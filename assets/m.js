@@ -469,6 +469,9 @@
     if (mvv && window.MediaViewer) { const c = mvv.closest('article.post'); if (c) { MediaViewer.open({ kind: 'video', post_id: c.dataset.id }, MV_OPTS); return; } }
     const z = e.target.closest('[data-zoom]');
     if (z) { const c = z.closest('article.post'); if (c && window.MediaViewer) { MediaViewer.open({ kind: 'photo', post_id: c.dataset.id, url: z.dataset.zoom }, MV_OPTS); return; } zoom(z.dataset.zoom); return; }
+    /* Appui sur le corps d'une actualité (hors liens, boutons, photo, vidéo, auteur) : ouvre le visionneur à balayage (2026-10-09). */
+    const ac = e.target.closest(AV_SEL);
+    if (ac && !ac.closest('#avz') && !e.target.closest('a, button, input, textarea, video, [data-prof], [data-zoom], .mv-wrap, .acts')) { avOuvrir(ac); return; }
     const a = e.target.closest('.post [data-act]'); if (!a) return;
     const card = a.closest('.post'), id = card.dataset.id, post = S.fil.posts.find(p => String(p.id) === String(id)) || postCache[id];
     if (a.dataset.act === 'like') {
@@ -996,6 +999,161 @@
     }).catch(() => { });
     viewFil();
   }
+  /* ---------- Actualités de l'accueil : défilement par lots + visionneur à balayage (2026-10-09, demande explicite) ----------
+     Avant : 5 actualités maximum, les autres invisibles. Maintenant : par lots de 5 au fil du défilement, jusqu'à ACTU_MAX sur l'accueil (au-delà, un bouton mène à
+     « Toutes les actualités », sans limite) — sinon le défilement infini ferait disparaître les sections situées plus bas (initiatives, boutiques…).
+     Couleurs inchangées : compte-rendu = bleu scintillant, toute autre actualité = vert scintillant. */
+  const ACTU_PAS = 5, ACTU_MAX = 20;
+  const ACTU = { liste: [], affiche: 0, page: 0, pages: 1, busy: false, obs: null };
+  const tsDe = x => { const t = Date.parse(x); return isNaN(t) ? 0 : t; };
+  async function actusPosts() {
+    ACTU.page++;
+    const r = await api('/api/fil?mode=tous&page=' + ACTU.page + '&limit=10').catch(() => null);
+    if (!r) { ACTU.page--; ACTU.pages = ACTU.page; return []; }
+    ACTU.pages = r.pages || 1;
+    const l = (r.posts || []).filter(p => p.type !== 'compte_rendu' && !p.compte_rendu && postHtml(p));
+    l.forEach(p => { postCache[p.id] = p; });
+    return l;
+  }
+  function actusAfficher(n) {
+    const el = $('#actu-liste'); if (!el) return 0;
+    const lot = ACTU.liste.slice(ACTU.affiche, ACTU.affiche + n);
+    if (!lot.length) return 0;
+    ACTU.affiche += lot.length;
+    el.insertAdjacentHTML('beforeend', lot.map(x => x.h).join(''));
+    $$('[data-clamp]', el).forEach(c => { if (c.scrollHeight > c.clientHeight + 2) { const b = c.parentNode.querySelector('[data-more]'); if (b) b.hidden = false; } });
+    return lot.length;
+  }
+  function actusFinal() {
+    const f = $('#actu-fin'); if (!f) return;
+    const reste = ACTU.affiche < ACTU.liste.length || ACTU.page < ACTU.pages;
+    if (reste && ACTU.affiche >= ACTU_MAX) f.innerHTML = '<a class="btn out block" href="#/actualites" style="margin-top:6px">Voir toutes les actualités</a>';
+    else if (!reste) f.innerHTML = '<p class="small muted" style="text-align:center;margin:6px 0 0">Vous avez vu toutes les actualités.</p>';
+    else { f.innerHTML = ''; return; }
+    if (ACTU.obs) { ACTU.obs.disconnect(); ACTU.obs = null; }
+  }
+  /* force = true : appelé par le visionneur (l'utilisateur parcourt volontairement) — ignore le plafond de l'accueil. */
+  async function actusPlus(force) {
+    if (ACTU.busy) return 0;
+    ACTU.busy = true;
+    try {
+      if (!force && ACTU.affiche >= ACTU_MAX) { actusFinal(); return 0; }
+      if (ACTU.liste.length - ACTU.affiche < ACTU_PAS && ACTU.page < ACTU.pages) {
+        const posts = await actusPosts();
+        ACTU.liste = ACTU.liste.concat(posts.map(p => ({ h: actuVerte(postHtml(p)) })));
+      }
+      const n = actusAfficher(ACTU_PAS);
+      actusFinal();
+      return n;
+    } finally { ACTU.busy = false; }
+  }
+  async function actusInit() {
+    if (ACTU.obs) { ACTU.obs.disconnect(); ACTU.obs = null; }
+    Object.assign(ACTU, { liste: [], affiche: 0, page: 0, pages: 1, busy: false });
+    const [cr, posts] = await Promise.all([api('/api/comptes-rendus/publies?limit=30').catch(() => ({ comptes_rendus: [] })), actusPosts()]);
+    const crs = (cr.comptes_rendus || []).slice().sort((a, b) => tsDe(b.publie_le) - tsDe(a.publie_le));
+    /* Les 3 derniers comptes-rendus en tête (demande du 2026-10-08), puis le reste mêlé par date. */
+    const suite = crs.slice(3).map(c => ({ ts: tsDe(c.publie_le), h: crCarte(c) }))
+      .concat(posts.map(p => ({ ts: tsDe(p.created_at), h: actuVerte(postHtml(p)) }))).sort((a, b) => b.ts - a.ts);
+    ACTU.liste = crs.slice(0, 3).map(c => ({ h: crCarte(c) })).concat(suite);
+    if (!ACTU.liste.length) return;
+    homeBlock('home-actus', 'Actualités', '<div id="actu-liste"></div><div id="actu-fin" style="min-height:2px"></div>', '<a href="#/actualites" class="sec-more">Toutes les actualités ›</a>', 'Les derniers comptes-rendus et publications. Touchez une actualité pour parcourir les suivantes.');
+    actusAfficher(ACTU_PAS);
+    const f = $('#actu-fin');
+    if (!f) return;
+    if (!('IntersectionObserver' in window)) { while (ACTU.affiche < ACTU_MAX && await actusPlus(false)); return; }
+    ACTU.obs = new IntersectionObserver(async es => {
+      if (!es.some(e => e.isIntersecting)) return;
+      await actusPlus(false);
+      /* Un lot ajouté peut laisser la sentinelle encore visible : sans événement de franchissement, il faut la ré-observer. */
+      if (ACTU.obs) { ACTU.obs.unobserve(f); ACTU.obs.observe(f); }
+    }, { rootMargin: '500px 0px' });
+    ACTU.obs.observe(f);
+  }
+  /* Visionneur : un appui sur une actualité l'ouvre en plein écran ; on balaie à gauche/droite (ou flèches ‹ ›) pour passer aux autres. Les diapositives sont
+     des copies des cartes déjà affichées (même rendu, mêmes couleurs, mêmes boutons J'aime/Commenter/Partager). Retour du téléphone = fermeture. */
+  let AV = null;
+  const AV_SEL = 'article.crn, article.post.actu';
+  function avOuvrir(card) {
+    const root = card.closest('#home-actus') || card.closest('#pane-body') || card.parentElement;
+    const cartes = $$(AV_SEL, root), i = cartes.indexOf(card);
+    if (i < 0 || AV) return;
+    const ov = document.createElement('div');
+    ov.id = 'avz'; ov.className = 'avz'; ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true'); ov.setAttribute('aria-label', 'Actualités');
+    ov.innerHTML = '<div class="avz-top"><button type="button" class="avz-x" aria-label="Fermer">✕</button><span class="avz-n" aria-live="polite"></span><span class="avz-aide">Balayez ↔</span></div>'
+      + '<div class="avz-track"></div><button type="button" class="avz-fl avz-prev" aria-label="Actualité précédente">‹</button><button type="button" class="avz-fl avz-next" aria-label="Actualité suivante">›</button>';
+    document.body.appendChild(ov);
+    const dansAccueil = root.id === 'home-actus';
+    AV = {
+      el: ov, track: $('.avz-track', ov), root, n: 0, i, fini: false, charge: false, histo: false, apres: null,
+      retour: document.activeElement, overflow: document.documentElement.style.overflow,
+      plus: dansAccueil ? () => actusPlus(true) : async () => {
+        const b = $('#fil-next'); if (!b || b.disabled) return 0;
+        const avant = $$(AV_SEL, root).length; b.click();
+        for (let k = 0; k < 40; k++) { await new Promise(r => setTimeout(r, 150)); if ($$(AV_SEL, root).length > avant) return 1; }
+        return 0;
+      },
+    };
+    AV.fini = dansAccueil ? (ACTU.affiche >= ACTU.liste.length && ACTU.page >= ACTU.pages) : !$('#fil-next');
+    document.documentElement.style.overflow = 'hidden';
+    avAjouter();
+    AV.track.scrollLeft = i * AV.track.clientWidth;
+    avMaj();
+    try { history.pushState({ av: 1 }, ''); AV.histo = true; } catch (e) { /* rien */ }
+    document.addEventListener('keydown', avTouches, true); window.addEventListener('popstate', avPop); window.addEventListener('hashchange', avHash);
+    let raf = 0; AV.track.addEventListener('scroll', () => { if (raf) return; raf = requestAnimationFrame(() => { raf = 0; avMaj(); }); }, { passive: true });
+    ov.addEventListener('click', e => {
+      if (e.target.closest('.avz-x')) return avFermer();
+      if (e.target.closest('.avz-prev')) return avAller(-1);
+      if (e.target.closest('.avz-next')) return avAller(1);
+      const a = e.target.closest('a[href^="#/"]');
+      if (a) { e.preventDefault(); const h = a.getAttribute('href'); avFermer(() => { location.hash = h; }); }
+    });
+    ov.tabIndex = -1; ov.focus({ preventScroll: true });
+  }
+  function avAjouter() {
+    const cartes = $$(AV_SEL, AV.root);
+    for (let k = AV.n; k < cartes.length; k++) {
+      const s = document.createElement('div'); s.className = 'avz-slide'; s.innerHTML = cartes[k].outerHTML; AV.track.appendChild(s);
+    }
+    const ajoute = cartes.length - AV.n; AV.n = cartes.length; return ajoute;
+  }
+  function avMaj() {
+    const v = AV; if (!v) return;
+    const w = v.track.clientWidth || 1;
+    v.i = Math.max(0, Math.min(v.n - 1, Math.round(v.track.scrollLeft / w)));
+    const lab = $('.avz-n', v.el); if (lab) lab.textContent = (v.i + 1) + ' / ' + v.n + (v.fini ? '' : '+');
+    if (!v.fini && !v.charge && v.i >= v.n - 2) {
+      v.charge = true;
+      v.plus().then(n => { if (AV !== v) return; if (!n || !avAjouter()) v.fini = true; avMaj(); }).catch(() => { v.fini = true; }).finally(() => { v.charge = false; });
+    }
+  }
+  function avAller(d) {
+    const v = AV; if (!v) return;
+    const cible = Math.max(0, Math.min(v.n - 1, v.i + d));
+    const reduit = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    v.track.scrollTo({ left: cible * v.track.clientWidth, behavior: reduit ? 'auto' : 'smooth' });
+  }
+  function avTouches(e) {
+    if (!AV || e.target.closest('input, textarea')) return;
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); avFermer(); }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); avAller(1); }
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); avAller(-1); }
+  }
+  function avFermer(apres) {
+    const v = AV; if (!v) return;
+    if (v.histo) { v.apres = apres || null; try { history.back(); return; } catch (e) { /* repli ci-dessous */ } }
+    avNettoyer(apres);
+  }
+  function avNettoyer(apres) {
+    const v = AV; if (!v) return; AV = null;
+    document.removeEventListener('keydown', avTouches, true); window.removeEventListener('popstate', avPop); window.removeEventListener('hashchange', avHash);
+    v.el.remove(); document.documentElement.style.overflow = v.overflow || '';
+    if (v.retour && v.retour.isConnected && v.retour.focus) { try { v.retour.focus({ preventScroll: true }); } catch (e) { /* rien */ } }
+    if (apres) apres();
+  }
+  function avPop() { if (AV) { AV.histo = false; avNettoyer(AV.apres); } }
+  function avHash() { if (AV) avNettoyer(); }
   /* ---------- Compte-rendu : bloc d'action, barre « Synthèse / Agir » et synthèse (2026-10-07) ----------
      Mêmes règles que compte-rendu.html : actions choisies par l'auteur (liens http/https) + « Laisser un message à l'organisateur » toujours
      proposé en dernier ; la synthèse est composée automatiquement de ce que l'auteur a déjà saisi. */
@@ -1354,18 +1512,7 @@
   }
   function loadHome() {
     const safe = fn => fn().catch(() => { });
-    safe(async () => {
-      /* Actualités (2026-10-08, demande explicite) : les comptes-rendus publiés passent en premier, en cartouches d'événement avec aperçu ; les
-         publications du fil complètent. Sans compte-rendu ni publication, le bloc n'apparaît pas. */
-      const [fr, cr] = await Promise.all([api('/api/fil?mode=tous&page=1&limit=10').catch(() => ({ posts: [] })), api('/api/comptes-rendus/publies?limit=10').catch(() => ({ comptes_rendus: [] }))]);
-      const crs = (cr.comptes_rendus || []).slice().sort((a, b) => String(b.publie_le || '').localeCompare(String(a.publie_le || ''))).slice(0, 3);
-      const autres = (fr.posts || []).filter(p => p.type !== 'compte_rendu' && !p.compte_rendu && postHtml(p));
-      const reste = autres.slice(0, Math.max(0, 5 - crs.length));
-      reste.forEach(p => { postCache[p.id] = p; });
-      if (!crs.length && !reste.length) return;
-      homeBlock('home-actus', 'Actualités', crs.map(crCarte).join('') + reste.map(p => actuVerte(postHtml(p))).join(''), '<a href="#/actualites" class="sec-more">Toutes les actualités ›</a>', 'Les derniers comptes-rendus et publications de la communauté.');
-      $$('#home-actus [data-clamp]').forEach(c => { if (c.scrollHeight > c.clientHeight + 2) { const b = c.parentNode.querySelector('[data-more]'); if (b) b.hidden = false; } });
-    });
+    safe(actusInit);
     safe(async () => {
       const a = ((await api('/api/annonces-officielles/actives')).annonces || [])[0]; if (!a) return;
       $('#home-annonce').innerHTML = `<div class="card">${a.image_url ? mediaBlock(a.image_url, { alt: a.titre }) : ''}<div class="pad"><span class="badge o">Annonce officielle</span><h3 style="margin:8px 0 4px;font-size:18px">${esc(a.titre)}</h3>${a.accroche ? `<p class="muted" style="margin:0 0 8px">${esc(strip(a.accroche))}</p>` : ''}${a.evenement_id ? `<a class="btn sm" href="#/evenement/${a.evenement_id}">Voir l’événement</a>` : ''}</div></div>`;

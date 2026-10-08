@@ -456,3 +456,21 @@ button.li{background:none;font:inherit;color:inherit}
 .conv-more:active{background:rgba(13,43,78,.08)}
 .conv-more svg{width:20px;height:20px;fill:currentColor;stroke:none}
 .convw .unr{margin-right:4px}
+/* Visionneur d'actualités à balayage — 2026-10-09 (au-dessus de #pane/#tabs, sous #sheet des commentaires et #toast) */
+.avz{position:fixed;inset:0;z-index:65;background:rgba(8,16,32,.985);display:flex;flex-direction:column}
+.avz:focus{outline:none}
+.avz-top{flex:none;display:flex;align-items:center;gap:10px;padding:calc(env(safe-area-inset-top) + 8px) 12px 8px;color:#fff}
+.avz-x{width:40px;height:40px;border-radius:50%;border:0;background:rgba(255,255,255,.16);color:#fff;font-size:18px;cursor:pointer}
+.avz-n{font-weight:800;font-size:14px}
+.avz-aide{margin-left:auto;font-size:12px;opacity:.75}
+.avz-track{flex:1;min-height:0;display:flex;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;scrollbar-width:none}
+.avz-track::-webkit-scrollbar{display:none}
+.avz-slide{flex:0 0 100%;scroll-snap-align:center;scroll-snap-stop:always;overflow-y:auto;overscroll-behavior:contain;padding:4px 12px calc(env(safe-area-inset-bottom) + 24px);box-sizing:border-box}
+.avz-slide>.card{max-width:560px;margin:0 auto}
+.avz .post .clamp{display:block;-webkit-line-clamp:unset;overflow:visible}
+.avz [data-more]{display:none!important}
+.avz-fl{display:none;position:absolute;top:50%;transform:translateY(-50%);width:44px;height:44px;border-radius:50%;border:0;background:rgba(255,255,255,.18);color:#fff;font-size:26px;cursor:pointer;place-items:center}
+.avz-prev{left:8px}
+.avz-next{right:8px}
+@media (hover:hover) and (pointer:fine){.avz-fl{display:grid}}
+#home-actus .card.post,#home-actus .card.crn{cursor:pointer}
