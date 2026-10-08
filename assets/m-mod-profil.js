@@ -97,7 +97,7 @@
   function hero(o) {
     const own = S.me && o.uid && Number(S.me.id) === Number(o.uid);
     const act = own
-      ? '<p class="small muted" style="margin:0">Voici comment les autres vous voient.</p>'
+      ? `${o.kind !== 'collectivite' ? `<a class="btn sm navy block" style="margin-bottom:6px" href="profil-app.html">✏️ Modifier mon profil</a>` : ''}<p class="small muted" style="margin:0">Voici comment les autres vous voient.</p>`
       : `${o.adherer ? `<button type="button" class="btn sm navy block" style="margin-bottom:6px" data-adh="${o.fid}" data-nom="${esc(o.nom)}">${ic('people', 's')} Adhérer à cette structure</button>` : ''}${o.rejoindre ? `<div class="pf-act" style="margin-bottom:6px"><button type="button" class="btn sm out" data-rejoindre="benevole" data-fid="${o.fid}" data-nom="${esc(o.nom)}">🙋 Devenir bénévole</button><button type="button" class="btn sm out" data-rejoindre="partenaire" data-fid="${o.fid}" data-nom="${esc(o.nom)}">🤝 Devenir partenaire</button></div>` : ''}<div class="pf-act">${o.uid ? `<button type="button" class="btn sm" data-sup="${o.uid}">${ic('heart', 's')} Soutenir</button><button type="button" class="btn sm out" data-write="${o.uid}">${ic('chat', 's')} Contacter</button>` : ''}${o.fid ? `<button type="button" class="btn sm out" data-follow="${o.fid}" data-kind="${esc(o.kind)}" data-on="0">${ic('bell', 's')} S’abonner</button>` : ''}</div>`;
     if (o.uid) { S.annNames = S.annNames || {}; S.annNames[o.uid] = o.nom; }
     return `<div class="pf-hero"><div class="pf-banner">${o.banner ? `<img src="${attrUrl(o.banner)}" alt="" onerror="this.remove()">` : ''}</div>

@@ -1920,7 +1920,7 @@ function render() {
      n'affiche rien si absent (voir assets/don-banner.js). Mode floating (bouton fixe bas-droite,
      indépendant de la structure de la page) plutôt qu'inline : posé avant la branche
      utilisateur/organisme ci-dessous pour s'appliquer aux deux sans dépendre de leur DOM. */
-  if (window.DonBanner) DonBanner.render(profil.id, { mode: 'floating' });
+  if (!isOwn && window.DonBanner) DonBanner.render(profil.id, { mode: 'floating' });
 
   // Carte Diaspo'Actif : remplace le profil public pour le rôle utilisateur uniquement
   // (2026-07-27). Les autres rôles gardent la vue hi-fi existante ci-dessous.
