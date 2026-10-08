@@ -1928,7 +1928,34 @@ function render() {
   // Carte Diaspo'Actif : remplace le profil public pour le rôle utilisateur uniquement
   // (2026-07-27). Les autres rôles gardent la vue hi-fi existante ci-dessous.
   if (profil.role === 'utilisateur' && window.CarteDiaspoActif) {
-    CarteDiaspoActif.render(document.getElementById('pvz-visitor'), profil, { isOwner: isOwn, isAdmin: CU && CU.role === 'administrateur', cu: CU });
+    const _cdaConteneur = document.getElementById('pvz-visitor');
+    const _cdaOpts = { isOwner: isOwn, isAdmin: CU && CU.role === 'administrateur', cu: CU };
+    CarteDiaspoActif.render(_cdaConteneur, profil, _cdaOpts);
+    /* Arrivée depuis l'affiche « Remplissez votre profil public » : ouvre directement le bon formulaire. */
+    const _completer = new URLSearchParams(location.search).get('completer');
+    if (isOwn && ['residence', 'origine', 'domaine'].includes(_completer)) {
+      history.replaceState(null, '', location.pathname + location.hash);
+      setTimeout(() => CarteDiaspoActif.completer(_cdaConteneur, profil, _cdaOpts, _completer), 500);
+    }
+    /* Arrivée depuis la modale « Profil incomplet » qui bloque une action d'affiliation
+       (2026-10-08, demande explicite) — ?completer=champ&champ=<cle>&label=<libellé>, piloté par
+       les clés du système de complétude (server/completude.js). 'bio'/'competences' ont un
+       formulaire dédié sur cette carte (CarteDiaspoActif.completer, étendu ci-dessus) ; les autres
+       clés de ce rôle n'en ont aucun aujourd'hui sur cette carte — on ramène alors la carte en vue
+       et on nomme le champ manquant plutôt que d'appeler une fonction inexistante. */
+    const _champParams = new URLSearchParams(location.search);
+    if (isOwn && _champParams.get('completer') === 'champ') {
+      history.replaceState(null, '', location.pathname + location.hash);
+      const _cle = _champParams.get('champ'), _label = _champParams.get('label') || '';
+      setTimeout(() => {
+        if (['bio', 'competences'].includes(_cle)) {
+          CarteDiaspoActif.completer(_cdaConteneur, profil, _cdaOpts, _cle);
+        } else {
+          _cdaConteneur.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          if (typeof showToast === 'function' && _label) showToast(`📝 À compléter : ${_label}`, 'info', 5000);
+        }
+      }, 500);
+    }
     return;
   }
   renderVisitorProfile();
@@ -1947,6 +1974,12 @@ function render() {
      (?completer=origine) : ouvre directement la fenêtre d'édition plutôt que de laisser
      le membre chercher où cliquer. Sans ce déclencheur, le lien de la relance déposait
      simplement sur le profil, sans rien montrer de plus qu'une visite ordinaire. */
+  /* Affiche « Remplissez votre profil public » pour une initiative : le domaine d'activité se saisit ici. */
+  if (isOwn && new URLSearchParams(location.search).get('completer') === 'domaine' && typeof editDomaineActiviteInit === 'function') {
+    history.replaceState(null, '', location.pathname + location.hash);
+    setTimeout(() => editDomaineActiviteInit(), 600);
+  }
+
   if (isOwn && new URLSearchParams(location.search).get('completer') === 'origine') {
     history.replaceState(null, '', location.pathname + location.hash);
     setTimeout(() => {
@@ -2440,6 +2473,7 @@ function editDomaineActiviteInit() {
       Object.assign(profil, r.profil);
       ov.remove();
       renderVisitorProfile();
+      if (window.relanceProfilApresSauvegarde) window.relanceProfilApresSauvegarde();
     } catch (e) {
       err.textContent = e.message || 'Erreur.';
       err.style.display = 'block';

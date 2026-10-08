@@ -373,6 +373,8 @@
       try {
         await onSave(ov);
         ov.remove();
+        /* Parcours « relance profil public » (assets/app.js) : la liste des points restants revient. */
+        if (window.relanceProfilApresSauvegarde) window.relanceProfilApresSauvegarde();
       } catch (e) {
         err.textContent = e.message || 'Erreur.';
         err.style.display = 'block';
@@ -513,5 +515,21 @@
     }
   }
 
-  window.CarteDiaspoActif = { render };
+  /* Ouvre directement le formulaire demandé par l'affiche « Remplissez votre profil public »
+     (?completer=residence|origine|domaine), étendu (2026-10-08, blocage des affiliations tant que
+     le profil n'est pas assez rempli) aux clés du système de complétude (server/completude.js,
+     CRITERES.utilisateur) qui ont un éditeur sur cette carte : 'bio' et 'competences'. Les autres
+     clés de ce même système (titre_pro, experiences, centres_interet, publics_json, besoins_json,
+     realisations_json, services_perso, reseaux_json, annee_debut) n'ont aujourd'hui aucun
+     formulaire sur cette carte — appelant retombe alors sur un simple défilement + le libellé du
+     champ manquant plutôt que d'appeler une fonction inexistante (voir profil-app.html, le bloc
+     ?completer=champ qui pilote cet appel). */
+  function completer(container, profil, opts, cle) {
+    if (cle === 'domaine') editDomaineActivite(container, profil, opts);
+    else if (cle === 'bio') editBio(container, profil, opts);
+    else if (cle === 'competences') editDomaine(container, profil, opts);
+    else editInfos(container, profil, opts);
+  }
+
+  window.CarteDiaspoActif = { render, completer };
 })();

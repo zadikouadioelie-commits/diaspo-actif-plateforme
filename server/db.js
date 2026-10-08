@@ -5743,6 +5743,22 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_admin_acces_demandes_admin ON admin_acces_demandes(admin_id, statut);
   CREATE INDEX IF NOT EXISTS idx_admin_acces_demandes_cible ON admin_acces_demandes(cible_id, statut);
+
+  /* Relance « remplissez votre profil public » (2026-10-08, demande explicite : bouton rouge
+     « Relance » de l'annuaire, réservé à l'administrateur et aux administrateurs juniors
+     autorisés). Une ligne = une affiche envoyée à un compte. 'active' tant que la personne ne
+     l'a ni terminée (plus rien ne manque) ni fermée (« Plus tard »). */
+  CREATE TABLE IF NOT EXISTS relances_profil (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id         INTEGER NOT NULL,
+    envoye_par      INTEGER NOT NULL,
+    envoye_par_nom  TEXT,
+    statut          TEXT NOT NULL DEFAULT 'active' CHECK(statut IN ('active','terminee','fermee')),
+    created_at      TEXT DEFAULT (datetime('now')),
+    repondu_at      TEXT,
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_relances_profil_user ON relances_profil(user_id, statut);
 `);
 
 /* ═══════════════════════════════════════════════════════════════════════════

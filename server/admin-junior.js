@@ -85,6 +85,9 @@ const CATALOGUE_ADMIN_JUNIOR = [
   { id: 'avis.consulter', module: 'avis', numero: 1, description: "Consulter tous les avis, réponses et signalements", capability: 'avis.consulter' },
   { id: 'avis.moderer',   module: 'avis', numero: 2, description: "Masquer/supprimer un avis ou une réponse, traiter les signalements", capability: 'avis.moderer' },
 
+  // ── Module: relances_profil (2026-10-08, bouton rouge « Relance » de l'annuaire) ──
+  { id: 'relances_profil.envoyer', module: 'relances_profil', numero: 1, description: "Envoyer une relance « Merci de remplir votre profil public » depuis l'annuaire (bouton rouge)", capability: 'relances_profil.envoyer' },
+
   /* Pas d'entrée "liens_adherents" ici (2026-09-24, demande explicite) : ce module accorde une
      vraie valeur (12 mois de Premium par lien) et reste réservé au seul compte administrateur
      officiel (contact@diaspoactif.com), jamais délégable à un administrateur junior — voir

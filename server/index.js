@@ -2603,6 +2603,117 @@ route("POST", "/api/auth/connexions/:id/deconnecter", async (req, res, params) =
     estCourante ? { "Set-Cookie": ["sid=; HttpOnly; Path=/; Max-Age=0", "auth=; HttpOnly; Path=/; Max-Age=0"] } : undefined);
 });
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   RELANCE « REMPLISSEZ VOTRE PROFIL PUBLIC » (2026-10-08, demande explicite)
+   Bouton rouge « Relance » sur les cartes de l'annuaire (visible de l'administrateur et des
+   administrateurs juniors autorisés, et seulement quand le profil est incomplet). Il dépose
+   une affiche au milieu de l'écran du compte concerné + une notification.
+   L'affiche LISTE chaque information manquante ; chaque ligne mène directement au bon
+   formulaire. La liste est recalculée à chaque affichage depuis la base : elle diminue au fur
+   et à mesure que la personne remplit, et la relance se termine toute seule à la fin.
+   Garde-fous : droit vérifié côté serveur (jamais seulement masqué à l'écran), une seule
+   relance active par compte, et au plus une relance tous les 7 jours.
+   Points vérifiés = ce que la carte de l'annuaire affiche et que la personne peut saisir sur
+   son profil public. La nationalité n'en fait PAS partie : elle se modifie dans Confidentialité
+   et une modification y retire un badge d'identité déjà vérifié.
+   ═══════════════════════════════════════════════════════════════════════════ */
+const RELANCE_PROFIL_DELAI_JOURS = 7;
+
+/* Liste des informations manquantes du compte, avec le lien qui ouvre le bon formulaire.
+   Chaque type de compte est lu sur SES propres champs (même règle que la carte de l'annuaire
+   et que le bandeau d'origine) : une initiative sur sa fiche initiative, jamais sur son
+   responsable — sauf l'origine, où la carte retient aussi celle du propriétaire. */
+async function manquantsProfilPublic(u) {
+  const out = [];
+  if (u.role === 'initiative') {
+    const ini = await db.prepare("SELECT id, slug, origine1, origine2, pays_origine, domaine_principal FROM initiatives WHERE owner_user_id=? ORDER BY created_at DESC LIMIT 1").get(u.id);
+    if (!ini) return out;
+    const prop = await db.prepare("SELECT origine1, origine2 FROM users WHERE id=?").get(u.id);
+    const ref = ini.slug || ini.id;
+    if (!(ini.origine1 || ini.origine2 || ini.pays_origine || prop?.origine1 || prop?.origine2)) {
+      out.push({ cle: 'origine', libelle: "Votre pays d'origine", lien: `initiative.html?id=${encodeURIComponent(ref)}&completer=origines` });
+    }
+    if (!ini.domaine_principal) out.push({ cle: 'domaine', libelle: "Votre domaine d'activité", lien: 'profil.html?completer=domaine' });
+    return out;
+  }
+  if (['collectivite', 'institutionnel', 'officiel'].includes(u.role)) {
+    const r = await db.prepare("SELECT pays_origine_institution, origine1 FROM users WHERE id=?").get(u.id);
+    if (!(r?.pays_origine_institution || r?.origine1)) out.push({ cle: 'origine', libelle: "Votre pays d'origine", lien: 'confidentialite.html?completer=origine' });
+    return out;
+  }
+  const r = await db.prepare("SELECT ville, pays, origine1, origine2, domaine_principal FROM users WHERE id=?").get(u.id);
+  if (!(r?.ville && r?.pays)) out.push({ cle: 'residence', libelle: "Votre ville et votre pays de résidence", lien: 'profil.html?completer=residence' });
+  if (!(r?.origine1 || r?.origine2)) out.push({ cle: 'origine', libelle: "Votre pays d'origine", lien: 'profil.html?completer=origine' });
+  if (!r?.domaine_principal) out.push({ cle: 'domaine', libelle: "Votre domaine d'activité", lien: 'profil.html?completer=domaine' });
+  return out;
+}
+
+route("GET", "/api/admin/relances-profil/droit", async (req, res) => {
+  const me = await getCurrentUser(req);
+  const autorise = !!me && await AdminJunior.hasAdminPermission(me, 'relances_profil.envoyer', db);
+  sendJSON(res, 200, { autorise });
+});
+
+route("POST", "/api/admin/relances-profil", async (req, res, params, body) => {
+  const me = await getCurrentUser(req);
+  if (!me || !(await AdminJunior.hasAdminPermission(me, 'relances_profil.envoyer', db))) return sendJSON(res, 403, { error: "Réservé aux administrateurs autorisés." });
+  const cibleId = Number(body && body.user_id);
+  if (!cibleId) return sendJSON(res, 400, { error: "Compte à relancer manquant." });
+  if (cibleId === Number(me.id)) return sendJSON(res, 400, { error: "Vous ne pouvez pas vous relancer vous-même." });
+  const cible = await db.prepare("SELECT id, role, nom, prenom FROM users WHERE id=?").get(cibleId);
+  if (!cible) return sendJSON(res, 404, { error: "Compte introuvable." });
+  if (['administrateur', 'administrateur_junior'].includes(cible.role)) return sendJSON(res, 400, { error: "Ce compte n'est pas concerné." });
+
+  const manquants = await manquantsProfilPublic(cible);
+  if (!manquants.length) return sendJSON(res, 409, { error: "Le profil public de ce compte est déjà complet : rien à relancer.", deja: true });
+
+  const derniere = await db.prepare("SELECT id, statut, created_at FROM relances_profil WHERE user_id=? ORDER BY id DESC LIMIT 1").get(cibleId);
+  if (derniere) {
+    if (derniere.statut === 'active') return sendJSON(res, 409, { error: "Une relance est déjà en attente de lecture par ce compte.", deja: true });
+    const brut = derniere.created_at;
+    const tms = brut instanceof Date ? brut.getTime() : new Date(String(brut).includes('T') ? String(brut) : String(brut).replace(' ', 'T') + 'Z').getTime();
+    const ageJours = (Date.now() - tms) / 86400000;
+    if (ageJours < RELANCE_PROFIL_DELAI_JOURS) {
+      const reste = Math.max(1, Math.ceil(RELANCE_PROFIL_DELAI_JOURS - ageJours));
+      return sendJSON(res, 409, { error: `Ce compte a déjà été relancé récemment. Nouvelle relance possible dans ${reste} jour${reste > 1 ? 's' : ''}.`, deja: true });
+    }
+  }
+
+  const nomEnvoyeur = `${me.prenom || ''} ${me.nom || ''}`.trim() || me.email;
+  const id = Number((await db.prepare("INSERT INTO relances_profil (user_id, envoye_par, envoye_par_nom) VALUES (?,?,?)").run(cibleId, me.id, nomEnvoyeur)).lastInsertRowid);
+  try {
+    await db.prepare("INSERT INTO notifications (user_id, type, titre, contenu, data_json) VALUES (?,?,?,?,?)").run(
+      cibleId, 'relance_profil', "Merci de remplir votre profil public",
+      `Il vous reste ${manquants.length} information${manquants.length > 1 ? 's' : ''} à renseigner : ${manquants.map(m => m.libelle.charAt(0).toLowerCase() + m.libelle.slice(1)).join(', ')}.`,
+      JSON.stringify({ relance_id: id, lien: manquants[0].lien })
+    );
+  } catch (e) { logError(e, "notification relance profil", req); }
+  await AdminJunior.journaliserActionSiJunior(db, me, 'relances_profil.envoyer', `Relance profil public → compte #${cibleId}`);
+  sendJSON(res, 201, { ok: true, id });
+});
+
+/* Côté destinataire : l'affiche en attente avec la liste À JOUR des points manquants. Quand
+   plus rien ne manque, la relance se termine ici (terminee:true, pour afficher le merci). */
+route("GET", "/api/relances-profil/active", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 200, { relance: null });
+  const r = await db.prepare("SELECT id FROM relances_profil WHERE user_id=? AND statut='active' ORDER BY id DESC LIMIT 1").get(user.id);
+  if (!r) return sendJSON(res, 200, { relance: null });
+  const manquants = await manquantsProfilPublic(user);
+  if (!manquants.length) {
+    await db.prepare("UPDATE relances_profil SET statut='terminee', repondu_at=datetime('now') WHERE id=? AND statut='active'").run(Number(r.id));
+    return sendJSON(res, 200, { relance: null, terminee: true });
+  }
+  sendJSON(res, 200, { relance: { id: Number(r.id), manquants } });
+});
+
+route("POST", "/api/relances-profil/:id/fermer", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  await db.prepare("UPDATE relances_profil SET statut='fermee', repondu_at=datetime('now') WHERE id=? AND user_id=? AND statut='active'").run(Number(params.id), user.id);
+  sendJSON(res, 200, { ok: true });
+});
+
 route("GET", "/api/auth/me", async (req, res) => {
   const user = await getCurrentUser(req);
   const pub = publicUser(user);

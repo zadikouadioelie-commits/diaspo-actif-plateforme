@@ -511,6 +511,7 @@ const NOTIF_ICONS = {
   nouveau_abonne: "👤",
   nouvelle_publication: "📰",
   evenement_promo: "🎯",
+  relance_profil: "💙",
   pub_commentaire: "💬",
   pub_like: "❤️",
   demande_contact: "📩",
@@ -845,6 +846,196 @@ function showEmailVerifBanner(user) {
   };
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   RELANCE « REMPLISSEZ VOTRE PROFIL PUBLIC » (2026-10-08, demande explicite)
+   1) Bouton rouge « Relance » sur les cartes de l'annuaire : visible seulement de
+      l'administrateur et des administrateurs juniors autorisés, et seulement pour un compte
+      dont le profil public est incomplet (mêmes critères que le serveur : manquantsProfilPublic).
+      Le droit réel est revérifié par le serveur à l'envoi : masquer le bouton ne protège rien.
+   2) Affiche au milieu de l'écran du compte relancé (bleu apaisant, léger scintillement) :
+      elle LISTE chaque information manquante ; chaque ligne mène directement au bon formulaire.
+      Après chaque enregistrement elle revient, la ligne remplie est cochée ✅, jusqu'au merci final.
+   ═══════════════════════════════════════════════════════════════════════════ */
+/* Lu AU CHARGEMENT du script, avant que la page ne nettoie son adresse (replaceState) : sur une
+   page ouverte par un clic de l'affiche, le formulaire demandé s'ouvre seul — l'affiche ne
+   doit pas se superposer à lui. */
+const RP_ARRIVEE_COMPLETER = /[?&]completer=/.test(location.search);
+
+function relanceProfilIncomplet(o, type) {
+  const origine = !!daOrigineDeclaree(o);
+  if (type === 'initiative') {
+    /* Seul le domaine d'activité NOUVEAU compte : l'ancien champ « domaine » n'est pas affiché
+       sur la carte, la personne ne le voit donc pas comme rempli. */
+    const dom = (typeof domaineActiviteInfo === 'function') ? domaineActiviteInfo(o.domaine_principal) : o.domaine_principal;
+    return !origine || !dom;
+  }
+  if (type === 'organisme') return !origine;
+  const dom = (typeof domaineActiviteInfo === 'function') ? domaineActiviteInfo(o.domaine_principal) : o.domaine_principal;
+  return !(o.ville && o.pays) || !origine || !dom;
+}
+
+let _relanceDroitPromesse = null;
+function relanceProfilChargerDroit() {
+  if (!_relanceDroitPromesse) {
+    _relanceDroitPromesse = api('GET', '/admin/relances-profil/droit')
+      .then(r => {
+        window.__relanceDroit = !!(r && r.autorise);
+        if (window.__relanceDroit) document.querySelectorAll('.relance-profil-btn[data-relance-jr="1"]').forEach(b => { b.style.display = ''; });
+      })
+      .catch(() => { window.__relanceDroit = false; });
+  }
+  return _relanceDroitPromesse;
+}
+
+function relanceProfilBoutonHtml(cibleId, estMoi, incomplet) {
+  if (!incomplet || estMoi || !cibleId || typeof CURRENT_USER === 'undefined' || !CURRENT_USER) return '';
+  const role = CURRENT_USER.role;
+  if (role !== 'administrateur' && role !== 'administrateur_junior') return '';
+  const junior = role === 'administrateur_junior';
+  if (junior && window.__relanceDroit === undefined) relanceProfilChargerDroit();
+  if (junior && window.__relanceDroit === false) return '';
+  const cache = junior && !window.__relanceDroit;
+  return `<button type="button" class="ann-card-btn relance-profil-btn" data-relance-jr="${junior ? 1 : 0}"${cache ? ' style="display:none"' : ''} title="Envoie à cette personne une affiche listant ce qu'il lui reste à remplir sur son profil public" onclick="event.stopPropagation(); relanceProfilEnvoyer(${cibleId}, this)">📣 Relance</button>`;
+}
+
+window.relanceProfilEnvoyer = async function (cibleId, bouton) {
+  if (!confirm("Envoyer une relance à cette personne ? Une affiche lui listera ce qu'il lui reste à remplir sur son profil public.")) return;
+  const ancien = bouton ? bouton.innerHTML : '';
+  if (bouton) { bouton.disabled = true; bouton.innerHTML = '⏳ Envoi…'; }
+  try {
+    await api('POST', '/admin/relances-profil', { user_id: cibleId });
+    if (bouton) { bouton.innerHTML = '✅ Relance envoyée'; bouton.classList.add('relance-profil-envoyee'); }
+  } catch (e) {
+    if (bouton) {
+      if (e.data && e.data.deja) { bouton.innerHTML = '⏳ Déjà relancé'; bouton.classList.add('relance-profil-envoyee'); }
+      else { bouton.disabled = false; bouton.innerHTML = ancien; }
+    }
+    alert(e.message || "Erreur lors de l'envoi de la relance.");
+  }
+};
+
+function injectRelanceProfilStyles() {
+  if (document.getElementById('relance-profil-style')) return;
+  const st = document.createElement('style');
+  st.id = 'relance-profil-style';
+  st.textContent = `
+.relance-profil-btn{background:#dc2626 !important;color:#fff !important;border:1px solid #b91c1c !important;font-weight:700;}
+.relance-profil-btn:hover{background:#b91c1c !important;}
+.relance-profil-btn.relance-profil-envoyee{background:#fee2e2 !important;color:#991b1b !important;border-color:#fecaca !important;cursor:default;}
+.rp-overlay{position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(15,40,80,.45);animation:rp-fondu .35s ease-out;}
+.rp-carte{position:relative;overflow:hidden;width:min(560px,100%);max-height:92vh;overflow-y:auto;box-sizing:border-box;padding:30px 28px 22px;border-radius:20px;text-align:center;color:#0c2d5a;
+  background:linear-gradient(135deg,#dbeafe 0%,#bfdbfe 45%,#e0f2fe 100%);border:2px solid #93c5fd;
+  box-shadow:0 0 0 4px rgba(147,197,253,.35),0 18px 50px rgba(30,64,175,.35);animation:rp-pouls 3.2s ease-in-out infinite;}
+.rp-carte::before{content:"";position:absolute;top:0;left:-60%;width:40%;height:100%;pointer-events:none;
+  background:linear-gradient(100deg,transparent,rgba(255,255,255,.7),transparent);transform:skewX(-18deg);animation:rp-brillance 3.6s ease-in-out infinite;}
+.rp-icone{font-size:38px;line-height:1;margin-bottom:8px;}
+.rp-titre{margin:0 0 8px;font-size:22px;font-weight:800;color:#1e3a8a;line-height:1.25;}
+.rp-texte{margin:0 0 12px;font-size:15px;line-height:1.55;color:#1e3a5f;}
+.rp-ok{margin:0 0 12px;padding:8px 12px;border-radius:10px;background:#dcfce7;border:1px solid #86efac;color:#166534;font-weight:700;font-size:14px;}
+.rp-liste{list-style:none;margin:0 0 14px;padding:0;display:flex;flex-direction:column;gap:8px;text-align:left;position:relative;}
+.rp-ligne{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:12px;background:#fff;border:1.5px solid #93c5fd;color:#1e3a8a;font-weight:700;font-size:15px;text-decoration:none;box-shadow:0 2px 8px rgba(37,99,235,.12);}
+a.rp-ligne:hover,a.rp-ligne:focus-visible{background:#eff6ff;border-color:#2563eb;outline:none;}
+.rp-ligne .rp-fleche{margin-left:auto;color:#2563eb;font-size:18px;}
+.rp-ligne.rp-fait{background:#f0fdf4;border-color:#bbf7d0;color:#15803d;box-shadow:none;}
+.rp-ligne.rp-fait .rp-lib{text-decoration:line-through;opacity:.8;}
+.rp-signature{margin:8px 0 6px;font-size:13.5px;font-style:italic;color:#3b5b8c;}
+.rp-bouton{display:inline-block;margin-top:6px;padding:11px 24px;border:none;border-radius:999px;background:#2563eb;color:#fff;font-weight:800;font-size:15px;cursor:pointer;box-shadow:0 6px 16px rgba(37,99,235,.4);}
+.rp-bouton:hover{background:#1d4ed8;}
+.rp-plus-tard{display:block;margin:10px auto 0;background:none;border:none;color:#475f86;font-size:12.5px;text-decoration:underline;cursor:pointer;padding:6px;}
+@keyframes rp-fondu{from{opacity:0}to{opacity:1}}
+@keyframes rp-pouls{0%,100%{box-shadow:0 0 0 4px rgba(147,197,253,.35),0 18px 50px rgba(30,64,175,.35)}50%{box-shadow:0 0 0 9px rgba(147,197,253,.18),0 18px 56px rgba(37,99,235,.45)}}
+@keyframes rp-brillance{0%{left:-60%}55%,100%{left:130%}}
+@media (prefers-reduced-motion:reduce){.rp-carte,.rp-carte::before,.rp-overlay{animation:none}}`;
+  document.head.appendChild(st);
+}
+
+/* Mémoire de la liste déjà montrée (le temps de l'onglet) : c'est elle qui permet de cocher ✅
+   ce qui vient d'être rempli et de dire merci à la fin. Vidée à la clôture. */
+const RP_CLE_VUS = 'da_relance_profil_vus';
+function rpLireVus() { try { return JSON.parse(sessionStorage.getItem(RP_CLE_VUS) || '[]'); } catch (e) { return []; } }
+function rpEcrireVus(v) { try { if (v && v.length) sessionStorage.setItem(RP_CLE_VUS, JSON.stringify(v)); else sessionStorage.removeItem(RP_CLE_VUS); } catch (e) { /* stockage indisponible : l'affiche reste fonctionnelle */ } }
+
+function rpOuvrirOverlay(carteHtml) {
+  injectRelanceProfilStyles();
+  const ancien = document.getElementById('rp-overlay');
+  if (ancien) ancien.remove();
+  const ov = document.createElement('div');
+  ov.id = 'rp-overlay';
+  ov.className = 'rp-overlay';
+  ov.setAttribute('role', 'dialog');
+  ov.setAttribute('aria-modal', 'true');
+  ov.setAttribute('aria-labelledby', 'rp-titre');
+  ov.innerHTML = `<div class="rp-carte" id="rp-carte">${carteHtml}</div>`;
+  document.body.appendChild(ov);
+  return ov;
+}
+
+async function afficherRelanceProfil(user, opts) {
+  opts = opts || {};
+  if (!user) return;
+  if (/(^|\/)(login|inscription)\.html$/.test(location.pathname)) return;
+  if (!opts.apresSauvegarde && RP_ARRIVEE_COMPLETER) return;
+  if (!opts.apresSauvegarde && document.getElementById('rp-overlay')) return;
+  let r;
+  try { r = await api('GET', '/relances-profil/active'); } catch (e) { return; }
+  if (!r) return;
+  const vus = rpLireVus();
+
+  if (!r.relance) {
+    /* Plus rien ne manque : merci — uniquement si la personne était en plein parcours. */
+    if (r.terminee && vus.length) {
+      rpEcrireVus([]);
+      const ov = rpOuvrirOverlay(`
+        <div class="rp-icone" aria-hidden="true">💙</div>
+        <h2 class="rp-titre" id="rp-titre">Merci, votre profil public est complet !</h2>
+        <p class="rp-texte">Vous êtes maintenant mieux placé pour être trouvé et mis en relation sur la plateforme.</p>
+        <p class="rp-signature">L'équipe Diaspo'Actif</p>
+        <button type="button" class="rp-bouton" id="rp-fin">Fermer</button>`);
+      ov.querySelector('#rp-fin').addEventListener('click', () => ov.remove());
+    }
+    return;
+  }
+
+  const rel = r.relance;
+  const restants = rel.manquants || [];
+  /* Liste affichée = tout ce qui avait été montré + ce qui manque (dans l'ordre d'origine). */
+  const cles = new Set(restants.map(m => m.cle));
+  const ordre = [];
+  vus.forEach(v => { if (!ordre.find(o => o.cle === v.cle)) ordre.push({ cle: v.cle, libelle: v.libelle }); });
+  restants.forEach(m => { if (!ordre.find(o => o.cle === m.cle)) ordre.push({ cle: m.cle, libelle: m.libelle }); });
+  rpEcrireVus(ordre);
+  const faitsNouveaux = ordre.filter(o => !cles.has(o.cle));
+
+  const lignes = ordre.map(o => {
+    const m = restants.find(x => x.cle === o.cle);
+    return m
+      ? `<li><a class="rp-ligne" href="${m.lien}"><span aria-hidden="true">📝</span><span class="rp-lib">${esc2Rp(o.libelle)}</span><span class="rp-fleche" aria-hidden="true">›</span></a></li>`
+      : `<li><div class="rp-ligne rp-fait"><span aria-hidden="true">✅</span><span class="rp-lib">${esc2Rp(o.libelle)}</span></div></li>`;
+  }).join('');
+  const n = restants.length;
+  const ov = rpOuvrirOverlay(`
+    <div class="rp-icone" aria-hidden="true">💙</div>
+    <h2 class="rp-titre" id="rp-titre">Merci de remplir votre profil public</h2>
+    ${opts.apresSauvegarde && faitsNouveaux.length ? '<div class="rp-ok">✅ C’est enregistré, merci !</div>' : ''}
+    <p class="rp-texte">Ceci est important pour la mise en relation sur notre plateforme. ${n > 1 ? `Il vous reste <strong>${n} informations</strong> à renseigner : cliquez sur une ligne, vous arrivez directement au bon endroit.` : 'Il vous reste <strong>une information</strong> : cliquez dessus, vous arrivez directement au bon endroit.'}</p>
+    <ul class="rp-liste">${lignes}</ul>
+    <p class="rp-signature">L'équipe Diaspo'Actif</p>
+    <button type="button" class="rp-plus-tard" id="rp-fermer">Plus tard</button>`);
+  const fermer = () => { api('POST', `/relances-profil/${rel.id}/fermer`).catch(() => {}); rpEcrireVus([]); ov.remove(); };
+  ov.querySelector('#rp-fermer').addEventListener('click', fermer);
+  document.addEventListener('keydown', function esc(e) {
+    if (e.key === 'Escape' && document.getElementById('rp-overlay') === ov) { fermer(); document.removeEventListener('keydown', esc); }
+  });
+}
+function esc2Rp(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+/* Appelée après chaque enregistrement d'un formulaire du profil : si la personne est en plein
+   parcours « relance », la liste revient, mise à jour. Sans parcours en cours, ne fait rien. */
+window.relanceProfilApresSauvegarde = function () {
+  if (!rpLireVus().length || typeof CURRENT_USER === 'undefined' || !CURRENT_USER) return;
+  setTimeout(() => afficherRelanceProfil(CURRENT_USER, { apresSauvegarde: true }), 450);
+};
+
 /* ── Bandeau "Complétez votre origine" ──
    L'indicateur origine_manquante/origine_lien est calculé UNE SEULE FOIS côté serveur
    (GET /api/auth/me) : ce bandeau ne fait que le lire, pour ne pas réécrire une troisième
@@ -924,6 +1115,7 @@ function showOrigineBanner(user) {
    disparaître, ce qui donnait l'impression que sa correction n'avait servi à rien. À appeler
    juste après un enregistrement réussi d'origine, quel que soit le type de compte. */
 async function recheckOrigineBanner() {
+  if (window.relanceProfilApresSauvegarde) window.relanceProfilApresSauvegarde();
   try {
     const r = await api("GET", "/auth/me");
     if (!r.user || !r.user.origine_manquante) {
@@ -1638,6 +1830,7 @@ async function applyAuthState() {
     } catch (e) { /* silencieux */ }
     showEmailVerifBanner(user);
     showOrigineBanner(user);
+    afficherRelanceProfil(user);
     showPwaInstallBanner(user);
   } else {
     el.innerHTML = `
@@ -2199,6 +2392,7 @@ function renderInitiativeCard(it){
             : `<button type="button" class="ann-card-btn ann-card-btn-adherer" data-adherer-init="${it.id}" onclick="event.stopPropagation(); demanderAdhesion(${it.id}, this)">🤝 Adhérer à l'initiative</button>`
         ) : ''}
         ${(!isOwnInit && it.owner_user_id && window.Soutenir) ? Soutenir.buttonHtml(it.owner_user_id, { cls: 'ann-card-btn', nom: it.nom }) : ''}
+        ${relanceProfilBoutonHtml(it.owner_user_id, isOwnInit, relanceProfilIncomplet(it, 'initiative'))}
         ${adminAnnuaireBoutonsHtml(it.owner_user_id, isOwnInit)}
       </div>
     </div>
@@ -2527,6 +2721,7 @@ async function initAnnuaire(){
           <button type="button" class="ann-card-btn" title="Envoyer ce profil à quelqu'un : le lien s'ouvre sans compte" onclick="event.stopPropagation(); openShareUrlModal(location.origin + '/' + '${profilHref}', ${JSON.stringify(nom || '').replace(/"/g,'&quot;')})">↗ Partager</button>
           ${!isOwn && typeof CURRENT_USER !== 'undefined' && CURRENT_USER ? `<span data-relation-user="${u.id}" data-relation-classe="ann-card-btn"></span>` : ''}
           ${!isOwn && typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.role === 'initiative' ? `<span data-affiliation-user="${u.id}" data-affiliation-nom="${nom.replace(/"/g,'&quot;')}" data-affiliation-classe="ann-card-btn ann-card-btn-affilier"></span>` : ''}
+          ${relanceProfilBoutonHtml(u.id, isOwn, relanceProfilIncomplet(u, 'utilisateur'))}
           ${adminAnnuaireBoutonsHtml(u.id, isOwn)}
         </div>
       </div>
@@ -2561,6 +2756,7 @@ async function initAnnuaire(){
           <button type="button" class="ann-card-btn" title="Envoyer ce profil à quelqu'un : le lien s'ouvre sans compte" onclick="event.stopPropagation(); openShareUrlModal(location.origin + '/' + '${profilHref}', ${JSON.stringify(nomAffiche || '').replace(/"/g,'&quot;')})">↗ Partager</button>
           ${abonnerBtn}
           ${!isOwn && typeof CURRENT_USER !== 'undefined' && CURRENT_USER ? `<span data-relation-user="${o.id}" data-relation-classe="ann-card-btn"></span>` : ''}
+          ${relanceProfilBoutonHtml(o.id, isOwn, relanceProfilIncomplet(o, 'organisme'))}
           ${adminAnnuaireBoutonsHtml(o.id, isOwn)}
         </div>
       </div>

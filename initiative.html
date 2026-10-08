@@ -1090,7 +1090,7 @@ const THEME_VITRINE_LABELS = { bordeaux:'Bordeaux', ocean:'Ocean', emeraude:'Eme
      de laisser le propriétaire chercher le bon crayon parmi toute la page.
      Appel différé (setTimeout) car window.editSection n'est assigné que plus loin dans
      cette même fonction d'initialisation — l'appeler ici directement échouerait. */
-  if (isOwner && new URLSearchParams(location.search).get('completer') === 'origine') {
+  if (isOwner && ['origine', 'origines'].includes(new URLSearchParams(location.search).get('completer'))) {
     history.replaceState(null, '', location.pathname + location.hash);
     setTimeout(() => { if (typeof window.editSection === 'function') window.editSection('origines'); }, 300);
   }
