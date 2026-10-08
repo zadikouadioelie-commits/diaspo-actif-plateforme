@@ -1144,11 +1144,18 @@
     if (!S.me) { el.innerHTML = loginCard('Connectez-vous pour lire et envoyer vos messages.'); $('#go-login').onclick = () => openLogin(); return; }
     el.innerHTML = '<div class="sk skc" style="height:70px"></div><div class="sk skc" style="height:70px"></div>';
     try {
-      const r = await api('/api/conversations'); const c = r.conversations || []; c.forEach(x => { S.convNames[x.id] = x.avec_nom; });
-      S.unreadMsg = c.reduce((n, x) => n + (Number(x.non_lus) || 0), 0); paintBadges();
-      el.innerHTML = c.length ? `<div class="lst">${c.map(x => `<a class="conv ${x.non_lus > 0 ? 'unread' : ''}" href="#/conv/${x.id}"><div class="av">${x.avec_photo ? `<img src="${attrUrl(x.avec_photo)}" alt="" onerror="this.remove()">` : esc(initials(x.avec_nom))}</div>
+      const r = await api('/api/conversations'); const tout = r.conversations || []; tout.forEach(x => { S.convNames[x.id] = x.avec_nom; });
+      S.unreadMsg = tout.reduce((n, x) => n + (Number(x.non_lus) || 0), 0); paintBadges();
+      /* Onglets Classiques / Automatiques (2026-10-08) — uniquement pour le compte Diaspo'Actif Officiel (le serveur ne les active que pour lui) :
+         les messages de bienvenue envoyés aux nouveaux comptes sont rangés à part. Le badge de non-lus ci-dessus compte tout. */
+      const onglets = r.onglets && r.onglets.actifs ? r.onglets : null;
+      const mode = onglets && S.msgOnglet === 'automatique' ? 'automatique' : 'classique';
+      const c = onglets ? tout.filter(x => !!x.automatique === (mode === 'automatique')) : tout;
+      const barre = onglets ? `<div class="chips" role="tablist"><button class="chip ${mode === 'classique' ? 'on' : ''}" data-msg-onglet="classique" role="tab" aria-selected="${mode === 'classique'}">💬 Classiques <span class="n">${onglets.classiques || 0}</span></button><button class="chip ${mode === 'automatique' ? 'on' : ''}" data-msg-onglet="automatique" role="tab" aria-selected="${mode === 'automatique'}">🤖 Automatiques <span class="n">${onglets.automatiques || 0}</span></button></div>` : '';
+      el.innerHTML = barre + (c.length ? `<div class="lst">${c.map(x => `<a class="conv ${x.non_lus > 0 ? 'unread' : ''}" href="#/conv/${x.id}"><div class="av">${x.avec_photo ? `<img src="${attrUrl(x.avec_photo)}" alt="" onerror="this.remove()">` : esc(initials(x.avec_nom))}</div>
         <div class="sp"><div class="row"><span class="nm ell sp">${esc(x.avec_nom)}</span><span class="tm">${esc(ago(x.derniere_date))}</span></div><div class="pv ell">${esc(x.derniere_type && x.derniere_type !== 'text' ? '📎 Pièce jointe' : strip(x.derniere || x.sujet || 'Nouvelle conversation'))}</div></div>${x.non_lus > 0 ? `<span class="unr">${x.non_lus}</span>` : ''}</a>`).join('')}</div>`
-        : `<div class="empty"><div class="ei">${ic('chat', 'l')}</div><b>Aucune conversation</b>Contactez une boutique ou un membre depuis son profil pour démarrer un échange.</div>`;
+        : `<div class="empty"><div class="ei">${ic('chat', 'l')}</div><b>${mode === 'automatique' ? 'Aucun message automatique' : 'Aucune conversation'}</b>${mode === 'automatique' ? 'Les messages de bienvenue sans réponse apparaissent ici.' : 'Contactez une boutique ou un membre depuis son profil pour démarrer un échange.'}</div>`);
+      el.querySelectorAll('[data-msg-onglet]').forEach(b => { b.onclick = () => { S.msgOnglet = b.dataset.msgOnglet; viewMessages(); }; });
     } catch (e) { el.innerHTML = `<div class="empty"><b>Messagerie indisponible</b>${esc(e.message)}</div>`; }
   }
   async function paneConv(id) {
