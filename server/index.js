@@ -14618,6 +14618,48 @@ route("GET", "/api/relation-statut-lot", async (req, res, params, body, query) =
   sendJSON(res, 200, { statuts });
 });
 
+/* GET /api/affiliation-statut-lot?user_ids=1,2,3 — bouton "🔗 Affiliation" des cartouches
+   "Utilisateur" de l'annuaire (2026-10-08, bug réel : le bouton restait affiché même après
+   acceptation, faute de vérifier le moindre statut existant — même patron en lot que
+   /relation-statut-lot ci-dessus, pour la même raison : une requête par cartouche
+   provoquerait des 429 sur une recherche à 30-50 résultats). Sens "l'Initiative affilie
+   l'utilisateur" (ouvrirAffiliationUtilisateur) : un seul appelant possible, le compte
+   Initiative connecté — les ids hors de son propre initiative_membres ressortent simplement
+   absents du résultat (pas de statut = bouton "Affiliation" normal, comportement inchangé). */
+route("GET", "/api/affiliation-statut-lot", async (req, res, params, body, query) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (user.role !== 'initiative') return sendJSON(res, 200, { statuts: {} });
+  const init = await db.prepare("SELECT id FROM initiatives WHERE owner_user_id = ?").get(user.id);
+  if (!init) return sendJSON(res, 200, { statuts: {} });
+  const ids = String(query?.user_ids || "").split(",").map(Number).filter(Boolean).slice(0, 100);
+  const statuts = {};
+  for (const userId of [...new Set(ids)]) {
+    try {
+      const m = await db.prepare("SELECT statut, origine FROM initiative_membres WHERE initiative_id=? AND user_id=?").get(init.id, userId);
+      if (m) statuts[userId] = { statut: m.statut, origine: m.origine };
+    } catch (e) { /* un id invalide ne doit jamais faire échouer tout le lot */ }
+  }
+  sendJSON(res, 200, { statuts });
+});
+
+/* GET /api/affiliation-statut-initiatives-lot?initiative_ids=1,2,3 — même bouton "🔗 Affiliation",
+   sens inverse (demanderAffiliation, cartouches "Initiative") : le compte connecté sollicite
+   l'initiative affichée. */
+route("GET", "/api/affiliation-statut-initiatives-lot", async (req, res, params, body, query) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const ids = String(query?.initiative_ids || "").split(",").map(Number).filter(Boolean).slice(0, 100);
+  const statuts = {};
+  for (const initiativeId of [...new Set(ids)]) {
+    try {
+      const m = await db.prepare("SELECT statut, origine FROM initiative_membres WHERE initiative_id=? AND user_id=?").get(initiativeId, user.id);
+      if (m) statuts[initiativeId] = { statut: m.statut, origine: m.origine };
+    } catch (e) { /* un id invalide ne doit jamais faire échouer tout le lot */ }
+  }
+  sendJSON(res, 200, { statuts });
+});
+
 /* POST /api/demandes-contact — envoyer une demande. Message imposé côté serveur : ce que
    le client enverrait n'est pas lu, sans quoi la règle ne tiendrait qu'à l'interface. */
 route("POST", "/api/demandes-contact", async (req, res, params, body) => {

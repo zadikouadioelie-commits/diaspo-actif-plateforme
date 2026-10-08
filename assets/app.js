@@ -2191,7 +2191,7 @@ function renderInitiativeCard(it){
         ${vitrineBtn}
         ${(!isOwnInit && typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? `<button type="button" class="ann-card-btn" data-abonne="0" onclick="event.stopPropagation(); daToggleSuivre('initiative', ${it.id}, this)">🔔 S'abonner</button>` : ''}
         ${(!isOwnInit && it.owner_user_id && typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? `<span data-relation-user="${it.owner_user_id}" data-relation-classe="ann-card-btn"></span>` : ''}
-        ${(!isOwnInit && typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? `<button type="button" class="ann-card-btn ann-card-btn-affilier" onclick="event.stopPropagation(); demanderAffiliation(${it.id}, this)">🔗 Affiliation</button>` : ''}
+        ${(!isOwnInit && typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? `<span data-affiliation-initiative="${it.id}" data-affiliation-classe="ann-card-btn ann-card-btn-affilier"></span>` : ''}
         ${it.owner_user_id ? `<button type="button" class="ann-card-btn" onclick="event.stopPropagation(); openAnnuaireEvents(${it.owner_user_id}, ${JSON.stringify(it.nom||'').replace(/"/g,'&quot;')})">📅 Événements</button>` : ''}
         ${['Association','ONG'].includes(it.type) && it.adhesions_ouvertes !== false ? (
           isOwnInit
@@ -2526,7 +2526,7 @@ async function initAnnuaire(){
           <a href="${profilHref}#avis" class="ann-card-btn" onclick="event.stopPropagation()">⭐ Avis</a>
           <button type="button" class="ann-card-btn" title="Envoyer ce profil à quelqu'un : le lien s'ouvre sans compte" onclick="event.stopPropagation(); openShareUrlModal(location.origin + '/' + '${profilHref}', ${JSON.stringify(nom || '').replace(/"/g,'&quot;')})">↗ Partager</button>
           ${!isOwn && typeof CURRENT_USER !== 'undefined' && CURRENT_USER ? `<span data-relation-user="${u.id}" data-relation-classe="ann-card-btn"></span>` : ''}
-          ${!isOwn && typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.role === 'initiative' ? `<button type="button" class="ann-card-btn ann-card-btn-affilier" data-affilier-nom="${nom.replace(/"/g,'&quot;')}" onclick="event.stopPropagation(); ouvrirAffiliationUtilisateur(${u.id}, this)">🔗 Affiliation</button>` : ''}
+          ${!isOwn && typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.role === 'initiative' ? `<span data-affiliation-user="${u.id}" data-affiliation-nom="${nom.replace(/"/g,'&quot;')}" data-affiliation-classe="ann-card-btn ann-card-btn-affilier"></span>` : ''}
           ${adminAnnuaireBoutonsHtml(u.id, isOwn)}
         </div>
       </div>
@@ -2642,6 +2642,7 @@ async function initAnnuaire(){
       </div>`;
     renderChips();
     if (typeof initBoutonsRelation === 'function') initBoutonsRelation(list);
+    if (typeof initBoutonsAffiliation === 'function') initBoutonsAffiliation(list);
     /* Don récurrent "vedette" affiché sur chaque cartouche d'initiative (2026-09-28, demande
        explicite : "doit apparaître partout... également dans l'annuaire... sur la cartouche de
        l'annuaire") — un seul par organisateur (cagnottes.est_vedette), n'affiche rien si absent
@@ -2716,6 +2717,7 @@ async function initAnnuaire(){
           </div>`;
       renderChips();
       if (typeof initBoutonsRelation === 'function') initBoutonsRelation(list);
+      if (typeof initBoutonsAffiliation === 'function') initBoutonsAffiliation(list);
       return;
     }
 
@@ -6607,7 +6609,65 @@ window.initBoutonsRelation = async function (racine) {
 
 document.addEventListener('DOMContentLoaded', function () {
   setTimeout(function () { window.initBoutonsRelation(); }, 400);
+  setTimeout(function () { if (window.initBoutonsAffiliation) window.initBoutonsAffiliation(); }, 400);
 });
+
+/* ══════════════════════════════════════════════════════════════════════════
+   BOUTON "🔗 Affiliation" DES CARTOUCHES ANNUAIRE — reflète le statut réel
+   ──────────────────────────────────────────────────────────────────────────
+   Bug réel (2026-10-08, signalé par capture d'écran) : le bouton "🔗 Affiliation"
+   restait affiché tel quel même après que l'affiliation avait été acceptée —
+   son rendu ne vérifiait jamais initiative_membres, juste "suis-je connecté et
+   n'est-ce pas mon propre compte ?". Même patron que initBoutonsRelation
+   ci-dessus : un placeholder <span> rempli après coup par un appel groupé
+   (GET .../affiliation-statut-lot ou .../affiliation-statut-initiatives-lot),
+   jamais une requête par cartouche (voir le commentaire au-dessus
+   d'initBoutonsRelation sur les 429 déjà rencontrés sur l'annuaire).
+
+   Usage : <span data-affiliation-user="123" data-affiliation-nom="..."></span>
+        (carte "Utilisateur", l'Initiative connectée affilie ce compte)
+        <span data-affiliation-initiative="45"></span>
+        (carte "Initiative", le compte connecté sollicite cette initiative)
+   puis window.initBoutonsAffiliation() après insertion dans le DOM.
+   ══════════════════════════════════════════════════════════════════════════ */
+function affiliationStatutHtml(classe, st, boutonActifHtml) {
+  if (!st) return boutonActifHtml;
+  if (st.statut === 'accepte') return `<span class="${classe}" style="opacity:.75;cursor:default;">✅ Affilié</span>`;
+  if (st.statut === 'refuse') return `<span class="${classe}" style="opacity:.6;cursor:default;">❌ Affiliation refusée</span>`;
+  // 'en_attente' : le libellé dépend de qui a lancé la demande (origine), même sens que
+  // les notifications côté serveur (server/index.js, routes /membres et /demande-affiliation).
+  const libelle = st.origine === 'demande' ? '⏳ Demande en attente' : '⏳ Invitation envoyée';
+  return `<span class="${classe}" style="opacity:.75;cursor:default;">${libelle}</span>`;
+}
+window.initBoutonsAffiliation = async function (racine) {
+  const elsUser = [...(racine || document).querySelectorAll('[data-affiliation-user]:not([data-affiliation-prete])')];
+  const elsInit = [...(racine || document).querySelectorAll('[data-affiliation-initiative]:not([data-affiliation-prete])')];
+  [...elsUser, ...elsInit].forEach(el => el.setAttribute('data-affiliation-prete', '1'));
+
+  if (elsUser.length) {
+    const ids = [...new Set(elsUser.map(el => el.getAttribute('data-affiliation-user')))];
+    let statuts = {};
+    try { statuts = (await api('GET', `/affiliation-statut-lot?user_ids=${ids.join(',')}`)).statuts || {}; } catch (e) {}
+    elsUser.forEach(el => {
+      const userId = el.getAttribute('data-affiliation-user');
+      const classe = el.getAttribute('data-affiliation-classe') || 'ann-card-btn';
+      const nomAttr = el.getAttribute('data-affiliation-nom') || '';
+      const bouton = `<button type="button" class="${classe}" data-affilier-nom="${nomAttr}" onclick="event.stopPropagation(); ouvrirAffiliationUtilisateur(${userId}, this)">🔗 Affiliation</button>`;
+      el.outerHTML = affiliationStatutHtml(classe, statuts[userId], bouton);
+    });
+  }
+  if (elsInit.length) {
+    const ids = [...new Set(elsInit.map(el => el.getAttribute('data-affiliation-initiative')))];
+    let statuts = {};
+    try { statuts = (await api('GET', `/affiliation-statut-initiatives-lot?initiative_ids=${ids.join(',')}`)).statuts || {}; } catch (e) {}
+    elsInit.forEach(el => {
+      const initiativeId = el.getAttribute('data-affiliation-initiative');
+      const classe = el.getAttribute('data-affiliation-classe') || 'ann-card-btn';
+      const bouton = `<button type="button" class="${classe}" onclick="event.stopPropagation(); demanderAffiliation(${initiativeId}, this)">🔗 Affiliation</button>`;
+      el.outerHTML = affiliationStatutHtml(classe, statuts[initiativeId], bouton);
+    });
+  }
+};
 
 /* ---------- Analytics maison — compteur de pages vues (2026-09-17, demande explicite) ----------
    Sans dépendance externe (pas de Google Analytics/Plausible/Umami), sans cookie : une seule
