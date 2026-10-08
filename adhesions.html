@@ -274,25 +274,36 @@ async function ouvrirFormulaireAdhesion(formule, montant, userId){
   const titreRub = (cle) => (rub.titres && rub.titres[cle]) ? String(rub.titres[cle]) : '';
   const enteteRub = (cle) => titreRub(cle) ? `<div style="font-size:12.5px;font-weight:700;margin:0 0 4px;">${escHtml(titreRub(cle))}</div>` : '';
   const rubriquesExtra = (Array.isArray(rub.extra) ? rub.extra : []).filter(r => r && (r.titre || r.texte));
+  /* Validation obligatoire par rubrique/PDF (2026-10-08, demande explicite) : si l'organisation a
+     activé "Faire valider" sur une rubrique, une case "J'ai lu et j'approuve" apparaît sous le
+     texte concerné et bloque le bouton "Continuer →" tant qu'elle n'est pas cochée. */
+  const doitValider = (cle) => !!(rub.valider && rub.valider[cle]);
+  /* Toujours appelée derrière un garde explicite côté appelant (doitValider(cle) pour les 3
+     rubriques fixes + 2 PDF, r.valider pour chaque rubrique extra — ces dernières n'ont pas de
+     clé dans rub.valider, donc caseValider ne peut pas re-vérifier elle-même ici). */
+  const caseValider = (cle, titre) => `<label style="display:flex;align-items:flex-start;gap:6px;font-size:11.5px;margin:-2px 0 10px;cursor:pointer;">
+        <input type="checkbox" class="adh-valid-checkbox" data-valid-key="${cle}" style="margin-top:2px;flex:none;"> J'ai lu et j'approuve${titre ? ' : ' + escHtml(titre) : ''}
+      </label>`;
   overlay.innerHTML = `
     <div class="modal-box" style="max-width:460px;width:94%;max-height:85vh;overflow-y:auto;">
       <h3 style="margin:0 0 6px;font-size:16px;">📝 ${escHtml(formule.nom)}</h3>
       ${!userId ? `<p style="font-size:12px;background:#eff6ff;border:1px solid #93c5fd;border-radius:8px;padding:8px 10px;margin:0 0 10px;">Vous adhérez sans compte Diaspo'Actif — renseignez simplement vos coordonnées ci-dessous. 🔑 <a href="login.html?next=${encodeURIComponent(location.href)}">Déjà un compte ? Connectez-vous</a> pour préremplir automatiquement.</p>` : ''}
-      ${formule.texte_intro ? `<div style="margin:0 0 10px;">${enteteRub('intro')}<p style="font-size:12.5px;color:var(--muted,#888);margin:0;white-space:pre-wrap;">${mdBold(escHtml(formule.texte_intro))}</p></div>` : ''}
+      ${formule.texte_intro ? `<div style="margin:0 0 10px;">${enteteRub('intro')}<p style="font-size:12.5px;color:var(--muted,#888);margin:0 0 6px;white-space:pre-wrap;">${mdBold(escHtml(formule.texte_intro))}</p>${doitValider('intro') ? caseValider('intro', titreRub('intro')) : ''}</div>` : ''}
       <div id="adh-form-champs" style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px;"></div>
-      ${formule.conditions_adhesion ? `<div style="font-size:11.5px;color:var(--muted,#888);background:#f9fafb;border-radius:8px;padding:8px 10px;margin-bottom:10px;white-space:pre-wrap;">${titreRub('conditions') ? `<div style="font-size:12.5px;font-weight:700;color:#374151;margin-bottom:4px;white-space:normal;">${escHtml(titreRub('conditions'))}</div>` : ''}${mdBold(escHtml(formule.conditions_adhesion))}</div>` : ''}
+      ${formule.conditions_adhesion ? `<div style="font-size:11.5px;color:var(--muted,#888);background:#f9fafb;border-radius:8px;padding:8px 10px;margin-bottom:10px;white-space:pre-wrap;">${titreRub('conditions') ? `<div style="font-size:12.5px;font-weight:700;color:#374151;margin-bottom:4px;white-space:normal;">${escHtml(titreRub('conditions'))}</div>` : ''}${mdBold(escHtml(formule.conditions_adhesion))}${doitValider('conditions') ? `<div style="white-space:normal;margin-top:8px;">${caseValider('conditions', titreRub('conditions') || "Conditions d'adhésion")}</div>` : ''}</div>` : ''}
       ${formule.reglement_interieur_texte ? `<details style="margin-bottom:10px;border:1px solid #e5e7eb;border-radius:8px;padding:8px 10px;">
         <summary style="cursor:pointer;font-size:12.5px;font-weight:700;">📜 ${escHtml(titreRub('reglement') || 'Règlement intérieur')}</summary>
         <div style="font-size:12px;color:#374151;margin-top:8px;max-height:200px;overflow-y:auto;white-space:pre-wrap;line-height:1.5;">${mdBold(escHtml(formule.reglement_interieur_texte))}</div>
+        ${doitValider('reglement') ? `<div style="margin-top:8px;">${caseValider('reglement', titreRub('reglement') || 'Règlement intérieur')}</div>` : ''}
       </details>` : ''}
-      ${rubriquesExtra.map(r => `<details style="margin-bottom:10px;border:1px solid #e5e7eb;border-radius:8px;padding:8px 10px;">
+      ${rubriquesExtra.map((r, i) => `<details style="margin-bottom:10px;border:1px solid #e5e7eb;border-radius:8px;padding:8px 10px;">
         <summary style="cursor:pointer;font-size:12.5px;font-weight:700;">${escHtml(r.titre || 'Information')}</summary>
         <div style="font-size:12px;color:#374151;margin-top:8px;max-height:200px;overflow-y:auto;white-space:pre-wrap;line-height:1.5;">${mdBold(escHtml(r.texte || ''))}</div>
+        ${r.valider ? `<div style="margin-top:8px;">${caseValider('extra_' + i, r.titre || 'Information')}</div>` : ''}
       </details>`).join('')}
       ${(formule.reglement_pdf_url || formule.statuts_pdf_url) ? `<div style="font-size:12px;margin-bottom:12px;">
-        ${formule.reglement_pdf_url ? `<a href="${escHtml(formule.reglement_pdf_url)}" target="_blank" rel="noopener" style="color:#2563eb;">📄 Règlement intérieur</a>` : ''}
-        ${formule.reglement_pdf_url && formule.statuts_pdf_url ? ' · ' : ''}
-        ${formule.statuts_pdf_url ? `<a href="${escHtml(formule.statuts_pdf_url)}" target="_blank" rel="noopener" style="color:#2563eb;">📄 Statuts de l'association</a>` : ''}
+        ${formule.reglement_pdf_url ? `<div style="margin-bottom:${doitValider('reglement_pdf')?'4px':'0'};"><a href="${escHtml(formule.reglement_pdf_url)}" target="_blank" rel="noopener" style="color:#2563eb;">📄 Règlement intérieur</a></div>${doitValider('reglement_pdf') ? caseValider('reglement_pdf', 'Règlement intérieur (PDF)') : ''}` : ''}
+        ${formule.statuts_pdf_url ? `<div><a href="${escHtml(formule.statuts_pdf_url)}" target="_blank" rel="noopener" style="color:#2563eb;">📄 Statuts de l'association</a></div>${doitValider('statuts_pdf') ? caseValider('statuts_pdf', "Statuts de l'association (PDF)") : ''}` : ''}
       </div>` : ''}
       <div id="adh-form-err" style="display:none;color:#dc2626;font-size:12.5px;margin-bottom:10px;"></div>
       <div style="display:flex;gap:10px;justify-content:flex-end;">
@@ -354,6 +365,8 @@ async function ouvrirFormulaireAdhesion(formule, montant, userId){
       }
     }
     if (manquants.length) { err.textContent = `Champs obligatoires manquants : ${manquants.join(', ')}`; err.style.display = 'block'; return; }
+    const casesNonCochees = overlay.querySelectorAll('.adh-valid-checkbox:not(:checked)').length;
+    if (casesNonCochees) { err.textContent = 'Merci de cocher « J\'ai lu et j\'approuve » pour chaque rubrique concernée avant de continuer.'; err.style.display = 'block'; return; }
     overlay.remove();
     continuerPaiement(formule.id, montant, reponses);
   };

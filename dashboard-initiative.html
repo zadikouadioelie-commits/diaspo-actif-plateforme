@@ -144,7 +144,6 @@
 <script src="assets/sidebar-reorder.js"></script>
 <script src="assets/soumission-da.js"></script>
 <script src="/assets/upload-media.js"></script>
-<script src="/assets/carte-proto.js?v=1"></script>
 <script src="/assets/rich-editor.js"></script>
 <script>
 /* Catalogue accréditations DA — défini ici pour éviter les problèmes de cache data.js */
@@ -1521,13 +1520,22 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           <summary style="cursor:pointer;font-size:12px;font-weight:700;">📝 Formulaire d'adhésion (texte, documents, champs)</summary>
           <div style="margin-top:12px;">
             <input type="text" class="adh-rub-titre" id="adh-rt-intro" data-defaut="Texte d'introduction" maxlength="80" title="Cliquez pour renommer cette rubrique" aria-label="Titre de la rubrique" style="font-size:12px;font-weight:700;border:0;border-bottom:1px dashed #cbd5e1;background:transparent;width:100%;padding:2px 0 3px;color:inherit;font-family:inherit;cursor:text;">
-            <textarea id="adh-f-texte-intro" class="input" rows="8" placeholder="Affiché en haut du formulaire, avant les tarifs." style="margin:4px 0 10px;width:100%;resize:vertical;min-height:120px;"></textarea>
+            <textarea id="adh-f-texte-intro" class="input" rows="8" placeholder="Affiché en haut du formulaire, avant les tarifs." style="margin:4px 0 4px;width:100%;resize:vertical;min-height:120px;"></textarea>
+            <label style="display:flex;align-items:center;gap:5px;font-size:10.5px;color:var(--muted);margin:0 0 10px;cursor:pointer;">
+              <input type="checkbox" id="adh-rv-intro"> Faire valider par l'adhérent (case « J'ai lu et j'approuve » obligatoire avant de pouvoir adhérer)
+            </label>
 
             <input type="text" class="adh-rub-titre" id="adh-rt-conditions" data-defaut="Conditions d'adhésion" maxlength="80" title="Cliquez pour renommer cette rubrique" aria-label="Titre de la rubrique" style="font-size:12px;font-weight:700;border:0;border-bottom:1px dashed #cbd5e1;background:transparent;width:100%;padding:2px 0 3px;color:inherit;font-family:inherit;cursor:text;">
-            <textarea id="adh-f-conditions" class="input" rows="10" placeholder="Ex. engagement moral, durée d'engagement, etc." style="margin:4px 0 10px;width:100%;resize:vertical;min-height:150px;"></textarea>
+            <textarea id="adh-f-conditions" class="input" rows="10" placeholder="Ex. engagement moral, durée d'engagement, etc." style="margin:4px 0 4px;width:100%;resize:vertical;min-height:150px;"></textarea>
+            <label style="display:flex;align-items:center;gap:5px;font-size:10.5px;color:var(--muted);margin:0 0 10px;cursor:pointer;">
+              <input type="checkbox" id="adh-rv-conditions"> Faire valider par l'adhérent (case « J'ai lu et j'approuve » obligatoire avant de pouvoir adhérer)
+            </label>
 
             <input type="text" class="adh-rub-titre" id="adh-rt-reglement" data-defaut="Règlement intérieur" maxlength="80" title="Cliquez pour renommer cette rubrique" aria-label="Titre de la rubrique" style="font-size:12px;font-weight:700;border:0;border-bottom:1px dashed #cbd5e1;background:transparent;width:100%;padding:2px 0 3px;color:inherit;font-family:inherit;cursor:text;">
             <textarea id="adh-f-reglement-texte" class="input" rows="10" maxlength="20000" placeholder="Rédigez ici le règlement intérieur : droits et devoirs des membres, fonctionnement, cotisation, sanctions, etc." style="margin:4px 0 4px;width:100%;resize:vertical;min-height:150px;"></textarea>
+            <label style="display:flex;align-items:center;gap:5px;font-size:10.5px;color:var(--muted);margin:0 0 4px;cursor:pointer;">
+              <input type="checkbox" id="adh-rv-reglement"> Faire valider par l'adhérent (case « J'ai lu et j'approuve » obligatoire avant de pouvoir adhérer)
+            </label>
             <p style="font-size:11px;color:var(--muted);margin:0 0 10px;">Affiché aux personnes qui adhèrent, dans une zone qu'elles peuvent faire défiler. Vous pouvez aussi joindre le document en PDF ci-dessous.</p>
 
             <div id="adh-f-rubriques-extra"></div>
@@ -1539,11 +1547,17 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
                 <label style="font-size:12px;font-weight:700;">Règlement intérieur (PDF, facultatif)</label>
                 <input type="file" id="adh-f-reglement-file" accept="application/pdf" style="margin-top:4px;width:100%;font-size:11.5px;" onchange="adhUploaderDocumentFormule(this,'reglement')">
                 <div id="adh-f-reglement-statut" style="font-size:11px;color:var(--muted);margin-top:4px;"></div>
+                <label style="display:flex;align-items:center;gap:5px;font-size:10.5px;color:var(--muted);margin-top:6px;cursor:pointer;">
+                  <input type="checkbox" id="adh-rv-reglement_pdf"> Faire valider ce document
+                </label>
               </div>
               <div style="flex:1;">
                 <label style="font-size:12px;font-weight:700;">Statuts de l'association (PDF)</label>
                 <input type="file" id="adh-f-statuts-file" accept="application/pdf" style="margin-top:4px;width:100%;font-size:11.5px;" onchange="adhUploaderDocumentFormule(this,'statuts')">
                 <div id="adh-f-statuts-statut" style="font-size:11px;color:var(--muted);margin-top:4px;"></div>
+                <label style="display:flex;align-items:center;gap:5px;font-size:10.5px;color:var(--muted);margin-top:6px;cursor:pointer;">
+                  <input type="checkbox" id="adh-rv-statuts_pdf"> Faire valider ce document
+                </label>
               </div>
             </div>
 
@@ -1615,7 +1629,6 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
             <video id="adh-f-video-thumb" style="width:100%;border-radius:8px;" muted></video>
             <button type="button" onclick="document.getElementById('adh-f-video-thumb').play()" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:50%;width:44px;height:44px;font-size:18px;cursor:pointer;">▶️</button>
           </div>
-          <button type="button" class="da-pill" id="adh-f-carte-btn" onclick="adhOuvrirPrototypeCarte()" title="Téléversez la maquette de votre carte de membre (recto et verso) : chaque adhérent la verra à son nom dans « Ma carte de membre » une fois son adhésion payée.">🪪 Prototype carte de membre</button>
         </div>
 
         <!-- Adhésion officielle de l'association (2026-09-28, demande explicite, capture à
@@ -7696,22 +7709,6 @@ async function adhUploadMediaPhoto(input){
   if (!allowed.includes(file.type)) { showToast('Format non supporté (JPG, PNG ou WebP uniquement).', 'warning'); return; }
   try{
     // 2026-09-25, bug réel : photos rejetées avant compression, voir assets/upload-media.js.
-/* Prototype de carte de membre de la formule (2026-10-08) — éditeur et affichage : assets/carte-proto.js. */
-let ADH_F_CARTE = null;
-function adhCarteMajStatut(){
-  const el = document.getElementById('adh-f-carte-statut'); if (!el) return;
-  const c = ADH_F_CARTE;
-  el.innerHTML = c && (c.recto || c.verso)
-    ? `✅ Prototype enregistré : ${[c.recto && 'recto', c.verso && 'verso'].filter(Boolean).join(' + ')} — prénom et nom ajoutés automatiquement pour chaque adhérent. <a href="#" onclick="adhOuvrirPrototypeCarte();return false;">Modifier</a>`
-    : '';
-}
-function adhOuvrirPrototypeCarte(){
-  if (!window.CarteProto) { showToast?.('Éditeur de carte indisponible, rechargez la page.', 'warning'); return; }
-  CarteProto.ouvrirEditeur(ADH_F_CARTE, {
-    upload: async (file) => uploadMedia(await compressIfImage(file, 1800, 1800, 0.9), 'logo'),
-    onSave: (p) => { ADH_F_CARTE = p; adhCarteMajStatut(); showToast?.(p ? '✅ Prototype de carte pris en compte — il sera enregistré avec la formule.' : 'Prototype de carte retiré.'); },
-  });
-}
     const url = await uploadMedia(await compressIfImage(file, 1200, 1200, 0.85), 'logo');
     ADH_F_MEDIA = { type: 'photo', url, duree: null };
     const preview = document.getElementById('adh-f-photo-preview');
@@ -7838,16 +7835,19 @@ function adhRenderRubriquesExtra(){
         <button type="button" class="btn btn-sm btn-outline" style="color:#ef4444;border-color:#ef4444;flex:none;" onclick="adhRetirerRubrique(${i})" title="Retirer cette rubrique">🗑</button>
       </div>
       <textarea data-rub="${i}" data-champ="texte" class="input" rows="5" maxlength="20000" placeholder="Texte de la rubrique" style="margin:4px 0 0;width:100%;resize:vertical;min-height:90px;">${escH(r.texte)}</textarea>
+      <label style="display:flex;align-items:center;gap:5px;font-size:10.5px;color:var(--muted);margin:4px 0 0;cursor:pointer;">
+        <input type="checkbox" data-rub="${i}" data-champ-check="valider" ${r.valider ? 'checked' : ''} onchange="ADH_RUBRIQUES_EXTRA[${i}].valider = this.checked;"> Faire valider par l'adhérent (case « J'ai lu et j'approuve » obligatoire avant de pouvoir adhérer)
+      </label>
     </div>`).join('');
 }
 function adhAjouterRubrique(){
   if (ADH_RUBRIQUES_EXTRA.length >= 10) { showToast('10 rubriques supplémentaires au plus.', 'warning'); return; }
-  ADH_RUBRIQUES_EXTRA.push({ titre: '', texte: '' }); adhRenderRubriquesExtra();
+  ADH_RUBRIQUES_EXTRA.push({ titre: '', texte: '', valider: false }); adhRenderRubriquesExtra();
   const t = document.querySelector('#adh-f-rubriques-extra [data-champ="titre"][data-rub="' + (ADH_RUBRIQUES_EXTRA.length - 1) + '"]'); if (t) t.focus();
 }
 function adhRetirerRubrique(i){ ADH_RUBRIQUES_EXTRA.splice(i, 1); adhRenderRubriquesExtra(); }
 document.addEventListener('input', e => {
-  const t = e.target; if (!t || t.dataset == null || t.dataset.rub === undefined || !ADH_RUBRIQUES_EXTRA[t.dataset.rub]) return;
+  const t = e.target; if (!t || t.dataset == null || t.dataset.rub === undefined || t.dataset.champ === undefined || !ADH_RUBRIQUES_EXTRA[t.dataset.rub]) return;
   ADH_RUBRIQUES_EXTRA[t.dataset.rub][t.dataset.champ] = t.value;
 });
 function adhChargerRubriques(f){
@@ -7855,7 +7855,11 @@ function adhChargerRubriques(f){
   document.querySelectorAll('.adh-rub-titre').forEach(inp => {
     const cle = inp.id.replace('adh-rt-', ''); inp.value = (r.titres && r.titres[cle]) || inp.dataset.defaut;
   });
-  ADH_RUBRIQUES_EXTRA = Array.isArray(r.extra) ? r.extra.map(x => ({ titre: x.titre || '', texte: x.texte || '' })) : [];
+  const valider = r.valider || {};
+  ['intro', 'conditions', 'reglement', 'reglement_pdf', 'statuts_pdf'].forEach(cle => {
+    const cb = document.getElementById('adh-rv-' + cle); if (cb) cb.checked = !!valider[cle];
+  });
+  ADH_RUBRIQUES_EXTRA = Array.isArray(r.extra) ? r.extra.map(x => ({ titre: x.titre || '', texte: x.texte || '', valider: !!x.valider })) : [];
   adhRenderRubriquesExtra();
 }
 function adhLireRubriques(){
@@ -7863,12 +7867,17 @@ function adhLireRubriques(){
   document.querySelectorAll('.adh-rub-titre').forEach(inp => {
     const v = inp.value.trim(); if (v && v !== inp.dataset.defaut) titres[inp.id.replace('adh-rt-', '')] = v;
   });
-  return { titres, extra: ADH_RUBRIQUES_EXTRA.filter(r => (r.titre || '').trim() || (r.texte || '').trim()) };
+  const valider = {};
+  ['intro', 'conditions', 'reglement', 'reglement_pdf', 'statuts_pdf'].forEach(cle => {
+    const cb = document.getElementById('adh-rv-' + cle); if (cb && cb.checked) valider[cle] = true;
+  });
+  return { titres, valider, extra: ADH_RUBRIQUES_EXTRA.filter(r => (r.titre || '').trim() || (r.texte || '').trim()) };
 }
 
 function adhOuvrirCreationFormule(officielle){
   ADH_EDIT_FORMULE_ID = null;
   ADH_F_MEDIA = { type: null, url: null, duree: null };
+  ADH_F_CARTE = null; adhCarteMajStatut();
   ADH_F_OFFICIELLE = !!officielle;
   adhRenderBoutonOfficielle();
   document.getElementById('adh-f-liste-nom').value = '';
@@ -7896,7 +7905,6 @@ function adhOuvrirCreationFormule(officielle){
   adhToggleModeValidite();
   document.getElementById('adh-f-texte-intro').value = '';
   document.getElementById('adh-f-conditions').value = '';
-  ADH_F_CARTE = null; adhCarteMajStatut();
   document.getElementById('adh-f-reglement-texte').value = '';
   adhChargerRubriques(null);
   adhRelancesCharger(null);
@@ -7949,8 +7957,6 @@ function adhOuvrirEditionFormule(id){
   document.getElementById('adh-f-texte-intro').value = f.texte_intro || '';
   document.getElementById('adh-f-conditions').value = f.conditions_adhesion || '';
   document.getElementById('adh-f-reglement-texte').value = f.reglement_interieur_texte || '';
-  try { ADH_F_CARTE = f.carte_proto_json ? JSON.parse(f.carte_proto_json) : null; } catch (e) { ADH_F_CARTE = null; }
-  adhCarteMajStatut();
   adhChargerRubriques(f);
   adhRelancesCharger(f.relances_config_json);
   document.getElementById('adh-f-reglement-file').value = '';
@@ -8079,7 +8085,6 @@ async function adhEnregistrerFormule(){
     else await api('POST', `/initiatives/${window.__vitrineInitId}/adhesion-formules`, payload);
     adhFermerModalFormule();
     adhRenderFormules();
-    carte_proto: ADH_F_CARTE,
     showToast('Formule enregistrée ✅');
   }catch(e){ showToast('Erreur : '+e.message, 'danger'); }
 }
