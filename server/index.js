@@ -1464,20 +1464,27 @@ route("GET", "/api/parrainage/mon-tableau-de-bord", async (req, res) => {
   } catch (e) { console.error('[migrateInscInscriptionsArchive]', e.message); }
 })();
 
-/* « Fiche partagée » (2026-10-08, demande explicite) — table neuve (pas une colonne ajoutée à une
-   table existante), donc CREATE TABLE IF NOT EXISTS directement plutôt que le patron PRAGMA
-   habituel : rien à détecter, juste à créer si absente, même sur une base déjà en place. */
-(async function migrateInscFichesPartages() {
+/* « Fiche partagée » (2026-10-08, demande explicite — refonte : "partager une fiche en crée
+   trois", TOUJOURS indépendantes, aucune ne doit jamais référencer les deux autres par une
+   clé étrangère, pour que supprimer n'importe laquelle ne puisse jamais rien casser ailleurs).
+   Remplace la 1ʳᵉ version (table insc_fiches_partages à part, avec FK des deux côtés — exactement
+   le problème que cette refonte corrige) : simples colonnes sur insc_fiches elle-même, jamais de
+   contrainte FOREIGN KEY dessus (fiche_origine_id en particulier reste volontairement "orpheline"
+   possible, lue seulement pour le badge "Partagée N fois", jamais pour une intégrité quelconque).
+   partage_role : NULL (fiche normale) · 'envoi_trace' (ma trace, visible UNIQUEMENT dans le
+   panneau Fiche partagée) · 'reception' (copie reçue — visible dans la liste principale
+   seulement une fois partage_accepte=1, toujours visible dans l'onglet Reçues). */
+(async function migrateInscFichesPartageColonnes() {
   try {
-    await db.prepare(`CREATE TABLE IF NOT EXISTS insc_fiches_partages (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      fiche_source_id INTEGER NOT NULL,
-      fiche_copie_id INTEGER NOT NULL,
-      expediteur_id INTEGER NOT NULL,
-      destinataire_id INTEGER NOT NULL,
-      created_at TEXT DEFAULT (datetime('now'))
-    )`).run();
-  } catch (e) { console.error('[migrateInscFichesPartages]', e.message); }
+    const cols = (await db.prepare("PRAGMA table_info(insc_fiches)").all()).map(c => c.name);
+    if (cols.length) {
+      if (!cols.includes('partage_role')) { try { await db.prepare("ALTER TABLE insc_fiches ADD COLUMN partage_role TEXT").run(); } catch (e) {} }
+      if (!cols.includes('partage_contact_nom')) { try { await db.prepare("ALTER TABLE insc_fiches ADD COLUMN partage_contact_nom TEXT").run(); } catch (e) {} }
+      if (!cols.includes('partage_le')) { try { await db.prepare("ALTER TABLE insc_fiches ADD COLUMN partage_le TEXT").run(); } catch (e) {} }
+      if (!cols.includes('partage_accepte')) { try { await db.prepare("ALTER TABLE insc_fiches ADD COLUMN partage_accepte INTEGER DEFAULT 0").run(); } catch (e) {} }
+      if (!cols.includes('fiche_origine_id')) { try { await db.prepare("ALTER TABLE insc_fiches ADD COLUMN fiche_origine_id INTEGER").run(); } catch (e) {} }
+    }
+  } catch (e) { console.error('[migrateInscFichesPartageColonnes]', e.message); }
 })();
 
 /* "Événement flash" (2026-09-30, demande explicite) — parcours allégé de POST /api/evenements
@@ -46540,9 +46547,13 @@ route("GET", "/api/insc/fiches", async (req, res) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const estAdmin = user.role === "administrateur" || (await AdminJunior.hasAdminPermission(user, "formulaires_inscription.consulter", db));
+  // "Fiche partagée" (2026-10-08) : ma trace d'envoi n'apparaît JAMAIS ici (uniquement dans le
+  // panneau dédié) ; une copie reçue n'apparaît ici qu'une fois affichée volontairement
+  // (partage_accepte=1) — avant ça, elle reste accessible uniquement depuis l'onglet "Reçues".
+  const filtrePartage = "(partage_role IS NULL OR (partage_role='reception' AND partage_accepte=1))";
   const fiches = estAdmin
-    ? await db.prepare("SELECT * FROM insc_fiches ORDER BY id DESC").all()
-    : await db.prepare("SELECT * FROM insc_fiches WHERE owner_user_id=? ORDER BY id DESC").all(user.id);
+    ? await db.prepare(`SELECT * FROM insc_fiches WHERE ${filtrePartage} ORDER BY id DESC`).all()
+    : await db.prepare(`SELECT * FROM insc_fiches WHERE owner_user_id=? AND ${filtrePartage} ORDER BY id DESC`).all(user.id);
   const enrichies = [];
   for (const f of fiches) {
     // Number(...) autour de COUNT(*) (2026-09-22, bug réel constaté en production) : Postgres
@@ -46565,7 +46576,11 @@ route("GET", "/api/insc/fiches", async (req, res) => {
        — même Number(...)-autour-de-COUNT(*) que nb_evenements ci-dessus (bug BIGSERIAL déjà
        rencontré : un COUNT(*) Postgres renvoyé en texte "0" est vrai en JS). */
     const nbTypesPayants = Number((await db.prepare("SELECT COUNT(*) n FROM insc_types WHERE fiche_id=? AND gratuit=0 AND COALESCE(prix,0) > 0").get(f.id))?.n) || 0;
-    enrichies.push({ ...f, nb_inscriptions: nb, nb_evenements: nbEvt, apercu_date: evtApercu?.date_evt || null, apercu_lieu: evtApercu ? [evtApercu.ville, evtApercu.pays].filter(Boolean).join(", ") : null, a_types_payants: nbTypesPayants > 0 });
+    // Badge "📤 Partagée N fois" (2026-10-08, demande explicite) : compte mes traces d'envoi dont
+    // fiche_origine_id pointe vers CETTE fiche — jamais vers une table à part (voir la refonte
+    // "3 fiches indépendantes" ci-dessus), donc toujours juste même si une trace a été supprimée.
+    const nbPartages = Number((await db.prepare("SELECT COUNT(*) n FROM insc_fiches WHERE fiche_origine_id=? AND partage_role='envoi_trace'").get(f.id))?.n) || 0;
+    enrichies.push({ ...f, nb_inscriptions: nb, nb_evenements: nbEvt, apercu_date: evtApercu?.date_evt || null, apercu_lieu: evtApercu ? [evtApercu.ville, evtApercu.pays].filter(Boolean).join(", ") : null, a_types_payants: nbTypesPayants > 0, nb_partages: nbPartages });
   }
   sendJSON(res, 200, { fiches: enrichies });
 });
@@ -47417,11 +47432,9 @@ route("DELETE", "/api/insc/fiches/:id", async (req, res, params) => {
   // étrangère et n'était pas nettoyée ici — DELETE FROM insc_fiches échouait (500) dès qu'un
   // lien de contrôle avait été créé, quel que soit son état actif/inactif.
   await db.prepare("DELETE FROM insc_liens_controle WHERE fiche_id=?").run(fiche.id);
-  // Même famille de bug, trouvée immédiatement en testant "Fiche partagée" (2026-10-08) :
-  // insc_fiches_partages référence fiche_id des DEUX côtés (source ET copie) — sans ce
-  // nettoyage, supprimer la fiche d'origine OU une copie reçue échouait dès qu'un partage
-  // avait eu lieu.
-  await db.prepare("DELETE FROM insc_fiches_partages WHERE fiche_source_id=? OR fiche_copie_id=?").run(fiche.id, fiche.id);
+  // "Fiche partagée" (2026-10-08) : fiche_origine_id n'est volontairement PAS une clé étrangère
+  // (voir migrateInscFichesPartageColonnes) — rien à nettoyer ici, supprimer l'originale, une
+  // trace d'envoi ou une copie reçue n'importe laquelle des trois n'affecte jamais les deux autres.
   await db.prepare("DELETE FROM insc_fiches WHERE id=?").run(fiche.id);
   sendJSON(res, 200, { ok: true });
 });
@@ -47519,67 +47532,100 @@ route("POST", "/api/insc/fiches/:id/dupliquer", async (req, res, params, body) =
   sendJSON(res, 201, { fiche_id: newId });
 });
 
-/* Partage d'une fiche à une AUTRE initiative (2026-10-08, demande explicite : "une option de
-   partager la fiche à une autre initiative qui pourra à son tour l'utiliser comme si c'était
-   à elle, sans mes inscriptions, de façon vierge, juste tous les paramètres"). Copie immédiate
-   et indépendante (pas de lien conservé avec l'original, pas d'acceptation requise — décidé
-   explicitement), chez un compte Initiative recherché par nom. */
+/* Partage d'une fiche à une AUTRE initiative (2026-10-08, demande explicite, revue le même jour :
+   "partager une fiche en crée trois" — l'originale (inchangée), MA trace d'envoi (visible
+   uniquement dans le panneau "Fiche partagée", jamais dans ma liste principale) et la copie
+   reçue (100% au destinataire — visible dans SA liste principale seulement une fois qu'il a
+   cliqué "Afficher dans ma liste principale", toujours visible dans son onglet Reçues entre-
+   temps). Les trois sont des insc_fiches tout à fait autonomes : aucune ne référence les deux
+   autres par une clé étrangère (fiche_origine_id est une simple colonne informative — voir
+   migrateInscFichesPartageColonnes), donc supprimer l'une n'affecte jamais les deux autres. */
 route("GET", "/api/insc/fiches/:id/partager/suggestions", async (req, res, params, body, query) => {
   const { erreur, msg, fiche } = await inscFicheProprietaire(req, params.id);
   if (erreur) return sendJSON(res, erreur, { error: msg });
-  const q = String((query && query.q) || '').trim().toLowerCase();
+  /* Recherche façon « @ » (2026-10-08, demande explicite : « même système de reconnaissance et de
+     proposition de compte avec arobase ») : on tape le nom du COMPTE (un « @ » éventuel est ignoré),
+     on obtient des propositions avec avatar, nom du compte et type. Seuls les comptes pouvant utiliser
+     ce module (Initiative, Collectivité) sont proposés — jamais le nom personnel du gestionnaire
+     (voir nomCompteAffichage) ni un compte masqué, suspendu, supprimé ou de démonstration. */
+  const q = String((query && query.q) || '').trim().replace(/^[@*]+/, '').trim().toLowerCase().replace(/[%_]/g, '');
   if (q.length < 2) return sendJSON(res, 200, { suggestions: [] });
-  const like = '%' + q.replace(/[%_]/g, '') + '%';
   const rows = await db.prepare(`
-    SELECT u.id AS user_id, i.nom, i.ville, i.pays FROM users u JOIN initiatives i ON i.owner_user_id=u.id
-    WHERE u.role='initiative' AND u.id<>? AND (u.compte_masque IS NULL OR u.compte_masque=0) AND COALESCE(u.suspendu_definitif,0)=0
-      AND LOWER(i.nom) LIKE ? LIMIT 10`).all(fiche.owner_user_id, like);
-  sendJSON(res, 200, { suggestions: rows.map(r => ({ user_id: r.user_id, nom: r.nom, detail: [r.ville, r.pays].filter(Boolean).join(', ') })) });
+    SELECT u.id AS user_id, u.role, u.photo_url, u.nom_institution, i.nom AS init_nom, i.logo_url,
+      COALESCE(i.ville, u.ville) AS ville, COALESCE(i.pays, u.pays) AS pays
+    FROM users u LEFT JOIN initiatives i ON i.owner_user_id=u.id
+    WHERE u.role IN ('initiative','collectivite') AND u.id<>?
+      AND (u.compte_masque IS NULL OR u.compte_masque=0) AND COALESCE(u.suspendu_definitif,0)=0
+      AND u.nom<>'Compte supprimé' AND (u.is_demo IS NULL OR u.is_demo=FALSE)
+      AND ((u.role='initiative' AND i.id IS NOT NULL AND LOWER(i.nom) LIKE ?) OR (u.role='collectivite' AND LOWER(u.nom_institution) LIKE ?))
+    ORDER BY CASE WHEN LOWER(COALESCE(i.nom, u.nom_institution)) LIKE ? THEN 0 ELSE 1 END, COALESCE(i.nom, u.nom_institution)
+    LIMIT 8`).all(fiche.owner_user_id, '%' + q + '%', '%' + q + '%', q + '%');
+  sendJSON(res, 200, { suggestions: rows.map(r => ({
+    user_id: r.user_id, role: r.role,
+    nom: r.role === 'initiative' ? r.init_nom : r.nom_institution,
+    avatar_url: r.photo_url || (r.role === 'initiative' ? r.logo_url : null) || null,
+    detail: [r.ville, r.pays].filter(Boolean).join(', '),
+  })) });
 });
 route("POST", "/api/insc/fiches/:id/partager", async (req, res, params, body) => {
   const { erreur, msg, fiche, user } = await inscFicheProprietaire(req, params.id);
   if (erreur) return sendJSON(res, erreur, { error: msg });
   const cibleId = Number(body?.user_id);
-  if (!cibleId) return sendJSON(res, 400, { error: "Choisissez une initiative." });
+  if (!cibleId) return sendJSON(res, 400, { error: "Choisissez le compte à qui partager cette fiche." });
   if (cibleId === Number(fiche.owner_user_id)) return sendJSON(res, 400, { error: "Vous ne pouvez pas partager une fiche à vous-même." });
-  const cibleInit = await db.prepare("SELECT u.id, i.id AS initiative_id, i.nom FROM users u JOIN initiatives i ON i.owner_user_id=u.id WHERE u.id=? AND u.role='initiative'").get(cibleId);
-  if (!cibleInit) return sendJSON(res, 404, { error: "Ce compte n'est pas (ou plus) une Initiative." });
-  const newId = await dupliquerFicheStructure(fiche, {
+  /* Destinataire : un compte Initiative ou Collectivité (les deux types qui utilisent ce module), actif et visible. */
+  const cibleRow = await db.prepare(`SELECT u.id, u.role, u.nom_institution, i.id AS initiative_id, i.nom AS init_nom
+    FROM users u LEFT JOIN initiatives i ON i.owner_user_id=u.id
+    WHERE u.id=? AND u.role IN ('initiative','collectivite') AND (u.compte_masque IS NULL OR u.compte_masque=0)
+      AND COALESCE(u.suspendu_definitif,0)=0 AND u.nom<>'Compte supprimé'`).get(cibleId);
+  const cibleNom = cibleRow && (cibleRow.role === 'initiative' ? cibleRow.init_nom : cibleRow.nom_institution);
+  if (!cibleRow || !cibleNom) return sendJSON(res, 404, { error: "Ce compte n'est pas (ou plus) une Initiative ou une Collectivité." });
+  const cibleInit = { id: cibleRow.id, initiative_id: cibleRow.role === 'initiative' ? cibleRow.initiative_id : null, nom: cibleNom };
+  const expediteurNom = await nomCompteAffichage(user.id);
+  const origineId = fiche.fiche_origine_id || fiche.id; // une trace partagée depuis une AUTRE trace garde le même "N fois" que l'originale
+  // Copie reçue : 100% au destinataire, masquée de SA liste principale tant qu'il n'a pas cliqué "Afficher".
+  const copieRecueId = await dupliquerFicheStructure(fiche, {
     nom: fiche.nom, copierEvenements: false, copierExtras: true, ownerUserId: cibleInit.id, initiativeId: cibleInit.initiative_id,
   });
-  await inscJournaliser(fiche.id, user, "partage", `Partagée à « ${cibleInit.nom} » (copie #${newId}).`);
-  await inscJournaliser(newId, { id: cibleId, prenom: '', nom: cibleInit.nom }, "creation", `Reçue par partage depuis « ${fiche.nom} » (#${fiche.id}).`);
-  await db.prepare("INSERT INTO insc_fiches_partages (fiche_source_id, fiche_copie_id, expediteur_id, destinataire_id) VALUES (?,?,?,?)")
-    .run(fiche.id, newId, user.id, cibleId);
+  await db.prepare("UPDATE insc_fiches SET partage_role='reception', partage_contact_nom=?, partage_le=datetime('now'), partage_accepte=0 WHERE id=?")
+    .run(expediteurNom, copieRecueId);
+  // Ma trace d'envoi : reste chez MOI, jamais dans ma liste principale, juste pour "je sais que j'ai partagé celle-ci".
+  const traceId = await dupliquerFicheStructure(fiche, {
+    nom: fiche.nom, copierEvenements: false, copierExtras: true, ownerUserId: fiche.owner_user_id, initiativeId: fiche.initiative_id,
+  });
+  await db.prepare("UPDATE insc_fiches SET partage_role='envoi_trace', partage_contact_nom=?, partage_le=datetime('now'), fiche_origine_id=? WHERE id=?")
+    .run(cibleInit.nom, origineId, traceId);
+  await inscJournaliser(fiche.id, user, "partage", `Partagée à « ${cibleInit.nom} » (copie #${copieRecueId}).`);
+  await inscJournaliser(copieRecueId, { id: cibleId, prenom: '', nom: cibleInit.nom }, "creation", `Reçue par partage depuis « ${fiche.nom} » (#${fiche.id}).`);
   creerNotif(cibleId, "insc_fiche_partagee", "Une fiche d'inscription vous a été partagée",
-    `${await nomCompteAffichage(user.id)} vous a partagé la fiche « ${fiche.nom} » : une copie vierge, à vous, avec tous ses réglages. Aucune inscription ni événement n'a été repris — c'est à vous de les ajouter.`,
-    { lien: `inscriptions-admin.html?fiche=${newId}` });
-  sendJSON(res, 201, { fiche_id: newId });
+    `${expediteurNom} vous a partagé la fiche « ${fiche.nom} » : une copie vierge, à vous, avec tous ses réglages. Aucune inscription ni événement n'a été repris — c'est à vous de les ajouter. Retrouvez-la dans « 📥 Formulaires partagés avec moi ».`,
+    { lien: `inscriptions-admin.html?partages=recues` });
+  sendJSON(res, 201, { fiche_id: copieRecueId, destinataire: cibleNom });
+});
+/* Le destinataire choisit d'afficher (ou non) la copie reçue dans sa liste principale — tant
+   qu'il n'a pas cliqué, elle reste accessible uniquement depuis l'onglet "Reçues" (2026-10-08,
+   demande explicite : "si la personne accepte, alors oui, elle est déplacée dans la liste
+   principale. Sinon, elle reste là où elle est"). */
+route("POST", "/api/insc/fiches/:id/afficher-dans-ma-liste", async (req, res, params) => {
+  const { erreur, msg, fiche } = await inscFicheProprietaire(req, params.id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  if (fiche.partage_role !== 'reception') return sendJSON(res, 400, { error: "Cette fiche n'est pas une copie reçue par partage." });
+  await db.prepare("UPDATE insc_fiches SET partage_accepte=1 WHERE id=?").run(fiche.id);
+  sendJSON(res, 200, { ok: true });
 });
 
-/* Panneau « Fiche partagée » : les deux sens réunis pour le compte courant, peu importe par
-   quelle fiche le panneau a été ouvert (2026-10-08, demande explicite — "toutes les fiches
-   partagées... et toutes les fiches que je reçois également", vue globale du compte, pas
-   limitée à une fiche précise). */
+/* Panneau « Fiche partagée » : les deux sens réunis pour le compte courant (2026-10-08, demande
+   explicite — vue globale, pas limitée à la fiche depuis laquelle le panneau a été ouvert). Lit
+   directement insc_fiches (plus de table à part depuis la refonte "3 fiches indépendantes"). */
 route("GET", "/api/insc/fiches-partagees", async (req, res) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  const envoyees = await db.prepare(`
-    SELECT p.id, p.created_at, p.destinataire_id, fc.id AS fiche_id, fc.nom, fc.statut,
-      ${sqlNomAffichage('u', 'i')} AS destinataire_nom
-    FROM insc_fiches_partages p
-    JOIN insc_fiches fc ON fc.id=p.fiche_copie_id
-    JOIN users u ON u.id=p.destinataire_id
-    LEFT JOIN initiatives i ON i.owner_user_id=u.id
-    WHERE p.expediteur_id=? ORDER BY p.id DESC`).all(user.id);
-  const recues = await db.prepare(`
-    SELECT p.id, p.created_at, p.expediteur_id, fc.id AS fiche_id, fc.nom, fc.statut,
-      ${sqlNomAffichage('u', 'i')} AS expediteur_nom
-    FROM insc_fiches_partages p
-    JOIN insc_fiches fc ON fc.id=p.fiche_copie_id
-    JOIN users u ON u.id=p.expediteur_id
-    LEFT JOIN initiatives i ON i.owner_user_id=u.id
-    WHERE p.destinataire_id=? ORDER BY p.id DESC`).all(user.id);
+  const envoyees = await db.prepare(
+    "SELECT id AS fiche_id, nom, statut, partage_contact_nom AS destinataire_nom, partage_le AS created_at FROM insc_fiches WHERE owner_user_id=? AND partage_role='envoi_trace' ORDER BY id DESC"
+  ).all(user.id);
+  const recues = await db.prepare(
+    "SELECT id AS fiche_id, nom, statut, partage_contact_nom AS expediteur_nom, partage_le AS created_at, partage_accepte FROM insc_fiches WHERE owner_user_id=? AND partage_role='reception' ORDER BY id DESC"
+  ).all(user.id);
   sendJSON(res, 200, { envoyees, recues });
 });
 

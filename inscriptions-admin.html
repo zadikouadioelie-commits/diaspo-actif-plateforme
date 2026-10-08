@@ -258,6 +258,8 @@ const state = {
   partageOnglet: 'nouveau', // 'nouveau' | 'envoyees' | 'recues'
   partageRecherche: '',
   partageResultats: [],
+  partageChoisi: null,  // compte choisi parmi les propositions (étape « Envoyer »)
+  partageActif: 0,      // proposition surlignée au clavier
   partageEnvoyees: [],
   partageRecues: [],
   publicData: null,
@@ -1317,7 +1319,11 @@ function renderListView() {
         <div style="padding:18px;">
           ${iaBaCartouche(f, false, '0 0 12px')}
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px;">
-            <div style="font-weight:700;font-size:15px;">${escH(f.nom)}</div>
+            <div>
+              <div style="font-weight:700;font-size:15px;">${escH(f.nom)}</div>
+              ${f.nb_partages ? `<span style="font-size:10.5px;font-weight:700;color:oklch(0.4 0.13 258);">📤 Partagée ${f.nb_partages} fois</span>` : ''}
+              ${f.partage_role === 'reception' ? `<span style="font-size:10.5px;font-weight:700;color:oklch(0.4 0.13 150);display:block;">📥 Reçue de ${escH(f.partage_contact_nom || '—')}</span>` : ''}
+            </div>
             <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;">
               <span style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;white-space:nowrap;background:${bg};color:${color};">${IA_STATUS_LABEL[f.statut]}${f.gele_le ? ' · 🔒' : ''}</span>
               ${f.a_types_payants
@@ -1819,35 +1825,64 @@ function renderModalPartage() {
   const fmt = d => d ? String(d).slice(0, 10).split('-').reverse().join('/') : '';
   let corps;
   if (state.partageOnglet === 'nouveau') {
-    corps = `
-      <p style="font-size:12.5px; color:oklch(0.55 0.006 30); margin:0 0 12px;">Cherchez l'Initiative à qui partager « ${escH(fiche.nom)} ». Elle reçoit une copie vierge (aucune inscription, aucun événement lié) avec tous les réglages — elle pourra ensuite tout modifier, la fiche lui appartient.</p>
-      <input id="partage-recherche-input" type="text" placeholder="Nom de l'initiative…" value="${escH(state.partageRecherche)}" autocomplete="off" style="width:100%; height:40px; border:1px solid oklch(0.8 0.006 30); border-radius:10px; padding:0 12px; font-size:13.5px; box-sizing:border-box; margin-bottom:10px;">
-      <div style="display:flex; flex-direction:column; gap:6px;">
-        ${state.partageRecherche.trim().length < 2 ? '' : (state.partageResultats.length
-          ? state.partageResultats.map(r => `
-            <div style="display:flex; align-items:center; gap:10px; border:1px solid oklch(0.9 0.004 30); border-radius:10px; padding:9px 12px;">
-              <div style="flex:1; min-width:0;"><div style="font-weight:700; font-size:13px;">${escH(r.nom)}</div>${r.detail ? `<div style="font-size:11.5px; color:oklch(0.55 0.006 30);">${escH(r.detail)}</div>` : ''}</div>
-              <button data-action="envoyerPartage" data-user-id="${r.user_id}" style="background:oklch(0.32 0.09 258); border:none; color:#fff; font-size:12px; font-weight:700; padding:7px 14px; border-radius:20px; cursor:pointer; white-space:nowrap;">Partager</button>
-            </div>`).join('')
-          : '<div style="font-size:12.5px; color:oklch(0.55 0.006 30); padding:8px 2px;">Aucune Initiative trouvée pour ce nom.</div>')}
-      </div>`;
+    /* Même principe que le « @ » des publications (assets/posts.js) : on tape le nom du compte, des
+       propositions apparaissent (avatar, nom, type, lieu), on en choisit une, puis « Envoyer ». */
+    const roleLib = { initiative: 'Initiative', collectivite: 'Collectivité' };
+    const avatar = r => r.avatar_url
+      ? `<img src="${escH(r.avatar_url)}" alt="" style="width:34px; height:34px; border-radius:50%; object-fit:cover; flex-shrink:0;">`
+      : `<span style="width:34px; height:34px; border-radius:50%; background:oklch(0.32 0.09 258); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px; flex-shrink:0;">${escH((r.nom || '?').trim().slice(0, 2).toUpperCase())}</span>`;
+    const c = state.partageChoisi;
+    if (c) {
+      corps = `
+        <p style="font-size:12.5px; color:oklch(0.55 0.006 30); margin:0 0 12px;">Partager « ${escH(fiche.nom)} » à :</p>
+        <div style="display:flex; align-items:center; gap:10px; border:1.5px solid oklch(0.32 0.09 258); border-radius:12px; padding:10px 12px; margin-bottom:14px; background:#fff;">
+          ${avatar(c)}
+          <div style="flex:1; min-width:0;"><div style="font-weight:700; font-size:13.5px;">@${escH(c.nom)}</div><div style="font-size:11.5px; color:oklch(0.55 0.006 30);">${escH(roleLib[c.role] || '')}${c.detail ? ' · ' + escH(c.detail) : ''}</div></div>
+          <button data-action="retirerChoixPartage" title="Choisir un autre compte" style="background:none; border:none; font-size:16px; cursor:pointer; color:oklch(0.55 0.006 30);">✕</button>
+        </div>
+        <p style="font-size:12px; color:oklch(0.55 0.006 30); margin:0 0 14px; line-height:1.5;">Ce compte reçoit une notification et retrouve la fiche dans « 📥 Formulaires partagés avec moi » : une copie vierge (aucune inscription, aucun événement lié) avec tous les réglages, qu'il pourra ensuite modifier librement.</p>
+        <button data-action="envoyerPartage" style="width:100%; background:oklch(0.32 0.09 258); border:none; color:#fff; font-size:13.5px; font-weight:700; padding:11px 14px; border-radius:24px; cursor:pointer;">Envoyer</button>`;
+    } else {
+      corps = `
+        <p style="font-size:12.5px; color:oklch(0.55 0.006 30); margin:0 0 12px;">À qui partager « ${escH(fiche.nom)} » ? Tapez le nom du compte (Initiative ou Collectivité), puis choisissez-le dans les propositions.</p>
+        <input id="partage-recherche-input" type="text" placeholder="@ nom du compte…" value="${escH(state.partageRecherche)}" autocomplete="off" style="width:100%; height:40px; border:1px solid oklch(0.8 0.006 30); border-radius:10px; padding:0 12px; font-size:13.5px; box-sizing:border-box; margin-bottom:10px;">
+        <div style="display:flex; flex-direction:column; gap:4px;">
+          ${state.partageRecherche.replace(/^[@*]+/, '').trim().length < 2 ? '' : (state.partageResultats.length
+            ? state.partageResultats.map((r, i) => `
+              <div data-action="choisirPartage" data-idx="${i}" style="display:flex; align-items:center; gap:10px; border:1px solid ${i === state.partageActif ? 'oklch(0.32 0.09 258)' : 'oklch(0.9 0.004 30)'}; background:${i === state.partageActif ? '#fff' : 'transparent'}; border-radius:10px; padding:8px 12px; cursor:pointer;">
+                ${avatar(r)}
+                <div style="flex:1; min-width:0;"><div style="font-weight:700; font-size:13px;">${escH(r.nom)}</div><div style="font-size:11.5px; color:oklch(0.55 0.006 30);">${escH(roleLib[r.role] || '')}${r.detail ? ' · ' + escH(r.detail) : ''}</div></div>
+              </div>`).join('')
+            : '<div style="font-size:12.5px; color:oklch(0.55 0.006 30); padding:8px 2px;">Aucun compte trouvé pour ce nom.</div>')}
+        </div>`;
+    }
   } else if (state.partageOnglet === 'envoyees') {
+    // Simple trace à moi (2026-10-08, "3 fiches indépendantes") — la supprimer ne touche ni
+    // l'originale ni ce que le destinataire a reçu, c'est juste un repère visuel que je retire.
     corps = state.partageEnvoyees.length ? `
       <div style="display:flex; flex-direction:column; gap:8px;">
         ${state.partageEnvoyees.map(p => `
-          <div style="border:1px solid oklch(0.9 0.004 30); border-radius:10px; padding:10px 12px; font-size:12.5px;">
-            ${ligneFiche(p.nom, p.statut)}<br>
-            <span style="color:oklch(0.55 0.006 30);">Partagée à <b>${escH(p.destinataire_nom || '—')}</b> le ${fmt(p.created_at)}</span>
+          <div style="display:flex; align-items:center; gap:10px; border:1px solid oklch(0.9 0.004 30); border-radius:10px; padding:10px 12px; font-size:12.5px;">
+            <div style="flex:1; min-width:0;">
+              ${ligneFiche(p.nom, p.statut)}<br>
+              <span style="color:oklch(0.55 0.006 30);">Partagée à <b>${escH(p.destinataire_nom || '—')}</b> le ${fmt(p.created_at)}</span>
+            </div>
+            <button data-action="supprimerTracePartage" data-id="${p.fiche_id}" title="Retirer cette trace (n'affecte ni l'originale ni la copie reçue)" style="background:none; border:1px solid oklch(0.85 0.03 20); color:oklch(0.5 0.16 20); font-size:14px; padding:6px 9px; border-radius:8px; cursor:pointer; flex-shrink:0;">🗑</button>
           </div>`).join('')}
       </div>` : `<div style="text-align:center; padding:24px 10px; color:oklch(0.55 0.006 30); font-size:13px;">Aucune fiche partagée pour l'instant.</div>`;
   } else {
     corps = state.partageRecues.length ? `
       <div style="display:flex; flex-direction:column; gap:8px;">
         ${state.partageRecues.map(p => `
-          <a href="#" data-action="selectFiche" data-id="${p.fiche_id}" style="display:block; text-decoration:none; color:inherit; border:1px solid oklch(0.9 0.004 30); border-radius:10px; padding:10px 12px; font-size:12.5px;">
-            ${ligneFiche(p.nom, p.statut)}<br>
-            <span style="color:oklch(0.55 0.006 30);">Reçue de <b>${escH(p.expediteur_nom || '—')}</b> le ${fmt(p.created_at)} — entièrement à vous, modifiable</span>
-          </a>`).join('')}
+          <div style="border:1px solid oklch(0.9 0.004 30); border-radius:10px; padding:10px 12px; font-size:12.5px;">
+            <a href="#" data-action="selectFiche" data-id="${p.fiche_id}" style="display:block; text-decoration:none; color:inherit;">
+              ${ligneFiche(p.nom, p.statut)}<br>
+              <span style="color:oklch(0.55 0.006 30);">Reçue de <b>${escH(p.expediteur_nom || '—')}</b> le ${fmt(p.created_at)} — entièrement à vous, modifiable</span>
+            </a>
+            ${Number(p.partage_accepte)
+              ? `<span style="display:inline-block; margin-top:8px; font-size:11px; font-weight:700; color:oklch(0.4 0.13 150);">✅ Affichée dans votre liste principale</span>`
+              : `<button data-action="afficherDansListePrincipale" data-id="${p.fiche_id}" style="margin-top:8px; background:oklch(0.32 0.09 258); border:none; color:#fff; font-size:11.5px; font-weight:700; padding:7px 13px; border-radius:20px; cursor:pointer;">Afficher dans ma liste principale</button>`}
+          </div>`).join('')}
       </div>` : `<div style="text-align:center; padding:24px 10px; color:oklch(0.55 0.006 30); font-size:13px;">Aucune fiche reçue pour l'instant.</div>`;
   }
   return `
@@ -3118,7 +3153,7 @@ const actions = {
     state.modalPartageFicheId = parseInt(el.dataset.id);
     state.modalPartageOuvert = true;
     state.partageOnglet = 'nouveau';
-    state.partageRecherche = ''; state.partageResultats = [];
+    state.partageRecherche = ''; state.partageResultats = []; state.partageChoisi = null; state.partageActif = 0;
     await actions.chargerPartages();
   },
   fermerModalPartage() { state.modalPartageOuvert = false; },
@@ -3139,16 +3174,22 @@ const actions = {
       state.partageRecues = r.recues || [];
     } catch (e) { state.partageEnvoyees = []; state.partageRecues = []; }
   },
+  choisirPartage(el) {
+    const r = state.partageResultats[Number(el.dataset.idx)];
+    if (r) { state.partageChoisi = r; state.partageResultats = []; }
+  },
+  retirerChoixPartage() { state.partageChoisi = null; state.partageActif = 0; },
   async envoyerPartage(el) {
-    const userId = Number(el.dataset.userId);
+    const c = state.partageChoisi;
+    if (!c) return;
     el.disabled = true; el.textContent = 'Envoi…';
     try {
-      await api('POST', `/insc/fiches/${state.modalPartageFicheId}/partager`, { user_id: userId });
-      ia_toast('Fiche partagée.', true);
-      state.partageRecherche = ''; state.partageResultats = [];
+      await api('POST', `/insc/fiches/${state.modalPartageFicheId}/partager`, { user_id: Number(c.user_id) });
+      ia_toast(`Fiche partagée à ${c.nom} : elle reçoit une notification.`, true);
+      state.partageRecherche = ''; state.partageResultats = []; state.partageChoisi = null; state.partageActif = 0;
       await actions.chargerPartages();
       state.partageOnglet = 'envoyees';
-    } catch (e) { ia_toast(e.message, false); }
+    } catch (e) { ia_toast(e.message, false); el.disabled = false; el.textContent = 'Envoyer'; }
   },
   /* Programmation ouverture/fermeture — accès rapide depuis la cartouche (2026-09-28, demande
      explicite). state.fiches contient déjà les deux dates (voir GET /insc/fiches) : pas besoin
@@ -3921,13 +3962,23 @@ function render() {
       const q = partageInput.value;
       t = setTimeout(async () => {
         state.partageRecherche = q;
-        if (q.trim().length < 2) { state.partageResultats = []; render(); return; }
+        const net = q.replace(/^[@*]+/, '').trim();
+        if (net.length < 2) { state.partageResultats = []; render(); return; }
         try {
-          const r = await api('GET', `/insc/fiches/${state.modalPartageFicheId}/partager/suggestions?q=${encodeURIComponent(q.trim())}`);
+          const r = await api('GET', `/insc/fiches/${state.modalPartageFicheId}/partager/suggestions?q=${encodeURIComponent(net)}`);
+          if (state.partageRecherche !== q) return; // une frappe plus récente a pris le relais
           state.partageResultats = r.suggestions || [];
         } catch (e) { state.partageResultats = []; }
+        state.partageActif = 0;
         render();
       }, 220);
+    });
+    partageInput.addEventListener('keydown', (e) => {
+      const n = state.partageResultats.length;
+      if (!n) return;
+      if (e.key === 'ArrowDown') { e.preventDefault(); state.partageActif = Math.min(state.partageActif + 1, n - 1); state.partageRecherche = partageInput.value; render(); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); state.partageActif = Math.max(state.partageActif - 1, 0); state.partageRecherche = partageInput.value; render(); }
+      else if (e.key === 'Enter') { e.preventDefault(); actions.choisirPartage({ dataset: { idx: state.partageActif } }); render(); }
     });
   }
 }
@@ -3956,6 +4007,8 @@ root.addEventListener('change', function (e) {
     // demande explicite) — chargé une fois au démarrage pour que le nombre soit juste dès le
     // premier affichage, sans attendre un clic.
     await actions.chargerPartages();
+    /* Lien direct depuis la notification « Une fiche d'inscription vous a été partagée » : ouvre « Reçues ». */
+    if (new URLSearchParams(location.search).get('partages') === 'recues') await actions.ouvrirPartageGlobal();
     /* Lien direct depuis evenements.html (aperçu du modèle standard avant création d'un
        événement) — ?fiche=<id> ouvre directement le détail plutôt que la liste. */
     const ficheIdParam = new URLSearchParams(location.search).get('fiche');

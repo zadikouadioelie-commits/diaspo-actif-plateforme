@@ -546,6 +546,14 @@ db.exec(`
     code_acces TEXT,
     gele_le TEXT, gele_motif TEXT,
     sponsors_json TEXT DEFAULT '[]', partenaires_json TEXT DEFAULT '[]',
+    /* « Fiche partagée » (2026-10-08, demande explicite) : volontairement SANS contrainte
+       FOREIGN KEY sur fiche_origine_id (une référence purement informative, pour le badge
+       "Partagée N fois" sur l'originale — jamais pour l'intégrité) afin que l'originale, ma
+       trace d'envoi et la copie reçue restent 3 fiches totalement indépendantes ; supprimer
+       n'importe laquelle des trois ne doit jamais impacter les deux autres. Voir
+       partage_role (NULL normale / 'envoi_trace' / 'reception') et partage_accepte (la copie
+       reçue n'apparaît dans la liste principale du destinataire qu'une fois acceptée). */
+    partage_role TEXT, partage_contact_nom TEXT, partage_le TEXT, partage_accepte INTEGER DEFAULT 0, fiche_origine_id INTEGER,
     created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY(owner_user_id) REFERENCES users(id),
     FOREIGN KEY(initiative_id) REFERENCES initiatives(id)
@@ -562,26 +570,6 @@ db.exec(`
     FOREIGN KEY(fiche_id) REFERENCES insc_fiches(id),
     FOREIGN KEY(evenement_id) REFERENCES evenements(id)
   );
-
-  /* Traçabilité du partage d'une fiche à une autre initiative (2026-10-08, demande explicite
-     « Fiche partagée ») — la copie elle-même (fiche_copie_id) est une fiche insc_fiches
-     ordinaire, pleinement autonome et modifiable par son nouveau propriétaire ; cette table
-     sert uniquement à reconstituer les deux listes « envoyées » / « reçues » affichées dans
-     le panneau « Fiche partagée », jamais à garder un lien vivant entre original et copie. */
-  CREATE TABLE IF NOT EXISTS insc_fiches_partages (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    fiche_source_id INTEGER NOT NULL,
-    fiche_copie_id INTEGER NOT NULL,
-    expediteur_id INTEGER NOT NULL,
-    destinataire_id INTEGER NOT NULL,
-    created_at TEXT DEFAULT (datetime('now')),
-    FOREIGN KEY(fiche_source_id) REFERENCES insc_fiches(id),
-    FOREIGN KEY(fiche_copie_id) REFERENCES insc_fiches(id),
-    FOREIGN KEY(expediteur_id) REFERENCES users(id),
-    FOREIGN KEY(destinataire_id) REFERENCES users(id)
-  );
-  CREATE INDEX IF NOT EXISTS idx_insc_partages_expediteur ON insc_fiches_partages(expediteur_id);
-  CREATE INDEX IF NOT EXISTS idx_insc_partages_destinataire ON insc_fiches_partages(destinataire_id);
 
   CREATE TABLE IF NOT EXISTS insc_types (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
