@@ -835,6 +835,8 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
     // Assigner DA-ID à l'initiative aussi
     const initRow = await db.prepare('SELECT id FROM initiatives WHERE owner_user_id=? ORDER BY id DESC LIMIT 1').get(id);
     if (initRow) try { await db.prepare('UPDATE initiatives SET da_id=? WHERE id=?').run(generateDaId(), initRow.id); } catch(_) {}
+    /* Numéro de déclaration demandé dès la création : confirmé aussitôt dans le registre officiel → point « Organisation vérifiée » (2026-10-08). */
+    if (initRow && statut_creation !== 'en_creation' && numero_immatriculation) { try { await verifierImmatriculationAuto(initRow.id); } catch (_) { /* le cron quotidien réessaiera */ } }
     // Profil public enrichi : champs facultatifs du formulaire d'inscription
     if (initRow) try {
       const THEMES_VITRINE_VALIDES = ['bordeaux', 'ocean', 'emeraude', 'prune', 'or'];
@@ -10446,6 +10448,7 @@ route("POST", "/api/initiatives", async (req, res, params, body) => {
       } catch(_) {}
     }
   }
+  if (numero_immatriculation && statut_creation !== 'en_creation') { try { await verifierImmatriculationAuto(id); } catch (_) { /* le cron quotidien réessaiera */ } }
   sendJSON(res, 201, { id, slug });
 });
 
@@ -19847,6 +19850,54 @@ route("GET", "/api/admin/verifications-organisation", async (req, res, params, b
   sendJSON(res, 200, { demandes: rows });
 });
 
+/* ══════════════════════════════════════════════════════════════════════════
+   « ORGANISATION VÉRIFIÉE » AUTOMATIQUE (2026-10-08, demande explicite)
+   Règle voulue : renseigner le numéro de sa déclaration (RNA pour une association, SIRET/SIREN pour une entreprise) suffit pour obtenir
+   le point « Organisation vérifiée » (+5) — sans bouton à cliquer. Le numéro est demandé dès la création du compte ; on le confirme
+   aussitôt dans le registre officiel (API publique recherche-entreprises.api.gouv.fr, gratuite, sans clé). Un numéro qui n'existe pas
+   dans le registre ne donne AUCUN point (sinon n'importe quel texte saisi suffirait). Hors de France (registre non couvert), la
+   vérification reste manuelle : justificatif examiné par l'équipe (voir PUT /api/admin/verifications-organisation/:id).
+   Distinct du contrôle Stripe (+8, initiatives.organisation_verifiee). ══ */
+function formatImmatriculation(numero) {
+  const n = String(numero || '').replace(/[\s.\-]/g, '').toUpperCase();
+  if (/^W\d{9}$/.test(n)) return { type: 'RNA', n };
+  if (/^\d{14}$/.test(n)) return { type: 'SIRET', n };
+  if (/^\d{9}$/.test(n)) return { type: 'SIREN', n };
+  return null;
+}
+/* → { statut: 'ok' | 'introuvable' | 'indisponible' | 'format', nom? } — le numéro cherché doit se retrouver À L'IDENTIQUE (siren, siret du
+   siège ou identifiant d'association) : l'API fait une recherche floue et peut renvoyer des structures sans rapport pour un faux numéro. */
+async function chercherImmatriculationRegistre(numero) {
+  const f = formatImmatriculation(numero);
+  if (!f) return { statut: 'format' };
+  try {
+    const r = await fetch("https://recherche-entreprises.api.gouv.fr/search?q=" + encodeURIComponent(f.n), { signal: AbortSignal.timeout(6000) });
+    if (!r.ok) return { statut: 'indisponible' };
+    const data = await r.json();
+    const match = (data.results || []).find(x => {
+      const siren = String(x.siren || '').toUpperCase(), siret = String(x.siege?.siret || '').toUpperCase(), rna = String(x.complements?.identifiant_association || '').toUpperCase();
+      return siren === f.n || siret === f.n || (rna && rna === f.n);
+    });
+    /* Une fiche sans nom (SIREN « fantôme » du registre, constaté sur 123456789) ne confirme aucune structure réelle. Limite assumée : le registre
+       prouve qu'une structure existe sous ce numéro, pas que ce compte en est le titulaire — d'où le nom du registre affiché au titulaire et à
+       l'équipe, et les contrôles plus poussés (justificatif, contrôle Stripe) qui restent des critères distincts. */
+    const nom = match ? (match.nom_complet || match.nom_raison_sociale || null) : null;
+    return nom ? { statut: 'ok', nom } : { statut: 'introuvable' };
+  } catch (e) { return { statut: 'indisponible' }; }
+}
+async function verifierImmatriculationAuto(initId, { notifier = true } = {}) {
+  const init = await db.prepare("SELECT id, owner_user_id, nom, numero_immatriculation, immat_verifiee_ligne FROM initiatives WHERE id=?").get(initId);
+  if (!init || !String(init.numero_immatriculation || '').trim()) return { statut: 'vide' };
+  if (init.immat_verifiee_ligne) return { statut: 'deja' };
+  const r = await chercherImmatriculationRegistre(init.numero_immatriculation);
+  if (r.statut === 'ok') {
+    await db.prepare("UPDATE initiatives SET immat_verifiee_ligne=1, immat_verifiee_ligne_le=datetime('now'), immat_nom_registre=? WHERE id=?").run(r.nom, init.id);
+    if (notifier && init.owner_user_id) await creerNotif(init.owner_user_id, 'immat_verifiee', 'Organisation vérifiée ✅',
+      `Votre numéro d'immatriculation est confirmé dans le registre officiel${r.nom ? ' (« ' + r.nom + ' »)' : ''} : +5 points de fiabilité.`, { lien: 'dashboard-initiative.html' });
+  }
+  return r;
+}
+
 /* PUT /api/admin/verifications-organisation/:id — approuver ou rejeter, avec motif si rejet */
 route("PUT", "/api/admin/verifications-organisation/:id", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
@@ -19885,6 +19936,8 @@ route("PUT", "/api/admin/verifications-organisation/:id", async (req, res, param
         "UPDATE initiatives SET numero_immatriculation=? WHERE id=? AND (numero_immatriculation IS NULL OR numero_immatriculation='')"
       ).run(demande.numero, demande.initiative_id);
     }
+    /* Organisation hors de France (ou registre indisponible) : le justificatif approuvé par l'équipe vaut vérification du numéro → point « Organisation vérifiée » (2026-10-08). */
+    await db.prepare("UPDATE initiatives SET immat_verifiee_ligne=1, immat_verifiee_ligne_le=datetime('now'), immat_nom_registre=COALESCE(immat_nom_registre, 'Justificatif vérifié par l''équipe') WHERE id=? AND COALESCE(immat_verifiee_ligne,0)=0 AND numero_immatriculation IS NOT NULL AND numero_immatriculation<>''").run(demande.initiative_id);
     if (init?.owner_user_id) {
       creerNotif(init.owner_user_id, "organisation_verifiee", "Organisation testée avec Stripe 🏢",
         `« ${init.nom} » a obtenu le badge Organisation testée avec Stripe.`, { initiative_id: demande.initiative_id });
@@ -30245,6 +30298,45 @@ async function handleRequest(req, res) {
     return;
   }
 
+  /* ── GET /api/cron/immatriculations — « Organisation vérifiée » automatique (2026-10-08, demande explicite) ──
+     Chaque jour : (1) confirme dans le registre officiel les numéros déjà saisis mais jamais validés (25 au hasard par passage : le
+     registre n'est jamais martelé, et un numéro refusé est simplement retenté plus tard) → +5 points accordés sans action de l'organisation ;
+     (2) rappelle (notification, au plus une fois tous les 30 jours par compte) les organisations déjà créées qui n'ont toujours pas de
+     numéro, ou dont le numéro n'a pas pu être confirmé. Aucun e-mail : notifications seulement. */
+  if (pathname === '/api/cron/immatriculations') {
+    const cronSecret = process.env.CRON_SECRET;
+    const authHeader = req.headers['authorization'] || '';
+    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) return sendJSON(res, 401, { error: "Non autorisé." });
+    try {
+      const bilan = { verifiees: 0, introuvables: 0, etrangers: 0, indisponibles: 0, rappels: 0 };
+      const aVerifier = await db.prepare(`SELECT id FROM initiatives WHERE numero_immatriculation IS NOT NULL AND TRIM(numero_immatriculation)<>'' AND COALESCE(immat_verifiee_ligne,0)=0 ORDER BY RANDOM() LIMIT 25`).all();
+      for (const row of aVerifier) {
+        const r = await verifierImmatriculationAuto(row.id);
+        if (r.statut === 'ok') bilan.verifiees++; else if (r.statut === 'introuvable') bilan.introuvables++; else if (r.statut === 'format') bilan.etrangers++; else if (r.statut === 'indisponible') bilan.indisponibles++;
+      }
+      const aRappeler = await db.prepare(`SELECT i.id, i.nom, i.owner_user_id, i.numero_immatriculation FROM initiatives i JOIN users u ON u.id=i.owner_user_id
+        WHERE COALESCE(i.statut_creation,'existante')='existante' AND COALESCE(i.immat_verifiee_ligne,0)=0 AND (u.compte_masque IS NULL OR u.compte_masque=0) AND (u.is_demo IS NULL OR u.is_demo=FALSE)
+        ORDER BY RANDOM() LIMIT 40`).all();
+      for (const i of aRappeler) {
+        const dernier = await db.prepare(`SELECT created_at FROM notifications WHERE user_id=? AND type='immat_rappel' ORDER BY id DESC LIMIT 1`).get(i.owner_user_id);
+        if (dernier && (Date.now() - new Date(String(dernier.created_at).replace(' ', 'T') + (String(dernier.created_at).includes('Z') ? '' : 'Z')).getTime()) < 30 * 86400000) continue;
+        const aNumero = !!String(i.numero_immatriculation || '').trim();
+        const etranger = aNumero && !formatImmatriculation(i.numero_immatriculation);
+        const contenu = !aNumero
+          ? `Renseignez le numéro de déclaration de « ${i.nom} » (RNA pour une association, SIRET pour une entreprise) : il est confirmé automatiquement et vous obtenez le badge « Organisation vérifiée » (+5 points).`
+          : etranger
+            ? `Le numéro de « ${i.nom} » n'est pas un identifiant français : envoyez votre justificatif d'enregistrement (rubrique Paiements) pour que l'équipe le vérifie et vous accorde le badge « Organisation vérifiée ».`
+            : `Le numéro de « ${i.nom} » n'a pas pu être confirmé dans le registre officiel : vérifiez qu'il est exact (RNA : W + 9 chiffres, SIREN : 9 chiffres, SIRET : 14 chiffres) pour obtenir le badge « Organisation vérifiée ».`;
+        await creerNotif(i.owner_user_id, 'immat_rappel', 'Obtenez le badge « Organisation vérifiée » 🏛️', contenu, { lien: 'dashboard-initiative.html' });
+        bilan.rappels++;
+      }
+      return sendJSON(res, 200, { ok: true, ...bilan });
+    } catch (e) {
+      console.error('[cron immatriculations]', e.message);
+      return sendJSON(res, 500, { error: 'Échec du passage.', detail: e.message });
+    }
+  }
+
   /* ── GET /api/cron/backup-verify — alerte par e-mail si la sauvegarde n'a pas tourné
      (2026-09-29) — cron séparé, programmé 2h après /api/cron/backup (3h UTC), pour laisser le
      temps à une exécution lente/retentée. Sans ça, un /api/cron/backup qui échoue silencieusement
@@ -36223,8 +36315,8 @@ ${jsonLd}
 
         { cle:'immatriculation', icon:'🏛️', label:'Organisation vérifiée', pts: init?.immat_verifiee_ligne ? 5 : 0, max:5,
           applicable: porteUneStructure,
-          aide: init?.immat_verifiee_ligne ? `Validée en ligne${init.immat_nom_registre ? ' — ' + init.immat_nom_registre : ''}.` : (init?.numero_immatriculation ? 'Numéro renseigné — validez-le en ligne pour obtenir ces points.' : 'Numéro SIRET, RNA ou équivalent.'),
-          action: init?.immat_verifiee_ligne ? null : { texte: init?.numero_immatriculation ? 'Valider mon numéro en ligne' : "Renseigner l'immatriculation", href:'reseau.html' } },
+          aide: init?.immat_verifiee_ligne ? `Validée en ligne${init.immat_nom_registre ? ' — ' + init.immat_nom_registre : ''}.` : (init?.numero_immatriculation ? 'Numéro renseigné — confirmé automatiquement dans le registre officiel (réessayez avec le bouton si besoin). Hors de France : envoyez votre justificatif pour une vérification par l’équipe.' : 'Numéro de votre déclaration : RNA (association) ou SIRET/SIREN (entreprise) — confirmé automatiquement, +5 points.'),
+          action: init?.immat_verifiee_ligne ? null : { texte: init?.numero_immatriculation ? 'Réessayer la vérification' : "Renseigner l'immatriculation", href:'reseau.html' } },
       ];
 
       const retenus = criteres.filter(c => c.applicable);
@@ -37613,6 +37705,7 @@ ${jsonLd}
       if (numero_immatriculation && String(numero_immatriculation).replace(/\s/g, '').toUpperCase() !== String(myInit.numero_immatriculation || '').replace(/\s/g, '').toUpperCase()) {
         await db.prepare(`UPDATE initiatives SET immat_verifiee_ligne=0, immat_verifiee_ligne_le=NULL, immat_nom_registre=NULL WHERE id=?`).run(myInit.id);
       }
+      const numeroModifie = !!numero_immatriculation;
       await db.prepare(`UPDATE initiatives SET
         numero_immatriculation=COALESCE(?,numero_immatriculation),
         pays_immatriculation=COALESCE(?,pays_immatriculation),
@@ -37633,7 +37726,10 @@ ${jsonLd}
         accepte_messages!==undefined?(accepte_messages?1:0):null,
         myInit.id
       );
-      return sendJSON(res, 200, { ok: true });
+      /* Numéro saisi ou corrigé : confirmé aussitôt dans le registre officiel (point « Organisation vérifiée », 2026-10-08). */
+      let immat = null;
+      if (numeroModifie || !myInit.immat_verifiee_ligne) { try { immat = await verifierImmatriculationAuto(myInit.id); } catch (_) {} }
+      return sendJSON(res, 200, { ok: true, immatriculation: immat ? immat.statut : null });
     }
 
     /* POST /api/initiatives/verifier-immatriculation — vérification en ligne, légère et
@@ -37651,29 +37747,13 @@ ${jsonLd}
       if (!myInit) return sendJSON(res, 404, { error: "Aucune initiative associée à votre compte." });
       const numero = String(myInit.numero_immatriculation || '').trim();
       if (!numero) return sendJSON(res, 400, { error: "Renseignez d'abord votre numéro d'immatriculation." });
-      const numeroNorm = numero.replace(/\s/g, '').toUpperCase();
-      try {
-        const r = await fetch("https://recherche-entreprises.api.gouv.fr/search?q=" + encodeURIComponent(numero), {
-          signal: AbortSignal.timeout(8000),
-        });
-        if (!r.ok) return sendJSON(res, 502, { error: "Service de vérification indisponible, réessayez plus tard." });
-        const data = await r.json();
-        const match = (data.results || []).find(res2 => {
-          const siren = String(res2.siren || '').toUpperCase();
-          const siret = String(res2.siege?.siret || '').toUpperCase();
-          const rna = String(res2.complements?.identifiant_association || '').toUpperCase();
-          return siren === numeroNorm || siret === numeroNorm || (rna && rna === numeroNorm);
-        });
-        if (!match) {
-          return sendJSON(res, 200, { valide: false, message: "Aucune structure trouvée avec ce numéro dans le registre officiel. Vérifiez qu'il est correctement saisi." });
-        }
-        const nomTrouve = match.nom_complet || match.nom_raison_sociale || null;
-        await db.prepare(`UPDATE initiatives SET immat_verifiee_ligne=1, immat_verifiee_ligne_le=datetime('now'), immat_nom_registre=? WHERE id=?`).run(nomTrouve, myInit.id);
-        return sendJSON(res, 200, { valide: true, nom_trouve: nomTrouve });
-      } catch (e) {
-        console.error('[verifier-immatriculation]', e.message);
-        return sendJSON(res, 502, { error: "Impossible de contacter le service de vérification pour le moment. Réessayez plus tard." });
-      }
+      /* Même vérification que la vérification automatique (chercherImmatriculationRegistre, 2026-10-08) : ce bouton ne sert plus que de nouvel essai manuel. */
+      const rr = await chercherImmatriculationRegistre(numero);
+      if (rr.statut === 'format') return sendJSON(res, 200, { valide: false, message: "Ce numéro n'a pas le format d'un identifiant français (RNA : W + 9 chiffres, SIREN : 9 chiffres, SIRET : 14 chiffres). Pour une organisation hors de France, envoyez votre justificatif d'enregistrement depuis « Paiements » : l'équipe le vérifie." });
+      if (rr.statut === 'indisponible') return sendJSON(res, 502, { error: "Impossible de contacter le service de vérification pour le moment. Réessayez plus tard." });
+      if (rr.statut === 'introuvable') return sendJSON(res, 200, { valide: false, message: "Aucune structure trouvée avec ce numéro dans le registre officiel. Vérifiez qu'il est correctement saisi." });
+      await db.prepare(`UPDATE initiatives SET immat_verifiee_ligne=1, immat_verifiee_ligne_le=datetime('now'), immat_nom_registre=? WHERE id=?`).run(rr.nom, myInit.id);
+      return sendJSON(res, 200, { valide: true, nom_trouve: rr.nom });
     }
 
     /* ═══════════════════════════════════════════════════════
