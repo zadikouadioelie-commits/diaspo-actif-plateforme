@@ -6245,8 +6245,6 @@ route("PUT", "/api/initiatives/:id/adhesions-ouvertes", async (req, res, params,
    jours : entiers de -10 (10 jours après la fin) à 90 (90 jours avant), sans doublon, 10 au plus ; liste vide = aucun rappel.
    Renvoie null si la valeur n'est pas exploitable (la formule retombe alors sur les réglages généraux). */
 const ADHESION_CANAUX_RAPPEL = ['email', 'notification', 'les_deux'];
-function sanitizeRelancesFormule(brut) {
-  let c = brut;
 /* Prototype de carte de membre d'une formule (2026-10-08, demande explicite) : une image recto et/ou verso
    + l'emplacement (en % de l'image) des zones « prénom » et « nom », où le prénom/nom de chaque adhérent est
    écrit pour lui présenter SA carte. Rien n'est stocké par adhérent : le visuel est composé à l'affichage.
@@ -6277,6 +6275,8 @@ function sanitizeCarteProto(brut) {
 }
 const carteProtoJson = brut => { const c = sanitizeCarteProto(brut); return c ? JSON.stringify(c) : null; };
 
+function sanitizeRelancesFormule(brut) {
+  let c = brut;
   if (typeof c === 'string') { try { c = JSON.parse(c); } catch (_) { return null; } }
   if (!c || typeof c !== 'object' || !Array.isArray(c.jours)) return null;
   const jours = [...new Set(c.jours.map(j => Math.round(Number(j))).filter(j => Number.isFinite(j) && j >= -10 && j <= 90))].sort((a, b) => b - a).slice(0, 10);
@@ -6407,9 +6407,9 @@ route("POST", "/api/initiatives/:id/adhesion-formules", async (req, res, params,
        reglement_interieur_texte ? String(reglement_interieur_texte).slice(0, 20000) : null,
        (() => { const c = sanitizeRelancesFormule(relances_config); return c ? JSON.stringify(c) : null; })())).lastInsertRowid;
   if (body.rubriques !== undefined) await db.prepare('UPDATE adhesion_formules SET rubriques_json=? WHERE id=?').run(sanitizeRubriques(body.rubriques), id);
+  if (body.carte_proto !== undefined) await db.prepare('UPDATE adhesion_formules SET carte_proto_json=? WHERE id=?').run(carteProtoJson(body.carte_proto), id);
   if (body.est_officielle) await adhAppliquerOfficielle(id, params.id, true);
   sendJSON(res, 201, { id });
-  if (body.carte_proto !== undefined) await db.prepare('UPDATE adhesion_formules SET carte_proto_json=? WHERE id=?').run(carteProtoJson(body.carte_proto), id);
 });
 
 /* ── Modifier une formule ── */
@@ -6491,9 +6491,9 @@ route("PUT", "/api/adhesion-formules/:id", async (req, res, params, body) => {
          relances_config !== undefined ? (() => { const c = sanitizeRelancesFormule(relances_config); return c ? JSON.stringify(c) : null; })() : f.relances_config_json,
          params.id);
   if (body.rubriques !== undefined) await db.prepare('UPDATE adhesion_formules SET rubriques_json=? WHERE id=?').run(sanitizeRubriques(body.rubriques), f.id);
+  if (body.carte_proto !== undefined) await db.prepare('UPDATE adhesion_formules SET carte_proto_json=? WHERE id=?').run(carteProtoJson(body.carte_proto), f.id);
   if (body.est_officielle !== undefined) await adhAppliquerOfficielle(f.id, f.initiative_id, !!body.est_officielle);
   sendJSON(res, 200, { ok: true });
-  if (body.carte_proto !== undefined) await db.prepare('UPDATE adhesion_formules SET carte_proto_json=? WHERE id=?').run(carteProtoJson(body.carte_proto), f.id);
 });
 
 /* ── Supprimer une formule ── */
@@ -6529,9 +6529,9 @@ route("POST", "/api/adhesion-formules/:id/dupliquer", async (req, res, params) =
        f.duree_valeur, f.duree_unite, f.duree_illimitee, f.max_adherents,
        f.texte_intro, f.conditions_adhesion, f.reglement_pdf_url, f.statuts_pdf_url, f.champs_config_json, f.champs_custom_json, f.reglement_interieur_texte, f.relances_config_json)).lastInsertRowid;
   if (f.rubriques_json) await db.prepare('UPDATE adhesion_formules SET rubriques_json=? WHERE id=?').run(f.rubriques_json, id);
+  if (f.carte_proto_json) await db.prepare('UPDATE adhesion_formules SET carte_proto_json=? WHERE id=?').run(f.carte_proto_json, id);
   sendJSON(res, 201, { id });
 });
-  if (f.carte_proto_json) await db.prepare('UPDATE adhesion_formules SET carte_proto_json=? WHERE id=?').run(f.carte_proto_json, id);
 
 /* ── Activer/désactiver une formule ── */
 route("PUT", "/api/adhesion-formules/:id/toggle-actif", async (req, res, params, body) => {
