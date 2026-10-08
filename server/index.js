@@ -6245,6 +6245,36 @@ route("PUT", "/api/initiatives/:id/adhesions-ouvertes", async (req, res, params,
 const ADHESION_CANAUX_RAPPEL = ['email', 'notification', 'les_deux'];
 function sanitizeRelancesFormule(brut) {
   let c = brut;
+/* Prototype de carte de membre d'une formule (2026-10-08, demande explicite) : une image recto et/ou verso
+   + l'emplacement (en % de l'image) des zones « prénom » et « nom », où le prénom/nom de chaque adhérent est
+   écrit pour lui présenter SA carte. Rien n'est stocké par adhérent : le visuel est composé à l'affichage.
+   Tout est revalidé ici (le client est de confiance nulle) : URL https uniquement, coordonnées bornées,
+   couleur en hexadécimal, message court. */
+function sanitizeCarteProto(brut) {
+  let c = brut;
+  if (typeof c === 'string') { try { c = JSON.parse(c); } catch (_) { return null; } }
+  if (!c || typeof c !== 'object') return null;
+  const url = u => (typeof u === 'string' && u.length <= 500 && /^https:\/\/[^\s"'<>]+$/.test(u)) ? u : null;
+  const num = (v, min, max) => { const n = Number(v); return Number.isFinite(n) ? Math.min(max, Math.max(min, Math.round(n * 100) / 100)) : null; };
+  const face = f => {
+    if (!f || typeof f !== 'object') return null;
+    const u = url(f.url); if (!u) return null;
+    const champs = {};
+    for (const k of ['prenom', 'nom']) {
+      const z = f.champs && f.champs[k]; if (!z) continue;
+      const x = num(z.x, 0, 99), y = num(z.y, 0, 99), w = num(z.w, 1, 100), h = num(z.h, 1, 100);
+      if ([x, y, w, h].some(v => v === null)) continue;
+      champs[k] = { x, y, w: Math.min(w, 100 - x), h: Math.min(h, 100 - y), couleur: /^#[0-9a-fA-F]{6}$/.test(z.couleur || '') ? z.couleur : '#111111' };
+    }
+    return { url: u, ratio: num(f.ratio, 0.3, 4) || 1.586, champs };
+  };
+  const recto = face(c.recto), verso = face(c.verso);
+  if (!recto && !verso) return null;
+  const message = String(c.message || '').replace(/[<>]/g, '').trim().slice(0, 400) || null;
+  return { recto, verso, message };
+}
+const carteProtoJson = brut => { const c = sanitizeCarteProto(brut); return c ? JSON.stringify(c) : null; };
+
   if (typeof c === 'string') { try { c = JSON.parse(c); } catch (_) { return null; } }
   if (!c || typeof c !== 'object' || !Array.isArray(c.jours)) return null;
   const jours = [...new Set(c.jours.map(j => Math.round(Number(j))).filter(j => Number.isFinite(j) && j >= -10 && j <= 90))].sort((a, b) => b - a).slice(0, 10);
@@ -6377,6 +6407,7 @@ route("POST", "/api/initiatives/:id/adhesion-formules", async (req, res, params,
   if (body.rubriques !== undefined) await db.prepare('UPDATE adhesion_formules SET rubriques_json=? WHERE id=?').run(sanitizeRubriques(body.rubriques), id);
   if (body.est_officielle) await adhAppliquerOfficielle(id, params.id, true);
   sendJSON(res, 201, { id });
+  if (body.carte_proto !== undefined) await db.prepare('UPDATE adhesion_formules SET carte_proto_json=? WHERE id=?').run(carteProtoJson(body.carte_proto), id);
 });
 
 /* ── Modifier une formule ── */
@@ -6460,6 +6491,7 @@ route("PUT", "/api/adhesion-formules/:id", async (req, res, params, body) => {
   if (body.rubriques !== undefined) await db.prepare('UPDATE adhesion_formules SET rubriques_json=? WHERE id=?').run(sanitizeRubriques(body.rubriques), f.id);
   if (body.est_officielle !== undefined) await adhAppliquerOfficielle(f.id, f.initiative_id, !!body.est_officielle);
   sendJSON(res, 200, { ok: true });
+  if (body.carte_proto !== undefined) await db.prepare('UPDATE adhesion_formules SET carte_proto_json=? WHERE id=?').run(carteProtoJson(body.carte_proto), f.id);
 });
 
 /* ── Supprimer une formule ── */
@@ -6497,6 +6529,7 @@ route("POST", "/api/adhesion-formules/:id/dupliquer", async (req, res, params) =
   if (f.rubriques_json) await db.prepare('UPDATE adhesion_formules SET rubriques_json=? WHERE id=?').run(f.rubriques_json, id);
   sendJSON(res, 201, { id });
 });
+  if (f.carte_proto_json) await db.prepare('UPDATE adhesion_formules SET carte_proto_json=? WHERE id=?').run(f.carte_proto_json, id);
 
 /* ── Activer/désactiver une formule ── */
 route("PUT", "/api/adhesion-formules/:id/toggle-actif", async (req, res, params, body) => {
@@ -15303,13 +15336,19 @@ route("GET", "/api/initiatives/:id/demande-adhesion", async (req, res, params) =
 route("GET", "/api/initiatives/:id/mon-adhesion-membre", async (req, res, params) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  const m = await db.prepare("SELECT id, nom, prenom, statut, date_expiration FROM adhesion_membres WHERE initiative_id=? AND linked_user_id=?").get(params.id, user.id);
+  const m = await db.prepare("SELECT id, nom, prenom, statut, date_expiration, formule_id FROM adhesion_membres WHERE initiative_id=? AND linked_user_id=?").get(params.id, user.id);
+  /* Prototype de carte de la formule de cet adhérent (2026-10-08) — remplace la carte figée de la plateforme dès
+     qu'une association a configuré la sienne (voir sanitizeCarteProto). */
+  let carte_proto = null;
+  if (m && m.formule_id) {
+    try { const fr = await db.prepare("SELECT carte_proto_json FROM adhesion_formules WHERE id=?").get(m.formule_id); carte_proto = sanitizeCarteProto(fr && fr.carte_proto_json); } catch (_) {}
+  }
   /* Carte physique (2026-10-08, demande explicite) : seule l'Initiative officielle Diaspo'Actif envoie une carte
      imprimée par la poste — l'aperçu « votre carte » (adhesions.html) ne s'affiche donc que pour elle. */
   const officielleId = await getInitiativeOfficielleId();
   const carte_physique = !!officielleId && Number(params.id) === Number(officielleId);
   sendJSON(res, 200, m
-    ? { membre_id: m.id, carte_physique, prenom: m.prenom || '', nom: m.nom || '', statut: computeAdhesionStatut(m) }
+    ? { membre_id: m.id, carte_physique, carte_proto, prenom: m.prenom || '', nom: m.nom || '', statut: computeAdhesionStatut(m) }
     : { membre_id: null, carte_physique });
 });
 

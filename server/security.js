@@ -47,6 +47,11 @@ const CSP = [
      des données topojson elles-mêmes. */
   "connect-src 'self' https://diaspoactif-media.b-cdn.net https://cdn.jsdelivr.net",
   "media-src 'self' data: blob: https:",
+  /* worker-src blob: (2026-10-08) : la lecture de texte dans le navigateur (tesseract.js, éditeur de prototype de carte de
+     membre — assets/carte-proto.js) exécute son moteur dans un Worker créé depuis un blob ; sans cette directive,
+     « default-src 'self' » le bloque. Les scripts du moteur et ses données de langue viennent de cdn.jsdelivr.net, déjà
+     autorisé (script-src / connect-src). */
+  "worker-src 'self' blob:",
   /* frame-src : lecteur YouTube intégré dans la modale des vidéos tutoriels (2026-09-18) —
      sans cette directive, "default-src 'self'" bloque silencieusement tout <iframe> vers un
      domaine externe, y compris youtube.com. */

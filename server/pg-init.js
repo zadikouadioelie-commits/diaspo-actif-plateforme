@@ -466,6 +466,8 @@ const COLONNES_MIGRATION = [
     ['events', 'origine1', 'TEXT'],
     ['events', 'origine2', 'TEXT'],
     ['evenements', 'origine2', 'TEXT'],
+    // Prototype de carte de membre d'une formule d'adhésion (2026-10-08) — miroir de db.js.
+    ['adhesion_formules', 'carte_proto_json', 'TEXT'],
     // Promotion J-7 d'un événement (2026-10-05) — miroir exact des ALTER db.js.
     ['evenements', 'promo_lancee_at', 'TEXT'],
     ['evenements', 'promo_nb_cibles', 'INTEGER'],

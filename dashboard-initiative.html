@@ -144,6 +144,7 @@
 <script src="assets/sidebar-reorder.js"></script>
 <script src="assets/soumission-da.js"></script>
 <script src="/assets/upload-media.js"></script>
+<script src="/assets/carte-proto.js?v=1"></script>
 <script src="/assets/rich-editor.js"></script>
 <script>
 /* Catalogue accréditations DA — défini ici pour éviter les problèmes de cache data.js */
@@ -1614,6 +1615,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
             <video id="adh-f-video-thumb" style="width:100%;border-radius:8px;" muted></video>
             <button type="button" onclick="document.getElementById('adh-f-video-thumb').play()" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:50%;width:44px;height:44px;font-size:18px;cursor:pointer;">▶️</button>
           </div>
+          <button type="button" class="da-pill" id="adh-f-carte-btn" onclick="adhOuvrirPrototypeCarte()" title="Téléversez la maquette de votre carte de membre (recto et verso) : chaque adhérent la verra à son nom dans « Ma carte de membre » une fois son adhésion payée.">🪪 Prototype carte de membre</button>
         </div>
 
         <!-- Adhésion officielle de l'association (2026-09-28, demande explicite, capture à
@@ -7694,6 +7696,22 @@ async function adhUploadMediaPhoto(input){
   if (!allowed.includes(file.type)) { showToast('Format non supporté (JPG, PNG ou WebP uniquement).', 'warning'); return; }
   try{
     // 2026-09-25, bug réel : photos rejetées avant compression, voir assets/upload-media.js.
+/* Prototype de carte de membre de la formule (2026-10-08) — éditeur et affichage : assets/carte-proto.js. */
+let ADH_F_CARTE = null;
+function adhCarteMajStatut(){
+  const el = document.getElementById('adh-f-carte-statut'); if (!el) return;
+  const c = ADH_F_CARTE;
+  el.innerHTML = c && (c.recto || c.verso)
+    ? `✅ Prototype enregistré : ${[c.recto && 'recto', c.verso && 'verso'].filter(Boolean).join(' + ')} — prénom et nom ajoutés automatiquement pour chaque adhérent. <a href="#" onclick="adhOuvrirPrototypeCarte();return false;">Modifier</a>`
+    : '';
+}
+function adhOuvrirPrototypeCarte(){
+  if (!window.CarteProto) { showToast?.('Éditeur de carte indisponible, rechargez la page.', 'warning'); return; }
+  CarteProto.ouvrirEditeur(ADH_F_CARTE, {
+    upload: async (file) => uploadMedia(await compressIfImage(file, 1800, 1800, 0.9), 'logo'),
+    onSave: (p) => { ADH_F_CARTE = p; adhCarteMajStatut(); showToast?.(p ? '✅ Prototype de carte pris en compte — il sera enregistré avec la formule.' : 'Prototype de carte retiré.'); },
+  });
+}
     const url = await uploadMedia(await compressIfImage(file, 1200, 1200, 0.85), 'logo');
     ADH_F_MEDIA = { type: 'photo', url, duree: null };
     const preview = document.getElementById('adh-f-photo-preview');
@@ -7878,6 +7896,7 @@ function adhOuvrirCreationFormule(officielle){
   adhToggleModeValidite();
   document.getElementById('adh-f-texte-intro').value = '';
   document.getElementById('adh-f-conditions').value = '';
+  ADH_F_CARTE = null; adhCarteMajStatut();
   document.getElementById('adh-f-reglement-texte').value = '';
   adhChargerRubriques(null);
   adhRelancesCharger(null);
@@ -7930,6 +7949,8 @@ function adhOuvrirEditionFormule(id){
   document.getElementById('adh-f-texte-intro').value = f.texte_intro || '';
   document.getElementById('adh-f-conditions').value = f.conditions_adhesion || '';
   document.getElementById('adh-f-reglement-texte').value = f.reglement_interieur_texte || '';
+  try { ADH_F_CARTE = f.carte_proto_json ? JSON.parse(f.carte_proto_json) : null; } catch (e) { ADH_F_CARTE = null; }
+  adhCarteMajStatut();
   adhChargerRubriques(f);
   adhRelancesCharger(f.relances_config_json);
   document.getElementById('adh-f-reglement-file').value = '';
@@ -8058,6 +8079,7 @@ async function adhEnregistrerFormule(){
     else await api('POST', `/initiatives/${window.__vitrineInitId}/adhesion-formules`, payload);
     adhFermerModalFormule();
     adhRenderFormules();
+    carte_proto: ADH_F_CARTE,
     showToast('Formule enregistrée ✅');
   }catch(e){ showToast('Erreur : '+e.message, 'danger'); }
 }

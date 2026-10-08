@@ -96,6 +96,7 @@
 <script src="assets/app.js?v=13"></script>
 <script src="assets/profile-qr.js"></script>
 <script src="/assets/upload-media.js"></script>
+<script src="/assets/carte-proto.js?v=1"></script>
 <script>
 const ADH_TYPE_LABELS = {
   don_libre: 'Don libre', don_ponctuel: 'Don ponctuel',
@@ -125,7 +126,7 @@ async function init(){
        telle quelle plutôt que dupliquée. */
     let meApresPaiement = { user: null };
     try { meApresPaiement = await api('GET', '/auth/me'); } catch(e) {}
-    if (meApresPaiement.user) { try { const adh = await api('GET', `/initiatives/${INIT_ID}/mon-adhesion-membre`); if (adh.carte_physique && adh.membre_id) afficherMaCarte(); } catch(e) {} }
+    if (meApresPaiement.user) { try { const adh = await api('GET', `/initiatives/${INIT_ID}/mon-adhesion-membre`); if ((adh.carte_physique || adh.carte_proto) && adh.membre_id) afficherMaCarte(); } catch(e) {} }
     if (!meApresPaiement.user) {
       let emailInvite = '';
       try { emailInvite = sessionStorage.getItem('adh_invite_email') || ''; sessionStorage.removeItem('adh_invite_email'); } catch(e) {}
@@ -453,7 +454,11 @@ async function afficherMaCarte(){
     if (!membreId) { zone.innerHTML = '<div class="notice">Vous n\'avez pas encore d\'adhésion pour cette initiative.</div>'; return; }
     const carte = await api('GET', `/adhesion-membres/${membreId}/carte`);
     /* Carte physique : seulement pour l'initiative officielle, et une fois l'adhésion à jour (ou juste après un paiement réussi). */
-    const apercuPhysique = (monAdh.carte_physique && (monAdh.statut === 'a_jour' || params.get('paiement') === 'succes')) ? carteVirtuelleHtml(monAdh.prenom || carte.prenom, monAdh.nom || carte.nom) : '';
+    /* Prototype de carte propre à l'association (2026-10-08) : prioritaire sur la carte figée de la plateforme.
+       Prénom et nom de l'adhérent sont écrits automatiquement dans les zones définies par l'association. */
+    const carteOk = (monAdh.statut === 'a_jour' || params.get('paiement') === 'succes');
+    const apercuPhysique = (monAdh.carte_proto && carteOk && window.CarteProto) ? CarteProto.html(monAdh.carte_proto, monAdh.prenom || carte.prenom, monAdh.nom || carte.nom)
+      : ((monAdh.carte_physique && carteOk) ? carteVirtuelleHtml(monAdh.prenom || carte.prenom, monAdh.nom || carte.nom) : '');
     zone.innerHTML = apercuPhysique + (apercuPhysique ? '<h3 style="text-align:center;margin:0 0 12px;">Votre carte numérique</h3>' : '') + `
       <div class="carte-membre">
         <div class="cm-top">
@@ -471,7 +476,7 @@ async function afficherMaCarte(){
           <button class="btn btn-orange" onclick="ouvrirPaiement(${carte.formule_id})">🔄 Renouveler mon adhésion</button>
         </div>` : ''}
       </div>`;
-    ajusterChampsCarte(zone);
+    ajusterChampsCarte(zone); if (window.CarteProto) CarteProto.ajusterChamps(zone);
     if (window.ProfileQR) {
       ProfileQR.render(document.getElementById('cm-qr-box'), {
         url: `${location.origin}${carte.verify_url}`,

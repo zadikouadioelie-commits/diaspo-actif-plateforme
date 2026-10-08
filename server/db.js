@@ -2091,6 +2091,8 @@ const MIGRATIONS = [
   ["events", "origine1 TEXT"],
   ["events", "origine2 TEXT"],
   ["evenements", "origine2 TEXT"],
+  // Prototype de carte de membre d'une formule d'adhésion (2026-10-08) : images recto/verso + zones prénom/nom (JSON).
+  ["adhesion_formules", "carte_proto_json TEXT"],
   // Promotion J-7 d'un événement (2026-10-05, demande explicite) : date de lancement (NULL = jamais lancée,
   // un seul lancement par événement), nombre de membres notifiés et post du fil créé.
   ["evenements", "promo_lancee_at TEXT"],
