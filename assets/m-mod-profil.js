@@ -9,6 +9,9 @@
   'use strict';
   const A = window.MApp; if (!A) return;
   const { S, api, esc, strip, ic, setPane, attrUrl, initials, richHtml, linkify, md, ago } = A;
+  /* Onglet « Moi » (2026-10-08) : le même rendu s'écrit dans un conteneur de l'onglet (cibleTab) au lieu d'un écran ouvert par-dessus. */
+  let cibleTab = null;
+  const rendre = (titre, html) => { if (cibleTab) cibleTab.innerHTML = html; else setPane(titre, html); };
 
   if (!document.getElementById('m-mod-profil-css')) {
     const st = document.createElement('style'); st.id = 'm-mod-profil-css';
@@ -85,7 +88,7 @@
   }
 
   async function initiative(id) {
-    let r; try { r = (await api('/api/initiatives/' + encodeURIComponent(id))).initiative; } catch (e) { return setPane('Profil', `<div class="empty"><b>Profil introuvable</b>${esc(e.message)}</div>`); }
+    let r; try { r = (await api('/api/initiatives/' + encodeURIComponent(id))).initiative; } catch (e) { return rendre('Profil', `<div class="empty"><b>Profil introuvable</b>${esc(e.message)}</div>`); }
     const [avis, pubs, prods] = await Promise.all([
       api('/api/initiatives/' + encodeURIComponent(r.id) + '/avis').catch(() => ({})),
       api('/api/initiatives/' + encodeURIComponent(r.id) + '/publications').catch(() => ({})),
@@ -117,14 +120,14 @@
     const badges = [r.type ? `<span class="badge g">${esc(r.type)}</span>` : '', verifiee ? `<span class="badge g">${ic('check', 's')} Vérifiée</span>` : ''].filter(Boolean);
     const h = hero({ adherer: ['Association', 'ONG'].includes(r.type) && r.adhesions_ouvertes !== false && r.adhesions_ouvertes !== 0, uid: r.owner_user_id, fid: r.id, kind: 'initiative', nom: r.nom, sous: r.sigle || '', photo: r.logo_url, banner: r.vitrine_banniere_url || r.banniere_url, badges, loc: [r.ville, r.pays].filter(Boolean).join(', '), orig: [r.origine1 || r.owner_origine1, r.origine2 || r.owner_origine2].filter(Boolean).join(' · '),
       stats: [[r.abonnes || 0, 'abonnés'], [r.vues || r.nb_vues || 0, 'vues'], [avis.total ? Number(avis.moyenne || 0).toFixed(1) + '★' : '—', 'avis']] });
-    setPane(r.nom, h + sections + `<a class="btn out block" style="margin:4px 0 8px" href="initiative.html?id=${encodeURIComponent(r.slug || r.id)}">${ic('out', 's')} Ouvrir la fiche complète sur le site</a>`);
+    rendre(r.nom, h + sections + `<a class="btn out block" style="margin:4px 0 8px" href="initiative.html?id=${encodeURIComponent(r.slug || r.id)}">${ic('out', 's')} Ouvrir la fiche complète sur le site</a>`);
     /* Partager ce profil (2026-10-07) : lien public, lisible sans compte. */
-    if (A.paneShare) A.paneShare(location.origin + (r.owner_user_id ? '/profil.html?id=' + encodeURIComponent(r.owner_user_id) : '/initiative.html?id=' + encodeURIComponent(r.slug || r.id)) + '&r=' + A.jetonPartage(), r.nom);
+    if (A.paneShare && !cibleTab) A.paneShare(location.origin + (r.owner_user_id ? '/profil.html?id=' + encodeURIComponent(r.owner_user_id) : '/initiative.html?id=' + encodeURIComponent(r.slug || r.id)) + '&r=' + A.jetonPartage(), r.nom);
   }
 
   async function compte(id) {
-    let p; try { p = (await api('/api/profil/' + encodeURIComponent(id))).profil; } catch (e) { return setPane('Profil', `<div class="empty"><b>Profil introuvable</b>${esc(e.message)}</div>`); }
-    if (p.role === 'initiative' && p.initiative_id) { location.replace('#/profil/i/' + p.initiative_id); return; }
+    let p; try { p = (await api('/api/profil/' + encodeURIComponent(id))).profil; } catch (e) { return rendre('Profil', `<div class="empty"><b>Profil introuvable</b>${esc(e.message)}</div>`); }
+    if (p.role === 'initiative' && p.initiative_id) { if (cibleTab) return initiative(p.initiative_id); location.replace('#/profil/i/' + p.initiative_id); return; }
     const pro = p.role !== 'utilisateur';
     const nom = pro ? (p.nom_structure || p.nom_institution || p.nom) : [p.prenom, p.nom].filter(Boolean).join(' ') || p.nom;
     const resp = pro && p.responsable ? (typeof p.responsable === 'string' ? p.responsable : [p.responsable.prenom, p.responsable.nom].filter(Boolean).join(' ')) : '';
@@ -148,13 +151,16 @@
     const badges = [pro && rolLabel ? `<span class="badge g">${esc(rolLabel)}</span>` : `<span class="badge">Membre</span>`, p.identite_verifiee ? `<span class="badge g">${ic('check', 's')} Identité vérifiée</span>` : '', p.partenaire_officiel ? '<span class="badge o">Partenaire officiel</span>' : ''].filter(Boolean);
     const h = hero({ uid: p.id, fid: p.id, kind: p.role === 'collectivite' ? 'collectivite' : 'user', nom, sous: pro ? '' : (p.titre_pro || ''), photo: p.photo_url, banner: p.banner_url || p.vitrine_banniere_url, rond: !pro, badges,
       loc: [p.ville, p.pays].filter(Boolean).join(', '), orig: [p.origine1, p.origine2].filter(Boolean).join(' · '), stats: [[p.nbAbonnes || 0, 'abonnés'], [p.nbSuivis || 0, 'abonnements'], [(Array.isArray(p.publications) ? p.publications.length : 0), 'publications']] });
-    setPane(nom, h + sections + `<a class="btn out block" style="margin:4px 0 8px" href="profil.html?id=${encodeURIComponent(p.id)}">${ic('out', 's')} Ouvrir le profil complet sur le site</a>`);
-    if (A.paneShare) A.paneShare(location.origin + '/profil.html?id=' + encodeURIComponent(p.id) + '&r=' + A.jetonPartage(), nom);
+    rendre(nom, h + sections + `<a class="btn out block" style="margin:4px 0 8px" href="profil.html?id=${encodeURIComponent(p.id)}">${ic('out', 's')} Ouvrir le profil complet sur le site</a>`);
+    if (A.paneShare && !cibleTab) A.paneShare(location.origin + '/profil.html?id=' + encodeURIComponent(p.id) + '&r=' + A.jetonPartage(), nom);
   }
 
   window.MMods.profil = function (b, c) {
+    cibleTab = null;
     setPane('Profil', '<div class="sk" style="height:140px;margin-bottom:12px"></div><div class="sk skc"></div>');
     if (b === 'i') return initiative(c);
     return compte(b);
   };
+  /* Profil public du compte connecté, affiché dans l'onglet « Moi » (voir viewMoi, m.js). */
+  window.MMods.profilTab = function (el, me) { cibleTab = el; return compte(me.id); };
 })();

@@ -1475,11 +1475,29 @@
       el.innerHTML = `${loginCard('Connectez-vous pour accéder à vos modules, vos billets et vos paramètres.')}<div class="lst" style="margin-top:6px"><a class="li" href="index.html?version=ordinateur"><span class="ic">${ic('desk')}</span><span class="sp"><span class="t">Découvrir Diaspo’Actif</span><br><span class="d">Présentation de la plateforme</span></span><span class="ch">${ic('chev', 's')}</span></a></div>`;
       $('#go-login').onclick = () => openLogin(); return;
     }
+    /* Le bouton « Moi » ouvre le PROFIL PUBLIC du compte (2026-10-08, demande explicite), tel que les autres le voient, dans l'habillage
+       de l'appli (assets/m-mod-profil.js). Les modules, le changement de compte et la déconnexion restent à un toucher : « Mes outils ». */
+    const m0 = S.me, nom0 = m0.nom_affichage || [m0.prenom, m0.nom].filter(Boolean).join(' ') || m0.email;
+    el.innerHTML = `<div class="moi-bar"><a class="btn block" href="#/outils">${ic('menu', 's')} Mes outils et modules</a>
+      <div class="row" style="gap:8px;margin-top:8px"><button type="button" class="btn out sm" id="moi-part" style="flex:1">${ic('share', 's')} Partager mon profil</button><button type="button" class="btn out sm" id="moi-switch" style="flex:1">${ic('people', 's')} Changer de compte</button></div></div>
+      <div id="moi-profil"><div class="sk" style="height:140px;margin-bottom:12px"></div><div class="sk skc"></div></div>`;
+    $('#moi-switch').onclick = openSwitcher;
+    $('#moi-part').onclick = () => partagerLien(location.origin + '/profil.html?id=' + encodeURIComponent(m0.id) + '&r=' + jetonPartage(), nom0);
+    if (window.MMods && MMods.profilTab) MMods.profilTab($('#moi-profil'), m0);
+    else $('#moi-profil').innerHTML = `<a class="btn out block" href="#/profil/${encodeURIComponent(m0.id)}">Voir mon profil public</a>`;
+  }
+  /* Ancien contenu de l'onglet « Moi » : le menu complet des modules, désormais un écran à part (#/outils). */
+  function paneOutils() {
+    if (!S.me) { location.hash = '#/moi'; return; }
+    setPane('Mes outils', '<div id="outils-box"></div>');
+    renderOutils($('#outils-box'));
+  }
+  function renderOutils(el) {
     const m = S.me, role = (m.role === 'utilisateur' || m.role === 'initiative') ? m.role : null;
     const resp = [m.prenom, m.nom].filter(Boolean).join(' ') || m.email; const nm = m.nom_affichage || resp;
     const prem = S.premium && S.premium.concerne ? (S.premium.actif ? '👑 Premium actif' : '🔒 Premium expiré') : '';
     const { premium: modsPrem, mods, compte } = modulesHtml(m);
-    el.innerHTML = `<a class="me" href="profil-app.html?id=${encodeURIComponent(m.id)}"><div class="av big">${m.photo_url ? `<img src="${attrUrl(m.photo_url)}" alt="" onerror="this.remove()">` : esc(initials(nm))}</div><div class="sp"><div class="nm ell">${esc(nm)}</div><div class="sub">${esc(ROLE_LABEL[m.role] || m.role)}${prem ? ' · ' + prem : ''}</div><div class="sub" style="margin-top:2px">Voir mon profil ›</div>${m.role !== 'utilisateur' && resp && resp !== nm ? `<div class="sub" style="font-size:10.5px;opacity:.7;margin-top:2px">Responsable : ${esc(resp)}</div>` : ''}</div></a>
+    el.innerHTML = `<a class="me" href="#/moi"><div class="av big">${m.photo_url ? `<img src="${attrUrl(m.photo_url)}" alt="" onerror="this.remove()">` : esc(initials(nm))}</div><div class="sp"><div class="nm ell">${esc(nm)}</div><div class="sub">${esc(ROLE_LABEL[m.role] || m.role)}${prem ? ' · ' + prem : ''}</div><div class="sub" style="margin-top:2px">Voir mon profil ›</div>${m.role !== 'utilisateur' && resp && resp !== nm ? `<div class="sub" style="font-size:10.5px;opacity:.7;margin-top:2px">Responsable : ${esc(resp)}</div>` : ''}</div></a>
       <button class="btn out block" id="me-switch" style="margin:10px 0 0">${ic('people', 's')} Changer de compte</button>
       <div class="mdark"><div class="h2" style="margin-top:0">MENU DES MODULES</div>
         ${modsPrem ? `<div class="h2">⭐ MODULES PREMIUM</div><div class="lst">${modsPrem}</div>` : ''}
@@ -1600,6 +1618,7 @@
     else if (a === 'billet') paneBillet(b, c);
     else if (a === 'notifs') paneNotifs();
     else if (a === 'post') panePost(b);
+    else if (a === 'outils') paneOutils();
     else if (a === 'cr') paneCR(b, c);
     else if (a === 'actualites') paneActus();
     else if (a === 'cagnottes') paneCagnottes(b);

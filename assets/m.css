@@ -434,3 +434,6 @@ button.li{background:none;font:inherit;color:inherit}
 /* Actualité repliable : la carte se recale sous la barre du haut quand on la replie (2026-10-08) */
 .post{scroll-margin-top:66px}
 .post .lnk{min-height:36px}
+/* Onglet Moi = profil public (2026-10-08) */
+.moi-bar{margin:0 0 12px}
+#moi-profil .pf-hero{margin-top:0}
