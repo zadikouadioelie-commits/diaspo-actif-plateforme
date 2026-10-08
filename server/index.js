@@ -14164,7 +14164,10 @@ route("GET", "/api/conversations", async (req, res, params, body, query) => {
       (SELECT contenu FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) AS derniere,
       (SELECT type FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) AS derniere_type,
       (SELECT created_at FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) AS derniere_date,
-      (SELECT COUNT(*) FROM messages WHERE conversation_id = c.id AND sender_id != ? AND lu = 0) AS non_lus
+      (SELECT COUNT(*) FROM messages WHERE conversation_id = c.id AND sender_id != ? AND lu = 0) AS non_lus,
+      (SELECT COUNT(*) FROM messages WHERE conversation_id = c.id) AS nb_messages,
+      (SELECT COUNT(*) FROM messages WHERE conversation_id = c.id AND sender_id != ?) AS nb_messages_autre,
+      (SELECT contenu FROM messages WHERE conversation_id = c.id ORDER BY id ASC LIMIT 1) AS premier_message
     FROM conversations c
     JOIN users u ON u.id = CASE WHEN c.user1_id = ? THEN c.user2_id ELSE c.user1_id END
     LEFT JOIN initiatives i_avec ON i_avec.owner_user_id = u.id
@@ -14172,13 +14175,38 @@ route("GET", "/api/conversations", async (req, res, params, body, query) => {
       AND (CASE WHEN c.user1_id = ? THEN c.deleted_u1 ELSE c.deleted_u2 END) = 0
       AND (c.contexte IS NULL OR c.contexte != 'mon_associe')
     ORDER BY COALESCE((SELECT created_at FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1), c.created_at) DESC
-  `).all(user.id, user.id, user.id, user.id, user.id);
+  `).all(user.id, user.id, user.id, user.id, user.id, user.id);
 
-  let filtered = rows.map(r => ({
-    ...r,
-    archive: r.user1_id === user.id ? !!r.archive_u1 : !!r.archive_u2,
-    archive_dossier: r.user1_id === user.id ? r.archive_dossier_u1 : r.archive_dossier_u2,
-  }));
+  /* Onglets « Messages classiques » / « Messages automatiques » (2026-10-08, demande explicite) —
+     UNIQUEMENT pour le compte Diaspo'Actif Officiel (propriétaire de l'Initiative officielle), dont la
+     messagerie était noyée par les messages de bienvenue envoyés à chaque nouveau compte (voir le
+     handler d'inscription). Une conversation est « automatique » tant qu'elle ne contient QUE le message
+     de bienvenue : aucune réponse du nouveau compte et aucun message écrit à la main ensuite. Dès que
+     l'un ou l'autre arrive, elle bascule d'elle-même dans les messages classiques. Déduit du contenu
+     plutôt que d'un drapeau en base : fonctionne aussi pour tous les messages déjà envoyés, sans
+     migration de schéma. Pour tout autre compte, rien ne change (automatique = false partout). */
+  let estOfficiel = false;
+  try {
+    const officielleId = await getInitiativeOfficielleId();
+    const officielle = officielleId ? await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(officielleId) : null;
+    estOfficiel = !!officielle && Number(officielle.owner_user_id) === Number(user.id);
+  } catch (_) {}
+
+  let filtered = rows.map(r => {
+    const { nb_messages, nb_messages_autre, premier_message, ...reste } = r;
+    return {
+      ...reste,
+      archive: r.user1_id === user.id ? !!r.archive_u1 : !!r.archive_u2,
+      archive_dossier: r.user1_id === user.id ? r.archive_dossier_u1 : r.archive_dossier_u2,
+      automatique: estOfficiel && Number(nb_messages) === 1 && Number(nb_messages_autre) === 0
+        && String(premier_message || "").includes("Bienvenue sur Diaspo'Actif !"),
+    };
+  });
+  const nbAutomatiques = filtered.filter(r => r.automatique && !r.archive).length;
+  const nbClassiques = filtered.filter(r => !r.automatique && !r.archive).length;
+  if (estOfficiel && (query.onglet === "automatique" || query.onglet === "classique")) {
+    filtered = filtered.filter(r => r.automatique === (query.onglet === "automatique"));
+  }
 
   if (filtre === "non_lus") filtered = filtered.filter(r => r.non_lus > 0);
   if (filtre === "archives") filtered = filtered.filter(r => r.archive);
@@ -14201,7 +14229,7 @@ route("GET", "/api/conversations", async (req, res, params, body, query) => {
     (r.derniere||"").toLowerCase().includes(q)
   );
 
-  sendJSON(res, 200, { conversations: filtered });
+  sendJSON(res, 200, { conversations: filtered, onglets: estOfficiel ? { actifs: true, automatiques: nbAutomatiques, classiques: nbClassiques } : { actifs: false } });
 });
 
 /* POST /api/conversations — créer ou retrouver une conversation */

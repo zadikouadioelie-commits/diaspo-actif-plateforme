@@ -287,6 +287,14 @@
         </select>
       </div>
 
+      <!-- Onglets propres au compte Diaspo'Actif Officiel (2026-10-08) : affichés seulement quand le serveur
+           les active (voir GET /api/conversations → onglets.actifs). Les messages de bienvenue envoyés
+           automatiquement aux nouveaux comptes sont rangés à part pour ne pas noyer les vraies discussions. -->
+      <div class="msg-tabs" id="onglets-auto" style="display:none;">
+        <button class="msg-tab active" data-onglet="classique">💬 Classiques <span id="onglet-classique-count" class="onglet-count"></span></button>
+        <button class="msg-tab" data-onglet="automatique">🤖 Automatiques <span id="onglet-auto-count" class="onglet-count"></span></button>
+      </div>
+
       <div class="msg-tabs">
         <button class="msg-tab active" data-filtre="tous">Tous</button>
         <button class="msg-tab" data-filtre="non_lus">Non lus <span id="tab-nonlus-count" style="display:none;"></span></button>
@@ -485,6 +493,7 @@ let me = null;
 let activeConvId = null;
 let pollTimer = null;
 let filtre = "tous";
+let onglet = "classique"; // "classique" | "automatique" — sans effet hors compte Diaspo'Actif Officiel
 let listeFiltre = "";
 let pendingAttach = null; // { type, icon, nom, url }
 const EMOJI_LIST = ["👍","😊","🙏","💪","🎉","❤️","😂","👏","🔥","✅","💡","🤝"];
@@ -571,13 +580,24 @@ function cancelAttach(){pendingAttach=null;showAttachPreview();}
 async function loadConvList(searchQ){
   loadMsgNotifPanel(); // panneau "À traiter" (grand écran) — indépendant du filtre/onglet actif ici
   const list=document.getElementById("conv-list");
-  const params=new URLSearchParams({filtre});
+  const params=new URLSearchParams({filtre, onglet});
   if(searchQ) params.set("q",searchQ);
   if(listeFiltre) params.set("liste_id",listeFiltre);
   let data;
   try{ data=await api("GET","/conversations?"+params.toString()); }
   catch(e){ list.innerHTML=`<div style="padding:16px;color:#D33;font-size:13px;">${e.message}</div>`; return; }
   const convs=data.conversations||[];
+
+  const barreOnglets=document.getElementById("onglets-auto");
+  if(barreOnglets){
+    const o=data.onglets||{};
+    barreOnglets.style.display=o.actifs?"":"none";
+    if(o.actifs){
+      const cc=document.getElementById("onglet-classique-count"), ca=document.getElementById("onglet-auto-count");
+      if(cc) cc.textContent="("+(o.classiques||0)+")";
+      if(ca) ca.textContent="("+(o.automatiques||0)+")";
+    }
+  }
 
   const nonLus=convs.filter(c=>c.non_lus>0).length;
   const badge=document.getElementById("tab-nonlus-count");
@@ -1565,11 +1585,20 @@ document.querySelectorAll('.msg-rubrique').forEach(b => {
 })();
 
 /* ---- Filtres ---- */
-document.querySelectorAll(".msg-tab").forEach(tab=>{
+document.querySelectorAll(".msg-tab[data-filtre]").forEach(tab=>{
   tab.addEventListener("click",()=>{
-    document.querySelectorAll(".msg-tab").forEach(t=>t.classList.remove("active"));
+    document.querySelectorAll(".msg-tab[data-filtre]").forEach(t=>t.classList.remove("active"));
     tab.classList.add("active");
     filtre=tab.dataset.filtre;
+    loadConvList();
+  });
+});
+/* ---- Onglets Classiques / Automatiques (compte officiel) ---- */
+document.querySelectorAll(".msg-tab[data-onglet]").forEach(tab=>{
+  tab.addEventListener("click",()=>{
+    document.querySelectorAll(".msg-tab[data-onglet]").forEach(t=>t.classList.remove("active"));
+    tab.classList.add("active");
+    onglet=tab.dataset.onglet;
     loadConvList();
   });
 });
