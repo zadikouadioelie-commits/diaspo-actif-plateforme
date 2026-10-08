@@ -1165,8 +1165,6 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;cursor:pointer;background:var(--bg);border:1px solid var(--border);border-radius:99px;padding:6px 14px;" title="Quand fermées, le bouton « Adhérer » disparaît partout (Annuaire, Boutiques, profil public) et aucune nouvelle adhésion n'est possible. Les membres déjà inscrits peuvent toujours renouveler.">
             <input type="checkbox" id="adh-toggle-ouvertes" checked onchange="adhToggleOuvertes(this.checked)"> Adhésions ouvertes
           </label>
-          <button class="btn btn-outline" onclick="adhOuvrirRelancesConfig()" title="Choisissez à quel moment les rappels de renouvellement sont envoyés (avant et/ou après expiration).">⏰ Délais de relance</button>
-          <button class="btn btn-outline" onclick="adhOuvrirModelesConfig()" title="Personnalisez le texte des e-mails de relance et de reçu de paiement.">📝 Modèles de texte</button>
           <button class="btn" style="background:#7C3AED;color:#fff;" onclick="adhOuvrirCreationFormule(true)" title="Crée directement la formule ciblée par le bouton public « Adhérer à l'initiative » (annuaire, boutiques, profil) — même formulaire que ci-contre (durée, coût, informations demandées…), marquée Officielle dès l'enregistrement.">⭐ Créer l'adhésion officielle</button>
           <button class="btn btn-orange" onclick="adhOuvrirCreationFormule()">➕ Créer une formule d'adhésion</button>
         </div>
@@ -1192,30 +1190,10 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         </div>
       </div>
 
-      <!-- Modal délais de relance personnalisables (tâche #71) -->
-      <div id="modal-adh-relances" class="modal-overlay" style="display:none;">
-        <div class="modal-box" style="max-width:440px;">
-          <h3 style="margin:0 0 6px;">⏰ Délais de relance</h3>
-          <p style="font-size:12.5px;color:var(--muted);margin:0 0 12px;line-height:1.5;">Cliquez sur les moments où un rappel (notification + e-mail) doit partir, par rapport à la date d'expiration de l'adhésion : <b>J-8</b> = 8 jours avant, <b>J+3</b> = 3 jours après (jusqu'à J+10). Vous pouvez en choisir plusieurs, 10 au plus. Un seul rappel par moment et par cycle d'adhésion.</p>
-          <div id="adh-relances-chips"></div>
-          <div id="adh-relances-resume" style="font-size:12.5px;font-weight:700;margin:12px 0 10px;"></div>
-          <div style="font-size:11.5px;color:var(--muted);margin-bottom:6px;">Un autre délai ? Saisissez un nombre de jours : positif = avant (jusqu'à 90), négatif = après (jusqu'à -10).</div>
-          <div style="display:flex;gap:8px;margin-bottom:14px;">
-            <input type="number" id="adh-relances-nouveau" class="input" placeholder="ex. 14" style="flex:1;" min="-10" max="90">
-            <button class="btn btn-sm btn-outline" onclick="adhAjouterDelaiRelance()">➕ Ajouter</button>
-          </div>
-          <div style="display:flex;gap:8px;justify-content:flex-end;">
-            <button class="btn btn-outline" onclick="document.getElementById('modal-adh-relances').style.display='none'">Annuler</button>
-            <button class="btn btn-orange" onclick="adhEnregistrerRelancesConfig()">Enregistrer</button>
-          </div>
-        </div>
-      </div>
       <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
         <button class="btn btn-sm" id="adh-tab-formules" onclick="adhSwitchTab('formules')">Formules</button>
         <button class="btn btn-sm btn-outline" id="adh-tab-registre" onclick="adhSwitchTab('registre')">Registre des membres</button>
         <button class="btn btn-sm btn-outline" id="adh-tab-stats" onclick="adhSwitchTab('stats')">Tableau de bord</button>
-        <button class="btn btn-sm btn-outline" id="adh-tab-campagnes" onclick="adhSwitchTab('campagnes')">Campagnes</button>
-        <button class="btn btn-sm btn-outline" id="adh-tab-journal" onclick="adhSwitchTab('journal')">🕓 Journal d'audit</button>
       </div>
       <div id="adhesions-init-content"><div style="text-align:center;padding:30px;color:var(--muted);">Chargement…</div></div>
     </div>
@@ -1516,26 +1494,25 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           </div>
         </details>
 
-        <details id="adh-f-relances-details" style="margin:4px 0 14px;border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;">
-          <summary style="cursor:pointer;font-size:12px;font-weight:700;">🔔 Rappels de renouvellement (combien, quand, par quel moyen)</summary>
+        <details id="adh-f-relances-details" open style="margin:4px 0 14px;border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;">
+          <summary style="cursor:pointer;font-size:12px;font-weight:700;">⏰ Délais de relance (quand relancer l'adhérent, et par quel moyen)</summary>
           <div style="margin-top:12px;">
-            <label class="da-pill checked" id="adh-f-relances-general-pill" style="display:inline-flex;margin-bottom:8px;"><input type="checkbox" id="adh-f-relances-general" checked onchange="adhRelancesBasculerGeneral()"><span>Reprendre les réglages généraux de l'association</span></label>
-            <div id="adh-f-relances-general-resume" style="font-size:11.5px;color:var(--muted);margin-bottom:6px;"></div>
-            <div id="adh-f-relances-editeur" style="display:none;">
-              <label style="font-size:12px;font-weight:700;">Rappels envoyés à l'adhérent</label>
-              <p style="font-size:11px;color:var(--muted);margin:2px 0 8px;">Chaque ligne est un rappel. Choisissez le nombre de jours avant ou après la fin de l'adhésion (jusqu'à 90 jours avant et 10 jours après, 10 rappels au plus). Aucun rappel : supprimez toutes les lignes.</p>
-              <div id="adh-f-relances-liste" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;"></div>
-              <button type="button" class="btn btn-sm btn-outline" onclick="adhRelancesAjouter()">➕ Ajouter un rappel</button>
-
-              <label style="font-size:12px;font-weight:700;display:block;margin-top:14px;">Par quel moyen ?</label>
-              <div class="da-pill-group" style="margin:6px 0 6px;">
-                <label class="da-pill" id="adh-f-relances-canal-email"><input type="radio" name="adh-f-relances-canal" value="email" onchange="adhRelancesChoisirCanal('email')"><span>✉️ E-mail</span></label>
-                <label class="da-pill" id="adh-f-relances-canal-notification"><input type="radio" name="adh-f-relances-canal" value="notification" onchange="adhRelancesChoisirCanal('notification')"><span>🔔 Notification Diaspo'Actif</span></label>
-                <label class="da-pill checked" id="adh-f-relances-canal-les_deux"><input type="radio" name="adh-f-relances-canal" value="les_deux" checked onchange="adhRelancesChoisirCanal('les_deux')"><span>✉️🔔 Les deux</span></label>
-              </div>
-              <p style="font-size:11px;color:var(--muted);margin:0;">La notification Diaspo'Actif n'atteint que les adhérents qui ont un compte ; les adhérents sans compte ne reçoivent que l'e-mail.</p>
-              <div id="adh-f-relances-apercu" style="font-size:11.5px;background:#f9fafb;border-radius:8px;padding:8px 10px;margin-top:10px;"></div>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px;line-height:1.5;">Cliquez sur les moments où un rappel doit partir, par rapport à la date d'expiration de l'adhésion : <b>J-8</b> = 8 jours avant, <b>J+3</b> = 3 jours après (jusqu'à J+10). Vous pouvez en choisir plusieurs, 10 au plus. Un seul rappel par moment et par cycle d'adhésion.</p>
+            <div id="adh-f-relances-chips"></div>
+            <div id="adh-f-relances-apercu" style="font-size:12.5px;font-weight:700;margin:12px 0 10px;"></div>
+            <div style="font-size:11.5px;color:var(--muted);margin-bottom:6px;">Un autre délai ? Saisissez un nombre de jours : positif = avant (jusqu'à 90), négatif = après (jusqu'à -10).</div>
+            <div style="display:flex;gap:8px;margin-bottom:14px;">
+              <input type="number" id="adh-f-relances-nouveau" class="input" placeholder="ex. 14" style="flex:1;" min="-10" max="90" onkeydown="if(event.key==='Enter'){event.preventDefault();adhRelancesAjouterAutre();}">
+              <button type="button" class="btn btn-sm btn-outline" onclick="adhRelancesAjouterAutre()">➕ Ajouter</button>
             </div>
+
+            <label style="font-size:12px;font-weight:700;display:block;">Par quel moyen ?</label>
+            <div class="da-pill-group" style="margin:6px 0 6px;">
+              <label class="da-pill" id="adh-f-relances-canal-email"><input type="radio" name="adh-f-relances-canal" value="email" onchange="adhRelancesChoisirCanal('email')"><span>✉️ E-mail</span></label>
+              <label class="da-pill" id="adh-f-relances-canal-notification"><input type="radio" name="adh-f-relances-canal" value="notification" onchange="adhRelancesChoisirCanal('notification')"><span>🔔 Notification Diaspo'Actif</span></label>
+              <label class="da-pill checked" id="adh-f-relances-canal-les_deux"><input type="radio" name="adh-f-relances-canal" value="les_deux" checked onchange="adhRelancesChoisirCanal('les_deux')"><span>✉️🔔 Les deux</span></label>
+            </div>
+            <p style="font-size:11px;color:var(--muted);margin:0;">La notification Diaspo'Actif n'atteint que les adhérents qui ont un compte ; les adhérents sans compte ne reçoivent que l'e-mail.</p>
           </div>
         </details>
 
@@ -7378,86 +7355,82 @@ const ADH_CHAMPS_CATALOGUE = [
 ];
 let ADH_F_CHAMPS_CUSTOM = [];
 let ADH_F_DOCS = { reglement_pdf_url: null, statuts_pdf_url: null };
-/* Rappels de renouvellement propres à la formule (2026-10-08). general=true : on reprend les réglages de l'association (rien n'est enregistré sur la formule). */
-let ADH_F_RELANCES = { general: true, jours: [30, 7, 0, -1], canal: 'les_deux' };
+/* Délais de relance de la formule (2026-10-08) — sélecteur à puces intégré directement dans le formulaire de création/modification
+   (demande explicite : « imbrique-le directement dans le formulaire », valable pour « Créer l'adhésion officielle » ET « Créer une
+   formule d'adhésion », qui ouvrent le même formulaire). Chaque formule porte ses propres délais (relances_config côté serveur) ;
+   une formule ancienne sans réglage propre est pré-remplie avec les délais généraux de l'association, qu'on peut alors ajuster. */
+const ADH_RELANCES_MAX = 10;
+const ADH_RELANCES_AVANT = [60, 45, 30, 21, 15, 10, 8, 7, 5, 3, 2, 1];
+const ADH_RELANCES_APRES = [-1, -2, -3, -4, -5, -6, -7, -8, -9, -10];
+const ADH_RELANCES_DEFAUT = [30, 7, 0, -1];
+let ADH_RELANCES_GENERAL = null; // délais généraux de l'association (formules anciennes sans réglage propre)
+let ADH_F_RELANCES = { jours: ADH_RELANCES_DEFAUT.slice(), canal: 'les_deux', parDefaut: false };
 const ADH_RELANCES_CANAL_LIBELLE = { email: 'par e-mail', notification: 'par notification Diaspo’Actif', les_deux: 'par e-mail et par notification Diaspo’Actif' };
-function adhRelancesLibelleJour(j) { return j > 0 ? `${j} jour${j > 1 ? 's' : ''} avant la fin` : j === 0 ? 'le jour de la fin' : `${-j} jour${-j > 1 ? 's' : ''} après la fin`; }
-function adhRelancesCollecterLignes() {
-  const jours = [];
-  document.querySelectorAll('#adh-f-relances-liste .adh-rel-ligne').forEach(l => {
-    const sens = l.querySelector('.adh-rel-sens').value, n = Math.round(Number(l.querySelector('.adh-rel-n').value) || 0);
-    if (sens === 'jour') jours.push(0);
-    else if (sens === 'avant') jours.push(Math.min(90, Math.max(1, n)));
-    else jours.push(-Math.min(10, Math.max(1, n)));
-  });
-  return [...new Set(jours)].sort((a, b) => b - a);
+function adhLibelleDelai(j) { return j > 0 ? `J-${j}` : j === 0 ? 'Jour J' : `J+${-j}`; }
+function adhRelancesPuce(j) {
+  const actif = ADH_F_RELANCES.jours.includes(j);
+  return `<button type="button" onclick="adhRelancesBasculer(${j})" aria-pressed="${actif}" style="cursor:pointer;border-radius:99px;padding:6px 13px;font-size:12.5px;font-weight:700;border:1.5px solid ${actif ? '#2E74E0' : 'var(--border)'};background:${actif ? '#2E74E0' : 'var(--bg)'};color:${actif ? '#fff' : 'inherit'};">${actif ? '✓ ' : ''}${adhLibelleDelai(j)}</button>`;
 }
 function adhRelancesRendre() {
-  const liste = document.getElementById('adh-f-relances-liste'); if (!liste) return;
-  liste.innerHTML = ADH_F_RELANCES.jours.map(j => `
-    <div class="adh-rel-ligne" style="display:flex;gap:6px;align-items:center;">
-      <input type="number" class="input adh-rel-n" min="1" max="${j < 0 ? 10 : 90}" value="${Math.abs(j) || 1}" style="width:70px;${j === 0 ? 'display:none;' : ''}" oninput="adhRelancesMaj()">
-      <select class="input adh-rel-sens" style="flex:1;" onchange="adhRelancesSens(this)">
-        <option value="avant" ${j > 0 ? 'selected' : ''}>jours avant la fin</option>
-        <option value="jour" ${j === 0 ? 'selected' : ''}>le jour de la fin</option>
-        <option value="apres" ${j < 0 ? 'selected' : ''}>jours après la fin</option>
-      </select>
-      <button type="button" class="btn btn-sm btn-outline" title="Supprimer ce rappel" onclick="adhRelancesRetirer(this)">✕</button>
-    </div>`).join('') || '<div style="font-size:11.5px;color:var(--muted);">Aucun rappel : l’adhérent ne sera pas relancé.</div>';
+  const zone = document.getElementById('adh-f-relances-chips'); if (!zone) return;
+  const groupe = (titre, liste) => liste.length ? `<div style="margin-bottom:10px;"><div style="font-size:11.5px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">${titre}</div><div style="display:flex;flex-wrap:wrap;gap:6px;">${liste.map(adhRelancesPuce).join('')}</div></div>` : '';
+  const connus = [...ADH_RELANCES_AVANT, 0, ...ADH_RELANCES_APRES];
+  const autres = ADH_F_RELANCES.jours.filter(j => !connus.includes(j)).sort((a, b) => b - a);
+  zone.innerHTML = groupe("Avant l'expiration", ADH_RELANCES_AVANT) + groupe("Le jour de l'expiration", [0]) + groupe("Après l'expiration", ADH_RELANCES_APRES) + groupe('Autres délais enregistrés', autres);
   adhRelancesApercu();
 }
-function adhRelancesSens(sel) {
-  const l = sel.closest('.adh-rel-ligne'), n = l.querySelector('.adh-rel-n');
-  n.style.display = sel.value === 'jour' ? 'none' : '';
-  n.max = sel.value === 'apres' ? 10 : 90;
-  if (!n.value || Number(n.value) < 1) n.value = 1;
-  adhRelancesMaj();
-}
-function adhRelancesMaj() { ADH_F_RELANCES.jours = adhRelancesCollecterLignes(); adhRelancesApercu(); }
-function adhRelancesAjouter() {
-  adhRelancesMaj();
-  if (ADH_F_RELANCES.jours.length >= 10) { alert('10 rappels au maximum.'); return; }
-  const pris = new Set(ADH_F_RELANCES.jours);
-  const suggestion = [30, 15, 7, 3, 1, 0, -1, -3, -7, -10].find(j => !pris.has(j));
-  if (suggestion === undefined) return;
-  ADH_F_RELANCES.jours.push(suggestion); ADH_F_RELANCES.jours.sort((a, b) => b - a);
+function adhRelancesBasculer(j) {
+  const l = ADH_F_RELANCES.jours;
+  if (l.includes(j)) ADH_F_RELANCES.jours = l.filter(x => x !== j);
+  else if (l.length >= ADH_RELANCES_MAX) { showToast?.(`${ADH_RELANCES_MAX} rappels au maximum : désactivez-en un avant d'en ajouter.`, 'warning'); return; }
+  else ADH_F_RELANCES.jours = [...l, j];
+  ADH_F_RELANCES.parDefaut = false;
   adhRelancesRendre();
 }
-function adhRelancesRetirer(btn) { btn.closest('.adh-rel-ligne').remove(); adhRelancesMaj(); adhRelancesRendre(); }
+function adhRelancesAjouterAutre() {
+  const input = document.getElementById('adh-f-relances-nouveau');
+  const v = Math.round(Number(input.value));
+  if (input.value === '' || !Number.isFinite(v) || v < -10 || v > 90) { showToast?.('Délai invalide : de 90 jours avant (90) à 10 jours après (-10).', 'warning'); return; }
+  if (!ADH_F_RELANCES.jours.includes(v)) {
+    if (ADH_F_RELANCES.jours.length >= ADH_RELANCES_MAX) { showToast?.(`${ADH_RELANCES_MAX} rappels au maximum.`, 'warning'); return; }
+    ADH_F_RELANCES.jours = [...ADH_F_RELANCES.jours, v];
+  }
+  ADH_F_RELANCES.parDefaut = false;
+  input.value = '';
+  adhRelancesRendre();
+}
 function adhRelancesChoisirCanal(c) {
   ADH_F_RELANCES.canal = c;
   ['email', 'notification', 'les_deux'].forEach(k => document.getElementById('adh-f-relances-canal-' + k)?.classList.toggle('checked', k === c));
   adhRelancesApercu();
 }
-function adhRelancesBasculerGeneral() {
-  const g = document.getElementById('adh-f-relances-general').checked;
-  ADH_F_RELANCES.general = g;
-  document.getElementById('adh-f-relances-general-pill').classList.toggle('checked', g);
-  document.getElementById('adh-f-relances-editeur').style.display = g ? 'none' : 'block';
-  if (!g) adhRelancesRendre();
-  adhRelancesResumeGeneral();
-}
-function adhRelancesResumeGeneral() {
-  const el = document.getElementById('adh-f-relances-general-resume'); if (!el) return;
-  const j = (typeof ADH_RELANCES_JOURS !== 'undefined' ? ADH_RELANCES_JOURS : [30, 7, 0, -1]).slice().sort((a, b) => b - a);
-  el.textContent = ADH_F_RELANCES.general ? `Réglages généraux actuels : ${j.map(adhRelancesLibelleJour).join(' · ')} — par e-mail et par notification Diaspo’Actif.` : '';
-}
 function adhRelancesApercu() {
   const el = document.getElementById('adh-f-relances-apercu'); if (!el) return;
-  const j = ADH_F_RELANCES.jours;
-  el.innerHTML = j.length ? `<b>${j.length} rappel${j.length > 1 ? 's' : ''}</b> ${ADH_RELANCES_CANAL_LIBELLE[ADH_F_RELANCES.canal]} : ${j.map(adhRelancesLibelleJour).join(' · ')}.` : '<b>Aucun rappel</b> pour cette formule.';
+  const j = ADH_F_RELANCES.jours.slice().sort((a, b) => b - a);
+  el.innerHTML = j.length
+    ? `Vos rappels : ${j.map(adhLibelleDelai).join(' · ')} <span style="font-weight:500;color:var(--muted);">(${j.length} sur ${ADH_RELANCES_MAX} — ${ADH_RELANCES_CANAL_LIBELLE[ADH_F_RELANCES.canal]})</span>`
+    : '<span style="font-weight:500;color:var(--muted);">Aucun rappel : l’adhérent ne sera pas relancé.</span>';
 }
-/* Remplit l'éditeur à l'ouverture du formulaire : cfg = relances_config_json de la formule (chaîne JSON) ou vide = réglages généraux. */
-function adhRelancesCharger(cfg) {
+/* Remplit le sélecteur à l'ouverture du formulaire : cfg = relances_config_json de la formule (chaîne JSON) ; vide = formule sans réglage propre → délais généraux de l'association. */
+async function adhRelancesCharger(cfg) {
   let c = null; try { c = cfg ? JSON.parse(cfg) : null; } catch (e) {}
-  ADH_F_RELANCES = c && Array.isArray(c.jours)
-    ? { general: false, jours: c.jours.map(Number).sort((a, b) => b - a), canal: ['email', 'notification', 'les_deux'].includes(c.canal) ? c.canal : 'les_deux' }
-    : { general: true, jours: (typeof ADH_RELANCES_JOURS !== 'undefined' ? ADH_RELANCES_JOURS : [30, 7, 0, -1]).slice().sort((a, b) => b - a), canal: 'les_deux' };
-  const g = document.getElementById('adh-f-relances-general'); if (!g) return;
-  g.checked = ADH_F_RELANCES.general;
+  if (c && Array.isArray(c.jours)) {
+    ADH_F_RELANCES = { jours: c.jours.map(Number).sort((a, b) => b - a), canal: ['email', 'notification', 'les_deux'].includes(c.canal) ? c.canal : 'les_deux', parDefaut: false };
+  } else {
+    ADH_F_RELANCES = { jours: (ADH_RELANCES_GENERAL || ADH_RELANCES_DEFAUT).slice().sort((a, b) => b - a), canal: 'les_deux', parDefaut: true };
+  }
   const r = document.querySelector(`input[name="adh-f-relances-canal"][value="${ADH_F_RELANCES.canal}"]`); if (r) r.checked = true;
   adhRelancesChoisirCanal(ADH_F_RELANCES.canal);
-  adhRelancesBasculerGeneral();
+  adhRelancesRendre();
+  // Délais généraux de l'association (une seule lecture) : appliqués seulement si l'utilisateur n'a encore rien modifié.
+  if (ADH_F_RELANCES.parDefaut && ADH_RELANCES_GENERAL === null && window.__vitrineInitId) {
+    try {
+      const rep = await api('GET', `/initiatives/${window.__vitrineInitId}`);
+      const data = rep.initiative || rep;
+      ADH_RELANCES_GENERAL = data.adhesion_relances_jours ? JSON.parse(data.adhesion_relances_jours).map(Number) : ADH_RELANCES_DEFAUT.slice();
+    } catch (e) { ADH_RELANCES_GENERAL = ADH_RELANCES_DEFAUT.slice(); }
+    if (ADH_F_RELANCES.parDefaut) { ADH_F_RELANCES.jours = ADH_RELANCES_GENERAL.slice().sort((a, b) => b - a); adhRelancesRendre(); }
+  }
 }
 
 function adhRenderChampsStandard(config){
@@ -7546,71 +7519,6 @@ async function adhToggleOuvertes(checked){
     if (tog) tog.checked = !checked;
     showToast?.('Erreur : ' + e.message, 'danger');
   }
-}
-
-let ADH_RELANCES_JOURS = [30, 7, 0, -1];
-function adhLibelleDelai(j){
-  if (j > 0) return `J-${j}`;
-  if (j === 0) return 'Jour J';
-  return `J+${-j}`;
-}
-const ADH_RELANCES_MAX = 10;
-const ADH_RELANCES_AVANT = [60, 45, 30, 21, 15, 10, 8, 7, 5, 3, 2, 1];
-const ADH_RELANCES_APRES = [-1, -2, -3, -4, -5, -6, -7, -8, -9, -10];
-/* Chaque délai est une puce sur laquelle on clique pour l'activer ou la désactiver (2026-10-07, demande explicite : « propose d'en mettre plusieurs…
-   permet d'aller jusqu'à J+10 ») ; les délais personnalisés déjà enregistrés restent visibles, dans un groupe « Autres ». */
-function adhPuceDelai(j){
-  const actif = ADH_RELANCES_JOURS.includes(j);
-  return `<button type="button" onclick="adhBasculerDelaiRelance(${j})" aria-pressed="${actif}" style="cursor:pointer;border-radius:99px;padding:6px 13px;font-size:12.5px;font-weight:700;border:1.5px solid ${actif ? '#2E74E0' : 'var(--border)'};background:${actif ? '#2E74E0' : 'var(--bg)'};color:${actif ? '#fff' : 'inherit'};">${actif ? '✓ ' : ''}${adhLibelleDelai(j)}</button>`;
-}
-function adhRenderRelancesChips(){
-  const zone = document.getElementById('adh-relances-chips');
-  const groupe = (titre, liste) => liste.length ? `<div style="margin-bottom:10px;"><div style="font-size:11.5px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">${titre}</div><div style="display:flex;flex-wrap:wrap;gap:6px;">${liste.map(adhPuceDelai).join('')}</div></div>` : '';
-  const connus = [...ADH_RELANCES_AVANT, 0, ...ADH_RELANCES_APRES];
-  const autres = ADH_RELANCES_JOURS.filter(j => !connus.includes(j)).sort((a, b) => b - a);
-  zone.innerHTML = groupe('Avant l\'expiration', ADH_RELANCES_AVANT) + groupe('Le jour de l\'expiration', [0]) + groupe('Après l\'expiration', ADH_RELANCES_APRES) + groupe('Autres délais enregistrés', autres);
-  const choisis = ADH_RELANCES_JOURS.slice().sort((a, b) => b - a);
-  const resume = document.getElementById('adh-relances-resume');
-  if (resume) resume.innerHTML = choisis.length ? `Vos rappels : ${choisis.map(adhLibelleDelai).join(' · ')} <span style="font-weight:500;color:var(--muted);">(${choisis.length} sur ${ADH_RELANCES_MAX})</span>` : '<span style="font-weight:500;color:var(--muted);">Aucun délai choisi.</span>';
-}
-function adhBasculerDelaiRelance(j){
-  if (ADH_RELANCES_JOURS.includes(j)) ADH_RELANCES_JOURS = ADH_RELANCES_JOURS.filter(x => x !== j);
-  else if (ADH_RELANCES_JOURS.length >= ADH_RELANCES_MAX) { showToast?.(`${ADH_RELANCES_MAX} rappels au maximum : désactivez-en un avant d'en ajouter.`, 'warning'); return; }
-  else ADH_RELANCES_JOURS.push(j);
-  adhRenderRelancesChips();
-}
-async function adhOuvrirRelancesConfig(){
-  const initId = window.__vitrineInitId;
-  if (!initId) return;
-  ADH_RELANCES_JOURS = [30, 7, 0, -1];
-  try{
-    const r = await api('GET', `/initiatives/${initId}`);
-    const data = r.initiative || r;
-    if (data.adhesion_relances_jours) ADH_RELANCES_JOURS = JSON.parse(data.adhesion_relances_jours);
-  } catch(e){ /* garde la valeur par défaut */ }
-  adhRenderRelancesChips();
-  document.getElementById('modal-adh-relances').style.display = 'flex';
-}
-function adhAjouterDelaiRelance(){
-  const input = document.getElementById('adh-relances-nouveau');
-  const v = Math.round(Number(input.value));
-  if (!Number.isFinite(v) || v < -10 || v > 90) { showToast?.('Délai invalide : de 90 jours avant (90) à 10 jours après (-10).', 'warning'); return; }
-  if (!ADH_RELANCES_JOURS.includes(v)) { if (ADH_RELANCES_JOURS.length >= ADH_RELANCES_MAX) { showToast?.(`${ADH_RELANCES_MAX} rappels au maximum.`, 'warning'); return; } ADH_RELANCES_JOURS.push(v); }
-  input.value = '';
-  adhRenderRelancesChips();
-}
-function adhRetirerDelaiRelance(j){
-  ADH_RELANCES_JOURS = ADH_RELANCES_JOURS.filter(x => x !== j);
-  adhRenderRelancesChips();
-}
-async function adhEnregistrerRelancesConfig(){
-  const initId = window.__vitrineInitId;
-  if (!ADH_RELANCES_JOURS.length) { showToast?.('Ajoutez au moins un délai.', 'warning'); return; }
-  try{
-    await api('PUT', `/initiatives/${initId}/adhesion-relances-config`, { jours: ADH_RELANCES_JOURS });
-    document.getElementById('modal-adh-relances').style.display = 'none';
-    showToast?.('✅ Délais de relance enregistrés.');
-  } catch(e){ showToast?.('Erreur : ' + e.message, 'danger'); }
 }
 
 async function adhOuvrirModelesConfig(){
@@ -8087,7 +7995,7 @@ async function adhEnregistrerFormule(){
     texte_intro: document.getElementById('adh-f-texte-intro').value || null,
     conditions_adhesion: document.getElementById('adh-f-conditions').value || null,
     reglement_interieur_texte: document.getElementById('adh-f-reglement-texte').value || null,
-    relances_config: (() => { if (document.getElementById('adh-f-relances-general').checked) return null; adhRelancesMaj(); return { jours: ADH_F_RELANCES.jours, canal: ADH_F_RELANCES.canal }; })(),
+    relances_config: { jours: ADH_F_RELANCES.jours, canal: ADH_F_RELANCES.canal },
     reglement_pdf_url: ADH_F_DOCS.reglement_pdf_url,
     statuts_pdf_url: ADH_F_DOCS.statuts_pdf_url,
     champs_config: Object.fromEntries(Array.from(document.querySelectorAll('.adh-champ-mode')).map(sel => [sel.dataset.key, sel.value])),
