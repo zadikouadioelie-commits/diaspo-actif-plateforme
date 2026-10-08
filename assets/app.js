@@ -6639,6 +6639,22 @@ function affiliationStatutHtml(classe, st, boutonActifHtml) {
   const libelle = st.origine === 'demande' ? '⏳ Demande en attente' : '⏳ Invitation envoyée';
   return `<span class="${classe}" style="opacity:.75;cursor:default;">${libelle}</span>`;
 }
+/* Puce dorée "Membre de X" (2026-10-08, demande explicite : afficher le NOM de l'organisation
+   affiliée plutôt qu'un badge générique "Affilié", une par affiliation puisqu'un compte peut en
+   avoir plusieurs à la fois, cliquable pour voir la fonction). Même dégradé doré que
+   .sidebar-toggle/.pvz-premium-badge (assets/styles.v2.css) — langage visuel déjà établi pour
+   "doré", repris tel quel plutôt qu'une nouvelle couleur inventée pour l'occasion. */
+function affiliationPuceDoreeHtml(a) {
+  const nom = escH(a.nom || '');
+  const fonction = escH(a.fonction || '');
+  const titre = a.fonction ? `${nom} — ${fonction}` : nom;
+  return `<button type="button" class="ann-card-btn" style="background:linear-gradient(135deg,#F5D061,#C9971C);border:1px solid rgba(0,0,0,.08);color:#3A2600;font-weight:700;" data-aff-nom="${nom}" data-aff-fonction="${fonction}" onclick="event.stopPropagation(); voirFonctionAffiliation(this)" title="${titre}">${a.est_officielle ? '⭐' : '🏅'} ${nom}</button>`;
+}
+window.voirFonctionAffiliation = function (btn) {
+  const nom = btn.dataset.affNom || '';
+  const fonction = btn.dataset.affFonction || '';
+  if (typeof showToast === 'function') showToast(fonction ? `🏅 ${nom} — ${fonction}` : `🏅 Affilié à ${nom} (fonction non précisée)`, 'info', 4000);
+};
 window.initBoutonsAffiliation = async function (racine) {
   const elsUser = [...(racine || document).querySelectorAll('[data-affiliation-user]:not([data-affiliation-prete])')];
   const elsInit = [...(racine || document).querySelectorAll('[data-affiliation-initiative]:not([data-affiliation-prete])')];
@@ -6652,8 +6668,18 @@ window.initBoutonsAffiliation = async function (racine) {
       const userId = el.getAttribute('data-affiliation-user');
       const classe = el.getAttribute('data-affiliation-classe') || 'ann-card-btn';
       const nomAttr = el.getAttribute('data-affiliation-nom') || '';
+      const st = statuts[userId] || {};
+      const puces = (st.affiliations || []).map(affiliationPuceDoreeHtml).join('');
       const bouton = `<button type="button" class="${classe}" data-affilier-nom="${nomAttr}" onclick="event.stopPropagation(); ouvrirAffiliationUtilisateur(${userId}, this)">🔗 Affiliation</button>`;
-      el.outerHTML = affiliationStatutHtml(classe, statuts[userId], bouton);
+      // Demande explicite (2026-10-08) : le bouton "Affiliation" (vert) reste disponible pour en
+      // proposer une AUTRE même quand une ou plusieurs affiliations existent déjà — celles-ci
+      // s'affichent à part, en puces dorées, pas en remplacement du bouton. Seul un statut
+      // 'en_attente'/'refuse' le transforme en badge d'état (relancer serait de toute façon
+      // rejeté par le serveur, UNIQUE sur initiative_membres) ; 'accepte' n'a plus de badge
+      // dédié ici — déjà représenté par la puce dorée correspondante.
+      const monStatutPourBouton = st.mon_statut && st.mon_statut.statut !== 'accepte' ? st.mon_statut : null;
+      el.style.display = 'inline-flex'; el.style.flexWrap = 'wrap'; el.style.gap = '6px';
+      el.innerHTML = puces + affiliationStatutHtml(classe, monStatutPourBouton, bouton);
     });
   }
   if (elsInit.length) {

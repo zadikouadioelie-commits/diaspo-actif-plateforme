@@ -14618,26 +14618,47 @@ route("GET", "/api/relation-statut-lot", async (req, res, params, body, query) =
   sendJSON(res, 200, { statuts });
 });
 
-/* GET /api/affiliation-statut-lot?user_ids=1,2,3 — bouton "🔗 Affiliation" des cartouches
-   "Utilisateur" de l'annuaire (2026-10-08, bug réel : le bouton restait affiché même après
-   acceptation, faute de vérifier le moindre statut existant — même patron en lot que
-   /relation-statut-lot ci-dessus, pour la même raison : une requête par cartouche
-   provoquerait des 429 sur une recherche à 30-50 résultats). Sens "l'Initiative affilie
-   l'utilisateur" (ouvrirAffiliationUtilisateur) : un seul appelant possible, le compte
-   Initiative connecté — les ids hors de son propre initiative_membres ressortent simplement
-   absents du résultat (pas de statut = bouton "Affiliation" normal, comportement inchangé). */
+/* GET /api/affiliation-statut-lot?user_ids=1,2,3 — cartouches "Utilisateur" de l'annuaire
+   (2026-10-08, bug réel : le bouton "🔗 Affiliation" restait affiché même après acceptation ;
+   demande explicite de suite : afficher le NOM de chaque organisation affiliée — une personne
+   peut être affiliée à plusieurs à la fois —, cliquable pour voir sa fonction, en gardant le
+   bouton "Affiliation" disponible pour en proposer une nouvelle). Deux informations bien
+   distinctes par id :
+   - `affiliations` : la liste PUBLIQUE de toutes les affiliations acceptées de ce compte, quelle
+     que soit l'organisation (même requête que GET /api/profil/:id, qui alimente déjà le bloc
+     "🤝 Affiliations" du profil complet — pas de nouvelle règle à maintenir en double).
+   - `mon_statut` : la relation spécifique entre CE compte Initiative connecté et la personne
+     (ou null) — décide si le bouton "Affiliation" doit rester actif, être désactivé
+     ("en attente") ou disparaître, comme avant ce correctif.
+   Même patron en lot que /relation-statut-lot ci-dessus (une requête pour toute la page, pas une
+   par cartouche — évite les 429 déjà rencontrés sur l'annuaire). */
 route("GET", "/api/affiliation-statut-lot", async (req, res, params, body, query) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  if (user.role !== 'initiative') return sendJSON(res, 200, { statuts: {} });
-  const init = await db.prepare("SELECT id FROM initiatives WHERE owner_user_id = ?").get(user.id);
-  if (!init) return sendJSON(res, 200, { statuts: {} });
+  const estInitiative = user.role === 'initiative';
+  const monInit = estInitiative ? await db.prepare("SELECT id FROM initiatives WHERE owner_user_id = ?").get(user.id) : null;
   const ids = String(query?.user_ids || "").split(",").map(Number).filter(Boolean).slice(0, 100);
+  const officielleId = await getInitiativeOfficielleId();
   const statuts = {};
   for (const userId of [...new Set(ids)]) {
     try {
-      const m = await db.prepare("SELECT statut, origine FROM initiative_membres WHERE initiative_id=? AND user_id=?").get(init.id, userId);
-      if (m) statuts[userId] = { statut: m.statut, origine: m.origine };
+      const affiliationsBrutes = await db.prepare(`
+        SELECT im.fonction, i.nom, i.slug, i.logo_url, i.vitrine_banniere_url, i.id AS initiative_id
+        FROM initiative_membres im JOIN initiatives i ON i.id = im.initiative_id
+        WHERE im.user_id = ? AND im.statut = 'accepte' AND im.visible_publiquement = 1
+        ORDER BY im.created_at ASC
+      `).all(userId);
+      const affiliations = affiliationsBrutes.map(a => ({
+        initiative_id: a.initiative_id, nom: a.nom, slug: a.slug, fonction: a.fonction,
+        badge_image: a.vitrine_banniere_url || a.logo_url || null,
+        est_officielle: officielleId != null && Number(a.initiative_id) === Number(officielleId),
+      })).sort((a, b) => (b.est_officielle - a.est_officielle));
+      let monStatut = null;
+      if (monInit) {
+        const m = await db.prepare("SELECT statut, origine FROM initiative_membres WHERE initiative_id=? AND user_id=?").get(monInit.id, userId);
+        if (m) monStatut = { statut: m.statut, origine: m.origine };
+      }
+      statuts[userId] = { affiliations, mon_statut: monStatut };
     } catch (e) { /* un id invalide ne doit jamais faire échouer tout le lot */ }
   }
   sendJSON(res, 200, { statuts });
