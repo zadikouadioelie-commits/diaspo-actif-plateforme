@@ -46571,19 +46571,9 @@ async function envoyerConfirmationInscription(inscriptionId) {
 }
 
 /* ── ADMIN : Fiches ── */
-route("GET", "/api/insc/fiches", async (req, res) => {
-  const user = await getCurrentUser(req);
-  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  const estAdmin = user.role === "administrateur" || (await AdminJunior.hasAdminPermission(user, "formulaires_inscription.consulter", db));
-  // "Fiche partagée" (2026-10-08) : ma trace d'envoi n'apparaît JAMAIS ici (uniquement dans le
-  // panneau dédié) ; une copie reçue n'apparaît ici qu'une fois affichée volontairement
-  // (partage_accepte=1) — avant ça, elle reste accessible uniquement depuis l'onglet "Reçues".
-  const filtrePartage = "(partage_role IS NULL OR (partage_role='reception' AND partage_accepte=1))";
-  const fiches = estAdmin
-    ? await db.prepare(`SELECT * FROM insc_fiches WHERE ${filtrePartage} ORDER BY id DESC`).all()
-    : await db.prepare(`SELECT * FROM insc_fiches WHERE owner_user_id=? AND ${filtrePartage} ORDER BY id DESC`).all(user.id);
-  const enrichies = [];
-  for (const f of fiches) {
+/* Données d'une carte de fiche (liste principale ET onglet « Reçues » du panneau « Fiche partagée » : même carte aux deux endroits,
+   2026-10-08, demande explicite — une seule source pour les deux). */
+async function inscEnrichirFiche(f) {
     // Number(...) autour de COUNT(*) (2026-09-22, bug réel constaté en production) : Postgres
     // renvoie un COUNT(*) sous forme de chaîne ("0", "1"...) pour préserver la précision d'un
     // bigint, contrairement à SQLite qui renvoie un vrai number — un "0" texte est VRAI en
@@ -46608,8 +46598,22 @@ route("GET", "/api/insc/fiches", async (req, res) => {
     // fiche_origine_id pointe vers CETTE fiche — jamais vers une table à part (voir la refonte
     // "3 fiches indépendantes" ci-dessus), donc toujours juste même si une trace a été supprimée.
     const nbPartages = Number((await db.prepare("SELECT COUNT(*) n FROM insc_fiches WHERE fiche_origine_id=? AND partage_role='envoi_trace'").get(f.id))?.n) || 0;
-    enrichies.push({ ...f, nb_inscriptions: nb, nb_evenements: nbEvt, apercu_date: evtApercu?.date_evt || null, apercu_lieu: evtApercu ? [evtApercu.ville, evtApercu.pays].filter(Boolean).join(", ") : null, a_types_payants: nbTypesPayants > 0, nb_partages: nbPartages });
-  }
+  return { ...f, nb_inscriptions: nb, nb_evenements: nbEvt, apercu_date: evtApercu?.date_evt || null, apercu_lieu: evtApercu ? [evtApercu.ville, evtApercu.pays].filter(Boolean).join(", ") : null, a_types_payants: nbTypesPayants > 0, nb_partages: nbPartages };
+}
+
+route("GET", "/api/insc/fiches", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const estAdmin = user.role === "administrateur" || (await AdminJunior.hasAdminPermission(user, "formulaires_inscription.consulter", db));
+  // "Fiche partagée" (2026-10-08) : ma trace d'envoi n'apparaît JAMAIS ici (uniquement dans le
+  // panneau dédié) ; une copie reçue n'apparaît ici qu'une fois affichée volontairement
+  // (partage_accepte=1) — avant ça, elle reste accessible uniquement depuis l'onglet "Reçues".
+  const filtrePartage = "(partage_role IS NULL OR (partage_role='reception' AND partage_accepte=1))";
+  const fiches = estAdmin
+    ? await db.prepare(`SELECT * FROM insc_fiches WHERE ${filtrePartage} ORDER BY id DESC`).all()
+    : await db.prepare(`SELECT * FROM insc_fiches WHERE owner_user_id=? AND ${filtrePartage} ORDER BY id DESC`).all(user.id);
+  const enrichies = [];
+  for (const f of fiches) enrichies.push(await inscEnrichirFiche(f));
   sendJSON(res, 200, { fiches: enrichies });
 });
 
@@ -47651,9 +47655,10 @@ route("GET", "/api/insc/fiches-partagees", async (req, res) => {
   const envoyees = await db.prepare(
     "SELECT id AS fiche_id, nom, statut, partage_contact_nom AS destinataire_nom, partage_le AS created_at FROM insc_fiches WHERE owner_user_id=? AND partage_role='envoi_trace' ORDER BY id DESC"
   ).all(user.id);
-  const recues = await db.prepare(
-    "SELECT id AS fiche_id, nom, statut, partage_contact_nom AS expediteur_nom, partage_le AS created_at, partage_accepte FROM insc_fiches WHERE owner_user_id=? AND partage_role='reception' ORDER BY id DESC"
-  ).all(user.id);
+  /* Reçues : lignes COMPLÈTES de fiche, enrichies comme dans la liste principale, pour que le panneau les affiche avec la même carte. */
+  const recuesBrutes = await db.prepare("SELECT * FROM insc_fiches WHERE owner_user_id=? AND partage_role='reception' ORDER BY id DESC").all(user.id);
+  const recues = [];
+  for (const f of recuesBrutes) recues.push({ ...(await inscEnrichirFiche(f)), fiche_id: f.id, expediteur_nom: f.partage_contact_nom });
   sendJSON(res, 200, { envoyees, recues });
 });
 

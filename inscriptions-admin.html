@@ -1307,12 +1307,13 @@ async function iaBaEnregistrer() {
   catch (e) { alert(e.message || 'Enregistrement impossible.'); btn.disabled = false; }
 }
 
-function renderListView() {
-  const cards = state.fiches.map(f => {
+/* Carte d'une fiche — MÊME carte pour la liste principale (ctx 'liste') et pour l'onglet « Reçues » du panneau « Fiche partagée »
+   (ctx 'recue', 2026-10-08, demande explicite : « une affiche pareille que dans la zone de formulaire normal »). */
+function iaCarteFiche(f, ctx) {
     const [bg, color] = IA_STATUS_STYLES[f.statut] || IA_STATUS_STYLES['brouillon'];
     return `
-      <div style="background:#fff;${Number(f.est_bouton_action) ? 'border:2px solid #2E8BFF;box-shadow:0 0 14px rgba(46,139,255,.45);' : 'border:1px solid oklch(0.9 0.004 30);'}border-radius:12px;overflow:hidden;cursor:pointer;position:relative;" data-action="selectFiche" data-id="${f.id}">
-        <button title="Supprimer la fiche" data-action="supprimerFicheListe" data-id="${f.id}" data-nom="${escH(f.nom)}" style="position:absolute;top:8px;right:8px;z-index:1;width:28px;height:28px;border-radius:50%;border:none;background:rgba(0,0,0,.45);color:#fff;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;">🗑</button>
+      <div style="background:#fff;${Number(f.est_bouton_action) ? 'border:2px solid #2E8BFF;box-shadow:0 0 14px rgba(46,139,255,.45);' : 'border:1px solid oklch(0.9 0.004 30);'}border-radius:12px;overflow:hidden;cursor:pointer;position:relative;" ${ctx === 'recue' ? 'data-action="ouvrirFicheRecue"' : 'data-action="selectFiche"'} data-id="${f.id}">
+        ${ctx === 'liste' ? `<button title="Supprimer la fiche" data-action="supprimerFicheListe" data-id="${f.id}" data-nom="${escH(f.nom)}" style="position:absolute;top:8px;right:8px;z-index:1;width:28px;height:28px;border-radius:50%;border:none;background:rgba(0,0,0,.45);color:#fff;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;">🗑</button>` : ''}
         <div style="height:120px;background:${f.affiche_url ? `oklch(0.9 0.004 30) center/cover no-repeat url('${escH(f.affiche_url)}')` : 'oklch(0.94 0.01 258)'};display:flex;align-items:center;justify-content:center;">
           ${f.affiche_url ? '' : '<span style="font-size:28px;opacity:.5;">📅</span>'}
         </div>
@@ -1342,7 +1343,7 @@ function renderListView() {
                un seul accès rapide, jamais une copie séparée. Liée à un événement (f.nb_evenements
                > 0) : ouverture automatique, seule la fermeture est affichée/modifiable ici (même
                règle appliquée en temps réel côté serveur, voir GET /api/insc/public/:slug). -->
-          <div data-action="ouvrirProgrammationListe" data-id="${f.id}" title="Cliquez pour modifier" style="cursor:pointer;font-size:11.5px;font-weight:600;color:${f.nb_evenements ? 'oklch(0.4 0.13 258)' : 'oklch(0.4 0.006 30)'};background:${f.nb_evenements ? 'oklch(0.96 0.03 258)' : 'oklch(0.97 0.004 30)'};border:1px solid ${f.nb_evenements ? 'oklch(0.85 0.05 258)' : 'oklch(0.88 0.004 30)'};border-radius:8px;padding:7px 10px;margin-bottom:14px;display:flex;align-items:center;gap:6px;">
+          <div ${ctx === 'liste' ? `data-action="ouvrirProgrammationListe" data-id="${f.id}" title="Cliquez pour modifier" style="cursor:pointer;` : `style="`}font-size:11.5px;font-weight:600;color:${f.nb_evenements ? 'oklch(0.4 0.13 258)' : 'oklch(0.4 0.006 30)'};background:${f.nb_evenements ? 'oklch(0.96 0.03 258)' : 'oklch(0.97 0.004 30)'};border:1px solid ${f.nb_evenements ? 'oklch(0.85 0.05 258)' : 'oklch(0.88 0.004 30)'};border-radius:8px;padding:7px 10px;margin-bottom:14px;display:flex;align-items:center;gap:6px;">
             ${f.nb_evenements
               ? `<span>🔗 Ouverture automatique (lié à un événement) · Ferme ${f.date_fermeture_inscriptions ? 'le ' + escH(f.date_fermeture_inscriptions.slice(0,10)) : '— à définir'}</span>`
               : `<span>📅 ${f.date_ouverture_inscriptions ? escH(f.date_ouverture_inscriptions.slice(0,10)) : 'Ouverture à définir'} → ${f.date_fermeture_inscriptions ? escH(f.date_fermeture_inscriptions.slice(0,10)) : 'fermeture à définir'}</span>`}
@@ -1350,6 +1351,15 @@ function renderListView() {
           </div>
           <div style="display:flex;gap:12px;padding-top:12px;border-top:1px solid oklch(0.93 0.004 30);align-items:center;flex-wrap:wrap;">
             <div><div style="font-size:11px;color:oklch(0.55 0.006 30);">Inscrits</div><div style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600;">${f.nb_inscriptions}</div></div>
+${ctx === 'recue' ? `
+            <div style="flex:1;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">
+              <button data-action="gererFicheRecue" data-id="${f.id}" style="background:oklch(0.32 0.09 258);border:none;color:#fff;font-size:11.5px;font-weight:700;padding:6px 12px;border-radius:20px;cursor:pointer;white-space:nowrap;">🗂️ Gérer</button>
+              <button data-action="ouvrirFicheRecue" data-id="${f.id}" style="background:#fff;border:1px solid oklch(0.8 0.006 30);color:oklch(0.2 0.006 30);font-size:11.5px;font-weight:600;padding:6px 11px;border-radius:20px;cursor:pointer;white-space:nowrap;">✏️ Modifier</button>
+              ${Number(f.partage_accepte)
+                ? `<span style="font-size:11px;font-weight:700;color:oklch(0.4 0.13 150);align-self:center;">✓ Dans votre liste principale</span>`
+                : `<button data-action="afficherDansListePrincipale" data-id="${f.id}" style="background:oklch(0.94 0.05 150);border:1px solid oklch(0.4 0.13 150);color:oklch(0.4 0.13 150);font-size:11.5px;font-weight:700;padding:6px 11px;border-radius:20px;cursor:pointer;white-space:nowrap;">📥 Afficher dans ma liste principale</button>`}
+            </div>
+` : `
             <div style="flex:1;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">
               <!-- Accès rapide "Gérer"/"Modifier" (2026-09-26, demande explicite : "évite de
                    rentrer encore une fois dans la fiche pour aller chercher à l'intérieur") —
@@ -1367,10 +1377,14 @@ function renderListView() {
                 ? `<button data-action="fermerFicheListe" data-id="${f.id}" style="background:#fff;border:1px solid #dc2626;color:#dc2626;font-size:11.5px;font-weight:600;padding:6px 11px;border-radius:20px;cursor:pointer;white-space:nowrap;">🔒 Fermer la fiche</button>`
                 : ''}
             </div>
+`}
           </div>
         </div>
       </div>`;
-  }).join('');
+}
+
+function renderListView() {
+  const cards = state.fiches.map(f => iaCarteFiche(f, 'liste')).join('');
 
   return `
     <div style="max-width:1180px;margin:0 auto;padding:40px 28px;">
@@ -1872,22 +1886,11 @@ function renderModalPartage() {
       </div>` : `<div style="text-align:center; padding:24px 10px; color:oklch(0.55 0.006 30); font-size:13px;">Aucune fiche partagée pour l'instant.</div>`;
   } else {
     corps = state.partageRecues.length ? `
-      <div style="display:flex; flex-direction:column; gap:8px;">
-        ${state.partageRecues.map(p => `
-          <div style="border:1px solid oklch(0.9 0.004 30); border-radius:10px; padding:10px 12px; font-size:12.5px;">
-            <a href="#" data-action="selectFiche" data-id="${p.fiche_id}" style="display:block; text-decoration:none; color:inherit;">
-              ${ligneFiche(p.nom, p.statut)}<br>
-              <span style="color:oklch(0.55 0.006 30);">Reçue de <b>${escH(p.expediteur_nom || '—')}</b> le ${fmt(p.created_at)} — entièrement à vous, modifiable</span>
-            </a>
-            ${Number(p.partage_accepte)
-              ? `<span style="display:inline-block; margin-top:8px; font-size:11px; font-weight:700; color:oklch(0.4 0.13 150);">✅ Affichée dans votre liste principale</span>`
-              : `<button data-action="afficherDansListePrincipale" data-id="${p.fiche_id}" style="margin-top:8px; background:oklch(0.32 0.09 258); border:none; color:#fff; font-size:11.5px; font-weight:700; padding:7px 13px; border-radius:20px; cursor:pointer;">Afficher dans ma liste principale</button>`}
-          </div>`).join('')}
-      </div>` : `<div style="text-align:center; padding:24px 10px; color:oklch(0.55 0.006 30); font-size:13px;">Aucune fiche reçue pour l'instant.</div>`;
+      <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:16px;">${state.partageRecues.map(f => iaCarteFiche(f, 'recue')).join('')}</div>` : `<div style="text-align:center; padding:24px 10px; color:oklch(0.55 0.006 30); font-size:13px;">Aucune fiche reçue pour l'instant.</div>`;
   }
   return `
     <div style="position:fixed; inset:0; background:rgba(20,20,30,.55); z-index:200; display:flex; align-items:center; justify-content:center; padding:20px;">
-      <div style="background:oklch(0.97 0.002 30); border-radius:16px; max-width:520px; width:100%; max-height:88vh; overflow-y:auto; padding:24px; box-sizing:border-box;">
+      <div style="background:oklch(0.97 0.002 30); border-radius:16px; max-width:${state.partageOnglet === 'recues' ? '980px' : '520px'}; width:100%; max-height:88vh; overflow-y:auto; padding:24px; box-sizing:border-box;">
         <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:14px; gap:10px;">
           <h3 style="margin:0; font-size:17px;">🤝 Fiche partagée</h3>
           <button data-action="fermerModalPartage" style="background:none; border:none; font-size:20px; cursor:pointer; color:oklch(0.55 0.006 30); flex-shrink:0;">✕</button>
@@ -3157,6 +3160,23 @@ const actions = {
     await actions.chargerPartages();
   },
   fermerModalPartage() { state.modalPartageOuvert = false; },
+  /* Cartes de l'onglet « Reçues » : ouvrir la fiche ferme d'abord le panneau (sinon il resterait affiché par-dessus la fiche). */
+  async ouvrirFicheRecue(el) { state.modalPartageOuvert = false; await actions.selectFiche(el); },
+  async gererFicheRecue(el) { state.modalPartageOuvert = false; await actions.gererFicheListe(el); },
+  /* « Afficher dans ma liste principale » : la copie reçue rejoint la liste des fiches (sinon elle reste dans « Reçues »). */
+  async afficherDansListePrincipale(el) {
+    await api('POST', `/insc/fiches/${parseInt(el.dataset.id)}/afficher-dans-ma-liste`);
+    await iaChargerListe();
+    await actions.chargerPartages();
+    ia_toast('Fiche ajoutée à votre liste principale.', true);
+  },
+  /* Retirer ma trace d'envoi (n'affecte ni l'originale ni la copie reçue : trois fiches indépendantes). */
+  async supprimerTracePartage(el) {
+    if (!confirm('Retirer cette trace de la liste des fiches envoyées ? La fiche d\'origine et la copie reçue ne sont pas touchées.')) return;
+    await api('DELETE', '/insc/fiches/' + parseInt(el.dataset.id));
+    await actions.chargerPartages();
+    ia_toast('Trace retirée.', true);
+  },
   // Raccourci d'en-tête "📥 Formulaires partagés avec moi" (2026-10-08) — ouvre directement sur
   // "Reçues", sans fiche de départ (modalPartageFicheId reste null : l'onglet "✨ Partager" s'en
   // accommode, voir renderModalPartage()).
