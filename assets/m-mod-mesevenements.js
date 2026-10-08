@@ -28,6 +28,58 @@
   const ZONES = ['Ville', 'Commune', 'Département', 'Région', 'National', 'International'];
   const STATUT_FICHE = { inscrit: ['Inscrit', ''], confirme: ['Confirmé', 'g'], present: ['Présent', 'g'], absent: ['Absent', 'r'], annule: ['Annulé', 'r'], liste_attente: ['Liste d’attente', 'o'] };
 
+  /* ============================================================
+     ÉVÉNEMENT FLASH — accès direct + « ? » (2026-10-09, demande explicite : « l'option de créer des événements flash sur téléphone,
+     avec un point d'interrogation qui explique ce que c'est »). Même bouton vert et même « ? » accolé que sur le site
+     (evenements-app.html), même explication. La création elle-même existait déjà dans le formulaire (choix « Événement flash »).
+     flashCarte() est aussi utilisée par l'écran Événements (m.js) : le CSS est donc injecté dès le chargement du module, pas
+     seulement quand on ouvre « Mes événements ». Le « ? » est géré par un seul écouteur global (attribut data-flash-aide).
+     ============================================================ */
+  (function cssFlash() {
+    if ($('#m-mod-flash-css')) return;
+    const s = document.createElement('style');
+    s.id = 'm-mod-flash-css';
+    s.textContent = `
+.mev-flash{display:flex;align-items:stretch;gap:2px;margin:0 0 12px}
+.mev-flash a{flex:1;min-width:0;display:flex;align-items:center;gap:10px;min-height:56px;padding:10px 14px;background:#7BE87B;color:#052e0f;text-decoration:none;border-radius:14px 0 0 14px}
+.mev-flash a b{display:block;font-size:15px;line-height:1.2}
+.mev-flash a small{display:block;font-size:12.5px;font-weight:500;line-height:1.3}
+.mev-flash a .ei{flex:none;font-size:22px;line-height:1}
+.mev-flash button{flex:none;width:52px;min-height:56px;border:none;border-left:1px solid rgba(5,46,15,.25);background:#7BE87B;color:#052e0f;font-size:20px;font-weight:800;border-radius:0 14px 14px 0;cursor:pointer;font-family:inherit}
+.mev-flash a:focus-visible,.mev-flash button:focus-visible,.mev-q:focus-visible{outline:3px solid var(--navy,#0D2B4E);outline-offset:2px}
+.mev-q{position:relative;display:inline-flex;align-items:center;justify-content:center;min-width:30px;height:30px;padding:0;margin-left:8px;border:none;border-radius:50%;background:#7BE87B;color:#052e0f;font-size:16px;font-weight:800;vertical-align:middle;cursor:pointer;font-family:inherit}
+.mev-q:after{content:"";position:absolute;inset:-8px}
+.mev-fa p{margin:0 0 10px;line-height:1.5}
+`;
+    document.head.appendChild(s);
+  })();
+
+  /* Carte « ⚡ Événement flash » + « ? ». Réservée aux comptes Initiative, comme la création d'événement sur téléphone (gate()). */
+  function flashCarte() {
+    if (!S.me || S.me.role !== 'initiative') return '';
+    return `<div class="mev-flash"><a href="#/mesevenements/flash"><span class="ei" aria-hidden="true">⚡</span><span><b>Événement flash</b><small>Une annonce publiée en quelques secondes</small></span></a>`
+      + `<button type="button" data-flash-aide aria-label="Qu’est-ce qu’un événement flash ?">?</button></div>`;
+  }
+  /* Explication (feuille qui monte du bas). Depuis le formulaire, pas de bouton « Créer » : on y est déjà. */
+  function aideFlash(depuisFormulaire) {
+    const close = A.openSheet(`<div class="mev-fa"><h2 style="margin:0 0 8px;font-size:19px">⚡ Qu’est-ce qu’un événement flash ?</h2>
+      <p>Une <b>annonce publiée en quelques secondes</b> pour prévenir rapidement la communauté : un titre, la date, l’adresse, une courte description (500 caractères au maximum) et une photo.</p>
+      <p><b>Purement informatif</b> : aucune inscription n’est proposée aux membres.</p>
+      <p>Vous voulez que les gens puissent s’inscrire ? Créez plutôt un événement <b>avec inscriptions</b>.</p>
+      ${depuisFormulaire ? '' : '<a class="btn block" href="#/mesevenements/flash" id="fa-go">⚡ Créer un événement flash</a>'}
+      <button type="button" class="btn out block" id="fa-close" style="margin-top:10px">${depuisFormulaire ? 'Compris' : 'Fermer'}</button></div>`);
+    const c = $('#fa-close'); if (c) { c.onclick = close; c.focus(); }
+    const g = $('#fa-go'); if (g) g.addEventListener('click', close);
+  }
+  if (!window.__mevFlashAide) {
+    window.__mevFlashAide = true;
+    document.addEventListener('click', e => {
+      const q = e.target.closest('[data-flash-aide]');
+      if (q) { e.preventDefault(); e.stopPropagation(); aideFlash(!!q.closest('#mev-form')); }
+    });
+  }
+  window.MMods.flashCarte = flashCarte;
+
   /* ---------- styles (injectés une seule fois) ---------- */
   function css() {
     if ($('#m-mod-mesevenements-css')) return;
@@ -192,6 +244,7 @@
     const t = ++rendu; css();
     if (!b) return liste(t);
     if (b === 'nouveau') return formulaire(t, null);
+    if (b === 'flash') return formulaire(t, null, 'flash');
     if (/^\d+$/.test(b)) {
       if (c === 'inscrits') return inscrits(t, b);
       if (c === 'modifier') return formulaire(t, b);
@@ -217,7 +270,7 @@
     // Premier affichage : on ouvre directement l'onglet qui contient quelque chose.
     ST.tab = g.avenir.length ? 'avenir' : g.brouillons.length ? 'brouillons' : g.termines.length ? 'termines' : 'avenir';
     ST.q = ''; ST.shown = 30;
-    setPane(NOM, `<div id="mev-top"></div><div id="mev-list"></div>
+    setPane(NOM, `${flashCarte()}<div id="mev-top"></div><div id="mev-list"></div>
       <div class="mev-note" style="margin-top:6px"><b>Billetterie et billets payants</b>Les événements avec types de billets, ventes et finances se gèrent sur ordinateur.<br><a href="dashboard-initiative.html#evenements" style="text-decoration:underline;font-weight:700">Ouvrir sur ordinateur</a></div>`,
     `<a class="btn block" href="#/mesevenements/nouveau">${ic('plus', 's')} Créer un événement</a>`);
     paintListe();
@@ -546,8 +599,9 @@
   const opt = (name, val, titre, aide, on) => `<label class="mev-opt ${on ? 'on' : ''}"><input type="radio" name="${name}" value="${val}" ${on ? 'checked' : ''}><span><b>${titre}</b><small>${aide}</small></span></label>`;
   const sel = (id, opts, cur, vide) => `<select id="${id}">${vide ? `<option value="">${vide}</option>` : ''}${opts.map(o => { const [v, l] = Array.isArray(o) ? o : [o, DOMAINES_LIB[o] || o]; return `<option value="${esc(v)}" ${String(cur || '') === String(v) ? 'selected' : ''}>${esc(l)}</option>`; }).join('')}</select>`;
 
-  async function formulaire(t, id) {
-    const edition = !!id; const titrePane = edition ? 'Modifier l’événement' : 'Nouvel événement';
+  async function formulaire(t, id, modeInit) {
+    const edition = !!id; const titrePane = edition ? 'Modifier l’événement' : (modeInit === 'flash' ? 'Événement flash' : 'Nouvel événement');
+    const flashInit = !edition && modeInit === 'flash';
     if (!gate(titrePane)) return;
     let e = null;
     if (edition) {
@@ -566,9 +620,9 @@
 
     const html = `<form id="mev-form" class="mev-f" novalidate autocomplete="off">
       <div class="mev-gerr" id="mev-gerr" role="alert"></div>
-      ${edition ? '' : `<div class="h2" style="margin-top:2px">TYPE D’ÉVÉNEMENT</div>
-        ${opt('mev-mode', 'inscriptions', 'Avec inscriptions', 'Les membres s’inscrivent depuis l’application ; vous suivez la liste des inscrits.', true)}
-        ${opt('mev-mode', 'flash', 'Événement flash', 'Informatif, sans inscription : pour prévenir vite la communauté.', false)}`}
+      ${edition ? '' : `<div class="h2" style="margin-top:2px">TYPE D’ÉVÉNEMENT <button type="button" class="mev-q" data-flash-aide aria-label="Qu’est-ce qu’un événement flash ?">?</button></div>
+        ${opt('mev-mode', 'inscriptions', 'Avec inscriptions', 'Les membres s’inscrivent depuis l’application ; vous suivez la liste des inscrits.', !flashInit)}
+        ${opt('mev-mode', 'flash', 'Événement flash', 'Informatif, sans inscription : pour prévenir vite la communauté.', flashInit)}`}
       <div class="h2">L’ESSENTIEL</div>
       <label class="mev-l" for="mev-titre">Titre *</label>
       <input type="text" id="mev-titre" maxlength="160" value="${esc(v.titre || '')}" placeholder="Ex. : Soirée de la diaspora" aria-describedby="mev-e-titre"><div class="mev-err" id="mev-e-titre" role="alert"></div>
