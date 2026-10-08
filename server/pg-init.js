@@ -1181,6 +1181,8 @@ const COLONNES_MIGRATION = [
     ['initiatives', 'affichage_membres', "TEXT DEFAULT 'tous'"],
     // Liste générale "Tous les membres" (2026-08-08) : miroir de l'ALTER db.js
     ['initiatives', 'liste_membres_generale_id', 'INTEGER'],
+    // Liste de diffusion « Toutes les affiliations » (2026-10-09) : miroir de l'ALTER db.js
+    ['initiatives', 'liste_affiliations_id', 'INTEGER'],
     // Transfert de gestionnaire (2026-08-08) : compteur d'invalidation des tokens 'auth' stateless
     ['users', 'credential_version', 'INTEGER NOT NULL DEFAULT 1'],
     // Module Administrateurs Junior — suspension manuelle (miroir de l'ALTER db.js)
@@ -1240,6 +1242,9 @@ const COLONNES_MIGRATION = [
     ['produits_vitrine', 'livraison_expedition', 'INTEGER DEFAULT 0'],
     ['produits_vitrine', 'frais_expedition', 'REAL'],
     ['commandes_vitrine', 'mode_livraison', 'TEXT'],
+    // Paiement multi-prestataires (2026-09-29, rétabli 2026-10-09) — miroir de l'ALTER db.js
+    ['commandes_vitrine', 'provider', "TEXT DEFAULT 'stripe'"],
+    ['commandes_vitrine', 'paypal_order_id', 'TEXT'],
     ['commandes_vitrine', 'livraison_nom', 'TEXT'],
     ['commandes_vitrine', 'livraison_adresse', 'TEXT'],
     ['commandes_vitrine', 'livraison_code_postal', 'TEXT'],

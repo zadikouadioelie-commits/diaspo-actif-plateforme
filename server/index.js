@@ -9218,7 +9218,7 @@ route("GET", "/api/talents-diaspora", async (req, res) => {
       ...utilisateurs.map(u => ({
         cle: `u${u.id}`, type: 'utilisateur', id: u.id,
         nom: [u.prenom, u.nom].filter(Boolean).join(' ') || u.nom,
-        role: u.titre_pro || 'Membre Diaspo\'Actif',
+        role: u.titre_pro || '',
         ville: u.ville, pays: u.pays, origine: u.origine1 || u.nationalite1 || null,
         photo_url: u.photo_url, tags: parseTags(u.competences),
         href: `profil.html?id=${u.id}`,

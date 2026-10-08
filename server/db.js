@@ -1919,6 +1919,9 @@ const MIGRATIONS = [
   // pour que les deux chemins nourrissent la même fiche Réseau Pro — jamais deux contacts
   // séparés pour la même personne.
   ["initiatives", "liste_membres_generale_id INTEGER"],
+  // Liste de diffusion « Toutes les affiliations » (2026-10-09) : miroir automatique des affiliations
+  // acceptées de l'initiative (module Affiliations), voir syncListeAffiliations() dans server/index.js.
+  ["initiatives", "liste_affiliations_id INTEGER"],
   ["users", "type_institution TEXT"],
   ["users", "statut_verification TEXT DEFAULT 'auto'"],
   // Champs de base initiatives (peuvent manquer sur DB ancienne)
@@ -5569,6 +5572,11 @@ db.exec(`
   if (!userCols3.includes('crm_contexte_actif_initiative_id')) {
     db.exec('ALTER TABLE users ADD COLUMN crm_contexte_actif_initiative_id INTEGER');
   }
+  /* is_demo (2026-10-09) : existait seulement sur PostgreSQL (server/pg-init.js) alors que ~90 requêtes de server/index.js
+     la lisent — en local (SQLite) ces routes (annuaire, compteurs, audience publicitaire…) plantaient « no such column ». */
+  if (!userCols3.includes('is_demo')) {
+    db.exec('ALTER TABLE users ADD COLUMN is_demo INTEGER DEFAULT 0');
+  }
 }
 
 /* Ancien format local (DAS-XXXX-XXXX-XXXX, Math.random) abandonné au profit de
@@ -7869,6 +7877,11 @@ db.exec(`
   ["commandes_vitrine", "paiement_statut TEXT DEFAULT 'aucun'"],
   ["commandes_vitrine", "montant_total REAL"],
   ["commandes_vitrine", "stripe_session_id TEXT"],
+  /* Paiement multi-prestataires (2026-09-29) : provider = prestataire qui a encaissé, paypal_order_id = équivalent PayPal de
+     stripe_session_id. Rétabli le 2026-10-09 : ces deux lignes avaient disparu du code alors que server/index.js les utilise
+     (INSERT ... provider) — chaque commande boutique payante échouait en production. */
+  ["commandes_vitrine", "provider TEXT DEFAULT 'stripe'"],
+  ["commandes_vitrine", "paypal_order_id TEXT"],
   ["vitrine_publications", "media_bg TEXT"],
   ["vitrine_avis", "titre TEXT"],
   ["vitrine_avis", "reponse_texte TEXT"],
