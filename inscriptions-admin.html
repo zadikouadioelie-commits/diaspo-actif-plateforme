@@ -251,6 +251,15 @@ const state = {
   modalLiaisonOuvert: false, // modale "Lier à un événement" (cartouches), ouvrable depuis la liste sans changer de vue
   modalProgrammationOuvert: false, // modale "Programmation" (ouverture/fermeture), accès rapide depuis la cartouche
   modalProgrammationFicheId: null,
+  // "Fiche partagée" (2026-10-08, demande explicite) : un seul bouton par fiche qui ouvre ce panneau,
+  // réunissant envoyées/reçues (compte entier, pas juste cette fiche) + l'envoi d'un nouveau partage.
+  modalPartageOuvert: false,
+  modalPartageFicheId: null,
+  partageOnglet: 'nouveau', // 'nouveau' | 'envoyees' | 'recues'
+  partageRecherche: '',
+  partageResultats: [],
+  partageEnvoyees: [],
+  partageRecues: [],
   publicData: null,
   publicSelectedTypeId: null,
   publicReponses: {},
@@ -1345,6 +1354,7 @@ function renderListView() {
               <button data-action="selectFiche" data-id="${f.id}" style="background:#fff;border:1px solid oklch(0.8 0.006 30);color:oklch(0.2 0.006 30);font-size:11.5px;font-weight:600;padding:6px 11px;border-radius:20px;cursor:pointer;white-space:nowrap;">✏️ Modifier</button>
               ${f.nb_evenements ? `<button data-action="ouvrirLiaisonEvenement" data-id="${f.id}" style="background:oklch(0.95 0.03 258);border:1px solid oklch(0.85 0.05 258);color:oklch(0.32 0.09 258);font-size:11.5px;font-weight:600;padding:6px 11px;border-radius:20px;cursor:pointer;white-space:nowrap;">📅 ${f.nb_evenements} événement${f.nb_evenements > 1 ? 's' : ''} lié${f.nb_evenements > 1 ? 's' : ''}</button>` : ''}
               <button data-action="ouvrirLiaisonEvenement" data-id="${f.id}" style="background:#fff;border:1px solid oklch(0.8 0.006 30);color:oklch(0.2 0.006 30);font-size:11.5px;font-weight:600;padding:6px 11px;border-radius:20px;cursor:pointer;white-space:nowrap;">🔗 Lier à un événement</button>
+              <button data-action="ouvrirPartage" data-id="${f.id}" style="background:#fff;border:1px solid oklch(0.8 0.006 30);color:oklch(0.2 0.006 30);font-size:11.5px;font-weight:600;padding:6px 11px;border-radius:20px;cursor:pointer;white-space:nowrap;">🤝 Fiche partagée</button>
               ${(f.statut === 'brouillon' || f.statut === 'fermee')
                 ? `<button data-action="ouvrirFicheListe" data-id="${f.id}" style="background:oklch(0.94 0.05 150);border:1px solid oklch(0.4 0.13 150);color:oklch(0.4 0.13 150);font-size:11.5px;font-weight:700;padding:6px 11px;border-radius:20px;cursor:pointer;white-space:nowrap;">🔓 Ouvrir la fiche</button>`
                 : f.statut === 'publiee'
@@ -1784,6 +1794,69 @@ function renderModalLiaison() {
         </div>
         <p style="font-size:12.5px; color:oklch(0.55 0.006 30); margin:0 0 18px;">Le bouton « S'inscrire » d'un événement lié redirige vers cette fiche au lieu du parcours d'inscription classique. Un événement ne peut être lié qu'à une seule fiche à la fois.</p>
         <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:14px;">${cartouches}</div>
+      </div>
+    </div>`;
+}
+
+/* ---- Modale "🤝 Fiche partagée" (2026-10-08, demande explicite) ----
+   Un seul bouton par fiche, un seul panneau pour tout le compte : partager cette fiche à une
+   nouvelle Initiative (copie vierge, tous les réglages, modifiable à 100 % par qui la reçoit —
+   confirmé explicitement), + l'historique des fiches envoyées et reçues (toutes fiches
+   confondues, pas seulement celle-ci : "toutes les fiches partagées... et toutes les fiches
+   que je reçois"). */
+function renderModalPartage() {
+  if (!state.modalPartageOuvert) return '';
+  const fiche = state.fiches.find(f => Number(f.id) === state.modalPartageFicheId);
+  if (!fiche) return '';
+  const onglet = (libelle, cle, n) => `<button data-action="ongletPartage" data-onglet="${cle}" style="background:${state.partageOnglet === cle ? 'oklch(0.32 0.09 258)' : '#fff'}; color:${state.partageOnglet === cle ? '#fff' : 'oklch(0.2 0.006 30)'}; border:1px solid ${state.partageOnglet === cle ? 'oklch(0.32 0.09 258)' : 'oklch(0.85 0.004 30)'}; font-size:12px; font-weight:700; padding:7px 13px; border-radius:20px; cursor:pointer; white-space:nowrap;">${libelle}${n != null ? ` (${n})` : ''}</button>`;
+  const ligneFiche = (nom, statut) => `<span style="font-weight:600;">${escH(nom)}</span><span style="font-size:11px;color:oklch(0.55 0.006 30);margin-left:6px;">${escH(statut)}</span>`;
+  const fmt = d => d ? String(d).slice(0, 10).split('-').reverse().join('/') : '';
+  let corps;
+  if (state.partageOnglet === 'nouveau') {
+    corps = `
+      <p style="font-size:12.5px; color:oklch(0.55 0.006 30); margin:0 0 12px;">Cherchez l'Initiative à qui partager « ${escH(fiche.nom)} ». Elle reçoit une copie vierge (aucune inscription, aucun événement lié) avec tous les réglages — elle pourra ensuite tout modifier, la fiche lui appartient.</p>
+      <input id="partage-recherche-input" type="text" placeholder="Nom de l'initiative…" value="${escH(state.partageRecherche)}" autocomplete="off" style="width:100%; height:40px; border:1px solid oklch(0.8 0.006 30); border-radius:10px; padding:0 12px; font-size:13.5px; box-sizing:border-box; margin-bottom:10px;">
+      <div style="display:flex; flex-direction:column; gap:6px;">
+        ${state.partageRecherche.trim().length < 2 ? '' : (state.partageResultats.length
+          ? state.partageResultats.map(r => `
+            <div style="display:flex; align-items:center; gap:10px; border:1px solid oklch(0.9 0.004 30); border-radius:10px; padding:9px 12px;">
+              <div style="flex:1; min-width:0;"><div style="font-weight:700; font-size:13px;">${escH(r.nom)}</div>${r.detail ? `<div style="font-size:11.5px; color:oklch(0.55 0.006 30);">${escH(r.detail)}</div>` : ''}</div>
+              <button data-action="envoyerPartage" data-user-id="${r.user_id}" style="background:oklch(0.32 0.09 258); border:none; color:#fff; font-size:12px; font-weight:700; padding:7px 14px; border-radius:20px; cursor:pointer; white-space:nowrap;">Partager</button>
+            </div>`).join('')
+          : '<div style="font-size:12.5px; color:oklch(0.55 0.006 30); padding:8px 2px;">Aucune Initiative trouvée pour ce nom.</div>')}
+      </div>`;
+  } else if (state.partageOnglet === 'envoyees') {
+    corps = state.partageEnvoyees.length ? `
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        ${state.partageEnvoyees.map(p => `
+          <div style="border:1px solid oklch(0.9 0.004 30); border-radius:10px; padding:10px 12px; font-size:12.5px;">
+            ${ligneFiche(p.nom, p.statut)}<br>
+            <span style="color:oklch(0.55 0.006 30);">Partagée à <b>${escH(p.destinataire_nom || '—')}</b> le ${fmt(p.created_at)}</span>
+          </div>`).join('')}
+      </div>` : `<div style="text-align:center; padding:24px 10px; color:oklch(0.55 0.006 30); font-size:13px;">Aucune fiche partagée pour l'instant.</div>`;
+  } else {
+    corps = state.partageRecues.length ? `
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        ${state.partageRecues.map(p => `
+          <a href="#" data-action="selectFiche" data-id="${p.fiche_id}" style="display:block; text-decoration:none; color:inherit; border:1px solid oklch(0.9 0.004 30); border-radius:10px; padding:10px 12px; font-size:12.5px;">
+            ${ligneFiche(p.nom, p.statut)}<br>
+            <span style="color:oklch(0.55 0.006 30);">Reçue de <b>${escH(p.expediteur_nom || '—')}</b> le ${fmt(p.created_at)} — entièrement à vous, modifiable</span>
+          </a>`).join('')}
+      </div>` : `<div style="text-align:center; padding:24px 10px; color:oklch(0.55 0.006 30); font-size:13px;">Aucune fiche reçue pour l'instant.</div>`;
+  }
+  return `
+    <div style="position:fixed; inset:0; background:rgba(20,20,30,.55); z-index:200; display:flex; align-items:center; justify-content:center; padding:20px;">
+      <div style="background:oklch(0.97 0.002 30); border-radius:16px; max-width:520px; width:100%; max-height:88vh; overflow-y:auto; padding:24px; box-sizing:border-box;">
+        <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:14px; gap:10px;">
+          <h3 style="margin:0; font-size:17px;">🤝 Fiche partagée</h3>
+          <button data-action="fermerModalPartage" style="background:none; border:none; font-size:20px; cursor:pointer; color:oklch(0.55 0.006 30); flex-shrink:0;">✕</button>
+        </div>
+        <div style="display:flex; gap:6px; margin-bottom:16px; flex-wrap:wrap;">
+          ${onglet('✨ Partager', 'nouveau')}
+          ${onglet('📤 Envoyées', 'envoyees', state.partageEnvoyees.length)}
+          ${onglet('📥 Reçues', 'recues', state.partageRecues.length)}
+        </div>
+        ${corps}
       </div>
     </div>`;
 }
@@ -3032,6 +3105,36 @@ const actions = {
     state.modalLiaisonOuvert = true;
   },
   fermerModalLiaison() { state.modalLiaisonOuvert = false; },
+  // "🤝 Fiche partagée" (2026-10-08, demande explicite) — ouvre directement sur l'onglet envoi,
+  // mais charge aussi envoyées/reçues (compte entier) pour que les compteurs des onglets soient
+  // justes dès l'ouverture, sans attendre un clic sur ces onglets.
+  async ouvrirPartage(el) {
+    state.modalPartageFicheId = parseInt(el.dataset.id);
+    state.modalPartageOuvert = true;
+    state.partageOnglet = 'nouveau';
+    state.partageRecherche = ''; state.partageResultats = [];
+    await actions.chargerPartages();
+  },
+  fermerModalPartage() { state.modalPartageOuvert = false; },
+  ongletPartage(el) { state.partageOnglet = el.dataset.onglet; },
+  async chargerPartages() {
+    try {
+      const r = await api('GET', '/insc/fiches-partagees');
+      state.partageEnvoyees = r.envoyees || [];
+      state.partageRecues = r.recues || [];
+    } catch (e) { state.partageEnvoyees = []; state.partageRecues = []; }
+  },
+  async envoyerPartage(el) {
+    const userId = Number(el.dataset.userId);
+    el.disabled = true; el.textContent = 'Envoi…';
+    try {
+      await api('POST', `/insc/fiches/${state.modalPartageFicheId}/partager`, { user_id: userId });
+      ia_toast('Fiche partagée.', true);
+      state.partageRecherche = ''; state.partageResultats = [];
+      await actions.chargerPartages();
+      state.partageOnglet = 'envoyees';
+    } catch (e) { ia_toast(e.message, false); }
+  },
   /* Programmation ouverture/fermeture — accès rapide depuis la cartouche (2026-09-28, demande
      explicite). state.fiches contient déjà les deux dates (voir GET /insc/fiches) : pas besoin
      de recharger la fiche complète juste pour ouvrir ce modal léger. */
@@ -3783,12 +3886,34 @@ async function dispatch(name, el) {
 
 const root = document.getElementById('ia-root');
 function render() {
-  root.innerHTML = `<div style="min-height:100%; width:100%;">${state.view === 'list' ? renderListView() : renderDetailView()}${renderModalLiaison()}${renderModalProgrammation()}</div>`;
+  root.innerHTML = `<div style="min-height:100%; width:100%;">${state.view === 'list' ? renderListView() : renderDetailView()}${renderModalLiaison()}${renderModalProgrammation()}${renderModalPartage()}</div>`;
   // Éditeur de texte enrichi sur la Description (le panneau "Informations générales" est
   // entièrement reconstruit à chaque render() — l'attacher ici garantit qu'il est toujours
   // présent quand le panneau est ouvert, sans dupliquer si déjà attaché sur cet élément.
   if (window.RichEditor && state.view === 'detail' && state.activeTab === 'overview' && state.editionInfosOuverte) {
     RichEditor.attach('ia-infos-description', { placeholder: 'Décrivez cette fiche…' })?.setHTML(selectedFiche()?.description || '');
+  }
+  /* Recherche d'initiative en direct (2026-10-08) — en dehors du système data-action/dispatch
+     (qui ne réagit qu'au clic et au "change", pas à la frappe) : branché directement sur
+     l'élément, toujours neuf à chaque render() puisque innerHTML est reconstruit en entier. */
+  const partageInput = document.getElementById('partage-recherche-input');
+  if (partageInput) {
+    partageInput.focus();
+    partageInput.setSelectionRange(partageInput.value.length, partageInput.value.length);
+    let t;
+    partageInput.addEventListener('input', () => {
+      clearTimeout(t);
+      const q = partageInput.value;
+      t = setTimeout(async () => {
+        state.partageRecherche = q;
+        if (q.trim().length < 2) { state.partageResultats = []; render(); return; }
+        try {
+          const r = await api('GET', `/insc/fiches/${state.modalPartageFicheId}/partager/suggestions?q=${encodeURIComponent(q.trim())}`);
+          state.partageResultats = r.suggestions || [];
+        } catch (e) { state.partageResultats = []; }
+        render();
+      }, 220);
+    });
   }
 }
 root.addEventListener('click', function (e) {

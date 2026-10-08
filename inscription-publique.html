@@ -80,7 +80,7 @@
    néon pour se distinguer du violet de la candidature ci-dessus. target="_blank" volontaire :
    "ce lien ne devra pas fermer l'inscription, mais ouvrir en arrière-plan" — ne remplace jamais
    l'écran courant, quel qu'il soit. */
-.ip-parrainage-box{display:flex;align-items:center;gap:10px;background:#EAF8FF;border:1.5px solid #00AEEF;border-radius:14px;padding:14px 18px;margin-bottom:20px;box-shadow:0 0 10px rgba(0,174,239,.2);text-decoration:none;color:#0369A1;font-size:13.5px;font-weight:600;}
+.ip-parrainage-box{display:flex;align-items:center;flex-wrap:wrap;gap:10px;background:#EAF8FF;border:1.5px solid #00AEEF;border-radius:14px;padding:14px 18px;margin-bottom:20px;box-shadow:0 0 10px rgba(0,174,239,.2);text-decoration:none;color:#0369A1;font-size:13.5px;font-weight:600;}
 .ip-parrainage-box:hover{background:#DCF3FF;}
 .ip-parrainage-box strong{color:#0284C7;}
 .ip-cand-titre{font-size:15px;font-weight:800;color:#6B0FA3;margin:0 0 8px;display:flex;align-items:center;gap:8px;}
@@ -88,6 +88,16 @@
 .ip-cand-doc{display:flex;align-items:center;gap:10px;border:1px solid oklch(0.92 0.004 30);border-radius:8px;padding:8px 10px;text-decoration:none;color:inherit;}
 .ip-cand-doc:hover{border-color:#BC13FE;}
 .ip-cand-doc-titre{flex:1;font-size:13px;font-weight:600;}
+/* Responsive (2026-10-08, demande explicite, capture à l'appui : "l'image est restreinte, on ne voit pas la
+   totalité") — cette rangée mélange titre, bouton Télécharger et bloc Déposer/Remplacer sur une seule
+   ligne non repliable ; sur téléphone (overflow-x masqué par l'habillage mobile, m-site.css) ça dépassait
+   purement et simplement hors de l'écran au lieu de s'adapter. Un simple flex-wrap suffit : icône + titre
+   restent côte à côte tant qu'ils tiennent, Télécharger/Déposer basculent à la ligne au besoin — sans
+   toucher à l'affichage desktop existant (tout tient déjà sur une ligne à cette largeur-là). */
+@media (max-width:480px){
+  .ip-cand-doc{flex-wrap:wrap;}
+  .ip-cand-doc-titre{flex:1 1 auto;min-width:0;}
+}
 .ip-cand-email{background:oklch(0.97 0.01 300);border:1px dashed oklch(0.8 0.05 300);border-radius:8px;padding:10px 12px;font-size:12.5px;margin:14px 0;}
 .ip-cand-declare-btn{width:100%;height:44px;border-radius:8px;border:none;font-size:13.5px;font-weight:700;cursor:pointer;background:#8B12D6;color:#fff;}
 .ip-cand-declare-btn:disabled{background:#F0FDF4;color:#15803d;border:1.5px solid #15803d;cursor:default;opacity:1;}

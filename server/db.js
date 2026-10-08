@@ -563,6 +563,26 @@ db.exec(`
     FOREIGN KEY(evenement_id) REFERENCES evenements(id)
   );
 
+  /* Traçabilité du partage d'une fiche à une autre initiative (2026-10-08, demande explicite
+     « Fiche partagée ») — la copie elle-même (fiche_copie_id) est une fiche insc_fiches
+     ordinaire, pleinement autonome et modifiable par son nouveau propriétaire ; cette table
+     sert uniquement à reconstituer les deux listes « envoyées » / « reçues » affichées dans
+     le panneau « Fiche partagée », jamais à garder un lien vivant entre original et copie. */
+  CREATE TABLE IF NOT EXISTS insc_fiches_partages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fiche_source_id INTEGER NOT NULL,
+    fiche_copie_id INTEGER NOT NULL,
+    expediteur_id INTEGER NOT NULL,
+    destinataire_id INTEGER NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(fiche_source_id) REFERENCES insc_fiches(id),
+    FOREIGN KEY(fiche_copie_id) REFERENCES insc_fiches(id),
+    FOREIGN KEY(expediteur_id) REFERENCES users(id),
+    FOREIGN KEY(destinataire_id) REFERENCES users(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_insc_partages_expediteur ON insc_fiches_partages(expediteur_id);
+  CREATE INDEX IF NOT EXISTS idx_insc_partages_destinataire ON insc_fiches_partages(destinataire_id);
+
   CREATE TABLE IF NOT EXISTS insc_types (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     fiche_id INTEGER NOT NULL,

@@ -1464,6 +1464,22 @@ route("GET", "/api/parrainage/mon-tableau-de-bord", async (req, res) => {
   } catch (e) { console.error('[migrateInscInscriptionsArchive]', e.message); }
 })();
 
+/* « Fiche partagée » (2026-10-08, demande explicite) — table neuve (pas une colonne ajoutée à une
+   table existante), donc CREATE TABLE IF NOT EXISTS directement plutôt que le patron PRAGMA
+   habituel : rien à détecter, juste à créer si absente, même sur une base déjà en place. */
+(async function migrateInscFichesPartages() {
+  try {
+    await db.prepare(`CREATE TABLE IF NOT EXISTS insc_fiches_partages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      fiche_source_id INTEGER NOT NULL,
+      fiche_copie_id INTEGER NOT NULL,
+      expediteur_id INTEGER NOT NULL,
+      destinataire_id INTEGER NOT NULL,
+      created_at TEXT DEFAULT (datetime('now'))
+    )`).run();
+  } catch (e) { console.error('[migrateInscFichesPartages]', e.message); }
+})();
+
 /* "Événement flash" (2026-09-30, demande explicite) — parcours allégé de POST /api/evenements
    pour un événement purement informatif, SANS inscription (public_concerne est propre à ce
    parcours : à qui l'événement s'adresse, ex. "Étudiants", "Familles", distinct de origine qui
@@ -47322,6 +47338,11 @@ route("DELETE", "/api/insc/fiches/:id", async (req, res, params) => {
   // étrangère et n'était pas nettoyée ici — DELETE FROM insc_fiches échouait (500) dès qu'un
   // lien de contrôle avait été créé, quel que soit son état actif/inactif.
   await db.prepare("DELETE FROM insc_liens_controle WHERE fiche_id=?").run(fiche.id);
+  // Même famille de bug, trouvée immédiatement en testant "Fiche partagée" (2026-10-08) :
+  // insc_fiches_partages référence fiche_id des DEUX côtés (source ET copie) — sans ce
+  // nettoyage, supprimer la fiche d'origine OU une copie reçue échouait dès qu'un partage
+  // avait eu lieu.
+  await db.prepare("DELETE FROM insc_fiches_partages WHERE fiche_source_id=? OR fiche_copie_id=?").run(fiche.id, fiche.id);
   await db.prepare("DELETE FROM insc_fiches WHERE id=?").run(fiche.id);
   sendJSON(res, 200, { ok: true });
 });
@@ -47340,15 +47361,25 @@ route("PATCH", "/api/insc/fiches/:id/statut", async (req, res, params, body) => 
    partagée entre la duplication manuelle (bouton "Dupliquer") ET l'application automatique
    du modèle standard à la création d'un événement (copierEvenements:false dans ce second cas,
    la copie sera liée UNIQUEMENT au nouvel événement, jamais aux anciens liens de la source). */
-async function dupliquerFicheStructure(fiche, { nom, copierEvenements = true } = {}) {
+async function dupliquerFicheStructure(fiche, { nom, copierEvenements = true, ownerUserId = null, initiativeId = undefined, copierExtras = false } = {}) {
   const nomCopie = (nom || `${fiche.nom} (copie)`).slice(0, 200);
   const slug = await inscSlugUnique(nomCopie);
+  /* ownerUserId/initiativeId (2026-10-08, demande explicite : "partager la fiche à une autre
+     initiative... comme si c'était à elle") — la copie peut appartenir à un AUTRE compte que
+     la fiche source ; initiativeId undefined (par défaut) = reprend celui de la source (cas
+     "Dupliquer", même propriétaire), mais explicitement null quand on partage vers un compte
+     dont on ne connaît pas l'initiative_id ici (résolu par l'appelant, route /partager). */
+  const finalOwner = ownerUserId != null ? ownerUserId : fiche.owner_user_id;
+  const finalInitiative = initiativeId !== undefined ? initiativeId : fiche.initiative_id;
   const newId = (await db.prepare(`
     INSERT INTO insc_fiches (owner_user_id, initiative_id, nom, slug, description, affiche_url, organisateur,
-      contact_nom, contact_email, contact_telephone, visibilite)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?)
-  `).run(fiche.owner_user_id, fiche.initiative_id, nomCopie, slug, fiche.description, fiche.affiche_url,
-    fiche.organisateur, fiche.contact_nom, fiche.contact_email, fiche.contact_telephone, fiche.visibilite)).lastInsertRowid;
+      contact_nom, contact_email, contact_telephone, visibilite, sponsors_json, partenaires_json,
+      programme_texte, programme_fichier_url, programme_fichier_nom)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+  `).run(finalOwner, finalInitiative, nomCopie, slug, fiche.description, fiche.affiche_url,
+    fiche.organisateur, fiche.contact_nom, fiche.contact_email, fiche.contact_telephone, fiche.visibilite,
+    copierExtras ? (fiche.sponsors_json || '[]') : '[]', copierExtras ? (fiche.partenaires_json || '[]') : '[]',
+    copierExtras ? fiche.programme_texte : null, copierExtras ? fiche.programme_fichier_url : null, copierExtras ? fiche.programme_fichier_nom : null)).lastInsertRowid;
   if (copierEvenements) {
     const evenements = await db.prepare("SELECT evenement_id FROM insc_fiches_evenements WHERE fiche_id=?").all(fiche.id);
     for (const e of evenements) await db.prepare("INSERT INTO insc_fiches_evenements (fiche_id, evenement_id) VALUES (?,?)").run(newId, e.evenement_id);
@@ -47371,6 +47402,33 @@ async function dupliquerFicheStructure(fiche, { nom, copierEvenements = true } =
         c.position, c.valeur_defaut, c.placeholder, c.options_json, c.regle_validation, c.condition_json);
     }
   }
+  /* "Tous les paramètres" pour un partage (2026-10-08, demande explicite) — galerie et module
+     Candidature, absents de la simple "Dupliquer" (copierExtras reste false là-bas, comportement
+     inchangé). Jamais les déclarations/dépôts des candidats : ce sont des données de PARTICIPANTS,
+     pas des réglages — exactement comme les inscriptions, jamais copiées non plus. */
+  if (copierExtras) {
+    const medias = await db.prepare("SELECT * FROM insc_fiches_medias WHERE fiche_id=? ORDER BY position").all(fiche.id);
+    for (const m of medias) {
+      await db.prepare("INSERT INTO insc_fiches_medias (fiche_id, type, url, libelle, duree_sec, position) VALUES (?,?,?,?,?,?)")
+        .run(newId, m.type, m.url, m.libelle, m.duree_sec, m.position);
+    }
+    const cand = await db.prepare("SELECT * FROM insc_candidature_config WHERE fiche_id=?").get(fiche.id);
+    if (cand) {
+      /* formulaire_json (2026-10-06, colonne ajoutée après coup — voir PUT .../candidature) : copié
+         comme le reste des réglages de la candidature, jamais date_ouverture/date_fermeture (même
+         logique que les dates des types juste au-dessus — une copie "vierge" ne reprend pas le
+         calendrier de la campagne d'origine, au nouveau propriétaire de fixer le sien). */
+      const newCandId = (await db.prepare(`
+        INSERT INTO insc_candidature_config (fiche_id, actif, titre, description, instructions, message_candidat, email_reception, formulaire_json)
+        VALUES (?,?,?,?,?,?,?,?)
+      `).run(newId, cand.actif, cand.titre, cand.description, cand.instructions, cand.message_candidat, cand.email_reception, cand.formulaire_json)).lastInsertRowid;
+      const docs = await db.prepare("SELECT * FROM insc_candidature_documents WHERE config_id=? ORDER BY ordre").all(cand.id);
+      for (const d of docs) {
+        await db.prepare("INSERT INTO insc_candidature_documents (config_id, titre, description, pdf_url, obligatoire, ordre) VALUES (?,?,?,?,?,?)")
+          .run(newCandId, d.titre, d.description, d.pdf_url, d.obligatoire, d.ordre);
+      }
+    }
+  }
   return newId;
 }
 
@@ -47380,6 +47438,70 @@ route("POST", "/api/insc/fiches/:id/dupliquer", async (req, res, params, body) =
   const newId = await dupliquerFicheStructure(fiche, { nom: body?.nom });
   await inscJournaliser(newId, user, "duplication", `Dupliquée depuis « ${fiche.nom} » (#${fiche.id}).`);
   sendJSON(res, 201, { fiche_id: newId });
+});
+
+/* Partage d'une fiche à une AUTRE initiative (2026-10-08, demande explicite : "une option de
+   partager la fiche à une autre initiative qui pourra à son tour l'utiliser comme si c'était
+   à elle, sans mes inscriptions, de façon vierge, juste tous les paramètres"). Copie immédiate
+   et indépendante (pas de lien conservé avec l'original, pas d'acceptation requise — décidé
+   explicitement), chez un compte Initiative recherché par nom. */
+route("GET", "/api/insc/fiches/:id/partager/suggestions", async (req, res, params, body, query) => {
+  const { erreur, msg, fiche } = await inscFicheProprietaire(req, params.id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const q = String((query && query.q) || '').trim().toLowerCase();
+  if (q.length < 2) return sendJSON(res, 200, { suggestions: [] });
+  const like = '%' + q.replace(/[%_]/g, '') + '%';
+  const rows = await db.prepare(`
+    SELECT u.id AS user_id, i.nom, i.ville, i.pays FROM users u JOIN initiatives i ON i.owner_user_id=u.id
+    WHERE u.role='initiative' AND u.id<>? AND (u.compte_masque IS NULL OR u.compte_masque=0) AND COALESCE(u.suspendu_definitif,0)=0
+      AND LOWER(i.nom) LIKE ? LIMIT 10`).all(fiche.owner_user_id, like);
+  sendJSON(res, 200, { suggestions: rows.map(r => ({ user_id: r.user_id, nom: r.nom, detail: [r.ville, r.pays].filter(Boolean).join(', ') })) });
+});
+route("POST", "/api/insc/fiches/:id/partager", async (req, res, params, body) => {
+  const { erreur, msg, fiche, user } = await inscFicheProprietaire(req, params.id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const cibleId = Number(body?.user_id);
+  if (!cibleId) return sendJSON(res, 400, { error: "Choisissez une initiative." });
+  if (cibleId === Number(fiche.owner_user_id)) return sendJSON(res, 400, { error: "Vous ne pouvez pas partager une fiche à vous-même." });
+  const cibleInit = await db.prepare("SELECT u.id, i.id AS initiative_id, i.nom FROM users u JOIN initiatives i ON i.owner_user_id=u.id WHERE u.id=? AND u.role='initiative'").get(cibleId);
+  if (!cibleInit) return sendJSON(res, 404, { error: "Ce compte n'est pas (ou plus) une Initiative." });
+  const newId = await dupliquerFicheStructure(fiche, {
+    nom: fiche.nom, copierEvenements: false, copierExtras: true, ownerUserId: cibleInit.id, initiativeId: cibleInit.initiative_id,
+  });
+  await inscJournaliser(fiche.id, user, "partage", `Partagée à « ${cibleInit.nom} » (copie #${newId}).`);
+  await inscJournaliser(newId, { id: cibleId, prenom: '', nom: cibleInit.nom }, "creation", `Reçue par partage depuis « ${fiche.nom} » (#${fiche.id}).`);
+  await db.prepare("INSERT INTO insc_fiches_partages (fiche_source_id, fiche_copie_id, expediteur_id, destinataire_id) VALUES (?,?,?,?)")
+    .run(fiche.id, newId, user.id, cibleId);
+  creerNotif(cibleId, "insc_fiche_partagee", "Une fiche d'inscription vous a été partagée",
+    `${await nomCompteAffichage(user.id)} vous a partagé la fiche « ${fiche.nom} » : une copie vierge, à vous, avec tous ses réglages. Aucune inscription ni événement n'a été repris — c'est à vous de les ajouter.`,
+    { lien: `inscriptions-admin.html?fiche=${newId}` });
+  sendJSON(res, 201, { fiche_id: newId });
+});
+
+/* Panneau « Fiche partagée » : les deux sens réunis pour le compte courant, peu importe par
+   quelle fiche le panneau a été ouvert (2026-10-08, demande explicite — "toutes les fiches
+   partagées... et toutes les fiches que je reçois également", vue globale du compte, pas
+   limitée à une fiche précise). */
+route("GET", "/api/insc/fiches-partagees", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const envoyees = await db.prepare(`
+    SELECT p.id, p.created_at, p.destinataire_id, fc.id AS fiche_id, fc.nom, fc.statut,
+      ${sqlNomAffichage('u', 'i')} AS destinataire_nom
+    FROM insc_fiches_partages p
+    JOIN insc_fiches fc ON fc.id=p.fiche_copie_id
+    JOIN users u ON u.id=p.destinataire_id
+    LEFT JOIN initiatives i ON i.owner_user_id=u.id
+    WHERE p.expediteur_id=? ORDER BY p.id DESC`).all(user.id);
+  const recues = await db.prepare(`
+    SELECT p.id, p.created_at, p.expediteur_id, fc.id AS fiche_id, fc.nom, fc.statut,
+      ${sqlNomAffichage('u', 'i')} AS expediteur_nom
+    FROM insc_fiches_partages p
+    JOIN insc_fiches fc ON fc.id=p.fiche_copie_id
+    JOIN users u ON u.id=p.expediteur_id
+    LEFT JOIN initiatives i ON i.owner_user_id=u.id
+    WHERE p.destinataire_id=? ORDER BY p.id DESC`).all(user.id);
+  sendJSON(res, 200, { envoyees, recues });
 });
 
 /* Modèle standard : une fiche par compte peut être marquée comme référence — appliquée
