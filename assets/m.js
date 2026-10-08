@@ -1537,9 +1537,22 @@
     else if (a === 'videos') paneVideos();
     else if (a === 'video') paneVideo(b);
     else if (window.MMods && typeof window.MMods[a] === 'function') window.MMods[a](b, c);
-    else if (SITE_PAGES[a]) { location.replace(SITE_PAGES[a]); return; }
+    else if (SITE_PAGES[a]) { attendreModule(a, b, c); return; }
     else { location.hash = '#/accueil'; return; }
     done();
+  }
+  /* Un écran « m-mod-*.js » pas encore chargé (réseau mobile lent, fichier en échec) ne renvoie JAMAIS vers l'ancienne page du site
+     (2026-10-08, signalé : le compte initiative « revenait par moment à l'ancienne interface » — Mes événements, Cotisations et Messages boutique
+     pointaient vers l'ancien tableau de bord dès que leur fichier n'était pas encore arrivé). On attend la fin du chargement ; si l'écran manque
+     vraiment, un message propose de réessayer. L'ancienne page n'est proposée que sur demande explicite, en petit. */
+  function attendreModule(a, b, c) {
+    setPane('Chargement…', '<div class="sk skc"></div><div class="sk skc" style="height:120px"></div>');
+    const verifie = () => {
+      if (window.MMods && typeof window.MMods[a] === 'function') { window.MMods[a](b, c); renderTop(); return; }
+      setPane('Chargement impossible', `<div class="empty"><div class="ei">${ic('doc', 'l')}</div><b>Cet écran n’a pas pu se charger</b>Vérifiez votre connexion puis réessayez.<br><br><button class="btn" id="mod-retry">Réessayer</button><br><br><a class="small" style="text-decoration:underline" href="${attrUrl(SITE_PAGES[a])}">Ouvrir la page de l’ancien site</a></div>`);
+      $('#mod-retry').onclick = () => location.reload();
+    };
+    if (document.readyState === 'complete') verifie(); else window.addEventListener('load', verifie, { once: true });
   }
 
   /* ---------- démarrage ---------- */
