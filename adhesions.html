@@ -185,7 +185,7 @@ function renderFormules(){
         <div class="adh-nom">${escHtml(f.nom)}</div>
         <div class="adh-type">${ADH_TYPE_LABELS[f.type_contribution]||f.type_contribution}</div>
         <div class="adh-montant">${
-          f.montant_type==='fixe' ? `${f.montant_fixe} ${f.devise}` :
+          f.montant_type==='fixe' ? (Number(f.montant_fixe) > 0 ? `${f.montant_fixe} ${f.devise}` : 'Gratuit') :
           f.montant_type==='libre' ? `Montant libre${f.montant_max?' (max '+f.montant_max+' '+f.devise+')':''}` :
           `À partir de ${f.montant_min} ${f.devise}`
         }</div>
@@ -361,7 +361,7 @@ function continuerPaiement(formuleId, montant, reponses){
   overlay.innerHTML = `
     <div class="modal-box" style="max-width:400px;width:94%;">
       <h3 style="margin:0 0 6px;font-size:16px;">💳 Confirmer le paiement</h3>
-      <p style="font-size:13px;color:var(--muted,#888);margin:0 0 14px;">« ${escHtml(formule.nom)} » — <strong>${(montant ?? formule.montant_fixe)} ${escHtml(formule.devise)}</strong></p>
+      <p style="font-size:13px;color:var(--muted,#888);margin:0 0 14px;">« ${escHtml(formule.nom)} » — <strong>${Number(montant ?? formule.montant_fixe) > 0 ? `${(montant ?? formule.montant_fixe)} ${escHtml(formule.devise)}` : 'Gratuit'}</strong></p>
       <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:#374151;margin:0 0 14px;cursor:pointer;">
         <input type="checkbox" id="adh-save-card"> Enregistrer cette carte pour mes prochains achats
       </label>

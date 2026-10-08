@@ -6349,7 +6349,7 @@ route("POST", "/api/initiatives/:id/adhesion-formules", async (req, res, params,
     INSERT INTO adhesion_formules (initiative_id,nom,description,couleur,icone,type_contribution,montant_type,montant_fixe,montant_min,montant_max,devise,modes_paiement_json,ordre,media_type,media_url,media_duree_secondes,liste_stockage_id,mode_validite,periode_collective_debut,periode_collective_fin,duree_valeur,duree_unite,duree_illimitee,renouvellement_auto_collectif,max_adherents,texte_intro,conditions_adhesion,reglement_pdf_url,statuts_pdf_url,champs_config_json,champs_custom_json,reglement_interieur_texte,relances_config_json)
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
   `).run(params.id, nom.trim(), description || null, couleur || '#f97316', icone || '🎫',
-       type_contribution || 'cotisation_annuelle', montant_type || 'fixe', montant_fixe ?? null, montant_min ?? null, montant_max ?? null,
+       type_contribution || 'cotisation_annuelle', montant_type || 'fixe', (montant_type || 'fixe') === 'fixe' ? (Number(montant_fixe) > 0 ? Number(montant_fixe) : 0) : (montant_fixe ?? null), montant_min ?? null, montant_max ?? null,
        devise || 'EUR', JSON.stringify(sanitizeAdhesionModes(modes_paiement)), maxOrdre + 1,
        media_type || null, media_type ? (media_url || null) : null, media_type === 'video' ? (Number(media_duree_secondes) || null) : null,
        listeStockageId, modeValidite,

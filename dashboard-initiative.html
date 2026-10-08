@@ -7631,7 +7631,7 @@ async function adhRenderFormules(){
             </div>
           </div>
           <div style="font-size:13px;font-weight:700;margin-bottom:6px;">
-            ${f.montant_type==='fixe' ? `${f.montant_fixe} ${f.devise}` : f.montant_type==='libre' ? `Libre${f.montant_max?' (max '+f.montant_max+' '+f.devise+')':''}` : `Min. ${f.montant_min} ${f.devise}`}
+            ${f.montant_type==='fixe' ? (Number(f.montant_fixe) > 0 ? `${f.montant_fixe} ${f.devise}` : 'Gratuit') : f.montant_type==='libre' ? `Libre${f.montant_max?' (max '+f.montant_max+' '+f.devise+')':''}` : `Min. ${f.montant_min} ${f.devise}`}
           </div>
           ${f.description?`<p style="font-size:12px;color:var(--muted);margin:0 0 8px;">${mdBold(escH(f.description))}</p>`:''}
           ${f.mode_validite==='collectif'?`<div style="font-size:11px;color:#7c3aed;background:#f5f3ff;border-radius:6px;padding:4px 8px;margin-bottom:8px;display:inline-block;">📅 Calendrier fixe : ${f.periode_collective_debut?new Date(f.periode_collective_debut).toLocaleDateString('fr-FR'):'?'} → ${f.periode_collective_fin?new Date(f.periode_collective_fin).toLocaleDateString('fr-FR'):'?'}${f.renouvellement_auto_collectif?' · 🔁 auto':''}</div>`
