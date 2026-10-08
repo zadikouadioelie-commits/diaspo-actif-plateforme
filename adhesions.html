@@ -412,17 +412,6 @@ async function confirmerPaiementAdhesion(formuleId, montant, saveCard, reponses)
   }
 }
 
-async function afficherMaCarte(){
-  const zone = document.getElementById('adh-carte-zone');
-  zone.style.display = 'block';
-  zone.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);">Chargement de votre carte…</div>';
-  zone.scrollIntoView({ behavior: 'smooth' });
-  try {
-    /* Trouve la fiche membre de l'utilisateur connecté pour cette initiative (self-service, ne
-       dépend pas d'être propriétaire — cf. GET /initiatives/:id/mon-adhesion-membre). */
-    const monAdh = await api('GET', `/initiatives/${INIT_ID}/mon-adhesion-membre`);
-    const membreId = monAdh.membre_id;
-    if (!membreId) { zone.innerHTML = '<div class="notice">Vous n\'avez pas encore d\'adhésion pour cette initiative.</div>'; return; }
 /* Aperçu de la carte physique envoyée par la poste (initiative officielle uniquement). Prénom et nom sont écrits
    dans les deux cases blanches de la carte ; un nom trop long est réduit jusqu'à tenir dans sa case. */
 function carteVirtuelleHtml(prenom, nom){
@@ -451,6 +440,17 @@ function ajusterChampsCarte(racine){
     while (texte.offsetWidth > el.clientWidth - marge && taille > 6) { taille -= 0.5; el.style.fontSize = taille + 'px'; }
   });
 }
+async function afficherMaCarte(){
+  const zone = document.getElementById('adh-carte-zone');
+  zone.style.display = 'block';
+  zone.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);">Chargement de votre carte…</div>';
+  zone.scrollIntoView({ behavior: 'smooth' });
+  try {
+    /* Trouve la fiche membre de l'utilisateur connecté pour cette initiative (self-service, ne
+       dépend pas d'être propriétaire — cf. GET /initiatives/:id/mon-adhesion-membre). */
+    const monAdh = await api('GET', `/initiatives/${INIT_ID}/mon-adhesion-membre`);
+    const membreId = monAdh.membre_id;
+    if (!membreId) { zone.innerHTML = '<div class="notice">Vous n\'avez pas encore d\'adhésion pour cette initiative.</div>'; return; }
     const carte = await api('GET', `/adhesion-membres/${membreId}/carte`);
     /* Carte physique : seulement pour l'initiative officielle, et une fois l'adhésion à jour (ou juste après un paiement réussi). */
     const apercuPhysique = (monAdh.carte_physique && (monAdh.statut === 'a_jour' || params.get('paiement') === 'succes')) ? carteVirtuelleHtml(monAdh.prenom || carte.prenom, monAdh.nom || carte.nom) : '';
@@ -471,6 +471,7 @@ function ajusterChampsCarte(racine){
           <button class="btn btn-orange" onclick="ouvrirPaiement(${carte.formule_id})">🔄 Renouveler mon adhésion</button>
         </div>` : ''}
       </div>`;
+    ajusterChampsCarte(zone);
     if (window.ProfileQR) {
       ProfileQR.render(document.getElementById('cm-qr-box'), {
         url: `${location.origin}${carte.verify_url}`,
@@ -481,7 +482,6 @@ function ajusterChampsCarte(racine){
     }
   } catch(e) {
     zone.innerHTML = `<div class="notice">Erreur : ${e.message}</div>`;
-    ajusterChampsCarte(zone);
   }
 }
 
