@@ -648,7 +648,7 @@
     const paid = e.prix_min > 0 || e.type_participation === 'payant';
     const part = e.type_participation === 'partiellement_payant' ? 'Partiellement payant' : paid ? 'Payant' : 'Gratuit';
     const inscrit = S.myInsc.has(Number(e.id));
-    return `<a class="card ev" href="#/evenement/${e.id}" style="display:block">
+    return `<a class="card ev${e.est_termine ? ' ev-fini' : ''}" href="#/evenement/${e.id}" style="display:block">
       <div class="cov">${(e.visibilite || 'public') === 'public' ? `<button type="button" class="ev-share" data-share-ev="${e.id}" data-share-titre="${esc(e.titre)}" aria-label="Partager cet événement">${ic('share', 's')}</button>` : ''}${p ? `<div class="dt"><b>${p.d}</b><span>${MOIS[p.m - 1]}</span></div>` : ''}${cov ? mediaBlock(cov, { alt: e.titre }) : `<div class="media" style="min-height:78px;background:linear-gradient(135deg,var(--navy),var(--navy2))"></div>`}</div>
       <div class="bd"><h3 class="tt">${esc(e.titre)}</h3>
         <div class="meta">${ic('clock', 's')}<span>${esc(dateLong(e.date_evt))}${e.heure_debut ? ' · ' + esc(String(e.heure_debut).slice(0, 5)) : ''}</span></div>

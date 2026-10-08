@@ -100,6 +100,13 @@ svg.i.l{width:28px;height:28px}
 
 /* ---------- événements ---------- */
 .ev .cov{position:relative}
+/* Événement terminé (2026-10-08, demande explicite) : cartouche grise scintillante — l'image et le texte gardent leurs couleurs. */
+.card.ev-fini{position:relative;background:linear-gradient(135deg,#EEF0F3 0%,#C9CED6 46%,#E9EBEF 100%);border-color:#AEB5C0;box-shadow:0 0 0 1px rgba(255,255,255,.7) inset,0 6px 18px rgba(78,88,104,.28)}
+.card.ev-fini:before{content:"";position:absolute;inset:0;z-index:4;pointer-events:none;border-radius:inherit;background-image:radial-gradient(circle,rgba(255,255,255,.95) 0 1.2px,transparent 1.9px),radial-gradient(circle,rgba(255,255,255,.8) 0 1px,transparent 1.7px),radial-gradient(circle,rgba(255,255,255,.9) 0 1.5px,transparent 2.1px);background-size:46px 46px,31px 31px,67px 67px;background-position:0 0,13px 19px,29px 7px;animation:evFiniScint 3.4s ease-in-out infinite}
+.card.ev-fini:after{content:"";position:absolute;top:0;left:-60%;width:35%;height:100%;z-index:4;pointer-events:none;background:linear-gradient(115deg,transparent,rgba(255,255,255,.5),transparent);animation:evFiniReflet 5s ease-in-out infinite}
+@keyframes evFiniScint{0%,100%{opacity:.55}50%{opacity:1}}
+@keyframes evFiniReflet{0%,55%{left:-60%}100%{left:130%}}
+@media (prefers-reduced-motion:reduce){.card.ev-fini:before,.card.ev-fini:after{animation:none}}
 .ev .dt{position:absolute;left:12px;top:12px;z-index:3;background:#fff;border-radius:12px;padding:6px 10px;text-align:center;box-shadow:var(--shadow);line-height:1.1}
 .ev .dt b{display:block;font-size:20px;color:var(--navy)}
 .ev .dt span{font-size:11px;font-weight:700;color:var(--orange-d);text-transform:uppercase}

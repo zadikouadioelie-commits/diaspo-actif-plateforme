@@ -21,9 +21,15 @@ window.EvtTemporel = (function () {
       .evt-badge-statut{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;padding:2px 8px;border-radius:99px;margin-left:6px;vertical-align:middle}
       .evt-badge-statut.termine{background:#E5E7EB;color:#374151}
       .evt-badge-statut.en_cours{background:#FEE2E2;color:#B91C1C}
-      .evt-card-termine .evt-img{filter:grayscale(1);opacity:.6}
-      .evt-card-termine .evt-title,.evt-card-termine .evt-meta,.evt-card-termine .evt-body > p{opacity:.65}
-      .evt-card-termine .evt-date{color:#6B7280}
+      /* Événement terminé (2026-10-08, demande explicite) : plus rien n'est grisé ni atténué — l'image et le texte gardent leurs couleurs ;
+         c'est la cartouche qui est grise et scintillante (même effet de paillettes que les boutons bleus du compte-rendu). */
+      .evt-card-termine{position:relative;background:linear-gradient(135deg,#EEF0F3 0%,#C9CED6 46%,#E9EBEF 100%)!important;border-color:#AEB5C0!important;box-shadow:0 0 0 1px rgba(255,255,255,.7) inset,0 6px 18px rgba(78,88,104,.28)}
+      .evt-card-termine:before{content:"";position:absolute;inset:0;z-index:2;pointer-events:none;border-radius:inherit;background-image:radial-gradient(circle,rgba(255,255,255,.95) 0 1.2px,transparent 1.9px),radial-gradient(circle,rgba(255,255,255,.8) 0 1px,transparent 1.7px),radial-gradient(circle,rgba(255,255,255,.9) 0 1.5px,transparent 2.1px);background-size:46px 46px,31px 31px,67px 67px;background-position:0 0,13px 19px,29px 7px;animation:evtTermScint 3.4s ease-in-out infinite}
+      .evt-card-termine:after{content:"";position:absolute;top:0;left:-60%;width:35%;height:100%;z-index:2;pointer-events:none;background:linear-gradient(115deg,transparent,rgba(255,255,255,.5),transparent);animation:evtTermReflet 5s ease-in-out infinite}
+      .evt-card-termine .evt-date{color:#4B5563}
+      @keyframes evtTermScint{0%,100%{opacity:.55}50%{opacity:1}}
+      @keyframes evtTermReflet{0%,55%{left:-60%}100%{left:130%}}
+      @media (prefers-reduced-motion:reduce){.evt-card-termine:before,.evt-card-termine:after{animation:none}}
       .evt-plus{display:block;margin:16px auto 0;border:1px solid var(--border,#E3DDD8);background:var(--card,#fff);color:#2F6BED;border-radius:99px;padding:8px 20px;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
     `;
     document.head.appendChild(s);
