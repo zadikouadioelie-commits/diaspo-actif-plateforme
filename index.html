@@ -2355,7 +2355,7 @@
       <a class="hp-talent-card" href="${t.href}" style="display:block;text-decoration:none;color:inherit;">
         <img class="hp-talent-avatar" loading="lazy" src="${avatarSrc}" alt="${t.nom}" style="object-fit:cover;">
         <div class="hp-talent-name">${t.nom}</div>
-        <div class="hp-talent-role">${t.role}</div>
+        ${t.role ? `<div class="hp-talent-role">${t.role}</div>` : ''}
         <div class="hp-talent-loc">${locLine}</div>
         ${t.tags && t.tags.length ? `<div class="hp-talent-tags">${t.tags.map(tag => `<span class="hp-talent-tag">${tag}</span>`).join('')}</div>` : ''}
       </a>`;
@@ -2531,7 +2531,7 @@ document.getElementById('hp-vit-q')?.addEventListener('keydown', e => {
         <div class="hp-feed-post-header">
           <img loading="lazy" class="hp-feed-avatar" src="${avatarSrc}" alt="${p.auteur_nom||'Membre'}">
           <div>
-            <div class="hp-feed-author">${p.auteur_nom || 'Membre DiaspoActif'}</div>
+            <div class="hp-feed-author">${p.auteur_nom || 'Membre'}</div>
             <div class="hp-feed-time">${icon} ${ts}</div>
           </div>
         </div>
@@ -2813,7 +2813,7 @@ async function hpReagir(postId, btn) {
       <div class="temo-quote">"</div>
       ${t.note ? `<div class="temo-stars">${stars(t.note)}</div>` : ''}
       <p class="temo-text">"${t.description.slice(0, 220)}${t.description.length > 220 ? '…' : ''}"</p>
-      <div class="temo-author">${t.nom_affichage || 'Membre Diaspo\'Actif'}</div>
+      <div class="temo-author">${t.nom_affichage || 'Membre'}</div>
       <div class="temo-meta">${[t.pays_utilisateur, foncts].filter(Boolean).join(' · ')}</div>
       ${t.type_usage ? `<span class="temo-badge">${usageLabel[t.type_usage] || t.type_usage}</span>` : ''}
     </div>`;

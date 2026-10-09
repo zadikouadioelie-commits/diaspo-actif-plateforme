@@ -469,7 +469,7 @@
     if (!vivant(t)) return;
     const tous = r.demandes || [];
     const att = tous.filter(d => d.statut === 'en_attente'), fait = tous.filter(d => d.statut !== 'en_attente');
-    const nomD = d => [d.prenom, d.nom].filter(Boolean).join(' ') || 'Membre Diaspo’Actif';
+    const nomD = d => [d.prenom, d.nom].filter(Boolean).join(' ') || 'Membre';
     const carte = (d, actions) => `<div class="card pad"><div class="row"><div class="av">${d.photo_url ? `<img src="${A.attrUrl(d.photo_url)}" alt="" onerror="this.remove()">` : esc(A.initials(nomD(d)))}</div><div class="sp"><div style="font-weight:700;word-break:break-word">${esc(nomD(d))}</div>
         <div class="small muted">${esc([d.ville, d.pays].filter(Boolean).join(', '))}${d.created_at ? (d.ville || d.pays ? ' · ' : '') + esc(depuis('demande', d.created_at)) : ''}</div></div>${actions ? '' : `<span class="badge ${d.statut === 'acceptee' ? 'g' : 'r'}">${d.statut === 'acceptee' ? 'Acceptée' : 'Refusée'}</span>`}</div>
         ${d.email ? `<div class="mco-contact"><a href="mailto:${esc(d.email)}">${esc(d.email)}</a></div>` : ''}

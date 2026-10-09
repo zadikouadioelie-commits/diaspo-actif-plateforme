@@ -400,7 +400,7 @@ function fmtDate(d){if(!d)return '';try{return new Date(d).toLocaleDateString('f
     ProfileQR.render(qrEl, {
       userId: me.id,
       userName: nom,
-      userRole: 'Membre Diaspo\'Actif',
+      userRole: '',
       userOrg: me.organisation || '',
       size: 140,
     });

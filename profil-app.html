@@ -8510,7 +8510,7 @@ function buildSectionPubs() {
         <div class="post-av">${avHtml}</div>
         <div class="post-meta">
           <div class="pm-nom">${esc(nom)}</div>
-          <div class="pm-titre">${esc(profil.titre_pro||profil.situation_pro||'Membre Diaspo\'Actif')}</div>
+          ${(profil.titre_pro||profil.situation_pro) ? `<div class="pm-titre">${esc(profil.titre_pro||profil.situation_pro)}</div>` : ''}
           <div class="pm-date">${esc(p.date)}</div>
         </div>
         <span class="post-cat-pill">${esc(p.cat)}</span>

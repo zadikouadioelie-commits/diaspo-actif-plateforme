@@ -1535,7 +1535,7 @@
     });
     safe(async () => {
       const l = (await api('/api/temoignages/public?limit=8')).temoignages || []; if (!l.length) return;
-      homeBlock('home-temo', 'Ils ont rejoint Diaspo’Actif', `<div class="hs">${l.map(t => `<div class="card tm"><div class="pad">${t.note ? `<div style="color:#f59e0b;letter-spacing:2px">${'★'.repeat(t.note)}${'☆'.repeat(5 - t.note)}</div>` : ''}<p style="margin:6px 0 8px">« ${esc(String(t.description || '').slice(0, 200))}${String(t.description || '').length > 200 ? '…' : ''} »</p><div class="small"><b>${esc(t.nom_affichage || 'Membre Diaspo’Actif')}</b>${t.pays_utilisateur ? ' · ' + esc(t.pays_utilisateur) : ''}</div></div></div>`).join('')}</div>`);
+      homeBlock('home-temo', 'Ils ont rejoint Diaspo’Actif', `<div class="hs">${l.map(t => `<div class="card tm"><div class="pad">${t.note ? `<div style="color:#f59e0b;letter-spacing:2px">${'★'.repeat(t.note)}${'☆'.repeat(5 - t.note)}</div>` : ''}<p style="margin:6px 0 8px">« ${esc(String(t.description || '').slice(0, 200))}${String(t.description || '').length > 200 ? '…' : ''} »</p><div class="small"><b>${esc(t.nom_affichage || 'Membre')}</b>${t.pays_utilisateur ? ' · ' + esc(t.pays_utilisateur) : ''}</div></div></div>`).join('')}</div>`);
     });
     safe(async () => {
       const l = (await api('/api/partenaires/carousel?limit=12')).partenaires || []; if (!l.length) return;
