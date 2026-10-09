@@ -2685,17 +2685,21 @@ window.hydraterAdhesions = hydraterAdhesions;
 })();
 
 async function demanderAdhesion(initiativeId, btn){
-  if (typeof CURRENT_USER === 'undefined' || !CURRENT_USER) { window.location.href = 'login.html'; return; }
+  /* Plus de connexion forcée (2026-10-09, demande explicite : « toute personne peut adhérer, avec ou sans compte Diaspo'Actif ») :
+     un visiteur arrive directement sur la page d'adhésion, où il saisit nom, prénom et e-mail (voir adhesions.html). */
+  const connecte = typeof CURRENT_USER !== 'undefined' && CURRENT_USER;
   /* Garde-fou (2026-08-08) : le propriétaire ne peut pas adhérer à sa propre structure — on le
      redirige vers la gestion de ses formules plutôt que de le laisser buter sur l'erreur serveur. */
-  try {
-    const init = await api('GET', `/initiatives/${initiativeId}`);
-    const initData = init.initiative || init;
-    if (initData.owner_user_id && Number(initData.owner_user_id) === Number(CURRENT_USER.id)) {
-      window.location.href = 'dashboard-initiative.html#adhesions-init';
-      return;
-    }
-  } catch (e) { /* vérification impossible : on continue normalement */ }
+  if (connecte) {
+    try {
+      const init = await api('GET', `/initiatives/${initiativeId}`);
+      const initData = init.initiative || init;
+      if (initData.owner_user_id && Number(initData.owner_user_id) === Number(CURRENT_USER.id)) {
+        window.location.href = 'dashboard-initiative.html#adhesions-init';
+        return;
+      }
+    } catch (e) { /* vérification impossible : on continue normalement */ }
+  }
   let officielle = null;
   try {
     const f = await api('GET', `/initiatives/${initiativeId}/adhesion-formules`);

@@ -6722,6 +6722,229 @@ route("PUT", "/api/adhesion-formules/:id/toggle-actif", async (req, res, params,
   sendJSON(res, 200, { ok: true, actif: !!actif });
 });
 
+/* ══════════════════════════════════════════════════════════════════════════
+   ADHÉSION GRATUITE AUTOMATIQUE (2026-10-09, demande explicite)
+   ──────────────────────────────────────────────────────────────────────────
+   Pour une association dont l'adhésion est gratuite : un interrupteur (jamais activé automatiquement,
+   pour ne pas entrer en conflit avec de vraies formules créées plus tard) met à disposition une formule
+   gratuite de 12 mois, que l'association peut modifier (durée, champs obligatoires, documents) avec les
+   outils habituels des formules.
+   - Tant qu'elle est ACTIVE, elle est aussi l'adhésion officielle : c'est donc elle que cible le bouton
+     « Adhérer à l'initiative » partout (cartes, profil, événements, boutiques, téléphone), sans autre câblage.
+   - Désactivée, elle n'est plus proposée aux nouvelles personnes ; ses adhérents gardent leur fiche et leurs
+     rappels. L'association peut alors créer de vraies formules : deux fiches distinctes, sans conflit.
+   - Une personne avec OU sans compte Diaspo'Actif adhère en saisissant nom, prénom, e-mail (+ les champs que
+     l'association a rendus obligatoires). La fiche va dans le même registre (adhesion_membres) que les autres,
+     « en attente » jusqu'à l'acceptation par l'association. Mêmes rappels que toute formule (notification +
+     e-mail pour un compte, e-mail seul pour une personne sans compte : voir /api/cron/adhesion-relances). */
+const ADH_GRATUITE_DUREE_MOIS = 12;
+
+async function adhEtatGratuiteAuto(init) {
+  const formules = await db.prepare("SELECT id, actif, est_gratuite_auto FROM adhesion_formules WHERE initiative_id=?").all(init.id);
+  const gratuite = formules.find(f => Number(f.est_gratuite_auto) === 1) || null;
+  return {
+    actif: !!gratuite && Number(gratuite.actif) === 1,
+    formule_id: gratuite ? Number(gratuite.id) : null,
+    autres_formules_actives: formules.filter(f => Number(f.est_gratuite_auto) !== 1 && Number(f.actif) === 1).length,
+    type_ok: ['Association', 'ONG'].includes(init.type),
+    adhesions_fermees: init.adhesions_ouvertes != null && !init.adhesions_ouvertes,
+  };
+}
+
+route("GET", "/api/initiatives/:id/adhesion-gratuite-auto", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT id, nom, type, owner_user_id, adhesions_ouvertes FROM initiatives WHERE id=?").get(params.id);
+  if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  sendJSON(res, 200, await adhEtatGratuiteAuto(init));
+});
+
+route("PUT", "/api/initiatives/:id/adhesion-gratuite-auto", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT id, nom, type, owner_user_id, adhesions_ouvertes FROM initiatives WHERE id=?").get(params.id);
+  if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  if (!(await exigerPremium(user, res, "adhesions"))) return;
+  const etat = await adhEtatGratuiteAuto(init);
+  if (body && body.actif) {
+    if (!etat.type_ok) return sendJSON(res, 400, { error: "L'adhésion n'est proposée que pour les Associations et ONG." });
+    if (etat.autres_formules_actives > 0) {
+      return sendJSON(res, 409, { error: "Vous avez déjà des formules d'adhésion actives : l'adhésion gratuite automatique est réservée aux associations qui n'en ont pas encore. Désactivez-les d'abord si vous voulez la proposer à la place." });
+    }
+    let formuleId = etat.formule_id;
+    if (formuleId) {
+      await db.prepare("UPDATE adhesion_formules SET actif=1, updated_at=datetime('now') WHERE id=?").run(formuleId);
+    } else {
+      /* Même liste de diffusion automatique que toute nouvelle formule (voir POST /adhesion-formules). */
+      const listeId = (await db.prepare(`INSERT INTO listes_diffusion (proprietaire_id, nom, description, icone) VALUES (?,?,?,?)`)
+        .run(user.id, "Adhésion — Adhésion gratuite", "Créée automatiquement pour l'adhésion gratuite automatique.", '🎫')).lastInsertRowid;
+      const maxOrdre = (await db.prepare(`SELECT COALESCE(MAX(ordre),0) AS m FROM adhesion_formules WHERE initiative_id=?`).get(init.id)).m;
+      formuleId = Number((await db.prepare(`
+        INSERT INTO adhesion_formules (initiative_id,nom,description,couleur,icone,type_contribution,montant_type,montant_fixe,devise,modes_paiement_json,ordre,
+          liste_stockage_id,mode_validite,duree_valeur,duree_unite,duree_illimitee,champs_config_json,champs_custom_json,est_gratuite_auto,actif)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+      `).run(init.id, "Adhésion gratuite", `Adhésion gratuite de ${ADH_GRATUITE_DUREE_MOIS} mois à ${init.nom}. Aucun paiement : votre demande est examinée par l'association.`,
+        '#16a34a', '🤝', 'adhesion_unique', 'fixe', 0, 'EUR', '["carte"]', maxOrdre + 1,
+        listeId, 'individuel', ADH_GRATUITE_DUREE_MOIS, 'mois', 0,
+        JSON.stringify(sanitizeChampsConfig({})), JSON.stringify(sanitizeChampsCustom([])), 1, 1)).lastInsertRowid);
+    }
+    await adhAppliquerOfficielle(formuleId, init.id, true);
+    journaliserAdhesion(init.id, null, 'gratuite_auto_activee', user, "Adhésion gratuite automatique activée.");
+  } else if (etat.formule_id) {
+    await db.prepare("UPDATE adhesion_formules SET actif=0, updated_at=datetime('now') WHERE id=?").run(etat.formule_id);
+    await adhAppliquerOfficielle(etat.formule_id, init.id, false);
+    journaliserAdhesion(init.id, null, 'gratuite_auto_desactivee', user, "Adhésion gratuite automatique désactivée : ses adhérents gardent leur fiche.");
+  }
+  sendJSON(res, 200, { ok: true, ...(await adhEtatGratuiteAuto(init)) });
+});
+
+async function adhEmailSimple(to, sujet, paragraphes, lien) {
+  if (!to) return;
+  try {
+    const { sendEmail } = require('./mailer');
+    const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const html = paragraphes.map(p => `<p>${esc(p)}</p>`).join('')
+      + (lien ? `<p style="margin:18px 0;"><a href="${esc(lien.url)}" style="display:inline-block;background:#2563EB;color:#ffffff;text-decoration:none;font-weight:800;font-size:15px;padding:12px 24px;border-radius:10px;">${esc(lien.texte)}</a></p>` : '');
+    await sendEmail({ to, subject: sujet, html });
+  } catch (e) { console.error('[adhesion-email]', e.message); }
+}
+
+/* Demande d'adhésion à la formule gratuite automatique, depuis POST /adhesion-formules/:id/payer (aucun paiement,
+   aucune session Stripe). `identite` = compte connecté, ou { nom, prenom, email } d'une personne sans compte. */
+async function adhesionGratuiteAuto(res, { user, formule, init, reponses, identite }) {
+  const emailNorm = String(identite.email || '').trim().toLowerCase();
+  if (!user) {
+    /* Une adresse déjà liée à un compte : on invite à se connecter plutôt que de créer une fiche en double. */
+    const compte = await db.prepare("SELECT id FROM users WHERE LOWER(email)=? AND nom<>'Compte supprimé' LIMIT 1").get(emailNorm);
+    if (compte) return sendJSON(res, 409, { error: "Un compte Diaspo'Actif existe déjà avec cette adresse e-mail : connectez-vous pour adhérer.", connexion_requise: true });
+  }
+  let membre = user
+    ? await db.prepare("SELECT * FROM adhesion_membres WHERE formule_id=? AND linked_user_id=?").get(formule.id, user.id)
+    : await db.prepare("SELECT * FROM adhesion_membres WHERE formule_id=? AND linked_user_id IS NULL AND LOWER(email)=?").get(formule.id, emailNorm);
+  const nomComplet = `${identite.prenom || ''} ${identite.nom || ''}`.trim();
+  const acteur = { id: user ? user.id : null, prenom: identite.prenom, nom: identite.nom };
+  const origine = process.env.PUBLIC_ORIGIN || 'https://diaspoactif.com';
+  const lienPage = `${origine}/adhesions.html?initiative=${init.id}&formule=${formule.id}`;
+  let relance = false;
+
+  if (membre) {
+    const etat = computeAdhesionStatut(membre);
+    if (etat === 'en_attente') return sendJSON(res, 200, { ok: true, gratuit: true, deja: true, statut: 'en_attente', message: "Votre demande d'adhésion est déjà en cours d'examen par l'association." });
+    if (etat === 'a_jour') return sendJSON(res, 200, { ok: true, gratuit: true, deja: true, statut: 'a_jour', message: "Vous êtes déjà membre de cette association." });
+    if (etat === 'suspendu') return sendJSON(res, 403, { error: "Votre adhésion est suspendue : contactez l'association." });
+    if (etat === 'radie') {
+      if (!/^Demande refusée/.test(membre.observations || '')) return sendJSON(res, 403, { error: "Votre adhésion a pris fin : contactez l'association." });
+      relance = true; // une demande refusée peut être retentée, comme la demande simple
+    } else if (etat === 'non_a_jour') {
+      /* Renouvellement d'un membre déjà accepté : automatique, sans nouvelle validation. */
+      const expiration = calculerDateExpirationAdhesion(formule, ADH_GRATUITE_DUREE_MOIS);
+      await db.prepare(`UPDATE adhesion_membres SET statut='a_jour', date_expiration=?, reponses_json=?, updated_at=datetime('now') WHERE id=?`)
+        .run(expiration, JSON.stringify(reponses), membre.id);
+      const mAJ = await db.prepare("SELECT * FROM adhesion_membres WHERE id=?").get(membre.id);
+      await ajouterAListeStockage(formule.id, mAJ);
+      await syncAffiliationDepuisAdhesion(mAJ, 'accepte');
+      journaliserAdhesion(init.id, membre.id, 'renouvellement', acteur, `Renouvellement de l'adhésion gratuite « ${formule.nom} ».`);
+      if (membre.linked_user_id) creerNotif(membre.linked_user_id, "adhesion_renouvelee", "Adhésion renouvelée ✅", `Votre adhésion à « ${init.nom} » est renouvelée pour ${ADH_GRATUITE_DUREE_MOIS} mois.`, { membre_id: membre.id });
+      await adhEmailSimple(identite.email, `Adhésion renouvelée — ${init.nom}`, [`Bonjour ${identite.prenom || ''},`, `Votre adhésion à « ${init.nom} » est renouvelée pour ${ADH_GRATUITE_DUREE_MOIS} mois.`]);
+      return sendJSON(res, 200, { ok: true, gratuit: true, statut: 'a_jour', renouvele: true, message: "Votre adhésion est renouvelée." });
+    }
+  }
+
+  /* Nouvelle demande (ou nouvelle tentative après un refus). */
+  if (!Number(formule.actif)) return sendJSON(res, 404, { error: "Cette adhésion n'est plus proposée par l'association." });
+  if (init.adhesions_ouvertes != null && !init.adhesions_ouvertes) return sendJSON(res, 400, { error: "Les adhésions sont actuellement fermées pour cette structure." });
+  if (formule.max_adherents) {
+    const n = (await db.prepare(`SELECT COUNT(*) AS n FROM adhesion_membres WHERE formule_id=? AND statut IN ('en_attente','a_jour')`).get(formule.id)).n;
+    if (Number(n) >= Number(formule.max_adherents)) return sendJSON(res, 409, { error: "Cette formule a atteint son nombre maximum d'adhérents." });
+  }
+  const champsConfig = sanitizeChampsConfig(formule.champs_config_json);
+  const champsCustom = sanitizeChampsCustom(formule.champs_custom_json);
+  const manquants = [];
+  for (const champ of ADHESION_CHAMPS_STANDARD) {
+    if (champsConfig[champ.key] !== 'obligatoire') continue;
+    if (!String(reponses[champ.key] ?? identite[champ.key] ?? '').trim()) manquants.push(champ.label);
+  }
+  for (const champ of champsCustom) {
+    if (champ.mode === 'obligatoire' && !String(reponses[champ.id] ?? '').trim()) manquants.push(champ.label);
+  }
+  if (manquants.length) return sendJSON(res, 400, { error: `Champs obligatoires manquants : ${manquants.join(', ')}` });
+  const reponsesJson = JSON.stringify(reponses);
+
+  let membreId;
+  if (relance && membre) {
+    await db.prepare(`UPDATE adhesion_membres SET statut='en_attente', observations=NULL, reponses_json=?, updated_at=datetime('now') WHERE id=?`).run(reponsesJson, membre.id);
+    membreId = membre.id;
+  } else {
+    membreId = (await db.prepare(`
+      INSERT INTO adhesion_membres (formule_id, initiative_id, linked_user_id, nom, prenom, email, statut, reponses_json)
+      VALUES (?,?,?,?,?,?,'en_attente',?)
+    `).run(formule.id, formule.initiative_id, user ? user.id : null, identite.nom || '', identite.prenom || null, identite.email || null, reponsesJson)).lastInsertRowid;
+  }
+  journaliserAdhesion(init.id, membreId, 'creation', acteur, `Demande d'adhésion gratuite « ${formule.nom} »${user ? '' : ' (personne sans compte Diaspo\'Actif)'}.`);
+  if (init.owner_user_id) {
+    creerNotif(init.owner_user_id, "adhesion_demande", "Nouvelle demande d'adhésion",
+      `${nomComplet || 'Une personne'} souhaite adhérer à « ${init.nom} »${user ? '' : " (sans compte Diaspo'Actif)"}. À accepter ou refuser dans le registre des membres.`,
+      { membre_id: Number(membreId), initiative_id: Number(init.id) });
+  }
+  if (user) creerNotif(user.id, "adhesion_demande_recue", "Demande d'adhésion envoyée", `Votre demande d'adhésion à « ${init.nom} » a bien été reçue. L'association vous répondra.`, { membre_id: Number(membreId) });
+  await adhEmailSimple(identite.email, `Votre demande d'adhésion — ${init.nom}`,
+    [`Bonjour ${identite.prenom || ''},`, `Votre demande d'adhésion à « ${init.nom} » a bien été reçue. L'association l'examine et vous répondra par e-mail.`]);
+  return sendJSON(res, 201, { ok: true, gratuit: true, statut: 'en_attente', message: "Votre demande d'adhésion a bien été envoyée. L'association va l'examiner et vous répondre par e-mail." });
+}
+
+/* Accepter / refuser une demande en attente — formules gratuites seulement (un adhérent d'une formule payante devient
+   membre à son paiement, ou via « Marquer payé »). */
+async function adhChargerDemandeGratuite(req, res, params) {
+  const user = await getCurrentUser(req);
+  if (!user) { sendJSON(res, 401, { error: "Connexion requise." }); return null; }
+  const m = await db.prepare(`SELECT m.*, i.owner_user_id, i.nom AS init_nom FROM adhesion_membres m JOIN initiatives i ON i.id=m.initiative_id WHERE m.id=?`).get(params.id);
+  if (!m) { sendJSON(res, 404, { error: "Membre introuvable." }); return null; }
+  if (Number(m.owner_user_id) !== Number(user.id)) { sendJSON(res, 403, { error: "Réservé au propriétaire." }); return null; }
+  if (!(await exigerPremium(user, res, "adhesions"))) return null;
+  if (m.statut !== 'en_attente') { sendJSON(res, 400, { error: "Cette demande n'est plus en attente." }); return null; }
+  const formule = await db.prepare("SELECT * FROM adhesion_formules WHERE id=?").get(m.formule_id);
+  const gratuite = formule && (Number(formule.est_gratuite_auto) === 1 || (formule.montant_type === 'fixe' && !(Number(formule.montant_fixe) > 0)));
+  if (!gratuite) { sendJSON(res, 400, { error: "Un adhérent d'une formule payante devient membre à son paiement (ou via « Marquer payé »)." }); return null; }
+  return { user, m, formule };
+}
+
+route("POST", "/api/adhesion-membres/:id/accepter", async (req, res, params) => {
+  const ctx = await adhChargerDemandeGratuite(req, res, params); if (!ctx) return;
+  const { user, m, formule } = ctx;
+  const expiration = calculerDateExpirationAdhesion(formule, ADH_GRATUITE_DUREE_MOIS);
+  await db.prepare(`UPDATE adhesion_membres SET statut='a_jour', date_adhesion=COALESCE(date_adhesion, datetime('now')), date_expiration=?, observations=NULL, updated_at=datetime('now') WHERE id=?`)
+    .run(expiration, m.id);
+  const mAJ = await db.prepare("SELECT * FROM adhesion_membres WHERE id=?").get(m.id);
+  await ajouterAListeStockage(formule.id, mAJ);
+  await creerCodeDAPourAdherent(mAJ, formule, user);
+  await syncAffiliationDepuisAdhesion(mAJ, 'accepte');
+  journaliserAdhesion(m.initiative_id, m.id, 'acceptation', user, `Demande d'adhésion acceptée — « ${formule.nom} ».`);
+  if (m.linked_user_id) creerNotif(m.linked_user_id, "adhesion_acceptee", "Adhésion acceptée ✅", `Votre adhésion à « ${m.init_nom} » est acceptée.`, { membre_id: m.id });
+  const fin = expiration ? new Date(expiration.replace(' ', 'T') + 'Z').toLocaleDateString('fr-FR') : null;
+  const origine = process.env.PUBLIC_ORIGIN || 'https://diaspoactif.com';
+  await adhEmailSimple(m.email, `Votre adhésion est acceptée — ${m.init_nom}`, [
+    `Bonjour ${m.prenom || ''},`,
+    `Bonne nouvelle : votre adhésion à « ${m.init_nom} » est acceptée${fin ? `, valable jusqu'au ${fin}` : ''}. Numéro d'adhérent : ADH-${m.initiative_id}-${m.id}.`,
+    ...(m.linked_user_id ? [] : [`Vous n'avez pas encore de compte Diaspo'Actif ? Créez-en un avec cette même adresse e-mail : votre fiche d'adhérent vous sera proposée au rattachement.`]),
+  ], m.linked_user_id ? null : { url: `${origine}/inscription.html?role=utilisateur&email=${encodeURIComponent(m.email || '')}`, texte: "Créer mon compte Diaspo'Actif" });
+  sendJSON(res, 200, { ok: true, date_expiration: expiration });
+});
+
+route("POST", "/api/adhesion-membres/:id/refuser", async (req, res, params, body) => {
+  const ctx = await adhChargerDemandeGratuite(req, res, params); if (!ctx) return;
+  const { user, m } = ctx;
+  const motif = String((body && body.motif) || '').trim().slice(0, 300);
+  await db.prepare(`UPDATE adhesion_membres SET statut='radie', observations=?, updated_at=datetime('now') WHERE id=?`)
+    .run(motif ? `Demande refusée — ${motif}` : 'Demande refusée', m.id);
+  journaliserAdhesion(m.initiative_id, m.id, 'refus', user, motif ? `Demande d'adhésion refusée : ${motif}` : "Demande d'adhésion refusée.");
+  if (m.linked_user_id) creerNotif(m.linked_user_id, "adhesion_refusee", "Demande d'adhésion non retenue", `Votre demande d'adhésion à « ${m.init_nom} » n'a pas été retenue.${motif ? ' Motif : ' + motif : ''}`, { membre_id: m.id });
+  await adhEmailSimple(m.email, `Votre demande d'adhésion — ${m.init_nom}`, [
+    `Bonjour ${m.prenom || ''},`,
+    `Votre demande d'adhésion à « ${m.init_nom} » n'a pas été retenue.${motif ? ' Motif : ' + motif : ''}`,
+  ]);
+  sendJSON(res, 200, { ok: true });
+});
+
 /* PUT /api/adhesion-formules/:id/officielle — désigne une formule DÉJÀ EXISTANTE comme l'adhésion
    officielle de l'association (2026-10-07, demande explicite : un bouton « Définir comme
    l'adhésion officielle » sur chaque formule). Même effet que « Créer l'adhésion officielle » :
@@ -7360,7 +7583,9 @@ route("PUT", "/api/initiatives/:id/affichage-membres", async (req, res, params, 
 /* ── Paiement d'une formule (public/connecté) — one-off ou subscription selon le type ── */
 route("POST", "/api/adhesion-formules/:id/payer", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
-  const formule = await db.prepare("SELECT * FROM adhesion_formules WHERE id=? AND actif=1").get(params.id);
+  /* Une adhésion gratuite automatique DÉSACTIVÉE reste joignable pour ses adhérents existants (renouvellement via le lien des
+     rappels) — adhesionGratuiteAuto() refuse alors toute nouvelle personne. Toute autre formule désactivée reste introuvable. */
+  const formule = await db.prepare("SELECT * FROM adhesion_formules WHERE id=? AND (actif=1 OR est_gratuite_auto=1)").get(params.id);
   if (!formule) return sendJSON(res, 404, { error: "Formule introuvable." });
   const init = await db.prepare("SELECT * FROM initiatives WHERE id=?").get(formule.initiative_id);
   if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
@@ -7387,6 +7612,8 @@ route("POST", "/api/adhesion-formules/:id/payer", async (req, res, params, body)
     invite = { nom, prenom: String(reponses.prenom || '').trim() || null, email };
   }
   const identite = user ? { nom: user.nom, prenom: user.prenom, email: user.email } : invite;
+  /* Adhésion gratuite automatique (2026-10-09) : aucun paiement ni session Stripe — demande « en attente » examinée par l'association. */
+  if (Number(formule.est_gratuite_auto) === 1) return await adhesionGratuiteAuto(res, { user, formule, init, reponses, identite });
 
   const montant = resolveAdhesionMontant(formule, body.montant);
   if (montant == null) return sendJSON(res, 400, { error: "Montant invalide." });

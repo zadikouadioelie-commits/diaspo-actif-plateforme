@@ -7162,6 +7162,9 @@ db.exec(`
        l'initiative" cible désormais directement (les autres formules restent réservées à un
        usage interne/ciblé, ex. liées à un événement précis). */
     if (!adhFCols.includes('est_officielle'))        db.exec("ALTER TABLE adhesion_formules ADD COLUMN est_officielle INTEGER DEFAULT 0");
+    /* Adhésion gratuite automatique (2026-10-09, demande explicite) : formule créée UNIQUEMENT quand l'association active l'interrupteur du module Adhésions (jamais automatiquement),
+       distincte d'une vraie formule créée plus tard. Tant qu'elle est active elle est aussi l'adhésion officielle (c'est elle que cible le bouton « Adhérer à l'initiative »). */
+    if (!adhFCols.includes('est_gratuite_auto'))     db.exec("ALTER TABLE adhesion_formules ADD COLUMN est_gratuite_auto INTEGER DEFAULT 0");
   }
 }
 

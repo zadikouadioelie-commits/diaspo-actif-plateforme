@@ -958,7 +958,7 @@
     }
   }
   async function adherer(id, nom, btn) {
-    if (!(await needLogin('Connectez-vous pour adhérer à cette structure.'))) return;
+    /* Pas de connexion exigée (2026-10-09, demande explicite) : avec ou sans compte, la personne arrive sur la page d'adhésion (nom, prénom, e-mail). */
     if (btn) btn.disabled = true;
     try {
       let formules = []; try { formules = (await api(`/api/initiatives/${encodeURIComponent(id)}/adhesion-formules`)).formules || []; } catch (e) { /* formules inaccessibles : « bientôt disponible » */ }

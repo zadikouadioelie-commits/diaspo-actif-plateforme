@@ -7358,7 +7358,7 @@ async function voSoumettre(initId){
 /* ══════════════════════════════════════════════
    MODULE COTISATIONS & ADHÉSIONS — JS
    ══════════════════════════════════════════════ */
-let ADH_FORMULES = [], ADH_MEMBRES = [], ADH_TAB = 'formules', ADH_EDIT_FORMULE_ID = null, ADH_PAYER_MEMBRE_ID = null;
+let ADH_FORMULES = [], ADH_MEMBRES = [], ADH_TAB = 'formules', ADH_EDIT_FORMULE_ID = null, ADH_PAYER_MEMBRE_ID = null, ADH_GRATUITE = null;
 
 /* Formulaire personnalisable (incrément 2) — miroir client d'ADHESION_CHAMPS_STANDARD
    (server/index.js) : garder les deux listes synchronisées si le catalogue évolue. */
@@ -7626,11 +7626,14 @@ async function adhRenderFormules(){
   try{
     const r = await api('GET', `/initiatives/${initId}/adhesion-formules/gestion`);
     ADH_FORMULES = r.formules || [];
+    /* Cartouche « Adhésion gratuite automatique » (2026-10-09) — état lu à part : une erreur ici ne masque jamais les formules. */
+    try { ADH_GRATUITE = await api('GET', `/initiatives/${initId}/adhesion-gratuite-auto`); } catch(e) { ADH_GRATUITE = null; }
+    const cartoucheGratuite = adhCartoucheGratuiteHtml();
     if(!ADH_FORMULES.length){
-      el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);">Aucune formule pour le moment. Cliquez sur « Créer une formule d\'adhésion » pour commencer.</div>';
+      el.innerHTML = cartoucheGratuite + '<div style="text-align:center;padding:40px;color:var(--muted);">Aucune formule pour le moment. Cliquez sur « Créer une formule d\'adhésion » pour commencer.</div>';
       return;
     }
-    el.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;">
+    el.innerHTML = cartoucheGratuite + `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;">
       ${ADH_FORMULES.map(f => `
         <div class="card" style="padding:0;overflow:hidden;border-left:4px solid ${f.couleur};${f.actif?'':'opacity:.5;'}">
           ${f.media_type==='photo' && f.media_url ? `<img src="${escH(f.media_url)}" style="width:100%;aspect-ratio:16/9;object-fit:cover;display:block;">` :
@@ -7640,6 +7643,7 @@ async function adhRenderFormules(){
             </div>` : ''}
           <div style="padding:14px;">
             ${f.est_officielle ? `<div style="margin-bottom:8px;"><span title="Adhésion officielle de l'association — ciblée directement par le bouton public « Adhérer à l'initiative »" style="flex-shrink:0;background:linear-gradient(135deg,#B8860B,#FFD700 55%,#B8860B);color:#3A2A00;font-size:10.5px;font-weight:800;padding:3px 9px;border-radius:20px;white-space:nowrap;">⭐ Adhésion officielle</span></div>` : ''}
+            ${f.est_gratuite_auto ? `<div style="margin-bottom:8px;"><span title="Formule créée par l'interrupteur « Adhésion gratuite automatique » : elle se gère depuis la cartouche au-dessus des formules." style="display:inline-block;background:#dcfce7;color:#166534;font-size:10.5px;font-weight:800;padding:3px 9px;border-radius:20px;">🆓 Gratuite automatique</span></div>` : ''}
           <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px;">
             ${!f.media_type ? `<div style="font-size:24px;">${f.icone||'🎫'}</div>` : ''}
             <div style="flex:1;min-width:0;">
@@ -7660,8 +7664,8 @@ async function adhRenderFormules(){
             <button class="btn btn-sm btn-outline" onclick="adhDupliquerFormule(${f.id})">📄 Dupliquer</button>
             ${(!f.est_officielle && f.actif) ? `<button class="btn btn-sm btn-outline" style="color:#7C3AED;border-color:#7C3AED;" title="Cette formule devient celle que le bouton public « Adhérer à l'initiative » cible directement (elle remplace l'adhésion officielle actuelle, s'il y en a une)." onclick="adhDefinirOfficielle(${f.id}, '${escH(f.nom).replace(/'/g,"\\'")}')">⭐ Définir comme adhésion officielle</button>` : ''}
             ${f.actif ? `<button class="btn btn-sm btn-outline" onclick="adhOuvrirPartage(${f.id})">📤 Partager</button>` : ''}
-            <button class="btn btn-sm btn-outline" onclick="adhToggleActifFormule(${f.id})">${f.actif?'🙈 Désactiver':'👁️ Activer'}</button>
-            <button class="btn btn-sm btn-outline" style="color:#ef4444;border-color:#ef4444;" onclick="adhSupprimerFormule(${f.id},'${escH(f.nom).replace(/'/g,"\\'")}')">🗑️</button>
+            ${f.est_gratuite_auto ? '' : `<button class="btn btn-sm btn-outline" onclick="adhToggleActifFormule(${f.id})">${f.actif?'🙈 Désactiver':'👁️ Activer'}</button>
+            <button class="btn btn-sm btn-outline" style="color:#ef4444;border-color:#ef4444;" onclick="adhSupprimerFormule(${f.id},'${escH(f.nom).replace(/'/g,"\\'")}')">🗑️</button>`}
           </div>
           </div>
         </div>`).join('')}
@@ -8115,6 +8119,65 @@ async function adhToggleActifFormule(id){
   try{ await api('PUT', `/adhesion-formules/${id}/toggle-actif`, {}); adhRenderFormules(); }
   catch(e){ showToast(e.message, 'danger'); }
 }
+/* ── Adhésion gratuite automatique (2026-10-09, demande explicite) ──
+   Cartouche au-dessus des formules : un interrupteur, jamais activé automatiquement (il entrerait en conflit avec de
+   vraies formules créées plus tard). Activé, il met à disposition une formule gratuite de 12 mois — modifiable avec les
+   outils habituels (durée, champs obligatoires, documents) — proposée à toute personne, avec ou sans compte Diaspo'Actif,
+   par le bouton « Adhérer à l'initiative ». Désactivé, la formule n'est plus proposée aux nouveaux ; ses adhérents gardent
+   leur fiche, et l'association peut créer de vraies formules (deux fiches distinctes). */
+function adhCartoucheGratuiteHtml(){
+  const g = ADH_GRATUITE;
+  if (!g || !g.type_ok) return '';
+  const actif = !!g.actif;
+  const bloque = !actif && g.autres_formules_actives > 0;
+  const note = (txt, couleur) => `<p style="font-size:12.5px;color:${couleur};margin:8px 0 0;line-height:1.5;">${txt}</p>`;
+  return `<div id="adh-gratuite-carte" style="border:1.5px solid #86efac;background:linear-gradient(135deg,#f0fdf4,#ecfdf5);border-radius:14px;padding:16px 18px;margin-bottom:16px;">
+    <div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;">
+      <div style="font-size:28px;line-height:1;" aria-hidden="true">🆓</div>
+      <div style="flex:1;min-width:240px;">
+        <div style="font-weight:800;font-size:15px;color:#14532d;">Adhésion gratuite automatique</div>
+        <p style="font-size:13px;color:#166534;margin:4px 0 0;line-height:1.5;">Si l'adhésion à votre initiative est gratuite, activez ce bouton : une adhésion gratuite de 12 mois sera proposée à toute personne qui souhaite adhérer à votre association, <b>avec ou sans compte Diaspo'Actif</b> (nom, prénom et e-mail suffisent). Vous acceptez ou refusez chaque demande depuis le registre des membres.</p>
+        ${actif ? note("✅ Activée — c'est elle que propose le bouton « Adhérer à l'initiative ». Vous pouvez modifier la durée, les champs obligatoires et les documents demandés.", '#166534') : ''}
+        ${bloque ? note("Vous avez déjà des formules d'adhésion actives : le bouton « Adhérer à l'initiative » propose votre adhésion officielle. L'adhésion gratuite automatique est réservée aux associations qui n'ont pas encore de formule.", '#92400e') : ''}
+        ${(!actif && g.formule_id && !bloque) ? note("Désactivée — ses adhérents actuels gardent leur fiche et leurs rappels. Vous pouvez créer de vraies formules d'adhésion ci-dessous.", '#475569') : ''}
+        ${g.adhesions_fermees ? note("🔒 Vos adhésions sont actuellement fermées : personne ne peut adhérer tant qu'elles le restent (réglage « Adhésions ouvertes » ci-dessus).", '#b45309') : ''}
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;">
+        <label style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:13.5px;cursor:${bloque ? 'not-allowed' : 'pointer'};min-height:44px;">
+          <input type="checkbox" ${actif ? 'checked' : ''} ${bloque ? 'disabled' : ''} onchange="adhToggleGratuiteAuto(this)" style="width:20px;height:20px;accent-color:#16a34a;" aria-label="Adhésion gratuite automatique">
+          ${actif ? 'Activée' : 'Désactivée'}
+        </label>
+        ${actif && g.formule_id ? `<button type="button" class="btn btn-sm btn-outline" onclick="adhOuvrirEditionFormule(${g.formule_id})">⚙️ Personnaliser (durée, champs, documents)</button>` : ''}
+      </div>
+    </div>
+  </div>`;
+}
+async function adhToggleGratuiteAuto(cb){
+  const veut = cb.checked;
+  const msg = veut
+    ? "Activer l'adhésion gratuite automatique ?\n\nUne adhésion gratuite de 12 mois sera proposée à toute personne qui souhaite adhérer (avec ou sans compte Diaspo'Actif). Vous pourrez en modifier la durée, les champs obligatoires et les documents demandés, et vous acceptez ou refusez chaque demande."
+    : "Désactiver l'adhésion gratuite automatique ?\n\nElle ne sera plus proposée aux nouvelles personnes. Vos adhérents actuels gardent leur fiche et leurs rappels. Vous pourrez ensuite créer de vraies formules d'adhésion.";
+  if (!confirm(msg)) { cb.checked = !veut; return; }
+  cb.disabled = true;
+  try{
+    await api('PUT', `/initiatives/${window.__vitrineInitId}/adhesion-gratuite-auto`, { actif: veut });
+    showToast(veut ? '✅ Adhésion gratuite automatique activée.' : 'Adhésion gratuite automatique désactivée.');
+  }catch(e){ showToast(e.message, 'danger'); }
+  await adhRenderFormules();
+}
+async function adhAccepterMembre(id, btn){
+  if (!confirm("Accepter cette demande d'adhésion ? La personne sera prévenue et deviendra membre pour toute la durée de la formule.")) return;
+  if (btn) btn.disabled = true;
+  try{ await api('POST', `/adhesion-membres/${id}/accepter`); showToast('✅ Adhésion acceptée — la personne est prévenue.'); await adhAppliquerFiltresServeur(); }
+  catch(e){ showToast(e.message, 'danger'); if (btn) btn.disabled = false; }
+}
+async function adhRefuserMembre(id, btn){
+  const motif = prompt("Refuser cette demande d'adhésion ?\n\nMotif (facultatif, il sera communiqué à la personne) :", '');
+  if (motif === null) return;
+  if (btn) btn.disabled = true;
+  try{ await api('POST', `/adhesion-membres/${id}/refuser`, { motif }); showToast('Demande refusée — la personne est prévenue.'); await adhAppliquerFiltresServeur(); }
+  catch(e){ showToast(e.message, 'danger'); if (btn) btn.disabled = false; }
+}
 /* Désigne une formule existante comme l'adhésion officielle (2026-10-07) — même résultat que
    « Créer l'adhésion officielle » : l'ancienne officielle est remplacée côté serveur
    (adhAppliquerOfficielle), la nouvelle porte le badge et devient la cible du bouton public
@@ -8155,7 +8218,8 @@ function adhRenderMembresLignes(liste){
       <td style="padding:8px;white-space:nowrap;">
         ${m.linked_user_id?`<a class="btn btn-sm btn-outline" href="profil.html?id=${m.linked_user_id}" target="_blank">👁 Accéder au profil</a>`:''}
         ${!m.linked_user_id && m.email?`<button class="btn btn-sm btn-outline" onclick="adhInviterMembre(${m.id},this)" title="Envoie un e-mail invitant ce membre à créer son compte Diaspo'Actif — sa fiche lui sera automatiquement proposée au rattachement.">✉️ Inviter</button>`:''}
-        ${m.statut!=='a_jour'&&m.statut!=='radie'?`<button class="btn btn-sm btn-outline" onclick="adhOuvrirPaiementManuel(${m.id})">💰 Marquer payé</button>`:''}
+        ${(m.statut==='en_attente' && formule && (formule.est_gratuite_auto || (formule.montant_type==='fixe' && !(Number(formule.montant_fixe)>0)))) ? `<button class="btn btn-sm" style="background:#16a34a;color:#fff;border:none;" onclick="adhAccepterMembre(${m.id},this)" title="Accepter cette demande d'adhésion">✅ Accepter</button> <button class="btn btn-sm btn-outline" style="color:#b45309;border-color:#b45309;" onclick="adhRefuserMembre(${m.id},this)" title="Refuser cette demande d'adhésion">❌ Refuser</button>` : ''}
+        ${(m.statut!=='a_jour'&&m.statut!=='radie' && !(formule && formule.est_gratuite_auto))?`<button class="btn btn-sm btn-outline" onclick="adhOuvrirPaiementManuel(${m.id})">💰 Marquer payé</button>`:''}
         <button class="btn btn-sm btn-outline" onclick="adhGererBadges(${m.id})">🏅</button>
         ${m.statut==='suspendu'?`<button class="btn btn-sm btn-outline" onclick="adhChangerStatutMembre(${m.id},'a_jour',this)">▶️ Réactiver</button>`:m.statut!=='radie'?`<button class="btn btn-sm btn-outline" onclick="adhChangerStatutMembre(${m.id},'suspendu',this)">⛔ Suspendre</button>`:''}
         ${m.statut!=='radie'?`<button class="btn btn-sm btn-outline" style="color:#ef4444;border-color:#ef4444;" onclick="adhChangerStatutMembre(${m.id},'radie',this)" title="Fin définitive — irréversible depuis cet écran">🚫 Radier</button>`:'<span style="font-size:11px;color:var(--muted);">Radié</span>'}

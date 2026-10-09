@@ -215,7 +215,7 @@ function renderFormules(){
           ? `<button class="btn btn-outline" style="width:100%;" disabled>🔒 Adhésions fermées</button>`
           : f.max_adherents && f.places_restantes<=0
           ? `<button class="btn btn-outline" style="width:100%;" disabled>🚫 Complet</button>`
-          : `<button class="btn btn-orange" style="width:100%;" onclick="ouvrirPaiement(${f.id})">Adhérer / Contribuer</button>`}
+          : `<button class="btn btn-orange" style="width:100%;" onclick="ouvrirPaiement(${f.id})">${f.est_gratuite_auto ? 'Adhérer gratuitement' : 'Adhérer / Contribuer'}</button>`}
       </div>`).join('')}
   </div>`;
 }
@@ -308,7 +308,7 @@ async function ouvrirFormulaireAdhesion(formule, montant, userId){
       <div id="adh-form-err" style="display:none;color:#dc2626;font-size:12.5px;margin-bottom:10px;"></div>
       <div style="display:flex;gap:10px;justify-content:flex-end;">
         <button class="btn btn-outline" onclick="document.getElementById('adh-form-overlay').remove()">Annuler</button>
-        <button class="btn btn-orange" id="adh-form-continuer">Continuer →</button>
+        <button class="btn btn-orange" id="adh-form-continuer">${formule.est_gratuite_auto ? 'Envoyer ma demande →' : 'Continuer →'}</button>
       </div>
     </div>`;
   overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
@@ -385,6 +385,8 @@ const ADH_CHAMPS_CATALOGUE_PUB = [
 
 function continuerPaiement(formuleId, montant, reponses){
   const formule = FORMULES.find(f=>f.id===formuleId);
+  /* Adhésion gratuite automatique (2026-10-09) : aucun paiement — la demande est envoyée à l'association, avec ou sans compte Diaspo'Actif. */
+  if (formule.est_gratuite_auto) return envoyerDemandeGratuite(formuleId, reponses);
   const recurrent = ADH_RECURRENTS.includes(formule.type_contribution);
   if (recurrent) return confirmerPaiementAdhesion(formuleId, montant, false, reponses);
 
@@ -410,6 +412,29 @@ function continuerPaiement(formuleId, montant, reponses){
     overlay.remove();
     confirmerPaiementAdhesion(formuleId, montant, saveCard, reponses);
   };
+}
+
+async function envoyerDemandeGratuite(formuleId, reponses){
+  const fermer = () => document.getElementById('adh-gratuit-overlay')?.remove();
+  const afficher = (titre, texte, extra) => {
+    fermer();
+    const ov = document.createElement('div');
+    ov.id = 'adh-gratuit-overlay'; ov.className = 'modal-overlay';
+    ov.innerHTML = `<div class="modal-box" style="max-width:420px;width:94%;"><h3 style="margin:0 0 8px;font-size:17px;">${titre}</h3><p style="font-size:14px;line-height:1.5;margin:0 0 16px;">${escHtml(texte)}</p><div style="display:flex;gap:10px;justify-content:flex-end;">${extra || ''}<button class="btn btn-orange" id="adh-gratuit-ok">Fermer</button></div></div>`;
+    ov.addEventListener('click', e => { if (e.target === ov) fermer(); });
+    document.body.appendChild(ov);
+    document.getElementById('adh-gratuit-ok').onclick = fermer;
+  };
+  try {
+    const r = await api('POST', `/adhesion-formules/${formuleId}/payer`, { reponses: reponses || {} });
+    afficher(r.deja ? 'ℹ️ Adhésion' : '✅ Demande envoyée', r.message || 'Votre demande a bien été envoyée.');
+  } catch (e) {
+    if (e.data && e.data.connexion_requise) {
+      afficher('🔑 Vous avez déjà un compte', e.message, '<a class="btn btn-outline" href="login.html">Se connecter</a>');
+    } else {
+      afficher('Adhésion impossible', e.message || 'Une erreur est survenue.');
+    }
+  }
 }
 
 async function confirmerPaiementAdhesion(formuleId, montant, saveCard, reponses){
