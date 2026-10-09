@@ -1,0 +1,28 @@
+/* ============================================================
+   Diaspo'Actif — Image de marque de la vitrine (2026-10-09, demande explicite)
+   Colorimétrie tirée de l'affiche « COLOR COMBO » : fond nuit pétrole, lettres jaune ambré (dégradé #FDC004 → #FEA901),
+   combinaison orange, étiquette rouge, bois vert-gris — le tout sur FOND BLANC (à la place du fond crème).
+   Les couleurs des pages sont posées en ligne (style="…") et déjà converties ; ce fichier fixe les jetons de la marque
+   et les détails communs (sélection, focus, liens, champs de formulaire).
+   ============================================================ */
+:root {
+  --marque-blanc: #FFFFFF;
+  --marque-nuit: #031922;
+  --marque-nuit-profond: #010E12;
+  --marque-ambre: #FFB300;
+  --marque-ambre-clair: #FFC53D;
+  --marque-ambre-fonce: #FEA901;
+  --marque-orange: #F26A12;
+  --marque-orange-profond: #CC4710;
+  --marque-rouge: #9E1B12;
+  --marque-sauge: #556B62;
+  --marque-sauge-clair: #E6EDEB;
+  --marque-degrade-ambre: linear-gradient(180deg, #FDC004 0%, #FEA901 100%);
+}
+html, body { background: var(--marque-blanc); }
+::selection { background: var(--marque-ambre); color: var(--marque-nuit); }
+:focus-visible { outline: 3px solid var(--marque-ambre); outline-offset: 2px; }
+a:hover { text-decoration-color: var(--marque-orange-profond); }
+input, textarea, select { border-color: var(--marque-sauge-clair); }
+input:focus, textarea:focus, select:focus { outline: 3px solid var(--marque-ambre); outline-offset: 1px; border-color: var(--marque-orange-profond); }
+input::placeholder, textarea::placeholder { color: #587371; }
