@@ -21,6 +21,11 @@
 .dvt-card-reaction-btn.actif{background:#FFF0E8;border-color:#B84C1A;color:#B84C1A;}
 .dvt-card-reactions-loading{font-size:11px;color:#9AA5B1;}
 .dvt-card-plus{font-size:12px;font-weight:700;color:#B84C1A;margin-top:8px;}
+/* Vidéo DÉJÀ DISPONIBLE (2026-10-09, demande explicite) : cartouche jaune doré, pour la distinguer des « Bientôt disponible » voisines. */
+.dvt-card.dvt-dispo{background:linear-gradient(160deg,#FFF3C4,#F6D36B 55%,#E2A929);border:3px solid #E2A929;box-shadow:0 0 0 3px rgba(248,218,122,.4),0 10px 28px rgba(226,169,41,.45);}
+.dvt-card.dvt-dispo .dvt-card-titre{color:#3d2a00;}
+.dvt-card.dvt-dispo .dvt-badge-categorie{background:#fff;color:#8a5a00;border:1px solid #E2A929;}
+.dvt-dispo-tag{display:inline-block;margin:0 6px 6px 0;background:linear-gradient(135deg,#FFF3C4,#E2A929);color:#4a3200;font-size:11px;font-weight:800;letter-spacing:.03em;padding:3px 10px;border-radius:99px;border:1px solid #b9801a;box-shadow:0 2px 6px rgba(0,0,0,.22);}
 .dvt-card:hover .dvt-card-plus{text-decoration:underline;}
 
 /* ── Page vidéo individuelle ── */

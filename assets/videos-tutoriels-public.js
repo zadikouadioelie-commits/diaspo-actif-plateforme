@@ -46,13 +46,14 @@ function dvtVignetteHtml(v) {
 const DVT_FILM = { titre: "Créer son compte Diaspo'Actif pas à pas", duree: '1:27', categorie: 'Bien démarrer', poster: '/assets/media/film-inscription-poster.jpg' };
 function dvtCarteFilmHtml() {
   return `
-    <a class="dvt-card" href="inscription.html" onclick="dvtOuvrirFilm(event)" style="text-decoration:none;color:inherit;display:block;">
+    <a class="dvt-card dvt-dispo" href="inscription.html" onclick="dvtOuvrirFilm(event)" style="text-decoration:none;color:inherit;display:block;">
       <div class="dvt-thumb">
         <img src="${DVT_FILM.poster}" alt="" loading="lazy">
         <span class="dvt-duree">${DVT_FILM.duree}</span>
         <div class="dvt-play"><span>▶</span></div>
       </div>
       <div class="dvt-body">
+        <div class="dvt-dispo-tag">✓ Disponible</div>
         <div class="dvt-badge-categorie">${DVT_FILM.categorie}</div>
         <div class="dvt-card-titre">${dvtEsc(DVT_FILM.titre)}</div>
         <div class="dvt-card-plus">Voir le film →</div>

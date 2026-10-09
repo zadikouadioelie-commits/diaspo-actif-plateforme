@@ -1552,7 +1552,7 @@
   /* Film « Créer son compte pas à pas » (2026-10-09, demande explicite) : première vignette des tutoriels de l'accueil. Film animé
      (voix, musique, sous-titres) ouvert dans une fenêtre, chargé seulement au toucher. */
   function filmCard(wide) {
-    return `<a class="vcard${wide ? ' wide' : ''}" href="inscription.html" data-film-inscription="1"><div class="vth"><img src="assets/media/film-inscription-poster.jpg" alt="" loading="lazy"><span class="vd">1:27</span><span class="vp">▶</span></div><div class="vt">Créer son compte Diaspo’Actif pas à pas</div><div class="small muted">Bien démarrer</div></a>`;
+    return `<a class="vcard dispo${wide ? ' wide' : ''}" href="inscription.html" data-film-inscription="1"><div class="vth"><img src="assets/media/film-inscription-poster.jpg" alt="" loading="lazy"><span class="vdispo">✓ Disponible</span><span class="vd">1:27</span><span class="vp">▶</span></div><div class="vt">Créer son compte Diaspo’Actif pas à pas</div><div class="small muted">Bien démarrer</div></a>`;
   }
   let filmPromesse = null;
   document.addEventListener('click', e => {

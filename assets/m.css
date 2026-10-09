@@ -326,6 +326,11 @@ svg.i.l{width:28px;height:28px}
 #home-videos .sec-sub{color:#cdd7e6}
 #home-videos .vcard .vt{color:#fff}
 #home-videos .vcard .small.muted{color:#aebcd2}
+/* Vidéo DÉJÀ DISPONIBLE (2026-10-09, demande explicite) : cartouche jaune doré, distincte des « Bientôt » voisines */
+.vcard.dispo .vth{border:3px solid #E2A929;box-shadow:0 0 0 3px rgba(248,218,122,.35),0 8px 22px rgba(226,169,41,.45)}
+#home-videos .vcard.dispo .vt{color:#F8DA7A}
+#home-videos .vcard.dispo .small.muted{color:#F2C94C;font-weight:700}
+.vdispo{position:absolute;left:8px;top:8px;z-index:2;background:linear-gradient(135deg,#FFF3C4,#E2A929);color:#4a3200;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:800;box-shadow:0 2px 6px rgba(0,0,0,.3)}
 #home-videos .vth{border:1px solid rgba(255,255,255,.25)}
 
 /* ---------- bandeau de test privé ---------- */
