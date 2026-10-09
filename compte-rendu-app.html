@@ -66,6 +66,19 @@
 .crp-photos div{position:relative;width:84px;height:84px;border-radius:10px;overflow:hidden;background:#eee}
 .crp-photos img{width:100%;height:100%;object-fit:cover}
 .crp-photos button{position:absolute;top:3px;right:3px;border:none;background:rgba(0,0,0,.6);color:#fff;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:12px;line-height:20px;padding:0}
+/* Galerie photos de la page de lecture (2026-10-09) : grande grille + visionneuse dans la page */
+.crg{margin:22px 0}
+.crg-t{display:flex;align-items:baseline;gap:8px}
+.crg-t small{font-size:13px;font-weight:700;color:var(--muted,#5B6B82)}
+.crg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;margin-top:10px}
+.crg-it{position:relative;display:block;border:0;padding:0;border-radius:16px;overflow:hidden;cursor:zoom-in;aspect-ratio:4/3;background:#e5e7eb;box-shadow:0 2px 10px rgba(13,43,78,.12);transition:box-shadow .2s,transform .2s}
+.crg-it:hover,.crg-it:focus-visible{box-shadow:0 8px 24px rgba(13,43,78,.22);transform:translateY(-2px)}
+.crg-it:focus-visible{outline:3px solid #F26422;outline-offset:2px}
+.crg-it img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .3s}
+.crg-it:hover img{transform:scale(1.05)}
+.crg.feat .crg-it:first-child{grid-column:span 2;grid-row:span 2;aspect-ratio:auto}
+.crg-aide{margin-top:8px}
+@media (max-width:560px){.crg-grid{grid-template-columns:repeat(2,1fr);gap:8px}.crg.feat .crg-it:first-child{grid-column:span 2;grid-row:span 1;aspect-ratio:4/3}}
 .crp-grp{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin:8px 0}
 .crp-grp label{display:flex;gap:8px;align-items:center;border:1.5px solid var(--border,#DCE4F0);border-radius:10px;padding:10px 12px;cursor:pointer;font-weight:700;font-size:14px}
 .crp-grp label.sel{border-color:#2E74E0;background:#E8F0FD}
@@ -139,6 +152,7 @@
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js?v=13"></script>
 <script src="assets/upload-media.js"></script>
+<script src="assets/media-galerie.js?v=1"></script>
 <script src="assets/rich-editor.js"></script>
 <script>
 const $ = (s, r = document) => r.querySelector(s);
@@ -875,7 +889,7 @@ function vuePublique() {
     + etapeHtml(cr)
     + '</div></div>'
     + videoHtml(cr.video_url)
-    + ((cr.medias || []).length ? '<div class="crp-photos" style="margin:12px 0">' + cr.medias.map(u => '<div style="width:150px;height:110px"><a href="' + esc(u) + '" target="_blank" rel="noopener"><img src="' + esc(u) + '" alt="" loading="lazy"></a></div>').join('') + '</div>' : '')
+    + galerieHtml(cr.medias)
     + graph + detailHtml(cr)
     + (forts.length ? '<h2 id="cr-forts">Les temps forts</h2><div class="crp-tiles">' + forts.map((f, i) => '<div class="crp-tile" style="background:linear-gradient(135deg,' + GRAD[i % GRAD.length][0] + ',' + GRAD[i % GRAD.length][1] + ')">' + esc(f) + '</div>').join('') + '</div>' : '')
     + (d.identifies.length ? '<div class="cr-dore"><div class="cr-dore-in"><h2 id="cr-identifs">Compte Diaspo’Actif</h2><p class="crp-note">Les comptes Diaspo’Actif identifiés pour ce compte-rendu.</p><div class="crp-idgrid">' + d.identifies.map(i => '<a class="crp-idcard" href="' + hrefMention('u', i.user_id) + '" target="_blank" rel="noopener">'
@@ -888,6 +902,7 @@ function vuePublique() {
   if (!d.identifies.length && !d.peut_editer) z.remove();
   initLecture(['cr-resume', 'cr-coup', 'cr-recit', 'cr-forts', 'cr-identifs', 'cr-partenaires']);
   initCartes(); initNav();
+  initGalerie();
   chargerSocial();
   $$('[data-synth]').forEach(b => b.addEventListener('click', ouvrirSynthese));
   /* « ? » : bulle d'explication de la synthèse (clic ou touche Entrée ; se ferme par Échap ou un clic ailleurs). */
@@ -1000,10 +1015,41 @@ async function partagerCr() {
   }
   try { await navigator.clipboard.writeText(url); toast('Lien copié'); } catch (_) { window.prompt('Copiez ce lien :', url); }
 }
-async function chargerSocial() {
-  const box = $('#crp-social'); if (!box) return;
+/* ---------- Galerie photos (2026-10-09, demande explicite : « agrandis l'espace multimédia, et permets en cliquant sur une image
+   d'avoir accès aux réactions et de pouvoir défiler sur les autres médias — sans ouvrir une nouvelle page ») ----------
+   Avant : vignettes de 150×110px qui ouvraient l'image seule dans un nouvel onglet. Maintenant : grande grille (la 1re photo mise en
+   avant à partir de 5 photos), et un clic ouvre un visionneur DANS la page : photo en grand, flèches ‹ ›, balayage, miniatures, touches
+   ← → Échap, bouton retour du téléphone ; la barre du bas donne les réactions du compte-rendu (mêmes que sous le récit), les
+   commentaires et le partage. */
+function galerieHtml(medias) {
+  const l = (medias || []).filter(u => typeof u === 'string' && u);
+  if (!l.length) return '';
+  return '<section class="crg' + (l.length >= 5 ? ' feat' : '') + '" id="cr-galerie" aria-label="Photos de l\'événement"><h2 class="crg-t">📸 Photos de l\'événement <small>' + l.length + '</small></h2><div class="crg-grid">'
+    + l.map((u, i) => '<button type="button" class="crg-it" data-gi="' + i + '" aria-label="Agrandir la photo ' + (i + 1) + ' sur ' + l.length + '"><img src="' + esc(u) + '" alt="" loading="lazy"></button>').join('')
+    + '</div><p class="crp-note crg-aide">Touchez une photo pour l\'agrandir, réagir et passer aux suivantes.</p></section>';
+}
+function initGalerie() { $$('[data-gi]').forEach(b => b.addEventListener('click', () => galOuvrir(Number(b.dataset.gi)))); }
+/* La visionneuse elle-même est dans assets/media-galerie.js (partagée avec les cartouches de l'accueil) ; ici seulement la liaison avec
+   les réactions/commentaires/partage de CE compte-rendu. */
+function galOuvrir(i) {
+  const urls = ((ST.data && ST.data.compte_rendu && ST.data.compte_rendu.medias) || []).filter(u => typeof u === 'string' && u);
+  if (!urls.length || !window.MediaGalerie) return;
+  window.MediaGalerie.open({
+    items: urls.map(url => ({ url, kind: 'photo' })), index: i, titre: ST.data.compte_rendu.titre || ST.data.evenement.titre || '',
+    adapter: {
+      lire: async () => { const s = await lireSocial(); return { types: s.types, reacts: s.reacts, mine: s.mine, nbCom: (s.coms || []).length }; },
+      reagir: reagirCr,
+      commentaires: () => { const s = $('#crp-social'); if (s) { s.scrollIntoView({ behavior: 'smooth', block: 'center' }); const inp = $('#crp-cin'); if (inp) inp.focus({ preventScroll: true }); } },
+      partager: partagerCr,
+      apres: chargerSocial,
+      connecte: () => !!ST.user,
+    },
+  });
+}
+
+/* Lecture des réactions/commentaires du compte-rendu (page ET galerie photos : une seule source). */
+async function lireSocial() {
   const cr = ST.data.compte_rendu, postId = cr.statut === 'publie' ? cr.fil_post_id : null;
-  const connecte = !!ST.user;
   let reacts = {}, mine = {}, coms = [];
   try {
     if (postId) {
@@ -1017,13 +1063,23 @@ async function chargerSocial() {
     }
   } catch (_) {}
   const types = postId ? FIL_REACTIONS.map(r => [r.type, r.emoji]) : Object.keys(reacts).map(e => [e, e]);
+  return { postId, reacts, mine, coms, types };
+}
+/* Envoie une réaction ; renvoie true si elle a été enregistrée (sinon redirige vers la connexion ou affiche l'erreur). */
+async function reagirCr(type) {
+  if (!ST.user) { location.href = 'login.html'; return false; }
+  const cr = ST.data.compte_rendu, postId = cr.statut === 'publie' ? cr.fil_post_id : null;
+  try { postId ? await api('POST', `/fil/${postId}/react`, { type }) : await api('POST', `/evenements/${ST.evtId}/reactions`, { emoji: type }); return true; }
+  catch (e) { toast(e.message || 'Erreur'); return false; }
+}
+async function chargerSocial() {
+  const box = $('#crp-social'); if (!box) return;
+  const connecte = !!ST.user;
+  const { postId, reacts, mine, coms, types } = await lireSocial();
   box.innerHTML = '<div class="crp-react">' + types.map(([k, em]) => '<button type="button" class="crp-r ' + (mine[k] ? 'on' : '') + '" data-rk="' + esc(k) + '">' + em + ' ' + (reacts[k] || 0) + '</button>').join('') + (postId ? '<button type="button" class="crp-r" data-repost title="Republier sur votre profil">🔁 Republier</button>' : '') + '<button type="button" class="crp-r" data-share title="Partager ce compte-rendu">📤 Partager</button><span class="crp-note" style="margin-left:auto">' + coms.length + ' commentaire' + (coms.length > 1 ? 's' : '') + '</span></div>'
     + coms.map(c => '<div class="crp-cm"><div class="av">' + esc(String(c.auteur_nom || '?').trim().split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase()) + '</div><div class="bub"><b>' + esc(c.auteur_nom || '') + '</b> ' + mentionHtml(c.contenu) + '</div></div>').join('')
     + (connecte ? '<div class="crp-cin"><input id="crp-cin" placeholder="Écrire un commentaire…"><button type="button" class="cr-btn sec" id="crp-cpost">Commenter</button></div>' : '<p class="crp-note" style="margin-top:12px"><a href="login.html" class="cr-link">Connectez-vous</a> pour réagir et commenter.</p>');
-  $$('[data-rk]', box).forEach(b => b.addEventListener('click', async () => {
-    if (!connecte) { location.href = 'login.html'; return; }
-    try { postId ? await api('POST', `/fil/${postId}/react`, { type: b.dataset.rk }) : await api('POST', `/evenements/${ST.evtId}/reactions`, { emoji: b.dataset.rk }); chargerSocial(); } catch (e) { toast(e.message || 'Erreur'); }
-  }));
+  $$('[data-rk]', box).forEach(b => b.addEventListener('click', async () => { if (await reagirCr(b.dataset.rk)) chargerSocial(); }));
   $$('[data-repost]', box).forEach(b => b.addEventListener('click', republierCr));
   $$('[data-share]', box).forEach(b => b.addEventListener('click', partagerCr));
   const post = $('#crp-cpost', box);

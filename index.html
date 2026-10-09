@@ -1706,6 +1706,7 @@
 <script src="assets/data.js?v=5"></script>
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js?v=13"></script>
+<script src="assets/media-galerie.js?v=1"></script>
 <script src="assets/chatbot.js?v=2"></script>
 <script src="assets/packages.js"></script>
 <script src="assets/annonce-officielle.js?v=1"></script>
@@ -2510,14 +2511,19 @@ document.getElementById('hp-vit-q')?.addEventListener('keydown', e => {
       let corps = hpPlain(p.corps != null ? p.corps : p.contenu).replace(/\*\*/g, '');
       if (!corps && cr) corps = hpPlain(cr.resume);
       if (titreTxt && corps.indexOf(titreTxt) === 0) corps = corps.slice(titreTxt.length).trim();
-      const ouvrir = `hpOuvrirPost(${p.id})`;
+      /* Médias (2026-10-09, demande explicite) : miniatures de TOUTES les photos et vidéos au bas de la cartouche, et cartouche cliquable —
+         un clic ouvre la galerie (réactions, défilement sur les autres médias) sans quitter la page ; « Voir davantage » garde l'ouverture de la publication. */
+      (window.HP_POSTS = window.HP_POSTS || {})[p.id] = p;
+      const itemsMedias = window.MediaGalerie ? window.MediaGalerie.itemsDePost(p) : [];
+      const ouvrir = itemsMedias.length ? `hpOuvrirMedias(${p.id},0)` : `hpOuvrirPost(${p.id})`;
+      const bandeauMedias = (itemsMedias.length > 1 || (itemsMedias[0] && itemsMedias[0].kind === 'video')) ? window.MediaGalerie.bandeau(itemsMedias) : '';
       const bandeau = estCr
         ? '<div class="fc-band"><span aria-hidden="true">📄</span><b>COMPTE-RENDU</b><small>d’événement</small></div>'
         : '<div class="fc-band"><span aria-hidden="true">📰</span><b>ACTUALITÉ</b><small>de la communauté</small></div>';
       const crBtn = (estCr && cr && cr.evenement_id)
         ? `<a class="hp-feed-more hp-feed-cr-btn" href="compte-rendu.html?evt=${Number(cr.evenement_id)}">📝 Lire le compte-rendu</a>` : '';
       return `
-      <div class="hp-feed-post fc-carte ${estCr ? 'fc-cr' : 'fc-actu'}" data-post-id="${p.id}">
+      <div class="hp-feed-post fc-carte ${estCr ? 'fc-cr' : 'fc-actu'}" data-post-id="${p.id}" style="cursor:pointer">
         ${bandeau}
         <div class="fc-corps">
         <div class="hp-feed-post-header">
@@ -2531,9 +2537,10 @@ document.getElementById('hp-vit-q')?.addEventListener('keydown', e => {
         ${imgUrl ? `<img class="hp-feed-img" loading="lazy" src="${hpAttr(imgUrl)}" alt="${hpAttr(titreTxt || 'Publication')}" onclick="${ouvrir}">` : ''}
         ${corps ? `<p class="hp-feed-content">${hpEsc(corps)}</p>` : ''}
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <button type="button" class="hp-feed-more" onclick="${ouvrir}">Voir davantage <span aria-hidden="true">→</span></button>
+          <button type="button" class="hp-feed-more" onclick="hpOuvrirPost(${p.id})">Voir davantage <span aria-hidden="true">→</span></button>
           ${crBtn}
         </div>
+        ${bandeauMedias}
         ${actionsHtml}
         </div>
       </div>`;
@@ -2624,6 +2631,45 @@ async function hpOuvrirPost(postId) {
   } catch (e) { window.location.href = `fil-actualite.html#fp-${postId}`; }
 }
 window.hpOuvrirPost = hpOuvrirPost;
+
+/* Galerie photos/vidéos d'une cartouche (assets/media-galerie.js) : réactions du post, défilement sur les autres médias, sans nouvelle page. */
+function hpOuvrirMedias(postId, i) {
+  const p = (window.HP_POSTS || {})[postId];
+  const items = (p && window.MediaGalerie) ? window.MediaGalerie.itemsDePost(p) : [];
+  if (!items.length) { hpOuvrirPost(postId); return; }
+  const types = [['like', '❤️'], ['applause', '👏'], ['feliciter', '🎉'], ['inspirant', '🔥']];
+  let derniers = {};
+  window.MediaGalerie.open({
+    items, index: i || 0, titre: hpPlain((p.titre || (p.compte_rendu && p.compte_rendu.titre) || '')),
+    adapter: {
+      lire: async () => {
+        const [r, c] = await Promise.all([api('GET', '/fil/' + postId), api('GET', '/fil/' + postId + '/commentaires').catch(() => ({}))]);
+        const post = r.post || {}, mine = {}; if (post.user_a_aime) mine.like = true;
+        derniers = post.reactions || {};
+        return { types, reacts: derniers, mine, nbCom: (c.commentaires || c.comments || []).length || post.nb_commentaires || 0 };
+      },
+      reagir: async t => {
+        if (!window.CURRENT_USER) { window.location.href = 'login.html'; return false; }
+        try { await api('POST', '/fil/' + postId + '/react', { type: t }); return true; } catch (e) { alert(e.message || 'Erreur.'); return false; }
+      },
+      commentaires: () => hpOuvrirPost(postId),
+      partager: () => { if (typeof openShareUrlModal === 'function') openShareUrlModal(location.origin + '/fil-actualite.html#fp-' + postId, p.auteur_nom || ''); },
+      apres: async () => {
+        try { const r = await api('GET', '/fil/' + postId); const n = ((r.post && r.post.reactions) || {}).like || 0; const b = document.querySelector('.fc-carte[data-post-id="' + postId + '"] .hp-feed-action-btn:not(.locked)'); if (b && /J.aime/.test(b.textContent)) { b.classList.add('active'); b.innerHTML = '❤️ J’aime' + (n ? ' (' + n + ')' : ''); } } catch (e) {}
+      },
+      connecte: () => !!window.CURRENT_USER,
+    },
+  });
+}
+window.hpOuvrirMedias = hpOuvrirMedias;
+/* Cartouche cliquable : miniatures → galerie à ce média ; clic ailleurs sur la carte (hors liens/boutons) → galerie au 1er média. */
+document.addEventListener('click', e => {
+  const carte = e.target.closest('.hp-feed-post.fc-carte'); if (!carte) return;
+  const m = e.target.closest('.mgb-t, .mgb-lib');
+  if (m) { hpOuvrirMedias(Number(carte.dataset.postId), Number(m.dataset.mgi || 0)); return; }
+  if (e.target.closest('a, button, input, textarea, select, .hp-feed-actions, .mgb')) return;
+  hpOuvrirMedias(Number(carte.dataset.postId), 0);
+});
 
 async function hpReagir(postId, btn) {
   if (!window.CURRENT_USER) { window.location.href = 'login.html'; return; }

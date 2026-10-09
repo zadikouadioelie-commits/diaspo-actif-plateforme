@@ -20979,6 +20979,8 @@ async function carteCompteRenduPost(evenementId) {
   return {
     evenement_id: Number(evt.id), titre: cr.titre || evt.titre, evenement_titre: evt.titre, date_evt: evt.date_evt, date_fin: evt.date_fin || null,
     ville: evt.ville || null, image: crImageEvenement(evt), resume: crBrut(cr.resume), video_url: cr.video_url || null,
+    /* Photos du compte-rendu (2026-10-09) : montrées en miniatures au bas de la cartouche et dans la visionneuse (assets/media-galerie.js). */
+    medias: crJson(cr.medias_json, []).filter(u => typeof u === 'string' && u).slice(0, 20),
     etape_texte: cr.etape_texte || '', etape_date: cr.etape_date || '', etape_bouton: cr.etape_bouton || '', etape_lien: cr.etape_lien || '',
     identifies, organisateur: await nomCompteAffichage(evt.owner_user_id),
   };
