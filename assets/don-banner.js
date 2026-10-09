@@ -26,7 +26,7 @@ window.DonBanner = (function () {
 
   function boutonHtml(data, ownerUserId) {
     if (data.mode === 'toutes') {
-      return `<a href="cagnottes.html?owner=${encodeURIComponent(ownerUserId)}" class="don-banner-btn">💚 Faire un don</a>`;
+      return `<a href="cagnottes.html?owner=${encodeURIComponent(ownerUserId)}" class="don-banner-btn"><span class="don-banner-ico">💚</span><span class="don-banner-lbl">Faire un don</span></a>`;
     }
     /* Deux formes selon la route : GET /api/cagnottes/vedette renvoie { mode, don:{…} }, GET /api/cagnottes/vedette-lot (annuaire) renvoie le don
        à plat { mode, slug, titre… } — avant ce repli, le lot levait « reading 'slug' » : aucun bouton « Faire un don » dans l'annuaire, et les
@@ -34,8 +34,10 @@ window.DonBanner = (function () {
     const don = data.don || data;
     if (!don || !don.slug) return '';
     const href = `cagnotte.html?slug=${encodeURIComponent(don.slug)}`;
-    const label = `💚 Faire un don${don.titre ? ' — ' + String(don.titre).slice(0, 40) : ''}`;
-    return `<a href="${href}" class="don-banner-btn">${label}</a>`;
+    const texte = `Faire un don${don.titre ? ' — ' + String(don.titre).slice(0, 80) : ''}`;
+    const attr = texte.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    const lbl = texte.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+    return `<a href="${href}" class="don-banner-btn" title="${attr}"><span class="don-banner-ico">💚</span><span class="don-banner-lbl">${lbl}</span></a>`;
   }
 
   let stylesInjectes = false;
@@ -44,9 +46,14 @@ window.DonBanner = (function () {
     stylesInjectes = true;
     const style = document.createElement('style');
     style.textContent = `
-      .don-banner-btn { display:inline-flex; align-items:center; gap:6px; background:#F97316; color:#fff; font-size:13px; font-weight:700; padding:10px 18px; border-radius:999px; text-decoration:none; white-space:nowrap; box-shadow:0 2px 10px rgba(249,115,22,.35); }
+      /* max-width + retour à la ligne (2026-10-09) : un titre de don long (« Contribuer au déploiement… »)
+         débordait de la carte de profil, le bouton étant en nowrap sans plafond de largeur. Le libellé passe
+         à la ligne (2 lignes max, ellipse ensuite) et le bouton ne dépasse jamais son conteneur. */
+      .don-banner-btn { display:inline-flex; align-items:center; gap:8px; box-sizing:border-box; max-width:100%; min-width:0; background:#F97316; color:#fff; font-size:13px; font-weight:700; line-height:1.3; padding:10px 18px; border-radius:22px; text-decoration:none; text-align:left; box-shadow:0 2px 10px rgba(249,115,22,.35); }
       .don-banner-btn:hover { background:#EA580C; }
-      #don-banner-floating { position:fixed; bottom:90px; right:20px; z-index:850; }
+      .don-banner-ico { flex:none; }
+      .don-banner-lbl { min-width:0; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow-wrap:anywhere; }
+      #don-banner-floating { position:fixed; bottom:90px; right:20px; z-index:850; max-width:calc(100vw - 40px); display:flex; justify-content:flex-end; }
     `;
     document.head.appendChild(style);
   }
