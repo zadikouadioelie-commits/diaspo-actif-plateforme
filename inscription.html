@@ -43,6 +43,31 @@
   .insc-side-col{display:none;}
 }
 .insc-wrap{max-width:720px;margin:32px auto;padding:0 16px 64px}
+/* Cartouche du film « Comment ça marche » (2026-10-09, demande explicite : « présente la vidéo dans sa cartouche ») — affiche du film, durée,
+   deux versions. Le lecteur lui-même reste InscriptionFilm (assets/inscription-film.js). */
+.film-cartouche{display:flex;align-items:stretch;gap:0;max-width:640px;margin:18px auto 0;background:#fff;border:1px solid var(--border,#DCE4EF);border-radius:16px;overflow:hidden;box-shadow:0 6px 22px rgba(13,43,78,.10);text-align:left}
+.film-affiche{position:relative;flex:0 0 46%;min-height:170px;border:0;padding:0;margin:0;cursor:pointer;background:#0D2B4E;display:block;overflow:hidden}
+.film-affiche img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;transition:transform .35s ease}
+.film-affiche::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(13,43,78,.05),rgba(13,43,78,.45))}
+.film-cartouche:hover .film-affiche img{transform:scale(1.04)}
+.film-play{position:absolute;z-index:1;left:50%;top:50%;transform:translate(-50%,-50%);width:58px;height:58px;border-radius:50%;background:linear-gradient(135deg,#F26422,#ff8a4c);color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;padding-left:4px;box-shadow:0 8px 24px rgba(242,100,34,.55);transition:transform .2s ease}
+.film-affiche:hover .film-play,.film-affiche:focus-visible .film-play{transform:translate(-50%,-50%) scale(1.1)}
+.film-affiche:focus-visible{outline:3px solid #F26422;outline-offset:-3px}
+.film-duree{position:absolute;z-index:1;right:10px;bottom:10px;background:rgba(13,27,42,.82);color:#fff;font-size:12px;font-weight:700;padding:3px 9px;border-radius:999px;letter-spacing:.2px}
+.film-corps{flex:1;min-width:0;padding:18px 20px;display:flex;flex-direction:column;justify-content:center;gap:6px}
+.film-etiquette{font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#F26422}
+.film-titre{font-size:18px;font-weight:800;color:#0D1B2A;line-height:1.25}
+.film-sous{font-size:13px;color:var(--muted,#5B6B82);line-height:1.5;margin:0 0 6px}
+.film-actions{display:flex;flex-wrap:wrap;gap:8px}
+.film-btn{display:inline-flex;align-items:center;gap:7px;border:none;border-radius:999px;padding:9px 16px;font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;white-space:nowrap}
+.film-btn-principal{background:linear-gradient(135deg,#F26422,#ff8a4c);color:#fff;box-shadow:0 5px 14px rgba(242,100,34,.32)}
+.film-btn-secondaire{background:#fff;color:#0D2B4E;border:1.5px solid var(--border,#DCE4EF)}
+.film-btn:hover{filter:brightness(1.05)}
+@media(max-width:560px){
+  .film-cartouche{flex-direction:column}
+  .film-affiche{flex:none;min-height:0;aspect-ratio:16/10}
+  .film-corps{padding:14px 16px 16px}
+}
 .insc-stepper{display:flex;align-items:center;margin-bottom:32px}
 .insc-step-dot{display:flex;flex-direction:column;align-items:center;gap:4px;flex:1}
 .insc-step-dot .dot{width:32px;height:32px;border-radius:50%;background:var(--border);color:var(--muted);font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center}
@@ -146,8 +171,22 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
   <div style="text-align:center;margin-bottom:28px">
     <h2 style="margin:0 0 6px">Creer un compte Diaspo'Actif</h2>
     <p style="color:var(--muted);margin:0;font-size:14px">Choisissez le type de compte adapte a votre profil</p>
-    <button type="button" id="btn-film-inscription" onclick="InscriptionFilm.ouvrir()" style="margin-top:14px;display:inline-flex;align-items:center;gap:8px;border:none;border-radius:999px;padding:10px 20px;background:linear-gradient(135deg,#F26422,#ff8a4c);color:#fff;font-weight:800;font-size:14px;cursor:pointer;box-shadow:0 6px 18px rgba(242,100,34,.35)">▶ Voir comment ça marche <span style="opacity:.85;font-weight:600">(1 min 27)</span></button>
-    <div style="margin-top:8px"><a href="#" onclick="InscriptionFilm.ouvrir({version:'court'});return false" style="font-size:13px;color:var(--muted);text-decoration:underline">Version courte (55 s)</a></div>
+    <div class="film-cartouche" id="film-cartouche">
+      <button type="button" class="film-affiche" onclick="InscriptionFilm.ouvrir()" aria-label="Lancer le film « Comment ça marche », version complète, 1 minute 27">
+        <img src="assets/media/film-inscription-poster.jpg" alt="" width="640" height="400" loading="lazy">
+        <span class="film-play" aria-hidden="true">▶</span>
+        <span class="film-duree">1 min 27</span>
+      </button>
+      <div class="film-corps">
+        <div class="film-etiquette">Film · avec le son</div>
+        <div class="film-titre">Comment ça marche</div>
+        <p class="film-sous">Créer son compte et découvrir la plateforme, en images et en voix.</p>
+        <div class="film-actions">
+          <button type="button" id="btn-film-inscription" class="film-btn film-btn-principal" onclick="InscriptionFilm.ouvrir()">▶ Version complète <span style="opacity:.85;font-weight:600">1 min 27</span></button>
+          <button type="button" class="film-btn film-btn-secondaire" onclick="InscriptionFilm.ouvrir({version:'court'})">Version courte <span style="opacity:.7;font-weight:600">55 s</span></button>
+        </div>
+      </div>
+    </div>
   </div>
   <div class="insc-stepper">
     <div class="insc-step-dot"><div class="dot active" id="dot-1">1</div><span>Type de compte</span></div>
