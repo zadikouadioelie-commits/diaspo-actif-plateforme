@@ -773,7 +773,7 @@
      ============================================================ */
   const ANN_TYPES = [['', 'Tous'], ['Initiative', 'Initiatives'], ['Utilisateurs', 'Membres'], ['Collectivité', 'Collectivités']];
   /* Mêmes types que le filtre « Type d'organisme » de l'annuaire du site. */
-  const ANN_TYPE_OPTS = [['', 'Tous les types'], ['Utilisateurs', 'Membres'], ['Initiative', 'Initiatives (tous types)'], ['Association', 'Association'], ['Entreprise', 'Entreprise'], ['Institution', 'Institution'], ['Collectivité', 'Collectivité'], ['ONG', 'ONG'], ['Coopérative', 'Coopérative'], ['Média', 'Média'], ['Fondation', 'Fondation'], ['Particulier', 'Particulier'], ['Autre', 'Autre']];
+  const ANN_TYPE_OPTS = [['', 'Tous les types'], ['Utilisateurs', 'Membres'], ['Initiative', 'Initiatives (tous types)'], ['Association', 'Association'], ['Entreprise', 'Entreprise'], ['Institution', 'Institution'], ['Collectivité', 'Collectivité'], ['ONG', 'ONG'], ['Coopérative', 'Coopérative'], ['Média', 'Média'], ['Fondation', 'Fondation'], ['Startup', 'Startup'], ['Projet collectif', 'Projet collectif'], ['Mutuelle', 'Mutuelle'], ['Organisme de formation', 'Organisme de formation'], ['Établissement public', 'Établissement public'], ['Collectivité territoriale', 'Collectivité territoriale'], ['Organisation professionnelle', 'Organisation professionnelle'], ['Groupement d’entrepreneurs', 'Groupement d’entrepreneurs'], ['Particulier', 'Particulier'], ['Autre', 'Autre']];
   const normTxt = s => String(s == null ? '' : s).toLowerCase().trim().normalize('NFD').replace(/[̀-ͯ]/g, '');
   const annAll = r => [
     ...(r.initiatives || []).map(x => ({ k: 'i', rang: x._rang || 0, x })),
@@ -789,9 +789,15 @@
     if (A.ville && !normTxt(x.ville).includes(normTxt(A.ville))) return false;
     if (A.domaine && x.domaine_principal !== A.domaine) return false;
     if (A.origine && !annOrigines(x).some(v => normTxt(v).includes(normTxt(A.origine)))) return false;
+    /* Fiches de structure (2026-10-09) : forme juridique, taille, organisme financier — propres aux initiatives. */
+    const SI = window.STRUCTURES_INITIATIVE;
+    if (A.forme && !(SI && SI.formeCorrespond(x.forme_juridique, A.forme))) return false;
+    if (A.taille && x.taille_entreprise !== A.taille) return false;
+    if (A.famille && x.finance_famille !== A.famille) return false;
+    if (A.typeFin && x.finance_type !== A.typeFin) return false;
     return true;
   }
-  const annNbFiltres = () => ['pays', 'ville', 'domaine', 'origine'].filter(k => S.ann[k]).length + (S.ann.type && !ANN_TYPES.some(t => t[0] === S.ann.type) ? 1 : 0);
+  const annNbFiltres = () => ['pays', 'ville', 'domaine', 'origine', 'forme', 'taille', 'famille', 'typeFin'].filter(k => S.ann[k]).length + (S.ann.type && !ANN_TYPES.some(t => t[0] === S.ann.type) ? 1 : 0);
   function annPills() {
     const A = S.ann, p = [];
     if (A.type && !ANN_TYPES.some(t => t[0] === A.type)) p.push(['type', 'Type : ' + ((ANN_TYPE_OPTS.find(o => o[0] === A.type) || [])[1] || A.type)]);
@@ -799,6 +805,10 @@
     if (A.ville) p.push(['ville', 'Ville : ' + A.ville]);
     if (A.domaine) p.push(['domaine', domLabel(A.domaine)]);
     if (A.origine) p.push(['origine', 'Origine : ' + A.origine]);
+    if (A.forme) p.push(['forme', 'Forme : ' + A.forme]);
+    if (A.taille) p.push(['taille', 'Taille : ' + A.taille]);
+    if (A.famille) p.push(['famille', A.famille]);
+    if (A.typeFin) p.push(['typeFin', A.typeFin]);
     return p.map(([k, l]) => `<button class="chip on" data-clear="${k}" aria-label="Retirer le filtre ${esc(l)}">${esc(l)} ✕</button>`).join('');
   }
   function viewAnnuaire() {
@@ -840,19 +850,30 @@
     const close = openSheet('<div class="sk" style="height:120px"></div>'); const sh = $('#sheet');
     let o; try { o = await annOptions(); } catch (e) { close(); toast(e.message, true); return; }
     const A = S.ann, sel = (id, lab, opts, val) => `<label class="fl" for="${id}">${lab}</label><select class="fi" id="${id}">${opts.map(([v, t]) => `<option value="${esc(v)}" ${(v === '' ? !val : normTxt(v) === normTxt(val)) ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>`;
+    const SI = window.STRUCTURES_INITIATIVE || { FORMES: [], TAILLES: [], FIN: {}, estEntreprise: () => false, estDomaineFinance: () => false };
     sh.querySelector('.sb').innerHTML = `<h2 style="margin:2px 0 4px;font-size:19px">Filtres de l’annuaire</h2>
       <form id="ann-ff" novalidate>
         ${sel('ff-type', 'Type d’initiative / d’organisme', ANN_TYPE_OPTS, A.type)}
         ${sel('ff-pays', 'Pays de résidence', [['', 'Tous les pays'], ...o.pays.map(p => [p, p])], A.pays)}
         <label class="fl" for="ff-ville">Ville</label><input class="fi" id="ff-ville" list="ff-villes" placeholder="Ex : Paris, Abidjan…" value="${esc(A.ville)}" autocomplete="off"><datalist id="ff-villes">${o.villes.slice(0, 400).map(v => `<option value="${esc(v)}">`).join('')}</datalist>
         ${sel('ff-dom', 'Domaine d’activité', [['', 'Tous les domaines'], ...o.domaines], A.domaine)}
+        <div id="ff-grp-ent" style="display:none">${sel('ff-forme', 'Forme juridique', [['', 'Toutes les formes'], ...SI.FORMES.map(f => [f[0], f[0]])], A.forme)}${sel('ff-taille', 'Taille de l’entreprise', [['', 'Toutes les tailles'], ...SI.TAILLES.map(t => [t[0], t[0]])], A.taille)}</div>
+        <div id="ff-grp-fin" style="display:none">${sel('ff-fam', 'Famille d’organisme financier', [['', 'Toutes les familles'], ...Object.keys(SI.FIN).map(f => [f, f])], A.famille)}${sel('ff-tfin', 'Type d’organisme financier', [['', 'Tous les types'], ...((A.famille && SI.FIN[A.famille]) || []).map(t => [t, t])], A.typeFin)}</div>
         ${sel('ff-orig', 'Pays d’origine', [['', 'Tous les pays d’origine'], ...o.origines.map(p => [p, p])], A.origine)}
         <div class="row" style="gap:10px;margin-top:16px"><button type="button" class="btn out sp" id="ff-reset">Réinitialiser</button><button type="submit" class="btn sp">Appliquer</button></div>
       </form>`;
-    $('#ff-reset').onclick = () => { ['pays', 'ville', 'domaine', 'origine'].forEach(k => { A[k] = ''; }); const had = A.type && !ANN_TYPES.some(t => t[0] === A.type); if (had) { A.type = ''; A.loaded = false; } close(); viewAnnuaire(); };
+    /* Les champs spécialisés n'apparaissent que lorsqu'ils ont un sens (type Entreprise/Startup ; domaine financier). */
+    const majGroupes = () => { $('#ff-grp-ent').style.display = SI.estEntreprise($('#ff-type').value) ? '' : 'none'; $('#ff-grp-fin').style.display = SI.estDomaineFinance($('#ff-dom').value) ? '' : 'none'; };
+    $('#ff-type').onchange = majGroupes; $('#ff-dom').onchange = majGroupes;
+    $('#ff-fam').onchange = () => { $('#ff-tfin').innerHTML = '<option value="">Tous les types</option>' + (SI.FIN[$('#ff-fam').value] || []).map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join(''); };
+    majGroupes();
+    $('#ff-reset').onclick = () => { ['pays', 'ville', 'domaine', 'origine', 'forme', 'taille', 'famille', 'typeFin'].forEach(k => { A[k] = ''; }); const had = A.type && !ANN_TYPES.some(t => t[0] === A.type); if (had) { A.type = ''; A.loaded = false; } close(); viewAnnuaire(); };
     $('#ann-ff').onsubmit = ev => {
       ev.preventDefault(); const nt = $('#ff-type').value; if (nt !== A.type) { A.type = nt; A.loaded = false; }
       A.pays = $('#ff-pays').value; A.ville = $('#ff-ville').value.trim(); A.domaine = $('#ff-dom').value; A.origine = $('#ff-orig').value;
+      const ent = SI.estEntreprise(nt), fin = SI.estDomaineFinance(A.domaine);
+      A.forme = ent ? $('#ff-forme').value : ''; A.taille = ent ? $('#ff-taille').value : '';
+      A.famille = fin ? $('#ff-fam').value : ''; A.typeFin = fin && A.famille ? $('#ff-tfin').value : '';
       close(); viewAnnuaire();
     };
   }

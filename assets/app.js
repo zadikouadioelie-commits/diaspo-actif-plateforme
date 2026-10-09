@@ -2917,7 +2917,7 @@ async function initAnnuaire(){
   }
 
   /* État des filtres */
-  const state = { typeOrg: "", domaineActivite: "", paysRes: "", paysOrig: "", ville: "", nom: "", prenom: "", motCle: "" };
+  const state = { typeOrg: "", domaineActivite: "", paysRes: "", paysOrig: "", ville: "", nom: "", prenom: "", motCle: "", forme: "", taille: "", familleFin: "", typeFin: "" };
   let USERS_CACHE = null;
 
   /* Normalisation */
@@ -2984,6 +2984,10 @@ async function initAnnuaire(){
       ville:    "Ville",
       nom:      "Nom",
       prenom:   "Prénom",
+      forme:    "Forme juridique",
+      taille:   "Taille",
+      familleFin: "Famille financière",
+      typeFin:  "Organisme financier",
     };
     // Le domaine est stocké sous sa clé technique (ex. "medecine_sante") — affiche le libellé
     // lisible sur la chip plutôt que la clé brute, quand la taxonomie est chargée.
@@ -3008,6 +3012,10 @@ async function initAnnuaire(){
     const params = new URLSearchParams({ q: state.motCle || "" });
     if (state.typeOrg) params.set("type", state.typeOrg);
     if (state.domaineActivite) params.set("domaine_activite", state.domaineActivite);
+    if (state.forme) params.set("forme", state.forme);
+    if (state.taille) params.set("taille", state.taille);
+    if (state.familleFin) params.set("famille_fin", state.familleFin);
+    if (state.typeFin) params.set("type_fin", state.typeFin);
     if (state.ville) params.set("ville", state.ville);
     if (state.paysRes) params.set("pays", state.paysRes);
     /* state.paysOrig n'était jamais transmis : choisir un pays d'origine ne changeait
@@ -3065,6 +3073,7 @@ async function initAnnuaire(){
 
   /* ── Appliquer les filtres ── */
   async function apply() {
+    syncAffiner(); // champs spécialisés (forme, taille, organisme financier) : seulement quand ils ont un sens
     const prenomGroup = document.getElementById("f-prenom-group");
     if (prenomGroup) prenomGroup.style.display = state.typeOrg === "Utilisateurs" ? "" : "none";
 
@@ -3139,7 +3148,7 @@ async function initAnnuaire(){
 
   /* ── Exposer reset et removeFilter globalement ── */
   window.annResetFilters = function() {
-    state.typeOrg = state.domaineActivite = state.paysRes = state.paysOrig = state.ville = state.nom = state.prenom = state.motCle = "";
+    state.typeOrg = state.domaineActivite = state.paysRes = state.paysOrig = state.ville = state.nom = state.prenom = state.motCle = state.forme = state.taille = state.familleFin = state.typeFin = "";
     const typeEl = document.getElementById("f-type-org");
     if (typeEl) typeEl.value = "";
     const domaineEl = document.getElementById("f-domaine-activite");
@@ -3209,6 +3218,50 @@ async function initAnnuaire(){
       });
     }
     domaineActiviteEl.addEventListener("change", () => { state.domaineActivite = domaineActiviteEl.value; apply(); });
+  }
+  /* ── Fiches « Forme juridique », « Taille de l'entreprise » et « Organisme financier » (2026-10-09, demande explicite) ──
+     Panneau « Affiner » : les champs n'apparaissent que lorsqu'ils ont un sens (type Entreprise/Startup → forme + taille ;
+     domaine financier → organisme financier). Listes : assets/structures-initiative.js. */
+  function remplirTypeFin() {
+    const t = document.getElementById("f-type-fin"), S = window.STRUCTURES_INITIATIVE;
+    if (!t || !S) return;
+    t.disabled = !state.familleFin;
+    t.innerHTML = '<option value="">' + (state.familleFin ? "Tous les types" : "Choisissez d'abord une famille") + "</option>"
+      + (state.familleFin && S.FIN[state.familleFin] ? S.FIN[state.familleFin].map(x => '<option value="' + x.replace(/"/g, "&quot;") + '">' + x + "</option>").join("") : "");
+  }
+  function syncAffiner() {
+    const S = window.STRUCTURES_INITIATIVE;
+    if (!S || !document.getElementById("ann-affiner")) return;
+    const ent = S.estEntreprise(state.typeOrg), fin = S.estDomaineFinance(state.domaineActivite);
+    if (!ent) { state.forme = ""; state.taille = ""; }
+    if (!fin) { state.familleFin = ""; state.typeFin = ""; }
+    if (!state.familleFin) state.typeFin = "";
+    const aff = (id, on) => { const e = document.getElementById(id); if (e) e.style.display = on ? "" : "none"; };
+    aff("ann-g-forme", ent); aff("ann-g-taille", ent); aff("ann-g-fam", fin); aff("ann-g-type-fin", fin);
+    const aide = document.getElementById("ann-affiner-aide"); if (aide) aide.style.display = (ent || fin) ? "none" : "";
+    const val = (id, v) => { const e = document.getElementById(id); if (e && e.value !== v) e.value = v; };
+    val("f-forme", state.forme); val("f-taille", state.taille); val("f-fam-fin", state.familleFin);
+    remplirTypeFin(); val("f-type-fin", state.typeFin);
+  }
+  {
+    const S = window.STRUCTURES_INITIATIVE, pan = document.getElementById("ann-affiner"), btn = document.getElementById("btn-affiner");
+    if (S && pan) {
+      const o = (liste, vide) => '<option value="">' + vide + "</option>" + liste.map(x => '<option value="' + x.replace(/"/g, "&quot;") + '">' + x + "</option>").join("");
+      pan.innerHTML =
+        '<div class="ann-filter-group" id="ann-g-forme" style="display:none;"><label>⚖️ Forme juridique</label><select id="f-forme">' + o(S.FORMES.map(f => f[0]), "Toutes les formes") + "</select></div>"
+        + '<div class="ann-filter-group" id="ann-g-taille" style="display:none;"><label>📏 Taille de l\'entreprise</label><select id="f-taille">' + o(S.TAILLES.map(t => t[0]), "Toutes les tailles") + "</select></div>"
+        + '<div class="ann-filter-group" id="ann-g-fam" style="display:none;"><label>🏦 Famille d\'organisme financier</label><select id="f-fam-fin">' + o(Object.keys(S.FIN), "Toutes les familles") + "</select></div>"
+        + '<div class="ann-filter-group" id="ann-g-type-fin" style="display:none;"><label>🏦 Type d\'organisme financier</label><select id="f-type-fin" disabled><option value="">Choisissez d\'abord une famille</option></select></div>'
+        + '<p id="ann-affiner-aide" style="margin:0;font-size:13px;color:var(--muted);flex:1;min-width:260px;">Choisissez le type « Entreprise » pour filtrer par forme juridique et par taille, ou un domaine financier (banque, finance, assurance) pour filtrer par organisme financier.</p>';
+      const lier = (id, cle) => { const el = document.getElementById(id); if (el) el.addEventListener("change", () => { state[cle] = el.value; if (cle === "familleFin") state.typeFin = ""; apply(); }); };
+      lier("f-forme", "forme"); lier("f-taille", "taille"); lier("f-fam-fin", "familleFin"); lier("f-type-fin", "typeFin");
+    }
+    if (btn && pan) btn.addEventListener("click", () => {
+      const ouvrir = pan.style.display === "none";
+      pan.style.display = ouvrir ? "flex" : "none";
+      btn.setAttribute("aria-expanded", String(ouvrir));
+      btn.textContent = ouvrir ? "Affiner ▴" : "Affiner ▾";
+    });
   }
   if (btnQuickInit) btnQuickInit.addEventListener("click", () => {
     state.typeOrg = state.typeOrg === "Initiative" ? "" : "Initiative";

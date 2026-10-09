@@ -475,7 +475,7 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
             <div id="i-immat-zone"></div>
           </div>
           <div class="grid-2" style="margin-top:12px">
-            <div><label>Forme juridique <span class="i-admin-req" style="color:#2563EB">*</span></label><input type="text" id="i-forme-juridique" placeholder="Association loi 1901, SARL, ONG…"></div>
+            <div><label>Forme juridique <span class="i-admin-req" style="color:#2563EB">*</span></label><select id="i-forme-select" style="display:none;"></select><input type="text" id="i-forme-juridique" placeholder="Association loi 1901, SARL, ONG…"></div>
             <div><label>Date de création de la structure <span class="i-admin-req" style="color:#2563EB">*</span></label><input type="date" id="i-date-creation-structure"></div>
           </div>
           <div style="margin-top:12px;max-width:280px;"><label>Numéro fiscal <span style="font-size:11px;color:#64748B;">(si applicable)</span></label><input type="text" id="i-numero-fiscal" placeholder="Facultatif"></div>
@@ -499,6 +499,11 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
           <div id="i-nb-salaries-box" style="display:none;"><label>Nombre de salaries <span style="font-size:11px;color:#64748B;">(facultatif)</span></label>
             <input type="number" min="0" id="i-nb-salaries" placeholder="Ex : 12"></div>
         </div>
+        <div id="i-entreprise-row" class="grid-2" style="margin-top:12px;display:none;">
+          <div><label>Taille de l'entreprise <span style="font-size:11px;color:#64748B;">(facultatif)</span></label>
+            <select id="i-taille-entreprise"><option value="">— Sélectionner —</option></select>
+            <div id="i-taille-aide" style="font-size:11.5px;color:#64748B;margin-top:4px;"></div></div>
+        </div>
         <div class="grid-2" style="margin-top:12px">
           <div><label>Domaine d'activite <span style="color:#2563EB">*</span></label>
             <select id="i-domaine"><option value="">— Selectionner —</option></select>
@@ -509,6 +514,12 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
             <input id="i-sous-domaine-1" placeholder="Precisez votre activite reelle"></div>
           <div><label>Sous domaine 2 <span style="font-size:11px;color:#64748B;">(facultatif)</span></label>
             <input id="i-sous-domaine-2" placeholder="Facultatif"></div>
+        </div>
+        <div id="i-fin-row" class="grid-2" style="margin-top:12px;display:none;">
+          <div><label>Famille d'organisme financier <span style="font-size:11px;color:#64748B;">(facultatif)</span></label>
+            <select id="i-fin-famille"><option value="">— Sélectionner —</option></select></div>
+          <div><label>Type d'organisme financier <span style="font-size:11px;color:#64748B;">(facultatif)</span></label>
+            <select id="i-fin-type" disabled><option value="">Choisissez d'abord une famille</option></select></div>
         </div>
         <script>
           /* Peuplé au DOMContentLoaded plutôt qu'en ligne ici : assets/domaines-activite.js est
@@ -935,6 +946,71 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
 </div>
 <script src="assets/data.js"></script>
 <script src="assets/domaines-activite.js"></script>
+<script src="assets/structures-initiative.js"></script>
+<script>
+/* Fiches de structure (2026-10-09, demande explicite) : Type de structure, Forme juridique, Taille de l'entreprise, Organisme financier.
+   Listes partagées : assets/structures-initiative.js. Les champs spécialisés n'apparaissent que lorsqu'ils ont un sens
+   (entreprise / startup → forme + taille ; domaine financier → organisme financier). */
+(function () {
+  const S = window.STRUCTURES_INITIATIVE; if (!S) return;
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const opts = (liste, vide) => '<option value="">' + vide + '</option>' + liste.map(l => '<option value="' + esc(l) + '">' + esc(l) + '</option>').join('');
+  const typeSel = $('i-type'), formeSel = $('i-forme-select'), formeTxt = $('i-forme-juridique');
+  if (!typeSel || !formeSel || !formeTxt) return;
+  const placeholderInitial = formeTxt.placeholder;
+
+  typeSel.innerHTML = opts(S.TYPES.map(t => t[0]), '— Selectionner —');
+  formeSel.innerHTML = opts(S.FORMES.map(f => f[0]).concat([S.FORME_AUTRE]), '— Sélectionner —');
+  $('i-taille-entreprise').innerHTML = opts(S.TAILLES.map(t => t[0]), '— Sélectionner —');
+  $('i-fin-famille').innerHTML = opts(Object.keys(S.FIN), '— Sélectionner —');
+
+  function majForme() {
+    const ent = S.estEntreprise(typeSel.value);
+    formeSel.style.display = ent ? '' : 'none';
+    formeTxt.style.display = (!ent || formeSel.value === S.FORME_AUTRE) ? '' : 'none';
+    formeTxt.placeholder = ent ? 'Précisez la forme juridique' : placeholderInitial;
+  }
+  function majType() {
+    const ent = S.estEntreprise(typeSel.value);
+    $('i-entreprise-row').style.display = ent ? '' : 'none';
+    if (!ent) { $('i-taille-entreprise').value = ''; $('i-taille-aide').textContent = ''; formeSel.value = ''; }
+    majForme();
+  }
+  function majFin() {
+    const on = S.estDomaineFinance($('i-domaine').value);
+    $('i-fin-row').style.display = on ? '' : 'none';
+    if (!on) { $('i-fin-famille').value = ''; majFinType(); }
+  }
+  function majFinType() {
+    const f = $('i-fin-famille').value, t = $('i-fin-type');
+    t.disabled = !f;
+    t.innerHTML = f ? opts(S.FIN[f], '— Sélectionner —') : '<option value="">Choisissez d\'abord une famille</option>';
+  }
+  typeSel.addEventListener('change', majType);
+  formeSel.addEventListener('change', majForme);
+  $('i-taille-entreprise').addEventListener('change', function () {
+    const t = S.TAILLES.find(x => x[0] === this.value); $('i-taille-aide').textContent = t ? t[1] : '';
+  });
+  $('i-fin-famille').addEventListener('change', majFinType);
+  $('i-domaine').addEventListener('change', majFin);
+  majType(); majFin();
+
+  /* Valeurs lues à l'envoi du formulaire. */
+  window.valeurFormeJuridique = function () {
+    if (formeSel.style.display !== 'none' && formeSel.value && formeSel.value !== S.FORME_AUTRE) return formeSel.value;
+    return formeTxt.value.trim();
+  };
+  window.structuresPourEnvoi = function () {
+    const ent = $('i-entreprise-row').style.display !== 'none', fin = $('i-fin-row').style.display !== 'none';
+    return {
+      taille_entreprise: (ent ? $('i-taille-entreprise').value : '') || null,
+      finance_famille: (fin ? $('i-fin-famille').value : '') || null,
+      finance_type: (fin ? $('i-fin-type').value : '') || null
+    };
+  };
+})();
+</script>
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/geo.js"></script>
 <script src="assets/app.js?v=13"></script>
@@ -1471,7 +1547,7 @@ document.getElementById("i-submit").addEventListener("click",async()=>{
     if(!document.getElementById("i-photo").files.length)throw new Error("Le logo ou la photo de profil est obligatoire : il rend votre fiche reconnaissable dans l'annuaire.");
     const statutCreation=document.querySelector('input[name="i-statut-creation"]:checked')?.value;
     const immat=document.getElementById("i-immat").value.trim();
-    const formeJuridique=document.getElementById("i-forme-juridique").value.trim();
+    const formeJuridique=window.valeurFormeJuridique?valeurFormeJuridique():document.getElementById("i-forme-juridique").value.trim();
     const dateCreationStructure=document.getElementById("i-date-creation-structure").value;
     const domaine=document.getElementById("i-domaine").value;
     /* Nationalite devenue facultative : c'est le couple origine / implantation qui porte
@@ -1503,6 +1579,7 @@ document.getElementById("i-submit").addEventListener("click",async()=>{
       origine2:orig2i||null,
       rayonnement,pays_intervention,
       domaine_principal:document.getElementById("i-domaine").value||null,
+      ...(window.structuresPourEnvoi?structuresPourEnvoi():{}),
       sous_domaine_1:document.getElementById("i-sous-domaine-1").value.trim()||null,
       sous_domaine_2:document.getElementById("i-sous-domaine-2").value.trim()||null,
       description:desc,objectifs:document.getElementById("i-objectifs").value.trim()||null,
@@ -1557,8 +1634,8 @@ document.querySelectorAll('input[name="i-statut-creation"]').forEach(r=>{
   });
 });
 /* ===== Type d'organisation → taille (nombre de membres ou de salaries) ===== */
-const TYPES_ASSOCIATION = ['Association','ONG','Cooperative','Fondation','Projet collectif','Autre'];
-const TYPES_ENTREPRISE = ['Entreprise','Startup'];
+const TYPES_ASSOCIATION = ['Association','ONG','Cooperative','Coopérative','Fondation','Mutuelle','Organisation professionnelle',"Groupement d'entrepreneurs",'Projet collectif','Autre'];
+const TYPES_ENTREPRISE = ['Entreprise','Startup','Organisme de formation','Établissement public','Collectivité territoriale'];
 document.getElementById("i-type").addEventListener("change", function(){
   const v = this.value;
   const row = document.getElementById("i-taille-row");

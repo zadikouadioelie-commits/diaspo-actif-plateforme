@@ -90,6 +90,7 @@
 
 <script src="assets/data.js"></script>
 <script src="assets/domaines-activite.js"></script>
+<script src="assets/structures-initiative.js"></script>
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js?v=13"></script>
 <script src="/assets/cookies-banner.js"></script>
@@ -135,6 +136,12 @@
     } catch (e) { /* fiche pas encore accessible — carte simplement masquée plus bas */ }
   }
 
+  /* Fiches de structure (2026-10-09) : valeurs actuelles de l'initiative, pour les préremplir sans rien écraser. */
+  let structInit = null;
+  if (profil.role === 'initiative' && profil.initiative_id) {
+    try { structInit = (await api('GET', `/initiatives/${profil.initiative_id}`)).initiative || null; } catch (e) { /* carte simplement masquée */ }
+  }
+
   wrap.innerHTML = `
     <div class="pc-card">
       <h2>👤 Identité</h2>
@@ -170,6 +177,27 @@
       <button type="button" class="pc-btn pc-btn-save" id="pc-btn-domaine">Enregistrer</button>
       <p class="pc-msg" id="pc-msg-domaine"></p>
     </div>
+
+    ${structInit ? `
+    <div class="pc-card" id="pc-card-structure">
+      <h2>🏛 Structure et organisation</h2>
+      <p class="pc-desc">Type de structure, forme juridique, taille de l'entreprise et, pour la finance, organisme financier. Ces informations servent aux filtres de l'annuaire. Ce que vous avez déjà saisi est conservé.</p>
+      <div class="pc-field"><label>Type de structure</label><select id="pc-type-struct"></select></div>
+      <div class="pc-field"><label>Forme juridique</label>
+        <select id="pc-forme-select" style="display:none;"></select>
+        <input id="pc-forme-juridique" type="text" placeholder="Association loi 1901, ONG…" value="${esc(structInit.forme_juridique||'')}">
+      </div>
+      <div class="pc-field" id="pc-taille-wrap" style="display:none;"><label>Taille de l'entreprise <span style="text-transform:none;font-weight:400;">(facultatif)</span></label>
+        <select id="pc-taille"></select><p class="pc-hint" id="pc-taille-aide" style="margin:4px 0 0;"></p>
+      </div>
+      <div id="pc-fin-wrap" style="display:none;">
+        <div class="pc-field"><label>Famille d'organisme financier <span style="text-transform:none;font-weight:400;">(facultatif)</span></label><select id="pc-fin-famille"></select></div>
+        <div class="pc-field"><label>Type d'organisme financier <span style="text-transform:none;font-weight:400;">(facultatif)</span></label><select id="pc-fin-type"></select></div>
+      </div>
+      <button type="button" class="pc-btn pc-btn-save" id="pc-btn-structure">Enregistrer</button>
+      <p class="pc-msg" id="pc-msg-structure"></p>
+    </div>
+    ` : ''}
 
     ${profil.role === 'initiative' && profil.initiative_id ? `
     <div class="pc-card">
@@ -262,6 +290,56 @@
     } catch(e) { showMsg('pc-msg-identite', e.message || 'Erreur.', false); }
     finally { btn.disabled = false; }
   });
+
+  /* Fiches de structure (2026-10-09, demande explicite) — ce qui est déjà saisi est préservé : un type ou une forme juridique
+     hors liste (ancienne saisie libre) reste proposé tel quel et n'est jamais remplacé tant que la personne ne le change pas. */
+  if (structInit && window.STRUCTURES_INITIATIVE) {
+    const S = window.STRUCTURES_INITIATIVE, $ = id => document.getElementById(id);
+    const opts = (liste, vide, sel) => '<option value="">' + vide + '</option>' + liste.map(l => '<option value="' + esc(l) + '"' + (l === sel ? ' selected' : '') + '>' + esc(l) + '</option>').join('');
+
+    const types = S.TYPES.map(t => t[0]);
+    const typeEnreg = structInit.type || '';
+    const typeConnu = types.find(t => S.typeIdentique(t, typeEnreg));
+    $('pc-type-struct').innerHTML = opts(typeConnu || !typeEnreg ? types : types.concat([typeEnreg]), '— Sélectionner —', typeConnu || typeEnreg);
+
+    const formesLibelles = S.FORMES.map(f => f[0]);
+    const formeEnreg = structInit.forme_juridique || '';
+    $('pc-forme-select').innerHTML = opts(formesLibelles.concat([S.FORME_AUTRE]), '— Sélectionner —', formesLibelles.includes(formeEnreg) ? formeEnreg : (formeEnreg ? S.FORME_AUTRE : ''));
+    $('pc-taille').innerHTML = opts(S.TAILLES.map(t => t[0]), '— Sélectionner —', structInit.taille_entreprise || '');
+    $('pc-fin-famille').innerHTML = opts(Object.keys(S.FIN), '— Sélectionner —', structInit.finance_famille || '');
+    const remplirFinType = (f, sel) => { $('pc-fin-type').disabled = !f; $('pc-fin-type').innerHTML = f ? opts(S.FIN[f], '— Sélectionner —', sel || '') : '<option value="">Choisissez d\'abord une famille</option>'; };
+    remplirFinType(structInit.finance_famille || '', structInit.finance_type || '');
+
+    const majAffichage = () => {
+      const ent = S.estEntreprise($('pc-type-struct').value);
+      $('pc-forme-select').style.display = ent ? '' : 'none';
+      $('pc-forme-juridique').style.display = (!ent || $('pc-forme-select').value === S.FORME_AUTRE) ? '' : 'none';
+      $('pc-taille-wrap').style.display = ent ? '' : 'none';
+      const t = S.TAILLES.find(x => x[0] === $('pc-taille').value); $('pc-taille-aide').textContent = t ? t[1] : '';
+      $('pc-fin-wrap').style.display = S.estDomaineFinance($('pc-domaine').value) ? '' : 'none';
+    };
+    ['pc-type-struct', 'pc-forme-select', 'pc-taille', 'pc-domaine'].forEach(id => $(id).addEventListener('change', majAffichage));
+    $('pc-fin-famille').addEventListener('change', () => remplirFinType($('pc-fin-famille').value, ''));
+    majAffichage();
+
+    $('pc-btn-structure').addEventListener('click', async () => {
+      const btn = $('pc-btn-structure'); btn.disabled = true;
+      try {
+        const ent = S.estEntreprise($('pc-type-struct').value), fin = S.estDomaineFinance($('pc-domaine').value);
+        const formeLibre = $('pc-forme-juridique').value.trim();
+        const forme = (ent && $('pc-forme-select').value && $('pc-forme-select').value !== S.FORME_AUTRE) ? $('pc-forme-select').value : formeLibre;
+        await api('PUT', '/initiatives/' + profil.initiative_id + '/structure', {
+          type: $('pc-type-struct').value || null,
+          forme_juridique: forme,
+          taille_entreprise: ent ? $('pc-taille').value : '',
+          finance_famille: fin ? $('pc-fin-famille').value : '',
+          finance_type: fin ? $('pc-fin-type').value : ''
+        });
+        showMsg('pc-msg-structure', 'Enregistré ✓', true);
+      } catch (e) { showMsg('pc-msg-structure', e.message || 'Erreur.', false); }
+      btn.disabled = false;
+    });
+  }
 
   document.getElementById('pc-btn-domaine').addEventListener('click', async () => {
     const btn = document.getElementById('pc-btn-domaine'); btn.disabled = true;

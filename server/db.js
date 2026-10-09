@@ -6485,6 +6485,10 @@ db.exec(`
   if (!initCols7.includes('statut_creation'))                  db.exec("ALTER TABLE initiatives ADD COLUMN statut_creation TEXT DEFAULT 'existante'");
   if (!initCols7.includes('denomination_officielle'))          db.exec("ALTER TABLE initiatives ADD COLUMN denomination_officielle TEXT");
   if (!initCols7.includes('forme_juridique'))                  db.exec("ALTER TABLE initiatives ADD COLUMN forme_juridique TEXT");
+  /* Fiches « Taille de l'entreprise » et « Organisme financier » (2026-10-09) : champs facultatifs, vides pour les comptes existants. */
+  if (!initCols7.includes('taille_entreprise'))                db.exec("ALTER TABLE initiatives ADD COLUMN taille_entreprise TEXT");
+  if (!initCols7.includes('finance_famille'))                  db.exec("ALTER TABLE initiatives ADD COLUMN finance_famille TEXT");
+  if (!initCols7.includes('finance_type'))                     db.exec("ALTER TABLE initiatives ADD COLUMN finance_type TEXT");
   if (!initCols7.includes('date_creation_structure'))          db.exec("ALTER TABLE initiatives ADD COLUMN date_creation_structure TEXT");
   if (!initCols7.includes('date_debut_creation'))               db.exec("ALTER TABLE initiatives ADD COLUMN date_debut_creation TEXT");
   if (!initCols7.includes('genre_responsable'))                 db.exec("ALTER TABLE initiatives ADD COLUMN genre_responsable TEXT");

@@ -851,6 +851,8 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
     const initRow = await db.prepare('SELECT id FROM initiatives WHERE owner_user_id=? ORDER BY id DESC LIMIT 1').get(id);
     if (initRow) try { await db.prepare('UPDATE initiatives SET da_id=? WHERE id=?').run(generateDaId(), initRow.id); } catch(_) {}
     if (initRow && numero_immatriculation) { try { await db.prepare('UPDATE initiatives SET type_immatriculation=? WHERE id=?').run(Immat.typeEffectif(type_immatriculation, numero_immatriculation) || null, initRow.id); } catch (_) {} }
+    /* Fiches « Taille de l'entreprise » et « Organisme financier » (2026-10-09) — valeurs hors liste ignorées. */
+    if (initRow) { try { const st = STRUCTURES_INITIATIVE.nettoyer(body); await db.prepare('UPDATE initiatives SET taille_entreprise=?, finance_famille=?, finance_type=? WHERE id=?').run(st.taille_entreprise, st.finance_famille, st.finance_type, initRow.id); } catch (_) {} }
     /* Numéro de déclaration demandé dès la création : confirmé aussitôt dans le registre officiel → point « Organisation vérifiée » (2026-10-08). */
     if (initRow && statut_creation !== 'en_creation' && numero_immatriculation) { try { await verifierImmatriculationAuto(initRow.id); } catch (_) { /* le cron quotidien réessaiera */ } }
     // Profil public enrichi : champs facultatifs du formulaire d'inscription
@@ -8878,6 +8880,8 @@ async function getInitiativeByIdOrSlug(idOrSlug, columns = "*") {
 }
 
 /* ===== Recherche par mots-clés — Annuaire ===== */
+/* Listes partagées navigateur/serveur des fiches « Type de structure », « Forme juridique », « Taille », « Organisme financier » (2026-10-09). */
+const STRUCTURES_INITIATIVE = require("../assets/structures-initiative.js");
 const ANNUAIRE_NORMALISE = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 /* Le sélecteur de pays (assets/geo.js) demande une liste traduite en français à une API
@@ -9050,7 +9054,7 @@ route("GET", "/api/annuaire/recherche", async (req, res, params, body, query) =>
   if (query.domaine) initiatives = initiatives.filter(r => r.domaine === query.domaine);
   /* "Initiative" est un filtre générique (toutes les initiatives, quel que soit leur
      type_org Association/Entreprise/ONG/...) — distinct d'un type_org précis. */
-  if (query.type && query.type !== 'Initiative') initiatives = initiatives.filter(r => r.type === query.type);
+  if (query.type && query.type !== 'Initiative') initiatives = initiatives.filter(r => STRUCTURES_INITIATIVE.typeIdentique(r.type, query.type)); /* « Cooperative » = « Coopérative » */
   if (query.ville) { const v = query.ville.toLowerCase(); initiatives = initiatives.filter(r => (r.ville||'').toLowerCase().includes(v)); }
 
   let utilisateurs = (query.type && query.type !== 'Utilisateurs') ? [] : await db.prepare(
@@ -9088,6 +9092,16 @@ route("GET", "/api/annuaire/recherche", async (req, res, params, body, query) =>
     initiatives = initiatives.filter(r => r.domaine_principal === query.domaine_activite);
     utilisateurs = utilisateurs.filter(r => r.domaine_principal === query.domaine_activite);
     organismes = organismes.filter(r => r.domaine_principal === query.domaine_activite);
+  }
+
+  /* Fiches « Forme juridique », « Taille de l'entreprise » et « Organisme financier » (2026-10-09) : n'existent que sur les initiatives.
+     Une forme juridique saisie en texte libre avant la liste est reconnue par mots entiers (« SASU » ne correspond pas à « SAS »). */
+  if (query.forme || query.taille || query.famille_fin || query.type_fin) {
+    if (query.forme) initiatives = initiatives.filter(r => STRUCTURES_INITIATIVE.formeCorrespond(r.forme_juridique, query.forme));
+    if (query.taille) initiatives = initiatives.filter(r => r.taille_entreprise === query.taille);
+    if (query.famille_fin) initiatives = initiatives.filter(r => r.finance_famille === query.famille_fin);
+    if (query.type_fin) initiatives = initiatives.filter(r => r.finance_type === query.type_fin);
+    utilisateurs = []; organismes = [];
   }
 
   /* Filtre « Pays d'origine » — jusqu'ici totalement inopérant : le paramètre n'était ni
@@ -9352,6 +9366,19 @@ route("GET", "/api/annuaire/apercu-invitation", async (req, res) => {
   } catch (e) {
     sendJSON(res, 500, SEC.safeError(e, "apercu-invitation"));
   }
+});
+
+/* PUT /api/initiatives/:id/structure — l'initiative règle elle-même ses fiches « Type de structure », « Forme juridique », « Taille de l'entreprise » et « Organisme financier »
+   (Paramètres du compte, 2026-10-09). Propriétaire uniquement ; valeurs hors liste ignorées ; le type n'est changé que s'il est fourni. */
+route("PUT", "/api/initiatives/:id/structure", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT id, owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire de l'initiative." });
+  const st = STRUCTURES_INITIATIVE.nettoyer(body);
+  await db.prepare("UPDATE initiatives SET type=COALESCE(?,type), forme_juridique=?, taille_entreprise=?, finance_famille=?, finance_type=? WHERE id=?")
+    .run(st.type, st.forme_juridique, st.taille_entreprise, st.finance_famille, st.finance_type, init.id);
+  sendJSON(res, 200, { ok: true, structure: st });
 });
 
 route("GET", "/api/initiatives", async (req, res, params, body, query) => {

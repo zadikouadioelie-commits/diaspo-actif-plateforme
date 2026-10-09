@@ -321,6 +321,14 @@
           <option value="Coopérative">Coopérative</option>
           <option value="Média">Média</option>
           <option value="Fondation">Fondation</option>
+          <option value="Startup">Startup</option>
+          <option value="Projet collectif">Projet collectif</option>
+          <option value="Mutuelle">Mutuelle</option>
+          <option value="Organisme de formation">Organisme de formation</option>
+          <option value="Établissement public">Établissement public</option>
+          <option value="Collectivité territoriale">Collectivité territoriale</option>
+          <option value="Organisation professionnelle">Organisation professionnelle</option>
+          <option value="Groupement d'entrepreneurs">Groupement d'entrepreneurs</option>
           <option value="Particulier">Particulier</option>
           <option value="Autre">Autre</option>
         </select>
@@ -364,10 +372,16 @@
         <div id="f-pays-orig" class="ann-filter-geo"></div>
       </div>
 
+      <!-- Affiner : forme juridique, taille, organisme financier (2026-10-09) — les champs n'apparaissent que s'ils ont un sens -->
+      <div class="ann-filter-group" style="flex:0 0 auto;align-self:flex-end;">
+        <button type="button" class="ann-btn-reset" id="btn-affiner" aria-expanded="false" aria-controls="ann-affiner">Affiner ▾</button>
+      </div>
+
       <!-- Reset -->
       <button class="ann-btn-reset" id="btn-reset-filters">✕ Réinitialiser</button>
 
     </div>
+    <div class="ann-filters-inner" id="ann-affiner" style="display:none;margin-top:10px;padding-top:12px;border-top:1px dashed var(--border);"></div>
 
     <!-- Chips filtres actifs -->
     <div class="ann-active-chips" id="active-filters-bar"></div>
@@ -427,10 +441,11 @@
 
 <script src="assets/decouverte-premium.js"></script>
 <script src="assets/domaines-activite.js"></script>
+<script src="assets/structures-initiative.js"></script>
 <script src="assets/data.js?v=7"></script>
 <script src="assets/geo.js?v=3"></script>
 <script src="assets/demo.js?v=2"></script>
-<script src="assets/app.js?v=13"></script>
+<script src="assets/app.js?v=14"></script>
 <script src="assets/upload-media.js"></script>
 <script src="assets/image-cropper.js"></script>
 <script src="/assets/don-banner.js"></script>

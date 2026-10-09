@@ -126,7 +126,7 @@
       + (tel ? `<a class="pf-lk" href="tel:${esc(String(tel).replace(/[^+\d]/g, ''))}">${ic('chat', 's')}<span>${esc(tel)}</span></a>` : '')
       + (mail ? `<a class="pf-lk" href="mailto:${esc(mail)}">${ic('send', 's')}<span>${esc(mail)}</span></a>` : '') + rez;
     const adr = [r.adresse, r.ville, r.pays].filter(Boolean).join(', ');
-    const infos = [['Type', esc(r.type || '')], ['Créée en', esc(r.annee_creation || '')], ['Taille', esc(r.taille_structure || '')], ['Horaires', esc(strip(r.vitrine_horaires || ''))], ['Adresse', esc(adr)]];
+    const infos = [['Type', esc(r.type || '')], ['Créée en', esc(r.annee_creation || '')], ['Taille', esc(r.taille_structure || '')], ['Forme juridique', esc(r.forme_juridique || '')], ['Taille de l’entreprise', esc(r.taille_entreprise || '')], ['Organisme financier', esc(r.finance_type || '')], ['Horaires', esc(strip(r.vitrine_horaires || ''))], ['Adresse', esc(adr)]];
     const lstAvis = (avis.avis || []).slice(0, 4);
     const prodsL = (prods.produits || []).filter(p => p.disponible !== 0).slice(0, 6);
     const desc = r.description ? `<div class="rich">${richHtml(r.description)}</div>` : '';

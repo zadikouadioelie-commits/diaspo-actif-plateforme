@@ -11,11 +11,14 @@
    ══════════════════════════════════════════════════════════════════════ */
 window.DOMAINES_ACTIVITE = [
   ['agriculture',                '🌾', 'Agriculture'],
+  ['artisanat',                  '🧵', 'Artisanat'],
   ['associations_vie_citoyenne', '🏛️', 'Associations & Vie citoyenne'],
+  ['assurance_prevoyance',       '🛡️', 'Assurance & Prévoyance'],
   ['automobile_mobilite',        '🚗', 'Automobile & Mobilité'],
   ['banque_microfinance',        '🏦', 'Banque & Microfinance'],
   ['btp_immobilier',             '🏗️', 'BTP & Immobilier'],
   ['commerce_distribution',      '🛍️', 'Commerce & Distribution'],
+  ['commerce_international',     '🚢', 'Commerce international'],
   ['communication_medias',       '📱', 'Communication & Médias'],
   ['conseil_services',           '👩‍💼', 'Conseil & Services'],
   ['culture_arts',               '🎨', 'Culture & Arts'],
@@ -28,8 +31,11 @@ window.DOMAINES_ACTIVITE = [
   ['environnement',              '🌱', 'Environnement'],
   ['evenementiel',               '🎉', 'Événementiel'],
   ['finance_investissement',     '💰', 'Finance & Investissement'],
+  ['hotellerie_hebergement',     '🏨', 'Hôtellerie & Hébergement'],
+  ['immobilier',                 '🏠', 'Immobilier'],
   ['industrie_production',       '📦', 'Industrie & Production'],
   ['medecine_sante',             '🏥', 'Médecine & Santé'],
+  ['mines_ressources',           '⛏️', 'Mines & Ressources naturelles'],
   ['mobilite_internationale',    '✈️', 'Mobilité internationale'],
   ['mode_beaute',                '👗', 'Mode & Beauté'],
   ['numerique_technologie',      '💻', 'Numérique & Technologie'],
@@ -37,8 +43,12 @@ window.DOMAINES_ACTIVITE = [
   ['restauration_agroalimentaire','🍽️', 'Restauration & Agroalimentaire'],
   ['sante',                      '🩺', 'Santé'],
   ['sante_mentale',              '🧠', 'Santé mentale'],
+  ['securite_gardiennage',       '🔐', 'Sécurité & Gardiennage'],
+  ['services_personne',          '🧑‍🤝‍🧑', 'Services à la personne'],
+  ['services_funeraires',        '🕊️', 'Services funéraires'],
   ['social_famille',             '👶', 'Social & Famille'],
   ['sport',                      '🏃', 'Sport'],
+  ['telecoms_infrastructures',   '📡', 'Télécommunications & Infrastructures'],
   ['tourisme_voyage',            '🧳', 'Tourisme & Voyage'],
   ['transport_logistique',       '🚛', 'Transport & Logistique'],
   ['autre',                      '🏢', 'Autre'],
@@ -104,14 +114,21 @@ function wireSousDomaineSuggestions(domaineSelect, sousDomaineInputs) {
     dl.innerHTML = '';
     (liste || []).forEach(s => { const o = document.createElement('option'); o.value = s; dl.appendChild(o); });
   }
+  /* Suggestions fixes par domaine (assets/structures-initiative.js, 2026-10-09) fusionnées avec celles déjà tapées par d'autres comptes. */
+  const fusion = (domaine, deja) => {
+    const fixes = (window.STRUCTURES_INITIATIVE && window.STRUCTURES_INITIATIVE.SOUS_DOMAINES && window.STRUCTURES_INITIATIVE.SOUS_DOMAINES[domaine]) || [];
+    const vus = new Set();
+    return fixes.concat(deja || []).filter(s => { const k = String(s).trim().toLowerCase(); if (!k || vus.has(k)) return false; vus.add(k); return true; });
+  };
   async function charger(domaine) {
     if (!domaine) { afficher([]); return; }
-    if (cache[domaine]) { afficher(cache[domaine]); return; }
+    afficher(fusion(domaine, cache[domaine]));
+    if (cache[domaine]) return;
     try {
       const r = await api('GET', `/domaines-activite/sous-domaines?domaine=${encodeURIComponent(domaine)}`);
       cache[domaine] = r.suggestions || [];
-      afficher(cache[domaine]);
-    } catch (e) { /* champ libre, la saisie reste possible sans suggestion */ }
+      afficher(fusion(domaine, cache[domaine]));
+    } catch (e) { /* champ libre, la saisie reste possible ; les suggestions fixes restent affichées */ }
   }
   domaineSelect.addEventListener('change', () => charger(domaineSelect.value));
   if (domaineSelect.value) charger(domaineSelect.value);

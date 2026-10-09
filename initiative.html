@@ -947,6 +947,8 @@ const THEME_VITRINE_LABELS = { bordeaux:'Bordeaux', ocean:'Ocean', emeraude:'Eme
         <div class="activite-gauge"><div style="width:${SCOREACT.score}%;"></div></div>
         <div style="font-size:11px;color:var(--muted);">Calculé sur les publications, événements, campagnes, membres et la complétude du profil.</div>
       </div>` : ''}
+      <!-- Fiches de structure (2026-10-09) : type, forme juridique, taille, organisme financier — seulement ce qui est renseigné -->
+      ${(init.type || init.forme_juridique || init.taille_entreprise || init.finance_type) ? `<div class="side-card"><h4>🏛 Structure</h4>${[['Type de structure', init.type], ['Forme juridique', init.forme_juridique], ['Taille de l’entreprise', init.taille_entreprise], ['Organisme financier', init.finance_type ? init.finance_type + (init.finance_famille ? ' — ' + init.finance_famille : '') : '']].filter(x => x[1]).map(([k, v]) => `<div class="side-list-item"><div style="flex:1;"><div style="font-size:10.5px;color:var(--muted);">${k}</div><div style="font-weight:700;font-size:12.5px;">${esc2(v)}</div></div></div>`).join('')}</div>` : ''}
       <div class="side-card">
         <h4><span>📈 Statistiques</span> ${editBtn('stats')}</h4>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
