@@ -2677,11 +2677,76 @@ function populateSelect(id, values){
   });
 }
 
+/* Cartouche membre de l'annuaire : au niveau du fichier (2026-10-08) pour être appelée aussi depuis l'accueil (« Des profils qui inspirent »),
+   exactement comme renderInitiativeCard() — jamais une copie qui pourrait diverger. Le compte courant vient d'initAnnuaire() quand on est sur
+   la page Annuaire, de CURRENT_USER ailleurs. */
+let ANN_COMPTE_COURANT = null;
+function annCompteCourant() { return ANN_COMPTE_COURANT || ((typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? CURRENT_USER : null); }
+function annCardCoverHtml(id, name, bannerUrl, photoUrl, badgeHtml, isOwn) {
+  const bg = bannerUrl
+    ? `background-image:url('${bannerUrl}');background-size:cover;background-position:center;`
+    : `background:linear-gradient(135deg,#0D2B4E,#1B3A6B 55%,#F26422);`;
+  return `
+    <div class="ann-card-banner" style="${bg}">
+      ${badgeHtml}
+      ${isOwn ? `<button type="button" class="ann-card-cover-edit" onclick="event.stopPropagation(); annuaireEditCover(${id})">📷 Modifier la couverture</button>` : ''}
+    </div>
+    <div class="ann-card-avatar-wrap">${photoAvatar(name, 88, 'user', photoUrl)}</div>`;
+}
+
+function renderPersonCard(u) {
+  const loc = [u.ville, u.pays].filter(Boolean).map(casseLieu).join(', ') || '—';
+  const profilHref = `profil.html?id=${encodeURIComponent(u.id)}`;
+  const nom = [u.prenom, u.nom].filter(Boolean).join(' ') || u.nom;
+  const ME = annCompteCourant();
+  const isOwn = !!(ME && Number(ME.id) === Number(u.id));
+  // Nationalité/origine : renseignees via le module Confidentialite du profil (users.*) —
+  // toujours affichees ensemble avec le lieu (meme convention que les cartes initiative) :
+  // nationalite avec repli "-", origine seulement si l'information existe reellement.
+  const nats  = [u.nationalite1, u.nationalite2].filter(Boolean).join(' • ') || '—';
+  const origs = daOrigineDeclaree(u);
+  // Domaine d'activité unifié (2026-09-04) : un compte individuel n'affichait aucun domaine
+  // jusqu'ici (badge "UTILISATEUR" générique) — remplacé par son domaine s'il l'a renseigné
+  // via Paramètres du compte, garde défensive comme pour renderInitiativeCard.
+  const domUser = (typeof domaineActiviteInfo === 'function') ? domaineActiviteInfo(u.domaine_principal) : null;
+  const badgeUser = domUser
+    ? `<span class="ann-cat-badge" style="background:#1B3A6B;">${(`${domUser.icone} ${domUser.label}`).toUpperCase()}</span>`
+    : `<span class="ann-cat-badge" style="background:#1B3A6B;">UTILISATEUR</span>`;
+  const sousDomainesUser = [u.sous_domaine_1, u.sous_domaine_2].filter(Boolean).join(' • ');
+  const domaineLigneUser = domUser ? `${domUser.icone} ${domUser.label}` : '';
+  const sousDomaineLigneUser = sousDomainesUser ? `<strong>Sous domaine :</strong> ${sousDomainesUser}` : '';
+  return `
+  <div class="ann-card ann-card-profile" onclick="window.location.href='${profilHref}'" style="cursor:pointer;">
+    ${annCardCoverHtml(u.id, nom, u.banner_url, u.photo_url, badgeUser, isOwn)}
+    <div class="ann-card-body ann-card-body-profile">
+      <div class="ann-card-title">${nom}</div>
+      ${annAvisBadgeHtml(u)}
+      <div class="ann-card-meta-row" style="justify-content:center;"><span class="ann-card-loc">📍 ${loc}</span></div>
+      ${origs ? `<div class="ann-card-origs">🌍 <strong>Origines :</strong> ${origs}</div>` : ''}
+      <div class="ann-card-nats">🏛 <strong>Nationalités :</strong> ${nats}</div>
+      ${domaineLigneUser ? `<div class="ann-card-origs">🎯 <strong>Domaine d'activité :</strong> ${domaineLigneUser}</div>` : ''}
+      ${sousDomaineLigneUser ? `<div class="ann-card-origs">${sousDomaineLigneUser}</div>` : ''}
+      ${u.titre_pro ? `<div class="ann-card-desc">${u.titre_pro}</div>` : ''}
+      <div class="ann-card-foot" onclick="event.stopPropagation()">
+        <a href="${profilHref}" class="ann-card-btn ann-card-btn-primary" onclick="event.stopPropagation()">👁 Voir le profil</a>
+        <a href="${profilHref}#avis" class="ann-card-btn" onclick="event.stopPropagation()">⭐ Avis</a>
+        <button type="button" class="ann-card-btn" title="Envoyer ce profil à quelqu'un : le lien s'ouvre sans compte" onclick="event.stopPropagation(); openShareUrlModal(location.origin + '/' + '${profilHref}', ${JSON.stringify(nom || '').replace(/"/g,'&quot;')})">↗ Partager</button>
+        ${!isOwn && typeof CURRENT_USER !== 'undefined' && CURRENT_USER ? `<span data-relation-user="${u.id}" data-relation-classe="ann-card-btn"></span>` : ''}
+        ${!isOwn && typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.role === 'initiative' ? `<span data-affiliation-user="${u.id}" data-affiliation-nom="${nom.replace(/"/g,'&quot;')}" data-affiliation-classe="ann-card-btn ann-card-btn-affilier"></span>` : ''}
+        ${relanceProfilBoutonHtml(u.id, isOwn, relanceProfilIncomplet(u, 'utilisateur'))}
+        ${adminAnnuaireBoutonsHtml(u.id, isOwn)}
+      </div>
+    </div>
+  </div>`;
+}
+window.annRenderPersonCard = renderPersonCard;
+
 async function initAnnuaire(){
   const list = document.getElementById("init-list");
   if(!list) return;
 
   const ME = await fetchCurrentUser();
+  ANN_COMPTE_COURANT = ME;
 
   let ALL = [];
   try {
@@ -2712,63 +2777,6 @@ async function initAnnuaire(){
     'algeria': 'algerie', 'tunisia': 'tunisie', 'egypt': 'egypte', 'south africa': 'afrique du sud',
   };
   const normOrigine = s => { const n = norm(s); return ALIAS_PAYS_EN_FR[n] || n; };
-
-  function annCardCoverHtml(id, name, bannerUrl, photoUrl, badgeHtml, isOwn) {
-    const bg = bannerUrl
-      ? `background-image:url('${bannerUrl}');background-size:cover;background-position:center;`
-      : `background:linear-gradient(135deg,#0D2B4E,#1B3A6B 55%,#F26422);`;
-    return `
-      <div class="ann-card-banner" style="${bg}">
-        ${badgeHtml}
-        ${isOwn ? `<button type="button" class="ann-card-cover-edit" onclick="event.stopPropagation(); annuaireEditCover(${id})">📷 Modifier la couverture</button>` : ''}
-      </div>
-      <div class="ann-card-avatar-wrap">${photoAvatar(name, 88, 'user', photoUrl)}</div>`;
-  }
-
-  function renderPersonCard(u) {
-    const loc = [u.ville, u.pays].filter(Boolean).map(casseLieu).join(', ') || '—';
-    const profilHref = `profil.html?id=${encodeURIComponent(u.id)}`;
-    const nom = [u.prenom, u.nom].filter(Boolean).join(' ') || u.nom;
-    const isOwn = !!(ME && Number(ME.id) === Number(u.id));
-    // Nationalité/origine : renseignees via le module Confidentialite du profil (users.*) —
-    // toujours affichees ensemble avec le lieu (meme convention que les cartes initiative) :
-    // nationalite avec repli "-", origine seulement si l'information existe reellement.
-    const nats  = [u.nationalite1, u.nationalite2].filter(Boolean).join(' • ') || '—';
-    const origs = daOrigineDeclaree(u);
-    // Domaine d'activité unifié (2026-09-04) : un compte individuel n'affichait aucun domaine
-    // jusqu'ici (badge "UTILISATEUR" générique) — remplacé par son domaine s'il l'a renseigné
-    // via Paramètres du compte, garde défensive comme pour renderInitiativeCard.
-    const domUser = (typeof domaineActiviteInfo === 'function') ? domaineActiviteInfo(u.domaine_principal) : null;
-    const badgeUser = domUser
-      ? `<span class="ann-cat-badge" style="background:#1B3A6B;">${(`${domUser.icone} ${domUser.label}`).toUpperCase()}</span>`
-      : `<span class="ann-cat-badge" style="background:#1B3A6B;">UTILISATEUR</span>`;
-    const sousDomainesUser = [u.sous_domaine_1, u.sous_domaine_2].filter(Boolean).join(' • ');
-    const domaineLigneUser = domUser ? `${domUser.icone} ${domUser.label}` : '';
-    const sousDomaineLigneUser = sousDomainesUser ? `<strong>Sous domaine :</strong> ${sousDomainesUser}` : '';
-    return `
-    <div class="ann-card ann-card-profile" onclick="window.location.href='${profilHref}'" style="cursor:pointer;">
-      ${annCardCoverHtml(u.id, nom, u.banner_url, u.photo_url, badgeUser, isOwn)}
-      <div class="ann-card-body ann-card-body-profile">
-        <div class="ann-card-title">${nom}</div>
-        ${annAvisBadgeHtml(u)}
-        <div class="ann-card-meta-row" style="justify-content:center;"><span class="ann-card-loc">📍 ${loc}</span></div>
-        ${origs ? `<div class="ann-card-origs">🌍 <strong>Origines :</strong> ${origs}</div>` : ''}
-        <div class="ann-card-nats">🏛 <strong>Nationalités :</strong> ${nats}</div>
-        ${domaineLigneUser ? `<div class="ann-card-origs">🎯 <strong>Domaine d'activité :</strong> ${domaineLigneUser}</div>` : ''}
-        ${sousDomaineLigneUser ? `<div class="ann-card-origs">${sousDomaineLigneUser}</div>` : ''}
-        ${u.titre_pro ? `<div class="ann-card-desc">${u.titre_pro}</div>` : ''}
-        <div class="ann-card-foot" onclick="event.stopPropagation()">
-          <a href="${profilHref}" class="ann-card-btn ann-card-btn-primary" onclick="event.stopPropagation()">👁 Voir le profil</a>
-          <a href="${profilHref}#avis" class="ann-card-btn" onclick="event.stopPropagation()">⭐ Avis</a>
-          <button type="button" class="ann-card-btn" title="Envoyer ce profil à quelqu'un : le lien s'ouvre sans compte" onclick="event.stopPropagation(); openShareUrlModal(location.origin + '/' + '${profilHref}', ${JSON.stringify(nom || '').replace(/"/g,'&quot;')})">↗ Partager</button>
-          ${!isOwn && typeof CURRENT_USER !== 'undefined' && CURRENT_USER ? `<span data-relation-user="${u.id}" data-relation-classe="ann-card-btn"></span>` : ''}
-          ${!isOwn && typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.role === 'initiative' ? `<span data-affiliation-user="${u.id}" data-affiliation-nom="${nom.replace(/"/g,'&quot;')}" data-affiliation-classe="ann-card-btn ann-card-btn-affilier"></span>` : ''}
-          ${relanceProfilBoutonHtml(u.id, isOwn, relanceProfilIncomplet(u, 'utilisateur'))}
-          ${adminAnnuaireBoutonsHtml(u.id, isOwn)}
-        </div>
-      </div>
-    </div>`;
-  }
 
   function renderOrganismeCard(o) {
     const loc = [o.ville, o.pays].filter(Boolean).map(casseLieu).join(', ') || '—';

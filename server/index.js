@@ -9225,60 +9225,32 @@ route("GET", "/api/annuaire/utilisateurs", async (req, res, params, body, query)
    fenêtre, et change automatiquement à la fenêtre suivante — aucun état à stocker. */
 route("GET", "/api/talents-diaspora", async (req, res) => {
   try {
-    const [utilisateurs, initiatives, collectivites] = await Promise.all([
+    /* Mise à jour 2026-10-08 (demande explicite : « un réel aperçu de la cartouche de l'annuaire, et seulement les initiatives et les
+       utilisateurs avec photo de profil ») : on renvoie désormais les MÊMES lignes que l'annuaire (assets/app.js en tire les vraies
+       cartouches), limitées aux initiatives qui ont un visuel (bannière de vitrine ou logo) et aux membres qui ont une photo de profil.
+       Les collectivités n'y figurent plus. Deux initiatives et deux membres, entrelacés, tirés de façon déterministe par fenêtre de 2 h. */
+    const [utilisateurs, initiatives] = await Promise.all([
       db.prepare(
-        `SELECT id, nom, prenom, ville, pays, photo_url, titre_pro, competences, nationalite1, origine1
-         FROM users WHERE role='utilisateur' AND compte_masque=0 AND nom != 'Compte supprimé'
-         AND (is_demo IS NULL OR is_demo=FALSE)
-         AND ((photo_url IS NOT NULL AND photo_url!='') OR (titre_pro IS NOT NULL AND titre_pro!=''))
+        `SELECT id, nom, prenom, ville, pays, photo_url, banner_url, titre_pro, bio, competences, experiences, centres_interet, nationalite1, nationalite2, origine1, origine2, domaine_principal, sous_domaine_1, sous_domaine_2, invisible_annuaire_definitif, invisible_annuaire_jusqu_au
+         FROM users WHERE role='utilisateur' AND compte_masque=0 AND nom != 'Compte supprimé' AND (is_demo IS NULL OR is_demo=FALSE)
+         AND photo_url IS NOT NULL AND photo_url!=''
          ORDER BY id ASC LIMIT 300`
       ).all(),
       db.prepare(
-        `SELECT i.id, i.nom, i.slug, i.ville, i.pays, i.logo_url, i.domaine, i.type, i.owner_user_id
+        `SELECT i.*, u.origine1 AS owner_origine1, u.origine2 AS owner_origine2, u.invisible_annuaire_definitif AS owner_invisible_definitif, u.invisible_annuaire_jusqu_au AS owner_invisible_jusqu_au
          FROM initiatives i JOIN users u ON u.id=i.owner_user_id
          WHERE (u.is_demo IS NULL OR u.is_demo=FALSE) AND (u.email IS NULL OR u.email NOT LIKE '%@diaspoactif.invalid')
-         AND ((i.logo_url IS NOT NULL AND i.logo_url!='') OR (i.domaine IS NOT NULL AND i.domaine!=''))
+         AND ((i.vitrine_banniere_url IS NOT NULL AND i.vitrine_banniere_url!='') OR (i.logo_url IS NOT NULL AND i.logo_url!=''))
          ORDER BY i.id ASC LIMIT 300`
       ).all(),
-      db.prepare(
-        `SELECT id, nom, nom_institution, ville, pays, photo_url, type_organisme
-         FROM users WHERE role='collectivite' AND compte_masque=0 AND nom != 'Compte supprimé'
-         AND (is_demo IS NULL OR is_demo=FALSE)
-         AND ((photo_url IS NOT NULL AND photo_url!='') OR (type_organisme IS NOT NULL AND type_organisme!=''))
-         ORDER BY id ASC LIMIT 300`
-      ).all(),
     ]);
+    const membres = utilisateurs.filter(r => !annuaireEstInvisible(r));
+    membres.forEach(r => { delete r.invisible_annuaire_definitif; delete r.invisible_annuaire_jusqu_au; });
+    const structures = initiatives.filter(r => !annuaireEstInvisible({ invisible_annuaire_definitif: r.owner_invisible_definitif, invisible_annuaire_jusqu_au: r.owner_invisible_jusqu_au }));
+    structures.forEach(r => { delete r.owner_invisible_definitif; delete r.owner_invisible_jusqu_au; });
 
-    const parseTags = (json) => { try { const a = JSON.parse(json); return Array.isArray(a) ? a.slice(0, 3) : []; } catch { return []; } };
-
-    const pool = [
-      ...utilisateurs.map(u => ({
-        cle: `u${u.id}`, type: 'utilisateur', id: u.id,
-        nom: [u.prenom, u.nom].filter(Boolean).join(' ') || u.nom,
-        role: u.titre_pro || '',
-        ville: u.ville, pays: u.pays, origine: u.origine1 || u.nationalite1 || null,
-        photo_url: u.photo_url, tags: parseTags(u.competences),
-        href: `profil.html?id=${u.id}`,
-      })),
-      ...initiatives.map(i => ({
-        cle: `i${i.id}`, type: 'initiative', id: i.id,
-        nom: i.nom, role: i.domaine || i.type || 'Initiative',
-        ville: i.ville, pays: i.pays, origine: null,
-        photo_url: i.logo_url, tags: [i.type, i.domaine].filter(Boolean),
-        href: i.owner_user_id ? `profil.html?id=${i.owner_user_id}` : `initiative.html?id=${encodeURIComponent(i.slug || i.id)}`,
-      })),
-      ...collectivites.map(c => ({
-        cle: `c${c.id}`, type: 'collectivite', id: c.id,
-        nom: c.nom_institution || c.nom, role: c.type_organisme || 'Collectivité',
-        ville: c.ville, pays: c.pays, origine: null,
-        photo_url: c.photo_url, tags: ['Collectivité'],
-        href: `profil.html?id=${c.id}`,
-      })),
-    ];
-
-    /* Tirage déterministe : seed = fenêtre de 2h courante, mélange Fisher-Yates avec un
-       PRNG maison (mulberry32) — jamais Math.random(), qui donnerait un résultat différent
-       à chaque requête au lieu d'un résultat stable pendant toute la fenêtre de 2h. */
+    /* Tirage déterministe : seed = fenêtre de 2h courante, mélange Fisher-Yates avec un PRNG maison (mulberry32) — jamais Math.random(),
+       qui donnerait un résultat différent à chaque requête au lieu d'un résultat stable pendant toute la fenêtre de 2h. */
     const bucket = Math.floor(Date.now() / (2 * 3600 * 1000));
     let seed = bucket >>> 0;
     function mulberry32() {
@@ -9287,12 +9259,24 @@ route("GET", "/api/talents-diaspora", async (req, res) => {
       t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
       return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
     }
-    for (let i = pool.length - 1; i > 0; i--) {
-      const j = Math.floor(mulberry32() * (i + 1));
-      [pool[i], pool[j]] = [pool[j], pool[i]];
-    }
+    const melanger = tab => { for (let i = tab.length - 1; i > 0; i--) { const j = Math.floor(mulberry32() * (i + 1)); [tab[i], tab[j]] = [tab[j], tab[i]]; } return tab; };
+    melanger(structures); melanger(membres);
 
-    const talents = pool.slice(0, 4);
+    /* 2 + 2 si possible ; s'il manque d'un côté, l'autre complète (jusqu'à 4 au total). */
+    const nI0 = Math.min(2, structures.length), nU0 = Math.min(2, membres.length);
+    let reste = 4 - nI0 - nU0;
+    const extraI = Math.min(reste, structures.length - nI0); reste -= extraI;
+    const extraU = Math.min(reste, membres.length - nU0);
+    const cu = await getCurrentUser(req);
+    const [lesInitiatives, lesMembres] = await Promise.all([
+      attachAvisAggregate(structures.slice(0, nI0 + extraI).map(r => assainirInitiativePublique(r, cu)), 'owner_user_id'),
+      attachAvisAggregate(membres.slice(0, nU0 + extraU), 'id'),
+    ]);
+    const talents = [];
+    for (let k = 0; k < Math.max(lesInitiatives.length, lesMembres.length); k++) {
+      if (lesInitiatives[k]) talents.push({ type: 'initiative', data: lesInitiatives[k] });
+      if (lesMembres[k]) talents.push({ type: 'utilisateur', data: lesMembres[k] });
+    }
     sendJSON(res, 200, { talents });
   } catch (e) {
     sendJSON(res, 500, SEC.safeError(e, "talents-diaspora"));
