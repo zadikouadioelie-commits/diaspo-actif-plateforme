@@ -1127,6 +1127,7 @@
    régression : le tiroir ne s'ouvre toujours qu'au clic. */
 </style>
   <link rel="stylesheet" href="/assets/design-upgrade.v2.css">
+  <link rel="stylesheet" href="/assets/fil-cartouches.css?v=1">
   <link rel="stylesheet" href="/assets/theme-manager.css">
 </head>
 <body>
@@ -2503,8 +2504,30 @@ document.getElementById('hp-vit-q')?.addEventListener('keydown', e => {
             🔔 S'abonner <span class="hp-feed-lock-icon">🔒</span>
           </button>
         </div>`;
+      /* Cartouches scintillantes (2026-10-08, demande explicite) : compte-rendu = BLEU, toute autre
+         publication = VERT. Titre + image + aperçu du texte + « Voir davantage » ; un clic ouvre la
+         visionneuse (clic sur les côtés pour passer d'une publication à l'autre, avec réactions et
+         commentaires). */
+      const estCr = p.type === 'compte_rendu' || !!p.compte_rendu;
+      const cr = p.compte_rendu || null;
+      let medias = []; try { medias = JSON.parse(p.medias || '[]'); } catch (e) {}
+      const imgUrl = ((medias.find(m => m && m.type === 'image' && m.url) || {}).url)
+        || (p.media_type === 'image' && p.media_url) || (cr && cr.image) || '';
+      const titreHtml = hpTitreSur(p.titre || (cr && cr.titre) || '').replace(/\*\*/g, '').trim();
+      const titreTxt = hpPlain(titreHtml);
+      let corps = hpPlain(p.corps != null ? p.corps : p.contenu).replace(/\*\*/g, '');
+      if (!corps && cr) corps = hpPlain(cr.resume);
+      if (titreTxt && corps.indexOf(titreTxt) === 0) corps = corps.slice(titreTxt.length).trim();
+      const ouvrir = `hpOuvrirPost(${p.id})`;
+      const bandeau = estCr
+        ? '<div class="fc-band"><span aria-hidden="true">📄</span><b>COMPTE-RENDU</b><small>d’événement</small></div>'
+        : '<div class="fc-band"><span aria-hidden="true">📰</span><b>ACTUALITÉ</b><small>de la communauté</small></div>';
+      const crBtn = (estCr && cr && cr.evenement_id)
+        ? `<a class="hp-feed-more hp-feed-cr-btn" href="compte-rendu.html?evt=${Number(cr.evenement_id)}">📝 Lire le compte-rendu</a>` : '';
       return `
-      <div class="hp-feed-post">
+      <div class="hp-feed-post fc-carte ${estCr ? 'fc-cr' : 'fc-actu'}" data-post-id="${p.id}">
+        ${bandeau}
+        <div class="fc-corps">
         <div class="hp-feed-post-header">
           <img loading="lazy" class="hp-feed-avatar" src="${avatarSrc}" alt="${p.auteur_nom||'Membre'}">
           <div>
@@ -2512,8 +2535,15 @@ document.getElementById('hp-vit-q')?.addEventListener('keydown', e => {
             <div class="hp-feed-time">${icon} ${ts}</div>
           </div>
         </div>
-        <p class="hp-feed-content">${p.contenu || ''}</p>
+        ${titreHtml ? `<h3 class="hp-feed-titre">${titreHtml}</h3>` : ''}
+        ${imgUrl ? `<img class="hp-feed-img" loading="lazy" src="${hpAttr(imgUrl)}" alt="${hpAttr(titreTxt || 'Publication')}" onclick="${ouvrir}">` : ''}
+        ${corps ? `<p class="hp-feed-content">${hpEsc(corps)}</p>` : ''}
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button type="button" class="hp-feed-more" onclick="${ouvrir}">Voir davantage <span aria-hidden="true">→</span></button>
+          ${crBtn}
+        </div>
         ${actionsHtml}
+        </div>
       </div>`;
     });
     /* Publicité "homepage_feed" (2026-09-29, bug réel corrigé : promise à l'annonceur dès la
@@ -2565,6 +2595,44 @@ document.getElementById('hp-vit-q')?.addEventListener('keydown', e => {
    comportement que Posts.react(), qui ne gère lui non plus que le sens "aimer", jamais
    "retirer"). Le bouton passe donc à l'état "aimé" une fois pour toutes, sans repasser en
    arrière au reclic. */
+const hpEsc = t => String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const hpAttr = hpEsc;
+const hpPlain = h => String(h == null ? '' : h).replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+const hpTitreSur = h => String(h || '').replace(/<(?!\/?(strong|b|em|i|u)\b)[^>]*>/gi, '').replace(/<(strong|b|em|i|u)\b[^>]*>/gi, '<$1>');
+
+/* Visionneuse : le module du fil complet (assets/posts.js) est chargé seulement au premier clic —
+   on ne le télécharge pas pour un visiteur qui ne l'ouvre jamais. Elle navigue parmi les dernières
+   publications ; clic sur le bord gauche/droit de l'image (ou ← →) pour passer à l'autre. */
+let _hpPostsPromesse = null;
+function hpChargerPosts() {
+  if (window.Posts) return Promise.resolve();
+  if (!_hpPostsPromesse) {
+    _hpPostsPromesse = new Promise((ok, ko) => {
+      const sc = document.createElement('script');
+      sc.src = 'assets/posts.js';
+      sc.onload = ok; sc.onerror = () => { _hpPostsPromesse = null; ko(new Error('chargement')); };
+      document.head.appendChild(sc);
+    });
+  }
+  return _hpPostsPromesse;
+}
+async function hpOuvrirPost(postId) {
+  try {
+    await hpChargerPosts();
+    let ids = [];
+    try {
+      const r = await fetch('/api/fil?limit=20', { credentials: 'same-origin' });
+      const d = await r.json();
+      ids = (d.posts || d).map(p => p.id).filter(i => /^[0-9]+$/.test(String(i)));
+    } catch (e) {}
+    if (!ids.some(i => String(i) === String(postId))) ids.unshift(postId);
+    window.Posts._feedIds = ids;
+    window.Posts._navItems = null;
+    window.Posts.openDetail(postId);
+  } catch (e) { window.location.href = `fil-actualite.html#fp-${postId}`; }
+}
+window.hpOuvrirPost = hpOuvrirPost;
+
 async function hpReagir(postId, btn) {
   if (!window.CURRENT_USER) { window.location.href = 'login.html'; return; }
   if (btn.classList.contains('active')) return; // déjà aimé, rien à refaire côté serveur

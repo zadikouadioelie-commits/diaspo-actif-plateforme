@@ -131,7 +131,18 @@
     else if (p.categorie && p.categorie !== 'Publication') badges.push(`<span class="fg-badge">${esc(p.categorie)}</span>`);
     if (estRepost) badges.push(`<span class="fg-badge">🔁 Republié</span>`);
     if (media && media.nb > 1) badges.push(`<span class="fg-badge fg-badge-nb">⧉ ${media.nb}</span>`);
-    return `<article class="fg-tile" tabindex="0" role="button" data-post-id="${esc(p.id)}" aria-label="Ouvrir : ${esc(titre || p.auteur_nom)}">
+    /* Cartouches scintillantes (2026-10-08) : compte-rendu = bleu, toute autre publication = vert. */
+    const estCr = !!cr || p.type === 'compte_rendu';
+    if (!document.getElementById('fil-cartouches-css')) {
+      const l = document.createElement('link');
+      l.id = 'fil-cartouches-css'; l.rel = 'stylesheet'; l.href = 'assets/fil-cartouches.css?v=1';
+      document.head.appendChild(l);
+    }
+    const bandeau = estCr
+      ? '<div class="fc-band"><span aria-hidden="true">📄</span><b>COMPTE-RENDU</b></div>'
+      : '<div class="fc-band"><span aria-hidden="true">📰</span><b>ACTUALITÉ</b></div>';
+    return `<article class="fg-tile fc-carte ${estCr ? 'fc-cr' : 'fc-actu'}" tabindex="0" role="button" data-post-id="${esc(p.id)}" aria-label="Ouvrir : ${esc(titre || p.auteur_nom)}">
+      ${bandeau}
       <div class="fg-thumb">${vignette}<div class="fg-badges">${badges.join('')}</div></div>
       <div class="fg-meta">
         ${titre ? `<div class="fg-titre">${esc(titre)}</div>` : ''}

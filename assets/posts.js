@@ -435,6 +435,19 @@ function ensureCrCss() {
   l.id = 'compte-rendu-css'; l.rel = 'stylesheet'; l.href = 'assets/compte-rendu.css?v=1';
   document.head.appendChild(l);
 }
+/* Cartouches scintillantes du fil (2026-10-08) : bleue = compte-rendu, verte = toute autre publication. */
+function ensureFilCartouchesCss() {
+  if (document.getElementById('fil-cartouches-css')) return;
+  const l = document.createElement('link');
+  l.id = 'fil-cartouches-css'; l.rel = 'stylesheet'; l.href = 'assets/fil-cartouches.css?v=1';
+  document.head.appendChild(l);
+}
+function filBandeauHtml(post) {
+  const cr = post.type === 'compte_rendu' || !!post.compte_rendu;
+  return cr
+    ? { cls: 'fc-carte fc-cr', band: '<div class="fc-band"><span aria-hidden="true">📄</span><b>COMPTE-RENDU</b><small>d’événement</small></div>' }
+    : { cls: 'fc-carte fc-actu', band: '<div class="fc-band"><span aria-hidden="true">📰</span><b>ACTUALITÉ</b><small>de la communauté</small></div>' };
+}
 function renderCompteRenduBloc(post) {
   const c = post.compte_rendu;
   if (!c) return '';
@@ -551,8 +564,11 @@ function renderPostCard(post, options = {}) {
     ? `${REACTIONS.find(r => (reactions[r.type]||0) === Math.max(...Object.values(reactions)))?.emoji||'❤️'} ${totalReactions}`
     : '';
 
+  ensureFilCartouchesCss();
+  const fc = filBandeauHtml(post);
   return `
-<article class="post-card" id="post-${post.id}" data-post-id="${post.id}">
+<article class="post-card ${fc.cls}" id="post-${post.id}" data-post-id="${post.id}">
+  ${fc.band}
   <div class="post-header">
     <a href="profil.html?id=${post.auteur_id||''}" class="post-auteur-link">
       ${avatarHTML(post)}
@@ -768,6 +784,7 @@ function buildContributeModal() {
 
 /* ── Modal de vue détaillée (façon Facebook) ── */
 function buildDetailModal() {
+  ensureFilCartouchesCss();
   if (document.getElementById('posts-detail-modal')) return;
   const modal = document.createElement('div');
   modal.id = 'posts-detail-modal';
@@ -778,6 +795,8 @@ function buildDetailModal() {
   <button class="pd-close" onclick="Posts.closeDetail()" title="Fermer">✕</button>
   <button class="pd-nav pd-nav-prev" id="pd-nav-prev" onclick="Posts.detailPrev()" title="Publication précédente (↑)" aria-label="Publication précédente">︿</button>
   <button class="pd-nav pd-nav-next" id="pd-nav-next" onclick="Posts.detailNext()" title="Publication suivante (↓)" aria-label="Publication suivante">﹀</button>
+  <button class="pd-side-zone pd-side-prev" id="pd-side-prev" onclick="Posts.detailPrev()" title="Publication précédente (←)" aria-label="Publication précédente">‹</button>
+  <button class="pd-side-zone pd-side-next" id="pd-side-next" onclick="Posts.detailNext()" title="Publication suivante (→)" aria-label="Publication suivante">›</button>
   <div class="pd-hint" id="pd-hint" aria-hidden="true">↕ Faites défiler ou balayez pour changer de publication</div>
   <div class="pd-media" id="pd-media"></div>
   <div class="pd-side">
@@ -1551,6 +1570,9 @@ const Posts = {
     const nextBtn = document.getElementById('pd-nav-next');
     if (prevBtn) prevBtn.disabled = idx <= 0;
     if (nextBtn) nextBtn.disabled = idx === -1 || (idx >= seq.length - 1 && !this._navHasMore);
+    const sp = document.getElementById('pd-side-prev'), sn = document.getElementById('pd-side-next');
+    if (sp) sp.disabled = !!prevBtn && prevBtn.disabled;
+    if (sn) sn.disabled = !!nextBtn && nextBtn.disabled;
   },
 
   /* Petit rappel « faites défiler ou balayez », une seule fois par visite de la page. */
