@@ -13,6 +13,10 @@
    · Pour un utilisateur, « profil public » = ce que sa fiche lui permet réellement de remplir
      (photo, biographie, compétences, résidence, origine, domaine d'activité). Aucune publication
      n'est exigée.
+   · PHOTO DE PROFIL OBLIGATOIRE POUR TOUS (2026-10-09, demande explicite : « trop de profils ne le font pas ») :
+     tout compte concerné (utilisateur, initiative, collectivité) sans photo (logo pour une structure) est
+     bloqué sur sa fiche jusqu'à l'ajout de la photo — QUEL QUE SOIT son âge, son pourcentage ou son état
+     « exempt/terminé ». La photo manquante ne compte jamais comme « seuil atteint ».
    Le serveur calcule tout ; le navigateur (assets/app.js) n'affiche que ce qu'il reçoit via GET /api/auth/me.
    ═══════════════════════════════════════════════════════════════════════════ */
 const Completude = require('./completude');
@@ -47,7 +51,7 @@ async function points(db, user) {
       { cle: 'origine', libelle: "Votre pays d'origine", ok: rempli(ligne.origine1) || rempli(ligne.origine2) },
       { cle: 'domaine', libelle: "Votre domaine d'activité", ok: rempli(ligne.domaine_principal) },
     ].map(i => ({ ...i, lien: `profil.html?completer=${i.cle}` }));
-    return { seuil: SEUIL_UTILISATEUR, items, completude: Completude.evaluer('utilisateur', ligne) };
+    return { seuil: SEUIL_UTILISATEUR, items, photo: items.find(i => i.cle === 'photo'), completude: Completude.evaluer('utilisateur', ligne) };
   }
 
   if (role === 'initiative') {
@@ -62,7 +66,10 @@ async function points(db, user) {
     items.push({ cle: 'origine', libelle: "Le pays d'origine", ok: rempli(ini.origine1) || rempli(ini.origine2) || rempli(ini.pays_origine) || rempli(ligne.origine1) || rempli(ligne.origine2),
       lien: `initiative.html?id=${ref}&completer=origines&version=ordinateur` });
     items.push({ cle: 'domaine', libelle: "Le domaine d'activité", ok: rempli(ini.domaine_principal), lien: 'profil.html?completer=domaine' });
-    return { seuil: SEUIL_AUTRES, items, completude: Completude.evaluer('initiative', ini) };
+    /* Photo d'une structure = son logo (la photo personnelle du responsable n'est pas demandée à l'inscription). */
+    const photo = { ...items.find(i => i.cle === 'logo_url'), libelle: 'Le logo (photo de profil de la structure)' };
+    photo.ok = rempli(ini.logo_url) || rempli(ligne.photo_url);
+    return { seuil: SEUIL_AUTRES, items, photo, completude: Completude.evaluer('initiative', ini) };
   }
 
   if (role === 'collectivite') {
@@ -71,7 +78,9 @@ async function points(db, user) {
       cle: c.cles[0], libelle: majuscule(c.label), ok: c.cles.some(k => rempli(ligne[k])), lien,
     }));
     items.push({ cle: 'origine', libelle: "Le pays d'origine", ok: rempli(ligne.pays_origine_institution) || rempli(ligne.origine1), lien: 'confidentialite.html?completer=origine' });
-    return { seuil: SEUIL_AUTRES, items, completude: Completude.evaluer('collectivite', ligne) };
+    const photo = { ...items.find(i => i.cle === 'logo_url'), libelle: 'Le logo (photo de profil)' };
+    photo.ok = rempli(ligne.logo_url) || rempli(ligne.photo_url);
+    return { seuil: SEUIL_AUTRES, items, photo, completude: Completude.evaluer('collectivite', ligne) };
   }
   return null;
 }
@@ -83,6 +92,15 @@ function resume(p) {
     seuil: p.seuil, total, remplis,
     pct: total ? Math.round((remplis / total) * 100) : 100,
     points: p.items.map(i => ({ cle: i.cle, libelle: i.libelle, lien: i.lien, ok: !!i.ok })),
+  };
+}
+
+/* Obligation « photo seule » : le compte a déjà satisfait (ou est exempté de) l'obligation de pourcentage,
+   mais n'a pas de photo. Aucune écriture en base : l'obligation s'éteint toute seule dès que la photo existe. */
+function blocagePhoto(p) {
+  return {
+    actif: true, photo_seule: true, seuil: 100, total: 1, remplis: 0, pct: 0,
+    points: [{ cle: p.photo.cle, libelle: p.photo.libelle, lien: p.photo.lien, ok: false }],
   };
 }
 
@@ -98,10 +116,11 @@ async function etat(db, userBrut) {
   if (!user) return null;
   if (Number(user.is_demo) === 1 || user.is_demo === true || Number(user.compte_masque) === 1) return null;
   const ligne = await db.prepare('SELECT etat FROM profil_obligatoire WHERE user_id=?').get(user.id);
-  if (ligne && ligne.etat !== 'requis') return null;
 
   const p = await points(db, user);
   if (!p) return null;
+  const photoManque = !!(p.photo && !p.photo.ok);
+  if (ligne && ligne.etat !== 'requis') return photoManque ? blocagePhoto(p) : null;
   const r = resume(p);
 
   if (!ligne) {
@@ -109,17 +128,18 @@ async function etat(db, userBrut) {
     const vide = !p.completude || p.completude.remplis === 0;
     if (!nouveau && !vide) {
       await db.prepare("INSERT INTO profil_obligatoire (user_id, etat) VALUES (?, 'exempt')").run(user.id);
-      return null;
+      return photoManque ? blocagePhoto(p) : null;
     }
     if (r.pct >= r.seuil) {
       await db.prepare("INSERT INTO profil_obligatoire (user_id, etat, termine_at) VALUES (?, 'termine', datetime('now'))").run(user.id);
-      return null;
+      return photoManque ? blocagePhoto(p) : null;
     }
     await db.prepare("INSERT INTO profil_obligatoire (user_id, etat) VALUES (?, 'requis')").run(user.id);
     return { actif: true, ...r };
   }
 
   if (r.pct >= r.seuil) {
+    if (photoManque) return blocagePhoto(p);
     await db.prepare("UPDATE profil_obligatoire SET etat='termine', termine_at=datetime('now') WHERE user_id=? AND etat='requis'").run(user.id);
     return { termine: true, pct: r.pct, seuil: r.seuil };
   }

@@ -1088,7 +1088,9 @@ function poBandeau(g) {
     document.body.appendChild(b);
     document.body.classList.add('po-avec-bandeau');
   }
-  b.innerHTML = `<span>📋 État de votre profil : <b>${g.pct} %</b> — objectif <b>${g.seuil} %</b></span><button type="button" id="po-voir">Voir ce qu’il me reste à remplir</button>`;
+  b.innerHTML = g.photo_seule
+    ? `<span>📷 Une <b>photo de profil</b> est obligatoire pour utiliser Diaspo’Actif</span><button type="button" id="po-voir">Ajouter ma photo</button>`
+    : `<span>📋 État de votre profil : <b>${g.pct} %</b> — objectif <b>${g.seuil} %</b></span><button type="button" id="po-voir">Voir ce qu’il me reste à remplir</button>`;
   b.querySelector('#po-voir').addEventListener('click', () => poOuvrirCarte(g));
 }
 function poRetirerBandeau() {
@@ -1106,6 +1108,7 @@ window.poDeconnexion = poDeconnexion;
 
 function poOuvrirCarte(g) {
   injectPoStyles();
+  if (g.photo_seule) return poOuvrirCartePhoto(g);
   const manquants = g.points.filter(p => !p.ok);
   const faits = g.points.filter(p => p.ok);
   const ligneFaite = p => `<li><div class="rp-ligne rp-fait"><span aria-hidden="true">✅</span><span class="rp-lib">${esc2Rp(p.libelle)}</span></div></li>`;
@@ -1130,14 +1133,28 @@ function poOuvrirCarte(g) {
   return ov;
 }
 
-function poMerci() {
+/* Seule la photo manque : message dédié, sans barre de pourcentage. */
+function poOuvrirCartePhoto(g) {
+  const p = g.points[0];
+  const ov = rpOuvrirOverlay(`
+    <div class="rp-icone" aria-hidden="true">📷</div>
+    <h2 class="rp-titre" id="rp-titre">Merci d’ajouter votre photo de profil</h2>
+    <p class="rp-texte">La photo de profil (le logo pour une structure) est <strong>obligatoire</strong> : elle permet aux autres membres de vous reconnaître et de vous faire confiance. Il suffit d’un instant.</p>
+    <ul class="rp-liste"><li><a class="rp-ligne" href="${esc2Rp(p.lien)}"><span aria-hidden="true">📝</span><span class="rp-lib">${esc2Rp(p.libelle)}</span><span class="rp-fleche" aria-hidden="true">›</span></a></li></ul>
+    <p class="rp-signature">L'équipe Diaspo'Actif</p>
+    <button type="button" class="po-deco" id="po-deco">Se déconnecter</button>`);
+  ov.querySelector('#po-deco').addEventListener('click', poDeconnexion);
+  return ov;
+}
+
+function poMerci(photo) {
   poMarquer(false);
   window.__poActif = false;
   poRetirerBandeau();
   const ov = rpOuvrirOverlay(`
     <div class="rp-icone" aria-hidden="true">💙</div>
-    <h2 class="rp-titre" id="rp-titre">Merci, votre profil public est renseigné !</h2>
-    <p class="rp-texte">Vous êtes maintenant mieux placé pour être trouvé et mis en relation sur la plateforme.</p>
+    <h2 class="rp-titre" id="rp-titre">${photo ? 'Merci, votre photo de profil est enregistrée !' : 'Merci, votre profil public est renseigné !'}</h2>
+    <p class="rp-texte">${photo ? 'Les autres membres peuvent maintenant vous reconnaître.' : 'Vous êtes maintenant mieux placé pour être trouvé et mis en relation sur la plateforme.'}</p>
     <p class="rp-signature">L'équipe Diaspo'Actif</p>
     <button type="button" class="rp-bouton" id="po-fin">Continuer</button>`);
   ov.querySelector('#po-fin').addEventListener('click', () => ov.remove());
@@ -1149,7 +1166,12 @@ function appliquerProfilObligatoire(user, opts) {
   if (!user) return false;
   const g = user.profil_obligatoire;
   if (g && g.termine) { if (poFlag()) poMerci(); return false; }
-  if (!g || !g.actif) { window.__poActif = false; poMarquer(false); poRetirerBandeau(); return false; }
+  if (!g || !g.actif) {
+    const etait = window.__poActif || poFlag();
+    window.__poActif = false; poMarquer(false); poRetirerBandeau();
+    if (etait && opts.force) poMerci(true);
+    return false;
+  }
   g.apresEnregistrement = !!opts.force && window.__poRemplis != null && g.remplis > window.__poRemplis;
   window.__poRemplis = g.remplis;
   window.__poActif = true;
