@@ -1303,7 +1303,7 @@ function showPremierePublicationBanner(user) {
   const bar = document.createElement('div');
   bar.id = 'premiere-pub-banner';
   bar.style.cssText = 'position:sticky;top:0;z-index:45;background:#DBEAFE;border-bottom:1px solid #93C5FD;color:#1E3A8A;padding:10px 16px;display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;font-size:13.5px;font-weight:600;';
-  bar.innerHTML = `<span>✍️ Vous n'avez encore rien partagé avec la diaspora. Faites votre première publication !</span>
+  bar.innerHTML = `<span>✍️ Vous n'avez encore rien partagé avec la diaspora. Faites votre première publication ! 🛡️ Cette action fait progresser votre indice de fiabilité.</span>
     <a href="fil-actualite.html?publier=1" style="background:#1E3A8A;color:#fff;padding:6px 14px;border-radius:999px;font-weight:700;text-decoration:none;white-space:nowrap;">Écrire ma publication</a>
     <button type="button" onclick="document.getElementById('premiere-pub-banner').remove()" style="background:none;border:none;color:#1E3A8A;font-size:18px;cursor:pointer;line-height:1;padding:0 4px;" title="Fermer" aria-label="Fermer">✕</button>`;
   document.body.prepend(bar);

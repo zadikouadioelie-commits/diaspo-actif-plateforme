@@ -44,7 +44,7 @@ async function relancerPublicationsManquantes({ db, creerNotif, origine, mainten
     if (dernier && maintenant - ms(dernier.created_at) < INTERVALLE_MS) { bilan.reportes++; continue; }
     await db.prepare('INSERT INTO publication_relances (user_id) VALUES (?)').run(c.id);
     await creerNotif(c.id, 'publication_relance', 'Partagez votre expérience',
-      "Vous n'avez encore rien partagé avec la diaspora. Écrivez votre publication.",
+      "Vous n'avez encore rien partagé avec la diaspora. Écrivez votre publication. 🛡️ Cette action fait progresser votre indice de fiabilité.",
       { lien: `${origine}/fil-actualite.html?publier=1` });
     bilan.relances++;
   }
