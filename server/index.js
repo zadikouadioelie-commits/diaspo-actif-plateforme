@@ -19771,6 +19771,12 @@ route("GET", "/api/ads/:id/stats", async (req, res, params) => {
 
 /* POST /api/ads/create — crée une campagne (multipart: media image/vidéo) */
 /* Compte le nombre de comptes correspondant à un ciblage géo + listes Réseau Pro (cumulatif). */
+/* « Vrais » comptes joignables par une publicité (2026-10-09, bug réel : l'audience estimée affichait 136 comptes alors que la
+   plateforme n'en compte que 45 — le calcul incluait 86 comptes supprimés/anonymisés (nom « Compte supprimé ») et 5 comptes de
+   démonstration, que tous les autres compteurs de la plateforme excluent déjà). Même filtre pour le total ET la répartition. */
+const ADS_COMPTES_REELS = "u.role != 'administrateur' AND (u.compte_masque IS NULL OR u.compte_masque=0) AND (u.is_demo IS NULL OR u.is_demo=FALSE) AND u.nom != 'Compte supprimé'";
+/* Pays saisis librement (« France », « france », « FRANCE »…) : on les compare sans tenir compte de la casse ni des espaces. */
+const memePays = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase() && String(a || '').trim() !== '';
 async function adsComptesCiblage({ zones = [], ville, departement, region, pays, listes = [] }) {
   let sql = `SELECT COUNT(DISTINCT u.id) AS n FROM users u WHERE ${ADS_COMPTES_REELS}`;
   const args = [];
@@ -19782,12 +19788,6 @@ async function adsComptesCiblage({ zones = [], ville, departement, region, pays,
   if (zoneConds.length) sql += ' AND (' + zoneConds.join(' OR ') + ')';
   if (listes.length) {
     const ph = listes.map(() => '?').join(',');
-/* « Vrais » comptes joignables par une publicité (2026-10-09, bug réel : l'audience estimée affichait 136 comptes alors que la
-   plateforme n'en compte que 45 — le calcul incluait 86 comptes supprimés/anonymisés (nom « Compte supprimé ») et 5 comptes de
-   démonstration, que tous les autres compteurs de la plateforme excluent déjà). Même filtre pour le total ET la répartition. */
-const ADS_COMPTES_REELS = "u.role != 'administrateur' AND (u.compte_masque IS NULL OR u.compte_masque=0) AND (u.is_demo IS NULL OR u.is_demo=FALSE) AND u.nom != 'Compte supprimé'";
-/* Pays saisis librement (« France », « france », « FRANCE »…) : on les compare sans tenir compte de la casse ni des espaces. */
-const memePays = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase() && String(a || '').trim() !== '';
     sql += ` AND u.id IN (SELECT user_id FROM listes_diffusion_contacts WHERE liste_id IN (${ph}) AND user_id IS NOT NULL)`;
     args.push(...listes);
   }
@@ -33332,6 +33332,12 @@ ${jsonLd}
     if (req.method === 'GET' && pathname === '/api/listes-diffusion') {
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const q = parsed.query;
+      /* « Toutes les affiliations » : créée au premier affichage (rattrapage des affiliations existantes) puis resynchronisée —
+         la liste est donc toujours le reflet réel des affiliations acceptées, même si un chemin d'affiliation l'avait ignorée. */
+      if (q.archived !== '1') {
+        const mesInitiatives = await db.prepare("SELECT id FROM initiatives WHERE owner_user_id=?").all(me.id);
+        for (const i of mesInitiatives) await syncListeAffiliations(i.id);
+      }
       let sql = `
         SELECT l.*, COUNT(c.id) AS nb_contacts
         FROM listes_diffusion l
@@ -33343,12 +33349,6 @@ ${jsonLd}
       const listes = await db.prepare(sql).all(...args);
       return sendJSON(res, 200, { listes });
     }
-      /* « Toutes les affiliations » : créée au premier affichage (rattrapage des affiliations existantes) puis resynchronisée —
-         la liste est donc toujours le reflet réel des affiliations acceptées, même si un chemin d'affiliation l'avait ignorée. */
-      if (q.archived !== '1') {
-        const mesInitiatives = await db.prepare("SELECT id FROM initiatives WHERE owner_user_id=?").all(me.id);
-        for (const i of mesInitiatives) await syncListeAffiliations(i.id);
-      }
 
     /* ── Applique un objet de filtres à une requête SQL sur `users` — utilisé par génération intelligente + refresh dynamique ── */
     function appliquerFiltresListe(filtres) {
