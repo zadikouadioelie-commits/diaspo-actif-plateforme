@@ -1768,6 +1768,7 @@
   const MODS_COMPTE = [
     { t: 'Confidentialité', i: 'lock', h: '#/confidentialite', d: 'Vos données et votre visibilité', r: { utilisateur: 1, initiative: 1 } },
     { t: 'Mon abonnement', i: 'star', h: '#/abonnement', d: 'Premium et échéances', r: { utilisateur: 1, initiative: 1 } },
+    { t: 'Structure et organisation', i: 'people', h: '#/structure', d: 'Type, forme juridique, taille, organisme financier', r: { initiative: 1 } },
     { t: 'Liaison de comptes', i: 'people', h: '#', act: 'switch', d: 'Passer d’un compte à un autre', r: { utilisateur: 1, initiative: 1 } }
   ];
   const MENU_DESK = ['Soumettre à Diaspo’Actif', 'Mes projets', 'Évaluation de projet', 'CRM partagé', 'Emploi et stages', 'Paiements', 'Mes demandes de devis', 'Ma localisation', 'Programmation', 'Support pilote', 'Apparence', 'Mes statistiques'];
