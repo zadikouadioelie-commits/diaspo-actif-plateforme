@@ -21821,7 +21821,7 @@ route("GET", "/api/honneur/mon-bareme", async (req, res) => {
   const premier = honneur.cycleDepuisDebut(debut);
   const mode = await honneur.modeEligibilite();
   const el = await honneur.eligiblePremium(user.id, mode);
-  const base = { concerne: !!categorie, categorie, debut_programme: debut, mode_eligibilite: mode,
+  const base = { concerne: !!categorie, categorie, debut_programme: debut, mode_eligibilite: mode, premium_requis_des: await honneur.premiumRequisDes(),
     premium: { actif: el.origine.actif, origine: el.origine.origine, sous_type: el.origine.sous_type, libelle: el.origine.libelle, eligible: el.ok } };
   if (!categorie) return sendJSON(res, 200, { ...base, message: "Le programme concerne les comptes utilisateurs et les initiatives." });
 
@@ -21886,7 +21886,7 @@ route("GET", "/api/admin/honneur/cycles", async (req, res) => {
   if (!(await exigerAdmin(req, res))) return;
   const debut = await honneur.debutProgramme();
   sendJSON(res, 200, { debut_programme: debut, cycles: await db.prepare("SELECT * FROM honneur_cycles ORDER BY debut DESC").all(), mode_eligibilite: await honneur.modeEligibilite(),
-    parametres: { honneur_debut: debut, honneur_eligibilite: await honneur.parametre('honneur_eligibilite', 'auto'), honneur_mois_offert_auto: await honneur.parametre('honneur_mois_offert_auto', 'actif') } });
+    parametres: { honneur_debut: debut, honneur_eligibilite: await honneur.parametre('honneur_eligibilite', 'auto'), honneur_premium_requis_des: await honneur.premiumRequisDes(), honneur_mois_offert_auto: await honneur.parametre('honneur_mois_offert_auto', 'actif') } });
 });
 
 route("POST", "/api/admin/honneur/cycles/:cle/cloturer", async (req, res, params, body) => {
@@ -21904,7 +21904,8 @@ route("PUT", "/api/admin/honneur/parametres", async (req, res, params, body) => 
   const ecrire = async (cle, valeur, desc) => db.prepare(`INSERT INTO parametres_plateforme (cle, valeur, type, description, updated_at, updated_by) VALUES (?,?,'texte',?,?,?)
       ON CONFLICT(cle) DO UPDATE SET valeur=excluded.valeur, updated_at=excluded.updated_at, updated_by=excluded.updated_by`).run(cle, String(valeur), desc, new Date().toISOString(), admin.id);
   if (body.honneur_debut !== undefined) { if (!/^\d{4}-\d{2}-\d{2}$/.test(String(body.honneur_debut))) return sendJSON(res, 400, { error: "Date de lancement invalide." }); await ecrire('honneur_debut', body.honneur_debut, "Début du premier cycle des Comptes à l'honneur"); }
-  if (body.honneur_eligibilite !== undefined) { if (!['auto', 'payants', 'tous_premium'].includes(body.honneur_eligibilite)) return sendJSON(res, 400, { error: "Mode d'éligibilité invalide." }); await ecrire('honneur_eligibilite', body.honneur_eligibilite, "Éligibilité : auto, payants ou tous_premium"); }
+  if (body.honneur_eligibilite !== undefined) { if (!['auto', 'payants', 'tous_premium', 'aucun'].includes(body.honneur_eligibilite)) return sendJSON(res, 400, { error: "Mode d'éligibilité invalide." }); await ecrire('honneur_eligibilite', body.honneur_eligibilite, "Éligibilité : auto, payants ou tous_premium"); }
+  if (body.honneur_premium_requis_des !== undefined) { if (!/^\d{4}-\d{2}-\d{2}$/.test(String(body.honneur_premium_requis_des))) return sendJSON(res, 400, { error: "Date invalide." }); await ecrire('honneur_premium_requis_des', body.honneur_premium_requis_des, "Date à partir de laquelle la condition Premium s'applique à nouveau"); }
   if (body.honneur_mois_offert_auto !== undefined) { await ecrire('honneur_mois_offert_auto', body.honneur_mois_offert_auto === 'inactif' ? 'inactif' : 'actif', "Application automatique du mois offert"); }
   if (Array.isArray(body.honneur_bareme)) {
     const ok = body.honneur_bareme.every(p => honneur.BAREME_DEFAUT.some(d => d.k === p.k) && Number(p.poids) > 0 && Number(p.seuil) > 0);

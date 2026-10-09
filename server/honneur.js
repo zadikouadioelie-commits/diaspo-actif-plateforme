@@ -110,9 +110,13 @@ module.exports = function creerMoteurHonneur(deps) {
     return { actif: true, origine: 'promotion', sous_type: 'autre', libelle: 'Promotion', ua };
   }
   /* 'payants' dès qu'un compte a réellement payé ; sinon tous les Premium actifs (transition). Forçable par l'administrateur. */
+  /* Date à partir de laquelle la condition Premium s'applique à nouveau (2026-10-09, demande explicite) : le Premium est gratuit
+     pendant deux mois (fin le 3 décembre 2026) ; d'ici là le statut Premium n'est PAS pris en compte, tout le monde peut concourir. */
+  async function premiumRequisDes() { return String(await parametre('honneur_premium_requis_des', '2026-12-03')).slice(0, 10); }
   async function modeEligibilite() {
     const force = String(await parametre('honneur_eligibilite', 'auto'));
-    if (force === 'payants' || force === 'tous_premium') return force;
+    if (force === 'payants' || force === 'tous_premium' || force === 'aucun') return force;
+    if (dateParisISO() < await premiumRequisDes()) return 'aucun';
     try {
       const n = Number((await db.prepare(`SELECT COUNT(*) AS n FROM user_accreditations ua JOIN accred_definitions ad ON ad.id=ua.accred_id
           WHERE ad.type IN ('initiative_abonne','utilisateur_abonne') AND ua.statut='active' AND COALESCE(ua.type_tarif,'') NOT IN ('decouverte','lien_adherent','honneur')
@@ -122,6 +126,7 @@ module.exports = function creerMoteurHonneur(deps) {
   }
   async function eligiblePremium(userId, mode) {
     const o = await premiumOrigine(userId);
+    if (mode === 'aucun') return { ok: true, origine: o };
     if (!o.actif) return { ok: false, origine: o };
     const ok = mode === 'tous_premium' ? true : (o.origine === 'payant' || o.origine === 'honneur');
     return { ok, origine: o };
@@ -179,7 +184,7 @@ module.exports = function creerMoteurHonneur(deps) {
   async function classerCycle(cycle) {
     const mode = await modeEligibilite(); const bar = await bareme();
     const comptes = await db.prepare(`SELECT u.* FROM users u WHERE u.role IN ('utilisateur','initiative') AND (u.compte_masque IS NULL OR u.compte_masque=0) AND (u.is_demo IS NULL OR u.is_demo=FALSE)
-        AND COALESCE(u.suspendu_definitif,0)=0 AND u.nom<>'Compte supprimé' AND EXISTS (SELECT 1 FROM user_accreditations ua JOIN accred_definitions ad ON ad.id=ua.accred_id WHERE ua.user_id=u.id AND ad.type IN ('initiative_abonne','utilisateur_abonne') AND ua.statut='active')`).all();
+        AND COALESCE(u.suspendu_definitif,0)=0 AND u.nom<>'Compte supprimé' ${mode === 'aucun' ? '' : "AND EXISTS (SELECT 1 FROM user_accreditations ua JOIN accred_definitions ad ON ad.id=ua.accred_id WHERE ua.user_id=u.id AND ad.type IN ('initiative_abonne','utilisateur_abonne') AND ua.statut='active')"}`).all();
     const lignes = [];
     for (const u of comptes) {
       const el = await eligiblePremium(u.id, mode);
@@ -287,7 +292,7 @@ module.exports = function creerMoteurHonneur(deps) {
   }
 
   return { BAREME_DEFAUT, COUP_DE_POUCE_MAX, COUP_DE_POUCE_PALIERS, cycleContenant, cycleDepuisDebut, cyclesAClore, nbLaureats, scorer, ajouterMois,
-    parametre, debutProgramme, bareme, premiumOrigine, modeEligibilite, eligiblePremium, mesurer, activiteBrute, boostCycle, categorieDe, nbComptesCategorie,
+    parametre, debutProgramme, premiumRequisDes, bareme, premiumOrigine, modeEligibilite, eligiblePremium, mesurer, activiteBrute, boostCycle, categorieDe, nbComptesCategorie,
     classerCycle, appliquerMoisOffert, cloturerCycle, cronQuotidien, laureatsAffiches };
 };
 module.exports.ajouterMois = ajouterMois;

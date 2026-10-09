@@ -43,7 +43,8 @@
     else intro = `Le dernier cycle mesuré va du <b>${esc(dateFr(d.fenetre.debut))}</b> au <b>${esc(dateFr(d.fenetre.fin))}</b> (exclu). Le troisième mois n'est mesuré pour personne.`;
 
     let etat = '';
-    if (!d.premium.actif) etat = '<div class="hn-etat">Le programme est réservé aux comptes <b>Premium</b>. Passez au Premium pour participer au Trophée de la Diaspora.</div>';
+    if (d.mode_eligibilite === 'aucun') etat = `<div class="hn-etat">✓ Pendant la période de gratuité de Premium${d.premium_requis_des ? ' (jusqu’au ' + esc(dateFr(d.premium_requis_des)) + ')' : ''}, le statut Premium n’est pas pris en compte : tous les comptes peuvent participer. Passé ce délai, il sera à nouveau pris en compte.</div>`;
+    else if (!d.premium.actif) etat = '<div class="hn-etat">Le programme est réservé aux comptes <b>Premium</b>. Passez au Premium pour participer au Trophée de la Diaspora.</div>';
     else if (!d.premium.eligible) etat = `<div class="hn-etat">Votre Premium (${esc(d.premium.libelle)}) ne permet pas encore de concourir : seuls les abonnements réellement payants participent.</div>`;
     else etat = `<div class="hn-etat">✓ Votre Premium (${esc(d.premium.libelle)}) vous permet de participer.</div>`;
 

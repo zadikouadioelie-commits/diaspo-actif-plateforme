@@ -1550,7 +1550,7 @@
     return `<a class="vcard${wide ? ' wide' : ''}" href="#/video/${v.id}"><div class="vth">${videoThumb(v)}${bientot ? '<span class="vd" style="background:var(--orange-d)">Bientôt</span>' : (v.duree_secondes ? `<span class="vd">${fmtDuree(v.duree_secondes)}</span>` : '')}${bientot ? '' : '<span class="vp">▶</span>'}</div><div class="vt">${esc(v.titre)}</div>${v.categorie ? `<div class="small muted">${esc(v.categorie)}</div>` : ''}</a>`;
   }
   const miniCard = (href, photo, nom, sub, round) => `<a class="mc" href="${href}"><div class="av big" style="border-radius:${round ? '50%' : '16px'};margin:0 auto 8px">${photo ? `<img src="${attrUrl(photo)}" alt="" loading="lazy" onerror="this.remove()">` : esc(initials(nom))}</div><div class="mn">${esc(nom)}</div>${sub ? `<div class="small muted ell">${esc(sub)}</div>` : ''}</a>`;
-  const SEC_ICONS = { 'home-actus': 'fil', 'home-honneur': 'star', 'home-videos': 'play', 'home-init': 'heart', 'home-shops': 'shop', 'home-temo': 'comment', 'home-part': 'people' };
+  const SEC_ICONS = { 'home-actus': 'fil', 'home-honneur': 'star', 'home-troph': 'star', 'home-videos': 'play', 'home-init': 'heart', 'home-shops': 'shop', 'home-temo': 'comment', 'home-part': 'people' };
   const secHead = (titre, icone, more) => `<div class="sec"><h2 class="sec-t"><span class="sic">${ic(icone || 'star')}</span><span>${esc(titre)}</span></h2>${more || ''}</div>`;
   const homeBlock = (id, titre, html, more, sub) => { const el = $('#' + id); if (!el || !html) return; el.innerHTML = secHead(titre, SEC_ICONS[id], more) + (sub ? `<p class="sec-sub">${esc(sub)}</p>` : '') + html; };
 
@@ -1567,7 +1567,7 @@
       <div class="card"><div class="pad"><h2 class="sec-t sec-in"><span class="sic">${ic('star')}</span><span>Pourquoi Diaspo’Actif ?</span></h2>
         <p style="margin:0 0 10px">La diaspora africaine est un levier de développement majeur, mais ses initiatives restent dispersées, invisibles, sans réseau. Diaspo’Actif change ça.</p>
         <div class="tags" style="margin:0"><span class="badge">👥 Rassembler les talents</span><span class="badge">🗂️ Organiser les initiatives</span><span class="badge">🚀 Mobiliser pour un impact durable</span></div></div></div>
-      <div id="home-actus"></div><div id="home-shops"></div>${pubSlot('vitrine_section')}<div id="home-temo"></div><div id="home-part"></div>`;
+      <div id="home-actus"></div><div id="home-troph"></div><div id="home-shops"></div>${pubSlot('vitrine_section')}<div id="home-temo"></div><div id="home-part"></div>`;
     loadHome();
     if (window.MMap) { if (S.home.stopMap) S.home.stopMap(); S.home.stopMap = window.MMap.mount($('#home-map')); }
   }
@@ -1586,8 +1586,14 @@
       const v = (await api('/api/videos-tutoriels?limit=8')).videos || []; if (!v.length) return;
       homeBlock('home-videos', 'Tutoriels vidéo', `<div class="hs">${v.map(x => videoCard(x)).join('')}</div>`, '<a href="#/videos" class="sec-more">Tout voir ›</a>', 'Apprenez à utiliser Diaspo’Actif en quelques minutes.');
     });
-    /* EMPLACEMENT RÉSERVÉ (2026-10-09, décision de l'utilisateur) : ancien bloc « Initiatives à découvrir », retiré.
-       Le système de promotion le plus actif de la plateforme viendra ICI (même place que sur l'accueil ordinateur, index.html). */
+    /* Trophée de la Diaspora — « Prochainement » (2026-10-09) : occupe l'emplacement de l'ancien bloc « Initiatives à découvrir »
+       (même place que sur l'accueil ordinateur, index.html). À remplacer par les comptes mis à l'honneur une fois le premier cycle clos. */
+    homeBlock('home-troph', 'Trophée de la Diaspora', `<div class="card" style="box-shadow:0 0 0 2px #E7B93C,0 8px 22px rgba(231,185,60,.28)"><img src="assets/trophee-diaspora-affiche.webp" alt="Trophée de la Diaspora — les comptes les plus actifs sont récompensés" loading="lazy" style="width:100%;height:auto;display:block;border-radius:14px 14px 0 0"><div class="pad">
+        <h3 style="margin:0 0 6px;font-size:17px">Les comptes les plus actifs seront mis à l’honneur</h3>
+        <p style="margin:0 0 10px">Prochainement, ici seront affichés les comptes les plus actifs de notre plateforme. Publiez, échangez, participez : votre compte pourrait être le prochain.</p>
+        <div class="small" style="font-weight:700;margin:0 0 4px">Pour en faire partie</div>
+        <ul style="margin:0 0 10px;padding-left:18px"><li>Être actif régulièrement : publications, échanges avec la communauté, événements et comptes-rendus, réseau.</li><li>Avoir un profil soigné et une activité fiable.</li></ul>
+        <div class="small" style="background:#FFF8E1;border:1.5px solid #E3B84A;border-radius:12px;padding:10px 12px;color:#5c4200"><b>Premium :</b> pendant la période de gratuité de Premium (jusqu’au 3 décembre 2026), le statut Premium n’est pas pris en compte. Passé ce délai, il le sera à nouveau.</div></div></div>`, '', 'Prochainement');
     safe(async () => {
       const l = ((await api('/api/vitrines')).vitrines || []).slice(0, 10); if (!l.length) return;
       homeBlock('home-shops', 'Boutiques de la diaspora', `<div class="hs">${l.map(v => miniCard('#/profil/i/' + encodeURIComponent(v.id), v.logo_url, v.boutique_nom || v.nom, [v.ville, v.pays].filter(Boolean).join(', '))).join('')}</div>`, '<a href="#/boutiques" class="sec-more">Toutes ›</a>');

@@ -570,6 +570,22 @@
   font-weight: 600;
   color: var(--muted);
 }
+.hp-trophee {
+  display: grid;
+  grid-template-columns: minmax(220px, 300px) 1fr;
+  gap: 32px;
+  align-items: center;
+  background: #fff;
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 0 0 3px #E7B93C, 0 14px 38px rgba(231,185,60,.30);
+}
+.hp-trophee img { width: 100%; height: auto; display: block; border-radius: 14px; }
+.hp-trophee h3 { font-size: 15px; margin: 18px 0 8px; color: #0D1B2A; }
+.hp-trophee ul { margin: 0 0 12px; padding-left: 20px; color: #3b4a60; font-size: 14.5px; line-height: 1.6; }
+.hp-trophee p { color: #3b4a60; font-size: 15px; line-height: 1.6; margin: 0; }
+.hp-trophee .hp-trophee-premium { background: #FFF8E1; border: 1.5px solid #E3B84A; border-radius: 12px; padding: 12px 14px; font-size: 13.5px; color: #5c4200; }
+@media (max-width: 700px) { .hp-trophee { grid-template-columns: 1fr; gap: 18px; padding: 16px; } }
 .hp-discover-btn {
   display: inline-flex;
   align-items: center;
@@ -1454,9 +1470,27 @@
     </div>
   </section>
 
-  <!-- ===== EMPLACEMENT RÉSERVÉ (2026-10-09, décision de l'utilisateur) =====
-       Ancienne section « Initiatives à la une », retirée. Le système de promotion le plus actif de la plateforme viendra ICI
-       (même place sur téléphone : voir assets/m.js, accueil, entre « Tutoriels vidéo » et « Boutiques de la diaspora »). -->
+  <!-- ===== SECTION : TROPHÉE DE LA DIASPORA — PROCHAINEMENT (2026-10-09) =====
+       Occupe l'emplacement de l'ancienne section « Initiatives à la une » (même place sur téléphone : assets/m.js, accueil).
+       À remplacer par l'affichage des comptes mis à l'honneur une fois le premier cycle clos (assets/honneur-affichage.js). -->
+  <section class="hp-section" id="hp-trophee-bientot">
+    <div class="hp-section-inner">
+      <div class="hp-trophee">
+        <img src="assets/trophee-diaspora-affiche.webp" alt="Trophée de la Diaspora — les comptes les plus actifs sont récompensés" loading="lazy">
+        <div>
+          <div class="hp-section-eyebrow">Trophée de la Diaspora · Prochainement</div>
+          <h2 class="hp-section-title">Les comptes les plus actifs seront mis à l’honneur</h2>
+          <p>Prochainement, ici seront affichés les comptes les plus actifs de notre plateforme. Publiez, échangez, participez : votre compte pourrait être le prochain.</p>
+          <h3>Pour en faire partie</h3>
+          <ul>
+            <li>Être actif régulièrement : publications, échanges avec la communauté, événements et comptes-rendus, réseau.</li>
+            <li>Avoir un profil soigné et une activité fiable.</li>
+          </ul>
+          <div class="hp-trophee-premium"><strong>Premium :</strong> pendant la période de gratuité de Premium (jusqu’au 3 décembre 2026), le statut Premium n’est pas pris en compte. Passé ce délai, il le sera à nouveau.</div>
+        </div>
+      </div>
+    </div>
+  </section>
 
   <!-- ===== SECTION 6 : WIDGET ANNUAIRE ===== -->
   <section class="hp-section hp-annuaire" style="padding: 48px 0;">
