@@ -472,7 +472,7 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
                qu'il s'agit de la même valeur. Source unique : i-nom sert désormais aussi de
                dénomination officielle à la soumission (voir le handler i-submit). -->
           <div class="grid-2">
-            <div><label>Numéro d'immatriculation (RCCM, SIREN, IFU, n° d'association…) <span class="i-admin-req" style="color:#2563EB">*</span></label><input type="text" id="i-immat" placeholder="Ex : RCCM CI-ABJ-2024-B-1234"></div>
+            <div id="i-immat-zone"></div>
           </div>
           <div class="grid-2" style="margin-top:12px">
             <div><label>Forme juridique <span class="i-admin-req" style="color:#2563EB">*</span></label><input type="text" id="i-forme-juridique" placeholder="Association loi 1901, SARL, ONG…"></div>
@@ -1483,6 +1483,7 @@ document.getElementById("i-submit").addEventListener("click",async()=>{
     req(domaine,"Domaine d'activité");
     if(statutCreation==="existante"){
       req(immat,"Numéro d'immatriculation");
+      { const mImmat = ImmatType.valider("i-immat-type","i-immat"); if (mImmat) throw new Error(mImmat); }
       req(formeJuridique,"Forme juridique");req(dateCreationStructure,"Date de création de la structure");
     }
     if(pwd!==pwd2)throw new Error("Les mots de passe ne correspondent pas.");
@@ -1528,6 +1529,7 @@ document.getElementById("i-submit").addEventListener("click",async()=>{
       /* "Dénomination officielle" retirée du formulaire — même valeur que "Nom de l'organisation". */
       denomination_officielle:nom||null,
       numero_immatriculation:immat||null,
+      type_immatriculation:(document.getElementById("i-immat-type")||{}).value||null,
       forme_juridique:formeJuridique||null,
       date_creation_structure:dateCreationStructure||null,
       numero_fiscal:document.getElementById("i-numero-fiscal").value.trim()||null,
@@ -1785,6 +1787,8 @@ function collecterTerritoires(){
 <script src="assets/password-toggle.js"></script>
 <script src="/assets/guided-tour.js"></script>
 <script src="/assets/tours/tour-inscription.js"></script>
+<script src="assets/immat-type.js?v=1"></script>
+<script>ImmatType.monter(document.getElementById('i-immat-zone'), { inputId: 'i-immat', typeId: 'i-immat-type' });</script>
 <script src="assets/inscription-film.js?v=14"></script>
 </body>
 </html>

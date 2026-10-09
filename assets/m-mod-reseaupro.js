@@ -981,7 +981,8 @@ textarea.rp-in{min-height:96px;resize:vertical}
       '<button class="btn out block" id="rp-vis-go">Enregistrer la visibilité</button>' +
       '<div class="h2">IDENTITÉ DANS LE RÉSEAU</div><div class="card pad">' +
       '<label class="rp-lab" style="margin-top:0" for="rp-p-pays">Pays d’immatriculation</label><select class="rp-in" id="rp-p-pays"><option value="">— Sélectionner —</option>' + Object.entries(PAYS_IMMAT).map(([k, v]) => '<option value="' + k + '" ' + (m.pays_immatriculation === k ? 'selected' : '') + '>' + esc(v) + '</option>').join('') + '<option value="AUTRE" ' + (m.pays_immatriculation && !PAYS_IMMAT[m.pays_immatriculation] ? 'selected' : '') + '>Autre pays</option></select>' +
-      '<label class="rp-lab" for="rp-p-immat">Numéro officiel d’immatriculation *</label><input class="rp-in" id="rp-p-immat" maxlength="60" autocomplete="off" value="' + esc(m.numero_immatriculation || '') + '" placeholder="SIRET, BCE, RCCM, NINEA…">' + verif +
+      '<div id="rp-p-immat-zone"></div>' + verif +
+      '<label class="rp-lab" for="rp-p-fiscal">Numéro fiscal <span style="font-weight:400">(facultatif — +1 point de fiabilité)</span></label><input class="rp-in" id="rp-p-fiscal" maxlength="60" value="' + esc(m.numero_fiscal || '') + '">' +
       '<label class="rp-lab" for="rp-p-annee">Année de création</label><input class="rp-in" id="rp-p-annee" type="number" inputmode="numeric" min="1900" max="2099" value="' + esc(m.annee_creation || '') + '">' +
       '<label class="rp-lab" for="rp-p-taille">Taille de la structure</label><select class="rp-in" id="rp-p-taille"><option value="">— Sélectionner —</option>' + opt(TAILLES, m.taille_structure) + '</select>' +
       '<label class="rp-lab" for="rp-p-forme">Type de structure</label><select class="rp-in" id="rp-p-forme"><option value="">— Sélectionner —</option>' + opt(FORMES, m.forme_juridique) + '<option value="AUTRE" ' + (formeAutre ? 'selected' : '') + '>Autre (préciser)</option></select>' +
@@ -993,6 +994,7 @@ textarea.rp-in{min-height:96px;resize:vertical}
       '<p class="rp-err" id="rp-p-err" role="alert"></p><button class="btn block" id="rp-p-go">Enregistrer le profil réseau</button></div>' +
       '<div class="rp-note"><b>À faire sur ordinateur</b><br>Valider le numéro d’immatriculation en ligne auprès du registre officiel.<br><a href="' + SITE + '?tab=profil-reseau">Ouvrir mon profil réseau sur le site ↗</a></div>';
 
+    ImmatType.monter(document.getElementById('rp-p-immat-zone'), { inputId: 'rp-p-immat', typeId: 'rp-p-immat-type', type: m.type_immatriculation, numero: m.numero_immatriculation, classeInput: 'rp-in' });
     const forme = document.getElementById('rp-p-forme');
     forme.onchange = () => { document.getElementById('rp-p-forme2').style.display = forme.value === 'AUTRE' ? 'block' : 'none'; };
     const vg = document.getElementById('rp-vis-go');
@@ -1008,20 +1010,22 @@ textarea.rp-in{min-height:96px;resize:vertical}
     go.onclick = async () => {
       const immat = document.getElementById('rp-p-immat').value.trim();
       if (!immat) { err.textContent = 'Le numéro d’immatriculation est obligatoire pour apparaître dans les réseaux.'; document.getElementById('rp-p-immat').focus(); return; }
+      const msgImmat = ImmatType.valider('rp-p-immat-type', 'rp-p-immat');
+      if (msgImmat) { err.textContent = msgImmat; return; }
       const annee = parseInt(document.getElementById('rp-p-annee').value, 10);
       if (document.getElementById('rp-p-annee').value && (annee < 1900 || annee > 2099)) { err.textContent = 'L’année de création doit être comprise entre 1900 et 2099.'; return; }
       err.textContent = ''; go.disabled = true; go.textContent = 'Enregistrement…';
       try {
-        await api('/api/reseau/me/profil', {
+        const rr = await api('/api/reseau/me/profil', {
           method: 'PATCH', body: {
-            numero_immatriculation: immat, pays_immatriculation: document.getElementById('rp-p-pays').value || null, annee_creation: annee || null,
+            numero_immatriculation: immat, type_immatriculation: document.getElementById('rp-p-immat-type').value || null, numero_fiscal: (document.getElementById('rp-p-fiscal').value || '').trim() || null, pays_immatriculation: document.getElementById('rp-p-pays').value || null, annee_creation: annee || null,
             taille_structure: document.getElementById('rp-p-taille').value || null,
             forme_juridique: (forme.value === 'AUTRE' ? document.getElementById('rp-p-forme2').value.trim() : forme.value) || null,
             services: list(document.getElementById('rp-p-serv').value), langues: list(document.getElementById('rp-p-lang').value),
             reseau_visible: document.getElementById('rp-p-vis').checked, accepte_messages: document.getElementById('rp-p-msg').checked
           }
         });
-        toast('Profil réseau enregistré ✓'); reload();
+        toast(rr && rr.immatriculation === 'nom_different' ? 'Enregistré. Le nom du registre (« ' + (rr.nom_registre || '') + ' ») diffère de votre nom : dossier transmis à l’équipe.' : 'Profil réseau enregistré ✓'); reload();
       } catch (e) { err.textContent = e.message; go.disabled = false; go.textContent = 'Enregistrer le profil réseau'; }
     };
   }

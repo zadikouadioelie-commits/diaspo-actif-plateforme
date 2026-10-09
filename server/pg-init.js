@@ -1167,6 +1167,7 @@ const COLONNES_MIGRATION = [
     ['adhesion_formules', 'reglement_interieur_texte', 'TEXT'],
     ['adhesion_formules', 'rubriques_json', 'TEXT'],
     ['adhesion_formules', 'relances_config_json', 'TEXT'],
+    ['initiatives', 'type_immatriculation', 'TEXT'],
     ['adhesion_formules', 'champs_config_json', "TEXT DEFAULT '{}'"],
     ['adhesion_formules', 'champs_custom_json', "TEXT DEFAULT '[]'"],
     // Adhésion officielle de l'association (2026-09-28, miroir de server/db.js) — une seule

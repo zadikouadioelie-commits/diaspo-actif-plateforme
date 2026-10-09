@@ -527,6 +527,7 @@
 <script src="assets/data.js"></script>
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js?v=13"></script>
+<script src="assets/immat-type.js?v=1"></script>
 <script src="assets/subscription-required.js"></script>
 <script src="assets/ds.js"></script>
 <script>
@@ -1095,9 +1096,8 @@ async function loadProfilReseauTab(){
           </select>
         </div>
         <div class="form-field">
-          <label>Numéro officiel d'immatriculation *</label>
-          <div style="display:flex;gap:8px;align-items:flex-start;">
-            <input id="pr-immat" class="input-field" style="width:100%;" value="${escH(moi.numero_immatriculation||'')}" placeholder="SIRET, BCE, RCCM, NINEA…" oninput="document.getElementById('pr-immat-verif-badge').style.display='none';">
+          <div id="pr-immat-zone"></div>
+          <div style="margin-top:8px;display:flex;gap:8px;align-items:flex-start;">
             <button type="button" class="btn btn-sm btn-outline" style="white-space:nowrap;flex-shrink:0;" onclick="verifierImmatriculationEnLigne(this)">🔍 Valider en ligne</button>
           </div>
           <p style="font-size:.75rem;color:var(--muted);margin:6px 0 0;">Confirme gratuitement, via le registre officiel (SIRET/SIREN/RNA), qu'une structure réelle existe sous ce numéro — critère « Organisation vérifiée » de votre indice de fiabilité (+5 points). Enregistrez d'abord le numéro si vous venez de le modifier.</p>
@@ -1106,6 +1106,10 @@ async function loadProfilReseauTab(){
         <div class="form-field">
           <label>Année de création</label>
           <input id="pr-annee" type="number" class="input-field" style="width:100%;" min="1900" max="2099" value="${moi.annee_creation||''}">
+        </div>
+        <div class="form-field">
+          <label>Numéro fiscal <span style="font-weight:400;color:var(--muted);">(facultatif — +1 point de fiabilité)</span></label>
+          <input id="pr-fiscal" class="input-field" style="width:100%;" maxlength="60" value="${escH(moi.numero_fiscal||'')}">
         </div>
         <div class="form-field">
           <label>Taille de la structure</label>
@@ -1150,6 +1154,7 @@ async function loadProfilReseauTab(){
     `;
     window._currentServices=[...services];
     window._currentLangues=[...langues];
+    ImmatType.monter(document.getElementById('pr-immat-zone'),{inputId:'pr-immat',typeId:'pr-immat-type',type:moi.type_immatriculation,numero:moi.numero_immatriculation,onInput:()=>{const b=document.getElementById('pr-immat-verif-badge');if(b)b.style.display='none';}});
   }catch(e){el.innerHTML=`<div class="notice" style="color:#D33;">${escH(e.message)}</div>`;}
 }
 
@@ -1177,9 +1182,13 @@ function removeTag(type,btn,val){
 async function sauvegarderProfil(){
   const immat=document.getElementById('pr-immat')?.value.trim();
   if(!immat){DA.toast('Le numéro d\'immatriculation est obligatoire.',{type:'warning'});return;}
+  const msgImmat=ImmatType.valider('pr-immat-type','pr-immat');
+  if(msgImmat){DA.toast(msgImmat,{type:'warning'});return;}
   try{
-    await apiCall('PATCH','/reseau/me/profil',{
+    const rep=await apiCall('PATCH','/reseau/me/profil',{
       numero_immatriculation:immat,
+      type_immatriculation:document.getElementById('pr-immat-type').value||null,
+      numero_fiscal:document.getElementById('pr-fiscal')?.value.trim()||null,
       pays_immatriculation:document.getElementById('pr-pays-immat').value||null,
       annee_creation:parseInt(document.getElementById('pr-annee').value)||null,
       taille_structure:document.getElementById('pr-taille').value||null,
@@ -1190,6 +1199,8 @@ async function sauvegarderProfil(){
       accepte_messages:document.getElementById('pr-messages').checked,
     });
     DA.toast('Profil réseau sauvegardé !',{type:'success'});
+    if(rep&&rep.immatriculation==='nom_different')DA.toast('Ce numéro existe, mais le nom du registre («\u00a0'+(rep.nom_registre||'')+'\u00a0») diffère du nom de votre compte : votre dossier est transmis à l\'équipe, qui l\'examine.',{type:'warning'});
+    else if(rep&&rep.immatriculation==='ok')DA.toast('Numéro confirmé dans le registre officiel ✓ (+5 points)',{type:'success'});
     MY_INIT=null;
     loadMyState();
   }catch(e){DA.toast(e.message,{type:'danger'});}

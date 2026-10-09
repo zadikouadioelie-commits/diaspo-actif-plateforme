@@ -2202,6 +2202,8 @@ const MIGRATIONS = [
   // ── Module Réseau Professionnel ──
   ["initiatives", "numero_immatriculation TEXT"],
   ["initiatives", "pays_immatriculation TEXT"],
+  /* Type du numéro d'immatriculation choisi par la personne (RCCM, SIREN, SIRET, RNA, IFU, AUTRE) — 2026-10-08, voir server/immatriculation.js. */
+  ["initiatives", "type_immatriculation TEXT"],
   ["initiatives", "taille_structure TEXT"],
   ["initiatives", "annee_creation INTEGER"],
   ["initiatives", "services TEXT DEFAULT '[]'"],
