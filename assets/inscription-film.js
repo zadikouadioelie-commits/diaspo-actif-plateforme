@@ -68,16 +68,33 @@
 .gold{background:linear-gradient(180deg,#FDEBA8 0%,#E8B22E 52%,#B67E14 100%);-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent}
 .fi-welc{font-family:'Cinzel','Georgia','Times New Roman',serif;font-size:62px;font-weight:800;letter-spacing:.2em;white-space:nowrap;text-shadow:0 4px 22px rgba(0,0,0,.35)}
 .fi-tag{font-family:'Cinzel','Georgia',serif;font-size:21px;letter-spacing:.34em;color:#F2C94C;white-space:nowrap;font-weight:600}
+.fi-legend{display:flex;align-items:center;gap:9px;font-size:19px;color:#dbe8ff;white-space:nowrap;font-weight:600}
+.fi-legend i{display:inline-block;width:14px;height:14px;border-radius:50%;box-shadow:0 0 10px currentColor}
 .fi-logo{width:350px;height:350px;border-radius:50%;filter:drop-shadow(0 12px 30px rgba(0,0,0,.5)) drop-shadow(0 0 28px rgba(248,218,122,.45))}
 .fi-head{display:flex;align-items:center;gap:12px;font-size:28px;font-weight:800;white-space:nowrap}
 .fi-head img{width:56px;height:56px;border-radius:50%;object-fit:contain;background:#fff;box-shadow:0 0 0 3px #E2A929}
 .fi-head i{font-style:normal;color:#F26422}
-.fi-type{width:300px;height:330px;border-radius:26px;padding:20px 22px;background:linear-gradient(165deg,#15428a,#0a2556);border:3px solid #E2A929;text-align:center;box-shadow:0 14px 40px rgba(0,0,0,.4)}
+.fi-pill{display:inline-block;margin-top:12px;padding:5px 14px;border-radius:999px;background:rgba(255,255,255,.14);border:2px solid rgba(226,169,41,.75);font-size:15px;font-weight:700;color:#FDEBA8}
+.fi-pill.soon{border-color:rgba(255,255,255,.4);color:#cfe0ff;font-size:13px}
+.fi-steps{display:flex;align-items:flex-start;width:620px}
+.fi-st{display:flex;flex-direction:column;align-items:center;gap:6px;width:170px;font-size:15px;color:#cfe0ff;font-weight:600}
+.fi-st b{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.16);border:2px solid rgba(255,255,255,.5);font-size:18px}
+.fi-st.on b{background:linear-gradient(135deg,#f59e0b,#ea580c);border-color:#FDEBA8;color:#fff;box-shadow:0 0 18px rgba(245,158,11,.6)}
+.fi-st.done b{background:#16a34a;border-color:#86efac;color:#fff}
+.fi-st.on,.fi-st.done{color:#fff}
+.fi-sl{flex:1;height:3px;border-radius:2px;background:rgba(255,255,255,.32);margin-top:19px}
+.fi-fbot{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:10px;padding-top:12px;border-top:2px solid #e3ecfa}
+.fi-chk{display:flex;align-items:center;gap:10px;font-size:15px;color:#33527d;font-weight:600}
+.fi-chk b{width:26px;height:26px;flex:none;border-radius:6px;border:2px solid #d97706;display:flex;align-items:center;justify-content:center;color:transparent;background:#fff;font-size:17px}
+.fi-chk b.on{background:#16a34a;border-color:#16a34a;color:#fff}
+.fi-chk u{color:#2563eb}
+.fi-subb{padding:12px 20px;border-radius:12px;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;font-weight:800;font-size:16px;box-shadow:0 6px 16px rgba(37,99,235,.35);white-space:nowrap}
+.fi-type{width:300px;height:350px;border-radius:26px;padding:20px 22px;background:linear-gradient(165deg,#15428a,#0a2556);border:3px solid #E2A929;text-align:center;box-shadow:0 14px 40px rgba(0,0,0,.4)}
 .fi-ring{width:124px;height:124px;margin:10px auto 0;border-radius:50%;border:3px solid #E2A929;background:radial-gradient(circle,#1d57ad,#0B2A5B);display:flex;align-items:center;justify-content:center;font-size:62px;box-shadow:0 0 0 6px rgba(226,169,41,.18)}
 .fi-type h4{margin:16px 0 8px;font-family:'Cinzel','Georgia',serif;font-size:32px;font-weight:800;letter-spacing:.04em}
-.fi-type p{margin:0;font-size:19px;color:#cfe0ff;line-height:1.35}
+.fi-type p{margin:0;font-size:18px;color:#cfe0ff;line-height:1.35}
 .fi-card{border-radius:26px;border:5px solid transparent;background:linear-gradient(160deg,#ffffff,#eaf2ff) padding-box,linear-gradient(135deg,#FDEBA8,#E2A929 50%,#B67E14) border-box;color:#0B2A5B;box-shadow:0 30px 80px rgba(0,0,0,.5)}
-.fi-form{width:820px;height:420px;padding:26px 32px}
+.fi-form{width:820px;height:450px;padding:24px 32px}
 .fi-form h5{margin:0 0 18px;font-size:26px;font-weight:800;display:flex;align-items:center;gap:10px;font-family:'Cinzel','Georgia',serif;letter-spacing:.03em}
 .fi-form h5 span{font-family:'Segoe UI',system-ui,sans-serif;font-size:14px;font-weight:700;background:#fff1c9;color:#8a5a00;border-radius:999px;padding:5px 12px;letter-spacing:0;border:2px solid #E2A929}
 .fi-cols{display:flex;gap:30px}
@@ -108,12 +125,12 @@
 .fi-past{width:170px;height:170px;border-radius:50%;background:radial-gradient(circle at 50% 38%,#f2c9a0 0 20%,transparent 21%),radial-gradient(ellipse at 50% 100%,#1565C0 0 46%,transparent 47%),linear-gradient(160deg,#7cc0ff,#1565C0);box-shadow:0 0 0 6px #fff,0 0 0 11px #0B2A5B,0 0 0 16px #E2A929,0 0 70px rgba(248,218,122,.6)}
 .fi-pn{font-size:28px;font-weight:800;text-align:center;white-space:nowrap;font-family:'Cinzel','Georgia',serif}
 .fi-sat{width:200px;padding:14px 10px 16px;border-radius:22px;background:linear-gradient(165deg,#15428a,#0a2556);border:3px solid #E2A929;text-align:center;box-shadow:0 12px 30px rgba(0,0,0,.4)}
-.fi-sat .e{width:76px;height:76px;margin:0 auto;border-radius:50%;border:3px solid #E2A929;background:radial-gradient(circle,#1d57ad,#0B2A5B);display:flex;align-items:center;justify-content:center;font-size:38px}
+.fi-sat .e{width:76px;height:76px;margin:0 auto;border-radius:20px;border:3px solid rgba(255,255,255,.85);display:flex;align-items:center;justify-content:center;font-size:38px;box-shadow:0 6px 16px rgba(0,0,0,.35)}
 .fi-sat b{display:block;font-size:22px;margin-top:8px;font-family:'Cinzel','Georgia',serif;letter-spacing:.03em}
 .fi-big{font-family:'Cinzel','Georgia',serif;font-size:64px;font-weight:800;text-align:center;white-space:nowrap;letter-spacing:.02em;text-shadow:0 4px 30px rgba(0,0,0,.45)}
 .fi-script{font-family:'Caveat','Segoe Script','Brush Script MT',cursive;font-size:50px;font-weight:700;color:#fff;white-space:nowrap;text-align:center;text-shadow:0 3px 18px rgba(0,0,0,.4)}
 .fi-sub{font-size:28px;color:#dbe8ff;text-align:center;white-space:nowrap}
-.fi-cta{display:inline-block;padding:18px 44px;border-radius:999px;background:linear-gradient(135deg,#F26422,#ff8a4c);color:#fff;font-size:30px;font-weight:800;box-shadow:0 12px 40px rgba(242,100,34,.55),0 0 0 4px rgba(253,235,168,.7);white-space:nowrap}
+.fi-cta{display:inline-block;padding:18px 44px;border-radius:999px;background:linear-gradient(135deg,#f59e0b,#ea580c);color:#fff;font-size:30px;font-weight:800;box-shadow:0 12px 40px rgba(242,100,34,.55),0 0 0 4px rgba(253,235,168,.7);white-space:nowrap}
 .fi-url{font-family:'Cinzel','Georgia',serif;font-size:24px;letter-spacing:.2em;color:#F2C94C;font-weight:700;white-space:nowrap}
 .fi-motto{font-family:'Caveat','Segoe Script','Brush Script MT',cursive;font-size:34px;font-weight:700;color:#FDEBA8;white-space:nowrap}
 .fi-cap{min-height:62px;display:grid;place-items:center;text-align:center;color:#fff;font-size:clamp(15px,2.3vw,21px);line-height:1.4;padding:8px 14px;border-radius:12px;background:rgba(3,10,26,.55);border-top:2px solid rgba(226,169,41,.7)}
@@ -178,14 +195,16 @@
   <g data-r="arcs" fill="none" stroke-linecap="round"></g>
   <g data-r="nodes"></g>
 </svg>
+<div class="fi-abs fi-legend" data-r="leg"><i style="background:#FFA928"></i>Pays d'origine<i style="background:#5aaeff;margin-left:26px"></i>Pays de résidence</div>
 <img class="fi-abs fi-logo" data-r="logo" src="assets/media/logo-film.webp" alt="">
 <div class="fi-abs fi-welc gold" data-r="welc">BIENVENUE</div>
 <div class="fi-abs fi-tag" data-r="tag">PLATEFORME · RÉSEAU · OPPORTUNITÉS</div>
 <div class="fi-abs fi-head" data-r="head"><img src="assets/media/logo-film.webp" alt=""><span>Diaspo<i>'</i>Actif</span></div>
 
-<div class="fi-abs fi-type" data-r="c0"><div class="fi-ring">👤</div><h4>Utilisateur</h4><p>Je rejoins le réseau en tant que membre</p></div>
-<div class="fi-abs fi-type" data-r="c1"><div class="fi-ring">🤝</div><h4>Initiative</h4><p>Mon association, mon entreprise, mon projet</p></div>
-<div class="fi-abs fi-type" data-r="c2"><div class="fi-ring">🏛️</div><h4>Collectivité</h4><p>Mon institution, mon territoire</p></div>
+<div class="fi-abs fi-steps" data-r="steps"><div class="fi-st" data-s="0"><b>1</b><span>Type de compte</span></div><i class="fi-sl"></i><div class="fi-st" data-s="1"><b>2</b><span>Informations</span></div><i class="fi-sl"></i><div class="fi-st" data-s="2"><b>3</b><span>Confirmation</span></div></div>
+<div class="fi-abs fi-type" data-r="c0"><div class="fi-ring">👤</div><h4>Utilisateur</h4><p>Personne physique, particulier membre de la diaspora</p><span class="fi-pill">Gratuit</span></div>
+<div class="fi-abs fi-type" data-r="c1"><div class="fi-ring">🤝</div><h4>Initiative</h4><p>Association, ONG, entreprise, startup, projet collectif</p><span class="fi-pill">Gratuit</span></div>
+<div class="fi-abs fi-type" data-r="c2"><div class="fi-ring">🏛️</div><h4>Collectivité</h4><p>Ambassade, mairie, région, agence publique</p><span class="fi-pill soon">Compte étatique · bientôt disponible</span></div>
 
 <div class="fi-abs fi-card fi-form" data-r="form">
   <h5>Créer mon compte <span>Utilisateur</span></h5>
@@ -200,6 +219,7 @@
       <div class="fi-bio"><small>BIOGRAPHIE</small><span data-r="bio"></span></div>
     </div>
   </div>
+  <div class="fi-fbot"><div class="fi-chk"><b data-r="chk">✓</b><span>J'ai lu et j'accepte la <u>Charte</u> et les <u>CGU</u></span></div><div class="fi-subb" data-r="subb">Créer mon compte utilisateur</div></div>
 </div>
 
 <div class="fi-abs" data-r="env"><svg class="fi-env" viewBox="0 0 240 190" aria-hidden="true">
@@ -223,11 +243,11 @@
 
 <svg class="fi-globe" data-r="lines" viewBox="0 0 1280 720" width="1280" height="720" aria-hidden="true" style="left:0;top:0"></svg>
 <div class="fi-abs fi-past" data-r="past"></div><div class="fi-abs fi-pn" data-r="pn">Aminata K.</div>
-<div class="fi-abs fi-sat" data-r="s0"><div class="e">📖</div><b>Annuaire</b></div>
-<div class="fi-abs fi-sat" data-r="s1"><div class="e">📅</div><b>Événements</b></div>
-<div class="fi-abs fi-sat" data-r="s2"><div class="e">💚</div><b>Soutenir</b></div>
-<div class="fi-abs fi-sat" data-r="s3"><div class="e">🛍️</div><b>Boutique</b></div>
-<div class="fi-abs fi-sat" data-r="s4"><div class="e">💬</div><b>Communauté</b></div>
+<div class="fi-abs fi-sat" data-r="s0"><div class="e" style="background:linear-gradient(135deg,#2563eb,#4f8bff)">📖</div><b>Annuaire</b></div>
+<div class="fi-abs fi-sat" data-r="s1"><div class="e" style="background:linear-gradient(135deg,#f59e0b,#f97316)">📅</div><b>Événements</b></div>
+<div class="fi-abs fi-sat" data-r="s2"><div class="e" style="background:linear-gradient(135deg,#10b981,#34d399)">💚</div><b>Soutenir</b></div>
+<div class="fi-abs fi-sat" data-r="s3"><div class="e" style="background:linear-gradient(135deg,#06b6d4,#38d4ee)">🛍️</div><b>Boutique</b></div>
+<div class="fi-abs fi-sat" data-r="s4"><div class="e" style="background:linear-gradient(135deg,#8b5cf6,#a78bfa)">💬</div><b>Communauté</b></div>
 
 <div class="fi-abs" data-r="lauG">${laurier(false)}</div><div class="fi-abs" data-r="lauD">${laurier(true)}</div>
 <div class="fi-abs fi-big" data-r="t1">Rejoignez le <span class="gold">réseau</span></div>
@@ -353,6 +373,7 @@
     place(R.welc, 640, 98, 1, P(a, 0.2, 1.2) * (1 - P(a, 6.6, 7.4)));
     place(R.logo, 850, 345, lerp(0.55, 1, P(a, 2.0, 3.4, E.back)), P(a, 2.0, 3.0) * (1 - P(a, 6.6, 7.4)));
     place(R.tag, 640, 585, 1, P(a, 4.0, 5.0) * (1 - P(a, 6.6, 7.4)));
+    place(R.leg, 430, 548, 1, P(a, 3.0, 4.0) * (1 - P(a, 6.2, 6.9)));
     place(R.head, 300, 78, 1, P(a, 7.4, 8.4) * (1 - P(a, 40.0, 40.8)));
 
     /* Scène 2 : trois profils */
@@ -365,14 +386,22 @@
       if (i !== 0) { const go = P(a, 14.6, 15.4, E.inout); op *= 1 - go; x += (i === 1 ? 60 : -60) * go; }
       else { const up = P(a, 14.6, 15.4, E.inout); x = lerp(x, 640, up); s *= 1 + 0.25 * up; op *= 1 - P(a, 15.2, 15.7); }
       const el = R['c' + i];
-      place(el, x, y, s, a < 8.2 || a > 15.8 ? 0 : op);
+      place(el, x, y, s, a < 8.2 || a > 15.8 ? 0 : (i === 2 ? op * 0.8 : op));
       el.style.borderColor = lum > 0.05 ? `rgb(${Math.round(lerp(226, 255, lum))},${Math.round(lerp(169, 235, lum))},${Math.round(lerp(41, 168, lum))})` : '#E2A929';
       el.style.boxShadow = `0 14px 40px rgba(0,0,0,.4),0 0 ${lum * 55}px rgba(253,235,168,${lum * 0.75})`;
     });
 
+    /* Étapes du vrai parcours : Type de compte · Informations · Confirmation */
+    const etat = [a < 15.0 ? 'on' : 'done', a < 15.0 ? '' : a < 25.0 ? 'on' : 'done', a < 25.0 ? '' : a < 28.0 ? 'on' : 'done'];
+    R.stEls.forEach((el, i) => { el.className = 'fi-st ' + etat[i]; el.querySelector('b').textContent = etat[i] === 'done' ? '✓' : String(i + 1); });
+    place(R.steps, 640, 128, 1, P(a, 8.5, 9.3) * (1 - P(a, 31.0, 31.6)) * (a > 8.4 ? 1 : 0));
+
     /* Scène 3 : formulaire */
     const f = P(a, 15.0, 15.8, E.back) * (1 - P(a, 24.5, 25.2));
-    place(R.form, 640, 372, lerp(0.88, 1, P(a, 15.0, 15.8, E.back)), (a < 14.9 || a > 25.3) ? 0 : f);
+    place(R.form, 640, 386, lerp(0.88, 1, P(a, 15.0, 15.8, E.back)), (a < 14.9 || a > 25.3) ? 0 : f);
+    R.chk.classList.toggle('on', a >= 23.4);
+    const clic = P(a, 24.3, 24.45, E.lin) * (1 - P(a, 24.45, 24.7, E.lin));
+    R.subb.style.transform = `scale(${1 - 0.05 * clic})`; R.subb.style.boxShadow = clic > 0.05 ? `0 0 ${10 + 26 * clic}px rgba(245,158,11,${0.9 * clic})` : '';
     const vals = ["Côte d'Ivoire", 'France', 'Entrepreneuriat'], t0s = [15.7, 16.85, 18.0];
     [0, 1, 2].forEach(i => {
       R['v' + i].textContent = tape(vals[i], a, t0s[i], t0s[i] + 0.8);
@@ -540,9 +569,9 @@
     const gMer = ov.querySelector('[data-r="mer"]'); R.mer.forEach(e => gMer.appendChild(e));
     const gPar = ov.querySelector('[data-r="par"]');
     [-60, -30, 0, 30, 60].forEach(lat => { const y = -150 * Math.sin(lat * Math.PI / 180), x = 150 * Math.cos(lat * Math.PI / 180); const l = document.createElementNS('http://www.w3.org/2000/svg', 'line'); l.setAttribute('x1', -x); l.setAttribute('x2', x); l.setAttribute('y1', y); l.setAttribute('y2', y); gPar.appendChild(l); });
-    const gNodes = ov.querySelector('[data-r="nodes"]'); R.nd = NODES.map(() => { const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle'); c.setAttribute('fill', '#FFF1B8'); gNodes.appendChild(c); return c; });
+    const gNodes = ov.querySelector('[data-r="nodes"]'); R.nd = NODES.map((_, i) => { const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle'); c.setAttribute('fill', i >= 9 ? '#5aaeff' : '#FFA928'); c.setAttribute('stroke', '#fff'); c.setAttribute('stroke-opacity', '.8'); c.setAttribute('stroke-width', '2'); gNodes.appendChild(c); return c; });
     const gArcs = ov.querySelector('[data-r="arcs"]'); R.ar = LIENS.map((_, i) => { const p = document.createElementNS('http://www.w3.org/2000/svg', 'path'); p.setAttribute('pathLength', '1'); p.setAttribute('stroke-dasharray', '1'); p.setAttribute('stroke', i % 2 ? '#9fd0ff' : '#FFE7A0'); p.setAttribute('stroke-width', '2.4'); gArcs.appendChild(p); return p; });
-    R.ckEls = [...ov.querySelectorAll('[data-r="ck"] > div')];
+    R.ckEls = [...ov.querySelectorAll('[data-r="ck"] > div')]; R.stEls = [...ov.querySelectorAll('.fi-st')];
     echelle(); window.addEventListener('resize', echelle);
     document.addEventListener('keydown', clavier);
 
