@@ -115,6 +115,19 @@
 .statut-card .sc-desc{font-size:12px;color:var(--muted);line-height:1.4}
 .statut-card.pill-on{border-color:#2563EB;background:#EFF6FF;box-shadow:0 0 0 3px rgba(37,99,235,.15)}
 .statut-card.pill-on .sc-body strong{color:#1d4ed8}
+/* Bouton bien visible dans chaque cartouche (2026-10-09, demande explicite : « bien visibles
+   avec un bouton... qui permet de cliquer le bon bouton ») — en plus du radio natif, pas à sa
+   place : cliquer n'importe où dans la cartouche (y compris ce bouton) sélectionne le radio via
+   le <label> englobant, sans JS supplémentaire. */
+.statut-card .sc-btn{display:inline-flex;margin-top:8px;align-items:center;padding:7px 14px;border-radius:8px;font-size:12.5px;font-weight:700;border:1.5px solid #2563EB;color:#2563EB;background:#fff;align-self:flex-start;transition:background .15s,color .15s}
+.statut-card .sc-btn-on{display:none}
+.statut-card.pill-on .sc-btn{border-color:#2563EB;background:#2563EB;color:#fff}
+.statut-card.pill-on .sc-btn-off{display:none}
+.statut-card.pill-on .sc-btn-on{display:inline}
+/* Choix exclusif renforcé (2026-10-09, demande explicite) : dès qu'une cartouche est
+   sélectionnée, l'AUTRE devient grisée et incliquable (pas juste désélectionnée) — pour
+   cliquer la seconde, il faut d'abord recliquer la première pour la désélectionner. */
+.statut-card.locked{opacity:.45;pointer-events:none;background:#F8FAFC}
 /* Etat sélectionné bien visible pour tous les groupes de pastilles à choix multiples.
    Piloté en JS (classe .pill-on) plutôt qu'en CSS :has() pur, pour un rendu fiable
    sur tous les navigateurs (y compris versions plus anciennes de Safari/Firefox). */
@@ -445,6 +458,7 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
             <span class="sc-body">
               <strong>En création</strong>
               <span class="sc-desc">La structure n'existe pas encore officiellement. Vous complèterez les informations administratives plus tard.</span>
+              <span class="sc-btn"><span class="sc-btn-off">✓ Choisir « En création »</span><span class="sc-btn-on">✓ Sélectionné</span></span>
             </span>
           </label>
           <label class="statut-card">
@@ -453,6 +467,7 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
             <span class="sc-body">
               <strong>Initiative existante</strong>
               <span class="sc-desc">La structure existe déjà. Vous renseignerez ses informations administratives dès maintenant.</span>
+              <span class="sc-btn"><span class="sc-btn-off">✓ Choisir « Initiative existante »</span><span class="sc-btn-on">✓ Sélectionné</span></span>
             </span>
           </label>
         </div>
@@ -472,10 +487,10 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
                qu'il s'agit de la même valeur. Source unique : i-nom sert désormais aussi de
                dénomination officielle à la soumission (voir le handler i-submit). -->
           <div class="grid-2">
-            <div id="i-immat-zone"></div>
+            <div><label>Numéro d'immatriculation (RCCM, SIREN, IFU, n° d'association…) <span class="i-admin-req" style="color:#2563EB">*</span></label><input type="text" id="i-immat" placeholder="Ex : RCCM CI-ABJ-2024-B-1234"></div>
           </div>
           <div class="grid-2" style="margin-top:12px">
-            <div><label>Forme juridique <span class="i-admin-req" style="color:#2563EB">*</span></label><select id="i-forme-select" style="display:none;"></select><input type="text" id="i-forme-juridique" placeholder="Association loi 1901, SARL, ONG…"></div>
+            <div><label>Forme juridique <span class="i-admin-req" style="color:#2563EB">*</span></label><input type="text" id="i-forme-juridique" placeholder="Association loi 1901, SARL, ONG…"></div>
             <div><label>Date de création de la structure <span class="i-admin-req" style="color:#2563EB">*</span></label><input type="date" id="i-date-creation-structure"></div>
           </div>
           <div style="margin-top:12px;max-width:280px;"><label>Numéro fiscal <span style="font-size:11px;color:#64748B;">(si applicable)</span></label><input type="text" id="i-numero-fiscal" placeholder="Facultatif"></div>
@@ -499,11 +514,6 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
           <div id="i-nb-salaries-box" style="display:none;"><label>Nombre de salaries <span style="font-size:11px;color:#64748B;">(facultatif)</span></label>
             <input type="number" min="0" id="i-nb-salaries" placeholder="Ex : 12"></div>
         </div>
-        <div id="i-entreprise-row" class="grid-2" style="margin-top:12px;display:none;">
-          <div><label>Taille de l'entreprise <span style="font-size:11px;color:#64748B;">(facultatif)</span></label>
-            <select id="i-taille-entreprise"><option value="">— Sélectionner —</option></select>
-            <div id="i-taille-aide" style="font-size:11.5px;color:#64748B;margin-top:4px;"></div></div>
-        </div>
         <div class="grid-2" style="margin-top:12px">
           <div><label>Domaine d'activite <span style="color:#2563EB">*</span></label>
             <select id="i-domaine"><option value="">— Selectionner —</option></select>
@@ -514,12 +524,6 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
             <input id="i-sous-domaine-1" placeholder="Precisez votre activite reelle"></div>
           <div><label>Sous domaine 2 <span style="font-size:11px;color:#64748B;">(facultatif)</span></label>
             <input id="i-sous-domaine-2" placeholder="Facultatif"></div>
-        </div>
-        <div id="i-fin-row" class="grid-2" style="margin-top:12px;display:none;">
-          <div><label>Famille d'organisme financier <span style="font-size:11px;color:#64748B;">(facultatif)</span></label>
-            <select id="i-fin-famille"><option value="">— Sélectionner —</option></select></div>
-          <div><label>Type d'organisme financier <span style="font-size:11px;color:#64748B;">(facultatif)</span></label>
-            <select id="i-fin-type" disabled><option value="">Choisissez d'abord une famille</option></select></div>
         </div>
         <script>
           /* Peuplé au DOMContentLoaded plutôt qu'en ligne ici : assets/domaines-activite.js est
@@ -946,71 +950,6 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
 </div>
 <script src="assets/data.js"></script>
 <script src="assets/domaines-activite.js"></script>
-<script src="assets/structures-initiative.js"></script>
-<script>
-/* Fiches de structure (2026-10-09, demande explicite) : Type de structure, Forme juridique, Taille de l'entreprise, Organisme financier.
-   Listes partagées : assets/structures-initiative.js. Les champs spécialisés n'apparaissent que lorsqu'ils ont un sens
-   (entreprise / startup → forme + taille ; domaine financier → organisme financier). */
-(function () {
-  const S = window.STRUCTURES_INITIATIVE; if (!S) return;
-  const $ = id => document.getElementById(id);
-  const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-  const opts = (liste, vide) => '<option value="">' + vide + '</option>' + liste.map(l => '<option value="' + esc(l) + '">' + esc(l) + '</option>').join('');
-  const typeSel = $('i-type'), formeSel = $('i-forme-select'), formeTxt = $('i-forme-juridique');
-  if (!typeSel || !formeSel || !formeTxt) return;
-  const placeholderInitial = formeTxt.placeholder;
-
-  typeSel.innerHTML = opts(S.TYPES.map(t => t[0]), '— Selectionner —');
-  formeSel.innerHTML = opts(S.FORMES.map(f => f[0]).concat([S.FORME_AUTRE]), '— Sélectionner —');
-  $('i-taille-entreprise').innerHTML = opts(S.TAILLES.map(t => t[0]), '— Sélectionner —');
-  $('i-fin-famille').innerHTML = opts(Object.keys(S.FIN), '— Sélectionner —');
-
-  function majForme() {
-    const ent = S.estEntreprise(typeSel.value);
-    formeSel.style.display = ent ? '' : 'none';
-    formeTxt.style.display = (!ent || formeSel.value === S.FORME_AUTRE) ? '' : 'none';
-    formeTxt.placeholder = ent ? 'Précisez la forme juridique' : placeholderInitial;
-  }
-  function majType() {
-    const ent = S.estEntreprise(typeSel.value);
-    $('i-entreprise-row').style.display = ent ? '' : 'none';
-    if (!ent) { $('i-taille-entreprise').value = ''; $('i-taille-aide').textContent = ''; formeSel.value = ''; }
-    majForme();
-  }
-  function majFin() {
-    const on = S.estDomaineFinance($('i-domaine').value);
-    $('i-fin-row').style.display = on ? '' : 'none';
-    if (!on) { $('i-fin-famille').value = ''; majFinType(); }
-  }
-  function majFinType() {
-    const f = $('i-fin-famille').value, t = $('i-fin-type');
-    t.disabled = !f;
-    t.innerHTML = f ? opts(S.FIN[f], '— Sélectionner —') : '<option value="">Choisissez d\'abord une famille</option>';
-  }
-  typeSel.addEventListener('change', majType);
-  formeSel.addEventListener('change', majForme);
-  $('i-taille-entreprise').addEventListener('change', function () {
-    const t = S.TAILLES.find(x => x[0] === this.value); $('i-taille-aide').textContent = t ? t[1] : '';
-  });
-  $('i-fin-famille').addEventListener('change', majFinType);
-  $('i-domaine').addEventListener('change', majFin);
-  majType(); majFin();
-
-  /* Valeurs lues à l'envoi du formulaire. */
-  window.valeurFormeJuridique = function () {
-    if (formeSel.style.display !== 'none' && formeSel.value && formeSel.value !== S.FORME_AUTRE) return formeSel.value;
-    return formeTxt.value.trim();
-  };
-  window.structuresPourEnvoi = function () {
-    const ent = $('i-entreprise-row').style.display !== 'none', fin = $('i-fin-row').style.display !== 'none';
-    return {
-      taille_entreprise: (ent ? $('i-taille-entreprise').value : '') || null,
-      finance_famille: (fin ? $('i-fin-famille').value : '') || null,
-      finance_type: (fin ? $('i-fin-type').value : '') || null
-    };
-  };
-})();
-</script>
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/geo.js"></script>
 <script src="assets/app.js?v=13"></script>
@@ -1547,7 +1486,7 @@ document.getElementById("i-submit").addEventListener("click",async()=>{
     if(!document.getElementById("i-photo").files.length)throw new Error("Le logo ou la photo de profil est obligatoire : il rend votre fiche reconnaissable dans l'annuaire.");
     const statutCreation=document.querySelector('input[name="i-statut-creation"]:checked')?.value;
     const immat=document.getElementById("i-immat").value.trim();
-    const formeJuridique=window.valeurFormeJuridique?valeurFormeJuridique():document.getElementById("i-forme-juridique").value.trim();
+    const formeJuridique=document.getElementById("i-forme-juridique").value.trim();
     const dateCreationStructure=document.getElementById("i-date-creation-structure").value;
     const domaine=document.getElementById("i-domaine").value;
     /* Nationalite devenue facultative : c'est le couple origine / implantation qui porte
@@ -1559,7 +1498,6 @@ document.getElementById("i-submit").addEventListener("click",async()=>{
     req(domaine,"Domaine d'activité");
     if(statutCreation==="existante"){
       req(immat,"Numéro d'immatriculation");
-      { const mImmat = ImmatType.valider("i-immat-type","i-immat"); if (mImmat) throw new Error(mImmat); }
       req(formeJuridique,"Forme juridique");req(dateCreationStructure,"Date de création de la structure");
     }
     if(pwd!==pwd2)throw new Error("Les mots de passe ne correspondent pas.");
@@ -1579,7 +1517,6 @@ document.getElementById("i-submit").addEventListener("click",async()=>{
       origine2:orig2i||null,
       rayonnement,pays_intervention,
       domaine_principal:document.getElementById("i-domaine").value||null,
-      ...(window.structuresPourEnvoi?structuresPourEnvoi():{}),
       sous_domaine_1:document.getElementById("i-sous-domaine-1").value.trim()||null,
       sous_domaine_2:document.getElementById("i-sous-domaine-2").value.trim()||null,
       description:desc,objectifs:document.getElementById("i-objectifs").value.trim()||null,
@@ -1606,7 +1543,6 @@ document.getElementById("i-submit").addEventListener("click",async()=>{
       /* "Dénomination officielle" retirée du formulaire — même valeur que "Nom de l'organisation". */
       denomination_officielle:nom||null,
       numero_immatriculation:immat||null,
-      type_immatriculation:(document.getElementById("i-immat-type")||{}).value||null,
       forme_juridique:formeJuridique||null,
       date_creation_structure:dateCreationStructure||null,
       numero_fiscal:document.getElementById("i-numero-fiscal").value.trim()||null,
@@ -1624,18 +1560,57 @@ function refreshStatutCreationPills(){
     r.closest('label')?.classList.toggle('pill-on', r.checked);
   });
 }
+/* Verrouille la cartouche NON sélectionnée (grisée, incliquable) dès qu'un choix est fait —
+   demande explicite du 2026-10-09 : éviter de pouvoir cliquer les deux et semer la confusion.
+   Le radio verrouillé est aussi "disabled" (jamais atteignable au clavier/tab). */
+function refreshStatutCreationLock(){
+  const radios = [...document.querySelectorAll('input[name="i-statut-creation"]')];
+  const unChoixFait = radios.some(r => r.checked);
+  radios.forEach(r => {
+    const locked = unChoixFait && !r.checked;
+    r.closest('.statut-card')?.classList.toggle('locked', locked);
+    r.disabled = locked;
+  });
+}
+function refreshStatutCreationUI(){
+  refreshStatutCreationPills();
+  refreshStatutCreationLock();
+  const checked = document.querySelector('input[name="i-statut-creation"]:checked');
+  const enCreation = checked?.value === "en_creation";
+  const existante = checked?.value === "existante";
+  document.getElementById("i-statut-creation-banner").style.display = enCreation ? "" : "none";
+  document.getElementById("i-encreation-box").style.display = enCreation ? "" : "none";
+  document.getElementById("i-admin-box").style.display = existante ? "" : "none";
+}
 document.querySelectorAll('input[name="i-statut-creation"]').forEach(r=>{
-  r.addEventListener('change', function(){
-    refreshStatutCreationPills();
-    const enCreation = this.value === "en_creation";
-    document.getElementById("i-statut-creation-banner").style.display = enCreation ? "" : "none";
-    document.getElementById("i-encreation-box").style.display = enCreation ? "" : "none";
-    document.getElementById("i-admin-box").style.display = enCreation ? "none" : "";
+  r.addEventListener('change', refreshStatutCreationUI);
+});
+/* Désélection (2026-10-09, demande explicite : « je dois mettre non à en création pour que
+   initiative existante devienne cliquable ») — un radio ne se décoche jamais lui-même au clic
+   natif ; un second clic sur la cartouche déjà choisie la désélectionne ici, ce qui déverrouille
+   l'autre cartouche via refreshStatutCreationUI().
+   Piège : au moment où l'événement "click" est géré, le navigateur a DÉJÀ pré-coché le radio
+   (son "activation behavior" s'applique avant la propagation du clic, et n'est annulée qu'après
+   si on appelle preventDefault()) — lire radio.checked depuis le handler "click" verrait donc
+   toujours true, y compris au tout premier clic. On capture l'état réel juste AVANT, sur
+   pointerdown/keydown, dans un Map dédié. */
+const SC_ETAT_AVANT_CLIC = new Map();
+document.querySelectorAll('#i-statut-creation-group .statut-card').forEach(card => {
+  const radio = card.querySelector('input[type="radio"]');
+  const capturer = () => SC_ETAT_AVANT_CLIC.set(radio, radio.checked);
+  card.addEventListener('pointerdown', capturer);
+  card.addEventListener('keydown', e => { if (e.key === ' ' || e.key === 'Enter') capturer(); });
+  card.addEventListener('click', function(e){
+    if (SC_ETAT_AVANT_CLIC.get(radio)) {
+      e.preventDefault();
+      radio.checked = false;
+      refreshStatutCreationUI();
+    }
   });
 });
 /* ===== Type d'organisation → taille (nombre de membres ou de salaries) ===== */
-const TYPES_ASSOCIATION = ['Association','ONG','Cooperative','Coopérative','Fondation','Mutuelle','Organisation professionnelle',"Groupement d'entrepreneurs",'Projet collectif','Autre'];
-const TYPES_ENTREPRISE = ['Entreprise','Startup','Organisme de formation','Établissement public','Collectivité territoriale'];
+const TYPES_ASSOCIATION = ['Association','ONG','Cooperative','Fondation','Projet collectif','Autre'];
+const TYPES_ENTREPRISE = ['Entreprise','Startup'];
 document.getElementById("i-type").addEventListener("change", function(){
   const v = this.value;
   const row = document.getElementById("i-taille-row");
@@ -1864,8 +1839,6 @@ function collecterTerritoires(){
 <script src="assets/password-toggle.js"></script>
 <script src="/assets/guided-tour.js"></script>
 <script src="/assets/tours/tour-inscription.js"></script>
-<script src="assets/immat-type.js?v=1"></script>
-<script>ImmatType.monter(document.getElementById('i-immat-zone'), { inputId: 'i-immat', typeId: 'i-immat-type' });</script>
 <script src="assets/inscription-film.js?v=14"></script>
 </body>
 </html>
