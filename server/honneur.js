@@ -111,8 +111,8 @@ module.exports = function creerMoteurHonneur(deps) {
   }
   /* 'payants' dès qu'un compte a réellement payé ; sinon tous les Premium actifs (transition). Forçable par l'administrateur. */
   /* Date à partir de laquelle la condition Premium s'applique à nouveau (2026-10-09, demande explicite) : le Premium est gratuit
-     pendant deux mois (fin le 3 décembre 2026) ; d'ici là le statut Premium n'est PAS pris en compte, tout le monde peut concourir. */
-  async function premiumRequisDes() { return String(await parametre('honneur_premium_requis_des', '2026-12-03')).slice(0, 10); }
+     (gratuité commune jusqu'au 3 janvier 2027) ; le Trophée prend le Premium en compte dès J-3 semaines, le 13 décembre 2026 ; d'ici là le statut Premium n'est PAS pris en compte, tout le monde peut concourir. */
+  async function premiumRequisDes() { return String(await parametre('honneur_premium_requis_des', '2026-12-13')).slice(0, 10); }
   async function modeEligibilite() {
     const force = String(await parametre('honneur_eligibilite', 'auto'));
     if (force === 'payants' || force === 'tous_premium' || force === 'aucun') return force;

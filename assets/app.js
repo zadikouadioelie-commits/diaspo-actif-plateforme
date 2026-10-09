@@ -6897,13 +6897,49 @@ function afficherBandeauPremiumImpaye(st) {
   cible.insertBefore(b, cible.firstChild);
 }
 
+/* Bandeaux de rappel de fin de Premium gratuit (2026-10-09, demande explicite) : blanc (J-21), vert (J-15), jaune (J-1).
+   Ton d'invitation, toujours rattaché à la date d'échéance. Fermable ; revient au niveau suivant. Jamais pour un abonnement payant. */
+function afficherBandeauPremiumRappel(st) {
+  if (document.getElementById('premium-rappel-bandeau')) return;
+  const j = st.jours_restants; if (j === null || j > 21) return;
+  const niv = j > 15 ? 'blanc' : (j > 1 ? 'vert' : 'jaune');
+  const cle = 'da_prem_rappel_' + niv + '_' + (st.date_expiration || '');
+  try { if (localStorage.getItem(cle)) return; } catch (_) {}
+  const date = st.date_expiration ? new Date(st.date_expiration).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+  const C = { blanc: ['#FFFFFF', '#CBD6E6', '#0D2B4E', '#E6EDF8', '#0D2B4E', '#FFFFFF', '👑'],
+              vert:  ['#E3F5E8', '#5FBF7C', '#11492A', '#C4EBCF', '#15803D', '#FFFFFF', '🌱'],
+              jaune: ['#FFF1B8', '#E8B923', '#4D3800', '#FFE07A', '#2A1E00', '#FFE27A', '⏰'] }[niv];
+  const titre = niv === 'blanc' ? 'Si vous avez apprécié le statut Premium, nous vous invitons à y souscrire avant le ' + date + '.'
+    : niv === 'vert' ? 'Si le statut Premium vous a plu, nous vous invitons à y souscrire avant le ' + date + '.'
+    : 'Si vous avez apprécié le statut Premium, nous vous invitons à y souscrire avant demain, ' + date + '.';
+  const detail = niv === 'blanc' ? 'Merci d\u2019avoir testé Premium avec nous. Quoi que vous décidiez, vos contenus sont conservés. Le statut Premium est pris en compte pour les Comptes à l\u2019honneur.'
+    : niv === 'vert' ? 'Il reste ' + j + ' jours. En souscrivant, vous poursuivez sans interruption, et rien ne change pour vos adhérents.'
+    : 'Votre période gratuite s\u2019achève demain. Aucune donnée n\u2019est supprimée, dans tous les cas.';
+  const cible = document.querySelector('.content') || document.querySelector('main') || document.body;
+  const b = document.createElement('div');
+  b.id = 'premium-rappel-bandeau'; b.setAttribute('role', 'status');
+  b.style.cssText = 'margin:0 0 18px;padding:12px 16px;background:' + C[0] + ';border:1.5px solid ' + C[1] + ';border-radius:12px;color:' + C[2] + ';display:flex;gap:12px;align-items:center;flex-wrap:wrap;';
+  b.innerHTML =
+    '<span aria-hidden="true" style="flex:none;width:34px;height:34px;border-radius:50%;background:' + C[3] + ';display:grid;place-items:center;font-size:17px;">' + C[6] + '</span>'
+    + '<div style="flex:1;min-width:200px;"><div style="font-weight:800;font-size:13.5px;line-height:1.4;">' + titre + '</div>'
+    + '<div style="font-size:12.5px;margin-top:3px;opacity:.88;line-height:1.5;">' + detail + '</div></div>'
+    + '<a href="premium.html" style="flex:none;background:' + C[4] + ';color:' + C[5] + ';font-weight:800;font-size:12.5px;padding:9px 16px;border-radius:9px;text-decoration:none;white-space:nowrap;">' + (niv === 'blanc' ? 'Découvrir Premium' : 'Souscrire à Premium') + '</a>'
+    + '<button type="button" aria-label="Fermer" style="flex:none;background:none;border:0;font-size:20px;line-height:1;color:inherit;opacity:.6;cursor:pointer;padding:4px 6px;">×</button>';
+  b.querySelector('button').onclick = function () { try { localStorage.setItem(cle, '1'); } catch (_) {} b.remove(); };
+  cible.insertBefore(b, cible.firstChild);
+}
+
 /* Point d'entrée : appelé au chargement des espaces personnels. */
 window.initCyclePremium = async function () {
   const st = await premiumStatut();
   if (!st || !st.concerne) return;
   if (st.statut === 'expire') { afficherBandeauPremiumExpire(st); return; }
   if (st.statut === 'impaye') { afficherBandeauPremiumImpaye(st); return; }
-  if (st.statut === 'bientot_expire' && !premiumAlerteDejaVue(st)) afficherAlertePremium(st);
+  if (st.statut === 'bientot_expire') {
+    /* Gratuité (aucun montant payé) : bandeaux doux à partir de J-21, plus de fenêtre. Abonnement payant : fenêtre de renouvellement habituelle. */
+    if (!(Number(st.montant_paye || 0) > 0)) afficherBandeauPremiumRappel(st);
+    else if (!premiumAlerteDejaVue(st)) afficherAlertePremium(st);
+  }
 };
 
 /* Affiche le message du serveur lorsqu'une action est refusée faute d'abonnement.

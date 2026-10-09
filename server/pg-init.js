@@ -1076,6 +1076,7 @@ const COLONNES_MIGRATION = [
     ['user_accreditations', 'relance_expire_le', 'TEXT'],
     // Paliers J-60 à J-7 (fin d'abonnement Premium) — miroir de server/db.js
     ['user_accreditations', 'relance_60j_le', 'TEXT'],
+    ['user_accreditations', 'relance_21j_le', 'TEXT'],
     ['user_accreditations', 'relance_30j_le', 'TEXT'],
     ['user_accreditations', 'relance_15j_le', 'TEXT'],
     ['user_accreditations', 'relance_7j_le', 'TEXT'],

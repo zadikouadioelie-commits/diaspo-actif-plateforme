@@ -15757,6 +15757,7 @@ const PREMIUM_CONSERVATION_ILLIMITEE = true;
 const PREMIUM_PALIERS_RELANCE = [
   { jours: 60, col: 'relance_60j_le' },
   { jours: 30, col: 'relance_30j_le' },
+  { jours: 21, col: 'relance_21j_le' },
   { jours: 15, col: 'relance_15j_le' },
   { jours: 7,  col: 'relance_7j_le'  },
   { jours: 3,  col: 'relance_3j_le'  },
@@ -15782,17 +15783,21 @@ const PREMIUM_PALIERS_RELANCE = [
 const PREMIUM_DATE_PLANCHER = new Date(process.env.PREMIUM_DATE_PLANCHER || '2026-10-03T00:00:00.000Z');
 
 /* Fin de la période gratuite d'un compte, en tenant compte de la remise à zéro. */
+/* RÈGLE DES 3 MOIS PUIS DES 3 SEMAINES (2026-10-09, demande explicite de l'utilisateur) :
+   • Gratuité de 3 mois depuis le 3 octobre 2026 : échéance COMMUNE le 3 janvier 2027 pour tous les comptes créés avant cette
+     date, y compris ceux créés jusqu'à J-3 semaines (13 décembre 2026).
+   • Tout compte créé à partir de J-3 semaines (et pour tous les comptes à venir) a 3 semaines de Premium à compter de SA création.
+   • Règle unique : fin = la plus tardive de l'échéance commune et de (création + 21 jours).
+   Les abonnements PAYANTS ne sont pas concernés (leur échéance propre fait foi). Pour changer l'échéance commune sans redéployer :
+   variable d'environnement PREMIUM_FIN_GRATUITE_COMMUNE (ISO). La date plancher PREMIUM_DATE_PLANCHER n'est plus utilisée. */
+const PREMIUM_FIN_GRATUITE_COMMUNE = new Date(process.env.PREMIUM_FIN_GRATUITE_COMMUNE || '2027-01-03T00:00:00.000Z');
+const PREMIUM_ESSAI_NOUVEAUX_JOURS = 21;
 function finPeriodeGratuite(createdAt) {
   const cree = (createdAt instanceof Date) ? new Date(createdAt.getTime())
              : (createdAt ? new Date(String(createdAt).replace(' ', 'T')) : null);
-  /* Date de création absente ou illisible : on part de la date plancher. Un compte dont la
-     date de création est inexploitable est forcément un compte existant, donc concerné par la
-     remise à zéro. Constaté en production : created_at revenait vide, la période gratuite
-     n'était jamais calculée et la remise à zéro restait sans effet. Dépendre d'une colonne
-     facultative pour accorder un droit etait fragile — le repli supprime cette dépendance. */
-  const depart = (cree && !isNaN(cree.getTime()) && cree.getTime() > PREMIUM_DATE_PLANCHER.getTime())
-    ? cree : PREMIUM_DATE_PLANCHER;
-  return finDecouvertePremium(depart.toISOString());
+  /* Date de création absente ou illisible : forcément un compte existant, donc l'échéance commune. */
+  const essai = (cree && !isNaN(cree.getTime())) ? new Date(cree.getTime() + PREMIUM_ESSAI_NOUVEAUX_JOURS * 86400000) : null;
+  return (essai && essai.getTime() > PREMIUM_FIN_GRATUITE_COMMUNE.getTime()) ? essai : new Date(PREMIUM_FIN_GRATUITE_COMMUNE.getTime());
 }
 
 /* Statut Premium détaillé — SOURCE UNIQUE pour tous les modules réservés à l'abonnement.
@@ -15854,7 +15859,10 @@ async function getPremiumStatut(userId, role) {
     /* L'essai court jusqu'à la plus lointaine des deux dates : sa propre échéance ou celle
        issue de la remise à zéro. On ne raccourcit jamais un essai en cours. */
     const finLigne = ligne.date_expiration ? new Date(ligne.date_expiration).getTime() : 0;
-    if (finGratuite.getTime() > finLigne) {
+    /* Essai automatique (type_tarif « decouverte », montant nul) : la règle des 3 mois puis des 3 semaines fait foi, dans les deux sens.
+       Les autres gratuités (accordées par un administrateur, sans étiquette) ne sont jamais raccourcies. */
+    const essaiAuto = !!nouvActif && nouvActif.type_tarif === 'decouverte';
+    if (essaiAuto ? finGratuite.getTime() !== finLigne : finGratuite.getTime() > finLigne) {
       ligne = { date_expiration: finGratuite.toISOString() };
       source = 'periode_gratuite_remise_a_zero';
     }
@@ -16203,7 +16211,7 @@ async function accorderDecouvertePremium(userId, role) {
   try {
     const def = await db.prepare("SELECT id FROM accred_definitions WHERE type=?").get(type);
     if (!def) return;
-    const finCalculee = finDecouvertePremium(new Date().toISOString());
+    const finCalculee = finPeriodeGratuite(new Date());
     const expire = (finCalculee || new Date(Date.now() + 90 * 86400000)).toISOString();
     await db.prepare(`
       INSERT INTO user_accreditations (user_id, accred_id, statut, date_expiration, type_tarif, montant_paye)
@@ -31396,7 +31404,7 @@ async function handleRequest(req, res) {
       /* Tous les abonnements Premium, et plus seulement les essais « découverte » :
          un abonnement payant doit être annoncé comme les autres avant son échéance. */
       const essais = await db.prepare(`
-        SELECT ua.*, u.nom AS user_nom, u.email AS user_email, ad.type AS accred_type
+        SELECT ua.*, u.nom AS user_nom, u.email AS user_email, u.created_at AS user_created_at, ad.type AS accred_type
         FROM user_accreditations ua
         JOIN users u ON u.id=ua.user_id
         LEFT JOIN accred_definitions ad ON ad.id=ua.accred_id
@@ -31405,11 +31413,16 @@ async function handleRequest(req, res) {
       `).all();
       const now = Date.now();
       let relancesEnvoyees = 0, expirations = 0;
+      /* Annonce du Trophée dans la relance de J-3 semaines (2026-10-09) : le statut Premium y est pris en compte à partir de cette date. */
+      const dateHonneurISO = await honneur.premiumRequisDes(); const aujourdhuiISO = dateParisISO();
+      const dateHonneurFr = new Date(dateHonneurISO + 'T12:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
       for (const e of essais) {
-        const msRestant = new Date(e.date_expiration).getTime() - now;
-        const joursRestants = msRestant / 86400000;
-        const dateFr = new Date(e.date_expiration).toLocaleDateString('fr-FR');
         const essaiGratuit = e.type_tarif === 'decouverte';
+        /* Essai automatique : l'échéance vient de la règle (3 mois puis 3 semaines), pas de la ligne enregistrée. */
+        const finEff = essaiGratuit ? (finPeriodeGratuite(e.user_created_at) || new Date(e.date_expiration)) : new Date(e.date_expiration);
+        const msRestant = finEff.getTime() - now;
+        const joursRestants = msRestant / 86400000;
+        const dateFr = finEff.toLocaleDateString('fr-FR');
         const libelle = essaiGratuit ? '🥇 Découverte Premium' : '👑 Abonnement Premium';
         /* On retient le palier le PLUS PROCHE de l'échéance parmi ceux atteints, et non le
            plus lointain. Un compte découvert tardivement (cron interrompu, abonnement créé
@@ -31419,7 +31432,13 @@ async function handleRequest(req, res) {
         const palier = atteints.length && !e[atteints[atteints.length - 1].col] ? atteints[atteints.length - 1] : null;
         if (palier) {
           const restant = Math.max(1, Math.ceil(joursRestants));
-          const msg = `${libelle} : il vous reste ${restant} jour${restant > 1 ? 's' : ''}. Échéance le ${dateFr}.`;
+          let msg;
+          if (essaiGratuit) {
+            msg = `Si vous avez apprécié le statut Premium, nous vous invitons à y souscrire avant le ${dateFr}.` + (restant <= 21 ? ` Il reste ${restant} jour${restant > 1 ? 's' : ''}.` : '');
+            if (palier.jours === 21) msg += dateHonneurISO > aujourdhuiISO
+              ? ` À noter : à partir du ${dateHonneurFr}, le statut Premium sera pris en compte pour les Comptes à l’honneur (Trophée de la Diaspora).`
+              : ' À noter : le statut Premium est désormais pris en compte pour les Comptes à l’honneur (Trophée de la Diaspora).';
+          } else msg = `${libelle} : il vous reste ${restant} jour${restant > 1 ? 's' : ''}. Échéance le ${dateFr}.`;
           creerNotif(e.user_id, 'decouverte_premium', libelle, msg, { accred_id: e.accred_id, cta: 'passer_premium' });
           /* L'e-mail ne doit jamais faire échouer la relance : la notification plateforme
              reste le canal fiable, l'e-mail est un complément. */

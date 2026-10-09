@@ -8476,7 +8476,7 @@ db.exec(`
      ⚠ Miroir obligatoire dans server/pg-init.js. */
   [["relance_10j_le","TEXT"],["relance_5j_le","TEXT"],["relance_3j_le","TEXT"],
    ["relance_24h_le","TEXT"],["relance_expire_le","TEXT"],
-   ["relance_60j_le","TEXT"],["relance_30j_le","TEXT"],["relance_15j_le","TEXT"],
+   ["relance_60j_le","TEXT"],["relance_21j_le","TEXT"],["relance_30j_le","TEXT"],["relance_15j_le","TEXT"],
    ["relance_7j_le","TEXT"]].forEach(([col,type]) => {
     if (!cols.includes(col)) db.exec(`ALTER TABLE user_accreditations ADD COLUMN ${col} ${type}`);
   });

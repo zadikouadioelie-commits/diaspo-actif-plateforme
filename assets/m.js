@@ -1558,7 +1558,7 @@
     const el = $('#t-accueil');
     if (S.home.loaded && $('#home-actus', el)) return;
     S.home.loaded = true;
-    el.innerHTML = `${pubSlot('homepage_top')}<div id="home-annonce"></div><div id="home-honneur"></div><div id="home-videos"></div>${pubSlot('between_videos')}
+    el.innerHTML = `${pubSlot('homepage_top')}<div id="home-prem-rappel"></div><div id="home-annonce"></div><div id="home-honneur"></div><div id="home-videos"></div>${pubSlot('between_videos')}
       <div class="card hero"><div class="pad"><div class="small" style="font-weight:700;color:var(--orange-d)">🌍 Réseau diaspora mondial</div>
         <h2 style="margin:6px 0 8px;font-size:20px;line-height:1.25">Connecter les diasporas, valoriser les talents, accélérer le développement des territoires.</h2>
         <p class="muted small" style="margin:0 0 12px">Des passerelles entre pays d’origine et pays d’accueil, grâce aux compétences, projets, organisations et initiatives portés par les diasporas du monde entier.</p>
@@ -1568,7 +1568,7 @@
         <p style="margin:0 0 10px">La diaspora africaine est un levier de développement majeur, mais ses initiatives restent dispersées, invisibles, sans réseau. Diaspo’Actif change ça.</p>
         <div class="tags" style="margin:0"><span class="badge">👥 Rassembler les talents</span><span class="badge">🗂️ Organiser les initiatives</span><span class="badge">🚀 Mobiliser pour un impact durable</span></div></div></div>
       <div id="home-actus"></div><div id="home-troph"></div><div id="home-shops"></div>${pubSlot('vitrine_section')}<div id="home-temo"></div><div id="home-part"></div>`;
-    loadHome();
+    loadHome(); premiumRappelAccueil();
     if (window.MMap) { if (S.home.stopMap) S.home.stopMap(); S.home.stopMap = window.MMap.mount($('#home-map')); }
   }
   function loadHome() {
@@ -1593,7 +1593,7 @@
         <p style="margin:0 0 10px">Prochainement, ici seront affichés les comptes les plus actifs de notre plateforme. Publiez, échangez, participez : votre compte pourrait être le prochain.</p>
         <div class="small" style="font-weight:700;margin:0 0 4px">Pour en faire partie</div>
         <ul style="margin:0 0 10px;padding-left:18px"><li>Être actif régulièrement : publications, échanges avec la communauté, événements et comptes-rendus, réseau.</li><li>Avoir un profil soigné et une activité fiable.</li></ul>
-        <div class="small" style="background:#FFF8E1;border:1.5px solid #E3B84A;border-radius:12px;padding:10px 12px;color:#5c4200"><b>Premium :</b> pendant la période de gratuité de Premium (jusqu’au 3 décembre 2026), le statut Premium n’est pas pris en compte. Passé ce délai, il le sera à nouveau.</div></div></div>`, '', 'Prochainement');
+        <div class="small" style="background:#FFF8E1;border:1.5px solid #E3B84A;border-radius:12px;padding:10px 12px;color:#5c4200"><b>Premium :</b> pendant la période de gratuité de Premium (jusqu’au 13 décembre 2026), le statut Premium n’est pas pris en compte. Passé ce délai, il le sera à nouveau.</div></div></div>`, '', 'Prochainement');
     safe(async () => {
       const l = ((await api('/api/vitrines')).vitrines || []).slice(0, 10); if (!l.length) return;
       homeBlock('home-shops', 'Boutiques de la diaspora', `<div class="hs">${l.map(v => miniCard('#/profil/i/' + encodeURIComponent(v.id), v.logo_url, v.boutique_nom || v.nom, [v.ville, v.pays].filter(Boolean).join(', '))).join('')}</div>`, '<a href="#/boutiques" class="sec-more">Toutes ›</a>');
@@ -1727,6 +1727,24 @@
     { t: 'Liaison de comptes', i: 'people', h: '#', act: 'switch', d: 'Passer d’un compte à un autre', r: { utilisateur: 1, initiative: 1 } }
   ];
   const MENU_DESK = ['Soumettre à Diaspo’Actif', 'Mes projets', 'Évaluation de projet', 'CRM partagé', 'Emploi et stages', 'Paiements', 'Mes demandes de devis', 'Ma localisation', 'Programmation', 'Support pilote', 'Apparence', 'Mes statistiques'];
+  /* Bandeau de rappel de fin de Premium gratuit (2026-10-09) : blanc (J-21), vert (J-15), jaune (J-1) — ton d'invitation. */
+  async function premiumRappelAccueil() {
+    const el = $('#home-prem-rappel'); if (!el || !S.me) return;
+    if (!S.premium) { try { S.premium = await api('/api/premium/statut'); } catch (e) { return; } }
+    const st = S.premium; if (!st || !st.concerne || st.statut !== 'bientot_expire' || Number(st.montant_paye || 0) > 0) return;
+    const j = st.jours_restants; if (j === null || j > 21) return;
+    const niv = j > 15 ? 'blanc' : (j > 1 ? 'vert' : 'jaune'), cle = 'da_prem_rappel_' + niv + '_' + (st.date_expiration || '');
+    try { if (localStorage.getItem(cle)) return; } catch (e) {}
+    const date = st.date_expiration ? new Date(st.date_expiration).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+    const C = { blanc: ['#FFFFFF', '#CBD6E6', '#0D2B4E', '#0D2B4E', '#FFFFFF'], vert: ['#E3F5E8', '#5FBF7C', '#11492A', '#15803D', '#FFFFFF'], jaune: ['#FFF1B8', '#E8B923', '#4D3800', '#2A1E00', '#FFE27A'] }[niv];
+    const titre = niv === 'blanc' ? `Si vous avez apprécié le statut Premium, nous vous invitons à y souscrire avant le ${date}.`
+      : niv === 'vert' ? `Si le statut Premium vous a plu, nous vous invitons à y souscrire avant le ${date}.`
+      : `Si vous avez apprécié le statut Premium, nous vous invitons à y souscrire avant demain, ${date}.`;
+    const detail = niv === 'blanc' ? 'Merci d’avoir testé Premium avec nous. Quoi que vous décidiez, vos contenus sont conservés. Le statut Premium est pris en compte pour les Comptes à l’honneur.'
+      : niv === 'vert' ? `Il reste ${j} jours. En souscrivant, vous poursuivez sans interruption.` : 'Votre période gratuite s’achève demain. Aucune donnée n’est supprimée, dans tous les cas.';
+    el.innerHTML = `<div role="status" style="position:relative;margin:0 0 12px;padding:12px 34px 12px 14px;border:1.5px solid ${C[1]};border-radius:14px;background:${C[0]};color:${C[2]}"><div style="font-weight:800;font-size:14px;line-height:1.35">${esc(titre)}</div><div class="small" style="margin-top:3px;opacity:.9">${esc(detail)}</div><a href="#/abonnement" style="display:block;margin-top:10px;text-align:center;font-weight:800;font-size:13px;padding:10px;border-radius:10px;text-decoration:none;background:${C[3]};color:${C[4]}">${niv === 'blanc' ? 'Découvrir Premium' : 'Souscrire à Premium'}</a><button type="button" aria-label="Fermer" data-x style="position:absolute;top:4px;right:6px;background:none;border:0;font-size:20px;line-height:1;color:inherit;opacity:.6;cursor:pointer">×</button></div>`;
+    const x = el.querySelector('[data-x]'); if (x) x.onclick = () => { try { localStorage.setItem(cle, '1'); } catch (e) {} el.innerHTML = ''; };
+  }
   async function loadPremium() {
     try { S.premium = await api('/api/premium/statut'); } catch (e) { S.premium = null; }
     if (S.tab === 'moi') viewMoi();
