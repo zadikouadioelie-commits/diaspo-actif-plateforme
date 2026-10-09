@@ -41,6 +41,46 @@
   const LM_GAB = { classique: 'Classique', moderne: 'Moderne', elegant: 'Élégant', minimaliste: 'Minimaliste' };
   const MAX_DOCS = 2; // le serveur n'accepte que les emplacements 1 et 2
 
+  /* ---------- Texte enrichi du CV (2026-10-09) ----------
+     Le résumé, les descriptions et les zones de texte sont désormais saisis dans un éditeur de texte enrichi sur
+     ordinateur : ce sont des fragments HTML. riche() les nettoie (A.richHtml) ; un ancien texte brut reste affiché tel quel. */
+  const aDesBalises = s => /<\/?[a-z][\s\S]*?>/i.test(String(s == null ? '' : s));
+  const riche = s => aDesBalises(s) ? A.richHtml(s) : esc(s);
+  /* Texte brut d'un fragment HTML, pour le champ « Résumé » du formulaire du téléphone (retours à la ligne et puces conservés). */
+  const htmlEnTexte = s => {
+    s = String(s == null ? '' : s);
+    if (!aDesBalises(s)) return s;
+    const t = document.createElement('template');
+    t.innerHTML = s.replace(/<\/(p|div|h[1-6]|blockquote)>/gi, '\n').replace(/<br\s*\/?>/gi, '\n').replace(/<li[^>]*>/gi, '• ').replace(/<\/li>/gi, '\n');
+    return (t.content.textContent || '').replace(/\n{3,}/g, '\n\n').trim();
+  };
+  const lienCv = cv => cv && cv.partage_token && Number(cv.partage_actif) !== 0 ? location.origin + '/cv-public.html?t=' + encodeURIComponent(cv.partage_token) : '';
+  /* Message d'envoi : lien du CV + bouton « Accéder aux médias » quand des médias sont liés (WhatsApp, e-mail, messagerie). */
+  const messageCv = (cv, nbMedias) => {
+    const l = lienCv(cv); if (!l) return '';
+    return ['Mon CV' + (cv.titre && !/^mon cv$/i.test(cv.titre) ? ' « ' + cv.titre + ' »' : ''), '👀 Voir le CV : ' + l, nbMedias > 0 ? '▶ Accéder aux médias : ' + l + '&vue=medias' : ''].filter(Boolean).join('\n');
+  };
+  async function mediasDuCv(cv) {
+    try { const r = await api('/api/cv-medias'); return (r.medias || []).filter(m => (m.numeros || []).includes(Number(cv.numero))); }
+    catch (e) { return []; }
+  }
+  /* QR code du CV, dessiné dans le navigateur (l'adresse privée n'est jamais envoyée à un service tiers). */
+  async function qrDuCv(cv, medias) {
+    const l = lienCv(cv); if (!l) return null;
+    const q = (cv.data && cv.data.media && cv.data.media.qr) || {};
+    const enabled = q.enabled !== false;
+    let img = '';
+    if (enabled) {
+      try {
+        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js');
+        const box = document.createElement('div'); box.style.cssText = 'position:fixed;left:-9999px;top:0';
+        document.body.appendChild(box);
+        try { new window.QRCode(box, { text: l, width: 256, height: 256, correctLevel: window.QRCode.CorrectLevel.M }); const c = box.querySelector('canvas'); img = c ? c.toDataURL('image/png') : ''; } finally { box.remove(); }
+      } catch (e) { img = ''; }
+    }
+    return { enabled, url: l, img, medias: medias.length };
+  }
+
   /* Styles par défaut identiques à ceux des éditeurs du site (cv-builder.js / lettre-builder.html) */
   const CV_STYLE = { couleur1: '#1a3a5c', couleur2: '#4a90d9', couleur3: '#e8f0fe', font: 'Segoe UI', fontSize: 11, spacing: 1.4, margins: { top: 15, bottom: 15, left: 15, right: 15 } };
   const LM_STYLE = { couleur1: '#1a3a5c', couleur2: '#4a90d9', couleur3: '#eef4fb', font: 'Georgia, serif', fontSize: 11 };
@@ -93,6 +133,10 @@
 .mcl-it:last-child{border-bottom:none;padding-bottom:0}
 .mcl-it b{display:block}
 .mcl-txt{white-space:pre-line;word-break:break-word}
+/* Texte enrichi du CV : le gras reste dans la ligne (l'appli met « b » en bloc ailleurs), paragraphes et listes compacts */
+.mcl-txt b,.mcl-txt strong,.mcl-txt i,.mcl-txt em,.mcl-txt u,.mcl-txt a{display:inline;font-size:inherit;margin:0}
+.mcl-txt p{margin:0 0 6px}.mcl-txt p:last-child{margin-bottom:0}.mcl-txt ul,.mcl-txt ol{margin:2px 0 6px 18px;padding:0}.mcl-txt li{margin:0}
+.mcl-txt h2,.mcl-txt h3{font-size:1em;margin:6px 0 3px}
 .mcl-paper{background:#fff;border:1px solid var(--border);border-radius:6px;padding:18px 16px;font-family:Georgia,'Times New Roman',serif;font-size:15px;line-height:1.6;box-shadow:var(--shadow);margin-bottom:12px;word-break:break-word;overflow-wrap:anywhere}
 .mcl-paper .r{text-align:right;margin:16px 0}
 .mcl-paper .c{white-space:pre-wrap;margin:14px 0}
@@ -235,15 +279,23 @@
     const exps = (d.experiences || []).map(e => `<div class="mcl-it"><b>${esc(e.poste || 'Poste')}</b>
       <div class="small muted">${esc([e.entreprise, [e.ville, e.pays].filter(Boolean).join(', ')].filter(Boolean).join(' · '))}</div>
       <div class="small muted">${esc([fmtMois(e.date_debut), e.actuel ? 'Présent' : fmtMois(e.date_fin)].filter(Boolean).join(' → '))}</div>
-      ${e.description ? `<div class="mcl-txt" style="margin-top:4px">${esc(e.description)}</div>` : ''}</div>`).join('');
+      ${e.description ? `<div class="mcl-txt" style="margin-top:4px">${riche(e.description)}</div>` : ''}</div>`).join('');
     const edus = (d.formations || []).map(e => `<div class="mcl-it"><b>${esc(e.diplome || 'Diplôme')}</b>
       <div class="small muted">${esc([e.etablissement, [e.ville, e.pays].filter(Boolean).join(', ')].filter(Boolean).join(' · '))}</div>
-      ${e.annee ? `<div class="small muted">${esc(e.annee)}</div>` : ''}${e.description ? `<div class="mcl-txt" style="margin-top:4px">${esc(e.description)}</div>` : ''}</div>`).join('');
+      ${e.annee ? `<div class="small muted">${esc(e.annee)}</div>` : ''}${e.description ? `<div class="mcl-txt" style="margin-top:4px">${riche(e.description)}</div>` : ''}</div>`).join('');
     const comps = [['Techniques', comp.tech], ['Métiers', comp.metier], ['Numériques', comp.num]].filter(x => (x[1] || []).length)
       .map(x => `<div class="mcl-it"><div class="small muted">${x[0]}</div>${tags(x[1])}</div>`).join('');
     const langs = (d.langues || []).map(l => `<div class="kv"><span>${esc(l.langue)}</span><span>${esc(l.niveau || '')}</span></div>`).join('');
     const certs = (d.certifications || []).map(c => `<div class="mcl-it"><b>${esc(c.nom)}</b><div class="small muted">${esc([c.organisme, fmtMois(c.date)].filter(Boolean).join(' · '))}</div></div>`).join('');
     const vide = !nom && !d.resume && !exps && !edus;
+    const medias = await mediasDuCv(cv);
+    if (!here(my)) return;
+    const blocs = (d.blocs || []).filter(b => b && (b.titre || b.texte)).map(b => sec(b.titre || 'Zone de texte', b.texte ? `<div class="mcl-txt">${riche(b.texte)}</div>` : '')).join('');
+    const mediasHtml = medias.length ? `<div class="h2">MÉDIAS DE CE CV</div><div class="card"><div class="pad">${medias.map(m => `<div class="mcl-it"><b>${esc(m.titre || (m.kind === 'video' ? 'Vidéo' : 'Images'))}</b>
+        ${m.kind === 'video' ? `<video controls playsinline preload="metadata" src="${A.attrUrl(m.urls[0] || '')}" style="width:100%;max-height:60vh;border-radius:12px;background:#000;margin-top:6px"></video>`
+          : `<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-top:6px">${m.urls.map(u => `<a href="${A.attrUrl(u)}" target="_blank" rel="noopener"><img loading="lazy" src="${A.attrUrl(u)}" alt="" style="width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:10px;display:block"></a>`).join('')}</div>`}</div>`).join('')}
+        <p class="small muted" style="margin:8px 0 0">Pour ajouter, délier ou supprimer des médias : sur ordinateur.</p></div></div>` : '';
+    const lien = lienCv(cv);
     const html = `<div class="card"><div class="pad"><div class="mcl-hd">
         <div class="av big">${photo ? `<img src="${photo}" alt="" onerror="this.remove()">` : esc(A.initials(nom || cv.titre))}</div>
         <div class="sp"><div style="font-weight:700;font-size:18px;line-height:1.2">${esc(nom || cv.titre || 'Mon CV')}</div>${inf.titre_pro ? `<div class="muted">${esc(inf.titre_pro)}</div>` : ''}
@@ -251,19 +303,26 @@
         ${contact ? `<div style="margin-top:10px">${contact}</div>` : ''}
         <p class="small muted" style="margin:10px 0 0">« ${esc(cv.titre || 'Mon CV')} » · CV n° ${esc(cv.numero)} · modifié le ${esc(fmtDate(cv.updated_at))}</p></div></div>
       ${vide ? `<div class="mcl-note"><span>${ic('doc', 's')}</span><span>Ce CV est encore presque vide. Touchez « Modifier » pour ajouter votre identité, vos coordonnées et un résumé.</span></div>` : ''}
-      ${sec('Résumé', d.resume ? `<div class="mcl-txt">${esc(d.resume)}</div>` : '')}
+      ${sec('Résumé', d.resume ? `<div class="mcl-txt">${riche(d.resume)}</div>` : '')}
       ${sec('Expériences', exps)}${sec('Formations', edus)}${sec('Compétences', comps)}${sec('Langues', langs)}${sec('Certifications', certs)}
-      ${sec('Centres d’intérêt', tags(d.interests))}
+      ${sec('Centres d’intérêt', tags(d.interests))}${blocs}${mediasHtml}
       <div class="h2">ACTIONS</div>
       <div class="row" style="gap:10px;flex-wrap:wrap;margin-bottom:10px">
-        ${navigator.share ? `<button class="btn out sp" id="mcl-share">${ic('share', 's')} Partager</button>` : ''}
+        ${lien ? `<button class="btn sp" id="mcl-wa" style="background:#25D366;border-color:#25D366;color:#0b2a14">Envoyer par WhatsApp</button>` : ''}
+        ${lien ? `<button class="btn out sp" id="mcl-copie">Copier le lien</button>` : ''}
+        ${navigator.share ? `<button class="btn out sp" id="mcl-share">${ic('share', 's')} Partager le PDF</button>` : ''}
         <button class="btn out sp" id="mcl-print-btn">Imprimer</button></div>
+      ${cv.partage_token && Number(cv.partage_actif) === 0 ? `<p class="small muted" style="margin:0 4px 10px">La page publique de ce CV est désactivée (réglage sur ordinateur) : le lien et le QR code n’ouvrent plus rien.</p>` : ''}
+      ${lien ? `<p class="small muted" style="margin:0 4px 10px">Le lien ouvre votre CV${medias.length ? ' et vos médias' : ''} sans compte${medias.length ? ' (bouton « Accéder aux médias »)' : ''}.</p>` : ''}
       <a class="btn out block" href="cv-builder.html?id=${esc(cv.id)}" style="margin-bottom:10px">${ic('desk', 's')} Éditeur complet (à finir sur ordinateur)</a>
       <button class="btn out block mcl-danger" id="mcl-del">Supprimer ce CV</button>
       <p class="small muted" style="margin:10px 4px 0">Photo, couleurs, mise en page, ajout ou modification des expériences et formations : à faire sur ordinateur.</p>`;
     setPane(cv.titre || 'CV', html,
       `<a class="btn out" style="flex:1" href="${BASE}/cv/${esc(cv.id)}-modifier">Modifier</a><button class="btn" style="flex:1" id="mcl-pdf">Télécharger le PDF</button>`);
-    wireDoc('cv', cv, tpl);
+    wireDoc('cv', cv, tpl, medias);
+    const wa = $('#mcl-wa'), cp = $('#mcl-copie');
+    if (wa) wa.onclick = () => { window.open('https://wa.me/?text=' + encodeURIComponent(messageCv(cv, medias.length)), '_blank', 'noopener'); };
+    if (cp) cp.onclick = async () => { try { await navigator.clipboard.writeText(lien); toast('Lien copié'); } catch (e) { toast(lien); } };
   }
 
   /* ============================================================
@@ -304,7 +363,8 @@
   }
 
   /* ---------- boutons communs d'un document : PDF, partage, impression, suppression ---------- */
-  function wireDoc(kind, doc, tpl) {
+  function wireDoc(kind, doc, tpl, medias) {
+    doc.__medias = medias || [];
     const run = (btn, busy, fn) => btn && (btn.onclick = async () => {
       const old = btn.innerHTML; btn.disabled = true; btn.textContent = busy;
       try { await fn(); }
@@ -316,7 +376,8 @@
       const p = await makePdf(kind, doc, tpl);
       const file = new File([p.blob], p.name, { type: 'application/pdf' });
       try {
-        if (navigator.canShare && navigator.canShare({ files: [file] })) await navigator.share({ files: [file], title: doc.titre || 'Document' });
+        const texte = kind === 'cv' ? messageCv(doc, (doc.__medias || []).length) : '';
+        if (navigator.canShare && navigator.canShare({ files: [file] })) await navigator.share(Object.assign({ files: [file], title: doc.titre || 'Document' }, texte ? { text: texte } : {}));
         else { download(p.blob, p.name); toast('Partage de fichier indisponible : le PDF a été téléchargé.'); }
       } catch (e) { if (e && e.name !== 'AbortError') throw e; /* partage annulé : rien à faire */ }
     });
@@ -369,13 +430,14 @@
     return t.content;
   }
   /* Feuille A4 prête à être convertie (même rendu que les boutons « Générer le document PDF » du site) */
-  function buildSheet(kind, doc, tpl) {
+  function buildSheet(kind, doc, tpl, qr) {
     const d = doc.data || {}; let html, wrap;
     if (kind === 'cv') {
       const T = window.CV_TEMPLATES && (window.CV_TEMPLATES[tpl] || window.CV_TEMPLATES.moderne);
       if (!T) throw Object.assign(new Error('gabarit'), { userMsg: 'Le gabarit du CV est introuvable.' });
       const style = Object.assign({}, CV_STYLE, d.style);
-      html = T.render(Object.assign({}, d, { style, infos: d.infos || {} }), style);
+      /* qr : QR code + bouton « Accéder aux médias » vers la page publique du CV (qrDuCv). */
+      html = T.render(Object.assign({}, d, { style, infos: d.infos || {}, media: Object.assign({}, d.media, qr ? { qr } : {}) }), style);
       wrap = 'width:210mm;background:#fff;box-shadow:none;box-sizing:border-box;';
     } else {
       const T = window.LETTRE_TEMPLATES && (window.LETTRE_TEMPLATES[tpl] || window.LETTRE_TEMPLATES.classique);
@@ -391,7 +453,7 @@
   const fileName = t => (String(t || 'Document').replace(/[^a-zA-Z0-9À-ÿ_-]+/g, '_').replace(/^_+|_+$/g, '') || 'Document') + '.pdf';
   async function makePdf(kind, doc, tpl) {
     await ensureLibs(kind, true);
-    const el = buildSheet(kind, doc, tpl);
+    const el = buildSheet(kind, doc, tpl, kind === 'cv' ? await qrDuCv(doc, doc.__medias || await mediasDuCv(doc)) : null);
     const blob = await window.html2pdf().set({
       margin: 0, filename: fileName(doc.titre), image: { type: 'jpeg', quality: 0.95 },
       html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
@@ -406,7 +468,7 @@
   }
   async function printDoc(kind, doc, tpl) {
     await ensureLibs(kind, false);
-    const host = document.createElement('div'); host.id = 'mcl-print'; host.appendChild(buildSheet(kind, doc, tpl));
+    const host = document.createElement('div'); host.id = 'mcl-print'; host.appendChild(buildSheet(kind, doc, tpl, kind === 'cv' ? await qrDuCv(doc, doc.__medias || await mediasDuCv(doc)) : null));
     document.body.appendChild(host); document.body.classList.add('mcl-printing');
     const clean = () => { document.body.classList.remove('mcl-printing'); host.remove(); window.removeEventListener('afterprint', clean); };
     window.addEventListener('afterprint', clean);
@@ -469,7 +531,7 @@
       ${fld('cv-linkedin', 'LinkedIn', inf.linkedin, { max: 200, ph: 'Adresse de votre profil' })}
       ${fld('cv-site', 'Site web', inf.site, { max: 200 })}
       <div class="mcl-sec">PRÉSENTATION</div>
-      ${fld('cv-resume', 'Résumé du profil', d.resume, { area: 1, rows: 5, max: 1500, hint: '2 à 4 phrases : qui vous êtes, votre expérience, ce que vous cherchez.' })}
+      ${fld('cv-resume', 'Résumé du profil', htmlEnTexte(d.resume), { area: 1, rows: 5, max: 1500, hint: '2 à 4 phrases : qui vous êtes, votre expérience, ce que vous cherchez.' })}
       ${fld('cv-comp', 'Compétences métier', metiers, { max: 400, ph: 'Séparées par des virgules', hint: 'Ex. Gestion de projet, Conduite de travaux, Excel' })}
       <div class="mcl-sec">EXPÉRIENCES ET FORMATIONS</div>
       ${nbExp ? `<div class="mcl-note"><span>${ic('desk', 's')}</span><span>${esc(plus(nbExp, 'expérience'))} enregistrée${nbExp > 1 ? 's' : ''} : à modifier sur ordinateur (elles sont conservées telles quelles).</span></div>` : `
@@ -514,7 +576,8 @@
         const nd = edit ? JSON.parse(JSON.stringify(d)) : { style: Object.assign({}, CV_STYLE), photo: { url: '', shape: 'round', size: 80, show: true }, experiences: [], formations: [], competences: { tech: [], metier: [], num: [] }, langues: [], certifications: [], interests: [], media: { audio: null, video: null, signature: null, qr: { enabled: true, url: location.origin + '/profil.html?id=' + S.me.id } } };
         nd.meta = Object.assign({}, nd.meta, { titre: t, numero, template: gab });
         nd.infos = Object.assign({}, nd.infos, { prenom: pr, nom: no, titre_pro: val('cv-titrepro'), nationalite: val('cv-nat'), pays_residence: val('cv-pays'), ville: val('cv-ville'), telephone: val('cv-tel'), email: em, linkedin: val('cv-linkedin'), site: val('cv-site'), adresse: (nd.infos && nd.infos.adresse) || '' });
-        nd.resume = val('cv-resume');
+        /* Résumé inchangé : on garde l'original (mise en forme enrichie créée sur ordinateur) plutôt que sa version « texte ». */
+        nd.resume = (edit && val('cv-resume') === htmlEnTexte(d.resume).trim()) ? d.resume : val('cv-resume');
         nd.competences = Object.assign({ tech: [], metier: [], num: [] }, nd.competences, { metier: val('cv-comp').split(',').map(x => x.trim()).filter(Boolean) });
         if (!nbExp && xs) nd.experiences = [{ id: Date.now(), poste: val('cv-x-poste'), entreprise: val('cv-x-ent'), ville: '', pays: '', date_debut: val('cv-x-debut'), date_fin: act && act.checked ? '' : val('cv-x-fin'), actuel: !!(act && act.checked), description: val('cv-x-desc') }];
         if (!nbEdu && fs) nd.formations = [{ id: Date.now() + 1, diplome: val('cv-f-diplome'), etablissement: val('cv-f-etab'), pays: '', ville: '', annee: an, description: '' }];

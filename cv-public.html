@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#0D2B4E">
+<title>CV — Diaspo'Actif</title>
+<link rel="icon" href="/assets/logo.png">
+<style>
+/* Page de lecture d'un CV (2026-10-09) — ouverte par le QR code, le bouton « Accéder aux médias », les envois WhatsApp /
+   e-mail / messagerie, et — sans lien — liste « Mes CV » en lecture seule (téléphone). Autonome, adaptée au téléphone. */
+:root { --navy:#0D2B4E; --navy2:#16406f; --orange:#F26422; --ink:#14213a; --muted:#56637a; --line:#dfe6f0; --bg:#eef2f8; --card:#fff; --ok:#1e7a3f; --err:#b42318; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#0b1626; --card:#13243b; --ink:#e8eef8; --muted:#a9b6ca; --line:#27415f; } }
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin:0; font-family: 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif; background: var(--bg); color: var(--ink); line-height: 1.5; min-height: 100vh; }
+button, a { font-family: inherit; }
+:focus-visible { outline: 3px solid var(--orange); outline-offset: 2px; }
+.top { background: var(--navy); color:#fff; padding: calc(10px + env(safe-area-inset-top)) 16px 10px; display:flex; align-items:center; gap:10px; position:sticky; top:0; z-index:30; box-shadow:0 2px 10px rgba(0,0,0,.25); }
+.top a.marque { color:#fff; text-decoration:none; font-weight:800; font-size:1rem; display:flex; align-items:center; gap:8px; min-height:44px; }
+.top img { width:28px; height:28px; border-radius:6px; }
+.top .titre { margin-left:auto; font-size:.8rem; opacity:.85; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:55%; }
+main { max-width: 920px; margin: 0 auto; padding: 14px 12px calc(40px + env(safe-area-inset-bottom)); }
+.carte { background: var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; }
+h1 { font-size:1.15rem; margin:0 0 4px; }
+.sous { color: var(--muted); font-size:.85rem; margin:0 0 10px; }
+.barre { display:flex; flex-wrap:wrap; gap:8px; margin: 10px 0 12px; }
+.btn { display:inline-flex; align-items:center; justify-content:center; gap:6px; min-height:44px; padding:0 16px; border-radius:10px; border:2px solid var(--navy); background:var(--card); color:var(--navy); font-weight:700; font-size:.9rem; text-decoration:none; cursor:pointer; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .btn { color:#fff; border-color:#4f78a8; } }
+.btn.prim { background: var(--navy); color:#fff; }
+.btn.wa { background:#25D366; border-color:#25D366; color:#0b2a14; }
+.btn:disabled { opacity:.6; cursor:progress; }
+.onglets { display:flex; gap:6px; border-bottom:2px solid var(--line); margin: 6px 0 12px; }
+.onglets button { flex:1; min-height:46px; background:none; border:none; border-bottom:3px solid transparent; margin-bottom:-2px; font-weight:700; font-size:.92rem; color:var(--muted); cursor:pointer; }
+.onglets button[aria-selected="true"] { color: var(--navy); border-bottom-color: var(--orange); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .onglets button[aria-selected="true"] { color:#fff; } }
+.cadre { width:100%; overflow:hidden; border-radius:6px; box-shadow:0 4px 22px rgba(0,0,0,.18); background:#fff; }
+.feuille { width:210mm; background:#fff; transform-origin: top left; color:#000; }
+.medias { display:grid; gap:14px; }
+.media-carte { background: var(--card); border:1px solid var(--line); border-radius:14px; overflow:hidden; }
+.media-carte h2 { font-size:.95rem; margin:0; padding:10px 14px; }
+.media-carte video { width:100%; max-height:70vh; background:#000; display:block; }
+.galerie { display:grid; grid-template-columns: repeat(2, 1fr); gap:6px; padding:0 8px 10px; }
+.galerie button { padding:0; border:none; background:#000; border-radius:8px; overflow:hidden; aspect-ratio: 4/3; cursor: zoom-in; }
+.galerie img { width:100%; height:100%; object-fit:cover; display:block; }
+.vide, .erreur { text-align:center; padding:28px 14px; color: var(--muted); }
+.erreur { color: var(--err); }
+.liste { display:grid; gap:12px; }
+.liste .carte h2 { font-size:1rem; margin:0; }
+.puce { display:inline-block; font-size:.72rem; font-weight:700; padding:2px 10px; border-radius:12px; background:#e5edf9; color:var(--navy); margin-right:6px; }
+.squelette { height:240px; border-radius:14px; background: linear-gradient(90deg, var(--line) 25%, transparent 50%, var(--line) 75%); background-size:200% 100%; animation: sq 1.4s infinite linear; }
+@keyframes sq { to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .squelette { animation:none; } }
+.lb { position:fixed; inset:0; background: rgba(0,0,0,.92); z-index:100; display:none; align-items:center; justify-content:center; }
+.lb.on { display:flex; }
+.lb img { max-width:96vw; max-height:84vh; object-fit:contain; }
+.lb button { position:absolute; background:rgba(255,255,255,.16); color:#fff; border:none; width:48px; height:48px; border-radius:50%; font-size:1.4rem; cursor:pointer; }
+.lb .x { top: calc(12px + env(safe-area-inset-top)); right:12px; }
+.lb .p { left:10px; top:50%; } .lb .n { right:10px; top:50%; }
+.pied { text-align:center; font-size:.76rem; color: var(--muted); margin-top:22px; }
+.pied a { color: var(--muted); }
+.sr { position:absolute; left:-9999px; }
+#toast { position:fixed; left:50%; bottom: calc(18px + env(safe-area-inset-bottom)); transform:translateX(-50%); background:#111c2e; color:#fff; padding:10px 16px; border-radius:10px; font-size:.86rem; z-index:120; display:none; max-width:92vw; }
+@media (min-width: 700px) { .galerie { grid-template-columns: repeat(4, 1fr); } }
+@media print { .top, .barre, .onglets, .pied, #toast { display:none !important; } body { background:#fff; } .cadre { box-shadow:none; } }
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="marque" href="/index.html" aria-label="Diaspo'Actif — accueil"><img src="/assets/logo.png" alt="" width="28" height="28">Diaspo'Actif</a>
+  <span class="titre" id="entete-titre"></span>
+</header>
+<main id="app" aria-live="polite"><div class="squelette" role="status" aria-label="Chargement"></div></main>
+<div class="lb" id="lb" role="dialog" aria-modal="true" aria-label="Image agrandie">
+  <button class="x" id="lb-x" aria-label="Fermer">×</button>
+  <button class="p" id="lb-p" aria-label="Image précédente">‹</button>
+  <img id="lb-img" alt="">
+  <button class="n" id="lb-n" aria-label="Image suivante">›</button>
+</div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="/assets/cv-templates.js"></script>
+<script>
+(function () {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const params = new URLSearchParams(location.search);
+  const jeton = params.get('t');
+  let cv = null, scaleTimer = null;
+
+  function toast(t) { const e = $('toast'); e.textContent = t; e.style.display = 'block'; clearTimeout(toast._t); toast._t = setTimeout(() => { e.style.display = 'none'; }, 3500); }
+  const lienCV = () => `${location.origin}/cv-public.html?t=${encodeURIComponent(jeton)}`;
+
+  /* ───────────── Liste « Mes CV » (sans lien) : lecture seule ───────────── */
+  async function listeMesCV() {
+    document.title = 'Mes CV — Diaspo\'Actif'; $('entete-titre').textContent = 'Mes CV';
+    const app = $('app');
+    let r, j = {};
+    try { r = await fetch('/api/cv-lecture', { credentials: 'include' }); j = await r.json(); } catch (e) { r = { ok: false, status: 0 }; }
+    if (r.status === 401) {
+      app.innerHTML = `<div class="carte vide"><h1>Connexion requise</h1><p class="sous">Connectez-vous pour consulter vos CV.</p><a class="btn prim" href="/login.html?redirect=${encodeURIComponent('/cv-public.html')}">Se connecter</a></div>`; return;
+    }
+    if (!r.ok) { app.innerHTML = '<div class="carte erreur">Impossible de charger vos CV pour le moment.</div>'; return; }
+    const cvs = j.cvs || [];
+    if (!cvs.length) {
+      app.innerHTML = `<div class="carte vide"><h1>Aucun CV pour l'instant</h1><p class="sous">Créez votre CV depuis un ordinateur : il apparaîtra ici pour être consulté et envoyé.</p></div>`; return;
+    }
+    app.innerHTML = `<h1>Mes CV</h1><p class="sous">Consultation et envoi (lecture seule). Pour modifier un CV, utilisez un ordinateur.</p>
+      <div class="liste">${cvs.map(c => {
+        c.lien = `${location.origin}/cv-public.html?t=${encodeURIComponent(c.jeton)}`;
+        const d = c.mis_a_jour ? new Date(String(c.mis_a_jour).replace(' ', 'T') + 'Z').toLocaleDateString('fr-FR') : '';
+        return `<section class="carte"><h2>${esc(c.titre)}</h2>
+          <p class="sous"><span class="puce">CV n°${c.numero}</span>${c.medias ? `<span class="puce">🎬 ${c.medias} média${c.medias > 1 ? 's' : ''}</span>` : ''}${d ? ' Mis à jour le ' + d : ''}${c.actif ? '' : ' — page publique désactivée'}</p>
+          <div class="barre"><a class="btn prim" href="${esc(c.lien)}">👁 Consulter</a>
+            ${c.actif ? `<button class="btn wa" data-wa="${esc(c.lien)}" data-m="${c.medias}" data-t="${esc(c.titre)}">WhatsApp</button><button class="btn" data-copie="${esc(c.lien)}">🔗 Copier le lien</button>` : ''}</div></section>`;
+      }).join('')}</div>`;
+    liaisons(app);
+  }
+
+  function messageWA(lien, medias, titre) {
+    return [`Mon CV${titre && !/^mon cv$/i.test(titre) ? ' « ' + titre + ' »' : ''}`, `👀 Voir le CV : ${lien}`, medias > 0 ? `▶ Accéder aux médias : ${lien}&vue=medias` : ''].filter(Boolean).join('\n');
+  }
+  function liaisons(racine) {
+    racine.querySelectorAll('[data-wa]').forEach(b => b.addEventListener('click', () => {
+      window.open('https://wa.me/?text=' + encodeURIComponent(messageWA(b.dataset.wa, Number(b.dataset.m), b.dataset.t)), '_blank', 'noopener');
+    }));
+    racine.querySelectorAll('[data-copie]').forEach(b => b.addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(b.dataset.copie); toast('Lien copié.'); } catch (e) { toast(b.dataset.copie); }
+    }));
+  }
+
+  /* ───────────── Un CV ───────────── */
+  async function charger() {
+    const app = $('app');
+    let r, j = {};
+    try { r = await fetch('/api/cv-public/' + encodeURIComponent(jeton), { credentials: 'include' }); j = await r.json(); } catch (e) { r = { ok: false, status: 0 }; }
+    if (!r.ok) {
+      app.innerHTML = `<div class="carte erreur"><h1>Ce CV n'est pas disponible</h1><p>${r.status === 429 ? 'Trop de requêtes : réessayez dans un instant.' : 'Le lien est incorrect, a été remplacé ou la page a été désactivée par son auteur.'}</p><a class="btn" href="/index.html">Découvrir Diaspo'Actif</a></div>`;
+      return;
+    }
+    cv = j;
+    const inf = j.data.infos || {};
+    const nom = [inf.prenom, inf.nom].filter(Boolean).join(' ');
+    document.title = `CV ${nom ? '— ' + nom : ''} | Diaspo'Actif`;
+    $('entete-titre').textContent = nom || j.titre;
+    const nbm = j.medias.length;
+    const vueMedias = params.get('vue') === 'medias' && nbm > 0;
+    app.innerHTML = `
+      ${j.proprietaire ? `<div class="carte" style="margin-bottom:10px;background:#fff7ed;border-color:#f6c9a5;color:#7a3a0f;font-size:.85rem;">Vous consultez votre CV n°${j.numero} (lecture seule). <a href="/cv-public.html" style="color:inherit;">← Mes CV</a></div>` : ''}
+      <div class="barre">
+        <button class="btn prim" id="b-pdf">📄 Télécharger le PDF</button>
+        ${j.proprietaire ? `<button class="btn wa" id="b-wa">WhatsApp</button><button class="btn" id="b-part" style="display:none">📤 Partager…</button><button class="btn" id="b-copie">🔗 Copier le lien</button>` : ''}
+      </div>
+      <div class="onglets" role="tablist" aria-label="Contenu">
+        <button role="tab" id="t-cv" aria-selected="${vueMedias ? 'false' : 'true'}" aria-controls="p-cv">📄 CV</button>
+        <button role="tab" id="t-med" aria-selected="${vueMedias ? 'true' : 'false'}" aria-controls="p-med">🎬 Médias${nbm ? ' (' + nbm + ')' : ''}</button>
+      </div>
+      <section id="p-cv" role="tabpanel" aria-labelledby="t-cv" ${vueMedias ? 'hidden' : ''}><div class="cadre" id="cadre"><div class="feuille" id="feuille"></div></div></section>
+      <section id="p-med" role="tabpanel" aria-labelledby="t-med" ${vueMedias ? '' : 'hidden'}>${rendreMedias(j.medias)}</section>
+      <p class="pied">CV partagé via <a href="/index.html">Diaspo'Actif</a>${j.mis_a_jour ? ' · mis à jour le ' + new Date(String(j.mis_a_jour).replace(' ', 'T') + 'Z').toLocaleDateString('fr-FR') : ''}</p>`;
+
+    const tmpl = CV_TEMPLATES[j.data.meta?.template || j.theme] || CV_TEMPLATES['moderne'];
+    $('feuille').innerHTML = tmpl.render(j.data, j.data.style || {});
+    ajuster(); addEventListener('resize', () => { clearTimeout(scaleTimer); scaleTimer = setTimeout(ajuster, 120); });
+    if (window.ResizeObserver) new ResizeObserver(() => ajuster()).observe($('p-cv'));
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(ajuster);
+
+    const onglet = nom => { for (const [t, p] of [['t-cv', 'p-cv'], ['t-med', 'p-med']]) { const on = t === nom; $(t).setAttribute('aria-selected', on); $(p).hidden = !on; } if (nom === 't-cv') ajuster(); };
+    $('t-cv').onclick = () => onglet('t-cv'); $('t-med').onclick = () => onglet('t-med');
+    $('b-pdf').onclick = telechargerPDF;
+    if (j.proprietaire) {
+      const lien = lienCV();
+      $('b-wa').onclick = () => window.open('https://wa.me/?text=' + encodeURIComponent(messageWA(lien, nbm, j.titre)), '_blank', 'noopener');
+      $('b-copie').onclick = async () => { try { await navigator.clipboard.writeText(lien); toast('Lien copié.'); } catch (e) { toast(lien); } };
+      if (navigator.share) { const b = $('b-part'); b.style.display = ''; b.onclick = () => navigator.share({ title: 'Mon CV', text: messageWA(lien, nbm, j.titre) }).catch(() => {}); }
+    }
+    activerGalerie();
+  }
+
+  /* Adapte la feuille A4 (794 px) à la largeur de l'écran, sans jamais la déformer. */
+  function ajuster() {
+    const cadre = $('cadre'), f = $('feuille'); if (!cadre || !f || cadre.closest('[hidden]')) return;
+    const L = cadre.parentElement.clientWidth, w = 793.7;
+    if (!L) return; // page pas encore affichée : l'observateur de taille relance le calcul dès qu'elle l'est
+    const k = Math.min(1, L / w);
+    f.style.transform = `scale(${k})`;
+    cadre.style.height = Math.ceil(f.offsetHeight * k) + 'px';
+  }
+
+  function rendreMedias(medias) {
+    if (!medias.length) return '<div class="carte vide">Aucun média n\'est lié à ce CV.</div>';
+    return `<div class="medias">${medias.map((m, i) => `<article class="media-carte"><h2>${esc(m.titre || (m.kind === 'video' ? 'Vidéo' : 'Images'))}</h2>
+      ${m.kind === 'video'
+        ? `<video controls playsinline preload="metadata" src="${esc(m.urls[0] || '')}"></video>`
+        : `<div class="galerie">${m.urls.map((u, k) => `<button type="button" data-g="${i}" data-k="${k}" aria-label="Agrandir l'image ${k + 1}"><img loading="lazy" src="${esc(u)}" alt="${esc((m.titre || 'Image') + ' ' + (k + 1))}"></button>`).join('')}</div>`}
+    </article>`).join('')}</div>`;
+  }
+
+  /* Visionneuse d'images (clavier, fermeture au toucher du fond) */
+  function activerGalerie() {
+    const lb = $('lb'), img = $('lb-img'); let liste = [], pos = 0, retour = null;
+    const montrer = () => { img.src = liste[pos]; $('lb-p').style.display = $('lb-n').style.display = liste.length > 1 ? '' : 'none'; };
+    const fermer = () => { lb.classList.remove('on'); img.src = ''; if (retour) retour.focus(); };
+    document.querySelectorAll('[data-g]').forEach(b => b.addEventListener('click', () => {
+      liste = cv.medias[Number(b.dataset.g)].urls; pos = Number(b.dataset.k); retour = b; montrer(); lb.classList.add('on'); $('lb-x').focus();
+    }));
+    $('lb-x').onclick = fermer; $('lb-p').onclick = () => { pos = (pos + liste.length - 1) % liste.length; montrer(); }; $('lb-n').onclick = () => { pos = (pos + 1) % liste.length; montrer(); };
+    lb.addEventListener('click', e => { if (e.target === lb) fermer(); });
+    document.addEventListener('keydown', e => {
+      if (!lb.classList.contains('on')) return;
+      if (e.key === 'Escape') fermer(); else if (e.key === 'ArrowLeft') $('lb-p').click(); else if (e.key === 'ArrowRight') $('lb-n').click();
+    });
+  }
+
+  async function telechargerPDF() {
+    const b = $('b-pdf'); b.disabled = true; const txt = b.textContent; b.textContent = '⏳ Création du PDF…';
+    try {
+      if (typeof html2pdf === 'undefined') throw new Error('Générateur indisponible');
+      const tmpl = CV_TEMPLATES[cv.data.meta?.template || cv.theme] || CV_TEMPLATES['moderne'];
+      const hote = document.createElement('div');
+      hote.style.cssText = 'width:210mm;background:#fff;';
+      hote.innerHTML = tmpl.render(cv.data, cv.data.style || {});
+      const inf = cv.data.infos || {};
+      const nom = ([inf.prenom, inf.nom].filter(Boolean).join('_') || 'CV').replace(/[^a-zA-Z0-9À-ÿ_-]+/g, '_');
+      await html2pdf().set({ margin: 0, filename: `CV_${nom}.pdf`, image: { type: 'jpeg', quality: 0.92 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }, pagebreak: { mode: ['css', 'legacy'] }, enableLinks: true }).from(hote).save();
+    } catch (e) { toast('Le PDF n\'a pas pu être créé : ' + e.message); }
+    finally { b.disabled = false; b.textContent = txt; }
+  }
+
+  if (jeton) charger(); else listeMesCV();
+})();
+</script>
+</body>
+</html>

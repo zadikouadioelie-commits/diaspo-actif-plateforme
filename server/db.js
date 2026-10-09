@@ -2169,6 +2169,10 @@ const MIGRATIONS = [
   ["offres_candidatures", "type_candidature TEXT DEFAULT 'offre'"],
   // CV versions history
   ["cv_profiles", "versions_json TEXT DEFAULT '[]'"],
+  // Page publique du CV (2026-10-09) : jeton NON devinable (jamais l'identifiant du compte) lu par le QR code, le
+  // bouton « Accéder aux médias » et les envois WhatsApp/e-mail/messagerie ; partage_actif=0 coupe la page.
+  ["cv_profiles", "partage_token TEXT"],
+  ["cv_profiles", "partage_actif INTEGER DEFAULT 1"],
   // ── Module Recherche d'emploi & Stage : alertes ──
   ["offres", "initiative_id INTEGER"],
   ["offres", "contrat TEXT"],
@@ -2850,6 +2854,39 @@ db.exec(`
     UNIQUE(user_id, numero),
     FOREIGN KEY(user_id) REFERENCES users(id)
   );
+
+  /* ── Médias des CV (2026-10-09) ── bibliothèque propre à chaque compte : un média (une vidéo de 30 s OU une
+     galerie de 1 à 4 images) peut être lié au CV n°1, au CV n°2, aux deux ou à aucun. Les liens se font sur le
+     NUMÉRO d'emplacement (1/2) et non sur l'identifiant du CV : un CV dupliqué ou recréé garde ses médias.
+     Supprimer un média le retire de tous les CV ; le délier d'un CV ne le supprime pas. */
+  CREATE TABLE IF NOT EXISTS cv_medias (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    kind TEXT NOT NULL DEFAULT 'galerie',
+    titre TEXT,
+    urls_json TEXT NOT NULL DEFAULT '[]',
+    duree_s INTEGER,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_cv_medias_user ON cv_medias(user_id);
+  CREATE TABLE IF NOT EXISTS cv_media_liens (
+    media_id INTEGER NOT NULL,
+    cv_numero INTEGER NOT NULL CHECK(cv_numero IN (1,2)),
+    PRIMARY KEY(media_id, cv_numero),
+    FOREIGN KEY(media_id) REFERENCES cv_medias(id) ON DELETE CASCADE
+  );
+  /* Journal des envois de CV (e-mail, messagerie, WhatsApp) : sert surtout de plafond quotidien anti-spam
+     pour l'envoi par e-mail, qui écrit à des adresses extérieures à la plateforme. */
+  CREATE TABLE IF NOT EXISTS cv_partages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    cv_numero INTEGER,
+    canal TEXT NOT NULL,
+    destinataire TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_cv_partages_user ON cv_partages(user_id, created_at);
 
   CREATE TABLE IF NOT EXISTS lettres_motivation (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -27,6 +27,7 @@ let CVB = {
       linkedin: '', site: '', adresse: ''
     },
     resume: '',
+    blocs: [],
     experiences: [],
     formations: [],
     competences: { tech: [], metier: [], num: [] },
@@ -78,6 +79,7 @@ async function loadCV(id) {
     CVB.data.meta.numero = cv.numero || 1;
     CVB.data.meta.template = cv.data?.meta?.template || 'moderne';
     CVB.historyVersions = cv.versions || [];
+    if (cv.partage_token && window.CvX) CvX.appliquerJeton(cv.partage_token);
 
     // Remplir formulaire
     syncFormFromData();
@@ -109,6 +111,7 @@ async function saveCV(force = false) {
     if (r.ok) {
       const j = await r.json();
       if (!CVB.id) { CVB.id = j.id; history.replaceState({}, '', '?id=' + j.id); }
+      if (j.partage_token && window.CvX) CvX.appliquerJeton(j.partage_token);
       CVB.dirty = false;
       setSaveStatus('saved');
       if (j.version_saved) {
@@ -123,6 +126,7 @@ async function saveCV(force = false) {
 
 function setupAutoSave() {
   document.addEventListener('input', () => {
+    if (CVB.silent) return; // pose d'un éditeur de texte enrichi : aucun changement réel
     CVB.dirty = true;
     setSaveStatus('unsaved');
     clearTimeout(CVB.autoSaveTimer);
@@ -170,7 +174,7 @@ function syncFormFromData() {
   s('ville', inf.ville); s('telephone', inf.telephone);
   s('email', inf.email); s('linkedin', inf.linkedin);
   s('site', inf.site); s('adresse', inf.adresse);
-  s('resume', CVB.data.resume);
+  if (window.CvX) CvX.setRich('resume', CVB.data.resume); else s('resume', CVB.data.resume);
   s('cv-titre', CVB.data.meta.titre);
   const numEl = document.getElementById('cv-numero');
   if (numEl) numEl.value = CVB.data.meta.numero;
@@ -181,6 +185,7 @@ function syncFormFromData() {
   renderExpList(); renderEduList(); renderLangList(); renderCertList();
   renderTagsAll();
   renderDesignPanel();
+  if (window.CvX) CvX.renderBlocs();
 }
 
 /* ═══════════════════════════════════════════
@@ -191,7 +196,7 @@ function render() {
   const sheet = document.getElementById('cv-sheet');
   if (!sheet) return;
   const tmpl = CV_TEMPLATES[CVB.data.meta.template] || CV_TEMPLATES['moderne'];
-  sheet.innerHTML = tmpl.render(CVB.data, CVB.data.style);
+  sheet.innerHTML = tmpl.render(window.CvX ? CvX.vue(true) : { ...CVB.data, _edit: true }, CVB.data.style);
 }
 
 /* ═══════════════════════════════════════════
@@ -328,8 +333,9 @@ function renderExpList() {
       <div class="form-row"><div><label>Début</label><input type="month" value="${e.date_debut||''}" oninput="CVB.data.experiences[${i}].date_debut=this.value;render();CVB.dirty=true;"></div><div><label>Fin</label><input type="month" value="${e.date_fin||''}" ${e.actuel?'disabled':''} oninput="CVB.data.experiences[${i}].date_fin=this.value;render();CVB.dirty=true;"></div></div>
       <label style="font-size:.78rem;display:flex;align-items:center;gap:6px;margin-bottom:6px;"><input type="checkbox" ${e.actuel?'checked':''} onchange="CVB.data.experiences[${i}].actuel=this.checked;renderExpList();render();CVB.dirty=true;"> Poste actuel</label>
       <label style="font-size:.78rem;">Description</label>
-      <textarea rows="2" oninput="CVB.data.experiences[${i}].description=this.value;render();CVB.dirty=true;">${_esc(e.description)}</textarea>
+      <textarea id="exp-desc-${i}" rows="3" oninput="CVB.data.experiences[${i}].description=this.value;render();CVB.dirty=true;">${_esc(e.description)}</textarea>
     </div>`).join('');
+  if (window.CvX) CVB.data.experiences.forEach((e, i) => CvX.attachRich('exp-desc-' + i, 'Missions, réalisations, résultats…'));
 }
 
 /* ═══════════════════════════════════════════
@@ -348,8 +354,11 @@ function renderEduList() {
       <button class="repeater-remove" onclick="removeEdu(${i})">×</button>
       <div class="form-row"><div><label>Diplôme</label><input value="${_esc(e.diplome)}" oninput="CVB.data.formations[${i}].diplome=this.value;render();CVB.dirty=true;"></div><div><label>Établissement</label><input value="${_esc(e.etablissement)}" oninput="CVB.data.formations[${i}].etablissement=this.value;render();CVB.dirty=true;"></div></div>
       <div class="form-row"><div><label>Pays</label><input value="${_esc(e.pays)}" oninput="CVB.data.formations[${i}].pays=this.value;render();CVB.dirty=true;"></div><div><label>Ville</label><input value="${_esc(e.ville)}" oninput="CVB.data.formations[${i}].ville=this.value;render();CVB.dirty=true;"></div></div>
-      <div class="form-row"><div><label>Année</label><input type="number" min="1980" max="2030" value="${e.annee||''}" oninput="CVB.data.formations[${i}].annee=this.value;render();CVB.dirty=true;"></div><div><label>Description</label><input value="${_esc(e.description)}" oninput="CVB.data.formations[${i}].description=this.value;render();CVB.dirty=true;"></div></div>
+      <div class="form-row"><div><label>Année</label><input type="number" min="1980" max="2030" value="${e.annee||''}" oninput="CVB.data.formations[${i}].annee=this.value;render();CVB.dirty=true;"></div><div></div></div>
+      <label style="font-size:.78rem;">Description</label>
+      <textarea id="edu-desc-${i}" rows="3" oninput="CVB.data.formations[${i}].description=this.value;render();CVB.dirty=true;">${_esc(e.description)}</textarea>
     </div>`).join('');
+  if (window.CvX) CVB.data.formations.forEach((e, i) => CvX.attachRich('edu-desc-' + i, 'Spécialité, mention, projets…'));
 }
 
 /* ═══════════════════════════════════════════
@@ -728,17 +737,15 @@ window.removeVideo = function() {
 window.generateQR = function() {
   if (!CVB.userId) {
     const el = document.getElementById('qr-url');
-    if (el) el.textContent = 'Connectez-vous pour lier le QR à votre profil public.';
+    if (el) el.textContent = 'Connectez-vous pour créer le QR code de votre CV.';
     return;
   }
-  const url = `${location.origin}/profil.html?id=${CVB.userId}`;
-  const apiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url)}`;
-  const img = document.getElementById('qr-img');
-  if (img) { img.src = apiUrl; img.style.display = 'block'; }
-  const urlEl = document.getElementById('qr-url');
-  if (urlEl) urlEl.textContent = url;
-  CVB.data.media.qr = { enabled: CVB.data.media.qr?.enabled !== false, url };
-  render(); CVB.dirty = true;
+  if (!CVB.token) {
+    const el = document.getElementById('qr-url');
+    if (el) el.textContent = 'Le QR code est créé dès l\'enregistrement de votre CV (automatique après votre première saisie).';
+    return;
+  }
+  if (window.CvX) CvX.appliquerJeton(CVB.token);
 };
 window.toggleQR = function(enabled) {
   CVB.data.media.qr = { ...CVB.data.media.qr, enabled };
@@ -792,6 +799,7 @@ window.exportPDF = async function() {
     // Repli si le CDN html2pdf est indisponible : impression navigateur classique
     const sheet = document.getElementById('cv-sheet');
     const clone = sheet.cloneNode(true);
+    clone.querySelectorAll('[data-nopdf]').forEach(n => n.remove());
     clone.id = 'cv-print-target';
     clone.style.cssText = 'position:fixed;top:0;left:0;width:210mm;z-index:99999;display:block;box-shadow:none;';
     document.body.appendChild(clone);
@@ -803,6 +811,7 @@ window.exportPDF = async function() {
   try {
     const sheet = document.getElementById('cv-sheet');
     const clone = sheet.cloneNode(true);
+    clone.querySelectorAll('[data-nopdf]').forEach(n => n.remove());
     clone.style.cssText = 'width:210mm;box-shadow:none;';
     const filename = `${(CVB.data.meta.titre || 'CV').replace(/[^a-zA-Z0-9À-ÿ_-]+/g, '_')}.pdf`;
     await html2pdf().set({
@@ -826,7 +835,7 @@ window.exportPDF = async function() {
 window.exportWord = function() {
   collectFormData();
   const tmpl = CV_TEMPLATES[CVB.data.meta.template] || CV_TEMPLATES['moderne'];
-  const cvHtml = tmpl.render(CVB.data, CVB.data.style);
+  const cvHtml = tmpl.render(window.CvX ? CvX.vue(false) : CVB.data, CVB.data.style);
   const html = `
 <!DOCTYPE html>
 <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">

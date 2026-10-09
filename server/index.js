@@ -3127,6 +3127,10 @@ route("POST", "/api/upload/document", async (req, res) => {
   } catch (e) { sendJSON(res, 500, SEC.safeError(e, "upload document")); }
 });
 
+/* Module CV (2026-10-09) : médias, page publique par jeton, partage par e-mail — voir server/cv-extras.js. */
+const CvExtras = require("./cv-extras");
+CvExtras.registerCvExtras({ route, db, sendJSON, getCurrentUser, nomCompteAffichage });
+
 /* ========== VITRINE COMMERCIALE + BOUTIQUE (comptes Initiative) ========== */
 const MAX_PRODUITS_VITRINE = 100;
 const MAX_ARTICLES_PAR_CATALOGUE = 10;
@@ -32317,14 +32321,18 @@ ${jsonLd}
       if (!cv) return sendJSON(res, 404, { error: "CV introuvable" });
       cv.data = JSON.parse(cv.data_json || '{}');
       cv.versions = JSON.parse(cv.versions_json || '[]');
+      cv.partage_token = await CvExtras.assurerJetonCV(db, cv.id);
       return sendJSON(res, 200, cv);
     }
 
     /* --- POST /api/cv — créer ou mettre à jour un CV (upsert par numero) --- */
     if (req.method === "POST" && pathname === "/api/cv") {
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
-      const { numero = 1, titre = 'Mon CV', theme = 'bleu', data = {}, save_version = false } = body;
+      const { numero = 1, titre = 'Mon CV', theme = 'bleu', data: dataBrute = {}, save_version = false } = body;
       if (![1, 2].includes(Number(numero))) return sendJSON(res, 400, { error: "numero doit être 1 ou 2" });
+      /* Résumé, descriptions et zones de texte sont du HTML saisi dans RichEditor : nettoyé ICI, car la page
+         publique du CV affiche ce contenu à d'autres personnes. */
+      const data = CvExtras.nettoyerDataCV(dataBrute);
       const existing = await db.prepare(`SELECT id, data_json, versions_json FROM cv_profiles WHERE user_id = ? AND numero = ?`).get(me.id, numero);
       if (existing) {
         let versions = JSON.parse(existing.versions_json || '[]');
@@ -32336,11 +32344,11 @@ ${jsonLd}
         }
         await db.prepare(`UPDATE cv_profiles SET titre=?, theme=?, data_json=?, versions_json=?, updated_at=datetime('now') WHERE id=?`)
           .run(titre, theme, JSON.stringify(data), JSON.stringify(versions), existing.id);
-        return sendJSON(res, 200, { id: existing.id, saved: true, version_saved, versions });
+        return sendJSON(res, 200, { id: existing.id, saved: true, version_saved, versions, partage_token: await CvExtras.assurerJetonCV(db, existing.id) });
       } else {
         const r = await db.prepare(`INSERT INTO cv_profiles(user_id,numero,titre,theme,data_json,versions_json) VALUES(?,?,?,?,?,?)`)
           .run(me.id, numero, titre, theme, JSON.stringify(data), '[]');
-        return sendJSON(res, 201, { id: r.lastInsertRowid, saved: true, versions: [] });
+        return sendJSON(res, 201, { id: r.lastInsertRowid, saved: true, versions: [], partage_token: await CvExtras.assurerJetonCV(db, r.lastInsertRowid) });
       }
     }
 

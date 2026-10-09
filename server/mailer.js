@@ -2,7 +2,9 @@
 const RESEND_API_KEY = process.env.RESEND_API_KEY || process.env.RESEND_KEY_PROD;
 const FROM = "Diaspo'Actif <noreply@diaspoactif.com>";
 
-async function sendEmail({ to, subject, html }) {
+/* attachments : [{ filename, content }] (content = base64) — pièces jointes Resend (CV partagé, 2026-10-09).
+   replyTo : adresse de réponse (l'expéditeur réel d'un envoi fait pour le compte d'un membre). */
+async function sendEmail({ to, subject, html, attachments, replyTo }) {
   if (!RESEND_API_KEY) {
     console.log("[Mailer] RESEND_API_KEY absent — email non envoyé:", subject, "→", to);
     return { ok: false, reason: "no_key" };
@@ -14,7 +16,7 @@ async function sendEmail({ to, subject, html }) {
         "Authorization": `Bearer ${RESEND_API_KEY}`,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({ from: FROM, to, subject, html })
+      body: JSON.stringify({ from: FROM, to, subject, html, ...(attachments && attachments.length ? { attachments } : {}), ...(replyTo ? { reply_to: replyTo } : {}) })
     });
     const data = await res.json();
     if (!res.ok) {

@@ -124,9 +124,57 @@ textarea { resize: vertical; }
 /* QR */
 #qr-img { width: 150px; height: 150px; border-radius: 8px; margin: 8px auto; display: none; }
 #qr-url { font-size: .72rem; color: #888; word-break: break-all; margin-top: 4px; text-align: center; }
+/* Éditeurs de texte enrichi dans le panneau latéral (RichEditor, 2026-10-09) */
+#cvb-sidebar .rich-editor-wrap { border-radius: 8px; border-color: #d0d8e4; margin-bottom: 4px; }
+#cvb-sidebar .rich-editor-toolbar { padding: 3px; gap: 1px; }
+#cvb-sidebar .rich-editor-toolbar button { padding: 4px 6px; font-size: 12px; min-width: 26px; min-height: 28px; }
+#cvb-sidebar .rich-editor-area { min-height: 76px; max-height: 220px; font-size: 13px; padding: 8px 10px; line-height: 1.5; }
+/* Bibliothèque de médias */
+.cvx-vide { font-size: .78rem; color: #888; line-height: 1.5; margin-bottom: 8px; }
+.cvx-media { display: flex; gap: 10px; background: #fff; border: 1px solid #e0e8f0; border-radius: 10px; padding: 8px; margin-bottom: 8px; }
+.cvx-media.lie { border-color: var(--accent); box-shadow: 0 0 0 2px #4a90d922; }
+.cvx-thumb { position: relative; width: 84px; height: 64px; flex-shrink: 0; border-radius: 6px; overflow: hidden; background: #1a2b4a; }
+.cvx-thumb img, .cvx-thumb video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cvx-badge { position: absolute; right: 3px; bottom: 3px; background: rgba(0,0,0,.65); color: #fff; font-size: .62rem; font-weight: 700; padding: 1px 5px; border-radius: 8px; }
+.cvx-media-corps { flex: 1; min-width: 0; }
+.cvx-titre { width: 100%; padding: 4px 6px !important; font-weight: 700; font-size: .8rem !important; border-color: transparent !important; background: transparent !important; }
+.cvx-titre:hover, .cvx-titre:focus { border-color: #d0d8e4 !important; background: #fff !important; }
+.cvx-puces { display: flex; gap: 4px; margin: 2px 0 6px 2px; }
+.cvx-puce { font-size: .66rem; padding: 1px 8px; border-radius: 10px; background: #eef1f6; color: #99a; font-weight: 700; }
+.cvx-puce.on { background: #dff3e6; color: #1e7a3f; }
+.cvx-actions { display: flex; flex-direction: column; gap: 4px; }
+.cvx-actions button { text-align: left; padding: 6px 8px; border-radius: 6px; border: 1px solid #d0d8e4; background: #f8f9ff; font-size: .72rem; min-height: 32px; }
+.cvx-actions button.prim { background: var(--primary); color: #fff; border-color: var(--primary); }
+.cvx-actions button.dang { color: var(--red); }
+.cvx-actions button:hover { filter: brightness(.96); }
+.cvx-choix { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.cvx-choix button { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 16px 8px; border: 2px solid #d0d8e4; background: #f8f9ff; border-radius: 12px; min-height: 96px; }
+.cvx-choix button:hover { border-color: var(--accent); background: #eef4ff; }
+.cvx-choix small { color: #888; font-size: .72rem; }
+.cvx-miniatures { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.cvx-mini { position: relative; width: 84px; height: 84px; border-radius: 8px; overflow: hidden; }
+.cvx-mini img { width: 100%; height: 100%; object-fit: cover; }
+.cvx-mini button { position: absolute; top: 3px; right: 3px; width: 22px; height: 22px; border-radius: 50%; border: none; background: rgba(0,0,0,.7); color: #fff; line-height: 1; }
+#cvx-msg { display: none; font-size: .78rem; font-weight: 600; margin: 0 0 10px; }
+/* Zones de texte */
+#bloc-list .repeater-item textarea { margin-top: 2px; }
+/* Partage du PDF */
+.cvx-sugg { position: absolute; left: 0; right: 0; top: 100%; z-index: 20; background: #fff; border: 1px solid #d0d8e4; border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.15); max-height: 230px; overflow-y: auto; margin-top: 2px; }
+.cvx-sugg-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; background: none; border: none; text-align: left; min-height: 44px; }
+.cvx-sugg-item:hover, .cvx-sugg-item:focus-visible { background: #eef4ff; outline: none; }
+.cvx-sugg-item small { display: block; color: #888; font-size: .7rem; }
+.cvx-sugg-vide { padding: 10px; font-size: .78rem; color: #888; }
+.cvx-av { width: 30px; height: 30px; border-radius: 50%; background: var(--accent); color: #fff; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+#sh-chip { align-items: center; gap: 8px; background: #e8f0fe; color: var(--primary); font-weight: 700; padding: 8px 12px; border-radius: 8px; font-size: .85rem; }
+#sh-chip button { margin-left: auto; border: none; background: none; font-size: 1.1rem; color: #667; }
+.cvx-partage-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+.cvx-partage-actions .btn { flex: 1; min-width: 120px; min-height: 40px; }
+#cv-bottom-bar { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-top: 18px; padding-bottom: 6px; }
+#cv-bottom-bar .btn { padding: 12px 22px; font-size: .9rem; min-height: 44px; }
+button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid #1a3a5c; outline-offset: 2px; }
 /* Print */
 @media print {
-  #cvb-header, #cvb-sidebar, #cvb-preview-wrapper > *:not(.a4-wrapper) { display: none !important; }
+  #cvb-header, #cvb-sidebar, #cvb-preview-wrapper > *:not(.a4-wrapper), [data-nopdf] { display: none !important; }
   body { background: white !important; }
   #cvb-preview-wrapper { margin-left: 0 !important; padding: 0 !important; }
   .a4-wrapper { box-shadow: none !important; width: 210mm !important; }
@@ -170,6 +218,7 @@ textarea { resize: vertical; }
   <div class="hdr-spacer"></div>
   <button class="hdr-btn" onclick="openHistory()" title="Historique">🕐</button>
   <button class="hdr-btn" id="btn-export-pdf" onclick="exportPDF()">📄 Générer le document PDF</button>
+  <button class="hdr-btn" onclick="CvX.ouvrirPartage()">📤 Partager</button>
   <button class="hdr-btn" onclick="exportWord()">⬇ Word</button>
   <button class="hdr-btn primary" onclick="saveCV(true)">💾 Sauvegarder</button>
 </header>
@@ -288,6 +337,16 @@ textarea { resize: vertical; }
         </div>
       </div>
 
+      <div class="cv-section">
+        <div class="cv-section-header" onclick="toggleSection(this)">
+          <span>📦</span> Zones de texte <span class="toggle-arrow">▶</span>
+        </div>
+        <div class="cv-section-body">
+          <div id="bloc-list"></div>
+          <button type="button" class="btn-add" onclick="CvX.addBloc()">+ Ajouter une zone de texte</button>
+        </div>
+      </div>
+
     </div>
 
     <!-- TAB DESIGN -->
@@ -315,6 +374,14 @@ textarea { resize: vertical; }
 
     <!-- TAB MÉDIAS -->
     <div class="tab-content" id="tab-media">
+      <div class="media-block">
+        <h4>📚 Médias de mes CV</h4>
+        <div style="font-size:.74rem;color:#666;line-height:1.5;margin-bottom:8px;">Une vidéo de 30 secondes ou jusqu'à 4 images, ouvertes depuis le QR code (ou le bouton « Accéder aux médias ») de chaque CV auquel elles sont liées. Délier un média le garde dans cette bibliothèque ; le supprimer le retire de tous vos CV.</div>
+        <div id="cvx-msg" role="status" aria-live="polite"></div>
+        <div id="media-lib"></div>
+        <button type="button" class="btn-add" onclick="CvX.ouvrirAjout()">➕ Ajouter un média</button>
+      </div>
+
       <div class="media-block">
         <h4>📷 Photo de profil</h4>
         <div class="photo-preview-container"><img loading="lazy" id="photo-preview" alt="Photo" src=""></div>
@@ -373,13 +440,20 @@ textarea { resize: vertical; }
     <!-- TAB OPTIONS -->
     <div class="tab-content" id="tab-options">
       <div class="media-block">
-        <h4>🔲 QR Code vers mon profil public</h4>
-        <div style="font-size:.75rem;color:#888;margin-bottom:8px;">Intégré automatiquement à chaque PDF généré. Le recruteur qui le scanne accède à votre profil public Diaspo'Actif (parcours, compétences, portfolio…), toujours à jour même après modification.</div>
+        <h4>🔲 QR Code vers mon CV et mes médias</h4>
+        <div style="font-size:.75rem;color:#888;margin-bottom:8px;">Placé au centre de chaque PDF. Le recruteur qui le scanne ouvre la page de ce CV (le CV et les médias qui lui sont liés), toujours à jour. Pour un CV envoyé par e-mail ou WhatsApp, un bouton « Accéder aux médias » remplace le QR.</div>
         <div style="text-align:center;"><img loading="lazy" id="qr-img" alt="QR Code"><div id="qr-url"></div></div>
         <div class="media-actions">
           <button onclick="generateQR()">🔄 Actualiser</button>
           <button onclick="toggleQR(false)" style="color:var(--red);">❌ Retirer du PDF</button>
           <button onclick="toggleQR(true)">✅ Inclure dans le PDF</button>
+        </div>
+        <div id="qr-lien-actions" style="display:none;margin-top:8px;border-top:1px solid #e0e8f0;padding-top:8px;">
+          <div id="lien-statut" style="font-size:.75rem;font-weight:700;color:#27ae60;margin-bottom:6px;">Page publique active</div>
+          <div class="media-actions">
+            <button type="button" id="btn-lien-bascule" onclick="CvX.basculerLien()">⏸ Désactiver la page publique</button>
+            <button type="button" onclick="CvX.regenererLien()">🔄 Nouveau lien</button>
+          </div>
         </div>
       </div>
       <div class="media-block">
@@ -400,6 +474,10 @@ textarea { resize: vertical; }
   <div id="cvb-preview-wrapper">
     <div style="font-size:.73rem;color:#888;margin-bottom:12px;">Aperçu temps réel</div>
     <div class="a4-wrapper"><div id="cv-sheet"></div></div>
+    <div id="cv-bottom-bar">
+      <button type="button" class="btn btn-outline" onclick="exportPDF()">📄 Télécharger le PDF</button>
+      <button type="button" class="btn btn-primary" onclick="CvX.ouvrirPartage()">📤 Partager le PDF</button>
+    </div>
     <div style="height:40px;"></div>
   </div>
 </div>
@@ -453,7 +531,9 @@ textarea { resize: vertical; }
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script src="/assets/cv-templates.js"></script>
+<script src="/assets/rich-editor.js"></script>
 <script src="/assets/cv-builder.js"></script>
+<script src="/assets/cv-extras.js"></script>
 <script>
 // Init template gallery modal
 document.addEventListener('DOMContentLoaded', () => {
