@@ -146,7 +146,8 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
   <div style="text-align:center;margin-bottom:28px">
     <h2 style="margin:0 0 6px">Creer un compte Diaspo'Actif</h2>
     <p style="color:var(--muted);margin:0;font-size:14px">Choisissez le type de compte adapte a votre profil</p>
-    <button type="button" id="btn-film-inscription" onclick="InscriptionFilm.ouvrir()" style="margin-top:14px;display:inline-flex;align-items:center;gap:8px;border:none;border-radius:999px;padding:10px 20px;background:linear-gradient(135deg,#F26422,#ff8a4c);color:#fff;font-weight:800;font-size:14px;cursor:pointer;box-shadow:0 6px 18px rgba(242,100,34,.35)">▶ Voir comment ça marche <span style="opacity:.85;font-weight:600">(55 s)</span></button>
+    <button type="button" id="btn-film-inscription" onclick="InscriptionFilm.ouvrir()" style="margin-top:14px;display:inline-flex;align-items:center;gap:8px;border:none;border-radius:999px;padding:10px 20px;background:linear-gradient(135deg,#F26422,#ff8a4c);color:#fff;font-weight:800;font-size:14px;cursor:pointer;box-shadow:0 6px 18px rgba(242,100,34,.35)">▶ Voir comment ça marche <span style="opacity:.85;font-weight:600">(1 min 27)</span></button>
+    <div style="margin-top:8px"><a href="#" onclick="InscriptionFilm.ouvrir({version:'court'});return false" style="font-size:13px;color:var(--muted);text-decoration:underline">Version courte (55 s)</a></div>
   </div>
   <div class="insc-stepper">
     <div class="insc-step-dot"><div class="dot active" id="dot-1">1</div><span>Type de compte</span></div>
@@ -1745,7 +1746,7 @@ function collecterTerritoires(){
 <script src="assets/password-toggle.js"></script>
 <script src="/assets/guided-tour.js"></script>
 <script src="/assets/tours/tour-inscription.js"></script>
-<script src="assets/inscription-film.js?v=8"></script>
+<script src="assets/inscription-film.js?v=14"></script>
 </body>
 </html>
 

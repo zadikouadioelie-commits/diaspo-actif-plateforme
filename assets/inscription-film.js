@@ -13,9 +13,7 @@
   'use strict';
   if (window.InscriptionFilm) return;
 
-  const VOIX = 'assets/media/inscription-voix.mp3?v=1';
   const LEAD = 1.5;          // silence musical avant la voix
-  const FIN = 54.6;          // durée totale du film (temps film)
   const W = 1280, H = 720;   // scène virtuelle, mise à l'échelle par CSS
 
   const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
@@ -32,7 +30,7 @@
   const fmt = s => { s = Math.max(0, Math.floor(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
 
   /* Sous-titres (temps audio) — limites mesurées sur la voix réelle. */
-  const CAPS = [
+  const CAPS_COURT = [
     [0.0, 7.7, "Bienvenue sur Diaspo'Actif, la plateforme mondiale qui connecte les diasporas, valorise les talents et accélère le développement des territoires."],
     [8.22, 11.82, "Créer votre compte prend quelques minutes."],
     [12.12, 14.84, "Choisissez d'abord votre profil : utilisateur, initiative ou collectivité."],
@@ -45,7 +43,7 @@
     [43.36, 45.12, "Créez votre compte dès maintenant."],
   ];
   /* Bornes de scènes (temps audio) — sert aussi au mode « réduire les animations » (image fixe par scène). */
-  const SCENES = [[-LEAD, 8.0], [8.0, 15.0], [15.0, 24.7], [24.7, 31.6], [31.6, 40.7], [40.7, FIN - LEAD]];
+  const SCENES_COURT = [[-LEAD, 8.0], [8.0, 15.0], [15.0, 24.7], [24.7, 31.6], [31.6, 40.7], [40.7, 54.6 - LEAD]];
 
   const CSS = `
 .fi-ov{position:fixed;inset:0;z-index:100000;background:rgba(3,10,26,.9);display:flex;align-items:center;justify-content:center;padding:12px;animation:fi-in .25s ease-out;font-family:'Segoe UI',system-ui,-apple-system,Roboto,sans-serif}
@@ -142,6 +140,23 @@
 .fi-prog i{position:absolute;left:0;height:6px;border-radius:3px;background:linear-gradient(90deg,#E2A929,#F26422);width:0}
 .fi-prog b{position:absolute;top:50%;width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;background:#F26422;border:2px solid #fff;left:0}
 .fi-prog:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.fi-sect{font-size:14px;font-weight:800;letter-spacing:.12em;color:#2563eb;margin:0 0 12px;border-bottom:2px solid #e3ecfa;padding-bottom:6px}
+.fi-sect small{font-size:11px;color:#8a5a00;margin-left:6px;letter-spacing:.06em}
+.fi-fl.soft .v{color:#a9b9d3;font-weight:500;background:#f5f8fd;border-style:dashed}
+.fi-fl .v.sel:after{content:"▾";color:#6b82a8;font-size:18px;margin-left:8px}
+.fi-note{margin-top:8px;padding:9px 12px;border-radius:10px;background:#eef5ff;border:2px solid #cfe0fb;font-size:14px;color:#33527d;font-weight:600;line-height:1.35}
+.fi-chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.fi-chip{padding:7px 12px;border-radius:999px;border:2px solid #c7d7ee;background:#fff;font-size:15px;font-weight:700;color:#33527d}
+.fi-chip.on{background:#fff4d6;border-color:#E2A929;color:#8a5a00;box-shadow:0 0 0 3px rgba(226,169,41,.25)}
+.fi-badge{display:inline-block;margin-left:8px;padding:3px 10px;border-radius:999px;background:#F26422;color:#fff;font-size:12px;font-weight:800;letter-spacing:.06em;vertical-align:middle}
+.fi-map{width:100%;height:240px;border-radius:14px;background:linear-gradient(160deg,#0f3a7c,#061633);position:relative;overflow:hidden;border:2px solid #E2A929}
+.fi-map svg{position:absolute;inset:0}
+.fi-maplab{position:absolute;left:0;right:0;bottom:8px;text-align:center;font-size:15px;font-weight:700;color:#FDEBA8}
+.fi-pw{height:50px;border-radius:12px;border:2px solid #c7d7ee;background:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 14px;font-size:24px;letter-spacing:.2em;font-weight:800;color:#0B2A5B}
+.fi-str{height:10px;border-radius:999px;background:#e6edf8;overflow:hidden;margin-top:8px}
+.fi-str i{display:block;height:100%;width:0;border-radius:999px;background:linear-gradient(90deg,#f59e0b,#16a34a)}
+.fi-pill2{display:inline-block;margin-top:10px;padding:5px 12px;border-radius:999px;background:#ecfdf5;border:2px solid #86efac;color:#15803d;font-size:14px;font-weight:800}
+.fi-chk u.hl{background:#fff4d6;border-radius:4px;padding:0 3px;outline:2px solid #E2A929}
 @media (max-width:640px){.fi-titre{display:none!important}.fi-top{justify-content:flex-end}}
 @media (prefers-reduced-motion:reduce){.fi-ov{animation:none}}
 `;
@@ -239,6 +254,75 @@
     <div data-k="ori"><b>✓</b>Origine</div><div data-k="dom"><b>✓</b>Domaine d'activité</div>
   </div>
 </div>
+<!-- ── Écrans de la version complète (invisibles tant que le film court tourne) ── -->
+<div class="fi-abs fi-card fi-form" data-r="fA" style="opacity:0">
+  <h5>Créer mon compte <span>Utilisateur</span></h5>
+  <div class="fi-cols">
+    <div class="fi-col"><div class="fi-sect">IDENTITÉ</div>
+      <div class="fi-fl"><label>Nom *</label><div class="v"><span data-r="a0"></span><span class="ok" data-r="ak0">✓</span></div></div>
+      <div class="fi-fl"><label>Prénom *</label><div class="v"><span data-r="a1"></span><span class="ok" data-r="ak1">✓</span></div></div>
+      <div class="fi-fl"><label>Date de naissance *</label><div class="v"><span data-r="a2"></span><span class="ok" data-r="ak2">✓</span></div></div>
+    </div>
+    <div class="fi-col" data-r="anat"><div class="fi-sect">NATIONALITÉS <small>FACULTATIF</small></div>
+      <div class="fi-fl soft"><label>Nationalité 1</label><div class="v">Française (facultatif)</div></div>
+      <div class="fi-fl soft"><label>Nationalité 2</label><div class="v">Sénégalaise (opt.)</div></div>
+      <div class="fi-note">Information publique et facultative : le réseau fonctionne sans elle.</div>
+    </div>
+  </div>
+</div>
+
+<div class="fi-abs fi-card fi-form" data-r="fB" style="opacity:0">
+  <h5>Créer mon compte <span>Utilisateur</span></h5>
+  <div class="fi-cols">
+    <div class="fi-col"><div class="fi-sect">PAYS D'ORIGINE · RÉSIDENCE</div>
+      <div class="fi-fl"><label>Pays d'origine *</label><div class="v"><span data-r="q0"></span><span class="ok" data-r="qk0">✓</span></div></div>
+      <div class="fi-fl"><label>Pays de résidence *</label><div class="v"><span data-r="q1"></span><span class="ok" data-r="qk1">✓</span></div></div>
+      <div class="fi-fl"><label>Domaine d'activité *</label><div class="v sel"><span data-r="q2"></span><span class="ok" data-r="qk2">✓</span></div></div>
+    </div>
+    <div class="fi-col"><div class="fi-sect">VOTRE DIASPORA VOUS RETROUVE</div>
+      <div class="fi-map"><svg viewBox="0 0 300 240" aria-hidden="true">
+        <path d="${lisse(AFR_PTS)}" transform="translate(150,150) scale(.5)" fill="url(#fiGold)" fill-opacity=".9" stroke="#FFF6D6" stroke-opacity=".6" stroke-width="2"/>
+        <path data-r="marc" d="M104 156 Q40 100 142 54" fill="none" stroke="#FFE7A0" stroke-width="3" stroke-linecap="round" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1"/>
+        <circle data-r="mdo" cx="104" cy="156" r="9" fill="#FFA928" stroke="#fff" stroke-width="3"/>
+        <circle data-r="mdb" cx="142" cy="54" r="9" fill="#5aaeff" stroke="#fff" stroke-width="3"/>
+        <text x="118" y="176" fill="#FFE7A0" font-size="13" font-weight="700" data-r="mlo">Côte d'Ivoire</text>
+        <text x="156" y="48" fill="#bfe0ff" font-size="13" font-weight="700" data-r="mlb">France</text>
+      </svg></div>
+    </div>
+  </div>
+</div>
+
+<div class="fi-abs fi-card fi-form" data-r="fC" style="opacity:0">
+  <h5>Créer mon compte <span>Utilisateur</span></h5>
+  <div class="fi-cols">
+    <div class="fi-col"><div class="fi-sect">PROFIL PUBLIC <small>FACULTATIF</small></div>
+      <div style="font-size:14px;color:#4b6a93;font-weight:700;margin-bottom:6px">Publics qui vous concernent</div>
+      <div class="fi-chips" data-r="chipsA"><span class="fi-chip">Diaspora</span><span class="fi-chip">Entrepreneurs</span><span class="fi-chip">Étudiants</span><span class="fi-chip">Associations</span></div>
+      <div style="font-size:14px;color:#4b6a93;font-weight:700;margin-bottom:6px">Vous recherchez</div>
+      <div class="fi-chips" data-r="chipsB"><span class="fi-chip">Un emploi</span><span class="fi-chip">Des partenaires</span><span class="fi-chip">Des investisseurs</span><span class="fi-chip">Du mentorat</span></div>
+    </div>
+    <div class="fi-col">
+      <div class="fi-av" data-r="cav">📷<div class="ph" data-r="cph"></div></div>
+      <div style="text-align:center;margin:-6px 0 8px;height:22px"><span class="fi-badge" data-r="cb2" style="opacity:0">PHOTO OBLIGATOIRE</span></div>
+      <div class="fi-bio" style="height:118px"><small>BIOGRAPHIE <span class="fi-badge" data-r="cb1" style="opacity:0">OBLIGATOIRE</span></small><span data-r="cbio"></span></div>
+    </div>
+  </div>
+</div>
+
+<div class="fi-abs fi-card fi-form" data-r="fD" style="opacity:0">
+  <h5>Créer mon compte <span>Utilisateur</span></h5>
+  <div class="fi-cols">
+    <div class="fi-col"><div class="fi-sect">SÉCURITÉ</div>
+      <div class="fi-fl"><label>Mot de passe *</label><div class="fi-pw"><span data-r="pw0"></span><span class="ok" style="font-size:24px;color:#16a34a;letter-spacing:0" data-r="pk0">✓</span></div>
+        <div class="fi-str"><i data-r="pstr"></i></div><span class="fi-pill2" data-r="ppill" style="opacity:0">✓ 8 caractères minimum</span></div>
+      <div class="fi-fl"><label>Confirmer *</label><div class="fi-pw"><span data-r="pw1"></span><span class="ok" style="font-size:24px;color:#16a34a;letter-spacing:0" data-r="pk1">✓</span></div></div>
+    </div>
+    <div class="fi-col" style="display:flex;flex-direction:column;justify-content:center;gap:16px">
+      <div class="fi-note" style="background:#fff8ec;border-color:#f3d29a;font-size:16px;padding:14px"><div class="fi-chk" style="align-items:flex-start"><b data-r="dchk">✓</b><span>J'ai lu et j'accepte la <u data-r="dcharte">Charte Institutionnelle</u> ainsi que les <u data-r="dcgu">Conditions Générales d'Utilisation</u>. Cet engagement est obligatoire pour créer un compte.</span></div></div>
+      <div class="fi-subb" data-r="dsubb" style="text-align:center;font-size:19px;padding:16px">Créer mon compte utilisateur</div>
+    </div>
+  </div>
+</div>
 <div data-r="burst"></div>
 
 <svg class="fi-globe" data-r="lines" viewBox="0 0 1280 720" width="1280" height="720" aria-hidden="true" style="left:0;top:0"></svg>
@@ -262,8 +346,15 @@
   const LIENS = [[9, 0], [9, 2], [9, 4], [9, 6], [9, 1], [10, 5], [10, 7], [4, 5], [6, 8], [3, 1], [7, 6]];
 
   /* Effets sonores : [temps audio, type]. */
-  const SFX = [[16.5, 'clic'], [17.6, 'clic'], [18.9, 'clic'], [20.55, 'pop'], [27.4, 'pop'], [28.7, 'tic'], [29.0, 'tic'], [29.5, 'tic'], [30.0, 'tic'], [30.5, 'tic'], [31.0, 'tic'], [31.05, 'chime'],
+  const SFX_COURT = [[16.5, 'clic'], [17.6, 'clic'], [18.9, 'clic'], [20.55, 'pop'], [27.4, 'pop'], [28.7, 'tic'], [29.0, 'tic'], [29.5, 'tic'], [30.0, 'tic'], [30.5, 'tic'], [31.0, 'tic'], [31.05, 'chime'],
     [33.95, 'pop'], [35.3, 'pop'], [37.0, 'pop'], [38.4, 'pop'], [39.9, 'pop'], [43.4, 'chime']];
+
+  /* ── Les deux films : même moteur, voix / sous-titres / effets / durée propres à chacun ── */
+  const FILMS = {
+    court: { id: 'court', etiquette: '55 s', voix: 'assets/media/inscription-voix.mp3?v=1', fin: 54.6, dvoix: 45.12, caps: CAPS_COURT, scenes: SCENES_COURT, sfx: SFX_COURT, swell: [31.5, 41] },
+    long: { id: 'long', etiquette: '1 min 27', voix: 'assets/media/inscription-voix-long.mp3?v=1', fin: 87.0, dvoix: 79.36, caps: null, scenes: null, sfx: null, swell: [66.5, 74.5] },
+  };
+  let FILM = FILMS.long;
 
   /* ── État du film ── */
   let ov = null, R = {}, audio = null, ctx = null, master = null, rafId = 0, tickId = 0;
@@ -279,9 +370,9 @@
   const ARP = [0, 1, 2, 1, 0, 1, 2, 1];
   function volMusique(a) {
     if (a < 0) return 0.95;                                  // introduction musicale
-    if (a < 45.3) return a > 31.5 && a < 41 ? 0.5 : 0.34;    // sous la voix, léger crescendo à la scène 5
-    const k = clamp((a - 45.3) / 1.2);                       // la voix s'arrête : la musique s'ouvre
-    const fin = 1 - clamp((a - 51.6) / 1.5);
+    if (a < FILM.dvoix + 0.2) return a > FILM.swell[0] && a < FILM.swell[1] ? 0.5 : 0.34;    // sous la voix, léger crescendo avant la fin
+    const k = clamp((a - FILM.dvoix - 0.2) / 1.2);                       // la voix s'arrête : la musique s'ouvre
+    const fin = 1 - clamp((a - (FILM.fin - LEAD - 1.5)) / 1.5);
     return lerp(0.34, 0.95, k) * fin;
   }
   function note(f, quand, dur, type, gain, att, filtre) {
@@ -329,10 +420,10 @@
     return { x: r * Math.cos(la) * Math.sin(lo), y: -r * Math.sin(la), z: Math.cos(la) * Math.cos(lo) };
   };
 
-  function rendre(av) {
+  function rendreCourt(av) {
     /* « Réduire les animations » : on montre l'état FINAL de la scène en cours (images fixes), la voix continue. */
     let a = av;
-    if (calme) { const s = SCENES.find(x => av >= x[0] && av < x[1]) || SCENES[SCENES.length - 1]; a = s[1] - 0.02; }
+    if (calme) { const s = FILM.scenes.find(x => av >= x[0] && av < x[1]) || FILM.scenes[FILM.scenes.length - 1]; a = s[1] - 0.02; }
 
     /* Fond vivant + décor fixe (ruban de pied avec la devise, angle doré) */
     R.b1.style.transform = `translate(${Math.sin(a * .2) * 60}px,${Math.cos(a * .17) * 40}px)`;
@@ -461,12 +552,189 @@
     place(R.t3, 640, 490, lerp(0.8, 1, P(a, 43.5, 44.2, E.back)) * (calme ? 1 : pulse), P(a, 43.5, 44.1) * on6);
     place(R.t4, 640, 590, 1, P(a, 44.4, 45.4) * on6);
     R.fade.style.left = '0'; R.fade.style.top = '0'; R.fade.style.transform = '';
-    R.fade.style.opacity = clamp((a - (FIN - LEAD - 1.1)) / 1.1);
+    R.fade.style.opacity = clamp((a - (FILM.fin - LEAD - 1.1)) / 1.1);
   }
+
+  /* ═════ FILM COMPLET (≈ 1 min 30) : tutoriel pas à pas, calé mot à mot sur la voix (transcription horodatée) ═════ */
+  const CAPS_LONG = [
+    [0.0, 4.24, "Bienvenue sur Diaspo'Actif, la plateforme qui connecte les diasporas."],
+    [4.29, 8.64, "Voyons ensemble, étape par étape, comment créer votre compte utilisateur."],
+    [8.72, 10.88, "Étape un : le type de compte."],
+    [11.0, 14.16, "Utilisateur, pour un particulier membre de la diaspora."],
+    [14.28, 18.64, "Initiative, pour une association, une entreprise ou un projet collectif."],
+    [18.68, 20.56, "Les comptes étatiques arrivent bientôt."],
+    [20.64, 22.72, "Étape deux : vos informations."],
+    [22.76, 26.32, "Renseignez votre nom, votre prénom et votre date de naissance."],
+    [26.36, 28.4, "Les nationalités sont facultatives."],
+    [28.48, 35.31, "Indiquez ensuite votre pays d'origine et votre pays de résidence : c'est grâce à eux que les membres de votre diaspora vous retrouvent."],
+    [35.33, 37.6, "Puis choisissez votre domaine d'activité."],
+    [37.64, 40.8, "Précisez les publics qui vous concernent et ce que vous recherchez."],
+    [40.84, 46.96, "Puis rédigez une courte biographie et ajoutez votre photo de profil : ces deux éléments sont obligatoires."],
+    [47.04, 54.4, "Choisissez un mot de passe d'au moins huit caractères, acceptez la charte et les conditions d'utilisation, puis cliquez sur Créer mon compte."],
+    [54.48, 59.28, "Étape trois : confirmez votre adresse e-mail grâce au lien reçu dans votre boîte de réception."],
+    [59.44, 60.93, "Votre compte est créé !"],
+    [60.99, 63.2, "Une jauge indique l'état de votre profil."],
+    [63.28, 66.64, "Complétez-le jusqu'à cent pour cent pour être mieux repéré dans le réseau."],
+    [66.68, 74.08, "Vous pouvez alors explorer l'annuaire, rejoindre des événements, soutenir des projets, ouvrir votre boutique et échanger avec la communauté."],
+    [74.12, 77.52, "Diaspo'Actif : rejoignez le réseau, et passez à l'action."],
+    [77.56, 79.36, "Créez votre compte dès maintenant."],
+  ];
+  const FIN_LONG = 87.0;
+  const SCENES_LONG = [[-LEAD, 8.7], [8.7, 20.6], [20.6, 28.4], [28.4, 37.6], [37.6, 47.0], [47.0, 54.4], [54.4, 60.95], [60.95, 66.7], [66.7, 74.1], [74.1, FIN_LONG - LEAD]];
+  const SFX_LONG = [[24.1, 'clic'], [24.9, 'clic'], [26.4, 'clic'], [30.4, 'clic'], [31.8, 'clic'], [37.1, 'clic'], [38.5, 'pop'], [39.0, 'pop'], [40.4, 'pop'], [40.8, 'pop'], [44.2, 'pop'], [48.1, 'tic'], [49.4, 'tic'],
+    [50.5, 'clic'], [53.6, 'pop'], [59.5, 'pop'], [60.5, 'chime'], [63.5, 'tic'], [63.85, 'tic'], [64.2, 'tic'], [64.5, 'tic'], [64.8, 'tic'], [64.85, 'chime'], [68.2, 'pop'], [69.6, 'pop'], [70.9, 'pop'], [72.0, 'pop'], [73.55, 'pop'], [77.9, 'chime']];
+
+  function rendreLong(av) {
+    let a = av;
+    if (calme) { const s = FILM.scenes.find(x => av >= x[0] && av < x[1]) || FILM.scenes[FILM.scenes.length - 1]; a = s[1] - 0.02; }
+
+    /* Fond vivant + décor fixe */
+    R.b1.style.transform = `translate(${Math.sin(a * .2) * 60}px,${Math.cos(a * .17) * 40}px)`;
+    R.b2.style.transform = `translate(${Math.cos(a * .15) * -70}px,${Math.sin(a * .21) * -50}px)`;
+    R.pa.forEach((e, i) => {
+      const sx = (i * 197.3) % W, sy = (i * 83.7) % H, v = 8 + (i % 5) * 4;
+      e.el.style.transform = `translate(${(sx + Math.sin(a * .3 + i) * 30) % W}px,${((sy - a * v) % H + H) % H}px)`;
+      e.el.style.opacity = .25 + .35 * Math.abs(Math.sin(a * .8 + i));
+    });
+    const dec = P(a, -1.2, -0.3);
+    R.rub.style.opacity = dec; R.swoosh.style.opacity = dec * 0.9;
+    place(R.motto, 640, 690, 1, dec * 0.95);
+
+    /* Globe-réseau : à gauche → coin → fond de la scène finale */
+    const g1 = P(a, 7.2, 8.6, E.inout), g2 = P(a, 73.4, 75.0, E.inout), tard = a > 40;
+    place(R.globe, tard ? lerp(92, 640, g2) : lerp(430, 92, g1), tard ? lerp(78, 330, g2) : lerp(350, 78, g1), tard ? lerp(0.27, 1.4, g2) : lerp(1.15, 0.27, g1), (tard ? lerp(1, 0.45, g2) : 1) * P(a, -1.2, -0.2));
+    const rot = a * 0.33, rr = 150;
+    R.mer.forEach((m, i) => { m.setAttribute('rx', Math.abs(rr * Math.sin(i * Math.PI / 6 - rot * 0.5)).toFixed(1)); });
+    R.afr.setAttribute('transform', `scale(${(1 + 0.012 * Math.sin(a * 1.1)).toFixed(4)})`);
+    R.nd.forEach((c, i) => {
+      const n = NODES[i], ap = P(a, 0.2 + i * 0.12, 0.8 + i * 0.12, E.back);
+      c.setAttribute('cx', n[0]); c.setAttribute('cy', n[1]);
+      c.setAttribute('r', (5.5 * ap * (1 + 0.28 * Math.sin(a * 2.4 + i))).toFixed(1)); c.setAttribute('fill-opacity', clamp(ap).toFixed(2));
+    });
+    R.ar.forEach((pt, k) => {
+      const A = NODES[LIENS[k][0]], B = NODES[LIENS[k][1]], f = 1.3;
+      pt.setAttribute('d', `M${A[0]} ${A[1]} Q${(((A[0] + B[0]) / 2) * f).toFixed(1)} ${(((A[1] + B[1]) / 2) * f).toFixed(1)} ${B[0]} ${B[1]}`);
+      pt.setAttribute('stroke-dashoffset', (1 - P(a, 0.9 + k * 0.28, 1.9 + k * 0.28, E.inout)).toFixed(3)); pt.setAttribute('stroke-opacity', '0.92');
+    });
+
+    /* Scène 1 : bienvenue */
+    const s1out = 1 - P(a, 7.0, 7.8);
+    place(R.welc, 640, 98, 1, P(a, 0.2, 1.2) * s1out);
+    place(R.logo, 850, 345, lerp(0.55, 1, P(a, 2.0, 3.4, E.back)), P(a, 2.0, 3.0) * s1out);
+    place(R.tag, 640, 585, 1, P(a, 4.3, 5.3) * s1out);
+    place(R.leg, 430, 548, 1, P(a, 3.0, 4.0) * (1 - P(a, 6.6, 7.3)));
+    place(R.head, 300, 78, 1, P(a, 7.8, 8.8) * (1 - P(a, 73.8, 74.4)));
+
+    /* Étapes du vrai parcours */
+    const etat = [a < 20.5 ? 'on' : 'done', a < 20.5 ? '' : a < 54.4 ? 'on' : 'done', a < 54.4 ? '' : a < 60.9 ? 'on' : 'done'];
+    R.stEls.forEach((el, i) => { el.className = 'fi-st ' + etat[i]; el.querySelector('b').textContent = etat[i] === 'done' ? '✓' : String(i + 1); });
+    place(R.steps, 640, 128, 1, P(a, 8.7, 9.4) * (1 - P(a, 66.4, 67.0)) * (a > 8.6 ? 1 : 0));
+
+    /* Scène 2 : le type de compte (étape 1) */
+    const enter = [8.9, 9.2, 9.5], xs = [330, 640, 950];
+    const win = [[11.0, 14.16], [14.28, 18.64], [18.68, 20.56]];
+    [0, 1, 2].forEach(i => {
+      const e = P(a, enter[i], enter[i] + 0.7, E.back);
+      const lum = P(a, win[i][0] - 0.1, win[i][0] + 0.25) * (1 - P(a, win[i][1] - 0.15, win[i][1] + 0.25));
+      const op = P(a, enter[i], enter[i] + 0.5) * (1 - P(a, 20.2, 20.9));
+      const el = R['c' + i];
+      place(el, xs[i], lerp(470, 370, e), lerp(0.9, 1, e) * (1 + 0.07 * lum), a < 8.8 || a > 21 ? 0 : (i === 2 ? op * 0.82 : op));
+      el.style.borderColor = lum > 0.05 ? `rgb(${Math.round(lerp(226, 255, lum))},${Math.round(lerp(169, 235, lum))},${Math.round(lerp(41, 168, lum))})` : '#E2A929';
+      el.style.boxShadow = `0 14px 40px rgba(0,0,0,.4),0 0 ${lum * 55}px rgba(253,235,168,${lum * 0.75})`;
+    });
+
+    R.form.style.opacity = 0; // formulaire de la version courte : jamais affiché ici
+    /* Cartes de saisie : fondu enchaîné d'un formulaire au suivant */
+    const carte = (el, a0, a1, b0, b1) => place(el, 640, 386, lerp(0.9, 1, P(a, a0, a1 + 0.4, E.back)), (a < a0 - 0.1 || a > b1 + 0.1) ? 0 : P(a, a0, a1) * (1 - P(a, b0, b1)));
+    const champ = (pre, i, txt, t0, t1) => { R[pre + i].textContent = tape(txt, a, t0, t1); R[pre + 'k' + i].style.opacity = P(a, t1 + 0.05, t1 + 0.25); };
+
+    /* Scène 3 : identité et nationalités (étape 2) */
+    carte(R.fA, 20.5, 21.2, 28.3, 28.9);
+    champ('a', 0, 'Kouadio', 23.55, 24.0); champ('a', 1, 'Aminata', 24.3, 24.8); champ('a', 2, '12/03/1992', 25.25, 26.2);
+    const glow = P(a, 26.4, 26.9) * (1 - P(a, 28.0, 28.4));
+    R.anat.style.transform = `scale(${1 + 0.025 * glow})`; R.anat.style.opacity = lerp(0.55, 1, P(a, 26.3, 26.9));
+
+    /* Scène 4 : origine, résidence, domaine, et la carte qui relie la diaspora */
+    carte(R.fB, 28.3, 28.9, 37.5, 38.1);
+    champ('q', 0, "Côte d'Ivoire", 29.6, 30.3); champ('q', 1, 'France', 30.8, 31.5); champ('q', 2, 'Entrepreneuriat', 35.8, 36.9);
+    const mp = P(a, 31.6, 32.2);
+    R.marc.parentNode.parentNode.style.opacity = mp;
+    R.marc.setAttribute('stroke-dashoffset', (1 - P(a, 32.2, 34.4, E.inout)).toFixed(3));
+    const pul = 1 + 0.25 * Math.sin(a * 5);
+    R.mdo.setAttribute('r', (9 * pul).toFixed(1)); R.mdb.setAttribute('r', (9 * (a > 34.2 ? pul : 1)).toFixed(1));
+
+    /* Scène 5 : profil public, biographie et photo obligatoires */
+    carte(R.fC, 37.5, 38.1, 46.9, 47.5);
+    const chips = [[R.chipsA, 1, 38.5], [R.chipsA, 0, 39.0], [R.chipsB, 1, 40.35], [R.chipsB, 3, 40.75]];
+    [R.chipsA, R.chipsB].forEach(g => [...g.children].forEach(c => c.classList.remove('on')));
+    chips.forEach(([g, i, t]) => { if (a >= t) g.children[i].classList.add('on'); });
+    R.cbio.textContent = tape("Passionnée d'entrepreneuriat, je cherche des partenaires pour un projet agricole en Côte d'Ivoire.", a, 41.3, 45.6);
+    R.cb1.style.opacity = P(a, 42.3, 42.8) ; R.cb1.style.transform = `scale(${1 + 0.12 * Math.sin(Math.max(0, a - 46) * 9) * P(a, 46, 46.2)})`;
+    const cphoto = P(a, 43.9, 44.5, E.back);
+    R.cph.style.transform = `scale(${cphoto})`; R.cph.style.opacity = cphoto > 0 ? 1 : 0; R.cav.classList.toggle('set', cphoto > 0.5);
+    R.cb2.style.opacity = P(a, 44.9, 45.4);
+
+    /* Scène 6 : mot de passe, charte, bouton */
+    carte(R.fD, 46.9, 47.5, 54.3, 54.9);
+    R.pw0.textContent = tape('••••••••', a, 47.6, 48.2); R.pk0.style.opacity = P(a, 48.3, 48.5);
+    R.pstr.style.width = (P(a, 47.6, 49.4, E.lin) * 100).toFixed(0) + '%';
+    R.ppill.style.opacity = P(a, 48.5, 48.9);
+    R.pw1.textContent = tape('••••••••', a, 48.8, 49.4); R.pk1.style.opacity = P(a, 49.5, 49.7);
+    R.dchk.classList.toggle('on', a >= 50.2);
+    R.dcharte.classList.toggle('hl', a >= 50.1 && a < 50.7); R.dcgu.classList.toggle('hl', a >= 50.7 && a < 52.2);
+    const clic = P(a, 53.3, 53.5, E.lin) * (1 - P(a, 53.5, 53.9, E.lin));
+    R.dsubb.style.transform = `scale(${1 - 0.05 * clic})`; R.dsubb.style.boxShadow = clic > 0.05 ? `0 0 ${10 + 26 * clic}px rgba(245,158,11,${0.9 * clic})` : '';
+
+    /* Scène 7 : l'e-mail de confirmation (étape 3) */
+    place(R.env, 640, 370, lerp(0.8, 1.2, P(a, 54.6, 55.5, E.back)), P(a, 54.6, 55.3) * (1 - P(a, 60.7, 61.2)) * (a > 54.5 && a < 61.3 ? 1 : 0));
+    R.flap.style.transform = `rotateX(${lerp(0, 175, P(a, 57.2, 58.0, E.inout))}deg)`;
+    const eo = P(a, 59.45, 59.95, E.back);
+    R.envok.style.transform = `scale(${eo})`; R.envok.style.transformOrigin = '198px 52px'; R.envck.style.opacity = eo > 0.2 ? 1 : 0;
+    R.envl.style.opacity = P(a, 59.5, 60.0);
+    const bs1 = P(a, 59.5, 60.5, E.lin);
+    R.burst.innerHTML = a > 59.5 && a < 60.6 ? Array.from({ length: 16 }, (_, i) => { const an = i / 16 * Math.PI * 2, d = 40 + bs1 * 210; return `<i style="position:absolute;left:${640 + Math.cos(an) * d}px;top:${370 + Math.sin(an) * d * .75}px;width:11px;height:11px;border-radius:50%;background:${i % 3 === 0 ? '#F26422' : '#F8DA7A'};opacity:${1 - bs1}"></i>`; }).join('') : '';
+
+    /* Scène 8 : la jauge d'état de profil */
+    place(R.prof, 640, 385, lerp(0.88, 1, P(a, 61.0, 61.8, E.back)), (a < 60.9 || a > 67.0) ? 0 : P(a, 61.0, 61.6) * (1 - P(a, 66.3, 66.9)));
+    const ckT = { res: -1, pho: 63.4, bio: 63.8, com: 64.15, ori: 64.45, dom: 64.75 };
+    let nOn = 0;
+    R.ckEls.forEach(d => { const on = a >= (ckT[d.dataset.k] ?? 99) && (ckT[d.dataset.k] >= 0 || a >= 61.4); d.classList.toggle('on', on); if (on) nOn++; });
+    const pct = Math.round(nOn / 6 * 100);
+    R.pct.textContent = pct + ' %'; R.bar.style.width = pct + '%'; R.bar.style.transition = calme ? 'none' : 'width .45s ease';
+
+    /* Scène 9 : ce que l'on peut faire ensuite */
+    const inS9 = a > 66.5 && a < 74.5, pIn = P(a, 66.8, 67.6, E.back), pOut = P(a, 73.9, 74.5);
+    place(R.past, 640, 355, lerp(0.5, 1, pIn), inS9 ? pIn * (1 - pOut) : 0);
+    place(R.pn, 640, 478, 1, inS9 ? P(a, 67.2, 67.9) * (1 - pOut) : 0);
+    const ln = [], sc = [68.0, 69.45, 70.75, 71.85, 73.4];
+    sc.forEach((tc, i) => {
+      const an = (-90 + i * 72) * Math.PI / 180 + (calme ? 0 : Math.sin(a * 0.4) * 0.06), x = 640 + Math.cos(an) * 410, y = 355 + Math.sin(an) * 232;
+      const e = P(a, tc - 0.6, tc + 0.15, E.back);
+      place(R['s' + i], lerp(640, x, e), lerp(355, y, e), lerp(0.4, 1, e), inS9 ? e * (1 - pOut) : 0);
+      if (inS9 && e > 0) ln.push(`<line x1="640" y1="355" x2="${lerp(640, x, e).toFixed(1)}" y2="${lerp(355, y, e).toFixed(1)}" stroke="#E2A929" stroke-width="3.5" stroke-opacity="${(0.75 * (1 - pOut)).toFixed(2)}" stroke-dasharray="9 8"/>`);
+    });
+    R.lines.innerHTML = ln.join('');
+
+    /* Scène 10 : appel à l'action */
+    const fin6 = P(a, 74.1, 75.0), on6 = a > 74.0 ? 1 : 0, lau = P(a, 74.6, 75.8, E.back);
+    place(R.t1, 640, 240, lerp(0.92, 1, fin6), fin6 * on6);
+    place(R.lauG, 150, 250, 0.62 * lerp(0.7, 1, lau), P(a, 74.6, 75.6) * on6);
+    place(R.lauD, 1130, 250, 0.62 * lerp(0.7, 1, lau), P(a, 74.6, 75.6) * on6);
+    place(R.t0, 640, 328, 1, P(a, 75.6, 76.6) * on6);
+    place(R.t2, 640, 396, 1, P(a, 77.5, 78.2) * on6);
+    place(R.t3, 640, 490, lerp(0.8, 1, P(a, 77.8, 78.5, E.back)) * (calme ? 1 : 1 + 0.045 * Math.sin(Math.max(0, a - 78.5) * 4.2)), P(a, 77.8, 78.4) * on6);
+    place(R.t4, 640, 590, 1, P(a, 78.6, 79.6) * on6);
+    R.fade.style.left = '0'; R.fade.style.top = '0'; R.fade.style.transform = '';
+    R.fade.style.opacity = clamp((a - (FILM.fin - LEAD - 1.1)) / 1.1);
+  }
+
+  FILMS.long.caps = CAPS_LONG; FILMS.long.scenes = SCENES_LONG; FILMS.long.sfx = SFX_LONG;
+  function rendre(av) { return FILM.id === 'long' ? rendreLong(av) : rendreCourt(av); }
 
   /* ── Sous-titres ── */
   function majCaption(a) {
     let idx = -1;
+    const CAPS = FILM.caps;
     for (let i = 0; i < CAPS.length; i++) if (a >= CAPS[i][0] - 0.05 && a <= CAPS[i][1] + 0.4) { idx = i; break; }
     if (idx !== capIdx) {
       capIdx = idx;
@@ -487,26 +755,38 @@
     const w = R.win.clientWidth; R.stage.style.transform = `scale(${w / W})`;
   }
   function temps() { return tFilm; }
-  function boucle() {
-    rafId = requestAnimationFrame(boucle);
+  /* Horloge du film : la voix est la référence. Séparée du dessin pour que le temps, les effets sonores et la
+     musique continuent de suivre la voix même quand le navigateur suspend les animations (onglet en arrière-plan). */
+  let dernierRaf = 0;
+  function horloge() {
     const now = performance.now();
     if (enCours) {
       if (audio && !audio.paused && audio.readyState >= 2 && tFilm >= LEAD - 0.05) tFilm = audio.currentTime + LEAD;
       else if (tFilm >= LEAD && audio && audio.readyState < 3 && !finie) { /* la voix charge : on attend, l'horloge s'arrête */ tMur = now; }
       else tFilm += (now - tMur) / 1000;
       tMur = now;
-      if (audio && audio.paused && tFilm >= LEAD && tFilm < LEAD + 45.1 && audio.readyState >= 2) {
+      if (audio && audio.paused && tFilm >= LEAD && tFilm < LEAD + FILM.dvoix - 0.02 && audio.readyState >= 2) {
         audio.currentTime = Math.max(0, tFilm - LEAD); const pr = audio.play(); if (pr && pr.catch) pr.catch(() => {});
       }
-      if (tFilm >= FIN) { tFilm = FIN; terminer(); }
+      if (tFilm >= FILM.fin) { tFilm = FILM.fin; terminer(); }
     }
     const a = tFilm - LEAD;
-    SFX.forEach(s => { if (enCours && s[0] > dernierA && s[0] <= a && s[0] - dernierA < 0.5) bruit(s[1]); });
+    FILM.sfx.forEach(s => { if (enCours && s[0] > dernierA && s[0] <= a && s[0] - dernierA < 0.5) bruit(s[1]); });
     dernierA = a;
-    rendre(a); majCaption(a);
-    { const pc = (tFilm / FIN * 100).toFixed(2) + '%'; R.progf.style.width = pc; R.progb.style.left = pc; R.prog.setAttribute('aria-valuenow', String(Math.round(tFilm / FIN * 100))); } R.temps.textContent = fmt(tFilm) + ' / ' + fmt(FIN);
+    return a;
   }
-  function tickMusique() { if (enCours) planifierMusique(tFilm - LEAD); }
+  function boucle() {
+    rafId = requestAnimationFrame(boucle);
+    dernierRaf = performance.now();
+    const a = horloge();
+    rendre(a); majCaption(a);
+    { const pc = (tFilm / FILM.fin * 100).toFixed(2) + '%'; R.progf.style.width = pc; R.progb.style.left = pc; R.prog.setAttribute('aria-valuenow', String(Math.round(tFilm / FILM.fin * 100))); } R.temps.textContent = fmt(tFilm) + ' / ' + fmt(FILM.fin);
+  }
+  function tickMusique() {
+    if (!enCours) return;
+    if (performance.now() - dernierRaf > 300) horloge(); // animations suspendues : l'horloge continue sans elles
+    planifierMusique(tFilm - LEAD);
+  }
 
   function lecture() {
     if (finie) { aller(0); finie = false; }
@@ -521,7 +801,7 @@
     if (master && ctx) master.gain.setTargetAtTime(0, ctx.currentTime, 0.05);
   }
   function aller(t) {
-    tFilm = clamp(t, 0, FIN); dernierA = tFilm - LEAD; capIdx = -2;
+    tFilm = clamp(t, 0, FILM.fin); dernierA = tFilm - LEAD; capIdx = -2;
     if (audio) { audio.pause(); audio.currentTime = Math.max(0, tFilm - LEAD); }
     prochainPas = Math.ceil((tFilm - LEAD) / PAS) * PAS;
     if (enCours && audio && tFilm >= LEAD) { const pr = audio.play(); if (pr && pr.catch) pr.catch(() => {}); }
@@ -546,6 +826,7 @@
   function ouvrir(options) {
     if (ov) return;
     options = options || {};
+    FILM = options.version === 'court' ? FILMS.court : FILMS.long;
     if (!document.getElementById('fi-css')) { const st = document.createElement('style'); st.id = 'fi-css'; st.textContent = CSS; document.head.appendChild(st); }
     if (!document.getElementById('fi-fonts')) { const l = document.createElement('link'); l.id = 'fi-fonts'; l.rel = 'stylesheet'; l.href = 'https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Cinzel:wght@600;800&display=swap'; document.head.appendChild(l); }
     calme = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -553,11 +834,11 @@
     ov.className = 'fi-ov'; ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true'); ov.setAttribute('aria-label', "Film : créer son compte sur Diaspo'Actif");
     const surInscription = /(^|\/)inscription(\.html)?$/.test(location.pathname);
     ov.innerHTML = `<div class="fi-box">
-      <div class="fi-top"><span class="fi-titre">▶ COMMENT ÇA MARCHE · 55 s</span><span style="display:flex;gap:8px"><button class="fi-btn or" data-r="cta" type="button">Créer mon compte</button><button class="fi-btn" data-r="fermer" type="button" aria-label="Fermer le film">✕ Fermer</button></span></div>
+      <div class="fi-top"><span class="fi-titre">▶ COMMENT ÇA MARCHE · ${FILM.etiquette}</span><span style="display:flex;gap:8px"><button class="fi-btn or" data-r="cta" type="button">Créer mon compte</button><button class="fi-btn" data-r="fermer" type="button" aria-label="Fermer le film">✕ Fermer</button></span></div>
       <div class="fi-win" data-r="win"><div class="fi-stage" data-r="stage">${STAGE_HTML}</div></div>
       <div class="fi-cap" data-r="cap" aria-live="off"></div>
       <div class="fi-ctl"><button class="fi-btn" data-r="play" type="button">▶ Lecture</button><button class="fi-btn" data-r="son" type="button">🔊 Son</button>
-        <div class="fi-prog" data-r="prog" role="slider" tabindex="0" aria-label="Position dans le film" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i data-r="progf"></i><b data-r="progb"></b></div><span class="t" data-r="temps">0:00 / 0:54</span></div></div>`;
+        <div class="fi-prog" data-r="prog" role="slider" tabindex="0" aria-label="Position dans le film" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i data-r="progf"></i><b data-r="progb"></b></div><span class="t" data-r="temps">0:00 / ${fmt(FILM.fin)}</span></div></div>`;
     document.body.appendChild(ov);
     document.body.style.overflow = 'hidden';
     R = {};
@@ -575,7 +856,11 @@
     echelle(); window.addEventListener('resize', echelle);
     document.addEventListener('keydown', clavier);
 
-    audio = new Audio(VOIX); audio.preload = 'auto'; audio.muted = muet;
+    audio = new Audio(); audio.preload = 'auto'; audio.muted = muet;
+    /* La voix est chargée ENTIÈREMENT (≈ 1 Mo) avant d'être jouée : on peut alors sauter à n'importe quel instant
+       sans dépendre du serveur (lecture par plages d'octets absente de certains serveurs). Tant qu'elle n'est pas
+       prête, l'horloge du film s'arrête au début de la voix. */
+    { const courant = audio; fetch(FILM.voix).then(r => r.blob()).then(b => { if (audio === courant) { courant.dataset.url = URL.createObjectURL(b); courant.src = courant.dataset.url; } }).catch(() => { if (audio === courant) courant.src = FILM.voix; }); }
     const AC = window.AudioContext || window.webkitAudioContext;
     if (AC) { ctx = new AC(); master = ctx.createGain(); master.gain.value = 0; master.connect(ctx.destination); }
     tFilm = 0; dernierA = -LEAD; capIdx = -2; finie = false; muet = false; R._pctAff = 0;
@@ -583,7 +868,7 @@
     R.play.addEventListener('click', () => { enCours ? pause() : lecture(); });
     R.son.addEventListener('click', basculerSon);
     {
-      const depuis = e => { const r = R.prog.getBoundingClientRect(); aller(clamp((e.clientX - r.left) / r.width) * FIN); };
+      const depuis = e => { const r = R.prog.getBoundingClientRect(); aller(clamp((e.clientX - r.left) / r.width) * FILM.fin); };
       let glisse = false;
       R.prog.addEventListener('pointerdown', e => { glisse = true; try { R.prog.setPointerCapture(e.pointerId); } catch (x) { /* sans capture */ } depuis(e); });
       R.prog.addEventListener('pointermove', e => { if (glisse) depuis(e); });
@@ -599,11 +884,11 @@
   function fermer() {
     if (!ov) return;
     cancelAnimationFrame(rafId); clearInterval(tickId);
-    if (audio) { audio.pause(); audio.src = ''; audio = null; }
+    if (audio) { audio.pause(); if (audio.dataset.url) URL.revokeObjectURL(audio.dataset.url); audio.removeAttribute('src'); audio = null; }
     if (ctx) { try { ctx.close(); } catch (e) { /* déjà fermé */ } ctx = null; master = null; }
     window.removeEventListener('resize', echelle); document.removeEventListener('keydown', clavier);
     ov.remove(); ov = null; R = {}; enCours = false; document.body.style.overflow = '';
   }
 
-  window.InscriptionFilm = { ouvrir, fermer, aller: t => aller(t), pause, lecture, etat: () => ({ tFilm, enCours, finie, voix: audio ? { pause: audio.paused, t: audio.currentTime, pret: audio.readyState, dur: audio.duration, muet: audio.muted } : null, son: ctx ? ctx.state : null }), FIN, LEAD };
+  window.InscriptionFilm = { ouvrir, fermer, dessiner: t => { if (!ov) return; const a = t - LEAD; rendre(a); majCaption(a); }, aller: t => aller(t), pause, lecture, etat: () => ({ film: FILM.id, tFilm, enCours, finie, voix: audio ? { pause: audio.paused, t: audio.currentTime, pret: audio.readyState, dur: audio.duration, muet: audio.muted } : null, son: ctx ? ctx.state : null }), get FIN() { return FILM.fin; }, LEAD };
 })();

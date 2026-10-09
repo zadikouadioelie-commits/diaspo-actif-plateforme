@@ -31,3 +31,24 @@
 3. Construire les 6 scènes, caler les durées sur la voix réelle, ajouter la musique.
 4. Tester dans le navigateur (ordinateur et téléphone), puis ajouter le bouton sur la page d'inscription.
 5. Commit local ; mise en ligne seulement sur ton ordre (push groupé).
+
+---
+
+# Version complète « tutoriel » — 1 min 27 (voix de 79 s)
+
+Voix : Perle (ElevenLabs), `assets/media/inscription-voix-long.mp3`. Les temps de chaque mot viennent de la transcription horodatée de la voix (gratuite) : tout est calé à la seconde près. Si la voix est régénérée, relancer cette mesure.
+
+| Temps | Voix | Écran |
+|-------|------|-------|
+| 0:00–0:08 | Bienvenue sur Diaspo'Actif, la plateforme qui connecte les diasporas. Voyons ensemble, étape par étape, comment créer votre compte utilisateur. | Logo, globe-réseau doré, devise |
+| 0:08–0:20 | **Étape un** : le type de compte. Utilisateur… Initiative… Les comptes étatiques arrivent bientôt. | Les 3 cartes du vrai site, chacune s'illumine quand on la nomme ; étapes 1-2-3 en haut |
+| 0:20–0:28 | **Étape deux** : vos informations. Nom, prénom, date de naissance. Les nationalités sont facultatives. | Formulaire « Identité » qui se remplit ; colonne « Nationalités · facultatif » |
+| 0:28–0:37 | Pays d'origine et de résidence : c'est grâce à eux que les membres de votre diaspora vous retrouvent. Puis le domaine d'activité. | Champs + mini-carte : point orange (origine) relié en pointillé au point bleu (résidence) |
+| 0:37–0:47 | Les publics qui vous concernent, ce que vous recherchez, courte biographie, photo de profil : ces deux éléments sont obligatoires. | Puces sélectionnées, biographie qui s'écrit, photo, pastilles « OBLIGATOIRE » |
+| 0:47–0:54 | Mot de passe d'au moins huit caractères, charte et conditions, puis « Créer mon compte ». | Mot de passe (jauge), case de la charte, bouton qui s'enfonce |
+| 0:54–1:00 | **Étape trois** : confirmez votre adresse e-mail grâce au lien reçu. Votre compte est créé ! | Enveloppe qui s'ouvre, ✅, éclats dorés |
+| 1:00–1:07 | Une jauge indique l'état de votre profil. Complétez-le jusqu'à cent pour cent. | Jauge 17 % → 100 %, liste cochée |
+| 1:07–1:15 | Explorez l'annuaire, rejoignez des événements, soutenez des projets, ouvrez votre boutique, échangez. | Profil au centre, 5 rubriques colorées |
+| 1:15–1:27 | Diaspo'Actif : rejoignez le réseau, et passez à l'action. Créez votre compte dès maintenant. | Lauriers, slogan, bouton orange |
+
+Le lecteur choisit le film : `InscriptionFilm.ouvrir()` (complet, par défaut) ou `InscriptionFilm.ouvrir({version:'court'})` (55 s). La voix est chargée entièrement avant lecture (saut à n'importe quel instant fiable) et l'horloge suit la voix même si le navigateur suspend les animations.
