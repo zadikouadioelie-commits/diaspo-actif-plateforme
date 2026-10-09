@@ -132,6 +132,14 @@
       .cda-affil-add{width:76px;text-align:center;cursor:pointer;}
       .cda-affil-add span{display:flex;align-items:center;justify-content:center;width:56px;height:56px;border-radius:50%;border:2px dashed #CBD5E1;color:#94A3B8;font-size:22px;margin:0 auto 6px;}
       .cda-affil-add div{font-size:10px;color:#94A3B8;font-weight:600;}
+      /* Présentation en 3 colonnes (profil public) : mêmes cartes latérales que celles des initiatives (.pp-side-card) */
+      .cda-card-3col{margin-bottom:14px;}
+      .cda-box.cda-side{background:#fff;border:1px solid var(--border,#E5E9F0);border-radius:14px;padding:16px;margin:0 0 14px;box-shadow:0 1px 4px rgba(0,0,0,.05);}
+      .cda-side .cda-box-head{justify-content:space-between;color:var(--tp,#0D1B2A);margin-bottom:10px;}
+      .cda-side .cda-box-head small{margin-left:0;}
+      .cda-side .cda-info-row{flex-direction:column;gap:12px;margin-top:0;padding-right:0;}
+      .cda-bio-text.cda-collapsed{max-height:9.6em;overflow:hidden;-webkit-mask-image:linear-gradient(#000 65%,transparent);mask-image:linear-gradient(#000 65%,transparent);}
+      .cda-bio-more{background:none;border:none;color:var(--tp,#2563EB);font-size:12px;font-weight:700;cursor:pointer;padding:6px 0 0;}
       .cda-edit-btn{background:none;border:none;color:#94A3B8;font-size:13px;cursor:pointer;padding:2px 4px;border-radius:6px;line-height:1;}
       .cda-edit-btn:hover{background:#EEF2F7;color:#2563EB;}
       .cda-theme-btn{display:inline-flex;align-items:center;gap:7px;background:linear-gradient(135deg,#2E74E0,#1B4B8C);color:#fff;border:none;border-radius:10px;padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 3px 10px rgba(27,75,140,.3);}
@@ -206,67 +214,48 @@
        ville + globe vectoriel aux couleurs de la marque, net à toute résolution). */
     const bannerStyle = profil.banner_url ? `background-image:url('${esc(profil.banner_url)}');` : '';
 
-    container.innerHTML = `
-      <div class="cda-card">
-        <div class="cda-banner" style="${bannerStyle}">
-        </div>
-        <div class="cda-head">
-          <div class="cda-avatar-wrap">
-            <div class="cda-avatar">${profil.photo_url ? `<img src="${esc(profil.photo_url)}" alt="${esc(nom)}">` : esc((nom[0]||'?').toUpperCase())}</div>
-            <span class="cda-online-dot" title="En ligne"></span>
-            ${isOwner ? `<button type="button" class="cda-avatar-edit" id="cda-avatar-edit" title="Changer la photo">📷</button>` : ''}
-          </div>
-          <div class="cda-headtext">
-            <div class="cda-name">${esc(nom)}${isOwner ? ` <button type="button" class="cda-edit-btn" id="cda-nom-edit" title="Corriger mon prénom / mon nom" aria-label="Modifier mon nom">✏️</button>` : ''} ${verified ? '<span class="cda-verified" title="Identité vérifiée">✔</span>' : ''}${(badgesAffiliations || badgesPartenariats) ? `<span class="cda-name-badges">${badgesAffiliations}${badgesPartenariats}</span>` : ''}</div>
-            <div class="cda-info-row">
-              ${chipPays(profil.pays, 'Pays de résidence', profil.pays)}
-              ${chipInfo('📍', 'Ville de résidence', profil.ville)}
-              ${chipPays(profil.origine1, 'Origine 1', profil.origine1)}
-              ${chipPays(profil.origine2, 'Origine 2 (optionnel)', profil.origine2)}
-              ${isOwner ? `<button type="button" class="cda-edit-btn" id="cda-info-edit" title="Modifier">✏️</button>` : ''}
-            </div>
-          </div>
-          <div class="cda-actions" id="cda-actions"></div>
-        </div>
-        ${isOwner || profil.domaine_principal ? `<div style="padding:0 20px 4px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-          ${isOwner ? `<button type="button" class="cda-theme-btn" id="cda-banner-style">🎨 Thème de bandeaux</button>` : ''}
-          ${profil.domaine_principal ? `<span class="cda-theme-btn" style="cursor:default;">${esc(window.domaineActiviteLabel ? window.domaineActiviteLabel(profil.domaine_principal) : profil.domaine_principal)}${profil.sous_domaine_1 ? ' — ' + esc(profil.sous_domaine_1) : ''}${profil.sous_domaine_2 ? ' · ' + esc(profil.sous_domaine_2) : ''}</span>` : ''}
-          ${isOwner ? `<button type="button" class="cda-theme-btn" id="cda-domaine-activite-edit">🏷️ ${profil.domaine_principal ? 'Modifier mon domaine' : 'Renseigner mon domaine'}</button>` : ''}
-        </div>` : ''}
+    /* Présentation en 3 colonnes (2026-10-09, demande explicite : « affiche les profils publics des
+       utilisateurs de la même façon que ceux des initiatives… on n'ajoute pas de rubrique, juste
+       présente de la même façon »). Si la page hôte fournit ses deux colonnes latérales
+       (opts.colGauche / opts.colDroite, voir profil-app.html), les MÊMES rubriques sont réparties :
+       gauche = identité et repères (origine/résidence, domaine, statut, compétences), centre = carte
+       d'identité + publications + avis, droite = présentation (biographie), centres d'intérêt,
+       affiliations. Sans colonnes (tableau de bord), la carte reste en un seul bloc comme avant. */
+    const colG = opts.colGauche || null, colD = opts.colDroite || null;
+    const troisCol = !!(colG && colD);
+    const zones = troisCol ? [container, colG, colD] : [container];
+    const q = sel => { for (const z of zones) { const el = z.querySelector(sel); if (el) return el; } return null; };
+    const qa = sel => zones.reduce((acc, z) => acc.concat([...z.querySelectorAll(sel)]), []);
+    const boite = (id, inner, styleAncien) => `<div class="cda-box${troisCol ? ' cda-side' : ''}"${id ? ` id="${id}"` : ''}${!troisCol && styleAncien ? ` style="${styleAncien}"` : ''}>${inner}</div>`;
+    const editInfoBtn = isOwner ? `<button type="button" class="cda-edit-btn" id="cda-info-edit" title="Modifier">✏️</button>` : '';
+    const domaineLibelle = profil.domaine_principal ? `${esc(window.domaineActiviteLabel ? window.domaineActiviteLabel(profil.domaine_principal) : profil.domaine_principal)}${profil.sous_domaine_1 ? ' — ' + esc(profil.sous_domaine_1) : ''}${profil.sous_domaine_2 ? ' · ' + esc(profil.sous_domaine_2) : ''}` : '';
+    const infosChips = `${chipPays(profil.pays, 'Pays de résidence', profil.pays)}${chipInfo('📍', 'Ville de résidence', profil.ville)}${chipPays(profil.origine1, 'Origine 1', profil.origine1)}${chipPays(profil.origine2, 'Origine 2 (optionnel)', profil.origine2)}`;
+    const bioPlain = window.stripRichTags ? window.stripRichTags(bio) : bio;
+    const bioLongue = troisCol && bioPlain.length > 260;
 
-        <div class="cda-grid">
-          <div class="cda-box">
-            <div class="cda-box-head"><span>📝 Biographie</span>${isOwner ? `<button type="button" class="cda-edit-btn" id="cda-bio-edit" title="Modifier">✏️</button>` : ''}<small>${(window.stripRichTags ? window.stripRichTags(bio) : bio).length}/800</small></div>
-            <div class="cda-bio-text rich-content">${bio ? (window.renderRichText ? window.renderRichText(bio) : esc(bio)) : '<span class="cda-muted">Ce membre n\'a pas encore ajouté de présentation.</span>'}</div>
-          </div>
-          <div class="cda-col-right">
-            <div class="cda-box">
+    const hBio = boite('', `
+            <div class="cda-box-head"><span>📝 Biographie</span>${isOwner ? `<button type="button" class="cda-edit-btn" id="cda-bio-edit" title="Modifier">✏️</button>` : ''}<small>${bioPlain.length}/800</small></div>
+            <div class="cda-bio-text rich-content${bioLongue ? ' cda-collapsed' : ''}" id="cda-bio-text">${bio ? (window.renderRichText ? window.renderRichText(bio) : esc(bio)) : '<span class="cda-muted">Ce membre n\'a pas encore ajouté de présentation.</span>'}</div>
+            ${bioLongue ? `<button type="button" class="cda-bio-more" id="cda-bio-more">Lire la suite ▾</button>` : ''}`);
+    const hStatut = boite('', `
               <div class="cda-box-head"><span>💼 Statut professionnel</span></div>
               <div class="cda-statut-row" id="cda-statut-row">
                 ${STATUTS.map(s => `<button type="button" class="cda-statut-chip${s.v===statutActuel?' active':''}" data-statut="${s.v}" style="${s.v===statutActuel?`background:${s.couleur};border-color:${s.couleur};color:#fff;`:''}" ${isOwner?'':'disabled'}>${esc(s.label)}</button>`).join('')}
-              </div>
-            </div>
-            <div class="cda-box" id="cda-box-ci">
+              </div>`);
+    const hCi = boite('cda-box-ci', `
               <div class="cda-box-head"><span>🎯 Centres d'intérêt</span>${isOwner ? `<button type="button" class="cda-edit-btn" id="cda-ci-edit" title="Modifier mes centres d'intérêt">✏️</button>` : ''}</div>
               <div class="cda-ci">
                 ${centres.length ? centres.map((c, i) => `<span class="cda-ci-item"><span class="cda-ci-n">${i + 1}</span>${esc(ciMaj(c))}</span>`).join('') : `<span class="cda-muted">${isOwner ? 'Ajoutez vos centres d\'intérêt (bâtiment, investissement…).' : 'Aucun centre d\'intérêt renseigné.'}</span>`}
-              </div>
-            </div>
-            ${competences.length || isOwner ? `<div class="cda-box">
+              </div>`);
+    const hComp = (competences.length || isOwner) ? boite('', `
               <div class="cda-box-head"><span>🧰 Compétences</span>${isOwner ? `<button type="button" class="cda-edit-btn" id="cda-domaine-edit" title="Modifier">✏️</button>` : ''}</div>
               <div class="cda-tags">
                 ${competences.length ? competences.map(c => `<span class="cda-tag">${esc(c)}</span>`).join('') : '<span class="cda-muted">Aucune compétence renseignée.</span>'}
-              </div>
-            </div>` : ''}
-          </div>
-        </div>
-
-        <div class="cda-box" style="margin:14px 20px 20px;">
+              </div>`) : '';
+    const hPubs = boite('cda-pubs-box', `
           <div class="cda-box-head"><span>📰 Publications</span>${isOwner ? `<button type="button" class="cda-edit-btn" id="cda-publier-btn" title="Créer une publication">✍️ Créer une publication</button>` : ''}</div>
-          <div id="cda-publications-list"></div>
-        </div>
-
-        <div class="cda-box" style="margin:14px 20px 20px;">
+          <div id="cda-publications-list"></div>`, 'margin:14px 20px 20px;');
+    const hAffil = boite('', `
           <div class="cda-box-head"><span>🤝 Affiliations</span></div>
           <div class="cda-affiliations" id="cda-affiliations">
             ${affiliations.length ? affiliations.map(a => `
@@ -277,14 +266,80 @@
                 ${a.fonction ? `<div class="cda-affil-poste">${esc(a.fonction)}</div>` : ''}
                 ${a.est_officielle ? '<span class="cda-affil-officiel-tag">Officiel</span>' : ''}
               </a>`).join('') : '<span class="cda-muted">Aucune affiliation officielle pour l\'instant — une organisation enregistrée sur Diaspo\'Actif peut vous en proposer une.</span>'}
+          </div>`, 'margin:14px 20px 20px;');
+    const hAvis = boite('cda-avis-mount', '', 'margin:14px 20px 20px;');
+    const hInfosCarte = boite('', `
+              <div class="cda-box-head"><span>🌍 Origine et résidence</span>${editInfoBtn}</div>
+              <div class="cda-info-row">${infosChips}</div>`);
+    const hDomaine = (isOwner || profil.domaine_principal) ? boite('', `
+              <div class="cda-box-head"><span>🏷️ Domaine d'activité</span></div>
+              ${profil.domaine_principal ? `<div class="cda-tags"><span class="cda-tag">${domaineLibelle}</span></div>` : '<span class="cda-muted">Domaine non renseigné.</span>'}
+              ${isOwner ? `<button type="button" class="cda-theme-btn" id="cda-domaine-activite-edit" style="margin-top:10px;">🏷️ ${profil.domaine_principal ? 'Modifier mon domaine' : 'Renseigner mon domaine'}</button>` : ''}`) : '';
+
+    const tete = `
+        <div class="cda-banner" style="${bannerStyle}">
+        </div>
+        <div class="cda-head">
+          <div class="cda-avatar-wrap">
+            <div class="cda-avatar">${profil.photo_url ? `<img src="${esc(profil.photo_url)}" alt="${esc(nom)}">` : esc((nom[0]||'?').toUpperCase())}</div>
+            <span class="cda-online-dot" title="En ligne"></span>
+            ${isOwner ? `<button type="button" class="cda-avatar-edit" id="cda-avatar-edit" title="Changer la photo">📷</button>` : ''}
+          </div>
+          <div class="cda-headtext">
+            <div class="cda-name">${esc(nom)}${isOwner ? ` <button type="button" class="cda-edit-btn" id="cda-nom-edit" title="Corriger mon prénom / mon nom" aria-label="Modifier mon nom">✏️</button>` : ''} ${verified ? '<span class="cda-verified" title="Identité vérifiée">✔</span>' : ''}${(badgesAffiliations || badgesPartenariats) ? `<span class="cda-name-badges">${badgesAffiliations}${badgesPartenariats}</span>` : ''}</div>
+            ${troisCol ? '' : `<div class="cda-info-row">
+              ${infosChips}
+              ${editInfoBtn}
+            </div>`}
+          </div>
+          <div class="cda-actions" id="cda-actions"></div>
+        </div>`;
+
+    if (troisCol) {
+      container.innerHTML = `
+        <div class="cda-card cda-card-3col">${tete}
+          ${isOwner ? `<div style="padding:0 20px 18px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+            <button type="button" class="cda-theme-btn" id="cda-banner-style">🎨 Thème de bandeaux</button>
+          </div>` : '<div style="height:8px;"></div>'}
+        </div>
+        ${hPubs}
+        ${hAvis}`;
+      colG.innerHTML = hInfosCarte + hDomaine + hStatut + hComp;
+      colD.innerHTML = hBio + hCi + hAffil;
+    } else {
+      container.innerHTML = `
+      <div class="cda-card">${tete}
+        ${isOwner || profil.domaine_principal ? `<div style="padding:0 20px 4px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          ${isOwner ? `<button type="button" class="cda-theme-btn" id="cda-banner-style">🎨 Thème de bandeaux</button>` : ''}
+          ${profil.domaine_principal ? `<span class="cda-theme-btn" style="cursor:default;">${domaineLibelle}</span>` : ''}
+          ${isOwner ? `<button type="button" class="cda-theme-btn" id="cda-domaine-activite-edit">🏷️ ${profil.domaine_principal ? 'Modifier mon domaine' : 'Renseigner mon domaine'}</button>` : ''}
+        </div>` : ''}
+
+        <div class="cda-grid">
+          ${hBio}
+          <div class="cda-col-right">
+            ${hStatut}
+            ${hCi}
+            ${hComp}
           </div>
         </div>
 
-        <div class="cda-box" style="margin:14px 20px 20px;" id="cda-avis-mount"></div>
+        ${hPubs}
+
+        ${hAffil}
+
+        ${hAvis}
       </div>`;
+    }
+
+    const plusBio = q('#cda-bio-more');
+    if (plusBio) plusBio.addEventListener('click', () => {
+      const t = q('#cda-bio-text'); const ouvert = t.classList.toggle('cda-collapsed') === false;
+      plusBio.textContent = ouvert ? 'Réduire ▴' : 'Lire la suite ▾';
+    });
 
     if (isOwner) {
-      container.querySelectorAll('#cda-statut-row .cda-statut-chip').forEach(btn => {
+      qa('#cda-statut-row .cda-statut-chip').forEach(btn => {
         btn.addEventListener('click', async () => {
           const statut = btn.dataset.statut;
           try {
@@ -294,7 +349,7 @@
           } catch (e) { alert(e.message || 'Erreur.'); }
         });
       });
-      container.querySelectorAll('[data-remove-aff]').forEach(btn => {
+      qa('[data-remove-aff]').forEach(btn => {
         btn.addEventListener('click', async (ev) => {
           ev.preventDefault(); ev.stopPropagation();
           if (!confirm('Mettre fin à cette affiliation ?')) return;
@@ -307,7 +362,7 @@
         });
       });
 
-      const avatarBtn = container.querySelector('#cda-avatar-edit');
+      const avatarBtn = q('#cda-avatar-edit');
       if (avatarBtn) avatarBtn.addEventListener('click', async () => {
         const url = await window.pickAndUpload('avatar', { maxW: 500, maxH: 500 });
         if (!url) return;
@@ -315,32 +370,32 @@
         render(container, profil, opts);
       });
 
-      const styleBtn = container.querySelector('#cda-banner-style');
+      const styleBtn = q('#cda-banner-style');
       if (styleBtn) styleBtn.addEventListener('click', () => editBannerStyle(container, profil, opts));
 
-      const domaineActiviteBtn = container.querySelector('#cda-domaine-activite-edit');
+      const domaineActiviteBtn = q('#cda-domaine-activite-edit');
       if (domaineActiviteBtn) domaineActiviteBtn.addEventListener('click', () => editDomaineActivite(container, profil, opts));
 
-      const infoBtn = container.querySelector('#cda-info-edit');
+      const infoBtn = q('#cda-info-edit');
       if (infoBtn) infoBtn.addEventListener('click', () => editInfos(container, profil, opts));
 
-      const nomBtn = container.querySelector('#cda-nom-edit');
+      const nomBtn = q('#cda-nom-edit');
       if (nomBtn) nomBtn.addEventListener('click', () => editNom(container, profil, opts));
 
-      const bioBtn = container.querySelector('#cda-bio-edit');
+      const bioBtn = q('#cda-bio-edit');
       if (bioBtn) bioBtn.addEventListener('click', () => editBio(container, profil, opts));
 
-      const ciBtn = container.querySelector('#cda-ci-edit');
+      const ciBtn = q('#cda-ci-edit');
       if (ciBtn) ciBtn.addEventListener('click', () => editCentresInteret(container, profil, opts));
 
-      const domaineBtn = container.querySelector('#cda-domaine-edit');
+      const domaineBtn = q('#cda-domaine-edit');
       if (domaineBtn) domaineBtn.addEventListener('click', () => editDomaine(container, profil, opts));
 
-      const publierBtn = container.querySelector('#cda-publier-btn');
+      const publierBtn = q('#cda-publier-btn');
       if (publierBtn) publierBtn.addEventListener('click', () => window.Posts?.openModal());
     } else {
       // Boutons Demande / Message — widget partagé du site, uniquement pour un visiteur
-      const zone = container.querySelector('#cda-actions');
+      const zone = q('#cda-actions');
       if (zone && profil.id) {
         zone.innerHTML = `<span data-relation-user="${profil.id}" data-relation-origine="carte_diaspoactif" data-relation-classe="cda-btn"></span>`;
         if (window.initBoutonsRelation) window.initBoutonsRelation();
@@ -367,7 +422,7 @@
     // Avis + droit de réponse (cahier des charges "Avis + droit de réponse") — même composant
     // que sur les profils Initiative/Organisme (profil-app.html), monté ici pour le rôle
     // utilisateur puisque ces profils contournent renderVisitorProfile().
-    const avisMount = container.querySelector('#cda-avis-mount');
+    const avisMount = q('#cda-avis-mount');
     if (avisMount && window.AvisSection) {
       window.AvisSection.mount(avisMount, { profilId: profil.id, profilNom: nom, isOwner, isAdmin: !!opts.isAdmin, cu: opts.cu || null });
     }

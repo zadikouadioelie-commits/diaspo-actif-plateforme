@@ -641,10 +641,20 @@ html, body { overflow-x:clip; }
 
 /* ===== PROFIL MEMBRE : UN SEUL BANDEAU (2026-10-09, demande explicite) =====
    La carte Diaspo'Actif porte déjà son propre bandeau, collé à la photo de profil : le grand bandeau du haut est retiré (ses commandes sont déplacées
-   sur celui de la carte, voir pvzDeplacerCommandesBandeau) et la carte occupe toute la largeur — les colonnes latérales sont vides pour ce rôle. */
+   sur celui de la carte, voir pvzDeplacerCommandesBandeau) et la carte porte seule le bandeau. */
 body.pp-carte-membre #p-banner { display:none !important; }
-body.pp-carte-membre .pp-3col { grid-template-columns:minmax(0,1fr) !important; }
-body.pp-carte-membre #pp-col-left, body.pp-carte-membre #pp-col-right { display:none !important; }
+/* Colonnes latérales rendues à ce rôle (2026-10-09, demande explicite : « affiche les profils publics des utilisateurs de la même façon que ceux des initiatives, sur trois colonnes ») :
+   la carte les remplit elle-même (opts.colGauche / opts.colDroite, assets/carte-diaspoactif.js) ; seul le grand bandeau du haut reste retiré. */
+/* Écran étroit (colonnes empilées) : sans cela, la biographie et les repères arriveraient APRÈS toute la liste des publications (plusieurs milliers de pixels plus bas).
+   Les conteneurs « disparaissent » de la grille pour que chaque bloc puisse être ordonné : carte, présentation/intérêts/affiliations, repères, puis publications et avis. */
+@media(max-width:1100px){
+  body.pp-carte-membre #pp-center, body.pp-carte-membre #pvz-visitor { display:contents; }
+  body.pp-carte-membre .cda-card-3col { order:1; }
+  body.pp-carte-membre #pp-col-right { order:2; }
+  body.pp-carte-membre #pp-col-left { order:3; }
+  body.pp-carte-membre #cda-pubs-box { order:4; }
+  body.pp-carte-membre #cda-avis-mount { order:5; }
+}
 .cda-banner:hover .banner-crop-overlay { opacity:1; }
 
 /* ===== BANNER UPLOAD ===== */
@@ -1947,7 +1957,7 @@ function render() {
   // (2026-07-27). Les autres rôles gardent la vue hi-fi existante ci-dessous.
   if (profil.role === 'utilisateur' && window.CarteDiaspoActif) {
     const _cdaConteneur = document.getElementById('pvz-visitor');
-    const _cdaOpts = { isOwner: isOwn, isAdmin: CU && CU.role === 'administrateur', cu: CU, apresRendu: pvzDeplacerCommandesBandeau };
+    const _cdaOpts = { isOwner: isOwn, isAdmin: CU && CU.role === 'administrateur', cu: CU, apresRendu: pvzDeplacerCommandesBandeau, colGauche: document.getElementById('pp-col-left'), colDroite: document.getElementById('pp-col-right') };
     document.body.classList.add('pp-carte-membre');
     CarteDiaspoActif.render(_cdaConteneur, profil, _cdaOpts);
     /* Arrivée depuis l'affiche « Remplissez votre profil public » : ouvre directement le bon formulaire. */
@@ -9378,7 +9388,7 @@ init();
 <script src="assets/avis-section.js"></script>
 <script src="assets/banner-presets.js"></script>
 <script src="assets/domaines-activite.js"></script>
-<script src="assets/carte-diaspoactif.js"></script>
+<script src="assets/carte-diaspoactif.js?v=3"></script>
 <script src="/assets/image-cropper.js"></script>
 <script src="/assets/widget-board.js"></script>
   <script src="/assets/theme-manager.js"></script>
