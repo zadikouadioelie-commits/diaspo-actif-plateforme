@@ -48,103 +48,146 @@
   const SCENES = [[-LEAD, 8.0], [8.0, 15.0], [15.0, 24.7], [24.7, 31.6], [31.6, 40.7], [40.7, FIN - LEAD]];
 
   const CSS = `
-.fi-ov{position:fixed;inset:0;z-index:100000;background:rgba(5,14,30,.88);display:flex;align-items:center;justify-content:center;padding:12px;animation:fi-in .25s ease-out;font-family:'Segoe UI',system-ui,-apple-system,Roboto,sans-serif}
+.fi-ov{position:fixed;inset:0;z-index:100000;background:rgba(3,10,26,.9);display:flex;align-items:center;justify-content:center;padding:12px;animation:fi-in .25s ease-out;font-family:'Segoe UI',system-ui,-apple-system,Roboto,sans-serif}
 @keyframes fi-in{from{opacity:0}to{opacity:1}}
 .fi-box{width:min(960px,100%);display:flex;flex-direction:column;gap:10px;max-height:100%}
 .fi-top{display:flex;justify-content:space-between;align-items:center;color:#fff;font-size:13px;gap:8px}
-.fi-titre{font-weight:800;letter-spacing:.04em}
+.fi-titre{font-weight:800;letter-spacing:.06em;color:#F2C94C}
 .fi-btn{border:none!important;border-radius:999px!important;padding:8px 14px!important;min-height:0!important;height:auto!important;width:auto!important;line-height:1.2!important;background:rgba(255,255,255,.14);color:#fff!important;font-weight:700!important;font-size:13px!important;cursor:pointer;font-family:inherit!important;white-space:nowrap}
 .fi-btn:hover,.fi-btn:focus-visible{background:rgba(255,255,255,.28);outline:none}
 .fi-btn.or{background:#F26422!important}.fi-btn.or:hover{background:#d9541a!important}
-.fi-win{position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;border-radius:16px;background:#0D2B4E;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.fi-win{position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;border-radius:16px;background:#0B2A5B;box-shadow:0 20px 60px rgba(0,0,0,.55),0 0 0 2px rgba(226,169,41,.55)}
 .fi-stage{position:absolute;left:0;top:0;width:${W}px;height:${H}px;transform-origin:0 0;overflow:hidden;color:#fff}
 .fi-stage *{box-sizing:border-box}
-.fi-bg{position:absolute;inset:0;background:radial-gradient(120% 90% at 50% 0%,#17406f 0%,#0D2B4E 45%,#071a33 100%)}
-.fi-blob{position:absolute;width:640px;height:640px;border-radius:50%;filter:blur(70px);opacity:.38}
-.fi-blob.b1{background:#1565C0;left:-160px;top:-200px}.fi-blob.b2{background:#F26422;right:-220px;bottom:-280px;opacity:.22}
-.fi-part{position:absolute;left:0;top:0;width:6px;height:6px;border-radius:50%;background:#9ec9ff}
+.fi-bg{position:absolute;inset:0;background:radial-gradient(90% 75% at 12% 0%,rgba(60,130,215,.75) 0%,rgba(60,130,215,0) 58%),radial-gradient(70% 60% at 100% 100%,rgba(226,169,41,.38) 0%,rgba(226,169,41,0) 62%),linear-gradient(160deg,#0f3a7c 0%,#0B2A5B 46%,#061633 100%)}
+.fi-blob{position:absolute;width:620px;height:620px;border-radius:50%;filter:blur(80px);opacity:.34}
+.fi-blob.b1{background:#3b8be8;left:-180px;top:-220px}.fi-blob.b2{background:#E2A929;right:-240px;bottom:-300px;opacity:.26}
+.fi-part{position:absolute;left:0;top:0;width:5px;height:5px;border-radius:50%;background:#F8DA7A}
 .fi-abs{position:absolute;left:0;top:0;will-change:transform,opacity}
 .fi-globe{position:absolute;left:0;top:0;overflow:visible}
-.fi-word{font-size:78px;font-weight:800;letter-spacing:-1px;white-space:nowrap;text-shadow:0 4px 24px rgba(0,0,0,.35)}
-.fi-word i,.fi-head i{font-style:normal;color:#F26422}
-.fi-tag{font-size:24px;letter-spacing:.32em;text-transform:uppercase;color:#bcd9ff;white-space:nowrap}
-.fi-head{display:flex;align-items:center;gap:12px;font-size:30px;font-weight:800;white-space:nowrap}
-.fi-head img{width:44px;height:44px;border-radius:10px;object-fit:contain;background:#fff;padding:3px}
-.fi-type{width:300px;height:330px;border-radius:24px;padding:26px 22px;background:linear-gradient(160deg,rgba(255,255,255,.16),rgba(255,255,255,.06));border:2px solid rgba(255,255,255,.28);text-align:center;backdrop-filter:blur(6px)}
-.fi-type .ico{font-size:84px;line-height:1.1;margin-top:18px}
-.fi-type h4{margin:16px 0 8px;font-size:34px;font-weight:800}
-.fi-type p{margin:0;font-size:19px;color:#cfe3ff;line-height:1.35}
-.fi-form{width:820px;height:420px;border-radius:26px;padding:30px 34px;background:linear-gradient(160deg,#ffffff,#eaf2ff);color:#0D2B4E;box-shadow:0 30px 80px rgba(0,0,0,.45)}
-.fi-form h5{margin:0 0 20px;font-size:26px;font-weight:800;display:flex;align-items:center;gap:10px}
-.fi-form h5 span{font-size:15px;font-weight:700;background:#dbeafe;color:#1565C0;border-radius:999px;padding:5px 12px}
+.gold{background:linear-gradient(180deg,#FDEBA8 0%,#E8B22E 52%,#B67E14 100%);-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent}
+.fi-welc{font-family:'Cinzel','Georgia','Times New Roman',serif;font-size:62px;font-weight:800;letter-spacing:.2em;white-space:nowrap;text-shadow:0 4px 22px rgba(0,0,0,.35)}
+.fi-tag{font-family:'Cinzel','Georgia',serif;font-size:21px;letter-spacing:.34em;color:#F2C94C;white-space:nowrap;font-weight:600}
+.fi-logo{width:350px;height:350px;border-radius:50%;filter:drop-shadow(0 12px 30px rgba(0,0,0,.5)) drop-shadow(0 0 28px rgba(248,218,122,.45))}
+.fi-head{display:flex;align-items:center;gap:12px;font-size:28px;font-weight:800;white-space:nowrap}
+.fi-head img{width:56px;height:56px;border-radius:50%;object-fit:contain;background:#fff;box-shadow:0 0 0 3px #E2A929}
+.fi-head i{font-style:normal;color:#F26422}
+.fi-type{width:300px;height:330px;border-radius:26px;padding:20px 22px;background:linear-gradient(165deg,#15428a,#0a2556);border:3px solid #E2A929;text-align:center;box-shadow:0 14px 40px rgba(0,0,0,.4)}
+.fi-ring{width:124px;height:124px;margin:10px auto 0;border-radius:50%;border:3px solid #E2A929;background:radial-gradient(circle,#1d57ad,#0B2A5B);display:flex;align-items:center;justify-content:center;font-size:62px;box-shadow:0 0 0 6px rgba(226,169,41,.18)}
+.fi-type h4{margin:16px 0 8px;font-family:'Cinzel','Georgia',serif;font-size:32px;font-weight:800;letter-spacing:.04em}
+.fi-type p{margin:0;font-size:19px;color:#cfe0ff;line-height:1.35}
+.fi-card{border-radius:26px;border:5px solid transparent;background:linear-gradient(160deg,#ffffff,#eaf2ff) padding-box,linear-gradient(135deg,#FDEBA8,#E2A929 50%,#B67E14) border-box;color:#0B2A5B;box-shadow:0 30px 80px rgba(0,0,0,.5)}
+.fi-form{width:820px;height:420px;padding:26px 32px}
+.fi-form h5{margin:0 0 18px;font-size:26px;font-weight:800;display:flex;align-items:center;gap:10px;font-family:'Cinzel','Georgia',serif;letter-spacing:.03em}
+.fi-form h5 span{font-family:'Segoe UI',system-ui,sans-serif;font-size:14px;font-weight:700;background:#fff1c9;color:#8a5a00;border-radius:999px;padding:5px 12px;letter-spacing:0;border:2px solid #E2A929}
 .fi-cols{display:flex;gap:30px}
 .fi-col{flex:1;min-width:0}
 .fi-fl{margin-bottom:14px}
 .fi-fl label{display:block;font-size:15px;font-weight:700;color:#4b6a93;margin-bottom:5px}
 .fi-fl .v{height:50px;border-radius:12px;border:2px solid #c7d7ee;background:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 14px;font-size:21px;font-weight:600}
 .fi-fl .ok{color:#16a34a;font-weight:800;font-size:24px}
-.fi-av{width:116px;height:116px;border-radius:50%;border:4px dashed #9db8dd;display:flex;align-items:center;justify-content:center;font-size:44px;color:#9db8dd;margin:0 auto 14px;background:#fff;overflow:hidden;position:relative}
-.fi-av .ph{position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle at 50% 38%,#f2c9a0 0 22%,transparent 23%),radial-gradient(ellipse at 50% 100%,#1565C0 0 46%,transparent 47%),linear-gradient(160deg,#7cc0ff,#1565C0)}
+.fi-av{width:116px;height:116px;border-radius:50%;border:4px dashed #9db8dd;display:flex;align-items:center;justify-content:center;font-size:44px;color:#9db8dd;margin:0 auto 14px;background:#fff;position:relative}
+.fi-av.set{border:4px solid #fff;box-shadow:0 0 0 5px #0B2A5B,0 0 0 9px #E2A929}
+.fi-av .ph{position:absolute;inset:0;border-radius:50%;overflow:hidden;background:radial-gradient(circle at 50% 38%,#f2c9a0 0 22%,transparent 23%),radial-gradient(ellipse at 50% 100%,#1565C0 0 46%,transparent 47%),linear-gradient(160deg,#7cc0ff,#1565C0)}
 .fi-bio{height:150px;border-radius:12px;border:2px solid #c7d7ee;background:#fff;padding:10px 12px;font-size:17px;line-height:1.4;font-weight:500;color:#1e3a5f}
-.fi-bio small{display:block;font-size:13px;font-weight:800;color:#4b6a93;margin-bottom:4px;letter-spacing:.04em}
-.fi-prof{width:610px;height:470px;border-radius:26px;padding:26px 30px;background:linear-gradient(160deg,#ffffff,#eaf2ff);color:#0D2B4E;box-shadow:0 30px 80px rgba(0,0,0,.45)}
-.fi-prof .id{display:flex;align-items:center;gap:16px;margin-bottom:18px}
-.fi-prof .id .a{width:68px;height:68px;border-radius:50%;background:radial-gradient(circle at 50% 38%,#f2c9a0 0 22%,transparent 23%),radial-gradient(ellipse at 50% 100%,#1565C0 0 46%,transparent 47%),linear-gradient(160deg,#7cc0ff,#1565C0)}
-.fi-prof .id b{font-size:26px;display:block}.fi-prof .id span{font-size:16px;color:#4b6a93;font-weight:600}
+.fi-bio small{display:block;font-size:13px;font-weight:800;color:#8a5a00;margin-bottom:4px;letter-spacing:.06em}
+.fi-prof{width:610px;height:430px;padding:24px 30px}
+.fi-prof .id{display:flex;align-items:center;gap:16px;margin-bottom:16px}
+.fi-prof .id .a{width:68px;height:68px;border-radius:50%;box-shadow:0 0 0 3px #fff,0 0 0 6px #0B2A5B,0 0 0 9px #E2A929;background:radial-gradient(circle at 50% 38%,#f2c9a0 0 22%,transparent 23%),radial-gradient(ellipse at 50% 100%,#1565C0 0 46%,transparent 47%),linear-gradient(160deg,#7cc0ff,#1565C0)}
+.fi-prof .id b{font-size:26px;display:block;font-family:'Cinzel','Georgia',serif}.fi-prof .id span{font-size:16px;color:#4b6a93;font-weight:600}
 .fi-gt{display:flex;justify-content:space-between;font-weight:800;font-size:19px;margin-bottom:8px}
-.fi-bar{height:20px;border-radius:999px;background:#dbeafe;overflow:hidden}
-.fi-bar i{display:block;height:100%;width:0;border-radius:999px;background:linear-gradient(90deg,#2563eb,#38bdf8)}
-.fi-ck{display:grid;grid-template-columns:1fr 1fr;gap:10px 18px;margin-top:22px}
+.fi-bar{height:20px;border-radius:999px;background:#e6edf8;overflow:hidden;border:2px solid #d4e3fb}
+.fi-bar i{display:block;height:100%;width:0;border-radius:999px;background:linear-gradient(90deg,#E2A929,#FDEBA8 60%,#E2A929)}
+.fi-ck{display:grid;grid-template-columns:1fr 1fr;gap:10px 18px;margin-top:20px}
 .fi-ck div{display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:12px;background:#f1f6ff;border:2px solid #d4e3fb;font-size:18px;font-weight:700;color:#7f97b8}
 .fi-ck div.on{background:#ecfdf5;border-color:#86efac;color:#15803d}
 .fi-ck div b{width:26px;height:26px;border-radius:50%;border:2px solid #b7c9e4;display:flex;align-items:center;justify-content:center;font-size:15px;color:transparent;flex:none}
 .fi-ck div.on b{background:#16a34a;border-color:#16a34a;color:#fff}
 .fi-env{width:240px;height:190px}
-.fi-envl{font-size:22px;font-weight:800;text-align:center;color:#d9f99d;margin-top:10px;white-space:nowrap}
-.fi-past{width:170px;height:170px;border-radius:50%;border:6px solid #38bdf8;background:radial-gradient(circle at 50% 38%,#f2c9a0 0 20%,transparent 21%),radial-gradient(ellipse at 50% 100%,#1565C0 0 46%,transparent 47%),linear-gradient(160deg,#7cc0ff,#1565C0);box-shadow:0 0 50px rgba(56,189,248,.55)}
-.fi-pn{font-size:26px;font-weight:800;text-align:center;white-space:nowrap}
-.fi-sat{width:190px;padding:14px 10px;border-radius:20px;background:linear-gradient(160deg,rgba(255,255,255,.2),rgba(255,255,255,.08));border:2px solid rgba(255,255,255,.35);text-align:center;backdrop-filter:blur(6px)}
-.fi-sat .e{font-size:50px;line-height:1.1}.fi-sat b{display:block;font-size:22px;margin-top:4px}
-.fi-big{font-size:84px;font-weight:800;text-align:center;white-space:nowrap;letter-spacing:-1px;text-shadow:0 4px 30px rgba(0,0,0,.4)}
-.fi-big em{font-style:normal;background:linear-gradient(90deg,#38bdf8,#F26422);-webkit-background-clip:text;background-clip:text;color:transparent}
-.fi-sub{font-size:30px;color:#cfe3ff;text-align:center;white-space:nowrap}
-.fi-cta{display:inline-block;padding:20px 46px;border-radius:999px;background:linear-gradient(135deg,#F26422,#ff8a4c);color:#fff;font-size:32px;font-weight:800;box-shadow:0 12px 40px rgba(242,100,34,.55);white-space:nowrap}
-.fi-url{font-size:26px;letter-spacing:.18em;color:#bcd9ff;font-weight:700;white-space:nowrap}
-.fi-cap{min-height:62px;display:grid;place-items:center;text-align:center;color:#fff;font-size:clamp(15px,2.3vw,21px);line-height:1.4;padding:8px 14px;border-radius:12px;background:rgba(0,0,0,.35)}
+.fi-envl{font-size:22px;font-weight:800;text-align:center;color:#FDEBA8;margin-top:10px;white-space:nowrap;font-family:'Cinzel','Georgia',serif}
+.fi-past{width:170px;height:170px;border-radius:50%;background:radial-gradient(circle at 50% 38%,#f2c9a0 0 20%,transparent 21%),radial-gradient(ellipse at 50% 100%,#1565C0 0 46%,transparent 47%),linear-gradient(160deg,#7cc0ff,#1565C0);box-shadow:0 0 0 6px #fff,0 0 0 11px #0B2A5B,0 0 0 16px #E2A929,0 0 70px rgba(248,218,122,.6)}
+.fi-pn{font-size:28px;font-weight:800;text-align:center;white-space:nowrap;font-family:'Cinzel','Georgia',serif}
+.fi-sat{width:200px;padding:14px 10px 16px;border-radius:22px;background:linear-gradient(165deg,#15428a,#0a2556);border:3px solid #E2A929;text-align:center;box-shadow:0 12px 30px rgba(0,0,0,.4)}
+.fi-sat .e{width:76px;height:76px;margin:0 auto;border-radius:50%;border:3px solid #E2A929;background:radial-gradient(circle,#1d57ad,#0B2A5B);display:flex;align-items:center;justify-content:center;font-size:38px}
+.fi-sat b{display:block;font-size:22px;margin-top:8px;font-family:'Cinzel','Georgia',serif;letter-spacing:.03em}
+.fi-big{font-family:'Cinzel','Georgia',serif;font-size:64px;font-weight:800;text-align:center;white-space:nowrap;letter-spacing:.02em;text-shadow:0 4px 30px rgba(0,0,0,.45)}
+.fi-script{font-family:'Caveat','Segoe Script','Brush Script MT',cursive;font-size:50px;font-weight:700;color:#fff;white-space:nowrap;text-align:center;text-shadow:0 3px 18px rgba(0,0,0,.4)}
+.fi-sub{font-size:28px;color:#dbe8ff;text-align:center;white-space:nowrap}
+.fi-cta{display:inline-block;padding:18px 44px;border-radius:999px;background:linear-gradient(135deg,#F26422,#ff8a4c);color:#fff;font-size:30px;font-weight:800;box-shadow:0 12px 40px rgba(242,100,34,.55),0 0 0 4px rgba(253,235,168,.7);white-space:nowrap}
+.fi-url{font-family:'Cinzel','Georgia',serif;font-size:24px;letter-spacing:.2em;color:#F2C94C;font-weight:700;white-space:nowrap}
+.fi-motto{font-family:'Caveat','Segoe Script','Brush Script MT',cursive;font-size:34px;font-weight:700;color:#FDEBA8;white-space:nowrap}
+.fi-cap{min-height:62px;display:grid;place-items:center;text-align:center;color:#fff;font-size:clamp(15px,2.3vw,21px);line-height:1.4;padding:8px 14px;border-radius:12px;background:rgba(3,10,26,.55);border-top:2px solid rgba(226,169,41,.7)}
 .fi-cap p{margin:0;max-width:100%}.fi-cap span{opacity:.5;transition:opacity .12s}.fi-cap span.on{opacity:1}
 .fi-ctl{display:flex;align-items:center;gap:10px;color:#fff;font-size:13px}
 .fi-ctl .t{min-width:78px;text-align:center;font-variant-numeric:tabular-nums}
 .fi-prog{position:relative;flex:1;min-width:0;height:26px;cursor:pointer;touch-action:none;display:flex;align-items:center}
 .fi-prog:before{content:"";position:absolute;left:0;right:0;height:6px;border-radius:3px;background:rgba(255,255,255,.35)}
-.fi-prog i{position:absolute;left:0;height:6px;border-radius:3px;background:#F26422;width:0}
+.fi-prog i{position:absolute;left:0;height:6px;border-radius:3px;background:linear-gradient(90deg,#E2A929,#F26422);width:0}
 .fi-prog b{position:absolute;top:50%;width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;background:#F26422;border:2px solid #fff;left:0}
 .fi-prog:focus-visible{outline:2px solid #fff;outline-offset:2px}
 @media (max-width:640px){.fi-titre{display:none!important}.fi-top{justify-content:flex-end}}
 @media (prefers-reduced-motion:reduce){.fi-ov{animation:none}}
 `;
 
+  /* ── Formes dessinées : Afrique stylisée (lissée), lauriers ── */
+  const AFR_PTS = [[60, 30], [100, 22], [140, 28], [170, 38], [200, 40], [215, 55], [225, 80], [238, 102], [252, 112], [245, 132], [225, 150], [215, 175], [205, 205], [190, 235], [170, 250], [150, 255], [130, 240], [118, 215], [115, 190], [105, 170], [85, 160], [60, 160], [40, 150], [28, 135], [18, 110], [22, 80], [40, 55]].map(p => [p[0] - 130, p[1] - 140]);
+  function lisse(pts) {
+    const n = pts.length; let d = `M${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)}`;
+    for (let i = 0; i < n; i++) {
+      const p0 = pts[(i - 1 + n) % n], p1 = pts[i], p2 = pts[(i + 1) % n], p3 = pts[(i + 2) % n];
+      const c1 = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6], c2 = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6];
+      d += ` C${c1[0].toFixed(1)} ${c1[1].toFixed(1)} ${c2[0].toFixed(1)} ${c2[1].toFixed(1)} ${p2[0].toFixed(1)} ${p2[1].toFixed(1)}`;
+    }
+    return d + 'Z';
+  }
+  function laurier(miroir) {
+    /* Branche de laurier : une tige courbe et des paires de feuilles dorées le long de la tige. */
+    const P = t => { const u = 1 - t; return [u * u * 150 + 2 * u * t * 40 + t * t * 70, u * u * 300 + 2 * u * t * 150 + t * t * 30]; };
+    const feuilles = [];
+    for (let i = 1; i <= 9; i++) {
+      const t = i / 10, p = P(t), q = P(t + 0.02), ang = Math.atan2(q[1] - p[1], q[0] - p[0]) * 180 / Math.PI;
+      const s = 1.15 - t * 0.45;
+      [-42, 42].forEach(off => feuilles.push(`<ellipse cx="${(p[0] + (off < 0 ? -1 : 1) * 6).toFixed(1)}" cy="${p[1].toFixed(1)}" rx="${(30 * s).toFixed(1)}" ry="${(10.5 * s).toFixed(1)}" transform="rotate(${(ang + off).toFixed(1)} ${p[0].toFixed(1)} ${p[1].toFixed(1)}) translate(${(26 * s).toFixed(1)} 0)" fill="url(#fiGold)" stroke="#8a5a00" stroke-opacity=".45" stroke-width="1"/>`));
+    }
+    const s0 = P(0), s1 = P(1);
+    return `<svg width="220" height="320" viewBox="0 0 220 320" aria-hidden="true" style="${miroir ? 'transform:scaleX(-1);' : ''}overflow:visible"><path d="M${s0[0]} ${s0[1]} Q40 150 ${s1[0]} ${s1[1]}" fill="none" stroke="#C99A2E" stroke-width="4" stroke-linecap="round"/>${feuilles.join('')}</svg>`;
+  }
+
   /* ── Construction du décor (une seule fois par ouverture) ── */
   const STAGE_HTML = `
 <div class="fi-bg"></div>
 <div class="fi-blob b1" data-r="b1"></div><div class="fi-blob b2" data-r="b2"></div>
 <div data-r="parts"></div>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <linearGradient id="fiGold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FDEBA8"/><stop offset=".5" stop-color="#E8B22E"/><stop offset="1" stop-color="#B67E14"/></linearGradient>
+</defs></svg>
+<svg class="fi-globe" data-r="swoosh" viewBox="0 0 1280 720" width="1280" height="720" aria-hidden="true"><path d="M1280 0 L1280 170 C1210 100 1130 40 1040 0 Z" fill="url(#fiGold)" opacity=".95"/><path d="M1280 0 L1280 120 C1225 70 1165 28 1100 0 Z" fill="#0B2A5B" opacity=".9"/></svg>
+<svg class="fi-globe" data-r="rub" viewBox="0 0 1280 720" width="1280" height="720" aria-hidden="true">
+  <path d="M0 650 C 300 612, 640 700, 1280 640 L1280 720 L0 720 Z" fill="#061633" opacity=".94"/>
+  <path d="M0 650 C 300 612, 640 700, 1280 640" fill="none" stroke="url(#fiGold)" stroke-width="5"/>
+  <path d="M0 662 C 300 624, 640 712, 1280 652" fill="none" stroke="#1B7F3B" stroke-width="3" opacity=".9"/>
+</svg>
+<div class="fi-abs fi-motto" data-r="motto">Rassembler · Mobiliser · Impacter</div>
 <svg class="fi-globe" data-r="globe" viewBox="-200 -200 400 400" width="400" height="400" aria-hidden="true">
-  <defs><radialGradient id="fiGl" cx="40%" cy="35%" r="70%"><stop offset="0" stop-color="#2f7fe0" stop-opacity=".55"/><stop offset="1" stop-color="#0b2a55" stop-opacity=".15"/></radialGradient></defs>
-  <circle r="150" fill="url(#fiGl)" stroke="#6fb2ff" stroke-width="2.5"/>
-  <g data-r="mer" fill="none" stroke="#6fb2ff" stroke-width="1.4" stroke-opacity=".55"></g>
-  <g data-r="par" stroke="#6fb2ff" stroke-width="1.4" stroke-opacity=".45"></g>
+  <defs><radialGradient id="fiGl" cx="40%" cy="35%" r="70%"><stop offset="0" stop-color="#3a8be8" stop-opacity=".6"/><stop offset="1" stop-color="#0b2a55" stop-opacity=".2"/></radialGradient>
+    <filter id="fiGlow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+  <circle r="150" fill="url(#fiGl)" stroke="#8cc4ff" stroke-width="2.5"/>
+  <g data-r="mer" fill="none" stroke="#8cc4ff" stroke-width="1.3" stroke-opacity=".4"></g>
+  <g data-r="par" stroke="#8cc4ff" stroke-width="1.3" stroke-opacity=".35"></g>
+  <path d="${lisse(AFR_PTS)}" fill="url(#fiGold)" fill-opacity=".92" stroke="#FFF6D6" stroke-opacity=".7" stroke-width="2" filter="url(#fiGlow)" data-r="afr"/>
   <g data-r="arcs" fill="none" stroke-linecap="round"></g>
   <g data-r="nodes"></g>
 </svg>
-<div class="fi-abs fi-word" data-r="wordBig">Diaspo<i>'</i>Actif</div>
-<div class="fi-abs fi-tag" data-r="tag">Connecter · Valoriser · Agir</div>
-<div class="fi-abs fi-head" data-r="head"><img src="assets/logo.png" alt="" onerror="this.style.display='none'"><span>Diaspo<i>'</i>Actif</span></div>
+<img class="fi-abs fi-logo" data-r="logo" src="assets/media/logo-film.webp" alt="">
+<div class="fi-abs fi-welc gold" data-r="welc">BIENVENUE</div>
+<div class="fi-abs fi-tag" data-r="tag">PLATEFORME · RÉSEAU · OPPORTUNITÉS</div>
+<div class="fi-abs fi-head" data-r="head"><img src="assets/media/logo-film.webp" alt=""><span>Diaspo<i>'</i>Actif</span></div>
 
-<div class="fi-abs fi-type" data-r="c0"><div class="ico">👤</div><h4>Utilisateur</h4><p>Je rejoins le réseau en tant que membre</p></div>
-<div class="fi-abs fi-type" data-r="c1"><div class="ico">🤝</div><h4>Initiative</h4><p>Mon association, mon entreprise, mon projet</p></div>
-<div class="fi-abs fi-type" data-r="c2"><div class="ico">🏛️</div><h4>Collectivité</h4><p>Mon institution, mon territoire</p></div>
+<div class="fi-abs fi-type" data-r="c0"><div class="fi-ring">👤</div><h4>Utilisateur</h4><p>Je rejoins le réseau en tant que membre</p></div>
+<div class="fi-abs fi-type" data-r="c1"><div class="fi-ring">🤝</div><h4>Initiative</h4><p>Mon association, mon entreprise, mon projet</p></div>
+<div class="fi-abs fi-type" data-r="c2"><div class="fi-ring">🏛️</div><h4>Collectivité</h4><p>Mon institution, mon territoire</p></div>
 
-<div class="fi-abs fi-form" data-r="form">
+<div class="fi-abs fi-card fi-form" data-r="form">
   <h5>Créer mon compte <span>Utilisateur</span></h5>
   <div class="fi-cols">
     <div class="fi-col">
@@ -160,13 +203,13 @@
 </div>
 
 <div class="fi-abs" data-r="env"><svg class="fi-env" viewBox="0 0 240 190" aria-hidden="true">
-  <rect x="10" y="50" width="220" height="130" rx="14" fill="#e8f1ff"/>
+  <rect x="10" y="50" width="220" height="130" rx="14" fill="#eef4ff" stroke="#E2A929" stroke-width="4"/>
   <path d="M10 64 L120 140 L230 64" fill="none" stroke="#9db8dd" stroke-width="4"/>
-  <g data-r="flap" style="transform-origin:120px 50px"><path d="M10 50 L120 120 L230 50 Z" fill="#c5dbfa" stroke="#9db8dd" stroke-width="3"/></g>
-  <circle data-r="envok" cx="198" cy="52" r="28" fill="#16a34a"/><path data-r="envck" d="M184 52 L194 63 L214 40" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <g data-r="flap" style="transform-origin:120px 50px"><path d="M10 50 L120 120 L230 50 Z" fill="#dfeafc" stroke="#E2A929" stroke-width="4"/></g>
+  <circle data-r="envok" cx="198" cy="52" r="28" fill="#16a34a" stroke="#fff" stroke-width="4"/><path data-r="envck" d="M184 52 L194 63 L214 40" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
 </svg><div class="fi-envl" data-r="envl">E-mail confirmé</div></div>
 
-<div class="fi-abs fi-prof" data-r="prof">
+<div class="fi-abs fi-card fi-prof" data-r="prof">
   <div class="id"><div class="a"></div><div><b>Aminata K.</b><span>Utilisateur · Lille, France</span></div></div>
   <div class="fi-gt"><span>État de votre profil</span><span data-r="pct">17 %</span></div>
   <div class="fi-bar"><i data-r="bar"></i></div>
@@ -186,15 +229,17 @@
 <div class="fi-abs fi-sat" data-r="s3"><div class="e">🛍️</div><b>Boutique</b></div>
 <div class="fi-abs fi-sat" data-r="s4"><div class="e">💬</div><b>Communauté</b></div>
 
-<div class="fi-abs fi-big" data-r="t1">Rejoignez le <em>réseau</em></div>
+<div class="fi-abs" data-r="lauG">${laurier(false)}</div><div class="fi-abs" data-r="lauD">${laurier(true)}</div>
+<div class="fi-abs fi-big" data-r="t1">Rejoignez le <span class="gold">réseau</span></div>
+<div class="fi-abs fi-script" data-r="t0">Ensemble, révélons les talents de notre diaspora !</div>
 <div class="fi-abs fi-sub" data-r="t2">Créez votre compte dès maintenant</div>
 <div class="fi-abs" data-r="t3"><span class="fi-cta">Créer mon compte</span></div>
 <div class="fi-abs fi-url" data-r="t4">DIASPOACTIF.COM</div>
-<div class="fi-abs" data-r="fade" style="width:${W}px;height:${H}px;background:#071a33;opacity:0"></div>`;
+<div class="fi-abs" data-r="fade" style="width:${W}px;height:${H}px;background:#061633;opacity:0"></div>`;
 
-  /* Globe : points (latitude, longitude en degrés) et liaisons entre eux. */
-  const NODES = [[48.9, 2.3], [14.7, -17.4], [5.3, -4], [40.7, -74], [-4.3, 15.3], [51.5, -0.1], [35.7, 139.7], [6.5, 3.4]];
-  const LIENS = [[0, 1], [1, 2], [0, 3], [2, 4], [5, 2], [4, 6], [7, 5], [3, 1]];
+  /* Globe : réseau de points sur l'Afrique et l'Europe, liaisons (coordonnées dans le globe, centre 0,0). */
+  const NODES = [[-70, -105], [65, -92], [-108, -58], [70, -25], [-80, 10], [-50, 12], [-15, 45], [55, 25], [20, 95], [-20, -135], [-45, -128]];
+  const LIENS = [[9, 0], [9, 2], [9, 4], [9, 6], [9, 1], [10, 5], [10, 7], [4, 5], [6, 8], [3, 1], [7, 6]];
 
   /* Effets sonores : [temps audio, type]. */
   const SFX = [[16.5, 'clic'], [17.6, 'clic'], [18.9, 'clic'], [20.55, 'pop'], [27.4, 'pop'], [28.7, 'tic'], [29.0, 'tic'], [29.5, 'tic'], [30.0, 'tic'], [30.5, 'tic'], [31.0, 'tic'], [31.05, 'chime'],
@@ -269,45 +314,46 @@
     let a = av;
     if (calme) { const s = SCENES.find(x => av >= x[0] && av < x[1]) || SCENES[SCENES.length - 1]; a = s[1] - 0.02; }
 
-    /* Fond vivant */
-    place(R.b1, 0, 0, 1); R.b1.style.transform = `translate(${Math.sin(a * .2) * 60}px,${Math.cos(a * .17) * 40}px)`;
+    /* Fond vivant + décor fixe (ruban de pied avec la devise, angle doré) */
+    R.b1.style.transform = `translate(${Math.sin(a * .2) * 60}px,${Math.cos(a * .17) * 40}px)`;
     R.b2.style.transform = `translate(${Math.cos(a * .15) * -70}px,${Math.sin(a * .21) * -50}px)`;
     R.pa.forEach((e, i) => {
       const sx = (i * 197.3) % W, sy = (i * 83.7) % H, v = 8 + (i % 5) * 4;
       e.el.style.transform = `translate(${(sx + Math.sin(a * .3 + i) * 30) % W}px,${((sy - a * v) % H + H) % H}px)`;
       e.el.style.opacity = .25 + .35 * Math.abs(Math.sin(a * .8 + i));
     });
+    const dec = P(a, -1.2, -0.3);
+    R.rub.style.opacity = dec; R.swoosh.style.opacity = dec * 0.9;
+    place(R.motto, 640, 690, 1, dec * 0.95);
 
-    /* Globe : centre → coin → centre */
+    /* Globe-réseau sur l'Afrique : à gauche → coin → fond de la scène finale */
     const g1 = P(a, 6.7, 8.0, E.inout), g2 = P(a, 39.9, 41.4, E.inout);
-    const gx = a < 20 ? lerp(640, 92, g1) : lerp(92, 640, g2);
-    const gy = a < 20 ? lerp(330, 78, g1) : lerp(78, 330, g2);
-    const gs = a < 20 ? lerp(1.1, 0.27, g1) : lerp(0.27, 1.35, g2);
-    const gop = a < 20 ? 1 : lerp(1, 0.38, g2);
+    const gx = a < 20 ? lerp(430, 92, g1) : lerp(92, 640, g2);
+    const gy = a < 20 ? lerp(350, 78, g1) : lerp(78, 330, g2);
+    const gs = a < 20 ? lerp(1.15, 0.27, g1) : lerp(0.27, 1.4, g2);
+    const gop = a < 20 ? 1 : lerp(1, 0.45, g2);
     place(R.globe, gx, gy, gs, gop * P(a, -1.2, -0.2));
     const rot = a * 0.33, rr = 150;
     R.mer.forEach((m, i) => { m.setAttribute('rx', Math.abs(rr * Math.sin(i * Math.PI / 6 - rot * 0.5)).toFixed(1)); });
-    const pos = NODES.map(n => vue(n[0], n[1], rot, rr));
+    R.afr.setAttribute('transform', `scale(${(1 + 0.012 * Math.sin(a * 1.1)).toFixed(4)})`);
     R.nd.forEach((c, i) => {
-      const p = pos[i], ap = P(a, 0.2 + i * 0.15, 0.9 + i * 0.15);
-      c.setAttribute('cx', p.x.toFixed(1)); c.setAttribute('cy', p.y.toFixed(1));
-      c.setAttribute('r', (6 + 3 * (p.z > 0 ? p.z : 0)).toFixed(1));
-      c.setAttribute('fill-opacity', (ap * (p.z > 0 ? 0.55 + 0.45 * p.z : 0.12)).toFixed(2));
+      const n = NODES[i], ap = P(a, 0.2 + i * 0.12, 0.8 + i * 0.12, E.back);
+      c.setAttribute('cx', n[0]); c.setAttribute('cy', n[1]);
+      c.setAttribute('r', (5.5 * ap * (1 + 0.28 * Math.sin(a * 2.4 + i))).toFixed(1));
+      c.setAttribute('fill-opacity', clamp(ap).toFixed(2));
     });
     R.ar.forEach((pt, k) => {
-      const A = pos[LIENS[k][0]], B = pos[LIENS[k][1]];
-      const mx = (A.x + B.x) / 2, my = (A.y + B.y) / 2, f = 1.35, vis = Math.min(A.z, B.z) > -0.1 ? 1 : 0.12;
-      pt.setAttribute('d', `M${A.x.toFixed(1)} ${A.y.toFixed(1)} Q${(mx * f).toFixed(1)} ${(my * f).toFixed(1)} ${B.x.toFixed(1)} ${B.y.toFixed(1)}`);
-      const pr = P(a, 0.9 + k * 0.32, 2.0 + k * 0.32, E.inout);
-      pt.setAttribute('stroke-dashoffset', (1 - pr).toFixed(3));
-      pt.setAttribute('stroke-opacity', (0.9 * vis).toFixed(2));
+      const A = NODES[LIENS[k][0]], B = NODES[LIENS[k][1]], f = 1.3;
+      pt.setAttribute('d', `M${A[0]} ${A[1]} Q${(((A[0] + B[0]) / 2) * f).toFixed(1)} ${(((A[1] + B[1]) / 2) * f).toFixed(1)} ${B[0]} ${B[1]}`);
+      pt.setAttribute('stroke-dashoffset', (1 - P(a, 0.9 + k * 0.28, 1.9 + k * 0.28, E.inout)).toFixed(3));
+      pt.setAttribute('stroke-opacity', '0.92');
     });
 
-    /* Scène 1 : marque */
-    place(R.wordBig, 640, 585, 1, P(a, 2.4, 3.6) * (1 - P(a, 6.7, 7.5)));
-    R.wordBig.style.transform = `translate(640px,${lerp(610, 585, P(a, 2.4, 3.6))}px) translate(-50%,-50%)`;
-    place(R.tag, 640, 650, 1, P(a, 4.0, 5.0) * (1 - P(a, 6.7, 7.5)));
-    place(R.head, 232, 78, 1, P(a, 7.4, 8.4) * (1 - P(a, 40.0, 40.8)));
+    /* Scène 1 : bienvenue, logo en grand, devise de la plateforme */
+    place(R.welc, 640, 98, 1, P(a, 0.2, 1.2) * (1 - P(a, 6.6, 7.4)));
+    place(R.logo, 850, 345, lerp(0.55, 1, P(a, 2.0, 3.4, E.back)), P(a, 2.0, 3.0) * (1 - P(a, 6.6, 7.4)));
+    place(R.tag, 640, 585, 1, P(a, 4.0, 5.0) * (1 - P(a, 6.6, 7.4)));
+    place(R.head, 300, 78, 1, P(a, 7.4, 8.4) * (1 - P(a, 40.0, 40.8)));
 
     /* Scène 2 : trois profils */
     const enter = [8.3, 8.6, 8.9], cue = [13.35, 13.83, 14.36];
@@ -315,18 +361,18 @@
     [0, 1, 2].forEach(i => {
       const e = P(a, enter[i], enter[i] + 0.7, E.back);
       const lum = P(a, cue[i] - 0.25, cue[i] + 0.15) * (1 - P(a, cue[i] + 0.45, cue[i] + 0.75));
-      let op = P(a, enter[i], enter[i] + 0.5), x = xs[i], s = lerp(0.9, 1, e) * (1 + 0.07 * lum), y = lerp(480, 380, e);
+      let op = P(a, enter[i], enter[i] + 0.5), x = xs[i], s = lerp(0.9, 1, e) * (1 + 0.07 * lum), y = lerp(470, 370, e);
       if (i !== 0) { const go = P(a, 14.6, 15.4, E.inout); op *= 1 - go; x += (i === 1 ? 60 : -60) * go; }
       else { const up = P(a, 14.6, 15.4, E.inout); x = lerp(x, 640, up); s *= 1 + 0.25 * up; op *= 1 - P(a, 15.2, 15.7); }
       const el = R['c' + i];
       place(el, x, y, s, a < 8.2 || a > 15.8 ? 0 : op);
-      el.style.borderColor = lum > 0.05 ? `rgba(242,100,34,${0.35 + lum * 0.65})` : 'rgba(255,255,255,.28)';
-      el.style.boxShadow = `0 0 ${lum * 50}px rgba(242,100,34,${lum * 0.55})`;
+      el.style.borderColor = lum > 0.05 ? `rgb(${Math.round(lerp(226, 255, lum))},${Math.round(lerp(169, 235, lum))},${Math.round(lerp(41, 168, lum))})` : '#E2A929';
+      el.style.boxShadow = `0 14px 40px rgba(0,0,0,.4),0 0 ${lum * 55}px rgba(253,235,168,${lum * 0.75})`;
     });
 
     /* Scène 3 : formulaire */
     const f = P(a, 15.0, 15.8, E.back) * (1 - P(a, 24.5, 25.2));
-    place(R.form, 640, 392, lerp(0.88, 1, P(a, 15.0, 15.8, E.back)), (a < 14.9 || a > 25.3) ? 0 : f);
+    place(R.form, 640, 372, lerp(0.88, 1, P(a, 15.0, 15.8, E.back)), (a < 14.9 || a > 25.3) ? 0 : f);
     const vals = ["Côte d'Ivoire", 'France', 'Entrepreneuriat'], t0s = [15.7, 16.85, 18.0];
     [0, 1, 2].forEach(i => {
       R['v' + i].textContent = tape(vals[i], a, t0s[i], t0s[i] + 0.8);
@@ -334,16 +380,16 @@
     });
     const phoP = P(a, 20.4, 21.0, E.back);
     R.ph.style.transform = `scale(${phoP})`; R.ph.style.opacity = phoP > 0 ? 1 : 0;
-    R.av.style.borderStyle = phoP > 0.5 ? 'solid' : 'dashed'; R.av.style.borderColor = phoP > 0.5 ? '#38bdf8' : '#9db8dd';
+    R.av.classList.toggle('set', phoP > 0.5);
     R.bio.textContent = tape("Passionnée d'entrepreneuriat, je cherche des partenaires pour un projet agricole en Côte d'Ivoire.", a, 21.2, 24.2);
 
     /* Scène 4 : e-mail + profil */
-    place(R.env, 330, 360, lerp(0.7, 1, P(a, 25.1, 25.9, E.back)), P(a, 25.1, 25.7) * (1 - P(a, 31.2, 31.8)) * (a > 25 && a < 32 ? 1 : 0));
+    place(R.env, 330, 350, lerp(0.7, 1, P(a, 25.1, 25.9, E.back)), P(a, 25.1, 25.7) * (1 - P(a, 31.2, 31.8)) * (a > 25 && a < 32 ? 1 : 0));
     R.flap.style.transform = `rotateX(${lerp(0, 175, P(a, 26.2, 27.0, E.inout))}deg)`;
     const eo = P(a, 27.3, 27.8, E.back);
     R.envok.style.transform = `scale(${eo})`; R.envok.style.transformOrigin = '198px 52px'; R.envck.style.opacity = eo > 0.2 ? 1 : 0;
     R.envl.style.opacity = P(a, 27.4, 27.9);
-    place(R.prof, 880, 392, lerp(0.88, 1, P(a, 25.4, 26.2, E.back)), (a < 25.3 || a > 32.0) ? 0 : P(a, 25.3, 26.0) * (1 - P(a, 31.4, 32.0)));
+    place(R.prof, 880, 380, lerp(0.88, 1, P(a, 25.4, 26.2, E.back)), (a < 25.3 || a > 32.0) ? 0 : P(a, 25.3, 26.0) * (1 - P(a, 31.4, 32.0)));
     const ckT = { res: -1, pho: 28.9, bio: 29.4, com: 29.9, ori: 30.4, dom: 30.9 };
     let nOn = 0;
     R.ckEls.forEach(d => { const on = a >= (ckT[d.dataset.k] ?? 99) && (ckT[d.dataset.k] >= 0 || a >= 28.6); d.classList.toggle('on', on); if (on) nOn++; });
@@ -351,38 +397,41 @@
     R.pct.textContent = pct + ' %';
     R.bar.style.width = pct + '%'; R.bar.style.transition = calme ? 'none' : 'width .45s ease';
 
-    /* Éclats de réussite à 100 % */
+    /* Éclats dorés à 100 % */
     const bs = P(a, 31.0, 31.9, E.lin);
-    R.burst.innerHTML = a > 31.0 && a < 32.0 ? Array.from({ length: 14 }, (_, i) => {
-      const an = i / 14 * Math.PI * 2, d = 40 + bs * 170;
-      return `<i style="position:absolute;left:${880 + Math.cos(an) * d}px;top:${392 + Math.sin(an) * d * .8}px;width:10px;height:10px;border-radius:50%;background:${i % 2 ? '#F26422' : '#38bdf8'};opacity:${1 - bs}"></i>`;
+    R.burst.innerHTML = a > 31.0 && a < 32.0 ? Array.from({ length: 16 }, (_, i) => {
+      const an = i / 16 * Math.PI * 2, d = 40 + bs * 190;
+      return `<i style="position:absolute;left:${880 + Math.cos(an) * d}px;top:${380 + Math.sin(an) * d * .8}px;width:11px;height:11px;border-radius:50%;background:${i % 3 === 0 ? '#F26422' : '#F8DA7A'};opacity:${1 - bs}"></i>`;
     }).join('') : '';
 
     /* Scène 5 : le profil et ses usages */
     const inS5 = a > 31.4 && a < 40.9;
     const pIn = P(a, 31.8, 32.6, E.back), pOut = P(a, 40.0, 40.8);
-    place(R.past, 640, 360, lerp(0.5, 1, pIn), inS5 ? pIn * (1 - pOut) : 0);
+    place(R.past, 640, 355, lerp(0.5, 1, pIn), inS5 ? pIn * (1 - pOut) : 0);
     place(R.pn, 640, 478, 1, inS5 ? P(a, 32.2, 32.9) * (1 - pOut) : 0);
     const sc = [33.95, 35.3, 37.0, 38.4, 39.9];
     const ln = [];
     sc.forEach((tc, i) => {
       const an = (-90 + i * 72) * Math.PI / 180 + (calme ? 0 : Math.sin(a * 0.4) * 0.06);
-      const x = 640 + Math.cos(an) * 400, y = 360 + Math.sin(an) * 245;
+      const x = 640 + Math.cos(an) * 410, y = 355 + Math.sin(an) * 232;
       const e = P(a, tc - 0.55, tc + 0.15, E.back);
-      place(R['s' + i], lerp(640, x, e), lerp(360, y, e), lerp(0.4, 1, e), inS5 ? e * (1 - pOut) : 0);
-      if (inS5 && e > 0) ln.push(`<line x1="640" y1="360" x2="${lerp(640, x, e).toFixed(1)}" y2="${lerp(360, y, e).toFixed(1)}" stroke="#6fb2ff" stroke-width="3" stroke-opacity="${(0.55 * (1 - pOut)).toFixed(2)}" stroke-dasharray="8 8"/>`);
+      place(R['s' + i], lerp(640, x, e), lerp(355, y, e), lerp(0.4, 1, e), inS5 ? e * (1 - pOut) : 0);
+      if (inS5 && e > 0) ln.push(`<line x1="640" y1="355" x2="${lerp(640, x, e).toFixed(1)}" y2="${lerp(355, y, e).toFixed(1)}" stroke="#E2A929" stroke-width="3.5" stroke-opacity="${(0.75 * (1 - pOut)).toFixed(2)}" stroke-dasharray="9 8"/>`);
     });
     R.lines.innerHTML = ln.join('');
-    R.lines.style.opacity = 1;
 
-    /* Scène 6 : appel à l'action */
-    const fin6 = P(a, 40.7, 41.6);
-    place(R.t1, 640, 262, lerp(0.92, 1, fin6), fin6 * (a > 40.6 ? 1 : 0));
-    place(R.t2, 640, 372, 1, P(a, 43.3, 44.0) * (a > 40.6 ? 1 : 0));
+    /* Scène 6 : appel à l'action (lauriers, devise, bouton) */
+    const fin6 = P(a, 40.7, 41.6), on6 = a > 40.6 ? 1 : 0;
+    place(R.t1, 640, 240, lerp(0.92, 1, fin6), fin6 * on6);
+    const lau = P(a, 41.2, 42.4, E.back);
+    place(R.lauG, 150, 250, 0.62 * lerp(0.7, 1, lau), P(a, 41.2, 42.2) * on6);
+    place(R.lauD, 1130, 250, 0.62 * lerp(0.7, 1, lau), P(a, 41.2, 42.2) * on6);
+    place(R.t0, 640, 328, 1, P(a, 41.7, 42.8) * on6);
+    place(R.t2, 640, 396, 1, P(a, 43.3, 44.0) * on6);
     const pulse = 1 + 0.045 * Math.sin(Math.max(0, a - 44) * 4.2);
-    place(R.t3, 640, 505, lerp(0.8, 1, P(a, 43.5, 44.2, E.back)) * (calme ? 1 : pulse), P(a, 43.5, 44.1) * (a > 40.6 ? 1 : 0));
-    place(R.t4, 640, 650, 1, P(a, 44.4, 45.4) * (a > 40.6 ? 1 : 0));
-    R.fade.style.transform = ''; R.fade.style.left = '0'; R.fade.style.top = '0';
+    place(R.t3, 640, 490, lerp(0.8, 1, P(a, 43.5, 44.2, E.back)) * (calme ? 1 : pulse), P(a, 43.5, 44.1) * on6);
+    place(R.t4, 640, 590, 1, P(a, 44.4, 45.4) * on6);
+    R.fade.style.left = '0'; R.fade.style.top = '0'; R.fade.style.transform = '';
     R.fade.style.opacity = clamp((a - (FIN - LEAD - 1.1)) / 1.1);
   }
 
@@ -469,6 +518,7 @@
     if (ov) return;
     options = options || {};
     if (!document.getElementById('fi-css')) { const st = document.createElement('style'); st.id = 'fi-css'; st.textContent = CSS; document.head.appendChild(st); }
+    if (!document.getElementById('fi-fonts')) { const l = document.createElement('link'); l.id = 'fi-fonts'; l.rel = 'stylesheet'; l.href = 'https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Cinzel:wght@600;800&display=swap'; document.head.appendChild(l); }
     calme = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
     ov = document.createElement('div');
     ov.className = 'fi-ov'; ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true'); ov.setAttribute('aria-label', "Film : créer son compte sur Diaspo'Actif");
@@ -490,8 +540,8 @@
     const gMer = ov.querySelector('[data-r="mer"]'); R.mer.forEach(e => gMer.appendChild(e));
     const gPar = ov.querySelector('[data-r="par"]');
     [-60, -30, 0, 30, 60].forEach(lat => { const y = -150 * Math.sin(lat * Math.PI / 180), x = 150 * Math.cos(lat * Math.PI / 180); const l = document.createElementNS('http://www.w3.org/2000/svg', 'line'); l.setAttribute('x1', -x); l.setAttribute('x2', x); l.setAttribute('y1', y); l.setAttribute('y2', y); gPar.appendChild(l); });
-    const gNodes = ov.querySelector('[data-r="nodes"]'); R.nd = NODES.map(() => { const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle'); c.setAttribute('fill', '#F26422'); gNodes.appendChild(c); return c; });
-    const gArcs = ov.querySelector('[data-r="arcs"]'); R.ar = LIENS.map((_, i) => { const p = document.createElementNS('http://www.w3.org/2000/svg', 'path'); p.setAttribute('pathLength', '1'); p.setAttribute('stroke-dasharray', '1'); p.setAttribute('stroke', i % 2 ? '#38bdf8' : '#ffb27a'); p.setAttribute('stroke-width', '2.4'); gArcs.appendChild(p); return p; });
+    const gNodes = ov.querySelector('[data-r="nodes"]'); R.nd = NODES.map(() => { const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle'); c.setAttribute('fill', '#FFF1B8'); gNodes.appendChild(c); return c; });
+    const gArcs = ov.querySelector('[data-r="arcs"]'); R.ar = LIENS.map((_, i) => { const p = document.createElementNS('http://www.w3.org/2000/svg', 'path'); p.setAttribute('pathLength', '1'); p.setAttribute('stroke-dasharray', '1'); p.setAttribute('stroke', i % 2 ? '#9fd0ff' : '#FFE7A0'); p.setAttribute('stroke-width', '2.4'); gArcs.appendChild(p); return p; });
     R.ckEls = [...ov.querySelectorAll('[data-r="ck"] > div')];
     echelle(); window.addEventListener('resize', echelle);
     document.addEventListener('keydown', clavier);
