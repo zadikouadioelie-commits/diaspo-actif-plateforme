@@ -1563,12 +1563,23 @@
         <h2 style="margin:6px 0 8px;font-size:20px;line-height:1.25">Connecter les diasporas, valoriser les talents, accélérer le développement des territoires.</h2>
         <p class="muted small" style="margin:0 0 12px">Des passerelles entre pays d’origine et pays d’accueil, grâce aux compétences, projets, organisations et initiatives portés par les diasporas du monde entier.</p>
         <div class="row" style="flex-wrap:wrap;gap:8px">${S.me ? '' : '<a class="btn sm" href="inscription.html">Créer un compte</a>'}<a class="btn sm out" href="#/annuaire">Explorer l’annuaire</a></div></div></div>
+      <div class="card" style="box-shadow:0 0 0 2px #F26422,0 8px 22px rgba(242,100,34,.22)"><div class="pad">
+        <span class="badge o">⭐ Offre exceptionnelle</span>
+        <h3 style="margin:8px 0 6px;font-size:18px">3 mois de Premium offerts à toute la diaspora</h3>
+        <p class="muted small" style="margin:0 0 10px">Diaspo’Actif vous invite à découvrir la plateforme : créez votre boutique en ligne, mettez en avant votre activité, partagez votre expérience, gérez votre association.</p>
+        <div class="tags" style="margin:0 0 10px"><span class="badge">📅 Du 3 oct. 2026 au 3 janv. 2027</span></div>
+        <div class="small" style="background:#FFF8E1;border:1.5px solid #E3B84A;border-radius:12px;padding:10px 12px;color:#5c4200;margin:0 0 12px">Pour les nouveaux inscrits après le <b>13 décembre 2026</b>, l’offre passe à 3 semaines de Premium : profitez-en tant que c’est encore 3 mois pour tous.</div>
+        <div class="row" style="flex-wrap:wrap;gap:8px">${S.me ? '' : '<a class="btn sm" href="inscription.html">Créer un compte</a>'}<a class="btn sm out" href="#/annuaire">Visiter la plateforme</a><button class="btn sm out" id="promo-prem-share">📤 Partager</button></div>
+        <div class="small muted" style="margin-top:10px">🛡️ Partager cette offre fait progresser votre indice de fiabilité.</div>
+      </div></div>
       <div class="mapcard"><canvas id="home-map" role="img" aria-label="Carte animée des déplacements des diasporas dans le monde"></canvas><div class="maplegend"><span><i style="background:#F59E0B;box-shadow:0 0 6px #F59E0B"></i>Pays d’origine</span><span><i style="background:#4A90D9;box-shadow:0 0 6px #4A90D9"></i>Pays de résidence</span></div></div>
       <div class="card"><div class="pad"><h2 class="sec-t sec-in"><span class="sic">${ic('star')}</span><span>Pourquoi Diaspo’Actif ?</span></h2>
         <p style="margin:0 0 10px">La diaspora africaine est un levier de développement majeur, mais ses initiatives restent dispersées, invisibles, sans réseau. Diaspo’Actif change ça.</p>
         <div class="tags" style="margin:0"><span class="badge">👥 Rassembler les talents</span><span class="badge">🗂️ Organiser les initiatives</span><span class="badge">🚀 Mobiliser pour un impact durable</span></div></div></div>
       <div id="home-actus"></div><div id="home-troph"></div><div id="home-shops"></div>${pubSlot('vitrine_section')}<div id="home-temo"></div><div id="home-part"></div>`;
     loadHome(); premiumRappelAccueil();
+    const promoShareBtn = $('#promo-prem-share');
+    if (promoShareBtn) promoShareBtn.onclick = () => partagerLien(location.origin + '/', 'Diaspo’Actif — 3 mois de Premium offerts à toute la diaspora');
     if (window.MMap) { if (S.home.stopMap) S.home.stopMap(); S.home.stopMap = window.MMap.mount($('#home-map')); }
   }
   function loadHome() {
