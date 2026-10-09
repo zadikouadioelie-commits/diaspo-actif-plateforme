@@ -1567,7 +1567,7 @@
       <div class="card"><div class="pad"><h2 class="sec-t sec-in"><span class="sic">${ic('star')}</span><span>Pourquoi Diaspo’Actif ?</span></h2>
         <p style="margin:0 0 10px">La diaspora africaine est un levier de développement majeur, mais ses initiatives restent dispersées, invisibles, sans réseau. Diaspo’Actif change ça.</p>
         <div class="tags" style="margin:0"><span class="badge">👥 Rassembler les talents</span><span class="badge">🗂️ Organiser les initiatives</span><span class="badge">🚀 Mobiliser pour un impact durable</span></div></div></div>
-      <div id="home-actus"></div><div id="home-init"></div><div id="home-shops"></div>${pubSlot('vitrine_section')}<div id="home-temo"></div><div id="home-part"></div>`;
+      <div id="home-actus"></div><div id="home-shops"></div>${pubSlot('vitrine_section')}<div id="home-temo"></div><div id="home-part"></div>`;
     loadHome();
     if (window.MMap) { if (S.home.stopMap) S.home.stopMap(); S.home.stopMap = window.MMap.mount($('#home-map')); }
   }
@@ -1586,10 +1586,8 @@
       const v = (await api('/api/videos-tutoriels?limit=8')).videos || []; if (!v.length) return;
       homeBlock('home-videos', 'Tutoriels vidéo', `<div class="hs">${v.map(x => videoCard(x)).join('')}</div>`, '<a href="#/videos" class="sec-more">Tout voir ›</a>', 'Apprenez à utiliser Diaspo’Actif en quelques minutes.');
     });
-    safe(async () => {
-      const r = await api('/api/annuaire/recherche?type=Initiative&q='); const l = (r.initiatives || []).slice(0, 10); if (!l.length) return;
-      homeBlock('home-init', 'Initiatives à découvrir', `<div class="hs">${l.map(x => miniCard('#/profil/i/' + encodeURIComponent(x.slug || x.id), x.logo_url, x.nom, [x.ville, x.pays].filter(Boolean).join(', '))).join('')}</div>`, '<a href="#/annuaire" class="sec-more">Annuaire ›</a>');
-    });
+    /* EMPLACEMENT RÉSERVÉ (2026-10-09, décision de l'utilisateur) : ancien bloc « Initiatives à découvrir », retiré.
+       Le système de promotion le plus actif de la plateforme viendra ICI (même place que sur l'accueil ordinateur, index.html). */
     safe(async () => {
       const l = ((await api('/api/vitrines')).vitrines || []).slice(0, 10); if (!l.length) return;
       homeBlock('home-shops', 'Boutiques de la diaspora', `<div class="hs">${l.map(v => miniCard('#/profil/i/' + encodeURIComponent(v.id), v.logo_url, v.boutique_nom || v.nom, [v.ville, v.pays].filter(Boolean).join(', '))).join('')}</div>`, '<a href="#/boutiques" class="sec-more">Toutes ›</a>');
