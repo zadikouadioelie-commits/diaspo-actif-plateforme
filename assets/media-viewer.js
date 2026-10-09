@@ -202,7 +202,7 @@
     var photo = it.auteur_photo ? '<img src="' + esc(it.auteur_photo) + '" alt="" onerror="this.remove()">' : '';
     var ini = esc((it.auteur_nom || '?').trim().charAt(0).toUpperCase());
     el.querySelector('.mv-info').innerHTML = '<div class="mv-auteur"><button type="button" class="mv-av" data-a="auteur" aria-label="Voir le profil">' + (photo || ini) + '</button>'
-      + '<button type="button" class="mv-nom" data-a="auteur">' + esc(it.auteur_nom || 'Diaspo’Actif') + '</button></div>'
+      + '<button type="button" class="mv-nom" data-a="auteur">' + esc(it.auteur_nom || 'Membre') + '</button></div>'
       + ((it.titre || it.extrait) ? '<div class="mv-txt">' + (it.titre ? '<b>' + esc(it.titre) + '</b> ' : '') + esc(it.extrait) + '</div>' : '')
       + '<div class="mv-actions"><button type="button" data-a="like" aria-label="J’aime"><i>♡</i><span></span></button>'
       + '<button type="button" data-a="open" aria-label="Commentaires">💬 <span></span></button>'

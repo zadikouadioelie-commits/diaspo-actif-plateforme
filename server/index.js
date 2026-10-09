@@ -19922,7 +19922,7 @@ route("POST", "/api/ads/create", async (req, res) => {
         cible_zones, cible_ville, cible_departement, cible_region, cible_listes)
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?, 'approved', ${datePublicationSql}, ${dateFinSql}, datetime('now'), ?,?,?,?,?)
     `).run(
-      user.id, user.nom || 'Diaspo\'Actif', mediaType, url, titre, fields.description || null,
+      user.id, user.nom || 'Annonceur', mediaType, url, titre, fields.description || null,
       PUB_AD_CTA.includes(fields.cta) ? fields.cta : "En savoir plus",
       fields.lien_url || null, dureeJours,
       JSON.stringify(ciblePaysVal ? [ciblePaysVal] : []),

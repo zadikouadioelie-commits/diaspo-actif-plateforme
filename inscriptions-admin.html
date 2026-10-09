@@ -1463,7 +1463,7 @@ function renderDetailView() {
       </div>
       <div style="display:flex; gap:20px; margin-top:10px; font-size:13px; color:oklch(0.5 0.006 30); flex-wrap:wrap;">
         <span>📅 ${escH(fiche.date_ouverture_inscriptions ? fiche.date_ouverture_inscriptions.slice(0,10) : 'Ouverture à définir')} → ${escH(fiche.date_fermeture_inscriptions ? fiche.date_fermeture_inscriptions.slice(0,10) : 'fermeture à définir')}</span>
-        <span>👤 Organisateur : ${escH(fiche.organisateur || "Diaspo'Actif")}</span>
+        <span>👤 Organisateur : ${escH(fiche.organisateur || "cet organisateur")}</span>
         ${fiche.created_at ? `<span>🗓️ Créée le ${escH(iaDateCreation(fiche.created_at))}</span>` : ''}
       </div>
       ${progressBar}
@@ -1686,7 +1686,7 @@ function renderInfosGenerales(fiche) {
         <div style="width:64px; height:64px; border-radius:8px; flex-shrink:0; background:${fiche.affiche_url ? `url('${escH(fiche.affiche_url)}') center/cover` : 'oklch(0.95 0.004 30)'};"></div>
         <div style="flex:1; min-width:0;">
           <div style="font-size:13px; color:oklch(0.5 0.006 30); overflow:hidden; text-overflow:ellipsis;">${escH(stripRichTags(fiche.description) || 'Aucune description.')}</div>
-          <div style="font-size:11.5px; color:oklch(0.6 0.006 30); margin-top:2px;">Organisateur : ${escH(fiche.organisateur || "Diaspo'Actif")}${fiche.contact_email ? ' · ' + escH(fiche.contact_email) : ''}</div>
+          <div style="font-size:11.5px; color:oklch(0.6 0.006 30); margin-top:2px;">Organisateur : ${escH(fiche.organisateur || "cet organisateur")}${fiche.contact_email ? ' · ' + escH(fiche.contact_email) : ''}</div>
         </div>
         <button style="background:#fff; border:1px solid oklch(0.8 0.006 30); color:oklch(0.2 0.006 30); font-size:12.5px; font-weight:600; padding:8px 14px; border-radius:8px; cursor:pointer; white-space:nowrap;" data-action="toggleEditionInfos">✏️ Modifier</button>
       </div>`;

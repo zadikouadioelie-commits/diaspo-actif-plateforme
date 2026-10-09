@@ -401,7 +401,7 @@
     if (p.sous_type && !p.auteur_nom && !p.corps) return '';
     const orig = p.original_post;
     const src = orig || p;
-    const name = p.auteur_nom || 'Diaspo’Actif';
+    const name = p.auteur_nom || 'Membre';
     const photo = p.auteur_profil && p.auteur_profil.photo_url;
     const titre = md(strip(src.titre || src.article_titre || ''));
     let corps = md(strip(src.corps != null ? src.corps : (src.contenu || '')));

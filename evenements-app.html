@@ -2342,7 +2342,7 @@ function renderPublicationsOrganisations(posts) {
     return `
     <a href="fil-actualite.html" class="evt-pub-item" style="display:block;text-decoration:none;color:inherit;">
       <div class="evt-pub-auteur">
-        <span>${esc(p.auteur_nom || 'Diaspo\'Actif')}</span>
+        <span>${esc(p.auteur_nom || 'Membre')}</span>
         ${roleLbl ? `<span class="evt-pub-role">${roleLbl}</span>` : ''}
       </div>
       <div class="evt-pub-contenu">${texte}</div>

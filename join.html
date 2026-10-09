@@ -147,7 +147,7 @@
          <p class="jn-sous">Vous pouvez tout de même découvrir Diaspo'Actif et créer votre compte librement.</p>
          <div class="jn-actions"><a class="jn-btn jn-btn-utilisateur" href="/inscription.html">Créer un compte</a></div>`;
     card.innerHTML = `${banniereHtml}${avatarHtml}
-      <h1 class="jn-titre">${esc(invitation.inviteur_nom || 'Un membre Diaspo\'Actif')} vous invite</h1>
+      <h1 class="jn-titre">${esc(invitation.inviteur_nom || 'Un membre')} vous invite</h1>
       ${domaineHtml}
       ${suiteInactive}`;
     chargerApercuAnnuaire();
@@ -171,7 +171,7 @@
        </div>
        <p class="jn-deja">Déjà inscrit(e) ? <a href="/login.html">Se connecter</a></p>`;
   card.innerHTML = `${banniereHtml}${avatarHtml}
-    <h1 class="jn-titre">${esc(invitation.inviteur_nom || 'Un membre Diaspo\'Actif')} vous invite sur Diaspo'Actif</h1>
+    <h1 class="jn-titre">${esc(invitation.inviteur_nom || 'Un membre')} vous invite sur Diaspo'Actif</h1>
     <p class="jn-sous">La plateforme mondiale de la diaspora engagée — actions locales, impact global.</p>
     ${domaineHtml}
     ${ctaHtml}`;

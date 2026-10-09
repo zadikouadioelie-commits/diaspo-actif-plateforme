@@ -186,7 +186,7 @@
       </div>
       <div class="cg-photo">🔒</div>
       <h1 class="cg-title">${escH(err.titre)}</h1>
-      <div class="cg-organisateur">Organisée par ${escH(err.organisateur_nom || 'une initiative Diaspo\'Actif')}</div>
+      <div class="cg-organisateur">Organisée par ${escH(err.organisateur_nom || 'une initiative de la plateforme')}</div>
       <div class="cg-card" id="cg-acces-zone">
         <h3 style="margin:0 0 6px;font-size:16px;color:var(--navy);">🔒 Cagnotte privée</h3>
         <p style="font-size:13px;color:var(--muted);margin:0 0 16px;">Cette cagnotte n'est visible que par les personnes autorisées par son organisateur.</p>
@@ -531,7 +531,7 @@
           ${c.image_url ? `<img class="cg-photo" src="${escH(c.image_url)}" alt="">` : `<div class="cg-photo">🪙</div>`}
           ${c.categorie ? `<span class="cg-cat">${escH(c.categorie)}</span>` : ''}
           <h1 class="cg-title">${escH(c.titre)}</h1>
-          <div class="cg-organisateur">Organisée par ${escH(c.organisateur_nom || 'une initiative Diaspo\'Actif')} · ${CAG_STATUT_LABELS[c.statut]?.label || ''}</div>
+          <div class="cg-organisateur">Organisée par ${escH(c.organisateur_nom || 'une initiative de la plateforme')} · ${CAG_STATUT_LABELS[c.statut]?.label || ''}</div>
 
           <div class="cg-card">
             <div class="cg-montant">${objectifTxt}</div>
