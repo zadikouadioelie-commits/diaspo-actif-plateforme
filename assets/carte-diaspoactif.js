@@ -371,6 +371,10 @@
     if (avisMount && window.AvisSection) {
       window.AvisSection.mount(avisMount, { profilId: profil.id, profilNom: nom, isOwner, isAdmin: !!opts.isAdmin, cu: opts.cu || null });
     }
+
+    /* Point d'accroche (2026-10-09) : la carte se redessine à chaque modification ; la page hôte peut ainsi remettre en place, sur le NOUVEAU bandeau,
+       les commandes qu'elle y a déplacées (voir pvzDeplacerCommandesBandeau, profil-app.html). */
+    if (opts && typeof opts.apresRendu === 'function') { try { opts.apresRendu(container); } catch (e) { console.warn('[carte] apresRendu', e); } }
   }
 
   /* ── Modal d'édition générique, propre à la carte ── */

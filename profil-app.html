@@ -639,6 +639,14 @@ html, body { overflow-x:clip; }
 .act-load-more { width:100%; padding:10px; margin-top:10px; background:#fff; border:1.5px solid var(--border); border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; color:var(--muted); }
 .act-load-more:hover { border-color:var(--tp); color:var(--tp); }
 
+/* ===== PROFIL MEMBRE : UN SEUL BANDEAU (2026-10-09, demande explicite) =====
+   La carte Diaspo'Actif porte déjà son propre bandeau, collé à la photo de profil : le grand bandeau du haut est retiré (ses commandes sont déplacées
+   sur celui de la carte, voir pvzDeplacerCommandesBandeau) et la carte occupe toute la largeur — les colonnes latérales sont vides pour ce rôle. */
+body.pp-carte-membre #p-banner { display:none !important; }
+body.pp-carte-membre .pp-3col { grid-template-columns:minmax(0,1fr) !important; }
+body.pp-carte-membre #pp-col-left, body.pp-carte-membre #pp-col-right { display:none !important; }
+.cda-banner:hover .banner-crop-overlay { opacity:1; }
+
 /* ===== BANNER UPLOAD ===== */
 .p-banner-edit { display:none; }
 .is-own .p-banner-edit { display:flex; align-items:center; gap:6px; }
@@ -1939,7 +1947,8 @@ function render() {
   // (2026-07-27). Les autres rôles gardent la vue hi-fi existante ci-dessous.
   if (profil.role === 'utilisateur' && window.CarteDiaspoActif) {
     const _cdaConteneur = document.getElementById('pvz-visitor');
-    const _cdaOpts = { isOwner: isOwn, isAdmin: CU && CU.role === 'administrateur', cu: CU };
+    const _cdaOpts = { isOwner: isOwn, isAdmin: CU && CU.role === 'administrateur', cu: CU, apresRendu: pvzDeplacerCommandesBandeau };
+    document.body.classList.add('pp-carte-membre');
     CarteDiaspoActif.render(_cdaConteneur, profil, _cdaOpts);
     /* Arrivée depuis l'affiche « Remplissez votre profil public » : ouvre directement le bon formulaire. */
     const _completer = new URLSearchParams(location.search).get('completer');
@@ -2162,6 +2171,23 @@ async function pvzChargerComptesRendus() {
   } catch (e) {
     panel.innerHTML = `<div class="pvz-empty" style="padding:8px 0;">Impossible de charger les comptes-rendus.</div>`;
   }
+}
+
+/* Profil membre : le bandeau du haut (#p-banner) est masqué ; ses commandes (retour, changer / télécharger / supprimer / recadrer la bannière, couleurs de thème)
+   passent sur le bandeau de la carte. Les nœuds sont gardés en mémoire car la carte se redessine entièrement à chaque modification : on les rattache au
+   nouveau bandeau à chaque rendu (opts.apresRendu de CarteDiaspoActif). */
+let _pvzCmdBandeau = null;
+function pvzDeplacerCommandesBandeau(conteneur) {
+  const bandeau = conteneur && conteneur.querySelector('.cda-banner');
+  if (!bandeau) return;
+  if (!_pvzCmdBandeau) {
+    const haut = document.getElementById('p-banner');
+    if (!haut) return;
+    const calque = haut.querySelector('.banner-crop-overlay');
+    const pastilles = haut.querySelector('#theme-swatches');
+    _pvzCmdBandeau = [calque, document.getElementById('back-link'), pastilles ? pastilles.parentElement : null].filter(Boolean);
+  }
+  _pvzCmdBandeau.forEach(n => bandeau.appendChild(n));
 }
 
 function renderVisitorProfile() {
@@ -6821,6 +6847,9 @@ function renderBanner() {
     if (delBtn) delBtn.style.display = 'none';
     if (dlBtn)  dlBtn.style.display  = 'none';
   }
+  /* Profil membre : le bandeau de la carte suit la bannière (changée ou supprimée) ; vide = visuel par défaut de la carte. */
+  const _bandeauCarte = document.querySelector('.cda-banner');
+  if (_bandeauCarte) _bandeauCarte.style.backgroundImage = profil.banner_url ? `url('${String(profil.banner_url).replace(/'/g, '%27')}')` : '';
 }
 
 async function downloadBanner() {
