@@ -67,6 +67,17 @@
 .ts-crit-action:hover { background: #D9531A; }
 .ts-crit-action:focus-visible { outline: 3px solid #0D2B4E; outline-offset: 2px; }
 
+/* ── Barème complet (visible par tous) ── */
+.ts-bareme { margin-top: 14px; border: 1px solid #E2E8F0; border-radius: 10px; background: #F8FAFC; }
+.ts-bareme > summary { cursor: pointer; padding: 10px 12px; font-size: 12.5px; font-weight: 800; color: #0D2B4E; list-style: none; }
+.ts-bareme > summary::-webkit-details-marker { display: none; }
+.ts-bareme > summary:focus-visible { outline: 3px solid #0D2B4E; outline-offset: 2px; border-radius: 10px; }
+.ts-bareme-note { margin: 0; padding: 0 12px 8px; font-size: 11.5px; color: #64748b; line-height: 1.5; }
+.ts-bareme ul { list-style: none; margin: 0; padding: 0 12px 10px; display: flex; flex-direction: column; gap: 4px; }
+.ts-bareme li { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; padding: 7px 0; border-top: 1px solid #E2E8F0; font-size: 12.5px; color: #1F2937; }
+.ts-bareme li small { display: block; margin-top: 2px; font-size: 11.5px; color: #64748b; line-height: 1.4; font-weight: 400; }
+.ts-bareme li b { flex-shrink: 0; font-size: 12px; color: #475569; }
+
 /* ── Réactivité ── */
 .ts-react-row { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
 .ts-stars { font-size: 16px; letter-spacing: 1px; }
@@ -184,7 +195,7 @@
         fetch(`/api/users/${userId}/absence`).then(r => r.json()),
       ]);
 
-      const { score = 0, detail = [], color, couleur, sur, points, sens, reactivity } = tsRes;
+      const { score = 0, detail = [], color, couleur, sur, points, sens, reactivity, brut, bareme } = tsRes;
       const label = tsRes.label || palier(score).nom;
       const absence = absRes.absence;
       const col = couleur || color || scoreColor(score);
@@ -243,12 +254,17 @@
             <div class="ts-bar" style="width:${score}%;background:${col}"></div>
           </div>
           ${(typeof points === 'number' && sur)
-            ? `<div class="ts-total">${points} point${points > 1 ? 's' : ''} sur ${sur}${sur < 100 ? ' — les critères réservés aux structures ne vous sont pas comptés' : ''}</div>` : ''}
+            ? `<div class="ts-total">${points} point${points > 1 ? 's' : ''} sur ${sur}${(typeof brut === 'number' && brut > sur) ? ` — ${brut} points cumulés, plafonnés à ${sur}` : ''}</div>` : ''}
 
           ${restants.length ? `<div class="ts-groupe">${isMine ? 'Ce qu’il vous reste à faire' : 'Non acquis'}</div>
             <div class="ts-detail">${restants.map(ligne).join('')}</div>` : ''}
           ${acquis.length ? `<div class="ts-groupe">Acquis</div>
             <div class="ts-detail">${acquis.map(ligne).join('')}</div>` : ''}
+          ${(Array.isArray(bareme) && bareme.length) ? `<details class="ts-bareme">
+            <summary>📖 Voir le barème complet des points</summary>
+            <p class="ts-bareme-note">Le score est plafonné à ${sur || 100}. Le total des points possibles est supérieur : plusieurs chemins mènent à 100 %, et la récurrence (10ᵉ, 30ᵉ publication, adhérents…) rapporte des points en plus.</p>
+            <ul>${bareme.map(b => `<li><span>${esc(b.icon || '•')} <strong>${esc(b.label)}</strong><small>${esc(b.regle || '')}</small></span><b>${b.max} pts</b></li>`).join('')}</ul>
+          </details>` : ''}
         </div>`;
 
         // ── Indice de réactivité ──

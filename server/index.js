@@ -36562,6 +36562,40 @@ ${jsonLd}
       return NIVEAUX_FIABILITE.find(n => pct >= n.min) || NIVEAUX_FIABILITE[NIVEAUX_FIABILITE.length - 1];
     }
 
+    /* ── Barème « gestes + récurrence » (2026-10-09, demande explicite) ──
+       Le score n'est plus une PROPORTION d'un total qui change selon le type de compte : ce sont des
+       points absolus, plafonnés à 100. Le total des points disponibles dépasse volontairement 100
+       (marge) pour qu'il existe plusieurs chemins vers 100 % et que la récurrence compte vraiment.
+       Chaque geste rapporte dès la première fois ; les critères « à échelle » en rapportent davantage
+       au 10ᵉ, au 30ᵉ… (publications, adhérents, commentaires, réactions, événements…). L'historique
+       existant est lu en direct : les comptes qui ont déjà fait ces gestes reçoivent leurs points
+       sans aucune migration. Le compte officiel n'est PAS concerné (traité plus haut, reste à 100). */
+    function echelleFiabilite(nb, paliers, chaque, plafond) {
+      nb = Number(nb) || 0;
+      let pts = 0, prochain = null;
+      for (const [seuil, p] of paliers) {
+        if (nb >= seuil) pts += p;
+        else if (!prochain) prochain = { seuil, pts: p };
+      }
+      if (chaque) {
+        const dernier = paliers[paliers.length - 1][0];
+        if (nb >= dernier) {
+          const n = Math.floor((nb - dernier) / chaque.pas);
+          pts += n * chaque.pts;
+          prochain = { seuil: dernier + (n + 1) * chaque.pas, pts: chaque.pts };
+        }
+      }
+      pts = Math.min(plafond, pts);
+      if (pts >= plafond) prochain = null;
+      return { pts, prochain };
+    }
+    function regleEchelle(unite, paliers, chaque, plafond) {
+      const lib = (s) => `${s} ${s > 1 ? unite[1] : unite[0]}`;
+      const morceaux = paliers.map(([s, p], i) => `${i === 0 ? 'dès ' + lib(s) : 'dès ' + s} : +${p}`);
+      if (chaque) morceaux.push(`puis +${chaque.pts} tous les ${chaque.pas}`);
+      return morceaux.join(' · ') + ` (plafond ${plafond} pts)`;
+    }
+
     async function computeTrustScore(userId) {
       const user = await db.prepare(`SELECT *,
         CAST((julianday('now') - julianday(COALESCE(created_at,datetime('now')))) / 30 AS INTEGER) AS months_old
@@ -36614,7 +36648,7 @@ ${jsonLd}
         return resultatOfficiel;
       }
 
-      const init = await db.prepare(`SELECT numero_immatriculation, organisation_verifiee, immat_verifiee_ligne, immat_nom_registre FROM initiatives WHERE owner_user_id=?`).get(userId);
+      const init = await db.prepare(`SELECT * FROM initiatives WHERE owner_user_id=?`).get(userId);
       /* Les deux critères de structure ne concernent que les comptes qui portent une
          initiative. Un particulier ne les verra même pas : une ligne qu'on ne peut
          jamais cocher décourage sans rien apprendre. */
@@ -36624,42 +36658,59 @@ ${jsonLd}
       const mois = Math.max(0, user.months_old || 0);
       const ptsAnciennete = Math.min(12, mois);
 
-      /* ── Accréditations : 15 pts, 8 par accréditation ──
-         Le calcul ne lisait que compte_accreditations (ancien système). Les accréditations
-         accordées par le catalogue actuel s'écrivent dans user_accreditations et ne
-         rapportaient donc RIEN. Les deux tables sont désormais lues. */
-      const nbAccredLegacy = (await db.prepare(`SELECT COUNT(*) n FROM compte_accreditations WHERE user_id=? AND statut='active'`).get(userId))?.n || 0;
-      let nbAccredCatalogue = 0;
-      try {
-        nbAccredCatalogue = (await db.prepare(`SELECT COUNT(*) n FROM user_accreditations WHERE user_id=? AND statut='active'`).get(userId))?.n || 0;
-      } catch (e) { /* table absente sur une base ancienne : on garde le décompte legacy */ }
-      const nbAccred = nbAccredLegacy + nbAccredCatalogue;
-      const ptsAccred = Math.min(12, nbAccred * 6);
+      /* Accréditations : critère RETIRÉ (2026-10-09, remarque de l'utilisateur) — le système
+         d'accréditation n'existe plus, mais ses 12 points continuaient d'être comptés pour les
+         comptes qui en avaient une. Plus aucune lecture de compte_accreditations / user_accreditations. */
 
-      /* ── Activité : 15 pts ── */
-      const nbPosts     = (await db.prepare(`SELECT COUNT(*) n FROM fil_posts WHERE auteur_id=?`).get(userId))?.n || 0;
-      const nbCollabs   = (await db.prepare(`SELECT COUNT(*) n FROM candidatures WHERE user_id=? AND statut IN ('retenu','accepte')`).get(userId))?.n || 0;
-      const nbFollowers = (await db.prepare(`SELECT COUNT(*) n FROM user_follows WHERE followed_id=?`).get(userId))?.n || 0;
-      const ptsActivite = Math.min(12, Math.floor(nbPosts / 5) + nbCollabs * 2 + Math.floor(nbFollowers / 10));
-
-      /* ── Profil complet : 15 pts, détaillés pour être actionnables ──
-         La ligne « compétences » comptait la LONGUEUR DU TEXTE json stocké ('[]' = 2
-         caractères), pas le nombre de compétences : une seule suffisait à décrocher le
-         point censé en récompenser cinq. On compte désormais les éléments. */
-      let nbCompetences = 0;
+      /* ── Gestes et récurrence : tout est lu en direct dans l'historique existant ──
+         N() renvoie 0 si une table n'existe pas encore sur une base ancienne : un geste qu'on ne
+         sait pas compter ne fait jamais planter le calcul du score. */
+      const N = async (sql, ...a) => { try { return Number((await db.prepare(sql).get(...a))?.n) || 0; } catch (e) { return 0; } };
+      const initId = Number(init?.id) || 0;
+      const [nbCollabs, nbFollowers, nbPosts, nbCommentaires, nbReactions, nbRecents,
+             nbEvenements, nbComptesRendus, nbAchats, nbVentes, nbCagnottes, nbDonsRecus,
+             nbParticipations, nbFormules, nbAdherents] = await Promise.all([
+        N(`SELECT COUNT(*) n FROM candidatures WHERE user_id=? AND statut IN ('retenu','accepte')`, userId),
+        N(`SELECT COUNT(*) n FROM user_follows WHERE followed_id=?`, userId),
+        N(`SELECT COUNT(*) n FROM fil_posts WHERE auteur_id=? AND COALESCE(statut,'publie') NOT IN ('archive','brouillon')`, userId),
+        N(`SELECT COUNT(*) n FROM fil_commentaires WHERE auteur_id=?`, userId),
+        N(`SELECT COUNT(*) n FROM fil_reactions WHERE user_id=?`, userId),
+        N(`SELECT (SELECT COUNT(*) FROM fil_posts WHERE auteur_id=? AND COALESCE(statut,'publie') NOT IN ('archive','brouillon') AND created_at >= datetime('now','-30 days'))
+                + (SELECT COUNT(*) FROM fil_commentaires WHERE auteur_id=? AND created_at >= datetime('now','-30 days')) AS n`, userId, userId),
+        N(`SELECT COUNT(*) n FROM events WHERE organisateur_id=? AND statut IN ('publie','archive','ferme')`, userId),
+        N(`SELECT COUNT(*) n FROM evenement_comptes_rendus WHERE auteur_id=? AND statut='publie'`, userId),
+        N(`SELECT (SELECT COUNT(*) FROM commandes_vitrine WHERE acheteur_id=? AND statut<>'annulee')
+                + (SELECT COUNT(*) FROM tickets WHERE user_id=? AND payment_status='paid') AS n`, userId, userId),
+        N(`SELECT (SELECT COUNT(*) FROM commandes_vitrine WHERE initiative_id IN (SELECT id FROM initiatives WHERE owner_user_id=?) AND statut='traitee')
+                + (SELECT COUNT(*) FROM tickets t JOIN events e ON e.id=t.event_id WHERE e.organisateur_id=? AND t.payment_status='paid') AS n`, userId, userId),
+        N(`SELECT COUNT(*) n FROM cagnottes WHERE owner_user_id=?`, userId),
+        N(`SELECT COUNT(*) n FROM cagnotte_contributions cc JOIN cagnottes c ON c.id=cc.cagnotte_id
+            WHERE c.owner_user_id=? AND cc.statut='paye' AND (cc.user_id IS NULL OR cc.user_id<>c.owner_user_id)`, userId),
+        N(`SELECT COUNT(*) n FROM cagnotte_contributions cc JOIN cagnottes c ON c.id=cc.cagnotte_id
+            WHERE cc.user_id=? AND cc.statut='paye' AND c.owner_user_id<>?`, userId, userId),
+        initId ? N(`SELECT COUNT(*) n FROM adhesion_formules WHERE initiative_id=?`, initId) : 0,
+        initId ? N(`SELECT COUNT(*) n FROM adhesion_membres WHERE initiative_id=? AND statut IN ('a_jour','non_a_jour')`, initId) : 0,
+      ]);
+      /* Parrainage : la plateforme ne peut pas savoir si un lien a été réellement envoyé, mais elle
+         voit s'il a SERVI — ouvert (visite ou scan du QR) ou suivi d'une inscription. Trois marches. */
+      let parrCrees = 0, parrUtilises = 0, parrInscrits = 0;
       try {
-        const c = typeof user.competences === 'string' ? JSON.parse(user.competences || '[]') : user.competences;
-        nbCompetences = Array.isArray(c) ? c.length : 0;
-      } catch (e) { nbCompetences = 0; }
-      const morceauxProfil = [
-        { ok: !!user.photo_url,            pts: 3, quoi: 'photo de profil' },
-        { ok: (user.bio || '').length > 60, pts: 4, quoi: 'biographie détaillée' },
-        { ok: !!user.titre_pro,            pts: 3, quoi: 'titre professionnel' },
-        { ok: nbCompetences >= 3,          pts: 3, quoi: 'au moins 3 compétences' },
-        { ok: !!user.ville,                pts: 2, quoi: 'ville' },
-      ];
-      const ptsProfil = morceauxProfil.reduce((s, m) => s + (m.ok ? m.pts : 0), 0);
-      const manquantsProfil = morceauxProfil.filter(m => !m.ok).map(m => m.quoi);
+        const p = await db.prepare(`SELECT COUNT(*) AS crees,
+            COALESCE(SUM(CASE WHEN COALESCE(visit_count,0)+COALESCE(qr_scan_count,0)>0 THEN 1 ELSE 0 END),0) AS utilises,
+            COALESCE(SUM(CASE WHEN COALESCE(registration_count,0)>0 THEN 1 ELSE 0 END),0) AS inscrits
+          FROM invitations WHERE inviter_user_id=?`).get(userId);
+        parrCrees = Number(p?.crees) || 0; parrUtilises = Number(p?.utilises) || 0; parrInscrits = Number(p?.inscrits) || 0;
+      } catch (e) { /* table créée à la demande : absente tant que personne n'a utilisé le parrainage */ }
+      const ptsRayonnement = Math.min(12, nbCollabs * 2 + Math.floor(nbFollowers / 10));
+
+      /* ── Profil public rempli : 15 pts, PROPORTIONNELS au niveau de remplissage ──
+         Même mesure que les alertes « profil incomplet » (server/completude.js) : une seule
+         définition de « profil rempli » sur toute la plateforme. Pour un compte qui porte une
+         initiative, c'est la fiche de l'initiative qui est mesurée, sinon le profil du compte. */
+      const roleCompletude = init ? 'initiative' : (user.role === 'collectivite' ? 'collectivite' : 'utilisateur');
+      const compl = Completude.evaluer(roleCompletude, init || user) || { pct: 0, manquants: [] };
+      const ptsProfil = Math.round(compl.pct / 100 * 15);
+      const manquantsProfil = (compl.manquants || []).slice(0, 4);
 
       const nbSignal = user.signalements_confirmes || 0;
       const identiteOk = !!(user.is_verified || user.identite_verifiee);
@@ -36699,20 +36750,15 @@ ${jsonLd}
           aide: identiteOk ? 'Vérifiée' : "Contrôle en ligne, quelques minutes.",
           action: identiteOk ? null : { texte:'Vérifier mon identité', href:'profil.html?verifier=identite' } },
 
-        { cle:'profil', icon:'👤', label:'Profil complet', pts: ptsProfil, max:15, applicable:true,
-          aide: manquantsProfil.length ? 'Il manque : ' + manquantsProfil.join(', ') + '.' : 'Profil entièrement renseigné.',
-          action: manquantsProfil.length ? { texte:'Compléter mon profil', href:'profil.html' } : null },
+        { cle:'profil', icon:'👤', label:'Profil public rempli', pts: ptsProfil, max:15, applicable:true,
+          aide: manquantsProfil.length ? `Rempli à ${compl.pct} %. Il manque notamment : ${manquantsProfil.join(', ')}.` : 'Profil entièrement renseigné.',
+          action: manquantsProfil.length ? { texte:'Compléter mon profil', href: init ? 'dashboard-initiative.html' : 'profil.html' } : null },
 
         { cle:'anciennete', icon:'🕐', label:'Ancienneté sur la plateforme', pts: ptsAnciennete, max:12, applicable:true,
           aide: `${mois} mois — 1 point par mois, jusqu'à 12.`, action:null },
 
-        { cle:'accreditations', icon:'🏅', label:'Accréditations Diaspo’Actif', pts: ptsAccred, max:12, applicable:true,
-          aide: nbAccred ? `${nbAccred} accréditation(s) active(s).` : 'Aucune accréditation. 6 points chacune.',
-          action: ptsAccred >= 12 ? null : { texte:'Demander une accréditation', href:'accreditations.html' } },
-
-        { cle:'activite', icon:'📊', label:'Activité sur la plateforme', pts: ptsActivite, max:12, applicable:true,
-          aide: `${nbPosts} publication(s), ${nbFollowers} abonné(s), ${nbCollabs} collaboration(s).`,
-          action: ptsActivite >= 12 ? null : { texte:'Publier sur le fil', href:'fil-actualite.html' } },
+        { cle:'rayonnement', icon:'📣', label:'Rayonnement', pts: ptsRayonnement, max:12, applicable:true,
+          aide: `${nbFollowers} abonné(s), ${nbCollabs} collaboration(s).`, action:null },
 
         /* Ajouté le 2026-08-26 (demande explicite) : réutilise le même témoignage que la
            proposition périodique (voir POST /api/temoignage, initTemoignageWidget dans
@@ -36751,16 +36797,81 @@ ${jsonLd}
           applicable: porteUneStructure,
           aide: init?.immat_verifiee_ligne ? `Validée en ligne${init.immat_nom_registre ? ' — ' + init.immat_nom_registre : ''}.` : (init?.numero_immatriculation ? 'Numéro renseigné — confirmé automatiquement dans le registre officiel (réessayez avec le bouton si besoin). Hors de France : envoyez votre justificatif pour une vérification par l’équipe.' : 'Numéro de votre déclaration : RNA (association) ou SIRET/SIREN (entreprise) — confirmé automatiquement, +5 points.'),
           action: init?.immat_verifiee_ligne ? null : { texte: init?.numero_immatriculation ? 'Réessayer la vérification' : "Renseigner l'immatriculation", href:'reseau.html' } },
+
+        /* ═══ Gestes et récurrence (2026-10-09) ═══
+           « echelle » : points dès le 1er geste, puis à chaque palier (10ᵉ, 30ᵉ…).
+           « geste » : points une seule fois, dès le premier. */
+        ...(() => {
+          const echelle = (cle, icon, label, nb, paliers, chaque, plafond, unite, applicable, action) => {
+            const { pts, prochain } = echelleFiabilite(nb, paliers, chaque, plafond);
+            return { cle, icon, label, pts, max: plafond, applicable, regle: regleEchelle(unite, paliers, chaque, plafond),
+              aide: `${nb ? nb + ' ' + (nb > 1 ? unite[1] : unite[0]) + ' — ' : ''}${prochain ? `prochain palier : ${prochain.seuil} (+${prochain.pts} pts).` : 'palier maximum atteint.'}`,
+              action: pts >= plafond ? null : action };
+          };
+          const geste = (cle, icon, label, fait, pts, applicable, aide, action) => ({
+            cle, icon, label, pts: fait ? pts : 0, max: pts, applicable, regle: `+${pts} pts dès le premier`,
+            aide: fait ? 'Acquis.' : aide, action: fait ? null : action });
+          const S = porteUneStructure;
+          const parrPts = (parrCrees ? 2 : 0) + (parrUtilises ? 2 : 0) + (parrInscrits ? 3 : 0);
+          return [
+            echelle('publications', '📝', 'Publications', nbPosts, [[1, 3], [10, 3], [30, 4]], { pas: 30, pts: 2 }, 16, ['publication', 'publications'], true,
+              { texte: 'Publier sur le fil', href: 'fil-actualite.html' }),
+            echelle('commentaires', '💭', 'Commentaires', nbCommentaires, [[1, 2], [10, 2], [30, 2]], null, 6, ['commentaire', 'commentaires'], true,
+              { texte: 'Commenter une publication', href: 'fil-actualite.html' }),
+            echelle('reactions', '👍', 'Réactions (j’aime ou non)', nbReactions, [[1, 2], [10, 2], [30, 2]], null, 6, ['réaction', 'réactions'], true,
+              { texte: 'Réagir à une publication', href: 'fil-actualite.html' }),
+            { cle:'activite_recente', icon:'🔥', label:'Activité des 30 derniers jours', pts: Math.min(5, Math.ceil(nbRecents / 2)), max:5, applicable:true,
+              regle: '1 pt tous les 2 gestes (publication ou commentaire) sur 30 jours (plafond 5 pts)',
+              aide: `${nbRecents} geste(s) sur les 30 derniers jours.`,
+              action: nbRecents >= 10 ? null : { texte: 'Publier ou commenter', href: 'fil-actualite.html' } },
+            echelle('evenements', '📅', 'Événements publiés', nbEvenements, [[1, 5], [3, 3], [10, 4]], null, 12, ['événement', 'événements'], S,
+              { texte: 'Publier un événement', href: 'evenements-app.html' }),
+            echelle('comptes_rendus', '🧾', 'Comptes rendus d’événement', nbComptesRendus, [[1, 5], [3, 3]], null, 8, ['compte rendu', 'comptes rendus'], S,
+              { texte: 'Faire un compte rendu', href: 'evenements-app.html' }),
+            { cle:'parrainage', icon:'🤝', label:'Parrainage', pts: parrPts, max:7, applicable:true,
+              regle: 'lien créé : +2 · lien ouvert ou QR scanné : +2 · une inscription grâce à vous : +3',
+              aide: !parrCrees ? 'Créez votre lien de parrainage.' : !parrUtilises ? 'Lien créé — partagez-le : +2 dès que quelqu’un l’ouvre.' : !parrInscrits ? 'Votre lien a été ouvert — +3 dès qu’une personne s’inscrit grâce à lui.' : 'Parrainage abouti.',
+              action: parrPts >= 7 ? null : { texte: parrCrees ? 'Partager mon lien' : 'Créer mon lien', href: 'parrainage.html' } },
+            geste('achat', '🛒', 'A déjà acheté sur la plateforme', nbAchats > 0, 4, true, 'Une commande en boutique ou un billet d’événement.',
+              { texte: 'Découvrir les boutiques', href: 'vitrines.html' }),
+            geste('vente', '💶', 'A déjà vendu sur la plateforme', nbVentes > 0, 5, S, 'Une commande reçue et traitée, ou un billet vendu.',
+              { texte: 'Gérer ma boutique', href: 'dashboard-initiative.html' }),
+            geste('cagnotte_creee', '🪙', 'A créé une cagnotte', nbCagnottes > 0, 4, S, 'Créez une cagnotte ou un don récurrent.',
+              { texte: 'Créer une cagnotte', href: 'dashboard-initiative.html' }),
+            echelle('dons_recus', '💚', 'Dons reçus', nbDonsRecus, [[1, 4], [10, 3]], null, 7, ['don reçu', 'dons reçus'], S,
+              { texte: 'Partager ma cagnotte', href: 'dashboard-initiative.html' }),
+            geste('participation', '🎁', 'A participé à une cagnotte', nbParticipations > 0, 4, true, 'Soutenez une cagnotte ou faites un don.',
+              { texte: 'Voir les cagnottes', href: 'cagnottes.html' }),
+            geste('adhesion_creee', '🎫', 'A créé une adhésion', nbFormules > 0, 4, S, 'Créez la formule d’adhésion de votre structure.',
+              { texte: 'Créer mon adhésion', href: 'adhesions.html' }),
+            echelle('adherents', '👥', 'Adhérents', nbAdherents, [[1, 4], [10, 3], [20, 3], [30, 4]], { pas: 30, pts: 2 }, 20, ['adhérent', 'adhérents'], S,
+              { texte: 'Faire adhérer des membres', href: 'adhesions.html' }),
+          ];
+        })(),
       ];
 
+      /* Règles lisibles des critères historiques (le barème affiché aux membres les reprend). */
+      const REGLES = {
+        identite: '+20 pts une fois l’identité vérifiée', profil: 'jusqu’à 15 pts, proportionnels au remplissage du profil public',
+        anciennete: '1 pt par mois (plafond 12 pts)', rayonnement: '2 pts par collaboration, 1 pt par tranche de 10 abonnés (plafond 12 pts)',
+        temoignage: '+5 pts dès le témoignage partagé', rencontre: '+10 pts après une rencontre validée par un agent',
+        signalements: '+6 pts tant qu’aucun signalement n’est confirmé', organisation: '+8 pts une fois l’organisation testée avec Stripe',
+        immatriculation: '+5 pts une fois le numéro confirmé au registre officiel',
+      };
+      criteres.forEach(c => { if (!c.regle) c.regle = REGLES[c.cle] || `${c.max} pts`; });
+
+      /* Points ABSOLUS, plafonnés à 100 : plus de dénominateur qui varie. Le total disponible
+         dépasse 100 (marge voulue) — `brut` dit combien de points sont cumulés au-delà du plafond. */
       const retenus = criteres.filter(c => c.applicable);
-      const total   = retenus.reduce((s, c) => s + c.pts, 0);
-      const sur     = retenus.reduce((s, c) => s + c.max, 0);   // 100 pour une structure, 87 pour un particulier
-      const score   = sur > 0 ? Math.min(100, Math.round((total / sur) * 100)) : 0;
+      const brut    = retenus.reduce((s, c) => s + c.pts, 0);
+      const dispo   = retenus.reduce((s, c) => s + c.max, 0);
+      const score   = Math.min(100, Math.round(brut));
+      const total   = score, sur = 100;
 
       const niveau = niveauFiabilite(score);
       const resultat = {
-        score, detail: retenus, sur, points: total,
+        score, detail: retenus, sur, points: total, brut, disponible: dispo,
+        bareme: retenus.map(c => ({ cle: c.cle, icon: c.icon, label: c.label, max: c.max, regle: c.regle })),
         label: niveau.nom, couleur: niveau.couleur, sens: niveau.sens,
         color: niveau.couleur,          // conservé : d'anciens appels lisent encore `color`
       };
@@ -36858,6 +36969,30 @@ ${jsonLd}
       } catch (e) {
         logError(e, "trust-score", req); // journal maison : garde le vrai message côté serveur
         return sendJSON(res, 500, SEC.safeError(e, "trust-score"));
+      }
+    }
+
+    /* ── GET /api/cron/fiabilite — recalcul de l'indice de fiabilité (2026-10-09) ──
+       Le score n'était recalculé que lorsqu'on ouvrait la fiche d'un compte : l'annuaire (classement) lisait donc des
+       valeurs figées, y compris pour les comptes qui ont DÉJÀ fait les gestes du nouveau barème. Chaque nuit, on
+       recalcule les comptes dont le score est le plus ancien, dans la limite de 20 secondes de calcul (le reste est
+       repris le lendemain). Placé ici, après la définition de computeTrustScore. */
+    if (pathname === '/api/cron/fiabilite') {
+      const cronSecret = process.env.CRON_SECRET;
+      const authHeader = req.headers['authorization'] || '';
+      if (cronSecret && authHeader !== `Bearer ${cronSecret}`) return sendJSON(res, 401, { error: "Non autorisé." });
+      try {
+        const debut = Date.now();
+        const lignes = await db.prepare(`SELECT id FROM users ORDER BY COALESCE(trust_computed_at,'') ASC LIMIT 600`).all();
+        let recalcules = 0;
+        for (const l of lignes) {
+          if (Date.now() - debut > 20000) break;
+          try { await computeTrustScore(l.id); recalcules++; } catch (e) { /* un compte en échec ne bloque pas les autres */ }
+        }
+        return sendJSON(res, 200, { ok: true, recalcules, reportes: lignes.length - recalcules });
+      } catch (e) {
+        console.error('[cron fiabilite]', e.message);
+        return sendJSON(res, 500, { error: 'Échec du passage.', detail: e.message });
       }
     }
 

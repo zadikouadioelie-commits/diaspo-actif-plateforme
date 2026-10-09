@@ -25,7 +25,8 @@
     { "path": "/api/cron/recensement-purge", "schedule": "0 19 * * *" },
     { "path": "/api/cron/evenements-compte-rendu", "schedule": "0 10 * * *" },
     { "path": "/api/cron/honneur", "schedule": "0 6 * * *" },
-    { "path": "/api/cron/immatriculations", "schedule": "30 6 * * *" }
+    { "path": "/api/cron/immatriculations", "schedule": "30 6 * * *" },
+    { "path": "/api/cron/fiabilite", "schedule": "45 6 * * *" }
   ],
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api/index" },
