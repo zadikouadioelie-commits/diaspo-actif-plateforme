@@ -7191,6 +7191,173 @@ route("POST", "/api/initiatives/:id/adhesion-membres", async (req, res, params, 
   sendJSON(res, 201, { id });
 });
 
+/* ===== Import en masse d'adhérents (2026-10-09, demande explicite : « télécharger un fichier Excel
+   ou joindre un lien Google Sheets et récolter toutes les informations en une seule fois »).
+   Le fichier Excel/CSV est lu dans le navigateur (le serveur ne reçoit que des lignes déjà
+   découpées) ; seul le lien Google Sheets/Drive est lu côté serveur (CORS), sur une liste blanche
+   stricte de domaines. Mêmes effets qu'un ajout manuel (aucun e-mail envoyé aux personnes
+   importées, pas d'affiliation créée), mais avec détection des doublons et rattachement automatique
+   aux comptes Diaspo'Actif dont l'e-mail correspond. ===== */
+const ADH_IMPORT_MAX = 500;
+const ADH_IMPORT_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+/* Date de fichier → 'AAAA-MM-JJ' ('' si vide, null si illisible). Accepte AAAA-MM-JJ, JJ/MM/AAAA, JJ-MM-AAAA, JJ.MM.AAAA (année sur 2 chiffres = 20AA). */
+function adhImportNormaliserDate(v) {
+  const s = String(v == null ? '' : v).trim();
+  if (!s) return '';
+  let a, m, j, r;
+  if ((r = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/))) { a = +r[1]; m = +r[2]; j = +r[3]; }
+  else if ((r = s.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4}|\d{2})/))) { j = +r[1]; m = +r[2]; a = +r[3]; if (a < 100) a += 2000; }
+  else return null;
+  const d = new Date(Date.UTC(a, m - 1, j));
+  if (d.getUTCFullYear() !== a || d.getUTCMonth() !== m - 1 || d.getUTCDate() !== j) return null;
+  if (a < 1950 || d > new Date(Date.now() + 366 * 86400000)) return null;
+  return `${String(a).padStart(4, '0')}-${String(m).padStart(2, '0')}-${String(j).padStart(2, '0')}`;
+}
+
+/* Lecture d'un lien Google Sheets / Google Drive partagé « toute personne disposant du lien ». */
+async function adhImportLireLienGoogle(lien) {
+  let u;
+  try { u = new URL(String(lien || '').trim()); } catch (e) { return { erreur: "Ce lien n'est pas valide." }; }
+  if (u.protocol !== 'https:' || !['docs.google.com', 'drive.google.com'].includes(u.hostname)) {
+    return { erreur: "Seuls les liens Google Sheets ou Google Drive sont acceptés ici. Pour un autre fichier Excel, téléchargez-le puis déposez-le dans la zone prévue." };
+  }
+  const mSheet = u.pathname.match(/\/spreadsheets\/d\/([\w-]{15,})/);
+  const mFile = u.pathname.match(/\/file\/d\/([\w-]{15,})/) || (u.searchParams.get('id') || '').match(/^([\w-]{15,})$/);
+  const id = mSheet ? mSheet[1] : (mFile ? mFile[1] : null);
+  if (!id) return { erreur: "Impossible de trouver le fichier dans ce lien." };
+  const gid = ((u.hash || '').match(/gid=(\d+)/) || (u.search || '').match(/[?&]gid=(\d+)/) || [])[1];
+  const lire = async (url) => {
+    const r = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(12000), headers: { 'User-Agent': 'Mozilla/5.0' } });
+    return { ok: r.ok, type: (r.headers.get('content-type') || '').toLowerCase(), buf: Buffer.from(await r.arrayBuffer()) };
+  };
+  const estZip = (b) => b.length > 4 && b[0] === 0x50 && b[1] === 0x4B;
+  const estTexte = (r) => r.ok && !r.buf.slice(0, 200).toString('utf8').trimStart().startsWith('<') && /csv|text\/plain/.test(r.type);
+  const trop = (r) => r.buf.length > 8e6;
+  const refus = { erreur: "Google n'a pas donné accès au fichier. Ouvrez-le, cliquez sur « Partager » puis « Accès général : Toute personne disposant du lien » (rôle Lecteur), et recollez le lien." };
+  try {
+    if (mSheet) {
+      const r = await lire(`https://docs.google.com/spreadsheets/d/${id}/export?format=csv${gid ? '&gid=' + gid : ''}`);
+      if (trop(r)) return { erreur: "Ce fichier est trop volumineux." };
+      if (estTexte(r)) return { format: 'csv', texte: r.buf.toString('utf8') };
+    }
+    const r2 = await lire(`https://drive.google.com/uc?export=download&id=${id}`);
+    if (trop(r2)) return { erreur: "Ce fichier est trop volumineux." };
+    if (r2.ok && estZip(r2.buf)) return { format: 'xlsx', base64: r2.buf.toString('base64') };
+    if (estTexte(r2)) return { format: 'csv', texte: r2.buf.toString('utf8') };
+    return refus;
+  } catch (e) {
+    return { erreur: "Google ne répond pas, réessayez dans un instant." };
+  }
+}
+
+route("POST", "/api/initiatives/:id/adhesion-import/lien", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  if (!(await exigerPremium(user, res, "adhesions"))) return;
+  const r = await adhImportLireLienGoogle(body?.lien);
+  if (r.erreur) return sendJSON(res, 400, { error: r.erreur });
+  sendJSON(res, 200, r);
+});
+
+/* Contrôle (simuler:true) puis import réel (simuler:false) — la même passe de validation sert aux deux,
+   donc l'aperçu montré à l'association est exactement ce qui sera fait. */
+route("POST", "/api/initiatives/:id/adhesion-import", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  if (!(await exigerPremium(user, res, "adhesions"))) return;
+  const formule = await db.prepare("SELECT * FROM adhesion_formules WHERE id=? AND initiative_id=?").get(body?.formule_id, params.id);
+  if (!formule) return sendJSON(res, 400, { error: "Choisissez la formule d'adhésion concernée." });
+  const lignes = Array.isArray(body?.lignes) ? body.lignes : [];
+  if (!lignes.length) return sendJSON(res, 400, { error: "Aucune ligne à importer." });
+  if (lignes.length > ADH_IMPORT_MAX) return sendJSON(res, 400, { error: `${lignes.length} lignes — l'import est limité à ${ADH_IMPORT_MAX} lignes à la fois : découpez le fichier.` });
+  const simuler = body.simuler !== false;
+  const sansDateEnAttente = body.date_defaut === 'aucune';
+  const net = (v, max) => String(v == null ? '' : v).replace(/\s+/g, ' ').trim().slice(0, max);
+
+  /* 1. Contrôles ligne par ligne + doublons dans le fichier */
+  const vus = new Set();
+  const res_ = lignes.map((l, i) => {
+    const r = { ligne: Number(l?.ligne) || i + 1, nom: net(l?.nom, 120), prenom: net(l?.prenom, 120), email: net(l?.email, 200).toLowerCase(),
+      telephone: net(l?.telephone, 40), adresse: net(l?.adresse, 300), pays: net(l?.pays, 100), ville: net(l?.ville, 100), observations: net(l?.observations, 500),
+      statut: 'ok', motif: '', date: '' };
+    if (!r.nom) { r.statut = 'erreur'; r.motif = 'Nom manquant'; return r; }
+    if (r.email && !ADH_IMPORT_EMAIL_RE.test(r.email)) { r.statut = 'erreur'; r.motif = 'E-mail invalide'; return r; }
+    const d = adhImportNormaliserDate(l?.date_adhesion);
+    if (d === null) { r.statut = 'erreur'; r.motif = "Date d'adhésion illisible"; return r; }
+    r.date = d;
+    r.cle = r.email || `${r.nom.toLowerCase()}|${r.prenom.toLowerCase()}`;
+    if (vus.has(r.cle)) { r.statut = 'doublon_fichier'; r.motif = 'Déjà présent plus haut dans le fichier'; return r; }
+    vus.add(r.cle);
+    return r;
+  });
+
+  /* 2. Comptes Diaspo'Actif correspondant aux e-mails (en lots) + fiches déjà au registre */
+  const emails = [...new Set(res_.filter(r => r.statut === 'ok' && r.email).map(r => r.email))];
+  const comptes = new Map();
+  for (let i = 0; i < emails.length; i += 200) {
+    const lot = emails.slice(i, i + 200);
+    const rows = await db.prepare(`SELECT u.id, LOWER(u.email) AS e FROM users u WHERE LOWER(u.email) IN (${lot.map(() => '?').join(',')}) AND ${ADS_COMPTES_REELS}`).all(...lot);
+    rows.forEach(c => comptes.set(c.e, Number(c.id)));
+  }
+  const existants = await db.prepare("SELECT formule_id, linked_user_id, LOWER(email) AS email, LOWER(nom) AS nom, LOWER(COALESCE(prenom,'')) AS prenom FROM adhesion_membres WHERE initiative_id=?").all(params.id);
+  const comptesDeja = new Set(existants.filter(m => m.linked_user_id).map(m => Number(m.linked_user_id)));
+  const cleDeja = new Set(existants.filter(m => Number(m.formule_id) === Number(formule.id)).map(m => m.email || `${m.nom}|${m.prenom}`));
+  const aujourdhui = new Date().toISOString().slice(0, 10);
+  res_.forEach(r => {
+    if (r.statut !== 'ok') return;
+    const cpt = r.email ? comptes.get(r.email) : null;
+    if (cpt) {
+      if (comptesDeja.has(cpt)) { r.statut = 'deja_membre'; r.motif = "Ce compte Diaspo'Actif a déjà une fiche adhérent"; return; }
+      r.statut = 'rattache'; r.linked_user_id = cpt; r.motif = "Rattaché au compte Diaspo'Actif correspondant à cet e-mail";
+    } else if (cleDeja.has(r.cle)) { r.statut = 'deja_membre'; r.motif = 'Déjà inscrit dans cette formule'; return; }
+    const d = r.date || (sansDateEnAttente ? '' : aujourdhui);
+    if (d) {
+      r.date_effective = `${d} 12:00:00`; // midi : évite qu'un décalage de fuseau fasse reculer l'échéance d'un jour
+      r.date_expiration = calculerDateExpirationFiche(r.date_effective, {
+        mode_validite: formule.mode_validite === 'collectif' ? 'collectif' : 'individuel',
+        periode_collective_fin: formule.periode_collective_fin || null,
+        duree_illimitee: !!Number(formule.duree_illimitee),
+        duree_valeur: formule.duree_valeur ? Number(formule.duree_valeur) : null,
+        duree_unite: formule.duree_unite || 'mois',
+      });
+      r.statut_prevu = computeAdhesionStatut({ statut: 'a_jour', date_expiration: r.date_expiration });
+    } else { r.date_effective = null; r.date_expiration = null; r.statut_prevu = 'en_attente'; }
+  });
+
+  /* 3. Import réel (par petits lots parallèles pour rester rapide sur la base distante) */
+  const aImporter = res_.filter(r => r.statut === 'ok' || r.statut === 'rattache');
+  if (!simuler) {
+    for (let i = 0; i < aImporter.length; i += 10) {
+      await Promise.all(aImporter.slice(i, i + 10).map(async r => {
+        try {
+          const id = (await db.prepare(`
+            INSERT INTO adhesion_membres (formule_id, initiative_id, linked_user_id, nom, prenom, email, telephone, adresse, pays, ville, observations, statut, date_adhesion, date_expiration)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+          `).run(formule.id, params.id, r.linked_user_id || null, r.nom, r.prenom || null, r.email || null, r.telephone || null,
+            r.adresse || null, r.pays || null, r.ville || null, r.observations || null, r.statut_prevu, r.date_effective, r.date_expiration)).lastInsertRowid;
+          r.membre_id = id;
+          await journaliserAdhesion(params.id, id, 'creation', user, `Fiche créée par import de liste — « ${formule.nom} ».`);
+        } catch (e) { r.statut = 'erreur'; r.motif = "Enregistrement impossible"; console.error('[adhesion-import]', e.message); }
+      }));
+    }
+    const nbOk = res_.filter(r => r.membre_id).length;
+    await journaliserAdhesion(params.id, null, 'import_liste', user, `Import de liste : ${nbOk} adhérent(s) ajouté(s) sur ${res_.length} ligne(s) — « ${formule.nom} ».`);
+  }
+  const compte = (s) => res_.filter(r => r.statut === s).length;
+  sendJSON(res, 200, {
+    simuler,
+    total: res_.length, a_importer: simuler ? aImporter.length : res_.filter(r => r.membre_id).length,
+    rattaches: res_.filter(r => r.linked_user_id && (simuler || r.membre_id)).length,
+    deja_membres: compte('deja_membre'), doublons: compte('doublon_fichier'), erreurs: compte('erreur'),
+    lignes: res_.map(r => ({ ligne: r.ligne, statut: r.statut, motif: r.motif, nom: r.nom, prenom: r.prenom, email: r.email, statut_prevu: r.statut_prevu || null, expiration: r.date_expiration ? r.date_expiration.slice(0, 10) : null })),
+  });
+});
+
 /* Réglages par défaut (norme) du prochain ajout manuel d'un adhérent — pré-remplit le formulaire,
    toujours modifiable à l'usage (2026-10-09, demande explicite). null si aucun ajout manuel n'a
    encore précisé ces réglages (le formulaire garde alors ses valeurs par défaut habituelles). */

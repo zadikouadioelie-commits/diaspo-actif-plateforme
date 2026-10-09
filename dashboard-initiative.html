@@ -1650,10 +1650,22 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       </div>
     </div>
 
+    <!-- ══ MODAL IMPORT D'UNE LISTE D'ADHÉRENTS (Excel / CSV / Google Sheets) ══ -->
+    <div class="modal-back" id="modal-adh-import" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:510;align-items:flex-start;justify-content:center;overflow-y:auto;padding:30px 12px;">
+      <div class="card" style="max-width:760px;width:100%;padding:20px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px;">
+          <h3 style="margin:0;">📥 Importer une liste d'adhérents</h3>
+          <button type="button" class="btn btn-sm btn-outline" onclick="adhImpFermer()">✕</button>
+        </div>
+        <div id="adh-imp-corps"></div>
+      </div>
+    </div>
+
     <!-- ══ MODAL AJOUT MANUEL MEMBRE ══ -->
     <div class="modal-back" id="modal-adh-membre" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;align-items:flex-start;justify-content:center;overflow-y:auto;padding:30px 12px;">
       <div class="card" style="max-width:420px;width:100%;padding:20px;">
         <h3 style="margin:0 0 14px;">➕ Ajouter un adhérent</h3>
+        <button type="button" class="btn btn-sm btn-outline" style="width:100%;margin:-4px 0 14px;" onclick="document.getElementById('modal-adh-membre').style.display='none';adhImpOuvrir()">📥 Importer toute une liste (Excel, CSV, Google Sheets)</button>
         <label style="font-size:12px;font-weight:700;">Formule</label>
         <select id="adh-m-formule" class="input" style="margin:4px 0 10px;width:100%;"></select>
 
@@ -8445,7 +8457,7 @@ async function adhRenderRegistre(){
     ADH_MEMBRES = rm.membres || []; ADH_FORMULES = rf.formules || [];
     if(!ADH_MEMBRES.length){
       el.innerHTML = `<div style="text-align:center;padding:40px;color:var(--muted);">Aucun adhérent pour le moment.</div>
-        <div style="text-align:center;"><button class="btn btn-outline" onclick="adhOuvrirAjoutMembre()">➕ Ajouter un adhérent manuellement</button></div>`;
+        <div style="text-align:center;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;"><button class="btn btn-outline" onclick="adhOuvrirAjoutMembre()">➕ Ajouter un adhérent manuellement</button><button class="btn btn-outline" onclick="adhImpOuvrir()">📥 Importer une liste</button></div>`;
       return;
     }
     el.innerHTML = `
@@ -8453,6 +8465,7 @@ async function adhRenderRegistre(){
         <input type="text" id="adh-registre-recherche" placeholder="🔎 Rechercher (nom, email, téléphone, n° adhérent)…" style="flex:1;min-width:220px;padding:7px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;" oninput="adhFiltrerRegistre(this.value)">
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <button class="btn btn-sm btn-outline" onclick="adhOuvrirAjoutMembre()">➕ Ajouter un adhérent</button>
+          <button class="btn btn-sm btn-outline" onclick="adhImpOuvrir()" title="Importer toute une liste depuis un fichier Excel, CSV ou un lien Google Sheets">📥 Importer une liste</button>
           <a class="btn btn-sm btn-outline" href="/api/initiatives/${initId}/adhesion-export" target="_blank">⬇️ CSV</a>
           <a class="btn btn-sm btn-outline" href="/api/initiatives/${initId}/adhesion-export?format=excel" target="_blank">📊 Excel</a>
           <a class="btn btn-sm btn-outline" href="/api/initiatives/${initId}/adhesion-export?format=pdf" target="_blank" title="Ouvre un aperçu imprimable — utilisez « Enregistrer en PDF » dans la boîte de dialogue d'impression du navigateur.">📄 PDF</a>
@@ -8487,6 +8500,269 @@ async function adhRenderRegistre(){
       </table>
       </div>`;
   }catch(e){ el.innerHTML = `<div class="notice">Erreur : ${e.message}</div>`; }
+}
+
+/* ===== Import d'une liste d'adhérents : fichier Excel / CSV ou lien Google Sheets (2026-10-09) =====
+   Étapes : 1 source → 2 colonnes (reconnues automatiquement, modifiables) → 3 aperçu contrôlé par
+   le serveur (doublons, e-mails invalides, comptes Diaspo'Actif reconnus) → 4 compte rendu. */
+const ADH_IMP_CHAMPS = [
+  ['nom','Nom'], ['prenom','Prénom'], ['nom_complet','Nom complet (à séparer)'], ['email','E-mail'], ['telephone','Téléphone'],
+  ['adresse','Adresse'], ['pays','Pays'], ['ville','Ville'], ['date_adhesion',"Date d'adhésion"], ['observations','Observations']
+];
+const ADH_IMP_SYNONYMES = {
+  nom: ['nom','nomdefamille','lastname','surname','familyname','nomfamille'],
+  prenom: ['prenom','prenoms','firstname','givenname'],
+  nom_complet: ['nomcomplet','nometprenom','nomprenom','prenomnom','name','nomcompletdumembre','adherent','membre'],
+  email: ['email','mail','courriel','adressemail','adresseemail','emailadresse','adresseelectronique','adressemel','mel'],
+  telephone: ['telephone','tel','phone','mobile','portable','gsm','whatsapp','numerodetelephone','numerotelephone'],
+  adresse: ['adresse','address','rue','adressepostale'],
+  pays: ['pays','country','paysderesidence'],
+  ville: ['ville','city','commune','villederesidence'],
+  date_adhesion: ['dateadhesion','datedadhesion','dateinscription','datedinscription','adhesionle','adhereledate','adhesiondepuis','depuis'],
+  observations: ['observations','observation','remarque','remarques','notes','note','commentaire','commentaires','infos','information']
+};
+let ADH_IMP = null;
+function adhImpOuvrir(){
+  if(!ADH_FORMULES || !ADH_FORMULES.length){ showToast("Créez d'abord une formule d'adhésion pour y rattacher vos adhérents.", 'warning'); return; }
+  ADH_IMP = { etape:'source', formuleId: ADH_FORMULES[0].id, dateDefaut:'aujourdhui', rows:[], entete:true, map:{}, resultat:null, classeur:null, feuille:0, nomSource:'' };
+  document.getElementById('modal-adh-import').style.display = 'flex';
+  adhImpRendre();
+}
+function adhImpFermer(){
+  document.getElementById('modal-adh-import').style.display = 'none';
+  if(ADH_IMP && ADH_IMP.etape === 'fin') adhRenderRegistre && adhRenderRegistre();
+  ADH_IMP = null;
+}
+function adhImpNorm(s){ return String(s==null?'':s).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9]/g,''); }
+function adhImpLettre(i){ let s='',n=i+1; while(n>0){ const r=(n-1)%26; s=String.fromCharCode(65+r)+s; n=Math.floor((n-1)/26); } return s; }
+function adhImpAnalyserCsv(texte){
+  texte = String(texte||'').replace(/^﻿/,'');
+  const premiere = texte.split(/\r?\n/)[0] || '';
+  const compte = c => (premiere.match(new RegExp(c==='\t'?'\\t':'\\'+c,'g'))||[]).length;
+  const delim = [';','\t',','].sort((a,b)=>compte(b)-compte(a))[0];
+  const rows = []; let row = [], cell = '', q = false;
+  for(let i=0;i<texte.length;i++){
+    const c = texte[i];
+    if(q){ if(c==='"'){ if(texte[i+1]==='"'){ cell+='"'; i++; } else q=false; } else cell+=c; }
+    else if(c==='"') q = true;
+    else if(c===delim){ row.push(cell); cell=''; }
+    else if(c==='\n'||c==='\r'){ if(c==='\r'&&texte[i+1]==='\n') i++; row.push(cell); cell=''; rows.push(row); row=[]; }
+    else cell+=c;
+  }
+  if(cell!==''||row.length){ row.push(cell); rows.push(row); }
+  return rows;
+}
+function adhImpChargerXlsx(){
+  if(window.XLSX) return Promise.resolve();
+  return new Promise((ok,ko)=>{
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload = ()=>ok(); s.onerror = ()=>ko(new Error("Impossible de charger le lecteur Excel. Vérifiez votre connexion."));
+    document.head.appendChild(s);
+  });
+}
+async function adhImpLireClasseur(buffer){
+  await adhImpChargerXlsx();
+  const wb = XLSX.read(buffer, { type:'array', cellDates:true });
+  if(!wb.SheetNames.length) throw new Error('Ce fichier ne contient aucune feuille.');
+  ADH_IMP.classeur = wb; ADH_IMP.feuille = 0;
+  adhImpChoisirFeuille(0, true);
+}
+function adhImpChoisirFeuille(i, sansRendu){
+  const wb = ADH_IMP.classeur; ADH_IMP.feuille = Number(i)||0;
+  const ws = wb.Sheets[wb.SheetNames[ADH_IMP.feuille]];
+  /* raw:true → les cellules de date arrivent en vrais objets Date, convertis nous-mêmes en AAAA-MM-JJ
+     (le texte formaté par Excel dépend de la langue du fichier : « 3/9/26 » est ambigu). +12 h : à l'abri des décalages de fuseau. */
+  const iso = d => { const x = new Date(d.getTime() + 12*3600e3); return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`; };
+  ADH_IMP.rows = XLSX.utils.sheet_to_json(ws, { header:1, raw:true, defval:'', blankrows:false }).map(r => r.map(c => c instanceof Date ? iso(c) : c));
+  adhImpPreparer();
+  if(!sansRendu) adhImpRendre();
+}
+/* Normalise les lignes lues, repère la ligne de titres et propose l'association des colonnes. */
+function adhImpPreparer(){
+  ADH_IMP.rows = (ADH_IMP.rows||[]).map(r => (r||[]).map(c => String(c==null?'':c).trim())).filter(r => r.some(c => c !== ''));
+  const nbCol = Math.max(0, ...ADH_IMP.rows.map(r => r.length));
+  ADH_IMP.rows = ADH_IMP.rows.map(r => { const x = r.slice(); while(x.length < nbCol) x.push(''); return x; });
+  const t = ADH_IMP.rows[0] || [];
+  const reconnus = t.filter(c => Object.values(ADH_IMP_SYNONYMES).some(l => l.includes(adhImpNorm(c)))).length;
+  ADH_IMP.entete = reconnus >= 1;
+  adhImpDevinerColonnes();
+}
+function adhImpDevinerColonnes(){
+  const map = {}; const t = ADH_IMP.entete ? (ADH_IMP.rows[0]||[]) : [];
+  const pris = new Set();
+  Object.keys(ADH_IMP_SYNONYMES).forEach(champ => {
+    const i = t.findIndex((c,k) => !pris.has(k) && ADH_IMP_SYNONYMES[champ].includes(adhImpNorm(c)));
+    if(i >= 0){ map[champ] = i; pris.add(i); }
+  });
+  if(map.nom !== undefined && map.nom_complet !== undefined) delete map.nom_complet;
+  if(!ADH_IMP.entete && ADH_IMP.rows.length){
+    /* Sans titres : on devine d'après le contenu (une colonne d'e-mails, etc.) */
+    const echant = ADH_IMP.rows.slice(0,20);
+    const ci = echant[0].findIndex((_,k) => echant.filter(r => /@/.test(r[k])).length >= Math.ceil(echant.length/2));
+    if(ci >= 0) map.email = ci;
+  }
+  ADH_IMP.map = map;
+}
+async function adhImpFichier(input){
+  const f = input.files && input.files[0]; if(!f) return;
+  const err = document.getElementById('adh-imp-erreur'); if(err) err.textContent = '';
+  if(f.size > 8*1024*1024){ if(err) err.textContent = 'Ce fichier est trop volumineux (8 Mo maximum).'; return; }
+  try{
+    ADH_IMP.nomSource = f.name;
+    if(/\.(csv|txt|tsv)$/i.test(f.name)){
+      ADH_IMP.rows = adhImpAnalyserCsv(await f.text()); ADH_IMP.classeur = null; adhImpPreparer();
+    } else if(/\.(xlsx|xlsm|xls|ods)$/i.test(f.name)){
+      await adhImpLireClasseur(await f.arrayBuffer());
+    } else { if(err) err.textContent = 'Format non pris en charge : utilisez un fichier Excel (.xlsx, .xls) ou CSV.'; return; }
+    if(!ADH_IMP.rows.length){ if(err) err.textContent = 'Ce fichier est vide.'; return; }
+    ADH_IMP.etape = 'colonnes'; adhImpRendre();
+  }catch(e){ if(err) err.textContent = e.message || 'Lecture impossible.'; }
+}
+async function adhImpLien(){
+  const lien = (document.getElementById('adh-imp-lien').value||'').trim();
+  const err = document.getElementById('adh-imp-erreur'); err.textContent = '';
+  if(!lien){ err.textContent = 'Collez le lien de votre Google Sheets.'; return; }
+  const btn = document.getElementById('adh-imp-lien-btn'); btn.disabled = true; btn.textContent = 'Lecture…';
+  try{
+    const r = await api('POST', `/initiatives/${window.__vitrineInitId}/adhesion-import/lien`, { lien });
+    ADH_IMP.nomSource = 'Google Sheets';
+    if(r.format === 'xlsx'){
+      const bin = atob(r.base64); const buf = new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) buf[i] = bin.charCodeAt(i);
+      await adhImpLireClasseur(buf.buffer);
+    } else { ADH_IMP.rows = adhImpAnalyserCsv(r.texte); ADH_IMP.classeur = null; adhImpPreparer(); }
+    if(!ADH_IMP.rows.length){ err.textContent = 'Cette feuille est vide.'; btn.disabled = false; btn.textContent = 'Lire le lien'; return; }
+    ADH_IMP.etape = 'colonnes'; adhImpRendre();
+  }catch(e){ err.textContent = e.message || 'Lecture impossible.'; btn.disabled = false; btn.textContent = 'Lire le lien'; }
+}
+/* Découpe « NOM Prénom » ou « Prénom Nom » : un premier mot tout en majuscules est pris pour le nom de famille. */
+function adhImpSeparerNom(complet){
+  const virg = String(complet||'').split(',');
+  if(virg.length === 2 && virg[0].trim() && virg[1].trim()) return { nom: virg[0].trim(), prenom: virg[1].trim() }; // « Nom, Prénom »
+  const m = String(complet||'').trim().split(/\s+/).filter(Boolean);
+  if(m.length <= 1) return { nom: m[0]||'', prenom:'' };
+  const maj = s => s.length > 1 && s === s.toUpperCase() && s !== s.toLowerCase();
+  if(maj(m[0]) && !maj(m[m.length-1])){ let k = 0; while(k < m.length-1 && maj(m[k])) k++; return { nom: m.slice(0,k).join(' '), prenom: m.slice(k).join(' ') }; }
+  return { prenom: m[0], nom: m.slice(1).join(' ') };
+}
+function adhImpConstruireLignes(){
+  const debut = ADH_IMP.entete ? 1 : 0, M = ADH_IMP.map;
+  return ADH_IMP.rows.slice(debut).map((r,i) => {
+    const v = c => (M[c] !== undefined && M[c] !== '' ? (r[M[c]]||'') : '');
+    const l = { ligne: debut + i + 1, nom: v('nom'), prenom: v('prenom'), email: v('email'), telephone: v('telephone'),
+      adresse: v('adresse'), pays: v('pays'), ville: v('ville'), date_adhesion: v('date_adhesion'), observations: v('observations') };
+    if(!l.nom && M.nom_complet !== undefined && M.nom_complet !== ''){ Object.assign(l, adhImpSeparerNom(r[M.nom_complet])); }
+    return l;
+  });
+}
+function adhImpLireChoix(){
+  const f = document.getElementById('adh-imp-formule'); if(f) ADH_IMP.formuleId = Number(f.value);
+  const d = document.querySelector('input[name="adh-imp-date"]:checked'); if(d) ADH_IMP.dateDefaut = d.value;
+}
+function adhImpMajMap(champ, val){ if(val === '') delete ADH_IMP.map[champ]; else ADH_IMP.map[champ] = Number(val); }
+function adhImpToggleEntete(cb){ ADH_IMP.entete = cb.checked; adhImpDevinerColonnes(); adhImpRendre(); }
+async function adhImpVerifier(){
+  adhImpLireChoix();
+  const M = ADH_IMP.map; const err = document.getElementById('adh-imp-erreur'); err.textContent = '';
+  if(M.nom === undefined && M.nom_complet === undefined){ err.textContent = 'Indiquez quelle colonne contient le nom.'; return; }
+  const lignes = adhImpConstruireLignes();
+  if(!lignes.length){ err.textContent = 'Aucune ligne à importer (le fichier ne contient que des titres ?).'; return; }
+  const btn = document.getElementById('adh-imp-verifier'); btn.disabled = true; btn.textContent = 'Vérification…';
+  try{
+    ADH_IMP.lignesEnvoi = lignes;
+    ADH_IMP.resultat = await api('POST', `/initiatives/${window.__vitrineInitId}/adhesion-import`, { formule_id: ADH_IMP.formuleId, lignes, simuler:true, date_defaut: ADH_IMP.dateDefaut });
+    ADH_IMP.etape = 'apercu'; adhImpRendre();
+  }catch(e){ err.textContent = e.message; btn.disabled = false; btn.textContent = 'Vérifier →'; }
+}
+async function adhImpConfirmer(){
+  const btn = document.getElementById('adh-imp-confirmer'); btn.disabled = true; btn.textContent = 'Import en cours…';
+  const err = document.getElementById('adh-imp-erreur'); err.textContent = '';
+  try{
+    ADH_IMP.resultat = await api('POST', `/initiatives/${window.__vitrineInitId}/adhesion-import`, { formule_id: ADH_IMP.formuleId, lignes: ADH_IMP.lignesEnvoi, simuler:false, date_defaut: ADH_IMP.dateDefaut });
+    ADH_IMP.etape = 'fin'; adhImpRendre();
+  }catch(e){ err.textContent = e.message; btn.disabled = false; btn.textContent = 'Réessayer'; }
+}
+const ADH_IMP_STATUTS = {
+  ok: ['✅','Sera ajouté','#16a34a'], rattache: ['🔗',"Sera rattaché à un compte Diaspo'Actif",'#2563eb'],
+  deja_membre: ['⏭️','Déjà adhérent — ignoré','#b45309'], doublon_fichier: ['⏭️','Doublon dans le fichier — ignoré','#b45309'], erreur: ['⚠️','À corriger — ignoré','#dc2626']
+};
+function adhImpRendre(){
+  const el = document.getElementById('adh-imp-corps'); if(!el || !ADH_IMP) return;
+  const S = ADH_IMP;
+  const stepper = (n) => `<div style="font-size:12px;color:var(--muted);margin:0 0 14px;">Étape ${n} sur 3 — ${['Source','Colonnes','Vérification'][n-1]}</div>`;
+  if(S.etape === 'source'){
+    el.innerHTML = `${stepper(1)}
+      <label style="font-size:12px;font-weight:700;">Formule d'adhésion concernée</label>
+      <select id="adh-imp-formule" class="input" style="margin:4px 0 14px;width:100%;" onchange="adhImpLireChoix()">${ADH_FORMULES.map(f=>`<option value="${f.id}" ${f.id==S.formuleId?'selected':''}>${escH(f.nom)}</option>`).join('')}</select>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;">
+        <div style="border:1.5px dashed var(--border);border-radius:12px;padding:14px;">
+          <div style="font-weight:700;margin-bottom:4px;">📊 Fichier Excel ou CSV</div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">.xlsx, .xls ou .csv — 500 lignes maximum.</div>
+          <input type="file" id="adh-imp-fichier" accept=".xlsx,.xls,.xlsm,.ods,.csv,.tsv,.txt" onchange="adhImpFichier(this)" style="font-size:12.5px;max-width:100%;">
+        </div>
+        <div style="border:1.5px dashed var(--border);border-radius:12px;padding:14px;">
+          <div style="font-weight:700;margin-bottom:4px;">🔗 Lien Google Sheets</div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">La feuille doit être partagée en « Toute personne disposant du lien » (Lecteur).</div>
+          <input type="url" id="adh-imp-lien" class="input" placeholder="https://docs.google.com/spreadsheets/d/…" style="width:100%;margin-bottom:8px;">
+          <button type="button" id="adh-imp-lien-btn" class="btn btn-sm btn-primary" onclick="adhImpLien()">Lire le lien</button>
+        </div>
+      </div>
+      <div style="margin-top:14px;font-size:12.5px;"><b>Adhérents sans date dans le fichier :</b>
+        <label style="display:block;margin:6px 0 2px;"><input type="radio" name="adh-imp-date" value="aujourdhui" ${S.dateDefaut==='aujourdhui'?'checked':''} onchange="adhImpLireChoix()"> adhésion effective aujourd'hui (statut « à jour », échéance calculée selon la formule)</label>
+        <label style="display:block;"><input type="radio" name="adh-imp-date" value="aucune" ${S.dateDefaut==='aucune'?'checked':''} onchange="adhImpLireChoix()"> laisser « en attente » (sans date)</label>
+      </div>
+      <p style="font-size:12px;color:var(--muted);margin:12px 0 0;line-height:1.5;">Aucun e-mail n'est envoyé aux personnes importées. Si un e-mail correspond à un compte Diaspo'Actif, la fiche y est rattachée automatiquement. Assurez-vous d'avoir l'accord de ces personnes pour conserver leurs coordonnées.</p>
+      <div id="adh-imp-erreur" style="color:#dc2626;font-size:12.5px;margin-top:10px;"></div>`;
+  } else if(S.etape === 'colonnes'){
+    const t = S.entete ? S.rows[0] : S.rows[0].map((_,i)=>'Colonne '+adhImpLettre(i));
+    const opts = (sel) => `<option value="">— ignorer —</option>` + t.map((c,i)=>`<option value="${i}" ${sel===i?'selected':''}>${escH(c||('Colonne '+adhImpLettre(i)))}</option>`).join('');
+    const debut = S.entete ? 1 : 0;
+    const nbDonnees = S.rows.length - debut;
+    el.innerHTML = `${stepper(2)}
+      <div style="font-size:13px;margin-bottom:8px;">📄 <b>${escH(S.nomSource||'Liste')}</b> — ${nbDonnees} ligne${nbDonnees>1?'s':''} lue${nbDonnees>1?'s':''}.
+        ${S.classeur && S.classeur.SheetNames.length>1 ? `<select class="input" style="width:auto;margin-left:8px;font-size:12.5px;" onchange="adhImpChoisirFeuille(this.value)">${S.classeur.SheetNames.map((n,i)=>`<option value="${i}" ${i===S.feuille?'selected':''}>${escH(n)}</option>`).join('')}</select>` : ''}</div>
+      <label style="display:block;font-size:12.5px;margin-bottom:10px;"><input type="checkbox" ${S.entete?'checked':''} onchange="adhImpToggleEntete(this)"> La première ligne contient les titres des colonnes</label>
+      <div style="font-size:12.5px;font-weight:700;margin-bottom:6px;">Quelle colonne correspond à quoi ? <span style="font-weight:400;color:var(--muted);">(reconnu automatiquement, à corriger si besoin)</span></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px 12px;margin-bottom:12px;">
+        ${ADH_IMP_CHAMPS.map(([k,l])=>`<div><label style="font-size:11.5px;color:var(--muted);">${l}${k==='nom'?' *':''}</label><select class="input" style="width:100%;font-size:12.5px;" onchange="adhImpMajMap('${k}',this.value)">${opts(S.map[k])}</select></div>`).join('')}
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:4px;">Aperçu des premières lignes :</div>
+      <div style="overflow-x:auto;border:1px solid var(--border);border-radius:8px;"><table style="border-collapse:collapse;font-size:12px;width:100%;">
+        ${S.rows.slice(0,Math.min(S.rows.length,debut+5)).map((r,ri)=>`<tr style="${S.entete&&ri===0?'font-weight:700;background:var(--bg);':''}">${r.map(c=>`<td style="padding:4px 8px;border-bottom:1px solid var(--border);white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis;">${escH(c)}</td>`).join('')}</tr>`).join('')}
+      </table></div>
+      <div id="adh-imp-erreur" style="color:#dc2626;font-size:12.5px;margin-top:10px;"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;">
+        <button class="btn btn-outline" onclick="ADH_IMP.etape='source';adhImpRendre()">← Changer de fichier</button>
+        <button class="btn btn-primary" id="adh-imp-verifier" onclick="adhImpVerifier()">Vérifier →</button>
+      </div>`;
+  } else if(S.etape === 'apercu'){
+    const R = S.resultat;
+    const pastille = (n,l,c) => `<div style="flex:1;min-width:110px;border:1px solid var(--border);border-radius:10px;padding:8px 10px;text-align:center;"><div style="font-size:20px;font-weight:800;color:${c};">${n}</div><div style="font-size:11.5px;color:var(--muted);">${l}</div></div>`;
+    el.innerHTML = `${stepper(3)}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+        ${pastille(R.a_importer,'seront ajoutés','#16a34a')}${pastille(R.rattaches,"rattachés à un compte",'#2563eb')}${pastille(R.deja_membres+R.doublons,'ignorés (déjà adhérents / doublons)','#b45309')}${pastille(R.erreurs,'à corriger','#dc2626')}
+      </div>
+      <div style="max-height:340px;overflow:auto;border:1px solid var(--border);border-radius:8px;"><table style="border-collapse:collapse;font-size:12.5px;width:100%;">
+        <thead><tr style="text-align:left;position:sticky;top:0;background:var(--card,#fff);"><th style="padding:6px 8px;">Ligne</th><th style="padding:6px 8px;">Nom</th><th style="padding:6px 8px;">E-mail</th><th style="padding:6px 8px;">Résultat</th></tr></thead>
+        <tbody>${R.lignes.map(l=>{ const [ic,txt,col] = ADH_IMP_STATUTS[l.statut]||['','','']; const detail = l.motif && l.statut!=='ok' && l.statut!=='rattache' ? l.motif : txt;
+          const plus = (l.statut==='ok'||l.statut==='rattache') ? ` <span style="color:var(--muted);">— ${l.statut_prevu==='en_attente'?'en attente':(l.statut_prevu==='non_a_jour'?'échue depuis le '+escH(l.expiration):'à jour'+(l.expiration?' jusqu\'au '+escH(l.expiration):''))}</span>` : '';
+          return `<tr style="border-top:1px solid var(--border);"><td style="padding:5px 8px;color:var(--muted);">${l.ligne}</td><td style="padding:5px 8px;">${escH((l.prenom+' '+l.nom).trim())}</td><td style="padding:5px 8px;">${escH(l.email||'—')}</td><td style="padding:5px 8px;color:${col};">${ic} ${escH(detail)}${plus}</td></tr>`; }).join('')}</tbody>
+      </table></div>
+      <div id="adh-imp-erreur" style="color:#dc2626;font-size:12.5px;margin-top:10px;"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap;">
+        <button class="btn btn-outline" onclick="ADH_IMP.etape='colonnes';adhImpRendre()">← Modifier les colonnes</button>
+        <button class="btn btn-primary" id="adh-imp-confirmer" ${R.a_importer?'':'disabled'} onclick="adhImpConfirmer()">✅ Importer ${R.a_importer} adhérent${R.a_importer>1?'s':''}</button>
+      </div>`;
+  } else {
+    const R = S.resultat;
+    el.innerHTML = `<div style="text-align:center;padding:24px 8px;">
+      <div style="font-size:44px;">🎉</div>
+      <h3 style="margin:8px 0;">${R.a_importer} adhérent${R.a_importer>1?'s':''} ajouté${R.a_importer>1?'s':''} au registre</h3>
+      <p style="font-size:13px;color:var(--muted);line-height:1.6;margin:0 0 6px;">${R.rattaches} rattaché${R.rattaches>1?'s':''} à un compte Diaspo'Actif · ${R.deja_membres+R.doublons} ignoré${R.deja_membres+R.doublons>1?'s':''} (déjà adhérents ou doublons) · ${R.erreurs} à corriger.</p>
+      ${R.erreurs ? `<p style="font-size:12.5px;color:#b45309;">Les lignes « à corriger » n'ont pas été importées : corrigez-les dans votre fichier puis relancez l'import — les adhérents déjà ajoutés seront simplement ignorés.</p>` : ''}
+      <button class="btn btn-primary" style="margin-top:10px;" onclick="adhImpFermer()">Voir le registre</button>
+    </div>`;
+  }
 }
 
 let ADH_M_USER_SELECTIONNE = null;
