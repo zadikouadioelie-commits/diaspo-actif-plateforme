@@ -1669,6 +1669,52 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         <input type="text" id="adh-m-nom" class="input" style="margin:4px 0 10px;width:100%;">
         <label style="font-size:12px;font-weight:700;">Prénom</label>
         <input type="text" id="adh-m-prenom" class="input" style="margin:4px 0 10px;width:100%;">
+
+        <label style="font-size:12px;font-weight:700;">Date d'adhésion <span style="font-weight:400;color:var(--muted);">(facultatif)</span></label>
+        <p style="font-size:11px;color:var(--muted);margin:2px 0 6px;">Laissez vide pour une fiche en attente de paiement, comme avant. Renseignez-la pour enregistrer une adhésion déjà effective (ex. antidater quelqu'un qui a adhéré avant aujourd'hui) — la fiche passe alors directement « à jour ».</p>
+        <input type="date" id="adh-m-date-adhesion" class="input" style="margin:4px 0 10px;width:100%;">
+
+        <details id="adh-m-duree-details" style="margin:4px 0 14px;border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;">
+          <summary style="cursor:pointer;font-size:12px;font-weight:700;">⏳ Durée de validité — propre à cette fiche</summary>
+          <div style="margin-top:10px;">
+            <p style="font-size:11px;color:var(--muted);margin:0 0 8px;line-height:1.4;">Peut différer du réglage habituel de la formule, juste pour cette personne.</p>
+            <select id="adh-m-mode-validite" class="input" style="margin:4px 0 10px;width:100%;" onchange="adhMToggleModeValidite()">
+              <option value="individuel">Durée glissante (à partir de la date d'adhésion)</option>
+              <option value="collectif">Calendrier fixe (même échéance pour tous)</option>
+            </select>
+            <div id="adh-m-duree-glissante" style="display:flex;gap:8px;">
+              <input type="number" id="adh-m-duree-valeur" class="input" min="1" value="12" style="flex:1;">
+              <select id="adh-m-duree-unite" class="input" style="flex:1;">
+                <option value="jours">Jours</option>
+                <option value="semaines">Semaines</option>
+                <option value="mois" selected>Mois</option>
+                <option value="annees">Années</option>
+              </select>
+            </div>
+            <div id="adh-m-periode-collective" style="display:none;">
+              <label style="font-size:11px;color:var(--muted);">Fin de la période</label>
+              <input type="date" id="adh-m-periode-fin" class="input" style="width:100%;">
+            </div>
+          </div>
+        </details>
+
+        <details id="adh-m-relances-details" style="margin:4px 0 14px;border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;">
+          <summary style="cursor:pointer;font-size:12px;font-weight:700;">⏰ Rappels de renouvellement — propres à cette fiche</summary>
+          <div style="margin-top:10px;">
+            <div id="adh-m-relances-chips"></div>
+            <div id="adh-m-relances-apercu" style="font-size:12px;font-weight:700;margin:10px 0;"></div>
+            <div style="display:flex;gap:8px;margin-bottom:12px;">
+              <input type="number" id="adh-m-relances-nouveau" class="input" placeholder="ex. 14" style="flex:1;" min="-10" max="90" onkeydown="if(event.key==='Enter'){event.preventDefault();adhMRelancesAjouterAutre();}">
+              <button type="button" class="btn btn-sm btn-outline" onclick="adhMRelancesAjouterAutre()">➕ Ajouter</button>
+            </div>
+            <div class="da-pill-group" style="margin:6px 0;">
+              <label class="da-pill" id="adh-m-relances-canal-email"><input type="radio" name="adh-m-relances-canal" value="email" onchange="adhMRelancesChoisirCanal('email')"><span>✉️ E-mail</span></label>
+              <label class="da-pill" id="adh-m-relances-canal-notification"><input type="radio" name="adh-m-relances-canal" value="notification" onchange="adhMRelancesChoisirCanal('notification')"><span>🔔 Notification</span></label>
+              <label class="da-pill checked" id="adh-m-relances-canal-les_deux"><input type="radio" name="adh-m-relances-canal" value="les_deux" checked onchange="adhMRelancesChoisirCanal('les_deux')"><span>✉️🔔 Les deux</span></label>
+            </div>
+          </div>
+        </details>
+
         <label style="font-size:12px;font-weight:700;">Email</label>
         <input type="email" id="adh-m-email" class="input" style="margin:4px 0 10px;width:100%;">
         <label style="font-size:12px;font-weight:700;">Téléphone</label>
@@ -7454,6 +7500,59 @@ async function adhRelancesCharger(cfg) {
   }
 }
 
+/* ===== Rappels + durée PROPRES À LA FICHE, dans la modale « Ajouter un adhérent » (2026-10-09,
+   demande explicite : « réglage propre à la fiche ») — même widget de puces que ci-dessus pour
+   une formule, dupliqué ici avec son propre état (ADH_M_RELANCES) plutôt que partagé : cette
+   instance vit dans une modale différente, ouverte/fermée indépendamment. ===== */
+let ADH_M_RELANCES = { jours: ADH_RELANCES_DEFAUT.slice(), canal: 'les_deux' };
+function adhMRelancesPuce(j) {
+  const actif = ADH_M_RELANCES.jours.includes(j);
+  return `<button type="button" onclick="adhMRelancesBasculer(${j})" aria-pressed="${actif}" style="cursor:pointer;border-radius:99px;padding:6px 13px;font-size:12.5px;font-weight:700;border:1.5px solid ${actif ? '#2E74E0' : 'var(--border)'};background:${actif ? '#2E74E0' : 'var(--bg)'};color:${actif ? '#fff' : 'inherit'};">${actif ? '✓ ' : ''}${adhLibelleDelai(j)}</button>`;
+}
+function adhMRelancesRendre() {
+  const zone = document.getElementById('adh-m-relances-chips'); if (!zone) return;
+  const groupe = (titre, liste) => liste.length ? `<div style="margin-bottom:10px;"><div style="font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">${titre}</div><div style="display:flex;flex-wrap:wrap;gap:6px;">${liste.map(adhMRelancesPuce).join('')}</div></div>` : '';
+  const connus = [...ADH_RELANCES_AVANT, 0, ...ADH_RELANCES_APRES];
+  const autres = ADH_M_RELANCES.jours.filter(j => !connus.includes(j)).sort((a, b) => b - a);
+  zone.innerHTML = groupe("Avant l'expiration", ADH_RELANCES_AVANT) + groupe("Le jour de l'expiration", [0]) + groupe("Après l'expiration", ADH_RELANCES_APRES) + groupe('Autres délais', autres);
+  adhMRelancesApercu();
+}
+function adhMRelancesBasculer(j) {
+  const l = ADH_M_RELANCES.jours;
+  if (l.includes(j)) ADH_M_RELANCES.jours = l.filter(x => x !== j);
+  else if (l.length >= ADH_RELANCES_MAX) { showToast?.(`${ADH_RELANCES_MAX} rappels au maximum : désactivez-en un avant d'en ajouter.`, 'warning'); return; }
+  else ADH_M_RELANCES.jours = [...l, j];
+  adhMRelancesRendre();
+}
+function adhMRelancesAjouterAutre() {
+  const input = document.getElementById('adh-m-relances-nouveau');
+  const v = Math.round(Number(input.value));
+  if (input.value === '' || !Number.isFinite(v) || v < -10 || v > 90) { showToast?.('Délai invalide : de 90 jours avant (90) à 10 jours après (-10).', 'warning'); return; }
+  if (!ADH_M_RELANCES.jours.includes(v)) {
+    if (ADH_M_RELANCES.jours.length >= ADH_RELANCES_MAX) { showToast?.(`${ADH_RELANCES_MAX} rappels au maximum.`, 'warning'); return; }
+    ADH_M_RELANCES.jours = [...ADH_M_RELANCES.jours, v];
+  }
+  input.value = '';
+  adhMRelancesRendre();
+}
+function adhMRelancesChoisirCanal(c) {
+  ADH_M_RELANCES.canal = c;
+  ['email', 'notification', 'les_deux'].forEach(k => document.getElementById('adh-m-relances-canal-' + k)?.classList.toggle('checked', k === c));
+  adhMRelancesApercu();
+}
+function adhMRelancesApercu() {
+  const el = document.getElementById('adh-m-relances-apercu'); if (!el) return;
+  const j = ADH_M_RELANCES.jours.slice().sort((a, b) => b - a);
+  el.innerHTML = j.length
+    ? `Rappels : ${j.map(adhLibelleDelai).join(' · ')} <span style="font-weight:500;color:var(--muted);">(${ADH_RELANCES_CANAL_LIBELLE[ADH_M_RELANCES.canal]})</span>`
+    : '<span style="font-weight:500;color:var(--muted);">Aucun rappel : l’adhérent ne sera pas relancé.</span>';
+}
+function adhMToggleModeValidite() {
+  const collectif = document.getElementById('adh-m-mode-validite').value === 'collectif';
+  document.getElementById('adh-m-duree-glissante').style.display = collectif ? 'none' : 'flex';
+  document.getElementById('adh-m-periode-collective').style.display = collectif ? 'block' : 'none';
+}
+
 function adhRenderChampsStandard(config){
   const el = document.getElementById('adh-f-champs-standard');
   el.innerHTML = ADH_CHAMPS_CATALOGUE.map(c => {
@@ -8391,11 +8490,27 @@ async function adhRenderRegistre(){
 }
 
 let ADH_M_USER_SELECTIONNE = null;
-function adhOuvrirAjoutMembre(){
+async function adhOuvrirAjoutMembre(){
   document.getElementById('adh-m-formule').innerHTML = ADH_FORMULES.map(f=>`<option value="${f.id}">${escH(f.nom)}</option>`).join('');
-  ['adh-m-nom','adh-m-prenom','adh-m-email','adh-m-telephone','adh-m-adresse','adh-m-pays','adh-m-ville','adh-m-observations','adh-m-recherche-user'].forEach(id=>document.getElementById(id).value='');
+  ['adh-m-nom','adh-m-prenom','adh-m-email','adh-m-telephone','adh-m-adresse','adh-m-pays','adh-m-ville','adh-m-observations','adh-m-recherche-user','adh-m-date-adhesion'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('adh-m-user-resultats').innerHTML = '';
   adhDeselectionnerUser();
+  /* Norme des ajouts manuels (2026-10-09, demande explicite) : pré-remplit durée + relances
+     avec le tout premier réglage jamais saisi pour cette initiative — reste toujours
+     modifiable ensuite, juste pour cette fiche. */
+  let norme = null;
+  try { const r = await api('GET', `/initiatives/${window.__vitrineInitId}/adhesion-manuel-defaut`); norme = r.norme; } catch (e) {}
+  document.getElementById('adh-m-mode-validite').value = norme?.mode_validite || 'individuel';
+  document.getElementById('adh-m-duree-valeur').value = norme?.duree_valeur || 12;
+  document.getElementById('adh-m-duree-unite').value = norme?.duree_unite || 'mois';
+  document.getElementById('adh-m-periode-fin').value = norme?.periode_collective_fin || '';
+  adhMToggleModeValidite();
+  ADH_M_RELANCES = (norme?.relances_jours && norme.relances_jours.length)
+    ? { jours: norme.relances_jours.map(Number).sort((a,b)=>b-a), canal: norme.relances_canal || 'les_deux' }
+    : { jours: ADH_RELANCES_DEFAUT.slice(), canal: 'les_deux' };
+  const rC = document.querySelector(`input[name="adh-m-relances-canal"][value="${ADH_M_RELANCES.canal}"]`); if (rC) rC.checked = true;
+  ['email','notification','les_deux'].forEach(k => document.getElementById('adh-m-relances-canal-'+k)?.classList.toggle('checked', k === ADH_M_RELANCES.canal));
+  adhMRelancesRendre();
   document.getElementById('modal-adh-membre').style.display = 'flex';
 }
 let ADH_M_RECHERCHE_TIMER = null;
@@ -8432,6 +8547,8 @@ function adhDeselectionnerUser(){
 async function adhEnregistrerMembre(){
   const nom = document.getElementById('adh-m-nom').value.trim();
   if(!nom){ showToast('Nom requis.', 'warning'); return; }
+  const dateAdhesion = document.getElementById('adh-m-date-adhesion').value || null;
+  const modeValidite = document.getElementById('adh-m-mode-validite').value;
   try{
     await api('POST', `/initiatives/${window.__vitrineInitId}/adhesion-membres`, {
       formule_id: Number(document.getElementById('adh-m-formule').value),
@@ -8443,6 +8560,13 @@ async function adhEnregistrerMembre(){
       pays: document.getElementById('adh-m-pays').value || null,
       ville: document.getElementById('adh-m-ville').value || null,
       observations: document.getElementById('adh-m-observations').value || null,
+      date_adhesion: dateAdhesion,
+      mode_validite: modeValidite,
+      duree_valeur: Number(document.getElementById('adh-m-duree-valeur').value) || null,
+      duree_unite: document.getElementById('adh-m-duree-unite').value,
+      periode_collective_fin: modeValidite === 'collectif' ? document.getElementById('adh-m-periode-fin').value : null,
+      relances_jours: ADH_M_RELANCES.jours,
+      relances_canal: ADH_M_RELANCES.canal,
     });
     document.getElementById('modal-adh-membre').style.display = 'none';
     adhRenderRegistre();

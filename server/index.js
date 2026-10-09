@@ -5889,6 +5889,31 @@ function calculerDateExpirationAdhesion(formule, months) {
   return d.toISOString().slice(0, 19).replace('T', ' ');
 }
 
+/* Calcul de l'échéance pour une fiche d'adhérent ajoutée manuellement avec un réglage PROPRE À
+   LA FICHE (2026-10-09, demande explicite : « réglage propre à la fiche », pas juste un rappel
+   du réglage de la formule) — même logique que calculerDateExpirationAdhesion() ci-dessus, mais
+   ancrée sur une date d'adhésion donnée (pas forcément "maintenant") et sur des paramètres
+   propres à CETTE fiche plutôt que ceux, partagés, de sa formule. */
+function calculerDateExpirationFiche(dateAdhesion, p) {
+  const depart = dateAdhesion ? new Date(dateAdhesion) : new Date();
+  if (p?.mode_validite === 'collectif' && p.periode_collective_fin) {
+    return `${p.periode_collective_fin} 23:59:59`.slice(0, 19);
+  }
+  if (p?.duree_illimitee) return null;
+  if (p?.duree_valeur) {
+    const d = new Date(depart);
+    const v = Number(p.duree_valeur);
+    switch (p.duree_unite) {
+      case 'jours':    d.setDate(d.getDate() + v); break;
+      case 'semaines': d.setDate(d.getDate() + v * 7); break;
+      case 'annees':   d.setFullYear(d.getFullYear() + v); break;
+      case 'mois': default: d.setMonth(d.getMonth() + v); break;
+    }
+    return d.toISOString().slice(0, 19).replace('T', ' ');
+  }
+  return null;
+}
+
 /* Journal d'audit (tâche #70) : appelé à chaque mutation significative d'une fiche
    adhérent. acteur=null pour une confirmation automatique (webhook Stripe) — details
    reste une phrase lisible plutôt qu'un JSON, cohérent avec l'usage administrateur
@@ -7097,7 +7122,9 @@ route("POST", "/api/initiatives/:id/adhesion-membres", async (req, res, params, 
   const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
   if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
   if (!(await exigerPremium(user, res, "adhesions"))) return;
-  const { formule_id, nom, prenom, email, telephone, adresse, pays, ville, observations, linked_user_id } = body;
+  const { formule_id, nom, prenom, email, telephone, adresse, pays, ville, observations, linked_user_id,
+    date_adhesion, mode_validite, duree_valeur, duree_unite, duree_illimitee,
+    periode_collective_debut, periode_collective_fin, relances_jours, relances_canal } = body;
   if (!nom?.trim()) return sendJSON(res, 400, { error: "Nom requis." });
   const formule = await db.prepare("SELECT * FROM adhesion_formules WHERE id=? AND initiative_id=?").get(formule_id, params.id);
   if (!formule) return sendJSON(res, 400, { error: "Formule invalide." });
@@ -7112,13 +7139,69 @@ route("POST", "/api/initiatives/:id/adhesion-membres", async (req, res, params, 
     if (existant) return sendJSON(res, 400, { error: "Ce compte a déjà une fiche adhérent pour cette initiative." });
     linkedId = u.id;
   }
+  /* Date d'adhésion + échéance propres à la fiche (2026-10-09, demande explicite) — facultatif :
+     si l'association ne précise rien, comportement historique inchangé (ni date ni échéance,
+     statut 'en_attente' jusqu'au premier paiement). Dès qu'une date d'adhésion est donnée, la
+     fiche est considérée active tout de suite (le paiement est déjà acquis, enregistré a
+     posteriori) — son statut passe directement à 'a_jour' plutôt que de rester en attente. */
+  let dateAdhesionVal = null, dateExpirationVal = null, statutInitial = 'en_attente';
+  if (date_adhesion) {
+    const d = new Date(date_adhesion);
+    if (!isNaN(d)) {
+      dateAdhesionVal = d.toISOString().slice(0, 19).replace('T', ' ');
+      dateExpirationVal = calculerDateExpirationFiche(dateAdhesionVal, {
+        mode_validite: mode_validite === 'collectif' ? 'collectif' : 'individuel',
+        periode_collective_fin: periode_collective_fin || null,
+        duree_illimitee: !!duree_illimitee,
+        duree_valeur: duree_valeur ? Number(duree_valeur) : null,
+        duree_unite: duree_unite || 'mois',
+      });
+      statutInitial = 'a_jour';
+    }
+  }
+  /* Rappels propres à la fiche (2026-10-09, demande explicite) : même validation que pour une
+     formule (sanitizeRelancesFormule), NULL si rien n'est fourni — la fiche suit alors les
+     réglages de sa formule, comme avant. */
+  let relancesJoursVal = null, relancesCanalVal = null;
+  if (Array.isArray(relances_jours) && relances_jours.length) {
+    const sanitized = sanitizeRelancesFormule({ jours: relances_jours, canal: relances_canal });
+    if (sanitized) { relancesJoursVal = JSON.stringify(sanitized.jours); relancesCanalVal = sanitized.canal; }
+  }
   const id = (await db.prepare(`
-    INSERT INTO adhesion_membres (formule_id, initiative_id, linked_user_id, nom, prenom, email, telephone, adresse, pays, ville, observations, statut)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,'en_attente')
+    INSERT INTO adhesion_membres (formule_id, initiative_id, linked_user_id, nom, prenom, email, telephone, adresse, pays, ville, observations, statut, date_adhesion, date_expiration, relances_jours_json, relances_canal)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
   `).run(formule_id, params.id, linkedId, nom.trim(), prenom || null, email || null, telephone || null,
-    adresse || null, pays || null, ville || null, observations || null)).lastInsertRowid;
+    adresse || null, pays || null, ville || null, observations || null, statutInitial,
+    dateAdhesionVal, dateExpirationVal, relancesJoursVal, relancesCanalVal)).lastInsertRowid;
   journaliserAdhesion(params.id, id, 'creation', user, `Fiche créée manuellement par l'association — « ${formule.nom} ».`);
+  /* Norme des prochains ajouts manuels (2026-10-09, demande explicite) : posée une seule fois,
+     la première fois qu'un ajout manuel précise ces réglages — jamais réécrite ensuite, même si
+     un ajout suivant les modifie pour SA propre fiche ("le premier... reste la norme"). */
+  if (dateAdhesionVal || relancesJoursVal) {
+    const norme = {
+      mode_validite: mode_validite === 'collectif' ? 'collectif' : 'individuel',
+      duree_valeur: duree_valeur ? Number(duree_valeur) : null, duree_unite: duree_unite || 'mois',
+      duree_illimitee: !!duree_illimitee,
+      periode_collective_debut: periode_collective_debut || null, periode_collective_fin: periode_collective_fin || null,
+      relances_jours: relancesJoursVal ? JSON.parse(relancesJoursVal) : null, relances_canal: relancesCanalVal,
+    };
+    await db.prepare(`UPDATE initiatives SET adh_manuel_defaut_json=? WHERE id=? AND adh_manuel_defaut_json IS NULL`)
+      .run(JSON.stringify(norme), params.id);
+  }
   sendJSON(res, 201, { id });
+});
+
+/* Réglages par défaut (norme) du prochain ajout manuel d'un adhérent — pré-remplit le formulaire,
+   toujours modifiable à l'usage (2026-10-09, demande explicite). null si aucun ajout manuel n'a
+   encore précisé ces réglages (le formulaire garde alors ses valeurs par défaut habituelles). */
+route("GET", "/api/initiatives/:id/adhesion-manuel-defaut", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT owner_user_id, adh_manuel_defaut_json FROM initiatives WHERE id=?").get(params.id);
+  if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  let norme = null;
+  try { norme = init.adh_manuel_defaut_json ? JSON.parse(init.adh_manuel_defaut_json) : null; } catch (e) {}
+  sendJSON(res, 200, { norme });
 });
 
 /* ── Modifier la fiche d'un membre ── */
@@ -31210,12 +31293,16 @@ async function handleRequest(req, res) {
         /* Délais personnalisables (tâche #71) : chaque association choisit ses propres
            décalages (positif = jours avant expiration, négatif = jours après). Défaut =
            comportement historique J-30/J-7/jour J/lendemain. */
-        let joursConfig;
-        /* La formule peut avoir ses propres rappels (délais + canal) ; sinon réglages généraux de l'association, e-mail ET notification. */
+        let joursConfig, canalRappel;
+        /* Priorité (2026-10-09, demande explicite « réglage propre à la fiche ») : la fiche
+           elle-même (si l'association l'a réglée lors d'un ajout manuel) > la formule > les
+           réglages généraux de l'association > le défaut historique J-30/J-7/jour J/lendemain. */
+        const cfgFiche = sanitizeRelancesFormule({ jours: (() => { try { return JSON.parse(m.relances_jours_json || 'null'); } catch (e) { return null; } })(), canal: m.relances_canal });
         const cfgFormule = relancesParFormule[Number(m.formule_id)] || null;
-        const canalRappel = cfgFormule ? cfgFormule.canal : 'les_deux';
-        if (cfgFormule) joursConfig = cfgFormule.jours;
+        if (cfgFiche) { joursConfig = cfgFiche.jours; canalRappel = cfgFiche.canal; }
+        else if (cfgFormule) { joursConfig = cfgFormule.jours; canalRappel = cfgFormule.canal; }
         else {
+          canalRappel = 'les_deux';
           try { joursConfig = JSON.parse(m.relances_config_json || '[30,7,0,-1]'); }
           catch (e) { joursConfig = [30, 7, 0, -1]; }
         }

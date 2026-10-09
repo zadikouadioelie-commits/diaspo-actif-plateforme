@@ -7166,6 +7166,25 @@ db.exec(`
        distincte d'une vraie formule créée plus tard. Tant qu'elle est active elle est aussi l'adhésion officielle (c'est elle que cible le bouton « Adhérer à l'initiative »). */
     if (!adhFCols.includes('est_gratuite_auto'))     db.exec("ALTER TABLE adhesion_formules ADD COLUMN est_gratuite_auto INTEGER DEFAULT 0");
   }
+
+  /* Rappels propres à UNE fiche d'adhérent ajoutée manuellement (2026-10-09, demande explicite :
+     « réglage propre à la fiche ») — peut diverger du réglage de la formule. NULL = la fiche
+     suit les réglages de sa formule (comportement historique inchangé pour toutes les fiches
+     existantes et celles créées en libre-service). */
+  const adhMCols = db.prepare('PRAGMA table_info(adhesion_membres)').all().map(c => c.name);
+  if (adhMCols.length) {
+    if (!adhMCols.includes('relances_jours_json')) db.exec("ALTER TABLE adhesion_membres ADD COLUMN relances_jours_json TEXT");
+    if (!adhMCols.includes('relances_canal'))      db.exec("ALTER TABLE adhesion_membres ADD COLUMN relances_canal TEXT");
+  }
+
+  /* Réglages par défaut du PROCHAIN ajout manuel d'un adhérent (2026-10-09, demande explicite) :
+     { mode_validite, duree_valeur, duree_unite, periode_collective_debut, periode_collective_fin,
+       relances_jours, relances_canal }. Posé une seule fois — la première fois qu'un ajout manuel
+     précise ces réglages — puis jamais réécrit, même si un ajout suivant les modifie pour SA
+     propre fiche : « le premier... reste la norme » (demande explicite), seul le pré-remplissage
+     du formulaire change à chaque ajout, pas ce qui est mémorisé comme standard. */
+  const initCols8 = db.prepare('PRAGMA table_info(initiatives)').all().map(c => c.name);
+  if (!initCols8.includes('adh_manuel_defaut_json')) db.exec("ALTER TABLE initiatives ADD COLUMN adh_manuel_defaut_json TEXT");
 }
 
 /* ── Boutique de la Vitrine (produits/services, max 20 par initiative) ── */
