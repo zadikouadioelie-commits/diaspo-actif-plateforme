@@ -4176,6 +4176,31 @@ route("POST", "/api/admin/rencontres/terrain", async (req, res, params, body) =>
   sendJSON(res, 201, { ok: true });
 });
 
+/* PATCH /api/initiatives/:id/activer-module (2026-10-09, bug trouvé par l'utilisateur en
+   production) — un nouveau compte Initiative démarre avec plusieurs modules "Paramètres
+   Vitrine" explicitement désactivés (galerie_photos, expertise, certifications, etc. — voir le
+   repli hasContenu dans getVitrineModulesState : SANS cette désactivation explicite écrite au
+   signup, un module sans contenu resterait déjà invisible tout seul). La complétude du profil
+   (server/completude.js) demande malgré tout de remplir "la galerie photos" : cliquer sur ce
+   point dans la modale "Profil incomplet" amenait donc le titulaire vers une section soit
+   absente, soit invisible une fois remplie faute d'activation. Cette route n'ACTIVE jamais
+   qu'UN SEUL module explicitement demandé par son propriétaire (jamais de désactivation,
+   jamais en masse) — appelée par editVitrineGalerie() (profil-app.html) après le premier ajout
+   de photo. */
+route("PATCH", "/api/initiatives/:id/activer-module", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT id, owner_user_id, vitrine_modules_json FROM initiatives WHERE id=?").get(params.id);
+  if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
+  if (Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const cle = body && body.module;
+  if (!cle || !VITRINE_MODULES_REGISTRY[cle]) return sendJSON(res, 400, { error: "Module invalide." });
+  let etat = {}; try { etat = JSON.parse(init.vitrine_modules_json || "{}") || {}; } catch (e) { etat = {}; }
+  etat[cle] = { ...(etat[cle] || {}), actif: true };
+  await db.prepare("UPDATE initiatives SET vitrine_modules_json=? WHERE id=?").run(JSON.stringify(etat), params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
 route("PUT", "/api/initiatives/:id/vitrine", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
@@ -4191,7 +4216,7 @@ route("PUT", "/api/initiatives/:id/vitrine", async (req, res, params, body) => {
   }
 
   const {
-    vitrine_active, vitrine_banniere_url, vitrine_horaires, vitrine_services, description, mission, galerie_json,
+    vitrine_active, vitrine_banniere_url, vitrine_horaires, vitrine_services, description, mission, historique, galerie_json,
     vitrine_pub_onglet, vitrine_theme, vitrine_documents_json, vitrine_partenaires_json,
     vitrine_objectif_cible, vitrine_objectif_libelle, vitrine_offre_flash_titre, vitrine_offre_flash_fin,
     vitrine_pourquoi_choisir, vitrine_services_categories_json,
@@ -4221,7 +4246,7 @@ route("PUT", "/api/initiatives/:id/vitrine", async (req, res, params, body) => {
   await db.prepare(`
     UPDATE initiatives SET
       vitrine_active=?, vitrine_banniere_url=?, vitrine_horaires=?, vitrine_services=?,
-      description=?, mission=?, galerie_json=?, vitrine_pub_onglet=?, vitrine_theme=?,
+      description=?, mission=?, historique=?, galerie_json=?, vitrine_pub_onglet=?, vitrine_theme=?,
       vitrine_documents_json=?, vitrine_partenaires_json=?, vitrine_objectif_cible=?,
       vitrine_objectif_libelle=?, vitrine_offre_flash_titre=?, vitrine_offre_flash_fin=?,
       vitrine_pourquoi_choisir=?, vitrine_services_categories_json=?,
@@ -4240,6 +4265,7 @@ route("PUT", "/api/initiatives/:id/vitrine", async (req, res, params, body) => {
     vitrine_services !== undefined ? SEC.sanitizeRichHtml(vitrine_services) : init.vitrine_services,
     description !== undefined ? SEC.sanitizeRichHtml(description) : init.description,
     mission !== undefined ? SEC.sanitizeRichHtml(mission) : init.mission,
+    historique !== undefined ? SEC.sanitizeRichHtml(historique) : init.historique,
     galerie_json !== undefined ? JSON.stringify(galerie_json) : init.galerie_json,
     vitrine_pub_onglet !== undefined ? vitrine_pub_onglet : (init.vitrine_pub_onglet || 'À la une'),
     THEMES_VALIDES.includes(vitrine_theme) ? vitrine_theme : (init.vitrine_theme || 'bordeaux'),
@@ -13430,6 +13456,24 @@ function erreurProfilIncomplet(ev, message) {
 }
 const MSG_PROFIL_INCOMPLET_VALIDER = "Pour pouvoir valider votre affiliation, il vous faut remplir votre profil public.";
 const MSG_PROFIL_INCOMPLET_ENVOYER = "Pour pouvoir faire une affiliation, il vous faut remplir votre profil public.";
+
+/* GET /api/moi/completude-affiliation (2026-10-09, bug trouvé par l'utilisateur en production :
+   la modale "Profil incomplet" listait les champs manquants au moment du blocage, mais ne se
+   mettait jamais à jour quand l'utilisateur revenait après avoir rempli un champ dans un autre
+   onglet — rien ne lui indiquait que c'était bien pris en compte). Même calcul exact que le
+   garde-fou lui-même : un compte qui repasse ce contrôle ici repasse aussi la vraie action. */
+route("GET", "/api/moi/completude-affiliation", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  let role = 'utilisateur', idCompte = user.id;
+  if (user.role === 'initiative') {
+    const init = await db.prepare("SELECT id FROM initiatives WHERE owner_user_id=?").get(user.id);
+    if (init) { role = 'initiative'; idCompte = init.id; }
+  }
+  const ev = await evaluerProfilPourAffiliation(role, idCompte);
+  if (!ev) return sendJSON(res, 200, { pct: 100, manquants: [] });
+  sendJSON(res, 200, { pct: ev.pct, manquants: ev.manquants_detail });
+});
 
 /* Demande d'affiliation lancée par le compte utilisateur lui-même (2026-09-09, bouton
    "Demander une affiliation" sur les cartouches initiatives de l'annuaire) — sens inverse de

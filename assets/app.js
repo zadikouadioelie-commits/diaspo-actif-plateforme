@@ -2735,19 +2735,46 @@ function afficherModalProfilIncomplet(e) {
   overlay.id = 'aff-profil-incomplet-overlay';
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(13,43,78,.55);z-index:2100;display:flex;align-items:center;justify-content:center;padding:20px;';
   const monId = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? CURRENT_USER.id : '';
+  const ligne = m => `<a id="api-row-${escH(m.cle)}" data-cle="${escH(m.cle)}" data-label="${escH(m.label)}" href="profil-app.html?id=${monId}&completer=champ&champ=${encodeURIComponent(m.cle)}&label=${encodeURIComponent(m.label)}" target="_blank" rel="noopener" style="display:flex;align-items:center;gap:8px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;text-decoration:none;color:inherit;font-size:13px;">📝 ${escH(m.label)}</a>`;
   overlay.innerHTML = `
     <div class="card" style="width:100%;max-width:440px;background:#fff;border-radius:12px;padding:20px;">
-      <h3 style="margin:0 0 6px;">📝 Profil incomplet (${e.data.profil_pct ?? 0} %)</h3>
-      <p style="color:var(--muted);font-size:12.5px;margin:0 0 12px;">${escH(e.message)} Cliquez sur chaque point pour le régler — chacun s'ouvre dans un nouvel onglet, revenez ici cocher le suivant.</p>
-      <div style="display:flex;flex-direction:column;gap:7px;max-height:50vh;overflow-y:auto;">
-        ${manquants.map(m => `<a href="profil-app.html?id=${monId}&completer=champ&champ=${encodeURIComponent(m.cle)}&label=${encodeURIComponent(m.label)}" target="_blank" rel="noopener" style="display:flex;align-items:center;gap:8px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;text-decoration:none;color:inherit;font-size:13px;">📝 ${escH(m.label)}</a>`).join('')}
+      <h3 id="api-titre" style="margin:0 0 6px;">📝 Profil incomplet (${e.data.profil_pct ?? 0} %)</h3>
+      <p style="color:var(--muted);font-size:12.5px;margin:0 0 12px;">${escH(e.message)} Cliquez sur chaque point pour le régler — chacun s'ouvre dans un nouvel onglet. Revenez sur cet onglet une fois réglé : la liste se met à jour toute seule.</p>
+      <div id="api-liste" style="display:flex;flex-direction:column;gap:7px;max-height:50vh;overflow-y:auto;">
+        ${manquants.map(ligne).join('')}
       </div>
       <div style="display:flex;justify-content:flex-end;margin-top:16px;">
-        <button class="btn btn-outline btn-sm" onclick="document.getElementById('aff-profil-incomplet-overlay').remove()">Fermer</button>
+        <button class="btn btn-outline btn-sm" id="api-fermer">Fermer</button>
       </div>
     </div>`;
   document.body.appendChild(overlay);
-  overlay.addEventListener('click', ev => { if (ev.target === overlay) overlay.remove(); });
+  const fermer = () => { overlay.remove(); window.removeEventListener('focus', rafraichir); };
+  overlay.querySelector('#api-fermer').onclick = fermer;
+  overlay.addEventListener('click', ev => { if (ev.target === overlay) fermer(); });
+
+  /* Rafraîchit la liste quand on revient sur cet onglet (après avoir réglé un champ dans le
+     nouvel onglet ouvert par un lien ci-dessus) — même calcul exact que le blocage serveur
+     (server/index.js, evaluerProfilPourAffiliation), pour ne jamais afficher un état différent
+     de celui qui compte vraiment. Un point réglé passe en vert et n'est plus cliquable ; une
+     fois tout réglé, le bouton "Fermer" invite à relancer l'action. */
+  const rafraichir = async () => {
+    if (!document.body.contains(overlay)) { window.removeEventListener('focus', rafraichir); return; }
+    let r; try { r = await api('GET', '/moi/completude-affiliation'); } catch (err) { return; }
+    const restants = new Set((r.manquants || []).map(m => m.cle));
+    const titre = document.getElementById('api-titre'); if (titre) titre.textContent = `📝 Profil incomplet (${r.pct ?? 0} %)`;
+    manquants.forEach(m => {
+      const row = document.getElementById(`api-row-${m.cle}`); if (!row) return;
+      if (!restants.has(m.cle)) {
+        row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:9px 12px;border:1px solid #16a34a;background:#f0fdf4;border-radius:8px;text-decoration:none;color:#16a34a;font-size:13px;pointer-events:none;';
+        row.innerHTML = `✅ ${escH(m.label)}`;
+      }
+    });
+    if (!restants.size) {
+      const btnFermer = overlay.querySelector('button.btn-outline');
+      if (btnFermer) { btnFermer.textContent = 'Fermer — vous pouvez relancer l\'action'; btnFermer.className = 'btn btn-sm'; }
+    }
+  };
+  window.addEventListener('focus', rafraichir);
 }
 window.afficherModalProfilIncomplet = afficherModalProfilIncomplet;
 

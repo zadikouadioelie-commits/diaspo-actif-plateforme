@@ -2010,6 +2010,14 @@ function render() {
         editVitrineText(_cle, _label || _cle, CHAMPS_TEXTE_VITRINE[_cle]);
         return;
       }
+      /* Galerie photos (2026-10-09) : ouvre directement le sélecteur de fichiers plutôt que de
+         se contenter d'un défilement — la demande explicite d'origine est d'amener le titulaire
+         « directement au bon endroit à remplir », pas juste à proximité. */
+      if (_cle === 'galerie_json' && typeof editVitrineGalerie === 'function') {
+        document.getElementById('pv-galerie')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        editVitrineGalerie();
+        return;
+      }
       const section = SECTION_PAR_CHAMP[_cle] && document.getElementById(SECTION_PAR_CHAMP[_cle]);
       (section || document.getElementById('pvz-visitor') || document.body).scrollIntoView({ behavior: 'smooth', block: 'start' });
       if (typeof showToast === 'function' && _label) showToast(`📝 À compléter : ${_label}`, 'info', 5000);
@@ -3148,6 +3156,8 @@ async function renderVitrineVisitor(init) {
   // Sous-nav : uniquement les sections présentes ET actives (modules masqués exclus)
   const navItems = [];
   if ((init.description || isOwn) && modOn('a_propos'))      navItems.push(['presentation','Présentation']);
+  if ((init.mission || isOwn) && modOn('mission'))            navItems.push(['mission','Mission']);
+  if ((init.historique || isOwn) && modOn('historique'))      navItems.push(['historique','Notre histoire']);
   if ((catalogues.length || isOwn) && modOn('catalogue'))     navItems.push(['collections','Catalogue']);
   if ((articlesNonClasses.length || isOwn) && modOn('produits')) navItems.push(['produits','Non classé']);
   if (modOn('offre_flash') || true) navItems.push(['promos','Promotions']);
@@ -3260,6 +3270,26 @@ async function renderVitrineVisitor(init) {
     </div>
   </section>` : '';
 
+  /* « Mission » et « Notre histoire » (2026-10-09, bug trouvé par l'utilisateur en production :
+     ces deux champs sont demandés dans la complétude du profil et éditables via la modale
+     « Profil incomplet », mais n'avaient ÉTÉ AFFICHÉS NULLE PART sur la vitrine ordinateur —
+     seul `historique` apparaissait côté téléphone, sous « Nos atouts » (assets/m-mod-profil.js).
+     Même gabarit que la section Présentation ci-dessus : texte + bouton Modifier pour le
+     titulaire, section masquée si vide et visiteur. */
+  const missionSec = ((init.mission || isOwn) && modOn('mission')) ? `<section id="pv-mission" class="pvt-section">
+    <div class="pvt-section-head" style="display:flex;justify-content:space-between;align-items:center;"><h3>🎯 Notre mission</h3>${isOwn?`<button onclick="editVitrineText('mission','Mission','Quelle est votre mission ?')" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">✏️ Modifier</button>`:''}</div>
+    <div class="pvt-section-body" style="padding:16px 20px;">
+      <div class="rich-content" style="margin:0;font-size:14px;">${init.mission ? renderRichText(init.mission) : `<span style="color:#94a3b8;font-style:italic;">Aucune mission renseignée. ${isOwn?'Cliquez sur Modifier pour en ajouter une.':''}</span>`}</div>
+    </div>
+  </section>` : '';
+
+  const historiqueSec = ((init.historique || isOwn) && modOn('historique')) ? `<section id="pv-historique" class="pvt-section">
+    <div class="pvt-section-head" style="display:flex;justify-content:space-between;align-items:center;"><h3>📖 Notre histoire</h3>${isOwn?`<button onclick="editVitrineText('historique','Notre histoire','Votre histoire…')" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">✏️ Modifier</button>`:''}</div>
+    <div class="pvt-section-body" style="padding:16px 20px;">
+      <div class="rich-content" style="margin:0;font-size:14px;">${init.historique ? renderRichText(init.historique) : `<span style="color:#94a3b8;font-style:italic;">Aucun historique renseigné. ${isOwn?'Cliquez sur Modifier pour en ajouter un.':''}</span>`}</div>
+    </div>
+  </section>` : '';
+
   const collectionsSec = ((catalogues.length || isOwn) && modOn('catalogue')) ? `<section id="pv-collections" class="pvt-section">
     <div class="pvt-section-head" style="display:flex;justify-content:space-between;align-items:center;"><h3>Catalogue</h3>${isOwn?`<button onclick="openCatalogueModal()" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">➕ Créer un catalogue</button>`:''}</div>
     <div class="pvt-section-body"><div id="pvt-cataloguesgrid">${!catalogues.length?`<div class="pvz-empty" style="grid-column:1/-1;">Aucun catalogue pour le moment.${isOwn?' Cliquez sur « Créer un catalogue » pour commencer.':''}</div>`:''}</div></div>
@@ -3292,9 +3322,16 @@ async function renderVitrineVisitor(init) {
 
   // Services déplacé dans la colonne de gauche (2026-09-29) — voir renderVitrineCols().
 
-  const galerieSec = (galerie.length && modOn('galerie_photos')) ? `<section id="pv-galerie" class="pvt-section">
-    <div class="pvt-section-head sm"><h3>📸 Galerie</h3></div>
-    <div class="pvt-gallery">${galerie.map(u=>`<img loading="lazy" src="${esc(u)}" alt="">`).join('')}</div>
+  /* 2026-10-09, bug trouvé par l'utilisateur en production : « la galerie photos » est demandée
+     par la complétude du profil (server/completude.js) et le clic depuis la modale « Profil
+     incomplet » cible cette section (#pv-galerie) pour y déposer une photo — mais la section
+     n'existait QUE si la galerie avait déjà au moins une image, et ne proposait de toute façon
+     aucun bouton d'ajout, même pour le titulaire : impossible d'y arriver, impossible d'y
+     ajouter quoi que ce soit une fois arrivé. Visible désormais pour le titulaire même vide,
+     avec un bouton Ajouter et un retrait par photo (×). */
+  const galerieSec = ((galerie.length || isOwn) && modOn('galerie_photos')) ? `<section id="pv-galerie" class="pvt-section">
+    <div class="pvt-section-head sm" style="display:flex;justify-content:space-between;align-items:center;"><h3>📸 Galerie</h3>${isOwn?`<button onclick="editVitrineGalerie()" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">➕ Ajouter des photos</button>`:''}</div>
+    <div class="pvt-gallery">${galerie.map((u,i)=>`<div style="position:relative;">${isOwn?`<button onclick="pvtRetirerPhotoGalerie(${i})" title="Retirer" style="position:absolute;top:4px;right:4px;z-index:2;background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:50%;width:22px;height:22px;font-size:13px;line-height:1;cursor:pointer;">×</button>`:''}<img loading="lazy" src="${esc(u)}" alt=""></div>`).join('') || (isOwn?`<div class="pvz-empty">Aucune photo. Cliquez sur « Ajouter des photos ».</div>`:'')}</div>
   </section>` : '';
 
   // Meilleures ventes — chargées de façon asynchrone (nécessite une requête réseau)
@@ -3771,7 +3808,8 @@ async function renderVitrineVisitor(init) {
     ['actualites', actualitesSec], ['galerie_videos', videosSec],
     ['portfolio', portfolioSec], ['reservation', reservationSec], ['equipe', equipeSec],
     ['realisations', realisationsSec], ['reseaux_sociaux', reseauxSociauxSec],
-    ['offre_flash', offreFlashSec], ['a_propos', presentation], ['expertise', expertiseSec],
+    ['offre_flash', offreFlashSec], ['a_propos', presentation], ['mission', missionSec],
+    ['historique', historiqueSec], ['expertise', expertiseSec],
     ['certifications', certificationsSec], ['vision_objectifs', visionSec], ['catalogue', collectionsSec],
     ['produits', produitsSec], ['pourquoi_choisir', pourquoiSec],
     ['galerie_photos', galerieSec], ['resultats_impact', impactSec], ['besoins_projet', besoinsSec],
@@ -5175,6 +5213,55 @@ async function editVitrineBanner() {
   };
   input.click();
 }
+
+/* Ajout/retrait de photos dans la Galerie (2026-10-09, voir le commentaire sur galerieSec
+   ci-dessus) — même mécanique que editVitrineBanner (upload Bunny puis vitrineSave), mais sur
+   un tableau plutôt qu'une URL unique. Réutilise l'endpoint générique /api/upload/produit
+   (type 'produit' côté uploadMedia) : il ne fait qu'uploader et renvoyer l'URL, sans écrire
+   aucune colonne lui-même — exactement ce qu'il faut ici, comme pour la bannière. */
+const MAX_PHOTOS_GALERIE_VITRINE = 20;
+async function editVitrineGalerie() {
+  if (!isOwn || !_vitrineInit) return;
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/jpeg,image/png,image/webp,image/gif';
+  input.multiple = true;
+  input.onchange = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    const actuelle = safeParseJson(_vitrineInit.galerie_json, []);
+    if (actuelle.length >= MAX_PHOTOS_GALERIE_VITRINE) { alert(`Maximum ${MAX_PHOTOS_GALERIE_VITRINE} photos dans la galerie.`); return; }
+    const aAjouter = files.slice(0, MAX_PHOTOS_GALERIE_VITRINE - actuelle.length);
+    try {
+      const urls = [];
+      for (const file of aAjouter) { urls.push(await uploadMedia(file, 'produit')); }
+      const miseAJour = [...actuelle, ...urls];
+      await vitrineSave({ galerie_json: miseAJour });
+      /* Le module peut avoir été désactivé par défaut au signup (voir le commentaire sur la
+         route) : l'activer explicitement garantit que la photo qu'on vient d'ajouter est
+         réellement visible, jamais enregistrée dans le vide. Best-effort : une erreur ici ne
+         doit jamais faire perdre la photo déjà sauvegardée ci-dessus. */
+      try { await api('PATCH', `/initiatives/${_vitrineInit.id}/activer-module`, { module: 'galerie_photos' }); } catch (err) {}
+      _vitrineInit.galerie_json = JSON.stringify(miseAJour);
+      _vitrineInit.vitrine_modules_state = { ...(_vitrineInit.vitrine_modules_state || {}), galerie_photos: { actif: true, ordre: (_vitrineInit.vitrine_modules_state?.galerie_photos?.ordre ?? 4) } };
+      renderVitrineVisitor(_vitrineInit);
+    } catch (err) { alert('Erreur : ' + err.message); }
+  };
+  input.click();
+}
+window.editVitrineGalerie = editVitrineGalerie;
+async function pvtRetirerPhotoGalerie(index) {
+  if (!isOwn || !_vitrineInit) return;
+  const actuelle = safeParseJson(_vitrineInit.galerie_json, []);
+  if (!confirm('Retirer cette photo de la galerie ?')) return;
+  actuelle.splice(index, 1);
+  try {
+    await vitrineSave({ galerie_json: actuelle });
+    _vitrineInit.galerie_json = JSON.stringify(actuelle);
+    renderVitrineVisitor(_vitrineInit);
+  } catch (err) { alert('Erreur : ' + err.message); }
+}
+window.pvtRetirerPhotoGalerie = pvtRetirerPhotoGalerie;
 
 /* ── Enregistrement des contenus de la vitrine ──
    Dans l'aperçu du centre de création (?preview=draft), les contenus rejoignent le
