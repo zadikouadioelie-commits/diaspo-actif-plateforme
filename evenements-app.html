@@ -101,6 +101,25 @@
   .evt-layout{grid-template-columns:230px 1fr 300px 288px 290px;}
   .evt-pub-col{display:block;}
 }
+/* Portables et écrans moyens (2026-10-09, demande explicite : « abaisse les seuils d'affichage ») — la colonne pub n'apparaissait
+   qu'à partir de 1700px, donc jamais sur un portable courant : l'emplacement « evenements_sidebar » était invisible pour la plupart
+   des visiteurs. Entre 1101 et 1699px elle s'empile sous « Découvrir des initiatives » dans la colonne de droite (le conteneur
+   .evt-right-stack ; en display:contents ailleurs, la grille 4/5 colonnes des grands écrans reste exactement celle d'avant) ;
+   en dessous de 1100px (colonnes empilées) elle s'affiche à la suite au lieu de disparaître. */
+.evt-right-stack{display:contents;}
+@media(min-width:1101px) and (max-width:1699px){
+  .evt-right-stack{display:flex;flex-direction:column;gap:22px;position:sticky;top:80px;max-height:calc(100vh - 100px);overflow-y:auto;}
+  .evt-right-stack>.evt-suggest-col,.evt-right-stack>.evt-ad-col{position:static;max-height:none;overflow:visible;}
+  .evt-right-stack>.evt-ad-col{display:block;}
+}
+@media(max-width:1100px){
+  .evt-right-stack>.evt-ad-col{display:block;margin-top:22px;}
+}
+/* Carte pub en colonne étroite (2026-10-09) : la carte horizontale de renderAdSlot() (image 88px + texte + bouton) débordait d'une colonne de 226–300px — on l'empile verticalement ici. */
+.evt-ad-col [data-ad-emplacement] > div{flex-direction:column !important;align-items:stretch !important;gap:10px !important;}
+.evt-ad-col [data-ad-emplacement] img,.evt-ad-col [data-ad-emplacement] video{width:100% !important;height:auto !important;max-height:150px;}
+.evt-ad-col [data-ad-emplacement] .btn{align-self:flex-start;}
+.evt-right-stack{overflow-x:hidden;}
 .evt-ad-vision{font-size:12.5px;color:var(--muted);line-height:1.6;}
 .evt-ad-vision strong{display:block;color:var(--text);font-size:13.5px;margin-bottom:6px;}
 .evt-pub-item{padding:10px 0;border-bottom:1px solid var(--border);}
@@ -401,7 +420,8 @@
       <div class="evt-grid" id="evt-list"></div>
     </div>
 
-    <!-- ═══ COLONNE DROITE : SUGGESTIONS D'INITIATIVES ═══ -->
+    <!-- ═══ COLONNE DROITE : SUGGESTIONS D'INITIATIVES (+ espace publicitaire, voir .evt-right-stack) ═══ -->
+    <div class="evt-right-stack">
     <aside class="evt-suggest-col">
       <div class="evt-col-title">✨ Découvrir des initiatives</div>
       <div id="sugg-list" style="margin-top:10px;font-size:12.5px;color:var(--muted);">Chargement…</div>
@@ -424,6 +444,8 @@
       </template>
       <div id="ad-evenements-sidebar" data-ad-emplacement="evenements_sidebar" data-ad-fallback="evt-ad-fallback" data-ad-rotate="60000" style="margin-top:10px;"></div>
     </aside>
+
+    </div><!-- /.evt-right-stack -->
 
     <!-- ═══ COLONNE PUBLICATIONS (2026-09-29, demande explicite) — fil d'actualité filtré aux
          comptes Initiative/Collectivité/Administrateur, jamais les comptes Utilisateur

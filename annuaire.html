@@ -150,6 +150,23 @@
   #ann-page-row{justify-content:flex-start;}
   .ann-ad-col{display:block;}
 }
+/* Portables et écrans moyens (2026-10-09, demande explicite : « abaisse les seuils d'affichage ») — la colonne pub
+   n'apparaissait qu'à partir de 1550px, donc jamais sur un portable courant (1366–1536px) : l'emplacement « annuaire_sidebar »
+   était invisible pour la plupart des visiteurs. De 1280 à 1549px la grille passe à 3 colonnes pour lui laisser la place ;
+   en dessous de 1280px elle se range sous la grille, pleine largeur, au lieu de disparaître. */
+@media(min-width:1280px) and (max-width:1549px){
+  #ann-page-row{justify-content:flex-start;}
+  .ann-grid{flex:1 1 0;min-width:0;margin:0;grid-template-columns:repeat(3,1fr);}
+  .ann-ad-col{display:block;flex:0 0 280px;min-width:0;max-width:280px;margin-right:24px;}
+}
+@media(max-width:1279px){
+  #ann-page-row{flex-direction:column;align-items:stretch;}
+  .ann-ad-col{display:block;position:static;min-width:0;max-width:none;margin:0 24px 32px;}
+}
+/* Carte pub en colonne étroite (2026-10-09) : la carte horizontale de renderAdSlot() (image 88px + texte + bouton) débordait d'une colonne de 226–300px — on l'empile verticalement ici. */
+.ann-ad-col [data-ad-emplacement] > div{flex-direction:column !important;align-items:stretch !important;gap:10px !important;}
+.ann-ad-col [data-ad-emplacement] img,.ann-ad-col [data-ad-emplacement] video{width:100% !important;height:auto !important;max-height:150px;}
+.ann-ad-col [data-ad-emplacement] .btn{align-self:flex-start;}
 .ann-ad-vision{font-size:12.5px;color:var(--muted);line-height:1.6;}
 .ann-ad-vision strong{display:block;color:var(--text);font-size:13.5px;margin-bottom:6px;}
 

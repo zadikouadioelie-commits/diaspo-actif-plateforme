@@ -17,6 +17,57 @@
   const safeUrl = u => /^(https?:|data:image\/|\/|blob:)/i.test(String(u || '')) ? String(u) : '';
   const attrUrl = u => esc(safeUrl(u));
 
+  /* ---------- Publicités sur téléphone (2026-10-09, demande explicite) ----------
+     La version téléphone n'affichait AUCUNE publicité alors que les visiteurs mobiles y sont redirigés : les annonceurs ne touchaient que
+     l'ordinateur. Chaque emplacement vendu a désormais son équivalent ici (mêmes clés que le site : /api/ads/servir?emplacement=…) :
+       homepage_top, homepage_feed, between_videos, vitrine_section → Accueil · between_posts, fil_sidebar, vue_publication_restreinte → Fil/Actualités
+       evenements_sidebar → Événements · annuaire_sidebar → Annuaire · vitrine_section → Boutiques.
+     (inscription_sidebar_gauche/droite : la page d'inscription est une page à part, pas un écran de cette appli.)
+     Une case n'appelle le serveur — donc ne compte une impression — que lorsqu'elle approche de l'écran ; sans publicité active elle disparaît. */
+  const PUB_VUES = [];
+  const pubSlot = slot => `<div class="mpub" data-slot="${slot}"></div>`;
+  async function pubRemplir(el) {
+    el.dataset.ok = '1';
+    try {
+      const excl = PUB_VUES.slice(-6).join(',');
+      const r = await fetch('/api/ads/servir?emplacement=' + encodeURIComponent(el.dataset.slot) + (excl ? '&exclude=' + excl : ''), { credentials: 'include' }).then(x => x.json());
+      const ad = r && r.ad;
+      if (!ad) { el.remove(); return; }
+      PUB_VUES.push(ad.id);
+      const media = ad.media_url
+        ? (ad.media_type === 'video'
+          ? `<video src="${attrUrl(ad.media_url)}" muted autoplay loop playsinline style="width:100%;max-height:220px;object-fit:cover;display:block;background:#000"></video>`
+          : `<img src="${attrUrl(ad.media_url)}" alt="${esc(ad.titre)}" loading="lazy" style="width:100%;max-height:220px;object-fit:cover;display:block" onerror="this.remove()">`)
+        : '';
+      const lien = safeUrl(ad.lien_url);
+      el.innerHTML = `<div class="card pub-card">${media}<div class="pad"><span class="badge pub-badge">📣 Sponsorisé</span>
+        <div class="pub-t">${esc(ad.titre)}</div>${ad.description ? `<div class="small muted pub-d">${esc(ad.description)}</div>` : ''}
+        ${lien ? `<a class="btn sm" href="${esc(lien)}" target="_blank" rel="noopener sponsored" data-pub-clic="${Number(ad.id)}">${esc(ad.cta || 'En savoir plus')}</a>` : ''}</div></div>`;
+    } catch (e) { el.remove(); }
+  }
+  const pubObs = 'IntersectionObserver' in window
+    ? new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { pubObs.unobserve(e.target); pubRemplir(e.target); } }), { rootMargin: '300px 0px' })
+    : null;
+  function pubScan() {
+    $$('.mpub:not([data-ok]):not([data-obs])').forEach(el => { el.dataset.obs = '1'; if (pubObs) pubObs.observe(el); else pubRemplir(el); });
+  }
+  new MutationObserver(pubScan).observe(document.body, { childList: true, subtree: true });
+  document.addEventListener('click', e => {
+    const a = e.target.closest('[data-pub-clic]');
+    if (a) fetch('/api/ads/' + encodeURIComponent(a.dataset.pubClic) + '/clic', { method: 'POST', keepalive: true }).catch(() => { });
+  });
+  /* Intercale des cases pub dans une liste de cartes déjà rendues en HTML : `apres` = positions (1-based) → emplacement, `chaque` = toutes les N cartes. */
+  function pubIntercaler(cartes, depart, apres, chaque, slotChaque) {
+    const out = [];
+    cartes.forEach((h, k) => {
+      out.push(h);
+      const pos = depart + k + 1;
+      if (apres[pos]) out.push(pubSlot(apres[pos]));
+      else if (chaque && pos % chaque === 0) out.push(pubSlot(slotChaque));
+    });
+    return out;
+  }
+
   const ICONS = {
     fil: '<path d="M4 4h13v16H6a2 2 0 0 1-2-2V4z"/><path d="M17 9h3v9a2 2 0 0 1-2 2"/><path d="M8 8h5M8 12h5M8 16h3"/>',
     cal: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
@@ -375,7 +426,7 @@
   const FIL_MODES = [['tous', 'Pour vous'], ['suivis', 'Mes abonnements'], ['populaires', 'Populaires'], ['organisations', 'Organisations']];
   function viewFil() {
     const el = $('#home-feed');
-    el.innerHTML = `<div class="chips" role="tablist">${FIL_MODES.map(([k, l]) => `<button class="chip ${S.fil.mode === k ? 'on' : ''}" data-mode="${k}" role="tab" aria-selected="${S.fil.mode === k}">${l}</button>`).join('')}</div><div id="fil-list"></div><div id="fil-more"></div>`;
+    el.innerHTML = `<div class="chips" role="tablist">${FIL_MODES.map(([k, l]) => `<button class="chip ${S.fil.mode === k ? 'on' : ''}" data-mode="${k}" role="tab" aria-selected="${S.fil.mode === k}">${l}</button>`).join('')}</div>${pubSlot('between_posts')}<div id="fil-list"></div><div id="fil-more"></div>`;
     $$('.chip', el).forEach(c => c.onclick = async () => {
       if (c.dataset.mode === 'suivis' && !(await needLogin('Connectez-vous pour voir les publications de vos abonnements.'))) return;
       S.fil = { mode: c.dataset.mode, page: 1, pages: 1, posts: [], loaded: false }; viewFil();
@@ -441,8 +492,9 @@
   }
   function paintFil() {
     const list = $('#fil-list'), more = $('#fil-more'); if (!list) return;
-    const html = S.fil.posts.filter(p => p.type !== 'compte_rendu' && !p.compte_rendu).map(p => actuVerte(postHtml(p))).join('');
-    if (!html) {
+    const cartesFil = S.fil.posts.filter(p => p.type !== 'compte_rendu' && !p.compte_rendu).map(p => actuVerte(postHtml(p))).filter(Boolean);
+    const html = pubIntercaler(cartesFil, 0, { 3: 'fil_sidebar' }, 6, 'vue_publication_restreinte').join('');
+    if (!cartesFil.length) {
       list.innerHTML = `<div class="empty"><div class="ei">${ic('fil', 'l')}</div><b>${S.fil.mode === 'suivis' ? 'Rien à afficher pour l’instant' : 'Aucune publication'}</b>${esc(S.fil.conseil || 'Revenez bientôt : la communauté publie chaque jour.')}</div>`;
       more.innerHTML = ''; return;
     }
@@ -615,7 +667,7 @@
     /* Entrée « ⚡ Événement flash » + « ? » (comptes Initiative seulement) — fournie par le module Mes événements, vide sinon. */
     el.innerHTML = `${(window.MMods && window.MMods.flashCarte) ? window.MMods.flashCarte() : ''}<div class="search">${ic('search', 's')}<input id="evq" type="search" placeholder="Rechercher un événement…" aria-label="Rechercher un événement" value="${esc(S.ev.q)}"></div>
       <div class="chips">${[['avenir', 'À venir'], ['passes', 'Terminés'], ['gratuit', 'Gratuits'], ['mes', 'Mes inscriptions']].map(([k, l]) => `<button class="chip ${S.ev.filtre === k ? 'on' : ''}" data-f="${k}">${l}</button>`).join('')}</div>
-      <div id="ev-bar"></div><div class="small muted" id="ev-count" style="margin:0 4px 10px"></div><div id="ev-list"></div>`;
+      ${pubSlot('evenements_sidebar')}<div id="ev-bar"></div><div class="small muted" id="ev-count" style="margin:0 4px 10px"></div><div id="ev-list"></div>`;
     $$('.chip[data-f]', el).forEach(c => c.onclick = async () => {
       if (c.dataset.f === 'mes' && !(await needLogin('Connectez-vous pour retrouver vos inscriptions.'))) return;
       S.ev.filtre = c.dataset.f; viewEvents();
@@ -747,7 +799,7 @@
     el.innerHTML = `<div class="search">${ic('search', 's')}<input id="aq" type="search" placeholder="Nom, métier, ville, mot-clé…" aria-label="Rechercher dans l’annuaire" value="${esc(S.ann.q)}"></div>
       <div class="chips">${ANN_TYPES.map(([k, l]) => `<button class="chip ${S.ann.type === k ? 'on' : ''}" data-t="${esc(k)}">${l}</button>`).join('')}</div>
       <div class="ann-bar"><button class="btn out sm" id="ann-fl">${ic('search', 's')} Filtres${annNbFiltres() ? ' (' + annNbFiltres() + ')' : ''}</button><div class="chips" id="ann-pills">${annPills()}</div></div>
-      <div class="small muted" id="ann-count" style="margin:0 4px 10px"></div><div id="ann-list"></div><div id="ann-more"></div>`;
+      <div class="small muted" id="ann-count" style="margin:0 4px 10px"></div>${pubSlot('annuaire_sidebar')}<div id="ann-list"></div><div id="ann-more"></div>`;
     $$('.chip[data-t]', el).forEach(c => c.onclick = () => { S.ann.type = c.dataset.t; S.ann.loaded = false; viewAnnuaire(); });
     $$('[data-clear]', el).forEach(c => c.onclick = () => { S.ann[c.dataset.clear] = ''; if (c.dataset.clear === 'type') S.ann.loaded = false; viewAnnuaire(); });
     $('#ann-fl').onclick = openAnnFilters;
@@ -1019,8 +1071,10 @@
     const el = $('#actu-liste'); if (!el) return 0;
     const lot = ACTU.liste.slice(ACTU.affiche, ACTU.affiche + n);
     if (!lot.length) return 0;
+    const depart = ACTU.affiche;
     ACTU.affiche += lot.length;
-    el.insertAdjacentHTML('beforeend', lot.map(x => x.h).join(''));
+    /* Publicités : « homepage_feed » mêlée aux actualités (après la 2ᵉ, comme sur le site), puis « vue_publication_restreinte » toutes les 6 cartes. */
+    el.insertAdjacentHTML('beforeend', pubIntercaler(lot.map(x => x.h), depart, { 2: 'homepage_feed' }, 6, 'vue_publication_restreinte').join(''));
     $$('[data-clamp]', el).forEach(c => { if (c.scrollHeight > c.clientHeight + 2) { const b = c.parentNode.querySelector('[data-more]'); if (b) b.hidden = false; } });
     return lot.length;
   }
@@ -1433,7 +1487,7 @@
      ============================================================ */
   function viewBoutiques() {
     const el = $('#t-boutiques');
-    el.innerHTML = `<div class="search">${ic('search', 's')}<input id="bq" type="search" placeholder="Rechercher une boutique…" aria-label="Rechercher une boutique" value="${esc(S.boutiques.q)}"></div><div id="bt-bar"></div><div class="small muted" id="bt-count" style="margin:0 4px 10px"></div><div id="bt-list"></div>`;
+    el.innerHTML = `<div class="search">${ic('search', 's')}<input id="bq" type="search" placeholder="Rechercher une boutique…" aria-label="Rechercher une boutique" value="${esc(S.boutiques.q)}"></div><div id="bt-bar"></div><div class="small muted" id="bt-count" style="margin:0 4px 10px"></div>${pubSlot('vitrine_section')}<div id="bt-list"></div>`;
     let t; $('#bq').oninput = e => { clearTimeout(t); t = setTimeout(() => { S.boutiques.q = e.target.value.trim(); paintBoutiques(); }, 200); };
     if (!S.boutiques.loaded) loadBoutiques(); else paintBoutiques();
   }
@@ -1497,7 +1551,7 @@
     const el = $('#t-accueil');
     if (S.home.loaded && $('#home-actus', el)) return;
     S.home.loaded = true;
-    el.innerHTML = `<div id="home-annonce"></div><div id="home-honneur"></div><div id="home-videos"></div>
+    el.innerHTML = `${pubSlot('homepage_top')}<div id="home-annonce"></div><div id="home-honneur"></div><div id="home-videos"></div>${pubSlot('between_videos')}
       <div class="card hero"><div class="pad"><div class="small" style="font-weight:700;color:var(--orange-d)">🌍 Réseau diaspora mondial</div>
         <h2 style="margin:6px 0 8px;font-size:20px;line-height:1.25">Connecter les diasporas, valoriser les talents, accélérer le développement des territoires.</h2>
         <p class="muted small" style="margin:0 0 12px">Des passerelles entre pays d’origine et pays d’accueil, grâce aux compétences, projets, organisations et initiatives portés par les diasporas du monde entier.</p>
@@ -1506,7 +1560,7 @@
       <div class="card"><div class="pad"><h2 class="sec-t sec-in"><span class="sic">${ic('star')}</span><span>Pourquoi Diaspo’Actif ?</span></h2>
         <p style="margin:0 0 10px">La diaspora africaine est un levier de développement majeur, mais ses initiatives restent dispersées, invisibles, sans réseau. Diaspo’Actif change ça.</p>
         <div class="tags" style="margin:0"><span class="badge">👥 Rassembler les talents</span><span class="badge">🗂️ Organiser les initiatives</span><span class="badge">🚀 Mobiliser pour un impact durable</span></div></div></div>
-      <div id="home-actus"></div><div id="home-init"></div><div id="home-shops"></div><div id="home-temo"></div><div id="home-part"></div>`;
+      <div id="home-actus"></div><div id="home-init"></div><div id="home-shops"></div>${pubSlot('vitrine_section')}<div id="home-temo"></div><div id="home-part"></div>`;
     loadHome();
     if (window.MMap) { if (S.home.stopMap) S.home.stopMap(); S.home.stopMap = window.MMap.mount($('#home-map')); }
   }

@@ -474,3 +474,9 @@ button.li{background:none;font:inherit;color:inherit}
 .avz-next{right:8px}
 @media (hover:hover) and (pointer:fine){.avz-fl{display:grid}}
 #home-actus .card.post,#home-actus .card.crn{cursor:pointer}
+/* Publicités sur téléphone — 2026-10-09 (cases chargées à l'approche de l'écran, supprimées s'il n'y a pas de publicité) */
+.mpub:empty{height:1px;margin:0}
+.pub-card{overflow:hidden}
+.pub-badge{background:#EEF2FF;color:var(--navy2,#1B3A6B);font-size:11px;font-weight:800}
+.pub-t{font-weight:800;font-size:16px;line-height:1.25;margin:8px 0 2px}
+.pub-d{margin:0 0 10px}
