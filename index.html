@@ -569,27 +569,11 @@
   padding-top: 14px;
   border-top: 1px solid var(--border);
 }
-.hp-init-progress {
+.hp-init-ray {
   margin-top: 14px;
-}
-.hp-init-progress-bar {
-  height: 4px;
-  background: var(--border);
-  border-radius: 2px;
-  overflow: hidden;
-  margin-top: 6px;
-}
-.hp-init-progress-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #1565C0, #4A90D9);
-  border-radius: 2px;
-  transition: width 1s ease;
-}
-.hp-init-progress-label {
-  font-size: 11px;
+  font-size: 12.5px;
+  font-weight: 600;
   color: var(--muted);
-  display: flex;
-  justify-content: space-between;
 }
 .hp-discover-btn {
   display: inline-flex;
@@ -2288,8 +2272,10 @@
     'Finance':        {bg:'#1B5E20', lbl:'FINANCE'},
     'Droit':          {bg:'#37474F', lbl:'DROIT'},
   };
-  const PROG_LABEL = {locale:'Impact local',régionale:'Impact régional',nationale:'Impact national',internationale:'Impact mondial'};
-  const PROG_VAL   = {locale:20,régionale:45,nationale:65,internationale:92};
+  /* Rayonnement territorial choisi par l'initiative à l'inscription (locale / régionale / nationale / internationale).
+     Remplace l'ancienne barre « Impact … 20 % » (2026-10-09, demande explicite) : ce pourcentage n'était qu'une valeur fixe
+     par portée et laissait croire à une mesure d'impact qui n'existe pas. */
+  const RAY_TXT = {locale:'📍 Rayonnement local',régionale:'🗺️ Rayonnement régional',nationale:'🏳️ Rayonnement national',internationale:'🌐 Rayonnement international','internationale+':'🌐 Rayonnement international'};
   /* Initiales de l'initiative, pour les comptes qui n'ont pas encore chargé de visuel. */
   const initiales = nom => String(nom || '?').trim().split(/[\s'’-]+/).filter(Boolean)
     .slice(0, 2).map(m => m[0]).join('').toUpperCase() || '?';
@@ -2307,8 +2293,7 @@
       const photo = it.vitrine_banniere_url || it.logo_url || '';
       const loc   = [it.ville, it.pays].filter(Boolean).join(', ') || '—';
       const ray   = it.rayonnement || 'locale';
-      const pct   = PROG_VAL[ray] || 30;
-      const plbl  = PROG_LABEL[ray] || 'Impact';
+      const rayTxt = RAY_TXT[ray] || RAY_TXT.locale;
       return `
       <a class="hp-init-card" href="initiative.html?id=${encodeURIComponent(it.slug || it.id)}">
         <div class="hp-init-photo" style="background:linear-gradient(135deg,${badge.bg},#0D1B2A);">
@@ -2319,14 +2304,7 @@
         <div class="hp-init-body">
           <div class="hp-init-title">${it.nom}</div>
           <p class="hp-init-desc">${(stripRichTags(it.description || it.mission || '') || 'Initiative de la diaspora engagée pour le développement.').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]))}</p>
-          <div class="hp-init-progress">
-            <div class="hp-init-progress-label">
-              <span>${plbl}</span><span>${pct}%</span>
-            </div>
-            <div class="hp-init-progress-bar">
-              <div class="hp-init-progress-fill" style="width:${pct}%"></div>
-            </div>
-          </div>
+          <div class="hp-init-ray">${rayTxt}</div>
           <div class="hp-init-meta">
             <span>📍 ${loc}</span>
             <span class="hp-discover-btn">Découvrir →</span>
