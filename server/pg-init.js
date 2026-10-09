@@ -1264,6 +1264,10 @@ const COLONNES_MIGRATION = [
     ['commandes_vitrine', 'livre_le', 'TEXT'],
     ['commandes_vitrine', 'transporteur', 'TEXT'],
     ['commandes_vitrine', 'lien_suivi_perso', 'TEXT'],
+    // Ajouts manuels d'adhérents — réglage propre à la fiche (2026-10-09, miroir de l'ALTER db.js)
+    ['adhesion_membres', 'relances_jours_json', 'TEXT'],
+    ['adhesion_membres', 'relances_canal', 'TEXT'],
+    ['initiatives', 'adh_manuel_defaut_json', 'TEXT'],
 ];
 
 async function migratePg(pool) {
