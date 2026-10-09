@@ -28,7 +28,11 @@ window.DonBanner = (function () {
     if (data.mode === 'toutes') {
       return `<a href="cagnottes.html?owner=${encodeURIComponent(ownerUserId)}" class="don-banner-btn">💚 Faire un don</a>`;
     }
-    const don = data.don;
+    /* Deux formes selon la route : GET /api/cagnottes/vedette renvoie { mode, don:{…} }, GET /api/cagnottes/vedette-lot (annuaire) renvoie le don
+       à plat { mode, slug, titre… } — avant ce repli, le lot levait « reading 'slug' » : aucun bouton « Faire un don » dans l'annuaire, et les
+       comptes suivants du lot étaient abandonnés. */
+    const don = data.don || data;
+    if (!don || !don.slug) return '';
     const href = `cagnotte.html?slug=${encodeURIComponent(don.slug)}`;
     const label = `💚 Faire un don${don.titre ? ' — ' + String(don.titre).slice(0, 40) : ''}`;
     return `<a href="${href}" class="don-banner-btn">${label}</a>`;
