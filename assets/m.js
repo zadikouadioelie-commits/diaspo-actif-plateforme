@@ -191,6 +191,13 @@
   /* ---------- connexion ---------- */
   async function loadMe() {
     try { const r = await api('/api/auth/me'); S.me = r.user || null; } catch (e) { S.me = null; }
+    /* Profil public obligatoire (2026-10-09) : l'appli n'a pas les formulaires de saisie (photo, biographie, compétences…).
+       Le compte concerné est envoyé sur sa fiche complète (profil.html, qui reste ouverte sur téléphone) où l'écran
+       « Merci de bien vouloir renseigner vos informations » le guide point par point. */
+    if (S.me && S.me.profil_obligatoire && S.me.profil_obligatoire.actif) {
+      location.replace(S.me.role === 'collectivite' ? '/profil-collectivite.html?id=' + encodeURIComponent(S.me.id) : '/profil.html?obligatoire=1');
+      return;
+    }
     if (S.me) { refreshBadges(); loadMyInsc(); loadPremium(); }
     renderTop();
   }

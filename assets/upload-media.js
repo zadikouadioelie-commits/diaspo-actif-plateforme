@@ -142,6 +142,7 @@ function pickAndUpload(type = 'avatar', options = {}) {
           return resolve(null);
         }
         const url = await uploadMedia(compressed, type);
+        if (url && window.profilObligatoireRafraichir) window.profilObligatoireRafraichir();
         resolve(url);
       } catch (err) {
         console.error('[uploadMedia]', err);

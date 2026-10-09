@@ -142,6 +142,8 @@ const SEC = require("./security");
 const Connexions = require("./connexions");
 /* Confirmation d'un nouvel appareil (étape 2 du chantier sécurité des connexions) — server/confirmation-appareil.js. */
 const ConfirmationAppareil = require("./confirmation-appareil");
+const ProfilObligatoire = require("./profil-obligatoire");
+const RelancePublication = require("./relance-publication");
 /* Étape 3 : l'échéance réelle d'une session enregistrée est dans le registre (30 jours glissants pour un
    appareil principal, 3 jours pour un autre) — le jeton et le cookie doivent donc pouvoir vivre au moins
    aussi longtemps, d'où cette durée longue pour toute session portée par un jti. Sans jti (ancien
@@ -539,7 +541,7 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
   /* let (pas const) : domaine_principal/sous_domaine_1 sont réassignés plus bas quand une
      invitation de parrainage en fournit un repli — voir plus bas. */
   let {
-    nom, prenom, email, password, role,
+    nom, prenom, email, password, role, bio,
     date_naissance, nationalite1, nationalite2, nationalite3,
     pays, region, departement, ville, adresse, code_postal, telephone,
     centres_interet, situation_pro,
@@ -650,6 +652,11 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
   if ((role === "utilisateur" || role === "initiative") && !domaine_principal) {
     return sendJSON(res, 400, { error: "Le domaine d'activité est obligatoire." });
   }
+  /* Biographie obligatoire à l'inscription d'un compte utilisateur (2026-10-09, demande explicite) —
+     modifiable ensuite depuis la fiche. Revalidée ici, pas seulement dans le formulaire. */
+  if (role === "utilisateur" && !String(bio || "").trim()) {
+    return sendJSON(res, 400, { error: "La biographie est obligatoire." });
+  }
   /* Statut de l'initiative — "en_creation" : le porteur de projet peut créer son compte
      immédiatement, les informations administratives restent facultatives. "existante" :
      la structure est déjà officiellement créée, ces informations deviennent obligatoires
@@ -708,6 +715,10 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
        (celle-ci les réécrit ensuite sur `initiatives` juste en-dessous, voir plus bas). */
     domaine_principal || null, sous_domaine_1 || null, sous_domaine_2 || null
   )).lastInsertRowid;
+
+  if (String(bio || "").trim()) {
+    try { await db.prepare("UPDATE users SET bio=? WHERE id=?").run(String(bio).trim().slice(0, 2000), id); } catch (e) { logError(e, "bio à l'inscription", req); }
+  }
 
   /* Liens Adhérents — verrouillage atomique (cahier des charges § 12) : l'UPDATE conditionnelle
      (WHERE status='available') ne peut réussir que pour UNE seule requête concurrente sur le
@@ -2745,6 +2756,12 @@ route("GET", "/api/auth/me", async (req, res) => {
         pub.origine_manquante = false;
       }
     } catch (e) { pub.origine_manquante = false; }
+  }
+
+  /* Profil public obligatoire (2026-10-09) : calculé ici, lu tel quel par assets/app.js. */
+  if (pub) {
+    try { pub.profil_obligatoire = await ProfilObligatoire.etat(db, user); }
+    catch (e) { pub.profil_obligatoire = null; logError(e, "profil obligatoire", req); }
   }
 
   /* Adresse de livraison (2026-09-30, demande explicite : "fait le maximum de choses en

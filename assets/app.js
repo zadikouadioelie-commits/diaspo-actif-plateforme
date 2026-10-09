@@ -64,6 +64,7 @@ async function api(method, path, body) {
   let data = {};
   try { data = await res.json(); } catch (e) { /* réponse vide */ }
   if (!res.ok) throw Object.assign(new Error(data.error || "Erreur serveur"), { status: res.status, data });
+  if (method !== 'GET' && window.__poActif && !/^\/(auth|relances-profil|notifications|messages)/.test(path) && window.profilObligatoireRafraichir) window.profilObligatoireRafraichir();
   return data;
 }
 
@@ -1039,6 +1040,138 @@ window.relanceProfilApresSauvegarde = function () {
   setTimeout(() => afficherRelanceProfil(CURRENT_USER, { apresSauvegarde: true }), 450);
 };
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   PROFIL PUBLIC OBLIGATOIRE (2026-10-09, demande explicite)
+   Un compte dont l'obligation est active (GET /api/auth/me → profil_obligatoire.actif, calculé par
+   server/profil-obligatoire.js) est AUTOMATIQUEMENT dirigé vers sa fiche dès qu'il se connecte, sans
+   pouvoir refuser : sur toute autre page il est ramené à sa fiche. Il y voit « Merci de bien vouloir
+   renseigner vos informations », son ÉTAT DE PROFIL (pourcentage et objectif) et chaque point à remplir,
+   cliquable pour arriver exactement au bon formulaire. Après chaque enregistrement la liste revient,
+   mise à jour, jusqu'au seuil (100 % utilisateur, 50 % autres) puis un message de remerciement.
+   ═══════════════════════════════════════════════════════════════════════════ */
+const PO_PAGES_EDITION = /(^|\/)(profil|initiative|profil-collectivite|confidentialite|login|inscription|verifier-email|email-verifie|mot-de-passe-oublie|reset-password|reinitialiser|charte)(\.html)?$/;
+const PO_CLE_ACTIF = 'da_profil_obligatoire_actif';
+window.__poActif = false;
+
+function poCibleProfil(user) {
+  return user.role === 'collectivite' ? `profil-collectivite.html?id=${encodeURIComponent(user.id)}` : 'profil.html?obligatoire=1';
+}
+function poMarquer(actif) { try { if (actif) sessionStorage.setItem(PO_CLE_ACTIF, '1'); else sessionStorage.removeItem(PO_CLE_ACTIF); } catch (e) { /* stockage indisponible */ } }
+function poFlag() { try { return sessionStorage.getItem(PO_CLE_ACTIF) === '1'; } catch (e) { return false; } }
+
+function injectPoStyles() {
+  if (document.getElementById('po-style')) return;
+  injectRelanceProfilStyles();
+  const st = document.createElement('style');
+  st.id = 'po-style';
+  st.textContent = `
+.po-etat{margin:0 0 14px;padding:12px 14px;border-radius:12px;background:#fff;border:1.5px solid #93c5fd;text-align:left}
+.po-etat-titre{display:flex;justify-content:space-between;gap:10px;font-weight:800;color:#1e3a8a;font-size:14.5px;margin-bottom:8px}
+.po-barre{position:relative;height:12px;border-radius:999px;background:#dbeafe;overflow:hidden}
+.po-barre>i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,#2563eb,#38bdf8);transition:width .5s ease}
+.po-objectif{margin-top:6px;font-size:12px;color:#3b5b8c}
+.po-section{margin:4px 0 6px;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#3b5b8c;text-align:left}
+.po-deco{display:block;margin:10px auto 0;background:none;border:none;color:#475f86;font-size:12.5px;text-decoration:underline;cursor:pointer;padding:6px}
+#po-bandeau{position:fixed;top:0;left:0;right:0;z-index:9990;display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;padding:8px 14px;background:linear-gradient(135deg,#1e3a8a,#2563eb);color:#fff;font-size:13.5px;font-weight:600;box-shadow:0 2px 10px rgba(30,64,175,.35)}
+#po-bandeau b{font-weight:800}
+#po-bandeau button{border:none;border-radius:999px;padding:6px 14px;background:#fff;color:#1e3a8a;font-weight:800;font-size:12.5px;cursor:pointer}
+body.po-avec-bandeau{padding-top:44px}`;
+  document.head.appendChild(st);
+}
+
+function poBandeau(g) {
+  injectPoStyles();
+  let b = document.getElementById('po-bandeau');
+  if (!b) {
+    b = document.createElement('div');
+    b.id = 'po-bandeau';
+    document.body.appendChild(b);
+    document.body.classList.add('po-avec-bandeau');
+  }
+  b.innerHTML = `<span>📋 État de votre profil : <b>${g.pct} %</b> — objectif <b>${g.seuil} %</b></span><button type="button" id="po-voir">Voir ce qu’il me reste à remplir</button>`;
+  b.querySelector('#po-voir').addEventListener('click', () => poOuvrirCarte(g));
+}
+function poRetirerBandeau() {
+  const b = document.getElementById('po-bandeau');
+  if (b) b.remove();
+  document.body.classList.remove('po-avec-bandeau');
+}
+
+async function poDeconnexion() {
+  try { await api('POST', '/auth/logout', {}); } catch (e) { /* on part quand même */ }
+  poMarquer(false);
+  window.location.href = 'index.html';
+}
+window.poDeconnexion = poDeconnexion;
+
+function poOuvrirCarte(g) {
+  injectPoStyles();
+  const manquants = g.points.filter(p => !p.ok);
+  const faits = g.points.filter(p => p.ok);
+  const ligneFaite = p => `<li><div class="rp-ligne rp-fait"><span aria-hidden="true">✅</span><span class="rp-lib">${esc2Rp(p.libelle)}</span></div></li>`;
+  const ligneAFaire = p => `<li><a class="rp-ligne" href="${esc2Rp(p.lien)}"><span aria-hidden="true">📝</span><span class="rp-lib">${esc2Rp(p.libelle)}</span><span class="rp-fleche" aria-hidden="true">›</span></a></li>`;
+  const ov = rpOuvrirOverlay(`
+    <div class="rp-icone" aria-hidden="true">💙</div>
+    <h2 class="rp-titre" id="rp-titre">Merci de bien vouloir renseigner vos informations</h2>
+    ${g.apresEnregistrement ? '<div class="rp-ok">✅ C’est enregistré, merci !</div>' : ''}
+    <p class="rp-texte">Pour être trouvé et mis en relation sur Diaspo’Actif, votre profil public doit être renseigné à au moins <strong>${g.seuil} %</strong>.</p>
+    <div class="po-etat" aria-live="polite">
+      <div class="po-etat-titre"><span>État de votre profil</span><span>${g.pct} %</span></div>
+      <div class="po-barre" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${g.pct}"><i style="width:${Math.max(2, Math.min(100, g.pct))}%"></i></div>
+      <div class="po-objectif">Objectif : ${g.seuil} % · ${g.remplis} élément${g.remplis > 1 ? 's' : ''} renseigné${g.remplis > 1 ? 's' : ''} sur ${g.total}</div>
+    </div>
+    <div class="po-section">À renseigner (${manquants.length})</div>
+    <ul class="rp-liste">${manquants.map(ligneAFaire).join('')}</ul>
+    ${faits.length ? `<div class="po-section">Déjà renseigné (${faits.length})</div><ul class="rp-liste">${faits.map(ligneFaite).join('')}</ul>` : ''}
+    <p class="rp-signature">L'équipe Diaspo'Actif</p>
+    <button type="button" class="po-deco" id="po-deco">Se déconnecter</button>`);
+  ov.querySelector('#po-deco').addEventListener('click', poDeconnexion);
+  /* Pas de « Plus tard » ni de fermeture : l'obligation n'est levée que par le seuil atteint. */
+  return ov;
+}
+
+function poMerci() {
+  poMarquer(false);
+  window.__poActif = false;
+  poRetirerBandeau();
+  const ov = rpOuvrirOverlay(`
+    <div class="rp-icone" aria-hidden="true">💙</div>
+    <h2 class="rp-titre" id="rp-titre">Merci, votre profil public est renseigné !</h2>
+    <p class="rp-texte">Vous êtes maintenant mieux placé pour être trouvé et mis en relation sur la plateforme.</p>
+    <p class="rp-signature">L'équipe Diaspo'Actif</p>
+    <button type="button" class="rp-bouton" id="po-fin">Continuer</button>`);
+  ov.querySelector('#po-fin').addEventListener('click', () => ov.remove());
+}
+
+/* Retourne true si une obligation est active (la page est alors prise en charge ici). */
+function appliquerProfilObligatoire(user, opts) {
+  opts = opts || {};
+  if (!user) return false;
+  const g = user.profil_obligatoire;
+  if (g && g.termine) { if (poFlag()) poMerci(); return false; }
+  if (!g || !g.actif) { window.__poActif = false; poMarquer(false); poRetirerBandeau(); return false; }
+  g.apresEnregistrement = !!opts.force && window.__poRemplis != null && g.remplis > window.__poRemplis;
+  window.__poRemplis = g.remplis;
+  window.__poActif = true;
+  poMarquer(true);
+  /* Hors des pages où l'on peut remplir son profil : retour forcé à sa fiche. */
+  if (!PO_PAGES_EDITION.test(location.pathname)) { window.location.replace(poCibleProfil(user)); return true; }
+  poBandeau(g);
+  /* Un formulaire est déjà ouvert par l'arrivée depuis la liste (?completer=…) : on ne le recouvre pas. */
+  if (!RP_ARRIVEE_COMPLETER || opts.force) poOuvrirCarte(g);
+  return true;
+}
+
+let _poTimer = null;
+window.profilObligatoireRafraichir = function () {
+  if (!window.__poActif) return;
+  clearTimeout(_poTimer);
+  _poTimer = setTimeout(async () => {
+    const u = await fetchCurrentUser();
+    appliquerProfilObligatoire(u, { force: true });
+  }, 600);
+};
+
 /* ── Bandeau "Complétez votre origine" ──
    L'indicateur origine_manquante/origine_lien est calculé UNE SEULE FOIS côté serveur
    (GET /api/auth/me) : ce bandeau ne fait que le lire, pour ne pas réécrire une troisième
@@ -1833,7 +1966,7 @@ async function applyAuthState() {
     } catch (e) { /* silencieux */ }
     showEmailVerifBanner(user);
     showOrigineBanner(user);
-    afficherRelanceProfil(user);
+    if (!appliquerProfilObligatoire(user)) { afficherRelanceProfil(user); showPremierePublicationBanner(user); }
     showPwaInstallBanner(user);
   } else {
     el.innerHTML = `

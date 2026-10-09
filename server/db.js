@@ -5767,6 +5767,28 @@ db.exec(`
     FOREIGN KEY(user_id) REFERENCES users(id)
   );
   CREATE INDEX IF NOT EXISTS idx_relances_profil_user ON relances_profil(user_id, statut);
+
+  /* Profil public obligatoire (2026-10-09) : état de l'obligation par compte — voir server/profil-obligatoire.js.
+     'requis' tant que le seuil (100 % utilisateur, 50 % autres) n'est pas atteint ; 'termine' ensuite ;
+     'exempt' pour un ancien compte dont le profil n'était pas vide. */
+  CREATE TABLE IF NOT EXISTS profil_obligatoire (
+    user_id     INTEGER PRIMARY KEY,
+    etat        TEXT NOT NULL DEFAULT 'requis' CHECK(etat IN ('requis','termine','exempt')),
+    requis_at   TEXT DEFAULT (datetime('now')),
+    termine_at  TEXT,
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
+  /* Relance « première publication » (2026-10-09, demande explicite) — une ligne par relance
+     envoyée, sans clé étrangère (ne doit jamais bloquer la suppression d'un compte) — sert à
+     mesurer les 6 jours réels entre deux relances. Voir server/relance-publication.js. S'arrête
+     d'elle-même dès que users.premiere_publication_le est posé. */
+  CREATE TABLE IF NOT EXISTS publication_relances (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER NOT NULL,
+    created_at  TEXT DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_publication_relances_user ON publication_relances(user_id, created_at);
 `);
 
 /* ═══════════════════════════════════════════════════════════════════════════

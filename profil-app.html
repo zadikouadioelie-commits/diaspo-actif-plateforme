@@ -1933,7 +1933,7 @@ function render() {
     CarteDiaspoActif.render(_cdaConteneur, profil, _cdaOpts);
     /* Arrivée depuis l'affiche « Remplissez votre profil public » : ouvre directement le bon formulaire. */
     const _completer = new URLSearchParams(location.search).get('completer');
-    if (isOwn && ['residence', 'origine', 'domaine'].includes(_completer)) {
+    if (isOwn && ['residence', 'origine', 'domaine', 'photo', 'bio', 'competences'].includes(_completer)) {
       history.replaceState(null, '', location.pathname + location.hash);
       setTimeout(() => CarteDiaspoActif.completer(_cdaConteneur, profil, _cdaOpts, _completer), 500);
     }
