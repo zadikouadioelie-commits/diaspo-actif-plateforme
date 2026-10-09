@@ -1390,7 +1390,17 @@ async function renderEnrichedColumns() {
       </div>` : ''}
       <div class="pp-side-card">
         <h4><span>📝 À propos</span> ${owner ? `<button class="edit-btn" onclick="openEditIdentity()" title="Modifier">✏️</button>` : ''}</h4>
-        ${profil.bio ? `<div class="rich-content" style="font-size:13px;">${renderRichText(profil.bio)}</div>` : '<p style="font-size:12px;color:var(--muted);margin:0;">Ce membre n\'a pas encore ajouté de présentation.</p>'}
+        ${(() => {
+          if (!profil.bio) return '<p style="font-size:12px;color:var(--muted);margin:0;">Ce membre n\'a pas encore ajouté de présentation.</p>';
+          /* Texte "À propos" bien plus long que les autres rubriques de cette colonne (2026-10-09,
+             demande explicite après capture : "le texte à propos est beaucoup trop long... avec un
+             bouton de dépliement") — même mécanique que .apropos-text/.collapsed existant ailleurs
+             sur cette page (champ bio), réutilisée ici pour rester cohérent plutôt que d'inventer
+             un 2e système. */
+          const long2 = stripRichTags(profil.bio).length > 220;
+          return `<div class="rich-content apropos-text${long2?' collapsed':''}" id="pp-apropos-text" style="font-size:13px;">${renderRichText(profil.bio)}</div>
+            ${long2 ? `<button class="apropos-more-btn" id="pp-apropos-more" onclick="ppToggleApropos()">Lire la suite ▾</button>` : ''}`;
+        })()}
       </div>
       <div class="pp-side-card">
         <h4><span>🛡️ Indice de fiabilité</span> <span style="font-size:10px;color:var(--muted);font-weight:400;">(cliquer pour le détail)</span></h4>
@@ -2075,6 +2085,85 @@ function pvzFirstImage(p) {
   return null;
 }
 
+/* Charge les publications de l'onglet Profil via le composant partagé assets/posts.js
+   (voir le commentaire au-dessus de centerCol dans renderVisitorProfile) — réutilise la même
+   route que loadPublicationsTab (GET /profil/:id/publications), dont la forme est celle
+   attendue par Posts.renderFeed/renderPostCard (auteur_profil, reactions par type, hashtags…),
+   contrairement à l'objet `profil.publications` déjà en mémoire (trop allégé pour ce rendu). */
+async function pvzChargerPublications() {
+  const feed = document.getElementById('pvz-pub-feed');
+  if (!feed) return;
+  if (window.Posts) {
+    try {
+      const r = await api('GET', `/profil/${profil.id}/publications?page=1`);
+      Posts.renderFeed((r.publications || []).slice(0, 8), 'pvz-pub-feed', { currentUserId: CU?.id });
+      return;
+    } catch (e) { /* repli ci-dessous */ }
+  }
+  // Repli (Posts.js indisponible ou requête en échec) : rendu maison simplifié, déjà utilisé
+  // avant ce chantier — garde au moins un aperçu tronqué + bouton Voir plus/moins.
+  const pubs = (profil.publications || []).slice(0, 8);
+  const nomPersonnelFallback = [profil.prenom, profil.nom].filter(Boolean).join(' ') || profil.nom || 'Membre';
+  const nom = profil.nom_structure || nomPersonnelFallback;
+  const pubAv = profil.photo_url ? `<img loading="lazy" src="${esc(profil.photo_url)}" alt="" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">` : esc(initials(nom));
+  if (!pubs.length) { feed.innerHTML = `<div class="pvz-empty" style="padding:8px 0;">Aucune publication pour le moment.</div>`; return; }
+  feed.innerHTML = pubs.map(p => {
+    const d = new Date((p.created_at||'').replace(' ','T'));
+    const dateStr = isNaN(d) ? 'Récemment' : `${d.getDate()} ${MOIS[d.getMonth()]} ${d.getFullYear()}`;
+    const cat = p.categorie || (p.type==='article'?'Article':'Publication');
+    const img = pvzFirstImage(p);
+    const pp = pvzPubParts(p);
+    return `<article class="pvz-pub">
+      <div class="pvz-pub-head">
+        <div class="pvz-pub-av">${pubAv}</div>
+        <div style="flex:1;min-width:0;">
+          <div class="pvz-pub-name">${esc(nom)} <span style="color:var(--tp,#2F6BED);font-size:11px;font-weight:600;background-color:var(--tp-light,#EAF1FE);padding:2px 7px;border-radius:999px;margin-left:4px;">${esc(cat)}</span></div>
+          <div class="pvz-pub-date">${dateStr}</div>
+        </div>
+      </div>
+      ${pp.titreHtml?`<h4 class="pvz-pub-title">${pp.titreHtml}</h4>`:''}
+      ${img?`<img class="pvz-pub-img" loading="lazy" src="${esc(img)}" alt="">`:''}
+      ${pp.apercu?`<p class="pvz-pub-text pvz-pub-apercu">${esc(pp.apercu)}</p>`:''}
+      ${pp.tronque?`<p class="pvz-pub-text pvz-pub-complet" style="display:none;">${esc(pp.complet)}</p><button type="button" class="pvz-pub-more" onclick="pvzTogglePub(this)">Voir plus</button>`:''}
+      <div class="pvz-pub-meta"><span style="color:#E5484D;font-weight:600;">♥ ${p.nb_reactions||0}</span><span>💬 ${p.nb_commentaires||0} commentaires</span></div>
+    </article>`;
+  }).join('');
+}
+
+/* Comptes-rendus d'événements du compte (2026-10-09, voir le commentaire sur evtComptesRendusCol
+   dans renderVisitorProfile) — GET /api/comptes-rendus/publies?owner=, même carte visuelle
+   (.evt-card/.evt-img/.evt-body) que les événements juste au-dessus, colorée par le statut
+   temporel de L'ÉVÉNEMENT du compte-rendu (EvtTemporel), pas une couleur propre au compte-rendu
+   lui-même — "en gardant tout le système de couleurs". */
+async function pvzChargerComptesRendus() {
+  const panel = document.getElementById('pvz-cr-feed');
+  if (!panel) return;
+  try {
+    const r = await api('GET', `/comptes-rendus/publies?owner=${profil.id}&limit=12`);
+    const crs = r.comptes_rendus || [];
+    if (!crs.length) {
+      panel.innerHTML = `<div class="pvz-empty" style="padding:8px 0;">Aucun compte-rendu publié pour le moment.</div>`;
+      return;
+    }
+    panel.innerHTML = `<div class="evt-grid">${crs.map(c => {
+      const statut = EvtTemporel.statut({ date_evt: c.date_evt, date_fin: c.date_fin });
+      const resumeTxt = c.resume ? String(c.resume).replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim() : '';
+      const resumeApercu = resumeTxt.length > 120 ? resumeTxt.slice(0,120).trim() + '…' : resumeTxt;
+      return `<a class="evt-card${statut === 'termine' ? ' evt-card-termine' : ''}" href="compte-rendu.html?evt=${c.evenement_id}" style="text-decoration:none;color:inherit;">
+        <div class="evt-img">${c.image ? `<img src="${esc(c.image)}" alt="${esc(c.titre)}" loading="lazy" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentNode.textContent='📄'">` : '📄'}</div>
+        <div class="evt-body">
+          <div class="evt-date">${esc(fmtDateFull(c.date_evt))}${EvtTemporel.badge({ date_evt: c.date_evt, date_fin: c.date_fin })}</div>
+          <div class="evt-title">${esc(c.titre)}</div>
+          <div class="evt-meta">${c.ville?`<span class="evt-tag">🏙️ ${esc(c.ville)}</span>`:''}</div>
+          ${resumeApercu ? `<p style="font-size:13px;color:var(--muted);margin:0;line-height:1.5;">${esc(resumeApercu)}</p>` : ''}
+        </div>
+      </a>`;
+    }).join('')}</div>`;
+  } catch (e) {
+    panel.innerHTML = `<div class="pvz-empty" style="padding:8px 0;">Impossible de charger les comptes-rendus.</div>`;
+  }
+}
+
 function renderVisitorProfile() {
   const root = document.getElementById('pvz-visitor');
   if (!root) return;
@@ -2256,40 +2345,37 @@ function renderVisitorProfile() {
   </aside>`;
 
   // ── Colonne centrale : publications ──
+  /* 2026-10-09, demande explicite après capture : "cartouches bien distinctes", "aperçu" + bouton
+     de repliement/dépliement, "cliquer pour continuer à avancer dans les publications" — les trois
+     sont déjà fournis par le composant partagé assets/posts.js (.post-card bordé, Posts.toggleExpand,
+     Posts.openDetail/detailNext — même navigation que le fil d'actualité) : on le réutilise ici au
+     lieu de garder un rendu maison (pvzPubParts/pvzTogglePub, désormais conservés seulement comme
+     repli si Posts ne s'est pas chargé). Chargé séparément après le rendu (voir pvzChargerPublications
+     ci-dessous) car il utilise un format de données plus riche que l'objet `profil` déjà en mémoire. */
   const pubs = (profil.publications || []).slice(0, 8);
-  const pubAv = profil.photo_url ? `<img loading="lazy" src="${esc(profil.photo_url)}" alt="" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">` : esc(initials(nom));
-  let pubsInner;
-  if (pubs.length) {
-    pubsInner = pubs.map(p => {
-      const d = new Date((p.created_at||'').replace(' ','T'));
-      const dateStr = isNaN(d) ? 'Récemment' : `${d.getDate()} ${MOIS[d.getMonth()]} ${d.getFullYear()}`;
-      const cat = p.categorie || (p.type==='article'?'Article':'Publication');
-      const img = pvzFirstImage(p);
-      const pp = pvzPubParts(p);
-      return `<article class="pvz-pub">
-        <div class="pvz-pub-head">
-          <div class="pvz-pub-av">${pubAv}</div>
-          <div style="flex:1;min-width:0;">
-            <div class="pvz-pub-name">${esc(nom)} <span style="color:var(--tp,#2F6BED);font-size:11px;font-weight:600;background-color:var(--tp-light,#EAF1FE);padding:2px 7px;border-radius:999px;margin-left:4px;">${esc(cat)}</span></div>
-            <div class="pvz-pub-date">${dateStr}</div>
-          </div>
-        </div>
-        ${pp.titreHtml?`<h4 class="pvz-pub-title">${pp.titreHtml}</h4>`:''}
-        ${img?`<img class="pvz-pub-img" loading="lazy" src="${esc(img)}" alt="">`:''}
-        ${pp.apercu?`<p class="pvz-pub-text pvz-pub-apercu">${esc(pp.apercu)}</p>`:''}
-        ${pp.tronque?`<p class="pvz-pub-text pvz-pub-complet" style="display:none;">${esc(pp.complet)}</p><button type="button" class="pvz-pub-more" onclick="pvzTogglePub(this)">Voir plus</button>`:''}
-        <div class="pvz-pub-meta"><span style="color:#E5484D;font-weight:600;">♥ ${p.nb_reactions||0}</span><span>💬 ${p.nb_commentaires||0} commentaires</span></div>
-      </article>`;
-    }).join('');
-  } else {
-    pubsInner = `<div class="pvz-empty" style="padding:8px 0;">Aucune publication pour le moment.</div>`;
-  }
+  /* Événements créés + comptes-rendus (2026-10-09, demande explicite : "affiche les comptes
+     rendus d'événements également... affiche les différents événements créés par le compte...
+     en gardant tout le système de couleurs, pour les événements passés et présents ou futurs")
+     — réutilise loadEvenementsTab() (déjà construite pour le widget "Événements", jamais montée
+     par défaut jusqu'ici) et EvtTemporel (même code couleur rouge "En cours" / gris "Terminé"
+     que evenements-app.html). Réservé aux comptes "organisme" (structure) : un compte personnel
+     n'organise pas d'événement, section absente plutôt que vide pour lui. */
+  const evtComptesRendusCol = isOrgAccount ? `
+    <section class="pvz-card">
+      <div class="pvz-card-title">📅 Événements ${isOwn?`<a class="more" href="evenements.html" style="text-decoration:none;">Créer →</a>`:''}</div>
+      <div id="pvz-evt-feed"><div class="pvz-empty" style="padding:8px 0;">Chargement…</div></div>
+    </section>
+    <section class="pvz-card">
+      <div class="pvz-card-title">📄 Comptes-rendus d'événements</div>
+      <div id="pvz-cr-feed"><div class="pvz-empty" style="padding:8px 0;">Chargement…</div></div>
+    </section>` : '';
   const centerCol = `<main class="pvz-main">
     <section class="pvz-card">
       <div class="pvz-card-title">🗞️ Publications ${pubs.length?`<a class="more" href="fil-actualite.html" style="text-decoration:none;">Voir tout</a>`:''}</div>
       ${isOwn ? `<button class="pvz-btn primary" style="width:100%;justify-content:center;margin-bottom:14px;" onclick="window.Posts&&Posts.openModal()">✍️ Créer une publication</button>` : ''}
-      ${pubsInner}
+      <div id="pvz-pub-feed"><div class="pvz-empty" style="padding:8px 0;">Chargement…</div></div>
     </section>
+    ${evtComptesRendusCol}
     <div id="pvz-avis-mount"></div>
   </main>`;
 
@@ -2311,6 +2397,8 @@ function renderVisitorProfile() {
      bouton de mise en relation resterait vide, le composant ne balayant le DOM qu'au démarrage. */
   window.initBoutonsRelation && window.initBoutonsRelation(root);
   if (window.Soutenir) Soutenir.hydrate(root);
+  pvzChargerPublications();
+  if (isOrgAccount) { loadEvenementsTab('pvz-evt-feed'); pvzChargerComptesRendus(); }
 
   // Avis + droit de réponse (cahier des charges "Avis + droit de réponse") — visible sur
   // l'onglet Profil pour tout type de compte non-Utilisateur (Initiative/Collectivité/
@@ -6892,6 +6980,14 @@ function toggleApropos() {
   const collapsed = txt.classList.toggle('collapsed');
   btn.textContent = collapsed ? 'Lire la suite ▾' : 'Réduire ▴';
 }
+function ppToggleApropos() {
+  const txt = document.getElementById('pp-apropos-text');
+  const btn = document.getElementById('pp-apropos-more');
+  if (!txt || !btn) return;
+  const collapsed = txt.classList.toggle('collapsed');
+  btn.textContent = collapsed ? 'Lire la suite ▾' : 'Réduire ▴';
+}
+window.ppToggleApropos = ppToggleApropos;
 
 function openAproposEditor() {
   const block = document.getElementById('apropos-block');
@@ -7156,8 +7252,9 @@ function loadVideosTab() {
   </div></div>`;
 }
 
-async function loadEvenementsTab() {
-  const panel = document.getElementById('ptab-evenements');
+async function loadEvenementsTab(containerId = 'ptab-evenements') {
+  const panel = document.getElementById(containerId);
+  if (!panel) return;
   try {
     /* ?owner= ajouté (2026-09-30, demande explicite) — signature nécessaire pour que le
        serveur inclue les événements visibilite='boutique' de ce propriétaire (voir
@@ -7186,12 +7283,14 @@ async function loadEvenementsTab() {
     const PVT_TYPE_EVT_LABEL = {evenement:'Événement',forum:'Forum',atelier:'Atelier',webinaire:'Webinaire',conference:'Conférence',gala:'Gala',marche:'Marché / Foire',networking:'Networking',debat:'Débat',concours:'Concours',trophee_diaspora:'🏆 Trophée diaspora',autre:'Autre'};
     /* Onglets En cours / À venir / Terminés (2026-10-04) — assets/evt-temporel.js, statut serveur. */
     let ongletProfil = 'a_venir', maxProfil = 12;
+    const cleOnglet = 'pvt-profil-evt-' + containerId;
+    const plusFnName = 'pvtProfilEvtPlus_' + containerId.replace(/[^a-zA-Z0-9]/g, '');
     const dessinerProfil = () => {
     const gp = EvtTemporel.repartir(mine);
     const actifP = EvtTemporel.ongletActif(gp, ongletProfil);
     const tousP = gp[actifP];
-    window.pvtProfilEvtPlus = () => { maxProfil += 12; dessinerProfil(); };
-    panel.innerHTML = EvtTemporel.barre('pvt-profil-evt', gp, actifP, false, o => { ongletProfil = o; maxProfil = 12; dessinerProfil(); }) + `<div class="evt-grid">${tousP.slice(0, maxProfil).map(e=>{
+    window[plusFnName] = () => { maxProfil += 12; dessinerProfil(); };
+    panel.innerHTML = EvtTemporel.barre(cleOnglet, gp, actifP, false, o => { ongletProfil = o; maxProfil = 12; dessinerProfil(); }) + `<div class="evt-grid">${tousP.slice(0, maxProfil).map(e=>{
       const icon = PVT_DOMAINE_ICON[e.domaine] || '📢';
       const visiBadge = e.visibilite === 'prive' ? '<span class="evt-tag" style="color:#e74c3c;">🔒 Privé</span>' :
                         e.visibilite === 'abonnes' ? '<span class="evt-tag" style="color:#9b59b6;">⭐ Abonnés</span>' :
@@ -7216,7 +7315,7 @@ async function loadEvenementsTab() {
           ${descApercu ? `<p style="font-size:13px;color:var(--muted);margin:0;line-height:1.5;">${esc(descApercu)}</p>` : ''}
         </div>
       </a>`;
-    }).join('')}</div>` + (tousP.length > maxProfil ? '<button type="button" class="evt-plus" onclick="pvtProfilEvtPlus()">Voir plus (' + (tousP.length - maxProfil) + ' restant' + (tousP.length - maxProfil > 1 ? 's' : '') + ')</button>' : '');
+    }).join('')}</div>` + (tousP.length > maxProfil ? '<button type="button" class="evt-plus" onclick="' + plusFnName + '()">Voir plus (' + (tousP.length - maxProfil) + ' restant' + (tousP.length - maxProfil > 1 ? 's' : '') + ')</button>' : '');
     };
     dessinerProfil();
   } catch(e) {

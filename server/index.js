@@ -21404,10 +21404,24 @@ async function crIdentifies(evenementId) {
    celle d'une publication de compte-rendu du fil (carteCompteRenduPost) ; aucun contenu qui ne soit déjà public via /api/evenements/:id/compte-rendu. */
 route("GET", "/api/comptes-rendus/publies", async (req, res, params, body, query) => {
   const limite = Math.min(Math.max(Number(query && query.limit) || 10, 1), 30);
-  const lignes = await db.prepare(`SELECT c.evenement_id AS id, COALESCE(c.published_at, c.updated_at) AS publie_le
-    FROM evenement_comptes_rendus c JOIN evenements e ON e.id = c.evenement_id
-    WHERE c.statut='publie' AND COALESCE(e.visibilite,'public')='public'
-    ORDER BY COALESCE(c.published_at, c.updated_at) DESC LIMIT ?`).all(limite);
+  /* ?owner=<user_id> (2026-10-09, demande explicite : "affiche les comptes rendus d'événements...
+     sur le profil public") — même signature que GET /api/evenements?owner=, pour lister les
+     comptes-rendus des événements d'UN compte précis plutôt que le fil global. Un visiteur voit
+     uniquement les comptes-rendus d'événements publics ; le propriétaire (et l'admin) voient en
+     plus ceux de ses événements non publics, pour ne jamais sembler "sans historique" sur sa
+     propre page tant que le reste de la plateforme ne les montre pas. */
+  const meCr = query.owner ? await getCurrentUser(req) : null;
+  const estProprietaireCr = meCr && Number(query.owner) === Number(meCr.id);
+  const visibiliteCr = (estProprietaireCr || (meCr && meCr.role === 'administrateur')) ? '' : `AND COALESCE(e.visibilite,'public')='public'`;
+  const lignes = query.owner
+    ? await db.prepare(`SELECT c.evenement_id AS id, COALESCE(c.published_at, c.updated_at) AS publie_le
+        FROM evenement_comptes_rendus c JOIN evenements e ON e.id = c.evenement_id
+        WHERE c.statut='publie' AND e.owner_user_id=? ${visibiliteCr}
+        ORDER BY COALESCE(c.published_at, c.updated_at) DESC LIMIT ?`).all(Number(query.owner), limite)
+    : await db.prepare(`SELECT c.evenement_id AS id, COALESCE(c.published_at, c.updated_at) AS publie_le
+        FROM evenement_comptes_rendus c JOIN evenements e ON e.id = c.evenement_id
+        WHERE c.statut='publie' AND COALESCE(e.visibilite,'public')='public'
+        ORDER BY COALESCE(c.published_at, c.updated_at) DESC LIMIT ?`).all(limite);
   const cartes = [];
   for (const l of lignes) {
     try { const c = await carteCompteRenduPost(l.id); if (c) cartes.push({ ...c, publie_le: l.publie_le }); } catch (_) { /* une carte en échec ne bloque pas les autres */ }
