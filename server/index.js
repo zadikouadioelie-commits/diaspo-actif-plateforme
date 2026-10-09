@@ -293,7 +293,7 @@ async function getCurrentUser(req) {
        sur le cookie sid — sinon la session SQL (30 jours) la ferait renaître. */
     if (payload?.uid && payload.jti && !connexionOk) return null;
     if (payload?.uid && connexionOk) {
-      const user = await db.prepare("SELECT id, nom, prenom, email, role, ville, pays, profil_json, photo_url, email_verifie, nb_connexions, pwa_prompt_dismiss, temoignage_statut, temoignage_derniere_demande, demo_vue, da_id, identite_verifiee, credential_version FROM users WHERE id = ?").get(payload.uid);
+      const user = await db.prepare("SELECT id, nom, prenom, email, role, ville, pays, profil_json, photo_url, email_verifie, nb_connexions, pwa_prompt_dismiss, temoignage_statut, temoignage_derniere_demande, demo_vue, da_id, identite_verifiee, credential_version, premiere_publication_le FROM users WHERE id = ?").get(payload.uid);
       /* credential_version (2026-08-08, transfert de gestionnaire) : le token 'auth' est
          stateless (aucun état serveur, survit à un DELETE FROM sessions) — c'est le SEUL
          moyen de forcer son invalidation avant expiration naturelle. Un ancien gestionnaire
@@ -322,7 +322,7 @@ async function getCurrentUser(req) {
       Connexions.toucher(db, okReg);
     }
   } catch (e) { console.error('[connexions.verifier-sid]', e.message); }
-  const user = await db.prepare("SELECT id, nom, prenom, email, role, ville, pays, profil_json, photo_url, email_verifie, nb_connexions, pwa_prompt_dismiss, temoignage_statut, temoignage_derniere_demande, demo_vue, da_id, identite_verifiee FROM users WHERE id = ?").get(session.userId);
+  const user = await db.prepare("SELECT id, nom, prenom, email, role, ville, pays, profil_json, photo_url, email_verifie, nb_connexions, pwa_prompt_dismiss, temoignage_statut, temoignage_derniere_demande, demo_vue, da_id, identite_verifiee, premiere_publication_le FROM users WHERE id = ?").get(session.userId);
   if (user) user.id = Number(user.id);
   return user || null;
 }
@@ -440,7 +440,8 @@ function publicUser(u) {
   return { id: Number(u.id), nom: u.nom, prenom: u.prenom, email: u.email, role: u.role, ville: u.ville, pays: u.pays, profil: safeParse(u.profil_json),
     photo_url: u.photo_url || null,
     nb_connexions: u.nb_connexions || 0, pwa_prompt_dismiss: !!u.pwa_prompt_dismiss, temoignage_statut: u.temoignage_statut || 'non_demande', temoignage_derniere_demande: u.temoignage_derniere_demande || null,
-    demo_vue: u.demo_vue || 0, da_id: u.da_id || null, email_verifie: !!u.email_verifie, identite_verifiee: !!u.identite_verifiee };
+    demo_vue: u.demo_vue || 0, da_id: u.da_id || null, email_verifie: !!u.email_verifie, identite_verifiee: !!u.identite_verifiee,
+    a_publie: !!u.premiere_publication_le };
   // NOTE: ds_id est intentionnellement exclu — jamais exposé via cette fonction
 }
 
@@ -13541,6 +13542,13 @@ route("POST", "/api/fil", async (req, res, params, body) => {
     body.localisation_ville || null,
   )).lastInsertRowid;
   if (body.source_import) await db.prepare("UPDATE fil_posts SET source_import=? WHERE id=?").run(body.source_import, id);
+
+  /* Relance « première publication » (2026-10-09, demande explicite) : marquée une seule fois,
+     seulement pour une PUBLICATION réelle (pas un brouillon) — voir server/relance-publication.js.
+     COALESCE côté WHERE : ne touche jamais une date déjà posée. */
+  if (statut === 'publie') {
+    try { await db.prepare("UPDATE users SET premiere_publication_le=datetime('now') WHERE id=? AND premiere_publication_le IS NULL").run(user.id); } catch (e) { /* jamais bloquant */ }
+  }
 
   // Titre saisi (mise en forme en ligne autorisée) ou, à défaut, généré depuis le contenu.
   {
@@ -31116,7 +31124,13 @@ async function handleRequest(req, res) {
       try { completudeBilan = await Completude.relancerProfilsIncomplets({ db, creerNotif, origine: ORIGIN_PUBLIC }); }
       catch (e) { console.error('[completude-relances]', e.stack || e.message); completudeBilan = { erreur: e.message }; }
 
-      sendJSON(res, 200, { ok: true, relances_envoyees: relancesEnvoyees, confirmations_envoyees: confirmationsEnvoyees, completude: completudeBilan });
+      /* Phase 3 (2026-10-09, demande explicite) : relance « première publication » (tous les
+         6 jours réels, jusqu'à ce que la personne publie) — même isolation que la Phase 2. */
+      let publicationBilan = null;
+      try { publicationBilan = await RelancePublication.relancerPublicationsManquantes({ db, creerNotif, origine: ORIGIN_PUBLIC }); }
+      catch (e) { console.error('[publication-relances]', e.stack || e.message); publicationBilan = { erreur: e.message }; }
+
+      sendJSON(res, 200, { ok: true, relances_envoyees: relancesEnvoyees, confirmations_envoyees: confirmationsEnvoyees, completude: completudeBilan, publication: publicationBilan });
     } catch (e) {
       console.error('[origine-relances]', e.stack || e.message);
       sendJSON(res, 500, { error: 'Relances failed', detail: e.message });

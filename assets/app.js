@@ -1282,6 +1282,32 @@ function pwaIsIOSSafari() {
   return pwaIsIOS() && /Safari/.test(navigator.userAgent)
     && !/CriOS|FxiOS|EdgiOS|OPiOS|FBAN|FBAV|Instagram|Line\//.test(navigator.userAgent);
 }
+/* ── Bandeau "Faites votre première publication" (2026-10-09, demande explicite) ──
+   Montré à toute personne qui n'a encore rien publié sur le fil (user.a_publie, calculé côté
+   serveur dans getCurrentUser/publicUser à partir de users.premiere_publication_le — jamais posé
+   par un simple partage/republication). Réapparaît une connexion sur deux (n=2,4,6…), jusqu'à la
+   première publication, même principe que checkIdentityReminder/maybeShowPwaInstallBanner
+   ci-dessus (nb_connexions + sessionStorage pour ne pas réafficher plusieurs fois pendant la même
+   connexion). Complété par une relance automatique tous les 6 jours réels côté serveur
+   (server/relance-publication.js, greffée sur le même cron que les autres relances) — ce bandeau
+   n'est que le rappel visuel immédiat, pas la seule relance. */
+function showPremierePublicationBanner(user) {
+  if (!user || user.a_publie) return;
+  if (window.__poActif) return; // le profil obligatoire est déjà prioritaire, pas d'empilement
+  const n = user.nb_connexions || 0;
+  if (n < 2 || n % 2 !== 0) return;
+  const flagKey = 'da_premiere_pub_banner_' + n;
+  if (sessionStorage.getItem(flagKey)) return;
+  sessionStorage.setItem(flagKey, '1');
+  if (document.getElementById('premiere-pub-banner')) return;
+  const bar = document.createElement('div');
+  bar.id = 'premiere-pub-banner';
+  bar.style.cssText = 'position:sticky;top:0;z-index:45;background:#DBEAFE;border-bottom:1px solid #93C5FD;color:#1E3A8A;padding:10px 16px;display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;font-size:13.5px;font-weight:600;';
+  bar.innerHTML = `<span>✍️ Vous n'avez encore rien partagé avec la diaspora. Faites votre première publication !</span>
+    <a href="fil-actualite.html?publier=1" style="background:#1E3A8A;color:#fff;padding:6px 14px;border-radius:999px;font-weight:700;text-decoration:none;white-space:nowrap;">Écrire ma publication</a>
+    <button type="button" onclick="document.getElementById('premiere-pub-banner').remove()" style="background:none;border:none;color:#1E3A8A;font-size:18px;cursor:pointer;line-height:1;padding:0 4px;" title="Fermer" aria-label="Fermer">✕</button>`;
+  document.body.prepend(bar);
+}
 function showPwaInstallBanner(user) {
   _pwaCurrentUser = user;
   maybeShowPwaInstallBanner(user);

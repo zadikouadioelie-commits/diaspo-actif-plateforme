@@ -351,6 +351,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadFeed();
   }
 
+  /* Arrivée depuis le bandeau "Faites votre première publication" ou sa relance par e-mail/
+     notification (?publier=1, voir assets/app.js et server/relance-publication.js) : ouvre
+     directement le composer plutôt que de laisser la personne chercher le bouton. Même style
+     que le ?completer=... de profil-app.html : nettoie l'URL, laisse le temps à Posts.init(). */
+  const publier = urlParams.get('publier');
+  if (publier) {
+    history.replaceState(null, '', location.pathname + location.hash);
+    setTimeout(() => { if (window.Posts) Posts.openModal(publier === '1' ? undefined : publier); }, 500);
+  }
+
   loadMeilleuresVentes();
   loadSuggestionsComptes();
   loadEvenementsAVenir();

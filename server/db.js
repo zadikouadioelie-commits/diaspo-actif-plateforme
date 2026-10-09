@@ -2223,6 +2223,9 @@ const MIGRATIONS = [
   ["users", "is_verified INTEGER DEFAULT 0"],
   ["users", "is_official INTEGER DEFAULT 0"],
   ["users", "nb_connexions INTEGER DEFAULT 0"],
+  // ── Relance "première publication" (2026-10-09, demande explicite) — voir server/relance-publication.js.
+  // Posée une seule fois, jamais réinitialisée : marque la 1re publication propre (pas un partage/republication).
+  ["users", "premiere_publication_le TEXT"],
   // ── Bannière "Installer l'app" (PWA) — 2026-08-18 : réglage "Ne plus afficher" lié au compte,
   // réactivable depuis Confidentialité (voir buildPrivacyPanel() dans profil-app.html) ──
   ["users", "pwa_prompt_dismiss INTEGER DEFAULT 0"],
