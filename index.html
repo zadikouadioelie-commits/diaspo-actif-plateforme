@@ -443,11 +443,9 @@
 .hp-why-illus {
   height: 150px;
   margin: -36px -30px 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  overflow: hidden;
 }
-.hp-why-illus svg { width: 100%; height: 100%; display: block; }
+.hp-why-illus img, .hp-why-illus svg { width: 100%; height: 100%; display: block; object-fit: cover; }
 .hp-why-card h3 { font-size: 18px; font-weight: 800; margin: 0 0 12px; color: #0D1B2A; }
 .hp-why-card p { font-size: 14px; color: var(--muted); line-height: 1.7; margin: 0; }
 .hp-why-arrow {
@@ -1395,18 +1393,8 @@
       </div>
       <div class="hp-why-grid">
         <div class="hp-why-card">
-          <div class="hp-why-illus" style="background:#FFF1E8;">
-            <svg viewBox="0 0 320 150" fill="none" aria-hidden="true">
-              <circle cx="58" cy="48" r="9" fill="#EA580C" opacity=".85"/>
-              <circle cx="115" cy="95" r="6" fill="#EA580C" opacity=".6"/>
-              <circle cx="168" cy="42" r="10" fill="#EA580C" opacity=".9"/>
-              <circle cx="222" cy="100" r="7" fill="#EA580C" opacity=".65"/>
-              <circle cx="268" cy="55" r="6" fill="#EA580C" opacity=".55"/>
-              <circle cx="90" cy="118" r="4" fill="#EA580C" opacity=".4"/>
-              <path d="M70 48 L90 52" stroke="#EA580C" stroke-width="2" stroke-dasharray="3 5" opacity=".5" stroke-linecap="round"/>
-              <path d="M178 46 L200 58" stroke="#EA580C" stroke-width="2" stroke-dasharray="3 5" opacity=".5" stroke-linecap="round"/>
-              <path d="M232 96 L248 70" stroke="#EA580C" stroke-width="2" stroke-dasharray="3 5" opacity=".4" stroke-linecap="round"/>
-            </svg>
+          <div class="hp-why-illus">
+            <img src="assets/accueil-pourquoi-dispersion.png" alt="" loading="lazy">
           </div>
           <h3>Le problème : la dispersion</h3>
           <p>Des milliers d'initiatives de diaspora existent dans le monde — associations, startups, projets solidaires — mais elles agissent en silo, sans réseau, sans visibilité commune.</p>
@@ -1418,20 +1406,8 @@
           <a class="hp-why-arrow" href="annuaire.html" style="background:#EA580C;" aria-label="En savoir plus">→</a>
         </div>
         <div class="hp-why-card">
-          <div class="hp-why-illus" style="background:#EAF7EE;">
-            <svg viewBox="0 0 320 150" fill="none" aria-hidden="true">
-              <line x1="160" y1="75" x2="62" y2="42" stroke="#16A34A" stroke-width="2" opacity=".55"/>
-              <line x1="160" y1="75" x2="82" y2="118" stroke="#16A34A" stroke-width="2" opacity=".55"/>
-              <line x1="160" y1="75" x2="172" y2="30" stroke="#16A34A" stroke-width="2" opacity=".55"/>
-              <line x1="160" y1="75" x2="258" y2="50" stroke="#16A34A" stroke-width="2" opacity=".55"/>
-              <line x1="160" y1="75" x2="248" y2="118" stroke="#16A34A" stroke-width="2" opacity=".55"/>
-              <circle cx="62" cy="42" r="8" fill="#86EFAC"/>
-              <circle cx="82" cy="118" r="7" fill="#86EFAC"/>
-              <circle cx="172" cy="30" r="6" fill="#86EFAC"/>
-              <circle cx="258" cy="50" r="8" fill="#86EFAC"/>
-              <circle cx="248" cy="118" r="7" fill="#86EFAC"/>
-              <circle cx="160" cy="75" r="15" fill="#16A34A"/>
-            </svg>
+          <div class="hp-why-illus">
+            <img src="assets/accueil-pourquoi-reseau.png" alt="" loading="lazy">
           </div>
           <h3>Notre réponse : la mise en réseau</h3>
           <p>Diaspo'Actif crée un espace commun où individus, collectifs, associations et institutions peuvent se trouver, se soutenir et co-construire des projets à impact durable.</p>
@@ -1443,19 +1419,8 @@
           <a class="hp-why-arrow" href="annuaire.html" style="background:#16A34A;" aria-label="En savoir plus">→</a>
         </div>
         <div class="hp-why-card">
-          <div class="hp-why-illus" style="background:#EFF6FF;">
-            <svg viewBox="0 0 320 150" fill="none" aria-hidden="true">
-              <circle cx="160" cy="75" r="52" stroke="#2563EB" stroke-width="2.5" opacity=".9"/>
-              <line x1="108" y1="75" x2="212" y2="75" stroke="#2563EB" stroke-width="1.5" stroke-dasharray="3 5" opacity=".5"/>
-              <path d="M96 95 C70 85, 70 65, 90 55" stroke="#2563EB" stroke-width="2.5" stroke-linecap="round" marker-end="url(#hpWhyArr1)"/>
-              <path d="M224 55 C250 65, 250 85, 230 95" stroke="#2563EB" stroke-width="2.5" stroke-linecap="round" marker-end="url(#hpWhyArr2)"/>
-              <circle cx="90" cy="55" r="4" fill="#2563EB"/>
-              <circle cx="230" cy="95" r="4" fill="#2563EB"/>
-              <defs>
-                <marker id="hpWhyArr1" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="#2563EB"/></marker>
-                <marker id="hpWhyArr2" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="#2563EB"/></marker>
-              </defs>
-            </svg>
+          <div class="hp-why-illus">
+            <img src="assets/accueil-pourquoi-impact.png" alt="" loading="lazy">
           </div>
           <h3>L'impact visé : Sud ↔ Nord</h3>
           <p>Nos membres agissent dans plus de 28 pays. Ensemble, ils transfèrent des compétences, des ressources et de l'espoir — du Nord vers le Sud, et du Sud vers le monde.</p>
