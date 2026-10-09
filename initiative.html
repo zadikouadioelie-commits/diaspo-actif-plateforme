@@ -34,7 +34,11 @@
 /* overflow-x:hidden (CSS global) casse position:sticky — clip a le même effet anti-débordement
    horizontal sans créer de conteneur de défilement, ce qui préserve le comportement sticky. */
 html, body{overflow-x:clip !important;}
-.init-profile-wrap{max-width:1380px;margin:24px auto;padding:0 16px 48px;}
+/* Élargi de 1380px (2026-10-09, demande explicite : « utilise tout l'espace » — gros vides
+   des deux côtés constatés sur un écran large) : la colonne centrale est en 1fr (voir .init-3col
+   plus bas), donc l'espace gagné profite au contenu principal (bannière, cartouches), jamais
+   aux colonnes latérales qui restent plafonnées à 300px. */
+.init-profile-wrap{max-width:1800px;margin:24px auto;padding:0 16px 48px;}
 
 /* Layout 3 colonnes : gauche (identité/pratique) · centre · droite (action/preuve sociale) */
 .init-3col{display:grid;grid-template-columns:minmax(250px,300px) minmax(0,1fr) minmax(250px,300px);gap:16px;align-items:start;}
