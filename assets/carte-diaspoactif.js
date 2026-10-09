@@ -109,6 +109,18 @@
       .cda-tags{display:flex;flex-wrap:wrap;gap:8px;}
       .cda-tag{background:#EEF2FF;color:#3730A3;font-size:11.5px;font-weight:700;padding:5px 12px;border-radius:99px;}
       .cda-muted{color:#94A3B8;font-size:12px;}
+      /* Centres d'intérêt (2026-10-09, demande explicite) : une petite cartouche bien distincte par centre d'intérêt */
+      .cda-ci{display:flex;flex-wrap:wrap;gap:8px;}
+      .cda-ci-item{display:inline-flex;align-items:center;gap:6px;background:#fff;border:1.5px solid #C7D2FE;border-left:4px solid #4F46E5;color:#1E1B4B;font-size:12px;font-weight:700;padding:6px 12px;border-radius:10px;box-shadow:0 1px 2px rgba(79,70,229,.12);}
+      .cda-ci-item .cda-ci-n{font-size:10px;font-weight:800;color:#4F46E5;background:#EEF2FF;border-radius:6px;padding:1px 6px;}
+      .cda-ci-edit{display:flex;gap:8px;margin:0 0 10px;}
+      .cda-ci-edit input{flex:1;min-width:0;}
+      .cda-ci-add{flex:none;background:#4F46E5;color:#fff;border:none;border-radius:8px;padding:0 14px;font-weight:700;font-size:13px;cursor:pointer;}
+      .cda-ci-x{background:none;border:none;color:#6366F1;font-size:15px;line-height:1;cursor:pointer;padding:0 0 0 2px;}
+      .cda-ci-x:hover{color:#DC2626;}
+      .cda-ci-sug{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
+      .cda-ci-sug button{background:#F1F5F9;border:1px dashed #94A3B8;color:#475569;font-size:11.5px;font-weight:600;border-radius:99px;padding:4px 10px;cursor:pointer;}
+      .cda-ci-sug button:hover{background:#EEF2FF;border-color:#4F46E5;color:#3730A3;}
       .cda-affiliations{display:flex;flex-wrap:wrap;gap:14px;}
       .cda-affil-item{position:relative;width:88px;text-align:center;text-decoration:none;color:inherit;display:block;}
       .cda-affil-item:hover .cda-affil-nom{color:#2563EB;}
@@ -153,6 +165,7 @@
     const nom = [profil.prenom, profil.nom].filter(Boolean).join(' ') || profil.nom || 'Membre';
     const verified = !!profil.identite_verifiee;
     const competences = Array.isArray(profil.competences) ? profil.competences : [];
+    const centres = ciListe(profil.centres_interet);
     const affiliations = Array.isArray(profil.affiliations) ? profil.affiliations : [];
     /* Badges d'affiliation automatiques (2026-09-09, demande explicite) : un badge par
        affiliation acceptée, affiché près du nom — pas seulement celle à Diaspo'Actif. L'image
@@ -233,12 +246,18 @@
                 ${STATUTS.map(s => `<button type="button" class="cda-statut-chip${s.v===statutActuel?' active':''}" data-statut="${s.v}" style="${s.v===statutActuel?`background:${s.couleur};border-color:${s.couleur};color:#fff;`:''}" ${isOwner?'':'disabled'}>${esc(s.label)}</button>`).join('')}
               </div>
             </div>
-            <div class="cda-box">
-              <div class="cda-box-head"><span>🏷️ Domaine</span>${isOwner ? `<button type="button" class="cda-edit-btn" id="cda-domaine-edit" title="Modifier">✏️</button>` : ''}</div>
-              <div class="cda-tags">
-                ${competences.length ? competences.map(c => `<span class="cda-tag">${esc(c)}</span>`).join('') : '<span class="cda-muted">Aucun domaine renseigné.</span>'}
+            <div class="cda-box" id="cda-box-ci">
+              <div class="cda-box-head"><span>🎯 Centres d'intérêt</span>${isOwner ? `<button type="button" class="cda-edit-btn" id="cda-ci-edit" title="Modifier mes centres d'intérêt">✏️</button>` : ''}</div>
+              <div class="cda-ci">
+                ${centres.length ? centres.map((c, i) => `<span class="cda-ci-item"><span class="cda-ci-n">${i + 1}</span>${esc(ciMaj(c))}</span>`).join('') : `<span class="cda-muted">${isOwner ? 'Ajoutez vos centres d\'intérêt (bâtiment, investissement…).' : 'Aucun centre d\'intérêt renseigné.'}</span>`}
               </div>
             </div>
+            ${competences.length || isOwner ? `<div class="cda-box">
+              <div class="cda-box-head"><span>🧰 Compétences</span>${isOwner ? `<button type="button" class="cda-edit-btn" id="cda-domaine-edit" title="Modifier">✏️</button>` : ''}</div>
+              <div class="cda-tags">
+                ${competences.length ? competences.map(c => `<span class="cda-tag">${esc(c)}</span>`).join('') : '<span class="cda-muted">Aucune compétence renseignée.</span>'}
+              </div>
+            </div>` : ''}
           </div>
         </div>
 
@@ -310,6 +329,9 @@
 
       const bioBtn = container.querySelector('#cda-bio-edit');
       if (bioBtn) bioBtn.addEventListener('click', () => editBio(container, profil, opts));
+
+      const ciBtn = container.querySelector('#cda-ci-edit');
+      if (ciBtn) ciBtn.addEventListener('click', () => editCentresInteret(container, profil, opts));
 
       const domaineBtn = container.querySelector('#cda-domaine-edit');
       if (domaineBtn) domaineBtn.addEventListener('click', () => editDomaine(container, profil, opts));
@@ -464,8 +486,57 @@
     if (window.RichEditor) RichEditor.attach('cda-e-bio', { placeholder: 'Parlez de vous en quelques lignes…' });
   }
 
+  /* Centres d'intérêt : liste propre (sans doublon ni vide), 12 au plus, 40 caractères chacun. */
+  const CI_MAX = 12;
+  const CI_SUGGESTIONS = ['entrepreneuriat', 'investissement', 'emploi', 'formation', 'agriculture', 'santé', 'éducation', 'technologie', 'culture', 'sport', 'tourisme', 'bâtiment'];
+  function ciListe(v) {
+    const vus = new Set(), out = [];
+    (Array.isArray(v) ? v : []).forEach(x => {
+      const t = String(x == null ? '' : x).replace(/\s+/g, ' ').trim().slice(0, 40);
+      const k = t.toLowerCase();
+      if (t && !vus.has(k)) { vus.add(k); out.push(t); }
+    });
+    return out.slice(0, CI_MAX);
+  }
+  function ciMaj(t) { t = String(t || ''); return t.charAt(0).toUpperCase() + t.slice(1); }
+
+  function editCentresInteret(container, profil, opts) {
+    let liste = ciListe(profil.centres_interet);
+    const ov = openCdaModal('🎯 Centres d\'intérêt',
+      `<p style="font-size:12px;color:#64748b;margin:0 0 10px;">Ajoutez-les un par un (jusqu'à ${CI_MAX}) : chacun apparaît dans sa propre cartouche. Ex : bâtiment / construction, nurserie, investissement.</p>
+       <div class="cda-ci-edit"><input type="text" id="cda-ci-input" maxlength="40" placeholder="Un centre d'intérêt…" autocomplete="off"><button type="button" class="cda-ci-add" id="cda-ci-add">Ajouter</button></div>
+       <div class="cda-ci" id="cda-ci-liste"></div>
+       <div class="cda-muted" style="margin-top:12px;">Suggestions (un clic pour ajouter)</div>
+       <div class="cda-ci-sug" id="cda-ci-sug"></div>`,
+      async () => {
+        const r = await window.api('PUT', '/profil', { centres_interet: liste });
+        if (r && r.profil) Object.assign(profil, r.profil); else profil.centres_interet = liste;
+        render(container, profil, opts);
+      });
+    const input = ov.querySelector('#cda-ci-input'), box = ov.querySelector('#cda-ci-liste'), sug = ov.querySelector('#cda-ci-sug');
+    const dessiner = () => {
+      box.innerHTML = liste.length
+        ? liste.map((c, i) => `<span class="cda-ci-item"><span class="cda-ci-n">${i + 1}</span>${esc(ciMaj(c))}<button type="button" class="cda-ci-x" data-i="${i}" aria-label="Retirer ${esc(c)}">×</button></span>`).join('')
+        : '<span class="cda-muted">Aucun centre d\'intérêt pour l\'instant.</span>';
+      box.querySelectorAll('.cda-ci-x').forEach(b => b.onclick = () => { liste.splice(Number(b.dataset.i), 1); dessiner(); });
+      const pris = new Set(liste.map(x => x.toLowerCase()));
+      sug.innerHTML = CI_SUGGESTIONS.filter(x => !pris.has(x)).map(x => `<button type="button" data-s="${esc(x)}">+ ${esc(ciMaj(x))}</button>`).join('');
+      sug.querySelectorAll('button').forEach(b => b.onclick = () => ajouter(b.dataset.s));
+    };
+    const ajouter = txt => {
+      /* une virgule colle plusieurs centres d'intérêt d'un coup : on les sépare */
+      const avant = liste.length;
+      liste = ciListe(liste.concat(String(txt).split(',')));
+      if (liste.length === avant && String(txt).trim() && avant >= CI_MAX) alert('Vous pouvez indiquer ' + CI_MAX + ' centres d\'intérêt au plus.');
+      input.value = ''; dessiner(); input.focus();
+    };
+    ov.querySelector('#cda-ci-add').onclick = () => { if (input.value.trim()) ajouter(input.value); };
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); if (input.value.trim()) ajouter(input.value); } });
+    dessiner(); input.focus();
+  }
+
   function editDomaine(container, profil, opts) {
-    openCdaModal('🏷️ Domaine',
+    openCdaModal('🧰 Compétences',
       `<p style="font-size:12px;color:#64748b;margin:0;">Séparez chaque compétence par une virgule.</p>
        <textarea id="cda-e-comp" rows="3" placeholder="Ex : Entrepreneuriat, Innovation, Développement durable">${esc((Array.isArray(profil.competences)?profil.competences:[]).join(', '))}</textarea>`,
       async ov => {
@@ -525,9 +596,28 @@
      champ manquant plutôt que d'appeler une fonction inexistante (voir profil-app.html, le bloc
      ?completer=champ qui pilote cet appel). */
   function completer(container, profil, opts, cle) {
+    if (cle === 'photo') {
+      /* Le sélecteur de fichier d'un navigateur ne s'ouvre que sur un clic RÉEL de la personne :
+         on ne peut pas l'ouvrir tout seul à l'arrivée. Petite fenêtre avec un vrai bouton. */
+      const ov = openCdaModal('📷 Votre photo de profil',
+        `<p style="font-size:13.5px;line-height:1.5;margin:0 0 12px;">Une photo de vous rend votre profil bien plus humain et facilite la mise en relation.</p>
+         <button type="button" class="cda-modal-save" id="cda-choisir-photo" style="width:100%;">📷 Choisir ma photo</button>`,
+        async () => {});
+      const actions = ov.querySelector('.cda-modal-actions');
+      if (actions) actions.style.display = 'none';
+      ov.querySelector('#cda-choisir-photo').addEventListener('click', async () => {
+        const url = await window.pickAndUpload('avatar', { maxW: 500, maxH: 500 });
+        if (!url) return;
+        profil.photo_url = url;
+        ov.remove();
+        render(container, profil, opts);
+      });
+      return;
+    }
     if (cle === 'domaine') editDomaineActivite(container, profil, opts);
     else if (cle === 'bio') editBio(container, profil, opts);
     else if (cle === 'competences') editDomaine(container, profil, opts);
+    else if (cle === 'centres_interet') editCentresInteret(container, profil, opts);
     else editInfos(container, profil, opts);
   }
 
