@@ -87,9 +87,36 @@
 .type-card.selected .badge{background:linear-gradient(135deg,#2563EB,#1d4ed8);color:#fff;border-color:#2563EB}
 .form-section{margin-top:24px}
 .form-section h4{font-size:14px;color:#2563EB;text-transform:uppercase;letter-spacing:.1em;font-weight:800;margin:0 0 14px;padding-bottom:8px;border-bottom:2px solid #DBEAFE}
-.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
-@media(max-width:580px){.grid-2,.grid-3{grid-template-columns:1fr}}
+.grid-2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px}
+.grid-3{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr);gap:14px}
+.rg-4{display:grid;grid-template-columns:90px repeat(3,minmax(0,1fr));gap:14px}
+@media(max-width:580px){.grid-2,.grid-3,.rg-4{grid-template-columns:1fr}}
+/* Mise en page des formulaires d'inscription (2026-10-09, demande explicite : « organise mieux et évite les dépassements »).
+   Avant : les libellés restaient « en ligne » à gauche et chaque champ gardait sa propre largeur — colonnes inégales, champs qui
+   dépassaient du cadre (ex. « Fonction »). Maintenant : libellé AU-DESSUS, champ à la largeur exacte de sa colonne. */
+.insc-pane .grid-2>div,.insc-pane .grid-3>div,.insc-pane .rg-4>div{min-width:0}
+.insc-pane .grid-2>div>label,.insc-pane .grid-3>div>label,.insc-pane .rg-4>div>label{display:block;margin-bottom:5px;font-size:13px;font-weight:700;color:#1e293b}
+.insc-pane .grid-2>div>:is(input,select,textarea):not([type=checkbox]):not([type=radio]):not([type=file]),
+.insc-pane .grid-3>div>:is(input,select,textarea):not([type=checkbox]):not([type=radio]):not([type=file]),
+.insc-pane .rg-4>div>:is(input,select,textarea):not([type=checkbox]):not([type=radio]):not([type=file]){display:block;width:100%;max-width:100%;box-sizing:border-box;min-height:46px;padding:10px 14px;font-size:15px}
+.insc-pane .grid-2>div>input[type=file],.insc-pane .grid-3>div>input[type=file]{display:block;width:100%;max-width:100%;box-sizing:border-box;font-size:13px}
+/* Champ de date : même hauteur et même police que les autres champs, plus une aide qui reformule la date saisie. */
+.insc-pane input[type=date]{font-family:inherit;color:#1f2a44}
+.champ-aide{margin-top:6px;font-size:12.5px;color:#64748B;min-height:18px}
+.champ-aide.ok{color:#15803d;font-weight:600}
+.champ-aide.err{color:#b91c1c;font-weight:600}
+/* Aperçu en direct de la fiche (logo + bannière) — ce qui est choisi ci-dessus s'affiche ici tout de suite. */
+.apercu-profil{position:relative;margin-top:16px;border:1.5px solid var(--border);border-radius:14px;overflow:hidden;background:#fff;box-shadow:0 4px 14px rgba(13,43,78,.08)}
+.apercu-profil .ap-etiquette{position:absolute;right:10px;top:8px;z-index:2;font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#fff;background:rgba(13,27,42,.55);padding:3px 9px;border-radius:99px}
+.ap-banner{height:104px;background:linear-gradient(135deg,#0D2B4E,#1B3A6B 55%,#F26422) center/cover no-repeat}
+.ap-logo{position:absolute;left:18px;top:60px;width:84px;height:84px;border-radius:50%;border:4px solid #fff;background:#EEF2F8 center/cover no-repeat;display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:700;color:#7a8aa3;text-align:center;line-height:1.2;box-shadow:0 2px 10px rgba(0,0,0,.2)}
+.ap-corps{padding:52px 18px 14px}
+.ap-nom{font-weight:800;font-size:17px;color:#0D1B2A;word-break:break-word}
+.ap-aide{font-size:12px;color:var(--muted);margin-top:2px}
+.ap-info{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:7px;font-size:12.5px;color:#475569}
+.ap-info.err{color:#b91c1c;font-weight:600}
+.ap-info button{border:1px solid var(--border);background:#fff;border-radius:99px;padding:3px 10px;font-size:12px;font-weight:700;color:#475569;cursor:pointer;font-family:inherit}
+.ap-info button:hover{border-color:#b91c1c;color:#b91c1c}
 .nat-notice{background:#fff8e1;border:1px solid #ffd54f;border-radius:8px;padding:10px 14px;font-size:12px;color:#7a5700;margin-bottom:14px}
 .interests-grid{display:flex;flex-wrap:wrap;gap:8px}
 .interests-grid label{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;cursor:pointer;padding:6px 12px;border:1.5px solid var(--border);border-radius:99px;transition:background .12s,border-color .12s,color .12s}
@@ -395,13 +422,19 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
           <div>
             <label>Photo de profil <span style="color:#2563EB">*</span></label>
             <input type="file" id="u-photo" accept="image/png,image/jpeg,image/gif,image/webp" onchange="apercuImage(this,'u-photo-apercu')">
-            <img id="u-photo-apercu" style="display:none;margin-top:8px;width:64px;height:64px;border-radius:50%;object-fit:cover;border:1px solid var(--border)">
+            <div class="ap-info" id="u-photo-info"></div>
           </div>
           <div>
             <label>Banniere</label>
             <input type="file" id="u-banniere" accept="image/png,image/jpeg,image/gif,image/webp" onchange="apercuImage(this,'u-banniere-apercu')">
-            <img id="u-banniere-apercu" style="display:none;margin-top:8px;max-width:100%;height:64px;border-radius:8px;object-fit:cover;border:1px solid var(--border)">
+            <div class="ap-info" id="u-banniere-info"></div>
           </div>
+        </div>
+        <div class="apercu-profil" id="u-apercu" aria-label="Aperçu de votre fiche">
+          <span class="ap-etiquette">Aperçu</span>
+          <div class="ap-banner"></div>
+          <div class="ap-logo"><span>Votre<br>photo</span></div>
+          <div class="ap-corps"><div class="ap-nom">Votre prénom et votre nom</div><div class="ap-aide">Voici comment votre fiche apparaîtra dans l'annuaire.</div></div>
         </div>
         <div style="margin-top:14px;">
           <label style="font-size:12.5px;">Pas envie de televerser une banniere ? Choisissez une couleur a la place <span style="font-size:11px;color:#64748B;font-weight:400;">(facultatif)</span></label>
@@ -491,7 +524,7 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
           </div>
           <div class="grid-2" style="margin-top:12px">
             <div><label>Forme juridique <span class="i-admin-req" style="color:#2563EB">*</span></label><input type="text" id="i-forme-juridique" placeholder="Association loi 1901, SARL, ONG…"></div>
-            <div><label>Date de création de la structure <span class="i-admin-req" style="color:#2563EB">*</span></label><input type="date" id="i-date-creation-structure"></div>
+            <div><label>Date de création de la structure <span class="i-admin-req" style="color:#2563EB">*</span></label><input type="date" id="i-date-creation-structure"><div class="champ-aide" id="i-date-creation-aide">Jour / mois / année — la date officielle de création de la structure.</div></div>
           </div>
           <div style="margin-top:12px;max-width:280px;"><label>Numéro fiscal <span style="font-size:11px;color:#64748B;">(si applicable)</span></label><input type="text" id="i-numero-fiscal" placeholder="Facultatif"></div>
         </div>
@@ -673,7 +706,7 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
         </div>
       </div>
       <div class="form-section"><h4>Responsable principal</h4>
-        <div style="display:grid;grid-template-columns:90px 1fr 1fr 1fr;gap:14px">
+        <div class="rg-4">
           <div><label>Genre</label>
             <select id="i-rgenre">
               <option value="">—</option>
@@ -694,7 +727,6 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
           <div><label>Telephone 3 <span style="font-size:11px;color:#64748B;">(facultatif)</span></label><input type="tel" id="i-tel3" placeholder="+33 5 00 00 00 00"></div>
         </div>
       </div>
-      <style>@media(max-width:580px){[style*="90px 1fr 1fr 1fr"]{grid-template-columns:1fr!important}}</style>
       <div class="form-section"><h4>Presence en ligne (facultatif)</h4>
         <div class="grid-2">
           <div><label>Site internet</label><input type="url" id="i-site" placeholder="https://mon-initiative.org"></div>
@@ -706,13 +738,19 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
           <div>
             <label>Logo / photo de profil <span style="color:#2563EB">*</span></label>
             <input type="file" id="i-photo" accept="image/png,image/jpeg,image/gif,image/webp" onchange="apercuImage(this,'i-photo-apercu')">
-            <img id="i-photo-apercu" style="display:none;margin-top:8px;width:64px;height:64px;border-radius:50%;object-fit:cover;border:1px solid var(--border)">
+            <div class="ap-info" id="i-photo-info"></div>
           </div>
           <div>
             <label>Banniere</label>
             <input type="file" id="i-banniere" accept="image/png,image/jpeg,image/gif,image/webp" onchange="apercuImage(this,'i-banniere-apercu')">
-            <img id="i-banniere-apercu" style="display:none;margin-top:8px;max-width:100%;height:64px;border-radius:8px;object-fit:cover;border:1px solid var(--border)">
+            <div class="ap-info" id="i-banniere-info"></div>
           </div>
+        </div>
+        <div class="apercu-profil" id="i-apercu" aria-label="Aperçu de votre fiche">
+          <span class="ap-etiquette">Aperçu</span>
+          <div class="ap-banner"></div>
+          <div class="ap-logo"><span>Votre<br>photo</span></div>
+          <div class="ap-corps"><div class="ap-nom">Nom de votre structure</div><div class="ap-aide">Voici comment votre fiche apparaîtra dans l'annuaire.</div></div>
         </div>
         <div style="margin-top:14px;">
           <label style="font-size:12.5px;">Vous pouvez choisir une couleur de bannière <span style="font-size:11px;color:#64748B;font-weight:400;">(facultatif)</span></label>
@@ -1238,19 +1276,75 @@ function choisirTheme(boxId,themeId){
   if(boxId==='u-theme-swatches')THEME_CHOISI_U=(THEME_CHOISI_U===themeId?null:themeId);
   else THEME_CHOISI_I=(THEME_CHOISI_I===themeId?null:themeId);
   document.getElementById(boxId)._repaint();
+  majApercuProfil(boxId[0]);
 }
 renderThemeSwatches('u-theme-swatches',THEMES_BANNIERE_U);
 renderThemeSwatches('i-theme-swatches',THEMES_VITRINE_I);
 
 /* Apercu local du fichier choisi (photo de profil / banniere), avant meme la creation du compte. */
+/* Aperçu en direct (2026-10-09, demande explicite : « propose une visualisation du document téléchargé en logo et en bannière »).
+   Le fichier choisi s'affiche tout de suite, dans une fiche qui montre le rendu réel (bannière + logo rond + nom) ; sans bannière,
+   la couleur choisie la remplace. Les images restent en mémoire du navigateur : rien n'est envoyé avant la création du compte. */
+const APERCU_IMG={u:{photo:null,banniere:null},i:{photo:null,banniere:null}};
+function poidsLisible(o){return o>=1048576?(o/1048576).toFixed(1).replace('.',',')+' Mo':Math.max(1,Math.round(o/1024))+' Ko';}
+function majApercuProfil(pre){
+  const box=document.getElementById(pre+'-apercu');
+  if(!box)return;
+  const ban=box.querySelector('.ap-banner'),logo=box.querySelector('.ap-logo'),nomEl=box.querySelector('.ap-nom');
+  const a=APERCU_IMG[pre];
+  if(a.banniere){ban.style.background="center/cover no-repeat url('"+a.banniere+"')";}
+  else{
+    const themes=pre==='u'?THEMES_BANNIERE_U:THEMES_VITRINE_I, id=pre==='u'?THEME_CHOISI_U:THEME_CHOISI_I, t=themes.find(x=>x.id===id);
+    ban.style.background=t?t.gradient:'';
+  }
+  if(a.photo){logo.style.background="center/cover no-repeat url('"+a.photo+"')";logo.innerHTML='';}
+  else{logo.style.background='';logo.innerHTML='<span>'+(pre==='i'?'Votre<br>logo':'Votre<br>photo')+'</span>';}
+  const nom=pre==='i'?(document.getElementById('i-nom')||{}).value:[(document.getElementById('u-prenom')||{}).value,(document.getElementById('u-nom')||{}).value].filter(Boolean).join(' ');
+  nomEl.textContent=(nom||'').trim()||(pre==='i'?'Nom de votre structure':'Votre prénom et votre nom');
+}
 function apercuImage(input,imgId){
-  const img=document.getElementById(imgId);
-  const file=input.files[0];
-  if(!file){img.style.display="none";return;}
+  const m=/^(u|i)-(photo|banniere)$/.exec(input.id||'');
+  if(!m)return;
+  const pre=m[1],kind=m[2],info=document.getElementById(input.id+'-info'),file=input.files[0];
+  const finir=()=>{majApercuProfil(pre);};
+  if(info){info.className='ap-info';info.innerHTML='';}
+  if(!file){APERCU_IMG[pre][kind]=null;finir();return;}
+  if(!/^image\//.test(file.type)||file.size>15*1048576){
+    input.value='';APERCU_IMG[pre][kind]=null;
+    if(info){info.className='ap-info err';info.textContent=!/^image\//.test(file.type)?'Ce fichier n\'est pas une image (formats : JPG, PNG, WebP, GIF).':'Image trop lourde ('+poidsLisible(file.size)+') : 15 Mo maximum.';}
+    finir();return;
+  }
   const reader=new FileReader();
-  reader.onload=e=>{img.src=e.target.result;img.style.display="block";};
+  reader.onload=e=>{
+    APERCU_IMG[pre][kind]=e.target.result;
+    if(info){
+      info.innerHTML='<span>✓ '+file.name.replace(/[<>&]/g,'')+' · '+poidsLisible(file.size)+'</span><button type="button">Retirer</button>';
+      info.querySelector('button').onclick=()=>{input.value='';apercuImage(input,imgId);};
+    }
+    finir();
+  };
   reader.readAsDataURL(file);
 }
+['u-prenom','u-nom','i-nom'].forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener('input',()=>majApercuProfil(id[0]));});
+/* Champ « Date de création de la structure » : jamais dans le futur, et la date saisie est reformulée en clair. */
+(function(){
+  const auj=new Date().toISOString().slice(0,10);
+  document.querySelectorAll('.insc-pane input[type=date]').forEach(d=>{if(d.id!=='i-date-debut-creation'){d.max=auj;d.min='1900-01-01';}});
+  const champ=document.getElementById('i-date-creation-structure'),aide=document.getElementById('i-date-creation-aide');
+  if(!champ||!aide)return;
+  const defaut=aide.textContent;
+  champ.addEventListener('input',()=>{
+    const v=champ.value;
+    if(!v){aide.className='champ-aide';aide.textContent=defaut;return;}
+    const d=new Date(v+'T00:00:00'),now=new Date();
+    if(isNaN(d)||v>auj){aide.className='champ-aide err';aide.textContent='La date de création ne peut pas être dans le futur.';return;}
+    let mois=(now.getFullYear()-d.getFullYear())*12+(now.getMonth()-d.getMonth())-(now.getDate()<d.getDate()?1:0);
+    mois=Math.max(0,mois);const ans=Math.floor(mois/12),reste=mois%12;
+    const age=ans>0?(ans+' an'+(ans>1?'s':'')+(reste?' et '+reste+' mois':'')):(mois>0?mois+' mois':'moins d\'un mois');
+    aide.className='champ-aide ok';
+    aide.textContent='✓ Créée le '+d.toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})+' · il y a '+age;
+  });
+})();
 
 /* Televerse la photo de profil et/ou la banniere juste apres la creation du compte — la session
    vient d'etre ouverte par /auth/signup, les routes d'upload (deja existantes, utilisees partout
@@ -1499,6 +1593,7 @@ document.getElementById("i-submit").addEventListener("click",async()=>{
     if(statutCreation==="existante"){
       req(immat,"Numéro d'immatriculation");
       req(formeJuridique,"Forme juridique");req(dateCreationStructure,"Date de création de la structure");
+      if(dateCreationStructure>new Date().toISOString().slice(0,10))throw new Error("La date de création de la structure ne peut pas être dans le futur.");
     }
     if(pwd!==pwd2)throw new Error("Les mots de passe ne correspondent pas.");
     if(pwd.length<8)throw new Error("Le mot de passe doit comporter au moins 8 caracteres.");
