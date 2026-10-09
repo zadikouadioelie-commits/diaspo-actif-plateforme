@@ -1549,6 +1549,18 @@
     const bientot = v.type_source === 'bientot';
     return `<a class="vcard${wide ? ' wide' : ''}" href="#/video/${v.id}"><div class="vth">${videoThumb(v)}${bientot ? '<span class="vd" style="background:var(--orange-d)">Bientôt</span>' : (v.duree_secondes ? `<span class="vd">${fmtDuree(v.duree_secondes)}</span>` : '')}${bientot ? '' : '<span class="vp">▶</span>'}</div><div class="vt">${esc(v.titre)}</div>${v.categorie ? `<div class="small muted">${esc(v.categorie)}</div>` : ''}</a>`;
   }
+  /* Film « Créer son compte pas à pas » (2026-10-09, demande explicite) : première vignette des tutoriels de l'accueil. Film animé
+     (voix, musique, sous-titres) ouvert dans une fenêtre, chargé seulement au toucher. */
+  function filmCard(wide) {
+    return `<a class="vcard${wide ? ' wide' : ''}" href="inscription.html" data-film-inscription="1"><div class="vth"><img src="assets/media/film-inscription-poster.jpg" alt="" loading="lazy"><span class="vd">1:27</span><span class="vp">▶</span></div><div class="vt">Créer son compte Diaspo’Actif pas à pas</div><div class="small muted">Bien démarrer</div></a>`;
+  }
+  let filmPromesse = null;
+  document.addEventListener('click', e => {
+    const a = e.target.closest && e.target.closest('[data-film-inscription]'); if (!a) return;
+    e.preventDefault();
+    if (!filmPromesse) filmPromesse = window.InscriptionFilm ? Promise.resolve() : new Promise((ok, ko) => { const sc = document.createElement('script'); sc.src = 'assets/inscription-film.js?v=14'; sc.onload = ok; sc.onerror = () => { filmPromesse = null; ko(new Error('film')); }; document.head.appendChild(sc); });
+    filmPromesse.then(() => window.InscriptionFilm.ouvrir()).catch(() => { location.href = 'inscription.html'; });
+  });
   const miniCard = (href, photo, nom, sub, round) => `<a class="mc" href="${href}"><div class="av big" style="border-radius:${round ? '50%' : '16px'};margin:0 auto 8px">${photo ? `<img src="${attrUrl(photo)}" alt="" loading="lazy" onerror="this.remove()">` : esc(initials(nom))}</div><div class="mn">${esc(nom)}</div>${sub ? `<div class="small muted ell">${esc(sub)}</div>` : ''}</a>`;
   const SEC_ICONS = { 'home-actus': 'fil', 'home-honneur': 'star', 'home-troph': 'star', 'home-videos': 'play', 'home-init': 'heart', 'home-shops': 'shop', 'home-temo': 'comment', 'home-part': 'people' };
   const secHead = (titre, icone, more) => `<div class="sec"><h2 class="sec-t"><span class="sic">${ic(icone || 'star')}</span><span>${esc(titre)}</span></h2>${more || ''}</div>`;
@@ -1594,8 +1606,8 @@
       homeBlock('home-honneur', 'Comptes à l’honneur', `<div class="hs">${l.map(x => miniCard(esc(/initiative\.html\?id=/.test(x.profil_url || '') ? '#/profil/i/' + String(x.profil_url).replace(/^.*id=/, '') : '#/profil/' + x.user_id), x.photo_url, x.nom, [x.ville, x.pays].filter(Boolean).join(', '), x.categorie !== 'initiative')).join('')}</div>`);
     });
     safe(async () => {
-      const v = (await api('/api/videos-tutoriels?limit=8')).videos || []; if (!v.length) return;
-      homeBlock('home-videos', 'Tutoriels vidéo', `<div class="hs">${v.map(x => videoCard(x)).join('')}</div>`, '<a href="#/videos" class="sec-more">Tout voir ›</a>', 'Apprenez à utiliser Diaspo’Actif en quelques minutes.');
+      let v = []; try { v = (await api('/api/videos-tutoriels?limit=8')).videos || []; } catch (e) { /* le film d'inscription reste affiché */ }
+      homeBlock('home-videos', 'Tutoriels vidéo', `<div class="hs">${filmCard()}${v.map(x => videoCard(x)).join('')}</div>`, '<a href="#/videos" class="sec-more">Tout voir ›</a>', 'Apprenez à utiliser Diaspo’Actif en quelques minutes.');
     });
     /* Trophée de la Diaspora — « Prochainement » (2026-10-09) : occupe l'emplacement de l'ancien bloc « Initiatives à découvrir »
        (même place que sur l'accueil ordinateur, index.html). À remplacer par les comptes mis à l'honneur une fois le premier cycle clos. */

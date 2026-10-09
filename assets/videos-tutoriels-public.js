@@ -40,6 +40,45 @@ function dvtVignetteHtml(v) {
   return `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:32px;color:#fff;">${v.icone || '🎬'}</div>`;
 }
 
+/* ═══ Film « Créer son compte pas à pas » (2026-10-09, demande explicite : le présenter parmi les démos de l'accueil, avec son titre) ═══
+   Ce n'est pas un fichier vidéo mais un film animé (assets/inscription-film.js : voix, musique, sous-titres), ouvert dans une
+   fenêtre. Chargé seulement au clic. Sans JavaScript, le lien mène à la page d'inscription, qui propose le même film. */
+const DVT_FILM = { titre: "Créer son compte Diaspo'Actif pas à pas", duree: '1:27', categorie: 'Bien démarrer', poster: '/assets/media/film-inscription-poster.jpg' };
+function dvtCarteFilmHtml() {
+  return `
+    <a class="dvt-card" href="inscription.html" onclick="dvtOuvrirFilm(event)" style="text-decoration:none;color:inherit;display:block;">
+      <div class="dvt-thumb">
+        <img src="${DVT_FILM.poster}" alt="" loading="lazy">
+        <span class="dvt-duree">${DVT_FILM.duree}</span>
+        <div class="dvt-play"><span>▶</span></div>
+      </div>
+      <div class="dvt-body">
+        <div class="dvt-badge-categorie">${DVT_FILM.categorie}</div>
+        <div class="dvt-card-titre">${dvtEsc(DVT_FILM.titre)}</div>
+        <div class="dvt-card-plus">Voir le film →</div>
+      </div>
+    </a>`;
+}
+let _dvtFilmPromesse = null;
+function dvtChargerFilm() {
+  if (window.InscriptionFilm) return Promise.resolve();
+  if (!_dvtFilmPromesse) {
+    _dvtFilmPromesse = new Promise((ok, ko) => {
+      const sc = document.createElement('script');
+      sc.src = '/assets/inscription-film.js?v=14';
+      sc.onload = ok; sc.onerror = () => { _dvtFilmPromesse = null; ko(new Error('chargement du film')); };
+      document.head.appendChild(sc);
+    });
+  }
+  return _dvtFilmPromesse;
+}
+async function dvtOuvrirFilm(e) {
+  if (e) e.preventDefault();
+  try { await dvtChargerFilm(); window.InscriptionFilm.ouvrir(); }
+  catch (x) { window.location.href = 'inscription.html'; }
+}
+window.dvtOuvrirFilm = dvtOuvrirFilm;
+
 /* Carte cliquable → mène toujours à la page vidéo individuelle (lecteur + commentaires +
    réactions), jamais à une simple modale — cohérent avec la fiche vidéo du cahier des charges.
    Une capsule "bientot" (aucune vidéo réelle pour l'instant) reste cliquable mais affiche un
@@ -120,7 +159,7 @@ async function dvtReagirCarte(videoId, type) {
    dashboard-initiative.html — mais jamais affiché nulle part). Opt-in explicite : seul l'appel de
    videos-tutoriels.html (grille complète "vt-grid-page") le passe, jamais dvt-grid-accueil
    (aperçu compact de la page d'accueil) qui n'a pas fait cette promesse. */
-async function dvtCharger(gridId, { limit, sectionIdSiVide, compact, categorie, q, tri, posterSiVide, masquerIdsSiVide, plusBoutonInline, adEmplacement } = {}) {
+async function dvtCharger(gridId, { limit, sectionIdSiVide, compact, categorie, q, tri, posterSiVide, masquerIdsSiVide, plusBoutonInline, adEmplacement, filmInscription } = {}) {
   const grid = document.getElementById(gridId);
   if (!grid) return;
   try {
@@ -131,6 +170,13 @@ async function dvtCharger(gridId, { limit, sectionIdSiVide, compact, categorie, 
     if (tri) qs.set('tri', tri);
     const { videos } = await fetch('/api/videos-tutoriels?' + qs.toString()).then(r => r.json());
     const section = sectionIdSiVide ? document.getElementById(sectionIdSiVide) : null;
+    if (filmInscription && (!videos || !videos.length)) {
+      /* Aucune autre vidéo : le film d'inscription tient seul la rangée (jamais l'affiche « Bientôt disponible »). */
+      (masquerIdsSiVide || []).forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
+      grid.innerHTML = dvtCarteFilmHtml();
+      if (section) section.style.display = '';
+      return;
+    }
     if (!videos || !videos.length) {
       if (posterSiVide) {
         (masquerIdsSiVide || []).forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
@@ -142,6 +188,7 @@ async function dvtCharger(gridId, { limit, sectionIdSiVide, compact, categorie, 
       return;
     }
     const cartes = videos.map(v => dvtCardHtml(v, { compact }));
+    if (filmInscription) cartes.unshift(dvtCarteFilmHtml());
     if (adEmplacement) {
       cartes.splice(Math.min(2, cartes.length), 0,
         `<div id="ad-${adEmplacement.replace(/_/g,'-')}" data-ad-emplacement="${adEmplacement}" style="display:none;grid-column:span 2;"></div>`);
