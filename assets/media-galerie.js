@@ -52,6 +52,7 @@
   function bandeau(items, max) {
     max = max || 5;
     if (!items || !items.length) return '';
+    styles(); /* les styles de la bande doivent exister dès le rendu de la cartouche, pas seulement à l'ouverture de la galerie */
     var vis = items.slice(0, max), reste = items.length - vis.length;
     return '<div class="mgb" role="group" aria-label="Photos et vidéos : touchez pour tout voir"><div class="mgb-tiles">'
       + vis.map(function (it, i) {
