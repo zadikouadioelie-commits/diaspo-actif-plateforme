@@ -25,8 +25,12 @@
 <link rel="stylesheet" href="/assets/theme-manager.css">
 <style>
   html,body{background:#EEF1F6;}
-  .bpv-shell{max-width:1180px;margin:0 auto;padding:24px 20px 80px;display:grid;grid-template-columns:230px 1fr;gap:28px;align-items:start;}
-  @media(max-width:860px){.bpv-shell{grid-template-columns:1fr;} .bpv-toc{display:none;}}
+  /* minmax(0,1fr) + min-width:0 : sans eux, un tableau ou une grille trop large élargit la colonne du
+     document au-delà de l'écran (page décalée à droite, boutons du haut coupés). */
+  .bpv-shell{max-width:1180px;width:100%;box-sizing:border-box;margin:0 auto;padding:24px 20px 80px;display:grid;grid-template-columns:230px minmax(0,1fr);gap:28px;align-items:start;}
+  .bpv-doc{min-width:0;}
+  .bpv-actionbar{min-width:0;}
+  @media(max-width:860px){.bpv-shell{grid-template-columns:minmax(0,1fr);} .bpv-toc{display:none;}}
 
   /* ---- Barre d'actions ---- */
   .bpv-actionbar{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:4px;}
@@ -35,7 +39,18 @@
   .bpv-back:hover{color:var(--orange);}
 
   /* ---- Sommaire (TOC) ---- */
-  .bpv-toc{position:sticky;top:16px;background:#fff;border:1px solid var(--border);border-radius:14px;padding:14px 0;max-height:calc(100vh - 32px);overflow-y:auto;}
+  /* Sommaire à son propre défilement : collé sous la barre du site (qui est elle-même fixe, d'où
+     --bpv-top mesuré en JS) pour rester visible pendant la lecture du document. */
+  .bpv-toc{background:#fff;border:1px solid var(--border);border-radius:14px;padding:14px 0;overflow-y:auto;overscroll-behavior:contain;}
+  /* Deux niveaux de défilement indépendants sur ordinateur (demande 2026-10-10) : la page ne défile plus,
+     le sommaire (gauche) et le document (droite) ont chacun leur propre barre — le sommaire reste donc
+     toujours visible. (Un simple « sticky » ne marche pas ici : html et body ont tous deux overflow-x:hidden.) */
+  @media(min-width:861px){
+    .bpv-shell{height:calc(100vh - var(--bpv-tb,84px));overflow:hidden;grid-template-rows:auto minmax(0,1fr);padding-bottom:16px;}
+    .bpv-toc, .bpv-doc{min-height:0;max-height:100%;overflow-y:auto;overscroll-behavior:contain;}
+    .bpv-doc{scroll-behavior:smooth;}
+    .page{min-height:0!important;} /* sinon « 100vh » + bandeaux au-dessus = la page défile encore */
+  }
   .bpv-toc-title{font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);padding:0 16px 8px;}
   .bpv-toc a{display:flex;align-items:center;gap:8px;padding:7px 16px;font-size:12.5px;font-weight:600;color:var(--text);text-decoration:none;border-left:3px solid transparent;transition:background .1s;}
   .bpv-toc a:hover{background:var(--surface2,#f3f4f6);}
@@ -156,7 +171,8 @@
     *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important;}
     body{background:#fff;}
     .topbar, .bpv-toc, .bpv-actionbar{display:none!important;}
-    .bpv-shell{display:block;max-width:none;padding:0;}
+    .bpv-shell{display:block;max-width:none;padding:0;height:auto!important;overflow:visible!important;}
+    .bpv-doc{overflow:visible!important;max-height:none!important;}
     .bpv-doc{border:none;box-shadow:none;border-radius:0;}
     .bpv-doc > *:first-child, .bpv-doc > *:last-child{border-radius:0;}
     .bpv-section{break-inside:avoid;padding:20px 6px;}
@@ -661,13 +677,30 @@ async function init(){
 
   // Surbrillance de la section visible au scroll
   const links = [...document.querySelectorAll('.bpv-toc a')];
-  const io = new IntersectionObserver((entries) => {
-    entries.forEach(en => { if (en.isIntersecting) { links.forEach(l => l.classList.remove('active')); document.querySelector(`.bpv-toc a[href="#${en.target.id}"]`)?.classList.add('active'); } });
-  }, { rootMargin: '-20% 0px -70% 0px' });
-  document.querySelectorAll('.bpv-section').forEach(sec => io.observe(sec));
+  /* Section courante = la dernière (parmi celles du sommaire) dont le haut a dépassé le haut du document. */
+  const docEl = document.getElementById('bpv-doc'), tocEl = document.getElementById('bpv-toc');
+  const cibles = links.map(l => ({ l, s: document.getElementById(l.getAttribute('href').slice(1)) })).filter(c => c.s);
+  const majActive = () => {
+    const haut = window.matchMedia('(min-width:861px)').matches ? docEl.getBoundingClientRect().top : 0;
+    let cur = cibles[0];
+    cibles.forEach(c => { if (c.s.getBoundingClientRect().top - haut <= 120) cur = c; });
+    if (!cur || cur.l.classList.contains('active')) return;
+    links.forEach(l => l.classList.remove('active')); cur.l.classList.add('active');
+    const lt = cur.l.offsetTop, lh = cur.l.offsetHeight; // garde le lien actif visible dans le sommaire
+    if (lt < tocEl.scrollTop || lt + lh > tocEl.scrollTop + tocEl.clientHeight) tocEl.scrollTop = lt - tocEl.clientHeight / 2;
+  };
+  docEl.addEventListener('scroll', majActive, { passive: true }); window.addEventListener('scroll', majActive, { passive: true }); majActive();
 
   document.getElementById('bpv-loading').style.display = 'none';
   document.getElementById('bpv-shell').style.display = 'grid';
+  /* Le sommaire se cale sous la barre fixe du site, quelle que soit sa hauteur réelle. */
+  /* La hauteur des deux colonnes = ce qu'il reste d'écran sous tout ce qui précède (barre du site, bandeaux éventuels) :
+     la page elle-même ne défile pas, rien n'est coupé, et le sommaire reste en vue. */
+  const shellEl = document.getElementById('bpv-shell');
+  let tbPrec = null;
+  const calerSommaire = () => { const v = Math.max(0, Math.round(shellEl.getBoundingClientRect().top + window.scrollY)); if (v !== tbPrec) { tbPrec = v; document.documentElement.style.setProperty('--bpv-tb', v + 'px'); } };
+  calerSommaire(); window.addEventListener('resize', calerSommaire);
+  setInterval(calerSommaire, 800); // un bandeau peut apparaître après coup au-dessus (ex. vérification d'e-mail) et décaler la page
 }
 
 /* Export PDF réel (point 17) -- même bibliothèque/pattern que cv-builder.js (repli sur
