@@ -3136,6 +3136,9 @@ route("POST", "/api/upload/document", async (req, res) => {
 /* Module CV (2026-10-09) : médias, page publique par jeton, partage par e-mail — voir server/cv-extras.js. */
 const CvExtras = require("./cv-extras");
 CvExtras.registerCvExtras({ route, db, sendJSON, getCurrentUser, nomCompteAffichage });
+/* Liste de contrôle du profil public (2026-10-10) : GET /api/profil-public/checklist — voir server/profil-public.js. */
+const ProfilPublic = require("./profil-public");
+ProfilPublic.register({ route, db, sendJSON, getCurrentUser });
 
 /* ========== VITRINE COMMERCIALE + BOUTIQUE (comptes Initiative) ========== */
 const MAX_PRODUITS_VITRINE = 100;
@@ -37385,10 +37388,22 @@ ${jsonLd}
          Même mesure que les alertes « profil incomplet » (server/completude.js) : une seule
          définition de « profil rempli » sur toute la plateforme. Pour un compte qui porte une
          initiative, c'est la fiche de l'initiative qui est mesurée, sinon le profil du compte. */
-      const roleCompletude = init ? 'initiative' : (user.role === 'collectivite' ? 'collectivite' : 'utilisateur');
-      const compl = Completude.evaluer(roleCompletude, init || user) || { pct: 0, manquants: [] };
+      /* Depuis le 2026-10-10 : la MÊME liste que la liste de contrôle affichée au membre (server/profil-public.js) —
+         ce qu'il lit coché dans « Mon profil public » est exactement ce qui compte ici. Repli sur l'ancien calcul
+         pour les types de compte qui n'ont pas cette liste. */
+      let compl = null, manqueProfil = [];
+      try {
+        const lp = await ProfilPublic.liste(db, user);
+        if (lp) { compl = { pct: lp.pct }; manqueProfil = lp.items.filter(i => !i.ok).map(i => ({ libelle: i.libelle, lien: i.lien })); }
+      } catch (e) { /* repli */ }
+      if (!compl) {
+        const roleCompletude = init ? 'initiative' : (user.role === 'collectivite' ? 'collectivite' : 'utilisateur');
+        const ev = Completude.evaluer(roleCompletude, init || user) || { pct: 0, manquants: [] };
+        compl = { pct: ev.pct };
+        manqueProfil = (ev.manquants || []).map(l => ({ libelle: l, lien: init ? 'dashboard-initiative.html' : 'profil.html' }));
+      }
       const ptsProfil = Math.round(compl.pct / 100 * 15);
-      const manquantsProfil = (compl.manquants || []).slice(0, 4);
+      const manquantsProfil = manqueProfil.slice(0, 4).map(m => m.libelle);
 
       const nbSignal = user.signalements_confirmes || 0;
       const identiteOk = !!(user.is_verified || user.identite_verifiee);
@@ -37429,14 +37444,17 @@ ${jsonLd}
           action: identiteOk ? null : { texte:'Vérifier mon identité', href:'profil.html?verifier=identite' } },
 
         { cle:'profil', icon:'👤', label:'Profil public rempli', pts: ptsProfil, max:15, applicable:true,
-          aide: manquantsProfil.length ? `Rempli à ${compl.pct} %. Il manque notamment : ${manquantsProfil.join(', ')}.` : 'Profil entièrement renseigné.',
-          action: manquantsProfil.length ? { texte:'Compléter mon profil', href: init ? 'dashboard-initiative.html' : 'profil.html' } : null },
+          aide: manqueProfil.length ? `Rempli à ${compl.pct} %. Il manque ${manqueProfil.length} élément${manqueProfil.length > 1 ? 's' : ''}.` : 'Profil entièrement renseigné.',
+          /* Chaque élément manquant avec son lien direct : le widget en fait une liste de boutons « Remplir ». */
+          manque: manqueProfil.slice(0, 25),
+          action: manqueProfil.length ? { texte:'Compléter le prochain élément', href: manqueProfil[0].lien || 'profil.html' } : null },
 
         { cle:'anciennete', icon:'🕐', label:'Ancienneté sur la plateforme', pts: ptsAnciennete, max:12, applicable:true,
           aide: `${mois} mois — 1 point par mois, jusqu'à 12.`, action:null },
 
         { cle:'rayonnement', icon:'📣', label:'Rayonnement', pts: ptsRayonnement, max:12, applicable:true,
-          aide: `${nbFollowers} abonné(s), ${nbCollabs} collaboration(s).`, action:null },
+          aide: `${nbFollowers} abonné(s), ${nbCollabs} collaboration(s). Publier régulièrement attire des abonnés.`,
+          action: ptsRayonnement >= 12 ? null : { texte:'Publier sur le fil', href:'fil-actualite.html' } },
 
         /* Ajouté le 2026-08-26 (demande explicite) : réutilise le même témoignage que la
            proposition périodique (voir POST /api/temoignage, initTemoignageWidget dans
@@ -37530,9 +37548,9 @@ ${jsonLd}
               aide: `${nbRecents} geste(s) sur les 30 derniers jours.`,
               action: nbRecents >= 10 ? null : { texte: 'Publier ou commenter', href: 'fil-actualite.html' } },
             echelle('evenements', '📅', 'Événements publiés', nbEvenements, [[1, 5], [3, 3], [10, 4]], null, 12, ['événement', 'événements'], S,
-              { texte: 'Publier un événement', href: 'evenements-app.html' }),
+              { texte: 'Publier un événement', href: 'dashboard-initiative.html#evenements' }),
             echelle('comptes_rendus', '🧾', 'Comptes rendus d’événement', nbComptesRendus, [[1, 5], [3, 3]], null, 8, ['compte rendu', 'comptes rendus'], S,
-              { texte: 'Faire un compte rendu', href: 'evenements-app.html' }),
+              { texte: 'Faire un compte rendu', href: 'dashboard-initiative.html#evenements' }),
             { cle:'parrainage', icon:'🤝', label:'Parrainage', pts: parrPts, max:7, applicable:true,
               regle: 'lien créé : +2 · lien ouvert ou QR scanné : +2 · une inscription grâce à vous : +3',
               aide: !parrCrees ? 'Créez votre lien de parrainage.' : !parrUtilises ? 'Lien créé — partagez-le : +2 dès que quelqu’un l’ouvre.' : !parrInscrits ? 'Votre lien a été ouvert — +3 dès qu’une personne s’inscrit grâce à lui.' : 'Parrainage abouti.',
@@ -37540,17 +37558,17 @@ ${jsonLd}
             geste('achat', '🛒', 'A déjà acheté sur la plateforme', nbAchats > 0, 4, true, 'Une commande en boutique ou un billet d’événement.',
               { texte: 'Découvrir les boutiques', href: 'vitrines.html' }),
             geste('vente', '💶', 'A déjà vendu sur la plateforme', nbVentes > 0, 5, S, 'Une commande reçue et traitée, ou un billet vendu.',
-              { texte: 'Gérer ma boutique', href: 'dashboard-initiative.html' }),
+              { texte: 'Gérer ma boutique', href: 'dashboard-initiative.html#parametres-vitrine' }),
             geste('cagnotte_creee', '🪙', 'A créé une cagnotte', nbCagnottes > 0, 4, S, 'Créez une cagnotte ou un don récurrent.',
-              { texte: 'Créer une cagnotte', href: 'dashboard-initiative.html' }),
+              { texte: 'Créer une cagnotte', href: 'dashboard-initiative.html#cagnottes' }),
             echelle('dons_recus', '💚', 'Dons reçus', nbDonsRecus, [[1, 4], [10, 3]], null, 7, ['don reçu', 'dons reçus'], S,
-              { texte: 'Partager ma cagnotte', href: 'dashboard-initiative.html' }),
+              { texte: 'Partager ma cagnotte', href: 'dashboard-initiative.html#cagnottes' }),
             geste('participation', '🎁', 'A participé à une cagnotte', nbParticipations > 0, 4, true, 'Soutenez une cagnotte ou faites un don.',
               { texte: 'Voir les cagnottes', href: 'cagnottes.html' }),
             geste('adhesion_creee', '🎫', 'A créé une adhésion', nbFormules > 0, 4, S, 'Créez la formule d’adhésion de votre structure.',
-              { texte: 'Créer mon adhésion', href: 'adhesions.html' }),
+              { texte: 'Créer mon adhésion', href: 'dashboard-initiative.html#adhesions-init' }),
             echelle('adherents', '👥', 'Adhérents', nbAdherents, [[1, 4], [10, 3], [20, 3], [30, 4]], { pas: 30, pts: 2 }, 20, ['adhérent', 'adhérents'], S,
-              { texte: 'Faire adhérer des membres', href: 'adhesions.html' }),
+              { texte: 'Faire adhérer des membres', href: 'dashboard-initiative.html#adhesions-init' }),
           ];
         })(),
       ];

@@ -117,6 +117,9 @@
         <!-- ═══ CARTE DIASPO'ACTIF — remplace le profil public pour le rôle utilisateur ═══ -->
         <div id="cda-container" style="margin-bottom:20px;"></div>
 
+        <!-- ═══ MON PROFIL PUBLIC : tout ce qui doit y figurer, coché automatiquement, avec un bouton pour remplir (2026-10-10) ═══ -->
+        <div id="carte-profil-public" style="margin-bottom:20px;"><div data-profil-checklist></div></div>
+
         <!-- KPIs — retirés à la demande de l'utilisateur (2026-07-27) -->
         <div style="display:none;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:24px;">
           <div class="card" style="text-align:center;padding:16px;">
@@ -1047,6 +1050,7 @@ function fmtDate(d){if(!d)return '';try{return new Date(d).toLocaleDateString('f
 <script src="/assets/upload-media.js"></script>
 <script src="assets/banner-presets.js"></script>
 <script src="assets/rich-editor.js"></script>
+<script src="assets/profil-checklist.js"></script>
 <script src="assets/carte-diaspoactif.js?v=3"></script>
   <script src="/assets/theme-manager.js"></script>
 </body>

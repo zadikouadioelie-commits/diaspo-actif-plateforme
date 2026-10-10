@@ -66,6 +66,17 @@
 }
 .ts-crit-action:hover { background: #D9531A; }
 .ts-crit-action:focus-visible { outline: 3px solid #0D2B4E; outline-offset: 2px; }
+.ts-crit-action { min-height: 36px; line-height: 26px; }
+/* Lisibilité (2026-10-10) : points à gagner, éléments manquants avec leur bouton, résumé de ce qui reste */
+.ts-reste { font-size: 13px; line-height: 1.5; background: #FFF7ED; border: 1px solid #FED7AA; border-radius: 10px; padding: 9px 12px; margin: 4px 0 10px; color: #7C2D12; }
+.ts-titre-ligne { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ts-gain { font-size: 11px; font-weight: 800; background: #FEF3C7; color: #92400E; border: 1px solid #FDE68A; border-radius: 99px; padding: 1px 8px; white-space: nowrap; }
+.ts-sous { margin-top: 8px; }
+.ts-sous > summary { cursor: pointer; font-size: 12px; font-weight: 700; color: #334155; min-height: 28px; display: flex; align-items: center; }
+.ts-sous ul { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.ts-sous li { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12.5px; padding: 5px 8px; background: #fff; border: 1px solid #E2E8F0; border-radius: 8px; }
+.ts-mini { margin-top: 0 !important; padding: 0 11px !important; flex: none; white-space: nowrap; }
+.ts-sans-action { font-size: 11.5px; color: #64748b; margin-top: 6px; font-style: italic; }
 
 /* ── Barème complet (visible par tous) ── */
 .ts-bareme { margin-top: 14px; border: 1px solid #E2E8F0; border-radius: 10px; background: #F8FAFC; }
@@ -221,18 +232,26 @@
            sans jamais savoir ce qui lui manquait ni comment y remédier. On sépare donc
            l'obtenu du restant, et chaque manque porte son bouton d'action. */
         const acquis   = detail.filter(d => d.pts >= d.max);
-        const restants = detail.filter(d => d.pts < d.max);
+        /* Ce qu'il reste à faire : ce qui rapporte le plus de points EN PREMIER, et ce qui est faisable tout de suite
+           (un bouton existe) avant ce qui dépend du temps. */
+        const restants = detail.filter(d => d.pts < d.max).sort((a, b) =>
+          (a.action ? 0 : 1) - (b.action ? 0 : 1) || (b.max - b.pts) - (a.max - a.pts));
         const ligne = d => {
           const complet = d.pts >= d.max;
           const bouton = (isMine && d.action)
             ? `<a class="ts-crit-action" href="${esc(d.action.href)}"${d.action.href === '#rencontre' ? ' data-rencontre="1"' : ''}>${esc(d.action.texte)} →</a>`
             : '';
+          const gain = (!complet && d.max - d.pts > 0) ? `<span class="ts-gain">+${d.max - d.pts} pt${d.max - d.pts > 1 ? 's' : ''} à gagner</span>` : '';
+          const sous = (isMine && Array.isArray(d.manque) && d.manque.length)
+            ? `<details class="ts-sous"${d.manque.length <= 5 ? ' open' : ''}><summary>Voir les ${d.manque.length} élément${d.manque.length > 1 ? 's' : ''} à renseigner</summary><ul>${d.manque.map(m => `<li><span>${esc(m.libelle)}</span><a class="ts-crit-action ts-mini" href="${esc(m.lien)}">Remplir →</a></li>`).join('')}</ul></details>` : '';
+          const sansAction = (isMine && !complet && !d.action && !d.enCours && !d.alerte)
+            ? `<div class="ts-sans-action">Pas d'action à faire : ces points arrivent avec le temps ou grâce à l'activité du compte.</div>` : '';
           return `<div class="ts-crit${complet ? ' ok' : ''}${d.alerte ? ' alerte' : ''}${d.enCours ? ' encours' : ''}">
             <span class="ts-crit-icone">${d.icon || '•'}</span>
             <div class="ts-crit-corps">
-              <div class="ts-crit-titre">${esc(d.label)}</div>
+              <div class="ts-titre-ligne"><span class="ts-crit-titre">${esc(d.label)}</span>${isMine ? gain : ''}</div>
               ${d.aide ? `<div class="ts-crit-aide">${esc(d.aide)}</div>` : ''}
-              ${bouton}
+              ${sous}${bouton}${sansAction}
             </div>
             <span class="ts-crit-pts">${d.pts}<span style="opacity:.55">/${d.max}</span></span>
           </div>`;
@@ -256,6 +275,7 @@
           ${(typeof points === 'number' && sur)
             ? `<div class="ts-total">${points} point${points > 1 ? 's' : ''} sur ${sur}${(typeof brut === 'number' && brut > sur) ? ` — ${brut} points cumulés, plafonnés à ${sur}` : ''}</div>` : ''}
 
+          ${(isMine && restants.length && typeof points === 'number' && points < (sur || 100)) ? `<div class="ts-reste">🎯 Il vous manque <strong>${(sur || 100) - points} point${(sur || 100) - points > 1 ? 's' : ''}</strong> pour atteindre ${sur || 100} %. Les actions qui rapportent le plus sont en haut de la liste ; chaque bouton vous y emmène directement.</div>` : ''}
           ${restants.length ? `<div class="ts-groupe">${isMine ? 'Ce qu’il vous reste à faire' : 'Non acquis'}</div>
             <div class="ts-detail">${restants.map(ligne).join('')}</div>` : ''}
           ${acquis.length ? `<div class="ts-groupe">Acquis</div>

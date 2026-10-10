@@ -8384,6 +8384,15 @@ function renderSidebar() {
   // ── Initiatives en cours (démo, org uniquement) ──
   if (isOrgRole()) sb.appendChild(buildInitiativesEnCoursWidget());
 
+  // ── Mon profil public : liste de contrôle (titulaire seulement) — tout ce qui doit y figurer, coché si rempli, avec un bouton pour remplir ──
+  if (isOwn) {
+    const pcDiv = document.createElement('div');
+    pcDiv.style.marginBottom = '16px';
+    pcDiv.setAttribute('data-profil-checklist', '');
+    sb.appendChild(pcDiv);
+    if (window.ProfilChecklist) ProfilChecklist.render(pcDiv);
+  }
+
   // ── Trust Score widget ──
   const tsDiv = document.createElement('div');
   tsDiv.style.marginBottom = '16px';
@@ -9377,6 +9386,7 @@ async function modifierRec(id, statut) {
 init();
 </script>
 <script src="assets/trust-score.js"></script>
+<script src="assets/profil-checklist.js"></script>
 <script src="assets/profile-qr.js"></script>
 <script src="assets/posts.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>

@@ -3450,6 +3450,8 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
            Les comptes Initiative disposent de deux critères que les particuliers n'ont pas
            (immatriculation et organisation vérifiée) : ils sont donc notés sur 100, là où
            un particulier l'est sur 87. -->
+      <!-- ═══ MON PROFIL PUBLIC : tout ce qui doit y figurer, coché automatiquement, avec un bouton pour remplir (2026-10-10) ═══ -->
+      <div id="carte-profil-public" style="margin-top:16px;"><div data-profil-checklist></div></div>
       <div class="card" style="margin-top:16px;" id="carte-indice-fiabilite">
         <div id="mon-indice-fiabilite"><div style="color:var(--muted);font-size:12px;">Chargement de l'indice…</div></div>
       </div>
@@ -11038,6 +11040,7 @@ initPremiumGates();
 <!-- Requis par la carte « Mon indice de fiabilité » du cockpit. -->
 <script src="assets/signalement.js"></script>
 <script src="assets/trust-score.js"></script>
+<script src="assets/profil-checklist.js"></script>
 <script src="assets/posts.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js" defer></script>
