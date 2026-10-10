@@ -923,6 +923,11 @@ const COLONNES_MIGRATION = [
     // Types de questions d'un scrutin (2026-10-10) — miroir exact des ALTER db.js.
     ['vote_resolutions', 'config_json', 'TEXT'],
     ['vote_bulletins', 'commentaire', 'TEXT'],
+    // Colonnes déclarées dans db.js mais jamais reprises ici (constaté en production le 2026-10-10 : absentes de Neon, créées à la main) —
+    // page publique du CV (partage par jeton) et épinglage permanent d'un événement.
+    ['cv_profiles', 'partage_token', 'TEXT'],
+    ['cv_profiles', 'partage_actif', 'INTEGER DEFAULT 1'],
+    ['evenements', 'epingle_permanent', 'INTEGER DEFAULT 0'],
     // Liste de stockage des participants (Cotisations & Adhésions ↔ Réseau professionnel)
     ['adhesion_formules', 'liste_stockage_id', 'INTEGER'],
     // Profil public enrichi des initiatives
