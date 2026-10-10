@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Diaspo'Actif — Maquette A · Maison de prestige</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ivoire:#FAF7F0; --ivoire2:#F2ECDF; --papier:#FFFFFF;
+  --marine:#0B1F3A; --marine2:#14305A; --encre:#1B2433; --gris:#5B6475;
+  --or:#A9843F; --or-clair:#D4B672; --filet:#E4DAC4;
+  --ombre:0 1px 2px rgba(11,31,58,.04),0 10px 30px -12px rgba(11,31,58,.18);
+  --serif:"Cormorant Garamond",Georgia,"Times New Roman",serif;
+  --sans:"Hanken Grotesk",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --ease:cubic-bezier(.22,.61,.36,1);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--ivoire);color:var(--encre);font-family:var(--sans);font-size:17px;line-height:1.65;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:1180px;margin:0 auto;padding:0 32px}
+h1,h2,h3{font-family:var(--serif);font-weight:600;color:var(--marine);line-height:1.08;margin:0;text-wrap:balance}
+.eyebrow{font-size:12.5px;letter-spacing:.22em;text-transform:uppercase;font-weight:600;color:var(--or);display:inline-flex;align-items:center;gap:14px}
+.eyebrow::before{content:"";width:34px;height:1px;background:var(--or)}
+.btn{white-space:nowrap;display:inline-flex;align-items:center;gap:10px;padding:15px 30px;font:600 14.5px/1 var(--sans);letter-spacing:.06em;text-transform:uppercase;border:1px solid var(--marine);background:var(--marine);color:#fff;transition:background .5s var(--ease),color .5s var(--ease),border-color .5s var(--ease)}
+.btn:hover{background:var(--or);border-color:var(--or)}
+.btn.ghost{background:transparent;color:var(--marine)}
+.btn.ghost:hover{background:var(--marine);color:#fff;border-color:var(--marine)}
+.btn.or{background:var(--or-clair);border-color:var(--or-clair);color:var(--marine)}
+.btn.or:hover{background:#fff;border-color:#fff}
+:focus-visible{outline:2px solid var(--or);outline-offset:3px}
+
+/* bandeau + en-tête */
+.band{background:var(--marine);color:var(--or-clair);text-align:center;font-size:13.5px;letter-spacing:.14em;text-transform:uppercase;padding:10px 16px}
+.band b{color:#fff;font-weight:600}
+header.top{background:rgba(250,247,240,.92);backdrop-filter:blur(8px);position:sticky;top:0;z-index:20;border-bottom:1px solid var(--filet)}
+.top .wrap{display:flex;align-items:center;justify-content:space-between;height:84px;gap:24px}
+.brand{display:flex;align-items:center;gap:14px}
+.mark{width:42px;height:42px;border:1px solid var(--or);border-radius:50%;display:grid;place-items:center;font-family:var(--serif);font-weight:700;font-size:19px;color:var(--marine);letter-spacing:.02em}
+.brand span{font-family:var(--serif);font-size:26px;font-weight:700;color:var(--marine);letter-spacing:.01em}
+nav.main{display:flex;gap:30px}
+nav.main a{white-space:nowrap;font-size:13.5px;letter-spacing:.14em;text-transform:uppercase;font-weight:500;color:var(--encre);padding:6px 0;border-bottom:1px solid transparent;transition:border-color .4s var(--ease),color .4s}
+nav.main a:hover,nav.main a.on{border-color:var(--or);color:var(--marine)}
+.actions{display:flex;align-items:center;gap:22px}
+.burger{display:none;width:44px;height:44px;border:1px solid var(--filet);background:transparent;align-items:center;justify-content:center;cursor:pointer}.burger span{display:block;width:18px;height:1px;background:var(--marine);box-shadow:0 6px 0 var(--marine),0 -6px 0 var(--marine)}
+.actions .lnk{white-space:nowrap;font-size:13.5px;letter-spacing:.12em;text-transform:uppercase;font-weight:500}
+.actions .btn{padding:12px 22px;font-size:12.5px}
+
+/* hero */
+.hero{padding:96px 0 88px}
+.hero .wrap{display:grid;grid-template-columns:1.12fr .88fr;gap:72px;align-items:center}
+.hero h1{font-size:clamp(44px,5.1vw,74px);margin:22px 0 26px;letter-spacing:-.01em}
+.hero h1 em{font-style:italic;color:var(--or);font-weight:500}
+.hero p.lead{font-size:19px;color:var(--gris);max-width:540px;margin:0 0 40px}
+.hero .cta{display:flex;gap:16px;flex-wrap:wrap}
+.arche{position:relative;aspect-ratio:4/5;max-width:440px;margin-left:auto;width:100%}
+.arche .cadre{position:absolute;inset:0;border-radius:220px 220px 6px 6px;background:linear-gradient(165deg,var(--marine2),var(--marine) 70%);overflow:hidden;box-shadow:0 40px 70px -30px rgba(11,31,58,.5)}
+.arche .cadre::after{content:"";position:absolute;inset:0;background:radial-gradient(circle at 50% 38%,rgba(212,182,114,.22),transparent 60%)}
+.arche::before{content:"";position:absolute;inset:-14px;border:1px solid var(--or-clair);border-radius:234px 234px 12px 12px;pointer-events:none}
+.arche svg{position:absolute;left:50%;top:44%;width:84%;transform:translate(-50%,-50%);z-index:1}
+.arche .legende{position:absolute;left:0;right:0;bottom:30px;z-index:2;text-align:center;color:#EADFC3;font-size:12.5px;letter-spacing:.2em;text-transform:uppercase}
+.arche .legende i{display:inline-block;width:8px;height:8px;border-radius:50%;margin:0 8px 0 18px;background:var(--or-clair)}
+.arche .legende i.b{background:#7FA6E0}
+@keyframes lent{to{transform:rotate(360deg)}}
+.arche .orbite{transform-origin:50% 50%;animation:lent 120s linear infinite}
+
+/* chiffres */
+.chiffres{border-top:1px solid var(--filet);border-bottom:1px solid var(--filet);background:var(--papier)}
+.chiffres .wrap{display:grid;grid-template-columns:repeat(4,1fr)}
+.chiffres div.c{padding:44px 20px;text-align:center;border-left:1px solid var(--filet)}
+.chiffres div.c:first-child{border-left:0}
+.chiffres b{display:block;font-family:var(--serif);font-size:60px;font-weight:600;color:var(--marine);line-height:1;font-variant-numeric:lining-nums tabular-nums}
+.chiffres span{display:block;margin-top:12px;font-size:12.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--gris)}
+
+/* sections */
+section.s{padding:116px 0}
+.s-head{max-width:720px;margin-bottom:64px}
+.s-head h2{font-size:clamp(36px,4.4vw,58px);margin:18px 0 20px}
+.s-head p{color:var(--gris);margin:0;font-size:18px}
+.centre{text-align:center;margin-left:auto;margin-right:auto}
+.centre .eyebrow::after{content:"";width:34px;height:1px;background:var(--or)}
+
+.pourquoi .grille{display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:start}
+.piliers{list-style:none;margin:0;padding:0;border-top:1px solid var(--filet)}
+.piliers li{display:flex;gap:26px;align-items:flex-start;padding:34px 0;border-bottom:1px solid var(--filet)}
+.piliers svg{flex:none;width:34px;height:34px;stroke:var(--or);fill:none;stroke-width:1.2}
+.piliers h3{font-size:30px;margin-bottom:6px}
+.piliers p{margin:0;color:var(--gris);font-size:16px}
+
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-top:84px}
+.carte{background:var(--papier);border:1px solid var(--filet);padding:46px 44px;box-shadow:var(--ombre);position:relative}
+.carte h3{font-size:32px;margin:14px 0 14px}
+.carte p{margin:0 0 22px;color:var(--gris)}
+.carte ul{margin:0;padding:0;list-style:none;display:flex;gap:10px;flex-wrap:wrap}
+.carte li{font-size:12.5px;letter-spacing:.14em;text-transform:uppercase;border:1px solid var(--filet);padding:8px 14px;color:var(--marine)}
+.carte.nuit{background:var(--marine);border-color:var(--marine)}
+.carte.nuit h3{color:#fff}.carte.nuit p{color:#C4CCDB}.carte.nuit .eyebrow{color:var(--or-clair)}.carte.nuit .eyebrow::before{background:var(--or-clair)}
+.carte.nuit li{border-color:rgba(212,182,114,.45);color:var(--or-clair)}
+
+/* à l'honneur */
+.honneur{background:var(--ivoire2)}
+.cartes4{display:grid;grid-template-columns:repeat(4,1fr);gap:26px}
+.profil{background:var(--papier);border:1px solid var(--filet);padding:40px 26px 34px;text-align:center;transition:transform .7s var(--ease),box-shadow .7s var(--ease)}
+.profil:hover{transform:translateY(-6px);box-shadow:var(--ombre)}
+.monogramme{width:92px;height:92px;margin:0 auto 24px;border-radius:50%;display:grid;place-items:center;font-family:var(--serif);font-size:36px;font-weight:600;color:var(--marine);background:var(--ivoire);border:1px solid var(--or-clair);outline:1px solid var(--filet);outline-offset:6px}
+.profil h3{font-size:25px;margin-bottom:6px}
+.profil .lieu{font-size:14.5px;color:var(--gris);margin:0 0 18px}
+.profil .tag{display:inline-block;font-size:11.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--or);border-top:1px solid var(--filet);padding-top:14px;width:100%}
+
+/* premium */
+.premium{background:linear-gradient(120deg,var(--marine),var(--marine2));color:#fff;position:relative;overflow:hidden}
+.premium::before{content:"";position:absolute;right:-140px;top:-140px;width:460px;height:460px;border-radius:50%;border:1px solid rgba(212,182,114,.35)}
+.premium::after{content:"";position:absolute;right:-60px;top:-60px;width:300px;height:300px;border-radius:50%;border:1px solid rgba(212,182,114,.25)}
+.premium .wrap{display:grid;grid-template-columns:1.4fr .6fr;gap:56px;align-items:center;position:relative;z-index:1}
+.premium h2{color:#fff;font-size:clamp(34px,4vw,54px);margin:16px 0 18px}
+.premium p{color:#C9D2E2;margin:0;max-width:560px}
+.premium .eyebrow{color:var(--or-clair)}.premium .eyebrow::before{background:var(--or-clair)}
+.premium .droite{text-align:right}
+
+/* témoignage */
+.temo{text-align:center}
+.temo blockquote{margin:30px auto 34px;max-width:860px;font-family:var(--serif);font-style:italic;font-weight:500;font-size:clamp(28px,3.4vw,44px);line-height:1.25;color:var(--marine)}
+.temo .guillemet{font-family:var(--serif);font-size:90px;line-height:.4;color:var(--or-clair);display:block;height:42px}
+.temo cite{font-style:normal;font-size:13px;letter-spacing:.2em;text-transform:uppercase;color:var(--gris)}
+.temo cite b{color:var(--marine);font-weight:600}
+
+/* appel final */
+.final{background:var(--papier);border-top:1px solid var(--filet);text-align:center}
+.final h2{font-size:clamp(38px,5vw,66px);max-width:900px;margin:20px auto 22px}
+.final p{max-width:640px;margin:0 auto 40px;color:var(--gris);font-size:18px}
+.ornement{display:flex;align-items:center;justify-content:center;gap:16px;color:var(--or)}
+.ornement::before,.ornement::after{content:"";width:70px;height:1px;background:var(--or-clair)}
+.final .cta{display:flex;gap:16px;justify-content:center;flex-wrap:wrap}
+
+footer{background:var(--marine);color:#AEB8CC;padding:64px 0 40px;font-size:14.5px}
+footer .wrap{display:flex;justify-content:space-between;gap:40px;flex-wrap:wrap;align-items:center}
+footer .brand span{color:#fff}footer .mark{border-color:var(--or-clair);color:#fff}
+footer nav{display:flex;gap:28px;flex-wrap:wrap}
+footer nav a{letter-spacing:.12em;text-transform:uppercase;font-size:12.5px}
+footer nav a:hover{color:var(--or-clair)}
+.fin{border-top:1px solid rgba(255,255,255,.12);margin-top:40px;padding-top:24px;text-align:center;font-size:13px;color:#8693AB}
+
+/* apparition lente */
+.r{opacity:0;transform:translateY(22px);transition:opacity 1.1s var(--ease),transform 1.1s var(--ease)}
+.r.v{opacity:1;transform:none}
+@media (prefers-reduced-motion:reduce){.r{opacity:1;transform:none;transition:none}.arche .orbite{animation:none}html{scroll-behavior:auto}}
+
+@media (max-width:1100px){nav.main{display:none}.burger{display:flex}}
+@media (max-width:980px){
+  nav.main{display:none}
+  .hero .wrap,.pourquoi .grille,.duo,.premium .wrap{grid-template-columns:1fr}
+  .hero{padding:56px 0}.arche{margin:20px auto 0;max-width:340px}
+  .cartes4{grid-template-columns:1fr 1fr}
+  .chiffres .wrap{grid-template-columns:1fr 1fr}.chiffres div.c:nth-child(3){border-left:0}
+  .chiffres div.c:nth-child(n+3){border-top:1px solid var(--filet)}
+  section.s{padding:80px 0}.premium .droite{text-align:left}
+}
+@media (max-width:560px){
+  .actions .btn{display:none}.actions{gap:0}
+  .wrap{padding:0 20px}.cartes4{grid-template-columns:1fr}
+  .top .wrap{height:70px}.actions .lnk{display:none}.brand span{font-size:22px}
+  .band{font-size:11px;letter-spacing:.08em}.carte{padding:34px 26px}
+  .chiffres b{font-size:44px}
+}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-talents" viewBox="0 0 34 34"><circle cx="12" cy="12" r="5"/><circle cx="23" cy="13" r="4"/><path d="M3 29c0-5 4-9 9-9s9 4 9 9M20 21c1-.5 2-.7 3-.7 4 0 8 3 8 8"/></symbol>
+  <symbol id="i-init" viewBox="0 0 34 34"><rect x="4" y="5" width="11" height="11"/><rect x="19" y="5" width="11" height="11"/><rect x="4" y="19" width="11" height="11"/><rect x="19" y="19" width="11" height="11"/></symbol>
+  <symbol id="i-impact" viewBox="0 0 34 34"><path d="M17 3l3.6 8.4L29 14l-6.4 5.4L24.6 29 17 24.2 9.4 29l2-9.6L5 14l8.4-2.6z"/></symbol>
+</svg>
+
+<div class="band">Trois mois de <b>Premium offerts</b> à toute la diaspora</div>
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="#"><div class="mark">DA</div><span>Diaspo’Actif</span></a>
+    <nav class="main" aria-label="Navigation principale">
+      <a class="on" href="#">Accueil</a><a href="#">Annuaire</a><a href="#">Boutiques</a><a href="#">Fil d’actualité</a><a href="#">Événements</a>
+    </nav>
+    <div class="actions"><a class="lnk" href="#">Connexion</a><a class="btn" href="#">Créer un compte</a><button class="burger" aria-label="Ouvrir le menu"><span></span></button></div>
+  </div>
+</header>
+
+<main>
+<section class="hero">
+  <div class="wrap">
+    <div class="r">
+      <span class="eyebrow">Réseau diaspora mondial</span>
+      <h1>Connecter les diasporas, <em>valoriser</em> les talents, accélérer le développement des territoires.</h1>
+      <p class="lead">Des passerelles entre pays d’origine et pays d’accueil, grâce aux compétences, projets, organisations et initiatives portés par les diasporas du monde entier.</p>
+      <div class="cta"><a class="btn" href="#">Rejoindre la communauté</a><a class="btn ghost" href="#">Explorer l’annuaire</a></div>
+    </div>
+    <div class="arche r" aria-hidden="true">
+      <div class="cadre"></div>
+      <svg viewBox="0 0 400 400" fill="none" stroke="#D4B672" stroke-width=".8">
+        <circle cx="200" cy="200" r="150" opacity=".9"/>
+        <ellipse cx="200" cy="200" rx="150" ry="55" opacity=".5"/>
+        <ellipse cx="200" cy="200" rx="150" ry="105" opacity=".35"/>
+        <ellipse cx="200" cy="200" rx="55" ry="150" opacity=".5"/>
+        <ellipse cx="200" cy="200" rx="105" ry="150" opacity=".35"/>
+        <line x1="50" y1="200" x2="350" y2="200" opacity=".5"/><line x1="200" y1="50" x2="200" y2="350" opacity=".5"/>
+        <g class="orbite"><circle cx="200" cy="200" r="182" stroke-dasharray="2 7" opacity=".7"/><circle cx="200" cy="18" r="5" fill="#D4B672" stroke="none"/><circle cx="382" cy="200" r="4" fill="#7FA6E0" stroke="none"/></g>
+        <path d="M120 150 Q200 70 290 170" stroke="#EADFC3" stroke-width="1.1"/><circle cx="120" cy="150" r="4" fill="#D4B672" stroke="none"/><circle cx="290" cy="170" r="4" fill="#7FA6E0" stroke="none"/>
+        <path d="M150 262 Q230 200 296 250" stroke="#EADFC3" stroke-width="1.1" opacity=".8"/><circle cx="150" cy="262" r="3.5" fill="#D4B672" stroke="none"/><circle cx="296" cy="250" r="3.5" fill="#7FA6E0" stroke="none"/>
+      </svg>
+      <div class="legende"><i></i>Origine<i class="b"></i>Résidence</div>
+    </div>
+  </div>
+</section>
+
+<div class="chiffres">
+  <div class="wrap">
+    <div class="c r"><b>1 240</b><span>Membres</span></div>
+    <div class="c r"><b>186</b><span>Initiatives</span></div>
+    <div class="c r"><b>42</b><span>Pays</span></div>
+    <div class="c r"><b>9 800</b><span>Messages échangés</span></div>
+  </div>
+</div>
+
+<section class="s pourquoi">
+  <div class="wrap">
+    <div class="grille">
+      <div class="r">
+        <span class="eyebrow">Notre vision</span>
+        <h2 style="font-size:clamp(38px,4.6vw,62px);margin:18px 0 22px">Pourquoi Diaspo’Actif&nbsp;?</h2>
+        <p style="color:var(--gris);font-size:19px;margin:0">La diaspora africaine représente un levier de développement majeur. Pourtant, les initiatives restent dispersées, invisibles, sans réseau. Diaspo’Actif change ça.</p>
+      </div>
+      <ul class="piliers r">
+        <li><svg><use href="#i-talents"/></svg><div><h3>Rassembler les talents</h3><p>Individus, collectifs, associations et institutions se trouvent enfin.</p></div></li>
+        <li><svg><use href="#i-init"/></svg><div><h3>Organiser les initiatives</h3><p>Un annuaire mondial, des profils et des vitrines qui donnent de la visibilité.</p></div></li>
+        <li><svg><use href="#i-impact"/></svg><div><h3>Mobiliser pour un impact durable</h3><p>Des collaborations concrètes pour transformer les idées en actions.</p></div></li>
+      </ul>
+    </div>
+    <div class="duo">
+      <article class="carte r"><span class="eyebrow">Le problème</span><h3>La dispersion</h3><p>Des milliers d’initiatives de diaspora existent dans le monde — associations, startups, projets solidaires — mais elles agissent en silo, sans réseau, sans visibilité commune.</p><ul><li>Isolement</li><li>Manque de visibilité</li><li>Ressources limitées</li></ul></article>
+      <article class="carte nuit r"><span class="eyebrow">Notre réponse</span><h3>La mise en réseau</h3><p>Diaspo’Actif crée un espace commun où individus, collectifs, associations et institutions peuvent se trouver, se soutenir et co-construire des projets à impact durable.</p><ul><li>Annuaire mondial</li><li>Messagerie</li><li>Collaborations</li></ul></article>
+    </div>
+  </div>
+</section>
+
+<section class="s honneur">
+  <div class="wrap">
+    <div class="s-head centre r"><span class="eyebrow">Distinction</span><h2>Comptes à l’honneur</h2><p>Les comptes les plus actifs sont mis en lumière chaque mois.</p></div>
+    <div class="cartes4">
+      <article class="profil r"><div class="monogramme">AK</div><h3>Aminata Koné</h3><p class="lieu">Abidjan · Côte d’Ivoire</p><span class="tag">Initiative</span></article>
+      <article class="profil r"><div class="monogramme">MC</div><h3>Moussa Coulibaly</h3><p class="lieu">Lyon · France</p><span class="tag">Membre</span></article>
+      <article class="profil r"><div class="monogramme">FB</div><h3>Fatoumata Bah</h3><p class="lieu">Dakar · Sénégal</p><span class="tag">Initiative</span></article>
+      <article class="profil r"><div class="monogramme">JK</div><h3>Jean Kouassi</h3><p class="lieu">Montréal · Canada</p><span class="tag">Membre</span></article>
+    </div>
+  </div>
+</section>
+
+<section class="premium s" style="padding:96px 0">
+  <div class="wrap">
+    <div class="r"><span class="eyebrow">Offre de lancement</span><h2>3 mois de Premium offerts à toute la diaspora</h2><p>Profitez de toutes les fonctionnalités avancées, sans engagement, pour développer votre réseau et vos projets.</p></div>
+    <div class="droite r"><a class="btn or" href="#">Passer Premium</a></div>
+  </div>
+</section>
+
+<section class="s temo">
+  <div class="wrap">
+    <div class="r"><span class="eyebrow" style="justify-content:center">Ils ont rejoint Diaspo’Actif</span>
+    <blockquote><span class="guillemet">“</span>Grâce à Diaspo’Actif, notre association a trouvé des partenaires dans trois pays en quelques semaines.</blockquote>
+    <cite><b>Aminata K.</b> — Côte d’Ivoire</cite></div>
+  </div>
+</section>
+
+<section class="s final">
+  <div class="wrap r">
+    <div class="ornement"><svg width="22" height="22" viewBox="0 0 34 34" fill="none" stroke="currentColor" stroke-width="1.4"><use href="#i-impact"/></svg></div>
+    <h2>Rejoignez le mouvement mondial des diasporas engagées</h2>
+    <p>Que vous soyez entrepreneur, étudiant, expert, investisseur, association ou institution, Diaspo’Actif vous permet de transformer vos idées en actions et vos connexions en opportunités.</p>
+    <div class="cta"><a class="btn" href="#">Créer un compte</a><a class="btn ghost" href="#">Découvrir les initiatives</a></div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <a class="brand" href="#"><div class="mark">DA</div><span>Diaspo’Actif</span></a>
+    <nav><a href="#">Annuaire</a><a href="#">Boutiques</a><a href="#">Événements</a><a href="#">Mentions légales</a><a href="#">Contact</a></nav>
+  </div>
+  <div class="wrap"><div class="fin" style="width:100%">© Diaspo’Actif — Maquette de direction artistique A · les chiffres et noms sont des exemples</div></div>
+</footer>
+
+<script>
+(function(){
+  var els=[].slice.call(document.querySelectorAll('.r'));
+  if(!('IntersectionObserver' in window)){els.forEach(function(e){e.classList.add('v')});return;}
+  var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('v');io.unobserve(e.target)}})},{threshold:.12});
+  els.forEach(function(e,i){e.style.transitionDelay=(i%4)*90+'ms';io.observe(e)});
+})();
+</script>
+</body>
+</html>
