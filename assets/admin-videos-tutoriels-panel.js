@@ -107,7 +107,26 @@ function vtChangerType() {
 }
 
 function vtSourceLabel(v) {
-  return v.type_source === 'youtube' ? '📺 YouTube' : v.type_source === 'mp4' ? '🎞️ MP4' : '🕒 Bientôt disponible';
+  return v.type_source === 'youtube' ? '📺 YouTube' : v.type_source === 'mp4' ? '🎞️ MP4' : v.type_source === 'film' ? '🎬 Film animé de la plateforme' : '🕒 Bientôt disponible';
+}
+
+/* Film animé de la plateforme : sa source (le film lui-même) ne se choisit pas — on masque les choix YouTube / MP4 / Bientôt et on l'explique. */
+function vtAjusterFormFilm(estFilm) {
+  const radio = document.querySelector('input[name="vt-type"]');
+  const bloc = radio ? radio.closest('div[style*="flex"]')?.parentElement : null;
+  let note = document.getElementById('vt-note-film');
+  if (bloc) bloc.style.display = estFilm ? 'none' : '';
+  if (estFilm) {
+    document.getElementById('vt-champ-youtube').style.display = 'none';
+    document.getElementById('vt-champ-mp4').style.display = 'none';
+    if (!note && bloc) {
+      note = document.createElement('div'); note.id = 'vt-note-film';
+      note.style.cssText = 'background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:10px 12px;font-size:12.5px;color:#1E3A8A;line-height:1.5;';
+      note.textContent = "🎬 Film animé de la plateforme : il se lit dans son propre lecteur. Vous pouvez modifier son titre, sa description, sa catégorie, sa miniature, sa durée et son statut, le déplacer, le masquer ou le supprimer — mais pas changer sa source.";
+      bloc.parentElement.insertBefore(note, bloc);
+    }
+    if (note) note.style.display = '';
+  } else if (note) note.style.display = 'none';
 }
 
 function vtRemplirCategories() {
@@ -141,8 +160,13 @@ function vtOuvrirForm(id) {
   document.getElementById('vt-miniature-url').value = v?.miniature_url || '';
   document.getElementById('vt-fichier-miniature').value = '';
   document.getElementById('vt-miniature-statut').textContent = v?.miniature_url ? 'Miniature déjà envoyée — en choisir une nouvelle pour la remplacer.' : '';
-  document.querySelector(`input[name="vt-type"][value="${v?.type_source || 'youtube'}"]`).checked = true;
+  const estFilm = !!(v && v.type_source === 'film');
+  const champId = document.getElementById('vt-id');
+  champId.dataset.film = estFilm ? '1' : '';
+  champId.dataset.filmUrl = estFilm ? (v.url || '') : '';
+  document.querySelector(`input[name="vt-type"][value="${estFilm ? 'youtube' : (v?.type_source || 'youtube')}"]`).checked = true;
   vtChangerType();
+  vtAjusterFormFilm(estFilm);
   document.getElementById('vt-modal-overlay').style.display = 'flex';
 }
 
@@ -205,13 +229,15 @@ async function vtMiniatureChoisie(input) {
 async function vtSauver() {
   const id = document.getElementById('vt-id').value;
   const titre = document.getElementById('vt-titre').value.trim();
-  const type_source = document.querySelector('input[name="vt-type"]:checked').value;
-  const url = type_source === 'youtube' ? document.getElementById('vt-url-youtube').value.trim()
+  const estFilm = document.getElementById('vt-id').dataset.film === '1';
+  const type_source = estFilm ? 'film' : document.querySelector('input[name="vt-type"]:checked').value;
+  const url = estFilm ? (document.getElementById('vt-id').dataset.filmUrl || '')
+    : type_source === 'youtube' ? document.getElementById('vt-url-youtube').value.trim()
     : type_source === 'mp4' ? document.getElementById('vt-url-mp4').value.trim()
     : ''; // "bientot" : aucune vidéo réelle, pas d'URL à exiger
   const categorie = document.getElementById('vt-categorie').value;
   if (!titre) return alert('Le titre est obligatoire.');
-  if (type_source !== 'bientot' && !url) return alert(type_source === 'youtube' ? "L'URL YouTube est obligatoire." : 'Merci de charger un fichier vidéo.');
+  if (type_source !== 'bientot' && type_source !== 'film' && !url) return alert(type_source === 'youtube' ? "L'URL YouTube est obligatoire." : 'Merci de charger un fichier vidéo.');
   if (!categorie) return alert('La catégorie est obligatoire.');
   const payload = {
     titre,

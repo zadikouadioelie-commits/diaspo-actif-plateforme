@@ -1570,17 +1570,14 @@
     const bientot = v.type_source === 'bientot';
     return `<a class="vcard${wide ? ' wide' : ''}" href="#/video/${v.id}"><div class="vth">${videoThumb(v)}${bientot ? '<span class="vd" style="background:var(--orange-d)">Bientôt</span>' : (v.duree_secondes ? `<span class="vd">${fmtDuree(v.duree_secondes)}</span>` : '')}${bientot ? '' : '<span class="vp">▶</span>'}</div><div class="vt">${esc(v.titre)}</div>${v.categorie ? `<div class="small muted">${esc(v.categorie)}</div>` : ''}</a>`;
   }
-  /* Film « Créer son compte pas à pas » (2026-10-09, demande explicite) : première vignette des tutoriels de l'accueil. Film animé
-     (voix, musique, sous-titres) ouvert dans une fenêtre, chargé seulement au toucher. */
-  function filmCard(wide) {
-    return `<a class="vcard dispo${wide ? ' wide' : ''}" href="inscription.html" data-film-inscription="1"><div class="vth"><img src="assets/media/film-inscription-poster.jpg" alt="" loading="lazy"><span class="vdispo">✓ Disponible</span><span class="vd">1:27</span><span class="vp">▶</span></div><div class="vt">Créer son compte Diaspo’Actif pas à pas</div><div class="small muted">Bien démarrer</div></a>`;
-  }
+  /* Films animés de la plateforme (2026-10-10) : ce sont désormais de vraies vidéos de la rubrique (type_source 'film', gérées comme les autres) —
+     leur carte vient de l'API. Seul le lecteur diffère : le film (voix, musique, sous-titres) s'ouvre dans une fenêtre, chargé seulement au toucher. */
   let filmPromesse = null;
   document.addEventListener('click', e => {
     const a = e.target.closest && e.target.closest('[data-film-inscription]'); if (!a) return;
     e.preventDefault();
     if (!filmPromesse) filmPromesse = window.InscriptionFilm ? Promise.resolve() : new Promise((ok, ko) => { const sc = document.createElement('script'); sc.src = 'assets/inscription-film.js?v=14'; sc.onload = ok; sc.onerror = () => { filmPromesse = null; ko(new Error('film')); }; document.head.appendChild(sc); });
-    filmPromesse.then(() => window.InscriptionFilm.ouvrir()).catch(() => { location.href = 'inscription.html'; });
+    filmPromesse.then(() => window.InscriptionFilm.ouvrir(a.dataset.filmInscription === 'court' ? { version: 'court' } : undefined)).catch(() => { location.href = 'inscription.html'; });
   });
   const miniCard = (href, photo, nom, sub, round) => `<a class="mc" href="${href}"><div class="av big" style="border-radius:${round ? '50%' : '16px'};margin:0 auto 8px">${photo ? `<img src="${attrUrl(photo)}" alt="" loading="lazy" onerror="this.remove()">` : esc(initials(nom))}</div><div class="mn">${esc(nom)}</div>${sub ? `<div class="small muted ell">${esc(sub)}</div>` : ''}</a>`;
   const SEC_ICONS = { 'home-actus': 'fil', 'home-honneur': 'star', 'home-troph': 'star', 'home-videos': 'play', 'home-init': 'heart', 'home-shops': 'shop', 'home-temo': 'comment', 'home-part': 'people' };
@@ -1628,7 +1625,7 @@
     });
     safe(async () => {
       let v = []; try { v = (await api('/api/videos-tutoriels?limit=8')).videos || []; } catch (e) { /* le film d'inscription reste affiché */ }
-      homeBlock('home-videos', 'Tutoriels vidéo', `<div class="hs">${filmCard()}${v.map(x => videoCard(x)).join('')}</div>`, '<a href="#/videos" class="sec-more">Tout voir ›</a>', 'Apprenez à utiliser Diaspo’Actif en quelques minutes.');
+      homeBlock('home-videos', 'Tutoriels vidéo', `<div class="hs">${v.map(x => videoCard(x)).join('')}</div>`, '<a href="#/videos" class="sec-more">Tout voir ›</a>', 'Apprenez à utiliser Diaspo’Actif en quelques minutes.');
     });
     /* Trophée de la Diaspora — « Prochainement » (2026-10-09) : occupe l'emplacement de l'ancien bloc « Initiatives à découvrir »
        (même place que sur l'accueil ordinateur, index.html). À remplacer par les comptes mis à l'honneur une fois le premier cycle clos. */
@@ -1673,6 +1670,7 @@
     const y = v.type_source === 'youtube' ? ytId(v.url) : null;
     const player = y ? `<div class="vwrap"><iframe src="https://www.youtube-nocookie.com/embed/${y}?rel=0&playsinline=1" title="${esc(v.titre)}" allow="accelerometer; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe></div>`
       : v.type_source === 'mp4' ? videoBlock(v.url, v.miniature_url)
+        : v.type_source === 'film' ? `<a href="inscription.html" data-film-inscription="${v.url === 'inscription-court' ? 'court' : 'long'}" aria-label="Lancer le film : ${esc(v.titre)}" style="position:relative;display:block;aspect-ratio:16/9;border-radius:14px;overflow:hidden;background:#0B2A5B"><img src="${attrUrl(v.miniature_url || 'assets/media/film-inscription-poster.jpg')}" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover"><span style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:64px;height:64px;border-radius:50%;background:rgba(242,100,34,.95);color:#fff;font-size:26px;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(0,0,0,.4)">▶</span></a>`
         : `<div class="vsoon"><div class="vth">${videoThumb(v)}</div><div class="vsoon-b"><span class="badge o">${ic('clock', 's')} Bientôt disponible</span><span class="small">Cette vidéo sera publiée prochainement.</span></div></div>`;
     const suite = autres.length ? `<div class="sec" style="margin-top:22px"><h2 class="sec-t"><span class="sic">${ic('play')}</span><span>À suivre</span></h2></div>
       <div class="lst">${autres.slice(0, 8).map(x => `<a class="vrow" href="#/video/${x.id}"><div class="vth">${videoThumb(x)}${x.type_source === 'bientot' ? '<span class="vd" style="background:var(--orange-d)">Bientôt</span>' : (x.duree_secondes ? `<span class="vd">${fmtDuree(x.duree_secondes)}</span>` : '')}</div><div class="sp"><div class="vt" style="margin-top:0">${esc(x.titre)}</div>${x.categorie ? `<div class="small muted">${esc(x.categorie)}</div>` : ''}</div></a>`).join('')}</div>` : '';

@@ -24804,6 +24804,11 @@ route("PUT", "/api/admin/videos-tutoriels/:id", async (req, res, params, body) =
   if (!user || !(await AdminJunior.hasAdminPermission(user, 'videos_tutoriels.gerer', db))) return sendJSON(res, 403, { error: "Réservé aux administrateurs autorisés." });
   const { titre, description, icone, type_source, url, duree_secondes, categorie, miniature_url, statut } = body;
   if (type_source && !["youtube", "mp4", "bientot"].includes(type_source)) return sendJSON(res, 400, { error: "Type de source invalide." });
+  /* Un film animé de la plateforme (type « film ») se gère comme les autres vidéos — titre, description, catégorie, miniature, durée,
+     statut, ordre — mais sa SOURCE ne se change pas : on ignore tout type/URL envoyé pour lui. */
+  const actuel = await db.prepare("SELECT type_source FROM da_videos_tutoriels WHERE id=?").get(params.id);
+  if (!actuel) return sendJSON(res, 404, { error: "Vidéo introuvable." });
+  const estFilm = actuel.type_source === 'film';
   if (categorie && !VT_CATEGORIES.includes(categorie)) return sendJSON(res, 400, { error: "Catégorie invalide." });
   if (statut && !["brouillon", "publie", "depublie"].includes(statut)) return sendJSON(res, 400, { error: "Statut invalide." });
   await db.prepare(`UPDATE da_videos_tutoriels SET
@@ -24812,7 +24817,7 @@ route("PUT", "/api/admin/videos-tutoriels/:id", async (req, res, params, body) =
       miniature_url=COALESCE(?,miniature_url), statut=COALESCE(?,statut),
       actif=COALESCE(?,actif), duree_secondes=COALESCE(?,duree_secondes), updated_at=datetime('now')
     WHERE id=?`)
-    .run(titre || null, description ? SEC.sanitizeRichHtml(description) : (description ?? null), icone || null, type_source || null, url || null, categorie || null,
+    .run(titre || null, description ? SEC.sanitizeRichHtml(description) : (description ?? null), icone || null, estFilm ? null : (type_source || null), estFilm ? null : (url || null), categorie || null,
          miniature_url ?? null, statut || null, statut ? (statut === 'publie' ? 1 : 0) : null,
          (duree_secondes === undefined || duree_secondes === null) ? null : (duree_secondes | 0), params.id);
   await AdminJunior.journaliserActionSiJunior(db, user, 'videos_tutoriels.gerer', `Vidéo #${params.id} modifiée`);
@@ -29985,6 +29990,34 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
       created_at TEXT DEFAULT (datetime('now')),
       PRIMARY KEY(video_id, visiteur_hash, jour)
     )`).run();
+
+    /* Films animés de la plateforme (2026-10-10, demande explicite : « les vidéos que tu as ajoutées doivent apparaître ici pour être
+       gérées comme les autres »). Les deux films « Comment ça marche » (assets/inscription-film.js) n'étaient que des cartes codées en
+       dur sur l'accueil : absents de la rubrique Vidéos Tuto, donc impossibles à modifier, masquer, réordonner ou commenter. Ils sont
+       désormais de vraies lignes (type_source='film', url = clé du film) : mêmes fiches, commentaires, réactions, publication/dépublication,
+       ordre et suppression que les autres vidéos. Seul leur LECTEUR est particulier (le film s'ouvre dans sa fenêtre).
+       Inscrits UNE SEULE FOIS (marqueur dans parametres_plateforme) : un film supprimé ensuite par l'équipe ne revient pas au redémarrage. */
+    const FILMS_PLATEFORME = [
+      { cle: 'inscription-long', duree: 87, ordre: -2, titre: "Créer son compte Diaspo'Actif pas à pas",
+        description: "<p>Le film complet (1 min 27) : de la création du compte à un profil public complet. Choisir son profil, indiquer ses origines, ajouter une photo et une biographie, confirmer son e-mail, puis explorer l'annuaire, les événements, les projets et la boutique.</p>" },
+      { cle: 'inscription-court', duree: 55, ordre: -1, titre: "Comment ça marche : créer son compte en 55 secondes",
+        description: "<p>La version courte du film (55 secondes) : l'essentiel pour créer son compte et rejoindre le réseau Diaspo'Actif.</p>" },
+    ];
+    for (const f of FILMS_PLATEFORME) {
+      const marqueur = `vt_film_${f.cle}_seme`;
+      let deja = null;
+      try { deja = await db.prepare("SELECT valeur FROM parametres_plateforme WHERE cle=?").get(marqueur); } catch (e) { deja = null; }
+      if (deja) continue;
+      const existe = await db.prepare("SELECT id FROM da_videos_tutoriels WHERE type_source='film' AND url=?").get(f.cle);
+      if (!existe) {
+        await db.prepare("INSERT INTO da_videos_tutoriels (titre,description,icone,type_source,url,duree_secondes,categorie,miniature_url,statut,actif,ordre) VALUES (?,?,?,?,?,?,?,?,?,?,?)")
+          .run(f.titre, f.description, '🎬', 'film', f.cle, f.duree, 'Bien démarrer', '/assets/media/film-inscription-poster.jpg', 'publie', 1, f.ordre);
+      }
+      try {
+        await db.prepare("INSERT INTO parametres_plateforme (cle, valeur, type, description) VALUES (?,?,?,?)")
+          .run(marqueur, '1', 'texte', "Film déjà inscrit à la rubrique Vidéos Tuto (ne pas le recréer s'il est supprimé)");
+      } catch (e) { /* marqueur déjà posé par un démarrage concurrent */ }
+    }
   } catch (e) { console.error('[migrateVideosTutoriels]', e.message); }
 })();
 

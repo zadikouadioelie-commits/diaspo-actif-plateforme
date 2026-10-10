@@ -40,26 +40,10 @@ function dvtVignetteHtml(v) {
   return `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:32px;color:#fff;">${v.icone || '🎬'}</div>`;
 }
 
-/* ═══ Film « Créer son compte pas à pas » (2026-10-09, demande explicite : le présenter parmi les démos de l'accueil, avec son titre) ═══
-   Ce n'est pas un fichier vidéo mais un film animé (assets/inscription-film.js : voix, musique, sous-titres), ouvert dans une
-   fenêtre. Chargé seulement au clic. Sans JavaScript, le lien mène à la page d'inscription, qui propose le même film. */
-const DVT_FILM = { titre: "Créer son compte Diaspo'Actif pas à pas", duree: '1:27', categorie: 'Bien démarrer', poster: '/assets/media/film-inscription-poster.jpg' };
-function dvtCarteFilmHtml() {
-  return `
-    <a class="dvt-card dvt-dispo" href="inscription.html" onclick="dvtOuvrirFilm(event)" style="text-decoration:none;color:inherit;display:block;">
-      <div class="dvt-thumb">
-        <img src="${DVT_FILM.poster}" alt="" loading="lazy">
-        <span class="dvt-duree">${DVT_FILM.duree}</span>
-        <div class="dvt-play"><span>▶</span></div>
-      </div>
-      <div class="dvt-body">
-        <div class="dvt-dispo-tag">✓ Disponible</div>
-        <div class="dvt-badge-categorie">${DVT_FILM.categorie}</div>
-        <div class="dvt-card-titre">${dvtEsc(DVT_FILM.titre)}</div>
-        <div class="dvt-card-plus">Voir le film →</div>
-      </div>
-    </a>`;
-}
+/* ═══ Films animés de la plateforme (type_source = 'film') ═══
+   Depuis le 2026-10-10 les deux films « Comment ça marche » sont de vraies vidéos de la rubrique (même fiche, commentaires, réactions,
+   gestion que les autres) : leur carte vient de l'API comme toute autre. Seul le LECTEUR diffère : ce n'est pas un fichier vidéo mais un
+   film animé (assets/inscription-film.js : voix, musique, sous-titres), ouvert dans une fenêtre, chargé seulement au clic. */
 let _dvtFilmPromesse = null;
 function dvtChargerFilm() {
   if (window.InscriptionFilm) return Promise.resolve();
@@ -73,9 +57,9 @@ function dvtChargerFilm() {
   }
   return _dvtFilmPromesse;
 }
-async function dvtOuvrirFilm(e) {
+async function dvtOuvrirFilm(e, version) {
   if (e) e.preventDefault();
-  try { await dvtChargerFilm(); window.InscriptionFilm.ouvrir(); }
+  try { await dvtChargerFilm(); window.InscriptionFilm.ouvrir(version === 'court' ? { version: 'court' } : undefined); }
   catch (x) { window.location.href = 'inscription.html'; }
 }
 window.dvtOuvrirFilm = dvtOuvrirFilm;
@@ -171,13 +155,6 @@ async function dvtCharger(gridId, { limit, sectionIdSiVide, compact, categorie, 
     if (tri) qs.set('tri', tri);
     const { videos } = await fetch('/api/videos-tutoriels?' + qs.toString()).then(r => r.json());
     const section = sectionIdSiVide ? document.getElementById(sectionIdSiVide) : null;
-    if (filmInscription && (!videos || !videos.length)) {
-      /* Aucune autre vidéo : le film d'inscription tient seul la rangée (jamais l'affiche « Bientôt disponible »). */
-      (masquerIdsSiVide || []).forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
-      grid.innerHTML = dvtCarteFilmHtml();
-      if (section) section.style.display = '';
-      return;
-    }
     if (!videos || !videos.length) {
       if (posterSiVide) {
         (masquerIdsSiVide || []).forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
@@ -189,7 +166,6 @@ async function dvtCharger(gridId, { limit, sectionIdSiVide, compact, categorie, 
       return;
     }
     const cartes = videos.map(v => dvtCardHtml(v, { compact }));
-    if (filmInscription) cartes.unshift(dvtCarteFilmHtml());
     if (adEmplacement) {
       cartes.splice(Math.min(2, cartes.length), 0,
         `<div id="ad-${adEmplacement.replace(/_/g,'-')}" data-ad-emplacement="${adEmplacement}" style="display:none;grid-column:span 2;"></div>`);
@@ -210,6 +186,13 @@ function dvtLecteurHtml(v) {
       <div style="font-size:16px;font-weight:700;">Bientôt disponible</div>
       <div style="font-size:12.5px;color:rgba(255,255,255,.75);max-width:280px;text-align:center;">Cette vidéo est en préparation — revenez bientôt !</div>
     </div>`;
+  }
+  if (v.type_source === 'film') {
+    const version = v.url === 'inscription-court' ? 'court' : 'long';
+    return `<button type="button" onclick="dvtOuvrirFilm(event,'${version}')" aria-label="Lancer le film : ${dvtEsc(v.titre)}" style="position:relative;display:block;width:100%;height:100%;border:0;padding:0;cursor:pointer;background:#0B2A5B;">
+      <img src="${dvtEsc(v.miniature_url || '/assets/media/film-inscription-poster.jpg')}" alt="" style="width:100%;height:100%;object-fit:cover;display:block;">
+      <span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;"><span style="width:72px;height:72px;border-radius:50%;background:rgba(242,100,34,.95);color:#fff;font-size:30px;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(0,0,0,.4);">▶</span></span>
+    </button>`;
   }
   const ytId = v.type_source === 'youtube' ? dvtYoutubeId(v.url) : null;
   return ytId
