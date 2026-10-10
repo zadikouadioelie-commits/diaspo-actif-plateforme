@@ -8480,6 +8480,12 @@ async function resolveVoteElecteurs(initiativeId, sources, criteresReseauPro) {
     const rows = await db.prepare("SELECT user_id FROM initiative_membres WHERE initiative_id=? AND statut='accepte'").all(initiativeId);
     rows.forEach(r => userIds.set(Number(r.user_id), null));
   }
+  if (sources.includes("affilies")) {
+    /* « Personne affiliée » (2026-10-10, demande explicite) : les comptes dont l'affiliation à l'initiative est ACCEPTÉE (module Affiliations,
+       initiative_membres) — exactement la liste « Toutes les affiliations ». Le responsable n'en fait pas partie. */
+    const rows = await db.prepare("SELECT user_id FROM initiative_membres WHERE initiative_id=? AND statut='accepte'").all(initiativeId);
+    rows.forEach(r => userIds.set(Number(r.user_id), null));
+  }
   if (sources.includes("abonnes")) {
     const rows = await db.prepare("SELECT user_id FROM abonnements WHERE initiative_id=?").all(initiativeId);
     rows.forEach(r => userIds.set(Number(r.user_id), null));
@@ -8654,6 +8660,123 @@ route("PUT", "/api/vote-scrutins/:id", async (req, res, params, body) => {
 });
 
 /* ── Résolutions ── */
+/* ── Questions d'un scrutin (2026-10-10, demande explicite) ──
+   Trois formes, au choix de l'organisateur, dans le même moteur de résolutions :
+   · « choix »    — jusqu'à 10 réponses que le votant n'a qu'à cliquer ; l'organisateur fixe combien de réponses sont acceptées (une seule, deux au
+                    maximum, plusieurs sans limite) ;
+   · « oui_non »  — une phrase, réponse Oui ou Non ;
+   · « libre »    — consultation : le votant écrit ce qu'il veut.
+   Dans les trois cas l'organisateur peut autoriser un commentaire facultatif. Les anciens types (Pour/Contre/Abstention « pca », classement,
+   élection de personnes) restent disponibles. type_reponse est contraint par un CHECK en base : les nouveaux modes y sont rangés sous une valeur
+   existante, le mode exact et ses réglages vivent dans vote_resolutions.config_json. Sans config_json (anciennes résolutions), comportement d'origine. */
+const VO_MAX_REPONSES = 10;
+const VO_TYPE_PAR_MODE = { choix: "choix_multiple", oui_non: "oui_non_abstention", libre: "choix_multiple", pca: "oui_non_abstention", classement: "classement", election: "election_personnes" };
+function voConfig(r) { try { const c = r && r.config_json ? JSON.parse(r.config_json) : null; return c && typeof c === "object" ? c : null; } catch (_) { return null; } }
+function voOptions(r) { try { const o = JSON.parse((r && r.options_json) || "[]"); return Array.isArray(o) ? o.map(String) : []; } catch (_) { return []; } }
+function voMode(r) {
+  const c = voConfig(r);
+  if (c && c.mode) return c.mode;
+  return r.type_reponse === "oui_non_abstention" ? "pca" : r.type_reponse === "classement" ? "classement" : r.type_reponse === "election_personnes" ? "election" : "choix";
+}
+function voMaxChoix(r) {
+  const c = voConfig(r), n = voOptions(r).length;
+  if (!c || c.mode !== "choix") return 1;
+  return Number(c.max_choix) === 0 ? n : Math.max(1, Math.min(n, Number(c.max_choix) || 1));
+}
+/* Valide et normalise une question reçue du navigateur. Renvoie { erreur } ou { type_reponse, options, config }. */
+function voNormaliserQuestion(body) {
+  let mode = String(body.mode || "").trim();
+  if (!mode) {
+    /* Ancien format (type_reponse seul, sans réglages) : comportement d'origine, pas de config. */
+    const t = body.type_reponse || "oui_non_abstention";
+    if (!["oui_non_abstention", "choix_multiple", "classement", "election_personnes"].includes(t)) return { erreur: "Type de réponse invalide." };
+    return { type_reponse: t, options: Array.isArray(body.options) ? body.options : [], config: null };
+  }
+  if (!VO_TYPE_PAR_MODE[mode]) return { erreur: "Type de question invalide." };
+  let options = [];
+  if (mode === "choix" || mode === "classement" || mode === "election") {
+    const vues = new Set();
+    for (const brut of (Array.isArray(body.options) ? body.options : [])) {
+      const o = String(brut == null ? "" : brut).trim().slice(0, 120);
+      if (!o || vues.has(o.toLowerCase())) continue;
+      vues.add(o.toLowerCase()); options.push(o);
+    }
+    const plafond = mode === "choix" ? VO_MAX_REPONSES : 30;
+    if (options.length > plafond) return { erreur: `Au maximum ${plafond} réponses possibles.` };
+    if (options.length < 2) return { erreur: "Indiquez au moins deux réponses possibles." };
+  }
+  const config = { mode, commentaire: !!body.commentaire };
+  if (mode === "choix") {
+    const m = parseInt(body.max_choix, 10);
+    config.max_choix = m === 0 ? 0 : (Number.isFinite(m) && m > 0 ? Math.min(m, options.length) : 1);
+  }
+  return { type_reponse: VO_TYPE_PAR_MODE[mode], options, config };
+}
+/* Valide la réponse d'un votant à UNE question. Renvoie { vide:true } (pas de réponse : ignorée), { erreur } ou { choix, commentaire } prêt à enregistrer. */
+function voValiderReponse(res, rep) {
+  const mode = voMode(res), opts = voOptions(res), cfg = voConfig(res), brut = rep.choix;
+  const commentaire = (cfg && cfg.commentaire && typeof rep.commentaire === "string" && rep.commentaire.trim()) ? rep.commentaire.trim().slice(0, 1000) : null;
+  const intitule = `« ${String(res.titre).slice(0, 80)} »`;
+  if (mode === "libre") {
+    const t = typeof brut === "string" ? brut.trim() : "";
+    return t ? { choix: t.slice(0, 2000), commentaire } : { vide: true };
+  }
+  if (mode === "oui_non" || mode === "pca") {
+    if (brut == null || brut === "") return { vide: true };
+    const permis = mode === "oui_non" ? ["Oui", "Non"] : ["Pour", "Contre", "Abstention"];
+    return permis.includes(brut) ? { choix: brut, commentaire } : { erreur: `Réponse invalide pour ${intitule}.` };
+  }
+  let liste = Array.isArray(brut) ? brut.map(String) : (typeof brut === "string" && brut ? [brut] : []);
+  if (!liste.length) return { vide: true };
+  if (new Set(liste).size !== liste.length || liste.some(x => !opts.includes(x))) return { erreur: `Réponse invalide pour ${intitule}.` };
+  if (mode === "classement") return { choix: JSON.stringify(liste), commentaire };
+  const max = voMaxChoix(res);
+  if (liste.length > max) return { erreur: `Vous pouvez choisir au maximum ${max} réponse${max > 1 ? "s" : ""} pour ${intitule}.` };
+  /* Anciennes résolutions (sans réglages) : une seule réponse enregistrée en texte brut, comme avant. */
+  return { choix: cfg ? JSON.stringify(liste) : liste[0], commentaire };
+}
+async function voLireBulletins(resolutionId) {
+  try { return await db.prepare("SELECT choix, commentaire FROM vote_bulletins WHERE resolution_id=?").all(resolutionId); }
+  catch (_) { return await db.prepare("SELECT choix FROM vote_bulletins WHERE resolution_id=?").all(resolutionId); } // colonne commentaire pas encore créée
+}
+/* Dépouillement d'une question : décompte par réponse, textes libres et commentaires (triés par ordre alphabétique : l'ordre d'enregistrement
+   ne doit pas permettre de relier un texte à l'heure à laquelle quelqu'un a voté). */
+function voDepouiller(res, bulletins) {
+  const mode = voMode(res), compte = {}, libres = [], commentaires = [];
+  const tri = (a, b) => a.localeCompare(b, "fr", { sensitivity: "base" });
+  for (const b of bulletins) {
+    if (b.commentaire && String(b.commentaire).trim()) commentaires.push(String(b.commentaire).trim());
+    if (mode === "libre") { libres.push(String(b.choix)); continue; }
+    let v = b.choix;
+    try { const p = JSON.parse(b.choix); if (Array.isArray(p)) v = p; } catch (_) { /* texte brut */ }
+    if (Array.isArray(v)) {
+      if (mode === "classement") { const k = v.join(" > "); compte[k] = (compte[k] || 0) + 1; }
+      else v.forEach(o => { compte[o] = (compte[o] || 0) + 1; });
+    } else compte[v] = (compte[v] || 0) + 1;
+  }
+  if (mode === "choix" || mode === "oui_non" || mode === "pca" || mode === "election") {
+    const attendues = mode === "oui_non" ? ["Oui", "Non"] : mode === "pca" ? ["Pour", "Contre", "Abstention"] : voOptions(res);
+    attendues.forEach(o => { if (!(o in compte)) compte[o] = 0; }); // une réponse sans voix reste visible
+  }
+  return { resolution_id: res.id, titre: res.titre, mode, total: bulletins.length, compte, libres: libres.sort(tri), commentaires: commentaires.sort(tri) };
+}
+const VO_MODE_LABELS_SRV = { choix: "Réponses à choix", oui_non: "Oui / Non", libre: "Réponse libre", pca: "Pour / Contre / Abstention", classement: "Classement", election: "Élection de personnes" };
+function voResultatHtml(r) {
+  const pct = v => (r.total ? Math.round(v / r.total * 100) : 0);
+  let corps = "";
+  if (r.mode === "libre") {
+    corps = r.libres.length ? `<ul>${r.libres.map(t => `<li>${escapeHtml(t)}</li>`).join("")}</ul>` : "<p><em>Aucune réponse.</em></p>";
+  } else {
+    corps = `<ul>${Object.entries(r.compte).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<li>${escapeHtml(k)} : ${v} voix (${pct(v)}%)</li>`).join("")}</ul>`;
+  }
+  const comm = r.commentaires.length ? `<p style="margin:8px 0 2px;"><strong>Commentaires (${r.commentaires.length})</strong></p><ul>${r.commentaires.map(t => `<li>${escapeHtml(t)}</li>`).join("")}</ul>` : "";
+  return `<h3>${escapeHtml(r.titre)} <small style="color:#667;font-weight:400;">— ${VO_MODE_LABELS_SRV[r.mode] || ""}</small></h3><p>Exprimés : ${r.total}</p>${corps}${comm}`;
+}
+function voAdoptee(r) {
+  const c = r.compte;
+  return r.mode === "oui_non" ? (c["Oui"] || 0) > (c["Non"] || 0) : r.mode === "pca" ? (c["Pour"] || 0) > (c["Contre"] || 0) : false;
+}
+
 route("POST", "/api/vote-scrutins/:id/resolutions", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
@@ -8661,14 +8784,25 @@ route("POST", "/api/vote-scrutins/:id/resolutions", async (req, res, params, bod
   if (!s) return sendJSON(res, 404, { error: "Scrutin introuvable." });
   if (Number(s.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
   if (!(await exigerPremium(user, res, "votes"))) return;
-  const { titre, description, type_reponse, options } = body;
-  if (!titre?.trim()) return sendJSON(res, 400, { error: "Titre de la résolution requis." });
+  if (s.statut !== "brouillon") return sendJSON(res, 400, { error: "On ne peut plus ajouter de question à un scrutin déjà ouvert." });
+  const { titre, description } = body;
+  if (!titre?.trim()) return sendJSON(res, 400, { error: "Indiquez la question posée." });
+  const q = voNormaliserQuestion(body);
+  if (q.erreur) return sendJSON(res, 400, { error: q.erreur });
   const maxOrdre = (await db.prepare("SELECT COALESCE(MAX(ordre),0) AS m FROM vote_resolutions WHERE scrutin_id=?").get(params.id)).m;
   const id = (await db.prepare(`
     INSERT INTO vote_resolutions (scrutin_id,ordre,titre,description,type_reponse,options_json)
     VALUES (?,?,?,?,?,?)
-  `).run(params.id, maxOrdre + 1, titre.trim(), description || null, type_reponse || "oui_non_abstention",
-       JSON.stringify(Array.isArray(options) ? options : []))).lastInsertRowid;
+  `).run(params.id, maxOrdre + 1, titre.trim().slice(0, 500), description || null, q.type_reponse, JSON.stringify(q.options))).lastInsertRowid;
+  if (q.config) {
+    /* Écriture à part : si la colonne config_json n'existe pas encore (base non migrée), on ne garde pas une question à moitié enregistrée. */
+    try { await db.prepare("UPDATE vote_resolutions SET config_json=? WHERE id=?").run(JSON.stringify(q.config), id); }
+    catch (e) {
+      logError(e, "vote-resolution-config");
+      await db.prepare("DELETE FROM vote_resolutions WHERE id=?").run(id);
+      return sendJSON(res, 500, { error: "La base de données doit être mise à jour avant d'utiliser ce type de question." });
+    }
+  }
   sendJSON(res, 201, { id });
 });
 
@@ -8676,16 +8810,21 @@ route("PUT", "/api/vote-resolutions/:id", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const r = await db.prepare(`
-    SELECT vr.*, i.owner_user_id FROM vote_resolutions vr
+    SELECT vr.*, i.owner_user_id, vs.statut AS scrutin_statut FROM vote_resolutions vr
     JOIN vote_scrutins vs ON vs.id=vr.scrutin_id JOIN initiatives i ON i.id=vs.initiative_id WHERE vr.id=?
   `).get(params.id);
   if (!r) return sendJSON(res, 404, { error: "Résolution introuvable." });
   if (Number(r.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
-  const { titre, description, type_reponse, options } = body;
-  await db.prepare(`UPDATE vote_resolutions SET titre=COALESCE(?,titre), description=?, type_reponse=COALESCE(?,type_reponse),
-      options_json=COALESCE(?,options_json) WHERE id=?`)
-    .run(titre || null, description ?? r.description, type_reponse || null,
-         Array.isArray(options) ? JSON.stringify(options) : null, params.id);
+  if (r.scrutin_statut !== "brouillon") return sendJSON(res, 400, { error: "Cette question ne peut plus être modifiée : le scrutin est déjà ouvert." });
+  const { titre, description } = body;
+  if (body.mode || body.type_reponse || Array.isArray(body.options)) {
+    const q = voNormaliserQuestion(body.mode || body.type_reponse ? body : { ...body, mode: voMode(r), max_choix: (voConfig(r) || {}).max_choix, commentaire: (voConfig(r) || {}).commentaire });
+    if (q.erreur) return sendJSON(res, 400, { error: q.erreur });
+    await db.prepare("UPDATE vote_resolutions SET type_reponse=?, options_json=? WHERE id=?").run(q.type_reponse, JSON.stringify(q.options), params.id);
+    try { await db.prepare("UPDATE vote_resolutions SET config_json=? WHERE id=?").run(q.config ? JSON.stringify(q.config) : null, params.id); }
+    catch (e) { logError(e, "vote-resolution-config"); }
+  }
+  await db.prepare("UPDATE vote_resolutions SET titre=COALESCE(?,titre), description=? WHERE id=?").run(titre ? String(titre).trim().slice(0, 500) : null, description ?? r.description, params.id);
   sendJSON(res, 200, { ok: true });
 });
 
@@ -8704,7 +8843,7 @@ route("DELETE", "/api/vote-resolutions/:id", async (req, res, params) => {
 
 route("GET", "/api/vote-scrutins/:id/resolutions", async (req, res, params) => {
   const rows = await db.prepare("SELECT * FROM vote_resolutions WHERE scrutin_id=? ORDER BY ordre ASC, id ASC").all(params.id);
-  sendJSON(res, 200, { resolutions: rows });
+  sendJSON(res, 200, { resolutions: rows.map(r => ({ ...r, mode: voMode(r), config: voConfig(r), max_choix: voMaxChoix(r) })) });
 });
 
 /* ── Résolution des électeurs (multi-sources) + notifications ── */
@@ -8723,7 +8862,8 @@ route("POST", "/api/vote-scrutins/:id/electeurs/resoudre", async (req, res, para
     if (Number(uid) === Number(user.id) && !sources.includes("tous_actifs")) continue;
     const existe = await db.prepare("SELECT id FROM vote_electeurs WHERE scrutin_id=? AND user_id=?").get(params.id, uid);
     if (existe) continue;
-    const source = sources.includes("tous_actifs") ? "tous_actifs" : sources[0];
+    /* vote_electeurs.source est contraint à une liste fermée : « affilies » est enregistré sous « tous_actifs » (membres affiliés de l'initiative). */
+    const source = sources.includes("tous_actifs") ? "tous_actifs" : (sources[0] === "affilies" ? "tous_actifs" : sources[0]);
     /* code_acces conservé pour compatibilité de schéma mais n'est plus utilisé pour authentifier le
        vote — la clé d'authentification est désormais le Code de Sécurité Diaspo'Actif (DS-ID) de
        l'électeur (users.ds_id), signature numérique personnelle déjà existante sur la plateforme. */
@@ -8803,17 +8943,7 @@ route("POST", "/api/vote-scrutins/:id/clore", async (req, res, params) => {
   const participation = nbElecteurs > 0 ? Math.round((nbVotants / nbElecteurs) * 100) : 0;
 
   const resultatsParResolution = [];
-  for (const r of resolutions) {
-    const bulletins = await db.prepare("SELECT choix FROM vote_bulletins WHERE resolution_id=?").all(r.id);
-    const compte = {};
-    for (const b of bulletins) {
-      let choix = b.choix;
-      try { const parsed = JSON.parse(b.choix); choix = Array.isArray(parsed) ? parsed.join(", ") : parsed; } catch (e) { /* texte brut */ }
-      compte[choix] = (compte[choix] || 0) + 1;
-    }
-    resultatsParResolution.push({ resolution_id: r.id, titre: r.titre, total: bulletins.length, compte });
-    await db.prepare("UPDATE vote_resolutions SET options_json=options_json WHERE id=?").run(r.id); // no-op placeholder pour cohérence future
-  }
+  for (const r of resolutions) resultatsParResolution.push(voDepouiller(r, await voLireBulletins(r.id)));
 
   await db.prepare(`UPDATE vote_scrutins SET statut='clos', updated_at=datetime('now') WHERE id=?`).run(params.id);
 
@@ -8821,11 +8951,10 @@ route("POST", "/api/vote-scrutins/:id/clore", async (req, res, params) => {
   const dateGen = new Date().toISOString();
   const pvHtml = `<h1>Procès-verbal — ${escapeHtml(s.nom)}</h1><p>${escapeHtml(s.init_nom)} — ${dateGen}</p>
     <p>Participation : ${nbVotants}/${nbElecteurs} (${participation}%)</p>
-    ${resultatsParResolution.map(r => `<h3>${escapeHtml(r.titre)}</h3><ul>${Object.entries(r.compte).map(([k,v])=>`<li>${escapeHtml(k)} : ${v} voix</li>`).join('')}</ul>`).join('')}`;
-  const resultatsHtml = `<h1>Feuille de résultats — ${escapeHtml(s.nom)}</h1>${resultatsParResolution.map(r =>
-    `<h3>${escapeHtml(r.titre)}</h3><p>Total exprimés : ${r.total}</p><ul>${Object.entries(r.compte).map(([k,v])=>`<li>${escapeHtml(k)} : ${v} (${r.total?Math.round(v/r.total*100):0}%)</li>`).join('')}</ul>`).join('')}`;
-  const adoptees = resultatsParResolution.filter(r => (r.compte["Pour"]||0) > (r.compte["Contre"]||0));
-  const resolutionsAdopteesHtml = `<h1>Résolutions adoptées — ${escapeHtml(s.nom)}</h1><ul>${adoptees.map(r=>`<li>${escapeHtml(r.titre)}</li>`).join('') || '<li>Aucune (scrutin sans résolutions binaires Pour/Contre)</li>'}</ul>`;
+    ${resultatsParResolution.map(voResultatHtml).join('')}`;
+  const resultatsHtml = `<h1>Feuille de résultats — ${escapeHtml(s.nom)}</h1>${resultatsParResolution.map(voResultatHtml).join('')}`;
+  const adoptees = resultatsParResolution.filter(voAdoptee);
+  const resolutionsAdopteesHtml = `<h1>Résolutions adoptées — ${escapeHtml(s.nom)}</h1><ul>${adoptees.map(r=>`<li>${escapeHtml(r.titre)}</li>`).join('') || '<li>Aucune (scrutin sans question Oui/Non ou Pour/Contre adoptée)</li>'}</ul>`;
 
   const docs = [
     ["pv", pvHtml],
@@ -8882,19 +9011,7 @@ route("GET", "/api/vote-scrutins/:id/compte-rendu", async (req, res, params) => 
   let resultatsHtml = `<p style="color:#94a3b8;font-style:italic;">Résultats disponibles après clôture du scrutin (ou en direct si l'organisateur l'a activé).</p>`;
   if (peutMontrerResultats) {
     const blocs = [];
-    for (const r of resolutions) {
-      const bulletins = await db.prepare("SELECT choix FROM vote_bulletins WHERE resolution_id=?").all(r.id);
-      const compte = {};
-      for (const b of bulletins) {
-        let choix = b.choix;
-        try { const parsed = JSON.parse(b.choix); choix = Array.isArray(parsed) ? parsed.join(", ") : parsed; } catch (e) { /* texte brut */ }
-        compte[choix] = (compte[choix] || 0) + 1;
-      }
-      const total = bulletins.length;
-      blocs.push(`<h3>${escapeHtml(r.titre)}</h3><p>Exprimés : ${total}</p><ul>${
-        Object.entries(compte).map(([k, v]) => `<li>${escapeHtml(k)} : ${v} voix (${total ? Math.round(v / total * 100) : 0}%)</li>`).join('')
-      }</ul>`);
-    }
+    for (const r of resolutions) blocs.push(voResultatHtml(voDepouiller(r, await voLireBulletins(r.id))));
     resultatsHtml = blocs.join('') || '<p style="color:#94a3b8;">Aucune résolution.</p>';
   }
 
@@ -8971,7 +9088,8 @@ route("POST", "/api/vote-scrutins/:id/authentifier", async (req, res, params, bo
   if (!electeur.notif_ouverte_at) {
     await db.prepare("UPDATE vote_electeurs SET notif_ouverte_at=datetime('now') WHERE id=?").run(electeur.id);
   }
-  const resolutions = await db.prepare("SELECT id, ordre, titre, description, type_reponse, options_json FROM vote_resolutions WHERE scrutin_id=? ORDER BY ordre ASC").all(params.id);
+  const resolutions = await db.prepare("SELECT * FROM vote_resolutions WHERE scrutin_id=? ORDER BY ordre ASC").all(params.id)
+    .map(r => ({ id: r.id, ordre: r.ordre, titre: r.titre, description: r.description, type_reponse: r.type_reponse, options_json: r.options_json, mode: voMode(r), max_choix: voMaxChoix(r), commentaire: !!(voConfig(r) || {}).commentaire }));
   sendJSON(res, 200, { ok: true, resolutions, scrutin: { nom: s.nom, vote_nominatif: !!s.vote_nominatif } });
 });
 
@@ -8997,16 +9115,29 @@ route("POST", "/api/vote-scrutins/:id/voter", async (req, res, params, body) => 
     return sendJSON(res, 401, { error: dsIdOk.error });
   }
   const reponses = Array.isArray(body.reponses) ? body.reponses : [];
-  const resolutions = await db.prepare("SELECT id FROM vote_resolutions WHERE scrutin_id=?").all(params.id);
-  const idsValides = new Set(resolutions.map(r => r.id));
-  if (!reponses.length || reponses.some(r => !idsValides.has(Number(r.resolution_id)))) {
+  const resolutions = await db.prepare("SELECT * FROM vote_resolutions WHERE scrutin_id=?").all(params.id);
+  const parId = new Map(resolutions.map(r => [Number(r.id), r]));
+  if (!reponses.length || reponses.some(r => !r || !parId.has(Number(r.resolution_id)))) {
     return sendJSON(res, 400, { error: "Réponses invalides." });
   }
+  const dejaVues = new Set(), aEnregistrer = [];
+  for (const r of reponses) {
+    const rid = Number(r.resolution_id);
+    if (dejaVues.has(rid)) return sendJSON(res, 400, { error: "Une question a reçu deux réponses." });
+    dejaVues.add(rid);
+    const v = voValiderReponse(parId.get(rid), r);
+    if (v.erreur) return sendJSON(res, 400, { error: v.erreur });
+    if (!v.vide) aEnregistrer.push({ rid, ...v });
+  }
+  if (!aEnregistrer.length) return sendJSON(res, 400, { error: "Répondez à au moins une question." });
   /* Transaction anonyme : les bulletins n'ont AUCUN lien vers l'électeur — seule la ligne
      vote_electeurs.a_vote est mise à jour, sans jamais y stocker le choix exprimé. */
-  for (const r of reponses) {
-    const choix = typeof r.choix === "string" ? r.choix : JSON.stringify(r.choix);
-    await db.prepare("INSERT INTO vote_bulletins (scrutin_id,resolution_id,choix) VALUES (?,?,?)").run(params.id, r.resolution_id, choix);
+  for (const b of aEnregistrer) {
+    if (b.commentaire) {
+      try { await db.prepare("INSERT INTO vote_bulletins (scrutin_id,resolution_id,choix,commentaire) VALUES (?,?,?,?)").run(params.id, b.rid, b.choix, b.commentaire); continue; }
+      catch (e) { logError(e, "vote-bulletin-commentaire"); } // colonne absente : le vote compte, sans le commentaire
+    }
+    await db.prepare("INSERT INTO vote_bulletins (scrutin_id,resolution_id,choix) VALUES (?,?,?)").run(params.id, b.rid, b.choix);
   }
   await db.prepare("UPDATE vote_electeurs SET a_vote=1, vote_le=datetime('now') WHERE id=?").run(electeur.id);
   await db.prepare(`INSERT INTO ds_id_history (user_id, action, ip, user_agent) VALUES (?,?,?,?)`)

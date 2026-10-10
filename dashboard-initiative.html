@@ -1275,6 +1275,21 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       <div id="votes-init-content"><div style="text-align:center;padding:30px;color:var(--muted);">Chargement…</div></div>
     </div>
 
+    <style>
+    .voq-types{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 8px;}
+    .voq-type{border:1.5px solid var(--border,#d6dbe5);background:var(--card,#fff);color:inherit;border-radius:12px;padding:9px 14px;font-weight:700;font-size:13px;cursor:pointer;min-height:42px;}
+    .voq-type.actif{border-color:#ea580c;background:#fff4ec;color:#9a3412;box-shadow:0 0 0 2px rgba(234,88,12,.18);}
+    .voq-corps{border:1.5px solid var(--border,#d6dbe5);border-radius:12px;padding:12px;margin:2px 0 14px;background:var(--bg,#f8fafc);}
+    .voq-aide{font-size:11.5px;color:var(--muted);margin:0 0 8px;}
+    .voq-lbl{display:block;font-size:12px;font-weight:700;margin-top:4px;}
+    .voq-compte{font-weight:400;color:var(--muted);}
+    .voq-liste{display:flex;flex-direction:column;gap:6px;margin:4px 0;}
+    .voq-ligne{display:flex;align-items:center;gap:8px;}
+    .voq-ligne .input{flex:1;min-width:0;}
+    .voq-num{flex:0 0 22px;height:22px;border-radius:50%;background:#ea580c;color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;}
+    .voq-x{border:none;background:transparent;color:#b91c1c;font-size:15px;cursor:pointer;padding:6px;border-radius:8px;}
+    .voq-x:hover{background:#fee2e2;}
+    </style>
     <!-- ══ MODAL NOUVEAU SCRUTIN ══ -->
     <div class="modal-back" id="modal-vo-scrutin" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;align-items:flex-start;justify-content:center;overflow-y:auto;padding:30px 12px;">
       <div class="card" style="max-width:520px;width:100%;padding:20px;">
@@ -1311,10 +1326,13 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           <label class="da-pill"><input type="checkbox" id="vo-resultats-direct" onchange="this.closest('.da-pill').classList.toggle('checked',this.checked)"><span>📊 Résultats en direct</span></label>
           <label class="da-pill checked"><input type="checkbox" id="vo-pv-auto" checked onchange="this.closest('.da-pill').classList.toggle('checked',this.checked)"><span>📄 PV automatique</span></label>
         </div>
+        <label style="font-size:12px;font-weight:700;">❓ Question du scrutin <span style="font-weight:400;color:var(--muted);">(facultatif ici — vous pourrez en ajouter d'autres depuis la fiche)</span></label>
+        <div id="vo-c-q"></div>
         <label style="font-size:12px;font-weight:700;">👥 Destinataires (qui pourra voter)</label>
         <p style="font-size:11px;color:var(--muted);margin:2px 0 6px;">Facultatif ici — vous pourrez aussi les choisir plus tard depuis la fiche du scrutin.</p>
         <div class="da-pill-group" style="margin:6px 0 10px;">
           <label class="da-pill"><input type="checkbox" value="abonnes" class="vo-c-source" onchange="this.closest('.da-pill').classList.toggle('checked',this.checked)"><span>Abonnés</span></label>
+          <label class="da-pill"><input type="checkbox" value="affilies" class="vo-c-source" onchange="this.closest('.da-pill').classList.toggle('checked',this.checked)"><span>🤝 Personne affiliée</span></label>
           <label class="da-pill"><input type="checkbox" value="adhesion" class="vo-c-source" onchange="this.closest('.da-pill').classList.toggle('checked',this.checked); voCToggleCampagneRow(this.checked);"><span>Adhérents à jour</span></label>
           <label class="da-pill"><input type="checkbox" value="reseau_pro" class="vo-c-source" onchange="this.closest('.da-pill').classList.toggle('checked',this.checked); voCToggleListeRow(this.checked);"><span>Réseau professionnel</span></label>
         </div>
@@ -1348,22 +1366,8 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     <!-- ══ MODAL AJOUTER RÉSOLUTION ══ -->
     <div class="modal-back" id="modal-vo-resolution" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;align-items:flex-start;justify-content:center;overflow-y:auto;padding:30px 12px;">
       <div class="card" style="max-width:480px;width:100%;padding:20px;">
-        <h3 style="margin:0 0 14px;">➕ Ajouter une résolution</h3>
-        <label style="font-size:12px;font-weight:700;">Titre</label>
-        <input type="text" id="vo-r-titre" class="input" placeholder="Ex: Renouvellement du bureau" style="margin:4px 0 10px;width:100%;">
-        <label style="font-size:12px;font-weight:700;">Description</label>
-        <textarea id="vo-r-description" class="input" rows="2" style="margin:4px 0 10px;width:100%;"></textarea>
-        <label style="font-size:12px;font-weight:700;">Type de réponse</label>
-        <select id="vo-r-type" class="input" style="margin:4px 0 10px;width:100%;" onchange="voToggleOptionsResolution()">
-          <option value="oui_non_abstention">Pour / Contre / Abstention</option>
-          <option value="choix_multiple">Choix multiple</option>
-          <option value="classement">Classement</option>
-          <option value="election_personnes">Élection de personnes</option>
-        </select>
-        <div id="vo-r-options-row" style="display:none;margin-bottom:14px;">
-          <label style="font-size:12px;font-weight:700;">Options / candidats (une par ligne)</label>
-          <textarea id="vo-r-options" class="input" rows="3" style="margin:4px 0;width:100%;" placeholder="Paris&#10;Toulouse&#10;Abidjan"></textarea>
-        </div>
+        <h3 style="margin:0 0 14px;">➕ Ajouter une question</h3>
+        <div id="vo-r-q"></div>
         <div style="display:flex;gap:8px;justify-content:flex-end;">
           <button class="btn btn-outline" onclick="document.getElementById('modal-vo-resolution').style.display='none'">Annuler</button>
           <button class="btn btn-orange" onclick="voEnregistrerResolution()">Ajouter</button>
@@ -1378,6 +1382,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         <label style="font-size:12px;font-weight:700;">Sources</label>
         <div class="da-pill-group" style="margin:6px 0 14px;">
           <label class="da-pill"><input type="checkbox" value="abonnes" class="vo-source" onchange="this.closest('.da-pill').classList.toggle('checked',this.checked)"><span>Abonnés</span></label>
+          <label class="da-pill"><input type="checkbox" value="affilies" class="vo-source" onchange="this.closest('.da-pill').classList.toggle('checked',this.checked)"><span>🤝 Personne affiliée</span></label>
           <label class="da-pill"><input type="checkbox" value="adhesion" class="vo-source" onchange="this.closest('.da-pill').classList.toggle('checked',this.checked); voToggleCampagneRow(this.checked);"><span>Adhérents à jour</span></label>
           <label class="da-pill"><input type="checkbox" value="reseau_pro" class="vo-source" onchange="this.closest('.da-pill').classList.toggle('checked',this.checked); voToggleListeRow(this.checked);"><span>Réseau professionnel</span></label>
         </div>
@@ -9396,7 +9401,7 @@ async function voRenderPublies(){
     }).join('');
   }catch(e){ el.innerHTML = `<div class="notice">Erreur : ${e.message}</div>`; }
 }
-const VO_SOURCE_LABELS = { tous_actifs: 'Tous les membres actifs', abonnes: 'Abonnés', adhesion: 'Adhérents à jour', cotisation: 'Adhérents à jour', liste_perso: 'Liste personnalisée', reseau_pro: 'Réseau professionnel' };
+const VO_SOURCE_LABELS = { tous_actifs: 'Personne affiliée', abonnes: 'Abonnés', adhesion: 'Adhérents à jour', cotisation: 'Adhérents à jour', liste_perso: 'Liste personnalisée', reseau_pro: 'Réseau professionnel' };
 
 /* Photo de couverture d'un scrutin (2026-10-07, demande explicite) : téléversée dès le choix du fichier (compressée), son adresse part avec la création. */
 let VO_COUVERTURE_URL = null;
@@ -9418,7 +9423,133 @@ async function voChoisirCouverture(input){
 function voRetirerCouverture(){
   VO_COUVERTURE_URL = null; const i = document.getElementById('vo-cover-file'); if(i) i.value=''; voMajApercuCouverture();
 }
+/* ═══ Constructeur de question d'un scrutin (2026-10-10, demande explicite) ═══
+   Une même fenêtre pour poser une question à la création du scrutin (préfixe « vo-c ») et pour en ajouter d'autres depuis la fiche (« vo-r ») :
+   · ☑️ Réponses à choix : de 2 à 10 réponses que les votants n'ont qu'à cliquer ; l'organisateur fixe combien sont acceptées (une seule,
+     deux au maximum, … ou plusieurs sans limite) ;
+   · 👍 Oui / Non : on écrit la question, la réponse est Oui ou Non ;
+   · 💬 Réponse libre : consultation, les votants écrivent ce qu'ils veulent ;
+   et, pour chacune, « autoriser un commentaire » (facultatif pour le votant). Fiche : Pour / Contre / Abstention, Classement et Élection de personnes
+   restent proposés. Le serveur (server/index.js, voNormaliserQuestion) revalide tout. */
+const VOQ_MODES = {
+  choix:      { icone: '☑️', titre: 'Réponses à choix', aide: "Vous écrivez jusqu'à 10 réponses ; les votants n'ont qu'à cliquer.", exemple: 'Ex : Quelle ville pour la prochaine rencontre ?', plafond: 10 },
+  oui_non:    { icone: '👍', titre: 'Oui / Non', aide: 'Vous écrivez la question ; les votants répondent par Oui ou par Non.', exemple: 'Ex : Approuvez-vous le rapport financier 2025 ?' },
+  libre:      { icone: '💬', titre: 'Réponse libre', aide: 'Consultation : les votants écrivent ce qu\'ils veulent.', exemple: 'Ex : Que pensez-vous de notre nouveau local ?' },
+  pca:        { icone: '🗳️', titre: 'Pour / Contre / Abstention', aide: 'Vote classique d\'assemblée sur une résolution.', exemple: 'Ex : Approbation des comptes de l\'exercice' },
+  classement: { icone: '🔢', titre: 'Classement', aide: 'Les votants classent les options par ordre de préférence.', exemple: 'Ex : Classez nos priorités de l\'année', plafond: 30 },
+  election:   { icone: '🧑‍🤝‍🧑', titre: 'Élection de personnes', aide: 'Les votants choisissent parmi des candidats.', exemple: 'Ex : Élection du président', plafond: 30 },
+};
+const VOQ = {};   // préfixe -> { modes, mode, titre, description, reponses, max, commentaire }
+const voqEsc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+function voQInit(p, modes, modeInitial) {
+  VOQ[p] = { modes, mode: modeInitial || null, titre: '', description: '', reponses: ['', ''], max: 1, commentaire: false };
+  voQRendre(p);
+}
+function voQCapturer(p) {
+  const st = VOQ[p]; if (!st || !st.mode) return;
+  const t = document.getElementById(p + '-q-titre'); if (t) st.titre = t.value;
+  const d = document.getElementById(p + '-q-desc'); if (d) st.description = d.value;
+  const rs = document.querySelectorAll('#' + p + '-q .voq-rep'); if (rs.length) st.reponses = Array.from(rs).map(i => i.value);
+  const m = document.getElementById(p + '-q-max'); if (m) st.max = Number(m.value);
+}
+function voQChoisirMode(p, mode) {
+  voQCapturer(p);
+  const st = VOQ[p];
+  st.mode = (st.mode === mode && p === 'vo-c') ? null : mode; // à la création, recliquer le type retire la question
+  if (st.mode && VOQ_MODES[st.mode].plafond && st.reponses.length < 2) st.reponses = ['', ''];
+  voQRendre(p);
+}
+function voQAjouterReponse(p) {
+  voQCapturer(p);
+  const st = VOQ[p], plafond = VOQ_MODES[st.mode].plafond || 10;
+  if (st.reponses.length >= plafond) { showToast('Au maximum ' + plafond + ' réponses.', 'warning'); return; }
+  st.reponses.push(''); voQRendre(p, st.reponses.length - 1);
+}
+function voQRetirerReponse(p, i) {
+  voQCapturer(p);
+  const st = VOQ[p]; if (st.reponses.length <= 2) return;
+  st.reponses.splice(i, 1);
+  const n = st.reponses.filter(x => x.trim()).length || st.reponses.length;
+  if (st.max > n) st.max = 1;
+  voQRendre(p);
+}
+function voQBasculerCommentaire(p) { voQCapturer(p); VOQ[p].commentaire = !VOQ[p].commentaire; voQRendre(p); }
+
+function voQRendre(p, focusReponse) {
+  const zone = document.getElementById(p + '-q'); if (!zone) return;
+  const st = VOQ[p];
+  const boutons = st.modes.map(m => {
+    const d = VOQ_MODES[m], actif = st.mode === m;
+    return '<button type="button" class="voq-type' + (actif ? ' actif' : '') + '" aria-pressed="' + actif + '" onclick="voQChoisirMode(\'' + p + '\',\'' + m + '\')"><span aria-hidden="true">' + d.icone + '</span> ' + d.titre + '</button>';
+  }).join('');
+  let corps = '';
+  if (st.mode) {
+    const d = VOQ_MODES[st.mode];
+    const aDesReponses = !!d.plafond;
+    corps += '<p class="voq-aide">' + d.aide + '</p>' +
+      '<label class="voq-lbl" for="' + p + '-q-titre">' + (st.mode === 'libre' ? 'Votre question' : st.mode === 'oui_non' ? 'Oui ou non à quoi ?' : 'Question posée') + '</label>' +
+      '<input type="text" id="' + p + '-q-titre" class="input" maxlength="500" placeholder="' + voqEsc(d.exemple) + '" value="' + voqEsc(st.titre) + '" style="width:100%;margin:4px 0 10px;">';
+    if (aDesReponses) {
+      const plafond = d.plafond;
+      corps += '<label class="voq-lbl">Réponses proposées <span class="voq-compte">(' + st.reponses.length + '/' + plafond + ')</span></label><div class="voq-liste">' +
+        st.reponses.map((r, i) => '<div class="voq-ligne"><span class="voq-num">' + (i + 1) + '</span><input type="text" class="input voq-rep" maxlength="120" placeholder="Réponse ' + (i + 1) + '" value="' + voqEsc(r) + '" onkeydown="if(event.key===\'Enter\'){event.preventDefault();voQAjouterReponse(\'' + p + '\');}">' +
+          (st.reponses.length > 2 ? '<button type="button" class="voq-x" aria-label="Retirer la réponse ' + (i + 1) + '" onclick="voQRetirerReponse(\'' + p + '\',' + i + ')">✕</button>' : '') + '</div>').join('') + '</div>' +
+        (st.reponses.length < plafond ? '<button type="button" class="btn btn-sm btn-outline" style="margin:6px 0 10px;" onclick="voQAjouterReponse(\'' + p + '\')">➕ Ajouter une réponse</button>' : '');
+    }
+    if (st.mode === 'choix') {
+      const n = Math.max(2, st.reponses.filter(x => x.trim()).length || st.reponses.length);
+      const noms = { 1: 'Une seule réponse acceptée', 2: 'Deux réponses au maximum', 3: 'Trois réponses au maximum', 4: 'Quatre réponses au maximum', 5: 'Cinq réponses au maximum' };
+      let opts = '';
+      for (let k = 1; k <= Math.min(5, n - 1); k++) opts += '<option value="' + k + '"' + (st.max === k ? ' selected' : '') + '>' + noms[k] + '</option>';
+      opts += '<option value="0"' + (st.max === 0 ? ' selected' : '') + '>Plusieurs réponses acceptées (sans limite)</option>';
+      corps += '<label class="voq-lbl" for="' + p + '-q-max">Combien de réponses chaque votant peut-il choisir ?</label>' +
+        '<select id="' + p + '-q-max" class="input" style="width:100%;margin:4px 0 10px;">' + opts + '</select>';
+    }
+    corps += '<button type="button" class="da-pill' + (st.commentaire ? ' checked' : '') + '" style="cursor:pointer;" aria-pressed="' + st.commentaire + '" onclick="voQBasculerCommentaire(\'' + p + '\')"><span>💬 Autoriser un commentaire</span></button>' +
+      '<span class="voq-aide" style="margin-left:6px;">Le votant pourra expliquer sa réponse (facultatif).</span>' +
+      (p === 'vo-r' ? '<label class="voq-lbl" for="' + p + '-q-desc" style="margin-top:12px;">Précision <span class="voq-compte">(facultatif)</span></label><textarea id="' + p + '-q-desc" class="input" rows="2" style="width:100%;margin:4px 0 4px;">' + voqEsc(st.description) + '</textarea>' : '');
+  }
+  zone.innerHTML = '<div class="voq-types" role="group" aria-label="Type de question">' + boutons + '</div>' + (corps ? '<div class="voq-corps">' + corps + '</div>' : '');
+  if (focusReponse != null) { const champs = zone.querySelectorAll('.voq-rep'); if (champs[focusReponse]) champs[focusReponse].focus(); }
+}
+
+/* Lit la question saisie : null si aucune n'est demandée, { erreur } si elle est incomplète, sinon la charge utile à envoyer au serveur. */
+function voQLire(p) {
+  const st = VOQ[p]; if (!st || !st.mode) return null;
+  voQCapturer(p);
+  const titre = st.titre.trim();
+  if (!titre) return { erreur: 'Indiquez la question posée.' };
+  const payload = { titre, description: st.description.trim() || null, mode: st.mode, commentaire: st.commentaire };
+  if (VOQ_MODES[st.mode].plafond) {
+    const vues = new Set(); payload.options = [];
+    st.reponses.map(x => x.trim()).filter(Boolean).forEach(x => { if (!vues.has(x.toLowerCase())) { vues.add(x.toLowerCase()); payload.options.push(x); } });
+    if (payload.options.length < 2) return { erreur: 'Indiquez au moins deux réponses possibles.' };
+    if (st.mode === 'choix') payload.max_choix = Math.min(st.max === 0 ? 0 : st.max, payload.options.length);
+  }
+  return payload;
+}
+
+/* Résumé d'une question dans la fiche du scrutin. */
+function voQResume(r){
+  const d = VOQ_MODES[r.mode] || { titre: r.type_reponse };
+  let opts = []; try { opts = JSON.parse(r.options_json || '[]'); } catch(e) {}
+  let t = d.titre;
+  if (r.mode === 'choix' && opts.length) t += ' · ' + (r.max_choix >= opts.length ? 'plusieurs réponses acceptées' : r.max_choix === 1 ? 'une seule réponse acceptée' : r.max_choix + ' réponses au maximum');
+  if (r.config && r.config.commentaire) t += ' · commentaire autorisé';
+  return '<div style="font-size:11.5px;color:var(--muted);margin-top:3px;">' + escH(t) + '</div>' +
+    (opts.length ? '<div style="font-size:12px;margin-top:4px;">' + opts.map(o => '• ' + escH(o)).join('&nbsp; ') + '</div>' : '');
+}
+
+/* Pose la question saisie dans la fenêtre de création (le cas échéant) : renvoie false si elle est incomplète. */
+async function voCreerQuestionDepuisCreation(scrutinId, q){
+  if(!q) return true;
+  try{ await api('POST', '/vote-scrutins/' + scrutinId + '/resolutions', q); return true; }
+  catch(e){ showToast("Scrutin créé, mais la question n'a pas pu être enregistrée : " + e.message, 'warning'); return false; }
+}
+
 function voOuvrirCreationScrutin(){
+  voQInit('vo-c', ['choix', 'oui_non', 'libre'], null);
   VO_COUVERTURE_URL = null; { const i = document.getElementById('vo-cover-file'); if(i) i.value=''; } voMajApercuCouverture();
   document.getElementById('vo-nom').value = '';
   document.getElementById('vo-type').value = 'ag_ordinaire';
@@ -9505,6 +9636,8 @@ async function voResoudreDestinatairesDepuisCreation(scrutinId){
 async function voEnregistrerScrutin(){
   const nom = document.getElementById('vo-nom').value.trim();
   if(!nom){ showToast('Nom du scrutin requis.', 'warning'); return; }
+  const question = voQLire('vo-c');
+  if(question && question.erreur){ showToast(question.erreur, 'warning'); return; }
   const payload = {
     nom, type_scrutin: document.getElementById('vo-type').value,
     description: document.getElementById('vo-description').value || null,
@@ -9517,6 +9650,7 @@ async function voEnregistrerScrutin(){
   };
   try{
     const r = await api('POST', `/initiatives/${window.__vitrineInitId}/vote-scrutins`, payload);
+    await voCreerQuestionDepuisCreation(r.id, question);
     const nbElecteurs = await voResoudreDestinatairesDepuisCreation(r.id);
     document.getElementById('modal-vo-scrutin').style.display = 'none';
     voRenderScrutins();
@@ -9534,6 +9668,8 @@ async function voEnregistrerScrutin(){
 async function voEnregistrerEtPublierScrutin(){
   const nom = document.getElementById('vo-nom').value.trim();
   if(!nom){ showToast('Nom du scrutin requis.', 'warning'); return; }
+  const question = voQLire('vo-c');
+  if(question && question.erreur){ showToast(question.erreur, 'warning'); return; }
   const payload = {
     nom, type_scrutin: document.getElementById('vo-type').value,
     description: document.getElementById('vo-description').value || null,
@@ -9549,6 +9685,7 @@ async function voEnregistrerEtPublierScrutin(){
     const r = await api('POST', `/initiatives/${window.__vitrineInitId}/vote-scrutins`, payload);
     scrutinId = r.id;
   }catch(e){ showToast('Erreur : '+e.message, 'danger'); return; }
+  await voCreerQuestionDepuisCreation(scrutinId, question);
   const nbElecteurs = await voResoudreDestinatairesDepuisCreation(scrutinId);
   document.getElementById('modal-vo-scrutin').style.display = 'none';
   try{
@@ -9594,11 +9731,11 @@ async function voOuvrirDetail(scrutinId){
       </div>` : ''}
 
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-        <strong>Résolutions</strong>
+        <strong>Questions</strong>
         ${VO_SCRUTIN_ACTUEL.statut==='brouillon'?'<button class="btn btn-sm btn-outline" onclick="voOuvrirModalResolution()">➕ Ajouter</button>':''}
       </div>
       <div style="margin-bottom:20px;">
-        ${VO_RESOLUTIONS.length ? VO_RESOLUTIONS.map(r=>`<div class="card" style="padding:10px 14px;margin-bottom:6px;"><strong>${escH(r.titre)}</strong> <span style="font-size:11px;color:var(--muted);">(${r.type_reponse})</span></div>`).join('') : '<p style="color:var(--muted);font-size:13px;">Aucune résolution.</p>'}
+        ${VO_RESOLUTIONS.length ? VO_RESOLUTIONS.map(r=>`<div class="card" style="padding:10px 14px;margin-bottom:6px;"><strong>${escH(r.titre)}</strong> ${voQResume(r)}</div>`).join('') : '<p style="color:var(--muted);font-size:13px;">Aucune résolution.</p>'}
       </div>
 
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
@@ -9608,7 +9745,7 @@ async function voOuvrirDetail(scrutinId){
       <div style="overflow-x:auto;margin-bottom:20px;">
         <table style="width:100%;border-collapse:collapse;font-size:13px;">
           <thead><tr style="text-align:left;border-bottom:2px solid var(--border);"><th style="padding:6px;">Nom</th><th style="padding:6px;">Source</th><th style="padding:6px;">A voté</th></tr></thead>
-          <tbody>${electeurs.map(e=>`<tr style="border-bottom:1px solid var(--border);"><td style="padding:6px;">${escH(e.nom)}</td><td style="padding:6px;">${e.source}</td><td style="padding:6px;">${e.a_vote?'✅':'—'}</td></tr>`).join('')}</tbody>
+          <tbody>${electeurs.map(e=>`<tr style="border-bottom:1px solid var(--border);"><td style="padding:6px;">${escH(e.nom)}</td><td style="padding:6px;">${VO_SOURCE_LABELS[e.source] || e.source}</td><td style="padding:6px;">${e.a_vote?'✅':'—'}</td></tr>`).join('')}</tbody>
         </table>
       </div>
 
@@ -9623,29 +9760,18 @@ async function voOuvrirDetail(scrutinId){
 }
 
 function voOuvrirModalResolution(){
-  document.getElementById('vo-r-titre').value = '';
-  document.getElementById('vo-r-description').value = '';
-  document.getElementById('vo-r-type').value = 'oui_non_abstention';
-  document.getElementById('vo-r-options').value = '';
-  voToggleOptionsResolution();
+  voQInit('vo-r', ['choix', 'oui_non', 'libre', 'pca', 'classement', 'election'], 'choix');
   document.getElementById('modal-vo-resolution').style.display = 'flex';
 }
-function voToggleOptionsResolution(){
-  const t = document.getElementById('vo-r-type').value;
-  document.getElementById('vo-r-options-row').style.display = (t==='choix_multiple'||t==='classement'||t==='election_personnes') ? 'block' : 'none';
-}
 async function voEnregistrerResolution(){
-  const titre = document.getElementById('vo-r-titre').value.trim();
-  if(!titre){ showToast('Titre requis.', 'warning'); return; }
-  const options = document.getElementById('vo-r-options').value.split('\n').map(s=>s.trim()).filter(Boolean);
+  const q = voQLire('vo-r');
+  if(!q){ showToast('Choisissez un type de question.', 'warning'); return; }
+  if(q.erreur){ showToast(q.erreur, 'warning'); return; }
   try{
-    await api('POST', `/vote-scrutins/${VO_SCRUTIN_ACTUEL.id}/resolutions`, {
-      titre, description: document.getElementById('vo-r-description').value || null,
-      type_reponse: document.getElementById('vo-r-type').value, options,
-    });
+    await api('POST', `/vote-scrutins/${VO_SCRUTIN_ACTUEL.id}/resolutions`, q);
     document.getElementById('modal-vo-resolution').style.display = 'none';
     voOuvrirDetail(VO_SCRUTIN_ACTUEL.id);
-    showToast('Résolution ajoutée ✅');
+    showToast('Question ajoutée ✅');
   }catch(e){ showToast('Erreur : '+e.message, 'danger'); }
 }
 

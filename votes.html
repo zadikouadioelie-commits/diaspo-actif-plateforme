@@ -32,6 +32,8 @@
 .vo-choix-group{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;}
 .vo-choix-pill{padding:10px 20px;border:2px solid var(--border);border-radius:999px;cursor:pointer;font-weight:700;font-size:14px;min-height:44px;display:flex;align-items:center;}
 .vo-choix-pill.selected{border-color:var(--orange);background:var(--orange);color:#fff;}
+.vo-choix-pill[aria-pressed="true"]::before{content:'✓ ';margin-right:4px;}
+.vo-choix-pill:focus-visible{outline:3px solid #1d4ed8;outline-offset:2px;}
 .notice{background:#fff3e0;border:1px solid #ffb74d;border-radius:8px;padding:12px 16px;font-size:13px;margin-bottom:14px;}
 </style>
 </head>
@@ -119,10 +121,10 @@ async function ouvrirAuth(scrutinId){
     const r = await api('POST', `/vote-scrutins/${scrutinId}/authentifier`, { code });
     VOTE_SCRUTIN_ID = scrutinId;
     VOTE_RESOLUTIONS = r.resolutions || [];
-    VOTE_REPONSES = {};
+    VOTE_REPONSES = {}; VOTE_COMMENTS = {}; VOTE_MAX = {}; VOTE_OPTS = {};
     renderBulletin(r.scrutin, code);
   } catch(e) {
-    showToast?.(e.message, 'danger') || alert(e.message);
+    notifier(e.message, 'danger');
   }
 }
 
@@ -137,59 +139,142 @@ function renderBulletin(scrutin, code){
   zone.scrollIntoView({ behavior: 'smooth' });
 }
 
+/* ── Questions (2026-10-10) : réponses à choix (une, deux au maximum, plusieurs), Oui / Non, réponse libre, commentaire facultatif.
+      Toutes les valeurs passent par des attributs data-* : aucune réponse n'est jamais collée dans un attribut onclick (une option contenant une
+      apostrophe cassait l'ancien affichage). ── */
+let VOTE_OPTS = {};      // résolution -> liste des réponses proposées
+let VOTE_MAX = {};       // résolution -> nombre de réponses acceptées
+let VOTE_COMMENTS = {};  // résolution -> commentaire facultatif
+
+function notifier(message, type){
+  let z = document.getElementById('vo-notif');
+  if (!z) { z = document.createElement('div'); z.id = 'vo-notif'; z.setAttribute('role', 'alert'); z.style.cssText = 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:9999;max-width:92vw;padding:12px 18px;border-radius:12px;font-size:14px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,.25);color:#fff;'; document.body.appendChild(z); }
+  z.style.background = type === 'danger' ? '#b91c1c' : '#b45309';
+  z.textContent = message; z.style.display = 'block';
+  clearTimeout(z._t); z._t = setTimeout(() => { z.style.display = 'none'; }, 5000);
+}
+
+function indiceMax(max, nb){
+  if (max <= 1) return 'Une seule réponse possible';
+  if (max >= nb) return 'Plusieurs réponses possibles — cochez celles qui vous conviennent';
+  return max === 2 ? 'Deux réponses au maximum' : max + ' réponses au maximum';
+}
+
 function renderResolution(r){
   let options = [];
   try { options = JSON.parse(r.options_json || '[]'); } catch(e) {}
+  const mode = r.mode || (r.type_reponse === 'oui_non_abstention' ? 'pca' : r.type_reponse === 'classement' ? 'classement' : 'choix');
+  VOTE_OPTS[r.id] = options;
   let choixHtml = '';
-  if (r.type_reponse === 'oui_non_abstention') {
-    choixHtml = `<div class="vo-choix-group">
-      ${['Pour','Contre','Abstention'].map(c => `<div class="vo-choix-pill" onclick="choisir(${r.id},'${c}',this)">${c==='Pour'?'🟢':c==='Contre'?'🔴':'⚪'} ${c}</div>`).join('')}
-    </div>`;
-  } else if (r.type_reponse === 'choix_multiple' || r.type_reponse === 'election_personnes') {
-    choixHtml = `<div class="vo-choix-group">
-      ${options.map(o => `<div class="vo-choix-pill" onclick="choisir(${r.id},'${escHtml(o)}',this)">${escHtml(o)}</div>`).join('')}
-    </div>`;
-  } else if (r.type_reponse === 'classement') {
-    choixHtml = `<p style="font-size:12px;color:var(--muted);">Cliquez les options dans l'ordre de préférence.</p>
-    <div class="vo-choix-group" id="vo-classement-${r.id}">
-      ${options.map(o => `<div class="vo-choix-pill" onclick="ajouterClassement(${r.id},'${escHtml(o)}',this)">${escHtml(o)}</div>`).join('')}
-    </div>
-    <p style="font-size:13px;margin-top:8px;">Ordre choisi : <span id="vo-ordre-${r.id}">—</span></p>`;
+  if (mode === 'libre') {
+    choixHtml = '<textarea class="input vo-libre" rows="4" maxlength="2000" data-res="' + r.id + '" placeholder="Écrivez votre réponse ici…" style="width:100%;margin-top:10px;"></textarea>';
+  } else if (mode === 'oui_non') {
+    VOTE_OPTS[r.id] = ['Oui', 'Non']; VOTE_MAX[r.id] = 1;
+    choixHtml = '<div class="vo-choix-group">' + ['Oui', 'Non'].map((c, i) =>
+      '<div class="vo-choix-pill" role="button" tabindex="0" data-res="' + r.id + '" data-idx="' + i + '">' + (i === 0 ? '👍 ' : '👎 ') + c + '</div>').join('') + '</div>';
+  } else if (mode === 'pca') {
+    VOTE_OPTS[r.id] = ['Pour', 'Contre', 'Abstention']; VOTE_MAX[r.id] = 1;
+    choixHtml = '<div class="vo-choix-group">' + ['Pour', 'Contre', 'Abstention'].map((c, i) =>
+      '<div class="vo-choix-pill" role="button" tabindex="0" data-res="' + r.id + '" data-idx="' + i + '">' + (c === 'Pour' ? '🟢' : c === 'Contre' ? '🔴' : '⚪') + ' ' + c + '</div>').join('') + '</div>';
+  } else if (mode === 'classement') {
+    choixHtml = '<p style="font-size:12px;color:var(--muted);margin:8px 0 0;">Cliquez les options dans l\'ordre de préférence.</p>' +
+      '<div class="vo-choix-group" id="vo-classement-' + r.id + '">' + options.map((o, i) =>
+        '<div class="vo-choix-pill" role="button" tabindex="0" data-classe="' + r.id + '" data-idx="' + i + '">' + escHtml(o) + '</div>').join('') + '</div>' +
+      '<p style="font-size:13px;margin-top:8px;">Ordre choisi : <span id="vo-ordre-' + r.id + '">—</span> ' +
+      '<button type="button" class="btn btn-sm btn-outline" data-reinit="' + r.id + '">Recommencer</button></p>';
+  } else {
+    const max = mode === 'choix' ? Math.max(1, Math.min(options.length, Number(r.max_choix) || 1)) : 1;
+    VOTE_MAX[r.id] = max;
+    choixHtml = '<p style="font-size:12px;color:var(--muted);margin:8px 0 0;" id="vo-indice-' + r.id + '">' + indiceMax(max, options.length) + '</p>' +
+      '<div class="vo-choix-group">' + options.map((o, i) =>
+        '<div class="vo-choix-pill" role="button" tabindex="0" aria-pressed="false" data-res="' + r.id + '" data-idx="' + i + '">' + escHtml(o) + '</div>').join('') + '</div>';
   }
-  return `<div class="vo-resolution">
-    <strong>${escHtml(r.titre)}</strong>
-    ${r.description ? `<p style="font-size:13px;color:var(--muted);">${escHtml(r.description)}</p>` : ''}
-    ${choixHtml}
-  </div>`;
+  const commentaire = r.commentaire
+    ? '<label style="display:block;font-size:12px;font-weight:700;margin:12px 0 4px;">💬 Un commentaire ? <span style="font-weight:400;color:var(--muted);">(facultatif)</span></label>' +
+      '<textarea class="input vo-commentaire" rows="2" maxlength="1000" data-res="' + r.id + '" placeholder="Ajoutez un commentaire si vous le souhaitez" style="width:100%;"></textarea>'
+    : '';
+  return '<div class="vo-resolution"><strong>' + escHtml(r.titre) + '</strong>' +
+    (r.description ? '<p style="font-size:13px;color:var(--muted);">' + escHtml(r.description) + '</p>' : '') +
+    choixHtml + commentaire + '</div>';
 }
 
-function choisir(resolutionId, choix, el){
-  VOTE_REPONSES[resolutionId] = choix;
-  el.parentElement.querySelectorAll('.vo-choix-pill').forEach(p => p.classList.remove('selected'));
-  el.classList.add('selected');
+/* Un seul écouteur pour toutes les questions affichées. */
+document.addEventListener('click', function(e){
+  const reinit = e.target.closest('[data-reinit]');
+  if (reinit) {
+    const id = reinit.getAttribute('data-reinit');
+    delete VOTE_REPONSES[id];
+    document.querySelectorAll('#vo-classement-' + id + ' .vo-choix-pill').forEach(p => p.classList.remove('selected'));
+    document.getElementById('vo-ordre-' + id).textContent = '—';
+    return;
+  }
+  const classe = e.target.closest('[data-classe]');
+  if (classe) { ajouterClassement(classe.getAttribute('data-classe'), Number(classe.getAttribute('data-idx')), classe); return; }
+  const pill = e.target.closest('.vo-choix-pill[data-res]');
+  if (pill) basculer(pill.getAttribute('data-res'), Number(pill.getAttribute('data-idx')), pill);
+});
+document.addEventListener('keydown', function(e){
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.classList && e.target.classList.contains('vo-choix-pill')) { e.preventDefault(); e.target.click(); }
+});
+document.addEventListener('input', function(e){
+  const t = e.target;
+  if (t.classList && t.classList.contains('vo-libre')) VOTE_REPONSES[t.getAttribute('data-res')] = t.value;
+  if (t.classList && t.classList.contains('vo-commentaire')) VOTE_COMMENTS[t.getAttribute('data-res')] = t.value;
+});
+
+function basculer(resId, idx, el){
+  const option = (VOTE_OPTS[resId] || [])[idx];
+  if (option === undefined) return;
+  const max = VOTE_MAX[resId] || 1;
+  const groupe = el.parentElement;
+  if (max === 1) {
+    VOTE_REPONSES[resId] = option;
+    groupe.querySelectorAll('.vo-choix-pill').forEach(p => { p.classList.remove('selected'); p.setAttribute('aria-pressed', 'false'); });
+    el.classList.add('selected'); el.setAttribute('aria-pressed', 'true');
+    return;
+  }
+  let liste = Array.isArray(VOTE_REPONSES[resId]) ? VOTE_REPONSES[resId] : [];
+  if (liste.includes(option)) {
+    liste = liste.filter(x => x !== option);
+    el.classList.remove('selected'); el.setAttribute('aria-pressed', 'false');
+  } else {
+    if (liste.length >= max) { notifier('Vous pouvez choisir ' + indiceMax(max, 99).toLowerCase() + '.', 'warning'); return; }
+    liste = liste.concat(option);
+    el.classList.add('selected'); el.setAttribute('aria-pressed', 'true');
+  }
+  VOTE_REPONSES[resId] = liste;
+  const indice = document.getElementById('vo-indice-' + resId);
+  if (indice) indice.textContent = indiceMax(max, (VOTE_OPTS[resId] || []).length) + ' · ' + liste.length + ' choisie' + (liste.length > 1 ? 's' : '');
 }
 
-function ajouterClassement(resolutionId, option, el){
-  if (!VOTE_REPONSES[resolutionId]) VOTE_REPONSES[resolutionId] = [];
-  if (VOTE_REPONSES[resolutionId].includes(option)) return;
-  VOTE_REPONSES[resolutionId].push(option);
+function ajouterClassement(resId, idx, el){
+  const option = (VOTE_OPTS[resId] || [])[idx];
+  if (option === undefined) return;
+  if (!Array.isArray(VOTE_REPONSES[resId])) VOTE_REPONSES[resId] = [];
+  if (VOTE_REPONSES[resId].includes(option)) return;
+  VOTE_REPONSES[resId].push(option);
   el.classList.add('selected');
-  document.getElementById('vo-ordre-'+resolutionId).textContent = VOTE_REPONSES[resolutionId].join(' > ');
+  document.getElementById('vo-ordre-' + resId).textContent = VOTE_REPONSES[resId].join(' > ');
 }
+
+function reponseVide(v){ return v == null || v === '' || (Array.isArray(v) && !v.length) || (typeof v === 'string' && !v.trim()); }
 
 async function soumettreBulletin(code){
-  const reponses = Object.entries(VOTE_REPONSES).map(([resolution_id, choix]) => ({ resolution_id: Number(resolution_id), choix }));
+  const reponses = VOTE_RESOLUTIONS
+    .filter(r => !reponseVide(VOTE_REPONSES[r.id]))
+    .map(r => ({ resolution_id: r.id, choix: VOTE_REPONSES[r.id], commentaire: (VOTE_COMMENTS[r.id] || '').trim() || undefined }));
+  if (!reponses.length) { notifier('Répondez à au moins une question.', 'warning'); return; }
   if (reponses.length < VOTE_RESOLUTIONS.length) {
-    if (!confirm('Certaines résolutions n\'ont pas de réponse. Continuer quand même ?')) return;
+    if (!confirm('Certaines questions n\'ont pas de réponse. Continuer quand même ?')) return;
   }
   try {
-    await api('POST', `/vote-scrutins/${VOTE_SCRUTIN_ID}/voter`, { code, reponses });
+    await api('POST', '/vote-scrutins/' + VOTE_SCRUTIN_ID + '/voter', { code, reponses });
     document.getElementById('vo-bulletin-zone').innerHTML = '<div class="notice" style="background:#d1fae5;border-color:#10b981;">✅ Votre vote a été enregistré. Merci pour votre participation.</div>';
     const r = await api('GET', '/mes-votes');
     MES_VOTES = r.votes || [];
     renderListe();
   } catch(e) {
-    showToast?.(e.message, 'danger') || alert(e.message);
+    notifier(e.message, 'danger');
   }
 }
 

@@ -1909,6 +1909,9 @@ const MIGRATIONS = [
   ["initiatives", "adresse_visible INTEGER DEFAULT 1"],
   // Photo de couverture d'un scrutin (2026-10-07).
   ["vote_scrutins", "image_url TEXT"],
+  // Types de questions d'un scrutin (2026-10-10) : réglages (mode, nombre de réponses acceptées, commentaire autorisé) et commentaire anonyme du votant.
+  ["vote_resolutions", "config_json TEXT"],
+  ["vote_bulletins", "commentaire TEXT"],
   // Demande d'affiliation à l'initiative du côté du compte utilisateur (2026-09-09) :
   // distingue qui a lancé la relation. 'invitation' (défaut, comportement historique
   // inchangé) = l'initiative a invité le compte. 'demande' = le compte a lui-même demandé
