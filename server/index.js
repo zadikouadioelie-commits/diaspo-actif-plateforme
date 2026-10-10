@@ -17972,6 +17972,15 @@ route("GET", "/api/dashboard/initiative", async (req, res) => {
   const publications = await db.prepare("SELECT * FROM fil_posts WHERE auteur_id = ? ORDER BY created_at DESC LIMIT 5").all(user.id);
   /* Pour la carte "État de votre initiative" (checklist de progression du Cockpit). */
   const aBusinessPlan = !!(await db.prepare("SELECT id FROM business_plans WHERE user_id=? LIMIT 1").get(user.id));
+  /* « Immatriculation » et « Vérification » reflètent l'état RÉEL (2026-10-08, signalé : numéro RNA donné mais case restée
+     en attente). Immatriculation = un numéro existe, saisi sur la fiche OU joint à une demande de vérification ;
+     Vérification = confirmé dans le registre officiel, OU contrôle Stripe réussi, OU justificatif validé par l'équipe. */
+  let immatriculationRenseignee = false, verificationOk = false;
+  if (initiative) {
+    const verifs = await db.prepare("SELECT numero, statut FROM verifications_organisation WHERE initiative_id=?").all(initiative.id);
+    immatriculationRenseignee = !!String(initiative.numero_immatriculation || "").trim() || verifs.some(v => String(v.numero || "").trim() && v.statut !== "rejetee");
+    verificationOk = !!Number(initiative.immat_verifiee_ligne) || !!Number(initiative.organisation_verifiee) || verifs.some(v => v.statut === "verifiee");
+  }
 
   sendJSON(res, 200, {
     initiative: initiative ? {
@@ -17981,6 +17990,8 @@ route("GET", "/api/dashboard/initiative", async (req, res) => {
       abonnement_actif: !!initiative.abonnement_actif,
       vitrine_modules_state: getVitrineModulesState(initiative),
       a_business_plan: aBusinessPlan,
+      immatriculation_renseignee: immatriculationRenseignee,
+      verification_organisation_ok: verificationOk,
     } : null,
     messages_non_lus: messagesNonLus,
     publications_recentes: publications

@@ -3286,8 +3286,10 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       { label: 'Porteur du projet', done: !!(init.nom_responsable && init.email_responsable && init.tel_responsable) },
       { label: 'Boutique', done: !!Number(init.vitrine_active) },
       { label: 'Business Plan', done: !!init.a_business_plan },
-      { label: 'Immatriculation', done: !!init.numero_immatriculation },
-      { label: 'Vérification', done: false },
+      { label: 'Immatriculation', done: !!(init.immatriculation_renseignee || init.numero_immatriculation),
+        aide: "Le numéro officiel de votre structure : RNA pour une association (W + 9 chiffres), SIRET ou SIREN pour une entreprise. À renseigner dans Réseau Pro > Mon profil.", lien: 'reseau.html', lienTexte: 'Renseigner mon numéro →' },
+      { label: 'Vérification', done: !!(init.verification_organisation_ok || Number(init.organisation_verifiee) || Number(init.immat_verifiee_ligne)),
+        aide: "Votre numéro est confirmé dans le registre officiel (automatique dès qu'il est renseigné) ou votre organisation a passé le contrôle.", lien: 'reseau.html', lienTexte: 'Voir comment →' },
     ];
     const etatProgression = Math.round(etatChecklist.filter(x => x.done).length / etatChecklist.length * 100);
     const etatInitiativeHTML = `
@@ -3302,7 +3304,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           créée et que les informations administratives auront été complétées.
         </div>` : ''}
         <div style="display:flex;flex-direction:column;gap:6px;font-size:13px;margin-bottom:10px;">
-          ${etatChecklist.map(x => `<div>${x.done ? '✔' : '⏳'} ${x.label}</div>`).join('')}
+          ${etatChecklist.map(x => `<div title="${(x.aide || '').replace(/"/g, '&quot;')}">${x.done ? '✔' : '⏳'} ${x.label}${(!x.done && x.lien) ? ` <a href="${x.lien}" style="font-size:11.5px;font-weight:600;color:#2563EB;margin-left:6px;">${x.lienTexte || 'Voir →'}</a>` : ''}</div>`).join('')}
         </div>
         <div style="background:var(--bg);border-radius:20px;height:8px;overflow:hidden;">
           <div style="background:${etatEnCreation ? '#d97706' : '#16a34a'};height:100%;width:${etatProgression}%;"></div>
