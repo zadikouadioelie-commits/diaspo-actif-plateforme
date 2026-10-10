@@ -1808,16 +1808,19 @@
       return `<a class="li${l === 2 ? ' gold' : ''}" href="${esc(x.h)}" ${x.act ? `data-act="${x.act}"` : ''}>${inner}</a>`;
     };
     /* Comme le menu du site : les modules Premium (dorés) d'abord, puis les autres (blancs). */
-    return { role, premium: MODS.filter(x => lvl(x) === 2).map(li).join(''), mods: MODS.filter(x => lvl(x) !== 2).map(li).join(''), compte: MODS_COMPTE.map(li).join('') };
+    /* Compte administrateur (2026-10-10, demande explicite) : les modules d'administration, définis par assets/m-mod-admin.js. */
+    const admin = m.role === 'administrateur' && window.MAdminModules ? window.MAdminModules.map(x => `<a class="li" href="${esc(x.h)}"><span class="ic">${ic(x.i)}</span><span class="sp"><span class="t">${esc(x.t)}</span><br><span class="d">${esc(x.d)}</span></span><span class="ch">${ic('chev', 's')}</span></a>`).join('') : '';
+    return { role, admin, premium: MODS.filter(x => lvl(x) === 2).map(li).join(''), mods: MODS.filter(x => lvl(x) !== 2).map(li).join(''), compte: MODS_COMPTE.map(li).join('') };
   }
   function openMenu() {
     if (!S.me) { openLogin(); return; }
     const m = S.me, resp = [m.prenom, m.nom].filter(Boolean).join(' ') || m.email, nm = m.nom_affichage || resp;
     const prem = S.premium && S.premium.concerne ? (S.premium.actif ? '👑 Premium actif' : '🔒 Premium expiré') : '';
-    const { premium: modsPrem, mods, compte } = modulesHtml(m);
+    const { premium: modsPrem, mods, compte, admin: modsAdmin } = modulesHtml(m);
     const close = openSheet(`<div class="row" style="margin:0 0 6px"><div class="av big" style="width:48px;height:48px">${m.photo_url ? `<img src="${attrUrl(m.photo_url)}" alt="" onerror="this.remove()">` : esc(initials(nm))}</div><div class="sp"><div style="font-weight:700;font-size:17px;line-height:1.2">${esc(nm)}</div><div class="small muted">${esc(ROLE_LABEL[m.role] || m.role)}${prem ? ' · ' + prem : ''}</div></div></div>
       <div class="h2" style="margin-top:12px">MENU DES MODULES</div>
       <div class="lst"><a class="li" href="#/accueil"><span class="ic">${ic('home')}</span><span class="sp"><span class="t">Accueil</span><br><span class="d">Tutoriels vidéo, actualités, initiatives</span></span><span class="ch">${ic('chev', 's')}</span></a></div>
+      ${modsAdmin ? `<div class="h2">🛡 ADMINISTRATION</div><div class="lst">${modsAdmin}</div>` : ''}
       ${modsPrem ? `<div class="h2">⭐ MODULES PREMIUM</div><div class="lst">${modsPrem}</div>` : ''}
       <div class="h2">OUTILS</div><div class="lst">${mods}</div>
       <div class="h2">MON COMPTE</div><div class="lst">${compte}<a class="li" href="#/moi"><span class="ic">${ic('user')}</span><span class="sp"><span class="t">Mon espace</span><br><span class="d">Profil, tout le menu et les outils sur ordinateur</span></span><span class="ch">${ic('chev', 's')}</span></a></div>
@@ -1856,10 +1859,11 @@
     const m = S.me, role = (m.role === 'utilisateur' || m.role === 'initiative') ? m.role : null;
     const resp = [m.prenom, m.nom].filter(Boolean).join(' ') || m.email; const nm = m.nom_affichage || resp;
     const prem = S.premium && S.premium.concerne ? (S.premium.actif ? '👑 Premium actif' : '🔒 Premium expiré') : '';
-    const { premium: modsPrem, mods, compte } = modulesHtml(m);
+    const { premium: modsPrem, mods, compte, admin: modsAdmin } = modulesHtml(m);
     el.innerHTML = `<a class="me" href="#/moi"><div class="av big">${m.photo_url ? `<img src="${attrUrl(m.photo_url)}" alt="" onerror="this.remove()">` : esc(initials(nm))}</div><div class="sp"><div class="nm ell">${esc(nm)}</div><div class="sub">${esc(ROLE_LABEL[m.role] || m.role)}${prem ? ' · ' + prem : ''}</div><div class="sub" style="margin-top:2px">Voir mon profil ›</div>${m.role !== 'utilisateur' && resp && resp !== nm ? `<div class="sub" style="font-size:10.5px;opacity:.7;margin-top:2px">Responsable : ${esc(resp)}</div>` : ''}</div></a>
       <button class="btn out block" id="me-switch" style="margin:10px 0 0">${ic('people', 's')} Changer de compte</button>
       <div class="mdark"><div class="h2" style="margin-top:0">MENU DES MODULES</div>
+        ${modsAdmin ? `<div class="h2">🛡 ADMINISTRATION</div><div class="lst">${modsAdmin}</div>` : ''}
         ${modsPrem ? `<div class="h2">⭐ MODULES PREMIUM</div><div class="lst">${modsPrem}</div>` : ''}
         <div class="h2">OUTILS</div><div class="lst">${mods}</div>
         <div class="h2">MON COMPTE</div><div class="lst">${compte}</div></div>
