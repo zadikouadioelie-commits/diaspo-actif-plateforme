@@ -1576,7 +1576,7 @@
   document.addEventListener('click', e => {
     const a = e.target.closest && e.target.closest('[data-film-inscription]'); if (!a) return;
     e.preventDefault();
-    if (!filmPromesse) filmPromesse = window.InscriptionFilm ? Promise.resolve() : new Promise((ok, ko) => { const sc = document.createElement('script'); sc.src = 'assets/inscription-film.js?v=14'; sc.onload = ok; sc.onerror = () => { filmPromesse = null; ko(new Error('film')); }; document.head.appendChild(sc); });
+    if (!filmPromesse) filmPromesse = window.InscriptionFilm ? Promise.resolve() : new Promise((ok, ko) => { const sc = document.createElement('script'); sc.src = 'assets/inscription-film.js?v=15'; sc.onload = ok; sc.onerror = () => { filmPromesse = null; ko(new Error('film')); }; document.head.appendChild(sc); });
     filmPromesse.then(() => window.InscriptionFilm.ouvrir(a.dataset.filmInscription === 'court' ? { version: 'court' } : undefined)).catch(() => { location.href = 'inscription.html'; });
   });
   const miniCard = (href, photo, nom, sub, round) => `<a class="mc" href="${href}"><div class="av big" style="border-radius:${round ? '50%' : '16px'};margin:0 auto 8px">${photo ? `<img src="${attrUrl(photo)}" alt="" loading="lazy" onerror="this.remove()">` : esc(initials(nom))}</div><div class="mn">${esc(nom)}</div>${sub ? `<div class="small muted ell">${esc(sub)}</div>` : ''}</a>`;

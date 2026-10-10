@@ -50,7 +50,7 @@ function dvtChargerFilm() {
   if (!_dvtFilmPromesse) {
     _dvtFilmPromesse = new Promise((ok, ko) => {
       const sc = document.createElement('script');
-      sc.src = '/assets/inscription-film.js?v=14';
+      sc.src = '/assets/inscription-film.js?v=15';
       sc.onload = ok; sc.onerror = () => { _dvtFilmPromesse = null; ko(new Error('chargement du film')); };
       document.head.appendChild(sc);
     });

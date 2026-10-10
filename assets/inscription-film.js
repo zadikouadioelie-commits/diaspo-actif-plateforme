@@ -161,17 +161,7 @@
 @media (prefers-reduced-motion:reduce){.fi-ov{animation:none}}
 `;
 
-  /* ── Formes dessinées : Afrique stylisée (lissée), lauriers ── */
-  const AFR_PTS = [[60, 30], [100, 22], [140, 28], [170, 38], [200, 40], [215, 55], [225, 80], [238, 102], [252, 112], [245, 132], [225, 150], [215, 175], [205, 205], [190, 235], [170, 250], [150, 255], [130, 240], [118, 215], [115, 190], [105, 170], [85, 160], [60, 160], [40, 150], [28, 135], [18, 110], [22, 80], [40, 55]].map(p => [p[0] - 130, p[1] - 140]);
-  function lisse(pts) {
-    const n = pts.length; let d = `M${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)}`;
-    for (let i = 0; i < n; i++) {
-      const p0 = pts[(i - 1 + n) % n], p1 = pts[i], p2 = pts[(i + 1) % n], p3 = pts[(i + 2) % n];
-      const c1 = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6], c2 = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6];
-      d += ` C${c1[0].toFixed(1)} ${c1[1].toFixed(1)} ${c2[0].toFixed(1)} ${c2[1].toFixed(1)} ${p2[0].toFixed(1)} ${p2[1].toFixed(1)}`;
-    }
-    return d + 'Z';
-  }
+  /* ── Formes dessinées : lauriers ── */
   function laurier(miroir) {
     /* Branche de laurier : une tige courbe et des paires de feuilles dorées le long de la tige. */
     const P = t => { const u = 1 - t; return [u * u * 150 + 2 * u * t * 40 + t * t * 70, u * u * 300 + 2 * u * t * 150 + t * t * 30]; };
@@ -200,17 +190,6 @@
   <path d="M0 662 C 300 624, 640 712, 1280 652" fill="none" stroke="#1B7F3B" stroke-width="3" opacity=".9"/>
 </svg>
 <div class="fi-abs fi-motto" data-r="motto">Rassembler · Mobiliser · Impacter</div>
-<svg class="fi-globe" data-r="globe" viewBox="-200 -200 400 400" width="400" height="400" aria-hidden="true">
-  <defs><radialGradient id="fiGl" cx="40%" cy="35%" r="70%"><stop offset="0" stop-color="#3a8be8" stop-opacity=".6"/><stop offset="1" stop-color="#0b2a55" stop-opacity=".2"/></radialGradient>
-    <filter id="fiGlow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
-  <circle r="150" fill="url(#fiGl)" stroke="#8cc4ff" stroke-width="2.5"/>
-  <g data-r="mer" fill="none" stroke="#8cc4ff" stroke-width="1.3" stroke-opacity=".4"></g>
-  <g data-r="par" stroke="#8cc4ff" stroke-width="1.3" stroke-opacity=".35"></g>
-  <path d="${lisse(AFR_PTS)}" fill="url(#fiGold)" fill-opacity=".92" stroke="#FFF6D6" stroke-opacity=".7" stroke-width="2" filter="url(#fiGlow)" data-r="afr"/>
-  <g data-r="arcs" fill="none" stroke-linecap="round"></g>
-  <g data-r="nodes"></g>
-</svg>
-<div class="fi-abs fi-legend" data-r="leg"><i style="background:#FFA928"></i>Pays d'origine<i style="background:#5aaeff;margin-left:26px"></i>Pays de résidence</div>
 <img class="fi-abs fi-logo" data-r="logo" src="assets/media/logo-film.webp" alt="">
 <div class="fi-abs fi-welc gold" data-r="welc">BIENVENUE</div>
 <div class="fi-abs fi-tag" data-r="tag">PLATEFORME · RÉSEAU · OPPORTUNITÉS</div>
@@ -281,7 +260,6 @@
     </div>
     <div class="fi-col"><div class="fi-sect">VOTRE DIASPORA VOUS RETROUVE</div>
       <div class="fi-map"><svg viewBox="0 0 300 240" aria-hidden="true">
-        <path d="${lisse(AFR_PTS)}" transform="translate(150,150) scale(.5)" fill="url(#fiGold)" fill-opacity=".9" stroke="#FFF6D6" stroke-opacity=".6" stroke-width="2"/>
         <path data-r="marc" d="M104 156 Q40 100 142 54" fill="none" stroke="#FFE7A0" stroke-width="3" stroke-linecap="round" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1"/>
         <circle data-r="mdo" cx="104" cy="156" r="9" fill="#FFA928" stroke="#fff" stroke-width="3"/>
         <circle data-r="mdb" cx="142" cy="54" r="9" fill="#5aaeff" stroke="#fff" stroke-width="3"/>
@@ -340,10 +318,6 @@
 <div class="fi-abs" data-r="t3"><span class="fi-cta">Créer mon compte</span></div>
 <div class="fi-abs fi-url" data-r="t4">DIASPOACTIF.COM</div>
 <div class="fi-abs" data-r="fade" style="width:${W}px;height:${H}px;background:#061633;opacity:0"></div>`;
-
-  /* Globe : réseau de points sur l'Afrique et l'Europe, liaisons (coordonnées dans le globe, centre 0,0). */
-  const NODES = [[-70, -105], [65, -92], [-108, -58], [70, -25], [-80, 10], [-50, 12], [-15, 45], [55, 25], [20, 95], [-20, -135], [-45, -128]];
-  const LIENS = [[9, 0], [9, 2], [9, 4], [9, 6], [9, 1], [10, 5], [10, 7], [4, 5], [6, 8], [3, 1], [7, 6]];
 
   /* Effets sonores : [temps audio, type]. */
   const SFX_COURT = [[16.5, 'clic'], [17.6, 'clic'], [18.9, 'clic'], [20.55, 'pop'], [27.4, 'pop'], [28.7, 'tic'], [29.0, 'tic'], [29.5, 'tic'], [30.0, 'tic'], [30.5, 'tic'], [31.0, 'tic'], [31.05, 'chime'],
@@ -437,34 +411,10 @@
     R.rub.style.opacity = dec; R.swoosh.style.opacity = dec * 0.9;
     place(R.motto, 640, 690, 1, dec * 0.95);
 
-    /* Globe-réseau sur l'Afrique : à gauche → coin → fond de la scène finale */
-    const g1 = P(a, 6.7, 8.0, E.inout), g2 = P(a, 39.9, 41.4, E.inout);
-    const gx = a < 20 ? lerp(430, 92, g1) : lerp(92, 640, g2);
-    const gy = a < 20 ? lerp(350, 78, g1) : lerp(78, 330, g2);
-    const gs = a < 20 ? lerp(1.15, 0.27, g1) : lerp(0.27, 1.4, g2);
-    const gop = a < 20 ? 1 : lerp(1, 0.45, g2);
-    place(R.globe, gx, gy, gs, gop * P(a, -1.2, -0.2));
-    const rot = a * 0.33, rr = 150;
-    R.mer.forEach((m, i) => { m.setAttribute('rx', Math.abs(rr * Math.sin(i * Math.PI / 6 - rot * 0.5)).toFixed(1)); });
-    R.afr.setAttribute('transform', `scale(${(1 + 0.012 * Math.sin(a * 1.1)).toFixed(4)})`);
-    R.nd.forEach((c, i) => {
-      const n = NODES[i], ap = P(a, 0.2 + i * 0.12, 0.8 + i * 0.12, E.back);
-      c.setAttribute('cx', n[0]); c.setAttribute('cy', n[1]);
-      c.setAttribute('r', (5.5 * ap * (1 + 0.28 * Math.sin(a * 2.4 + i))).toFixed(1));
-      c.setAttribute('fill-opacity', clamp(ap).toFixed(2));
-    });
-    R.ar.forEach((pt, k) => {
-      const A = NODES[LIENS[k][0]], B = NODES[LIENS[k][1]], f = 1.3;
-      pt.setAttribute('d', `M${A[0]} ${A[1]} Q${(((A[0] + B[0]) / 2) * f).toFixed(1)} ${(((A[1] + B[1]) / 2) * f).toFixed(1)} ${B[0]} ${B[1]}`);
-      pt.setAttribute('stroke-dashoffset', (1 - P(a, 0.9 + k * 0.28, 1.9 + k * 0.28, E.inout)).toFixed(3));
-      pt.setAttribute('stroke-opacity', '0.92');
-    });
-
     /* Scène 1 : bienvenue, logo en grand, devise de la plateforme */
     place(R.welc, 640, 98, 1, P(a, 0.2, 1.2) * (1 - P(a, 6.6, 7.4)));
-    place(R.logo, 850, 345, lerp(0.55, 1, P(a, 2.0, 3.4, E.back)), P(a, 2.0, 3.0) * (1 - P(a, 6.6, 7.4)));
+    place(R.logo, 640, 340, lerp(0.6, 1.12, P(a, 2.0, 3.4, E.back)), P(a, 2.0, 3.0) * (1 - P(a, 6.6, 7.4)));
     place(R.tag, 640, 585, 1, P(a, 4.0, 5.0) * (1 - P(a, 6.6, 7.4)));
-    place(R.leg, 430, 548, 1, P(a, 3.0, 4.0) * (1 - P(a, 6.2, 6.9)));
     place(R.head, 300, 78, 1, P(a, 7.4, 8.4) * (1 - P(a, 40.0, 40.8)));
 
     /* Scène 2 : trois profils */
@@ -600,29 +550,11 @@
     R.rub.style.opacity = dec; R.swoosh.style.opacity = dec * 0.9;
     place(R.motto, 640, 690, 1, dec * 0.95);
 
-    /* Globe-réseau : à gauche → coin → fond de la scène finale */
-    const g1 = P(a, 7.2, 8.6, E.inout), g2 = P(a, 73.4, 75.0, E.inout), tard = a > 40;
-    place(R.globe, tard ? lerp(92, 640, g2) : lerp(430, 92, g1), tard ? lerp(78, 330, g2) : lerp(350, 78, g1), tard ? lerp(0.27, 1.4, g2) : lerp(1.15, 0.27, g1), (tard ? lerp(1, 0.45, g2) : 1) * P(a, -1.2, -0.2));
-    const rot = a * 0.33, rr = 150;
-    R.mer.forEach((m, i) => { m.setAttribute('rx', Math.abs(rr * Math.sin(i * Math.PI / 6 - rot * 0.5)).toFixed(1)); });
-    R.afr.setAttribute('transform', `scale(${(1 + 0.012 * Math.sin(a * 1.1)).toFixed(4)})`);
-    R.nd.forEach((c, i) => {
-      const n = NODES[i], ap = P(a, 0.2 + i * 0.12, 0.8 + i * 0.12, E.back);
-      c.setAttribute('cx', n[0]); c.setAttribute('cy', n[1]);
-      c.setAttribute('r', (5.5 * ap * (1 + 0.28 * Math.sin(a * 2.4 + i))).toFixed(1)); c.setAttribute('fill-opacity', clamp(ap).toFixed(2));
-    });
-    R.ar.forEach((pt, k) => {
-      const A = NODES[LIENS[k][0]], B = NODES[LIENS[k][1]], f = 1.3;
-      pt.setAttribute('d', `M${A[0]} ${A[1]} Q${(((A[0] + B[0]) / 2) * f).toFixed(1)} ${(((A[1] + B[1]) / 2) * f).toFixed(1)} ${B[0]} ${B[1]}`);
-      pt.setAttribute('stroke-dashoffset', (1 - P(a, 0.9 + k * 0.28, 1.9 + k * 0.28, E.inout)).toFixed(3)); pt.setAttribute('stroke-opacity', '0.92');
-    });
-
     /* Scène 1 : bienvenue */
     const s1out = 1 - P(a, 7.0, 7.8);
     place(R.welc, 640, 98, 1, P(a, 0.2, 1.2) * s1out);
-    place(R.logo, 850, 345, lerp(0.55, 1, P(a, 2.0, 3.4, E.back)), P(a, 2.0, 3.0) * s1out);
+    place(R.logo, 640, 340, lerp(0.6, 1.12, P(a, 2.0, 3.4, E.back)), P(a, 2.0, 3.0) * s1out);
     place(R.tag, 640, 585, 1, P(a, 4.3, 5.3) * s1out);
-    place(R.leg, 430, 548, 1, P(a, 3.0, 4.0) * (1 - P(a, 6.6, 7.3)));
     place(R.head, 300, 78, 1, P(a, 7.8, 8.8) * (1 - P(a, 73.8, 74.4)));
 
     /* Étapes du vrai parcours */
@@ -846,12 +778,6 @@
     /* éléments multiples */
     R.parts = ov.querySelector('[data-r="parts"]');
     R.pa = Array.from({ length: 36 }, () => { const el = document.createElement('i'); el.className = 'fi-part'; R.parts.appendChild(el); return { el }; });
-    R.mer = Array.from({ length: 6 }, () => { const e = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse'); e.setAttribute('ry', 150); return e; });
-    const gMer = ov.querySelector('[data-r="mer"]'); R.mer.forEach(e => gMer.appendChild(e));
-    const gPar = ov.querySelector('[data-r="par"]');
-    [-60, -30, 0, 30, 60].forEach(lat => { const y = -150 * Math.sin(lat * Math.PI / 180), x = 150 * Math.cos(lat * Math.PI / 180); const l = document.createElementNS('http://www.w3.org/2000/svg', 'line'); l.setAttribute('x1', -x); l.setAttribute('x2', x); l.setAttribute('y1', y); l.setAttribute('y2', y); gPar.appendChild(l); });
-    const gNodes = ov.querySelector('[data-r="nodes"]'); R.nd = NODES.map((_, i) => { const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle'); c.setAttribute('fill', i >= 9 ? '#5aaeff' : '#FFA928'); c.setAttribute('stroke', '#fff'); c.setAttribute('stroke-opacity', '.8'); c.setAttribute('stroke-width', '2'); gNodes.appendChild(c); return c; });
-    const gArcs = ov.querySelector('[data-r="arcs"]'); R.ar = LIENS.map((_, i) => { const p = document.createElementNS('http://www.w3.org/2000/svg', 'path'); p.setAttribute('pathLength', '1'); p.setAttribute('stroke-dasharray', '1'); p.setAttribute('stroke', i % 2 ? '#9fd0ff' : '#FFE7A0'); p.setAttribute('stroke-width', '2.4'); gArcs.appendChild(p); return p; });
     R.ckEls = [...ov.querySelectorAll('[data-r="ck"] > div')]; R.stEls = [...ov.querySelectorAll('.fi-st')];
     echelle(); window.addEventListener('resize', echelle);
     document.addEventListener('keydown', clavier);
