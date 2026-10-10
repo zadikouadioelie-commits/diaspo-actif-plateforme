@@ -1024,7 +1024,8 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
             </div>
           </label>
           <label style="display:block;">
-            <span style="font-size:12px;font-weight:700;color:var(--muted);">EMPLACEMENTS</span>
+            <span style="font-size:12px;font-weight:700;color:var(--muted);">EMPLACEMENTS</span> <span id="ad-slots-compteur" role="status" aria-live="polite" style="font-size:12px;font-weight:700;color:var(--muted);margin-left:6px;">0 / 4 choisis</span>
+            <span style="display:block;font-size:11.5px;color:var(--muted);font-weight:500;margin-top:2px;">4 emplacements au maximum. L'œil 👁 montre où la publicité s'affiche.</span>
             <div id="ad-emplacements" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;"></div>
           </label>
 
@@ -2631,15 +2632,22 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         between_videos: 'Entre les vidéos',
         vitrine_section: 'Section boutique',
         vue_publication_restreinte: 'Vue publication restreinte',
+        homepage_top: "Haut de la page d'accueil",
+        inscription_sidebar_gauche: 'Inscription — colonne gauche',
+        inscription_sidebar_droite: 'Inscription — colonne droite',
+        fil_sidebar: "Fil d'actualité — colonne latérale",
+        evenements_sidebar: 'Événements — colonne latérale',
+        annuaire_sidebar: 'Annuaire — colonne latérale',
       };
       document.getElementById('ad-emplacements').className = 'da-pill-group';
       document.getElementById('ad-emplacements').innerHTML = _adSlots.map(s => `
         <div style="display:inline-flex;align-items:center;gap:5px;">
           <label class="da-pill">
-            <input type="checkbox" value="${s}" class="ad-slot-check" onchange="this.closest('.da-pill').classList.toggle('checked',this.checked)"><span>${AD_SLOT_LABELS_FR[s] || s.replace(/_/g,' ')}</span>
+            <input type="checkbox" value="${s}" class="ad-slot-check" onchange="this.closest('.da-pill').classList.toggle('checked',this.checked);adSlotsMaj()"><span>${AD_SLOT_LABELS_FR[s] || s.replace(/_/g,' ')}</span>
           </label>
           <button type="button" onclick="showAdSlotPreview('${s}')" title="Voir un aperçu de cet emplacement" style="width:32px;height:32px;border-radius:50%;border:2px solid var(--border);background:#fff;cursor:pointer;font-size:14px;flex-shrink:0;">👁</button>
         </div>`).join('');
+      adSlotsMaj();
       const AD_ZONE_LABELS = { ville:'Ville', commune:'Commune', departement:'Département', region:'Région', pays:'Pays', international:'International' };
       document.getElementById('ad-zones').className = 'da-pill-group';
       document.getElementById('ad-zones').innerHTML = Object.entries(AD_ZONE_LABELS).map(([v,l]) => `
@@ -2778,12 +2786,26 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     document.querySelector('#ad-modal h3').textContent = ad ? 'Modifier la publicité' : 'Nouvelle publicité';
     document.getElementById('ad-btn-save').textContent = ad ? '💾 Enregistrer' : '📣 Publier';
     document.querySelectorAll('#ad-modal .da-pill').forEach(p => p.classList.toggle('checked', p.querySelector('input')?.checked));
+    adSlotsMaj();
     document.getElementById('ad-modal').style.display = 'block';
     adRefreshAudiencePreview();
   }
   function closeAdModal() { document.getElementById('ad-modal').style.display = 'none'; _editingAdId = null; }
 
   /* Aperçus visuels des emplacements publicitaires — mockups CSS légers, pas de vraies captures d'écran. */
+/* Briques des aperçus d'emplacements (2026-10-10) : mêmes mockups légers que les cinq premiers, factorisés pour les six nouveaux. */
+  const _pvTitre = t => `<div style="font-size:10px;font-weight:800;letter-spacing:.05em;color:#94a3b8;margin-bottom:8px;">${t}</div>`;
+  const _pvAd = (etiq, h) => `<div style="background:#FFF3EC;border:2px solid #B84C1A;border-radius:8px;padding:8px;position:relative;">
+      <span style="position:absolute;top:-9px;left:8px;background:#B84C1A;color:#fff;font-size:8px;padding:2px 7px;border-radius:99px;font-weight:800;">${etiq || '📣 PUBLICITÉ'}</span>
+      <div style="height:${h || 34}px;background:#FBD2BB;border-radius:5px;margin:4px 0 6px;"></div>
+      <div style="height:6px;width:70%;background:#FBD2BB;border-radius:3px;margin-bottom:4px;"></div><div style="height:6px;width:50%;background:#FCE0CD;border-radius:3px;"></div></div>`;
+  const _pvBloc = (h, extra) => `<div style="background:#fff;border:1px solid #DCE4EF;border-radius:8px;height:${h}px;${extra || ''}"></div>`;
+  const _pvLignes = () => `<div style="height:6px;width:70%;background:#E5EAF2;border-radius:3px;margin:6px 8px 4px;"></div><div style="height:6px;width:50%;background:#EEF1F6;border-radius:3px;margin:0 8px;"></div>`;
+  const _pvFormulaire = () => `<div style="background:#fff;border:1px solid #DCE4EF;border-radius:8px;padding:10px;">
+      <div style="height:8px;width:55%;background:#DCE4EF;border-radius:3px;margin-bottom:9px;"></div>
+      <div style="height:16px;background:#EEF1F6;border-radius:5px;margin-bottom:6px;"></div><div style="height:16px;background:#EEF1F6;border-radius:5px;margin-bottom:6px;"></div>
+      <div style="height:16px;background:#EEF1F6;border-radius:5px;margin-bottom:9px;"></div><div style="height:18px;width:45%;background:#0D2B4E;border-radius:6px;"></div></div>`;
+  const _pvAbsent = h => `<div style="border:1.5px dashed #CBD5E1;border-radius:8px;height:${h}px;"></div>`;
   const AD_SLOT_PREVIEWS = {
     homepage_feed: {
       titre: "Fil de la page d'accueil",
@@ -2862,6 +2884,56 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           </div>
         </div>`
     },
+    homepage_top: {
+      titre: "Haut de la page d'accueil",
+      caption: "Tout en haut de la page d'accueil, avant le reste du contenu : le premier emplacement que voit chaque visiteur, sur ordinateur comme sur téléphone. Badge « Sponsorisé » toujours visible.",
+      html: `<div style="background:#F4F6FA;border-radius:10px;padding:12px;">${_pvTitre('🏠 ACCUEIL — HAUT DE PAGE')}
+          <div style="height:14px;background:#0D2B4E;border-radius:5px;margin-bottom:10px;"></div>
+          ${_pvAd('📣 SPONSORISÉ', 22)}
+          <div style="height:46px;background:linear-gradient(135deg,#0D2B4E,#1E4F8A);border-radius:8px;margin:10px 0 8px;"></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">${_pvBloc(34)}${_pvBloc(34)}</div></div>`
+    },
+    inscription_sidebar_gauche: {
+      titre: "Inscription — colonne gauche",
+      caption: "Colonne de gauche de la page d'inscription : vue par chaque personne qui crée un compte, pendant qu'elle remplit le formulaire. Affichée sur ordinateur (écrans d'au moins 1180 px de large) ; sur petit écran, le formulaire occupe toute la largeur.",
+      html: `<div style="background:#F4F6FA;border-radius:10px;padding:12px;">${_pvTitre('✍️ CRÉER UN COMPTE')}
+          <div style="display:grid;grid-template-columns:1fr 1.7fr 1fr;gap:8px;align-items:start;">
+            ${_pvAd('📣 PUB', 60)}${_pvFormulaire()}${_pvAbsent(90)}</div></div>`
+    },
+    inscription_sidebar_droite: {
+      titre: "Inscription — colonne droite",
+      caption: "Colonne de droite de la page d'inscription : vue par chaque personne qui crée un compte, pendant qu'elle remplit le formulaire. Affichée sur ordinateur (écrans d'au moins 1180 px de large) ; sur petit écran, le formulaire occupe toute la largeur.",
+      html: `<div style="background:#F4F6FA;border-radius:10px;padding:12px;">${_pvTitre('✍️ CRÉER UN COMPTE')}
+          <div style="display:grid;grid-template-columns:1fr 1.7fr 1fr;gap:8px;align-items:start;">
+            ${_pvAbsent(90)}${_pvFormulaire()}${_pvAd('📣 PUB', 60)}</div></div>`
+    },
+    fil_sidebar: {
+      titre: "Fil d'actualité — colonne latérale",
+      caption: "Dans la colonne de droite du fil d'actualité, à côté des publications : visible en permanence pendant la lecture (ordinateur et tablette ; sur petit écran la colonne passe sous le fil).",
+      html: `<div style="background:#F4F6FA;border-radius:10px;padding:12px;">${_pvTitre("📰 FIL D'ACTUALITÉ")}
+          <div style="display:grid;grid-template-columns:1.7fr 1fr;gap:8px;align-items:start;">
+            <div>${[0, 1, 2].map(i => `<div style="background:#fff;border:1px solid #DCE4EF;border-radius:8px;margin-bottom:7px;padding:7px;">
+              <div style="display:flex;gap:6px;align-items:center;margin-bottom:5px;"><div style="width:18px;height:18px;border-radius:50%;background:#DCE4EF;"></div><div style="height:6px;width:35%;background:#E5EAF2;border-radius:3px;"></div></div>
+              <div style="height:6px;width:90%;background:#EEF1F6;border-radius:3px;margin-bottom:4px;"></div><div style="height:6px;width:65%;background:#EEF1F6;border-radius:3px;"></div></div>`).join('')}</div>
+            <div>${_pvAd('📣 PUB', 46)}<div style="height:8px;"></div>${_pvBloc(40)}</div></div></div>`
+    },
+    evenements_sidebar: {
+      titre: "Événements — colonne latérale",
+      caption: "Dans la colonne de droite de la page Événements, au-dessus des suggestions d'initiatives : vue par toutes les personnes qui parcourent ou recherchent un événement (ordinateur ; sur petit écran elle s'affiche à la suite de la liste).",
+      html: `<div style="background:#F4F6FA;border-radius:10px;padding:12px;">${_pvTitre('📅 ÉVÉNEMENTS')}
+          <div style="display:grid;grid-template-columns:.8fr 1.7fr 1fr;gap:8px;align-items:start;">
+            ${_pvBloc(90)}
+            <div>${[0, 1].map(() => `<div style="background:#fff;border:1px solid #DCE4EF;border-radius:8px;margin-bottom:7px;overflow:hidden;"><div style="height:34px;background:#DCE4EF;"></div>${_pvLignes()}<div style="height:6px;"></div></div>`).join('')}</div>
+            <div>${_pvAd('📣 PUB', 46)}<div style="height:8px;"></div>${_pvBloc(40)}</div></div></div>`
+    },
+    annuaire_sidebar: {
+      titre: "Annuaire — colonne latérale",
+      caption: "À droite de la grille des comptes de l'annuaire : vue par toutes les personnes qui cherchent une initiative ou un membre. Distincte de « Section boutique », qui est un bandeau au-dessus de la grille. Sur petit écran, elle se range sous la grille.",
+      html: `<div style="background:#F4F6FA;border-radius:10px;padding:12px;">${_pvTitre('📒 ANNUAIRE')}
+          <div style="display:grid;grid-template-columns:1.8fr 1fr;gap:8px;align-items:start;">
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;">${[0, 1, 2, 3, 4, 5].map(() => `<div style="background:#fff;border:1px solid #DCE4EF;border-radius:8px;padding:6px;text-align:center;"><div style="width:22px;height:22px;border-radius:50%;background:#DCE4EF;margin:0 auto 5px;"></div><div style="height:5px;width:70%;background:#E5EAF2;border-radius:3px;margin:0 auto;"></div></div>`).join('')}</div>
+            ${_pvAd('📣 PUB', 90)}</div></div>`
+    },
     vitrine_section: {
       titre: 'Section boutique',
       caption: "Affichée dans une section dédiée des boutiques (profils Initiative), en complément des produits mis en avant.",
@@ -2880,6 +2952,24 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           </div>
         </div>`
     },
+  };
+  /* Maximum de 4 emplacements par publicité (2026-10-10, demande explicite) : compteur visible, et dès que 4 sont choisis les autres cases se
+     verrouillent (jamais d'erreur au moment de publier). Le serveur applique la même limite. */
+  const AD_SLOTS_MAX = 4;
+  window.adSlotsMaj = function () {
+    const cases = Array.from(document.querySelectorAll('.ad-slot-check'));
+    const n = cases.filter(c => c.checked).length;
+    cases.forEach(c => {
+      const bloque = !c.checked && n >= AD_SLOTS_MAX;
+      c.disabled = bloque;
+      const pill = c.closest('.da-pill');
+      if (pill) { pill.style.opacity = bloque ? '.45' : ''; pill.style.cursor = bloque ? 'not-allowed' : ''; pill.title = bloque ? '4 emplacements au maximum : décochez-en un pour choisir celui-ci.' : ''; }
+    });
+    const el = document.getElementById('ad-slots-compteur');
+    if (el) {
+      el.textContent = n + ' / ' + AD_SLOTS_MAX + ' choisi' + (n > 1 ? 's' : '') + (n > AD_SLOTS_MAX ? ' — retirez-en ' + (n - AD_SLOTS_MAX) : '');
+      el.style.color = n > AD_SLOTS_MAX ? '#B3261E' : (n === AD_SLOTS_MAX ? '#B84C1A' : 'var(--muted)');
+    }
   };
   window.showAdSlotPreview = function(slot) {
     const p = AD_SLOT_PREVIEWS[slot];
@@ -2915,6 +3005,10 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     const listes = Array.from(document.querySelectorAll('.ad-liste-check:checked')).map(c => c.value);
     const publicationProgrammee = document.getElementById('ad-pub-programmee').checked;
     const datePublication = publicationProgrammee ? document.getElementById('ad-date-publication').value : '';
+    if (emplacements.length > AD_SLOTS_MAX) {
+      errBox.textContent = `4 emplacements au maximum par publicité : vous en avez choisi ${emplacements.length}. Décochez-en ${emplacements.length - AD_SLOTS_MAX}.`;
+      errBox.style.display = 'block'; return;
+    }
 
     const btn = document.getElementById('ad-btn-save');
     btn.disabled = true;

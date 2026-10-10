@@ -20276,6 +20276,12 @@ const PUB_SLOTS = [
   "vue_publication_restreinte",
 ];
 const PUB_AD_CTA = ["En savoir plus", "Acheter", "Contacter", "S'inscrire"];
+/* 4 emplacements au maximum par publicité (2026-10-10, demande explicite). */
+const PUB_SLOTS_MAX = 4;
+function pubNettoyerEmplacements(liste) {
+  const propres = [...new Set((Array.isArray(liste) ? liste : []).filter(e => PUB_SLOTS.includes(e)))];
+  return propres;
+}
 
 route("GET", "/api/ads/plans", async (req, res) => {
   sendJSON(res, 200, { plans: PUB_PLANS, slots: PUB_SLOTS, cta: PUB_AD_CTA });
@@ -20474,7 +20480,8 @@ route("POST", "/api/ads/create", async (req, res) => {
   }
 
   let emplacements = ["homepage_feed"];
-  try { const p = JSON.parse(fields.emplacements || "[]"); if (Array.isArray(p) && p.length) emplacements = p.filter(e => PUB_SLOTS.includes(e)); } catch (_) {}
+  try { const p = JSON.parse(fields.emplacements || "[]"); if (Array.isArray(p) && p.length) { const propres = pubNettoyerEmplacements(p); if (propres.length) emplacements = propres; } } catch (_) {}
+  if (emplacements.length > PUB_SLOTS_MAX) return sendJSON(res, 400, { error: `4 emplacements au maximum par publicité (${emplacements.length} choisis).` });
 
   let cibleZones = [];
   try { const z = JSON.parse(fields.cible_zones || "[]"); if (Array.isArray(z)) cibleZones = z.filter(v => ['ville','commune','departement','region','pays','international'].includes(v)); } catch (_) {}
@@ -20617,7 +20624,11 @@ route("PUT", "/api/ads/:id", async (req, res, params, body) => {
   const cta = body.cta !== undefined ? (PUB_AD_CTA.includes(body.cta) ? body.cta : ad.cta) : ad.cta;
   const lienUrl = body.lien_url !== undefined ? body.lien_url : ad.lien_url;
   let emplacements = safeParseArray(ad.emplacements);
-  if (Array.isArray(body.emplacements)) emplacements = body.emplacements.filter(e => PUB_SLOTS.includes(e));
+  if (Array.isArray(body.emplacements)) {
+    const propres = pubNettoyerEmplacements(body.emplacements);
+    if (propres.length > PUB_SLOTS_MAX) return sendJSON(res, 400, { error: `4 emplacements au maximum par publicité (${propres.length} choisis).` });
+    if (propres.length) emplacements = propres; // liste vide ou invalide : on conserve les emplacements actuels
+  }
 
   /* La durée reste celle définie à la création (max 30 jours) — on ignore volontairement body.duree_jours. */
   const dureeJours = Math.min(Math.max(parseInt(ad.duree_jours) || 7, 1), 30);
