@@ -1,0 +1,63 @@
+/* Design « Nuit dorée » — page Annuaire (2026-10-11). Complète assets/theme-nuit-doree.css (barre du haut, boutons, cartes de fiches, pied de page).
+   Tout est préfixé html body.nd : sans class="nd" sur <body>, la page garde son ancien design. */
+html body.nd .ann-hero{
+  height:190px;
+  background:
+    radial-gradient(120% 95% at 82% 8%, rgba(227,192,110,.20) 0%, rgba(227,192,110,0) 58%),
+    radial-gradient(90% 120% at 8% 100%, rgba(63,123,255,.22) 0%, rgba(63,123,255,0) 62%),
+    linear-gradient(135deg,#0B1226 0%,#14234a 62%,#0d1633 100%);
+  border-bottom:1px solid var(--nd-bord);
+}
+html body.nd .ann-hero::before{background:repeating-linear-gradient(115deg, rgba(227,192,110,.045) 0 1px, transparent 1px 26px)}
+html body.nd .ann-hero-overlay{background:linear-gradient(to bottom,rgba(6,10,20,0) 0%,rgba(6,10,20,.55) 100%)}
+html body.nd .ann-hero-text h1{font-family:var(--nd-display)!important;font-weight:500;font-size:clamp(34px,4.6vw,58px);text-transform:none;letter-spacing:-.01em;color:#fff;margin-bottom:6px}
+html body.nd .ann-hero-text p{color:var(--nd-doux);font-size:16px;max-width:520px}
+
+html body.nd .ann-stat-band{background:rgba(255,255,255,.03);border-bottom:1px solid var(--nd-bord2)}
+html body.nd .ann-stat-chip{color:var(--nd-texte);border-right:1px solid var(--nd-bord2)}
+html body.nd .ann-stat-icon{background:rgba(227,192,110,.12);border:1px solid var(--nd-bord)}
+
+html body.nd .ann-quick-row{background:transparent;border-bottom:1px solid var(--nd-bord2)}
+html body.nd .ann-quick-btn{background:var(--nd-verre);border:1px solid var(--nd-bord2);color:var(--nd-texte);border-radius:999px;font-weight:600}
+html body.nd .ann-quick-btn:hover{border-color:var(--nd-bord);color:var(--nd-or)}
+html body.nd .ann-quick-btn.active{background:var(--nd-degore);border-color:transparent;color:#1a1202;font-weight:800;box-shadow:0 8px 24px -12px rgba(227,192,110,.6)}
+
+html body.nd .ann-filters{background:rgba(8,13,30,.55);border-bottom:1px solid var(--nd-bord2)}
+html body.nd .ann-filter-group label,html body.nd .ann-filter-label{color:var(--nd-or)!important;letter-spacing:.08em;font-size:10.5px}
+html body.nd .ann-filter-group select,html body.nd .ann-filter-group input[type=text],html body.nd .ann-filters input[type=text],html body.nd .ann-filters input[type=search],html body.nd .ann-filters select{background:var(--nd-verre)!important;background-color:var(--nd-verre)!important;border:1px solid var(--nd-bord2);color:var(--nd-texte)!important;border-radius:12px}
+html body.nd .ann-filter-group select:focus,html body.nd .ann-filter-group input[type=text]:focus,html body.nd .ann-filters input:focus,html body.nd .ann-filters select:focus{border-color:var(--nd-or);box-shadow:0 0 0 3px rgba(227,192,110,.15)}
+html body.nd .ann-filters select option{background:#0B1226;color:#fff}
+html body.nd .ann-sugg-item{color:var(--nd-texte)}
+html body.nd .ann-sugg-item:hover{background:rgba(227,192,110,.12)}
+html body.nd .ann-btn-reset{background:var(--nd-verre);border:1px solid var(--nd-bord2);color:var(--nd-texte);border-radius:12px}
+html body.nd .ann-btn-reset:hover{background:rgba(255,255,255,.09);border-color:var(--nd-bord)}
+html body.nd .ann-search-btn{background:var(--nd-degore);color:#1a1202;border-radius:12px;font-weight:800}
+html body.nd .ann-search-btn:hover{background:var(--nd-degore);filter:brightness(1.06)}
+html body.nd .ann-unique-chk{color:var(--nd-doux)}
+html body.nd #ann-affiner{border-top:1px dashed var(--nd-bord)!important}
+html body.nd .ann-chip{background:rgba(227,192,110,.12);color:var(--nd-or);border:1px solid var(--nd-bord)}
+html body.nd .ann-chip-remove{color:var(--nd-or)}
+html body.nd .ann-chip-remove:hover{background:rgba(227,192,110,.25)}
+
+html body.nd .ann-section-head h2{font-family:var(--nd-display)!important;font-weight:500;font-size:clamp(28px,3.2vw,40px);color:#fff}
+html body.nd .ann-section-head h2::after{background:var(--nd-degore);height:2px;width:56px}
+html body.nd .ann-section-desc,html body.nd .ann-result-count{color:var(--nd-doux)}
+html body.nd .ann-result-count strong,html body.nd .ann-result-count b{color:var(--nd-or)}
+
+html body.nd .ann-ad-col{background:var(--nd-verre);border:1px solid var(--nd-bord2);border-radius:22px}
+html body.nd .ann-ad-vision{color:var(--nd-doux)}
+html body.nd .ann-ad-vision strong{color:#fff}
+
+html body.nd .ann-cta{background:transparent;padding:60px 24px 70px}
+html body.nd .ann-cta-inner{max-width:680px;padding:46px 36px;background:radial-gradient(ellipse at 50% 0%,rgba(227,192,110,.16),transparent 65%),var(--nd-verre);border:1px solid var(--nd-bord);border-radius:28px;box-shadow:0 40px 80px -46px #000}
+html body.nd .ann-cta-icon{background:rgba(227,192,110,.12);border:1px solid var(--nd-bord)}
+html body.nd .ann-cta h3{font-family:var(--nd-display)!important;font-weight:500;font-size:30px;color:#fff}
+html body.nd .ann-cta p{color:var(--nd-doux)}
+html body.nd .ann-cta-btn{background:var(--nd-degore);color:#1a1202;border-radius:999px;font-weight:800;padding:14px 32px;box-shadow:0 12px 32px -12px rgba(227,192,110,.65)}
+html body.nd .ann-cta-btn:hover{background:var(--nd-degore);filter:brightness(1.06)}
+
+@media (max-width:680px){
+  html body.nd .ann-hero{height:150px}
+  html body.nd .ann-hero-text h1{font-size:30px}
+  html body.nd .ann-cta-inner{padding:34px 22px}
+}

@@ -228,3 +228,8 @@ html body.nd .mobile-bottom-nav *{color:var(--nd-doux)!important}
 html body.nd .mobile-bottom-nav a.active,html body.nd .mobile-bottom-nav .active,html body.nd .mobile-bottom-nav [aria-current]{color:var(--nd-or)!important}
 html body.nd .mobile-bottom-nav__arrow{background:var(--nd-verre2)!important;color:#fff!important}
 @media (max-width:560px){#nd-ruban{bottom:auto;top:12px;left:50%;transform:translateX(-50%);max-width:92vw;font-size:11px;padding:7px 12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;text-align:center}#nd-ruban a{display:none}}
+html body.nd .ann-membres{background:rgba(255,255,255,.07)!important;border:1px solid var(--nd-bord2);color:var(--nd-doux)!important}
+html body.nd .don-banner-btn{background:var(--nd-degore)!important;border-radius:999px;box-shadow:0 8px 24px -12px rgba(227,192,110,.6)}
+html body.nd .don-banner-btn,html body.nd .don-banner-btn *{color:#1a1202!important}
+html body.nd #da-back-bar{background:rgba(8,13,30,.88)!important;border-bottom:1px solid var(--nd-bord2)!important;box-shadow:none!important}
+html body.nd #da-back-btn{background:var(--nd-verre)!important;color:var(--nd-texte)!important;border:1px solid var(--nd-bord2)!important;border-radius:999px!important}
