@@ -113,3 +113,7 @@ html body.nd .post-badge{white-space:normal;line-height:1.35;max-width:100%}
 html body.nd .post-auteur-name{flex-wrap:wrap}
 /* Rangée de boutons du profil : elle rétrécit et passe à la ligne au lieu de déborder de la carte */
 html body.nd .pvz-actions{flex:0 1 auto;min-width:0;max-width:100%}
+
+/* Pastilles « Zones d'intervention », « Public concerné », « Recherche actuellement » : fond clair d'origine, encre foncée d'origine */
+html body.nd .pp-tag{color:#1B3A6B!important}
+html body.nd .pp-tag.clickable{color:#78350F!important}

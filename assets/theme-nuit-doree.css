@@ -252,3 +252,17 @@ html body.nd #cx-btn .cx-n{background:rgba(255,255,255,.62)!important}
 html body.nd #cl-switch-btn{color:#1a1202!important}
 html body.nd #logout-link{background:#fff!important;color:#0D2B4E!important;border:0!important;border-radius:999px!important;font-weight:700}
 html body.nd #auth-area a.btn-outline{background:#fff!important;color:#0D2B4E!important;border:0!important}
+
+/* ===== Carte de compte-rendu dans le fil : « .fc-carte * {color:inherit} » écrasait la couleur des liens, boutons et pastilles clairs.
+   Chaque élément clair retrouve une encre foncée explicite (demande du 2026-10-12 : jamais de blanc sur blanc). ===== */
+html body.nd .fc-carte .cr-btn.pri,html body.nd .hp-feed-post .cr-btn.pri{color:#1f0e02!important}
+html body.nd .fc-carte .cr-btn.sec,html body.nd .hp-feed-post .cr-btn.sec,html body.nd .fc-carte .cr-chip,html body.nd .hp-feed-post .cr-chip{color:#0D2B4E!important}
+html body.nd .fc-carte .cr-btn.out,html body.nd .hp-feed-post .cr-btn.out{color:#1f2937!important}
+html body.nd .fc-carte .cr-link,html body.nd .hp-feed-post .cr-link{color:var(--nd-or)!important}
+html body.nd .fc-carte .cr-avec,html body.nd .hp-feed-post .cr-avec{color:var(--nd-doux)!important}
+html body.nd .fc-carte .cr-resume,html body.nd .hp-feed-post .cr-resume{color:var(--nd-texte)!important}
+html body.nd .fc-carte .cr-tag,html body.nd .fc-carte .cr-badge-cr{color:#0D1B2A!important}
+html body.nd .fc-carte .cr-lieu{color:#fff!important}
+html body.nd .fc-carte .cr-etape,html body.nd .fc-carte .cr-etape *{color:#1E293B!important}
+html body.nd .fc-carte .cr-etape .cr-etape-lbl{color:#B84C1A!important}
+html body.nd .fc-carte .cr-etape .cr-etape-date{color:#0F1F35!important}
