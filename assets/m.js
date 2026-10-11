@@ -750,11 +750,22 @@
         <div class="meta">${ic('pin', 's')}<span>${esc([e.lieu, e.ville, e.pays].filter(Boolean).join(', ') || 'En ligne')}</span></div>
         <div class="tags"><span class="badge ${paid ? 'o' : 'g'}">${paid ? (ev.prix_min > 0 ? 'Dès ' + esc(ev.prix_min) + ' €' : 'Payant') : 'Gratuit'}</span>${e.type_evt ? `<span class="badge">${esc(e.type_evt)}</span>` : ''}${e.domaine ? `<span class="badge">${esc(e.domaine)}</span>` : ''}${r.nb_participants ? `<span class="badge">${r.nb_participants} inscrit${r.nb_participants > 1 ? 's' : ''}</span>` : ''}</div>
         ${e.organisateur_nom || ev.organisateur_nom ? `<p class="small muted" style="margin:12px 0 0">Organisé par <b style="color:var(--text)" ${e.owner_user_id ? `data-prof="${esc(e.owner_user_id)}" role="link"` : ''}>${esc(ev.organisateur_nom || e.organisateur_nom)}</b></p>` : ''}</div></div>
+      ${(e.visibilite || 'public') === 'public' ? `<div class="card"><div class="pad" style="text-align:center"><b>${ic('ticket', 's')} QR code de l’événement</b><p class="small muted" style="margin:4px 0 0">Scannez-le pour ouvrir l’événement, ou montrez-le pour le partager.</p><div class="qr" id="ev-qr" role="img" aria-label="QR code de l’événement"></div><div class="row" style="gap:8px"><button type="button" class="btn out sm sp" id="ev-qr-big">${ic('search', 's')} Agrandir</button><button type="button" class="btn out sm sp" id="ev-qr-share">${ic('share', 's')} Partager le lien</button></div></div></div>` : ''}
       ${desc ? `<div class="card"><div class="pad rich" style="white-space:pre-line">${esc(desc)}</div></div>` : ''}
       ${e.lien_visio ? `<a class="btn out block" style="margin-bottom:12px" href="${attrUrl(e.lien_visio)}" target="_blank" rel="noopener">Rejoindre en visio ${ic('out', 's')}</a>` : ''}`;
     setPane(e.titre, html, cta);
     /* Lien public (lisible sans compte) : seulement pour un événement public ; &via = qui partage (aperçu « X vous invite »). */
     if ((e.visibilite || 'public') === 'public') paneShare(location.origin + '/evenements.html?evt=' + encodeURIComponent(id) + (S.me ? '&via=' + S.me.id : '') + '&r=' + jetonPartage(), e.titre);
+    /* QR code de l'événement (2026-10-11, demande explicite) : l'adresse publique, identique pour tous (sans jeton de partage) pour que le code reste valable. */
+    const evUrl = location.origin + '/evenements.html?evt=' + encodeURIComponent(id);
+    const dessinerQR = (el, taille) => { if (!el) return; if (!window.QRCode) { setTimeout(() => dessinerQR(el, taille), 300); return; } el.innerHTML = ''; new QRCode(el, { text: evUrl, width: taille, height: taille, colorDark: '#0D2B4E', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M }); };
+    dessinerQR($('#ev-qr'), 190);
+    const qrBig = $('#ev-qr-big'); if (qrBig) qrBig.onclick = () => {
+      openSheet(`<h3 style="margin:0 0 6px;text-align:center">${esc(e.titre)}</h3><p class="small muted" style="text-align:center;margin:0">Scannez pour ouvrir l’événement</p><div class="qr" id="ev-qr-l" role="img" aria-label="QR code de l’événement" style="margin-top:12px"></div><button type="button" class="btn out block" id="ev-qr-copy">Copier le lien</button>`);
+      dessinerQR($('#ev-qr-l'), 260);
+      $('#ev-qr-copy').onclick = async () => { try { await navigator.clipboard.writeText(evUrl); toast('Lien copié ✓'); } catch (er) { toast(evUrl); } };
+    };
+    const qrShare = $('#ev-qr-share'); if (qrShare) qrShare.onclick = () => partagerLien(evUrl + (S.me ? '&via=' + S.me.id : '') + '&r=' + jetonPartage(), e.titre);
     const j = $('#ev-join'); if (j) j.onclick = async () => {
       if (!(await needLogin('Connectez-vous pour vous inscrire à cet événement.'))) return paneEvent(id);
       j.disabled = true; j.textContent = 'Inscription…';
@@ -878,6 +889,8 @@
     };
   }
   const descPlain = v => strip(v).replace(/\n{3,}/g, '\n\n');
+  /* Origines affichées sur la cartouche : sans les nationalités, sans doublon (insensible à la casse et aux accents). */
+  const annOriginesAff = x => { const vu = new Set(), out = []; [x.origine1, x.origine2, x.owner_origine1, x.owner_origine2, x.pays_origine, x.pays_origine_institution].forEach(v => { const k = normTxt(v); if (k && !vu.has(k)) { vu.add(k); out.push(String(v).trim()); } }); return out; };
   function annCard(it) {
     const x = it.x; let nm, desc, badge, href, photo, uid, loc, kind, fid, key = it.k + x.id;
     loc = [x.ville, x.pays].filter(Boolean).join(', ');
@@ -901,12 +914,76 @@
     const peutAdherer = it.k === 'i' && ['Association', 'ONG'].includes(x.type) && x.adhesions_ouvertes !== false && x.adhesions_ouvertes !== 0 && !(S.me && uid && Number(S.me.id) === Number(uid));
     return `<article class="card ann" data-key="${esc(key)}"><a class="ann-top" href="${href}"><div class="av big" style="border-radius:${it.k === 'u' ? '50%' : '16px'}">${photo ? `<img src="${attrUrl(photo)}" alt="" loading="lazy" onerror="this.remove()">` : esc(initials(nm))}</div>
       <div class="sp"><div class="nm" style="font-weight:700;font-size:16px;line-height:1.2">${esc(nm)}</div>
-      <div class="meta" style="margin:2px 0">${loc ? ic('pin', 's') + '<span class="ell">' + esc(loc) + '</span>' : ''}</div>
       <div class="tags" style="margin:4px 0 0"><span class="badge ${it.k === 'u' ? '' : 'g'}">${esc(badge)}</span>${dom}${note}</div></div></a>
+      <div class="ann-info"><div><span>Origine</span><b>${esc(annOriginesAff(x).join(' · ') || '—')}</b></div><div><span>Pays de résidence</span><b>${esc(x.pays || '—')}</b></div><div><span>Ville de résidence</span><b>${esc(x.ville || '—')}</b></div></div>
       ${desc ? `<div class="ann-desc${open ? ' open' : ''}" data-desc>${esc(desc)}</div>` : ''}
       ${desc ? `<div class="ann-links"><button type="button" class="lnk" data-more hidden aria-expanded="${open}">${open ? 'Voir moins ▴' : 'Voir plus ▾'}</button></div>` : ''}
       <div class="ann-act2"><a class="btn sm out" href="${href}">${ic('user', 's')} Profil public</a><button type="button" class="btn sm out" data-share-ann="${esc(key)}" aria-label="Partager ce profil">${ic('share', 's')} Partager</button>${peutAdherer ? `<button type="button" class="btn sm navy" data-adh="${x.id}" data-nom="${esc(nm)}">${ic('people', 's')} Adhérer</button>` : ''}</div>
+      ${peutAffilier(it, x, uid) ? `<div class="ann-act2" data-aff-zone="${it.k === 'i' ? 'i' : 'u'}:${it.k === 'i' ? x.id : x.id}" data-nom="${esc(nm)}"></div>` : ''}
       <div class="ann-act3">${uid ? `<button type="button" class="btn sm" data-sup="${uid}">${ic('heart', 's')} Soutenir</button><button type="button" class="btn sm out" data-write="${uid}">${ic('chat', 's')} Contacter</button>` : ''}<button type="button" class="btn sm out" data-follow="${fid}" data-kind="${kind}" data-on="0">${ic('bell', 's')} S’abonner</button></div></article>`;
+  }
+  /* « Liaison » = bouton Affiliation des cartouches du site : un compte demande à rejoindre une initiative, ou une initiative invite un membre. */
+  function peutAffilier(it, x, uid) {
+    if (!S.me) return false;
+    if (it.k === 'i') return !(uid && Number(S.me.id) === Number(uid));
+    if (it.k === 'u') return S.me.role === 'initiative' && Number(S.me.id) !== Number(x.id);
+    return false;
+  }
+  const affEtat = (txt, cls) => `<span class="btn sm out aff-etat ${cls || ''}" style="flex:1;cursor:default">${txt}</span>`;
+  const affBtn = (kind, id, nom) => `<button type="button" class="btn sm out" data-aff-go="${kind}:${esc(id)}" data-nom="${esc(nom)}" style="flex:1">${ic('people', 's')} Affiliation</button>`;
+  const affStatutHtml = (st, bouton) => {
+    if (!st) return bouton;
+    if (st.statut === 'accepte') return affEtat('✅ Affilié', 'sub');
+    if (st.statut === 'refuse') return affEtat('❌ Affiliation refusée');
+    return affEtat(st.origine === 'demande' ? '⏳ Demande en attente' : '⏳ Invitation envoyée');
+  };
+  async function hydraterAffiliationsM(racine) {
+    const zones = [...(racine || document).querySelectorAll('[data-aff-zone]:not([data-aff-pret])')];
+    if (!zones.length || !S.me) return;
+    zones.forEach(z => z.setAttribute('data-aff-pret', '1'));
+    const parType = k => zones.filter(z => z.dataset.affZone.startsWith(k + ':'));
+    const ids = k => [...new Set(parType(k).map(z => z.dataset.affZone.split(':')[1]))];
+    const iZ = parType('i'), uZ = parType('u');
+    if (iZ.length) {
+      let st = {}; try { st = (await api('/api/affiliation-statut-initiatives-lot?initiative_ids=' + ids('i').slice(0, 100).join(','))).statuts || {}; } catch (e) { /* le clic vérifiera */ }
+      iZ.forEach(z => { const id = z.dataset.affZone.split(':')[1]; z.innerHTML = affStatutHtml(st[id], affBtn('i', id, z.dataset.nom)); });
+    }
+    if (uZ.length) {
+      let st = {}; try { st = (await api('/api/affiliation-statut-lot?user_ids=' + ids('u').slice(0, 100).join(','))).statuts || {}; } catch (e) { /* le clic vérifiera */ }
+      uZ.forEach(z => {
+        const id = z.dataset.affZone.split(':')[1], s1 = st[id] || {}, ms = s1.mon_statut && s1.mon_statut.statut !== 'accepte' ? s1.mon_statut : null;
+        const aff = (s1.affiliations || []).map(a => `<span class="badge o" style="align-self:center" title="${esc(a.fonction || '')}">🏅 ${esc(a.nom)}</span>`).join('');
+        z.style.flexWrap = 'wrap'; z.innerHTML = aff + affStatutHtml(ms, affBtn('u', id, z.dataset.nom));
+      });
+    }
+  }
+  /* Profil public incomplet : le serveur refuse l'affiliation et liste ce qui manque (même règle que sur le site). */
+  function affProfilIncomplet(er) {
+    const m = er && er.data && Array.isArray(er.data.manquants) ? er.data.manquants : null;
+    if (!m || !m.length) { toast((er && er.message) || 'Action impossible.', true); return; }
+    openSheet(`<h2 style="margin:2px 0 6px;font-size:19px">Complétez votre profil public</h2><p style="margin:0 0 10px">Pour vous affilier, votre profil public doit être mieux rempli. Il manque :</p><div class="lst">${m.map(x => `<a class="li" href="profil.html?id=${encodeURIComponent(S.me.id)}&completer=champ&champ=${encodeURIComponent(x.cle)}&label=${encodeURIComponent(x.label || '')}"><span class="sp"><span class="t">${esc(x.label || x.cle)}</span></span><span class="ch">${ic('chev', 's')}</span></a>`).join('')}</div>`);
+  }
+  const POSTES = ['Président', 'Vice-président', 'Directeur', 'Responsable communication', 'Responsable financier', 'Coordinateur', 'Chef de projet', 'Consultant', 'Développeur', 'Membre', 'Bénévole', 'Partenaire', 'Ambassadeur'];
+  async function affilier(kind, id, nom, btn) {
+    if (!(await needLogin('Connectez-vous pour demander une affiliation.'))) return;
+    if (kind === 'i') {
+      if (btn) btn.disabled = true;
+      try { await api(`/api/initiatives/${encodeURIComponent(id)}/demande-affiliation`, { method: 'POST' }); toast('Demande d’affiliation envoyée ✓'); if (btn && btn.parentNode) btn.parentNode.innerHTML = affEtat('⏳ Demande en attente'); }
+      catch (er) { if (btn) btn.disabled = false; if (er.status === 403 && er.data && er.data.manquants) affProfilIncomplet(er); else toast(er.message, true); }
+      return;
+    }
+    const close = openSheet(`<h2 style="margin:2px 0 4px;font-size:19px">Affilier ${esc(nom)}</h2><p class="small muted" style="margin:0 0 8px">Invitez ce compte à rejoindre officiellement votre initiative en tant que membre affilié.</p>
+      <label class="fl" for="af-poste">Poste / fonction (facultatif)</label><select class="fi" id="af-poste"><option value="">— Choisir —</option>${POSTES.map(p => `<option>${esc(p)}</option>`).join('')}<option value="__autre">Autre (préciser)…</option></select>
+      <input class="fi" id="af-autre" placeholder="Préciser le poste…" style="display:none;margin-top:8px">
+      <label class="fl" for="af-msg">Message (facultatif)</label><textarea class="fi" id="af-msg" rows="3"></textarea>
+      <button type="button" class="btn block" id="af-go" style="margin-top:14px">Envoyer l’invitation</button>`);
+    $('#af-poste').onchange = () => { $('#af-autre').style.display = $('#af-poste').value === '__autre' ? '' : 'none'; };
+    $('#af-go').onclick = async () => {
+      const go = $('#af-go'); go.disabled = true; go.textContent = 'Envoi…';
+      const ps = $('#af-poste').value, fonction = ps === '__autre' ? $('#af-autre').value.trim() : ps, message = $('#af-msg').value.trim();
+      try { await api(`/api/annuaire/inviter-affiliation/${encodeURIComponent(id)}`, { method: 'POST', body: { fonction: fonction || null, message: message || null } }); close(); toast('Invitation envoyée ✓'); if (btn && btn.parentNode) btn.parentNode.innerHTML = affEtat('⏳ Invitation envoyée'); }
+      catch (er) { go.disabled = false; go.textContent = 'Envoyer l’invitation'; if (er.status === 403 && er.data && er.data.manquants) { close(); affProfilIncomplet(er); } else toast(er.message, true); }
+    };
   }
   function paintAnnuaire() {
     const l = $('#ann-list'); if (!l) return;
@@ -918,7 +995,7 @@
     const n = $('#ann-next'); if (n) n.onclick = () => { S.ann.shown += 30; paintAnnuaire(); };
     /* « Voir plus » n'apparaît que si la description dépasse 3 lignes. */
     $$('[data-desc]', l).forEach(d => { const b = d.parentNode.querySelector('[data-more]'); if (b && (d.classList.contains('open') || d.scrollHeight > d.clientHeight + 2)) b.hidden = false; });
-    hydraterAdhesionsM(l);
+    hydraterAdhesionsM(l); hydraterAffiliationsM(l);
   }
   /* Adhérer : comme le site — formules de cotisation configurées => choix de la formule puis page d'adhésion (paiement) ; sinon simple demande à la structure. */
   const PERIODE = { cotisation_mensuelle: 'par mois', cotisation_trimestrielle: 'par trimestre', cotisation_semestrielle: 'par semestre', cotisation_annuelle: 'par an' };
@@ -974,6 +1051,8 @@
     if (shA) { e.preventDefault(); const s = (S.annShare || {})[shA.dataset.shareAnn]; if (s) partagerLien(location.origin + s.path + '&r=' + jetonPartage(), s.nm); return; }
     const shE = e.target.closest('[data-share-ev]');
     if (shE) { e.preventDefault(); e.stopPropagation(); partagerLien(location.origin + '/evenements.html?evt=' + encodeURIComponent(shE.dataset.shareEv) + (S.me ? '&via=' + S.me.id : '') + '&r=' + jetonPartage(), shE.dataset.shareTitre || 'Événement Diaspo’Actif'); return; }
+    const af = e.target.closest('[data-aff-go]');
+    if (af) { const [k, i] = af.dataset.affGo.split(':'); affilier(k, i, af.dataset.nom || 'ce compte', af); return; }
     const ad = e.target.closest('[data-adh]');
     if (ad) { adherer(ad.dataset.adh, ad.dataset.nom || 'cette structure', ad); return; }
     const more = e.target.closest('.ann [data-more]');

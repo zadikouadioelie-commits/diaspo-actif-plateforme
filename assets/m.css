@@ -485,3 +485,10 @@ button.li{background:none;font:inherit;color:inherit}
 .pub-badge{background:#EEF2FF;color:var(--navy2,#1B3A6B);font-size:11px;font-weight:800}
 .pub-t{font-weight:800;font-size:16px;line-height:1.25;margin:8px 0 2px}
 .pub-d{margin:0 0 10px}
+/* Cartouches de l'annuaire : origine / pays / ville de résidence en clair (2026-10-11) */
+.ann-info{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:2px 14px 10px}
+.ann-info div{min-width:0;background:var(--bg);border-radius:10px;padding:6px 8px}
+.ann-info span{display:block;font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.02em}
+.ann-info b{display:block;font-size:13px;line-height:1.25;word-break:break-word;margin-top:1px}
+.ann-act2 .aff-etat{display:inline-flex;align-items:center;justify-content:center;background:var(--bg);color:var(--muted);border:1px solid var(--border)}
+.ann-act2 .aff-etat.sub{background:var(--green-l);border-color:var(--green);color:var(--green)}
