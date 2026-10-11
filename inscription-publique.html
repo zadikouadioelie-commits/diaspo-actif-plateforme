@@ -52,9 +52,15 @@
 .ip-cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;font-size:13px;font-weight:700;text-transform:capitalize;}
 .ip-cal-nav{background:none;border:1px solid oklch(0.88 0.004 30);border-radius:6px;cursor:pointer;font-size:13px;color:oklch(0.4 0.006 30);width:24px;height:24px;line-height:1;padding:0;}
 .ip-cal-nav:disabled{opacity:.35;cursor:default;}
-.ip-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;text-align:center;}
+/* minmax(0,1fr), pas juste 1fr (2026-10-11, bug réel signalé, capture à l'appui : "le calendrier
+   déborde") : les jours avec événement sont des <button>, dont la largeur minimale intrinsèque
+   (style natif du navigateur) ne rétrécit jamais sous "1fr" tout seul — ça forçait toute la
+   colonne (et donc chaque ligne, les pistes de la grille étant partagées) à déborder de
+   l'encadré par-dessus la colonne de droite. min-width:0 sur chaque cellule en renfort, pour les
+   mêmes raisons. */
+.ip-cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;text-align:center;}
 .ip-cal-dow{font-size:10px;color:oklch(0.55 0.006 30);font-weight:600;padding-bottom:4px;}
-.ip-cal-day{font-size:12px;padding:6px 0;border-radius:6px;color:oklch(0.35 0.006 30);position:relative;}
+.ip-cal-day{font-size:12px;padding:6px 0;border-radius:6px;color:oklch(0.35 0.006 30);position:relative;min-width:0;}
 .ip-cal-day.empty{visibility:hidden;}
 .ip-cal-day.has-event{background:oklch(0.94 0.05 258);color:oklch(0.32 0.09 258);font-weight:700;cursor:pointer;border:none;font-family:inherit;}
 .ip-cal-day.has-event:hover{background:oklch(0.88 0.07 258);}
@@ -421,6 +427,15 @@ function ipOuvrirType(typeId) {
   const type = IP_TYPES.find(t => Number(t.id) === Number(typeId));
   if (!type || type.complet || type.periode_ouverte === false) return;
   IP_TYPE_ACTIF = type;
+  /* Doublon E-mail/Téléphone (2026-10-11, demande explicite, capture à l'appui) : certains
+     organisateurs ajoutent leur propre champ personnalisé "Adresse e-mail"/"Numéro de téléphone"
+     (type_champ email/telephone) en plus des deux champs génériques toujours affichés — la
+     personne voit alors deux fois la même question. Quand un tel champ personnalisé existe pour
+     ce type, le générique correspondant est masqué et c'est la réponse au champ personnalisé qui
+     alimente email/téléphone à la soumission (voir ipSoumettre) : zéro perte de billet/e-mail de
+     confirmation, juste une question en moins à l'écran. */
+  const ipChampEmailPerso = type.champs.find(c => c.type_champ === 'email');
+  const ipChampTelPerso = type.champs.find(c => c.type_champ === 'telephone');
   window.ipUploadValues = {};
   window.ipRepeatableValues = {};
   const evtChoix = IP_EVENEMENTS.length > 1 ? `
@@ -441,8 +456,8 @@ function ipOuvrirType(typeId) {
       ${evtChoix}
       <div class="ip-champ"><label>Nom <span class="ip-oblig">*</span></label><input type="text" name="__nom" required></div>
       <div class="ip-champ"><label>Prénom <span class="ip-oblig">*</span></label><input type="text" name="__prenom" required></div>
-      <div class="ip-champ"><label>E-mail</label><input type="email" name="__email"></div>
-      <div class="ip-champ"><label>Téléphone</label><input type="tel" name="__telephone"></div>
+      ${ipChampEmailPerso ? '' : `<div class="ip-champ"><label>E-mail</label><input type="email" name="__email"></div>`}
+      ${ipChampTelPerso ? '' : `<div class="ip-champ"><label>Téléphone</label><input type="tel" name="__telephone"></div>`}
       ${type.champs.map(ipChampHtml).join('')}
       <div id="ip-erreur" style="color:oklch(0.5 0.16 20);font-size:13px;margin-bottom:12px;display:none;"></div>
       ${IP_APERCU
@@ -503,6 +518,10 @@ async function ipSoumettre(ev) {
     reponses[nom] = complets;
   }
   if (repetableProbleme) { errEl.textContent = repetableProbleme; errEl.style.display = 'block'; return false; }
+  // Champ E-mail/Téléphone générique masqué (voir ipOuvrirType) : la réponse au champ
+  // personnalisé équivalent sert alors d'e-mail/téléphone pour la confirmation et le billet.
+  if (!email) { const c = IP_TYPE_ACTIF.champs.find(c => c.type_champ === 'email'); if (c) email = reponses[c.nom]; }
+  if (!telephone) { const c = IP_TYPE_ACTIF.champs.find(c => c.type_champ === 'telephone'); if (c) telephone = reponses[c.nom]; }
   const btn = form.querySelector('button[type=submit]');
   btn.disabled = true; btn.textContent = 'Envoi…';
   try {
