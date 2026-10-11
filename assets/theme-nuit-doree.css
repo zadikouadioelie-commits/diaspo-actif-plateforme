@@ -152,6 +152,13 @@ html body.nd .hp-feed-time,html body.nd .hp-feed-content{color:var(--nd-doux)!im
 html body.nd .hp-feed-more{color:var(--nd-or)!important}
 html body.nd .fc-band{background:var(--nd-degore)!important;color:#1a1202!important}
 html body.nd .fc-band *{color:#1a1202!important}
+/* Fil d'actualité : le thème doré ne repeint plus les cartouches — compte-rendu BLEU pailleté, autres publications VERT pailleté (2026-10-11, demande explicite) */
+html body.nd .fc-cr .fc-band{background:linear-gradient(135deg,#0A2F7A 0%,#1558C8 45%,#2E8BFF 100%)!important;color:#fff!important}
+html body.nd .fc-cr .fc-band *{color:#fff!important}
+html body.nd .fc-actu .fc-band{background:linear-gradient(135deg,#166534 0%,#15803d 45%,#22c55e 100%)!important;color:#fff!important}
+html body.nd .fc-actu .fc-band *{color:#fff!important}
+html body.nd .fc-carte.fc-cr{border:2px solid #1558C8!important;box-shadow:0 0 0 3px rgba(21,88,200,.22),0 26px 54px -34px #000!important}
+html body.nd .fc-carte.fc-actu{border:2px solid #15803d!important;box-shadow:0 0 0 3px rgba(21,128,61,.22),0 26px 54px -34px #000!important}
 html body.nd .hp-feed-actions{border-top:1px solid var(--nd-bord2)!important}
 html body.nd .hp-feed-action-btn{background:var(--nd-verre)!important;border:1px solid var(--nd-bord2)!important;color:var(--nd-doux)!important;border-radius:999px!important}
 html body.nd .hp-feed-cta{background:var(--nd-verre)!important;border:1px solid var(--nd-bord)!important;border-radius:22px!important;}
