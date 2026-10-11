@@ -495,3 +495,8 @@ button.li{background:none;font:inherit;color:inherit}
 /* Bouton « Adhérer » : sur sa propre ligne, texte à la ligne si besoin (« Adhésion bientôt disponible » débordait de la cartouche) */
 .ann-act2{flex-wrap:wrap}
 .ann-act2 .btn[data-adh]{flex:1 1 100%;white-space:normal;text-align:center;line-height:1.25;height:auto;min-height:40px;padding-top:6px;padding-bottom:6px}
+/* Mêmes couleurs que sur ordinateur : Adhérer en violet, Soutenir en vert (assets/annuaire-cards.css, assets/soutenir.js) */
+.btn[data-adh]:not(.adh-bientot){background:#7C3AED;border-color:#7C3AED;color:#fff}
+.btn[data-adh]:not(.adh-bientot):active{background:#6D28D9;border-color:#6D28D9}
+.btn[data-sup],.btn[data-soutenir-owner]{background:#16A34A;border-color:#16A34A;color:#fff}
+.btn[data-sup]:active,.btn[data-soutenir-owner]:active{background:#15803D;border-color:#15803D}
