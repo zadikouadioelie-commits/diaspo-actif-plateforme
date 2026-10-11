@@ -1791,10 +1791,12 @@ function renderModalLiaison() {
   if (!state.modalLiaisonOuvert) return '';
   const fiche = state.ficheDetail?.fiche;
   if (!fiche) return '';
-  const dejaLies = new Set((state.ficheDetail?.evenements || []).map(e => e.id));
+  /* Number() des deux côtés (2026-10-11) : en production (Postgres) les id reviennent en chaîne ("6"), jamais en nombre — la même
+     comparaison stricte dans le gestionnaire ci-dessous ne retrouvait donc pas l'événement déjà lié et « Délier » le re-liait. */
+  const dejaLies = new Set((state.ficheDetail?.evenements || []).map(e => Number(e.id)));
   const mesEvenements = state.mesEvenements || [];
   const cartouches = mesEvenements.length ? mesEvenements.map(e => {
-    const lie = dejaLies.has(e.id);
+    const lie = dejaLies.has(Number(e.id));
     const cover = e.image_couverture || e.image_url || null;
     return `
       <div style="background:#fff; border:1.5px solid ${lie ? 'oklch(0.32 0.09 258)' : 'oklch(0.9 0.004 30)'}; border-radius:12px; overflow:hidden;">
@@ -1804,7 +1806,10 @@ function renderModalLiaison() {
         <div style="padding:12px 14px;">
           <div style="font-weight:700; font-size:13px; margin-bottom:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escH(e.titre)}</div>
           <div style="font-size:11px; color:oklch(0.55 0.006 30); margin-bottom:10px;">📅 ${escH(e.date_evt || 'Date à définir')}${e.ville ? ' · 📍 ' + escH(e.ville) : ''}</div>
-          <button data-action="toggleLiaisonEvenementModal" data-evt-id="${e.id}" style="width:100%; background:${lie ? '#fff' : 'oklch(0.32 0.09 258)'}; border:1px solid ${lie ? 'oklch(0.8 0.006 30)' : 'oklch(0.32 0.09 258)'}; color:${lie ? 'oklch(0.2 0.006 30)' : '#fff'}; font-size:11.5px; font-weight:600; padding:8px; border-radius:8px; cursor:pointer;">${lie ? '✅ Lié — Délier' : '🔗 Lier à cet événement'}</button>
+          ${lie ? `
+          <div style="font-size:11.5px; font-weight:700; color:#15803D; margin-bottom:6px;">✅ Lié à cette fiche</div>
+          <button data-action="toggleLiaisonEvenementModal" data-evt-id="${e.id}" data-evt-titre="${escH(e.titre)}" title="Retire le lien : le bouton « S'inscrire » de cet événement reprend le parcours classique" style="width:100%; background:#fff; border:1.5px solid #DC2626; color:#DC2626; font-size:11.5px; font-weight:700; padding:8px; border-radius:8px; cursor:pointer;">⛓ Délier cet événement</button>`
+          : `<button data-action="toggleLiaisonEvenementModal" data-evt-id="${e.id}" style="width:100%; background:oklch(0.32 0.09 258); border:1px solid oklch(0.32 0.09 258); color:#fff; font-size:11.5px; font-weight:600; padding:8px; border-radius:8px; cursor:pointer;">🔗 Lier à cet événement</button>`}
         </div>
       </div>`;
   }).join('') : `<div style="grid-column:1/-1; text-align:center; padding:30px 10px; color:oklch(0.55 0.006 30); font-size:13px;">Aucun événement créé sur votre compte — <a href="evenements.html" target="_blank" rel="noopener" style="color:oklch(0.32 0.09 258); font-weight:600;">créez-en un →</a> pour pouvoir le lier.</div>`;
@@ -3262,8 +3267,9 @@ const actions = {
   // ajouter/retirer que celui-ci.
   async toggleLiaisonEvenementModal(el) {
     const evtId = parseInt(el.dataset.evtId);
-    const dejaLies = (state.ficheDetail?.evenements || []).map(e => e.id);
+    const dejaLies = (state.ficheDetail?.evenements || []).map(e => Number(e.id));
     const lieDeja = dejaLies.includes(evtId);
+    if (lieDeja && !confirm(`Délier « ${el.dataset.evtTitre || 'cet événement'} » de cette fiche ?\n\nSon bouton « S'inscrire » reprendra le parcours d'inscription classique.`)) return;
     const nouveaux = lieDeja ? dejaLies.filter(id => id !== evtId) : [...dejaLies, evtId];
     try {
       await api('PUT', `/insc/fiches/${state.selectedFicheId}`, { evenement_ids: nouveaux });
