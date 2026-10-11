@@ -456,7 +456,7 @@ const THEME_VITRINE_LABELS = { bordeaux:'Bordeaux', ocean:'Ocean', emeraude:'Eme
       <!-- ===== BOTTOM STRIP ===== -->
       <div class="init-strip">
         <div class="init-strip-item">
-          <div class="strip-icon">🌍</div>
+          <div class="strip-icon">${(window.daDrapeauListe && daDrapeauListe(window.daOrigineDeclaree ? daOrigineDeclaree(init) : '')) || '🌍'}</div>
           <div>
             <div class="strip-label">Origine</div>
             <!-- Ce bandeau affichait les NATIONALITÉS sous l'étiquette « Origine » : deux
@@ -467,7 +467,7 @@ const THEME_VITRINE_LABELS = { bordeaux:'Bordeaux', ocean:'Ocean', emeraude:'Eme
           </div>
         </div>
         <div class="init-strip-item">
-          <div class="strip-icon">📍</div>
+          <div class="strip-icon">${(window.daDrapeauImg && daDrapeauImg(init.pays)) || '📍'}</div>
           <div>
             <div class="strip-label">Pays de résidence</div>
             <div class="strip-val">${localisation || 'Non renseigné'}</div>
@@ -1368,8 +1368,8 @@ const THEME_VITRINE_LABELS = { bordeaux:'Bordeaux', ocean:'Ocean', emeraude:'Eme
   <script src="/assets/theme-manager.js"></script>
 <script src="assets/back-button.js"></script>
 <!-- Design « Nuit dorée » (2026-10-11) : surcharges chargées en dernier, tout est préfixé body.nd ; retour arrière : retirer ces 2 lignes et class="nd" sur <body> -->
-<link rel="stylesheet" href="/assets/theme-nuit-doree.css?v=4">
-<link rel="stylesheet" href="/assets/profil-nuit-doree.css?v=6">
+<link rel="stylesheet" href="/assets/theme-nuit-doree.css?v=6">
+<link rel="stylesheet" href="/assets/profil-nuit-doree.css?v=7">
 </body>
 </html>
 

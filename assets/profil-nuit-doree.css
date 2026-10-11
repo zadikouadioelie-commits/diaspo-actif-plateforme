@@ -89,3 +89,27 @@ html body.nd .breadcrumb a{color:var(--nd-or)}
 
 /* textes sombres posés en ligne (#0D1B2A, marine…) à l'intérieur des cartes de profil */
 html body.nd :is(.avz-card,.cda-card,.pvz-card,.pp-side-card,.side-card,.init-section,.pc-card,.post-card,.ts-card) :is([style*="color:#0D1B2A" i],[style*="color:#0D2B4E" i],[style*="color:#1B3A6B" i],[style*="color:var(--navy)"],[style*="color:var(--text)"],[style*="color: #0D1B2A" i]){color:var(--nd-texte)!important}
+
+/* ===== Corrections du 2026-10-11 (retours d'usage) ===== */
+/* Panneau « Confidentialité » (fond blanc, ligne de rubriques, vérification d'identité, zone de danger) : encre bleu très foncé */
+html body.nd .privacy-section{color:#0D2B4E}
+html body.nd .privacy-section :is(.privacy-label,.p-sec-hd h3,strong,.privacy-select){color:#0D2B4E!important}
+html body.nd .privacy-section h3:not([style*="color"]){color:#0D2B4E!important}
+html body.nd .pvz-card .privacy-section :is(.privacy-sub,p,.codes-sub,label){color:#475569!important}
+html body.nd .privacy-section p:not([style*="color:#dc2626"]){color:#475569!important}
+/* Étiquettes des formulaires dans les cartes sombres */
+html body.nd :is(.pp-side-card,.side-card,.init-section,.cda-box) label{color:var(--nd-doux)!important}
+html body.nd .avz-link-btn{color:#FCA5A5!important}
+/* Cartes d'événement : ce sont des <a> que responsive.v2.css passe en inline-flex → l'image était écrasée à gauche et la carte rétrécie
+   (terminés comme à venir). On rétablit la carte verticale : image en haut, texte dessous, même taille pour tous les événements. */
+html body.nd a.evt-card{display:block!important;width:auto}
+html body.nd .evt-card .evt-img{width:100%;height:130px}
+html body.nd .evt-card-termine:before{opacity:.3}
+/* En-tête des publications : le nom ne s'écrase plus quand les pastilles (type, adresse…) sont longues — elles passent à la ligne */
+html body.nd .post-header{flex-wrap:wrap;gap:8px 12px}
+html body.nd .post-auteur-link{flex:1 1 230px}
+html body.nd .post-header-right{flex:1 1 auto;min-width:0;flex-wrap:wrap;justify-content:flex-end}
+html body.nd .post-badge{white-space:normal;line-height:1.35;max-width:100%}
+html body.nd .post-auteur-name{flex-wrap:wrap}
+/* Rangée de boutons du profil : elle rétrécit et passe à la ligne au lieu de déborder de la carte */
+html body.nd .pvz-actions{flex:0 1 auto;min-width:0;max-width:100%}

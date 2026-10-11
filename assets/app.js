@@ -2159,6 +2159,24 @@ function daDrapeau(pays) {
   return String.fromCodePoint(...[...iso.toUpperCase()].map(c => 0x1F1E6 + c.charCodeAt(0) - 65));
 }
 
+/* Drapeau en miniature, dans un petit rectangle (2026-10-11, demande explicite) : vraie image (flagcdn) et non l'emoji, que Windows
+   n'affiche pas (il rend « FR » en lettres). Renvoie '' si le pays n'est pas reconnu — l'appelant garde alors son icône d'origine. */
+function daDrapeauImg(pays) {
+  const brut = String(pays || '').replace(/&#39;|&apos;/g, "'").replace(/&amp;/g, '&').trim();
+  if (!brut) return '';
+  const n = _daNorm(brut);
+  let iso = DA_PAYS_ISO[n];
+  if (!iso) { for (const [k, v] of Object.entries(DA_PAYS_ISO)) { if (_daNorm(k) === n) { iso = v; break; } } }
+  if (!iso || !/^[a-z]{2}$/i.test(iso)) return '';
+  iso = iso.toLowerCase();
+  const nom = brut.replace(/[<>"&]/g, '');
+  return '<img class="da-flag" src="https://flagcdn.com/24x18/' + iso + '.png" srcset="https://flagcdn.com/48x36/' + iso + '.png 2x" width="20" height="15" alt="' + nom + '" title="' + nom + '" loading="lazy" style="width:20px;height:15px;object-fit:cover;border-radius:2px;border:1px solid rgba(120,130,150,.55);vertical-align:-2px;margin-right:5px;flex:none">';
+}
+/* Plusieurs pays séparés par « · », « • », « , » ou « / » : un drapeau chacun. */
+function daDrapeauListe(txt) {
+  return String(txt || '').split(/\s*[·•,\/]\s*/).map(daDrapeauImg).filter(Boolean).join('');
+}
+
 /* Renvoie { pays, source } — ou null si rien n'est disponible.
 
    Le repli sur la nationalité vaut pour TOUS les comptes. L'annuaire les expose déjà à
@@ -2213,7 +2231,7 @@ function daBadgeOrigine(o, style) {
     : `Nationalité : ${org.pays} — origine non renseignée par ce compte`;
   const opacite = org.source === 'origine' ? '1' : '.82';
   return `<span class="ann-origine-badge" title="${(titre||'').replace(/"/g,'&quot;')}" style="opacity:${opacite};${style||''}">
-    <span style="font-size:14px;line-height:1;">${daDrapeau(premier)}</span>${escapeHtml(org.pays)}</span>`;
+    <span style="display:inline-flex;align-items:center;font-size:14px;line-height:1;">${daDrapeauListe(org.pays) || daDrapeau(premier)}</span>${escapeHtml(org.pays)}</span>`;
 }
 
 /* ── Abonnement à un compte Initiative/Collectivité/Institutionnel depuis une cartouche
@@ -2552,7 +2570,7 @@ function renderInitiativeCard(it){
         ${rayHtml}
         ${membres}
       </div>
-      ${origs ? `<div class="ann-card-origs">🌍 <strong>Origines :</strong> ${origs}</div>` : ''}
+      ${origs ? `<div class="ann-card-origs">${daDrapeauListe(origs) || '🌍'} <strong>Origines :</strong> ${origs}</div>` : ''}
       <div class="ann-card-nats">🏛 <strong>Nationalités :</strong> ${nats}</div>
       ${domaineLigne ? `<div class="ann-card-origs">🎯 <strong>Domaine d'activité :</strong> ${domaineLigne}</div>` : ''}
       ${sousDomaineLigne ? `<div class="ann-card-origs">${sousDomaineLigne}</div>` : ''}
@@ -2934,7 +2952,7 @@ function renderPersonCard(u) {
       <div class="ann-card-title">${nom}</div>
       ${annAvisBadgeHtml(u)}
       <div class="ann-card-meta-row" style="justify-content:center;"><span class="ann-card-loc">📍 ${loc}</span></div>
-      ${origs ? `<div class="ann-card-origs">🌍 <strong>Origines :</strong> ${origs}</div>` : ''}
+      ${origs ? `<div class="ann-card-origs">${daDrapeauListe(origs) || '🌍'} <strong>Origines :</strong> ${origs}</div>` : ''}
       <div class="ann-card-nats">🏛 <strong>Nationalités :</strong> ${nats}</div>
       ${domaineLigneUser ? `<div class="ann-card-origs">🎯 <strong>Domaine d'activité :</strong> ${domaineLigneUser}</div>` : ''}
       ${sousDomaineLigneUser ? `<div class="ann-card-origs">${sousDomaineLigneUser}</div>` : ''}
@@ -3009,7 +3027,7 @@ async function initAnnuaire(){
         <div class="ann-card-title">${nomAffiche}</div>
         ${annAvisBadgeHtml(o)}
         <div class="ann-card-meta-row" style="justify-content:center;"><span class="ann-card-loc">📍 ${loc}</span></div>
-        ${daOrigineDeclaree(o) ? `<div class="ann-card-origs">🌍 <strong>Origine :</strong> ${daOrigineDeclaree(o)}</div>` : ''}
+        ${daOrigineDeclaree(o) ? `<div class="ann-card-origs">${daDrapeauListe(daOrigineDeclaree(o)) || '🌍'} <strong>Origine :</strong> ${daOrigineDeclaree(o)}</div>` : ''}
         ${responsableNom ? `<div class="ann-card-responsable">👤 Responsable : ${responsableNom}${o.fonction_responsable_etatique ? ` — ${o.fonction_responsable_etatique}` : ''}</div>` : ''}
         ${o.bio ? `<div class="ann-card-desc">${o.bio}</div>` : ''}
         <div class="ann-card-foot" onclick="event.stopPropagation()">
@@ -3452,8 +3470,8 @@ function renderVitrineCard(v) {
      bleu jusqu'ici, faciles à manquer à côté des badges/produits. Chips pleines avec la couleur
      du thème de la boutique, même logique que les pastilles de type/domaine juste au-dessus. */
   const locs = [];
-  if (v.origine1) locs.push(`<span class="vit-loc-chip">${daDrapeau(v.origine1)} Origine : ${escapeHtml(v.origine1)}</span>`);
-  if (v.pays) locs.push(`<span class="vit-loc-chip">${daDrapeau(v.pays)} Résidence : ${escapeHtml(v.pays)}</span>`);
+  if (v.origine1) locs.push(`<span class="vit-loc-chip">${daDrapeauImg(v.origine1) || daDrapeau(v.origine1)} Origine : ${escapeHtml(v.origine1)}</span>`);
+  if (v.pays) locs.push(`<span class="vit-loc-chip">${daDrapeauImg(v.pays) || daDrapeau(v.pays)} Résidence : ${escapeHtml(v.pays)}</span>`);
   const noteHtml = v.nb_avis > 0 ? `<div class="vit-card-note">⭐ ${v.note_moyenne} (${v.nb_avis} avis)</div>` : '';
   const domainesSecondairesHtml = (v.domaines_secondaires||[]).length
     ? `<div style="display:flex;gap:5px;flex-wrap:wrap;margin:2px 0 6px;">${(v.domaines_secondaires||[]).map(d=>`<span style="font-size:10.5px;font-weight:700;color:var(--muted);background:var(--bg);border-radius:20px;padding:2px 8px;">${escapeHtml(d)}</span>`).join('')}</div>`

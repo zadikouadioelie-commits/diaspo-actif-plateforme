@@ -233,3 +233,22 @@ html body.nd .don-banner-btn{background:var(--nd-degore)!important;border-radius
 html body.nd .don-banner-btn,html body.nd .don-banner-btn *{color:#1a1202!important}
 html body.nd #da-back-bar{background:rgba(8,13,30,.88)!important;border-bottom:1px solid var(--nd-bord2)!important;box-shadow:none!important}
 html body.nd #da-back-btn{background:var(--nd-verre)!important;color:var(--nd-texte)!important;border:1px solid var(--nd-bord2)!important;border-radius:999px!important}
+
+/* ===== Corrections du 2026-10-11 (retours d'usage) : encre sombre sur toute cartouche claire ===== */
+/* Barre du haut : nombre d'appareils connectés, bouton ▾ et bouton de connexion/déconnexion */
+html body.nd .cx-btn,html body.nd .cx-btn *{color:#0D1B2A!important}
+html body.nd .cx-btn .cx-n{background:rgba(255,255,255,.62)!important;font-weight:800}
+html body.nd .cl-switch-btn{color:#1a1202!important}
+html body.nd .topbar a.btn-outline,html body.nd #auth-area a.btn-outline{background:#fff!important;color:#0D2B4E!important;border:0!important;border-radius:999px!important;font-weight:700}
+/* Pastilles et cartouches claires : encre bleu très foncé (jamais de blanc sur blanc) */
+html body.nd :is(.cda-ci-item,.pvz-interest-chip,.cr-tag,.cr-badge-cr){color:#0D1B2A!important}
+html body.nd .cda-ci-item .cda-ci-n{color:#4F46E5!important}
+html body.nd .cr-etape,html body.nd .cr-etape *{color:#1E293B!important}
+html body.nd .cr-etape .cr-etape-lbl{color:#B84C1A!important}
+html body.nd .cr-etape .cr-etape-date{color:#0F1F35!important}
+/* Sélecteurs par identifiant : une règle de design-upgrade.v2.css (« .topbar :not(…) » en !important) impose sinon le blanc */
+html body.nd #cx-btn,html body.nd #cx-btn *{color:#0D1B2A!important}
+html body.nd #cx-btn .cx-n{background:rgba(255,255,255,.62)!important}
+html body.nd #cl-switch-btn{color:#1a1202!important}
+html body.nd #logout-link{background:#fff!important;color:#0D2B4E!important;border:0!important;border-radius:999px!important;font-weight:700}
+html body.nd #auth-area a.btn-outline{background:#fff!important;color:#0D2B4E!important;border:0!important}

@@ -2245,10 +2245,10 @@ function renderVisitorProfile() {
   const origs = [profil.origine1, profil.origine2].filter(Boolean).join(' • ');
   const chips = [];
   if (profil.titre_pro) chips.push(`<span class="pvz-chip">💼 ${esc(profil.titre_pro)}</span>`);
-  if (profil.pays)      chips.push(`<span class="pvz-chip">🌍 ${esc(profil.pays)}</span>`);
+  if (profil.pays)      chips.push(`<span class="pvz-chip">${(window.daDrapeauImg && daDrapeauImg(profil.pays)) || '🌍'} ${esc(profil.pays)}</span>`);
   if (profil.ville)     chips.push(`<span class="pvz-chip">📍 ${esc(profil.ville)}</span>`);
   if (nats)             chips.push(`<span class="pvz-chip">🏛 Nationalité : ${esc(nats)}</span>`);
-  if (origs)            chips.push(`<span class="pvz-chip">🗺️ Origine : ${esc(origs)}</span>`);
+  if (origs)            chips.push(`<span class="pvz-chip">${(window.daDrapeauListe && daDrapeauListe(origs)) || '🗺️'} Origine : ${esc(origs)}</span>`);
   /* Domaine d'activité (2026-09-23, demande explicite, "même endroit" que la version déjà
      construite pour le rôle utilisateur sur assets/carte-diaspoactif.js) — même champ serveur
      (PUT /api/profil, domaine_principal/sous_domaine_1/sous_domaine_2), porté ici par
@@ -9406,8 +9406,8 @@ init();
   <script src="/assets/theme-manager.js"></script>
 <script src="assets/back-button.js"></script>
 <!-- Design « Nuit dorée » (2026-10-11) : surcharges chargées en dernier, tout est préfixé body.nd ; retour arrière : retirer ces 2 lignes et class="nd" sur <body> -->
-<link rel="stylesheet" href="/assets/theme-nuit-doree.css?v=4">
-<link rel="stylesheet" href="/assets/profil-nuit-doree.css?v=6">
+<link rel="stylesheet" href="/assets/theme-nuit-doree.css?v=6">
+<link rel="stylesheet" href="/assets/profil-nuit-doree.css?v=7">
 </body>
 </html>
 
