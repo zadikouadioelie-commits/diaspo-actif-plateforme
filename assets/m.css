@@ -492,3 +492,6 @@ button.li{background:none;font:inherit;color:inherit}
 .ann-info b{display:block;font-size:13px;line-height:1.25;word-break:break-word;margin-top:1px}
 .ann-act2 .aff-etat{display:inline-flex;align-items:center;justify-content:center;background:var(--bg);color:var(--muted);border:1px solid var(--border)}
 .ann-act2 .aff-etat.sub{background:var(--green-l);border-color:var(--green);color:var(--green)}
+/* Bouton « Adhérer » : sur sa propre ligne, texte à la ligne si besoin (« Adhésion bientôt disponible » débordait de la cartouche) */
+.ann-act2{flex-wrap:wrap}
+.ann-act2 .btn[data-adh]{flex:1 1 100%;white-space:normal;text-align:center;line-height:1.25;height:auto;min-height:40px;padding-top:6px;padding-bottom:6px}
