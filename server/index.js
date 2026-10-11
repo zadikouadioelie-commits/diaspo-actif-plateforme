@@ -3144,6 +3144,8 @@ CvExtras.registerCvExtras({ route, db, sendJSON, getCurrentUser, nomCompteAffich
 /* Liste de contrôle du profil public (2026-10-10) : GET /api/profil-public/checklist — voir server/profil-public.js. */
 const ProfilPublic = require("./profil-public");
 ProfilPublic.register({ route, db, sendJSON, getCurrentUser });
+/* Cartographie des compétences (2026-10-11) : GET /api/admin/cartographie-competences — voir server/cartographie-competences.js. */
+require("./cartographie-competences").register({ route, db, sendJSON, getCurrentUser });
 
 /* ========== VITRINE COMMERCIALE + BOUTIQUE (comptes Initiative) ========== */
 const MAX_PRODUITS_VITRINE = 100;

@@ -105,6 +105,7 @@
       <a href="#obs-coop" data-section="obs-coop">🌍 Observatoire Coopération</a>
       <a href="#obs-instit" data-section="obs-instit">🏛️ Observatoire Institutionnel</a>
       <a href="#revenus-diaspora" data-section="revenus-diaspora">🗺️ Revenus par diaspora</a>
+      <a href="#cartographie-competences" data-section="cartographie-competences">🧭 Cartographie des compétences</a>
       <a href="#obs-recensement" data-section="obs-recensement">📋 Observatoire Recensement</a>
       <a href="#finances" data-section="finances">💰 Finances</a>
       <a href="#ventes" data-section="ventes">🛒 Ventes & Transactions</a>
@@ -1394,6 +1395,56 @@
           <div class="card"><h3 style="margin:0 0 12px;font-size:15px;">💼 Par secteur d'activité</h3><div id="rd-par-secteur"></div></div>
           <div class="card"><h3 style="margin:0 0 12px;font-size:15px;">🧾 Par type de revenu</h3><div id="rd-par-type"></div></div>
         </div>
+      </section>
+
+      <section id="section-cartographie-competences" style="display:none;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:240px;">
+            <h2 style="margin:0;">🧭 Cartographie des compétences</h2>
+            <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Domaines d'activité des comptes de la diaspora, par diaspora (origine), zone de vie, pays de résidence et type de compte. Cliquez sur une barre, une ligne ou une zone pour filtrer.</p>
+          </div>
+          <button class="btn btn-outline" style="font-size:13px;" onclick="loadCartoCompetences()">↺ Actualiser</button>
+          <button class="btn btn-outline" style="font-size:13px;border-color:#059669;color:#059669;" onclick="ccExportCSV()">⬇️ Export CSV</button>
+        </div>
+        <div class="notice" style="margin-bottom:14px;">🔐 Données agrégées et anonymisées : seuls des comptages sont affichés — jamais un nom, un e-mail ni un téléphone. Comptes de démonstration, masqués et supprimés exclus.</div>
+
+        <div class="card" style="margin-bottom:16px;" id="cc-filtres">
+          <div class="cc-filtres">
+            <label for="cc-f-role">Type de compte<select id="cc-f-role" data-toutes="Tous les types" onchange="loadCartoCompetences()"><option value="">Tous les types</option></select></label>
+            <label for="cc-f-origine">Diaspora (origine)<select id="cc-f-origine" data-toutes="Toutes les diasporas" onchange="loadCartoCompetences()"><option value="">Toutes les diasporas</option></select></label>
+            <label for="cc-f-zone">Zone de vie<select id="cc-f-zone" data-toutes="Toutes les zones" onchange="loadCartoCompetences()"><option value="">Toutes les zones</option></select></label>
+            <label for="cc-f-pays">Pays de résidence<select id="cc-f-pays" data-toutes="Tous les pays" onchange="loadCartoCompetences()"><option value="">Tous les pays</option></select></label>
+            <label for="cc-f-domaine">Domaine d'activité<select id="cc-f-domaine" data-toutes="Tous les domaines" onchange="loadCartoCompetences()"><option value="">Tous les domaines</option></select></label>
+            <button class="btn btn-outline" style="font-size:13px;" onclick="ccReset()">✕ Réinitialiser</button>
+          </div>
+        </div>
+
+        <div class="cc-kpis" id="cc-kpis"><p class="cc-vide">Chargement…</p></div>
+
+        <div class="cc-grille">
+          <div class="card"><h3 style="margin:0 0 12px;font-size:15px;">🧩 Domaines d'activité</h3><div id="cc-domaines"></div></div>
+          <div class="card"><h3 style="margin:0 0 12px;font-size:15px;">🗺️ Zones de vie</h3><div id="cc-zones"></div></div>
+        </div>
+
+        <div class="card" style="margin-bottom:16px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+            <h3 style="margin:0;font-size:15px;">🔥 Domaines croisés</h3>
+            <div class="cc-onglets" role="group" aria-label="Croiser les domaines avec">
+              <button type="button" class="cc-onglet" data-dim="zone" aria-pressed="true" onclick="ccCroiser('zone')">Zone de vie</button>
+              <button type="button" class="cc-onglet" data-dim="diaspora" aria-pressed="false" onclick="ccCroiser('diaspora')">Diaspora (origine)</button>
+              <button type="button" class="cc-onglet" data-dim="role" aria-pressed="false" onclick="ccCroiser('role')">Type de compte</button>
+            </div>
+          </div>
+          <div id="cc-chaleur"></div>
+        </div>
+
+        <div class="card" style="margin-bottom:16px;"><h3 style="margin:0 0 12px;font-size:15px;">🌍 Par diaspora (origine)</h3><div id="cc-diasporas"></div></div>
+        <div class="cc-grille">
+          <div class="card"><h3 style="margin:0 0 12px;font-size:15px;">📍 Par pays de résidence</h3><div id="cc-pays"></div></div>
+          <div class="card"><h3 style="margin:0 0 12px;font-size:15px;">🏷️ Par type de compte</h3><div id="cc-roles"></div></div>
+        </div>
+        <div class="card" style="margin-bottom:16px;"><h3 style="margin:0 0 12px;font-size:15px;">🛠️ Compétences et spécialités les plus citées</h3><div id="cc-competences"></div></div>
+        <p id="cc-note" style="font-size:12.5px;color:var(--muted);margin:0 0 20px;"></p>
       </section>
 
       <section id="section-obs-recensement" style="display:none;">
@@ -3029,7 +3080,8 @@
       <section id="section-membres" style="display:none;">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:8px;">
           <h2 style="margin:0;">Gestion des membres</h2>
-          <div style="display:flex;gap:6px;">
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button class="btn btn-sm btn-outline" id="membres-btn-carto" onclick="document.querySelector('.sidebar a[data-section=&quot;cartographie-competences&quot;]').click()">🧭 Cartographie des compétences</button>
             <button class="btn btn-sm btn-orange" id="membres-tab-actifs" onclick="switchMembresTab('actifs')">👥 Membres</button>
             <button class="btn btn-sm btn-outline" id="membres-tab-historique" onclick="switchMembresTab('historique')">🕘 Historique des suppressions</button>
           </div>
@@ -9160,6 +9212,7 @@ async function submitAccordDirect(){
     'obs-coop':  () => loadObsCoop(),
     'obs-instit': () => loadObsInstit(),
     'revenus-diaspora': () => loadRevenusDiaspora(),
+    'cartographie-competences': () => window.loadCartoCompetences && window.loadCartoCompetences(),
     'obs-recensement': () => loadObsRecensement(),
     finances:    () => loadFinances(),
     ventes:      () => loadTransactions(),
@@ -14480,6 +14533,7 @@ async function diagEmail() {
   <script src="/assets/admin-videos-tutoriels-panel.js"></script>
   <script src="/assets/admin-parrainage-panel.js"></script>
   <script src="/assets/admin-avis-panel.js"></script>
+  <script src="/assets/admin-cartographie-competences.js"></script>
 </body>
 </html>
 
