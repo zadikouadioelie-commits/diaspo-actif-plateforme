@@ -258,7 +258,12 @@ async function vtSauver() {
 
 async function vtSupprimer(id) {
   if (!confirm("Supprimer cette vidéo ?\n\nCette action supprimera la vidéo de la rubrique Vidéos Tuto ainsi que ses commentaires et réactions. Cette action est irréversible.")) return;
-  try { await api('DELETE', `/admin/videos-tutoriels/${id}`); vtCharger(); }
+  try {
+    await api('DELETE', `/admin/videos-tutoriels/${id}`);
+    /* Depuis la page d'une vidéo (videos-tutoriels.html?v=…), la vidéo n'existe plus : retour à la liste. */
+    if (document.getElementById('dvt-page-video')?.style.display !== 'none' && new URLSearchParams(location.search).get('v')) { location.href = 'videos-tutoriels.html'; return; }
+    vtCharger();
+  }
   catch (e) { alert('Erreur : ' + e.message); }
 }
 

@@ -79,7 +79,8 @@ function dvtCardHtml(v, { compact } = {}) {
      stopPropagation() que les boutons de réaction ci-dessus, pour ne pas déclencher la
      navigation de la carte-lien englobante. */
   const boutonModifier = window.__vtEstAdmin
-    ? `<button type="button" class="dvt-admin-edit" onclick="event.preventDefault();event.stopPropagation();vtOuvrirForm(${v.id});" title="Modifier cette vidéo">✎</button>` : '';
+    ? `<button type="button" class="dvt-admin-edit" onclick="event.preventDefault();event.stopPropagation();vtOuvrirForm(${v.id});" title="Modifier cette vidéo">✎</button>
+       <button type="button" class="dvt-admin-edit dvt-admin-del" onclick="event.preventDefault();event.stopPropagation();vtSupprimer(${v.id});" title="Supprimer cette vidéo" aria-label="Supprimer cette vidéo">🗑</button>` : '';
   return `
     <a class="dvt-card" href="videos-tutoriels.html?v=${v.id}" style="text-decoration:none;color:inherit;display:block;">
       <div class="dvt-thumb">
@@ -330,7 +331,7 @@ async function dvtChargerPageVideo(videoId) {
       <div class="dvt-player">${dvtLecteurHtml(v)}</div>
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">
         <h1 class="dvt-page-titre">${dvtEsc(v.titre)}</h1>
-        ${window.__vtEstAdmin ? `<button type="button" class="dvt-btn-outline" style="margin-top:18px;flex-shrink:0;" onclick="vtOuvrirForm(${v.id})">✎ Modifier</button>` : ''}
+        ${window.__vtEstAdmin ? `<span style="display:flex;gap:8px;margin-top:18px;flex-shrink:0;"><button type="button" class="dvt-btn-outline" onclick="vtOuvrirForm(${v.id})">✎ Modifier</button><button type="button" class="dvt-btn-outline" style="color:#dc2626;border-color:#dc2626;" onclick="vtSupprimer(${v.id})">🗑 Supprimer</button></span>` : ''}
       </div>
       <div class="dvt-page-meta">🏷 ${dvtEsc(v.categorie||'')} · 📅 ${dvtFormatDate(v.created_at)} · 👁 ${v.vues||0} vues</div>
       <div class="dvt-page-desc rich-content">${window.renderRichText ? renderRichText(v.description || '') : dvtEsc(v.description || '')}</div>
