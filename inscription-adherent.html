@@ -82,6 +82,9 @@ main.container { max-width: 480px; margin: 0 auto; padding: 48px 24px 80px; }
         <select id="ia-origine" required><option value="">— Sélectionner —</option></select>
         <label for="ia-domaine">Domaine d'activité *</label>
         <select id="ia-domaine" required><option value="">— Sélectionner —</option></select>
+        <label for="ia-bio">Votre biographie *</label>
+        <textarea id="ia-bio" required rows="4" maxlength="800" placeholder="Qui êtes-vous ? Votre parcours, vos projets, ce que vous recherchez sur la plateforme…" style="width:100%;box-sizing:border-box;border:1.5px solid var(--border);border-radius:8px;padding:10px 12px;font-family:inherit;font-size:14px;resize:vertical;"></textarea>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px;">800 caractères maximum — modifiable plus tard depuis votre profil.</div>
         <div class="auth-error" id="ia-error" style="display:none;"></div>
         <button type="submit" class="btn btn-orange btn-block" style="margin-top:18px;" id="ia-submit-btn">Créer mon compte</button>
       </form>
@@ -172,6 +175,8 @@ async function initInscriptionAdherent() {
     const errBox = document.getElementById("ia-error");
     errBox.style.display = "none";
     const btn = document.getElementById('ia-submit-btn');
+    /* Biographie obligatoire (2026-10-11) : le serveur la refuse déjà vide ; sans ce champ, la création du compte par invitation échouait. */
+    if (!document.getElementById("ia-bio").value.trim()) { errBox.textContent = "La biographie est obligatoire."; errBox.style.display = ""; return; }
     btn.disabled = true; btn.textContent = '⏳ Création du compte…';
     const body = {
       nom: document.getElementById("ia-nom").value.trim(),
@@ -183,6 +188,7 @@ async function initInscriptionAdherent() {
       pays: document.getElementById("ia-pays").value,
       origine1: document.getElementById("ia-origine").value,
       domaine_principal: document.getElementById("ia-domaine").value,
+      bio: document.getElementById("ia-bio").value.trim(),
       lien_adherent_token: IA_TOKEN,
       _form_ts: window.__iaFormTs || Date.now(),
     };

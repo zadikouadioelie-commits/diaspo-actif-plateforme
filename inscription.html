@@ -414,8 +414,8 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
         </div>
       </div>
       <div class="form-section"><h4>Présentation <span style="font-size:11px;color:#B45309;font-weight:600;">(obligatoire — modifiable plus tard)</span></h4>
-        <label>Votre biographie <span style="color:#2563EB">*</span></label>
-        <textarea id="u-bio" rows="4" maxlength="2000" placeholder="Qui êtes-vous ? Votre parcours, vos projets, ce que vous recherchez sur la plateforme…" style="width:100%;box-sizing:border-box;"></textarea>
+        <label>Votre biographie <span style="color:#2563EB">*</span> <span style="font-size:11px;color:#64748B;font-weight:400;">(800 caractères maximum)</span></label>
+        <textarea id="u-bio" rows="4" maxlength="800" placeholder="Qui êtes-vous ? Votre parcours, vos projets, ce que vous recherchez sur la plateforme…" style="width:100%;box-sizing:border-box;"></textarea>
       </div>
       <div class="form-section"><h4>Photo de profil et banniere <span style="font-size:11px;color:#B45309;font-weight:600;">(photo de profil obligatoire — banniere facultative)</span></h4>
         <div class="grid-2">
@@ -815,7 +815,7 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
             <select id="ce-type" class="input-field" style="width:100%;margin-top:4px;"><option value="">— Sélectionner —</option><option>Ambassade</option><option>Consulat</option><option>Mairie</option><option>Préfecture</option><option>Sous-Préfecture</option><option>Région</option><option>Département</option><option>Province</option><option>Ministère</option><option>Gouvernorat</option><option>Agence publique</option><option>Administration</option><option>Collectivité territoriale</option><option>Chambre consulaire</option><option>Autorité administrative</option><option>Communauté de communes</option><option>Métropole</option><option>Organisation publique</option><option>Autre</option></select>
           </div>
           <div><label>Date de création <span style="font-size:11px;color:var(--muted);">(facultatif)</span></label><input id="ce-date-creation" type="date" class="input-field" style="width:100%;margin-top:4px;"></div>
-          <div style="grid-column:1/-1;"><label>Description <span style="font-size:11px;color:var(--muted);">(facultatif)</span></label>
+          <div style="grid-column:1/-1;"><label>Description <span style="color:#2563EB">*</span></label>
             <textarea id="ce-desc" style="width:100%;min-height:90px;border:1px solid var(--border);border-radius:8px;padding:10px;font-family:inherit;font-size:13px;margin-top:4px;resize:vertical;line-height:1.6;" placeholder="Missions, territoire, public concerné…"></textarea>
           </div>
           <div><label>Site internet officiel</label><input id="ce-site" type="url" class="input-field" style="width:100%;margin-top:4px;" placeholder="https://www.ambassade-ci.fr"></div>
@@ -1800,6 +1800,8 @@ function collecterTerritoires(){
     const err = g('c-error');
     if(!nom){if(err){err.textContent='Le nom officiel est obligatoire.';err.style.display='block';}return;}
     if(!type){if(err){err.textContent="Le type d'organisme est obligatoire.";err.style.display='block';}return;}
+    /* Description obligatoire (2026-10-11) : le texte riche vide compte pour vide. */
+    if(!(v('ce-desc')||'').replace(/<[^>]*>/g,' ').replace(/&nbsp;/g,' ').trim()){if(err){err.textContent="La description de l'institution est obligatoire.";err.style.display='block';}return;}
     if(err) err.style.display='none';
     ceShow(2);
     window.scrollTo({top: g('pane-collectivite').offsetTop - 20, behavior:'smooth'});

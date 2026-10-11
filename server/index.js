@@ -658,6 +658,11 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
   if (role === "utilisateur" && !String(bio || "").trim()) {
     return sendJSON(res, 400, { error: "La biographie est obligatoire." });
   }
+  /* Présentation obligatoire pour TOUS les types de compte (2026-10-11, demande explicite) : biographie (utilisateur, ci-dessus), description
+     de l'initiative, description de l'institution (collectivité). Un texte riche vide (<p><br></p>) compte pour vide. */
+  const texteSeul = h => String(h || "").replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/s+/g, " ").trim();
+  if (role === "initiative" && !texteSeul(description)) return sendJSON(res, 400, { error: "La description de l'initiative est obligatoire." });
+  if (role === "collectivite" && !texteSeul(description_institution)) return sendJSON(res, 400, { error: "La description de l'institution est obligatoire." });
   /* Statut de l'initiative — "en_creation" : le porteur de projet peut créer son compte
      immédiatement, les informations administratives restent facultatives. "existante" :
      la structure est déjà officiellement créée, ces informations deviennent obligatoires
@@ -721,7 +726,7 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
   )).lastInsertRowid;
 
   if (String(bio || "").trim()) {
-    try { await db.prepare("UPDATE users SET bio=? WHERE id=?").run(String(bio).trim().slice(0, 2000), id); } catch (e) { logError(e, "bio à l'inscription", req); }
+    try { await db.prepare("UPDATE users SET bio=? WHERE id=?").run(String(bio).trim().slice(0, 800), id); } catch (e) { logError(e, "bio à l'inscription", req); }
   }
 
   /* Liens Adhérents — verrouillage atomique (cahier des charges § 12) : l'UPDATE conditionnelle
