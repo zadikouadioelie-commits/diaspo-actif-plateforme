@@ -1,0 +1,91 @@
+/* Design « Nuit dorée » — pages de profil (2026-10-11) : profil membre (profil.html = profil-app.html), profil initiative (initiative.html),
+   profil collectivité (profil-collectivite.html) + publications et avis affichés dans ces pages.
+   Complète assets/theme-nuit-doree.css. Tout est préfixé html body.nd : sans class="nd" sur <body>, la page garde son ancien design. */
+
+/* ---- surfaces : toute carte devient du verre sombre au liseré doré discret ---- */
+html body.nd :is(.cda-card,.cda-box,.pd-side,.post-card,.posts-modal-box,.avz-card,.avz-reponse,.evt-card,.pp-gauge,.pp-side-card,
+  .pqr-canvas-wrap,.pvz-card,.pvz-hero,.activite-gauge,.ia-msg,.init-section,.side-card,.pc-card){
+  background:var(--nd-verre)!important;background-image:none!important;border:1px solid var(--nd-bord2)!important;
+  border-radius:22px;box-shadow:0 26px 54px -34px #000;color:var(--nd-texte)}
+html body.nd :is(.cda-box,.pvz-card,.pp-side-card,.side-card,.init-section,.pc-card,.avz-card){border-radius:18px}
+html body.nd :is(.cda-card,.pvz-card,.pvz-hero,.init-section,.side-card,.pc-card,.pp-side-card,.post-card,.avz-card,.cda-box,.evt-card){position:relative}
+/* héros / cartes principales : fond un peu plus profond, avec la lueur dorée du design */
+html body.nd :is(.cda-card,.pvz-hero){background:linear-gradient(160deg,rgba(23,37,77,.85),rgba(10,16,36,.9))!important;border-color:var(--nd-bord)!important}
+/* petites cartouches */
+html body.nd :is(.cda-statut-chip,.cda-tag,.pvz-chip,.pvz-btn,.pvz-segmented,.pvz-avatar,.pvz-verified,.pvz-link-ico,.psug-av,.psug-follow,.pqr-url,
+  .ts-badge-trust,.ts-badge-verified,.equipe-avatar,.init-card-header,.init-profile-logo,.side-tag,.strip-icon,.tag,.type-badge,
+  .evt-badge-statut,.evt-tag,.pc-doc-icon,.pc-evt-date,.pc-ia-suggestion,.pc-stat-icon,.banner-btn,.posts-btn-secondary,.posts-media-btn,.pp-join-btn,.pqr-btn){
+  background:var(--nd-verre)!important;background-image:none!important;border:1px solid var(--nd-bord)!important;color:var(--nd-texte)!important}
+html body.nd :is(.cda-statut-chip,.cda-tag,.pvz-chip,.side-tag,.tag,.type-badge,.evt-tag){border-radius:999px}
+html body.nd .cda-statut-chip[style*="background"]{background-image:none}   /* le statut actif garde sa couleur posée en ligne */
+
+/* lignes séparatrices */
+html body.nd :is(.pd-actions,.pd-caption,.pd-comment-form,.pd-header,.pd-statsbar,.post-actions,.post-stats-bar,.posts-modal-footer,.avz-form,.avz-item,
+  .pp-list-item,.equipe-item,.ia-input-row,.info-col,.init-strip,.init-strip-item,.pc-btn,.pc-stat-row,.side-list-item,.p-stats,.theme-row,.contrib-option){
+  border-color:var(--nd-bord2)!important}
+html body.nd :is(.cda-avatar,.p-avatar){border-color:var(--nd-or)!important;box-shadow:0 0 0 5px rgba(227,192,110,.12)}
+
+/* ---- textes ---- */
+html body.nd :is(.cda-card,.cda-box,.pvz-card,.pvz-hero,.pp-side-card,.side-card,.init-section,.pc-card,.avz-card,.avz-reponse,.evt-card,.post-card,.pd-side,
+  .posts-modal-box,.pqr-canvas-wrap,.init-strip,.equipe-item,.activite-gauge) *:not(button):not(a):not(input):not(select):not(textarea):not([class*="badge"]):not(svg):not(svg *){color:inherit}
+html body.nd :is(.cda-name,.cda-info-val,.pvz-name,.pvz-card-title,.evt-title,.avz-item-auteur,.avz-moy,.strip-val,.strip-label,.post-body-full,.post-body-preview,.posts-modal-title,.pd-header strong){color:#fff!important}
+html body.nd :is(.cda-info-label,.cda-muted,.cda-edit-btn,.pvz-empty,.pvz-sub,.pvz-responsable,.avz-empty,.avz-item-date,.avz-total,.avz-signaler,.avz-comment,.evt-date,.post-meta,.post-menu-btn,.posts-counter,.pc-empty,.l){color:var(--nd-doux)!important}
+html body.nd :is(.post-badge,.post-voir-plus,.pc-doc-icon){color:var(--nd-or)!important}
+html body.nd :is(.post-action-btn,.post-stats-item){color:var(--nd-doux)!important}
+html body.nd .post-action-btn:hover{color:var(--nd-or)!important}
+html body.nd :is(.pvz-link-row,.psug-type,.n){color:var(--nd-texte)!important}
+html body.nd .pvz-card-title,html body.nd .cda-box-head{color:#fff}
+html body.nd .cda-box-head span{color:#fff}
+html body.nd :is(.pvz-name,.cda-name){font-family:var(--nd-display)!important;font-weight:500;letter-spacing:-.005em}
+html body.nd .pvz-name{font-size:clamp(26px,3vw,36px)}
+html body.nd :is(.cda-bio-text,.pvz-card p){color:var(--nd-doux)!important}
+
+/* ---- boutons principaux et actions → or ---- */
+html body.nd :is(.cda-theme-btn,.rejoindre-btn,.posts-btn-primary,.p-view-btn,.oz-btn-p){
+  background:var(--nd-degore)!important;background-image:var(--nd-degore)!important;color:#1a1202!important;border:0!important;font-weight:800;border-radius:999px;box-shadow:0 10px 28px -12px rgba(227,192,110,.65)}
+html body.nd :is(.cda-theme-btn,.rejoindre-btn,.posts-btn-primary,.p-view-btn) *{color:#1a1202!important}
+html body.nd .pvz-btn:hover,html body.nd .pqr-btn:hover{border-color:var(--nd-or)!important}
+
+/* ---- champs de saisie (publier, commenter, avis, recherche) ---- */
+html body.nd :is(.post-comment-input,.posts-input,.posts-select,.posts-textarea,.avz-form input,.avz-form textarea,.avz-form select,.pc-card input,.pc-card textarea,.oz-sel,.ia-input-row input){
+  background:rgba(255,255,255,.06)!important;background-image:none!important;color:var(--nd-texte)!important;border:1px solid rgba(255,255,255,.2)!important;border-radius:12px}
+html body.nd .posts-label{color:var(--nd-or)!important;letter-spacing:.06em}
+html body.nd .posts-modal-header{background:var(--nd-verre)!important;border-bottom:1px solid var(--nd-bord2)!important}
+html body.nd .posts-modal-close{color:var(--nd-doux)!important}
+html body.nd .posts-modal-box select option{background:#0B1226;color:#fff}
+
+/* ---- fond de page et fenêtres ---- */
+html body.nd :is(.pvz-wrap,.pvz-page,.profile-page,.pc-page,.init-page,.page-wrap){background:transparent!important}
+html body.nd :is(.posts-modal,.posts-modal-overlay,.pd-overlay){background:rgba(3,6,14,.78)!important}
+
+/* bandeaux et badges à style en ligne */
+html body.nd #premiere-pub-banner{background:rgba(8,13,30,.94)!important;border-bottom:1px solid var(--nd-bord)!important;color:var(--nd-texte)!important}
+html body.nd #premiere-pub-banner *{color:inherit}
+html body.nd #premiere-pub-banner button{background:var(--nd-verre)!important;border:1px solid var(--nd-bord2)!important;color:var(--nd-doux)!important;border-radius:999px}
+html body.nd #premiere-pub-banner button:first-of-type{background:var(--nd-degore)!important;color:#1a1202!important;border:0!important;font-weight:800}
+html body.nd .post-badge{background:rgba(227,192,110,.14)!important;border:1px solid var(--nd-bord)!important;color:var(--nd-or)!important}
+html body.nd :is(.pp-side-card,.side-card,.pvz-card,.cda-card,.init-section,.pc-card) [style*="var(--bg)"]{background:rgba(255,255,255,.05)!important;border:1px solid var(--nd-bord2)}
+html body.nd .post-action-btn.active{background:rgba(227,192,110,.14)!important;border-color:var(--nd-bord)!important;color:var(--nd-or)!important}
+
+/* carte « Indice de fiabilité » (profil initiative et visiteur) */
+html body.nd .ts-card{background:var(--nd-verre)!important;background-image:none!important;border:1px solid var(--nd-bord)!important;border-radius:22px;box-shadow:0 26px 54px -34px #000;color:var(--nd-texte)}
+html body.nd .ts-card *:not(button):not(a):not(.ts-donut):not(.ts-stars):not(.ts-score-label){color:inherit}
+html body.nd .ts-card-title,html body.nd .ts-total,html body.nd .ts-groupe,html body.nd .ts-crit-titre{color:#fff!important}
+html body.nd :is(.ts-score-desc,.ts-crit-aide,.ts-bareme-note,.ts-react-label){color:var(--nd-doux)!important}
+html body.nd .ts-donut{color:#052e16!important}
+html body.nd .ts-score-label{background:rgba(255,255,255,.08)!important;color:#fff!important;border:1px solid var(--nd-bord2)}
+html body.nd .ts-bar-wrap{background:rgba(255,255,255,.1)!important}
+html body.nd :is(.ts-crit,.ts-bareme){background:rgba(255,255,255,.04)!important;border:1px solid var(--nd-bord2)!important;border-radius:14px}
+html body.nd .ts-bareme summary{color:var(--nd-or)!important}
+html body.nd .ts-report-btn{background:var(--nd-verre)!important;border:1px solid var(--nd-bord2)!important;color:var(--nd-doux)!important;border-radius:999px}
+
+/* profil collectivité : la couleur de bannière reste celle choisie par la collectivité (variables --pc-c1/--pc-c2) ; on habille le reste */
+html body.nd .pc-btn-primary{background:var(--nd-degore)!important;color:#1a1202!important;border:0!important;font-weight:800;border-radius:999px;box-shadow:0 10px 28px -12px rgba(227,192,110,.65)}
+html body.nd .pc-btn-outline{background:var(--nd-verre)!important;border:1px solid var(--nd-bord)!important;color:var(--nd-texte)!important;border-radius:999px}
+html body.nd .pc-logo{border:2px solid var(--nd-or)!important;box-shadow:0 0 0 5px rgba(227,192,110,.14),0 14px 34px -14px #000}
+html body.nd .pc-card a:not(.pc-btn),html body.nd .pc-more-link{color:var(--nd-bleu2)!important}
+html body.nd .pc-badge,html body.nd .pc-badge-verified,html body.nd .pc-badge-warm{border:1px solid var(--nd-bord)}
+html body.nd .breadcrumb a{color:var(--nd-or)}
+
+/* textes sombres posés en ligne (#0D1B2A, marine…) à l'intérieur des cartes de profil */
+html body.nd :is(.avz-card,.cda-card,.pvz-card,.pp-side-card,.side-card,.init-section,.pc-card,.post-card,.ts-card) :is([style*="color:#0D1B2A" i],[style*="color:#0D2B4E" i],[style*="color:#1B3A6B" i],[style*="color:var(--navy)"],[style*="color:var(--text)"],[style*="color: #0D1B2A" i]){color:var(--nd-texte)!important}

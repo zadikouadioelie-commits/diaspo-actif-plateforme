@@ -221,8 +221,10 @@ html, body{overflow-x:clip !important;}
 </style>
   <link rel="stylesheet" href="/assets/design-upgrade.v2.css">
   <link rel="stylesheet" href="/assets/theme-manager.css">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,500;0,6..96,600;1,6..96,500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
-<body>
+<body class="nd">
 <div class="page">
   <header class="topbar">
     <div class="topbar-inner">
@@ -1365,6 +1367,9 @@ const THEME_VITRINE_LABELS = { bordeaux:'Bordeaux', ocean:'Ocean', emeraude:'Eme
 <script src="/assets/don-banner.js"></script>
   <script src="/assets/theme-manager.js"></script>
 <script src="assets/back-button.js"></script>
+<!-- Design « Nuit dorée » (2026-10-11) : surcharges chargées en dernier, tout est préfixé body.nd ; retour arrière : retirer ces 2 lignes et class="nd" sur <body> -->
+<link rel="stylesheet" href="/assets/theme-nuit-doree.css?v=4">
+<link rel="stylesheet" href="/assets/profil-nuit-doree.css?v=6">
 </body>
 </html>
 
