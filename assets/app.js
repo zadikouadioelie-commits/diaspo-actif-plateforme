@@ -1184,6 +1184,18 @@ function ouvrirAbonnementSiDu(user) {
 }
 window.ouvrirAbonnementSiDu = ouvrirAbonnementSiDu;
 
+/* Mise à jour des documents légaux (2026-10-12) : bandeau tant que la nouvelle version n'a pas été acceptée. Calculé par GET /api/auth/me (legal_a_accepter). */
+function afficherBandeauLegal(user) {
+  var a = user && user.legal_a_accepter, ancien = document.getElementById('bandeau-legal');
+  if (!a || !a.length) { if (ancien) ancien.remove(); return; }
+  if (ancien || /parametres-compte.html/.test(location.pathname)) return;
+  var noms = a.map(function (d) { return String(d.titre).replace(/&/g, '&amp;').replace(/</g, '&lt;'); }).join(', ');
+  var b = document.createElement('div'); b.id = 'bandeau-legal'; b.setAttribute('role', 'status');
+  b.style.cssText = 'background:#FFF7ED;border-bottom:2px solid #FB923C;color:#7C2D12;padding:10px 16px;font-size:13.5px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:center;text-align:center;';
+  b.innerHTML = '<span>📜 Nos documents ont été mis à jour : <strong>' + noms + '</strong>. Merci de les lire et de les accepter.</span><a href="parametres-compte.html#pc-card-droits" style="background:#C2410C;color:#fff;font-weight:700;font-size:12.5px;padding:6px 14px;border-radius:8px;text-decoration:none;white-space:nowrap;">Lire et accepter</a>';
+  document.body.insertBefore(b, document.body.firstChild);
+}
+
 /* Retourne true si une obligation est active (la page est alors prise en charge ici). */
 function appliquerProfilObligatoire(user, opts) {
   opts = opts || {};
@@ -2052,6 +2064,7 @@ async function applyAuthState() {
     } catch (e) { /* silencieux */ }
     showEmailVerifBanner(user);
     showOrigineBanner(user);
+    afficherBandeauLegal(user);
     if (!appliquerProfilObligatoire(user)) { afficherRelanceProfil(user); showPremierePublicationBanner(user); ouvrirAbonnementSiDu(user); }
     showPwaInstallBanner(user);
   } else {

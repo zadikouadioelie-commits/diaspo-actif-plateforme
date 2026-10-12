@@ -54,6 +54,7 @@
       <!-- Désactivé temporairement : intégration réelle des API réseaux sociaux pas encore branchée. <a href="reseaux-sociaux.html">🔄 Synchronisation réseaux sociaux</a> -->
       <a href="#error-logs" data-section="error-logs" style="display:flex;justify-content:space-between;align-items:center;">🩺 Journal d'erreurs <span id="errlog-badge" style="display:none;background:#ef4444;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;"></span></a>
       <a href="#acces-delegue-admin" data-section="acces-delegue-admin">🔐 Accès délégué</a>
+      <a href="#conformite" data-section="conformite">⚖️ Conformité et données</a>
       <a href="#analytics-trafic" data-section="analytics-trafic">📈 Analytics trafic</a>
       <a href="#messages-techniques" data-section="messages-techniques" style="display:flex;justify-content:space-between;align-items:center;">🛠️ Messages techniques <span id="support-badge" style="display:none;background:#ef4444;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;"></span></a>
       <a href="#formations" data-section="formations">📚 Formations</a>
@@ -4893,6 +4894,19 @@
         <div id="acces-delegue-liste"><div class="notice">Chargement…</div></div>
       </section>
 
+      <!-- CONFORMITÉ ET DONNÉES (2026-10-12) : demandes d'exercice de droits, versions des documents légaux, registre des incidents -->
+      <section id="section-conformite" style="display:none;">
+        <h2>⚖️ Conformité et données</h2>
+        <div class="notice" style="margin-bottom:16px;">Demandes d'exercice des droits des personnes (réponse sous 30 jours), versions des documents légaux et preuve d'acceptation, registre des incidents de sécurité. Rien n'est supprimé : l'historique sert de preuve.</div>
+        <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+          <button class="btn btn-sm btn-orange" data-cf-onglet="demandes" onclick="cfOuvrir('demandes')">📨 Demandes de droits</button>
+          <button class="btn btn-sm btn-outline" data-cf-onglet="versions" onclick="cfOuvrir('versions')">📜 Versions des documents</button>
+          <button class="btn btn-sm btn-outline" data-cf-onglet="incidents" onclick="cfOuvrir('incidents')">🚨 Incidents de sécurité</button>
+          <button class="btn btn-sm btn-outline" data-cf-onglet="autres" onclick="cfOuvrir('autres')">🗂 Autres registres</button>
+        </div>
+        <div id="cf-contenu"><p style="color:var(--muted);font-size:13px;">Chargement…</p></div>
+      </section>
+
       <section id="section-error-logs" style="display:none;">
         <h2>🩺 Journal d'erreurs serveur</h2>
         <div class="notice" style="margin-bottom:16px;">Chaque erreur serveur (route qui plante, exception non gérée) est journalisée ici automatiquement. Remplace un service externe type Sentry pour un usage local/petite échelle.</div>
@@ -6278,6 +6292,148 @@ async function loadAccesDelegueAdmin() {
 /* ===== Journal d'erreurs (monitoring maison) ===== */
 let _errLogFiltre = 'actif';
 let _errLogCache = [];
+/* ═══ Conformité et données (2026-10-12) ═══ */
+let _cfOnglet = 'demandes', _cfStatut = '', _cfIncidentEdit = null;
+const CF_STATUT = { nouvelle: ['Reçue', '#92400E', '#FEF3C7'], en_cours: ['En cours', '#1E40AF', '#DBEAFE'], traitee: ['Traitée', '#166534', '#DCFCE7'], refusee: ['Refusée', '#991B1B', '#FEE2E2'] };
+const cfDate = iso => { const d = new Date(String(iso || '').replace(' ', 'T')); return isNaN(d.getTime()) ? '' : d.toLocaleDateString('fr-FR'); };
+const cfChip = (txt, fg, bg) => `<span style="background:${bg};color:${fg};border-radius:99px;padding:1px 10px;font-size:11.5px;font-weight:700;white-space:nowrap;">${escAdm(txt)}</span>`;
+
+async function cfOuvrir(onglet) {
+  if (onglet) _cfOnglet = onglet;
+  document.querySelectorAll('[data-cf-onglet]').forEach(b => { b.className = 'btn btn-sm ' + (b.dataset.cfOnglet === _cfOnglet ? 'btn-orange' : 'btn-outline'); });
+  const zone = document.getElementById('cf-contenu');
+  zone.innerHTML = '<p style="color:var(--muted);font-size:13px;">Chargement…</p>';
+  try {
+    if (_cfOnglet === 'demandes') await cfDemandes(zone);
+    else if (_cfOnglet === 'versions') await cfVersions(zone);
+    else if (_cfOnglet === 'incidents') await cfIncidents(zone);
+    else cfAutres(zone);
+  } catch (e) { zone.innerHTML = `<div class="notice" style="color:#dc2626;">Erreur : ${escAdm(e.message || 'chargement impossible')}</div>`; }
+}
+
+/* ── Demandes d'exercice de droits ── */
+async function cfDemandes(zone) {
+  const d = await api('GET', '/admin/droits/demandes' + (_cfStatut ? '?statut=' + encodeURIComponent(_cfStatut) : ''));
+  const ouvertes = (d.demandes || []).filter(x => !['traitee', 'refusee'].includes(x.statut)), retard = ouvertes.filter(x => x.en_retard).length;
+  const filtre = [['', 'Toutes'], ['nouvelle', 'Reçues'], ['en_cours', 'En cours'], ['traitee', 'Traitées'], ['refusee', 'Refusées']]
+    .map(([v, l]) => `<button class="btn btn-sm ${_cfStatut === v ? 'btn-orange' : 'btn-outline'}" onclick="_cfStatut='${v}';cfOuvrir('demandes')">${l}</button>`).join('');
+  zone.innerHTML = `<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px;">
+      <div class="card" style="text-align:center;min-width:150px;"><div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;">À traiter</div><div style="font-size:26px;font-weight:800;">${ouvertes.length}</div></div>
+      <div class="card" style="text-align:center;min-width:150px;"><div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;">En retard (&gt; ${d.delai_jours} j)</div><div style="font-size:26px;font-weight:800;color:${retard ? '#dc2626' : '#16a34a'};">${retard}</div></div>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">${filtre}</div>`
+    + ((d.demandes || []).length ? d.demandes.map(x => {
+        const s = CF_STATUT[x.statut] || [x.statut, '#334155', '#E2E8F0'];
+        const fini = ['traitee', 'refusee'].includes(x.statut);
+        return `<div class="card" style="margin-bottom:10px;${x.en_retard ? 'border-color:#fca5a5;' : ''}">
+          <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:flex-start;">
+            <div><strong>${escAdm(x.libelle)}</strong><div style="font-size:12.5px;color:var(--muted);">${escAdm([x.prenom, x.nom].filter(Boolean).join(' '))} · ${escAdm(x.email || '')} · ${escAdm(x.role || '')}</div></div>
+            <div style="text-align:right;">${cfChip(s[0], s[1], s[2])}<div style="font-size:11.5px;color:${x.en_retard ? '#dc2626' : 'var(--muted)'};margin-top:3px;">Reçue le ${cfDate(x.created_at)}${fini ? '' : ' · échéance ' + cfDate(x.echeance) + (x.en_retard ? ' — EN RETARD' : '')}</div></div>
+          </div>
+          ${x.message ? `<div style="margin-top:8px;background:#F8FAFC;border-radius:8px;padding:8px 10px;font-size:13px;">${escAdm(x.message)}</div>` : ''}
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:flex-start;">
+            <select id="cf-st-${x.id}" class="input-field" style="width:auto;">${Object.entries(CF_STATUT).map(([k, v]) => `<option value="${k}" ${k === x.statut ? 'selected' : ''}>${v[0]}</option>`).join('')}</select>
+            <textarea id="cf-rep-${x.id}" class="input-field" rows="2" placeholder="Réponse envoyée à la personne (visible dans son espace)…" style="flex:1;min-width:220px;">${escAdm(x.reponse || '')}</textarea>
+            <button class="btn btn-sm btn-orange" onclick="cfTraiter(${x.id})">Enregistrer</button>
+          </div></div>`;
+      }).join('') : '<div class="notice">Aucune demande pour ce filtre.</div>');
+}
+async function cfTraiter(id) {
+  try {
+    await api('PATCH', '/admin/droits/demandes/' + id, { statut: document.getElementById('cf-st-' + id).value, reponse: document.getElementById('cf-rep-' + id).value });
+    showToast('Demande mise à jour ✓'); cfOuvrir('demandes');
+  } catch (e) { showToast(e.message || 'Erreur', 'danger'); }
+}
+
+/* ── Versions des documents légaux ── */
+async function cfVersions(zone) {
+  const d = await api('GET', '/admin/legal/versions');
+  const auj = new Date().toISOString().slice(0, 10);
+  zone.innerHTML = `<div class="card" style="margin-bottom:16px;overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead><tr style="text-align:left;color:var(--muted);font-size:11.5px;"><th style="padding:6px;">Document</th><th style="padding:6px;">Version en vigueur</th><th style="padding:6px;">Publiée le</th><th style="padding:6px;">Comptes l'ayant acceptée</th><th style="padding:6px;"></th></tr></thead><tbody>
+      ${(d.documents || []).map(x => `<tr style="border-top:1px solid #E2E8F0;"><td style="padding:8px 6px;"><a href="${escAdm(x.url)}" target="_blank">${escAdm(x.titre)}</a></td><td style="padding:8px 6px;"><strong>${escAdm(x.version)}</strong>${x.reacceptation ? ' ' + cfChip('nouvelle acceptation exigée', '#92400E', '#FEF3C7') : ''}</td><td style="padding:8px 6px;">${escAdm(x.publiee_le || '')}</td><td style="padding:8px 6px;">${(d.acceptations || {})[x.cle] ?? 0}</td><td style="padding:8px 6px;"><button class="btn btn-sm btn-outline" onclick="cfFormVersion('${x.cle}')">Publier une nouvelle version</button></td></tr>`).join('')}
+      </tbody></table></div>
+    <div id="cf-form-version"></div>
+    <h3 style="font-size:15px;margin:18px 0 8px;">Historique des versions</h3>
+    <div class="card" style="overflow-x:auto;">${(d.historique || []).length ? `<table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="text-align:left;color:var(--muted);font-size:11.5px;"><th style="padding:6px;">Document</th><th style="padding:6px;">Version</th><th style="padding:6px;">Publiée le</th><th style="padding:6px;">Par</th><th style="padding:6px;">Note</th></tr></thead><tbody>
+      ${d.historique.map(h => `<tr style="border-top:1px solid #E2E8F0;"><td style="padding:7px 6px;">${escAdm(h.document)}</td><td style="padding:7px 6px;">${escAdm(h.version)}${Number(h.reacceptation) ? ' ' + cfChip('ré-acceptation', '#92400E', '#FEF3C7') : ''}</td><td style="padding:7px 6px;">${escAdm(h.publiee_le || '')}</td><td style="padding:7px 6px;">${escAdm(h.par_nom || '')}</td><td style="padding:7px 6px;">${escAdm(h.note || '')}</td></tr>`).join('')}</tbody></table>` : '<p style="color:var(--muted);font-size:13px;margin:0;">Aucune version publiée depuis cet écran : les versions d\'origine (2026-10-12) sont celles du code. La première publication ouvrira l\'historique.</p>'}</div>
+    <div class="notice" style="margin-top:14px;">Publier une nouvelle version n'écrase rien : l'ancienne reste en historique. Cochez « nouvelle acceptation exigée » uniquement pour une modification substantielle : tous les comptes verront alors la demande dans « Mes données et mes droits ».</div>`;
+  window._cfAuj = auj;
+}
+function cfFormVersion(cle) {
+  document.getElementById('cf-form-version').innerHTML = `<div class="card" style="margin-bottom:16px;border-color:#fdba74;">
+    <h3 style="margin:0 0 10px;font-size:15px;">Nouvelle version — ${escAdm(cle)}</h3>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <input id="cf-v-version" class="input-field" style="width:180px;" value="${escAdm(window._cfAuj || '')}" placeholder="Ex : 2026-11-05">
+      <input id="cf-v-note" class="input-field" style="flex:1;min-width:240px;" placeholder="Ce qui a changé (note interne, facultatif)">
+    </div>
+    <label style="display:flex;gap:8px;align-items:center;margin:10px 0;font-size:13px;"><input type="checkbox" id="cf-v-reacc"> Exiger une nouvelle acceptation de tous les comptes</label>
+    <button class="btn btn-sm btn-orange" onclick="cfPublierVersion('${cle}')">Publier</button> <button class="btn btn-sm btn-outline" onclick="document.getElementById('cf-form-version').innerHTML=''">Annuler</button></div>`;
+}
+async function cfPublierVersion(cle) {
+  try {
+    await api('POST', '/admin/legal/versions', { document: cle, version: document.getElementById('cf-v-version').value, note: document.getElementById('cf-v-note').value, reacceptation: document.getElementById('cf-v-reacc').checked });
+    showToast('Version publiée ✓'); cfOuvrir('versions');
+  } catch (e) { showToast(e.message || 'Erreur', 'danger'); }
+}
+
+/* ── Registre des incidents de sécurité (RGPD art. 33) ── */
+async function cfIncidents(zone) {
+  const d = await api('GET', '/admin/incidents');
+  const GRAV = { faible: ['Faible', '#166534', '#DCFCE7'], moyenne: ['Moyenne', '#92400E', '#FEF3C7'], elevee: ['Élevée', '#9A3412', '#FFEDD5'], critique: ['Critique', '#991B1B', '#FEE2E2'] };
+  window._cfIncidents = d.incidents || [];
+  zone.innerHTML = `<div class="notice" style="margin-bottom:14px;">En cas de violation de données personnelles, la CNIL doit être notifiée <strong>dans les 72 heures</strong> après en avoir pris connaissance, sauf risque improbable pour les personnes ; les personnes concernées sont informées si le risque est élevé. Ce registre garde la trace de chaque incident et des mesures prises.</div>
+    <button class="btn btn-sm btn-orange" onclick="cfFormIncident(null)" style="margin-bottom:14px;">➕ Déclarer un incident</button>
+    <div id="cf-form-incident"></div>`
+    + ((d.incidents || []).length ? d.incidents.map(i => {
+        const g = GRAV[i.gravite] || GRAV.faible;
+        return `<div class="card" style="margin-bottom:10px;"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;"><strong>${escAdm(i.titre)}</strong><div>${cfChip(g[0], g[1], g[2])} ${cfChip(i.statut === 'clos' ? 'Clos' : i.statut === 'en_cours' ? 'En cours' : 'Ouvert', '#1E40AF', '#DBEAFE')}</div></div>
+          <div style="font-size:12.5px;color:var(--muted);margin-top:2px;">Détecté le ${cfDate(i.date_detection)} · données personnelles : ${Number(i.donnees_perso) ? 'oui' : 'non'} · CNIL notifiée : ${Number(i.cnil_notifiee) ? 'oui' + (i.cnil_date ? ' (' + cfDate(i.cnil_date) + ')' : '') : 'non'} · personnes informées : ${Number(i.personnes_informees) ? 'oui' : 'non'}</div>
+          ${i.description ? `<p style="margin:8px 0 0;font-size:13px;">${escAdm(i.description)}</p>` : ''}${i.mesures ? `<p style="margin:6px 0 0;font-size:13px;"><strong>Mesures :</strong> ${escAdm(i.mesures)}</p>` : ''}
+          <button class="btn btn-sm btn-outline" style="margin-top:8px;" onclick="cfFormIncident(${i.id})">Modifier</button></div>`;
+      }).join('') : '<div class="notice">Aucun incident enregistré.</div>');
+}
+function cfFormIncident(id) {
+  const i = id ? (window._cfIncidents || []).find(x => x.id === id) : null; _cfIncidentEdit = id;
+  const v = (k, def) => escAdm(i && i[k] != null ? i[k] : (def == null ? '' : def));
+  const chk = k => i && Number(i[k]) ? 'checked' : '';
+  document.getElementById('cf-form-incident').innerHTML = `<div class="card" style="margin-bottom:14px;border-color:#fdba74;">
+    <h3 style="margin:0 0 10px;font-size:15px;">${i ? 'Modifier l\'incident' : 'Déclarer un incident'}</h3>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;">
+      <input id="cf-i-titre" class="input-field" placeholder="Titre *" value="${v('titre')}">
+      <input id="cf-i-date" class="input-field" type="date" value="${v('date_detection', new Date().toISOString().slice(0, 10))}" title="Date de détection">
+      <select id="cf-i-gravite" class="input-field">${['faible', 'moyenne', 'elevee', 'critique'].map(g => `<option value="${g}" ${i && i.gravite === g ? 'selected' : ''}>Gravité : ${g}</option>`).join('')}</select>
+      <select id="cf-i-statut" class="input-field">${['ouvert', 'en_cours', 'clos'].map(g => `<option value="${g}" ${i && i.statut === g ? 'selected' : ''}>Statut : ${g.replace('_', ' ')}</option>`).join('')}</select>
+    </div>
+    <textarea id="cf-i-desc" class="input-field" rows="3" placeholder="Ce qui s'est passé" style="margin-top:10px;">${v('description')}</textarea>
+    <textarea id="cf-i-mesures" class="input-field" rows="2" placeholder="Mesures prises" style="margin-top:10px;">${v('mesures')}</textarea>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;margin:10px 0;font-size:13px;align-items:center;">
+      <label><input type="checkbox" id="cf-i-dp" ${chk('donnees_perso')}> Données personnelles concernées</label>
+      <label><input type="checkbox" id="cf-i-cnil" ${chk('cnil_notifiee')}> CNIL notifiée</label>
+      <input id="cf-i-cnil-date" class="input-field" type="date" style="width:auto;" value="${v('cnil_date')}" title="Date de notification à la CNIL">
+      <label><input type="checkbox" id="cf-i-info" ${chk('personnes_informees')}> Personnes informées</label>
+    </div>
+    <button class="btn btn-sm btn-orange" onclick="cfEnregistrerIncident()">Enregistrer</button> <button class="btn btn-sm btn-outline" onclick="document.getElementById('cf-form-incident').innerHTML=''">Annuler</button></div>`;
+}
+async function cfEnregistrerIncident() {
+  const g = id => document.getElementById(id);
+  const corps = { titre: g('cf-i-titre').value, date_detection: g('cf-i-date').value, gravite: g('cf-i-gravite').value, statut: g('cf-i-statut').value, description: g('cf-i-desc').value, mesures: g('cf-i-mesures').value,
+    donnees_perso: g('cf-i-dp').checked, cnil_notifiee: g('cf-i-cnil').checked, cnil_date: g('cf-i-cnil-date').value, personnes_informees: g('cf-i-info').checked };
+  try {
+    if (_cfIncidentEdit) await api('PATCH', '/admin/incidents/' + _cfIncidentEdit, corps); else await api('POST', '/admin/incidents', corps);
+    showToast('Incident enregistré ✓'); cfOuvrir('incidents');
+  } catch (e) { showToast(e.message || 'Erreur', 'danger'); }
+}
+
+/* ── Autres registres déjà en place ── */
+function cfAutres(zone) {
+  const lien = (section, titre, texte) => `<a href="#${section}" onclick="event.preventDefault();document.querySelector('[data-section=&quot;${section}&quot;]')?.click();" class="card" style="display:block;text-decoration:none;color:inherit;margin-bottom:10px;"><strong>${titre}</strong><div style="font-size:13px;color:var(--muted);margin-top:2px;">${texte}</div></a>`;
+  zone.innerHTML = lien('moderation', '🚩 Signalements et modération', 'Contenus signalés, décisions de modération et contestations.')
+    + lien('suppression-comptes', '🗑 Demandes de suppression de compte', 'Dossiers de suppression définitive, avec historique et messagerie.')
+    + lien('acces-delegue-admin', '🔐 Accès administrateurs', 'Accès délégués et journal des accès.')
+    + lien('error-logs', '🩺 Journal d\'erreurs et sauvegarde', 'Erreurs serveur et contrôles de diagnostic.');
+}
+
 async function loadErrorLogs(filtre) {
   if (filtre) _errLogFiltre = filtre;
   ['actif','resolu','tout'].forEach(f => {
@@ -9235,6 +9391,7 @@ async function submitAccordDirect(){
     'videos-tutoriels': () => vtOuvrirOnglet('videos'),
     'avis-moderation': () => avOuvrirOnglet('avis'),
     'error-logs': () => loadErrorLogs(),
+    conformite: () => cfOuvrir(),
     'acces-delegue-admin': () => loadAccesDelegueAdmin(),
     'analytics-trafic': () => loadAnalytics(),
     ads: () => loadAdsAdmin(),

@@ -249,6 +249,21 @@
       <p class="pc-hint">Les e-mails de sécurité (vérification de compte, réinitialisation de mot de passe) sont toujours envoyés, quel que soit ce réglage.</p>
       <p class="pc-msg" id="pc-msg-notif"></p>
     </div>
+
+    <div class="pc-card" id="pc-card-droits">
+      <h2>🛡️ Mes données et mes droits</h2>
+      <p class="pc-desc">Les documents que vous avez acceptés, et la façon d'exercer vos droits sur vos données personnelles. Diaspo'Actif vous répond sous <strong>30 jours</strong>.</p>
+      <div id="pc-legal-liste" class="pc-hint">Chargement…</div>
+      <h3 style="font-size:14px;margin:18px 0 6px;">Exercer un droit</h3>
+      <div class="pc-field"><label>Votre demande</label><select id="pc-droit-type"></select></div>
+      <div class="pc-field"><label>Précisions <span style="text-transform:none;font-weight:400;">(facultatif)</span></label>
+        <textarea id="pc-droit-msg" rows="3" maxlength="2000" placeholder="Ce que vous souhaitez obtenir ou corriger…" style="width:100%;box-sizing:border-box;border:1.5px solid var(--border,#d9e0ea);border-radius:10px;padding:10px 12px;font-family:inherit;font-size:14px;resize:vertical;"></textarea>
+      </div>
+      <button type="button" class="pc-btn pc-btn-save" id="pc-btn-droit">Envoyer la demande</button>
+      <p class="pc-msg" id="pc-msg-droit"></p>
+      <div id="pc-droit-liste"></div>
+      <p class="pc-hint">Pour masquer ou supprimer votre compte, rendez-vous dans <a href="confidentialite.html">Confidentialité</a> (« Zone de danger »). Pour retirer un consentement facultatif, utilisez le réglage « E-mails non essentiels » de la carte Notifications ci-dessus ou les notifications de <a href="confidentialite.html">Confidentialité</a>.</p>
+    </div>
   `;
 
   function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -395,6 +410,52 @@
     } catch(e) { showMsg('pc-msg-pwd', e.message || 'Erreur.', false); }
     finally { btn.disabled = false; }
   });
+
+  /* Mes données et mes droits (2026-10-12, demande explicite) : documents acceptés (avec leur version) et exercice des droits RGPD. */
+  (function () {
+    const liste = document.getElementById('pc-legal-liste'), dl = document.getElementById('pc-droit-liste'), sel = document.getElementById('pc-droit-type');
+    if (!liste || !dl || !sel) return;
+    const dateFr = iso => { const d = new Date(String(iso || '').replace(' ', 'T')); return isNaN(d.getTime()) ? '' : d.toLocaleDateString('fr-FR'); };
+    const STATUT = { nouvelle: ['Reçue', '#92400E', '#FEF3C7'], en_cours: ['En cours', '#1E40AF', '#DBEAFE'], traitee: ['Traitée', '#166534', '#DCFCE7'], refusee: ['Refusée', '#991B1B', '#FEE2E2'] };
+    async function rendre() {
+      try {
+        const [leg, dr] = await Promise.all([api('GET', '/legal/mes-acceptations'), api('GET', '/droits/demandes')]);
+        const acc = {}; (leg.acceptations || []).forEach(a => { (acc[a.document] = acc[a.document] || []).push(a); });
+        const doitAccepter = new Set((leg.a_accepter || []).map(d => d.cle));
+        liste.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:13px;">'
+          + '<thead><tr style="text-align:left;color:#64748B;font-size:11.5px;"><th style="padding:6px 4px;">Document</th><th style="padding:6px 4px;">Version en vigueur</th><th style="padding:6px 4px;">Votre acceptation</th></tr></thead><tbody>'
+          + (leg.documents || []).filter(d => d.cle !== 'cgv' || (acc.cgv || []).length).map(d => {
+              const dernier = (acc[d.cle] || [])[0];
+              const etat = doitAccepter.has(d.cle) ? '<strong style="color:#B45309;">À accepter</strong>' : (dernier ? 'Acceptée le ' + esc(dateFr(dernier.accepted_at)) + ' (version ' + esc(dernier.version) + ')' : '<span style="color:#64748B;">Compte créé avant l\'enregistrement des versions</span>');
+              return '<tr style="border-top:1px solid #E2E8F0;"><td style="padding:7px 4px;"><a href="' + esc(d.url) + '" target="_blank">' + esc(d.titre) + '</a></td><td style="padding:7px 4px;">' + esc(d.version) + '</td><td style="padding:7px 4px;">' + etat + '</td></tr>';
+            }).join('') + '</tbody></table>'
+          + (doitAccepter.size ? '<button type="button" class="pc-btn pc-btn-save" id="pc-btn-reaccepter" style="margin-top:10px;">J\'ai lu et j\'accepte les nouvelles versions</button>' : '');
+        const b = document.getElementById('pc-btn-reaccepter');
+        if (b) b.onclick = async () => { b.disabled = true; try { await api('POST', '/legal/accepter', { documents: [...doitAccepter] }); await rendre(); } catch (e) { showMsg('pc-msg-droit', e.message || 'Erreur.', false); b.disabled = false; } };
+        if (!sel.options.length) sel.innerHTML = Object.entries(dr.types || {}).map(([k, v]) => '<option value="' + esc(k) + '">' + esc(v) + '</option>').join('');
+        dl.innerHTML = (dr.demandes || []).length
+          ? '<h3 style="font-size:14px;margin:16px 0 6px;">Mes demandes</h3>' + dr.demandes.map(d => {
+              const s = STATUT[d.statut] || [d.statut, '#334155', '#E2E8F0'];
+              return '<div style="border:1px solid #E2E8F0;border-radius:10px;padding:10px 12px;margin-bottom:8px;font-size:13px;">'
+                + '<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;"><strong>' + esc(d.libelle) + '</strong><span style="background:' + s[2] + ';color:' + s[1] + ';border-radius:99px;padding:1px 10px;font-size:11.5px;font-weight:700;">' + esc(s[0]) + '</span></div>'
+                + '<div style="color:#64748B;font-size:12px;margin-top:2px;">Envoyée le ' + esc(dateFr(d.created_at)) + (['traitee', 'refusee'].includes(d.statut) ? '' : ' · réponse attendue avant le ' + esc(dateFr(d.echeance))) + '</div>'
+                + (d.reponse ? '<div style="margin-top:6px;background:#F8FAFC;border-radius:8px;padding:8px 10px;"><strong>Réponse :</strong> ' + esc(d.reponse) + '</div>' : '') + '</div>';
+            }).join('')
+          : '';
+      } catch (e) { liste.textContent = 'Impossible de charger cette section pour le moment.'; }
+    }
+    document.getElementById('pc-btn-droit').addEventListener('click', async () => {
+      const btn = document.getElementById('pc-btn-droit'); btn.disabled = true;
+      try {
+        await api('POST', '/droits/demandes', { type: sel.value, message: document.getElementById('pc-droit-msg').value });
+        document.getElementById('pc-droit-msg').value = '';
+        showMsg('pc-msg-droit', 'Demande envoyée ✓ — vous recevrez une réponse sous 30 jours.', true);
+        await rendre();
+      } catch (e) { showMsg('pc-msg-droit', e.message || 'Erreur.', false); }
+      btn.disabled = false;
+    });
+    rendre();
+  })();
 
   document.getElementById('pc-notif-toggle').addEventListener('change', async (ev) => {
     try {

@@ -2940,6 +2940,59 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_recrut_commentaires_candidat ON recrut_commentaires(candidat_id);
 
 
+  /* ── Documents légaux : versions, preuve d'acceptation, droits des personnes, registre des incidents (2026-10-12) ── */
+  CREATE TABLE IF NOT EXISTS legal_versions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    document TEXT NOT NULL,
+    version TEXT NOT NULL,
+    publiee_le TEXT,
+    note TEXT,
+    reacceptation INTEGER DEFAULT 0,
+    publiee_par INTEGER,
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(document, version)
+  );
+  CREATE TABLE IF NOT EXISTS legal_acceptations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    document TEXT NOT NULL,
+    version TEXT NOT NULL,
+    contexte TEXT,
+    accepted_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(user_id, document, version),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_legal_acc_user ON legal_acceptations(user_id);
+  CREATE TABLE IF NOT EXISTS demandes_donnees (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    type TEXT NOT NULL,
+    message TEXT,
+    statut TEXT NOT NULL DEFAULT 'nouvelle',
+    reponse TEXT,
+    traitee_par INTEGER,
+    traitee_at TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_demandes_donnees_user ON demandes_donnees(user_id, statut);
+  CREATE TABLE IF NOT EXISTS incidents_securite (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    titre TEXT NOT NULL,
+    description TEXT,
+    date_detection TEXT NOT NULL,
+    gravite TEXT NOT NULL DEFAULT 'faible',
+    donnees_perso INTEGER DEFAULT 0,
+    cnil_notifiee INTEGER DEFAULT 0,
+    cnil_date TEXT,
+    personnes_informees INTEGER DEFAULT 0,
+    mesures TEXT,
+    statut TEXT NOT NULL DEFAULT 'ouvert',
+    created_by INTEGER,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT
+  );
+
   CREATE TABLE IF NOT EXISTS lettres_motivation (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,

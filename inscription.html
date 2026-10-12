@@ -455,7 +455,7 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
       <div id="u-charte-box" onclick="if(event.target.closest('a'))return; var cb=document.getElementById('u-charte'); if(event.target!==cb){event.preventDefault(); cb.checked=!cb.checked; cb.dispatchEvent(new Event('change',{bubbles:true}));}" style="margin-top:18px;background:#fff8f2;border:2px solid #fed7aa;border-radius:10px;padding:14px 16px;transition:background .15s,border-color .15s;cursor:pointer;">
         <label style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;font-size:13.5px;line-height:1.5;padding:4px;margin:-4px;">
           <input type="checkbox" id="u-charte" onclick="event.stopPropagation();" onchange="document.getElementById('u-charte-box').style.background=this.checked?'#f0fdf4':'#fff8f2';document.getElementById('u-charte-box').style.borderColor=this.checked?'#16a34a':'#fed7aa';document.getElementById('u-charte-confirm').style.display=this.checked?'flex':'none';" class="charte-check">
-          <span>J'ai lu et j'accepte la <a href="charte.html" target="_blank" style="color:#2563EB;font-weight:600;text-decoration:underline;">Charte Institutionnelle de Diaspo'Actif</a> ainsi que les <a href="cgu.html" target="_blank" style="color:#2563EB;font-weight:600;text-decoration:underline;">Conditions Générales d'Utilisation</a>. Cet engagement est obligatoire pour créer un compte.</span>
+          <span>J'ai lu et j'accepte la <a href="charte.html" target="_blank" style="color:#2563EB;font-weight:600;text-decoration:underline;">Charte Institutionnelle de Diaspo'Actif</a> ainsi que les <a href="cgu.html" target="_blank" style="color:#2563EB;font-weight:600;text-decoration:underline;">Conditions Générales d'Utilisation</a> et la <a href="politique-confidentialite.html" target="_blank" style="color:#2563EB;font-weight:600;text-decoration:underline;">Politique de confidentialité</a>. Cet engagement est obligatoire pour créer un compte.</span>
         </label>
         <div id="u-charte-confirm" style="display:none;align-items:center;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid #bbf7d0;color:#15803d;font-weight:700;font-size:12.5px;">✓ Lecture confirmée — vous pouvez créer votre compte.</div>
       </div>
@@ -776,7 +776,7 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
       <div id="i-charte-box" onclick="if(event.target.closest('a'))return; var cb=document.getElementById('i-charte'); if(event.target!==cb){event.preventDefault(); cb.checked=!cb.checked; cb.dispatchEvent(new Event('change',{bubbles:true}));}" style="margin-top:18px;background:#fff8f2;border:2px solid #fed7aa;border-radius:10px;padding:14px 16px;transition:background .15s,border-color .15s;cursor:pointer;">
         <label style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;font-size:13.5px;line-height:1.5;padding:4px;margin:-4px;">
           <input type="checkbox" id="i-charte" onclick="event.stopPropagation();" onchange="document.getElementById('i-charte-box').style.background=this.checked?'#f0fdf4':'#fff8f2';document.getElementById('i-charte-box').style.borderColor=this.checked?'#16a34a':'#fed7aa';document.getElementById('i-charte-confirm').style.display=this.checked?'flex':'none';" class="charte-check">
-          <span>J'ai lu et j'accepte la <a href="charte.html" target="_blank" style="color:#2563EB;font-weight:600;text-decoration:underline;">Charte Institutionnelle de Diaspo'Actif</a> ainsi que les <a href="cgu.html" target="_blank" style="color:#2563EB;font-weight:600;text-decoration:underline;">Conditions Générales d'Utilisation</a>. Cet engagement est obligatoire pour créer un compte.</span>
+          <span>J'ai lu et j'accepte la <a href="charte.html" target="_blank" style="color:#2563EB;font-weight:600;text-decoration:underline;">Charte Institutionnelle de Diaspo'Actif</a> ainsi que les <a href="cgu.html" target="_blank" style="color:#2563EB;font-weight:600;text-decoration:underline;">Conditions Générales d'Utilisation</a> et la <a href="politique-confidentialite.html" target="_blank" style="color:#2563EB;font-weight:600;text-decoration:underline;">Politique de confidentialité</a>. Cet engagement est obligatoire pour créer un compte.</span>
         </label>
         <div id="i-charte-confirm" style="display:none;align-items:center;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid #bbf7d0;color:#15803d;font-weight:700;font-size:12.5px;">✓ Lecture confirmée — vous pouvez créer votre compte.</div>
       </div>
@@ -919,6 +919,14 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
           <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
             <input type="checkbox" id="ce-declaration" style="margin-top:2px;accent-color:#2563EB;flex-shrink:0;">
             <span style="font-size:12.5px;color:#78350F;line-height:1.55;"><strong>J'accepte et je certifie</strong> que cette demande est faite avec l'autorisation du responsable légal de l'institution.</span>
+          </label>
+        </div>
+
+        <!-- Acceptation des documents légaux (2026-10-12) : enregistrée avec la version en vigueur -->
+        <div style="margin-top:14px;">
+          <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+            <input type="checkbox" id="ce-legal" style="margin-top:2px;accent-color:#2563EB;flex-shrink:0;">
+            <span style="font-size:12.5px;line-height:1.55;">J'ai lu et j'accepte la <a href="charte.html" target="_blank" style="color:#2563EB;font-weight:600;text-decoration:underline;">Charte Institutionnelle</a>, les <a href="cgu.html" target="_blank" style="color:#2563EB;font-weight:600;text-decoration:underline;">Conditions Générales d'Utilisation</a> et la <a href="politique-confidentialite.html" target="_blank" style="color:#2563EB;font-weight:600;text-decoration:underline;">Politique de confidentialité</a>.</span>
           </label>
         </div>
 
@@ -1541,7 +1549,7 @@ document.getElementById("u-submit").addEventListener("click",async()=>{
     const interests=[...document.querySelectorAll("#u-interests input:checked")].map(c=>c.value);
     const sitpro=[...document.querySelectorAll('.u-sitpro:checked')].map(c=>c.value).join(", ")||null;
     await submitForm("u-submit","u-error",{
-      role:"utilisateur",nom,prenom,email,password:pwd,bio,
+      role:"utilisateur",nom,prenom,email,password:pwd,bio,acceptations:["cgu","confidentialite","charte"],
       date_naissance:dob,nationalite1:nat1,
       nationalite2:document.getElementById("u-nat2").value.trim()||null,
       nationalite3:document.getElementById("u-nat3").value.trim()||null,
@@ -1602,7 +1610,7 @@ document.getElementById("i-submit").addEventListener("click",async()=>{
     const rayonnement=document.querySelector('input[name="i-ray"]:checked')?.value||'locale';
     const pays_intervention=rayonnement==='internationale'?collecterTerritoires():[];
     await submitForm("i-submit","i-error",{
-      role:"initiative",nom:rnom,prenom:rprenom,email,password:pwd,
+      role:"initiative",nom:rnom,prenom:rprenom,email,password:pwd,acceptations:["cgu","confidentialite","charte"],
       nom_institution:nom,type_org:typeOrg,
       /* Source unique : origine1/2 alimentent aussi nationalite1/2 — plus de champ séparé
          redemandant le même pays (voir la suppression de "Nationalités concernées" ci-dessus). */
@@ -1850,6 +1858,7 @@ function collecterTerritoires(){
       if(!rfct)   throw new Error('La fonction du responsable est obligatoire.');
       if(!email)  throw new Error("L'e-mail professionnel est obligatoire.");
       if(!decl)   throw new Error('Vous devez accepter la déclaration officielle.');
+      if(!g('ce-legal')?.checked) throw new Error('Vous devez accepter les CGU, la Politique de confidentialité et la Charte pour créer un compte.');
       if(!pwd)    throw new Error('Le mot de passe est obligatoire.');
       if(pwd !== pwd2) throw new Error('Les mots de passe ne correspondent pas.');
       if(pwd.length < 8) throw new Error('Le mot de passe doit comporter au moins 8 caractères.');
@@ -1857,6 +1866,7 @@ function collecterTerritoires(){
 
       await submitForm('c-submit','c-error', {
         role:'collectivite',
+        acceptations:['cgu','confidentialite','charte'],
         nom: rnom, prenom: rprenom, email, password: pwd,
         /* Section 1 — Institution */
         nom_institution:       v('ce-nom'),

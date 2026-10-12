@@ -1,3 +1,6 @@
+/* Pied de page légal complété sur toutes les pages publiques qui chargent ce script (2026-10-12). */
+(function () { try { var s = document.createElement('script'); s.src = '/assets/legal-footer.js?v=1'; s.defer = true; document.head.appendChild(s); } catch (e) {} })();
+
 /* ── Bandeau cookies Diaspo'Actif ── */
 (function () {
   if (localStorage.getItem('da_cookies_ok')) return;

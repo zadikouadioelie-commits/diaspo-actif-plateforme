@@ -663,6 +663,9 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
   const texteSeul = h => String(h || "").replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/s+/g, " ").trim();
   if (role === "initiative" && !texteSeul(description)) return sendJSON(res, 400, { error: "La description de l'initiative est obligatoire." });
   if (role === "collectivite" && !texteSeul(description_institution)) return sendJSON(res, 400, { error: "La description de l'institution est obligatoire." });
+  /* Acceptation des documents légaux (2026-10-12) : CGU, politique de confidentialité et charte, enregistrées avec leur VERSION (preuve). */
+  const acceptes = Array.isArray(body.acceptations) ? body.acceptations : [];
+  if (!legal.A_L_INSCRIPTION.every(c => acceptes.includes(c))) return sendJSON(res, 400, { error: "Vous devez accepter les Conditions générales d'utilisation, la Politique de confidentialité et la Charte pour créer un compte. Rechargez la page si la case n'apparaît pas." });
   /* Statut de l'initiative — "en_creation" : le porteur de projet peut créer son compte
      immédiatement, les informations administratives restent facultatives. "existante" :
      la structure est déjà officiellement créée, ces informations deviennent obligatoires
@@ -728,6 +731,7 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
   if (String(bio || "").trim()) {
     try { await db.prepare("UPDATE users SET bio=? WHERE id=?").run(String(bio).trim().slice(0, 800), id); } catch (e) { logError(e, "bio à l'inscription", req); }
   }
+  try { await legal.enregistrer(id, legal.A_L_INSCRIPTION, "inscription"); } catch (e) { logError(e, "acceptation légale à l'inscription", req); }
 
   /* Liens Adhérents — verrouillage atomique (cahier des charges § 12) : l'UPDATE conditionnelle
      (WHERE status='available') ne peut réussir que pour UNE seule requête concurrente sur le
@@ -2782,6 +2786,8 @@ route("GET", "/api/auth/me", async (req, res) => {
   if (pub) {
     try { pub.profil_obligatoire = await ProfilObligatoire.etat(db, user); }
     catch (e) { pub.profil_obligatoire = null; logError(e, "profil obligatoire", req); }
+    /* Documents légaux dont la nouvelle version doit être acceptée (2026-10-12) : vide en temps normal, sans requête. */
+    try { pub.legal_a_accepter = await legal.aAccepter(user.id); } catch (e) { pub.legal_a_accepter = []; logError(e, "documents légaux à accepter", req); }
     /* Ouverture de la page Premium après le profil rempli (voir ProfilObligatoire.abonnementDu) : jamais pour un compte déjà abonné en payant. */
     pub.ouverture_abonnement = false;
     try {
@@ -22543,6 +22549,85 @@ async function exigerAdmin(req, res) {
   return u;
 }
 
+/* ═══════════ Documents légaux, droits des personnes, registre des incidents (2026-10-12) ═══════════
+   Versions publiées, preuve d'acceptation par compte et par version, demandes d'exercice des droits (RGPD, réponse sous un mois),
+   registre des incidents de sécurité. Tout est conservé : l'historique sert de preuve. */
+route("GET", "/api/legal/documents", async (req, res) => sendJSON(res, 200, { documents: await legal.versionsCourantes() }));
+
+route("GET", "/api/legal/mes-acceptations", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  sendJSON(res, 200, { documents: await legal.versionsCourantes(), acceptations: await legal.mesAcceptations(user.id), a_accepter: await legal.aAccepter(user.id) });
+});
+
+route("POST", "/api/legal/accepter", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const cles = Array.isArray(body && body.documents) ? body.documents : [];
+  await legal.enregistrer(user.id, cles, "mise à jour des conditions");
+  sendJSON(res, 200, { ok: true, a_accepter: await legal.aAccepter(user.id) });
+});
+
+route("GET", "/api/droits/demandes", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  sendJSON(res, 200, { types: legal.TYPES_DROITS, delai_jours: legal.DELAI_REPONSE_JOURS, demandes: await legal.mesDemandes(user.id) });
+});
+
+route("POST", "/api/droits/demandes", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const r = await legal.creerDemande(user.id, body && body.type, body && body.message);
+  if (r.erreur) return sendJSON(res, 400, { error: r.erreur });
+  try {
+    const admins = await db.prepare("SELECT id FROM users WHERE role='administrateur'").all();
+    for (const a of admins) creerNotif(a.id, "droits_donnees", "Nouvelle demande d'exercice de droits", `${user.prenom || ""} ${user.nom || ""} : ${legal.TYPES_DROITS[body.type]}. Réponse attendue sous ${legal.DELAI_REPONSE_JOURS} jours.`, { demande_id: r.id });
+  } catch (e) { logError(e, "notification demande de droits", req); }
+  sendJSON(res, 201, { ok: true, id: r.id, delai_jours: legal.DELAI_REPONSE_JOURS });
+});
+
+route("GET", "/api/admin/legal/versions", async (req, res) => {
+  const admin = await exigerAdmin(req, res); if (!admin) return;
+  sendJSON(res, 200, { documents: await legal.versionsCourantes(), historique: await legal.historiqueVersions(), acceptations: await legal.statsAcceptations() });
+});
+route("POST", "/api/admin/legal/versions", async (req, res, params, body) => {
+  const admin = await exigerAdmin(req, res); if (!admin) return;
+  const r = await legal.publierVersion(body && body.document, body && body.version, body && body.note, body && body.reacceptation, admin.id);
+  if (r.erreur) return sendJSON(res, 400, { error: r.erreur });
+  sendJSON(res, 201, { ok: true });
+});
+
+route("GET", "/api/admin/droits/demandes", async (req, res, params, body, query) => {
+  const admin = await exigerAdmin(req, res); if (!admin) return;
+  sendJSON(res, 200, { types: legal.TYPES_DROITS, delai_jours: legal.DELAI_REPONSE_JOURS, demandes: await legal.listerDemandes(query && query.statut ? String(query.statut) : "") });
+});
+route("PATCH", "/api/admin/droits/demandes/:id", async (req, res, params, body) => {
+  const admin = await exigerAdmin(req, res); if (!admin) return;
+  const r = await legal.traiterDemande(Number(params.id), body && body.statut, body && body.reponse, admin.id);
+  if (r.erreur) return sendJSON(res, r.code || 400, { error: r.erreur });
+  if (["traitee", "refusee"].includes(body.statut)) {
+    try { creerNotif(r.user_id, "droits_donnees", "Votre demande a reçu une réponse", "Consultez la réponse dans Paramètres du compte → Mes données et mes droits.", { demande_id: Number(params.id) }); } catch (e) { logError(e, "notification réponse droits", req); }
+  }
+  sendJSON(res, 200, { ok: true });
+});
+
+route("GET", "/api/admin/incidents", async (req, res) => {
+  const admin = await exigerAdmin(req, res); if (!admin) return;
+  sendJSON(res, 200, { gravites: legal.GRAVITES, statuts: legal.STATUTS_INCIDENT, incidents: await legal.listerIncidents() });
+});
+route("POST", "/api/admin/incidents", async (req, res, params, body) => {
+  const admin = await exigerAdmin(req, res); if (!admin) return;
+  const r = await legal.creerIncident(body, admin.id);
+  if (r.erreur) return sendJSON(res, 400, { error: r.erreur });
+  sendJSON(res, 201, { ok: true, id: r.id });
+});
+route("PATCH", "/api/admin/incidents/:id", async (req, res, params, body) => {
+  const admin = await exigerAdmin(req, res); if (!admin) return;
+  const r = await legal.majIncident(Number(params.id), body);
+  if (r.erreur) return sendJSON(res, r.code || 400, { error: r.erreur });
+  sendJSON(res, 200, { ok: true });
+});
+
 /* GET public — annonces actuellement affichées (accueil, fil). */
 route("GET", "/api/annonces-officielles/actives", async (req, res) => {
   const rows = await db.prepare("SELECT * FROM annonces_officielles WHERE statut='publiee' ORDER BY id DESC LIMIT 5").all();
@@ -22647,6 +22732,8 @@ route("POST", "/api/admin/annonces-officielles/:id/retirer", async (req, res, pa
    ══════════════════════════════════════════════════════════════════════════ */
 const Completude = require("./completude");
 const Immat = require("./immatriculation");
+/* Documents légaux : versions, preuve d'acceptation, droits des personnes, registre des incidents (2026-10-12). */
+const legal = require("./legal")({ db, logError });
 const honneur = require("./honneur")({
   db, dateParisISO, nomCompteAffichage, creerNotif, logError,
   getStripe: () => { try { return require("./stripe-client").stripe; } catch (_) { return null; } },

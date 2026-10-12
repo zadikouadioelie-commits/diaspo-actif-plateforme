@@ -1686,7 +1686,7 @@
     const el = $('#t-accueil');
     if (S.home.loaded && $('#home-actus', el)) return;
     S.home.loaded = true;
-    el.innerHTML = `${pubSlot('homepage_top')}<div id="home-prem-rappel"></div><div id="home-annonce"></div><div id="home-honneur"></div><div id="home-videos"></div>${pubSlot('between_videos')}
+    el.innerHTML = `${pubSlot('homepage_top')}<div id="home-legal"></div><div id="home-prem-rappel"></div><div id="home-annonce"></div><div id="home-honneur"></div><div id="home-videos"></div>${pubSlot('between_videos')}
       <div class="card hero"><div class="pad"><div class="small" style="font-weight:700;color:var(--orange-d)">🌍 Réseau diaspora mondial</div>
         <h2 style="margin:6px 0 8px;font-size:20px;line-height:1.25">Connecter les diasporas, valoriser les talents, accélérer le développement des territoires.</h2>
         <p class="muted small" style="margin:0 0 12px">Des passerelles entre pays d’origine et pays d’accueil, grâce aux compétences, projets, organisations et initiatives portés par les diasporas du monde entier.</p>
@@ -1705,7 +1705,7 @@
         <p style="margin:0 0 10px">La diaspora africaine est un levier de développement majeur, mais ses initiatives restent dispersées, invisibles, sans réseau. Diaspo’Actif change ça.</p>
         <div class="tags" style="margin:0"><span class="badge">👥 Rassembler les talents</span><span class="badge">🗂️ Organiser les initiatives</span><span class="badge">🚀 Mobiliser pour un impact durable</span></div></div></div>
       <div id="home-actus"></div><div id="home-troph"></div><div id="home-shops"></div>${pubSlot('vitrine_section')}<div id="home-temo"></div><div id="home-part"></div>`;
-    loadHome(); premiumRappelAccueil();
+    loadHome(); legalRappelAccueil(); premiumRappelAccueil();
     const promoShareBtn = $('#promo-prem-share');
     if (promoShareBtn) promoShareBtn.onclick = () => partagerLien(location.origin + '/', 'Diaspo’Actif — 3 mois de Premium offerts à toute la diaspora');
     if (window.MMap) { if (S.home.stopMap) S.home.stopMap(); S.home.stopMap = window.MMap.mount($('#home-map')); }
@@ -1898,11 +1898,18 @@
   ];
   const MODS_COMPTE = [
     { t: 'Confidentialité', i: 'lock', h: '#/confidentialite', d: 'Vos données et votre visibilité', r: { utilisateur: 1, initiative: 1 } },
+    { t: 'Mes données et mes droits', i: 'lock', h: '#/droits', d: 'Documents acceptés, demandes sur vos données', r: { utilisateur: 1, initiative: 1 } },
     { t: 'Mon abonnement', i: 'star', h: '#/abonnement', d: 'Premium et échéances', r: { utilisateur: 1, initiative: 1 } },
     { t: 'Structure et organisation', i: 'people', h: '#/structure', d: 'Type, forme juridique, taille, organisme financier', r: { initiative: 1 } },
     { t: 'Liaison de comptes', i: 'people', h: '#', act: 'switch', d: 'Passer d’un compte à un autre', r: { utilisateur: 1, initiative: 1 } }
   ];
   const MENU_DESK = ['Soumettre à Diaspo’Actif', 'Mes projets', 'Évaluation de projet', 'CRM partagé', 'Emploi et stages', 'Paiements', 'Mes demandes de devis', 'Ma localisation', 'Programmation', 'Support pilote', 'Apparence', 'Mes statistiques'];
+  /* Nouvelle version d’un document légal à accepter (2026-10-12) : bandeau d’accueil renvoyant vers « Mes données et mes droits ». */
+  function legalRappelAccueil() {
+    const el = $('#home-legal'); if (!el || !S.me) return;
+    const l = S.me.legal_a_accepter || []; if (!l.length) return;
+    el.innerHTML = `<a class="card pad" href="#/droits" style="display:block;margin:0 0 12px;background:#FEF3C7;color:#78350F;text-decoration:none"><b>Documents mis à jour</b><br><span class="small">${esc(l.map(d => d.titre).join(', '))} : merci de prendre connaissance de la nouvelle version.</span></a>`;
+  }
   /* Bandeau de rappel de fin de Premium gratuit (2026-10-09) : blanc (J-21), vert (J-15), jaune (J-1) — ton d'invitation. */
   async function premiumRappelAccueil() {
     const el = $('#home-prem-rappel'); if (!el || !S.me) return;
