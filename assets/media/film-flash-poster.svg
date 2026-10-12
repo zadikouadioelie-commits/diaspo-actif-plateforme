@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-label="Tuto : publier un événement flash">
+  <defs>
+    <radialGradient id="a" cx=".1" cy="0" r="1"><stop offset="0" stop-color="#3c82d7" stop-opacity=".75"/><stop offset="1" stop-color="#3c82d7" stop-opacity="0"/></radialGradient>
+    <radialGradient id="b" cx="1" cy="1" r=".8"><stop offset="0" stop-color="#e2a929" stop-opacity=".4"/><stop offset="1" stop-color="#e2a929" stop-opacity="0"/></radialGradient>
+    <linearGradient id="bg" x1="0" y1="0" x2=".4" y2="1"><stop offset="0" stop-color="#0f3a7c"/><stop offset=".5" stop-color="#0b2a5b"/><stop offset="1" stop-color="#061633"/></linearGradient>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fdeba8"/><stop offset=".5" stop-color="#e8b22e"/><stop offset="1" stop-color="#b67e14"/></linearGradient>
+  </defs>
+  <rect width="1280" height="720" fill="url(#bg)"/><rect width="1280" height="720" fill="url(#a)"/><rect width="1280" height="720" fill="url(#b)"/>
+  <path d="M0 650 C 300 612, 640 700, 1280 640 L1280 720 L0 720 Z" fill="#061633" opacity=".94"/>
+  <path d="M0 650 C 300 612, 640 700, 1280 640" fill="none" stroke="url(#g)" stroke-width="5"/>
+  <text x="640" y="170" text-anchor="middle" font-family="Georgia,'Times New Roman',serif" font-size="30" letter-spacing="9" fill="#f2c94c" font-weight="700">TUTO · DIASPO'ACTIF</text>
+  <path d="M606 220 L548 330 L600 330 L574 430 L670 304 L616 304 L650 220 Z" fill="url(#g)" stroke="#8a5a00" stroke-width="3" stroke-linejoin="round"/>
+  <text x="640" y="525" text-anchor="middle" font-family="Georgia,'Times New Roman',serif" font-size="92" font-weight="700" letter-spacing="8" fill="url(#g)">ÉVÉNEMENT FLASH</text>
+  <text x="640" y="590" text-anchor="middle" font-family="Georgia,'Times New Roman',serif" font-size="34" fill="#dbe8ff">Une annonce · sans inscription</text>
+</svg>

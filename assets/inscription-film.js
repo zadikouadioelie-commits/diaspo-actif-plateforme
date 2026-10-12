@@ -157,6 +157,77 @@
 .fi-str i{display:block;height:100%;width:0;border-radius:999px;background:linear-gradient(90deg,#f59e0b,#16a34a)}
 .fi-pill2{display:inline-block;margin-top:10px;padding:5px 12px;border-radius:999px;background:#ecfdf5;border:2px solid #86efac;color:#15803d;font-size:14px;font-weight:800}
 .fi-chk u.hl{background:#fff4d6;border-radius:4px;padding:0 3px;outline:2px solid #E2A929}
+/* ── Tuto « Événements flash » ── */
+.ff-steps{display:flex;align-items:flex-start;width:900px}
+.ff-steps .fi-st{width:150px}
+.ff-title{font-family:'Cinzel','Georgia',serif;font-size:74px;font-weight:800;letter-spacing:.12em;white-space:nowrap;text-shadow:0 4px 26px rgba(0,0,0,.4)}
+.ff-title span{display:inline-block;margin-right:14px;filter:drop-shadow(0 0 18px rgba(255,190,40,.8))}
+.ff-demo{position:relative;display:inline-flex;align-items:center;gap:20px;padding:14px 30px;border-radius:999px;background:rgba(255,255,255,.1);border:2px solid rgba(255,255,255,.35);font-size:30px;font-weight:800;color:#dbe8ff;white-space:nowrap}
+.ff-demo .b{padding:10px 26px;border-radius:12px;background:#2563eb;color:#fff;font-size:26px;position:relative}
+.ff-demo .st{position:absolute;left:24px;right:auto;top:50%;height:6px;width:210px;margin-top:-3px;border-radius:3px;background:#ef4444;transform-origin:0 50%;transform:scaleX(0);box-shadow:0 0 14px rgba(239,68,68,.8)}
+.ff-demo em{font-style:normal;color:#FDEBA8}
+.ff-mini{width:400px;height:215px;padding:16px 20px;border-radius:22px;background:linear-gradient(165deg,#15428a,#0a2556);border:3px solid #E2A929;box-shadow:0 14px 40px rgba(0,0,0,.4)}
+.ff-mini-t{font-size:15px;font-weight:800;letter-spacing:.16em;color:#F2C94C}
+.ff-org{display:flex;align-items:center;gap:12px;margin:12px 0 8px;font-size:21px;font-weight:700}
+.ff-org img{width:44px;height:44px;border-radius:50%;background:#fff;object-fit:contain;box-shadow:0 0 0 3px #E2A929}
+.ff-org b{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#8b5cf6,#6366f1);display:flex;align-items:center;justify-content:center;font-size:17px;box-shadow:0 0 0 3px #E2A929}
+.ff-mini-n{font-family:'Cinzel','Georgia',serif;font-size:27px;font-weight:800;line-height:1.15}
+.ff-mini-d{margin-top:8px;font-size:17px;color:#cfe0ff;font-weight:600}
+.ff-flash{display:inline-block;margin-top:10px;padding:4px 14px;border-radius:999px;background:#16a34a;color:#fff;font-size:14px;font-weight:800;letter-spacing:.08em}
+.ff-pill{display:inline-block;padding:12px 26px;border-radius:999px;background:rgba(255,255,255,.14);border:2px solid rgba(226,169,41,.8);font-size:25px;font-weight:700;color:#FDEBA8;white-space:nowrap}
+.ff-bar{width:1020px;height:92px;border-radius:20px;background:linear-gradient(180deg,#0f2a52,#0a1d3b);border:3px solid #E2A929;display:flex;align-items:center;gap:22px;padding:0 24px;box-shadow:0 18px 50px rgba(0,0,0,.5);font-size:21px;font-weight:700;color:#dbe8ff}
+.ff-bar img{width:54px;height:54px;border-radius:50%;background:#fff;object-fit:contain}
+.ff-bar .lg{font-family:'Cinzel','Georgia',serif;font-weight:800;color:#fff;letter-spacing:.06em;font-size:24px}
+.ff-bar .nv{display:flex;gap:20px;margin-left:12px}
+.ff-bar .ch{margin-left:auto;display:flex;align-items:center;gap:12px;padding:8px 18px;border-radius:999px;background:rgba(255,255,255,.1);border:2px solid rgba(255,255,255,.3);color:#fff;white-space:nowrap}
+.ff-bar .ch b{display:block;font-size:19px}.ff-bar .ch span{font-size:14px;padding:2px 10px;border-radius:999px;background:#1d4ed8;color:#fff}
+.ff-bar .ch i{width:12px;height:12px;border-radius:50%;background:#22c55e;box-shadow:0 0 10px #22c55e}
+.ff-page{width:1040px;height:400px}
+.ff-ph{position:absolute;left:24px;top:22px;font-family:'Cinzel','Georgia',serif;font-size:34px;font-weight:800}
+.ff-ps{position:absolute;left:24px;top:76px;font-size:18px;color:#4b6a93;font-weight:600}
+.ff-b{position:absolute;height:58px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:800;white-space:nowrap;border:2px solid #c7d7ee;background:#fff;color:#0B2A5B}
+.ff-b.green{background:#4ade80;border-color:#22c55e;color:#0a3d1c}
+.ff-b.blue{background:#2563eb;border-color:#1d4ed8;color:#fff}
+.ff-q{position:absolute;width:46px;height:46px;margin-top:6px;border-radius:50%;background:#16a34a;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:22px}
+.ff-sk{position:absolute;width:300px;height:110px;border-radius:14px;background:#eef4ff;border:2px solid #d4e3fb}
+.ff-call{padding:8px 18px;border-radius:999px;background:#fff4d6;border:2px solid #E2A929;color:#8a5a00;font-size:19px;font-weight:800;white-space:nowrap}
+.ff-cur{filter:drop-shadow(0 3px 5px rgba(0,0,0,.5))}
+.ff-fm{width:1040px;height:470px;padding:22px 30px}
+.ff-fm h5{margin:0 0 14px;font-size:25px;font-weight:800;display:flex;align-items:center;gap:10px;font-family:'Cinzel','Georgia',serif}
+.ff-fm h5 span{font-family:'Segoe UI',system-ui,sans-serif;font-size:14px;font-weight:700;background:#dcfce7;color:#15803d;border-radius:999px;padding:5px 12px;border:2px solid #86efac}
+.ff-fm .fi-fl{margin-bottom:10px}.ff-fm .fi-fl label{font-size:14px;margin-bottom:3px}
+.ff-fm .fi-fl .v{height:44px;font-size:19px}
+.ff-row2{display:flex;gap:14px}.ff-row2>div{flex:1}
+.ff-glow{box-shadow:0 0 0 4px rgba(226,169,41,.45);border-radius:12px}
+.ff-ph2{display:flex;gap:12px;margin-bottom:10px}
+.ff-tile{width:120px;height:78px;border-radius:12px;border:3px dashed #9db8dd;background:#fff;display:flex;align-items:center;justify-content:center;font-size:30px;color:#9db8dd;position:relative;overflow:hidden}
+.ff-tile i{position:absolute;inset:0;opacity:0}
+.ff-t1 i{background:linear-gradient(135deg,#f59e0b,#c2410c 60%,#7c2d12)}.ff-t2 i{background:linear-gradient(135deg,#0ea5e9,#1d4ed8 60%,#312e81)}
+.ff-rad{display:flex;align-items:center;gap:12px;padding:8px 14px;border-radius:12px;border:2px solid #c7d7ee;background:#fff;font-size:17px;font-weight:700;margin-bottom:8px}
+.ff-rad b{width:22px;height:22px;border-radius:50%;border:3px solid #9db8dd;flex:none;display:block;background:#fff}
+.ff-rad.on{border-color:#E2A929;background:#fff8e1}.ff-rad.on b{border-color:#d97706;background:radial-gradient(circle,#d97706 0 45%,#fff 50%)}
+.ff-rad.pk{box-shadow:0 0 0 4px rgba(226,169,41,.45)}
+.ff-rec{width:790px;height:455px;padding:0;overflow:hidden}
+.ff-aff{height:125px;background:linear-gradient(120deg,#0B2A5B 0%,#1d57ad 45%,#c2410c 100%);display:flex;align-items:center;justify-content:center;font-family:'Cinzel','Georgia',serif;font-size:30px;font-weight:800;color:#fff;letter-spacing:.06em;text-align:center;line-height:1.2;padding:0 40px}
+.ff-rl{padding:12px 30px 0;font-size:19px;line-height:1.5;font-weight:600;color:#1e3a5f}
+.ff-rl b{color:#8a5a00}
+.ff-rn{margin:10px 30px 0;padding:9px 14px;border-radius:10px;background:#eef5ff;border:2px solid #cfe0fb;font-size:16px;color:#33527d;font-weight:700}
+.ff-rb{display:flex;justify-content:space-between;align-items:center;padding:14px 30px 0}
+.ff-bt{padding:12px 24px;border-radius:12px;font-size:19px;font-weight:800;white-space:nowrap}
+.ff-bt.o{background:#fff;border:2px solid #c7d7ee;color:#33527d}
+.ff-bt.p{background:linear-gradient(135deg,#FDEBA8,#E2A929 60%,#B67E14);color:#3a2600;box-shadow:0 8px 20px rgba(226,169,41,.45)}
+.ff-lst{width:620px;height:340px;padding:0;overflow:hidden;background:linear-gradient(160deg,#f0fdf4,#dcfce7) padding-box,linear-gradient(135deg,#86efac,#16a34a) border-box}
+.ff-lst .ban{height:120px;background:linear-gradient(120deg,#0B2A5B 0%,#1d57ad 45%,#c2410c 100%);display:flex;align-items:center;justify-content:center;font-family:'Cinzel','Georgia',serif;font-size:26px;font-weight:800;color:#fff}
+.ff-lst .bd{padding:14px 26px}
+.ff-lst .dt{font-size:16px;font-weight:800;color:#15803d;letter-spacing:.05em}
+.ff-lst .tt{font-family:'Cinzel','Georgia',serif;font-size:27px;font-weight:800;margin:4px 0 6px}
+.ff-lst .ch{display:flex;gap:8px;align-items:center;margin-bottom:12px;font-size:16px;font-weight:700;color:#33527d}
+.ff-lst .ch em{font-style:normal;padding:3px 12px;border-radius:999px;background:#fff;border:2px solid #c7d7ee}
+.ff-lst .ch em.fl{background:#4ade80;border-color:#22c55e;color:#0a3d1c}
+.ff-lst .bs{display:flex;gap:10px}
+.ff-lst .bs span{padding:10px 20px;border-radius:12px;background:#fff;border:2px solid #c7d7ee;font-size:17px;font-weight:800;color:#2563eb}
+.ff-lst .bs span.in{color:#0f766e;background:#ecfeff;border-color:#99f6e4}
+.ff-toast{padding:14px 28px;border-radius:14px;background:#16a34a;color:#fff;font-size:24px;font-weight:800;box-shadow:0 12px 36px rgba(22,163,74,.5);white-space:nowrap}
 @media (max-width:640px){.fi-titre{display:none!important}.fi-top{justify-content:flex-end}}
 @media (prefers-reduced-motion:reduce){.fi-ov{animation:none}}
 `;
@@ -661,7 +732,200 @@
   }
 
   FILMS.long.caps = CAPS_LONG; FILMS.long.scenes = SCENES_LONG; FILMS.long.sfx = SFX_LONG;
-  function rendre(av) { return FILM.id === 'long' ? rendreLong(av) : rendreCourt(av); }
+
+  /* ═══ Tuto « Événements flash » (2026-10-12) : décor, sous-titres, effets, scènes ═══ */
+  const STAGE_FLASH_HTML = `
+<div class="fi-bg"></div>
+<div class="fi-blob b1" data-r="b1"></div><div class="fi-blob b2" data-r="b2"></div>
+<div data-r="parts"></div>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <linearGradient id="fiGold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FDEBA8"/><stop offset=".5" stop-color="#E8B22E"/><stop offset="1" stop-color="#B67E14"/></linearGradient>
+</defs></svg>
+<svg class="fi-globe" data-r="rub" viewBox="0 0 1280 720" width="1280" height="720" aria-hidden="true">
+  <path d="M0 650 C 300 612, 640 700, 1280 640 L1280 720 L0 720 Z" fill="#061633" opacity=".94"/>
+  <path d="M0 650 C 300 612, 640 700, 1280 640" fill="none" stroke="url(#fiGold)" stroke-width="5"/>
+  <path d="M0 662 C 300 624, 640 712, 1280 652" fill="none" stroke="#1B7F3B" stroke-width="3" opacity=".9"/>
+</svg>
+<div class="fi-abs fi-motto" data-r="motto">Rassembler · Mobiliser · Impacter</div>
+<div class="fi-abs fi-head" data-r="head"><img src="assets/media/logo-film.webp" alt=""><span>Diaspo<i>'</i>Actif</span></div>
+
+<div class="fi-abs ff-title gold" data-r="ft"><span>⚡</span>ÉVÉNEMENT FLASH</div>
+<div class="fi-abs fi-tag" data-r="fsub">UNE ANNONCE · SANS INSCRIPTION</div>
+<div class="fi-abs ff-demo" data-r="fdemo"><span class="b">S'inscrire</span><i class="st" data-r="fstrike"></i><em>aucune inscription</em></div>
+<div class="fi-abs ff-mini" data-r="fc0"><div class="ff-mini-t">VOTRE ÉVÉNEMENT</div><div class="ff-org"><img src="assets/media/logo-film.webp" alt=""><span>Diaspo'Actif</span></div><div class="ff-mini-n">Forum de la diaspora</div><div class="ff-mini-d">📅 Sam. 7 novembre · Toulouse</div><span class="ff-flash">⚡ FLASH</span></div>
+<div class="fi-abs ff-mini" data-r="fc1"><div class="ff-mini-t">ÉVÉNEMENT RELAYÉ</div><div class="ff-org"><b>AT</b><span>Association Les Tisserands</span></div><div class="ff-mini-n">Festival des cultures</div><div class="ff-mini-d">📅 Sam. 14 novembre · Lyon</div><span class="ff-flash">⚡ FLASH</span></div>
+<div class="fi-abs ff-pill" data-r="fbell">🔔 La diaspora est informée</div>
+
+<div class="fi-abs ff-steps" data-r="steps"><div class="fi-st" data-s="0"><b>1</b><span>Connexion</span></div><i class="fi-sl"></i><div class="fi-st" data-s="1"><b>2</b><span>Événements</span></div><i class="fi-sl"></i><div class="fi-st" data-s="2"><b>3</b><span>Informations</span></div><i class="fi-sl"></i><div class="fi-st" data-s="3"><b>4</b><span>Récapitulatif</span></div><i class="fi-sl"></i><div class="fi-st" data-s="4"><b>5</b><span>Publication</span></div></div>
+
+<div class="fi-abs ff-bar" data-r="fbar"><img src="assets/media/logo-film.webp" alt=""><span class="lg">DIASPO'ACTIF</span><span class="nv"><span>Accueil</span><span>Annuaire</span><span>Boutiques</span><span>Événements</span></span><span class="ch" data-r="fchip"><i></i><span><b>ZADI</b><span>Initiative</span></span></span></div>
+<div class="fi-abs ff-pill" data-r="fconn">Connecté avec votre compte Initiative</div>
+
+<div class="fi-abs fi-card ff-page" data-r="fev">
+  <div class="ff-ph">📅 Événements Diaspo'Actif</div><div class="ff-ps">Tous les événements présents sur la plateforme, réunis au même endroit.</div>
+  <div class="ff-b" style="left:24px;top:150px;width:190px">🔔 Alertes</div>
+  <div class="ff-b" style="left:226px;top:150px;width:196px">📅 Calendrier</div>
+  <div class="ff-b green" data-r="fbtn" style="left:434px;top:150px;width:210px">⚡ Événement flash</div>
+  <div class="ff-q" style="left:652px;top:150px">?</div>
+  <div class="ff-b blue" data-r="fcreate" style="left:716px;top:150px;width:250px">📣 Créer un événement</div>
+  <div class="ff-sk" style="left:24px;top:250px"></div><div class="ff-sk" style="left:340px;top:250px"></div><div class="ff-sk" style="left:656px;top:250px"></div>
+</div>
+<div class="fi-abs ff-call" data-r="fcall">avec des inscriptions</div>
+<svg class="fi-abs ff-cur" data-r="fcur" width="40" height="40" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 2 L3 19 L8 14.5 L11.5 22 L14.5 20.6 L11 13.5 L18 13.5 Z" fill="#fff" stroke="#0B2A5B" stroke-width="1.5" stroke-linejoin="round"/></svg>
+
+<div class="fi-abs fi-card ff-fm" data-r="fform">
+  <h5>⚡ Événement flash <span>Sans inscription</span></h5>
+  <div class="fi-cols">
+    <div class="fi-col">
+      <div class="fi-fl"><label>TITRE *</label><div class="v"><span data-r="x0"></span><span class="ok" data-r="k0">✓</span></div></div>
+      <div class="ff-row2"><div class="fi-fl"><label>DATE *</label><div class="v"><span data-r="x1"></span><span class="ok" data-r="k1">✓</span></div></div><div class="fi-fl"><label>HEURE DE DÉBUT</label><div class="v">09:00</div></div></div>
+      <div class="fi-fl"><label>ADRESSE DE L'ÉVÉNEMENT *</label><div class="v"><span data-r="x2"></span><span class="ok" data-r="k2">✓</span></div></div>
+      <div class="fi-fl"><label>DESCRIPTION *</label><div class="fi-bio" style="height:96px;font-size:17px"><span data-r="x3"></span></div></div>
+    </div>
+    <div class="fi-col">
+      <div class="fi-fl"><label>PHOTOS</label><div class="ff-ph2"><div class="ff-tile ff-t1">📷<i data-r="p1"></i></div><div class="ff-tile ff-t2">📷<i data-r="p2"></i></div></div></div>
+      <div class="fi-fl" data-r="forga"><label>ORGANISATEUR (SI CE N'EST PAS VOUS) · LOGO</label><div class="ff-row2" style="align-items:center"><div class="v" style="flex:3;height:44px;border-radius:12px;border:2px solid #c7d7ee;background:#fff;padding:0 14px;display:flex;align-items:center;font-size:19px;font-weight:600"><span data-r="x4"></span></div><div class="ff-tile" style="flex:none;width:64px;height:64px;border-radius:50%;font-size:22px">🏷️<i data-r="lg" style="background:linear-gradient(135deg,#8b5cf6,#6366f1);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-style:normal;font-size:20px">AT</i></div></div></div>
+      <div class="fi-fl"><label>VISIBILITÉ</label>
+        <div class="ff-rad" data-r="r0"><b></b><span>🌍🛍 Calendrier public ET boutique</span></div>
+        <div class="ff-rad" data-r="r1"><b></b><span>🌍 Calendrier public uniquement</span></div>
+        <div class="ff-rad" data-r="r2"><b></b><span>🛍 Page boutique uniquement</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="fi-abs fi-card ff-rec" data-r="frec">
+  <div class="ff-aff">FORUM DE LA DIASPORA<br>SAMEDI 7 NOVEMBRE · TOULOUSE</div>
+  <div class="ff-rl"><b>Titre :</b> Forum de la diaspora d'Occitanie<br><b>Date :</b> samedi 7 novembre 2026 à 09:00<br><b>Adresse :</b> 153 avenue de Lardenne, Toulouse<br><b>Organisateur :</b> Association Les Tisserands<br><b>Visible :</b> 🌍🛍 calendrier public et boutique</div>
+  <div class="ff-rn">ℹ️ Événement informatif — aucune inscription ne sera proposée.</div>
+  <div class="ff-rb"><span class="ff-bt o" data-r="fmod">← Modifier</span><span class="ff-bt p" data-r="fconf">✅ Confirmer et publier</span></div>
+</div>
+<div class="fi-abs ff-toast" data-r="ftoast">✅ Événement publié</div>
+<div class="fi-abs fi-card ff-lst" data-r="flist">
+  <div class="ban">FORUM DE LA DIASPORA</div>
+  <div class="bd"><div class="dt">SAMEDI 7 NOVEMBRE 2026 · 09:00</div><div class="tt">Forum de la diaspora d'Occitanie</div>
+    <div class="ch"><em>Gratuit</em><em class="fl" data-r="fbadge">⚡ Flash</em><em>0 inscrit</em></div>
+    <div class="bs"><span>Voir</span><span>Partager</span><span class="in">Informatif</span></div></div>
+</div>
+<div class="fi-abs ff-pill" data-r="fnoins">Pas de bouton « S'inscrire »</div>
+
+<div class="fi-abs" data-r="lauG">${laurier(false)}</div><div class="fi-abs" data-r="lauD">${laurier(true)}</div>
+<div class="fi-abs fi-logo" data-r="logoF" style="width:230px;height:230px;margin:0"><img src="assets/media/logo-film.webp" alt="" style="width:100%;height:100%;border-radius:50%"></div>
+<div class="fi-abs fi-big" data-r="t1">Informez la <span class="gold">diaspora</span></div>
+<div class="fi-abs fi-script" data-r="t0">en un instant</div>
+<div class="fi-abs" data-r="t3"><span class="fi-cta">Publier un événement flash</span></div>
+<div class="fi-abs fi-url" data-r="t4">DIASPOACTIF.COM</div>
+<div class="fi-abs" data-r="fade" style="width:${W}px;height:${H}px;background:#061633;opacity:0"></div>`;
+
+  const CAPS_FLASH = [
+    [0.0, 2.4, "Un événement à annoncer, sans inscription ?"],
+    [2.5, 6.6, "Utilisez l'événement flash : une annonce publiée en quelques secondes."],
+    [6.6, 11.2, "Pour vos événements, ou pour relayer celui d'un autre organisateur et informer la diaspora."],
+    [11.5, 14.8, "Un : connectez-vous avec votre compte Initiative."],
+    [14.76, 18.9, "Deux : dans l'espace Événements, cliquez sur le bouton vert « Événement flash »."],
+    [19.1, 22.7, "Avec des inscriptions ? Choisissez plutôt « Créer un événement »."],
+    [22.7, 27.9, "Trois : renseignez le titre, la date, l'adresse, la description et vos photos."],
+    [27.9, 30.95, "Autre organisateur ? Ajoutez son nom et son logo."],
+    [30.96, 35.05, "Choisissez la visibilité : calendrier public, boutique, ou les deux."],
+    [35.08, 39.2, "Quatre : vérifiez le récapitulatif, vous pouvez encore modifier."],
+    [39.2, 41.5, "Cinq : confirmez et publiez !"],
+    [41.5, 45.7, "L'annonce apparaît aussitôt, avec son badge « Flash », sans inscription."],
+    [45.7, 49.3, "Diaspo'Actif : informez la diaspora, en un instant."],
+  ];
+  const SCENES_FLASH = [[-LEAD, 11.4], [11.4, 14.9], [14.9, 22.7], [22.7, 35.1], [35.1, 39.4], [39.4, 45.6], [45.6, 54.0 - LEAD]];
+  const SFX_FLASH = [[2.2, 'clic'], [6.7, 'pop'], [8.1, 'pop'], [10.0, 'pop'], [13.45, 'chime'], [18.4, 'clic'], [21.0, 'pop'], [24.55, 'tic'], [25.25, 'tic'], [26.0, 'tic'], [26.8, 'tic'],
+    [27.6, 'pop'], [30.2, 'pop'], [32.5, 'clic'], [33.7, 'clic'], [34.6, 'clic'], [37.4, 'pop'], [40.65, 'clic'], [41.3, 'chime'], [43.6, 'pop'], [45.7, 'chime']];
+
+  function rendreFlash(av) {
+    let a = av;
+    if (calme) { const s = FILM.scenes.find(x => av >= x[0] && av < x[1]) || FILM.scenes[FILM.scenes.length - 1]; a = s[1] - 0.02; }
+    const w = (a0, a1, f) => P(a, a0, a0 + (f || 0.5)) * (1 - P(a, a1 - (f || 0.5), a1));   // fenêtre de visibilité (fondu entrant / sortant)
+    const pic = (a0, a1) => P(a, a0, a0 + 0.25, E.lin) * (1 - P(a, a1 - 0.25, a1, E.lin));   // impulsion lumineuse
+
+    R.b1.style.transform = `translate(${Math.sin(a * .2) * 60}px,${Math.cos(a * .17) * 40}px)`;
+    R.b2.style.transform = `translate(${Math.cos(a * .15) * -70}px,${Math.sin(a * .21) * -50}px)`;
+    R.pa.forEach((e, i) => {
+      const sx = (i * 197.3) % W, sy = (i * 83.7) % H, v = 8 + (i % 5) * 4;
+      e.el.style.transform = `translate(${(sx + Math.sin(a * .3 + i) * 30) % W}px,${((sy - a * v) % H + H) % H}px)`;
+      e.el.style.opacity = .25 + .35 * Math.abs(Math.sin(a * .8 + i));
+    });
+    const dec = P(a, -1.2, -0.3);
+    R.rub.style.opacity = dec * (1 - P(a, 45.4, 46.2));
+    place(R.motto, 640, 690, 1, dec * 0.95 * (1 - P(a, 45.4, 46.2)));
+    place(R.head, 300, 62, 1, P(a, 11.0, 11.9) * (1 - P(a, 45.4, 46.2)));
+
+    /* Scène 1 : « Événement flash » — une annonce, sans inscription ; pour soi ou pour relayer un événement d'autrui */
+    place(R.ft, 640, 150, lerp(0.9, 1, P(a, 0.2, 1.4, E.back)), P(a, 0.2, 1.2) * (1 - P(a, 10.6, 11.4)));
+    place(R.fsub, 640, 232, 1, P(a, 3.9, 4.9) * (1 - P(a, 10.6, 11.4)));
+    place(R.fdemo, 640, 345, lerp(0.85, 1, P(a, 1.4, 2.2, E.back)), P(a, 1.4, 2.0) * (1 - P(a, 5.4, 6.0)));
+    R.fstrike.style.transform = `scaleX(${P(a, 2.1, 2.9, E.inout)})`;
+    [[R.fc0, 400, 6.5, 6.88, 7.6], [R.fc1, 880, 7.9, 8.8, 9.75]].forEach(([el, x, t0, c0, c1]) => {
+      const e = P(a, t0, t0 + 0.7, E.back), lum = pic(c0, c1);
+      place(el, x, lerp(560, 500, e), lerp(0.88, 1, e) * (1 + 0.05 * lum), P(a, t0, t0 + 0.5) * (1 - P(a, 10.7, 11.4)));
+      el.style.borderColor = lum > 0.05 ? '#FDEBA8' : '#E2A929';
+      el.style.boxShadow = `0 14px 40px rgba(0,0,0,.4),0 0 ${lum * 50}px rgba(253,235,168,${lum * 0.7})`;
+    });
+    place(R.fbell, 640, 372, lerp(0.85, 1, P(a, 9.85, 10.5, E.back)), P(a, 9.85, 10.4) * (1 - P(a, 10.8, 11.4)));
+
+    /* Suivi des 5 étapes */
+    const idx = a < 14.9 ? 0 : a < 22.7 ? 1 : a < 35.1 ? 2 : a < 39.4 ? 3 : 4;
+    R.stEls.forEach((el, i) => { const st = i < idx ? 'done' : i === idx ? (a >= 45.6 ? 'done' : 'on') : ''; el.className = 'fi-st ' + st; el.querySelector('b').textContent = st === 'done' ? '✓' : String(i + 1); });
+    place(R.steps, 640, 140, 1, P(a, 11.3, 12.0) * (1 - P(a, 45.0, 45.7)) * (a > 11.2 ? 1 : 0));
+
+    /* Scène 2 (étape 1) : barre du site, compte Initiative connecté */
+    place(R.fbar, 640, 330, lerp(0.94, 1, P(a, 11.7, 12.6)), P(a, 11.7, 12.4) * (1 - P(a, 14.5, 15.1)));
+    const lc = pic(13.5, 14.8);
+    R.fchip.style.boxShadow = `0 0 ${lc * 34}px rgba(253,235,168,${lc * 0.9})`; R.fchip.style.borderColor = lc > 0.05 ? '#FDEBA8' : 'rgba(255,255,255,.3)';
+    place(R.fconn, 640, 440, lerp(0.9, 1, P(a, 13.4, 14.0, E.back)), P(a, 13.4, 14.0) * (1 - P(a, 14.5, 15.1)));
+
+    /* Scène 3 (étape 2) : page Événements, bouton vert « Événement flash » ; « Créer un événement » = avec inscriptions */
+    place(R.fev, 640, 415, lerp(0.9, 0.95, P(a, 15.0, 15.9)), P(a, 15.0, 15.7) * (1 - P(a, 22.3, 22.9)));
+    const gf = pic(17.0, 18.95), gc = pic(20.4, 22.6);
+    R.fbtn.style.boxShadow = gf > 0.05 ? `0 0 ${gf * 40}px rgba(74,222,128,${gf})` : ''; R.fbtn.style.transform = `scale(${1 + 0.06 * gf - 0.07 * P(a, 18.3, 18.4, E.lin) * (1 - P(a, 18.5, 18.7, E.lin))})`;
+    R.fcreate.style.boxShadow = gc > 0.05 ? `0 0 ${gc * 40}px rgba(96,165,250,${gc})` : ''; R.fcreate.style.transform = `scale(${1 + 0.05 * gc})`;
+    place(R.fcall, 945, 338, lerp(0.9, 1, P(a, 19.2, 19.8, E.back)), P(a, 19.2, 19.8) * (1 - P(a, 22.2, 22.8)));
+    { const m = P(a, 16.2, 18.2, E.inout);
+      place(R.fcur, lerp(930, 660, m) + 12, lerp(590, 387, m) + 14, 1, P(a, 16.0, 16.5) * (1 - P(a, 18.9, 19.4)) * (a > 15.9 ? 1 : 0)); }
+
+    /* Scène 4 (étape 3) : le formulaire se remplit */
+    place(R.fform, 640, 425, lerp(0.85, 0.9, P(a, 22.8, 23.6, E.back)), P(a, 22.8, 23.5) * (1 - P(a, 34.7, 35.3)));
+    R.x0.textContent = tape("Forum de la diaspora d'Occitanie", a, 23.7, 24.55); R.k0.style.opacity = a >= 24.6 ? 1 : 0;
+    R.x1.textContent = tape('07/11/2026', a, 24.7, 25.25); R.k1.style.opacity = a >= 25.3 ? 1 : 0;
+    R.x2.textContent = tape('153 avenue de Lardenne, Toulouse', a, 25.35, 26.0); R.k2.style.opacity = a >= 26.05 ? 1 : 0;
+    R.x3.textContent = tape("Rencontre ouverte à toute la diaspora. Entrée libre.", a, 26.2, 26.85);
+    R.p1.style.opacity = P(a, 27.3, 27.6); R.p2.style.opacity = P(a, 27.55, 27.85);
+    const go = pic(27.95, 30.95);
+    R.forga.className = 'fi-fl' + (go > 0.05 ? ' ff-glow' : ''); R.forga.style.padding = '6px'; R.forga.style.margin = '-6px -6px 4px';
+    R.x4.textContent = tape('Association Les Tisserands', a, 29.15, 30.1); R.lg.style.opacity = P(a, 30.1, 30.8);
+    const sel = a >= 34.6 ? 0 : -1, pk = a >= 34.6 ? 0 : a >= 33.7 ? 2 : a >= 32.5 ? 1 : -1;
+    [0, 1, 2].forEach(i => { R['r' + i].className = 'ff-rad' + (i === sel ? ' on' : '') + (i === pk && a < 34.9 ? ' pk' : ''); });
+
+    /* Scène 5 (étape 4) : récapitulatif puis clic sur « Confirmer et publier » */
+    place(R.frec, 640, 425, lerp(0.9, 0.93, P(a, 35.3, 36.1, E.back)), P(a, 35.3, 36.0) * (1 - P(a, 40.9, 41.4)));
+    const pm = pic(37.4, 39.15), pcf = pic(39.8, 40.65);
+    R.fmod.style.boxShadow = pm > 0.05 ? `0 0 ${pm * 26}px rgba(96,165,250,${pm})` : ''; R.fmod.style.transform = `scale(${1 + 0.07 * pm})`;
+    R.fconf.style.boxShadow = `0 8px 20px rgba(226,169,41,.45)${pcf > 0.05 ? `,0 0 ${pcf * 40}px rgba(253,235,168,${pcf})` : ''}`;
+    R.fconf.style.transform = `scale(${1 + 0.06 * pcf - 0.08 * P(a, 40.55, 40.65, E.lin) * (1 - P(a, 40.75, 40.95, E.lin))})`;
+
+    /* Scène 6 (étape 5) : l'annonce apparaît dans la liste, badge Flash, pas de bouton « S'inscrire » */
+    place(R.ftoast, 640, 218, lerp(0.85, 1, P(a, 41.0, 41.6, E.back)), P(a, 41.0, 41.5) * (1 - P(a, 44.0, 44.6)));
+    place(R.flist, 640, 440, lerp(0.9, 1, P(a, 41.3, 42.1, E.back)), P(a, 41.3, 42.0) * (1 - P(a, 45.1, 45.7)));
+    const bf = pic(43.4, 44.6);
+    R.fbadge.style.boxShadow = bf > 0.05 ? `0 0 ${bf * 26}px rgba(74,222,128,${bf})` : ''; R.fbadge.style.transform = `scale(${1 + 0.18 * bf})`;
+    place(R.fnoins, 640, 218, lerp(0.9, 1, P(a, 44.6, 45.1, E.back)), P(a, 44.6, 45.0) * (1 - P(a, 45.2, 45.7)));
+
+    /* Scène 7 : conclusion */
+    const fin = P(a, 45.7, 46.6);
+    place(R.lauG, 250, 330, 1, fin * 0.9); place(R.lauD, 1030, 330, 1, fin * 0.9);
+    place(R.logoF, 640, 205, lerp(0.7, 1, P(a, 45.8, 46.8, E.back)), fin);
+    place(R.t1, 640, 395, 1, P(a, 46.6, 47.4)); place(R.t0, 640, 470, 1, P(a, 47.4, 48.3));
+    place(R.t3, 640, 560, lerp(0.9, 1, P(a, 48.6, 49.3, E.back)) * (1 + 0.04 * Math.sin(a * 5) * P(a, 49.3, 50)), P(a, 48.6, 49.3));
+    place(R.t4, 640, 612, 1, P(a, 49.4, 50.2));
+    R.fade.style.opacity = P(a, 52.0, 52.5);
+  }
+
+  FILMS.flash = { id: 'flash', stage: 'flash', etiquette: '55 s', titre: 'TUTO · ÉVÉNEMENTS FLASH', aria: "Tuto vidéo : publier un événement flash sur Diaspo'Actif", cta: { label: 'Publier un événement flash', href: 'evenements.html' }, voix: 'assets/media/evenement-flash-voix.mp3?v=1', fin: 54.0, dvoix: 49.2, caps: CAPS_FLASH, scenes: SCENES_FLASH, sfx: SFX_FLASH, swell: [35, 46] };
+  function rendre(av) { return FILM.id === 'long' ? rendreLong(av) : FILM.id === 'flash' ? rendreFlash(av) : rendreCourt(av); }
 
   /* ── Sous-titres ── */
   function majCaption(a) {
@@ -758,16 +1022,16 @@
   function ouvrir(options) {
     if (ov) return;
     options = options || {};
-    FILM = options.version === 'court' ? FILMS.court : FILMS.long;
+    FILM = options.version === 'court' ? FILMS.court : options.version === 'flash' ? FILMS.flash : FILMS.long;
     if (!document.getElementById('fi-css')) { const st = document.createElement('style'); st.id = 'fi-css'; st.textContent = CSS; document.head.appendChild(st); }
     if (!document.getElementById('fi-fonts')) { const l = document.createElement('link'); l.id = 'fi-fonts'; l.rel = 'stylesheet'; l.href = 'https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Cinzel:wght@600;800&display=swap'; document.head.appendChild(l); }
     calme = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
     ov = document.createElement('div');
-    ov.className = 'fi-ov'; ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true'); ov.setAttribute('aria-label', "Film : créer son compte sur Diaspo'Actif");
+    ov.className = 'fi-ov'; ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true'); ov.setAttribute('aria-label', FILM.aria || "Film : créer son compte sur Diaspo'Actif");
     const surInscription = /(^|\/)inscription(\.html)?$/.test(location.pathname);
     ov.innerHTML = `<div class="fi-box">
-      <div class="fi-top"><span class="fi-titre">▶ COMMENT ÇA MARCHE · ${FILM.etiquette}</span><span style="display:flex;gap:8px"><button class="fi-btn or" data-r="cta" type="button">Créer mon compte</button><button class="fi-btn" data-r="fermer" type="button" aria-label="Fermer le film">✕ Fermer</button></span></div>
-      <div class="fi-win" data-r="win"><div class="fi-stage" data-r="stage">${STAGE_HTML}</div></div>
+      <div class="fi-top"><span class="fi-titre">▶ ${FILM.titre || 'COMMENT ÇA MARCHE'} · ${FILM.etiquette}</span><span style="display:flex;gap:8px"><button class="fi-btn or" data-r="cta" type="button">${FILM.cta ? FILM.cta.label : 'Créer mon compte'}</button><button class="fi-btn" data-r="fermer" type="button" aria-label="Fermer le film">✕ Fermer</button></span></div>
+      <div class="fi-win" data-r="win"><div class="fi-stage" data-r="stage">${FILM.stage === 'flash' ? STAGE_FLASH_HTML : STAGE_HTML}</div></div>
       <div class="fi-cap" data-r="cap" aria-live="off"></div>
       <div class="fi-ctl"><button class="fi-btn" data-r="play" type="button">▶ Lecture</button><button class="fi-btn" data-r="son" type="button">🔊 Son</button>
         <div class="fi-prog" data-r="prog" role="slider" tabindex="0" aria-label="Position dans le film" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i data-r="progf"></i><b data-r="progb"></b></div><span class="t" data-r="temps">0:00 / ${fmt(FILM.fin)}</span></div></div>`;
@@ -801,7 +1065,7 @@
       R.prog.addEventListener('pointerup', () => { glisse = false; });
       R.prog.addEventListener('pointercancel', () => { glisse = false; });
     }
-    R.cta.addEventListener('click', () => { if (surInscription) fermer(); else window.location.href = 'inscription.html'; });
+    R.cta.addEventListener('click', () => { if (FILM.cta) { if (location.pathname.split('/').pop() === FILM.cta.href) fermer(); else window.location.href = FILM.cta.href; } else if (surInscription) fermer(); else window.location.href = 'inscription.html'; });
     ov.addEventListener('click', e => { if (e.target === ov) fermer(); });
     rafId = requestAnimationFrame(boucle); tickId = setInterval(tickMusique, 90);
     if (options.auto !== false) lecture();

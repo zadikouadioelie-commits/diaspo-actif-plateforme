@@ -30194,6 +30194,10 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
         description: "<p>Le film complet (1 min 27) : de la création du compte à un profil public complet. Choisir son profil, indiquer ses origines, ajouter une photo et une biographie, confirmer son e-mail, puis explorer l'annuaire, les événements, les projets et la boutique.</p>" },
       { cle: 'inscription-court', duree: 55, ordre: -1, titre: "Comment ça marche : créer son compte en 55 secondes",
         description: "<p>La version courte du film (55 secondes) : l'essentiel pour créer son compte et rejoindre le réseau Diaspo'Actif.</p>" },
+      /* Tuto « Événements flash » (2026-10-13, demande explicite) : publier en quelques secondes une annonce d'événement SANS inscription — le sien, ou un
+         événement organisé par quelqu'un d'autre que l'on relaie pour informer la diaspora. Film assets/inscription-film.js (version 'flash', voix assets/media/evenement-flash-voix.mp3). */
+      { cle: 'evenement-flash', duree: 54, ordre: 0, categorie: 'Événements', miniature: '/assets/media/film-flash-poster.svg', titre: "Publier un événement flash : informer la diaspora sans inscription",
+        description: "<p>Un événement flash est une annonce publiée en quelques secondes, <strong>sans aucune inscription</strong> : on donne simplement l'information d'un événement. Il peut servir pour vos propres événements, mais aussi pour relayer un événement organisé par quelqu'un d'autre et informer la diaspora de ce qui se passe.</p><p>En 5 étapes : se connecter avec son compte Initiative, ouvrir l'espace Événements et cliquer sur « Événement flash », renseigner les informations (titre, date, adresse, description, photos, organisateur, visibilité), vérifier le récapitulatif, puis confirmer et publier.</p>" },
     ];
     for (const f of FILMS_PLATEFORME) {
       const marqueur = `vt_film_${f.cle}_seme`;
@@ -30203,7 +30207,7 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
       const existe = await db.prepare("SELECT id FROM da_videos_tutoriels WHERE type_source='film' AND url=?").get(f.cle);
       if (!existe) {
         await db.prepare("INSERT INTO da_videos_tutoriels (titre,description,icone,type_source,url,duree_secondes,categorie,miniature_url,statut,actif,ordre) VALUES (?,?,?,?,?,?,?,?,?,?,?)")
-          .run(f.titre, f.description, '🎬', 'film', f.cle, f.duree, 'Bien démarrer', '/assets/media/film-inscription-poster.jpg', 'publie', 1, f.ordre);
+          .run(f.titre, f.description, '🎬', 'film', f.cle, f.duree, f.categorie || 'Bien démarrer', f.miniature || '/assets/media/film-inscription-poster.jpg', 'publie', 1, f.ordre);
       }
       try {
         await db.prepare("INSERT INTO parametres_plateforme (cle, valeur, type, description) VALUES (?,?,?,?)")
