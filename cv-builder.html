@@ -199,13 +199,17 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 <link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
   <link rel="stylesheet" href="/assets/design-upgrade.v2.css">
   <link rel="stylesheet" href="/assets/theme-manager.css">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,500;6..96,600&family=Manrope:wght@400;500;600;700;800&display=swap">
+<!-- Design « Nuit dorée » (2026-10-12) : surcharge chargée en dernier, tout est préfixé body.nd-cv ; retour arrière : retirer ce lien et class="nd-cv" sur <body> -->
+<link rel="stylesheet" href="/assets/cv-nuit-doree.css?v=8">
 </head>
-<body>
+<body class="nd-cv">
 
 <header id="cvb-header">
   <a href="/dashboard-utilisateur.html" class="hdr-back">← Dashboard</a>
   <div class="hdr-sep"></div>
-  <span class="hdr-title">Éditeur CV</span>
+  <span class="hdr-title">Éditeur de CV</span>
   <input id="cv-titre" type="text" placeholder="Titre du CV" oninput="CVB.dirty=true;">
   <select id="cv-numero" title="Emplacement" onchange="CVB.data.meta.numero=parseInt(this.value);CVB.dirty=true;">
     <option value="1">CV n°1</option>
@@ -539,6 +543,8 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 <script src="/assets/rich-editor.js"></script>
 <script src="/assets/cv-builder.js"></script>
 <script src="/assets/cv-extras.js"></script>
+<script src="/assets/cv-template-nuit-doree.js?v=4"></script>
+<script src="/assets/cv-ajuste-apercu.js?v=1"></script>
 <script>
 // Init template gallery modal
 document.addEventListener('DOMContentLoaded', () => {

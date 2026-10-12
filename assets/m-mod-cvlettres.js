@@ -37,7 +37,7 @@
 
   /* Gabarits proposés par le site (assets/cv-templates.js et assets/lettre-templates.js).
      On les liste ici pour ne charger les moteurs de rendu qu'à la demande (téléchargement, impression). */
-  const CV_GAB = { moderne: 'Moderne', classique: 'Classique', elegant: 'Élégant', minimaliste: 'Minimaliste', diaspora: 'Diaspora', corporate: 'Corporate', creatif: 'Créatif', international: 'International' };
+  const CV_GAB = { moderne: 'Moderne', classique: 'Classique', elegant: 'Élégant', minimaliste: 'Minimaliste', diaspora: 'Diaspora', corporate: 'Corporate', creatif: 'Créatif', international: 'International', 'nuit-doree': 'Nuit dorée' };
   const LM_GAB = { classique: 'Classique', moderne: 'Moderne', elegant: 'Élégant', minimaliste: 'Minimaliste' };
   const MAX_DOCS = 2; // le serveur n'accepte que les emplacements 1 et 2
 
@@ -437,7 +437,8 @@
     return libs[src];
   }
   async function ensureLibs(kind, needPdf) {
-    const jobs = [loadScript(kind === 'cv' ? 'assets/cv-templates.js' : 'assets/lettre-templates.js')];
+    /* Le gabarit « Nuit dorée » s'enregistre dans CV_TEMPLATES : il doit être chargé APRÈS cv-templates.js. */
+    const jobs = [kind === 'cv' ? loadScript('assets/cv-templates.js').then(() => loadScript('assets/cv-template-nuit-doree.js?v=4')) : loadScript('assets/lettre-templates.js')];
     if (needPdf && !window.html2pdf) jobs.push(loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js'));
     await Promise.all(jobs);
   }
