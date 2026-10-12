@@ -378,12 +378,14 @@
   /* ---------- barre du haut + onglets ---------- */
   function renderTop() {
     const top = $('#top');
+    /* Bouton « Actualités » (2026-10-12, demande explicite) : accessible partout, connecté ou non — ouvre « Toutes les actualités » (#/actualites). */
+    const actu = `<a class="ibtn" href="#/actualites" aria-label="Actualités" title="Actualités">${ic('fil')}</a>`;
     const right = S.me
-      ? `<button class="ibtn" id="top-switch" aria-label="Changer de compte">${ic('swap')}</button><a class="ibtn" href="#/notifs" aria-label="Notifications">${ic('bell')}<span class="dot" id="notif-badge" hidden></span></a>`
+      ? `${actu}<button class="ibtn" id="top-switch" aria-label="Changer de compte">${ic('swap')}</button><a class="ibtn" href="#/notifs" aria-label="Notifications">${ic('bell')}<span class="dot" id="notif-badge" hidden></span></a>`
       /* Bouton « Créer un compte » restauré dans le bandeau (2026-10-08, demande explicite) : avait
          disparu de la nouvelle interface téléphone, seule « Connexion » y figurait — à la différence
          du bandeau du site (assets/app.js) qui a toujours les deux côte à côte. */
-      : `<div class="top-auth"><a class="pill-cta ghost" href="inscription.html">Créer un compte</a><button class="pill-cta" id="top-login">Connexion</button></div>`;
+      : `<div class="top-auth">${actu}<a class="pill-cta ghost" href="inscription.html">Créer un compte</a><button class="pill-cta" id="top-login">Connexion</button></div>`;
     const left = S.me ? `<button class="menu-btn" id="top-menu" aria-label="Menu des modules">${ic('menu')}<span>Menu</span></button>` : '';
     top.innerHTML = `${left}<img class="logo" src="assets/logo.svg" alt="" onerror="this.style.display='none'">
       <h1><span class="brand-s">Diaspo’Actif</span><span id="top-title">${esc(TITLES[S.tab] || '')}</span></h1>${right}`;

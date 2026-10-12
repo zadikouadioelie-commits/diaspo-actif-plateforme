@@ -1920,12 +1920,10 @@ async function applyAuthState() {
       ${demoBtnHtml}
       ${premiumBtnHtml}
       ${apercuBtnHtml}
-      <!-- Raccourci Annuaire (2026-09-19, demande explicite : sous 768px, .nav (donc le lien
-           "Annuaire" du menu principal) est déjà masquée par styles.v2.css — seul le tiroir
-           latéral y menait encore, plus rien dans le bandeau lui-même. Espace libéré par ce
-           même masquage réutilisé pour ce raccourci direct. -->
-      <a href="annuaire.html" class="topbar-icon-btn" title="Annuaire">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+      <!-- Bouton « Actualités » (2026-10-12, demande explicite) : remplace la loupe, qui menait à l'Annuaire — lequel a déjà son
+           lien dans le menu principal. Ouvre le fil d'actualité (publications, comptes rendus, cagnottes, boutiques…, façon réseau social). -->
+      <a href="fil-actualite.html" class="topbar-icon-btn" title="Actualités" aria-label="Actualités">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v14a1 1 0 0 0 1 1H6a2 2 0 0 1-2-2V5z"></path><path d="M18 8h2a1 1 0 0 1 1 1v9a2 2 0 0 1-2 2"></path><line x1="8" y1="8" x2="14" y2="8"></line><line x1="8" y1="12" x2="14" y2="12"></line><line x1="8" y1="16" x2="12" y2="16"></line></svg>
       </a>
       <a href="messagerie.html" class="topbar-icon-btn" title="Messagerie">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:middle;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
