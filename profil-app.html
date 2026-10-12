@@ -3327,6 +3327,7 @@ async function renderVitrineVisitor(init) {
   const actionbar = `<section class="pvt-actionbar">
     <div class="pvt-rating"><span style="font-size:12.5px;color:#6B7686;">${esc(init.domaine||'Boutique de la diaspora')}</span></div>
     <div class="pvt-actions-r">
+      ${isOwn ? `<button class="pvt-btn soft" id="pvt-param-btn" type="button" aria-expanded="false" onclick="ouvrirParametresBoutique()" title="Ouvre les paramètres de la Boutique à gauche, sans quitter la page">⚙️ Paramètres Boutique</button>` : ''}
       <button class="pvt-btn soft" onclick="contacterBoutique(${ownerId})">✉️ Contacter</button>
       ${tel ? `<a class="pvt-btn grey" href="tel:${esc(telClean)}">📞 Appeler</a>` : ''}
       ${telClean ? `<a class="pvt-btn wa" href="https://wa.me/${esc(telClean.replace('+',''))}" target="_blank" rel="noopener">🟢 WhatsApp</a>` : ''}
@@ -9406,6 +9407,7 @@ init();
 <!-- Design « Nuit dorée » (2026-10-11) : surcharges chargées en dernier, tout est préfixé body.nd ; retour arrière : retirer ces 2 lignes et class="nd" sur <body> -->
 <link rel="stylesheet" href="/assets/theme-nuit-doree.css?v=7">
 <link rel="stylesheet" href="/assets/profil-nuit-doree.css?v=9">
+<script src="/assets/boutique-parametres.js?v=1" defer></script>
 </body>
 </html>
 
