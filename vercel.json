@@ -32,6 +32,7 @@
     { "source": "/api/:path*", "destination": "/api/index" },
     { "source": "/sitemap.xml", "destination": "/api/index" },
     { "source": "/profil.html", "destination": "/api/index" },
+    { "source": "/partage-compte.html", "destination": "/api/index" },
     { "source": "/join/:code", "destination": "/api/index" },
     { "source": "/evenements.html", "destination": "/api/index" },
     { "source": "/fil-actualite.html", "destination": "/api/index" },

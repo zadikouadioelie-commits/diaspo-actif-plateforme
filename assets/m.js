@@ -913,7 +913,7 @@
     S.annNames = S.annNames || {}; if (uid) S.annNames[uid] = nm;
     /* Partage (2026-10-07) : adresse PUBLIQUE du profil, lisible sans compte (même adresse que le bouton « Partager » du site : le profil du compte, ou la fiche de l'initiative sans propriétaire). */
     S.annShare = S.annShare || {};
-    S.annShare[key] = { nm, path: it.k === 'i' && !uid ? '/initiative.html?id=' + encodeURIComponent(x.slug || x.id) : '/profil.html?id=' + encodeURIComponent(it.k === 'i' ? uid : x.id) };
+    S.annShare[key] = { nm, path: '/partage-compte.html?t=' + (it.k === 'i' ? 'i&id=' + encodeURIComponent(x.slug || x.id) : 'u&id=' + encodeURIComponent(x.id)) };
     const dom = it.k === 'i' && x.domaine ? `<span class="badge">${esc(x.domaine)}</span>` : '';
     const note = x.avis_total ? `<span class="badge o">★ ${esc(Number(x.avis_moyenne || 0).toFixed(1))} (${x.avis_total})</span>` : '';
     const open = !!(S.ann.open && S.ann.open[key]);
@@ -1054,7 +1054,7 @@
   document.addEventListener('click', async e => {
     /* Partager un profil de l'annuaire ou un événement de la liste : le lien s'ouvre sans compte, un jeton rend chaque envoi unique (aperçu WhatsApp). */
     const shA = e.target.closest('[data-share-ann]');
-    if (shA) { e.preventDefault(); const s = (S.annShare || {})[shA.dataset.shareAnn]; if (s) partagerLien(location.origin + s.path + '&r=' + jetonPartage(), s.nm); return; }
+    if (shA) { e.preventDefault(); const s = (S.annShare || {})[shA.dataset.shareAnn]; if (s) partagerLien(location.origin + s.path + (S.me ? '&via=' + S.me.id : '') + '&r=' + jetonPartage(), s.nm); return; }
     const shE = e.target.closest('[data-share-ev]');
     if (shE) { e.preventDefault(); e.stopPropagation(); partagerLien(location.origin + '/evenements.html?evt=' + encodeURIComponent(shE.dataset.shareEv) + (S.me ? '&via=' + S.me.id : '') + '&r=' + jetonPartage(), shE.dataset.shareTitre || 'Événement Diaspo’Actif'); return; }
     const af = e.target.closest('[data-aff-go]');

@@ -32754,6 +32754,99 @@ async function handleRequest(req, res) {
     return;
   }
 
+  /* ── Carte de partage d'un compte de l'annuaire (2026-10-12, demande explicite) : le lien envoyé depuis l'annuaire du téléphone ouvre
+     cette page — image, nom, informations principales (origine, pays et ville de résidence), aperçu de la description, bouton
+     « Voir le profil public » et bouton « Accéder à Diaspo'Actif » (accueil). Les mêmes éléments servent d'aperçu du lien (WhatsApp…).
+     Fichier modèle partage-compte-app.html : le nom public /partage-compte.html passe par vercel.json (voir la note sur profil.html). ?t=u&id=<compte>
+     ou ?t=i&id=<identifiant ou adresse de l'initiative> ; ?via=<compte> = la personne qui partage. Données publiques seulement. ── */
+  if (pathname === '/partage-compte.html') {
+    try {
+      let html = await fs.promises.readFile(path.join(ROOT, 'partage-compte-app.html'), 'utf8');
+      const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const base = 'https://diaspoactif.com';
+      const sansHtml = v => String(v || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+      const imgOk = v => { const s = String(v || ''); return (/^https?:\/\//i.test(s) || /^\/[^\/]/.test(s) || /^data:image\//i.test(s)) ? s : ''; };
+      const imgAbs = v => { const s = String(v || ''); return /^https?:\/\//i.test(s) ? s : (/^\/[^\/]/.test(s) ? base + s : ''); };
+      const t = parsed.query.t === 'i' ? 'i' : 'u';
+      const idq = String(parsed.query.id || '').trim();
+      let m = null;   // modèle de la carte
+      if (idq) {
+        let u = null, init = null;
+        if (t === 'i') {
+          init = await db.prepare("SELECT * FROM initiatives WHERE slug=? OR id=?").get(idq, /^\d+$/.test(idq) ? Number(idq) : -1);
+          u = init && init.owner_user_id ? await db.prepare("SELECT * FROM users WHERE id=?").get(init.owner_user_id) : null;
+        } else {
+          u = await db.prepare("SELECT * FROM users WHERE id=?").get(/^\d+$/.test(idq) ? Number(idq) : -1);
+          init = u && u.role === 'initiative' ? await db.prepare("SELECT * FROM initiatives WHERE owner_user_id=?").get(u.id) : null;
+        }
+        const masque = !!(u && Number(u.compte_masque) === 1);
+        if ((u || init) && !masque) {
+          if (init) {
+            const orig = [init.origine1, init.origine2, u && u.origine1, u && u.origine2, init.pays_origine].filter(Boolean);
+            m = { kind: 'i', nom: init.nom, badge: init.type || 'Initiative', sous: init.domaine || '',
+              couv: imgOk(init.vitrine_banniere_url), logo: imgOk(init.logo_url), origines: orig,
+              pays: init.pays || (u && u.pays) || '', ville: init.ville || (u && u.ville) || '',
+              desc: sansHtml(init.description || init.mission || init.slogan),
+              profil: init.owner_user_id ? `/profil.html?id=${init.owner_user_id}` : `/initiative.html?id=${encodeURIComponent(init.slug || init.id)}` };
+          } else {
+            const org = ['collectivite', 'administrateur'].includes(u.role) && u.nom_institution;
+            const orig = org ? [u.pays_origine_institution] : [u.origine1, u.origine2];
+            m = { kind: 'u', nom: org ? u.nom_institution : ([u.prenom, u.nom].filter(Boolean).join(' ') || u.nom),
+              badge: u.role === 'collectivite' ? 'Collectivité' : (u.role === 'administrateur' ? "Diaspo'Actif" : 'Membre'), sous: sansHtml(u.titre_pro),
+              couv: imgOk(u.banner_url), logo: imgOk(u.photo_url), origines: orig.filter(Boolean),
+              pays: u.pays || '', ville: u.ville || '', desc: sansHtml(u.bio), profil: `/profil.html?id=${u.id}` };
+          }
+        }
+      }
+      const via = m && parsed.query.via ? await nomCompteAffichage(parsed.query.via) : '';
+      let titre, description, image, carte, invitation = '';
+      if (m) {
+        const apercu = m.desc.length > 320 ? m.desc.slice(0, m.desc.lastIndexOf(' ', 320) > 200 ? m.desc.lastIndexOf(' ', 320) : 320) + '…' : m.desc;
+        const lieu = [m.ville, m.pays].filter(Boolean).join(', ');
+        titre = via ? `${via} vous recommande ${m.nom} — Diaspo'Actif` : `${m.nom} — Diaspo'Actif`;
+        description = (apercu || `Découvrez ${m.nom}${lieu ? ' (' + lieu + ')' : ''} sur Diaspo'Actif, la plateforme de la diaspora.`).slice(0, 200);
+        image = imgAbs(m.couv) || imgAbs(m.logo) || `${base}/assets/logo.png`;
+        const initiales = esc((m.nom || '?').split(/\s+/).map(w => w[0] || '').join('').slice(0, 2).toUpperCase());
+        invitation = via ? `<p class="invit"><b>${esc(via)}</b> vous recommande ce compte sur Diaspo’Actif.</p>` : `<p class="invit">Un compte à découvrir sur <b>Diaspo’Actif</b>.</p>`;
+        carte = `<article class="carte">
+  <div class="couv"${m.couv ? ` style="background-image:url('${esc(m.couv)}')"` : ''}></div>
+  <div class="tete"><div class="avatar${m.kind === 'i' ? ' carre' : ''}">${m.logo ? `<img src="${esc(m.logo)}" alt="" onerror="this.remove()">` : initiales}</div>
+    <h1>${esc(m.nom)}</h1><div class="badges"><span class="badge v">${esc(m.badge)}</span>${m.sous ? `<span class="badge">${esc(m.sous.slice(0, 60))}</span>` : ''}</div></div>
+  <div class="corps">
+    <div class="infos"><div><span>Origine</span><b>${esc(m.origines.join(' · ') || '—')}</b></div><div><span>Pays de résidence</span><b>${esc(m.pays || '—')}</b></div><div><span>Ville de résidence</span><b>${esc(m.ville || '—')}</b></div></div>
+    ${apercu ? `<p class="desc">${esc(apercu)}</p>` : ''}
+    <div class="btns"><a class="btn p" href="${esc(m.profil)}">Voir le profil public</a><a class="btn s" href="/">Accéder à Diaspo’Actif</a></div>
+  </div></article>`;
+      } else {
+        titre = "Diaspo'Actif — La plateforme de la diaspora";
+        description = "Rejoignez Diaspo'Actif, la plateforme de la diaspora.";
+        image = `${base}/assets/logo.png`;
+        carte = `<article class="carte"><div class="corps" style="padding-top:22px"><h1>Ce compte n’est pas disponible</h1><p class="desc">Le lien est peut-être incomplet ou le compte n’est plus visible. Vous pouvez tout de même découvrir Diaspo’Actif.</p><div class="btns"><a class="btn p" href="/">Accéder à Diaspo’Actif</a></div></div></article>`;
+      }
+      const pageUrl = `${base}/partage-compte.html?t=${t}&id=${encodeURIComponent(idq)}`;
+      html = html.replace(/<meta (?:property="og:[^"]*"|name="twitter:[^"]*"|name="description")[^>]*>\s*/g, '')
+        .replace(/<title>.*?<\/title>/, `<title>${esc(titre)}</title>`)
+        .replace('</head>', `<meta name="description" content="${esc(description)}">
+<meta name="robots" content="noindex, nofollow">
+<meta property="og:title" content="${esc(titre)}">
+<meta property="og:description" content="${esc(description)}">
+<meta property="og:image" content="${esc(image)}">
+<meta property="og:url" content="${esc(pageUrl)}">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+</head>`)
+        .replace('<!--INVITATION-->', invitation).replace('<!--CARTE-->', carte);
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
+      res.end(html);
+      return;
+    } catch (e) {
+      console.error('[partage-compte]', e.stack || e.message);
+      res.writeHead(302, { Location: '/' });
+      res.end();
+      return;
+    }
+  }
+
   /* ── profil.html est servi depuis profil-app.html (fichier renommé) — voir SEO ci-dessous.
      Le rewrite vercel.json cible "/profil.html" ; comme aucun fichier physique de ce nom
      n'existe plus, Vercel ne peut pas le servir en statique et passe systématiquement par
