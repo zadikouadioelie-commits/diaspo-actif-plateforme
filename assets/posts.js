@@ -954,7 +954,14 @@ function injectStyles() {
 /* ── Vue détaillée d'une publication, façon Facebook (2026-09-30, demande explicite) :
    clic sur une image → publication à gauche, réactions + commentaires TOUJOURS ouverts
    (jamais de bouton pour les replier) à droite. ── */
-.pd-overlay{z-index:1200;padding:0;}
+.pd-overlay{padding:0;}
+/* z-index (2026-10-12) : .posts-modal-overlay{z-index:1000}, déclarée plus bas avec le même poids, écrasait l'ancien .pd-overlay{z-index:1200} —
+   la bulle flottante des assistants (#assist-hub-fab, z-index 1097) passait alors AU-DESSUS de la fenêtre et recouvrait le bouton « Publier »
+   des commentaires : un clic ouvrait la messagerie au lieu d'envoyer. Sélecteur plus précis : la fenêtre repasse au-dessus de la bulle. */
+.posts-modal-overlay.pd-overlay{z-index:1200;}
+/* Le bandeau cookies (z-index 9999, fixé en bas) recouvrait le champ et le bouton « Publier » tant qu'il n'était pas accepté : il se
+   met en retrait pendant que la fenêtre de publication est AFFICHÉE (elle reste dans la page, masquée, une fois fermée), et revient dès sa fermeture (le choix reste à faire). */
+body:has(.pd-overlay:not([style*="display: none"])) #da-cookie-banner{display:none !important;}
 .pd-box{position:relative;background:#000;width:100%;height:100%;max-width:1280px;max-height:900px;display:flex;border-radius:12px;overflow:hidden;}
 .pd-close{position:absolute;top:14px;right:14px;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.15);border:none;color:#fff;font-size:16px;cursor:pointer;z-index:5;}
 .pd-close:hover{background:rgba(255,255,255,.28);}
