@@ -1,0 +1,41 @@
+/* Cartes d'événement : boutons mieux disposés et mieux cadrés (2026-10-12, demande explicite : « améliore les boutons, à disposer et à cadrer »).
+   Avant : des boutons de largeurs inégales qui passaient à la ligne n'importe où (le bouton « S'inscrire » seul sur une 2ᵉ rangée), et des rangées
+   d'actions qui ne tombaient pas à la même hauteur d'une carte à l'autre. Maintenant :
+   · la carte est une colonne : les boutons sont ancrés en bas, donc alignés d'une carte à l'autre dans la grille ;
+   · les boutons partagent la largeur à parts égales, même hauteur, texte centré ; les rangées incomplètes s'étirent au lieu de laisser un vide ;
+   · la rangée de gestion (Modifier, Gérer, Lier une fiche…) suit la même logique en plus petit ;
+   · les pastilles d'information (forme, domaine, gratuit, flash, organisateur) ont toutes la même hauteur.
+   Feuille de surcharge, sans toucher au script de la page. Retour arrière : retirer son lien. */
+
+/* ── la carte devient une colonne : le corps prend la hauteur restante, les actions vont en bas ── */
+.evt-grid>.evt-card{display:flex;flex-direction:column}
+.evt-grid>.evt-card>.evt-body{flex:1 1 auto;display:flex;flex-direction:column;min-width:0}
+.evt-grid>.evt-card>.evt-body>.evt-actions{margin-top:auto;padding-top:14px}
+
+/* ── actions publiques : « Voir » et « Partager » côte à côte, l'action principale (S'inscrire, Terminé, Informatif…) pleine largeur dessous.
+   Même schéma sur toutes les cartes : jamais un bouton seul qui retombe au hasard sur une 2ᵉ rangée ── */
+.evt-card .evt-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.evt-card .evt-actions>.btn,.evt-card .evt-actions>a.btn,.evt-card .evt-actions>span.btn{
+  min-width:0;box-sizing:border-box;min-height:44px;padding:8px 12px!important;
+  display:inline-flex!important;align-items:center;justify-content:center;gap:6px;
+  border-radius:12px;font-size:14px!important;font-weight:700;line-height:1.15;text-align:center;text-decoration:none;margin:0;
+  white-space:normal;overflow-wrap:anywhere}
+.evt-card .evt-actions>:nth-child(n+3){grid-column:1/-1}
+/* l'action principale ressort */
+.evt-card .evt-actions>.btn-orange{box-shadow:0 6px 16px -8px var(--navy,#0D2B4E)}
+/* « Informatif » n'est pas un bouton : une pastille discrète, non cliquable */
+.evt-card .evt-actions>span.btn{border-style:dashed!important;background:transparent!important;cursor:default;opacity:.85!important;box-shadow:none}
+
+/* ── gestion : même système, plus discret ── */
+.evt-card .evt-actions-gerer{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;padding-top:14px}
+.evt-card .evt-actions-gerer>.btn,.evt-card .evt-actions-gerer>a.btn{
+  flex:1 1 96px;min-width:0;box-sizing:border-box;min-height:38px;padding:6px 10px!important;
+  display:inline-flex!important;align-items:center;justify-content:center;gap:6px;
+  border-radius:10px;font-size:12px!important;font-weight:600;line-height:1.15;text-align:center;margin:0;
+  white-space:normal;overflow-wrap:anywhere}
+
+/* ── pastilles d'information : toutes de la même hauteur, alignées sur une même ligne de base ── */
+.evt-card .evt-meta{gap:8px;align-items:center}
+.evt-card .evt-meta>.evt-tag{display:inline-flex;align-items:center;gap:5px;min-height:26px;padding:3px 11px;line-height:1.2;white-space:nowrap;max-width:100%}
+.evt-card .evt-meta>.evt-tag img{flex:none}
+.evt-card .evt-meta>.evt-tag{overflow:hidden;text-overflow:ellipsis}
