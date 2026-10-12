@@ -9920,6 +9920,60 @@ route("GET", "/api/annuaire/utilisateurs", async (req, res, params, body, query)
   sendJSON(res, 200, { users: rows });
 });
 
+/* GET /api/promo/comptes-vedette — 2 comptes présentés sur la cartouche promo de l'accueil
+   (2026-10-09, demande explicite) : toujours UN compte Initiative + UN compte Utilisateur,
+   jamais un compte sans photo de profil, jamais un compte invisible/masqué/démo/supprimé.
+   Rotation toutes les 2 heures (pas à chaque chargement de page) : la fenêtre de 2h sert
+   d'indice stable dans la liste triée par id — tous les visiteurs voient la même paire pendant
+   la même fenêtre, sans tirage aléatoire ni état à stocker. */
+const PROMO_VEDETTE_FENETRE_MS = 2 * 3600 * 1000;
+async function compteVedette(role) {
+  const rows = role === 'initiative'
+    ? await db.prepare(`
+        SELECT i.id AS initiative_id, i.nom, i.description, i.domaine_principal, i.origine1, i.origine2, i.pays_origine,
+               i.ville, i.pays, i.logo_url, i.vitrine_banniere_url, i.slug, i.owner_user_id,
+               u.invisible_annuaire_definitif, u.invisible_annuaire_jusqu_au
+        FROM initiatives i JOIN users u ON u.id = i.owner_user_id
+        WHERE u.compte_masque=0 AND u.nom != 'Compte supprimé' AND (u.is_demo IS NULL OR u.is_demo=FALSE)
+        ORDER BY i.id ASC`).all()
+    : await db.prepare(`
+        SELECT id, nom, prenom, bio, domaine_principal, origine1, origine2, ville, pays, photo_url,
+               invisible_annuaire_definitif, invisible_annuaire_jusqu_au
+        FROM users WHERE role='utilisateur' AND compte_masque=0 AND nom != 'Compte supprimé' AND (is_demo IS NULL OR is_demo=FALSE)
+        ORDER BY id ASC`).all();
+  const avecPhoto = role === 'initiative'
+    ? rows.filter(r => String(r.vitrine_banniere_url || r.logo_url || '').trim())
+    : rows.filter(r => String(r.photo_url || '').trim());
+  const eligibles = avecPhoto.filter(r => !annuaireEstInvisible(r));
+  if (!eligibles.length) return null;
+  const fenetre = Math.floor(Date.now() / PROMO_VEDETTE_FENETRE_MS);
+  const r = eligibles[fenetre % eligibles.length];
+  if (role === 'initiative') {
+    return {
+      type: 'initiative', id: r.initiative_id, nom: r.nom,
+      description: (r.description || '').slice(0, 140),
+      photo_url: r.vitrine_banniere_url || r.logo_url,
+      domaine_principal: r.domaine_principal || null,
+      origine: r.origine1 || r.origine2 || r.pays_origine || null,
+      ville: r.ville || null, pays: r.pays || null,
+      lien: `initiative.html?id=${encodeURIComponent(r.slug || r.initiative_id)}`,
+    };
+  }
+  return {
+    type: 'utilisateur', id: r.id, nom: [r.prenom, r.nom].filter(Boolean).join(' ') || r.nom,
+    description: (r.bio || '').replace(/<[^>]*>/g, '').slice(0, 140),
+    photo_url: r.photo_url,
+    domaine_principal: r.domaine_principal || null,
+    origine: r.origine1 || r.origine2 || null,
+    ville: r.ville || null, pays: r.pays || null,
+    lien: `profil.html?id=${r.id}`,
+  };
+}
+route("GET", "/api/promo/comptes-vedette", async (req, res) => {
+  const [initiative, utilisateur] = await Promise.all([compteVedette('initiative'), compteVedette('utilisateur')]);
+  sendJSON(res, 200, { initiative, utilisateur });
+});
+
 /* GET /api/talents-diaspora — 4 vrais comptes mis en avant sur l'accueil ("Des profils qui
    inspirent"), en remplacement des 4 profils fictifs auparavant codés en dur dans index.html.
    Mélange Initiative/Utilisateur/Collectivité selon ce qui existe réellement (pas de quota
@@ -32781,10 +32835,11 @@ async function handleRequest(req, res) {
           u = await db.prepare("SELECT * FROM users WHERE id=?").get(/^\d+$/.test(idq) ? Number(idq) : -1);
           init = u && u.role === 'initiative' ? await db.prepare("SELECT * FROM initiatives WHERE owner_user_id=?").get(u.id) : null;
         }
-        const masque = !!(u && Number(u.compte_masque) === 1);
+        const masque = !!(u && (Number(u.compte_masque) === 1 || /\.invalid$/i.test(String(u.email || '')) || u.nom === 'Compte supprimé'));   // masqué ou supprimé (anonymisé) : carte neutre
         if ((u || init) && !masque) {
           if (init) {
-            const orig = [init.origine1, init.origine2, u && u.origine1, u && u.origine2, init.pays_origine].filter(Boolean);
+            const orig = [init.origine1, init.origine2, u && u.origine1, u && u.origine2, init.pays_origine].filter(Boolean)
+              .filter((v, i, a) => a.findIndex(w => String(w).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim() === String(v).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()) === i);
             m = { kind: 'i', nom: init.nom, badge: init.type || 'Initiative', sous: init.domaine || '',
               couv: imgOk(init.vitrine_banniere_url), logo: imgOk(init.logo_url), origines: orig,
               pays: init.pays || (u && u.pays) || '', ville: init.ville || (u && u.ville) || '',
