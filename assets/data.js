@@ -417,12 +417,12 @@ const ROLE_LABELS = {
 };
 
 const FOOTER_TEXT = {
-  fr: "Diaspo'Actif · Du Sud au Nord — Prototype interactif (données fictives) · 2026",
-  en: "Diaspo'Actif · From South to North — Interactive prototype (sample data) · 2026",
-  es: "Diaspo'Actif · Del Sur al Norte — Prototipo interactivo (datos ficticios) · 2026",
-  de: "Diaspo'Actif · Vom Süden in den Norden — Interaktiver Prototyp (Beispieldaten) · 2026",
-  zh: "Diaspo'Actif · 从南到北 — 交互式原型（示例数据） · 2026",
-  hi: "Diaspo'Actif · दक्षिण से उत्तर — इंटरैक्टिव प्रोटोटाइप (नमूना डेटा) · 2026"
+  fr: "Diaspo'Actif · Du Sud au Nord · 2026",
+  en: "Diaspo'Actif · From South to North · 2026",
+  es: "Diaspo'Actif · Del Sur al Norte · 2026",
+  de: "Diaspo'Actif · Vom Süden in den Norden · 2026",
+  zh: "Diaspo'Actif · 从南到北 · 2026",
+  hi: "Diaspo'Actif · दक्षिण से उत्तर · 2026"
 };
 
 const GREETING = { fr:"Bonjour", en:"Hello", es:"Hola", de:"Hallo", zh:"你好", hi:"नमस्ते" };
