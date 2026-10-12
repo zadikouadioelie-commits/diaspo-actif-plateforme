@@ -246,6 +246,8 @@ svg.i.l{width:28px;height:28px}
 .vcard.wide{width:auto}
 .vth{position:relative;aspect-ratio:16/10;background:linear-gradient(135deg,var(--navy),var(--navy2));border-radius:12px;overflow:hidden;display:flex;align-items:center;justify-content:center;color:#fff}
 .vth img{width:100%;height:100%;object-fit:cover}
+.vsh{position:absolute;right:8px;top:8px;width:34px;height:34px;border-radius:50%;border:0;background:rgba(13,43,78,.78);color:#fff;display:flex;align-items:center;justify-content:center;z-index:2;cursor:pointer}
+.vsh:active{background:var(--orange)}
 .vd{position:absolute;right:8px;bottom:8px;background:rgba(13,43,78,.88);color:#fff;border-radius:6px;padding:1px 7px;font-size:12px;font-weight:700}
 .vp{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:42px;height:42px;border-radius:50%;background:rgba(242,100,34,.92);color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;padding-left:3px}
 .vt{font-weight:700;font-size:14px;line-height:1.25;margin:7px 0 1px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}

@@ -3146,6 +3146,9 @@ const ProfilPublic = require("./profil-public");
 ProfilPublic.register({ route, db, sendJSON, getCurrentUser });
 /* Cartographie des compétences (2026-10-11) : GET /api/admin/cartographie-competences — voir server/cartographie-competences.js. */
 require("./cartographie-competences").register({ route, db, sendJSON, getCurrentUser });
+/* Partager un tuto vidéo sur le fil (2026-10-12) : POST /api/videos-tutoriels/:id/partager — voir server/tuto-partage.js. */
+const TutoPartage = require("./tuto-partage");
+TutoPartage.register({ route, db, sendJSON, getCurrentUser, SEC, nomCompteAffichage });
 
 /* ========== VITRINE COMMERCIALE + BOUTIQUE (comptes Initiative) ========== */
 const MAX_PRODUITS_VITRINE = 100;
@@ -25866,7 +25869,10 @@ async function enrichPost(p, cu) {
   if (p.compte_rendu_evenement_id) { try { compte_rendu = await carteCompteRenduPost(p.compte_rendu_evenement_id); } catch (_) {} }
   let annonce = null;
   if (p.annonce_officielle_id) { try { annonce = await carteAnnonceOfficielle(p.annonce_officielle_id); } catch (_) {} }
-  return { ...titrePostComplet(p), auteur_nom, reactions: counts, nb_commentaires, user_a_aime, auteur_profil: auteur, auteur_certif, auteur_accreditations, score, original_post, evenement_promo, compte_rendu, annonce };
+  /* Tuto partagé (2026-10-12) : carte du tuto (titre, affiche, durée, lien) pour le bouton « Voir le tuto ». */
+  let tuto = null;
+  if (p.tuto_video_id) { try { tuto = await TutoPartage.carteTutoPost(db, p.tuto_video_id); } catch (_) {} }
+  return { ...titrePostComplet(p), auteur_nom, reactions: counts, nb_commentaires, user_a_aime, auteur_profil: auteur, auteur_certif, auteur_accreditations, score, original_post, evenement_promo, compte_rendu, annonce, tuto };
 }
 
 /* ---------- Fil intelligent ---------- */
@@ -25975,7 +25981,7 @@ route("GET", "/api/fil", async (req, res, params, body, query) => {
      Ajouté ici car cette clause est reprise par toutes les requêtes de chaque mode du fil. */
   /* Post de promotion J-7 : retiré du fil dès que l'événement est terminé (calcul à la lecture,
      aucun cron — voir PROMO_FENETRE_JOURS). Même clause reprise par tous les modes du fil. */
-  const promoExpireClause = ` AND (p.promo_evenement_id IS NULL OR EXISTS (SELECT 1 FROM evenements pe WHERE pe.id=p.promo_evenement_id AND COALESCE(NULLIF(pe.date_fin,''), pe.date_evt) >= '${dateParisISO()}'))`;
+  const promoExpireClause = ` AND (p.promo_evenement_id IS NULL OR EXISTS (SELECT 1 FROM evenements pe WHERE pe.id=p.promo_evenement_id AND COALESCE(NULLIF(pe.date_fin,''), pe.date_evt) >= '${dateParisISO()}'))` + TutoPartage.tutoClause;
   const catClause = (catFiltre ? " AND p.categorie=?" : "") + " AND COALESCE(p.statut,'publie') NOT IN ('archive','brouillon')" + promoExpireClause;
   const catArgs = catFiltre ? [catFiltre] : [];
 

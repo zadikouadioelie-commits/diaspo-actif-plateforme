@@ -40,6 +40,21 @@ function dvtVignetteHtml(v) {
   return `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:32px;color:#fff;">${v.icone || '🎬'}</div>`;
 }
 
+/* Partager un tuto (2026-10-12, demande explicite) : fenêtre d'aperçu de la cartouche + publication sur le fil / WhatsApp / lien
+   (assets/tuto-partage.js), chargée seulement au clic — aucune page n'a besoin de l'inclure. */
+let _dvtPartagePromesse = null;
+function dvtPartager(id) {
+  if (!_dvtPartagePromesse) {
+    _dvtPartagePromesse = window.TutoPartage ? Promise.resolve() : new Promise((ok, ko) => {
+      const sc = document.createElement('script');
+      sc.src = '/assets/tuto-partage.js?v=1';
+      sc.onload = ok; sc.onerror = () => { _dvtPartagePromesse = null; ko(new Error('chargement du partage')); };
+      document.head.appendChild(sc);
+    });
+  }
+  return _dvtPartagePromesse.then(() => window.TutoPartage.ouvrir(id)).catch(() => { try { navigator.clipboard.writeText(location.origin + '/videos-tutoriels.html?v=' + id); alert('Lien du tuto copié.'); } catch (e) { /* rien de plus à faire */ } });
+}
+
 /* ═══ Films animés de la plateforme (type_source = 'film') ═══
    Depuis le 2026-10-10 les deux films « Comment ça marche » sont de vraies vidéos de la rubrique (même fiche, commentaires, réactions,
    gestion que les autres) : leur carte vient de l'API comme toute autre. Seul le LECTEUR diffère : ce n'est pas un fichier vidéo mais un
@@ -100,7 +115,10 @@ function dvtCardHtml(v, { compact } = {}) {
         ${!bientot ? `<div class="dvt-card-reactions" id="dvt-card-reactions-${v.id}" onclick="event.preventDefault();event.stopPropagation();">
           <span class="dvt-card-reactions-loading">Chargement des réactions…</span>
         </div>` : ''}` : ''}
-        <div class="dvt-card-plus">En savoir plus →</div>
+        <div class="dvt-card-actions">
+          <div class="dvt-card-plus">En savoir plus →</div>
+          ${bientot ? '' : `<button type="button" class="dvt-share" onclick="event.preventDefault();event.stopPropagation();dvtPartager(${v.id});" title="Partager ce tuto" aria-label="Partager le tuto ${dvtEsc(v.titre)}">📤 Partager</button>`}
+        </div>
       </div>
     </a>`;
 }
@@ -331,7 +349,10 @@ async function dvtChargerPageVideo(videoId) {
       <div class="dvt-player">${dvtLecteurHtml(v)}</div>
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">
         <h1 class="dvt-page-titre">${dvtEsc(v.titre)}</h1>
-        ${window.__vtEstAdmin ? `<span style="display:flex;gap:8px;margin-top:18px;flex-shrink:0;"><button type="button" class="dvt-btn-outline" onclick="vtOuvrirForm(${v.id})">✎ Modifier</button><button type="button" class="dvt-btn-outline" style="color:#dc2626;border-color:#dc2626;" onclick="vtSupprimer(${v.id})">🗑 Supprimer</button></span>` : ''}
+        <span style="display:flex;gap:8px;margin-top:18px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end;">
+          ${v.type_source !== 'bientot' ? `<button type="button" class="dvt-btn-outline" onclick="dvtPartager(${v.id})">📤 Partager</button>` : ''}
+          ${window.__vtEstAdmin ? `<button type="button" class="dvt-btn-outline" onclick="vtOuvrirForm(${v.id})">✎ Modifier</button><button type="button" class="dvt-btn-outline" style="color:#dc2626;border-color:#dc2626;" onclick="vtSupprimer(${v.id})">🗑 Supprimer</button>` : ''}
+        </span>
       </div>
       <div class="dvt-page-meta">🏷 ${dvtEsc(v.categorie||'')} · 📅 ${dvtFormatDate(v.created_at)} · 👁 ${v.vues||0} vues</div>
       <div class="dvt-page-desc rich-content">${window.renderRichText ? renderRichText(v.description || '') : dvtEsc(v.description || '')}</div>

@@ -2113,6 +2113,8 @@ const MIGRATIONS = [
   // Annonces officielles Diaspo'Actif (2026-10-05) : publication épinglée du fil rattachée à une annonce.
   ["fil_posts", "annonce_officielle_id INTEGER"],
   ["fil_posts", "compte_rendu_evenement_id INTEGER"],
+  // Tuto vidéo partagé sur le fil (2026-10-12) : id du tuto (da_videos_tutoriels) — voir server/tuto-partage.js
+  ["fil_posts", "tuto_video_id INTEGER"],
   ["insc_fiches", "programme_texte TEXT"],
   ["insc_fiches", "programme_fichier_url TEXT"],
   ["insc_fiches", "programme_fichier_nom TEXT"],

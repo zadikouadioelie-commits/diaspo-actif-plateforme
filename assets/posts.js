@@ -490,6 +490,15 @@ function renderAnnonceOfficielleBloc(post) {
   return '<div style="padding:12px 0"><strong>' + escHtml(a.titre) + '</strong><p>' + escHtml(a.accroche || '') + '</p><a class="btn" href="' + (a.evenement_id ? 'evenements.html?evt=' + a.evenement_id : 'fil-actualite.html') + '">Découvrir le programme</a></div>';
 }
 
+/* Tuto partagé (2026-10-12) : la publication montre l'affiche du tuto (c'est son média) ; ce bouton ouvre le tuto lui-même.
+   post.tuto vient de GET /api/fil (carte du tuto : titre, affiche, durée, lien) — absent si le tuto n'est plus publié. */
+function renderTutoCta(post) {
+  const t = post.tuto;
+  if (!t || !t.lien) return '';
+  const d = t.duree_secondes ? ` · ${Math.floor(t.duree_secondes / 60)}:${String(t.duree_secondes % 60).padStart(2, '0')}` : '';
+  return `<a class="tuto-cta" href="${escHtml(t.lien)}"><span class="tuto-cta-play" aria-hidden="true">▶</span><span>Voir le tuto${d}</span></a>`;
+}
+
 function renderPostCard(post, options = {}) {
   if (post.type === 'carte_vitrine') return renderVitrineCard(post);
   if (post.type === 'evenement_promo') return renderEvenementPromoCard(post);
@@ -602,6 +611,8 @@ function renderPostCard(post, options = {}) {
     <div class="post-body-full"${texteTronque ? ' style="display:none"' : ''}>${contenuHTML}</div>
     ${texteTronque ? `<button type="button" class="post-voir-plus" onclick="Posts.toggleExpand(${post.id}, this)">Voir plus</button>` : ''}
   </div>
+
+  ${renderTutoCta(post)}
 
   ${hashtags.length ? `<div class="post-hashtags">${hashtags.map(h=>`<a href="fil-actualite.html?hashtag=${encodeURIComponent(h.replace('#',''))}" class="post-hashtag">${escHtml(h.startsWith('#')?h:'#'+h)}</a>`).join(' ')}</div>` : ''}
 
@@ -959,6 +970,11 @@ function injectStyles() {
    la bulle flottante des assistants (#assist-hub-fab, z-index 1097) passait alors AU-DESSUS de la fenêtre et recouvrait le bouton « Publier »
    des commentaires : un clic ouvrait la messagerie au lieu d'envoyer. Sélecteur plus précis : la fenêtre repasse au-dessus de la bulle. */
 .posts-modal-overlay.pd-overlay{z-index:1200;}
+.tuto-cta{display:inline-flex;align-items:center;gap:9px;margin:4px 16px 12px;padding:9px 16px;border-radius:99px;background:linear-gradient(135deg,#F26422,#e0501a);color:#fff;font-weight:800;font-size:.9rem;text-decoration:none;min-height:40px;}
+.tuto-cta:hover{filter:brightness(1.07);}
+.tuto-cta:focus-visible{outline:3px solid #2563EB;outline-offset:2px;}
+.tuto-cta-play{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,.25);font-size:.7rem;padding-left:2px;}
+.pd-caption .tuto-cta{margin:12px 0 0;}
 /* Le bandeau cookies (z-index 9999, fixé en bas) recouvrait le champ et le bouton « Publier » tant qu'il n'était pas accepté : il se
    met en retrait pendant que la fenêtre de publication est AFFICHÉE (elle reste dans la page, masquée, une fois fermée), et revient dès sa fermeture (le choix reste à faire). */
 body:has(.pd-overlay:not([style*="display: none"])) #da-cookie-banner{display:none !important;}
@@ -1723,7 +1739,7 @@ const Posts = {
       ? titrePostHtml(post) + renderCompteRenduBloc(post).replace(/<div class="cr-cover">[\s\S]*?<\/div>\s*(?=<div class="cr-resume)/, '')
       : promoEvt
       ? `<h3 class="post-titre">${escHtml(promoEvt.titre)}</h3><a href="evenements.html?evt=${promoEvt.id}" style="color:var(--orange,#ff6b00);font-weight:700;">Voir l'événement →</a>`
-      : titrePostHtml(post) + processContent(texteBrut);
+      : titrePostHtml(post) + processContent(texteBrut) + renderTutoCta(post);
 
     document.getElementById('pd-actions').innerHTML = `
       <div class="post-reactions-wrap">

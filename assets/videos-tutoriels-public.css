@@ -23,6 +23,10 @@
 .dvt-card-reaction-btn.actif{background:#FFF0E8;border-color:#B84C1A;color:#B84C1A;}
 .dvt-card-reactions-loading{font-size:11px;color:#9AA5B1;}
 .dvt-card-plus{font-size:12px;font-weight:700;color:#B84C1A;margin-top:8px;}
+.dvt-card-actions{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;}
+.dvt-share{margin-top:8px;display:inline-flex;align-items:center;gap:5px;background:#fff;color:#102A43;border:1.5px solid #D6DEE8;border-radius:99px;font:inherit;font-size:12px;font-weight:700;padding:5px 11px;min-height:30px;cursor:pointer;}
+.dvt-share:hover{background:#FFF4EC;border-color:#F26422;color:#B84C1A;}
+.dvt-share:focus-visible{outline:2px solid #2563EB;outline-offset:2px;}
 /* Vidéo DÉJÀ DISPONIBLE (2026-10-09, demande explicite) : cartouche jaune doré, pour la distinguer des « Bientôt disponible » voisines. */
 .dvt-card.dvt-dispo{background:linear-gradient(160deg,#FFF3C4,#F6D36B 55%,#E2A929);border:3px solid #E2A929;box-shadow:0 0 0 3px rgba(248,218,122,.4),0 10px 28px rgba(226,169,41,.45);}
 .dvt-card.dvt-dispo .dvt-card-titre{color:#3d2a00;}

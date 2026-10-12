@@ -483,6 +483,8 @@
       extra = `<a class="promo row" href="#/cr/${esc(cr.evenement_id)}"><div class="sp"><div class="small muted">Compte-rendu${cr.evenement_titre ? ' · ' + esc(cr.evenement_titre) : ''}</div><b>${esc(cr.titre)}</b><div class="small muted">Lire le compte-rendu complet</div></div>${ic('chev')}</a>`;
     }
     else if (cr && cr.titre) extra = `<div class="promo"><div class="small muted">Compte-rendu</div><b>${esc(cr.titre)}</b></div>`;
+    /* Tuto partagé (2026-10-12) : l'affiche est le média de la publication ; la carte ouvre le tuto dans l'application. */
+    if (!extra && p.tuto && p.tuto.id) extra = `<a class="promo row" href="#/video/${esc(p.tuto.id)}"><div class="sp"><div class="small muted">Tuto${p.tuto.categorie ? ' · ' + esc(p.tuto.categorie) : ''}</div><b>${esc(p.tuto.titre || '')}</b></div>${ic('play', 's')} Voir</a>`;
     const liked = !!p.user_a_aime, nLike = (p.reactions && p.reactions.like) || 0;
     return `<article class="card post" data-id="${p.id}">
       <div class="head" ${p.auteur_id ? `data-prof="${esc(p.auteur_id)}" role="link" tabindex="0"` : ''}><div class="av">${photo ? `<img src="${attrUrl(photo)}" alt="" loading="lazy" onerror="this.remove()">` : esc(initials(name))}</div>
@@ -1647,7 +1649,7 @@
   }
   function videoCard(v, wide) {
     const bientot = v.type_source === 'bientot';
-    return `<a class="vcard${wide ? ' wide' : ''}" href="#/video/${v.id}"><div class="vth">${videoThumb(v)}${bientot ? '<span class="vd" style="background:var(--orange-d)">Bientôt</span>' : (v.duree_secondes ? `<span class="vd">${fmtDuree(v.duree_secondes)}</span>` : '')}${bientot ? '' : '<span class="vp">▶</span>'}</div><div class="vt">${esc(v.titre)}</div>${v.categorie ? `<div class="small muted">${esc(v.categorie)}</div>` : ''}</a>`;
+    return `<a class="vcard${wide ? ' wide' : ''}" href="#/video/${v.id}"><div class="vth">${videoThumb(v)}${bientot ? '<span class="vd" style="background:var(--orange-d)">Bientôt</span>' : (v.duree_secondes ? `<span class="vd">${fmtDuree(v.duree_secondes)}</span>` : '')}${bientot ? '' : '<span class="vp">▶</span>'}${bientot ? '' : `<button type="button" class="vsh" data-share-tuto="${esc(v.id)}" aria-label="Partager ce tuto">${ic('share', 's')}</button>`}</div><div class="vt">${esc(v.titre)}</div>${v.categorie ? `<div class="small muted">${esc(v.categorie)}</div>` : ''}</a>`;
   }
   /* Films animés de la plateforme (2026-10-10) : ce sont désormais de vraies vidéos de la rubrique (type_source 'film', gérées comme les autres) —
      leur carte vient de l'API. Seul le lecteur diffère : le film (voix, musique, sous-titres) s'ouvre dans une fenêtre, chargé seulement au toucher. */
@@ -1741,6 +1743,39 @@
     };
     draw();
   }
+  /* Partager un tuto (2026-10-12, demande explicite) : aperçu de la cartouche (affiche + « <nom du compte> vous invite à voir le tuto … »),
+     publication sur le fil (compte connecté) puis partage du lien de la publication (aperçu image + texte sur WhatsApp). */
+  async function partagerTuto(id) {
+    let d;
+    try { d = await api('/api/videos-tutoriels/' + encodeURIComponent(id) + '/partager'); }
+    catch (e) { return toast(e.message || 'Ce tuto n’est pas disponible.', true); }
+    const c = d.carte;
+    let lien = location.origin + '/videos-tutoriels.html?v=' + encodeURIComponent(c.id);
+    const texte = d.texte || `Découvrez le tuto « ${c.titre} » sur Diaspo’Actif`;
+    const close = openSheet(`<h3 style="margin:0 0 10px">Partager ce tuto</h3>
+      <div class="card" style="margin-bottom:12px;overflow:hidden">${c.image ? mediaBlock(c.image, { alt: c.titre }) : ''}<div class="pad"><b>${esc(texte)}</b></div></div>
+      <div id="tp-info" class="small muted" style="margin:0 0 8px" role="status"></div>
+      ${d.connecte ? `<button type="button" class="btn block" id="tp-fil">Publier sur mon fil</button>`
+        : `<a class="btn block" href="login.html?redirect=${encodeURIComponent('/m.html')}">Se connecter pour publier sur mon fil</a>`}
+      <button type="button" class="btn out block" id="tp-lien" style="margin-top:8px">${ic('share', 's')} Envoyer le lien (WhatsApp…)</button>`);
+    const fil = $('#tp-fil');
+    if (fil) fil.onclick = async () => {
+      fil.disabled = true; fil.textContent = 'Publication…';
+      try {
+        const j = await api('/api/videos-tutoriels/' + encodeURIComponent(c.id) + '/partager', { method: 'POST', body: {} });
+        lien = location.origin + '/fil-actualite.html?post=' + encodeURIComponent(j.post_id) + '&r=' + jetonPartage();
+        fil.textContent = '✓ Publié sur mon fil';
+        $('#tp-info').innerHTML = `${j.deja ? 'Vous aviez déjà partagé ce tuto aujourd’hui. ' : 'Tuto publié sur votre fil. '}<a href="#/post/${esc(j.post_id)}" id="tp-voir" style="font-weight:700">Voir la publication</a>`;
+        $('#tp-voir').onclick = () => close();
+      } catch (e) { fil.disabled = false; fil.textContent = 'Publier sur mon fil'; $('#tp-info').textContent = e.message || 'Publication impossible.'; }
+    };
+    $('#tp-lien').onclick = () => partagerLien(lien, texte);
+  }
+  document.addEventListener('click', e => {
+    const b = e.target.closest && e.target.closest('[data-share-tuto]'); if (!b) return;
+    e.preventDefault(); e.stopPropagation(); partagerTuto(b.dataset.shareTuto);
+  }, true);
+
   async function paneVideo(id) {
     setPane('Tutoriel vidéo', '<div class="sk skc"></div>');
     let v, autres = [];
@@ -1754,7 +1789,9 @@
     const suite = autres.length ? `<div class="sec" style="margin-top:22px"><h2 class="sec-t"><span class="sic">${ic('play')}</span><span>À suivre</span></h2></div>
       <div class="lst">${autres.slice(0, 8).map(x => `<a class="vrow" href="#/video/${x.id}"><div class="vth">${videoThumb(x)}${x.type_source === 'bientot' ? '<span class="vd" style="background:var(--orange-d)">Bientôt</span>' : (x.duree_secondes ? `<span class="vd">${fmtDuree(x.duree_secondes)}</span>` : '')}</div><div class="sp"><div class="vt" style="margin-top:0">${esc(x.titre)}</div>${x.categorie ? `<div class="small muted">${esc(x.categorie)}</div>` : ''}</div></a>`).join('')}</div>` : '';
     setPane(v.titre, `${player}<div class="card" style="margin-top:12px"><div class="pad"><h2 style="margin:0 0 6px;font-size:19px">${esc(v.titre)}</h2><div class="tags" style="margin:0 0 8px">${v.categorie ? `<span class="badge">${esc(v.categorie)}</span>` : ''}${v.duree_secondes ? `<span class="badge">${fmtDuree(v.duree_secondes)}</span>` : ''}${v.vues ? `<span class="badge">${v.vues} vues</span>` : ''}</div>${v.description ? `<div class="rich" style="white-space:pre-line">${esc(strip(v.description))}</div>` : ''}</div></div>
+      ${v.type_source !== 'bientot' ? `<button type="button" class="btn block" style="margin-top:14px" data-share-tuto="${esc(v.id)}">${ic('share', 's')} Partager ce tuto</button>` : ''}
       ${suite}<a class="btn out block" style="margin-top:14px" href="#/videos">Toutes les vidéos</a>`);
+    if (v.type_source !== 'bientot') { const sb = $('#pane-share'); if (sb) { sb.hidden = false; sb.onclick = () => partagerTuto(v.id); } }
   }
 
   /* ---------- cagnottes et dons ---------- */
