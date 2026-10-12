@@ -319,6 +319,36 @@
 @media (prefers-reduced-motion: reduce){
   .evt-card-trophee, .trophee-shimmer::after, .trophee-cachet{animation:none;}
 }
+/* ═══ Cartouche ⚡ Événement flash (2026-10-12, demande explicite : "cartouche vert
+   scintillant pas agressif pour les yeux") — même principe que la cartouche Trophée
+   ci-dessus, en vert et délibérément plus doux : glow plus faible, reflet plus
+   transparent et plus lent, cachet plus petit. ═══ */
+.evt-card-flash{
+  background:linear-gradient(135deg,#F3FDF5,#E4FAE8);
+  border:1.5px solid #7BE87B !important;
+  animation:flashCarteGlow 3.6s ease-in-out infinite;
+}
+.flash-shimmer{position:relative;overflow:hidden;}
+.flash-shimmer::after{
+  content:''; position:absolute; top:0; left:-60%; width:35%; height:100%;
+  background:linear-gradient(115deg,transparent,rgba(255,255,255,.5),transparent);
+  animation:btnFlashSweep 3.8s ease-in-out infinite; pointer-events:none;
+}
+.flash-cachet{
+  position:absolute; top:8px; right:8px; z-index:2;
+  width:46px; height:46px; border-radius:50%;
+  background:radial-gradient(circle at 35% 30%,#E4FAE8,#7BE87B 55%,#2FA84F 100%);
+  border:2px solid #F3FDF5; box-shadow:0 0 0 2px #1F7A3A, 0 2px 6px rgba(0,0,0,.2);
+  display:flex; align-items:center; justify-content:center;
+  transform:rotate(-6deg); animation:flashCachetGlow 3s ease-in-out infinite;
+}
+.flash-cachet .ic{font-size:19px;line-height:1;}
+@keyframes flashCarteGlow{0%,100%{box-shadow:0 1px 4px rgba(0,0,0,.06);}50%{box-shadow:0 0 10px 1px rgba(123,232,123,.3);}}
+@keyframes btnFlashSweep{0%{left:-60%;}55%,100%{left:130%;}}
+@keyframes flashCachetGlow{0%,100%{box-shadow:0 0 0 2px #1F7A3A, 0 2px 6px rgba(0,0,0,.2);}50%{box-shadow:0 0 0 2px #1F7A3A, 0 0 8px 2px rgba(123,232,123,.5);}}
+@media (prefers-reduced-motion: reduce){
+  .evt-card-flash, .flash-shimmer::after, .flash-cachet{animation:none;}
+}
 </style>
   <link rel="stylesheet" href="/assets/design-upgrade.v2.css">
   <link rel="stylesheet" href="/assets/theme-manager.css">
@@ -980,16 +1010,22 @@ function renderEvts() {
     // Cachet "Trophée" (2026-09-23, demande explicite : "cartouches dorées et scintillantes...
     // titre Trophée bien visible comme un cachet") — voir .evt-card-trophee/.trophee-cachet.
     const estTrophee = evt.type_evt === 'trophee_diaspora';
-    const cachetHtml = estTrophee ? `<div class="trophee-cachet" title="Événement Trophée diaspora"><span class="ic">🏆</span><span class="tx">Trophée</span></div>` : '';
+    // Cachet "⚡ Flash" (2026-10-12, demande explicite : "cartouche vert scintillant pas
+    // agressif pour les yeux") — même principe que le cachet Trophée, en vert et plus doux.
+    // Réservé au vrai parcours flash (même garde que badgeFlash), jamais un événement trophée
+    // en même temps dans la pratique, mais le trophée garde la priorité visuelle si jamais.
+    const estFlash = !estTrophee && evt.inscription_ouverte === 0;
+    const cachetHtml = estTrophee ? `<div class="trophee-cachet" title="Événement Trophée diaspora"><span class="ic">🏆</span><span class="tx">Trophée</span></div>`
+      : estFlash ? `<div class="flash-cachet" title="Événement flash — informatif, sans inscription"><span class="ic">⚡</span></div>` : '';
     /* Design « Promo J-7 » (2026-10-05) : uniquement tant que la promotion est lancée ET que
        l'événement n'est pas terminé (evt.promo_active, calculé côté serveur à la lecture). */
     const promoBand = evt.promo_active
       ? `<div class="promo-band"><span class="promo-j">J-${Math.max(0, evt.promo_jours ?? 0)}</span> ${evt.promo_jours <= 0 ? "Aujourd'hui !" : evt.promo_jours === 1 ? 'Demain !' : 'Plus que ' + evt.promo_jours + ' jours'}</div>` : '';
     const promouvoirHtml = promoBoutonHtml(evt, peutGerer);
-    return `<div class="evt-card${estTrophee ? ' evt-card-trophee' : ''}${evt.est_termine ? ' evt-card-termine' : ''}${evt.promo_active ? ' evt-card-promo' : ''}" data-evt-id="${evt.id}">
+    return `<div class="evt-card${estTrophee ? ' evt-card-trophee' : ''}${estFlash ? ' evt-card-flash' : ''}${evt.est_termine ? ' evt-card-termine' : ''}${evt.promo_active ? ' evt-card-promo' : ''}" data-evt-id="${evt.id}">
       ${peutGerer ? `<button class="evt-delete-float" onclick="supprimerEvenement(${evt.id},this)" title="Supprimer cet événement">🗑</button>` : ''}
       ${evt.whatsapp_lien ? `<a href="${esc(evt.whatsapp_lien)}" target="_blank" rel="noopener" title="Rejoindre la chaîne WhatsApp de l'événement" class="evt-whatsapp-float"><svg width="24" height="24" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="16" fill="#25D366"/><path fill="#fff" d="M23.47 8.52A10.6 10.6 0 0 0 16.02 5.4c-5.86 0-10.62 4.76-10.62 10.62 0 1.87.49 3.7 1.42 5.31L5.3 26.6l5.4-1.42a10.6 10.6 0 0 0 5.31 1.35h.01c5.86 0 10.62-4.76 10.62-10.62 0-2.84-1.1-5.5-3.17-7.39Zm-7.45 16.34h-.01a8.8 8.8 0 0 1-4.5-1.23l-.32-.19-3.35.88.89-3.26-.21-.34a8.79 8.79 0 0 1-1.35-4.7c0-4.86 3.96-8.82 8.83-8.82 2.36 0 4.57.92 6.24 2.6a8.75 8.75 0 0 1 2.58 6.23c0 4.86-3.96 8.83-8.8 8.83Zm4.83-6.61c-.26-.13-1.57-.78-1.82-.86-.24-.09-.42-.13-.6.13-.18.26-.68.86-.84 1.04-.15.18-.31.2-.57.07-.26-.13-1.1-.4-2.1-1.29-.78-.69-1.3-1.55-1.46-1.81-.15-.26-.02-.4.11-.53.12-.12.26-.31.39-.47.13-.15.17-.26.26-.44.09-.18.04-.33-.02-.46-.07-.13-.6-1.44-.82-1.98-.22-.51-.44-.44-.6-.45h-.51c-.18 0-.46.07-.7.33-.24.26-.92.9-.92 2.19s.94 2.54 1.08 2.72c.13.18 1.85 2.83 4.49 3.97.63.27 1.12.43 1.5.55.63.2 1.2.17 1.66.1.5-.08 1.57-.64 1.79-1.26.22-.62.22-1.15.16-1.26-.07-.12-.24-.19-.5-.32Z"/></svg></a>` : ''}
-      <div class="evt-img${estTrophee ? ' trophee-shimmer' : ''}">${cover ? `<img src="${esc(cover)}" alt="${esc(evt.titre)}" loading="lazy" onerror="this.parentNode.innerHTML='${icon}'">` : icon}${cachetHtml}${promoBand}</div>
+      <div class="evt-img${estTrophee ? ' trophee-shimmer' : estFlash ? ' flash-shimmer' : ''}">${cover ? `<img src="${esc(cover)}" alt="${esc(evt.titre)}" loading="lazy" onerror="this.parentNode.innerHTML='${icon}'">` : icon}${cachetHtml}${promoBand}</div>
       <div class="evt-body">
         <div class="evt-date">${fmtDate(evt.date_evt)}${evt.heure_debut?' · '+evt.heure_debut:''}${EvtTemporel.badge(evt)}</div>
         <div class="evt-title">${esc(evt.titre)}</div>
@@ -2145,9 +2181,14 @@ function renderEventDetail(evt, isPreview) {
   // Cachet "Trophée" sur la vue détail (2026-09-23) — même badge que sur la carte de liste,
   // voir .trophee-cachet et son commentaire.
   const estTropheeDetail = evt.type_evt === 'trophee_diaspora';
-  const cachetDetailHtml = estTropheeDetail ? `<div class="trophee-cachet" title="Événement Trophée diaspora"><span class="ic">🏆</span><span class="tx">Trophée</span></div>` : '';
+  // Cachet "⚡ Flash" sur la vue détail (2026-10-12) — même badge que sur la carte de liste,
+  // voir .flash-cachet et son commentaire.
+  const estFlashDetail = !estTropheeDetail && evt.inscription_ouverte === 0;
+  const cachetDetailHtml = estTropheeDetail ? `<div class="trophee-cachet" title="Événement Trophée diaspora"><span class="ic">🏆</span><span class="tx">Trophée</span></div>`
+    : estFlashDetail ? `<div class="flash-cachet" title="Événement flash — informatif, sans inscription"><span class="ic">⚡</span></div>` : '';
+  const classeCachetDetail = estTropheeDetail ? ' evt-card-trophee trophee-shimmer' : estFlashDetail ? ' evt-card-flash flash-shimmer' : '';
   const carouselHTML = uniqueSlides.length ? `
-    <div class="carousel-wrap${estTropheeDetail ? ' evt-card-trophee trophee-shimmer' : ''}" id="${prefix}-carousel-wrap">
+    <div class="carousel-wrap${classeCachetDetail}" id="${prefix}-carousel-wrap">
       <div class="carousel-track" id="${prefix}-carousel">
         ${uniqueSlides.map(src => `<div class="carousel-slide"><img src="${esc(src)}" alt=""></div>`).join('')}
       </div>
@@ -2158,7 +2199,7 @@ function renderEventDetail(evt, isPreview) {
         <div class="carousel-dots">${uniqueSlides.map((_,i)=>`<div class="carousel-dot${i===0?' active':''}" onclick="carouselGo('${prefix}-carousel',${i})"></div>`).join('')}</div>
       ` : ''}
     </div>
-  ` : `<div class="evt-img${estTropheeDetail ? ' evt-card-trophee trophee-shimmer' : ''}" style="height:200px;background:linear-gradient(135deg,#ff6b00,#ff9f43);display:flex;align-items:center;justify-content:center;font-size:60px;position:relative;">📢${cachetDetailHtml}</div>`;
+  ` : `<div class="evt-img${classeCachetDetail}" style="height:200px;background:linear-gradient(135deg,#ff6b00,#ff9f43);display:flex;align-items:center;justify-content:center;font-size:60px;position:relative;">📢${cachetDetailHtml}</div>`;
 
   const thumbsHTML = galerie.length > 1 ? `
     <div style="padding:0 20px 10px;">
