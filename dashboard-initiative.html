@@ -29,8 +29,11 @@
   <link rel="stylesheet" href="/assets/guided-tour.css">
   <!-- Design « Nuit dorée » (2026-10-12) : Cotisations & Adhésions et ses fenêtres ; retour arrière : retirer cette ligne -->
   <link rel="stylesheet" href="/assets/adhesions-nuit-doree.css?v=6">
+  <!-- Design « Nuit dorée » (2026-10-13) : tableau de bord Initiative (cockpit, Paramètres Boutique, rubriques) ; retour arrière : retirer ces 2 lignes, le script dashboard-nuit-doree.js et class="nd" sur <body> -->
+  <link rel="stylesheet" href="/assets/theme-nuit-doree.css?v=7">
+  <link rel="stylesheet" href="/assets/dashboard-nuit-doree.css?v=4">
 </head>
-<body>
+<body class="nd">
 <div class="page">
 
   <header class="topbar">
@@ -141,6 +144,7 @@
 </div>
 
 <script src="assets/data.js"></script>
+<script src="/assets/dashboard-nuit-doree.js?v=3" defer></script>
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js?v=13"></script>
 <script src="assets/sidebar-reorder.js"></script>

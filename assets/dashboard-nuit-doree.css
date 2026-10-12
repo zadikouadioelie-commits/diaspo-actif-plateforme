@@ -1,0 +1,214 @@
+/* Design « Nuit dorée » — tableau de bord Initiative (dashboard-initiative.html) : cockpit, Paramètres Boutique et toutes les rubriques affichées dans la zone de contenu (2026-10-13).
+   Complète assets/theme-nuit-doree.css (fond, barre du haut, boutons, menu des modules).
+   Tout est préfixé html body.nd : sans class="nd" sur <body>, la page garde son ancien design. Les variables du site (--bg, --text, --border…) ne sont redéfinies
+   que dans la zone de contenu et les fenêtres, jamais sur <body> (barre du haut intacte). Retour arrière : retirer les 2 liens et class="nd" sur <body>.
+   La cartouche d'annuaire de « Paramètres Boutique » (#pv-card-preview-mount) reste volontairement fidèle à l'annuaire public, dont le design n'a pas changé. */
+
+@import url("https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,500;6..96,600&family=Manrope:wght@400;500;600;700;800&display=swap");
+
+/* ═══ variables : la zone de contenu et les fenêtres passent en nuit ═══ */
+html body.nd :is(main.content,.modal-back,.modal-box,.modal-overlay,.pv-builder-layout){
+  --bg:rgba(255,255,255,.06); --bg-alt:rgba(255,255,255,.07); --card:rgba(255,255,255,.045); --text:#EDEAE0; --muted:#AEB8D0;
+  --border:rgba(255,255,255,.13); --navy:#FFFFFF; --orange:#E3C06E; --orange-light:rgba(227,192,110,.12); --green:#8FE0B0; --surface:rgba(255,255,255,.05); --surface2:rgba(255,255,255,.08);
+}
+html body.nd main.content{background:transparent!important;color:var(--nd-texte);padding-top:34px}
+html body.nd main.content :is(input,select,textarea){color-scheme:dark}
+
+/* ═══ titres ═══ */
+html body.nd main.content :is(h1,h2){font-family:var(--nd-display)!important;font-weight:500;color:#fff!important;letter-spacing:-.01em}
+html body.nd main.content h1{font-size:clamp(30px,3.6vw,46px);line-height:1.1;margin-bottom:6px}
+html body.nd main.content h2{font-size:clamp(26px,3vw,38px);line-height:1.15}
+html body.nd main.content h3{color:#fff!important;font-weight:700}
+html body.nd main.content :is(h1,h2,h3,h4) em{color:var(--nd-or)}
+html body.nd main.content :is(.sub,.muted){color:var(--nd-doux)}
+
+/* ═══ surfaces : toute carte devient du verre sombre au liseré doré discret ═══ */
+html body.nd main.content :is(.card,.stat-card,.search-card,.nat-card,.profile-card,.price-card,.chat-wrap,.po-feed-card),
+html body.nd :is(.modal-box){
+  background:var(--nd-verre)!important;background-image:none!important;border:1px solid var(--nd-bord2)!important;border-radius:22px;
+  box-shadow:0 26px 54px -34px #000!important;color:var(--nd-texte)}
+html body.nd main.content .stat-card{border-radius:18px;text-align:center}
+html body.nd main.content .stat-card::before{display:none}
+html body.nd main.content .stat-card .label{color:var(--nd-doux);letter-spacing:.04em}
+html body.nd main.content .stat-card .num,html body.nd main.content .stat-card [class*="num"]{font-family:var(--nd-display);font-weight:500}
+html body.nd .modal-box{background:linear-gradient(160deg,rgba(23,37,77,.96),rgba(10,16,36,.98))!important;border-color:var(--nd-bord)!important;box-shadow:0 40px 90px -30px #000!important}
+html body.nd :is(.modal-back,.modal-overlay){background:rgba(3,6,14,.72)!important;backdrop-filter:blur(5px)}
+
+/* cartes de raccourcis (Nouvelle publication, Candidatures, Réseau Pro…) et cartes à lien */
+html body.nd main.content a.card:hover,html body.nd main.content .card[onclick]:hover,html body.nd main.content a[style*="border:1px solid var(--border)"]:hover{border-color:var(--nd-bord)!important;transform:translateY(-3px)}
+html body.nd main.content a.card,html body.nd main.content .card[onclick]{transition:transform .5s var(--nd-ease),border-color .5s var(--nd-ease)}
+
+/* ═══ bandeaux d'information ═══ */
+html body.nd main.content .notice{background:rgba(227,192,110,.09)!important;border:1px solid var(--nd-bord);border-left:3px solid var(--nd-or);border-radius:14px;color:#F3E3B5}
+html body.nd main.content .notice a{color:var(--nd-or)}
+html body.nd main.content .empty{color:var(--nd-doux)}
+
+/* ═══ boutons : or pour l'action principale, verre pour le reste ═══ */
+html body.nd main.content :is(.btn-orange,.btn-primary),html body.nd .modal-box :is(.btn-orange,.btn-primary){
+  background:var(--nd-degore)!important;color:#1a1202!important;border:0!important;font-weight:800;box-shadow:0 10px 24px -12px rgba(227,192,110,.75)}
+html body.nd main.content :is(.btn-orange,.btn-primary):hover{filter:brightness(1.07);box-shadow:0 14px 30px -12px rgba(227,192,110,.85)}
+html body.nd main.content .btn-outline,html body.nd .modal-box .btn-outline{background:var(--nd-verre)!important;color:var(--nd-texte)!important;border:1px solid var(--nd-bord)!important;font-weight:700}
+html body.nd main.content .btn-outline:hover,html body.nd .modal-box .btn-outline:hover{background:var(--nd-verre2)!important;border-color:var(--nd-or)!important;color:#fff!important}
+html body.nd main.content .btn-navy{background:var(--nd-verre2)!important;color:#fff!important;border:1px solid var(--nd-bord)!important}
+/* boutons sans variante, posés en ligne (« Visible » / « Non visible », « Passer à Premium »…) */
+html body.nd main.content .btn:not(.btn-orange):not(.btn-primary):not(.btn-outline):not(.btn-navy):not([style*="background"]){background:var(--nd-verre)!important;color:var(--nd-texte)!important;border:1px solid var(--nd-bord)!important}
+html body.nd main.content .btn[style*="background:linear-gradient(135deg,#c8960c"]{background:var(--nd-degore)!important;color:#1a1202!important;border:0!important;box-shadow:0 10px 24px -12px rgba(227,192,110,.75)}
+html body.nd main.content .btn[disabled]{opacity:.45}
+
+/* ═══ champs de saisie ═══ */
+html body.nd main.content :is(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]):not([type=file]),select,textarea),
+html body.nd .modal-box :is(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]):not([type=file]),select,textarea){
+  background:rgba(255,255,255,.06)!important;color:#fff!important;border:1px solid var(--nd-bord2)!important;border-radius:12px;transition:border-color .3s,box-shadow .3s}
+html body.nd main.content :is(input,select,textarea)::placeholder,html body.nd .modal-box :is(input,textarea)::placeholder{color:#7C88A4}
+html body.nd main.content :is(input,select,textarea):focus,html body.nd .modal-box :is(input,select,textarea):focus{outline:none;border-color:var(--nd-or)!important;box-shadow:0 0 0 3px rgba(227,192,110,.18)}
+html body.nd main.content select option,html body.nd .modal-box select option{background:#0B1226;color:#fff}
+html body.nd main.content :is(input,select,textarea):disabled{opacity:.55}
+html body.nd main.content input[type=checkbox],html body.nd main.content input[type=radio],html body.nd .modal-box :is(input[type=checkbox],input[type=radio]){accent-color:#B9893A}
+html body.nd main.content :is(.form-label,label:not(.da-pill),.pv-lbl,.cr-label,.voq-lbl){color:var(--nd-doux)!important;letter-spacing:.06em}
+html body.nd main.content label:not(.da-pill) :is(span,div):not([style*="color:"]){color:inherit!important}
+html body.nd main.content :is(.pv-lbl,.cr-label){text-transform:uppercase;font-size:11.5px;font-weight:700;color:var(--nd-or)!important}
+html body.nd main.content .da-pill{background:var(--nd-verre)!important;border:1px solid var(--nd-bord2)!important;color:var(--nd-texte)!important}
+html body.nd main.content .da-pill:hover{border-color:var(--nd-bord)!important}
+html body.nd main.content :is(.da-pill.checked,.da-pill:has(input:checked)){background:rgba(227,192,110,.16)!important;border-color:var(--nd-or)!important;color:#fff!important}
+
+/* ═══ étiquettes, pastilles, tableaux ═══ */
+html body.nd main.content :is(.tag,.pill:not(.sidebar .pill)){background:rgba(227,192,110,.12)!important;border:1px solid var(--nd-bord)!important;color:#F3E3B5!important}
+html body.nd main.content table{color:var(--nd-texte);border-color:var(--nd-bord2)}
+html body.nd main.content :is(th,thead td){background:var(--nd-verre2)!important;color:var(--nd-doux)!important;border-color:var(--nd-bord2)!important;letter-spacing:.06em}
+html body.nd main.content td{border-color:var(--nd-bord2)!important;color:var(--nd-texte)}
+html body.nd main.content tr:hover td{background:var(--nd-verre)}
+html body.nd main.content :is(hr,.sep){border-color:var(--nd-bord2)}
+html body.nd main.content a:not(.btn):not([class*="card"]){color:var(--nd-or)}
+html body.nd main.content :is(code,pre){background:rgba(255,255,255,.07);color:#F3E3B5;border-radius:8px}
+
+/* ═══ progression, jauges ═══ */
+html body.nd main.content [style*="background:var(--border)"][style*="border-radius"]{background:rgba(255,255,255,.1)!important}
+html body.nd main.content [style*="background:#e5e7eb"],html body.nd main.content [style*="background:#E5E7EB"]{background:rgba(255,255,255,.1)!important}
+
+/* ═══ teintes posées en ligne (pastel + encre sombre) → verres teintés, encre claire ═══ */
+html body.nd main.content :is([style*="background:#fff"],[style*="background:white"],[style*="background: #fff"]):not(img):not([style*="background:#fff;color:#"]){background:var(--nd-verre)!important;border-color:var(--nd-bord2)!important}
+html body.nd main.content :is([style*="background:#eef1f6"],[style*="background:#f4f6fa"],[style*="background:#f1f5f9"],[style*="background:#f8fafc"],[style*="background:#fafafa"],[style*="background:#f9fafb"],[style*="background:#e5eaf2"],[style*="background:#dce4ef"],[style*="background:#f0f4ff"]){
+  background:var(--nd-verre)!important;border-color:var(--nd-bord2)!important;color:var(--nd-texte)!important}
+html body.nd main.content :is([style*="background:var(--bg)"]:not([style*="background:var(--bg-"])){background:var(--nd-verre)!important}
+html body.nd main.content :is([style*="background:#eff6ff"],[style*="background:#dbeafe"],[style*="background:#f0f9ff"]){background:rgba(63,123,255,.12)!important;border-color:rgba(63,123,255,.35)!important;color:#C7D8FF!important}
+html body.nd main.content :is([style*="background:#fffbeb"],[style*="background:#fff7ed"],[style*="background:#fff3ec"],[style*="background:#fef9c3"],[style*="background:#fef3c7"],[style*="background:#fbd2bb"],[style*="background:#fce0cd"],[style*="background:linear-gradient(135deg,#fffbeb"]){
+  background:rgba(227,192,110,.12)!important;border-color:var(--nd-bord)!important;color:#F3E3B5!important}
+html body.nd main.content :is([style*="background:#fee2e2"],[style*="background:#fef2f2"]){background:rgba(255,154,143,.12)!important;border-color:rgba(255,154,143,.35)!important;color:#FFB3AA!important}
+html body.nd main.content :is([style*="background:#dcfce7"],[style*="background:#f0fdf4"],[style*="background:#d1fae5"]){background:rgba(143,224,176,.12)!important;border-color:rgba(143,224,176,.32)!important;color:#9BE8B8!important}
+html body.nd main.content :is([style*="background:#f5f3ff"],[style*="background:#ede9fe"],[style*="background:#faf5ff"]){background:rgba(167,139,250,.12)!important;border-color:rgba(167,139,250,.35)!important;color:#CFC1FF!important}
+/* fonds pleins (navy / orange) portant du texte blanc : or + encre sombre */
+html body.nd main.content :is([style*="background:var(--navy)"]:not([style*="background:var(--navy-"]),[style*="background:var(--orange)"]:not([style*="background:var(--orange-"]),[style*="background:#b84c1a"],[style*="background:#B84C1A"]){background:var(--nd-degore)!important;color:#1a1202!important}
+html body.nd main.content :is([style*="background:#7c3aed"],[style*="background:#7C3AED"]){background:linear-gradient(135deg,#9B6BFF,#6D28D9)!important;color:#fff!important}
+/* encres posées en ligne trop sombres pour la nuit */
+html body.nd main.content :is([style*="color:#555"],[style*="color:#374151"],[style*="color:#475569"],[style*="color:#64748b"],[style*="color:#6b7280"],[style*="color:#334155"],[style*="color:#888"],[style*="color:#94a3b8"],[style*="color:#ccc"]){color:var(--nd-doux)!important}
+html body.nd main.content :is([style*="color:#dc2626"],[style*="color:#ef4444"],[style*="color:#d33"],[style*="color:#991b1b"]){color:#FFA79D!important}
+html body.nd main.content :is([style*="color:#2563eb"],[style*="color:#1d4ed8"],[style*="color:#1e40af"],[style*="color:#3b82f6"],[style*="color:#0369a1"],[style*="color:#1b4b8c"],[style*="color:#4a90d9"]){color:#A9C4FF!important}
+html body.nd main.content :is([style*="color:#92400e"],[style*="color:#9a3412"],[style*="color:#b45309"],[style*="color:#b84c1a"],[style*="color:#B84C1A"]){color:#F3E3B5!important}
+html body.nd main.content :is([style*="color:#166534"],[style*="color:#16a34a"],[style*="color:#10b981"],[style*="color:#059669"],[style*="color:#065f46"]){color:#9BE8B8!important}
+html body.nd main.content [style*="color:#7c3aed"]{color:#CFC1FF!important}
+html body.nd main.content [style*="color:#0d2b4e"],html body.nd main.content [style*="color:#0D2B4E"],html body.nd main.content [style*="color:#0d1b2a"]{color:#fff!important}
+/* les boutons dorés posés en ligne gardent leur encre sombre */
+html body.nd main.content [style*="color:#2a1e00"]{color:#2a1e00!important}
+
+/* ═══ bandeau d'état (« État de votre initiative », indice de fiabilité) ═══ */
+html body.nd main.content [style*="border-left:4px solid"]{border-left-color:var(--nd-or)!important}
+
+/* ═══ menu des modules (tiroir de gauche) ═══ */
+html body.nd .sidebar a{background:rgba(255,255,255,.04)!important;color:var(--nd-texte)!important;border:1px solid transparent;font-weight:600;transition:background .35s var(--nd-ease),border-color .35s var(--nd-ease)}
+html body.nd .sidebar a:hover{background:var(--nd-verre2)!important;border-color:var(--nd-bord2);filter:none}
+html body.nd .sidebar a.active{background:rgba(227,192,110,.14)!important;color:#fff!important;border-color:var(--nd-or);box-shadow:none}
+html body.nd .sidebar a.premium-locked{opacity:.7}
+html body.nd .sidebar .sb-group-lbl{color:var(--nd-or)!important;letter-spacing:.14em;opacity:.85}
+html body.nd .sidebar .pill{background:var(--nd-degore)!important;color:#1a1202!important;border:0!important;font-weight:800}
+html body.nd .sidebar .brand{font-family:var(--nd-display);font-weight:600}
+
+/* ═══ Paramètres Boutique : colonnes, aperçu en direct ═══ */
+html body.nd #parametres-vitrine>h2{margin-bottom:6px}
+html body.nd #parametres-vitrine :is(.pv-builder-left,.pv-builder-right)>.card h3{font-size:16px}
+html body.nd #parametres-vitrine iframe{border:1px solid var(--nd-bord)!important;border-radius:16px;background:#060A14}
+html body.nd #parametres-vitrine [style*="border:2px dashed"],html body.nd #parametres-vitrine [style*="border:1.5px dashed"]{border-color:var(--nd-bord)!important;background:rgba(255,255,255,.03)!important}
+html body.nd #parametres-vitrine :is(.pv-device-btn,[id^="pv-device"],[onclick*="pvSetDevice"],[onclick*="pvDevice"]){background:var(--nd-verre)!important;border:1px solid var(--nd-bord2)!important;color:var(--nd-texte)!important;border-radius:12px}
+html body.nd #parametres-vitrine :is([onclick*="pvSetDevice"],[onclick*="pvDevice"]).active,html body.nd #parametres-vitrine :is(.pv-device-btn,[id^="pv-device"]).active{background:var(--nd-degore)!important;color:#1a1202!important;border-color:var(--nd-or)!important;font-weight:800}
+/* cartes à choisir (domaines, modules, styles, thèmes) */
+html body.nd #parametres-vitrine [style*="border:2px solid"],html body.nd #parametres-vitrine [style*="border:1.5px solid"]{border-color:var(--nd-bord2)!important}
+html body.nd #parametres-vitrine :is([style*="border:2px solid #E3C06E"],[style*="border:2px solid var(--orange)"],[style*="border:2px solid #b84c1a"],[style*="border:2px solid #B84C1A"]):not([style*="background:var(--orange)"]){border-color:var(--nd-or)!important;background:rgba(227,192,110,.1)!important}
+html body.nd #parametres-vitrine [style*="border:2px solid var(--orange)"][style*="background:var(--orange)"]{border-color:var(--nd-or)!important}
+/* petites étiquettes « Étape 1 / 2 / 3 » */
+html body.nd #parametres-vitrine span[style*="background:var(--navy)"]:not([style*="background:var(--navy-"]){background:var(--nd-degore)!important;color:#1a1202!important}
+/* l'aperçu de la cartouche reste fidèle à l'annuaire public : on l'encadre seulement d'un liseré doré */
+html body.nd #pv-card-preview-mount .vit-card{box-shadow:0 0 0 1px rgba(227,192,110,.35),0 22px 44px -22px #000}
+html body.nd #pv-card-preview-mount .vit-card{--text:#0D2B4E;--muted:#676F77;--border:#DCE4EF;--bg:#EEF2F8;--navy:#0D2B4E;--orange:#B84C1A;--orange-light:#FFF0E8;background:#fff!important}
+html body.nd #pv-card-preview-mount .vit-card-title{color:#0D2B4E!important}
+html body.nd #pv-card-preview-mount .vit-card-desc{color:#676F77!important}
+
+/* ═══ Centre financier, QR, visibilité (bas du cockpit) ═══ */
+html body.nd main.content #qr-boutique-canvas,html body.nd main.content img[src^="data:image"][alt*="QR"],html body.nd main.content canvas{background:#fff;border-radius:12px;padding:6px}
+
+/* ═══ indice de fiabilité, jauges circulaires ═══ */
+html body.nd main.content :is([class*="gauge"],[class*="trust"],[class*="fiab"]) text{fill:#fff}
+
+/* ═══ pastille de bascule du menu (bouton rond du tiroir) et assistant ═══ */
+html body.nd #sidebar-toggle,html body.nd .sidebar-toggle{background:var(--nd-degore)!important;color:#1a1202!important;border:0!important;box-shadow:0 10px 28px -8px rgba(227,192,110,.6)}
+
+/* ═══ défilement ═══ */
+html body.nd main.content{scrollbar-color:rgba(227,192,110,.4) transparent}
+
+/* ═══ carte « Indice de fiabilité » (même habillage que sur les profils) ═══ */
+html body.nd .ts-card{background:var(--nd-verre)!important;background-image:none!important;border:1px solid var(--nd-bord)!important;border-radius:22px;box-shadow:0 26px 54px -34px #000;color:var(--nd-texte)}
+html body.nd .ts-card *:not(button):not(a):not(.ts-donut):not(.ts-stars):not(.ts-score-label){color:inherit}
+html body.nd .ts-card-title,html body.nd .ts-total,html body.nd .ts-groupe,html body.nd .ts-crit-titre{color:#fff!important}
+html body.nd :is(.ts-score-desc,.ts-crit-aide,.ts-bareme-note,.ts-react-label){color:var(--nd-doux)!important}
+html body.nd .ts-donut{color:#052e16!important}
+html body.nd .ts-score-label{background:rgba(255,255,255,.08)!important;color:#fff!important;border:1px solid var(--nd-bord2)}
+html body.nd .ts-bar-wrap{background:rgba(255,255,255,.1)!important}
+html body.nd :is(.ts-crit,.ts-bareme){background:rgba(255,255,255,.04)!important;border:1px solid var(--nd-bord2)!important;border-radius:14px}
+html body.nd .ts-bareme summary{color:var(--nd-or)!important}
+html body.nd .ts-report-btn{background:var(--nd-verre)!important;border:1px solid var(--nd-bord2)!important;color:var(--nd-doux)!important;border-radius:999px}
+html body.nd .ts-card :is(.ts-crit.ok){background:rgba(143,224,176,.09)!important;border-color:rgba(143,224,176,.32)!important}
+html body.nd .ts-card :is(.ts-crit.encours){background:rgba(227,192,110,.09)!important;border-color:var(--nd-bord)!important}
+html body.nd .ts-card :is(.ts-crit.alerte){background:rgba(255,154,143,.1)!important;border-color:rgba(255,154,143,.35)!important}
+html body.nd .ts-card .ts-crit-pts{color:var(--nd-doux)!important}
+html body.nd .ts-card .ts-crit.ok .ts-crit-pts{color:#9BE8B8!important}
+html body.nd .ts-card .ts-crit-action{background:var(--nd-degore)!important;color:#1a1202!important;font-weight:800;border-radius:999px;box-shadow:0 8px 20px -10px rgba(227,192,110,.7)}
+html body.nd .ts-card .ts-crit-action:hover{filter:brightness(1.07)}
+html body.nd .ts-card .ts-reste{background:rgba(227,192,110,.1)!important;border-color:var(--nd-bord)!important;color:#F3E3B5!important}
+html body.nd .ts-card .ts-reste strong{color:#fff!important}
+html body.nd .ts-card .ts-gain{background:rgba(227,192,110,.14)!important;border:1px solid var(--nd-bord)!important;color:var(--nd-or)!important}
+html body.nd .ts-card .ts-sous>summary{color:var(--nd-or)!important}
+html body.nd .ts-card .ts-sous li{background:rgba(255,255,255,.05)!important;border-color:var(--nd-bord2)!important;color:var(--nd-texte)!important}
+html body.nd .ts-card .ts-sans-action{color:var(--nd-doux)!important}
+html body.nd .ts-card .ts-bareme li{border-top-color:var(--nd-bord2)!important;color:var(--nd-texte)!important}
+html body.nd .ts-card .ts-bareme li small{color:var(--nd-doux)!important}
+html body.nd .ts-card .ts-bareme li b{color:var(--nd-or)!important}
+html body.nd .ts-card .ts-absence{background:rgba(227,192,110,.1)!important;border-color:var(--nd-bord)!important;color:#F3E3B5!important}
+html body.nd .ts-modal,html body.nd .ts-absence-modal{background:linear-gradient(160deg,rgba(23,37,77,.98),rgba(10,16,36,.99))!important;border:1px solid var(--nd-bord)!important;color:var(--nd-texte)!important}
+html body.nd main.content p:not([style*="color:#"]):not([style*="color: #"]){color:var(--nd-doux)!important}
+/* ═══ QR code de la boutique : boutons Carte / PNG / SVG / Copier / Partager ═══ */
+html body.nd main.content .pqr-btn{background:var(--nd-verre)!important;border:1px solid var(--nd-bord)!important;color:var(--nd-texte)!important;border-radius:999px}
+html body.nd main.content .pqr-btn:hover{background:var(--nd-verre2)!important;border-color:var(--nd-or)!important;color:#fff!important}
+html body.nd main.content .pqr-btn.primary{background:var(--nd-degore)!important;color:#1a1202!important;border:0!important;font-weight:800;box-shadow:0 10px 24px -12px rgba(227,192,110,.75)}
+html body.nd main.content .pqr-url{background:rgba(255,255,255,.05)!important;border:1px solid var(--nd-bord2)!important;color:var(--nd-doux)!important}
+html body.nd main.content .pqr-canvas-wrap{background:#fff!important;border-radius:16px;padding:6px}
+html body.nd main.content :is(h1,h2,h3){border-bottom-color:var(--nd-bord)!important}
+
+/* ═══ couleurs claires posées en ligne, repérées par assets/dashboard-nuit-doree.js (data-nd-*) ═══ */
+html body.nd :is(main.content,.modal-back,.modal-overlay,.modal-box,[id^="modal-"]) [data-nd-fond="neutre"]{background:var(--nd-verre)!important;border-color:var(--nd-bord2)!important}
+html body.nd :is(main.content,.modal-back,.modal-overlay,.modal-box,[id^="modal-"]) [data-nd-fond="or"]{background:rgba(227,192,110,.12)!important;border-color:var(--nd-bord)!important}
+html body.nd :is(main.content,.modal-back,.modal-overlay,.modal-box,[id^="modal-"]) [data-nd-fond="rouge"]{background:rgba(255,154,143,.12)!important;border-color:rgba(255,154,143,.35)!important}
+html body.nd :is(main.content,.modal-back,.modal-overlay,.modal-box,[id^="modal-"]) [data-nd-fond="vert"]{background:rgba(143,224,176,.12)!important;border-color:rgba(143,224,176,.32)!important}
+html body.nd :is(main.content,.modal-back,.modal-overlay,.modal-box,[id^="modal-"]) [data-nd-fond="bleu"]{background:rgba(63,123,255,.13)!important;border-color:rgba(63,123,255,.35)!important}
+html body.nd :is(main.content,.modal-back,.modal-overlay,.modal-box,[id^="modal-"]) [data-nd-fond="violet"]{background:rgba(167,139,250,.12)!important;border-color:rgba(167,139,250,.35)!important}
+html body.nd :is(main.content,.modal-back,.modal-overlay,.modal-box,[id^="modal-"]) [data-nd-bord]{border-color:var(--nd-bord2)!important}
+html body.nd :is(main.content,.modal-back,.modal-overlay,.modal-box,[id^="modal-"]) [data-nd-encre="texte"]{color:var(--nd-texte)!important}
+html body.nd :is(main.content,.modal-back,.modal-overlay,.modal-box,[id^="modal-"]) [data-nd-encre="doux"]{color:var(--nd-doux)!important}
+html body.nd :is(main.content,.modal-back,.modal-overlay,.modal-box,[id^="modal-"]) [data-nd-encre="rouge"]{color:#FFA79D!important}
+html body.nd :is(main.content,.modal-back,.modal-overlay,.modal-box,[id^="modal-"]) [data-nd-encre="or"]{color:#F3E3B5!important}
+html body.nd :is(main.content,.modal-back,.modal-overlay,.modal-box,[id^="modal-"]) [data-nd-encre="vert"]{color:#9BE8B8!important}
+html body.nd :is(main.content,.modal-back,.modal-overlay,.modal-box,[id^="modal-"]) [data-nd-encre="bleu"]{color:#A9C4FF!important}
+html body.nd :is(main.content,.modal-back,.modal-overlay,.modal-box,[id^="modal-"]) [data-nd-encre="violet"]{color:#CFC1FF!important}
+/* un bouton doré posé en ligne garde son encre sombre */
+html body.nd main.content [style*="background:linear-gradient(135deg,#c8960c"][data-nd-encre]{color:#2a1e00!important}
+
+/* ═══ filtres en pastilles (rubrique « Soumission DA ») et boutons sans classe ═══ */
+html body.nd main.content :is(.da-sda-filter,.tab-btn,.filter-btn,[class*="-filter"]:not(select):not(input)){background:var(--nd-verre)!important;border:1px solid var(--nd-bord2)!important;color:var(--nd-texte)!important;border-radius:999px}
+html body.nd main.content :is(.da-sda-filter,.tab-btn,.filter-btn,[class*="-filter"]:not(select):not(input)):is(.active,.on,.selected){background:var(--nd-degore)!important;color:#1a1202!important;border-color:var(--nd-or)!important;font-weight:800}
