@@ -1933,6 +1933,15 @@ async function applyAuthState() {
         </button>
         <div class="notif-dropdown" id="notif-dropdown"></div>
       </div>
+      <!-- Rafraîchir la page (2026-10-12, demande explicite, capture à l'appui) : l'app est
+           installée en PWA ("display":"standalone" dans manifest.json) — sans barre d'adresse
+           ni bouton de rechargement du navigateur, donc aucun moyen natif de recharger une page
+           qui semble figée/périmée une fois ouverte en plein écran. Icône normale du bandeau
+           (pas dans "Plus d'options", masqué au-delà de 1180px — ce bouton doit rester
+           joignable en permanence, desktop compris). -->
+      <button type="button" class="topbar-icon-btn" title="Rafraîchir la page" onclick="location.reload()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+      </button>
       <!-- Bouton dédié vers le tableau de bord (icône maison) : la pastille d'identité
            juste après y mène déjà, mais rien n'indiquait visuellement que ce lien existait
            (demandé le 2026-08-19, capture à l'appui). Icône remplacée le 2026-09-20 (demande
