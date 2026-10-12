@@ -266,12 +266,20 @@
     const nom = [inf.prenom, inf.nom].filter(Boolean).join(' ');
     const tpl = (d.meta && CV_GAB[d.meta.template]) ? d.meta.template : (CV_GAB[cv.theme] ? cv.theme : 'moderne');
     const lieu = [inf.ville, inf.pays_residence].filter(Boolean).join(', ');
+    /* Logos des liens (2026-10-12) : LinkedIn et compte Diaspo'Actif, avec le logo de chaque service. */
+    const LOGO = {
+      linkedin: '<svg width="16" height="16" viewBox="0 0 24 24" role="img" aria-label="LinkedIn" style="flex:none"><rect width="24" height="24" rx="4" fill="#0A66C2"/><path fill="#fff" d="M6.94 9.5H3.9V20h3.04V9.5zM5.42 4.5a1.76 1.76 0 100 3.52 1.76 1.76 0 000-3.52zM20.1 13.6c0-3.1-1.65-4.55-3.85-4.55-1.77 0-2.57.98-3.01 1.67V9.5h-3.04V20h3.04v-5.8c0-1.53.29-3.01 2.18-3.01 1.86 0 1.88 1.75 1.88 3.1V20h3.04v-6.4z"/></svg>',
+      da: '<img src="assets/logo.png" alt="Diaspo’Actif" width="20" height="20" style="flex:none;object-fit:contain;border-radius:3px">'
+    };
+    const lienExt = u => { const t = String(u || '').trim(); return /^https?:\/\//i.test(t) ? t : 'https://' + t; };
+    const ligneLien = (logo, u) => `<div class="meta">${logo}<a class="ell" href="${esc(lienExt(u))}" target="_blank" rel="noopener">${esc(u)}</a></div>`;
     const contact = [
       inf.email ? `<div class="meta">${ic('send', 's')}<a href="mailto:${esc(inf.email)}" class="ell">${esc(inf.email)}</a></div>` : '',
       inf.telephone ? `<div class="meta">${ic('chat', 's')}<a href="tel:${esc(String(inf.telephone).replace(/[^\d+]/g, ''))}">${esc(inf.telephone)}</a></div>` : '',
       lieu ? `<div class="meta">${ic('pin', 's')}<span>${esc(lieu)}</span></div>` : '',
-      inf.linkedin ? `<div class="meta">${ic('out', 's')}<span class="ell">${esc(inf.linkedin)}</span></div>` : '',
-      inf.site ? `<div class="meta">${ic('out', 's')}<span class="ell">${esc(inf.site)}</span></div>` : ''
+      inf.linkedin ? ligneLien(LOGO.linkedin, inf.linkedin) : '',
+      inf.site ? `<div class="meta">${ic('out', 's')}<span class="ell">${esc(inf.site)}</span></div>` : '',
+      inf.diasporactif ? ligneLien(LOGO.da, inf.diasporactif) : ''
     ].join('');
     const photo = d.photo && d.photo.show !== false && d.photo.url ? A.attrUrl(d.photo.url) : '';
     const sec = (t, inner) => inner ? `<div class="h2">${esc(t)}</div><div class="card"><div class="pad">${inner}</div></div>` : '';
@@ -530,6 +538,8 @@
       ${fld('cv-tel', 'Téléphone', v('telephone', me.telephone), { type: 'tel', max: 40, ac: 'tel', im: 'tel' })}
       ${fld('cv-linkedin', 'LinkedIn', inf.linkedin, { max: 200, ph: 'Adresse de votre profil' })}
       ${fld('cv-site', 'Site web', inf.site, { max: 200 })}
+      ${fld('cv-da', 'Mon compte Diaspo’Actif', inf.diasporactif, { max: 200, ph: 'Lien de votre compte', hint: 'Affiché sur le CV avec le logo Diaspo’Actif.' })}
+      <button type="button" class="btn out sm" style="margin:-4px 0 12px" onclick="var c=document.getElementById('cv-da');if(c&&window.MApp&&MApp.S.me){c.value=location.origin+'/profil.html?id='+MApp.S.me.id;c.dispatchEvent(new Event('input',{bubbles:true}));}">Utiliser le lien de mon compte</button>
       <div class="mcl-sec">PRÉSENTATION</div>
       ${fld('cv-resume', 'Résumé du profil', htmlEnTexte(d.resume), { area: 1, rows: 5, max: 1500, hint: '2 à 4 phrases : qui vous êtes, votre expérience, ce que vous cherchez.' })}
       ${fld('cv-comp', 'Compétences métier', metiers, { max: 400, ph: 'Séparées par des virgules', hint: 'Ex. Gestion de projet, Conduite de travaux, Excel' })}
@@ -575,7 +585,7 @@
         const gab = val('cv-gab') || tpl;
         const nd = edit ? JSON.parse(JSON.stringify(d)) : { style: Object.assign({}, CV_STYLE), photo: { url: '', shape: 'round', size: 80, show: true }, experiences: [], formations: [], competences: { tech: [], metier: [], num: [] }, langues: [], certifications: [], interests: [], media: { audio: null, video: null, signature: null, qr: { enabled: true, url: location.origin + '/profil.html?id=' + S.me.id } } };
         nd.meta = Object.assign({}, nd.meta, { titre: t, numero, template: gab });
-        nd.infos = Object.assign({}, nd.infos, { prenom: pr, nom: no, titre_pro: val('cv-titrepro'), nationalite: val('cv-nat'), pays_residence: val('cv-pays'), ville: val('cv-ville'), telephone: val('cv-tel'), email: em, linkedin: val('cv-linkedin'), site: val('cv-site'), adresse: (nd.infos && nd.infos.adresse) || '' });
+        nd.infos = Object.assign({}, nd.infos, { prenom: pr, nom: no, titre_pro: val('cv-titrepro'), nationalite: val('cv-nat'), pays_residence: val('cv-pays'), ville: val('cv-ville'), telephone: val('cv-tel'), email: em, linkedin: val('cv-linkedin'), site: val('cv-site'), diasporactif: val('cv-da'), adresse: (nd.infos && nd.infos.adresse) || '' });
         /* Résumé inchangé : on garde l'original (mise en forme enrichie créée sur ordinateur) plutôt que sa version « texte ». */
         nd.resume = (edit && val('cv-resume') === htmlEnTexte(d.resume).trim()) ? d.resume : val('cv-resume');
         nd.competences = Object.assign({ tech: [], metier: [], num: [] }, nd.competences, { metier: val('cv-comp').split(',').map(x => x.trim()).filter(Boolean) });

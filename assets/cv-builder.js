@@ -24,7 +24,7 @@ let CVB = {
     infos: {
       prenom: '', nom: '', titre_pro: '', nationalite: '',
       pays_residence: '', ville: '', telephone: '', email: '',
-      linkedin: '', site: '', adresse: ''
+      linkedin: '', site: '', diasporactif: '', adresse: ''
     },
     resume: '',
     blocs: [],
@@ -156,7 +156,7 @@ function collectFormData() {
     prenom: g('prenom'), nom: g('nom'), titre_pro: g('titre-pro'),
     nationalite: g('nationalite'), pays_residence: g('pays-residence'),
     ville: g('ville'), telephone: g('telephone'), email: g('email'),
-    linkedin: g('linkedin'), site: g('site'), adresse: g('adresse')
+    linkedin: g('linkedin'), site: g('site'), diasporactif: g('diasporactif'), adresse: g('adresse')
   };
   CVB.data.resume = document.getElementById('resume')?.value || '';
   CVB.data.meta.titre = document.getElementById('cv-titre')?.value || 'Mon CV';
@@ -173,7 +173,7 @@ function syncFormFromData() {
   s('nationalite', inf.nationalite); s('pays-residence', inf.pays_residence);
   s('ville', inf.ville); s('telephone', inf.telephone);
   s('email', inf.email); s('linkedin', inf.linkedin);
-  s('site', inf.site); s('adresse', inf.adresse);
+  s('site', inf.site); s('diasporactif', inf.diasporactif); s('adresse', inf.adresse);
   if (window.CvX) CvX.setRich('resume', CVB.data.resume); else s('resume', CVB.data.resume);
   s('cv-titre', CVB.data.meta.titre);
   const numEl = document.getElementById('cv-numero');
@@ -880,4 +880,13 @@ document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.modal-backdrop').forEach(m => {
     m.addEventListener('click', e => { if (e.target === m) m.style.display = 'none'; });
   });
+});
+
+/* « Mon compte Diaspo’Actif » (2026-10-12) : un appui remplit le champ avec le lien public du profil du compte connecté. */
+document.addEventListener('click', function (e) {
+  if (!e.target.closest || !e.target.closest('#btn-da-compte')) return;
+  if (!CVB.userId) { alert('Connectez-vous pour utiliser le lien de votre compte.'); return; }
+  const champ = document.getElementById('diasporactif'); if (!champ) return;
+  champ.value = location.origin + '/profil.html?id=' + CVB.userId;
+  champ.dispatchEvent(new Event('input', { bubbles: true }));
 });

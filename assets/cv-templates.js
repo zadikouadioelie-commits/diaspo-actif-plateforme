@@ -89,6 +89,12 @@ function _blocsHTML(blocs, s) {
     ${_hasText(b.texte) ? `<div class="cv-rich" style="font-size:9pt;color:#333;line-height:1.55;">${_rich(b.texte)}</div>` : ''}
   </div>`).join('');
 }
+/* Logos des liens du CV (2026-10-12, demande explicite) : le lien LinkedIn s'affiche avec le logo LinkedIn, le lien du compte avec le logo Diaspo'Actif. */
+function _logoLien(type) {
+  if (type === 'linkedin') return '<svg width="16" height="16" viewBox="0 0 24 24" role="img" aria-label="LinkedIn" style="vertical-align:-2px;flex:none"><rect width="24" height="24" rx="4" fill="#0A66C2"/><path fill="#fff" d="M6.94 9.5H3.9V20h3.04V9.5zM5.42 4.5a1.76 1.76 0 100 3.52 1.76 1.76 0 000-3.52zM20.1 13.6c0-3.1-1.65-4.55-3.85-4.55-1.77 0-2.57.98-3.01 1.67V9.5h-3.04V20h3.04v-5.8c0-1.53.29-3.01 2.18-3.01 1.86 0 1.88 1.75 1.88 3.1V20h3.04v-6.4z"/></svg>';
+  if (type === 'da') return '<img src="/assets/logo.png" alt="Diaspo’Actif" width="18" height="18" style="vertical-align:-2px;flex:none;object-fit:contain;border-radius:3px">';
+  return '';
+}
 function _contactLine(icon, val) {
   if (!val) return '';
   return `<span style="display:inline-flex;align-items:center;gap:4px;margin-right:10px;font-size:9pt;">${icon} ${_e(val)}</span>`;
@@ -193,7 +199,7 @@ CV_TEMPLATES['moderne'] = {
     const contacts = [
       _contactLine('✉', inf.email), _contactLine('📞', inf.telephone),
       _contactLine('📍', [inf.ville, inf.pays_residence].filter(Boolean).join(', ')),
-      _contactLine('🔗', inf.linkedin), _contactLine('🌐', inf.site)
+      _contactLine(_logoLien('linkedin'), inf.linkedin), _contactLine('🌐', inf.site), _contactLine(_logoLien('da'), inf.diasporactif)
     ].filter(Boolean).join('');
     return `
 <div style="display:grid;grid-template-columns:220px 1fr;min-height:297mm;font-family:${s.font || 'Segoe UI'};font-size:${s.fontSize || 11}pt;">
@@ -257,7 +263,7 @@ CV_TEMPLATES['classique'] = {
     <div style="font-size:22pt;font-weight:800;color:${s.couleur1};letter-spacing:2px;margin-top:${(d.photo?.url&&d.photo?.show)||d._edit?'8px':'0'}">${_e([inf.prenom,inf.nom].filter(Boolean).join(' ')||'VOTRE NOM')}</div>
     ${inf.titre_pro ? `<div style="font-size:12pt;color:${s.couleur2};margin-top:4px;font-style:italic;">${_e(inf.titre_pro)}</div>` : ''}
     <div style="margin-top:10px;font-size:9pt;color:#555;">
-      ${[inf.email&&`✉ ${inf.email}`,inf.telephone&&`📞 ${inf.telephone}`,[inf.ville,inf.pays_residence].filter(Boolean).join(', ')&&`📍 ${[inf.ville,inf.pays_residence].filter(Boolean).join(', ')}`,inf.linkedin&&`🔗 ${inf.linkedin}`].filter(Boolean).join(' &nbsp;·&nbsp; ')}
+      ${[inf.email&&`✉ ${inf.email}`,inf.telephone&&`📞 ${inf.telephone}`,[inf.ville,inf.pays_residence].filter(Boolean).join(', ')&&`📍 ${[inf.ville,inf.pays_residence].filter(Boolean).join(', ')}`,inf.linkedin&&`${_logoLien('linkedin')} ${_e(inf.linkedin)}`,inf.diasporactif&&`${_logoLien('da')} ${_e(inf.diasporactif)}`].filter(Boolean).join(' &nbsp;·&nbsp; ')}
     </div>
   </div>
   ${d.media?.audio ? _audioWidget(d.media.audio) : ''}
@@ -302,7 +308,7 @@ CV_TEMPLATES['elegant'] = {
       ${inf.titre_pro ? `<div style="font-size:10pt;opacity:.8;margin-top:6px;border-top:1px solid rgba(255,255,255,.3);padding-top:6px;">${_e(inf.titre_pro)}</div>` : ''}
     </div>
     <div style="text-align:right;font-size:8.5pt;opacity:.85;line-height:1.9;">
-      ${inf.email?`✉ ${_e(inf.email)}<br>`:''}${inf.telephone?`📞 ${_e(inf.telephone)}<br>`:''}${(inf.ville||inf.pays_residence)?`📍 ${_e([inf.ville,inf.pays_residence].filter(Boolean).join(', '))}<br>`:''}${inf.linkedin?`🔗 ${_e(inf.linkedin)}`:''}
+      ${inf.email?`✉ ${_e(inf.email)}<br>`:''}${inf.telephone?`📞 ${_e(inf.telephone)}<br>`:''}${(inf.ville||inf.pays_residence)?`📍 ${_e([inf.ville,inf.pays_residence].filter(Boolean).join(', '))}<br>`:''}${inf.linkedin?`${_logoLien('linkedin')} ${_e(inf.linkedin)}${inf.diasporactif?'<br>':''}`:''}${inf.diasporactif?`${_logoLien('da')} ${_e(inf.diasporactif)}`:''}
     </div>
   </div>
   <!-- ACCENT BAR -->
@@ -356,7 +362,7 @@ CV_TEMPLATES['minimaliste'] = {
     ${_photoSlot(d.photo, s, d._edit)}
   </div>
   <div style="font-size:8.5pt;color:#666;margin:8px 0 16px;display:flex;flex-wrap:wrap;gap:0;">
-    ${inf.email?_contactLine('✉',inf.email):''}${inf.telephone?_contactLine('📞',inf.telephone):''}${(inf.ville||inf.pays_residence)?_contactLine('📍',[inf.ville,inf.pays_residence].filter(Boolean).join(', ')):''}${inf.linkedin?_contactLine('🔗',inf.linkedin):''}
+    ${inf.email?_contactLine('✉',inf.email):''}${inf.telephone?_contactLine('📞',inf.telephone):''}${(inf.ville||inf.pays_residence)?_contactLine('📍',[inf.ville,inf.pays_residence].filter(Boolean).join(', ')):''}${inf.linkedin?_contactLine(_logoLien('linkedin'),inf.linkedin):''}${inf.diasporactif?_contactLine(_logoLien('da'),inf.diasporactif):''}
   </div>
   ${d.media?.audio ? _audioWidget(d.media.audio) : ''}
   ${d.media?.video ? _videoWidget(d.media.video) : ''}
@@ -507,7 +513,7 @@ CV_TEMPLATES['creatif'] = {
     </div>
   </div>
   <div style="position:relative;padding:0 28px 28px;font-size:8.5pt;color:#666;display:flex;flex-wrap:wrap;gap:12px;margin-bottom:6px;">
-    ${inf.email?_contactLine('✉',inf.email):''}${inf.telephone?_contactLine('📞',inf.telephone):''}${(inf.ville||inf.pays_residence)?_contactLine('📍',[inf.ville,inf.pays_residence].filter(Boolean).join(', ')):''}
+    ${inf.email?_contactLine('✉',inf.email):''}${inf.telephone?_contactLine('📞',inf.telephone):''}${(inf.ville||inf.pays_residence)?_contactLine('📍',[inf.ville,inf.pays_residence].filter(Boolean).join(', ')):''}${inf.linkedin?_contactLine(_logoLien('linkedin'),inf.linkedin):''}${inf.diasporactif?_contactLine(_logoLien('da'),inf.diasporactif):''}
   </div>
   <div style="position:relative;padding:0 28px;display:grid;grid-template-columns:1fr 1fr;gap:20px;">
     <div>
@@ -553,7 +559,7 @@ CV_TEMPLATES['international'] = {
     ${_qrWidget(d.media?.qr, true)}
     ${_sectionTitle('Contact', s, true)}
     <div style="font-size:8.5pt;line-height:1.9;">
-      ${inf.email?`✉ ${_e(inf.email)}<br>`:''}${inf.telephone?`📞 ${_e(inf.telephone)}<br>`:''}${(inf.ville||inf.pays_residence)?`📍 ${_e([inf.ville,inf.pays_residence].filter(Boolean).join(', '))}<br>`:''}${inf.linkedin?`🔗 ${_e(inf.linkedin)}`:''}
+      ${inf.email?`✉ ${_e(inf.email)}<br>`:''}${inf.telephone?`📞 ${_e(inf.telephone)}<br>`:''}${(inf.ville||inf.pays_residence)?`📍 ${_e([inf.ville,inf.pays_residence].filter(Boolean).join(', '))}<br>`:''}${inf.linkedin?`${_logoLien('linkedin')} ${_e(inf.linkedin)}${inf.diasporactif?'<br>':''}`:''}${inf.diasporactif?`${_logoLien('da')} ${_e(inf.diasporactif)}`:''}
     </div>
     ${inf.nationalite ? `${_sectionTitle('Nationality / Nationalité', s, true)}<div style="font-size:9pt;">${_e(inf.nationalite)}</div>` : ''}
     ${d.langues?.length ? `${_sectionTitle('Languages / Langues', s, true)}${d.langues.map(l=>`<div style="display:flex;justify-content:space-between;font-size:8.5pt;margin-bottom:4px;"><span>${_e(l.langue)}</span><span style="opacity:.7;">${_e(l.niveau)}</span></div>`).join('')}` : ''}
