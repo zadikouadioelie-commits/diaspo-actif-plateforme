@@ -343,10 +343,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.querySelector('h2').nextElementSibling.textContent = `Publications avec le hashtag #${hashtag}`;
   }
 
-  // Post unique depuis URL
+  /* Ouverture directe en vue plein écran (2026-10-13, demande explicite) — ?post=<id> (lien
+     partagé, notification) ouvre CETTE publication précise ; ?decouvrir=1 (bouton « Actualités »
+     du bandeau, assets/app.js) en ouvre une AU HASARD parmi les publications récentes, pour que
+     les gens découvrent autre chose à chaque clic en balayant vers la suivante. Les deux passent
+     par Posts.openDetail() (vue immersive avec défilement ‹ › vers les autres publications), qui
+     a besoin de Posts._feedIds pour naviguer — jamais garanti par loadFeed() seul : la vue par
+     défaut du fil est la GRILLE (feedVue='grille' plus haut), qui route vers FilGrille.charger()
+     et ne peuple jamais _feedIds. On charge donc ici la liste nous-mêmes, indépendamment de la
+     vue affichée, via Posts.renderFeed() (même fonction que loadFeed() en mode liste). */
   const postId = urlParams.get('post');
-  if (postId) {
-    loadSinglePost(postId);
+  const decouvrir = urlParams.get('decouvrir');
+  if (postId || decouvrir) {
+    fetch(`/api/fil?mode=${feedMode}&page=1&limit=15`, { credentials: 'include' }).then(r => r.json()).then(r => {
+      const posts = r.posts || [];
+      Posts.renderFeed(posts, 'feed-list', { currentUserId: currentUser?.id });
+      renderPagination(r.page, r.pages, r.total);
+      let cible = postId;
+      if (!cible && posts.length) cible = posts[Math.floor(Math.random() * posts.length)].id;
+      if (cible) Posts.openDetail(cible);
+    }).catch(() => loadFeed());
   } else {
     loadFeed();
   }
@@ -501,19 +517,6 @@ async function loadFeed() {
   } catch(e) {
     container.innerHTML = `<div style="text-align:center;padding:30px;color:#dc2626;"><p>Erreur de chargement. <button onclick="loadFeed()" class="btn-secondary" style="margin-left:8px;">Réessayer</button></p></div>`;
   }
-}
-
-/* ── Post unique ── */
-async function loadSinglePost(postId) {
-  try {
-    const r = await fetch(`/api/fil/${postId}`, { credentials: 'include' }).then(r => r.json());
-    if (r.post) {
-      document.getElementById('feed-list').innerHTML = Posts.renderPostCard(r.post, { currentUserId: currentUser?.id });
-      document.getElementById('feed-filters').style.display = 'none';
-      document.getElementById('cat-filters').style.display = 'none';
-      document.getElementById('feed-pagination').innerHTML = `<button class="btn-secondary" onclick="history.back()">← Retour au fil</button>`;
-    }
-  } catch(e) { loadFeed(); }
 }
 
 /* ── Pagination ── */

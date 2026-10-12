@@ -1921,9 +1921,17 @@ async function applyAuthState() {
       ${premiumBtnHtml}
       ${apercuBtnHtml}
       <!-- Bouton « Actualités » (2026-10-12, demande explicite) : remplace la loupe, qui menait à l'Annuaire — lequel a déjà son
-           lien dans le menu principal. Ouvre le fil d'actualité (publications, comptes rendus, cagnottes, boutiques…, façon réseau social). -->
-      <a href="fil-actualite.html" class="topbar-icon-btn" title="Actualités" aria-label="Actualités">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v14a1 1 0 0 0 1 1H6a2 2 0 0 1-2-2V5z"></path><path d="M18 8h2a1 1 0 0 1 1 1v9a2 2 0 0 1-2 2"></path><line x1="8" y1="8" x2="14" y2="8"></line><line x1="8" y1="12" x2="14" y2="12"></line><line x1="8" y1="16" x2="12" y2="16"></line></svg>
+           lien dans le menu principal. Ouvre le fil d'actualité (publications, comptes rendus, cagnottes, boutiques…, façon réseau social).
+           ?decouvrir=1 (2026-10-13, demande explicite) : ouvre directement une publication AU HASARD en vue plein écran (Posts.openDetail,
+           voir fil-actualite-app.html) au lieu de la simple liste — jamais toujours la même, pour donner envie de balayer vers les autres.
+           Icône redessinée (rayons + ▶ centré, couleurs Diaspo'Actif) pour se distinguer des icônes neutres du bandeau : un vrai bouton
+           de découverte, pas une simple icône de document. -->
+      <a href="fil-actualite.html?decouvrir=1" class="topbar-icon-btn" title="Découvrir une publication" aria-label="Découvrir une publication">
+        <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+          <g stroke="#F26422" stroke-width="2" stroke-linecap="round"><line x1="12" y1="1" x2="12" y2="4"></line><line x1="12" y1="20" x2="12" y2="23"></line><line x1="1" y1="12" x2="4" y2="12"></line><line x1="20" y1="12" x2="23" y2="12"></line><line x1="4.2" y1="4.2" x2="6.3" y2="6.3"></line><line x1="17.7" y1="17.7" x2="19.8" y2="19.8"></line><line x1="4.2" y1="19.8" x2="6.3" y2="17.7"></line><line x1="17.7" y1="6.3" x2="19.8" y2="4.2"></line></g>
+          <circle cx="12" cy="12" r="6.5" fill="#F26422"></circle>
+          <path d="M10.3 9.2v5.6l4.6-2.8z" fill="#fff"></path>
+        </svg>
       </a>
       <a href="messagerie.html" class="topbar-icon-btn" title="Messagerie">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:middle;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>

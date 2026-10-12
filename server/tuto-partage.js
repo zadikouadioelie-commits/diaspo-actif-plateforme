@@ -21,11 +21,15 @@ function imageTuto(v) {
   return null;
 }
 
-/* Carte du tuto jointe aux publications partagées (null si le tuto n'est plus publié). */
+/* Carte du tuto jointe aux publications partagées (null si le tuto n'est plus publié).
+   type_source/url/miniature_url exposés depuis le 2026-10-13 (demande explicite : "rester dans
+   le fil, pas besoin d'aller sur la page de la vidéo") — nécessaires au front pour lancer la
+   lecture directement dans la publication (assets/posts.js), sans navigation. `lien` reste pour
+   le repli (WhatsApp, lien copié, navigateur sans JS). */
 async function carteTutoPost(db, videoId) {
   const v = await db.prepare("SELECT id, titre, categorie, duree_secondes, type_source, url, miniature_url, statut FROM da_videos_tutoriels WHERE id=?").get(videoId);
   if (!v || v.statut !== "publie") return null;
-  return { id: Number(v.id), titre: v.titre, categorie: v.categorie || null, duree_secondes: v.duree_secondes || null, image: imageTuto(v), lien: `videos-tutoriels.html?v=${v.id}` };
+  return { id: Number(v.id), titre: v.titre, categorie: v.categorie || null, duree_secondes: v.duree_secondes || null, type_source: v.type_source || null, url: v.url || null, miniature_url: v.miniature_url || null, image: imageTuto(v), lien: `videos-tutoriels.html?v=${v.id}` };
 }
 
 /* Clause SQL reprise par tous les modes du fil : une publication de tuto n'apparaît que si le tuto existe et est publié. */

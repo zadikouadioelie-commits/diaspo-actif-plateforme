@@ -491,13 +491,65 @@ function renderAnnonceOfficielleBloc(post) {
 }
 
 /* Tuto partagé (2026-10-12) : la publication montre l'affiche du tuto (c'est son média) ; ce bouton ouvre le tuto lui-même.
-   post.tuto vient de GET /api/fil (carte du tuto : titre, affiche, durée, lien) — absent si le tuto n'est plus publié. */
+   post.tuto vient de GET /api/fil (carte du tuto : titre, affiche, durée, lien, type_source, url) — absent si le tuto n'est plus publié.
+   Lecture DIRECTEMENT dans le fil depuis le 2026-10-13 (demande explicite : "rester dans le fil, pas besoin d'aller sur la page de
+   la vidéo") — ce n'est plus un lien de navigation, voir _ouvrirTutoInline() juste en dessous. */
+const _tutoCache = {};
 function renderTutoCta(post) {
   const t = post.tuto;
   if (!t || !t.lien) return '';
+  _tutoCache[t.id] = t;
   const d = t.duree_secondes ? ` · ${Math.floor(t.duree_secondes / 60)}:${String(t.duree_secondes % 60).padStart(2, '0')}` : '';
-  return `<a class="tuto-cta" href="${escHtml(t.lien)}"><span class="tuto-cta-play" aria-hidden="true">▶</span><span>Voir le tuto${d}</span></a>`;
+  return `<button type="button" class="tuto-cta" onclick="_ouvrirTutoInline(${t.id})"><span class="tuto-cta-play" aria-hidden="true">▶</span><span>Voir le tuto${d}</span></button>`;
 }
+/* Lecture inline d'un tuto partagé — même aiguillage par type_source que dvtLecteurHtml()
+   (assets/videos-tutoriels-public.js), mais sans jamais quitter le fil :
+   - film  : assets/inscription-film.js, overlay autonome, lecture automatique dès l'ouverture.
+   - mp4   : assets/media-viewer.js (déjà utilisé pour les médias des publications), même lecture
+             centrée + automatique ; son post_id ne correspond à aucune publication réelle, le
+             visionneur bascule alors sur son repli documenté (lire directement cfg.url).
+   - youtube : petite fenêtre dédiée (lecture automatique via le paramètre d'URL).
+   - bientot : aucune vidéo réelle, un simple message suffit. */
+let _tutoFilmPromesse = null;
+function _chargerFilmTuto() {
+  if (window.InscriptionFilm) return Promise.resolve();
+  if (!_tutoFilmPromesse) _tutoFilmPromesse = new Promise(resolve => {
+    const s = document.createElement('script'); s.src = '/assets/inscription-film.js?v=16'; s.onload = () => resolve(); s.onerror = () => resolve(); document.head.appendChild(s);
+  });
+  return _tutoFilmPromesse;
+}
+function _ouvrirTutoYoutube(t) {
+  const m = String(t.url || '').match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([A-Za-z0-9_-]{11})/);
+  const overlay = document.createElement('div');
+  overlay.className = 'posts-modal-overlay';
+  overlay.innerHTML = `<div style="width:100%;max-width:900px;aspect-ratio:16/9;position:relative;background:#000;border-radius:10px;overflow:hidden;">
+    <button type="button" aria-label="Fermer" style="position:absolute;top:8px;right:8px;z-index:1;width:34px;height:34px;border-radius:50%;border:none;background:rgba(0,0,0,.55);color:#fff;font-size:16px;cursor:pointer;">✕</button>
+    ${m ? `<iframe src="https://www.youtube.com/embed/${m[1]}?autoplay=1" style="width:100%;height:100%;border:0;" allow="autoplay; encrypted-media" allowfullscreen></iframe>` : `<div style="color:#fff;display:flex;align-items:center;justify-content:center;height:100%;">Vidéo indisponible.</div>`}
+  </div>`;
+  overlay.addEventListener('click', e => { if (e.target === overlay || e.target.closest('button')) overlay.remove(); });
+  document.body.appendChild(overlay);
+}
+async function _ouvrirTutoInline(id) {
+  const t = _tutoCache[id];
+  if (!t) { if (typeof showToast === 'function') showToast('Ce tuto n\'est plus disponible.', 'error'); return; }
+  if (t.type_source === 'bientot') { if (typeof showToast === 'function') showToast('Cette vidéo est en préparation — revenez bientôt !', 'info'); return; }
+  if (t.type_source === 'film') {
+    const version = t.url === 'inscription-court' ? 'court' : (t.url === 'evenement-flash' || t.url === 'flash') ? 'flash' : undefined;
+    await _chargerFilmTuto();
+    if (window.InscriptionFilm) window.InscriptionFilm.ouvrir(version ? { version } : undefined);
+    else window.location.href = t.lien;
+    return;
+  }
+  if (t.type_source === 'youtube') { _ouvrirTutoYoutube(t); return; }
+  // mp4 (ou tout autre fichier vidéo direct) : même visionneur que les médias des publications.
+  await chargerVisionneur();
+  if (window.MediaViewer) window.MediaViewer.open({ kind: 'video', post_id: t.id, url: t.url });
+  else window.location.href = t.lien;
+}
+// Exposé globalement (2026-10-13) : posts.js tourne dans une IIFE (voir l'ouverture du fichier),
+// ses fonctions ne sont donc PAS visibles depuis un attribut onclick="" (exécuté en portée globale)
+// sans cet export explicite — même raison que `window.Posts = Posts;` plus bas dans ce fichier.
+window._ouvrirTutoInline = _ouvrirTutoInline;
 
 function renderPostCard(post, options = {}) {
   if (post.type === 'carte_vitrine') return renderVitrineCard(post);
@@ -970,7 +1022,7 @@ function injectStyles() {
    la bulle flottante des assistants (#assist-hub-fab, z-index 1097) passait alors AU-DESSUS de la fenêtre et recouvrait le bouton « Publier »
    des commentaires : un clic ouvrait la messagerie au lieu d'envoyer. Sélecteur plus précis : la fenêtre repasse au-dessus de la bulle. */
 .posts-modal-overlay.pd-overlay{z-index:1200;}
-.tuto-cta{display:inline-flex;align-items:center;gap:9px;margin:4px 16px 12px;padding:9px 16px;border-radius:99px;background:linear-gradient(135deg,#F26422,#e0501a);color:#fff;font-weight:800;font-size:.9rem;text-decoration:none;min-height:40px;}
+.tuto-cta{display:inline-flex;align-items:center;gap:9px;margin:4px 16px 12px;padding:9px 16px;border:none;border-radius:99px;background:linear-gradient(135deg,#F26422,#e0501a);color:#fff;font-family:inherit;font-weight:800;font-size:.9rem;text-decoration:none;min-height:40px;cursor:pointer;}
 .tuto-cta:hover{filter:brightness(1.07);}
 .tuto-cta:focus-visible{outline:3px solid #2563EB;outline-offset:2px;}
 .tuto-cta-play{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,.25);font-size:.7rem;padding-left:2px;}
