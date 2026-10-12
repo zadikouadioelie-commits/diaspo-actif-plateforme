@@ -1656,11 +1656,23 @@ function flashOuvrir() {
   document.getElementById('modal-flash-bg').classList.add('open');
 }
 function flashFermer() { document.getElementById('modal-flash-bg').classList.remove('open'); }
+/* Ajuster le cadrage avant compression (2026-10-12, demande explicite : "permet de pouvoir
+   ajuster l'image") — même recadreur que les bannières/logos de profil (assets/app.js), avec
+   repli silencieux sur le fichier d'origine non recadré si le script n'a pas pu se charger,
+   pour ne jamais bloquer l'ajout d'une photo. Annuler le recadrage annule tout l'ajout (même
+   convention que annuaireEditCover() et consorts dans assets/app.js). */
+async function flashRecadrer(file, opts) {
+  if (!window.openImageCropper) return file;
+  try { return await openImageCropper(file, opts); }
+  catch (e) { return file; }
+}
 async function flashHandlePhoto(inputId, previewId, setter) {
   const el = document.getElementById(inputId);
   const file = el.files[0]; if (!file) return;
   if (file.size > 10*1024*1024) { alert('Image trop lourde (max 10 Mo).'); el.value = ''; return; }
-  const b64 = await compressImage(file, 1000, 700, 0.8);
+  const recadree = await flashRecadrer(file, { shape: 'rect', aspect: 1000/700, outW: 1000, outH: 700 });
+  if (!recadree) { el.value = ''; return; } // recadrage annulé par la personne
+  const b64 = await compressImage(recadree, 1000, 700, 0.8);
   setter(b64);
   const prev = document.getElementById(previewId);
   prev.src = b64; prev.style.display = '';
@@ -1671,7 +1683,9 @@ document.getElementById('fl-photo2').addEventListener('change', () => flashHandl
 document.getElementById('fl-logo').addEventListener('change', async function () {
   const file = this.files[0]; if (!file) return;
   if (file.size > 10*1024*1024) { alert('Image trop lourde (max 10 Mo).'); this.value = ''; return; }
-  flashLogo = await compressImage(file, 200, 200, 0.85);
+  const recadree = await flashRecadrer(file, { shape: 'circle', aspect: 1, outW: 200, outH: 200 });
+  if (!recadree) { this.value = ''; return; }
+  flashLogo = await compressImage(recadree, 200, 200, 0.85);
   const prev = document.getElementById('fl-logo-preview');
   prev.src = flashLogo; prev.style.display = '';
 });
@@ -1763,7 +1777,9 @@ async function flashPublier() {
 document.getElementById('cover-file').addEventListener('change', async function() {
   const file = this.files[0]; if (!file) return;
   if (file.size > 10*1024*1024) { alert('Image trop lourde (max 10 Mo).'); return; }
-  coverData = await compressImage(file, 1200, 600, 0.82);
+  const recadree = await flashRecadrer(file, { shape: 'rect', aspect: 1200/600, outW: 1200, outH: 600 });
+  if (!recadree) return; // recadrage annulé par la personne
+  coverData = await compressImage(recadree, 1200, 600, 0.82);
   document.getElementById('cover-img').src = coverData;
   document.getElementById('cover-preview').style.display = '';
   document.getElementById('cover-placeholder').style.display = 'none';
@@ -1775,10 +1791,12 @@ document.getElementById('cover-file').addEventListener('change', async function(
   document.getElementById('gfile-'+i).addEventListener('change', async function() {
     const file = this.files[0]; if (!file) return;
     if (file.size > 10*1024*1024) { alert('Image trop lourde (max 10 Mo).'); return; }
+    const recadree = await flashRecadrer(file, { shape: 'rect', aspect: 1, outW: 800, outH: 800 });
+    if (!recadree) return; // recadrage annulé par la personne
     const bar = document.getElementById('gallery-bar');
     document.getElementById('gallery-progress').style.display = '';
     bar.style.width = '30%';
-    const b64 = await compressImage(file, 800, 800, 0.78);
+    const b64 = await compressImage(recadree, 800, 800, 0.78);
     galleryData[i] = b64;
     bar.style.width = '100%';
     setTimeout(() => document.getElementById('gallery-progress').style.display = 'none', 600);
@@ -2706,6 +2724,9 @@ function cdFermerCalendrier() {
 <script src="/assets/cookies-banner.js"></script>
 <script src="/assets/don-banner.js"></script>
 <script src="/assets/upload-media.js"></script>
+<!-- Recadrage des photos (2026-10-12, demande explicite : "permet de pouvoir ajuster l'image")
+     — même recadreur déjà utilisé pour les bannières/logos de profil (assets/app.js). -->
+<script src="/assets/image-cropper.js"></script>
 <script src="/assets/rich-editor.js"></script>
   <script src="/assets/theme-manager.js"></script>
 <script src="assets/back-button.js"></script>
