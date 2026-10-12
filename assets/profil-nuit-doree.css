@@ -18,6 +18,8 @@ html body.nd :is(.cda-statut-chip,.cda-tag,.pvz-chip,.pvz-btn,.pvz-segmented,.pv
   background:var(--nd-verre)!important;background-image:none!important;border:1px solid var(--nd-bord)!important;color:var(--nd-texte)!important}
 html body.nd :is(.cda-statut-chip,.cda-tag,.pvz-chip,.side-tag,.tag,.type-badge,.evt-tag){border-radius:999px}
 html body.nd .cda-statut-chip[style*="background"]{background-image:none}   /* le statut actif garde sa couleur posée en ligne */
+/* Le statut professionnel CHOISI doit se voir : la règle des petites cartouches ci-dessus (!important) écrasait la couleur posée en ligne, tous les statuts paraissaient donc non renseignés (2026-10-12) */
+html body.nd .cda-statut-chip.active{background:var(--nd-degore)!important;background-image:var(--nd-degore)!important;color:#1a1202!important;border-color:var(--nd-or)!important;font-weight:800;box-shadow:0 6px 18px -8px rgba(227,192,110,.55)}
 
 /* lignes séparatrices */
 html body.nd :is(.pd-actions,.pd-caption,.pd-comment-form,.pd-header,.pd-statsbar,.post-actions,.post-stats-bar,.posts-modal-footer,.avz-form,.avz-item,
