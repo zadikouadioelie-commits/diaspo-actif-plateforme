@@ -1,0 +1,57 @@
+/* Design « Nuit dorée » — rubrique Expansion du tableau de bord Initiative (2026-10-13).
+   Limité à la section #expansion-catalogue : le reste du tableau de bord garde son design actuel (ou celui que lui donne sa propre feuille).
+   Autonome : fonctionne avec ou sans class="nd" sur <body>. Quand la section est affichée, la zone de contenu passe en nuit.
+   Retour arrière : retirer le lien de la feuille. */
+@import url("https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,500;6..96,600&family=Manrope:wght@400;500;600;700;800&display=swap");
+
+:root{
+  --ex-or:#E3C06E; --ex-or2:#B9893A; --ex-texte:#E8ECF6; --ex-doux:#AEB8D0; --ex-verre:rgba(255,255,255,.05); --ex-verre2:rgba(255,255,255,.09);
+  --ex-bord:rgba(227,192,110,.28); --ex-bord2:rgba(255,255,255,.12);
+  --ex-degore:linear-gradient(135deg,#F3DC9B 0%,#E3C06E 38%,#B9893A 100%);
+  --ex-titres:'Bodoni Moda','Didot',Georgia,serif; --ex-sans:'Manrope','Segoe UI',system-ui,sans-serif;
+}
+
+/* ── la zone de contenu passe en nuit tant que la rubrique est affichée ── */
+main#dashboard-content:has(>#expansion-catalogue:not([style*="none"])){
+  background:radial-gradient(ellipse 700px 420px at 100% 0%,rgba(227,192,110,.12),transparent 62%),radial-gradient(ellipse 620px 460px at 0% 100%,rgba(63,123,255,.12),transparent 62%),#060A14!important;
+  font-family:var(--ex-sans);min-height:calc(100vh - 60px)}
+
+/* ── variables du site redéfinies dans la rubrique seulement ── */
+main#dashboard-content #expansion-catalogue{
+  --bg:rgba(255,255,255,.06); --card:rgba(255,255,255,.05); --text:#EDEAE0; --muted:#AEB8D0; --border:rgba(255,255,255,.14);
+  --navy:#FFFFFF; --orange:#E3C06E; --orange-light:rgba(227,192,110,.12);
+  color:var(--ex-texte);font-family:var(--ex-sans)}
+
+/* ── titre et introduction ── */
+main#dashboard-content #expansion-catalogue>h2{font-family:var(--ex-titres);font-weight:500;font-size:clamp(28px,3.4vw,40px);color:#fff!important;letter-spacing:-.01em;margin:0 0 8px!important;border-bottom:0!important;padding-bottom:0!important}
+main#dashboard-content #expansion-catalogue>p{color:var(--ex-doux)!important;font-size:14px!important;line-height:1.6;max-width:760px;margin:0 0 24px!important}
+
+/* ── une carte par module ── */
+main#dashboard-content #expansion-catalogue .card{background:var(--ex-verre)!important;border:1px solid var(--ex-bord2)!important;border-radius:22px!important;padding:20px 24px!important;color:var(--ex-texte);
+  box-shadow:0 24px 50px -36px rgba(0,0,0,.9);transition:border-color .35s,transform .35s,background .35s}
+main#dashboard-content #expansion-catalogue .card:hover{border-color:var(--ex-bord)!important;background:var(--ex-verre2)!important;transform:translateY(-2px)}
+main#dashboard-content #expansion-catalogue .card [style*="font-weight:700"][style*="font-size:14px"]{color:#fff;font-size:15.5px!important;font-weight:700;letter-spacing:.005em;margin-bottom:6px!important}
+main#dashboard-content #expansion-catalogue .card [style*="color:var(--muted)"]{color:var(--ex-doux)!important;line-height:1.55}
+
+/* ── lien « Ouvrir mes dossiers de candidatures » ── */
+main#dashboard-content #expansion-catalogue .card a[style*="#1B4B8C"]{color:var(--ex-or)!important;font-weight:700;text-decoration:none;border-bottom:1px solid var(--ex-bord);padding-bottom:1px;transition:border-color .3s,color .3s}
+main#dashboard-content #expansion-catalogue .card a[style*="#1B4B8C"]:hover{color:#F3DC9B!important;border-bottom-color:var(--ex-or)}
+
+/* ── bouton Activer : or, pastille ── */
+main#dashboard-content #expansion-catalogue .btn{background:var(--ex-degore)!important;color:#1a1202!important;border:0!important;border-radius:999px!important;padding:11px 22px;min-height:44px;font-family:var(--ex-sans);font-weight:800;font-size:13.5px;
+  box-shadow:0 10px 24px -12px rgba(227,192,110,.75);transition:transform .3s,box-shadow .3s}
+main#dashboard-content #expansion-catalogue .btn:hover{transform:translateY(-1px);box-shadow:0 14px 28px -12px rgba(227,192,110,.9)}
+main#dashboard-content #expansion-catalogue .btn:focus-visible,#expansion-catalogue .card a:focus-visible{outline:2px solid var(--ex-or);outline-offset:3px}
+
+/* ── module déjà activé ── */
+main#dashboard-content #expansion-catalogue .card span[style*="#16a34a"]{color:#9BE8B8!important;background:rgba(52,199,120,.12);border:1px solid rgba(52,199,120,.4);border-radius:999px;padding:8px 16px;font-weight:800!important}
+
+/* ── états : chargement, aucun module ── */
+main#dashboard-content #expansion-catalogue .notice{background:rgba(227,192,110,.1)!important;border:1px solid var(--ex-bord)!important;border-radius:14px;color:#F3E3B5!important}
+main#dashboard-content #expansion-catalogue #expansion-catalogue-content>div[style*="text-align:center"]{color:var(--ex-doux)!important}
+
+@media (max-width:640px){
+  main#dashboard-content #expansion-catalogue .card{padding:16px 16px!important;border-radius:18px!important}
+  main#dashboard-content #expansion-catalogue .btn{width:100%}
+}
+@media (prefers-reduced-motion:reduce){main#dashboard-content #expansion-catalogue *{transition:none!important}}
