@@ -54,6 +54,8 @@
     t.innerHTML = s.replace(/<\/(p|div|h[1-6]|blockquote)>/gi, '\n').replace(/<br\s*\/?>/gi, '\n').replace(/<li[^>]*>/gi, '• ').replace(/<\/li>/gi, '\n');
     return (t.content.textContent || '').replace(/\n{3,}/g, '\n\n').trim();
   };
+  /* Fenêtre d'envoi d'un CV (compte Diaspo'Actif, e-mail, WhatsApp, copie) — assets/recrut-partage.js, chargée à la demande. */
+  const chargerPartage = () => window.RecrutPartage ? Promise.resolve() : new Promise(res => { const sc = document.createElement('script'); sc.src = 'assets/recrut-partage.js?v=20261012a'; sc.onload = sc.onerror = res; document.head.appendChild(sc); });
   const estBrouillon = cv => !!(cv && cv.data && cv.data.meta && cv.data.meta.brouillon);
   const lienCv = cv => cv && cv.partage_token && Number(cv.partage_actif) !== 0 && !estBrouillon(cv) ? location.origin + '/cv-public.html?t=' + encodeURIComponent(cv.partage_token) : '';
   /* Message d'envoi : lien du CV + bouton « Accéder aux médias » quand des médias sont liés (WhatsApp, e-mail, messagerie). */
@@ -323,6 +325,7 @@
       <div class="row" style="gap:10px;flex-wrap:wrap;margin-bottom:10px">
         ${lien ? `<button class="btn sp" id="mcl-wa" style="background:#25D366;border-color:#25D366;color:#0b2a14">Envoyer par WhatsApp</button>` : ''}
         ${lien ? `<button class="btn out sp" id="mcl-copie">Copier le lien</button>` : ''}
+        ${lien ? `<button class="btn sp" id="mcl-envoyer">📤 Envoyer à un contact ou par e-mail</button>` : ''}
         ${navigator.share ? `<button class="btn out sp" id="mcl-share">${ic('share', 's')} Partager le PDF</button>` : ''}
         <button class="btn out sp" id="mcl-print-btn">Imprimer</button></div>
       ${estBrouillon(cv) ? `<button class="btn block" id="mcl-terminer" style="margin-bottom:10px;background:#16a34a;border-color:#16a34a">✅ Terminer le CV</button>` : `<button class="btn out block" id="mcl-rebrouillon" style="margin-bottom:10px">📝 Repasser en brouillon</button>`}
@@ -342,7 +345,8 @@
     const bt = $('#mcl-terminer'), br = $('#mcl-rebrouillon');
     if (bt) bt.onclick = () => basculer(false);
     if (br) br.onclick = () => { if (confirm('Repasser ce CV en brouillon ? Son lien de partage cessera de fonctionner jusqu’à ce que vous le terminiez à nouveau.')) basculer(true); };
-    const wa = $('#mcl-wa'), cp = $('#mcl-copie');
+    const wa = $('#mcl-wa'), cp = $('#mcl-copie'), en = $('#mcl-envoyer');
+    if (en) en.onclick = async () => { await chargerPartage(); if (window.RecrutPartage) window.RecrutPartage.ouvrir({ monCv: { numero: cv.numero, nom: nom || cv.titre || 'mon CV', lien } }); else toast('Envoi indisponible pour le moment.', true); };
     if (wa) wa.onclick = () => { window.open('https://wa.me/?text=' + encodeURIComponent(messageCv(cv, medias.length)), '_blank', 'noopener'); };
     if (cp) cp.onclick = async () => { try { await navigator.clipboard.writeText(lien); toast('Lien copié'); } catch (e) { toast(lien); } };
   }

@@ -102,6 +102,20 @@ module.exports.lienPublic = lienPublic;
 module.exports.assurerJetonCV = assurerJetonCV;
 module.exports.supprimerFichierCDN = supprimerFichierCDN;
 
+/* Un CV tel que le voit un visiteur du lien public (2026-10-12, dossiers de recrutement) : null si le jeton est inconnu, si le CV est en
+   brouillon ou si son propriétaire a coupé la page publique. Renvoie le CV nettoyé (dataPublique) et ses médias liés. */
+module.exports.lireCVPublicParJeton = async function lireCVPublicParJeton(db, jeton) {
+  if (!/^[\w-]{16,64}$/.test(String(jeton || ""))) return null;
+  const cv = await db.prepare("SELECT * FROM cv_profiles WHERE partage_token=?").get(jeton);
+  if (!cv || Number(cv.partage_actif) === 0) return null;
+  let data = {}; try { data = JSON.parse(cv.data_json || "{}"); } catch (e) {}
+  if (data.meta && data.meta.brouillon) return null;
+  const rows = await db.prepare(`SELECT m.* FROM cv_medias m JOIN cv_media_liens l ON l.media_id=m.id
+    WHERE m.user_id=? AND l.cv_numero=? ORDER BY m.id ASC`).all(cv.user_id, Number(cv.numero));
+  return { cv, titre: cv.titre || "CV", theme: cv.theme || "bleu", numero: Number(cv.numero), data: dataPublique(data), medias: rows.map(lireMedia) };
+};
+module.exports.lienPublicCV = lienPublic;
+
 module.exports.registerCvExtras = function registerCvExtras(deps) {
   const { route, db, sendJSON, getCurrentUser, nomCompteAffichage } = deps;
 
@@ -337,6 +351,43 @@ module.exports.registerCvExtras = function registerCvExtras(deps) {
     if (!r.ok) return sendJSON(res, 502, { error: r.reason === "no_key" ? "L'envoi d'e-mails n'est pas disponible pour le moment." : "L'e-mail n'a pas pu être envoyé. Réessayez plus tard." });
     await db.prepare("INSERT INTO cv_partages (user_id, cv_numero, canal, destinataire) VALUES (?,?,?,?)").run(user.id, numero, "email", email);
     sendJSON(res, 200, { ok: true, medias: nbMedias, lien: lienMedias });
+  });
+
+  /* Envoi du LIEN de son propre CV par e-mail, sans PDF (2026-10-12, depuis le téléphone, où le PDF n'est pas généré à l'envoi) :
+     le destinataire ouvre le CV en ligne (cartouche, médias). Mêmes garde-fous que l'envoi du PDF ; un brouillon ne s'envoie pas. */
+  route("POST", "/api/cv/partager-lien-email", async (req, res, params, body) => {
+    const user = await getCurrentUser(req);
+    if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+    if (user.email_verifie != null && !Number(user.email_verifie)) return sendJSON(res, 403, { error: "Confirmez d'abord votre adresse e-mail pour pouvoir envoyer un CV par e-mail." });
+    const email = SEC.normalizeEmail(body?.email || "");
+    if (!email || !SEC.isValidEmail(email)) return sendJSON(res, 400, { error: "Adresse e-mail du destinataire invalide." });
+    const numero = Number(body?.numero) === 2 ? 2 : 1;
+    const message = String(body?.message || "").trim().slice(0, 600);
+    const deja = Number((await db.prepare("SELECT COUNT(*) n FROM cv_partages WHERE user_id=? AND canal='email' AND created_at >= datetime('now','-1 day')").get(user.id))?.n) || 0;
+    if (deja >= MAX_EMAILS_PAR_JOUR) return sendJSON(res, 429, { error: `Limite de ${MAX_EMAILS_PAR_JOUR} CV envoyés par e-mail par jour atteinte.` });
+    const lim = SEC.rateLimit(`cvmail:${user.id}`, 5, 10 * 60000);
+    if (!lim.allowed) return sendJSON(res, 429, { error: `Un peu de patience : réessayez dans ${lim.retryAfter}s.` });
+    const cv = await db.prepare("SELECT id, titre, partage_actif, data_json FROM cv_profiles WHERE user_id=? AND numero=?").get(user.id, numero);
+    if (!cv) return sendJSON(res, 404, { error: "Enregistrez d'abord ce CV." });
+    let data = {}; try { data = JSON.parse(cv.data_json || "{}"); } catch (e) {}
+    if (data.meta && data.meta.brouillon) return sendJSON(res, 400, { error: "Ce CV est un brouillon : terminez-le avant de l'envoyer." });
+    if (Number(cv.partage_actif) === 0) return sendJSON(res, 400, { error: "La page publique de ce CV est désactivée : réactivez-la pour pouvoir l'envoyer." });
+    const lien = lienPublic(await assurerJeton(cv.id));
+    const nbMedias = (await mediasDuCV(user.id, numero)).length;
+    const expediteur = (await nomCompteAffichage(user.id)) || "Un membre de Diaspo'Actif";
+    const inf = data.infos || {}; const nom = [inf.prenom, inf.nom].filter(Boolean).join(" ");
+    const bouton = (href, texte, plein) => `<a href="${esc(href)}" style="display:inline-block;margin:6px 6px 0 0;padding:12px 22px;border-radius:10px;font-weight:700;font-size:15px;text-decoration:none;${plein ? "background:#0D2B4E;color:#fff;" : "background:#fff;color:#0D2B4E;border:2px solid #0D2B4E;"}">${esc(texte)}</a>`;
+    const html = `<div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;color:#1a2b4a;line-height:1.55;">
+      <h2 style="margin:0 0 10px;font-size:20px;">${esc(expediteur)} vous transmet ${nom && nom !== expediteur ? "le CV de " + esc(nom) : "son CV"}</h2>
+      ${message ? `<p style="margin:0 0 14px;padding:10px 14px;background:#f3f6fb;border-radius:8px;white-space:pre-wrap;">${esc(message)}</p>` : ""}
+      <p style="margin:0 0 12px;">Merci d'en prendre connaissance — excellente lecture.</p>
+      <div>${bouton(lien, "Ouvrir le CV", true)}${nbMedias > 0 ? bouton(lien + "&vue=medias", "▶ Accéder aux médias", false) : ""}</div>
+      <p style="margin:22px 0 0;font-size:12px;color:#8a97a8;">Envoyé via Diaspo'Actif au nom de ${esc(expediteur)}. Vous pouvez répondre à ce message : votre réponse lui sera adressée.</p>
+    </div>`;
+    const r = await sendEmail({ to: email, subject: `${expediteur} vous transmet ${nom && nom !== expediteur ? "le CV de " + nom : "son CV"}`, html, replyTo: user.email || undefined });
+    if (!r.ok) return sendJSON(res, 502, { error: r.reason === "no_key" ? "L'envoi d'e-mails n'est pas disponible pour le moment." : "L'e-mail n'a pas pu être envoyé. Réessayez plus tard." });
+    await db.prepare("INSERT INTO cv_partages (user_id, cv_numero, canal, destinataire) VALUES (?,?,?,?)").run(user.id, numero, "email", email);
+    sendJSON(res, 200, { ok: true, lien });
   });
 
   /* Journalisation des autres canaux (WhatsApp, messagerie) : pas d'effet, seulement le décompte. */

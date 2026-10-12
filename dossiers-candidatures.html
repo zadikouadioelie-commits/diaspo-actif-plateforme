@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0D2B4E">
+<meta name="robots" content="noindex">
+<title>Dossiers de candidatures — Diaspo'Actif</title>
+<link rel="icon" href="/assets/logo.png">
+<style>
+/* Dossiers de candidatures (2026-10-12) — les CV reçus, notés de 0 à 10, classés par dossier, avec diagrammes de tendances.
+   Autonome et pensée téléphone : une colonne, cibles tactiles de 44 px. Les données viennent de /api/recrutement/* (privées au compte). */
+:root { --navy:#0D2B4E; --navy2:#1E4F8A; --orange:#F26422; --ink:#14213a; --muted:#56637a; --line:#dfe6f0; --bg:#eef2f8; --card:#fff; --ideal:#16a34a; --inter:#ea580c; --non:#dc2626; --sans:#94a3b8; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#0b1626; --card:#13243b; --ink:#e8eef8; --muted:#a9b6ca; --line:#27415f; } }
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin:0; font-family:'Segoe UI', system-ui, -apple-system, Roboto, sans-serif; background:var(--bg); color:var(--ink); line-height:1.5; min-height:100vh; }
+button, a, input, select, textarea { font-family:inherit; }
+:focus-visible { outline:3px solid var(--orange); outline-offset:2px; }
+.top { background:var(--navy); color:#fff; padding:calc(10px + env(safe-area-inset-top)) 16px 10px; display:flex; align-items:center; gap:10px; position:sticky; top:0; z-index:30; box-shadow:0 2px 10px rgba(0,0,0,.25); }
+.top a.marque { color:#fff; text-decoration:none; font-weight:800; display:flex; align-items:center; gap:8px; min-height:44px; }
+.top img { width:28px; height:28px; border-radius:6px; }
+.top .titre { margin-left:auto; font-size:.82rem; opacity:.9; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:55%; }
+main { max-width:980px; margin:0 auto; padding:14px 12px calc(40px + env(safe-area-inset-bottom)); }
+h1 { font-size:1.25rem; margin:0 0 4px; }
+h2 { font-size:1.02rem; margin:0 0 8px; }
+.sous { color:var(--muted); font-size:.88rem; margin:0 0 12px; }
+.carte { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; margin-bottom:12px; }
+.btn { display:inline-flex; align-items:center; justify-content:center; gap:6px; min-height:44px; padding:0 16px; border-radius:10px; border:2px solid var(--navy); background:var(--card); color:var(--navy); font-weight:700; font-size:.92rem; cursor:pointer; text-decoration:none; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .btn { color:#fff; border-color:#4f78a8; } }
+.btn.prim { background:var(--navy); color:#fff; }
+.btn.danger { color:#b42318; border-color:#f1b5ae; }
+.btn:disabled { opacity:.55; cursor:progress; }
+.barre { display:flex; flex-wrap:wrap; gap:8px; margin:10px 0 14px; }
+.retour { display:inline-flex; align-items:center; gap:6px; min-height:44px; color:var(--navy2); font-weight:700; text-decoration:none; background:none; border:0; cursor:pointer; padding:0; font-size:.92rem; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .retour { color:#9fc2ee; } }
+.vide, .erreur { text-align:center; padding:30px 14px; color:var(--muted); }
+.erreur { color:#b42318; }
+/* liste des dossiers */
+.dossiers { display:grid; gap:12px; }
+@media (min-width:700px) { .dossiers { grid-template-columns:1fr 1fr; } }
+.dos { cursor:pointer; text-align:left; width:100%; border:1px solid var(--line); border-radius:14px; background:var(--card); padding:14px; color:inherit; font:inherit; }
+.dos:hover { border-color:var(--navy2); box-shadow:0 4px 16px rgba(13,43,78,.12); }
+.dos h2 { margin:0 0 2px; }
+.dos .meta { color:var(--muted); font-size:.82rem; margin-bottom:10px; }
+.mb { display:flex; height:12px; border-radius:99px; overflow:hidden; background:var(--line); }
+.mb span { display:block; height:100%; }
+.leg { display:flex; flex-wrap:wrap; gap:6px 12px; margin-top:8px; font-size:.78rem; color:var(--muted); }
+.leg i { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:5px; vertical-align:-1px; }
+/* indicateurs et diagrammes */
+.kpis { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; margin-bottom:12px; }
+@media (min-width:700px) { .kpis { grid-template-columns:repeat(5,1fr); } }
+.kpi { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:10px 12px; }
+.kpi b { display:block; font-size:1.5rem; line-height:1.1; color:var(--navy); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .kpi b { color:#fff; } }
+.kpi span { font-size:.76rem; color:var(--muted); }
+.graphs { display:grid; gap:12px; margin-bottom:12px; }
+@media (min-width:760px) { .graphs { grid-template-columns:1fr 1fr; } .graphs .large { grid-column:1 / -1; } }
+.graphs svg { width:100%; height:auto; display:block; }
+.tend { display:inline-flex; align-items:center; gap:6px; font-weight:700; font-size:.88rem; padding:4px 12px; border-radius:99px; background:#eef5ff; color:var(--navy); }
+.tend.hausse { background:#e6f6ec; color:#14532d; } .tend.baisse { background:#fdecea; color:#7a1a12; }
+.cl { display:grid; gap:7px; }
+.cl button { display:grid; grid-template-columns:minmax(80px,32%) 1fr 34px; gap:8px; align-items:center; border:0; background:none; padding:2px 0; cursor:pointer; text-align:left; color:inherit; font:inherit; min-height:34px; }
+.cl .nm { font-size:.86rem; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cl .ba { height:14px; border-radius:99px; background:var(--line); overflow:hidden; }
+.cl .ba i { display:block; height:100%; border-radius:99px; }
+.cl .no { font-weight:800; font-size:.86rem; text-align:right; }
+/* liste des candidats */
+.filtres { display:flex; flex-wrap:wrap; gap:6px; margin:4px 0 10px; }
+.filtres button { min-height:40px; padding:0 14px; border-radius:99px; border:1.5px solid var(--line); background:var(--card); color:var(--ink); font-weight:700; font-size:.84rem; cursor:pointer; }
+.filtres button[aria-pressed="true"] { background:var(--navy); border-color:var(--navy); color:#fff; }
+.cands { display:grid; gap:10px; }
+@media (min-width:700px) { .cands { grid-template-columns:1fr 1fr; } }
+.cand { display:flex; gap:12px; align-items:center; width:100%; text-align:left; border:1px solid var(--line); border-left:6px solid var(--bord, var(--sans)); border-radius:14px; background:var(--card); padding:12px; cursor:pointer; color:inherit; font:inherit; }
+.cand:hover { box-shadow:0 4px 16px rgba(13,43,78,.12); }
+.av { flex:none; width:48px; height:48px; border-radius:50%; background:var(--navy2); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; overflow:hidden; }
+.av img { width:100%; height:100%; object-fit:cover; display:block; }
+.cand .tx { min-width:0; flex:1; }
+.cand .nm { font-weight:800; font-size:.98rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cand .st { color:var(--muted); font-size:.8rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.pil { display:inline-flex; align-items:center; gap:5px; font-size:.74rem; font-weight:800; border-radius:99px; padding:2px 10px; color:#fff; margin-top:4px; }
+.nt { flex:none; min-width:48px; text-align:center; font-weight:800; font-size:1.25rem; color:var(--navy); line-height:1; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .nt { color:#fff; } }
+.nt small { display:block; font-size:.66rem; color:var(--muted); font-weight:600; }
+/* fiche candidat */
+.verd { display:grid; gap:8px; }
+@media (min-width:620px) { .verd { grid-template-columns:repeat(3,1fr); } }
+.v { display:flex; align-items:center; justify-content:center; gap:8px; min-height:50px; border-radius:12px; border:2.5px solid var(--c); background:var(--card); color:var(--c); font-weight:800; font-size:.95rem; cursor:pointer; }
+.v[aria-pressed="true"] { background:var(--c); color:#fff; box-shadow:0 0 0 3px color-mix(in srgb, var(--c) 28%, transparent); }
+.notes { display:grid; grid-template-columns:repeat(11,1fr); gap:4px; }
+@media (max-width:420px) { .notes { grid-template-columns:repeat(6,1fr); } }
+.n { min-height:44px; border-radius:10px; border:2px solid var(--line); background:var(--card); color:var(--ink); font-weight:800; font-size:.95rem; cursor:pointer; padding:0; }
+.n[aria-pressed="true"] { background:var(--navy); border-color:var(--navy); color:#fff; }
+.lbl { display:block; font-weight:800; font-size:.82rem; color:var(--navy); margin:14px 0 6px; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .lbl { color:#9fc2ee; } }
+textarea, select, input[type=text] { width:100%; font-size:16px; padding:10px 12px; border:1.5px solid var(--line); border-radius:10px; background:var(--card); color:var(--ink); }
+textarea { min-height:76px; resize:vertical; }
+.com { border:1px solid var(--line); border-radius:12px; padding:10px 12px; margin-bottom:8px; background:var(--card); }
+.com small { color:var(--muted); display:flex; justify-content:space-between; gap:8px; margin-bottom:3px; }
+.com p { margin:0; white-space:pre-wrap; overflow-wrap:anywhere; }
+.com button { border:0; background:none; color:#b42318; font-weight:700; cursor:pointer; font-size:.78rem; }
+.alerte { background:#fff7ed; border:1px solid #fdba74; color:#7a3a0f; border-radius:12px; padding:10px 12px; font-size:.86rem; margin-bottom:12px; }
+.cadre { width:100%; overflow:hidden; border-radius:6px; box-shadow:0 4px 22px rgba(0,0,0,.18); background:#fff; }
+.feuille { width:210mm; background:#fff; transform-origin:top left; color:#000; }
+.medias { display:grid; gap:12px; }
+.medias video { width:100%; max-height:60vh; background:#000; border-radius:12px; }
+.galerie { display:grid; grid-template-columns:repeat(2,1fr); gap:6px; }
+.galerie img { width:100%; aspect-ratio:4/3; object-fit:cover; border-radius:8px; display:block; }
+#toast { position:fixed; left:50%; bottom:calc(18px + env(safe-area-inset-bottom)); transform:translateX(-50%); background:#111c2e; color:#fff; padding:10px 16px; border-radius:10px; font-size:.86rem; display:none; z-index:200; max-width:92vw; }
+.sr { position:absolute; left:-9999px; }
+@media print { .top, .barre, .filtres, #toast { display:none !important; } body { background:#fff; } }
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="marque" href="/index.html" aria-label="Diaspo'Actif — accueil"><img src="/assets/logo.png" alt="" width="28" height="28">Diaspo'Actif</a>
+  <span class="titre" id="entete-titre">Candidatures</span>
+</header>
+<main id="app" aria-live="polite"><div class="vide">Chargement…</div></main>
+<div id="toast" role="status" aria-live="polite"></div>
+<script src="/assets/cv-templates.js"></script>
+<script src="/assets/cv-template-nuit-doree.js?v=4"></script>
+<script src="/assets/recrut-partage.js"></script>
+<script>
+(function () {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const VERDICTS = { ideal: { lib: 'Candidat idéal', ico: '🟢', c: '#16a34a' }, interessant: { lib: 'Candidat intéressant', ico: '🟠', c: '#ea580c' }, non: { lib: 'Ne correspond pas', ico: '🔴', c: '#dc2626' } };
+  const couleurNote = n => n >= 7 ? '#16a34a' : n >= 4 ? '#ea580c' : '#dc2626';
+  const fmt = n => n === null || n === undefined ? '–' : String(n).replace('.', ',');
+  const date = s => { const d = new Date(String(s || '').replace(' ', 'T') + (String(s || '').includes('Z') || String(s || '').includes('+') ? '' : 'Z')); return isNaN(d) ? '' : d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }); };
+  let scaleTimer = null;
+  function toast(t) { const e = $('toast'); e.textContent = t; e.style.display = 'block'; clearTimeout(toast._t); toast._t = setTimeout(() => { e.style.display = 'none'; }, 3500); }
+  async function api(methode, url, corps) {
+    const r = await fetch(url, { method: methode, credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: corps ? JSON.stringify(corps) : undefined });
+    const j = await r.json().catch(() => ({})); j._s = r.status; return j;
+  }
+  const app = () => $('app');
+  const titre = t => { $('entete-titre').textContent = t; document.title = t + ' — Diaspo\'Actif'; };
+  const initiales = n => String(n || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase() || '?';
+  function aller(params, remplacer) {
+    const u = new URL(location.href); u.search = ''; Object.entries(params || {}).forEach(([k, v]) => { if (v) u.searchParams.set(k, v); });
+    (remplacer ? history.replaceState : history.pushState).call(history, {}, '', u.pathname + u.search); montrer();
+  }
+  function verifierSession(j) {
+    if (j._s !== 401) return false;
+    app().innerHTML = `<div class="carte vide"><h1>Connexion requise</h1><p class="sous">Connectez-vous pour consulter vos dossiers de candidatures.</p><a class="btn prim" href="/login.html?redirect=${encodeURIComponent(location.pathname + location.search)}">Se connecter</a></div>`;
+    return true;
+  }
+  const barreVerdicts = v => {
+    const t = (v.ideal || 0) + (v.interessant || 0) + (v.non || 0) + (v.sans || 0) || 1;
+    return `<div class="mb" role="img" aria-label="${v.ideal || 0} idéal, ${v.interessant || 0} intéressant, ${v.non || 0} ne correspond pas, ${v.sans || 0} non évalué">
+      <span style="width:${(v.ideal || 0) / t * 100}%;background:var(--ideal)"></span><span style="width:${(v.interessant || 0) / t * 100}%;background:var(--inter)"></span><span style="width:${(v.non || 0) / t * 100}%;background:var(--non)"></span><span style="width:${(v.sans || 0) / t * 100}%;background:var(--sans)"></span></div>`;
+  };
+  const legende = v => `<div class="leg"><span><i style="background:var(--ideal)"></i>${v.ideal || 0} idéal${(v.ideal || 0) > 1 ? 's' : ''}</span><span><i style="background:var(--inter)"></i>${v.interessant || 0} intéressant${(v.interessant || 0) > 1 ? 's' : ''}</span><span><i style="background:var(--non)"></i>${v.non || 0} ne correspond${(v.non || 0) > 1 ? 'ent' : ''} pas</span>${v.sans ? `<span><i style="background:var(--sans)"></i>${v.sans} non évalué${v.sans > 1 ? 's' : ''}</span>` : ''}</div>`;
+
+  /* ───────────── Liste des dossiers ───────────── */
+  async function listeDossiers() {
+    titre('Dossiers de candidatures');
+    const j = await api('GET', '/api/recrutement/dossiers'); if (verifierSession(j)) return;
+    if (j._s !== 200) { app().innerHTML = '<div class="carte erreur">Impossible de charger vos dossiers pour le moment.</div>'; return; }
+    const l = j.dossiers || [];
+    app().innerHTML = `<h1>Dossiers de candidatures</h1><p class="sous">Les CV que vous recevez, notés de 0 à 10 et rangés par poste à pourvoir. Ouvrez un CV, donnez votre verdict, puis enregistrez-le dans un dossier : il y reste avec toutes vos notes.</p>
+      <div class="barre"><button class="btn prim" id="nouveau">＋ Nouveau dossier</button></div>
+      <div id="form-nouveau" class="carte" hidden><label class="lbl" for="nd-t" style="margin-top:0">Titre du dossier</label><input type="text" id="nd-t" maxlength="120" placeholder="Ex. Candidature — Poste de manager principal"><div class="barre"><button class="btn prim" id="nd-ok">Créer le dossier</button><button class="btn" id="nd-x">Annuler</button></div></div>
+      ${l.length ? `<div class="dossiers">${l.map(d => `<button class="dos" data-id="${d.id}"><h2>${esc(d.titre)}</h2><div class="meta">${d.total} CV${d.total > 1 ? '' : ''}${d.moyenne !== null ? ' · moyenne ' + fmt(d.moyenne) + '/10' : ''}${d.meilleur ? ' · meilleur : ' + esc(d.meilleur.nom) + ' (' + d.meilleur.note + ')' : ''}</div>${d.total ? barreVerdicts(d.verdicts) + legende(d.verdicts) : '<div class="meta">Aucun CV pour le moment.</div>'}</button>`).join('')}</div>`
+        : `<div class="carte vide"><h2>Aucun dossier pour le moment</h2><p class="sous">Créez un dossier, puis ouvrez un CV reçu (dans la messagerie, bouton « Ouvrir le CV ») pour l’y enregistrer.</p></div>`}`;
+    $('nouveau').onclick = () => { $('form-nouveau').hidden = false; $('nd-t').focus(); };
+    $('nd-x').onclick = () => { $('form-nouveau').hidden = true; };
+    $('nd-ok').onclick = async () => {
+      const r = await api('POST', '/api/recrutement/dossiers', { titre: $('nd-t').value.trim() });
+      if (r._s !== 201) { toast(r.error || 'Création impossible.'); return; }
+      aller({ dossier: r.id });
+    };
+    app().querySelectorAll('.dos').forEach(b => b.onclick = () => aller({ dossier: b.dataset.id }));
+  }
+
+  /* ───────────── Un dossier : indicateurs, diagrammes, candidats ───────────── */
+  function histogrammeSVG(h) {
+    const max = Math.max(1, ...h), L = 330, H = 130, bw = 24, gap = 6.6, base = 100;
+    const bars = h.map((n, i) => { const hh = Math.round(n / max * 70); const x = 4 + i * (bw + gap); return `<rect x="${x}" y="${base - hh}" width="${bw}" height="${hh}" rx="4" fill="${couleurNote(i)}" opacity="${n ? 1 : .18}"/>${n ? `<text x="${x + bw / 2}" y="${base - hh - 4}" text-anchor="middle" font-size="11" font-weight="700" fill="currentColor">${n}</text>` : ''}<text x="${x + bw / 2}" y="${base + 16}" text-anchor="middle" font-size="11" fill="currentColor" opacity=".75">${i}</text>`; }).join('');
+    return `<svg viewBox="0 0 ${L} ${H}" role="img" aria-label="Répartition des notes : ${h.map((n, i) => n ? n + ' CV à ' + i : '').filter(Boolean).join(', ') || 'aucune note'}">${bars}</svg>`;
+  }
+  function evolutionSVG(ev) {
+    const L = 330, H = 90, pad = 14, n = ev.length;
+    const x = i => pad + (n === 1 ? 0 : i * (L - 2 * pad) / (n - 1)), y = v => H - 18 - (v / 10) * (H - 36);
+    const pts = ev.map((p, i) => `${x(i).toFixed(1)},${y(p.moyenne).toFixed(1)}`).join(' ');
+    const der = ev[n - 1];
+    return `<svg viewBox="0 0 ${L} ${H}" role="img" aria-label="Moyenne cumulée des notes : de ${fmt(ev[0].moyenne)} à ${fmt(der.moyenne)} sur 10"><line x1="${pad}" y1="${y(5)}" x2="${L - pad}" y2="${y(5)}" stroke="currentColor" opacity=".15" stroke-dasharray="3 4"/><polyline points="${pts}" fill="none" stroke="#1E4F8A" stroke-width="2.5" stroke-linejoin="round"/>${ev.map((p, i) => `<circle cx="${x(i)}" cy="${y(p.moyenne)}" r="3.5" fill="#1E4F8A"/>`).join('')}<text x="${x(n - 1)}" y="${y(der.moyenne) - 8}" text-anchor="end" font-size="12" font-weight="800" fill="currentColor">${fmt(der.moyenne)}</text><text x="${pad}" y="${H - 2}" font-size="10" fill="currentColor" opacity=".7">${esc((ev[0].date || '').slice(5).split('-').reverse().join('/'))}</text><text x="${L - pad}" y="${H - 2}" text-anchor="end" font-size="10" fill="currentColor" opacity=".7">${esc((der.date || '').slice(5).split('-').reverse().join('/'))}</text></svg>`;
+  }
+  let filtre = 'tous';
+  async function dossier(id) {
+    const j = await api('GET', '/api/recrutement/dossiers/' + encodeURIComponent(id)); if (verifierSession(j)) return;
+    if (j._s === 404) { app().innerHTML = '<div class="carte vide"><h1>Dossier introuvable</h1><button class="btn prim" id="r">Voir mes dossiers</button></div>'; $('r').onclick = () => aller({}); return; }
+    if (j._s !== 200) { app().innerHTML = '<div class="carte erreur">Impossible de charger ce dossier.</div>'; return; }
+    const d = j.dossier, c = j.candidats || [], s = j.stats || {};
+    titre(d.titre);
+    const tend = s.tendance ? `<span class="tend ${s.tendance.sens}">${s.tendance.sens === 'hausse' ? '↗ Notes en hausse' : s.tendance.sens === 'baisse' ? '↘ Notes en baisse' : '→ Notes stables'} (${s.tendance.ecart > 0 ? '+' : ''}${fmt(s.tendance.ecart)})</span>` : '';
+    const visibles = c.filter(x => filtre === 'tous' || (filtre === 'sans' ? !x.verdict : x.verdict === filtre));
+    app().innerHTML = `<button class="retour" id="retour">← Tous les dossiers</button>
+      <h1>${esc(d.titre)}</h1>
+      <p class="sous">Créé le ${esc(date(d.cree_le))} · ${c.length} CV${c.length > 1 ? '' : ''}</p>
+      <div class="barre"><button class="btn" id="renommer">✏️ Renommer</button><button class="btn danger" id="supprimer">🗑 Supprimer le dossier</button></div>
+      ${c.length ? `
+      <div class="kpis"><div class="kpi"><b>${s.total}</b><span>CV dans le dossier</span></div><div class="kpi"><b>${s.notes}</b><span>CV notés</span></div><div class="kpi"><b>${fmt(s.moyenne)}</b><span>Moyenne /10</span></div><div class="kpi"><b>${fmt(s.mediane)}</b><span>Médiane /10</span></div><div class="kpi"><b style="font-size:1.05rem">${s.meilleur ? esc(s.meilleur.nom) : '–'}</b><span>${s.meilleur ? 'Meilleure note : ' + s.meilleur.note + '/10' : 'Aucune note'}</span></div></div>
+      <div class="graphs">
+        <section class="carte large"><h2>Verdicts</h2>${barreVerdicts(s.verdicts)}${legende(s.verdicts)}${tend ? `<div style="margin-top:10px">${tend}</div>` : ''}</section>
+        <section class="carte"><h2>Répartition des notes</h2>${histogrammeSVG(s.histogramme)}</section>
+        <section class="carte"><h2>Classement</h2>${(s.classement || []).length ? `<div class="cl">${s.classement.map(x => `<button data-id="${x.id}"><span class="nm">${esc(x.nom)}</span><span class="ba"><i style="width:${x.note * 10}%;background:${x.verdict ? VERDICTS[x.verdict].c : '#1E4F8A'}"></i></span><span class="no">${x.note}</span></button>`).join('')}</div>` : '<p class="sous">Notez vos CV pour voir le classement.</p>'}</section>
+        ${(s.evolution || []).length >= 2 ? `<section class="carte large"><h2>Évolution de la moyenne</h2><p class="sous" style="margin-bottom:6px">Moyenne cumulée des notes, au fil des CV enregistrés.</p>${evolutionSVG(s.evolution)}</section>` : ''}
+      </div>
+      <div class="filtres" role="group" aria-label="Filtrer les candidats">${[['tous', 'Tous (' + c.length + ')'], ['ideal', '🟢 Idéal'], ['interessant', '🟠 Intéressant'], ['non', '🔴 Ne correspond pas'], ['sans', 'Non évalué']].map(f => `<button data-f="${f[0]}" aria-pressed="${filtre === f[0]}">${f[1]}</button>`).join('')}</div>
+      <div class="cands">${visibles.length ? visibles.map(x => `<button class="cand" data-id="${x.id}" style="--bord:${x.verdict ? VERDICTS[x.verdict].c : 'var(--sans)'}"><span class="av">${x.photo ? `<img src="${esc(x.photo)}" alt="" loading="lazy" onerror="this.remove()">` : esc(initiales(x.nom))}</span>
+        <span class="tx"><div class="nm">${esc(x.nom)}</div><div class="st">${esc(x.titre_pro || x.titre_cv || '')}</div>${x.verdict ? `<span class="pil" style="background:${VERDICTS[x.verdict].c}">${VERDICTS[x.verdict].ico} ${VERDICTS[x.verdict].lib}</span>` : '<span class="pil" style="background:var(--sans)">Non évalué</span>'}${x.nb_commentaires ? `<span class="st" style="margin-left:8px">💬 ${x.nb_commentaires}</span>` : ''}</span>
+        <span class="nt">${x.note !== null ? x.note : '–'}<small>/10</small></span></button>`).join('') : '<div class="vide">Aucun CV ne correspond à ce filtre.</div>'}</div>`
+      : `<div class="carte vide"><h2>Ce dossier est vide</h2><p class="sous">Ouvrez un CV reçu (messagerie → « Ouvrir le CV »), donnez votre verdict et choisissez ce dossier pour l’y enregistrer.</p></div>`}`;
+    $('retour').onclick = () => aller({});
+    $('renommer').onclick = async () => {
+      const t = prompt('Nouveau titre du dossier :', d.titre); if (t === null) return;
+      const r = await api('PUT', '/api/recrutement/dossiers/' + d.id, { titre: t }); if (r._s !== 200) { toast(r.error || 'Renommage impossible.'); return; } dossier(d.id);
+    };
+    $('supprimer').onclick = async () => {
+      if (!confirm(`Supprimer le dossier « ${d.titre} » et ses ${c.length} CV (avec leurs notes et commentaires) ? Cette action est définitive.`)) return;
+      const r = await api('DELETE', '/api/recrutement/dossiers/' + d.id); if (r._s !== 200) { toast(r.error || 'Suppression impossible.'); return; } toast('Dossier supprimé.'); aller({});
+    };
+    app().querySelectorAll('[data-f]').forEach(b => b.onclick = () => { filtre = b.dataset.f; dossier(id); });
+    app().querySelectorAll('.cand, .cl button').forEach(b => b.onclick = () => aller({ dossier: d.id, candidat: b.dataset.id }));
+  }
+
+  /* ───────────── Fiche d'un candidat ───────────── */
+  async function candidat(id, dossierId) {
+    const j = await api('GET', '/api/recrutement/candidats/' + encodeURIComponent(id)); if (verifierSession(j)) return;
+    if (j._s !== 200) { app().innerHTML = '<div class="carte vide"><h1>Candidat introuvable</h1><button class="btn prim" id="r">Retour</button></div>'; $('r').onclick = () => aller(dossierId ? { dossier: dossierId } : {}); return; }
+    const c = j.candidat, cv = j.cv || {}, inf = (cv.data && cv.data.infos) || {};
+    titre(c.nom);
+    let note = c.note, verdict = c.verdict;
+    app().innerHTML = `<button class="retour" id="retour">← ${j.dossier ? esc(j.dossier.titre) : 'Retour'}</button>
+      <h1>${esc(c.nom)}</h1><p class="sous">${esc(c.titre_pro || c.titre_cv || '')}${c.titre_pro ? ' · ' : ''}enregistré le ${esc(date(c.cree_le))}</p>
+      ${c.cv_en_ligne ? '' : '<div class="alerte">Le propriétaire a retiré ce CV, l’a mis en brouillon ou ne le partage plus : la <b>copie enregistrée dans votre dossier</b> reste consultable ci-dessous, avec toutes vos notes.</div>'}
+      <section class="carte">
+        <span class="lbl" style="margin-top:0">Votre verdict</span>
+        <div class="verd" role="group" aria-label="Verdict">${Object.entries(VERDICTS).map(([k, v]) => `<button type="button" class="v" data-v="${k}" style="--c:${v.c}" aria-pressed="false"><span aria-hidden="true">${v.ico}</span>${v.lib}</button>`).join('')}</div>
+        <span class="lbl">Votre note sur 10</span>
+        <div class="notes" role="group" aria-label="Note de 0 à 10">${Array.from({ length: 11 }, (_, i) => `<button type="button" class="n" data-n="${i}" aria-pressed="false" aria-label="${i} sur 10">${i}</button>`).join('')}</div>
+        <div class="barre" style="margin-bottom:0">
+          <button class="btn prim" id="partager">📤 Repartager</button>
+          ${c.cv_en_ligne && c.jeton ? `<a class="btn" href="/cv-public.html?t=${encodeURIComponent(c.jeton)}" target="_blank" rel="noopener">🔗 Ouvrir le CV en ligne</a>` : ''}
+        </div>
+      </section>
+      <section class="carte"><h2>Commentaires</h2>
+        <div id="coms">${(j.commentaires || []).map(k => `<div class="com"><small><span>${esc(date(k.cree_le))}</span><button data-k="${k.id}">Supprimer</button></small><p>${esc(k.texte)}</p></div>`).join('') || '<p class="sous" id="aucun-com">Aucun commentaire pour le moment.</p>'}</div>
+        <label class="lbl" for="nc">Ajouter un commentaire</label><textarea id="nc" maxlength="2000" placeholder="Points forts, réserves, questions pour l’entretien…"></textarea>
+        <div class="barre"><button class="btn prim" id="nc-ok">Ajouter</button></div>
+      </section>
+      <section class="carte"><h2>Dossier</h2>
+        <label class="lbl" for="dos" style="margin-top:0">Déplacer vers un autre dossier</label>
+        <select id="dos">${(j.dossiers || []).map(d => `<option value="${d.id}"${j.dossier && d.id === j.dossier.id ? ' selected' : ''}>${esc(d.titre)}</option>`).join('')}</select>
+        <div class="barre"><button class="btn" id="deplacer">Déplacer</button><button class="btn danger" id="retirer">🗑 Retirer ce CV du dossier</button></div>
+      </section>
+      <h2 style="margin:16px 2px 8px">CV enregistré</h2>
+      <div class="cadre" id="cadre"><div class="feuille" id="feuille"></div></div>
+      ${(cv.medias || []).length ? `<h2 style="margin:16px 2px 8px">Médias du candidat</h2><div class="medias">${cv.medias.map(m => `<div class="carte"><b>${esc(m.titre || (m.kind === 'video' ? 'Vidéo' : 'Images'))}</b>${m.kind === 'video' ? `<video controls playsinline preload="metadata" src="${esc((m.urls || [])[0] || '')}"></video>` : `<div class="galerie">${(m.urls || []).map(u => `<a href="${esc(u)}" target="_blank" rel="noopener"><img loading="lazy" src="${esc(u)}" alt=""></a>`).join('')}</div>`}</div>`).join('')}</div>` : ''}`;
+    /* CV copié, rendu avec le même modèle que la page publique */
+    try { const tmpl = CV_TEMPLATES[(cv.data.meta && cv.data.meta.template) || cv.theme] || CV_TEMPLATES['moderne']; $('feuille').innerHTML = tmpl.render(cv.data, cv.data.style || {}); }
+    catch (e) { $('cadre').innerHTML = '<div class="vide">Aperçu du CV indisponible.</div>'; }
+    ajuster(); addEventListener('resize', () => { clearTimeout(scaleTimer); scaleTimer = setTimeout(ajuster, 120); });
+    const maj = () => {
+      app().querySelectorAll('.v').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === verdict)));
+      app().querySelectorAll('.n').forEach(b => b.setAttribute('aria-pressed', String(note !== null && Number(b.dataset.n) === note)));
+    };
+    const sauver = async champs => {
+      const r = await api('PATCH', '/api/recrutement/candidats/' + c.id, champs);
+      if (r._s !== 200) { toast(r.error || 'Enregistrement impossible.'); return false; } toast('Enregistré ✓'); return true;
+    };
+    app().querySelectorAll('.v').forEach(b => b.onclick = async () => { const nv = verdict === b.dataset.v ? null : b.dataset.v; if (await sauver({ verdict: nv })) { verdict = nv; maj(); } });
+    app().querySelectorAll('.n').forEach(b => b.onclick = async () => { const nn = note === Number(b.dataset.n) ? null : Number(b.dataset.n); if (await sauver({ note: nn })) { note = nn; maj(); } });
+    maj();
+    $('retour').onclick = () => aller(j.dossier ? { dossier: j.dossier.id } : {});
+    $('partager').onclick = () => window.RecrutPartage.ouvrir({ candidatId: c.id, nom: c.nom });
+    $('nc-ok').onclick = async () => {
+      const t = $('nc').value.trim(); if (t.length < 2) { toast('Écrivez votre commentaire.'); return; }
+      const r = await api('POST', `/api/recrutement/candidats/${c.id}/commentaires`, { texte: t }); if (r._s !== 201) { toast(r.error || 'Ajout impossible.'); return; }
+      candidat(id, dossierId); toast('Commentaire ajouté ✓');
+    };
+    app().querySelectorAll('[data-k]').forEach(b => b.onclick = async () => { if (!confirm('Supprimer ce commentaire ?')) return; const r = await api('DELETE', '/api/recrutement/commentaires/' + b.dataset.k); if (r._s === 200) candidat(id, dossierId); });
+    $('deplacer').onclick = async () => { const v = Number($('dos').value); if (j.dossier && v === j.dossier.id) { toast('Ce CV est déjà dans ce dossier.'); return; } if (await sauver({ dossier_id: v })) aller({ dossier: v, candidat: c.id }, true); };
+    $('retirer').onclick = async () => {
+      if (!confirm(`Retirer le CV de ${c.nom} de ce dossier ? Ses notes et commentaires seront supprimés.`)) return;
+      const r = await api('DELETE', '/api/recrutement/candidats/' + c.id); if (r._s !== 200) { toast(r.error || 'Suppression impossible.'); return; } toast('CV retiré.'); aller(j.dossier ? { dossier: j.dossier.id } : {});
+    };
+  }
+  function ajuster() {
+    const cadre = $('cadre'), f = $('feuille'); if (!cadre || !f) return;
+    const L = cadre.parentElement.clientWidth, w = 793.7; if (!L) return;
+    const k = Math.min(1, L / w); f.style.transform = `scale(${k})`; cadre.style.height = Math.ceil(f.offsetHeight * k) + 'px';
+  }
+
+  function montrer() {
+    const p = new URLSearchParams(location.search);
+    window.scrollTo(0, 0);
+    if (p.get('candidat')) return candidat(p.get('candidat'), p.get('dossier'));
+    if (p.get('dossier')) return dossier(p.get('dossier'));
+    return listeDossiers();
+  }
+  addEventListener('popstate', montrer);
+  montrer();
+})();
+</script>
+</body>
+</html>

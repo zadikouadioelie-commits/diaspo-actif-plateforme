@@ -3158,6 +3158,8 @@ route("POST", "/api/upload/document", async (req, res) => {
 /* Module CV (2026-10-09) : médias, page publique par jeton, partage par e-mail — voir server/cv-extras.js. */
 const CvExtras = require("./cv-extras");
 CvExtras.registerCvExtras({ route, db, sendJSON, getCurrentUser, nomCompteAffichage });
+/* Dossiers de recrutement (2026-10-12) : noter, commenter, classer et repartager les CV reçus — voir server/recrutement.js. */
+require("./recrutement").registerRecrutement({ route, db, sendJSON, getCurrentUser, nomCompteAffichage });
 /* Liste de contrôle du profil public (2026-10-10) : GET /api/profil-public/checklist — voir server/profil-public.js. */
 const ProfilPublic = require("./profil-public");
 ProfilPublic.register({ route, db, sendJSON, getCurrentUser });

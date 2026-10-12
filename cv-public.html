@@ -84,6 +84,8 @@ h1 { font-size:1.15rem; margin:0 0 4px; }
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script src="/assets/cv-templates.js"></script>
 <script src="/assets/cv-template-nuit-doree.js?v=4"></script>
+<script src="/assets/recrut-partage.js"></script>
+<script src="/assets/cv-evaluation.js"></script>
 <script>
 (function () {
   'use strict';
@@ -154,7 +156,7 @@ h1 { font-size:1.15rem; margin:0 0 4px; }
       ${j.proprietaire ? `<div class="carte" style="margin-bottom:10px;background:#fff7ed;border-color:#f6c9a5;color:#7a3a0f;font-size:.85rem;">Vous consultez votre CV n°${j.numero} (lecture seule). <a href="/cv-public.html" style="color:inherit;">← Mes CV</a></div>` : ''}
       <div class="barre">
         <button class="btn prim" id="b-pdf">📄 Télécharger le PDF</button>
-        ${j.proprietaire ? `<button class="btn wa" id="b-wa">WhatsApp</button><button class="btn" id="b-part" style="display:none">📤 Partager…</button><button class="btn" id="b-copie">🔗 Copier le lien</button>` : ''}
+        ${j.proprietaire ? `<button class="btn wa" id="b-wa">WhatsApp</button><button class="btn" id="b-envoyer">📤 Envoyer à un contact</button><button class="btn" id="b-part" style="display:none">📤 Partager…</button><button class="btn" id="b-copie">🔗 Copier le lien</button>` : ''}
       </div>
       <div class="onglets" role="tablist" aria-label="Contenu">
         <button role="tab" id="t-cv" aria-selected="${vueMedias ? 'false' : 'true'}" aria-controls="p-cv">📄 CV</button>
@@ -175,11 +177,15 @@ h1 { font-size:1.15rem; margin:0 0 4px; }
     $('b-pdf').onclick = telechargerPDF;
     if (j.proprietaire) {
       const lien = lienCV();
+      /* Envoi à un compte Diaspo'Actif ou par e-mail (2026-10-12) : même fenêtre que les dossiers, sans notes. */
+      $('b-envoyer').onclick = () => { if (window.RecrutPartage) window.RecrutPartage.ouvrir({ monCv: { numero: j.numero, nom: nom || j.titre, lien } }); };
       $('b-wa').onclick = () => window.open('https://wa.me/?text=' + encodeURIComponent(messageWA(lien, nbm, j.titre)), '_blank', 'noopener');
       $('b-copie').onclick = async () => { try { await navigator.clipboard.writeText(lien); toast('Lien copié.'); } catch (e) { toast(lien); } };
       if (navigator.share) { const b = $('b-part'); b.style.display = ''; b.onclick = () => navigator.share({ title: 'Mon CV', text: messageWA(lien, nbm, j.titre) }).catch(() => {}); }
     }
     activerGalerie();
+    /* Le destinataire évalue le CV : verdict, note, commentaire, dossier de candidatures, repartage (2026-10-12). */
+    if (window.CvEval) CvEval.monter({ jeton, cv: j });
   }
 
   /* Adapte la feuille A4 (794 px) à la largeur de l'écran, sans jamais la déformer. */

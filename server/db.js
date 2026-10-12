@@ -2896,6 +2896,49 @@ db.exec(`
     created_at TEXT DEFAULT (datetime('now'))
   );
   CREATE INDEX IF NOT EXISTS idx_cv_partages_user ON cv_partages(user_id, created_at);
+  /* ── Dossiers de recrutement (2026-10-12) ── un compte qui reçoit des CV les range dans des DOSSIERS (ex. « Candidature — Poste de manager
+     principal »), les note de 0 à 10, leur donne un verdict (idéal / intéressant / ne correspond pas) et les commente. Le CV est COPIÉ
+     (snapshot_json) au moment de l'enregistrement : il reste consultable, avec toutes ses notes, même si son propriétaire le retire ensuite.
+     Tout est privé au compte qui évalue (user_id) ; voir server/recrutement.js. */
+  CREATE TABLE IF NOT EXISTS recrut_dossiers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    titre TEXT NOT NULL,
+    description TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_recrut_dossiers_user ON recrut_dossiers(user_id);
+  CREATE TABLE IF NOT EXISTS recrut_candidats (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    dossier_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    cv_jeton TEXT,
+    cv_user_id INTEGER,
+    nom TEXT,
+    titre_pro TEXT,
+    titre_cv TEXT,
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    note INTEGER CHECK(note IS NULL OR (note >= 0 AND note <= 10)),
+    verdict TEXT CHECK(verdict IS NULL OR verdict IN ('ideal','interessant','non')),
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(dossier_id, cv_jeton),
+    FOREIGN KEY(dossier_id) REFERENCES recrut_dossiers(id) ON DELETE CASCADE
+  );
+  CREATE INDEX IF NOT EXISTS idx_recrut_candidats_dossier ON recrut_candidats(dossier_id);
+  CREATE INDEX IF NOT EXISTS idx_recrut_candidats_user ON recrut_candidats(user_id, cv_jeton);
+  CREATE TABLE IF NOT EXISTS recrut_commentaires (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    candidat_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    texte TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(candidat_id) REFERENCES recrut_candidats(id) ON DELETE CASCADE
+  );
+  CREATE INDEX IF NOT EXISTS idx_recrut_commentaires_candidat ON recrut_commentaires(candidat_id);
+
 
   CREATE TABLE IF NOT EXISTS lettres_motivation (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
