@@ -660,7 +660,7 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
   }
   /* Présentation obligatoire pour TOUS les types de compte (2026-10-11, demande explicite) : biographie (utilisateur, ci-dessus), description
      de l'initiative, description de l'institution (collectivité). Un texte riche vide (<p><br></p>) compte pour vide. */
-  const texteSeul = h => String(h || "").replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/s+/g, " ").trim();
+  const texteSeul = h => String(h || "").replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
   if (role === "initiative" && !texteSeul(description)) return sendJSON(res, 400, { error: "La description de l'initiative est obligatoire." });
   if (role === "collectivite" && !texteSeul(description_institution)) return sendJSON(res, 400, { error: "La description de l'institution est obligatoire." });
   /* Acceptation des documents légaux (2026-10-12) : CGU, politique de confidentialité et charte, enregistrées avec leur VERSION (preuve). */
