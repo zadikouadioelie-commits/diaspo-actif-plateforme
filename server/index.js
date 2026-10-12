@@ -23100,21 +23100,6 @@ async function ensureEvenementsOuvertureInscriptionsCol() {
   catch (e) {}
   global.__evenementsOuvertureInscriptionsEnsured = true;
 }
-/* Organisateur externe (2026-10-12, demande explicite) — réservé au parcours ⚡ Événement flash :
-   permet de RELAYER un événement qui n'est pas le sien (prévenir la communauté), en créditant le
-   vrai organisateur (nom + logo) distinctement du compte Diaspo'Actif qui publie. Volontairement
-   DISTINCT de evenements.organisateur/organisateur_nom déjà existants : ceux-ci désignent
-   toujours le COMPTE propriétaire (voir le commentaire "jamais celui de son responsable" sur
-   GET /api/evenements) et sont recalculés à la lecture — les écraser aurait rendu le crédit à
-   l'organisateur externe invisible dès le premier chargement de la liste. */
-async function ensureEvenementsOrganisateurExterneCol() {
-  if (global.__evenementsOrganisateurExterneEnsured) return;
-  try { await db.prepare(`ALTER TABLE evenements ADD COLUMN organisateur_externe_nom TEXT`).run(); }
-  catch (e) {}
-  try { await db.prepare(`ALTER TABLE evenements ADD COLUMN organisateur_externe_logo_url TEXT`).run(); }
-  catch (e) {}
-  global.__evenementsOrganisateurExterneEnsured = true;
-}
 
 route("POST", "/api/evenements", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
@@ -23154,7 +23139,6 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
      payant) fait foi. Même idiome que zone_diffusion juste au-dessus. */
   await ensureEvenementsTypeParticipationCol();
   await ensureEvenementsOuvertureInscriptionsCol();
-  await ensureEvenementsOrganisateurExterneCol();
   const {
     titre, organisateur, date_evt, lieu, pays, ville, origine, description, type_evt, domaine,
     zone_diffusion, type_participation, statut, ouverture_inscriptions,
@@ -23163,8 +23147,7 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
     image_couverture, galerie_photos, video1_url, video1_titre, video2_url, video2_titre,
     pdf_url, pdf_nom, pdf_acces,
     langue, mode_participation, region, departement, masquer_inscrits,
-    whatsapp_lien, lieu_gps, public_concerne, masquer_boutique,
-    organisateur_externe_nom, organisateur_externe_logo_url
+    whatsapp_lien, lieu_gps, public_concerne, masquer_boutique
   } = body;
   if (!titre || !date_evt) return sendJSON(res, 400, { error: "Titre et date requis." });
   /* Sanitisé avant écriture (2026-09-25, éditeur de texte enrichi) — seule vraie barrière,
@@ -23185,9 +23168,8 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
      heure_debut,heure_fin,date_fin,lien_visio,visibilite,
      image_couverture,galerie_photos,video1_url,video1_titre,video2_url,video2_titre,
      pdf_url,pdf_nom,pdf_acces,
-     langue,mode_participation,region,departement,masquer_inscrits,whatsapp_lien,lieu_gps,public_concerne,masquer_boutique,
-     organisateur_externe_nom,organisateur_externe_logo_url)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+     langue,mode_participation,region,departement,masquer_inscrits,whatsapp_lien,lieu_gps,public_concerne,masquer_boutique)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
     .run(
       titre, organisateur || await nomCompteAffichage(user.id), date_evt, lieu||null, pays||null, ville||null, origine||null,
       descriptionSafe||null, type_evt||"evenement", domaine||null, zone_diffusion||null,
@@ -23198,8 +23180,7 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
       video1_url||null, video1_titre||null, video2_url||null, video2_titre||null,
       pdf_url||null, pdf_nom||null, pdf_acces||'public',
       langue||'francais', mode_participation||'presentiel', region||null, departement||null,
-      masquer_inscrits?1:0, whatsapp_lien||null, lieu_gps||null, public_concerne||null, masquer_boutique?1:0,
-      organisateur_externe_nom||null, organisateur_externe_logo_url||null
+      masquer_inscrits?1:0, whatsapp_lien||null, lieu_gps||null, public_concerne||null, masquer_boutique?1:0
     )).lastInsertRowid;
   // Notifier abonnés de l'initiative — jamais pour un brouillon, la publication n'est pas
   // encore réelle (voir statutFinal ci-dessus).
