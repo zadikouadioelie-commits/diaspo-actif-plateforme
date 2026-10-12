@@ -3881,37 +3881,8 @@ async function initDashboardUtilisateur(){
     };
   }
 
-  /* — Financements (données démo) — */
-  const fin = document.getElementById("dv-financements");
-  if(fin && typeof MES_FINANCEMENTS!=="undefined"){
-    fin.innerHTML = MES_FINANCEMENTS.map(f=>`
-      <div class="flex-between" style="padding:10px 0;border-bottom:1px solid var(--border);">
-        <span>💚 ${f.campagne}</span>
-        <span style="color:var(--orange);font-weight:700;">${f.montant} €</span>
-        <span style="color:var(--muted);font-size:12px;">${f.date}</span>
-      </div>`).join("");
-  }
-
-  /* — Collaborations (données démo) — */
-  const collab = document.getElementById("dv-collaborations");
-  if(collab && typeof MES_COLLABORATIONS!=="undefined"){
-    collab.innerHTML = MES_COLLABORATIONS.map(c=>`
-      <div class="init-card" style="margin-bottom:10px;">
-        <div class="init-logo">${initials(c.titre)}</div>
-        <div class="meta"><h4>${c.titre}</h4><p>${c.role} · avec ${c.avec}</p></div>
-        <span class="tag">${c.statut}</span>
-      </div>`).join("");
-  }
-
-  /* — Recherches (données démo) — */
-  const rl = document.getElementById("dv-recherches");
-  if(rl && typeof RECHERCHES!=="undefined"){
-    rl.innerHTML = RECHERCHES.map(r=>`
-      <div class="flex-between" style="padding:12px 0;border-bottom:1px solid var(--border);">
-        <span>🔍 Recherche : ${r.requete}</span>
-        <span style="color:var(--muted);font-size:12.5px;">${r.date}</span>
-      </div>`).join("");
-  }
+  /* Financements, collaborations et recherches : alimentés par les vraies données du compte (dashboard-utilisateur.html).
+     Plus de données de démonstration ici (2026-10-12) : elles s'affichaient quelques secondes avant d'être remplacées. */
 
   /* — Conversations (API) — */
   const cv = document.getElementById("dv-conversations");
@@ -3961,23 +3932,10 @@ const EMPTY_ACTUALITES_HTML = `<div class="empty">
   <p style="font-weight:700;color:var(--text);margin:0;">Aucun projet publié pour l'instant</p>
   <p style="margin:0;max-width:420px;">Très bientôt, les réussites, annonces et appels à projets portés par les initiatives de la diaspora seront mis en avant ici. Revenez bientôt !</p>
 </div>`;
-function initEvenements(){
-  const el = document.getElementById("evt-list");
-  if(!el || typeof EVENEMENTS === "undefined") return;
-  el.innerHTML = EVENEMENTS.map(e=>`
-    <div class="timeline-item">
-      <div class="date-chip"><div>${e.date.split(" ")[0]}</div><span>${e.date.split(" ")[1]}</span></div>
-      <div class="card" style="flex:1;">
-        <div class="flex-between">
-          <div>
-            <h3 style="margin:0 0 4px;">${e.titre}</h3>
-            <p style="margin:0;">${e.organisateur} · ${e.lieu}</p>
-          </div>
-          <span class="tag">${e.statut}</span>
-        </div>
-      </div>
-    </div>`).join("");
-}
+/* Événements (2026-10-12, signalé par l'utilisateur) : cette fonction remplissait #evt-list avec les événements FICTIFS de
+   assets/data.js (Forum de Toulouse, Gala A.I.T.O, Sommet Tech Dakar…) dès l'ouverture de la page, quelques secondes avant que la
+   vraie liste (API, evenements-app.html → renderEvts) ne les remplace. La liste réelle se charge elle-même : rien à faire ici. */
+function initEvenements(){}
 
 /* ---------- Fil d'actualité global (branché sur l'API) ---------- */
 /* ================================================================
