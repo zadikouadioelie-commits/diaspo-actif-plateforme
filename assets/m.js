@@ -1562,6 +1562,8 @@
   async function paneConv(id) {
     if (!S.me) { location.hash = '#/messages'; return; }
     setPane('Conversation', '<div class="sk skc" style="height:80px"></div>');
+    /* module des cartouches de CV, chargé à la demande (aucune modification de m.html) */
+    if (!window.CvCarte) await new Promise(res => { const sc = document.createElement('script'); sc.src = 'assets/cv-carte.js?v=20261012a'; sc.onload = sc.onerror = res; document.head.appendChild(sc); });
     const render = async (scroll) => {
       let r; try { r = await api(`/api/conversations/${encodeURIComponent(id)}/messages`); } catch (e) { return setPane('Conversation', `<div class="empty"><b>Conversation inaccessible</b>${esc(e.message)}</div>`); }
       const autre = r.autre || {}; const msgs = r.messages || [];
@@ -1569,7 +1571,17 @@
       msgs.forEach(m => {
         const d = dayLabel(m.created_at); if (d !== last) { html += `<div class="day">${esc(d)}</div>`; last = d; }
         const mine = Number(m.sender_id) === Number(S.me.id);
-        const body = m.deleted ? '<i style="opacity:.75">Message supprimé</i>' : m.type && m.type !== 'text' ? `📎 ${esc(m.fichier_nom || m.type)}` : esc(m.contenu || '');
+        let body;
+        if (m.deleted) body = '<i style="opacity:.75">Message supprimé</i>';
+        else {
+          /* Pièce jointe (cliquable quand son adresse est connue) ET texte du message : avant, un fichier accompagné d'un texte n'affichait que son nom.
+             CV partagé (2026-10-12) : le lien du CV devient une cartouche (aperçu, titre, « Ouvrir le CV ») avec un petit mot d'accompagnement. */
+          let fj = null; try { fj = m.fichier_json ? JSON.parse(m.fichier_json) : null; } catch (e) { fj = null; }
+          const cvc = window.CvCarte && m.contenu ? window.CvCarte.extraire(m.contenu) : null;
+          const txt = cvc ? window.CvCarte.sansLien(m.contenu, cvc.url) : (m.contenu || '');
+          const fichier = m.type && m.type !== 'text' ? (fj && fj.url ? `<a href="${attrUrl(fj.url)}" target="_blank" rel="noopener" style="display:block;font-weight:700;margin-bottom:4px">📎 ${esc(fj.nom || m.fichier_nom || 'Fichier')}</a>` : `<div style="margin-bottom:4px">📎 ${esc(m.fichier_nom || m.type)}</div>`) : '';
+          body = fichier + (txt ? `<div>${esc(txt)}</div>` : '') + (cvc ? window.CvCarte.html(cvc, { expediteur: S.convNames[id] || autre.nom || '', moi: mine }) : '');
+        }
         html += `<div class="b ${mine ? 'out' : 'in'}">${body}<time>${esc(hhmm(m.created_at))}</time></div>`;
       });
       const list = $('#chat'); const atBottom = !list || (list.parentNode.scrollHeight - list.parentNode.scrollTop - list.parentNode.clientHeight < 120);
@@ -1579,6 +1591,7 @@
         const cv = r.conversation || {}, moi1 = Number(cv.user1_id) === Number(S.me.id);
         paneMore(() => convActions({ id, avec_nom: S.convNames[id] || autre.nom || '', archive: !!(moi1 ? cv.archive_u1 : cv.archive_u2), theme: (moi1 ? cv.archive_dossier_u1 : cv.archive_dossier_u2) || '' }, () => { location.hash = '#/messages'; }));
       } else { list.innerHTML = html; }
+      if (window.CvCarte && $('#chat')) window.CvCarte.hydrater($('#chat'));
       const body = $('.pbody'); if (body && (scroll || atBottom)) body.scrollTop = body.scrollHeight;
     };
     await render(true);

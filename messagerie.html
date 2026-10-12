@@ -485,6 +485,7 @@
 <script src="assets/data.js"></script>
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js?v=13"></script>
+<script src="/assets/cv-carte.js"></script>
 <script>
 /* =====================================================
    MESSAGERIE — Logique complète
@@ -1280,8 +1281,14 @@ function renderMessages(msgs) {
         }
       }
       if(m.contenu){
-        const linkified=escHtml(m.contenu).replace(/(https?:\/\/\S+)/g,'<a href="$1" target="_blank" class="bubble-link">$1</a>');
-        inner+=`<div>${linkified}</div>`;
+        /* CV partagé (2026-10-12) : le lien du CV devient une cartouche (aperçu, titre, « Ouvrir le CV ») avec un petit mot d'accompagnement. */
+        const cvc=window.CvCarte&&CvCarte.extraire(m.contenu);
+        const texteMsg=cvc?CvCarte.sansLien(m.contenu,cvc.url):m.contenu;
+        if(texteMsg){
+          const linkified=escHtml(texteMsg).replace(/(https?:\/\/\S+)/g,'<a href="$1" target="_blank" class="bubble-link">$1</a>');
+          inner+=`<div>${linkified}</div>`;
+        }
+        if(cvc) inner+=CvCarte.html(cvc,{expediteur:nom,moi:isMe});
       }
       inner+=`<span class="bubble-time">${isEdited?`<span title="Message modifié" style="font-style:italic;opacity:.85;">(modifié)</span> · `:''}${timeLabel(m.created_at)}</span>`;
     }
@@ -1330,6 +1337,7 @@ function renderMessages(msgs) {
       </div>`;
   });
   body.innerHTML=html;
+  if(window.CvCarte) CvCarte.hydrater(body);
   body.scrollTop=body.scrollHeight;
 
   // Planifie un re-rendu au moment où la fenêtre de 10 min du plus ancien message
