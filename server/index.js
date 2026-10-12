@@ -30188,10 +30188,10 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
        dur sur l'accueil : absents de la rubrique Vidéos Tuto, donc impossibles à modifier, masquer, réordonner ou commenter. Ils sont
        désormais de vraies lignes (type_source='film', url = clé du film) : mêmes fiches, commentaires, réactions, publication/dépublication,
        ordre et suppression que les autres vidéos. Seul leur LECTEUR est particulier (le film s'ouvre dans sa fenêtre).
-       Inscrits UNE SEULE FOIS (marqueur dans parametres_plateforme) : un film supprimé ensuite par l'équipe ne revient pas au redémarrage. */
+       Inscrits UNE SEULE FOIS (marqueur dans parametres_plateforme) : un film supprimé ensuite par l'équipe ne revient pas au redémarrage.
+       « inscription-long » (titre "Créer son compte Diaspo'Actif pas à pas") retiré définitivement de cette liste le 2026-10-13
+       (demande explicite, 4e suppression manuelle) — la ligne est aussi supprimée directement en base ; ne JAMAIS le réinscrire ici. */
     const FILMS_PLATEFORME = [
-      { cle: 'inscription-long', duree: 87, ordre: -2, titre: "Créer son compte Diaspo'Actif pas à pas",
-        description: "<p>Le film complet (1 min 27) : de la création du compte à un profil public complet. Choisir son profil, indiquer ses origines, ajouter une photo et une biographie, confirmer son e-mail, puis explorer l'annuaire, les événements, les projets et la boutique.</p>" },
       { cle: 'inscription-court', duree: 55, ordre: -1, titre: "Comment ça marche : créer son compte en 55 secondes",
         description: "<p>La version courte du film (55 secondes) : l'essentiel pour créer son compte et rejoindre le réseau Diaspo'Actif.</p>" },
       /* Tuto « Événements flash » (2026-10-13, demande explicite) : publier en quelques secondes une annonce d'événement SANS inscription — le sien, ou un
