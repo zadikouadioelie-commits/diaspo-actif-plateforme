@@ -30196,7 +30196,7 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
         description: "<p>La version courte du film (55 secondes) : l'essentiel pour créer son compte et rejoindre le réseau Diaspo'Actif.</p>" },
       /* Tuto « Événements flash » (2026-10-13, demande explicite) : publier en quelques secondes une annonce d'événement SANS inscription — le sien, ou un
          événement organisé par quelqu'un d'autre que l'on relaie pour informer la diaspora. Film assets/inscription-film.js (version 'flash', voix assets/media/evenement-flash-voix.mp3). */
-      { cle: 'evenement-flash', duree: 54, ordre: 0, categorie: 'Événements', miniature: '/assets/media/film-flash-poster.svg', titre: "Publier un événement flash : informer la diaspora sans inscription",
+      { cle: 'evenement-flash', duree: 54, ordre: -1, categorie: 'Événements', miniature: '/assets/media/film-flash-poster.svg', titre: "Publier un événement flash : informer la diaspora sans inscription",
         description: "<p>Un événement flash est une annonce publiée en quelques secondes, <strong>sans aucune inscription</strong> : on donne simplement l'information d'un événement. Il peut servir pour vos propres événements, mais aussi pour relayer un événement organisé par quelqu'un d'autre et informer la diaspora de ce qui se passe.</p><p>En 5 étapes : se connecter avec son compte Initiative, ouvrir l'espace Événements et cliquer sur « Événement flash », renseigner les informations (titre, date, adresse, description, photos, organisateur, visibilité), vérifier le récapitulatif, puis confirmer et publier.</p>" },
     ];
     for (const f of FILMS_PLATEFORME) {
