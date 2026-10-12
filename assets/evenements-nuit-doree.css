@@ -1,0 +1,123 @@
+/* Design « Nuit dorée » — espace Événements Diaspo'Actif (evenements.html) (2026-10-12).
+   Complète assets/theme-nuit-doree.css (barre du haut, boutons, cartes de comptes « Découvrir des initiatives », pied de page).
+   Tout est préfixé html body.nd : sans class="nd" sur <body>, la page garde son ancien design. Les variables du site (--bg, --text, --border…)
+   ne sont redéfinies que dans les blocs de contenu, jamais sur <body> (barre du haut et menu intacts). Retour arrière : retirer le lien et class="nd". */
+
+html body.nd :is(.evt-layout,.evt-main-col,#evt-identity,.evt-epingle,.modal,.evt-card,#trophee-cta-zone){
+  --bg:rgba(255,255,255,.06); --bg-alt:rgba(255,255,255,.07); --card:rgba(255,255,255,.045); --text:#EDEAE0; --muted:#AEB8D0;
+  --border:rgba(255,255,255,.13); --navy:#FFFFFF; --orange:#E3C06E; --orange-light:rgba(227,192,110,.12);
+}
+
+/* ═══ bandeau d'identité : de l'orange vif à la nuit, avec des pastilles dorées ═══ */
+html body.nd #evt-identity{background:linear-gradient(135deg,#0B1226 0%,#14234a 70%,#0d1633 100%);border-bottom:1px solid var(--nd-bord);color:var(--nd-texte);padding:12px 24px;gap:12px}
+html body.nd .evt-pill{background:rgba(227,192,110,.1);border:1px solid var(--nd-bord);color:#F3E3B5;font-weight:700;padding:5px 14px}
+html body.nd .evt-identity-link{color:var(--nd-or);font-weight:800}
+html body.nd #evt-identity span[style*="opacity"]{color:var(--nd-doux)}
+
+/* ═══ en-tête de la page ═══ */
+html body.nd #evt-page-row h2{font-family:var(--nd-display)!important;font-weight:500;font-size:clamp(30px,3.6vw,46px);letter-spacing:-.01em;color:#fff}
+html body.nd #evt-page-row .sub{color:var(--nd-doux)}
+html body.nd #btn-flash{background:linear-gradient(135deg,#9DF29D,#52C95F)!important;color:#052e0f!important;border-radius:999px 0 0 999px!important;box-shadow:0 10px 24px -12px rgba(123,232,123,.7)}
+html body.nd #btn-flash-wrap button:not(#btn-flash){background:#52C95F!important;color:#052e0f!important;border-radius:0 999px 999px 0!important}
+
+/* ═══ colonnes : filtres, suggestions, publicité, publications ═══ */
+html body.nd :is(.evt-filters-col,.evt-suggest-col,.evt-ad-col,.evt-pub-col){background:var(--nd-verre);border:1px solid var(--nd-bord2);border-radius:22px;padding:20px;box-shadow:0 24px 50px -36px rgba(0,0,0,.9);scrollbar-width:thin;scrollbar-color:rgba(227,192,110,.4) transparent}
+html body.nd .evt-col-title{color:var(--nd-or);letter-spacing:.12em;font-size:11px;margin-bottom:6px}
+html body.nd .evt-filters-col{gap:12px}
+html body.nd .evt-filters-col :is(select,input){height:44px;border-radius:12px;background:rgba(255,255,255,.06)!important;color:#fff!important;border:1px solid var(--nd-bord2)!important;padding:0 14px;color-scheme:dark;transition:border-color .3s,box-shadow .3s}
+html body.nd .evt-filters-col input::placeholder{color:#7C88A4}
+html body.nd .evt-filters-col :is(select,input):focus{outline:none;border-color:var(--nd-or)!important;box-shadow:0 0 0 3px rgba(227,192,110,.18)}
+html body.nd .evt-filters-col select option{background:#0B1226;color:#fff}
+html body.nd .evt-filters-col .btn{min-height:44px;border-radius:999px;font-weight:700}
+html body.nd .evt-filters-col .btn:not(.btn-orange):not(.btn-trophee){background:var(--nd-verre)!important;color:var(--nd-texte)!important;border:1px solid var(--nd-bord)!important}
+html body.nd .evt-ad-vision{color:var(--nd-doux)}
+html body.nd .evt-ad-vision strong{color:#fff;font-family:var(--nd-display);font-weight:500;font-size:17px}
+html body.nd .evt-pub-item{border-bottom-color:var(--nd-bord2)}
+html body.nd .evt-pub-role{background:rgba(227,192,110,.12);color:var(--nd-or)}
+html body.nd .evt-pub-auteur{color:#fff}
+
+/* ═══ onglets En cours / À venir / Terminés ═══ */
+html body.nd .evt-tabs{gap:10px;margin-bottom:18px}
+html body.nd .evt-tab{background:var(--nd-verre);border:1px solid var(--nd-bord2);color:var(--nd-doux);padding:9px 18px;font-weight:700;transition:background .3s,color .3s,border-color .3s}
+html body.nd .evt-tab:hover{border-color:var(--nd-bord);color:#fff}
+html body.nd .evt-tab.actif{background:var(--nd-degore);border-color:transparent;color:#1a1202;box-shadow:0 10px 24px -12px rgba(227,192,110,.7)}
+html body.nd #evt-count{color:var(--nd-doux)}
+
+/* ═══ cartes d'événement ═══ */
+html body.nd .evt-grid{gap:24px}
+html body.nd .evt-card{background:var(--nd-verre);border:1px solid var(--nd-bord2);border-radius:22px;box-shadow:0 24px 50px -34px rgba(0,0,0,.9);transition:transform .45s var(--nd-ease),border-color .45s,box-shadow .45s}
+html body.nd .evt-card:hover{transform:translateY(-4px);border-color:var(--nd-bord);box-shadow:0 34px 60px -30px rgba(0,0,0,.95),0 0 0 1px rgba(227,192,110,.12)}
+html body.nd .evt-img{background:linear-gradient(135deg,#14234a,#0B1226)}
+html body.nd .evt-body{padding:20px 20px 22px}
+html body.nd .evt-date{color:var(--nd-or);letter-spacing:.1em}
+html body.nd .evt-title{font-family:var(--nd-display)!important;font-weight:500;font-size:20px;line-height:1.25;color:#fff;margin-bottom:10px}
+html body.nd .evt-meta{color:var(--nd-doux)}
+html body.nd .evt-meta a{color:var(--nd-or)!important}
+html body.nd .evt-tag{background:rgba(255,255,255,.06);border:1px solid var(--nd-bord2);color:var(--nd-texte)}
+html body.nd .evt-tag[style*="color:#16a34a"]{color:#6FE0A8!important}
+html body.nd .evt-tag[style*="color:#D97706"]{color:#F3C26E!important}
+html body.nd .evt-tag[style*="#7BE87B"]{background:linear-gradient(135deg,#9DF29D,#52C95F)!important;color:#052e0f!important;border-color:transparent}
+html body.nd .evt-card p[style*="color:var(--muted)"]{color:var(--nd-doux)!important}
+html body.nd .evt-actions-gerer{border-top-color:var(--nd-bord2)}
+/* boutons de la carte : verre pour les secondaires, or pour l'action principale */
+html body.nd .evt-card .btn-outline,html body.nd .evt-card .btn:not(.btn-orange):not(.btn-adherer-violet){background:var(--nd-verre)!important;color:var(--nd-texte)!important;border:1px solid var(--nd-bord)!important}
+html body.nd .evt-card .btn-outline:hover{background:rgba(255,255,255,.1)!important;border-color:var(--nd-or)!important}
+html body.nd .evt-card .btn-orange{background:var(--nd-degore)!important;color:#1a1202!important;border:0!important;box-shadow:0 10px 24px -12px rgba(227,192,110,.75)}
+html body.nd .evt-card .btn[disabled]{opacity:.5}
+html body.nd .evt-card .btn-adherer-violet{background:#7C3AED!important;color:#fff!important}
+html body.nd .evt-delete-float{background:rgba(6,10,20,.7);border:1px solid var(--nd-bord2)}
+/* variantes : flash (vert), trophée (or), promo, terminé */
+html body.nd .evt-card-flash{background:linear-gradient(165deg,rgba(52,199,120,.2),rgba(255,255,255,.04) 60%);border-color:rgba(52,199,120,.55)}
+html body.nd .evt-card-trophee{background:linear-gradient(165deg,rgba(227,192,110,.22),rgba(255,255,255,.04) 60%);border-color:rgba(227,192,110,.65)}
+html body.nd .evt-card-termine{filter:saturate(.7);opacity:.88}
+html body.nd .evt-card-termine:hover{opacity:1;filter:none}
+
+/* ═══ événement épinglé (3 mois de Premium offerts) ═══ */
+html body.nd .evt-epingle{border:1px solid var(--nd-bord);border-radius:26px;background:radial-gradient(800px 300px at 85% 0%,rgba(227,192,110,.2),transparent 62%),linear-gradient(135deg,#0E1B3C 0%,#0B1226 100%);box-shadow:0 30px 60px -36px rgba(0,0,0,.95)}
+html body.nd .evt-epingle h3{font-family:var(--nd-display)!important;font-weight:500;font-size:26px}
+html body.nd .evt-epingle-badge{background:var(--nd-degore);color:#1a1202}
+html body.nd .evt-epingle-cta-primary{background:var(--nd-degore)!important;color:#1a1202!important;border-radius:999px!important;font-weight:800}
+html body.nd .evt-epingle-cta-secondary{border-radius:999px!important;color:var(--nd-or)!important}
+
+/* ═══ fenêtres : calendrier Diaspora, détail, création, aperçu ═══ */
+html body.nd .modal-bg{background:rgba(3,6,14,.78);backdrop-filter:blur(7px)}
+html body.nd .modal{background:#0E1630;border:1px solid var(--nd-bord);border-radius:26px;color:var(--nd-texte);box-shadow:0 50px 110px -34px rgba(0,0,0,.95);scrollbar-width:thin;scrollbar-color:rgba(227,192,110,.4) transparent}
+html body.nd .modal h3,html body.nd .modal h2{font-family:var(--nd-display)!important;font-weight:500;color:#fff}
+html body.nd .modal p{color:var(--nd-doux)}
+html body.nd .modal label:not(.da-pill){color:var(--nd-doux)!important}
+html body.nd .modal :is([style*="color:#2563EB"],[style*="color:#2563eb"]){color:#FFB070!important}
+html body.nd .modal :is([style*="color:#1d4ed8"],[style*="color:#1E40AF"]){color:#A9C4FF!important}
+html body.nd .modal #cover-drop{background:rgba(255,255,255,.04)!important;border-color:var(--nd-bord)!important;border-radius:16px!important}
+html body.nd .modal #cover-drop:hover{border-color:var(--nd-or)!important}
+html body.nd .modal #cover-placeholder span[style*="#aaa"]{color:var(--nd-doux)!important}
+html body.nd .modal label.fchip,html body.nd .fchip{background:rgba(227,192,110,.14)!important;border:1px solid var(--nd-bord)!important;color:#F3E3B5!important}
+html body.nd .modal div[style*="background:#fff7ed"],html body.nd .modal div[style*="background:#FFF7ED"],html body.nd .modal div[style*="background:#f0f9ff"],html body.nd .modal div[style*="background:#F0F9FF"]{background:rgba(227,192,110,.1)!important;border-color:var(--nd-bord)!important;color:#F3E3B5!important}
+/* pied de la fenêtre « Créer un événement » : quatre boutons réguliers, l'action principale pleine largeur dessous */
+html body.nd #modal-bg #btn-cancel{background:var(--nd-verre)!important;color:var(--nd-texte)!important;border:1px solid var(--nd-bord)!important}
+html body.nd #modal-bg div:has(>#btn-cancel){display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px!important;justify-content:stretch!important}
+html body.nd #modal-bg div:has(>#btn-cancel)>.btn{width:100%;min-width:0;white-space:normal;line-height:1.2}
+html body.nd #modal-bg div:has(>#btn-cancel)>#btn-save{grid-column:1/-1}
+@media (max-width:560px){html body.nd #modal-bg div:has(>#btn-cancel){grid-template-columns:minmax(0,1fr)}}
+/* case « photo supplémentaire » : un carré en pointillés au lieu d'un carré blanc */
+html body.nd .modal :is(div[style*="background:#fff;"],div[style*="background:#FFF;"],div[style*="background:#fafafa"],div[style*="background:#FAFAFA"]):not(#cover-drop){background:rgba(255,255,255,.05)!important;border-color:var(--nd-bord)!important;color:var(--nd-doux)!important}
+html body.nd .modal [id^="gslot-"]{background:rgba(255,255,255,.05)!important;border-color:var(--nd-bord)!important;border-radius:14px!important}
+html body.nd .modal [id^="gph-"]{color:var(--nd-doux)!important}
+html body.nd .modal input[type=checkbox]{accent-color:#B9893A}
+html body.nd .modal .btn-adherer-violet[disabled]{background:#4B2A94!important;color:#E6DAFF!important;opacity:1}
+html body.nd .modal :is(input:not([type=checkbox]):not([type=radio]):not([type=file]),select,textarea){background:rgba(255,255,255,.06)!important;color:#fff!important;border:1px solid var(--nd-bord2)!important;border-radius:12px;color-scheme:dark}
+html body.nd .modal select option{background:#0B1226;color:#fff}
+html body.nd .modal .btn-outline{background:var(--nd-verre)!important;color:var(--nd-texte)!important;border:1px solid var(--nd-bord)!important}
+html body.nd .modal .btn-orange{background:var(--nd-degore)!important;color:#1a1202!important;border:0!important}
+html body.nd .cd-cal-head{color:#fff;font-family:var(--nd-display);font-weight:500;font-size:18px}
+html body.nd .cd-cal-nav{border:1px solid var(--nd-bord);color:var(--nd-texte);border-radius:999px;background:var(--nd-verre)}
+html body.nd .cd-cal-dow{color:var(--nd-or)}
+html body.nd .cd-cal-day{color:var(--nd-texte)}
+html body.nd .cd-cal-day.has-event{background:rgba(227,192,110,.16);color:var(--nd-or)}
+html body.nd .cd-cal-day.has-event:hover{background:rgba(227,192,110,.28)}
+html body.nd .cd-cal-day.has-event.passe{background:rgba(255,255,255,.06);color:var(--nd-doux)}
+html body.nd .cd-cal-day.today{box-shadow:inset 0 0 0 2px var(--nd-or)}
+html body.nd .cd-cal-day.selected{outline-color:var(--nd-or)}
+html body.nd .cd-jour-item{border-bottom-color:var(--nd-bord2);color:var(--nd-texte)}
+html body.nd .cd-jour-meta{color:var(--nd-doux)}
+
+@media (prefers-reduced-motion:reduce){html body.nd .evt-card,html body.nd .evt-tab{transition:none}}
