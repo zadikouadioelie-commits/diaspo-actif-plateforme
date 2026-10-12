@@ -1,0 +1,113 @@
+/* Design « Nuit dorée » — Cotisations & Adhésions (tableau de bord Initiative) et ses formulaires (2026-10-12).
+   Limité à la section #adhesions-init et à ses fenêtres (#modal-adh-*) : le reste du tableau de bord garde son design actuel.
+   Quand la section est affichée, la zone de contenu passe en nuit ; les variables du site (--bg, --text, --border…) sont redéfinies
+   dans ces blocs seulement. Retour arrière : retirer le lien de la feuille. */
+@import url("https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,500;6..96,600&family=Manrope:wght@400;500;600;700;800&display=swap");
+
+:root{
+  --ad-or:#E3C06E; --ad-or2:#B9893A; --ad-texte:#E8ECF6; --ad-doux:#AEB8D0; --ad-verre:rgba(255,255,255,.05); --ad-verre2:rgba(255,255,255,.09);
+  --ad-bord:rgba(227,192,110,.28); --ad-bord2:rgba(255,255,255,.12);
+  --ad-degore:linear-gradient(135deg,#F3DC9B 0%,#E3C06E 38%,#B9893A 100%);
+  --ad-titres:'Bodoni Moda','Didot',Georgia,serif; --ad-sans:'Manrope','Segoe UI',system-ui,sans-serif;
+}
+
+/* ── la zone de contenu passe en nuit tant que cette section est affichée ── */
+main#dashboard-content:has(>#adhesions-init:not([style*="none"])){
+  background:radial-gradient(ellipse 700px 420px at 100% 0%,rgba(227,192,110,.12),transparent 62%),radial-gradient(ellipse 620px 460px at 0% 100%,rgba(63,123,255,.12),transparent 62%),#060A14!important;
+  font-family:var(--ad-sans);min-height:calc(100vh - 60px)}
+
+/* ── variables du site redéfinies dans la section et ses fenêtres ── */
+#adhesions-init,#adhesions-init :is(.card),:is(#modal-adh-formule,#modal-adh-modeles,[id^="modal-adh-"]),:is(#modal-adh-formule,#modal-adh-modeles,[id^="modal-adh-"]) .modal-box{
+  --bg:rgba(255,255,255,.06); --card:rgba(255,255,255,.05); --text:#EDEAE0; --muted:#AEB8D0; --border:rgba(255,255,255,.14);
+  --navy:#FFFFFF; --orange:#E3C06E; --orange-light:rgba(227,192,110,.12);
+}
+#adhesions-init{color:var(--ad-texte)}
+#adhesions-init h2{font-family:var(--ad-titres);font-weight:500;font-size:clamp(28px,3.4vw,40px);letter-spacing:-.01em}
+#adhesions-init h3{font-family:var(--ad-titres);font-weight:500}
+/* la feuille globale impose une encre sombre et un filet clair aux titres du contenu (!important) */
+#adhesions-init :is(h1,h2,h3,h4,h5){color:#fff!important;border-bottom-color:rgba(227,192,110,.3)!important}
+#adhesions-init p{color:var(--ad-doux)!important}
+/* pastilles d'initiales : elles utilisaient --navy comme fond (devenu blanc ici) */
+#adhesions-init div[style*="background:var(--navy"]{background:var(--ad-degore)!important;color:#1a1202!important}
+
+/* ── bandeau d'information, interrupteur « Adhésions ouvertes » ── */
+#adhesions-init p[style*="display:inline-block"]{background:rgba(255,255,255,.05)!important;border:1px solid var(--ad-bord2)!important;border-radius:12px!important;color:var(--ad-doux)!important;padding:8px 14px!important}
+#adhesions-init label[title]{background:var(--ad-verre)!important;border:1px solid var(--ad-bord)!important;color:var(--ad-texte)!important;padding:9px 18px!important}
+#adhesions-init input[type=checkbox]{accent-color:#B9893A}
+
+/* ── boutons : or pour l'action principale, verre pour le reste ── */
+#adhesions-init .btn,.modal-box .btn{font-family:var(--ad-sans)}
+#adhesions-init .btn-orange,#modal-adh-formule .btn-orange{background:var(--ad-degore)!important;color:#1a1202!important;border:0!important;border-radius:999px;font-weight:800;box-shadow:0 10px 24px -12px rgba(227,192,110,.75)}
+#adhesions-init .btn[style*="#7C3AED"]{background:linear-gradient(135deg,#9B6BFF,#6D28D9)!important;color:#fff!important;border:0!important;border-radius:999px;font-weight:800;box-shadow:0 10px 24px -12px rgba(124,58,237,.7)}
+#adhesions-init .btn-outline,#adhesions-init .btn-sm.btn-outline{background:var(--ad-verre)!important;color:var(--ad-texte)!important;border:1px solid var(--ad-bord)!important;border-radius:999px;font-weight:700}
+#adhesions-init .btn-outline:hover{background:var(--ad-verre2)!important;border-color:var(--ad-or)!important}
+#adhesions-init .btn-sm:not(.btn-outline):not(.btn-orange){background:var(--ad-degore)!important;color:#1a1202!important;border:0!important;border-radius:999px;font-weight:800}
+#adhesions-init .btn[style*="color:#dc2626"],#adhesions-init .btn[style*="color:#B91C1C"]{color:#FFA79D!important}
+
+/* ── cartes (formules, adhérents, tableaux de bord) ── */
+#adhesions-init .card{background:var(--ad-verre)!important;border:1px solid var(--ad-bord2)!important;border-radius:22px;box-shadow:0 24px 50px -36px rgba(0,0,0,.9);color:var(--ad-texte)}
+#adhesions-init .card h3,#adhesions-init .card strong{color:#fff}
+#adhesions-init .card :is(div,span,p)[style*="color:var(--muted)"]{color:var(--ad-doux)!important}
+#adhesions-init .card img{border-radius:0}
+
+/* ── messages et panneaux colorés posés en ligne (pastel + encre sombre) ── */
+#adhesions-init :is([style*="background:#f0fdf4"],[style*="background:#F0FDF4"],[style*="background:#ecfdf5"],[style*="background:#d1fae5"],[style*="background:#dcfce7"]){background:rgba(52,199,120,.12)!important;border-color:rgba(52,199,120,.4)!important;color:#CDEFD9!important}
+#adhesions-init :is([style*="background:#fffbeb"],[style*="background:#fef3c7"],[style*="background:#fff7ed"],[style*="background:#FFF7ED"],[style*="background:#FEF9C3"],[style*="background:#fef9c3"]){background:rgba(227,192,110,.12)!important;border-color:var(--ad-bord)!important;color:#F3E3B5!important}
+#adhesions-init :is([style*="background:#fee2e2"],[style*="background:#fef2f2"]){background:rgba(255,154,143,.12)!important;border-color:rgba(255,154,143,.4)!important;color:#FFB3AA!important}
+#adhesions-init :is([style*="background:#EFF6FF"],[style*="background:#eff6ff"],[style*="background:#dbeafe"]){background:rgba(63,123,255,.14)!important;border-color:rgba(63,123,255,.4)!important;color:#A9C4FF!important}
+#adhesions-init :is([style*="background:#f1f5f9"],[style*="background:#F1F5F9"],[style*="background:#f8fafc"],[style*="background:#fafafa"],[style*="background:#FAFAFA"],[style*="background:#fff;"]){background:var(--ad-verre)!important;border-color:var(--ad-bord2)!important;color:var(--ad-texte)!important}
+#adhesions-init :is([style*="color:#1E40AF"],[style*="color:#1d4ed8"],[style*="color:#2563EB"],[style*="color:#2563eb"]){color:#A9C4FF!important}
+#adhesions-init :is([style*="color:#166534"],[style*="color:#15803d"],[style*="color:#065f46"]){color:#9BE8B8!important}
+#adhesions-init :is([style*="color:#92400e"],[style*="color:#b45309"],[style*="color:#9a3412"]){color:#F3E3B5!important}
+#adhesions-init :is([style*="color:#991b1b"],[style*="color:#dc2626"]){color:#FFB3AA!important}
+
+/* ── champs de la section (recherche, import…) ── */
+#adhesions-init :is(input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=color]),select,textarea,.input){background:rgba(255,255,255,.06)!important;color:#fff!important;border:1px solid var(--ad-bord2)!important;border-radius:12px;color-scheme:dark}
+#adhesions-init :is(input,textarea)::placeholder{color:#7C88A4}
+#adhesions-init :is(input,select,textarea,.input):focus{outline:none;border-color:var(--ad-or)!important;box-shadow:0 0 0 3px rgba(227,192,110,.18)}
+#adhesions-init select option{background:#0B1226;color:#fff}
+
+/* ── tableaux (registre des membres) ── */
+#adhesions-init table{color:var(--ad-texte)}
+#adhesions-init th{background:var(--ad-verre2)!important;color:var(--ad-or)!important;border-color:var(--ad-bord2)!important}
+#adhesions-init td{border-color:var(--ad-bord2)!important;color:var(--ad-texte)}
+#adhesions-init tr:hover td{background:var(--ad-verre)}
+
+/* ── FENÊTRES : créer / modifier une formule, adhésion officielle, modèles de texte ── */
+#modal-adh-formule,#modal-adh-modeles{background:rgba(3,6,14,.8)!important;backdrop-filter:blur(7px);font-family:var(--ad-sans)}
+#modal-adh-formule>div,#modal-adh-modeles .modal-box,[id^="modal-adh-"] .modal-box{
+  background:radial-gradient(ellipse 520px 300px at 100% 0%,rgba(227,192,110,.13),transparent 62%),radial-gradient(ellipse 460px 320px at 0% 100%,rgba(63,123,255,.12),transparent 62%),#0B1226!important;
+  border:1px solid var(--ad-bord);border-radius:28px!important;color:var(--ad-texte);padding:34px 36px!important;
+  box-shadow:0 50px 110px -34px rgba(0,0,0,.95);scrollbar-width:thin;scrollbar-color:rgba(227,192,110,.4) transparent}
+#modal-adh-formule h3,#modal-adh-modeles h3{font-family:var(--ad-titres);font-weight:500;font-size:clamp(24px,3vw,32px);color:#fff;margin:0 0 20px!important}
+#modal-adh-formule label,#modal-adh-modeles label{display:block;color:var(--ad-or)!important;font-size:11px!important;font-weight:800!important;letter-spacing:.1em;text-transform:uppercase;line-height:1.35}
+#modal-adh-formule label span,#modal-adh-modeles label span{letter-spacing:0;text-transform:none;color:var(--ad-doux)!important;font-weight:500}
+#modal-adh-formule :is(input:not([type=checkbox]):not([type=radio]):not([type=color]),select,textarea,.input),#modal-adh-modeles :is(textarea,.input,input:not([type=checkbox])){
+  min-height:48px;width:100%;box-sizing:border-box;padding:12px 16px;border-radius:14px;background:rgba(255,255,255,.06)!important;color:#fff!important;border:1px solid var(--ad-bord2)!important;
+  font:500 15px/1.35 var(--ad-sans);color-scheme:dark;transition:border-color .3s,box-shadow .3s}
+#modal-adh-formule textarea,#modal-adh-modeles textarea{min-height:90px;line-height:1.6}
+#modal-adh-formule :is(input,select,textarea,.input):focus,#modal-adh-modeles :is(textarea,.input,input):focus{outline:none;border-color:var(--ad-or)!important;box-shadow:0 0 0 3px rgba(227,192,110,.18)}
+#modal-adh-formule :is(input,textarea)::placeholder,#modal-adh-modeles textarea::placeholder{color:#7C88A4}
+#modal-adh-formule select option{background:#0B1226;color:#fff}
+#modal-adh-formule input[type=color]{height:48px;width:100%;padding:4px;border-radius:14px;background:var(--ad-verre)!important;border:1px solid var(--ad-bord2)!important}
+#modal-adh-formule input[type=checkbox],#modal-adh-formule input[type=radio]{accent-color:#B9893A}
+#modal-adh-formule :is(div,p,small,span)[style*="color:var(--muted)"],#modal-adh-modeles :is(div,p,small)[style*="color:var(--muted)"]{color:var(--ad-doux)!important}
+#modal-adh-formule :is([style*="background:#EFF6FF"],[style*="background:#eff6ff"],[style*="background:#f0f9ff"]),#modal-adh-modeles :is([style*="background:#EFF6FF"],[style*="background:#eff6ff"]){background:rgba(63,123,255,.14)!important;border-color:rgba(63,123,255,.4)!important;color:#A9C4FF!important}
+#modal-adh-formule :is([style*="background:#fffbeb"],[style*="background:#FFF7ED"],[style*="background:#fff7ed"],[style*="background:#FEF9C3"]){background:rgba(227,192,110,.12)!important;border-color:var(--ad-bord)!important;color:#F3E3B5!important}
+#modal-adh-formule :is([style*="background:#f1f5f9"],[style*="background:#F1F5F9"],[style*="background:#fafafa"],[style*="background:#FAFAFA"],[style*="background:#f8fafc"],[style*="background:#f9fafb"]){background:var(--ad-verre)!important;border-color:var(--ad-bord2)!important;color:var(--ad-texte)!important}
+/* pastilles (cases à cocher) : les textes internes suivent la pastille, y compris sur le fond doré de l'état coché */
+#modal-adh-formule .da-pill span,#modal-adh-formule .da-pill{color:var(--ad-texte)}
+#modal-adh-formule .da-pill.checked,#modal-adh-formule .da-pill.checked *{color:#1a1202!important}
+#modal-adh-formule button.da-pill{background:var(--ad-verre)!important;border:1px solid var(--ad-bord2)!important;color:var(--ad-texte)!important;border-radius:999px!important;min-height:44px;padding:10px 18px!important}
+#modal-adh-formule button.da-pill.checked,#modal-adh-formule button.da-pill:is(.on,.actif,.selected){background:var(--ad-degore)!important;color:#1a1202!important;border-color:transparent!important}
+#modal-adh-formule button.adh-officielle-btn{background:rgba(124,58,237,.18)!important;color:#E6DAFF!important;border:1px solid rgba(167,139,250,.55)!important;border-radius:999px!important;font-weight:700}
+#modal-adh-formule button.adh-officielle-btn.checked,#modal-adh-formule button.adh-officielle-btn:is(.on,.actif,.active){background:linear-gradient(135deg,#9B6BFF,#6D28D9)!important;color:#fff!important}
+/* modes de paiement : pastilles à cocher */
+#modal-adh-formule label.da-pill,#adhesions-init label.da-pill{display:inline-flex!important;align-items:center;gap:8px;min-height:44px;padding:10px 18px!important;border-radius:999px!important;background:var(--ad-verre)!important;border:1px solid var(--ad-bord2)!important;color:var(--ad-texte)!important;font-size:13.5px!important;font-weight:700!important;letter-spacing:0!important;text-transform:none!important;cursor:pointer;transition:background .3s,border-color .3s}
+#modal-adh-formule label.da-pill:hover{border-color:var(--ad-bord)!important}
+#modal-adh-formule label.da-pill.checked,#adhesions-init label.da-pill.checked{background:var(--ad-degore)!important;border-color:transparent!important;color:#1a1202!important}
+#modal-adh-formule .btn,#modal-adh-modeles .btn{min-height:48px;padding:12px 26px;border-radius:999px;font-weight:800;font-size:14px}
+#modal-adh-formule .btn-outline,#modal-adh-modeles .btn-outline,#modal-adh-formule .btn:not(.btn-orange):not([style*="background"]){background:var(--ad-verre)!important;color:var(--ad-texte)!important;border:1px solid var(--ad-bord)!important}
+#modal-adh-formule .btn-orange,#modal-adh-modeles .btn-orange{background:var(--ad-degore)!important;color:#1a1202!important;border:0!important;box-shadow:0 12px 28px -12px rgba(227,192,110,.75)}
+#modal-adh-formule div[style*="justify-content:flex-end"],#modal-adh-modeles div[style*="justify-content:flex-end"]{gap:14px!important;margin-top:26px!important;padding-top:22px;border-top:1px solid var(--ad-bord2)}
+@media (prefers-reduced-motion:reduce){#modal-adh-formule *,#adhesions-init *{transition:none!important}}
