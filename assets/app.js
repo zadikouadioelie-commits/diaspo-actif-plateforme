@@ -1050,6 +1050,10 @@ window.relanceProfilApresSauvegarde = function () {
    mise à jour, jusqu'au seuil (100 % utilisateur, 50 % autres) puis un message de remerciement.
    ═══════════════════════════════════════════════════════════════════════════ */
 const PO_PAGES_EDITION = /(^|\/)(profil|initiative|profil-collectivite|confidentialite|login|inscription|verifier-email|email-verifie|mot-de-passe-oublie|reset-password|reinitialiser|charte)(\.html)?$/;
+/* Pages où le membre reste LIBRE de lire et d'agir (commenter, réagir, partager, s'inscrire…) malgré l'obligation (2026-10-12, demande explicite :
+   « je ne souhaite pas bloquer les actions telles que commenter, partager ou réagir ») : il n'est pas ramené à sa fiche, un bandeau
+   permanent lui rappelle ce qu'il lui reste à remplir. Sur toutes les autres pages le retour à la fiche reste forcé. */
+const PO_PAGES_LIBRES = /(^|\/)(fil-actualite(-app)?|evenements(-app)?|actualites|agenda|annuaire|messagerie)(\.html)?$/;
 const PO_CLE_ACTIF = 'da_profil_obligatoire_actif';
 window.__poActif = false;
 
@@ -1079,7 +1083,7 @@ body.po-avec-bandeau{padding-top:44px}`;
   document.head.appendChild(st);
 }
 
-function poBandeau(g) {
+function poBandeau(g, versFiche) {
   injectPoStyles();
   let b = document.getElementById('po-bandeau');
   if (!b) {
@@ -1091,7 +1095,8 @@ function poBandeau(g) {
   b.innerHTML = g.photo_seule
     ? `<span>📷 Une <b>photo de profil</b> est obligatoire pour utiliser Diaspo’Actif</span><button type="button" id="po-voir">Ajouter ma photo</button>`
     : `<span>📋 État de votre profil : <b>${g.pct} %</b> — objectif <b>${g.seuil} %</b></span><button type="button" id="po-voir">Voir ce qu’il me reste à remplir</button>`;
-  b.querySelector('#po-voir').addEventListener('click', () => poOuvrirCarte(g));
+  /* Page libre : le bouton mène à la fiche (la carte plein écran, sans fermeture, y est réservée). */
+  b.querySelector('#po-voir').addEventListener('click', () => versFiche ? window.location.assign(versFiche) : poOuvrirCarte(g));
 }
 function poRetirerBandeau() {
   const b = document.getElementById('po-bandeau');
@@ -1177,7 +1182,11 @@ function appliquerProfilObligatoire(user, opts) {
   window.__poActif = true;
   poMarquer(true);
   /* Hors des pages où l'on peut remplir son profil : retour forcé à sa fiche. */
-  if (!PO_PAGES_EDITION.test(location.pathname)) { window.location.replace(poCibleProfil(user)); return true; }
+  if (!PO_PAGES_EDITION.test(location.pathname)) {
+    if (!PO_PAGES_LIBRES.test(location.pathname)) { window.location.replace(poCibleProfil(user)); return true; }
+    poBandeau(g, poCibleProfil(user));
+    return false;
+  }
   poBandeau(g);
   /* Un formulaire est déjà ouvert par l'arrivée depuis la liste (?completer=…) : on ne le recouvre pas. */
   if (!RP_ARRIVEE_COMPLETER || opts.force) poOuvrirCarte(g);
