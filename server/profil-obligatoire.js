@@ -146,4 +146,18 @@ async function etat(db, userBrut) {
   return { actif: true, ...r };
 }
 
-module.exports = { etat, points, resume, SEUIL_UTILISATEUR, SEUIL_AUTRES, DEPUIS_MS };
+/* Ouverture automatique de la page Premium (2026-10-12, demande explicite) : une fois le profil public rempli, le compte
+   (utilisateur ou initiative) est dirigé UNE fois vers l'abonnement de son type, où il voit les prix et peut souscrire
+   tout de suite, ou reporter. Dû si l'obligation vient de se terminer (à partir de la date ci-dessous : les comptes qui
+   l'avaient terminée avant ne sont pas dérangés) et que la page n'a pas encore été montrée. */
+const ABONNEMENT_DEPUIS = '2026-10-12 00:00:00';
+async function abonnementDu(db, user) {
+  if (!user || !['utilisateur', 'initiative'].includes(user.role)) return false;
+  const l = await db.prepare('SELECT etat, termine_at, abonnement_ouvert_at FROM profil_obligatoire WHERE user_id=?').get(user.id);
+  return !!(l && l.etat === 'termine' && !l.abonnement_ouvert_at && l.termine_at && String(l.termine_at) >= ABONNEMENT_DEPUIS);
+}
+async function abonnementVu(db, userId) {
+  await db.prepare("UPDATE profil_obligatoire SET abonnement_ouvert_at=datetime('now') WHERE user_id=? AND abonnement_ouvert_at IS NULL").run(userId);
+}
+
+module.exports = { etat, points, resume, abonnementDu, abonnementVu, SEUIL_UTILISATEUR, SEUIL_AUTRES, DEPUIS_MS };

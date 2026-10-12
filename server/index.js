@@ -2436,6 +2436,14 @@ route("PUT", "/api/profil/origine-institution", async (req, res, params, body) =
   sendJSON(res, 200, { ok: true });
 });
 
+/* POST /api/auth/ouverture-abonnement-vue — la page Premium d'accueil a été montrée : on ne la rouvre plus toute seule. */
+route("POST", "/api/auth/ouverture-abonnement-vue", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  try { await ProfilObligatoire.abonnementVu(db, user.id); } catch (e) { logError(e, "ouverture abonnement vue", req); }
+  sendJSON(res, 200, { ok: true });
+});
+
 route("POST", "/api/auth/logout", async (req, res) => {
   const cookies = parseCookies(req);
   if (cookies.sid) destroySession(cookies.sid);
@@ -2774,6 +2782,15 @@ route("GET", "/api/auth/me", async (req, res) => {
   if (pub) {
     try { pub.profil_obligatoire = await ProfilObligatoire.etat(db, user); }
     catch (e) { pub.profil_obligatoire = null; logError(e, "profil obligatoire", req); }
+    /* Ouverture de la page Premium après le profil rempli (voir ProfilObligatoire.abonnementDu) : jamais pour un compte déjà abonné en payant. */
+    pub.ouverture_abonnement = false;
+    try {
+      if (!(pub.profil_obligatoire && pub.profil_obligatoire.actif) && await ProfilObligatoire.abonnementDu(db, user)) {
+        const st = await getPremiumStatut(user.id, user.role);
+        pub.ouverture_abonnement = !!st.concerne && !(st.actif && Number(st.montant_paye || 0) > 0);
+        if (!pub.ouverture_abonnement && st.concerne) await ProfilObligatoire.abonnementVu(db, user.id);
+      }
+    } catch (e) { pub.ouverture_abonnement = false; logError(e, "ouverture abonnement", req); }
   }
 
   /* Adresse de livraison (2026-09-30, demande explicite : "fait le maximum de choses en

@@ -1162,13 +1162,33 @@ function poMerci(photo) {
     <p class="rp-texte">${photo ? 'Les autres membres peuvent maintenant vous reconnaître.' : 'Vous êtes maintenant mieux placé pour être trouvé et mis en relation sur la plateforme.'}</p>
     <p class="rp-signature">L'équipe Diaspo'Actif</p>
     <button type="button" class="rp-bouton" id="po-fin">Continuer</button>`);
-  ov.querySelector('#po-fin').addEventListener('click', () => ov.remove());
+  ov.querySelector('#po-fin').addEventListener('click', () => { ov.remove(); ouvrirAbonnementSiDu(window.__poUser); });
 }
+
+/* ═══ OUVERTURE DE LA PAGE PREMIUM APRÈS LE PROFIL PUBLIC (2026-10-12, demande explicite) ═══
+   Dès que le profil public est rempli, un compte utilisateur ou initiative est dirigé UNE fois vers la page Premium de SON type
+   (premium.html?type=…) : il y voit les prix et peut souscrire tout de suite, ou « Reporter à plus tard ». Le serveur décide
+   (GET /api/auth/me → ouverture_abonnement) et retient que la page a été montrée (POST /api/auth/ouverture-abonnement-vue,
+   appelé par premium.html) : pas de répétition. Garde de session en plus, au cas où l'enregistrement échouerait. */
+const ABO_PAGES_EXCLUES = /(^|\/)(premium|mon-abonnement|login|inscription|verifier-email|email-verifie|mot-de-passe-oublie|reset-password|reinitialiser|charte)(\.html)?$/;
+function ouvrirAbonnementSiDu(user) {
+  try {
+    if (!user || !user.ouverture_abonnement || window.__poActif) return;
+    if (ABO_PAGES_EXCLUES.test(location.pathname)) return;
+    if (document.getElementById('po-fin')) return;               /* le merci est à l'écran : son bouton « Continuer » s'en charge */
+    if (new URLSearchParams(location.search).get('paiement')) return;
+    if (sessionStorage.getItem('da_abo_ouvert') === '1') return;
+    sessionStorage.setItem('da_abo_ouvert', '1');
+    location.replace('premium.html?type=' + (user.role === 'initiative' ? 'initiative' : 'utilisateur') + '&bienvenue=1');
+  } catch (e) { /* stockage indisponible : on n'ouvre rien plutôt que de risquer une boucle */ }
+}
+window.ouvrirAbonnementSiDu = ouvrirAbonnementSiDu;
 
 /* Retourne true si une obligation est active (la page est alors prise en charge ici). */
 function appliquerProfilObligatoire(user, opts) {
   opts = opts || {};
   if (!user) return false;
+  window.__poUser = user;
   const g = user.profil_obligatoire;
   if (g && g.termine) { if (poFlag()) poMerci(); return false; }
   if (!g || !g.actif) {
@@ -2023,7 +2043,7 @@ async function applyAuthState() {
     } catch (e) { /* silencieux */ }
     showEmailVerifBanner(user);
     showOrigineBanner(user);
-    if (!appliquerProfilObligatoire(user)) { afficherRelanceProfil(user); showPremierePublicationBanner(user); }
+    if (!appliquerProfilObligatoire(user)) { afficherRelanceProfil(user); showPremierePublicationBanner(user); ouvrirAbonnementSiDu(user); }
     showPwaInstallBanner(user);
   } else {
     el.innerHTML = `

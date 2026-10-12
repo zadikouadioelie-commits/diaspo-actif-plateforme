@@ -198,6 +198,10 @@
       location.replace(S.me.role === 'collectivite' ? '/profil-collectivite.html?id=' + encodeURIComponent(S.me.id) : '/profil.html?obligatoire=1');
       return;
     }
+    /* Profil public rempli (2026-10-12) : une seule fois, le compte voit les prix de son abonnement Premium et peut souscrire (page premium.html, bouton « Reporter à plus tard »). */
+    if (S.me && S.me.ouverture_abonnement) {
+      try { if (sessionStorage.getItem('da_abo_ouvert') !== '1') { sessionStorage.setItem('da_abo_ouvert', '1'); location.replace('/premium.html?type=' + (S.me.role === 'initiative' ? 'initiative' : 'utilisateur') + '&bienvenue=1'); return; } } catch (e) { /* stockage indisponible : rien ne s'ouvre */ }
+    }
     if (S.me) { refreshBadges(); loadMyInsc(); loadPremium(); }
     renderTop();
   }

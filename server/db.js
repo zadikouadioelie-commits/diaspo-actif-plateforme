@@ -2209,6 +2209,8 @@ const MIGRATIONS = [
   ["initiatives", "pays_immatriculation TEXT"],
   /* Type du numéro d'immatriculation choisi par la personne (RCCM, SIREN, SIRET, RNA, IFU, AUTRE) — 2026-10-08, voir server/immatriculation.js. */
   ["initiatives", "type_immatriculation TEXT"],
+  /* Ouverture automatique de la page Premium après le profil public rempli (2026-10-12) : date à laquelle elle a été montrée (une seule fois). */
+  ["profil_obligatoire", "abonnement_ouvert_at TEXT"],
   ["initiatives", "taille_structure TEXT"],
   ["initiatives", "annee_creation INTEGER"],
   ["initiatives", "services TEXT DEFAULT '[]'"],
@@ -5823,6 +5825,7 @@ db.exec(`
     etat        TEXT NOT NULL DEFAULT 'requis' CHECK(etat IN ('requis','termine','exempt')),
     requis_at   TEXT DEFAULT (datetime('now')),
     termine_at  TEXT,
+    abonnement_ouvert_at TEXT,
     FOREIGN KEY(user_id) REFERENCES users(id)
   );
 
