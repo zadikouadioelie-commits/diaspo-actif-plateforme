@@ -654,7 +654,7 @@
      formulaire sur cette carte — appelant retombe alors sur un simple défilement + le libellé du
      champ manquant plutôt que d'appeler une fonction inexistante (voir profil-app.html, le bloc
      ?completer=champ qui pilote cet appel). */
-  function completer(container, profil, opts, cle) {
+  function completer(container, profil, opts, cle, label) {
     if (cle === 'photo') {
       /* Le sélecteur de fichier d'un navigateur ne s'ouvre que sur un clic RÉEL de la personne :
          on ne peut pas l'ouvrir tout seul à l'arrivée. Petite fenêtre avec un vrai bouton. */
@@ -677,7 +677,147 @@
     else if (cle === 'bio') editBio(container, profil, opts);
     else if (cle === 'competences') editDomaine(container, profil, opts);
     else if (cle === 'centres_interet') editCentresInteret(container, profil, opts);
-    else editInfos(container, profil, opts);
+    else if (cle === 'titre_pro') editTitrePro(container, profil, opts);
+    else if (cle === 'experiences') editExperience(container, profil, opts);
+    else if (cle === 'reseaux_json') editReseaux(container, profil, opts);
+    else if (cle === 'publics_json') editPublics(container, profil, opts);
+    else if (cle === 'besoins_json') editBesoins(container, profil, opts);
+    else if (cle === 'realisations_json') editRealisations(container, profil, opts);
+    else if (cle === 'services_perso') editServices(container, profil, opts);
+    else if (cle === 'annee_debut') editAnneeDebut(container, profil, opts);
+    else if (cle === 'residence' || cle === 'origine') editInfos(container, profil, opts);
+    else signalerAFaire(label);
+  }
+
+  /* ── Formulaires « liste de contrôle du profil public » (2026-10-12, demande explicite : « quand je clique sur Remplir, ça me renvoie sur la
+     page de mon profil mais pas sur l'endroit où je dois remplir précisément »). Chaque ligne de la liste ouvre maintenant SON formulaire. ── */
+  function signalerAFaire(label) { if (label && typeof window.showToast === 'function') window.showToast('📝 À compléter : ' + label, 'info', 5000); }
+
+  function editTitrePro(container, profil, opts) {
+    openCdaModal('💼 Titre professionnel',
+      `<p style="font-size:12px;color:#64748b;margin:0 0 8px;">Votre métier ou votre fonction, en quelques mots.</p>
+       <input type="text" id="cda-e-titre" maxlength="80" placeholder="Ex : Ingénieure agronome · Consultant en export" value="${esc(profil.titre_pro || '')}">`,
+      async ov => {
+        const titre_pro = ov.querySelector('#cda-e-titre').value.trim();
+        if (!titre_pro) throw new Error('Indiquez votre titre professionnel.');
+        const r = await window.api('PUT', '/profil', { titre_pro });
+        if (r && r.profil) Object.assign(profil, r.profil); else profil.titre_pro = titre_pro;
+        render(container, profil, opts);
+      });
+    setTimeout(() => { const i = document.getElementById('cda-e-titre'); if (i) i.focus(); }, 60);
+  }
+
+  /* Ajoute UNE expérience à la liste existante (la route PUT /api/profil remplace tout le tableau : on repart de l'existant). */
+  function editExperience(container, profil, opts) {
+    openCdaModal('💼 Ajouter une expérience',
+      `<label>Titre du poste *</label><input type="text" id="cda-x-titre" placeholder="Ex : Responsable commercial">
+       <label>Entreprise / organisation *</label><input type="text" id="cda-x-ent" placeholder="Ex : Association Diaspora Plus">
+       <label>Lieu</label><input type="text" id="cda-x-lieu" placeholder="Ex : Lyon, France">
+       <div style="display:flex;gap:10px;"><div style="flex:1"><label>Début (AAAA-MM)</label><input type="text" id="cda-x-deb" placeholder="2022-01"></div>
+       <div style="flex:1"><label>Fin (AAAA-MM)</label><input type="text" id="cda-x-fin" placeholder="2024-06"></div></div>
+       <label style="display:flex;align-items:center;gap:8px;font-weight:600;margin-top:10px;"><input type="checkbox" id="cda-x-act" style="width:auto" onchange="document.getElementById('cda-x-fin').disabled=this.checked"> Poste actuel</label>
+       <label>Description</label><textarea id="cda-x-desc" rows="3"></textarea>`,
+      async ov => {
+        const v = s => ov.querySelector(s).value.trim();
+        const titre = v('#cda-x-titre'), entreprise = v('#cda-x-ent');
+        if (!titre || !entreprise) throw new Error('Le titre du poste et l\'organisation sont obligatoires.');
+        const actuel = ov.querySelector('#cda-x-act').checked;
+        const nouvelle = { titre, entreprise, lieu: v('#cda-x-lieu'), debut: v('#cda-x-deb'), fin: actuel ? '' : v('#cda-x-fin'), actuel, description: v('#cda-x-desc') };
+        const experiences = (Array.isArray(profil.experiences) ? profil.experiences : []).concat([nouvelle]);
+        const r = await window.api('PUT', '/profil', { experiences });
+        if (r && r.profil) Object.assign(profil, r.profil); else profil.experiences = experiences;
+        render(container, profil, opts);
+      });
+    setTimeout(() => { const i = document.getElementById('cda-x-titre'); if (i) i.focus(); }, 60);
+  }
+
+  function editReseaux(container, profil, opts) {
+    const r0 = profil.reseaux_sociaux || {};
+    const champs = [['site_web', 'Site web'], ['linkedin', 'LinkedIn'], ['instagram', 'Instagram'], ['facebook', 'Facebook'], ['x', 'X / Twitter'], ['youtube', 'YouTube']];
+    openCdaModal('🌐 Réseaux & liens',
+      `<p style="font-size:12px;color:#64748b;margin:0 0 4px;">Renseignez au moins un lien (adresse complète).</p>` +
+      champs.map(([k, l]) => `<label>${l}</label><input type="text" id="cda-r-${k}" placeholder="https://…" value="${esc(r0[k] || '')}">`).join(''),
+      async ov => {
+        const reseaux = {};
+        champs.forEach(([k]) => { const v = ov.querySelector('#cda-r-' + k).value.trim(); if (v) reseaux[k] = v; });
+        if (!Object.keys(reseaux).length) throw new Error('Indiquez au moins un lien.');
+        /* Deux colonnes coexistent : users.reseaux_sociaux (affichée sur le profil, route /reseaux-sociaux) et users.reseaux_json (celle que
+           compte la liste de contrôle et le pourcentage du profil, route /profil-public). On écrit les deux pour que l'élément soit coché ET affiché. */
+        await window.api('PUT', '/profil/reseaux-sociaux', { reseaux });
+        await window.api('PUT', '/profil/profil-public', { reseaux });
+        profil.reseaux_sociaux = reseaux;
+        render(container, profil, opts);
+      });
+    setTimeout(() => { const i = document.getElementById('cda-r-linkedin'); if (i) i.focus(); }, 60);
+  }
+
+  /* Publics visés, besoins, réalisations, services, année de début : leurs éditeurs n'existent que dans la vue « initiative » de la page
+     (window.ppEditSection n'est pas chargé pour un compte utilisateur) → formulaires propres à cette carte. Enregistrement : PUT /api/profil/profil-public. */
+  const PUBLICS_PRESETS = ['Diaspora', 'Entrepreneurs', 'Étudiants', 'Associations', 'Collectivités', 'Jeunes', 'Femmes', 'Agriculteurs', 'Professionnels', 'Familles'];
+  const BESOINS_PRESETS = ['un emploi', 'des partenaires', 'des investisseurs', 'des clients', 'une mission', 'du mentorat', 'des collaborateurs', 'un stage'];
+
+  function editListePills(container, profil, opts, cfg) {
+    const actuels = Array.isArray(profil[cfg.champ]) ? profil[cfg.champ] : [];
+    const pill = p => `<label style="display:inline-flex;align-items:center;gap:6px;margin:0 6px 8px 0;padding:6px 12px;border:1.5px solid ${actuels.includes(p) ? '#4F46E5' : '#CBD5E1'};border-radius:99px;font-size:12.5px;font-weight:600;cursor:pointer;">
+        <input type="checkbox" class="cda-pl" value="${esc(p)}" style="width:auto;margin:0" ${actuels.includes(p) ? 'checked' : ''}> ${esc(p)}</label>`;
+    openCdaModal(cfg.titre,
+      `<p style="font-size:12px;color:#64748b;margin:0 0 10px;">${cfg.aide}</p>
+       <div>${cfg.presets.map(pill).join('')}</div>
+       <label>Autres (séparés par des virgules)</label>
+       <input type="text" id="cda-pl-autre" value="${esc(actuels.filter(a => !cfg.presets.includes(a)).join(', '))}">`,
+      async ov => {
+        const cochees = [...ov.querySelectorAll('.cda-pl:checked')].map(c => c.value);
+        const autres = ov.querySelector('#cda-pl-autre').value.split(',').map(s => s.trim()).filter(Boolean);
+        const liste = [...new Set(cochees.concat(autres))];
+        if (!liste.length) throw new Error('Choisissez ou saisissez au moins un élément.');
+        await window.api('PUT', '/profil/profil-public', { [cfg.cle]: liste });
+        profil[cfg.champ] = liste;
+        render(container, profil, opts);
+      });
+  }
+  function editPublics(container, profil, opts) {
+    editListePills(container, profil, opts, { titre: '🎯 Les publics que vous visez', aide: 'Les personnes ou structures que vous accompagnez ou auxquelles vous vous adressez.', presets: PUBLICS_PRESETS, champ: 'publics', cle: 'publics' });
+  }
+  function editBesoins(container, profil, opts) {
+    editListePills(container, profil, opts, { titre: '🤝 Ce que vous recherchez', aide: 'Partenaires, financement, compétences, emploi…', presets: BESOINS_PRESETS, champ: 'besoins', cle: 'besoins' });
+  }
+  function editRealisations(container, profil, opts) {
+    const reals = Array.isArray(profil.realisations) ? profil.realisations : [];
+    openCdaModal('📂 Vos réalisations',
+      `<p style="font-size:12px;color:#64748b;margin:0 0 8px;">Une par ligne, au format : <em>Titre | Année</em> (l'année est facultative).</p>
+       <textarea id="cda-real" rows="6" placeholder="Ex : Ouverture d'une école à Bouaké | 2023">${esc(reals.map(r => r.titre + (r.annee ? ' | ' + r.annee : '')).join('\n'))}</textarea>`,
+      async ov => {
+        const realisations = ov.querySelector('#cda-real').value.split('\n').map(l => l.trim()).filter(Boolean).map(l => { const [titre, annee] = l.split('|').map(s => s.trim()); return annee ? { titre, annee } : { titre }; });
+        if (!realisations.length) throw new Error('Indiquez au moins une réalisation.');
+        await window.api('PUT', '/profil/profil-public', { realisations });
+        profil.realisations = realisations;
+        render(container, profil, opts);
+      });
+  }
+  function editServices(container, profil, opts) {
+    openCdaModal('💼 Les services que vous proposez',
+      `<p style="font-size:12px;color:#64748b;margin:0 0 8px;">Conseil, formation, accompagnement… quelques lignes suffisent.</p>
+       <textarea id="cda-serv" rows="5">${esc(String(profil.services_perso || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim())}</textarea>`,
+      async ov => {
+        const services_perso = ov.querySelector('#cda-serv').value.trim();
+        if (!services_perso) throw new Error('Décrivez au moins un service.');
+        await window.api('PUT', '/profil/profil-public', { services_perso });
+        profil.services_perso = services_perso;
+        render(container, profil, opts);
+      });
+  }
+  function editAnneeDebut(container, profil, opts) {
+    openCdaModal('📅 Année de début d\'activité',
+      `<p style="font-size:12px;color:#64748b;margin:0 0 8px;">L'année où vous avez commencé votre activité.</p>
+       <input type="number" id="cda-annee" min="1950" max="2100" placeholder="Ex : 2018" value="${esc(profil.annee_debut || '')}">`,
+      async ov => {
+        const annee = parseInt(ov.querySelector('#cda-annee').value, 10);
+        if (!annee || annee < 1950 || annee > 2100) throw new Error('Indiquez une année valide (entre 1950 et 2100).');
+        await window.api('PUT', '/profil/profil-public', { annee_debut: annee });
+        profil.annee_debut = annee;
+        render(container, profil, opts);
+      });
+    setTimeout(() => { const i = document.getElementById('cda-annee'); if (i) i.focus(); }, 60);
   }
 
   window.CarteDiaspoActif = { render, completer };

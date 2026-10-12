@@ -1500,7 +1500,7 @@ async function renderEnrichedColumns() {
   function openEditModal(titre, bodyHtml, onSave) {
     const ov = document.createElement('div');
     ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:900;display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:40px 14px;';
-    ov.innerHTML = `<div style="background:#fff;border-radius:14px;max-width:440px;width:100%;padding:20px;">
+    ov.innerHTML = `<div style="background:#fff;color:#0D1B2A;border-radius:14px;max-width:440px;width:100%;padding:20px;">
       <h3 style="margin:0 0 14px;font-size:15px;">${titre}</h3>
       <div>${bodyHtml}</div>
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
@@ -1979,12 +1979,10 @@ function render() {
       history.replaceState(null, '', location.pathname + location.hash);
       const _cle = _champParams.get('champ'), _label = _champParams.get('label') || '';
       setTimeout(() => {
-        if (['bio', 'competences'].includes(_cle)) {
-          CarteDiaspoActif.completer(_cdaConteneur, profil, _cdaOpts, _cle);
-        } else {
-          _cdaConteneur.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          if (typeof showToast === 'function' && _label) showToast(`📝 À compléter : ${_label}`, 'info', 5000);
-        }
+        /* 2026-10-12 : chaque élément de la liste de contrôle ouvre SON formulaire (CarteDiaspoActif.completer : titre professionnel, expériences,
+           centres d'intérêt, publics, besoins, réalisations, services, réseaux, année de début). Une clé inconnue ramène la carte en vue + le libellé. */
+        _cdaConteneur.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        CarteDiaspoActif.completer(_cdaConteneur, profil, _cdaOpts, _cle, _label);
       }, 500);
     }
     return;

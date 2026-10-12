@@ -30,7 +30,7 @@ const CRITERES = {
     { cles: ['besoins_json'], label: 'vos besoins' },
     { cles: ['realisations_json'], label: 'vos réalisations' },
     { cles: ['services_perso'], label: 'vos services' },
-    { cles: ['reseaux_json'], label: 'vos réseaux sociaux' },
+    { cles: ['reseaux_json', 'reseaux_sociaux'], label: 'vos réseaux sociaux' },   // 2 colonnes coexistent : reseaux_sociaux (affichée, route /reseaux-sociaux) et reseaux_json (route /profil-public)
     { cles: ['annee_debut'], label: 'votre année de début d\'activité' },
   ],
   initiative: [
