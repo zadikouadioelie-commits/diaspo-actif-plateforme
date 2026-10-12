@@ -1,0 +1,84 @@
+/* Design « Nuit dorée » — fiche « ⚡ Événement flash » (PROPOSITION 2026-10-12).
+   Tout est limité à #modal-flash-bg : la fiche est reconstruite visuellement (verre sombre, champs alignés, zones de photos, trois cartes de visibilité)
+   sans toucher au balisage ni au script de la page (mêmes identifiants, mêmes champs, mêmes boutons). Un seul lien à ajouter dans la page,
+   et rien d'autre : pas de classe sur <body> nécessaire. Retour arrière : retirer le lien. */
+@import url("https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,500;6..96,600&family=Manrope:wght@400;500;600;700;800&display=swap");
+
+#modal-flash-bg{
+  --fl-or:#E3C06E; --fl-or2:#B9893A; --fl-texte:#E8ECF6; --fl-doux:#AEB8D0; --fl-bord:rgba(227,192,110,.28); --fl-bord2:rgba(255,255,255,.12);
+  --fl-verre:rgba(255,255,255,.05); --fl-degore:linear-gradient(135deg,#F3DC9B 0%,#E3C06E 38%,#B9893A 100%);
+  background:rgba(3,6,14,.78)!important;backdrop-filter:blur(7px);font-family:'Manrope','Segoe UI',system-ui,sans-serif;
+  z-index:2500!important; /* au-dessus de la barre de navigation du bas (téléphone), qui masquait les boutons */
+}
+
+/* ── la fiche ── */
+#modal-flash-bg .modal{
+  max-width:680px!important;padding:36px 38px 32px;border-radius:28px;color:var(--fl-texte);
+  background:
+    radial-gradient(ellipse 520px 300px at 100% 0%,rgba(227,192,110,.13),transparent 62%),
+    radial-gradient(ellipse 460px 320px at 0% 100%,rgba(63,123,255,.12),transparent 62%),
+    #0B1226;
+  border:1px solid var(--fl-bord);box-shadow:0 50px 110px -34px rgba(0,0,0,.95),0 0 0 1px rgba(227,192,110,.08);
+  container-type:inline-size;scrollbar-width:thin;scrollbar-color:rgba(227,192,110,.4) transparent;
+}
+#modal-flash-bg .modal h3{font-family:'Bodoni Moda','Didot',Georgia,serif;font-weight:500;font-size:clamp(26px,4cqi,34px);color:#fff;letter-spacing:-.005em;margin:0 0 8px}
+#modal-flash-bg .modal>p{color:var(--fl-doux)!important;font-size:14px!important;line-height:1.55;margin:0 0 26px!important;padding-bottom:22px;border-bottom:1px solid var(--fl-bord2)}
+
+/* ── grille : deux colonnes aérées, une seule sur petite largeur ── */
+#modal-flash-bg .grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px 20px}
+#modal-flash-bg .grid-2>div{min-width:0}
+@container (max-width:520px){#modal-flash-bg .grid-2{grid-template-columns:minmax(0,1fr)}#modal-flash-bg .grid-2>div{grid-column:1/-1!important}}
+
+/* ── libellés au-dessus des champs, tous pareils ── */
+#modal-flash-bg label:not([style*="display:flex"]){display:block!important;margin:0 0 9px;font-size:11px!important;font-weight:800!important;letter-spacing:.1em;text-transform:uppercase;color:var(--fl-or)!important;line-height:1.3}
+#modal-flash-bg label span{letter-spacing:0;text-transform:none}
+#modal-flash-bg label [style*="color:#2563EB"]{color:#FFB070!important}
+#modal-flash-bg label span[style*="font-weight:400"],#modal-flash-bg #fl-compteur{color:var(--fl-doux)!important;font-weight:500!important;letter-spacing:.02em}
+
+/* ── champs : verre sombre, même hauteur, largeur pleine ── */
+#modal-flash-bg :is(input[type=text],input[type=date],input[type=time],select,textarea){
+  display:block;width:100%!important;box-sizing:border-box;min-height:48px;padding:12px 16px;border-radius:14px;
+  background:rgba(255,255,255,.06)!important;color:#fff!important;border:1px solid var(--fl-bord2)!important;
+  font:500 15px/1.3 'Manrope','Segoe UI',system-ui,sans-serif;color-scheme:dark;transition:border-color .3s,box-shadow .3s,background .3s}
+#modal-flash-bg textarea{min-height:130px;line-height:1.6;resize:vertical}
+#modal-flash-bg :is(input,textarea)::placeholder{color:#7C88A4}
+#modal-flash-bg :is(input,select,textarea):focus{outline:none;border-color:var(--fl-or)!important;box-shadow:0 0 0 3px rgba(227,192,110,.18);background:rgba(255,255,255,.09)!important}
+#modal-flash-bg select option{background:#0B1226;color:#fff}
+#modal-flash-bg input[type=time],#modal-flash-bg input[type=date]{padding-right:12px}
+
+/* ── logo / photos : zones pointillées avec un bouton « Choisir » doré ── */
+#modal-flash-bg input[type=file]{display:block;width:100%;box-sizing:border-box;padding:14px;border-radius:14px;border:1.5px dashed var(--fl-bord)!important;background:var(--fl-verre)!important;color:var(--fl-doux)!important;font:600 12px 'Manrope',sans-serif;cursor:pointer;transition:border-color .3s,background .3s}
+#modal-flash-bg input[type=file]:hover{border-color:var(--fl-or)!important;background:rgba(227,192,110,.08)!important}
+#modal-flash-bg input[type=file]::file-selector-button{margin-right:12px;padding:9px 16px;border:0;border-radius:999px;background:var(--fl-degore);color:#1a1202;font:800 12.5px 'Manrope',sans-serif;cursor:pointer}
+#modal-flash-bg #fl-logo-preview{border:2px solid var(--fl-or)}
+#modal-flash-bg [id$="-preview"]{border:1px solid var(--fl-bord)}
+#modal-flash-bg div[style*="margin-top:10px"]>div{min-width:0}
+
+/* ── visibilité : trois cartes qui se sélectionnent d'un geste ── */
+#modal-flash-bg .pv-lbl{margin:8px 0 12px!important}
+#modal-flash-bg label[style*="border:1.5px"]{
+  display:flex!important;align-items:flex-start;gap:14px;margin:0!important;padding:16px 18px!important;border-radius:18px!important;cursor:pointer;
+  background:var(--fl-verre)!important;border:1.5px solid var(--fl-bord2)!important;color:var(--fl-texte)!important;
+  text-transform:none!important;letter-spacing:0!important;font-size:14px!important;font-weight:500!important;line-height:1.45;transition:border-color .3s,background .3s,box-shadow .3s}
+#modal-flash-bg label[style*="border:1.5px"]:hover{border-color:var(--fl-bord)!important}
+#modal-flash-bg label[style*="border:1.5px"]:has(input:checked){border-color:var(--fl-or)!important;background:rgba(227,192,110,.12)!important;box-shadow:0 0 0 3px rgba(227,192,110,.14)}
+#modal-flash-bg label[style*="border:1.5px"] strong{color:#fff;font-weight:800;font-size:14.5px}
+#modal-flash-bg label[style*="border:1.5px"] span span{color:var(--fl-doux)!important;font-size:12.5px!important}
+#modal-flash-bg input[type=radio]{accent-color:#B9893A;width:18px;height:18px;margin-top:2px;flex:none}
+
+/* ── messages, étape « récap » et boutons ── */
+#modal-flash-bg #fl-err,#modal-flash-bg #fl-recap-err{color:#FFB3AA!important;background:rgba(255,154,143,.12);border:1px solid rgba(255,154,143,.4);border-radius:12px;padding:10px 14px;font-size:13px!important}
+#modal-flash-bg #fl-recap-body{color:var(--fl-texte);background:var(--fl-verre);border:1px solid var(--fl-bord2);border-radius:18px;padding:20px 22px;font-size:14.5px!important;line-height:1.75}
+#modal-flash-bg #fl-recap-body strong{color:var(--fl-or)}
+#modal-flash-bg #fl-recap-body a{color:var(--fl-or)}
+#modal-flash-bg #fl-recap-body [style*="color:#8B12D6"]{color:#CFC1FF!important}
+#modal-flash-bg #fl-recap-body [style*="var(--muted"]{color:var(--fl-doux)!important}
+#modal-flash-bg label[style*="#BC13FE"],#modal-flash-bg label[style*="#F5EBFF"]{background:var(--fl-verre)!important;border-color:var(--fl-bord2)!important}
+#modal-flash-bg .btn{border-radius:999px;padding:13px 26px;font-weight:800;font-size:14px;min-height:48px;line-height:1.1}
+#modal-flash-bg .btn-orange{background:var(--fl-degore)!important;color:#1a1202!important;border:0!important;box-shadow:0 12px 28px -12px rgba(227,192,110,.75);transition:transform .3s,filter .3s}
+#modal-flash-bg .btn-orange:hover{transform:translateY(-2px);filter:brightness(1.06)}
+#modal-flash-bg .btn-outline{background:var(--fl-verre)!important;color:var(--fl-texte)!important;border:1px solid var(--fl-bord)!important}
+#modal-flash-bg .btn-outline:hover{background:rgba(255,255,255,.1)!important}
+#modal-flash-bg #flash-step-form>div[style*="justify-content:flex-end"],#modal-flash-bg #flash-step-recap>div[style*="justify-content:space-between"]{gap:14px!important;margin-top:28px!important;padding-top:22px;border-top:1px solid var(--fl-bord2)}
+@media (max-width:520px){#modal-flash-bg{padding:8px!important}#modal-flash-bg .modal{padding:26px 22px 24px;border-radius:22px}#modal-flash-bg .btn{flex:1}}
+@media (prefers-reduced-motion:reduce){#modal-flash-bg *{transition:none!important}}
