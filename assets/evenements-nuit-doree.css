@@ -69,8 +69,15 @@ html body.nd .evt-delete-float{background:rgba(6,10,20,.7);border:1px solid var(
 /* variantes : flash (vert), trophée (or), promo, terminé */
 html body.nd .evt-card-flash{background:linear-gradient(165deg,rgba(52,199,120,.2),rgba(255,255,255,.04) 60%);border-color:rgba(52,199,120,.55)}
 html body.nd .evt-card-trophee{background:linear-gradient(165deg,rgba(227,192,110,.22),rgba(255,255,255,.04) 60%);border-color:rgba(227,192,110,.65)}
-html body.nd .evt-card-termine{filter:saturate(.7);opacity:.88}
-html body.nd .evt-card-termine:hover{opacity:1;filter:none}
+/* événement terminé : le script evt-temporel.js lui pose un fond « argent » (!important) avec voile blanc et reflet ; sur la nuit, ce fond clair rendait tout
+   le texte illisible. On garde l'idée (carte posée, scintillement discret) mais en verre sombre, texte clair. */
+html body.nd .evt-card.evt-card-termine{background:linear-gradient(160deg,rgba(255,255,255,.075),rgba(255,255,255,.025))!important;border-color:rgba(174,184,208,.4)!important;box-shadow:0 24px 50px -34px rgba(0,0,0,.9)}
+html body.nd .evt-card-termine:before{opacity:.14}
+html body.nd .evt-img img[loading="lazy"]:not(.loaded){background:#0B1226}
+html body.nd .evt-card-termine:after{opacity:.16}
+html body.nd .evt-card-termine .evt-date{color:var(--nd-or)}
+html body.nd .evt-card-termine .evt-img{filter:saturate(.75)}
+html body.nd .evt-card-termine:hover{border-color:var(--nd-bord)!important}
 
 /* ═══ événement épinglé (3 mois de Premium offerts) ═══ */
 html body.nd .evt-epingle{border:1px solid var(--nd-bord);border-radius:26px;background:radial-gradient(800px 300px at 85% 0%,rgba(227,192,110,.2),transparent 62%),linear-gradient(135deg,#0E1B3C 0%,#0B1226 100%);box-shadow:0 30px 60px -36px rgba(0,0,0,.95)}
