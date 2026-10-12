@@ -495,6 +495,11 @@ window.CvX = (function () {
   };
   X.ouvrirPartage = function () {
     if (!CVB.userId) { alert('Connectez-vous pour partager votre CV.'); return; }
+    /* Un CV en brouillon ne se partage pas : le lien public et le QR sont fermés tant qu'il n'est pas terminé. */
+    if (window.CvDraft && CvDraft.est()) {
+      if (confirm('Ce CV est un brouillon : il ne peut pas encore être partagé.\n\nLe terminer maintenant pour pouvoir le partager ?')) CvDraft.terminer().then(() => X.ouvrirPartage());
+      return;
+    }
     dest = { compte: null, email: '' };
     const m = modalPartage(); m.style.display = 'flex';
     const champ = $('sh-dest'); champ.value = ''; champ.style.display = ''; $('sh-chip').style.display = 'none'; $('sh-etat').textContent = ''; majBoutons();

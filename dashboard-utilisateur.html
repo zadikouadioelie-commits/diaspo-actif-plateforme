@@ -466,17 +466,28 @@ function fmtDate(d){if(!d)return '';try{return new Date(d).toLocaleDateString('f
     const el = document.getElementById('dv-cv');
     let cvs = [];
     try { const r = await fetch('/api/cv', {credentials:'include'}); cvs = await r.json(); } catch(e) {}
-    const cv = cvs.find(c => c.numero === 1) || cvs[0] || null;
-    el.innerHTML = cv ? `
-        <div style="border:1px solid var(--border);border-radius:10px;padding:14px;background:var(--bg);">
-          <div style="font-weight:700;font-size:.9rem;margin-bottom:4px;">📄 ${esc(cv.titre)}</div>
+    /* CV en brouillon (création à terminer plus tard, 2026-10-12) : l'état vient de /api/cv-lecture. */
+    const brouillons = {};
+    try { const r2 = await fetch('/api/cv-lecture', {credentials:'include'}); if (r2.ok) ((await r2.json()).cvs || []).forEach(c => { brouillons[c.id] = !!c.brouillon; }); } catch(e) {}
+    /* Tous les CV (2 au plus) : un CV en brouillon se reprend d'un appui, un CV terminé se modifie. */
+    const carte = cv => {
+      const estBrouillon = !!brouillons[cv.id];
+      return `
+        <div style="border:1px solid ${estBrouillon ? '#fdba74' : 'var(--border)'};border-radius:10px;padding:14px;background:${estBrouillon ? '#fff7ed' : 'var(--bg)'};">
+          <div style="font-weight:700;font-size:.9rem;margin-bottom:4px;">📄 ${esc(cv.titre)} <span style="font-weight:500;color:var(--muted);font-size:11px;">· CV n°${cv.numero}</span></div>
+          ${estBrouillon ? '<div style="display:inline-block;font-size:11px;font-weight:700;color:#b45309;background:#ffedd5;border-radius:99px;padding:2px 10px;margin-bottom:6px;">📝 Brouillon — à terminer</div>' : ''}
           <div style="font-size:11px;color:var(--muted);margin-bottom:10px;">Modifié le ${fmtDate(cv.updated_at)}</div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;">
-            <a href="cv-builder.html?id=${cv.id}" class="btn btn-outline btn-sm">✏️ Modifier</a>
+            <a href="cv-builder.html?id=${cv.id}" class="btn ${estBrouillon ? 'btn-orange' : 'btn-outline'} btn-sm">${estBrouillon ? '▶ Reprendre et terminer' : '✏️ Modifier'}</a>
             <a href="cv-builder.html?id=${cv.id}" target="_blank" class="btn btn-outline btn-sm">👁 Aperçu</a>
             <button class="btn btn-outline btn-sm" style="color:#e74c3c;" onclick="deleteCV(${cv.id})">🗑 Supprimer</button>
           </div>
-        </div>` : `
+        </div>`;
+    };
+    const libre = [1, 2].find(n => !cvs.some(c => Number(c.numero) === n));
+    el.innerHTML = cvs.length
+      ? cvs.map(carte).join('') + (libre ? `<div style="border:2px dashed var(--border);border-radius:10px;padding:14px;text-align:center;background:#fafafa;display:flex;align-items:center;justify-content:center;"><a href="cv-builder.html?numero=${libre}" class="btn btn-primary btn-sm">+ Créer un 2e CV</a></div>` : '')
+      : `
         <div style="border:2px dashed var(--border);border-radius:10px;padding:14px;text-align:center;background:#fafafa;">
           <div style="font-size:.85rem;color:var(--muted);margin-bottom:10px;">Aucun CV créé</div>
           <a href="cv-builder.html" class="btn btn-primary btn-sm">+ Créer mon CV</a>
@@ -881,6 +892,8 @@ function fmtDate(d){if(!d)return '';try{return new Date(d).toLocaleDateString('f
   document.querySelectorAll('.sidebar a[data-usection]').forEach(a=>{
     a.addEventListener('click', e=>{ e.preventDefault(); uShowSection(a.dataset.usection); });
   });
+  /* Retour de l'éditeur de CV (« Terminer plus tard ») : on arrive directement sur la liste des CV. */
+  if (location.hash === '#outils') uShowSection('outils');
 
   /* KPIs candidatures */
   try {

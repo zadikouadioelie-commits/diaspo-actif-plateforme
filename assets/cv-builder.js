@@ -54,10 +54,20 @@ window.addEventListener('DOMContentLoaded', async () => {
   if (id) {
     await loadCV(id);
   } else {
-    CVB.data.meta.numero = num;
-    document.getElementById('cv-numero').value = num;
-    render();
+    /* « Créer un CV » sur un emplacement déjà occupé : le serveur enregistre « par emplacement » et écraserait ce CV ; on le REPREND à la place. */
+    let existant = null;
+    try { const r = await fetch('/api/cv', { credentials: 'include' }); if (r.ok) existant = (await r.json()).find(c => Number(c.numero) === num) || null; } catch (e) { /* non connecté */ }
+    if (existant) {
+      await loadCV(existant.id);
+      history.replaceState({}, '', '?id=' + existant.id);
+    } else {
+      CVB.data.meta.numero = num;
+      CVB.data.meta.brouillon = true;   /* un CV neuf démarre en brouillon : à terminer quand il est prêt */
+      document.getElementById('cv-numero').value = num;
+      render();
+    }
   }
+  if (window.CvDraft) CvDraft.maj();
   generateQR();
   setupAutoSave();
   renderTemplateGallery();
@@ -77,7 +87,12 @@ async function loadCV(id) {
     CVB.data = deepMerge(CVB.data, cv.data || {});
     CVB.data.meta.titre = cv.titre || 'Mon CV';
     CVB.data.meta.numero = cv.numero || 1;
+    /* Bug trouvé le 2026-10-12 : l'appel suivant (appliquerJeton) relit le formulaire et remettait le numéro à celui de la liste déroulante (n°1) AVANT que
+       le formulaire soit rempli : un CV n°2 ouvert par son identifiant s'enregistrait ensuite sur l'emplacement n°1 et ÉCRASAIT le CV n°1. On cale donc
+       la liste sur le numéro du CV chargé tout de suite. */
+    const numEl0 = document.getElementById('cv-numero'); if (numEl0) numEl0.value = CVB.data.meta.numero;
     CVB.data.meta.template = cv.data?.meta?.template || 'moderne';
+    CVB.data.meta.brouillon = !!cv.data?.meta?.brouillon;
     CVB.historyVersions = cv.versions || [];
     if (cv.partage_token && window.CvX) CvX.appliquerJeton(cv.partage_token);
 
@@ -890,3 +905,44 @@ document.addEventListener('click', function (e) {
   champ.value = location.origin + '/profil.html?id=' + CVB.userId;
   champ.dispatchEvent(new Event('input', { bubbles: true }));
 });
+
+/* ═══════════════════════════════════════════
+   BROUILLON — terminer la création du CV plus tard (2026-10-12, demande explicite)
+   meta.brouillon === true : CV en cours de création — jamais partagé (le lien public et le QR sont fermés par le serveur), jamais
+   utilisé tant qu'il n'est pas terminé. Un CV NEUF démarre en brouillon ; les CV existants restent « terminés ».
+═══════════════════════════════════════════ */
+const CvDraft = {
+  est() { return !!(CVB.data && CVB.data.meta && CVB.data.meta.brouillon); },
+  maj() {
+    const b = this.est();
+    const etat = document.getElementById('cv-etat');
+    if (etat) {
+      etat.textContent = b ? '📝 Brouillon' : '✅ Terminé';
+      etat.style.background = b ? '#fff7ed' : '#ecfdf5'; etat.style.color = b ? '#b45309' : '#047857'; etat.style.borderColor = b ? '#fdba74' : '#6ee7b7';
+      etat.title = b ? 'Création en cours : ce CV n’est ni partagé ni visible par d’autres. Terminez-le quand il est prêt.' : 'CV terminé : il peut être partagé.';
+    }
+    const aff = (id, vu) => { const e = document.getElementById(id); if (e) e.style.display = vu ? '' : 'none'; };
+    aff('btn-terminer', b); aff('btn-plus-tard', b); aff('btn-rebrouillon', !b);
+  },
+  async fixer(brouillon) {
+    CVB.data.meta.brouillon = brouillon; CVB.dirty = true; collectFormData(); this.maj();
+    clearTimeout(CVB.autoSaveTimer);
+    while (CVB.saving) await new Promise(r => setTimeout(r, 100));
+    await saveCV(false);
+  },
+  async terminer() { await this.fixer(false); this.avis('CV terminé ✓ — vous pouvez maintenant le partager.'); },
+  async repasserBrouillon() {
+    if (!confirm('Repasser ce CV en brouillon ? Son lien de partage et son QR code cesseront de fonctionner jusqu’à ce que vous le terminiez à nouveau.')) return;
+    await this.fixer(true); this.avis('CV remis en brouillon.');
+  },
+  /* « Terminer plus tard » : enregistre tel quel, en brouillon, et ramène à la liste des CV où il se reprend d'un appui. */
+  async plusTard() { await this.fixer(true); location.href = '/dashboard-utilisateur.html#outils'; },
+  avis(msg) {
+    let t = document.getElementById('cv-avis');
+    if (!t) { t = document.createElement('div'); t.id = 'cv-avis'; t.style.cssText = 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#0D2B4E;color:#fff;padding:10px 18px;border-radius:999px;font-size:13px;font-weight:700;z-index:9999;box-shadow:0 6px 20px rgba(0,0,0,.3)'; document.body.appendChild(t); }
+    t.textContent = msg; t.style.display = '';
+    clearTimeout(this._t); this._t = setTimeout(() => { t.style.display = 'none'; }, 3500);
+  }
+};
+
+window.CvDraft = CvDraft;   /* une const de haut niveau n est pas une propriété de window : cv-extras.js et l init la testent par window.CvDraft */

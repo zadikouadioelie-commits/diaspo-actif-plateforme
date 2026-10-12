@@ -54,7 +54,8 @@
     t.innerHTML = s.replace(/<\/(p|div|h[1-6]|blockquote)>/gi, '\n').replace(/<br\s*\/?>/gi, '\n').replace(/<li[^>]*>/gi, '• ').replace(/<\/li>/gi, '\n');
     return (t.content.textContent || '').replace(/\n{3,}/g, '\n\n').trim();
   };
-  const lienCv = cv => cv && cv.partage_token && Number(cv.partage_actif) !== 0 ? location.origin + '/cv-public.html?t=' + encodeURIComponent(cv.partage_token) : '';
+  const estBrouillon = cv => !!(cv && cv.data && cv.data.meta && cv.data.meta.brouillon);
+  const lienCv = cv => cv && cv.partage_token && Number(cv.partage_actif) !== 0 && !estBrouillon(cv) ? location.origin + '/cv-public.html?t=' + encodeURIComponent(cv.partage_token) : '';
   /* Message d'envoi : lien du CV + bouton « Accéder aux médias » quand des médias sont liés (WhatsApp, e-mail, messagerie). */
   const messageCv = (cv, nbMedias) => {
     const l = lienCv(cv); if (!l) return '';
@@ -244,10 +245,13 @@
       r.forEach((x, i) => { if (x.status === 'fulfilled' && x.value && x.value.data) tpl[docs[i].id] = x.value.data.template; });
       if (!here(my)) return;
     }
+    /* CV en brouillon (création à terminer plus tard) : l'état vient de /api/cv-lecture, la liste simple ne le donne pas. */
+    const brouillons = {};
+    if (kind === 'cv' && docs.length) { try { ((await api('/api/cv-lecture')).cvs || []).forEach(c => { brouillons[c.id] = !!c.brouillon; }); } catch (e) { /* sans état : pas d'étiquette */ } if (!here(my)) return; }
     const gabOf = d => { const k = kind === 'cv' ? d.theme : tpl[d.id]; return K.gab[k] ? 'Gabarit ' + K.gab[k] : ''; };
     const plein = docs.length >= MAX_DOCS;
     const body = docs.length
-      ? `<div class="lst">${docs.map(d => `<a class="li" href="${BASE}/${kind}/${d.id}"><span class="ic">${ic(K.icon)}</span><span class="sp"><span class="t">${esc(d.titre || 'Sans titre')}</span><br><span class="d">${esc([gabOf(d), d.updated_at ? 'modifié le ' + fmtDate(d.updated_at) : ''].filter(Boolean).join(' · '))}</span></span><span class="ch">${ic('chev', 's')}</span></a>`).join('')}</div>
+      ? `<div class="lst">${docs.map(d => `<a class="li" href="${BASE}/${kind}/${d.id}"><span class="ic">${ic(K.icon)}</span><span class="sp"><span class="t">${esc(d.titre || 'Sans titre')}</span>${brouillons[d.id] ? ' <span class="badge o">📝 Brouillon</span>' : ''}<br><span class="d">${esc([brouillons[d.id] ? 'À terminer' : '', gabOf(d), d.updated_at ? 'modifié le ' + fmtDate(d.updated_at) : ''].filter(Boolean).join(' · '))}</span></span><span class="ch">${ic('chev', 's')}</span></a>`).join('')}</div>
          <p class="small muted" style="margin:10px 4px">${plein ? esc(K.max) : esc(plus(docs.length, K.one) + ' sur ' + MAX_DOCS + ' possibles.')} Enregistré sur votre compte : disponible aussi sur ordinateur.</p>`
       : `<div class="empty"><div class="ei">${ic(K.icon, 'l')}</div><b>${esc(K.vide)}</b>${esc(K.videTxt)}</div>`;
     setPane(K.title, body, plein ? null : `<a class="btn block" href="${BASE}/${kind}/nouveau">${ic('plus', 's')} ${esc(K.nouveau)}</a>`);
@@ -310,6 +314,7 @@
         <div class="tags" style="margin-top:6px"><span class="badge">Gabarit ${esc(CV_GAB[tpl])}</span></div></div></div>
         ${contact ? `<div style="margin-top:10px">${contact}</div>` : ''}
         <p class="small muted" style="margin:10px 0 0">« ${esc(cv.titre || 'Mon CV')} » · CV n° ${esc(cv.numero)} · modifié le ${esc(fmtDate(cv.updated_at))}</p></div></div>
+      ${estBrouillon(cv) ? `<div class="mcl-note" style="background:#fff7ed;border-color:#fdba74"><span>📝</span><span><b>Brouillon — à terminer.</b> Ce CV n’est ni partagé ni visible par d’autres. Touchez « Terminer le CV » quand il est prêt.</span></div>` : ''}
       ${vide ? `<div class="mcl-note"><span>${ic('doc', 's')}</span><span>Ce CV est encore presque vide. Touchez « Modifier » pour ajouter votre identité, vos coordonnées et un résumé.</span></div>` : ''}
       ${sec('Résumé', d.resume ? `<div class="mcl-txt">${riche(d.resume)}</div>` : '')}
       ${sec('Expériences', exps)}${sec('Formations', edus)}${sec('Compétences', comps)}${sec('Langues', langs)}${sec('Certifications', certs)}
@@ -320,6 +325,7 @@
         ${lien ? `<button class="btn out sp" id="mcl-copie">Copier le lien</button>` : ''}
         ${navigator.share ? `<button class="btn out sp" id="mcl-share">${ic('share', 's')} Partager le PDF</button>` : ''}
         <button class="btn out sp" id="mcl-print-btn">Imprimer</button></div>
+      ${estBrouillon(cv) ? `<button class="btn block" id="mcl-terminer" style="margin-bottom:10px;background:#16a34a;border-color:#16a34a">✅ Terminer le CV</button>` : `<button class="btn out block" id="mcl-rebrouillon" style="margin-bottom:10px">📝 Repasser en brouillon</button>`}
       ${cv.partage_token && Number(cv.partage_actif) === 0 ? `<p class="small muted" style="margin:0 4px 10px">La page publique de ce CV est désactivée (réglage sur ordinateur) : le lien et le QR code n’ouvrent plus rien.</p>` : ''}
       ${lien ? `<p class="small muted" style="margin:0 4px 10px">Le lien ouvre votre CV${medias.length ? ' et vos médias' : ''} sans compte${medias.length ? ' (bouton « Accéder aux médias »)' : ''}.</p>` : ''}
       <a class="btn out block" href="cv-builder.html?id=${esc(cv.id)}" style="margin-bottom:10px">${ic('desk', 's')} Éditeur complet (à finir sur ordinateur)</a>
@@ -328,6 +334,14 @@
     setPane(cv.titre || 'CV', html,
       `<a class="btn out" style="flex:1" href="${BASE}/cv/${esc(cv.id)}-modifier">Modifier</a><button class="btn" style="flex:1" id="mcl-pdf">Télécharger le PDF</button>`);
     wireDoc('cv', cv, tpl, medias);
+    /* Terminer / repasser en brouillon : même enregistrement par emplacement que le reste, seule meta.brouillon change. */
+    const basculer = async brouillon => {
+      try { const nd = JSON.parse(JSON.stringify(cv.data || {})); nd.meta = Object.assign({}, nd.meta, { brouillon }); await api('/api/cv', { method: 'POST', body: { numero: cv.numero, titre: cv.titre, theme: cv.theme, data: nd } }); toast(brouillon ? 'CV remis en brouillon' : 'CV terminé ✓ — vous pouvez le partager'); detailCv(id); }
+      catch (e) { toast(e.message || 'Action impossible', true); }
+    };
+    const bt = $('#mcl-terminer'), br = $('#mcl-rebrouillon');
+    if (bt) bt.onclick = () => basculer(false);
+    if (br) br.onclick = () => { if (confirm('Repasser ce CV en brouillon ? Son lien de partage cessera de fonctionner jusqu’à ce que vous le terminiez à nouveau.')) basculer(true); };
     const wa = $('#mcl-wa'), cp = $('#mcl-copie');
     if (wa) wa.onclick = () => { window.open('https://wa.me/?text=' + encodeURIComponent(messageCv(cv, medias.length)), '_blank', 'noopener'); };
     if (cp) cp.onclick = async () => { try { await navigator.clipboard.writeText(lien); toast('Lien copié'); } catch (e) { toast(lien); } };
@@ -557,15 +571,18 @@
       <p class="mcl-e" id="mcl-gerr" role="alert" style="margin:8px 2px"></p>
       <p class="small muted" style="margin:8px 4px 0">Photo, couleurs et mise en page : à finir sur ordinateur.</p>
     </form>`;
-    setPane(titre, html, `<button class="btn block" type="submit" form="mcl-form" id="mcl-save">Enregistrer</button>`);
+    const dejaBrouillon = edit && estBrouillon(cv);
+    setPane(titre, html, (edit && !dejaBrouillon ? '' : `<button class="btn out" style="flex:1" type="button" id="mcl-plustard">⏳ Terminer plus tard</button>`) + `<button class="btn" style="flex:1" type="submit" form="mcl-form" id="mcl-save">${edit && !dejaBrouillon ? 'Enregistrer' : (dejaBrouillon ? 'Terminer le CV' : 'Créer le CV')}</button>`);
+    const plusTard = $('#mcl-plustard'); if (plusTard) plusTard.onclick = () => { window.__cvBrouillon = true; $('#mcl-form').requestSubmit(); };
     const act = $('#cv-x-act'); if (act) act.onchange = () => { const f = $('#cv-x-fin'); f.disabled = act.checked; if (act.checked) f.value = ''; };
     $('#mcl-form').onsubmit = async ev => {
       ev.preventDefault(); clearErrs();
+      const brouillon = !!window.__cvBrouillon; window.__cvBrouillon = false;   /* « Terminer plus tard » : enregistre en brouillon, seul le nom du CV est exigé */
       const t = val('cv-titre'), pr = val('cv-prenom'), no = val('cv-nom'), em = val('cv-email');
       let ok = true;
       if (!t) ok = setErr('cv-titre', 'Donnez un nom à ce CV pour le retrouver.') && ok;
-      if (!edit && !pr) ok = setErr('cv-prenom', 'Indiquez votre prénom.') && ok;
-      if (!edit && !no) ok = setErr('cv-nom', 'Indiquez votre nom.') && ok;
+      if (!edit && !pr && !brouillon) ok = setErr('cv-prenom', 'Indiquez votre prénom.') && ok;
+      if (!edit && !no && !brouillon) ok = setErr('cv-nom', 'Indiquez votre nom.') && ok;
       if (!emailOk(em)) ok = setErr('cv-email', 'Cette adresse e-mail ne semble pas valide (exemple : nom@exemple.com).') && ok;
       const xs = !nbExp && ['cv-x-poste', 'cv-x-ent', 'cv-x-debut', 'cv-x-fin', 'cv-x-desc'].some(k => val(k)) || (!nbExp && act && act.checked);
       if (xs && !val('cv-x-poste')) ok = setErr('cv-x-poste', 'Indiquez l’intitulé du poste.') && ok;
@@ -584,7 +601,7 @@
         }
         const gab = val('cv-gab') || tpl;
         const nd = edit ? JSON.parse(JSON.stringify(d)) : { style: Object.assign({}, CV_STYLE), photo: { url: '', shape: 'round', size: 80, show: true }, experiences: [], formations: [], competences: { tech: [], metier: [], num: [] }, langues: [], certifications: [], interests: [], media: { audio: null, video: null, signature: null, qr: { enabled: true, url: location.origin + '/profil.html?id=' + S.me.id } } };
-        nd.meta = Object.assign({}, nd.meta, { titre: t, numero, template: gab });
+        nd.meta = Object.assign({}, nd.meta, { titre: t, numero, template: gab, brouillon });
         nd.infos = Object.assign({}, nd.infos, { prenom: pr, nom: no, titre_pro: val('cv-titrepro'), nationalite: val('cv-nat'), pays_residence: val('cv-pays'), ville: val('cv-ville'), telephone: val('cv-tel'), email: em, linkedin: val('cv-linkedin'), site: val('cv-site'), diasporactif: val('cv-da'), adresse: (nd.infos && nd.infos.adresse) || '' });
         /* Résumé inchangé : on garde l'original (mise en forme enrichie créée sur ordinateur) plutôt que sa version « texte ». */
         nd.resume = (edit && val('cv-resume') === htmlEnTexte(d.resume).trim()) ? d.resume : val('cv-resume');
@@ -592,7 +609,7 @@
         if (!nbExp && xs) nd.experiences = [{ id: Date.now(), poste: val('cv-x-poste'), entreprise: val('cv-x-ent'), ville: '', pays: '', date_debut: val('cv-x-debut'), date_fin: act && act.checked ? '' : val('cv-x-fin'), actuel: !!(act && act.checked), description: val('cv-x-desc') }];
         if (!nbEdu && fs) nd.formations = [{ id: Date.now() + 1, diplome: val('cv-f-diplome'), etablissement: val('cv-f-etab'), pays: '', ville: '', annee: an, description: '' }];
         const r = await api('/api/cv', { method: 'POST', body: { numero, titre: t, theme: gab, data: nd } });
-        toast(edit ? 'CV enregistré ✓' : 'CV créé ✓');
+        toast(brouillon ? 'Brouillon enregistré — à terminer plus tard ✓' : (edit ? 'CV enregistré ✓' : 'CV créé ✓'));
         location.replace(`${BASE}/cv/${r.id || (edit ? cv.id : '')}`);
       } catch (e) {
         if (e.status === 401) return A.openLogin('Votre session a expiré : reconnectez-vous pour enregistrer.');

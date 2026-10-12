@@ -222,12 +222,16 @@ module.exports.registerCvExtras = function registerCvExtras(deps) {
     const cv = await db.prepare("SELECT * FROM cv_profiles WHERE partage_token=?").get(jeton);
     if (!cv || Number(cv.partage_actif) === 0) return sendJSON(res, 404, { error: "Ce CV n'est pas disponible." });
     let data = {}; try { data = JSON.parse(cv.data_json || "{}"); } catch (e) {}
-    const medias = await mediasDuCV(cv.user_id, Number(cv.numero));
     const moi = await getCurrentUser(req).catch(() => null);
+    /* CV en BROUILLON (création à terminer plus tard, 2026-10-12) : jamais visible par un tiers, même avec le lien ou le QR ; seul le propriétaire
+       peut l'ouvrir (aperçu), avec la mention « brouillon » pour qu'il ne le transmette pas par erreur. */
+    const brouillon = !!(data.meta && data.meta.brouillon);
+    if (brouillon && !(moi && Number(moi.id) === Number(cv.user_id))) return sendJSON(res, 404, { error: "Ce CV n'est pas disponible." });
+    const medias = await mediasDuCV(cv.user_id, Number(cv.numero));
     sendJSON(res, 200, {
       titre: cv.titre || "CV", numero: Number(cv.numero), theme: cv.theme || "bleu",
       data: dataPublique(data), medias,
-      proprietaire: !!(moi && Number(moi.id) === Number(cv.user_id)),
+      proprietaire: !!(moi && Number(moi.id) === Number(cv.user_id)), brouillon,
       mis_a_jour: cv.updated_at || null,
     });
   });
@@ -236,12 +240,13 @@ module.exports.registerCvExtras = function registerCvExtras(deps) {
   route("GET", "/api/cv-lecture", async (req, res) => {
     const user = await getCurrentUser(req);
     if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-    const cvs = await db.prepare("SELECT id, numero, titre, updated_at, partage_actif FROM cv_profiles WHERE user_id=? ORDER BY numero").all(user.id);
+    const cvs = await db.prepare("SELECT id, numero, titre, updated_at, partage_actif, data_json FROM cv_profiles WHERE user_id=? ORDER BY numero").all(user.id);
     const out = [];
     for (const c of cvs) {
       const jeton = await assurerJeton(c.id);
       const nb = (await mediasDuCV(user.id, Number(c.numero))).length;
-      out.push({ id: Number(c.id), numero: Number(c.numero), titre: c.titre || "Mon CV", mis_a_jour: c.updated_at, actif: Number(c.partage_actif) !== 0, jeton, lien: lienPublic(jeton), medias: nb });
+      let brouillon = false; try { brouillon = !!(JSON.parse(c.data_json || "{}").meta || {}).brouillon; } catch (e) {}
+      out.push({ id: Number(c.id), numero: Number(c.numero), titre: c.titre || "Mon CV", mis_a_jour: c.updated_at, actif: Number(c.partage_actif) !== 0 && !brouillon, brouillon, jeton, lien: lienPublic(jeton), medias: nb });
     }
     sendJSON(res, 200, { cvs: out });
   });

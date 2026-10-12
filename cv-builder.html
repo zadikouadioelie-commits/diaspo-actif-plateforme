@@ -215,11 +215,15 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
   <button class="hdr-btn" id="btn-template" onclick="document.getElementById('modal-gallery').style.display='flex'">🎨 Template</button>
   <div class="hdr-sep"></div>
   <span id="save-status">✅ Prêt</span>
+  <span id="cv-etat" style="font-size:.72rem;font-weight:700;padding:3px 10px;border:1px solid #fdba74;border-radius:99px;white-space:nowrap;background:#fff7ed;color:#b45309;cursor:default" title="Statut du CV">📝 Brouillon</span>
   <div class="hdr-spacer"></div>
   <button class="hdr-btn" onclick="openHistory()" title="Historique">🕐</button>
   <button class="hdr-btn" id="btn-export-pdf" onclick="exportPDF()">📄 Générer le document PDF</button>
   <button class="hdr-btn" onclick="CvX.ouvrirPartage()">📤 Partager</button>
   <button class="hdr-btn" onclick="exportWord()">⬇ Word</button>
+  <button class="hdr-btn" id="btn-plus-tard" onclick="CvDraft.plusTard()" title="Enregistrer ce CV en brouillon et le reprendre plus tard">⏳ Terminer plus tard</button>
+  <button class="hdr-btn" id="btn-terminer" onclick="CvDraft.terminer()" style="background:#16a34a;color:#fff;border-color:#16a34a" title="Marquer le CV comme terminé : il pourra être partagé">✅ Terminer le CV</button>
+  <button class="hdr-btn" id="btn-rebrouillon" onclick="CvDraft.repasserBrouillon()" style="display:none" title="Remettre ce CV en brouillon (le lien de partage se ferme)">📝 Repasser en brouillon</button>
   <button class="hdr-btn primary" onclick="saveCV(true)">💾 Sauvegarder</button>
 </header>
 
