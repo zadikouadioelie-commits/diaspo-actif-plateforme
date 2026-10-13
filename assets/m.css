@@ -502,3 +502,8 @@ button.li{background:none;font:inherit;color:inherit}
 .btn[data-adh]:not(.adh-bientot):active{background:#6D28D9;border-color:#6D28D9}
 .btn[data-sup],.btn[data-soutenir-owner]{background:#16A34A;border-color:#16A34A;color:#fff}
 .btn[data-sup]:active,.btn[data-soutenir-owner]:active{background:#15803D;border-color:#15803D}
+
+/* Bouton « Reels » (2026-10-13) : en tête des filtres du fil, une petite caméra stylisée + le mot Reels (n'apparaît que s'il existe des vidéos) */
+.chip.reels{gap:7px;background:linear-gradient(135deg,#14234a,#0B1226);border-color:#E3C06E88;color:#E3C06E;font-weight:800;letter-spacing:.03em;padding-left:11px}
+.chip.reels[hidden]{display:none}
+.chip.reels .mv-cam{width:20px;height:20px}

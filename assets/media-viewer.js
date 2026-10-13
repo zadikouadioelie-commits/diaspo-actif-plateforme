@@ -13,6 +13,8 @@
   var urlOk = function (u) { return typeof u === 'string' && /^(https?:\/\/|\/[^\/])/i.test(u); };
   var plain = function (s) { return String(s == null ? '' : s).replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\*\*|__|`/g, '').replace(/\s+/g, ' ').trim(); };
   var V = null, toastT = null;
+  /* Petite caméra stylisée (logo « Reels ») : corps arrondi, objectif en triangle, dégradé or — même dessin sur le site et sur téléphone. */
+  var CAM = '<svg class="mv-cam" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="mvcg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F3DC9B"/><stop offset=".5" stop-color="#E3C06E"/><stop offset="1" stop-color="#B9893A"/></linearGradient></defs><rect x="2" y="6" width="13.5" height="12" rx="3.2" fill="url(#mvcg)"/><path d="M17.2 10.4l4.2-2.5a.7.7 0 0 1 1.05.6v7a.7.7 0 0 1-1.05.6l-4.2-2.5z" fill="url(#mvcg)"/><circle cx="8.7" cy="12" r="2.6" fill="#0B1226" opacity=".85"/></svg>';
 
   function getJson(path) {
     return fetch(path, { credentials: 'same-origin' }).then(function (r) {
@@ -65,11 +67,30 @@
     });
   }
 
+  /* ---------- Reels : l'univers des petites vidéos de la plateforme (2026-10-13, demande explicite) ----------
+     Même visionneur, ouvert directement sur la vidéo la plus récente de TOUTE la plateforme, vidéos seules : on balaie vers le haut / le bas
+     (ou ↑ ↓, molette) pour passer à la suivante, avec toutes les actions : j'aime, commentaires (tiroir), enregistrer, partager, s'abonner
+     à l'auteur, voir la publication (où l'on peut aussi contribuer). */
+  function openReels(opts) {
+    if (V) fermer(true);
+    var v = V = { kind: 'video', reels: true, scope: 'plateforme', auteurId: null, items: [], idx: 0, mi: 0, opts: opts || {}, cur: { avant: null, apres: null }, fin: { avant: false, apres: true }, charge: { avant: false, apres: false }, histo: false, ver: 0, anim: 0, roue: 0 };
+    construire();
+    return getJson('/api/fil/medias?type=video&limit=8').then(function (r) {
+      if (V !== v) return false;
+      var l = (r && r.items) || [];
+      if (!l.length) { toast('Aucun Reel pour le moment. Revenez bientôt !'); setTimeout(function () { if (V === v) fermer(); }, 1800); return false; }
+      v.items = l; v.idx = 0; v.mi = 0; v.cur.avant = r.suivant != null ? r.suivant : l[l.length - 1].post_id; if (r.suivant == null) v.fin.avant = true;
+      v.cur.apres = l[0].post_id; majPortee(); render(0); charger('avant');
+      return true;
+    }, function () { if (V === v) { toast('Les Reels ne se chargent pas pour le moment.'); setTimeout(function () { if (V === v) fermer(); }, 1800); } return false; });
+  }
+
   function construire() {
     var d = document.createElement('div');
-    d.className = 'mv'; d.setAttribute('role', 'dialog'); d.setAttribute('aria-modal', 'true'); d.setAttribute('aria-label', 'Visionneur de médias');
+    d.className = 'mv' + (V.reels ? ' mv-reels' : ''); d.setAttribute('role', 'dialog'); d.setAttribute('aria-modal', 'true'); d.setAttribute('aria-label', V.reels ? 'Reels' : 'Visionneur de médias');
     d.innerHTML = '<div class="mv-top"><button type="button" class="mv-btn mv-x" aria-label="Fermer">✕</button>'
-      + '<div class="mv-portee" role="tablist"><button type="button" data-p="auteur">Cette personne</button><button type="button" data-p="plateforme">Toute la plateforme</button></div></div>'
+      + (V.reels ? '<div class="mv-brand">' + CAM + '<b>Reels</b></div>'
+        : '<div class="mv-portee" role="tablist"><button type="button" data-p="auteur">Cette personne</button><button type="button" data-p="plateforme">Toute la plateforme</button></div>') + '</div>'
       + '<div class="mv-stage"></div><div class="mv-dots"></div>'
       + '<div class="mv-fleches"><button type="button" class="mv-btn" data-d="-1" aria-label="Précédent">▲</button><button type="button" class="mv-btn" data-d="1" aria-label="Suivant">▼</button></div>'
       + '<div class="mv-info"></div><div class="mv-toast" role="status"></div>';
@@ -96,7 +117,9 @@
     }, { passive: false });
     d.addEventListener('click', function (e) {
       var a = e.target.closest('[data-a]'); if (!a) return;
-      if (a.dataset.a === 'like') aimer(); else if (a.dataset.a === 'part') partager(); else if (a.dataset.a === 'auteur') ouvrirProfil(); else ouvrirPost();
+      var k = a.dataset.a;
+      if (k === 'like') aimer(); else if (k === 'part') partager(); else if (k === 'auteur') ouvrirProfil();
+      else if (k === 'comm') commentaires(); else if (k === 'suivre') suivre(); else if (k === 'save') enregistrer(); else ouvrirPost();
     });
     document.addEventListener('keydown', touches, true);
     window.addEventListener('popstate', retour);
@@ -104,7 +127,11 @@
   function touches(e) {
     if (!V) return;
     var k = e.key;
-    if (k === 'Escape') { e.preventDefault(); e.stopPropagation(); fermer(); }
+    if (e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName)) {            /* saisie d'un commentaire : les lettres ne font pas défiler */
+      if (k === 'Escape') { e.preventDefault(); e.stopPropagation(); fermerCommentaires(); }
+      return;
+    }
+    if (k === 'Escape') { e.preventDefault(); e.stopPropagation(); if (V.el.querySelector('.mv-comm')) fermerCommentaires(); else fermer(); }
     else if (k === 'ArrowDown' || k === 'j' || k === 'J') { e.preventDefault(); e.stopPropagation(); aller(1); }
     else if (k === 'ArrowUp' || k === 'k' || k === 'K') { e.preventDefault(); e.stopPropagation(); aller(-1); }
     else if (k === 'ArrowRight') { e.preventDefault(); e.stopPropagation(); media(1); }
@@ -177,7 +204,9 @@
     if (!V) return; var it = cur(), el = V.el;
     var l = el.querySelector('[data-a="like"]'); if (!l) return;
     l.classList.toggle('on', !!it.a_aime); l.querySelector('i').textContent = it.a_aime ? '♥' : '♡'; l.querySelector('span').textContent = it.nb_likes || '';
-    el.querySelector('[data-a="open"] span').textContent = it.nb_commentaires ? it.nb_commentaires : '';
+    var c = el.querySelector('[data-a="comm"] span') || el.querySelector('[data-a="open"] span'); if (c) c.textContent = it.nb_commentaires ? it.nb_commentaires : '';
+    var sv = el.querySelector('[data-a="save"]'); if (sv) { sv.classList.toggle('on', !!it.a_enregistre); sv.querySelector('span').textContent = it.a_enregistre ? 'Enregistré' : 'Enregistrer'; }
+    var sf = el.querySelector('[data-a="suivre"]'); if (sf) { sf.classList.toggle('on', !!it.suivi); sf.textContent = it.suivi ? 'Abonné ✓' : '+ S’abonner'; sf.hidden = !!it.est_moi || !it.auteur_id; }
   }
   function render(dir) {
     if (!V) return; var it = cur(), m = it.medias[V.mi] || it.medias[0], el = V.el, st = el.querySelector('.mv-stage');
@@ -201,6 +230,20 @@
     dots.innerHTML = it.medias.length > 1 ? it.medias.map(function (x, i) { return '<b class="' + (i === V.mi ? 'on' : '') + '"></b>'; }).join('') : '';
     var photo = it.auteur_photo ? '<img src="' + esc(it.auteur_photo) + '" alt="" onerror="this.remove()">' : '';
     var ini = esc((it.auteur_nom || '?').trim().charAt(0).toUpperCase());
+    if (V.reels) {
+      el.querySelector('.mv-info').innerHTML = '<div class="mv-rail">'
+        + '<button type="button" data-a="like" aria-label="J’aime"><i>♡</i><span></span></button>'
+        + '<button type="button" data-a="comm" aria-label="Commentaires"><i>💬</i><span></span></button>'
+        + '<button type="button" data-a="save" aria-label="Enregistrer"><i>🔖</i><span>Enregistrer</span></button>'
+        + '<button type="button" data-a="part" aria-label="Partager"><i>↗</i><span>Partager</span></button></div>'
+        + '<div class="mv-auteur"><button type="button" class="mv-av" data-a="auteur" aria-label="Voir le profil">' + (photo || ini) + '</button>'
+        + '<button type="button" class="mv-nom" data-a="auteur">' + esc(it.auteur_nom || 'Membre') + '</button>'
+        + '<button type="button" class="mv-suivre" data-a="suivre">+ S’abonner</button></div>'
+        + ((it.titre || it.extrait) ? '<div class="mv-txt">' + (it.titre ? '<b>' + esc(it.titre) + '</b> ' : '') + esc(it.extrait) + '</div>' : '')
+        + '<button type="button" class="mv-voir" data-a="open">Voir la publication · Contribuer ›</button>';
+      majActions(); majFleches();
+      return;
+    }
     el.querySelector('.mv-info').innerHTML = '<div class="mv-auteur"><button type="button" class="mv-av" data-a="auteur" aria-label="Voir le profil">' + (photo || ini) + '</button>'
       + '<button type="button" class="mv-nom" data-a="auteur">' + esc(it.auteur_nom || 'Membre') + '</button></div>'
       + ((it.titre || it.extrait) ? '<div class="mv-txt">' + (it.titre ? '<b>' + esc(it.titre) + '</b> ' : '') + esc(it.extrait) + '</div>' : '')
@@ -224,6 +267,48 @@
     var url = location.origin + '/fil-actualite.html?post=' + it.post_id + '&r=' + Date.now().toString(36), titre = it.titre || it.auteur_nom || 'Diaspo’Actif';
     var secours = function () { if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(function () { toast('Lien copié ✓'); }, function () { toast(url); }); else toast(url); };
     if (navigator.share) navigator.share({ title: titre, url: url }).catch(function (e) { if (!e || e.name !== 'AbortError') secours(); }); else secours();
+  }
+  var ilYa = function (s) { var t = new Date(String(s || '').replace(' ', 'T') + (/[zZ]|[+-]\d\d:?\d\d$/.test(String(s || '')) ? '' : 'Z')); if (isNaN(t)) return ''; var d = Math.round((Date.now() - t) / 60000); return d < 1 ? 'à l’instant' : d < 60 ? d + ' min' : d < 1440 ? Math.round(d / 60) + ' h' : Math.round(d / 1440) + ' j'; };
+  function suivre() {
+    var it = cur(); if (!it || !it.auteur_id) return;
+    fetch('/api/follow/' + it.auteur_id, { method: it.suivi ? 'DELETE' : 'POST', credentials: 'same-origin' })
+      .then(function (r) {
+        if (r.status === 401) { toast('Connectez-vous pour vous abonner.'); return; } if (!r.ok) throw new Error();
+        var etat = !it.suivi; V.items.forEach(function (x) { if (x.auteur_id === it.auteur_id) x.suivi = etat; }); majActions(); toast(etat ? 'Abonné ✓' : 'Abonnement retiré');
+      }).catch(function () { toast('Action impossible pour le moment.'); });
+  }
+  function enregistrer() {
+    var it = cur(); if (!it) return;
+    fetch('/api/fil/' + it.post_id + '/bookmark', { method: 'POST', credentials: 'same-origin' })
+      .then(function (r) { if (r.status === 401) { toast('Connectez-vous pour enregistrer cette vidéo.'); return null; } if (!r.ok) throw new Error(); return r.json(); })
+      .then(function (j) { if (!j) return; it.a_enregistre = !!j.bookmarked; majActions(); toast(it.a_enregistre ? 'Enregistré ✓' : 'Retiré des enregistrements'); })
+      .catch(function () { toast('Action impossible pour le moment.'); });
+  }
+  function fermerCommentaires() { var d = V && V.el.querySelector('.mv-comm'); if (d) d.remove(); }
+  function commentaires() {
+    var it = cur(); if (!it || !V) return;
+    if (V.el.querySelector('.mv-comm')) { fermerCommentaires(); return; }
+    var d = document.createElement('div'); d.className = 'mv-comm'; d.setAttribute('role', 'dialog'); d.setAttribute('aria-label', 'Commentaires');
+    d.innerHTML = '<div class="mv-comm-h"><b>Commentaires</b><button type="button" class="mv-btn mv-comm-x" aria-label="Fermer les commentaires">✕</button></div>'
+      + '<div class="mv-comm-l"><p class="mv-comm-vide">Chargement…</p></div>'
+      + '<form class="mv-comm-f"><input type="text" maxlength="500" placeholder="Écrire un commentaire…" aria-label="Écrire un commentaire" autocomplete="off"><button type="submit">Publier</button></form>';
+    V.el.appendChild(d);
+    var liste = d.querySelector('.mv-comm-l'), v = V, post = it.post_id;
+    var ligne = function (c) {
+      var ini = esc((c.auteur_nom || '?').trim().charAt(0).toUpperCase()), ph = c.photo_url && urlOk(c.photo_url) ? '<img src="' + esc(c.photo_url) + '" alt="" onerror="this.remove()">' : '';
+      return '<div class="mv-c"><span class="mv-c-av">' + (ph || ini) + '</span><div><b>' + esc(c.auteur_nom || 'Membre') + '</b> <small>' + esc(ilYa(c.created_at)) + '</small><p>' + esc(c.contenu) + '</p></div></div>';
+    };
+    var peindre = function (l) { liste.innerHTML = l.length ? l.map(ligne).join('') : '<p class="mv-comm-vide">Aucun commentaire. Soyez le premier !</p>'; liste.scrollTop = liste.scrollHeight; };
+    var cache = [];
+    getJson('/api/fil/' + encodeURIComponent(post) + '/commentaires').then(function (r) { if (V !== v) return; cache = r.commentaires || []; it.nb_commentaires = cache.length; majActions(); peindre(cache); }, function () { liste.innerHTML = '<p class="mv-comm-vide">Les commentaires ne se chargent pas pour le moment.</p>'; });
+    d.querySelector('.mv-comm-x').onclick = fermerCommentaires;
+    d.querySelector('form').onsubmit = function (e) {
+      e.preventDefault(); var inp = d.querySelector('input'), txt = inp.value.trim(); if (!txt) return;
+      fetch('/api/fil/' + encodeURIComponent(post) + '/commentaires', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contenu: txt }) })
+        .then(function (r) { if (r.status === 401) { toast('Connectez-vous pour commenter.'); return null; } if (!r.ok) throw new Error(); return r.json(); })
+        .then(function (j) { if (!j || V !== v) return; var c = j.commentaire || j; cache.push(c); it.nb_commentaires = cache.length; inp.value = ''; majActions(); peindre(cache); })
+        .catch(function () { toast('Commentaire impossible pour le moment.'); });
+    };
   }
   function ouvrirPost() {
     var it = cur(), o = V && V.opts; if (!it) return; fermer();
@@ -255,5 +340,5 @@
     }
   }
 
-  root.MediaViewer = { open: open, close: fermer, attachDetail: attachDetail, estOuvert: function () { return !!V; } };
+  root.MediaViewer = { open: open, openReels: openReels, iconeReels: function () { return CAM; }, close: fermer, attachDetail: attachDetail, estOuvert: function () { return !!V; } };
 })(typeof window !== 'undefined' ? window : globalThis);

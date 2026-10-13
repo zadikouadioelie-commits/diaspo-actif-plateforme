@@ -439,8 +439,16 @@
   const FIL_MODES = [['tous', 'Pour vous'], ['suivis', 'Mes abonnements'], ['populaires', 'Populaires'], ['organisations', 'Organisations']];
   function viewFil() {
     const el = $('#home-feed');
-    el.innerHTML = `<div class="chips" role="tablist">${FIL_MODES.map(([k, l]) => `<button class="chip ${S.fil.mode === k ? 'on' : ''}" data-mode="${k}" role="tab" aria-selected="${S.fil.mode === k}">${l}</button>`).join('')}</div>${pubSlot('between_posts')}<div id="fil-list"></div><div id="fil-more"></div>`;
-    $$('.chip', el).forEach(c => c.onclick = async () => {
+    /* Bouton « Reels » (2026-10-13, demande explicite) : une petite caméra stylisée, qui apparaît toute seule dès qu'il existe au moins une vidéo
+       publique ; il ouvre l'univers des petites vidéos de la plateforme (visionneur plein écran, mode Reels). */
+    const reelsBtn = `<button type="button" class="chip reels" id="reels-open" hidden aria-label="Reels, les petites vidéos">${(window.MediaViewer && MediaViewer.iconeReels) ? MediaViewer.iconeReels() : ''}<span>Reels</span></button>`;
+    el.innerHTML = `<div class="chips" role="tablist">${reelsBtn}${FIL_MODES.map(([k, l]) => `<button class="chip ${S.fil.mode === k ? 'on' : ''}" data-mode="${k}" role="tab" aria-selected="${S.fil.mode === k}">${l}</button>`).join('')}</div>${pubSlot('between_posts')}<div id="fil-list"></div><div id="fil-more"></div>`;
+    const rb = $('#reels-open', el);
+    if (rb) {
+      rb.onclick = () => { if (window.MediaViewer && MediaViewer.openReels) MediaViewer.openReels(MV_OPTS); };
+      api('/api/fil/medias?type=video&limit=1').then(r => { if (r && r.items && r.items.length) rb.hidden = false; }).catch(() => { /* aucune vidéo connue : le bouton reste caché */ });
+    }
+    $$('.chip[data-mode]', el).forEach(c => c.onclick = async () => {
       if (c.dataset.mode === 'suivis' && !(await needLogin('Connectez-vous pour voir les publications de vos abonnements.'))) return;
       S.fil = { mode: c.dataset.mode, page: 1, pages: 1, posts: [], loaded: false }; viewFil();
     });

@@ -14595,6 +14595,9 @@ route("GET", "/api/fil/medias", async (req, res, params, body, query) => {
       if (!medias.length) continue;
       const likes = await db.prepare("SELECT COUNT(*) AS n FROM fil_reactions WHERE post_id=? AND type='like'").get(p.id);
       const comm = await db.prepare("SELECT COUNT(*) AS n FROM fil_commentaires WHERE post_id=?").get(p.id);
+      /* Reels (2026-10-13) : état « abonné » et « enregistré » du compte connecté, pour que les boutons du visionneur s'affichent dans le bon état. */
+      const suivi = cu ? !!await db.prepare("SELECT 1 FROM user_follows WHERE follower_id=? AND followed_id=?").get(cu.id, p.auteur_id) : false;
+      const enregistre = cu ? !!await db.prepare("SELECT 1 FROM fil_bookmarks WHERE user_id=? AND post_id=?").get(cu.id, p.id) : false;
       const aime = cu ? !!await db.prepare("SELECT 1 FROM fil_reactions WHERE post_id=? AND user_id=? AND type='like'").get(p.id, cu.id) : false;
       let photo = null;
       try {
@@ -14607,6 +14610,7 @@ route("GET", "/api/fil/medias", async (req, res, params, body, query) => {
         post_id: Number(p.id), auteur_id: Number(p.auteur_id), auteur_nom: await nomCompteAffichage(p.auteur_id), auteur_photo: photo,
         kind, medias: medias.slice(0, 10).map(m => ({ kind: m.kind, url: m.url, poster: m.poster })),
         titre: titre.slice(0, 120), extrait: (titre && corps.startsWith(titre) ? corps.slice(titre.length).trim() : corps).slice(0, 180),
+        suivi, a_enregistre: enregistre, est_moi: cu ? Number(cu.id) === Number(p.auteur_id) : false,
         nb_likes: likes ? Number(likes.n) : 0, nb_commentaires: comm ? Number(comm.n) : 0, a_aime: aime, created_at: p.created_at,
       });
       if (items.length >= limite) { limiteAtteinte = true; break; }
