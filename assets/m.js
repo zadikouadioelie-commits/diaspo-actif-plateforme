@@ -73,6 +73,7 @@
     cal: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
     chat: '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/>',
     shop: '<path d="M4 9l1.5-5h13L20 9"/><path d="M4 9v11h16V9"/><path d="M4 9a2.7 2.7 0 0 0 5.3 0 2.7 2.7 0 0 0 5.4 0A2.7 2.7 0 0 0 20 9"/><path d="M10 20v-6h4v6"/>',
+    cart: '<circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M3 4h2l2.2 11.1a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.6L21 8H6"/>',
     user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
     bell: '<path d="M6 10a6 6 0 0 1 12 0c0 5 2 6 2 7H4c0-1 2-2 2-7z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
     heart: '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>',
@@ -180,7 +181,7 @@
     me: null, tab: null, unreadMsg: 0, unreadNotif: 0,
     fil: { mode: 'tous', page: 1, pages: 1, posts: [], loaded: false },
     ev: { items: [], filtre: 'avenir', q: '', loaded: false },
-    boutiques: { items: [], q: '', loaded: false },
+    boutiques: { items: [], q: '', loaded: false, open: {} },
     ann: { type: '', q: '', pays: '', ville: '', domaine: '', origine: '', items: [], shown: 30, loaded: false, opts: null, open: {} },
     myInsc: new Set(), pane: null, chatTimer: null, convNames: {}
   };
@@ -212,14 +213,20 @@
     } catch (e) { /* facultatif */ }
   }
   async function refreshBadges() {
-    if (!S.me) { S.unreadMsg = 0; S.unreadNotif = 0; paintBadges(); return; }
+    if (!S.me) { S.unreadMsg = 0; S.unreadNotif = 0; S.panierCount = 0; paintBadges(); return; }
     try { const r = await api('/api/messages/non-lus'); S.unreadMsg = Number(r.total != null ? r.total : r.non_lus) || 0; } catch (e) { }
     try { const r = await api('/api/notifications?limit=1'); S.unreadNotif = Number(r.non_lues) || 0; } catch (e) { }
+    /* Panier (2026-10-13, demande explicite : « le bouton panier doit aussi être disponible sur
+       le téléphone portable ») — même route et même pastille de comptage que sur ordinateur
+       (updatePanierBadge dans assets/app.js), voir ajouterPanier()/viewProduit() dans
+       assets/m-mod-boutique.js qui doit aussi la rafraîchir après un ajout. */
+    try { const r = await api('/api/panier'); S.panierCount = Number(r.nb_articles) || 0; } catch (e) { }
     paintBadges();
   }
   function paintBadges() {
     const b = $('#tab-badge-messages'); if (b) { b.hidden = !S.unreadMsg; b.textContent = S.unreadMsg > 99 ? '99+' : S.unreadMsg; }
     const n = $('#notif-badge'); if (n) { n.hidden = !S.unreadNotif; n.textContent = S.unreadNotif > 99 ? '99+' : S.unreadNotif; }
+    const p = $('#panier-badge'); if (p) { p.hidden = !S.panierCount; p.textContent = S.panierCount > 99 ? '99+' : S.panierCount; }
   }
 
   /* Environnement de test privé (tout sauf diaspoactif.com) : deux comptes de démonstration accessibles en un appui, sans saisie ni code. */
@@ -381,7 +388,7 @@
     /* Bouton « Actualités » (2026-10-12, demande explicite) : accessible partout, connecté ou non — ouvre « Toutes les actualités » (#/actualites). */
     const actu = `<a class="ibtn" href="#/actualites" aria-label="Actualités" title="Actualités">${ic('fil')}</a>`;
     const right = S.me
-      ? `${actu}<button class="ibtn" id="top-switch" aria-label="Changer de compte">${ic('swap')}</button><a class="ibtn" href="#/notifs" aria-label="Notifications">${ic('bell')}<span class="dot" id="notif-badge" hidden></span></a>`
+      ? `${actu}<button class="ibtn" id="top-switch" aria-label="Changer de compte">${ic('swap')}</button><a class="ibtn" href="panier.html" aria-label="Mon panier" title="Mon panier">${ic('cart')}<span class="dot" id="panier-badge" hidden></span></a><a class="ibtn" href="#/notifs" aria-label="Notifications">${ic('bell')}<span class="dot" id="notif-badge" hidden></span></a>`
       /* Bouton « Créer un compte » restauré dans le bandeau (2026-10-08, demande explicite) : avait
          disparu de la nouvelle interface téléphone, seule « Connexion » y figurait — à la différence
          du bandeau du site (assets/app.js) qui a toujours les deux côte à côte. */
@@ -1093,6 +1100,11 @@
       const card = more.closest('.ann'), d = card.querySelector('[data-desc]'), on = d.classList.toggle('open');
       S.ann.open = S.ann.open || {}; S.ann.open[card.dataset.key] = on; more.textContent = on ? 'Voir moins ▴' : 'Voir plus ▾'; more.setAttribute('aria-expanded', String(on)); return;
     }
+    const moreBt = e.target.closest('.shop [data-more]');
+    if (moreBt) {
+      const d = moreBt.closest('.shop').querySelector('[data-desc]'), on = d.classList.toggle('open');
+      S.boutiques.open = S.boutiques.open || {}; S.boutiques.open[moreBt.dataset.shop] = on; moreBt.textContent = on ? 'Voir moins ▴' : 'Voir plus ▾'; moreBt.setAttribute('aria-expanded', String(on)); return;
+    }
     const sup = e.target.closest('[data-sup]');
     if (sup) { location.hash = '#/cagnottes/' + sup.dataset.sup; return; }
     const fo = e.target.closest('[data-follow]');
@@ -1674,13 +1686,22 @@
     l.innerHTML = a.map(v => {
       const nm = v.boutique_nom || v.nom; const prods = (v.produits_vedettes || []).slice(0, 3);
       const desc = strip(v.boutique_description || v.description || v.slogan || '');
+      /* Catégories visibles (2026-10-13, demande explicite : "il n'y a rien qui me permettrait
+         de savoir dans quelle catégorie est cette boutique") — type + jusqu'à 3 domaines, en
+         badges distincts de la ligne ville/pays (jusqu'ici le domaine était noyé en texte brut,
+         collé à la localisation). Même parité que la carte ordinateur (renderVitrineCard). */
+      const cats = [v.domaine, ...(v.domaines_secondaires || [])].filter(Boolean).slice(0, 3);
+      const tagsHtml = (v.type || cats.length) ? `<div class="tags" style="margin:4px 0 0">${v.type ? `<span class="badge">${esc(v.type)}</span>` : ''}${cats.map(c => `<span class="badge o">${esc(c)}</span>`).join('')}</div>` : '';
+      const open = !!(S.boutiques.open && S.boutiques.open[v.id]);
       return `<article class="card shop"><div class="top"><div class="lg">${v.logo_url ? `<img src="${attrUrl(v.logo_url)}" alt="" onerror="this.remove()">` : esc(initials(nm))}</div>
-        <div class="sp"><div class="nm">${esc(nm)}</div><div class="small muted ell">${esc([v.domaine, [v.ville, v.pays].filter(Boolean).join(', ')].filter(Boolean).join(' · '))}</div>${v.certif || v.organisation_verifiee ? `<span class="badge g" style="margin-top:4px">${ic('check', 's')} Vérifiée</span>` : ''}</div></div>
-        ${desc ? `<div class="txt small" style="padding:0 14px 8px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(desc)}</div>` : ''}
+        <div class="sp"><div class="nm">${esc(nm)}</div><div class="small muted ell">${esc([v.ville, v.pays].filter(Boolean).join(', '))}</div>${tagsHtml}${v.certif || v.organisation_verifiee ? `<span class="badge g" style="margin-top:4px">${ic('check', 's')} Vérifiée</span>` : ''}</div></div>
+        ${desc ? `<div class="txt small${open ? ' open' : ''}" data-desc style="padding:0 14px 4px">${esc(desc)}</div><div class="shop-links"><button type="button" class="lnk" data-more data-shop="${esc(v.id)}" hidden aria-expanded="${open}">${open ? 'Voir moins ▴' : 'Voir plus ▾'}</button></div>` : ''}
         ${apercuPrixBoutique(v)}
         ${prods.length ? `<div class="prods">${prods.map(p => `<a class="p" href="${p.id ? '#/produit/' + encodeURIComponent(p.id) : '#/boutique/' + encodeURIComponent(v.id)}" style="color:inherit;text-decoration:none"><div class="ph">${p.photo ? `<img src="${attrUrl(p.photo)}" alt="" loading="lazy" onerror="this.remove()">` : ic('shop')}</div><div class="pn ell">${esc(p.nom)}</div><div class="pp">${esc(prixBoutique(p.prix, p.devise))}</div></a>`).join('')}</div>` : ''}
         <div class="ft row"><a class="btn block sm sp" href="#/boutique/${encodeURIComponent(v.id)}">Voir la boutique</a></div></article>`;
     }).join('');
+    /* « Voir plus » n'apparaît que si la description dépasse 2 lignes (même règle que l'Annuaire, ligne ~1036). */
+    $$('[data-desc]', l).forEach(d => { const b = d.parentNode.querySelector('[data-more]'); if (b && (d.classList.contains('open') || d.scrollHeight > d.clientHeight + 2)) b.hidden = false; });
   }
 
   /* ============================================================
@@ -2237,6 +2258,6 @@
     if ('serviceWorker' in navigator) { /* le site est « réseau uniquement » : rien à enregistrer */ }
   }
   window.MMods = window.MMods || {};
-  window.MApp = { S, api, esc, strip, md, linkify, richHtml, ic, ICONS, setPane, paneShare, partagerLien, jetonPartage, closePane, openSheet, toast, needLogin, openLogin, loginCard, mediaBlock, videoBlock, money, dateLong, parseDay, ago, hhmm, dayLabel, initials, attrUrl, safeUrl, premiumLocked, premiumSheet, loadPremium, afterAuthChange, ROLE_LABEL };
+  window.MApp = { S, api, esc, strip, md, linkify, richHtml, ic, ICONS, setPane, paneShare, partagerLien, jetonPartage, closePane, openSheet, toast, needLogin, openLogin, loginCard, mediaBlock, videoBlock, money, dateLong, parseDay, ago, hhmm, dayLabel, initials, attrUrl, safeUrl, premiumLocked, premiumSheet, loadPremium, afterAuthChange, ROLE_LABEL, paintBadges };
   init();
 })();

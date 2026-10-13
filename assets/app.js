@@ -3491,7 +3491,14 @@ async function initAnnuaire(){
 
 /* ---------- Fiche initiative (branchée sur l'API) ---------- */
 /* ---------- Rubrique Vitrines (catalogue public des vitrines d'initiatives) ---------- */
-const DOMAINES_VITRINE = ["Agriculture","Agroalimentaire","Agropastoral","Artisanat","Assurance","Commerce","Communication & Médias","Construction & BTP","Consulting & Conseil","Culture & Arts","Éducation","Énergie","Environnement","Événementiel","Finance","Formation","Immobilier","Industrie","Institution","Numérique & Technologies","Restauration","Santé, Soins & Thérapies","Services","Tourisme","Transport & Logistique","Autres"];
+/* Liste élargie (2026-10-13, demande explicite : "ajoute tous les domaines qui te semblent
+   pertinents") — même liste que PV_DOMAINES dans dashboard-initiative.html, à garder
+   synchronisée. "Autres" reste en dernier : c'est lui qui déclenche le champ libre
+   (pvToggleDomaineAutre) permettant à un compte d'écrire son propre domaine si aucune entrée
+   ne lui convient — ce texte libre est ensuite stocké tel quel dans domaine/
+   domaines_secondaires (colonnes TEXT sans contrainte), donc visible partout où ces champs
+   le sont déjà (carte boutique, recherche) sans aucun autre changement. */
+const DOMAINES_VITRINE = ["Agriculture","Agroalimentaire","Agropastoral","Alimentation & Épicerie","Artisanat","Assurance","Automobile","Bijouterie & Joaillerie","Commerce","Communication & Médias","Construction & BTP","Consulting & Conseil","Cosmétique & Beauté","Culture & Arts","Décoration & Maison","Éducation","Énergie","Environnement","Événementiel","Finance","Formation","Immobilier","Industrie","Institution","Mode & Accessoires","Numérique & Technologies","Restauration","Santé, Soins & Thérapies","Services","Sport & Bien-être","Tourisme","Transport & Logistique","Autres"];
 
 /* Même palette que PVT_THEMES (profil-app.html) — la boutique choisit l'un de ces 5 thèmes
    pour sa propre page (couleur dominante de sa vitrine) ; dupliquée ici plutôt que partagée en
@@ -3569,7 +3576,13 @@ function renderVitrineCard(v) {
       ${domainesSecondairesHtml}
       ${produitsHtml}
       ${locs.length ? `<div class="vit-card-locs" style="--vc:${themeColor};">${locs.join('')}</div>` : ''}
-      ${(descBoutique || estProprio) ? `<div class="vit-card-desc" style="display:flex;align-items:flex-start;justify-content:space-between;gap:4px;-webkit-line-clamp:unset;overflow:visible;"><span style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${descBoutique ? escapeHtml(descBoutique) : '<em>Aucun descriptif — cliquez sur ✏️ pour en ajouter un.</em>'}</span>${descEditBtn}</div>` : ''}
+      ${(descBoutique || estProprio) ? `<div class="vit-card-desc" style="display:flex;flex-direction:column;gap:2px;-webkit-line-clamp:unset;overflow:visible;">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:4px;">
+          <span class="vit-desc-txt" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${descBoutique ? escapeHtml(descBoutique) : '<em>Aucun descriptif — cliquez sur ✏️ pour en ajouter un.</em>'}</span>
+          ${descEditBtn}
+        </div>
+        ${descBoutique ? `<button type="button" class="vit-desc-more" hidden onclick="event.stopPropagation();vitToggleDesc(this)" style="background:none;border:none;color:${themeColor};font-weight:700;font-size:11.5px;cursor:pointer;padding:0;align-self:flex-start;">Voir plus ▾</button>` : ''}
+      </div>` : ''}
       ${noteHtml}
       <div class="vit-card-foot">
         <a href="${href}" class="vit-card-btn" onclick="event.stopPropagation()">🏬 Découvrir la boutique</a>
@@ -3585,6 +3598,16 @@ function renderVitrineCard(v) {
    autre page. Sauvegarde sur la même route que "Présentation de la boutique"
    (PUT /api/initiatives/:id/vitrine, champ boutique_description), puis met à jour uniquement le
    texte de CETTE carte plutôt que de recharger tout le listing. */
+/* "Voir plus"/"Voir moins" du descriptif d'une carte boutique (2026-10-13, demande explicite :
+   "la description a été coupée... permet plus d'informations... avec un bouton voir plus"). */
+function vitToggleDesc(btn) {
+  const span = btn.closest(".vit-card-desc")?.querySelector(".vit-desc-txt");
+  if (!span) return;
+  const open = span.style.webkitLineClamp === "unset";
+  if (open) { span.style.webkitLineClamp = "2"; span.style.overflow = "hidden"; btn.textContent = "Voir plus ▾"; }
+  else { span.style.webkitLineClamp = "unset"; span.style.overflow = "visible"; btn.textContent = "Voir moins ▴"; }
+}
+
 function vitEditDescription(id, btn) {
   const card = btn.closest('.vit-card');
   const span = card?.querySelector('.vit-card-desc span');
@@ -3660,6 +3683,12 @@ async function initVitrines(){
     list.innerHTML = rows.length
       ? rows.map(renderVitrineCard).join("")
       : `<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted);">Aucune boutique ne correspond à ces critères.</div>`;
+    /* "Voir plus" n'apparaît que si le descriptif dépasse réellement 2 lignes (même règle que
+       la version téléphone, assets/m.js paintBoutiques()). */
+    list.querySelectorAll(".vit-desc-txt").forEach(span => {
+      const btn = span.closest(".vit-card-desc")?.querySelector(".vit-desc-more");
+      if (btn && span.scrollHeight > span.clientHeight + 2) btn.hidden = false;
+    });
   }
 
   /* Recherche temps réel — même pattern que l'Annuaire (debounce 350ms). */

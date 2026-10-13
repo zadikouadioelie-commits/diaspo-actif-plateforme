@@ -127,6 +127,10 @@ svg.i.l{width:28px;height:28px}
 .prods .pn{font-size:12px;margin-top:3px}
 .prods .pp{font-size:12px;font-weight:700;color:var(--navy2)}
 .shop .ft{padding:8px 14px 14px}
+.shop .txt{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;white-space:pre-line;word-break:break-word}
+.shop .txt.open{display:block;-webkit-line-clamp:unset;overflow:visible}
+.shop-links{padding:0 14px 8px}
+.shop-links .lnk{color:var(--orange-d);font-weight:700;font-size:13.5px;min-height:32px;display:inline-flex;align-items:center}
 
 /* ---------- messages ---------- */
 .conv{display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--border);width:100%;text-align:left;min-height:68px}

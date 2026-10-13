@@ -186,8 +186,12 @@
     try {
       /* Même règle que sur ordinateur : l'expédition seulement si le retrait sur place n'est pas proposé. */
       const mode = expedition && !retrait ? 'expedition' : 'retrait';
-      await api('/api/panier', { method: 'POST', body: { produit_id: Number(p.id), quantite: 1, mode_livraison: mode } });
+      const r = await api('/api/panier', { method: 'POST', body: { produit_id: Number(p.id), quantite: 1, mode_livraison: mode } });
       toast('Ajouté au panier ✓');
+      /* Pastille du panier dans la barre du haut (2026-10-13) — même principe que
+         window.updatePanierBadge() sur ordinateur : se met à jour sans attendre un changement
+         d'onglet. */
+      if (r && r.nb_articles != null) { S.panierCount = Number(r.nb_articles) || 0; A.paintBadges(); }
       const f = $('#pane-foot'); if (f) {
         const ancien = $('#bq-add');
         if (ancien) { ancien.insertAdjacentHTML('afterend', '<a class="btn sp" id="bq-cart" href="panier.html">Voir mon panier</a>'); ancien.remove(); }
