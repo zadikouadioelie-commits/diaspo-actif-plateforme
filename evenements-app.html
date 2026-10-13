@@ -1100,6 +1100,7 @@ function renderEvts() {
         <div class="evt-actions">
           <button class="btn btn-outline" style="font-size:12px" onclick="openDetail(${evt.id})">Voir</button>
           <button class="btn btn-outline" style="font-size:12px" onclick="partagerEvenement(${evt.id})">📤 Partager</button>
+          ${agendaBouton(evt.id, 12)}
           ${evt.est_termine ? evtBoutonTermine(evt, inscrit, 12) + evtBoutonCompteRendu(evt, peutGerer, 12) : evt.inscription_ouverte === 0
             ? `<span class="btn btn-outline" style="font-size:12px;cursor:default;opacity:.75;" title="Événement informatif, sans inscription">ℹ️ Informatif</span>`
             : (evt.lien_inscription
@@ -1253,6 +1254,39 @@ function mapsLienItineraire(v) {
 }
 
 /* Ouvre le formulaire d'inscription à un événement */
+/* ═══ « Ajouter à mon agenda » (2026-10-13, demande explicite) ═══
+   Le Calendrier Diaspora montre tous les événements ; « Mon Agenda » (agenda.html) est personnel. Ce bouton copie l'événement dans l'agenda du membre
+   (POST /api/evenements/:id/ajouter-agenda, idempotent) ; un visiteur sans compte est envoyé vers la connexion puis revient sur l'événement.
+   Un événement déjà ajouté affiche « Dans mon agenda » ; un nouvel appui ouvre l'agenda. */
+let AGENDA_IDS = new Set();
+async function chargerAgendaIds() {
+  try { const r = await api('GET', '/agenda/evenements-ajoutes'); AGENDA_IDS = new Set((r.ids || []).map(Number)); AGENDA_IDS.forEach(majBoutonsAgenda); } catch (e) { /* visiteur : rien d'ajouté */ }
+}
+function agendaBouton(id, taille) {
+  const dedans = AGENDA_IDS.has(Number(id));
+  return '<button class="btn btn-outline" style="font-size:' + (taille || 12) + 'px" data-agenda="' + id + '" onclick="ajouterAMonAgenda(' + id + ',this)" title="' + (dedans ? 'Ouvrir mon agenda' : 'Ajouter cet événement à mon agenda personnel') + '">' + (dedans ? '✅ Dans mon agenda' : '📅 Ajouter à mon agenda') + '</button>';
+}
+function majBoutonsAgenda(id) {
+  document.querySelectorAll('[data-agenda="' + id + '"]').forEach(b => {
+    b.disabled = false; b.title = 'Ouvrir mon agenda';
+    b.innerHTML = b.hasAttribute('data-court') ? '✅ Ajouté' : '✅ Dans mon agenda';
+  });
+}
+window.ajouterAMonAgenda = async function (id, btn) {
+  id = Number(id);
+  if (typeof CURRENT_USER === 'undefined' || !CURRENT_USER) { window.location.href = 'login.html?next=' + encodeURIComponent('evenements.html?evt=' + id); return; }
+  if (AGENDA_IDS.has(id)) { window.location.href = 'agenda.html'; return; }
+  if (btn) btn.disabled = true;
+  try {
+    const r = await api('POST', '/evenements/' + id + '/ajouter-agenda');
+    AGENDA_IDS.add(id); majBoutonsAgenda(id);
+    if (typeof showToast === 'function') showToast(r.deja ? 'Cet événement était déjà dans votre agenda.' : '📅 Ajouté à votre agenda.', 'success');
+  } catch (e) {
+    if (btn) btn.disabled = false;
+    if (typeof showToast === 'function') showToast(e.message || 'Impossible d\'ajouter cet événement.', 'danger'); else alert(e.message);
+  }
+};
+
 function rejoindre(id, btn) {
   if (typeof CURRENT_USER === 'undefined' || !CURRENT_USER) { window.location.href='login.html'; return; }
   const evt = allEvts.find(e => e.id === id) || {};
@@ -2416,6 +2450,7 @@ function renderEventDetail(evt, isPreview) {
           )
         }
         <button class="btn btn-outline" style="font-size:13px;" ${isPreview ? 'disabled title="Disponible une fois l\'événement enregistré"' : `onclick="partagerEvenement(${evt.id})"`}>📤 Partager</button>
+        ${isPreview ? '' : agendaBouton(evt.id, 13)}
         ${modifierDetailHtml}
         ${gererDetailHtml}
         ${lierFicheDetailHtml}
@@ -2667,7 +2702,10 @@ function cdAllerAuJour(dateStr) {
           <div class="cd-jour-titre">${esc(e.titre || 'Sans titre')}</div>
           <div class="cd-jour-meta">${esc(e.ville || e.lieu || '')}${cdEstPasse(e) ? ' · Terminé' : ''}</div>
         </div>
-        <a href="javascript:void(0)" onclick="cdFermerCalendrier();openDetail(${e.id})" style="font-size:11.5px;color:var(--orange,#ff6b00);font-weight:700;text-decoration:none;white-space:nowrap;">Voir →</a>
+        <span style="display:flex;gap:10px;align-items:center;white-space:nowrap;">
+          <a href="javascript:void(0)" data-agenda="${e.id}" data-court onclick="ajouterAMonAgenda(${e.id},this)" title="Ajouter à mon agenda" style="font-size:11.5px;color:var(--orange,#ff6b00);font-weight:700;text-decoration:none;">${AGENDA_IDS.has(Number(e.id)) ? '✅ Ajouté' : '📅 Agenda'}</a>
+          <a href="javascript:void(0)" onclick="cdFermerCalendrier();openDetail(${e.id})" style="font-size:11.5px;color:var(--orange,#ff6b00);font-weight:700;text-decoration:none;">Voir →</a>
+        </span>
       </div>`).join('') || '<div style="color:var(--muted);font-size:12.5px;">Aucun événement.</div>'}`;
 }
 /* Toujours re-charger à l'ouverture (2026-09-29, demande explicite : "met à jour le calendrier
@@ -2711,6 +2749,7 @@ function cdFermerCalendrier() {
     document.getElementById('btn-creer').style.display = 'inline-flex';
     document.getElementById('btn-flash-wrap').style.display = 'inline-flex';
   }
+  chargerAgendaIds();
   await Promise.all([syncFiltreDomaineOptions(), loadEvts(), chargerEvenementEpingle(), (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? loadMesEvts() : Promise.resolve(), initSuggestions(), initPublicationsOrganisations()]);
   /* Lien direct vers la fiche complète d'un événement (2026-09-10, demande explicite : bouton
      "En savoir plus" depuis la mini-fenêtre "Événements" de l'annuaire) — reprend le format

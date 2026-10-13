@@ -33868,8 +33868,8 @@ ${jsonLd}
         for (const rem of reminders) {
           const remAt = new Date(evDate.getTime() - rem.ms).toISOString();
           if (new Date(remAt) > new Date()) {
-            (await db.prepare(`INSERT INTO agenda_reminders(user_id,event_id,remind_at,type) VALUES(?,?,?,?)`)
-              .run(me.id, r).lastInsertRowid, remAt, rem.type);
+            await db.prepare(`INSERT INTO agenda_reminders(user_id,event_id,remind_at,type) VALUES(?,?,?,?)`)
+              .run(me.id, Number(r.lastInsertRowid), remAt, rem.type);
           }
         }
       } catch(e) {}
@@ -33881,6 +33881,62 @@ ${jsonLd}
         }
       } catch (_) {}
       return sendJSON(res, 201, { id: r.lastInsertRowid });
+    }
+
+    /* ── « Ajouter à mon agenda » (2026-10-13, demande explicite) ──
+       Le Calendrier Diaspora (page Événements) montre TOUS les événements de la plateforme ; « Mon Agenda » est personnel. Ce bouton copie un
+       événement du calendrier dans l'agenda du membre (titre, dates, lieu, description + lien vers l'événement) et le pousse vers Google Agenda si
+       son compte est branché. Idempotent : agenda_events.evenement_id empêche tout doublon (même événement, même membre).
+       Placé dans cette chaîne de routes parce que gcalPushEvent() n'existe qu'ici. */
+    if (req.method === "GET" && pathname === "/api/agenda/evenements-ajoutes") {
+      const me = await getCurrentUser(req);
+      if (!me) return sendJSON(res, 200, { ids: [] });
+      let lignes = [];
+      try { lignes = await db.prepare("SELECT evenement_id FROM agenda_events WHERE user_id=? AND evenement_id IS NOT NULL").all(me.id); } catch (_) { /* colonne pas encore créée */ }
+      return sendJSON(res, 200, { ids: lignes.map(l => Number(l.evenement_id)) });
+    }
+    if (req.method === "POST" && /^\/api\/evenements\/\d+\/ajouter-agenda$/.test(pathname)) {
+      const me = await getCurrentUser(req);
+      if (!me) return sendJSON(res, 401, { error: "Connectez-vous pour ajouter cet événement à votre agenda." });
+      const evtId = Number(pathname.split("/")[3]);
+      const evt = await db.prepare("SELECT * FROM evenements WHERE id=?").get(evtId);
+      if (!evt) return sendJSON(res, 404, { error: "Événement introuvable." });
+      const proprio = Number(evt.owner_user_id) === Number(me.id);
+      if (!proprio && (evt.statut === "brouillon" || evt.visibilite === "prive")) return sendJSON(res, 404, { error: "Événement introuvable." });
+      if (!evt.date_evt) return sendJSON(res, 400, { error: "Cet événement n'a pas de date : impossible de l'ajouter à l'agenda." });
+      const deja = await db.prepare("SELECT id FROM agenda_events WHERE user_id=? AND evenement_id=?").get(me.id, evt.id);
+      if (deja) return sendJSON(res, 200, { ok: true, deja: true, id: Number(deja.id) });
+
+      /* Dates : « AAAA-MM-JJ » + heure facultative. Sans heure de début, l'événement occupe la journée. */
+      const jour = String(evt.date_evt).slice(0, 10), jourFin = String(evt.date_fin || evt.date_evt).slice(0, 10);
+      const hhmm = h => { const m = /^(\d{1,2}):(\d{2})/.exec(String(h || "")); return m ? m[1].padStart(2, "0") + ":" + m[2] : ""; };
+      const hd = hhmm(evt.heure_debut);
+      let hf = hhmm(evt.heure_fin);
+      const toutJour = !hd;
+      const debut = jour + "T" + (hd || "00:00");
+      if (!hf) hf = hd ? String(Math.min(23, Number(hd.slice(0, 2)) + 1)).padStart(2, "0") + ":" + hd.slice(3) : "23:59";
+      const fin = jourFin + "T" + hf;
+      const lien = getOrigin(req) + "/evenements.html?evt=" + encodeURIComponent(evt.id);
+      const lieu = [evt.lieu, evt.ville, evt.pays].filter(Boolean).join(", ") || (evt.mode_participation === "ligne" ? "En ligne" : "");
+      const resume = String(evt.description || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 600);
+      const description = [resume, "Événement Diaspo'Actif : " + lien].filter(Boolean).join("\n\n");
+      const r = await db.prepare(`INSERT INTO agenda_events(user_id,titre,description,date_debut,date_fin,lieu,lieu_type,couleur,all_day,evenement_id)
+        VALUES(?,?,?,?,?,?,?,?,?,?)`).run(me.id, String(evt.titre).slice(0, 200), description, debut, fin, lieu || null, evt.mode_participation === "ligne" ? "virtuel" : "physique", "#c9971c", toutJour ? 1 : 0, evt.id);
+      const nouvelId = Number(r.lastInsertRowid);
+      try {
+        for (const rem of [{ type: "24h", ms: 24 * 3600 * 1000 }, { type: "1h", ms: 3600 * 1000 }, { type: "15m", ms: 15 * 60 * 1000 }]) {
+          const remAt = new Date(new Date(debut).getTime() - rem.ms).toISOString();
+          if (new Date(remAt) > new Date()) await db.prepare("INSERT INTO agenda_reminders(user_id,event_id,remind_at,type) VALUES(?,?,?,?)").run(me.id, nouvelId, remAt, rem.type);
+        }
+      } catch (e) { logError(e, "agenda-evenement-rappels", req); }
+      try {
+        const u = await db.prepare("SELECT google_calendar_sync_mode, google_calendar_refresh_token FROM users WHERE id=?").get(me.id);
+        if (u?.google_calendar_sync_mode === "diaspo_vers_google" && u.google_calendar_refresh_token) {
+          const ligne = await db.prepare("SELECT * FROM agenda_events WHERE id=?").get(nouvelId);
+          gcalPushEvent(me.id, ligne).catch(() => {});
+        }
+      } catch (_) { /* la synchronisation Google ne doit jamais bloquer l'ajout */ }
+      return sendJSON(res, 201, { ok: true, deja: false, id: nouvelId });
     }
 
     /* PUT /api/agenda/events/:id */

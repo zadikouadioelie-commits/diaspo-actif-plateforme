@@ -929,6 +929,7 @@ const COLONNES_MIGRATION = [
     ['cv_profiles', 'partage_token', 'TEXT'],
     ['cv_profiles', 'partage_actif', 'INTEGER DEFAULT 1'],
     ['evenements', 'epingle_permanent', 'INTEGER DEFAULT 0'],
+    ['agenda_events', 'evenement_id', 'INTEGER'],
     // Liste de stockage des participants (Cotisations & Adhésions ↔ Réseau professionnel)
     ['adhesion_formules', 'liste_stockage_id', 'INTEGER'],
     // Profil public enrichi des initiatives

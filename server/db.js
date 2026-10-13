@@ -2243,6 +2243,8 @@ const MIGRATIONS = [
   // l'événement qui doit toujours apparaître en premier, quels que soient les autres événements
   // créés ensuite — même idiome que produits_vitrine.mis_en_avant / cagnottes.est_vedette.
   ["evenements", "epingle_permanent INTEGER DEFAULT 0"],
+  // « Ajouter à mon agenda » (2026-10-13) : événement du Calendrier Diaspora copié dans l'agenda personnel — évite les doublons.
+  ["agenda_events", "evenement_id INTEGER"],
   // ── Bannière "Installer l'app" (PWA) — 2026-08-18 : réglage "Ne plus afficher" lié au compte,
   // réactivable depuis Confidentialité (voir buildPrivacyPanel() dans profil-app.html) ──
   ["users", "pwa_prompt_dismiss INTEGER DEFAULT 0"],

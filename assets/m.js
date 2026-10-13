@@ -775,8 +775,23 @@
         ${e.organisateur_nom || ev.organisateur_nom ? `<p class="small muted" style="margin:12px 0 0">Organisé par <b style="color:var(--text)" ${e.owner_user_id ? `data-prof="${esc(e.owner_user_id)}" role="link"` : ''}>${esc(ev.organisateur_nom || e.organisateur_nom)}</b></p>` : ''}</div></div>
       ${(e.visibilite || 'public') === 'public' ? `<div class="card"><div class="pad" style="text-align:center"><b>${ic('ticket', 's')} QR code de l’événement</b><p class="small muted" style="margin:4px 0 0">Scannez-le pour ouvrir l’événement, ou montrez-le pour le partager.</p><div class="qr" id="ev-qr" role="img" aria-label="QR code de l’événement"></div><div class="row" style="gap:8px"><button type="button" class="btn out sm sp" id="ev-qr-big">${ic('search', 's')} Agrandir</button><button type="button" class="btn out sm sp" id="ev-qr-share">${ic('share', 's')} Partager le lien</button></div></div></div>` : ''}
       ${desc ? `<div class="card"><div class="pad rich" style="white-space:pre-line">${esc(desc)}</div></div>` : ''}
-      ${e.lien_visio ? `<a class="btn out block" style="margin-bottom:12px" href="${attrUrl(e.lien_visio)}" target="_blank" rel="noopener">Rejoindre en visio ${ic('out', 's')}</a>` : ''}`;
+      ${e.lien_visio ? `<a class="btn out block" style="margin-bottom:12px" href="${attrUrl(e.lien_visio)}" target="_blank" rel="noopener">Rejoindre en visio ${ic('out', 's')}</a>` : ''}
+      <button class="btn out block" id="ev-agenda" type="button" style="margin-bottom:12px">${ic('cal', 's')} Ajouter à mon agenda</button>`;
     setPane(e.titre, html, cta);
+    /* « Ajouter à mon agenda » (2026-10-13) : copie l'événement dans l'agenda personnel ; déjà ajouté → ouvre l'agenda. */
+    const ag = $('#ev-agenda');
+    if (ag) {
+      const dedans = () => { ag.innerHTML = `${ic('check', 's')} Dans mon agenda`; ag.dataset.ok = '1'; };
+      if (S.me) api('/api/agenda/evenements-ajoutes').then(x => { if ((x.ids || []).map(Number).includes(Number(id))) dedans(); }).catch(() => { });
+      ag.onclick = async () => {
+        if (ag.dataset.ok) { location.href = 'agenda.html'; return; }
+        if (!(await needLogin('Connectez-vous pour ajouter cet événement à votre agenda.'))) return paneEvent(id);
+        ag.disabled = true;
+        try { const r2 = await api(`/api/evenements/${id}/ajouter-agenda`, { method: 'POST', body: {} }); dedans(); toast(r2.deja ? 'Déjà dans votre agenda' : 'Ajouté à votre agenda ✓'); }
+        catch (er) { toast(er.message, true); }
+        ag.disabled = false;
+      };
+    }
     /* Lien public (lisible sans compte) : seulement pour un événement public ; &via = qui partage (aperçu « X vous invite »). */
     if ((e.visibilite || 'public') === 'public') paneShare(location.origin + '/evenements.html?evt=' + encodeURIComponent(id) + (S.me ? '&via=' + S.me.id : '') + '&r=' + jetonPartage(), e.titre);
     /* QR code de l'événement (2026-10-11, demande explicite) : l'adresse publique, identique pour tous (sans jeton de partage) pour que le code reste valable. */

@@ -392,6 +392,13 @@ function addDays(d, n) { return new Date(d.getFullYear(), d.getMonth(), d.getDat
 
 /* ═══════════ INIT ═══════════ */
 (async () => {
+  /* Agenda PERSONNEL : un visiteur sans compte est renvoyé vers la connexion (avant, il restait sur une page vide). Le calendrier public de tous
+     les événements est le « Calendrier Diaspora » de la page Événements. */
+  try {
+    const rm = await fetch('/api/auth/me', { credentials: 'include' });
+    const jm = rm.ok ? await rm.json() : {};
+    if (!jm.user) { location.replace('login.html?next=' + encodeURIComponent('agenda.html' + location.search + location.hash)); return; }
+  } catch (e) { /* hors ligne : on laisse la page se charger */ }
   await loadEvents();
   await loadRdv();
   render();
@@ -693,12 +700,13 @@ function openEventDetail(id) {
     <div style="font-size:.82rem;color:#888;">📅 ${fmt(sd)} → ${fmt(ed)}</div>
     ${ev.lieu?`<div style="font-size:.82rem;color:#888;">📍 ${_esc(ev.lieu)}</div>`:''}
   </div>`;
-  if(ev.description) html+=`<div style="font-size:.85rem;color:#333;margin-bottom:10px;line-height:1.6;">${_esc(ev.description)}</div>`;
+  if(ev.description) html+=`<div style="font-size:.85rem;color:#333;margin-bottom:10px;line-height:1.6;white-space:pre-line;">${_esc(ev.description).replace(/(https?:\/\/[^\s<]+)/g,'<a href="$1" target="_blank" rel="noopener" style="color:#2563EB;">$1</a>')}</div>`;
   if(ev.notes_privees) html+=`<div style="background:#fffbe6;border-radius:6px;padding:8px;font-size:.8rem;margin-bottom:10px;">🔒 ${_esc(ev.notes_privees)}</div>`;
   document.getElementById('event-detail-content').innerHTML=html;
   const actions=document.createElement('div');
   actions.className='modal-actions';
-  actions.innerHTML=`<button class="btn btn-outline" onclick="editBloc(${id})">✏️ Modifier</button>`;
+  actions.innerHTML=ev.evenement_id?`<a class="btn btn-outline" href="evenements.html?evt=${Number(ev.evenement_id)}" style="text-decoration:none;">🔗 Voir l'événement</a>`:'';
+  actions.innerHTML+=`<button class="btn btn-outline" onclick="editBloc(${id})">✏️ Modifier</button>`;
   actions.innerHTML+=`<button class="btn btn-outline" onclick="closeModal('modal-event-detail')">Fermer</button>`;
   document.getElementById('event-detail-content').appendChild(actions);
   openModal('modal-event-detail');
