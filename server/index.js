@@ -3166,6 +3166,8 @@ const CvExtras = require("./cv-extras");
 CvExtras.registerCvExtras({ route, db, sendJSON, getCurrentUser, nomCompteAffichage });
 /* Dossiers de recrutement (2026-10-12) : noter, commenter, classer et repartager les CV reçus — voir server/recrutement.js. */
 require("./recrutement").registerRecrutement({ route, db, sendJSON, getCurrentUser, nomCompteAffichage });
+/* Réception des vidéos des Reels, envoi direct navigateur → Bunny Stream (la limite de 4,5 Mo de Vercel interdit de passer par le serveur) — voir server/reels-upload.js. */
+require("./reels-upload").registerReelsUpload({ route, sendJSON, getCurrentUser });
 /* Liste de contrôle du profil public (2026-10-10) : GET /api/profil-public/checklist — voir server/profil-public.js. */
 const ProfilPublic = require("./profil-public");
 ProfilPublic.register({ route, db, sendJSON, getCurrentUser });
