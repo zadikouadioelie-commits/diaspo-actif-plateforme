@@ -3175,7 +3175,7 @@ ProfilPublic.register({ route, db, sendJSON, getCurrentUser });
 require("./cartographie-competences").register({ route, db, sendJSON, getCurrentUser });
 /* Partager un tuto vidéo sur le fil (2026-10-12) : POST /api/videos-tutoriels/:id/partager — voir server/tuto-partage.js. */
 const TutoPartage = require("./tuto-partage");
-TutoPartage.register({ route, db, sendJSON, getCurrentUser, SEC, nomCompteAffichage });
+TutoPartage.register({ route, db, sendJSON, getCurrentUser, SEC, nomCompteAffichage, getOrigin });
 
 /* ========== VITRINE COMMERCIALE + BOUTIQUE (comptes Initiative) ========== */
 const MAX_PRODUITS_VITRINE = 100;

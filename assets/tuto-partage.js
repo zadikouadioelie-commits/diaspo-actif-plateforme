@@ -106,6 +106,8 @@
         <a class="tp-btn wa" id="tp-wa" href="https://wa.me/?text=${encodeURIComponent(texte + ' ' + lien)}" target="_blank" rel="noopener">💬 Envoyer par WhatsApp</a>
         <button type="button" class="tp-btn" id="tp-copie">🔗 Copier le lien</button>
         ${navigator.share ? '<button type="button" class="tp-btn" id="tp-natif">📤 Autres applications…</button>' : ''}
+        ${d.connecte ? `<button type="button" class="tp-btn" id="tp-mail">✉️ Envoyer par e-mail (titre, affiche, durée)</button>
+        <div id="tp-mailbox" hidden style="display:none;flex-direction:column;gap:9px"><input type="text" id="tp-mailin" inputmode="email" autocomplete="email" aria-label="Adresses e-mail des destinataires" placeholder="adresse@exemple.com (jusqu'à 5, séparées par une virgule)" style="width:100%;box-sizing:border-box;padding:12px;border:1.5px solid #d1d5db;border-radius:12px;font:inherit;font-size:15px"><button type="button" class="tp-btn pri" id="tp-mailgo">Envoyer l'e-mail</button></div>` : ''}
       </div>`;
 
     const msg = (html, cls) => { document.getElementById('tp-msg').innerHTML = html ? `<div class="${cls}" role="status">${html}</div>` : ''; };
@@ -117,6 +119,21 @@
     const natif = document.getElementById('tp-natif');
     if (natif) natif.onclick = () => navigator.share({ title: c.titre, text: texte, url: lien }).catch(() => {});
     const wa = document.getElementById('tp-wa');
+    const mail = document.getElementById('tp-mail');
+    if (mail) {
+      mail.onclick = () => { document.getElementById('tp-mailbox').style.display = 'flex'; mail.style.display = 'none'; document.getElementById('tp-mailin').focus(); };
+      const go = document.getElementById('tp-mailgo');
+      go.onclick = async () => {
+        go.disabled = true; go.textContent = 'Envoi…'; msg('');
+        try {
+          const r = await fetch(`/api/videos-tutoriels/${encodeURIComponent(c.id)}/envoyer-email`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ emails: document.getElementById('tp-mailin').value }) });
+          const j = await r.json().catch(() => ({}));
+          if (!r.ok) throw new Error(j.error || 'Envoi impossible.');
+          msg(j.envoyes > 1 ? `✅ E-mail envoyé à ${j.envoyes} personnes.` : '✅ E-mail envoyé.', 'tp-ok');
+          go.textContent = '✓ Envoyé';
+        } catch (e) { msg(esc(e.message), 'tp-err'); go.disabled = false; go.textContent = 'Envoyer l\'e-mail'; }
+      };
+    }
     const fil = document.getElementById('tp-fil');
     if (fil) fil.onclick = async () => {
       fil.disabled = true; fil.textContent = 'Publication…'; msg('');

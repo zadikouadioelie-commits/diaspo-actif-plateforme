@@ -1868,7 +1868,20 @@
       <div id="tp-info" class="small muted" style="margin:0 0 8px" role="status"></div>
       ${d.connecte ? `<button type="button" class="btn block" id="tp-fil">Publier sur mon fil</button>`
         : `<a class="btn block" href="login.html?redirect=${encodeURIComponent('/m.html')}">Se connecter pour publier sur mon fil</a>`}
-      <button type="button" class="btn out block" id="tp-lien" style="margin-top:8px">${ic('share', 's')} Envoyer le lien (WhatsApp…)</button>`);
+      <button type="button" class="btn out block" id="tp-lien" style="margin-top:8px">${ic('share', 's')} Envoyer le lien (WhatsApp…)</button>
+      ${d.connecte ? `<button type="button" class="btn out block" id="tp-mail" style="margin-top:8px">✉️ Envoyer par e-mail (titre, affiche, durée)</button>
+      <div id="tp-mailbox" hidden style="margin-top:8px"><input type="text" id="tp-mailin" inputmode="email" autocomplete="email" placeholder="adresse@exemple.com (jusqu’à 5, séparées par une virgule)" style="width:100%;box-sizing:border-box;padding:12px;border:1.5px solid var(--line,#d1d5db);border-radius:12px;font:inherit;font-size:15px"><button type="button" class="btn block" id="tp-mailgo" style="margin-top:8px">Envoyer l’e-mail</button></div>` : ''}`);
+    const mail = $('#tp-mail');
+    if (mail) {
+      mail.onclick = () => { $('#tp-mailbox').hidden = false; mail.hidden = true; $('#tp-mailin').focus(); };
+      $('#tp-mailgo').onclick = async () => {
+        const go = $('#tp-mailgo'); go.disabled = true; go.textContent = 'Envoi…';
+        try {
+          const j = await api('/api/videos-tutoriels/' + encodeURIComponent(c.id) + '/envoyer-email', { method: 'POST', body: { emails: $('#tp-mailin').value } });
+          $('#tp-info').textContent = j.envoyes > 1 ? `✅ E-mail envoyé à ${j.envoyes} personnes.` : '✅ E-mail envoyé.'; go.textContent = '✓ Envoyé';
+        } catch (e) { go.disabled = false; go.textContent = 'Envoyer l’e-mail'; $('#tp-info').textContent = e.message || 'Envoi impossible.'; }
+      };
+    }
     const fil = $('#tp-fil');
     if (fil) fil.onclick = async () => {
       fil.disabled = true; fil.textContent = 'Publication…';

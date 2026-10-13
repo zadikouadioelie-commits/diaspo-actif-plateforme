@@ -39,7 +39,7 @@ const tutoClause = " AND (p.tuto_video_id IS NULL OR EXISTS (SELECT 1 FROM da_vi
 const texteInvitation = (nom, titre) => `${nom} vous invite à voir le tuto « ${String(titre || "").trim().slice(0, TITRE_MAX)} »`;
 
 module.exports = { imageTuto, carteTutoPost, tutoClause, texteInvitation };
-module.exports.register = function register({ route, db, sendJSON, getCurrentUser, SEC, nomCompteAffichage }) {
+module.exports.register = function register({ route, db, sendJSON, getCurrentUser, SEC, nomCompteAffichage, getOrigin }) {
   /* GET /api/videos-tutoriels/:id/partager — aperçu avant partage : la carte du tuto et le texte exact qui sera publié (nom du compte
      qui partage compris). Ouvert à tous : un visiteur non connecté peut quand même copier le lien / l'envoyer par WhatsApp. */
   route("GET", "/api/videos-tutoriels/:id/partager", async (req, res, params) => {
@@ -74,5 +74,40 @@ module.exports.register = function register({ route, db, sendJSON, getCurrentUse
       .run(user.id, nom, pub, pub, texteInvitation(nom, carte.titre), null, carte.image ? "image" : null, medias, carte.id)).lastInsertRowid;
     try { await db.prepare("UPDATE users SET premiere_publication_le=datetime('now') WHERE id=? AND premiere_publication_le IS NULL").run(user.id); } catch (e) { /* jamais bloquant */ }
     sendJSON(res, 201, { ok: true, deja: false, post_id: Number(id), lien: `fil-actualite.html?post=${id}` });
+  });
+
+  /* POST /api/videos-tutoriels/:id/envoyer-email { emails: [..] } — envoie la carte du tuto (titre, affiche, durée, bouton) par e-mail, au nom du
+     compte connecté. Connecté obligatoire + 10 envois / heure / compte + 5 destinataires maximum par demande : ce n'est jamais un relais de spam. */
+  route("POST", "/api/videos-tutoriels/:id/envoyer-email", async (req, res, params, body) => {
+    const user = await getCurrentUser(req);
+    if (!user) return sendJSON(res, 401, { error: "Connectez-vous pour envoyer ce tuto par e-mail." });
+    const brut = Array.isArray(body && body.emails) ? body.emails : String((body && body.emails) || "").split(/[,;\s]+/);
+    const emails = [...new Set(brut.map(x => String(x || "").trim().toLowerCase()).filter(Boolean))];
+    if (!emails.length) return sendJSON(res, 400, { error: "Indiquez au moins une adresse e-mail." });
+    if (emails.length > 5) return sendJSON(res, 400, { error: "5 adresses au maximum par envoi." });
+    const invalide = emails.find(x => !/^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]{2,}$/.test(x) || x.length > 254);
+    if (invalide) return sendJSON(res, 400, { error: `Adresse e-mail invalide : ${invalide}` });
+    const limite = SEC.rateLimit(`tuto-email:${user.id}`, 10, 3600000);
+    if (!limite.allowed) return sendJSON(res, 429, { error: `Trop d'envois. Réessayez dans ${limite.retryAfter}s.` });
+    const carte = await carteTutoPost(db, params.id);
+    if (!carte) return sendJSON(res, 404, { error: "Ce tuto n'est pas disponible." });
+    const desc = (await db.prepare("SELECT description FROM da_videos_tutoriels WHERE id=?").get(carte.id) || {}).description || "";
+    const origin = getOrigin(req);
+    /* Gmail/Outlook n'affichent PAS les images SVG : si l'affiche du tuto est un .svg et qu'une version .jpg/.png du même nom existe, c'est elle qui part dans l'e-mail. */
+    const rasterise = u => {
+      if (!u || !/\.svg(\?|$)/i.test(u) || /^https?:/i.test(u)) return u;
+      for (const ext of [".jpg", ".png"]) { const alt = u.replace(/\.svg(\?.*)?$/i, ext); if (require("fs").existsSync(require("path").join(__dirname, "..", alt.split("?")[0]))) return alt; }
+      return null;
+    };
+    const absolu = u => !u ? null : (/^https?:\/\//i.test(u) ? u : origin + (u.startsWith("/") ? "" : "/") + u);
+    const d = Number(carte.duree_secondes) || 0;
+    const dureeTxt = !d ? "" : (d >= 60 ? `${Math.floor(d / 60)} min${d % 60 ? ` ${String(d % 60).padStart(2, "0")} s` : ""}` : `${d} s`);
+    const auteurNom = (await nomCompteAffichage(user.id)) || "Un membre de Diaspo'Actif";
+    const { emailPartageTuto } = require("./mailer");
+    const lien = `${origin}/${carte.lien}`;
+    const resultats = await Promise.all(emails.map(email => emailPartageTuto({ email, auteurNom, titre: String(carte.titre || "").slice(0, TITRE_MAX), description: desc, categorie: carte.categorie, imageUrl: absolu(rasterise(carte.image)), dureeTxt, lien })));
+    const envoyes = resultats.filter(r => r && r.ok).length;
+    if (!envoyes) return sendJSON(res, 502, { error: "L'envoi a échoué. Réessayez dans un instant." });
+    sendJSON(res, 200, { ok: true, envoyes, echecs: emails.length - envoyes });
   });
 };
