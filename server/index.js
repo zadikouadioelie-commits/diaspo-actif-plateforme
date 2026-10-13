@@ -30279,8 +30279,12 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
   try {
     const existant = await db.prepare("SELECT id FROM evenements WHERE epingle_permanent=1 LIMIT 1").get();
     if (existant) return;
-    const officielId = await getOfficialUserId();
-    if (!officielId) return; // aucun compte officiel dans cet environnement : rien à créer plutôt qu'un propriétaire incorrect
+    /* Propriétaire : le compte officiel s'il est marqué (is_official=1) ; sinon le plus ancien administrateur — même repli que la publication d'une annonce
+       officielle (« getOfficialUserId() || admin.id »). Constaté en production (2026-10-13) : aucun compte n'y est marqué is_official, l'événement épinglé
+       n'aurait donc jamais été créé. Marquer un compte « officiel » changerait d'autres comportements (abonnement automatique des nouveaux inscrits…). */
+    let officielId = await getOfficialUserId();
+    if (!officielId) { const adm = await db.prepare("SELECT id FROM users WHERE role='administrateur' ORDER BY id ASC LIMIT 1").get(); officielId = adm ? adm.id : null; }
+    if (!officielId) return; // aucun administrateur dans cet environnement : rien à créer plutôt qu'un propriétaire incorrect
     await db.prepare(`
       INSERT INTO evenements
         (titre, organisateur, date_evt, date_fin, lieu, statut, owner_user_id, description, domaine,
@@ -30292,6 +30296,7 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
       "Diaspo'Actif vous invite à découvrir la plateforme de la diaspora : créez votre boutique en ligne, mettez en avant votre activité, partagez votre expérience, gérez votre association. Tout notre système Premium est à votre disposition jusqu'au 3 janvier 2027. Offre exceptionnelle : à partir du 13 décembre 2026, les nouveaux inscrits n'auront droit qu'à 3 semaines de Premium.",
       "autre",
     );
+    await db.prepare("DELETE FROM evenements WHERE epingle_permanent=1 AND id > (SELECT MIN(id) FROM (SELECT id FROM evenements WHERE epingle_permanent=1) AS t)").run();
   } catch (e) { console.error('[seedEvenementPromoPremium]', e.message); }
 })();
 
