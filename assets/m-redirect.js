@@ -18,7 +18,7 @@
     'messagerie.html': '#/messages', 'mes-billets.html': '#/billets', 'formations.html': '#/formations',
     'parrainage.html': '#/parrainage', 'mon-abonnement.html': '#/abonnement', 'confidentialite.html': '#/confidentialite',
     'reseau.html': '#/reseaupro', 'business-plan.html': '#/businessplan', 'mon-associe.html': '#/associe',
-    'videos-tutoriels.html': '#/videos', 'cagnottes.html': '#/cagnottes',
+    'videos-tutoriels.html': '#/videos', 'cagnottes.html': '#/cagnottes', 'agenda.html': '#/agenda',
     'fil-actualite.html': '#/accueil', 'fil-actualite-app.html': '#/accueil', 'evenements.html': '#/evenements'
   };
   /* Les tableaux de bord (dashboard-*.html) ne sont PAS redirigés : ils contiennent des outils qui n'existent pas encore dans l'appli. */

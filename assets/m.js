@@ -404,14 +404,15 @@
   /* ---------- barre du haut + onglets ---------- */
   function renderTop() {
     const top = $('#top');
-    /* Bouton « Actualités » (2026-10-12, demande explicite) : accessible partout, connecté ou non — ouvre « Toutes les actualités » (#/actualites). */
-    const actu = `<a class="ibtn" href="#/actualites" aria-label="Actualités" title="Actualités">${ic('fil')}</a>`;
+    /* Bouton « Actualités » déplacé dans la barre d'onglets du bas (2026-10-13, demande
+       explicite : "mets-le en bas après le bouton moi") — voir renderTabs(), toujours
+       accessible connecté ou non puisque les onglets sont toujours affichés. */
     const right = S.me
-      ? `${actu}<button class="ibtn" id="top-switch" aria-label="Changer de compte">${ic('swap')}</button><a class="ibtn" href="panier.html" aria-label="Mon panier" title="Mon panier">${ic('cart')}<span class="dot" id="panier-badge" hidden></span></a><a class="ibtn" href="#/notifs" aria-label="Notifications">${ic('bell')}<span class="dot" id="notif-badge" hidden></span></a>`
+      ? `<button class="ibtn" id="top-switch" aria-label="Changer de compte">${ic('swap')}</button><a class="ibtn" href="panier.html" aria-label="Mon panier" title="Mon panier">${ic('cart')}<span class="dot" id="panier-badge" hidden></span></a><a class="ibtn" href="#/notifs" aria-label="Notifications">${ic('bell')}<span class="dot" id="notif-badge" hidden></span></a>`
       /* Bouton « Créer un compte » restauré dans le bandeau (2026-10-08, demande explicite) : avait
          disparu de la nouvelle interface téléphone, seule « Connexion » y figurait — à la différence
          du bandeau du site (assets/app.js) qui a toujours les deux côte à côte. */
-      : `<div class="top-auth">${actu}<a class="pill-cta ghost" href="inscription.html">Créer un compte</a><button class="pill-cta" id="top-login">Connexion</button></div>`;
+      : `<div class="top-auth"><a class="pill-cta ghost" href="inscription.html">Créer un compte</a><button class="pill-cta" id="top-login">Connexion</button></div>`;
     const left = S.me ? `<button class="menu-btn" id="top-menu" aria-label="Menu des modules">${ic('menu')}<span>Menu</span></button>` : '';
     top.innerHTML = `${left}<img class="logo" src="assets/logo-roundel.webp" alt="" onerror="this.src='assets/logo.svg'">
       <h1 class="sr-only"><span class="brand-s">Diaspo’Actif</span><span id="top-title">${esc(TITLES[S.tab] || '')}</span></h1><span style="flex:1"></span>${right}`;
@@ -421,7 +422,7 @@
     paintBadges();
   }
   function renderTabs() {
-    const items = [['accueil', 'Accueil', 'home'], ['evenements', 'Événements', 'cal'], ['annuaire', 'Annuaire', 'dir'], ['messages', 'Messages', 'chat'], ['boutiques', 'Boutiques', 'shop'], ['moi', 'Moi', 'user']];
+    const items = [['accueil', 'Accueil', 'home'], ['evenements', 'Événements', 'cal'], ['annuaire', 'Annuaire', 'dir'], ['messages', 'Messages', 'chat'], ['boutiques', 'Boutiques', 'shop'], ['moi', 'Moi', 'user'], ['actualites', 'Actualités', 'fil']];
     $('#tabs').innerHTML = items.map(([k, l, i]) => `<button data-tab="${k}" aria-label="${l}" ${S.tab === k ? 'aria-current="page"' : ''} class="${S.tab === k ? 'on' : ''}">${ic(i)}<span>${l}</span>${k === 'messages' ? '<span class="dot" id="tab-badge-messages" hidden></span>' : ''}</button>`).join('');
     $$('#tabs button').forEach(b => b.onclick = () => {
       if (S.tab === b.dataset.tab && !S.pane) { window.scrollTo({ top: 0, behavior: 'smooth' }); refreshTab(b.dataset.tab); }
@@ -714,15 +715,24 @@
   function viewEvents() {
     const el = $('#t-evenements');
     /* Entrée « ⚡ Événement flash » + « ? » (comptes Initiative seulement) — fournie par le module Mes événements, vide sinon. */
-    el.innerHTML = `${(window.MMods && window.MMods.flashCarte) ? window.MMods.flashCarte() : ''}<div class="search">${ic('search', 's')}<input id="evq" type="search" placeholder="Rechercher un événement…" aria-label="Rechercher un événement" value="${esc(S.ev.q)}"></div>
+    el.innerHTML = `${(window.MMods && window.MMods.flashCarte) ? window.MMods.flashCarte() : ''}<div class="ev-top"><div class="search">${ic('search', 's')}<input id="evq" type="search" placeholder="Rechercher un événement…" aria-label="Rechercher un événement" value="${esc(S.ev.q)}"></div><button type="button" id="ev-cloche" aria-label="Être informé des événements" title="Être informé des événements"></button></div>
+      <a class="btn out block" href="#/calendrier" style="margin:10px 0 2px">${ic('cal', 's')} Calendrier — voir par mois et ajouter à mon agenda</a>
       <div class="chips">${[['avenir', 'À venir'], ['passes', 'Terminés'], ['gratuit', 'Gratuits'], ['mes', 'Mes inscriptions']].map(([k, l]) => `<button class="chip ${S.ev.filtre === k ? 'on' : ''}" data-f="${k}">${l}</button>`).join('')}</div>
       ${pubSlot('evenements_sidebar')}<div id="ev-bar"></div><div class="small muted" id="ev-count" style="margin:0 4px 10px"></div><div id="ev-list"></div>`;
     $$('.chip[data-f]', el).forEach(c => c.onclick = async () => {
       if (c.dataset.f === 'mes' && !(await needLogin('Connectez-vous pour retrouver vos inscriptions.'))) return;
       S.ev.filtre = c.dataset.f; viewEvents();
     });
+    /* Cloche des événements (2026-10-13) : choisir les événements pour lesquels on veut être notifié. Module chargé à la demande. */
+    poserClocheEvenements($('#ev-cloche', el));
     let t; $('#evq').oninput = e => { clearTimeout(t); t = setTimeout(() => { S.ev.q = e.target.value.trim(); paintEvents(); }, 200); };
     if (!S.ev.loaded) loadEvents(); else paintEvents();
+  }
+  function poserClocheEvenements(b) {
+    if (!b) return;
+    const pret = () => window.AlertesEvt.poser(b, { connexion: () => { needLogin('Connectez-vous pour être informé des événements qui vous intéressent.'); } });
+    if (window.AlertesEvt) return pret();
+    const s = document.createElement('script'); s.src = 'assets/alertes-evenements.js?v=20261013a'; s.onload = pret; document.head.appendChild(s);
   }
   function drawEvBar() {
     const bar = $('#ev-bar'); if (!bar) return; S.ev.f = S.ev.f || {}; const defs = evFilterDefs();
@@ -750,7 +760,29 @@
     if (!a.length) { l.innerHTML = `<div class="empty"><div class="ei">${ic('cal', 'l')}</div><b>Aucun événement</b>${f === 'mes' ? 'Vous n’êtes inscrit à aucun événement pour le moment.' : 'Essayez un autre filtre ou une autre recherche.'}</div>`; return; }
     l.innerHTML = a.map(evtCard).join('');
   }
+  /* Cartouche de l'événement épinglé « 3 mois de Premium offerts » (2026-10-13, demande explicite : « inspire-toi du rendu sur l'ordinateur,
+     là je le trouve très banal »). Même langage que la cartouche .evt-epingle du site : nuit, halo doré, badge or, titre en Bodoni, boutons
+     en pilule. Bodoni n'est chargé qu'à la première apparition de la cartouche (le reste de l'application reste en police système). */
+  function evtPromo(e) {
+    if (!document.getElementById('ep-font')) { const l = document.createElement('link'); l.id = 'ep-font'; l.rel = 'stylesheet'; l.href = 'https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,500&display=swap'; document.head.appendChild(l); }
+    const court = s => { const p = parseDay(s); return p ? `${p.d} ${MOIS[p.m - 1]}` : ''; };
+    const dFin = parseDay(e.date_fin);
+    const periode = e.date_evt ? (e.date_fin && e.date_fin !== e.date_evt ? `Du ${court(e.date_evt)} au ${court(e.date_fin)}${dFin ? ' ' + dFin.y : ''}` : court(e.date_evt)) : '';
+    const resume = String(e.description || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 170);
+    return `<div class="ev-promo" role="group" aria-label="Événement spécial Diaspo’Actif">
+      <span class="ep-ring" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 2.5l2.7 6.3 6.8.6-5.2 4.5 1.6 6.7L12 16.9 6.1 20.6l1.6-6.7L2.5 9.4l6.8-.6z"/></svg></span>
+      <span class="ep-badge">Événement spécial Diaspo’Actif</span>
+      <h3 class="ep-titre">${esc(e.titre)}</h3>
+      ${resume ? `<p class="ep-texte">${esc(resume)}${String(e.description || '').length > 170 ? '…' : ''}</p>` : ''}
+      ${periode ? `<span class="ep-periode">${ic('cal', 's')}${esc(periode)}</span>` : ''}
+      <div class="ep-cta">
+        <a class="ep-voir" href="#/evenement/${e.id}">Voir l’événement</a>
+        <button type="button" class="ep-part" data-share-ev="${e.id}" data-share-titre="${esc(e.titre)}" data-promo="1">${ic('share', 's')}Partager · gagnez 3 points</button>
+      </div>
+    </div>`;
+  }
   function evtCard(e) {
+    if (Number(e.epingle_permanent) === 1) return evtPromo(e);
     const p = parseDay(e.date_evt); const cov = evtCover(e);
     const paid = e.prix_min > 0 || e.type_participation === 'payant';
     const part = e.type_participation === 'partiellement_payant' ? 'Partiellement payant' : paid ? 'Payant' : 'Gratuit';
@@ -803,7 +835,7 @@
       const dedans = () => { ag.innerHTML = `${ic('check', 's')} Dans mon agenda`; ag.dataset.ok = '1'; };
       if (S.me) api('/api/agenda/evenements-ajoutes').then(x => { if ((x.ids || []).map(Number).includes(Number(id))) dedans(); }).catch(() => { });
       ag.onclick = async () => {
-        if (ag.dataset.ok) { location.href = 'agenda.html'; return; }
+        if (ag.dataset.ok) { location.hash = '#/agenda'; return; }
         if (!(await needLogin('Connectez-vous pour ajouter cet événement à votre agenda.'))) return paneEvent(id);
         ag.disabled = true;
         try { const r2 = await api(`/api/evenements/${id}/ajouter-agenda`, { method: 'POST', body: {} }); dedans(); toast(r2.deja ? 'Déjà dans votre agenda' : 'Ajouté à votre agenda ✓'); }
@@ -822,7 +854,7 @@
       dessinerQR($('#ev-qr-l'), 260);
       $('#ev-qr-copy').onclick = async () => { try { await navigator.clipboard.writeText(evUrl); toast('Lien copié ✓'); } catch (er) { toast(evUrl); } };
     };
-    const qrShare = $('#ev-qr-share'); if (qrShare) qrShare.onclick = () => partagerLien(evUrl + (S.me ? '&via=' + S.me.id : '') + '&r=' + jetonPartage(), e.titre);
+    const qrShare = $('#ev-qr-share'); if (qrShare) qrShare.onclick = () => partagerEvt(evUrl + (S.me ? '&via=' + S.me.id : '') + '&r=' + jetonPartage(), e.titre, e.id);
     const j = $('#ev-join'); if (j) j.onclick = async () => {
       if (!(await needLogin('Connectez-vous pour vous inscrire à cet événement.'))) return paneEvent(id);
       j.disabled = true; j.textContent = 'Inscription…';
@@ -1124,7 +1156,7 @@
     const shA = e.target.closest('[data-share-ann]');
     if (shA) { e.preventDefault(); const s = (S.annShare || {})[shA.dataset.shareAnn]; if (s) partagerLien(location.origin + s.path + (S.me ? '&via=' + S.me.id : '') + '&r=' + jetonPartage(), s.nm); return; }
     const shE = e.target.closest('[data-share-ev]');
-    if (shE) { e.preventDefault(); e.stopPropagation(); partagerLien(location.origin + '/evenements.html?evt=' + encodeURIComponent(shE.dataset.shareEv) + (S.me ? '&via=' + S.me.id : '') + '&r=' + jetonPartage(), shE.dataset.shareTitre || 'Événement Diaspo’Actif'); return; }
+    if (shE) { e.preventDefault(); e.stopPropagation(); if (shE.dataset.promo && S.me) api('/api/evenements/' + encodeURIComponent(shE.dataset.shareEv) + '/partage-promo', { method: 'POST', body: {} }).then(r => { if (r && r.points) toast('+3 points d’indice de fiabilité ✓'); }).catch(() => { /* le partage lui-même ne doit jamais dépendre du bonus */ }); partagerEvt(location.origin + '/evenements.html?evt=' + encodeURIComponent(shE.dataset.shareEv) + (S.me ? '&via=' + S.me.id : '') + '&r=' + jetonPartage(), shE.dataset.shareTitre || 'Événement Diaspo’Actif', shE.dataset.shareEv); return; }
     const af = e.target.closest('[data-aff-go]');
     if (af) { const [k, i] = af.dataset.affGo.split(':'); affilier(k, i, af.dataset.nom || 'ce compte', af); return; }
     const ad = e.target.closest('[data-adh]');
@@ -1995,6 +2027,7 @@
     { t: 'Messages de la boutique', i: 'shop', h: '#/msgboutique', d: 'Demandes reçues via votre boutique', r: { initiative: 2 } },
     { t: 'Messagerie', i: 'chat', h: '#/messages', d: 'Vos conversations', r: { utilisateur: 1, initiative: 1 } },
     { t: 'Mes billets', i: 'ticket', h: '#/billets', d: 'Inscriptions et QR codes d’entrée', r: { utilisateur: 1, initiative: 1 } },
+    { t: 'Mon agenda', i: 'cal', h: '#/agenda', d: 'Vos événements personnels et ceux ajoutés', r: { utilisateur: 1, initiative: 1 } },
     { t: 'Cagnottes et dons', i: 'heart', h: '#/cagnottes', d: { utilisateur: 'Soutenir les cagnottes ouvertes', initiative: 'Vos cagnottes et les dons reçus' }, r: { initiative: 2 } },
     { t: 'Mon Associé', i: 'people', h: '#/associe', d: { utilisateur: 'Consulter les annonces, candidater', initiative: 'Annonces d’associés · publier = Premium' }, r: { utilisateur: 1, initiative: 3 } },
     { t: 'Mon Réseau Pro', i: 'brief', h: '#/reseaupro', d: 'Contacts et réseau professionnel', r: { utilisateur: 2, initiative: 1 } },
@@ -2195,6 +2228,27 @@
     try { await navigator.clipboard.writeText(url); toast('Lien copié ✓'); return; } catch (er) { /* presse-papiers refusé */ }
     openSheet('<h3 style="margin:0 0 8px">Partager</h3><p class="small muted" style="margin:0 0 8px">Copiez ce lien : il s’ouvre sans compte.</p><input class="fi" id="sh-url" readonly value="' + esc(url) + '">');
     const i = $('#sh-url'); if (i) { i.focus(); i.select(); }
+  }
+  /* Partager un événement (2026-10-13, demande explicite : « quand on envoie un événement à une personne, la cartouche apparaît avec les informations »).
+     Connecté : une fenêtre propose le lien (WhatsApp… : l'aperçu du lien porte déjà image, titre, date et lieu) OU l'e-mail avec la carte complète ;
+     non connecté : partage du lien directement, comme avant. */
+  function partagerEvt(url, titre, id) {
+    if (!S.me || !id) return partagerLien(url, titre);
+    const close = openSheet(`<h3 style="margin:0 0 10px">Partager cet événement</h3>
+      <p class="small muted" style="margin:0 0 10px">${esc(titre)}</p>
+      <div id="pe-info" class="small muted" style="margin:0 0 8px" role="status"></div>
+      <button type="button" class="btn block" id="pe-lien">${ic('share', 's')} Envoyer le lien (WhatsApp…)</button>
+      <button type="button" class="btn out block" id="pe-mail" style="margin-top:8px">✉️ Envoyer par e-mail (affiche, date, lieu)</button>
+      <div id="pe-mailbox" hidden style="margin-top:8px"><input type="text" id="pe-mailin" inputmode="email" autocomplete="email" placeholder="adresse@exemple.com (jusqu’à 5, séparées par une virgule)" style="width:100%;box-sizing:border-box;padding:12px;border:1.5px solid var(--line,#d1d5db);border-radius:12px;font:inherit;font-size:15px"><button type="button" class="btn block" id="pe-mailgo" style="margin-top:8px">Envoyer l’e-mail</button></div>`);
+    $('#pe-lien').onclick = () => { close(); partagerLien(url, titre); };
+    $('#pe-mail').onclick = () => { $('#pe-mailbox').hidden = false; $('#pe-mail').hidden = true; $('#pe-mailin').focus(); };
+    $('#pe-mailgo').onclick = async () => {
+      const go = $('#pe-mailgo'); go.disabled = true; go.textContent = 'Envoi…';
+      try {
+        const j = await api('/api/evenements/' + encodeURIComponent(id) + '/envoyer-email', { method: 'POST', body: { emails: $('#pe-mailin').value } });
+        $('#pe-info').textContent = j.envoyes > 1 ? `✅ E-mail envoyé à ${j.envoyes} personnes.` : '✅ E-mail envoyé.'; go.textContent = '✓ Envoyé';
+      } catch (er) { go.disabled = false; go.textContent = 'Envoyer l’e-mail'; $('#pe-info').textContent = er.message || 'Envoi impossible.'; }
+    };
   }
   /* Lien unique à chaque partage (&r=) : WhatsApp garde un aperçu raté pour toujours par adresse exacte (voir partagerEvenement du site). */
   const jetonPartage = () => Date.now().toString(36);
