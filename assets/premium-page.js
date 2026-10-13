@@ -142,14 +142,23 @@
     } catch (e) { return { tarifs: [] }; }
   }
 
+  /* Confirmation OBLIGATOIRE avant tout paiement (2026-10-13) : exécution immédiate + renonciation au droit de rétractation — voir assets/premium-renonciation.js. */
+  async function demanderRenonciation(typeTarif) {
+    if (!window.PremiumRenonciation) {
+      await new Promise(r => { const s = document.createElement('script'); s.src = '/assets/premium-renonciation.js?v=1'; s.onload = s.onerror = r; document.head.appendChild(s); });
+    }
+    return window.PremiumRenonciation ? window.PremiumRenonciation.demander({ typeTarif }) : window.confirm('Je demande l’exécution immédiate de mon abonnement Premium et je renonce à mon droit de rétractation de 14 jours.');
+  }
+
   async function souscrire(accredType, typeTarif, btn, parrainageDsId) {
+    if (!(await demanderRenonciation(typeTarif))) return;
     if (btn) { btn.disabled = true; btn.textContent = 'Redirection…'; }
     try {
       const r = await fetch('/api/accreditations/' + accredType + '/payer', {
         method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
         // parrainage_ds_id n'est qu'une indication : le serveur recalcule et revalide
         // systématiquement, jamais confiance dans un prix envoyé par le client.
-        body: JSON.stringify({ type_tarif: typeTarif, parrainage_ds_id: parrainageDsId || undefined }),
+        body: JSON.stringify({ type_tarif: typeTarif, parrainage_ds_id: parrainageDsId || undefined, renonciation_retractation: true }),
       }).then(async res => {
         const d = await res.json();
         if (!res.ok) throw Object.assign(new Error(d.error || 'Erreur'), { data: d });

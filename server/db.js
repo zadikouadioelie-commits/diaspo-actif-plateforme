@@ -2245,6 +2245,11 @@ const MIGRATIONS = [
   ["evenements", "epingle_permanent INTEGER DEFAULT 0"],
   // « Ajouter à mon agenda » (2026-10-13) : événement du Calendrier Diaspora copié dans l'agenda personnel — évite les doublons.
   ["agenda_events", "evenement_id INTEGER"],
+  // Souscription Premium (2026-10-13) : preuve de la renonciation au droit de rétractation + date du premier prélèvement (fin de la période offerte).
+  ["accred_paiements", "renonciation_at TEXT"],
+  ["accred_paiements", "renonciation_version TEXT"],
+  ["accred_paiements", "renonciation_ip TEXT"],
+  ["accred_paiements", "facturation_debut TEXT"],
   // ── Bannière "Installer l'app" (PWA) — 2026-08-18 : réglage "Ne plus afficher" lié au compte,
   // réactivable depuis Confidentialité (voir buildPrivacyPanel() dans profil-app.html) ──
   ["users", "pwa_prompt_dismiss INTEGER DEFAULT 0"],

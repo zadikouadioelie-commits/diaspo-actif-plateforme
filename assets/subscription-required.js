@@ -85,7 +85,16 @@
     return dev && sessionStorage.getItem('da_bypass_' + key) === '1';
   };
 
+  /* Confirmation OBLIGATOIRE avant tout paiement (2026-10-13) — voir assets/premium-renonciation.js. */
+  async function demanderRenonciation(typeTarif) {
+    if (!window.PremiumRenonciation) {
+      await new Promise(r => { const s = document.createElement('script'); s.src = '/assets/premium-renonciation.js?v=1'; s.onload = s.onerror = r; document.head.appendChild(s); });
+    }
+    return window.PremiumRenonciation ? window.PremiumRenonciation.demander({ typeTarif }) : window.confirm('Je demande l’exécution immédiate de mon abonnement Premium et je renonce à mon droit de rétractation de 14 jours.');
+  }
+
   async function souscrire(accredType, typeTarif, btn) {
+    if (!(await demanderRenonciation(typeTarif))) return;
     if (btn) { btn.disabled = true; btn.textContent = 'Redirection…'; }
     try {
       const apiFn = window.api || (async (m, p, b) => {
@@ -94,7 +103,7 @@
         if (!r.ok) throw Object.assign(new Error(d.error || 'Erreur'), { status: r.status, data: d });
         return d;
       });
-      const r = await apiFn('POST', `/accreditations/${accredType}/payer`, { type_tarif: typeTarif });
+      const r = await apiFn('POST', `/accreditations/${accredType}/payer`, { type_tarif: typeTarif, renonciation_retractation: true });
       if (r.checkout_url) window.location.href = r.checkout_url;
     } catch (e) {
       alert((e.data && e.data.error) || e.message || 'Impossible de démarrer le paiement.');

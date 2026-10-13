@@ -174,7 +174,7 @@ async function loadAbonnement() {
           <td>${fmtDate(p.created_at)}</td>
           <td>${escH(p.emoji||'')} ${escH(p.label)}</td>
           <td>${p.type_tarif === 'annuel' ? 'Annuelle' : 'Mensuelle'}</td>
-          <td>${p.statut === 'paye' ? '✅ Payé' : p.statut === 'en_attente' ? '⏳ En attente' : '❌ Échoué'}</td>
+          <td>${p.statut === 'paye' && p.facturation_debut && new Date(p.facturation_debut) > new Date() ? '🗓️ Premier prélèvement le ' + fmtDate(p.facturation_debut) : p.statut === 'paye' ? '✅ Payé' : p.statut === 'en_attente' ? '⏳ En attente' : '❌ Échoué'}</td>
           <td style="text-align:right;font-weight:700;">${fmtPrix(p.montant, p.devise)}</td>
         </tr>`).join('')}</tbody></table></div>` : '<p style="color:var(--muted);font-size:13px;margin:0;">Aucun paiement enregistré.</p>'}
       </div>`;

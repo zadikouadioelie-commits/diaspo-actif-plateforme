@@ -930,6 +930,11 @@ const COLONNES_MIGRATION = [
     ['cv_profiles', 'partage_actif', 'INTEGER DEFAULT 1'],
     ['evenements', 'epingle_permanent', 'INTEGER DEFAULT 0'],
     ['agenda_events', 'evenement_id', 'INTEGER'],
+    // Souscription Premium (2026-10-13) — miroir exact des ALTER db.js.
+    ['accred_paiements', 'renonciation_at', 'TEXT'],
+    ['accred_paiements', 'renonciation_version', 'TEXT'],
+    ['accred_paiements', 'renonciation_ip', 'TEXT'],
+    ['accred_paiements', 'facturation_debut', 'TEXT'],
     // Liste de stockage des participants (Cotisations & Adhésions ↔ Réseau professionnel)
     ['adhesion_formules', 'liste_stockage_id', 'INTEGER'],
     // Profil public enrichi des initiatives

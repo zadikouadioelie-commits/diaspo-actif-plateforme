@@ -8064,8 +8064,23 @@ route("POST", "/api/accreditations/:type/payer", async (req, res, params, body) 
   const montantReduit = typeTarif === 'annuel' ? calcule.montant_annuel : calcule.montant_mensuel;
   const tarif = { montant: montantPlein, devise: calcule.devise };
 
-  const dejaActive = await hasAccreditation(user.id, def.type);
-  if (dejaActive) return sendJSON(res, 400, { error: "Vous êtes déjà abonné." });
+  /* Case OBLIGATOIRE (2026-10-13, demande explicite) : demande d'exécution immédiate + renonciation au droit de rétractation de 14 jours.
+     Refus côté serveur : jamais de souscription sans cette confirmation, même si la fenêtre du navigateur est contournée. */
+  if (body.renonciation_retractation !== true) {
+    return sendJSON(res, 400, { code: "renonciation_requise", error: "Pour souscrire, cochez la case par laquelle vous demandez l'exécution immédiate de votre abonnement et renoncez à votre droit de rétractation de 14 jours." });
+  }
+  /* « Déjà abonné » = abonnement PAYANT actif. La période Premium offerte (30 jours de découverte, 3 mois / 3 semaines) ne doit jamais empêcher de
+     souscrire : on peut s'abonner dès le premier jour. */
+  const statutAvant = await getPremiumStatut(user.id, user.role);
+  if (statutAvant.actif && Number(statutAvant.montant_paye) > 0) return sendJSON(res, 400, { error: "Vous êtes déjà abonné." });
+  /* Période offerte en cours : elle n'est JAMAIS perdue. L'abonnement est enregistré tout de suite (carte enregistrée, tout est scellé) mais le
+     premier prélèvement n'a lieu qu'à sa fin (trial_end). Le prestataire exige au moins 48 h d'avance et au plus 2 ans ; au-delà de ces bornes
+     (ou période offerte déjà terminée) le prélèvement est immédiat. */
+  let finEssai = null;
+  if (statutAvant.actif && !(Number(statutAvant.montant_paye) > 0) && statutAvant.date_expiration) {
+    const finMs = new Date(statutAvant.date_expiration).getTime(), maintenant = Date.now();
+    if (finMs > maintenant) { finEssai = new Date(Math.max(finMs, maintenant + 49 * 3600 * 1000)); if (finEssai.getTime() - maintenant > 700 * 86400000) finEssai = null; }
+  }
 
   // reduction_pct_appliquee : traçabilité générique (D'A + parrainage + tout futur
   // mécanisme) documentant qu'une réduction a été appliquée via coupon, même si tarif.montant
@@ -8075,6 +8090,10 @@ route("POST", "/api/accreditations/:type/payer", async (req, res, params, body) 
     INSERT INTO accred_paiements (user_id, accred_id, type_tarif, montant, devise, statut, reduction_pct_appliquee)
     VALUES (?,?,?,?,?,'en_attente',?)
   `).run(user.id, def.id, typeTarif, tarif.montant, tarif.devise || 'EUR', reductionAppliquee)).lastInsertRowid;
+  try {
+    await db.prepare("UPDATE accred_paiements SET renonciation_at=?, renonciation_version=?, renonciation_ip=?, facturation_debut=? WHERE id=?")
+      .run(new Date().toISOString(), PREMIUM_RENONCIATION_VERSION, SEC.clientIp(req), finEssai ? finEssai.toISOString() : null, paiementId);
+  } catch (e) { logError(e, "premium-renonciation-preuve", req); }
 
   const origin = getOrigin(req);
   const interval = typeTarif === 'annuel' ? 'year' : 'month';
@@ -8118,12 +8137,13 @@ route("POST", "/api/accreditations/:type/payer", async (req, res, params, body) 
         quantity: 1,
       }],
       ...(stripeCouponId ? { discounts: [{ coupon: stripeCouponId }] } : {}),
-      metadata: { diaspoactif_accred_paiement_id: String(paiementId), diaspoactif_accred_user_id: String(user.id), diaspoactif_accred_def_id: String(def.id) },
+      ...(finEssai ? { payment_method_collection: "always", subscription_data: { trial_end: Math.floor(finEssai.getTime() / 1000), metadata: { diaspoactif_accred_paiement_id: String(paiementId) } } } : {}),
+      metadata: { diaspoactif_accred_paiement_id: String(paiementId), diaspoactif_accred_user_id: String(user.id), diaspoactif_accred_def_id: String(def.id), ...(finEssai ? { diaspoactif_trial_end: finEssai.toISOString() } : {}) },
       success_url: `${origin}/dashboard-utilisateur.html?abonnement=succes&paiement_id=${paiementId}`,
       cancel_url: `${origin}/dashboard-utilisateur.html?abonnement=annule&paiement_id=${paiementId}`,
     });
     await db.prepare(`UPDATE accred_paiements SET stripe_session_id=? WHERE id=?`).run(session.id, paiementId);
-    return sendJSON(res, 201, { ok: true, id: paiementId, checkout_url: session.url });
+    return sendJSON(res, 201, { ok: true, id: paiementId, checkout_url: session.url, premier_prelevement: finEssai ? finEssai.toISOString() : null });
   } catch (e) {
     await db.prepare(`UPDATE accred_paiements SET statut='echoue' WHERE id=?`).run(paiementId);
     /* Action compensatoire : un paiement qui n'aboutit jamais en Checkout ne doit pas
@@ -16583,6 +16603,8 @@ const PREMIUM_DATE_PLANCHER = new Date(process.env.PREMIUM_DATE_PLANCHER || '202
    variable d'environnement PREMIUM_FIN_GRATUITE_COMMUNE (ISO). La date plancher PREMIUM_DATE_PLANCHER n'est plus utilisée. */
 const PREMIUM_FIN_GRATUITE_COMMUNE = new Date(process.env.PREMIUM_FIN_GRATUITE_COMMUNE || '2027-01-03T00:00:00.000Z');
 const PREMIUM_ESSAI_NOUVEAUX_JOURS = 21;
+/* Texte de renonciation accepté à la souscription (version enregistrée comme preuve avec la date et l'adresse IP — voir POST /api/accreditations/:type/payer). */
+const PREMIUM_RENONCIATION_VERSION = 'cgv-2026-10-13-v1';
 function finPeriodeGratuite(createdAt) {
   const cree = (createdAt instanceof Date) ? new Date(createdAt.getTime())
              : (createdAt ? new Date(String(createdAt).replace(' ', 'T')) : null);
@@ -20133,6 +20155,17 @@ async function handleStripeWebhook(req, res) {
             stripe_subscription_id=excluded.stripe_subscription_id, reduction_pct_appliquee=excluded.reduction_pct_appliquee,
             updated_at=datetime('now')
         `).run(pay.user_id, pay.accred_id, pay.type_tarif, pay.montant, session.customer || null, session.subscription || null, pay.reduction_pct_appliquee || 0);
+        /* Abonnement scellé pendant la période OFFERTE (trial_end) : aucun paiement n'a encore eu lieu. Le montant payé reste donc à 0 (c'est lui qui distingue
+           une période offerte d'un abonnement payant) et l'accès est garanti jusqu'à 2 jours après le premier prélèvement, le temps que sa confirmation arrive
+           (invoice.payment_succeeded fixe alors le montant réel et supprime cette date). La ligne de paiement passe aussi à 0 : aucun chiffre d'affaires avant le
+           premier prélèvement réel. */
+        const essaiFin = session.metadata && session.metadata.diaspoactif_trial_end;
+        if (essaiFin) {
+          const garde = new Date(new Date(essaiFin).getTime() + 2 * 86400000).toISOString();
+          await db.prepare("UPDATE user_accreditations SET montant_paye=0, date_expiration=? WHERE user_id=? AND accred_id=?").run(garde, pay.user_id, pay.accred_id);
+          await db.prepare("UPDATE accred_paiements SET montant=0, facturation_debut=? WHERE id=?").run(essaiFin, paiementId);
+          creerNotif(pay.user_id, "accred_abonnement_programme", "Abonnement confirmé ✅", `Votre Premium offert continue jusqu'au ${new Date(essaiFin).toLocaleDateString('fr-FR')}. Aucun prélèvement avant cette date : le premier prélèvement aura lieu ce jour-là.`, { accred_id: pay.accred_id });
+        }
         creerNotif(pay.user_id, "accred_abonnement", "Abonnement activé ⭐", "Votre abonnement est actif : Réseau Pro, Business Plans et Mes projets sont débloqués.", { accred_id: pay.accred_id });
 
         /* Codes Adhésion D'A — ancrage de la fenêtre à la PREMIÈRE utilisation confirmée
@@ -20280,6 +20313,14 @@ async function handleStripeWebhook(req, res) {
       const accredUA = await db.prepare("SELECT * FROM user_accreditations WHERE stripe_subscription_id=?").get(invoice.subscription);
       if (accredUA && invoice.billing_reason !== "subscription_create") {
         await db.prepare(`UPDATE user_accreditations SET statut='active', grace_until=NULL, updated_at=datetime('now') WHERE id=?`).run(accredUA.id);
+        /* Premier prélèvement réel après la période offerte : l'abonnement devient PAYANT (montant réel, plus de date de fin forcée : le prestataire
+           gère la suite). Les renouvellements suivants ne passent pas ici (montant déjà > 0). */
+        const paye = Number(invoice.amount_paid || 0) / 100;
+        if (paye > 0 && !(Number(accredUA.montant_paye) > 0)) {
+          await db.prepare("UPDATE user_accreditations SET montant_paye=?, date_expiration=NULL WHERE id=?").run(paye, accredUA.id);
+          await db.prepare("UPDATE accred_paiements SET montant=?, facturation_debut=NULL WHERE stripe_subscription_id=? AND montant=0").run(paye, invoice.subscription);
+          creerNotif(accredUA.user_id, "accred_premier_prelevement", "Premier prélèvement effectué ✅", "Votre abonnement Premium payant a commencé. Merci de votre confiance !", { accred_id: accredUA.accred_id });
+        }
       }
       /* Renouvellement d'un don récurrent (cagnottes, 2026-09-28) — même modèle que le
          renouvellement Adhésions ci-dessus : une NOUVELLE ligne cagnotte_contributions par
@@ -28534,7 +28575,7 @@ route("GET", "/api/mon-abonnement", async (req, res) => {
   }
 
   const paiements = await db.prepare(`
-    SELECT ap.id, ap.type_tarif, ap.montant, ap.devise, ap.statut, ap.reduction_pct_appliquee, ap.created_at, d.label, d.emoji
+    SELECT ap.id, ap.type_tarif, ap.montant, ap.devise, ap.statut, ap.reduction_pct_appliquee, ap.created_at, ap.facturation_debut, d.label, d.emoji
     FROM accred_paiements ap JOIN accred_definitions d ON d.id = ap.accred_id
     WHERE ap.user_id=? ORDER BY ap.created_at DESC LIMIT 50
   `).all(user.id);
