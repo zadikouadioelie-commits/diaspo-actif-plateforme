@@ -105,6 +105,7 @@
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let PN = { items: [], total: 0 };
 let PN_USER = null;
+let PN_PRESTATAIRES = null;
 
 const fmt = (n, devise) => Number(n).toFixed(2) + ' ' + (devise || 'EUR');
 
@@ -128,6 +129,13 @@ async function pnCharger() {
   try {
     const r = await api('GET', '/panier');
     PN = r;
+    /* Prestataires réellement disponibles (2026-10-13) — plus de boutons Carte/PayPal codés en
+       dur : si l'admin désactive un prestataire (ou si ses clés API sont absentes), il
+       disparaît ici au lieu de mener à une erreur au moment de payer. Chargé une seule fois. */
+    if (PN_PRESTATAIRES === null) {
+      try { PN_PRESTATAIRES = (await api('GET', '/paiement/prestataires-disponibles')).prestataires || []; }
+      catch (e) { PN_PRESTATAIRES = []; }
+    }
     pnRender();
     if (typeof updatePanierBadge === 'function') updatePanierBadge(r.nb_articles);
   } catch (e) {
@@ -190,16 +198,20 @@ function pnRender() {
       <input class="pn-input" id="pn-tel" placeholder="Téléphone (optionnel)" value="${esc(PN_USER?.telephone || '')}">
     </div>` : '';
 
+  const ICONE_PRESTATAIRE = { stripe: '💳', paypal: '🅿️' };
+  const prestataires = PN_PRESTATAIRES || [];
+  const aucunPrestataire = !prestataires.length;
+  const moyenPaiementHtml = aucunPrestataire
+    ? `<p class="pn-warn" style="margin:0 0 8px;">Aucun moyen de paiement n'est disponible pour le moment — réessayez plus tard.</p>`
+    : `<div class="pn-pay">${prestataires.map((p, i) => `<label><input type="radio" name="pn-provider" value="${p.code}" ${i === 0 ? 'checked' : ''}> ${ICONE_PRESTATAIRE[p.code] || '💳'} ${esc(p.label)}</label>`).join('')}</div>`;
+
   box.innerHTML = groupes + `<div class="pn-card">
     ${adresse}
     <div style="font-size:13px;font-weight:700;">Moyen de paiement</div>
-    <div class="pn-pay">
-      <label><input type="radio" name="pn-provider" value="stripe" checked> 💳 Carte</label>
-      <label><input type="radio" name="pn-provider" value="paypal"> 🅿️ PayPal</label>
-    </div>
+    ${moyenPaiementHtml}
     <div class="pn-total"><span>Total (${PN.nb_articles} article${PN.nb_articles > 1 ? 's' : ''})</span><span>${fmt(PN.total, PN.items[0].devise)}</span></div>
     <p id="pn-err" style="color:#dc2626;font-size:12.5px;display:none;margin:0 0 8px;"></p>
-    <button class="pn-btn" id="pn-payer" onclick="pnPayer()" ${bloquant ? 'disabled' : ''}>💳 Payer ${fmt(PN.total, PN.items[0].devise)}</button>
+    <button class="pn-btn" id="pn-payer" onclick="pnPayer()" ${bloquant || aucunPrestataire ? 'disabled' : ''}>💳 Payer ${fmt(PN.total, PN.items[0].devise)}</button>
     <div style="text-align:center;margin-top:10px;"><button class="pn-rm" onclick="pnVider()">Vider le panier</button></div>
   </div>`;
 }

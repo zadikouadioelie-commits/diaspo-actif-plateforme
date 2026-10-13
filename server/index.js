@@ -3176,6 +3176,9 @@ require("./cartographie-competences").register({ route, db, sendJSON, getCurrent
 /* Partager un tuto vidéo sur le fil (2026-10-12) : POST /api/videos-tutoriels/:id/partager — voir server/tuto-partage.js. */
 const TutoPartage = require("./tuto-partage");
 TutoPartage.register({ route, db, sendJSON, getCurrentUser, SEC, nomCompteAffichage, getOrigin });
+/* Envoyer un événement par e-mail (carte complète) + texte d'aperçu du lien (date, lieu) : server/partage-evenement.js. urlImagePartageEvenement est une déclaration de fonction (hissée). */
+const PartageEvenement = require("./partage-evenement");
+PartageEvenement.register({ route, db, sendJSON, getCurrentUser, SEC, nomCompteAffichage, getOrigin, urlImagePartageEvenement });
 
 /* ========== VITRINE COMMERCIALE + BOUTIQUE (comptes Initiative) ========== */
 const MAX_PRODUITS_VITRINE = 100;
@@ -5414,11 +5417,13 @@ route("POST", "/api/produits/:id/commander", async (req, res, params, body) => {
     const provider = body.provider === "paypal" ? "paypal" : "stripe";
     /* Vérifier la disponibilité du prestataire AVANT de créer la commande — sinon une
        indisponibilité laisse une ligne 'en_attente' orpheline, jamais marquée 'echoue'
-       (aucun webhook/retour ne viendra jamais la clôturer). */
-    const { paypalEnabled, createOrder } = require("./paypal-client");
-    const { stripe, getOrCreateStripeCustomer } = require("./stripe-client");
-    if (provider === "paypal" ? !paypalEnabled : !stripe) {
-      return sendJSON(res, 503, { error: "Paiements momentanément indisponibles." });
+       (aucun webhook/retour ne viendra jamais la clôturer). isProviderAllowed() vérifie à la
+       fois les clés API ET l'interrupteur admin (paiements-admin.html) — avant le module
+       server/payments (2026-10-13), seules les clés API étaient vérifiées : désactiver un
+       prestataire depuis l'admin n'avait aucun effet réel sur le parcours d'achat. */
+    const Payments = require("./payments");
+    if (!(await Payments.isProviderAllowed(db, provider, { pays: init.pays, devise: prod.devise }))) {
+      return sendJSON(res, 503, { error: "Ce moyen de paiement est momentanément indisponible." });
     }
 
     /* Frais de livraison inclus automatiquement dans le montant encaissé (2026-09-30, demande
@@ -5436,55 +5441,28 @@ route("POST", "/api/produits/:id/commander", async (req, res, params, body) => {
     `).run(params.id, prod.initiative_id, user.id, publicationId, body.message || null, quantite, montantTotal, provider,
       modeLivraisonDemande, livraisonNom, livraisonAdresse, livraisonCodePostal, livraisonVille, livraisonPays, livraisonTelephone, fraisLivraison)).lastInsertRowid;
 
-    if (provider === "paypal") {
-      try {
-        const origin = getOrigin(req);
-        const order = await createOrder({
-          amount: montantTotal,
-          currency: (prod.devise || "EUR").toUpperCase(),
-          description: `${prod.nom} (x${quantite})${fraisLivraison > 0 ? ' + frais de livraison' : ''}`,
-          custom_id: id,
-          return_url: `${origin}/api/paypal/commandes/${id}/retour?id=${init.owner_user_id}`,
-          cancel_url: `${origin}/profil.html?id=${init.owner_user_id}&vitrine=1&paiement=annule&commande=${id}`,
-        });
-        await db.prepare(`UPDATE commandes_vitrine SET paypal_order_id=? WHERE id=?`).run(order.id, id);
-        return sendJSON(res, 201, { ok: true, id, checkout_url: order.approveUrl });
-      } catch (e) {
-        await db.prepare(`UPDATE commandes_vitrine SET paiement_statut='echoue' WHERE id=?`).run(id);
-        return sendJSON(res, 500, SEC.safeError(e, "commander-produit-paypal"));
-      }
-    }
-
+    const origin = getOrigin(req);
+    const devise = (prod.devise || "EUR").toUpperCase();
+    const lineItems = [
+      { nom: prod.nom, montantUnitaire: Number(prod.prix), quantite },
+      ...(fraisLivraison > 0 ? [{ nom: "Frais de livraison", montantUnitaire: fraisLivraison, quantite: 1 }] : []),
+    ];
     try {
-      const origin = getOrigin(req);
-      const stripeCustomerId = await getOrCreateStripeCustomer(db, user);
-      const session = await stripe.checkout.sessions.create({
-        mode: "payment",
-        customer: stripeCustomerId,
-        line_items: [{
-          price_data: {
-            currency: (prod.devise || "EUR").toLowerCase(),
-            unit_amount: Math.round(Number(prod.prix) * 100),
-            product_data: { name: prod.nom },
-          },
-          quantity: quantite,
-        }, ...(fraisLivraison > 0 ? [{
-          price_data: {
-            currency: (prod.devise || "EUR").toLowerCase(),
-            unit_amount: Math.round(fraisLivraison * 100),
-            product_data: { name: "Frais de livraison" },
-          },
-          quantity: 1,
-        }] : [])],
-        ...(body.enregistrer_carte ? { payment_intent_data: { setup_future_usage: "off_session" } } : {}),
+      const { providerSessionId, checkoutUrl } = await Payments.creerSessionPaiement({
+        db, user, providerCode: provider, devise, lineItems,
+        customId: id,
         metadata: { diaspoactif_commande_vitrine_id: String(id) },
-        success_url: `${origin}/profil.html?id=${init.owner_user_id}&vitrine=1&paiement=succes&commande=${id}`,
-        cancel_url: `${origin}/profil.html?id=${init.owner_user_id}&vitrine=1&paiement=annule&commande=${id}`,
+        enregistrerCarte: !!body.enregistrer_carte,
+        successUrl: provider === "paypal"
+          ? `${origin}/api/paypal/commandes/${id}/retour?id=${init.owner_user_id}`
+          : `${origin}/profil.html?id=${init.owner_user_id}&vitrine=1&paiement=succes&commande=${id}`,
+        cancelUrl: `${origin}/profil.html?id=${init.owner_user_id}&vitrine=1&paiement=annule&commande=${id}`,
       });
-      await db.prepare(`UPDATE commandes_vitrine SET stripe_session_id=? WHERE id=?`).run(session.id, id);
-      return sendJSON(res, 201, { ok: true, id, checkout_url: session.url });
+      const sessionColonne = provider === "paypal" ? "paypal_order_id" : "stripe_session_id";
+      await db.prepare(`UPDATE commandes_vitrine SET ${sessionColonne}=? WHERE id=?`).run(providerSessionId, id);
+      return sendJSON(res, 201, { ok: true, id, checkout_url: checkoutUrl });
     } catch (e) {
-      await db.prepare(`UPDATE commandes_vitrine SET paiement_statut='echoue' WHERE id=?`).run(id);
+      await db.prepare(`UPDATE commandes_vitrine SET paiement_statut=? WHERE id=?`).run(Payments.STATUT_PAIEMENT.ECHOUE, id);
       return sendJSON(res, 500, SEC.safeError(e, "commander-produit-checkout"));
     }
   }
@@ -5718,10 +5696,9 @@ route("POST", "/api/panier/commander", async (req, res, params, body) => {
   }
 
   const provider = body.provider === "paypal" ? "paypal" : "stripe";
-  const { paypalEnabled, createOrder } = require("./paypal-client");
-  const { stripe, getOrCreateStripeCustomer } = require("./stripe-client");
-  if (provider === "paypal" ? !paypalEnabled : !stripe) {
-    return sendJSON(res, 503, { error: "Paiements momentanément indisponibles." });
+  const Payments = require("./payments");
+  if (!(await Payments.isProviderAllowed(db, provider))) {
+    return sendJSON(res, 503, { error: "Ce moyen de paiement est momentanément indisponible." });
   }
 
   const devise = (items[0].devise || "EUR").toUpperCase();
@@ -5745,54 +5722,28 @@ route("POST", "/api/panier/commander", async (req, res, params, body) => {
   const montantGlobal = parseFloat(commandes.reduce((s, c) => s + c.montantTotal, 0).toFixed(2));
   const idsPlaceholders = commandes.map(() => "?").join(",");
 
-  if (provider === "paypal") {
-    try {
-      const order = await createOrder({
-        amount: montantGlobal,
-        currency: devise,
-        description: `Panier Diaspo'Actif (${commandes.length} article${commandes.length > 1 ? "s" : ""})`,
-        custom_id: `panier-${user.id}`,
-        return_url: `${origin}/api/paypal/panier/retour?ids=${commandes.map(c => c.id).join(",")}`,
-        cancel_url: `${origin}/panier.html?paiement=annule`,
-      });
-      await db.prepare(`UPDATE commandes_vitrine SET paypal_order_id=? WHERE id IN (${idsPlaceholders})`).run(order.id, ...commandes.map(c => c.id));
-      await db.prepare("DELETE FROM panier_items WHERE user_id=?").run(user.id);
-      return sendJSON(res, 201, { ok: true, checkout_url: order.approveUrl });
-    } catch (e) {
-      await db.prepare(`UPDATE commandes_vitrine SET paiement_statut='echoue' WHERE id IN (${idsPlaceholders})`).run(...commandes.map(c => c.id));
-      return sendJSON(res, 500, SEC.safeError(e, "panier-commander-paypal"));
-    }
+  const lineItems = [];
+  for (const c of commandes) {
+    lineItems.push({ nom: c.item.produit_nom, montantUnitaire: Number(c.item.prix), quantite: c.item.quantite });
+    if (c.fraisLivraison > 0) lineItems.push({ nom: `Frais de livraison — ${c.item.produit_nom}`, montantUnitaire: c.fraisLivraison, quantite: 1 });
   }
-
   try {
-    const stripeCustomerId = await getOrCreateStripeCustomer(db, user);
-    const lineItems = [];
-    for (const c of commandes) {
-      lineItems.push({
-        price_data: { currency: devise.toLowerCase(), unit_amount: Math.round(Number(c.item.prix) * 100), product_data: { name: c.item.produit_nom } },
-        quantity: c.item.quantite,
-      });
-      if (c.fraisLivraison > 0) {
-        lineItems.push({
-          price_data: { currency: devise.toLowerCase(), unit_amount: Math.round(c.fraisLivraison * 100), product_data: { name: `Frais de livraison — ${c.item.produit_nom}` } },
-          quantity: 1,
-        });
-      }
-    }
-    const session = await stripe.checkout.sessions.create({
-      mode: "payment",
-      customer: stripeCustomerId,
-      line_items: lineItems,
+    const { providerSessionId, checkoutUrl } = await Payments.creerSessionPaiement({
+      db, user, providerCode: provider, devise, lineItems,
+      customId: `panier-${user.id}`,
       metadata: { diaspoactif_panier_checkout: "1" },
-      success_url: `${origin}/panier.html?paiement=succes`,
-      cancel_url: `${origin}/panier.html?paiement=annule`,
+      successUrl: provider === "paypal"
+        ? `${origin}/api/paypal/panier/retour?ids=${commandes.map(c => c.id).join(",")}`
+        : `${origin}/panier.html?paiement=succes`,
+      cancelUrl: `${origin}/panier.html?paiement=annule`,
     });
-    await db.prepare(`UPDATE commandes_vitrine SET stripe_session_id=? WHERE id IN (${idsPlaceholders})`).run(session.id, ...commandes.map(c => c.id));
+    const sessionColonne = provider === "paypal" ? "paypal_order_id" : "stripe_session_id";
+    await db.prepare(`UPDATE commandes_vitrine SET ${sessionColonne}=? WHERE id IN (${idsPlaceholders})`).run(providerSessionId, ...commandes.map(c => c.id));
     await db.prepare("DELETE FROM panier_items WHERE user_id=?").run(user.id);
-    return sendJSON(res, 201, { ok: true, checkout_url: session.url });
+    return sendJSON(res, 201, { ok: true, checkout_url: checkoutUrl });
   } catch (e) {
-    await db.prepare(`UPDATE commandes_vitrine SET paiement_statut='echoue' WHERE id IN (${idsPlaceholders})`).run(...commandes.map(c => c.id));
-    return sendJSON(res, 500, SEC.safeError(e, "panier-commander-stripe"));
+    await db.prepare(`UPDATE commandes_vitrine SET paiement_statut=? WHERE id IN (${idsPlaceholders})`).run(Payments.STATUT_PAIEMENT.ECHOUE, ...commandes.map(c => c.id));
+    return sendJSON(res, 500, SEC.safeError(e, "panier-commander-checkout"));
   }
 });
 
@@ -10291,7 +10242,6 @@ route("GET", "/api/vitrines", async (req, res, params, body, query) => {
        disponibles et fourchette de prix (articles à prix fixe seulement ; « sur demande » exclu). */
     const prixFixes = prods.map(p => Number(p.prix)).filter(n => n > 0);
     const apercuPrix = { nb_articles: prods.length, prix_min: prixFixes.length ? Math.min(...prixFixes) : null, prix_max: prixFixes.length ? Math.max(...prixFixes) : null, devise: (prods.find(p => Number(p.prix) > 0) || {}).devise || 'EUR' };
-
     return {
       id: r.id, owner_user_id: r.owner_user_id, slug: r.slug, nom: r.nom, type: r.type, domaine: r.domaine,
       domaines_secondaires: safeParseArray(r.domaines_secondaires_json), description: r.description,
@@ -14615,10 +14565,10 @@ route("GET", "/api/fil/medias", async (req, res, params, body, query) => {
       if (!medias.length) continue;
       const likes = await db.prepare("SELECT COUNT(*) AS n FROM fil_reactions WHERE post_id=? AND type='like'").get(p.id);
       const comm = await db.prepare("SELECT COUNT(*) AS n FROM fil_commentaires WHERE post_id=?").get(p.id);
+      const aime = cu ? !!await db.prepare("SELECT 1 FROM fil_reactions WHERE post_id=? AND user_id=? AND type='like'").get(p.id, cu.id) : false;
       /* Reels (2026-10-13) : état « abonné » et « enregistré » du compte connecté, pour que les boutons du visionneur s'affichent dans le bon état. */
       const suivi = cu ? !!await db.prepare("SELECT 1 FROM user_follows WHERE follower_id=? AND followed_id=?").get(cu.id, p.auteur_id) : false;
       const enregistre = cu ? !!await db.prepare("SELECT 1 FROM fil_bookmarks WHERE user_id=? AND post_id=?").get(cu.id, p.id) : false;
-      const aime = cu ? !!await db.prepare("SELECT 1 FROM fil_reactions WHERE post_id=? AND user_id=? AND type='like'").get(p.id, cu.id) : false;
       let photo = null;
       try {
         const u = await db.prepare("SELECT photo_url, role FROM users WHERE id=?").get(p.auteur_id);
@@ -14630,8 +14580,8 @@ route("GET", "/api/fil/medias", async (req, res, params, body, query) => {
         post_id: Number(p.id), auteur_id: Number(p.auteur_id), auteur_nom: await nomCompteAffichage(p.auteur_id), auteur_photo: photo,
         kind, medias: medias.slice(0, 10).map(m => ({ kind: m.kind, url: m.url, poster: m.poster })),
         titre: titre.slice(0, 120), extrait: (titre && corps.startsWith(titre) ? corps.slice(titre.length).trim() : corps).slice(0, 180),
-        suivi, a_enregistre: enregistre, est_moi: cu ? Number(cu.id) === Number(p.auteur_id) : false,
         nb_likes: likes ? Number(likes.n) : 0, nb_commentaires: comm ? Number(comm.n) : 0, a_aime: aime, created_at: p.created_at,
+        suivi, a_enregistre: enregistre, est_moi: cu ? Number(cu.id) === Number(p.auteur_id) : false,
       });
       if (items.length >= limite) { limiteAtteinte = true; break; }
     }
@@ -20032,8 +19982,11 @@ async function handleStripeWebhook(req, res) {
          à l'initiative, retrait ultérieur via le Centre Financier. Idempotent (voir la fonction). */
       await finaliserCommandeVitrinePayee(Number(event.data.object.metadata.diaspoactif_commande_vitrine_id));
     } else if (event.type === "checkout.session.expired" && event.data.object.metadata?.diaspoactif_commande_vitrine_id) {
+      /* Distinct d'un paiement "échoué" (carte refusée, etc.) — ici l'acheteur n'a simplement
+         jamais terminé la session dans le délai imparti par Stripe (2026-10-13, cahier des
+         charges § 4 : les deux doivent être des statuts séparés). */
       const commandeId = Number(event.data.object.metadata.diaspoactif_commande_vitrine_id);
-      await db.prepare(`UPDATE commandes_vitrine SET paiement_statut='echoue' WHERE id=? AND paiement_statut='en_attente'`).run(commandeId);
+      await db.prepare(`UPDATE commandes_vitrine SET paiement_statut=? WHERE id=? AND paiement_statut='en_attente'`).run(require("./payments").STATUT_PAIEMENT.EXPIRE, commandeId);
     } else if (event.type === "checkout.session.completed" && event.data.object.metadata?.diaspoactif_panier_checkout === "1") {
       /* Paiement d'un PANIER multi-articles (2026-10-02) — une session Stripe peut regrouper
          plusieurs commandes_vitrine (potentiellement plusieurs vendeurs différents) : on
@@ -20042,7 +19995,7 @@ async function handleStripeWebhook(req, res) {
       const lignes = await db.prepare(`SELECT id FROM commandes_vitrine WHERE stripe_session_id=?`).all(event.data.object.id);
       for (const ligne of lignes) await finaliserCommandeVitrinePayee(Number(ligne.id));
     } else if (event.type === "checkout.session.expired" && event.data.object.metadata?.diaspoactif_panier_checkout === "1") {
-      await db.prepare(`UPDATE commandes_vitrine SET paiement_statut='echoue' WHERE stripe_session_id=? AND paiement_statut='en_attente'`).run(event.data.object.id);
+      await db.prepare(`UPDATE commandes_vitrine SET paiement_statut=? WHERE stripe_session_id=? AND paiement_statut='en_attente'`).run(require("./payments").STATUT_PAIEMENT.EXPIRE, event.data.object.id);
     } else if (event.type === "checkout.session.completed" && event.data.object.metadata?.diaspoactif_formation_inscription_id) {
       /* Paiement formation confirmé — même modèle que Boutique/Billetterie (commission 3%,
          crédit wallet_balance au propriétaire de la formation). Idempotent : ne traite que si
@@ -21412,6 +21365,97 @@ route("POST", "/api/notifications/lire-tout", async (req, res) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   await db.prepare("UPDATE notifications SET lue=1 WHERE user_id=?").run(user.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ═══ ALERTES D'ÉVÉNEMENTS (2026-10-13, demande explicite : la cloche du bouton Événements) ═══
+   Un compte déclare ce qu'il veut savoir (domaine, forme, zone, gratuit/payant) ; dès qu'un événement correspondant est PUBLIÉ
+   (création directe, passage de brouillon à publié, ou synchronisation depuis la billetterie), il reçoit une notification dans
+   l'application ET, s'il a activé les notifications, sur l'écran de son téléphone (même verrouillé, via le push existant).
+   Garde-fous : une seule notification par événement et par compte, jamais pour l'organisateur lui-même ; au-delà de 3 alertes par jour,
+   la notification reste dans l'application mais n'envoie plus de push (pas de lassitude). */
+const ALERTE_ZONES = ['monde', 'pays', 'region', 'ville'];
+const ALERTE_MAX_PAR_COMPTE = 10;
+const ALERTE_PUSH_MAX_PAR_JOUR = 3;
+const alerteNorm = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+const alerteTxt = (s, n) => String(s || '').trim().slice(0, n) || null;
+
+function alerteEvtPart(e) {
+  return e.type_participation === 'partiellement_payant' ? 'partiel' : ((Number(e.prix_min) > 0 || e.type_participation === 'payant') ? '0' : '1');
+}
+function alerteCorrespond(a, e, u) {
+  if (a.domaine && alerteNorm(e.domaine) !== alerteNorm(a.domaine)) return false;
+  if (a.type_evt && alerteNorm(e.type_evt) !== alerteNorm(a.type_evt)) return false;
+  if (a.part && alerteEvtPart(e) !== String(a.part)) return false;
+  const zone = ALERTE_ZONES.includes(a.zone) ? a.zone : 'monde';
+  if (zone === 'monde') return true;
+  if (e.mode_participation === 'distanciel') return !!Number(a.en_ligne);
+  const champ = zone === 'ville' ? 'ville' : zone === 'region' ? 'region' : 'pays';
+  return !!alerteNorm(u[champ]) && alerteNorm(e[champ]) === alerteNorm(u[champ]);
+}
+
+async function alertesEvenementDeclencher(evenementId) {
+  try {
+    const e = await db.prepare("SELECT * FROM evenements WHERE id=?").get(evenementId);
+    if (!e || e.statut !== 'ouvert' || (e.visibilite || 'public') !== 'public' || Number(e.epingle_permanent) === 1) return;
+    const alertes = await db.prepare("SELECT a.*, u.pays AS u_pays, u.region AS u_region, u.ville AS u_ville FROM evenement_alertes a JOIN users u ON u.id=a.user_id WHERE a.actif=1 AND a.user_id<>?").all(Number(e.owner_user_id) || 0);
+    const faits = new Set();
+    for (const a of alertes) {
+      if (faits.has(a.user_id)) continue;
+      if (!alerteCorrespond(a, e, { pays: a.u_pays, region: a.u_region, ville: a.u_ville })) continue;
+      const deja = await db.prepare("SELECT 1 FROM notifications WHERE user_id=? AND type='alerte_evenement' AND data_json LIKE ?").get(a.user_id, `%"evenement_id":${Number(e.id)},%`);
+      if (deja) { faits.add(a.user_id); continue; }
+      faits.add(a.user_id);
+      const lieu = e.mode_participation === 'distanciel' ? 'En ligne' : [e.ville, e.pays].filter(Boolean).join(', ');
+      const titre = 'Un événement pour vous';
+      const domLib = { Sante: 'Santé', Economique: 'Économique', 'Action Sociale': 'Action sociale' }[e.domaine] || e.domaine;
+      const contenu = `${e.titre}${domLib ? ' · ' + domLib : ''}${lieu ? ' · ' + lieu : ''}`;
+      const data = { evenement_id: Number(e.id), alerte_id: Number(a.id) };
+      await db.prepare("INSERT INTO notifications (user_id,type,titre,contenu,data_json) VALUES (?,?,?,?,?)").run(a.user_id, 'alerte_evenement', titre, contenu, JSON.stringify(data));
+      const auj = (await db.prepare("SELECT COUNT(*) AS n FROM notifications WHERE user_id=? AND type='alerte_evenement' AND created_at >= datetime('now','-1 day')").get(a.user_id))?.n || 0;
+      if (Number(auj) <= ALERTE_PUSH_MAX_PAR_JOUR) { try { require("./push").envoyerPush(a.user_id, { titre, contenu, data }); } catch (_) {} }
+    }
+  } catch (err) { console.error('[alertesEvenementDeclencher]', err.message); }
+}
+
+function alerteSortie(r) {
+  return { id: r.id, domaine: r.domaine || '', type_evt: r.type_evt || '', part: r.part || '', zone: r.zone || 'monde', en_ligne: !!Number(r.en_ligne), actif: !!Number(r.actif) };
+}
+route("GET", "/api/evenement-alertes", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const rows = await db.prepare("SELECT * FROM evenement_alertes WHERE user_id=? ORDER BY id DESC").all(user.id);
+  const p = await db.prepare("SELECT pays, region, ville FROM users WHERE id=?").get(user.id) || {};
+  sendJSON(res, 200, { alertes: rows.map(alerteSortie), profil: { pays: p.pays || '', region: p.region || '', ville: p.ville || '' }, max: ALERTE_MAX_PAR_COMPTE });
+});
+route("POST", "/api/evenement-alertes", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const b = body || {};
+  const zone = ALERTE_ZONES.includes(b.zone) ? b.zone : 'monde';
+  const part = ['1', '0', 'partiel'].includes(String(b.part)) ? String(b.part) : null;
+  const n = (await db.prepare("SELECT COUNT(*) AS n FROM evenement_alertes WHERE user_id=?").get(user.id))?.n || 0;
+  if (Number(n) >= ALERTE_MAX_PAR_COMPTE) return sendJSON(res, 400, { error: `Vous pouvez avoir ${ALERTE_MAX_PAR_COMPTE} alertes au maximum. Supprimez-en une pour en créer une autre.` });
+  if (zone !== 'monde') {
+    const p = await db.prepare("SELECT pays, region, ville FROM users WHERE id=?").get(user.id) || {};
+    const champ = zone === 'ville' ? 'ville' : zone === 'region' ? 'region' : 'pays';
+    if (!alerteNorm(p[champ])) return sendJSON(res, 400, { error: `Renseignez ${champ === 'ville' ? 'votre ville' : champ === 'region' ? 'votre région' : 'votre pays'} dans votre profil pour recevoir les événements de votre zone.`, profil_incomplet: champ });
+  }
+  const r = await db.prepare("INSERT INTO evenement_alertes (user_id,domaine,type_evt,part,zone,en_ligne) VALUES (?,?,?,?,?,?)")
+    .run(user.id, alerteTxt(b.domaine, 60), alerteTxt(b.type_evt, 60), part, zone, b.en_ligne === false ? 0 : 1);
+  sendJSON(res, 201, { id: r.lastInsertRowid });
+});
+route("PATCH", "/api/evenement-alertes/:id", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const r = await db.prepare("UPDATE evenement_alertes SET actif=? WHERE id=? AND user_id=?").run(body && body.actif === false ? 0 : 1, params.id, user.id);
+  if (!r.changes) return sendJSON(res, 404, { error: "Alerte introuvable." });
+  sendJSON(res, 200, { ok: true });
+});
+route("DELETE", "/api/evenement-alertes/:id", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  await db.prepare("DELETE FROM evenement_alertes WHERE id=? AND user_id=?").run(params.id, user.id);
   sendJSON(res, 200, { ok: true });
 });
 
@@ -23328,6 +23372,8 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
     const nomOrganisateur = await nomCompteAffichage(user.id);
     abonnes.forEach(a => creerNotif(a.user_id, "evenement", "Nouvel événement", `${nomOrganisateur} organise : ${titre}`, { evenement_id: id }));
   }
+  /* Alertes d'événements (cloche) : jamais pour un brouillon, jamais bloquant pour l'organisateur. */
+  if (statutFinal !== 'brouillon') alertesEvenementDeclencher(id);
 
   /* Modèle standard de fiche d'inscription (demande explicite du 2026-09-09) : appliqué par
      défaut sauf refus explicite du front (appliquer_fiche_standard === false), jamais en
@@ -23416,6 +23462,7 @@ route("PUT", "/api/evenements/:id", async (req, res, params, body) => {
       places_max || null, masquer_inscrits ? 1 : 0, visibilite || "public", lien_visio || null, whatsapp_lien || null,
       coverImg, coverImg, galerie, evt.id
     );
+  if (evt.statut === 'brouillon' && statutFinal === 'ouvert') alertesEvenementDeclencher(evt.id);
   sendJSON(res, 200, { id: evt.id });
 });
 
@@ -27014,20 +27061,24 @@ route("GET", "/api/admin/finances", async (req, res) => {
   });
 });
 
-/* ===== MODULE PAIEMENTS (Lot 1) — tableau de bord agrégé en lecture seule + moyens de paiement =====
-   Ne touche à aucune table de paiement existante (wallet_transactions, commandes_vitrine,
-   adhesion_paiements, transactions) : lecture seule, agrégation. Limité pour l'instant à
-   carte bancaire / PayPal / virement bancaire. */
+/* ===== MODULE PAIEMENTS — tableau de bord agrégé + moyens de paiement =====
+   Lot 1 (lecture seule) étendu le 2026-10-13 (cahier des charges "module de paiement
+   boutiques") : l'interrupteur actif/inactif ci-dessous est désormais réellement appliqué par
+   server/payments/registry.js (POST /api/produits/:id/commander, POST /api/panier/commander) —
+   avant cette date il n'avait aucun effet sur le parcours d'achat réel.
+   'virement' (virement bancaire) est volontairement exclu de cette liste : aucune route n'a
+   jamais su encaisser un virement (aucun code, aucun prestataire) — le proposer à l'achat
+   aurait été trompeur. La ligne existe encore en base (ancien seed) mais n'est plus montrée ni
+   modifiable ici ; voir server/payments/registry.js pour la correspondance code↔prestataire. */
 
 route("GET", "/api/admin/paiements/methodes", async (req, res) => {
   const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
-  let methodes = await db.prepare("SELECT * FROM payment_methods_config ORDER BY code").all();
+  let methodes = await db.prepare("SELECT * FROM payment_methods_config WHERE code != 'virement' ORDER BY code").all();
   if (!methodes.length) {
     methodes = [
-      { code: 'carte', libelle: 'Carte bancaire', actif: 1 },
+      { code: 'carte', libelle: 'Carte bancaire (Stripe)', actif: 1 },
       { code: 'paypal', libelle: 'PayPal', actif: 1 },
-      { code: 'virement', libelle: 'Virement bancaire', actif: 1 },
     ];
   }
   sendJSON(res, 200, { methodes });
@@ -27036,13 +27087,24 @@ route("GET", "/api/admin/paiements/methodes", async (req, res) => {
 route("PUT", "/api/admin/paiements/methodes/:code", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
-  if (!['carte', 'paypal', 'virement'].includes(params.code)) return sendJSON(res, 400, { error: "Moyen de paiement inconnu." });
-  const libelles = { carte: 'Carte bancaire', paypal: 'PayPal', virement: 'Virement bancaire' };
+  if (!['carte', 'paypal'].includes(params.code)) return sendJSON(res, 400, { error: "Moyen de paiement inconnu." });
+  const libelles = { carte: 'Carte bancaire (Stripe)', paypal: 'PayPal' };
   const actif = body.actif ? 1 : 0;
   const existe = await db.prepare("SELECT code FROM payment_methods_config WHERE code=?").get(params.code);
   if (existe) await db.prepare("UPDATE payment_methods_config SET actif=?, updated_at=datetime('now') WHERE code=?").run(actif, params.code);
   else await db.prepare("INSERT INTO payment_methods_config (code, libelle, actif) VALUES (?,?,?)").run(params.code, libelles[params.code], actif);
   sendJSON(res, 200, { ok: true });
+});
+
+/* GET /api/paiement/prestataires-disponibles — public (sans auth : appelé AVANT que l'acheteur
+   choisisse, panier.html/profil-app.html n'imposent pas de connexion pour voir les options).
+   Remplace les boutons "💳 Carte / 🅿️ PayPal" codés en dur côté client : si un admin désactive
+   un prestataire (ou si ses clés API sont absentes), son bouton disparaît réellement au lieu de
+   mener à une erreur 503 au moment de payer. */
+route("GET", "/api/paiement/prestataires-disponibles", async (req, res, params, body, query) => {
+  const Payments = require("./payments");
+  const prestataires = await Payments.listAvailable(db, { pays: query?.pays, devise: query?.devise });
+  sendJSON(res, 200, { prestataires });
 });
 
 route("GET", "/api/admin/paiements/dashboard", async (req, res) => {
@@ -33265,6 +33327,44 @@ ${jsonLd}
     }
   }
 
+  /* Aperçu de lien d'un tuto vidéo partagé (2026-10-13, demande explicite : « quand on envoie une vidéo à une personne, la cartouche apparaît avec les
+     informations »). videos-tutoriels.html est servi depuis videos-tutoriels-app.html (même raison que profil.html : un fichier physique de ce nom serait
+     servi tel quel par Vercel, sans jamais passer ici ; le rewrite de vercel.json fait le reste, l'adresse publique ne change pas). ?v=<id> pose
+     titre du tuto + affiche (la même qu'à l'accueil, en JPG/PNG si l'affiche est un SVG que les messageries n'affichent pas) + « ▶ durée · description ». */
+  if (pathname === '/videos-tutoriels.html') {
+    try {
+      let html = await fs.promises.readFile(path.join(ROOT, 'videos-tutoriels-app.html'), 'utf8');
+      if (parsed.query.v) {
+        try {
+          const TP = require('./tuto-partage');
+          const v = await db.prepare("SELECT id, titre, description, categorie, duree_secondes, type_source, url, miniature_url, statut FROM da_videos_tutoriels WHERE id=?").get(parsed.query.v);
+          if (v && v.statut === 'publie') {
+            const base = 'https://diaspoactif.com';
+            const brut = s => String(s == null ? '' : s).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+            const img = TP.imageRaster(TP.imageTuto(v));
+            const image = img ? (/^https?:\/\//i.test(img) ? img : base + (img.startsWith('/') ? '' : '/') + img) : `${base}/assets/og-image.png`;
+            const d = Number(v.duree_secondes) || 0;
+            const duree = !d ? '' : (d >= 60 ? `${Math.floor(d / 60)} min${d % 60 ? ' ' + String(d % 60).padStart(2, '0') + ' s' : ''}` : `${d} s`);
+            const nomInviteur = parsed.query.via ? await nomCompteAffichage(parsed.query.via) : '';
+            const description = ((duree ? `▶ Durée : ${duree}` : '') + (brut(v.description) ? (duree ? ' · ' : '') + brut(v.description) : '')).slice(0, 200) || "Un tuto vidéo sur Diaspo'Actif.";
+            html = apercuLien(html, {
+              titre: nomInviteur ? `${nomInviteur} vous invite à voir le tuto « ${v.titre} »` : `${v.titre} — Tuto Diaspo'Actif`,
+              description, image, url: `${base}/videos-tutoriels.html?v=${v.id}`,
+            });
+          }
+        } catch (e) { console.error('[apercu-tuto]', e.message); }
+      }
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
+      res.end(html);
+      return;
+    } catch (e) {
+      console.error('[SEO videos-tutoriels.html]', e.message);
+      res.writeHead(500, { 'Content-Type': 'text/plain' });
+      res.end('Erreur serveur.');
+      return;
+    }
+  }
+
   /* Aperçu de lien dynamique pour un événement partagé (2026-09-28, demande explicite : "ajoute
      l'image de couverture de l'événement, le nom du compte qui a envoyé l'invitation et un
      aperçu du descriptif"). evenements.html est servi depuis evenements-app.html (fichier
@@ -33292,8 +33392,7 @@ ${jsonLd}
             const base = 'https://diaspoactif.com';
             const nomInviteur = parsed.query.via ? await nomCompteAffichage(parsed.query.via) : '';
             const titre = nomInviteur ? `${nomInviteur} vous invite à l'événement ${evt.titre}` : `${evt.titre} — Diaspo'Actif`;
-            const description = (evt.description ? String(evt.description).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200) : null)
-              || "La plateforme mondiale de la diaspora engagée — actions locales, impact global.";
+            const description = PartageEvenement.descriptionApercu(evt);   // « 📅 date · heure — 📍 lieu — description »
             /* og:image DOIT être une vraie URL http(s) — un crawler (WhatsApp, etc.) ne peut pas
                "récupérer" un data: URI comme il le ferait d'une image (bug réel constaté, capture
                à l'appui : image_couverture peut valoir un data:image/...;base64,... brut pour un
@@ -35356,8 +35455,9 @@ ${jsonLd}
           await db.prepare(`UPDATE evenements SET ${colonnes.map(c => `${c}=?`).join(',')} WHERE id=?`)
             .run(...valeurs, existant.id);
         } else {
-          await db.prepare(`INSERT INTO evenements (${colonnes.join(',')}, source_events_id) VALUES (${colonnes.map(() => '?').join(',')}, ?)`)
+          const nouveau = await db.prepare(`INSERT INTO evenements (${colonnes.join(',')}, source_events_id) VALUES (${colonnes.map(() => '?').join(',')}, ?)`)
             .run(...valeurs, eventId);
+          if (nouveau && nouveau.lastInsertRowid) alertesEvenementDeclencher(nouveau.lastInsertRowid);
         }
       } catch (e) { console.error('[syncEvenementVersProgrammation]', eventId, e.message); }
     }
