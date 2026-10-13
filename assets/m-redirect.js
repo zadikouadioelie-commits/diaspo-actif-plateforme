@@ -30,6 +30,8 @@
     if ((f === 'dashboard-utilisateur.html' || f === 'dashboard-initiative.html') && !String(hash || '').replace(/^#/, '')) return '#/moi';
     var q = {}; String(search || '').replace(/^\?/, '').split('&').forEach(function (kv) { var p = kv.split('='); if (p[0]) q[decodeURIComponent(p[0])] = decodeURIComponent(p[1] || ''); });
     if (f === 'initiative.html' && q.id) return '#/profil/i/' + encodeURIComponent(q.id);
+    /* Lien de boutique (profil.html?id=<compte>&vitrine=1) : la boutique, pas le profil public (signalé le 2026-10-13). */
+    if ((f === 'profil.html' || f === 'profil-app.html') && q.id && q.vitrine === '1') return '#/boutique/u/' + encodeURIComponent(q.id);
     if ((f === 'profil.html' || f === 'profil-app.html') && q.id) return '#/profil/' + encodeURIComponent(q.id);
     if ((f === 'compte-rendu.html' || f === 'compte-rendu-app.html') && q.evt && !q.edition) return '#/cr/' + encodeURIComponent(q.evt) + (q.synthese === '1' ? '/synthese' : '');
     /* Liens de partage (2026-10-07) : un événement ou une publication partagés s'ouvrent directement dans l'appli, sans compte. */
