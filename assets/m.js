@@ -937,7 +937,7 @@
       ${it.k === 'i' && Number(x.vitrine_active) === 1 ? `<div class="ann-act2"><a class="btn sm block" href="#/boutique/${encodeURIComponent(x.id)}">${ic('shop', 's')} Voir la boutique</a></div>` : ''}
       <div class="ann-act2"><a class="btn sm out" href="${href}">${ic('user', 's')} Profil public</a><button type="button" class="btn sm out" data-share-ann="${esc(key)}" aria-label="Partager ce profil">${ic('share', 's')} Partager</button>${peutAdherer ? `<button type="button" class="btn sm navy" data-adh="${x.id}" data-nom="${esc(nm)}">${ic('people', 's')} Adhérer</button>` : ''}</div>
       ${peutAffilier(it, x, uid) ? `<div class="ann-act2" data-aff-zone="${it.k === 'i' ? 'i' : 'u'}:${it.k === 'i' ? x.id : x.id}" data-nom="${esc(nm)}"></div>` : ''}
-      <div class="ann-act3">${uid ? `<button type="button" class="btn sm" data-sup="${uid}">${ic('heart', 's')} Soutenir</button><button type="button" class="btn sm out" data-write="${uid}">${ic('chat', 's')} Contacter</button>` : ''}<button type="button" class="btn sm out" data-follow="${fid}" data-kind="${kind}" data-on="0">${ic('bell', 's')} S’abonner</button></div></article>`;
+      <div class="ann-act3">${uid ? `<button type="button" class="btn sm" data-sup="${uid}" hidden>${ic('heart', 's')} Soutenir</button><button type="button" class="btn sm out" data-write="${uid}">${ic('chat', 's')} Contacter</button>` : ''}<button type="button" class="btn sm out" data-follow="${fid}" data-kind="${kind}" data-on="0">${ic('bell', 's')} S’abonner</button></div></article>`;
   }
   /* « Liaison » = bouton Affiliation des cartouches du site : un compte demande à rejoindre une initiative, ou une initiative invite un membre. */
   function peutAffilier(it, x, uid) {
@@ -1012,7 +1012,23 @@
     const n = $('#ann-next'); if (n) n.onclick = () => { S.ann.shown += 30; paintAnnuaire(); };
     /* « Voir plus » n'apparaît que si la description dépasse 3 lignes. */
     $$('[data-desc]', l).forEach(d => { const b = d.parentNode.querySelector('[data-more]'); if (b && (d.classList.contains('open') || d.scrollHeight > d.clientHeight + 2)) b.hidden = false; });
-    hydraterAdhesionsM(l); hydraterAffiliationsM(l);
+    hydraterAdhesionsM(l); hydraterAffiliationsM(l); hydraterSoutienM(l);
+  }
+  /* « Soutenir » (2026-10-13, demande explicite) : réservé aux associations et aux ONG ; une entreprise ne l'a que si elle a créé une cagnotte
+     ouverte. Même règle que le site : c'est le serveur qui décide (GET /api/soutenir-lot, une requête pour toute la page) ; le bouton reste
+     masqué tant qu'il ne confirme pas — jamais de faux bouton si le service est indisponible. */
+  async function hydraterSoutienM(racine) {
+    const bs = [...(racine || document).querySelectorAll('[data-sup]:not([data-sup-verifie])')];
+    if (!bs.length) return;
+    bs.forEach(b => b.setAttribute('data-sup-verifie', '1'));
+    const ids = [...new Set(bs.map(b => b.dataset.sup))];
+    for (let i = 0; i < ids.length; i += 100) {
+      const lot = ids.slice(i, i + 100);
+      try {
+        const ok = (await api('/api/soutenir-lot?owner_user_ids=' + lot.join(','))).soutiens || {};
+        bs.filter(b => lot.includes(b.dataset.sup) && ok[b.dataset.sup]).forEach(b => { b.hidden = false; });
+      } catch (e) { /* indisponible : le bouton reste masqué */ }
+    }
   }
   /* Adhérer : comme le site — formules de cotisation configurées => choix de la formule puis page d'adhésion (paiement) ; sinon simple demande à la structure. */
   const PERIODE = { cotisation_mensuelle: 'par mois', cotisation_trimestrielle: 'par trimestre', cotisation_semestrielle: 'par semestre', cotisation_annuelle: 'par an' };

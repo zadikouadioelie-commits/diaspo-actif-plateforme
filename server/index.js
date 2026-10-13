@@ -23702,12 +23702,16 @@ async function chargerSoutiens(ownerIds) {
 
   for (const id of ids) {
     const init = initParOwner[id] || null;
-    const boutiqueOuverte = !!init && init.vitrine_active !== 0 && (produitsParInit[init.id] || 0) > 0;
-    const adhesionOuverte = !!init && ["Association", "ONG"].includes(init.type) && (init.adhesions_ouvertes == null || !!init.adhesions_ouvertes);
+    /* Bouton « Soutenir » réservé aux associations et aux ONG (2026-10-13, demande explicite : « une entreprise n'a pas à l'avoir d'office »).
+       Tout autre type de compte (entreprise, startup, type non renseigné…) ne l'a QUE s'il a créé une cagnotte ouverte, et la cartouche ne
+       lui présente alors que cette cagnotte : sa boutique et ses billets d'événements ont leurs propres boutons. */
+    const associatif = !!init && ["Association", "ONG"].includes(init.type);
+    const boutiqueOuverte = associatif && init.vitrine_active !== 0 && (produitsParInit[init.id] || 0) > 0;
+    const adhesionOuverte = associatif && (init.adhesions_ouvertes == null || !!init.adhesions_ouvertes);
     resultat[id] = {
       initiative: init ? { id: init.id, nom: init.nom, type: init.type } : null,
       dons: donsParOwner[id] || [],
-      evenements: evtsParOwner[id] || [],
+      evenements: associatif ? (evtsParOwner[id] || []) : [],
       boutique: boutiqueOuverte ? { nb_produits: produitsParInit[init.id] } : null,
       adhesions: adhesionOuverte ? (autresFormulesParInit[init.id] || []) : [],
     };
