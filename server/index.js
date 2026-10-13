@@ -10260,11 +10260,16 @@ route("GET", "/api/vitrines", async (req, res, params, body, query) => {
        avec les premiers produits disponibles pour que la carte ne reste jamais vide dès qu'il
        existe des produits — jamais de produit masqué/épuisé mis en avant malgré lui ici. */
     const prods = await db.prepare(
-      "SELECT nom, prix, devise, photos_json, mis_en_avant FROM produits_vitrine WHERE initiative_id=? AND (statut IS NULL OR statut='disponible') ORDER BY mis_en_avant DESC, ordre ASC, id ASC"
+      "SELECT id, nom, prix, devise, photos_json, mis_en_avant FROM produits_vitrine WHERE initiative_id=? AND (statut IS NULL OR statut='disponible') ORDER BY mis_en_avant DESC, ordre ASC, id ASC"
     ).all(r.id);
     const produitsVedettes = prods.slice(0, 3).map(p => ({
-      nom: p.nom, prix: p.prix, devise: p.devise || 'EUR', photo: (safeParseArray(p.photos_json)[0]) || null,
+      id: p.id, nom: p.nom, prix: p.prix, devise: p.devise || 'EUR', photo: (safeParseArray(p.photos_json)[0]) || null,
     }));
+    /* Aperçu des prix sur la liste des boutiques du téléphone (2026-10-13) : nombre d'articles
+       disponibles et fourchette de prix (articles à prix fixe seulement ; « sur demande » exclu). */
+    const prixFixes = prods.map(p => Number(p.prix)).filter(n => n > 0);
+    const apercuPrix = { nb_articles: prods.length, prix_min: prixFixes.length ? Math.min(...prixFixes) : null, prix_max: prixFixes.length ? Math.max(...prixFixes) : null, devise: (prods.find(p => Number(p.prix) > 0) || {}).devise || 'EUR' };
+
     return {
       id: r.id, owner_user_id: r.owner_user_id, slug: r.slug, nom: r.nom, type: r.type, domaine: r.domaine,
       domaines_secondaires: safeParseArray(r.domaines_secondaires_json), description: r.description,
@@ -10280,6 +10285,7 @@ route("GET", "/api/vitrines", async (req, res, params, body, query) => {
       owner_identite_verifiee: await ownerIdentiteVerifiee(r.owner_user_id),
       adhesions_ouvertes: r.adhesions_ouvertes == null ? true : !!r.adhesions_ouvertes,
       produits_vedettes: produitsVedettes,
+      apercu_prix: apercuPrix,
     };
   }));
 

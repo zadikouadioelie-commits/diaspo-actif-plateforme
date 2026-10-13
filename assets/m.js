@@ -460,7 +460,7 @@
   }
   function postHtml(p) {
     if (p.sous_type === 'vitrine' || p.type === 'carte_vitrine') {
-      return `<a class="card pad row" href="profil.html?id=${encodeURIComponent(p.owner_user_id)}&vitrine=1" style="gap:12px"><div class="shop"><div class="lg" style="width:48px;height:48px">${esc(initials(p.initiative_nom || p.titre))}</div></div><div class="sp"><div class="small muted">Boutique à découvrir</div><div class="nm" style="font-weight:700">${esc(p.initiative_nom || p.titre)}</div><div class="small muted">${esc([p.ville, p.pays].filter(Boolean).join(', '))}</div></div>${ic('chev')}</a>`;
+      return `<a class="card pad row" href="#/boutique/u/${encodeURIComponent(p.owner_user_id)}" style="gap:12px"><div class="shop"><div class="lg" style="width:48px;height:48px">${esc(initials(p.initiative_nom || p.titre))}</div></div><div class="sp"><div class="small muted">Boutique à découvrir</div><div class="nm" style="font-weight:700">${esc(p.initiative_nom || p.titre)}</div><div class="small muted">${esc([p.ville, p.pays].filter(Boolean).join(', '))}</div></div>${ic('chev')}</a>`;
     }
     if (p.sous_type && !p.auteur_nom && !p.corps) return '';
     const orig = p.original_post;
@@ -926,6 +926,7 @@
       <div class="ann-info"><div><span>Origine</span><b>${esc(annOriginesAff(x).join(' · ') || '—')}</b></div><div><span>Pays de résidence</span><b>${esc(x.pays || '—')}</b></div><div><span>Ville de résidence</span><b>${esc(x.ville || '—')}</b></div></div>
       ${desc ? `<div class="ann-desc${open ? ' open' : ''}" data-desc>${esc(desc)}</div>` : ''}
       ${desc ? `<div class="ann-links"><button type="button" class="lnk" data-more hidden aria-expanded="${open}">${open ? 'Voir moins ▴' : 'Voir plus ▾'}</button></div>` : ''}
+      ${it.k === 'i' && Number(x.vitrine_active) === 1 ? `<div class="ann-act2"><a class="btn sm block" href="#/boutique/${encodeURIComponent(x.id)}">${ic('shop', 's')} Voir la boutique</a></div>` : ''}
       <div class="ann-act2"><a class="btn sm out" href="${href}">${ic('user', 's')} Profil public</a><button type="button" class="btn sm out" data-share-ann="${esc(key)}" aria-label="Partager ce profil">${ic('share', 's')} Partager</button>${peutAdherer ? `<button type="button" class="btn sm navy" data-adh="${x.id}" data-nom="${esc(nm)}">${ic('people', 's')} Adhérer</button>` : ''}</div>
       ${peutAffilier(it, x, uid) ? `<div class="ann-act2" data-aff-zone="${it.k === 'i' ? 'i' : 'u'}:${it.k === 'i' ? x.id : x.id}" data-nom="${esc(nm)}"></div>` : ''}
       <div class="ann-act3">${uid ? `<button type="button" class="btn sm" data-sup="${uid}">${ic('heart', 's')} Soutenir</button><button type="button" class="btn sm out" data-write="${uid}">${ic('chat', 's')} Contacter</button>` : ''}<button type="button" class="btn sm out" data-follow="${fid}" data-kind="${kind}" data-on="0">${ic('bell', 's')} S’abonner</button></div></article>`;
@@ -1628,6 +1629,17 @@
     try { const r = await api('/api/vitrines'); S.boutiques.items = r.vitrines || []; S.boutiques.loaded = true; paintBoutiques(); }
     catch (e) { l.innerHTML = `<div class="empty"><b>Impossible de charger les boutiques</b>${esc(e.message)}<br><br><button class="btn sm" id="retry">Réessayer</button></div>`; $('#retry').onclick = loadBoutiques; }
   }
+  /* Aperçu des prix d'une boutique (2026-10-13) : « 12 articles · de 5 € à 60 € ». Pas de lien vers le profil ici : en Boutiques, on regarde la boutique ; le profil se consulte depuis l'Annuaire. */
+  function prixBoutique(n, devise) {
+    if (n == null || !(Number(n) > 0)) return 'Sur demande';
+    try { return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: (devise || 'EUR').toUpperCase(), maximumFractionDigits: Number(n) % 1 ? 2 : 0 }).format(Number(n)); }
+    catch (e) { return Number(n) + ' ' + (devise || '€'); }
+  }
+  function apercuPrixBoutique(v) {
+    const a = v.apercu_prix; if (!a || !a.nb_articles) return '';
+    const fourchette = a.prix_min == null ? 'Prix sur demande' : (a.prix_min === a.prix_max ? prixBoutique(a.prix_min, a.devise) : 'de ' + prixBoutique(a.prix_min, a.devise) + ' à ' + prixBoutique(a.prix_max, a.devise));
+    return `<div class="small" style="padding:0 14px 8px"><b>${a.nb_articles} article${a.nb_articles > 1 ? 's' : ''}</b> <span class="muted">· ${esc(fourchette)}</span></div>`;
+  }
   function paintBoutiques() {
     const l = $('#bt-list'); if (!l) return;
     S.boutiques.f = S.boutiques.f || {}; drawBtBar();
@@ -1641,8 +1653,9 @@
       return `<article class="card shop"><div class="top"><div class="lg">${v.logo_url ? `<img src="${attrUrl(v.logo_url)}" alt="" onerror="this.remove()">` : esc(initials(nm))}</div>
         <div class="sp"><div class="nm">${esc(nm)}</div><div class="small muted ell">${esc([v.domaine, [v.ville, v.pays].filter(Boolean).join(', ')].filter(Boolean).join(' · '))}</div>${v.certif || v.organisation_verifiee ? `<span class="badge g" style="margin-top:4px">${ic('check', 's')} Vérifiée</span>` : ''}</div></div>
         ${desc ? `<div class="txt small" style="padding:0 14px 8px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(desc)}</div>` : ''}
-        ${prods.length ? `<div class="prods">${prods.map(p => `<div class="p"><div class="ph">${p.photo ? `<img src="${attrUrl(p.photo)}" alt="" loading="lazy" onerror="this.remove()">` : ic('shop')}</div><div class="pn ell">${esc(p.nom)}</div><div class="pp">${p.prix != null ? esc(p.prix) + ' ' + esc(p.devise === 'EUR' || !p.devise ? '€' : p.devise) : ''}</div></div>`).join('')}</div>` : ''}
-        <div class="ft"><a class="btn block sm" href="#/profil/i/${encodeURIComponent(v.id)}">Voir la boutique et le profil</a></div></article>`;
+        ${apercuPrixBoutique(v)}
+        ${prods.length ? `<div class="prods">${prods.map(p => `<a class="p" href="${p.id ? '#/produit/' + encodeURIComponent(p.id) : '#/boutique/' + encodeURIComponent(v.id)}" style="color:inherit;text-decoration:none"><div class="ph">${p.photo ? `<img src="${attrUrl(p.photo)}" alt="" loading="lazy" onerror="this.remove()">` : ic('shop')}</div><div class="pn ell">${esc(p.nom)}</div><div class="pp">${esc(prixBoutique(p.prix, p.devise))}</div></a>`).join('')}</div>` : ''}
+        <div class="ft row"><a class="btn block sm sp" href="#/boutique/${encodeURIComponent(v.id)}">Voir la boutique</a></div></article>`;
     }).join('');
   }
 
@@ -1737,7 +1750,7 @@
         <div class="small" style="background:#FFF8E1;border:1.5px solid #E3B84A;border-radius:12px;padding:10px 12px;color:#5c4200"><b>Premium :</b> pendant la période de gratuité de Premium (jusqu’au 13 décembre 2026), le statut Premium n’est pas pris en compte. Passé ce délai, il le sera à nouveau.</div></div></div>`, '', 'Prochainement');
     safe(async () => {
       const l = ((await api('/api/vitrines')).vitrines || []).slice(0, 10); if (!l.length) return;
-      homeBlock('home-shops', 'Boutiques de la diaspora', `<div class="hs">${l.map(v => miniCard('#/profil/i/' + encodeURIComponent(v.id), v.logo_url, v.boutique_nom || v.nom, [v.ville, v.pays].filter(Boolean).join(', '))).join('')}</div>`, '<a href="#/boutiques" class="sec-more">Toutes ›</a>');
+      homeBlock('home-shops', 'Boutiques de la diaspora', `<div class="hs">${l.map(v => miniCard('#/boutique/' + encodeURIComponent(v.id), v.logo_url, v.boutique_nom || v.nom, [v.ville, v.pays].filter(Boolean).join(', '))).join('')}</div>`, '<a href="#/boutiques" class="sec-more">Toutes ›</a>');
     });
     safe(async () => {
       const l = (await api('/api/temoignages/public?limit=8')).temoignages || []; if (!l.length) return;
@@ -2108,7 +2121,7 @@
     p.hidden = true; document.body.style.overflow = ''; clearInterval(S.chatTimer); S.pane = null;
     const f = $('#pane-foot'); if (f) { f.innerHTML = ''; f.hidden = true; }
   }
-  const SITE_PAGES = { mesevenements: 'dashboard-initiative.html#evenements', cotisations: 'dashboard-initiative.html#adhesions-init', msgboutique: 'dashboard-initiative.html#messages-vitrine', associe: 'mon-associe.html', reseaupro: 'reseau.html', businessplan: 'business-plan.html', formations: 'formations.html', cvlettres: 'dashboard-utilisateur.html', parrainage: 'parrainage.html', confidentialite: 'confidentialite.html', abonnement: 'mon-abonnement.html' };
+  const SITE_PAGES = { boutique: 'vitrines.html', produit: 'vitrines.html', mesevenements: 'dashboard-initiative.html#evenements', cotisations: 'dashboard-initiative.html#adhesions-init', msgboutique: 'dashboard-initiative.html#messages-vitrine', associe: 'mon-associe.html', reseaupro: 'reseau.html', businessplan: 'business-plan.html', formations: 'formations.html', cvlettres: 'dashboard-utilisateur.html', parrainage: 'parrainage.html', confidentialite: 'confidentialite.html', abonnement: 'mon-abonnement.html' };
   function openSheet(inner) {
     const sh = $('#sheet'); sh.hidden = false; const close = () => { sh.hidden = true; sh.innerHTML = ''; };
     sh.innerHTML = '<div class="sh" role="dialog" aria-modal="true"><div class="grip"></div><div class="sb">' + inner + '</div></div>';
