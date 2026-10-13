@@ -93,6 +93,7 @@ async function vtCharger() {
           <button class="btn btn-sm btn-outline" ${i === videos.length - 1 ? 'disabled' : ''} onclick="vtDeplacer(${v.id},'bas')" title="Descendre">↓</button>
           ${v.statut !== 'publie' ? `<button class="btn btn-sm btn-outline" style="color:#16a34a;border-color:#16a34a;" onclick="vtPublier(${v.id})">✅ Publier</button>` : `<button class="btn btn-sm btn-outline" onclick="vtDepublier(${v.id})">🚫 Dépublier</button>`}
           <button class="btn btn-sm btn-outline" onclick="vtOuvrirForm(${v.id})">✎ Modifier</button>
+          ${v.statut === 'publie' ? `<button class="btn btn-sm btn-outline" onclick="naNotifierVideo(${v.id})" title="Envoyer une notification pour cette vidéo">🔔 Notifier</button>` : ''}
           <button class="btn btn-sm btn-outline" style="color:#dc2626;border-color:#dc2626;" onclick="vtSupprimer(${v.id})">🗑 Supprimer</button>
         </div>
       </div>`;

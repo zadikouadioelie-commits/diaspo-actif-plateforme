@@ -503,6 +503,7 @@ function injectNotifStyles() {
 }
 
 const NOTIF_ICONS = {
+  info_admin: "📢",
   mention:    "🔔",
   reaction:   "❤️",
   message:    "💬",
@@ -1189,7 +1190,7 @@ window.ouvrirAbonnementSiDu = ouvrirAbonnementSiDu;
 function proposerNotifications(user) {
   const go = () => { try { window.DaNotifInvite.proposer(user); } catch (e) { /* silencieux */ } };
   if (window.DaNotifInvite) return go();
-  const sc = document.createElement('script'); sc.src = '/assets/notif-invite.js?v=20261013a'; sc.onload = go; document.head.appendChild(sc);
+  const sc = document.createElement('script'); sc.src = '/assets/notif-invite.js?v=20261013b'; sc.onload = go; document.head.appendChild(sc);
 }
 function afficherBandeauLegal(user) {
   var a = user && user.legal_a_accepter, ancien = document.getElementById('bandeau-legal');

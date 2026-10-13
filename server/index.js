@@ -22704,6 +22704,43 @@ route("PATCH", "/api/admin/incidents/:id", async (req, res, params, body) => {
   sendJSON(res, 200, { ok: true });
 });
 
+/* ═══════════ Notifications d'administration (2026-10-13, demande explicite) ═══════════
+   L'administrateur cible des comptes (type, domaine d'activité, pays, compte précis), rédige la notification — souvent liée à
+   une publication — et l'envoie : cloche pour tous les comptes ciblés, écran pour ceux qui ont activé les notifications.
+   Plafond d'une notification d'administration par compte et par 24 h ; historique conservé. */
+route("POST", "/api/admin/notifications/apercu", async (req, res, params, body) => {
+  if (!(await exigerAdmin(req, res))) return;
+  try { sendJSON(res, 200, await notifsAdmin.apercu(body && body.cible)); } catch (e) { sendJSON(res, 500, SEC.safeError(e, "notifs-admin-apercu")); }
+});
+route("GET", "/api/admin/notifications/comptes", async (req, res, params, body, query) => {
+  if (!(await exigerAdmin(req, res))) return;
+  try { sendJSON(res, 200, { comptes: await notifsAdmin.chercherComptes(query && query.q) }); } catch (e) { sendJSON(res, 500, SEC.safeError(e, "notifs-admin-comptes")); }
+});
+route("GET", "/api/admin/notifications/historique", async (req, res) => {
+  if (!(await exigerAdmin(req, res))) return;
+  try { sendJSON(res, 200, { historique: await notifsAdmin.historique(), activation: await notifsAdmin.statsActivation(), plafond_heures: notifsAdmin.PLAFOND_HEURES }); } catch (e) { sendJSON(res, 500, SEC.safeError(e, "notifs-admin-historique")); }
+});
+route("POST", "/api/admin/notifications", async (req, res, params, body) => {
+  const admin = await exigerAdmin(req, res); if (!admin) return;
+  try {
+    const c = await notifsAdmin.creer(admin.id, body || {});
+    if (c.erreur) return sendJSON(res, 400, { error: c.erreur });
+    if (c.doublon) return sendJSON(res, 409, { error: "Ce contenu a déjà fait l'objet d'une notification.", doublon: c.doublon });
+    const r = await notifsAdmin.envoyerLots(Number(c.notif.id), 20000);
+    SEC.logSecurity("notification_admin_envoyee", { uid: Number(admin.id), notif_admin_id: Number(c.notif.id), envoyes: r.total_envoyes, push: r.push });
+    sendJSON(res, 201, { ok: true, ...r });
+  } catch (e) { sendJSON(res, 500, SEC.safeError(e, "notifs-admin-envoi")); }
+});
+/* Reprise d'un envoi interrompu (lot suivant) — sans jamais doubler. */
+route("POST", "/api/admin/notifications/:id/continuer", async (req, res, params) => {
+  if (!(await exigerAdmin(req, res))) return;
+  try {
+    const r = await notifsAdmin.envoyerLots(Number(params.id), 20000);
+    if (r.erreur) return sendJSON(res, 404, { error: r.erreur });
+    sendJSON(res, 200, { ok: true, ...r });
+  } catch (e) { sendJSON(res, 500, SEC.safeError(e, "notifs-admin-continuer")); }
+});
+
 /* GET public — annonces actuellement affichées (accueil, fil). */
 route("GET", "/api/annonces-officielles/actives", async (req, res) => {
   const rows = await db.prepare("SELECT * FROM annonces_officielles WHERE statut='publiee' ORDER BY id DESC LIMIT 5").all();
@@ -22810,6 +22847,8 @@ const Completude = require("./completude");
 const Immat = require("./immatriculation");
 /* Documents légaux : versions, preuve d'acceptation, droits des personnes, registre des incidents (2026-10-12). */
 const legal = require("./legal")({ db, logError });
+/* Notifications d'administration : ciblage par type / domaine / pays, envoi par lots, historique (2026-10-13). */
+const notifsAdmin = require("./notifs-admin")({ db, logError });
 const honneur = require("./honneur")({
   db, dateParisISO, nomCompteAffichage, creerNotif, logError,
   getStripe: () => { try { return require("./stripe-client").stripe; } catch (_) { return null; } },

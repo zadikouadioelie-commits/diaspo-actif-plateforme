@@ -2951,6 +2951,32 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_recrut_commentaires_candidat ON recrut_commentaires(candidat_id);
 
+  /* ── Notifications d'administration (2026-10-13) : historique des envois + un envoi par compte (plafond quotidien, aucun doublon) ── */
+  CREATE TABLE IF NOT EXISTS notifications_admin (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    admin_id INTEGER,
+    titre TEXT NOT NULL,
+    contenu TEXT,
+    lien TEXT,
+    lien_m TEXT,
+    source_type TEXT,
+    source_id INTEGER,
+    cible_json TEXT DEFAULT '{}',
+    nb_cibles INTEGER DEFAULT 0,
+    nb_envoyes INTEGER DEFAULT 0,
+    nb_push INTEGER DEFAULT 0,
+    nb_ignores_plafond INTEGER DEFAULT 0,
+    statut TEXT DEFAULT 'en_cours',
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+  CREATE TABLE IF NOT EXISTS notifications_admin_envois (
+    notif_admin_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    envoye_le TEXT NOT NULL,
+    PRIMARY KEY (notif_admin_id, user_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_notifs_admin_envois_user ON notifications_admin_envois(user_id, envoye_le);
+
   /* ── Documents légaux : versions, preuve d'acceptation, droits des personnes, registre des incidents (2026-10-12) ── */
   CREATE TABLE IF NOT EXISTS legal_versions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

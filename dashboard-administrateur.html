@@ -114,6 +114,7 @@
       <span class="sb-group-lbl">🟥 Communication</span>
       <a href="#communication" data-section="communication">✉ Communication</a>
       <a href="#publications" data-section="publications">📢 Publications</a>
+      <a href="#notifications-admin" data-section="notifications-admin">🔔 Notifications</a>
       <a href="#moderation" data-section="moderation">🛡 Modération</a>
       <a href="#regles-contact" data-section="regles-contact">🤝 Contact &amp; diffusion</a>
       <a href="#suppression-comptes" data-section="suppression-comptes" style="display:flex;justify-content:space-between;align-items:center;">🗑 Demandes de suppression <span id="delreq-badge" style="display:none;background:#ef4444;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;"></span></a>
@@ -3309,10 +3310,22 @@
           </div>
           <textarea id="pub-contenu" style="width:100%;min-height:100px;border-radius:10px;border:1px solid var(--border);padding:12px;font-family:inherit;" placeholder="Rédigez une annonce officielle visible par tous les membres de la plateforme…"></textarea>
           <div style="margin-top:10px;display:flex;gap:8px;justify-content:flex-end;">
+            <button class="btn btn-outline" id="btn-publier-notifier" onclick="naPublierEtNotifier()">🔔 Publier et notifier</button>
             <button class="btn btn-orange" id="btn-publier-admin">Publier sur le fil</button>
           </div>
         </div>
         <div id="publications-list"><div class="notice">Chargement des publications…</div></div>
+      </section>
+
+      <!-- NOTIFICATIONS (2026-10-13) : envoi ciblé, taux d'activation, historique -->
+      <section id="section-notifications-admin" style="display:none;">
+        <h2>🔔 Notifications</h2>
+        <div class="notice" style="margin-bottom:16px;">Envoyez une information précise à tous, ou à un type de compte, un domaine d’activité, un pays ou un compte. Elle arrive dans la cloche de chaque compte ciblé, et sur l’écran du téléphone de ceux qui ont activé les notifications. Vous pouvez aussi notifier directement depuis une publication ou une vidéo (bouton 🔔).</div>
+        <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+          <button class="btn btn-orange" onclick="notifAdminOuvrir({publication:true})">＋ Nouvelle information pour tous</button>
+          <button class="btn btn-outline" onclick="notifAdminOuvrir({})">🔔 Notification seule</button>
+        </div>
+        <div id="na-contenu"><p style="color:var(--muted);font-size:13px;">Chargement…</p></div>
       </section>
 
       <!-- CERTIFICATIONS -->
@@ -9389,6 +9402,7 @@ async function submitAccordDirect(){
     'oz-admin':  () => loadOzAdmin(),
     onboarding:  () => loadObAdmin(),
     'videos-tutoriels': () => vtOuvrirOnglet('videos'),
+    'notifications-admin': () => naOuvrir(),
     'avis-moderation': () => avOuvrirOnglet('avis'),
     'error-logs': () => loadErrorLogs(),
     conformite: () => cfOuvrir(),
@@ -9712,12 +9726,14 @@ async function submitAccordDirect(){
   // Publications admin section
   const publisSection = document.getElementById("publications-list");
   if (data.publications_recentes?.length) {
+    if (window.naPubEnregistrer) naPubEnregistrer(data.publications_recentes);
     publisSection.innerHTML = data.publications_recentes.map(p => `
       <div class="card" style="margin-bottom:10px;padding:12px 16px;">
         <div style="display:flex;gap:8px;align-items:center;">
           <span class="feed-cat">${p.categorie||"post"}</span>
           <span style="font-size:12.5px;color:var(--muted);">${p.auteur_nom||"Anonyme"} · ${p.created_at?.slice(0,10)||""}</span>
-          <button class="btn btn-sm btn-outline" style="margin-left:auto;color:#D33;">Supprimer</button>
+          <button class="btn btn-sm btn-outline" style="margin-left:auto;" onclick="naNotifierPublication(${p.id})" title="Envoyer une notification pour cette publication">🔔 Notifier</button>
+          <button class="btn btn-sm btn-outline" style="color:#D33;">Supprimer</button>
         </div>
         <p style="margin:8px 0 0;font-size:13.5px;">${p.contenu}</p>
       </div>
@@ -14688,6 +14704,8 @@ async function diagEmail() {
   <script src="/assets/upload-media.js"></script>
   <script src="/assets/rich-editor.js"></script>
   <script src="/assets/admin-videos-tutoriels-panel.js"></script>
+  <script src="/assets/domaines-activite.js"></script>
+  <script src="/assets/admin-notifications-panel.js?v=20261013a"></script>
   <script src="/assets/admin-parrainage-panel.js"></script>
   <script src="/assets/admin-avis-panel.js"></script>
   <script src="/assets/admin-cartographie-competences.js"></script>

@@ -6,9 +6,12 @@
    opportunités créées par la diaspora. » Un appui sur « Activer » déclenche la demande d'autorisation du navigateur puis
    l'abonnement push de CET appareil — exactement comme l'interrupteur de Confidentialité (qui reste le lieu pour les couper).
 
-   Règles :
+   Règles (invitation douce) :
    - affichée une seule fois par session (onglet / ouverture du raccourci), donc de nouveau à la connexion suivante tant que
      les notifications ne sont pas activées sur cet appareil ; « Plus tard » ferme pour la session ;
+   - après 3 « Plus tard », elle ne revient plus qu'une fois par semaine ;
+   - à un moment où l'intérêt est évident (juste après l'envoi d'un message), une variante propose d'être prévenu de la réponse,
+     au plus une fois tous les 3 jours ;
    - jamais si l'appareil est déjà abonné, si le navigateur ne sait pas faire de push, si l'autorisation est « bloquée »,
      si la personne a désactivé elle-même les notifications dans Confidentialité (da_notif_off), si le serveur n'a pas de
      clé d'envoi, ni sur les pages d'inscription, de connexion, de paiement ou de vérification ;
@@ -20,7 +23,8 @@
   'use strict';
   if (window.DaNotifInvite) return;
 
-  const VU = 'da_notif_invite_vue', OFF = 'da_notif_off';
+  const VU = 'da_notif_invite_vue', OFF = 'da_notif_off', REP = 'da_notif_report', CTX = 'da_notif_ctx_t';
+  const SEMAINE = 7 * 24 * 3600 * 1000, TROIS_JOURS = 3 * 24 * 3600 * 1000, REPORTS_AVANT_RALENTI = 3;
   const PAGES_EXCLUES = ['inscription', 'login', 'connexion', 'paiement', 'panier', 'checkout', 'premium', 'verif', 'mot-de-passe', 'reset'];
   const pushPossible = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
   const lire = (st, k) => { try { return window[st].getItem(k); } catch (e) { return null; } };
@@ -33,6 +37,20 @@
     if (!r.ok) throw new Error((j && (j.error || j.message)) || 'Une erreur est survenue.');
     return j || {};
   };
+  const rapport = () => { try { return JSON.parse(lire('localStorage', REP) || '{}') || {}; } catch (e) { return {}; } };
+
+  /* Demande l'autorisation puis abonne cet appareil. À appeler DEPUIS un appui de la personne. */
+  async function abonner(publicKey) {
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') return { ok: false, permission: permission };
+    let reg = await navigator.serviceWorker.getRegistration();
+    if (!reg) reg = await navigator.serviceWorker.register('/sw.js');
+    reg = await Promise.race([navigator.serviceWorker.ready, delai(10000, 'Le service de notifications met trop de temps à démarrer.')]);
+    const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: u8(publicKey) });
+    await json('/api/push/subscribe', { method: 'POST', body: JSON.stringify({ subscription: sub.toJSON() }) });
+    try { localStorage.removeItem(OFF); } catch (e) { /* sans conséquence */ }
+    return { ok: true };
+  }
 
   const CSS = `
 .dni-fond{position:fixed;inset:0;z-index:100000;background:rgba(6,18,36,.72);display:flex;align-items:center;justify-content:center;padding:18px;font-family:inherit}
@@ -50,38 +68,34 @@
 @media (prefers-reduced-motion:no-preference){.dni-carte{animation:dniEntree .25s ease-out}@keyframes dniEntree{from{transform:translateY(14px);opacity:0}to{transform:none;opacity:1}}}
 `;
 
-  function afficher(publicKey) {
+  function afficher(publicKey, contexte) {
     if (document.getElementById('dni-fond')) return;
     const st = document.createElement('style'); st.textContent = CSS; document.head.appendChild(st);
+    const titre = contexte === 'message' ? 'Être prévenu dès que votre message reçoit une réponse, et ne pas rater les opportunités créées par la diaspora.' : 'Activer les notifications afin de ne pas rater toutes les opportunités créées par la diaspora.';
     const fond = document.createElement('div');
     fond.className = 'dni-fond'; fond.id = 'dni-fond'; fond.setAttribute('role', 'dialog'); fond.setAttribute('aria-modal', 'true'); fond.setAttribute('aria-labelledby', 'dni-titre');
     fond.innerHTML = `<div class="dni-carte">
       <div class="dni-cloche" aria-hidden="true">🔔</div>
-      <h2 class="dni-titre" id="dni-titre">Activer les notifications afin de ne pas rater toutes les opportunités créées par la diaspora.</h2>
+      <h2 class="dni-titre" id="dni-titre">${titre}</h2>
       <p class="dni-texte">Un seul appui, puis « Autoriser ». Vous pourrez les couper à tout moment dans Confidentialité.</p>
       <button type="button" class="dni-btn dni-oui" id="dni-oui">Activer les notifications</button>
       <button type="button" class="dni-btn dni-plus" id="dni-plus">Plus tard</button>
       <p class="dni-msg" id="dni-msg" role="status" aria-live="polite"></p></div>`;
     document.body.appendChild(fond);
     const msg = document.getElementById('dni-msg'), oui = document.getElementById('dni-oui'), plus = document.getElementById('dni-plus');
+    const echap = ev => { if (ev.key === 'Escape') reporter(); };
     const fermer = () => { document.removeEventListener('keydown', echap); fond.remove(); };
-    const echap = ev => { if (ev.key === 'Escape') fermer(); };
+    const reporter = () => { const r = rapport(); ecrire('localStorage', REP, JSON.stringify({ n: Number(r.n || 0) + 1, t: Date.now() })); fermer(); };
     document.addEventListener('keydown', echap);
-    plus.onclick = fermer;
+    plus.onclick = reporter;
     oui.onclick = async () => {
       oui.disabled = plus.disabled = true; msg.className = 'dni-msg'; msg.textContent = '';
       try {
-        const permission = await Notification.requestPermission();
-        if (permission !== 'granted') {
-          msg.textContent = permission === 'denied' ? 'Autorisation refusée. Vous pourrez les activer plus tard dans Confidentialité.' : 'Autorisation non accordée. Vous pourrez réessayer dans Confidentialité.';
-          plus.disabled = false; plus.textContent = 'Fermer'; return;
+        const r = await abonner(publicKey);
+        if (!r.ok) {
+          msg.textContent = r.permission === 'denied' ? 'Autorisation refusée. Vous pourrez les activer plus tard dans Confidentialité.' : 'Autorisation non accordée. Vous pourrez réessayer dans Confidentialité.';
+          plus.disabled = false; plus.textContent = 'Fermer'; plus.onclick = fermer; return;
         }
-        let reg = await navigator.serviceWorker.getRegistration();
-        if (!reg) reg = await navigator.serviceWorker.register('/sw.js');
-        reg = await Promise.race([navigator.serviceWorker.ready, delai(10000, 'Le service de notifications met trop de temps à démarrer.')]);
-        const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: u8(publicKey) });
-        await json('/api/push/subscribe', { method: 'POST', body: JSON.stringify({ subscription: sub.toJSON() }) });
-        try { localStorage.removeItem(OFF); } catch (e) { /* sans conséquence */ }
         msg.textContent = '✓ Notifications activées sur cet appareil.';
         setTimeout(fermer, 1600);
       } catch (e) {
@@ -93,26 +107,44 @@
     setTimeout(() => { try { oui.focus(); } catch (e) { /* sans conséquence */ } }, 50);
   }
 
-  async function proposer(user) {
+  /* Vrai si cet appareil peut encore recevoir l'invitation (support, autorisation, choix de la personne, abonnement existant). */
+  async function eligible(user) {
+    if (!user || !user.id || !pushPossible()) return false;
+    if (Notification.permission === 'denied') return false;
+    if (lire('localStorage', OFF) === '1') return false;
+    if (user.profil_obligatoire && user.profil_obligatoire.actif) return false;
+    const chemin = (location.pathname || '').toLowerCase();
+    if (PAGES_EXCLUES.some(p => chemin.includes(p))) return false;
+    const reg = await navigator.serviceWorker.getRegistration();
+    const deja = reg ? await reg.pushManager.getSubscription() : null;
+    return !deja;
+  }
+
+  async function proposer(user, options) {
     try {
-      if (!user || !user.id || !pushPossible()) return;
-      if (Notification.permission === 'denied') return;
-      if (lire('sessionStorage', VU) === '1' || lire('localStorage', OFF) === '1') return;
-      if (user.profil_obligatoire && user.profil_obligatoire.actif) return;
-      const chemin = (location.pathname || '').toLowerCase();
-      if (PAGES_EXCLUES.some(p => chemin.includes(p))) return;
-      const reg = await navigator.serviceWorker.getRegistration();
-      const deja = reg ? await reg.pushManager.getSubscription() : null;
-      if (deja) return;
+      const contexte = options && options.contexte;
+      if (lire('sessionStorage', VU) === '1') return;
+      if (contexte) { if (Date.now() - Number(lire('localStorage', CTX) || 0) < TROIS_JOURS) return; }
+      else { const r = rapport(); if (Number(r.n || 0) >= REPORTS_AVANT_RALENTI && Date.now() - Number(r.t || 0) < SEMAINE) return; }
+      if (!(await eligible(user))) return;
       const publicKey = (await json('/api/push/vapid-public-key')).publicKey;
       if (!publicKey) return;
       /* Laisse la page se poser (bandeaux, écrans obligatoires) avant d'ouvrir la fenêtre. */
       setTimeout(() => {
         if (lire('sessionStorage', VU) === '1') return;
-        ecrire('sessionStorage', VU, '1'); afficher(publicKey);
-      }, 1500);
+        ecrire('sessionStorage', VU, '1'); if (contexte) ecrire('localStorage', CTX, String(Date.now()));
+        afficher(publicKey, contexte);
+      }, contexte ? 700 : 1500);
     } catch (e) { /* silencieux : une invitation ne doit jamais gêner la page */ }
   }
 
-  window.DaNotifInvite = { proposer: proposer, marquerDesactive: () => ecrire('localStorage', OFF, '1'), marquerActive: () => { try { localStorage.removeItem(OFF); } catch (e) { /* sans conséquence */ } } };
+  /* Pour un bandeau « Activer » placé dans une page : vrai si on peut le montrer, et la fonction qui active. */
+  async function proposable(user) { try { return await eligible(user); } catch (e) { return false; } }
+  async function activerMaintenant() {
+    const publicKey = (await json('/api/push/vapid-public-key')).publicKey;
+    if (!publicKey) throw new Error('Notifications indisponibles pour le moment.');
+    return abonner(publicKey);
+  }
+
+  window.DaNotifInvite = { proposer: proposer, proposable: proposable, activerMaintenant: activerMaintenant, marquerDesactive: () => ecrire('localStorage', OFF, '1'), marquerActive: () => { try { localStorage.removeItem(OFF); } catch (e) { /* sans conséquence */ } } };
 })();

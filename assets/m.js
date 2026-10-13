@@ -1676,7 +1676,7 @@
     ta.oninput = () => { btn.disabled = !ta.value.trim(); ta.style.height = 'auto'; ta.style.height = Math.min(120, ta.scrollHeight) + 'px'; };
     $('form', f).onsubmit = async ev => {
       ev.preventDefault(); const t = ta.value.trim(); if (!t) return; btn.disabled = true;
-      try { await api(`/api/conversations/${encodeURIComponent(id)}/messages`, { method: 'POST', body: { contenu: t } }); ta.value = ''; ta.style.height = 'auto'; await rerender(true); }
+      try { await api(`/api/conversations/${encodeURIComponent(id)}/messages`, { method: 'POST', body: { contenu: t } }); ta.value = ''; ta.style.height = 'auto'; await rerender(true); if (window.DaNotifInvite) window.DaNotifInvite.proposer(S.me, { contexte: 'message' }); }
       catch (e) { toast(e.message, true); btn.disabled = false; }
     };
   }
@@ -2158,6 +2158,7 @@
       const r = await api('/api/notifications?limit=30'); const l = r.notifications || [];
       const href = n => {
         const d = n.data || {};
+        if (d.lien_m) return d.lien_m;
         if (d.lien) {
           const L = String(d.lien), ev = /evenements-app\.html\?gerer_evenement=(\d+)/.exec(L), cr = /compte-rendu\.html\?evt=(\d+)/.exec(L);
           return ev ? '#/mesevenements/' + ev[1] + '/inscrits' : cr ? '#/cr/' + cr[1] : L;
@@ -2173,6 +2174,13 @@
       };
       const html = l.length ? `<div class="lst">${l.map(n => `<a class="li" ${n.data && n.data.with_user_id ? `href="#" data-write="${esc(n.data.with_user_id)}"` : `href="${esc(href(n))}"`} style="${n.lue ? '' : 'background:var(--orange-l)'}"><span class="ic">${ic('bell')}</span><span class="sp"><span class="t">${esc(n.titre)}</span><br><span class="d">${esc(strip(n.contenu || '').slice(0, 110))} · ${esc(ago(n.created_at))}</span></span></a>`).join('')}</div>` : `<div class="empty"><div class="ei">${ic('bell', 'l')}</div><b>Aucune notification</b>Vous êtes à jour.</div>`;
       setPane('Notifications', html);
+      /* Activation en douceur (2026-10-13) : si cet appareil n'a pas encore les notifications, un bandeau propose de les activer ici. */
+      if (window.DaNotifInvite) window.DaNotifInvite.proposable(S.me).then(ok => {
+        const b = $('#pane-body'); if (!ok || !b || $('#notif-act')) return;
+        b.insertAdjacentHTML('afterbegin', '<div class="card pad" id="notif-act" style="background:var(--navy);color:#fff;border:0;display:flex;flex-direction:column;gap:8px"><b>🔔 Recevez-les directement sur votre téléphone</b><span class="small" style="color:rgba(255,255,255,.85)">Activez les notifications pour ne plus rien rater, même application fermée.</span><button type="button" class="btn sm" id="notif-act-b" style="background:#F5D061;border-color:#F5D061;color:var(--navy)">Activer les notifications</button></div>');
+        const bt = $('#notif-act-b');
+        bt.onclick = async () => { bt.disabled = true; try { const r = await window.DaNotifInvite.activerMaintenant(); if (r.ok) { toast('Notifications activées ✓'); $('#notif-act').remove(); } else { toast('Autorisation non accordée.', true); bt.disabled = false; } } catch (e) { toast('Impossible d’activer. ' + e.message, true); bt.disabled = false; } };
+      }).catch(() => { });
       if (r.non_lues) { api('/api/notifications/lire-tout', { method: 'POST', body: {} }).then(() => { S.unreadNotif = 0; paintBadges(); }).catch(() => { }); }
     } catch (e) { setPane('Notifications', `<div class="empty"><b>Indisponible</b>${esc(e.message)}</div>`); }
   }
