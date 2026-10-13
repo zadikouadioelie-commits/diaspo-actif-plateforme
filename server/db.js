@@ -2239,6 +2239,10 @@ const MIGRATIONS = [
   // ── Relance "première publication" (2026-10-09, demande explicite) — voir server/relance-publication.js.
   // Posée une seule fois, jamais réinitialisée : marque la 1re publication propre (pas un partage/republication).
   ["users", "premiere_publication_le TEXT"],
+  // ── Événement épinglé "3 mois de Premium offerts" (2026-10-09, demande explicite) : marque
+  // l'événement qui doit toujours apparaître en premier, quels que soient les autres événements
+  // créés ensuite — même idiome que produits_vitrine.mis_en_avant / cagnottes.est_vedette.
+  ["evenements", "epingle_permanent INTEGER DEFAULT 0"],
   // ── Bannière "Installer l'app" (PWA) — 2026-08-18 : réglage "Ne plus afficher" lié au compte,
   // réactivable depuis Confidentialité (voir buildPrivacyPanel() dans profil-app.html) ──
   ["users", "pwa_prompt_dismiss INTEGER DEFAULT 0"],
@@ -2896,6 +2900,7 @@ db.exec(`
     created_at TEXT DEFAULT (datetime('now'))
   );
   CREATE INDEX IF NOT EXISTS idx_cv_partages_user ON cv_partages(user_id, created_at);
+
   /* ── Dossiers de recrutement (2026-10-12) ── un compte qui reçoit des CV les range dans des DOSSIERS (ex. « Candidature — Poste de manager
      principal »), les note de 0 à 10, leur donne un verdict (idéal / intéressant / ne correspond pas) et les commente. Le CV est COPIÉ
      (snapshot_json) au moment de l'enregistrement : il reste consultable, avec toutes ses notes, même si son propriétaire le retire ensuite.
@@ -2938,7 +2943,6 @@ db.exec(`
     FOREIGN KEY(candidat_id) REFERENCES recrut_candidats(id) ON DELETE CASCADE
   );
   CREATE INDEX IF NOT EXISTS idx_recrut_commentaires_candidat ON recrut_commentaires(candidat_id);
-
 
   /* ── Documents légaux : versions, preuve d'acceptation, droits des personnes, registre des incidents (2026-10-12) ── */
   CREATE TABLE IF NOT EXISTS legal_versions (
@@ -5935,6 +5939,17 @@ db.exec(`
     created_at  TEXT DEFAULT (datetime('now'))
   );
   CREATE INDEX IF NOT EXISTS idx_publication_relances_user ON publication_relances(user_id, created_at);
+
+  /* Partage de l'événement "3 mois de Premium offerts" (2026-10-09, demande explicite : "Partager
+     cet événement va permettre de gagner 3 points de score de fiabilité. Ça ne se cumule pas.") —
+     UNIQUE sur user_id, écrite en INSERT OR IGNORE : le bonus +3 (server/index.js,
+     computeTrustScore) ne peut donc jamais être compté deux fois pour le même compte, quel que
+     soit le nombre de partages réels. Pas de clé étrangère : ne doit jamais bloquer la
+     suppression d'un compte. */
+  CREATE TABLE IF NOT EXISTS promo_event_partages (
+    user_id     INTEGER PRIMARY KEY,
+    created_at  TEXT DEFAULT (datetime('now'))
+  );
 `);
 
 /* ═══════════════════════════════════════════════════════════════════════════

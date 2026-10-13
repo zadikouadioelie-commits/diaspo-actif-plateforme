@@ -859,9 +859,9 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
     // Assigner DA-ID à l'initiative aussi
     const initRow = await db.prepare('SELECT id FROM initiatives WHERE owner_user_id=? ORDER BY id DESC LIMIT 1').get(id);
     if (initRow) try { await db.prepare('UPDATE initiatives SET da_id=? WHERE id=?').run(generateDaId(), initRow.id); } catch(_) {}
-    if (initRow && numero_immatriculation) { try { await db.prepare('UPDATE initiatives SET type_immatriculation=? WHERE id=?').run(Immat.typeEffectif(type_immatriculation, numero_immatriculation) || null, initRow.id); } catch (_) {} }
     /* Fiches « Taille de l'entreprise » et « Organisme financier » (2026-10-09) — valeurs hors liste ignorées. */
     if (initRow) { try { const st = STRUCTURES_INITIATIVE.nettoyer(body); await db.prepare('UPDATE initiatives SET taille_entreprise=?, finance_famille=?, finance_type=? WHERE id=?').run(st.taille_entreprise, st.finance_famille, st.finance_type, initRow.id); } catch (_) {} }
+    if (initRow && numero_immatriculation) { try { await db.prepare('UPDATE initiatives SET type_immatriculation=? WHERE id=?').run(Immat.typeEffectif(type_immatriculation, numero_immatriculation) || null, initRow.id); } catch (_) {} }
     /* Numéro de déclaration demandé dès la création : confirmé aussitôt dans le registre officiel → point « Organisation vérifiée » (2026-10-08). */
     if (initRow && statut_creation !== 'en_creation' && numero_immatriculation) { try { await verifierImmatriculationAuto(initRow.id); } catch (_) { /* le cron quotidien réessaiera */ } }
     // Profil public enrichi : champs facultatifs du formulaire d'inscription
@@ -21768,6 +21768,29 @@ route("POST", "/api/evenements/:id/promouvoir", async (req, res, params) => {
   }
 });
 
+/* POST /api/evenements/:id/partage-promo (2026-10-09, demande explicite : "Partager cet
+   événement va permettre de gagner 3 points de score de fiabilité. Ça ne se cumule pas.") —
+   réservée à L'événement épinglé (epingle_permanent=1) : partager un événement ordinaire ne
+   rapporte rien, seule cette promotion le fait. INSERT OR IGNORE sur promo_event_partages
+   (clé primaire user_id) : idempotent, le bonus n'est jamais compté deux fois même si cette
+   route est appelée à chaque partage réel. Le score lui-même n'est jamais écrit ici — il est
+   recalculé en direct par computeTrustScore() à partir de cette table, comme toute autre
+   source de points de fiabilité sur cette plateforme. */
+route("POST", "/api/evenements/:id/partage-promo", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const evt = await db.prepare("SELECT id, epingle_permanent FROM evenements WHERE id=?").get(params.id);
+  if (!evt) return sendJSON(res, 404, { error: "Événement introuvable." });
+  if (!Number(evt.epingle_permanent)) return sendJSON(res, 200, { ok: true, points: false });
+  let deja = true;
+  try {
+    const avant = await db.prepare("SELECT 1 FROM promo_event_partages WHERE user_id=?").get(user.id);
+    deja = !!avant;
+    if (!deja) await db.prepare("INSERT OR IGNORE INTO promo_event_partages (user_id) VALUES (?)").run(user.id);
+  } catch (e) { /* jamais bloquant pour le partage lui-même */ }
+  sendJSON(res, 200, { ok: true, points: !deja });
+});
+
 /* ══════════════════════════════════════════════════════════════════════════
    MODULE COMPTE-RENDU D'ÉVÉNEMENT (2026-10-05, demande explicite)
    - Relance du créateur à la fin de l'événement : notification Diaspo'Actif ET e-mail
@@ -23010,7 +23033,11 @@ route("GET", "/api/evenements/recommandes", async (req, res, params, body, query
 });
 
 route("GET", "/api/evenements", async (req, res, params, body, query) => {
-  let rows = await db.prepare("SELECT e.*, u.nom AS organisateur_nom FROM evenements e LEFT JOIN users u ON u.id=e.owner_user_id ORDER BY e.date_evt ASC, e.heure_debut ASC").all();
+  /* epingle_permanent (2026-10-09, demande explicite) : un événement ainsi marqué reste TOUJOURS
+     en premier, quels que soient les autres événements créés ensuite — même idiome que
+     produits_vitrine.mis_en_avant/cagnottes.est_vedette (tri par indicateur avant la date),
+     jamais une date truquée pour tricher sur le tri normal. */
+  let rows = await db.prepare("SELECT e.*, u.nom AS organisateur_nom FROM evenements e LEFT JOIN users u ON u.id=e.owner_user_id ORDER BY COALESCE(e.epingle_permanent,0) DESC, e.date_evt ASC, e.heure_debut ASC").all();
   /* Brouillon (2026-09-23, demande explicite : "un bouton brouillon... pour le conserver sans
      le publier" ; restreint le 2026-09-24, capture à l'appui : "l'événement en brouillon ne
      doit pas apparaître au public, il doit apparaître que dans Mes événements") — un brouillon
@@ -30242,6 +30269,32 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
    distinguer une ligne "cagnotte" d'un billet (event_id) ou d'une adhésion
    (adhesion_paiement_id) dans l'historique unifié du Centre Financier. Même idiome que
    migrateRencontresContact() ci-dessus. */
+/* Événement épinglé "3 mois de Premium offerts" (2026-10-09, demande explicite) — créé une seule
+   fois, repéré par epingle_permanent=1 (jamais recréé au redémarrage suivant). owner_user_id =
+   le compte officiel de la plateforme (getOfficialUserId(), jamais codé en dur : l'id diffère
+   entre environnements, voir la désynchronisation des comptes démo déjà documentée). Mêmes dates
+   que la cartouche d'accueil (index.html #hp-promo-premium) et la vraie règle serveur de
+   gratuité Premium (RÈGLE DES 3 MOIS PUIS DES 3 SEMAINES, plus haut dans ce fichier). */
+(async function seedEvenementPromoPremium() {
+  try {
+    const existant = await db.prepare("SELECT id FROM evenements WHERE epingle_permanent=1 LIMIT 1").get();
+    if (existant) return;
+    const officielId = await getOfficialUserId();
+    if (!officielId) return; // aucun compte officiel dans cet environnement : rien à créer plutôt qu'un propriétaire incorrect
+    await db.prepare(`
+      INSERT INTO evenements
+        (titre, organisateur, date_evt, date_fin, lieu, statut, owner_user_id, description, domaine,
+         visibilite, type_participation, mode_participation, epingle_permanent)
+      VALUES (?, ?, ?, ?, ?, 'ouvert', ?, ?, ?, 'public', 'gratuit', 'ligne', 1)
+    `).run(
+      "3 mois de Premium offerts à toute la diaspora", "Diaspo'Actif",
+      "2026-10-09", "2027-01-03", "En ligne — toute la plateforme", officielId,
+      "Diaspo'Actif vous invite à découvrir la plateforme de la diaspora : créez votre boutique en ligne, mettez en avant votre activité, partagez votre expérience, gérez votre association. Tout notre système Premium est à votre disposition jusqu'au 3 janvier 2027. Offre exceptionnelle : à partir du 13 décembre 2026, les nouveaux inscrits n'auront droit qu'à 3 semaines de Premium.",
+      "autre",
+    );
+  } catch (e) { console.error('[seedEvenementPromoPremium]', e.message); }
+})();
+
 (async function migrateCagnottesWallet() {
   try {
     const cols = (await db.prepare("PRAGMA table_info(wallet_transactions)").all()).map(c => c.name);
@@ -37804,7 +37857,7 @@ ${jsonLd}
       const initId = Number(init?.id) || 0;
       const [nbCollabs, nbFollowers, nbPosts, nbCommentaires, nbReactions, nbRecents,
              nbEvenements, nbComptesRendus, nbAchats, nbVentes, nbCagnottes, nbDonsRecus,
-             nbParticipations, nbFormules, nbAdherents] = await Promise.all([
+             nbParticipations, nbFormules, nbAdherents, nbPartagePromo] = await Promise.all([
         N(`SELECT COUNT(*) n FROM candidatures WHERE user_id=? AND statut IN ('retenu','accepte')`, userId),
         N(`SELECT COUNT(*) n FROM user_follows WHERE followed_id=?`, userId),
         N(`SELECT COUNT(*) n FROM fil_posts WHERE auteur_id=? AND COALESCE(statut,'publie') NOT IN ('archive','brouillon')`, userId),
@@ -37825,6 +37878,7 @@ ${jsonLd}
             WHERE cc.user_id=? AND cc.statut='paye' AND c.owner_user_id<>?`, userId, userId),
         initId ? N(`SELECT COUNT(*) n FROM adhesion_formules WHERE initiative_id=?`, initId) : 0,
         initId ? N(`SELECT COUNT(*) n FROM adhesion_membres WHERE initiative_id=? AND statut IN ('a_jour','non_a_jour')`, initId) : 0,
+        N(`SELECT COUNT(*) n FROM promo_event_partages WHERE user_id=?`, userId),
       ]);
       /* Parrainage : la plateforme ne peut pas savoir si un lien a été réellement envoyé, mais elle
          voit s'il a SERVI — ouvert (visite ou scan du QR) ou suivi d'une inscription. Trois marches. */
@@ -38023,6 +38077,13 @@ ${jsonLd}
               { texte: 'Créer mon adhésion', href: 'dashboard-initiative.html#adhesions-init' }),
             echelle('adherents', '👥', 'Adhérents', nbAdherents, [[1, 4], [10, 3], [20, 3], [30, 4]], { pas: 30, pts: 2 }, 20, ['adhérent', 'adhérents'], S,
               { texte: 'Faire adhérer des membres', href: 'dashboard-initiative.html#adhesions-init' }),
+            /* Bonus unique "+3" (2026-10-09, demande explicite : "Partager cet événement va
+               permettre de gagner 3 points de score de fiabilité. Ça ne se cumule pas.") — lu
+               depuis promo_event_partages (clé primaire user_id), jamais compté deux fois quel
+               que soit le nombre de partages réels. Concerne l'événement épinglé "3 mois de
+               Premium offerts" uniquement, voir POST /api/evenements/:id/partage-promo. */
+            geste('partage_promo', '📤', 'A partagé l\'événement "3 mois de Premium offerts"', nbPartagePromo > 0, 3, true, 'Partagez l\'événement "3 mois de Premium offerts" depuis la page Événements.',
+              { texte: 'Voir l\'événement', href: 'evenements.html' }),
           ];
         })(),
       ];

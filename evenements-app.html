@@ -349,6 +349,21 @@
 @media (prefers-reduced-motion: reduce){
   .evt-card-flash, .flash-shimmer::after, .flash-cachet{animation:none;}
 }
+
+/* ═══ Événement épinglé "3 mois de Premium offerts" (2026-10-09, demande explicite) ═══
+   Chargé et affiché indépendamment des onglets En cours/À venir/Terminés et des filtres —
+   "peu importe les autres événements qui vont être créés, cet événement doit demeurer la
+   première chose qu'on voit" : rendu une seule fois dans #evt-epingle, jamais soumis au tri/
+   filtrage de renderEvts(). Même palette que la cartouche d'accueil (index.html). */
+.evt-epingle{position:relative;overflow:hidden;border-radius:18px;padding:24px;margin-bottom:18px;background:radial-gradient(800px 300px at 80% 10%,#1B3A6B 0%,#0D2B4E 46%,#081A33 100%);border:1.5px solid rgba(245,208,97,.3);box-shadow:0 16px 36px -14px rgba(8,26,51,.5)}
+.evt-epingle-badge{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#F5D061,#C9971C);color:#3A2600;font-weight:800;font-size:11px;letter-spacing:.04em;padding:5px 12px;border-radius:999px;margin-bottom:10px}
+.evt-epingle h3{margin:0 0 8px;font-size:21px;color:#fff;font-weight:800}
+.evt-epingle p{margin:0 0 12px;font-size:13.5px;line-height:1.55;color:#C7D4E8;max-width:640px}
+.evt-epingle-meta{display:inline-flex;align-items:center;gap:7px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:#fff;font-weight:700;font-size:12.5px;padding:6px 12px;border-radius:9px;margin:0 8px 12px 0}
+.evt-epingle-ctas{display:flex;flex-wrap:wrap;gap:10px}
+.evt-epingle-ctas a,.evt-epingle-ctas button{display:inline-flex;align-items:center;gap:7px;font-weight:700;font-size:13px;padding:9px 16px;border-radius:10px;text-decoration:none;cursor:pointer;border:none}
+.evt-epingle-cta-primary{background:#F26422;color:#fff}
+.evt-epingle-cta-secondary{background:rgba(255,255,255,.06);color:#F5D061;border:1px solid rgba(245,208,97,.4) !important}
 </style>
   <link rel="stylesheet" href="/assets/design-upgrade.v2.css">
   <link rel="stylesheet" href="/assets/theme-manager.css">
@@ -455,6 +470,7 @@
 
     <!-- ═══ COLONNE CENTRALE : ÉVÉNEMENTS ═══ -->
     <div class="evt-main-col">
+      <div id="evt-epingle"></div>
       <div id="evt-tabs"></div>
       <div id="evt-count" style="font-size:13px;color:var(--muted);margin-bottom:8px"></div>
       <div id="trophee-cta-zone"></div>
@@ -919,6 +935,35 @@ async function loadEvts() {
 let inscritSet = new Set();
 async function loadMesEvts() {
   try { const r=await api('GET','/mes-evenements'); inscritSet=new Set((r.evenements||[]).map(e=>e.id)); } catch(e) {}
+}
+
+/* Événement épinglé "3 mois de Premium offerts" (2026-10-09, demande explicite) — indépendant de
+   loadEvts()/renderEvts() et de leurs onglets/filtres : toujours affiché en haut, qu'il tombe ou
+   non dans l'onglet actif "En cours/À venir/Terminés". Un seul appel au chargement de la page
+   (pas rejoué à chaque changement de filtre) : l'événement et ses dates ne bougent pas pendant
+   la visite. Partager réutilise partagerEvenement() (bonus fiabilité inclus, voir plus haut). */
+async function chargerEvenementEpingle() {
+  const zone = document.getElementById('evt-epingle');
+  if (!zone) return;
+  try {
+    const r = await api('GET', '/evenements');
+    const evt = (r.evenements || []).find(e => Number(e.epingle_permanent) === 1);
+    if (!evt) { zone.innerHTML = ''; return; }
+    const debut = evt.date_evt ? new Date(evt.date_evt + 'T12:00:00Z').toLocaleDateString('fr-FR', { day:'numeric', month:'long', year:'numeric', timeZone:'Europe/Paris' }) : '';
+    const fin = evt.date_fin ? new Date(evt.date_fin + 'T12:00:00Z').toLocaleDateString('fr-FR', { day:'numeric', month:'long', year:'numeric', timeZone:'Europe/Paris' }) : '';
+    zone.innerHTML = `<div class="evt-epingle">
+      <span class="evt-epingle-badge">⭐ Événement spécial Diaspo'Actif</span>
+      <h3>${esc(evt.titre)}</h3>
+      <p>${evtDescApercu(evt.description, 280)}</p>
+      <div>
+        <span class="evt-epingle-meta">📅 Du ${debut} au ${fin}</span>
+      </div>
+      <div class="evt-epingle-ctas">
+        <a class="evt-epingle-cta-primary" href="javascript:void(0)" onclick="openDetail(${evt.id})">👁 Voir l'événement</a>
+        <button type="button" class="evt-epingle-cta-secondary" onclick="partagerEvenement(${evt.id})">📤 Partager — gagnez 3 points de fiabilité</button>
+      </div>
+    </div>`;
+  } catch (e) { zone.innerHTML = ''; }
 }
 
 /* Aperçu court de la description sur la carte de liste (2026-09-25, éditeur de texte enrichi) —
@@ -1958,6 +2003,15 @@ window.partagerEvenement = async function(id) {
      de l'utilisateur pour ne pas réutiliser un ancien lien. Ignoré côté serveur (seuls evt/via
      sont lus, voir server/index.js) : ne change rien à quel événement s'ouvre au clic. */
   const url = location.origin + location.pathname + '?evt=' + id + via + '&r=' + Date.now().toString(36);
+  /* Bonus fiabilité "+3" (2026-10-09, demande explicite) — réservé à l'événement épinglé
+     "3 mois de Premium offerts" (evt.epingle_permanent) ; non cumulable, le serveur garde
+     l'idempotence (promo_event_partages). Fire-and-forget : ne doit jamais retarder le partage
+     lui-même, juste informer après coup si des points ont réellement été gagnés. */
+  if (evt && evt.epingle_permanent && typeof api === 'function') {
+    api('POST', `/evenements/${id}/partage-promo`).then(r => {
+      if (r && r.points && typeof showToast === 'function') showToast('🛡️ +3 points d\'indice de fiabilité !');
+    }).catch(() => {});
+  }
   if (navigator.share) {
     /* PAS de `text` (2026-09-28, essayé deux fois, retiré deux fois, capture à l'appui à chaque
        fois) — un `text` non vide fait que WhatsApp compose le message avec ce texte collé AVANT
@@ -2657,7 +2711,7 @@ function cdFermerCalendrier() {
     document.getElementById('btn-creer').style.display = 'inline-flex';
     document.getElementById('btn-flash-wrap').style.display = 'inline-flex';
   }
-  await Promise.all([syncFiltreDomaineOptions(), loadEvts(), (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? loadMesEvts() : Promise.resolve(), initSuggestions(), initPublicationsOrganisations()]);
+  await Promise.all([syncFiltreDomaineOptions(), loadEvts(), chargerEvenementEpingle(), (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? loadMesEvts() : Promise.resolve(), initSuggestions(), initPublicationsOrganisations()]);
   /* Lien direct vers la fiche complète d'un événement (2026-09-10, demande explicite : bouton
      "En savoir plus" depuis la mini-fenêtre "Événements" de l'annuaire) — reprend le format
      d'ancre déjà utilisé par notifUrl() (assets/app.js) pour les notifications liées à un
