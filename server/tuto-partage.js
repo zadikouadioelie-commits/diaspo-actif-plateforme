@@ -21,6 +21,14 @@ function imageTuto(v) {
   return null;
 }
 
+/* Gmail/Outlook (et certains aperçus de lien) n'affichent PAS les images SVG : si l'affiche d'un tuto est un .svg et qu'une version .jpg/.png du même nom
+   existe dans le dépôt, c'est elle qu'il faut envoyer ; sinon null (le texte seul vaut mieux qu'une image cassée). */
+function imageRaster(u) {
+  if (!u || !/\.svg(\?|$)/i.test(u) || /^https?:/i.test(u)) return u;
+  for (const ext of [".jpg", ".png"]) { const alt = u.replace(/\.svg(\?.*)?$/i, ext); if (require("fs").existsSync(require("path").join(__dirname, "..", alt.split("?")[0]))) return alt; }
+  return null;
+}
+
 /* Carte du tuto jointe aux publications partagées (null si le tuto n'est plus publié).
    type_source/url/miniature_url exposés depuis le 2026-10-13 (demande explicite : "rester dans
    le fil, pas besoin d'aller sur la page de la vidéo") — nécessaires au front pour lancer la
@@ -38,7 +46,7 @@ const tutoClause = " AND (p.tuto_video_id IS NULL OR EXISTS (SELECT 1 FROM da_vi
 /* Texte de la publication : le nom du compte qui partage et le titre du tuto, rien d'autre. */
 const texteInvitation = (nom, titre) => `${nom} vous invite à voir le tuto « ${String(titre || "").trim().slice(0, TITRE_MAX)} »`;
 
-module.exports = { imageTuto, carteTutoPost, tutoClause, texteInvitation };
+module.exports = { imageRaster, imageTuto, carteTutoPost, tutoClause, texteInvitation };
 module.exports.register = function register({ route, db, sendJSON, getCurrentUser, SEC, nomCompteAffichage, getOrigin }) {
   /* GET /api/videos-tutoriels/:id/partager — aperçu avant partage : la carte du tuto et le texte exact qui sera publié (nom du compte
      qui partage compris). Ouvert à tous : un visiteur non connecté peut quand même copier le lien / l'envoyer par WhatsApp. */
@@ -93,19 +101,13 @@ module.exports.register = function register({ route, db, sendJSON, getCurrentUse
     if (!carte) return sendJSON(res, 404, { error: "Ce tuto n'est pas disponible." });
     const desc = (await db.prepare("SELECT description FROM da_videos_tutoriels WHERE id=?").get(carte.id) || {}).description || "";
     const origin = getOrigin(req);
-    /* Gmail/Outlook n'affichent PAS les images SVG : si l'affiche du tuto est un .svg et qu'une version .jpg/.png du même nom existe, c'est elle qui part dans l'e-mail. */
-    const rasterise = u => {
-      if (!u || !/\.svg(\?|$)/i.test(u) || /^https?:/i.test(u)) return u;
-      for (const ext of [".jpg", ".png"]) { const alt = u.replace(/\.svg(\?.*)?$/i, ext); if (require("fs").existsSync(require("path").join(__dirname, "..", alt.split("?")[0]))) return alt; }
-      return null;
-    };
     const absolu = u => !u ? null : (/^https?:\/\//i.test(u) ? u : origin + (u.startsWith("/") ? "" : "/") + u);
     const d = Number(carte.duree_secondes) || 0;
     const dureeTxt = !d ? "" : (d >= 60 ? `${Math.floor(d / 60)} min${d % 60 ? ` ${String(d % 60).padStart(2, "0")} s` : ""}` : `${d} s`);
     const auteurNom = (await nomCompteAffichage(user.id)) || "Un membre de Diaspo'Actif";
     const { emailPartageTuto } = require("./mailer");
     const lien = `${origin}/${carte.lien}`;
-    const resultats = await Promise.all(emails.map(email => emailPartageTuto({ email, auteurNom, titre: String(carte.titre || "").slice(0, TITRE_MAX), description: desc, categorie: carte.categorie, imageUrl: absolu(rasterise(carte.image)), dureeTxt, lien })));
+    const resultats = await Promise.all(emails.map(email => emailPartageTuto({ email, auteurNom, titre: String(carte.titre || "").slice(0, TITRE_MAX), description: desc, categorie: carte.categorie, imageUrl: absolu(imageRaster(carte.image)), dureeTxt, lien })));
     const envoyes = resultats.filter(r => r && r.ok).length;
     if (!envoyes) return sendJSON(res, 502, { error: "L'envoi a échoué. Réessayez dans un instant." });
     sendJSON(res, 200, { ok: true, envoyes, echecs: emails.length - envoyes });

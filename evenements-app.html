@@ -2046,7 +2046,7 @@ window.partagerEvenement = async function(id) {
       if (r && r.points && typeof showToast === 'function') showToast('🛡️ +3 points d\'indice de fiabilité !');
     }).catch(() => {});
   }
-  if (navigator.share) {
+  if (navigator.share && window.matchMedia && matchMedia('(pointer:coarse)').matches) {   // téléphone/tablette : feuille de partage native ; ordinateur : fenêtre lien + QR + e-mail
     /* PAS de `text` (2026-09-28, essayé deux fois, retiré deux fois, capture à l'appui à chaque
        fois) — un `text` non vide fait que WhatsApp compose le message avec ce texte collé AVANT
        le lien au lieu de traiter le partage comme un lien seul à déplier ; aucune carte d'aperçu
@@ -2061,10 +2061,10 @@ window.partagerEvenement = async function(id) {
     try { await navigator.share({ title: titre, url }); return; }
     catch (e) { if (e && e.name === 'AbortError') return; }
   }
-  ouvrirModalePartage(url, titre);
+  ouvrirModalePartage(url, titre, id);
 };
 
-function ouvrirModalePartage(url, titre) {
+function ouvrirModalePartage(url, titre, id) {
   const bg = document.createElement('div');
   bg.className = 'modal-bg open';
   bg.innerHTML = `
@@ -2077,6 +2077,13 @@ function ouvrirModalePartage(url, titre) {
         <input type="text" readonly value="${esc(url)}" onclick="this.select()" style="flex:1;min-width:0;height:38px;padding:0 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;color:#333;">
         <button class="btn btn-outline" style="font-size:13px;white-space:nowrap;" id="btn-copier-lien-partage">🔗 Copier</button>
       </div>
+      ${(typeof CURRENT_USER !== 'undefined' && CURRENT_USER && id) ? `
+      <button class="btn btn-outline" id="btn-evt-mail" style="width:100%;margin-top:10px;font-size:13px;">✉️ Envoyer par e-mail (affiche, date, lieu)</button>
+      <div id="evt-mailbox" style="display:none;margin-top:10px;text-align:left;">
+        <input type="text" id="evt-mailin" inputmode="email" autocomplete="email" aria-label="Adresses e-mail des destinataires" placeholder="adresse@exemple.com (jusqu'à 5, séparées par une virgule)" style="width:100%;box-sizing:border-box;height:38px;padding:0 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;">
+        <button class="btn btn-primary" id="btn-evt-mailgo" style="width:100%;margin-top:8px;font-size:13px;">Envoyer l'e-mail</button>
+        <div id="evt-mailmsg" role="status" style="margin-top:8px;font-size:12.5px;"></div>
+      </div>` : ''}
     </div>`;
   bg.addEventListener('click', e => { if (e.target === bg) bg.remove(); });
   document.body.appendChild(bg);
@@ -2086,6 +2093,20 @@ function ouvrirModalePartage(url, titre) {
       setTimeout(() => { this.textContent = '🔗 Copier'; }, 2000);
     });
   });
+  const btnMail = bg.querySelector('#btn-evt-mail');
+  if (btnMail) {
+    btnMail.addEventListener('click', () => { bg.querySelector('#evt-mailbox').style.display = 'block'; btnMail.style.display = 'none'; bg.querySelector('#evt-mailin').focus(); });
+    bg.querySelector('#btn-evt-mailgo').addEventListener('click', async function() {
+      const msg = bg.querySelector('#evt-mailmsg');
+      this.disabled = true; this.textContent = 'Envoi…'; msg.textContent = '';
+      try {
+        const r = await fetch('/api/evenements/' + encodeURIComponent(id) + '/envoyer-email', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ emails: bg.querySelector('#evt-mailin').value }) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(j.error || 'Envoi impossible.');
+        msg.style.color = '#15803d'; msg.textContent = j.envoyes > 1 ? '✅ E-mail envoyé à ' + j.envoyes + ' personnes.' : '✅ E-mail envoyé.'; this.textContent = '✓ Envoyé';
+      } catch (e) { msg.style.color = '#b91c1c'; msg.textContent = e.message; this.disabled = false; this.textContent = "Envoyer l'e-mail"; }
+    });
+  }
   const mount = bg.querySelector('#partage-qr-mount');
   if (window.ProfileQR) window.ProfileQR.render(mount, { url, userName: titre, size: 160, compact: true, showActions: false });
 }

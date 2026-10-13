@@ -1167,3 +1167,49 @@ function emailPartageTuto({ email, auteurNom, titre, description, categorie, ima
   });
 }
 module.exports.emailPartageTuto = emailPartageTuto;
+
+/* Partage d'un événement par e-mail (2026-10-13, demande explicite) : même carte que le tuto — affiche, titre, organisateur, date, lieu, extrait, bouton. */
+function emailPartageEvenement({ email, auteurNom, titre, organisateur, quand, ou, description, imageUrl, lien }) {
+  const e = v => String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const ligne = (ico, txt) => txt ? `<div style="margin-top:7px;font-size:14px;font-weight:700;color:#334155;">${ico} ${e(txt)}</div>` : "";
+  const affiche = imageUrl
+    ? `<a href="${e(lien)}" style="text-decoration:none;"><img src="${e(imageUrl)}" alt="${e(titre)}" width="496" style="display:block;width:100%;max-width:496px;height:auto;border:0;border-radius:12px 12px 0 0;background:#0D1B2A;"></a>`
+    : `<a href="${e(lien)}" style="display:block;text-decoration:none;background:linear-gradient(135deg,#0D1B2A,#1B3A6B);border-radius:12px 12px 0 0;padding:46px 0;text-align:center;font-size:44px;">📅</a>`;
+  return sendEmail({
+    to: email,
+    subject: `${auteurNom} vous invite à l'événement « ${titre} » — Diaspo'Actif`,
+    html: `
+<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#FFF7ED;font-family:Inter,Arial,sans-serif;">
+  <div style="max-width:560px;margin:40px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 8px 32px rgba(242,100,34,.12);">
+    <div style="background:linear-gradient(135deg,#0D1B2A,#1B3A6B);padding:26px 32px;text-align:center;">
+      <div style="font-size:26px;font-weight:900;color:#fff;letter-spacing:-.02em;">DIASPO'ACTIF</div>
+      <div style="color:rgba(255,255,255,.6);font-size:13px;margin-top:4px;">Du Sud au Nord</div>
+    </div>
+    <div style="padding:30px 32px 34px;">
+      <h1 style="margin:0 0 18px;font-size:19px;font-weight:900;color:#0D1B2A;line-height:1.35;">📅 ${e(auteurNom)} vous invite à un événement</h1>
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:separate;border:1px solid #E2E8F0;border-radius:12px;">
+        <tr><td style="padding:0;">${affiche}</td></tr>
+        <tr><td style="padding:16px 18px 18px;">
+          <div style="font-size:18px;font-weight:900;color:#0D1B2A;line-height:1.3;">${e(titre)}</div>
+          ${organisateur ? `<div style="margin-top:4px;font-size:13px;color:#64748B;">Organisé par ${e(organisateur)}</div>` : ""}
+          ${ligne("🗓️", quand)}${ligne("📍", ou)}
+          ${description ? `<div style="margin-top:12px;font-size:14px;color:#475569;line-height:1.6;">${e(description)}</div>` : ""}
+        </td></tr>
+      </table>
+      <div style="text-align:center;margin:26px 0 6px;">
+        <a href="${e(lien)}" style="display:inline-block;background:linear-gradient(135deg,#F26422,#c2410c);color:#fff;text-decoration:none;font-weight:800;font-size:15px;padding:14px 32px;border-radius:12px;box-shadow:0 4px 16px rgba(242,100,34,.3);">Voir l'événement →</a>
+      </div>
+      <p style="color:#94A3B8;font-size:12px;text-align:center;margin:16px 0 0;">Si vous ne connaissez pas ${e(auteurNom)}, vous pouvez ignorer cet e-mail.</p>
+    </div>
+    <div style="background:#F8FAFF;padding:16px 32px;text-align:center;border-top:1px solid #E8EFFE;">
+      <p style="margin:0;font-size:11px;color:#94A3B8;">Diaspo'Actif · contact@diaspoactif.com</p>
+    </div>
+  </div>
+</body>
+</html>`
+  });
+}
+module.exports.emailPartageEvenement = emailPartageEvenement;
