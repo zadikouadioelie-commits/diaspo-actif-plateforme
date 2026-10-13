@@ -272,6 +272,9 @@ svg.i.l{width:28px;height:28px}
 .menu-btn svg.i{width:20px;height:20px;stroke-width:2.4}
 #top .logo{width:30px;height:30px}
 #top{gap:8px}
+/* Barre du haut (2026-10-13, demande explicite) : le texte « Diaspo’Actif / Accueil » était coupé — on ne garde que le logo (vrai logo rond), le titre reste lu par les lecteurs d’écran. */
+#top .logo{width:42px;height:42px;padding:0;border-radius:50%;background:transparent;object-fit:cover;flex:none}
+.sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 #desk-banner{position:relative;z-index:200;background:#fff6da;color:#3A2600;border-bottom:2px solid #C9971C;padding:10px 14px;font-size:13px;line-height:1.35;font-family:"Segoe UI",system-ui,sans-serif}
 #desk-banner button{margin-left:6px;background:#3A2600;color:#fff;border-radius:14px;padding:3px 12px;font-weight:700}
 

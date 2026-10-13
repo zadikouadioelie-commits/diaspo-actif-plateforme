@@ -394,8 +394,8 @@
          du bandeau du site (assets/app.js) qui a toujours les deux côte à côte. */
       : `<div class="top-auth">${actu}<a class="pill-cta ghost" href="inscription.html">Créer un compte</a><button class="pill-cta" id="top-login">Connexion</button></div>`;
     const left = S.me ? `<button class="menu-btn" id="top-menu" aria-label="Menu des modules">${ic('menu')}<span>Menu</span></button>` : '';
-    top.innerHTML = `${left}<img class="logo" src="assets/logo.svg" alt="" onerror="this.style.display='none'">
-      <h1><span class="brand-s">Diaspo’Actif</span><span id="top-title">${esc(TITLES[S.tab] || '')}</span></h1>${right}`;
+    top.innerHTML = `${left}<img class="logo" src="assets/logo-roundel.webp" alt="" onerror="this.src='assets/logo.svg'">
+      <h1 class="sr-only"><span class="brand-s">Diaspo’Actif</span><span id="top-title">${esc(TITLES[S.tab] || '')}</span></h1><span style="flex:1"></span>${right}`;
     const l = $('#top-login'); if (l) l.onclick = () => openLogin();
     const sw = $('#top-switch'); if (sw) sw.onclick = openSwitcher;
     const mn = $('#top-menu'); if (mn) mn.onclick = openMenu;
