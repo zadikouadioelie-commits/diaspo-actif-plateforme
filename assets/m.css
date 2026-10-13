@@ -507,3 +507,18 @@ button.li{background:none;font:inherit;color:inherit}
 .chip.reels{gap:7px;background:linear-gradient(135deg,#14234a,#0B1226);border-color:#E3C06E88;color:#E3C06E;font-weight:800;letter-spacing:.03em;padding-left:11px}
 .chip.reels[hidden]{display:none}
 .chip.reels .mv-cam{width:20px;height:20px}
+
+/* Cartouche « 3 mois de Premium offerts » de l'accueil (2026-10-13, demande explicite) : jaune doré luisant + bleu nuit, pour ne pas passer inaperçue */
+.promo-or{position:relative;overflow:hidden;border:2px solid var(--navy);background:linear-gradient(135deg,#FFE88A 0%,#F7CF4A 38%,#E2A90F 68%,#FFD966 100%);box-shadow:0 0 0 3px rgba(245,208,97,.55),0 14px 30px -10px rgba(184,134,11,.7)}
+.promo-or::after{content:"";position:absolute;top:0;bottom:0;left:-60%;width:45%;background:linear-gradient(105deg,transparent,rgba(255,255,255,.65),transparent);transform:skewX(-18deg);animation:poReflet 4.5s ease-in-out infinite;pointer-events:none}
+@keyframes poReflet{0%,55%{left:-60%}100%{left:130%}}
+.promo-or .pad{position:relative;z-index:1;color:var(--navy)}
+.promo-or h3{color:var(--navy)}
+.promo-or .muted{color:rgba(13,43,78,.88)}
+.promo-or .po-badge{background:var(--navy);color:#F5D061}
+.promo-or .tags .badge{background:rgba(13,43,78,.12);color:var(--navy);border:1px solid rgba(13,43,78,.35)}
+.promo-or .po-note{background:var(--navy);color:#fff;border:0;border-radius:12px;padding:10px 12px;margin:0 0 12px}
+.promo-or .po-note b{color:#F5D061}
+.promo-or .btn.navy{background:var(--navy);border-color:var(--navy);color:#F5D061}
+.promo-or .btn.out{background:rgba(255,255,255,.55);border:1.5px solid var(--navy);color:var(--navy)}
+@media (prefers-reduced-motion:reduce){.promo-or::after{animation:none;display:none}}
