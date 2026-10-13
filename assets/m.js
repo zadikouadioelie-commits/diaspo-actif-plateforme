@@ -70,6 +70,7 @@
 
   const ICONS = {
     fil: '<path d="M4 4h13v16H6a2 2 0 0 1-2-2V4z"/><path d="M17 9h3v9a2 2 0 0 1-2 2"/><path d="M8 8h5M8 12h5M8 16h3"/>',
+    down: '<path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 20h14"/>',
     cal: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
     chat: '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/>',
     shop: '<path d="M4 9l1.5-5h13L20 9"/><path d="M4 9v11h16V9"/><path d="M4 9a2.7 2.7 0 0 0 5.3 0 2.7 2.7 0 0 0 5.4 0A2.7 2.7 0 0 0 20 9"/><path d="M10 20v-6h4v6"/>',
@@ -111,6 +112,22 @@
     doc: '<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h7"/>'
   };
   const ic = (n, cls) => `<svg class="i ${cls || ''}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n] || ''}</svg>`;
+
+  /* ---------- Télécharger Diaspo'Actif (2026-10-13, demande explicite) ----------
+     Bouton en tête du menu des modules : installe l'application (raccourci sur l'écran du téléphone). L'invite d'installation du navigateur
+     arrive très tôt : on la garde ici (window.__daInvite) pour assets/telecharger-app.js, chargé seulement au toucher ; sans invite
+     (iPhone, navigateur qui ne la propose pas), il affiche le guide adapté. Le bouton disparaît une fois l'application installée. */
+  window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); window.__daInvite = e; });
+  window.addEventListener('appinstalled', () => { window.__daInvite = null; document.querySelectorAll('[data-da-install]').forEach(b => b.remove()); });
+  const daInstallee = () => { try { return matchMedia('(display-mode: standalone)').matches || navigator.standalone === true; } catch (e) { return false; } };
+  const daBouton = () => daInstallee() ? '' : `<button type="button" class="btn block" data-da-install style="margin:8px 0 12px;background:linear-gradient(135deg,#F59E0B,#E2A929);color:#1A2332;border-color:transparent">${ic('down', 's')} Télécharger Diaspo’Actif</button>`;
+  let daPromesse = null;
+  document.addEventListener('click', e => {
+    const b = e.target.closest && e.target.closest('[data-da-install]'); if (!b) return;
+    e.preventDefault();
+    if (!daPromesse) daPromesse = window.DAInstall ? Promise.resolve() : new Promise((ok, ko) => { const sc = document.createElement('script'); sc.src = 'assets/telecharger-app.js?v=1'; sc.onload = ok; sc.onerror = () => { daPromesse = null; ko(new Error('chargement')); }; document.head.appendChild(sc); });
+    daPromesse.then(() => window.DAInstall.ouvrir()).catch(() => toast('Installation indisponible pour le moment.', true));
+  });
 
   function ago(d) {
     if (!d) return '';
@@ -2031,7 +2048,7 @@
     const prem = S.premium && S.premium.concerne ? (S.premium.actif ? '👑 Premium actif' : '🔒 Premium expiré') : '';
     const { premium: modsPrem, mods, compte, admin: modsAdmin } = modulesHtml(m);
     const close = openSheet(`<div class="row" style="margin:0 0 6px"><div class="av big" style="width:48px;height:48px">${m.photo_url ? `<img src="${attrUrl(m.photo_url)}" alt="" onerror="this.remove()">` : esc(initials(nm))}</div><div class="sp"><div style="font-weight:700;font-size:17px;line-height:1.2">${esc(nm)}</div><div class="small muted">${esc(ROLE_LABEL[m.role] || m.role)}${prem ? ' · ' + prem : ''}</div></div></div>
-      <div class="h2" style="margin-top:12px">MENU DES MODULES</div>
+      <div class="h2" style="margin-top:12px">MENU DES MODULES</div>${daBouton()}
       <div class="lst"><a class="li" href="#/accueil"><span class="ic">${ic('home')}</span><span class="sp"><span class="t">Accueil</span><br><span class="d">Tutoriels vidéo, actualités, initiatives</span></span><span class="ch">${ic('chev', 's')}</span></a></div>
       ${modsAdmin ? `<div class="h2">🛡 ADMINISTRATION</div><div class="lst">${modsAdmin}</div>` : ''}
       ${modsPrem ? `<div class="h2">⭐ MODULES PREMIUM</div><div class="lst">${modsPrem}</div>` : ''}
@@ -2075,7 +2092,7 @@
     const { premium: modsPrem, mods, compte, admin: modsAdmin } = modulesHtml(m);
     el.innerHTML = `<a class="me" href="#/moi"><div class="av big">${m.photo_url ? `<img src="${attrUrl(m.photo_url)}" alt="" onerror="this.remove()">` : esc(initials(nm))}</div><div class="sp"><div class="nm ell">${esc(nm)}</div><div class="sub">${esc(ROLE_LABEL[m.role] || m.role)}${prem ? ' · ' + prem : ''}</div><div class="sub" style="margin-top:2px">Voir mon profil ›</div>${m.role !== 'utilisateur' && resp && resp !== nm ? `<div class="sub" style="font-size:10.5px;opacity:.7;margin-top:2px">Responsable : ${esc(resp)}</div>` : ''}</div></a>
       <button class="btn out block" id="me-switch" style="margin:10px 0 0">${ic('people', 's')} Changer de compte</button>
-      <div class="mdark"><div class="h2" style="margin-top:0">MENU DES MODULES</div>
+      <div class="mdark"><div class="h2" style="margin-top:0">MENU DES MODULES</div>${daBouton()}
         ${modsAdmin ? `<div class="h2">🛡 ADMINISTRATION</div><div class="lst">${modsAdmin}</div>` : ''}
         ${modsPrem ? `<div class="h2">⭐ MODULES PREMIUM</div><div class="lst">${modsPrem}</div>` : ''}
         <div class="h2">OUTILS</div><div class="lst">${mods}</div>

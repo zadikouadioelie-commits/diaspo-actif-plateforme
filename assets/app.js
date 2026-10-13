@@ -6484,6 +6484,30 @@ document.addEventListener("DOMContentLoaded", async ()=>{
 
   // ── Groupe "Bandeau" dans la sidebar : reprend sur mobile les actions du bandeau du haut
   // qui n'ont plus de place à cet endroit (nav masquée, sélecteur de langue masqué, etc.)
+  /* « Télécharger Diaspo'Actif » (2026-10-13, demande explicite) : bouton en tête du menu des modules qui installe l'application (raccourci sur
+     l'écran du téléphone ou de l'ordinateur) — installation native en un clic quand le navigateur l'offre, sinon guide adapté + fichier
+     raccourci (assets/telecharger-app.js, chargé seulement au clic). Absent une fois l'application installée. */
+  (function initSidebarTelecharger() {
+    const sidebar = document.querySelector(".sidebar");
+    if (!sidebar || sidebar.querySelector(".sb-install-group")) return;
+    try { if (matchMedia("(display-mode: standalone)").matches || navigator.standalone === true) return; } catch (e) { /* détection impossible : on affiche le bouton */ }
+    const wrap = document.createElement("div");
+    wrap.className = "sb-install-group";
+    wrap.innerHTML = `<a href="#" id="sb-install" role="button" style="display:flex!important;align-items:center;gap:8px;margin:8px 8px 6px!important;padding:10px 12px!important;border-radius:10px;background:linear-gradient(135deg,#F59E0B,#E2A929)!important;color:#1A2332!important;font-weight:800;font-size:13px;text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,.25);">📲 Télécharger Diaspo'Actif</a>`;
+    const anchor = sidebar.querySelector(".sb-search-wrap") || sidebar.querySelector(".brand");
+    if (anchor) anchor.insertAdjacentElement("afterend", wrap); else sidebar.insertBefore(wrap, sidebar.firstChild);
+    let promesse = null;
+    document.getElementById("sb-install").addEventListener("click", e => {
+      e.preventDefault();
+      if (!promesse) promesse = window.DAInstall ? Promise.resolve() : new Promise((ok, ko) => {
+        const sc = document.createElement("script");
+        sc.src = "/assets/telecharger-app.js?v=1"; sc.onload = ok; sc.onerror = () => { promesse = null; ko(new Error("chargement")); };
+        document.head.appendChild(sc);
+      });
+      promesse.then(() => window.DAInstall.ouvrir()).catch(() => alert("Installation indisponible pour le moment. Réessayez dans un instant."));
+    });
+  })();
+
   (async function initSidebarBandeau() {
     const sidebar = document.querySelector(".sidebar");
     if (!sidebar || sidebar.querySelector(".sb-bandeau-group")) return;
