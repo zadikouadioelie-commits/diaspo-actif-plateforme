@@ -48,7 +48,7 @@
     const spec = await config();
     const ext = (String(file.name || '').split('.').pop() || '').toLowerCase();
     const typeOk = spec.formats.includes(String(file.type || '').toLowerCase()) || (!file.type && spec.extensions.includes(ext));
-    if (!typeOk) return { ok: false, erreur: 'Format non pris en charge. Utilisez une vidéo MP4, MOV ou WebM.' };
+    if (!typeOk) return { ok: false, erreur: 'Format non pris en charge. Utilisez une vidéo MP4 ou MOV.' };
     if (file.size > spec.taille_max_octets) return { ok: false, erreur: `Fichier trop volumineux (${Math.round(file.size / 1048576)} Mo, maximum ${spec.taille_max_mo} Mo). Exportez la vidéo en 1080×1920 : un reel de 90 s dépasse rarement 150 Mo.` };
     const m = await lireMetadonnees(file), avert = [];
     if (!m) return { ok: true, avertissements: ['Aperçu impossible sur cet appareil : la durée sera contrôlée après l’envoi.'], duree: null };

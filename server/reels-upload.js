@@ -16,7 +16,7 @@
    courts ; Facebook accepte jusqu'à 4 Go) :
      • durée   : 3 s minimum, 90 s maximum (idéal 15-45 s) ;
      • cadre   : vertical 9:16 recommandé (1080×1920) ; 4:5, carré 1:1 et horizontal 16:9 acceptés, affichés sans déformation ;
-     • poids   : 1 Go maximum (un reel de 90 s en 1080p fait ~100 Mo) ; formats MP4, MOV (iPhone), WebM ;
+     • poids   : 1 Go maximum (un reel de 90 s en 1080p fait ~100 Mo) ; formats MP4 et MOV (iPhone) ;
      • définition minimale : 480 px sur le plus petit côté.
 
    ACTIVATION. Tant que les trois variables ci-dessous ne sont pas renseignées, /api/reels/config répond actif:false et l'envoi est
@@ -41,8 +41,10 @@ const SPEC = Object.freeze({
   cadre_recommande: "9:16",
   resolution_recommandee: "1080x1920",
   cadres_acceptes: ["9:16", "4:5", "1:1", "16:9"],
-  formats: ["video/mp4", "video/quicktime", "video/webm"],
-  extensions: ["mp4", "mov", "webm"],
+  /* MP4 et MOV seulement, comme Facebook : un WebM produit par un navigateur (sans durée dans l'en-tête) est resté bloqué en analyse chez Bunny
+     lors du test réel du 2026-10-13, alors que le MP4 a été traité en moins de 6 minutes. */
+  formats: ["video/mp4", "video/quicktime"],
+  extensions: ["mp4", "mov"],
   zone_sure: { bas_pct: 20, droite_pct: 12 },   // le texte reste hors de ces zones (boutons de réaction superposés)
 });
 
@@ -78,9 +80,13 @@ async function appelBunny(methode, chemin, corps) {
 
 /* Adresses publiques d'une vidéo prête. HLS = lecture adaptative (hls.js hors Safari/iOS) ; mp4 = repli direct (nécessite l'option
    « MP4 Fallback » de la bibliothèque) ; miniature et aperçu animé sont générés par Bunny. */
-function urlsLecture(guid) {
+function urlsLecture(guid, qualites) {
   const h = cfg().hote; if (!h || !guidValide(guid)) return null;
-  return { hls: `https://${h}/${guid}/playlist.m3u8`, mp4: `https://${h}/${guid}/play_720p.mp4`, miniature: `https://${h}/${guid}/thumbnail.jpg`, apercu: `https://${h}/${guid}/preview.webp`, embed: `https://iframe.mediadelivery.net/embed/${cfg().lib}/${guid}` };
+  /* MP4 de repli : seules les qualités ≤ à celle de la vidéo d'origine existent (test réel : une source 540×960 n'a pas de play_720p.mp4).
+     On prend 720p si elle existe, sinon la plus haute disponible. */
+  const hauteurs = (qualites || []).map(q => parseInt(q, 10)).filter(Boolean).sort((a, b) => b - a);
+  const q = hauteurs.includes(720) ? 720 : (hauteurs[0] || 720);
+  return { hls: `https://${h}/${guid}/playlist.m3u8`, mp4: `https://${h}/${guid}/play_${q}p.mp4`, miniature: `https://${h}/${guid}/thumbnail.jpg`, apercu: `https://${h}/${guid}/preview.webp`, embed: `https://iframe.mediadelivery.net/embed/${cfg().lib}/${guid}` };
 }
 
 const cadreDe = (l, h) => { if (!l || !h) return null; const r = l / h; return r < 0.7 ? "vertical" : r < 0.9 ? "4:5" : r <= 1.15 ? "carre" : "horizontal"; };
@@ -98,7 +104,10 @@ async function etatVideo(guid) {
   }
   if (largeur && hauteur && Math.min(largeur, hauteur) < SPEC.cote_min_px) { await supprimerVideo(guid); return { ...base, etat: "refuse", erreur: `Définition trop faible (${largeur}×${hauteur}). Minimum ${SPEC.cote_min_px} px sur le plus petit côté.` }; }
   /* Lisible dès qu'une première qualité est encodée (statut 3 avec au moins une définition disponible) : inutile d'attendre la fin. */
-  if (v.status === 4 || (v.status === 3 && String(v.availableResolutions || "").trim())) return { ...base, etat: "pret", urls: urlsLecture(guid), qualites: String(v.availableResolutions || "").split(",").filter(Boolean) };
+  if (v.status === 4 || (v.status === 3 && String(v.availableResolutions || "").trim())) {
+    const qualites = String(v.availableResolutions || "").split(",").map(s => s.trim()).filter(Boolean);
+    return { ...base, etat: "pret", urls: urlsLecture(guid, qualites), qualites };
+  }
   return { ...base, etat: v.status <= 1 ? "envoi" : "traitement", progression: Number(v.encodeProgress) || 0 };
 }
 
@@ -123,7 +132,7 @@ function registerReelsUpload({ route, sendJSON, getCurrentUser }) {
     const taille = Number(body && body.taille), type = String((body && body.type) || "").toLowerCase();
     if (!Number.isFinite(taille) || taille <= 0) return sendJSON(res, 400, { error: "Taille du fichier inconnue." });
     if (taille > SPEC.taille_max_mo * 1024 * 1024) return sendJSON(res, 400, { error: `Fichier trop volumineux (maximum ${SPEC.taille_max_mo} Mo). Exportez la vidéo en 1080×1920 : un reel de 90 s dépasse rarement 150 Mo.` });
-    if (type && !SPEC.formats.includes(type)) return sendJSON(res, 400, { error: "Format non pris en charge. Utilisez MP4, MOV ou WebM." });
+    if (type && !SPEC.formats.includes(type)) return sendJSON(res, 400, { error: "Format non pris en charge. Utilisez une vidéo MP4 ou MOV." });
     const titre = String((body && body.titre) || "Reel").replace(/[\r\n]+/g, " ").trim().slice(0, 80) || "Reel";
     try {
       const c = cfg();

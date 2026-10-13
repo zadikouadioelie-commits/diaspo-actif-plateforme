@@ -46,7 +46,9 @@ const CSP = [
      autorisé via script-src ci-dessus ; connect-src devait l'être aussi pour le fetch()
      des données topojson elles-mêmes. */
   /* video.bunnycdn.com (2026-10-13) : envoi direct des vidéos des Reels vers Bunny Stream (protocole TUS, voir server/reels-upload.js). */
-  "connect-src 'self' https://diaspoactif-media.b-cdn.net https://cdn.jsdelivr.net https://video.bunnycdn.com",
+  /* *.b-cdn.net (2026-10-13) : le lecteur HLS des Reels (hls.js) charge la liste de lecture et les segments de la bibliothèque Bunny Stream
+     (vz-xxxxxxxx-xxx.b-cdn.net) par requête réseau, pas seulement par balise <video>. */
+  "connect-src 'self' https://diaspoactif-media.b-cdn.net https://*.b-cdn.net https://cdn.jsdelivr.net https://video.bunnycdn.com",
   "media-src 'self' data: blob: https:",
   /* worker-src blob: (2026-10-08) : la lecture de texte dans le navigateur (tesseract.js, éditeur de prototype de carte de
      membre — assets/carte-proto.js) exécute son moteur dans un Worker créé depuis un blob ; sans cette directive,
