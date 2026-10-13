@@ -16,10 +16,11 @@
     const st = document.createElement('style');
     st.id = 'cx-style';
     st.textContent = `
-.cx-btn{display:none;align-items:center;gap:4px;border:none;cursor:pointer;margin-left:4px;height:24px;padding:0 8px;border-radius:6px;font-size:12px;font-weight:800;background:#e5e7eb;color:#1f2937;box-shadow:0 1px 4px rgba(0,0,0,.25);}
-.cx-btn:hover{filter:brightness(.95);}
-.cx-btn:focus-visible{outline:2px solid #ff6b00;outline-offset:2px;}
-.cx-btn.cx-alerte{background:linear-gradient(135deg,#f97316,#fb923c);color:#fff;}
+.cx-btn{display:none;align-items:center;gap:4px;border:none;cursor:pointer;margin-left:4px;height:24px;padding:0 8px;border-radius:6px;font-size:12px;font-weight:800;background:linear-gradient(135deg,#15803d,#22c55e);color:#fff;border:1.5px solid rgba(255,255,255,.55);box-shadow:0 1px 4px rgba(0,0,0,.3);}
+.cx-btn:hover{filter:brightness(1.08);}
+.cx-btn:focus-visible{outline:2px solid #fff;outline-offset:2px;}
+.cx-btn .cx-n{background:rgba(0,0,0,.3);color:#fff;border-radius:99px;min-width:16px;height:16px;line-height:16px;padding:0 4px;text-align:center;font-size:11px;}
+.cx-btn.cx-alerte{background:linear-gradient(135deg,#ea580c,#f97316);}
 .cx-overlay{position:fixed;inset:0;background:rgba(13,27,42,.6);z-index:2500;display:none;align-items:center;justify-content:center;padding:16px;}
 .cx-overlay.open{display:flex;}
 .cx-box{background:#fff;color:#111;color-scheme:light;border-radius:16px;width:100%;max-width:560px;max-height:calc(100vh - 32px);overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.35);}
