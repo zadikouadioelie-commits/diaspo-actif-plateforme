@@ -221,6 +221,8 @@
       try { if (sessionStorage.getItem('da_abo_ouvert') !== '1') { sessionStorage.setItem('da_abo_ouvert', '1'); location.replace('/premium.html?type=' + (S.me.role === 'initiative' ? 'initiative' : 'utilisateur') + '&bienvenue=1'); return; } } catch (e) { /* stockage indisponible : rien ne s'ouvre */ }
     }
     if (S.me) { refreshBadges(); loadMyInsc(); loadPremium(); }
+    /* Invitation à activer les notifications à la connexion (2026-10-13, demande explicite) : assets/notif-invite.js. */
+    if (S.me && window.DaNotifInvite) window.DaNotifInvite.proposer(S.me);
     renderTop();
   }
   async function loadMyInsc() {
@@ -1778,7 +1780,7 @@
     const el = $('#t-accueil');
     if (S.home.loaded && $('#home-actus', el)) return;
     S.home.loaded = true;
-    el.innerHTML = `${pubSlot('homepage_top')}<div id="home-legal"></div><div id="home-notif"></div><div id="home-prem-rappel"></div><div id="home-annonce"></div><div id="home-honneur"></div><div id="home-videos"></div>${pubSlot('between_videos')}
+    el.innerHTML = `${pubSlot('homepage_top')}<div id="home-legal"></div><div id="home-prem-rappel"></div><div id="home-annonce"></div><div id="home-honneur"></div><div id="home-videos"></div>${pubSlot('between_videos')}
       <div class="card hero"><div class="pad"><div class="small" style="font-weight:700;color:var(--orange-d)">🌍 Réseau diaspora mondial</div>
         <h2 style="margin:6px 0 8px;font-size:20px;line-height:1.25">Connecter les diasporas, valoriser les talents, accélérer le développement des territoires.</h2>
         <p class="muted small" style="margin:0 0 12px">Des passerelles entre pays d’origine et pays d’accueil, grâce aux compétences, projets, organisations et initiatives portés par les diasporas du monde entier.</p>
@@ -1797,7 +1799,7 @@
         <p style="margin:0 0 10px">La diaspora africaine est un levier de développement majeur, mais ses initiatives restent dispersées, invisibles, sans réseau. Diaspo’Actif change ça.</p>
         <div class="tags" style="margin:0"><span class="badge">👥 Rassembler les talents</span><span class="badge">🗂️ Organiser les initiatives</span><span class="badge">🚀 Mobiliser pour un impact durable</span></div></div></div>
       <div id="home-actus"></div><div id="home-troph"></div><div id="home-shops"></div>${pubSlot('vitrine_section')}<div id="home-temo"></div><div id="home-part"></div>`;
-    loadHome(); legalRappelAccueil(); if (window.MMods && MMods.notifInvite) MMods.notifInvite(); premiumRappelAccueil();
+    loadHome(); legalRappelAccueil(); premiumRappelAccueil();
     const promoShareBtn = $('#promo-prem-share');
     if (promoShareBtn) promoShareBtn.onclick = () => partagerLien(location.origin + '/', 'Diaspo’Actif — 3 mois de Premium offerts à toute la diaspora');
     if (window.MMap) { if (S.home.stopMap) S.home.stopMap(); S.home.stopMap = window.MMap.mount($('#home-map')); }

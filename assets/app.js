@@ -1185,6 +1185,12 @@ function ouvrirAbonnementSiDu(user) {
 window.ouvrirAbonnementSiDu = ouvrirAbonnementSiDu;
 
 /* Mise à jour des documents légaux (2026-10-12) : bandeau tant que la nouvelle version n'a pas été acceptée. Calculé par GET /api/auth/me (legal_a_accepter). */
+/* Invitation à activer les notifications à la connexion (2026-10-13, demande explicite) : voir assets/notif-invite.js. */
+function proposerNotifications(user) {
+  const go = () => { try { window.DaNotifInvite.proposer(user); } catch (e) { /* silencieux */ } };
+  if (window.DaNotifInvite) return go();
+  const sc = document.createElement('script'); sc.src = '/assets/notif-invite.js?v=20261013a'; sc.onload = go; document.head.appendChild(sc);
+}
 function afficherBandeauLegal(user) {
   var a = user && user.legal_a_accepter, ancien = document.getElementById('bandeau-legal');
   if (!a || !a.length) { if (ancien) ancien.remove(); return; }
@@ -2071,7 +2077,7 @@ async function applyAuthState() {
     showEmailVerifBanner(user);
     showOrigineBanner(user);
     afficherBandeauLegal(user);
-    if (!appliquerProfilObligatoire(user)) { afficherRelanceProfil(user); showPremierePublicationBanner(user); ouvrirAbonnementSiDu(user); }
+    if (!appliquerProfilObligatoire(user)) { afficherRelanceProfil(user); showPremierePublicationBanner(user); ouvrirAbonnementSiDu(user); proposerNotifications(user); }
     showPwaInstallBanner(user);
   } else {
     el.innerHTML = `

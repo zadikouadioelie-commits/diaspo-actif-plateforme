@@ -365,7 +365,7 @@
         const reg = await navigator.serviceWorker.getRegistration();
         const sub = reg ? await reg.pushManager.getSubscription() : null;
         if (sub) { await api('/api/push/unsubscribe', { method: 'POST', body: { endpoint: sub.endpoint } }); await sub.unsubscribe(); }
-        peindrePush('inactif'); toast('Notifications désactivées sur ce téléphone ✓');
+        peindrePush('inactif'); try { localStorage.setItem('da_notif_off', '1'); } catch (e) { /* sans conséquence */ } toast('Notifications désactivées sur ce téléphone ✓');
       } catch (e) { peindrePush('actif'); toast('Impossible de désactiver. ' + e.message, true); }
       return;
     }
@@ -382,7 +382,7 @@
       reg = await Promise.race([navigator.serviceWorker.ready, delai(10000, 'Le service de notifications met trop de temps à démarrer.')]);
       const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: u8(publicKey) });
       await api('/api/push/subscribe', { method: 'POST', body: { subscription: sub.toJSON() } });
-      peindrePush('actif'); toast('Notifications activées sur ce téléphone ✓');
+      peindrePush('actif'); try { localStorage.removeItem('da_notif_off'); } catch (e) { /* sans conséquence */ } toast('Notifications activées sur ce téléphone ✓');
     } catch (e) { peindrePush('inactif'); toast('Impossible d’activer les notifications. ' + e.message, true); }
   }
 

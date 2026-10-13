@@ -324,6 +324,7 @@ function urlBase64ToUint8Array(base64String) {
         applicationServerKey: urlBase64ToUint8Array(publicKey),
       });
       await api('POST', '/push/subscribe', { subscription: subscription.toJSON() });
+      try { localStorage.removeItem('da_notif_off'); } catch (e) { /* sans conséquence */ }
       renderState('actif');
     } catch (e) {
       alert(e.message || "Impossible d'activer les notifications.");
@@ -340,6 +341,7 @@ function urlBase64ToUint8Array(base64String) {
         await api('POST', '/push/unsubscribe', { endpoint: subscription.endpoint });
         await subscription.unsubscribe();
       }
+      try { localStorage.setItem('da_notif_off', '1'); } catch (e) { /* sans conséquence */ }
       renderState('inactif');
     } catch (e) {
       alert(e.message || "Erreur.");
