@@ -1634,7 +1634,9 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           <label class="da-pill" id="adh-f-media-choice-photo"><input type="radio" name="adh-f-media-choice" value="photo" onchange="adhChoisirTypeMedia('photo')"><span>📷 Photo</span></label>
           <label class="da-pill" id="adh-f-media-choice-video"><input type="radio" name="adh-f-media-choice" value="video" onchange="adhChoisirTypeMedia('video')"><span>🎥 Vidéo (max 1 min)</span></label>
           <label class="da-pill" id="adh-f-media-choice-aucun"><input type="radio" name="adh-f-media-choice" value="" checked onchange="adhChoisirTypeMedia('')"><span>Aucun</span></label>
+          <button type="button" class="da-pill" id="adh-f-carte-btn" onclick="adhOuvrirPrototypeCarte()" title="Téléversez la maquette de votre carte de membre (recto et verso) : chaque adhérent la verra à son nom dans « Ma carte de membre » une fois son adhésion payée.">🪪 Prototype carte de membre</button>
         </div>
+        <div id="adh-f-carte-statut" style="font-size:12px;color:var(--muted);margin:-4px 0 10px;"></div>
         <div id="adh-f-media-photo-row" style="display:none;margin-bottom:10px;">
           <input type="file" id="adh-f-photo-file" accept="image/jpeg,image/png,image/webp" onchange="adhUploadMediaPhoto(this)">
           <img id="adh-f-photo-preview" style="display:none;max-width:100%;border-radius:8px;margin-top:8px;">
@@ -1649,7 +1651,6 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
             <video id="adh-f-video-thumb" style="width:100%;border-radius:8px;" muted></video>
             <button type="button" onclick="document.getElementById('adh-f-video-thumb').play()" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:50%;width:44px;height:44px;font-size:18px;cursor:pointer;">▶️</button>
           </div>
-          <button type="button" class="da-pill" id="adh-f-carte-btn" onclick="adhOuvrirPrototypeCarte()" title="Téléversez la maquette de votre carte de membre (recto et verso) : chaque adhérent la verra à son nom dans « Ma carte de membre » une fois son adhésion payée.">🪪 Prototype carte de membre</button>
         </div>
 
         <!-- Adhésion officielle de l'association (2026-09-28, demande explicite, capture à
@@ -7926,22 +7927,6 @@ let ADH_F_MEDIA = { type: null, url: null, duree: null };
 // initiative, voir adhToggleOfficielle() et son commentaire.
 let ADH_F_OFFICIELLE = false;
 
-function adhChoisirTypeMedia(type){
-  document.querySelectorAll('[id^="adh-f-media-choice-"]').forEach(el => el.classList.remove('checked'));
-  const id = type === 'photo' ? 'adh-f-media-choice-photo' : type === 'video' ? 'adh-f-media-choice-video' : 'adh-f-media-choice-aucun';
-  document.getElementById(id).classList.add('checked');
-  document.getElementById('adh-f-media-photo-row').style.display = type === 'photo' ? 'block' : 'none';
-  document.getElementById('adh-f-media-video-row').style.display = type === 'video' ? 'block' : 'none';
-  if (!type) ADH_F_MEDIA = { type: null, url: null, duree: null };
-  else ADH_F_MEDIA.type = type;
-}
-
-async function adhUploadMediaPhoto(input){
-  const file = input.files[0]; if(!file) return;
-  const allowed = ['image/jpeg','image/png','image/webp'];
-  if (!allowed.includes(file.type)) { showToast('Format non supporté (JPG, PNG ou WebP uniquement).', 'warning'); return; }
-  try{
-    // 2026-09-25, bug réel : photos rejetées avant compression, voir assets/upload-media.js.
 /* Prototype de carte de membre de la formule (2026-10-08) — éditeur et affichage : assets/carte-proto.js. */
 let ADH_F_CARTE = null;
 function adhCarteMajStatut(){
@@ -7958,6 +7943,22 @@ function adhOuvrirPrototypeCarte(){
     onSave: (p) => { ADH_F_CARTE = p; adhCarteMajStatut(); showToast?.(p ? '✅ Prototype de carte pris en compte — il sera enregistré avec la formule.' : 'Prototype de carte retiré.'); },
   });
 }
+function adhChoisirTypeMedia(type){
+  document.querySelectorAll('[id^="adh-f-media-choice-"]').forEach(el => el.classList.remove('checked'));
+  const id = type === 'photo' ? 'adh-f-media-choice-photo' : type === 'video' ? 'adh-f-media-choice-video' : 'adh-f-media-choice-aucun';
+  document.getElementById(id).classList.add('checked');
+  document.getElementById('adh-f-media-photo-row').style.display = type === 'photo' ? 'block' : 'none';
+  document.getElementById('adh-f-media-video-row').style.display = type === 'video' ? 'block' : 'none';
+  if (!type) ADH_F_MEDIA = { type: null, url: null, duree: null };
+  else ADH_F_MEDIA.type = type;
+}
+
+async function adhUploadMediaPhoto(input){
+  const file = input.files[0]; if(!file) return;
+  const allowed = ['image/jpeg','image/png','image/webp'];
+  if (!allowed.includes(file.type)) { showToast('Format non supporté (JPG, PNG ou WebP uniquement).', 'warning'); return; }
+  try{
+    // 2026-09-25, bug réel : photos rejetées avant compression, voir assets/upload-media.js.
     const url = await uploadMedia(await compressIfImage(file, 1200, 1200, 0.85), 'logo');
     ADH_F_MEDIA = { type: 'photo', url, duree: null };
     const preview = document.getElementById('adh-f-photo-preview');
@@ -8310,6 +8311,7 @@ async function adhEnregistrerFormule(){
     montant_max: document.getElementById('adh-f-montant-max').value ? Number(document.getElementById('adh-f-montant-max').value) : null,
     modes_paiement: modes.length ? modes : ['carte'],
     media_type: ADH_F_MEDIA.type || null,
+    carte_proto: ADH_F_CARTE,
     media_url: ADH_F_MEDIA.url || null,
     media_duree_secondes: ADH_F_MEDIA.duree || null,
     liste_stockage_id: listeStockageId,
@@ -8337,7 +8339,6 @@ async function adhEnregistrerFormule(){
     else await api('POST', `/initiatives/${window.__vitrineInitId}/adhesion-formules`, payload);
     adhFermerModalFormule();
     adhRenderFormules();
-    carte_proto: ADH_F_CARTE,
     showToast('Formule enregistrée ✅');
   }catch(e){ showToast('Erreur : '+e.message, 'danger'); }
 }
