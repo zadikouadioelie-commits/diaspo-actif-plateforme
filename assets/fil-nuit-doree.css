@@ -1,0 +1,181 @@
+/* ============================================================
+   Fil d'actualité — design « Nuit dorée » (2026-10-13, demande explicite : « applique la nouvelle DA sur la page fil d'actualité,
+   dans chacun des boutons »). Feuille de surcharge chargée APRÈS theme-nuit-doree.css ; tout est préfixé html body.nd.
+   Retour arrière : retirer les 2 lignes <link> et class="nd" sur <body> de fil-actualite-app.html.
+   ============================================================ */
+
+/* ── En-tête de la page ── */
+html body.nd main.container h2{font-family:var(--nd-display)!important;font-weight:500;font-size:clamp(30px,3.2vw,42px);letter-spacing:-.01em;color:#fff;margin-bottom:4px!important}
+html body.nd main.container>div:first-child p{color:var(--nd-doux)!important}
+html body.nd #btn-create-post{background:var(--nd-degore)!important;color:#1a1202!important;font-weight:800;border:0!important;border-radius:999px!important;min-height:46px;padding:0 24px;box-shadow:0 12px 26px -14px rgba(227,192,110,.7);cursor:pointer;transition:transform .25s var(--nd-ease)}
+html body.nd #btn-create-post:hover{transform:translateY(-2px)}
+
+/* ── « Quoi de neuf ? » + Photo / Vidéo / Article / Texte ── */
+html body.nd .posts-create-trigger{background:var(--nd-verre)!important;border:1px solid var(--nd-bord2)!important;border-radius:22px!important;color:var(--nd-faible)!important;padding:14px 18px;box-shadow:0 24px 50px -36px #000;transition:border-color .3s,box-shadow .3s}
+html body.nd .posts-create-trigger:hover{border-color:var(--nd-or)!important;box-shadow:0 0 0 3px rgba(227,192,110,.14)!important}
+html body.nd .posts-create-trigger .pct-avatar{background:rgba(227,192,110,.12)!important;border:1px solid var(--nd-bord);width:44px;height:44px}
+html body.nd .posts-create-trigger-actions{gap:10px;margin:2px 0 6px}
+html body.nd .pct-action-btn{background:var(--nd-verre)!important;border:1px solid var(--nd-bord2)!important;color:var(--nd-texte)!important;border-radius:999px!important;min-height:42px;padding:0 18px!important;font-size:.88rem!important;font-weight:700;gap:7px;transition:border-color .25s,background .25s,transform .25s var(--nd-ease)}
+html body.nd .pct-action-btn:hover{background:rgba(227,192,110,.12)!important;border-color:var(--nd-or)!important;color:#fff!important;transform:translateY(-1px)}
+
+/* ── Colonnes : cartes de filtres et cartes latérales ── */
+html body.nd .fil-filter-card,html body.nd .fil-side-card{background:var(--nd-verre)!important;border:1px solid var(--nd-bord2)!important;border-radius:22px!important;padding:18px 16px 18px;box-shadow:0 24px 50px -36px #000;color:var(--nd-texte)}
+html body.nd .fil-filter-card h4,html body.nd .fil-side-card h4{color:var(--nd-or)!important;letter-spacing:.14em;font-size:11px;margin-bottom:12px}
+html body.nd :is(.fil-col-left,.fil-col-center,.fil-col-right){scrollbar-width:thin;scrollbar-color:rgba(227,192,110,.4) transparent}
+
+/* ── Boutons de filtre (Tous, Mes abonnements, catégories…) ── */
+html body.nd .posts-feed-filters{gap:8px}
+html body.nd .posts-feed-filter{background:var(--nd-verre)!important;border:1px solid var(--nd-bord2)!important;color:var(--nd-texte)!important;border-radius:999px!important;min-height:42px;padding:0 16px!important;font-size:.88rem!important;font-weight:600;transition:border-color .25s,background .25s,color .25s}
+html body.nd .posts-feed-filter:hover{border-color:var(--nd-bord)!important;background:var(--nd-verre2)!important;color:#fff!important}
+html body.nd .posts-feed-filter.active{background:var(--nd-degore)!important;border-color:transparent!important;color:#1a1202!important;font-weight:800;box-shadow:0 10px 22px -14px rgba(227,192,110,.8)}
+html body.nd .fil-filters-vertical .posts-feed-filter{border-radius:14px!important;text-align:left}
+html body.nd :is(.posts-feed-filter,.pct-action-btn,.fg-bascule button,.fg-plus,.fil-sugg-btn,#btn-create-post):focus-visible{outline:3px solid var(--nd-or);outline-offset:2px}
+
+/* ── Barre « Grille / Liste » ── */
+html body.nd .fg-barre-info{color:var(--nd-doux)!important}
+html body.nd .fg-bascule{background:var(--nd-verre)!important;border:1px solid var(--nd-bord)!important;border-radius:999px!important;padding:3px;gap:2px}
+html body.nd .fg-bascule button{color:var(--nd-doux)!important;border-radius:999px;padding:8px 18px;min-height:40px}
+html body.nd .fg-bascule button.active{background:var(--nd-degore)!important;color:#1a1202!important;font-weight:800}
+
+/* ── Tuiles de la grille ── */
+html body.nd .fg-tile{background:var(--nd-verre)!important;border:1px solid var(--nd-bord2)!important;border-radius:22px!important;box-shadow:0 26px 54px -34px #000;transition:transform .5s var(--nd-ease),border-color .4s,box-shadow .4s}
+html body.nd .fg-tile:hover{border-color:var(--nd-bord)!important;box-shadow:0 34px 60px -32px #000,0 0 0 1px rgba(227,192,110,.18);transform:translateY(-4px)}
+html body.nd .fg-titre{color:#fff!important}
+html body.nd .fg-nom{color:var(--nd-texte)!important}
+html body.nd :is(.fg-auteur,.fg-stats,.fg-pied,.fg-separateur span){color:var(--nd-doux)!important}
+html body.nd .fg-separateur{border-top:1px dashed var(--nd-bord)!important;color:#fff!important}
+html body.nd .fg-vide{color:var(--nd-faible)!important}
+html body.nd .fg-badge{background:rgba(8,13,30,.78)!important;color:var(--nd-or)!important;border:1px solid var(--nd-bord);backdrop-filter:blur(6px);box-shadow:none}
+html body.nd .fg-badge-promo{background:var(--nd-degore)!important;color:#1a1202!important;border-color:transparent}
+html body.nd .fg-badge-nb{background:rgba(8,13,30,.78)!important;color:#fff!important}
+html body.nd .fg-play{background:rgba(8,13,30,.7);border:1px solid var(--nd-bord);color:var(--nd-or)}
+html body.nd .fg-plus{background:transparent!important;border:1px solid var(--nd-or)!important;color:var(--nd-or)!important;border-radius:999px!important;min-height:46px;padding:0 26px}
+html body.nd .fg-plus:hover{background:var(--nd-degore)!important;color:#1a1202!important;border-color:transparent!important}
+html body.nd .fg-ad{background:var(--nd-verre)!important;border:1px solid var(--nd-bord)!important}
+html body.nd .fg-ad-badge{background:var(--nd-degore)!important;color:#1a1202!important}
+html body.nd .fg-ad-desc{color:var(--nd-doux)!important}
+html body.nd .fg-ad-cta{background:var(--nd-degore)!important;color:#1a1202!important;border-radius:999px;font-weight:800;padding:9px 18px}
+
+/* ── Cartouches « Actualité » (vert) et « Compte-rendu » (bleu) : or sur la nuit ── */
+html body.nd .fc-carte.fc-actu{border:1px solid var(--nd-bord)!important;box-shadow:0 26px 54px -34px #000,0 0 0 1px rgba(227,192,110,.1)!important}
+html body.nd .fc-carte.fc-cr{border:1px solid rgba(127,166,224,.45)!important;box-shadow:0 26px 54px -34px #000,0 0 0 1px rgba(63,123,255,.12)!important}
+html body.nd .fc-actu .fc-band{background:var(--nd-degore)!important;color:#1a1202!important}
+html body.nd .fc-actu .fc-band *{color:#1a1202!important}
+html body.nd .fc-cr .fc-band{background:linear-gradient(135deg,#0B1F52 0%,#1B3F96 60%,#2E5FD0 100%)!important}
+
+/* ── Colonne de droite : suggestions de comptes et événements à venir ── */
+html body.nd .fil-sugg-item,html body.nd .fil-evt-item{border-bottom:1px solid var(--nd-bord2)!important}
+html body.nd .fil-sugg-nom,html body.nd .fil-evt-titre{color:#fff!important}
+html body.nd :is(.fil-sugg-desc,.fil-evt-lieu){color:var(--nd-doux)!important}
+html body.nd .fil-sugg-btn{background:transparent!important;border:1px solid var(--nd-or)!important;color:var(--nd-or)!important;border-radius:999px!important;min-height:36px;padding:0 16px;font-size:12.5px;font-weight:800;transition:background .25s,color .25s}
+html body.nd .fil-sugg-btn:hover{background:var(--nd-degore)!important;color:#1a1202!important;border-color:transparent!important}
+html body.nd .fil-evt-date{background:rgba(227,192,110,.1)!important;border:1px solid var(--nd-bord);border-radius:12px!important}
+html body.nd .fil-evt-date .j{color:#fff!important}
+html body.nd .fil-evt-date .m{color:var(--nd-or)!important}
+html body.nd :is(.fil-evt-photo,.fil-evt-photo-fallback){background:var(--nd-verre2)!important;border-radius:12px!important}
+html body.nd .fil-evt-domaine{background:rgba(227,192,110,.14)!important;color:var(--nd-or)!important;border-radius:999px;padding:2px 9px}
+
+/* ── Petit écran : bandeau des filtres collé sous la barre du haut ── */
+@media(max-width:1024px){
+  html body.nd .fil-col-left{background:rgba(6,10,20,.94)!important;backdrop-filter:blur(14px);box-shadow:0 14px 30px -22px #000}
+  html body.nd .fil-filter-card{padding:10px 12px;border-radius:18px!important}
+  html body.nd .fil-filter-card .posts-feed-filters{margin-bottom:0;padding-bottom:0}
+  html body.nd .fil-filters-vertical .posts-feed-filter{border-radius:999px!important}
+}
+
+/* ── Bandeau « Faites votre première publication » (posé par assets/app.js, styles en ligne : !important nécessaire) ── */
+html body.nd #premiere-pub-banner{background:rgba(8,13,30,.96)!important;border-bottom:1px solid var(--nd-bord)!important;color:var(--nd-texte)!important;backdrop-filter:blur(12px)}
+html body.nd #premiere-pub-banner a{background:var(--nd-degore)!important;color:#1a1202!important;font-weight:800!important}
+html body.nd #premiere-pub-banner button{color:var(--nd-doux)!important}
+
+/* ── Vue « Liste » : publications complètes ── */
+html body.nd .post-card{border-radius:22px!important;box-shadow:0 26px 54px -34px #000}
+html body.nd .post-badge{background:rgba(227,192,110,.14)!important;color:var(--nd-or)!important;border:1px solid var(--nd-bord);border-radius:999px!important;font-weight:700}
+html body.nd .post-badge-loc{background:var(--nd-verre2)!important;color:var(--nd-texte)!important;border-color:var(--nd-bord2)}
+html body.nd .post-auteur-name{color:#fff!important}
+html body.nd :is(.post-meta,.post-stats-bar,.post-action-count){color:var(--nd-doux)!important}
+html body.nd .post-actions{border-top:1px solid var(--nd-bord2)!important;gap:6px}
+html body.nd .post-action-btn{background:transparent!important;border:1px solid transparent!important;color:var(--nd-doux)!important;border-radius:999px!important;min-height:42px;padding:0 14px!important;transition:background .25s,border-color .25s,color .25s}
+html body.nd .post-action-btn:hover{background:rgba(227,192,110,.1)!important;border-color:var(--nd-bord)!important;color:#fff!important}
+html body.nd .post-action-btn.active,html body.nd .post-action-btn.liked{color:var(--nd-or)!important}
+html body.nd .post-action-btn-danger:hover{border-color:rgba(255,120,120,.5)!important;color:#FFB4B4!important;background:rgba(255,120,120,.1)!important}
+html body.nd .post-contribute-btn{background:var(--nd-degore)!important;color:#1a1202!important;font-weight:800;border:0!important}
+html body.nd .post-contribute-btn:hover{color:#1a1202!important}
+html body.nd .post-menu-btn{background:transparent!important;color:var(--nd-doux)!important;border-radius:999px}
+html body.nd :is(.post-menu-dropdown,.post-reaction-menu){background:rgba(11,18,38,.97)!important;border:1px solid var(--nd-bord)!important;border-radius:16px!important;box-shadow:0 24px 50px -20px #000;color:var(--nd-texte)}
+html body.nd .post-menu-item{color:var(--nd-texte)!important;border-radius:10px}
+html body.nd .post-menu-item:hover{background:var(--nd-verre2)!important}
+html body.nd .post-react-btn:hover{background:rgba(227,192,110,.14)!important;border-radius:999px}
+html body.nd .post-comments-section{border-top:1px solid var(--nd-bord2)!important}
+html body.nd .post-comment-input{background:rgba(255,255,255,.06)!important;border:1px solid var(--nd-bord2)!important;color:#fff!important;border-radius:16px!important;color-scheme:dark}
+html body.nd .post-comment-input:focus{outline:none;border-color:var(--nd-or)!important;box-shadow:0 0 0 3px rgba(227,192,110,.18)}
+html body.nd .post-comment-form .btn-primary,html body.nd .post-comments-section .btn-primary{background:var(--nd-degore)!important;color:#1a1202!important;font-weight:800;border:0!important;border-radius:999px!important}
+
+/* ── Fenêtre « Créer une publication » ── */
+html body.nd .posts-modal-overlay{background:rgba(3,6,14,.74)!important;backdrop-filter:blur(6px)}
+html body.nd .posts-modal-box{background:radial-gradient(420px 220px at 100% 0%,rgba(227,192,110,.14),transparent 66%),linear-gradient(160deg,#14234a 0%,#0B1226 62%)!important;border:1px solid rgba(227,192,110,.4)!important;border-radius:26px!important;color:var(--nd-texte);box-shadow:0 40px 80px -30px #000;scrollbar-width:thin;scrollbar-color:rgba(227,192,110,.4) transparent}
+html body.nd :is(.posts-modal-header,.posts-modal-footer){background:transparent!important;border-color:var(--nd-bord2)!important}
+html body.nd .posts-modal-title{font-family:var(--nd-display)!important;font-weight:500;font-size:24px;color:#fff!important}
+html body.nd .posts-modal-close{background:var(--nd-verre2)!important;border:1px solid var(--nd-bord2)!important;color:#fff!important;border-radius:50%!important;width:42px;height:42px}
+html body.nd .posts-modal-box :is(label,.posts-label){color:var(--nd-doux)!important}
+html body.nd .posts-modal-box :is(.posts-textarea,.posts-input,.posts-select,.rich-editor-area){background:rgba(255,255,255,.06)!important;border:1px solid var(--nd-bord2)!important;color:#fff!important;border-radius:14px!important;color-scheme:dark}
+html body.nd .posts-modal-box :is(.posts-textarea,.posts-input,.posts-select,.rich-editor-area):focus{outline:none;border-color:var(--nd-or)!important;box-shadow:0 0 0 3px rgba(227,192,110,.18)}
+html body.nd .posts-modal-box .posts-select option{background:#0f1a38;color:#fff}
+html body.nd .posts-modal-box .rich-editor-wrap{border:1px solid var(--nd-bord2);border-radius:14px;background:rgba(255,255,255,.03);overflow:hidden}
+html body.nd .posts-modal-box .rich-editor-wrap .rich-editor-area{border:0!important;border-radius:0!important}
+html body.nd .posts-modal-box .rich-editor-toolbar{background:rgba(255,255,255,.05)!important;border-bottom:1px solid var(--nd-bord2)!important}
+html body.nd .posts-modal-box .rich-editor-toolbar button{background:transparent!important;color:var(--nd-texte)!important;border:1px solid transparent!important;border-radius:10px}
+html body.nd .posts-modal-box .rich-editor-toolbar button:hover{background:var(--nd-verre2)!important;border-color:var(--nd-bord)!important}
+html body.nd .posts-counter{color:var(--nd-faible)!important}
+html body.nd .posts-media-btn{background:var(--nd-verre)!important;border:1px solid var(--nd-bord2)!important;color:var(--nd-texte)!important;border-radius:999px!important;min-height:42px;padding:0 16px;font-weight:600;transition:border-color .25s,background .25s}
+html body.nd .posts-media-btn:hover{background:rgba(227,192,110,.12)!important;border-color:var(--nd-or)!important;color:#fff!important}
+html body.nd .posts-btn-secondary{background:var(--nd-verre)!important;border:1px solid var(--nd-bord)!important;color:var(--nd-texte)!important;border-radius:999px!important;min-height:46px;padding:0 20px;font-weight:700}
+html body.nd .posts-btn-secondary:hover{border-color:var(--nd-or)!important;color:#fff!important}
+html body.nd .posts-btn-primary{background:var(--nd-degore)!important;color:#1a1202!important;border:0!important;border-radius:999px!important;min-height:46px;padding:0 26px;font-weight:800;box-shadow:0 12px 26px -14px rgba(227,192,110,.7)}
+html body.nd .posts-modal-box :is(.posts-media-btn,.posts-btn-secondary,.posts-btn-primary,.posts-modal-close):focus-visible{outline:3px solid var(--nd-or);outline-offset:2px}
+
+/* ── Dans la fenêtre de création : médias ajoutés, lien, programmation ── */
+html body.nd .posts-modal-box .posts-modal-header{background:#101c3e!important;border-bottom:1px solid var(--nd-bord2)!important;border-radius:26px 26px 0 0}
+html body.nd .posts-modal-box .posts-modal-footer{background:#0f1a38!important;border-top:1px solid var(--nd-bord2)!important;border-radius:0 0 26px 26px}
+html body.nd .posts-media-item{background:var(--nd-verre)!important;border:1px solid var(--nd-bord2)!important;border-radius:14px!important;color:var(--nd-texte)!important;padding:8px 12px}
+html body.nd .posts-media-item input{color:#fff!important;background:none!important;border:0!important;box-shadow:none!important}
+html body.nd .posts-media-item input::placeholder{color:var(--nd-faible)}
+html body.nd .posts-media-item img,html body.nd .posts-media-item video{border-radius:10px}
+html body.nd .posts-media-remove{color:#FFB4B4!important;border-radius:50%}
+html body.nd #posts-schedule-panel{background:rgba(255,255,255,.04)!important;border-top:1px solid var(--nd-bord2)!important}
+html body.nd #posts-schedule-panel .posts-btn-primary{margin-top:10px!important}
+html body.nd #post-programmed-at{max-width:300px!important}
+
+/* ── Fiche d'une publication (ce qui s'ouvre au clic sur une tuile) ── */
+html body.nd .pd-box{border:1px solid var(--nd-bord);border-radius:26px!important;box-shadow:0 40px 90px -30px #000}
+html body.nd .pd-side{background:radial-gradient(360px 200px at 100% 0%,rgba(227,192,110,.12),transparent 66%),linear-gradient(170deg,#101c3e 0%,#0B1226 70%)!important;border-left:1px solid var(--nd-bord);color:var(--nd-texte)}
+html body.nd :is(.pd-header,.pd-caption,.pd-statsbar,.pd-actions,.pd-comment-form){border-color:var(--nd-bord2)!important;background:transparent!important}
+html body.nd .pd-caption{color:var(--nd-texte)!important}
+html body.nd .pd-side :is(.post-auteur-name,.post-titre){color:#fff!important}
+html body.nd .pd-side :is(.post-meta,.pd-statsbar,.post-action-count){color:var(--nd-doux)!important}
+html body.nd .pd-profil-btn{background:transparent!important;border:1px solid var(--nd-or)!important;color:var(--nd-or)!important;border-radius:999px!important;min-height:38px;padding:0 16px;font-weight:800}
+html body.nd .pd-profil-btn:hover{background:var(--nd-degore)!important;color:#1a1202!important;border-color:transparent!important}
+html body.nd .pd-close{background:rgba(8,13,30,.78)!important;border:1px solid var(--nd-bord)!important;color:#fff!important;width:42px;height:42px}
+html body.nd .pd-close:hover{background:rgba(227,192,110,.2)!important}
+html body.nd .pd-nav{background:rgba(8,13,30,.78)!important;border:1px solid var(--nd-bord)!important;color:var(--nd-or)!important}
+html body.nd .pd-nav:hover{background:rgba(227,192,110,.2)!important}
+html body.nd .pd-hint{background:rgba(8,13,30,.85)!important;border:1px solid var(--nd-bord);color:var(--nd-doux)!important;border-radius:999px}
+html body.nd .pd-media{background:#05080f}
+html body.nd .pd-texte{background:radial-gradient(520px 320px at 85% 0%,rgba(227,192,110,.2),transparent 66%),linear-gradient(145deg,#14234a 0%,#0B1226 75%)!important}
+html body.nd .pd-texte-titre{font-family:var(--nd-display)!important;font-weight:500;font-size:clamp(1.7rem,2.4vw,2.3rem)}
+html body.nd .pd-texte a{color:var(--nd-or)!important}
+html body.nd .pd-comments{scrollbar-width:thin;scrollbar-color:rgba(227,192,110,.4) transparent;color:var(--nd-doux)}
+html body.nd .post-comment-bubble{background:var(--nd-verre2)!important;border:1px solid var(--nd-bord2);border-radius:16px!important}
+html body.nd .post-comment-author{color:#fff!important}
+html body.nd .post-comment-text{color:var(--nd-texte)!important}
+html body.nd .pd-comment-form .btn-primary{background:var(--nd-degore)!important;color:#1a1202!important;font-weight:800;border:0!important;border-radius:999px!important;min-height:40px;padding:0 18px}
+html body.nd :is(.pd-close,.pd-nav,.pd-profil-btn):focus-visible{outline:3px solid var(--nd-or);outline-offset:2px}
+
+/* ── Tuile « Boutique » (dégradé orange en ligne → nuit et or) et fin de fil ── */
+html body.nd .fg-tile-boutique .fg-texte{background:radial-gradient(240px 160px at 85% 0%,rgba(227,192,110,.38),transparent 70%),linear-gradient(145deg,#14234a 0%,#0B1226 80%)!important;font-size:40px}
+html body.nd .fg-fin{color:var(--nd-doux)!important}
+
+/* ── États vides (« Aucune publication », « Rien de nouveau ») et boutons d'appel à l'action du fil ── */
+html body.nd .fil-col-center .btn-primary,html body.nd .fil-col-center .btn-sm.btn-primary{background:var(--nd-degore)!important;color:#1a1202!important;font-weight:800;border:0!important;border-radius:999px!important;min-height:42px;padding:0 20px}
+html body.nd .fil-col-center :is(.posts-empty,.posts-empty-state,.fg-vide) {color:var(--nd-doux)!important}
+html body.nd .posts-feed-filter.active:hover{color:#1a1202!important;background:var(--nd-degore)!important}
