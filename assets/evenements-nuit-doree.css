@@ -128,3 +128,10 @@ html body.nd .cd-jour-item{border-bottom-color:var(--nd-bord2);color:var(--nd-te
 html body.nd .cd-jour-meta{color:var(--nd-doux)}
 
 @media (prefers-reduced-motion:reduce){html body.nd .evt-card,html body.nd .evt-tab{transition:none}}
+
+/* ── Lien « Plus d'informations » des événements (2026-10-14) ── */
+html body.nd .evt-lien-info{display:inline-flex;align-items:center;gap:8px;min-height:46px;padding:0 20px;margin:0 0 12px;border-radius:999px;border:1px solid var(--nd-or);color:var(--nd-or)!important;font-weight:800;font-size:14px;text-decoration:none;background:transparent;transition:background .25s,color .25s}
+html body.nd .evt-lien-info:hover{background:var(--nd-degore);color:#1a1202!important;border-color:transparent}
+html body.nd .evt-lien-info:focus-visible,html body.nd .evt-lien-info-mini:focus-visible{outline:3px solid var(--nd-or);outline-offset:2px}
+html body.nd .evt-lien-info-mini{color:var(--nd-or)!important;font-weight:700;text-decoration:none;border-bottom:1px solid rgba(227,192,110,.5)}
+html body.nd .evt-lien-info-mini:hover{color:#fff!important;border-color:#fff}

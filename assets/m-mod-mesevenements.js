@@ -667,6 +667,10 @@
       <input type="text" id="mev-lieu" value="${esc(v.lieu || '')}" placeholder="Ex. : Salle des fêtes, 12 rue…" aria-describedby="mev-e-lieu"><div class="mev-err" id="mev-e-lieu" role="alert"></div>
       <label class="mev-l" for="mev-visio">Lien de visioconférence <small>(si en ligne)</small></label>
       <input type="url" id="mev-visio" value="${esc(v.lien_visio || '')}" placeholder="https://meet.google.com/…" inputmode="url" aria-describedby="mev-e-visio"><div class="mev-err" id="mev-e-visio" role="alert"></div>
+      <div id="mev-info-wrap" ${mostraProgramme ? '' : 'hidden'}>
+        <label class="mev-l" for="mev-info">Lien pour plus d’informations <small>(facultatif)</small></label>
+        <input type="text" id="mev-info" value="${esc(v.lien_plus_info || '')}" placeholder="https://www.exemple.com/mon-evenement" inputmode="url" autocomplete="off" aria-describedby="mev-e-info"><div class="mev-err" id="mev-e-info" role="alert"></div>
+      </div>
       <div class="h2">DESCRIPTION</div>
       ${plat ? `<label class="mev-l" for="mev-desc">Description * <small id="mev-cnt"></small></label>
         <textarea id="mev-desc" placeholder="Programme, objectifs, public concerné…" aria-describedby="mev-e-desc">${esc(v.description || '')}</textarea><div class="mev-err" id="mev-e-desc" role="alert"></div>`
@@ -731,8 +735,8 @@
          l'ouverture du formulaire — le radio de type n'existe plus, flash vaut toujours faux
          ici, donc on ne doit JAMAIS les masquer via ce chemin en édition. */
       if (!edition) {
-        const pw = $('#mev-prog-wrap'), iw = $('#mev-ir-wrap');
-        if (pw) pw.hidden = !flash; if (iw) iw.hidden = !flash;
+        const pw = $('#mev-prog-wrap'), iw = $('#mev-ir-wrap'), lw = $('#mev-info-wrap');
+        if (pw) pw.hidden = !flash; if (iw) iw.hidden = !flash; if (lw) lw.hidden = !flash;
       }
       compteur();
     }
@@ -810,6 +814,8 @@
       if (!date) bad('date', 'Choisissez la date de l’événement.');
       const visio = champ('mev-visio');
       if (visio && !/^https?:\/\/\S+$/i.test(visio)) bad('visio', 'Ce lien doit commencer par https://');
+      const info = champ('mev-info'), infoWrap = $('#mev-info-wrap');
+      if (info && infoWrap && !infoWrap.hidden && !/^(https?:\/\/)?[^\s\/]+\.[^\s\/]+\S*$/i.test(info)) bad('info', 'Indiquez une adresse complète, par exemple https://www.exemple.com');
       if (!champ('mev-lieu') && !champ('mev-ville') && !visio) bad('lieu', 'Indiquez l’adresse, la ville ou un lien de visioconférence.');
       const dsc = $('#mev-desc');
       if (dsc) { if (!dsc.value.trim()) bad('desc', 'Décrivez votre événement en quelques lignes.'); else if (flash && dsc.value.length > 500) bad('desc', 'Une description d’événement flash tient en 500 caractères maximum.'); }
@@ -837,7 +843,7 @@
         // (mostraProgramme faux) — on ne les envoie alors pas du tout, pour ne jamais écraser une
         // valeur existante avec `undefined` (voir server/index.js, PUT /api/evenements/:id).
         if (mostraProgramme) {
-          body.programme = programme;
+          body.programme = programme; body.lien_plus_info = champ('mev-info') || null;
           const irCk2 = $('#mev-ir-ck'); if (irCk2) body.inscription_rapide_active = irCk2.checked;
         }
       } else {
@@ -853,7 +859,7 @@
         if (visio && !lieu && !ville) body.mode_participation = 'distanciel';
         if (flash) {
           body.inscription_ouverte = false; body.appliquer_fiche_standard = false;
-          body.programme = programme;
+          body.programme = programme; body.lien_plus_info = champ('mev-info') || null;
           const irCk2 = $('#mev-ir-ck'); if (irCk2) body.inscription_rapide_active = irCk2.checked;
         }
         else {

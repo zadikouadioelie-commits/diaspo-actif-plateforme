@@ -375,7 +375,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,500;0,6..96,600;1,6..96,500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <!-- Design « Nuit dorée » (2026-10-12) : surcharges chargées en dernier, tout est préfixé html body.nd ; retour arrière : retirer ces 2 lignes et class="nd" sur <body> -->
   <link rel="stylesheet" href="/assets/theme-nuit-doree.css?v=7">
-  <link rel="stylesheet" href="/assets/evenements-nuit-doree.css?v=7">
+  <link rel="stylesheet" href="/assets/evenements-nuit-doree.css?v=8">
 </head>
 <body class="nd">
 <div class="page">
@@ -578,6 +578,7 @@
       </label>
     </div>
     <div style="margin-bottom:10px;"><label>🔗 Lien visioconférence (si en ligne)</label><input type="url" id="e-visio-evt" placeholder="https://zoom.us/… ou https://meet.google.com/…"></div>
+    <div style="margin-bottom:10px;"><label>🔗 Lien pour plus d'informations <span style="font-weight:400;color:var(--muted,#6b7280);">(facultatif)</span></label><input type="text" id="e-lien-info" inputmode="url" autocomplete="off" placeholder="https://www.exemple.com/mon-evenement"></div>
     <div style="margin-bottom:10px;"><label>💬 Lien WhatsApp (groupe ou chaîne de l'événement)</label><input type="url" id="e-whatsapp" placeholder="https://chat.whatsapp.com/… ou https://whatsapp.com/channel/…"></div>
 
     <!-- Type de participation — Gratuit/Partiellement payant/Payant (2026-09-22, demande
@@ -740,6 +741,8 @@
         <div><label>Origine (diaspora ciblée)</label><select id="fl-origine"><option value="">-- Origine --</option></select></div>
         <div style="grid-column:1/-1;"><label>Adresse de l'événement <span style="color:#2563EB">*</span></label><input type="text" id="fl-adresse" placeholder="Adresse complète"></div>
         <div style="grid-column:1/-1;"><label>Public concerné</label><input type="text" id="fl-public" placeholder="Ex : Étudiants, Familles, Entrepreneurs…"></div>
+        <!-- Lien « Plus d'informations » (2026-10-14, demande explicite) : facultatif, page externe (site de l'organisateur, billetterie, article…) ; le serveur ajoute https:// si besoin. -->
+        <div style="grid-column:1/-1;"><label>🔗 Lien pour plus d'informations <span style="font-weight:400;color:var(--muted,#6b7280);">(facultatif)</span></label><input type="text" id="fl-lien-info" inputmode="url" autocomplete="off" placeholder="https://www.exemple.com/mon-evenement"></div>
         <!-- Organisateur relayé (2026-10-12, demande explicite) : "permettre à des personnes de
              signaler des événements qui ne sont pas les leurs... faire relais d'informations" —
              distinct du compte Diaspo'Actif qui publie (toujours affiché par ailleurs). Facultatif :
@@ -1088,6 +1091,7 @@ function renderEvts() {
           ${evt.ville ? '<span>🏙️ '+esc(evt.ville)+'</span>' : ''}
           ${evt.pays ? '<span>🌍 '+esc(evt.pays)+'</span>' : ''}
           ${evt.lieu_gps ? '<a href="'+esc(mapsLienItineraire(evt.lieu_gps))+'" target="_blank" rel="noopener" style="text-decoration:none;color:#2563EB;">🧭 Itinéraire</a>' : ''}
+          ${evt.lien_plus_info ? '<a class="evt-lien-info-mini" href="'+esc(evt.lien_plus_info)+'" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">🔗 Plus d\'infos</a>' : ''}
           ${evt.origine ? '<span>🎯 '+[evt.origine,evt.origine2].filter(Boolean).map(esc).join(' · ')+'</span>' : ''}
           ${evt.type_evt === 'trophee_diaspora' ? '<span class="evt-tag" style="background:linear-gradient(135deg,#B8860B,#FFD700);color:#4A3500;font-weight:700;">'+esc(TYPE_EVT_LABEL[evt.type_evt])+'</span>' : (evt.type_evt ? '<span class="evt-tag">'+esc(TYPE_EVT_LABEL[evt.type_evt]||evt.type_evt)+'</span>' : '')}
           ${evt.domaine ? '<span class="evt-tag">'+esc(evt.domaine)+'</span>' : ''}
@@ -1576,6 +1580,7 @@ function ouvrirModaleEdition(id) {
   document.getElementById('e-visibilite').value = evt.visibilite === 'boutique' ? 'public' : (evt.visibilite || 'public');
   document.getElementById('e-visio-evt').value = evt.lien_visio || '';
   document.getElementById('e-whatsapp').value = evt.whatsapp_lien || '';
+  document.getElementById('e-lien-info').value = evt.lien_plus_info || '';
   // Priorité à la fiche d'inscription liée (2026-09-23, demande explicite ; étendu à 3
   // catégories le 2026-09-24) : type_participation est désormais TOUJOURS synchronisé côté
   // serveur dès qu'une fiche liée a au moins un type de tarif actif (inscSyncPrixMinEvenements
@@ -1725,6 +1730,7 @@ function flashOuvrir() {
   document.getElementById('fl-origine').value = '';
   document.getElementById('fl-adresse').value = '';
   document.getElementById('fl-public').value = '';
+  document.getElementById('fl-lien-info').value = '';
   document.getElementById('fl-organisateur').value = '';
   document.getElementById('fl-texte').value = '';
   document.getElementById('fl-compteur').textContent = '0/500';
@@ -1787,6 +1793,7 @@ function flashLireChamps() {
     origine: document.getElementById('fl-origine').value || null,
     lieu: document.getElementById('fl-adresse').value.trim(),
     public_concerne: document.getElementById('fl-public').value.trim() || null,
+    lien_plus_info: document.getElementById('fl-lien-info').value.trim() || null,
     organisateur_externe_nom: document.getElementById('fl-organisateur').value.trim() || null,
     description: document.getElementById('fl-texte').value.trim(),
     // Visibilité à 3 états (voir le commentaire HTML du bloc radio) — traduite ici en
@@ -1814,6 +1821,7 @@ function flashVoirRecap() {
     <div><strong>Adresse :</strong> ${esc(c.lieu)}</div>
     ${c.origine ? `<div><strong>Origine :</strong> ${esc(c.origine)}</div>` : ''}
     ${c.public_concerne ? `<div><strong>Public concerné :</strong> ${esc(c.public_concerne)}</div>` : ''}
+    ${c.lien_plus_info ? `<div><strong>Lien d'information :</strong> ${esc(c.lien_plus_info)}</div>` : ''}
     ${c.organisateur_externe_nom ? `<div style="display:flex;align-items:center;gap:6px;">${flashLogo ? `<img src="${flashLogo}" style="width:22px;height:22px;border-radius:50%;object-fit:cover;">` : ''}<strong>Organisateur :</strong> ${esc(c.organisateur_externe_nom)}</div>` : ''}
     <div style="margin-top:8px;"><strong>Description :</strong><br>${esc(c.description)}</div>
     <div style="margin-top:8px;color:#8B12D6;font-weight:600;">${visMsg}</div>
@@ -1847,6 +1855,7 @@ async function flashPublier() {
       galerie_photos: flashPhoto2 ? [flashPhoto2] : [],
       organisateur_externe_nom: c.organisateur_externe_nom,
       organisateur_externe_logo_url: flashLogo || null,
+      lien_plus_info: c.lien_plus_info,
     });
     flashFermer();
     if (typeof loadEvts === 'function') loadEvts();
@@ -1944,6 +1953,7 @@ async function enregistrerEvenement(statutVise) {
       visibilite:    document.getElementById('e-boutique-uniquement').checked ? 'boutique' : document.getElementById('e-visibilite').value,
       lien_visio:    document.getElementById('e-visio-evt').value || null,
       whatsapp_lien: document.getElementById('e-whatsapp').value || null,
+      lien_plus_info: document.getElementById('e-lien-info').value.trim() || null,
       image_couverture: coverData,
       galerie_photos:   galerie,
       statut:        statutVise,
@@ -2451,6 +2461,7 @@ function renderEventDetail(evt, isPreview) {
         </div>
       </div>` : ''}
       ${evt.description ? `<div class="rich-content" style="margin:0 0 12px;">${renderRichText(evt.description)}</div>` : ''}
+      ${evt.lien_plus_info ? `<a class="evt-lien-info" href="${esc(evt.lien_plus_info)}" target="_blank" rel="noopener noreferrer">🔗 Plus d'informations ↗</a>` : ''}
       ${evt.whatsapp_lien ? `<a href="${esc(evt.whatsapp_lien)}" target="_blank" rel="noopener" style="display:flex;align-items:center;gap:10px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:10px 12px;margin-bottom:12px;text-decoration:none;">
         <svg width="26" height="26" viewBox="0 0 32 32" style="flex-shrink:0;" aria-hidden="true"><circle cx="16" cy="16" r="16" fill="#25D366"/><path fill="#fff" d="M23.47 8.52A10.6 10.6 0 0 0 16.02 5.4c-5.86 0-10.62 4.76-10.62 10.62 0 1.87.49 3.7 1.42 5.31L5.3 26.6l5.4-1.42a10.6 10.6 0 0 0 5.31 1.35h.01c5.86 0 10.62-4.76 10.62-10.62 0-2.84-1.1-5.5-3.17-7.39Zm-7.45 16.34h-.01a8.8 8.8 0 0 1-4.5-1.23l-.32-.19-3.35.88.89-3.26-.21-.34a8.79 8.79 0 0 1-1.35-4.7c0-4.86 3.96-8.82 8.83-8.82 2.36 0 4.57.92 6.24 2.6a8.75 8.75 0 0 1 2.58 6.23c0 4.86-3.96 8.83-8.8 8.83Zm4.83-6.61c-.26-.13-1.57-.78-1.82-.86-.24-.09-.42-.13-.6.13-.18.26-.68.86-.84 1.04-.15.18-.31.2-.57.07-.26-.13-1.1-.4-2.1-1.29-.78-.69-1.3-1.55-1.46-1.81-.15-.26-.02-.4.11-.53.12-.12.26-.31.39-.47.13-.15.17-.26.26-.44.09-.18.04-.33-.02-.46-.07-.13-.6-1.44-.82-1.98-.22-.51-.44-.44-.6-.45h-.51c-.18 0-.46.07-.7.33-.24.26-.92.9-.92 2.19s.94 2.54 1.08 2.72c.13.18 1.85 2.83 4.49 3.97.63.27 1.12.43 1.5.55.63.2 1.2.17 1.66.1.5-.08 1.57-.64 1.79-1.26.22-.62.22-1.15.16-1.26-.07-.12-.24-.19-.5-.32Z"/></svg>
         <strong style="font-size:13px;color:#166534;">Rejoindre la chaîne WhatsApp de l'événement</strong>

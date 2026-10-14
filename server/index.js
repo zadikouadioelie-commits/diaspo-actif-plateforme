@@ -23351,11 +23351,30 @@ async function ensureEvenementsOuvertureInscriptionsCol() {
    inscription_rapide_active : simple interrupteur ; les inscriptions elles-mêmes vivent dans
    evenements_inscriptions_rapides (table dédiée, car interrogée ligne à ligne par
    l'organisateur — liste, comptage — contrairement au programme). */
+/* Normalise le lien « Plus d'informations » : vide → null ; sans schéma → https:// ajouté ; seuls http et https sont acceptés
+   (jamais javascript: ni data:) ; 500 caractères au plus. Retourne la chaîne propre, null si vide, ou false si invalide. */
+function normaliserLienInfo(v) {
+  let t = String(v == null ? '' : v).trim();
+  if (!t) return null;
+  if (!/^[a-z][a-z0-9+.-]*:/i.test(t)) t = 'https://' + t.replace(/^\/+/, '');
+  if (t.length > 500) return false;
+  try {
+    const u = new URL(t);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
+    if (!u.hostname || !u.hostname.includes('.')) return false;
+    return u.toString();
+  } catch (_) { return false; }
+}
 async function ensureEvenementsFlashExtras() {
   if (global.__evenementsFlashExtrasEnsured) return;
   try { await db.prepare(`ALTER TABLE evenements ADD COLUMN programme_json TEXT`).run(); }
   catch (e) {}
   try { await db.prepare(`ALTER TABLE evenements ADD COLUMN inscription_rapide_active INTEGER DEFAULT 0`).run(); }
+  catch (e) {}
+  /* Lien « Plus d'informations » (2026-10-14, demande explicite : « ajouter un lien pour plus d'info sur les événements flash ») —
+     adresse d'une page externe (site de l'organisateur, billetterie, article…), facultative. Volontairement DISTINCT de
+     lien_inscription (bouton « S'inscrire » des événements avec inscription) et de whatsapp_lien. */
+  try { await db.prepare(`ALTER TABLE evenements ADD COLUMN lien_plus_info TEXT`).run(); }
   catch (e) {}
   try {
     await db.prepare(`CREATE TABLE IF NOT EXISTS evenements_inscriptions_rapides (
@@ -23476,7 +23495,7 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
     langue, mode_participation, region, departement, masquer_inscrits,
     whatsapp_lien, lieu_gps, public_concerne, masquer_boutique,
     organisateur_externe_nom, organisateur_externe_logo_url,
-    programme, inscription_rapide_active
+    programme, inscription_rapide_active, lien_plus_info
   } = body;
   if (!titre || !date_evt) return sendJSON(res, 400, { error: "Titre et date requis." });
   /* Sanitisé avant écriture (2026-09-25, éditeur de texte enrichi) — seule vraie barrière,
@@ -23495,6 +23514,8 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
   // ensureEvenementsFlashExtras ci-dessus) : jamais interrogé côté serveur, simple JSON gardé
   // tel quel, validé seulement en forme (tableau) pour ne jamais stocker une valeur inexploitable.
   const programmeJson = Array.isArray(programme) ? JSON.stringify(programme) : null;
+  const lienInfo = normaliserLienInfo(lien_plus_info);
+  if (lienInfo === false) return sendJSON(res, 400, { error: "Le lien « Plus d'informations » n'est pas valide : indiquez une adresse complète, par exemple https://www.exemple.com/mon-evenement." });
   const id = (await db.prepare(`INSERT INTO evenements
     (titre,organisateur,date_evt,lieu,pays,ville,origine,description,type_evt,domaine,zone_diffusion,type_participation,ouverture_inscriptions,places_max,
      inscription_ouverte,lien_inscription,image_url,statut,owner_user_id,
@@ -23502,8 +23523,8 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
      image_couverture,galerie_photos,video1_url,video1_titre,video2_url,video2_titre,
      pdf_url,pdf_nom,pdf_acces,
      langue,mode_participation,region,departement,masquer_inscrits,whatsapp_lien,lieu_gps,public_concerne,masquer_boutique,
-     organisateur_externe_nom,organisateur_externe_logo_url,programme_json,inscription_rapide_active)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+     organisateur_externe_nom,organisateur_externe_logo_url,programme_json,inscription_rapide_active,lien_plus_info)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
     .run(
       titre, organisateur || await nomCompteAffichage(user.id), date_evt, lieu||null, pays||null, ville||null, origine||null,
       descriptionSafe||null, type_evt||"evenement", domaine||null, zone_diffusion||null,
@@ -23515,7 +23536,7 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
       pdf_url||null, pdf_nom||null, pdf_acces||'public',
       langue||'francais', mode_participation||'presentiel', region||null, departement||null,
       masquer_inscrits?1:0, whatsapp_lien||null, lieu_gps||null, public_concerne||null, masquer_boutique?1:0,
-      organisateur_externe_nom||null, organisateur_externe_logo_url||null, programmeJson, inscription_rapide_active?1:0
+      organisateur_externe_nom||null, organisateur_externe_logo_url||null, programmeJson, inscription_rapide_active?1:0, lienInfo
     )).lastInsertRowid;
   // Notifier abonnés de l'initiative — jamais pour un brouillon, la publication n'est pas
   // encore réelle (voir statutFinal ci-dessus).
@@ -23581,7 +23602,7 @@ route("PUT", "/api/evenements/:id", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   await ensureEvenementsFlashExtras();
-  const evt = await db.prepare("SELECT id, owner_user_id, statut, programme_json, inscription_rapide_active FROM evenements WHERE id=?").get(params.id);
+  const evt = await db.prepare("SELECT id, owner_user_id, statut, programme_json, inscription_rapide_active, lien_plus_info FROM evenements WHERE id=?").get(params.id);
   if (!evt) return sendJSON(res, 404, { error: "Événement introuvable." });
   if (Number(evt.owner_user_id) !== Number(user.id) && user.role !== "administrateur") {
     return sendJSON(res, 403, { error: "Vous ne pouvez modifier que vos propres événements." });
@@ -23591,7 +23612,7 @@ route("PUT", "/api/evenements/:id", async (req, res, params, body) => {
   const {
     titre, date_evt, heure_debut, heure_fin, type_evt, domaine, zone_diffusion, type_participation, statut, ouverture_inscriptions, pays, lieu, ville, lieu_gps,
     origine, description, places_max, masquer_inscrits, visibilite, lien_visio, whatsapp_lien,
-    image_couverture, image_url, galerie_photos, programme, inscription_rapide_active
+    image_couverture, image_url, galerie_photos, programme, inscription_rapide_active, lien_plus_info
   } = body;
   if (!titre || !date_evt) return sendJSON(res, 400, { error: "Titre et date requis." });
   /* Sanitisé avant écriture (2026-09-25, éditeur de texte enrichi) — seule vraie barrière,
@@ -23611,17 +23632,20 @@ route("PUT", "/api/evenements/:id", async (req, res, params, body) => {
      même vide ([] ou false), s'applique telle quelle. */
   const programmeJson = programme === undefined ? evt.programme_json : (Array.isArray(programme) ? JSON.stringify(programme) : null);
   const inscriptionRapideActive = inscription_rapide_active === undefined ? evt.inscription_rapide_active : (inscription_rapide_active ? 1 : 0);
+  /* Lien « Plus d'informations » : même règle (`undefined` conserve l'existant, une valeur envoyée — même vide — s'applique). */
+  const lienInfo = lien_plus_info === undefined ? evt.lien_plus_info : normaliserLienInfo(lien_plus_info);
+  if (lienInfo === false) return sendJSON(res, 400, { error: "Le lien « Plus d'informations » n'est pas valide : indiquez une adresse complète, par exemple https://www.exemple.com/mon-evenement." });
   await db.prepare(`UPDATE evenements SET
     titre=?, date_evt=?, heure_debut=?, heure_fin=?, type_evt=?, domaine=?, zone_diffusion=?, type_participation=?, ouverture_inscriptions=?, statut=?, pays=?, lieu=?, ville=?, lieu_gps=?,
     origine=?, description=?, places_max=?, masquer_inscrits=?, visibilite=?, lien_visio=?, whatsapp_lien=?,
-    image_couverture=?, image_url=?, galerie_photos=?, programme_json=?, inscription_rapide_active=?
+    image_couverture=?, image_url=?, galerie_photos=?, programme_json=?, inscription_rapide_active=?, lien_plus_info=?
     WHERE id=?`)
     .run(
       titre, date_evt, heure_debut || null, heure_fin || null, type_evt || "evenement", domaine || null, zone_diffusion || null,
       ['payant','partiellement_payant'].includes(type_participation) ? type_participation : 'gratuit', ouverture_inscriptions || null, statutFinal,
       pays || null, lieu || null, ville || null, lieu_gps || null, origine || null, descriptionSafe || null,
       places_max || null, masquer_inscrits ? 1 : 0, visibilite || "public", lien_visio || null, whatsapp_lien || null,
-      coverImg, coverImg, galerie, programmeJson, inscriptionRapideActive, evt.id
+      coverImg, coverImg, galerie, programmeJson, inscriptionRapideActive, lienInfo, evt.id
     );
   if (evt.statut === 'brouillon' && statutFinal === 'ouvert') alertesEvenementDeclencher(evt.id);
   sendJSON(res, 200, { id: evt.id });

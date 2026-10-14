@@ -846,6 +846,7 @@
       ${desc ? `<div class="card"><div class="pad rich" style="white-space:pre-line">${esc(desc)}</div></div>` : ''}
       ${programmeHtml}
       ${inscriptionRapideHtml}
+      ${e.lien_plus_info ? `<a class="btn out block" style="margin-bottom:12px" href="${attrUrl(e.lien_plus_info)}" target="_blank" rel="noopener noreferrer">${ic('out', 's')} Plus d’informations</a>` : ''}
       ${e.lien_visio ? `<a class="btn out block" style="margin-bottom:12px" href="${attrUrl(e.lien_visio)}" target="_blank" rel="noopener">Rejoindre en visio ${ic('out', 's')}</a>` : ''}
       <button class="btn out block" id="ev-agenda" type="button" style="margin-bottom:12px">${ic('cal', 's')} Ajouter à mon agenda</button>`;
     setPane(e.titre, html, cta);

@@ -2243,6 +2243,7 @@ const MIGRATIONS = [
   // l'événement qui doit toujours apparaître en premier, quels que soient les autres événements
   // créés ensuite — même idiome que produits_vitrine.mis_en_avant / cagnottes.est_vedette.
   ["evenements", "epingle_permanent INTEGER DEFAULT 0"],
+  ["evenements", "lien_plus_info TEXT"],
   // « Ajouter à mon agenda » (2026-10-13) : événement du Calendrier Diaspora copié dans l'agenda personnel — évite les doublons.
   ["agenda_events", "evenement_id INTEGER"],
   // Souscription Premium (2026-10-13) : preuve de la renonciation au droit de rétractation + date du premier prélèvement (fin de la période offerte).
