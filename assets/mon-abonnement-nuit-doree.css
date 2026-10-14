@@ -1,0 +1,59 @@
+/* ============================================================
+   Mon Abonnement (mon-abonnement.html) — design « Nuit dorée » (2026-10-14, demande explicite : « nouvelle DA »).
+   Feuille de surcharge chargée APRÈS theme-nuit-doree.css ; tout est préfixé html body.nd. Aucun changement de logique ni de montant.
+   Retour arrière : retirer les 2 <link> et class="nd" sur <body> de mon-abonnement.html.
+   ============================================================ */
+
+/* ── Titres de page et de section ── */
+html body.nd main.container h1{font-family:var(--nd-display)!important;font-weight:500;font-size:clamp(30px,3.4vw,42px)!important;letter-spacing:-.01em;color:#fff}
+html body.nd main.container h2{font-family:var(--nd-display)!important;font-weight:500;font-size:clamp(24px,2.6vw,30px)!important;letter-spacing:-.005em;color:#fff}
+html body.nd main.container :is(h1,h2)+p,html body.nd main.container div>p[style*="var(--muted)"]{color:var(--nd-doux)!important}
+
+/* ── Cartes ── */
+html body.nd .abo-card{background:var(--nd-verre)!important;border:1px solid var(--nd-bord2)!important;border-radius:24px!important;padding:26px!important;color:var(--nd-texte);box-shadow:0 26px 54px -36px #000}
+html body.nd .abo-card :is(a:not(.btn)){color:var(--nd-or)}
+html body.nd .abo-card [style*="color:var(--text)"]{color:#fff!important}
+html body.nd .abo-card [style*="color:var(--muted)"],html body.nd .abo-empty{color:var(--nd-doux)!important}
+html body.nd .abo-empty a:not(.btn){color:var(--nd-or)}
+/* états vides : carte nuit avec halo doré */
+html body.nd .abo-card.abo-empty{padding:46px 26px 50px!important;background:radial-gradient(420px 220px at 100% 0%,rgba(227,192,110,.16),transparent 66%),linear-gradient(160deg,#14234a 0%,#0B1226 70%)!important;border-color:rgba(227,192,110,.35)!important}
+html body.nd .abo-card.abo-empty>div:first-child{filter:drop-shadow(0 0 18px rgba(227,192,110,.45))}
+html body.nd .abo-card.abo-empty>div[style*="font-weight:700"]{font-family:var(--nd-display)!important;font-weight:500!important;font-size:clamp(22px,2.6vw,28px)!important;line-height:1.2;color:#fff!important}
+
+/* ── Abonnement actif : grande carte nuit et or ── */
+html body.nd .abo-hero{position:relative;overflow:hidden;border-radius:26px!important;padding:28px!important;border:1px solid rgba(227,192,110,.45);background:radial-gradient(520px 260px at 100% 0%,rgba(227,192,110,.26),transparent 66%),linear-gradient(145deg,#14234a 0%,#0B1226 72%)!important;box-shadow:0 34px 70px -40px #000}
+html body.nd .abo-hero>div:first-child [style*="opacity:.75"]{color:var(--nd-or);opacity:1!important;letter-spacing:.16em!important;font-weight:800}
+html body.nd .abo-hero>div:first-child [style*="font-size:19px"]{font-family:var(--nd-display)!important;font-weight:500!important;font-size:clamp(24px,3vw,30px)!important}
+html body.nd .abo-hero .prix{font-family:var(--nd-display)!important;font-weight:500!important;font-size:clamp(40px,5.5vw,56px)!important;letter-spacing:-.02em;color:#fff}
+html body.nd .abo-hero .prix span{font-family:var(--nd-sans)!important;color:var(--nd-doux);opacity:1!important}
+html body.nd .abo-hero [style*="opacity:.85"]{color:var(--nd-doux);opacity:1!important}
+
+/* ── Pastilles de statut (la couleur en ligne garde son sens) ── */
+html body.nd .abo-pill{letter-spacing:.08em;border:1px solid rgba(255,255,255,.25)}
+
+/* ── Lignes et historique ── */
+html body.nd .abo-row{border-bottom:1px solid var(--nd-bord2)!important}
+html body.nd .abo-row .lbl{color:var(--nd-doux)!important}
+html body.nd .abo-row .val{color:#fff}
+html body.nd table.abo-hist th{color:var(--nd-or)!important;letter-spacing:.12em;background:rgba(227,192,110,.07);border-bottom:1px solid var(--nd-bord)!important}
+html body.nd table.abo-hist td{color:var(--nd-texte);border-bottom:1px solid var(--nd-bord2)!important}
+
+/* ── Boutons ── */
+html body.nd main :is(.btn-orange,.btn-primary){background:var(--nd-degore)!important;color:#1a1202!important;border:0!important;border-radius:999px!important;min-height:46px;padding:0 24px;font-weight:800;box-shadow:0 12px 26px -14px rgba(227,192,110,.7)}
+html body.nd main .btn-outline{background:transparent!important;color:var(--nd-or)!important;border:1px solid var(--nd-or)!important;border-radius:999px!important;min-height:46px;padding:0 22px;font-weight:800}
+html body.nd main .btn-outline:hover{background:rgba(227,192,110,.12)!important}
+html body.nd .abo-hero button.btn[style*="color:#0D2B4E"]{background:var(--nd-degore)!important;color:#1a1202!important;border:0!important;border-radius:999px!important;min-height:46px;padding:0 22px;font-weight:800}
+html body.nd .abo-hero button.btn[style*="rgba(255,255,255,.15)"]{background:transparent!important;color:var(--nd-texte)!important;border:1px solid var(--nd-bord2)!important;border-radius:999px!important;min-height:46px;padding:0 22px;font-weight:700}
+html body.nd .abo-card .btn-sm{border-radius:999px!important;min-height:40px;padding:0 18px!important}
+html body.nd .abo-card .btn-sm[style*="#dc2626"]{background:rgba(255,120,120,.12)!important;color:#FFB4B4!important;border:1px solid rgba(255,120,120,.45)!important}
+html body.nd :is(main .btn,main button,.modal-box button):focus-visible{outline:3px solid var(--nd-or);outline-offset:2px}
+
+/* ── Fenêtres de résiliation et d'arrêt d'un don ── */
+html body.nd .modal-bg{background:rgba(3,6,14,.78)!important;backdrop-filter:blur(6px)}
+html body.nd .modal-box{background:radial-gradient(420px 220px at 100% 0%,rgba(227,192,110,.14),transparent 66%),linear-gradient(160deg,#14234a 0%,#0B1226 62%)!important;border:1px solid rgba(227,192,110,.4);border-radius:26px!important;padding:26px!important;color:var(--nd-texte);box-shadow:0 40px 80px -30px #000}
+html body.nd .modal-box h3{font-family:var(--nd-display)!important;font-weight:500;font-size:26px;color:#fff}
+html body.nd .modal-box :is(p,label)[style]{color:var(--nd-doux)!important}
+html body.nd .modal-box strong{color:var(--nd-or)}
+html body.nd .modal-box textarea{background:rgba(255,255,255,.06)!important;border:1px solid var(--nd-bord2)!important;border-radius:14px!important;color:#fff!important;color-scheme:dark}
+html body.nd .modal-box textarea:focus{outline:none;border-color:var(--nd-or)!important;box-shadow:0 0 0 3px rgba(227,192,110,.18)}
+html body.nd .modal-box .btn[style*="#dc2626"]{background:#dc2626!important;color:#fff!important;border:0!important;border-radius:999px!important;min-height:46px;padding:0 22px;font-weight:800}
