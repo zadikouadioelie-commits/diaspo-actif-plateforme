@@ -255,6 +255,10 @@
     const hPubs = boite('cda-pubs-box', `
           <div class="cda-box-head"><span>📰 Publications</span>${isOwner ? `<button type="button" class="cda-edit-btn" id="cda-publier-btn" title="Créer une publication">✍️ Créer une publication</button>` : ''}</div>
           <div id="cda-publications-list"></div>`, 'margin:14px 20px 20px;');
+    /* Reels du compte (2026-10-14) : leurs vidéos + « Créer un Reel » sur son propre profil ; la boîte se masque seule s'il n'y en a aucune (assets/reels-profil.js). */
+    const hReels = boite('cda-reels-box', `
+          <div class="cda-box-head"><span>🎬 Reels</span></div>
+          <div id="cda-reels-mount"></div>`, 'margin:14px 20px 0;display:none;');
     const hAffil = boite('', `
           <div class="cda-box-head"><span>🤝 Affiliations</span></div>
           <div class="cda-affiliations" id="cda-affiliations">
@@ -302,6 +306,7 @@
             <button type="button" class="cda-theme-btn" id="cda-banner-style">🎨 Thème de bandeaux</button>
           </div>` : '<div style="height:8px;"></div>'}
         </div>
+        ${hReels}
         ${hPubs}
         ${hAvis}`;
       colG.innerHTML = hInfosCarte + hDomaine + hStatut + hComp;
@@ -323,6 +328,8 @@
             ${hComp}
           </div>
         </div>
+
+        ${hReels}
 
         ${hPubs}
 
@@ -408,6 +415,10 @@
     // profil.publications est déjà renvoyé par GET /api/profil/:id (utilisé ailleurs sur la
     // plateforme, voir profil-app.html) — pas de nouvelle route nécessaire pour l'affichage
     // initial ; window.CdaPublicationsRefresh() ne réinterroge que pour rafraîchir après un post.
+    if (window.ReelsProfil) {
+      const rb = document.getElementById('cda-reels-box');
+      if (rb) { rb.style.display = 'none'; ReelsProfil.monter(document.getElementById('cda-reels-mount'), { auteurId: profil.id, estMoi: isOwner }).then(v => { if (v) rb.style.display = ''; }); }
+    }
     if (window.Posts) {
       window.Posts.renderFeed(profil.publications || [], 'cda-publications-list');
       window.CdaPublicationsRefresh = async () => {

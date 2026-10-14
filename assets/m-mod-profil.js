@@ -67,6 +67,13 @@
   const domLabel = k => { const d = (window.DOMAINES_ACTIVITE || []).find(z => z[0] === k); return d ? d[2] : (k ? String(k).replace(/_/g, ' ') : ''); };
   const item = x => typeof x === 'string' ? x : (x && (x.titre || x.nom || x.libelle || x.texte || x.label)) || '';
   const chips = (arr, cls) => arr.filter(Boolean).length ? `<div class="tags" style="margin:0">${arr.filter(Boolean).map(t => `<span class="badge ${cls || ''}">${esc(t)}</span>`).join('')}</div>` : '';
+  /* Reels du compte (2026-10-14) : section + montage après affichage ; invisible si le compte n'a aucun Reel (sauf sur son propre profil). */
+  const reelsSec = () => `<section class="pf-sec"><h3>Reels</h3><div id="rp-mount"></div></section>`;
+  const reelsMonter = uid => {
+    const m = document.getElementById('rp-mount'); if (!m || !window.ReelsProfil || !uid) return;
+    ReelsProfil.monter(m, { auteurId: uid, estMoi: !!(S.me && Number(S.me.id) === Number(uid)), viewerOpts: {
+      onOpenPost: id => { location.hash = '#/post/' + id; }, onOpenProfile: id => { location.hash = '#/profil/' + id; }, onLogin: () => A.openLogin('Connectez-vous pour créer un Reel.') } });
+  };
   const sec = (titre, html) => html ? `<section class="pf-sec"><h3>${esc(titre)}</h3>${html}</section>` : '';
   const url = u => { u = String(u || '').trim(); if (!u) return ''; return /^https?:\/\//i.test(u) ? u : 'https://' + u; };
   const rich = v => v ? `<div class="rich">${richHtml(v)}</div>` : '';
@@ -161,12 +168,14 @@
       sec('Contact et liens', liens),
       prodsL.length ? sec('Boutique', `<div class="prods" style="padding:0">${prodsL.map(p => { const ph = list(p.photos_json)[0]; return `<a class="p" href="#/produit/${encodeURIComponent(p.id)}" style="color:inherit;text-decoration:none"><div class="ph">${ph ? `<img src="${attrUrl(ph)}" alt="" loading="lazy" onerror="this.remove()">` : ic('shop')}</div><div class="pn ell">${esc(p.nom)}</div><div class="pp">${p.prix != null ? esc(p.prix) + ' ' + esc(!p.devise || p.devise === 'EUR' ? '€' : p.devise) : ''}</div></a>`; }).join('')}</div><a class="pf-more" href="#/boutique/${encodeURIComponent(r.id)}">Voir toute la boutique ›</a>`) : '',
       sec('Avis' + (avis.total ? ` (${avis.total})` : ''), avis.total ? `<div class="row" style="margin-bottom:6px"><b style="font-size:22px">${esc(Number(avis.moyenne || 0).toFixed(1))}</b><span class="pf-st">${stars(avis.moyenne)}</span></div>` + lstAvis.map(v => `<div class="pf-rev"><span class="pf-st">${stars(v.note || v.rating)}</span> <b class="small">${esc(v.auteur_nom || v.nom || '')}</b><div>${esc(strip(v.commentaire || v.texte || v.contenu || ''))}</div></div>`).join('') : ''),
+      reelsSec(),
       sec('Publications', posts(pubs.publications || []))
     ].join('');
     const badges = [r.type ? `<span class="badge g">${esc(r.type)}</span>` : '', verifiee ? `<span class="badge g">${ic('check', 's')} Vérifiée</span>` : ''].filter(Boolean);
     const h = hero({ rejoindre: true, adherer: ['Association', 'ONG'].includes(r.type) && r.adhesions_ouvertes !== false && r.adhesions_ouvertes !== 0, uid: r.owner_user_id, fid: r.id, kind: 'initiative', nom: r.nom, sous: r.sigle || '', photo: r.logo_url, banner: r.vitrine_banniere_url || r.banniere_url, badges, loc: [r.ville, r.pays].filter(Boolean).join(', '), orig: [r.origine1 || r.owner_origine1, r.origine2 || r.owner_origine2].filter(Boolean).join(' · '),
       stats: [[r.abonnes || 0, 'abonnés'], [r.vues || r.nb_vues || 0, 'vues'], [avis.total ? Number(avis.moyenne || 0).toFixed(1) + '★' : '—', 'avis']] });
     rendre(r.nom, h + sections + `<a class="btn out block" style="margin:4px 0 8px" href="initiative.html?id=${encodeURIComponent(r.slug || r.id)}">${ic('out', 's')} Ouvrir la fiche complète sur le site</a>`);
+    reelsMonter(r.owner_user_id);
     /* Partager ce profil (2026-10-07) : lien public, lisible sans compte. */
     if (A.paneShare && !cibleTab) A.paneShare(location.origin + (r.owner_user_id ? '/profil.html?id=' + encodeURIComponent(r.owner_user_id) : '/initiative.html?id=' + encodeURIComponent(r.slug || r.id)) + '&r=' + A.jetonPartage(), r.nom);
   }
@@ -212,6 +221,7 @@
       sec('Score d’activité', sc && sc.score != null ? gauge(sc.score) + '<div class="pf-note">Calculé sur les publications, abonnés, relations et la complétude du profil.</div>' : ''),
       sec('Galerie', galerieHtml(gal)),
       sec('Initiatives suivies', suivies.map(i => `<a class="pf-eq" href="#/profil/i/${encodeURIComponent(i.slug || i.id)}"><span class="pf-eqav">${i.logo_url ? `<img src="${attrUrl(i.logo_url)}" alt="" onerror="this.remove()">` : esc(initials(i.nom))}</span><span><b>${esc(i.nom)}</b>${i.type ? `<span class="small muted" style="display:block">${esc(i.type)}</span>` : ''}</span></a>`).join('')),
+      reelsSec(),
       sec('Publications', posts(Array.isArray(p.publications) ? p.publications : []))
     ].join('');
     const rolLabel = A.ROLE_LABEL[p.role] || '';
@@ -219,6 +229,7 @@
     const h = hero({ uid: p.id, fid: p.id, kind: p.role === 'collectivite' ? 'collectivite' : 'user', nom, sous: pro ? '' : (p.titre_pro || ''), photo: p.photo_url, banner: p.banner_url || p.vitrine_banniere_url, rond: !pro, badges,
       loc: [p.ville, p.pays].filter(Boolean).join(', '), orig: [p.origine1, p.origine2].filter(Boolean).join(' · '), stats: [[p.nbAbonnes || 0, 'abonnés'], [p.nbSuivis || 0, 'abonnements'], [(Array.isArray(p.publications) ? p.publications.length : 0), 'publications']] });
     rendre(nom, h + sections + `<a class="btn out block" style="margin:4px 0 8px" href="profil.html?id=${encodeURIComponent(p.id)}">${ic('out', 's')} Ouvrir le profil complet sur le site</a>`);
+    reelsMonter(p.id);
     if (A.paneShare && !cibleTab) A.paneShare(location.origin + '/profil.html?id=' + encodeURIComponent(p.id) + '&r=' + A.jetonPartage(), nom);
   }
 
@@ -255,6 +266,7 @@
       sec('Liens', (c.site_web ? `<a class="pf-lk" href="${esc(attrUrl(url(c.site_web)))}" target="_blank" rel="noopener">${ic('out', 's')}<span>Site officiel</span></a>` : '') + reseaux(obj(c.reseaux_sociaux))),
       sec('Documents', docs.map(d => `<a class="pf-lk" href="${esc(attrUrl(d.url))}" target="_blank" rel="noopener">${ic('out', 's')}<span>${esc(d.nom || d.titre || 'Document')}</span></a>`).join('')),
       sec('Galerie', galerieHtml(gal)),
+      reelsSec(),
       sec('Actualités', posts(act.posts || []))
     ].join('');
     const st = c.stats || {};
@@ -262,6 +274,7 @@
       badges: [`<span class="badge g">${esc(type)}</span>`, c.is_verified ? `<span class="badge g">${ic('check', 's')} Vérifiée</span>` : ''].filter(Boolean),
       loc: territoire, stats: [[st.abonnes || 0, 'abonnés'], [st.publications || 0, 'publications'], [st.evenements || 0, 'événements']] });
     rendre(c.nom, h + sections + `<a class="btn out block" style="margin:4px 0 8px" href="profil-collectivite.html?id=${encodeURIComponent(c.id)}">${ic('out', 's')} Ouvrir le profil complet sur le site</a>`);
+    reelsMonter(c.id);
     if (A.paneShare && !cibleTab) A.paneShare(location.origin + '/profil-collectivite.html?id=' + encodeURIComponent(c.id) + '&r=' + A.jetonPartage(), c.nom);
   }
 

@@ -254,6 +254,7 @@ html, body{overflow-x:clip !important;}
 <script src="assets/data.js"></script>
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js?v=13"></script>
+<script src="assets/reels-profil.js?v=20261014a"></script>
 <script src="assets/rich-editor.js"></script>
 <script src="assets/signalement.js"></script>
 <!-- Requis par les boutons « Modifier la bannière / le logo » du propriétaire.
@@ -523,6 +524,12 @@ const THEME_VITRINE_LABELS = { bordeaux:'Bordeaux', ocean:'Ocean', emeraude:'Eme
       <div id="init-trust-widget">Chargement…</div>
     </div>
 
+    <!-- ===== REELS (2026-10-14) ===== -->
+    <div class="init-section" data-reels-section hidden style="display:none">
+      <h3>🎬 Reels</h3>
+      <div id="init-reels"></div>
+    </div>
+
     <!-- ===== PUBLICATIONS ===== -->
     <div class="init-section">
       <h3>📰 Publications récentes</h3>
@@ -718,6 +725,9 @@ const THEME_VITRINE_LABELS = { bordeaux:'Bordeaux', ocean:'Ocean', emeraude:'Eme
       size: 180,
     });
   }
+
+  /* ---- Reels du compte (2026-10-14) ---- */
+  if (window.ReelsProfil && init.owner_user_id) ReelsProfil.monter(document.getElementById('init-reels'), { auteurId: init.owner_user_id, estMoi: !!isOwner });
 
   /* ---- Publications ---- */
   try {

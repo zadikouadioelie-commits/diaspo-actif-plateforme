@@ -231,8 +231,8 @@ let _visionneurPromesse = null;
 function chargerVisionneur() {
   if (window.MediaViewer) return Promise.resolve();
   if (!_visionneurPromesse) _visionneurPromesse = new Promise(resolve => {
-    const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = '/assets/media-viewer.css?v=20261008a'; document.head.appendChild(l);
-    const s = document.createElement('script'); s.src = '/assets/media-viewer.js?v=20261008a'; s.onload = () => resolve(); s.onerror = () => resolve(); document.head.appendChild(s);
+    const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = '/assets/media-viewer.css?v=20261014a'; document.head.appendChild(l);
+    const s = document.createElement('script'); s.src = '/assets/media-viewer.js?v=20261014a'; s.onload = () => resolve(); s.onerror = () => resolve(); document.head.appendChild(s);
   });
   return _visionneurPromesse;
 }

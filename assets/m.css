@@ -551,3 +551,6 @@ button.li{background:none;font:inherit;color:inherit}
 .ev-top{display:flex;align-items:flex-start;gap:10px}
 .ev-top .search{flex:1;min-width:0}
 .ev-top .ae-cloche{width:46px;height:46px}
+/* Bouton Reels de la barre du haut (2026-10-14) : petite caméra dorée à côté du logo */
+#top .reels-top{color:#F5D061;margin-left:2px}
+#top .reels-top svg{width:28px;height:28px}

@@ -1,14 +1,14 @@
 /* ============================================================
    Diaspo'Actif — Bouton « Reels » du site (2026-10-13, demande explicite)
    « Un logo à gauche des publications, qui sert à basculer dans l'univers des Reels : des publications vidéo courtes. »
-   Posé en haut de la colonne de gauche du fil d'actualité. Il n'apparaît QUE s'il existe au moins une vidéo publique (aucun bouton mort).
+   Posé en haut de la colonne de gauche du fil d'actualité. Toujours visible (2026-10-14) : s'il n'existe pas encore de vidéo publique, le visionneur l'annonce (« Aucun Reel pour le moment »).
    Un clic charge à la demande le visionneur plein écran (assets/media-viewer.js) et l'ouvre en mode Reels : on y balaie / fait défiler de
    vidéo en vidéo, avec toutes les actions (j'aime, commentaires, enregistrer, partager, s'abonner, voir la publication).
    Sur téléphone, le même bouton est dans assets/m.js (bandeau des filtres du fil).
    ============================================================ */
 (function () {
   'use strict';
-  var VERSION = '20261013a';
+  var VERSION = '20261014a';
   function css() {
     if (document.getElementById('reels-css')) return;
     var s = document.createElement('style'); s.id = 'reels-css';
@@ -45,14 +45,10 @@
     if (!col || document.getElementById('fil-reels-btn')) return;
     css();
     var b = document.createElement('button');
-    b.type = 'button'; b.id = 'fil-reels-btn'; b.className = 'fil-reels-btn'; b.hidden = true; b.setAttribute('aria-label', 'Ouvrir les Reels, les petites vidéos de la plateforme');
-    b.innerHTML = '<span class="fil-reels-ic">' + CAM_SECOURS + '</span><span class="fil-reels-tx"><b>Reels</b><small>Les petites vidéos de la plateforme</small></span>';
+    b.type = 'button'; b.id = 'fil-reels-btn'; b.className = 'fil-reels-btn'; b.setAttribute('aria-label', 'Ouvrir les Reels, les petites vidéos de la plateforme');
+    b.innerHTML = '<span class="fil-reels-ic">' + CAM_SECOURS + '</span><span class="fil-reels-tx"><b>Reels</b><small>Regarder et créer de petites vidéos</small></span>';
     b.onclick = ouvrir;
     col.insertBefore(b, col.firstChild);
-    fetch('/api/fil/medias?type=video&limit=1', { credentials: 'same-origin' })
-      .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (j) { if (j && j.items && j.items.length) b.hidden = false; })
-      .catch(function () { /* pas de vidéo connue : le bouton reste caché */ });
   }
   window.Reels = { ouvrir: ouvrir };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', monter); else monter();

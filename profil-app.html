@@ -652,6 +652,7 @@ body.pp-carte-membre #p-banner { display:none !important; }
   body.pp-carte-membre .cda-card-3col { order:1; }
   body.pp-carte-membre #pp-col-right { order:2; }
   body.pp-carte-membre #pp-col-left { order:3; }
+  body.pp-carte-membre #cda-reels-box { order:4; }
   body.pp-carte-membre #cda-pubs-box { order:4; }
   body.pp-carte-membre #cda-avis-mount { order:5; }
 }
@@ -2406,6 +2407,10 @@ function renderVisitorProfile() {
       <div id="pvz-cr-feed"><div class="pvz-empty" style="padding:8px 0;">Chargement…</div></div>
     </section>` : '';
   const centerCol = `<main class="pvz-main">
+    <section class="pvz-card" data-reels-section hidden style="display:none">
+      <div class="pvz-card-title">🎬 Reels</div>
+      <div id="pvz-reels-mount"></div>
+    </section>
     <section class="pvz-card">
       <div class="pvz-card-title">🗞️ Publications ${pubs.length?`<a class="more" href="fil-actualite.html" style="text-decoration:none;">Voir tout</a>`:''}</div>
       ${isOwn ? `<button class="pvz-btn primary" style="width:100%;justify-content:center;margin-bottom:14px;" onclick="window.Posts&&Posts.openModal()">✍️ Créer une publication</button>` : ''}
@@ -2434,6 +2439,8 @@ function renderVisitorProfile() {
   window.initBoutonsRelation && window.initBoutonsRelation(root);
   if (window.Soutenir) Soutenir.hydrate(root);
   pvzChargerPublications();
+  /* Reels du compte (2026-10-14) : leurs vidéos, et « Créer un Reel » sur son propre profil. */
+  if (window.ReelsProfil) ReelsProfil.monter(document.getElementById('pvz-reels-mount'), { auteurId: profil.id, estMoi: !!isOwn });
   if (isOrgAccount) { loadEvenementsTab('pvz-evt-feed'); pvzChargerComptesRendus(); }
 
   // Avis + droit de réponse (cahier des charges "Avis + droit de réponse") — visible sur
@@ -2709,6 +2716,8 @@ function buildWidgetRegistry() {
   }};
 
   // Contenus (loaders ciblant #ptab-*)
+  /* Reels du compte (2026-10-14) : ses petites vidéos, et « Créer un Reel » sur son propre profil ; la carte se masque seule s'il n'y en a aucune. */
+  R.reels = { title:'Reels', icon:'🎬', defaultSize:'large', render:(b)=>{ const c=document.createElement('div'); c.id='ptab-reels'; b.appendChild(c); if (window.ReelsProfil) ReelsProfil.monter(c, { auteurId: profil.id, estMoi: !!isOwn }); } };
   R.publications = { title:'Publications', icon:'📰', defaultSize:'large', render:(b)=>widgetFromLoader(b,'ptab-publications',()=>{ if(typeof loadPublicationsTab==='function') loadPublicationsTab(); }) };
   R.photos = { title:'Photos', icon:'🖼', defaultSize:'medium', render:(b)=>widgetFromLoader(b,'ptab-photos',loadPhotosTab) };
   R.videos = { title:'Vidéos', icon:'🎬', defaultSize:'medium', render:(b)=>widgetFromLoader(b,'ptab-videos',loadVideosTab) };
@@ -2764,6 +2773,7 @@ function defaultLayout(role) {
   if (org) {
     return [
       { id:'apropos', size:'full' },
+      { id:'reels', size:'large' },
       { id:'publications', size:'large' },
       { id:'statistiques', size:'small' },
       { id:'evenements', size:'large' },
@@ -2784,6 +2794,7 @@ function defaultLayout(role) {
   // citoyen : allégé
   return [
     { id:'apropos', size:'full' },
+    { id:'reels', size:'large' },
     { id:'publications', size:'large' },
     { id:'statistiques', size:'small' },
     { id:'competences', size:'medium' },
@@ -2808,7 +2819,7 @@ function initWidgetBoard() {
   let saved = (profil.profil && Array.isArray(profil.profil.layout)) ? profil.profil.layout : null;
   let layout = (saved && saved.length ? saved : def).filter(x => registry[x.id]);
   // Ajouter en fin les widgets par défaut manquants (nouvelles rubriques), masqués
-  def.forEach(d => { if (!layout.find(x=>x.id===d.id)) layout.push({ ...d, hidden:true }); });
+  def.forEach(d => { if (!layout.find(x=>x.id===d.id)) layout.push({ ...d, hidden: d.id !== 'reels' }); });
 
   _board = window.WidgetBoard.init(container, {
     registry, layout, editable: isOwn,
@@ -9390,6 +9401,7 @@ init();
 <script src="assets/profil-checklist.js"></script>
 <script src="assets/profile-qr.js"></script>
 <script src="assets/posts.js"></script>
+<script src="assets/reels-profil.js?v=20261014a"></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js" defer></script>
 <script src="assets/gsap-animations.js" defer></script>
@@ -9399,7 +9411,7 @@ init();
 <script src="assets/avis-section.js"></script>
 <script src="assets/banner-presets.js"></script>
 <script src="assets/domaines-activite.js"></script>
-<script src="assets/carte-diaspoactif.js?v=3"></script>
+<script src="assets/carte-diaspoactif.js?v=4"></script>
 <script src="/assets/image-cropper.js"></script>
 <script src="/assets/widget-board.js"></script>
   <script src="/assets/theme-manager.js"></script>

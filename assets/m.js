@@ -415,10 +415,12 @@
       : `<div class="top-auth"><a class="pill-cta ghost" href="inscription.html">Créer un compte</a><button class="pill-cta" id="top-login">Connexion</button></div>`;
     const left = S.me ? `<button class="menu-btn" id="top-menu" aria-label="Menu des modules">${ic('menu')}<span>Menu</span></button>` : '';
     top.innerHTML = `${left}<img class="logo" src="assets/logo-roundel.webp" alt="" onerror="this.src='assets/logo.svg'">
-      <h1 class="sr-only"><span class="brand-s">Diaspo’Actif</span><span id="top-title">${esc(TITLES[S.tab] || '')}</span></h1><span style="flex:1"></span>${right}`;
+      <h1 class="sr-only"><span class="brand-s">Diaspo’Actif</span><span id="top-title">${esc(TITLES[S.tab] || '')}</span></h1><span style="flex:1"></span><button class="ibtn reels-top" id="top-reels" type="button" aria-label="Reels, les petites vidéos" title="Reels">${(window.MediaViewer && MediaViewer.iconeReels) ? MediaViewer.iconeReels() : ''}</button>${right}`;
     const l = $('#top-login'); if (l) l.onclick = () => openLogin();
     const sw = $('#top-switch'); if (sw) sw.onclick = openSwitcher;
     const mn = $('#top-menu'); if (mn) mn.onclick = openMenu;
+    /* Bouton Reels de la barre du haut (2026-10-14, demande explicite : « à côté du logo ») : ouvre l'univers des petites vidéos depuis n'importe quel écran, connecté ou non. */
+    const rl = $('#top-reels'); if (rl) rl.onclick = () => { if (window.MediaViewer && MediaViewer.openReels) MediaViewer.openReels(MV_OPTS); };
     paintBadges();
   }
   function renderTabs() {
@@ -468,12 +470,11 @@
     const el = $('#home-feed');
     /* Bouton « Reels » (2026-10-13, demande explicite) : une petite caméra stylisée, qui apparaît toute seule dès qu'il existe au moins une vidéo
        publique ; il ouvre l'univers des petites vidéos de la plateforme (visionneur plein écran, mode Reels). */
-    const reelsBtn = `<button type="button" class="chip reels" id="reels-open" hidden aria-label="Reels, les petites vidéos">${(window.MediaViewer && MediaViewer.iconeReels) ? MediaViewer.iconeReels() : ''}<span>Reels</span></button>`;
+    const reelsBtn = `<button type="button" class="chip reels" id="reels-open" aria-label="Reels, les petites vidéos">${(window.MediaViewer && MediaViewer.iconeReels) ? MediaViewer.iconeReels() : ''}<span>Reels</span></button>`;
     el.innerHTML = `<div class="chips" role="tablist">${reelsBtn}${FIL_MODES.map(([k, l]) => `<button class="chip ${S.fil.mode === k ? 'on' : ''}" data-mode="${k}" role="tab" aria-selected="${S.fil.mode === k}">${l}</button>`).join('')}</div>${pubSlot('between_posts')}<div id="fil-list"></div><div id="fil-more"></div>`;
     const rb = $('#reels-open', el);
     if (rb) {
       rb.onclick = () => { if (window.MediaViewer && MediaViewer.openReels) MediaViewer.openReels(MV_OPTS); };
-      api('/api/fil/medias?type=video&limit=1').then(r => { if (r && r.items && r.items.length) rb.hidden = false; }).catch(() => { /* aucune vidéo connue : le bouton reste caché */ });
     }
     $$('.chip[data-mode]', el).forEach(c => c.onclick = async () => {
       if (c.dataset.mode === 'suivis' && !(await needLogin('Connectez-vous pour voir les publications de vos abonnements.'))) return;

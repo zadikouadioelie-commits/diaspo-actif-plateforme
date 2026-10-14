@@ -16,6 +16,10 @@
   /* Petite caméra stylisée (logo « Reels ») : corps arrondi, objectif en triangle, dégradé or — même dessin sur le site et sur téléphone. */
   var CAM = '<svg class="mv-cam" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="mvcg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F3DC9B"/><stop offset=".5" stop-color="#E3C06E"/><stop offset="1" stop-color="#B9893A"/></linearGradient></defs><rect x="2" y="6" width="13.5" height="12" rx="3.2" fill="url(#mvcg)"/><path d="M17.2 10.4l4.2-2.5a.7.7 0 0 1 1.05.6v7a.7.7 0 0 1-1.05.6l-4.2-2.5z" fill="url(#mvcg)"/><circle cx="8.7" cy="12" r="2.6" fill="#0B1226" opacity=".85"/></svg>';
 
+  /* Les six réactions du fil (mêmes types que REACTIONS dans assets/posts.js et que REACTIONS_FIL côté serveur). */
+  var REACTIONS = [['like', '❤️', 'J’aime'], ['applause', '👏', 'Applaudir'], ['utile', '💡', 'Utile'], ['soutien', '🤝', 'Soutenir'], ['feliciter', '🎉', 'Féliciter'], ['inspirant', '🔥', 'Inspirant']];
+  var emojiDe = function (t) { for (var i = 0; i < REACTIONS.length; i++) if (REACTIONS[i][0] === t) return REACTIONS[i][1]; return '❤️'; };
+
   function getJson(path) {
     return fetch(path, { credentials: 'same-origin' }).then(function (r) {
       return r.json().catch(function () { return null; }).then(function (j) { if (!r.ok) throw new Error((j && j.error) || 'Erreur'); return j || {}; });
@@ -73,23 +77,45 @@
      à l'auteur, voir la publication (où l'on peut aussi contribuer). */
   function openReels(opts) {
     if (V) fermer(true);
-    var v = V = { kind: 'video', reels: true, scope: 'plateforme', auteurId: null, items: [], idx: 0, mi: 0, opts: opts || {}, cur: { avant: null, apres: null }, fin: { avant: false, apres: true }, charge: { avant: false, apres: false }, histo: false, ver: 0, anim: 0, roue: 0 };
+    var v = V = { kind: 'video', reels: true, scope: (opts && opts.auteurId) ? 'auteur' : 'plateforme', auteurId: (opts && Number(opts.auteurId)) || null, items: [], idx: 0, mi: 0, opts: opts || {}, cur: { avant: null, apres: null }, fin: { avant: false, apres: true }, charge: { avant: false, apres: false }, histo: false, ver: 0, anim: 0, roue: 0 };
     construire();
-    return getJson('/api/fil/medias?type=video&limit=8').then(function (r) {
+    return getJson('/api/fil/medias?type=video&limit=8' + (opts && opts.auteurId ? '&auteur_id=' + Number(opts.auteurId) : '') + (opts && opts.postId ? '&avant=' + (Number(opts.postId) + 1) : '')).then(function (r) {
       if (V !== v) return false;
       var l = (r && r.items) || [];
-      if (!l.length) { toast('Aucun Reel pour le moment. Revenez bientôt !'); setTimeout(function () { if (V === v) fermer(); }, 1800); return false; }
+      if (!l.length) { ecranVide(v); return false; }
+      if (opts && opts.postId) v.fin.apres = false;
       v.items = l; v.idx = 0; v.mi = 0; v.cur.avant = r.suivant != null ? r.suivant : l[l.length - 1].post_id; if (r.suivant == null) v.fin.avant = true;
       v.cur.apres = l[0].post_id; majPortee(); render(0); charger('avant');
       return true;
     }, function () { if (V === v) { toast('Les Reels ne se chargent pas pour le moment.'); setTimeout(function () { if (V === v) fermer(); }, 1800); } return false; });
   }
 
+  /* Aucun Reel (encore) : le visionneur reste ouvert et invite à publier le premier (2026-10-14). */
+  function ecranVide(v) {
+    v.fin = { avant: true, apres: true };
+    v.el.querySelector('.mv-stage').innerHTML = '';
+    v.el.querySelector('.mv-info').innerHTML = '<div class="mv-vide"><b>Aucun Reel pour le moment</b><p>Soyez le premier à publier une petite vidéo : toute la communauté pourra la voir et réagir.</p>'
+      + '<button type="button" class="mv-voir" data-a="creer">＋ Créer un Reel</button></div>';
+  }
+  /* Création d'un Reel (fenêtre assets/reels-creer.js, chargée à la demande) — après publication, le visionneur se rouvre sur le nouveau Reel. */
+  function creer() {
+    var lancer = function () {
+      window.ReelsCreer.ouvrir({
+        onLogin: V && V.opts && V.opts.onLogin,
+        onPublie: function (r) { if (V && r && r.post_id) { var o = {}; for (var k in V.opts) o[k] = V.opts[k]; o.postId = r.post_id; openReels(o); } }
+      });
+    };
+    if (window.ReelsCreer) { lancer(); return; }
+    var sc = document.createElement('script'); sc.src = '/assets/reels-creer.js?v=20261014a'; sc.onload = lancer;
+    sc.onerror = function () { toast('Impossible d’ouvrir la création pour le moment.'); };
+    document.head.appendChild(sc);
+  }
+
   function construire() {
     var d = document.createElement('div');
     d.className = 'mv' + (V.reels ? ' mv-reels' : ''); d.setAttribute('role', 'dialog'); d.setAttribute('aria-modal', 'true'); d.setAttribute('aria-label', V.reels ? 'Reels' : 'Visionneur de médias');
     d.innerHTML = '<div class="mv-top"><button type="button" class="mv-btn mv-x" aria-label="Fermer">✕</button>'
-      + (V.reels ? '<div class="mv-brand">' + CAM + '<b>Reels</b></div>'
+      + (V.reels ? '<div class="mv-brand">' + CAM + '<b>Reels</b></div><button type="button" class="mv-creer" data-a="creer" aria-label="Créer un Reel">＋ Créer</button>'
         : '<div class="mv-portee" role="tablist"><button type="button" data-p="auteur">Cette personne</button><button type="button" data-p="plateforme">Toute la plateforme</button></div>') + '</div>'
       + '<div class="mv-stage"></div><div class="mv-dots"></div>'
       + '<div class="mv-fleches"><button type="button" class="mv-btn" data-d="-1" aria-label="Précédent">▲</button><button type="button" class="mv-btn" data-d="1" aria-label="Suivant">▼</button></div>'
@@ -116,17 +142,37 @@
       e.preventDefault(); var n = Date.now(); if (n - V.roue < 550 || Math.abs(e.deltaY) < 12) return; V.roue = n; aller(e.deltaY > 0 ? 1 : -1);
     }, { passive: false });
     d.addEventListener('click', function (e) {
+      var a0 = e.target.closest('[data-a="like"]');
+      if (a0 && V.lp) { V.lp = false; return; }                                              /* le « clic » qui suit l'appui long ne doit pas refermer le choix qu'il vient d'ouvrir */
+      var rr = e.target.closest('[data-r]'); if (rr) { reagir(rr.dataset.r); fermerPicker(); return; }
+      if (!e.target.closest('.mv-picker')) fermerPicker();
       var a = e.target.closest('[data-a]'); if (!a) return;
       var k = a.dataset.a;
-      if (k === 'like') aimer(); else if (k === 'part') partager(); else if (k === 'auteur') ouvrirProfil();
+      if (k === 'creer') creer();
+      else if (k === 'like') { if (V.reels) reagir('like'); else aimer(); } else if (k === 'part') partager(); else if (k === 'auteur') ouvrirProfil();
       else if (k === 'comm') commentaires(); else if (k === 'suivre') suivre(); else if (k === 'save') enregistrer(); else ouvrirPost();
     });
+    /* Réactions des Reels : appui long (téléphone), survol (ordinateur) ou clic droit sur le cœur ouvrent le choix des six réactions. */
+    var lpT = null, survolT = null, peutSurvoler = window.matchMedia && window.matchMedia('(hover:hover)').matches;
+    d.addEventListener('pointerdown', function (e) {
+      if (!V || !V.reels || !e.target.closest('[data-a="like"]')) return; V.lp = false; clearTimeout(lpT);
+      lpT = setTimeout(function () { if (V) { V.lp = true; ouvrirPicker(); } }, 450);
+    });
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (t) { d.addEventListener(t, function () { clearTimeout(lpT); setTimeout(function () { if (V) V.lp = false; }, 400); }, true); });   /* le « clic » qui suit un appui long est ignoré, puis l'indicateur retombe */
+    d.addEventListener('contextmenu', function (e) { if (V && V.reels && e.target.closest('[data-a="like"]')) { e.preventDefault(); ouvrirPicker(); } });
+    d.addEventListener('mouseover', function (e) {
+      if (!peutSurvoler || !V || !V.reels || !e.target.closest('[data-a="like"]') || d.querySelector('.mv-picker')) return;
+      clearTimeout(survolT); survolT = setTimeout(function () { if (V) ouvrirPicker(); }, 350);
+    });
+    d.addEventListener('mouseout', function (e) { if (e.target.closest('[data-a="like"]')) clearTimeout(survolT); });
     document.addEventListener('keydown', touches, true);
     window.addEventListener('popstate', retour);
   }
   function touches(e) {
     if (!V) return;
+    if (document.querySelector('.rc-fond')) return;                                             /* fenêtre de création ouverte : elle gère le clavier */
     var k = e.key;
+    if (k === 'Escape' && V.el.querySelector('.mv-picker')) { e.preventDefault(); e.stopPropagation(); fermerPicker(); return; }
     if (e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName)) {            /* saisie d'un commentaire : les lettres ne font pas défiler */
       if (k === 'Escape') { e.preventDefault(); e.stopPropagation(); fermerCommentaires(); }
       return;
@@ -203,7 +249,13 @@
   function majActions() {
     if (!V) return; var it = cur(), el = V.el;
     var l = el.querySelector('[data-a="like"]'); if (!l) return;
-    l.classList.toggle('on', !!it.a_aime); l.querySelector('i').textContent = it.a_aime ? '♥' : '♡'; l.querySelector('span').textContent = it.nb_likes || '';
+    if (V.reels && it.reactions) {
+      var mes = it.mes_reactions || [], total = it.nb_reactions || 0;
+      l.classList.toggle('on', mes.length > 0); l.querySelector('i').textContent = mes.length ? emojiDe(mes[0]) : '♡'; l.querySelector('span').textContent = total || '';
+      var rs = el.querySelector('.mv-reacts');
+      if (rs) rs.innerHTML = REACTIONS.filter(function (r) { return it.reactions[r[0]] > 0; }).sort(function (a, b) { return it.reactions[b[0]] - it.reactions[a[0]]; })
+        .map(function (r) { return '<span class="' + (mes.indexOf(r[0]) >= 0 ? 'on' : '') + '" title="' + esc(r[2]) + '">' + r[1] + ' ' + it.reactions[r[0]] + '</span>'; }).join('');
+    } else { l.classList.toggle('on', !!it.a_aime); l.querySelector('i').textContent = it.a_aime ? '♥' : '♡'; l.querySelector('span').textContent = it.nb_likes || ''; }
     var c = el.querySelector('[data-a="comm"] span') || el.querySelector('[data-a="open"] span'); if (c) c.textContent = it.nb_commentaires ? it.nb_commentaires : '';
     var sv = el.querySelector('[data-a="save"]'); if (sv) { sv.classList.toggle('on', !!it.a_enregistre); sv.querySelector('span').textContent = it.a_enregistre ? 'Enregistré' : 'Enregistrer'; }
     var sf = el.querySelector('[data-a="suivre"]'); if (sf) { sf.classList.toggle('on', !!it.suivi); sf.textContent = it.suivi ? 'Abonné ✓' : '+ S’abonner'; sf.hidden = !!it.est_moi || !it.auteur_id; }
@@ -240,6 +292,7 @@
         + '<button type="button" class="mv-nom" data-a="auteur">' + esc(it.auteur_nom || 'Membre') + '</button>'
         + '<button type="button" class="mv-suivre" data-a="suivre">+ S’abonner</button></div>'
         + ((it.titre || it.extrait) ? '<div class="mv-txt">' + (it.titre ? '<b>' + esc(it.titre) + '</b> ' : '') + esc(it.extrait) + '</div>' : '')
+        + '<div class="mv-reacts" aria-label="Réactions"></div>'
         + '<button type="button" class="mv-voir" data-a="open">Voir la publication · Contribuer ›</button>';
       majActions(); majFleches();
       return;
@@ -261,6 +314,39 @@
     fetch('/api/fil/' + it.post_id + '/react', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'like' }) })
       .then(function (r) { if (r.status === 401) { toast('Connectez-vous pour aimer cette publication.'); return; } if (!r.ok) throw new Error(); it.a_aime = true; it.nb_likes++; majActions(); })
       .catch(function () { toast('Action impossible pour le moment.'); });
+  }
+  /* Réactions des Reels (2026-10-14) : un appui sur le cœur ajoute / retire « J'aime » ; le choix complet (six réactions) s'ouvre par appui long,
+     survol ou clic droit. Chaque réaction se pose et se retire séparément ; le serveur garde un compteur par type. */
+  function reagir(type) {
+    var it = cur(); if (!it) return;
+    it.reactions = it.reactions || {}; it.mes_reactions = it.mes_reactions || [];
+    var deja = it.mes_reactions.indexOf(type) >= 0;
+    var req = deja ? fetch('/api/fil/' + it.post_id + '/react/' + encodeURIComponent(type), { method: 'DELETE', credentials: 'same-origin' })
+      : fetch('/api/fil/' + it.post_id + '/react', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: type }) });
+    req.then(function (r) {
+      if (r.status === 401) { toast('Connectez-vous pour réagir.'); return null; }
+      if (!r.ok) throw new Error(); return r.json();
+    }).then(function (j) {
+      if (!j) return;
+      var c = {}, tot = 0; REACTIONS.forEach(function (x) { var n = Number((j.reactions || {})[x[0]]) || 0; if (n) { c[x[0]] = n; tot += n; } });
+      it.reactions = c; it.nb_reactions = tot;
+      it.mes_reactions = deja ? it.mes_reactions.filter(function (t) { return t !== type; }) : it.mes_reactions.concat([type]);
+      it.a_aime = it.mes_reactions.indexOf('like') >= 0; it.nb_likes = c.like || 0;
+      if (V && cur() === it) majActions();
+    }).catch(function () { toast('Action impossible pour le moment.'); });
+  }
+  function fermerPicker() { var p = V && V.el && V.el.querySelector('.mv-picker'); if (p) p.remove(); }
+  function ouvrirPicker() {
+    var it = cur(); if (!V || !it) return; fermerPicker();
+    var info = V.el.querySelector('.mv-info'), like = V.el.querySelector('[data-a="like"]'); if (!info || !like) return;
+    var mes = it.mes_reactions || [], rc = it.reactions || {};
+    var p = document.createElement('div'); p.className = 'mv-picker'; p.setAttribute('role', 'menu'); p.setAttribute('aria-label', 'Choisir une réaction');
+    p.innerHTML = REACTIONS.map(function (r) {
+      return '<button type="button" role="menuitem" data-r="' + r[0] + '" class="' + (mes.indexOf(r[0]) >= 0 ? 'on' : '') + '" aria-label="' + esc(r[2]) + '" title="' + esc(r[2]) + '"><i>' + r[1] + '</i><span>' + (rc[r[0]] || '') + '</span></button>';
+    }).join('');
+    info.appendChild(p);
+    var br = like.getBoundingClientRect(), ir = info.getBoundingClientRect();
+    p.style.top = (br.top - ir.top - 4) + 'px'; p.style.right = (ir.right - br.left + 6) + 'px';
   }
   function partager() {
     var it = cur(); if (!it) return;

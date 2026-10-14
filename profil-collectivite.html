@@ -105,6 +105,7 @@
 <script src="assets/back-to-dashboard.js"></script>
 <script src="assets/galerie-lightbox.js"></script>
 <script src="assets/posts.js"></script>
+<script src="assets/reels-profil.js?v=20261014a"></script>
 <script src="/assets/upload-media.js"></script>
 <script>
 /* 7 thèmes de couleurs pour le profil public Collectivité */
@@ -233,6 +234,11 @@ function applyPcTheme(name) {
           <div id="pc-appels"></div>
         </div>
 
+        <div class="pc-card" data-reels-section hidden style="display:none;margin-bottom:14px">
+          <h3 style="margin:0 0 10px;">🎬 Reels</h3>
+          <div id="pc-reels"></div>
+        </div>
+
         <div id="pc-actualites">
           <div class="pc-feed-card"><div class="pc-post pc-empty">Chargement des actualités…</div></div>
         </div>
@@ -271,6 +277,9 @@ function applyPcTheme(name) {
       </div>
     </div>
   `;
+
+  // Reels du compte (2026-10-14)
+  if (window.ReelsProfil) ReelsProfil.monter(document.getElementById('pc-reels'), { auteurId: profil.id, estMoi: !!(CU && Number(CU.id) === Number(profil.id)) });
 
   // Actualités (fil central) — cartes complètes : photos multiples, réactions, commentaires, republier
   try {

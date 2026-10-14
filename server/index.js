@@ -14322,6 +14322,33 @@ route("POST", "/api/fil", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise pour publier." });
 
+  /* REEL (2026-10-14, demande explicite : « permettre de créer des Reels et de les regarder, pour tous les comptes »).
+     Un Reel est une publication vidéo publique dont la vidéo a été envoyée directement à Bunny Stream (assets/reels-upload.js).
+     Le navigateur ne fournit JAMAIS l'adresse de la vidéo : il donne seulement la preuve de son envoi (guid + jeton, voir
+     server/reels-upload.js) ; le serveur vérifie que la vidéo est prête et construit lui-même le média. Chemin dédié : la règle
+     « un compte Utilisateur ne peut pas ajouter de vidéo à une publication » (validerMediasUtilisateur) reste en vigueur pour les
+     publications ordinaires, mais ne s'applique pas à un Reel vérifié — les Reels sont ouverts à tous les comptes. */
+  let reelVerifie = false;
+  if (body && body.reel && body.reel.guid) {
+    const R = require("./reels-upload");
+    if (!R.actif()) return sendJSON(res, 503, { error: "L’envoi de Reels sera disponible très bientôt.", code: "reels_inactif" });
+    if (!R.guidValide(body.reel.guid) || !R.jetonValide(user.id, body.reel.guid, body.reel.jeton)) return sendJSON(res, 403, { error: "Envoi inconnu." });
+    const lim = SEC.rateLimit(`reels-publier:${user.id}`, 10, 3600000);
+    if (!lim.allowed) return sendJSON(res, 429, { error: "Trop de Reels publiés en peu de temps. Réessayez dans un moment." });
+    const deja = await db.prepare("SELECT id FROM fil_posts WHERE auteur_id=? AND medias LIKE ?").get(user.id, `%${body.reel.guid}%`);
+    if (deja) return sendJSON(res, 409, { error: "Ce Reel est déjà publié.", post_id: Number(deja.id) });
+    let etatReel;
+    try { etatReel = await R.etatVideo(body.reel.guid); }
+    catch (e) { return sendJSON(res, 502, SEC.safeError(e, "reels publier")); }
+    if (!etatReel || etatReel.etat !== "pret") return sendJSON(res, 409, { error: etatReel && etatReel.erreur ? etatReel.erreur : "Votre vidéo n’est pas encore prête. Patientez quelques instants puis réessayez.", etat: etatReel && etatReel.etat });
+    body.pub_type = "video"; body.visibilite = "public"; body.statut = "publie";
+    body.medias = [{ type: "video", url: etatReel.urls.mp4, poster: etatReel.urls.miniature, hls: etatReel.urls.hls, apercu: etatReel.urls.apercu, reel: true, guid: etatReel.guid, duree: etatReel.duree, largeur: etatReel.largeur, hauteur: etatReel.hauteur }];
+    body.media_url = null; body.video_duree = Math.round(etatReel.duree) || null;
+    body.categorie = body.categorie || "Reels";
+    body.contenu = String(body.contenu || "").trim().slice(0, 600) || "Nouveau Reel";
+    reelVerifie = true;
+  }
+
   const pub_type = body.pub_type || "texte";
   const contenu  = (body.contenu || "").trim();
   const article_titre   = (body.article_titre || "").trim();
@@ -14338,7 +14365,7 @@ route("POST", "/api/fil", async (req, res, params, body) => {
     if (!contenu && !article_titre && !titrePlainSaisi) return sendJSON(res, 400, { error: "Le contenu ne peut pas être vide." });
   }
 
-  const erreurMedias = validerMediasUtilisateur(user, medias, pub_type);
+  const erreurMedias = reelVerifie ? null : validerMediasUtilisateur(user, medias, pub_type);
   if (erreurMedias) return sendJSON(res, 403, { error: erreurMedias });
 
   // Extraire automatiquement les hashtags du contenu
@@ -14459,6 +14486,19 @@ route("POST", "/api/fil/:id/dwell", async (req, res, params, body) => {
   sendJSON(res, 200, { ok: true });
 });
 
+/* Les six réactions du fil (mêmes types que REACTIONS dans assets/posts.js) — les autres lignes de fil_reactions (repost, partage…) ne sont pas des réactions. */
+const REACTIONS_FIL = ["like", "applause", "utile", "soutien", "feliciter", "inspirant"];
+/* Retire UNE réaction du compte connecté (Reels, 2026-10-14) : l'ajout existe déjà (POST ci-dessous), le retrait manquait. */
+route("DELETE", "/api/fil/:id/react/:type", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (!REACTIONS_FIL.includes(params.type)) return sendJSON(res, 400, { error: "Réaction inconnue." });
+  await db.prepare("DELETE FROM fil_reactions WHERE post_id=? AND user_id=? AND type=?").run(params.id, user.id, params.type);
+  const reactions = await db.prepare("SELECT type, COUNT(*) AS n FROM fil_reactions WHERE post_id=? GROUP BY type").all(params.id);
+  const counts = {};
+  reactions.forEach(r => { if (REACTIONS_FIL.includes(r.type)) counts[r.type] = Number(r.n); });
+  sendJSON(res, 200, { reactions: counts });
+});
 route("POST", "/api/fil/:id/react", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
@@ -14634,6 +14674,12 @@ route("GET", "/api/fil/medias", async (req, res, params, body, query) => {
       const likes = await db.prepare("SELECT COUNT(*) AS n FROM fil_reactions WHERE post_id=? AND type='like'").get(p.id);
       const comm = await db.prepare("SELECT COUNT(*) AS n FROM fil_commentaires WHERE post_id=?").get(p.id);
       const aime = cu ? !!await db.prepare("SELECT 1 FROM fil_reactions WHERE post_id=? AND user_id=? AND type='like'").get(p.id, cu.id) : false;
+      /* Réactions détaillées des Reels (2026-10-14) : compteur par type (les six réactions du fil, jamais les « partage/repost » stockés dans la même table) et celles du compte connecté. */
+      const reactionsParType = {}; let nbReactions = 0;
+      for (const r of await db.prepare("SELECT type, COUNT(*) AS n FROM fil_reactions WHERE post_id=? GROUP BY type").all(p.id)) {
+        if (REACTIONS_FIL.includes(r.type)) { reactionsParType[r.type] = Number(r.n); nbReactions += Number(r.n); }
+      }
+      const mesReactions = cu ? (await db.prepare("SELECT type FROM fil_reactions WHERE post_id=? AND user_id=?").all(p.id, cu.id)).map(r => r.type).filter(t => REACTIONS_FIL.includes(t)) : [];
       /* Reels (2026-10-13) : état « abonné » et « enregistré » du compte connecté, pour que les boutons du visionneur s'affichent dans le bon état. */
       const suivi = cu ? !!await db.prepare("SELECT 1 FROM user_follows WHERE follower_id=? AND followed_id=?").get(cu.id, p.auteur_id) : false;
       const enregistre = cu ? !!await db.prepare("SELECT 1 FROM fil_bookmarks WHERE user_id=? AND post_id=?").get(cu.id, p.id) : false;
@@ -14649,6 +14695,7 @@ route("GET", "/api/fil/medias", async (req, res, params, body, query) => {
         kind, medias: medias.slice(0, 10).map(m => ({ kind: m.kind, url: m.url, poster: m.poster })),
         titre: titre.slice(0, 120), extrait: (titre && corps.startsWith(titre) ? corps.slice(titre.length).trim() : corps).slice(0, 180),
         nb_likes: likes ? Number(likes.n) : 0, nb_commentaires: comm ? Number(comm.n) : 0, a_aime: aime, created_at: p.created_at,
+        reactions: reactionsParType, nb_reactions: nbReactions, mes_reactions: mesReactions,
         suivi, a_enregistre: enregistre, est_moi: cu ? Number(cu.id) === Number(p.auteur_id) : false,
       });
       if (items.length >= limite) { limiteAtteinte = true; break; }
@@ -34421,39 +34468,8 @@ ${jsonLd}
       const proprio = Number(evt.owner_user_id) === Number(me.id);
       if (!proprio && (evt.statut === "brouillon" || evt.visibilite === "prive")) return sendJSON(res, 404, { error: "Événement introuvable." });
       if (!evt.date_evt) return sendJSON(res, 400, { error: "Cet événement n'a pas de date : impossible de l'ajouter à l'agenda." });
-      const deja = await db.prepare("SELECT id FROM agenda_events WHERE user_id=? AND evenement_id=?").get(me.id, evt.id);
-      if (deja) return sendJSON(res, 200, { ok: true, deja: true, id: Number(deja.id) });
-
-      /* Dates : « AAAA-MM-JJ » + heure facultative. Sans heure de début, l'événement occupe la journée. */
-      const jour = String(evt.date_evt).slice(0, 10), jourFin = String(evt.date_fin || evt.date_evt).slice(0, 10);
-      const hhmm = h => { const m = /^(\d{1,2}):(\d{2})/.exec(String(h || "")); return m ? m[1].padStart(2, "0") + ":" + m[2] : ""; };
-      const hd = hhmm(evt.heure_debut);
-      let hf = hhmm(evt.heure_fin);
-      const toutJour = !hd;
-      const debut = jour + "T" + (hd || "00:00");
-      if (!hf) hf = hd ? String(Math.min(23, Number(hd.slice(0, 2)) + 1)).padStart(2, "0") + ":" + hd.slice(3) : "23:59";
-      const fin = jourFin + "T" + hf;
-      const lien = getOrigin(req) + "/evenements.html?evt=" + encodeURIComponent(evt.id);
-      const lieu = [evt.lieu, evt.ville, evt.pays].filter(Boolean).join(", ") || (evt.mode_participation === "ligne" ? "En ligne" : "");
-      const resume = String(evt.description || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 600);
-      const description = [resume, "Événement Diaspo'Actif : " + lien].filter(Boolean).join("\n\n");
-      const r = await db.prepare(`INSERT INTO agenda_events(user_id,titre,description,date_debut,date_fin,lieu,lieu_type,couleur,all_day,evenement_id)
-        VALUES(?,?,?,?,?,?,?,?,?,?)`).run(me.id, String(evt.titre).slice(0, 200), description, debut, fin, lieu || null, evt.mode_participation === "ligne" ? "virtuel" : "physique", "#c9971c", toutJour ? 1 : 0, evt.id);
-      const nouvelId = Number(r.lastInsertRowid);
-      try {
-        for (const rem of [{ type: "24h", ms: 24 * 3600 * 1000 }, { type: "1h", ms: 3600 * 1000 }, { type: "15m", ms: 15 * 60 * 1000 }]) {
-          const remAt = new Date(new Date(debut).getTime() - rem.ms).toISOString();
-          if (new Date(remAt) > new Date()) await db.prepare("INSERT INTO agenda_reminders(user_id,event_id,remind_at,type) VALUES(?,?,?,?)").run(me.id, nouvelId, remAt, rem.type);
-        }
-      } catch (e) { logError(e, "agenda-evenement-rappels", req); }
-      try {
-        const u = await db.prepare("SELECT google_calendar_sync_mode, google_calendar_refresh_token FROM users WHERE id=?").get(me.id);
-        if (u?.google_calendar_sync_mode === "diaspo_vers_google" && u.google_calendar_refresh_token) {
-          const ligne = await db.prepare("SELECT * FROM agenda_events WHERE id=?").get(nouvelId);
-          gcalPushEvent(me.id, ligne).catch(() => {});
-        }
-      } catch (_) { /* la synchronisation Google ne doit jamais bloquer l'ajout */ }
-      return sendJSON(res, 201, { ok: true, deja: false, id: nouvelId });
+      const r = await ajouterEvenementAgenda(evt, me.id, req);
+      return sendJSON(res, r.deja ? 200 : 201, r);
     }
 
     /* PUT /api/agenda/events/:id */
