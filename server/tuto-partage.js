@@ -23,7 +23,10 @@ function imageTuto(v) {
 
 /* Gmail/Outlook (et certains aperçus de lien) n'affichent PAS les images SVG : si l'affiche d'un tuto est un .svg et qu'une version .jpg/.png du même nom
    existe dans le dépôt, c'est elle qu'il faut envoyer ; sinon null (le texte seul vaut mieux qu'une image cassée). */
+/* Correspondance explicite : sur Vercel, la fonction serveur n'embarque pas les fichiers d'assets, donc existsSync ne les voit pas (constaté en production : aperçu du tuto flash retombé sur l'image générique). */
+const RASTER_CONNUS = { '/assets/media/film-flash-poster.svg': '/assets/media/film-flash-poster.jpg' };
 function imageRaster(u) {
+  if (u && RASTER_CONNUS[String(u).split('?')[0]]) return RASTER_CONNUS[String(u).split('?')[0]];
   if (!u || !/\.svg(\?|$)/i.test(u) || /^https?:/i.test(u)) return u;
   for (const ext of [".jpg", ".png"]) { const alt = u.replace(/\.svg(\?.*)?$/i, ext); if (require("fs").existsSync(require("path").join(__dirname, "..", alt.split("?")[0]))) return alt; }
   return null;
