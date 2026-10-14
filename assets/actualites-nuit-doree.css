@@ -1,0 +1,28 @@
+/* ============================================================
+   Projets diaspora (actualites.html) — design « Nuit dorée » (2026-10-14, demande explicite : « applique la nouvelle DA »).
+   Feuille de surcharge chargée APRÈS theme-nuit-doree.css ; tout est préfixé html body.nd.
+   Retour arrière : retirer les 2 <link> et class="nd" sur <body> de actualites.html.
+   ============================================================ */
+
+/* ── Bannière « Projets diaspora » : cadre doré et halo, comme une affiche sur la nuit ── */
+html body.nd .actu-banner-wrap{margin-top:6px}
+html body.nd .actu-banner-wrap img{border-radius:28px!important;border:1px solid var(--nd-bord);box-shadow:0 40px 80px -42px #000,0 0 110px -34px rgba(227,192,110,.28)}
+
+/* ── Liste des projets publiés ── */
+html body.nd #actu-list{margin-top:34px}
+html body.nd #actu-list .card{background:var(--nd-verre)!important;border:1px solid var(--nd-bord2)!important;border-radius:22px!important;padding:24px 26px!important;box-shadow:0 26px 54px -34px #000;color:var(--nd-texte);transition:transform .5s var(--nd-ease),border-color .4s}
+html body.nd #actu-list .card:hover{transform:translateY(-3px);border-color:var(--nd-bord)!important}
+html body.nd #actu-list .card h3{font-family:var(--nd-display)!important;font-weight:500;font-size:clamp(21px,2.4vw,26px);line-height:1.2;letter-spacing:-.005em;color:#fff!important;margin:0 0 6px}
+html body.nd #actu-list .card p{color:var(--nd-doux)!important;font-size:15px;line-height:1.6}
+html body.nd #actu-list .card .flex-between>span{color:var(--nd-faible)!important;font-weight:600;white-space:nowrap}
+html body.nd #actu-list .card p:last-child{color:var(--nd-or)!important;font-weight:800;letter-spacing:.08em;text-transform:uppercase;font-size:12px!important}
+
+/* ── Aucun projet publié pour l'instant ── */
+html body.nd #actu-list .empty{max-width:640px;margin:0 auto;padding:46px 28px 50px;border-radius:28px;background:radial-gradient(420px 220px at 100% 0%,rgba(227,192,110,.16),transparent 66%),linear-gradient(160deg,#14234a 0%,#0B1226 70%);border:1px solid rgba(227,192,110,.35);box-shadow:0 34px 70px -40px #000;color:var(--nd-doux)!important}
+html body.nd #actu-list .empty p{color:var(--nd-doux)!important;font-size:15px;line-height:1.65;margin-left:auto!important;margin-right:auto!important}
+html body.nd #actu-list .empty p:first-of-type{font-family:var(--nd-display)!important;font-weight:500!important;font-size:clamp(24px,3vw,32px);line-height:1.15;color:#fff!important;margin-bottom:12px!important}
+html body.nd #actu-list .empty :is(.ei,.icon,svg,img){filter:drop-shadow(0 0 16px rgba(227,192,110,.4))}
+
+/* ── Pied de page ── */
+html body.nd .footer{background:transparent!important;border-top:1px solid var(--nd-bord2);color:var(--nd-faible)!important}
+html body.nd .footer a,html body.nd .footer-link{color:var(--nd-or)!important}

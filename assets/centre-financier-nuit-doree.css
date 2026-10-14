@@ -1,0 +1,65 @@
+/* ============================================================
+   Centre Financier (centre-financier.html) — design « Nuit dorée » (2026-10-14, demande explicite : « nouvelle DA »).
+   Feuille de surcharge chargée APRÈS theme-nuit-doree.css ; tout est préfixé html body.nd. Aucun changement de logique ni de montant.
+   Retour arrière : retirer les 2 <link> et class="nd" sur <body> de centre-financier.html.
+   ============================================================ */
+
+/* ── En-tête ── */
+html body.nd main.container h2{font-family:var(--nd-display)!important;font-weight:500;font-size:clamp(30px,3.4vw,42px);letter-spacing:-.01em;color:#fff;margin-bottom:6px!important}
+html body.nd main.container>div:first-child p{color:var(--nd-doux)!important}
+
+/* ── Cartes ── */
+html body.nd .cf-card{background:var(--nd-verre)!important;border:1px solid var(--nd-bord2)!important;border-radius:22px!important;padding:22px 24px!important;color:var(--nd-texte)!important;box-shadow:0 26px 54px -36px #000}
+html body.nd .cf-card h3{font-family:var(--nd-display)!important;font-weight:500;font-size:24px;letter-spacing:-.005em;color:#fff!important}
+html body.nd .cf-card :is(p,.muted),html body.nd .cf-card [style*="color:var(--muted"]{color:var(--nd-doux)!important}
+/* encart « Sécurité » (fond jaune en ligne) */
+html body.nd .cf-card[style*="fffbeb"]{background:rgba(227,192,110,.08)!important;border-color:var(--nd-bord)!important;color:#F3E3B5!important;font-size:13.5px!important;line-height:1.55}
+html body.nd .cf-card[style*="fffbeb"] strong{color:var(--nd-or)}
+
+/* ── Onglets ── */
+html body.nd .cf-tabs{gap:8px;border-bottom:0;margin:22px 0}
+html body.nd .cf-tab{background:var(--nd-verre)!important;border:1px solid var(--nd-bord2)!important;border-radius:999px;color:var(--nd-texte)!important;padding:0 20px;min-height:46px;font-size:14px;font-weight:700;transition:border-color .25s,background .25s}
+html body.nd .cf-tab:hover{border-color:var(--nd-bord)!important;background:var(--nd-verre2)!important}
+html body.nd .cf-tab.active{background:var(--nd-degore)!important;border-color:transparent!important;color:#1a1202!important;font-weight:800;box-shadow:0 12px 24px -14px rgba(227,192,110,.8)}
+html body.nd .cf-tab:focus-visible{outline:3px solid var(--nd-or);outline-offset:2px}
+
+/* ── Solde retirable ── */
+html body.nd .cf-wallet-hero{position:relative;overflow:hidden;border-radius:26px!important;padding:28px 28px 26px!important;border:1px solid rgba(227,192,110,.45);background:radial-gradient(520px 260px at 100% 0%,rgba(227,192,110,.26),transparent 66%),linear-gradient(145deg,#14234a 0%,#0B1226 72%)!important;box-shadow:0 34px 70px -40px #000}
+html body.nd .cf-wallet-hero>div:first-child{color:var(--nd-or);opacity:1!important;letter-spacing:.16em!important;font-weight:800}
+html body.nd .cf-wallet-hero>div:nth-child(2){font-family:var(--nd-display)!important;font-weight:500!important;font-size:clamp(44px,6vw,64px)!important;letter-spacing:-.02em;line-height:1.05;color:#fff}
+html body.nd .cf-wallet-hero>div[style*="opacity"]:not(:first-child){color:var(--nd-doux);opacity:1!important}
+html body.nd .cf-kpi{background:rgba(255,255,255,.06)!important;border:1px solid var(--nd-bord2);border-radius:16px!important;padding:14px 10px!important}
+html body.nd .cf-kpi .n{font-family:var(--nd-display)!important;font-weight:500;font-size:22px;color:#fff}
+html body.nd .cf-kpi .l{color:var(--nd-or);opacity:1!important;letter-spacing:.1em;font-weight:700}
+
+/* ── Tableaux (historique des transactions, retraits) ── */
+html body.nd .cf-table{font-size:14px}
+html body.nd .cf-table th{color:var(--nd-or)!important;letter-spacing:.12em;font-size:11px;background:rgba(227,192,110,.07)!important;border-bottom:1px solid var(--nd-bord)!important}
+html body.nd .cf-table td{color:var(--nd-texte)!important;border-bottom:1px solid var(--nd-bord2)!important}
+html body.nd .cf-table tr:hover td{background:var(--nd-verre)}
+
+/* ── Pastilles de statut (sens conservé : vert = validé, ambre = en attente, rouge = refusé) ── */
+html body.nd .cf-badge{border:1px solid transparent;letter-spacing:.06em}
+html body.nd .cf-badge.valide,html body.nd .cf-badge.traite,html body.nd .cf-badge.active{background:rgba(52,211,153,.16)!important;color:#7DE3B5!important;border-color:rgba(52,211,153,.4)}
+html body.nd .cf-badge.en_attente,html body.nd .cf-badge.demande,html body.nd .cf-badge.pending{background:rgba(227,192,110,.16)!important;color:var(--nd-or)!important;border-color:var(--nd-bord)}
+html body.nd .cf-badge.rembourse,html body.nd .cf-badge.annule,html body.nd .cf-badge.echoue,html body.nd .cf-badge.rejected{background:rgba(255,120,120,.14)!important;color:#FFB4B4!important;border-color:rgba(255,120,120,.4)}
+
+/* ── Lignes (comptes, cartes, paramètres) et états vides ── */
+html body.nd .cf-provider-row{background:rgba(255,255,255,.04);border:1px solid var(--nd-bord2)!important;border-radius:16px!important;padding:14px 16px}
+html body.nd .cf-settings-row{border-bottom:1px solid var(--nd-bord2)!important;color:var(--nd-texte)}
+html body.nd .cf-empty{color:var(--nd-doux)!important}
+html body.nd .cf-empty a,html body.nd .cf-card a{color:var(--nd-or)}
+
+/* ── Champs ── */
+html body.nd .cf-card :is(input[type=number],input[type=text],select){background:rgba(255,255,255,.06)!important;border:1px solid var(--nd-bord2)!important;border-radius:14px!important;color:#fff!important;min-height:46px;color-scheme:dark}
+html body.nd .cf-card select option{background:#0f1a38;color:#fff}
+html body.nd .cf-card :is(input,select):focus{outline:none;border-color:var(--nd-or)!important;box-shadow:0 0 0 3px rgba(227,192,110,.18)}
+html body.nd .cf-card input[type=checkbox]{accent-color:var(--nd-or)}
+
+/* ── Boutons ── */
+html body.nd :is(main .btn-primary,main .btn-orange){background:var(--nd-degore)!important;color:#1a1202!important;border:0!important;border-radius:999px!important;min-height:46px;padding:0 22px;font-weight:800;box-shadow:0 12px 26px -14px rgba(227,192,110,.7)}
+html body.nd main .btn-outline{background:transparent!important;color:var(--nd-or)!important;border:1px solid var(--nd-or)!important;border-radius:999px!important;min-height:46px;padding:0 22px;font-weight:800}
+html body.nd main .btn-outline:hover{background:rgba(227,192,110,.12)!important}
+html body.nd .cf-card .btn-sm:not(.btn-primary){border-radius:999px!important;min-height:40px;padding:0 16px!important}
+html body.nd .cf-card .btn-sm[style*="fee2e2"]{background:rgba(255,120,120,.14)!important;color:#FFB4B4!important;border:1px solid rgba(255,120,120,.4)!important}
+html body.nd :is(.cf-card button,.cf-tab):focus-visible{outline:3px solid var(--nd-or);outline-offset:2px}
