@@ -515,6 +515,24 @@ button.li{background:none;font:inherit;color:inherit}
 .chip.reels[hidden]{display:none}
 .chip.reels .mv-cam{width:20px;height:20px}
 
+/* Cartouche de l'événement épinglé « 3 mois de Premium offerts » (2026-10-13) — même langage que la cartouche .evt-epingle du site :
+   nuit, halo doré, badge or, titre Bodoni, boutons en pilule. */
+.ev-promo{position:relative;overflow:hidden;border-radius:24px;padding:22px 18px 18px;margin:0 0 16px;color:#fff;border:1px solid rgba(227,192,110,.55);box-shadow:0 22px 40px -24px rgba(6,10,20,.95),0 0 0 1px rgba(227,192,110,.08) inset;background:radial-gradient(420px 240px at 100% 0%,rgba(227,192,110,.30),transparent 66%),radial-gradient(280px 180px at 0% 100%,rgba(68,144,226,.20),transparent 70%),linear-gradient(145deg,#14234a 0%,#0B1226 70%)}
+.ev-promo:before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.55;background-image:radial-gradient(circle,rgba(227,192,110,.9) 0 1px,transparent 1.6px),radial-gradient(circle,rgba(255,255,255,.7) 0 .8px,transparent 1.4px);background-size:58px 58px,37px 37px;background-position:11px 9px,26px 31px;-webkit-mask-image:linear-gradient(135deg,#000,transparent 62%);mask-image:linear-gradient(135deg,#000,transparent 62%)}
+.ev-promo>*{position:relative}
+.ev-promo .ep-ring{position:absolute;top:16px;right:16px;width:46px;height:46px;border-radius:50%;display:grid;place-items:center;border:1px solid rgba(227,192,110,.6);background:rgba(227,192,110,.12);box-shadow:0 0 22px rgba(227,192,110,.25)}
+.ev-promo .ep-ring svg{width:22px;height:22px;fill:#E3C06E;stroke:none}
+.ev-promo .ep-badge{display:inline-flex;align-items:center;max-width:calc(100% - 64px);padding:6px 12px;border-radius:999px;background:linear-gradient(135deg,#F3DC9A,#B9893A);color:#1a1202;font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;line-height:1.25}
+.ev-promo .ep-titre{margin:16px 0 8px;font-family:"Bodoni Moda","Didot",Georgia,serif;font-weight:500;font-size:27px;line-height:1.14;letter-spacing:-.01em;color:#fff}
+.ev-promo .ep-texte{margin:0 0 14px;font-size:14px;line-height:1.5;color:#C7D4E8;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.ev-promo .ep-periode{display:inline-flex;align-items:center;gap:8px;padding:7px 13px;border-radius:999px;border:1px solid rgba(227,192,110,.4);background:rgba(255,255,255,.06);font-size:13px;font-weight:700;color:#F3E3B5}
+.ev-promo .ep-periode svg,.ev-promo .ep-part svg{width:17px;height:17px;flex:none}
+.ev-promo .ep-cta{display:flex;flex-direction:column;gap:10px;margin-top:18px}
+.ev-promo .ep-voir,.ev-promo .ep-part{display:flex;align-items:center;justify-content:center;gap:8px;min-height:50px;padding:0 18px;border-radius:999px;font:inherit;font-size:15px;font-weight:800;text-decoration:none;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.ev-promo .ep-voir{border:0;background:linear-gradient(135deg,#F3DC9A,#B9893A);color:#1a1202;box-shadow:0 12px 24px -12px rgba(227,192,110,.7)}
+.ev-promo .ep-part{background:transparent;border:1px solid rgba(227,192,110,.6);color:#E3C06E}
+.ev-promo .ep-voir:active,.ev-promo .ep-part:active{transform:scale(.98)}
+
 /* Cartouche « 3 mois de Premium offerts » de l'accueil (2026-10-13, demande explicite) : jaune doré luisant + bleu nuit, pour ne pas passer inaperçue */
 .promo-or{position:relative;overflow:hidden;border:2px solid var(--navy);background:linear-gradient(135deg,#FFE88A 0%,#F7CF4A 38%,#E2A90F 68%,#FFD966 100%);box-shadow:0 0 0 3px rgba(245,208,97,.55),0 14px 30px -10px rgba(184,134,11,.7)}
 .promo-or::after{content:"";position:absolute;top:0;bottom:0;left:-60%;width:45%;background:linear-gradient(105deg,transparent,rgba(255,255,255,.65),transparent);transform:skewX(-18deg);animation:poReflet 4.5s ease-in-out infinite;pointer-events:none}
