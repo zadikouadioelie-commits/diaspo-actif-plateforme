@@ -1845,7 +1845,27 @@
     });
     safe(async () => {
       const l = (await api('/api/honneur/laureats')).laureats || []; if (!l.length) return;
-      homeBlock('home-honneur', 'Comptes à l’honneur', `<div class="hs">${l.map(x => miniCard(esc(/initiative\.html\?id=/.test(x.profil_url || '') ? '#/profil/i/' + String(x.profil_url).replace(/^.*id=/, '') : '#/profil/' + x.user_id), x.photo_url, x.nom, [x.ville, x.pays].filter(Boolean).join(', '), x.categorie !== 'initiative')).join('')}</div>`);
+      /* Cartes riches (2026-10-14, demande explicite) : type, domaines, description et actions S'abonner / Adhérer / Soutenir — mêmes boutons et mêmes règles
+         que les cartes de l'annuaire (gestionnaires data-follow, data-adh, data-sup plus bas ; le serveur décide de « Soutenir » via hydraterSoutienM). */
+      const honneurCarte = x => {
+        const ini = x.categorie === 'initiative' && x.initiative_id;
+        const href = ini ? '#/profil/i/' + x.initiative_id : '#/profil/' + x.user_id;
+        const fid = ini ? x.initiative_id : x.user_id, kind = ini ? 'initiative' : 'user';
+        const propre = !!(S.me && Number(S.me.id) === Number(x.user_id));
+        const doms = (x.domaines || []).slice(0, 2).map(domLabel);
+        const tags = (x.type ? `<span class="badge">${esc(x.type)}</span>` : '') + doms.map(d => `<span class="badge g">${esc(d)}</span>`).join('');
+        const acts = propre ? '' : `<button type="button" class="btn sm out" style="flex:0 0 auto;max-width:100%;white-space:normal" data-follow="${fid}" data-kind="${kind}" data-on="0">${ic('bell', 's')} S’abonner</button>`
+          + (ini && x.adhesions_ouvertes ? `<button type="button" class="btn sm navy" style="flex:0 0 auto;max-width:100%;white-space:normal" data-adh="${x.initiative_id}" data-nom="${esc(x.nom)}">${ic('people', 's')} Adhérer</button>` : '')
+          + (ini ? `<button type="button" class="btn sm" style="flex:0 0 auto;max-width:100%;white-space:normal" data-sup="${x.user_id}" hidden>${ic('heart', 's')} Soutenir</button>` : '');
+        return `<article class="card" style="width:272px;padding:14px;text-align:center;position:relative"><a href="${esc(href)}" style="display:block;color:inherit;text-decoration:none"><div class="av big" style="border-radius:${ini ? '16px' : '50%'};margin:0 auto 8px">${x.photo_url ? `<img src="${attrUrl(x.photo_url)}" alt="" loading="lazy" onerror="this.remove()">` : esc(initials(x.nom))}</div>
+          <div class="nm" style="font-weight:700;font-size:16px;line-height:1.2">${esc(x.nom)}</div><div class="muted small" style="margin-top:2px">${ini ? 'Initiative' : 'Membre'}${x.ville ? ' · ' + esc(x.ville) : ''}</div></a>
+          ${tags ? `<div class="tags" style="justify-content:center;margin:8px 0 0">${tags}</div>` : ''}
+          ${x.description ? `<p class="muted small" style="margin:8px 2px 0;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">${esc(x.description)}</p>` : ''}
+          <div class="ann-act2" style="margin-top:10px"><a class="btn sm block" href="${esc(href)}">${ic('user', 's')} Voir le profil</a></div>
+          ${acts ? `<div class="ann-act3" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;justify-content:center;overflow:visible">${acts}</div>` : ''}</article>`;
+      };
+      homeBlock('home-honneur', 'Comptes à l’honneur', `<div class="hs" style="align-items:stretch">${l.map(honneurCarte).join('')}</div>`);
+      const zone = $('#home-honneur'); if (zone) { hydraterAdhesionsM(zone); hydraterSoutienM(zone); }
     });
     safe(async () => {
       let v = []; try { v = (await api('/api/videos-tutoriels?limit=8')).videos || []; } catch (e) { /* le film d'inscription reste affiché */ }

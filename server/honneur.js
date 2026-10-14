@@ -280,14 +280,35 @@ module.exports = function creerMoteurHonneur(deps) {
     return { debut_programme: debut, aujourdhui, cycles: out };
   }
 
+  const STATUTS_PRO = { en_poste: 'En poste', en_recherche: 'En recherche', disponible: 'Disponible pour opportunités', autre: 'Autre statut' };
+  const texteSimple = (t, max) => {
+    const brut = String(t || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/\s+/g, ' ').trim();
+    return brut.length > max ? brut.slice(0, max - 1).replace(/\s+\S*$/, '') + '…' : brut;
+  };
+  function presentationPublique(l) {
+    const initiative = l.categorie === 'initiative';
+    const doms = (initiative ? [l.i_dom, l.i_s1, l.i_s2] : [l.u_dom, l.u_s1, l.u_s2]).map(x => String(x || '').trim()).filter(Boolean);
+    let type = '';
+    if (initiative) type = String(l.i_type || '').trim();
+    else { try { type = STATUTS_PRO[(JSON.parse(l.u_pj || '{}') || {}).situation_pro] || ''; } catch (_) { type = ''; } }
+    const description = texteSimple(initiative ? (l.i_desc || l.i_mission) : l.u_bio, 200);
+    return { type, domaines: doms.slice(0, 3), description,
+      adhesions_ouvertes: initiative && ['Association', 'ONG'].includes(String(l.i_type || '')) && (l.i_adh == null || !!Number(l.i_adh)),
+      mois_offert: l.mois_offert_statut === 'applique' };
+  }
+
   /* Comptes actuellement à l'honneur : du jour de clôture jusqu'à la clôture du cycle suivant (couverture continue). */
   async function laureatsAffiches() {
     const aujourdhui = dateParisISO();
     const cycles = await db.prepare("SELECT * FROM honneur_cycles WHERE statut='clos' ORDER BY fin_mesure DESC LIMIT 4").all();
     const actif = cycles.find(c => c.fin_mesure <= aujourdhui && aujourdhui < ajouterMois(c.fin_mesure, 3).slice(0, 7) + '-01');
     if (!actif) return { cycle: null, laureats: [] };
-    const rows = await db.prepare(`SELECT l.*, u.role, u.photo_url, u.ville, u.pays, i.logo_url, i.slug AS init_slug, i.nom AS init_nom
+    const rows = await db.prepare(`SELECT l.*, u.role, u.photo_url, u.ville, u.pays, u.bio AS u_bio, u.profil_json AS u_pj, u.domaine_principal AS u_dom, u.sous_domaine_1 AS u_s1, u.sous_domaine_2 AS u_s2,
+        i.logo_url, i.slug AS init_slug, i.nom AS init_nom, i.type AS i_type, i.description AS i_desc, i.mission AS i_mission, i.domaine_principal AS i_dom, i.sous_domaine_1 AS i_s1, i.sous_domaine_2 AS i_s2, i.adhesions_ouvertes AS i_adh
         FROM honneur_laureats l JOIN users u ON u.id=l.user_id LEFT JOIN initiatives i ON i.id=l.initiative_id WHERE l.cycle_cle=? ORDER BY l.categorie, l.nom_snapshot`).all(actif.cle);
+    /* Présentation publique de chaque carte (2026-10-14) : type, domaines, courte description, indicateurs d'actions.
+       Uniquement des informations déjà publiques sur la fiche du compte ; jamais de points ni de pourcentages. */
+    rows.forEach(l => { l.pub = presentationPublique(l); });
     return { cycle: { cle: actif.cle, debut: actif.debut, fin_mesure: actif.fin_mesure, fin: actif.fin, affiche_jusqu_au: ajouterMois(actif.fin_mesure, 3).slice(0, 7) + '-01' }, laureats: rows };
   }
 

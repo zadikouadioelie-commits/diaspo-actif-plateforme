@@ -22940,7 +22940,7 @@ route("GET", "/api/honneur/mon-bareme", async (req, res) => {
     pct: honneurPct(total), statut, historique });
 });
 
-/* GET public — comptes actuellement à l'honneur (nom, type, photo, profil) : aucun score. */
+/* GET public — comptes actuellement à l'honneur (nom, type, domaines, description, photo, profil) : aucun score. */
 route("GET", "/api/honneur/laureats", async (req, res) => {
   const r = await honneur.laureatsAffiches();
   sendJSON(res, 200, { cycle: r.cycle, laureats: r.laureats.map(l => ({
@@ -22948,6 +22948,7 @@ route("GET", "/api/honneur/laureats", async (req, res) => {
     initiative_slug: l.init_slug || null, ville: l.ville || null, pays: l.pays || null,
     photo_url: l.categorie === 'initiative' ? (l.logo_url || null) : (l.photo_url || null),
     profil_url: l.categorie === 'initiative' && l.initiative_id ? `initiative.html?id=${l.initiative_id}` : `profil.html?id=${l.user_id}`,
+    ...(l.pub || {}),   /* type, domaines, description, adhesions_ouvertes, mois_offert (voir server/honneur.js, presentationPublique) */
   })) });
 });
 
