@@ -293,6 +293,8 @@
       <div class="msg-tabs" id="onglets-auto" style="display:none;">
         <button class="msg-tab active" data-onglet="classique">💬 Classiques <span id="onglet-classique-count" class="onglet-count"></span></button>
         <button class="msg-tab" data-onglet="automatique">🤖 Automatiques <span id="onglet-auto-count" class="onglet-count"></span></button>
+        <!-- Messages automatiques de remerciement (2026-10-14) : modèles envoyés aux adhérents, abonnés et soutiens de cagnotte — voir assets/messages-auto.js -->
+        <button type="button" class="msg-tab" id="onglet-modeles" style="display:none;">⚙️ Mes messages automatiques</button>
       </div>
 
       <div class="msg-tabs">
@@ -597,6 +599,8 @@ async function loadConvList(searchQ){
       const cc=document.getElementById("onglet-classique-count"), ca=document.getElementById("onglet-auto-count");
       if(cc) cc.textContent="("+(o.classiques||0)+")";
       if(ca) ca.textContent="("+(o.automatiques||0)+")";
+      const bm=document.getElementById("onglet-modeles");
+      if(bm){ bm.style.display=o.modeles?"":"none"; bm.onclick=()=>{ if(window.MessagesAuto) MessagesAuto.ouvrir(); }; }
     }
   }
 
@@ -1830,6 +1834,7 @@ async function proposerClassementContact(contactId, contactNom, convId){
 <script src="/assets/cookies-banner.js"></script>
   <script src="/assets/theme-manager.js"></script>
 <script src="assets/back-button.js"></script>
+<script src="assets/messages-auto.js?v=20261014a"></script>
 
 <script>
 /* Mesure réelle du bas de .topbar (voir commentaire sur --msg-top-offset plus haut) —

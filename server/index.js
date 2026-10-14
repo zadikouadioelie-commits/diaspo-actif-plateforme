@@ -7024,6 +7024,7 @@ route("POST", "/api/adhesion-membres/:id/accepter", async (req, res, params) => 
   await syncAffiliationDepuisAdhesion(mAJ, 'accepte');
   journaliserAdhesion(m.initiative_id, m.id, 'acceptation', user, `Demande d'adhésion acceptée — « ${formule.nom} ».`);
   if (m.linked_user_id) creerNotif(m.linked_user_id, "adhesion_acceptee", "Adhésion acceptée ✅", `Votre adhésion à « ${m.init_nom} » est acceptée.`, { membre_id: m.id });
+  if (m.linked_user_id) await envoyerMessageAuto({ initiativeId: m.initiative_id, userId: m.linked_user_id, declencheur: 'adhesion', vars: { initiative: m.init_nom } });
   const fin = expiration ? new Date(expiration.replace(' ', 'T') + 'Z').toLocaleDateString('fr-FR') : null;
   const origine = process.env.PUBLIC_ORIGIN || 'https://diaspoactif.com';
   await adhEmailSimple(m.email, `Votre adhésion est acceptée — ${m.init_nom}`, [
@@ -7558,6 +7559,7 @@ route("POST", "/api/adhesion-membres/:id/marquer-paye", async (req, res, params,
   if (m.linked_user_id) {
     creerNotif(m.linked_user_id, "adhesion_payee", "Adhésion confirmée ✅",
       `Votre « ${formule?.nom || 'adhésion'} » a été enregistrée comme payée. Reçu ${numeroRecu}.`, { paiement_id: paiementId });
+    await envoyerMessageAuto({ initiativeId: m.initiative_id, userId: m.linked_user_id, declencheur: 'adhesion' });
   }
   await ajouterAListeStockage(m.formule_id, m);
   { const initComplete = await db.prepare("SELECT * FROM initiatives WHERE id=?").get(m.initiative_id);
@@ -15345,7 +15347,8 @@ route("GET", "/api/conversations", async (req, res, params, body, query) => {
       (SELECT COUNT(*) FROM messages WHERE conversation_id = c.id AND sender_id != ? AND lu = 0) AS non_lus,
       (SELECT COUNT(*) FROM messages WHERE conversation_id = c.id) AS nb_messages,
       (SELECT COUNT(*) FROM messages WHERE conversation_id = c.id AND sender_id != ?) AS nb_messages_autre,
-      (SELECT contenu FROM messages WHERE conversation_id = c.id ORDER BY id ASC LIMIT 1) AS premier_message
+      (SELECT contenu FROM messages WHERE conversation_id = c.id ORDER BY id ASC LIMIT 1) AS premier_message,
+      (SELECT id FROM messages WHERE conversation_id = c.id ORDER BY id ASC LIMIT 1) AS premier_message_id
     FROM conversations c
     JOIN users u ON u.id = CASE WHEN c.user1_id = ? THEN c.user2_id ELSE c.user1_id END
     LEFT JOIN initiatives i_avec ON i_avec.owner_user_id = u.id
@@ -15369,20 +15372,28 @@ route("GET", "/api/conversations", async (req, res, params, body, query) => {
     const officielle = officielleId ? await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(officielleId) : null;
     estOfficiel = !!officielle && Number(officielle.owner_user_id) === Number(user.id);
   } catch (_) {}
+  /* Remerciements automatiques des initiatives (2026-10-14) : une conversation est aussi « automatique » tant qu'elle ne contient QUE
+     un de ces remerciements (voir messages_auto_envois). Les onglets s'affichent donc pour tout compte qui possède une initiative. */
+  let autoIds = new Set(), aDesAutos = false;
+  try {
+    autoIds = new Set((await db.prepare("SELECT message_id FROM messages_auto_envois WHERE owner_user_id=? AND message_id IS NOT NULL").all(user.id)).map(x => Number(x.message_id)));
+    aDesAutos = autoIds.size > 0 || !!(await db.prepare("SELECT 1 FROM initiatives WHERE owner_user_id=?").get(user.id));
+  } catch (_) {}
 
   let filtered = rows.map(r => {
-    const { nb_messages, nb_messages_autre, premier_message, ...reste } = r;
+    const { nb_messages, nb_messages_autre, premier_message, premier_message_id, ...reste } = r;
     return {
       ...reste,
       archive: r.user1_id === user.id ? !!r.archive_u1 : !!r.archive_u2,
       archive_dossier: r.user1_id === user.id ? r.archive_dossier_u1 : r.archive_dossier_u2,
-      automatique: estOfficiel && Number(nb_messages) === 1 && Number(nb_messages_autre) === 0
-        && String(premier_message || "").includes("Bienvenue sur Diaspo'Actif !"),
+      automatique: (estOfficiel && Number(nb_messages) === 1 && Number(nb_messages_autre) === 0
+        && String(premier_message || "").includes("Bienvenue sur Diaspo'Actif !"))
+        || (Number(nb_messages) === 1 && Number(nb_messages_autre) === 0 && autoIds.has(Number(premier_message_id))),
     };
   });
   const nbAutomatiques = filtered.filter(r => r.automatique && !r.archive).length;
   const nbClassiques = filtered.filter(r => !r.automatique && !r.archive).length;
-  if (estOfficiel && (query.onglet === "automatique" || query.onglet === "classique")) {
+  if ((estOfficiel || aDesAutos) && (query.onglet === "automatique" || query.onglet === "classique")) {
     filtered = filtered.filter(r => r.automatique === (query.onglet === "automatique"));
   }
 
@@ -15407,7 +15418,7 @@ route("GET", "/api/conversations", async (req, res, params, body, query) => {
     (r.derniere||"").toLowerCase().includes(q)
   );
 
-  sendJSON(res, 200, { conversations: filtered, onglets: estOfficiel ? { actifs: true, automatiques: nbAutomatiques, classiques: nbClassiques } : { actifs: false } });
+  sendJSON(res, 200, { conversations: filtered, onglets: (estOfficiel || aDesAutos) ? { actifs: true, automatiques: nbAutomatiques, classiques: nbClassiques, modeles: aDesAutos } : { actifs: false } });
 });
 
 /* POST /api/conversations — créer ou retrouver une conversation */
@@ -16398,6 +16409,8 @@ route("POST", "/api/initiatives/:id/suivre", async (req, res, params) => {
   try {
     await db.prepare("INSERT INTO abonnements (user_id, initiative_id) VALUES (?, ?)").run(user.id, params.id);
     await db.prepare("UPDATE initiatives SET abonnes = abonnes + 1 WHERE id = ?").run(params.id);
+    /* Message de remerciement automatique (2026-10-14) : uniquement à la 1re fois, voir envoyerMessageAuto(). */
+    await envoyerMessageAuto({ ownerId: init.owner_user_id, initiativeId: init.id, userId: user.id, declencheur: 'abonnement' });
     sendJSON(res, 201, { ok: true, abonne: true });
   } catch (e) {
     sendJSON(res, 409, { ok: false, abonne: true, message: "Déjà abonné." });
@@ -20185,6 +20198,7 @@ async function handleStripeWebhook(req, res) {
           creerNotif(membre.linked_user_id, "adhesion_payee", "Adhésion confirmée ✅",
             `Votre « ${formule?.nom || 'adhésion'} » (${init.nom}) est confirmée. Reçu ${numeroRecu}.`, { paiement_id: paiementId });
         }
+        if (membre.linked_user_id) await envoyerMessageAuto({ ownerId: init.owner_user_id, initiativeId: init.id, userId: membre.linked_user_id, declencheur: 'adhesion', vars: { initiative: init.nom } });
         creerNotif(init.owner_user_id, "adhesion_recue", "Nouvelle adhésion 🎫",
           `« ${formule?.nom || ''} » réglée par ${membre.prenom || ''} ${membre.nom} (+${organizer_amount}€).`, { paiement_id: paiementId });
         await ajouterAListeStockage(pay.formule_id, membre);
@@ -20495,6 +20509,8 @@ async function handleStripeWebhook(req, res) {
               ? `« ${c.titre} » vient de recevoir sa toute première contribution (${contrib.montant} ${contrib.devise}) !`
               : `Une contribution de ${contrib.montant} ${contrib.devise} a été reçue pour « ${c.titre} ».`,
             { cagnotte_id: contrib.cagnotte_id });
+          /* Remerciement automatique au contributeur (2026-10-14) — seulement s'il a un compte ; jamais aux renouvellements (dédoublonné). */
+          if (contrib.user_id) await envoyerMessageAuto({ ownerId: c.owner_user_id, userId: contrib.user_id, declencheur: 'cagnotte', vars: { cagnotte: c.titre, montant: `${contrib.montant} ${contrib.devise || ''}`.trim() } });
           /* Objectif atteint pour la première fois seulement : on compare AVANT/APRÈS pour ne
              pas republier à chaque contribution supplémentaire une fois l'objectif dépassé. */
           const avantMontant = Number(c.montant_collecte) - Number(contrib.montant);
@@ -21571,6 +21587,138 @@ route("DELETE", "/api/evenement-alertes/:id", async (req, res, params) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   await db.prepare("DELETE FROM evenement_alertes WHERE id=? AND user_id=?").run(params.id, user.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ═══ MESSAGES AUTOMATIQUES DE REMERCIEMENT (2026-10-14, demande explicite) ═══
+   « Dès qu'une personne adhère, s'abonne ou soutient une cagnotte, un message la remercie — pour établir un premier contact. Seulement
+   pour celles qui ont un compte Diaspo'Actif. Les initiatives pourront modifier ces messages et créer les leurs. »
+   Trois textes standard (adhésion, abonnement, cagnotte) sont utilisés d'office tant que le compte n'a rien changé ; dès qu'il ouvre ses
+   modèles, ils deviennent des modèles à lui (modifiables, désactivables, réinitialisables). Un seul modèle actif par déclencheur. */
+const MSGAUTO_DECLENCHEURS = ['adhesion', 'abonnement', 'cagnotte'];
+const MSGAUTO_MAX_MODELES = 12;
+const MSGAUTO_STANDARD = {
+  adhesion: { nom: "Merci d'avoir adhéré", contenu: "Bonjour {prenom} 👋\n\nMerci d'avoir adhéré à {initiative} ! Nous sommes heureux de vous compter parmi nos membres.\n\nN'hésitez pas à nous écrire ici pour toute question : nous vous répondrons avec plaisir." },
+  abonnement: { nom: "Merci de votre abonnement", contenu: "Bonjour {prenom} 👋\n\nMerci de vous être abonné(e) à {initiative} ! Vous suivrez désormais nos actualités, nos projets et nos événements.\n\nN'hésitez pas à nous écrire ici si vous souhaitez en savoir plus." },
+  cagnotte: { nom: "Merci de votre soutien", contenu: "Bonjour {prenom} 👋\n\nMerci d'avoir soutenu {initiative}{cagnotte_phrase} ! Votre contribution compte énormément pour nous.\n\nN'hésitez pas à nous écrire ici, nous serons ravis d'échanger avec vous." }
+};
+async function msgAutoNomInitiative(ownerId, initiativeId) {
+  try {
+    const i = initiativeId ? await db.prepare("SELECT nom FROM initiatives WHERE id=?").get(initiativeId) : await db.prepare("SELECT nom FROM initiatives WHERE owner_user_id=? ORDER BY id ASC LIMIT 1").get(ownerId);
+    if (i && i.nom) return i.nom;
+  } catch (_) {}
+  try { return await nomCompteAffichage(ownerId); } catch (_) { return "notre structure"; }
+}
+function msgAutoRendre(contenu, vars) {
+  const v = vars || {};
+  return String(contenu || '')
+    .replace(/\{cagnotte_phrase\}/g, v.cagnotte ? ` pour la cagnotte « ${v.cagnotte} »` : '')
+    .replace(/\{(prenom|nom|initiative|cagnotte|montant)\}/g, (_, k) => String(v[k] == null ? '' : v[k]))
+    .replace(/[ \t]+\n/g, '\n').replace(/ {2,}/g, ' ').trim();
+}
+/* Crée, pour ce compte, les trois modèles standard qui manquent (idempotent) — appelé quand le compte ouvre ses modèles. */
+async function msgAutoAssurerStandard(ownerId) {
+  for (const d of MSGAUTO_DECLENCHEURS) {
+    const n = (await db.prepare("SELECT COUNT(*) AS n FROM messages_auto_modeles WHERE owner_user_id=? AND declencheur=?").get(ownerId, d))?.n || 0;
+    if (!Number(n)) await db.prepare("INSERT INTO messages_auto_modeles (owner_user_id,declencheur,nom,contenu,actif,est_standard) VALUES (?,?,?,?,1,1)").run(ownerId, d, MSGAUTO_STANDARD[d].nom, MSGAUTO_STANDARD[d].contenu);
+  }
+}
+/* Envoie le remerciement. Ne lève jamais : un remerciement raté ne doit jamais faire échouer une adhésion, un abonnement ou un don. */
+async function envoyerMessageAuto({ ownerId, initiativeId, userId, declencheur, vars }) {
+  try {
+    if (!MSGAUTO_DECLENCHEURS.includes(declencheur) || !userId) return false;
+    if (!ownerId && initiativeId) ownerId = (await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(initiativeId))?.owner_user_id;
+    if (!ownerId || Number(ownerId) === Number(userId)) return false;
+    const destinataire = await db.prepare("SELECT id, prenom, nom, email FROM users WHERE id=?").get(userId);
+    if (!destinataire) return false;                                                     /* pas de compte : aucun message (voulu) */
+    if (await contactBloque(ownerId, userId)) return false;
+    if (await db.prepare("SELECT 1 FROM messages_auto_envois WHERE owner_user_id=? AND user_id=? AND declencheur=?").get(ownerId, userId, declencheur)) return false;
+    let modele = null;
+    const tous = await db.prepare("SELECT * FROM messages_auto_modeles WHERE owner_user_id=? AND declencheur=? ORDER BY id ASC").all(ownerId, declencheur);
+    if (!tous.length) modele = { id: null, contenu: MSGAUTO_STANDARD[declencheur].contenu };   /* rien changé : texte standard d'office */
+    else { modele = tous.find(m => Number(m.actif)); if (!modele) return false; }            /* tout désactivé : le compte ne veut pas de message */
+    const texte = msgAutoRendre(modele.contenu, {
+      prenom: destinataire.prenom || destinataire.nom || '', nom: destinataire.nom || '',
+      initiative: (vars && vars.initiative) || await msgAutoNomInitiative(ownerId, initiativeId),
+      cagnotte: vars && vars.cagnotte, montant: vars && vars.montant
+    }).slice(0, 2000);
+    if (!texte) return false;
+    let conv = await db.prepare("SELECT id FROM conversations WHERE (user1_id=? AND user2_id=?) OR (user1_id=? AND user2_id=?)").get(ownerId, userId, userId, ownerId);
+    let convId = conv?.id;
+    if (!convId) convId = (await db.prepare("INSERT INTO conversations (user1_id, user2_id) VALUES (?,?)").run(ownerId, userId)).lastInsertRowid;
+    const messageId = (await db.prepare("INSERT INTO messages (conversation_id, sender_id, contenu, type) VALUES (?,?,?,'text')").run(convId, ownerId, texte)).lastInsertRowid;
+    await db.prepare("INSERT INTO messages_auto_envois (owner_user_id,user_id,declencheur,modele_id,message_id) VALUES (?,?,?,?,?)").run(ownerId, userId, declencheur, modele.id, messageId);
+    creerNotif(userId, "message", "Nouveau message", `${(vars && vars.initiative) || await msgAutoNomInitiative(ownerId, initiativeId)} vous a envoyé un message`, { conversation_id: convId });
+    return true;
+  } catch (e) { console.error('[envoyerMessageAuto]', e.message); return false; }
+}
+
+async function msgAutoProprietaire(req, res) {
+  const user = await getCurrentUser(req);
+  if (!user) { sendJSON(res, 401, { error: "Connexion requise." }); return null; }
+  const aInit = await db.prepare("SELECT 1 FROM initiatives WHERE owner_user_id=?").get(user.id);
+  if (!aInit && !["initiative", "collectivite", "administrateur"].includes(user.role)) { sendJSON(res, 403, { error: "Réservé aux comptes Initiative." }); return null; }
+  return user;
+}
+function msgAutoModeleSortie(m) {
+  return { id: m.id, declencheur: m.declencheur, nom: m.nom, contenu: m.contenu, actif: !!Number(m.actif), est_standard: !!Number(m.est_standard) };
+}
+route("GET", "/api/messages-auto/modeles", async (req, res) => {
+  const user = await msgAutoProprietaire(req, res); if (!user) return;
+  await msgAutoAssurerStandard(user.id);
+  const rows = await db.prepare("SELECT * FROM messages_auto_modeles WHERE owner_user_id=? ORDER BY id ASC").all(user.id);
+  const envois = await db.prepare("SELECT declencheur, COUNT(*) AS n FROM messages_auto_envois WHERE owner_user_id=? GROUP BY declencheur").all(user.id);
+  const nbEnvois = {}; envois.forEach(e => { nbEnvois[e.declencheur] = Number(e.n); });
+  sendJSON(res, 200, { modeles: rows.map(msgAutoModeleSortie), envois: nbEnvois, max: MSGAUTO_MAX_MODELES, standard: MSGAUTO_STANDARD, nom_initiative: await msgAutoNomInitiative(user.id) });
+});
+function msgAutoValider(b, creation) {
+  const nom = String((b && b.nom) || '').trim().slice(0, 80);
+  const contenu = String((b && b.contenu) || '').replace(/\r\n/g, '\n').trim().slice(0, 1000);
+  const declencheur = b && b.declencheur;
+  if (creation || b.nom !== undefined) { if (!nom) return { erreur: "Donnez un nom à ce modèle." }; }
+  if (creation || b.contenu !== undefined) { if (!contenu) return { erreur: "Écrivez le texte du message." }; }
+  if ((creation || declencheur !== undefined) && !MSGAUTO_DECLENCHEURS.includes(declencheur)) return { erreur: "Choisissez quand ce message est envoyé : adhésion, abonnement ou cagnotte." };
+  return { nom, contenu, declencheur };
+}
+route("POST", "/api/messages-auto/modeles", async (req, res, params, body) => {
+  const user = await msgAutoProprietaire(req, res); if (!user) return;
+  const v = msgAutoValider(body, true); if (v.erreur) return sendJSON(res, 400, { error: v.erreur });
+  const n = (await db.prepare("SELECT COUNT(*) AS n FROM messages_auto_modeles WHERE owner_user_id=?").get(user.id))?.n || 0;
+  if (Number(n) >= MSGAUTO_MAX_MODELES) return sendJSON(res, 400, { error: `Vous pouvez avoir ${MSGAUTO_MAX_MODELES} modèles au maximum. Supprimez-en un pour en créer un autre.` });
+  await msgAutoAssurerStandard(user.id);
+  const actif = body.actif === false ? 0 : 1;
+  const id = (await db.prepare("INSERT INTO messages_auto_modeles (owner_user_id,declencheur,nom,contenu,actif,est_standard) VALUES (?,?,?,?,?,0)").run(user.id, v.declencheur, v.nom, v.contenu, actif)).lastInsertRowid;
+  if (actif) await db.prepare("UPDATE messages_auto_modeles SET actif=0 WHERE owner_user_id=? AND declencheur=? AND id<>?").run(user.id, v.declencheur, id);
+  sendJSON(res, 201, { id });
+});
+route("PUT", "/api/messages-auto/modeles/:id", async (req, res, params, body) => {
+  const user = await msgAutoProprietaire(req, res); if (!user) return;
+  const m = await db.prepare("SELECT * FROM messages_auto_modeles WHERE id=? AND owner_user_id=?").get(params.id, user.id);
+  if (!m) return sendJSON(res, 404, { error: "Modèle introuvable." });
+  const v = msgAutoValider(body || {}, false); if (v.erreur) return sendJSON(res, 400, { error: v.erreur });
+  const nom = (body && body.nom !== undefined) ? v.nom : m.nom;
+  const contenu = (body && body.contenu !== undefined) ? v.contenu : m.contenu;
+  const declencheur = (body && body.declencheur !== undefined) ? v.declencheur : m.declencheur;
+  const actif = (body && body.actif !== undefined) ? (body.actif ? 1 : 0) : Number(m.actif);
+  await db.prepare("UPDATE messages_auto_modeles SET nom=?, contenu=?, declencheur=?, actif=?, updated_at=datetime('now') WHERE id=?").run(nom, contenu, declencheur, actif, m.id);
+  if (actif) await db.prepare("UPDATE messages_auto_modeles SET actif=0 WHERE owner_user_id=? AND declencheur=? AND id<>?").run(user.id, declencheur, m.id);
+  sendJSON(res, 200, { ok: true });
+});
+route("POST", "/api/messages-auto/modeles/:id/reinitialiser", async (req, res, params) => {
+  const user = await msgAutoProprietaire(req, res); if (!user) return;
+  const m = await db.prepare("SELECT * FROM messages_auto_modeles WHERE id=? AND owner_user_id=?").get(params.id, user.id);
+  if (!m) return sendJSON(res, 404, { error: "Modèle introuvable." });
+  if (!Number(m.est_standard)) return sendJSON(res, 400, { error: "Seuls les modèles standard peuvent être réinitialisés." });
+  const s = MSGAUTO_STANDARD[m.declencheur];
+  await db.prepare("UPDATE messages_auto_modeles SET nom=?, contenu=?, updated_at=datetime('now') WHERE id=?").run(s.nom, s.contenu, m.id);
+  sendJSON(res, 200, { ok: true, contenu: s.contenu });
+});
+route("DELETE", "/api/messages-auto/modeles/:id", async (req, res, params) => {
+  const user = await msgAutoProprietaire(req, res); if (!user) return;
+  const m = await db.prepare("SELECT * FROM messages_auto_modeles WHERE id=? AND owner_user_id=?").get(params.id, user.id);
+  if (!m) return sendJSON(res, 404, { error: "Modèle introuvable." });
+  if (Number(m.est_standard)) return sendJSON(res, 400, { error: "Un modèle standard ne se supprime pas : désactivez-le ou modifiez son texte." });
+  await db.prepare("DELETE FROM messages_auto_modeles WHERE id=?").run(m.id);
   sendJSON(res, 200, { ok: true });
 });
 

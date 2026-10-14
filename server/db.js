@@ -5999,6 +5999,35 @@ db.exec(`
      économique dans ma région ». Un compte peut avoir plusieurs alertes ; chaque critère vide = « peu importe ». zone : monde | pays |
      region | ville, comparée à la localisation du PROFIL du compte (jamais une position GPS). en_ligne : inclure aussi les événements
      en ligne, qui n'ont pas de lieu. */
+  /* Messages automatiques de remerciement (2026-10-14, demande explicite) — quand une personne ADHÈRE à une initiative, S'ABONNE à elle
+     ou SOUTIENT l'une de ses cagnottes, un message part tout seul dans sa messagerie (uniquement si elle a un compte Diaspo'Actif).
+     Un modèle appartient à un compte (owner_user_id : le propriétaire de l'initiative). declencheur : adhesion | abonnement | cagnotte.
+     Un seul modèle ACTIF par compte et par déclencheur. est_standard : les trois textes de départ, modifiables et réinitialisables.
+     messages_auto_envois : un seul remerciement par personne, par compte et par déclencheur (jamais de renvoi à un renouvellement) ;
+     message_id sert à classer la conversation dans l'onglet « Automatiques » tant qu'elle ne contient que ce message. */
+  CREATE TABLE IF NOT EXISTS messages_auto_modeles (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    owner_user_id  INTEGER NOT NULL,
+    declencheur    TEXT NOT NULL,
+    nom            TEXT NOT NULL,
+    contenu        TEXT NOT NULL,
+    actif          INTEGER DEFAULT 1,
+    est_standard   INTEGER DEFAULT 0,
+    created_at     TEXT DEFAULT (datetime('now')),
+    updated_at     TEXT DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_msgauto_modeles_owner ON messages_auto_modeles(owner_user_id, declencheur);
+  CREATE TABLE IF NOT EXISTS messages_auto_envois (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    owner_user_id  INTEGER NOT NULL,
+    user_id        INTEGER NOT NULL,
+    declencheur    TEXT NOT NULL,
+    modele_id      INTEGER,
+    message_id     INTEGER,
+    created_at     TEXT DEFAULT (datetime('now')),
+    UNIQUE(owner_user_id, user_id, declencheur)
+  );
+
   CREATE TABLE IF NOT EXISTS evenement_alertes (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id     INTEGER NOT NULL,
