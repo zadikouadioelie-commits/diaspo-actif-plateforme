@@ -66,6 +66,7 @@
 .mco-contact{display:flex;flex-wrap:wrap;gap:6px 14px;margin:6px 0 4px;font-size:14px}
 .mco-contact a{color:var(--navy2);font-weight:600;text-decoration:underline;word-break:break-all}
 .mco-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.mco-acts{display:grid;gap:8px}
 `;
     document.head.appendChild(s);
   }
@@ -156,7 +157,9 @@
     const t = ++rendu; css();
     if (!b) return accueil(t);
     if (b === 'formules') return c === 'nouvelle' ? formNouvelle(t) : formules(t);
-    if (b === 'adherents') return adherents(t);
+    if (b === 'modifier' && /^\d+$/.test(c || '')) return formNouvelle(t, Number(c));
+    if (b === 'nouvel-adherent') return formAdherent(t);
+    if (b === 'adherents') return adherents(t, c === 'attente' ? 'en_attente' : '');
     if (b === 'demandes') return demandes(t);
     location.replace('#/cotisations');
   };
@@ -217,11 +220,12 @@
       <div class="h2">GÉRER</div>
       <div class="lst">
         ${ligne('#/cotisations/demandes', 'check', 'Demandes d’adhésion', attente == null ? 'Momentanément indisponible' : attente ? pl(attente, 'demande à traiter', 'demandes à traiter') : 'Aucune demande en attente', attente ? `<span class="badge o">${attente}</span>` : '')}
+        ${compte('en_attente') ? ligne('#/cotisations/adherents/attente', 'check', 'Adhérents en attente', 'À accepter ou à encaisser', `<span class="badge o">${compte('en_attente')}</span>`) : ''}
         ${ligne('#/cotisations/adherents', 'people', 'Adhérents', membres ? (membres.length ? pl(membres.length, 'adhérent enregistré', 'adhérents enregistrés') : 'Aucun adhérent pour le moment') : 'Momentanément indisponible')}
         ${ligne('#/cotisations/formules', 'card', 'Formules d’adhésion', formules ? (formules.length ? pl(actives, 'formule active', 'formules actives') + ' sur ' + formules.length : 'Aucune formule : créez la première') : 'Momentanément indisponible')}
         <button class="li" id="mco-share"><span class="ic">${ic('share')}</span><span class="sp"><span class="t">Partager le lien d’adhésion</span><br><span class="d">Envoyer le lien par message ou le copier</span></span><span class="ch">${ic('chev', 's')}</span></button>
       </div>
-      <div class="mco-note" style="margin-top:14px"><b>À faire sur ordinateur</b>Ces opérations demandent un grand écran :<ul><li>enregistrer un paiement reçu, suspendre ou radier un adhérent</li><li>importer ou exporter les adhérents, ajouter un adhérent à la main</li><li>délais de relance, modèles de reçu et de message</li><li>campagnes d’adhésion, journal d’audit, modification complète d’une formule</li></ul><a href="dashboard-initiative.html#adhesions-init" style="text-decoration:underline;font-weight:700;display:inline-block;margin-top:6px">Ouvrir sur ordinateur</a></div>
+      <div class="mco-note" style="margin-top:14px"><b>À faire sur ordinateur</b>Ces opérations demandent un grand écran :<ul><li>importer une liste d’adhérents (Excel, Google Sheets) ou exporter le registre</li><li>délais de relance, modèles de reçu et de message</li><li>campagnes d’adhésion, journal d’audit, réglages avancés d’une formule</li></ul><a href="dashboard-initiative.html#adhesions-init" style="text-decoration:underline;font-weight:700;display:inline-block;margin-top:6px">Ouvrir sur ordinateur</a></div>
       <p class="small muted" style="margin:0 4px">Un reçu de paiement est fourni pour chaque adhésion ; Diaspo’Actif ne délivre pas de reçu fiscal officiel.</p>`;
     paint(t, NOM, html, `<button class="btn block" id="mco-share-foot">${ic('share', 's')} Partager le lien d’adhésion</button>`);
 
@@ -332,17 +336,36 @@
       return `<div class="card mco-fcard"><div class="pad">
         <div class="row" style="align-items:flex-start"><div class="sp"><div style="font-weight:700;font-size:16px;line-height:1.25;word-break:break-word">${esc(f.nom)}</div>
           <div class="small muted">${esc(TYPE_LIB[f.type_contribution] || f.type_contribution || '')}</div></div>
-          <button class="mco-sw" data-id="${Number(f.id)}" role="switch" aria-checked="${on}" aria-label="Formule ${esc(f.nom)} active"><i></i></button></div>
+          ${Number(f.est_gratuite_auto) ? '<span class="badge g">🆓 Gratuite automatique</span>' : `<button class="mco-sw" data-id="${Number(f.id)}" role="switch" aria-checked="${on}" aria-label="Formule ${esc(f.nom)} active"><i></i></button>`}</div>
         <div style="font-weight:700;margin:8px 0 2px">${esc(montantLib(f))}</div>
         ${f.description ? `<div class="small muted" style="white-space:pre-line;word-break:break-word">${esc(A.strip(f.description).slice(0, 200))}</div>` : ''}
         <div class="tags"><span class="badge ${on ? 'g' : ''}">${on ? 'Active' : 'Désactivée'}</span>${Number(f.est_officielle) ? '<span class="badge o">Adhésion officielle</span>' : ''}<span class="badge">${esc(pl(nb, 'adhérent', 'adhérents'))}</span>${places}</div>
         ${on ? `<button class="btn out sm" data-share="${Number(f.id)}" style="margin-top:12px">${ic('share', 's')} Partager cette formule</button>` : '<p class="small muted" style="margin:10px 0 0">Désactivée : elle n’est plus proposée et son lien ne fonctionne plus pour adhérer.</p>'}
+        <div class="mco-2" style="margin-top:10px"><a class="btn out sm" href="#/cotisations/modifier/${Number(f.id)}">Modifier</a><button class="btn out sm" data-dup="${Number(f.id)}">Dupliquer</button></div>
+        ${on && !Number(f.est_officielle) ? `<button class="btn out sm block" data-off="${Number(f.id)}" style="margin-top:8px">⭐ Définir comme adhésion officielle</button>` : ''}
+        ${Number(f.est_gratuite_auto) ? '' : `<button class="btn out sm block" data-del="${Number(f.id)}" style="margin-top:8px;color:var(--red)">Supprimer</button>`}
       </div></div>`;
     };
     paint(t, 'Formules d’adhésion', `${l.map(carte).join('')}
-      <div class="mco-note"><b>Modifier une formule</b>Durée, calendrier fixe, informations demandées, photo ou vidéo, duplication et suppression se font sur ordinateur.<br><a href="dashboard-initiative.html#adhesions-init" style="text-decoration:underline;font-weight:700">Ouvrir sur ordinateur</a></div>`, foot);
+      <div class="mco-note"><b>Réglages avancés</b>Durée personnalisée ou calendrier fixe, informations demandées aux adhérents, photo ou vidéo, délais de relance : sur ordinateur.<br><a href="dashboard-initiative.html#adhesions-init" style="text-decoration:underline;font-weight:700">Ouvrir sur ordinateur</a></div>`, foot);
     $$('.mco-sw[data-id]').forEach(b => b.onclick = () => basculerFormule(t, b, l.find(f => Number(f.id) === Number(b.dataset.id))));
     $$('[data-share]').forEach(b => b.onclick = () => { const f = l.find(x => Number(x.id) === Number(b.dataset.share)); if (f) partager(lienAdhesion(init, f.id), 'Adhésion — ' + f.nom); });
+    $$('[data-dup]').forEach(b => b.onclick = () => actionFormule(b, 'dup', l));
+    $$('[data-off]').forEach(b => b.onclick = () => actionFormule(b, 'off', l));
+    $$('[data-del]').forEach(b => b.onclick = () => actionFormule(b, 'del', l));
+  }
+  /* Dupliquer (la copie est créée désactivée), définir comme adhésion officielle, supprimer. */
+  async function actionFormule(btn, k, l) {
+    const id = Number(btn.dataset.dup || btn.dataset.off || btn.dataset.del), f = l.find(x => Number(x.id) === id); if (!f) return;
+    if (k === 'off' && !confirm('Faire de « ' + f.nom + ' » l’adhésion officielle ?\n\nLe bouton « Adhérer » de votre structure mènera directement à cette formule. L’ancienne adhésion officielle perd ce statut.')) return;
+    if (k === 'del' && !confirm('Supprimer « ' + f.nom + ' » ?\n\nCette action est définitive. Une formule qui a déjà des adhérents ne peut pas être supprimée : désactivez-la plutôt.')) return;
+    btn.disabled = true;
+    try {
+      if (k === 'dup') { await api('/api/adhesion-formules/' + id + '/dupliquer', { method: 'POST', body: {} }); toast('Formule dupliquée — la copie est désactivée'); }
+      else if (k === 'off') { const r = await api('/api/adhesion-formules/' + id + '/officielle', { method: 'PUT', body: { officielle: true } }); toast(r && r.remplace ? 'Adhésion officielle remplacée ✓' : 'Adhésion officielle définie ✓'); }
+      else { await api('/api/adhesion-formules/' + id, { method: 'DELETE' }); toast('Formule supprimée'); }
+      C.at = 0; formules(++rendu);
+    } catch (er) { btn.disabled = false; erreurAction(er); }
   }
   async function basculerFormule(t, sw, f) {
     if (!f) return;
@@ -358,11 +381,18 @@
 
   /* ---------- création simple d'une formule ---------- */
   const opt = (name, val, titre, aide, on) => `<label class="mco-opt ${on ? 'on' : ''}"><input type="radio" name="${name}" value="${val}" ${on ? 'checked' : ''}><span><b>${titre}</b><small>${aide}</small></span></label>`;
-  async function formNouvelle(t) {
-    const titre = 'Nouvelle formule';
+  async function formNouvelle(t, fid) {
+    const titre = fid ? 'Modifier la formule' : 'Nouvelle formule';
     if (!gate(titre)) return;
-    let init;
-    try { init = await chargerInit(); } catch (e) { return showError(t, titre, e, 'Impossible de charger votre initiative', () => formNouvelle(++rendu)); }
+    let init, f0 = null;
+    if (fid) setPane(titre, SK);
+    try {
+      init = await chargerInit();
+      if (fid) {
+        f0 = ((await api(`/api/initiatives/${Number(init.id)}/adhesion-formules/gestion`)).formules || []).find(x => Number(x.id) === Number(fid));
+        if (!f0) throw Object.assign(new Error('Cette formule n’existe plus.'), { status: 404 });
+      }
+    } catch (e) { return showError(t, titre, e, 'Impossible de charger votre initiative', () => formNouvelle(++rendu, fid)); }
     if (!vivant(t)) return;
     const html = `<form id="mco-form" class="mco-f" novalidate autocomplete="off">
       <div class="mco-gerr" id="mco-gerr" role="alert"></div>
@@ -392,7 +422,7 @@
       <div class="h2">ADHÉSION OFFICIELLE</div>
       <label class="mco-opt"><input type="checkbox" id="mco-off"><span><b>Formule officielle de ${esc(init.nom)}</b><small>Le bouton public « Adhérer » mène directement à cette formule. Une seule formule peut l’être : choisir celle-ci retire ce statut à l’ancienne.</small></span></label>
     </form>`;
-    setPane(titre, html, `<button class="btn block" id="mco-save">Créer la formule</button>`);
+    setPane(titre, html, `<button class="btn block" id="mco-save">${fid ? 'Enregistrer' : 'Créer la formule'}</button>`);
 
     const form = $('#mco-form'); form.onsubmit = ev => ev.preventDefault();
     $$('.mco-opt input', form).forEach(r => r.addEventListener('change', () => {
@@ -402,6 +432,28 @@
     const mt = () => { const c = $('input[name="mco-mt"]:checked', form); return c ? c.value : 'fixe'; };
     function majMontant() { const m = mt(); $('#mco-b-fixe').hidden = m !== 'fixe'; $('#mco-b-libre').hidden = m !== 'libre'; $('#mco-b-min').hidden = m !== 'minimum'; }
     majMontant();
+
+    /* Modification : le formulaire se remplit avec la formule existante. Les réglages que ce formulaire ne montre pas
+       (durée personnalisée, calendrier fixe, champs demandés, médias…) ne sont pas envoyés : le serveur les conserve. */
+    const gratuiteAuto = !!(f0 && Number(f0.est_gratuite_auto));
+    if (f0) {
+      const set = (id, v) => { const x = $('#' + id); if (x && v != null) x.value = v; };
+      set('mco-nom', f0.nom); set('mco-desc', f0.description || ''); set('mco-type', f0.type_contribution || 'cotisation_annuelle');
+      const mtype = f0.montant_type || 'fixe';
+      const radio = $(`input[name="mco-mt"][value="${mtype}"]`, form); if (radio) { radio.checked = true; radio.dispatchEvent(new Event('change')); }
+      set('mco-fixe', Number(f0.montant_fixe) || 0); set('mco-min', Number(f0.montant_min) || ''); set('mco-max', Number(f0.montant_max) || '');
+      set('mco-places', f0.max_adherents ? Number(f0.max_adherents) : '');
+      let modes = []; try { modes = JSON.parse(f0.modes_paiement_json || '[]'); } catch (e) { modes = []; }
+      if (modes.length) $$('input[name="mco-mode"]', form).forEach(x => { x.checked = modes.includes(x.value); x.closest('.mco-opt').classList.toggle('on', x.checked); });
+      const off = $('#mco-off'); if (off) { off.checked = !!Number(f0.est_officielle); off.closest('.mco-opt').classList.toggle('on', off.checked); }
+      if (gratuiteAuto) {
+        ['mco-type'].forEach(i => { const x = $('#' + i); if (x) x.disabled = true; });
+        $$('input[name="mco-mt"]', form).forEach(x => { x.disabled = true; });
+        const fx = $('#mco-fixe'); if (fx) fx.disabled = true;
+        const note = document.createElement('div'); note.className = 'mco-note'; note.innerHTML = '<b>Adhésion gratuite automatique</b>Cette formule reste gratuite et de 12 mois par défaut : le montant et le type ne se modifient pas. Pour la fermer, utilisez l’interrupteur du tableau de bord.';
+        form.insertBefore(note, form.firstChild.nextSibling);
+      }
+    }
 
     const val = id => { const x = $('#' + id); return x ? x.value.trim() : ''; };
     const err = (id, msg) => { const x = $('#mco-' + id), m = $('#mco-e-' + id); if (x) x.setAttribute('aria-invalid', 'true'); if (m) m.textContent = msg; return x; };
@@ -427,10 +479,17 @@
       if (m === 'fixe') body.montant_fixe = Number(val('mco-fixe'));
       if (m === 'minimum') body.montant_min = Number(val('mco-min'));
       if (m === 'libre' && val('mco-max')) body.montant_max = Number(val('mco-max'));
-      $$('#pane-foot button').forEach(b => { b.disabled = true; }); const txt = btn.textContent; btn.textContent = 'Création…';
+      if (fid) {
+        /* statut officiel : envoyé seulement s'il a changé (le serveur refuse de rendre officielle une formule désactivée) */
+        if (!!Number(f0.est_officielle) === body.est_officielle) delete body.est_officielle;
+        if (gratuiteAuto) { delete body.montant_type; delete body.montant_fixe; delete body.type_contribution; }
+      }
+      $$('#pane-foot button').forEach(b => { b.disabled = true; }); const txt = btn.textContent; btn.textContent = fid ? 'Enregistrement…' : 'Création…';
       try {
-        await api(`/api/initiatives/${Number(init.id)}/adhesion-formules`, { method: 'POST', body });
-        toast('Formule créée ✓'); location.replace('#/cotisations/formules');
+        if (fid) await api(`/api/adhesion-formules/${Number(fid)}`, { method: 'PUT', body });
+        else await api(`/api/initiatives/${Number(init.id)}/adhesion-formules`, { method: 'POST', body });
+        C.at = 0;
+        toast(fid ? 'Formule modifiée ✓' : 'Formule créée ✓'); location.replace('#/cotisations/formules');
       } catch (er) {
         $$('#pane-foot button').forEach(b => { b.disabled = false; }); btn.textContent = txt;
         if (er && er.status === 402) { A.premiumSheet(NOM); return; }
@@ -445,19 +504,19 @@
      ============================================================ */
   const AD = { rows: [], formules: {}, init: null, f: '', q: '', shown: 40 };
 
-  async function adherents(t) {
+  async function adherents(t, filtre) {
     if (!gate(NOM)) return;
     setPane('Adhérents', SK);
     let init, m, fo;
     try {
       init = await chargerInit();
       [m, fo] = await Promise.all([api(`/api/initiatives/${Number(init.id)}/adhesion-membres`), api(`/api/initiatives/${Number(init.id)}/adhesion-formules/gestion`).catch(ko)]);
-    } catch (e) { return showError(t, 'Adhérents', e, 'Impossible de charger les adhérents', () => adherents(++rendu)); }
+    } catch (e) { return showError(t, 'Adhérents', e, 'Impossible de charger les adhérents', () => adherents(++rendu, filtre)); }
     if (!vivant(t)) return;
-    AD.init = init; AD.rows = m.membres || []; AD.f = ''; AD.q = ''; AD.shown = 40;
+    AD.init = init; AD.rows = m.membres || []; AD.f = filtre || ''; AD.q = ''; AD.shown = 40;
     AD.formules = {}; (fo.erreur ? [] : fo.formules || []).forEach(f => { AD.formules[Number(f.id)] = f; });
     if (!AD.rows.length) {
-      paint(t, 'Adhérents', `<div class="empty"><div class="ei">${ic('people', 'l')}</div><b>Aucun adhérent pour le moment</b>Partagez votre lien d’adhésion : les adhérents apparaîtront ici dès leur inscription. Vous pouvez aussi en ajouter à la main sur ordinateur.<br><br><button class="btn" id="mco-share2">${ic('share', 's')} Partager le lien d’adhésion</button></div>`);
+      paint(t, 'Adhérents', `<div class="empty"><div class="ei">${ic('people', 'l')}</div><b>Aucun adhérent pour le moment</b>Partagez votre lien d’adhésion : les adhérents apparaîtront ici dès leur inscription. Vous pouvez aussi ajouter un adhérent à la main.<br><br><a class="btn out" href="#/cotisations/nouvel-adherent" style="margin-right:8px">Ajouter un adhérent</a><button class="btn" id="mco-share2">${ic('share', 's')} Partager le lien d’adhésion</button></div>`);
       const sh = $('#mco-share2'); if (sh) sh.onclick = () => partager(lienAdhesion(init), 'Adhérer à ' + init.nom);
       return;
     }
@@ -473,7 +532,7 @@
     const top = $('#mco-atop'); if (!top) return;
     const c = compteStatuts();
     const tabs = [['', 'Tous'], ['a_jour', 'À jour'], ['en_attente', 'En attente'], ['non_a_jour', 'Non à jour'], ['suspendu', 'Suspendus'], ['radie', 'Radiés']].filter(([k]) => k === '' || c[k]);
-    top.innerHTML = `<div class="search">${ic('search', 's')}<input id="mco-q" type="search" placeholder="Nom, e-mail, téléphone, n° d’adhérent…" aria-label="Rechercher un adhérent" value="${esc(AD.q)}"></div>
+    top.innerHTML = `<a class="btn out sm block" href="#/cotisations/nouvel-adherent" style="margin-bottom:10px">➕ Ajouter un adhérent</a><div class="search">${ic('search', 's')}<input id="mco-q" type="search" placeholder="Nom, e-mail, téléphone, n° d’adhérent…" aria-label="Rechercher un adhérent" value="${esc(AD.q)}"></div>
       <div class="chips" role="tablist">${tabs.map(([k, l]) => `<button class="chip ${AD.f === k ? 'on' : ''}" role="tab" aria-selected="${AD.f === k}" data-k="${k}">${l} <span class="n">${c[k] || 0}</span></button>`).join('')}</div>`;
     $$('.chip', top).forEach(b => b.onclick = () => { AD.f = b.dataset.k; AD.shown = 40; paintAdherents(); });
     const q = $('#mco-q');
@@ -504,9 +563,129 @@
       ${r.email || tel ? `<div class="mco-contact">${r.email ? `<a href="mailto:${esc(r.email)}">${esc(r.email)}</a>` : ''}${tel ? `<a href="tel:${esc(tel)}">${esc(r.telephone)}</a>` : ''}</div>` : '<p class="small muted" style="margin:0">Aucune coordonnée enregistrée.</p>'}
       <div style="margin-top:8px">${kv('Numéro d’adhérent', 'ADH-' + Number(AD.init.id) + '-' + Number(r.id))}${kv('Formule', f ? f.nom : '')}${kv('Adhésion depuis le', dateCourte(r.date_adhesion))}${kv('Valable jusqu’au', dateCourte(r.date_expiration))}${kv('Montant payé', r.montant_paye ? eur(r.montant_paye, f && f.devise) : '')}${kv('Mode de paiement', r.mode_paiement ? ({ carte: 'Carte bancaire', paypal: 'PayPal', virement: 'Virement' }[r.mode_paiement] || r.mode_paiement) : '')}${kv('Ville', lieu)}${kv('Distinctions', badges.join(', '))}${kv('Observations', r.observations ? A.strip(r.observations) : '')}</div>
       ${r.linked_user_id ? `<a class="btn out block" style="margin-top:12px" href="profil.html?id=${Number(r.linked_user_id)}">Voir son profil ${ic('out', 's')}</a>` : ''}
-      <p class="small muted" style="margin:12px 2px 10px">Enregistrer un paiement, suspendre ou radier : à faire sur ordinateur.</p>
-      <button class="btn out block" id="mco-fc">Fermer</button>`);
+      <div class="h2" style="margin-top:14px">ACTIONS</div>
+      <div class="mco-acts">${actionsFiche(r, f)}</div>
+      <button class="btn out block" id="mco-fc" style="margin-top:8px">Fermer</button>`);
     const c = $('#mco-fc'); if (c) c.onclick = close;
+    const on = (id, fn) => { const b = $('#' + id); if (b) b.onclick = () => fn(r, f, close); };
+    on('mco-fk-ok', accepterFiche); on('mco-fk-no', refuserFiche); on('mco-fk-pay', paiementFiche); on('mco-fk-edit', modifierFiche);
+    on('mco-fk-sus', (r2, f2, cl) => statutFiche(r2, 'suspendu', cl)); on('mco-fk-rea', (r2, f2, cl) => statutFiche(r2, 'a_jour', cl)); on('mco-fk-rad', (r2, f2, cl) => statutFiche(r2, 'radie', cl));
+  }
+
+  /* ---------- actions sur une fiche d'adhérent ---------- */
+  const estGratuite = f => !!f && (Number(f.est_gratuite_auto) === 1 || (f.montant_type === 'fixe' && !(Number(f.montant_fixe) > 0)));
+  function actionsFiche(r, f) {
+    const a = [];
+    if (r.statut === 'en_attente' && estGratuite(f)) a.push('<div class="mco-2"><button class="btn out" id="mco-fk-no">Refuser</button><button class="btn" id="mco-fk-ok">Accepter</button></div>');
+    else if (r.statut !== 'radie' && !estGratuite(f)) a.push('<button class="btn block" id="mco-fk-pay">💰 Enregistrer un paiement</button>');
+    a.push('<button class="btn out block" id="mco-fk-edit">Modifier la fiche</button>');
+    if (r.statut === 'suspendu') a.push('<button class="btn out block" id="mco-fk-rea">Réactiver</button>');
+    else if (r.statut !== 'radie') a.push('<button class="btn out block" id="mco-fk-sus">Suspendre</button>');
+    if (r.statut !== 'radie') a.push('<button class="btn out block" id="mco-fk-rad" style="color:var(--red)">Radier</button>');
+    return a.join('');
+  }
+  async function appliquer(close, fait, requete) {
+    try { await requete(); close(); toast(fait); C.at = 0; adherents(++rendu, AD.f); }
+    catch (er) { erreurAction(er); }
+  }
+  function accepterFiche(r, f, close) {
+    appliquer(close, 'Adhésion acceptée ✓', () => api('/api/adhesion-membres/' + Number(r.id) + '/accepter', { method: 'POST', body: {} }));
+  }
+  function refuserFiche(r, f, close) {
+    const motif = prompt('Motif du refus (facultatif — la personne en sera informée) :', '');
+    if (motif === null) return;
+    appliquer(close, 'Demande refusée', () => api('/api/adhesion-membres/' + Number(r.id) + '/refuser', { method: 'POST', body: { motif: motif.trim().slice(0, 300) } }));
+  }
+  async function statutFiche(r, statut, close) {
+    const nm = [r.prenom, r.nom].filter(Boolean).join(' ') || 'cet adhérent';
+    const txt = {
+      suspendu: ['Suspendre ' + nm + ' ?', 'Son adhésion est mise en pause : il n’est plus compté parmi les adhérents à jour. Vous pourrez le réactiver.', 'Suspendre'],
+      a_jour: ['Réactiver ' + nm + ' ?', 'Son adhésion redevient active.', 'Réactiver'],
+      radie: ['Radier ' + nm + ' ?', 'Fin définitive de son adhésion : elle ne peut plus être réactivée depuis le téléphone.', 'Radier']
+    }[statut];
+    close();
+    if (!(await confirmerFeuille(txt[0], txt[1], txt[2]))) return fiche(r);
+    try {
+      await api('/api/adhesion-membres/' + Number(r.id), { method: 'PUT', body: { statut } });
+      toast({ suspendu: 'Adhérent suspendu', a_jour: 'Adhérent réactivé ✓', radie: 'Adhérent radié' }[statut]);
+      C.at = 0; adherents(++rendu, AD.f);
+    } catch (er) { erreurAction(er); fiche(r); }
+  }
+  function paiementFiche(r, f, close) {
+    close();
+    const fixe = f && f.montant_type === 'fixe' && Number(f.montant_fixe) > 0 ? Number(f.montant_fixe) : '';
+    const fermer = A.openSheet('<h3 style="margin:0 0 4px">Enregistrer un paiement</h3><p class="small muted" style="margin:0 0 4px">Paiement reçu hors ligne (virement, espèces, etc.). L’adhérent passe « à jour », un reçu lui est envoyé et son échéance est recalculée.</p>' +
+      '<div class="mco-f"><label class="mco-l" for="mco-pm">Montant reçu (' + esc((f && f.devise) || 'EUR') + ') *</label><input type="number" id="mco-pm" min="0.01" step="0.01" inputmode="decimal" value="' + fixe + '"><div class="mco-err" id="mco-pm-e" role="alert"></div>' +
+      '<label class="mco-l" for="mco-pmode">Mode de paiement</label><select id="mco-pmode">' + MODES.map(([v, l]) => '<option value="' + v + '"' + (v === 'virement' ? ' selected' : '') + '>' + l + '</option>').join('') + '</select></div>' +
+      '<button class="btn block" id="mco-pok" style="margin-top:14px">Enregistrer</button><button class="btn out block" id="mco-pno" style="margin-top:8px">Annuler</button>');
+    $('#mco-pno').onclick = () => { fermer(); fiche(r); };
+    $('#mco-pok').onclick = async ev => {
+      const m = Number($('#mco-pm').value);
+      if (!(m > 0)) { $('#mco-pm-e').textContent = 'Indiquez le montant reçu.'; return; }
+      const b = ev.currentTarget; b.disabled = true;
+      try {
+        await api('/api/adhesion-membres/' + Number(r.id) + '/marquer-paye', { method: 'POST', body: { montant: m, mode_paiement: $('#mco-pmode').value } });
+        fermer(); toast('Paiement enregistré ✓'); C.at = 0; adherents(++rendu, AD.f);
+      } catch (er) { b.disabled = false; erreurAction(er); }
+    };
+  }
+  function modifierFiche(r, f, close) {
+    close();
+    const ch = (id, lib, v, type) => '<label class="mco-l" for="' + id + '">' + lib + '</label><input type="' + (type || 'text') + '" id="' + id + '" value="' + esc(v || '') + '" maxlength="200">';
+    const fermer = A.openSheet('<h3 style="margin:0 0 4px">Modifier la fiche</h3><div class="mco-f">' + ch('mco-em-nom', 'Nom *', r.nom) + ch('mco-em-prenom', 'Prénom', r.prenom) + ch('mco-em-email', 'E-mail', r.email, 'email') + ch('mco-em-tel', 'Téléphone', r.telephone, 'tel') + ch('mco-em-ville', 'Ville', r.ville) + ch('mco-em-pays', 'Pays', r.pays) +
+      '<label class="mco-l" for="mco-em-obs">Observations</label><textarea id="mco-em-obs" maxlength="1000">' + esc(r.observations || '') + '</textarea><div class="mco-err" id="mco-em-e" role="alert"></div></div>' +
+      '<button class="btn block" id="mco-eok" style="margin-top:14px">Enregistrer</button><button class="btn out block" id="mco-eno" style="margin-top:8px">Annuler</button>');
+    $('#mco-eno').onclick = () => { fermer(); fiche(r); };
+    $('#mco-eok').onclick = async ev => {
+      const v = id => $('#' + id).value.trim();
+      if (!v('mco-em-nom')) { $('#mco-em-e').textContent = 'Le nom est obligatoire.'; return; }
+      const b = ev.currentTarget; b.disabled = true;
+      try {
+        await api('/api/adhesion-membres/' + Number(r.id), { method: 'PUT', body: { nom: v('mco-em-nom'), prenom: v('mco-em-prenom'), email: v('mco-em-email'), telephone: v('mco-em-tel'), ville: v('mco-em-ville'), pays: v('mco-em-pays'), observations: v('mco-em-obs') } });
+        fermer(); toast('Fiche modifiée ✓'); C.at = 0; adherents(++rendu, AD.f);
+      } catch (er) { b.disabled = false; erreurAction(er); }
+    };
+  }
+
+  /* ---------- ajout d'un adhérent à la main ---------- */
+  async function formAdherent(t) {
+    const titre = 'Ajouter un adhérent';
+    if (!gate(titre)) return;
+    setPane(titre, SK);
+    let init, fl;
+    try { init = await chargerInit(); fl = (await api('/api/initiatives/' + Number(init.id) + '/adhesion-formules/gestion')).formules || []; }
+    catch (e) { return showError(t, titre, e, 'Impossible de charger vos formules', () => formAdherent(++rendu)); }
+    if (!vivant(t)) return;
+    if (!fl.length) return paint(t, titre, '<div class="empty"><div class="ei">' + ic('card', 'l') + '</div><b>Créez d’abord une formule</b>Un adhérent est rattaché à une formule d’adhésion.<br><br><a class="btn" href="#/cotisations/formules/nouvelle">Créer une formule</a></div>');
+    const defaut = (fl.find(f => Number(f.est_officielle)) || fl.find(f => Number(f.actif)) || fl[0]).id;
+    const ch = (id, lib, type, extra) => '<label class="mco-l" for="' + id + '">' + lib + '</label><input type="' + (type || 'text') + '" id="' + id + '" maxlength="200" ' + (extra || '') + '>';
+    const html = '<form id="mco-fa" class="mco-f" novalidate autocomplete="off"><div class="mco-gerr" id="mco-fa-g" role="alert"></div>' +
+      '<label class="mco-l" for="mco-fa-f">Formule *</label><select id="mco-fa-f">' + fl.map(f => '<option value="' + Number(f.id) + '"' + (Number(f.id) === Number(defaut) ? ' selected' : '') + '>' + esc(f.nom) + '</option>').join('') + '</select>' +
+      ch('mco-fa-nom', 'Nom *') + ch('mco-fa-prenom', 'Prénom') + ch('mco-fa-email', 'E-mail', 'email', 'inputmode="email"') + ch('mco-fa-tel', 'Téléphone', 'tel') + ch('mco-fa-ville', 'Ville') + ch('mco-fa-pays', 'Pays') +
+      '<label class="mco-l" for="mco-fa-date">Date d’adhésion <small>(facultative)</small></label><input type="date" id="mco-fa-date">' +
+      '<p class="mco-hint">Laissez vide pour une fiche « en attente de paiement ». Avec une date, l’adhésion est enregistrée comme déjà effective : elle passe « à jour » et son échéance suit la formule choisie.</p>' +
+      '<div class="mco-err" id="mco-fa-e" role="alert"></div></form>';
+    setPane(titre, html, '<button class="btn block" id="mco-fa-ok">Ajouter l’adhérent</button>');
+    const form = $('#mco-fa'); form.onsubmit = ev => ev.preventDefault();
+    $('#mco-fa-ok').onclick = async ev => {
+      const v = id => $('#' + id).value.trim();
+      $('#mco-fa-e').textContent = ''; $('#mco-fa-g').textContent = '';
+      if (!v('mco-fa-nom')) { $('#mco-fa-e').textContent = 'Le nom est obligatoire.'; $('#mco-fa-nom').focus(); return; }
+      const f = fl.find(x => Number(x.id) === Number(v('mco-fa-f'))) || {};
+      const body = { formule_id: Number(v('mco-fa-f')), nom: v('mco-fa-nom'), prenom: v('mco-fa-prenom') || null, email: v('mco-fa-email') || null, telephone: v('mco-fa-tel') || null, ville: v('mco-fa-ville') || null, pays: v('mco-fa-pays') || null };
+      if (v('mco-fa-date')) {
+        body.date_adhesion = v('mco-fa-date');
+        body.mode_validite = f.mode_validite === 'collectif' ? 'collectif' : 'individuel';
+        body.duree_valeur = f.duree_valeur ? Number(f.duree_valeur) : null; body.duree_unite = f.duree_unite || 'mois'; body.duree_illimitee = !!Number(f.duree_illimitee);
+        body.periode_collective_debut = f.periode_collective_debut || null; body.periode_collective_fin = f.periode_collective_fin || null;
+        /* Formule sans durée propre : l'échéance suit son type (annuelle = 12 mois…), comme pour un paiement enregistré. */
+        const MOIS_TYPE = { cotisation_annuelle: 12, cotisation_semestrielle: 6, cotisation_trimestrielle: 3, cotisation_mensuelle: 1 };
+        if (!body.duree_valeur && !body.duree_illimitee && body.mode_validite !== 'collectif' && MOIS_TYPE[f.type_contribution]) { body.duree_valeur = MOIS_TYPE[f.type_contribution]; body.duree_unite = 'mois'; }
+      }
+      const b = ev.currentTarget; b.disabled = true; const txt = b.textContent; b.textContent = 'Ajout…';
+      try { await api('/api/initiatives/' + Number(init.id) + '/adhesion-membres', { method: 'POST', body }); C.at = 0; toast('Adhérent ajouté ✓'); location.replace('#/cotisations/adherents'); }
+      catch (er) { b.disabled = false; b.textContent = txt; if (er && er.status === 402) { A.premiumSheet(NOM); return; } $('#mco-fa-g').textContent = (er && er.message) || 'Ajout impossible.'; toast((er && er.message) || 'Ajout impossible.', true); }
+    };
   }
 
   /* ============================================================

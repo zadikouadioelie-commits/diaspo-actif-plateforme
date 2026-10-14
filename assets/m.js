@@ -1998,7 +1998,7 @@
       html += `<div class="h2" style="margin-top:2px">MES CAGNOTTES</div><div class="card"><div class="pad">
         <div class="row"><div class="sp"><b style="font-size:20px">${mes.length}</b> <span class="muted small">cagnotte${mes.length > 1 ? 's' : ''}</span></div><div><b>${esc(money(total))}</b> <span class="muted small">collectés</span></div></div>
         ${mes.slice(0, 5).map(c => `<div class="kv"><span class="ell" style="max-width:62%">${esc(md(strip(c.titre)))}</span><span>${esc(money(c.montant_collecte, c.devise))}</span></div>`).join('')}
-        <a class="btn block sm ${lock ? 'out' : ''}" style="margin-top:12px" ${lock ? 'data-lock="1" href="#"' : 'href="dashboard-initiative.html#cagnottes"'}>${lock ? ic('lock', 's') + ' ' : ''}Gérer mes cagnottes ${lock ? '👑' : ''}</a></div></div>`;
+        <a class="btn block sm ${lock ? 'out' : ''}" style="margin-top:12px" ${lock ? 'data-lock="1" href="#"' : 'href="#/mescagnottes"'}>${lock ? ic('lock', 's') + ' ' : ''}Créer et gérer mes cagnottes ${lock ? '👑' : ''}</a></div></div>`;
     }
     html += `<div class="h2" ${mes ? '' : 'style="margin-top:2px"'}>${owner ? 'CAGNOTTES DE ' + esc(String(nomOwner || 'CE COMPTE').toUpperCase()) : 'CAGNOTTES OUVERTES'}</div>` + (pub.length ? pub.map(cagnotteCard).join('') : (owner ? `<div class="empty"><div class="ei">${ic('heart', 'l')}</div><b>Aucune cagnotte ouverte pour ${esc(nomOwner || 'ce compte')}</b>Ce compte n’a pas de cagnotte en cours pour le moment.<br><br><a class="btn out" href="#/cagnottes">Voir toutes les cagnottes</a></div>` : `<div class="empty"><div class="ei">${ic('heart', 'l')}</div><b>Aucune cagnotte ouverte</b>Revenez bientôt.</div>`));
     setPane(owner ? 'Soutenir' + (nomOwner ? ' · ' + nomOwner : '') : 'Cagnottes et dons', html);
@@ -2298,7 +2298,7 @@
     p.hidden = true; document.body.style.overflow = ''; clearInterval(S.chatTimer); S.pane = null;
     const f = $('#pane-foot'); if (f) { f.innerHTML = ''; f.hidden = true; }
   }
-  const SITE_PAGES = { boutique: 'vitrines.html', produit: 'vitrines.html', mesevenements: 'dashboard-initiative.html#evenements', cotisations: 'dashboard-initiative.html#adhesions-init', msgboutique: 'dashboard-initiative.html#messages-vitrine', associe: 'mon-associe.html', reseaupro: 'reseau.html', businessplan: 'business-plan.html', formations: 'formations.html', cvlettres: 'dashboard-utilisateur.html', parrainage: 'parrainage.html', confidentialite: 'confidentialite.html', abonnement: 'mon-abonnement.html' };
+  const SITE_PAGES = { boutique: 'vitrines.html', produit: 'vitrines.html', mesevenements: 'dashboard-initiative.html#evenements', cotisations: 'dashboard-initiative.html#adhesions-init', mescagnottes: 'dashboard-initiative.html#cagnottes', msgboutique: 'dashboard-initiative.html#messages-vitrine', associe: 'mon-associe.html', reseaupro: 'reseau.html', businessplan: 'business-plan.html', formations: 'formations.html', cvlettres: 'dashboard-utilisateur.html', parrainage: 'parrainage.html', confidentialite: 'confidentialite.html', abonnement: 'mon-abonnement.html' };
   function openSheet(inner) {
     const sh = $('#sheet'); sh.hidden = false; const close = () => { sh.hidden = true; sh.innerHTML = ''; };
     sh.innerHTML = '<div class="sh" role="dialog" aria-modal="true"><div class="grip"></div><div class="sb">' + inner + '</div></div>';
