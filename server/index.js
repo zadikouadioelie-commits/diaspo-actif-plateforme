@@ -23271,6 +23271,84 @@ async function ensureEvenementsOuvertureInscriptionsCol() {
    toujours le COMPTE propriétaire (voir le commentaire "jamais celui de son responsable" sur
    GET /api/evenements) et sont recalculés à la lecture — les écraser aurait rendu le crédit à
    l'organisateur externe invisible dès le premier chargement de la liste. */
+/* Programme (journées + étapes) et inscription rapide (2026-10-14, demande explicite) —
+   réservés au parcours ⚡ Événement flash, au même titre que organisateur_externe_* ci-dessus.
+   "Flash" n'est jamais stocké comme un type à part : partout ailleurs dans ce fichier et sur
+   evenements-app.html (estFlash/estFlashDetail), un événement flash se détecte uniquement par
+   inscription_ouverte===0 — même convention reprise ici, aucune nouvelle colonne "est_flash".
+   programme_json : tableau de journées [{ date_debut, date_fin, etapes:[{titre,heure_debut,
+   heure_fin}] }] — JSON simple (jamais interrogé ligne à ligne), même choix que
+   vitrine_portfolio_json/domaines_secondaires_json ailleurs dans ce projet, pas de nouvelle
+   table relationnelle pour un contenu toujours lu/écrit en bloc par son seul propriétaire.
+   inscription_rapide_active : simple interrupteur ; les inscriptions elles-mêmes vivent dans
+   evenements_inscriptions_rapides (table dédiée, car interrogée ligne à ligne par
+   l'organisateur — liste, comptage — contrairement au programme). */
+async function ensureEvenementsFlashExtras() {
+  if (global.__evenementsFlashExtrasEnsured) return;
+  try { await db.prepare(`ALTER TABLE evenements ADD COLUMN programme_json TEXT`).run(); }
+  catch (e) {}
+  try { await db.prepare(`ALTER TABLE evenements ADD COLUMN inscription_rapide_active INTEGER DEFAULT 0`).run(); }
+  catch (e) {}
+  try {
+    await db.prepare(`CREATE TABLE IF NOT EXISTS evenements_inscriptions_rapides (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      evenement_id INTEGER NOT NULL,
+      user_id INTEGER,
+      nom TEXT NOT NULL,
+      prenom TEXT NOT NULL,
+      email TEXT NOT NULL,
+      telephone TEXT,
+      ville TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY(evenement_id) REFERENCES evenements(id),
+      FOREIGN KEY(user_id) REFERENCES users(id)
+    )`).run();
+  } catch (e) {}
+  global.__evenementsFlashExtrasEnsured = true;
+}
+
+/* Ajoute un événement à l'agenda personnel d'un compte — factorisé (2026-10-14) hors de
+   POST /api/evenements/:id/ajouter-agenda (comportement inchangé, copié tel quel) pour être
+   réutilisé par l'inscription rapide d'un événement flash (POST .../inscription-rapide), qui
+   ajoute aussi automatiquement l'événement à l'agenda d'un inscrit connecté — « déclencher une
+   inscription rapide avec inscription dans l'agenda des personnes ayant un compte », demande
+   explicite du 2026-10-14. Idempotent (agenda_events(user_id, evenement_id) déjà vérifié avant
+   insertion), jamais appelé pour un invité (pas de user_id). */
+async function ajouterEvenementAgenda(evt, userId, req) {
+  const deja = await db.prepare("SELECT id FROM agenda_events WHERE user_id=? AND evenement_id=?").get(userId, evt.id);
+  if (deja) return { ok: true, deja: true, id: Number(deja.id) };
+  /* Dates : « AAAA-MM-JJ » + heure facultative. Sans heure de début, l'événement occupe la journée. */
+  const jour = String(evt.date_evt).slice(0, 10), jourFin = String(evt.date_fin || evt.date_evt).slice(0, 10);
+  const hhmm = h => { const m = /^(\d{1,2}):(\d{2})/.exec(String(h || "")); return m ? m[1].padStart(2, "0") + ":" + m[2] : ""; };
+  const hd = hhmm(evt.heure_debut);
+  let hf = hhmm(evt.heure_fin);
+  const toutJour = !hd;
+  const debut = jour + "T" + (hd || "00:00");
+  if (!hf) hf = hd ? String(Math.min(23, Number(hd.slice(0, 2)) + 1)).padStart(2, "0") + ":" + hd.slice(3) : "23:59";
+  const fin = jourFin + "T" + hf;
+  const lien = getOrigin(req) + "/evenements.html?evt=" + encodeURIComponent(evt.id);
+  const lieu = [evt.lieu, evt.ville, evt.pays].filter(Boolean).join(", ") || (evt.mode_participation === "ligne" ? "En ligne" : "");
+  const resume = String(evt.description || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 600);
+  const description = [resume, "Événement Diaspo'Actif : " + lien].filter(Boolean).join("\n\n");
+  const r = await db.prepare(`INSERT INTO agenda_events(user_id,titre,description,date_debut,date_fin,lieu,lieu_type,couleur,all_day,evenement_id)
+    VALUES(?,?,?,?,?,?,?,?,?,?)`).run(userId, String(evt.titre).slice(0, 200), description, debut, fin, lieu || null, evt.mode_participation === "ligne" ? "virtuel" : "physique", "#c9971c", toutJour ? 1 : 0, evt.id);
+  const nouvelId = Number(r.lastInsertRowid);
+  try {
+    for (const rem of [{ type: "24h", ms: 24 * 3600 * 1000 }, { type: "1h", ms: 3600 * 1000 }, { type: "15m", ms: 15 * 60 * 1000 }]) {
+      const remAt = new Date(new Date(debut).getTime() - rem.ms).toISOString();
+      if (new Date(remAt) > new Date()) await db.prepare("INSERT INTO agenda_reminders(user_id,event_id,remind_at,type) VALUES(?,?,?,?)").run(userId, nouvelId, remAt, rem.type);
+    }
+  } catch (e) { logError(e, "agenda-evenement-rappels", req); }
+  try {
+    const u = await db.prepare("SELECT google_calendar_sync_mode, google_calendar_refresh_token FROM users WHERE id=?").get(userId);
+    if (u?.google_calendar_sync_mode === "diaspo_vers_google" && u.google_calendar_refresh_token) {
+      const ligne = await db.prepare("SELECT * FROM agenda_events WHERE id=?").get(nouvelId);
+      gcalPushEvent(userId, ligne).catch(() => {});
+    }
+  } catch (_) { /* la synchronisation Google ne doit jamais bloquer l'ajout */ }
+  return { ok: true, deja: false, id: nouvelId };
+}
+
 async function ensureEvenementsOrganisateurExterneCol() {
   if (global.__evenementsOrganisateurExterneEnsured) return;
   try { await db.prepare(`ALTER TABLE evenements ADD COLUMN organisateur_externe_nom TEXT`).run(); }
@@ -23319,6 +23397,7 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
   await ensureEvenementsTypeParticipationCol();
   await ensureEvenementsOuvertureInscriptionsCol();
   await ensureEvenementsOrganisateurExterneCol();
+  await ensureEvenementsFlashExtras();
   const {
     titre, organisateur, date_evt, lieu, pays, ville, origine, description, type_evt, domaine,
     zone_diffusion, type_participation, statut, ouverture_inscriptions,
@@ -23328,7 +23407,8 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
     pdf_url, pdf_nom, pdf_acces,
     langue, mode_participation, region, departement, masquer_inscrits,
     whatsapp_lien, lieu_gps, public_concerne, masquer_boutique,
-    organisateur_externe_nom, organisateur_externe_logo_url
+    organisateur_externe_nom, organisateur_externe_logo_url,
+    programme, inscription_rapide_active
   } = body;
   if (!titre || !date_evt) return sendJSON(res, 400, { error: "Titre et date requis." });
   /* Sanitisé avant écriture (2026-09-25, éditeur de texte enrichi) — seule vraie barrière,
@@ -23343,6 +23423,10 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
   // le publier") — statut passe désormais par le body au lieu d'être figé sur 'ouvert', mais
   // reste strictement limité à ces deux valeurs (jamais un statut arbitraire venu du client).
   const statutFinal = statut === 'brouillon' ? 'brouillon' : 'ouvert';
+  // Programme (2026-10-14, demande explicite) — réservé à l'Événement flash (voir
+  // ensureEvenementsFlashExtras ci-dessus) : jamais interrogé côté serveur, simple JSON gardé
+  // tel quel, validé seulement en forme (tableau) pour ne jamais stocker une valeur inexploitable.
+  const programmeJson = Array.isArray(programme) ? JSON.stringify(programme) : null;
   const id = (await db.prepare(`INSERT INTO evenements
     (titre,organisateur,date_evt,lieu,pays,ville,origine,description,type_evt,domaine,zone_diffusion,type_participation,ouverture_inscriptions,places_max,
      inscription_ouverte,lien_inscription,image_url,statut,owner_user_id,
@@ -23350,8 +23434,8 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
      image_couverture,galerie_photos,video1_url,video1_titre,video2_url,video2_titre,
      pdf_url,pdf_nom,pdf_acces,
      langue,mode_participation,region,departement,masquer_inscrits,whatsapp_lien,lieu_gps,public_concerne,masquer_boutique,
-     organisateur_externe_nom,organisateur_externe_logo_url)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+     organisateur_externe_nom,organisateur_externe_logo_url,programme_json,inscription_rapide_active)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
     .run(
       titre, organisateur || await nomCompteAffichage(user.id), date_evt, lieu||null, pays||null, ville||null, origine||null,
       descriptionSafe||null, type_evt||"evenement", domaine||null, zone_diffusion||null,
@@ -23363,7 +23447,7 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
       pdf_url||null, pdf_nom||null, pdf_acces||'public',
       langue||'francais', mode_participation||'presentiel', region||null, departement||null,
       masquer_inscrits?1:0, whatsapp_lien||null, lieu_gps||null, public_concerne||null, masquer_boutique?1:0,
-      organisateur_externe_nom||null, organisateur_externe_logo_url||null
+      organisateur_externe_nom||null, organisateur_externe_logo_url||null, programmeJson, inscription_rapide_active?1:0
     )).lastInsertRowid;
   // Notifier abonnés de l'initiative — jamais pour un brouillon, la publication n'est pas
   // encore réelle (voir statutFinal ci-dessus).
@@ -23428,7 +23512,8 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
 route("PUT", "/api/evenements/:id", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  const evt = await db.prepare("SELECT id, owner_user_id, statut FROM evenements WHERE id=?").get(params.id);
+  await ensureEvenementsFlashExtras();
+  const evt = await db.prepare("SELECT id, owner_user_id, statut, programme_json, inscription_rapide_active FROM evenements WHERE id=?").get(params.id);
   if (!evt) return sendJSON(res, 404, { error: "Événement introuvable." });
   if (Number(evt.owner_user_id) !== Number(user.id) && user.role !== "administrateur") {
     return sendJSON(res, 403, { error: "Vous ne pouvez modifier que vos propres événements." });
@@ -23438,7 +23523,7 @@ route("PUT", "/api/evenements/:id", async (req, res, params, body) => {
   const {
     titre, date_evt, heure_debut, heure_fin, type_evt, domaine, zone_diffusion, type_participation, statut, ouverture_inscriptions, pays, lieu, ville, lieu_gps,
     origine, description, places_max, masquer_inscrits, visibilite, lien_visio, whatsapp_lien,
-    image_couverture, image_url, galerie_photos
+    image_couverture, image_url, galerie_photos, programme, inscription_rapide_active
   } = body;
   if (!titre || !date_evt) return sendJSON(res, 400, { error: "Titre et date requis." });
   /* Sanitisé avant écriture (2026-09-25, éditeur de texte enrichi) — seule vraie barrière,
@@ -23451,20 +23536,76 @@ route("PUT", "/api/evenements/:id", async (req, res, params, body) => {
   // brouillon" depuis l'édition) — conserve le statut actuel si rien n'est envoyé (défensif,
   // au cas où un futur appelant de cette route omettrait ce champ).
   const statutFinal = ['ouvert','brouillon'].includes(statut) ? statut : evt.statut;
+  /* Programme/inscription rapide (2026-10-14) : cette route écrase TOUT champ non protégé dès
+     qu'il est absent du corps (voir coverImg/galerie juste au-dessus, déjà ainsi) — un appelant
+     qui ignore ces deux champs (tout appelant d'avant cette date) ne doit pas effacer un
+     programme déjà saisi. `undefined` (jamais envoyé) conserve l'existant ; une valeur envoyée,
+     même vide ([] ou false), s'applique telle quelle. */
+  const programmeJson = programme === undefined ? evt.programme_json : (Array.isArray(programme) ? JSON.stringify(programme) : null);
+  const inscriptionRapideActive = inscription_rapide_active === undefined ? evt.inscription_rapide_active : (inscription_rapide_active ? 1 : 0);
   await db.prepare(`UPDATE evenements SET
     titre=?, date_evt=?, heure_debut=?, heure_fin=?, type_evt=?, domaine=?, zone_diffusion=?, type_participation=?, ouverture_inscriptions=?, statut=?, pays=?, lieu=?, ville=?, lieu_gps=?,
     origine=?, description=?, places_max=?, masquer_inscrits=?, visibilite=?, lien_visio=?, whatsapp_lien=?,
-    image_couverture=?, image_url=?, galerie_photos=?
+    image_couverture=?, image_url=?, galerie_photos=?, programme_json=?, inscription_rapide_active=?
     WHERE id=?`)
     .run(
       titre, date_evt, heure_debut || null, heure_fin || null, type_evt || "evenement", domaine || null, zone_diffusion || null,
       ['payant','partiellement_payant'].includes(type_participation) ? type_participation : 'gratuit', ouverture_inscriptions || null, statutFinal,
       pays || null, lieu || null, ville || null, lieu_gps || null, origine || null, descriptionSafe || null,
       places_max || null, masquer_inscrits ? 1 : 0, visibilite || "public", lien_visio || null, whatsapp_lien || null,
-      coverImg, coverImg, galerie, evt.id
+      coverImg, coverImg, galerie, programmeJson, inscriptionRapideActive, evt.id
     );
   if (evt.statut === 'brouillon' && statutFinal === 'ouvert') alertesEvenementDeclencher(evt.id);
   sendJSON(res, 200, { id: evt.id });
+});
+
+/* POST /api/evenements/:id/inscription-rapide — réservé aux événements flash
+   (inscription_rapide_active, activé par l'organisateur), 2026-10-14, demande explicite :
+   "déclencher une inscription rapide avec inscription dans l'agenda des personnes ayant un
+   compte Diaspo'Actif... pour ceux n'en ayant pas, il n'y a pas de prise en charge prévue,
+   sauf une anticipation du nombre de personnes". Public (un invité sans compte peut s'inscrire,
+   capturé seulement pour le comptage de l'organisateur) ; un compte connecté est en plus ajouté
+   à son agenda personnel (ajouterEvenementAgenda, même mécanique que le bouton "Ajouter à mon
+   agenda"). Jamais de création de compte, jamais de prise en charge particulière pour un
+   invité — exactement comme demandé. */
+route("POST", "/api/evenements/:id/inscription-rapide", async (req, res, params, body) => {
+  await ensureEvenementsFlashExtras();
+  const evt = await db.prepare("SELECT * FROM evenements WHERE id=?").get(params.id);
+  if (!evt) return sendJSON(res, 404, { error: "Événement introuvable." });
+  if (!evt.inscription_rapide_active) return sendJSON(res, 400, { error: "L'inscription rapide n'est pas activée pour cet événement." });
+  const nom = String(body?.nom || "").trim();
+  const prenom = String(body?.prenom || "").trim();
+  const email = String(body?.email || "").trim();
+  const telephone = String(body?.telephone || "").trim() || null;
+  const ville = String(body?.ville || "").trim() || null;
+  if (!nom || !prenom) return sendJSON(res, 400, { error: "Nom et prénom sont requis." });
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return sendJSON(res, 400, { error: "Adresse e-mail invalide." });
+  const user = await getCurrentUser(req);
+  let agenda = null;
+  if (user) {
+    const deja = await db.prepare("SELECT id FROM evenements_inscriptions_rapides WHERE evenement_id=? AND user_id=?").get(evt.id, user.id);
+    if (deja) return sendJSON(res, 200, { ok: true, deja: true });
+    if (evt.date_evt) agenda = await ajouterEvenementAgenda(evt, user.id, req);
+  }
+  await db.prepare(`INSERT INTO evenements_inscriptions_rapides (evenement_id, user_id, nom, prenom, email, telephone, ville) VALUES (?,?,?,?,?,?,?)`)
+    .run(evt.id, user ? user.id : null, nom, prenom, email, telephone, ville);
+  creerNotif(evt.owner_user_id, "inscription_rapide", "Nouvelle inscription",
+    `${prenom} ${nom} s'est inscrit à « ${evt.titre} ».`, { evenement_id: evt.id });
+  sendJSON(res, 201, { ok: true, deja: false, ajoute_agenda: !!(agenda && !agenda.deja) });
+});
+
+/* GET /api/evenements/:id/inscriptions-rapides — organisateur uniquement : liste + comptage,
+   pour "une anticipation du nombre de personnes" (demande explicite). */
+route("GET", "/api/evenements/:id/inscriptions-rapides", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const evt = await db.prepare("SELECT owner_user_id FROM evenements WHERE id=?").get(params.id);
+  if (!evt) return sendJSON(res, 404, { error: "Événement introuvable." });
+  if (Number(evt.owner_user_id) !== Number(user.id) && user.role !== "administrateur") {
+    return sendJSON(res, 403, { error: "Réservé à l'organisateur." });
+  }
+  const inscriptions = await db.prepare("SELECT id, nom, prenom, email, telephone, ville, user_id, created_at FROM evenements_inscriptions_rapides WHERE evenement_id=? ORDER BY created_at DESC").all(params.id);
+  sendJSON(res, 200, { inscriptions, total: inscriptions.length });
 });
 
 /* PATCH /api/evenements/:id/media — retire UNE image/document natif sans toucher au reste de
@@ -24772,6 +24913,18 @@ route("DELETE", "/api/evenements/:id", async (req, res, params) => {
   await db.prepare("DELETE FROM evenement_cr_envois WHERE evenement_id=?").run(params.id);
   await db.prepare("DELETE FROM evenement_cr_messages WHERE evenement_id=?").run(params.id);
   await db.prepare("DELETE FROM evenement_comptes_rendus WHERE evenement_id=?").run(params.id);
+  /* Même classe de bug que ci-dessus (2026-10-14, repéré en testant l'inscription rapide
+     flash) : evenements_inscriptions_rapides a une FK sur evenements(id) — simple artefact de
+     comptage pour CET événement, retiré sans condition comme les tables evenement_* plus haut. */
+  await ensureEvenementsFlashExtras();
+  await db.prepare("DELETE FROM evenements_inscriptions_rapides WHERE evenement_id=?").run(params.id);
+  /* Bug réel repéré le même jour (pas seulement sur les données de test) : agenda_events.evenement_id
+     n'a jamais été nettoyé ici — un utilisateur ayant ajouté cet événement à son agenda personnel
+     gardait une entrée orpheline pointant vers un événement supprimé. C'est l'agenda PERSONNEL du
+     visiteur (pas un historique de l'organisateur à protéger) : retiré sans condition, comme pour
+     « Ajouter à mon agenda » qui est une simple copie, pas un lien vivant. */
+  await db.prepare("DELETE FROM agenda_reminders WHERE event_id IN (SELECT id FROM agenda_events WHERE evenement_id=?)").run(params.id);
+  await db.prepare("DELETE FROM agenda_events WHERE evenement_id=?").run(params.id);
   await db.prepare("DELETE FROM evenements WHERE id=?").run(params.id);
   if (estAdmin) SEC.logSecurity('evenement_force_deleted_by_admin', { admin_id: user.id, evenement_id: params.id, avait_participants: nbParticipants });
   sendJSON(res, 200, { ok: true });

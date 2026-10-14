@@ -598,6 +598,26 @@
 
   const opt = (name, val, titre, aide, on) => `<label class="mev-opt ${on ? 'on' : ''}"><input type="radio" name="${name}" value="${val}" ${on ? 'checked' : ''}><span><b>${titre}</b><small>${aide}</small></span></label>`;
   const sel = (id, opts, cur, vide) => `<select id="${id}">${vide ? `<option value="">${vide}</option>` : ''}${opts.map(o => { const [v, l] = Array.isArray(o) ? o : [o, DOMAINES_LIB[o] || o]; return `<option value="${esc(v)}" ${String(cur || '') === String(v) ? 'selected' : ''}>${esc(l)}</option>`; }).join('')}</select>`;
+  /* Constructeur de Programme (journées + étapes), 2026-10-14 — demande explicite, réservé aux
+     événements flash (voir server/index.js ensureEvenementsFlashExtras et m.js pour l'affichage
+     public en lecture seule). « Journée 1 2 3 avec date début et fin de journée » : plusieurs
+     journées possibles, chacune avec ses propres dates et son propre déroulé d'étapes. */
+  function jourHtml(j, i) {
+    return `<div class="mev-note" style="margin-top:${i ? 12 : 0}">
+      <div class="row" style="justify-content:space-between;align-items:center"><b>Journée ${i + 1}</b><button type="button" class="btn out sm" data-prog-del-j="${i}">Supprimer</button></div>
+      <div class="mev-2" style="margin-top:8px"><div><label class="mev-l">Début de journée</label><input type="date" data-pf="db" data-i="${i}" value="${esc(j.date_debut || '')}"></div>
+        <div><label class="mev-l">Fin de journée</label><input type="date" data-pf="df" data-i="${i}" value="${esc(j.date_fin || '')}"></div></div>
+      ${(j.etapes || []).map((et, k) => `
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+        <label class="mev-l">Étape ${k + 1}</label>
+        <input type="text" data-pf="et-titre" data-i="${i}" data-k="${k}" value="${esc(et.titre || '')}" placeholder="Ex. : Accueil">
+        <div class="mev-2" style="margin-top:6px"><div><label class="mev-l">Début</label><input type="time" data-pf="et-hd" data-i="${i}" data-k="${k}" value="${esc(et.heure_debut || '')}"></div>
+          <div><label class="mev-l">Fin</label><input type="time" data-pf="et-hf" data-i="${i}" data-k="${k}" value="${esc(et.heure_fin || '')}"></div></div>
+        <button type="button" class="btn out sm" style="margin-top:6px" data-prog-del-e="${i}:${k}">Retirer cette étape</button>
+      </div>`).join('')}
+      <button type="button" class="btn out sm" style="margin-top:10px" data-prog-add-e="${i}">+ Ajouter une étape</button>
+    </div>`;
+  }
 
   async function formulaire(t, id, modeInit) {
     const edition = !!id; const titrePane = edition ? 'Modifier l’événement' : (modeInit === 'flash' ? 'Événement flash' : 'Nouvel événement');
@@ -617,6 +637,14 @@
     const plat = !e || estPlat(e.description);
     const pays = await chargerPays(); if (!vivant(t)) return;
     const zoneInit = v.zone_diffusion || '';
+    /* Programme + inscription rapide : réservés à l'événement flash. En création, la bascule se
+       fait avec le choix de type (majMode) ; en modification, le radio n'existe pas (voir
+       l'avertissement du module en tête de fichier) donc on détecte directement le flash déjà en
+       base — et ça ne change plus jamais ensuite. */
+    const mostraProgramme = edition ? Number(v.inscription_ouverte) === 0 : true;
+    let programme = [];
+    try { programme = v.programme_json ? JSON.parse(v.programme_json) : []; } catch (_) { programme = []; }
+    if (!Array.isArray(programme)) programme = [];
 
     const html = `<form id="mev-form" class="mev-f" novalidate autocomplete="off">
       <div class="mev-gerr" id="mev-gerr" role="alert"></div>
@@ -647,6 +675,15 @@
       <div id="mev-b-places">
         <label class="mev-l" for="mev-places">Nombre de places <small>(vide = illimité)</small></label>
         <input type="number" id="mev-places" min="1" step="1" inputmode="numeric" value="${v.places_max ? esc(v.places_max) : ''}" placeholder="Illimitées" aria-describedby="mev-e-places"><div class="mev-err" id="mev-e-places" role="alert"></div>
+      </div>
+      <div class="h2" id="mev-h-prog">PROGRAMME</div>
+      <div id="mev-prog-wrap" ${mostraProgramme ? '' : 'hidden'}>
+        <p class="mev-hint">Le déroulé de votre événement, jour par jour (facultatif).</p>
+        <div id="mev-prog-list">${programme.map((j, i) => jourHtml(j, i)).join('')}</div>
+        <button type="button" class="btn out block" style="margin-top:10px" data-prog-add-j>+ Ajouter une journée</button>
+      </div>
+      <div id="mev-ir-wrap" ${mostraProgramme ? '' : 'hidden'}>
+        <label class="mev-opt ${v.inscription_rapide_active ? 'on' : ''}" style="margin-top:14px" id="mev-ir-opt"><input type="checkbox" id="mev-ir-ck" ${v.inscription_rapide_active ? 'checked' : ''}><span><b>Activer l’inscription rapide</b><small>Nom, prénom, e-mail (téléphone et ville facultatifs) pour confirmer sa venue — ajoutée automatiquement à l’agenda des personnes connectées ; une simple estimation du nombre de personnes pour les autres.</small></span></label>
       </div>
       ${edition ? `<div class="mev-note" style="margin-top:14px"><b>Visibilité : ${esc(visLabel(v))}</b>Elle se règle à la création ; pour la changer, ouvrez l’événement sur ordinateur.</div>` : `
       <div id="mev-b-part"><div class="h2">PARTICIPATION</div>
@@ -689,10 +726,50 @@
       const d = $('#mev-desc'); if (d) d.maxLength = flash ? 500 : 5000;
       const part = $('input[name="mev-part"]:checked', form), hint = $('#mev-part-hint');
       if (hint) hint.hidden = !part || part.value === 'gratuit';
+      /* Programme + inscription rapide : en création, visibles uniquement en mode « flash ».
+         En modification, leur visibilité (mostraProgramme) est fixée une fois pour toutes à
+         l'ouverture du formulaire — le radio de type n'existe plus, flash vaut toujours faux
+         ici, donc on ne doit JAMAIS les masquer via ce chemin en édition. */
+      if (!edition) {
+        const pw = $('#mev-prog-wrap'), iw = $('#mev-ir-wrap');
+        if (pw) pw.hidden = !flash; if (iw) iw.hidden = !flash;
+      }
       compteur();
     }
     const d0 = $('#mev-desc'); if (d0) d0.addEventListener('input', compteur);
     majMode();
+
+    // Programme (journées + étapes) : rendu déjà fait côté serveur-string, ici seulement la
+    // mutation en mémoire + le ré-affichage après ajout/retrait d'une journée ou d'une étape.
+    const progList = $('#mev-prog-list');
+    if (progList) {
+      const progWrap = $('#mev-prog-wrap');
+      const renderProgramme = () => { progList.innerHTML = programme.map((j, i) => jourHtml(j, i)).join(''); };
+      progWrap.addEventListener('input', ev => {
+        const t = ev.target, pf = t.dataset.pf; if (!pf) return;
+        const i = Number(t.dataset.i);
+        if (pf === 'db') programme[i].date_debut = t.value;
+        else if (pf === 'df') programme[i].date_fin = t.value;
+        else {
+          const k = Number(t.dataset.k), et = programme[i].etapes[k];
+          if (pf === 'et-titre') et.titre = t.value;
+          else if (pf === 'et-hd') et.heure_debut = t.value;
+          else if (pf === 'et-hf') et.heure_fin = t.value;
+        }
+      });
+      progWrap.addEventListener('click', ev => {
+        const addJ = ev.target.closest('[data-prog-add-j]');
+        const delJ = ev.target.closest('[data-prog-del-j]');
+        const addE = ev.target.closest('[data-prog-add-e]');
+        const delE = ev.target.closest('[data-prog-del-e]');
+        if (addJ) { programme.push({ date_debut: '', date_fin: '', etapes: [] }); renderProgramme(); }
+        else if (delJ) { if (!confirm('Supprimer cette journée et toutes ses étapes ?')) return; programme.splice(Number(delJ.dataset.progDelJ), 1); renderProgramme(); }
+        else if (addE) { const i = Number(addE.dataset.progAddE); programme[i].etapes = programme[i].etapes || []; programme[i].etapes.push({ titre: '', heure_debut: '', heure_fin: '' }); renderProgramme(); }
+        else if (delE) { const [i, k] = delE.dataset.progDelE.split(':').map(Number); programme[i].etapes.splice(k, 1); renderProgramme(); }
+      });
+    }
+    const irCk = $('#mev-ir-ck');
+    if (irCk) irCk.onchange = ev => ev.target.closest('.mev-opt').classList.toggle('on', ev.target.checked);
 
     let photo = null; // Blob déjà réduit, envoyé seulement à la validation
     const ph = $('#mev-photo');
@@ -756,6 +833,13 @@
           places_max: champ('mev-places') ? Number(champ('mev-places')) : null
         });
         if ($('#mev-desc')) body.description = $('#mev-desc').value.trim();
+        // Programme + inscription rapide : champs absents du formulaire pour un événement non-flash
+        // (mostraProgramme faux) — on ne les envoie alors pas du tout, pour ne jamais écraser une
+        // valeur existante avec `undefined` (voir server/index.js, PUT /api/evenements/:id).
+        if (mostraProgramme) {
+          body.programme = programme;
+          const irCk2 = $('#mev-ir-ck'); if (irCk2) body.inscription_rapide_active = irCk2.checked;
+        }
       } else {
         const vis = $('input[name="mev-vis"]:checked', form).value;
         body = {
@@ -767,7 +851,11 @@
           statut, galerie_photos: []
         };
         if (visio && !lieu && !ville) body.mode_participation = 'distanciel';
-        if (flash) { body.inscription_ouverte = false; body.appliquer_fiche_standard = false; }
+        if (flash) {
+          body.inscription_ouverte = false; body.appliquer_fiche_standard = false;
+          body.programme = programme;
+          const irCk2 = $('#mev-ir-ck'); if (irCk2) body.inscription_rapide_active = irCk2.checked;
+        }
         else {
           body.inscription_ouverte = true;
           body.places_max = champ('mev-places') ? Number(champ('mev-places')) : null;

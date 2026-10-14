@@ -817,6 +817,24 @@
     else if (inscrit) cta = `<button class="btn out block" id="ev-quit">${ic('check', 's')} Je suis inscrit · Annuler</button>`;
     else if (!e.inscription_ouverte) cta = `<button class="btn block" disabled>Inscriptions fermées</button>`;
     else cta = `<button class="btn block" id="ev-join">Je m’inscris</button>`;
+    /* Programme (journées + étapes) et inscription rapide (2026-10-14, demande explicite) —
+       réservés à l'Événement flash (voir server/index.js ensureEvenementsFlashExtras), affichage
+       en lecture seule ici : la saisie se fait côté organisateur (assets/m-mod-mesevenements.js). */
+    let programme = null;
+    try { programme = e.programme_json ? JSON.parse(e.programme_json) : null; } catch (_) { /* JSON invalide : pas d'affichage plutôt qu'une erreur */ }
+    const programmeHtml = (Array.isArray(programme) && programme.length) ? `<div class="card"><div class="pad"><b>${ic('cal', 's')} Programme</b>${programme.map((jour, i) => `
+        <div style="margin-top:10px;${i ? 'border-top:1px solid var(--border);padding-top:10px;' : ''}">
+          <div style="font-weight:700;font-size:13px">Journée ${i + 1}${jour.date_debut ? ' — ' + esc(dateLong(jour.date_debut)) : ''}${jour.date_fin && jour.date_fin !== jour.date_debut ? ' au ' + esc(dateLong(jour.date_fin)) : ''}</div>
+          ${(jour.etapes || []).length ? jour.etapes.map(et => `<div style="display:flex;justify-content:space-between;gap:10px;font-size:13px;margin-top:6px"><span>${esc(et.titre || '')}</span><span class="muted">${esc(et.heure_debut || '')}${et.heure_fin ? ' – ' + esc(et.heure_fin) : ''}</span></div>`).join('') : `<p class="small muted" style="margin:4px 0 0">Aucune étape renseignée.</p>`}
+        </div>`).join('')}</div></div>` : '';
+    const inField = (id, ph, type) => `<input class="in-rapide" id="${id}" ${type ? `type="${type}"` : ''} placeholder="${ph}" style="width:100%;box-sizing:border-box;padding:11px 14px;font-size:16px;border:1px solid var(--border);border-radius:12px;background:var(--card);color:var(--text);margin-top:8px">`;
+    const inscriptionRapideHtml = e.inscription_rapide_active ? `<div class="card"><div class="pad">
+        <b>${ic('check', 's')} Inscription rapide</b>
+        <p class="small muted" style="margin:6px 0 10px">${S.me ? 'Confirmez votre venue — ajoutée automatiquement à votre agenda.' : 'Indiquez vos coordonnées pour confirmer votre venue.'}</p>
+        ${S.me ? '' : inField('ir-nom', 'Nom') + inField('ir-prenom', 'Prénom') + inField('ir-email', 'E-mail', 'email') + inField('ir-tel', 'Téléphone (facultatif)', 'tel') + inField('ir-ville', 'Ville')}
+        <button class="btn block" id="ev-insc-rapide" type="button" style="margin-top:10px">Je m’inscris</button>
+        <p class="small muted" id="ev-insc-rapide-msg" style="margin-top:8px"></p>
+      </div></div>` : '';
     const html = `${cov ? mediaBlock(cov, { alt: e.titre }) : ''}
       <div class="card" style="margin-top:12px"><div class="pad"><h2 style="margin:0 0 8px;font-size:21px;line-height:1.25">${esc(e.titre)}</h2>
         <div class="meta">${ic('cal', 's')}<span>${esc(dateLong(e.date_evt))}${e.date_fin && e.date_fin !== e.date_evt ? ' → ' + esc(dateLong(e.date_fin)) : ''}</span></div>
@@ -826,6 +844,8 @@
         ${e.organisateur_nom || ev.organisateur_nom ? `<p class="small muted" style="margin:12px 0 0">Organisé par <b style="color:var(--text)" ${e.owner_user_id ? `data-prof="${esc(e.owner_user_id)}" role="link"` : ''}>${esc(ev.organisateur_nom || e.organisateur_nom)}</b></p>` : ''}</div></div>
       ${(e.visibilite || 'public') === 'public' ? `<div class="card"><div class="pad" style="text-align:center"><b>${ic('ticket', 's')} QR code de l’événement</b><p class="small muted" style="margin:4px 0 0">Scannez-le pour ouvrir l’événement, ou montrez-le pour le partager.</p><div class="qr" id="ev-qr" role="img" aria-label="QR code de l’événement"></div><div class="row" style="gap:8px"><button type="button" class="btn out sm sp" id="ev-qr-big">${ic('search', 's')} Agrandir</button><button type="button" class="btn out sm sp" id="ev-qr-share">${ic('share', 's')} Partager le lien</button></div></div></div>` : ''}
       ${desc ? `<div class="card"><div class="pad rich" style="white-space:pre-line">${esc(desc)}</div></div>` : ''}
+      ${programmeHtml}
+      ${inscriptionRapideHtml}
       ${e.lien_visio ? `<a class="btn out block" style="margin-bottom:12px" href="${attrUrl(e.lien_visio)}" target="_blank" rel="noopener">Rejoindre en visio ${ic('out', 's')}</a>` : ''}
       <button class="btn out block" id="ev-agenda" type="button" style="margin-bottom:12px">${ic('cal', 's')} Ajouter à mon agenda</button>`;
     setPane(e.titre, html, cta);
@@ -865,6 +885,29 @@
       if (!confirm('Annuler votre inscription à cet événement ?')) return;
       try { await api(`/api/evenements/${id}/quitter`, { method: 'DELETE' }); S.myInsc.delete(Number(id)); toast('Inscription annulée'); S.ev.loaded = false; paneEvent(id); }
       catch (er) { toast(er.message, true); }
+    };
+    /* Inscription rapide (2026-10-14) : un tap pour un compte connecté (coordonnées du profil,
+       ajout automatique à l'agenda côté serveur) ; formulaire à 5 champs pour un invité, sans
+       aucune prise en charge particulière au-delà du comptage pour l'organisateur. */
+    const ir = $('#ev-insc-rapide');
+    if (ir) ir.onclick = async () => {
+      const msg = $('#ev-insc-rapide-msg');
+      let payload;
+      if (S.me) {
+        payload = { nom: S.me.nom || '', prenom: S.me.prenom || '', email: S.me.email || '' };
+      } else {
+        const v = id2 => { const el = $('#' + id2); return el ? el.value.trim() : ''; };
+        payload = { nom: v('ir-nom'), prenom: v('ir-prenom'), email: v('ir-email'), telephone: v('ir-tel'), ville: v('ir-ville') };
+        if (!payload.nom || !payload.prenom) { if (msg) msg.textContent = 'Nom et prénom sont requis.'; return; }
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email)) { if (msg) msg.textContent = 'Adresse e-mail invalide.'; return; }
+      }
+      ir.disabled = true;
+      try {
+        const rr = await api(`/api/evenements/${id}/inscription-rapide`, { method: 'POST', body: payload });
+        ir.innerHTML = `${ic('check', 's')} Inscription confirmée`;
+        if (msg) msg.textContent = rr.deja ? 'Vous étiez déjà inscrit.' : (rr.ajoute_agenda ? 'Ajoutée à votre agenda ✓' : 'Merci, c’est noté !');
+        toast('Inscription confirmée ✓');
+      } catch (er) { if (msg) msg.textContent = er.message; ir.disabled = false; }
     };
   }
 
