@@ -871,9 +871,9 @@
   /* ============================================================
      ANNUAIRE — initiatives, membres, collectivités (route /api/annuaire/recherche)
      ============================================================ */
-  const ANN_TYPES = [['', 'Tous'], ['Initiative', 'Initiatives'], ['Utilisateurs', 'Membres'], ['Collectivité', 'Collectivités']];
+  const ANN_TYPES = [['', 'Tous'], ['Initiative', 'Initiatives'], ['Utilisateurs', 'Utilisateurs'], ['Collectivité', 'Collectivités']];
   /* Mêmes types que le filtre « Type d'organisme » de l'annuaire du site. */
-  const ANN_TYPE_OPTS = [['', 'Tous les types'], ['Utilisateurs', 'Membres'], ['Initiative', 'Initiatives (tous types)'], ['Association', 'Association'], ['Entreprise', 'Entreprise'], ['Institution', 'Institution'], ['Collectivité', 'Collectivité'], ['ONG', 'ONG'], ['Coopérative', 'Coopérative'], ['Média', 'Média'], ['Fondation', 'Fondation'], ['Startup', 'Startup'], ['Projet collectif', 'Projet collectif'], ['Mutuelle', 'Mutuelle'], ['Organisme de formation', 'Organisme de formation'], ['Établissement public', 'Établissement public'], ['Collectivité territoriale', 'Collectivité territoriale'], ['Organisation professionnelle', 'Organisation professionnelle'], ['Groupement d’entrepreneurs', 'Groupement d’entrepreneurs'], ['Particulier', 'Particulier'], ['Autre', 'Autre']];
+  const ANN_TYPE_OPTS = [['', 'Tous les types'], ['Utilisateurs', 'Utilisateurs'], ['Initiative', 'Initiatives (tous types)'], ['Association', 'Association'], ['Entreprise', 'Entreprise'], ['Institution', 'Institution'], ['Collectivité', 'Collectivité'], ['ONG', 'ONG'], ['Coopérative', 'Coopérative'], ['Média', 'Média'], ['Fondation', 'Fondation'], ['Startup', 'Startup'], ['Projet collectif', 'Projet collectif'], ['Mutuelle', 'Mutuelle'], ['Organisme de formation', 'Organisme de formation'], ['Établissement public', 'Établissement public'], ['Collectivité territoriale', 'Collectivité territoriale'], ['Organisation professionnelle', 'Organisation professionnelle'], ['Groupement d’entrepreneurs', 'Groupement d’entrepreneurs'], ['Particulier', 'Particulier'], ['Autre', 'Autre']];
   const normTxt = s => String(s == null ? '' : s).toLowerCase().trim().normalize('NFD').replace(/[̀-ͯ]/g, '');
   const annAll = r => [
     ...(r.initiatives || []).map(x => ({ k: 'i', rang: x._rang || 0, x })),
@@ -980,6 +980,7 @@
   const descPlain = v => strip(v).replace(/\n{3,}/g, '\n\n');
   /* Origines affichées sur la cartouche : sans les nationalités, sans doublon (insensible à la casse et aux accents). */
   const annOriginesAff = x => { const vu = new Set(), out = []; [x.origine1, x.origine2, x.owner_origine1, x.owner_origine2, x.pays_origine, x.pays_origine_institution].forEach(v => { const k = normTxt(v); if (k && !vu.has(k)) { vu.add(k); out.push(String(v).trim()); } }); return out; };
+  const STATUT_PRO = { en_poste: 'En poste', en_recherche: 'En recherche', disponible: 'Disponible pour opportunités', autre: 'Autre statut', etudiant: 'Étudiant·e', salarie: 'Salarié·e', entrepreneur: 'Entrepreneur·e', liberal: 'Profession libérale', fonctionnaire: 'Fonctionnaire', retraite: 'Retraité·e', sans_emploi: 'Sans emploi' };
   function annCard(it) {
     const x = it.x; let nm, desc, badge, href, photo, uid, loc, kind, fid, key = it.k + x.id;
     loc = [x.ville, x.pays].filter(Boolean).join(', ');
@@ -987,7 +988,7 @@
       nm = x.nom; badge = x.type || 'Initiative'; photo = x.logo_url; uid = x.owner_user_id; kind = 'initiative'; fid = x.id;
       desc = descPlain(x.description || x.mission || x.slogan || ''); href = '#/profil/i/' + encodeURIComponent(x.slug || x.id);
     } else if (it.k === 'u') {
-      nm = [x.prenom, x.nom].filter(Boolean).join(' ') || x.nom; badge = 'Membre'; photo = x.photo_url; uid = x.id; kind = 'user'; fid = x.id;
+      nm = [x.prenom, x.nom].filter(Boolean).join(' ') || x.nom; badge = 'Utilisateur'; photo = x.photo_url; uid = x.id; kind = 'user'; fid = x.id;
       desc = descPlain(x.bio || x.titre_pro || ''); href = '#/profil/' + encodeURIComponent(x.id);
     } else {
       nm = x.nom_institution || x.nom; badge = x.role === 'administrateur' ? 'Diaspo’Actif' : (x.role === 'collectivite' ? 'Collectivité' : 'Institution'); photo = x.photo_url; uid = x.id;
@@ -997,13 +998,15 @@
     /* Partage (2026-10-07) : adresse PUBLIQUE du profil, lisible sans compte (même adresse que le bouton « Partager » du site : le profil du compte, ou la fiche de l'initiative sans propriétaire). */
     S.annShare = S.annShare || {};
     S.annShare[key] = { nm, path: '/partage-compte.html?t=' + (it.k === 'i' ? 'i&id=' + encodeURIComponent(x.slug || x.id) : 'u&id=' + encodeURIComponent(x.id)) };
-    const dom = it.k === 'i' && x.domaine ? `<span class="badge">${esc(x.domaine)}</span>` : '';
+    const dom = it.k === 'i' && x.domaine ? `<span class="badge">${esc(x.domaine)}</span>` : (it.k === 'u' && x.domaine_principal ? `<span class="badge g">${esc(domLabel(x.domaine_principal))}</span>` : '');
+    /* Statut professionnel d’un compte utilisateur (même liste que la cartouche du site) ; plusieurs valeurs possibles, séparées par une virgule à l’inscription. */
+    const statutPro = it.k === 'u' ? String(x.situation_pro || '').split(/[,;]/).map(v => STATUT_PRO[v.trim()]).filter(Boolean).map(l => `<span class="badge o">${esc(l)}</span>`).join('') : '';
     const note = x.avis_total ? `<span class="badge o">★ ${esc(Number(x.avis_moyenne || 0).toFixed(1))} (${x.avis_total})</span>` : '';
     const open = !!(S.ann.open && S.ann.open[key]);
     const peutAdherer = it.k === 'i' && ['Association', 'ONG'].includes(x.type) && x.adhesions_ouvertes !== false && x.adhesions_ouvertes !== 0 && !(S.me && uid && Number(S.me.id) === Number(uid));
     return `<article class="card ann" data-key="${esc(key)}"><a class="ann-top" href="${href}"><div class="av big" style="border-radius:${it.k === 'u' ? '50%' : '16px'}">${photo ? `<img src="${attrUrl(photo)}" alt="" loading="lazy" onerror="this.remove()">` : esc(initials(nm))}</div>
       <div class="sp"><div class="nm" style="font-weight:700;font-size:16px;line-height:1.2">${esc(nm)}</div>
-      <div class="tags" style="margin:4px 0 0"><span class="badge ${it.k === 'u' ? '' : 'g'}">${esc(badge)}</span>${dom}${note}</div></div></a>
+      <div class="tags" style="margin:4px 0 0"><span class="badge ${it.k === 'u' ? '' : 'g'}">${esc(badge)}</span>${dom}${statutPro}${note}</div></div></a>
       <div class="ann-info"><div><span>Origine</span><b>${esc(annOriginesAff(x).join(' · ') || '—')}</b></div><div><span>Pays de résidence</span><b>${esc(x.pays || '—')}</b></div><div><span>Ville de résidence</span><b>${esc(x.ville || '—')}</b></div></div>
       ${desc ? `<div class="ann-desc${open ? ' open' : ''}" data-desc>${esc(desc)}</div>` : ''}
       ${desc ? `<div class="ann-links"><button type="button" class="lnk" data-more hidden aria-expanded="${open}">${open ? 'Voir moins ▴' : 'Voir plus ▾'}</button></div>` : ''}
