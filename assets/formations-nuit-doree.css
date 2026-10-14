@@ -1,0 +1,99 @@
+/* ============================================================
+   Plateforme de formations (formations.html) — design « Nuit dorée » (2026-10-14, demande explicite : « nouvelle DA »).
+   Feuille de surcharge chargée APRÈS theme-nuit-doree.css ; tout est préfixé html body.nd. Aucun changement de logique.
+   design-upgrade.v2.css impose des couleurs en !important sur .content : les surcharges ci-dessous en font autant.
+   Retour arrière : retirer les 2 <link> et class="nd" sur <body> de formations.html.
+   ============================================================ */
+
+/* ── Fond et colonne centrale ── */
+html body.nd :is(.with-sidebar,.content,main.content){background:transparent!important;color:var(--nd-texte)}
+html body.nd .content :is(h1,h2){font-family:var(--nd-display)!important;font-weight:500!important;letter-spacing:-.01em;color:#fff!important}
+html body.nd .content h1{font-size:clamp(32px,3.8vw,48px)!important}
+html body.nd .content h3{color:#fff!important}
+html body.nd .content :is(p,.muted,label,small,span)[style*="var(--muted"],html body.nd .content p[style*="color:var(--muted"]{color:var(--nd-doux)!important}
+html body.nd .content label{color:var(--nd-doux)!important}
+html body.nd .content a:not(.btn):not(.fc-btn):not([class*="btn"]){color:var(--nd-or)}
+
+/* ── Menu latéral « Formations » ── */
+html body.nd .with-sidebar>.sidebar{background:rgba(8,13,30,.72)!important;border-right:1px solid var(--nd-bord)!important;backdrop-filter:blur(14px)}
+html body.nd .with-sidebar>.sidebar .brand{font-family:var(--nd-display)!important;font-weight:600;color:#fff!important}
+html body.nd .with-sidebar>.sidebar a{color:var(--nd-doux)!important;border-radius:14px;transition:background .25s,color .25s}
+html body.nd .with-sidebar>.sidebar a:hover{background:var(--nd-verre2)!important;color:#fff!important}
+html body.nd .with-sidebar>.sidebar a.active{background:var(--nd-degore)!important;color:#1a1202!important;font-weight:800}
+
+/* ── Encarts et cartes ── */
+html body.nd .content .notice{background:rgba(227,192,110,.08)!important;border:1px solid var(--nd-bord)!important;border-radius:18px!important;color:#F3E3B5!important;line-height:1.55}
+html body.nd .content .card,html body.nd .content .formation-card{background:var(--nd-verre)!important;border:1px solid var(--nd-bord2)!important;border-radius:22px!important;color:var(--nd-texte);box-shadow:0 26px 54px -36px #000}
+html body.nd .content .formation-card{overflow:hidden;transition:transform .5s var(--nd-ease),border-color .4s}
+html body.nd .content .formation-card:hover{transform:translateY(-3px);border-color:var(--nd-bord)!important}
+html body.nd .content .card h3{font-family:var(--nd-display)!important;font-weight:500!important;font-size:22px;line-height:1.2}
+html body.nd .content .card :is(p,div)[style*="color"]{color:var(--nd-doux)!important}
+html body.nd .content .card p{color:var(--nd-doux)!important}
+html body.nd .fc-media-placeholder{background:radial-gradient(240px 160px at 85% 0%,rgba(227,192,110,.38),transparent 70%),linear-gradient(145deg,#14234a 0%,#0B1226 80%)!important;color:var(--nd-or)!important;font-family:var(--nd-display)}
+html body.nd #devenir-formateur-banner{background:linear-gradient(135deg,rgba(227,192,110,.14),rgba(227,192,110,.05))!important;border:1px solid var(--nd-bord)!important;border-radius:22px!important}
+html body.nd #devenir-formateur-banner strong{color:#fff}
+html body.nd #devenir-formateur-banner p{color:var(--nd-doux)!important}
+html body.nd #devenir-formateur-banner a{background:var(--nd-degore)!important;color:#1a1202!important;border-radius:999px!important;font-weight:800}
+
+/* ── Pastilles et étiquettes ── */
+html body.nd .content :is(.feed-cat,.tag,.badge){background:rgba(227,192,110,.12)!important;color:var(--nd-or)!important;border:1px solid var(--nd-bord);border-radius:999px!important;font-weight:700}
+html body.nd .content .badge.badge-asso{background:rgba(52,211,153,.14)!important;color:#7DE3B5!important;border-color:rgba(52,211,153,.4)}
+html body.nd #formations-count-badge{background:var(--nd-verre2)!important;color:#fff!important}
+
+/* ── Champs ── */
+html body.nd .content :is(.input-field,input[type=text],input[type=number],input[type=search],input[type=email],input[type=url],select,textarea){background:rgba(255,255,255,.06)!important;border:1px solid var(--nd-bord2)!important;border-radius:14px!important;color:#fff!important;min-height:46px;color-scheme:dark}
+html body.nd .content textarea{min-height:90px}
+html body.nd .content :is(.input-field,input,select,textarea)::placeholder{color:var(--nd-faible)}
+html body.nd .content :is(.input-field,input,select,textarea):focus{outline:none;border-color:var(--nd-or)!important;box-shadow:0 0 0 3px rgba(227,192,110,.18)}
+html body.nd .content select option{background:#0f1a38;color:#fff}
+html body.nd .content input[type=checkbox],html body.nd .content input[type=radio]{accent-color:var(--nd-or)}
+
+/* ── Boutons ── */
+html body.nd .content :is(.btn-orange,.btn-primary){background:var(--nd-degore)!important;color:#1a1202!important;border:0!important;border-radius:999px!important;min-height:44px;padding:0 22px;font-weight:800;box-shadow:0 12px 26px -14px rgba(227,192,110,.7)}
+html body.nd .content .btn-outline{background:transparent!important;color:var(--nd-or)!important;border:1px solid var(--nd-or)!important;border-radius:999px!important;font-weight:800}
+html body.nd .content .btn-outline:hover{background:rgba(227,192,110,.12)!important}
+html body.nd .content .btn-sm{min-height:40px;padding:0 16px}
+html body.nd :is(.content .btn,.content button,.fb-modal-box button):focus-visible{outline:3px solid var(--nd-or);outline-offset:2px}
+
+/* ── Espace formateur : onglets, cartes de modules, leçons ── */
+html body.nd .fb-tab,html body.nd .mf-cat-pill{background:var(--nd-verre)!important;border:1px solid var(--nd-bord2)!important;border-radius:999px!important;color:var(--nd-texte)!important;font-weight:700}
+html body.nd .fb-tab:hover,html body.nd .mf-cat-pill:hover{border-color:var(--nd-bord)!important}
+html body.nd .fb-tab.active,html body.nd .mf-cat-pill.checked{background:var(--nd-degore)!important;border-color:transparent!important;color:#1a1202!important}
+html body.nd .mfw-step{color:var(--nd-doux);border-bottom-color:var(--nd-bord2)}
+html body.nd .mfw-step.active{color:var(--nd-or);border-bottom-color:var(--nd-or)}
+html body.nd .mfw-step.done{color:#7DE3B5;border-bottom-color:rgba(52,211,153,.5)}
+html body.nd .fb-module-card,html body.nd .fb-dash-card,html body.nd .fb-preview-card{background:var(--nd-verre)!important;border:1px solid var(--nd-bord2)!important;border-radius:18px!important;color:var(--nd-texte)}
+html body.nd .fb-lecon-row{background:rgba(255,255,255,.04)!important;border:1px solid var(--nd-bord2)!important;border-radius:14px!important;color:var(--nd-texte)}
+html body.nd :is(.fb-module-card.dragover,.fb-lecon-row.dragover){border-color:var(--nd-or)!important;background:rgba(227,192,110,.1)!important}
+html body.nd :is(.fb-stats-auto){background:rgba(255,255,255,.04)!important;border-radius:16px!important}
+html body.nd :is(.fb-stats-num,.fb-dash-num){color:var(--nd-or)!important;font-family:var(--nd-display)}
+html body.nd :is(.fb-stats-lbl,.fb-dash-lbl,.fb-upload-status,.fb-drag-handle){color:var(--nd-doux)!important}
+html body.nd .fb-subsection-title{color:var(--nd-or)!important;border-bottom-color:var(--nd-bord2)!important;letter-spacing:.06em}
+html body.nd .fb-preview-badge{background:rgba(227,192,110,.14)!important;color:var(--nd-or)!important}
+html body.nd .fb-help{background:var(--nd-verre2)!important;color:var(--nd-doux)!important}
+html body.nd .fb-help:hover{background:var(--nd-or)!important;color:#1a1202!important}
+html body.nd .fb-eleve-table :is(th,td){border-bottom:1px solid var(--nd-bord2)!important;color:var(--nd-texte)}
+html body.nd .fb-eleve-table th{color:var(--nd-or)!important;letter-spacing:.1em}
+html body.nd .fb-statut-pill.active{background:rgba(127,166,224,.18)!important;color:#A9C4F0!important}
+html body.nd .fb-statut-pill.terminee{background:rgba(52,211,153,.16)!important;color:#7DE3B5!important}
+html body.nd .fb-statut-pill.non-commencee{background:var(--nd-verre2)!important;color:var(--nd-doux)!important}
+html body.nd .fb-switch .fb-switch-track{background:rgba(255,255,255,.18)}
+html body.nd .fb-switch input[type=checkbox]:checked + .fb-switch-track{background:var(--nd-or)}
+html body.nd .fb-ai-msg.bot{background:var(--nd-verre2)!important;color:var(--nd-texte)!important}
+html body.nd .fb-ai-msg.user{background:var(--nd-degore)!important;color:#1a1202!important}
+
+/* ── Fenêtres (création de formation, module, leçon…) ── */
+html body.nd .fb-modal-bg{background:rgba(3,6,14,.78)!important;backdrop-filter:blur(6px)}
+html body.nd .fb-modal-box{background:radial-gradient(420px 220px at 100% 0%,rgba(227,192,110,.14),transparent 66%),linear-gradient(160deg,#14234a 0%,#0B1226 62%)!important;border:1px solid rgba(227,192,110,.4);border-radius:26px!important;color:var(--nd-texte);box-shadow:0 40px 80px -30px #000;scrollbar-width:thin;scrollbar-color:rgba(227,192,110,.4) transparent}
+html body.nd .fb-modal-box :is(h2,h3){font-family:var(--nd-display)!important;font-weight:500;color:#fff!important}
+html body.nd .fb-field label{color:var(--nd-doux)!important}
+html body.nd .fb-field :is(input[type=text],input[type=number],select,textarea){background:rgba(255,255,255,.06)!important;border:1px solid var(--nd-bord2)!important;color:#fff!important;border-radius:14px!important}
+html body.nd #fb-tooltip-popup{background:rgba(11,18,38,.97)!important;border:1px solid var(--nd-bord);border-radius:14px!important;color:var(--nd-texte)}
+html body.nd #fb-tooltip-popup::after{background:rgba(11,18,38,.97)!important;border-left:1px solid var(--nd-bord);border-top:1px solid var(--nd-bord)}
+
+/* ── Fenêtres « modal-… » (besoin en formation, inscription…) : la carte intérieure devient pleine, pas translucide ── */
+html body.nd :is(.content,body)>[id^="modal-"],html body.nd .content [id^="modal-"][style*="fixed"],html body.nd div[id^="modal-"][style*="position:fixed"]{background:rgba(3,6,14,.78)!important;backdrop-filter:blur(6px)}
+html body.nd [id^="modal-"]>.card{background:radial-gradient(420px 220px at 100% 0%,rgba(227,192,110,.14),transparent 66%),linear-gradient(160deg,#14234a 0%,#0B1226 62%)!important;border:1px solid rgba(227,192,110,.4)!important;border-radius:26px!important;box-shadow:0 40px 80px -30px #000;color:var(--nd-texte)}
+html body.nd [id^="modal-"]>.card :is(h2,h3){font-family:var(--nd-display)!important;font-weight:500;color:#fff!important}
+html body.nd [id^="modal-"]>.card{width:min(580px,calc(100% - 32px));max-width:580px;margin:8vh auto 0!important;padding:24px 26px!important}
+@media (max-width:640px){html body.nd [id^="modal-"]>.card{margin:4vh auto 0!important}}
