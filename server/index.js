@@ -27833,10 +27833,18 @@ route("GET", "/api/admin/retention", async (req, res) => {
 
 /* ===== HEARTBEAT SESSION (temps passé sur la plateforme) ===== */
 
+const HEARTBEAT_DERNIER = new Map();
 route("POST", "/api/session/heartbeat", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 200, { ok: false });
-  const secs = Math.min(Math.max(parseInt(body.secs) || 30, 1), 120);
+  let secs = Math.min(Math.max(parseInt(body.secs) || 30, 1), 35);
+  /* Le temps de connexion rapporte des points de fiabilité (2026-10-14) : un battement ne vaut jamais plus que le temps réellement écoulé depuis
+     le précédent (30 s en usage normal) — un script qui répète la requête ne fabrique pas d'heures. Mémoire de l'instance : suffisant ici. */
+  const maintenant = Date.now(), dernier = HEARTBEAT_DERNIER.get(user.id) || 0;
+  HEARTBEAT_DERNIER.set(user.id, maintenant);
+  if (dernier) secs = Math.min(secs, Math.max(0, Math.round((maintenant - dernier) / 1000) + 2));
+  if (HEARTBEAT_DERNIER.size > 5000) HEARTBEAT_DERNIER.clear();
+  if (secs < 1) return sendJSON(res, 200, { ok: true });
   await db.prepare(`
     INSERT INTO user_sessions (user_id, date, duree_sec) VALUES (?, date('now'), ?)
     ON CONFLICT(user_id, date) DO UPDATE SET duree_sec = user_sessions.duree_sec + excluded.duree_sec
@@ -38650,6 +38658,10 @@ ${jsonLd}
         parrCrees = Number(p?.crees) || 0; parrUtilises = Number(p?.utilises) || 0; parrInscrits = Number(p?.inscrits) || 0;
       } catch (e) { /* table créée à la demande : absente tant que personne n'a utilisé le parrainage */ }
       const ptsRayonnement = Math.min(12, nbCollabs * 2 + Math.floor(nbFollowers / 10));
+      /* Temps de connexion cumulé (2026-10-14, demande explicite) : somme de TOUTES les journées de user_sessions depuis la création du compte
+         (battements envoyés par le site et par l'application téléphone, uniquement page visible — voir POST /api/session/heartbeat). */
+      const secsConnexion = await N(`SELECT COALESCE(SUM(duree_sec),0) n FROM user_sessions WHERE user_id=?`, userId);
+      const nbConnexions = Number(user.nb_connexions) || 0;
 
       /* ── Profil public rempli : 15 pts, PROPORTIONNELS au niveau de remplissage ──
          Même mesure que les alertes « profil incomplet » (server/completude.js) : une seule
@@ -38814,6 +38826,19 @@ ${jsonLd}
               regle: '1 pt tous les 2 gestes (publication ou commentaire) sur 30 jours (plafond 5 pts)',
               aide: `${nbRecents} geste(s) sur les 30 derniers jours.`,
               action: nbRecents >= 10 ? null : { texte: 'Publier ou commenter', href: 'fil-actualite.html' } },
+            /* Temps de connexion cumulé : +10 pts dès 1 h, +5 pts de plus dès 5 h (15 pts au total). */
+            (() => {
+              const heures = secsConnexion / 3600;
+              const r = echelleFiabilite(heures, [[1, 10], [5, 5]], null, 15);
+              const min = Math.floor(secsConnexion / 60);
+              const duree = min >= 60 ? `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, '0')}` : `${min} min`;
+              return { cle:'temps_connexion', icon:'⏱️', label:'Temps de connexion (depuis la création du compte)', pts: r.pts, max: 15, applicable:true,
+                regle: 'dès 1 h de connexion cumulée : +10 · dès 5 h : +5 de plus (plafond 15 pts)',
+                aide: `${duree} de connexion cumulée — ${r.prochain ? `prochain palier : ${r.prochain.seuil} h (+${r.prochain.pts} pts).` : 'palier maximum atteint.'}`,
+                action: null };
+            })(),
+            /* Connexions : +3 pts à la 10ᵉ, +3 pts de plus à la 20ᵉ (6 pts au total). */
+            echelle('connexions', '🔑', 'Connexions au compte', nbConnexions, [[10, 3], [20, 3]], null, 6, ['connexion', 'connexions'], true, null),
             echelle('evenements', '📅', 'Événements publiés', nbEvenements, [[1, 5], [3, 3], [10, 4]], null, 12, ['événement', 'événements'], S,
               { texte: 'Publier un événement', href: 'dashboard-initiative.html#evenements' }),
             echelle('comptes_rendus', '🧾', 'Comptes rendus d’événement', nbComptesRendus, [[1, 5], [3, 3]], null, 8, ['compte rendu', 'comptes rendus'], S,

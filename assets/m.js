@@ -113,6 +113,16 @@
   };
   const ic = (n, cls) => `<svg class="i ${cls || ''}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n] || ''}</svg>`;
 
+  /* ---------- Temps de connexion (2026-10-14, demande explicite) ----------
+     L'application téléphone n'envoyait aucun battement (seul le site le faisait) : son temps de connexion n'était jamais compté dans le score.
+     Un battement de 30 s toutes les 30 s, seulement compte connecté ET page visible (jamais en arrière-plan). */
+  setInterval(() => {
+    try {
+      if (!S.me || document.hidden) return;
+      fetch('/api/session/heartbeat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ secs: 30 }), keepalive: true }).catch(() => { });
+    } catch (e) { /* jamais bloquant */ }
+  }, 30000);
+
   /* ---------- Télécharger Diaspo'Actif (2026-10-13, demande explicite) ----------
      Bouton en tête du menu des modules : installe l'application (raccourci sur l'écran du téléphone). L'invite d'installation du navigateur
      arrive très tôt : on la garde ici (window.__daInvite) pour assets/telecharger-app.js, chargé seulement au toucher ; sans invite

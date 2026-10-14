@@ -6605,7 +6605,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
 
   // ── Heartbeat session : envoie 30s toutes les 30s si connecté
   (function startHeartbeat() {
-    const beat = () => fetch("/api/session/heartbeat", {
+    const beat = () => document.hidden ? null : fetch("/api/session/heartbeat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ secs: 30 })
