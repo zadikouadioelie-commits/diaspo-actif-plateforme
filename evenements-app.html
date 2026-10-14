@@ -432,6 +432,8 @@
       <p class="sub" style="margin:0">Tous les événements présents sur la plateforme Diaspo'Actif, réunis au même endroit — affinez avec les filtres ci-contre.</p>
     </div>
     <div style="display:flex;gap:8px;align-items:center;">
+      <!-- Cloche des événements (2026-10-13, demande explicite) : choisir les événements pour lesquels on veut être notifié — retour arrière : retirer ce bouton et le script en bas de page -->
+      <button type="button" id="btn-alertes-evt" aria-label="Être informé des événements" title="Être informé des événements"></button>
       <a class="btn btn-outline" href="programmation.html" style="font-size:12.5px;">🔔 Programmation d'alertes</a>
       <button class="btn btn-outline" id="btn-calendrier-diaspora" style="font-size:12.5px;" onclick="cdOuvrirCalendrier()">📅 Calendrier Diaspora</button>
       <span id="btn-flash-wrap" style="display:none;align-items:center;gap:2px;">
@@ -2849,6 +2851,8 @@ function cdFermerCalendrier() {
 <script src="/assets/rich-editor.js"></script>
   <script src="/assets/theme-manager.js"></script>
 <script src="assets/back-button.js"></script>
+<script src="/assets/alertes-evenements.js?v=20261013a"></script>
+<script>AlertesEvt.poser(document.getElementById('btn-alertes-evt'));</script>
 </body>
 </html>
 

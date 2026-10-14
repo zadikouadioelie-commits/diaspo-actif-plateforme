@@ -5983,6 +5983,22 @@ db.exec(`
     user_id     INTEGER PRIMARY KEY,
     created_at  TEXT DEFAULT (datetime('now'))
   );
+
+  /* Alertes d'événements (2026-10-13, demande explicite : la cloche du bouton Événements) — « prévenez-moi dès que paraît un événement
+     économique dans ma région ». Un compte peut avoir plusieurs alertes ; chaque critère vide = « peu importe ». zone : monde | pays |
+     region | ville, comparée à la localisation du PROFIL du compte (jamais une position GPS). en_ligne : inclure aussi les événements
+     en ligne, qui n'ont pas de lieu. */
+  CREATE TABLE IF NOT EXISTS evenement_alertes (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER NOT NULL,
+    domaine     TEXT,
+    type_evt    TEXT,
+    part        TEXT,
+    zone        TEXT DEFAULT 'monde',
+    en_ligne    INTEGER DEFAULT 1,
+    actif       INTEGER DEFAULT 1,
+    created_at  TEXT DEFAULT (datetime('now'))
+  );
 `);
 
 /* ═══════════════════════════════════════════════════════════════════════════

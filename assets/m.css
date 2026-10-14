@@ -529,3 +529,7 @@ button.li{background:none;font:inherit;color:inherit}
 .promo-or .btn.navy{background:var(--navy);border-color:var(--navy);color:#F5D061}
 .promo-or .btn.out{background:rgba(255,255,255,.55);border:1.5px solid var(--navy);color:var(--navy)}
 @media (prefers-reduced-motion:reduce){.promo-or::after{animation:none;display:none}}
+/* Cloche des événements (2026-10-13) : à droite de la recherche */
+.ev-top{display:flex;align-items:flex-start;gap:10px}
+.ev-top .search{flex:1;min-width:0}
+.ev-top .ae-cloche{width:46px;height:46px}
