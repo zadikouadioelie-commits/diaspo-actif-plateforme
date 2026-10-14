@@ -169,6 +169,13 @@ label.pill-on{
 .validation-notice{background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:12px 14px;font-size:13px;color:#0c4a6e;margin-top:16px}
 .validation-notice strong{display:block;margin-bottom:4px}
 .auth-error{display:none;background:#fef2f2;border:1px solid #fecaca;color:#dc2626;border-radius:8px;padding:10px 14px;margin-top:12px;font-size:13px}
+.auth-error ul{list-style:disc}
+.auth-error li{margin:2px 0}
+/* Champ signalé manquant/invalide à l'échec de la création (2026-10-14, demande explicite :
+   "informe à l'échec ce qui manque... et puissent rectifier") — retiré automatiquement dès que
+   la personne touche au champ (voir l'écouteur délégué plus bas), pas besoin de resoumettre pour
+   que la marque disparaisse. */
+.di-champ-manquant{border-color:#dc2626 !important;box-shadow:0 0 0 1px #dc2626}
 .insc-pane{display:none}.insc-pane.active{display:block}
 .success-box{text-align:center;padding:40px 24px}
 .success-box .success-icon{font-size:64px;margin-bottom:16px}
@@ -1594,7 +1601,36 @@ async function submitForm(btnId,errId,body){
     errBox.scrollIntoView({block:"center"});
   }
 }
-function req(v,label){if(!v)throw new Error("Le champ « "+label+" » est obligatoire.");}
+/* Collecte une erreur de champ obligatoire au lieu d'interrompre la validation (voir
+   afficherErreursFormulaire ci-dessous) — pousse dans `erreurs` plutôt que de jeter. */
+function req(erreurs,v,label,elId){if(!v)erreurs.push({msg:"Le champ « "+label+" » est obligatoire.",id:elId});}
+/* Affiche TOUTES les erreurs d'un coup (2026-10-14, demande explicite : "informe à l'échec ce
+   qui manque... et puissent rectifier") — avant ce correctif, la validation s'arrêtait à la
+   première erreur rencontrée : une personne avec plusieurs champs manquants ne découvrait le
+   suivant qu'après avoir corrigé le premier et resoumis, ce qui pouvait donner l'impression que
+   l'inscription "ne marche pas". Marque aussi chaque champ en cause (bordure rouge, retirée dès
+   que la personne y touche — voir l'écouteur délégué plus bas) pour qu'elle sache où corriger. */
+function afficherErreursFormulaire(erreurs,errId){
+  document.querySelectorAll('.di-champ-manquant').forEach(el=>el.classList.remove('di-champ-manquant'));
+  const eb=document.getElementById(errId);
+  let premier=null;
+  erreurs.forEach(e=>{
+    if(!e.id)return;
+    const el=document.getElementById(e.id);
+    if(el){el.classList.add('di-champ-manquant');if(!premier)premier=el;}
+  });
+  eb.innerHTML=erreurs.length===1?erreurs[0].msg:
+    "Certains champs doivent être corrigés avant de continuer :<ul>"+erreurs.map(e=>"<li>"+e.msg+"</li>").join("")+"</ul>";
+  eb.style.display="block";
+  (premier||eb).scrollIntoView({block:"center"});
+}
+/* Retire la marque "champ manquant" dès que la personne touche au champ concerné — pas besoin
+   de resoumettre tout le formulaire pour voir disparaître l'avertissement déjà corrigé. */
+['pane-utilisateur','pane-initiative'].forEach(id=>{
+  const root=document.getElementById(id);
+  if(!root)return;
+  ['input','change'].forEach(evt=>root.addEventListener(evt,e=>{e.target.classList?.remove('di-champ-manquant');}));
+});
 document.getElementById("u-submit").addEventListener("click",async()=>{
   try{
     const nom=document.getElementById("u-nom").value.trim();
@@ -1609,19 +1645,21 @@ document.getElementById("u-submit").addEventListener("click",async()=>{
     const pwd2=document.getElementById("u-pwd2").value;
     const region=document.getElementById("u-region").value.trim();
     const domaine=document.getElementById("u-domaine").value;
-    req(nom,"Nom");req(prenom,"Prenom");req(dob,"Date de naissance");
+    const erreurs=[];
+    req(erreurs,nom,"Nom","u-nom");req(erreurs,prenom,"Prenom","u-prenom");req(erreurs,dob,"Date de naissance","u-dob");
     /* Pays d'origine et pays de residence sont le socle de la mise en relation entre
        diasporas : ils deviennent obligatoires. La nationalite passe en facultatif —
        elle n'est pas necessaire au fonctionnement du reseau. */
-    req(orig1,"Pays d'origine");req(pays,"Pays de residence");req(region,"Region de residence");req(ville,"Ville");
-    req(domaine,"Domaine d'activité");
+    req(erreurs,orig1,"Pays d'origine","u-orig1");req(erreurs,pays,"Pays de residence","u-pays");req(erreurs,region,"Region de residence","u-region");req(erreurs,ville,"Ville","u-ville");
+    req(erreurs,domaine,"Domaine d'activité","u-domaine");
     const bio=document.getElementById("u-bio").value.trim();
-    req(bio,"Biographie");
-    if(!document.getElementById("u-photo").files.length)throw new Error("La photo de profil est obligatoire : elle rend votre profil humain et facilite la mise en relation.");
-    req(email,"Email");req(pwd,"Mot de passe");
-    if(pwd!==pwd2)throw new Error("Les mots de passe ne correspondent pas.");
-    if(pwd.length<8)throw new Error("Le mot de passe doit comporter au moins 8 caracteres.");
-    if(!document.getElementById("u-charte").checked)throw new Error("Vous devez lire et accepter la Charte Institutionnelle pour créer un compte.");
+    req(erreurs,bio,"Biographie","u-bio");
+    if(!document.getElementById("u-photo").files.length)erreurs.push({msg:"La photo de profil est obligatoire : elle rend votre profil humain et facilite la mise en relation.",id:"u-photo"});
+    req(erreurs,email,"Email","u-email");req(erreurs,pwd,"Mot de passe","u-pwd");
+    if(pwd&&pwd2&&pwd!==pwd2)erreurs.push({msg:"Les mots de passe ne correspondent pas.",id:"u-pwd2"});
+    if(pwd&&pwd.length<8)erreurs.push({msg:"Le mot de passe doit comporter au moins 8 caracteres.",id:"u-pwd"});
+    if(!document.getElementById("u-charte").checked)erreurs.push({msg:"Vous devez lire et accepter la Charte Institutionnelle pour créer un compte.",id:"u-charte"});
+    if(erreurs.length){afficherErreursFormulaire(erreurs,"u-error");return;}
     const interests=[...document.querySelectorAll("#u-interests input:checked")].map(c=>c.value);
     const sitpro=[...document.querySelectorAll('.u-sitpro:checked')].map(c=>c.value).join(", ")||null;
     await submitForm("u-submit","u-error",{
@@ -1661,28 +1699,30 @@ document.getElementById("i-submit").addEventListener("click",async()=>{
     const pwd2=document.getElementById("i-pwd2").value;
     const orig2i=document.getElementById("i-orig2").value.trim();
     const orig1=document.getElementById("i-orig1").value.trim();
-    if(!document.getElementById("i-photo").files.length)throw new Error("Le logo ou la photo de profil est obligatoire : il rend votre fiche reconnaissable dans l'annuaire.");
     const statutCreation=document.querySelector('input[name="i-statut-creation"]:checked')?.value;
     const immat=document.getElementById("i-immat").value.trim();
     const formeJuridique=window.valeurFormeJuridique?valeurFormeJuridique():document.getElementById("i-forme-juridique").value.trim();
     const dateCreationStructure=document.getElementById("i-date-creation-structure").value;
     const domaine=document.getElementById("i-domaine").value;
+    const erreurs=[];
+    if(!document.getElementById("i-photo").files.length)erreurs.push({msg:"Le logo ou la photo de profil est obligatoire : il rend votre fiche reconnaissable dans l'annuaire.",id:"i-photo"});
     /* Nationalite devenue facultative : c'est le couple origine / implantation qui porte
        l'identite territoriale de l'organisation. */
-    req(nom,"Nom organisation");req(typeOrg,"Type");req(orig1,"Pays d'origine");req(desc,"Description");
-    req(pays,"Pays");req(ville,"Ville");req(rnom,"Nom responsable");
-    req(rprenom,"Prenom responsable");req(email,"Email");req(tel,"Telephone");req(pwd,"Mot de passe");
-    req(statutCreation,"Statut de l'initiative");
-    req(domaine,"Domaine d'activité");
+    req(erreurs,nom,"Nom organisation","i-nom");req(erreurs,typeOrg,"Type","i-type");req(erreurs,orig1,"Pays d'origine","i-orig1");req(erreurs,desc,"Description","i-desc");
+    req(erreurs,pays,"Pays","i-pays");req(erreurs,ville,"Ville","i-ville");req(erreurs,rnom,"Nom responsable","i-rnom");
+    req(erreurs,rprenom,"Prenom responsable","i-rprenom");req(erreurs,email,"Email","i-email");req(erreurs,tel,"Telephone","i-tel");req(erreurs,pwd,"Mot de passe","i-pwd");
+    req(erreurs,statutCreation,"Statut de l'initiative");
+    req(erreurs,domaine,"Domaine d'activité","i-domaine");
     if(statutCreation==="existante"){
-      req(immat,"Numéro d'immatriculation");
-      { const mImmat = ImmatType.valider("i-immat-type","i-immat"); if (mImmat) throw new Error(mImmat); }
-      req(formeJuridique,"Forme juridique");req(dateCreationStructure,"Date de création de la structure");
-      if(dateCreationStructure>new Date().toISOString().slice(0,10))throw new Error("La date de création de la structure ne peut pas être dans le futur.");
+      req(erreurs,immat,"Numéro d'immatriculation","i-immat");
+      { const mImmat = ImmatType.valider("i-immat-type","i-immat"); if (mImmat) erreurs.push({msg:mImmat,id:"i-immat"}); }
+      req(erreurs,formeJuridique,"Forme juridique","i-forme-juridique");req(erreurs,dateCreationStructure,"Date de création de la structure","i-date-creation-structure");
+      if(dateCreationStructure&&dateCreationStructure>new Date().toISOString().slice(0,10))erreurs.push({msg:"La date de création de la structure ne peut pas être dans le futur.",id:"i-date-creation-structure"});
     }
-    if(pwd!==pwd2)throw new Error("Les mots de passe ne correspondent pas.");
-    if(pwd.length<8)throw new Error("Le mot de passe doit comporter au moins 8 caracteres.");
-    if(!document.getElementById("i-charte").checked)throw new Error("Vous devez lire et accepter la Charte Institutionnelle pour créer un compte.");
+    if(pwd&&pwd2&&pwd!==pwd2)erreurs.push({msg:"Les mots de passe ne correspondent pas.",id:"i-pwd2"});
+    if(pwd&&pwd.length<8)erreurs.push({msg:"Le mot de passe doit comporter au moins 8 caracteres.",id:"i-pwd"});
+    if(!document.getElementById("i-charte").checked)erreurs.push({msg:"Vous devez lire et accepter la Charte Institutionnelle pour créer un compte.",id:"i-charte"});
+    if(erreurs.length){afficherErreursFormulaire(erreurs,"i-error");return;}
     const rs=document.getElementById("i-rs").value.trim();
     const rayonnement=document.querySelector('input[name="i-ray"]:checked')?.value||'locale';
     const pays_intervention=rayonnement==='internationale'?collecterTerritoires():[];
