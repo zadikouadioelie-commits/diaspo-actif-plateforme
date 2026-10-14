@@ -228,6 +228,89 @@
 .ff-lst .bs span{padding:10px 20px;border-radius:12px;background:#fff;border:2px solid #c7d7ee;font-size:17px;font-weight:800;color:#2563eb}
 .ff-lst .bs span.in{color:#0f766e;background:#ecfeff;border-color:#99f6e4}
 .ff-toast{padding:14px 28px;border-radius:14px;background:#16a34a;color:#fff;font-size:24px;font-weight:800;box-shadow:0 12px 36px rgba(22,163,74,.5);white-space:nowrap}
+/* ── Tuto « Diaspo'Actif sur téléphone » (compte Initiative) ── */
+.ft-phone{width:332px;height:664px;border-radius:46px;background:linear-gradient(145deg,#2a3550,#0b1224);box-shadow:0 30px 70px rgba(0,0,0,.6),0 0 0 3px #3b4a6b,0 0 0 6px rgba(226,169,41,.55)}
+.ft-dot{position:absolute;left:50%;top:5px;width:9px;height:9px;margin-left:-4px;border-radius:50%;background:#05070f;box-shadow:0 0 0 2px #1b2540}
+.ft-scr{position:absolute;left:11px;top:14px;width:390px;height:800px;transform:scale(.795);transform-origin:0 0;border-radius:38px;overflow:hidden;background:#EEF2FA;font-family:'Segoe UI',system-ui,-apple-system,Roboto,sans-serif;color:#102a43;line-height:1.25}
+.ft-scr *{box-sizing:border-box}
+.ft-abs2{position:absolute;left:0;top:0;width:390px}
+.ft-hdr{height:62px;background:#10294f;z-index:5}
+.ft-hdr .mn{position:absolute;left:14px;top:11px;width:94px;height:40px;border-radius:12px;background:linear-gradient(135deg,#FDEBA8,#E8B22E 55%,#B67E14);color:#2a1d02;font-weight:800;font-size:16px;display:flex;align-items:center;justify-content:center;gap:7px}
+.ft-hdr .lg{position:absolute;left:116px;top:8px;width:46px;height:46px;border-radius:50%;background:#fff;object-fit:contain;box-shadow:0 0 0 2px rgba(255,255,255,.35)}
+.ft-hdr svg{position:absolute;top:19px;width:26px;height:26px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.ft-hdr .bd{position:absolute;left:360px;top:8px;min-width:17px;height:17px;border-radius:9px;background:#F26422;color:#fff;font-size:10.5px;font-weight:800;text-align:center;line-height:17px;padding:0 4px}
+.ft-tabs{top:739px;height:61px;background:#fff;border-top:1px solid #d9e1ef;z-index:5;display:flex}
+.ft-tabs>div{width:55.7px;text-align:center;padding-top:7px;font-size:10.5px;font-weight:600;color:#6b7a90}
+.ft-tabs>div i{display:block;font-style:normal;font-size:20px;line-height:24px;filter:grayscale(1);opacity:.7}
+.ft-tabs>div.on{color:#C9460B}.ft-tabs>div.on i{filter:none;opacity:1}
+.ft-ring{position:absolute;z-index:9;border:3px solid #FDEBA8;border-radius:14px;box-shadow:0 0 18px rgba(253,235,168,.95),inset 0 0 10px rgba(253,235,168,.5);opacity:0;pointer-events:none}
+.ft-dim{inset:0;width:390px;height:800px;background:#05122b;opacity:0;z-index:6}
+.ft-view{top:62px;height:677px;overflow:hidden}
+.ft-hin{padding:14px 14px 30px}
+.ft-tuto{border:3px solid #F26422;border-radius:24px;background:#16427e;padding:14px 14px 16px;box-shadow:0 10px 26px rgba(15,42,82,.3)}
+.ft-tuto .hd{display:flex;align-items:center;gap:12px}
+.ft-tuto .ic{width:44px;height:44px;border-radius:12px;background:#F26422;display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;flex:none}
+.ft-tuto .tt{font-size:22px;font-weight:800;color:#fff;flex:1}
+.ft-tuto .tv{font-size:14px;font-weight:700;color:#F8DA7A}
+.ft-tuto .ln{height:3px;margin:10px 0 8px;border-radius:2px;background:linear-gradient(90deg,#F26422 0 22%,rgba(255,255,255,.18) 22%)}
+.ft-tuto p{margin:0 0 10px;font-size:14px;color:#cfe0ff}
+.ft-vr{display:flex;gap:10px;width:760px}
+.ft-vc{width:270px}
+.ft-vc .po{position:relative;height:152px;border-radius:14px;overflow:hidden;background:#0B2A5B;border:2px solid rgba(255,255,255,.25)}
+.ft-vc .po img{width:100%;height:100%;object-fit:cover;display:block}
+.ft-vc .pl{position:absolute;left:50%;top:50%;width:46px;height:46px;margin:-23px 0 0 -23px;border-radius:50%;background:#F26422;color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;padding-left:3px}
+.ft-vc .du{position:absolute;right:8px;bottom:8px;background:rgba(0,0,0,.72);color:#fff;font-size:12px;font-weight:700;padding:2px 7px;border-radius:6px}
+.ft-vc .sh{position:absolute;right:8px;top:8px;width:32px;height:32px;border-radius:50%;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;font-size:15px;color:#fff}
+.ft-vc b{display:block;margin-top:8px;font-size:15px;line-height:1.25;color:#fff}
+.ft-vc span{font-size:12.5px;color:#9dbbe6}
+.ft-rn{margin-top:14px;border-radius:20px;background:#fff;padding:16px;border:1px solid #e3e9f4}
+.ft-rn em{font-style:normal;font-size:13px;font-weight:700;color:#C9460B}
+.ft-rn h4{margin:6px 0 6px;font-size:22px;line-height:1.2;color:#10294f;font-weight:800}
+.ft-rn p{margin:0;font-size:13.5px;color:#5b6b82}
+.ft-sheet{left:0;width:390px;border-radius:26px 26px 0 0;overflow:hidden;z-index:8}
+.ft-sheet.nv{top:100px;height:700px;background:#10294f}
+.ft-sheet.wh{top:318px;height:482px;background:#fff;box-shadow:0 -10px 40px rgba(0,0,0,.35)}
+.ft-hand{position:absolute;left:145px;top:10px;width:100px;height:5px;border-radius:3px;background:rgba(255,255,255,.35);z-index:2}
+.ft-sheet.wh .ft-hand{background:#c6cfdd}
+.ft-min{position:absolute;left:0;top:0;width:390px;padding:34px 16px 30px}
+.ft-mh{display:flex;align-items:center;gap:14px;margin-bottom:16px}
+.ft-mh img{width:62px;height:62px;border-radius:50%;background:#fff;object-fit:contain}
+.ft-mh b{display:block;font-size:21px;color:#fff;font-weight:700}.ft-mh span{font-size:15px;color:#b7c8e6}
+.ft-ml{font-size:12.5px;font-weight:700;letter-spacing:.14em;color:#8ea3c4;margin:14px 0 8px 4px}
+.ft-ml.pr{color:#C9A23A}
+.ft-mc{display:flex;align-items:center;gap:14px;min-height:62px;padding:9px 14px;border-radius:16px;background:#fff;margin-bottom:8px;color:#10294f}
+.ft-mc .ib{width:44px;height:44px;border-radius:12px;background:#E4ECFB;display:flex;align-items:center;justify-content:center;font-size:20px;flex:none}
+.ft-mc b{display:block;font-size:17px;font-weight:700}.ft-mc span.s{font-size:13px;color:#5b6b82}
+.ft-mc.gd{min-height:70px;background:linear-gradient(135deg,#FCD66B,#E8B22E 55%,#B67E14);color:#2a1d02}
+.ft-mc.gd .ib{background:rgba(255,245,214,.75)}.ft-mc.gd span.s{color:#4a3604}
+.ft-mc.gd em{font-style:normal;display:inline-block;margin-left:6px;padding:2px 9px;border-radius:999px;background:#2a1d02;color:#F8DA7A;font-size:11.5px;font-weight:800;vertical-align:2px}
+.ft-mc.out{background:transparent;border:2px solid rgba(255,255,255,.7);color:#fff;justify-content:center;font-weight:700;font-size:17px;min-height:54px;border-radius:999px}
+.ft-ah{padding:30px 22px 8px;font-size:27px;font-weight:800;color:#10294f}
+.ft-ar{display:flex;align-items:center;gap:14px;padding:11px 22px;border-top:1px solid #e3e9f4}
+.ft-av{width:54px;height:54px;border-radius:50%;flex:none;color:#fff;font-weight:800;font-size:19px;display:flex;align-items:center;justify-content:center}
+.ft-av.lo{background:#fff;border:1px solid #d9e1ef;overflow:hidden}.ft-av.lo img{width:100%;height:100%;object-fit:contain}
+.ft-ar .nm{flex:1;min-width:0}.ft-ar .nm b{display:block;font-size:18px;color:#10294f}.ft-ar .nm span{font-size:14px;color:#6b7a90}
+.ft-ar .bt{padding:10px 20px;border-radius:999px;background:#B84D1A;color:#fff;font-weight:800;font-size:16px}
+.ft-ar .ac{padding:7px 18px;border-radius:999px;background:#dcfce7;color:#15803d;font-weight:800;font-size:15px}
+.ft-ag{margin:12px 22px 0;padding:13px;border-radius:999px;border:2px solid #c9d6ea;text-align:center;font-weight:800;font-size:17px;color:#10294f}
+.ft-not{left:0;top:0;width:390px;height:800px;background:#EEF2FA;z-index:10}
+.ft-not .nh{height:62px;background:#10294f;color:#fff;font-size:22px;font-weight:700;display:flex;align-items:center;gap:16px;padding:0 18px}
+.ft-nl{padding:14px}
+.ft-ni{display:flex;gap:14px;align-items:flex-start;padding:12px;border-radius:16px;background:#fff;margin-bottom:8px;border:1px solid #e3e9f4}
+.ft-ni .bl{width:46px;height:46px;border-radius:14px;background:#E4ECFB;display:flex;align-items:center;justify-content:center;font-size:21px;flex:none}
+.ft-ni b{display:block;font-size:16.5px;color:#10294f;margin-bottom:2px}.ft-ni span{font-size:13.5px;color:#5b6b82;line-height:1.35}
+.ft-mg{padding:16px 14px}
+.ft-chr{display:flex;gap:10px;margin-bottom:12px}
+.ft-ch{padding:10px 18px;border-radius:999px;background:#fff;border:2px solid #d4deef;font-weight:800;font-size:16px;color:#10294f;white-space:nowrap}
+.ft-ch.on{background:#10294f;border-color:#10294f;color:#fff}
+.ft-ml2{border-radius:20px;background:#fff;border:1px solid #e3e9f4;overflow:hidden}
+.ft-mr{display:flex;align-items:center;gap:14px;padding:13px 14px;border-top:1px solid #e9eef7}
+.ft-mr:first-child{border-top:0}
+.ft-mr .nm{flex:1;min-width:0}.ft-mr .nm b{display:block;font-size:17px;color:#10294f}.ft-mr .nm span{font-size:14px;color:#6b7a90}
+.ft-mr i{font-style:normal;font-size:22px;color:#6b7a90;letter-spacing:2px}
+.ft-h{font-family:'Cinzel','Georgia',serif;font-size:40px;font-weight:800;line-height:1.15;text-align:center;width:560px;text-shadow:0 4px 22px rgba(0,0,0,.35)}
+.ft-sub{width:560px;text-align:center;font-family:'Cinzel','Georgia',serif;font-size:15.5px;letter-spacing:.14em;line-height:1.6;color:#F2C94C;font-weight:600}
+.ft-li{padding:13px 28px;border-radius:999px;background:rgba(255,255,255,.1);border:2px solid rgba(226,169,41,.5);font-size:26px;font-weight:700;color:#e8f0ff;white-space:nowrap;box-shadow:0 8px 22px rgba(0,0,0,.25)}
 @media (max-width:640px){.fi-titre{display:none!important}.fi-top{justify-content:flex-end}}
 @media (prefers-reduced-motion:reduce){.fi-ov{animation:none}}
 `;
@@ -925,7 +1008,270 @@
   }
 
   FILMS.flash = { id: 'flash', stage: 'flash', etiquette: '55 s', titre: 'TUTO · ÉVÉNEMENTS FLASH', aria: "Tuto vidéo : publier un événement flash sur Diaspo'Actif", cta: { label: 'Publier un événement flash', href: 'evenements.html' }, voix: 'assets/media/evenement-flash-voix.mp3?v=1', fin: 54.0, dvoix: 49.2, caps: CAPS_FLASH, scenes: SCENES_FLASH, sfx: SFX_FLASH, swell: [35, 46] };
-  function rendre(av) { return FILM.id === 'long' ? rendreLong(av) : FILM.id === 'flash' ? rendreFlash(av) : rendreCourt(av); }
+  /* ═══ Tuto « Diaspo'Actif sur téléphone — compte Initiative » (2026-10-14) : décor, sous-titres, effets, scènes ═══
+     Tous les noms affichés sont FICTIFS (Association Horizon Afrique, Kofi Mensah, Awa Diallo…) : aucune donnée réelle dans le film.
+     Voix : prise 1 (39,52 s). Les temps ci-dessous viennent de la transcription horodatée (Scribe) de la prise 2, recalés sur les silences
+     mesurés dans la prise 1 : si la voix est régénérée, REMESURER. */
+  const STAGE_TEL_HTML = `
+<div class="fi-bg"></div>
+<div class="fi-blob b1" data-r="b1"></div><div class="fi-blob b2" data-r="b2"></div>
+<div data-r="parts"></div>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <linearGradient id="fiGold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FDEBA8"/><stop offset=".5" stop-color="#E8B22E"/><stop offset="1" stop-color="#B67E14"/></linearGradient>
+</defs></svg>
+<svg class="fi-globe" data-r="rub" viewBox="0 0 1280 720" width="1280" height="720" aria-hidden="true">
+  <path d="M0 650 C 300 612, 640 700, 1280 640 L1280 720 L0 720 Z" fill="#061633" opacity=".94"/>
+  <path d="M0 650 C 300 612, 640 700, 1280 640" fill="none" stroke="url(#fiGold)" stroke-width="5"/>
+  <path d="M0 662 C 300 624, 640 712, 1280 652" fill="none" stroke="#1B7F3B" stroke-width="3" opacity=".9"/>
+</svg>
+<div class="fi-abs fi-motto" data-r="motto">Rassembler · Mobiliser · Impacter</div>
+<div class="fi-abs fi-head" data-r="head"><img src="assets/media/logo-film.webp" alt=""><span>Diaspo<i>'</i>Actif</span></div>
+
+<div class="fi-abs ft-h gold" data-r="fth"></div>
+<div class="fi-abs ft-sub" data-r="fts"></div>
+<div class="fi-abs ft-li" data-r="fl0"></div><div class="fi-abs ft-li" data-r="fl1"></div><div class="fi-abs ft-li" data-r="fl2"></div><div class="fi-abs ft-li" data-r="fl3"></div><div class="fi-abs ft-li" data-r="fl4"></div>
+
+<div class="fi-abs ft-phone" data-r="tph"><i class="ft-dot"></i>
+ <div class="ft-scr">
+  <div class="ft-abs2 ft-view" data-r="tvh"><div class="ft-hin" data-r="thin">
+    <div class="ft-tuto"><div class="hd"><span class="ic">▶</span><span class="tt">Tutoriels vidéo</span><span class="tv">Tout voir ›</span></div><div class="ln"></div><p>Apprenez à utiliser Diaspo'Actif en quelques minutes.</p>
+      <div class="ft-vr"><div class="ft-vc"><div class="po"><img src="assets/media/film-inscription-poster.jpg" alt=""><span class="pl">▶</span><span class="sh">⤴</span><span class="du">0:55</span></div><b>Comment ça marche : créer son compte en 55 secondes</b><span>Bien démarrer</span></div>
+      <div class="ft-vc"><div class="po"><img src="assets/media/film-flash-poster.jpg" alt=""><span class="pl">▶</span><span class="sh">⤴</span><span class="du">0:54</span></div><b>Publier un événement flash : informer la diaspora</b><span>Événements</span></div></div></div>
+    <div class="ft-rn"><em>🌍 Réseau diaspora mondial</em><h4>Connecter les diasporas, valoriser les talents, accélérer le développement des territoires.</h4><p>Des passerelles entre pays d'origine et pays d'accueil, grâce aux compétences, projets et initiatives portés par les diasporas du monde entier.</p></div>
+  </div></div>
+
+  <div class="ft-abs2 ft-view" data-r="tvm" style="opacity:0"><div class="ft-mg">
+    <div class="ft-chr"><span class="ft-ch on">💬 Messages</span><span class="ft-ch">🗂 Archivés</span></div>
+    <div class="ft-chr"><span class="ft-ch on" data-r="chA">💬 Classiques 3</span><span class="ft-ch" data-r="chB">🤖 Automatiques 31</span></div>
+    <div class="ft-ml2" data-r="mlA">
+      <div class="ft-mr"><b class="ft-av" style="background:linear-gradient(135deg,#f472b6,#be185d)">AD</b><div class="nm"><b>Awa Diallo</b><span>Merci pour l'invitation !</span></div><i>···</i></div>
+      <div class="ft-mr"><b class="ft-av" style="background:linear-gradient(135deg,#34d399,#047857)">MT</b><div class="nm"><b>Mariam Traoré</b><span>Nouvelle conversation</span></div><i>···</i></div>
+      <div class="ft-mr"><b class="ft-av" style="background:linear-gradient(135deg,#a78bfa,#6d28d9)">AS</b><div class="nm"><b>Atelier Soleil</b><span>Nouvelle conversation</span></div><i>···</i></div>
+    </div>
+    <div class="ft-ml2" data-r="mlB" style="display:none">
+      <div class="ft-mr"><b class="ft-av" style="background:#10294f">🔔</b><div class="nm"><b>Rappel de cotisation</b><span>Trois adhésions arrivent à échéance.</span></div><i>···</i></div>
+      <div class="ft-mr"><b class="ft-av" style="background:#10294f">🎉</b><div class="nm"><b>Bienvenue sur Diaspo'Actif</b><span>Complétez votre profil public.</span></div><i>···</i></div>
+      <div class="ft-mr"><b class="ft-av" style="background:#10294f">📅</b><div class="nm"><b>Nouvel événement</b><span>Gala annuel · 14 novembre.</span></div><i>···</i></div>
+    </div>
+  </div></div>
+
+  <div class="ft-abs2 ft-hdr" data-r="thdr">
+    <span class="mn"><svg style="position:static;width:20px;height:20px;stroke:#2a1d02;stroke-width:2.6" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>Menu</span>
+    <img class="lg" src="assets/media/logo-film.webp" alt="">
+    <svg style="left:237px" viewBox="0 0 24 24"><path d="M4 8h15M15 4l4 4-4 4M20 16H5M9 12l-4 4 4 4"/></svg>
+    <svg style="left:289px" viewBox="0 0 24 24"><path d="M3 4h2.5l2.4 11h10.2l2-8H7"/><circle cx="9.5" cy="19.5" r="1.3"/><circle cx="17" cy="19.5" r="1.3"/></svg>
+    <svg style="left:341px" viewBox="0 0 24 24"><path d="M6 17V11a6 6 0 0 1 12 0v6l1.6 2H4.4zM10 21a2 2 0 0 0 4 0"/></svg><span class="bd">6</span>
+  </div>
+  <div class="ft-abs2 ft-tabs" data-r="ttabs"><div class="on"><i>🏠</i>Accueil</div><div><i>📅</i>Événements</div><div><i>👥</i>Annuaire</div><div><i>💬</i>Messages</div><div><i>🏪</i>Boutiques</div><div><i>👤</i>Moi</div><div><i>📰</i>Actualités</div></div>
+  <div class="ft-ring" data-r="tring"></div>
+  <div class="ft-abs2 ft-dim" data-r="tdim"></div>
+
+  <div class="ft-abs2 ft-sheet nv" data-r="tmenu"><span class="ft-hand"></span><div class="ft-min" data-r="tmin">
+    <div class="ft-mh"><img src="assets/media/logo-film.webp" alt=""><div><b>Association Horizon Afrique</b><span>Initiative · 👑 Premium actif</span></div></div>
+    <div class="ft-ml">MENU DES MODULES</div>
+    <div class="ft-mc"><span class="ib">🏠</span><div><b>Accueil</b><span class="s">Tutoriels vidéo, actualités, initiatives</span></div></div>
+    <div class="ft-ml pr" data-r="mpr">★ MODULES PREMIUM</div>
+    <div class="ft-mc gd" data-r="pc0"><span class="ib">📅</span><div><b>Mes événements<em>👑 Premium</em></b><span class="s">Créer et gérer vos événements</span></div></div>
+    <div class="ft-mc gd" data-r="pc1"><span class="ib">👥</span><div><b>Cotisations et adhésions<em>👑 Premium</em></b><span class="s">Formules, adhérents, paiements</span></div></div>
+    <div class="ft-mc gd" data-r="pc2"><span class="ib">🏪</span><div><b>Messages de la boutique<em>👑 Premium</em></b><span class="s">Demandes reçues via votre boutique</span></div></div>
+    <div class="ft-mc gd" data-r="pc3"><span class="ib">💛</span><div><b>Cagnottes et dons<em>👑 Premium</em></b><span class="s">Vos cagnottes et les dons reçus</span></div></div>
+    <div class="ft-mc gd" data-r="pc4"><span class="ib">📄</span><div><b>Business Plans<em>👑 Premium</em></b><span class="s">Construire et défendre vos projets</span></div></div>
+    <div class="ft-ml" data-r="mOut">OUTILS</div>
+    <div class="ft-mc"><span class="ib">💬</span><div><b>Messagerie</b><span class="s">Vos conversations</span></div></div>
+    <div class="ft-mc"><span class="ib">🎫</span><div><b>Mes billets</b><span class="s">Inscriptions et QR codes d'entrée</span></div></div>
+    <div class="ft-mc"><span class="ib">📆</span><div><b>Mon agenda</b><span class="s">Vos événements personnels et ceux ajoutés</span></div></div>
+    <div class="ft-mc"><span class="ib">🤝</span><div><b>Mon Réseau Pro</b><span class="s">Contacts et réseau professionnel</span></div></div>
+    <div class="ft-mc"><span class="ib">🎓</span><div><b>Formations</b><span class="s">Catalogue et formations suivies</span></div></div>
+    <div class="ft-ml" data-r="mAcc">MON COMPTE</div>
+    <div class="ft-mc"><span class="ib">🔒</span><div><b>Confidentialité</b><span class="s">Vos données et votre visibilité</span></div></div>
+    <div class="ft-mc"><span class="ib">⭐</span><div><b>Mon abonnement</b><span class="s">Premium et échéances</span></div></div>
+    <div class="ft-mc"><span class="ib">🏛️</span><div><b>Structure et organisation</b><span class="s">Type, forme juridique, taille</span></div></div>
+    <div class="ft-mc"><span class="ib">🔁</span><div><b>Liaison de comptes</b><span class="s">Passer d'un compte à un autre</span></div></div>
+    <div class="ft-mc out">⇄ Changer de compte</div>
+    <div class="ft-mc out">↪ Se déconnecter</div>
+  </div></div>
+
+  <div class="ft-abs2 ft-sheet wh" data-r="tacc"><span class="ft-hand"></span>
+    <div class="ft-ah">Changer de compte</div>
+    <div class="ft-ar"><b class="ft-av" style="background:#1d4e8f">AD</b><div class="nm"><b>Admin Démo</b><span>Administrateur</span></div><span class="bt">Basculer</span></div>
+    <div class="ft-ar"><b class="ft-av lo"><img src="assets/media/logo-film.webp" alt=""></b><div class="nm"><b>Association Horizon Afrique</b><span>Initiative</span></div><span class="ac">Actif</span></div>
+    <div class="ft-ar"><b class="ft-av" style="background:linear-gradient(135deg,#f472b6,#be185d)">AD</b><div class="nm"><b>Awa Diallo</b><span>Utilisateur</span></div><span class="bt" data-r="bsw">Basculer</span></div>
+    <div class="ft-ar"><b class="ft-av" style="background:linear-gradient(135deg,#60a5fa,#1d4ed8)">KM</b><div class="nm"><b>Kofi Mensah</b><span>Utilisateur</span></div><span class="bt">Basculer</span></div>
+    <div class="ft-ag">＋ Gérer / lier un compte</div>
+  </div>
+
+  <div class="ft-abs2 ft-not" data-r="tnot"><div class="nh"><span style="font-size:30px;line-height:1">‹</span>Notifications</div><div class="ft-nl" data-r="tnl">
+    <div class="ft-ni"><span class="bl">🔔</span><div><b>Nouvelle recommandation</b><span>« Collectif Baobab » a recommandé votre initiative. · 2 j</span></div></div>
+    <div class="ft-ni"><span class="bl">🔔</span><div><b>Nouvelle demande d'affiliation</b><span>« Collectif Baobab » souhaite rejoindre votre Réseau Professionnel · 2 j</span></div></div>
+    <div class="ft-ni"><span class="bl">🔔</span><div><b>Partagez votre expérience</b><span>Vous n'avez encore rien partagé avec la diaspora. Écrivez votre publication. · 4 j</span></div></div>
+    <div class="ft-ni"><span class="bl">🔔</span><div><b>Affiliation acceptée</b><span>Kofi Mensah a rejoint « Association Horizon Afrique ». · 5 j</span></div></div>
+    <div class="ft-ni"><span class="bl">🔔</span><div><b>Une fiche d'inscription vous a été partagée</b><span>Académie Savoir Plus vous a partagé la fiche « Gala annuel » : une copie vierge, à vous. · 5 j</span></div></div>
+    <div class="ft-ni"><span class="bl">🔔</span><div><b>Une fiche d'inscription vous a été partagée</b><span>Académie Savoir Plus vous a partagé la fiche « Trophée du mérite ». · 5 j</span></div></div>
+  </div></div>
+ </div>
+</div>
+
+<div class="fi-abs" data-r="lauG">${laurier(false)}</div><div class="fi-abs" data-r="lauD">${laurier(true)}</div>
+<div class="fi-abs fi-logo" data-r="logoF" style="width:230px;height:230px;margin:0"><img src="assets/media/logo-film.webp" alt="" style="width:100%;height:100%;border-radius:50%"></div>
+<div class="fi-abs fi-big" data-r="t1">Votre <span class="gold">initiative</span></div>
+<div class="fi-abs fi-script" data-r="t0">dans votre poche</div>
+<div class="fi-abs" data-r="t3"><span class="fi-cta">Ouvrir l'application mobile</span></div>
+<div class="fi-abs fi-url" data-r="t4">DIASPOACTIF.COM</div>
+<div class="fi-abs" data-r="fade" style="width:${W}px;height:${H}px;background:#061633;opacity:0"></div>`;
+
+  const CAPS_TEL = [
+    [0.0, 4.0, "Voici Diaspo'Actif sur votre téléphone, avec un compte Initiative."],
+    [4.3, 6.0, "En haut, quatre boutons rapides :"],
+    [6.34, 8.24, "le menu doré, pour tous vos modules ;"],
+    [8.54, 9.54, "le changement de compte ;"],
+    [9.86, 10.5, "le panier ;"],
+    [10.78, 12.3, "et la cloche des notifications."],
+    [12.68, 16.08, "À l'accueil, des tutoriels vidéo pour apprendre en quelques minutes."],
+    [16.4, 19.0, "Dans le menu, vos modules Premium brillent en or :"],
+    [19.32, 23.3, "événements, cotisations, boutique, cagnottes, business plans."],
+    [23.42, 25.68, "En dessous, vos outils, et votre compte."],
+    [26.0, 26.98, "Besoin d'un autre compte ?"],
+    [27.28, 28.62, "Un geste, et vous basculez."],
+    [28.96, 30.4, "Notifications et messages :"],
+    [30.66, 32.94, "tout est regroupé, classiques ou automatiques."],
+    [33.44, 35.8, "Et en bas, sept onglets pour aller à l'essentiel."],
+    [36.16, 39.3, "Diaspo'Actif : votre initiative, dans votre poche."],
+  ];
+  const SCENES_TEL = [[-LEAD, 4.3], [4.3, 12.68], [12.68, 16.4], [16.4, 26.0], [26.0, 28.96], [28.96, 33.44], [33.44, 36.16], [36.16, 43.2 - LEAD]];
+  const SFX_TEL = [[0.5, 'pop'], [6.4, 'clic'], [8.6, 'clic'], [9.9, 'clic'], [10.8, 'clic'], [12.7, 'pop'], [16.5, 'pop'], [19.32, 'tic'], [20.0, 'tic'], [21.0, 'tic'], [21.8, 'tic'], [22.6, 'tic'], [24.2, 'clic'], [25.0, 'clic'],
+    [26.1, 'pop'], [28.1, 'clic'], [29.0, 'pop'], [30.45, 'pop'], [31.7, 'clic'], [32.45, 'clic'], [33.95, 'tic'], [34.2, 'tic'], [34.45, 'tic'], [34.7, 'tic'], [34.95, 'tic'], [35.2, 'tic'], [35.45, 'tic'], [36.3, 'chime']];
+  /* Panneau de droite : titre, sous-titre et pastilles qui s'allument à l'instant où la voix les cite. [texte, instant] */
+  const SEGS_TEL = [
+    { a0: -2, a1: 4.3, h: "Diaspo'Actif sur téléphone", s: 'COMPTE INITIATIVE', it: [] },
+    { a0: 4.3, a1: 12.68, h: 'Les 4 boutons rapides', s: '', it: [['☰ Menu doré · tous vos modules', 6.34], ['⇄ Changer de compte', 8.54], ['🛒 Panier', 9.86], ['🔔 Notifications', 10.78]] },
+    { a0: 12.68, a1: 16.4, h: "À l'accueil", s: '', it: [['▶ Tutoriels vidéo', 13.55], ['Apprendre en quelques minutes', 15.2]] },
+    { a0: 16.4, a1: 23.35, h: '👑 Modules Premium', s: '', it: [['Mes événements', 19.32], ['Cotisations et adhésions', 20.0], ['Boutique', 21.0], ['Cagnottes et dons', 21.78], ['Business Plans', 22.6]] },
+    { a0: 23.35, a1: 26.0, h: 'En dessous', s: '', it: [['Vos outils', 24.2], ['Votre compte', 24.98]] },
+    { a0: 26.0, a1: 28.96, h: 'Changer de compte', s: '', it: [["Besoin d'un autre compte ?", 26.0], ['Un geste, et vous basculez', 27.4]] },
+    { a0: 28.96, a1: 33.44, h: 'Notifications et messages', s: '', it: [['🔔 Notifications', 28.96], ['💬 Messages classiques', 31.7], ['🤖 Messages automatiques', 32.45]] },
+    { a0: 33.44, a1: 36.1, h: '7 onglets en bas', s: 'ACCUEIL · ÉVÉNEMENTS · ANNUAIRE · MESSAGES · BOUTIQUES · MOI · ACTUALITÉS', it: [] },
+  ];
+  /* Anneau doré qui se déplace sur l'écran du téléphone (coordonnées de l'écran, 390 × 800) : [instant, [x, y, largeur, hauteur]] */
+  const RING_HDR = [[6.34, [8, 7, 106, 48]], [8.54, [226, 7, 50, 48]], [9.86, [278, 7, 50, 48]], [10.78, [330, 7, 50, 48]]];
+  const RING_TABS = [0, 1, 2, 3, 4, 5, 6].map(i => [33.9 + i * 0.25, [i * 55.7 + 1, 742, 53.7, 56]]);
+
+  function rendreTel(av) {
+    let a = av;
+    if (calme) { const s = FILM.scenes.find(x => av >= x[0] && av < x[1]) || FILM.scenes[FILM.scenes.length - 1]; a = s[1] - 0.02; }
+    const pic = (a0, a1) => P(a, a0, a0 + 0.25, E.lin) * (1 - P(a, a1 - 0.25, a1, E.lin));
+    if (!R._tel) {
+      R._tel = true;
+      R.tl = [R.fl0, R.fl1, R.fl2, R.fl3, R.fl4];
+      R.pc = [R.pc0, R.pc1, R.pc2, R.pc3, R.pc4];
+      R.tabE = [...R.ttabs.children];
+      R._seg = null;
+    }
+    R.b1.style.transform = `translate(${Math.sin(a * .2) * 60}px,${Math.cos(a * .17) * 40}px)`;
+    R.b2.style.transform = `translate(${Math.cos(a * .15) * -70}px,${Math.sin(a * .21) * -50}px)`;
+    R.pa.forEach((e, i) => {
+      const sx = (i * 197.3) % W, sy = (i * 83.7) % H, v = 8 + (i % 5) * 4;
+      e.el.style.transform = `translate(${(sx + Math.sin(a * .3 + i) * 30) % W}px,${((sy - a * v) % H + H) % H}px)`;
+      e.el.style.opacity = .25 + .35 * Math.abs(Math.sin(a * .8 + i));
+    });
+    const dec = P(a, -1.2, -0.3), fin0 = P(a, 36.0, 36.8);
+    R.rub.style.opacity = dec * (1 - fin0);
+    place(R.motto, 640, 690, 1, dec * 0.95 * (1 - fin0));
+    place(R.head, 905, 58, 1, P(a, 0.5, 1.3) * (1 - fin0));
+
+    /* Le téléphone entre, puis sort pour la conclusion */
+    const pin = P(a, 0.1, 1.2, E.back);
+    place(R.tph, 400, lerp(900, 362, pin), lerp(0.92, 1, pin) * (1 - 0.1 * fin0), P(a, 0.1, 0.6) * (1 - fin0));
+
+    /* Panneau de droite */
+    const seg = SEGS_TEL.find(s => a >= s.a0 && a < s.a1) || null;
+    if (seg !== R._seg) {
+      R._seg = seg;
+      if (seg) {
+        R.fth.textContent = seg.h; R.fts.textContent = seg.s;
+        R.tl.forEach((el, i) => { el.textContent = seg.it[i] ? seg.it[i][0] : ''; el.dataset.on = seg.it[i] ? '1' : ''; });
+      }
+    }
+    if (seg) {
+      const k = P(a, seg.a0, seg.a0 + 0.5) * (1 - P(a, seg.a1 - 0.35, seg.a1));
+      place(R.fth, 905, lerp(160, 150, k), 1, k);
+      place(R.fts, 905, 228, 1, seg.s ? k : 0);
+      R.tl.forEach((el, i) => {
+        const it = seg.it[i];
+        if (!it) { el.style.opacity = 0; return; }
+        const nxt = seg.it[i + 1] ? seg.it[i + 1][1] : seg.a1;
+        const on = pic(it[1], Math.max(nxt, it[1] + 0.9));
+        const vis = P(a, it[1] - 0.05, it[1] + 0.4) * (1 - P(a, seg.a1 - 0.3, seg.a1));
+        place(el, lerp(960, 905, P(a, it[1] - 0.05, it[1] + 0.45, E.back)), 300 + i * 82, 1 + 0.06 * on, vis);
+        el.style.borderColor = on > 0.05 ? '#FDEBA8' : 'rgba(226,169,41,.5)';
+        el.style.boxShadow = `0 8px 22px rgba(0,0,0,.25),0 0 ${on * 34}px rgba(253,235,168,${on * 0.75})`;
+        el.style.color = on > 0.5 ? '#fff' : '#e8f0ff';
+      });
+    } else { R.fth.style.opacity = 0; R.fts.style.opacity = 0; R.tl.forEach(el => { el.style.opacity = 0; }); }
+
+    /* Accueil : défilement doux, puis bascule vers les messages */
+    const msgK = P(a, 30.4, 30.9);
+    R.thin.style.transform = `translateY(${-P(a, 12.7, 16.0, E.inout) * 190}px)`;
+    R.tvh.style.opacity = 1 - msgK; R.tvm.style.opacity = msgK;
+    const classiques = a < 32.45;
+    R.chA.className = 'ft-ch' + (classiques ? ' on' : ''); R.chB.className = 'ft-ch' + (classiques ? '' : ' on');
+    R.mlA.style.display = classiques ? '' : 'none'; R.mlB.style.display = classiques ? 'none' : '';
+    const g1 = pic(31.7, 32.45), g2 = pic(32.45, 33.2);
+    R.chA.style.boxShadow = g1 > 0.05 ? `0 0 ${g1 * 24}px rgba(226,169,41,${g1})` : ''; R.chB.style.boxShadow = g2 > 0.05 ? `0 0 ${g2 * 24}px rgba(226,169,41,${g2})` : '';
+
+    /* Anneau doré : boutons du haut, puis onglets du bas */
+    const plan = a < 13 ? RING_HDR : RING_TABS, fin = a < 13 ? 12.4 : 35.9;
+    let ring = null, tabOn = a < 30.4 ? 0 : 3;
+    if (a >= plan[0][0] && a <= fin) {
+      let i = plan.length - 1; while (plan[i][0] > a) i--;
+      const prv = plan[Math.max(0, i - 1)][1], k = P(a, plan[i][0], plan[i][0] + 0.2, E.inout);
+      ring = { r: plan[i][1].map((v, j) => lerp(prv[j], v, k)), op: P(a, plan[0][0], plan[0][0] + 0.2) * (1 - P(a, fin - 0.3, fin)) };
+      if (plan === RING_TABS) tabOn = i;
+    }
+    R.tabE.forEach((el, i) => { el.className = i === tabOn ? 'on' : ''; });
+    if (ring) {
+      R.tring.style.left = ring.r[0] + 'px'; R.tring.style.top = ring.r[1] + 'px'; R.tring.style.width = ring.r[2] + 'px'; R.tring.style.height = ring.r[3] + 'px';
+      R.tring.style.opacity = ring.op * (0.8 + 0.2 * Math.sin(a * 12));
+    } else R.tring.style.opacity = 0;
+
+    /* Feuille du menu des modules (16,4 → 26,0) */
+    const mIn = P(a, 16.4, 17.2), mOut = P(a, 26.0, 26.7, E.inout);
+    R.tmenu.style.transform = `translateY(${(1 - mIn) * 720 + mOut * 720}px)`;
+    R.tdim.style.opacity = 0.62 * mIn * (1 - P(a, 28.9, 29.4));
+    if (!R._m) R._m = { o: R.mOut.offsetTop - 70, c: R.mAcc.offsetTop - 70, max: Math.max(0, R.tmin.offsetHeight - 700 + 20) };
+    const sc = Math.min(R._m.max, P(a, 23.42, 24.3, E.inout) * R._m.o + P(a, 24.9, 25.75, E.inout) * (R._m.c - R._m.o));
+    R.tmin.style.transform = `translateY(${-sc}px)`;
+    const gAll = pic(17.7, 19.3);
+    const gp = [pic(19.32, 20.0), pic(20.0, 21.0), pic(21.0, 21.78), pic(21.78, 22.6), pic(22.6, 23.3)];
+    R.pc.forEach((el, i) => {
+      const gl = Math.max(gp[i], gAll * 0.5);
+      el.style.boxShadow = gl > 0.05 ? `0 0 0 3px rgba(255,248,200,${gl}),0 0 ${gl * 26}px rgba(253,235,168,${gl * 0.9})` : '';
+      el.style.transform = `scale(${1 + 0.025 * gp[i]})`;
+    });
+
+    /* Feuille « Changer de compte » (26,0 → 28,96) */
+    const cIn = P(a, 26.1, 26.8), cOut = P(a, 28.9, 29.5, E.inout);
+    R.tacc.style.transform = `translateY(${(1 - cIn) * 520 + cOut * 520}px)`;
+    const gb = pic(27.3, 28.5);
+    R.bsw.style.boxShadow = gb > 0.05 ? `0 0 ${gb * 22}px rgba(253,235,168,${gb}),0 0 0 3px rgba(253,235,168,${gb})` : '';
+    R.bsw.style.transform = `scale(${1 + 0.12 * gb - 0.1 * P(a, 28.05, 28.15, E.lin) * (1 - P(a, 28.2, 28.4, E.lin))})`;
+
+    /* Notifications : page qui entre par la droite, puis ressort vers les messages */
+    const nIn = P(a, 28.96, 29.55), nOut = P(a, 30.4, 30.95, E.inout);
+    R.tnot.style.transform = `translateX(${(1 - nIn) * 390 + nOut * 390}px)`;
+    R.tnl.style.transform = `translateY(${-P(a, 29.6, 30.4, E.inout) * 70}px)`;
+
+    /* Conclusion */
+    const fin1 = P(a, 36.2, 37.0);
+    place(R.lauG, 250, 330, 1, fin1 * 0.9); place(R.lauD, 1030, 330, 1, fin1 * 0.9);
+    place(R.logoF, 640, 205, lerp(0.7, 1, P(a, 36.3, 37.3, E.back)), fin1);
+    place(R.t1, 640, 395, 1, P(a, 37.1, 37.9)); place(R.t0, 640, 470, 1, P(a, 38.4, 39.3));
+    place(R.t3, 640, 560, lerp(0.9, 1, P(a, 39.6, 40.3, E.back)) * (1 + 0.04 * Math.sin(a * 5) * P(a, 40.3, 41)), P(a, 39.6, 40.3));
+    place(R.t4, 640, 612, 1, P(a, 40.4, 41.1));
+    R.fade.style.opacity = P(a, 41.2, 41.7);
+  }
+
+  FILMS.telephone = { id: 'telephone', stage: 'telephone', etiquette: '40 s', titre: "TUTO · DIASPO'ACTIF SUR TÉLÉPHONE", aria: "Tuto vidéo : Diaspo'Actif sur téléphone, compte Initiative", cta: { label: "Ouvrir l'application mobile", href: 'm.html' }, voix: 'assets/media/telephone-initiative-voix.mp3?v=1', fin: 43.2, dvoix: 39.52, caps: CAPS_TEL, scenes: SCENES_TEL, sfx: SFX_TEL, swell: [31, 40] };
+  function rendre(av) { return FILM.id === 'long' ? rendreLong(av) : FILM.id === 'flash' ? rendreFlash(av) : FILM.id === 'telephone' ? rendreTel(av) : rendreCourt(av); }
 
   /* ── Sous-titres ── */
   function majCaption(a) {
@@ -1022,7 +1368,7 @@
   function ouvrir(options) {
     if (ov) return;
     options = options || {};
-    FILM = options.version === 'court' ? FILMS.court : options.version === 'flash' ? FILMS.flash : FILMS.long;
+    FILM = options.version === 'court' ? FILMS.court : options.version === 'flash' ? FILMS.flash : options.version === 'telephone' ? FILMS.telephone : FILMS.long;
     if (!document.getElementById('fi-css')) { const st = document.createElement('style'); st.id = 'fi-css'; st.textContent = CSS; document.head.appendChild(st); }
     if (!document.getElementById('fi-fonts')) { const l = document.createElement('link'); l.id = 'fi-fonts'; l.rel = 'stylesheet'; l.href = 'https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Cinzel:wght@600;800&display=swap'; document.head.appendChild(l); }
     calme = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -1031,7 +1377,7 @@
     const surInscription = /(^|\/)inscription(\.html)?$/.test(location.pathname);
     ov.innerHTML = `<div class="fi-box">
       <div class="fi-top"><span class="fi-titre">▶ ${FILM.titre || 'COMMENT ÇA MARCHE'} · ${FILM.etiquette}</span><span style="display:flex;gap:8px"><button class="fi-btn or" data-r="cta" type="button">${FILM.cta ? FILM.cta.label : 'Créer mon compte'}</button><button class="fi-btn" data-r="fermer" type="button" aria-label="Fermer le film">✕ Fermer</button></span></div>
-      <div class="fi-win" data-r="win"><div class="fi-stage" data-r="stage">${FILM.stage === 'flash' ? STAGE_FLASH_HTML : STAGE_HTML}</div></div>
+      <div class="fi-win" data-r="win"><div class="fi-stage" data-r="stage">${FILM.stage === 'flash' ? STAGE_FLASH_HTML : FILM.stage === 'telephone' ? STAGE_TEL_HTML : STAGE_HTML}</div></div>
       <div class="fi-cap" data-r="cap" aria-live="off"></div>
       <div class="fi-ctl"><button class="fi-btn" data-r="play" type="button">▶ Lecture</button><button class="fi-btn" data-r="son" type="button">🔊 Son</button>
         <div class="fi-prog" data-r="prog" role="slider" tabindex="0" aria-label="Position dans le film" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i data-r="progf"></i><b data-r="progb"></b></div><span class="t" data-r="temps">0:00 / ${fmt(FILM.fin)}</span></div></div>`;

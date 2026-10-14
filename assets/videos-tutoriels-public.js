@@ -65,7 +65,7 @@ function dvtChargerFilm() {
   if (!_dvtFilmPromesse) {
     _dvtFilmPromesse = new Promise((ok, ko) => {
       const sc = document.createElement('script');
-      sc.src = '/assets/inscription-film.js?v=16';
+      sc.src = '/assets/inscription-film.js?v=17';
       sc.onload = ok; sc.onerror = () => { _dvtFilmPromesse = null; ko(new Error('chargement du film')); };
       document.head.appendChild(sc);
     });
@@ -74,8 +74,8 @@ function dvtChargerFilm() {
 }
 async function dvtOuvrirFilm(e, version) {
   if (e) e.preventDefault();
-  try { await dvtChargerFilm(); window.InscriptionFilm.ouvrir(version === 'court' ? { version: 'court' } : version === 'flash' ? { version: 'flash' } : undefined); }
-  catch (x) { window.location.href = version === 'flash' ? 'evenements.html' : 'inscription.html'; }
+  try { await dvtChargerFilm(); window.InscriptionFilm.ouvrir(version === 'court' ? { version: 'court' } : version === 'flash' ? { version: 'flash' } : version === 'telephone' ? { version: 'telephone' } : undefined); }
+  catch (x) { window.location.href = version === 'flash' ? 'evenements.html' : version === 'telephone' ? 'm.html' : 'inscription.html'; }
 }
 window.dvtOuvrirFilm = dvtOuvrirFilm;
 
@@ -207,7 +207,7 @@ function dvtLecteurHtml(v) {
     </div>`;
   }
   if (v.type_source === 'film') {
-    const version = v.url === 'inscription-court' ? 'court' : v.url === 'evenement-flash' ? 'flash' : 'long';
+    const version = v.url === 'inscription-court' ? 'court' : v.url === 'evenement-flash' ? 'flash' : v.url === 'telephone-initiative' ? 'telephone' : 'long';
     return `<button type="button" onclick="dvtOuvrirFilm(event,'${version}')" aria-label="Lancer le film : ${dvtEsc(v.titre)}" style="position:relative;display:block;width:100%;height:100%;border:0;padding:0;cursor:pointer;background:#0B2A5B;">
       <img src="${dvtEsc(v.miniature_url || '/assets/media/film-inscription-poster.jpg')}" alt="" style="width:100%;height:100%;object-fit:cover;display:block;">
       <span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;"><span style="width:72px;height:72px;border-radius:50%;background:rgba(242,100,34,.95);color:#fff;font-size:30px;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(0,0,0,.4);">▶</span></span>
