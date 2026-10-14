@@ -46,6 +46,7 @@
 .mco-note b{display:block;margin-bottom:2px}
 .mco-note ul{margin:6px 0 0;padding-left:1.2em}
 .mco-warn{background:var(--orange-l);color:var(--orange-d)}
+.mco-warn-t{color:var(--orange-d)}
 .mco-f label.mco-l{display:block;font-weight:700;font-size:13.5px;margin:14px 2px 5px}
 .mco-f label.mco-l small{font-weight:400;color:var(--muted)}
 .mco-f input[type=text],.mco-f input[type=number],.mco-f select,.mco-f textarea{display:block;width:100%;min-width:0;min-height:46px;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:#fff;font-size:16px;color:var(--text);font-family:inherit}
@@ -166,14 +167,15 @@
   async function accueil(t) {
     if (!gate(NOM)) return;
     setPane(NOM, SK);
-    let init, stats, mem, dem, fo;
+    let init, stats, mem, dem, fo, gra;
     try {
       init = await chargerInit(true);
-      [stats, mem, dem, fo] = await Promise.all([
+      [stats, mem, dem, fo, gra] = await Promise.all([
         api(`/api/initiatives/${Number(init.id)}/adhesion-stats`).catch(ko),
         api(`/api/initiatives/${Number(init.id)}/adhesion-membres`).catch(ko),
         api(`/api/initiatives/${Number(init.id)}/adhesion-demandes`).catch(ko),
-        api(`/api/initiatives/${Number(init.id)}/adhesion-formules/gestion`).catch(ko)
+        api(`/api/initiatives/${Number(init.id)}/adhesion-formules/gestion`).catch(ko),
+        api(`/api/initiatives/${Number(init.id)}/adhesion-gratuite-auto`).catch(ko)
       ]);
     } catch (e) { return showError(t, NOM, e, 'Impossible de charger vos adhésions', () => accueil(++rendu)); }
     if (!vivant(t)) return;
@@ -197,6 +199,7 @@
           <div class="small muted" id="mco-op-d">${op ? 'Le bouton « Adhérer » est visible partout sur Diaspo’Actif.' : 'Le bouton « Adhérer » est masqué ; aucune nouvelle adhésion possible.'}</div></div>
           <button class="mco-sw" id="mco-sw" role="switch" aria-checked="${op}" aria-label="Adhésions ouvertes"><i></i></button></div>
       </div></div>
+      ${carteGratuite(gra, op)}
       ${!estAsso(init) ? `<div class="mco-note"><b>Structure de type « ${esc(init.type || 'non précisé')} »</b>Le bouton public « Adhérer » et les demandes d’adhésion simples sont réservés aux associations et ONG. Vos formules restent utilisables en partageant leur lien.</div>` : ''}
       ${actives === 0 ? `<div class="mco-note mco-warn"><b>Aucune formule active</b>Créez ou activez une formule pour que les personnes puissent adhérer.</div>` : ''}
       <div class="mco-stats">
@@ -223,11 +226,60 @@
     paint(t, NOM, html, `<button class="btn block" id="mco-share-foot">${ic('share', 's')} Partager le lien d’adhésion</button>`);
 
     const sw = $('#mco-sw'); if (sw) sw.onclick = () => basculer(init, sw);
+    const swg = $('#mco-gr'); if (swg) swg.onclick = () => basculerGratuite(init, swg);
     const share = () => partager(lienAdhesion(init), 'Adhérer à ' + init.nom);
     const s1 = $('#mco-share'); if (s1) s1.onclick = share;
     const s2 = $('#mco-share-foot'); if (s2) s2.onclick = share;
     $$('#mco-per .chip').forEach(b => b.onclick = () => { $$('#mco-per .chip').forEach(x => x.classList.toggle('on', x === b)); evolution(t, init, Number(b.dataset.j)); });
     evolution(t, init, 30);
+  }
+
+  /* « Adhésion gratuite automatique » (2026-10-14, demande explicite : l'interrupteur existait seulement sur ordinateur) — mêmes règles et
+     même route que le tableau de bord du site (PUT /api/initiatives/:id/adhesion-gratuite-auto). Associations et ONG seulement ; jamais activée
+     d'office ; impossible tant que des formules d'adhésion sont actives. Activée, une adhésion gratuite de 12 mois est proposée à toute personne,
+     avec ou sans compte ; l'association accepte ou refuse chaque demande. */
+  function carteGratuite(g, ouvert) {
+    if (!g || g.erreur || !g.type_ok) return '';
+    const actif = !!g.actif, bloque = !actif && Number(g.autres_formules_actives) > 0;
+    const note = (txt, cls) => `<p class="small ${cls || 'muted'}" style="margin:10px 0 0;line-height:1.45">${txt}</p>`;
+    return `<div class="card" id="mco-gr-card"><div class="pad">
+      <div class="row"><div class="sp"><div style="font-weight:700">🆓 Adhésion gratuite automatique</div>
+        <div class="small muted" id="mco-gr-t">${actif ? 'Activée' : 'Désactivée'}</div></div>
+        <button class="mco-sw" id="mco-gr" role="switch" aria-checked="${actif}" aria-label="Adhésion gratuite automatique" ${bloque ? 'disabled' : ''}><i></i></button></div>
+      <p class="small muted" style="margin:8px 0 0;line-height:1.45">Si l’adhésion à votre association est gratuite, activez-la : une adhésion gratuite de 12 mois est proposée à toute personne qui souhaite adhérer, <b>avec ou sans compte Diaspo’Actif</b> (nom, prénom et e-mail suffisent). Vous acceptez ou refusez chaque demande.</p>
+      ${actif ? note('✅ Activée : c’est elle que propose le bouton « Adhérer ». Pour modifier la durée, les champs ou les documents demandés, utilisez l’ordinateur.') : ''}
+      ${bloque ? note('Vous avez déjà des formules d’adhésion actives : le bouton « Adhérer » propose votre adhésion officielle. L’adhésion gratuite automatique est réservée aux associations qui n’ont pas encore de formule.', 'mco-warn-t') : ''}
+      ${(!actif && g.formule_id && !bloque) ? note('Désactivée : ses adhérents actuels gardent leur fiche. Vous pouvez créer de vraies formules d’adhésion.') : ''}
+      ${!ouvert ? note('🔒 Vos adhésions sont fermées : personne ne peut adhérer tant qu’elles le restent (interrupteur « Adhésions ouvertes » ci-dessus).', 'mco-warn-t') : ''}
+    </div></div>`;
+  }
+  /* Confirmation dans l'application (feuille du bas), pas la boîte de dialogue du navigateur : celle-ci est bloquée ou ignorée par certains
+     navigateurs de téléphone (navigateurs intégrés aux applications, « empêcher cette page de créer des boîtes de dialogue »), et l'interrupteur
+     paraissait alors ne rien faire. */
+  function confirmerFeuille(titre, texte, oui) {
+    return new Promise(ok => {
+      let decide = false;
+      const close = A.openSheet(`<h3 style="margin:0 0 8px">${titre}</h3><p class="small" style="margin:0 0 14px;line-height:1.5">${texte}</p>
+        <button type="button" class="btn block" id="mco-c-oui">${oui}</button><button type="button" class="btn out block" id="mco-c-non" style="margin-top:8px">Annuler</button>`);
+      const fin = v => { if (decide) return; decide = true; close(); ok(v); };
+      $('#mco-c-oui').onclick = () => fin(true);
+      $('#mco-c-non').onclick = () => fin(false);
+    });
+  }
+  async function basculerGratuite(init, sw) {
+    const cible = sw.getAttribute('aria-checked') !== 'true';
+    const oui = await confirmerFeuille(cible ? 'Activer l’adhésion gratuite automatique ?' : 'Désactiver l’adhésion gratuite automatique ?',
+      cible ? 'Une adhésion gratuite de 12 mois sera proposée à toute personne qui souhaite adhérer (avec ou sans compte Diaspo’Actif). Vous acceptez ou refusez chaque demande.'
+            : 'Elle ne sera plus proposée aux nouvelles personnes. Vos adhérents actuels gardent leur fiche et leurs rappels. Vous pourrez ensuite créer de vraies formules d’adhésion.',
+      cible ? 'Activer' : 'Désactiver');
+    if (!oui) return;
+    sw.disabled = true;
+    try {
+      await api(`/api/initiatives/${Number(init.id)}/adhesion-gratuite-auto`, { method: 'PUT', body: { actif: cible } });
+      C.at = 0;
+      toast(cible ? 'Adhésion gratuite automatique activée ✓' : 'Adhésion gratuite automatique désactivée');
+      accueil(++rendu);
+    } catch (er) { sw.disabled = false; erreurAction(er); }
   }
 
   /* Interrupteur « adhésions ouvertes » : le serveur masque ou rend le bouton « Adhérer » partout. */
