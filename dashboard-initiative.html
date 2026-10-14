@@ -168,6 +168,59 @@ if (typeof ACCREDITATIONS_DA === 'undefined') {
 if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
   window.REGLE_ACCREDITATIONS_DA = "Les accréditations Diaspo'Actif ne constituent ni une récompense, ni une distinction honorifique. Elles correspondent à des autorisations opérationnelles accordées à un utilisateur ou à une organisation afin d'exercer certaines fonctions ou d'accéder à des services spécifiques de la plateforme.";
 }
+/* Relais Diaspora — widget "Créer un accès invité" (prototype local, 2026-10-13). Autonome,
+   injecté directement dans document.body (pas dans #dashboard-content) pour ne dépendre
+   d'aucune structure interne de ce tableau de bord. */
+async function initRelaisDiasporaWidget(me, api) {
+  if (document.getElementById('rd-widget')) return;
+  const box = document.createElement('div');
+  box.id = 'rd-widget';
+  box.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:500;background:#fff;border:1.5px solid #0D2B4E;border-radius:14px;padding:16px;width:320px;box-shadow:0 8px 24px rgba(0,0,0,.18);font-family:Inter,Arial,sans-serif;font-size:13px;max-height:80vh;overflow:auto;';
+  box.innerHTML = `
+    <div style="font-weight:800;color:#0D2B4E;margin-bottom:6px;">🔁 Relais Diaspora — accès invité</div>
+    <p style="color:#64748B;font-size:11.5px;margin-bottom:10px;">Créer un accès invité temporaire (axe « gestion des inscriptions ») pour l'organisme client d'une de vos fiches.</p>
+    <label style="display:block;font-size:11px;color:#64748B;margin-bottom:3px;">Fiche d'inscription</label>
+    <select id="rd-fiche" style="width:100%;padding:7px;border-radius:7px;border:1px solid #CBD5E1;margin-bottom:8px;"><option>Chargement…</option></select>
+    <label style="display:block;font-size:11px;color:#64748B;margin-bottom:3px;">E-mail de l'organisme</label>
+    <input id="rd-email" type="email" style="width:100%;padding:7px;border-radius:7px;border:1px solid #CBD5E1;margin-bottom:8px;">
+    <label style="display:block;font-size:11px;color:#64748B;margin-bottom:3px;">Mot de passe (8 caractères min)</label>
+    <input id="rd-password" type="text" style="width:100%;padding:7px;border-radius:7px;border:1px solid #CBD5E1;margin-bottom:8px;">
+    <label style="display:block;font-size:11px;color:#64748B;margin-bottom:3px;">Expire le (suggestion : fin d'événement + 15 jours)</label>
+    <input id="rd-expire" type="datetime-local" style="width:100%;padding:7px;border-radius:7px;border:1px solid #CBD5E1;margin-bottom:8px;">
+    <label style="display:flex;align-items:center;gap:6px;margin-bottom:10px;font-size:12px;color:#334155;"><input id="rd-modifier" type="checkbox"> Autoriser à modifier le statut des inscrits</label>
+    <button id="rd-creer" style="width:100%;background:#F26422;color:#fff;border:none;border-radius:8px;padding:9px;font-weight:700;cursor:pointer;">Créer l'accès invité</button>
+    <div id="rd-msg" style="margin-top:8px;font-size:12px;"></div>
+  `;
+  document.body.appendChild(box);
+
+  try {
+    const { fiches } = await api('GET', '/insc/fiches');
+    const select = document.getElementById('rd-fiche');
+    select.innerHTML = fiches.length
+      ? fiches.map(f => `<option value="${f.id}">${(f.nom || ('Fiche #' + f.id)).replace(/</g, '&lt;')}</option>`).join('')
+      : '<option value="">Aucune fiche — créez-en une d\'abord</option>';
+  } catch (e) { document.getElementById('rd-fiche').innerHTML = '<option value="">Erreur de chargement</option>'; }
+
+  document.getElementById('rd-creer').addEventListener('click', async () => {
+    const msg = document.getElementById('rd-msg');
+    msg.style.color = ''; msg.textContent = '';
+    const ficheId = document.getElementById('rd-fiche').value;
+    const email = document.getElementById('rd-email').value.trim();
+    const password = document.getElementById('rd-password').value;
+    const expireRaw = document.getElementById('rd-expire').value;
+    if (!ficheId) { msg.style.color = '#DC2626'; msg.textContent = 'Choisissez une fiche.'; return; }
+    if (!expireRaw) { msg.style.color = '#DC2626'; msg.textContent = 'Indiquez une date d\'expiration.'; return; }
+    try {
+      const r = await api('POST', `/insc/fiches/${ficheId}/relais-diaspora/invite`, {
+        email, password, expire_le: new Date(expireRaw).toISOString(),
+        permissions: { voir_coordonnees: true, modifier_statut: document.getElementById('rd-modifier').checked },
+      });
+      msg.style.color = '#16A34A';
+      msg.textContent = `✅ Accès créé (DS-ID ${r.ds_id}). Transmettez l'e-mail et le mot de passe à l'organisme.`;
+    } catch (e) { msg.style.color = '#DC2626'; msg.textContent = '❌ ' + e.message; }
+  });
+}
+
 (async function initDashboardInitiative() {
   const content = document.getElementById("dashboard-content");
 
@@ -220,6 +273,13 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
      ne prévienne l'utilisateur. Voir saveInitEvt() pour la vérification qui s'appuie dessus. */
   window._daMeId = me.id;
   if (window.Posts) Posts.init(me.id);
+
+  /* Relais Diaspora — axe "gestion des inscriptions" (prototype local, 2026-10-13, demande
+     explicite). Widget autonome, volontairement indépendant du reste de ce tableau de bord
+     (pas intégré aux onglets existants) : visible uniquement pour un producteur "Initiative
+     Relais Diaspora" (drapeau est_relais_diaspora), permet de créer un accès invité temporaire
+     sur UNE de ses fiches d'inscription. */
+  if (me.est_relais_diaspora) initRelaisDiasporaWidget(me, api);
 
   /* Statut Premium — déterminé tôt pour que le premier rendu (paiement, etc.) soit déjà correctement gaté. */
   try {

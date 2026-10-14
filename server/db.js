@@ -2586,6 +2586,16 @@ const MIGRATIONS = [
   // Image d'illustration à droite du texte "Présentation de la boutique" (2026-09-29, demande
   // explicite) — facultative, jamais requise.
   ["initiatives", "vitrine_presentation_image_url TEXT"],
+  // Relais Diaspora (2026-10-13, prototype local demandé explicitement — PAS encore sur Neon).
+  // Producteur : compte Initiative classique + ce drapeau, créé/géré par l'administrateur.
+  ["users", "est_relais_diaspora INTEGER DEFAULT 0"],
+  // Invité "Utilisateur Relais Diaspora" : compte temporaire scopé à UNE fiche d'inscription,
+  // effacé définitivement à relais_invite_expire_le (purge paresseuse, voir server/index.js).
+  ["users", "relais_invite_fiche_id INTEGER"],
+  ["users", "relais_invite_axe TEXT"],
+  ["users", "relais_invite_expire_le TEXT"],
+  ["users", "relais_invite_permissions_json TEXT DEFAULT '{}'"],
+  ["users", "relais_invite_cree_par_user_id INTEGER"],
 ];
 
 /* Initialise updated_at pour les initiatives déjà existantes (jamais modifiées depuis) —

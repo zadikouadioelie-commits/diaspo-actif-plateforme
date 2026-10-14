@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Relais Diaspora — Admin (test local)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { min-height: 100vh; background: #0D1B2A; font-family: Inter, Arial, sans-serif; padding: 24px; color: #fff; }
+.wrap { max-width: 720px; margin: 0 auto; }
+h1 { font-size: 20px; font-weight: 900; margin-bottom: 4px; }
+.subtitle { color: #94A3B8; font-size: 13px; margin-bottom: 20px; }
+.warn { background: rgba(242,100,34,.12); border: 1px solid rgba(242,100,34,.35); border-radius: 10px; padding: 12px 14px; margin-bottom: 20px; font-size: 12px; color: #FDBA74; line-height: 1.5; }
+.card { background: rgba(255,255,255,.06); border: 1.5px solid rgba(255,255,255,.1); border-radius: 14px; padding: 18px; margin-bottom: 16px; }
+.card h2 { font-size: 15px; margin-bottom: 12px; }
+input { width: 100%; padding: 9px 11px; border-radius: 8px; border: 1.5px solid rgba(255,255,255,.15); background: rgba(255,255,255,.07); color: #fff; font-size: 13px; margin-bottom: 8px; }
+label { font-size: 11px; color: #94A3B8; display: block; margin-bottom: 3px; }
+.btn { background: #F26422; color: #fff; border: none; border-radius: 8px; padding: 9px 14px; font-size: 13px; font-weight: 700; cursor: pointer; }
+.btn:hover { opacity: .9; }
+.btn-sec { background: rgba(255,255,255,.12); }
+.btn-danger { background: #DC2626; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+.liste-item { background: rgba(0,0,0,.25); border-radius: 10px; padding: 12px; margin-bottom: 8px; font-size: 13px; }
+.liste-item .nom { font-weight: 700; }
+.liste-item .meta { color: #94A3B8; font-size: 11px; margin: 2px 0 8px; font-family: monospace; }
+.statut-suspendu { color: #FCA5A5; }
+.statut-actif { color: #34D399; }
+.msg { font-size: 12px; margin-top: 8px; }
+.msg.ok { color: #34D399; }
+.msg.err { color: #FCA5A5; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Relais Diaspora — Administration (prototype local)</h1>
+  <p class="subtitle">Remplace temporairement le cadenas discret + validation par rapprochement au registre des adhérents — différé.</p>
+  <div class="warn">⚠️ Page de test, non liée à la vraie navigation admin. Nécessite d'être déjà connecté dans ce navigateur avec un compte Administrateur (ex. via comptes-test.html).</div>
+
+  <div class="card">
+    <h2>Créer un producteur « Initiative Relais Diaspora »</h2>
+    <label>Nom</label><input id="c-nom" placeholder="Nom de l'adhérent">
+    <label>Prénom</label><input id="c-prenom" placeholder="Prénom (facultatif)">
+    <label>E-mail</label><input id="c-email" type="email" placeholder="adherent@exemple.com">
+    <label>Mot de passe (au moins 8 caractères)</label><input id="c-password" type="text" placeholder="Choisi par l'adhérent">
+    <div class="row"><button class="btn" onclick="creerProducteur()">Créer</button></div>
+    <div id="c-msg" class="msg"></div>
+  </div>
+
+  <div class="card">
+    <h2>Producteurs existants</h2>
+    <div id="liste"></div>
+    <button class="btn btn-sec" onclick="chargerListe()">↻ Rafraîchir</button>
+  </div>
+</div>
+
+<script>
+async function api(method, path, body) {
+  const res = await fetch('/api' + path, {
+    method, credentials: 'include',
+    headers: body ? { 'Content-Type': 'application/json' } : {},
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || ('Erreur ' + res.status));
+  return data;
+}
+
+async function creerProducteur() {
+  const msg = document.getElementById('c-msg');
+  msg.textContent = ''; msg.className = 'msg';
+  try {
+    const r = await api('POST', '/admin/relais-diaspora/producteurs', {
+      nom: document.getElementById('c-nom').value.trim(),
+      prenom: document.getElementById('c-prenom').value.trim(),
+      email: document.getElementById('c-email').value.trim(),
+      password: document.getElementById('c-password').value,
+    });
+    msg.textContent = `✅ Compte créé (id ${r.user_id}, DS-ID ${r.ds_id}). Identifiants à transmettre à l'adhérent.`;
+    msg.className = 'msg ok';
+    chargerListe();
+  } catch (e) { msg.textContent = '❌ ' + e.message; msg.className = 'msg err'; }
+}
+
+async function chargerListe() {
+  const liste = document.getElementById('liste');
+  liste.textContent = 'Chargement…';
+  try {
+    const r = await api('GET', '/admin/relais-diaspora/producteurs');
+    if (!r.producteurs.length) { liste.innerHTML = '<p style="color:#64748B;font-size:13px;">Aucun producteur pour l\'instant.</p>'; return; }
+    liste.innerHTML = r.producteurs.map(p => `
+      <div class="liste-item">
+        <div class="nom">${escH(p.nom)} ${escH(p.prenom || '')} — <span class="${p.suspendu_definitif ? 'statut-suspendu' : 'statut-actif'}">${p.suspendu_definitif ? 'Suspendu' : 'Actif'}</span></div>
+        <div class="meta">#${p.id} · ${escH(p.email)} · DS-ID ${escH(p.ds_id || '—')}</div>
+        <div class="row">
+          <button class="btn btn-sec" onclick="toggleSuspendre(${p.id}, ${p.suspendu_definitif ? 0 : 1})">${p.suspendu_definitif ? 'Réactiver' : 'Suspendre'}</button>
+          <button class="btn btn-sec" onclick="reassigner(${p.id})">Réattribuer</button>
+          <button class="btn btn-danger" onclick="supprimer(${p.id})">Supprimer (masquer)</button>
+        </div>
+      </div>
+    `).join('');
+  } catch (e) { liste.innerHTML = '<p style="color:#FCA5A5;font-size:13px;">❌ ' + escH(e.message) + '</p>'; }
+}
+
+async function toggleSuspendre(id, suspendu) {
+  try { await api('PATCH', `/admin/relais-diaspora/producteurs/${id}/suspendre`, { suspendu: !!suspendu }); chargerListe(); }
+  catch (e) { alert(e.message); }
+}
+async function reassigner(id) {
+  const nouvel_email = prompt('Nouvel e-mail pour ce compte :');
+  if (!nouvel_email) return;
+  const nouveau_mot_de_passe = prompt('Nouveau mot de passe (8 caractères min) :');
+  if (!nouveau_mot_de_passe) return;
+  try {
+    const r = await api('PATCH', `/admin/relais-diaspora/producteurs/${id}/reassigner`, { nouvel_email, nouveau_mot_de_passe });
+    alert('Réattribué. Nouveau DS-ID : ' + r.ds_id + '. L\'ancienne liaison de comptes a été retirée.');
+    chargerListe();
+  } catch (e) { alert(e.message); }
+}
+async function supprimer(id) {
+  if (!confirm('Masquer ce compte producteur ? Son contenu déjà publié reste visible.')) return;
+  try { await api('DELETE', `/admin/relais-diaspora/producteurs/${id}`); chargerListe(); }
+  catch (e) { alert(e.message); }
+}
+function escH(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+chargerListe();
+</script>
+</body>
+</html>

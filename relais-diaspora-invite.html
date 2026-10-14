@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Accès invité — Relais Diaspora</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { min-height: 100vh; background: #F5F6F8; font-family: Inter, Arial, sans-serif; color: #0D2B4E; }
+header { background: #0D2B4E; color: #fff; padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; }
+header .logo { font-weight: 900; font-size: 15px; }
+main { max-width: 760px; margin: 0 auto; padding: 24px 16px; }
+h1 { font-size: 19px; margin-bottom: 4px; }
+.subtitle { color: #64748B; font-size: 13px; margin-bottom: 18px; }
+.card { background: #fff; border: 1px solid #E2E8F0; border-radius: 12px; padding: 18px; margin-bottom: 16px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid #E2E8F0; }
+th { color: #64748B; font-weight: 700; font-size: 11px; text-transform: uppercase; }
+select { padding: 4px 6px; border-radius: 6px; border: 1px solid #CBD5E1; font-size: 12px; }
+.muted { color: #94A3B8; font-size: 13px; }
+.etat { padding: 24px; text-align: center; }
+.etat a { color: #F26422; font-weight: 700; }
+</style>
+</head>
+<body>
+<header>
+  <span class="logo">DIASPO'ACTIF — Relais Diaspora</span>
+  <a href="#" id="logout-link" style="color:#fff;font-size:12px;text-decoration:none;opacity:.8;">Se déconnecter</a>
+</header>
+<main>
+  <div id="contenu" class="etat">Chargement…</div>
+</main>
+
+<script src="/assets/app.js"></script>
+<script>
+async function init() {
+  const contenu = document.getElementById('contenu');
+  const user = await fetchCurrentUser();
+  if (!user || !user.relais_invite_fiche_id) {
+    contenu.innerHTML = '<p>Cet accès invité n\'est plus valide (expiré ou déjà révoqué).</p><p style="margin-top:8px;"><a href="login.html">Retour à la connexion</a></p>';
+    return;
+  }
+  injecterBadgeAccesInvite(user);
+  document.getElementById('logout-link').addEventListener('click', async (e) => {
+    e.preventDefault();
+    try { await api('POST', '/auth/logout'); } catch (_) {}
+    window.location.href = 'index.html';
+  });
+  try {
+    const r = await api('GET', '/relais-diaspora/mes-inscrits');
+    render(r);
+  } catch (e) {
+    contenu.innerHTML = '<p>' + escH(e.message) + '</p>';
+  }
+}
+
+function render(r) {
+  const contenu = document.getElementById('contenu');
+  contenu.className = '';
+  const peutModifier = !!(r.permissions && r.permissions.modifier_statut);
+  const voirCoord = r.permissions && r.permissions.voir_coordonnees !== false;
+  let lignes = r.inscrits.map(i => `
+    <tr>
+      <td>${escH(i.nom)} ${escH(i.prenom || '')}</td>
+      ${voirCoord ? `<td>${escH(i.email || '—')}<br><span class="muted">${escH(i.telephone || '')}</span></td>` : ''}
+      <td>${peutModifier ? statutSelect(i) : escH(i.statut || '—')}</td>
+      <td class="muted">${escH((i.created_at || '').slice(0, 16).replace('T', ' '))}</td>
+    </tr>
+  `).join('');
+  contenu.innerHTML = `
+    <h1>${escH(r.fiche?.nom || 'Fiche d\'inscription')}</h1>
+    <p class="subtitle">Accès invité — consultation ${peutModifier ? 'et mise à jour des statuts' : 'uniquement'}, aucun export possible.</p>
+    <div class="card">
+      ${r.inscrits.length ? `
+        <table>
+          <thead><tr><th>Inscrit</th>${voirCoord ? '<th>Coordonnées</th>' : ''}<th>Statut</th><th>Inscription</th></tr></thead>
+          <tbody>${lignes}</tbody>
+        </table>
+      ` : '<p class="muted">Aucun inscrit pour l\'instant.</p>'}
+    </div>
+  `;
+}
+
+function statutSelect(i) {
+  const options = ['inscrit','confirme','present','absent','annule','liste_attente'];
+  return `<select onchange="changerStatut(${i.id}, this.value)">${options.map(o => `<option value="${o}" ${o === i.statut ? 'selected' : ''}>${o}</option>`).join('')}</select>`;
+}
+
+async function changerStatut(id, statut) {
+  try { await api('PATCH', `/relais-diaspora/mes-inscrits/${id}/statut`, { statut }); }
+  catch (e) { alert(e.message); }
+}
+
+function escH(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+init();
+</script>
+</body>
+</html>

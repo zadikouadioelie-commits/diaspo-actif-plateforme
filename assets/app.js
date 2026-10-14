@@ -116,6 +116,9 @@ function loginLandingUrl(user) {
     const redirect = new URLSearchParams(location.search).get("redirect");
     if (redirect && /^\/[^/\\]|^[a-z0-9_-]+\.html/i.test(redirect) && !/^\/\//.test(redirect)) return redirect;
   } catch (e) {}
+  /* Relais Diaspora — accès invité temporaire (prototype local, 2026-10-13) : vérifié AVANT le cas
+     générique "utilisateur" ci-dessous, puisque ce compte porte role==='utilisateur'. */
+  if (user.relais_invite_fiche_id) return "relais-diaspora-invite.html";
   /* Téléphone (2026-10-07) : après la connexion, l'appli remplace l'ancien espace (écran « Moi »). */
   if ((user.role === "utilisateur" || user.role === "initiative") && window.MRedirect && window.MRedirect.estTelephone()) return "/m.html#/moi";
   if (user.role === "utilisateur" || user.role === "initiative") return "profil.html";
@@ -1751,6 +1754,21 @@ function chargerConnexionsUI() {
   document.head.appendChild(sc);
 }
 
+/* Relais Diaspora — badge « Accès invité » (prototype local, 2026-10-13) : visible sur TOUTE page
+   authentifiée tant que le compte est un accès invité temporaire (relais_invite_fiche_id posé),
+   même emplacement que le widget de comptes liés ci-dessous puisque c'est le seul point commun
+   à toutes les pages qui appellent applyAuthState(). */
+function injecterBadgeAccesInvite(user) {
+  if (!user || !user.relais_invite_fiche_id) return;
+  if (document.getElementById('relais-invite-badge')) return;
+  const badge = document.createElement('div');
+  badge.id = 'relais-invite-badge';
+  badge.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#F26422;color:#fff;text-align:center;font-size:13px;font-weight:600;padding:6px 10px;';
+  badge.textContent = "🔒 Accès invité Relais Diaspora — consultation limitée à un seul événement";
+  document.body.prepend(badge);
+  document.body.style.paddingTop = (parseInt(getComputedStyle(document.body).paddingTop || '0', 10) + badge.offsetHeight) + 'px';
+}
+
 async function initComptesLiesSwitcher(user) {
   let comptes;
   try {
@@ -2040,6 +2058,7 @@ async function applyAuthState() {
       window.location.href = "index.html";
     });
     initComptesLiesSwitcher(user);
+    injecterBadgeAccesInvite(user);
     initCompactMenu();
     chargerConnexionsUI();
     // Bouton "Passer à Premium" : visible seulement si pas déjà abonné — retiré pour le

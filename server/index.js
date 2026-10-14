@@ -293,7 +293,7 @@ async function getCurrentUser(req) {
        sur le cookie sid — sinon la session SQL (30 jours) la ferait renaître. */
     if (payload?.uid && payload.jti && !connexionOk) return null;
     if (payload?.uid && connexionOk) {
-      const user = await db.prepare("SELECT id, nom, prenom, email, role, ville, pays, profil_json, photo_url, email_verifie, nb_connexions, pwa_prompt_dismiss, temoignage_statut, temoignage_derniere_demande, demo_vue, da_id, identite_verifiee, credential_version, premiere_publication_le FROM users WHERE id = ?").get(payload.uid);
+      const user = await db.prepare("SELECT id, nom, prenom, email, role, ville, pays, profil_json, photo_url, email_verifie, nb_connexions, pwa_prompt_dismiss, temoignage_statut, temoignage_derniere_demande, demo_vue, da_id, identite_verifiee, credential_version, premiere_publication_le, est_relais_diaspora, relais_invite_fiche_id, relais_invite_axe, relais_invite_expire_le, relais_invite_permissions_json FROM users WHERE id = ?").get(payload.uid);
       /* credential_version (2026-08-08, transfert de gestionnaire) : le token 'auth' est
          stateless (aucun état serveur, survit à un DELETE FROM sessions) — c'est le SEUL
          moyen de forcer son invalidation avant expiration naturelle. Un ancien gestionnaire
@@ -301,6 +301,10 @@ async function getCurrentUser(req) {
          encore l'ancienne valeur en `cv` et est donc rejeté ici, sans attendre son expiration
          (jusqu'à 7 jours sinon). Absence de `cv` dans le payload (tokens émis avant ce
          correctif) = toléré, jamais bloquant rétroactivement. */
+      if (user && user.relais_invite_expire_le && new Date(user.relais_invite_expire_le) <= new Date()) {
+        await purgerCompteRelaisInviteExpire(user.id);
+        return null;
+      }
       if (user && (payload.cv === undefined || Number(payload.cv) === Number(user.credential_version))) {
         user.id = Number(user.id); return user;
       }
@@ -322,9 +326,59 @@ async function getCurrentUser(req) {
       Connexions.toucher(db, okReg);
     }
   } catch (e) { console.error('[connexions.verifier-sid]', e.message); }
-  const user = await db.prepare("SELECT id, nom, prenom, email, role, ville, pays, profil_json, photo_url, email_verifie, nb_connexions, pwa_prompt_dismiss, temoignage_statut, temoignage_derniere_demande, demo_vue, da_id, identite_verifiee, premiere_publication_le FROM users WHERE id = ?").get(session.userId);
+  const user = await db.prepare("SELECT id, nom, prenom, email, role, ville, pays, profil_json, photo_url, email_verifie, nb_connexions, pwa_prompt_dismiss, temoignage_statut, temoignage_derniere_demande, demo_vue, da_id, identite_verifiee, premiere_publication_le, est_relais_diaspora, relais_invite_fiche_id, relais_invite_axe, relais_invite_expire_le, relais_invite_permissions_json FROM users WHERE id = ?").get(session.userId);
+  if (user && user.relais_invite_expire_le && new Date(user.relais_invite_expire_le) <= new Date()) {
+    await purgerCompteRelaisInviteExpire(user.id);
+    return null;
+  }
   if (user) user.id = Number(user.id);
   return user || null;
+}
+
+/* Relais Diaspora — accès invité temporaire ("Utilisateur Relais Diaspora", prototype local 2026-10-13) :
+   purge paresseuse à l'expiration (relais_invite_expire_le dépassée), appelée depuis getCurrentUser,
+   POST /api/auth/login et POST /api/comptes-lies/basculer — jamais de cron, comme le reste de ce code.
+   Efface tout : le compte ET sa liaison DS-ID éventuelle (comptes_lies_membres n'a pas de ON DELETE
+   CASCADE), même séquence que DELETE /api/comptes-lies/:userId. Jamais bloquant si une table n'existe pas. */
+/* Retire un compte de son éventuel groupe de comptes liés, sans toucher à la ligne users
+   elle-même — même séquence que DELETE /api/comptes-lies/:userId (ligne ~13180). Réutilisé par
+   la purge d'expiration ci-dessous ET par la réattribution d'un producteur Relais Diaspora
+   (l'ancien titulaire ne doit plus pouvoir basculer vers le compte réattribué). */
+async function retirerLiaisonCompte(userId) {
+  try {
+    const membre = await db.prepare("SELECT groupe_id FROM comptes_lies_membres WHERE user_id=?").get(userId);
+    if (membre) {
+      await db.prepare("DELETE FROM comptes_lies_membres WHERE user_id=?").run(userId);
+      const restants = await db.prepare("SELECT COUNT(*) AS n FROM comptes_lies_membres WHERE groupe_id=?").get(membre.groupe_id);
+      if (Number(restants?.n || 0) === 0) await db.prepare("DELETE FROM comptes_lies_groupes WHERE id=?").run(membre.groupe_id);
+    }
+  } catch (e) { console.error('[retirerLiaisonCompte]', e.message); }
+}
+async function purgerCompteRelaisInviteExpire(userId) {
+  await retirerLiaisonCompte(userId);
+  /* connexions/sessions/user_activity portent une FOREIGN KEY vers users(id) sans ON DELETE
+     CASCADE — un simple login ou une bascule suffit à poser une ligne qui bloquerait la
+     suppression ci-dessous si elle n'est pas retirée en premier (repéré en testant ce
+     prototype : PRAGMA foreign_key_list a confirmé qu'aucune AUTRE table ne référence un
+     compte invité qui ne fait que se connecter et consulter sa fiche). */
+  for (const [table, col] of [["connexions", "user_id"], ["sessions", "user_id"], ["user_activity", "user_id"]]) {
+    try { await db.prepare(`DELETE FROM ${table} WHERE ${col}=?`).run(userId); }
+    catch (e) { console.error(`[purgerCompteRelaisInviteExpire:${table}]`, e.message); }
+  }
+  try { await db.prepare("DELETE FROM users WHERE id=?").run(userId); }
+  catch (e) { console.error('[purgerCompteRelaisInviteExpire:users]', e.message); }
+}
+
+/* Génère un DS-ID unique pour un nouveau compte Relais Diaspora (producteur ou invité) — même
+   boucle de nouvelle tentative qu'ailleurs dans ce fichier (ex. ligne ~11592), generateDsIdUnique()
+   de server/db.js n'étant pas exporté. */
+async function dsIdUniqueGenerer() {
+  for (let essai = 0; essai < 5; essai++) {
+    const candidat = generateDsId();
+    const collision = await db.prepare("SELECT 1 FROM users WHERE ds_id=?").get(candidat);
+    if (!collision) return candidat;
+  }
+  return generateDsId(); // improbable sur 36^10 combinaisons : on cède plutôt que de bloquer
 }
 
 /* Audit « fuites vers les visiteurs » (2026-10-06) : les routes publiques de l'annuaire renvoyaient la ligne
@@ -441,7 +495,8 @@ function publicUser(u) {
     photo_url: u.photo_url || null,
     nb_connexions: u.nb_connexions || 0, pwa_prompt_dismiss: !!u.pwa_prompt_dismiss, temoignage_statut: u.temoignage_statut || 'non_demande', temoignage_derniere_demande: u.temoignage_derniere_demande || null,
     demo_vue: u.demo_vue || 0, da_id: u.da_id || null, email_verifie: !!u.email_verifie, identite_verifiee: !!u.identite_verifiee,
-    a_publie: !!u.premiere_publication_le };
+    a_publie: !!u.premiere_publication_le,
+    est_relais_diaspora: !!u.est_relais_diaspora, relais_invite_fiche_id: u.relais_invite_fiche_id ? Number(u.relais_invite_fiche_id) : null };
   // NOTE: ds_id est intentionnellement exclu — jamais exposé via cette fonction
 }
 
@@ -1760,7 +1815,14 @@ route("POST", "/api/auth/login", async (req, res, params, body) => {
   if (!email || !password) return sendJSON(res, 400, { error: "E-mail et mot de passe requis." });
 
   /* Recherche insensible à la casse (ne casse aucun compte existant). */
-  const user = await db.prepare("SELECT * FROM users WHERE LOWER(email) = ?").get(email);
+  let user = await db.prepare("SELECT * FROM users WHERE LOWER(email) = ?").get(email);
+  /* Relais Diaspora — accès invité expiré (relais_invite_expire_le dépassée) : purge immédiate et
+     totale (compte + liaison DS-ID), puis traité comme un compte introuvable — jamais de message
+     distinct, pour ne jamais révéler qu'un accès invité a existé ici. */
+  if (user && user.relais_invite_expire_le && new Date(user.relais_invite_expire_le) <= new Date()) {
+    await purgerCompteRelaisInviteExpire(user.id);
+    user = null;
+  }
   if (!user || !verifyPassword(password, user.password_salt, user.password_hash)) {
     SEC.logSecurity("login_failed", { ip, email });
     dbLoginRecord(`ip:${ip}`, false);
@@ -13108,8 +13170,14 @@ route("POST", "/api/comptes-lies/basculer", async (req, res, params, body) => {
     return sendJSON(res, 403, { error: "Ce compte ne fait pas partie de votre groupe de comptes liés." });
   }
 
-  const cible = await db.prepare("SELECT * FROM users WHERE id=?").get(cibleId);
+  let cible = await db.prepare("SELECT * FROM users WHERE id=?").get(cibleId);
   if (!cible) return sendJSON(res, 404, { error: "Compte introuvable." });
+  /* Relais Diaspora — un accès invité déjà expiré ne doit pas pouvoir être rejoint par bascule,
+     même si la purge paresseuse de la connexion ne l'a pas encore atteint (voir purgerCompteRelaisInviteExpire). */
+  if (cible.relais_invite_expire_le && new Date(cible.relais_invite_expire_le) <= new Date()) {
+    await purgerCompteRelaisInviteExpire(cible.id);
+    return sendJSON(res, 403, { error: "Ce compte d'accès invité a expiré." });
+  }
   if (cible.suspendu_definitif || (cible.suspendu_jusqu_au && new Date(cible.suspendu_jusqu_au) > new Date())) {
     return sendJSON(res, 403, { error: "Ce compte est suspendu et ne peut pas être activé." });
   }
@@ -25785,6 +25853,95 @@ route("PATCH", "/api/admin/comptes/:id/rejeter", async (req, res, params, body) 
   creerNotif(Number(params.id), "validation", "Demande non retenue", `Votre demande n'a pas pu être validée : ${motif}. Contactez-nous pour plus d'informations.`, { motif });
   await AdminJunior.journaliserActionSiJunior(db, user, 'moderation.comptes.rejeter', `Compte #${params.id} rejeté (${motif})`);
   sendJSON(res, 200, { ok: true, statut: "rejete" });
+});
+
+/* ═══════════════════════════════════════════════════════════════════
+   RELAIS DIASPORA — prototype local (2026-10-13, PAS encore sur Neon, demande explicite).
+   "Initiative Relais Diaspora" (producteur) : compte Initiative classique + est_relais_diaspora=1,
+   créé directement par l'administrateur pour un adhérent de l'association déjà reconnu —
+   remplace temporairement le futur « petit cadenas » discret sur inscription.html + la
+   validation par rapprochement au registre des adhérents (différés, voir le plan).
+   Contrôle volontairement simple (user.role==='administrateur') : action neuve, pas encore de
+   clé de permission dédiée pour un administrateur junior.
+   ═══════════════════════════════════════════════════════════════════ */
+route("GET", "/api/admin/relais-diaspora/producteurs", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  const rows = await db.prepare("SELECT id,nom,prenom,email,ds_id,suspendu_definitif,created_at FROM users WHERE est_relais_diaspora=1 ORDER BY created_at DESC").all();
+  sendJSON(res, 200, { producteurs: rows });
+});
+
+route("POST", "/api/admin/relais-diaspora/producteurs", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  const { nom, prenom, email, password } = body || {};
+  if (!nom || !email || !password) return sendJSON(res, 400, { error: "Champs requis manquants (nom, email, password)." });
+  if (!SEC.isValidEmail(email)) return sendJSON(res, 400, { error: "Adresse e-mail invalide." });
+  if (String(password).length < 8) return sendJSON(res, 400, { error: "Le mot de passe doit comporter au moins 8 caractères." });
+  const emailNorm = SEC.normalizeEmail(email);
+  const existing = await db.prepare("SELECT id FROM users WHERE LOWER(email)=?").get(emailNorm);
+  if (existing) return sendJSON(res, 409, { error: "Un compte existe déjà avec cet e-mail." });
+  const { hash, salt } = hashPassword(password);
+  const dsId = await dsIdUniqueGenerer();
+  /* statut_verification='valide' directement : cette route EST la validation (admin, par
+     reconnaissance de l'adhérent) — pas de second circuit de validation à repasser derrière. */
+  const id = (await db.prepare(`
+    INSERT INTO users (nom, prenom, email, password_hash, password_salt, role, pays, origine1,
+      domaine_principal, telephone, statut_verification, est_relais_diaspora, da_id, ds_id)
+    VALUES (?, ?, ?, ?, ?, 'initiative', 'France', 'France', 'autre', '0000000000', 'valide', 1, ?, ?)
+  `).run(nom, prenom || null, emailNorm, hash, salt, generateDaId(), dsId)).lastInsertRowid;
+  const slug = `${String(nom).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}-relais-${id}`;
+  await db.prepare(`
+    INSERT INTO initiatives (slug, nom, description, pays, origine1, owner_user_id, abonnement_actif, statut_creation)
+    VALUES (?, ?, 'Initiative Relais Diaspora (compte de test local)', 'France', 'France', ?, 0, 'existante')
+  `).run(slug, nom, id);
+  sendJSON(res, 201, { ok: true, user_id: Number(id), ds_id: dsId });
+});
+
+route("PATCH", "/api/admin/relais-diaspora/producteurs/:id/suspendre", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  const cible = await db.prepare("SELECT id FROM users WHERE id=? AND est_relais_diaspora=1").get(params.id);
+  if (!cible) return sendJSON(res, 404, { error: "Compte Relais Diaspora introuvable." });
+  const suspendu = !!(body && body.suspendu);
+  await db.prepare("UPDATE users SET suspendu_definitif=? WHERE id=?").run(suspendu ? 1 : 0, params.id);
+  sendJSON(res, 200, { ok: true, suspendu });
+});
+
+/* Réattribution (révocation + remise à un autre adhérent) : nouveaux identifiants ET nouveau
+   DS-ID, credential_version incrémenté (invalide tout jeton 'auth' déjà émis — même mécanisme
+   que le transfert de gestionnaire, ligne ~297), et la liaison de comptes existante est retirée
+   — l'ancien titulaire ne doit plus jamais pouvoir basculer vers ce compte via son propre lien. */
+route("PATCH", "/api/admin/relais-diaspora/producteurs/:id/reassigner", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  const cible = await db.prepare("SELECT id FROM users WHERE id=? AND est_relais_diaspora=1").get(params.id);
+  if (!cible) return sendJSON(res, 404, { error: "Compte Relais Diaspora introuvable." });
+  const { nouvel_email, nouveau_mot_de_passe } = body || {};
+  if (!nouvel_email || !nouveau_mot_de_passe) return sendJSON(res, 400, { error: "Nouvel e-mail et nouveau mot de passe requis." });
+  if (!SEC.isValidEmail(nouvel_email)) return sendJSON(res, 400, { error: "Adresse e-mail invalide." });
+  if (String(nouveau_mot_de_passe).length < 8) return sendJSON(res, 400, { error: "Le mot de passe doit comporter au moins 8 caractères." });
+  const emailNorm = SEC.normalizeEmail(nouvel_email);
+  const autre = await db.prepare("SELECT id FROM users WHERE LOWER(email)=? AND id<>?").get(emailNorm, params.id);
+  if (autre) return sendJSON(res, 409, { error: "Un autre compte existe déjà avec cet e-mail." });
+  const { hash, salt } = hashPassword(nouveau_mot_de_passe);
+  const dsId = await dsIdUniqueGenerer();
+  await db.prepare("UPDATE users SET email=?, password_hash=?, password_salt=?, ds_id=?, credential_version=credential_version+1, suspendu_definitif=0 WHERE id=?")
+    .run(emailNorm, hash, salt, dsId, params.id);
+  await retirerLiaisonCompte(Number(params.id));
+  sendJSON(res, 200, { ok: true, ds_id: dsId });
+});
+
+/* Suppression = masquage, jamais destructrice (même convention que invisible_annuaire_* /
+   suspendu_definitif ailleurs sur la plateforme) : le contenu déjà publié par ce producteur
+   (événements, fiches, cagnottes) reste intact et visible, seule sa connexion est bloquée. */
+route("DELETE", "/api/admin/relais-diaspora/producteurs/:id", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  const cible = await db.prepare("SELECT id FROM users WHERE id=? AND est_relais_diaspora=1").get(params.id);
+  if (!cible) return sendJSON(res, 404, { error: "Compte Relais Diaspora introuvable." });
+  await db.prepare("UPDATE users SET suspendu_definitif=1 WHERE id=?").run(params.id);
+  sendJSON(res, 200, { ok: true });
 });
 
 route("DELETE", "/api/admin/contenu/:type/:id", async (req, res, params) => {
@@ -50251,6 +50408,78 @@ route("PATCH", "/api/insc/inscriptions/:id/statut", async (req, res, params, bod
   await db.prepare("UPDATE insc_inscriptions SET statut=?, updated_at=datetime('now') WHERE id=?").run(body.statut, insc.id);
   await inscJournaliser(insc.fiche_id, user, "statut_inscription", `Inscription #${insc.id} (${insc.nom} ${insc.prenom}) : ${insc.statut} → ${body.statut}`, insc.evenement_id);
   if (body.statut === "confirme") await envoyerConfirmationInscription(insc.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ═══════════════════════════════════════════════════════════════════
+   RELAIS DIASPORA — axe "gestion des inscriptions" (prototype local, 2026-10-13).
+   Créé par le producteur ("Initiative Relais Diaspora") propriétaire de la fiche, pour
+   l'organisme client. Compte "Utilisateur Relais Diaspora" : température, scopé à CETTE
+   seule fiche, jamais d'export. expire_le est saisi explicitement par le producteur (pas de
+   dérivation automatique sur une fiche à plusieurs événements liés — plus simple et testable
+   à la main pour ce prototype).
+   ═══════════════════════════════════════════════════════════════════ */
+route("POST", "/api/insc/fiches/:id/relais-diaspora/invite", async (req, res, params, body) => {
+  const ctx = await inscFicheProprietaire(req, params.id);
+  if (ctx.erreur) return sendJSON(res, ctx.erreur, { error: ctx.msg });
+  const { user, fiche } = ctx;
+  if (!user.est_relais_diaspora && user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux comptes Initiative Relais Diaspora." });
+  const { email, password, expire_le, organisme_nom } = body || {};
+  if (!email || !password || !expire_le) return sendJSON(res, 400, { error: "E-mail, mot de passe et date d'expiration requis." });
+  if (!SEC.isValidEmail(email)) return sendJSON(res, 400, { error: "Adresse e-mail invalide." });
+  if (String(password).length < 8) return sendJSON(res, 400, { error: "Le mot de passe doit comporter au moins 8 caractères." });
+  const expireDate = new Date(expire_le);
+  if (isNaN(expireDate.getTime()) || expireDate <= new Date()) return sendJSON(res, 400, { error: "La date d'expiration doit être dans le futur." });
+  const emailNorm = SEC.normalizeEmail(email);
+  const existing = await db.prepare("SELECT id FROM users WHERE LOWER(email)=?").get(emailNorm);
+  if (existing) return sendJSON(res, 409, { error: "Un compte existe déjà avec cet e-mail." });
+  const { hash, salt } = hashPassword(password);
+  const dsId = await dsIdUniqueGenerer();
+  /* Permissions v1 volontairement réduites à 2 booléens (décision prise, voir le plan) :
+     « exporter » n'existe même pas comme option — aucune route d'export n'est jamais exposée
+     à ce compte, défense en profondeur structurelle plutôt qu'un drapeau à vérifier partout. */
+  const permissions = {
+    voir_coordonnees: body?.permissions?.voir_coordonnees !== false,
+    modifier_statut: !!body?.permissions?.modifier_statut,
+  };
+  const id = (await db.prepare(`
+    INSERT INTO users (nom, prenom, email, password_hash, password_salt, role, statut_verification,
+      relais_invite_fiche_id, relais_invite_axe, relais_invite_expire_le, relais_invite_permissions_json,
+      relais_invite_cree_par_user_id, da_id, ds_id)
+    VALUES (?, ?, ?, ?, ?, 'utilisateur', 'auto', ?, 'gestion_inscriptions', ?, ?, ?, ?, ?)
+  `).run("Accès invité", organisme_nom || null, emailNorm, hash, salt, fiche.id, expireDate.toISOString(), JSON.stringify(permissions), user.id, generateDaId(), dsId)).lastInsertRowid;
+  sendJSON(res, 201, { ok: true, user_id: Number(id), ds_id: dsId, expire_le: expireDate.toISOString(), permissions });
+});
+
+/* Vue scopée de l'invité — uniquement les inscrits de SA fiche, jamais d'export. Le compte réel
+   lié via DS-ID y accède en basculant sur cette identité (comptes-lies/basculer) : pas de
+   double-session simultanée, comme partout ailleurs dans ce module. */
+route("GET", "/api/relais-diaspora/mes-inscrits", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (!user.relais_invite_fiche_id) return sendJSON(res, 403, { error: "Réservé à un accès invité Relais Diaspora." });
+  const permissions = (() => { try { return JSON.parse(user.relais_invite_permissions_json || "{}"); } catch (_) { return {}; } })();
+  const fiche = await db.prepare("SELECT id, nom FROM insc_fiches WHERE id=?").get(user.relais_invite_fiche_id);
+  const colonnesContact = permissions.voir_coordonnees !== false ? "i.email, i.telephone," : "NULL AS email, NULL AS telephone,";
+  const inscrits = await db.prepare(`
+    SELECT i.id, i.nom, i.prenom, ${colonnesContact} i.statut, i.created_at
+    FROM insc_inscriptions i WHERE i.fiche_id=? ORDER BY i.created_at DESC
+  `).all(user.relais_invite_fiche_id);
+  sendJSON(res, 200, { fiche, inscrits, permissions });
+});
+
+route("PATCH", "/api/relais-diaspora/mes-inscrits/:id/statut", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (!user.relais_invite_fiche_id) return sendJSON(res, 403, { error: "Réservé à un accès invité Relais Diaspora." });
+  const permissions = (() => { try { return JSON.parse(user.relais_invite_permissions_json || "{}"); } catch (_) { return {}; } })();
+  if (!permissions.modifier_statut) return sendJSON(res, 403, { error: "Cet accès invité ne permet pas de modifier le statut des inscrits." });
+  const insc = await db.prepare("SELECT id, fiche_id, evenement_id, nom, prenom, statut FROM insc_inscriptions WHERE id=?").get(params.id);
+  if (!insc || Number(insc.fiche_id) !== Number(user.relais_invite_fiche_id)) return sendJSON(res, 404, { error: "Inscription introuvable." });
+  const valides = ["inscrit", "confirme", "present", "absent", "annule", "liste_attente"];
+  if (!valides.includes(body?.statut)) return sendJSON(res, 400, { error: "Statut invalide." });
+  await db.prepare("UPDATE insc_inscriptions SET statut=?, updated_at=datetime('now') WHERE id=?").run(body.statut, insc.id);
+  await inscJournaliser(insc.fiche_id, user, "statut_inscription", `Inscription #${insc.id} (${insc.nom} ${insc.prenom}) : ${insc.statut} → ${body.statut} (via accès invité Relais Diaspora)`, insc.evenement_id);
   sendJSON(res, 200, { ok: true });
 });
 
