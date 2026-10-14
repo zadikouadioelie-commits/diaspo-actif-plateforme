@@ -59,6 +59,23 @@ function dvtPartager(id) {
    Depuis le 2026-10-10 les deux films « Comment ça marche » sont de vraies vidéos de la rubrique (même fiche, commentaires, réactions,
    gestion que les autres) : leur carte vient de l'API comme toute autre. Seul le LECTEUR diffère : ce n'est pas un fichier vidéo mais un
    film animé (assets/inscription-film.js : voix, musique, sous-titres), ouvert dans une fenêtre, chargé seulement au clic. */
+/* Lecture automatique + écran de fin « Accueil / Créer mon compte » (2026-10-14) : voir assets/tuto-lecture.js. */
+let _dvtLecturePromesse = null;
+function dvtChargerLecture() {
+  if (window.TutoLecture) return Promise.resolve();
+  if (!_dvtLecturePromesse) {
+    _dvtLecturePromesse = new Promise((ok, ko) => {
+      const sc = document.createElement('script');
+      sc.src = '/assets/tuto-lecture.js?v=6';
+      sc.onload = ok; sc.onerror = () => { _dvtLecturePromesse = null; ko(new Error('chargement du lecteur')); };
+      document.head.appendChild(sc);
+    });
+  }
+  return _dvtLecturePromesse;
+}
+function dvtOptsLecture() {
+  return { accueil: 'index.html', inscription: 'inscription.html', autres: 'videos-tutoriels.html', connecte: () => dvtGuestUser().then(u => !!u) };
+}
 let _dvtFilmPromesse = null;
 function dvtChargerFilm() {
   if (window.InscriptionFilm) return Promise.resolve();
@@ -74,6 +91,7 @@ function dvtChargerFilm() {
 }
 async function dvtOuvrirFilm(e, version) {
   if (e) e.preventDefault();
+  try { await dvtChargerLecture(); window.TutoLecture.ouvrirFilm(version, dvtOptsLecture()); return; } catch (x) { /* repli : ancien lecteur ci-dessous */ }
   try { await dvtChargerFilm(); window.InscriptionFilm.ouvrir(version === 'court' ? { version: 'court' } : version === 'flash' ? { version: 'flash' } : version === 'telephone' ? { version: 'telephone' } : undefined); }
   catch (x) { window.location.href = version === 'flash' ? 'evenements.html' : version === 'telephone' ? 'm.html' : 'inscription.html'; }
 }
@@ -346,7 +364,8 @@ async function dvtChargerPageVideo(videoId) {
     if (!v) { root.innerHTML = '<p style="color:var(--muted);">Vidéo introuvable.</p>'; return; }
     document.title = `${v.titre} — Diaspo'Actif`;
     root.innerHTML = `
-      <div class="dvt-player">${dvtLecteurHtml(v)}</div>
+      <a class="dvt-btn-outline" href="index.html" style="display:inline-block;margin:0 0 10px;text-decoration:none;">🏠 Accueil</a>
+      <div class="dvt-player" id="dvt-lecteur">${v.type_source === 'bientot' ? dvtLecteurHtml(v) : ''}</div>
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">
         <h1 class="dvt-page-titre">${dvtEsc(v.titre)}</h1>
         <span style="display:flex;gap:8px;margin-top:18px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end;">
@@ -362,6 +381,10 @@ async function dvtChargerPageVideo(videoId) {
       <div id="dvt-comment-form"></div>
       <div id="dvt-commentaires-liste" style="margin-top:16px;"><p style="color:var(--muted);font-size:13px;">Chargement…</p></div>
     `;
+    if (v.type_source !== 'bientot') {
+      dvtChargerLecture().then(() => window.TutoLecture.monter(document.getElementById('dvt-lecteur'), v, dvtOptsLecture()))
+        .catch(() => { const z = document.getElementById('dvt-lecteur'); if (z) z.innerHTML = dvtLecteurHtml(v); });
+    }
     fetch(`/api/videos-tutoriels/${videoId}/vue`, { method: 'POST' }).catch(() => {});
     dvtChargerReactions(videoId);
     dvtChargerCommentaires(videoId);

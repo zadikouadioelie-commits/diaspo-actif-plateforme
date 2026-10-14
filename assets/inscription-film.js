@@ -1349,9 +1349,12 @@
     if (enCours && audio && tFilm >= LEAD) { const pr = audio.play(); if (pr && pr.catch) pr.catch(() => {}); }
     tMur = performance.now();
   }
+  /* Rappel facultatif à la fin du film (options.onFin, 2026-10-14) : l'écran « Accueil / Créer mon compte » des tutos. */
+  let surFin = null;
   function terminer() {
     enCours = false; finie = true; if (audio) audio.pause(); R.play.textContent = '↻ Revoir';
     if (master && ctx) master.gain.setTargetAtTime(0, ctx.currentTime, 0.1);
+    if (surFin) { try { surFin(); } catch (e) { /* sans conséquence */ } }
   }
   function basculerSon() {
     muet = !muet; if (audio) audio.muted = muet; R.son.textContent = muet ? '🔇 Son coupé' : '🔊 Son';
@@ -1368,6 +1371,7 @@
   function ouvrir(options) {
     if (ov) return;
     options = options || {};
+    surFin = typeof options.onFin === 'function' ? options.onFin : null;
     FILM = options.version === 'court' ? FILMS.court : options.version === 'flash' ? FILMS.flash : options.version === 'telephone' ? FILMS.telephone : FILMS.long;
     if (!document.getElementById('fi-css')) { const st = document.createElement('style'); st.id = 'fi-css'; st.textContent = CSS; document.head.appendChild(st); }
     if (!document.getElementById('fi-fonts')) { const l = document.createElement('link'); l.id = 'fi-fonts'; l.rel = 'stylesheet'; l.href = 'https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Cinzel:wght@600;800&display=swap'; document.head.appendChild(l); }

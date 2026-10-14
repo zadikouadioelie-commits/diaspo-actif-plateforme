@@ -1855,10 +1855,13 @@
   }
   /* Films animés de la plateforme (2026-10-10) : ce sont désormais de vraies vidéos de la rubrique (type_source 'film', gérées comme les autres) —
      leur carte vient de l'API. Seul le lecteur diffère : le film (voix, musique, sous-titres) s'ouvre dans une fenêtre, chargé seulement au toucher. */
+  /* Lecture automatique + écran de fin « Accueil / Créer mon compte » (2026-10-14) : voir assets/tuto-lecture.js. */
+  const optsLecture = () => ({ accueil: '#/accueil', inscription: 'inscription.html', autres: '#/videos', connecte: () => !!S.me });
   let filmPromesse = null;
   document.addEventListener('click', e => {
     const a = e.target.closest && e.target.closest('[data-film-inscription]'); if (!a) return;
     e.preventDefault();
+    if (window.TutoLecture) { window.TutoLecture.ouvrirFilm(a.dataset.filmInscription === 'court' ? 'court' : a.dataset.filmInscription === 'flash' ? 'flash' : a.dataset.filmInscription === 'telephone' ? 'telephone' : 'long', optsLecture()); return; }
     if (!filmPromesse) filmPromesse = window.InscriptionFilm ? Promise.resolve() : new Promise((ok, ko) => { const sc = document.createElement('script'); sc.src = 'assets/inscription-film.js?v=17'; sc.onload = ok; sc.onerror = () => { filmPromesse = null; ko(new Error('film')); }; document.head.appendChild(sc); });
     filmPromesse.then(() => window.InscriptionFilm.ouvrir(a.dataset.filmInscription === 'court' ? { version: 'court' } : a.dataset.filmInscription === 'flash' ? { version: 'flash' } : a.dataset.filmInscription === 'telephone' ? { version: 'telephone' } : undefined)).catch(() => { location.href = a.getAttribute('href') || 'inscription.html'; });
   });
@@ -2017,7 +2020,8 @@
     try { v = (await api('/api/videos-tutoriels/' + encodeURIComponent(id))).video; } catch (e) { return setPane('Tutoriel vidéo', `<div class="empty"><b>Vidéo introuvable</b>${esc(e.message)}</div>`); }
     try { autres = ((await api('/api/videos-tutoriels')).videos || []).filter(x => String(x.id) !== String(v.id)); } catch (e) { /* la suite est facultative */ }
     const y = v.type_source === 'youtube' ? ytId(v.url) : null;
-    const player = y ? `<div class="vwrap"><iframe src="https://www.youtube-nocookie.com/embed/${y}?rel=0&playsinline=1" title="${esc(v.titre)}" allow="accelerometer; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe></div>`
+    const lecteurAuto = !!window.TutoLecture && (!!y || v.type_source === 'mp4' || v.type_source === 'film');
+    const player = lecteurAuto ? '<div class="vwrap" id="tl-zone"></div>' : y ? `<div class="vwrap"><iframe src="https://www.youtube-nocookie.com/embed/${y}?rel=0&playsinline=1" title="${esc(v.titre)}" allow="accelerometer; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe></div>`
       : v.type_source === 'mp4' ? videoBlock(v.url, v.miniature_url)
         : v.type_source === 'film' ? `<a href="${v.url === 'evenement-flash' ? 'evenements.html' : v.url === 'telephone-initiative' ? 'm.html' : 'inscription.html'}" data-film-inscription="${v.url === 'inscription-court' ? 'court' : v.url === 'evenement-flash' ? 'flash' : v.url === 'telephone-initiative' ? 'telephone' : 'long'}" aria-label="Lancer le film : ${esc(v.titre)}" style="position:relative;display:block;aspect-ratio:16/9;border-radius:14px;overflow:hidden;background:#0B2A5B"><img src="${attrUrl(v.miniature_url || 'assets/media/film-inscription-poster.jpg')}" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover"><span style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:64px;height:64px;border-radius:50%;background:rgba(242,100,34,.95);color:#fff;font-size:26px;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(0,0,0,.4)">▶</span></a>`
         : `<div class="vsoon"><div class="vth">${videoThumb(v)}</div><div class="vsoon-b"><span class="badge o">${ic('clock', 's')} Bientôt disponible</span><span class="small">Cette vidéo sera publiée prochainement.</span></div></div>`;
@@ -2026,6 +2030,7 @@
     setPane(v.titre, `${player}<div class="card" style="margin-top:12px"><div class="pad"><h2 style="margin:0 0 6px;font-size:19px">${esc(v.titre)}</h2><div class="tags" style="margin:0 0 8px">${v.categorie ? `<span class="badge">${esc(v.categorie)}</span>` : ''}${v.duree_secondes ? `<span class="badge">${fmtDuree(v.duree_secondes)}</span>` : ''}${v.vues ? `<span class="badge">${v.vues} vues</span>` : ''}</div>${v.description ? `<div class="rich" style="white-space:pre-line">${esc(strip(v.description))}</div>` : ''}</div></div>
       ${v.type_source !== 'bientot' ? `<button type="button" class="btn block" style="margin-top:14px" data-share-tuto="${esc(v.id)}">${ic('share', 's')} Partager ce tuto</button>` : ''}
       ${suite}<a class="btn out block" style="margin-top:14px" href="#/videos">Toutes les vidéos</a>`);
+    if (lecteurAuto) { const zl = $('#tl-zone'); if (zl) window.TutoLecture.monter(zl, v, optsLecture()); }
     if (v.type_source !== 'bientot') { const sb = $('#pane-share'); if (sb) { sb.hidden = false; sb.onclick = () => partagerTuto(v.id); } }
   }
 
