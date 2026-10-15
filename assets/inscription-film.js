@@ -311,6 +311,52 @@
 .ft-h{font-family:'Cinzel','Georgia',serif;font-size:40px;font-weight:800;line-height:1.15;text-align:center;width:560px;text-shadow:0 4px 22px rgba(0,0,0,.35)}
 .ft-sub{width:560px;text-align:center;font-family:'Cinzel','Georgia',serif;font-size:15.5px;letter-spacing:.14em;line-height:1.6;color:#F2C94C;font-weight:600}
 .ft-li{padding:13px 28px;border-radius:999px;background:rgba(255,255,255,.1);border:2px solid rgba(226,169,41,.5);font-size:26px;font-weight:700;color:#e8f0ff;white-space:nowrap;box-shadow:0 8px 22px rgba(0,0,0,.25)}
+/* ── Tuto « Business Plan — de l'idée à l'exécution » (maquettes fictives) ── */
+.fb-pgb{position:absolute;left:0;top:62px;width:390px;bottom:0;overflow:hidden}
+.fb-in{position:absolute;left:0;top:0;width:390px;padding:14px 14px 40px}
+.fb-bar{position:absolute;left:0;bottom:0;width:390px;height:108px;background:#fff;border-top:1px solid #d9e1ef;padding:20px 14px;z-index:2}
+.fb-btn{height:66px;border-radius:999px;background:#B84D1A;color:#fff;font-size:21px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:10px}
+.fb-tabs{display:flex;gap:10px;margin-bottom:14px;width:560px}
+.fb-tab{padding:14px 22px;border-radius:999px;background:#fff;border:2px solid #d4deef;font-size:18px;font-weight:700;color:#10294f;white-space:nowrap}
+.fb-tab.on{background:#10294f;border-color:#10294f;color:#fff}
+.fb-card{border-radius:22px;background:#faf7f2;border:1px solid #e6dfd2;overflow:hidden;margin-bottom:14px;box-shadow:0 6px 18px rgba(16,41,79,.08)}
+.fb-cov{height:190px;position:relative;display:flex;align-items:center;gap:14px;padding:0 16px;color:#fff;background:linear-gradient(120deg,#0a1a3a,#7c2d12 60%,#ea580c)}
+.fb-cov .lg{width:84px;height:84px;border-radius:50%;background:#fff;object-fit:contain;flex:none}
+.fb-cov b{font-size:21px;line-height:1.15;display:block}.fb-cov small{display:block;font-size:13px;opacity:.9;margin-top:4px;letter-spacing:.04em}
+.fb-cov2{height:120px;background:linear-gradient(135deg,#0f766e,#14b8a6 55%,#fde68a)}
+.fb-cov3{height:90px;background:linear-gradient(120deg,#be185d,#f472b6 55%,#fde68a)}
+.fb-bd{padding:16px}
+.fb-bd h3{margin:0 0 10px;font-size:24px;line-height:1.2;color:#10294f;font-weight:700}
+.fb-ch{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.fb-ch span{padding:7px 14px;border-radius:999px;background:#e4ecfb;color:#1d4e8f;font-size:15px;font-weight:600}
+.fb-ch span.or{background:#fdeee3;color:#b84d1a}
+.fb-pr{height:12px;border-radius:6px;background:#e1e8f4;overflow:hidden}.fb-pr i{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,#ea580c,#f97316)}
+.fb-pm{display:flex;justify-content:space-between;margin-top:8px;font-size:15px;color:#5b6b82}
+.fb-lab{font-size:13px;font-weight:700;letter-spacing:.12em;color:#5b6b82;margin:20px 4px 8px}
+.fb-sc{display:inline-block;padding:14px 24px;border-radius:16px;background:#eaf0fb}
+.fb-sc small{display:block;font-size:14px;color:#5b6b82}.fb-sc b{font-size:32px;color:#10294f;font-weight:700}
+.fb-row{display:flex;align-items:center;gap:14px;padding:12px 14px;background:#fff;border-bottom:1px solid #e3e9f4}
+.fb-row .ib{width:46px;height:46px;border-radius:14px;background:#E4ECFB;display:flex;align-items:center;justify-content:center;font-size:21px;flex:none}
+.fb-row b{font-size:17.5px;color:#10294f;font-weight:600}.fb-row span.s{display:block;font-size:13.5px;color:#5b6b82}
+.fb-row em{font-style:normal;margin-left:8px;padding:3px 12px;border-radius:999px;background:#e4ecfb;color:#1d4e8f;font-size:13px;font-weight:700;white-space:nowrap}
+.fb-row em.g{background:#dcfce7;color:#15803d}.fb-row em.y{background:#fff4d6;color:#8a5a00}.fb-row em.o{background:#fdeee3;color:#b84d1a}
+.fb-row .chev{margin-left:auto;color:#8a97ad;font-size:24px;flex:none}
+.fb-grp{border-radius:20px;overflow:hidden;border:1px solid #e3e9f4;background:#fff}
+.fb-grp .fb-row:last-child{border-bottom:0}
+.fb-form{padding:18px 16px 10px;background:#faf7f2;border-radius:22px;border:1px solid #e6dfd2}
+.fb-fld{margin-bottom:14px}.fb-fld label{display:block;font-size:17px;font-weight:700;color:#10294f;margin-bottom:8px}
+.fb-inp{height:62px;border-radius:16px;background:#fff;border:2px solid #d9e1ef;padding:0 18px;display:flex;align-items:center;font-size:21px;color:#10294f;justify-content:space-between}
+.fb-inp.ph{color:#8a97ad}.fb-inp.fc{border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.25)}
+.fb-mod{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.fb-mod>div{padding:14px;border-radius:18px;background:#fff;border:2px solid #d9e1ef;min-height:84px}
+.fb-mod>div b{display:block;font-size:19px;color:#10294f}.fb-mod>div span{font-size:14px;color:#5b6b82}
+.fb-mod>div.on{background:#fff0e8;border-color:#10294f}
+.fb-note{margin:14px 0;padding:14px 16px;border-radius:16px;background:#fff0e8;font-size:15px;color:#7a3b1d;line-height:1.35}
+.fb-act{border-radius:22px;background:#faf7f2;border:1px solid #e6dfd2;padding:14px}
+.fb-act div{height:56px;border-radius:999px;border:2px solid #d4deef;background:#fff;display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:700;color:#10294f;margin-bottom:10px}
+.fb-act div.rd{border-color:#b42318;color:#b42318;margin-bottom:0}
+.fb-stp{position:absolute;left:0;top:0;width:146px;border-radius:14px 14px 4px 4px;background:linear-gradient(180deg,#FDEBA8 0%,#E8B22E 40%,#B67E14 100%);box-shadow:0 14px 34px rgba(0,0,0,.4);display:flex;align-items:flex-start;justify-content:center;padding-top:12px;font-family:'Cinzel','Georgia',serif;font-size:34px;font-weight:800;color:#5a3a00}
+.fb-lbl{padding:12px 28px;border-radius:999px;background:rgba(255,255,255,.12);border:2px solid #FDEBA8;font-family:'Cinzel','Georgia',serif;font-size:28px;font-weight:800;color:#FDEBA8;white-space:nowrap;box-shadow:0 0 34px rgba(253,235,168,.55)}
 @media (max-width:640px){.fi-titre{display:none!important}.fi-top{justify-content:flex-end}}
 @media (prefers-reduced-motion:reduce){.fi-ov{animation:none}}
 `;
@@ -1271,7 +1317,262 @@
   }
 
   FILMS.telephone = { id: 'telephone', stage: 'telephone', etiquette: '40 s', titre: "TUTO · DIASPO'ACTIF SUR TÉLÉPHONE", aria: "Tuto vidéo : Diaspo'Actif sur téléphone, compte Initiative", cta: { label: "Ouvrir l'application mobile", href: 'm.html' }, voix: 'assets/media/telephone-initiative-voix.mp3?v=1', fin: 43.2, dvoix: 39.52, caps: CAPS_TEL, scenes: SCENES_TEL, sfx: SFX_TEL, swell: [31, 40] };
-  function rendre(av) { return FILM.id === 'long' ? rendreLong(av) : FILM.id === 'flash' ? rendreFlash(av) : FILM.id === 'telephone' ? rendreTel(av) : rendreCourt(av); }
+  /* ═══ Tuto « Business Plan — de l'idée à l'exécution » (2026-10-14) : décor, sous-titres, effets, scènes ═══
+     Écrans = maquettes HTML fidèles au module Business Plans du téléphone, avec des données 100 % FICTIVES (Terre Fertile, Atelier Soleil,
+     Association Horizon Afrique…). Voix : prise unique Perle (46,72 s), temps tirés de sa transcription horodatée (Scribe) :
+     si la voix est régénérée, REMESURER. */
+  const STEPS_BP = [['🏷️', 'Informations générales', 'g', 'Complet'], ['📄', 'Résumé exécutif', 'y', 'En cours'], ['🏢', 'Présentation détaillée', 'y', 'En cours'], ['🔍', 'Analyse du problème', '', 'Vide'],
+    ['💡', 'Solution proposée', '', 'Vide'], ['📊', 'Étude de marché', '', 'Vide'], ['⚡', 'Analyse SWOT', '', 'Vide'], ['🎯', 'Business Model Canvas', '', 'Vide'], ['📦', 'Produits et services', '', 'Vide'],
+    ['📣', 'Stratégie marketing', '', 'Vide'], ['💼', 'Plan commercial', '', 'Vide'], ['⚙️', 'Plan opérationnel', '', 'Vide'], ['🏗️', 'Organisation et gouvernance', '', 'Vide'], ['👥', 'Ressources humaines', '', 'Vide'],
+    ['📅', 'Calendrier de mise en œuvre', '', 'Vide'], ['💰', 'Plan financier', '', 'Vide'], ['⚠️', 'Analyse des risques', '', 'Vide'], ['🌱', 'Impact', '', 'Vide'], ['🏦', 'Recherche de financement', '', 'Vide'], ['📎', 'Annexes', '', 'Vide']];
+  const STAGE_BP_HTML = `
+<div class="fi-bg"></div>
+<div class="fi-blob b1" data-r="b1"></div><div class="fi-blob b2" data-r="b2"></div>
+<div data-r="parts"></div>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <linearGradient id="fiGold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FDEBA8"/><stop offset=".5" stop-color="#E8B22E"/><stop offset="1" stop-color="#B67E14"/></linearGradient>
+</defs></svg>
+<svg class="fi-globe" data-r="rub" viewBox="0 0 1280 720" width="1280" height="720" aria-hidden="true">
+  <path d="M0 650 C 300 612, 640 700, 1280 640 L1280 720 L0 720 Z" fill="#061633" opacity=".94"/>
+  <path d="M0 650 C 300 612, 640 700, 1280 640" fill="none" stroke="url(#fiGold)" stroke-width="5"/>
+  <path d="M0 662 C 300 624, 640 712, 1280 652" fill="none" stroke="#1B7F3B" stroke-width="3" opacity=".9"/>
+</svg>
+<div class="fi-abs fi-motto" data-r="motto">Rassembler · Mobiliser · Impacter</div>
+<div class="fi-abs fi-head" data-r="head"><img src="assets/media/logo-film.webp" alt=""><span>Diaspo<i>'</i>Actif</span></div>
+
+<div class="fi-abs ft-h gold" data-r="fth"></div>
+<div class="fi-abs ft-sub" data-r="fts"></div>
+<div class="fi-abs ft-li" data-r="fl0"></div><div class="fi-abs ft-li" data-r="fl1"></div><div class="fi-abs ft-li" data-r="fl2"></div><div class="fi-abs ft-li" data-r="fl3"></div><div class="fi-abs ft-li" data-r="fl4"></div>
+
+<div class="fi-abs ft-phone" data-r="tph"><i class="ft-dot"></i>
+ <div class="ft-scr">
+  <div class="ft-abs2 ft-view"><div class="ft-hin">
+    <div class="ft-tuto"><div class="hd"><span class="ic">▶</span><span class="tt">Tutoriels vidéo</span><span class="tv">Tout voir ›</span></div><div class="ln"></div><p>Apprenez à utiliser Diaspo'Actif en quelques minutes.</p>
+      <div class="ft-vr"><div class="ft-vc"><div class="po"><img src="assets/media/film-inscription-poster.jpg" alt=""><span class="pl">▶</span><span class="sh">⤴</span><span class="du">0:55</span></div><b>Comment ça marche : créer son compte en 55 secondes</b><span>Bien démarrer</span></div></div></div>
+    <div class="ft-rn"><em>🌍 Réseau diaspora mondial</em><h4>Connecter les diasporas, valoriser les talents, accélérer le développement des territoires.</h4></div>
+  </div></div>
+  <div class="ft-abs2 ft-hdr">
+    <span class="mn"><svg style="position:static;width:20px;height:20px;stroke:#2a1d02;stroke-width:2.6" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>Menu</span>
+    <img class="lg" src="assets/media/logo-film.webp" alt="">
+    <svg style="left:237px" viewBox="0 0 24 24"><path d="M4 8h15M15 4l4 4-4 4M20 16H5M9 12l-4 4 4 4"/></svg>
+    <svg style="left:289px" viewBox="0 0 24 24"><path d="M3 4h2.5l2.4 11h10.2l2-8H7"/><circle cx="9.5" cy="19.5" r="1.3"/><circle cx="17" cy="19.5" r="1.3"/></svg>
+    <svg style="left:341px" viewBox="0 0 24 24"><path d="M6 17V11a6 6 0 0 1 12 0v6l1.6 2H4.4zM10 21a2 2 0 0 0 4 0"/></svg><span class="bd">2</span>
+  </div>
+  <div class="ft-abs2 ft-tabs"><div class="on"><i>🏠</i>Accueil</div><div><i>📅</i>Événements</div><div><i>👥</i>Annuaire</div><div><i>💬</i>Messages</div><div><i>🏪</i>Boutiques</div><div><i>👤</i>Moi</div><div><i>📰</i>Actualités</div></div>
+  <div class="ft-abs2 ft-dim" data-r="tdim"></div>
+
+  <div class="ft-abs2 ft-sheet nv" data-r="tmenu"><span class="ft-hand"></span><div class="ft-min" style="padding-top:34px">
+    <div class="ft-mh"><img src="assets/media/logo-film.webp" alt=""><div><b>Association Horizon Afrique</b><span>Initiative · 👑 Premium actif</span></div></div>
+    <div class="ft-ml">MENU DES MODULES</div>
+    <div class="ft-mc"><span class="ib">🏠</span><div><b>Accueil</b><span class="s">Tutoriels vidéo, actualités, initiatives</span></div></div>
+    <div class="ft-ml pr">★ MODULES PREMIUM</div>
+    <div class="ft-mc gd" data-r="pc0"><span class="ib">📅</span><div><b>Mes événements<em>👑 Premium</em></b><span class="s">Créer et gérer vos événements</span></div></div>
+    <div class="ft-mc gd" data-r="pc1"><span class="ib">👥</span><div><b>Cotisations et adhésions<em>👑 Premium</em></b><span class="s">Formules, adhérents, paiements</span></div></div>
+    <div class="ft-mc gd" data-r="pc2"><span class="ib">🏪</span><div><b>Messages de la boutique<em>👑 Premium</em></b><span class="s">Demandes reçues via votre boutique</span></div></div>
+    <div class="ft-mc gd" data-r="pc3"><span class="ib">💛</span><div><b>Cagnottes et dons<em>👑 Premium</em></b><span class="s">Vos cagnottes et les dons reçus</span></div></div>
+    <div class="ft-mc gd" data-r="pc4"><span class="ib">📄</span><div><b>Business Plans<em>👑 Premium</em></b><span class="s">Construire et défendre vos projets</span></div></div>
+    <div class="ft-ml">OUTILS</div>
+    <div class="ft-mc"><span class="ib">💬</span><div><b>Messagerie</b><span class="s">Vos conversations</span></div></div>
+  </div></div>
+
+  <div class="ft-abs2 ft-not" data-r="pLst"><div class="nh"><span style="font-size:30px;line-height:1">‹</span>Business Plans</div>
+    <div class="fb-pgb"><div class="fb-in" data-r="pLstIn">
+      <div class="fb-tabs"><span class="fb-tab on" data-r="tbA">Mes plans (3)</span><span class="fb-tab" data-r="tbB">Partagés avec moi</span><span class="fb-tab" data-r="tbC">Exemple de référence</span></div>
+      <div class="fb-card"><div class="fb-cov"><img class="lg" src="assets/media/logo-film.webp" alt=""><div><b>ASSOCIATION HORIZON AFRIQUE</b><small>ANNUAIRE PROFESSIONNEL</small></div></div>
+        <div class="fb-bd"><h3>Terre Fertile — maraîchage solidaire</h3><div class="fb-ch"><span>Coopérative</span><span>Agriculture & Agroalimentaire</span><span class="or">Brouillon</span><span>Non transmis</span></div>
+        <div class="fb-pr"><i style="width:42%"></i></div><div class="fb-pm"><span>42 % complété</span><span>Modifié 2 octobre 2026</span></div></div></div>
+      <div class="fb-card"><div class="fb-cov fb-cov2"></div><div class="fb-bd"><h3>Atelier Soleil — couture</h3><div class="fb-ch"><span>PME</span><span>Culture & Arts</span><span class="or">Brouillon</span></div><div class="fb-pr"><i style="width:18%"></i></div><div class="fb-pm"><span>18 % complété</span><span>Modifié 28 septembre 2026</span></div></div></div>
+      <div class="fb-card"><div class="fb-cov fb-cov3"></div><div class="fb-bd"><h3>Académie Savoir Plus — formation</h3><div class="fb-ch"><span>Association</span><span>Éducation & Formation</span></div></div></div>
+    </div>
+    <div class="fb-bar"><div class="fb-btn" data-r="bNew">＋ Nouveau business plan</div></div></div></div>
+
+  <div class="ft-abs2 ft-not" data-r="pNew"><div class="nh"><span style="font-size:30px;line-height:1">‹</span>Nouveau business plan</div>
+    <div class="fb-pgb"><div class="fb-in"><div class="fb-form">
+      <div class="fb-fld"><label>Nom du projet *</label><div class="fb-inp" data-r="bNom"><span data-r="bNomT"></span></div></div>
+      <div class="fb-fld"><label>Secteur d'activité</label><div class="fb-inp ph" data-r="bSec"><span data-r="bSecT">Choisir…</span><span style="font-size:18px">⌄</span></div></div>
+      <div class="fb-fld"><label>Modèle de business plan</label><div class="fb-mod">
+        <div class="on" data-r="md0"><b>Startup</b><span>Projet tech ou innovant</span></div><div data-r="md1"><b>PME</b><span>Petite / moyenne entreprise</span></div>
+        <div data-r="md2"><b>Association</b><span>Sans but lucratif</span></div><div data-r="md3"><b>ONG</b><span>Projet humanitaire</span></div>
+        <div data-r="md4"><b>Coopérative</b><span>Agriculture, artisanat…</span></div><div data-r="md5"><b>Social</b><span>Impact social fort</span></div></div></div>
+    </div></div>
+    <div class="fb-bar"><div class="fb-btn" data-r="bCre">Créer le business plan</div></div></div></div>
+
+  <div class="ft-abs2 ft-not" data-r="pOv"><div class="nh"><span style="font-size:30px;line-height:1">‹</span>Terre Fertile</div>
+    <div class="fb-pgb"><div class="fb-in" data-r="pOvIn">
+      <div class="fb-card"><div class="fb-bd"><h3>Terre Fertile — maraîchage solidaire</h3><div class="fb-ch"><span>Coopérative</span><span>Agriculture & Agroalimentaire</span><span class="or">Brouillon</span><span>Non transmis</span></div>
+        <div class="fb-pr"><i style="width:42%"></i></div><div class="fb-pm"><span>42 % des étapes commencées</span><span>Modifié</span></div></div></div>
+      <div class="fb-lab">CHIFFRES CLÉS</div>
+      <div class="fb-card" style="padding:14px"><span class="fb-sc" data-r="bScore"><small>Score de solidité</small><b>38 / 100</b></span></div>
+      <div class="fb-lab" data-r="bPri">À AMÉLIORER EN PRIORITÉ</div>
+      <div class="fb-grp" data-r="bPriG">
+        <div class="fb-row"><span class="ib">📊</span><div><b>Compléter le marché</b><span class="s">Étude de marché · 2 / 9 points</span></div><span class="chev">›</span></div>
+        <div class="fb-row"><span class="ib">💡</span><div><b>Compléter la solution</b><span class="s">Produit / Solution · 3 / 9 points</span></div><span class="chev">›</span></div>
+        <div class="fb-row"><span class="ib">👥</span><div><b>Compléter l'équipe</b><span class="s">Équipe · 1 / 9 points</span></div><span class="chev">›</span></div></div>
+      <div class="fb-lab" data-r="bStp">LES ÉTAPES DU PLAN</div>
+      <div class="fb-grp">${STEPS_BP.map(s => `<div class="fb-row"><span class="ib">${s[0]}</span><b>${s[1]}<em class="${s[2]}">${s[3]}</em></b><span class="chev">›</span></div>`).join('')}</div>
+      <div class="fb-lab" data-r="bAct">ACTIONS</div>
+      <div class="fb-act"><div>Dupliquer ce plan</div><div class="rd">Supprimer ce plan</div></div>
+      <div class="fb-note"><b>À finir sur ordinateur.</b> Tableaux financiers détaillés, listes, outils stratégiques, versions, collaborateurs, pièces jointes et médias.</div>
+      <div class="fb-grp" data-r="bRows">
+        <div class="fb-row" data-r="ar0"><span class="ib">📄</span><div><b>Dossier investisseur</b><span class="s">Génération PDF et PowerPoint</span></div><span class="chev">↗</span></div>
+        <div class="fb-row"><span class="ib">🖥️</span><div><b>Éditeur complet</b><span class="s">Toutes les étapes, aide de l'IA, versions</span></div><span class="chev">↗</span></div>
+        <div class="fb-row" data-r="ar2"><span class="ib">🎤</span><div><b>Simulation de présentation</b><span class="s">S'entraîner à défendre son projet</span></div><span class="chev">↗</span></div>
+        <div class="fb-row" data-r="ar3"><span class="ib">📨</span><div><b>Transmettre à Diaspo'Actif</b><span class="s">Depuis la page « Mes business plans »</span></div><span class="chev">↗</span></div>
+        <div class="fb-row"><span class="ib">📑</span><div><b>Version document complète</b><span class="s">Mise en page du site, impression</span></div><span class="chev">↗</span></div></div>
+    </div></div></div>
+ </div>
+</div>
+
+<div class="fi-abs fb-stp" data-r="sp0" style="height:60px">1</div><div class="fi-abs fb-stp" data-r="sp1" style="height:120px">2</div><div class="fi-abs fb-stp" data-r="sp2" style="height:180px">3</div><div class="fi-abs fb-stp" data-r="sp3" style="height:240px">4</div><div class="fi-abs fb-stp" data-r="sp4" style="height:300px">5</div>
+<div class="fi-abs fb-lbl" data-r="sLbl">1 · Clarifier le projet</div>
+<div class="fi-abs" data-r="sArr" style="font-size:34px;color:#FDEBA8;text-shadow:0 0 18px rgba(253,235,168,.9)">▼</div>
+<div class="fi-abs" data-r="lauG">${laurier(false)}</div><div class="fi-abs" data-r="lauD">${laurier(true)}</div>
+<div class="fi-abs fi-big" data-r="t1">La première <span class="gold">marche</span></div>
+<div class="fi-abs fi-script" data-r="t0">clarifier le projet</div>
+<div class="fi-abs" data-r="t3"><span class="fi-cta">Créer mon business plan</span></div>
+<div class="fi-abs" data-r="fade" style="width:${W}px;height:${H}px;background:#061633;opacity:0"></div>`;
+
+  const CAPS_BP = [
+    [0.0, 2.72, "La diaspora porte une multitude de projets."],
+    [2.8, 7.84, "Diaspo'Actif met à votre disposition l'outil nécessaire pour passer de l'idée à l'exécution :"],
+    [8.2, 9.92, "le module Business Plan."],
+    [9.96, 12.08, "Dans le menu, parmi les modules Premium,"],
+    [12.16, 13.68, "ouvrez Business Plans."],
+    [13.72, 17.28, "Vos plans, ceux partagés avec vous, et un exemple de référence."],
+    [17.52, 18.53, "Un nouveau projet ?"],
+    [18.59, 21.6, "Donnez-lui un nom, choisissez le secteur et le modèle :"],
+    [22.03, 26.48, "startup, PME, association, ONG, coopérative ou social."],
+    [26.8, 31.6, "Votre plan s'ouvre avec son score de solidité, les points à améliorer en priorité,"],
+    [31.68, 35.84, "et vingt étapes guidées, du résumé exécutif à la recherche de financement."],
+    [35.89, 36.96, "Puis passez à l'action :"],
+    [37.44, 43.68, "dossier investisseur en PDF et PowerPoint, simulation de présentation, et transmission à Diaspo'Actif."],
+    [43.7, 45.44, "Et la première marche, c'est :"],
+    [45.52, 46.8, "clarifier votre projet."],
+  ];
+  const SCENES_BP = [[-LEAD, 9.96], [9.96, 13.72], [13.72, 17.5], [17.5, 26.7], [26.7, 35.89], [35.89, 43.7], [43.7, 52.0 - LEAD]];
+  const SFX_BP = [[0.4, 'pop'], [6.5, 'tic'], [7.2, 'tic'], [8.4, 'pop'], [10.1, 'pop'], [12.3, 'tic'], [13.5, 'clic'], [14.0, 'pop'], [14.1, 'tic'], [14.7, 'tic'], [16.3, 'tic'], [17.2, 'clic'], [17.6, 'pop'], [18.9, 'tic'], [20.0, 'tic'], [21.0, 'tic'],
+    [22.05, 'tic'], [22.5, 'tic'], [23.5, 'tic'], [24.15, 'tic'], [24.9, 'tic'], [25.85, 'tic'], [26.4, 'clic'], [26.8, 'pop'], [28.1, 'tic'], [29.55, 'tic'], [31.7, 'tic'], [37.5, 'tic'], [40.2, 'tic'], [41.7, 'tic'], [43.7, 'pop'], [45.5, 'chime']];
+  /* Panneau de droite : titre, sous-titre, pastilles allumées à l'instant où la voix les cite */
+  const SEGS_BP = [
+    { a0: -2, a1: 9.96, h: "De l'idée à l'exécution", s: 'LE MODULE BUSINESS PLAN', it: [["💡 L'idée", 6.52], ["🚀 L'exécution", 7.16], ['📘 Le module Business Plan', 8.3]] },
+    { a0: 9.96, a1: 13.72, h: '👑 Modules Premium', s: '', it: [['Business Plans', 12.2]] },
+    { a0: 13.72, a1: 17.5, h: 'Vos business plans', s: '', it: [['Mes plans', 14.0], ['Partagés avec moi', 14.68], ['Exemple de référence', 16.28]] },
+    { a0: 17.5, a1: 26.7, h: 'Un nouveau projet', s: '', it: [['1 · Le nom', 18.59], ['2 · Le secteur', 19.6], ['3 · Le modèle', 20.72]] },
+    { a0: 26.7, a1: 35.89, h: 'Votre plan', s: '', it: [['Score de solidité', 28.08], ['Points à améliorer', 29.52], ['20 étapes guidées', 31.68]] },
+    { a0: 35.89, a1: 43.7, h: "Passez à l'action", s: '', it: [['📄 Dossier investisseur', 37.44], ['🎤 Simulation de présentation', 40.2], ["📨 Transmettre à Diaspo'Actif", 41.6]] },
+  ];
+  const MODELES_BP = [22.03, 22.48, 23.48, 24.12, 24.88, 25.84];
+
+  function rendreBP(av) {
+    let a = av;
+    if (calme) { const s = FILM.scenes.find(x => av >= x[0] && av < x[1]) || FILM.scenes[FILM.scenes.length - 1]; a = s[1] - 0.02; }
+    const pic = (a0, a1) => P(a, a0, a0 + 0.25, E.lin) * (1 - P(a, a1 - 0.25, a1, E.lin));
+    const glow = (el, g, col) => { el.style.boxShadow = g > 0.05 ? `0 0 0 3px rgba(255,248,200,${g}),0 0 ${g * 26}px ${col || 'rgba(253,235,168,' + g * 0.9 + ')'}` : ''; };
+    if (!R._bp) {
+      R._bp = true;
+      R.tl = [R.fl0, R.fl1, R.fl2, R.fl3, R.fl4]; R._seg = null;
+      R.pc = [R.pc0, R.pc1, R.pc2, R.pc3, R.pc4]; R.md = [R.md0, R.md1, R.md2, R.md3, R.md4, R.md5];
+      R.sp = [R.sp0, R.sp1, R.sp2, R.sp3, R.sp4];
+    }
+    R.b1.style.transform = `translate(${Math.sin(a * .2) * 60}px,${Math.cos(a * .17) * 40}px)`;
+    R.b2.style.transform = `translate(${Math.cos(a * .15) * -70}px,${Math.sin(a * .21) * -50}px)`;
+    R.pa.forEach((e, i) => {
+      const sx = (i * 197.3) % W, sy = (i * 83.7) % H, v = 8 + (i % 5) * 4;
+      e.el.style.transform = `translate(${(sx + Math.sin(a * .3 + i) * 30) % W}px,${((sy - a * v) % H + H) % H}px)`;
+      e.el.style.opacity = .25 + .35 * Math.abs(Math.sin(a * .8 + i));
+    });
+    const dec = P(a, -1.2, -0.3), fin0 = P(a, 43.2, 44.0);
+    R.rub.style.opacity = dec;
+    place(R.motto, 640, 690, 1, dec * 0.95);
+    place(R.head, 905, 58, 1, P(a, 0.5, 1.3) * (1 - fin0));
+
+    /* Le téléphone entre, puis cède la place à l'escalier */
+    const pin = P(a, 0.1, 1.2, E.back);
+    place(R.tph, 400, lerp(900, 362, pin), lerp(0.92, 1, pin) * (1 - 0.1 * fin0), P(a, 0.1, 0.6) * (1 - fin0));
+
+    /* Panneau de droite */
+    const seg = SEGS_BP.find(s => a >= s.a0 && a < s.a1) || null;
+    if (seg !== R._seg) {
+      R._seg = seg;
+      if (seg) { R.fth.textContent = seg.h; R.fts.textContent = seg.s; R.tl.forEach((el, i) => { el.textContent = seg.it[i] ? seg.it[i][0] : ''; }); }
+    }
+    if (seg) {
+      const k = P(a, seg.a0, seg.a0 + 0.5) * (1 - P(a, seg.a1 - 0.35, seg.a1));
+      place(R.fth, 905, lerp(160, 150, k), 1, k);
+      place(R.fts, 905, 228, 1, seg.s ? k : 0);
+      R.tl.forEach((el, i) => {
+        const it = seg.it[i];
+        if (!it) { el.style.opacity = 0; return; }
+        const nxt = seg.it[i + 1] ? seg.it[i + 1][1] : seg.a1;
+        const on = pic(it[1], Math.max(nxt, it[1] + 0.9));
+        const vis = P(a, it[1] - 0.05, it[1] + 0.4) * (1 - P(a, seg.a1 - 0.3, seg.a1));
+        place(el, lerp(960, 905, P(a, it[1] - 0.05, it[1] + 0.45, E.back)), 300 + i * 82, 1 + 0.06 * on, vis);
+        el.style.borderColor = on > 0.05 ? '#FDEBA8' : 'rgba(226,169,41,.5)';
+        el.style.boxShadow = `0 8px 22px rgba(0,0,0,.25),0 0 ${on * 34}px rgba(253,235,168,${on * 0.75})`;
+        el.style.color = on > 0.5 ? '#fff' : '#e8f0ff';
+      });
+    } else { R.fth.style.opacity = 0; R.fts.style.opacity = 0; R.tl.forEach(el => { el.style.opacity = 0; }); }
+
+    /* Menu des modules : la carte dorée « Business Plans » s'illumine, puis on l'ouvre */
+    const mIn = P(a, 10.0, 10.8), mOut = P(a, 13.6, 14.2, E.inout);
+    R.tmenu.style.transform = `translateY(${(1 - mIn) * 720 + mOut * 720}px)`;
+    R.tdim.style.opacity = 0.62 * mIn * (1 - P(a, 13.9, 14.4));
+    const gAll = pic(10.8, 12.1), gB = pic(12.2, 13.7);
+    R.pc.forEach((el, i) => { const gl = i === 4 ? Math.max(gB, gAll * 0.5) : gAll * 0.5; glow(el, gl); el.style.transform = `scale(${1 + (i === 4 ? 0.03 * gB - 0.04 * P(a, 13.45, 13.55, E.lin) * (1 - P(a, 13.6, 13.8, E.lin)) : 0)})`; });
+
+    /* Liste des business plans */
+    const lIn = P(a, 13.6, 14.3);
+    R.pLst.style.transform = `translateX(${(1 - lIn) * 390}px)`;
+    R.pLstIn.style.transform = `translateY(${-P(a, 15.2, 17.0, E.inout) * 70}px)`;
+    const tg = [pic(14.0, 14.66), pic(14.68, 16.2), pic(16.28, 17.3)];
+    [R.tbA, R.tbB, R.tbC].forEach((el, i) => { el.className = 'fb-tab' + (i === (a >= 16.28 ? 2 : a >= 14.68 ? 1 : 0) ? ' on' : ''); glow(el, tg[i]); });
+    const gn = pic(16.85, 17.55);
+    glow(R.bNew, gn); R.bNew.style.transform = `scale(${1 + 0.03 * gn - 0.05 * P(a, 17.15, 17.25, E.lin) * (1 - P(a, 17.3, 17.5, E.lin))})`;
+
+    /* Nouveau projet : nom, secteur, modèle */
+    const nIn = P(a, 17.5, 18.15);
+    R.pNew.style.transform = `translateX(${(1 - nIn) * 390}px)`;
+    const nom = tape('Terre Fertile', a, 18.7, 19.5);
+    R.bNomT.textContent = nom; R.bNom.className = 'fb-inp' + (a >= 18.6 && a < 19.6 ? ' fc' : '');
+    R.bSecT.textContent = a >= 20.35 ? 'Agriculture & Agroalimentaire' : 'Choisir…'; R.bSec.className = 'fb-inp' + (a >= 20.35 ? '' : ' ph') + (a >= 19.6 && a < 20.7 ? ' fc' : '');
+    const selM = a >= 25.6 ? 4 : 0;
+    R.md.forEach((el, i) => {
+      const g = pic(MODELES_BP[i], i < 5 ? MODELES_BP[i + 1] : 26.6);
+      el.className = i === selM ? 'on' : ''; glow(el, a >= 25.6 && i === 4 ? Math.max(g, 0) : g * 0.9);
+    });
+    const gc = pic(26.0, 26.7);
+    glow(R.bCre, gc); R.bCre.style.transform = `scale(${1 + 0.03 * gc - 0.05 * P(a, 26.4, 26.5, E.lin) * (1 - P(a, 26.55, 26.7, E.lin))})`;
+
+    /* Vue d'ensemble du plan : score, priorités, 20 étapes, actions */
+    const oIn = P(a, 26.6, 27.25);
+    R.pOv.style.transform = `translateX(${(1 - oIn) * 390}px)`;
+    if (!R._o) R._o = { stp: R.bStp.offsetTop, act: R.bAct.offsetTop, rows: R.bRows.offsetTop, h: R.pOvIn.offsetHeight };
+    const O = R._o, maxS = Math.max(0, O.h - 677 + 20);
+    const kf = [[27.2, 0], [29.4, 0], [31.0, 120], [31.7, 120], [32.9, O.stp - 62], [33.2, O.stp - 62], [35.5, O.act - 560], [36.0, O.act - 560], [37.4, O.rows - 150], [43.2, O.rows - 150]];
+    let y = 0; for (let i = 0; i < kf.length - 1; i++) if (a >= kf[i][0] && a <= kf[i + 1][0]) { y = lerp(kf[i][1], kf[i + 1][1], E.inout(clamp((a - kf[i][0]) / (kf[i + 1][0] - kf[i][0])))); break; } if (a > kf[kf.length - 1][0]) y = kf[kf.length - 1][1];
+    R.pOvIn.style.transform = `translateY(${-Math.min(maxS, y)}px)`;
+    glow(R.bScore, pic(28.08, 29.5)); glow(R.bPriG, pic(29.52, 31.7) * 0.9);
+    glow(R.ar0, pic(37.44, 40.1) * 0.9); glow(R.ar2, pic(40.2, 41.65) * 0.9); glow(R.ar3, pic(41.6, 43.7) * 0.9);
+
+    /* Conclusion : l'escalier, la première marche s'allume */
+    const x0 = 270;
+    R.sp.forEach((el, i) => {
+      const h = 60 + i * 60, t0 = 43.9 + i * 0.12, e = P(a, t0, t0 + 0.7, E.back);
+      const lit = i === 0 ? P(a, 45.3, 45.9) : 0;
+      place(el, x0 + i * 148 + 73, 560 - h / 2 + (1 - e) * 80, 1, e * (i === 0 ? 1 : 0.55 + 0.45 * P(a, 46.4, 47.4)));
+      el.style.boxShadow = lit > 0.05 ? `0 14px 34px rgba(0,0,0,.4),0 0 ${lit * 60}px rgba(253,235,168,${lit})` : '0 14px 34px rgba(0,0,0,.4)';
+    });
+    place(R.sLbl, x0 + 73, 402, lerp(0.9, 1, P(a, 45.4, 46.0, E.back)), P(a, 45.4, 46.0));
+    place(R.sArr, x0 + 73, 458, 1, P(a, 45.6, 46.2) * (0.7 + 0.3 * Math.sin(a * 6)));
+    const f1 = P(a, 43.8, 44.6);
+    place(R.lauG, 130, 380, 1, f1 * 0.7); place(R.lauD, 1150, 380, 1, f1 * 0.7);
+    place(R.t1, 640, 135, 1, P(a, 43.8, 44.6)); place(R.t0, 640, 215, 1, P(a, 45.5, 46.3));
+    place(R.t3, 640, 612, lerp(0.9, 1, P(a, 47.2, 47.9, E.back)) * (1 + 0.04 * Math.sin(a * 5) * P(a, 47.9, 48.6)), P(a, 47.2, 47.9));
+    R.fade.style.opacity = P(a, 50.0, 50.5);
+  }
+
+  FILMS.businessplan = { id: 'businessplan', stage: 'businessplan', etiquette: '50 s', titre: 'TUTO · BUSINESS PLAN', aria: "Tuto vidéo : le module Business Plan de Diaspo'Actif, de l'idée à l'exécution", cta: { label: 'Créer mon business plan', href: 'business-plan.html' }, voix: 'assets/media/business-plan-voix.mp3?v=1', fin: 52.0, dvoix: 46.72, caps: CAPS_BP, scenes: SCENES_BP, sfx: SFX_BP, swell: [38, 47] };
+  function rendre(av) { return FILM.id === 'long' ? rendreLong(av) : FILM.id === 'flash' ? rendreFlash(av) : FILM.id === 'telephone' ? rendreTel(av) : FILM.id === 'businessplan' ? rendreBP(av) : rendreCourt(av); }
 
   /* ── Sous-titres ── */
   function majCaption(a) {
@@ -1372,7 +1673,7 @@
     if (ov) return;
     options = options || {};
     surFin = typeof options.onFin === 'function' ? options.onFin : null;
-    FILM = options.version === 'court' ? FILMS.court : options.version === 'flash' ? FILMS.flash : options.version === 'telephone' ? FILMS.telephone : FILMS.long;
+    FILM = options.version === 'court' ? FILMS.court : options.version === 'flash' ? FILMS.flash : options.version === 'telephone' ? FILMS.telephone : options.version === 'businessplan' ? FILMS.businessplan : FILMS.long;
     if (!document.getElementById('fi-css')) { const st = document.createElement('style'); st.id = 'fi-css'; st.textContent = CSS; document.head.appendChild(st); }
     if (!document.getElementById('fi-fonts')) { const l = document.createElement('link'); l.id = 'fi-fonts'; l.rel = 'stylesheet'; l.href = 'https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Cinzel:wght@600;800&display=swap'; document.head.appendChild(l); }
     calme = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -1381,7 +1682,7 @@
     const surInscription = /(^|\/)inscription(\.html)?$/.test(location.pathname);
     ov.innerHTML = `<div class="fi-box">
       <div class="fi-top"><span class="fi-titre">▶ ${FILM.titre || 'COMMENT ÇA MARCHE'} · ${FILM.etiquette}</span><span style="display:flex;gap:8px"><button class="fi-btn or" data-r="cta" type="button">${FILM.cta ? FILM.cta.label : 'Créer mon compte'}</button><button class="fi-btn" data-r="fermer" type="button" aria-label="Fermer le film">✕ Fermer</button></span></div>
-      <div class="fi-win" data-r="win"><div class="fi-stage" data-r="stage">${FILM.stage === 'flash' ? STAGE_FLASH_HTML : FILM.stage === 'telephone' ? STAGE_TEL_HTML : STAGE_HTML}</div></div>
+      <div class="fi-win" data-r="win"><div class="fi-stage" data-r="stage">${FILM.stage === 'flash' ? STAGE_FLASH_HTML : FILM.stage === 'telephone' ? STAGE_TEL_HTML : FILM.stage === 'businessplan' ? STAGE_BP_HTML : STAGE_HTML}</div></div>
       <div class="fi-cap" data-r="cap" aria-live="off"></div>
       <div class="fi-ctl"><button class="fi-btn" data-r="play" type="button">▶ Lecture</button><button class="fi-btn" data-r="son" type="button">🔊 Son</button>
         <div class="fi-prog" data-r="prog" role="slider" tabindex="0" aria-label="Position dans le film" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i data-r="progf"></i><b data-r="progb"></b></div><span class="t" data-r="temps">0:00 / ${fmt(FILM.fin)}</span></div></div>`;
