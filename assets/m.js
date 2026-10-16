@@ -132,11 +132,13 @@
   const daInstallee = () => { try { return matchMedia('(display-mode: standalone)').matches || navigator.standalone === true; } catch (e) { return false; } };
   const daBouton = () => daInstallee() ? '' : `<button type="button" class="btn block" data-da-install style="margin:8px 0 12px;background:linear-gradient(135deg,#F59E0B,#E2A929);color:#1A2332;border-color:transparent">${ic('down', 's')} Télécharger Diaspo’Actif</button>`;
   let daPromesse = null;
+  const daCharger = () => daPromesse || (daPromesse = window.DAInstall ? Promise.resolve() : new Promise((ok, ko) => { const sc = document.createElement('script'); sc.src = 'assets/telecharger-app.js?v=2'; sc.onload = ok; sc.onerror = () => { daPromesse = null; ko(new Error('chargement')); }; document.head.appendChild(sc); }));
+  /* Préchargé peu après l'ouverture : le toucher n'attend plus le réseau (sinon, sur une connexion lente, rien ne s'affichait pendant plusieurs secondes). */
+  window.addEventListener('load', () => setTimeout(() => { daCharger().catch(() => {}); }, 2500));
   document.addEventListener('click', e => {
     const b = e.target.closest && e.target.closest('[data-da-install]'); if (!b) return;
     e.preventDefault();
-    if (!daPromesse) daPromesse = window.DAInstall ? Promise.resolve() : new Promise((ok, ko) => { const sc = document.createElement('script'); sc.src = 'assets/telecharger-app.js?v=1'; sc.onload = ok; sc.onerror = () => { daPromesse = null; ko(new Error('chargement')); }; document.head.appendChild(sc); });
-    daPromesse.then(() => window.DAInstall.ouvrir()).catch(() => toast('Installation indisponible pour le moment.', true));
+    daCharger().then(() => window.DAInstall.ouvrir()).catch(() => toast('Installation indisponible pour le moment.', true));
   });
 
   function ago(d) {

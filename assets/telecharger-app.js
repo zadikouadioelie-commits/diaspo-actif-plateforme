@@ -95,6 +95,7 @@
       .dai-btn:hover{background:#f9fafb}.dai-btn:focus-visible,.dai-x:focus-visible{outline:3px solid #2563EB;outline-offset:2px}
       .dai-btn.pri{background:linear-gradient(135deg,#F59E0B,#E2A929);border-color:transparent;color:#1A2332}.dai-btn.pri:hover{filter:brightness(1.06)}
       .dai-note{font-size:12.5px;color:#6b7280;margin:8px 0 0}
+      .dai-alerte{background:#fff7ed;border:1px solid #fdba74;color:#9a3412;border-radius:12px;padding:10px 14px;font-size:13.5px;line-height:1.45;margin:0 0 12px}
       .dai-ok{background:#ecfdf5;border:1px solid #6ee7b7;color:#065f46;border-radius:12px;padding:10px 14px;font-size:14px;margin-top:10px}
       @media (prefers-reduced-motion:no-preference){.dai-box{animation:dai-in .18s ease-out}@keyframes dai-in{from{transform:translateY(12px);opacity:0}to{opacity:1}}}`;
     document.head.appendChild(s);
@@ -128,6 +129,9 @@
     } catch (err) { return false; }
   }
 
+  /* Navigateur intégré d'une application (WhatsApp, Facebook, Instagram, TikTok…) : il ne sait pas installer ; il faut ouvrir le site dans le vrai navigateur. */
+  const navigateurIntegre = () => /FBAN|FBAV|FB_IAB|Instagram|TikTok|Snapchat|MicroMessenger|Line\/|; wv\)|GSA\//.test(navigator.userAgent || '');
+
   function ouvrirGuide() {
     css(); fermer();
     precedentFocus = document.activeElement;
@@ -140,7 +144,10 @@
       <div class="dai-tete"><h2 id="dai-titre">Télécharger Diaspo'Actif</h2><button type="button" class="dai-x" id="dai-x" aria-label="Fermer">✕</button></div>
       <div class="dai-corps">
         <div class="dai-logo"><img src="/assets/logo.png" alt=""><p>Ajoutez Diaspo'Actif à l'écran d'accueil de votre téléphone ou au bureau de votre ordinateur : l'application s'ouvre en un geste, en plein écran.</p></div>
-        <div class="dai-h">${esc(g.titre)}</div>
+        ${navigateurIntegre() ? `<div class="dai-alerte">⚠️ Vous êtes dans le navigateur intégré d'une application (WhatsApp, Facebook…). Il ne peut pas installer Diaspo'Actif : touchez le menu <b>⋮</b> puis <b>« Ouvrir dans le navigateur »</b> (ou « Ouvrir avec Chrome »), puis recommencez.</div>` : ''}
+        ${invite ? `<button type="button" class="dai-btn pri" id="dai-direct">📲 Installer maintenant</button><p class="dai-note">Votre navigateur va vous demander de confirmer : touchez « Installer ».</p>` : ''}
+        <div class="dai-h">${invite ? 'Ou à la main' : esc(g.titre)}</div>
+        ${invite ? `<div class="dai-h" style="margin-top:0;text-transform:none;letter-spacing:0;font-size:13px">${esc(g.titre)}</div>` : ''}
         <ol class="dai-etapes">${g.etapes.map(e => `<li>${e}</li>`).join('')}</ol>
         ${p.mobile ? '' : `<div class="dai-h">Ou un raccourci à poser sur le bureau</div><button type="button" class="dai-btn pri" id="dai-fichier">⬇️ Télécharger le raccourci</button><p class="dai-note">Un petit fichier « ${esc(fichierRaccourci(p.os).nom)} » : placez-le sur votre bureau, un double-clic ouvre Diaspo'Actif.</p>`}
         <div id="dai-msg" role="status"></div>
@@ -152,16 +159,27 @@
     document.getElementById('dai-fermer').onclick = fermer;
     const f = document.getElementById('dai-fichier');
     if (f) f.onclick = () => { telechargerRaccourci(p.os); document.getElementById('dai-msg').innerHTML = '<div class="dai-ok">✅ Raccourci téléchargé : retrouvez-le dans vos téléchargements et déposez-le sur votre bureau.</div>'; };
+    const direct = document.getElementById('dai-direct');
+    if (direct) direct.onclick = async () => {
+      direct.disabled = true; direct.textContent = 'Ouverture de la fenêtre du navigateur…';
+      const e = invite; invite = null; window.__daInvite = null;   // une invite ne sert qu'une fois
+      const m = document.getElementById('dai-msg');
+      try {
+        await e.prompt();
+        const c = await e.userChoice;
+        if (c && c.outcome === 'accepted') { direct.style.display = 'none'; m.innerHTML = '<div class="dai-ok">✅ Installation lancée : l\'icône Diaspo\'Actif arrive sur votre écran d\'accueil dans un instant.</div>'; }
+        else { direct.style.display = 'none'; m.innerHTML = '<div class="dai-ok" style="background:#fff7ed;border-color:#fdba74;color:#9a3412">Vous avez fermé la fenêtre d\'installation. Pour recommencer, suivez les étapes ci-dessous.</div>'; }
+      } catch (err) { direct.style.display = 'none'; m.innerHTML = '<div class="dai-ok" style="background:#fff7ed;border-color:#fdba74;color:#9a3412">L\'installation en un geste n\'est pas disponible ici. Suivez les étapes ci-dessous.</div>'; }
+    };
     document.addEventListener('keydown', surTouche, true);
-    (f || document.getElementById('dai-fermer')).focus();
+    (direct || f || document.getElementById('dai-fermer')).focus();
   }
 
   /* Point d'entrée des boutons : installation native en un clic si le navigateur l'offre, sinon le guide. */
   async function ouvrir() {
     preparer();
     if (estInstallee()) { css(); ouvrirGuide(); document.getElementById('dai-msg').innerHTML = '<div class="dai-ok">Diaspo\'Actif est déjà installée sur cet appareil.</div>'; return; }
-    if (invite) { const ok = await installerDirect(); if (ok) return; }
-    ouvrirGuide();
+    ouvrirGuide();   // toujours une fenêtre visible (l'installation en un geste s'y déclenche par un bouton : jamais de toucher « sans effet »)
   }
 
   window.DAInstall = { ouvrir, estInstallee, plateforme };

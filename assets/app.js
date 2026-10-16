@@ -6527,7 +6527,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       e.preventDefault();
       if (!promesse) promesse = window.DAInstall ? Promise.resolve() : new Promise((ok, ko) => {
         const sc = document.createElement("script");
-        sc.src = "/assets/telecharger-app.js?v=1"; sc.onload = ok; sc.onerror = () => { promesse = null; ko(new Error("chargement")); };
+        sc.src = "/assets/telecharger-app.js?v=2"; sc.onload = ok; sc.onerror = () => { promesse = null; ko(new Error("chargement")); };
         document.head.appendChild(sc);
       });
       promesse.then(() => window.DAInstall.ouvrir()).catch(() => alert("Installation indisponible pour le moment. Réessayez dans un instant."));
