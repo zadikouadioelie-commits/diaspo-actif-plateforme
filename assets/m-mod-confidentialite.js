@@ -249,7 +249,8 @@
       <div class="h2">QUI VOIT MON PROFIL</div>${rub}
       <div class="h2">MES INFORMATIONS</div>
       <div class="cf-card">
-        ${ligne('infos', 'file', 'Informations déclarées', 'Nom, naissance, e-mail, nationalités, origines')}
+        ${ligne('coord', 'user', 'Mes coordonnées', 'Adresse e-mail et numéro de téléphone')}
+        ${ligne('infos', 'file', 'Informations déclarées', 'Nom, naissance, nationalités, origines')}
         ${ROLES_INSTITUTION.includes(role()) ? ligne('origine', 'home', 'Origine officielle de l’institution', 'Pays, région, ministère de tutelle') : ''}
         ${idLigne}
         ${ligne('ds', 'lock', 'Code de sécurité (DS-ID)', 'Afficher mon code, protégé par mot de passe')}
@@ -283,6 +284,7 @@
       const b = ev.target.closest && ev.target.closest('[data-cf]'); if (!b || b.disabled) return;
       switch (b.dataset.cf) {
         case 'recharger': ecranPrincipal(); break;
+        case 'coord': location.hash = '#/confidentialite/coordonnees'; break;
         case 'infos': location.hash = '#/confidentialite/infos'; break;
         case 'origine': location.hash = '#/confidentialite/origine'; break;
         case 'niveaux': location.hash = '#/confidentialite/niveaux'; break;
@@ -440,7 +442,6 @@
     ['nom', 'cf-nom', 'Nom', 'text', 'family-name'],
     ['prenom', 'cf-prenom', 'Prénom', 'text', 'given-name'],
     ['date_naissance', 'cf-naissance', 'Date de naissance', 'date', 'bday'],
-    ['email', 'cf-email', 'Adresse e-mail', 'email', 'email'],
     ['nationalite1', 'cf-nat1', 'Nationalité 1', 'text', 'off'],
     ['nationalite2', 'cf-nat2', 'Nationalité 2 (facultatif)', 'text', 'off'],
     ['origine1', 'cf-orig1', 'Origine 1', 'text', 'off'],
@@ -506,6 +507,65 @@
   }
 
   /* ============================================================
+     MES COORDONNÉES — e-mail (mot de passe exigé) et téléphone
+     POST /api/profil/email · POST /api/profil/telephone
+     ============================================================ */
+  async function ecranCoord() {
+    const mon = ++jeton;
+    skeleton('Mes coordonnées');
+    if (!(await connecte('Connectez-vous pour gérer vos coordonnées.'))) return;
+    let inf;
+    try { inf = (await api('/api/profil/informations-declarees')).informations || {}; }
+    catch (e) { if (mon !== jeton || !ici()) return; if (e.status === 401) return sessionExpiree(); return erreur('Mes coordonnées', e, ecranCoord); }
+    if (mon !== jeton || !ici()) return;
+    const html = `<div id="cf-root">
+      <p class="muted" style="margin:2px 4px 12px;line-height:1.5">L’adresse e-mail sert à vous connecter et à recevoir les messages du compte ; le téléphone permet qu’on vous joigne.</p>
+      <div class="cf-card cf-box">
+        <b>Adresse e-mail</b>
+        <p class="cf-hint" style="margin:4px 0 0">Actuelle : <b>${esc(norm(inf.email) || '—')}</b> · ${inf.email_verifie ? '✅ confirmée' : '⏳ à confirmer (lien envoyé par e-mail)'}</p>
+        <label class="cf-lbl" for="cf-new-email">Nouvelle adresse e-mail</label>
+        <input class="cf-in" id="cf-new-email" type="email" inputmode="email" autocapitalize="off" autocomplete="email" maxlength="120">
+        <label class="cf-lbl" for="cf-email-mdp">Votre mot de passe (pour confirmer)</label>
+        <input class="cf-in" id="cf-email-mdp" type="password" autocomplete="current-password">
+        <p class="cf-hint">Un lien de confirmation est envoyé à la nouvelle adresse, et une alerte à l’ancienne.</p>
+        <p class="cf-err" id="cf-err-email" role="alert"></p>
+        <button class="btn block" id="cf-save-email">Changer l’adresse e-mail</button>
+      </div>
+      <div class="cf-card cf-box">
+        <b>Téléphone</b>
+        <p class="cf-hint" style="margin:4px 0 0">Actuel : <b>${esc(norm(inf.telephone) || 'non renseigné')}</b></p>
+        <label class="cf-lbl" for="cf-new-tel">Nouveau numéro (avec l’indicatif, ex. +33612345678)</label>
+        <input class="cf-in" id="cf-new-tel" type="tel" inputmode="tel" autocomplete="tel" maxlength="30" value="${esc(norm(inf.telephone))}">
+        <p class="cf-err" id="cf-err-tel" role="alert"></p>
+        <button class="btn block" id="cf-save-tel">Enregistrer le numéro</button>
+      </div></div>`;
+    setPane('Mes coordonnées', html);
+    const envoyer = async (k, url, corps, btn, libelle, ok) => {
+      const err = $('#cf-err-' + k); err.textContent = '';
+      btn.disabled = true; btn.textContent = 'Enregistrement…';
+      try {
+        const r = await api(url, { method: 'POST', body: corps });
+        toast(ok(r));
+        if (k === 'email' && S.me) S.me.email = r.email;
+        ecranCoord();
+      } catch (e) {
+        if (e.status === 401) { btn.disabled = false; btn.textContent = libelle; return sessionExpiree(); }
+        err.textContent = e.message || 'Enregistrement impossible.';
+        btn.disabled = false; btn.textContent = libelle;
+      }
+    };
+    $('#cf-save-email').onclick = ev => {
+      const email = norm($('#cf-new-email').value), mdp = $('#cf-email-mdp').value, err = $('#cf-err-email');
+      err.textContent = '';
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { err.textContent = 'Cette adresse e-mail n’est pas valide (exemple : nom@exemple.com).'; return; }
+      if (!mdp) { err.textContent = 'Saisissez votre mot de passe pour confirmer.'; return; }
+      envoyer('email', '/api/profil/email', { email, mot_de_passe: mdp }, ev.currentTarget, 'Changer l’adresse e-mail',
+        r => r.confirmation_envoyee ? 'Adresse modifiée ✓ Lien de confirmation envoyé.' : 'Adresse modifiée ✓ (e-mail de confirmation non parti : renvoyez-le depuis le bandeau)');
+    };
+    $('#cf-save-tel').onclick = ev => envoyer('tel', '/api/profil/telephone', { telephone: norm($('#cf-new-tel').value) }, ev.currentTarget, 'Enregistrer le numéro', () => 'Numéro enregistré ✓');
+  }
+
+  /* ============================================================
      ORIGINE OFFICIELLE DE L'INSTITUTION (collectivité, institution, officiel)
      ============================================================ */
   async function ecranOrigine() {
@@ -562,6 +622,7 @@
   }
 
   window.MMods.confidentialite = function (b) {
+    if (b === 'coordonnees') return ecranCoord();
     if (b === 'infos') return ecranInfos();
     if (b === 'origine') return ecranOrigine();
     if (b === 'niveaux') return ecranNiveaux();

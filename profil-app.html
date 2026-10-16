@@ -7568,6 +7568,11 @@ function buildPrivacyPanel() {
       </div>`).join('')}
     <div id="priv-msg" style="font-size:12px;color:#16a34a;margin-top:10px;display:none">✅ Paramètres sauvegardés</div>
     <div style="margin-top:28px;padding-top:20px;border-top:1px solid var(--border);">
+      <h3 style="font-size:14px;margin:0 0 6px;">📇 Mes coordonnées</h3>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 12px;">L'adresse e-mail de connexion et le numéro de téléphone de votre compte.</p>
+      <div id="coord-card-body"><p style="font-size:13px;color:var(--muted);">Chargement…</p></div>
+    </div>
+    <div style="margin-top:28px;padding-top:20px;border-top:1px solid var(--border);">
       <h3 style="font-size:14px;margin:0 0 12px;">🔐 Vérifier mon identité</h3>
       <div id="identity-card-body"><p style="font-size:13px;color:var(--muted);">Chargement…</p></div>
     </div>
@@ -7583,7 +7588,77 @@ function buildPrivacyPanel() {
     </div>`;
   setTimeout(loadDeletionRequestStatus, 0);
   setTimeout(loadMesSignalements, 0);
+  setTimeout(loadCoordonnees, 0);
   return div;
+}
+
+/* ---- Mes coordonnées : e-mail (mot de passe exigé) + téléphone — POST /profil/email, /profil/telephone ---- */
+let _coordInfo = null;
+async function loadCoordonnees() {
+  const zone = document.getElementById('coord-card-body');
+  if (!zone) return;
+  try { _coordInfo = (await api('GET', '/profil/informations-declarees')).informations || {}; }
+  catch (e) { zone.innerHTML = `<p style="font-size:13px;color:#dc2626;">${esc(e.message || 'Impossible de charger vos coordonnées.')}</p>`; return; }
+  const champ = 'width:100%;box-sizing:border-box;border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;margin-top:4px;background:var(--bg);color:var(--text);';
+  const ligne = 'border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px;';
+  const badge = _coordInfo.email_verifie
+    ? '<span style="font-size:11.5px;font-weight:700;color:#16a34a;">✅ confirmée</span>'
+    : '<span style="font-size:11.5px;font-weight:700;color:#b45309;">⏳ à confirmer (lien envoyé par e-mail)</span>';
+  zone.innerHTML = `
+    <div style="${ligne}">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+        <div><div style="font-size:12px;font-weight:700;color:var(--muted);">ADRESSE E-MAIL</div>
+          <div style="font-size:14px;font-weight:600;word-break:break-all;">${esc(_coordInfo.email || '—')}</div>${badge}</div>
+        <button type="button" class="btn-ico" style="padding:6px 12px;font-size:12px;" onclick="coordToggle('email')">✏️ Modifier</button>
+      </div>
+      <div id="coord-form-email" style="display:none;margin-top:12px;">
+        <label style="font-size:12px;font-weight:700;" for="coord-email">Nouvelle adresse e-mail</label>
+        <input id="coord-email" type="email" autocomplete="email" style="${champ}">
+        <label style="font-size:12px;font-weight:700;display:block;margin-top:8px;" for="coord-email-mdp">Votre mot de passe (pour confirmer)</label>
+        <input id="coord-email-mdp" type="password" autocomplete="current-password" style="${champ}">
+        <p style="font-size:11.5px;color:var(--muted);margin:6px 0 0;">Un lien de confirmation sera envoyé à la nouvelle adresse, et une alerte à l'ancienne.</p>
+        <div id="coord-err-email" role="alert" style="display:none;color:#dc2626;font-size:12.5px;margin-top:8px;"></div>
+        <button type="button" class="btn-ico" style="margin-top:10px;background:#2563EB;color:#fff;border:none;padding:8px 16px;" onclick="coordSave('email', this)">💾 Enregistrer</button>
+      </div>
+    </div>
+    <div style="${ligne}">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+        <div><div style="font-size:12px;font-weight:700;color:var(--muted);">TÉLÉPHONE</div>
+          <div style="font-size:14px;font-weight:600;">${esc(_coordInfo.telephone || 'Non renseigné')}</div></div>
+        <button type="button" class="btn-ico" style="padding:6px 12px;font-size:12px;" onclick="coordToggle('tel')">✏️ Modifier</button>
+      </div>
+      <div id="coord-form-tel" style="display:none;margin-top:12px;">
+        <label style="font-size:12px;font-weight:700;" for="coord-tel">Nouveau numéro (avec l'indicatif, ex. +33612345678)</label>
+        <input id="coord-tel" type="tel" autocomplete="tel" style="${champ}" value="${esc(_coordInfo.telephone || '')}">
+        <div id="coord-err-tel" role="alert" style="display:none;color:#dc2626;font-size:12.5px;margin-top:8px;"></div>
+        <button type="button" class="btn-ico" style="margin-top:10px;background:#2563EB;color:#fff;border:none;padding:8px 16px;" onclick="coordSave('tel', this)">💾 Enregistrer</button>
+      </div>
+    </div>
+    <div id="coord-ok" style="display:none;background:#f0fdf4;border:1.5px solid #22c55e;border-radius:8px;padding:8px 12px;font-size:12.5px;color:#166534;"></div>`;
+}
+function coordToggle(k) {
+  const f = document.getElementById('coord-form-' + k);
+  if (f) f.style.display = f.style.display === 'none' ? 'block' : 'none';
+}
+async function coordSave(k, btn) {
+  const err = document.getElementById('coord-err-' + k), ok = document.getElementById('coord-ok');
+  err.style.display = 'none'; ok.style.display = 'none';
+  btn.disabled = true;
+  try {
+    let r;
+    if (k === 'email') r = await api('POST', '/profil/email', { email: document.getElementById('coord-email').value.trim(), mot_de_passe: document.getElementById('coord-email-mdp').value });
+    else r = await api('POST', '/profil/telephone', { telephone: document.getElementById('coord-tel').value.trim() });
+    await loadCoordonnees();
+    const ok2 = document.getElementById('coord-ok');
+    ok2.textContent = k === 'email'
+      ? (r.confirmation_envoyee ? '✅ Adresse modifiée. Un lien de confirmation a été envoyé à la nouvelle adresse.' : '✅ Adresse modifiée, mais l\'e-mail de confirmation n\'a pas pu partir : utilisez « Renvoyer l\'e-mail » depuis le bandeau en haut de page.')
+      : '✅ Numéro de téléphone mis à jour.';
+    ok2.style.display = 'block';
+    if (k === 'tel' && typeof profil === 'object' && profil) profil.telephone = r.telephone;
+  } catch (e) {
+    err.textContent = e.message || 'Erreur lors de l’enregistrement.'; err.style.display = 'block';
+    btn.disabled = false;
+  }
 }
 
 /* ---- Mes dossiers de signalement (en tant que compte signalé ou signalant) ---- */

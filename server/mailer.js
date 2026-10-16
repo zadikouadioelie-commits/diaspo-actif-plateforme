@@ -1118,7 +1118,41 @@ function emailNomModifie({ email, ancien, nouveau }) {
   });
 }
 
-module.exports = { emailNomModifie, emailCodeConfirmationAppareil, emailCompteRenduRelance, emailCompteRenduDiffusion, sendEmail, emailBienvenue, emailVerification, emailResetPassword, emailAccreditation, emailDeletionConfirmee, emailSuppressionProgrammee, emailCompteRestaure, emailConfirmationBillets, emailInvitationCagnotte, emailConfirmationParticipationCagnotte, emailAccesCagnottePrivee, emailDemandeDevisRecue, emailDemandeDevisReponse, emailConfirmationInscription, emailCommunicationInscription };
+/* Alerte envoyée à l'ANCIENNE adresse après un changement d'e-mail (2026-10-16) : c'est elle qui permet au vrai titulaire de réagir si quelqu'un d'autre a pris la main. */
+function emailAdresseModifiee({ email, nouvelle }) {
+  const esc = (t) => String(t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return sendEmail({
+    to: email,
+    subject: "L'adresse e-mail de votre compte a été modifiée — Diaspo'Actif",
+    html: `
+<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#F0F4FF;font-family:Inter,Arial,sans-serif;">
+  <div style="max-width:560px;margin:40px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 8px 32px rgba(37,99,235,.1);">
+    <div style="background:linear-gradient(135deg,#0D1B2A,#1B3A6B);padding:32px;text-align:center;">
+      <div style="font-size:28px;font-weight:900;color:#fff;letter-spacing:-.02em;">DIASPO'ACTIF</div>
+    </div>
+    <div style="padding:36px 32px;">
+      <h1 style="margin:0 0 12px;font-size:22px;font-weight:900;color:#0D1B2A;">Adresse e-mail modifiée</h1>
+      <p style="color:#475569;line-height:1.7;margin:0 0 16px;">
+        L'adresse e-mail de votre compte Diaspo'Actif vient de passer à <strong>${esc(nouvelle)}</strong>. Vous ne recevrez plus les messages du compte sur cette adresse-ci.
+      </p>
+      <p style="color:#475569;line-height:1.7;margin:0 0 16px;">C'est bien vous ? Il n'y a rien à faire.</p>
+      <p style="color:#B91C1C;line-height:1.7;margin:0;font-weight:700;">
+        Ce n'est pas vous ? Écrivez-nous sans attendre à contact@diaspoactif.com pour que nous sécurisions votre compte.
+      </p>
+    </div>
+    <div style="background:#F8FAFF;padding:16px 32px;text-align:center;border-top:1px solid #E8EFFE;">
+      <p style="margin:0;font-size:11px;color:#94A3B8;">Diaspo'Actif · contact@diaspoactif.com</p>
+    </div>
+  </div>
+</body>
+</html>`
+  });
+}
+
+module.exports = { emailAdresseModifiee, emailNomModifie, emailCodeConfirmationAppareil, emailCompteRenduRelance, emailCompteRenduDiffusion, sendEmail, emailBienvenue, emailVerification, emailResetPassword, emailAccreditation, emailDeletionConfirmee, emailSuppressionProgrammee, emailCompteRestaure, emailConfirmationBillets, emailInvitationCagnotte, emailConfirmationParticipationCagnotte, emailAccesCagnottePrivee, emailDemandeDevisRecue, emailDemandeDevisReponse, emailConfirmationInscription, emailCommunicationInscription };
 
 /* Partage d'un tuto vidéo par e-mail (2026-10-13, demande explicite : l'e-mail doit montrer le titre du tuto, l'affiche — la même que sur la
    cartouche de l'accueil — et la durée). Carte en table HTML + styles inline (rendu identique Gmail/Outlook) ; l'affiche et le bouton

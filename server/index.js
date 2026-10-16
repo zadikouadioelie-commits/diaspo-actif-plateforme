@@ -2391,7 +2391,7 @@ route("GET", "/api/profil/informations-declarees", async (req, res) => {
     /* pays_origine_institution & co ajoutés en lecture seule : affichés dans la carte dédiée
        de confidentialite.html, sauvegardés par la route séparée /profil/origine-institution
        (qui, elle, ne touche jamais à identite_verifiee). */
-    "SELECT nom,prenom,email,date_naissance,nationalite1,nationalite2,origine1,origine2,email_verifie,identite_verifiee,role,pays_origine_institution,ministere_tutelle,administration_rattachement,region_origine FROM users WHERE id=?"
+    "SELECT nom,prenom,email,telephone,date_naissance,nationalite1,nationalite2,origine1,origine2,email_verifie,identite_verifiee,role,pays_origine_institution,ministere_tutelle,administration_rattachement,region_origine FROM users WHERE id=?"
   ).get(cu.id);
   if (!u) return sendJSON(res, 404, { error: "Introuvable." });
   sendJSON(res, 200, { informations: u });
@@ -19185,6 +19185,70 @@ route("POST", "/api/profil/nom", async (req, res, params, body) => {
   } catch (e) { console.error("[profil-nom:email]", e.message); }
 
   sendJSON(res, 200, { ok: true, prenom: nouveauPrenom, nom: nouveauNom, affichage });
+});
+
+/* POST /api/profil/email — changer son adresse e-mail depuis Confidentialité (2026-10-16, demande explicite).
+   Même logique que /profil/nom : mot de passe exigé (une session volée ne suffit pas à détourner le compte),
+   limitation de débit, nouvelle adresse à reconfirmer (lien de vérification), alerte envoyée à l'ANCIENNE adresse.
+   Ne touche PAS à l'identité vérifiée (l'e-mail n'est pas une donnée d'identité, contrairement à
+   PUT /profil/informations-declarees qui la retirait). */
+route("POST", "/api/profil/email", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const lim = SEC.rateLimit(`profil-email:${user.id}`, 10, 15 * 60 * 1000);
+  if (!lim.allowed) return sendJSON(res, 429, { error: `Trop de tentatives. Réessayez dans ${lim.retryAfter}s.` });
+
+  const row = await db.prepare("SELECT nom, prenom, email, password_hash, password_salt FROM users WHERE id=?").get(user.id);
+  if (!row) return sendJSON(res, 404, { error: "Compte introuvable." });
+  if (!body || !body.mot_de_passe || !verifyPassword(String(body.mot_de_passe), row.password_salt, row.password_hash)) {
+    SEC.logSecurity("profil_email_mdp_incorrect", { uid: Number(user.id) });
+    return sendJSON(res, 403, { error: "Mot de passe incorrect." });
+  }
+  const nouvelle = SEC.normalizeEmail(body.email);
+  if (!nouvelle || !SEC.isValidEmail(nouvelle)) return sendJSON(res, 400, { error: "Adresse e-mail invalide." });
+  const ancienne = SEC.normalizeEmail(row.email);
+  if (nouvelle === ancienne) return sendJSON(res, 400, { error: "Aucun changement : c'est déjà l'adresse de votre compte." });
+  const existe = await db.prepare("SELECT id FROM users WHERE LOWER(email)=? AND id<>?").get(nouvelle, user.id);
+  if (existe) return sendJSON(res, 409, { error: "Cette adresse e-mail est déjà utilisée par un autre compte." });
+
+  const verifToken = crypto.randomBytes(32).toString("hex");
+  const verifExpires = Date.now() + 24 * 3600000;
+  await db.prepare("UPDATE users SET email=?, email_verifie=0, email_verif_token=?, email_verif_expires=? WHERE id=?").run(nouvelle, verifToken, verifExpires, user.id);
+  SEC.logSecurity("profil_email_modifie", { uid: Number(user.id) });
+
+  let envoye = false;
+  try {
+    const { emailVerification, emailAdresseModifiee } = require("./mailer");
+    const envoi = await emailVerification({ email: nouvelle, prenom: row.prenom || row.nom, token: verifToken });
+    envoye = !!(envoi && envoi.ok);
+    if (!envoye) await logError(new Error(`Envoi email de vérification (changement d'adresse) échoué : ${JSON.stringify(envoi)}`), "email_change_verification", req);
+    if (row.email) {
+      const alerte = await emailAdresseModifiee({ email: row.email, nouvelle });
+      if (!alerte || !alerte.ok) await logError(new Error(`Alerte ancienne adresse non envoyée : ${JSON.stringify(alerte && (alerte.error || alerte.reason) || "raison inconnue")}`), "profil-email-alerte", req);
+    }
+  } catch (e) { try { await logError(e, "email_change_verification", req); } catch (_) {} }
+  try { await creerNotif(user.id, "email_modifie", "Votre adresse e-mail a été modifiée", `L'adresse de votre compte est maintenant ${nouvelle}. Confirmez-la grâce au lien reçu à cette adresse. Ce n'est pas vous ? Écrivez à contact@diaspoactif.com.`, { lien: "confidentialite.html" }); } catch (_) {}
+
+  sendJSON(res, 200, { ok: true, email: nouvelle, email_verifie: false, confirmation_envoyee: envoye });
+});
+
+/* POST /api/profil/telephone — changer son numéro de téléphone depuis Confidentialité (2026-10-16).
+   Pas de mot de passe (simple coordonnée de contact, sans effet sur la connexion), mais format contrôlé et
+   numéro obligatoire pour un compte Initiative (exigé à l'inscription). Aucun SMS de confirmation n'existe sur la plateforme. */
+route("POST", "/api/profil/telephone", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const lim = SEC.rateLimit(`profil-tel:${user.id}`, 20, 15 * 60 * 1000);
+  if (!lim.allowed) return sendJSON(res, 429, { error: `Trop de tentatives. Réessayez dans ${lim.retryAfter}s.` });
+  const brut = String((body && body.telephone) == null ? "" : body.telephone).replace(/[\s.\-()]/g, "");
+  if (!brut) {
+    if (user.role === "initiative") return sendJSON(res, 400, { error: "Un numéro de téléphone est obligatoire pour un compte Initiative." });
+    await db.prepare("UPDATE users SET telephone=NULL WHERE id=?").run(user.id);
+    return sendJSON(res, 200, { ok: true, telephone: null });
+  }
+  if (!/^\+?\d{6,15}$/.test(brut)) return sendJSON(res, 400, { error: "Numéro invalide. Utilisez uniquement des chiffres, avec l'indicatif du pays si possible (ex. +33612345678)." });
+  await db.prepare("UPDATE users SET telephone=? WHERE id=?").run(brut, user.id);
+  sendJSON(res, 200, { ok: true, telephone: brut });
 });
 
 /* ---------- Changement de mot de passe (compte connecté) ----------
