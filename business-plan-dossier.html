@@ -117,6 +117,27 @@ table.doc-table tr.total td{font-weight:700;border-top:1.5px solid var(--dp-ink)
 .annexe-qr{width:44px;height:44px;}
 .annexe-qr img{display:block;width:100%;height:100%;}
 
+/* ===== Gabarit « Institutionnel » (2026-10-17, demande explicite) : feuilles blanches, écriture administrative, aucun logo Diaspo'Actif ===== */
+body.dp-inst{--dp-mono:Arial,Helvetica,sans-serif;--dp-display:Arial,Helvetica,sans-serif;--dp-body:Arial,Helvetica,sans-serif;}
+.dp-inst .sheet{box-shadow:0 1px 8px rgba(0,0,0,.2);}
+.dp-inst .eyebrow-tag{display:none;}
+.dp-inst .pg-title{font-size:21px;font-weight:700;letter-spacing:0;border-bottom:2px solid var(--dp-orange);padding-bottom:8px;margin:0 0 18px;}
+.dp-inst .pg-sub{font-size:12.5px;}
+.dp-inst .pg-chrome-top,.dp-inst .pg-chrome-bottom{text-transform:none;letter-spacing:0;font-size:9.5px;}
+.dp-inst .pg-chrome-top{border-bottom:1px solid var(--dp-ink);}
+.dp-inst .block-title{text-transform:none;letter-spacing:0;font-size:12.5px;font-weight:700;color:var(--dp-ink);border-bottom:1px solid var(--dp-line);padding-bottom:4px;}
+.dp-inst .field .fl,.dp-inst .kpi .kl,.dp-inst table.doc-table th,.dp-inst .bmc-cell h5{text-transform:none;letter-spacing:0;font-size:10.5px;font-weight:700;color:var(--dp-ink-soft);}
+.dp-inst .field .fv{font-size:12px;}
+.dp-inst .kpi{background:#fff;border-radius:0;border:1px solid var(--dp-line);}
+.dp-inst .kpi .kv{font-weight:700;font-size:18px;}
+.dp-inst .pill{text-transform:none;letter-spacing:0;border-radius:2px;font-size:10.5px;}
+.dp-inst table.doc-table td:first-child{font-weight:700;}
+.dossier-interc{display:none;align-items:center;gap:7px;font-size:12px;font-weight:700;color:var(--muted);}
+.dossier-interc button{width:22px;height:22px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px #94a3b8;cursor:pointer;padding:0;}
+.dossier-interc button.on{box-shadow:0 0 0 2px #111827;transform:scale(1.1);}
+.dossier-interc button:focus-visible{outline:3px solid #2563EB;outline-offset:2px;}
+@media print{ .sheet{-webkit-print-color-adjust:exact;print-color-adjust:exact;} }
+
 @media print{
   .topbar,.dossier-toolbar{display:none!important;}
   html,body{background:#fff;}
@@ -149,6 +170,7 @@ table.doc-table tr.total td{font-weight:700;border-top:1.5px solid var(--dp-ink)
         <a href="#" id="dossier-back" class="dossier-back">← Retour au business plan</a>
         <select id="dossier-template-select" onchange="onTemplateChange(this.value)"></select>
         <select id="dossier-format-select" onchange="onFormatChange(this.value)"></select>
+        <span class="dossier-interc" id="dossier-interc" role="group" aria-label="Couleur des intercalaires"></span>
       </div>
       <div style="display:flex;gap:8px;">
         <button class="btn btn-outline btn-sm" id="dossier-btn-pptx" onclick="generatePPTX()" disabled>⏳ PowerPoint…</button>
@@ -201,19 +223,48 @@ const STATUTS = { brouillon:'Brouillon', complet:'Dossier complet', archive:'Arc
    composition de couverture et le degré de sobriété (cf. maquette validée). Le logo reste
    toujours celui de Diaspo'Actif, jamais recoloré. */
 const TEMPLATES = {
+  institutionnel: { label:'📘 Institutionnel — feuilles blanches (recommandé)', inst:true, navy:'#1A1A1A', orange:'#0D2B4E', blue:'#0D2B4E', paper:'#FFFFFF', ink:'#1A1A1A', inkSoft:'#555B66', line:'#C9CED6', cover:'inst' },
   premium:   { label:'🟣 Premium — investisseurs', navy:'#0D2B4E', orange:'#B84C1A', blue:'#1E4F8A', paper:'#F7F5F0', ink:'#181B20', inkSoft:'#4B5160', line:'#DBD6C8', cover:'dark', coverBg:'radial-gradient(ellipse 900px 500px at 15% 8%, rgba(242,100,34,.14), transparent 60%), linear-gradient(165deg,#14171C 0%,#0D2B4E 130%)' },
   corporate: { label:'🟦 Corporate — institutions', navy:'#0D2B4E', orange:'#B84C1A', blue:'#1E4F8A', paper:'#FFFFFF', ink:'#0D2B4E', inkSoft:'#5A6B85', line:'#DDE3EE', cover:'light' },
   moderne:   { label:'🟢 Moderne — entrepreneurial', navy:'#0D2B4E', orange:'#B84C1A', blue:'#1E4F8A', paper:'#EEF2F8', ink:'#0D2B4E', inkSoft:'#5A6B85', line:'#D7DFEC', cover:'dark', coverBg:'linear-gradient(135deg,#0D2B4E,#1E4F8A)' },
   impact:    { label:'🌍 Impact — social & territorial', navy:'#0D2B4E', orange:'#1A7A52', blue:'#1E4F8A', paper:'#F4F0E6', ink:'#0D2B4E', inkSoft:'#6B6250', line:'#E4DCC8', cover:'impact' },
   finance:   { label:'🏦 Finance — banques & financeurs', navy:'#14171C', orange:'#8A6D3F', blue:'#1E4F8A', paper:'#FFFFFF', ink:'#14171C', inkSoft:'#5B5F66', line:'#E2E4E8', cover:'light' },
 };
-let ACTIVE_TPL = TEMPLATES.premium;
+let ACTIVE_TPL = TEMPLATES.institutionnel;
+/* ---- Couleur des intercalaires (pages de séparation de chapitre) : 7 choix, mémorisée sur cet appareil ---- */
+const INTERCALAIRES = [
+  { k:'marine',   nom:'Bleu marine',  c:'#0D2B4E' },
+  { k:'bleu',     nom:'Bleu',         c:'#1E4F8A' },
+  { k:'vert',     nom:'Vert',         c:'#1A7A52' },
+  { k:'bordeaux', nom:'Bordeaux',     c:'#7A1F2B' },
+  { k:'orange',   nom:'Orange brûlé', c:'#B84C1A' },
+  { k:'ardoise',  nom:'Gris ardoise', c:'#475569' },
+  { k:'violet',   nom:'Violet',       c:'#5B3A8C' },
+];
+let INTERC_CLE = 'marine';
+try { const m = localStorage.getItem('dossier-intercalaire'); if (INTERCALAIRES.some(x => x.k === m)) INTERC_CLE = m; } catch (_) { /* choix non mémorisé : sans conséquence */ }
+const couleurInterc = () => (INTERCALAIRES.find(x => x.k === INTERC_CLE) || INTERCALAIRES[0]).c;
+function majSelecteurInterc(){
+  const z = document.getElementById('dossier-interc'); if (!z) return;
+  z.style.display = (ACTIVE_TPL && ACTIVE_TPL.inst) ? 'inline-flex' : 'none';
+  z.innerHTML = `<span>Intercalaires :</span>` + INTERCALAIRES.map(x => `<button type="button" class="${x.k === INTERC_CLE ? 'on' : ''}" style="background:${x.c}" title="${esc(x.nom)}" aria-label="Intercalaires : ${esc(x.nom)}" aria-pressed="${x.k === INTERC_CLE}" onclick="choisirInterc('${x.k}')"></button>`).join('');
+}
+function choisirInterc(k){
+  INTERC_CLE = k;
+  try { localStorage.setItem('dossier-intercalaire', k); } catch (_) { /* non mémorisé */ }
+  if (ACTIVE_TPL && ACTIVE_TPL.inst && DOSSIER_BP) { applyTemplate('institutionnel'); renderDossier(DOSSIER_BP, 'institutionnel', ACTIVE_FORMAT); } else majSelecteurInterc();
+}
+
 function applyTemplate(key){
-  const t = TEMPLATES[key] || TEMPLATES.premium;
+  const t = TEMPLATES[key] || TEMPLATES.institutionnel;
   ACTIVE_TPL = t;
   const root = document.documentElement.style;
   root.setProperty('--dp-navy', t.navy); root.setProperty('--dp-orange', t.orange); root.setProperty('--dp-blue', t.blue);
   root.setProperty('--dp-paper', t.paper); root.setProperty('--dp-ink', t.ink); root.setProperty('--dp-ink-soft', t.inkSoft); root.setProperty('--dp-line', t.line);
+  /* Gabarit institutionnel : la couleur choisie pour les intercalaires sert aussi d'accent (filets, titres) — une seule couleur sur tout le dossier. */
+  document.body.classList.toggle('dp-inst', !!t.inst);
+  if (t.inst) { const c = couleurInterc(); root.setProperty('--dp-orange', c); root.setProperty('--dp-blue', c); root.setProperty('--dp-navy', t.navy); }
+  majSelecteurInterc();
 }
 function onTemplateChange(key){
   applyTemplate(key);
@@ -260,8 +311,14 @@ function classifyProfile(bp){
 function kpi(label, value, note){ if (!has(value)) return ''; return `<div class="kpi"><p class="kl">${esc(label)}</p><p class="kv">${esc(value)}</p>${note?`<p class="kn">${esc(note)}</p>`:''}</div>`; }
 function kpiRow(items){ const cells = items.filter(([l,v]) => has(v)).map(([l,v,n]) => kpi(l,v,n)); if (!cells.length) return ''; const n = Math.min(cells.length,4); return `<div class="kpi-row n${n}">${cells.join('')}</div>`; }
 function fieldGrid(data, schema){ const rows = Object.entries(schema).filter(([k]) => has(data?.[k])); if (!rows.length) return ''; return `<div class="field-grid">${rows.map(([k,l]) => `<div class="field"><p class="fl">${esc(l)}</p><p class="fv">${esc(data[k])}</p></div>`).join('')}</div>`; }
-function chromeTop(bp, eyebrow){ return `<div class="pg-chrome-top"><div class="brand"><img src="${LOGO_DATA}" alt="">${esc(bp.nom_projet||'Business Plan')} · Dossier</div><span>${esc(eyebrow)}</span></div>`; }
-function chromeBottom(){ return `<div class="pg-chrome-bottom"><span>Diaspo'Actif — Dossier confidentiel</span><span class="dp-pagenum">—</span></div>`; }
+function chromeTop(bp, eyebrow){
+  if (ACTIVE_TPL && ACTIVE_TPL.inst) return `<div class="pg-chrome-top"><div class="brand">${esc(bp.nom_projet||'Business plan')} — Dossier de présentation</div><span>${esc(eyebrow)}</span></div>`;
+  return `<div class="pg-chrome-top"><div class="brand"><img src="${LOGO_DATA}" alt="">${esc(bp.nom_projet||'Business Plan')} · Dossier</div><span>${esc(eyebrow)}</span></div>`;
+}
+function chromeBottom(){
+  if (ACTIVE_TPL && ACTIVE_TPL.inst) return `<div class="pg-chrome-bottom"><span>${esc((DOSSIER_BP && DOSSIER_BP.nom_projet) || 'Business plan')} — Document confidentiel</span><span class="dp-pagenum">—</span></div>`;
+  return `<div class="pg-chrome-bottom"><span>Diaspo'Actif — Dossier confidentiel</span><span class="dp-pagenum">—</span></div>`;
+}
 function page(id, cls, inner){ return `<div class="sheet ${cls||''}" data-page-id="${id}"><div class="pg">${inner}</div></div>`; }
 
 /* ---- Schémas de champs simples réutilisés pour les sections « génériques » ---- */
@@ -282,6 +339,7 @@ const FIELD_LABELS = {
    (Impact) — la structure des informations affichées ne change jamais, seul l'habillage change. */
 function pageCouverture(bp, tpl){
   tpl = tpl || ACTIVE_TPL;
+  if (tpl.inst) return pageCouvertureInst(bp);
   const meta = [TYPES[bp.type_initiative]||bp.type_initiative, bp.secteur, [bp.sections?.infos_generales?.ville, bp.sections?.infos_generales?.pays].filter(Boolean).join(', '), STATUTS[bp.statut]].filter(has);
   const metaPills = (color, borderA) => meta.map(m=>`<span class="pill" style="border-color:${borderA};color:${color};">${esc(m)}</span>`).join('');
 
@@ -345,6 +403,64 @@ function pageCouverture(bp, tpl){
   </div>`;
 }
 
+/* ---- Gabarit institutionnel : couverture, intercalaire, conclusion (feuilles blanches, écriture administrative, sans logo Diaspo'Actif) ---- */
+function pageCouvertureInst(bp){
+  const ig = (bp.sections || {}).infos_generales || {};
+  const lignes = [
+    ['Porteur du projet', ig.responsable ? ig.responsable + (ig.responsable_poste ? ' — ' + ig.responsable_poste : '') : ''],
+    ['Nature de la structure', TYPES[bp.type_initiative] || bp.type_initiative],
+    ["Secteur d'activité", bp.secteur],
+    ['Localisation', [ig.ville, ig.pays].filter(Boolean).join(', ')],
+    ['Adresse électronique', ig.email], ['Téléphone', ig.telephone],
+    ['Date de mise à jour', fmtDate(bp.updated_at)],
+  ].filter(([, v]) => has(v));
+  const logo = has(bp.logo_url) ? `<img src="${esc(bp.logo_url)}" alt="" style="max-height:64px;max-width:200px;object-fit:contain;">` : '<span></span>';   // logo du PROJET seulement, jamais celui de Diaspo'Actif
+  return `<div class="sheet" data-page-id="cover"><div class="pg" style="padding:30mm 24mm 18mm;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;min-height:64px;">${logo}<span style="font-size:11px;color:var(--dp-ink-soft);">Document confidentiel</span></div>
+    <div style="margin-top:34mm;">
+      <p style="margin:0 0 14px;font-size:13px;color:var(--dp-ink-soft);">Dossier de présentation du projet</p>
+      <h1 style="font-family:var(--dp-display);color:var(--dp-ink);font-size:38px;font-weight:700;line-height:1.15;margin:0 0 14px;">${esc(bp.nom_projet || 'Sans titre')}</h1>
+      <div style="width:72px;height:4px;background:var(--dp-orange);margin:0 0 18px;"></div>
+      ${has(bp.slogan) ? `<p style="font-size:15px;color:var(--dp-ink-soft);margin:0 0 30px;">${esc(bp.slogan)}</p>` : ''}
+    </div>
+    ${lignes.length ? `<table class="doc-table" style="margin-top:auto;border-top:1.5px solid var(--dp-ink);font-size:12px;"><tbody>${lignes.map(([l, v]) => `<tr><td style="width:36%;">${esc(l)}</td><td style="text-align:left;font-weight:400;">${esc(v)}</td></tr>`).join('')}</tbody></table>` : '<div style="margin-top:auto;"></div>'}
+    ${chromeBottom()}
+  </div></div>`;
+}
+/* Intercalaire : page pleine couleur (couleur choisie dans la barre d'outils), texte blanc, sans dégradé. */
+function pageChapitreInst(bp, num, titre, sousTitre, items){
+  return `<div class="sheet" data-page-id="chap-${num}" style="background:var(--dp-orange);color:#fff;"><div class="pg" style="padding:30mm 24mm 18mm;justify-content:center;">
+    <p style="font-size:15px;margin:0 0 10px;color:rgba(255,255,255,.88);font-weight:700;">Chapitre ${num}</p>
+    <h2 style="font-family:var(--dp-display);font-size:40px;font-weight:700;line-height:1.15;margin:0 0 12px;color:#fff;max-width:88%;">${esc(titre)}</h2>
+    <div style="width:72px;height:4px;background:#fff;margin:0 0 20px;"></div>
+    ${sousTitre ? `<p style="font-size:15px;color:rgba(255,255,255,.92);margin:0 0 24px;max-width:80%;">${esc(sousTitre)}</p>` : ''}
+    ${items.length ? `<ul style="margin:0;padding-left:20px;font-size:13px;line-height:1.9;color:#fff;">${items.map(l => `<li>${esc(l)}</li>`).join('')}</ul>` : ''}
+    <div class="pg-chrome-bottom" style="border-top-color:rgba(255,255,255,.5);color:rgba(255,255,255,.9);"><span>${esc(bp.nom_projet || 'Business plan')}</span><span class="dp-pagenum">—</span></div>
+  </div></div>`;
+}
+function pageConclusionInst(bp){
+  const fi = (bp.sections || {}).financement || {}, ig = (bp.sections || {}).infos_generales || {};
+  const montant = has(fi.montant) ? fmtEUR(fi.montant) : '';
+  const demande = montant ? `Le porteur du projet sollicite un financement de ${montant}${has(fi.utilisation) ? ', destiné à : ' + String(fi.utilisation).split(/[.\n]/)[0] : ''}.` : "Nous vous remercions de l'attention portée à ce dossier.";
+  const contact = [['Personne à contacter', ig.responsable], ['Adresse électronique', ig.email], ['Téléphone', ig.telephone]].filter(([, v]) => has(v));
+  return page('conclusion', '', `
+    ${chromeTop(bp, 'Conclusion')}
+    <h2 class="pg-title">${montant ? 'Demande de financement' : 'Conclusion'}</h2>
+    <p style="font-size:14px;line-height:1.7;margin:0 0 26px;">${esc(demande)}</p>
+    ${contact.length ? `<p class="block-title">Contact</p><table class="doc-table" style="font-size:12px;"><tbody>${contact.map(([l, v]) => `<tr><td style="width:36%;">${esc(l)}</td><td style="text-align:left;font-weight:400;">${esc(v)}</td></tr>`).join('')}</tbody></table>` : ''}
+    ${chromeBottom()}
+  `);
+}
+/* Écriture administrative : le titre de chaque page reprend simplement l'intitulé de la rubrique (au lieu d'une accroche éditoriale). */
+function administratifier(stage){
+  stage.querySelectorAll('.sheet[data-page-id]').forEach(sh => {
+    const id = sh.dataset.pageId;
+    if (id === 'cover' || id === 'toc' || id === 'conclusion' || id.startsWith('chap-')) return;
+    const t = sh.querySelector('.pg-title'), lab = sh.querySelector('.pg-chrome-top > span');
+    if (t && lab && lab.textContent.trim()) t.textContent = lab.textContent.trim().replace(/^\d+\s*[—–-]\s*/, '');   // « 02 — Résumé exécutif » -> « Résumé exécutif »
+  });
+}
+
 /* ---- Page : Table des matières (contenu injecté après coup, voir buildToc) ---- */
 function pageToc(bp){
   return `<div class="sheet" data-page-id="toc"><div class="pg">
@@ -362,6 +478,7 @@ function pageToc(bp){
    -- jamais une liste figée qui listerait une page absente faute de données). */
 function pageChapitre(bp, tpl, num, titre, sousTitre, itemsLabels){
   tpl = tpl || ACTIVE_TPL;
+  if (tpl.inst) return pageChapitreInst(bp, num, titre, sousTitre, itemsLabels);
   const dark = tpl.cover === 'dark';
   const bg = dark ? (tpl.coverBg || `linear-gradient(165deg,#14171C 0%,${tpl.navy} 130%)`) : tpl.paper;
   const ink = dark ? '#F7F5F0' : tpl.navy;
@@ -918,6 +1035,7 @@ function pageEquipe(bp){
 /* ---- Page : Conclusion ---- */
 function pageConclusion(bp, tpl){
   tpl = tpl || ACTIVE_TPL;
+  if (tpl.inst) return pageConclusionInst(bp);
   const fi = (bp.sections||{}).financement || {}, ig = (bp.sections||{}).infos_generales || {};
   const ask = has(fi.montant) ? `${fmtEUR(fi.montant)} recherchés${has(fi.utilisation)?' — '+fi.utilisation.split(/[.\n]/)[0]:''}.` : "Merci de l'attention portée à ce dossier.";
   const contactName = ig.responsable || '', contactEmail = ig.email || '';
@@ -1082,6 +1200,7 @@ function renderDossier(bp, tplKey, formatKey){
 
   const stage = document.getElementById('dossier-stage');
   stage.innerHTML = pageCouverture(bp, tpl) + pageToc(bp) + bodyHtml + pageConclusion(bp, tpl);
+  if (tpl.inst) administratifier(stage);
 
   // Table des matières + numérotation, calculées sur les pages réellement produites.
   const sheets = [...stage.querySelectorAll('.sheet')];
@@ -1128,18 +1247,18 @@ async function init(){
   DOSSIER_BP = bp;
   if (bp.exemple) { showError("Cet exemple de référence ne peut pas être téléchargé (ni PDF, ni PowerPoint). Dupliquez-le pour obtenir votre propre version."); return; }
 
-  document.title = `Dossier — ${bp.nom_projet || 'Business Plan'} — Diaspo'Actif`;
+  document.title = `Dossier — ${bp.nom_projet || 'Business Plan'}`;
 
   const select = document.getElementById('dossier-template-select');
   select.innerHTML = Object.entries(TEMPLATES).map(([k,t]) => `<option value="${k}">${esc(t.label)}</option>`).join('');
-  select.value = 'premium';
+  select.value = 'institutionnel';
 
   const formatSelect = document.getElementById('dossier-format-select');
   formatSelect.innerHTML = Object.entries(FORMATS).map(([k,f]) => `<option value="${k}">${esc(f.label)}</option>`).join('');
   formatSelect.value = ACTIVE_FORMAT;
 
-  applyTemplate('premium');
-  renderDossier(bp, 'premium', ACTIVE_FORMAT);
+  applyTemplate('institutionnel');
+  renderDossier(bp, 'institutionnel', ACTIVE_FORMAT);
 
   document.getElementById('dossier-loading').style.display = 'none';
   document.getElementById('dossier-shell').style.display = '';
@@ -1181,7 +1300,7 @@ async function generatePPTX(){
     const s = bp.sections || {};
     const pres = new PptxGenJS();
     pres.layout = 'LAYOUT_WIDE';
-    pres.author = "Diaspo'Actif";
+    pres.author = ACTIVE_TPL.inst ? (bp.nom_projet || 'Business Plan') : "Diaspo'Actif";
     pres.title = `${bp.nom_projet || 'Business Plan'} — Dossier investisseur`;
 
     // Reprend le gabarit couleur actif dans le PDF (sélecteur de la barre d'outils) -- même
@@ -1191,7 +1310,7 @@ async function generatePPTX(){
     const FD = 'Cambria', FB = 'Calibri'; // display / body — voir note ci-dessus
     const R = pres.ShapeType.rect, OV = pres.ShapeType.ellipse;
     const W = 13.333, MX = 0.55;
-    const logoPng = await logoToPng(160).catch(() => null);
+    const logoPng = ACTIVE_TPL.inst ? null : await logoToPng(160).catch(() => null);   // gabarit institutionnel : jamais le logo Diaspo'Actif
 
     let n = 0; // numéro de diapo, calculé au fil de l'eau (nombre de diapos variable selon les données)
     const chrome = (slide, eyebrow) => {
