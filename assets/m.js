@@ -2132,7 +2132,8 @@
     { t: 'Business Plans', i: 'file', h: '#/businessplan', d: 'Construire et défendre vos projets', r: { utilisateur: 2, initiative: 2 } },
     { t: 'Formations', i: 'book', h: '#/formations', d: 'Catalogue et formations suivies', r: { utilisateur: 1, initiative: 1 } },
     { t: 'CV, lettres, candidatures', i: 'doc', h: '#/cvlettres', d: 'Vos documents de candidature', r: { utilisateur: 1 } },
-    { t: 'Parrainage', i: 'gift', h: '#/parrainage', d: 'Invitez vos proches', r: { utilisateur: 1, initiative: 1 } }
+    { t: 'Parrainage', i: 'gift', h: '#/parrainage', d: 'Invitez vos proches', r: { utilisateur: 1, initiative: 1 } },
+    { t: 'Maracana Tracker', i: 'star', h: '#/tracker', d: 'Matchs, présences, notes et prix', r: { initiative: 1 } }
   ];
   const MODS_COMPTE = [
     { t: 'Confidentialité', i: 'lock', h: '#/confidentialite', d: 'Vos données et votre visibilité', r: { utilisateur: 1, initiative: 1 } },
@@ -2373,7 +2374,7 @@
     p.hidden = true; document.body.style.overflow = ''; clearInterval(S.chatTimer); S.pane = null;
     const f = $('#pane-foot'); if (f) { f.innerHTML = ''; f.hidden = true; }
   }
-  const SITE_PAGES = { boutique: 'vitrines.html', produit: 'vitrines.html', mesevenements: 'dashboard-initiative.html#evenements', cotisations: 'dashboard-initiative.html#adhesions-init', mescagnottes: 'dashboard-initiative.html#cagnottes', msgboutique: 'dashboard-initiative.html#messages-vitrine', associe: 'mon-associe.html', reseaupro: 'reseau.html', businessplan: 'business-plan.html', formations: 'formations.html', cvlettres: 'dashboard-utilisateur.html', parrainage: 'parrainage.html', confidentialite: 'confidentialite.html', abonnement: 'mon-abonnement.html' };
+  const SITE_PAGES = { boutique: 'vitrines.html', produit: 'vitrines.html', tracker: 'dashboard-initiative.html#tracker', mesevenements: 'dashboard-initiative.html#evenements', cotisations: 'dashboard-initiative.html#adhesions-init', mescagnottes: 'dashboard-initiative.html#cagnottes', msgboutique: 'dashboard-initiative.html#messages-vitrine', associe: 'mon-associe.html', reseaupro: 'reseau.html', businessplan: 'business-plan.html', formations: 'formations.html', cvlettres: 'dashboard-utilisateur.html', parrainage: 'parrainage.html', confidentialite: 'confidentialite.html', abonnement: 'mon-abonnement.html' };
   function openSheet(inner) {
     const sh = $('#sheet'); sh.hidden = false; const close = () => { sh.hidden = true; sh.innerHTML = ''; };
     sh.innerHTML = '<div class="sh" role="dialog" aria-modal="true"><div class="grip"></div><div class="sb">' + inner + '</div></div>';

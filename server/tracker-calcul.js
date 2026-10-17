@@ -35,11 +35,39 @@ const MODELES = {
   },
   fairplay: {
     cle: 'fairplay', nom: 'Joueur fair-play', emoji: '🤝',
-    description: 'Points de fair-play par match joué : 5/10 par défaut (irréprochable), +2 ou +3 pour un fait remarquable. Moyenne par match ou total.',
+    description: 'Niveau de fair-play par match joué : 5/10 pour tout le monde, +1 à +3 pour une belle action, moins les cartons. Moyenne sur les matchs joués.',
     poste_filtre: null,
-    regle_defaut: { min_matchs: 3, fair_play_mode: 'moyenne', poids: {} },
+    regle_defaut: { min_matchs: 3, poids: {} },
+  },
+  jogabonito: {
+    cle: 'jogabonito', nom: 'Joga Bonito', emoji: '✨', dore: true,
+    description: 'Le joueur le plus technique et le plus plaisant à regarder : celui qui a du style, joue avec le ballon et fait plaisir aux yeux. Noté sur 10 à chaque match.',
+    poste_filtre: null,
+    regle_defaut: { min_matchs: 3, joga_mode: 'moyenne', poids: {} },
   },
 };
+
+/* ---------- Cartons et niveau de fair-play ---------- */
+const CARTONS = ['rouge', 'jaune', 'vert', 'blanc'];
+const PORTEES = ['tous', 'entrainement', 'match'];
+/* Réglage de départ, demandé et confirmé à chaque nouvelle journée puis conservé jusqu'à modification.
+   malus : points de fair-play retirés (sur 10) ; matchs : nombre de matchs sur lesquels le malus pèse (1 à 3) ;
+   portee : type de rencontres concernées (entrainement, match, ou tous). */
+const CARTONS_DEFAUT = {
+  rouge: { malus: 3, matchs: 1, portee: 'tous' }, jaune: { malus: 1, matchs: 1, portee: 'tous' },
+  vert: { malus: 2, matchs: 1, portee: 'tous' }, blanc: { malus: 0, matchs: 1, portee: 'tous' },
+};
+function normaliserCartons(brut) {
+  const b = brut && typeof brut === 'object' ? brut : {};
+  const out = {};
+  for (const c of CARTONS) {
+    const x = b[c] && typeof b[c] === 'object' ? b[c] : {}, d = CARTONS_DEFAUT[c];
+    const malus = x.malus === undefined || x.malus === '' ? d.malus : Math.min(10, Math.max(0, Math.round(Number(x.malus)) || 0));
+    const matchs = [1, 2, 3].includes(Number(x.matchs)) ? Number(x.matchs) : d.matchs;
+    out[c] = { malus, matchs, portee: PORTEES.includes(x.portee) ? x.portee : d.portee };
+  }
+  return out;
+}
 
 const POSTES = ['gardien', 'defenseur', 'milieu', 'attaquant'];
 const CATEGORIES = ['match', 'entrainement'];
@@ -58,8 +86,48 @@ function normaliserRegle(modele, regle) {
   /* Catégories de rencontres prises en compte : matchs officiels, entraînements entre équipes du club, ou les deux (défaut). */
   let cats = Array.isArray(r.categories) ? r.categories.filter(c => CATEGORIES.includes(c)) : CATEGORIES.slice();
   if (!cats.length) cats = CATEGORIES.slice();
-  const out = { min_matchs: min, poids, categories: cats };
-  if (modele === 'fairplay') out.fair_play_mode = (r.fair_play_mode || base.fair_play_mode) === 'total' ? 'total' : 'moyenne';
+  /* « Membres à jour » : si coché, seuls les adhérents dont la cotisation est à jour comptent pour ce prix (classement, lauréat, trophée). */
+  const out = { min_matchs: min, poids, categories: cats, membres_a_jour: r.membres_a_jour === true || r.membres_a_jour === 1 || r.membres_a_jour === '1' };
+  if (modele === 'jogabonito') out.joga_mode = (r.joga_mode || base.joga_mode) === 'total' ? 'total' : 'moyenne';
+  return out;
+}
+
+/* Niveau de fair-play d'UN joueur, match après match (ordre chronologique : date puis ordre du match).
+   Règles : base 5 pour tout le monde, qui ne s'ADDITIONNE PAS d'un match à l'autre ; les points rapides (+1, +2, +3, changement d'équipe)
+   s'ajoutent au match concerné (plafond 10) ; un carton retire son malus sur le nombre de matchs réglé (match où il est donné compris),
+   uniquement sur les rencontres de son type ; le niveau peut passer SOUS ZÉRO. Dès que le niveau est ≤ 0, le joueur est « en sanction » :
+   son niveau reste figé (et baisse si d'autres malus tombent) jusqu'à ce qu'il ait joué sur DEUX JOURNÉES DIFFÉRENTES sans aucun malus.
+   Deux matchs le même jour comptent pour une seule journée. Après quoi tout est remis à plat : retour aux 5 points.
+   matchs : [{ cle, date, categorie, cartons:{rouge,jaune,vert,blanc}, points, reglage }] → [{ cle, niveau, score, sanction, malus }] */
+function historiqueFairPlay(matchs) {
+  const out = [];
+  let actifs = [], sanction = null;
+  const jours = [];
+  for (const m of matchs || []) { const j = jours[jours.length - 1]; if (j && j.date === m.date) j.matchs.push(m); else jours.push({ date: m.date, matchs: [m] }); }
+  for (const jour of jours) {
+    let malusDuJour = false;
+    for (const m of jour.matchs) {
+      const reg = normaliserCartons(m.reglage), nouveaux = [];
+      for (const c of CARTONS) for (let k = 0; k < Math.max(0, Math.floor(n(m.cartons && m.cartons[c]))); k++) nouveaux.push({ points: reg[c].malus, restants: reg[c].matchs, portee: reg[c].portee });
+      const concerne = (e) => e.portee === 'tous' || e.portee === m.categorie;
+      const malusNouveau = nouveaux.filter(concerne).reduce((s, e) => s + e.points, 0);
+      if (nouveaux.some(e => e.points > 0)) malusDuJour = true;
+      actifs.push(...nouveaux);
+      let niveau;
+      if (sanction) { sanction.niveau -= malusNouveau; niveau = sanction.niveau; }
+      else {
+        niveau = FAIR_PLAY_DEFAUT - actifs.filter(concerne).reduce((s, e) => s + e.points, 0);
+        if (niveau <= 0) sanction = { niveau, depuis: jour.date, propres: 0 };
+      }
+      out.push({ cle: m.cle, niveau, score: Math.min(10, niveau + n(m.points)), sanction: !!sanction, malus: FAIR_PLAY_DEFAUT - niveau });
+      actifs.forEach(e => { if (concerne(e)) e.restants -= 1; });
+      actifs = actifs.filter(e => e.restants > 0);
+    }
+    if (sanction && sanction.depuis !== jour.date) {
+      if (malusDuJour) sanction.propres = 0;
+      else if (++sanction.propres >= 2) { sanction = null; actifs = []; }
+    }
+  }
   return out;
 }
 
@@ -69,14 +137,16 @@ function agreger(notes, posteFiltre) {
   for (const x of notes || []) {
     if (posteFiltre && String(x.poste_joue || '').toLowerCase() !== posteFiltre) continue;
     const id = x.joueur_id;
-    if (!par.has(id)) par.set(id, { joueur_id: id, matchs: 0, buts: 0, passes: 0, fair_play: 0, fp_n: 0, arrets: 0, buts_encaisses: 0, duels: 0, interceptions: 0, tacles: 0, etoiles_somme: 0, etoiles_n: 0 });
+    if (!par.has(id)) par.set(id, { joueur_id: id, matchs: 0, buts: 0, passes: 0, fair_play: 0, fp_n: 0, joga: 0, cartons: 0, arrets: 0, buts_encaisses: 0, duels: 0, interceptions: 0, tacles: 0, etoiles_somme: 0, etoiles_n: 0 });
     const a = par.get(id);
     a.matchs += 1;
     a.buts += n(x.buts); a.passes += n(x.passes);
-    /* Fair-play : un joueur PRÉSENT sans note de fair-play compte automatiquement FAIR_PLAY_DEFAUT (5/10 = irréprochable
-       sans être extraordinaire). Le bureau ajoute +2 ou +3 pour un fait remarquable (la note finale reste entre 0 et 10). */
-    const fp = (x.fair_play === null || x.fair_play === undefined || x.fair_play === '') ? FAIR_PLAY_DEFAUT : n(x.fair_play);
+    /* Fair-play du match : calculé en amont (historiqueFairPlay : base 5, points rapides, malus des cartons, sanction) et passé dans fp_match.
+       Sans valeur calculée : 5 + points rapides (plafond 10). */
+    const fp = (x.fp_match !== undefined && x.fp_match !== null) ? n(x.fp_match) : Math.min(10, FAIR_PLAY_DEFAUT + n(x.fp_points) + n(x.fp_bonus));
     a.fair_play += fp; a.fp_n += 1;
+    a.joga += Math.min(10, Math.max(0, n(x.joga_bonito)));
+    a.cartons += n(x.carton_rouge) + n(x.carton_jaune) + n(x.carton_vert) + n(x.carton_blanc);
     a.arrets += n(x.arrets); a.buts_encaisses += n(x.buts_encaisses);
     a.duels += n(x.duels_gagnes); a.interceptions += n(x.interceptions); a.tacles += n(x.tacles);
     if (x.note_etoiles !== null && x.note_etoiles !== undefined && x.note_etoiles !== '') { a.etoiles_somme += n(x.note_etoiles); a.etoiles_n += 1; }
@@ -95,11 +165,15 @@ function noter(modele, regle, agregats) {
   }
   if (modele === 'fairplay') {
     return agregats.filter(a => a.fp_n > 0).map(a => {
-      const moy = a.fair_play / a.fp_n;                      // moyenne par match où le fair-play est noté
-      const score = regle.fair_play_mode === 'total' ? a.fair_play : moy;
-      return { a, score, detail: { fair_play_total: arrondi(a.fair_play), fair_play_moyenne: arrondi(moy), matchs: a.fp_n },
-        tri: [score, a.fair_play, a.fp_n] };
+      const moy = a.fair_play / a.fp_n;                      // niveau moyen sur les matchs joués (le fair-play ne s'additionne pas)
+      return { a, score: moy, detail: { fair_play_moyen: arrondi(moy), cartons: a.cartons, matchs: a.fp_n }, tri: [moy, -a.cartons, a.fp_n] };
     });
+  }
+  if (modele === 'jogabonito') {
+    return agregats.filter(a => a.matchs > 0).map(a => {
+      const moy = a.joga / a.matchs, score = regle.joga_mode === 'total' ? a.joga : moy;   // non noté = 0
+      return { a, score, detail: { joga_moyen: arrondi(moy), joga_total: arrondi(a.joga), matchs: a.matchs }, tri: [score, a.joga, a.matchs] };
+    }).filter(l => l.a.joga > 0);
   }
   if (modele === 'gardien') {
     const lignes = agregats.map(a => {
@@ -187,4 +261,72 @@ function combinerScoreEtVote(classement, votesParJoueur, poidsVotePct) {
   return { lignes, poids: { score: ps, vote: pv } };
 }
 
-module.exports = { MODELES, POSTES, CATEGORIES, FAIR_PLAY_DEFAUT, FAIR_PLAY_BONUS, normaliserRegle, classer, combinerScoreEtVote };
+/* ============================================================
+   SÉANCE D'ENTRAÎNEMENT : enchaînement automatique des matchs entre équipes du club.
+   regle : 'gagnant_reste' (le vainqueur reste, le perdant passe en fin de file, l'équipe suivante entre)
+           'gagnant_sort'  (les DEUX équipes sortent, les deux suivantes entrent)
+           'manuel'        (aucune proposition, le gestionnaire choisit chaque affiche)
+   ordre  : ids des équipes dans l'ordre d'entrée voulu (les deux premières jouent en premier).
+   matchs : rencontres déjà jouées dans l'ordre [{ a, b, sp, sc }] (sp/sc null = score pas encore saisi).
+   Le calcul REJOUE l'historique à chaque fois : modifier un score ancien met la file à jour sans état stocké.
+   ============================================================ */
+const REGLES_ROTATION = ['gagnant_reste', 'gagnant_sort', 'manuel'];
+function etatRotation(regle, ordre, matchs) {
+  const eq = (ordre || []).map(Number);
+  if (eq.length < 2) return { prochain: null, attente: eq, attend_score: false, raison: 'Il faut au moins deux équipes.' };
+  if (regle === 'manuel') return { prochain: null, attente: [], attend_score: false, raison: 'Mode manuel : choisissez vous-même les équipes.' };
+  let queue = eq.slice(), cur = [eq[0], eq[1]];
+  const consec = {}; eq.forEach(id => { consec[id] = 0; });
+  for (const m of matchs || []) {
+    const a = Number(m.a), b = Number(m.b);
+    queue = queue.filter(t => t !== a && t !== b);
+    if (m.sp === null || m.sp === undefined || m.sc === null || m.sc === undefined) return { sur_terrain: [a, b], prochain: null, attente: queue, attend_score: true, raison: 'Saisissez le score du match en cours pour connaître la suite.' };
+    consec[a] = (consec[a] || 0) + 1; consec[b] = (consec[b] || 0) + 1;
+    const sp = n(m.sp), sc = n(m.sc);
+    if (regle === 'gagnant_sort') {
+      queue.push(a, b); consec[a] = 0; consec[b] = 0;
+      cur = [queue.shift(), queue.shift()];
+    } else {
+      let reste, sort;
+      if (sp > sc) { reste = a; sort = b; }
+      else if (sc > sp) { reste = b; sort = a; }
+      else if (consec[a] > consec[b]) { sort = a; reste = b; }   // nul : l'équipe restée le plus longtemps sort
+      else if (consec[b] > consec[a]) { sort = b; reste = a; }
+      else { sort = a; reste = b; }
+      queue.push(sort); consec[sort] = 0;
+      cur = [reste, queue.shift()];
+    }
+  }
+  return { sur_terrain: null, prochain: cur[0] && cur[1] && cur[0] !== cur[1] ? cur : null, attente: queue, attend_score: false, raison: null };
+}
+
+const POSTE_PLURIEL = { gardien: 'gardien', defenseur: 'défenseur', milieu: 'milieu', attaquant: 'attaquant' };
+/* Équipe la plus logique pour un joueur donné (retardataire) : celle qui compte le moins de joueurs à CE poste, puis le moins de joueurs au total.
+   equipes : [{ id, nom, joueurs:[{ poste }] }] */
+function suggererEquipe(equipes, poste) {
+  if (!equipes || !equipes.length) return null;
+  const lignes = equipes.map((e, i) => ({ e, i, nbPoste: poste ? e.joueurs.filter(j => j.poste === poste).length : 0, total: e.joueurs.length }));
+  lignes.sort((x, y) => x.nbPoste - y.nbPoste || x.total - y.total || x.i - y.i);
+  const g = lignes[0], lib = POSTE_PLURIEL[poste] || null;
+  let raison;
+  if (!lib) raison = `${g.e.nom} a le moins de joueurs (${g.total})`;
+  else if (g.nbPoste === 0) raison = `${g.e.nom} n'a aucun ${lib}`;
+  else { const pl = lib === 'milieu' ? 'milieux' : lib + 's'; raison = `${g.e.nom} a le moins ${/^[aeiouéh]/.test(pl) ? 'd’' : 'de '}${pl} (${g.nbPoste})`; }
+  return { equipe_id: g.e.id, nom: g.e.nom, raison, comptes: lignes.map(l => ({ equipe_id: l.e.id, nom: l.e.nom, au_poste: l.nbPoste, total: l.total })) };
+}
+
+/* Répartition équilibrée de tous les présents entre les équipes, poste par poste (gardiens d'abord).
+   presents : [{ joueur_id, poste }], equipeIds : [id...] → { joueur_id: equipe_id } */
+function equilibrer(presents, equipeIds) {
+  const ordre = ['gardien', 'defenseur', 'milieu', 'attaquant', ''];
+  const tri = (presents || []).slice().sort((x, y) => ordre.indexOf(x.poste || '') - ordre.indexOf(y.poste || ''));
+  const eq = equipeIds.map(id => ({ id, joueurs: [] }));
+  const res = {};
+  for (const p of tri) {
+    const cible = eq.slice().sort((x, y) => x.joueurs.filter(j => j.poste === p.poste).length - y.joueurs.filter(j => j.poste === p.poste).length || x.joueurs.length - y.joueurs.length)[0];
+    cible.joueurs.push({ poste: p.poste }); res[p.joueur_id] = cible.id;
+  }
+  return res;
+}
+
+module.exports = { CARTONS, PORTEES, CARTONS_DEFAUT, normaliserCartons, historiqueFairPlay, REGLES_ROTATION, etatRotation, suggererEquipe, equilibrer, MODELES, POSTES, CATEGORIES, FAIR_PLAY_DEFAUT, FAIR_PLAY_BONUS, normaliserRegle, classer, combinerScoreEtVote };

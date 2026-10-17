@@ -1774,6 +1774,23 @@ const MIGRATIONS = [
   ["tracker_matchs", "equipe_b TEXT"],
   ["tracker_notes", "arrive_en_retard INTEGER NOT NULL DEFAULT 0"],
   ["tracker_joueurs", "poste_2 TEXT"],
+  // Séance d'entraînement : un match d'entraînement appartient à une séance (présents du jour + équipes + enchaînement de matchs).
+  ["tracker_matchs", "seance_id INTEGER"],
+  ["tracker_matchs", "equipe_a_id INTEGER"],
+  ["tracker_matchs", "equipe_b_id INTEGER"],
+  ["tracker_matchs", "ordre_seance INTEGER"],
+  // Point de fair-play automatique accordé à un joueur qui change d'équipe en cours de séance (s'ajoute à la note, bornée à 10).
+  ["tracker_notes", "fp_bonus INTEGER NOT NULL DEFAULT 0"],
+  // Points rapides et cartons d'un joueur sur un match : fair-play (points ajoutés), Joga Bonito (0 à 10), 4 cartons cumulables.
+  ["tracker_notes", "fp_points INTEGER NOT NULL DEFAULT 0"],
+  ["tracker_notes", "joga_bonito INTEGER NOT NULL DEFAULT 0"],
+  ["tracker_notes", "carton_rouge INTEGER NOT NULL DEFAULT 0"],
+  ["tracker_notes", "carton_jaune INTEGER NOT NULL DEFAULT 0"],
+  ["tracker_notes", "carton_vert INTEGER NOT NULL DEFAULT 0"],
+  ["tracker_notes", "carton_blanc INTEGER NOT NULL DEFAULT 0"],
+  // Réglage des cartons de la journée (malus, durée, type de match) gardé avec la séance / la rencontre : modifier le réglage plus tard ne change pas le passé.
+  ["tracker_seances", "cartons_json TEXT"],
+  ["tracker_matchs", "cartons_json TEXT"],
   // Module "Équipe" de la vitrine (2026-09-10, demande explicite : "Équipe c'est un
   // organigramme") — tableau de {nom, fonction, rattache_a, photo}, l'arbre hiérarchique est
   // reconstruit à l'affichage à partir de rattache_a (nom du responsable), voir profil-app.html.
@@ -7952,6 +7969,11 @@ db.exec(`
     initiative_id INTEGER NOT NULL,
     date_match TEXT NOT NULL,
     categorie TEXT NOT NULL DEFAULT 'match',
+    cartons_json TEXT,
+    seance_id INTEGER,
+    equipe_a_id INTEGER,
+    equipe_b_id INTEGER,
+    ordre_seance INTEGER,
     equipe_a TEXT,
     equipe_b TEXT,
     adversaire TEXT,
@@ -7971,6 +7993,13 @@ db.exec(`
     equipe TEXT,
     poste_joue TEXT,
     arrive_en_retard INTEGER NOT NULL DEFAULT 0,
+    fp_bonus INTEGER NOT NULL DEFAULT 0,
+    fp_points INTEGER NOT NULL DEFAULT 0,
+    joga_bonito INTEGER NOT NULL DEFAULT 0,
+    carton_rouge INTEGER NOT NULL DEFAULT 0,
+    carton_jaune INTEGER NOT NULL DEFAULT 0,
+    carton_vert INTEGER NOT NULL DEFAULT 0,
+    carton_blanc INTEGER NOT NULL DEFAULT 0,
     buts INTEGER NOT NULL DEFAULT 0,
     passes INTEGER NOT NULL DEFAULT 0,
     fair_play INTEGER,
@@ -8010,6 +8039,47 @@ db.exec(`
     laureat_joueur_id INTEGER,
     created_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY(initiative_id) REFERENCES initiatives(id) ON DELETE CASCADE
+  );
+  CREATE TABLE IF NOT EXISTS tracker_seances (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    initiative_id INTEGER NOT NULL,
+    date_seance TEXT NOT NULL,
+    titre TEXT,
+    regle TEXT NOT NULL DEFAULT 'gagnant_reste',
+    suivi_auto INTEGER NOT NULL DEFAULT 1,
+    ordre_json TEXT,
+    cartons_json TEXT,
+    created_by INTEGER,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id) ON DELETE CASCADE
+  );
+  CREATE TABLE IF NOT EXISTS tracker_reglages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    initiative_id INTEGER NOT NULL UNIQUE,
+    cartons_json TEXT,
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id) ON DELETE CASCADE
+  );
+  CREATE TABLE IF NOT EXISTS tracker_equipes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    seance_id INTEGER NOT NULL,
+    nom TEXT NOT NULL,
+    ordre INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY(seance_id) REFERENCES tracker_seances(id) ON DELETE CASCADE
+  );
+  CREATE TABLE IF NOT EXISTS tracker_seance_presents (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    seance_id INTEGER NOT NULL,
+    joueur_id INTEGER NOT NULL,
+    equipe_id INTEGER,
+    poste_joue TEXT,
+    arrive_en_retard INTEGER NOT NULL DEFAULT 0,
+    bonus_transfert INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(seance_id, joueur_id),
+    FOREIGN KEY(seance_id) REFERENCES tracker_seances(id) ON DELETE CASCADE,
+    FOREIGN KEY(joueur_id) REFERENCES tracker_joueurs(id) ON DELETE CASCADE
   );
   CREATE TABLE IF NOT EXISTS tracker_historique (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
