@@ -76,6 +76,22 @@
 .tpl-card .name{font-size:12px;font-weight:700;}
 .tpl-card .desc{font-size:10.5px;color:var(--muted);margin-top:2px;}
 
+
+/* Cartouche distincte « Exemple de référence » (2026-10-17) */
+.bpx{display:grid;grid-template-columns:minmax(0,260px) minmax(0,1fr);gap:0;margin:0 0 26px;border-radius:20px;overflow:hidden;border:2px solid #E7B93C;background:linear-gradient(135deg,#FFFBEA,#FFF1C2);box-shadow:0 0 0 4px rgba(242,201,76,.22),0 14px 36px rgba(242,201,76,.25);}
+.bpx-media{background:radial-gradient(circle at 50% 40%,#F6D365 0%,#C9962B 45%,#12395F 100%);min-height:200px;display:grid;place-items:center;position:relative;}
+.bpx-media img{width:100%;height:100%;object-fit:cover;position:absolute;inset:0;}
+.bpx-media .ic{font-size:64px;filter:drop-shadow(0 6px 14px rgba(0,0,0,.35));position:relative;}
+.bpx-body{padding:18px 22px;color:#3b2a00;min-width:0;}
+.bpx-tag{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#2A1D00;background:linear-gradient(135deg,#FFF3B0,#F2C94C 50%,#C9962B);padding:4px 12px;border-radius:99px;}
+.bpx-body h2{margin:10px 0 2px;font-size:22px;color:#2a1d00;}
+.bpx-slogan{font-style:italic;color:#7a5200;font-size:13.5px;margin-bottom:6px;}
+.bpx-desc{margin:6px 0 10px;font-size:13.5px;line-height:1.55;color:#4a3500;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
+.bpx-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}
+.bpx-chips i{font-style:normal;font-size:11.5px;font-weight:800;padding:3px 10px;border-radius:99px;background:#fff;border:1px solid #E7B93C;color:#7a5200;}
+.bpx-foot{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+@media(max-width:760px){.bpx{grid-template-columns:1fr;} .bpx-media{min-height:140px;}}
+
 /* Tabs */
 .bp-tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:20px;}
 .bp-tab{padding:10px 20px;font-size:13.5px;font-weight:700;cursor:pointer;border:none;background:none;color:var(--muted);border-bottom:2px solid transparent;transition:all .15s;}
@@ -118,11 +134,13 @@
       <button class="btn btn-orange" onclick="openCreateModal()">+ Nouveau Business Plan</button>
     </div>
 
+    <!-- Exemple de référence : cartouche distincte, masquée tant qu'aucun exemple n'est publié -->
+    <div id="bp-exemple-zone" style="display:none;"></div>
+
     <!-- Tabs -->
     <div class="bp-tabs">
       <button class="bp-tab active" data-tab="mes">Mes plans (<span id="tab-mes-count">0</span>)</button>
       <button class="bp-tab" data-tab="partages">Partagés avec moi (<span id="tab-part-count">0</span>)</button>
-      <button class="bp-tab" data-tab="exemple">🌟 Exemple de référence</button>
     </div>
 
     <!-- Mes plans -->
@@ -139,15 +157,6 @@
       </div>
     </div>
 
-    <!-- Exemple de référence -->
-    <div class="tab-panel" id="tab-exemple">
-      <p style="margin:0 0 16px;color:var(--muted);font-size:13px;">
-        Un business plan complet, rempli avec tous les outils de la plateforme, à titre d'exemple. Consultable par tous les comptes, non modifiable.
-      </p>
-      <div id="bp-exemple-list" class="bp-grid">
-        <div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted);">Chargement…</div>
-      </div>
-    </div>
 
   </main>
 
@@ -303,6 +312,27 @@ function renderBPCard(bp, partage, exemple) {
     </div>`;
 }
 
+/* Cartouche de l'exemple de référence (2026-10-17) : lecture seule pour tous, y compris son propriétaire ; ni modifiable, ni supprimable, ni téléchargeable.
+   Seules actions : consulter et dupliquer (la copie appartient à celui qui la fait). */
+function renderExempleCartouche(bp) {
+  const sections = (() => { try { return JSON.parse(bp.sections_json || '{}'); } catch(_) { return {}; } })();
+  const desc = sections.presentation?.description || sections.solution?.description || '';
+  return `<section class="bpx" aria-label="Exemple de référence">
+    <div class="bpx-media">${bp.photo_principale_url ? `<img src="${esc(bp.photo_principale_url)}" alt="">` : `<span class="ic" aria-hidden="true">🌟</span>`}</div>
+    <div class="bpx-body">
+      <span class="bpx-tag">🌟 Exemple de référence</span>
+      <h2>${esc(bp.nom_projet || 'Business plan')}</h2>
+      ${bp.slogan ? `<div class="bpx-slogan">"${esc(bp.slogan)}"</div>` : ''}
+      ${desc ? `<p class="bpx-desc">${esc(desc)}</p>` : ''}
+      <div class="bpx-chips"><i>🔒 Lecture seule</i><i>✋ Non modifiable</i><i>🚫 Non téléchargeable</i><i>👥 Visible par tous les comptes</i></div>
+      <div class="bpx-foot">
+        <button class="btn btn-sm btn-orange" onclick="openBP(${bp.id})">👁️ Consulter l'exemple</button>
+        <button class="btn btn-sm btn-outline" onclick="dupBP(${bp.id})">📋 Dupliquer comme point de départ</button>
+      </div>
+    </div>
+  </section>`;
+}
+
 async function loadBPs() {
   try {
     const data = await api('GET', '/business-plans');
@@ -326,9 +356,9 @@ async function loadBPs() {
       ? part.map(bp => renderBPCard(bp, true)).join('')
       : `<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted);">Aucun plan partagé avec vous.</div>`;
 
-    document.getElementById('bp-exemple-list').innerHTML = exemples.length
-      ? exemples.map(bp => renderBPCard(bp, false, true)).join('')
-      : `<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted);">Aucun exemple de référence publié pour le moment.</div>`;
+    const zoneEx = document.getElementById('bp-exemple-zone');
+    zoneEx.innerHTML = exemples.map(renderExempleCartouche).join('');
+    zoneEx.style.display = exemples.length ? '' : 'none';
   } catch(e) {
     document.getElementById('bp-mes-list').innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px;color:#D33;">${e.message}</div>`;
   }

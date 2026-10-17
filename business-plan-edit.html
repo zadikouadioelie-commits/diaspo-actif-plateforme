@@ -878,6 +878,7 @@ async function loadBP() {
   if (!bpId) { window.location.href='business-plan.html'; return; }
   try {
     bp = await api('GET', `/business-plans/${bpId}`);
+    if (bp.exemple) { window.location.replace(`business-plan-view.html?id=${bpId}`); return; }   /* exemple de référence : lecture seule, consultation uniquement */
     sections = bp.sections || {};
     monRole = bp.mon_role || 'lecteur';
     bpDeviseWorking = null; // réinitialise l'état de travail de la config monétaire sur ce plan fraîchement chargé

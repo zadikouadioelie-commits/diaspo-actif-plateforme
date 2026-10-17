@@ -429,6 +429,19 @@ textarea.bpm-in{min-height:96px;resize:vertical;line-height:1.45}
       </div></a>`;
   }
 
+  /* Cartouche distincte de l'exemple de référence (2026-10-17) : lecture seule pour tous, ni modifiable, ni supprimable, ni téléchargeable. */
+  function exempleCartouche(bp) {
+    return `<a class="card" id="bpm-exemple" href="#/businessplan/${bp.id}" style="display:block;color:inherit;text-decoration:none;border:2px solid #E7B93C;background:linear-gradient(135deg,#FFFBEA,#FFF1C2);box-shadow:0 0 0 3px rgba(242,201,76,.25);margin-bottom:16px">
+      ${bp.photo_principale_url ? cover(bp.photo_principale_url) : ''}
+      <div class="pad">
+        <div class="tags" style="margin:0 0 8px">${badge('🌟 Exemple de référence', 'o')}</div>
+        <h3 style="margin:0 0 2px;font-size:18px;line-height:1.25;overflow-wrap:anywhere">${esc(bp.nom_projet || 'Business plan')}</h3>
+        ${has(bp.slogan) ? `<div class="small muted" style="font-style:italic;margin-bottom:6px">« ${esc(bp.slogan)} »</div>` : ''}
+        <div class="tags" style="margin:8px 0 10px">${badge('🔒 Lecture seule')}${badge('✋ Non modifiable')}${badge('🚫 Non téléchargeable')}</div>
+        <div class="small muted">Visible par tous les comptes. Dupliquez-le pour en faire votre propre plan.</div>
+      </div></a>`;
+  }
+
   async function listScreen() {
     const my = ++nav;
     const T = 'Business Plans';
@@ -438,7 +451,7 @@ textarea.bpm-in{min-height:96px;resize:vertical;line-height:1.45}
     try { r = await api(API); } catch (e) { if (alive(my)) fail(e, T, listScreen); return; }
     if (!alive(my)) return;
     const mes = arr(r.mes_plans), part = arr(r.partages), ex = arr(r.exemples);
-    const tabs = [['mes', 'Mes plans', mes.length], ['partages', 'Partagés avec moi', part.length], ['exemple', 'Exemple de référence', ex.length]];
+    const tabs = [['mes', 'Mes plans', mes.length], ['partages', 'Partagés avec moi', part.length]];
     if (!tabs.some(t => t[0] === listTab)) listTab = 'mes';
     const corps = () => {
       if (listTab === 'mes') {
@@ -454,11 +467,11 @@ textarea.bpm-in{min-height:96px;resize:vertical;line-height:1.45}
           : `<div class="empty"><div class="ei">${ic('star', 'l')}</div><b>Pas encore d’exemple</b>Aucun exemple de référence n’est publié pour le moment.</div>`);
     };
     const draw = () => {
-      setPane(T, `<div class="chips" role="tablist">${tabs.map(t => `<button class="chip ${listTab === t[0] ? 'on' : ''}" role="tab" aria-selected="${listTab === t[0]}" data-t="${t[0]}">${esc(t[1])}${t[2] ? ' (' + t[2] + ')' : ''}</button>`).join('')}</div>${corps()}
+      setPane(T, `${ex.map(exempleCartouche).join('')}<div class="chips" role="tablist">${tabs.map(t => `<button class="chip ${listTab === t[0] ? 'on' : ''}" role="tab" aria-selected="${listTab === t[0]}" data-t="${t[0]}">${esc(t[1])}${t[2] ? ' (' + t[2] + ')' : ''}</button>`).join('')}</div>${corps()}
         <div class="bpm-note" style="margin-top:14px">Transmission à Diaspo’Actif, dossier investisseur (PDF et PowerPoint), simulation de présentation et aide de l’IA : <a href="${SITE_LISTE}" style="text-decoration:underline;font-weight:700">à faire sur ordinateur</a>.</div>`,
         `<a class="btn block" href="#/businessplan/new">${ic('plus', 's')} Nouveau business plan</a>`);
       $$('#pane-body .chip').forEach(c => c.onclick = () => { listTab = c.dataset.t; draw(); });
-      const g = $('#bpm-goex'); if (g) g.onclick = () => { listTab = 'exemple'; draw(); };
+      const g = $('#bpm-goex'); if (g) g.onclick = () => { const x = $('#bpm-exemple'); if (x) x.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
     };
     draw();
   }
@@ -547,7 +560,7 @@ textarea.bpm-in{min-height:96px;resize:vertical;line-height:1.45}
 
     const trans = modif ? arr(bp.transmissions) : [];
     const html = `
-      ${bp.is_public ? `<div class="bpm-note"><b>Exemple de référence, en lecture seule.</b> Dupliquez-le pour en faire votre propre plan et le modifier.</div>` : ''}
+      ${bp.is_public ? `<div class="bpm-note"><b>Exemple de référence : lecture seule, non modifiable et non téléchargeable.</b> Dupliquez-le pour en faire votre propre plan et le modifier.</div>` : ''}
       ${bp.mon_role !== 'proprietaire' && !bp.is_public ? `<div class="bpm-note">Plan partagé avec vous · votre rôle : <b>${esc(ROLES[bp.mon_role] || 'Lecteur')}</b>${modif ? '' : ' (lecture seule)'}</div>` : ''}
       <div class="card">${bp.photo_principale_url ? A.mediaBlock(bp.photo_principale_url, { alt: '' }) : ''}<div class="pad">
         <h2 style="margin:0 0 2px;font-size:21px;line-height:1.25;overflow-wrap:anywhere">${esc(bp.nom_projet || 'Sans titre')}</h2>
@@ -585,11 +598,11 @@ textarea.bpm-in{min-height:96px;resize:vertical;line-height:1.45}
 
       <div class="bpm-note"><b>À finir sur ordinateur.</b> Tableaux financiers détaillés, listes (produits, risques, phases, annexes), outils stratégiques, versions, collaborateurs, pièces jointes et médias.</div>
       <div class="lst">
-        <a class="li" href="${siteDossier(id)}"><span class="ic">${ic('file')}</span><span class="sp"><span class="t">Dossier investisseur</span><br><span class="d">Génération PDF et PowerPoint</span></span><span class="ch">${ic('out', 's')}</span></a>
+        ${bp.is_public ? '' : `<a class="li" href="${siteDossier(id)}"><span class="ic">${ic('file')}</span><span class="sp"><span class="t">Dossier investisseur</span><br><span class="d">Génération PDF et PowerPoint</span></span><span class="ch">${ic('out', 's')}</span></a>`}
         ${modif ? `<a class="li" href="${siteEdit(id)}"><span class="ic">${ic('desk')}</span><span class="sp"><span class="t">Éditeur complet</span><br><span class="d">Toutes les étapes, aide de l’IA, versions</span></span><span class="ch">${ic('out', 's')}</span></a>` : ''}
         ${proprio ? `<a class="li" href="${siteSimu(id)}"><span class="ic">${ic('people')}</span><span class="sp"><span class="t">Simulation de présentation</span><br><span class="d">S’entraîner à défendre son projet</span></span><span class="ch">${ic('out', 's')}</span></a>
         <a class="li" href="${SITE_LISTE}"><span class="ic">${ic('send')}</span><span class="sp"><span class="t">Transmettre à Diaspo’Actif</span><br><span class="d">Depuis la page « Mes business plans »</span></span><span class="ch">${ic('out', 's')}</span></a>` : ''}
-        <a class="li" href="${siteView(id)}"><span class="ic">${ic('doc')}</span><span class="sp"><span class="t">Version document complète</span><br><span class="d">Mise en page du site, impression</span></span><span class="ch">${ic('out', 's')}</span></a>
+        <a class="li" href="${siteView(id)}"><span class="ic">${ic('doc')}</span><span class="sp"><span class="t">Version document complète</span><br><span class="d">${bp.is_public ? 'Mise en page du site, lecture seule' : 'Mise en page du site, impression'}</span></span><span class="ch">${ic('out', 's')}</span></a>
       </div>`;
     setPane(bp.nom_projet || 'Business plan', html);
 

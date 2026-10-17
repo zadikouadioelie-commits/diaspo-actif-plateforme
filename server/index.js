@@ -34206,6 +34206,19 @@ ${jsonLd}
       await readBody(req);
     }
 
+    /* Modèle de référence (2026-10-17, demande explicite) : un business plan is_public=1 est un EXEMPLE — lecture seule pour TOUS les comptes, y compris son
+       propriétaire : aucune écriture (plan, médias, devises, versions, collaborateurs, commentaires, documents, provenance, assistant, analyse, transmission).
+       Seule la duplication reste permise : la copie appartient à celui qui la demande et n'est jamais publique. Garde placée ici, avant toute route, pour
+       qu'une route ajoutée plus tard sous /api/business-plans/:id soit protégée sans y penser. */
+    if (req.method !== "GET" && req.method !== "HEAD") {
+      const mBP = pathname.match(/^\/api\/business-plans\/(\d+)(\/.*)?$/);
+      if (mBP && mBP[2] !== "/duplicate") {
+        let ligneBP = null;
+        try { ligneBP = await db.prepare("SELECT is_public FROM business_plans WHERE id=?").get(mBP[1]); } catch (e) { /* lecture impossible : les gardes propres à chaque route restent actives */ }
+        if (ligneBP && ligneBP.is_public) return sendJSON(res, 403, { error: "Ce business plan est un exemple de référence : lecture seule, non modifiable et non téléchargeable. Dupliquez-le pour en faire votre propre plan." });
+      }
+    }
+
     for (const r of routes) {
       if (r.method !== req.method) continue;
       const m = pathname.match(r.regex);
@@ -45571,7 +45584,7 @@ app.get('/api/business-plans', requireAuth, requireUtilisateurAbonneMw, async (r
       ${sousRequeteTransmission}
     FROM business_plans bp
     JOIN users u ON u.id=bp.user_id
-    WHERE bp.user_id=?
+    WHERE bp.user_id=? AND COALESCE(bp.is_public,0)=0
     ORDER BY bp.updated_at DESC
   `).all(req.user.id);
   // Aussi les BPs où l'utilisateur est collaborateur
@@ -45581,6 +45594,7 @@ app.get('/api/business-plans', requireAuth, requireUtilisateurAbonneMw, async (r
     FROM business_plans bp
     JOIN users u ON u.id=bp.user_id
     JOIN bp_collaborateurs bc ON bc.bp_id=bp.id AND bc.user_id=?
+    WHERE COALESCE(bp.is_public,0)=0
     ORDER BY bp.updated_at DESC
   `).all(req.user.id);
   /* Modèle de référence (2026-09-01) : un business plan marqué is_public=1 sert d'exemple
@@ -45591,9 +45605,9 @@ app.get('/api/business-plans', requireAuth, requireUtilisateurAbonneMw, async (r
     SELECT bp.*, u.nom as owner_nom, u.prenom as owner_prenom
     FROM business_plans bp
     JOIN users u ON u.id=bp.user_id
-    WHERE bp.is_public=1 AND bp.user_id!=?
+    WHERE bp.is_public=1
     ORDER BY bp.updated_at DESC
-  `).all(req.user.id);
+  `).all();
   const parseGalerie = list => list.map(bp => ({ ...bp, galerie: safeJSON(bp.galerie_json, []), devise_config: safeJSON(bp.devise_config, { reference: 'EUR', secondaires: [] }) }));
   sendJSON(res, 200, { mes_plans: parseGalerie(rows), partages: parseGalerie(collab), exemples: parseGalerie(exemples) });
 });
@@ -45630,7 +45644,8 @@ app.get('/api/business-plans/:id', requireAuth, requireUtilisateurAbonneMw, asyn
   ).all(bp.id);
   sendJSON(res, 200, { ...bp, sections, galerie: safeJSON(bp.galerie_json, []),
     devise_config: safeJSON(bp.devise_config, { reference: 'EUR', secondaires: [] }), completude, progression,
-    mon_role: bp.user_id===req.user.id?'proprietaire':(collab?.role||'lecteur'),
+    mon_role: bp.is_public ? 'lecteur' : (bp.user_id===req.user.id?'proprietaire':(collab?.role||'lecteur')),
+    exemple: !!bp.is_public,
     transmissions: transmissions.map(t => ({ ...t, besoins: safeJSON(t.besoins, []) })) });
 });
 
@@ -45673,7 +45688,7 @@ app.put('/api/business-plans/:id', requireAuth, requireUtilisateurAbonneMw, asyn
   `).run(JSON.stringify(newSections), progression,
     nom_projet||null, slogan||null, logo_url||null,
     type_initiative||null, secteur||null, statut||null,
-    is_public!=null?is_public:null, niveauValide, bp.id);
+    (is_public!=null && req.user.role==='administrateur')?is_public:null, niveauValide, bp.id);   /* marquer un plan « exemple de référence » : administrateur seulement */
 
   sendJSON(res, 200, { ok: true, progression });
 });

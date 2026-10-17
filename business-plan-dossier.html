@@ -1126,6 +1126,7 @@ async function init(){
   try { bp = await api('GET', `/business-plans/${id}`); }
   catch(e) { showError(e.status === 403 ? "Vous n'avez pas accès à ce business plan." : (e.status === 404 ? 'Business plan introuvable.' : ('Erreur : ' + e.message))); return; }
   DOSSIER_BP = bp;
+  if (bp.exemple) { showError("Cet exemple de référence ne peut pas être téléchargé (ni PDF, ni PowerPoint). Dupliquez-le pour obtenir votre propre version."); return; }
 
   document.title = `Dossier — ${bp.nom_projet || 'Business Plan'} — Diaspo'Actif`;
 
