@@ -544,6 +544,7 @@ body.bp-type-agriculture .bp-conditionnel-agriculture { display: block; }
 <!-- Fonctions de calcul pures (2026-09-01, consolidation) -- voir assets/business-plan-calc.js
      pour le pourquoi (testabilité, fin de la duplication de logique). -->
 <script src="assets/business-plan-calc.js"></script>
+<script src="assets/bp-test-questions.js?v=1"></script>
 <script>
 /* ===================================================
    BUSINESS PLAN EDITOR
@@ -578,6 +579,7 @@ const SECTIONS = [
   { key:'impact', icon:'🌱', label:'Impact' },
   { key:'financement', icon:'🏦', label:'Recherche de financement' },
   { key:'annexes', icon:'📎', label:'Annexes' },
+  { key:'test_bp', icon:'🎤', label:'Tester mon business plan', noSave:true },
   { key:'completude', icon:'✅', label:'Vérification complétude', noSave:true },
 ];
 
@@ -1151,6 +1153,7 @@ function renderSection(key) {
     financement: renderFinancement,
     annexes: renderAnnexes,
     completude: renderCompletude,
+    test_bp: renderTestBP,
   };
   const fn = renderers[key] || (() => '<div class="bp-section"><div class="bp-card-inner"><p>Section en cours de développement.</p></div></div>');
   content.innerHTML = fn();
@@ -1850,6 +1853,163 @@ async function bpPJSupprimer(id, key) {
   try { await api('DELETE', `/business-plans/${bpId}/documents/${id}`); } catch (e) { alert(e.message || 'Suppression impossible.'); }
   bpPJCharger(key);
 }
+
+/* ---- Tester mon business plan (2026-10-17, demande explicite) ----
+   Exercice À DEUX : une personne joue l'interlocuteur (investisseur, client, collaborateur, inconnu) et pose 30 questions adaptées au plan (assets/bp-test-questions.js) ;
+   celui qui porte le projet répond à voix haute. L'interlocuteur note chaque réponse (solide / à renforcer / non) et prend des notes. Les résultats sont conservés dans
+   sections.test_bp (enregistrement automatique du plan) ; les questions « à renforcer » renvoient à la rubrique du plan à compléter. */
+const BPT = { aud: null, liste: [], i: 0, indices: true, t0: 0, tmr: null, mode: 'toutes', fini: false };
+const BPT_RATINGS = { solide: ['✅', 'Réponse solide'], renforcer: ['🟠', 'À renforcer'], non: ['🔴', 'Pas de réponse'] };
+const BPT_LIBELLE_RUBRIQUE = k => (SECTIONS.find(s => s.key === k) || {}).label || k;
+function bpTData() { sections.test_bp = sections.test_bp || {}; sections.test_bp.notes = sections.test_bp.notes || {}; sections.test_bp.hist = sections.test_bp.hist || []; return sections.test_bp; }
+function bpTQuestions() { return (window.BPTest ? BPTest.generer(bp, sections) : {}); }
+function renderTestBP() {
+  if (!window.BPTest) return `<div class="bp-section"><div class="bp-section-head"><h2>🎤 Tester mon business plan</h2></div><div class="bp-card-inner">Le module de questions n'est pas chargé. Rechargez la page.</div></div>`;
+  if (BPT.aud && BPT.liste.length) return bpTSeance();
+  return bpTAccueil();
+}
+function bpTAccueil() {
+  const Q = bpTQuestions(), d = bpTData();
+  const cartes = Object.keys(BPTest.PROFILS).map(a => {
+    const p = BPTest.PROFILS[a], l = Q[a] || [];
+    const lacunes = l.filter(x => x.lacune).length, faites = l.filter(x => d.notes[x.id]).length;
+    return `<button type="button" class="bpt-card" onclick="bpTChoisir('${a}')">
+      <span class="ic">${p.icone}</span><b>${esc(p.titre)}</b><span class="sub">${esc(p.court)}</span>
+      <span class="desc">${esc(p.desc)}</span>
+      <span class="meta">${l.length} questions · ${lacunes ? `<em>${lacunes} sans réponse dans votre plan</em>` : 'votre plan répond à toutes'}${faites ? ` · ${faites} déjà notées` : ''}</span>
+    </button>`;
+  }).join('');
+  const hist = d.hist.slice(0, 6).map(h => `<tr><td>${esc(h.date)}</td><td>${esc((BPTest.PROFILS[h.aud] || {}).titre || h.aud)}</td><td>${h.nb}</td><td>✅ ${h.solide}</td><td>🟠 ${h.renforcer}</td><td>🔴 ${h.non}</td></tr>`).join('');
+  return `<div class="bp-section">
+    <div class="bp-section-head"><h2>🎤 Tester mon business plan</h2>
+      <p>Un exercice à faire <strong>avec une autre personne</strong> : elle joue l'interlocuteur et vous pose des questions (30 par type d'interlocuteur), vous répondez à voix haute comme en situation réelle. Les questions sont <strong>adaptées à votre projet</strong> : elles reprennent le nom, le secteur, la cible, les prix, le montant recherché et les concurrents de votre plan, et changent de vocabulaire selon que vous êtes une entreprise ou une association.</p>
+    </div>
+    <style>
+      .bpt-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin:6px 0 18px;}
+      .bpt-card{display:flex;flex-direction:column;gap:6px;text-align:left;padding:18px;border:1.5px solid var(--border);border-radius:16px;background:#fff;cursor:pointer;font:inherit;transition:border-color .15s,transform .1s,box-shadow .15s;}
+      .bpt-card:hover{border-color:#B84C1A;transform:translateY(-2px);box-shadow:0 8px 22px rgba(13,43,78,.1);}
+      .bpt-card .ic{font-size:30px;} .bpt-card b{font-size:16px;color:#0D2B4E;} .bpt-card .sub{font-size:12.5px;font-weight:700;color:#B84C1A;}
+      .bpt-card .desc{font-size:12.5px;color:var(--muted);line-height:1.5;} .bpt-card .meta{font-size:12px;color:#334155;margin-top:4px;} .bpt-card .meta em{font-style:normal;color:#b45309;font-weight:700;}
+      .bpt-hist{width:100%;border-collapse:collapse;font-size:12.5px;} .bpt-hist td,.bpt-hist th{padding:7px 10px;border-bottom:1px solid var(--border);text-align:left;} .bpt-hist th{font-size:11px;text-transform:uppercase;color:var(--muted);}
+    </style>
+    <div class="bpt-grid">${cartes}</div>
+    <div class="bp-card-inner"><h3 style="margin:0 0 8px;">Comment faire l'exercice ?</h3>
+      <ol style="margin:0;padding-left:20px;font-size:13.5px;line-height:1.7;color:#334155;">
+        <li>Choisissez l'interlocuteur à simuler, puis le nombre de questions.</li>
+        <li>L'interlocuteur lit chaque question, écoute la réponse et note : <b>solide</b>, <b>à renforcer</b> ou <b>pas de réponse</b>. Il peut cacher les « indices » à celui qui répond.</li>
+        <li>Une question marquée « Votre plan n'y répond pas encore » indique une rubrique à compléter avant de passer devant un vrai financeur ou client.</li>
+        <li>À la fin, un bilan liste les points à travailler et renvoie vers les rubriques concernées. Vous pouvez recommencer uniquement avec les questions à renforcer.</li>
+      </ol></div>
+    ${hist ? `<div class="bp-card-inner"><h3 style="margin:0 0 8px;">Dernières séances</h3><table class="bpt-hist"><thead><tr><th>Date</th><th>Interlocuteur</th><th>Questions</th><th>Solides</th><th>À renforcer</th><th>Sans réponse</th></tr></thead><tbody>${hist}</tbody></table></div>` : ''}
+  </div>`;
+}
+function bpTChoisir(aud) {
+  const Q = bpTQuestions()[aud] || [], d = bpTData();
+  const aRenforcer = Q.filter(x => d.notes[x.id] && d.notes[x.id].r && d.notes[x.id].r !== 'solide').length;
+  const p = BPTest.PROFILS[aud];
+  const z = document.getElementById('bp-content');
+  z.innerHTML = `<div class="bp-section"><div class="bp-section-head"><h2>${p.icone} ${esc(p.titre)}</h2><p>${esc(p.desc)}</p></div>
+    <div class="bp-card-inner">
+      <h3 style="margin:0 0 10px;">Quelles questions poser ?</h3>
+      <div style="display:grid;gap:8px;">
+        ${[['toutes', 'Les 30 questions, des plus simples aux plus difficiles'], ['dix', '10 questions variées tirées au hasard (séance courte)'], ['lacunes', `Seulement celles auxquelles mon plan ne répond pas encore (${Q.filter(x => x.lacune).length})`], ['renforcer', `Seulement celles à renforcer lors des séances précédentes (${aRenforcer})`]].map(([v, l], k) => `
+        <label style="display:flex;gap:10px;align-items:center;padding:10px 12px;border:1px solid var(--border);border-radius:12px;cursor:pointer;background:#fff;"><input type="radio" name="bpt-mode" value="${v}" ${k === 0 ? 'checked' : ''}> <span style="font-size:13.5px;">${esc(l)}</span></label>`).join('')}
+      </div>
+      <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;">
+        <button class="btn btn-orange" onclick="bpTDemarrer('${aud}')">▶ Commencer l'exercice</button>
+        <button class="btn btn-outline" onclick="bpTAbandonner()">← Changer d'interlocuteur</button>
+      </div></div></div>`;
+}
+function bpTDemarrer(aud) {
+  const mode = (document.querySelector('input[name="bpt-mode"]:checked') || {}).value || 'toutes';
+  const d = bpTData(); let L = (bpTQuestions()[aud] || []).slice();
+  if (mode === 'lacunes') L = L.filter(x => x.lacune);
+  else if (mode === 'renforcer') L = L.filter(x => d.notes[x.id] && d.notes[x.id].r && d.notes[x.id].r !== 'solide');
+  else if (mode === 'dix') { L = L.sort(() => Math.random() - .5).slice(0, 10); }
+  if (mode !== 'dix') L.sort((a, b) => BPTest.ORDRE[a.niveau] - BPTest.ORDRE[b.niveau]);
+  if (!L.length) { alert('Aucune question dans cette sélection : choisissez « Les 30 questions ».'); return; }
+  Object.assign(BPT, { aud, liste: L, i: 0, mode, fini: false, t0: 0 });
+  bpTRafraichir();
+}
+function bpTAbandonner() { clearInterval(BPT.tmr); Object.assign(BPT, { aud: null, liste: [], i: 0, fini: false }); renderSection('test_bp'); }
+function bpTRafraichir() { document.getElementById('bp-content').innerHTML = bpTSeance(); bpTChrono(true); }
+function bpTSeance() {
+  if (BPT.fini) return bpTBilan();
+  const q = BPT.liste[BPT.i], p = BPTest.PROFILS[BPT.aud], d = bpTData(), n = d.notes[q.id] || {};
+  const pct = Math.round(((BPT.i) / BPT.liste.length) * 100);
+  return `<div class="bp-section">
+    <style>
+      .bpt-top{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;font-size:13px;color:#334155;}
+      .bpt-bar{height:8px;background:#E5EAF2;border-radius:99px;overflow:hidden;margin-bottom:18px;} .bpt-bar i{display:block;height:100%;background:#B84C1A;}
+      .bpt-q{background:#fff;border:1.5px solid var(--border);border-radius:20px;padding:clamp(22px,4vw,44px);box-shadow:0 6px 24px rgba(13,43,78,.07);}
+      .bpt-q .niv{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:4px 12px;border-radius:99px;background:#F1F4F9;color:#475569;}
+      .bpt-q h3{margin:16px 0 12px;font-size:clamp(20px,2.6vw,30px);line-height:1.35;color:#0D2B4E;}
+      .bpt-ind{margin-top:14px;padding:12px 14px;border-radius:12px;background:#FFF7F2;border:1px solid #F8CDB0;font-size:13px;color:#7a3a14;}
+      .bpt-lacune{margin-top:12px;padding:12px 14px;border-radius:12px;background:#FEF3C7;border:1px solid #FDE68A;font-size:13px;color:#92400E;}
+      .bpt-rate{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:18px 0 12px;}
+      .bpt-rate button{padding:12px;border:2px solid var(--border);border-radius:14px;background:#fff;font:700 14px/1.2 inherit;font-family:inherit;cursor:pointer;}
+      .bpt-rate button.on{border-color:#B84C1A;background:#FFF0E8;}
+      .bpt-nav{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:18px;}
+    </style>
+    <div class="bpt-top"><span><b>${p.icone} ${esc(p.titre)}</b> — question ${BPT.i + 1} sur ${BPT.liste.length}</span>
+      <span><button class="btn btn-outline btn-sm" onclick="bpTBascule()">${BPT.indices ? '🙈 Cacher les indices' : '👁 Afficher les indices'}</button> <span id="bpt-chrono" style="font-variant-numeric:tabular-nums;font-weight:800;margin-left:8px;">⏱ 0:00</span> <button class="btn btn-outline btn-sm" onclick="bpTChrono(true)">↺</button></span></div>
+    <div class="bpt-bar"><i style="width:${pct}%"></i></div>
+    <div class="bpt-q">
+      <span class="niv">${{ facile: 'Question d\'ouverture', moyen: 'Question de fond', difficile: 'Question exigeante' }[q.niveau]}</span>
+      <h3>${esc(q.q)}</h3>
+      ${BPT.indices ? `<div class="bpt-ind"><b>🎧 Ce que l'interlocuteur doit écouter :</b> ${esc(q.indice)}</div>` : ''}
+      ${q.lacune ? `<div class="bpt-lacune">⚠️ Votre plan ne répond pas encore à cette question. Rubrique à compléter : <b>${esc(BPT_LIBELLE_RUBRIQUE(q.section))}</b> <button class="btn btn-outline btn-sm" style="margin-left:6px;" onclick="bpTOuvrir('${q.section}')">Ouvrir la rubrique</button></div>` : ''}
+      <div class="bpt-rate" role="group" aria-label="Qualité de la réponse">${Object.entries(BPT_RATINGS).map(([k, [ic, l]]) => `<button type="button" class="${n.r === k ? 'on' : ''}" onclick="bpTNoter('${q.id}','${k}')">${ic} ${l}</button>`).join('')}</div>
+      <label style="font-size:12.5px;font-weight:700;color:#334155;">Notes de l'interlocuteur (à améliorer, mots clés manquants…)</label>
+      <textarea rows="3" style="width:100%;margin-top:6px;" oninput="bpTTexte('${q.id}',this.value)" placeholder="Ex. : n'a pas donné de chiffre, hésite sur le prix…">${esc(n.t || '')}</textarea>
+      <div class="bpt-nav">
+        <button class="btn btn-outline" ${BPT.i === 0 ? 'disabled' : ''} onclick="bpTAller(-1)">← Précédente</button>
+        <span style="display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-outline" onclick="bpTBilanOuvrir()">Terminer la séance</button>
+        <button class="btn btn-orange" onclick="bpTAller(1)">${BPT.i === BPT.liste.length - 1 ? 'Voir le bilan →' : 'Question suivante →'}</button></span>
+      </div></div></div>`;
+}
+function bpTBascule() { BPT.indices = !BPT.indices; const y = window.scrollY; bpTRafraichir(); window.scrollTo(0, y); }
+function bpTNoter(id, r) { if (monRole === 'lecteur') return; const d = bpTData(); d.notes[id] = Object.assign({}, d.notes[id], { r }); markDirty(); bpTRafraichir(); }
+function bpTTexte(id, t) { if (monRole === 'lecteur') return; const d = bpTData(); d.notes[id] = Object.assign({}, d.notes[id], { t }); markDirty(); }
+function bpTAller(delta) {
+  const j = BPT.i + delta;
+  if (j >= BPT.liste.length) { bpTBilanOuvrir(); return; }
+  if (j < 0) return;
+  BPT.i = j; bpTRafraichir(); window.scrollTo(0, 0);
+}
+function bpTChrono(reset) {
+  clearInterval(BPT.tmr); if (reset) BPT.t0 = Date.now();
+  const cible = (BPTest.PROFILS[BPT.aud] || {}).chrono || 60;
+  const maj = () => { const el = document.getElementById('bpt-chrono'); if (!el) { clearInterval(BPT.tmr); return; } const s = Math.floor((Date.now() - BPT.t0) / 1000); el.textContent = '⏱ ' + Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0') + ' / ' + Math.floor(cible / 60) + ':' + String(cible % 60).padStart(2, '0'); el.style.color = s > cible ? '#dc2626' : '#0D2B4E'; };
+  maj(); BPT.tmr = setInterval(maj, 1000);
+}
+function bpTOuvrir(k) { clearInterval(BPT.tmr); navTo(k); }
+function bpTBilanOuvrir() { clearInterval(BPT.tmr); BPT.fini = true; const d = bpTData(), L = BPT.liste; const cnt = { solide: 0, renforcer: 0, non: 0 }; L.forEach(q => { const r = (d.notes[q.id] || {}).r; if (cnt[r] != null) cnt[r]++; });
+  if (monRole !== 'lecteur') { d.hist.unshift({ date: new Date().toLocaleDateString('fr-FR'), aud: BPT.aud, nb: L.length, solide: cnt.solide, renforcer: cnt.renforcer, non: cnt.non }); d.hist = d.hist.slice(0, 20); markDirty(); }
+  bpTRafraichir(); window.scrollTo(0, 0); }
+function bpTBilan() {
+  const d = bpTData(), L = BPT.liste, p = BPTest.PROFILS[BPT.aud];
+  const note = q => (d.notes[q.id] || {});
+  const cnt = { solide: 0, renforcer: 0, non: 0, sans: 0 }; L.forEach(q => { const r = note(q).r; if (cnt[r] != null) cnt[r]++; else cnt.sans++; });
+  const faibles = L.filter(q => ['renforcer', 'non'].includes(note(q).r));
+  const parRubrique = {}; faibles.forEach(q => { (parRubrique[q.section] = parRubrique[q.section] || []).push(q); });
+  return `<div class="bp-section"><div class="bp-section-head"><h2>📋 Bilan — ${p.icone} ${esc(p.titre)}</h2><p>${L.length} questions posées. Voici ce qu'il faut travailler avant de présenter votre projet.</p></div>
+    <div class="bp-card-inner" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;text-align:center;">
+      <div><div style="font-size:30px;font-weight:800;color:#16a34a;">${cnt.solide}</div><div style="font-size:12.5px;">✅ réponses solides</div></div>
+      <div><div style="font-size:30px;font-weight:800;color:#d97706;">${cnt.renforcer}</div><div style="font-size:12.5px;">🟠 à renforcer</div></div>
+      <div><div style="font-size:30px;font-weight:800;color:#dc2626;">${cnt.non}</div><div style="font-size:12.5px;">🔴 sans réponse</div></div>
+      <div><div style="font-size:30px;font-weight:800;color:#64748b;">${cnt.sans}</div><div style="font-size:12.5px;">non notées</div></div></div>
+    <div class="bp-card-inner"><h3 style="margin:0 0 10px;">Rubriques à travailler</h3>
+      ${faibles.length ? Object.keys(parRubrique).map(k => `<div style="padding:12px 14px;border:1px solid var(--border);border-radius:12px;margin-bottom:10px;background:#fff;">
+        <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;"><b>${esc(BPT_LIBELLE_RUBRIQUE(k))}</b><button class="btn btn-outline btn-sm" onclick="bpTOuvrir('${k}')">Ouvrir la rubrique</button></div>
+        <ul style="margin:8px 0 0;padding-left:18px;font-size:13px;line-height:1.6;">${parRubrique[k].map(q => `<li>${BPT_RATINGS[note(q).r][0]} ${esc(q.q)}${note(q).t ? `<div style="color:var(--muted);font-size:12px;">📝 ${esc(note(q).t)}</div>` : ''}</li>`).join('')}</ul></div>`).join('') : '<p style="margin:0;color:#16a34a;font-weight:700;">Aucun point faible relevé sur cette séance. Bravo !</p>'}
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      ${faibles.length ? `<button class="btn btn-orange" onclick="bpTRefaire('${BPT.aud}')">🔁 Refaire seulement les questions à renforcer</button>` : ''}
+      <button class="btn btn-outline" onclick="bpTChoisir('${BPT.aud}')">Nouvelle séance avec cet interlocuteur</button>
+      <button class="btn btn-outline" onclick="bpTAbandonner()">Choisir un autre interlocuteur</button></div></div>`;
+}
+function bpTRefaire(aud) { const d = bpTData(); const L = (bpTQuestions()[aud] || []).filter(x => d.notes[x.id] && d.notes[x.id].r && d.notes[x.id].r !== 'solide'); if (!L.length) return; Object.assign(BPT, { aud, liste: L, i: 0, fini: false, mode: 'renforcer' }); bpTRafraichir(); window.scrollTo(0, 0); }
 
 /* ---- 2. Résumé exécutif ---- */
 function renderResumeExecutif() {
