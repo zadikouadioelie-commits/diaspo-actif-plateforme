@@ -19,6 +19,7 @@
   const POSTE = { gardien: '🧤 Gardien', defenseur: '🛡️ Défenseur', milieu: '🎯 Milieu', attaquant: '⚽ Attaquant' };
   const fmtDate = (d) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(d || ''); return m ? `${m[3]}/${m[2]}/${m[1]}` : (d || ''); };
   const aujourdhui = () => new Date().toISOString().slice(0, 10);
+  const libMatch = (m) => m.categorie === 'entrainement' ? `${m.equipe_a || 'Équipe 1'} contre ${m.equipe_b || 'Équipe 2'}` : (m.adversaire || 'Match');
   const RAPPEL = '<div class="cf-alert o" style="background:#FFFBEB;border:1px solid #F59E0B;color:#92400E;border-radius:12px;padding:10px 12px;font-size:13px;margin:0 0 12px">⚠️ Le Tracker ne concerne que les <b>personnes majeures</b>. Ne saisissez aucune donnée relative à un mineur.</div>';
   const call = (m, p, b) => api('/api/tracker' + p, b === undefined ? { method: m } : { method: m, body: b });
 
@@ -63,17 +64,23 @@
     const mon = ++jeton; skeleton(); if (!(await init())) return;
     let r; try { r = await call('GET', '/matchs'); } catch (e) { return ici(mon) && erreur(e, ecranMatchs); }
     if (!ici(mon)) return;
+    const memeJour = r.matchs.some(m => m.date_match === aujourdhui());
     setPane(TITRE, `${nav('')}${RAPPEL}
-      <div class="card pad"><b>＋ Nouveau match</b>
+      <div class="card pad"><b>＋ Nouvelle rencontre</b>
+        <p class="small muted" style="margin:4px 0 0">Autant de rencontres que vous voulez dans la même journée.</p>
+        <label class="tk-lbl" for="tk-cat">Catégorie</label><select class="tk-in" id="tk-cat"><option value="match">⚽ Match (contre un adversaire)</option><option value="entrainement">🏋️ Entraînement (équipes du club)</option></select>
         <label class="tk-lbl" for="tk-d">Date</label><input class="tk-in" type="date" id="tk-d" value="${aujourdhui()}">
-        <label class="tk-lbl" for="tk-a">Adversaire</label><input class="tk-in" id="tk-a" placeholder="ex. AS Sud">
-        <div class="tk-num" style="margin-top:10px"><div><label>Notre score</label><input type="number" inputmode="numeric" min="0" id="tk-sp"></div><div><label>Score adverse</label><input type="number" inputmode="numeric" min="0" id="tk-sc"></div></div>
-        <p class="tk-err" id="tk-err" role="alert"></p><button class="btn block" id="tk-creer">Créer le match</button></div>
-      <div class="h2" style="margin-top:14px">MATCHS</div>
-      ${r.matchs.length ? `<div class="lst">${r.matchs.map(m => `<a class="li" href="#/tracker/match/${m.id}"><span class="sp"><span class="t">${fmtDate(m.date_match)} — ${esc(m.adversaire || 'Match')}</span><br><span class="d">${m.score_pour == null ? 'Score non saisi' : esc(m.score_pour + ' - ' + m.score_contre)} · ${m.joueurs} présent(s)</span></span></a>`).join('')}</div>` : '<div class="empty"><b>Aucun match</b>Créez le premier ci-dessus.</div>'}`);
+        <div data-c="match"><label class="tk-lbl" for="tk-a">Adversaire</label><input class="tk-in" id="tk-a" placeholder="ex. AS Sud"></div>
+        <div data-c="entrainement" hidden><label class="tk-lbl" for="tk-ea">Équipe 1</label><input class="tk-in" id="tk-ea" value="Équipe 1" placeholder="ex. CT 1"><label class="tk-lbl" for="tk-eb">Équipe 2</label><input class="tk-in" id="tk-eb" value="Équipe 2" placeholder="ex. MCT 2"></div>
+        <div class="tk-num" style="margin-top:10px"><div><label>Score éq. 1 / nous</label><input type="number" inputmode="numeric" min="0" id="tk-sp"></div><div><label>Score éq. 2 / adverse</label><input type="number" inputmode="numeric" min="0" id="tk-sc"></div></div>
+        <label style="display:flex;gap:10px;align-items:center;margin-top:12px;font-weight:600"><input type="checkbox" id="tk-rep" style="width:24px;height:24px"${memeJour ? ' checked' : ''}> Reprendre les présents de la rencontre précédente du jour</label>
+        <p class="tk-err" id="tk-err" role="alert"></p><button class="btn block" id="tk-creer">Créer la rencontre</button></div>
+      <div class="h2" style="margin-top:14px">RENCONTRES</div>
+      ${r.matchs.length ? `<div class="lst">${r.matchs.map(m => `<a class="li" href="#/tracker/match/${m.id}"><span class="sp"><span class="t">${m.categorie === 'entrainement' ? '🏋️' : '⚽'} ${fmtDate(m.date_match)} — ${esc(libMatch(m))}</span><br><span class="d">${m.score_pour == null ? 'Score non saisi' : esc(m.score_pour + ' - ' + m.score_contre)} · ${m.joueurs} présent(s)</span></span></a>`).join('')}</div>` : '<div class="empty"><b>Aucune rencontre</b>Créez la première ci-dessus.</div>'}`);
+    const cat = $('#tk-cat'); cat.onchange = () => document.querySelectorAll('[data-c]').forEach(b => { b.hidden = b.dataset.c !== cat.value; });
     $('#tk-creer').onclick = async (ev) => {
       const b = ev.currentTarget, err = $('#tk-err'); err.textContent = ''; b.disabled = true;
-      try { const x = await call('POST', '/matchs', { date_match: $('#tk-d').value, adversaire: $('#tk-a').value, score_pour: $('#tk-sp').value, score_contre: $('#tk-sc').value }); toast('Match créé ✓'); location.hash = '#/tracker/match/' + x.id; }
+      try { const x = await call('POST', '/matchs', { categorie: cat.value, date_match: $('#tk-d').value, adversaire: $('#tk-a').value, equipe_a: $('#tk-ea').value, equipe_b: $('#tk-eb').value, score_pour: $('#tk-sp').value, score_contre: $('#tk-sc').value, reprendre_presents: $('#tk-rep').checked }); toast(x.presents_repris ? `Créée · ${x.presents_repris} présent(s) repris ✓` : 'Rencontre créée ✓'); vueMatch = 'presents'; location.hash = '#/tracker/match/' + x.id; }
       catch (e) { err.textContent = e.message || 'Erreur.'; b.disabled = false; }
     };
   }
@@ -85,14 +92,19 @@
     let dm, rj; try { [dm, rj] = await Promise.all([call('GET', '/matchs/' + id), call('GET', '/joueurs')]); } catch (e) { return ici(mon) && erreur(e, () => ecranMatch(id)); }
     if (!ici(mon)) return;
     const m = dm.match, notes = dm.notes, joueurs = rj.joueurs, presents = new Map(notes.map(n => [Number(n.joueur_id), n]));
-    const entete = `<div class="small muted" style="margin:0 4px 10px"><b>${fmtDate(m.date_match)} — ${esc(m.adversaire || 'Match')}</b>${m.score_pour == null ? '' : ' · ' + esc(m.score_pour + ' - ' + m.score_contre)}</div>
+    const entr = m.categorie === 'entrainement', eqA = m.equipe_a || 'Équipe 1', eqB = m.equipe_b || 'Équipe 2';
+    const absents = joueurs.filter(j => !presents.has(Number(j.id)));
+    const entete = `<div class="small muted" style="margin:0 4px 10px"><b>${entr ? '🏋️' : '⚽'} ${fmtDate(m.date_match)} — ${esc(libMatch(m))}</b>${m.score_pour == null ? '' : ' · ' + esc(m.score_pour + ' - ' + m.score_contre)}</div>
       <div class="tk-nav"><a href="#/tracker" >← Matchs</a><a href="#" data-v="presents" class="${vueMatch === 'presents' ? 'on' : ''}">① Présents (${notes.length})</a><a href="#" data-v="notes" class="${vueMatch === 'notes' ? 'on' : ''}">② Notes</a></div>`;
     let corps = '', pied = '';
     if (vueMatch === 'presents') {
-      corps = `${RAPPEL}<p class="small muted" style="margin:0 4px 10px;line-height:1.5">Cochez les joueurs <b>présents ce jour-là</b> : eux seuls pourront être notés.</p>
+      const optEq = (sel) => `<option value="">Équipe ?</option><option value="${esc(eqA)}"${sel === eqA ? ' selected' : ''}>${esc(eqA)}</option><option value="${esc(eqB)}"${sel === eqB ? ' selected' : ''}>${esc(eqB)}</option>`;
+      corps = `${RAPPEL}<p class="small muted" style="margin:0 4px 10px;line-height:1.5">Cochez les joueurs <b>présents ce jour-là</b> : eux seuls pourront être notés.${entr ? ` Répartissez-les entre <b>${esc(eqA)}</b> et <b>${esc(eqB)}</b>.` : ''}</p>
         ${joueurs.length ? `<div class="card" style="overflow:hidden">${joueurs.map(j => { const p = presents.get(Number(j.id)); const po = (p && p.poste_joue) || j.poste_habituel || '';
-          return `<label class="tk-pres"><input type="checkbox" data-pres="${j.id}"${p ? ' checked' : ''}><span class="sp" style="flex:1;font-weight:600">${esc((j.prenom || '') + ' ' + j.nom)}</span>
-            <select data-po="${j.id}" aria-label="Poste ce jour"><option value="">Poste</option>${ctx.postes.map(x => `<option value="${x}"${po === x ? ' selected' : ''}>${POSTE[x]}</option>`).join('')}</select></label>`; }).join('')}</div>`
+          const postes = [j.poste_habituel, j.poste_2].filter(Boolean).map(x => POSTE[x]).join(' · ');
+          return `<div class="tk-pres" style="flex-wrap:wrap"><label style="display:flex;align-items:center;gap:12px;flex:1;min-width:200px"><input type="checkbox" data-pres="${j.id}"${p ? ' checked' : ''}><span class="sp" style="font-weight:600">${esc((j.prenom || '') + ' ' + j.nom)}${p && p.arrive_en_retard ? ' <span class="tk-pill no">en retard</span>' : ''}${postes ? `<br><span class="small muted" style="font-weight:400">${postes}</span>` : ''}</span></label>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">${entr ? `<select data-eq="${j.id}" aria-label="Équipe">${optEq(p && p.equipe)}</select>` : ''}<select data-po="${j.id}" aria-label="Poste ce jour"><option value="">Poste</option>${ctx.postes.map(x => `<option value="${x}"${po === x ? ' selected' : ''}>${POSTE[x]}</option>`).join('')}</select></div></div>`; }).join('')}</div>
+          ${absents.length ? '<button class="btn out block" id="tk-retard" style="margin-top:12px">⏱️ Un joueur arrive en retard</button>' : ''}`
           : '<div class="empty"><b>Aucun joueur</b>Ajoutez-en dans l’onglet Joueurs.</div>'}`;
       pied = joueurs.length ? '<button class="btn block" id="tk-save-pres">Enregistrer les présents</button>' : '';
     } else {
@@ -104,10 +116,23 @@
     document.querySelectorAll('.tk-nav a[data-v]').forEach(a => a.onclick = ev => { ev.preventDefault(); vueMatch = a.dataset.v; ecranMatch(id); });
     document.querySelectorAll('.tk-fp').forEach(g => g.querySelectorAll('button').forEach(b => b.onclick = () => { g.querySelector('input').value = b.dataset.v; g.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); }));
     const sp = $('#tk-save-pres'); if (sp) sp.onclick = async () => {
-      const presentsL = [...document.querySelectorAll('[data-pres]')].filter(c => c.checked).map(c => ({ joueur_id: Number(c.dataset.pres), poste_joue: ($(`[data-po="${c.dataset.pres}"]`) || {}).value || '' }));
+      const presentsL = [...document.querySelectorAll('[data-pres]')].filter(c => c.checked).map(c => ({ joueur_id: Number(c.dataset.pres), poste_joue: ($(`[data-po="${c.dataset.pres}"]`) || {}).value || '', equipe: ($(`[data-eq="${c.dataset.pres}"]`) || {}).value || '' }));
       sp.disabled = true;
       try { await call('PUT', `/matchs/${id}/presents`, { presents: presentsL }); toast('Présents enregistrés ✓'); vueMatch = 'notes'; ecranMatch(id); }
       catch (e) { $('#tk-err').textContent = e.message || 'Erreur.'; sp.disabled = false; }
+    };
+    const rt = $('#tk-retard'); if (rt) rt.onclick = () => {
+      const close = openSheet(`<h2 style="margin:4px 0 8px;font-size:19px">⏱️ Joueur arrivé en retard</h2>
+        <label class="tk-lbl" for="tk-rj">Joueur</label><select class="tk-in" id="tk-rj">${absents.map(j => `<option value="${j.id}">${esc((j.prenom || '') + ' ' + j.nom)}</option>`).join('')}</select>
+        ${entr ? `<label class="tk-lbl" for="tk-rq">Équipe</label><select class="tk-in" id="tk-rq"><option value="">Équipe ?</option><option value="${esc(eqA)}">${esc(eqA)}</option><option value="${esc(eqB)}">${esc(eqB)}</option></select>` : ''}
+        <label class="tk-lbl" for="tk-rp">Poste</label><select class="tk-in" id="tk-rp"><option value="">—</option>${ctx.postes.map(x => `<option value="${x}">${POSTE[x]}</option>`).join('')}</select>
+        <label style="display:flex;gap:10px;align-items:center;margin:12px 0;font-weight:600"><input type="checkbox" id="tk-rjr" style="width:24px;height:24px"> Aussi aux autres rencontres de la journée</label>
+        <p class="tk-err" id="tk-rerr" role="alert"></p><button class="btn block" id="tk-rok">Ajouter aux présents</button>`);
+      $('#tk-rok').onclick = async (ev) => {
+        const b = ev.currentTarget; b.disabled = true;
+        try { await call('POST', `/matchs/${id}/retardataire`, { joueur_id: Number($('#tk-rj').value), equipe: ($('#tk-rq') || {}).value || '', poste_joue: $('#tk-rp').value, aussi_journee: $('#tk-rjr').checked }); close(); toast('Ajouté aux présents ✓'); ecranMatch(id); }
+        catch (e) { $('#tk-rerr').textContent = e.message || 'Erreur.'; b.disabled = false; }
+      };
     };
     const sn = $('#tk-save-notes'); if (sn) sn.onclick = async () => {
       const out = {}; document.querySelectorAll('[data-n]').forEach(e => { const j = e.dataset.n; out[j] = out[j] || { joueur_id: Number(j) }; out[j][e.dataset.k] = e.value; });
@@ -123,6 +148,7 @@
     const spe = p === 'gardien' ? num('arrets', 'Arrêts', n.arrets) + num('buts_encaisses', 'Encaissés', n.buts_encaisses) + et
       : p === 'defenseur' ? num('duels_gagnes', 'Duels', n.duels_gagnes) + num('interceptions', 'Intercept.', n.interceptions) + num('tacles', 'Tacles', n.tacles) + et : et;
     return `<div class="card pad" style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><b>${esc((n.prenom || '') + ' ' + n.nom)}</b><span class="tk-pill">${POSTE[p] || 'poste ?'}</span></div>
+      <div style="margin-top:6px">${n.equipe ? `<span class="tk-pill mu">${esc(n.equipe)}</span> ` : ''}${n.arrive_en_retard ? '<span class="tk-pill no">arrivé en retard</span>' : ''}</div>
       <div class="tk-num" style="margin-top:10px">${num('buts', 'Buts', n.buts, 30)}${num('passes', 'Passes', n.passes, 30)}${spe}</div>
       <label class="tk-lbl">Fair-play (0-10)</label><div class="tk-fp"><button type="button" data-v="" class="${fp === null ? 'on' : ''}">${def} par défaut</button>
         ${ctx.fair_play.bonus.map(b => `<button type="button" data-v="${def + b}" class="${fp === def + b ? 'on' : ''}">+${b} → ${def + b}</button>`).join('')}<input type="number" inputmode="numeric" min="0" max="10" data-n="${id}" data-k="fair_play" value="${fp === null ? '' : fp}" placeholder="libre"></div>
@@ -137,13 +163,14 @@
     const prop = ra.adherents.filter(a => !a.deja_ajoute);
     setPane(TITRE, `${nav('joueurs')}${RAPPEL}
       <div class="h2">JOUEURS (${rj.joueurs.length})</div>
-      ${rj.joueurs.length ? `<div class="lst">${rj.joueurs.map(j => `<div class="li"><span class="sp"><span class="t">${esc((j.prenom || '') + ' ' + j.nom)}</span><br><span class="d">${POSTE[j.poste_habituel] || 'poste libre'} · ${j.matchs} match(s) · ${j.buts} but(s)</span></span><button class="btn out sm" data-ret="${j.id}" data-nom="${esc((j.prenom || '') + ' ' + j.nom)}">Retirer</button></div>`).join('')}</div>` : '<div class="empty"><b>Aucun joueur</b></div>'}
+      ${rj.joueurs.length ? `<div class="lst">${rj.joueurs.map(j => `<div class="li"><span class="sp"><span class="t">${esc((j.prenom || '') + ' ' + j.nom)}</span><br><span class="d">${[j.poste_habituel, j.poste_2].filter(Boolean).map(x => POSTE[x]).join(' · ') || 'postes non précisés'} · ${j.matchs} match(s) · ${j.buts} but(s)</span></span><button class="btn out sm" data-fic="${j.id}">Fiche</button> <button class="btn out sm" data-ret="${j.id}" data-nom="${esc((j.prenom || '') + ' ' + j.nom)}">Retirer</button></div>`).join('')}</div>` : '<div class="empty"><b>Aucun joueur</b></div>'}
       <div class="h2" style="margin-top:16px">AJOUTER UN ADHÉRENT</div>
       ${prop.length ? `<div class="lst">${prop.map((a, i) => `<div class="li"><span class="sp"><span class="t">${esc((a.prenom || '') + ' ' + a.nom)}</span>${a.mineur ? '<br><span class="tk-pill no">mineur — refusé</span>' : (a.age_inconnu ? '<br><span class="d">âge non renseigné</span>' : '')}</span><button class="btn out sm" data-adh="${i}"${a.mineur ? ' disabled' : ''}>Ajouter</button></div>`).join('')}</div>` : '<p class="small muted" style="margin:4px">Aucun adhérent à proposer.</p>'}
       <div class="h2" style="margin-top:16px">PERSONNE SANS COMPTE</div>
       <div class="card pad"><label class="tk-lbl" for="tk-jn" style="margin-top:0">Nom *</label><input class="tk-in" id="tk-jn"><label class="tk-lbl" for="tk-jp">Prénom</label><input class="tk-in" id="tk-jp">
         <label class="tk-lbl" for="tk-je">E-mail * (pour lui envoyer ses statistiques)</label><input class="tk-in" id="tk-je" type="email" inputmode="email" autocapitalize="off">
-        <label class="tk-lbl" for="tk-jo">Poste habituel</label><select class="tk-in" id="tk-jo"><option value="">—</option>${ctx.postes.map(x => `<option value="${x}">${POSTE[x]}</option>`).join('')}</select>
+        <label class="tk-lbl" for="tk-jo">Poste 1</label><select class="tk-in" id="tk-jo"><option value="">—</option>${ctx.postes.map(x => `<option value="${x}">${POSTE[x]}</option>`).join('')}</select>
+        <label class="tk-lbl" for="tk-jo2">Poste 2</label><select class="tk-in" id="tk-jo2"><option value="">—</option>${ctx.postes.map(x => `<option value="${x}">${POSTE[x]}</option>`).join('')}</select>
         <label style="display:flex;gap:10px;align-items:center;margin-top:12px;font-weight:600"><input type="checkbox" id="tk-jm" style="width:24px;height:24px"> J’atteste que cette personne est majeure (18 ans ou plus)</label>
         <p class="tk-err" id="tk-err" role="alert"></p><button class="btn block" id="tk-jadd">Ajouter</button></div>`);
     const recharger = ecranJoueurs;
@@ -151,6 +178,22 @@
       const ok = await confirmer(`Retirer ${b.dataset.nom} ?`, 'Toutes ses notes et statistiques seront supprimées.', 'Retirer');
       if (!ok) return;
       try { await call('DELETE', '/joueurs/' + b.dataset.ret); toast('Joueur retiré ✓'); recharger(); } catch (e) { toast(e.message || 'Erreur', true); }
+    });
+    document.querySelectorAll('[data-fic]').forEach(b => b.onclick = () => {
+      const j = rj.joueurs.find(x => Number(x.id) === Number(b.dataset.fic)); const lie = !!j.user_id;
+      const opt = (sel) => `<option value="">—</option>${ctx.postes.map(x => `<option value="${x}"${sel === x ? ' selected' : ''}>${POSTE[x]}</option>`).join('')}`;
+      const close = openSheet(`<h2 style="margin:4px 0 8px;font-size:19px">🪪 Fiche joueur</h2>${lie ? '<p class="small muted" style="margin:0 0 6px">Adhérent avec compte : nom et e-mail viennent de son compte.</p>' : ''}
+        <label class="tk-lbl" for="tk-fn">Nom</label><input class="tk-in" id="tk-fn" value="${esc(j.nom)}"${lie ? ' disabled' : ''}>
+        <label class="tk-lbl" for="tk-fp">Prénom</label><input class="tk-in" id="tk-fp" value="${esc(j.prenom || '')}"${lie ? ' disabled' : ''}>
+        <label class="tk-lbl" for="tk-fe">E-mail</label><input class="tk-in" id="tk-fe" type="email" inputmode="email" value="${esc(j.email || '')}"${lie ? ' disabled' : ''}>
+        <label class="tk-lbl" for="tk-f1">Poste 1</label><select class="tk-in" id="tk-f1">${opt(j.poste_habituel)}</select>
+        <label class="tk-lbl" for="tk-f2">Poste 2</label><select class="tk-in" id="tk-f2">${opt(j.poste_2)}</select>
+        <p class="tk-err" id="tk-ferr" role="alert"></p><button class="btn block" id="tk-fok">Enregistrer la fiche</button>`);
+      $('#tk-fok').onclick = async (ev) => {
+        const bt = ev.currentTarget; bt.disabled = true;
+        try { await call('PUT', '/joueurs/' + j.id, { nom: $('#tk-fn').value, prenom: $('#tk-fp').value, email: $('#tk-fe').value, poste_habituel: $('#tk-f1').value, poste_2: $('#tk-f2').value }); close(); toast('Fiche enregistrée ✓'); recharger(); }
+        catch (e) { $('#tk-ferr').textContent = e.message || 'Erreur.'; bt.disabled = false; }
+      };
     });
     document.querySelectorAll('[data-adh]').forEach(b => b.onclick = async () => {
       const a = prop[Number(b.dataset.adh)];
@@ -160,7 +203,7 @@
     });
     $('#tk-jadd').onclick = async (ev) => {
       const b = ev.currentTarget, err = $('#tk-err'); err.textContent = ''; b.disabled = true;
-      try { await call('POST', '/joueurs', { nom: $('#tk-jn').value, prenom: $('#tk-jp').value, email: $('#tk-je').value, poste_habituel: $('#tk-jo').value, majeur_atteste: $('#tk-jm').checked }); toast('Joueur ajouté ✓'); recharger(); }
+      try { await call('POST', '/joueurs', { nom: $('#tk-jn').value, prenom: $('#tk-jp').value, email: $('#tk-je').value, poste_habituel: $('#tk-jo').value, poste_2: $('#tk-jo2').value, majeur_atteste: $('#tk-jm').checked }); toast('Joueur ajouté ✓'); recharger(); }
       catch (e) { err.textContent = e.message || 'Erreur.'; b.disabled = false; }
     };
   }

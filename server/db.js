@@ -1767,6 +1767,13 @@ db.exec(`
 
 /* -- Migration douce : ajoute les colonnes si elles n'existent pas encore -- */
 const MIGRATIONS = [
+  // Maracana Tracker (2026-10-17) : catégorie du match (match officiel ou entraînement entre équipes du même club), noms des
+  // deux équipes, arrivée en retard d'un joueur, 2e poste d'un joueur. Aussi présentes dans les CREATE TABLE tracker_* plus bas.
+  ["tracker_matchs", "categorie TEXT NOT NULL DEFAULT 'match'"],
+  ["tracker_matchs", "equipe_a TEXT"],
+  ["tracker_matchs", "equipe_b TEXT"],
+  ["tracker_notes", "arrive_en_retard INTEGER NOT NULL DEFAULT 0"],
+  ["tracker_joueurs", "poste_2 TEXT"],
   // Module "Équipe" de la vitrine (2026-09-10, demande explicite : "Équipe c'est un
   // organigramme") — tableau de {nom, fonction, rattache_a, photo}, l'arbre hiérarchique est
   // reconstruit à l'affichage à partir de rattache_a (nom du responsable), voir profil-app.html.
@@ -7932,6 +7939,7 @@ db.exec(`
     prenom TEXT,
     email TEXT,
     poste_habituel TEXT,
+    poste_2 TEXT,
     majeur_atteste INTEGER NOT NULL DEFAULT 0,
     majeur_atteste_par INTEGER,
     majeur_atteste_le TEXT,
@@ -7943,6 +7951,9 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     initiative_id INTEGER NOT NULL,
     date_match TEXT NOT NULL,
+    categorie TEXT NOT NULL DEFAULT 'match',
+    equipe_a TEXT,
+    equipe_b TEXT,
     adversaire TEXT,
     lieu TEXT,
     score_pour INTEGER,
@@ -7959,6 +7970,7 @@ db.exec(`
     joueur_id INTEGER NOT NULL,
     equipe TEXT,
     poste_joue TEXT,
+    arrive_en_retard INTEGER NOT NULL DEFAULT 0,
     buts INTEGER NOT NULL DEFAULT 0,
     passes INTEGER NOT NULL DEFAULT 0,
     fair_play INTEGER,

@@ -52,6 +52,7 @@ module.exports = function monterTracker({ route, db, sendJSON, getCurrentUser, S
     const ctx = await acces(req, res); if (!ctx) return;
     sendJSON(res, 200, { initiative: { id: ctx.init.id, nom: ctx.init.nom }, estProprietaire: ctx.estProprietaire, postes: POSTES,
       fair_play: { defaut: calcul.FAIR_PLAY_DEFAUT, bonus: calcul.FAIR_PLAY_BONUS, max: 10 },
+      categories: [{ cle: 'match', nom: 'Match' }, { cle: 'entrainement', nom: 'Entraînement (entre équipes du club)' }],
       modeles: Object.values(MODELES).map(m => ({ cle: m.cle, nom: m.nom, emoji: m.emoji, description: m.description, regle_defaut: m.regle_defaut })) });
   });
 
@@ -86,11 +87,11 @@ module.exports = function monterTracker({ route, db, sendJSON, getCurrentUser, S
   route('GET', '/api/tracker/joueurs', async (req, res) => {
     const ctx = await acces(req, res); if (!ctx) return;
     const rows = await db.prepare(`
-      SELECT j.id, j.user_id, j.adhesion_membre_id, j.nom, j.prenom, j.email, j.poste_habituel, j.majeur_atteste_le,
+      SELECT j.id, j.user_id, j.adhesion_membre_id, j.nom, j.prenom, j.email, j.poste_habituel, j.poste_2, j.majeur_atteste_le,
              COUNT(n.id) AS matchs, COALESCE(SUM(n.buts),0) AS buts, COALESCE(SUM(n.passes),0) AS passes
         FROM tracker_joueurs j LEFT JOIN tracker_notes n ON n.joueur_id=j.id
        WHERE j.initiative_id=? AND j.actif=1
-       GROUP BY j.id, j.user_id, j.adhesion_membre_id, j.nom, j.prenom, j.email, j.poste_habituel, j.majeur_atteste_le
+       GROUP BY j.id, j.user_id, j.adhesion_membre_id, j.nom, j.prenom, j.email, j.poste_habituel, j.poste_2, j.majeur_atteste_le
        ORDER BY j.nom, j.prenom`).all(ctx.init.id);
     sendJSON(res, 200, { joueurs: rows });
   });
@@ -154,17 +155,31 @@ module.exports = function monterTracker({ route, db, sendJSON, getCurrentUser, S
     const dup = await db.prepare('SELECT id FROM tracker_joueurs WHERE initiative_id=? AND actif=1 AND ((? IS NOT NULL AND user_id=?) OR (? IS NOT NULL AND adhesion_membre_id=?) OR (? IS NOT NULL AND LOWER(email)=?))')
       .get(id, userId, userId, adhId, adhId, email, email);
     if (dup) return sendJSON(res, 409, { error: 'Cette personne est déjà dans la liste des joueurs.' });
-    const jid = (await db.prepare(`INSERT INTO tracker_joueurs (initiative_id, user_id, adhesion_membre_id, nom, prenom, email, poste_habituel, majeur_atteste, majeur_atteste_par, majeur_atteste_le)
-        VALUES (?,?,?,?,?,?,?,1,?,datetime('now'))`).run(id, userId, adhId, nom, prenom || null, email, poste(body.poste_habituel), ctx.user.id)).lastInsertRowid;
+    const p1 = poste(body.poste_habituel), p2 = poste(body.poste_2);
+    const jid = (await db.prepare(`INSERT INTO tracker_joueurs (initiative_id, user_id, adhesion_membre_id, nom, prenom, email, poste_habituel, poste_2, majeur_atteste, majeur_atteste_par, majeur_atteste_le)
+        VALUES (?,?,?,?,?,?,?,?,1,?,datetime('now'))`).run(id, userId, adhId, nom, prenom || null, email, p1, p2 && p2 !== p1 ? p2 : null, ctx.user.id)).lastInsertRowid;
     await journal(ctx, 'joueur_ajout', `${prenom || ''} ${nom}`.trim(), 'majorité attestée');
     sendJSON(res, 200, { ok: true, id: jid });
   });
 
+  /* Fiche joueur : poste 1 et poste 2 modifiables pour tous ; nom, prénom et e-mail seulement pour une personne SANS compte
+     (pour un adhérent avec compte, ces informations viennent de son compte). */
   route('PUT', '/api/tracker/joueurs/:id', async (req, res, params, body) => {
     const ctx = await acces(req, res); if (!ctx) return;
-    const j = await db.prepare('SELECT id FROM tracker_joueurs WHERE id=? AND initiative_id=? AND actif=1').get(params.id, ctx.init.id);
+    body = body || {};
+    const j = await db.prepare('SELECT id, user_id, nom, prenom, email FROM tracker_joueurs WHERE id=? AND initiative_id=? AND actif=1').get(params.id, ctx.init.id);
     if (!j) return sendJSON(res, 404, { error: 'Joueur introuvable.' });
-    await db.prepare('UPDATE tracker_joueurs SET poste_habituel=? WHERE id=?').run(poste(body && body.poste_habituel), params.id);
+    const p1 = poste(body.poste_habituel), p2 = poste(body.poste_2);
+    let nom = j.nom, prenom = j.prenom, email = j.email;
+    if (!j.user_id) {
+      nom = txt(body.nom, 80) || j.nom; prenom = txt(body.prenom, 80) || null;
+      email = body.email === undefined ? j.email : (SEC.normalizeEmail(body.email) || null);
+      if (!email) return sendJSON(res, 400, { error: 'L’adresse e-mail est nécessaire pour envoyer ses statistiques à une personne sans compte.' });
+      const dup = await db.prepare('SELECT id FROM tracker_joueurs WHERE initiative_id=? AND actif=1 AND id<>? AND LOWER(email)=?').get(ctx.init.id, j.id, email);
+      if (dup) return sendJSON(res, 409, { error: 'Cette adresse e-mail est déjà utilisée par un autre joueur.' });
+    }
+    await db.prepare('UPDATE tracker_joueurs SET nom=?, prenom=?, email=?, poste_habituel=?, poste_2=? WHERE id=?').run(nom, prenom, email, p1, p2 && p2 !== p1 ? p2 : null, j.id);
+    await journal(ctx, 'joueur_modification', `${prenom || ''} ${nom}`.trim(), null);
     sendJSON(res, 200, { ok: true });
   });
 
@@ -183,23 +198,43 @@ module.exports = function monterTracker({ route, db, sendJSON, getCurrentUser, S
   /* ---------- matchs ---------- */
   route('GET', '/api/tracker/matchs', async (req, res) => {
     const ctx = await acces(req, res); if (!ctx) return;
-    const rows = await db.prepare(`SELECT m.id, m.date_match, m.adversaire, m.lieu, m.score_pour, m.score_contre, COUNT(n.id) AS joueurs
+    const rows = await db.prepare(`SELECT m.id, m.date_match, m.categorie, m.equipe_a, m.equipe_b, m.adversaire, m.lieu, m.score_pour, m.score_contre, COUNT(n.id) AS joueurs
         FROM tracker_matchs m LEFT JOIN tracker_notes n ON n.match_id=m.id WHERE m.initiative_id=?
-        GROUP BY m.id, m.date_match, m.adversaire, m.lieu, m.score_pour, m.score_contre ORDER BY m.date_match DESC, m.id DESC`).all(ctx.init.id);
+        GROUP BY m.id, m.date_match, m.categorie, m.equipe_a, m.equipe_b, m.adversaire, m.lieu, m.score_pour, m.score_contre ORDER BY m.date_match DESC, m.id DESC`).all(ctx.init.id);
     sendJSON(res, 200, { matchs: rows });
   });
-  const champsMatch = (b) => ({
-    date: dateIso(b.date_match), adv: txt(b.adversaire, 120) || null, lieu: txt(b.lieu, 120) || null,
-    sp: b.score_pour === '' || b.score_pour == null ? null : entier(b.score_pour, 99), sc: b.score_contre === '' || b.score_contre == null ? null : entier(b.score_contre, 99),
-    note: txt(b.note_bureau, 1000) || null });
+  /* Deux catégories : « match » (contre un adversaire extérieur) et « entrainement » (deux équipes du MÊME club, ex. Équipe 1 contre Équipe 2,
+     noms libres). Aucune limite au nombre de rencontres par journée. Score : « pour » = équipe A / notre équipe, « contre » = équipe B / adversaire. */
+  const libelleMatch = (m) => m.categorie === 'entrainement' ? `${m.equipe_a || 'Équipe 1'} contre ${m.equipe_b || 'Équipe 2'}` : (m.adversaire || 'Match');
+  const champsMatch = (b) => {
+    const cat = b.categorie === 'entrainement' ? 'entrainement' : 'match';
+    let ea = txt(b.equipe_a, 40), eb = txt(b.equipe_b, 40);
+    if (cat === 'entrainement') { ea = ea || 'Équipe 1'; eb = eb || 'Équipe 2'; } else { ea = null; eb = null; }
+    return {
+      cat, ea, eb, date: dateIso(b.date_match), adv: cat === 'match' ? (txt(b.adversaire, 120) || null) : null, lieu: txt(b.lieu, 120) || null,
+      sp: b.score_pour === '' || b.score_pour == null ? null : entier(b.score_pour, 99), sc: b.score_contre === '' || b.score_contre == null ? null : entier(b.score_contre, 99),
+      note: txt(b.note_bureau, 1000) || null };
+  };
   route('POST', '/api/tracker/matchs', async (req, res, params, body) => {
     const ctx = await acces(req, res); if (!ctx) return;
-    const c = champsMatch(body || {});
-    if (!c.date) return sendJSON(res, 400, { error: 'Date du match requise (AAAA-MM-JJ).' });
-    const mid = (await db.prepare('INSERT INTO tracker_matchs (initiative_id, date_match, adversaire, lieu, score_pour, score_contre, note_bureau, created_by) VALUES (?,?,?,?,?,?,?,?)')
-      .run(ctx.init.id, c.date, c.adv, c.lieu, c.sp, c.sc, c.note, ctx.user.id)).lastInsertRowid;
-    await journal(ctx, 'match_creation', `${c.date} ${c.adv || ''}`.trim(), null);
-    sendJSON(res, 200, { ok: true, id: mid });
+    body = body || {};
+    const c = champsMatch(body);
+    if (!c.date) return sendJSON(res, 400, { error: 'Date requise (AAAA-MM-JJ).' });
+    if (c.cat === 'entrainement' && c.ea.toLowerCase() === c.eb.toLowerCase()) return sendJSON(res, 400, { error: 'Les deux équipes doivent avoir un nom différent.' });
+    const mid = (await db.prepare('INSERT INTO tracker_matchs (initiative_id, date_match, categorie, equipe_a, equipe_b, adversaire, lieu, score_pour, score_contre, note_bureau, created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?)')
+      .run(ctx.init.id, c.date, c.cat, c.ea, c.eb, c.adv, c.lieu, c.sp, c.sc, c.note, ctx.user.id)).lastInsertRowid;
+    /* Plusieurs rencontres le même jour : on peut reprendre les présents de la rencontre précédente de la journée (statistiques remises à zéro,
+       équipes et postes conservés, modifiables ensuite). Les présents restent toujours à déclarer avant de noter. */
+    let repris = 0;
+    if (body.reprendre_presents) {
+      const prec = await db.prepare('SELECT id FROM tracker_matchs WHERE initiative_id=? AND date_match=? AND id<>? ORDER BY id DESC').get(ctx.init.id, c.date, mid);
+      if (prec) {
+        const anciens = await db.prepare('SELECT joueur_id, equipe, poste_joue FROM tracker_notes WHERE match_id=?').all(prec.id);
+        for (const a of anciens) { await db.prepare('INSERT INTO tracker_notes (match_id, joueur_id, equipe, poste_joue) VALUES (?,?,?,?)').run(mid, a.joueur_id, c.cat === 'entrainement' ? a.equipe : null, a.poste_joue); repris++; }
+      }
+    }
+    await journal(ctx, 'match_creation', `${c.date} ${c.cat === 'entrainement' ? 'Entraînement ' : ''}${libelleMatch({ categorie: c.cat, equipe_a: c.ea, equipe_b: c.eb, adversaire: c.adv })}`.trim(), repris ? `${repris} présent(s) repris` : null);
+    sendJSON(res, 200, { ok: true, id: mid, presents_repris: repris });
   });
   async function chargerMatch(ctx, id) {
     return db.prepare('SELECT * FROM tracker_matchs WHERE id=? AND initiative_id=?').get(id, ctx.init.id);
@@ -216,11 +251,12 @@ module.exports = function monterTracker({ route, db, sendJSON, getCurrentUser, S
     const ctx = await acces(req, res); if (!ctx) return;
     const m = await chargerMatch(ctx, params.id);
     if (!m) return sendJSON(res, 404, { error: 'Match introuvable.' });
-    const c = champsMatch(body || {});
-    if (!c.date) return sendJSON(res, 400, { error: 'Date du match requise (AAAA-MM-JJ).' });
-    await db.prepare("UPDATE tracker_matchs SET date_match=?, adversaire=?, lieu=?, score_pour=?, score_contre=?, note_bureau=?, updated_at=datetime('now') WHERE id=?")
-      .run(c.date, c.adv, c.lieu, c.sp, c.sc, c.note, m.id);
-    await journal(ctx, 'match_modification', `${c.date} ${c.adv || ''}`.trim(), null);
+    const c = champsMatch({ categorie: m.categorie, equipe_a: m.equipe_a, equipe_b: m.equipe_b, ...(body || {}) });
+    if (!c.date) return sendJSON(res, 400, { error: 'Date requise (AAAA-MM-JJ).' });
+    if (c.cat === 'entrainement' && c.ea.toLowerCase() === c.eb.toLowerCase()) return sendJSON(res, 400, { error: 'Les deux équipes doivent avoir un nom différent.' });
+    await db.prepare("UPDATE tracker_matchs SET date_match=?, categorie=?, equipe_a=?, equipe_b=?, adversaire=?, lieu=?, score_pour=?, score_contre=?, note_bureau=?, updated_at=datetime('now') WHERE id=?")
+      .run(c.date, c.cat, c.ea, c.eb, c.adv, c.lieu, c.sp, c.sc, c.note, m.id);
+    await journal(ctx, 'match_modification', `${c.date} ${libelleMatch({ categorie: c.cat, equipe_a: c.ea, equipe_b: c.eb, adversaire: c.adv })}`.trim(), null);
     sendJSON(res, 200, { ok: true });
   });
   route('DELETE', '/api/tracker/matchs/:id', async (req, res, params) => {
@@ -231,6 +267,43 @@ module.exports = function monterTracker({ route, db, sendJSON, getCurrentUser, S
     await db.prepare('DELETE FROM tracker_matchs WHERE id=?').run(m.id);
     await journal(ctx, 'match_suppression', `${m.date_match} ${m.adversaire || ''}`.trim(), null);
     sendJSON(res, 200, { ok: true });
+  });
+
+  /* Équipe d'un présent : pour un entraînement, uniquement l'une des deux équipes du match (sinon vide = pas encore répartie). */
+  function equipeValide(m, brut) {
+    const e = txt(brut, 40);
+    if (m.categorie !== 'entrainement') return e || null;
+    const a = String(m.equipe_a || 'Équipe 1'), b = String(m.equipe_b || 'Équipe 2');
+    if (e.toLowerCase() === a.toLowerCase()) return a;
+    if (e.toLowerCase() === b.toLowerCase()) return b;
+    return null;
+  }
+
+  /* Joueur arrivé en RETARD : ajouté aux présents sans toucher aux autres. `aussi_journee` l'ajoute aussi aux autres rencontres du même jour
+     où il n'est pas encore présent (utile lors d'un entraînement avec plusieurs matchs). Il peut ensuite être noté comme les autres. */
+  route('POST', '/api/tracker/matchs/:id/retardataire', async (req, res, params, body) => {
+    const ctx = await acces(req, res); if (!ctx) return;
+    const m = await chargerMatch(ctx, params.id);
+    if (!m) return sendJSON(res, 404, { error: 'Match introuvable.' });
+    body = body || {};
+    const j = await db.prepare('SELECT id, nom, prenom FROM tracker_joueurs WHERE id=? AND initiative_id=? AND actif=1 AND majeur_atteste=1').get(body.joueur_id, ctx.init.id);
+    if (!j) return sendJSON(res, 400, { error: 'Joueur introuvable dans votre liste (ou sans attestation de majorité).' });
+    const cibles = [m];
+    if (body.aussi_journee) {
+      const autres = await db.prepare('SELECT * FROM tracker_matchs WHERE initiative_id=? AND date_match=? AND id<>?').all(ctx.init.id, m.date_match, m.id);
+      cibles.push(...autres);
+    }
+    let ajoutes = 0;
+    for (const c of cibles) {
+      const deja = await db.prepare('SELECT 1 AS x FROM tracker_notes WHERE match_id=? AND joueur_id=?').get(c.id, j.id);
+      if (deja) continue;
+      const eq = c.id === m.id ? equipeValide(c, body.equipe) : null;
+      await db.prepare('INSERT INTO tracker_notes (match_id, joueur_id, equipe, poste_joue, arrive_en_retard) VALUES (?,?,?,?,1)').run(c.id, j.id, eq, poste(body.poste_joue));
+      ajoutes++;
+    }
+    if (!ajoutes) return sendJSON(res, 409, { error: 'Ce joueur est déjà présent.' });
+    await journal(ctx, 'retardataire_ajoute', `${j.prenom || ''} ${j.nom}`.trim(), `${m.date_match} · ${ajoutes} rencontre(s)`);
+    sendJSON(res, 200, { ok: true, ajoutes });
   });
 
   /* ÉTAPE 1 — présents du jour : seuls les joueurs déclarés présents (avec leur équipe et leur poste ce jour-là)
@@ -248,7 +321,7 @@ module.exports = function monterTracker({ route, db, sendJSON, getCurrentUser, S
       if (!valides.has(jid)) return sendJSON(res, 400, { error: 'Un des joueurs n’existe pas dans votre liste (ou n’a pas d’attestation de majorité).' });
       if (vus.has(jid)) return sendJSON(res, 400, { error: 'Un joueur est listé deux fois.' });
       vus.add(jid);
-      propres.push({ jid, equipe: txt(x.equipe, 40) || null, poste: poste(x.poste_joue) });
+      propres.push({ jid, equipe: equipeValide(m, x.equipe), poste: poste(x.poste_joue) });
     }
     const existants = await db.prepare('SELECT joueur_id FROM tracker_notes WHERE match_id=?').all(m.id);
     const dejaIds = new Set(existants.map(e => Number(e.joueur_id)));
@@ -265,7 +338,12 @@ module.exports = function monterTracker({ route, db, sendJSON, getCurrentUser, S
   /* Historique des présences, jour après jour : une ligne par joueur, une colonne par match. */
   route('GET', '/api/tracker/presences', async (req, res) => {
     const ctx = await acces(req, res); if (!ctx) return;
-    const matchs = await db.prepare('SELECT id, date_match, adversaire FROM tracker_matchs WHERE initiative_id=? ORDER BY date_match, id').all(ctx.init.id);
+    const matchs = await db.prepare('SELECT id, date_match, categorie, equipe_a, equipe_b, adversaire FROM tracker_matchs WHERE initiative_id=? ORDER BY date_match, id').all(ctx.init.id);
+    matchs.forEach(m => { m.libelle = libelleMatch(m); });
+    /* Plusieurs rencontres identiques le même jour (ex. deux « CT 1 contre MCT 2 ») : numérotées pour les distinguer. */
+    const tot = {}, vu = {};
+    matchs.forEach(m => { const k = m.date_match + '|' + m.libelle; tot[k] = (tot[k] || 0) + 1; });
+    matchs.forEach(m => { const k = m.date_match + '|' + m.libelle; if (tot[k] > 1) { vu[k] = (vu[k] || 0) + 1; m.libelle += ` n°${vu[k]}`; } });
     const joueurs = await db.prepare('SELECT id, nom, prenom FROM tracker_joueurs WHERE initiative_id=? AND actif=1 ORDER BY nom, prenom').all(ctx.init.id);
     const pres = await db.prepare('SELECT n.match_id, n.joueur_id FROM tracker_notes n JOIN tracker_matchs m ON m.id=n.match_id WHERE m.initiative_id=?').all(ctx.init.id);
     const parJoueur = new Map();
@@ -338,14 +416,16 @@ module.exports = function monterTracker({ route, db, sendJSON, getCurrentUser, S
   /* ---------- prix + classements ---------- */
   async function calculerPrix(ctx, prix) {
     const debut = dateIso(prix.periode_debut), fin = dateIso(prix.periode_fin);
+    let regle = null; try { regle = prix.regle_json ? JSON.parse(prix.regle_json) : null; } catch (e) { regle = null; }
+    const cats = calcul.normaliserRegle(prix.modele, regle).categories;
     let sql = `SELECT n.joueur_id, n.match_id, n.poste_joue, n.buts, n.passes, n.fair_play, n.arrets, n.buts_encaisses, n.note_etoiles, n.duels_gagnes, n.interceptions, n.tacles
         FROM tracker_notes n JOIN tracker_matchs m ON m.id=n.match_id JOIN tracker_joueurs j ON j.id=n.joueur_id
        WHERE m.initiative_id=? AND j.actif=1 AND j.majeur_atteste=1`;
     const args = [ctx.init.id];
+    sql += ` AND m.categorie IN (${cats.map(() => '?').join(',')})`; args.push(...cats);
     if (debut) { sql += ' AND m.date_match >= ?'; args.push(debut); }
     if (fin) { sql += ' AND m.date_match <= ?'; args.push(fin); }
     const notes = await db.prepare(sql).all(...args);
-    let regle = null; try { regle = prix.regle_json ? JSON.parse(prix.regle_json) : null; } catch (e) { regle = null; }
     const res = classer(prix.modele, notes, regle);
     const noms = new Map((await db.prepare('SELECT id, nom, prenom FROM tracker_joueurs WHERE initiative_id=?').all(ctx.init.id)).map(j => [Number(j.id), `${j.prenom || ''} ${j.nom}`.trim()]));
     res.classement.forEach(c => { c.nom = noms.get(Number(c.joueur_id)) || '—'; });

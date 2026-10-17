@@ -42,7 +42,8 @@ const MODELES = {
 };
 
 const POSTES = ['gardien', 'defenseur', 'milieu', 'attaquant'];
-const FAIR_PLAY_DEFAUT = 5;      // note de fair-play d'un joueur présent quand le bureau n'a rien noté
+const CATEGORIES = ['match', 'entrainement'];
+const FAIR_PLAY_DEFAUT = 5;     // note de fair-play d'un joueur présent quand le bureau n'a rien noté
 const FAIR_PLAY_BONUS = [2, 3];  // bonus proposés au bureau pour un comportement remarquable
 
 const n = (v) => { const x = Number(v); return Number.isFinite(x) ? x : 0; };
@@ -54,7 +55,10 @@ function normaliserRegle(modele, regle) {
   const min = Math.max(1, Math.floor(n(r.min_matchs !== undefined ? r.min_matchs : base.min_matchs)) || 1);
   const poids = { ...(base.poids || {}), ...((r.poids && typeof r.poids === 'object') ? r.poids : {}) };
   Object.keys(poids).forEach(k => { poids[k] = Math.max(0, n(poids[k])); });
-  const out = { min_matchs: min, poids };
+  /* Catégories de rencontres prises en compte : matchs officiels, entraînements entre équipes du club, ou les deux (défaut). */
+  let cats = Array.isArray(r.categories) ? r.categories.filter(c => CATEGORIES.includes(c)) : CATEGORIES.slice();
+  if (!cats.length) cats = CATEGORIES.slice();
+  const out = { min_matchs: min, poids, categories: cats };
   if (modele === 'fairplay') out.fair_play_mode = (r.fair_play_mode || base.fair_play_mode) === 'total' ? 'total' : 'moyenne';
   return out;
 }
@@ -183,4 +187,4 @@ function combinerScoreEtVote(classement, votesParJoueur, poidsVotePct) {
   return { lignes, poids: { score: ps, vote: pv } };
 }
 
-module.exports = { MODELES, POSTES, FAIR_PLAY_DEFAUT, FAIR_PLAY_BONUS, normaliserRegle, classer, combinerScoreEtVote };
+module.exports = { MODELES, POSTES, CATEGORIES, FAIR_PLAY_DEFAUT, FAIR_PLAY_BONUS, normaliserRegle, classer, combinerScoreEtVote };
