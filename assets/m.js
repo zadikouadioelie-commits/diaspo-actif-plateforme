@@ -141,6 +141,18 @@
     daCharger().then(() => window.DAInstall.ouvrir()).catch(() => toast('Installation indisponible pour le moment.', true));
   });
 
+  /* ---------- Partager Diaspo'Actif (2026-10-17, demande explicite) ----------
+     Bouton dans le menu des modules, juste sous "Télécharger" : invite quelqu'un à découvrir
+     la plateforme (lien d'accueil, pas un profil précis). Même mécanique de partage que le
+     reste de l'application (partagerLien, &r= jetonPartage) et même &via= que les autres liens
+     d'invitation de ce fichier, pour que ce partage profite du même suivi si un jour il existe. */
+  const partageBouton = () => `<button type="button" class="btn out block" data-da-partage style="margin:0 0 12px">${ic('share', 's')} Partager Diaspo’Actif</button>`;
+  document.addEventListener('click', e => {
+    const b = e.target.closest && e.target.closest('[data-da-partage]'); if (!b) return;
+    e.preventDefault();
+    partagerLien(location.origin + '/?' + (S.me ? 'via=' + S.me.id + '&' : '') + 'r=' + jetonPartage(), 'Diaspo’Actif — la plateforme mondiale de la diaspora engagée');
+  });
+
   function ago(d) {
     if (!d) return '';
     const t = new Date(String(d).replace(' ', 'T') + (/[zZ]|[+-]\d\d:?\d\d$/.test(String(d)) ? '' : 'Z'));
@@ -2182,7 +2194,7 @@
     const prem = S.premium && S.premium.concerne ? (S.premium.actif ? '👑 Premium actif' : '🔒 Premium expiré') : '';
     const { premium: modsPrem, mods, compte, admin: modsAdmin } = modulesHtml(m);
     const close = openSheet(`<div class="row" style="margin:0 0 6px"><div class="av big" style="width:48px;height:48px">${m.photo_url ? `<img src="${attrUrl(m.photo_url)}" alt="" onerror="this.remove()">` : esc(initials(nm))}</div><div class="sp"><div style="font-weight:700;font-size:17px;line-height:1.2">${esc(nm)}</div><div class="small muted">${esc(ROLE_LABEL[m.role] || m.role)}${prem ? ' · ' + prem : ''}</div></div></div>
-      <div class="h2" style="margin-top:12px">MENU DES MODULES</div>${daBouton()}
+      <div class="h2" style="margin-top:12px">MENU DES MODULES</div>${daBouton()}${partageBouton()}
       <div class="lst"><a class="li" href="#/accueil"><span class="ic">${ic('home')}</span><span class="sp"><span class="t">Accueil</span><br><span class="d">Tutoriels vidéo, actualités, initiatives</span></span><span class="ch">${ic('chev', 's')}</span></a></div>
       ${modsAdmin ? `<div class="h2">🛡 ADMINISTRATION</div><div class="lst">${modsAdmin}</div>` : ''}
       ${modsPrem ? `<div class="h2">⭐ MODULES PREMIUM</div><div class="lst">${modsPrem}</div>` : ''}
@@ -2226,7 +2238,7 @@
     const { premium: modsPrem, mods, compte, admin: modsAdmin } = modulesHtml(m);
     el.innerHTML = `<a class="me" href="#/moi"><div class="av big">${m.photo_url ? `<img src="${attrUrl(m.photo_url)}" alt="" onerror="this.remove()">` : esc(initials(nm))}</div><div class="sp"><div class="nm ell">${esc(nm)}</div><div class="sub">${esc(ROLE_LABEL[m.role] || m.role)}${prem ? ' · ' + prem : ''}</div><div class="sub" style="margin-top:2px">Voir mon profil ›</div>${m.role !== 'utilisateur' && resp && resp !== nm ? `<div class="sub" style="font-size:10.5px;opacity:.7;margin-top:2px">Responsable : ${esc(resp)}</div>` : ''}</div></a>
       <button class="btn out block" id="me-switch" style="margin:10px 0 0">${ic('people', 's')} Changer de compte</button>
-      <div class="mdark"><div class="h2" style="margin-top:0">MENU DES MODULES</div>${daBouton()}
+      <div class="mdark"><div class="h2" style="margin-top:0">MENU DES MODULES</div>${daBouton()}${partageBouton()}
         ${modsAdmin ? `<div class="h2">🛡 ADMINISTRATION</div><div class="lst">${modsAdmin}</div>` : ''}
         ${modsPrem ? `<div class="h2">⭐ MODULES PREMIUM</div><div class="lst">${modsPrem}</div>` : ''}
         <div class="h2">OUTILS</div><div class="lst">${mods}</div>
