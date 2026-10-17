@@ -45724,7 +45724,7 @@ route("POST", "/api/business-plans/:id/media", async (req, res, params) => {
   const { uploadToBunny, parseMultipart } = require("./upload");
   const { fields, files } = parseMultipart(raw, boundaryMatch[1]);
   const kind = fields.type;
-  if (!["photo_principale", "galerie", "video_pitch"].includes(kind)) {
+  if (!["photo_principale", "galerie", "video_pitch", "piece_video"].includes(kind)) {
     return sendJSON(res, 400, { error: "Type de média invalide" });
   }
   const file = files["file"] || files[Object.keys(files)[0]];
@@ -45732,7 +45732,8 @@ route("POST", "/api/business-plans/:id/media", async (req, res, params) => {
   const b = file.buffer;
 
   try {
-    if (kind === "video_pitch") {
+    if (kind === "video_pitch" || kind === "piece_video") {
+      /* piece_video (2026-10-17) : vidéo jointe à une rubrique — même contrôle de type réel et de taille ; seule la vidéo de pitch est écrite dans le plan. */
       /* La durée réelle (≤2 min) n'est vérifiable qu'en décodant la vidéo (ffprobe) —
          absent de ce serveur. Elle est donc vérifiée côté client avant l'envoi ; ici on se
          protège uniquement par le type réel (magic bytes) et une taille max raisonnable. */
@@ -45742,7 +45743,7 @@ route("POST", "/api/business-plans/:id/media", async (req, res, params) => {
       if (!vidType) return sendJSON(res, 400, { error: "Format vidéo non supporté (MP4 ou WebM requis)." });
       const filename = `bp-${bp.id}-video-${Date.now()}.${vidType.split("/")[1]}`;
       const url = await uploadToBunny(b, filename, "business-plans");
-      await db.prepare("UPDATE business_plans SET video_pitch_url=?, updated_at=datetime('now') WHERE id=?").run(url, bp.id);
+      if (kind === "video_pitch") await db.prepare("UPDATE business_plans SET video_pitch_url=?, updated_at=datetime('now') WHERE id=?").run(url, bp.id);
       SEC.logSecurity("upload", { uid: Number(user.id), kind: "bp_video_pitch", bpId: Number(bp.id), size: b.length });
       return sendJSON(res, 200, { url });
     }
@@ -46126,10 +46127,10 @@ app.post('/api/business-plans/:id/commentaires/:section', requireAuth, requireUt
    verifications_organisation le fait pour son propre document_url.
    ═══════════════════════════════════════════════════════════════════ */
 app.get('/api/business-plans/:id/documents', requireAuth, requireUtilisateurAbonneMw, async (req, res) => {
-  const bp = await db.prepare('SELECT user_id FROM business_plans WHERE id=?').get(req.params.id);
+  const bp = await db.prepare('SELECT user_id, is_public FROM business_plans WHERE id=?').get(req.params.id);
   if (!bp) return sendJSON(res, 404, { error: 'Introuvable' });
   const collab = await db.prepare('SELECT role FROM bp_collaborateurs WHERE bp_id=? AND user_id=?').get(req.params.id, req.user.id);
-  if (bp.user_id !== req.user.id && !collab) return sendJSON(res, 403, { error: 'Accès refusé' });
+  if (bp.user_id !== req.user.id && !collab && !bp.is_public) return sendJSON(res, 403, { error: 'Accès refusé' });   /* l'exemple de référence est consultable par tous : ses pièces aussi */
   const section = req.query?.section || null;
   const list = section
     ? await db.prepare('SELECT * FROM bp_documents WHERE bp_id=? AND section_key=? ORDER BY created_at DESC').all(req.params.id, section)
@@ -46145,6 +46146,12 @@ app.post('/api/business-plans/:id/documents', requireAuth, requireUtilisateurAbo
   if (!canEdit) return sendJSON(res, 403, { error: 'Accès refusé' });
   const { section_key, field_key, categorie, nom, url_bunny, type_mime } = await parseBody(req);
   if (!url_bunny || !nom) return sendJSON(res, 400, { error: 'Nom et fichier requis.' });
+  if (field_key === 'piece_jointe') {
+    /* Pièce jointe d'une rubrique (images, vidéos, PDF, Excel…) pour expliciter le rapport : 12 au plus par rubrique, adresse https obligatoire. */
+    if (!/^https:\/\/[^\s]+$/i.test(String(url_bunny))) return sendJSON(res, 400, { error: 'Adresse du fichier invalide.' });
+    const dejaPJ = await db.prepare("SELECT COUNT(*) AS n FROM bp_documents WHERE bp_id=? AND section_key=? AND field_key='piece_jointe'").get(req.params.id, section_key || null);
+    if (Number(dejaPJ?.n || 0) >= 12) return sendJSON(res, 400, { error: 'Douze pièces jointes au maximum par rubrique.' });
+  }
   const CATEGORIES = ['administratif','juridique','financier','commercial','technique','marche','equipe','traction','contrats','certifications','propriete_intellectuelle','temoignages','autre'];
   const cat = CATEGORIES.includes(categorie) ? categorie : 'autre';
   const r = await db.prepare(

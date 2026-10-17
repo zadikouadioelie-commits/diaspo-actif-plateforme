@@ -1154,6 +1154,7 @@ function renderSection(key) {
   };
   const fn = renderers[key] || (() => '<div class="bp-section"><div class="bp-card-inner"><p>Section en cours de développement.</p></div></div>');
   content.innerHTML = fn();
+  if (!def?.noSave && key !== 'completude') { content.insertAdjacentHTML('beforeend', bpPJBloc(key)); bpPJCharger(key); }   /* pièces jointes de la rubrique */
   if (key === 'plan_financier') calcAllFinance();
   if (key === 'produits') (sections.produits?.etude_prix||[]).forEach((_,i)=>calcMargeEtudePrix(i));
   if (key === 'presentation') bpLoadTractionDocs();
@@ -1753,6 +1754,101 @@ async function bpSupprimerPieceJointeMembre(docId) {
   if (!confirm('Supprimer cette pièce jointe ?')) return;
   await api('DELETE', `/business-plans/${bpId}/documents/${docId}`);
   bpChargerDocsMembresEquipe();
+}
+
+/* ---- Pièces jointes par rubrique (2026-10-17, demande explicite) ----
+   Images, vidéos (MP4/WebM ou lien YouTube/Vimeo), tableaux Excel, PDF, Word, PowerPoint, joints à N'IMPORTE QUELLE rubrique pour expliciter le rapport.
+   Mêmes routes que les autres pièces du plan : fichier -> POST /api/upload/document (Bunny, octets magiques vérifiés) ou, pour une vidéo,
+   POST /business-plans/:id/media (type piece_video) ; puis POST /business-plans/:id/documents avec field_key = 'piece_jointe'.
+   Affichées sous la rubrique dans la consultation du plan (business-plan-view.html). */
+const BP_PJ_ACCEPT = 'image/*,video/mp4,video/webm,.pdf,.xls,.xlsx,.doc,.docx,.ppt,.pptx';
+const BP_PJ_ICONES = { image:'🖼️', video:'🎬', lien:'🔗', pdf:'📕', excel:'📊', word:'📘', ppt:'📙', fichier:'📎' };
+function bpPJType(d) {
+  const m = String(d.type_mime || '').toLowerCase(), u = String(d.url_bunny || '').toLowerCase().split('?')[0];
+  if (m === 'video/link') return 'lien';
+  if (m.startsWith('image/') || /\.(jpe?g|png|webp|gif)$/.test(u)) return 'image';
+  if (m.startsWith('video/') || /\.(mp4|webm)$/.test(u)) return 'video';
+  if (m === 'application/pdf' || /\.pdf$/.test(u)) return 'pdf';
+  if (/\.(xlsx?|csv)$/.test(u) || /sheet|excel/.test(m)) return 'excel';
+  if (/\.docx?$/.test(u) || /word/.test(m)) return 'word';
+  if (/\.pptx?$/.test(u) || /powerpoint|presentation/.test(m)) return 'ppt';
+  return 'fichier';
+}
+function bpPJBloc(key) {
+  const ro = monRole === 'lecteur';
+  return `<div class="bp-section" id="bp-pj" style="padding-top:0;"><div class="bp-card-inner">
+    <h3 style="margin:0 0 4px;">📎 Pièces jointes de cette rubrique</h3>
+    <p style="margin:0 0 12px;font-size:12.5px;color:var(--muted);">Joignez des images, des vidéos, des tableaux Excel, des PDF ou des documents Word/PowerPoint pour expliciter ce que vous avancez. Ils s'affichent sous cette rubrique dans la version consultable du plan.</p>
+    <div id="bp-pj-liste" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;"><div style="color:var(--muted);font-size:13px;">Chargement…</div></div>
+    ${ro ? '' : `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;">
+      <button class="btn btn-outline btn-sm" id="bp-pj-add" onclick="bpPJAjouter('${key}')">📎 Joindre un fichier</button>
+      <button class="btn btn-outline btn-sm" onclick="bpPJAjouterLien('${key}')">🔗 Ajouter un lien vidéo (YouTube, Vimeo)</button>
+    </div>
+    <div style="margin-top:8px;font-size:11.5px;color:var(--muted);">Images, MP4/WebM, PDF, Excel, Word, PowerPoint — 12 pièces au plus par rubrique. Fichier trop lourd, ou vidéo volumineuse ? Ajoutez plutôt son lien.</div>`}
+  </div></div>`;
+}
+async function bpPJCharger(key) {
+  const z = document.getElementById('bp-pj-liste'); if (!z) return;
+  let docs = [];
+  try { docs = (await api('GET', `/business-plans/${bpId}/documents?section=${encodeURIComponent(key)}`)).filter(d => d.field_key === 'piece_jointe').sort((a, b) => Number(a.id) - Number(b.id)); }
+  catch (e) { z.innerHTML = '<span style="color:#dc2626;font-size:13px;">Erreur de chargement.</span>'; return; }
+  if (currentSection !== key) return;   // l'utilisateur a changé de rubrique entre-temps
+  z.innerHTML = docs.length ? docs.map(d => {
+    const t = bpPJType(d);
+    const apercu = t === 'image'
+      ? `<a href="${esc(d.url_bunny)}" target="_blank" rel="noopener"><img src="${esc(d.url_bunny)}" alt="" loading="lazy" style="width:100%;height:110px;object-fit:cover;border-radius:10px;display:block;"></a>`
+      : `<a href="${esc(d.url_bunny)}" target="_blank" rel="noopener" style="display:grid;place-items:center;height:110px;border-radius:10px;background:var(--bg);font-size:38px;text-decoration:none;">${BP_PJ_ICONES[t]}</a>`;
+    return `<div style="border:1px solid var(--border);border-radius:12px;padding:8px;background:#fff;">${apercu}
+      <div style="display:flex;gap:6px;align-items:center;margin-top:6px;"><span style="flex:1;min-width:0;font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(d.nom)}">${esc(d.nom)}</span>
+      ${monRole !== 'lecteur' ? `<button onclick="bpPJSupprimer(${d.id},'${key}')" title="Retirer cette pièce" aria-label="Retirer ${esc(d.nom)}" style="background:none;border:none;cursor:pointer;color:var(--muted);">✕</button>` : ''}</div></div>`;
+  }).join('') : '<div style="color:var(--muted);font-size:13px;grid-column:1/-1;">Aucune pièce jointe pour l\'instant.</div>';
+}
+async function bpPJLireReponse(r) {
+  let j = null; try { j = await r.json(); } catch (_) { /* réponse non JSON (ex. refus de taille par l'hébergeur) */ }
+  if (r.status === 413) throw new Error('Fichier trop lourd pour l\'envoi direct (4 Mo sur le site en ligne). Pour une vidéo, ajoutez plutôt son lien YouTube ou Vimeo.');
+  if (!r.ok) throw new Error((j && j.error) || 'Envoi impossible.');
+  return j;
+}
+function bpPJAjouter(key) {
+  if (monRole === 'lecteur') { alert('Lecture seule.'); return; }
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = BP_PJ_ACCEPT;
+  input.onchange = async () => {
+    const file = input.files[0]; if (!file) return;
+    const nom = prompt('Titre de cette pièce (ex. Tableau des ventes 2025) ?', file.name.replace(/\.[^.]+$/, '')) || file.name;
+    const btn = document.getElementById('bp-pj-add'); if (btn) { btn.disabled = true; btn.textContent = '⏳ Envoi…'; }
+    try {
+      const estVideo = /^video\//.test(file.type) || /\.(mp4|webm)$/i.test(file.name);
+      let url, mime = file.type;
+      if (estVideo) {
+        const fd = new FormData(); fd.append('type', 'piece_video'); fd.append('file', file);
+        url = (await bpPJLireReponse(await fetch(`/api/business-plans/${bpId}/media`, { method: 'POST', credentials: 'same-origin', body: fd }))).url;
+      } else {
+        const fichier = await compressIfImage(file, 1600, 1600, 0.85); mime = fichier.type || mime;
+        const fd = new FormData(); fd.append('document', fichier);
+        url = (await bpPJLireReponse(await fetch('/api/upload/document', { method: 'POST', credentials: 'same-origin', body: fd }))).url;
+      }
+      await api('POST', `/business-plans/${bpId}/documents`, { section_key: key, field_key: 'piece_jointe', categorie: 'autre', nom, url_bunny: url, type_mime: mime });
+    } catch (e) { alert(e.message || 'Envoi impossible.'); }
+    if (btn) { btn.disabled = false; btn.textContent = '📎 Joindre un fichier'; }
+    bpPJCharger(key);
+  };
+  input.click();
+}
+async function bpPJAjouterLien(key) {
+  if (monRole === 'lecteur') { alert('Lecture seule.'); return; }
+  const lien = (prompt('Adresse de la vidéo (YouTube, Vimeo ou autre lien https) :') || '').trim();
+  if (!lien) return;
+  if (!/^https:\/\/[^\s]+$/i.test(lien)) { alert('Collez une adresse complète commençant par https://'); return; }
+  const nom = prompt('Titre de cette vidéo ?', 'Vidéo explicative') || 'Vidéo';
+  try { await api('POST', `/business-plans/${bpId}/documents`, { section_key: key, field_key: 'piece_jointe', categorie: 'autre', nom, url_bunny: lien, type_mime: 'video/link' }); }
+  catch (e) { alert(e.message || 'Ajout impossible.'); }
+  bpPJCharger(key);
+}
+async function bpPJSupprimer(id, key) {
+  if (!confirm('Retirer cette pièce jointe ?')) return;
+  try { await api('DELETE', `/business-plans/${bpId}/documents/${id}`); } catch (e) { alert(e.message || 'Suppression impossible.'); }
+  bpPJCharger(key);
 }
 
 /* ---- 2. Résumé exécutif ---- */

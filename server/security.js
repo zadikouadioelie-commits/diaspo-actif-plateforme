@@ -58,7 +58,8 @@ const CSP = [
   /* frame-src : lecteur YouTube intégré dans la modale des vidéos tutoriels (2026-09-18) —
      sans cette directive, "default-src 'self'" bloque silencieusement tout <iframe> vers un
      domaine externe, y compris youtube.com. */
-  "frame-src 'self' https://www.youtube.com",
+  /* + player.vimeo.com (2026-10-17) : vidéos jointes aux rubriques d'un business plan (liens YouTube / Vimeo intégrés). */
+  "frame-src 'self' https://www.youtube.com https://player.vimeo.com",
   "frame-ancestors 'self'",
   "base-uri 'self'",
   "form-action 'self'",
