@@ -7908,6 +7908,110 @@ db.exec(`
 `);
 
 /* ═══════════════════════════════════════════════
+   MARACANA TRACKER (2026-10-17) — suivi des performances d'une association sportive.
+   Tables génériques (utilisables par toute association sportive), nommées tracker_*.
+   Règle : aucune personne mineure ne doit y figurer (attestation du bureau, voir majeur_atteste).
+   ═══════════════════════════════════════════════ */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS tracker_bureau (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    initiative_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    ajoute_par INTEGER,
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(initiative_id, user_id),
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id) ON DELETE CASCADE,
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+  CREATE TABLE IF NOT EXISTS tracker_joueurs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    initiative_id INTEGER NOT NULL,
+    user_id INTEGER,
+    adhesion_membre_id INTEGER,
+    nom TEXT NOT NULL,
+    prenom TEXT,
+    email TEXT,
+    poste_habituel TEXT,
+    majeur_atteste INTEGER NOT NULL DEFAULT 0,
+    majeur_atteste_par INTEGER,
+    majeur_atteste_le TEXT,
+    actif INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id) ON DELETE CASCADE
+  );
+  CREATE TABLE IF NOT EXISTS tracker_matchs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    initiative_id INTEGER NOT NULL,
+    date_match TEXT NOT NULL,
+    adversaire TEXT,
+    lieu TEXT,
+    score_pour INTEGER,
+    score_contre INTEGER,
+    note_bureau TEXT,
+    created_by INTEGER,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id) ON DELETE CASCADE
+  );
+  CREATE TABLE IF NOT EXISTS tracker_notes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    match_id INTEGER NOT NULL,
+    joueur_id INTEGER NOT NULL,
+    equipe TEXT,
+    poste_joue TEXT,
+    buts INTEGER NOT NULL DEFAULT 0,
+    passes INTEGER NOT NULL DEFAULT 0,
+    fair_play INTEGER,
+    observations TEXT,
+    arrets INTEGER NOT NULL DEFAULT 0,
+    buts_encaisses INTEGER NOT NULL DEFAULT 0,
+    note_etoiles REAL,
+    competences_json TEXT,
+    duels_gagnes INTEGER NOT NULL DEFAULT 0,
+    interceptions INTEGER NOT NULL DEFAULT 0,
+    tacles INTEGER NOT NULL DEFAULT 0,
+    updated_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(match_id, joueur_id),
+    FOREIGN KEY(match_id) REFERENCES tracker_matchs(id) ON DELETE CASCADE,
+    FOREIGN KEY(joueur_id) REFERENCES tracker_joueurs(id) ON DELETE CASCADE
+  );
+  CREATE TABLE IF NOT EXISTS tracker_lots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    initiative_id INTEGER NOT NULL,
+    nom TEXT NOT NULL,
+    description TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id) ON DELETE CASCADE
+  );
+  CREATE TABLE IF NOT EXISTS tracker_prix (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    initiative_id INTEGER NOT NULL,
+    nom TEXT NOT NULL,
+    modele TEXT NOT NULL,
+    lot_id INTEGER,
+    periode_debut TEXT,
+    periode_fin TEXT,
+    regle_json TEXT,
+    vote_actif INTEGER NOT NULL DEFAULT 0,
+    poids_vote INTEGER NOT NULL DEFAULT 0,
+    statut TEXT NOT NULL DEFAULT 'ouvert',
+    laureat_joueur_id INTEGER,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id) ON DELETE CASCADE
+  );
+  CREATE TABLE IF NOT EXISTS tracker_historique (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    initiative_id INTEGER NOT NULL,
+    user_id INTEGER,
+    action TEXT NOT NULL,
+    cible TEXT,
+    detail TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id) ON DELETE CASCADE
+  );
+`);
+
+/* ═══════════════════════════════════════════════
    MODULE BUSINESS PLAN — Tables
    ═══════════════════════════════════════════════ */
 db.exec(`

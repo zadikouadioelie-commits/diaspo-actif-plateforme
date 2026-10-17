@@ -19251,6 +19251,9 @@ route("POST", "/api/profil/telephone", async (req, res, params, body) => {
   sendJSON(res, 200, { ok: true, telephone: brut });
 });
 
+/* Maracana Tracker (2026-10-17) — suivi des performances d'une association sportive : toutes ses routes sont dans server/tracker-routes.js. */
+require("./tracker-routes")({ route, db, sendJSON, getCurrentUser, SEC });
+
 /* ---------- Changement de mot de passe (compte connecté) ----------
    N'existait pas avant ce module (seul le flux "mot de passe oublié" par e-mail existait,
    POST /api/auth/reset-password ci-dessus) — exige ici le mot de passe ACTUEL, comme tout
