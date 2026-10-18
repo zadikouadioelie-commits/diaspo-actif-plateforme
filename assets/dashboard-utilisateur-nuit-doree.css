@@ -62,3 +62,6 @@ html body.nd :is(.content .btn,.content button,.content a):focus-visible{outline
   html body.nd #usec-cockpit>#carte-profil-public{grid-column:1;grid-row:3/span 12}
   html body.nd #usec-cockpit>:not(h1):not(#cda-container):not(#carte-profil-public){grid-column:2}
 }
+
+/* Carte « Mon QR Code » : au-dessus de 1100 px elle tient dans la colonne de droite ; en une seule colonne elle n'occupe plus toute la largeur (2026-10-18). */
+@media (max-width:1099px){ html body.nd #usec-cockpit>.card:has(#u-qr-container){max-width:520px} }
