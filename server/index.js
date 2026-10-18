@@ -21504,7 +21504,65 @@ route("GET", "/api/admin/verifications-organisation", async (req, res, params, b
     WHERE vo.statut = ?
     ORDER BY vo.created_at ASC
   `).all(statut);
+  /* Contexte utile à l'agent qui vérifie (2026-10-18) : pays/ville, type de numéro, dénomination légale, titulaire du compte (identité vérifiée ?)
+     et fiches « qui contacter » du pays. Rien de tout cela n'est public. */
+  const fichesPays = await db.prepare("SELECT * FROM pays_verification_fiches WHERE COALESCE(actif,1)=1 ORDER BY pays_nom, organisme").all();
+  for (const d of rows) {
+    try {
+      const ini = await db.prepare("SELECT pays, ville, pays_immatriculation, type_immatriculation, denomination_officielle, owner_user_id FROM initiatives WHERE id=?").get(d.initiative_id);
+      const prop = ini && ini.owner_user_id ? await db.prepare("SELECT nom, prenom, identite_verifiee, is_verified FROM users WHERE id=?").get(ini.owner_user_id) : null;
+      const pays = Immat.nomPays(ini && (ini.pays_immatriculation || ini.pays));
+      d.contexte = ini ? {
+        pays, ville: ini.ville || '', type_numero: Immat.typeEffectif(ini.type_immatriculation, d.numero || '') || '',
+        denomination: ini.denomination_officielle || '',
+        titulaire: prop ? [prop.prenom, prop.nom].filter(Boolean).join(' ') : '', identite_verifiee: !!(prop && (prop.identite_verifiee || prop.is_verified)),
+      } : null;
+      d.fiches_pays = pays ? fichesPays.filter(f => Immat.normaliserPays(f.pays_nom) === Immat.normaliserPays(pays)) : [];
+    } catch (e) { d.contexte = null; d.fiches_pays = []; }
+  }
   sendJSON(res, 200, { demandes: rows });
+});
+
+/* ── Fiches « qui contacter » par pays (2026-10-18) — réservées aux administrateurs ──
+   Pour chaque pays : l'organisme qui tient le registre (greffe, guichet unique…), ses coordonnées et la marche à suivre pour faire confirmer un
+   numéro. Aucune coordonnée n'est pré-remplie : c'est à l'équipe de les saisir après les avoir vérifiées. */
+function nettoyerFichePays(b) {
+  const c = (v, n) => String(v == null ? '' : v).trim().slice(0, n);
+  const f = { pays_nom: c(b.pays_nom, 80), organisme: c(b.organisme, 160), role_organisme: c(b.role_organisme, 160), telephone: c(b.telephone, 60),
+    email: c(b.email, 160), site_web: c(b.site_web, 300), marche_a_suivre: c(b.marche_a_suivre, 2000) };
+  if (!f.pays_nom || !f.organisme) return { erreur: "Le pays et l'organisme sont obligatoires." };
+  if (f.site_web && !/^https?:\/\//i.test(f.site_web)) return { erreur: "L'adresse du site doit commencer par http:// ou https://." };
+  if (f.email && !SEC.isValidEmail(f.email)) return { erreur: "Adresse e-mail invalide." };
+  return { f };
+}
+route("GET", "/api/admin/pays-verification", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  sendJSON(res, 200, { fiches: await db.prepare("SELECT * FROM pays_verification_fiches WHERE COALESCE(actif,1)=1 ORDER BY pays_nom, organisme").all() });
+});
+route("POST", "/api/admin/pays-verification", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  const { f, erreur } = nettoyerFichePays(body || {});
+  if (erreur) return sendJSON(res, 400, { error: erreur });
+  const id = (await db.prepare(`INSERT INTO pays_verification_fiches (pays_nom, organisme, role_organisme, telephone, email, site_web, marche_a_suivre, maj_par) VALUES (?,?,?,?,?,?,?,?)`)
+    .run(f.pays_nom, f.organisme, f.role_organisme || null, f.telephone || null, f.email || null, f.site_web || null, f.marche_a_suivre || null, user.nom || null)).lastInsertRowid;
+  sendJSON(res, 201, { ok: true, id });
+});
+route("PUT", "/api/admin/pays-verification/:id", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  const { f, erreur } = nettoyerFichePays(body || {});
+  if (erreur) return sendJSON(res, 400, { error: erreur });
+  await db.prepare(`UPDATE pays_verification_fiches SET pays_nom=?, organisme=?, role_organisme=?, telephone=?, email=?, site_web=?, marche_a_suivre=?, maj_le=datetime('now'), maj_par=? WHERE id=?`)
+    .run(f.pays_nom, f.organisme, f.role_organisme || null, f.telephone || null, f.email || null, f.site_web || null, f.marche_a_suivre || null, user.nom || null, params.id);
+  sendJSON(res, 200, { ok: true });
+});
+route("DELETE", "/api/admin/pays-verification/:id", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  await db.prepare("UPDATE pays_verification_fiches SET actif=0, maj_le=datetime('now'), maj_par=? WHERE id=?").run(user.nom || null, params.id);
+  sendJSON(res, 200, { ok: true });
 });
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -21535,7 +21593,7 @@ async function verifierImmatriculationAuto(initId, { notifier = true } = {}) {
 
   const nomsSaisis = [init.nom, init.denomination_officielle];
   if (Immat.nomsConcordent(nomsSaisis, r.noms)) {
-    await db.prepare("UPDATE initiatives SET immat_verifiee_ligne=1, immat_verifiee_ligne_le=datetime('now'), immat_nom_registre=? WHERE id=?").run(r.nom, init.id);
+    await db.prepare("UPDATE initiatives SET immat_verifiee_ligne=1, immat_verifiee_ligne_le=datetime('now'), immat_nom_registre=?, immat_verif_mode='registre', immat_verif_le=date('now') WHERE id=?").run(r.nom, init.id);
     // un examen automatique resté ouvert (nom différent, puis nom corrigé) n'a plus d'objet
     try { await db.prepare("UPDATE verifications_organisation SET statut='verifiee', admin_nom='Contrôle automatique', traite_le=datetime('now') WHERE initiative_id=? AND document_type='controle_automatique' AND statut='en_attente'").run(init.id); } catch (_) {}
     if (notifier && init.owner_user_id) await creerNotif(init.owner_user_id, 'immat_verifiee', 'Organisation vérifiée ✅',
@@ -21573,9 +21631,27 @@ route("PUT", "/api/admin/verifications-organisation/:id", async (req, res, param
   if (!["verifiee", "rejetee"].includes(decision)) return sendJSON(res, 400, { error: "Décision invalide." });
   if (decision === "rejetee" && !(motif_rejet || "").trim()) return sendJSON(res, 400, { error: "Motif de rejet requis." });
 
+  /* Niveau de vérification et journal (2026-10-18). « justificatif_seul » = document examiné, aucun contact avec l'autorité ; « appel » / « courriel » /
+     « portail » = confirmé AUPRÈS de l'autorité du pays — il faut alors dire laquelle ET avoir contrôlé que le dirigeant de l'extrait est bien le
+     titulaire du compte (sinon le numéro d'une vraie entreprise pourrait être utilisé par n'importe qui). Sans ces champs (ancienne interface,
+     téléphone) : comportement d'avant, c'est-à-dire justificatif examiné seulement. */
+  const MODES_VERIF = ["justificatif_seul", "appel", "courriel", "portail"];
+  const modeVerif = decision === "verifiee" && MODES_VERIF.includes(body.mode_verification) ? body.mode_verification : "";
+  const cv = (v, n) => String(v == null ? "" : v).trim().slice(0, n);
+  const aupres = cv(body.verifie_aupres_de, 200), interloc = cv(body.contact_interlocuteur, 200), dirigeant = cv(body.dirigeant_nom, 160), notes = cv(body.notes_internes, 2000);
+  const dateVerif = /^\d{4}-\d{2}-\d{2}$/.test(String(body.date_verification || "")) ? body.date_verification : new Date().toISOString().slice(0, 10);
+  if (modeVerif && modeVerif !== "justificatif_seul") {
+    if (!aupres) return sendJSON(res, 400, { error: "Indiquez l'organisme contacté (ex. greffe du tribunal de commerce d'Abidjan)." });
+    if (!body.lien_dirigeant_ok) return sendJSON(res, 400, { error: "Confirmez que le dirigeant indiqué sur l'extrait correspond au titulaire du compte (identité vérifiée) avant de valider." });
+  }
+
   await db.prepare(
     "UPDATE verifications_organisation SET statut=?, motif_rejet=?, admin_id=?, admin_nom=?, traite_le=datetime('now') WHERE id=?"
   ).run(decision, decision === "rejetee" ? motif_rejet.trim() : null, user.id, user.nom, params.id);
+  if (modeVerif) {
+    await db.prepare("UPDATE verifications_organisation SET mode_verification=?, verifie_aupres_de=?, contact_interlocuteur=?, dirigeant_nom=?, lien_dirigeant_ok=?, notes_internes=?, date_verification=? WHERE id=?")
+      .run(modeVerif, aupres || null, interloc || null, dirigeant || null, body.lien_dirigeant_ok ? 1 : 0, notes || null, dateVerif, params.id);
+  }
 
   const init = await db.prepare("SELECT owner_user_id, nom FROM initiatives WHERE id=?").get(demande.initiative_id);
 
@@ -21604,6 +21680,9 @@ route("PUT", "/api/admin/verifications-organisation/:id", async (req, res, param
     }
     /* Organisation hors de France (ou registre indisponible) : le justificatif approuvé par l'équipe vaut vérification du numéro → point « Organisation vérifiée » (2026-10-08). */
     await db.prepare("UPDATE initiatives SET immat_verifiee_ligne=1, immat_verifiee_ligne_le=datetime('now'), immat_nom_registre=COALESCE(immat_nom_registre, 'Justificatif vérifié par l''équipe') WHERE id=? AND COALESCE(immat_verifiee_ligne,0)=0 AND numero_immatriculation IS NOT NULL AND numero_immatriculation<>''").run(demande.initiative_id);
+    /* Niveau affiché publiquement (voir Immat.identificationPublique) : vérifié auprès de l'autorité (appel / courriel / portail), ou justificatif seul. */
+    if (modeVerif) await db.prepare("UPDATE initiatives SET immat_verif_mode=?, immat_verif_organisme=?, immat_verif_le=? WHERE id=?").run(modeVerif, modeVerif === 'justificatif_seul' ? null : aupres, dateVerif, demande.initiative_id);
+    else await db.prepare("UPDATE initiatives SET immat_verif_mode=COALESCE(immat_verif_mode, ?), immat_verif_le=COALESCE(immat_verif_le, date('now')) WHERE id=?").run(examenSansDocument ? 'registre' : 'justificatif_seul', demande.initiative_id);
     if (init?.owner_user_id) {
       try { await db.prepare("DELETE FROM trust_cache WHERE user_id=?").run(init.owner_user_id); } catch (_) {}
       if (examenSansDocument) creerNotif(init.owner_user_id, "immat_verifiee", "Organisation vérifiée ✅",

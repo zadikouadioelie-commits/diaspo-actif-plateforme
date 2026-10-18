@@ -1373,6 +1373,21 @@ db.exec(`
     FOREIGN KEY(admin_id) REFERENCES users(id)
   );
 
+  /* Fiches « qui contacter » par pays (2026-10-18) : organisme qui tient le registre, coordonnées et marche à suivre pour faire confirmer un numéro. */
+  CREATE TABLE IF NOT EXISTS pays_verification_fiches (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    pays_nom TEXT NOT NULL,
+    organisme TEXT NOT NULL,
+    role_organisme TEXT,
+    telephone TEXT,
+    email TEXT,
+    site_web TEXT,
+    marche_a_suivre TEXT,
+    actif INTEGER DEFAULT 1,
+    maj_le TEXT DEFAULT (datetime('now')),
+    maj_par TEXT
+  );
+
   /* Demande de passage "Statut de l'initiative" : En création → Existante, validée par un
      administrateur (voir module Avancement pour le % d'avancement joint en contexte à la
      demande). Une ligne par tentative — historique conservé en cas de refus + nouvel essai. */
@@ -2233,6 +2248,19 @@ const MIGRATIONS = [
   ["initiatives", "pays_immatriculation TEXT"],
   /* Type du numéro d'immatriculation choisi par la personne (RCCM, SIREN, SIRET, RNA, IFU, AUTRE) — 2026-10-08, voir server/immatriculation.js. */
   ["initiatives", "type_immatriculation TEXT"],
+  /* Niveau de vérification du numéro d'immatriculation, affiché publiquement (2026-10-18) : 'registre' (registre officiel interrogé),
+     'appel' / 'courriel' / 'portail' (confirmé par l'équipe auprès de l'autorité du pays), 'justificatif_seul' (document examiné). */
+  ["initiatives", "immat_verif_mode TEXT"],
+  ["initiatives", "immat_verif_organisme TEXT"],
+  ["initiatives", "immat_verif_le TEXT"],
+  /* Journal de vérification d'un dossier (2026-10-18) : jamais public, sauf l'organisme et la date repris sur la fiche de la structure. */
+  ["verifications_organisation", "mode_verification TEXT"],
+  ["verifications_organisation", "verifie_aupres_de TEXT"],
+  ["verifications_organisation", "contact_interlocuteur TEXT"],
+  ["verifications_organisation", "dirigeant_nom TEXT"],
+  ["verifications_organisation", "lien_dirigeant_ok INTEGER DEFAULT 0"],
+  ["verifications_organisation", "notes_internes TEXT"],
+  ["verifications_organisation", "date_verification TEXT"],
   /* Ouverture automatique de la page Premium après le profil public rempli (2026-10-12) : date à laquelle elle a été montrée (une seule fois). */
   ["profil_obligatoire", "abonnement_ouvert_at TEXT"],
   ["initiatives", "taille_structure TEXT"],

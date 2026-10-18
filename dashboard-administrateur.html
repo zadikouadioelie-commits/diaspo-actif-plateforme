@@ -3360,6 +3360,24 @@
           <button class="btn btn-sm btn-outline" id="vo-admin-filtre-verifiee" onclick="loadVerificationsOrganisation('verifiee')">✅ Vérifiées</button>
           <button class="btn btn-sm btn-outline" id="vo-admin-filtre-rejetee" onclick="loadVerificationsOrganisation('rejetee')">❌ Rejetées</button>
         </div>
+        <div style="margin-bottom:14px;">
+          <button class="btn btn-sm btn-outline" onclick="voTogglePaysPanel()">📞 Fiches pays — qui contacter pour vérifier un numéro</button>
+          <div id="vo-pays-panel" style="display:none;margin-top:10px;border:1px solid var(--border,#d0d8e4);border-radius:12px;padding:14px;">
+            <p style="font-size:12.5px;color:var(--muted);margin:0 0 10px;">Pour chaque pays : l'organisme qui tient le registre (greffe, guichet unique…), ses coordonnées et la marche à suivre. Les agents les retrouvent dans chaque dossier du même pays. Saisissez uniquement des coordonnées que vous avez vérifiées.</p>
+            <div id="vo-pays-liste" style="margin-bottom:12px;"></div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px;">
+              <input type="hidden" id="vp-id">
+              <input id="vp-pays" placeholder="Pays * (ex. Côte d'Ivoire)" maxlength="80">
+              <input id="vp-organisme" placeholder="Organisme * (ex. Greffe du tribunal de commerce d'Abidjan)" maxlength="160">
+              <input id="vp-role" placeholder="Rôle (ex. tient le RCCM)" maxlength="160">
+              <input id="vp-tel" placeholder="Téléphone" maxlength="60">
+              <input id="vp-email" placeholder="E-mail" maxlength="160">
+              <input id="vp-site" placeholder="Site (https://…)" maxlength="300">
+            </div>
+            <textarea id="vp-marche" rows="3" maxlength="2000" placeholder="Marche à suivre (ce qu'il faut demander, justificatifs à présenter, délais…)" style="width:100%;margin-top:8px;"></textarea>
+            <div style="margin-top:8px;"><button class="btn btn-sm btn-orange" onclick="voEnregistrerFichePays()">Enregistrer la fiche</button></div>
+          </div>
+        </div>
         <div id="vo-admin-list"><p class="notice">Chargement…</p></div>
       </section>
 
@@ -9277,6 +9295,12 @@ async function loadVerificationsOrganisation(statut){
             <div style="font-weight:700;">${voEsc(d.initiative_nom)} <span style="font-size:11px;font-weight:600;color:var(--muted);">— ${voEsc(d.type_compte)}</span></div>
             <div style="font-size:12px;color:var(--muted);margin-top:2px;">Numéro déclaré : ${d.numero ? voEsc(d.numero) : '—'}</div>
             <div style="font-size:12px;color:var(--muted);">Soumis le ${new Date((d.created_at||'').replace(' ','T')+'Z').toLocaleString('fr-FR')}</div>
+            ${d.contexte ? `<div style="font-size:12px;margin-top:6px;line-height:1.55;">
+              <b>Pays :</b> ${voEsc(d.contexte.pays||'—')}${d.contexte.ville ? ' · ' + voEsc(d.contexte.ville) : ''} · <b>Type de numéro :</b> ${voEsc(d.contexte.type_numero||'—')}<br>
+              ${d.contexte.denomination ? `<b>Dénomination légale :</b> ${voEsc(d.contexte.denomination)}<br>` : ''}
+              <b>Titulaire du compte :</b> ${voEsc(d.contexte.titulaire||'—')} — ${d.contexte.identite_verifiee ? '<span style="color:#15803d;">✅ identité vérifiée</span>' : '<span style="color:#b45309;">⚠️ identité non vérifiée</span>'}</div>` : ''}
+            ${voFichesPaysHTML(d)}
+            ${d.mode_verification ? `<div style="font-size:12px;margin-top:6px;color:#15803d;">✔ ${voEsc(({appel:'Vérifié par appel',courriel:'Vérifié par courriel',portail:'Vérifié sur le portail officiel',justificatif_seul:'Justificatif examiné seulement'})[d.mode_verification]||d.mode_verification)}${d.verifie_aupres_de ? ' auprès de ' + voEsc(d.verifie_aupres_de) : ''}${d.date_verification ? ' le ' + voEsc(d.date_verification) : ''}${d.contact_interlocuteur ? ' (interlocuteur : ' + voEsc(d.contact_interlocuteur) + ')' : ''}${d.admin_nom ? ' — par ' + voEsc(d.admin_nom) : ''}</div>${d.notes_internes ? `<div style="font-size:11.5px;color:var(--muted);">Notes : ${voEsc(d.notes_internes)}</div>` : ''}` : ''}
             ${d.motif_alerte ? `<div style="font-size:12px;color:#92400e;background:#fffbeb;border:1px solid #f59e0b;border-radius:6px;padding:6px 10px;margin-top:6px;">⚠️ ${voEsc(d.motif_alerte)}</div>` : ''}
             ${d.statut === 'rejetee' && d.motif_rejet ? `<div style="font-size:12px;color:#991b1b;margin-top:6px;">Motif du rejet : ${voEsc(d.motif_rejet)}</div>` : ''}
           </div>
@@ -9284,15 +9308,116 @@ async function loadVerificationsOrganisation(statut){
             ${d.document_url ? `<a href="${voEsc(d.document_url)}" target="_blank" rel="noopener" class="btn btn-sm btn-outline">📄 Voir le document</a>` : `<span style="font-size:11.5px;color:var(--muted);max-width:230px;text-align:right;">Contrôle automatique : aucun document (nom différent du registre officiel). Valider confirme le numéro, sans le badge Stripe.</span>`}
             ${d.statut === 'en_attente' ? `
               <div style="display:flex;gap:6px;">
-                <button class="btn btn-sm" style="background:#16a34a;color:#fff;border:none;" onclick="voAdminDecider(${d.id},'verifiee')">✅ Valider</button>
+                <button class="btn btn-sm" style="background:#16a34a;color:#fff;border:none;" onclick="voAdminFormValider(${d.id})">✅ Valider</button>
                 <button class="btn btn-sm btn-outline" style="color:#dc2626;border-color:#dc2626;" onclick="voAdminRejeterPrompt(${d.id})">❌ Rejeter</button>
               </div>` : ''}
           </div>
         </div>
+        ${d.statut === 'en_attente' ? voFormValiderHTML(d) : ''}
       </div>`).join('');
   } catch(e) {
     el.innerHTML = `<p class="notice" style="color:#dc2626;">Erreur : ${voEsc(e.message)}</p>`;
   }
+}
+
+/* Fiche « qui contacter » du pays du dossier (2026-10-18) */
+function voFichesPaysHTML(d){
+  const f = d.fiches_pays || [];
+  const pays = d.contexte && d.contexte.pays;
+  if (!pays) return '';
+  if (!f.length) return `<div style="font-size:11.5px;color:#92400e;margin-top:6px;">Aucune fiche « qui contacter » pour ${voEsc(pays)} — ajoutez-en une dans « 📞 Fiches pays ».</div>`;
+  return `<details style="margin-top:6px;font-size:12px;"><summary style="cursor:pointer;font-weight:700;">📞 Qui contacter — ${voEsc(pays)}</summary>${f.map(x => `
+    <div style="border-left:3px solid var(--orange,#B84C1A);padding:2px 0 2px 8px;margin:6px 0;line-height:1.5;">
+      <b>${voEsc(x.organisme)}</b>${x.role_organisme ? ' — ' + voEsc(x.role_organisme) : ''}<br>
+      ${x.telephone ? '📞 ' + voEsc(x.telephone) + ' ' : ''}${x.email ? '✉️ ' + voEsc(x.email) + ' ' : ''}${x.site_web ? `<a href="${voEsc(x.site_web)}" target="_blank" rel="noopener noreferrer">🌐 site</a>` : ''}
+      ${x.marche_a_suivre ? `<div style="color:var(--muted);white-space:pre-wrap;">${voEsc(x.marche_a_suivre)}</div>` : ''}
+    </div>`).join('')}</details>`;
+}
+
+/* Formulaire de validation : niveau de vérification + journal (2026-10-18) */
+function voFormValiderHTML(d){
+  const i = d.id, auj = new Date().toISOString().slice(0,10);
+  const champ = 'width:100%;padding:7px 9px;border:1px solid var(--border,#d0d8e4);border-radius:7px;margin:3px 0 8px;font-size:12.5px;';
+  return `<div id="vo-form-${i}" style="display:none;margin-top:12px;border:1px solid var(--border,#d0d8e4);border-radius:10px;padding:12px;background:rgba(127,127,127,.06);">
+    <div style="font-weight:800;font-size:13px;margin-bottom:6px;">Valider ce dossier</div>
+    <label style="font-size:12px;font-weight:700;">Comment le numéro a-t-il été vérifié ?</label>
+    <select id="vo-mode-${i}" onchange="voAdminModeChange(${i})" style="${champ}">
+      <option value="justificatif_seul">Justificatif examiné seulement (aucun contact avec l'autorité)</option>
+      <option value="appel">Confirmé par appel téléphonique auprès de l'autorité du pays</option>
+      <option value="courriel">Confirmé par courriel / courrier auprès de l'autorité du pays</option>
+      <option value="portail">Confirmé sur le portail officiel en ligne</option>
+    </select>
+    <div id="vo-detail-${i}" style="display:none;">
+      <label style="font-size:12px;font-weight:700;">Organisme contacté *</label>
+      <input id="vo-aupres-${i}" maxlength="200" placeholder="Ex. Greffe du tribunal de commerce d'Abidjan" style="${champ}">
+      <label style="font-size:12px;font-weight:700;">Interlocuteur (nom, fonction)</label>
+      <input id="vo-interloc-${i}" maxlength="200" style="${champ}">
+      <label style="font-size:12px;font-weight:700;">Date de la vérification</label>
+      <input id="vo-date-${i}" type="date" value="${auj}" style="${champ}">
+      <label style="font-size:12px;font-weight:700;">Dirigeant indiqué sur l'extrait</label>
+      <input id="vo-dirigeant-${i}" maxlength="160" style="${champ}">
+      <label style="font-size:12px;display:flex;gap:7px;align-items:flex-start;margin-bottom:8px;"><input type="checkbox" id="vo-lien-${i}" style="margin-top:2px;"> <span>Le dirigeant correspond au titulaire du compte (identité vérifiée) <b>*</b></span></label>
+      <label style="font-size:12px;font-weight:700;">Notes internes (jamais publiques)</label>
+      <textarea id="vo-notes-${i}" rows="2" maxlength="2000" style="${champ}"></textarea>
+      <div style="font-size:11.5px;color:var(--muted);margin-bottom:8px;">Le profil public affichera : « Vérifié par Diaspo'Actif auprès de [organisme] le [date] ». Les notes, l'interlocuteur et le dirigeant restent internes.</div>
+    </div>
+    <div style="display:flex;gap:6px;"><button class="btn btn-sm" style="background:#16a34a;color:#fff;border:none;" onclick="voAdminConfirmerValidation(${i})">Confirmer la validation</button>
+    <button class="btn btn-sm btn-outline" onclick="document.getElementById('vo-form-${i}').style.display='none'">Annuler</button></div>
+  </div>`;
+}
+function voAdminFormValider(id){ const f = document.getElementById('vo-form-' + id); if (f) f.style.display = f.style.display === 'none' ? 'block' : 'none'; }
+function voAdminModeChange(id){ const m = document.getElementById('vo-mode-' + id).value; document.getElementById('vo-detail-' + id).style.display = m === 'justificatif_seul' ? 'none' : 'block'; }
+async function voAdminConfirmerValidation(id){
+  const v = k => { const e = document.getElementById(`vo-${k}-${id}`); return e ? e.value : ''; };
+  const mode = v('mode');
+  const body = { decision: 'verifiee', mode_verification: mode };
+  if (mode !== 'justificatif_seul') {
+    body.verifie_aupres_de = v('aupres'); body.contact_interlocuteur = v('interloc'); body.date_verification = v('date');
+    body.dirigeant_nom = v('dirigeant'); body.notes_internes = v('notes');
+    body.lien_dirigeant_ok = !!(document.getElementById('vo-lien-' + id) || {}).checked;
+  }
+  try { await api('PUT', `/admin/verifications-organisation/${id}`, body); loadVerificationsOrganisation(); }
+  catch(e) { alert(e.message || 'Erreur.'); }
+}
+
+/* ── Fiches « qui contacter » par pays ── */
+async function voTogglePaysPanel(){
+  const p = document.getElementById('vo-pays-panel');
+  p.style.display = p.style.display === 'none' ? 'block' : 'none';
+  if (p.style.display === 'block') voChargerFichesPays();
+}
+async function voChargerFichesPays(){
+  const el = document.getElementById('vo-pays-liste');
+  try {
+    const r = await api('GET', '/admin/pays-verification');
+    const f = r.fiches || [];
+    window._voFichesPays = f;
+    el.innerHTML = f.length ? f.map(x => `<div style="border:1px solid var(--border,#d0d8e4);border-radius:9px;padding:8px 10px;margin-bottom:6px;font-size:12.5px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+      <div><b>${voEsc(x.pays_nom)}</b> — ${voEsc(x.organisme)}${x.role_organisme ? ' (' + voEsc(x.role_organisme) + ')' : ''}<br><span style="color:var(--muted);">${x.telephone ? '📞 ' + voEsc(x.telephone) + ' ' : ''}${x.email ? '✉️ ' + voEsc(x.email) + ' ' : ''}${x.site_web ? voEsc(x.site_web) : ''}</span></div>
+      <div style="display:flex;gap:5px;"><button class="btn btn-sm btn-outline" onclick="voEditerFichePays(${x.id})">Modifier</button><button class="btn btn-sm btn-outline" style="color:#dc2626;border-color:#dc2626;" onclick="voSupprimerFichePays(${x.id})">Retirer</button></div></div>`).join('')
+      : '<p class="notice">Aucune fiche pour l\'instant. Ajoutez, par exemple, le greffe du tribunal de commerce de Côte d\'Ivoire une fois ses coordonnées vérifiées.</p>';
+  } catch(e) { el.innerHTML = `<p class="notice" style="color:#dc2626;">Erreur : ${voEsc(e.message)}</p>`; }
+}
+function voEditerFichePays(id){
+  const x = (window._voFichesPays || []).find(f => Number(f.id) === Number(id)) || {};
+  const set = (k, v) => { document.getElementById('vp-' + k).value = v || ''; };
+  document.getElementById('vp-id').value = x.id || '';
+  set('pays', x.pays_nom); set('organisme', x.organisme); set('role', x.role_organisme); set('tel', x.telephone); set('email', x.email); set('site', x.site_web); set('marche', x.marche_a_suivre);
+  document.getElementById('vp-pays').focus();
+}
+async function voEnregistrerFichePays(){
+  const g = k => document.getElementById('vp-' + k).value;
+  const body = { pays_nom: g('pays'), organisme: g('organisme'), role_organisme: g('role'), telephone: g('tel'), email: g('email'), site_web: g('site'), marche_a_suivre: g('marche') };
+  const id = g('id');
+  try {
+    await api(id ? 'PUT' : 'POST', '/admin/pays-verification' + (id ? '/' + id : ''), body);
+    ['id','pays','organisme','role','tel','email','site','marche'].forEach(k => { document.getElementById('vp-' + k).value = ''; });
+    voChargerFichesPays();
+  } catch(e) { alert(e.message || 'Erreur.'); }
+}
+async function voSupprimerFichePays(id){
+  if (!confirm('Retirer cette fiche ?')) return;
+  try { await api('DELETE', '/admin/pays-verification/' + id); voChargerFichesPays(); } catch(e) { alert(e.message || 'Erreur.'); }
 }
 
 async function voAdminDecider(id, decision, motif_rejet){

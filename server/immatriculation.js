@@ -162,6 +162,26 @@ const LIENS_REGISTRE = {
 };
 const NOMS_PAYS = { FR: 'France', BE: 'Belgique', CI: "Côte d'Ivoire", SN: 'Sénégal', CA: 'Canada', MA: 'Maroc', TN: 'Tunisie', CM: 'Cameroun', ML: 'Mali',
   BF: 'Burkina Faso', MG: 'Madagascar', GA: 'Gabon', CG: 'Congo', CD: 'RDC', DE: 'Allemagne', GB: 'Royaume-Uni', US: 'États-Unis', CH: 'Suisse' };
+/* Nom d'un pays à partir d'un code (CI) ou d'un nom ; comparaison insensible à la casse et aux accents. */
+function nomPays(v) { const c = String(v || '').trim(); return NOMS_PAYS[c.toUpperCase()] || c; }
+function normaliserPays(v) { return String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(); }
+const dateFr = d => { const m = String(d || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}/${m[2]}/${m[1]}` : ''; };
+/* Niveau de vérification d'un numéro, du plus fort au plus faible : registre officiel > vérifié auprès de l'autorité > justificatif examiné > déclaré. */
+function niveauVerification(ini) {
+  if (!ini.immat_verifiee_ligne) return 'declare';
+  const m = String(ini.immat_verif_mode || '');
+  if (m === 'registre') return 'registre';
+  if (['appel', 'courriel', 'portail'].includes(m)) return 'equipe';
+  if (m === 'justificatif_seul') return 'justificatif';
+  // lignes d'avant le 2026-10-18 : le libellé du registre dit d'où vient la confirmation
+  return String(ini.immat_nom_registre || '') === "Justificatif vérifié par l'équipe" ? 'justificatif' : 'registre';
+}
+function libelleNiveau(niveau, ini) {
+  if (niveau === 'registre') return '✓ Confirmé au registre officiel';
+  if (niveau === 'equipe') return `✓ Vérifié par Diaspo'Actif${ini.immat_verif_organisme ? ' auprès de ' + ini.immat_verif_organisme : ''}${dateFr(ini.immat_verif_le) ? ' le ' + dateFr(ini.immat_verif_le) : ''}`;
+  if (niveau === 'justificatif') return "Justificatif examiné par Diaspo'Actif";
+  return 'Déclaré par la structure';
+}
 function identificationPublique(ini) {
   if (!ini) return null;
   const codePays = String(ini.pays_immatriculation || '').trim();
@@ -171,13 +191,14 @@ function identificationPublique(ini) {
   if (num) {
     const type = typeEffectif(ini.type_immatriculation, num);
     const lien = type && LIENS_REGISTRE[type] ? LIENS_REGISTRE[type](compact(num)) : '';
+    const niveau = niveauVerification(ini);
     numeros.push({ type, libelle: type ? TYPES[type].libelle : "Numéro d'immatriculation", numero: num, confirme: !!ini.immat_verifiee_ligne,
-      lien, registre: lien ? 'Annuaire des entreprises (État français)' : '' });
+      niveau, statut_libelle: libelleNiveau(niveau, ini), lien, registre: lien ? 'Annuaire des entreprises (État français)' : '' });
   }
   const fiscal = String(ini.numero_fiscal || '').trim();
-  if (fiscal) numeros.push({ type: 'FISCAL', libelle: 'Numéro fiscal', numero: fiscal, confirme: false, lien: '', registre: '' });
+  if (fiscal) numeros.push({ type: 'FISCAL', libelle: 'Numéro fiscal', numero: fiscal, confirme: false, niveau: 'declare', statut_libelle: 'Déclaré par la structure', lien: '', registre: '' });
   if (!numeros.length) return null;
   return { pays, nom_legal: String(ini.denomination_officielle || '').trim(), numeros };
 }
 
-module.exports = { identificationPublique, TYPES, compact, luhnValide, cleValide, formatImmatriculation, typeEffectif, validerSaisie, jetons, memeNom, nomsConcordent, chercherRegistre };
+module.exports = { nomPays, normaliserPays, identificationPublique, TYPES, compact, luhnValide, cleValide, formatImmatriculation, typeEffectif, validerSaisie, jetons, memeNom, nomsConcordent, chercherRegistre };

@@ -160,7 +160,7 @@
         const idp = r.identification_publique; if (!idp || !(idp.numeros || []).length) return '';
         const lignes = [];
         if (idp.nom_legal) lignes.push(['Dénomination légale', esc(idp.nom_legal)]);
-        idp.numeros.forEach(n => lignes.push([n.libelle, `<b>${esc(n.numero)}</b><br><span class="small muted">${n.confirme ? '✓ Confirmé par la plateforme' : 'Déclaré par la structure'}</span>${n.lien ? `<br><a href="${esc(attrUrl(n.lien))}" target="_blank" rel="noopener noreferrer">Vérifier au registre ↗</a>` : ''}`]));
+        idp.numeros.forEach(n => lignes.push([n.libelle, `<b>${esc(n.numero)}</b><br><span class="small muted">${esc(n.statut_libelle || (n.confirme ? '✓ Confirmé par la plateforme' : 'Déclaré par la structure'))}</span>${n.lien ? `<br><a href="${esc(attrUrl(n.lien))}" target="_blank" rel="noopener noreferrer">Vérifier au registre ↗</a>` : ''}`]));
         if (idp.pays) lignes.push(['Pays où vérifier', esc(idp.pays)]);
         return sec('Identification officielle', kvs(lignes) + '<p class="small muted" style="margin:8px 2px 0">Ces numéros sont publics : chacun peut les contrôler auprès du registre officiel du pays indiqué.</p>');
       })(),
