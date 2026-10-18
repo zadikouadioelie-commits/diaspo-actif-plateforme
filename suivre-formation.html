@@ -176,6 +176,7 @@ function sfRender(){
         </div>
         <div id="sf-modules-list"></div>
         <div id="sf-att-zone"></div>
+        <div id="sf-cartes-zone"></div>
       </aside>
       <main class="sf-main" id="sf-content"></main>
     </div>
@@ -209,7 +210,16 @@ function sfRender(){
   const rp = document.getElementById('sf-reprendre');
   if (rp) rp.addEventListener('click', () => sfGoTo(Number(p.prochaine_lecon_id)));
   sfRenderAttestation();
+  sfRenderCartes();
   sfRenderContent();
+}
+
+/* Cartes mentales rattachées à la formation par le formateur : consultables (et exportables) par les apprenants inscrits. */
+function sfRenderCartes(){
+  const zone = document.getElementById('sf-cartes-zone');
+  const cartes = (SF_DATA && SF_DATA.cartes_mentales) || [];
+  if (!zone) return;
+  zone.innerHTML = cartes.length ? `<div class="sf-att"><h4>🧠 Carte${cartes.length > 1 ? 's' : ''} mentale${cartes.length > 1 ? 's' : ''}</h4><ul>${cartes.map(c => `<li><a href="carte-mentale.html?id=${encodeURIComponent(c.id)}" target="_blank" rel="noopener">${escH(c.titre)}</a></li>`).join('')}</ul><small>Un résumé visuel de la formation : consultez-le ou exportez-le en image / PDF.</small></div>` : '';
 }
 
 /* Document (attestation / certificat) : conditions restantes, ou accès au document une fois délivré. */

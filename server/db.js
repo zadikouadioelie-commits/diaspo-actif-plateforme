@@ -4724,11 +4724,53 @@ db.exec(`
     date_emission TEXT DEFAULT (datetime('now')),
     statut TEXT DEFAULT 'valide',
     motif_revocation TEXT,
-    created_at TEXT DEFAULT (datetime('now')),
-    FOREIGN KEY(formation_id) REFERENCES formations(id),
-    FOREIGN KEY(user_id) REFERENCES users(id)
+    created_at TEXT DEFAULT (datetime('now'))
   );
   CREATE INDEX IF NOT EXISTS idx_fatt_user ON formation_attestations(user_id);
+`);
+/* Les attestations n'ont volontairement AUCUNE clé étrangère : titre, organisme et nom du titulaire y sont recopiés pour qu'un document reste vérifiable
+   même si la formation ou le compte disparaît ensuite. */
+
+/* Lot 3 « Diaspo'Actif Formation » (2026-10-18) : cartes mentales, prérequis entre formations, parcours de formation. */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS cartes_mentales (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    owner_user_id INTEGER NOT NULL,
+    formation_id INTEGER,
+    titre TEXT NOT NULL,
+    data_json TEXT NOT NULL,
+    nb_noeuds INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_cm_owner ON cartes_mentales(owner_user_id);
+  CREATE INDEX IF NOT EXISTS idx_cm_formation ON cartes_mentales(formation_id);
+
+  CREATE TABLE IF NOT EXISTS formation_prerequis (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    formation_id INTEGER NOT NULL,
+    prerequis_formation_id INTEGER NOT NULL,
+    UNIQUE(formation_id, prerequis_formation_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS formation_parcours (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    owner_user_id INTEGER NOT NULL,
+    titre TEXT NOT NULL,
+    description TEXT,
+    objectif TEXT,
+    statut TEXT DEFAULT 'brouillon',
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+  );
+  CREATE TABLE IF NOT EXISTS formation_parcours_etapes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    parcours_id INTEGER NOT NULL,
+    formation_id INTEGER NOT NULL,
+    ordre INTEGER DEFAULT 0,
+    UNIQUE(parcours_id, formation_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_fpe_parcours ON formation_parcours_etapes(parcours_id);
 `);
 
 /* L'accréditation createur_formations est supprimée : la création de formations est désormais

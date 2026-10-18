@@ -144,6 +144,8 @@
       <a href="#" id="sb-tab-inscriptions">🎓 Mes inscriptions</a>
       <a href="#" id="sb-tab-favoris">⭐ Favoris</a>
       <a href="#" id="sb-tab-certifications">📜 Certifications</a>
+      <a href="#" id="sb-tab-cartes">🧠 Cartes mentales</a>
+      <a href="#" id="sb-tab-parcours">🧭 Parcours</a>
     </aside>
     <main class="content">
 
@@ -251,8 +253,28 @@
         <div class="flex-between" style="margin-bottom:12px;">
           <h2 style="margin:0;">📜 Mes certifications</h2>
         </div>
-        <div class="notice" style="margin-bottom:16px;">📜 Terminez une formation à 100% dans « Mes inscriptions » pour générer votre attestation numérique.</div>
+        <div class="notice" style="margin-bottom:16px;">📜 Votre attestation ou votre certificat est délivré automatiquement dès que vous remplissez les conditions de la formation (activités obligatoires terminées, quiz réussis selon le cas). Chaque document porte un numéro et peut être vérifié par n'importe qui.</div>
         <div id="certifications-list"><div class="notice">Chargement…</div></div>
+      </div>
+
+      <!-- Volet Cartes mentales (lot 3) -->
+      <div id="volet-cartes" style="display:none;">
+        <div class="flex-between" style="margin-bottom:12px;gap:8px;flex-wrap:wrap;">
+          <h2 style="margin:0;">🧠 Mes cartes mentales</h2>
+          <button class="btn btn-sm btn-orange" id="btn-nouvelle-carte">+ Nouvelle carte</button>
+        </div>
+        <div class="notice" style="margin-bottom:16px;">Une carte mentale résume un cours ou prépare un projet : idées, sous-idées, notes et liens. Elle s'enregistre toute seule et s'exporte en image ou en PDF. Les cartes que les formateurs rattachent à une formation suivie se trouvent dans l'espace de suivi de cette formation.</div>
+        <div id="cartes-list"><div class="notice">Chargement…</div></div>
+      </div>
+
+      <!-- Volet Parcours (lot 3) -->
+      <div id="volet-parcours" style="display:none;">
+        <div class="flex-between" style="margin-bottom:12px;gap:8px;flex-wrap:wrap;">
+          <h2 style="margin:0;">🧭 Parcours de formation</h2>
+          <button class="btn btn-sm btn-orange" id="btn-creer-parcours" style="display:none;">+ Créer un parcours</button>
+        </div>
+        <div class="notice" style="margin-bottom:16px;">Un parcours réunit plusieurs formations dans l'ordre pour atteindre un objectif (entreprendre, gérer une initiative, comprendre les démarches…). Certaines formations demandent d'avoir terminé la précédente.</div>
+        <div id="parcours-list"><div class="notice">Chargement…</div></div>
       </div>
 
       <!-- Volet Espace Formateur (visible uniquement après accréditation Créateur de formation) -->
@@ -319,6 +341,8 @@
             <button class="btn btn-sm fb-tab" data-tab="contenu">🧩 Modules &amp; Leçons <span class="fb-help" title="Le contenu pédagogique : organisez vos modules, chapitres et leçons (vidéo, PDF, texte, quiz…).">?</span></button>
             <button class="btn btn-sm fb-tab" data-tab="quiz">📝 Quiz &amp; Évaluations <span class="fb-help" title="Créez des quiz et exercices pour évaluer la progression des apprenants.">?</span></button>
             <button class="btn btn-sm fb-tab" data-tab="certificat">🎓 Certificat <span class="fb-help" title="Activez un certificat de réussite délivré automatiquement à la fin de la formation.">?</span></button>
+            <button class="btn btn-sm fb-tab" data-tab="carte">🧠 Carte mentale <span class="fb-help" title="Un résumé visuel de votre formation, que vos apprenants consultent et exportent.">?</span></button>
+            <button class="btn btn-sm fb-tab" data-tab="prerequis">🧭 Prérequis <span class="fb-help" title="Les formations à terminer avant de pouvoir s'inscrire à celle-ci.">?</span></button>
             <button class="btn btn-sm fb-tab" data-tab="apercu">👁️ Aperçu <span class="fb-help" title="Voyez votre formation exactement comme la verra un apprenant, avant de la publier.">?</span></button>
             <button class="btn btn-sm fb-tab" data-tab="soumission">📤 Soumission <span class="fb-help" title="Vérifiez que tout est prêt puis envoyez votre formation à l'équipe Diaspo'Actif pour validation.">?</span></button>
           </nav>
@@ -682,6 +706,32 @@
           </div>
         </div>
 
+        <!-- Onglet Carte mentale (lot 3) -->
+        <div class="fb-panel" data-fb-panel="carte" style="display:none;">
+          <div class="card">
+            <h3 style="margin:0 0 6px;">🧠 Cartes mentales de la formation</h3>
+            <p style="font-size:13px;color:var(--muted);margin:0 0 12px;line-height:1.5;">Une carte mentale résume visuellement votre formation. Vos apprenants inscrits la consultent dans leur espace de suivi, la parcourent (chaque idée peut renvoyer vers un chapitre ou une leçon) et peuvent l'exporter en image ou en PDF. Vous seul la modifiez.</p>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
+              <button class="btn btn-sm btn-orange" id="fb-carte-plan">✨ Générer depuis le plan de la formation</button>
+              <button class="btn btn-sm btn-outline" id="fb-carte-vide">+ Carte vierge</button>
+            </div>
+            <div id="fb-cartes-list"><div class="notice">Chargement…</div></div>
+          </div>
+        </div>
+
+        <!-- Onglet Prérequis (lot 3) -->
+        <div class="fb-panel" data-fb-panel="prerequis" style="display:none;">
+          <div class="card">
+            <h3 style="margin:0 0 6px;">🧭 Prérequis</h3>
+            <p style="font-size:13px;color:var(--muted);margin:0 0 12px;line-height:1.5;">Choisissez les formations qu'un apprenant doit avoir <strong>terminées</strong> avant de pouvoir s'inscrire à celle-ci. L'inscription est refusée tant qu'elles ne sont pas terminées. Vous pouvez ensuite les réunir dans un <em>parcours</em> (menu « Parcours »).</p>
+            <div id="fb-prerequis-list" style="margin-bottom:12px;"><div class="notice">Chargement…</div></div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+              <select id="fb-prerequis-select" class="input-field" style="flex:1;min-width:220px;"></select>
+              <button class="btn btn-sm btn-orange" id="fb-prerequis-add">+ Ajouter ce prérequis</button>
+            </div>
+          </div>
+        </div>
+
         <!-- Onglet Aperçu -->
         <div class="fb-panel" data-fb-panel="apercu" style="display:none;">
           <div class="notice" style="margin-bottom:14px;">👁️ Cette vue montre exactement ce que verra un apprenant inscrit — utilisez-la pour vérifier le rendu avant de publier. <span class="fb-help" title="L'aperçu se met à jour en temps réel : toute modification enregistrée dans les autres sections apparaît immédiatement ici.">?</span></div>
@@ -773,6 +823,41 @@
 </div>
 
 <div id="fb-tooltip-popup"></div>
+
+<!-- MODALES PARCOURS (lot 3) -->
+<div class="fb-modal-bg" id="modal-parcours-detail" onclick="if(event.target===this) fermerParcoursDetail()">
+  <div class="fb-modal-box" style="width:680px;">
+    <div class="flex-between" style="margin-bottom:12px;">
+      <h3 style="margin:0;" id="pd-titre">Parcours</h3>
+      <button class="btn btn-sm btn-outline" onclick="fermerParcoursDetail()">✕</button>
+    </div>
+    <div id="pd-contenu"><div class="notice">Chargement…</div></div>
+  </div>
+</div>
+
+<div class="fb-modal-bg" id="modal-parcours-edit" onclick="if(event.target===this) fermerParcoursEdit()">
+  <div class="fb-modal-box" style="width:680px;">
+    <div class="flex-between" style="margin-bottom:12px;">
+      <h3 style="margin:0;" id="pe-titre-modale">Créer un parcours</h3>
+      <button class="btn btn-sm btn-outline" onclick="fermerParcoursEdit()">✕</button>
+    </div>
+    <div class="fb-field"><label>Titre du parcours</label><input type="text" id="pe-titre" maxlength="140" placeholder="Ex : Devenir entrepreneur agricole"></div>
+    <div class="fb-field"><label>Objectif <span class="fb-help" title="Une phrase : ce que l'apprenant saura faire à la fin du parcours.">?</span></label><input type="text" id="pe-objectif" maxlength="300" placeholder="Ex : Lancer et gérer son exploitation"></div>
+    <div class="fb-field"><label>Description</label><textarea id="pe-description" rows="3" maxlength="1500"></textarea></div>
+    <div class="fb-field">
+      <label>Formations du parcours, dans l'ordre <span class="fb-help" title="De 2 à 12 formations. Pour imposer l'ordre, déclarez aussi des prérequis dans chaque formation (onglet « Prérequis » de l'éditeur).">?</span></label>
+      <div id="pe-etapes" style="margin-bottom:8px;"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;"><select id="pe-select" class="input-field" style="flex:1;min-width:220px;"></select><button class="btn btn-sm btn-outline" id="pe-ajouter" type="button">+ Ajouter</button></div>
+    </div>
+    <div class="fb-field"><label>Statut</label>
+      <select id="pe-statut"><option value="brouillon">Brouillon (visible de moi seul)</option><option value="publie">Publié (visible de tous — toutes les formations doivent être publiées)</option></select>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px;">
+      <button class="btn btn-sm btn-outline" onclick="fermerParcoursEdit()">Annuler</button>
+      <button class="btn btn-sm btn-orange" id="pe-enregistrer">Enregistrer</button>
+    </div>
+  </div>
+</div>
 
 <!-- MODAL QUESTION DE QUIZ -->
 <div class="fb-modal-bg" id="fb-question-modal-bg" onclick="if(event.target===this) fbCloseQuestionModal()">
@@ -1507,7 +1592,7 @@
   initDevenirFormateur();
 
   // ── Volets Catalogue / Besoins / Mes inscriptions / Favoris / Certifications ──
-  const VOLETS = ['catalogue','besoins','inscriptions','favoris','certifications','espace-formateur'];
+  const VOLETS = ['catalogue','besoins','inscriptions','favoris','certifications','cartes','parcours','espace-formateur'];
   function switchVolet(v){
     VOLETS.forEach(x => {
       document.getElementById('volet-'+x).style.display = (x===v) ? '' : 'none';
@@ -1517,6 +1602,8 @@
     if(v==='inscriptions') loadInscriptions();
     if(v==='favoris') loadFavoris();
     if(v==='certifications') loadCertifications();
+    if(v==='cartes') loadCartesPerso();
+    if(v==='parcours') loadParcours();
     if(v==='espace-formateur') loadMesFormations();
   }
   VOLETS.forEach(v => document.getElementById('sb-tab-'+v).addEventListener('click', e=>{ e.preventDefault(); switchVolet(v); }));
@@ -1977,6 +2064,8 @@
     if(tab==='contenu') fbLoadModules();
     else if(tab==='quiz') fbLoadQuiz();
     else if(tab==='certificat') fbLoadCertificat();
+    else if(tab==='carte') fbLoadCartes();
+    else if(tab==='prerequis') fbLoadPrerequis();
     else if(tab==='apercu') fbLoadApercu();
     else if(tab==='soumission') fbLoadMessages();
     else if(tab==='tarification') mfwRenderCoupons();
@@ -2353,6 +2442,223 @@
       });
       document.getElementById('fb-quiz-titre').value = '';
       fbLoadQuiz();
+    } catch(e){ showMsg(e.message||'Erreur.', 'danger'); }
+  });
+
+  // ════════════════════════════════════════════════════════════════
+  // Lot 3 — Cartes mentales, prérequis et parcours de formation
+  // ════════════════════════════════════════════════════════════════
+  const dateCourte = v => escQ(String(v || '').slice(0, 10));
+
+  // ── Mes cartes mentales (personnelles) ──
+  async function loadCartesPerso(){
+    const el = document.getElementById('cartes-list');
+    if(!await requireLoginForVolet()){ el.innerHTML = '<div class="notice">Connectez-vous pour créer vos cartes mentales.</div>'; return; }
+    try {
+      const { cartes } = await api('GET', '/cartes-mentales');
+      const perso = cartes.filter(c => !c.formation_id);
+      if(!perso.length){ el.innerHTML = '<div class="notice">Aucune carte pour le moment. Cliquez sur « + Nouvelle carte » pour résumer un cours ou préparer un projet.</div>'; return; }
+      el.innerHTML = perso.map(c => `
+        <div class="card" style="margin-bottom:12px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;">
+          <div><strong>🧠 ${escQ(c.titre)}</strong><div style="font-size:12.5px;color:var(--muted);">${c.nb_noeuds} idée${c.nb_noeuds>1?'s':''} · modifiée le ${dateCourte(c.updated_at)}</div></div>
+          <div style="display:flex;gap:8px;"><a class="btn btn-sm btn-orange" href="carte-mentale.html?id=${encodeURIComponent(c.id)}">Ouvrir</a><button class="btn btn-sm btn-outline cm-suppr" data-id="${c.id}" data-titre="${escQ(c.titre)}">🗑️</button></div>
+        </div>`).join('');
+      el.querySelectorAll('.cm-suppr').forEach(b => b.addEventListener('click', async () => {
+        if(!confirm(`Supprimer la carte « ${b.dataset.titre} » ?`)) return;
+        try { await api('DELETE', `/cartes-mentales/${b.dataset.id}`); loadCartesPerso(); } catch(e){ showMsg(e.message||'Erreur.', 'danger'); }
+      }));
+    } catch(e){ el.innerHTML = '<div class="notice">Erreur de chargement.</div>'; }
+  }
+  document.getElementById('btn-nouvelle-carte').addEventListener('click', async () => {
+    if(!await requireLoginForVolet()) return;
+    const titre = prompt('Titre de la carte :', 'Ma carte mentale');
+    if(titre === null) return;
+    try { const r = await api('POST', '/cartes-mentales', { titre: titre.trim() || 'Ma carte mentale' }); location.href = `carte-mentale.html?id=${encodeURIComponent(r.id)}`; }
+    catch(e){ showMsg(e.message||'Erreur.', 'danger'); }
+  });
+
+  // ── Éditeur de formation : cartes de la formation ──
+  async function fbLoadCartes(){
+    const el = document.getElementById('fb-cartes-list');
+    el.innerHTML = '<div class="notice">Chargement…</div>';
+    try {
+      const { cartes } = await api('GET', `/cartes-mentales?formation_id=${fbFormationId}`);
+      if(!cartes.length){ el.innerHTML = '<div class="notice">Aucune carte pour cette formation.</div>'; return; }
+      el.innerHTML = cartes.map(c => `
+        <div class="card" style="margin-bottom:10px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;">
+          <div><strong>🧠 ${escQ(c.titre)}</strong><div style="font-size:12.5px;color:var(--muted);">${c.nb_noeuds} idée${c.nb_noeuds>1?'s':''} · modifiée le ${dateCourte(c.updated_at)}</div></div>
+          <div style="display:flex;gap:8px;"><a class="btn btn-sm btn-orange" href="carte-mentale.html?id=${encodeURIComponent(c.id)}" target="_blank" rel="noopener">Ouvrir</a><button class="btn btn-sm btn-outline fb-cm-suppr" data-id="${c.id}">🗑️</button></div>
+        </div>`).join('');
+      el.querySelectorAll('.fb-cm-suppr').forEach(b => b.addEventListener('click', async () => {
+        if(!confirm('Supprimer cette carte ?')) return;
+        try { await api('DELETE', `/cartes-mentales/${b.dataset.id}`); fbLoadCartes(); } catch(e){ showMsg(e.message||'Erreur.', 'danger'); }
+      }));
+    } catch(e){ el.innerHTML = '<div class="notice">Erreur de chargement.</div>'; }
+  }
+  async function fbCreerCarte(modele){
+    try {
+      const r = await api('POST', '/cartes-mentales', { formation_id: fbFormationId, modele });
+      window.open(`carte-mentale.html?id=${encodeURIComponent(r.id)}`, '_blank', 'noopener');
+      fbLoadCartes();
+    } catch(e){ showMsg(e.message||'Erreur.', 'danger'); }
+  }
+  document.getElementById('fb-carte-plan').addEventListener('click', () => fbCreerCarte('plan'));
+  document.getElementById('fb-carte-vide').addEventListener('click', () => fbCreerCarte('vide'));
+
+  // ── Éditeur de formation : prérequis ──
+  let fbPrerequis = [];
+  async function fbLoadPrerequis(){
+    const el = document.getElementById('fb-prerequis-list');
+    el.innerHTML = '<div class="notice">Chargement…</div>';
+    try {
+      const [{ prerequis }, cat, mes] = await Promise.all([api('GET', `/formations/${fbFormationId}/prerequis`), api('GET', '/formations').catch(()=>({ formations: [] })), api('GET', '/mes-formations').catch(()=>({ formations: [] }))]);
+      fbPrerequis = prerequis;
+      const tous = new Map();
+      [...(cat.formations||[]), ...(mes.formations||[])].forEach(f => { if(String(f.id) !== String(fbFormationId)) tous.set(String(f.id), f); });
+      const deja = new Set(prerequis.map(p => String(p.id)));
+      document.getElementById('fb-prerequis-select').innerHTML = '<option value="">Choisir une formation…</option>' + [...tous.values()].filter(f => !deja.has(String(f.id))).map(f => `<option value="${f.id}">${escQ(f.titre)}</option>`).join('');
+      el.innerHTML = prerequis.length ? prerequis.map(p => `<span class="tag" style="margin:0 6px 6px 0;display:inline-flex;gap:6px;align-items:center;">🧭 ${escQ(p.titre)} <button type="button" class="fb-pre-retirer" data-id="${p.id}" aria-label="Retirer ce prérequis" style="border:0;background:none;cursor:pointer;font-size:14px;line-height:1;">✕</button></span>`).join('') : '<div class="notice" style="padding:12px;">Aucun prérequis : tout le monde peut s\'inscrire.</div>';
+      el.querySelectorAll('.fb-pre-retirer').forEach(b => b.addEventListener('click', () => fbEnregistrerPrerequis(fbPrerequis.filter(p => String(p.id) !== b.dataset.id).map(p => p.id))));
+    } catch(e){ el.innerHTML = '<div class="notice">Erreur de chargement.</div>'; }
+  }
+  async function fbEnregistrerPrerequis(ids){
+    try { await api('PUT', `/formations/${fbFormationId}/prerequis`, { ids }); fbLoadPrerequis(); }
+    catch(e){ showMsg(e.message||'Erreur.', 'danger'); fbLoadPrerequis(); }
+  }
+  document.getElementById('fb-prerequis-add').addEventListener('click', () => {
+    const v = document.getElementById('fb-prerequis-select').value;
+    if(!v){ showMsg('Choisissez une formation.', 'danger'); return; }
+    fbEnregistrerPrerequis([...fbPrerequis.map(p => p.id), Number(v)]);
+  });
+
+  // ── Parcours de formation ──
+  const PARCOURS_STATUT = {
+    termine:    ['✅ Terminée', '#166534', '#dcfce7'],
+    en_cours:   ['▶ En cours', '#c2410c', '#fff3e6'],
+    disponible: ['○ Disponible', '#1d4ed8', '#dbeafe'],
+    verrouille: ['🔒 Verrouillée', '#475569', '#e2e8f0'],
+  };
+  let parcoursPeutCreer = false, parcoursEdition = null, parcoursChoix = [];
+  async function loadParcours(){
+    const el = document.getElementById('parcours-list');
+    try {
+      const me = await fetchCurrentUser();
+      parcoursPeutCreer = !!me && ['administrateur','partenaire','initiative'].includes(me.role);
+      document.getElementById('btn-creer-parcours').style.display = parcoursPeutCreer ? '' : 'none';
+      const { parcours } = await api('GET', '/parcours-formation');
+      if(!parcours.length){ el.innerHTML = '<div class="notice">Aucun parcours pour le moment.</div>'; return; }
+      el.innerHTML = parcours.map(p => `
+        <div class="card" style="margin-bottom:14px;">
+          <div class="flex-between" style="gap:8px;flex-wrap:wrap;align-items:flex-start;">
+            <div style="flex:1;min-width:220px;">
+              <h3 style="margin:0 0 4px;">🧭 ${escQ(p.titre)} ${p.mien && p.statut !== 'publie' ? '<span class="tag">Brouillon</span>' : ''}</h3>
+              ${p.objectif ? `<p style="margin:0 0 6px;font-size:13px;"><strong>Objectif :</strong> ${escQ(p.objectif)}</p>` : ''}
+              <p style="margin:0;color:var(--muted);font-size:13px;">${p.nb_etapes} formation${p.nb_etapes>1?'s':''} : ${p.titres.map(escQ).join(' → ')}</p>
+            </div>
+            <span class="tag">${p.termine ? '🏆 Parcours terminé' : `${p.nb_termine}/${p.nb_etapes} terminée${p.nb_termine>1?'s':''}`}</span>
+          </div>
+          <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-sm btn-orange pc-voir" data-id="${p.id}">Voir le parcours</button>
+            ${p.mien ? `<button class="btn btn-sm btn-outline pc-modif" data-id="${p.id}">✏️ Modifier</button><button class="btn btn-sm btn-outline pc-suppr" data-id="${p.id}" data-titre="${escQ(p.titre)}" style="color:#dc2626;border-color:#fca5a5;">🗑️ Supprimer</button>` : ''}
+          </div>
+        </div>`).join('');
+      el.querySelectorAll('.pc-voir').forEach(b => b.addEventListener('click', () => ouvrirParcours(b.dataset.id)));
+      el.querySelectorAll('.pc-modif').forEach(b => b.addEventListener('click', () => ouvrirEditionParcours(b.dataset.id)));
+      el.querySelectorAll('.pc-suppr').forEach(b => b.addEventListener('click', async () => {
+        if(!confirm(`Supprimer le parcours « ${b.dataset.titre} » ? Les formations ne sont pas supprimées.`)) return;
+        try { await api('DELETE', `/parcours-formation/${b.dataset.id}`); loadParcours(); } catch(e){ showMsg(e.message||'Erreur.', 'danger'); }
+      }));
+    } catch(e){ el.innerHTML = '<div class="notice">Erreur de chargement.</div>'; }
+  }
+  function fermerParcoursDetail(){ document.getElementById('modal-parcours-detail').classList.remove('open'); }
+  async function ouvrirParcours(id){
+    document.getElementById('modal-parcours-detail').classList.add('open');
+    const c = document.getElementById('pd-contenu');
+    c.innerHTML = '<div class="notice">Chargement…</div>';
+    try {
+      const d = await api('GET', `/parcours-formation/${id}`);
+      document.getElementById('pd-titre').textContent = d.parcours.titre;
+      c.innerHTML = `
+        ${d.parcours.objectif ? `<p style="margin:0 0 6px;"><strong>Objectif :</strong> ${escQ(d.parcours.objectif)}</p>` : ''}
+        ${d.parcours.description ? `<p style="margin:0 0 12px;color:var(--muted);font-size:13.5px;white-space:pre-line;">${escQ(d.parcours.description)}</p>` : ''}
+        <div style="margin:0 0 14px;font-weight:700;">${d.termine ? '🏆 Parcours terminé, bravo !' : `${d.nb_termine}/${d.nb_etapes} formation${d.nb_etapes>1?'s':''} terminée${d.nb_termine>1?'s':''}`}</div>
+        ${d.etapes.map((e, i) => {
+          const st = PARCOURS_STATUT[e.statut] || PARCOURS_STATUT.disponible;
+          const f = e.formation;
+          return `<div class="card" style="margin-bottom:10px;${d.prochaine_formation_id === f.id ? 'border:2px solid var(--orange,#ff6b00);' : ''}">
+            <div class="flex-between" style="gap:8px;flex-wrap:wrap;align-items:flex-start;">
+              <div style="flex:1;min-width:200px;"><div style="font-size:12px;color:var(--muted);">Étape ${i+1}${d.prochaine_formation_id === f.id ? ' · <strong style="color:var(--orange,#ff6b00);">à suivre maintenant</strong>' : ''}</div>
+                <strong>${escQ(f.titre)}</strong>
+                <div style="font-size:12.5px;color:var(--muted);">${f.gratuit ? 'Gratuite' : `${f.prix} ${escQ(f.devise)}`}${f.niveau ? ' · ' + escQ(f.niveau) : ''}${f.duree ? ' · ' + escQ(f.duree) : ''}</div></div>
+              <span style="font-size:12px;font-weight:800;padding:3px 10px;border-radius:99px;color:${st[1]};background:${st[2]};">${st[0]}${e.statut==='en_cours' ? ` · ${e.avancement_pct}%` : ''}</span>
+            </div>
+            ${e.indisponible ? '<div style="font-size:12.5px;color:#b45309;margin-top:6px;">Cette formation n\'est plus disponible.</div>' : ''}
+            ${e.statut === 'verrouille' ? `<div style="font-size:12.5px;color:var(--muted);margin-top:6px;">🔒 À terminer d'abord : ${e.prerequis_manquants.map(m => '« ' + escQ(m.titre) + ' »').join(', ')}</div>` : ''}
+            <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
+              ${e.statut === 'disponible' && !e.indisponible ? `<button class="btn btn-sm btn-orange pd-inscrire" data-id="${f.id}">S'inscrire${f.gratuit ? '' : ' (' + f.prix + ' ' + escQ(f.devise) + ')'}</button>` : ''}
+              ${e.statut === 'en_cours' || e.statut === 'termine' ? `<a class="btn btn-sm btn-outline" href="suivre-formation.html?id=${encodeURIComponent(f.id)}">${e.statut === 'termine' ? 'Revoir' : 'Continuer'}</a>` : ''}
+            </div>
+          </div>`;
+        }).join('')}`;
+      c.querySelectorAll('.pd-inscrire').forEach(b => b.addEventListener('click', async () => {
+        if(!await requireLoginForVolet()) return;
+        try {
+          const r = await api('POST', `/formations/${b.dataset.id}/inscrire`, {});
+          if(r.checkout_url){ location.href = r.checkout_url; return; }
+          showMsg('Inscription confirmée.', 'success'); ouvrirParcours(id); loadParcours();
+        } catch(e){ showMsg(e.message||'Inscription impossible.', 'danger'); }
+      }));
+    } catch(e){ c.innerHTML = `<div class="notice">${escQ(e.message || 'Parcours introuvable.')}</div>`; }
+  }
+
+  function fermerParcoursEdit(){ document.getElementById('modal-parcours-edit').classList.remove('open'); }
+  function rendreEtapesEdition(){
+    const el = document.getElementById('pe-etapes');
+    el.innerHTML = parcoursChoix.length ? parcoursChoix.map((f, i) => `<div style="display:flex;gap:6px;align-items:center;padding:6px 0;border-bottom:1px dashed var(--border);">
+        <span style="width:22px;color:var(--muted);">${i+1}.</span><span style="flex:1;">${escQ(f.titre)}${f.statut && f.statut !== 'publiee' ? ' <span class="tag">non publiée</span>' : ''}</span>
+        <button type="button" class="btn btn-sm btn-outline pe-haut" data-i="${i}" ${i===0?'disabled':''} aria-label="Monter">↑</button>
+        <button type="button" class="btn btn-sm btn-outline pe-bas" data-i="${i}" ${i===parcoursChoix.length-1?'disabled':''} aria-label="Descendre">↓</button>
+        <button type="button" class="btn btn-sm btn-outline pe-retirer" data-i="${i}" aria-label="Retirer">✕</button></div>`).join('') : '<div class="notice" style="padding:10px;">Aucune formation ajoutée.</div>';
+    el.querySelectorAll('.pe-haut').forEach(b => b.addEventListener('click', () => { const i = +b.dataset.i; [parcoursChoix[i-1], parcoursChoix[i]] = [parcoursChoix[i], parcoursChoix[i-1]]; rendreEtapesEdition(); }));
+    el.querySelectorAll('.pe-bas').forEach(b => b.addEventListener('click', () => { const i = +b.dataset.i; [parcoursChoix[i+1], parcoursChoix[i]] = [parcoursChoix[i], parcoursChoix[i+1]]; rendreEtapesEdition(); }));
+    el.querySelectorAll('.pe-retirer').forEach(b => b.addEventListener('click', () => { parcoursChoix.splice(+b.dataset.i, 1); rendreEtapesEdition(); majSelectParcours(); }));
+  }
+  let parcoursCatalogue = [];
+  function majSelectParcours(){
+    const pris = new Set(parcoursChoix.map(f => String(f.id)));
+    document.getElementById('pe-select').innerHTML = '<option value="">Choisir une formation…</option>' + parcoursCatalogue.filter(f => !pris.has(String(f.id))).map(f => `<option value="${f.id}">${escQ(f.titre)}${f.statut && f.statut !== 'publiee' ? ' (non publiée)' : ''}</option>`).join('');
+  }
+  async function ouvrirEditionParcours(id){
+    const [cat, mes] = await Promise.all([api('GET', '/formations').catch(()=>({ formations: [] })), api('GET', '/mes-formations').catch(()=>({ formations: [] }))]);
+    const m = new Map(); [...(cat.formations||[]), ...(mes.formations||[])].forEach(f => m.set(String(f.id), f));
+    parcoursCatalogue = [...m.values()];
+    parcoursEdition = id || null; parcoursChoix = [];
+    ['pe-titre','pe-objectif','pe-description'].forEach(x => document.getElementById(x).value = '');
+    document.getElementById('pe-statut').value = 'brouillon';
+    document.getElementById('pe-titre-modale').textContent = id ? 'Modifier le parcours' : 'Créer un parcours';
+    if(id){
+      try {
+        const d = await api('GET', `/parcours-formation/${id}`);
+        document.getElementById('pe-titre').value = d.parcours.titre; document.getElementById('pe-objectif').value = d.parcours.objectif || '';
+        document.getElementById('pe-description').value = d.parcours.description || ''; document.getElementById('pe-statut').value = d.parcours.statut;
+        parcoursChoix = d.etapes.map(e => ({ id: e.formation.id, titre: e.formation.titre, statut: e.formation.statut }));
+      } catch(e){ showMsg(e.message||'Erreur.', 'danger'); return; }
+    }
+    rendreEtapesEdition(); majSelectParcours();
+    document.getElementById('modal-parcours-edit').classList.add('open');
+  }
+  document.getElementById('btn-creer-parcours').addEventListener('click', () => ouvrirEditionParcours(null));
+  document.getElementById('pe-ajouter').addEventListener('click', () => {
+    const v = document.getElementById('pe-select').value; if(!v) return;
+    const f = parcoursCatalogue.find(x => String(x.id) === String(v)); if(!f) return;
+    parcoursChoix.push({ id: f.id, titre: f.titre, statut: f.statut }); rendreEtapesEdition(); majSelectParcours();
+  });
+  document.getElementById('pe-enregistrer').addEventListener('click', async () => {
+    const corps = { titre: document.getElementById('pe-titre').value.trim(), objectif: document.getElementById('pe-objectif').value.trim(), description: document.getElementById('pe-description').value.trim(), statut: document.getElementById('pe-statut').value, formation_ids: parcoursChoix.map(f => Number(f.id)) };
+    try {
+      if(parcoursEdition) await api('PUT', `/parcours-formation/${parcoursEdition}`, corps);
+      else await api('POST', '/parcours-formation', corps);
+      fermerParcoursEdit(); showMsg('Parcours enregistré.', 'success'); loadParcours();
     } catch(e){ showMsg(e.message||'Erreur.', 'danger'); }
   });
 

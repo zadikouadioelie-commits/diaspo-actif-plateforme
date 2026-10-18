@@ -189,6 +189,7 @@ async function nomOrganisme(deps, f) {
 
 /* Prénom + initiale du nom : la page publique de vérification n'expose pas l'identité complète. */
 function nomPublic(nomComplet) {
+  if (String(nomComplet || "").trim() === "Compte supprimé") return "Compte supprimé";
   const parts = String(nomComplet || "").trim().split(/\s+/).filter(Boolean);
   if (parts.length <= 1) return parts[0] || "";
   return `${parts[0]} ${parts[parts.length - 1].charAt(0).toUpperCase()}.`;

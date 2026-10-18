@@ -2121,6 +2121,10 @@ async function executerSuppressionCompte(userId, drId) {
     WHERE id=?
   `).run(anonEmail, hash, salt, userId);
 
+  /* Formation : le nom du titulaire est recopié dans formation_attestations (le document reste vérifiable, sans identité) ; les cartes mentales personnelles sont effacées. */
+  try { await db.prepare("UPDATE formation_attestations SET apprenant_nom='Compte supprimé' WHERE user_id=?").run(userId); } catch (_) {}
+  try { await db.prepare("DELETE FROM cartes_mentales WHERE owner_user_id=? AND formation_id IS NULL").run(userId); } catch (_) {}
+
   const init = await db.prepare("SELECT id FROM initiatives WHERE owner_user_id=?").get(userId);
   if (init) {
     await db.prepare(`
@@ -3242,6 +3246,11 @@ TutoPartage.register({ route, db, sendJSON, getCurrentUser, SEC, nomCompteAffich
    checkFormationOwner, creerNotif et nomCompteAffichage sont des déclarations de fonction (hissées). */
 const FormationParcours = require("./formation-parcours");
 FormationParcours.register({ route, db, sendJSON, getCurrentUser, SEC, checkFormationOwner, creerNotif, nomCompteAffichage });
+/* Lot 3 : cartes mentales (server/cartes-mentales.js) et prérequis + parcours de formation (server/parcours-formation.js). */
+const CartesMentales = require("./cartes-mentales");
+CartesMentales.register({ route, db, sendJSON, getCurrentUser, SEC, checkFormationOwner });
+const ParcoursFormation = require("./parcours-formation");
+ParcoursFormation.register({ route, db, sendJSON, getCurrentUser, checkFormationOwner });
 /* Envoyer un événement par e-mail (carte complète) + texte d'aperçu du lien (date, lieu) : server/partage-evenement.js. urlImagePartageEvenement est une déclaration de fonction (hissée). */
 const PartageEvenement = require("./partage-evenement");
 PartageEvenement.register({ route, db, sendJSON, getCurrentUser, SEC, nomCompteAffichage, getOrigin, urlImagePartageEvenement });
@@ -17656,8 +17665,13 @@ route("DELETE", "/api/formations/:id/coupons/:couponId", async (req, res, params
 async function cascadeDeleteFormation(id) {
   const quizIds = (await db.prepare("SELECT id FROM formation_quiz WHERE formation_id=?").all(id)).map(q => q.id);
   for (const qid of quizIds) {
+    await db.prepare("DELETE FROM formation_quiz_tentatives WHERE quiz_id=?").run(qid);
     await db.prepare("DELETE FROM formation_quiz_questions WHERE quiz_id=?").run(qid);
   }
+  /* Lot 3 : cartes de la formation, prérequis (dans les deux sens) et places dans des parcours. Les attestations délivrées, elles, sont CONSERVÉES (vérifiables, sans clé étrangère). */
+  await db.prepare("DELETE FROM cartes_mentales WHERE formation_id=?").run(id);
+  await db.prepare("DELETE FROM formation_prerequis WHERE formation_id=? OR prerequis_formation_id=?").run(id, id);
+  await db.prepare("DELETE FROM formation_parcours_etapes WHERE formation_id=?").run(id);
   await db.prepare("DELETE FROM formation_quiz WHERE formation_id=?").run(id);
   try { await db.prepare("DELETE FROM formation_lecons_progression WHERE inscription_id IN (SELECT id FROM formation_inscriptions WHERE formation_id=?)").run(id); } catch(_) {}
   await db.prepare("DELETE FROM formation_lecons WHERE module_id IN (SELECT id FROM formation_modules WHERE formation_id=?)").run(id);
@@ -17755,8 +17769,9 @@ route("GET", "/api/formations/:id/suivre", async (req, res, params) => {
     attestation = a ? FormationParcours.vueAttestation(a) : null;
   }
   const typeDoc = FormationParcours.typeValide(f.certificat_type);
+  const cartesMentales = await CartesMentales.cartesDeFormation(db, f.id);
   sendJSON(res, 200, {
-    formation: f, modules: parcours.modules, avancement_pct: parcours.avancement_pct, mode: inscription ? 'apprenant' : 'apercu', inscription_id: inscription ? inscription.id : null,
+    formation: f, modules: parcours.modules, cartes_mentales: cartesMentales, avancement_pct: parcours.avancement_pct, mode: inscription ? 'apprenant' : 'apercu', inscription_id: inscription ? inscription.id : null,
     parcours: {
       statut: parcours.statut, nb_total: parcours.nb_total, nb_termine: parcours.nb_termine, nb_restant: parcours.nb_restant,
       chapitres_total: parcours.chapitres_total, chapitres_termines: parcours.chapitres_termines, prochaine_lecon_id: parcours.prochaine_lecon_id,
@@ -18137,6 +18152,9 @@ route("POST", "/api/formations/:id/inscrire", async (req, res, params, body) => 
   if (f.date_suppression_prevue) return sendJSON(res, 400, { error: "Les inscriptions sont fermées : cette formation sera bientôt retirée du catalogue." });
   const deja = await db.prepare("SELECT id FROM formation_inscriptions WHERE formation_id=? AND user_id=?").get(params.id, user.id);
   if (deja) return sendJSON(res, 409, { error: "Déjà inscrit." });
+  /* Prérequis (lot 3) : les formations exigées doivent être terminées AVANT l'inscription — contrôle serveur. */
+  const manquants = await ParcoursFormation.prerequisManquants(db, f.id, user.id);
+  if (manquants.length) return sendJSON(res, 403, { error: `Cette formation demande d'abord de terminer : ${manquants.map(m => `« ${m.titre} »`).join(', ')}.`, code: 'prerequis_manquants', prerequis: manquants });
   let montant = 0, acces_gratuit = 0, code_valide = null;
   if (f.mode_acces === 'payant_sauf_membres') {
     const code = (body.code||'').trim().toUpperCase();
