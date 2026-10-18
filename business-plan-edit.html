@@ -543,7 +543,8 @@ body.bp-type-agriculture .bp-conditionnel-agriculture { display: block; }
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@4.0.1/dist/pptxgen.bundle.js"></script>
 <!-- Fonctions de calcul pures (2026-09-01, consolidation) -- voir assets/business-plan-calc.js
      pour le pourquoi (testabilité, fin de la duplication de logique). -->
-<script src="assets/business-plan-calc.js"></script>
+<script src="assets/business-plan-calc.js?v=2"></script>
+<script src="assets/business-plan-excel.js?v=1"></script>
 <script src="assets/bp-test-questions.js?v=1"></script>
 <script>
 /* ===================================================
@@ -3377,14 +3378,16 @@ function renderFinancier() {
       </div>
     </div>
 
+    ${bpExcelHTML()}
+
     <div class="bp-card-inner"><h3>Investissements initiaux</h3><div class="fg">
       <div>${field('investissement_initial',`Investissement total requis (${bpDeviseRefSymbole()})`,'','number').replace("oninput=\"updateField('investissement_initial',this.value)\"","oninput=\"updateField('investissement_initial',this.value);calcAllFinance()\"")}${provenanceWidget('plan_financier','investissement_initial')}</div>
       ${field('apport_personnel',`Apport personnel / fonds propres (${bpDeviseRefSymbole()})`,'','number').replace("oninput=\"updateField('apport_personnel',this.value)\"","oninput=\"updateField('apport_personnel',this.value);calcAllFinance()\"")}
       ${field('financement_recherche',`Financement externe recherché (${bpDeviseRefSymbole()})`,'','number').replace("oninput=\"updateField('financement_recherche',this.value)\"","oninput=\"updateField('financement_recherche',this.value);calcAllFinance()\"")}
       ${textarea('immobilisations','Détail des immobilisations','Équipements, locaux, brevets…',3,true)}
       ${textarea('bfr','Besoin en fonds de roulement (BFR)','Explication et montant…',2,true).replace("oninput=\"updateField('bfr',this.value)\"","oninput=\"updateField('bfr',this.value);calcAllFinance()\"")}
-      ${field('delai_paiement_clients','Délai de paiement clients','Ex : 30 jours')}
-      ${field('delai_paiement_fournisseurs','Délai de paiement fournisseurs','Ex : 45 jours')}
+      ${field('delai_paiement_clients','Délai de paiement clients','Ex : 30 jours').replace("oninput=\"updateField('delai_paiement_clients',this.value)\"","oninput=\"updateField('delai_paiement_clients',this.value);calcAllFinance()\"")}
+      ${field('delai_paiement_fournisseurs','Délai de paiement fournisseurs','Ex : 45 jours').replace("oninput=\"updateField('delai_paiement_fournisseurs',this.value)\"","oninput=\"updateField('delai_paiement_fournisseurs',this.value);calcAllFinance()\"")}
       ${field('duree_stockage','Durée de stockage','Ex : 20 jours')}
       ${field('creances_clients','Créances clients','','number').replace("oninput=\"updateField('creances_clients',this.value)\"","oninput=\"updateField('creances_clients',this.value);calcAllFinance()\"")}
       ${field('dettes_fournisseurs','Dettes fournisseurs','','number').replace("oninput=\"updateField('dettes_fournisseurs',this.value)\"","oninput=\"updateField('dettes_fournisseurs',this.value);calcAllFinance()\"")}
@@ -3411,6 +3414,8 @@ function renderFinancier() {
       <div id="dettes-list">${renderDettes(s.dettes || [{ nom:'' }])}</div>
     </div>
 
+    ${bpFiscalHTML(s)}
+
     <div class="bp-card-inner">
       <h3>Compte de résultat prévisionnel</h3>
       <div style="overflow-x:auto;">
@@ -3429,7 +3434,14 @@ function renderFinancier() {
             <tr><td>Autres charges</td>${annees.map((_,i)=>`<td>${finInput('autres_charges',i+1)}</td>`).join('')}</tr>
             <tr style="color:var(--muted);"><td>+ Amortissements <span style="font-size:10.5px;">(calculé depuis les immobilisations ci-dessus, s'ajoute aux charges)</span></td>${annees.map((_,i)=>`<td id="fin-amort-${i+1}">—</td>`).join('')}</tr>
             <tr style="color:var(--muted);"><td>+ Intérêts d'emprunt <span style="font-size:10.5px;">(calculé depuis les emprunts ci-dessus, s'ajoute aux charges)</span></td>${annees.map((_,i)=>`<td id="fin-interets-${i+1}">—</td>`).join('')}</tr>
-            <tr class="total-row" id="fin-resultat-row"><td>RÉSULTAT NET <span style="font-size:10.5px;font-weight:400;">(inclut amortissements + intérêts ci-dessus)</span></td>${annees.map((_,i)=>`<td id="fin-res-${i+1}">—</td>`).join('')}</tr>
+            <tr class="total-row" id="fin-resultat-row"><td id="fin-resultat-label">RÉSULTAT NET <span style="font-size:10.5px;font-weight:400;">(inclut amortissements + intérêts ci-dessus)</span></td>${annees.map((_,i)=>`<td id="fin-res-${i+1}">—</td>`).join('')}</tr>
+            <tr id="fin-impot-row" style="display:none;color:var(--muted);"><td id="fin-impot-label">− Impôt sur le résultat</td>${annees.map((_,i)=>`<td id="fin-impot-${i+1}">—</td>`).join('')}</tr>
+            <tr class="total-row" id="fin-net-row" style="display:none;"><td>RÉSULTAT NET <span style="font-size:10.5px;font-weight:400;">(après impôt)</span></td>${annees.map((_,i)=>`<td id="fin-net-${i+1}">—</td>`).join('')}</tr>
+            <tr class="header-row fin-tva-row" style="display:none;"><td colspan="6">TVA (montants saisis hors taxe)</td></tr>
+            <tr class="fin-tva-row" style="display:none;"><td>TVA collectée</td>${annees.map((_,i)=>`<td id="fin-tvac-${i+1}">—</td>`).join('')}</tr>
+            <tr class="fin-tva-row" style="display:none;"><td>TVA déductible</td>${annees.map((_,i)=>`<td id="fin-tvad-${i+1}">—</td>`).join('')}</tr>
+            <tr class="fin-tva-row" style="display:none;"><td>TVA à reverser (négatif = crédit de TVA)</td>${annees.map((_,i)=>`<td id="fin-tvas-${i+1}">—</td>`).join('')}</tr>
+            <tr class="fin-tva-row" style="display:none;"><td>Chiffre d'affaires TTC</td>${annees.map((_,i)=>`<td id="fin-ttc-${i+1}">—</td>`).join('')}</tr>
           </tbody>
         </table>
       </div>
@@ -3493,7 +3505,7 @@ function renderFinancier() {
     </div>
 
     <div class="bp-card-inner">
-      <h3>💵 3. Plan de trésorerie mensuel</h3>
+      <h3>💵 3. Plan de trésorerie mensuel (saisie)</h3>
       <p style="font-size:12.5px;color:var(--muted);margin-top:-4px;">Sur 12 mois — très demandé par les banques.</p>
       <div style="overflow-x:auto;">
         <table class="fin-table">
@@ -3509,8 +3521,10 @@ function renderFinancier() {
       </div>
     </div>
 
+    ${bpTreso36HTML(s)}
+
     <div class="bp-card-inner">
-      <h3>📈 4. Ratios financiers</h3>
+      <h3>📈 5. Ratios financiers</h3>
       <p style="font-size:12.5px;color:var(--muted);margin-top:-4px;">Calculés automatiquement à partir du compte de résultat (An 1 → An 2).</p>
       <div class="ratio-grid">
         <div class="ratio-card"><span class="r-label">Marge brute</span><span class="r-value" id="ratio-marge-brute">—</span></div>
@@ -3523,6 +3537,204 @@ function renderFinancier() {
     </div>
   </div>`;
 }
+/* ═══════ Fiscalité, TVA, trésorerie sur 36 mois, Excel (2026-10-18) ═══════
+   Le calcul vit dans assets/business-plan-calc.js (BPCalc.calcModeleFinancier / calcTresorerie) ;
+   le format Excel dans assets/business-plan-excel.js. Ici : seulement l'affichage et les saisies.
+   Sans régime fiscal ni TVA renseignés, rien ne change pour les plans existants. */
+function bpAttr(v){ return esc(v).replace(/"/g,'&quot;'); }
+function bpFiscalHTML(s) {
+  const ro = monRole==='lecteur';
+  const sel = (key, defaut, options) => `<select data-key="${key}" ${ro?'disabled':''} onchange="updFin('${key}',this.value);calcAllFinance()">${options.map(([v,l])=>`<option value="${v}" ${((s[key]||defaut)===v)?'selected':''}>${l}</option>`).join('')}</select>`;
+  const inp = (key, ph) => `<input type="number" step="any" data-key="${key}" value="${bpAttr(s[key]||'')}" placeholder="${ph}" ${ro?'readonly':''} oninput="updFin('${key}',this.value);calcAllFinance()">`;
+  return `<div class="bp-card-inner">
+    <h3>🧾 Fiscalité et TVA</h3>
+    <p style="font-size:12.5px;color:var(--muted);margin-top:-4px;">Facultatif. Sans régime choisi, le résultat reste « avant impôt ». Les montants du compte de résultat se saisissent hors taxe.</p>
+    <div class="fg">
+      <div class="full"><label>Régime fiscal</label>${sel('regime_fiscal','',[['','Pas d\'impôt calculé'],['is','Société — impôt sur les sociétés'],['ir','Entreprise individuelle — impôt sur le revenu'],['micro','Micro-entreprise — cotisations forfaitaires sur le chiffre d\'affaires'],['exonere','Association ou structure exonérée — aucun impôt']])}</div>
+      <div id="fisc-g-taux"><label id="fisc-l-taux">Taux d'impôt (%)</label>${inp('taux_impot','')}</div>
+      <div id="fisc-g-reduit"><label>IS : taux réduit (%) <span style="font-weight:400;color:var(--muted);">facultatif</span></label>${inp('is_taux_reduit','ex : 15')}</div>
+      <div id="fisc-g-seuil"><label>IS : taux réduit jusqu'à un bénéfice de</label>${inp('is_seuil_reduit','ex : 42500')}</div>
+      <div id="fisc-g-deficit"><label>Report des déficits sur les années suivantes</label>${sel('report_deficit','oui',[['oui','Oui (par défaut)'],['non','Non']])}</div>
+      <div><label>Assujetti à la TVA ?</label>${sel('tva_assujetti','non',[['non','Non'],['oui','Oui']])}</div>
+      <div id="fisc-g-tva"><label>Taux de TVA (%)</label>${inp('tva_taux','20')}</div>
+      <div id="fisc-g-ded"><label>Part des achats et charges ouvrant droit à déduction de TVA (%)</label>${inp('tva_part_deductible','100')}</div>
+    </div>
+    <div id="fisc-resume" style="font-size:12.5px;margin-top:10px;"></div>
+  </div>`;
+}
+function bpFiscUI() {
+  const el = id => document.getElementById(id);
+  const resume = el('fisc-resume');
+  if (!resume) return;
+  const s = sections.plan_financier || {};
+  const m = BPCalc.calcModeleFinancier(s);
+  const show = (id, on) => { const e = el(id); if (e) e.style.display = on ? '' : 'none'; };
+  const rg = m.regime;
+  show('fisc-g-taux', rg==='is'||rg==='ir'||rg==='micro');
+  show('fisc-g-reduit', rg==='is'); show('fisc-g-seuil', rg==='is');
+  show('fisc-g-deficit', rg==='is'||rg==='ir');
+  show('fisc-g-tva', m.tvaOn); show('fisc-g-ded', m.tvaOn);
+  const lab = el('fisc-l-taux');
+  if (lab) lab.textContent = rg==='micro' ? 'Taux de cotisations et d\'impôt sur le chiffre d\'affaires (%)' : rg==='ir' ? 'Taux moyen d\'imposition (%)' : 'Taux de l\'impôt sur les sociétés (%)';
+  const tin = document.querySelector('[data-key="taux_impot"]');
+  if (tin) tin.placeholder = rg ? `${BPCalc.TAUX_IMPOT_DEFAUT[rg]} (taux indicatif, à adapter à votre pays)` : '';
+  const lignes = [];
+  const a1 = m.annees[0];
+  const totalImpot = m.annees.reduce((t, y) => t + y.impot, 0);
+  if (rg === 'exonere') lignes.push('Structure exonérée : aucun impôt n\'est déduit du résultat.');
+  else if (rg) lignes.push(`Impôt sur 5 ans : <strong>${fmtEuro(totalImpot)}</strong> — résultat net An 1 : <strong>${fmtEuro(a1.net)}</strong>.`);
+  if (m.tvaOn) lignes.push(`TVA An 1 : collectée ${fmtEuro(a1.tvaCollectee)}, déductible ${fmtEuro(a1.tvaDeductible)}, <strong>${a1.tvaSolde>=0?'à reverser':'crédit de TVA'} ${fmtEuro(Math.abs(a1.tvaSolde))}</strong>.`);
+  resume.innerHTML = lignes.map(l => `<div style="background:var(--bg);border-radius:8px;padding:8px 12px;margin-bottom:6px;">🧮 ${l}</div>`).join('');
+}
+
+/* Trésorerie sur 36 mois, calculée : tuiles de synthèse, courbe et tableau. */
+function bpTreso36HTML(s) {
+  const ro = monRole==='lecteur';
+  const saison = Array.from({length:12},(_,i)=>`<div><label style="font-size:11px;">Mois ${i+1}</label><input type="number" step="any" data-key="saison_M${i+1}" value="${bpAttr(s['saison_M'+(i+1)]||'')}" placeholder="1" ${ro?'readonly':''} oninput="updFin('saison_M${i+1}',this.value);calcAllFinance()"></div>`).join('');
+  return `<div class="bp-card-inner">
+    <h3>📅 4. Trésorerie sur 36 mois (calculée)</h3>
+    <p style="font-size:12.5px;color:var(--muted);margin-top:-4px;">Calculée à partir du compte de résultat, du plan de financement, des emprunts, de la TVA et des délais de paiement (clients et fournisseurs, saisis plus haut). Elle ne remplace pas la saisie mensuelle ci-dessus : elle l'élargit à 3 ans.</p>
+    <div class="fg">
+      <div><label>Montée en charge de l'année 1 (mois)</label><input type="number" step="1" min="0" data-key="montee_en_charge_mois" value="${bpAttr(s.montee_en_charge_mois||'')}" placeholder="0 = ventes régulières" ${ro?'readonly':''} oninput="updFin('montee_en_charge_mois',this.value);calcAllFinance()"></div>
+      <div id="tr36-delais" style="align-self:end;font-size:12.5px;color:var(--muted);"></div>
+    </div>
+    <details style="margin:8px 0 12px;"><summary style="cursor:pointer;font-size:12.5px;font-weight:700;">Saisonnalité des ventes (facultatif)</summary>
+      <p style="font-size:12px;color:var(--muted);">Poids relatif de chaque mois : 1 = mois normal, 2 = deux fois plus de ventes, 0,5 = deux fois moins. Le total de l'année ne change pas.</p>
+      <div class="fg" style="grid-template-columns:repeat(auto-fill,minmax(90px,1fr));">${saison}</div>
+    </details>
+    <div id="tr36-alerte"></div>
+    <div class="fin-dash-grid" id="tr36-tuiles"></div>
+    <div id="tr36-graph" style="margin:12px 0;"></div>
+    <div style="overflow-x:auto;" id="tr36-table"></div>
+  </div>`;
+}
+function bpTresoSvg(mois) {
+  const W=720, H=200, L=58, R=14, T=16, B=28;
+  const vals = mois.map(m=>m.tresorerie);
+  let lo = Math.min(0,...vals), hi = Math.max(0,...vals);
+  if (hi === lo) hi = lo + 1;
+  const x = i => L + (W-L-R)*i/Math.max(1,mois.length-1);
+  const y = v => T + (H-T-B)*(hi-v)/(hi-lo);
+  const abr = v => Math.abs(v)>=1e6 ? (v/1e6).toFixed(1).replace('.',',')+' M' : Math.abs(v)>=1e3 ? Math.round(v/1e3)+' k' : String(Math.round(v));
+  const pts = vals.map((v,i)=>`${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+  const z = y(0).toFixed(1);
+  const iMin = vals.indexOf(Math.min(...vals));
+  const negatifs = vals.map((v,i)=> v<-0.5 ? `<circle cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="3.2" fill="#dc2626"/>` : '').join('');
+  const ticks = [6,12,18,24,30,36].filter(n=>n<=mois.length).map(n=>`<text x="${x(n-1).toFixed(1)}" y="${H-8}" text-anchor="middle" font-size="10" fill="#64748b">M${n}</text>`).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Courbe de la trésorerie en fin de mois sur 36 mois">
+    <line x1="${L}" y1="${z}" x2="${W-R}" y2="${z}" stroke="#94a3b8" stroke-dasharray="4 3"/>
+    <polygon points="${x(0).toFixed(1)},${z} ${pts} ${x(mois.length-1).toFixed(1)},${z}" fill="#0D2B4E" fill-opacity=".10"/>
+    <polyline points="${pts}" fill="none" stroke="#0D2B4E" stroke-width="2.2" stroke-linejoin="round"/>
+    ${negatifs}
+    <circle cx="${x(iMin).toFixed(1)}" cy="${y(vals[iMin]).toFixed(1)}" r="4.5" fill="${vals[iMin]<0?'#dc2626':'#F26422'}" stroke="#fff" stroke-width="1.5"/>
+    <text x="${L-6}" y="${(y(hi)+4).toFixed(1)}" text-anchor="end" font-size="10" fill="#64748b">${abr(hi)}</text>
+    <text x="${L-6}" y="${(y(0)+4).toFixed(1)}" text-anchor="end" font-size="10" fill="#64748b">0</text>
+    ${lo<0?`<text x="${L-6}" y="${(y(lo)+4).toFixed(1)}" text-anchor="end" font-size="10" fill="#dc2626">${abr(lo)}</text>`:''}
+    ${ticks}
+  </svg>`;
+}
+function bpCalcTreso36() {
+  const tab = document.getElementById('tr36-table');
+  if (!tab) return;
+  const s = sections.plan_financier || {};
+  const vide = !(parseFloat(s.ca_1) > 0);
+  const delais = document.getElementById('tr36-delais');
+  const alerte = document.getElementById('tr36-alerte'), tuiles = document.getElementById('tr36-tuiles'), graph = document.getElementById('tr36-graph');
+  const tr = BPCalc.calcTresorerie(s, 36);
+  if (delais) delais.textContent = `Délais appliqués : clients ${tr.delaiClientsMois} mois · fournisseurs ${tr.delaiFournisseursMois} mois.`;
+  if (vide) {
+    alerte.innerHTML = '<div style="color:var(--muted);font-size:12.5px;">Renseignez le chiffre d\'affaires de l\'An 1 dans le compte de résultat pour voir la trésorerie sur 36 mois.</div>';
+    tuiles.innerHTML = ''; graph.innerHTML = ''; tab.innerHTML = '';
+    return;
+  }
+  const sym = bpDeviseRefSymbole();
+  const n0 = v => Math.round(v).toLocaleString('fr-FR');
+  const mois = tr.mois;
+  const r0 = v => Math.round(v);
+  alerte.innerHTML = tr.premierMoisNegatif
+    ? `<div class="pf-balance ko" style="text-align:left;">⚠️ La trésorerie devient négative au <strong>mois ${tr.premierMoisNegatif}</strong>. Point bas : <strong>${fmtEuro(r0(tr.minimum))}</strong> au mois ${tr.moisMinimum}. Il manque environ <strong>${fmtEuro(r0(tr.besoinComplementaire))}</strong> de financement ou de trésorerie de départ.</div>`
+    : `<div class="pf-balance ok" style="text-align:left;">✅ La trésorerie reste positive sur 36 mois. Point bas : <strong>${fmtEuro(r0(tr.minimum))}</strong> au mois ${tr.moisMinimum}.</div>`;
+  const tuile = (l, v, neg) => `<div class="fin-dash-card"><div class="fdc-label">${l}</div><div class="fdc-value" style="${neg?'color:#dc2626;':''}">${v}</div></div>`;
+  tuiles.innerHTML = tuile('Point bas', fmtEuro(r0(tr.minimum)), tr.minimum<0) + tuile('Mois du point bas', 'Mois ' + tr.moisMinimum)
+    + tuile('Fin de l\'An 1', fmtEuro(r0(tr.finAn1)), tr.finAn1<0) + tuile('Fin de l\'An 2', fmtEuro(r0(tr.finAn2)), tr.finAn2<0) + tuile('Fin de l\'An 3', fmtEuro(r0(tr.fin)), tr.fin<0);
+  graph.innerHTML = bpTresoSvg(mois);
+  const lignes = [
+    ['Encaissements clients', 'clients'], ['Autres produits', 'autresProduits'], ['Apports et ressources', 'apports'], ['Emprunts encaissés', 'emprunts'], ['TOTAL ENCAISSEMENTS', 'encaissements', 1],
+    ['Fournisseurs et charges', 'fournisseurs'], ['Loyers', 'loyers'], ['Salaires et charges', 'salaires'], ['TVA reversée', 'tva'], ['Impôts', 'impots'],
+    ['Remboursement des emprunts', 'remboursements'], ['Investissements', 'investissements'], ['TOTAL DÉCAISSEMENTS', 'decaissements', 1],
+    ['Flux net du mois', 'flux', 1], ['TRÉSORERIE EN FIN DE MOIS', 'tresorerie', 2],
+  ];
+  const stick = 'position:sticky;left:0;background:var(--card,#fff);z-index:1;min-width:190px;';
+  tab.innerHTML = `<table class="fin-table"><thead><tr><th style="${stick}">Montants en ${esc(sym)}</th>${mois.map(m=>`<th>M${m.m}</th>`).join('')}</tr></thead><tbody>
+    ${lignes.map(([l,k,g]) => `<tr${g?' class="total-row"':''}><td style="${stick}">${l}</td>${mois.map(m=>{ const v=m[k]; const rouge=(k==='tresorerie'||k==='flux')&&v<-0.5; return `<td style="${rouge?'color:#dc2626;':''}">${Math.abs(v)<0.5?'—':n0(v)}</td>`; }).join('')}</tr>`).join('')}
+  </tbody></table>
+  <p style="font-size:11px;color:var(--muted);">Hypothèses : chaque année est répartie sur 12 mois (saisonnalité et montée en charge ci-dessus) ; la TVA du mois est reversée le mois suivant ; l'impôt est payé au 3e mois de l'année suivante ; les emprunts sont encaissés au mois 1 puis remboursés chaque mois ; la réserve « Trésorerie » du plan de financement reste en caisse. Estimation indicative, pas une prévision comptable certifiée.</p>`;
+}
+
+/* Excel : exporter et importer le modèle financier. SheetJS est chargé à la demande. */
+function bpExcelHTML() {
+  const ro = monRole==='lecteur';
+  return `<div class="bp-card-inner">
+    <h3>📊 Excel : exporter et importer le modèle</h3>
+    <p style="font-size:12.5px;color:var(--muted);margin-top:-4px;">Téléchargez le modèle financier au format Excel (formules comprises), travaillez-le dans Excel, puis réimportez-le : les valeurs saisies reviennent dans ce plan. Vous pouvez aussi télécharger le modèle vide pour le remplir de zéro.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+      <button class="btn btn-outline btn-sm" onclick="bpExcelExporter()">📥 Télécharger le modèle Excel</button>
+      ${ro ? '' : `<label class="btn btn-outline btn-sm" style="cursor:pointer;margin:0;">📤 Importer un fichier Excel<input type="file" accept=".xlsx,.xls" style="display:none;" onchange="bpExcelImporter(this)"></label>`}
+    </div>
+    <div id="bp-excel-msg" style="margin-top:10px;font-size:12.5px;"></div>
+  </div>`;
+}
+function bpChargerXLSX() {
+  return new Promise((ok, ko) => {
+    if (window.XLSX) return ok(window.XLSX);
+    const sc = document.createElement('script');
+    sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    sc.onload = () => window.XLSX ? ok(window.XLSX) : ko(new Error('Bibliothèque Excel introuvable.'));
+    sc.onerror = () => ko(new Error('Impossible de charger la bibliothèque Excel (connexion ?).'));
+    document.head.appendChild(sc);
+  });
+}
+function bpExcelOpts() {
+  return { PF_RESSOURCES, PF_EMPLOIS, CF_ENTREES, CF_SORTIES, BPCalc, nomProjet: bp?.nom_projet || '', devise: bpDeviseRefSymbole() };
+}
+function bpExcelMsg(html, ok) {
+  const el = document.getElementById('bp-excel-msg');
+  if (el) el.innerHTML = `<div style="background:${ok?'#d1fae5':'#fee2e2'};color:${ok?'#065f46':'#991b1b'};border-radius:8px;padding:8px 12px;">${html}</div>`;
+}
+async function bpExcelExporter() {
+  try {
+    const XLSX = await bpChargerXLSX();
+    const wb = BPExcel.construireClasseur(XLSX, sections.plan_financier || {}, bpExcelOpts());
+    const nom = String(bp?.nom_projet || 'business-plan').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,40) || 'business-plan';
+    XLSX.writeFile(wb, `modele-financier-${nom}.xlsx`);
+    bpExcelMsg('Modèle téléchargé. Modifiez les cellules de saisie, puis réimportez le fichier ici.', true);
+  } catch (e) { bpExcelMsg(esc(e.message || 'Export impossible.'), false); }
+}
+async function bpExcelImporter(input) {
+  const f = input.files && input.files[0];
+  input.value = '';
+  if (!f) return;
+  if (f.size > 5 * 1024 * 1024) { bpExcelMsg('Fichier trop volumineux (5 Mo maximum).', false); return; }
+  try {
+    const XLSX = await bpChargerXLSX();
+    const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' });
+    const r = BPExcel.lireClasseur(XLSX, wb, sections.plan_financier || {}, bpExcelOpts());
+    if (!r.total) { bpExcelMsg('Aucune donnée reconnue : utilisez le modèle téléchargé depuis cette page (feuilles Hypothèses, Compte de résultat, Plan de financement, Immobilisations, Emprunts, Trésorerie 12 mois).', false); return; }
+    const L = r.resume;
+    const detail = `${L.hypotheses} hypothèses, ${L.resultat} lignes du compte de résultat, ${L.financement} postes du plan de financement, ${L.tresorerie} cases de trésorerie, ${L.immobilisations} immobilisations, ${L.emprunts} emprunts`;
+    if (!confirm(`Importer ce fichier ?\n\n${detail}.\n\nLes valeurs correspondantes de ce plan seront remplacées (les autres restent intactes).`)) { bpExcelMsg('Import annulé.', true); return; }
+    if (!sections.plan_financier) sections.plan_financier = {};
+    Object.entries(r.valeurs).forEach(([k, v]) => { sections.plan_financier[k] = v; });
+    if (r.immobilisations && r.immobilisations.length) sections.plan_financier.immobilisations_liste = r.immobilisations;
+    if (r.dettes && r.dettes.length) sections.plan_financier.dettes = r.dettes;
+    markDirty();
+    renderSection('plan_financier');
+    calcAllFinance();
+    const av = r.avertissements.length ? `<br>⚠️ ${r.avertissements.length} cellule(s) ignorée(s) :<br>${r.avertissements.slice(0,8).map(esc).join('<br>')}${r.avertissements.length>8?'<br>…':''}` : '';
+    bpExcelMsg(`Import terminé : ${esc(detail)}.${av}`, !r.avertissements.length);
+  } catch (e) { bpExcelMsg('Fichier illisible : ' + esc(e.message || 'format inattendu') + '. Utilisez un classeur .xlsx.', false); }
+}
+
 function updFin(key,val) {
   if(!sections.plan_financier) sections.plan_financier={};
   sections.plan_financier[key]=val;
@@ -3673,21 +3885,28 @@ function bpCalcInteretsParAnnee() {
   return BPCalc.calcInteretsParAnnee(sections.plan_financier?.dettes || []);
 }
 function calcFinRow() {
-  const s = sections.plan_financier||{};
-  const amortAnnuel = bpCalcAmortissementAnnuel();
-  const interetsParAnnee = bpCalcInteretsParAnnee();
-  for(let i=1;i<=5;i++){
-    const ca=(parseFloat(s[`ca_${i}`])||0)+(parseFloat(s[`autres_produits_${i}`])||0);
-    const interets = interetsParAnnee[i] || 0;
-    const charges=(parseFloat(s[`achats_${i}`])||0)+(parseFloat(s[`salaires_${i}`])||0)+
-      (parseFloat(s[`loyers_${i}`])||0)+(parseFloat(s[`marketing_charge_${i}`])||0)+(parseFloat(s[`autres_charges_${i}`])||0)+
-      amortAnnuel+interets;
-    const res=ca-charges;
-    const elAmort=document.getElementById(`fin-amort-${i}`); if(elAmort) elAmort.textContent=fmtEuro(amortAnnuel);
-    const elInt=document.getElementById(`fin-interets-${i}`); if(elInt) elInt.textContent=fmtEuro(interets);
-    const el=document.getElementById(`fin-res-${i}`);
-    if(el){el.textContent=fmtEuro(res);el.style.color=res>=0?'#10b981':'#dc2626';}
-  }
+  /* Un seul calcul, partagé avec le dossier : BPCalc.calcModeleFinancier (assets/business-plan-calc.js).
+     Sans régime fiscal choisi, « Résultat avant impôt » reste la dernière ligne affichée, comme avant. */
+  const m = BPCalc.calcModeleFinancier(sections.plan_financier || {});
+  const set = (id, txt, couleur) => { const el=document.getElementById(id); if(el){ el.textContent=txt; if(couleur) el.style.color=couleur; } };
+  const avecImpot = !!m.regime;
+  const afficher = (id, on) => { const el=document.getElementById(id); if(el) el.style.display = on ? '' : 'none'; };
+  afficher('fin-impot-row', avecImpot); afficher('fin-net-row', avecImpot); afficher('fin-tva-rows', m.tvaOn);
+  document.querySelectorAll('.fin-tva-row').forEach(r => { r.style.display = m.tvaOn ? '' : 'none'; });
+  const lab = document.getElementById('fin-resultat-label');
+  if (lab) lab.firstChild.textContent = avecImpot ? 'RÉSULTAT AVANT IMPÔT ' : 'RÉSULTAT NET ';
+  const labImpot = document.getElementById('fin-impot-label');
+  if (labImpot) labImpot.textContent = m.regime==='micro' ? '− Cotisations et impôt forfaitaires' : m.regime==='exonere' ? '− Impôt (structure exonérée)' : '− Impôt sur le résultat';
+  m.annees.forEach(y => {
+    const i = y.a;
+    set(`fin-amort-${i}`, fmtEuro(y.amortissements));
+    set(`fin-interets-${i}`, fmtEuro(y.interets));
+    set(`fin-res-${i}`, fmtEuro(y.avantImpot), y.avantImpot>=0?'#10b981':'#dc2626');
+    set(`fin-impot-${i}`, fmtEuro(y.impot));
+    set(`fin-net-${i}`, fmtEuro(y.net), y.net>=0?'#10b981':'#dc2626');
+    set(`fin-tvac-${i}`, fmtEuro(y.tvaCollectee)); set(`fin-tvad-${i}`, fmtEuro(y.tvaDeductible));
+    set(`fin-tvas-${i}`, fmtEuro(y.tvaSolde)); set(`fin-ttc-${i}`, fmtEuro(y.caTTC));
+  });
 }
 function calcPlanFinancement() {
   const s = sections.plan_financier||{};
@@ -3726,7 +3945,7 @@ function calcRatios() {
      reste cohérent avec le compte de résultat détaillé (calcFinRow), qui les intègre déjà. */
   const chargesFinancieresAn1 = bpCalcAmortissementAnnuel() + (bpCalcInteretsParAnnee()[1] || 0);
   const charges1=achats1+(parseFloat(s.salaires_1)||0)+(parseFloat(s.loyers_1)||0)+(parseFloat(s.marketing_charge_1)||0)+(parseFloat(s.autres_charges_1)||0)+chargesFinancieresAn1;
-  const resultat1=ca1-charges1;
+  const resultat1=BPCalc.calcModeleFinancier(s).annees[0].net; // après impôt si un régime fiscal est choisi
   const invest=parseFloat(s.investissement_initial)||0;
   const financement=parseFloat(s.financement_recherche)||0;
   /* bfr est un champ de TEXTE LIBRE ("Besoin en fonds de roulement estimé à 12 000 € pour
@@ -3774,6 +3993,8 @@ function calcAllFinance() {
   calcDashboard(tresorerieDisponible, ratios);
   bpAfficherSuggestionCA();
   bpAfficherBFRCalcule();
+  bpFiscUI();
+  bpCalcTreso36();
 }
 /* BFR calculé (2026-09-01, consolidation) -- affiché en complément du champ texte libre
    "Besoin en fonds de roulement" ci-dessus, JAMAIS à sa place (même principe que

@@ -182,7 +182,7 @@ body.dp-inst{--dp-mono:Arial,Helvetica,sans-serif;--dp-display:Arial,Helvetica,s
 
 </div>
 
-<script src="assets/business-plan-calc.js"></script>
+<script src="assets/business-plan-calc.js?v=2"></script>
 <script src="assets/data.js"></script>
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js?v=13"></script>
@@ -280,8 +280,8 @@ function onTemplateChange(key){
    source, sélection différente. "complet" = comportement actuel, aucune restriction. */
 const FORMATS = {
   complet:     { label:'📄 Business Plan complet', ids:null },
-  bancaire:    { label:'🏦 Dossier bancaire', ids:['resume','traction','marche','finances','planfinancement','tresorerie','risques','financement','equipe','annexes'] },
-  investisseur:{ label:'💼 Dossier investisseur', ids:['resume','probleme','solution','traction','marche','pestel','swot','bmc','produits','bcg','finances','planfinancement','risques','financement','equipe'] },
+  bancaire:    { label:'🏦 Dossier bancaire', ids:['resume','traction','marche','finances','planfinancement','tresorerie','tresorerie36','risques','financement','equipe','annexes'] },
+  investisseur:{ label:'💼 Dossier investisseur', ids:['resume','probleme','solution','traction','marche','pestel','swot','bmc','produits','bcg','finances','planfinancement','tresorerie36','risques','financement','equipe'] },
   subvention:  { label:'🏛️ Dossier subvention', ids:['resume','probleme','solution','marche','persona','impact','finances','calendrier','equipe','annexes'] },
   partenaire:  { label:'🤝 Dossier partenaire', ids:['resume','traction','bmc','produits','strategie_marketing','plan_commercial','organisation','equipe'] },
 };
@@ -819,7 +819,10 @@ function pageFinances(bp){
   const kRow = kpiRow([['Investissement total', has(pf.investissement_initial)?fmtEUR(pf.investissement_initial):''],['Financement recherché', has(pf.financement_recherche)?fmtEUR(pf.financement_recherche):''],['Seuil de rentabilité', pf.seuil_rentabilite],['Point mort', has(pf.point_mort)?`${pf.point_mort} mois`:'']]);
   // Ratios financiers -- calculés directement sur les mêmes champs que l'éditeur (An 1), pas de
   // dépendance à calcRatios() (non exportée par assets/business-plan-calc.js) pour rester simple.
-  const ca1 = Number(pf.ca_1)||0, resultat1 = ca1 - ['achats_1','salaires_1','loyers_1','marketing_charge_1','autres_charges_1'].reduce((s,k)=>s+(Number(pf[k])||0),0);
+  const ca1 = Number(pf.ca_1)||0, resultatSimple1 = ca1 - ['achats_1','salaires_1','loyers_1','marketing_charge_1','autres_charges_1'].reduce((s,k)=>s+(Number(pf[k])||0),0);
+  // Modèle complet (impôt compris quand un régime fiscal est choisi) : même calcul que l'éditeur.
+  const modele = typeof BPCalc!=='undefined' ? BPCalc.calcModeleFinancier(pf) : null;
+  const resultat1 = modele ? modele.annees[0].net : resultatSimple1;
   const margeBrute1 = ca1>0 ? Math.round(((ca1-(Number(pf.achats_1)||0))/ca1)*100) : null;
   const margeNette1 = ca1>0 ? Math.round((resultat1/ca1)*100) : null;
   const bfrCalcule = (has(pf.stock_moyen_valeur)||has(pf.creances_clients)||has(pf.dettes_fournisseurs)) && typeof BPCalc!=='undefined'
@@ -854,8 +857,11 @@ function pageFinances(bp){
       const resExploitation = ebe - amortAnnuel;
       const interets = interetsParAn[a] || 0;
       const resAvantImpot = resExploitation - interets;
-      return { a, produits, achats, chargesExternes, va, chargesPersonnel, ebe, amortAnnuel, resExploitation, interets, resAvantImpot };
+      const my = modele ? modele.annees[a-1] : null;
+      return { a, produits, achats, chargesExternes, va, chargesPersonnel, ebe, amortAnnuel, resExploitation, interets, resAvantImpot, impot: my ? my.impot : 0, net: my ? my.net : resAvantImpot };
     });
+    const libImpot = !modele ? '' : modele.regime==='micro' ? 'Cotisations et impôt forfaitaires' : modele.regime==='exonere' ? 'Impôt (structure exonérée)' : 'Impôt sur le résultat';
+    const noteImpot = modele && modele.regime ? (modele.regime==='exonere' ? 'Structure exonérée : aucun impôt déduit.' : `Après impôt — régime « ${{is:'impôt sur les sociétés',ir:'impôt sur le revenu',micro:'micro-entreprise'}[modele.regime]} », taux ${modele.tauxImpot} %${modele.reportDeficit && modele.regime!=='micro' ? ', déficits reportés' : ''}.`) : 'Avant impôt sur les sociétés — aucun régime fiscal renseigné dans le business plan.';
     const sigRow = (label, get, gras) => `<tr${gras?' class="total"':''}><td>${label}</td>${sig.map(s=>`<td>${fmtEUR(get(s))}</td>`).join('')}</tr>`;
     crTable = `<p class="block-title">Soldes intermédiaires de gestion (SIG)</p><table class="doc-table"><thead><tr><th style="text-align:left;">Ligne</th>${annees.map(a=>`<th>An ${a}</th>`).join('')}</tr></thead><tbody>
       ${sigRow('Produits d\'exploitation', s=>s.produits)}
@@ -868,7 +874,8 @@ function pageFinances(bp){
       ${sigRow('= Résultat d\'exploitation', s=>s.resExploitation, true)}
       ${sigRow('− Intérêts d\'emprunt', s=>-s.interets)}
       ${sigRow('= Résultat avant impôt', s=>s.resAvantImpot, true)}
-    </tbody></table><p style="font-size:9.5px;color:var(--dp-ink-soft);margin:-4px 0 10px;">Avant impôt sur les sociétés — aucun taux d'IS renseigné dans le business plan.</p>`;
+      ${modele && modele.regime ? sigRow('− ' + libImpot, s=>-s.impot) + sigRow('= Résultat net', s=>s.net, true) : ''}
+    </tbody></table><p style="font-size:9.5px;color:var(--dp-ink-soft);margin:-4px 0 10px;">${noteImpot}</p>`;
     const caVals = annees.map(a => Number(pf[`ca_${a}`])||0).filter(v=>v>0);
     if (caVals.length >= 2){
       const max = Math.max(...caVals);
@@ -985,6 +992,71 @@ function pageTresorerie(bp){
     <p class="pg-sub" style="max-width:100%;">Un projet rentable sur l'année peut manquer de trésorerie un mois donné si les encaissements arrivent après les décaissements — c'est ce que cette page vérifie.</p>
     ${kRow}
     ${chart}
+    ${chromeBottom()}
+  `);
+}
+
+/* ---- Page : Trésorerie sur 36 mois (calculée) ----
+   Calculée par BPCalc.calcTresorerie (assets/business-plan-calc.js) à partir du compte de résultat,
+   du plan de financement, des emprunts, de la TVA et des délais de paiement -- la même source que
+   l'éditeur. Complète la page « Trésorerie » (saisie manuelle sur 12 mois), qui reste inchangée. */
+function pageTresorerie36(bp){
+  if (typeof BPCalc === 'undefined') return '';
+  const pf = (bp.sections||{}).plan_financier || {};
+  if (!(Number(pf.ca_1) > 0)) return '';
+  const tr = BPCalc.calcTresorerie(pf, 36);
+  const mois = tr.mois;
+  const vals = mois.map(m => m.tresorerie);
+  const W = 660, H = 140, L = 52, R = 10, T = 12, B = 24;
+  let lo = Math.min(0, ...vals), hi = Math.max(0, ...vals);
+  if (hi === lo) hi = lo + 1;
+  const x = i => L + (W-L-R) * i / Math.max(1, mois.length-1);
+  const y = v => T + (H-T-B) * (hi-v) / (hi-lo);
+  const abr = v => Math.abs(v) >= 1e6 ? (v/1e6).toFixed(1).replace('.',',') + ' M' : Math.abs(v) >= 1e3 ? Math.round(v/1e3) + ' k' : String(Math.round(v));
+  const pts = vals.map((v,i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+  const z = y(0).toFixed(1);
+  const iMin = vals.indexOf(Math.min(...vals));
+  const rouges = vals.map((v,i) => v < -0.5 ? `<circle cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="3" style="fill:#B5451F"/>` : '').join('');
+  const reperes = [6,12,18,24,30,36].map(n => `<text x="${x(n-1).toFixed(1)}" y="${H-7}" text-anchor="middle" font-size="9" style="fill:var(--dp-ink-soft)">M${n}</text>`).join('');
+  const chart = `<p class="block-title">Trésorerie en fin de mois</p><svg width="100%" height="${H+4}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMinYMid meet">
+    <line x1="${L}" y1="${z}" x2="${W-R}" y2="${z}" stroke="var(--dp-line)" stroke-dasharray="4 3"/>
+    <polygon points="${x(0).toFixed(1)},${z} ${pts} ${x(mois.length-1).toFixed(1)},${z}" style="fill:var(--dp-navy)" opacity="0.10"/>
+    <polyline points="${pts}" fill="none" style="stroke:var(--dp-navy)" stroke-width="2"/>
+    ${rouges}
+    <circle cx="${x(iMin).toFixed(1)}" cy="${y(vals[iMin]).toFixed(1)}" r="4" style="fill:${vals[iMin] < 0 ? '#B5451F' : 'var(--dp-orange)'}"/>
+    <text x="${L-5}" y="${(y(hi)+3).toFixed(1)}" text-anchor="end" font-size="9" style="fill:var(--dp-ink-soft)">${abr(hi)}</text>
+    <text x="${L-5}" y="${(y(0)+3).toFixed(1)}" text-anchor="end" font-size="9" style="fill:var(--dp-ink-soft)">0</text>
+    ${lo < 0 ? `<text x="${L-5}" y="${(y(lo)+3).toFixed(1)}" text-anchor="end" font-size="9" style="fill:#B5451F">${abr(lo)}</text>` : ''}
+    ${reperes}
+  </svg>`;
+  const kRow = kpiRow([
+    ['Point bas de trésorerie', fmtEUR(Math.round(tr.minimum)), 'Mois ' + tr.moisMinimum],
+    ['Besoin complémentaire', tr.besoinComplementaire > 0 ? fmtEUR(Math.round(tr.besoinComplementaire)) : 'Aucun', tr.premierMoisNegatif ? 'Négative dès le mois ' + tr.premierMoisNegatif : 'Positive sur 36 mois'],
+    ['Trésorerie fin An 1', fmtEUR(Math.round(tr.finAn1))],
+    ['Trésorerie fin An 3', fmtEUR(Math.round(tr.fin))],
+  ]);
+  const parAn = [1,2,3].map(a => {
+    const m = mois.filter(x => x.annee === a);
+    const som = k => m.reduce((s,x) => s + x[k], 0);
+    return { a, enc: som('encaissements'), dec: som('decaissements'), flux: som('flux'), fin: m[m.length-1].tresorerie };
+  });
+  const ligne = (label, get, gras) => `<tr${gras?' class="total"':''}><td>${label}</td>${parAn.map(p => `<td>${fmtEUR(Math.round(get(p)))}</td>`).join('')}</tr>`;
+  const table = `<p class="block-title">Synthèse par année</p><table class="doc-table"><thead><tr><th style="text-align:left;">Ligne</th>${parAn.map(p => `<th>An ${p.a}</th>`).join('')}</tr></thead><tbody>
+    ${ligne('Encaissements', p => p.enc)}${ligne('Décaissements', p => -p.dec)}${ligne('Flux net', p => p.flux, true)}${ligne('Trésorerie en fin d\'année', p => p.fin, true)}
+  </tbody></table>`;
+  const mod = BPCalc.calcModeleFinancier(pf);
+  const tva = !mod.tvaOn ? '' : `<p class="block-title">TVA (montants hors taxe, taux ${mod.tvaTaux} %)</p><table class="doc-table"><thead><tr><th style="text-align:left;">Ligne</th>${[0,1,2].map(i => `<th>An ${i+1}</th>`).join('')}</tr></thead><tbody>${[['TVA collectée', y => y.tvaCollectee], ['TVA déductible', y => -y.tvaDeductible], ['TVA à reverser (négatif = crédit)', y => y.tvaSolde, true]].map(([l, f, g]) => `<tr${g ? ' class="total"' : ''}><td>${l}</td>${[0,1,2].map(i => `<td>${fmtEUR(Math.round(f(mod.annees[i])))}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+  const hyp = `Délais de paiement appliqués : clients ${tr.delaiClientsMois} mois, fournisseurs ${tr.delaiFournisseursMois} mois. TVA reversée le mois suivant, impôt payé au 3e mois de l'année suivante, emprunts remboursés chaque mois. Estimation indicative issue du plan financier.`;
+  return page('tresorerie36','',`
+    ${chromeTop(bp,'Trésorerie sur 36 mois')}
+    <p class="eyebrow-tag">Prévisionnel mensuel — 36 mois</p>
+    <h2 class="pg-title">Trésorerie sur trois ans</h2>
+    <p class="pg-sub" style="max-width:100%;">${tr.premierMoisNegatif ? 'La trésorerie passe sous zéro au mois ' + tr.premierMoisNegatif + ' : le besoin de financement ci-dessous est celui à couvrir pour tenir.' : 'La trésorerie reste positive tout au long des trois premières années.'}</p>
+    ${kRow}
+    ${chart}
+    ${table}
+    ${tva}
+    <p style="font-size:9.5px;color:var(--dp-ink-soft);margin:4px 0 0;">${hyp}</p>
     ${chromeBottom()}
   `);
 }
@@ -1170,6 +1242,7 @@ function renderDossier(bp, tplKey, formatKey){
     { id:'finances', label:'Plan financier', html: pageFinances(bp) },
     { id:'planfinancement', label:'Plan de financement', html: pagePlanFinancement(bp) },
     { id:'tresorerie', label:'Trésorerie', html: pageTresorerie(bp) },
+    { id:'tresorerie36', label:'Trésorerie 36 mois', html: pageTresorerie36(bp) },
     { id:'risques', label:'Analyse des risques', html: pageRisques(bp) },
     generic(bp,'impact'),
     { id:'financement', label:'Financement', html: pageFinancement(bp) },
@@ -1184,7 +1257,7 @@ function renderDossier(bp, tplKey, formatKey){
     { num:1, titre:'Le projet', sous:'Résumé, problème et solution', ids:['resume','probleme','solution'] },
     { num:2, titre:'Marché & traction', sous:'Étude de marché, positionnement et preuves', ids:['traction','marche','pestel','persona','swot'] },
     { num:3, titre:'Modèle & opérations', sous:'Business model, produits et organisation', ids:['bmc','produits','bcg','strategie_marketing','plan_commercial','capsoncas','plan_operationnel','organisation','rh','calendrier'] },
-    { num:4, titre:'Finances', sous:'Trajectoire financière, risques et impact', ids:['finances','planfinancement','tresorerie','risques','impact','financement'] },
+    { num:4, titre:'Finances', sous:'Trajectoire financière, risques et impact', ids:['finances','planfinancement','tresorerie','tresorerie36','risques','impact','financement'] },
     { num:5, titre:"Équipe & annexes", sous:'Qui porte le projet', ids:['equipe','annexes'] },
   ];
   let currentChapitre = null, bodyHtml = '';

@@ -238,8 +238,213 @@
         cible: 'plan_financier' });
     }
 
+    // 8. Trésorerie négative dans les 36 premiers mois (calculée avec les délais de paiement, la TVA,
+    //    les emprunts et le plan de financement) : un projet rentable peut manquer de cash.
+    if (has(fin.ca_1) && num(fin.ca_1) > 0) {
+      const tr = calcTresorerie(fin, 36);
+      if (tr.premierMoisNegatif) {
+        alertes.push({ titre: 'Trésorerie négative dans les 36 premiers mois',
+          detail: `La trésorerie calculée devient négative au mois ${tr.premierMoisNegatif}. Point bas : ${Math.round(tr.minimum)} au mois ${tr.moisMinimum} — il manque environ ${Math.round(tr.besoinComplementaire)} de financement ou de trésorerie de départ.`,
+          cible: 'plan_financier' });
+      }
+    }
+
     return alertes;
   }
 
-  return { calcAmortissementAnnuel, calcInteretsParAnnee, calcMensualite, calcEcheancierEmprunt, calcDilution, calcScenariosFinancement, calcBFR, detecterIncoherences };
+  /* ═══════════════ Fiscalité, TVA et trésorerie sur 36 mois (2026-10-18) ═══════════════
+     Trois fonctions pures ajoutées pour rapprocher le module d'un vrai modèle de prévisionnel
+     (impôt et TVA calculés, trésorerie mensuelle avec délais de paiement). Elles lisent le même
+     objet `plan_financier` que l'éditeur ; sans régime fiscal ni TVA renseignés, tout se comporte
+     comme avant (impôt = 0, TVA = 0) : les plans existants ne changent pas d'un centime. */
+  const has = v => v !== undefined && v !== null && String(v).trim() !== '';
+  // « 30 jours », « 45 j », « 30 » → 30 ; texte sans chiffre → 0.
+  function parseJours(texte) {
+    const m = String(texte === undefined || texte === null ? '' : texte).match(/\d+(?:[.,]\d+)?/);
+    return m ? parseFloat(m[0].replace(',', '.')) : 0;
+  }
+
+  const REGIMES = ['is', 'ir', 'micro', 'exonere'];
+  // Valeurs indicatives proposées quand l'utilisateur choisit un régime sans saisir de taux.
+  const TAUX_IMPOT_DEFAUT = { is: 25, ir: 15, micro: 12.3, exonere: 0 };
+  const RESSOURCES_PF = ['pf_apport', 'pf_associes', 'pf_famille', 'pf_business_angels', 'pf_banque', 'pf_subvention', 'pf_investisseur', 'pf_crowdfunding', 'pf_diaspo_invest', 'pf_autres_ress'];
+  const EMPLOIS_PF = ['pf_terrain', 'pf_construction', 'pf_materiel', 'pf_vehicules', 'pf_logiciels', 'pf_stocks', 'pf_tresorerie', 'pf_frais_admin', 'pf_communication', 'pf_recrutement'];
+
+  /* Compte de résultat complet sur 5 ans, avec impôt et TVA.
+     - Impôt (régime `is` ou `ir`) : taux × résultat avant impôt positif, après imputation des
+       déficits antérieurs (report illimité, désactivable : report_deficit = 'non'). En `is`, un taux
+       réduit peut s'appliquer jusqu'à un plafond de bénéfice (is_taux_reduit / is_seuil_reduit).
+     - `micro` : cotisations et impôt forfaitaires = taux × chiffre d'affaires, sans lien avec les charges.
+     - `exonere` (association, structure exonérée) : aucun impôt.
+     - TVA (tva_assujetti = 'oui') : les montants saisis sont HORS TAXE ; collectée sur le chiffre
+       d'affaires, déductible sur achats + loyers + marketing + autres charges (part ouvrant droit à
+       déduction réglable), jamais sur les salaires. Solde négatif = crédit de TVA. */
+  function calcModeleFinancier(pf) {
+    pf = pf || {};
+    const amort = calcAmortissementAnnuel(pf.immobilisations_liste || []);
+    const interets = calcInteretsParAnnee(pf.dettes || []);
+    const regime = REGIMES.includes(pf.regime_fiscal) ? pf.regime_fiscal : '';
+    const tauxImpot = has(pf.taux_impot) ? Math.max(0, num(pf.taux_impot)) : (TAUX_IMPOT_DEFAUT[regime] || 0);
+    const tauxReduit = regime === 'is' && has(pf.is_taux_reduit) ? Math.max(0, num(pf.is_taux_reduit)) : 0;
+    const seuilReduit = regime === 'is' && has(pf.is_seuil_reduit) ? Math.max(0, num(pf.is_seuil_reduit)) : 0;
+    const reportDeficit = pf.report_deficit !== 'non';
+    const tvaOn = pf.tva_assujetti === 'oui';
+    const tvaTaux = tvaOn ? (has(pf.tva_taux) ? Math.max(0, num(pf.tva_taux)) : 20) : 0;
+    const tvaPartDeductible = has(pf.tva_part_deductible) ? Math.min(100, Math.max(0, num(pf.tva_part_deductible))) : 100;
+
+    const impotSur = base => {
+      if (base <= 0) return 0;
+      if (tauxReduit > 0 && seuilReduit > 0) return Math.min(base, seuilReduit) * tauxReduit / 100 + Math.max(0, base - seuilReduit) * tauxImpot / 100;
+      return base * tauxImpot / 100;
+    };
+
+    let deficit = 0;
+    const annees = [];
+    for (let a = 1; a <= 5; a++) {
+      const ca = num(pf['ca_' + a]), autresProduits = num(pf['autres_produits_' + a]);
+      const achats = num(pf['achats_' + a]), salaires = num(pf['salaires_' + a]);
+      const chargesExternes = num(pf['loyers_' + a]) + num(pf['marketing_charge_' + a]) + num(pf['autres_charges_' + a]);
+      const produits = ca + autresProduits;
+      const va = produits - achats - chargesExternes;
+      const ebe = va - salaires;
+      const resExploitation = ebe - amort;
+      const interetsAn = interets[a] || 0;
+      const avantImpot = resExploitation - interetsAn;
+      let impot = 0;
+      if (regime === 'micro') impot = produits > 0 ? produits * tauxImpot / 100 : 0;
+      else if (regime === 'is' || regime === 'ir') {
+        let base = avantImpot;
+        if (reportDeficit) {
+          if (base < 0) { deficit += -base; base = 0; }
+          else if (deficit > 0) { const imputation = Math.min(deficit, base); deficit -= imputation; base -= imputation; }
+        }
+        impot = impotSur(base);
+      }
+      const tvaCollectee = tvaOn ? ca * tvaTaux / 100 : 0;
+      const tvaDeductible = tvaOn ? (achats + chargesExternes) * tvaTaux / 100 * tvaPartDeductible / 100 : 0;
+      annees.push({
+        a, ca, autresProduits, produits, achats, chargesExternes, personnel: salaires, va, ebe,
+        amortissements: amort, interets: interetsAn, resExploitation, avantImpot, impot, net: avantImpot - impot,
+        tvaCollectee, tvaDeductible, tvaSolde: tvaCollectee - tvaDeductible, caTTC: tvaOn ? ca * (1 + tvaTaux / 100) : ca,
+      });
+    }
+    return { regime, tauxImpot, tauxReduit, seuilReduit, reportDeficit, tvaOn, tvaTaux, tvaPartDeductible, annees };
+  }
+
+  /* Échéancier MENSUEL d'un emprunt sur `nbMois` mois : tableau [mois 1..nbMois] de
+     { interets, capital }. Même convention que calcEcheancierEmprunt (aucune échéance pendant le
+     différé ; la mensualité saisie prime sur le calcul PMT). */
+  function calcEcheancierMensuel(dette, nbMois) {
+    const n = Math.max(0, Math.floor(num(nbMois)));
+    const sortie = Array.from({ length: n + 1 }, () => ({ interets: 0, capital: 0 }));
+    const montant = num(dette && dette.montant), tauxAnnuel = num(dette && dette.taux);
+    const dureeMois = num(dette && dette.duree), differe = Math.max(0, num(dette && dette.differe));
+    if (!montant || !dureeMois || dureeMois <= differe) return sortie;
+    const mensualite = num(dette.mensualite) > 0 ? num(dette.mensualite) : calcMensualite(montant, tauxAnnuel, dureeMois - differe);
+    const tauxMensuel = tauxAnnuel ? tauxAnnuel / 100 / 12 : 0;
+    let restant = montant;
+    for (let mois = differe + 1; mois <= Math.min(dureeMois, n); mois++) {
+      const interet = restant * tauxMensuel;
+      const capital = Math.min(restant, Math.max(0, mensualite - interet));
+      restant -= capital;
+      sortie[mois] = { interets: interet, capital };
+    }
+    return sortie;
+  }
+
+  /* Trésorerie mensuelle sur 36 mois (par défaut), calculée à partir du compte de résultat annuel.
+     Hypothèses (toutes réglables dans l'éditeur) :
+     - chaque année est répartie sur 12 mois selon la saisonnalité (saison_M1..M12, 1 = mois normal)
+       et, en année 1, une montée en charge linéaire sur `montee_en_charge_mois` mois ;
+     - les achats suivent les ventes, les autres charges sont lissées sur 12 mois ;
+     - les clients règlent après `delai_paiement_clients`, les fournisseurs après
+       `delai_paiement_fournisseurs` (jours → mois arrondis) ; loyers et salaires sont payés le mois même ;
+     - la TVA du mois est reversée le mois suivant (un crédit de TVA se reporte) ;
+     - l'impôt d'une année est payé au 3e mois de l'année suivante ;
+     - au mois 1 : encaissement des ressources du plan de financement (les emprunts détaillés
+       remplacent le poste « Banque »), décaissement des emplois — sauf le poste « Trésorerie »,
+       qui reste en caisse ; puis remboursement mensuel exact des emprunts. */
+  function calcTresorerie(pf, nbMois) {
+    pf = pf || {};
+    const N = Math.max(1, Math.floor(num(nbMois)) || 36);
+    const modele = calcModeleFinancier(pf);
+    const t = modele.tvaTaux / 100, ded = modele.tvaPartDeductible / 100;
+    const dc = Math.max(0, Math.round(parseJours(pf.delai_paiement_clients) / 30));
+    const df = Math.max(0, Math.round(parseJours(pf.delai_paiement_fournisseurs) / 30));
+    const montee = Math.max(0, Math.round(num(pf.montee_en_charge_mois)));
+    const poids = Array.from({ length: 12 }, (_, i) => (has(pf['saison_M' + (i + 1)]) && num(pf['saison_M' + (i + 1)]) >= 0) ? num(pf['saison_M' + (i + 1)]) : 1);
+    const parts = annee => {
+      const w = poids.map((x, i) => x * (annee === 1 && montee > 0 ? Math.min(1, (i + 1) / montee) : 1));
+      const somme = w.reduce((s, x) => s + x, 0);
+      return w.map(x => somme > 0 ? x / somme : 1 / 12);
+    };
+    const tab = () => new Array(N + 1).fill(0);
+    const clients = tab(), autresProduits = tab(), apports = tab(), emprunts = tab(), fournisseurs = tab(), loyers = tab(), salaires = tab(),
+      tva = tab(), impots = tab(), remboursements = tab(), investissements = tab();
+    const tvaDue = tab(); // TVA à régler, mois par mois (avant décalage)
+
+    for (let m = 1; m <= N; m++) {
+      const an = Math.ceil(m / 12), idx = (m - 1) % 12;
+      const y = modele.annees[an - 1];
+      if (!y) continue;
+      const part = parts(an)[idx];
+      const ventesHT = y.ca * part, achats = y.achats * part;
+      const flat = v => v / 12;
+      const loyer = num(pf['loyers_' + an]) / 12, marketing = num(pf['marketing_charge_' + an]) / 12, autre = num(pf['autres_charges_' + an]) / 12;
+      if (m + dc <= N) clients[m + dc] += ventesHT * (1 + t);
+      autresProduits[m] += flat(y.autresProduits);
+      const fournisseursHT = achats + marketing + autre;
+      if (m + df <= N) fournisseurs[m + df] += fournisseursHT * (1 + t * ded);
+      loyers[m] += loyer * (1 + t * ded);
+      salaires[m] += flat(y.personnel);
+      tvaDue[m] = ventesHT * t - (fournisseursHT + loyer) * t * ded;
+    }
+    let credit = 0;
+    for (let m = 1; m < N; m++) {
+      const solde = tvaDue[m] + credit;
+      if (solde > 0) { tva[m + 1] += solde; credit = 0; } else credit = solde;
+    }
+    for (let an = 1; an <= Math.floor(N / 12); an++) {
+      const mois = an * 12 + 3;
+      if (mois <= N && modele.annees[an - 1]) impots[mois] += modele.annees[an - 1].impot;
+    }
+    // Mois 1 : ressources et emplois du plan de financement.
+    const dettes = pf.dettes || [];
+    const totalDettes = dettes.reduce((s, d) => s + num(d.montant), 0);
+    const ressources = RESSOURCES_PF.filter(k => !(k === 'pf_banque' && totalDettes > 0)).reduce((s, k) => s + num(pf[k]), 0);
+    const emplois = EMPLOIS_PF.filter(k => k !== 'pf_tresorerie').reduce((s, k) => s + num(pf[k]), 0);
+    const planVide = RESSOURCES_PF.concat(EMPLOIS_PF).every(k => !num(pf[k]));
+    apports[1] += planVide ? num(pf.apport_personnel) + (totalDettes > 0 ? 0 : num(pf.financement_recherche)) : ressources;
+    investissements[1] += planVide ? num(pf.investissement_initial) : emplois;
+    dettes.forEach(d => {
+      emprunts[1] += num(d.montant);
+      const ech = calcEcheancierMensuel(d, N);
+      for (let m = 1; m <= N; m++) remboursements[m] += ech[m].capital + ech[m].interets;
+    });
+
+    const mois = [];
+    let cumul = 0, min = Infinity, moisMin = 0, premierNegatif = 0;
+    for (let m = 1; m <= N; m++) {
+      const encaissements = clients[m] + autresProduits[m] + apports[m] + emprunts[m];
+      const decaissements = fournisseurs[m] + loyers[m] + salaires[m] + tva[m] + impots[m] + remboursements[m] + investissements[m];
+      const flux = encaissements - decaissements;
+      cumul += flux;
+      if (cumul < min) { min = cumul; moisMin = m; }
+      if (!premierNegatif && cumul < -0.5) premierNegatif = m;
+      mois.push({
+        m, annee: Math.ceil(m / 12), clients: clients[m], autresProduits: autresProduits[m], apports: apports[m], emprunts: emprunts[m],
+        encaissements, fournisseurs: fournisseurs[m], loyers: loyers[m], salaires: salaires[m], tva: tva[m], impots: impots[m],
+        remboursements: remboursements[m], investissements: investissements[m], decaissements, flux, tresorerie: cumul,
+      });
+    }
+    return {
+      mois, delaiClientsMois: dc, delaiFournisseursMois: df,
+      minimum: min, moisMinimum: moisMin, premierMoisNegatif: premierNegatif,
+      besoinComplementaire: Math.max(0, -min),
+      finAn1: mois[Math.min(11, N - 1)].tresorerie, finAn2: N >= 24 ? mois[23].tresorerie : null, fin: cumul,
+    };
+  }
+
+  return { calcAmortissementAnnuel, calcInteretsParAnnee, calcMensualite, calcEcheancierEmprunt, calcDilution, calcScenariosFinancement, calcBFR, detecterIncoherences,
+    parseJours, calcModeleFinancier, calcEcheancierMensuel, calcTresorerie, REGIMES, TAUX_IMPOT_DEFAUT };
 });

@@ -382,6 +382,7 @@
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js?v=13"></script>
 <script src="assets/currency-manager.js"></script>
+<script src="assets/business-plan-calc.js?v=2"></script>
 <!-- Génération PDF réelle (point 17 du cahier des charges "Gestion multidevise" : "il ne suffit
      pas que les conversions apparaissent uniquement dans l'interface") -- même bibliothèque déjà
      utilisée ailleurs sur la plateforme (cv-builder.js), pas une nouvelle dépendance. -->
@@ -694,6 +695,24 @@ function renderPlanFinancier(pf){
       </thead><tbody>
       ${Object.entries(CR_LIGNES).map(([k,label]) => `<tr><td>${label}</td>${anneesCR.map(a=>devisesActives.map(code=>`<td class="num">${celluleMontant(pf[`${k}_${a}`], code)}</td>`).join('')).join('')}</tr>`).join('')}
     </tbody></table></div>`;
+
+    // Résultat après impôt et TVA, quand un régime fiscal ou la TVA sont renseignés (BPCalc : même calcul que l'éditeur).
+    if (typeof BPCalc !== 'undefined') {
+      const mod = BPCalc.calcModeleFinancier(pf);
+      if (mod.regime || mod.tvaOn) {
+        const libImpot = mod.regime === 'micro' ? 'Cotisations et impôt forfaitaires' : mod.regime === 'exonere' ? 'Impôt (structure exonérée)' : 'Impôt sur le résultat';
+        const lignes = [['Résultat avant impôt', y => y.avantImpot, true]];
+        if (mod.regime) lignes.push(['− ' + libImpot, y => y.impot], ['Résultat net', y => y.net, true]);
+        if (mod.tvaOn) lignes.push(['TVA collectée', y => y.tvaCollectee], ['TVA déductible', y => y.tvaDeductible], ['TVA à reverser', y => y.tvaSolde]);
+        html += `<div class="bpv-field" style="margin-top:20px;"><h4>Résultat${mod.regime ? ', impôt' : ''}${mod.tvaOn ? ' et TVA' : ''}</h4></div>
+          <div class="bpv-table-wrap"><table class="bpv-table"><thead>
+            <tr><th${devisesActives.length>1?' rowspan="2"':''}>Ligne</th>${anneesCR.map(a=>`<th class="num" colspan="${devisesActives.length}">Année ${a}</th>`).join('')}</tr>
+            ${devisesActives.length>1 ? `<tr>${anneesCR.map(()=>devisesActives.map(code=>`<th class="num">${esc(code)}</th>`).join('')).join('')}</tr>` : ''}
+          </thead><tbody>
+          ${lignes.map(([label, f, gras]) => `<tr${gras ? ' style="font-weight:800;"' : ''}><td>${label}</td>${anneesCR.map(a=>devisesActives.map(code=>`<td class="num">${celluleMontant(f(mod.annees[a-1]), code)}</td>`).join('')).join('')}</tr>`).join('')}
+        </tbody></table></div>`;
+      }
+    }
   }
 
   // Plan de financement — Ressources / Emplois
