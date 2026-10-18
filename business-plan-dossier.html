@@ -182,7 +182,7 @@ body.dp-inst{--dp-mono:Arial,Helvetica,sans-serif;--dp-display:Arial,Helvetica,s
 
 </div>
 
-<script src="assets/business-plan-calc.js?v=2"></script>
+<script src="assets/business-plan-calc.js?v=3"></script>
 <script src="assets/data.js"></script>
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js?v=13"></script>
@@ -280,8 +280,8 @@ function onTemplateChange(key){
    source, sélection différente. "complet" = comportement actuel, aucune restriction. */
 const FORMATS = {
   complet:     { label:'📄 Business Plan complet', ids:null },
-  bancaire:    { label:'🏦 Dossier bancaire', ids:['resume','traction','marche','finances','planfinancement','tresorerie','tresorerie36','risques','financement','equipe','annexes'] },
-  investisseur:{ label:'💼 Dossier investisseur', ids:['resume','probleme','solution','traction','marche','pestel','swot','bmc','produits','bcg','finances','planfinancement','tresorerie36','risques','financement','equipe'] },
+  bancaire:    { label:'🏦 Dossier bancaire', ids:['resume','traction','marche','finances','prixproduits','massesalariale','planfinancement','tresorerie','tresorerie36','risques','financement','equipe','annexes'] },
+  investisseur:{ label:'💼 Dossier investisseur', ids:['resume','probleme','solution','traction','marche','pestel','swot','bmc','produits','bcg','finances','prixproduits','massesalariale','planfinancement','tresorerie36','risques','financement','equipe'] },
   subvention:  { label:'🏛️ Dossier subvention', ids:['resume','probleme','solution','marche','persona','impact','finances','calendrier','equipe','annexes'] },
   partenaire:  { label:'🤝 Dossier partenaire', ids:['resume','traction','bmc','produits','strategie_marketing','plan_commercial','organisation','equipe'] },
 };
@@ -996,6 +996,71 @@ function pageTresorerie(bp){
   `);
 }
 
+/* ---- Page : Produits (prix, volumes, marges) et masse salariale ----
+   Calculée par BPCalc.calcProduits / calcMasseSalariale (assets/business-plan-calc.js), les mêmes
+   fonctions que l'éditeur. Absente quand ni produits chiffrés ni postes salariés ne sont saisis. */
+function pagePrixMasse(bp, partie){
+  if (typeof BPCalc === 'undefined') return '';
+  const pf = (bp.sections||{}).plan_financier || {};
+  const pr = BPCalc.calcProduits(pf), ms = BPCalc.calcMasseSalariale(pf);
+  if (partie === 'produits' ? pr.vide : ms.vide) return '';
+  const MAX = 8;
+  const ansP = pr.annees.filter(y => y.ca > 0 || y.achats > 0);
+  const ansM = ms.annees.filter(y => y.total > 0);
+  const th = (cols) => cols.map(c => `<th>${c}</th>`).join('');
+  const euro = v => fmtEUR(Math.round(v * 100) / 100);
+  let produits = '';
+  if (partie === 'produits' && !pr.vide) {
+    const liste = pr.produits.slice(0, MAX);
+    const volAns = ansP.map(y => y.a).slice(0, 3);
+    produits = `<p class="block-title">Produits : prix, coûts et volumes</p><table class="doc-table"><thead><tr><th style="text-align:left;">Produit ou service</th>${th(['Prix HT', 'Coût unitaire', 'Marge'].concat(volAns.map(a => 'Volume An ' + a)))}</tr></thead><tbody>
+      ${liste.map(p => `<tr><td>${esc(p.nom || '—')}</td><td>${euro(p.prix)}</td><td>${euro(p.cout)}</td><td>${p.prix > 0 ? Math.round(p.margePct) + ' %' : '—'}</td>${volAns.map(a => `<td>${Number(p.parAn[a-1].vol).toLocaleString('fr-FR')}</td>`).join('')}</tr>`).join('')}
+    </tbody></table>${pr.produits.length > MAX ? `<p style="font-size:9.5px;color:var(--dp-ink-soft);margin:-4px 0 8px;">+ ${pr.produits.length - MAX} autre(s) produit(s) dans le business plan.</p>` : ''}`;
+    if (ansP.length) {
+      produits += `<table class="doc-table"><thead><tr><th style="text-align:left;">Total des produits</th>${th(ansP.map(y => 'An ' + y.a))}</tr></thead><tbody>
+        <tr class="total"><td>Chiffre d'affaires HT</td>${ansP.map(y => `<td>${fmtEUR(Math.round(y.ca))}</td>`).join('')}</tr>
+        <tr><td>Achats et coûts directs</td>${ansP.map(y => `<td>${fmtEUR(-Math.round(y.achats))}</td>`).join('')}</tr>
+        <tr class="total"><td>Marge brute</td>${ansP.map(y => `<td>${fmtEUR(Math.round(y.marge))}</td>`).join('')}</tr>
+        <tr><td>Taux de marge</td>${ansP.map(y => `<td>${y.ca > 0 ? Math.round(y.margePct) + ' %' : '—'}</td>`).join('')}</tr>
+      </tbody></table>`;
+    }
+  }
+  let masse = '';
+  if (partie === 'masse' && !ms.vide) {
+    const liste = ms.postes.slice(0, MAX);
+    const colAns = ansM.map(y => y.a).slice(0, 3);
+    masse = `<p class="block-title">Masse salariale</p><table class="doc-table"><thead><tr><th style="text-align:left;">Poste</th>${th(['Effectif', 'Brut mensuel', 'Embauche'].concat(colAns.map(a => 'Coût An ' + a)))}</tr></thead><tbody>
+      ${liste.map(p => `<tr><td>${esc(p.poste || '—')}</td><td>${Math.round(p.effectif * 10) / 10}</td><td>${euro(p.brut)}</td><td>mois ${p.debut}</td>${colAns.map(a => `<td>${fmtEUR(Math.round(p.couts[a-1]))}</td>`).join('')}</tr>`).join('')}
+    </tbody></table>${ms.postes.length > MAX ? `<p style="font-size:9.5px;color:var(--dp-ink-soft);margin:-4px 0 8px;">+ ${ms.postes.length - MAX} autre(s) poste(s) dans le business plan.</p>` : ''}
+    <table class="doc-table"><thead><tr><th style="text-align:left;">Total</th>${th(ansM.map(y => 'An ' + y.a))}</tr></thead><tbody>
+      <tr><td>Salaires bruts</td>${ansM.map(y => `<td>${fmtEUR(Math.round(y.brut))}</td>`).join('')}</tr>
+      <tr><td>Charges patronales${ms.tauxDefaut ? ' (' + ms.tauxDefaut + ' % par défaut)' : ''}</td>${ansM.map(y => `<td>${fmtEUR(Math.round(y.charges))}</td>`).join('')}</tr>
+      <tr class="total"><td>Coût employeur total</td>${ansM.map(y => `<td>${fmtEUR(Math.round(y.total))}</td>`).join('')}</tr>
+      <tr><td>Effectif moyen (équivalent temps plein)</td>${ansM.map(y => `<td>${(Math.round(y.etp * 10) / 10).toLocaleString('fr-FR')}</td>`).join('')}</tr>
+    </tbody></table>`;
+  }
+  const a1P = pr.annees[0], a1M = ms.annees[0];
+  const kRow = partie === 'produits' ? kpiRow([
+    ['Chiffre d\'affaires (produits) An 1', a1P.ca > 0 ? fmtEUR(Math.round(a1P.ca)) : ''],
+    ['Taux de marge brute An 1', a1P.ca > 0 ? Math.round(a1P.margePct) + ' %' : ''],
+    ['Nombre de produits', String(pr.produits.length)],
+  ]) : kpiRow([
+    ['Coût employeur An 1', a1M.total > 0 ? fmtEUR(Math.round(a1M.total)) : ''],
+    ['Effectif moyen An 1', a1M.etp > 0 ? (Math.round(a1M.etp * 10) / 10).toLocaleString('fr-FR') : ''],
+    ['Nombre de postes', String(ms.postes.length)],
+  ]);
+  const titre = partie === 'produits' ? 'Prix, volumes et marges' : 'Masse salariale';
+  return page(partie === 'produits' ? 'prixproduits' : 'massesalariale','',`
+    ${chromeTop(bp, titre)}
+    <p class="eyebrow-tag">Détail du plan financier</p>
+    <h2 class="pg-title">${titre}</h2>
+    ${kRow}
+    ${produits}
+    ${masse}
+    ${chromeBottom()}
+  `);
+}
+
 /* ---- Page : Trésorerie sur 36 mois (calculée) ----
    Calculée par BPCalc.calcTresorerie (assets/business-plan-calc.js) à partir du compte de résultat,
    du plan de financement, des emprunts, de la TVA et des délais de paiement -- la même source que
@@ -1240,6 +1305,8 @@ function renderDossier(bp, tplKey, formatKey){
     { id:'capsoncas', label:'CAP-SONCAS', html: pageCapSoncas(bp) },
     generic(bp,'plan_operationnel'), generic(bp,'organisation'), generic(bp,'rh'), generic(bp,'calendrier'),
     { id:'finances', label:'Plan financier', html: pageFinances(bp) },
+    { id:'prixproduits', label:'Prix, volumes et marges', html: pagePrixMasse(bp, 'produits') },
+    { id:'massesalariale', label:'Masse salariale', html: pagePrixMasse(bp, 'masse') },
     { id:'planfinancement', label:'Plan de financement', html: pagePlanFinancement(bp) },
     { id:'tresorerie', label:'Trésorerie', html: pageTresorerie(bp) },
     { id:'tresorerie36', label:'Trésorerie 36 mois', html: pageTresorerie36(bp) },
@@ -1257,7 +1324,7 @@ function renderDossier(bp, tplKey, formatKey){
     { num:1, titre:'Le projet', sous:'Résumé, problème et solution', ids:['resume','probleme','solution'] },
     { num:2, titre:'Marché & traction', sous:'Étude de marché, positionnement et preuves', ids:['traction','marche','pestel','persona','swot'] },
     { num:3, titre:'Modèle & opérations', sous:'Business model, produits et organisation', ids:['bmc','produits','bcg','strategie_marketing','plan_commercial','capsoncas','plan_operationnel','organisation','rh','calendrier'] },
-    { num:4, titre:'Finances', sous:'Trajectoire financière, risques et impact', ids:['finances','planfinancement','tresorerie','tresorerie36','risques','impact','financement'] },
+    { num:4, titre:'Finances', sous:'Trajectoire financière, risques et impact', ids:['finances','prixproduits','massesalariale','planfinancement','tresorerie','tresorerie36','risques','impact','financement'] },
     { num:5, titre:"Équipe & annexes", sous:'Qui porte le projet', ids:['equipe','annexes'] },
   ];
   let currentChapitre = null, bodyHtml = '';

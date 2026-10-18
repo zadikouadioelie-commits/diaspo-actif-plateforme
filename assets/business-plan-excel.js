@@ -8,7 +8,7 @@
      écrire dans `plan_financier`, sans rien modifier lui-même.
 
    Les feuilles « Hypothèses », « Compte de résultat », « Plan de financement »,
-   « Immobilisations », « Emprunts » et « Trésorerie 12 mois » sont réimportables (la colonne A,
+   « Immobilisations », « Emprunts », « Produits », « Masse salariale » et « Trésorerie 12 mois » sont réimportables (la colonne A,
    masquée, porte la clé technique de chaque ligne). « Trésorerie 36 mois » est calculée : exportée
    pour lecture, jamais relue. Seules les clés connues sont lues (liste blanche) ; une valeur qui
    n'est pas un nombre valide est ignorée et signalée.
@@ -44,6 +44,8 @@
     ['tva_part_deductible', 'Part des achats et charges ouvrant droit à déduction de TVA (%)', 'Vide = 100 %', 'nombre'],
     ['delai_paiement_clients', 'Délai de paiement des clients (jours)', 'Décale les encaissements', 'jours'],
     ['delai_paiement_fournisseurs', 'Délai de paiement des fournisseurs (jours)', 'Décale les décaissements', 'jours'],
+    ['taux_charges_patronales', 'Taux de charges patronales par défaut (%)', 'Appliqué à tous les postes de la masse salariale sans taux propre', 'nombre'],
+    ['revalorisation_salaires', 'Revalorisation annuelle des salaires (%)', 'Augmentation appliquée à chaque nouvelle année', 'nombre'],
     ['montee_en_charge_mois', 'Montée en charge de l\'année 1 (mois)', 'Les ventes montent progressivement pendant N mois (0 = aucune)', 'nombre'],
   ].concat(MOIS12.map(m => ['saison_' + m, 'Saisonnalité : poids du mois ' + m.slice(1), '1 = mois normal, 2 = deux fois plus de ventes, 0,5 = deux fois moins', 'nombre']))
     .concat([
@@ -61,6 +63,12 @@
     ['duree_amortissement', "Durée d'amortissement (ans)", 'nombre'], ['valeur_residuelle', 'Valeur résiduelle', 'nombre']];
   const EMPRUNTS = [['nom', 'Désignation', 'texte'], ['montant', 'Montant', 'nombre'], ['taux', 'Taux (%)', 'nombre'], ['duree', 'Durée (mois)', 'nombre'],
     ['differe', 'Différé (mois)', 'nombre'], ['mensualite', 'Mensualité', 'nombre'], ['date_debut', 'Date de début (AAAA-MM-JJ)', 'date'], ['date_fin', 'Date de fin (AAAA-MM-JJ)', 'date']];
+
+  const PRODUITS = [['nom', 'Produit ou service', 'texte'], ['prix_ht', 'Prix de vente HT', 'nombre'], ['cout_unitaire', 'Coût unitaire (achat ou revient)', 'nombre']]
+    .concat([1, 2, 3, 4, 5].map(a => ['vol_' + a, 'Volume An ' + a, 'nombre']));
+  const MASSE = [['poste', 'Poste', 'texte'], ['effectif', 'Effectif', 'nombre'], ['brut_mensuel', 'Salaire brut mensuel', 'nombre'],
+    ['debut_mois', "Mois d'embauche (1 = début du projet)", 'nombre'], ['fin_mois', "Mois de fin (vide = jusqu'au bout)", 'nombre'],
+    ['taux_charges', 'Charges patronales (%) — vide = taux par défaut', 'nombre']];
 
   const colLettre = i => { let s = '', n = i + 1; while (n > 0) { const r = (n - 1) % 26; s = String.fromCharCode(65 + r) + s; n = Math.floor((n - 1) / 26); } return s; };
   const arrondi = v => Math.round(v * 100) / 100;
@@ -91,7 +99,7 @@
       ['Exporté depuis Diaspo\'Actif. Montants en ' + (opts.devise || 'devise du projet') + ', hors taxe.'],
       [''],
       ['Comment l\'utiliser'],
-      ['1. Modifiez les cellules de saisie des feuilles : Hypothèses, Compte de résultat, Plan de financement, Immobilisations, Emprunts, Trésorerie 12 mois.'],
+      ['1. Modifiez les cellules de saisie des feuilles : Hypothèses, Compte de résultat, Plan de financement, Immobilisations, Emprunts, Produits, Masse salariale, Trésorerie 12 mois.'],
       ['2. Les lignes de totaux et de résultats sont des formules : ne les écrasez pas.'],
       ['3. De retour dans Diaspo\'Actif (Plan financier), cliquez sur « Importer un fichier Excel » : les valeurs saisies sont relues.'],
       ['4. La feuille « Trésorerie 36 mois » est calculée par Diaspo\'Actif : elle sert à la lecture et n\'est pas relue.'],
@@ -153,6 +161,31 @@
     const emp = [EMPRUNTS.map(d => d[1])];
     listeVersLignes(pf.dettes, EMPRUNTS).forEach(l => emp.push(l));
     ajouter('Emprunts', emp, [40, 16, 12, 14, 14, 16, 26, 26], false);
+
+    // ── Produits (saisie + calcul) ──
+    const prod = [PRODUITS.map(d => d[1]).concat(['Marge unitaire', 'Marge (%)', 'Prix TTC', 'CA An 1', 'CA An 2', 'CA An 3', 'CA An 4', 'CA An 5'])];
+    const modeleProd = BPCalc ? BPCalc.calcProduits(pf) : null;
+    listeVersLignes(pf.produits_liste, PRODUITS).forEach((l, i) => {
+      const r = i + 2, calc = modeleProd && modeleProd.produits[i];
+      const tva = modeleProd ? modeleProd.tva : 0;
+      prod.push(l.concat([
+        cellule(calc ? calc.marge : 0, `B${r}-C${r}`),
+        cellule(calc ? calc.margePct : 0, `IF(B${r}>0,(B${r}-C${r})/B${r}*100,0)`),
+        cellule(calc ? calc.ttc : 0, `B${r}*(1+${tva}/100)`),
+      ].concat([0, 1, 2, 3, 4].map(k => cellule(calc ? calc.parAn[k].ca : 0, `B${r}*${colLettre(3 + k)}${r}`)))));
+    });
+    ajouter('Produits', prod, [36, 16, 22, 14, 14, 14, 14, 14, 16, 12, 14, 14, 14, 14, 14, 14], false);
+
+    // ── Masse salariale (saisie + calcul) ──
+    const ms = BPCalc ? BPCalc.calcMasseSalariale(pf) : null;
+    const masse = [MASSE.map(d => d[1]).concat(['Coût employeur An 1', 'An 2', 'An 3', 'An 4', 'An 5'])];
+    const postesValides = (pf.masse_salariale_liste || []).filter(p => p && num(p.brut_mensuel) > 0);
+    listeVersLignes(pf.masse_salariale_liste, MASSE).forEach(l => {
+      const idx = postesValides.findIndex(p => String(p.poste || '') === String(l[0] || '') && num(p.brut_mensuel) === num(l[2]));
+      const couts = ms && idx >= 0 && ms.postes[idx] ? ms.postes[idx].couts : [0, 0, 0, 0, 0];
+      masse.push(l.concat(couts.map(arrondi)));
+    });
+    ajouter('Masse salariale', masse, [34, 12, 20, 22, 26, 34, 18, 14, 14, 14, 14], false);
 
     // ── Trésorerie 12 mois (saisie) ──
     const t12 = [['Clé', 'Poste'].concat(MOIS12), ['', 'ENTRÉES']];
@@ -282,14 +315,18 @@
       });
       return out;
     };
+    const produits = lireListe('Produits', PRODUITS);
+    const masseSalariale = lireListe('Masse salariale', MASSE);
+    resume.produits = produits ? produits.length : 0;
+    resume.masse = masseSalariale ? masseSalariale.length : 0;
     const immobilisations = lireListe('Immobilisations', IMMOBILISATIONS);
     const dettes = lireListe('Emprunts', EMPRUNTS);
     resume.immobilisations = immobilisations ? immobilisations.length : 0;
     resume.emprunts = dettes ? dettes.length : 0;
 
     const total = Object.values(resume).reduce((s, n) => s + n, 0);
-    return { valeurs, immobilisations, dettes, resume, avertissements, total };
+    return { valeurs, immobilisations, dettes, produits, masseSalariale, resume, avertissements, total };
   }
 
-  return { construireClasseur, lireClasseur, HYPOTHESES, LIGNES_CR, IMMOBILISATIONS, EMPRUNTS };
+  return { construireClasseur, lireClasseur, HYPOTHESES, LIGNES_CR, IMMOBILISATIONS, EMPRUNTS, PRODUITS, MASSE };
 });

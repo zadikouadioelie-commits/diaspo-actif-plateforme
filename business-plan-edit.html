@@ -543,8 +543,8 @@ body.bp-type-agriculture .bp-conditionnel-agriculture { display: block; }
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@4.0.1/dist/pptxgen.bundle.js"></script>
 <!-- Fonctions de calcul pures (2026-09-01, consolidation) -- voir assets/business-plan-calc.js
      pour le pourquoi (testabilité, fin de la duplication de logique). -->
-<script src="assets/business-plan-calc.js?v=2"></script>
-<script src="assets/business-plan-excel.js?v=1"></script>
+<script src="assets/business-plan-calc.js?v=3"></script>
+<script src="assets/business-plan-excel.js?v=2"></script>
 <script src="assets/bp-test-questions.js?v=1"></script>
 <script>
 /* ===================================================
@@ -3416,6 +3416,10 @@ function renderFinancier() {
 
     ${bpFiscalHTML(s)}
 
+    ${bpProduitsHTML(s)}
+
+    ${bpMasseHTML(s)}
+
     <div class="bp-card-inner">
       <h3>Compte de résultat prévisionnel</h3>
       <div style="overflow-x:auto;">
@@ -3542,6 +3546,165 @@ function renderFinancier() {
    le format Excel dans assets/business-plan-excel.js. Ici : seulement l'affichage et les saisies.
    Sans régime fiscal ni TVA renseignés, rien ne change pour les plans existants. */
 function bpAttr(v){ return esc(v).replace(/"/g,'&quot;'); }
+/* ═══════ Produits (prix × volumes) et masse salariale détaillée (2026-10-18) ═══════
+   Calcul dans assets/business-plan-calc.js (BPCalc.calcProduits / calcMasseSalariale). Ici : saisie
+   en tableaux et deux boutons qui reportent les totaux dans le compte de résultat — jamais de
+   remplacement silencieux : on confirme quand une valeur déjà saisie va changer. */
+function bpListeAssurer(cle) {
+  if (!sections.plan_financier) sections.plan_financier = {};
+  if (!Array.isArray(sections.plan_financier[cle])) sections.plan_financier[cle] = [];
+  return sections.plan_financier[cle];
+}
+function bpListeRendre(cle) {
+  const l = bpListeAssurer(cle);
+  const el = document.getElementById(cle === 'produits_liste' ? 'prod-table' : 'masse-table');
+  if (el) el.innerHTML = cle === 'produits_liste' ? bpProduitsTable(l.length ? l : [{}]) : bpMasseTable(l.length ? l : [{}]);
+}
+function bpListeMaj(cle, i, champ, val) {
+  const l = bpListeAssurer(cle);
+  while (l.length <= i) l.push({});
+  l[i][champ] = val;
+  markDirty(); calcAllFinance();
+}
+function bpListeAjouter(cle) {
+  const l = bpListeAssurer(cle);
+  if (!l.length) l.push({});
+  l.push({});
+  bpListeRendre(cle); markDirty(); calcAllFinance();
+}
+function bpListeSupprimer(cle, i) {
+  bpListeAssurer(cle).splice(i, 1);
+  bpListeRendre(cle); markDirty(); calcAllFinance();
+}
+function bpCelluleSaisie(cle, i, champ, valeur, largeur, placeholder, type) {
+  const ro = monRole === 'lecteur';
+  return `<input type="${type || 'number'}" step="any" value="${bpAttr(valeur || '')}" placeholder="${placeholder || ''}" style="width:${largeur}px;min-width:${largeur}px;${type === 'text' ? 'text-align:left;' : ''}" ${ro ? 'readonly' : ''} oninput="bpListeMaj('${cle}',${i},'${champ}',this.value)">`;
+}
+function bpBoutonSupprimer(cle, i) {
+  return monRole === 'lecteur' ? '' : `<button onclick="bpListeSupprimer('${cle}',${i})" style="background:none;border:none;cursor:pointer;color:var(--muted);" title="Retirer cette ligne">✕</button>`;
+}
+
+function bpProduitsTable(liste) {
+  const c = (i, k, v, w, ph, type) => bpCelluleSaisie('produits_liste', i, k, v, w, ph, type);
+  return `<table class="fin-table"><thead><tr><th style="min-width:180px;">Produit ou service</th><th>Prix de vente HT</th><th>Coût unitaire</th><th>Marge unitaire</th><th>Marge</th><th>Prix TTC</th>${[1,2,3,4,5].map(a => `<th>Volume An ${a}</th>`).join('')}<th></th></tr></thead><tbody>
+    ${liste.map((p, i) => `<tr><td>${c(i,'nom',p.nom,180,'Ex : Mangue séchée 200 g','text')}</td><td>${c(i,'prix_ht',p.prix_ht,84)}</td><td>${c(i,'cout_unitaire',p.cout_unitaire,84)}</td><td id="prod-m-${i}">—</td><td id="prod-mp-${i}">—</td><td id="prod-ttc-${i}">—</td>${[1,2,3,4,5].map(a => `<td>${c(i,'vol_'+a,p['vol_'+a],84,'0')}</td>`).join('')}<td>${bpBoutonSupprimer('produits_liste', i)}</td></tr>`).join('')}
+  </tbody></table>`;
+}
+function bpProduitsHTML(s) {
+  const ro = monRole === 'lecteur';
+  const liste = s.produits_liste && s.produits_liste.length ? s.produits_liste : [{}];
+  return `<div class="bp-card-inner">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+      <h3 style="margin:0;">🛒 Produits : prix, volumes et marges</h3>
+      ${ro ? '' : `<div style="display:flex;gap:6px;flex-wrap:wrap;"><button class="btn btn-outline btn-sm" onclick="bpListeAjouter('produits_liste')">+ Ajouter un produit</button><button class="btn btn-outline btn-sm" onclick="bpProduitsDepuisEtude()">↧ Reprendre l'étude de prix</button></div>`}
+    </div>
+    <p style="font-size:12.5px;color:var(--muted);margin-top:0;">Un produit par ligne : prix de vente hors taxe, coût unitaire (achat ou revient) et volumes vendus chaque année. Le chiffre d'affaires, les achats et la marge se calculent tout seuls.</p>
+    <div style="overflow-x:auto;"><div id="prod-table">${bpProduitsTable(liste)}</div></div>
+    <div id="prod-totaux" style="margin-top:10px;overflow-x:auto;"></div>
+    ${ro ? '' : `<div style="text-align:right;margin-top:8px;"><button class="btn btn-outline btn-sm" onclick="bpReporterProduits()">➡️ Reporter le chiffre d'affaires et les achats dans le compte de résultat</button></div>`}
+  </div>`;
+}
+function bpMajProduits() {
+  const tot = document.getElementById('prod-totaux');
+  if (!tot) return;
+  const s = sections.plan_financier || {};
+  const pr = BPCalc.calcProduits(s);
+  const n = v => parseFloat(v) || 0;
+  (s.produits_liste && s.produits_liste.length ? s.produits_liste : [{}]).forEach((p, i) => {
+    const prix = n(p.prix_ht), cout = n(p.cout_unitaire);
+    const set = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
+    const vide = !prix && !cout;
+    set(`prod-m-${i}`, vide ? '—' : fmtEuro(prix - cout));
+    set(`prod-mp-${i}`, prix > 0 ? ((prix - cout) / prix * 100).toFixed(1) + ' %' : '—');
+    set(`prod-ttc-${i}`, prix > 0 ? fmtEuro(prix * (1 + pr.tva / 100)) : '—');
+  });
+  if (!pr.avecVolumes) { tot.innerHTML = '<div style="font-size:12.5px;color:var(--muted);">Renseignez les volumes vendus pour voir le chiffre d\'affaires, les achats et la marge par année.</div>'; return; }
+  const ligne = (l, f, gras) => `<tr${gras ? ' class="total-row"' : ''}><td>${l}</td>${pr.annees.map(y => `<td>${f(y)}</td>`).join('')}</tr>`;
+  tot.innerHTML = `<table class="fin-table"><thead><tr><th>Total des produits</th>${pr.annees.map(y => `<th>An ${y.a}</th>`).join('')}</tr></thead><tbody>
+    ${ligne('Chiffre d\'affaires HT', y => fmtEuro(Math.round(y.ca)), true)}${ligne('Achats et coûts directs', y => fmtEuro(Math.round(y.achats)))}${ligne('Marge brute', y => fmtEuro(Math.round(y.marge)), true)}${ligne('Taux de marge', y => y.ca > 0 ? y.margePct.toFixed(1) + ' %' : '—')}
+  </tbody></table>`;
+}
+function bpReporterProduits() {
+  const s = sections.plan_financier || {};
+  const pr = BPCalc.calcProduits(s);
+  if (!pr.avecVolumes) { alert('Renseignez d\'abord les prix et les volumes des produits.'); return; }
+  const diff = pr.annees.filter(y => y.ca > 0 && ((s['ca_' + y.a] || '') !== '' && Math.abs(parseFloat(s['ca_' + y.a]) - y.ca) > 0.5));
+  if (diff.length && !confirm(`Le chiffre d'affaires déjà saisi pour ${diff.map(y => 'l\'An ' + y.a).join(', ')} sera remplacé par le total des produits. Continuer ?`)) return;
+  pr.annees.forEach(y => {
+    if (y.ca > 0) s['ca_' + y.a] = String(Math.round(y.ca * 100) / 100);
+    if (y.achats > 0) s['achats_' + y.a] = String(Math.round(y.achats * 100) / 100);
+  });
+  markDirty(); renderSection('plan_financier'); calcAllFinance();
+}
+function bpProduitsDepuisEtude() {
+  const etude = (sections.produits && sections.produits.etude_prix) || [];
+  const l = bpListeAssurer('produits_liste');
+  const existants = new Set(l.map(p => String(p.nom || '').trim().toLowerCase()));
+  let ajoutes = 0;
+  etude.forEach(e => {
+    const nom = String(e.produit || '').trim();
+    if (!nom || existants.has(nom.toLowerCase())) return;
+    const ligne = { nom, prix_ht: e.prix_vente || '', cout_unitaire: e.cout_revient || '' };
+    if (e.volume_estime) ligne.vol_1 = e.volume_estime;
+    const vide = l.findIndex(p => !p || !Object.keys(p).some(k => String(p[k] || '').trim() !== ''));
+    if (vide >= 0) l[vide] = ligne; else l.push(ligne);
+    ajoutes++;
+  });
+  if (!ajoutes) { alert(etude.length ? 'Tous les produits de l\'étude de prix sont déjà dans ce tableau.' : 'Aucun produit dans l\'étude de prix (rubrique « Produits & Services »).'); return; }
+  bpListeRendre('produits_liste'); markDirty(); calcAllFinance();
+}
+
+function bpMasseTable(liste) {
+  const c = (i, k, v, w, ph, type) => bpCelluleSaisie('masse_salariale_liste', i, k, v, w, ph, type);
+  return `<table class="fin-table"><thead><tr><th style="min-width:170px;">Poste</th><th>Effectif</th><th>Salaire brut mensuel</th><th>Embauche (mois)</th><th>Fin (mois)</th><th>Charges patronales (%)</th>${[1,2,3,4,5].map(a => `<th>Coût An ${a}</th>`).join('')}<th></th></tr></thead><tbody>
+    ${liste.map((p, i) => `<tr><td>${c(i,'poste',p.poste,170,'Ex : Responsable production','text')}</td><td>${c(i,'effectif',p.effectif,64,'1')}</td><td>${c(i,'brut_mensuel',p.brut_mensuel,96)}</td><td>${c(i,'debut_mois',p.debut_mois,76,'1')}</td><td>${c(i,'fin_mois',p.fin_mois,76,'—')}</td><td>${c(i,'taux_charges',p.taux_charges,84,'défaut')}</td>${[1,2,3,4,5].map(a => `<td id="masse-c-${i}-${a}">—</td>`).join('')}<td>${bpBoutonSupprimer('masse_salariale_liste', i)}</td></tr>`).join('')}
+  </tbody></table>`;
+}
+function bpMasseHTML(s) {
+  const ro = monRole === 'lecteur';
+  const liste = s.masse_salariale_liste && s.masse_salariale_liste.length ? s.masse_salariale_liste : [{}];
+  const g = (k, ph) => `<input type="number" step="any" data-key="${k}" value="${bpAttr(s[k] || '')}" placeholder="${ph}" ${ro ? 'readonly' : ''} oninput="updFin('${k}',this.value);calcAllFinance()">`;
+  return `<div class="bp-card-inner">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+      <h3 style="margin:0;">👥 Masse salariale (détail par poste)</h3>
+      ${ro ? '' : `<button class="btn btn-outline btn-sm" onclick="bpListeAjouter('masse_salariale_liste')">+ Ajouter un poste</button>`}
+    </div>
+    <p style="font-size:12.5px;color:var(--muted);margin-top:0;">Un poste par ligne : effectif, salaire brut mensuel et période d'emploi (mois 1 = début du projet). Le coût employeur ajoute les charges patronales, avec une revalorisation chaque année.</p>
+    <div class="fg">
+      <div><label>Charges patronales par défaut (%)</label>${g('taux_charges_patronales', 'ex : 25 — selon votre pays')}</div>
+      <div><label>Revalorisation annuelle des salaires (%)</label>${g('revalorisation_salaires', 'ex : 3')}</div>
+    </div>
+    <div style="overflow-x:auto;margin-top:8px;"><div id="masse-table">${bpMasseTable(liste)}</div></div>
+    <div id="masse-totaux" style="margin-top:10px;overflow-x:auto;"></div>
+    ${ro ? '' : `<div style="text-align:right;margin-top:8px;"><button class="btn btn-outline btn-sm" onclick="bpReporterMasse()">➡️ Reporter dans « Salaires & charges » du compte de résultat</button></div>`}
+  </div>`;
+}
+function bpMajMasse() {
+  const tot = document.getElementById('masse-totaux');
+  if (!tot) return;
+  const s = sections.plan_financier || {};
+  const ms = BPCalc.calcMasseSalariale(s);
+  (s.masse_salariale_liste && s.masse_salariale_liste.length ? s.masse_salariale_liste : [{}]).forEach((p, i) => {
+    const poste = BPCalc.calcMasseSalariale({ ...s, masse_salariale_liste: [p] }).postes[0];
+    for (let a = 1; a <= 5; a++) { const el = document.getElementById(`masse-c-${i}-${a}`); if (el) el.textContent = poste ? fmtEuro(Math.round(poste.couts[a - 1])) : '—'; }
+  });
+  if (ms.vide) { tot.innerHTML = '<div style="font-size:12.5px;color:var(--muted);">Renseignez au moins un poste avec un salaire brut mensuel pour voir la masse salariale.</div>'; return; }
+  const ligne = (l, f, gras) => `<tr${gras ? ' class="total-row"' : ''}><td>${l}</td>${ms.annees.map(y => `<td>${f(y)}</td>`).join('')}</tr>`;
+  tot.innerHTML = (ms.tauxDefaut === 0 && ms.postes.some(p => p.taux === 0) ? '<div class="pf-balance ko" style="text-align:left;margin:0 0 8px;">⚠️ Aucun taux de charges patronales : le coût employeur est sous-estimé. Renseignez le taux de votre pays.</div>' : '')
+    + `<table class="fin-table"><thead><tr><th>Total de la masse salariale</th>${ms.annees.map(y => `<th>An ${y.a}</th>`).join('')}</tr></thead><tbody>
+    ${ligne('Salaires bruts', y => fmtEuro(Math.round(y.brut)))}${ligne('Charges patronales', y => fmtEuro(Math.round(y.charges)))}${ligne('Coût employeur total', y => fmtEuro(Math.round(y.total)), true)}${ligne('Effectif moyen (équivalent temps plein)', y => (Math.round(y.etp * 10) / 10).toLocaleString('fr-FR'))}
+  </tbody></table>`;
+}
+function bpReporterMasse() {
+  const s = sections.plan_financier || {};
+  const ms = BPCalc.calcMasseSalariale(s);
+  if (ms.vide) { alert('Renseignez d\'abord au moins un poste avec un salaire brut mensuel.'); return; }
+  const diff = ms.annees.filter(y => y.total > 0 && ((s['salaires_' + y.a] || '') !== '' && Math.abs(parseFloat(s['salaires_' + y.a]) - y.total) > 0.5));
+  if (diff.length && !confirm(`Les salaires déjà saisis pour ${diff.map(y => 'l\'An ' + y.a).join(', ')} seront remplacés par le coût employeur détaillé. Continuer ?`)) return;
+  ms.annees.forEach(y => { if (y.total > 0) s['salaires_' + y.a] = String(Math.round(y.total * 100) / 100); });
+  markDirty(); renderSection('plan_financier'); calcAllFinance();
+}
+
 function bpFiscalHTML(s) {
   const ro = monRole==='lecteur';
   const sel = (key, defaut, options) => `<select data-key="${key}" ${ro?'disabled':''} onchange="updFin('${key}',this.value);calcAllFinance()">${options.map(([v,l])=>`<option value="${v}" ${((s[key]||defaut)===v)?'selected':''}>${l}</option>`).join('')}</select>`;
@@ -3719,14 +3882,16 @@ async function bpExcelImporter(input) {
     const XLSX = await bpChargerXLSX();
     const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' });
     const r = BPExcel.lireClasseur(XLSX, wb, sections.plan_financier || {}, bpExcelOpts());
-    if (!r.total) { bpExcelMsg('Aucune donnée reconnue : utilisez le modèle téléchargé depuis cette page (feuilles Hypothèses, Compte de résultat, Plan de financement, Immobilisations, Emprunts, Trésorerie 12 mois).', false); return; }
+    if (!r.total) { bpExcelMsg('Aucune donnée reconnue : utilisez le modèle téléchargé depuis cette page (feuilles Hypothèses, Compte de résultat, Plan de financement, Immobilisations, Emprunts, Produits, Masse salariale, Trésorerie 12 mois).', false); return; }
     const L = r.resume;
-    const detail = `${L.hypotheses} hypothèses, ${L.resultat} lignes du compte de résultat, ${L.financement} postes du plan de financement, ${L.tresorerie} cases de trésorerie, ${L.immobilisations} immobilisations, ${L.emprunts} emprunts`;
+    const detail = `${L.hypotheses} hypothèses, ${L.resultat} lignes du compte de résultat, ${L.financement} postes du plan de financement, ${L.tresorerie} cases de trésorerie, ${L.immobilisations} immobilisations, ${L.emprunts} emprunts, ${L.produits} produits, ${L.masse} postes de masse salariale`;
     if (!confirm(`Importer ce fichier ?\n\n${detail}.\n\nLes valeurs correspondantes de ce plan seront remplacées (les autres restent intactes).`)) { bpExcelMsg('Import annulé.', true); return; }
     if (!sections.plan_financier) sections.plan_financier = {};
     Object.entries(r.valeurs).forEach(([k, v]) => { sections.plan_financier[k] = v; });
     if (r.immobilisations && r.immobilisations.length) sections.plan_financier.immobilisations_liste = r.immobilisations;
     if (r.dettes && r.dettes.length) sections.plan_financier.dettes = r.dettes;
+    if (r.produits && r.produits.length) sections.plan_financier.produits_liste = r.produits;
+    if (r.masseSalariale && r.masseSalariale.length) sections.plan_financier.masse_salariale_liste = r.masseSalariale;
     markDirty();
     renderSection('plan_financier');
     calcAllFinance();
@@ -3994,6 +4159,8 @@ function calcAllFinance() {
   bpAfficherSuggestionCA();
   bpAfficherBFRCalcule();
   bpFiscUI();
+  bpMajProduits();
+  bpMajMasse();
   bpCalcTreso36();
 }
 /* BFR calculé (2026-09-01, consolidation) -- affiché en complément du champ texte libre

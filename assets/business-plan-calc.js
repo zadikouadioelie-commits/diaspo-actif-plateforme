@@ -238,6 +238,23 @@
         cible: 'plan_financier' });
     }
 
+    // 9. Salaires du compte de résultat différents de la masse salariale détaillée (par année)
+    const ms = calcMasseSalariale(fin);
+    if (!ms.vide) {
+      const an = ms.annees.find(y => y.total > 0 && has(fin['salaires_' + y.a]) && Math.abs(num(fin['salaires_' + y.a]) - y.total) > Math.max(500, y.total * 0.1));
+      if (an) alertes.push({ titre: 'Salaires du compte de résultat différents de la masse salariale détaillée',
+        detail: `An ${an.a} : « Salaires & charges » saisi ${Math.round(num(fin['salaires_' + an.a]))}, masse salariale détaillée (charges patronales comprises) ${Math.round(an.total)}.`,
+        cible: 'plan_financier' });
+    }
+    // 10. Chiffre d'affaires du compte de résultat différent du total des produits (prix × volumes)
+    const pr = calcProduits(fin);
+    if (pr.avecVolumes) {
+      const an = pr.annees.find(y => y.ca > 0 && has(fin['ca_' + y.a]) && Math.abs(num(fin['ca_' + y.a]) - y.ca) > Math.max(500, y.ca * 0.1));
+      if (an) alertes.push({ titre: 'Chiffre d\'affaires différent du total des produits (prix × volumes)',
+        detail: `An ${an.a} : chiffre d'affaires saisi ${Math.round(num(fin['ca_' + an.a]))}, total des produits ${Math.round(an.ca)}.`,
+        cible: 'plan_financier' });
+    }
+
     // 8. Trésorerie négative dans les 36 premiers mois (calculée avec les délais de paiement, la TVA,
     //    les emprunts et le plan de financement) : un projet rentable peut manquer de cash.
     if (has(fin.ca_1) && num(fin.ca_1) > 0) {
@@ -445,6 +462,58 @@
     };
   }
 
+  /* ═══════════════ Masse salariale et tableaux par produit (2026-10-18) ═══════════════ */
+
+  /* Masse salariale détaillée sur 5 ans. Chaque poste : effectif, salaire brut mensuel, mois
+     d'embauche (1 = premier mois du projet) et de fin (vide = jusqu'au bout), taux de charges
+     patronales propre (vide = taux par défaut du plan). Le salaire est revalorisé chaque année de
+     `revalorisation_salaires` %. Coût employeur = brut × (1 + charges patronales). */
+  function calcMasseSalariale(pf) {
+    pf = pf || {};
+    const tauxDefaut = has(pf.taux_charges_patronales) ? Math.max(0, num(pf.taux_charges_patronales)) : 0;
+    const reval = has(pf.revalorisation_salaires) ? num(pf.revalorisation_salaires) : 0;
+    const liste = (pf.masse_salariale_liste || []).filter(p => p && (has(p.brut_mensuel) || has(p.effectif)) && num(p.brut_mensuel) > 0);
+    const annees = [1, 2, 3, 4, 5].map(a => ({ a, brut: 0, charges: 0, total: 0, etp: 0 }));
+    const postes = liste.map(p => {
+      const effectif = has(p.effectif) ? Math.max(0, num(p.effectif)) : 1;
+      const debut = has(p.debut_mois) ? Math.max(1, Math.floor(num(p.debut_mois))) : 1;
+      const fin = has(p.fin_mois) && num(p.fin_mois) > 0 ? Math.floor(num(p.fin_mois)) : 60;
+      const taux = has(p.taux_charges) ? Math.max(0, num(p.taux_charges)) : tauxDefaut;
+      const couts = [1, 2, 3, 4, 5].map(a => {
+        const mois = Math.max(0, Math.min(fin, 12 * a) - Math.max(debut, 12 * (a - 1) + 1) + 1);
+        const brut = effectif * num(p.brut_mensuel) * Math.pow(1 + reval / 100, a - 1) * mois;
+        const charges = brut * taux / 100;
+        const y = annees[a - 1];
+        y.brut += brut; y.charges += charges; y.total += brut + charges; y.etp += effectif * mois / 12;
+        return brut + charges;
+      });
+      return { poste: p.poste || '', effectif, brut: num(p.brut_mensuel), debut, fin, taux, couts };
+    });
+    return { annees, postes, tauxDefaut, reval, vide: !postes.length };
+  }
+
+  /* Produits : prix de vente HT, coût unitaire, volumes par année (vol_1..vol_5). Donne la marge
+     unitaire, le prix TTC (avec la TVA du plan si elle est activée) et, par année, le chiffre
+     d'affaires, les achats et la marge brute — de quoi alimenter le compte de résultat. */
+  function calcProduits(pf) {
+    pf = pf || {};
+    const tva = pf.tva_assujetti === 'oui' ? (has(pf.tva_taux) ? Math.max(0, num(pf.tva_taux)) : 20) : 0;
+    const liste = (pf.produits_liste || []).filter(p => p && (has(p.nom) || has(p.prix_ht)));
+    const annees = [1, 2, 3, 4, 5].map(a => ({ a, ca: 0, achats: 0, marge: 0 }));
+    const produits = liste.map(p => {
+      const prix = num(p.prix_ht), cout = num(p.cout_unitaire);
+      const parAn = [1, 2, 3, 4, 5].map(a => {
+        const vol = num(p['vol_' + a]);
+        const ligne = { vol, ca: prix * vol, achats: cout * vol, marge: (prix - cout) * vol };
+        const y = annees[a - 1]; y.ca += ligne.ca; y.achats += ligne.achats; y.marge += ligne.marge;
+        return ligne;
+      });
+      return { nom: p.nom || '', prix, cout, marge: prix - cout, margePct: prix > 0 ? (prix - cout) / prix * 100 : 0, ttc: prix * (1 + tva / 100), parAn };
+    });
+    annees.forEach(y => { y.margePct = y.ca > 0 ? y.marge / y.ca * 100 : 0; });
+    return { produits, annees, tva, avecVolumes: annees.some(y => y.ca > 0 || y.achats > 0), vide: !produits.length };
+  }
+
   return { calcAmortissementAnnuel, calcInteretsParAnnee, calcMensualite, calcEcheancierEmprunt, calcDilution, calcScenariosFinancement, calcBFR, detecterIncoherences,
-    parseJours, calcModeleFinancier, calcEcheancierMensuel, calcTresorerie, REGIMES, TAUX_IMPOT_DEFAUT };
+    parseJours, calcModeleFinancier, calcEcheancierMensuel, calcTresorerie, calcMasseSalariale, calcProduits, REGIMES, TAUX_IMPOT_DEFAUT };
 });

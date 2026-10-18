@@ -382,7 +382,7 @@
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js?v=13"></script>
 <script src="assets/currency-manager.js"></script>
-<script src="assets/business-plan-calc.js?v=2"></script>
+<script src="assets/business-plan-calc.js?v=3"></script>
 <!-- Génération PDF réelle (point 17 du cahier des charges "Gestion multidevise" : "il ne suffit
      pas que les conversions apparaissent uniquement dans l'interface") -- même bibliothèque déjà
      utilisée ailleurs sur la plateforme (cv-builder.js), pas une nouvelle dépendance. -->
@@ -712,6 +712,30 @@ function renderPlanFinancier(pf){
           ${lignes.map(([label, f, gras]) => `<tr${gras ? ' style="font-weight:800;"' : ''}><td>${label}</td>${anneesCR.map(a=>devisesActives.map(code=>`<td class="num">${celluleMontant(f(mod.annees[a-1]), code)}</td>`).join('')).join('')}</tr>`).join('')}
         </tbody></table></div>`;
       }
+    }
+  }
+
+  // Produits (prix × volumes) et masse salariale détaillée -- mêmes calculs que l'éditeur (BPCalc).
+  if (typeof BPCalc !== 'undefined') {
+    const pr = BPCalc.calcProduits(pf);
+    if (!pr.vide) {
+      const ans = pr.annees.filter(y => y.ca > 0 || y.achats > 0);
+      html += `<div class="bpv-field" style="margin-top:20px;"><h4>Produits : prix, volumes et marges</h4></div>
+        <div class="bpv-table-wrap"><table class="bpv-table"><thead><tr><th>Produit ou service</th><th class="num">Prix HT</th><th class="num">Coût unitaire</th><th class="num">Marge</th>${ans.map(y => `<th class="num">Volume An ${y.a}</th>`).join('')}</tr></thead><tbody>
+          ${pr.produits.map(p => `<tr><td>${esc(p.nom || '—')}</td><td class="num">${fmtMontant(p.prix)}</td><td class="num">${fmtMontant(p.cout)}</td><td class="num">${p.prix > 0 ? Math.round(p.margePct) + ' %' : '—'}</td>${ans.map(y => `<td class="num">${Number(p.parAn[y.a-1].vol).toLocaleString('fr-FR')}</td>`).join('')}</tr>`).join('')}
+          ${ans.length ? `<tr style="font-weight:800;"><td colspan="4">Chiffre d'affaires HT / marge brute</td>${ans.map(y => `<td class="num">${fmtMontant(Math.round(y.ca))}<br><small>${fmtMontant(Math.round(y.marge))}</small></td>`).join('')}</tr>` : ''}
+        </tbody></table></div>`;
+    }
+    const ms = BPCalc.calcMasseSalariale(pf);
+    if (!ms.vide) {
+      const ans = ms.annees.filter(y => y.total > 0);
+      html += `<div class="bpv-field" style="margin-top:20px;"><h4>Masse salariale</h4></div>
+        <div class="bpv-table-wrap"><table class="bpv-table"><thead><tr><th>Ligne</th>${ans.map(y => `<th class="num">Année ${y.a}</th>`).join('')}</tr></thead><tbody>
+          <tr><td>Salaires bruts</td>${ans.map(y => `<td class="num">${fmtMontant(Math.round(y.brut))}</td>`).join('')}</tr>
+          <tr><td>Charges patronales${ms.tauxDefaut ? ' (' + ms.tauxDefaut + ' % par défaut)' : ''}</td>${ans.map(y => `<td class="num">${fmtMontant(Math.round(y.charges))}</td>`).join('')}</tr>
+          <tr style="font-weight:800;"><td>Coût employeur total</td>${ans.map(y => `<td class="num">${fmtMontant(Math.round(y.total))}</td>`).join('')}</tr>
+          <tr><td>Effectif moyen (équivalent temps plein)</td>${ans.map(y => `<td class="num">${(Math.round(y.etp * 10) / 10).toLocaleString('fr-FR')}</td>`).join('')}</tr>
+        </tbody></table></div>`;
     }
   }
 
