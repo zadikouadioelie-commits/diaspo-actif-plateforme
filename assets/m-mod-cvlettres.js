@@ -365,6 +365,9 @@
     const expe = [[x.exp_prenom, x.exp_nom].filter(Boolean).join(' '), x.exp_adresse, x.exp_ville, x.exp_tel, x.exp_email];
     const dest = [x.dest_nom, x.dest_fonction, x.dest_entreprise, x.dest_adresse];
     const vide = !x.corps;
+    /* Lettre mise en forme sur ordinateur (couleurs, polices…) : affichée avec sa mise en forme, nettoyée par le même filtre que les gabarits. */
+    let corpsRiche = '';
+    if (x.corps_html) { try { await ensureLibs('lettre', false); if (window._leRich) corpsRiche = _leRich(x.corps_html); } catch (e) {} if (!here(my)) return; }
     const html = `<div class="row" style="gap:8px;margin:0 2px 10px;flex-wrap:wrap"><span class="badge">Gabarit ${esc(LM_GAB[tpl])}</span><span class="small muted">Lettre n° ${esc(lm.numero)} · modifiée le ${esc(fmtDate(lm.updated_at))}</span></div>
       ${vide ? `<div class="mcl-note"><span>${ic('file', 's')}</span><span>Cette lettre est encore vide. Touchez « Modifier » pour écrire votre texte.</span></div>` : ''}
       <div class="mcl-paper">
@@ -372,7 +375,7 @@
         ${dest.some(Boolean) ? `<div class="r">${nl(dest)}</div>` : ''}
         ${x.lieu_date ? `<div class="muted" style="font-size:14px;margin-top:10px">${esc(x.lieu_date)}</div>` : ''}
         ${x.objet ? `<div style="margin-top:12px"><b>Objet :</b> ${esc(x.objet)}</div>` : ''}
-        <div class="c">${esc(x.corps || '')}</div>
+        ${corpsRiche ? `<div class="c le-rich" style="white-space:normal">${corpsRiche}</div>` : `<div class="c">${esc(x.corps || '')}</div>`}
         <div>${esc(x.sig_texte || [x.exp_prenom, x.exp_nom].filter(Boolean).join(' '))}</div>
         ${x.sig_image ? `<img src="${A.attrUrl(x.sig_image)}" alt="Signature" style="max-height:60px;margin-top:8px;display:block">` : ''}
       </div>
@@ -470,7 +473,7 @@
       const T = window.LETTRE_TEMPLATES && (window.LETTRE_TEMPLATES[tpl] || window.LETTRE_TEMPLATES.classique);
       if (!T) throw Object.assign(new Error('gabarit'), { userMsg: 'Le gabarit de la lettre est introuvable.' });
       const style = Object.assign({}, LM_STYLE, d.style);
-      const m = { prenom: d.exp_prenom, nom: d.exp_nom, adresse: d.exp_adresse, ville: d.exp_ville, tel: d.exp_tel, email: d.exp_email, destNom: d.dest_nom, destFonction: d.dest_fonction, destEntreprise: d.dest_entreprise, destAdresse: d.dest_adresse, lieuDate: d.lieu_date, objet: d.objet, corps: d.corps, sigTexte: d.sig_texte, sigData: d.sig_image, qr: d.qr };
+      const m = { prenom: d.exp_prenom, nom: d.exp_nom, adresse: d.exp_adresse, ville: d.exp_ville, tel: d.exp_tel, email: d.exp_email, destNom: d.dest_nom, destFonction: d.dest_fonction, destEntreprise: d.dest_entreprise, destAdresse: d.dest_adresse, lieuDate: d.lieu_date, objet: d.objet, corps: d.corps, corpsHtml: d.corps_html, sigTexte: d.sig_texte, sigData: d.sig_image, qr: d.qr };
       html = T.render(m, style);
       wrap = `width:210mm;min-height:297mm;background:#fff;padding:30mm 25mm;box-shadow:none;box-sizing:border-box;font-family:${style.font};font-size:${style.fontSize}pt;line-height:1.7;`;
     }
@@ -659,7 +662,7 @@
       <div class="mcl-sec">LA LETTRE</div>
       ${fld('lm-lieu', 'Lieu et date', edit ? x.lieu_date : [me.ville, 'le ' + aujd].filter(Boolean).join(', '), { max: 120 })}
       ${fld('lm-objet', 'Objet', x.objet, { max: 160, ph: 'Ex. Candidature au poste de chargé(e) de projet' })}
-      ${fld('lm-corps', 'Texte de la lettre', edit ? x.corps : LM_CORPS_TYPE, { area: 1, rows: 14, max: 8000, req: 1, hint: edit ? '' : 'Modèle à adapter : remplacez les passages entre crochets.' })}
+      ${fld('lm-corps', 'Texte de la lettre', edit ? x.corps : LM_CORPS_TYPE, { area: 1, rows: 14, max: 8000, req: 1, hint: edit ? (x.corps_html ? 'Cette lettre a une mise en forme (couleurs, polices…) faite sur ordinateur : la modifier ici la remplace par du texte simple.' : '') : 'Modèle à adapter : remplacez les passages entre crochets.' })}
       ${fld('lm-sig', 'Signature (texte)', f('sig_texte', [me.prenom, me.nom].filter(Boolean).join(' ')), { max: 100 })}
       <p class="mcl-e" id="mcl-gerr" role="alert" style="margin:8px 2px"></p>
       <p class="small muted" style="margin:8px 4px 0">Mise en page, couleurs, signature manuscrite et QR code : à finir sur ordinateur.</p>
@@ -685,6 +688,8 @@
         const gab = val('lm-gab') || tpl;
         /* On repart des données existantes : signature image, style et QR définis sur ordinateur sont conservés. */
         const nd = edit ? JSON.parse(JSON.stringify(x)) : { sig_image: '', style: Object.assign({}, LM_STYLE), qr: { enabled: true, url: location.origin + '/profil.html?id=' + S.me.id } };
+        /* Texte modifié ici (zone de saisie simple) : l'ancienne version mise en forme n'est plus valable. */
+        if (edit && nd.corps_html && corps !== (x.corps || '')) nd.corps_html = '';
         Object.assign(nd, { exp_prenom: val('lm-prenom'), exp_nom: val('lm-nom'), exp_adresse: val('lm-adresse'), exp_ville: val('lm-ville'), exp_tel: val('lm-tel'), exp_email: em, dest_nom: val('lm-dnom'), dest_fonction: val('lm-dfonc'), dest_entreprise: val('lm-dent'), dest_adresse: val('lm-dadr'), lieu_date: val('lm-lieu'), objet: val('lm-objet'), corps, sig_texte: val('lm-sig'), template: gab });
         const r = await api('/api/lettres', { method: 'POST', body: { numero, titre: t, data: nd } });
         toast(edit ? 'Lettre enregistrée ✓' : 'Lettre créée ✓');

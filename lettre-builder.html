@@ -43,12 +43,13 @@ input:focus,textarea:focus,select:focus{border-color:#4a90d9}
 textarea{resize:vertical}
 .form-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 
-/* Editeur de corps */
-.editor-toolbar{display:flex;gap:4px;margin-bottom:6px;flex-wrap:wrap}
-.editor-toolbar button{padding:5px 10px;border:1px solid #ddd;border-radius:4px;background:#f9f9f9;cursor:pointer;font-size:.78rem;font-weight:600}
-.editor-toolbar button:hover{background:#eee}
-#corps-lettre{min-height:240px;border:1px solid #ddd;border-radius:5px;padding:10px;font-size:.83rem;line-height:1.7;outline:none;font-family:inherit}
-#corps-lettre:focus{border-color:#4a90d9}
+/* Corps de la lettre : traitement de texte complet (assets/rich-editor.js, option avance — 2026-10-18) */
+.rich-editor-wrap{border-radius:8px;border-color:#ddd;margin-bottom:10px}
+/* les règles globales « input,textarea,select » de la page ne doivent pas déformer la barre d'outils */
+.rich-editor-toolbar select{width:auto;padding:0 3px;margin:0;font-size:12px;border-radius:6px}
+.rich-editor-toolbar{padding:4px;gap:1px}
+.rich-editor-toolbar button{padding:4px 6px;font-size:12px;min-width:26px;min-height:28px}
+.rich-editor-area{min-height:260px;max-height:560px;font-size:.83rem;line-height:1.7;padding:10px 12px}
 
 /* PREVIEW */
 .lmb-preview{overflow-y:auto;max-height:calc(100vh - 58px);padding:20px;display:flex;flex-direction:column;align-items:center;background:#e8eaef}
@@ -182,24 +183,9 @@ textarea{resize:vertical}
     <label>Objet</label>
     <input id="objet" type="text" oninput="render()" placeholder="Candidature au poste de Chargé(e) de projet">
 
-    <label style="margin-top:4px">Corps de la lettre</label>
-    <div class="editor-toolbar">
-      <button onclick="fmt('bold')"><b>G</b></button>
-      <button onclick="fmt('italic')"><i>I</i></button>
-      <button onclick="fmt('underline')"><u>S</u></button>
-      <button onclick="insertText('\n\n')">¶</button>
-    </div>
-    <div id="corps-lettre" contenteditable="true" oninput="render()" spellcheck="true">Madame, Monsieur,
-
-Passionné(e) par le développement international et fort(e) d'une expérience de X ans dans [domaine], je me permets de vous adresser ma candidature au poste de [poste] au sein de [organisation].
-
-[Votre paragraphe d'accroche et de motivation...]
-
-[Vos compétences et expériences en lien avec le poste...]
-
-[Votre conclusion et appel à l'action...]
-
-Dans l'attente d'un entretien que vous voudrez bien m'accorder, je vous adresse mes sincères salutations.</div>
+    <label style="margin-top:4px" for="corps-lettre">Corps de la lettre</label>
+    <p style="font-size:.72rem;color:#777;margin:0 0 6px;line-height:1.4;">Sélectionnez un passage puis choisissez la police, la taille, la couleur de l'écriture ou le surlignage. <b>Entrée</b> = nouveau paragraphe, <b>Maj + Entrée</b> = retour à la ligne.</p>
+    <textarea id="corps-lettre" rows="12"><p>Madame, Monsieur,</p><p>Passionné(e) par le développement international et fort(e) d'une expérience de X ans dans [domaine], je me permets de vous adresser ma candidature au poste de [poste] au sein de [organisation].</p><p>[Votre paragraphe d'accroche et de motivation...]</p><p>[Vos compétences et expériences en lien avec le poste...]</p><p>[Votre conclusion et appel à l'action...]</p><p>Dans l'attente d'un entretien que vous voudrez bien m'accorder, je vous adresse mes sincères salutations.</p></textarea>
 
     <h2>Signature</h2>
     <label>Signature texte</label>
@@ -217,10 +203,12 @@ Dans l'attente d'un entretien que vous voudrez bien m'accorder, je vous adresse 
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script src="/assets/lettre-templates.js"></script>
+<script src="/assets/rich-editor.js"></script>
 <script>
 let lettreId = null;
 let sigData = '';
 let lmUserId = null;
+let lmEditeur = null;
 let lmTemplate = 'classique';
 let lmStyle = { couleur1: '#1a3a5c', couleur2: '#4a90d9', couleur3: '#eef4fb', font: 'Georgia, serif', fontSize: 11 };
 let lmQr = { enabled: true, url: '' };
@@ -242,6 +230,10 @@ window.addEventListener('DOMContentLoaded', async () => {
     const r = await fetch('/api/auth/me', { credentials: 'include' });
     if (r.ok) { const j = await r.json(); lmUserId = j.user?.id || null; }
   } catch(e) {}
+  /* Traitement de texte du corps de la lettre : police, taille, gras/italique/souligné/barré, couleur de l'écriture, surlignage,
+     alignements, listes, retour à la ligne… Chaque frappe met la feuille à jour (RichEditor déclenche « input » sur le champ). */
+  lmEditeur = RichEditor.attach('corps-lettre', { avance: true, placeholder: 'Écrivez votre lettre ici…' });
+  document.getElementById('corps-lettre').addEventListener('input', render);
   generateQRLettre();
   renderTemplateGalleryLettre();
   renderThemePresetsLettre();
@@ -310,7 +302,9 @@ async function loadLettre(id) {
       const el = document.getElementById(fid);
       if (el && d[key]) el.value = d[key];
     });
-    if (d.corps) document.getElementById('corps-lettre').innerText = d.corps;
+    /* Lettre mise en forme (corps_html) ; sinon ancienne lettre en texte brut : paragraphes et retours à la ligne conservés. */
+    if (d.corps_html && lmEditeur) lmEditeur.setHTML(d.corps_html);
+    else if (d.corps && lmEditeur) lmEditeur.setHTML(texteEnHtml(d.corps));
     if (d.sig_image) sigData = d.sig_image;
     if (d.template) { lmTemplate = d.template; renderTemplateGalleryLettre(); }
     if (d.style) {
@@ -326,16 +320,16 @@ async function loadLettre(id) {
   } catch(e) { render(); }
 }
 
-function fmt(cmd) {
-  document.getElementById('corps-lettre').focus();
-  document.execCommand(cmd, false, null);
-  render();
+/* Texte brut → paragraphes HTML (blocs séparés par une ligne vide ; simple retour = <br>). */
+function texteEnHtml(t) {
+  return String(t || '').split(/\n\s*\n/).filter(p => p.trim())
+    .map(p => '<p>' + _esc(p.trim()).replace(/\n/g, '<br>') + '</p>').join('') || '<p><br></p>';
 }
-function insertText(t) {
-  const el = document.getElementById('corps-lettre');
-  el.focus();
-  document.execCommand('insertText', false, t);
-  render();
+/* HTML du corps → texte brut (copie lisible pour les écrans qui n'affichent que du texte : téléphone, listes…). */
+function htmlEnTexte(h) {
+  const t = document.createElement('template');
+  t.innerHTML = String(h || '').replace(/<br\s*\/?>/gi, '\n').replace(/<\/(p|div|h2|h3|h4|blockquote)>/gi, '$&\n\n').replace(/<li[^>]*>/gi, '- ').replace(/<\/li>/gi, '\n');
+  return t.content.textContent.replace(/\u200b/g, '').replace(/\n{3,}/g, '\n\n').trim();
 }
 function loadSig(input) {
   const f = input.files[0]; if (!f) return;
@@ -354,7 +348,7 @@ function render() {
     destNom: g('dest-nom'), destFonction: g('dest-fonction'),
     destEntreprise: g('dest-entreprise'), destAdresse: g('dest-adresse'),
     lieuDate: g('lieu-date'), objet: g('objet'),
-    corps: document.getElementById('corps-lettre')?.innerText || '',
+    corps: htmlEnTexte(g('corps-lettre')), corpsHtml: g('corps-lettre'),
     sigTexte: g('sig-texte'), sigData,
     qr: lmQr
   };
@@ -369,7 +363,8 @@ function render() {
 }
 
 async function saveLettre() {
-  const corps = document.getElementById('corps-lettre')?.innerText || '';
+  const corpsHtml = g('corps-lettre');
+  const corps = htmlEnTexte(corpsHtml);
   const data = {
     exp_prenom: g('exp-prenom'), exp_nom: g('exp-nom'),
     exp_adresse: g('exp-adresse'), exp_ville: g('exp-ville'),
@@ -377,7 +372,7 @@ async function saveLettre() {
     dest_nom: g('dest-nom'), dest_fonction: g('dest-fonction'),
     dest_entreprise: g('dest-entreprise'), dest_adresse: g('dest-adresse'),
     lieu_date: g('lieu-date'), objet: g('objet'),
-    corps, sig_texte: g('sig-texte'), sig_image: sigData,
+    corps, corps_html: corpsHtml, sig_texte: g('sig-texte'), sig_image: sigData,
     template: lmTemplate, style: lmStyle, qr: lmQr
   };
   const payload = {

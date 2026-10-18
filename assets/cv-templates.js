@@ -25,7 +25,26 @@ function _photoHTML(photo, style) {
    (cv-public.html) affiche le contenu d'un autre compte, la liste blanche ci-dessous est donc une barrière
    de sécurité à part entière (le serveur nettoie aussi à l'enregistrement). Un ancien texte brut (sans
    balise) reste affiché tel quel, retours à la ligne conservés. */
-const _RICH_OK = { P:1, BR:1, B:1, STRONG:1, I:1, EM:1, U:1, UL:1, OL:1, LI:1, H2:1, H3:1, BLOCKQUOTE:1, A:1, DIV:1, SPAN:1 };
+const _RICH_OK = { P:1, BR:1, B:1, STRONG:1, I:1, EM:1, U:1, S:1, STRIKE:1, SUB:1, SUP:1, UL:1, OL:1, LI:1, H2:1, H3:1, BLOCKQUOTE:1, A:1, DIV:1, SPAN:1 };
+/* Mise en forme du traitement de texte (2026-10-18) : seules ces propriétés de style survivent, avec des valeurs sûres
+   (jamais url(), var(), expression…). Même liste blanche que le nettoyeur serveur (server/security.js). */
+const _RICH_FAM = 'Arial|Helvetica|Georgia|Times New Roman|Verdana|Tahoma|Trebuchet MS|Courier New|Garamond|Calibri|Cambria|Comic Sans MS|Palatino Linotype|Segoe UI|sans-serif|serif|monospace';
+const _RICH_STYLES = {
+  'text-align': /^(left|right|center|justify)$/i,
+  'color': /^(#[0-9a-f]{3}|#[0-9a-f]{6}|rgb\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*\))$/i,
+  'background-color': /^(#[0-9a-f]{3}|#[0-9a-f]{6}|rgb\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*\))$/i,
+  'font-family': new RegExp('^["\']?(' + _RICH_FAM + ')["\']?(\\s*,\\s*["\']?(' + _RICH_FAM + ')["\']?)*$', 'i'),
+  'font-size': /^(?:[6-9]|[1-8]\d|9[0-6])(?:\.\d)?(?:pt|px)$/,
+  'line-height': /^(?:[1-3](?:\.\d{1,2})?|\d{2,3}%)$/,
+};
+function _RICH_Style(st) {
+  return String(st || '').split(';').map(d => {
+    const i = d.indexOf(':'); if (i < 0) return '';
+    const p = d.slice(0, i).trim().toLowerCase(), v = d.slice(i + 1).trim();
+    return (_RICH_STYLES[p] && _RICH_STYLES[p].test(v)) ? p + ':' + v : '';
+  }).filter(Boolean).join(';');
+}
+
 const _RICH_DROP = { SCRIPT:1, STYLE:1, IFRAME:1, OBJECT:1, EMBED:1, SVG:1, MATH:1, LINK:1, META:1, NOSCRIPT:1, TEMPLATE:1, FORM:1, INPUT:1, TEXTAREA:1, BUTTON:1, IMG:1, VIDEO:1, AUDIO:1 };
 function _hasText(v) {
   return String(v == null ? '' : v).replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim().length > 0;
@@ -50,8 +69,8 @@ function _rich(v) {
         const h = (n.getAttribute('href') || '').trim();
         if (/^(https?:|mailto:)/i.test(h)) { el.setAttribute('href', h); el.setAttribute('target', '_blank'); el.setAttribute('rel', 'noopener noreferrer'); }
       }
-      const m = (n.getAttribute('style') || '').match(/text-align:\s*(left|right|center|justify)/i);
-      if (m) el.setAttribute('style', 'text-align:' + m[1].toLowerCase());
+      const st = _RICH_Style(n.getAttribute('style'));
+      if (st) el.setAttribute('style', st);
       copie(n, el);
       dst.appendChild(el);
     });

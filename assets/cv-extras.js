@@ -26,7 +26,8 @@ window.CvX = (function () {
     if (!ta || !window.RichEditor) return null;
     ta.value = legacyToHtml(ta.value);
     let inst = null;
-    silencieux(() => { inst = RichEditor.attach(ta, { placeholder: placeholder || 'Écrivez ici…' }); });
+    /* Traitement de texte complet : police, taille, couleur de l'écriture, surlignage, alignements… (option avance) */
+    silencieux(() => { inst = RichEditor.attach(ta, { placeholder: placeholder || 'Écrivez ici…', avance: true }); });
     return inst;
   };
   X.setRich = function (id, html) {

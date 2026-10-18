@@ -33,6 +33,11 @@
        // ed.setHTML(html) → recharge un contenu (édition d'un élément existant).
        // ed.isEmpty() → true si aucun texte saisi.
      </script>
+
+   Option { avance: true } (2026-10-18, lettre de motivation + CV) : barre « traitement de texte » complète, à la manière
+   d'OpenOffice — annuler/rétablir, police, taille, gras, italique, souligné, barré, indice, exposant, COULEUR de l'écriture,
+   SURLIGNAGE (palette + couleur libre + « Automatique »), titres, listes, alignements (dont justifié), retour à la ligne,
+   lien, effacer la mise en forme. Sans cette option, la barre reste celle des autres modules, inchangée.
    ═══════════════════════════════════════════════════════════════════ */
 (function () {
   if (window.RichEditor) return; // déjà chargé sur cette page (plusieurs <script> possibles)
@@ -58,6 +63,57 @@
     { cmd: 'removeFormat', label: '⌫', title: 'Effacer la mise en forme' },
   ];
 
+  /* ─── Barre « traitement de texte » (option avance) ─── */
+  const POLICES = ['Arial', 'Georgia', 'Times New Roman', 'Verdana', 'Tahoma', 'Trebuchet MS', 'Courier New', 'Garamond', 'Calibri', 'Cambria', 'Comic Sans MS'];
+  const TAILLES = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 36, 48];
+  const TOOLBAR_AVANCE = [
+    { cmd: 'undo', label: '↶', title: 'Annuler (Ctrl+Z)' },
+    { cmd: 'redo', label: '↷', title: 'Rétablir (Ctrl+Y)' },
+    { sep: true },
+    { select: 'police' },
+    { select: 'taille' },
+    { sep: true },
+    { cmd: 'bold', label: '<b>G</b>', title: 'Gras (Ctrl+B)' },
+    { cmd: 'italic', label: '<i>I</i>', title: 'Italique (Ctrl+I)' },
+    { cmd: 'underline', label: '<u>S</u>', title: 'Souligné (Ctrl+U)' },
+    { cmd: 'strikeThrough', label: '<s>ab</s>', title: 'Barré' },
+    { cmd: 'subscript', label: 'x<sub>2</sub>', title: 'Indice' },
+    { cmd: 'superscript', label: 'x<sup>2</sup>', title: 'Exposant' },
+    { sep: true },
+    { couleur: 'foreColor', label: '<span class="re-teinte" data-teinte="texte">A</span>', title: "Couleur de l'écriture" },
+    { couleur: 'hiliteColor', label: '<span class="re-teinte re-teinte-fond" data-teinte="fond">ab</span>', title: 'Surlignage (couleur de fond du texte)' },
+    { sep: true },
+    { block: 'H2', label: 'Titre', title: 'Titre' },
+    { block: 'H3', label: 'Sous-titre', title: 'Sous-titre' },
+    { block: 'P', label: '¶', title: 'Paragraphe normal' },
+    { block: 'BLOCKQUOTE', label: '❝', title: 'Citation' },
+    { sep: true },
+    { cmd: 'insertUnorderedList', label: '•⁠—', title: 'Liste à puces' },
+    { cmd: 'insertOrderedList', label: '1.—', title: 'Liste numérotée' },
+    { sep: true },
+    { cmd: 'justifyLeft', label: '⇤', title: 'Aligner à gauche' },
+    { cmd: 'justifyCenter', label: '⇔', title: 'Centrer' },
+    { cmd: 'justifyRight', label: '⇥', title: 'Aligner à droite' },
+    { cmd: 'justifyFull', label: '☰', title: 'Justifier' },
+    { sep: true },
+    { cmd: 'insertLineBreak', label: '↵', title: 'Retour à la ligne (Maj + Entrée) : va à la ligne sans ouvrir un nouveau paragraphe' },
+    { action: 'link', label: '🔗', title: 'Insérer un lien' },
+    { cmd: 'removeFormat', label: '⌫', title: 'Effacer la mise en forme' },
+  ];
+  const ETAT_CMDS = ['bold', 'italic', 'underline', 'strikeThrough', 'subscript', 'superscript', 'insertUnorderedList', 'insertOrderedList', 'justifyLeft', 'justifyCenter', 'justifyRight', 'justifyFull'];
+  /* Palette façon OpenOffice : gris, teintes vives, puis 3 variantes claires et 2 sombres de chaque teinte. */
+  function melange(hex, cible, t) {
+    const c = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+    const a = c(hex), b = c(cible);
+    return '#' + a.map((v, i) => Math.round(v + (b[i] - v) * t).toString(16).padStart(2, '0')).join('');
+  }
+  const PALETTE = (function () {
+    const gris = ['#000000', '#434343', '#666666', '#999999', '#b7b7b7', '#cccccc', '#d9d9d9', '#efefef', '#f3f3f3', '#ffffff'];
+    const vives = ['#ff0000', '#ff9900', '#ffff00', '#00ff00', '#00ffff', '#4a86e8', '#0000ff', '#9900ff', '#ff00ff', '#e91e63'];
+    const rangs = [gris, vives];
+    [[('#ffffff'), .8], ['#ffffff', .6], ['#ffffff', .4], ['#000000', .25], ['#000000', .5]].forEach(m => rangs.push(vives.map(v => melange(v, m[0], m[1]))));
+    return rangs;
+  })();
   function injectStyles() {
     if (document.getElementById('rich-editor-style')) return;
     const s = document.createElement('style');
@@ -81,6 +137,21 @@
       .rich-editor-area a{color:var(--orange,#B84C1A);text-decoration:underline;}
       .rich-editor-area:empty::before{content:attr(data-placeholder);color:#9AA5B1;}
       .rich-editor-area.rich-editor-area-compact{min-height:44px;max-height:none;overflow:visible;font-size:17px;line-height:1.4;padding:10px 14px;}
+      .rich-editor-toolbar{align-items:center;}
+      .rich-editor-toolbar select{border:1px solid var(--border,#D6DEE8);border-radius:6px;font-size:12px;padding:0 3px;background:#fff!important;color:#102A43!important;height:28px;min-height:28px;max-width:112px;font-family:inherit;cursor:pointer;}
+      .rich-editor-toolbar select.re-taille{max-width:58px;}
+      .rich-editor-toolbar select option{background:#fff;color:#102A43;}
+      .re-teinte{display:inline-block;font-weight:800;line-height:1.05;padding:0 2px 1px;border-bottom:4px solid var(--re-teinte,#d00000);}
+      .re-teinte-fond{font-weight:700;border-bottom:0;background:var(--re-teinte,#ffee58);color:#102A43;padding:1px 4px;border-radius:2px;}
+      .rich-editor-palette{position:fixed;z-index:100000;background:#fff;border:1px solid #cfd8e3;border-radius:10px;box-shadow:0 10px 30px rgba(15,35,60,.28);padding:10px;width:248px;color:#102A43;font-family:inherit;}
+      .rich-editor-palette .re-pal-titre{font-size:12px;font-weight:800;margin:0 0 7px;}
+      .rich-editor-palette .re-pal-grille{display:grid;grid-template-columns:repeat(10,1fr);gap:3px;}
+      .rich-editor-palette .re-pal-grille button{width:100%;aspect-ratio:1;border:1px solid rgba(0,0,0,.18);border-radius:3px;padding:0;cursor:pointer;min-width:0;}
+      .rich-editor-palette .re-pal-grille button:hover{outline:2px solid #0D2B4E;outline-offset:1px;}
+      .rich-editor-palette .re-pal-pied{display:flex;gap:6px;margin-top:9px;align-items:stretch;}
+      .rich-editor-palette .re-pal-pied button,.rich-editor-palette .re-pal-pied label{flex:1;border:1px solid #cfd8e3;border-radius:7px;background:#F5F7FA;font-size:12px;font-weight:700;padding:7px 4px;cursor:pointer;text-align:center;color:#102A43;font-family:inherit;margin:0;}
+      .rich-editor-palette .re-pal-pied button:hover,.rich-editor-palette .re-pal-pied label:hover{background:#E2E8F0;}
+      .rich-editor-palette input[type=color]{position:absolute;opacity:0;width:0;height:0;pointer-events:none;}
     `;
     document.head.appendChild(s);
   }
@@ -120,7 +191,8 @@
        (un titre tient sur une ligne) et le collage est ramené à du texte brut. defaultBold met le
        gras par défaut à la première saisie — l'auteur peut l'enlever ou le remplacer. */
     const COMPACT_CMDS = ['bold', 'italic', 'underline', 'removeFormat'];
-    const barre = opts.compact ? TOOLBAR.filter(i => !i.sep && COMPACT_CMDS.includes(i.cmd)) : TOOLBAR;
+    const avance = !!opts.avance && !opts.compact;
+    const barre = opts.compact ? TOOLBAR.filter(i => !i.sep && COMPACT_CMDS.includes(i.cmd)) : (avance ? TOOLBAR_AVANCE : TOOLBAR);
     if (opts.compact) {
       area.classList.add('rich-editor-area-compact');
       area.innerHTML = textarea.value || '';
@@ -144,16 +216,173 @@
         });
       }
     }
+    /* ── Outils du traitement de texte (option avance) ── */
+    let derniereSel = null;         // dernière sélection faite DANS l'éditeur (un menu ou la palette la fait perdre au focus)
+    let selPolice = null, selTaille = null;
+    const boutonsEtat = [];
+    const teintes = { texte: null, fond: null };
+    function restaurer() {
+      area.focus();
+      if (derniereSel) { const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(derniereSel); }
+    }
+    function surSelectionChange() {
+      if (!area.isConnected) { document.removeEventListener('selectionchange', surSelectionChange); return; }
+      const sel = window.getSelection();
+      if (!sel.rangeCount || !area.contains(sel.anchorNode)) return;
+      derniereSel = sel.getRangeAt(0).cloneRange();
+      majEtat();
+    }
+    function majEtat() {
+      boutonsEtat.forEach(([cmd, b]) => { let on = false; try { on = document.queryCommandState(cmd); } catch (e) {} b.classList.toggle('active', !!on); });
+      if (selPolice) {
+        let v = ''; try { v = String(document.queryCommandValue('fontName') || '').replace(/["']/g, '').split(',')[0].trim(); } catch (e) {}
+        selPolice.value = POLICES.find(p => p.toLowerCase() === v.toLowerCase()) || '';
+      }
+      if (selTaille) {
+        const sel = window.getSelection(); let el = sel.anchorNode; if (el && el.nodeType !== 1) el = el.parentElement;
+        let pt = ''; if (el && area.contains(el)) { const px = parseFloat(getComputedStyle(el).fontSize); if (px) pt = String(Math.round(px * 0.75)); }
+        selTaille.value = TAILLES.map(String).includes(pt) ? pt : '';
+      }
+    }
+    /* Retire une propriété de style (couleur, surlignage, police) des passages touchés par la sélection = « Automatique ». */
+    function retirerStyle(prop) {
+      restaurer();
+      const sel = window.getSelection(); if (!sel.rangeCount) return;
+      const r = sel.getRangeAt(0);
+      area.querySelectorAll('[style]').forEach(el => {
+        if (!r.intersectsNode(el)) return;
+        el.style.removeProperty(prop);
+        if (!el.getAttribute('style')) el.removeAttribute('style');
+        if (el.tagName === 'SPAN' && !el.attributes.length) { while (el.firstChild) el.parentNode.insertBefore(el.firstChild, el); el.remove(); }
+      });
+    }
+    function viderSpans() {
+      area.querySelectorAll('span').forEach(el => { if (!el.attributes.length) { while (el.firstChild) el.parentNode.insertBefore(el.firstChild, el); el.remove(); } });
+    }
+    function appliquerCouleur(cmd, hex) {
+      if (hex == null) retirerStyle(cmd === 'foreColor' ? 'color' : 'background-color');
+      else {
+        restaurer();
+        document.execCommand('styleWithCSS', false, true);
+        document.execCommand(cmd, false, hex);
+        document.execCommand('styleWithCSS', false, false);
+      }
+      teintes[cmd === 'foreColor' ? 'texte' : 'fond'] = hex;
+      toolbarEl.querySelectorAll('.re-teinte').forEach(t => {
+        const mine = t.dataset.teinte === (cmd === 'foreColor' ? 'texte' : 'fond');
+        if (mine) { if (hex) t.style.setProperty('--re-teinte', hex); else t.style.removeProperty('--re-teinte'); }
+      });
+      sync(); majEtat();
+    }
+    function appliquerPolice(nom) {
+      if (!nom) retirerStyle('font-family');
+      else {
+        restaurer();
+        document.execCommand('styleWithCSS', false, true);
+        document.execCommand('fontName', false, nom);
+        document.execCommand('styleWithCSS', false, false);
+      }
+      sync(); majEtat();
+    }
+    /* La taille passe par execCommand('fontSize', 7) puis chaque <font size="7"> est remplacé par un <span> en points :
+       seule façon de choisir une taille exacte en pt avec cette API. */
+    function appliquerTaille(pt) {
+      restaurer();
+      const sel = window.getSelection(); if (!sel.rangeCount) return;
+      const r0 = sel.getRangeAt(0);
+      if (r0.collapsed) {
+        // Pas de texte sélectionné : la prochaine saisie prendra la taille choisie.
+        const sp = document.createElement('span'); sp.style.fontSize = pt + 'pt';
+        const t = document.createTextNode('\u200b'); sp.appendChild(t);
+        r0.insertNode(sp);
+        const r = document.createRange(); r.setStart(t, 1); r.collapse(true);
+        sel.removeAllRanges(); sel.addRange(r);
+        sync(); majEtat(); return;
+      }
+      document.execCommand('styleWithCSS', false, false);
+      document.execCommand('fontSize', false, '7');
+      const fonts = Array.from(area.querySelectorAll('font[size="7"]'));
+      fonts.forEach(f => {
+        const sp = document.createElement('span'); sp.style.fontSize = pt + 'pt';
+        while (f.firstChild) sp.appendChild(f.firstChild);
+        sp.querySelectorAll('[style]').forEach(e => { e.style.removeProperty('font-size'); if (!e.getAttribute('style')) e.removeAttribute('style'); });
+        f.replaceWith(sp);
+      });
+      viderSpans();
+      if (fonts.length) {
+        const spans = Array.from(area.querySelectorAll('span')).filter(x => x.style.fontSize === pt + 'pt');
+        if (spans.length) { const r = document.createRange(); r.setStartBefore(spans[0]); r.setEndAfter(spans[spans.length - 1]); sel.removeAllRanges(); sel.addRange(r); }
+      }
+      sync(); majEtat();
+    }
+    /* Palette : couleur de l'écriture ou surlignage. Fermée par un clic ailleurs, Échap, ou le choix d'une couleur. */
+    let palette = null;
+    function fermerPalette() { if (palette) { palette.remove(); palette = null; document.removeEventListener('mousedown', clicHors, true); document.removeEventListener('keydown', echap, true); } }
+    function clicHors(e) { if (palette && !palette.contains(e.target) && !(e.target.closest && e.target.closest('.rich-editor-toolbar button[data-pal]'))) fermerPalette(); }
+    function echap(e) { if (e.key === 'Escape') fermerPalette(); }
+    function ouvrirPalette(btn, item) {
+      if (palette && palette.dataset.cmd === item.couleur) { fermerPalette(); return; }
+      fermerPalette();
+      const fond = item.couleur === 'hiliteColor';
+      palette = document.createElement('div');
+      palette.className = 'rich-editor-palette'; palette.dataset.cmd = item.couleur;
+      const titre = document.createElement('div'); titre.className = 're-pal-titre'; titre.textContent = fond ? 'Surlignage' : "Couleur de l'écriture";
+      const grille = document.createElement('div'); grille.className = 're-pal-grille';
+      PALETTE.forEach(rang => rang.forEach(hex => {
+        const b = document.createElement('button'); b.type = 'button'; b.style.background = hex; b.title = hex; b.setAttribute('aria-label', hex);
+        b.addEventListener('mousedown', e => e.preventDefault());
+        b.addEventListener('click', () => { appliquerCouleur(item.couleur, hex); fermerPalette(); });
+        grille.appendChild(b);
+      }));
+      const pied = document.createElement('div'); pied.className = 're-pal-pied';
+      const auto = document.createElement('button'); auto.type = 'button'; auto.textContent = fond ? 'Aucun surlignage' : 'Automatique';
+      auto.addEventListener('mousedown', e => e.preventDefault());
+      auto.addEventListener('click', () => { appliquerCouleur(item.couleur, null); fermerPalette(); });
+      const autre = document.createElement('label'); autre.textContent = 'Autre couleur…';
+      const inp = document.createElement('input'); inp.type = 'color'; inp.value = teintes[fond ? 'fond' : 'texte'] || (fond ? '#ffee58' : '#d00000');
+      inp.addEventListener('change', () => { appliquerCouleur(item.couleur, inp.value); fermerPalette(); });
+      autre.appendChild(inp);
+      pied.appendChild(auto); pied.appendChild(autre);
+      palette.appendChild(titre); palette.appendChild(grille); palette.appendChild(pied);
+      document.body.appendChild(palette);
+      const rc = btn.getBoundingClientRect();
+      palette.style.left = Math.max(6, Math.min(rc.left, window.innerWidth - 256)) + 'px';
+      const bas = rc.bottom + 4, h = palette.offsetHeight;
+      palette.style.top = (bas + h > window.innerHeight - 6 ? Math.max(6, rc.top - h - 4) : bas) + 'px';
+      document.addEventListener('mousedown', clicHors, true);
+      document.addEventListener('keydown', echap, true);
+    }
+    if (avance) document.addEventListener('selectionchange', surSelectionChange);
+
     barre.forEach(item => {
       if (item.sep) { toolbarEl.appendChild(Object.assign(document.createElement('span'), { className: 'rich-editor-sep' })); return; }
+      if (item.select) {
+        const sel = document.createElement('select');
+        if (item.select === 'police') {
+          sel.title = 'Police (forme de l\'écriture)'; sel.setAttribute('aria-label', 'Police');
+          sel.innerHTML = '<option value="">Police</option>' + POLICES.map(p => '<option value="' + p + '" style="font-family:\'' + p + '\'">' + p + '</option>').join('');
+          sel.addEventListener('change', () => appliquerPolice(sel.value));
+          selPolice = sel;
+        } else {
+          sel.className = 're-taille'; sel.title = 'Taille de l\'écriture (en points)'; sel.setAttribute('aria-label', 'Taille');
+          sel.innerHTML = '<option value="">Taille</option>' + TAILLES.map(t => '<option value="' + t + '">' + t + '</option>').join('');
+          sel.addEventListener('change', () => { if (sel.value) appliquerTaille(+sel.value); });
+          selTaille = sel;
+        }
+        toolbarEl.appendChild(sel);
+        return;
+      }
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.title = item.title;
       btn.innerHTML = item.label;
       btn.addEventListener('mousedown', e => e.preventDefault()); // ne pas perdre la sélection avant le clic
+      if (item.couleur) { btn.dataset.pal = '1'; btn.addEventListener('click', () => ouvrirPalette(btn, item)); toolbarEl.appendChild(btn); return; }
+      if (item.cmd && ETAT_CMDS.includes(item.cmd)) boutonsEtat.push([item.cmd, btn]);
       btn.addEventListener('click', () => {
         area.focus();
-        if (item.cmd) document.execCommand(item.cmd, false, null);
+        if (item.cmd === 'insertLineBreak') { if (!document.execCommand('insertLineBreak')) document.execCommand('insertHTML', false, '<br>'); }
+        else if (item.cmd) document.execCommand(item.cmd, false, null);
         else if (item.block) document.execCommand('formatBlock', false, item.block);
         else if (item.action === 'link') {
           const url = prompt('Adresse du lien (https://…) :');

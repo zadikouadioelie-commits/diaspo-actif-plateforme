@@ -34360,6 +34360,12 @@ ${jsonLd}
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const { numero = 1, titre = 'Ma lettre', data = {} } = body;
       if (![1, 2].includes(Number(numero))) return sendJSON(res, 400, { error: "numero doit être 1 ou 2" });
+      /* Traitement de texte du corps (2026-10-18) : corps_html est re-nettoyé par la liste blanche serveur (balises + styles sûrs) AVANT
+         d'être stocké — jamais de confiance dans le HTML envoyé par le navigateur. `corps` reste la copie en texte brut. */
+      if (data && typeof data === "object" && !Array.isArray(data)) {
+        data.corps_html = SEC.sanitizeRichHtml(String(data.corps_html == null ? "" : data.corps_html).slice(0, 30000));
+        if (data.corps != null) data.corps = String(data.corps).slice(0, 30000);
+      }
       const existing = await db.prepare(`SELECT id FROM lettres_motivation WHERE user_id = ? AND numero = ?`).get(me.id, numero);
       if (existing) {
         await db.prepare(`UPDATE lettres_motivation SET titre=?, data_json=?, updated_at=datetime('now') WHERE id=?`)

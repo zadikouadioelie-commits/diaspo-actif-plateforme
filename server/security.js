@@ -218,8 +218,11 @@ function logSecurity(event, data = {}) {
    d'iframes, pas de tableaux) : ce que l'éditeur ne sait pas
    produire, le nettoyeur ne doit pas l'accepter non plus.
 --------------------------------------------------------------- */
+const COULEUR_OK = /^(?:#[0-9a-f]{3}|#[0-9a-f]{6}|rgb\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*\))$/i;
 const RICH_HTML_OPTIONS = {
-  allowedTags: ["p", "br", "strong", "b", "em", "i", "u", "ul", "ol", "li", "h2", "h3", "h4", "blockquote", "a"],
+  /* 2026-10-18 (traitement de texte complet : lettre de motivation + CV) : span (couleur, surlignage, police, taille),
+     s/strike (barré), sub/sup (indice/exposant). Aucune autre balise n'est ajoutée. */
+  allowedTags: ["p", "br", "strong", "b", "em", "i", "u", "s", "strike", "sub", "sup", "span", "ul", "ol", "li", "h2", "h3", "h4", "blockquote", "a"],
   allowedAttributes: {
     a: ["href", "target", "rel"],
     // `style` doit être explicitement listé ici pour que allowedStyles (ci-dessous) ait quoi
@@ -228,14 +231,24 @@ const RICH_HTML_OPTIONS = {
     // silencieusement malgré allowedStyles seul). Tous les blocs pouvant recevoir un alignement
     // (execCommand justifyLeft/Center/Right agit sur le bloc englobant le curseur, quel qu'il
     // soit parmi ceux-ci).
-    p: ["style"], h2: ["style"], h3: ["style"], h4: ["style"], blockquote: ["style"], li: ["style"],
+    p: ["style"], h2: ["style"], h3: ["style"], h4: ["style"], blockquote: ["style"], li: ["style"], span: ["style"],
   },
   // http(s)/mailto uniquement — bloque javascript:/data: et autres schémas actifs.
   allowedSchemes: ["http", "https", "mailto"],
   // Alignement (execCommand justifyLeft/Center/Right) : seule propriété de style tolérée,
   // et seulement ces 3 valeurs — jamais de style arbitraire (fuite de mise en page/exfiltration
   // via des sélecteurs CSS exotiques).
-  allowedStyles: { "*": { "text-align": [/^left$/, /^center$/, /^right$/] } },
+  allowedStyles: { "*": {
+    "text-align": [/^left$/, /^center$/, /^right$/, /^justify$/],
+    /* Couleurs : #rgb, #rrggbb ou rgb(r, g, b) uniquement (c'est ce que produit le navigateur) — jamais url(), var(), expression(). */
+    "color": [COULEUR_OK],
+    "background-color": [COULEUR_OK],
+    /* Police : liste fermée de familles courantes (le navigateur écrit la famille choisie, éventuellement entre guillemets). */
+    "font-family": [/^["']?(Arial|Helvetica|Georgia|Times New Roman|Verdana|Tahoma|Trebuchet MS|Courier New|Garamond|Calibri|Cambria|Comic Sans MS|Palatino Linotype|Segoe UI|sans-serif|serif|monospace)["']?(\s*,\s*["']?(Arial|Helvetica|Georgia|Times New Roman|Verdana|Tahoma|Trebuchet MS|Courier New|Garamond|Calibri|Cambria|Comic Sans MS|Palatino Linotype|Segoe UI|sans-serif|serif|monospace)["']?)*$/i],
+    /* Taille : de 6 à 96, en pt ou px, une décimale au plus. */
+    "font-size": [/^(?:[6-9]|[1-8]\d|9[0-6])(?:\.\d)?(?:pt|px)$/],
+    "line-height": [/^(?:[1-3](?:\.\d{1,2})?|\d{2,3}%)$/],
+  } },
   // Un lien fabriqué par l'éditeur n'a jamais target/rel — ajoutés systématiquement ici plutôt
   // que de faire confiance à ce que le client aurait pu envoyer (rel manquant = vulnérable au
   // tabnabbing ; voir la CSP déjà en place pour le reste du site, même logique de défense
