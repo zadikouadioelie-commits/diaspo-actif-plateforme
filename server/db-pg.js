@@ -174,9 +174,14 @@ function pragmaToTable(sql) {
 }
 
 /* Convertit les BigInt en Number dans les résultats (COUNT(*) PostgreSQL retourne BigInt) */
+/* Dates texte (2026-10-18) : une colonne TEXT dont le DEFAULT est resté « now() » côté PostgreSQL stocke « 2026-10-17 12:00:00.123456+00 »
+   (microsecondes + décalage) au lieu du « 2026-10-17 12:00:00 » de SQLite. Tout le code client ajoute « Z » à ce texte pour le lire en UTC :
+   avec le décalage déjà présent, new Date() renvoie « Invalid Date » (vu au Centre Financier). On ramène donc le texte au format SQLite. */
+const DATE_PG_TEXTE = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+\+00(?::00)?$/;
 function normalizeBigInt(obj) {
   if (obj === null || obj === undefined) return obj;
   if (typeof obj === 'bigint') return Number(obj);
+  if (typeof obj === 'string') return (obj.length >= 24 && obj.length <= 32 && DATE_PG_TEXTE.test(obj)) ? obj.slice(0, 19) : obj;
   if (Array.isArray(obj)) return obj.map(normalizeBigInt);
   if (typeof obj === 'object') {
     const out = {};

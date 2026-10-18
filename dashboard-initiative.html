@@ -6352,7 +6352,7 @@ async function loadCockpitFinancierWidget() {
       <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;">
         <div><div style="font-size:22px;font-weight:800;color:var(--text);">${(r.balance||0).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})} €</div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Solde disponible</div></div>
         <div><div style="font-size:18px;font-weight:700;color:var(--text);">${(r.revenus.mois||0).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})} €</div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Revenus du mois</div></div>
-        <div><div style="font-size:18px;font-weight:700;color:var(--text);">${dernier ? new Date(dernier.date.replace(' ','T')+'Z').toLocaleDateString('fr-FR') : '—'}</div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Dernière transaction</div></div>
+        <div><div style="font-size:18px;font-weight:700;color:var(--text);">${dernier ? ((typeof fmtDateGlobal === 'function' ? fmtDateGlobal(dernier.date) : '') || '—') : '—'}</div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Dernière transaction</div></div>
         <a href="centre-financier.html" class="btn btn-orange btn-sm" style="margin-left:auto;">💸 Effectuer un retrait</a>
       </div>`;
   } catch(e) { body.innerHTML = '<a href="centre-financier.html" style="color:var(--orange);font-weight:700;">Ouvrir le Centre Financier →</a>'; }
