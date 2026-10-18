@@ -373,6 +373,13 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
           <div class="color-swatch"><label>Fond</label><input type="color" id="color3" value="#e8f0fe"></div>
         </div>
       </div>
+      <div class="design-row">
+        <label>Couleur de l'écriture</label>
+        <div class="color-row" style="align-items:flex-end;">
+          <div class="color-swatch"><label>Texte du CV</label><input type="color" id="color-texte" value="#222222" aria-label="Couleur de l'écriture du CV"></div>
+          <button type="button" id="color-texte-auto" style="min-height:36px;padding:0 12px;border-radius:10px;border:1px solid rgba(255,255,255,.25);background:transparent;color:inherit;font:inherit;font-size:.78rem;font-weight:700;cursor:pointer;">↺ Automatique</button>
+        </div>
+      </div>
       <div class="design-row"><label>Police</label><select id="font-select"><option>Segoe UI</option><option>Arial</option><option value="Georgia, serif">Georgia</option><option value="Times New Roman, serif">Times New Roman</option><option value="Calibri, sans-serif">Calibri</option><option value="Garamond, serif">Garamond</option><option value="Trebuchet MS, sans-serif">Trebuchet MS</option></select></div>
       <div class="design-row"><label>Taille police : <span class="range-val" id="font-size-val">11pt</span></label><input type="range" id="font-size" min="8" max="14" value="11" oninput="document.getElementById('font-size-val').textContent=this.value+'pt';"></div>
       <div class="design-row"><label>Interligne : <span class="range-val" id="spacing-val">1.4</span></label><input type="range" id="spacing" min="1" max="2" step=".1" value="1.4" oninput="document.getElementById('spacing-val').textContent=this.value;"></div>
@@ -543,7 +550,7 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 <script src="/assets/rich-editor.js"></script>
 <script src="/assets/cv-builder.js"></script>
 <script src="/assets/cv-extras.js"></script>
-<script src="/assets/cv-template-nuit-doree.js?v=4"></script>
+<script src="/assets/cv-template-nuit-doree.js?v=5"></script>
 <script src="/assets/cv-ajuste-apercu.js?v=1"></script>
 <script>
 // Init template gallery modal

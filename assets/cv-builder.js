@@ -278,6 +278,7 @@ function renderDesignPanel() {
   g('color1', s.couleur1); g('color2', s.couleur2); g('color3', s.couleur3);
   g('font-select', s.font); g('font-size', s.fontSize);
   g('spacing', s.spacing);
+  const ct = document.getElementById('color-texte'); if (ct) ct.value = /^#[0-9a-f]{6}$/i.test(s.couleur_texte || '') ? s.couleur_texte : '#222222';
 }
 function setupDesignListeners() {
   renderThemePresets();
@@ -287,6 +288,15 @@ function setupDesignListeners() {
       CVB.data.style[map[id]] = e.target.value;
       render(); CVB.dirty = true;
     });
+  });
+  /* Couleur de l'écriture : choisie → style.couleur_texte ; « Automatique » → retirée (gris très foncé par défaut). */
+  document.getElementById('color-texte')?.addEventListener('input', e => {
+    CVB.data.style.couleur_texte = e.target.value; render(); CVB.dirty = true;
+  });
+  document.getElementById('color-texte-auto')?.addEventListener('click', () => {
+    delete CVB.data.style.couleur_texte;
+    const ct = document.getElementById('color-texte'); if (ct) ct.value = '#222222';
+    render(); CVB.dirty = true;
   });
   document.getElementById('font-select')?.addEventListener('change', e => {
     CVB.data.style.font = e.target.value; render(); CVB.dirty = true;

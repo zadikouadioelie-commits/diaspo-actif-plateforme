@@ -45371,7 +45371,7 @@ app.post('/api/oz/chat', requireAuth, async (req, res) => {
   if (msgLower.includes('bonjour') || msgLower.includes('salut') || msgLower.includes('bonsoir')) {
     reply = `Bonjour ${userName} ! Je suis OZ, votre assistant Diaspo'Actif. Comment puis-je vous aider aujourd'hui ? Vous pouvez me poser des questions sur la plateforme, vos projets, votre profil, ou me demander de l'aide pour trouver des partenaires.`;
   } else if (msgLower.includes('cv') || msgLower.includes('curriculum')) {
-    reply = `Pour créer ou améliorer votre CV sur Diaspo'Actif :\n1. Allez dans **Outils & Documents** depuis votre tableau de bord\n2. Cliquez sur **+ Créer mon CV**\n3. Remplissez les sections : expériences, compétences, formation\n4. Téléchargez votre CV en PDF\n\nSouhaitez-vous des conseils pour rendre votre CV plus percutant pour la diaspora ?`;
+    reply = `Pour créer ou améliorer votre CV sur Diaspo'Actif :\n1. Ouvrez **CV, Lettres, Candidatures** dans le menu de votre tableau de bord\n2. Cliquez sur **+ Créer mon CV**\n3. Remplissez les sections : expériences, compétences, formation\n4. Téléchargez votre CV en PDF\n\nSouhaitez-vous des conseils pour rendre votre CV plus percutant pour la diaspora ?`;
   } else if (msgLower.includes('initiative') || msgLower.includes('association') || msgLower.includes('projet')) {
     reply = `Diaspo'Actif vous permet de :\n• **Créer une initiative** : présentez votre association, ONG ou projet\n• **Rejoindre** des initiatives existantes dans l'annuaire\n• **Collaborer** via le système de Deals\n\nVous cherchez à créer une nouvelle initiative ou à en rejoindre une existante ?`;
   } else if (msgLower.includes('partenaire') || msgLower.includes('réseau') || msgLower.includes('contact')) {
