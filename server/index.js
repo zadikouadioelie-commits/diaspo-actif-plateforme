@@ -16624,11 +16624,25 @@ async function hasAccreditation(userId, type) {
   const ancien = await db.prepare("SELECT id, date_expiration FROM compte_accreditations WHERE user_id=? AND type=? AND statut='active'").get(userId, type);
   if (ancien && !(ancien.date_expiration && new Date(ancien.date_expiration).getTime() < Date.now())) return true;
   const def = await db.prepare("SELECT id FROM accred_definitions WHERE type=?").get(type);
-  if (!def) return false;
-  const nouv = await db.prepare("SELECT id, date_expiration FROM user_accreditations WHERE user_id=? AND accred_id=? AND statut='active'").get(userId, def.id);
-  if (!nouv) return false;
-  if (nouv.date_expiration && new Date(nouv.date_expiration).getTime() < Date.now()) return false;
-  return true;
+  if (def) {
+    const nouv = await db.prepare("SELECT id, date_expiration FROM user_accreditations WHERE user_id=? AND accred_id=? AND statut='active'").get(userId, def.id);
+    if (nouv && !(nouv.date_expiration && new Date(nouv.date_expiration).getTime() < Date.now())) return true;
+  }
+  /* Période gratuite universelle (règle des 3 mois puis 3 semaines — voir finPeriodeGratuite,
+     plus bas dans ce fichier) : tout compte dans un rôle abonnable y a droit automatiquement
+     depuis sa création, MÊME sans ligne user_accreditations. Sans ce filet, un compte jamais
+     passé par accorderDecouvertePremium() (créé avant ce mécanisme, ou tout cas futur non
+     prévu) restait verrouillé pendant la période pourtant offerte à "toute la diaspora" —
+     constaté le 2026-10-18 sur le module Business Plans. getPremiumStatut() appliquait déjà
+     cette règle ; hasAccreditation() ne l'appliquait pas, d'où l'incohérence entre deux comptes
+     réels. Cette règle doit rester automatique pour tout compte, présent ou futur, sans
+     intervention manuelle. */
+  if (Object.values(PREMIUM_TYPE_PAR_ROLE).includes(type)) {
+    const u = await db.prepare("SELECT created_at FROM users WHERE id=?").get(userId);
+    const fin = u ? finPeriodeGratuite(u.created_at) : null;
+    if (fin && fin.getTime() > Date.now()) return true;
+  }
+  return false;
 }
 
 /* Le Premium actif de ce compte a-t-il été payé à 100% du tarif (jamais lui-même réduit) ?
@@ -29259,7 +29273,28 @@ route("GET", "/api/accreditations/mes", async (req, res) => {
     WHERE ua.user_id=? ORDER BY ua.created_at DESC
   `).all(user.id);
   const types = new Set(anciens.map(a => a.type));
-  sendJSON(res, 200, { accreditations: [...anciens, ...nouveaux.filter(n => !types.has(n.type))] });
+  const accreditations = [...anciens, ...nouveaux.filter(n => !types.has(n.type))];
+  /* Période gratuite universelle (règle des 3 mois puis 3 semaines) : si ce rôle a un type
+     d'abonnement et qu'aucune ligne active de ce type n'existe déjà ci-dessus, on ajoute une
+     entrée synthétique tant que la période offerte n'est pas terminée — même filet que
+     hasAccreditation() plus haut dans ce fichier, pour que cette liste (consultée par le
+     navigateur sur business-plan.html et d'autres modules abonnés) ne contredise jamais
+     getPremiumStatut(), la source unique. Sans INSERT réel : rien à migrer, ça couvre aussi
+     bien les comptes déjà existants que tout compte futur, sans intervention. */
+  const typePremium = PREMIUM_TYPE_PAR_ROLE[user.role];
+  if (typePremium && !accreditations.some(a => a.type === typePremium && a.statut === 'active')) {
+    /* getCurrentUser() ne charge pas created_at (colonnes explicites) : on la lit à part,
+       comme le fait déjà getPremiumStatut() plus haut dans ce fichier. */
+    const uCree = await db.prepare("SELECT created_at FROM users WHERE id=?").get(user.id);
+    const fin = uCree ? finPeriodeGratuite(uCree.created_at) : null;
+    if (fin && fin.getTime() > Date.now()) {
+      accreditations.push({
+        type: typePremium, statut: 'active', type_tarif: 'decouverte', montant_paye: 0,
+        date_attribution: uCree.created_at || null, date_expiration: fin.toISOString(), synthetique: true,
+      });
+    }
+  }
+  sendJSON(res, 200, { accreditations });
 });
 
 /* ══════════════════════════════════════════════════════════════════════════════
