@@ -53,3 +53,12 @@ html body.nd .content :is(.pill,.u-proj-filter){background:var(--nd-verre)!impor
 html body.nd .content :is(.pill.active,.u-proj-filter.active){background:var(--nd-degore)!important;border-color:transparent!important;color:#1a1202!important}
 html body.nd .content .u-proj-card{background:var(--nd-verre)!important;border:1px solid var(--nd-bord2)!important;border-radius:18px!important;color:var(--nd-texte)}
 html body.nd :is(.content .btn,.content button,.content a):focus-visible{outline:3px solid var(--nd-or);outline-offset:2px}
+
+/* ── Cockpit en deux colonnes (2026-10-18, demande explicite) : le profil public prend 80 % de la largeur, tout ce qui le suit
+   (actions rapides, conversations, bientôt disponible, QR…) passe dans une colonne de droite de 20 %. Un seul bloc en dessous de 1100 px. ── */
+@media (min-width:1100px){
+  html body.nd #usec-cockpit{display:grid;grid-template-columns:minmax(0,4fr) minmax(230px,1fr);column-gap:24px;align-items:start}
+  html body.nd #usec-cockpit>h1,html body.nd #usec-cockpit>#cda-container{grid-column:1/-1}
+  html body.nd #usec-cockpit>#carte-profil-public{grid-column:1;grid-row:3/span 12}
+  html body.nd #usec-cockpit>:not(h1):not(#cda-container):not(#carte-profil-public){grid-column:2}
+}

@@ -212,3 +212,24 @@ html body.nd main.content [style*="background:linear-gradient(135deg,#c8960c"][d
 /* ═══ filtres en pastilles (rubrique « Soumission DA ») et boutons sans classe ═══ */
 html body.nd main.content :is(.da-sda-filter,.tab-btn,.filter-btn,[class*="-filter"]:not(select):not(input)){background:var(--nd-verre)!important;border:1px solid var(--nd-bord2)!important;color:var(--nd-texte)!important;border-radius:999px}
 html body.nd main.content :is(.da-sda-filter,.tab-btn,.filter-btn,[class*="-filter"]:not(select):not(input)):is(.active,.on,.selected){background:var(--nd-degore)!important;color:#1a1202!important;border-color:var(--nd-or)!important;font-weight:800}
+
+/* ═══ Liste « Mon profil public » (assets/profil-checklist.js, 2026-10-18) : rangées en verre sombre, textes lisibles ═══
+   Le composant pose ses propres fonds clairs (vert pâle, jaune pâle) : sur la nuit, ses textes (clairs via les variables du site) devenaient invisibles. */
+html body.nd .pc-card{background:var(--nd-verre)!important;border:1px solid var(--nd-bord2)!important;color:var(--nd-texte)!important}
+html body.nd .pc-titre{color:var(--nd-or)!important}
+html body.nd .pc-resume{color:var(--nd-texte)!important}
+html body.nd .pc-barre{background:rgba(255,255,255,.12)!important}
+html body.nd .pc-groupe{color:var(--nd-or)!important}
+html body.nd .pc-it{background:rgba(255,255,255,.05)!important;border:1px solid var(--nd-bord2)!important;color:var(--nd-texte)!important}
+html body.nd .pc-it.manque{background:rgba(227,192,110,.1)!important;border-color:var(--nd-bord)!important}
+html body.nd .pc-it.ok{background:rgba(143,224,176,.08)!important;border-color:rgba(143,224,176,.3)!important}
+html body.nd .pc-lib{color:#fff!important}
+html body.nd .pc-it.ok .pc-lib{color:#9BE8B8!important}
+html body.nd .pc-aide{color:var(--nd-doux)!important}
+html body.nd .pc-it.manque .pc-ic{background:transparent!important;border-color:var(--nd-or)!important;color:var(--nd-or)!important}
+html body.nd .pc-btn{background:var(--nd-degore)!important;color:#1a1202!important;border:0!important;font-weight:800}
+html body.nd .pc-cta{background:var(--nd-degore)!important;color:#1a1202!important}
+html body.nd .pc-fait{color:#9BE8B8!important}
+html body.nd .pc-bascule{background:var(--nd-verre)!important;border-color:var(--nd-bord)!important;color:var(--nd-texte)!important}
+html body.nd .pc-bascule:hover{background:var(--nd-verre2)!important}
+html body.nd .pc-erreur,html body.nd .pc-chargement{color:var(--nd-doux)!important}
