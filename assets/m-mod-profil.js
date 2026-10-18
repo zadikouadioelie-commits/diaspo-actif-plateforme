@@ -162,6 +162,7 @@
         if (idp.nom_legal) lignes.push(['Dénomination légale', esc(idp.nom_legal)]);
         idp.numeros.forEach(n => lignes.push([n.libelle, `<b>${esc(n.numero)}</b><br><span class="small muted">${esc(n.statut_libelle || (n.confirme ? '✓ Confirmé par la plateforme' : 'Déclaré par la structure'))}</span>${n.lien ? `<br><a href="${esc(attrUrl(n.lien))}" target="_blank" rel="noopener noreferrer">Vérifier au registre ↗</a>` : ''}`]));
         if (idp.pays) lignes.push(['Pays où vérifier', esc(idp.pays)]);
+        (idp.ou_verifier || []).forEach(o => lignes.push(['Où vérifier', `<b>${esc(o.organisme)}</b>${o.role ? `<br><span class="small muted">${esc(o.role)}</span>` : ''}${o.site_web ? `<br><a href="${esc(attrUrl(o.site_web))}" target="_blank" rel="noopener noreferrer">Site officiel ↗</a>` : ''}`]));
         return sec('Identification officielle', kvs(lignes) + '<p class="small muted" style="margin:8px 2px 0">Ces numéros sont publics : chacun peut les contrôler auprès du registre officiel du pays indiqué.</p>');
       })(),
       sec('Informations pratiques', kvs(infos) + carteLien(adr)),

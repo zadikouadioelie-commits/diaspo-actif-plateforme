@@ -757,6 +757,7 @@ async function voirFiche(id){
         ${i.pays_immatriculation?`<div><b>Pays d'immatriculation :</b> ${escH(i.pays_immatriculation)}</div>`:''}
         ${(i.identification_publique?.numeros||[]).map(n=>`<div><b>${escH(n.libelle)} :</b> ${escH(n.numero)} <span style="color:var(--muted);font-size:.75rem;">${escH(n.statut_libelle||(n.confirme?'✓ confirmé':'déclaré'))}</span>${n.lien?` · <a href="${escH(n.lien)}" target="_blank" rel="noopener noreferrer">Vérifier ↗</a>`:''}</div>`).join('')}
         ${i.identification_publique?.pays?`<div><b>Pays où vérifier :</b> ${escH(i.identification_publique.pays)}</div>`:''}
+        ${(i.identification_publique?.ou_verifier||[]).map(o=>`<div><b>Où vérifier :</b> ${escH(o.organisme)}${o.role?` (${escH(o.role)})`:''}${o.site_web?` · <a href="${escH(o.site_web)}" target="_blank" rel="noopener noreferrer">site ↗</a>`:''}</div>`).join('')}
         <div><b>👍 Recommandations :</b> ${i.nb_recommandations||0}</div>
         <div><b>🔗 Membres du réseau :</b> ${i.nb_affiliations||0}</div>
       </div>

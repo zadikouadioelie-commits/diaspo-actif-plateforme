@@ -10431,13 +10431,25 @@ route("GET", "/api/mon-initiative", async (req, res, params, body, query) => {
   sendJSON(res, 200, { initiative: row });
 });
 
+/* « Où vérifier ce numéro » (2026-10-18) : l'organisme du pays (greffe, guichet unique…) tel que saisi dans les fiches pays des administrateurs.
+   Seuls l'organisme, son rôle et son site sont publics ; téléphone, e-mail et marche à suivre restent internes. */
+async function ouVerifierPays(identification) {
+  if (!identification || !identification.pays) return identification;
+  try {
+    const fiches = await db.prepare("SELECT organisme, role_organisme, site_web, pays_nom FROM pays_verification_fiches WHERE COALESCE(actif,1)=1 ORDER BY organisme").all();
+    const cible = Immat.normaliserPays(identification.pays);
+    identification.ou_verifier = fiches.filter(f => Immat.normaliserPays(f.pays_nom) === cible)
+      .map(f => ({ organisme: f.organisme, role: f.role_organisme || '', site_web: /^https?:\/\//i.test(f.site_web || '') ? f.site_web : '' }));
+  } catch (e) { identification.ou_verifier = []; }
+  return identification;
+}
 route("GET", "/api/initiatives/:id", async (req, res, params, body, query) => {
   const row = await getInitiativeByIdOrSlug(params.id);
   if (!row) return sendJSON(res, 404, { error: "Initiative introuvable." });
   /* Numéros d'identification (RNA, SIREN, SIRET, RCCM, IFU, numéro fiscal…) + pays : PUBLICS (2026-10-18, demande explicite — n'importe qui doit
      pouvoir les vérifier). Calculé AVANT assainirInitiativePublique, qui retire le numéro fiscal des champs bruts : seule cette liste structurée
      l'expose. */
-  row.identification_publique = Immat.identificationPublique(row);
+  row.identification_publique = await ouVerifierPays(Immat.identificationPublique(row));
   /* Coordonnées privées retirées AVANT tout enrichissement, pour qu'aucune branche du
      traitement ne puisse les réintroduire par inadvertance. Le numéro du responsable est
      une donnée de gestion de compte : il était renvoyé publiquement, y compris dans la
@@ -40356,7 +40368,7 @@ ${jsonLd}
     const RESEAU_CHAMPS_PRIVES = ['email_responsable', 'tel_responsable', 'tel_responsable_2', 'tel_responsable_3', 'stripe_identity_session_id', 'numero_fiscal'];
     async function enrichInit(row, garderPrive) {
       if (!row) return null;
-      const identificationPublique = Immat.identificationPublique(row); // avant le retrait du numéro fiscal des champs bruts
+      const identificationPublique = await ouVerifierPays(Immat.identificationPublique(row)); // avant le retrait du numéro fiscal des champs bruts
       if (!garderPrive) { row = { ...row }; RESEAU_CHAMPS_PRIVES.forEach(k => { delete row[k]; }); }
       return {
         ...row,
