@@ -80,9 +80,9 @@
   <div style="background:linear-gradient(135deg,${s.couleur1} 0%,#060A14 100%);color:#F4F1E8;padding:${s.margins?.top || 15}mm ${s.margins?.right || 15}mm 12mm ${s.margins?.left || 15}mm;display:flex;gap:20px;align-items:center;">
     <div style="flex:1;min-width:0;">
       <div style="font-size:7.5pt;font-weight:800;letter-spacing:.3em;text-transform:uppercase;color:#E3C06E;margin-bottom:6px;">Curriculum vitæ</div>
-      <div style="font-family:${TITRES};font-size:27pt;font-weight:500;line-height:1.05;color:#fff;letter-spacing:-.005em;">${_e(nom)}</div>
-      ${inf.titre_pro ? `<div style="font-size:11.5pt;color:#E3C06E;margin-top:7px;font-weight:600;">${_e(inf.titre_pro)}</div>` : ''}
-      ${contacts ? `<div style="margin-top:12px;font-size:8.5pt;color:#CBD3E4;display:flex;flex-wrap:wrap;">${contacts}</div>` : ''}
+      <div style="font-family:${TITRES};font-size:27pt;font-weight:500;line-height:1.05;color:var(--cv-nom,#fff);letter-spacing:-.005em;">${_e(nom)}</div>
+      ${inf.titre_pro ? `<div style="font-size:11.5pt;color:var(--cv-nom,#E3C06E);margin-top:7px;font-weight:600;">${_e(inf.titre_pro)}</div>` : ''}
+      ${contacts ? `<div style="margin-top:12px;font-size:8.5pt;color:var(--cv-coord,#CBD3E4);display:flex;flex-wrap:wrap;">${contacts}</div>` : ''}
     </div>
     ${ph ? `<div style="flex:none;padding:3px;border-radius:${d.photo?.shape === 'square' ? '12px' : '50%'};background:linear-gradient(135deg,#F3DC9B,#B9893A);line-height:0;">${ph}</div>` : ''}
   </div>
@@ -102,7 +102,7 @@
       ${d.langues?.length ? `${titre('Langues', s)}${d.langues.map(l => `<div style="display:flex;justify-content:space-between;align-items:center;font-size:9pt;margin-bottom:5px;"><span style="font-weight:700;">${_e(l.langue)}</span><span style="display:inline-flex;align-items:center;" title="${_e(l.niveau)}">${points(niveauLangue(l.niveau))}</span></div>`).join('')}` : ''}
       ${d.certifications?.length ? `${titre('Certifications', s)}${d.certifications.map(c => `<div style="font-size:8.5pt;margin-bottom:6px;line-height:1.35;"><strong>${_e(c.nom)}</strong>${c.organisme ? `<br><span style="color:var(--cv-txt,#4a5468);">${_e(c.organisme)}</span>` : ''}</div>`).join('')}` : ''}
       ${d.interests?.length ? `${titre("Centres d'intérêt", s)}<div>${pastilles(d.interests, s)}</div>` : ''}
-      ${inf.nationalite ? `<div style="margin-top:12px;font-size:8.5pt;color:var(--cv-txt,#4a5468);">🌍 ${_e(inf.nationalite)}</div>` : ''}
+      ${inf.nationalite ? `<div style="margin-top:12px;font-size:8.5pt;color:var(--cv-coord,var(--cv-txt,#4a5468));">🌍 ${_e(inf.nationalite)}</div>` : ''}
       ${_qrWidget(d.media?.qr, false)}
     </div>` : ''}
   </div>

@@ -84,6 +84,26 @@ textarea { resize: vertical; }
 .color-swatch input[type="color"] { width: 48px; height: 36px; border: 2px solid #e0e8f0; border-radius: 6px; cursor: pointer; padding: 2px; }
 .design-row { margin-bottom: 12px; }
 .range-val { font-size: .75rem; color: var(--accent); font-weight: 700; }
+/* Réglages « − / + » gradués (2026-10-18, demande explicite) : remplacent les curseurs, peu lisibles. Chaque cran de la barre = un pas du réglage ;
+   les crans remplis montrent jusqu'où l'on est monté, le cran courant est plus lumineux. Les <input type=range> d'origine restent la source de
+   vérité (masqués) : le composant écrit leur valeur puis déclenche leur événement « input ». */
+.stp-src { display: none !important; }
+.stp-row > label { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.stp-val { font-size: 1.05rem; font-weight: 800; color: var(--cv-or, var(--accent)); font-variant-numeric: tabular-nums; }
+.stp { display: grid; grid-template-columns: 40px 1fr 40px; gap: 10px; align-items: start; }
+.stp-btn { width: 40px; height: 40px; border-radius: 10px; border: 1.5px solid var(--cv-or, var(--accent)); background: transparent; color: var(--cv-or, var(--accent)); font-size: 1.5rem; font-weight: 700; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; user-select: none; touch-action: manipulation; transition: background .12s, color .12s, transform .08s; }
+.stp-btn:hover:not(:disabled) { background: var(--cv-or, var(--accent)); color: #101827; }
+.stp-btn:active:not(:disabled) { transform: scale(.94); }
+.stp-btn:disabled { opacity: .32; cursor: not-allowed; }
+.stp-btn:focus-visible, .stp-scale:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.stp-scale { position: relative; display: flex; gap: 2px; height: 22px; margin: 9px 0 24px; cursor: pointer; }
+.stp-cran { flex: 1; min-width: 0; border-radius: 3px; background: rgba(128,140,165,.28); position: relative; transition: background .12s; }
+.stp-cran.on { background: color-mix(in srgb, var(--cv-or, var(--accent)) 62%, transparent); }
+.stp-cran.cur { background: var(--cv-or, var(--accent)); box-shadow: 0 0 0 2px rgba(255,255,255,.55), 0 0 10px color-mix(in srgb, var(--cv-or, var(--accent)) 70%, transparent); z-index: 1; }
+.stp-cran i { position: absolute; top: 27px; left: 50%; transform: translateX(-50%); font-style: normal; font-size: .64rem; font-weight: 700; color: #8b97ad; white-space: nowrap; pointer-events: none; }
+.stp-cran.cur i { color: var(--cv-or, var(--accent)); }
+.stp-cran.rep::before { content: ""; position: absolute; left: 50%; top: 100%; width: 1px; height: 5px; background: #8b97ad; }
+
 /* Photo */
 .photo-preview-container { text-align: center; margin-bottom: 12px; }
 #photo-preview { width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 3px solid var(--accent); display: none; }
@@ -268,6 +288,15 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
           <div class="form-field"><label>Site personnel</label><input id="site" type="url" placeholder="monsite.com" oninput="render()"></div>
           <div class="form-field"><label>Mon compte Diaspo’Actif <em style="font-weight:400;color:#64748b">· affiché avec le logo Diaspo’Actif</em></label><input id="diasporactif" type="url" placeholder="Lien de votre compte Diaspo’Actif" oninput="render()"><button type="button" id="btn-da-compte" style="margin-top:6px;background:none;border:0;padding:0;color:#2563eb;font-weight:700;font-size:12.5px;cursor:pointer;text-decoration:underline">Utiliser le lien de mon compte</button></div>
           <div class="form-field"><label>Adresse</label><input id="adresse" type="text" placeholder="12 rue..." oninput="render()"></div>
+          <div class="form-field" id="cv-couleurs-infos">
+            <label>Couleurs des informations personnelles <em style="font-weight:400;color:#64748b">· choisissez, ou laissez la couleur du modèle</em></label>
+            <div class="color-row" style="align-items:flex-end;grid-template-columns:auto 1fr;gap:10px 12px;">
+              <div class="color-swatch"><label>Nom et titre</label><input type="color" id="color-nom" value="#222222" aria-label="Couleur du nom et du titre professionnel"></div>
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><button type="button" id="color-nom-auto" style="min-height:36px;padding:0 12px;border-radius:10px;border:1px solid rgba(255,255,255,.25);background:transparent;color:inherit;font:inherit;font-size:.78rem;font-weight:700;cursor:pointer;">↺ Couleur du modèle</button><span id="color-nom-etat" style="font-size:.72rem;color:#64748b"></span></div>
+              <div class="color-swatch"><label>Coordonnées</label><input type="color" id="color-coord" value="#222222" aria-label="Couleur des coordonnées : e-mail, téléphone, ville, liens, nationalité"></div>
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><button type="button" id="color-coord-auto" style="min-height:36px;padding:0 12px;border-radius:10px;border:1px solid rgba(255,255,255,.25);background:transparent;color:inherit;font:inherit;font-size:.78rem;font-weight:700;cursor:pointer;">↺ Couleur du modèle</button><span id="color-coord-etat" style="font-size:.72rem;color:#64748b"></span></div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -382,10 +411,42 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
         </div>
       </div>
       <div class="design-row"><label>Police</label><select id="font-select"><option>Segoe UI</option><option>Arial</option><option value="Georgia, serif">Georgia</option><option value="Times New Roman, serif">Times New Roman</option><option value="Calibri, sans-serif">Calibri</option><option value="Garamond, serif">Garamond</option><option value="Trebuchet MS, sans-serif">Trebuchet MS</option></select></div>
-      <div class="design-row"><label>Taille police : <span class="range-val" id="font-size-val">11pt</span></label><input type="range" id="font-size" min="8" max="14" value="11" oninput="document.getElementById('font-size-val').textContent=this.value+'pt';"></div>
-      <div class="design-row"><label>Interligne : <span class="range-val" id="spacing-val">1.4</span></label><input type="range" id="spacing" min="1" max="2" step=".1" value="1.4" oninput="document.getElementById('spacing-val').textContent=this.value;"></div>
-      <div class="design-row"><label>Marges haut/bas (mm)</label><input type="range" min="5" max="30" value="15" oninput="CVB.data.style.margins.top=CVB.data.style.margins.bottom=parseInt(this.value);render();CVB.dirty=true;"></div>
-      <div class="design-row"><label>Marges gauche/droite (mm)</label><input type="range" min="5" max="30" value="15" oninput="CVB.data.style.margins.left=CVB.data.style.margins.right=parseInt(this.value);render();CVB.dirty=true;"></div>
+      <div class="design-row stp-row">
+        <label>Taille de la police <span class="stp-val" data-stp-val>11 pt</span></label>
+        <div class="stp" data-min="8" data-max="14" data-step="1" data-unit=" pt" data-every="1">
+          <button type="button" class="stp-btn" data-dir="-1" aria-label="Diminuer : Taille de la police">−</button>
+          <div class="stp-scale" role="slider" tabindex="0" aria-label="Taille de la police" aria-valuemin="8" aria-valuemax="14" aria-valuenow="11"></div>
+          <button type="button" class="stp-btn" data-dir="1" aria-label="Augmenter : Taille de la police">+</button>
+        </div>
+        <input type="range" id="font-size" class="stp-src" min="8" max="14" value="11">
+      </div>
+      <div class="design-row stp-row">
+        <label>Interligne <span class="stp-val" data-stp-val>1.4</span></label>
+        <div class="stp" data-min="1" data-max="2" data-step="0.1" data-unit="" data-every="5">
+          <button type="button" class="stp-btn" data-dir="-1" aria-label="Diminuer : Interligne">−</button>
+          <div class="stp-scale" role="slider" tabindex="0" aria-label="Interligne" aria-valuemin="1" aria-valuemax="2" aria-valuenow="1.4"></div>
+          <button type="button" class="stp-btn" data-dir="1" aria-label="Augmenter : Interligne">+</button>
+        </div>
+        <input type="range" id="spacing" class="stp-src" min="1" max="2" step=".1" value="1.4">
+      </div>
+      <div class="design-row stp-row">
+        <label>Marges haut / bas <span class="stp-val" data-stp-val>15 mm</span></label>
+        <div class="stp" data-min="5" data-max="30" data-step="1" data-unit=" mm" data-every="5">
+          <button type="button" class="stp-btn" data-dir="-1" aria-label="Diminuer : Marges haut / bas">−</button>
+          <div class="stp-scale" role="slider" tabindex="0" aria-label="Marges haut / bas" aria-valuemin="5" aria-valuemax="30" aria-valuenow="15"></div>
+          <button type="button" class="stp-btn" data-dir="1" aria-label="Augmenter : Marges haut / bas">+</button>
+        </div>
+        <input type="range" id="margin-tb" class="stp-src" min="5" max="30" value="15" oninput="CVB.data.style.margins.top=CVB.data.style.margins.bottom=parseInt(this.value);render();CVB.dirty=true;">
+      </div>
+      <div class="design-row stp-row">
+        <label>Marges gauche / droite <span class="stp-val" data-stp-val>15 mm</span></label>
+        <div class="stp" data-min="5" data-max="30" data-step="1" data-unit=" mm" data-every="5">
+          <button type="button" class="stp-btn" data-dir="-1" aria-label="Diminuer : Marges gauche / droite">−</button>
+          <div class="stp-scale" role="slider" tabindex="0" aria-label="Marges gauche / droite" aria-valuemin="5" aria-valuemax="30" aria-valuenow="15"></div>
+          <button type="button" class="stp-btn" data-dir="1" aria-label="Augmenter : Marges gauche / droite">+</button>
+        </div>
+        <input type="range" id="margin-lr" class="stp-src" min="5" max="30" value="15" oninput="CVB.data.style.margins.left=CVB.data.style.margins.right=parseInt(this.value);render();CVB.dirty=true;">
+      </div>
       <div style="margin-top:16px;"><div style="font-size:.75rem;font-weight:700;margin-bottom:8px;color:#888;">CHOISIR UN TEMPLATE</div><div class="tmpl-grid" id="template-list"></div></div>
     </div>
 

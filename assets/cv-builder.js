@@ -278,9 +278,90 @@ function renderDesignPanel() {
   g('color1', s.couleur1); g('color2', s.couleur2); g('color3', s.couleur3);
   g('font-select', s.font); g('font-size', s.fontSize);
   g('spacing', s.spacing);
+  const m = s.margins || {};
+  g('margin-tb', m.top); g('margin-lr', m.left);
   const ct = document.getElementById('color-texte'); if (ct) ct.value = /^#[0-9a-f]{6}$/i.test(s.couleur_texte || '') ? s.couleur_texte : '#222222';
+  renderCouleursInfos();
+  syncSteppers();
+}
+/* Couleurs des informations personnelles (2026-10-18, demande explicite) : style.couleur_nom (nom + titre) et style.couleur_coord (coordonnées +
+   nationalité). Absente = couleur d'origine du modèle (voir _txtVar dans cv-templates.js). */
+const CV_COULEURS_INFOS = [
+  { cle: 'couleur_nom', id: 'color-nom' },
+  { cle: 'couleur_coord', id: 'color-coord' }
+];
+function renderCouleursInfos() {
+  const s = CVB.data.style;
+  CV_COULEURS_INFOS.forEach(({ cle, id }) => {
+    const choisie = /^#[0-9a-f]{6}$/i.test(s[cle] || '');
+    const inp = document.getElementById(id); if (inp) inp.value = choisie ? s[cle] : '#222222';
+    const etat = document.getElementById(id + '-etat'); if (etat) etat.textContent = choisie ? 'couleur choisie' : 'couleur du modèle';
+  });
+}
+/* Réglages « − / + » gradués : voir le bloc CSS .stp dans cv-builder.html. */
+function stepperDecimales(st) { return (String(st).split('.')[1] || '').length; }
+function syncSteppers() {
+  document.querySelectorAll('.stp').forEach(el => {
+    const src = el.parentElement.querySelector('.stp-src'); if (!src) return;
+    const min = parseFloat(el.dataset.min), max = parseFloat(el.dataset.max), pas = parseFloat(el.dataset.step), every = parseInt(el.dataset.every) || 1;
+    const dec = stepperDecimales(el.dataset.step), unit = el.dataset.unit || '';
+    const n = Math.round((max - min) / pas) + 1;
+    const val = Math.min(max, Math.max(min, parseFloat(src.value) || min));
+    const cur = Math.round((val - min) / pas);
+    const scale = el.querySelector('.stp-scale');
+    if (scale.children.length !== n) {
+      scale.innerHTML = Array.from({ length: n }, (_, i) => {
+        const v = (min + i * pas).toFixed(dec);
+        const etiquette = (i % every === 0 || i === n - 1) ? `<i>${v}</i>` : '';
+        return `<span class="stp-cran${etiquette ? ' rep' : ''}" data-i="${i}">${etiquette}</span>`;
+      }).join('');
+    }
+    [...scale.children].forEach((c, i) => { c.classList.toggle('on', i <= cur); c.classList.toggle('cur', i === cur); });
+    el.querySelector('[data-dir="-1"]').disabled = cur <= 0;
+    el.querySelector('[data-dir="1"]').disabled = cur >= n - 1;
+    scale.setAttribute('aria-valuenow', val.toFixed(dec));
+    const aff = el.closest('.stp-row').querySelector('[data-stp-val]'); if (aff) aff.textContent = val.toFixed(dec) + unit;
+  });
+}
+function setupSteppers() {
+  const regler = (el, cran) => {
+    const src = el.parentElement.querySelector('.stp-src'); if (!src) return;
+    const min = parseFloat(el.dataset.min), max = parseFloat(el.dataset.max), pas = parseFloat(el.dataset.step), dec = stepperDecimales(el.dataset.step);
+    const n = Math.round((max - min) / pas) + 1;
+    cran = Math.min(n - 1, Math.max(0, cran));
+    const nouvelle = (min + cran * pas).toFixed(dec);
+    if (src.value === nouvelle) return;
+    src.value = nouvelle;
+    src.dispatchEvent(new Event('input', { bubbles: true }));
+    syncSteppers();
+  };
+  const courant = el => { const src = el.parentElement.querySelector('.stp-src'); return Math.round(((parseFloat(src.value) || 0) - parseFloat(el.dataset.min)) / parseFloat(el.dataset.step)); };
+  document.querySelectorAll('.stp').forEach(el => {
+    el.querySelectorAll('.stp-btn').forEach(b => {
+      const dir = parseInt(b.dataset.dir);
+      let t1 = null, t2 = null, repete = false;
+      const stop = () => { clearTimeout(t1); clearInterval(t2); t1 = t2 = null; };
+      /* Un clic (souris, tactile, Entrée/Espace) = un cran ; maintenir appuyé = répétition rapide
+         (le « click » qui suit une répétition est ignoré pour ne pas ajouter un cran de trop). */
+      b.addEventListener('click', () => { if (repete) { repete = false; return; } if (!b.disabled) regler(el, courant(el) + dir); });
+      b.addEventListener('pointerdown', e => {
+        repete = false;
+        if (b.disabled || e.button > 0) return;
+        t1 = setTimeout(() => { repete = true; t2 = setInterval(() => regler(el, courant(el) + dir), 90); }, 420);
+      });
+      ['pointerup', 'pointerleave', 'pointercancel', 'blur'].forEach(ev => b.addEventListener(ev, stop));
+    });
+    const scale = el.querySelector('.stp-scale');
+    scale.addEventListener('click', e => { const c = e.target.closest('.stp-cran'); if (c) regler(el, parseInt(c.dataset.i)); });
+    scale.addEventListener('keydown', e => {
+      const k = { ArrowRight: 1, ArrowUp: 1, ArrowLeft: -1, ArrowDown: -1 }[e.key];
+      if (k) { e.preventDefault(); regler(el, courant(el) + k); }
+    });
+  });
+  syncSteppers();
 }
 function setupDesignListeners() {
+  setupSteppers();
   renderThemePresets();
   ['color1','color2','color3'].forEach(id => {
     document.getElementById(id)?.addEventListener('input', e => {
@@ -297,6 +378,14 @@ function setupDesignListeners() {
     delete CVB.data.style.couleur_texte;
     const ct = document.getElementById('color-texte'); if (ct) ct.value = '#222222';
     render(); CVB.dirty = true;
+  });
+  CV_COULEURS_INFOS.forEach(({ cle, id }) => {
+    document.getElementById(id)?.addEventListener('input', e => {
+      CVB.data.style[cle] = e.target.value; renderCouleursInfos(); render(); CVB.dirty = true;
+    });
+    document.getElementById(id + '-auto')?.addEventListener('click', () => {
+      delete CVB.data.style[cle]; renderCouleursInfos(); render(); CVB.dirty = true;
+    });
   });
   document.getElementById('font-select')?.addEventListener('change', e => {
     CVB.data.style.font = e.target.value; render(); CVB.dirty = true;
