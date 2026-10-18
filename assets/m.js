@@ -10,7 +10,11 @@
   const $ = (s, r) => (r || document).querySelector(s);
   const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
   const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const strip = v => String(v == null ? '' : v).replace(/<[^>]*>/g, ' ').replace(/[ \t]+/g, ' ').replace(/ ?\n ?/g, '\n').trim();
+  /* Texte brut lisible : le serveur stocke certains titres déjà échappés (« Diaspo&#39;Actif ») et les mentions sous forme @[Nom](u:12) ;
+     strip() les ramène à « Diaspo'Actif » / « Nom ». Tout reste ré-échappé par esc() avant d'être affiché, donc aucun risque d'injection. */
+  const ENT = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
+  const deent = s => { for (let i = 0; i < 6 && /&(?:#\d+|#x[0-9a-f]+|amp|lt|gt|quot|apos|nbsp);/i.test(s); i++) s = s.replace(/&(#\d+|#x[0-9a-f]+|amp|lt|gt|quot|apos|nbsp);/gi, (m, e) => { if (e[0] !== '#') return ENT[e.toLowerCase()]; try { return String.fromCodePoint(e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10)); } catch (x) { return m; } }); return s; };
+  const strip = v => deent(String(v == null ? '' : v).replace(/@\[([^\]]+)\]\([uic]:\d+\)/g, '$1').replace(/<[^>]*>/g, ' ')).replace(/[ \t]+/g, ' ').replace(/ ?\n ?/g, '\n').trim();
   const md = v => String(v == null ? '' : v).replace(/\*\*([^*]+)\*\*/g, '$1');
   const linkify = t => esc(t).replace(/((?:https?:\/\/)?(?:[a-z0-9-]+\.)+(?:com|fr|org|net|io|app)(?:\/[^\s<]*)?)/gi, u => { const h = /^https?:/i.test(u) ? u : 'https://' + u; return '<a href="' + h + '" target="_blank" rel="noopener" style="color:var(--navy2);text-decoration:underline;word-break:break-all">' + u + '</a>'; });
   const initials = n => (String(n || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0] || '').join('') || '?').toUpperCase();

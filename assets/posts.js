@@ -43,7 +43,10 @@ function tronquerTexteBrut(texte, max) {
 /* Titre d'une publication (2026-10-05, demande explicite) : HTML en ligne (gras/italique/souligné)
    déjà nettoyé par le serveur ; filtré une seconde fois ici, par principe, avant injection. */
 function titreSur(html) {
-  return String(html || '')
+  /* ramène les titres sur-échappés (« &amp;#39; ») à une seule couche d'entité : l'apostrophe s'affiche au lieu de « &#39; » */
+  let h = String(html || '');
+  for (let i = 0; i < 6 && /&amp;(?:#\d+|#x[0-9a-f]+|amp|lt|gt|quot|apos);/i.test(h); i++) h = h.replace(/&amp;(#\d+|#x[0-9a-f]+|amp|lt|gt|quot|apos);/gi, '&$1;');
+  return h
     .replace(/<(?!\/?(strong|b|em|i|u)\b)[^>]*>/gi, '')
     .replace(/<(strong|b|em|i|u)\b[^>]*>/gi, '<$1>');
 }

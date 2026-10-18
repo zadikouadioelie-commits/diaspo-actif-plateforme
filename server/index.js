@@ -26643,11 +26643,19 @@ route("GET", "/api/mes-candidatures", async (req, res) => {
 function texteDuTitre(html) {
   return String(html || "").replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s+/g, " ").trim();
 }
+/* Le contenu arrive parfois déjà échappé (« l&#39;un »), parfois plusieurs fois : on le ramène à du texte brut avant de le
+   ré-échapper pour le titre, sinon l'apostrophe s'affiche « &#39; » à l'écran. */
+function decoderEntitesTitre(s) {
+  s = String(s);
+  for (let i = 0; i < 6 && /&(?:amp|lt|gt|quot|apos|#39|#x27);/i.test(s); i++) s = s.replace(/&(?:#39|#x27|apos);/gi, "'").replace(/&quot;/gi, '"').replace(/&lt;/gi, '<').replace(/&gt;/gi, '>').replace(/&amp;/gi, '&');
+  return s;
+}
 function genererTitrePost(p) {
   const pub = p.pub_type || p.type || "";
   const nettoyer = (l) => String(l)
     .replace(/@\[([^\]]+)\]\([ui]:\d+\)/g, "$1")
     .replace(/<[^>]+>/g, " ")
+    .replace(/^[\s\S]*$/, decoderEntitesTitre)
     .replace(/https?:\/\/\S+/g, "")
     .replace(/\s+/g, " ")
     .trim();

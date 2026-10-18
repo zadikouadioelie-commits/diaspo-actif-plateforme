@@ -11,7 +11,7 @@
   var RE_VIDEO = /\.(mp4|webm|mov|m4v|ogv)(\?|#|$)/i, RE_IMG = /\.(jpe?g|png|gif|webp|avif)(\?|#|$)/i;
   var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
   var urlOk = function (u) { return typeof u === 'string' && /^(https?:\/\/|\/[^\/])/i.test(u); };
-  var plain = function (s) { return String(s == null ? '' : s).replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\*\*|__|`/g, '').replace(/\s+/g, ' ').trim(); };
+  var plain = function (s) { s = String(s == null ? '' : s).replace(/<[^>]*>/g, ' '); for (var i = 0; i < 6 && /&(?:#39|#x27|apos|quot|amp|lt|gt);/i.test(s); i++) s = s.replace(/&(?:#39|#x27|apos);/gi, "'").replace(/&quot;/gi, '"').replace(/&lt;/gi, '<').replace(/&gt;/gi, '>').replace(/&amp;/gi, '&'); return s.replace(/&nbsp;/g, ' ').replace(/\*\*|__|`/g, '').replace(/\s+/g, ' ').trim(); };
   var V = null, toastT = null;
   /* Petite caméra stylisée (logo « Reels ») : corps arrondi, objectif en triangle, dégradé or — même dessin sur le site et sur téléphone. */
   var CAM = '<svg class="mv-cam" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="mvcg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F3DC9B"/><stop offset=".5" stop-color="#E3C06E"/><stop offset="1" stop-color="#B9893A"/></linearGradient></defs><rect x="2" y="6" width="13.5" height="12" rx="3.2" fill="url(#mvcg)"/><path d="M17.2 10.4l4.2-2.5a.7.7 0 0 1 1.05.6v7a.7.7 0 0 1-1.05.6l-4.2-2.5z" fill="url(#mvcg)"/><circle cx="8.7" cy="12" r="2.6" fill="#0B1226" opacity=".85"/></svg>';
