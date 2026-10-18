@@ -1232,7 +1232,7 @@ async function initRelaisDiasporaWidget(me, api) {
     <div style="display:none;" id="adhesions-init">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px;">
         <div>
-          <h2 style="margin:0;">🎫 Cotisations &amp; Adhésions</h2>
+          <h2 style="margin:0;">🎫 Cotisations &amp; Adhésions</h2><p id="adh-compteur-adherents" style="display:none;font-size:13px;font-weight:700;margin:6px 0 0;color:var(--text);"></p>
           <p style="font-size:13px;color:var(--muted);margin:4px 0 0;">Créez des formules d'adhésion et encaissez réellement vos cotisations.</p>
           <p style="font-size:11.5px;color:var(--muted);margin:6px 0 0;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:6px 10px;display:inline-block;">ℹ️ Diaspo'Actif fournit un reçu de paiement pour chaque adhésion, mais ne délivre pas de reçu fiscal officiel (Cerfa). Si votre organisation est éligible à en émettre pour des dons, cela reste de votre responsabilité de les délivrer vous-même.</p>
         </div>
@@ -3507,10 +3507,7 @@ async function initRelaisDiasporaWidget(me, api) {
       </div>
       ${etatInitiativeHTML}
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:20px;">
-        <div class="card" style="text-align:center;padding:14px;">
-          <div style="font-size:26px;font-weight:800;color:#2563EB;" id="init-kpi-membres">${(init.membres||0).toLocaleString('fr-FR')}</div>
-          <div style="font-size:12px;color:var(--muted);margin-top:4px;">Membres réseau</div>
-        </div>
+        ${['Association','ONG'].includes(init.type) ? `<div class="card" id="init-card-adherents" style="text-align:center;padding:14px;cursor:pointer;" onclick="initShowSection('adhesions-init')" title="Voir les cotisations et adhésions"><div style="font-size:26px;font-weight:800;color:#2563EB;" id="init-kpi-membres">…</div><div style="font-size:12px;color:var(--muted);margin-top:4px;">Adhérents de l'initiative</div><div style="font-size:11px;color:var(--muted);margin-top:2px;" id="init-kpi-membres-att"></div></div>` : ''}<div class="card" id="init-card-partenaires" style="text-align:center;padding:14px;cursor:pointer;" onclick="initShowSection('partenaires-liste')" title="Voir mes partenaires"><div style="font-size:26px;font-weight:800;color:#0f766e;" id="init-kpi-partenaires">…</div><div style="font-size:12px;color:var(--muted);margin-top:4px;">Partenaires</div></div>
         <div class="card" style="text-align:center;padding:14px;">
           <div style="font-size:26px;font-weight:800;color:#3b82f6;" id="init-kpi-msgs">${messages_non_lus||0}</div>
           <div style="font-size:12px;color:var(--muted);margin-top:4px;">Messages non lus</div>
@@ -3676,7 +3673,7 @@ async function initRelaisDiasporaWidget(me, api) {
     /* L'ancien module « Affiliation » est désormais l'onglet « Membres affiliés » de Cotisations & Adhésions (2026-10-08) — les anciens liens (#affiliation, notifications d'invitation) y mènent. */
     let ouvrirOngletAffil = false;
     if (name === 'affiliation') { name = 'adhesions-init'; ouvrirOngletAffil = true; }
-    if (window.rappelAdhesionOfficielle) window.rappelAdhesionOfficielle();
+    if (window.rappelAdhesionOfficielle) window.rappelAdhesionOfficielle(); if (name === 'cockpit' || name === 'adhesions-init') setTimeout(adhMajCompteurs, 0);
     INIT_SECTIONS.forEach(s => {
       const el = document.getElementById(s);
       if(el) el.style.display = s===name ? '' : 'none';
@@ -11285,10 +11282,33 @@ async function initPremiumGates() {
     }
   }
 }
+/* Compteurs « Adhérents de l'initiative » (cockpit + en-tête de Cotisations & Adhésions, réservés aux associations et ONG) et « Partenaires ». */
+async function adhMajCompteurs(essai){
+  essai = essai || 0;
+  const initId = window.__vitrineInitId;
+  const k = document.getElementById('init-kpi-membres'), p = document.getElementById('init-kpi-partenaires'), pill = document.getElementById('adh-compteur-adherents');
+  if(!initId || (!k && !p && !pill)){ if(essai < 30) setTimeout(() => adhMajCompteurs(essai + 1), 400); return; }
+  try{
+    const c = await api('GET', `/initiatives/${initId}/compteurs-cockpit`);
+    const f = v => Number(v || 0).toLocaleString('fr-FR');
+    const a = c.adherents;
+    if(k && a){
+      k.textContent = f(a.a_jour);
+      const att = document.getElementById('init-kpi-membres-att');
+      if(att) att.textContent = a.en_attente ? f(a.en_attente) + ' en attente' : '';
+    }
+    if(p) p.textContent = f(c.partenaires);
+    if(pill && a){
+      pill.textContent = '👥 ' + f(a.a_jour) + ' adhérent' + (a.a_jour > 1 ? 's' : '') + ' à jour' + (a.en_attente ? ' · ' + f(a.en_attente) + ' en attente' : '') + (a.non_a_jour ? ' · ' + f(a.non_a_jour) + ' à renouveler' : '');
+      pill.style.display = '';
+    }
+  }catch(e){ if(k && k.textContent === '…') k.textContent = '—'; if(p && p.textContent === '…') p.textContent = '—'; }
+}
 /* Initialisation au chargement */
 initAssoSidebar();
 initFormationsSidebar();
 initPremiumGates();
+adhMajCompteurs();
 </script>
 
   

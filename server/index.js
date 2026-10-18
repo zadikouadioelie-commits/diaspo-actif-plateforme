@@ -6489,6 +6489,26 @@ route("GET", "/api/adhesions-officielles", async (req, res, params, body, query)
   sendJSON(res, 200, { officielles });
 });
 
+/* Compteurs du cockpit Initiative (2026-10-18, demande explicite) : « Adhérents de l'initiative » = les personnes inscrites au registre
+   des adhésions (même source que le bouton d'adhésion et les paramètres d'adhésion) — réservé aux associations et ONG — et « Partenaires »
+   = partenaires actifs de la fiche. Ce n'est plus le champ saisi à l'inscription. */
+route("GET", "/api/initiatives/:id/compteurs-cockpit", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await getInitiativeByIdOrSlug(params.id);
+  if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
+  if (Number(init.owner_user_id) !== Number(user.id) && user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const N = async (sql, ...a) => { try { const r = await db.prepare(sql).get(...a); return r ? Number(Object.values(r)[0]) || 0 : 0; } catch (e) { return 0; } };
+  const out = { adherents: null, partenaires: await N("SELECT COUNT(*) c FROM initiative_partenaires WHERE initiative_id=? AND actif=1", init.id) };
+  if (["Association", "ONG"].includes(init.type)) {
+    out.adherents = {
+      a_jour: await N("SELECT COUNT(*) c FROM adhesion_membres WHERE initiative_id=? AND statut='a_jour'", init.id),
+      en_attente: await N("SELECT COUNT(*) c FROM adhesion_membres WHERE initiative_id=? AND statut='en_attente'", init.id),
+      non_a_jour: await N("SELECT COUNT(*) c FROM adhesion_membres WHERE initiative_id=? AND statut='non_a_jour'", init.id),
+    };
+  }
+  sendJSON(res, 200, out);
+});
 /* ── Formules : gestion complète (owner) ── */
 route("GET", "/api/initiatives/:id/adhesion-formules/gestion", async (req, res, params) => {
   const user = await getCurrentUser(req);
