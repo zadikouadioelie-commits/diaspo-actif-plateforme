@@ -31,6 +31,12 @@
 <style>
 /* ===== HOMEPAGE — styles dédiés ===== */
 
+/* Bandeau du haut toujours visible pendant le scroll : responsive.css pose overflow-x:hidden sur
+   <body>, ce qui en fait un conteneur de défilement (non scrollable, sa hauteur = son contenu) —
+   le `position:sticky` de .topbar s'y accrochait donc et ne collait jamais au viewport.
+   `clip` coupe le débordement horizontal sans créer de conteneur de défilement. */
+body { overflow-x: clip; }
+
 /* --- Hero --- */
 .hp-hero {
   min-height: 100vh;
