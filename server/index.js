@@ -10244,16 +10244,29 @@ route("GET", "/api/initiatives", async (req, res, params, body, query) => {
       .forEach(c => { certifParInit[Number(c.initiative_id)] = { niveau: c.niveau, statut: c.statut, date_attribution: c.date_attribution }; });
   }
   const identiteParOwner = {};
+  const createdAtParOwner = {};
   if (ownerIds.length) {
     const ph = ownerIds.map(() => "?").join(",");
-    (await db.prepare(`SELECT id, identite_verifiee, identite_expire_le FROM users WHERE id IN (${ph})`).all(...ownerIds))
-      .forEach(u => { identiteParOwner[Number(u.id)] = !!(u.identite_verifiee && u.identite_expire_le && new Date(u.identite_expire_le) > new Date()); });
+    (await db.prepare(`SELECT id, identite_verifiee, identite_expire_le, created_at FROM users WHERE id IN (${ph})`).all(...ownerIds))
+      .forEach(u => {
+        identiteParOwner[Number(u.id)] = !!(u.identite_verifiee && u.identite_expire_le && new Date(u.identite_expire_le) > new Date());
+        createdAtParOwner[Number(u.id)] = u.created_at;
+      });
   }
 
   rows = rows.map(r => {
     const oid = r.owner_user_id ? Number(r.owner_user_id) : null;
     const dateExp = oid ? decouverteParOwner[oid] : null;
-    const decouverte_premium = (dateExp && new Date(dateExp).getTime() >= Date.now()) ? { date_expiration: dateExp } : null;
+    let decouverte_premium = (dateExp && new Date(dateExp).getTime() >= Date.now()) ? { date_expiration: dateExp } : null;
+    /* Période gratuite universelle (règle des 3 mois puis 3 semaines) : un propriétaire jamais
+       passé par accorderDecouvertePremium() (créé avant ce mécanisme) n'a aucune ligne
+       'decouverte' ci-dessus, mais est quand même dans la période offerte à toute la diaspora —
+       même filet que hasAccreditation()/accreditations.mes, sinon le badge public « Découverte
+       Premium » n'apparaît pas pour lui alors qu'il y a bien droit (2026-10-18). */
+    if (!decouverte_premium && oid) {
+      const finGratuite = finPeriodeGratuite(createdAtParOwner[oid]);
+      if (finGratuite && finGratuite.getTime() > Date.now()) decouverte_premium = { date_expiration: finGratuite.toISOString() };
+    }
     const sien = moiListe && Number(moiListe.id) === oid;
     const contacts = sien ? {} : {
       tel_responsable: null, email_responsable: null,
