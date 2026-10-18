@@ -3244,6 +3244,7 @@
           <button class="btn btn-outline" id="adm-ftab-codes" onclick="admFormTab('codes')">🔑 Codes d'accès</button>
           <button class="btn btn-outline" id="adm-ftab-all" onclick="admFormTab('all')">Toutes</button>
           <button class="btn btn-outline" id="adm-ftab-stats" onclick="admFormTab('stats')">📊 Statistiques</button>
+          <button class="btn btn-outline" id="adm-ftab-invites" onclick="admFormTab('invites')">🎓 Formateurs invités</button>
         </div>
 
         <!-- Panel en attente -->
@@ -3268,6 +3269,20 @@
         <!-- Panel statistiques -->
         <div id="adm-fpanel-stats" style="display:none;">
           <div id="adm-fstats"><div class="card" style="padding:16px;color:var(--muted);">Chargement…</div></div>
+        </div>
+
+        <!-- Panel formateurs invités -->
+        <div id="adm-fpanel-invites" style="display:none;">
+          <div class="card" style="padding:16px;margin-bottom:16px;">
+            <h3 style="margin:0 0 6px;font-size:15px;">Inviter un expert à créer des formations</h3>
+            <p style="font-size:12.5px;color:var(--muted);margin:0 0 12px;line-height:1.5;">Un compte invité peut créer et animer ses formations sans être Initiative Premium ni Partenaire. Vous gardez la validation de chaque formation avant publication. Le retrait de l'invitation empêche d'en créer de nouvelles ; les formations existantes restent en place.</p>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <input id="adm-inv-ident" class="input-field" style="flex:1;min-width:220px;" placeholder="E-mail ou numéro du compte">
+              <input id="adm-inv-motif" class="input-field" style="flex:1;min-width:220px;" placeholder="Motif (ex. expert en comptabilité) — facultatif" maxlength="300">
+              <button class="btn btn-orange" onclick="admInviterFormateur()">+ Inviter</button>
+            </div>
+          </div>
+          <div id="adm-invites-list" class="card" style="padding:0;overflow:hidden;"><div style="padding:16px;color:var(--muted);">Chargement…</div></div>
         </div>
 
         <!-- Panel codes d'accès -->
@@ -6971,7 +6986,7 @@ let _admFormTab = 'en_attente';
 
 function admFormTab(tab) {
   _admFormTab = tab;
-  ['en_attente','publiee','codes','all','stats'].forEach(t => {
+  ['en_attente','publiee','codes','all','stats','invites'].forEach(t => {
     const btn = document.getElementById(`adm-ftab-${t}`);
     const panel = document.getElementById(`adm-fpanel-${t}`);
     if (btn) btn.className = t === tab ? 'btn btn-orange' : 'btn btn-outline';
@@ -6979,6 +6994,7 @@ function admFormTab(tab) {
   });
   if (tab === 'codes') loadAdmCodes();
   else if (tab === 'stats') loadAdmFormStats();
+  else if (tab === 'invites') loadAdmInvites();
   else loadAdmFormations(tab);
 }
 
@@ -7020,6 +7036,41 @@ async function loadAdmFormStats() {
   }
 }
 
+/* Formateurs invités : experts autorisés par l'administration à créer des formations. */
+async function loadAdmInvites() {
+  const el = document.getElementById('adm-invites-list');
+  if (!el) return;
+  el.innerHTML = '<div style="padding:16px;color:var(--muted);">Chargement…</div>';
+  try {
+    const { invites } = await api('GET', '/admin/formateurs-invites');
+    if (!invites.length) { el.innerHTML = '<div style="padding:16px;color:var(--muted);">Aucun formateur invité pour le moment.</div>'; return; }
+    el.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead><tr style="border-bottom:2px solid var(--border);background:#f8fafc;"><th style="padding:10px 14px;text-align:left;">Compte</th><th style="padding:10px 14px;text-align:left;">Motif</th><th style="padding:10px 14px;text-align:left;">Formations</th><th style="padding:10px 14px;text-align:left;">Statut</th><th style="padding:10px 14px;"></th></tr></thead><tbody>
+      ${invites.map(i => `<tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 14px;"><div style="font-weight:700;">${esc(i.nom)}</div><div style="font-size:11px;color:var(--muted);">${esc(i.email || '')} · compte n° ${i.user_id}</div></td>
+        <td style="padding:10px 14px;font-size:12px;">${esc(i.motif || '—')}</td><td style="padding:10px 14px;">${i.nb_formations}</td>
+        <td style="padding:10px 14px;"><span style="padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700;background:${i.statut === 'actif' ? '#dcfce7;color:#166534' : '#f1f5f9;color:#64748b'};">${i.statut === 'actif' ? 'Actif' : 'Retiré'}</span></td>
+        <td style="padding:10px 14px;">${i.statut === 'actif' ? `<button class="btn btn-sm btn-outline" style="color:#dc2626;" onclick="admRetirerFormateur(${i.user_id}, '${esc(i.nom).replace(/'/g, '')}')">Retirer</button>` : `<button class="btn btn-sm btn-outline" onclick="admReinviterFormateur(${i.user_id})">Réinviter</button>`}</td></tr>`).join('')}
+      </tbody></table>`;
+  } catch (e) { el.innerHTML = `<div style="padding:16px;color:red;">Erreur : ${esc(e.message || 'chargement impossible')}</div>`; }
+}
+async function admInviterFormateur() {
+  const ident = document.getElementById('adm-inv-ident').value.trim();
+  if (!ident) { alert('Indiquez l\'e-mail ou le numéro du compte.'); return; }
+  try {
+    const r = await api('POST', '/admin/formateurs-invites', { identifiant: ident, motif: document.getElementById('adm-inv-motif').value.trim() });
+    document.getElementById('adm-inv-ident').value = ''; document.getElementById('adm-inv-motif').value = '';
+    alert((r.nom || 'Ce compte') + ' peut désormais créer des formations.');
+    loadAdmInvites();
+  } catch (e) { alert(e.message || 'Erreur.'); }
+}
+async function admReinviterFormateur(userId) {
+  try { await api('POST', '/admin/formateurs-invites', { identifiant: String(userId) }); loadAdmInvites(); } catch (e) { alert(e.message || 'Erreur.'); }
+}
+async function admRetirerFormateur(userId, nom) {
+  if (!confirm('Retirer à ' + nom + ' le droit de créer de nouvelles formations ? Ses formations existantes restent en place.')) return;
+  try { await api('DELETE', '/admin/formateurs-invites/' + userId); loadAdmInvites(); } catch (e) { alert(e.message || 'Erreur.'); }
+}
+
 async function admRevoquerDocument(code) {
   const motif = prompt('Motif de la révocation de ce document (obligatoire) :');
   if (!motif || !motif.trim()) return;
@@ -7037,8 +7088,8 @@ async function loadAdmFormations(statut) {
     const url = statut === 'en_attente' ? '/admin/formations/en-attente' : `/admin/formations${statut !== 'all' ? `?statut=${statut}` : ''}`;
     const { formations } = await api('GET', url);
     if (!formations.length) { el.innerHTML = '<div style="padding:16px;color:var(--muted);">Aucune formation.</div>'; return; }
-    const STATUT_LBL = { brouillon:'Brouillon', en_attente:'En attente', publiee:'Publiée', refusee:'Refusée', suspendue:'Suspendue' };
-    const STATUT_CLR = { en_attente:'#d97706', publiee:'#16a34a', refusee:'#dc2626', suspendue:'#9333ea', brouillon:'#6b7280' };
+    const STATUT_LBL = { brouillon:'Brouillon', soumise:'Soumise', en_attente:'En attente', en_cours_analyse:'En cours d\'analyse', publiee:'Publiée', refusee:'Refusée', suspendue:'Suspendue' };
+    const STATUT_CLR = { soumise:'#d97706', en_attente:'#d97706', en_cours_analyse:'#d97706', publiee:'#16a34a', refusee:'#dc2626', suspendue:'#9333ea', brouillon:'#6b7280' };
     el.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:13px;">
       <thead><tr style="border-bottom:2px solid var(--border);background:#f8fafc;">
         <th style="padding:10px 14px;text-align:left;font-size:11px;text-transform:uppercase;color:var(--muted);">Formation</th>
@@ -7054,6 +7105,7 @@ async function loadAdmFormations(statut) {
             <div style="font-weight:700;">${f.titre}</div>
             <div style="font-size:11px;color:var(--muted);">${f.categorie||'—'} · ${f.niveau||'—'} · Soumise le ${(f.created_at||'').slice(0,10)}</div>
             ${f.description ? `<div style="font-size:12px;margin-top:4px;color:var(--muted);max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${f.description}</div>` : ''}
+            ${['soumise','en_attente','en_cours_analyse'].includes(st) ? (f.droits_confirmes_le ? `<div style="font-size:11px;margin-top:4px;color:#166534;">✓ Droits sur les contenus confirmés par le formateur le ${(f.droits_confirmes_le||'').slice(0,10)}</div>` : '<div style="font-size:11px;margin-top:4px;color:#b45309;">⚠ Confirmation des droits sur les contenus absente</div>') : ''}
           </td>
           <td style="padding:12px 14px;font-size:12px;">${f.auteur_nom||'—'}<br><span style="color:var(--muted);font-size:11px;">${f.auteur_email||''}</span></td>
           <td style="padding:12px 14px;font-size:12px;">${f.mode_acces||'gratuit'}${f.prix>0?' · '+f.prix+'€':''}</td>
@@ -7063,7 +7115,7 @@ async function loadAdmFormations(statut) {
             </span>
           </td>
           <td style="padding:12px 14px;">
-            ${st === 'en_attente' ? `
+            ${['soumise','en_attente','en_cours_analyse'].includes(st) ? `
               <button class="btn btn-sm btn-orange" onclick="admValiderFormation(${f.id},'${f.titre.replace(/'/g,"\\'")}')">✅ Valider</button>
               <button class="btn btn-sm btn-outline" style="color:#dc2626;margin-left:4px;" onclick="admRefuserFormation(${f.id},'${f.titre.replace(/'/g,"\\'")}')">❌ Refuser</button>
             ` : ''}

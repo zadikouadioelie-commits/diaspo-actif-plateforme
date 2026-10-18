@@ -34,6 +34,28 @@
   .pied .code{font-weight:800;color:var(--navy);font-size:13px;letter-spacing:.05em}
   .avert{max-width:150mm;line-height:1.45;font-size:10.5px}
   .revoque{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:system-ui,sans-serif;font-size:64px;font-weight:900;color:rgba(220,38,38,.28);transform:rotate(-18deg);pointer-events:none}
+  /* Modèles visuels choisis par le formateur (figés sur le document à sa délivrance) */
+  .feuille.m-moderne{font-family:system-ui,'Segoe UI',Arial,sans-serif;padding:0;overflow:hidden}
+  .m-moderne .cadre{border:0;padding:0;background:linear-gradient(90deg,var(--navy) 0 26mm,#fff 26mm)}
+  .m-moderne .cadre-int{border:0;padding:12mm 18mm 10mm 40mm;align-items:flex-start;text-align:left}
+  .m-moderne .marque{color:#fff;position:absolute;left:5mm;top:12mm;writing-mode:vertical-rl;transform:rotate(180deg);letter-spacing:.35em;font-size:14px}
+  .m-moderne .marque img{display:none}
+  .m-moderne h1{font-size:40px;letter-spacing:.02em;text-transform:none;color:var(--navy);margin:2mm 0 2mm;font-weight:800}
+  .m-moderne h1::after{content:'';display:block;width:30mm;height:1.6mm;background:var(--orange);margin-top:3mm}
+  .m-moderne .sous{font-style:normal;color:var(--muted)}
+  .m-moderne .nom{font-style:normal;font-weight:800;border-bottom:0;padding:0;color:var(--navy);font-size:36px}
+  .m-moderne .corps{max-width:none}
+  .m-moderne .pied{margin-top:auto}
+  .feuille.m-premium{background:radial-gradient(circle at 20% 15%,#16385f 0%,#0a1f38 70%);color:#f8fafc}
+  .m-premium .cadre{border:2.2mm solid transparent;border-image:linear-gradient(135deg,#f3d58a,#B8893B 45%,#f3d58a) 1}
+  .m-premium .cadre-int{border:.5mm solid rgba(243,213,138,.55)}
+  .m-premium .marque,.m-premium h1{color:#f3d58a}
+  .m-premium .sous,.m-premium .decerne,.m-premium .pied,.m-premium .avert{color:#cbd5e1}
+  .m-premium .nom{color:#fff;border-bottom-color:#f3d58a}
+  .m-premium .corps,.m-premium .res{color:#e2e8f0}
+  .m-premium .corps strong,.m-premium .res strong,.m-premium .pied .code{color:#f3d58a}
+  .m-premium .pied .qr #qr{background:#fff;padding:2mm;border-radius:2mm;box-sizing:content-box}
+  @media print{.feuille.m-premium,.m-moderne .cadre{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
   @page{size:A4 landscape;margin:0}
   @media print{body{background:#fff}.barre{display:none}.feuille{margin:0;box-shadow:none}}
   @media (max-width:1100px){.feuille{zoom:.55}} @media (max-width:640px){.feuille{zoom:.36}}
@@ -62,7 +84,7 @@ const code = new URLSearchParams(location.search).get('code') || '';
   const verbe = a.type === 'reussite' ? 'a réussi la formation' : a.type === 'suivi' ? 'a suivi la formation' : 'a participé à la formation';
   document.title = a.type_label + ' — ' + a.formation_titre;
   racine.innerHTML = `
-  <div class="feuille"><div class="cadre"><div class="cadre-int">
+  <div class="feuille m-${['classique','moderne','premium'].includes(a.modele) ? a.modele : 'classique'}"><div class="cadre"><div class="cadre-int">
     ${a.statut !== 'valide' ? '<div class="revoque">RÉVOQUÉ</div>' : ''}
     <div class="marque"><img src="assets/logo.png" alt="" onerror="this.remove()"> DIASPO'ACTIF</div>
     <h1>${esc(a.type_label)}</h1>
@@ -73,7 +95,7 @@ const code = new URLSearchParams(location.search).get('code') || '';
     ${a.resultat_pct != null ? `<div class="res">Résultat obtenu : <strong>${a.resultat_pct} %</strong></div>` : ''}
     <div class="pied">
       <div class="avert"><div>Délivré le ${esc(dateFr(a.date_emission))}</div><div style="margin-top:5px">${esc(a.avertissement)}</div></div>
-      <div class="qr"><div id="qr"></div><div class="code">${esc(a.code)}</div><div>Vérifier l'authenticité</div></div>
+      <div class="qr">${a.qr === false ? '' : '<div id="qr"></div>'}<div class="code">${esc(a.code)}</div><div>${a.qr === false ? 'Vérification en ligne : voir le code ci-dessus' : 'Vérifier l’authenticité'}</div></div>
     </div>
   </div></div></div>`;
   document.getElementById('barre').style.display = '';
@@ -81,7 +103,7 @@ const code = new URLSearchParams(location.search).get('code') || '';
   /* QR code vers la page publique de vérification (qrcodejs, même bibliothèque que le QR de profil) ; sans lui, le code imprimé suffit à vérifier. */
   const s = document.createElement('script');
   s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
-  s.onload = () => { try { new QRCode(document.getElementById('qr'), { text: urlVerif, width: 200, height: 200, correctLevel: QRCode.CorrectLevel.M }); } catch (e) {} };
+  s.onload = () => { try { if (document.getElementById('qr')) new QRCode(document.getElementById('qr'), { text: urlVerif, width: 200, height: 200, correctLevel: QRCode.CorrectLevel.M }); } catch (e) {} };
   document.head.appendChild(s);
 })();
 </script>

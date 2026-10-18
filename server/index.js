@@ -2124,6 +2124,8 @@ async function executerSuppressionCompte(userId, drId) {
   /* Formation : le nom du titulaire est recopié dans formation_attestations (le document reste vérifiable, sans identité) ; les cartes mentales personnelles sont effacées. */
   try { await db.prepare("UPDATE formation_attestations SET apprenant_nom='Compte supprimé' WHERE user_id=?").run(userId); } catch (_) {}
   try { await db.prepare("DELETE FROM cartes_mentales WHERE owner_user_id=? AND formation_id IS NULL").run(userId); } catch (_) {}
+  try { await db.prepare("UPDATE formation_discussions SET contenu='Message supprimé (compte fermé)', statut='masque' WHERE user_id=?").run(userId); } catch (_) {}
+  try { await db.prepare("UPDATE formation_quiz_tentatives SET fichier_url=NULL, fichier_nom=NULL WHERE inscription_id IN (SELECT id FROM formation_inscriptions WHERE user_id=?)").run(userId); } catch (_) {}
 
   const init = await db.prepare("SELECT id FROM initiatives WHERE owner_user_id=?").get(userId);
   if (init) {
@@ -3251,6 +3253,11 @@ const CartesMentales = require("./cartes-mentales");
 CartesMentales.register({ route, db, sendJSON, getCurrentUser, SEC, checkFormationOwner });
 const ParcoursFormation = require("./parcours-formation");
 ParcoursFormation.register({ route, db, sendJSON, getCurrentUser, checkFormationOwner });
+/* Lot 4 : espace d'échange (server/formation-echanges.js), formateurs invités + aperçu gratuit + mode de suivi (server/formation-acces.js). */
+const FormationEchanges = require("./formation-echanges");
+FormationEchanges.register({ route, db, sendJSON, getCurrentUser, SEC, checkFormationOwner, creerNotif });
+const FormationAcces = require("./formation-acces");
+FormationAcces.register({ route, db, sendJSON, getCurrentUser, SEC, checkFormationOwner, FormationParcours, exigerPremium, hasAccreditation, creerNotif, nomCompteAffichage });
 /* Envoyer un événement par e-mail (carte complète) + texte d'aperçu du lien (date, lieu) : server/partage-evenement.js. urlImagePartageEvenement est une déclaration de fonction (hissée). */
 const PartageEvenement = require("./partage-evenement");
 PartageEvenement.register({ route, db, sendJSON, getCurrentUser, SEC, nomCompteAffichage, getOrigin, urlImagePartageEvenement });
@@ -16870,6 +16877,8 @@ async function exigerPremium(user, res, contexte) {
      ne la consomme pas. Sans cette exemption, un administrateur dont la periode gratuite
      s'acheve perdrait l'acces aux outils de moderation. */
   if (user.role === 'administrateur') return true;
+  /* Formateur invité par l'administration (lot 4 « Formation ») : expert autorisé sans abonnement pour tout ce qui touche ses formations. */
+  if (contexte === "formations" && await FormationAcces.estInvite(db, user.id)) return true;
   const st = await getPremiumStatut(user.id, user.role);
   if (!st.concerne || st.actif) return true;
   /* Mode observation : on laisse passer sans rien journaliser. Un journal en mémoire ne
@@ -17326,7 +17335,8 @@ route("PATCH", "/api/formations/suivi/:id", async (req, res, params, body) => {
 
 route("GET", "/api/formations", async (req, res, params, body, query) => {
   let rows = await db.prepare(`
-    SELECT f.*, u.nom AS auteur_nom
+    SELECT f.*, u.nom AS auteur_nom,
+      (SELECT COUNT(*) FROM formation_lecons l JOIN formation_modules m ON m.id=l.module_id WHERE m.formation_id=f.id AND l.apercu_gratuit=1 AND l.type<>'quiz') AS nb_apercu
     FROM formations f
     LEFT JOIN users u ON u.id = f.owner_user_id
     WHERE COALESCE(f.statut,'publiee') = 'publiee'
@@ -17356,7 +17366,8 @@ route("GET", "/api/formations/:id", async (req, res, params) => {
   if (!row) return sendJSON(res, 404, { error: "Formation introuvable." });
   const avis = await db.prepare("SELECT a.*, u.nom AS auteur FROM formation_avis a JOIN users u ON u.id=a.user_id WHERE a.formation_id=? ORDER BY a.created_at DESC").all(params.id);
   const nb_inscrits = (await db.prepare("SELECT COUNT(*) AS n FROM formation_inscriptions WHERE formation_id=? AND statut='active'").get(params.id))?.n;
-  sendJSON(res, 200, { formation: { ...row, avis, nb_inscrits } });
+  const nb_apercu = (await db.prepare("SELECT COUNT(*) AS n FROM formation_lecons l JOIN formation_modules m ON m.id=l.module_id WHERE m.formation_id=? AND l.apercu_gratuit=1 AND l.type<>'quiz'").get(params.id))?.n || 0;
+  sendJSON(res, 200, { formation: { ...row, avis, nb_inscrits, nb_apercu } });
 });
 
 /* Mes formations (créateur) */
@@ -17416,6 +17427,8 @@ route("GET", "/api/mes-formations/dashboard", async (req, res) => {
     /* Documents réellement délivrés par la plateforme (attestations/certificats vérifiables) — l'ancien décompte comptait des mentions saisies par les membres eux-mêmes. */
     stats.nb_certificats = (await db.prepare(`SELECT COUNT(*) AS n FROM formation_attestations WHERE formation_id IN (${placeholders}) AND COALESCE(statut,'valide')='valide'`).get(...ids))?.n || 0;
     stats.nb_a_corriger = (await db.prepare(`SELECT COUNT(*) AS n FROM formation_quiz_tentatives t JOIN formation_quiz q ON q.id=t.quiz_id WHERE q.formation_id IN (${placeholders}) AND t.statut='a_corriger'`).get(...ids))?.n || 0;
+    stats.nb_questions = (await db.prepare(`SELECT COUNT(*) AS n FROM formation_discussions d WHERE d.formation_id IN (${placeholders}) AND d.parent_id IS NULL AND d.role='apprenant' AND d.statut='visible' AND COALESCE(d.resolue,0)=0
+      AND NOT EXISTS (SELECT 1 FROM formation_discussions x WHERE x.parent_id=d.id AND x.role='formateur')`).get(...ids))?.n || 0;
     const limiteAbandon = new Date(Date.now() - 21*24*3600*1000).toISOString().slice(0,19).replace('T',' ');
     stats.nb_abandons = (await db.prepare(`SELECT COUNT(*) AS n FROM formation_inscriptions WHERE formation_id IN (${placeholders}) AND statut='active' AND COALESCE(paiement_statut,'paye')='paye' AND COALESCE(avancement_pct,0)<100 AND COALESCE(derniere_activite_le, date_inscription, created_at) < ?`).get(...ids, limiteAbandon))?.n || 0;
     const avis = await db.prepare(`SELECT note FROM formation_avis WHERE formation_id IN (${placeholders})`).all(...ids);
@@ -17468,6 +17481,7 @@ route("GET", "/api/formations/:id/suivi", async (req, res, params) => {
     eleves: inscriptions.map(i => {
       const x = analyse.eleves[Number(i.id)] || {};
       return {
+        inscription_id: Number(i.id), quiz_epuises: x.quiz_epuises || [],
         nom: i.eleve_nom, email: i.eleve_email, avancement_pct: i.avancement_pct,
         derniere_activite: i.derniere_activite,
         statut: (i.avancement_pct||0) >= 100 ? 'Terminée' : (i.avancement_pct||0) > 0 ? 'Active' : 'Non commencée',
@@ -17497,9 +17511,9 @@ route("POST", "/api/formations", async (req, res, params, body) => {
      Administrateur (incrément 6 du module Partenariat : un partenaire n'est pas soumis au
      système Premium, réservé aux rôles utilisateur/initiative).
      Les comptes Utilisateur peuvent consulter le catalogue et s'inscrire, mais pas créer de formation. */
-  if (user.role !== 'administrateur' && user.role !== 'partenaire') {
+  if (user.role !== 'administrateur' && user.role !== 'partenaire' && !(await FormationAcces.estInvite(db, user.id))) {
     if (user.role !== 'initiative') {
-      return sendJSON(res, 403, { error: "La création de formations est réservée aux comptes Initiative." });
+      return sendJSON(res, 403, { error: "La création de formations est réservée aux comptes Initiative, aux partenaires et aux formateurs invités par Diaspo'Actif." });
     }
     if (!(await hasAccreditation(user.id, 'initiative_abonne'))) {
       return sendJSON(res, 402, { error: "La création de formations est réservée aux comptes Initiative Premium.", accred_type: 'initiative_abonne' });
@@ -17666,8 +17680,12 @@ async function cascadeDeleteFormation(id) {
   const quizIds = (await db.prepare("SELECT id FROM formation_quiz WHERE formation_id=?").all(id)).map(q => q.id);
   for (const qid of quizIds) {
     await db.prepare("DELETE FROM formation_quiz_tentatives WHERE quiz_id=?").run(qid);
+    await db.prepare("DELETE FROM formation_quiz_sessions WHERE quiz_id=?").run(qid);
     await db.prepare("DELETE FROM formation_quiz_questions WHERE quiz_id=?").run(qid);
   }
+  /* Lot 4 : espace d'échange de la formation. */
+  await db.prepare("DELETE FROM formation_discussion_signalements WHERE discussion_id IN (SELECT id FROM formation_discussions WHERE formation_id=?)").run(id);
+  await db.prepare("DELETE FROM formation_discussions WHERE formation_id=?").run(id);
   /* Lot 3 : cartes de la formation, prérequis (dans les deux sens) et places dans des parcours. Les attestations délivrées, elles, sont CONSERVÉES (vérifiables, sans clé étrangère). */
   await db.prepare("DELETE FROM cartes_mentales WHERE formation_id=?").run(id);
   await db.prepare("DELETE FROM formation_prerequis WHERE formation_id=? OR prerequis_formation_id=?").run(id, id);
@@ -17750,6 +17768,42 @@ route("GET", "/api/formations/:id/modules", async (req, res, params) => {
 });
 function checkFormationOwner(f, user) { return f && (f.owner_user_id === user.id || user.role === 'administrateur'); }
 
+/* Suppression d'un quiz avec tout ce qui en dépend (clés étrangères Postgres : tentatives, sessions chronométrées et questions d'abord). */
+async function supprimerQuiz(quizId) {
+  await db.prepare("DELETE FROM formation_quiz_tentatives WHERE quiz_id=?").run(quizId);
+  await db.prepare("DELETE FROM formation_quiz_sessions WHERE quiz_id=?").run(quizId);
+  await db.prepare("DELETE FROM formation_quiz_questions WHERE quiz_id=?").run(quizId);
+  await db.prepare("DELETE FROM formation_quiz WHERE id=?").run(quizId);
+}
+/* Retire une leçon : son quiz, la progression des apprenants ; les discussions qui lui étaient attachées deviennent générales à la formation. */
+async function retirerLecon(leconId) {
+  for (const q of await db.prepare("SELECT id FROM formation_quiz WHERE lecon_id=?").all(leconId)) await supprimerQuiz(q.id);
+  try { await db.prepare("DELETE FROM formation_lecons_progression WHERE lecon_id=?").run(leconId); } catch (_) {}
+  try { await db.prepare("UPDATE formation_discussions SET lecon_id=NULL WHERE lecon_id=?").run(leconId); } catch (_) {}
+  await db.prepare("DELETE FROM formation_lecons WHERE id=?").run(leconId);
+}
+/* Réglages d'un quiz (lot 4) : temps imparti, tentatives limitées, ordre mélangé, dépôt de fichier. Une clé absente du corps = inchangé ; null/vide = « pas de limite ». */
+function lireReglagesQuiz(body, courant) {
+  const out = {};
+  const entier = (v, min, max, nom) => {
+    if (v === null || v === "") return { v: null };
+    const n = Math.floor(Number(v));
+    if (!Number.isFinite(n) || n < min || n > max) return { erreur: `${nom} doit être compris entre ${min} et ${max} (ou vide pour aucune limite).` };
+    return { v: n };
+  };
+  if (body.temps_limite_min !== undefined) { const r = entier(body.temps_limite_min, 1, 480, "Le temps imparti (en minutes)"); if (r.erreur) return r; out.temps_limite_min = r.v; }
+  if (body.max_tentatives !== undefined) { const r = entier(body.max_tentatives, 1, 20, "Le nombre de tentatives"); if (r.erreur) return r; out.max_tentatives = r.v; }
+  if (body.melanger !== undefined) out.melanger = body.melanger ? 1 : 0;
+  if (body.depot_fichier !== undefined) {
+    if (!FormationParcours.MODES_DEPOT.includes(String(body.depot_fichier))) return { erreur: "Dépôt de fichier inconnu (non, optionnel ou obligatoire)." };
+    out.depot_fichier = String(body.depot_fichier);
+  }
+  const auto = body.correction_auto === undefined ? Number(courant.correction_auto) !== 0 : !!body.correction_auto;
+  const depot = out.depot_fichier !== undefined ? out.depot_fichier : (courant.depot_fichier || "non");
+  if (auto && depot !== "non") return { erreur: "Le dépôt de fichier est réservé aux devoirs corrigés par le formateur : choisissez la correction manuelle." };
+  return { vals: out };
+}
+
 /* ── Espace apprenant : suivre une formation ── */
 route("GET", "/api/formations/:id/suivre", async (req, res, params) => {
   const user = await getCurrentUser(req);
@@ -17789,6 +17843,8 @@ route("POST", "/api/formations/:id/lecons/:leconId/progression", async (req, res
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const inscription = await db.prepare("SELECT * FROM formation_inscriptions WHERE formation_id=? AND user_id=? AND statut='active' AND COALESCE(paiement_statut,'paye')<>'en_attente'").get(params.id, user.id);
   if (!inscription) return sendJSON(res, 403, { error: "Vous devez être inscrit pour suivre cette formation." });
+  const fSuivi = await db.prepare("SELECT suivi_mode FROM formations WHERE id=?").get(params.id);
+  if (fSuivi && fSuivi.suivi_mode === 'aucun') return sendJSON(res, 409, { error: "Cette formation n'enregistre pas de progression.", code: "suivi_desactive" });
   /* Une leçon portant un quiz ne se valide que par la RÉUSSITE du quiz (POST …/quiz/:quizId/soumettre) : un simple clic ne suffit pas. */
   const quizLie = await db.prepare("SELECT id FROM formation_quiz WHERE formation_id=? AND lecon_id=?").get(params.id, params.leconId);
   if (quizLie && body.termine) return sendJSON(res, 409, { error: "Cette activité est un quiz : elle se valide en le réussissant.", code: "quiz_requis", quiz_id: Number(quizLie.id) });
@@ -17837,7 +17893,7 @@ route("DELETE", "/api/formations/:id/modules/:moduleId", async (req, res, params
   const chapitres = await db.prepare("SELECT id FROM formation_chapitres WHERE module_id=?").all(params.moduleId);
   for (const c of chapitres) {
     const lecons = await db.prepare("SELECT id FROM formation_lecons WHERE chapitre_id=?").all(c.id);
-    for (const l of lecons) { await db.prepare("DELETE FROM formation_quiz WHERE lecon_id=?").run(l.id); await db.prepare("DELETE FROM formation_lecons WHERE id=?").run(l.id); }
+    for (const l of lecons) await retirerLecon(l.id);
     await db.prepare("DELETE FROM formation_chapitres WHERE id=?").run(c.id);
   }
   await db.prepare("DELETE FROM formation_modules WHERE id=? AND formation_id=?").run(params.moduleId, params.id);
@@ -17886,7 +17942,7 @@ route("DELETE", "/api/formations/:id/modules/:moduleId/chapitres/:chapitreId", a
   if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
   if (!(await exigerPremium(user, res, "formations"))) return;
   const lecons = await db.prepare("SELECT id FROM formation_lecons WHERE chapitre_id=?").all(params.chapitreId);
-  for (const l of lecons) { await db.prepare("DELETE FROM formation_quiz WHERE lecon_id=?").run(l.id); await db.prepare("DELETE FROM formation_lecons WHERE id=?").run(l.id); }
+  for (const l of lecons) await retirerLecon(l.id);
   await db.prepare("DELETE FROM formation_chapitres WHERE id=? AND module_id=?").run(params.chapitreId, params.moduleId);
   sendJSON(res, 200, { ok: true });
 });
@@ -17908,14 +17964,15 @@ route("POST", "/api/formations/:id/chapitres/:chapitreId/lecons", async (req, re
   if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
   if (!(await exigerPremium(user, res, "formations"))) return;
   if (!body.titre) return sendJSON(res, 400, { error: "Le titre de la leçon est requis." });
-  const chapitre = await db.prepare("SELECT module_id FROM formation_chapitres WHERE id=?").get(params.chapitreId);
+  if (body.apercu_gratuit && body.type === 'quiz') return sendJSON(res, 400, { error: "Un quiz ne peut pas être offert en aperçu : il se passe après l'inscription." });
+  const chapitre = await db.prepare("SELECT c.module_id FROM formation_chapitres c JOIN formation_modules m ON m.id=c.module_id WHERE c.id=? AND m.formation_id=?").get(params.chapitreId, params.id);
   if (!chapitre) return sendJSON(res, 404, { error: "Chapitre introuvable." });
   const { max } = await db.prepare("SELECT COALESCE(MAX(ordre),-1) AS max FROM formation_lecons WHERE chapitre_id=?").get(params.chapitreId);
-  const id = (await db.prepare(`INSERT INTO formation_lecons (module_id,chapitre_id,titre,description,type,duree_minutes,contenu_url,contenu_texte,ressources_json,image_url,ordre,telechargement_autorise,nb_pages,obligatoire)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+  const id = (await db.prepare(`INSERT INTO formation_lecons (module_id,chapitre_id,titre,description,type,duree_minutes,contenu_url,contenu_texte,ressources_json,image_url,ordre,telechargement_autorise,nb_pages,obligatoire,apercu_gratuit)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
     chapitre.module_id, params.chapitreId, body.titre, body.description||null, body.type||'texte', body.duree_minutes||null,
     body.contenu_url||null, body.contenu_texte ? SEC.sanitizeRichHtml(body.contenu_texte) : null, body.ressources_json ? JSON.stringify(body.ressources_json) : null,
-    body.image_url||null, max+1, body.telechargement_autorise === false ? 0 : 1, body.nb_pages||null, body.obligatoire === false ? 0 : 1
+    body.image_url||null, max+1, body.telechargement_autorise === false ? 0 : 1, body.nb_pages||null, body.obligatoire === false ? 0 : 1, body.apercu_gratuit ? 1 : 0
   )).lastInsertRowid;
   sendJSON(res, 201, { id });
 });
@@ -17926,15 +17983,21 @@ route("PUT", "/api/formations/:id/lecons/:leconId", async (req, res, params, bod
   if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
   if (!(await exigerPremium(user, res, "formations"))) return;
   const n = v => (v === undefined ? null : v);
+  const lecon = await db.prepare("SELECT l.* FROM formation_lecons l JOIN formation_modules m ON m.id=l.module_id WHERE l.id=? AND m.formation_id=?").get(params.leconId, params.id);
+  if (!lecon) return sendJSON(res, 404, { error: "Leçon introuvable dans cette formation." });
+  const typeFinal = body.type || lecon.type;
+  if (body.apercu_gratuit && typeFinal === 'quiz') return sendJSON(res, 400, { error: "Un quiz ne peut pas être offert en aperçu : il se passe après l'inscription." });
   await db.prepare(`UPDATE formation_lecons SET
     titre=COALESCE(?,titre), description=COALESCE(?,description), type=COALESCE(?,type),
     duree_minutes=COALESCE(?,duree_minutes), contenu_url=COALESCE(?,contenu_url),
     contenu_texte=COALESCE(?,contenu_texte), ressources_json=COALESCE(?,ressources_json), image_url=COALESCE(?,image_url),
-    telechargement_autorise=COALESCE(?,telechargement_autorise), nb_pages=COALESCE(?,nb_pages), obligatoire=COALESCE(?,obligatoire)
+    telechargement_autorise=COALESCE(?,telechargement_autorise), nb_pages=COALESCE(?,nb_pages), obligatoire=COALESCE(?,obligatoire),
+    apercu_gratuit=COALESCE(?,apercu_gratuit)
     WHERE id=?`).run(n(body.titre),n(body.description),n(body.type),n(body.duree_minutes),n(body.contenu_url),
     (body.contenu_texte === undefined ? null : SEC.sanitizeRichHtml(body.contenu_texte)), body.ressources_json?JSON.stringify(body.ressources_json):null, n(body.image_url),
     body.telechargement_autorise === undefined ? null : (body.telechargement_autorise ? 1 : 0), n(body.nb_pages),
-    body.obligatoire === undefined ? null : (body.obligatoire ? 1 : 0), params.leconId);
+    body.obligatoire === undefined ? null : (body.obligatoire ? 1 : 0),
+    typeFinal === 'quiz' ? 0 : (body.apercu_gratuit === undefined ? null : (body.apercu_gratuit ? 1 : 0)), params.leconId);
   sendJSON(res, 200, { ok: true });
 });
 route("DELETE", "/api/formations/:id/lecons/:leconId", async (req, res, params) => {
@@ -17943,8 +18006,9 @@ route("DELETE", "/api/formations/:id/lecons/:leconId", async (req, res, params) 
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
   if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
   if (!(await exigerPremium(user, res, "formations"))) return;
-  await db.prepare("DELETE FROM formation_quiz WHERE lecon_id=?").run(params.leconId);
-  await db.prepare("DELETE FROM formation_lecons WHERE id=?").run(params.leconId);
+  const lec = await db.prepare("SELECT l.id FROM formation_lecons l JOIN formation_modules m ON m.id=l.module_id WHERE l.id=? AND m.formation_id=?").get(params.leconId, params.id);
+  if (!lec) return sendJSON(res, 404, { error: "Leçon introuvable dans cette formation." });
+  await retirerLecon(lec.id);
   sendJSON(res, 200, { ok: true });
 });
 route("PUT", "/api/formations/:id/chapitres/:chapitreId/lecons/reorder", async (req, res, params, body) => {
@@ -17980,9 +18044,18 @@ route("POST", "/api/formations/:id/quiz", async (req, res, params, body) => {
   if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
   if (!(await exigerPremium(user, res, "formations"))) return;
   if (!body.titre) return sendJSON(res, 400, { error: "Le titre du quiz est requis." });
-  const id = (await db.prepare(`INSERT INTO formation_quiz (formation_id,lecon_id,titre,type,note_minimale,temps_limite_min,correction_auto,commentaires_personnalises)
-    VALUES (?,?,?,?,?,?,?,?)`).run(params.id, body.lecon_id||null, body.titre, body.type||'intermediaire',
-    body.note_minimale||50, body.temps_limite_min||null, body.correction_auto===false?0:1, body.commentaires_personnalises||null)).lastInsertRowid;
+  if (f.suivi_mode === 'aucun') return sendJSON(res, 400, { error: "Cette formation est réglée « sans suivi de progression » : elle ne peut pas contenir de quiz. Changez d'abord le mode de suivi.", code: "suivi_desactive" });
+  const reg = lireReglagesQuiz(body, { correction_auto: body.correction_auto === false ? 0 : 1, depot_fichier: 'non' });
+  if (reg.erreur) return sendJSON(res, 400, { error: reg.erreur });
+  if (body.lecon_id) {
+    const lec = await db.prepare("SELECT l.id FROM formation_lecons l JOIN formation_modules m ON m.id=l.module_id WHERE l.id=? AND m.formation_id=?").get(body.lecon_id, params.id);
+    if (!lec) return sendJSON(res, 404, { error: "Leçon introuvable dans cette formation." });
+  }
+  const v = reg.vals;
+  const id = (await db.prepare(`INSERT INTO formation_quiz (formation_id,lecon_id,titre,type,note_minimale,temps_limite_min,correction_auto,commentaires_personnalises,max_tentatives,melanger,depot_fichier)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?)`).run(params.id, body.lecon_id||null, body.titre, body.type||'intermediaire',
+    body.note_minimale||50, v.temps_limite_min == null ? null : v.temps_limite_min, body.correction_auto===false?0:1, body.commentaires_personnalises||null,
+    v.max_tentatives == null ? null : v.max_tentatives, v.melanger || 0, v.depot_fichier || 'non')).lastInsertRowid;
   sendJSON(res, 201, { id });
 });
 route("PUT", "/api/formations/:id/quiz/:quizId", async (req, res, params, body) => {
@@ -17991,12 +18064,18 @@ route("PUT", "/api/formations/:id/quiz/:quizId", async (req, res, params, body) 
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
   if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
   if (!(await exigerPremium(user, res, "formations"))) return;
+  const quiz = await db.prepare("SELECT * FROM formation_quiz WHERE id=? AND formation_id=?").get(params.quizId, params.id);
+  if (!quiz) return sendJSON(res, 404, { error: "Quiz introuvable dans cette formation." });
+  const reg = lireReglagesQuiz(body, quiz);
+  if (reg.erreur) return sendJSON(res, 400, { error: reg.erreur });
   const n = v => (v === undefined ? null : v);
   await db.prepare(`UPDATE formation_quiz SET titre=COALESCE(?,titre), type=COALESCE(?,type),
-    note_minimale=COALESCE(?,note_minimale), temps_limite_min=COALESCE(?,temps_limite_min),
+    note_minimale=COALESCE(?,note_minimale),
     correction_auto=COALESCE(?,correction_auto), commentaires_personnalises=COALESCE(?,commentaires_personnalises)
-    WHERE id=?`).run(n(body.titre),n(body.type),n(body.note_minimale),n(body.temps_limite_min),
-    body.correction_auto===undefined?null:(body.correction_auto?1:0), n(body.commentaires_personnalises), params.quizId);
+    WHERE id=? AND formation_id=?`).run(n(body.titre),n(body.type),n(body.note_minimale),
+    body.correction_auto===undefined?null:(body.correction_auto?1:0), n(body.commentaires_personnalises), params.quizId, params.id);
+  /* Les réglages (liste fermée de colonnes) s'appliquent même à null : c'est ainsi qu'on retire une limite. */
+  for (const k of Object.keys(reg.vals)) await db.prepare(`UPDATE formation_quiz SET ${k}=? WHERE id=?`).run(reg.vals[k], params.quizId);
   sendJSON(res, 200, { ok: true });
 });
 route("DELETE", "/api/formations/:id/quiz/:quizId", async (req, res, params) => {
@@ -18005,8 +18084,9 @@ route("DELETE", "/api/formations/:id/quiz/:quizId", async (req, res, params) => 
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
   if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
   if (!(await exigerPremium(user, res, "formations"))) return;
-  await db.prepare("DELETE FROM formation_quiz_questions WHERE quiz_id=?").run(params.quizId);
-  await db.prepare("DELETE FROM formation_quiz WHERE id=?").run(params.quizId);
+  const quiz = await db.prepare("SELECT id FROM formation_quiz WHERE id=? AND formation_id=?").get(params.quizId, params.id);
+  if (!quiz) return sendJSON(res, 404, { error: "Quiz introuvable dans cette formation." });
+  await supprimerQuiz(quiz.id);
   sendJSON(res, 200, { ok: true });
 });
 route("POST", "/api/formations/:id/quiz/:quizId/questions", async (req, res, params, body) => {
@@ -18015,6 +18095,8 @@ route("POST", "/api/formations/:id/quiz/:quizId/questions", async (req, res, par
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
   if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
   if (!(await exigerPremium(user, res, "formations"))) return;
+  const quiz = await db.prepare("SELECT id FROM formation_quiz WHERE id=? AND formation_id=?").get(params.quizId, params.id);
+  if (!quiz) return sendJSON(res, 404, { error: "Quiz introuvable dans cette formation." });
   if (!body.question) return sendJSON(res, 400, { error: "L'énoncé de la question est requis." });
   const { max } = await db.prepare("SELECT COALESCE(MAX(ordre),-1) AS max FROM formation_quiz_questions WHERE quiz_id=?").get(params.quizId);
   const id = (await db.prepare(`INSERT INTO formation_quiz_questions (quiz_id,question,type,options_json,reponse_correcte,points,ordre)
@@ -18028,6 +18110,8 @@ route("DELETE", "/api/formations/:id/quiz/:quizId/questions/:questionId", async 
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
   if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
   if (!(await exigerPremium(user, res, "formations"))) return;
+  const quiz = await db.prepare("SELECT id FROM formation_quiz WHERE id=? AND formation_id=?").get(params.quizId, params.id);
+  if (!quiz) return sendJSON(res, 404, { error: "Quiz introuvable dans cette formation." });
   await db.prepare("DELETE FROM formation_quiz_questions WHERE id=? AND quiz_id=?").run(params.questionId, params.quizId);
   sendJSON(res, 200, { ok: true });
 });
@@ -18042,6 +18126,8 @@ route("PUT", "/api/formations/:id/certificat", async (req, res, params, body) =>
   /* Type de document (lot 1 « Diaspo'Actif Formation ») : participation | suivi | reussite. Un certificat de RÉUSSITE suppose au moins une évaluation à réussir. */
   const typeDoc = body.certificat_type === undefined ? FormationParcours.typeValide(f.certificat_type) : String(body.certificat_type);
   if (!Object.prototype.hasOwnProperty.call(FormationParcours.TYPES, typeDoc)) return sendJSON(res, 400, { error: "Type de document inconnu (participation, suivi ou reussite)." });
+  if (body.certificat_modele && !FormationParcours.MODELES.includes(String(body.certificat_modele))) return sendJSON(res, 400, { error: "Modèle de document inconnu (classique, moderne ou premium)." });
+  if (body.certificat_actif && f.suivi_mode === 'aucun') return sendJSON(res, 400, { error: "Cette formation est réglée « sans suivi de progression » : aucun document ne peut être délivré. Changez d'abord le mode de suivi.", code: "suivi_desactive" });
   if (body.certificat_actif && typeDoc === 'reussite') {
     const nbQuiz = (await db.prepare("SELECT COUNT(*) AS n FROM formation_quiz WHERE formation_id=?").get(params.id))?.n || 0;
     if (!Number(nbQuiz)) return sendJSON(res, 400, { error: "Un certificat de réussite nécessite au moins un quiz ou un examen final : créez-le d'abord dans l'onglet « Quiz », ou choisissez une attestation de suivi." });
@@ -18085,7 +18171,7 @@ route("POST", "/api/formations/:id/messages", async (req, res, params, body) => 
 });
 
 /* Soumettre à validation — Étape 11 : vérifications automatiques */
-route("POST", "/api/formations/:id/publier", async (req, res, params) => {
+route("POST", "/api/formations/:id/publier", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
@@ -18133,8 +18219,12 @@ route("POST", "/api/formations/:id/publier", async (req, res, params) => {
   }
   if (!f.mode_acces) erreurs.push("Le mode d'accès (gratuit / payant / adhérents / invitation) n'est pas défini.");
   if (erreurs.length) return sendJSON(res, 400, { error: "Formation incomplète.", details: erreurs });
+  /* Simple contrôle (bouton « Vérifier ») : on répond « prête » sans rien changer. */
+  if (body && body.verifier_seulement === true) return sendJSON(res, 200, { ok: true, pret: true });
+  /* Droits sur les contenus (lot 4) : à chaque soumission, le formateur déclare être l'auteur des contenus ou détenir les droits de les diffuser (textes, images, vidéos, musiques, documents). */
+  if (!body || body.droits_confirmes !== true) return sendJSON(res, 400, { error: "Confirmez que vous détenez les droits sur les contenus de cette formation avant de la soumettre.", code: "droits_requis" });
 
-  await db.prepare("UPDATE formations SET statut='soumise', date_soumission=datetime('now'), motif_refus=NULL WHERE id=?").run(params.id);
+  await db.prepare("UPDATE formations SET statut='soumise', date_soumission=datetime('now'), motif_refus=NULL, droits_confirmes_le=datetime('now'), droits_confirmes_par=? WHERE id=?").run(user.id, params.id);
   await db.prepare("INSERT INTO formation_historique (formation_id,action,admin_id,admin_nom) VALUES (?,'soumise',?,?)").run(params.id, user.id, user.nom);
   const admins = await db.prepare("SELECT id FROM users WHERE role='administrateur'").all();
   for (const a of admins) {

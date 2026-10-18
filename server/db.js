@@ -4614,6 +4614,7 @@ db.exec(`
     telechargement_autorise INTEGER DEFAULT 1,
     nb_pages INTEGER,
     obligatoire INTEGER DEFAULT 1,
+    apercu_gratuit INTEGER DEFAULT 0,
     created_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY(module_id) REFERENCES formation_modules(id),
     FOREIGN KEY(chapitre_id) REFERENCES formation_chapitres(id)
@@ -4631,6 +4632,9 @@ db.exec(`
     correction_auto INTEGER DEFAULT 1,
     commentaires_personnalises TEXT,
     ordre INTEGER DEFAULT 0,
+    max_tentatives INTEGER,
+    melanger INTEGER DEFAULT 0,
+    depot_fichier TEXT DEFAULT 'non',
     created_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY(formation_id) REFERENCES formations(id),
     FOREIGN KEY(lecon_id) REFERENCES formation_lecons(id)
@@ -4685,6 +4689,12 @@ db.exec(`
 /* Lot 1 « Diaspo'Actif Formation » (2026-10-18) : leçons obligatoires/facultatives (SQLite déjà existant : la colonne est aussi dans le CREATE TABLE ci-dessus),
    tentatives de quiz corrigées côté serveur, et attestations délivrées par la plateforme (vérifiables publiquement par leur code). */
 try { db.exec('ALTER TABLE formation_lecons ADD COLUMN obligatoire INTEGER DEFAULT 1'); } catch(_) {}
+/* Lot 4 (2026-10-18) : colonnes ajoutées à des tables déjà existantes (SQLite ; Postgres : pg-init.js). */
+;['apercu_gratuit INTEGER DEFAULT 0'].forEach(col => { try { db.exec(`ALTER TABLE formation_lecons ADD COLUMN ${col}`); } catch(_) {} });
+;['max_tentatives INTEGER','melanger INTEGER DEFAULT 0',"depot_fichier TEXT DEFAULT 'non'"].forEach(col => { try { db.exec(`ALTER TABLE formation_quiz ADD COLUMN ${col}`); } catch(_) {} });
+;['fichier_url TEXT','fichier_nom TEXT'].forEach(col => { try { db.exec(`ALTER TABLE formation_quiz_tentatives ADD COLUMN ${col}`); } catch(_) {} });
+;['modele TEXT'].forEach(col => { try { db.exec(`ALTER TABLE formation_attestations ADD COLUMN ${col}`); } catch(_) {} });
+;["suivi_mode TEXT DEFAULT 'auto'",'droits_confirmes_le TEXT','droits_confirmes_par INTEGER'].forEach(col => { try { db.exec(`ALTER TABLE formations ADD COLUMN ${col}`); } catch(_) {} });
 /* Lot 2 (2026-10-18) : correction manuelle d'un quiz par le formateur (statut a_corriger -> corrige) ; ALTER pour une base SQLite qui possède déjà la table du lot 1. */
 ;["statut TEXT DEFAULT 'corrige'",'commentaire_formateur TEXT','corrige_par INTEGER','corrige_le TEXT'].forEach(col => {
   try { db.exec(`ALTER TABLE formation_quiz_tentatives ADD COLUMN ${col}`); } catch(_) {}
@@ -4704,6 +4714,8 @@ db.exec(`
     commentaire_formateur TEXT,
     corrige_par INTEGER,
     corrige_le TEXT,
+    fichier_url TEXT,
+    fichier_nom TEXT,
     created_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY(inscription_id) REFERENCES formation_inscriptions(id),
     FOREIGN KEY(quiz_id) REFERENCES formation_quiz(id)
@@ -4724,6 +4736,7 @@ db.exec(`
     date_emission TEXT DEFAULT (datetime('now')),
     statut TEXT DEFAULT 'valide',
     motif_revocation TEXT,
+    modele TEXT,
     created_at TEXT DEFAULT (datetime('now'))
   );
   CREATE INDEX IF NOT EXISTS idx_fatt_user ON formation_attestations(user_id);
@@ -4771,6 +4784,53 @@ db.exec(`
     UNIQUE(parcours_id, formation_id)
   );
   CREATE INDEX IF NOT EXISTS idx_fpe_parcours ON formation_parcours_etapes(parcours_id);
+`);
+
+/* Lot 4 « Diaspo'Actif Formation » (2026-10-18) : quiz chronométrés, espace d'échange, formateurs invités. */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS formation_quiz_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    inscription_id INTEGER NOT NULL,
+    quiz_id INTEGER NOT NULL,
+    debut TEXT NOT NULL,
+    ordre_json TEXT,
+    UNIQUE(inscription_id, quiz_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS formation_discussions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    formation_id INTEGER NOT NULL,
+    lecon_id INTEGER,
+    user_id INTEGER NOT NULL,
+    parent_id INTEGER,
+    role TEXT DEFAULT 'apprenant',
+    contenu TEXT NOT NULL,
+    statut TEXT DEFAULT 'visible',
+    resolue INTEGER DEFAULT 0,
+    nb_signalements INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_fdisc_formation ON formation_discussions(formation_id, lecon_id);
+  CREATE INDEX IF NOT EXISTS idx_fdisc_parent ON formation_discussions(parent_id);
+
+  CREATE TABLE IF NOT EXISTS formation_discussion_signalements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    discussion_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    motif TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(discussion_id, user_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS formation_formateurs_invites (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL UNIQUE,
+    invite_par INTEGER,
+    motif TEXT,
+    statut TEXT DEFAULT 'actif',
+    created_at TEXT DEFAULT (datetime('now')),
+    revoque_le TEXT
+  );
 `);
 
 /* L'accréditation createur_formations est supprimée : la création de formations est désormais

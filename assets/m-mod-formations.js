@@ -153,6 +153,7 @@
     if (b === 'cartes') return screenCartes(my);
     if (/^\d+$/.test(b)) {
       if (c === 'suivre') return screenSuivre(my, b);
+      if (c === 'decouverte') return screenDecouverte(my, b);
       if (c && /^l\d+$/.test(c)) return screenLecon(my, b, Number(c.slice(1)));
       return screenDetail(my, b);
     }
@@ -370,7 +371,7 @@
       ${etatNote}
       ${desc ? `<div class="h2">À PROPOS</div><div class="card"><div class="pad rich">${desc}</div></div>` : (f.description_courte ? `<div class="card"><div class="pad">${esc(strip(f.description_courte))}</div></div>` : '')}
       ${facts.length ? `<div class="h2">EN BREF</div><div class="card"><div class="pad">${facts.map(([k, v]) => `<div class="kv"><span>${esc(k)}</span><span>${esc(v)}</span></div>`).join('')}</div></div>` : ''}
-      ${section('PROGRAMME', (progLine ? `<p style="margin:0 0 8px"><b>${esc(progLine)}</b></p>` : '') + (etat === 'inscrit' ? `<a class="btn out sm" href="#/formations/${esc(f.id)}/suivre">Voir le plan et les leçons</a>` : '<p class="small muted" style="margin:0">Le détail des modules et des leçons est accessible dès votre inscription.</p>'))}
+      ${section('PROGRAMME', (progLine ? `<p style="margin:0 0 8px"><b>${esc(progLine)}</b></p>` : '') + (etat === 'inscrit' ? `<a class="btn out sm" href="#/formations/${esc(f.id)}/suivre">Voir le plan et les leçons</a>` : '<p class="small muted" style="margin:0">Le détail des modules et des leçons est accessible dès votre inscription.</p>' + (Number(f.nb_apercu) > 0 ? `<a class="btn out sm" style="margin-top:10px" href="#/formations/${esc(f.id)}/decouverte">🎁 Lire ${esc(plural(Number(f.nb_apercu), 'leçon offerte', 'leçons offertes'))}</a>` : '')))}
       ${section('OBJECTIFS', objectifs.length ? listHtml(objectifs) : '')}
       ${section('COMPÉTENCES ACQUISES', competences.length ? listHtml(competences) : '')}
       ${section('RÉSULTATS ATTENDUS', resultats.length ? listHtml(resultats) : '')}
@@ -535,6 +536,7 @@
     if (!alive(my)) return;
     outlineSeen = String(id);
     const f = d.formation, items = flat(d), apercu = d.mode === 'apercu';
+    const mode = modeSuivi(d), libre = mode === 'aucun';
     const pc = d.parcours || {};
     const nbTot = pc.nb_total != null ? pc.nb_total : items.length;
     const done = pc.nb_termine != null ? pc.nb_termine : items.filter(x => x.l.termine).length;
@@ -543,13 +545,14 @@
     const statut = pc.statut || 'non_commence';
     const STATUTS = { non_commence: 'Non commencé', en_cours: 'En cours', en_attente_evaluation: 'En attente d’évaluation', termine: 'Terminé' };
     let html = `<div class="card"><div class="pad"><h2 style="margin:0 0 6px;font-size:20px;line-height:1.25">${esc(f.titre)}</h2>
-      ${apercu ? '<span class="badge o">Aperçu créateur</span>' : `<div class="row small" style="margin:8px 0 6px"><b class="sp">${p} % terminé</b><span class="badge ${statut === 'termine' ? 'g' : 'o'}">${esc(STATUTS[statut] || statut)}</span></div>
+      ${apercu ? '<span class="badge o">Aperçu créateur</span>' : libre ? '<div class="small muted" style="margin-top:8px">Formation en accès libre : votre progression n’est pas enregistrée et aucun document n’est délivré.</div>' : `<div class="row small" style="margin:8px 0 6px"><b class="sp">${p} % terminé</b><span class="badge ${statut === 'termine' ? 'g' : 'o'}">${esc(STATUTS[statut] || statut)}</span></div>
       <div class="bar" role="progressbar" aria-valuenow="${p}" aria-valuemin="0" aria-valuemax="100" aria-label="Progression globale"><i style="width:${p}%"></i></div>
       <div class="small muted" style="margin-top:6px">${done} activité${done > 1 ? 's' : ''} obligatoire${done > 1 ? 's' : ''} terminée${done > 1 ? 's' : ''} sur ${nbTot}${pc.chapitres_total ? ` · ${pc.chapitres_termines || 0}/${pc.chapitres_total} chapitre${pc.chapitres_total > 1 ? 's' : ''}` : ''}</div>`}
       ${items.length ? `<a class="btn block" style="margin-top:14px" href="#/formations/${esc(id)}/l${suivante.l.id}">${apercu ? 'Voir la première leçon' : statut === 'termine' ? 'Revoir la formation' : done === 0 ? 'Commencer' : 'Reprendre ma formation'}</a>` : ''}</div></div>`;
+    if (mode === 'manuel' && !apercu) html += `<div class="fm-note" style="margin-bottom:0">Mode manuel : cochez vos leçons, puis enregistrez votre progression.</div>` + carteEnregistrer(id);
     /* Document (attestation / certificat) : conditions restantes, ou accès une fois délivré. */
     const at = d.attestation;
-    if (!apercu && at && at.active) {
+    if (!apercu && !libre && at && at.active) {
       if (at.delivree) {
         const dl = at.delivree;
         html += `<div class="card"><div class="pad"><b>🎓 ${esc(dl.type_label)} obtenu(e)</b><div class="small muted" style="margin:4px 0 10px">N° ${esc(dl.code)}</div>
@@ -573,14 +576,15 @@
         html += `<div class="h2">${esc(String(m.titre || 'Module').toUpperCase())}</div>`;
         chs.forEach(c => {
           const st = c.stats;
-          html += `<div class="small muted" style="margin:0 6px 6px;font-weight:600">${esc(c.titre || '')}${st && !apercu ? ` — ${st.pct}%${st.total ? ` (${st.termine}/${st.total})` : ''}` : ''}</div>
-            ${st && !apercu ? `<div class="bar" style="margin:0 6px 8px" role="progressbar" aria-valuenow="${st.pct}" aria-valuemin="0" aria-valuemax="100" aria-label="Progression du chapitre ${esc(c.titre || '')}"><i style="width:${st.pct}%"></i></div>` : ''}
-            <div class="lst" style="margin-bottom:12px">${c.lecons.map(l => `<a class="fm-les ${l.termine ? 'done' : ''}" href="#/formations/${esc(id)}/l${esc(l.id)}"><span class="fm-ck" aria-hidden="true">${l.termine ? ic('check', 's') : ''}</span><span class="sp"><span class="t">${l.quiz ? (l.quiz.en_attente ? '⏳ ' : '📝 ') : ''}${esc(l.titre)}</span><br><span class="d">${esc(lessonSub(l))}${l.obligatoire === false ? ' · facultative' : ''}${l.termine ? ' · terminée' : l.quiz && l.quiz.en_attente ? ' · en attente de correction' : ''}</span></span><span class="ch" style="color:#94a3b8">${ic('chev', 's')}</span></a>`).join('')}</div>`;
+          html += `<div class="small muted" style="margin:0 6px 6px;font-weight:600">${esc(c.titre || '')}${st && !apercu && !libre ? ` — ${st.pct}%${st.total ? ` (${st.termine}/${st.total})` : ''}` : ''}</div>
+            ${st && !apercu && !libre ? `<div class="bar" style="margin:0 6px 8px" role="progressbar" aria-valuenow="${st.pct}" aria-valuemin="0" aria-valuemax="100" aria-label="Progression du chapitre ${esc(c.titre || '')}"><i style="width:${st.pct}%"></i></div>` : ''}
+            <div class="lst" style="margin-bottom:12px">${c.lecons.map(l => `<a class="fm-les ${!libre && faite(id, l) ? 'done' : ''}" href="#/formations/${esc(id)}/l${esc(l.id)}"><span class="fm-ck" aria-hidden="true">${!libre && faite(id, l) ? ic('check', 's') : ''}</span><span class="sp"><span class="t">${l.quiz ? (l.quiz.en_attente ? '⏳ ' : '📝 ') : ''}${esc(l.titre)}</span><br><span class="d">${esc(lessonSub(l))}${!libre && l.obligatoire === false ? ' · facultative' : ''}${libre ? '' : (Object.prototype.hasOwnProperty.call(pendDe(id), l.id) ? ' · à enregistrer' : l.termine ? ' · terminée' : '')}${!libre && !l.termine && l.quiz && l.quiz.en_attente ? ' · en attente de correction' : ''}</span></span><span class="ch" style="color:#94a3b8">${ic('chev', 's')}</span></a>`).join('')}</div>`;
         });
       });
     }
     html += `<a class="btn out block" href="#/formations/${esc(id)}">Fiche de la formation</a>`;
     setPane(f.titre, html);
+    brancherEnregistrer(id, () => screenSuivre(++seq, id));
   }
 
   const noFile = msg => `<div class="card"><div class="pad muted">${esc(msg)}</div></div>`;
@@ -613,10 +617,13 @@
     }
   }
 
-  /* ── Quiz (lot 1-2) : questions reçues SANS corrigé ; correction et seuil appliqués par le serveur ; devoirs corrigés par le formateur ── */
+  /* ── Quiz : questions reçues SANS corrigé ; correction, seuil, tentatives et temps imparti appliqués par le serveur ; devoirs (avec fichier) corrigés par le formateur ── */
   let LASTQ = null; // { leconId, res } : résultat de la dernière tentative, affiché une fois après le rechargement de la leçon
+  let QTIMER = null; // chronomètre d'un quiz à temps imparti
+  const fmtTemps = s => { s = Math.max(0, Math.round(s)); return Math.floor(s / 60) + ' min ' + String(s % 60).padStart(2, '0') + ' s'; };
   async function montrerQuiz(id, l, d) {
     const zone = $('#fm-quiz'); if (!zone) return;
+    clearInterval(QTIMER); QTIMER = null;
     if (!l.quiz) { zone.innerHTML = noFile('Aucun quiz n’est encore rattaché à cette leçon.'); return; }
     if (d.mode === 'apercu') { zone.innerHTML = noFile('Quiz « ' + l.quiz.titre + ' » : passable par les apprenants inscrits.'); return; }
     zone.innerHTML = '<div class="sk skc" style="height:90px"></div>';
@@ -624,17 +631,40 @@
     try { q = await api(`/api/formations/${encodeURIComponent(id)}/quiz/${encodeURIComponent(l.quiz.id)}/passer`); }
     catch (e) { zone.innerHTML = noFile(e.message || 'Quiz indisponible.'); return; }
     const res = LASTQ && LASTQ.leconId === Number(l.id) ? LASTQ.res : null; if (res) LASTQ = null;
-    const quiz = q.quiz, t = q.tentatives || {}, manuel = !!quiz.correction_manuelle;
+    rendreQuiz(zone, id, l, d, q, res);
+  }
+  function rendreQuiz(zone, id, l, d, q, res) {
+    clearInterval(QTIMER); QTIMER = null;
+    const quiz = q.quiz, t = q.tentatives || {}, ch = q.chrono, manuel = !!quiz.correction_manuelle;
     const attente = !!t.en_attente, dejaReussi = !!t.reussi || !!(res && res.reussi);
-    const verrou = attente || (manuel && dejaReussi);
+    const epuise = q.bloque === 'tentatives_epuisees';
+    const verrou = attente || epuise || (manuel && dejaReussi);
+    const note = (bg, fg, txt) => `<div class="fm-note" style="background:${bg};color:${fg}">${txt}</div>`;
     let verdict = '';
-    if (attente) verdict = '<div class="fm-note" style="background:#fffbeb;color:#92400e">⏳ Votre travail a été envoyé : il est en attente de correction par le formateur. Vous serez prévenu(e) dès qu’il sera corrigé.</div>';
-    else if (res && !res.en_attente_correction) verdict = res.reussi
-      ? `<div class="fm-note" style="background:#dcfce7;color:#14532d">✅ Quiz réussi${res.note_pct != null ? ' — ' + esc(res.note_pct) + '%' : ''}. Cette activité est validée.</div>`
-      : `<div class="fm-note" style="background:#fef2f2;color:#7f1d1d">❌ ${esc(res.note_pct)}% — il faut au moins ${esc(res.seuil)}%. Relisez le cours puis réessayez : les bonnes réponses s’affichent une fois le quiz réussi.</div>`;
-    else if (dejaReussi) verdict = '<div class="fm-note" style="background:#dcfce7;color:#14532d">✅ ' + (manuel ? 'Cette évaluation est validée.' : 'Vous avez déjà réussi ce quiz. Vous pouvez le repasser pour vous entraîner.') + '</div>';
-    else if (manuel && t.derniere && t.derniere.statut === 'corrige') verdict = `<div class="fm-note" style="background:#fef2f2;color:#7f1d1d">📝 Dernière correction : ${t.derniere.note_pct != null ? esc(t.derniere.note_pct) + '%' : '—'} (seuil ${esc(quiz.note_minimale)}%). Vous pouvez améliorer votre travail et le renvoyer.</div>`;
+    if (ch && ch.expire_enregistre && !res) verdict += note('#fef2f2', '#7f1d1d', '⌛ Le temps imparti était écoulé : la tentative a été comptée sans note.');
+    if (attente) verdict += note('#fffbeb', '#92400e', '⏳ Votre travail a été envoyé : il est en attente de correction par le formateur. Vous serez prévenu(e) dès qu’il sera corrigé.');
+    else if (res && res.hors_delai) verdict += note('#fef2f2', '#7f1d1d', '⌛ Temps écoulé : votre envoi est arrivé après l’échéance. La tentative est comptée sans note.');
+    else if (res && !res.en_attente_correction) verdict += res.reussi
+      ? note('#dcfce7', '#14532d', '✅ Quiz réussi' + (res.note_pct != null ? ' — ' + esc(res.note_pct) + '%' : '') + '. Cette activité est validée.')
+      : note('#fef2f2', '#7f1d1d', '❌ ' + esc(res.note_pct) + '% — il faut au moins ' + esc(res.seuil) + '%. Relisez le cours puis réessayez : les bonnes réponses s’affichent une fois le quiz réussi.');
+    else if (dejaReussi) verdict += note('#dcfce7', '#14532d', '✅ ' + (manuel ? 'Cette évaluation est validée.' : 'Vous avez déjà réussi ce quiz. Vous pouvez le repasser pour vous entraîner.'));
+    else if (manuel && t.derniere && t.derniere.statut === 'corrige') verdict += note('#fef2f2', '#7f1d1d', '📝 Dernière correction : ' + (t.derniere.note_pct != null ? esc(t.derniere.note_pct) + '%' : '—') + ' (seuil ' + esc(quiz.note_minimale) + '%). Vous pouvez améliorer votre travail et le renvoyer.');
+    if (epuise && !(res && res.reussi)) verdict += note('#fef2f2', '#7f1d1d', '🔒 Vous avez utilisé toutes vos tentatives. Posez la question au formateur dans « Questions et échanges » ci-dessous : il peut vous en redonner.');
     if (t.derniere && t.derniere.statut === 'corrige' && t.derniere.commentaire && !attente) verdict += `<div class="fm-note"><b>Commentaire du formateur :</b> ${esc(t.derniere.commentaire)}</div>`;
+    const meta = `Seuil de réussite : ${esc(quiz.note_minimale)}%${quiz.temps_limite_min ? ' · temps imparti : ' + esc(quiz.temps_limite_min) + ' min' : ''}${quiz.max_tentatives ? ' · tentatives : ' + Math.min(t.nb || 0, quiz.max_tentatives) + '/' + quiz.max_tentatives : (t.nb ? ' · ' + t.nb + ' tentative' + (t.nb > 1 ? 's' : '') : '')}${t.meilleure_note != null ? ', meilleure note : ' + esc(t.meilleure_note) + '%' : ''}${quiz.melanger ? ' · ordre aléatoire' : ''}`;
+    /* Quiz chronométré pas encore commencé : questions cachées jusqu'au clic. */
+    if (ch && !ch.demarre && !verrou) {
+      zone.innerHTML = `<div class="card"><div class="pad"><b>📝 ${esc(quiz.titre)}</b><div class="small muted" style="margin:4px 0 10px">${meta}</div>${verdict}
+        ${note('#eff6ff', '#1e3a8a', '⏱ Quiz chronométré : vous avez <b>' + esc(ch.minutes) + ' minute' + (ch.minutes > 1 ? 's' : '') + '</b>. Le temps démarre au clic sur « Commencer » et continue de s’écouler si vous quittez la page.')}
+        ${quiz.nb_questions ? '<button class="btn block" id="fm-qstart">▶ Commencer</button>' : noFile('Ce quiz ne contient pas encore de question.')}</div></div>`;
+      const st = $('#fm-qstart');
+      if (st) st.onclick = async () => {
+        st.disabled = true; st.textContent = 'Démarrage…';
+        try { const etat = await api(`/api/formations/${encodeURIComponent(id)}/quiz/${encodeURIComponent(quiz.id)}/demarrer`, { method: 'POST', body: {} }); rendreQuiz(zone, id, l, d, etat, null); }
+        catch (e) { toast(e.message, true); montrerQuiz(id, l, d); }
+      };
+      return;
+    }
     const detail = {}; if (res && res.detail) res.detail.forEach(x => { detail[x.question_id] = x; });
     const qs = (q.questions || []).map((qu, i) => {
       const dt = detail[qu.id];
@@ -643,34 +673,66 @@
         ? `<textarea class="fm-in" name="q${qu.id}" rows="4" maxlength="5000" aria-label="Votre réponse" ${verrou ? 'disabled' : ''}></textarea>`
         : `<input class="fm-in" type="text" name="q${qu.id}" maxlength="500" autocomplete="off" aria-label="Votre réponse">`;
       else champ = qu.options.map(o => `<label style="display:flex;gap:10px;align-items:center;min-height:44px"><input type="${qu.multiple ? 'checkbox' : 'radio'}" name="q${qu.id}" value="${esc(o)}" ${verrou ? 'disabled' : ''}> <span>${esc(o)}</span></label>`).join('') + (qu.multiple ? '<div class="small muted">Plusieurs réponses possibles.</div>' : '');
-      const note = dt && dt.note ? `<div class="small" style="margin-top:6px;font-weight:700;color:${dt.correct ? 'var(--green)' : 'var(--red)'}">${dt.correct ? '✓ Bonne réponse' : '✗ Réponse incorrecte'}${dt.bonne_reponse ? ' — attendue : ' + esc(dt.bonne_reponse) : ''}</div>` : '';
-      return `<div style="padding:12px 0;border-top:1px solid var(--border)"><div style="font-weight:700;margin-bottom:6px">${i + 1}. ${esc(qu.question)} <span class="small muted" style="font-weight:400">(${qu.points} pt${qu.points > 1 ? 's' : ''})</span></div>${champ}${note}</div>`;
+      const nt = dt && dt.note ? `<div class="small" style="margin-top:6px;font-weight:700;color:${dt.correct ? 'var(--green)' : 'var(--red)'}">${dt.correct ? '✓ Bonne réponse' : '✗ Réponse incorrecte'}${dt.bonne_reponse ? ' — attendue : ' + esc(dt.bonne_reponse) : ''}</div>` : '';
+      return `<div style="padding:12px 0;border-top:1px solid var(--border)"><div style="font-weight:700;margin-bottom:6px">${i + 1}. ${esc(qu.question)} <span class="small muted" style="font-weight:400">(${qu.points} pt${qu.points > 1 ? 's' : ''})</span></div>${champ}${nt}</div>`;
     }).join('');
+    const depot = !verrou && quiz.depot_fichier && quiz.depot_fichier !== 'non';
+    const depotHtml = depot ? `<div style="padding:12px 0;border-top:1px solid var(--border)"><div style="font-weight:700;margin-bottom:6px">📎 Votre fichier ${quiz.depot_fichier === 'obligatoire' ? '<span class="small" style="color:var(--red)">(obligatoire)</span>' : '<span class="small muted">(facultatif)</span>'}</div>
+      <input type="file" id="fm-fichier" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.webp" aria-label="Fichier à rendre"><div class="small muted" style="margin-top:4px">PDF, Word, Excel, PowerPoint ou image — 15 Mo maximum.</div></div>` : '';
+    const libelle = manuel ? 'Envoyer mon travail au formateur' : res ? 'Valider une nouvelle tentative' : 'Valider mes réponses';
     zone.innerHTML = `<div class="card"><div class="pad"><b>📝 ${esc(quiz.titre)}</b>
-      <div class="small muted" style="margin:4px 0 10px">Seuil de réussite : ${esc(quiz.note_minimale)}%${t.nb ? ` · ${t.nb} tentative${t.nb > 1 ? 's' : ''}${t.meilleure_note != null ? ', meilleure note : ' + esc(t.meilleure_note) + '%' : ''}` : ''}</div>
-      ${verdict}<form id="fm-qf" novalidate>${qs || noFile('Ce quiz ne contient pas encore de question.')}
-      ${qs && !verrou ? `<button type="submit" class="btn block" id="fm-qs" style="margin-top:12px">${manuel ? 'Envoyer mon travail au formateur' : res ? 'Valider une nouvelle tentative' : 'Valider mes réponses'}</button>` : ''}</form></div></div>`;
-    const form = $('#fm-qf'); if (!form || !qs || verrou) return;
-    form.onsubmit = async ev => {
-      ev.preventDefault();
+      <div class="small muted" style="margin:4px 0 10px">${meta}</div>
+      ${ch && ch.demarre && !verrou ? '<div class="fm-note" id="fm-timer" style="background:#eff6ff;color:#1e3a8a;font-weight:700;position:sticky;top:0;z-index:5">⏱ Temps restant : <span id="fm-timer-txt"></span></div>' : ''}
+      ${verdict}<form id="fm-qf" novalidate>${qs || (!depot && !epuise ? noFile('Ce quiz ne contient pas encore de question.') : '')}${depotHtml}
+      ${(qs || depot) && !verrou ? `<button type="submit" class="btn block" id="fm-qs" style="margin-top:12px">${libelle}</button>` : ''}</form></div></div>`;
+    const form = $('#fm-qf'); if (!form || (!qs && !depot) || verrou) return;
+    let envoye = false;
+    const soumettre = async auto => {
+      if (envoye) return; envoye = true; clearInterval(QTIMER); QTIMER = null;
       const reponses = {};
       (q.questions || []).forEach(qu => {
-        const ch = $$(`[name="q${qu.id}"]`, form); if (!ch.length) return;
-        if (ch[0].type === 'text' || ch[0].tagName === 'TEXTAREA') reponses[qu.id] = ch[0].value;
-        else if (ch[0].type === 'checkbox') reponses[qu.id] = ch.filter(c => c.checked).map(c => c.value);
-        else { const c = ch.find(x => x.checked); reponses[qu.id] = c ? c.value : ''; }
+        const c = $$(`[name="q${qu.id}"]`, form); if (!c.length) return;
+        if (c[0].type === 'text' || c[0].tagName === 'TEXTAREA') reponses[qu.id] = c[0].value;
+        else if (c[0].type === 'checkbox') reponses[qu.id] = c.filter(x => x.checked).map(x => x.value);
+        else { const x = c.find(y => y.checked); reponses[qu.id] = x ? x.value : ''; }
       });
-      const btn = $('#fm-qs'); btn.disabled = true; btn.textContent = 'Correction…';
+      const btn = $('#fm-qs'); if (btn) { btn.disabled = true; btn.textContent = auto ? 'Temps écoulé — envoi…' : 'Correction…'; }
+      const reset = () => { envoye = false; if (btn) { btn.disabled = false; btn.textContent = libelle; } };
       try {
-        const r = await api(`/api/formations/${encodeURIComponent(id)}/quiz/${encodeURIComponent(quiz.id)}/soumettre`, { method: 'POST', body: { reponses } });
-        LASTQ = { leconId: Number(l.id), res: r };
+        const corps = { reponses };
+        const fi = $('#fm-fichier'), fichier = fi && fi.files && fi.files[0];
+        if (fichier) {
+          if (fichier.size > 15 * 1024 * 1024) { toast('Fichier trop volumineux (15 Mo maximum).', true); return reset(); }
+          if (btn) btn.textContent = 'Envoi du fichier…';
+          const fd = new FormData(); fd.append('document', fichier);
+          const up = await fetch('/api/upload/document', { method: 'POST', credentials: 'same-origin', body: fd });
+          const upd = await up.json().catch(() => ({}));
+          if (!up.ok || !upd.url) { toast(upd.error || 'Le fichier n’a pas pu être envoyé.', true); return reset(); }
+          corps.fichier_url = upd.url; corps.fichier_nom = fichier.name;
+        }
+        const r = await api(`/api/formations/${encodeURIComponent(id)}/quiz/${encodeURIComponent(quiz.id)}/soumettre`, { method: 'POST', body: corps });
+        LASTQ = { leconId: Number(l.id), res: r.en_attente_correction ? null : r };
         await loadSuivi(id, true);
         if (r.attestation) toast('🎉 Votre ' + String(r.attestation.type_label).toLowerCase() + ' est disponible !');
         else if (r.en_attente_correction) toast('Travail envoyé ✓');
+        else if (r.hors_delai) toast('Temps écoulé : tentative comptée sans note', true);
         else toast(r.reussi ? 'Quiz réussi ✓' : 'Quiz non réussi', !r.reussi);
         screenLecon(++seq, id, Number(l.id));
-      } catch (e) { toast(e.message, true); btn.disabled = false; btn.textContent = manuel ? 'Envoyer mon travail au formateur' : 'Valider mes réponses'; }
+      } catch (e) { toast(e.message, true); reset(); }
     };
+    form.onsubmit = ev => { ev.preventDefault(); soumettre(false); };
+    if (ch && ch.demarre) {
+      const fin = Date.now() + (ch.reste_sec || 0) * 1000;
+      const tick = () => {
+        const txt = $('#fm-timer-txt');
+        if (!txt) { clearInterval(QTIMER); QTIMER = null; return; }
+        const reste = Math.round((fin - Date.now()) / 1000);
+        txt.textContent = fmtTemps(reste);
+        const bar = $('#fm-timer'); if (bar && reste <= 60) { bar.style.background = '#fef2f2'; bar.style.color = '#b91c1c'; }
+        if (reste <= 0) soumettre(true);
+      };
+      tick(); QTIMER = setInterval(tick, 1000);
+    }
   }
 
   async function screenLecon(my, id, leconId) {
@@ -682,23 +744,44 @@
     const items = flat(d), i = items.findIndex(x => Number(x.l.id) === leconId);
     if (i < 0) return setPane('Leçon', `<div class="empty"><div class="ei">${ic('book', 'l')}</div><b>Leçon introuvable</b>Elle a peut-être été retirée de la formation.<br><br><a class="btn" href="#/formations/${esc(id)}/suivre">Retour au plan</a></div>`);
     const { l, m, c } = items[i], prev = items[i - 1], next = items[i + 1], apercu = d.mode === 'apercu';
+    const mode = modeSuivi(d), libre = mode === 'aucun', manuel = mode === 'manuel', fait = faite(id, l);
     const goTo = x => location.replace(`#/formations/${id}/l${x.l.id}`);
     const toOutline = () => { if (outlineSeen === String(id) && history.length > 1) history.back(); else location.replace(`#/formations/${id}/suivre`); };
 
     const html = `<div class="small muted" style="margin:0 2px 8px">${esc(m.titre || '')}${c.titre ? ' · ' + esc(c.titre) : ''} — leçon ${i + 1} sur ${items.length}</div>
       <h2 style="margin:0 0 12px;font-size:21px;line-height:1.25">${esc(l.titre)}</h2>
-      ${lessonBody(l)}
+      ${lessonBody(l)}${manuel && !apercu ? carteEnregistrer(id) : ''}
+      <div id="fm-ech" style="margin-top:18px"></div>
       <a class="btn out block" style="margin-top:12px" href="#/formations/${esc(id)}/suivre">Plan de la formation</a>`;
     const foot = `<button class="btn out" id="fm-prev" aria-label="Leçon précédente" ${prev ? '' : 'disabled'}>${ic('back')}</button>
-      ${apercu || l.quiz ? '<span class="sp"></span>' : `<button class="btn ${l.termine ? 'out' : ''}" id="fm-done" style="flex:1;padding:0 10px">${l.termine ? '✓ Terminée · annuler' : next ? 'Terminer et continuer' : 'Terminer la leçon'}</button>`}
+      ${apercu || l.quiz || libre ? '<span class="sp"></span>' : manuel ? `<button class="btn ${fait ? 'out' : ''}" id="fm-done" style="flex:1;padding:0 10px">${fait ? '✓ Cochée · décocher' : 'Cocher comme terminée'}</button>` : `<button class="btn ${l.termine ? 'out' : ''}" id="fm-done" style="flex:1;padding:0 10px">${l.termine ? '✓ Terminée · annuler' : next ? 'Terminer et continuer' : 'Terminer la leçon'}</button>`}
       <button class="btn out" id="fm-next" aria-label="Leçon suivante" ${next ? '' : 'disabled'}>${ic('chev')}</button>`;
     setPane(l.titre, html, foot);
 
     if (l.type === 'quiz') montrerQuiz(id, l, d);
+    montrerEchanges(id, l);
+    brancherEnregistrer(id, () => screenLecon(++seq, id, leconId));
     $('#fm-prev').onclick = () => prev && goTo(prev);
-    $('#fm-next').onclick = () => next && goTo(next);
+    /* Mode automatique : la leçon qu'on quitte en avançant est validée (sauf un quiz, qui se réussit). */
+    $('#fm-next').onclick = async () => {
+      if (!next) return;
+      if (mode === 'auto' && !apercu && !l.quiz && !l.termine) {
+        try {
+          const r = await api(`/api/formations/${encodeURIComponent(id)}/lecons/${encodeURIComponent(l.id)}/progression`, { method: 'POST', body: { termine: true } });
+          l.termine = true; d.avancement_pct = r.avancement_pct; SF.at = 0;
+          if (r.attestation) toast('🎉 Votre ' + String(r.attestation.type_label).toLowerCase() + ' est disponible dans le plan de la formation !');
+        } catch (e) { /* silencieux : la leçon pourra être cochée à la main */ }
+      }
+      goTo(next);
+    };
     const dn = $('#fm-done');
     if (dn) dn.onclick = async () => {
+      if (manuel) {
+        /* Mode manuel : coche locale, enregistrée d'un seul geste plus tard. */
+        const p = pendDe(id), nouveau = !fait;
+        if (nouveau === !!l.termine) delete p[l.id]; else p[l.id] = nouveau;
+        return screenLecon(++seq, id, leconId);
+      }
       const val = !l.termine; dn.disabled = true;
       try {
         const r = await api(`/api/formations/${encodeURIComponent(id)}/lecons/${encodeURIComponent(l.id)}/progression`, { method: 'POST', body: { termine: val } });
@@ -711,6 +794,120 @@
       } catch (e) { toast(e.message, true); dn.disabled = false; }
     };
   }
+  /* ============================================================
+     LOT 4 : mode de suivi, espace d'échange, aperçu gratuit
+     ============================================================ */
+  const modeSuivi = d => (d && d.formation && d.formation.suivi_mode) || 'auto';
+  const PEND = {};   // mode « manuel » : { [formation]: { [leçon]: coche locale, pas encore enregistrée } }
+  const pendDe = id => (PEND[id] = PEND[id] || {});
+  const nbPend = id => Object.keys(pendDe(id)).length;
+  const faite = (id, l) => (Object.prototype.hasOwnProperty.call(pendDe(id), l.id) ? !!pendDe(id)[l.id] : !!l.termine);
+  function carteEnregistrer(id) {
+    const n = nbPend(id);
+    if (!n) return '';
+    return `<div class="fm-note" id="fm-pend" style="margin-top:12px"><b>${n}</b> coche${n > 1 ? 's' : ''} non enregistrée${n > 1 ? 's' : ''} : elles ne comptent pas tant que vous n’avez pas enregistré.
+      <button class="btn block" id="fm-pend-go" style="margin-top:8px">💾 Enregistrer ma progression</button><button class="btn out block" id="fm-pend-cancel" style="margin-top:8px">Annuler les coches</button></div>`;
+  }
+  function brancherEnregistrer(id, apres) {
+    const go = $('#fm-pend-go'), no = $('#fm-pend-cancel');
+    if (no) no.onclick = () => { delete PEND[id]; apres(); };
+    if (go) go.onclick = async () => {
+      go.disabled = true; go.textContent = 'Enregistrement…';
+      try {
+        const lecons = Object.keys(pendDe(id)).map(k => ({ id: Number(k), termine: !!pendDe(id)[k] }));
+        const r = await api(`/api/formations/${encodeURIComponent(id)}/progression-lot`, { method: 'POST', body: { lecons } });
+        delete PEND[id]; if (SF) SF.at = 0;
+        toast(r.attestation ? '🎉 Votre ' + String(r.attestation.type_label).toLowerCase() + ' est disponible !' : 'Progression enregistrée ✓');
+        apres();
+      } catch (e) { toast(e.message, true); go.disabled = false; go.textContent = '💾 Enregistrer ma progression'; }
+    };
+  }
+
+  /* ── Espace d'échange : questions sous la leçon, réponses du formateur et des autres apprenants, signalement ── */
+  const ECH = { scope: 'lecon' };
+  const dateEch = iso => {
+    const t = String(iso || ''); const dt = new Date(t.replace(' ', 'T') + (t.length <= 19 && !/Z|\+/.test(t) ? 'Z' : ''));
+    return isNaN(dt) ? '' : dt.toLocaleString('fr-FR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
+  };
+  async function montrerEchanges(id, l) {
+    const zone = $('#fm-ech'); if (!zone) return;
+    const cible = ECH.scope === 'general' ? 'general' : l.id;
+    let d;
+    try { d = await api(`/api/formations/${encodeURIComponent(id)}/discussions?lecon_id=${cible}`); } catch (e) { zone.innerHTML = ''; return; }
+    if (!$('#fm-ech')) return;
+    const act = (a, mid, txt, danger) => `<button type="button" class="fm-ea" data-a="${a}" data-id="${mid}" style="min-height:40px;padding:0 10px;font-weight:700;font-size:13px;${danger ? 'color:var(--red)' : 'color:var(--muted)'}">${txt}</button>`;
+    const msg = (m, rep) => {
+      const a = [];
+      if (!rep) {
+        if (m.est_moi || d.moderateur) a.push(act('resolue', m.id, m.resolue ? '↩ Rouvrir' : '✓ Résolue'));
+        if (!m.masque || d.moderateur) a.push(act('repondre', m.id, '↪ Répondre'));
+      }
+      if (!m.est_moi && !m.masque) a.push(act('signaler', m.id, '🚩 Signaler'));
+      if (d.moderateur) a.push(act(m.masque ? 'afficher' : 'masquer', m.id, m.masque ? '👁 Réafficher' : '🙈 Masquer'));
+      if (m.est_moi || d.moderateur) a.push(act('supprimer', m.id, '🗑', true));
+      return `<div class="card" style="${rep ? 'margin-left:18px;' : ''}${m.masque ? 'opacity:.65;' : ''}"><div class="pad">
+        <div class="small"><b>${esc(m.auteur)}</b>${m.role === 'formateur' ? ' <span class="badge o">Formateur</span>' : ''}${m.resolue ? ' <span class="badge g">Résolue</span>' : ''}${m.masque ? ' <span class="badge r">Masqué</span>' : ''} <span class="muted">· ${esc(dateEch(m.created_at))}</span></div>
+        <div style="white-space:pre-wrap;margin:6px 0;word-break:break-word">${esc(m.contenu)}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:0 4px">${a.join('')}</div>${rep ? '' : `<div class="fm-rep" id="fm-rep-${m.id}" hidden></div>`}</div></div>`;
+    };
+    const fils = d.fils || [];
+    zone.innerHTML = `<div class="h2">💬 QUESTIONS ET ÉCHANGES</div>
+      <div class="chips"><button type="button" class="chip ${ECH.scope === 'lecon' ? 'on' : ''}" data-scope="lecon">Cette leçon</button><button type="button" class="chip ${ECH.scope === 'general' ? 'on' : ''}" data-scope="general">Questions générales</button></div>
+      ${d.resume && d.resume.a_repondre ? `<div class="fm-note" style="background:#fffbeb;color:#92400e">${d.resume.a_repondre} question${d.resume.a_repondre > 1 ? 's' : ''} en attente de votre réponse.</div>` : ''}
+      <form id="fm-ech-form"><textarea class="fm-in" id="fm-ech-new" rows="3" maxlength="2000" placeholder="${ECH.scope === 'general' ? 'Posez une question sur la formation entière…' : 'Posez votre question sur cette leçon…'}" aria-label="Votre question"></textarea>
+        <div class="small muted" style="margin:4px 2px 8px">Restez courtois : un message peut être signalé et masqué par le formateur.</div><button type="submit" class="btn block">Publier</button></form>
+      <div style="margin-top:14px">${fils.length ? fils.map(f => msg(f, false) + (f.reponses || []).map(x => msg(x, true)).join('')).join('') : '<p class="small muted" style="text-align:center">Aucune question pour le moment. Soyez la première personne à en poser une.</p>'}</div>`;
+    const base = `/api/formations/${encodeURIComponent(id)}/discussions`;
+    const rafraichir = () => montrerEchanges(id, l);
+    const poster = async (url, method, body) => { try { return await api(url, body ? { method, body } : { method }); } catch (e) { toast(e.message, true); return null; } };
+    $$('.chip[data-scope]', zone).forEach(b => b.onclick = () => { ECH.scope = b.dataset.scope; rafraichir(); });
+    $('#fm-ech-form').onsubmit = async ev => {
+      ev.preventDefault();
+      const contenu = $('#fm-ech-new').value.trim(); if (contenu.length < 2) return;
+      if (await poster(base, 'POST', { contenu, lecon_id: ECH.scope === 'general' ? undefined : l.id })) rafraichir();
+    };
+    $$('.fm-ea', zone).forEach(b => b.onclick = async () => {
+      const mid = b.dataset.id, u = base + '/' + mid;
+      switch (b.dataset.a) {
+        case 'repondre': {
+          const bloc = $('#fm-rep-' + mid); if (!bloc.hidden) { bloc.hidden = true; return; }
+          bloc.hidden = false;
+          bloc.innerHTML = '<textarea class="fm-in" rows="2" maxlength="2000" placeholder="Votre réponse…" aria-label="Votre réponse"></textarea><button type="button" class="btn block" style="margin-top:8px">Répondre</button>';
+          $('textarea', bloc).focus();
+          $('button', bloc).onclick = async () => { const contenu = $('textarea', bloc).value.trim(); if (contenu.length < 2) return; if (await poster(base, 'POST', { contenu, parent_id: Number(mid) })) rafraichir(); };
+          return;
+        }
+        case 'resolue': { const m = fils.find(f => String(f.id) === mid); if (await poster(u + '/resolue', 'POST', { resolue: !(m && m.resolue) })) rafraichir(); return; }
+        case 'signaler': { const motif = prompt('Pourquoi signalez-vous ce message ? (facultatif)'); if (motif === null) return; if (await poster(u + '/signaler', 'POST', { motif })) { toast('Merci, le message a été signalé au formateur.'); rafraichir(); } return; }
+        case 'masquer': case 'afficher': if (await poster(u + '/moderer', 'POST', { action: b.dataset.a })) rafraichir(); return;
+        case 'supprimer': if (confirm('Supprimer ce message ? Si c’est une question, ses réponses seront supprimées aussi.') && await poster(u, 'DELETE')) rafraichir(); return;
+      }
+    });
+  }
+
+  /* ── Aperçu gratuit : plan complet, contenu des seules leçons offertes ── */
+  async function screenDecouverte(my, id) {
+    setPane('Aperçu gratuit', '<div class="sk skc" style="height:110px"></div><div class="sk skc"></div>');
+    let d;
+    try { d = await api(`/api/formations/${encodeURIComponent(id)}/decouverte`); }
+    catch (e) { if (!alive(my)) return; return setPane('Aperçu gratuit', `<div class="empty"><div class="ei">${ic('lock', 'l')}</div><b>Aperçu indisponible</b>${esc(e.message || '')}<br><br><a class="btn" href="#/formations/${esc(id)}">Voir la fiche de la formation</a></div>`); }
+    if (!alive(my)) return;
+    const f = d.formation;
+    let html = `<div class="card"><div class="pad"><h2 style="margin:0 0 6px;font-size:20px;line-height:1.25">${esc(f.titre)}</h2>
+      <span class="badge o">🎁 Aperçu gratuit</span><p class="small muted" style="margin:8px 0 0">${d.nb_apercu ? 'Lisez gratuitement ' + plural(d.nb_apercu, 'leçon offerte', 'leçons offertes') + ' ; les autres leçons sont réservées aux inscrits.' : 'Aucune leçon n’est offerte pour le moment.'}</p></div></div>`;
+    (d.modules || []).forEach(m => {
+      html += `<div class="h2">${esc(String(m.titre || 'Module').toUpperCase())}</div>`;
+      (m.chapitres || []).forEach(c => {
+        if (!(c.lecons || []).length) return;
+        html += `<div class="small muted" style="margin:0 6px 6px;font-weight:600">${esc(c.titre || '')}</div>`;
+        html += c.lecons.map(l => l.apercu_gratuit
+          ? `<details class="card" style="margin-bottom:10px"><summary style="padding:14px;font-weight:700;cursor:pointer">🎁 ${esc(l.titre)} <span class="small muted" style="font-weight:400">· ${esc(lessonSub(l))}</span></summary><div class="pad">${lessonBody(l)}</div></details>`
+          : `<div class="card" style="margin-bottom:10px;opacity:.75"><div class="pad row"><span class="sp">🔒 ${esc(l.titre)}<br><span class="small muted">${esc(lessonSub(l))} · réservée aux inscrits</span></span></div></div>`).join('');
+      });
+    });
+    setPane(f.titre, html, `<a class="btn block" href="#/formations/${esc(id)}">S’inscrire à la formation</a>`);
+  }
+
   /* ============================================================
      PARCOURS DE FORMATION (lot 3) : suites de formations, avec prérequis
      ============================================================ */

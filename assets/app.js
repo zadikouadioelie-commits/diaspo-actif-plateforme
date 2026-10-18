@@ -5730,6 +5730,7 @@ async function initFormations() {
         </div>
         <div style="margin-top:12px;display:flex;gap:8px;">
           <button class="btn btn-orange btn-sm btn-inscrire" data-id="${f.id}" data-titre="${f.titre}">S'inscrire</button>
+          ${f.nb_apercu > 0 ? `<a class="btn btn-outline btn-sm" href="suivre-formation.html?id=${f.id}&decouverte=1" title="Lire gratuitement quelques leçons avant de vous inscrire">🎁 Aperçu gratuit (${f.nb_apercu} leçon${f.nb_apercu > 1 ? 's' : ''})</a>` : ''}
           <button class="btn btn-outline btn-sm btn-favori-formation" data-id="${f.id}" title="Ajouter aux favoris">☆</button>
         </div>
       </div>
