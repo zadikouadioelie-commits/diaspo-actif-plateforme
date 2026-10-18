@@ -17357,7 +17357,8 @@ route("GET", "/api/mes-formations", async (req, res) => {
   const formations = await db.prepare(`
     SELECT f.*,
       (SELECT COUNT(*) FROM formation_inscriptions i WHERE i.formation_id=f.id AND i.statut='active') AS nb_inscrits,
-      (SELECT COALESCE(SUM(montant_paye),0) FROM formation_inscriptions i WHERE i.formation_id=f.id AND i.statut='active') AS revenu_brut
+      (SELECT COALESCE(SUM(montant_paye),0) FROM formation_inscriptions i WHERE i.formation_id=f.id AND i.statut='active') AS revenu_brut,
+      (SELECT COUNT(*) FROM formation_quiz_tentatives t JOIN formation_quiz q ON q.id=t.quiz_id WHERE q.formation_id=f.id AND t.statut='a_corriger') AS nb_a_corriger
     FROM formations f
     WHERE f.owner_user_id=?
     ORDER BY f.created_at DESC
@@ -17382,7 +17383,7 @@ route("GET", "/api/mes-formations/dashboard", async (req, res) => {
     nb_eleves: 0, nb_nouveaux_eleves_7j: 0, nb_formations_terminees: 0,
     taux_reussite_moyen: 0, taux_avancement_moyen: 0,
     revenu_total: 0, revenu_mois: 0, revenu_annee: 0,
-    nb_certificats: 0, nb_avis: 0, note_moyenne: 0
+    nb_certificats: 0, nb_avis: 0, note_moyenne: 0, nb_a_corriger: 0, nb_abandons: 0
   };
   if (ids.length) {
     const placeholders = ids.map(() => '?').join(',');
@@ -17403,7 +17404,11 @@ route("GET", "/api/mes-formations/dashboard", async (req, res) => {
     stats.revenu_mois = inscriptions.filter(i => (i.date_inscription||i.created_at) >= debutMois).reduce((s,i)=>s+(i.montant_paye||0), 0);
     stats.revenu_annee = inscriptions.filter(i => (i.date_inscription||i.created_at) >= debutAnnee).reduce((s,i)=>s+(i.montant_paye||0), 0);
 
-    stats.nb_certificats = (await db.prepare(`SELECT COUNT(*) AS n FROM user_certifications_obtenues WHERE formation_id IN (${placeholders})`).get(...ids))?.n || 0;
+    /* Documents réellement délivrés par la plateforme (attestations/certificats vérifiables) — l'ancien décompte comptait des mentions saisies par les membres eux-mêmes. */
+    stats.nb_certificats = (await db.prepare(`SELECT COUNT(*) AS n FROM formation_attestations WHERE formation_id IN (${placeholders}) AND COALESCE(statut,'valide')='valide'`).get(...ids))?.n || 0;
+    stats.nb_a_corriger = (await db.prepare(`SELECT COUNT(*) AS n FROM formation_quiz_tentatives t JOIN formation_quiz q ON q.id=t.quiz_id WHERE q.formation_id IN (${placeholders}) AND t.statut='a_corriger'`).get(...ids))?.n || 0;
+    const limiteAbandon = new Date(Date.now() - 21*24*3600*1000).toISOString().slice(0,19).replace('T',' ');
+    stats.nb_abandons = (await db.prepare(`SELECT COUNT(*) AS n FROM formation_inscriptions WHERE formation_id IN (${placeholders}) AND statut='active' AND COALESCE(paiement_statut,'paye')='paye' AND COALESCE(avancement_pct,0)<100 AND COALESCE(derniere_activite_le, date_inscription, created_at) < ?`).get(...ids, limiteAbandon))?.n || 0;
     const avis = await db.prepare(`SELECT note FROM formation_avis WHERE formation_id IN (${placeholders})`).all(...ids);
     stats.nb_avis = avis.length;
     stats.note_moyenne = avis.length ? Math.round((avis.reduce((s,a)=>s+a.note,0) / avis.length) * 10) / 10 : 0;
@@ -17443,15 +17448,23 @@ route("GET", "/api/formations/:id/suivi", async (req, res, params) => {
   const nonCommence = inscriptions.filter(i => (i.avancement_pct||0) === 0).length;
   const progressionMoyenne = inscriptions.length ? Math.round(inscriptions.reduce((s,i)=>s+(i.avancement_pct||0),0) / inscriptions.length) : 0;
   const tauxReussite = inscriptions.length ? Math.round((termine / inscriptions.length) * 100) : 0;
+  const analyse = await FormationParcours.analyseFormation(db, f);
+  const { eleves: _elevesAnalyse, ...analyseResume } = analyse;
   sendJSON(res, 200, {
     formation: f, nb_modules, nb_lecons,
     nb_inscrits: inscriptions.length, progression_moyenne: progressionMoyenne,
     termine, en_cours: enCours, non_commence: nonCommence, taux_reussite: tauxReussite,
-    eleves: inscriptions.map(i => ({
-      nom: i.eleve_nom, email: i.eleve_email, avancement_pct: i.avancement_pct,
-      derniere_activite: i.derniere_activite,
-      statut: (i.avancement_pct||0) >= 100 ? 'Terminée' : (i.avancement_pct||0) > 0 ? 'Active' : 'Non commencée'
-    }))
+    /* Lot 2 : analyse pédagogique (chapitres, quiz, documents délivrés, abandons apparents, travaux à corriger) — server/formation-parcours.js. */
+    analyse: analyseResume,
+    eleves: inscriptions.map(i => {
+      const x = analyse.eleves[Number(i.id)] || {};
+      return {
+        nom: i.eleve_nom, email: i.eleve_email, avancement_pct: i.avancement_pct,
+        derniere_activite: i.derniere_activite,
+        statut: (i.avancement_pct||0) >= 100 ? 'Terminée' : (i.avancement_pct||0) > 0 ? 'Active' : 'Non commencée',
+        inactif_jours: x.inactif_jours ?? null, abandon_apparent: !!x.abandon_apparent, attestation: x.attestation || null, attestation_statut: x.attestation_statut || null,
+      };
+    })
   });
 });
 

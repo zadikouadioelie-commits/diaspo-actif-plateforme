@@ -4685,6 +4685,10 @@ db.exec(`
 /* Lot 1 « Diaspo'Actif Formation » (2026-10-18) : leçons obligatoires/facultatives (SQLite déjà existant : la colonne est aussi dans le CREATE TABLE ci-dessus),
    tentatives de quiz corrigées côté serveur, et attestations délivrées par la plateforme (vérifiables publiquement par leur code). */
 try { db.exec('ALTER TABLE formation_lecons ADD COLUMN obligatoire INTEGER DEFAULT 1'); } catch(_) {}
+/* Lot 2 (2026-10-18) : correction manuelle d'un quiz par le formateur (statut a_corriger -> corrige) ; ALTER pour une base SQLite qui possède déjà la table du lot 1. */
+;["statut TEXT DEFAULT 'corrige'",'commentaire_formateur TEXT','corrige_par INTEGER','corrige_le TEXT'].forEach(col => {
+  try { db.exec(`ALTER TABLE formation_quiz_tentatives ADD COLUMN ${col}`); } catch(_) {}
+});
 db.exec(`
   CREATE TABLE IF NOT EXISTS formation_quiz_tentatives (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -4696,6 +4700,10 @@ db.exec(`
     reussi INTEGER DEFAULT 0,
     nb_non_notees INTEGER DEFAULT 0,
     reponses_json TEXT,
+    statut TEXT DEFAULT 'corrige',
+    commentaire_formateur TEXT,
+    corrige_par INTEGER,
+    corrige_le TEXT,
     created_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY(inscription_id) REFERENCES formation_inscriptions(id),
     FOREIGN KEY(quiz_id) REFERENCES formation_quiz(id)

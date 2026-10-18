@@ -998,6 +998,10 @@ const COLONNES_MIGRATION = [
     // Lot 1 « Diaspo'Actif Formation » (2026-10-18)
     ['formations', 'certificat_type', "TEXT DEFAULT 'suivi'"],
     ['formation_lecons', 'obligatoire', 'INTEGER DEFAULT 1'],
+    ['formation_quiz_tentatives', 'statut', "TEXT DEFAULT 'corrige'"],
+    ['formation_quiz_tentatives', 'commentaire_formateur', 'TEXT'],
+    ['formation_quiz_tentatives', 'corrige_par', 'INTEGER'],
+    ['formation_quiz_tentatives', 'corrige_le', 'TEXT'],
     ['formations', 'mode_acces', "TEXT DEFAULT 'gratuit'"],
     ['formations', 'commission_pct', 'REAL DEFAULT 0'],
     ['formations', 'telecharge_autorise', 'INTEGER DEFAULT 0'],

@@ -197,7 +197,7 @@ function sfRender(){
         const active = SF_CURRENT_LECON && SF_CURRENT_LECON.id === l.id;
         html += `<button type="button" class="sf-lecon ${l.termine ? 'termine':''} ${active?'active':''}" data-lecon-id="${l.id}" ${active ? 'aria-current="true"' : ''}>
           <span class="chk" aria-hidden="true">${l.termine ? '✓' : ''}</span>
-          <span>${l.quiz ? '📝 ' : ''}${escH(l.titre)}</span>
+          <span>${l.quiz ? (l.quiz.en_attente ? '⏳ ' : '📝 ') : ''}${escH(l.titre)}</span>
           ${l.obligatoire === false ? '<span class="sf-opt">facultative</span>' : ''}
         </button>`;
       });
@@ -350,12 +350,24 @@ function sfQuizRender(zone, l, d, resultat){
   const entete = `<p class="sf-quiz-meta">Seuil de réussite : <strong>${q.note_minimale}%</strong>${q.temps_limite_min ? ` · temps conseillé : ${q.temps_limite_min} min` : ''}
     ${d.tentatives && d.tentatives.nb ? ` · ${d.tentatives.nb} tentative${d.tentatives.nb > 1 ? 's' : ''}${d.tentatives.meilleure_note != null ? `, meilleure note : ${d.tentatives.meilleure_note}%` : ''}` : ''}</p>`;
   let verdict = '';
-  if (resultat) {
+  const manuel = !!q.correction_manuelle;
+  /* Verrouillé : en attente de correction, ou évaluation manuelle déjà validée (rien de plus à envoyer). */
+  const enAttente = !!(d.tentatives && d.tentatives.en_attente);
+  const verrouille = enAttente || (manuel && dejaReussi);
+  const der = d.tentatives && d.tentatives.derniere;
+  if (enAttente) {
+    verdict = '<div class="sf-q-result" style="background:#fffbeb;color:#92400e;" role="status">⏳ Votre travail a été envoyé : il est en attente de correction par le formateur. Vous serez prévenu(e) dès que le travail sera corrigé.</div>';
+  } else if (resultat) {
     verdict = resultat.reussi
       ? `<div class="sf-q-result ok" role="status">✅ Quiz réussi${resultat.note_pct != null ? ` — ${resultat.note_pct}%` : ''}. Cette activité est validée.${resultat.nb_non_notees ? ` (${resultat.nb_non_notees} réponse${resultat.nb_non_notees > 1 ? 's' : ''} libre${resultat.nb_non_notees > 1 ? 's' : ''} non notée${resultat.nb_non_notees > 1 ? 's' : ''})` : ''}</div>`
       : `<div class="sf-q-result ko" role="status">❌ ${resultat.note_pct}% — il faut au moins ${resultat.seuil}% pour réussir. Relisez le cours puis réessayez : les bonnes réponses seront affichées une fois le quiz réussi.</div>`;
   } else if (dejaReussi) {
-    verdict = '<div class="sf-q-result ok" role="status">✅ Vous avez déjà réussi ce quiz. Vous pouvez le repasser pour vous entraîner.</div>';
+    verdict = manuel ? '<div class="sf-q-result ok" role="status">✅ Cette évaluation est validée.</div>' : '<div class="sf-q-result ok" role="status">✅ Vous avez déjà réussi ce quiz. Vous pouvez le repasser pour vous entraîner.</div>';
+  } else if (der && der.statut === 'corrige' && manuel) {
+    verdict = `<div class="sf-q-result ko" role="status">📝 Dernière correction : ${der.note_pct != null ? der.note_pct + '%' : '—'} (seuil ${q.note_minimale}%). Vous pouvez améliorer votre travail et le renvoyer.</div>`;
+  }
+  if (der && der.statut === 'corrige' && der.commentaire && !enAttente) {
+    verdict += `<div class="sf-quiz-meta" style="background:#f8fafc;border-radius:10px;padding:10px 12px;"><strong>Commentaire du formateur :</strong> ${escH(der.commentaire)}</div>`;
   }
   const detail = {};
   if (resultat) (resultat.detail||[]).forEach(x => { detail[x.question_id] = x; });
@@ -363,7 +375,9 @@ function sfQuizRender(zone, l, d, resultat){
     const dt = detail[qu.id];
     const cls = dt && dt.note ? (dt.correct ? 'juste' : 'faux') : '';
     let champ;
-    if (qu.type === 'texte_libre' || !qu.options.length) {
+    if (manuel && (qu.type === 'texte_libre' || !qu.options.length)) {
+      champ = `<textarea name="q${qu.id}" rows="4" aria-label="Votre réponse" maxlength="5000" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:10px;font-family:inherit;" ${verrouille ? 'disabled' : ''}></textarea>`;
+    } else if (qu.type === 'texte_libre' || !qu.options.length) {
       champ = `<input type="text" name="q${qu.id}" aria-label="Votre réponse" maxlength="500" autocomplete="off"><div class="hint">Réponse courte.</div>`;
     } else {
       const type = qu.multiple ? 'checkbox' : 'radio';
@@ -374,16 +388,16 @@ function sfQuizRender(zone, l, d, resultat){
   }).join('');
   zone.innerHTML = `<div class="sf-quiz"><h3 style="margin:0 0 6px;">📝 ${escH(q.titre)}</h3>${entete}${verdict}${q.commentaires ? `<p class="sf-quiz-meta">${escH(q.commentaires)}</p>` : ''}
     <form id="sf-quiz-form" novalidate>${questions || '<div class="notice">Ce quiz ne contient pas encore de question.</div>'}
-    ${questions ? `<div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;"><button type="submit" class="btn" id="sf-quiz-submit">${resultat ? 'Valider une nouvelle tentative' : 'Valider mes réponses'}</button></div>` : ''}</form></div>`;
+    ${questions && !verrouille ? `<div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;"><button type="submit" class="btn" id="sf-quiz-submit">${manuel ? 'Envoyer mon travail au formateur' : (resultat ? 'Valider une nouvelle tentative' : 'Valider mes réponses')}</button></div>` : ''}</form></div>`;
   const form = document.getElementById('sf-quiz-form');
-  if (!form || !questions) return;
+  if (!form || !questions || verrouille) return;
   form.addEventListener('submit', async ev => {
     ev.preventDefault();
     const reponses = {};
     (d.questions||[]).forEach(qu => {
       const champs = form.querySelectorAll(`[name="q${qu.id}"]`);
       if (!champs.length) return;
-      if (champs[0].type === 'text') reponses[qu.id] = champs[0].value;
+      if (champs[0].type === 'text' || champs[0].tagName === 'TEXTAREA') reponses[qu.id] = champs[0].value;
       else if (champs[0].type === 'checkbox') reponses[qu.id] = [...champs].filter(c => c.checked).map(c => c.value);
       else { const c = [...champs].find(c => c.checked); reponses[qu.id] = c ? c.value : ''; }
     });
@@ -395,6 +409,12 @@ function sfQuizRender(zone, l, d, resultat){
       if (!r.ok) { alert(res.error || 'Impossible de corriger le quiz.'); btn.disabled = false; btn.textContent = 'Valider mes réponses'; return; }
       /* On rafraîchit les jauges, puis on réaffiche le quiz avec le corrigé (réussite) ou le score (échec). */
       await sfLoad(l.id);
+      if (res.en_attente_correction) {
+        const zoneA = document.getElementById('sf-quiz-zone');
+        const rr0 = await fetch(`/api/formations/${formationId}/quiz/${q.id}/passer`, { credentials: 'same-origin' });
+        if (zoneA && rr0.ok) { sfQuizRender(zoneA, flatLecons().find(x => Number(x.id) === Number(l.id)) || l, await rr0.json(), null); zoneA.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+        return;
+      }
       const nouvelle = flatLecons().find(x => Number(x.id) === Number(l.id));
       const zone2 = document.getElementById('sf-quiz-zone');
       if (zone2 && nouvelle) {

@@ -637,6 +637,10 @@
               </select>
               <input id="fb-quiz-note-min" type="number" min="0" max="100" class="input-field" placeholder="Note minimale (%)" value="50">
               <input id="fb-quiz-temps" type="number" min="0" class="input-field" placeholder="Temps limité (minutes, facultatif)">
+              <select id="fb-quiz-correction" class="input-field" style="grid-column:1/-1;">
+                <option value="auto">Correction automatique (choix multiples, vrai/faux, réponses courtes)</option>
+                <option value="manuelle">Correction manuelle par moi (devoir rédigé : j'attribue la note)</option>
+              </select>
               <select id="fb-quiz-lecon" class="input-field" style="grid-column:1/-1;"><option value="">Aucune leçon (évaluation indépendante, ex. examen final)</option></select>
             </div>
             <p style="font-size:12px;color:var(--muted);margin:8px 0 0;">💡 Pour qu'une leçon de type « Quiz » se valide par la réussite du quiz, rattachez le quiz à cette leçon. L'apprenant réussit le quiz s'il atteint la note minimale ; la correction se fait automatiquement.</p>
@@ -1659,6 +1663,7 @@
           <div class="tags" style="margin-top:10px;">
             <span class="tag">👥 ${f.nb_inscrits||0} inscrit(s)</span>
             <span class="tag">💰 ${(f.revenu_brut||0).toFixed(2)} € brut</span>
+            ${Number(f.nb_a_corriger) > 0 ? `<span class="tag" style="background:#fef3c7;color:#92400e;">📝 ${f.nb_a_corriger} à corriger</span>` : ''}
           </div>
           ${(f.statut==='refusee'||f.statut==='modifications_demandees') && f.motif_refus ? `<p style="margin:8px 0 0;font-size:12.5px;color:#dc2626;">Motif : ${f.motif_refus}</p>` : ''}
           ${f.date_suppression_prevue ? `<div class="notice" style="margin-top:8px;font-size:12.5px;">🗑️ Suppression programmée le <strong>${f.date_suppression_prevue.slice(0,10)}</strong>. <button type="button" class="mf-annuler-suppr" data-id="${f.id}" style="border:none;background:none;color:#ff6b00;text-decoration:underline;cursor:pointer;">Annuler</button></div>` : ''}
@@ -1736,7 +1741,7 @@
         [s.nb_eleves, 'Élèves'], [s.nb_nouveaux_eleves_7j, 'Nouveaux (7j)'], [s.nb_formations_terminees, 'Formations terminées'],
         [s.taux_reussite_moyen+'%', 'Taux de réussite moyen'], [s.taux_avancement_moyen+'%', "Taux d'avancement moyen"],
         [(s.revenu_total||0).toFixed(2)+' €', "Chiffre d'affaires"], [(s.revenu_mois||0).toFixed(2)+' €', 'Revenus du mois'], [(s.revenu_annee||0).toFixed(2)+' €', 'Revenus annuels'],
-        [s.nb_certificats, 'Certificats délivrés'], [s.nb_avis, 'Avis laissés'], [s.note_moyenne ? s.note_moyenne+'/5' : '—', 'Note moyenne'],
+        [s.nb_certificats, 'Documents délivrés'], [s.nb_a_corriger||0, '📝 Travaux à corriger'], [s.nb_abandons||0, 'Abandons apparents (21 j)'], [s.nb_avis, 'Avis laissés'], [s.note_moyenne ? s.note_moyenne+'/5' : '—', 'Note moyenne'],
       ];
       el.innerHTML = cards.map(([num,lbl]) => `<div class="fb-dash-card"><div class="fb-dash-num">${num}</div><div class="fb-dash-lbl">${lbl}</div></div>`).join('');
     } catch(e){ el.innerHTML = '<div class="notice">Erreur de chargement du tableau de bord.</div>'; }
@@ -1749,37 +1754,95 @@
     el.innerHTML = '<div class="notice">Chargement…</div>';
     try {
       const d = await api('GET', `/formations/${id}/suivi`);
+      const a = d.analyse || { chapitres: [], quiz: [], attestations: { total: 0, par_type: {} }, abandons: 0, a_corriger: 0, jours_abandon: 21 };
+      const carte = (n, l, alerte) => `<div class="fb-dash-card"${alerte ? ' style="border-color:#f59e0b;background:#fffbeb;"' : ''}><div class="fb-dash-num">${n}</div><div class="fb-dash-lbl">${l}</div></div>`;
+      const barre = p => `<div style="height:8px;background:#e2e8f0;border-radius:99px;overflow:hidden;min-width:90px;"><div style="height:100%;width:${p}%;background:${p>=100?'#22c55e':'var(--orange,#ff6b00)'};"></div></div>`;
+      const docLbl = { participation: 'Attestation de participation', suivi: 'Attestation de suivi', reussite: 'Certificat de réussite' };
+      const parType = a.attestations.par_type || {};
       el.innerHTML = `
         <div class="tags" style="margin-bottom:14px;">
           <span class="tag">${FB_STATUT_LBL[d.formation.statut]||d.formation.statut}</span>
           <span class="tag">${d.formation.gratuit ? 'Gratuit' : (d.formation.prix||0)+' '+(d.formation.devise||'EUR')}</span>
           <span class="tag">🧩 ${d.nb_modules} module(s)</span>
           <span class="tag">📖 ${d.nb_lecons} leçon(s)</span>
+          ${d.formation.certificat_actif ? `<span class="tag">🎓 ${escQ(docLbl[d.formation.certificat_type] || docLbl.suivi)}</span>` : ''}
         </div>
         <div class="fb-dash-grid" style="margin-bottom:18px;">
-          <div class="fb-dash-card"><div class="fb-dash-num">${d.nb_inscrits}</div><div class="fb-dash-lbl">Élèves inscrits</div></div>
-          <div class="fb-dash-card"><div class="fb-dash-num">${d.progression_moyenne}%</div><div class="fb-dash-lbl">Progression moyenne</div></div>
-          <div class="fb-dash-card"><div class="fb-dash-num">${d.termine}</div><div class="fb-dash-lbl">Formation terminée</div></div>
-          <div class="fb-dash-card"><div class="fb-dash-num">${d.en_cours}</div><div class="fb-dash-lbl">Formation en cours</div></div>
-          <div class="fb-dash-card"><div class="fb-dash-num">${d.non_commence}</div><div class="fb-dash-lbl">Non commencée</div></div>
-          <div class="fb-dash-card"><div class="fb-dash-num">${d.taux_reussite}%</div><div class="fb-dash-lbl">Taux de réussite</div></div>
+          ${carte(d.nb_inscrits, 'Élèves inscrits')}
+          ${carte(d.progression_moyenne + '%', 'Progression moyenne')}
+          ${carte(d.termine, 'Formation terminée')}
+          ${carte(d.en_cours, 'Formation en cours')}
+          ${carte(d.non_commence, 'Non commencée')}
+          ${carte(d.taux_reussite + '%', 'Taux de complétion')}
+          ${carte(a.attestations.total, 'Documents délivrés')}
+          ${carte(a.abandons, `Abandons apparents (${a.jours_abandon} j)`, a.abandons > 0)}
+          ${carte(a.a_corriger, 'Travaux à corriger', a.a_corriger > 0)}
         </div>
+        ${a.attestations.total ? `<p style="font-size:12.5px;color:var(--muted);margin:-6px 0 16px;">Dont : ${Object.keys(docLbl).filter(k => parType[k]).map(k => `${parType[k]} ${docLbl[k].toLowerCase()}`).join(' · ') || '—'}${a.attestations.revoquees ? ` · ${a.attestations.revoquees} révoqué(s)` : ''}</p>` : ''}
+
+        <div id="suivi-a-corriger"></div>
+
+        <h3 style="margin:0 0 10px;">Avancement par chapitre</h3>
+        ${a.chapitres.length ? `<table class="fb-eleve-table" style="margin-bottom:20px;"><thead><tr><th>Chapitre</th><th>Activités obligatoires</th><th>Élèves l'ayant terminé</th><th style="width:30%;"></th></tr></thead><tbody>
+          ${a.chapitres.map(c => `<tr><td>${escQ(c.titre)}<div style="font-size:11px;color:var(--muted);">${escQ(c.module)}</div></td><td>${c.nb_activites}</td><td>${c.nb_termine}/${d.nb_inscrits} (${c.pct_completion}%)</td><td>${barre(c.pct_completion)}</td></tr>`).join('')}
+        </tbody></table>` : '<div class="notice" style="margin-bottom:20px;">Aucun chapitre.</div>'}
+
+        ${a.quiz.length ? `<h3 style="margin:0 0 10px;">Évaluations</h3>
+        <table class="fb-eleve-table" style="margin-bottom:20px;"><thead><tr><th>Quiz</th><th>Correction</th><th>Tentatives</th><th>Taux de réussite</th><th>Note moyenne</th><th>À corriger</th></tr></thead><tbody>
+          ${a.quiz.map(q => `<tr><td>${escQ(q.titre)}<div style="font-size:11px;color:var(--muted);">seuil ${q.seuil}%</div></td><td>${q.correction_manuelle ? 'Manuelle' : 'Automatique'}</td><td>${q.nb_tentatives} (${q.nb_apprenants} élève${q.nb_apprenants>1?'s':''})</td><td>${q.nb_apprenants ? q.taux_reussite + '%' : '—'}</td><td>${q.note_moyenne != null ? q.note_moyenne + '%' : '—'}</td><td>${q.a_corriger || '—'}</td></tr>`).join('')}
+        </tbody></table>` : ''}
+
         <h3 style="margin:0 0 10px;">Progression détaillée des élèves</h3>
         ${d.eleves.length ? `
         <table class="fb-eleve-table">
-          <thead><tr><th>Élève</th><th>Progression</th><th>Dernière activité</th><th>Statut</th></tr></thead>
+          <thead><tr><th>Élève</th><th>Progression</th><th>Dernière activité</th><th>Statut</th><th>Document</th></tr></thead>
           <tbody>
             ${d.eleves.map(e => `
               <tr>
-                <td>${e.nom}</td>
+                <td>${escQ(e.nom)}</td>
                 <td>${e.avancement_pct||0}%</td>
-                <td>${(e.derniere_activite||'').slice(0,10)}</td>
+                <td>${escQ((e.derniere_activite||'').slice(0,10))}${e.abandon_apparent ? `<div style="font-size:11px;color:#b45309;">⚠ inactif depuis ${e.inactif_jours} j</div>` : ''}</td>
                 <td><span class="fb-statut-pill ${e.statut==='Terminée'?'terminee':e.statut==='Active'?'active':'non-commencee'}">${e.statut}</span></td>
+                <td>${e.attestation ? `🎓 ${escQ(docLbl[e.attestation] || '')}${e.attestation_statut && e.attestation_statut !== 'valide' ? ' (révoqué)' : ''}` : '—'}</td>
               </tr>`).join('')}
           </tbody>
         </table>` : '<div class="notice">Aucun élève inscrit pour le moment.</div>'}
       `;
+      if (a.a_corriger > 0) fbChargerACorriger(id, titre);
     } catch(e){ el.innerHTML = '<div class="notice">Erreur de chargement du suivi.</div>'; }
+  }
+
+  /* Travaux à corriger : réponses de l'apprenant en regard des questions, note + commentaire ; la correction valide (ou non) l'activité et peut délivrer le document. */
+  async function fbChargerACorriger(formationId, titre){
+    const zone = document.getElementById('suivi-a-corriger');
+    if (!zone) return;
+    try {
+      const { travaux } = await api('GET', `/formations/${formationId}/a-corriger`);
+      if (!travaux.length) { zone.innerHTML = ''; return; }
+      zone.innerHTML = `<h3 style="margin:0 0 10px;">📝 Travaux à corriger (${travaux.length})</h3>` + travaux.map(t => `
+        <div class="card" style="margin-bottom:14px;border-left:4px solid #f59e0b;" data-travail="${t.id}">
+          <div class="flex-between" style="gap:8px;flex-wrap:wrap;"><strong>${escQ(t.apprenant)} — ${escQ(t.quiz_titre)}</strong><span style="font-size:12px;color:var(--muted);">rendu le ${escQ((t.soumis_le||'').slice(0,10))} · seuil ${t.seuil}%</span></div>
+          ${t.reponses.map((r, i) => `<div style="margin-top:10px;font-size:13px;"><div style="font-weight:700;">${i+1}. ${escQ(r.question)} <span style="font-weight:400;color:var(--muted);">(${r.points} pt${r.points>1?'s':''})</span></div>
+            <div style="white-space:pre-wrap;background:rgba(127,127,127,.14);border:1px solid rgba(127,127,127,.35);color:inherit;border-radius:8px;padding:8px 10px;margin-top:4px;">${escQ(Array.isArray(r.reponse) ? r.reponse.join(', ') : r.reponse) || '<em style="color:var(--muted);">Pas de réponse</em>'}</div>
+            ${r.attendue ? `<div style="font-size:11.5px;color:var(--muted);margin-top:3px;">Réponse attendue : ${escQ(r.attendue)}</div>` : ''}</div>`).join('')}
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start;margin-top:12px;">
+            <input type="number" min="0" max="100" step="1" class="input-field fb-corr-note" placeholder="Note (%)" style="width:110px;" aria-label="Note sur 100">
+            <textarea class="fb-corr-com" rows="2" placeholder="Commentaire pour l'apprenant (facultatif)" style="flex:1;min-width:200px;border-radius:10px;border:1px solid var(--border);padding:8px;font-family:inherit;"></textarea>
+            <button class="btn btn-sm btn-orange fb-corr-save" data-id="${t.id}">Enregistrer la correction</button>
+          </div>
+        </div>`).join('');
+      zone.querySelectorAll('.fb-corr-save').forEach(btn => btn.addEventListener('click', async () => {
+        const carteT = btn.closest('[data-travail]');
+        const note = carteT.querySelector('.fb-corr-note').value;
+        if (note === '' || Number(note) < 0 || Number(note) > 100) { showMsg('Indiquez une note entre 0 et 100.', 'danger'); return; }
+        try {
+          const r = await api('POST', `/formations/${formationId}/tentatives/${btn.dataset.id}/corriger`, { note_pct: Number(note), commentaire: carteT.querySelector('.fb-corr-com').value.trim() });
+          showMsg(r.reussi ? 'Correction enregistrée : activité validée.' + (r.attestation ? ' Le document a été délivré à l\'apprenant.' : '') : 'Correction enregistrée : sous le seuil, l\'apprenant pourra repasser.', 'success');
+          openSuiviFormation(formationId, titre);
+          loadDashboardCentreCommande();
+        } catch (e) { showMsg(e.message || 'Erreur.', 'danger'); }
+      }));
+    } catch (e) { zone.innerHTML = ''; }
   }
   document.getElementById('modal-suivi-close').addEventListener('click', ()=>{ document.getElementById('modal-suivi').style.display = 'none'; });
 
@@ -2212,7 +2275,7 @@
             <strong>${escQ(q.titre)}</strong>
             <button class="btn btn-sm btn-outline fb-del-quiz" data-id="${q.id}">🗑️</button>
           </div>
-          <p style="font-size:12.5px;color:var(--muted);margin:6px 0;">Seuil de réussite : ${q.note_minimale}% ${q.temps_limite_min?`· ${q.temps_limite_min} min`:''} · ${lecon ? `rattaché à la leçon « ${escQ(lecon.titre)} »` : 'évaluation indépendante'}</p>
+          <p style="font-size:12.5px;color:var(--muted);margin:6px 0;">Seuil de réussite : ${q.note_minimale}% ${q.temps_limite_min?`· ${q.temps_limite_min} min`:''} · ${Number(q.correction_auto)===0 ? 'correction manuelle' : 'correction automatique'} · ${lecon ? `rattaché à la leçon « ${escQ(lecon.titre)} »` : 'évaluation indépendante'}</p>
           <div id="fb-quiz-q-${q.id}">
             ${q.questions.map(qu=>`<div class="fb-q-row"><div style="flex:1;">❓ ${escQ(qu.question)}<span class="fb-q-meta">${FB_Q_TYPES[qu.type]||qu.type} · ${qu.points||1} pt${(qu.points||1)>1?'s':''} · ${qu.reponse_correcte ? 'Réponse : ' + escQ(String(qu.reponse_correcte).split('|').join(' / ')) : 'non notée'}</span></div><button class="btn btn-sm btn-outline fb-del-question" data-quiz="${q.id}" data-id="${qu.id}">✕</button></div>`).join('') || '<div class="notice" style="padding:10px;">Aucune question pour l\'instant.</div>'}
           </div>
@@ -2285,6 +2348,7 @@
         titre, type: document.getElementById('fb-quiz-type').value,
         note_minimale: parseInt(document.getElementById('fb-quiz-note-min').value)||50,
         temps_limite_min: parseInt(document.getElementById('fb-quiz-temps').value)||null,
+        correction_auto: document.getElementById('fb-quiz-correction').value !== 'manuelle',
         lecon_id: document.getElementById('fb-quiz-lecon').value ? parseInt(document.getElementById('fb-quiz-lecon').value) : null
       });
       document.getElementById('fb-quiz-titre').value = '';

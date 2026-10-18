@@ -59,16 +59,18 @@ function corriger(q, reponse) {
 /* ── Parcours d'un apprenant ── */
 async function construireParcours(db, f, inscription) {
   const modules = await db.prepare("SELECT * FROM formation_modules WHERE formation_id=? ORDER BY ordre ASC, id ASC").all(f.id);
-  const quizRows = await db.prepare("SELECT id, lecon_id, titre, type, note_minimale FROM formation_quiz WHERE formation_id=? ORDER BY ordre ASC, id ASC").all(f.id);
+  const quizRows = await db.prepare("SELECT id, lecon_id, titre, type, note_minimale, correction_auto FROM formation_quiz WHERE formation_id=? ORDER BY ordre ASC, id ASC").all(f.id);
   const termines = new Set();
   const tentativesParQuiz = {};
   if (inscription) {
     (await db.prepare("SELECT lecon_id FROM formation_lecons_progression WHERE inscription_id=? AND termine=1").all(inscription.id))
       .forEach(p => termines.add(Number(p.lecon_id)));
-    (await db.prepare("SELECT quiz_id, note_pct, reussi FROM formation_quiz_tentatives WHERE inscription_id=?").all(inscription.id)).forEach(t => {
+    (await db.prepare("SELECT quiz_id, note_pct, reussi, statut FROM formation_quiz_tentatives WHERE inscription_id=?").all(inscription.id)).forEach(t => {
       const k = Number(t.quiz_id);
-      const e = tentativesParQuiz[k] || (tentativesParQuiz[k] = { nb: 0, meilleure: null, reussi: false });
+      const e = tentativesParQuiz[k] || (tentativesParQuiz[k] = { nb: 0, meilleure: null, reussi: false, en_attente: false });
       e.nb++;
+      /* Tentative en attente de correction par le formateur : ni réussie ni ratée tant qu'elle n'est pas corrigée. */
+      if (t.statut === "a_corriger") { e.en_attente = true; return; }
       if (t.note_pct != null && (e.meilleure == null || Number(t.note_pct) > e.meilleure)) e.meilleure = Number(t.note_pct);
       if (Number(t.reussi) === 1) e.reussi = true;
     });
@@ -86,8 +88,8 @@ async function construireParcours(db, f, inscription) {
         l.obligatoire = l.obligatoire == null ? true : Number(l.obligatoire) !== 0;
         const q = quizParLecon[Number(l.id)];
         if (q) {
-          const t = tentativesParQuiz[Number(q.id)] || { nb: 0, meilleure: null, reussi: false };
-          l.quiz = { id: Number(q.id), titre: q.titre, type: q.type, note_minimale: nombre(q.note_minimale), nb_tentatives: t.nb, meilleure_note: t.meilleure, reussi: t.reussi };
+          const t = tentativesParQuiz[Number(q.id)] || { nb: 0, meilleure: null, reussi: false, en_attente: false };
+          l.quiz = { id: Number(q.id), titre: q.titre, type: q.type, note_minimale: nombre(q.note_minimale), correction_manuelle: Number(q.correction_auto) === 0, nb_tentatives: t.nb, meilleure_note: t.meilleure, reussi: t.reussi, en_attente: !!t.en_attente && !t.reussi };
         }
         toutes.push(l);
       });
@@ -113,6 +115,7 @@ async function construireParcours(db, f, inscription) {
   let statut = "non_commence";
   if (!inscription) statut = "apercu";
   else if (avancement_pct >= 100) statut = (ev.reussite_requise && !ev.evaluations_ok) ? "en_attente_evaluation" : "termine";
+  else if (toutes.some(l => l.obligatoire && !l.termine && l.quiz && l.quiz.en_attente) && toutes.filter(l => l.obligatoire && !l.termine).every(l => l.quiz && l.quiz.en_attente)) statut = "en_attente_evaluation";
   else if (nbTermine > 0 || Object.keys(tentativesParQuiz).length || toutes.some(l => l.termine)) statut = "en_cours";
 
   const suivante = toutes.find(l => l.obligatoire && !l.termine) || toutes.find(l => !l.termine) || null;
@@ -200,7 +203,125 @@ function vueAttestation(a) {
   };
 }
 
-module.exports = { TYPES, AVERTISSEMENT, typeValide, corriger, construireParcours, evaluerAttestation, vueAttestation, nomPublic };
+/* ── Lot 2 : analyse pédagogique d'une formation (tableau de bord formateur) ── */
+const JOURS_ABANDON = 21;
+const jours = (iso) => {
+  if (!iso) return null;
+  const t = String(iso);
+  const d = new Date(t.replace(" ", "T") + (t.length <= 19 && !/Z|\+/.test(t) ? "Z" : ""));
+  return isNaN(d) ? null : Math.floor((Date.now() - d.getTime()) / 86400000);
+};
+const pct = (a, b) => (b ? Math.round((a / b) * 100) : 0);
+
+/* Par chapitre : part des apprenants qui ont terminé toutes ses activités obligatoires ; par quiz : tentatives, taux de réussite, note moyenne ;
+   par apprenant : statut, jours d'inactivité, « abandon apparent » (non terminé et sans activité depuis JOURS_ABANDON jours) ; documents délivrés ; travaux à corriger. */
+async function analyseFormation(db, f) {
+  const inscriptions = await db.prepare("SELECT * FROM formation_inscriptions WHERE formation_id=? AND statut='active' AND COALESCE(paiement_statut,'paye')='paye'").all(f.id);
+  const modules = await db.prepare("SELECT id, titre FROM formation_modules WHERE formation_id=? ORDER BY ordre ASC, id ASC").all(f.id);
+  const toutes = [];
+  const chapitres = [];
+  for (const m of modules) {
+    for (const c of await db.prepare("SELECT id, titre FROM formation_chapitres WHERE module_id=? ORDER BY ordre ASC, id ASC").all(m.id)) {
+      const lecons = (await db.prepare("SELECT id, type, obligatoire FROM formation_lecons WHERE chapitre_id=? ORDER BY ordre ASC, id ASC").all(c.id))
+        .map(l => ({ id: Number(l.id), type: l.type, obligatoire: l.obligatoire == null ? true : Number(l.obligatoire) !== 0 }));
+      lecons.forEach(l => toutes.push(l));
+      chapitres.push({ id: Number(c.id), titre: c.titre, module: m.titre, lecons });
+    }
+  }
+  const nbOblig = toutes.filter(l => l.obligatoire).length;
+  const compte = l => (nbOblig ? l.obligatoire : true);
+  const ids = inscriptions.map(i => Number(i.id));
+  const termines = {};   // inscription_id -> Set(lecon_id)
+  const derniereDate = {}; // inscription_id -> dernière date de validation
+  if (ids.length) {
+    const marques = ids.map(() => "?").join(",");
+    for (const r of await db.prepare(`SELECT inscription_id, lecon_id, date_completion FROM formation_lecons_progression WHERE termine=1 AND inscription_id IN (${marques})`).all(...ids)) {
+      const k = Number(r.inscription_id);
+      (termines[k] || (termines[k] = new Set())).add(Number(r.lecon_id));
+      if (r.date_completion && (!derniereDate[k] || r.date_completion > derniereDate[k])) derniereDate[k] = r.date_completion;
+    }
+  }
+  const chapitresStats = chapitres.map(c => {
+    const req = c.lecons.filter(compte);
+    const nbOk = req.length ? inscriptions.filter(i => req.every(l => (termines[Number(i.id)] || new Set()).has(l.id))).length : 0;
+    return { id: c.id, titre: c.titre, module: c.module, nb_activites: req.length, nb_termine: nbOk, pct_completion: pct(nbOk, inscriptions.length) };
+  });
+
+  const quizRows = await db.prepare("SELECT id, titre, type, note_minimale, correction_auto FROM formation_quiz WHERE formation_id=? ORDER BY ordre ASC, id ASC").all(f.id);
+  const tent = ids.length ? await db.prepare(`SELECT inscription_id, quiz_id, note_pct, reussi, statut FROM formation_quiz_tentatives WHERE inscription_id IN (${ids.map(() => "?").join(",")})`).all(...ids) : [];
+  const quiz = quizRows.map(q => {
+    const lignes = tent.filter(t => Number(t.quiz_id) === Number(q.id));
+    const parAppr = {};
+    lignes.forEach(t => { const e = parAppr[t.inscription_id] || (parAppr[t.inscription_id] = { meilleure: null, reussi: false, corrigee: false }); if (t.statut === "a_corriger") return; e.corrigee = true; if (t.note_pct != null && (e.meilleure == null || Number(t.note_pct) > e.meilleure)) e.meilleure = Number(t.note_pct); if (Number(t.reussi) === 1) e.reussi = true; });
+    const corriges = Object.values(parAppr).filter(e => e.corrigee);
+    const notes = corriges.map(e => e.meilleure).filter(v => v != null);
+    return {
+      id: Number(q.id), titre: q.titre, type: q.type, seuil: nombre(q.note_minimale), correction_manuelle: Number(q.correction_auto) === 0,
+      nb_apprenants: corriges.length, nb_tentatives: lignes.length, taux_reussite: pct(corriges.filter(e => e.reussi).length, corriges.length),
+      note_moyenne: notes.length ? Math.round(notes.reduce((a, b) => a + b, 0) / notes.length) : null,
+      a_corriger: lignes.filter(t => t.statut === "a_corriger").length,
+    };
+  });
+  const a_corriger = quiz.reduce((a, q) => a + q.a_corriger, 0);
+
+  const atts = await db.prepare("SELECT type, statut, inscription_id FROM formation_attestations WHERE formation_id=?").all(f.id);
+  const attParInsc = {};
+  atts.forEach(a => { attParInsc[Number(a.inscription_id)] = a; });
+  const par_type = { participation: 0, suivi: 0, reussite: 0 };
+  atts.filter(a => (a.statut || "valide") === "valide").forEach(a => { par_type[typeValide(a.type)]++; });
+
+  let abandons = 0;
+  const eleves = {};
+  for (const i of inscriptions) {
+    const k = Number(i.id);
+    const set = termines[k] || new Set();
+    const req = toutes.filter(compte);
+    const ok = req.filter(l => set.has(l.id)).length;
+    const avancement = req.length ? Math.round((ok / req.length) * 100) : 0;
+    const derniere = derniereDate[k] || i.derniere_activite_le || i.date_inscription || i.created_at;
+    const inactif = jours(derniere);
+    const termine = avancement >= 100;
+    const abandon = !termine && inactif != null && inactif >= JOURS_ABANDON;
+    if (abandon) abandons++;
+    eleves[k] = { avancement_pct: avancement, inactif_jours: inactif, abandon_apparent: abandon, attestation: attParInsc[k] ? typeValide(attParInsc[k].type) : null, attestation_statut: attParInsc[k] ? (attParInsc[k].statut || "valide") : null };
+  }
+  return { jours_abandon: JOURS_ABANDON, nb_inscrits: inscriptions.length, abandons, a_corriger, chapitres: chapitresStats, quiz, attestations: { total: atts.filter(a => (a.statut || "valide") === "valide").length, revoquees: atts.filter(a => (a.statut || "valide") !== "valide").length, par_type }, eleves };
+}
+
+/* Vue d'ensemble pour l'administration Diaspo'Actif. */
+async function statistiquesAdmin(db) {
+  const formations = await db.prepare(`SELECT f.id, f.titre, f.statut, f.mode_acces, f.prix, f.gratuit, f.owner_user_id,
+    (SELECT COUNT(*) FROM formation_inscriptions i WHERE i.formation_id=f.id AND i.statut='active' AND COALESCE(i.paiement_statut,'paye')='paye') AS nb_inscrits,
+    (SELECT COUNT(*) FROM formation_inscriptions i WHERE i.formation_id=f.id AND i.statut='active' AND COALESCE(i.paiement_statut,'paye')='paye' AND i.avancement_pct>=100) AS nb_termines,
+    (SELECT COALESCE(SUM(i.montant_paye),0) FROM formation_inscriptions i WHERE i.formation_id=f.id AND i.statut='active' AND COALESCE(i.paiement_statut,'paye')='paye') AS revenu
+    FROM formations f`).all();
+  const num = v => nombre(v);
+  const parStatut = {};
+  formations.forEach(f => { const k = f.statut || "brouillon"; parStatut[k] = (parStatut[k] || 0) + 1; });
+  const publiees = formations.filter(f => f.statut === "publiee");
+  const inscrits = formations.reduce((a, f) => a + num(f.nb_inscrits), 0);
+  const termines = formations.reduce((a, f) => a + num(f.nb_termines), 0);
+  const gratuites = publiees.filter(f => Number(f.gratuit) === 1 || f.mode_acces === "gratuit").length;
+  const atts = await db.prepare("SELECT type, statut FROM formation_attestations").all();
+  const par_type = { participation: 0, suivi: 0, reussite: 0 };
+  atts.filter(a => (a.statut || "valide") === "valide").forEach(a => { par_type[typeValide(a.type)]++; });
+  const aCorriger = (await db.prepare("SELECT COUNT(*) AS n FROM formation_quiz_tentatives WHERE statut='a_corriger'").get() || {}).n;
+  const tentatives = (await db.prepare("SELECT COUNT(*) AS n FROM formation_quiz_tentatives").get() || {}).n;
+  const recentes = await db.prepare("SELECT code, type, statut, formation_titre, apprenant_nom, date_emission, organisme FROM formation_attestations ORDER BY date_emission DESC, id DESC LIMIT 25").all();
+  const top = formations.filter(f => num(f.nb_inscrits) > 0).sort((a, b) => num(b.nb_inscrits) - num(a.nb_inscrits)).slice(0, 10)
+    .map(f => ({ id: Number(f.id), titre: f.titre, statut: f.statut, nb_inscrits: num(f.nb_inscrits), taux_completion: pct(num(f.nb_termines), num(f.nb_inscrits)), revenu: Math.round(num(f.revenu) * 100) / 100, gratuite: Number(f.gratuit) === 1 || f.mode_acces === "gratuit" }));
+  return {
+    formations: { total: formations.length, par_statut: parStatut, publiees: publiees.length, publiees_gratuites: gratuites, publiees_payantes: publiees.length - gratuites },
+    inscriptions: { total: inscrits, terminees: termines, taux_completion: pct(termines, inscrits) },
+    revenu_total: Math.round(formations.reduce((a, f) => a + num(f.revenu), 0) * 100) / 100,
+    documents: { total: par_type.participation + par_type.suivi + par_type.reussite, par_type, revoques: atts.filter(a => (a.statut || "valide") !== "valide").length },
+    evaluations: { tentatives: num(tentatives), a_corriger: num(aCorriger) },
+    top_formations: top,
+    documents_recents: recentes.map(a => ({ code: a.code, type: typeValide(a.type), type_label: TYPES[typeValide(a.type)].label, statut: a.statut || "valide", formation_titre: a.formation_titre, organisme: a.organisme, beneficiaire: nomPublic(a.apprenant_nom), date_emission: a.date_emission })),
+  };
+}
+
+module.exports = { TYPES, AVERTISSEMENT, typeValide, corriger, construireParcours, evaluerAttestation, vueAttestation, nomPublic, analyseFormation, statistiquesAdmin };
 
 module.exports.register = function register(deps) {
   const { route, db, sendJSON, getCurrentUser, SEC, checkFormationOwner } = deps;
@@ -222,9 +343,11 @@ module.exports.register = function register(deps) {
       return { id: Number(q.id), question: q.question, type: q.type, options: q.type === "vrai_faux" && !options.length ? ["Vrai", "Faux"] : options, points: nombre(q.points) || 1, multiple: q.type === "qcm" && options.length > 0 && attenduesDe(q).length > 1 };
     });
     const t = await db.prepare("SELECT COUNT(*) AS n, MAX(note_pct) AS meilleure, MAX(reussi) AS reussi FROM formation_quiz_tentatives WHERE inscription_id=? AND quiz_id=?").get(inscription.id, quiz.id);
+    const derniere = await db.prepare("SELECT statut, note_pct, reussi, commentaire_formateur, corrige_le FROM formation_quiz_tentatives WHERE inscription_id=? AND quiz_id=? ORDER BY id DESC LIMIT 1").get(inscription.id, quiz.id);
     sendJSON(res, 200, {
-      quiz: { id: Number(quiz.id), titre: quiz.titre, type: quiz.type, note_minimale: nombre(quiz.note_minimale), temps_limite_min: quiz.temps_limite_min || null, commentaires: quiz.commentaires_personnalises || null },
-      questions, tentatives: { nb: nombre(t && t.n), meilleure_note: t && t.meilleure != null ? Number(t.meilleure) : null, reussi: !!(t && Number(t.reussi) === 1) },
+      quiz: { id: Number(quiz.id), titre: quiz.titre, type: quiz.type, note_minimale: nombre(quiz.note_minimale), temps_limite_min: quiz.temps_limite_min || null, commentaires: quiz.commentaires_personnalises || null, correction_manuelle: Number(quiz.correction_auto) === 0 },
+      questions, tentatives: { nb: nombre(t && t.n), meilleure_note: t && t.meilleure != null ? Number(t.meilleure) : null, reussi: !!(t && Number(t.reussi) === 1), en_attente: !!(derniere && derniere.statut === "a_corriger"),
+        derniere: derniere ? { statut: derniere.statut || "corrige", note_pct: derniere.note_pct != null ? Number(derniere.note_pct) : null, reussi: Number(derniere.reussi) === 1, commentaire: derniere.commentaire_formateur || null } : null },
     });
   });
 
@@ -241,6 +364,26 @@ module.exports.register = function register(deps) {
     const reponses = body && typeof body.reponses === "object" && body.reponses ? body.reponses : {};
     const questions = await db.prepare("SELECT * FROM formation_quiz_questions WHERE quiz_id=? ORDER BY ordre ASC, id ASC").all(quiz.id);
     if (!questions.length) return sendJSON(res, 400, { error: "Ce quiz ne contient pas encore de question." });
+
+    /* Quiz à CORRECTION MANUELLE (formation_quiz.correction_auto = 0) : les réponses sont enregistrées, l'activité n'est validée qu'après la note du formateur. */
+    if (Number(quiz.correction_auto) === 0) {
+      const dejaAttente = await db.prepare("SELECT id FROM formation_quiz_tentatives WHERE inscription_id=? AND quiz_id=? AND statut='a_corriger'").get(inscription.id, quiz.id);
+      if (dejaAttente) return sendJSON(res, 409, { error: "Votre précédente tentative est en attente de correction par le formateur.", code: "deja_en_attente" });
+      const dejaReussi = await db.prepare("SELECT id FROM formation_quiz_tentatives WHERE inscription_id=? AND quiz_id=? AND reussi=1").get(inscription.id, quiz.id);
+      if (dejaReussi) return sendJSON(res, 409, { error: "Vous avez déjà réussi cette évaluation.", code: "deja_reussi" });
+      const propres = {};
+      questions.forEach(q => { const d = reponses[String(q.id)]; propres[q.id] = Array.isArray(d) ? d.slice(0, 20).map(x => String(x).slice(0, 2000)) : String(d == null ? "" : d).slice(0, 5000); });
+      const ptsTotal = questions.reduce((a, q) => a + (nombre(q.points) || 1), 0);
+      await db.prepare(`INSERT INTO formation_quiz_tentatives (inscription_id, quiz_id, note_pct, points_obtenus, points_total, reussi, nb_non_notees, reponses_json, statut)
+        VALUES (?,?,?,?,?,?,?,?,?)`).run(inscription.id, quiz.id, null, 0, ptsTotal, 0, questions.length, JSON.stringify(propres).slice(0, 60000), "a_corriger");
+      const fm = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
+      if (fm && typeof deps.creerNotif === "function" && fm.owner_user_id) {
+        deps.creerNotif(fm.owner_user_id, "formation", "📝 Un travail est à corriger", `Un apprenant a rendu « ${quiz.titre} » dans la formation « ${fm.titre} ».`, { formation_id: Number(fm.id), quiz_id: Number(quiz.id) });
+      }
+      await db.prepare("UPDATE formation_inscriptions SET derniere_activite_le=datetime('now'), relance_inactivite_le=NULL WHERE id=?").run(inscription.id);
+      const pm = await construireParcours(db, fm, inscription);
+      return sendJSON(res, 200, { ok: true, en_attente_correction: true, avancement_pct: pm.avancement_pct, statut: pm.statut, attestation: null });
+    }
 
     let total = 0, obtenus = 0, nonNotees = 0;
     const detail = [];
@@ -332,5 +475,74 @@ module.exports.register = function register(deps) {
     if (!motif) return sendJSON(res, 400, { error: "Indiquez le motif de la révocation." });
     await db.prepare("UPDATE formation_attestations SET statut='revoque', motif_revocation=? WHERE id=?").run(motif, a.id);
     sendJSON(res, 200, { ok: true });
+  });
+  /* ── Lot 2 : correction manuelle des quiz par le formateur ── */
+
+  /* GET /api/formations/:id/a-corriger — travaux en attente de correction, avec les réponses de l'apprenant en regard des questions. */
+  route("GET", "/api/formations/:id/a-corriger", async (req, res, params) => {
+    const user = await getCurrentUser(req);
+    if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+    const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
+    if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
+    if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
+    const rows = await db.prepare(`SELECT t.id, t.quiz_id, t.reponses_json, t.created_at, q.titre AS quiz_titre, q.note_minimale, u.nom AS u_nom, u.prenom AS u_prenom
+      FROM formation_quiz_tentatives t
+      JOIN formation_quiz q ON q.id=t.quiz_id
+      JOIN formation_inscriptions i ON i.id=t.inscription_id
+      JOIN users u ON u.id=i.user_id
+      WHERE q.formation_id=? AND t.statut='a_corriger' ORDER BY t.created_at ASC, t.id ASC`).all(params.id);
+    const travaux = [];
+    for (const t of rows) {
+      let reps = {}; try { reps = JSON.parse(t.reponses_json || "{}") || {}; } catch (_) { reps = {}; }
+      const questions = await db.prepare("SELECT * FROM formation_quiz_questions WHERE quiz_id=? ORDER BY ordre ASC, id ASC").all(t.quiz_id);
+      travaux.push({
+        id: Number(t.id), quiz_id: Number(t.quiz_id), quiz_titre: t.quiz_titre, seuil: nombre(t.note_minimale), soumis_le: t.created_at,
+        apprenant: [t.u_prenom, t.u_nom].filter(Boolean).join(" ") || "Apprenant",
+        reponses: questions.map(q => ({ question: q.question, type: q.type, points: nombre(q.points) || 1, reponse: reps[String(q.id)] == null ? "" : reps[String(q.id)], attendue: q.reponse_correcte ? String(q.reponse_correcte).split("|").join(" / ") : null })),
+      });
+    }
+    sendJSON(res, 200, { travaux });
+  });
+
+  /* POST /api/formations/:id/tentatives/:tentativeId/corriger { note_pct, commentaire } — note du formateur ; même effets qu'un quiz corrigé automatiquement. */
+  route("POST", "/api/formations/:id/tentatives/:tentativeId/corriger", async (req, res, params, body) => {
+    const user = await getCurrentUser(req);
+    if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+    const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
+    if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
+    if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
+    const t = await db.prepare(`SELECT t.*, q.titre AS quiz_titre, q.lecon_id, q.note_minimale FROM formation_quiz_tentatives t JOIN formation_quiz q ON q.id=t.quiz_id
+      WHERE t.id=? AND q.formation_id=?`).get(params.tentativeId, params.id);
+    if (!t) return sendJSON(res, 404, { error: "Travail introuvable." });
+    if (t.statut !== "a_corriger") return sendJSON(res, 409, { error: "Ce travail a déjà été corrigé." });
+    const note = Number(body && body.note_pct);
+    if (!Number.isFinite(note) || note < 0 || note > 100) return sendJSON(res, 400, { error: "Indiquez une note entre 0 et 100." });
+    const commentaire = String((body && body.commentaire) || "").trim().slice(0, 2000);
+    const reussi = note >= nombre(t.note_minimale);
+    await db.prepare("UPDATE formation_quiz_tentatives SET note_pct=?, reussi=?, statut='corrige', commentaire_formateur=?, corrige_par=?, corrige_le=datetime('now') WHERE id=?")
+      .run(Math.round(note * 10) / 10, reussi ? 1 : 0, commentaire || null, user.id, t.id);
+    const inscription = await db.prepare("SELECT * FROM formation_inscriptions WHERE id=?").get(t.inscription_id);
+    if (reussi && t.lecon_id != null) {
+      const ex = await db.prepare("SELECT id FROM formation_lecons_progression WHERE inscription_id=? AND lecon_id=?").get(t.inscription_id, t.lecon_id);
+      if (ex) await db.prepare("UPDATE formation_lecons_progression SET termine=1, date_completion=? WHERE id=?").run(new Date().toISOString(), ex.id);
+      else await db.prepare("INSERT INTO formation_lecons_progression (inscription_id, lecon_id, termine, date_completion) VALUES (?,?,1,?)").run(t.inscription_id, t.lecon_id, new Date().toISOString());
+    }
+    const p = await construireParcours(db, f, inscription);
+    await db.prepare("UPDATE formation_inscriptions SET avancement_pct=? WHERE id=?").run(p.avancement_pct, inscription.id);
+    const attestation = await evaluerAttestation(deps, inscription.id);
+    if (typeof deps.creerNotif === "function") {
+      deps.creerNotif(inscription.user_id, "formation", reussi ? "✅ Votre travail a été corrigé" : "📝 Votre travail a été corrigé",
+        reussi ? `« ${t.quiz_titre} » : ${Math.round(note)} % — validé.` : `« ${t.quiz_titre} » : ${Math.round(note)} % (seuil ${nombre(t.note_minimale)} %). Vous pouvez le repasser.`,
+        { formation_id: Number(f.id), quiz_id: Number(t.quiz_id) });
+    }
+    sendJSON(res, 200, { ok: true, reussi, avancement_pct: p.avancement_pct, attestation: attestation ? vueAttestation(attestation) : null });
+  });
+
+  /* GET /api/admin/formation-stats — vue d'ensemble de la plateforme (administration). */
+  route("GET", "/api/admin/formation-stats", async (req, res) => {
+    const user = await getCurrentUser(req);
+    if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+    if (user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé à l'administration." });
+    sendJSON(res, 200, await statistiquesAdmin(db));
   });
 };
