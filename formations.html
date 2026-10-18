@@ -44,6 +44,9 @@
 .fb-module-card.dragover{border-color:#ff6b00;background:#fff7ed;}
 .fb-lecon-row{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;margin-top:6px;background:#f8fafc;cursor:grab;}
 .fb-lecon-row.dragover{border-color:#ff6b00;background:#fff7ed;}
+.fb-opt-tag{font-size:10.5px;font-weight:700;background:#e2e8f0;color:#475569;padding:1px 8px;border-radius:99px;margin-left:6px;white-space:nowrap;}
+.fb-q-row{font-size:13px;padding:8px 0;border-top:1px dashed var(--border);display:flex;gap:8px;align-items:flex-start;}
+.fb-q-row .fb-q-meta{display:block;color:var(--muted);font-size:11.5px;margin-top:2px;}
 .fb-drag-handle{cursor:grab;color:var(--muted);}
 .fb-modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:400;display:none;align-items:center;justify-content:center;padding:20px;}
 .fb-modal-bg.open{display:flex;}
@@ -634,7 +637,9 @@
               </select>
               <input id="fb-quiz-note-min" type="number" min="0" max="100" class="input-field" placeholder="Note minimale (%)" value="50">
               <input id="fb-quiz-temps" type="number" min="0" class="input-field" placeholder="Temps limité (minutes, facultatif)">
+              <select id="fb-quiz-lecon" class="input-field" style="grid-column:1/-1;"><option value="">Aucune leçon (évaluation indépendante, ex. examen final)</option></select>
             </div>
+            <p style="font-size:12px;color:var(--muted);margin:8px 0 0;">💡 Pour qu'une leçon de type « Quiz » se valide par la réussite du quiz, rattachez le quiz à cette leçon. L'apprenant réussit le quiz s'il atteint la note minimale ; la correction se fait automatiquement.</p>
             <button class="btn btn-orange btn-sm" id="fb-add-quiz" style="margin-top:10px;">+ Créer le quiz</button>
           </div>
           <div id="fb-quiz-list"></div>
@@ -644,21 +649,30 @@
         <div class="fb-panel" data-fb-panel="certificat" style="display:none;">
           <div class="card">
             <label class="fb-switch" style="font-size:14px;font-weight:700;margin-bottom:14px;">
-              <input type="checkbox" id="fb-cert-actif"><span class="fb-switch-track"></span> Délivrer un certificat à la fin de cette formation
-              <span class="fb-help" title="Un certificat numérique (avec QR de vérification) est généré automatiquement pour chaque apprenant qui termine la formation avec succès.">?</span>
+              <input type="checkbox" id="fb-cert-actif"><span class="fb-switch-track"></span> Délivrer un document à la fin de cette formation
+              <span class="fb-help" title="Le document est généré automatiquement, une seule fois par apprenant, dès que les conditions du type choisi sont remplies. Il porte un numéro unique et peut être vérifié par n'importe qui sur la page de vérification.">?</span>
             </label>
             <div id="fb-cert-fields" style="display:none;flex-direction:column;gap:12px;">
-              <div><label style="font-size:13px;font-weight:700;">Modèle de certificat <span class="fb-help" title="Le design visuel du certificat délivré.">?</span></label>
+              <div><label style="font-size:13px;font-weight:700;">Type de document <span class="fb-help" title="Les trois documents n'ont pas la même valeur : choisissez celui qui correspond à ce que vous évaluez réellement.">?</span></label>
+                <select id="fb-cert-type" class="input-field" style="width:100%;margin-top:4px;">
+                  <option value="participation">Attestation de participation — dès la première activité terminée</option>
+                  <option value="suivi">Attestation de suivi — toutes les activités obligatoires terminées</option>
+                  <option value="reussite">Certificat de réussite — activités terminées + quiz et examens réussis</option>
+                </select>
+                <div id="fb-cert-type-note" style="font-size:12px;color:var(--muted);margin-top:6px;line-height:1.5;"></div>
+              </div>
+              <div><label style="font-size:13px;font-weight:700;">Modèle visuel <span class="fb-help" title="Le design du document délivré.">?</span></label>
                 <select id="fb-cert-modele" class="input-field" style="width:100%;margin-top:4px;">
                   <option value="classique">Classique</option>
                   <option value="moderne">Moderne</option>
                   <option value="premium">Premium</option>
                 </select>
               </div>
-              <div><label style="font-size:13px;font-weight:700;">Conditions d'obtention <span class="fb-help" title="Décrivez ce que l'apprenant doit accomplir pour recevoir le certificat (ex: réussir l'examen final, terminer toutes les leçons…).">?</span></label>
-                <textarea id="fb-cert-conditions" style="width:100%;min-height:60px;border-radius:10px;border:1px solid var(--border);padding:10px;font-family:inherit;margin-top:4px;" placeholder="ex: Réussir l'examen final avec au moins 70%…"></textarea>
+              <div><label style="font-size:13px;font-weight:700;">Précisions pour les apprenants (facultatif) <span class="fb-help" title="Texte libre affiché en complément. Les conditions réelles d'obtention sont celles du type de document choisi ci-dessus.">?</span></label>
+                <textarea id="fb-cert-conditions" style="width:100%;min-height:60px;border-radius:10px;border:1px solid var(--border);padding:10px;font-family:inherit;margin-top:4px;" placeholder="ex : Un justificatif d'activité est demandé pour la validation finale…"></textarea>
               </div>
-              <label style="display:flex;gap:8px;align-items:center;font-size:13px;"><input type="checkbox" id="fb-cert-qr" checked> Inclure un QR code de vérification et un numéro unique <span class="fb-help" title="Permet à n'importe qui de vérifier l'authenticité du certificat en scannant le QR code.">?</span></label>
+              <div style="font-size:12px;color:#92400e;background:#fef3c7;border-radius:10px;padding:10px 12px;line-height:1.5;">⚠️ Ce document est délivré par Diaspo'Actif. Il n'est <strong>ni un diplôme reconnu par l'État, ni une certification professionnelle officielle</strong> : il atteste du suivi ou de la réussite d'une formation proposée sur la plateforme.</div>
+              <label style="display:flex;gap:8px;align-items:center;font-size:13px;"><input type="checkbox" id="fb-cert-qr" checked> Inclure un QR code de vérification et un numéro unique <span class="fb-help" title="Permet à n'importe qui de vérifier l'authenticité du document sur la page de vérification.">?</span></label>
               <button class="btn btn-orange btn-sm" id="fb-save-cert" style="align-self:flex-start;">💾 Enregistrer</button>
             </div>
           </div>
@@ -756,6 +770,52 @@
 
 <div id="fb-tooltip-popup"></div>
 
+<!-- MODAL QUESTION DE QUIZ -->
+<div class="fb-modal-bg" id="fb-question-modal-bg" onclick="if(event.target===this) fbCloseQuestionModal()">
+  <div class="fb-modal-box">
+    <div class="flex-between" style="margin-bottom:14px;">
+      <h3 style="margin:0;">Ajouter une question</h3>
+      <button class="btn btn-sm btn-outline" onclick="fbCloseQuestionModal()">✕</button>
+    </div>
+    <div class="fb-field">
+      <label>Type de question</label>
+      <select id="fb-q-type">
+        <option value="qcm">Choix multiples (QCM)</option>
+        <option value="vrai_faux">Vrai / Faux</option>
+        <option value="texte_libre">Réponse courte écrite</option>
+      </select>
+    </div>
+    <div class="fb-field">
+      <label>Énoncé</label>
+      <textarea id="fb-q-enonce" rows="2"></textarea>
+    </div>
+    <div class="fb-field" id="fb-q-options-field">
+      <label>Choix proposés <span class="fb-help" title="Un choix par ligne, au moins deux. L'ordre est conservé tel quel.">?</span></label>
+      <textarea id="fb-q-options" rows="4" placeholder="Un choix par ligne"></textarea>
+    </div>
+    <div class="fb-field" id="fb-q-bonne-qcm-field">
+      <label>Bonne(s) réponse(s) <span class="fb-help" title="Recopiez exactement le ou les choix corrects, un par ligne. Plusieurs lignes = l'apprenant doit cocher exactement ces choix.">?</span></label>
+      <textarea id="fb-q-bonne-qcm" rows="2" placeholder="Recopiez le choix correct (un par ligne)"></textarea>
+    </div>
+    <div class="fb-field" id="fb-q-bonne-vf-field" style="display:none;">
+      <label>Bonne réponse</label>
+      <select id="fb-q-bonne-vf"><option value="Vrai">Vrai</option><option value="Faux">Faux</option></select>
+    </div>
+    <div class="fb-field" id="fb-q-bonne-texte-field" style="display:none;">
+      <label>Réponse(s) acceptée(s) <span class="fb-help" title="Séparez plusieurs réponses acceptées par le signe | (ex : Côte d'Ivoire | Cote d'Ivoire). Les majuscules, accents et points finaux sont ignorés. Laissez vide : la question n'est alors pas notée.">?</span></label>
+      <input type="text" id="fb-q-bonne-texte" placeholder="Laissez vide pour une question non notée">
+    </div>
+    <div class="fb-field">
+      <label>Points</label>
+      <input type="number" id="fb-q-points" min="1" max="100" value="1">
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px;">
+      <button class="btn btn-sm btn-outline" onclick="fbCloseQuestionModal()">Annuler</button>
+      <button class="btn btn-sm btn-orange" id="fb-q-save-btn">Enregistrer la question</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL LEÇON -->
 <div class="fb-modal-bg" id="fb-lecon-modal-bg" onclick="if(event.target===this) fbCloseLeconModal()">
   <div class="fb-modal-box">
@@ -798,6 +858,13 @@
         <input type="checkbox" id="fb-lecon-telechargement" checked style="width:auto;">
         Autoriser le téléchargement par les apprenants
         <span class="fb-help" title="Décochez pour permettre la consultation en ligne uniquement, sans possibilité de télécharger le fichier.">?</span>
+      </label>
+    </div>
+    <div class="fb-field">
+      <label style="display:flex;align-items:center;gap:8px;font-weight:600;">
+        <input type="checkbox" id="fb-lecon-obligatoire" checked style="width:auto;">
+        Activité obligatoire pour terminer la formation
+        <span class="fb-help" title="Seules les activités obligatoires comptent dans la jauge de progression et dans les conditions d'obtention du document. Décochez pour une lecture ou un exercice complémentaire.">?</span>
       </label>
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px;">
@@ -1546,14 +1613,31 @@
     const el = document.getElementById('certifications-list');
     if(!await requireLoginForVolet()){ el.innerHTML = '<div class="notice">Connectez-vous pour voir vos certifications.</div>'; return; }
     try {
-      const rows = await api('GET', '/certifications');
-      if(!rows.length){ el.innerHTML = '<div class="notice">Aucune certification obtenue pour le moment.</div>'; return; }
-      el.innerHTML = rows.map(c => `
-        <div class="card" style="margin-bottom:14px;">
-          <h3 style="margin:0 0 4px;">📜 ${c.titre}</h3>
-          <p style="margin:0;color:var(--muted);font-size:13px;">${c.organisme||'Organisme non précisé'} · obtenue le ${(c.date_obtention||'').slice(0,10)}</p>
-          <p style="margin:8px 0 0;font-size:12px;color:var(--muted);">Code de vérification : <code>${c.code_verification}</code></p>
+      const [{ attestations }, rows] = await Promise.all([api('GET', '/mes-attestations').catch(()=>({ attestations: [] })), api('GET', '/certifications')]);
+      const esc = escQ;
+      const delivres = (attestations||[]).map(a => `
+        <div class="card" style="margin-bottom:14px;border-left:4px solid ${a.statut==='valide'?'#16a34a':'#dc2626'};">
+          <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start;">
+            <div style="flex:1;min-width:220px;">
+              <div style="font-size:12px;font-weight:800;color:${a.statut==='valide'?'#166534':'#991b1b'};text-transform:uppercase;letter-spacing:.04em;">🎓 ${esc(a.type_label)}${a.statut==='valide'?'':' — révoqué(e)'}</div>
+              <h3 style="margin:4px 0;">${esc(a.formation_titre)}</h3>
+              <p style="margin:0;color:var(--muted);font-size:13px;">${esc(a.organisme||'')} · délivré(e) le ${esc((a.date_emission||'').slice(0,10))}${a.resultat_pct!=null?` · résultat ${a.resultat_pct} %`:''}</p>
+              <p style="margin:6px 0 0;font-size:12px;color:var(--muted);">N° <code>${esc(a.code)}</code></p>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <a class="btn btn-sm btn-orange" href="attestation.html?code=${encodeURIComponent(a.code)}" target="_blank" rel="noopener">📄 Voir / imprimer</a>
+              <a class="btn btn-sm btn-outline" href="verifier-attestation.html?code=${encodeURIComponent(a.code)}" target="_blank" rel="noopener">🔎 Vérifier</a>
+            </div>
+          </div>
         </div>`).join('');
+      const declarees = rows.map(c => `
+        <div class="card" style="margin-bottom:14px;">
+          <h3 style="margin:0 0 4px;">📜 ${esc(c.titre)}</h3>
+          <p style="margin:0;color:var(--muted);font-size:13px;">${esc(c.organisme||'Organisme non précisé')} · obtenue le ${esc((c.date_obtention||'').slice(0,10))}</p>
+          <p style="margin:8px 0 0;font-size:12px;color:var(--muted);">Code de vérification : <code>${esc(c.code_verification)}</code> · <em>mention déclarée par vous, non délivrée par Diaspo'Actif</em></p>
+        </div>`).join('');
+      if(!delivres && !declarees){ el.innerHTML = '<div class="notice">Aucune certification obtenue pour le moment.</div>'; return; }
+      el.innerHTML = (delivres ? `<h3 style="margin:0 0 10px;">Délivrés par Diaspo'Actif</h3>${delivres}` : '') + (declarees ? `<h3 style="margin:${delivres?'22px':'0'} 0 10px;">Déclarés par vous</h3>${declarees}` : '');
     } catch(e){ el.innerHTML = '<div class="notice">Erreur de chargement.</div>'; }
   }
 
@@ -1874,7 +1958,7 @@
                   ${c.lecons.map(l => `
                     <div class="fb-lecon-row" draggable="true" data-lecon-id="${l.id}">
                       <span class="fb-drag-handle">⠿</span>
-                      <span style="flex:1;">${(FB_LECON_TYPES.find(t=>t[0]===l.type)||['','?'])[1]} — ${l.titre}${l.duree_minutes?` (${l.duree_minutes} min)`:''}</span>
+                      <span style="flex:1;">${(FB_LECON_TYPES.find(t=>t[0]===l.type)||['','?'])[1]} — ${l.titre}${l.duree_minutes?` (${l.duree_minutes} min)`:''}${(l.obligatoire===0||l.obligatoire===false)?'<span class="fb-opt-tag">facultative</span>':''}</span>
                       <button class="btn btn-sm btn-outline fb-edit-lecon" data-id="${l.id}" data-chapitre-id="${c.id}">✏️</button>
                       <button class="btn btn-sm btn-outline fb-del-lecon" data-id="${l.id}">🗑️</button>
                     </div>`).join('')}
@@ -2014,6 +2098,7 @@
     document.getElementById('fb-lecon-upload-status').textContent = '';
     document.getElementById('fb-lecon-nb-pages').value = '';
     document.getElementById('fb-lecon-telechargement').checked = true;
+    document.getElementById('fb-lecon-obligatoire').checked = true;
     typeSel.value = 'texte';
 
     const populate = (l) => {
@@ -2026,6 +2111,7 @@
       document.getElementById('fb-lecon-contenu-url').value = l.contenu_url || '';
       document.getElementById('fb-lecon-nb-pages').value = l.nb_pages || '';
       document.getElementById('fb-lecon-telechargement').checked = l.telechargement_autorise !== 0 && l.telechargement_autorise !== false;
+      document.getElementById('fb-lecon-obligatoire').checked = l.obligatoire !== 0 && l.obligatoire !== false;
       typeSel.value = l.type || 'texte';
       if (l.contenu_url) document.getElementById('fb-lecon-upload-status').innerHTML = `Fichier actuel : <a href="${l.contenu_url}" target="_blank" rel="noopener">voir</a>`;
       fbUpdateLeconModalFields();
@@ -2094,6 +2180,7 @@
       contenu_url: document.getElementById('fb-lecon-contenu-url').value || null,
       nb_pages: document.getElementById('fb-lecon-nb-pages').value ? parseInt(document.getElementById('fb-lecon-nb-pages').value) : null,
       telechargement_autorise: document.getElementById('fb-lecon-telechargement').checked,
+      obligatoire: document.getElementById('fb-lecon-obligatoire').checked,
     };
     const { chapitreId, leconId } = fbLeconModalCtx;
     const req = leconId
@@ -2103,24 +2190,34 @@
   });
 
   // ── Quiz ──
+  const FB_Q_TYPES = { qcm: 'Choix multiples', vrai_faux: 'Vrai / Faux', texte_libre: 'Réponse courte' };
+  function escQ(v){ return String(v == null ? '' : v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
   async function fbLoadQuiz(){
     const el = document.getElementById('fb-quiz-list');
     el.innerHTML = '<div class="notice">Chargement…</div>';
     try {
-      const { quiz } = await api('GET', `/formations/${fbFormationId}/quiz`);
+      const [{ quiz }, { modules }] = await Promise.all([api('GET', `/formations/${fbFormationId}/quiz`), api('GET', `/formations/${fbFormationId}/modules`)]);
+      const leconsQuiz = [];
+      modules.forEach(m => (m.chapitres||[]).forEach(c => (c.lecons||[]).forEach(l => { if (l.type === 'quiz') leconsQuiz.push({ id: l.id, titre: l.titre, chapitre: c.titre }); })));
+      const deja = new Set(quiz.filter(q => q.lecon_id != null).map(q => String(q.lecon_id)));
+      const sel = document.getElementById('fb-quiz-lecon');
+      sel.innerHTML = '<option value="">Aucune leçon (évaluation indépendante, ex. examen final)</option>' +
+        leconsQuiz.filter(l => !deja.has(String(l.id))).map(l => `<option value="${l.id}">Leçon « ${escQ(l.titre)} » — ${escQ(l.chapitre)}</option>`).join('');
       if(!quiz.length){ el.innerHTML = '<div class="notice">Aucun quiz créé.</div>'; return; }
-      el.innerHTML = quiz.map(q => `
+      el.innerHTML = quiz.map(q => {
+        const lecon = q.lecon_id != null ? leconsQuiz.find(l => String(l.id) === String(q.lecon_id)) : null;
+        return `
         <div class="card" style="margin-bottom:12px;">
           <div class="flex-between">
-            <strong>${q.titre}</strong>
+            <strong>${escQ(q.titre)}</strong>
             <button class="btn btn-sm btn-outline fb-del-quiz" data-id="${q.id}">🗑️</button>
           </div>
-          <p style="font-size:12.5px;color:var(--muted);margin:6px 0;">Note minimale : ${q.note_minimale}% ${q.temps_limite_min?`· ${q.temps_limite_min} min`:''} · Correction ${q.correction_auto?'automatique':'manuelle'}</p>
+          <p style="font-size:12.5px;color:var(--muted);margin:6px 0;">Seuil de réussite : ${q.note_minimale}% ${q.temps_limite_min?`· ${q.temps_limite_min} min`:''} · ${lecon ? `rattaché à la leçon « ${escQ(lecon.titre)} »` : 'évaluation indépendante'}</p>
           <div id="fb-quiz-q-${q.id}">
-            ${q.questions.map(qu=>`<div style="font-size:13px;padding:6px 0;border-top:1px dashed var(--border);">❓ ${qu.question} <button class="btn btn-sm btn-outline fb-del-question" data-quiz="${q.id}" data-id="${qu.id}" style="float:right;">✕</button></div>`).join('')}
+            ${q.questions.map(qu=>`<div class="fb-q-row"><div style="flex:1;">❓ ${escQ(qu.question)}<span class="fb-q-meta">${FB_Q_TYPES[qu.type]||qu.type} · ${qu.points||1} pt${(qu.points||1)>1?'s':''} · ${qu.reponse_correcte ? 'Réponse : ' + escQ(String(qu.reponse_correcte).split('|').join(' / ')) : 'non notée'}</span></div><button class="btn btn-sm btn-outline fb-del-question" data-quiz="${q.id}" data-id="${qu.id}">✕</button></div>`).join('') || '<div class="notice" style="padding:10px;">Aucune question pour l\'instant.</div>'}
           </div>
           <button class="btn btn-sm btn-outline fb-add-question" data-id="${q.id}" style="margin-top:8px;">+ Ajouter une question</button>
-        </div>`).join('');
+        </div>`; }).join('');
       document.querySelectorAll('.fb-del-quiz').forEach(b=>b.addEventListener('click', async ()=>{
         if(!confirm('Supprimer ce quiz ?')) return;
         await api('DELETE', `/formations/${fbFormationId}/quiz/${b.dataset.id}`);
@@ -2130,15 +2227,56 @@
         await api('DELETE', `/formations/${fbFormationId}/quiz/${b.dataset.quiz}/questions/${b.dataset.id}`);
         fbLoadQuiz();
       }));
-      document.querySelectorAll('.fb-add-question').forEach(b=>b.addEventListener('click', async ()=>{
-        const question = prompt('Énoncé de la question :');
-        if(!question) return;
-        const reponse = prompt('Réponse correcte :');
-        try { await api('POST', `/formations/${fbFormationId}/quiz/${b.dataset.id}/questions`, { question, type:'qcm', reponse_correcte: reponse||null }); fbLoadQuiz(); }
-        catch(e){ showMsg(e.message||'Erreur.', 'danger'); }
-      }));
+      document.querySelectorAll('.fb-add-question').forEach(b=>b.addEventListener('click', ()=> fbOpenQuestionForm(b.dataset.id)));
     } catch(e){ el.innerHTML = '<div class="notice">Erreur de chargement.</div>'; }
   }
+
+  // Éditeur de question : choix multiples, vrai/faux, réponse courte (la correction est faite côté serveur à partir de ces réponses)
+  let fbQuestionQuizId = null;
+  function fbMajChampsQuestion(){
+    const t = document.getElementById('fb-q-type').value;
+    document.getElementById('fb-q-options-field').style.display = t === 'qcm' ? '' : 'none';
+    document.getElementById('fb-q-bonne-qcm-field').style.display = t === 'qcm' ? '' : 'none';
+    document.getElementById('fb-q-bonne-vf-field').style.display = t === 'vrai_faux' ? '' : 'none';
+    document.getElementById('fb-q-bonne-texte-field').style.display = t === 'texte_libre' ? '' : 'none';
+  }
+  function fbOpenQuestionForm(quizId){
+    fbQuestionQuizId = quizId;
+    ['fb-q-enonce','fb-q-options','fb-q-bonne-qcm','fb-q-bonne-texte'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('fb-q-type').value = 'qcm';
+    document.getElementById('fb-q-bonne-vf').value = 'Vrai';
+    document.getElementById('fb-q-points').value = 1;
+    fbMajChampsQuestion();
+    document.getElementById('fb-question-modal-bg').classList.add('open');
+  }
+  function fbCloseQuestionModal(){ document.getElementById('fb-question-modal-bg').classList.remove('open'); }
+  document.getElementById('fb-q-type').addEventListener('change', fbMajChampsQuestion);
+  document.getElementById('fb-q-save-btn').addEventListener('click', async ()=>{
+    const type = document.getElementById('fb-q-type').value;
+    const question = document.getElementById('fb-q-enonce').value.trim();
+    if(!question){ showMsg('Saisissez l\'énoncé de la question.', 'danger'); return; }
+    const lignes = id => document.getElementById(id).value.split('\n').map(x => x.trim()).filter(Boolean);
+    const payload = { question, type, points: Math.max(1, parseInt(document.getElementById('fb-q-points').value) || 1) };
+    if(type === 'qcm'){
+      const options = lignes('fb-q-options'), bonnes = lignes('fb-q-bonne-qcm');
+      if(options.length < 2){ showMsg('Proposez au moins deux choix (un par ligne).', 'danger'); return; }
+      if(!bonnes.length){ showMsg('Indiquez la ou les bonnes réponses.', 'danger'); return; }
+      const norm = x => x.toLowerCase();
+      const inconnue = bonnes.find(b => !options.some(o => norm(o) === norm(b)));
+      if(inconnue){ showMsg(`« ${inconnue} » ne figure pas dans les choix proposés : recopiez-le exactement.`, 'danger'); return; }
+      payload.options = options;
+      payload.reponse_correcte = bonnes.map(b => options.find(o => norm(o) === norm(b))).join('|');
+    } else if(type === 'vrai_faux'){
+      payload.reponse_correcte = document.getElementById('fb-q-bonne-vf').value;
+    } else {
+      payload.reponse_correcte = document.getElementById('fb-q-bonne-texte').value.trim() || null;
+    }
+    try {
+      await api('POST', `/formations/${fbFormationId}/quiz/${fbQuestionQuizId}/questions`, payload);
+      fbCloseQuestionModal();
+      fbLoadQuiz();
+    } catch(e){ showMsg(e.message||'Erreur.', 'danger'); }
+  });
   document.getElementById('fb-add-quiz').addEventListener('click', async ()=>{
     const titre = document.getElementById('fb-quiz-titre').value.trim();
     if(!titre){ showMsg('Titre du quiz requis.', 'danger'); return; }
@@ -2146,7 +2284,8 @@
       await api('POST', `/formations/${fbFormationId}/quiz`, {
         titre, type: document.getElementById('fb-quiz-type').value,
         note_minimale: parseInt(document.getElementById('fb-quiz-note-min').value)||50,
-        temps_limite_min: parseInt(document.getElementById('fb-quiz-temps').value)||null
+        temps_limite_min: parseInt(document.getElementById('fb-quiz-temps').value)||null,
+        lecon_id: document.getElementById('fb-quiz-lecon').value ? parseInt(document.getElementById('fb-quiz-lecon').value) : null
       });
       document.getElementById('fb-quiz-titre').value = '';
       fbLoadQuiz();
@@ -2159,11 +2298,20 @@
       const { formation } = await api('GET', `/formations/${fbFormationId}`);
       document.getElementById('fb-cert-actif').checked = !!formation.certificat_actif;
       document.getElementById('fb-cert-fields').style.display = formation.certificat_actif ? 'flex' : 'none';
+      document.getElementById('fb-cert-type').value = ['participation','suivi','reussite'].includes(formation.certificat_type) ? formation.certificat_type : 'suivi';
+      fbMajNoteTypeDoc();
       document.getElementById('fb-cert-modele').value = formation.certificat_modele || 'classique';
       document.getElementById('fb-cert-conditions').value = formation.certificat_conditions || '';
       document.getElementById('fb-cert-qr').checked = formation.certificat_qr !== 0;
     } catch(e){}
   }
+  const FB_NOTES_TYPE_DOC = {
+    participation: 'Délivrée dès que l\'apprenant a terminé au moins une activité. Elle atteste uniquement de sa participation.',
+    suivi: 'Délivrée quand l\'apprenant a terminé toutes les activités obligatoires. Elle atteste qu\'il a suivi le parcours, sans évaluer ses acquis.',
+    reussite: 'Délivré quand toutes les activités obligatoires sont terminées ET que tous les quiz et examens de la formation sont réussis (seuil fixé pour chaque quiz). Il exige au moins un quiz.'
+  };
+  function fbMajNoteTypeDoc(){ document.getElementById('fb-cert-type-note').textContent = FB_NOTES_TYPE_DOC[document.getElementById('fb-cert-type').value] || ''; }
+  document.getElementById('fb-cert-type').addEventListener('change', fbMajNoteTypeDoc);
   document.getElementById('fb-cert-actif').addEventListener('change', function(){
     document.getElementById('fb-cert-fields').style.display = this.checked ? 'flex' : 'none';
   });
@@ -2171,11 +2319,12 @@
     try {
       await api('PUT', `/formations/${fbFormationId}/certificat`, {
         certificat_actif: document.getElementById('fb-cert-actif').checked,
+        certificat_type: document.getElementById('fb-cert-type').value,
         certificat_modele: document.getElementById('fb-cert-modele').value,
         certificat_conditions: document.getElementById('fb-cert-conditions').value.trim(),
         certificat_qr: document.getElementById('fb-cert-qr').checked
       });
-      showMsg('Configuration du certificat enregistrée.', 'success');
+      showMsg('Configuration du document enregistrée.', 'success');
     } catch(e){ showMsg(e.message||'Erreur.', 'danger'); }
   });
 

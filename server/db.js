@@ -4613,6 +4613,7 @@ db.exec(`
     ordre INTEGER DEFAULT 0,
     telechargement_autorise INTEGER DEFAULT 1,
     nb_pages INTEGER,
+    obligatoire INTEGER DEFAULT 1,
     created_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY(module_id) REFERENCES formation_modules(id),
     FOREIGN KEY(chapitre_id) REFERENCES formation_chapitres(id)
@@ -4674,10 +4675,53 @@ db.exec(`
 
 /* Extension de formations pour les étapes 8 (certificat) et 11 (soumission/analyse) */
 ;['certificat_actif INTEGER DEFAULT 0','certificat_modele TEXT','certificat_conditions TEXT',
-  'certificat_qr INTEGER DEFAULT 1','date_soumission TEXT'
+  'certificat_qr INTEGER DEFAULT 1','date_soumission TEXT',
+  /* Lot 1 « Diaspo'Actif Formation » (2026-10-18) : participation | suivi | reussite */
+  "certificat_type TEXT DEFAULT 'suivi'"
 ].forEach(col => {
   try { db.exec(`ALTER TABLE formations ADD COLUMN ${col}`); } catch(_) {}
 });
+
+/* Lot 1 « Diaspo'Actif Formation » (2026-10-18) : leçons obligatoires/facultatives (SQLite déjà existant : la colonne est aussi dans le CREATE TABLE ci-dessus),
+   tentatives de quiz corrigées côté serveur, et attestations délivrées par la plateforme (vérifiables publiquement par leur code). */
+try { db.exec('ALTER TABLE formation_lecons ADD COLUMN obligatoire INTEGER DEFAULT 1'); } catch(_) {}
+db.exec(`
+  CREATE TABLE IF NOT EXISTS formation_quiz_tentatives (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    inscription_id INTEGER NOT NULL,
+    quiz_id INTEGER NOT NULL,
+    note_pct REAL DEFAULT 0,
+    points_obtenus REAL DEFAULT 0,
+    points_total REAL DEFAULT 0,
+    reussi INTEGER DEFAULT 0,
+    nb_non_notees INTEGER DEFAULT 0,
+    reponses_json TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(inscription_id) REFERENCES formation_inscriptions(id),
+    FOREIGN KEY(quiz_id) REFERENCES formation_quiz(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_fqt_insc_quiz ON formation_quiz_tentatives(inscription_id, quiz_id);
+
+  CREATE TABLE IF NOT EXISTS formation_attestations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT NOT NULL UNIQUE,
+    inscription_id INTEGER NOT NULL UNIQUE,
+    formation_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    type TEXT NOT NULL DEFAULT 'suivi',
+    formation_titre TEXT,
+    organisme TEXT,
+    apprenant_nom TEXT,
+    resultat_pct REAL,
+    date_emission TEXT DEFAULT (datetime('now')),
+    statut TEXT DEFAULT 'valide',
+    motif_revocation TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(formation_id) REFERENCES formations(id),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_fatt_user ON formation_attestations(user_id);
+`);
 
 /* L'accréditation createur_formations est supprimée : la création de formations est désormais
    réservée aux comptes Premium (accréditation utilisateur_abonne / initiative_abonne), plus besoin

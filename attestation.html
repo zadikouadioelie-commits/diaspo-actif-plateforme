@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Diaspo'Actif — Mon attestation</title>
+<link rel="icon" href="/assets/logo.png">
+<style>
+  :root{--navy:#0D2B4E;--orange:#F26422;--or:#B8893B;--ink:#1e293b;--muted:#64748b}
+  *{box-sizing:border-box}
+  body{margin:0;background:#e9edf3;font-family:Georgia,'Times New Roman',serif;color:var(--ink)}
+  .barre{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;padding:14px;font-family:system-ui,sans-serif}
+  .barre button,.barre a{background:var(--orange);color:#fff;border:0;border-radius:10px;padding:10px 18px;font-weight:700;font-size:14px;cursor:pointer;text-decoration:none;font-family:inherit}
+  .barre a.sec{background:#fff;color:var(--navy);border:1px solid #cbd5e1}
+  .msg{max-width:560px;margin:60px auto;text-align:center;font-family:system-ui,sans-serif;color:var(--muted);padding:0 20px}
+  .msg a{color:var(--orange);font-weight:700}
+  .feuille{width:297mm;height:210mm;margin:0 auto 30px;background:#fff;position:relative;box-shadow:0 8px 30px rgba(13,43,78,.15);padding:11mm}
+  .cadre{height:100%;border:2.2mm solid var(--navy);padding:2mm}
+  .cadre-int{height:100%;border:.6mm solid var(--or);padding:9mm 14mm;display:flex;flex-direction:column;align-items:center;text-align:center;position:relative}
+  .marque{display:flex;align-items:center;gap:10px;font-family:system-ui,sans-serif;font-weight:800;letter-spacing:.06em;color:var(--navy);font-size:15px}
+  .marque img{width:38px;height:38px;object-fit:contain}
+  h1{font-size:34px;letter-spacing:.04em;text-transform:uppercase;color:var(--navy);margin:14px 0 4px;font-weight:700}
+  .sous{font-size:14px;color:var(--muted);font-style:italic}
+  .decerne{margin-top:16px;font-size:15px;color:var(--muted)}
+  .nom{font-size:34px;color:var(--orange);margin:4px 0 10px;font-style:italic;border-bottom:.4mm solid var(--or);padding:0 30px 4px}
+  .corps{font-size:16px;line-height:1.6;max-width:200mm}
+  .corps strong{color:var(--navy)}
+  .res{margin-top:8px;font-size:15px;color:var(--navy)}
+  .pied{margin-top:auto;width:100%;display:flex;justify-content:space-between;align-items:flex-end;gap:14px;font-family:system-ui,sans-serif;font-size:11.5px;color:var(--muted);text-align:left}
+  .pied .qr{text-align:center;min-width:34mm}
+  .pied .qr #qr{width:26mm;height:26mm;margin:0 auto 4px}
+  .pied .qr #qr img,.pied .qr #qr canvas{width:26mm!important;height:26mm!important}
+  .pied .code{font-weight:800;color:var(--navy);font-size:13px;letter-spacing:.05em}
+  .avert{max-width:150mm;line-height:1.45;font-size:10.5px}
+  .revoque{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:system-ui,sans-serif;font-size:64px;font-weight:900;color:rgba(220,38,38,.28);transform:rotate(-18deg);pointer-events:none}
+  @page{size:A4 landscape;margin:0}
+  @media print{body{background:#fff}.barre{display:none}.feuille{margin:0;box-shadow:none}}
+  @media (max-width:1100px){.feuille{zoom:.55}} @media (max-width:640px){.feuille{zoom:.36}}
+</style>
+</head>
+<body>
+<div class="barre" id="barre" style="display:none">
+  <button type="button" onclick="window.print()">🖨️ Imprimer / enregistrer en PDF</button>
+  <a class="sec" id="lien-verif" href="#" target="_blank" rel="noopener">🔎 Page de vérification</a>
+</div>
+<div id="racine"><div class="msg">Chargement…</div></div>
+
+<script>
+function esc(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function dateFr(iso){ const d = new Date(String(iso || '').replace(' ', 'T') + (String(iso||'').length <= 19 && !/Z|\+/.test(String(iso||'')) ? 'Z' : '')); return isNaN(d) ? String(iso||'').slice(0,10) : d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Paris' }); }
+const code = new URLSearchParams(location.search).get('code') || '';
+(async function(){
+  const racine = document.getElementById('racine');
+  if (!code){ racine.innerHTML = '<div class="msg">Aucun document indiqué.</div>'; return; }
+  let r;
+  try { r = await fetch('/api/attestations/mon/' + encodeURIComponent(code), { credentials: 'same-origin' }); } catch (e) { racine.innerHTML = '<div class="msg">Connexion impossible. Réessayez.</div>'; return; }
+  if (r.status === 401){ racine.innerHTML = '<div class="msg">Connectez-vous pour consulter votre document.<br><br><a href="login.html">Se connecter</a></div>'; return; }
+  if (!r.ok){ racine.innerHTML = '<div class="msg">Document introuvable, ou il ne vous appartient pas.</div>'; return; }
+  const a = (await r.json()).attestation;
+  const urlVerif = location.origin + '/verifier-attestation.html?code=' + encodeURIComponent(a.code);
+  const verbe = a.type === 'reussite' ? 'a réussi la formation' : a.type === 'suivi' ? 'a suivi la formation' : 'a participé à la formation';
+  document.title = a.type_label + ' — ' + a.formation_titre;
+  racine.innerHTML = `
+  <div class="feuille"><div class="cadre"><div class="cadre-int">
+    ${a.statut !== 'valide' ? '<div class="revoque">RÉVOQUÉ</div>' : ''}
+    <div class="marque"><img src="assets/logo.png" alt="" onerror="this.remove()"> DIASPO'ACTIF</div>
+    <h1>${esc(a.type_label)}</h1>
+    <div class="sous">délivré(e) par Diaspo'Actif au titre d'une formation de la plateforme</div>
+    <div class="decerne">Décerné à</div>
+    <div class="nom">${esc(a.apprenant_nom)}</div>
+    <div class="corps">qui ${verbe}<br><strong>« ${esc(a.formation_titre)} »</strong><br>proposée par ${esc(a.organisme || "Diaspo'Actif")}.</div>
+    ${a.resultat_pct != null ? `<div class="res">Résultat obtenu : <strong>${a.resultat_pct} %</strong></div>` : ''}
+    <div class="pied">
+      <div class="avert"><div>Délivré le ${esc(dateFr(a.date_emission))}</div><div style="margin-top:5px">${esc(a.avertissement)}</div></div>
+      <div class="qr"><div id="qr"></div><div class="code">${esc(a.code)}</div><div>Vérifier l'authenticité</div></div>
+    </div>
+  </div></div></div>`;
+  document.getElementById('barre').style.display = '';
+  document.getElementById('lien-verif').href = urlVerif;
+  /* QR code vers la page publique de vérification (qrcodejs, même bibliothèque que le QR de profil) ; sans lui, le code imprimé suffit à vérifier. */
+  const s = document.createElement('script');
+  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+  s.onload = () => { try { new QRCode(document.getElementById('qr'), { text: urlVerif, width: 200, height: 200, correctLevel: QRCode.CorrectLevel.M }); } catch (e) {} };
+  document.head.appendChild(s);
+})();
+</script>
+</body>
+</html>

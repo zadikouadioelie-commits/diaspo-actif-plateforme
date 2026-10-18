@@ -995,6 +995,9 @@ const COLONNES_MIGRATION = [
     ['formation_inscriptions', 'relance_inactivite_le', 'TEXT'],
     // Module Diaspo Formation — extension de la table formations (jamais migrée en Postgres jusqu'ici)
     ['formations', 'statut', "TEXT DEFAULT 'brouillon'"],
+    // Lot 1 « Diaspo'Actif Formation » (2026-10-18)
+    ['formations', 'certificat_type', "TEXT DEFAULT 'suivi'"],
+    ['formation_lecons', 'obligatoire', 'INTEGER DEFAULT 1'],
     ['formations', 'mode_acces', "TEXT DEFAULT 'gratuit'"],
     ['formations', 'commission_pct', 'REAL DEFAULT 0'],
     ['formations', 'telecharge_autorise', 'INTEGER DEFAULT 0'],

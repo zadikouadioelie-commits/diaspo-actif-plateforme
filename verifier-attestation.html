@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Diaspo'Actif — Vérifier une attestation ou un certificat</title>
+<meta name="description" content="Vérifiez l'authenticité d'une attestation ou d'un certificat délivré par Diaspo'Actif grâce à son numéro.">
+<link rel="icon" href="/assets/logo.png">
+<style>
+  :root{--navy:#0D2B4E;--orange:#F26422;--ink:#1e293b;--muted:#64748b}
+  *{box-sizing:border-box}
+  body{margin:0;background:#f1f5f9;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;color:var(--ink);line-height:1.5}
+  header{background:var(--navy);color:#fff;padding:14px 20px;display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:.06em}
+  header img{width:32px;height:32px;object-fit:contain}
+  main{max-width:620px;margin:0 auto;padding:28px 16px 60px}
+  h1{font-size:24px;margin:0 0 6px;color:var(--navy)}
+  .lead{color:var(--muted);margin:0 0 20px}
+  form{display:flex;gap:8px;flex-wrap:wrap}
+  input{flex:1;min-width:200px;padding:13px 14px;border:1.5px solid #cbd5e1;border-radius:12px;font-size:16px;font-family:inherit;text-transform:uppercase;letter-spacing:.05em}
+  input:focus{outline:3px solid rgba(242,100,34,.35);border-color:var(--orange)}
+  button{background:var(--orange);color:#fff;border:0;border-radius:12px;padding:13px 22px;font-weight:800;font-size:15px;cursor:pointer}
+  .carte{margin-top:22px;border-radius:16px;background:#fff;border:2px solid #e2e8f0;padding:22px;box-shadow:0 6px 24px rgba(13,43,78,.07)}
+  .carte.ok{border-color:#86efac}
+  .carte.alerte{border-color:#fcd34d}
+  .carte.ko{border-color:#fca5a5}
+  .etat{font-size:19px;font-weight:900;margin:0 0 4px}
+  .ok .etat{color:#15803d}.alerte .etat{color:#b45309}.ko .etat{color:#b91c1c}
+  dl{margin:16px 0 0;display:grid;grid-template-columns:max-content 1fr;gap:8px 16px}
+  dt{color:var(--muted);font-size:13px}
+  dd{margin:0;font-weight:700;word-break:break-word}
+  .avert{margin-top:16px;font-size:12px;color:var(--muted);border-top:1px solid #e2e8f0;padding-top:12px}
+  .mention{margin-top:12px;font-size:13px;background:#fffbeb;border-radius:10px;padding:10px 12px;color:#92400e}
+</style>
+</head>
+<body>
+<header><img src="assets/logo.png" alt="" onerror="this.remove()"> DIASPO'ACTIF</header>
+<main>
+  <h1>Vérifier un document</h1>
+  <p class="lead">Saisissez le numéro figurant sur l'attestation ou le certificat (ou scannez son QR code) pour confirmer qu'il a bien été délivré par Diaspo'Actif.</p>
+  <form id="f" autocomplete="off">
+    <input id="code" name="code" placeholder="DA-XXXX-XXXX-XXXX" maxlength="40" aria-label="Numéro du document" required>
+    <button type="submit">Vérifier</button>
+  </form>
+  <div id="res" aria-live="polite"></div>
+</main>
+<script>
+function esc(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function dateFr(iso){ const t = String(iso || ''); const d = new Date(t.replace(' ', 'T') + (t.length <= 19 && !/Z|\+/.test(t) ? 'Z' : '')); return isNaN(d) ? t.slice(0,10) : d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Paris' }); }
+const res = document.getElementById('res');
+async function verifier(code){
+  code = String(code || '').trim();
+  if (!code) return;
+  res.innerHTML = '<div class="carte"><p style="margin:0;color:#64748b">Vérification…</p></div>';
+  let r, d;
+  try { r = await fetch('/api/attestations/verifier/' + encodeURIComponent(code)); d = await r.json().catch(() => ({})); }
+  catch (e) { res.innerHTML = '<div class="carte alerte"><p class="etat">Connexion impossible</p><p style="margin:0">Réessayez dans un instant.</p></div>'; return; }
+  if (r.status === 429) { res.innerHTML = `<div class="carte alerte"><p class="etat">Trop de vérifications</p><p style="margin:0">${esc(d.error || 'Réessayez plus tard.')}</p></div>`; return; }
+  if (!r.ok || !d.trouve) { res.innerHTML = '<div class="carte ko"><p class="etat">✗ Aucun document trouvé</p><p style="margin:0">Aucun document ne correspond à ce numéro. Vérifiez la saisie : ce document n\'a peut-être pas été délivré par Diaspo\'Actif.</p></div>'; return; }
+  const declaree = d.origine === 'declaree';
+  const revoque = d.valide === false;
+  const classe = revoque ? 'ko' : declaree ? 'alerte' : 'ok';
+  const etat = revoque ? '✗ Document révoqué' : declaree ? '⚠ Mention déclarée par le titulaire' : '✓ Document authentique';
+  res.innerHTML = `<div class="carte ${classe}">
+    <p class="etat">${etat}</p>
+    <p style="margin:0;color:#475569">${revoque ? 'Ce document a existé mais n\'est plus valable.' : declaree ? 'Cette mention n\'a pas été délivrée par Diaspo\'Actif.' : 'Ce document a bien été délivré par Diaspo\'Actif.'}</p>
+    <dl>
+      <dt>Type</dt><dd>${esc(d.type_label || '')}</dd>
+      ${d.beneficiaire ? `<dt>Titulaire</dt><dd>${esc(d.beneficiaire)}</dd>` : ''}
+      <dt>Formation</dt><dd>${esc(d.formation_titre || '')}</dd>
+      ${d.organisme ? `<dt>Organisme</dt><dd>${esc(d.organisme)}</dd>` : ''}
+      <dt>Délivré le</dt><dd>${esc(dateFr(d.date_emission))}</dd>
+      ${d.resultat_pct != null ? `<dt>Résultat</dt><dd>${esc(d.resultat_pct)} %</dd>` : ''}
+      ${d.mention && !declaree ? `<dt>Mention</dt><dd>${esc(d.mention)}</dd>` : ''}
+    </dl>
+    ${declaree && d.mention ? `<div class="mention">${esc(d.mention)}</div>` : ''}
+    <div class="avert">${esc(d.avertissement || '')}</div></div>`;
+}
+document.getElementById('f').addEventListener('submit', e => { e.preventDefault(); const c = document.getElementById('code').value; history.replaceState(null, '', '?code=' + encodeURIComponent(c)); verifier(c); });
+const initial = new URLSearchParams(location.search).get('code');
+if (initial) { document.getElementById('code').value = initial; verifier(initial); }
+</script>
+</body>
+</html>

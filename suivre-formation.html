@@ -22,28 +22,75 @@
 <meta name="theme-color" content="#ff6b00">
 <style>
 .sf-wrap{display:flex;gap:0;min-height:calc(100vh - 64px);}
-.sf-sidebar{width:320px;flex-shrink:0;background:#f8fafc;border-right:1px solid var(--border);overflow-y:auto;max-height:calc(100vh - 64px);position:sticky;top:64px;}
+.sf-sidebar{width:340px;flex-shrink:0;background:#f8fafc;border-right:1px solid var(--border);overflow-y:auto;max-height:calc(100vh - 64px);position:sticky;top:64px;}
 .sf-sidebar-head{padding:16px;border-bottom:1px solid var(--border);}
 .sf-progress-bar{height:8px;background:#e2e8f0;border-radius:99px;overflow:hidden;margin-top:8px;}
 .sf-progress-fill{height:100%;background:var(--orange, #ff6b00);transition:width .3s;}
+.sf-progress-fill.ok{background:#22c55e;}
+.sf-gauge-top{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-top:10px;}
+.sf-gauge-pct{font-size:26px;font-weight:900;color:#0f172a;line-height:1;}
+.sf-gauge-sub{font-size:12px;color:#64748b;margin-top:4px;}
+.sf-statut{display:inline-block;font-size:11px;font-weight:800;padding:3px 10px;border-radius:99px;background:#e2e8f0;color:#334155;}
+.sf-statut.en_cours{background:#fff3e6;color:#c2410c;}
+.sf-statut.en_attente_evaluation{background:#fef3c7;color:#92400e;}
+.sf-statut.termine{background:#dcfce7;color:#166534;}
+.sf-reprendre{width:100%;margin-top:12px;}
 .sf-module{border-bottom:1px solid var(--border);}
 .sf-module-title{padding:12px 16px;font-weight:800;font-size:13px;color:#334155;background:#f1f5f9;}
-.sf-chapitre-title{padding:8px 16px 4px;font-weight:700;font-size:12px;color:#64748b;text-transform:uppercase;}
-.sf-lecon{display:flex;align-items:center;gap:8px;padding:8px 16px 8px 24px;cursor:pointer;font-size:13px;color:#334155;}
+.sf-chapitre{padding:10px 16px 4px;}
+.sf-chapitre-title{display:flex;justify-content:space-between;gap:8px;font-weight:700;font-size:12px;color:#475569;text-transform:uppercase;}
+.sf-chapitre-title .done{color:#16a34a;}
+.sf-chapitre-bar{height:5px;background:#e2e8f0;border-radius:99px;overflow:hidden;margin:5px 0 2px;}
+.sf-chapitre-bar > div{height:100%;background:var(--orange,#ff6b00);}
+.sf-chapitre-bar > div.ok{background:#22c55e;}
+.sf-chapitre-sub{font-size:11px;color:#94a3b8;}
+.sf-lecon{display:flex;align-items:center;gap:8px;padding:8px 16px 8px 24px;cursor:pointer;font-size:13px;color:#334155;border:0;background:none;width:100%;text-align:left;font-family:inherit;}
 .sf-lecon:hover{background:#eef2f7;}
+.sf-lecon:focus-visible{outline:2px solid var(--orange,#ff6b00);outline-offset:-2px;}
 .sf-lecon.active{background:#fff3e6;color:var(--orange,#ff6b00);font-weight:700;}
 .sf-lecon .chk{width:16px;height:16px;border-radius:50%;border:2px solid #cbd5e1;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;}
 .sf-lecon.termine .chk{background:#22c55e;border-color:#22c55e;color:#fff;}
-.sf-main{flex:1;padding:32px;max-width:900px;margin:0 auto;}
+.sf-opt{font-size:10px;font-weight:700;background:#e2e8f0;color:#475569;padding:1px 7px;border-radius:99px;margin-left:auto;white-space:nowrap;}
+.sf-main{flex:1;padding:32px;max-width:900px;margin:0 auto;min-width:0;}
 .sf-content-video video{width:100%;border-radius:12px;background:#000;}
 .sf-content-pdf iframe{width:100%;height:75vh;border:1px solid var(--border);border-radius:12px;}
 .sf-content-pdf .sf-pdf-toolbar{display:flex;align-items:center;gap:10px;margin-bottom:8px;font-size:13px;color:var(--muted);}
 .sf-content-ppt iframe{width:100%;height:75vh;border:1px solid var(--border);border-radius:12px;}
 .sf-content-image img{max-width:100%;border-radius:12px;}
 .sf-fullscreen-btn{background:none;border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:12px;cursor:pointer;}
-.sf-nav-btns{display:flex;justify-content:space-between;margin-top:32px;gap:12px;}
+.sf-nav-btns{display:flex;justify-content:space-between;margin-top:32px;gap:12px;flex-wrap:wrap;}
 .sf-badge-apercu{background:#fef3c7;color:#92400e;padding:4px 12px;border-radius:99px;font-size:12px;font-weight:800;}
 .notice{text-align:center;padding:60px 20px;color:var(--muted);}
+.sf-att{margin:14px 16px 20px;border:1px solid var(--border);border-radius:12px;background:#fff;padding:12px 14px;font-size:12.5px;}
+.sf-att.ok{border-color:#86efac;background:#f0fdf4;}
+.sf-att h4{margin:0 0 6px;font-size:13px;}
+.sf-att ul{list-style:none;margin:6px 0 0;padding:0;}
+.sf-att li{padding:3px 0;color:#475569;display:flex;gap:6px;}
+.sf-att li.ok{color:#166534;}
+.sf-att small{display:block;margin-top:8px;color:#94a3b8;line-height:1.4;}
+.sf-banner{position:sticky;top:64px;z-index:30;background:#dcfce7;border-bottom:1px solid #86efac;color:#14532d;padding:12px 20px;font-weight:700;font-size:14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
+.sf-banner a{color:#14532d;text-decoration:underline;}
+/* Quiz */
+.sf-quiz{border:1px solid var(--border);border-radius:14px;padding:18px;background:#fff;}
+.sf-quiz-meta{font-size:13px;color:#64748b;margin:0 0 14px;line-height:1.5;}
+.sf-q{border-top:1px solid #eef2f7;padding:14px 0;}
+.sf-q:first-of-type{border-top:0;}
+.sf-q-title{font-weight:700;margin:0 0 8px;}
+.sf-q label.opt{display:flex;gap:8px;align-items:center;padding:6px 0;cursor:pointer;}
+.sf-q input[type=text]{width:100%;padding:10px;border:1px solid var(--border);border-radius:10px;font-family:inherit;}
+.sf-q .hint{font-size:11.5px;color:#94a3b8;margin-top:4px;}
+.sf-q.juste{background:#f0fdf4;border-radius:10px;padding:14px 10px;}
+.sf-q.faux{background:#fef2f2;border-radius:10px;padding:14px 10px;}
+.sf-q .verdict{font-size:12.5px;font-weight:700;margin-top:6px;}
+.sf-q-result{border-radius:12px;padding:14px 16px;margin-bottom:14px;font-weight:700;}
+.sf-q-result.ok{background:#dcfce7;color:#14532d;}
+.sf-q-result.ko{background:#fef2f2;color:#7f1d1d;}
+@media (max-width:820px){
+  .sf-wrap{flex-direction:column;}
+  .sf-sidebar{width:100%;max-height:none;position:static;border-right:0;border-bottom:1px solid var(--border);}
+  .sf-main{padding:18px 16px;}
+  .sf-banner{top:0;}
+}
 </style>
 <link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
 <link rel="stylesheet" href="/assets/design-upgrade.v2.css">
@@ -67,6 +114,7 @@
     </div>
   </header>
 
+  <div id="sf-banner-zone"></div>
   <div id="sf-root"><div class="notice">Chargement…</div></div>
 
 </div>
@@ -75,11 +123,12 @@
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js?v=13"></script>
 <script>
-function escH(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function escH(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 const params = new URLSearchParams(location.search);
 const formationId = params.get('id');
 let SF_DATA = null;
 let SF_CURRENT_LECON = null;
+const STATUTS = { non_commence: 'Non commencé', en_cours: 'En cours', en_attente_evaluation: 'En attente d\'évaluation', termine: 'Terminé', apercu: 'Aperçu' };
 
 function flatLecons(){
   const flat = [];
@@ -87,7 +136,7 @@ function flatLecons(){
   return flat;
 }
 
-async function sfLoad(){
+async function sfLoad(keepLeconId){
   if (!formationId){ document.getElementById('sf-root').innerHTML = '<div class="notice">Formation introuvable.</div>'; return; }
   const r = await fetch(`/api/formations/${formationId}/suivre`, { credentials: 'same-origin' });
   if (!r.ok){
@@ -98,24 +147,35 @@ async function sfLoad(){
   SF_DATA = await r.json();
   if (SF_DATA.mode === 'apercu') document.getElementById('sf-back-editeur').style.display = '';
   const flat = flatLecons();
-  const startLeconId = Number(params.get('lecon'));
-  SF_CURRENT_LECON = (startLeconId && flat.find(l => l.id === startLeconId)) || flat.find(l => !l.termine) || flat[0] || null;
+  const demande = Number(keepLeconId) || Number(params.get('lecon')) || (SF_DATA.parcours && SF_DATA.parcours.prochaine_lecon_id) || 0;
+  SF_CURRENT_LECON = (demande && flat.find(l => Number(l.id) === demande)) || flat.find(l => !l.termine) || flat[0] || null;
   sfRender();
+}
+
+function sfJauge(pct, ok){
+  return `<div class="sf-progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}" aria-label="Progression globale"><div class="sf-progress-fill ${ok ? 'ok' : ''}" style="width:${pct}%;"></div></div>`;
 }
 
 function sfRender(){
   const root = document.getElementById('sf-root');
   const f = SF_DATA.formation;
+  const p = SF_DATA.parcours || {};
+  const apercu = SF_DATA.mode === 'apercu';
+  const statut = p.statut || 'non_commence';
+  const reprendre = !apercu && p.prochaine_lecon_id && statut !== 'termine';
   root.innerHTML = `
     <div class="sf-wrap">
-      <aside class="sf-sidebar">
+      <aside class="sf-sidebar" aria-label="Plan de la formation">
         <div class="sf-sidebar-head">
           <div style="font-weight:800;">${escH(f.titre)}</div>
-          ${SF_DATA.mode === 'apercu' ? '<span class="sf-badge-apercu">👁️ Mode aperçu créateur</span>' : `
-          <div style="font-size:12px;color:var(--muted);margin-top:4px;">${SF_DATA.avancement_pct}% terminé</div>
-          <div class="sf-progress-bar"><div class="sf-progress-fill" style="width:${SF_DATA.avancement_pct}%;"></div></div>`}
+          ${apercu ? '<span class="sf-badge-apercu">👁️ Mode aperçu créateur</span>' : `
+          <div class="sf-gauge-top"><span class="sf-gauge-pct">${SF_DATA.avancement_pct}%</span><span class="sf-statut ${statut}">${escH(STATUTS[statut] || statut)}</span></div>
+          ${sfJauge(SF_DATA.avancement_pct, statut === 'termine')}
+          <div class="sf-gauge-sub">${p.nb_termine || 0} activité${(p.nb_termine||0) > 1 ? 's' : ''} obligatoire${(p.nb_total||0) > 1 ? 's' : ''} terminée${(p.nb_termine||0) > 1 ? 's' : ''} sur ${p.nb_total || 0} · ${p.chapitres_termines || 0}/${p.chapitres_total || 0} chapitre${(p.chapitres_total||0) > 1 ? 's' : ''}${p.nb_restant ? ` · il en reste ${p.nb_restant}` : ''}</div>
+          ${reprendre ? '<button type="button" class="btn sf-reprendre" id="sf-reprendre">▶ Reprendre ma formation</button>' : ''}`}
         </div>
         <div id="sf-modules-list"></div>
+        <div id="sf-att-zone"></div>
       </aside>
       <main class="sf-main" id="sf-content"></main>
     </div>
@@ -126,29 +186,48 @@ function sfRender(){
     modEl.className = 'sf-module';
     let html = `<div class="sf-module-title">${escH(m.titre)}</div>`;
     (m.chapitres||[]).forEach(c => {
-      html += `<div class="sf-chapitre-title">${escH(c.titre)}</div>`;
+      const st = c.stats || { total: 0, termine: 0, pct: 0 };
+      const fini = st.total > 0 && st.termine >= st.total;
+      html += `<div class="sf-chapitre">
+        <div class="sf-chapitre-title"><span>${escH(c.titre)}</span><span class="${fini ? 'done' : ''}">${fini ? '✓ ' : ''}${st.pct}%</span></div>
+        ${apercu ? '' : `<div class="sf-chapitre-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${st.pct}" aria-label="Progression du chapitre ${escH(c.titre)}"><div class="${fini ? 'ok' : ''}" style="width:${st.pct}%"></div></div>
+        <div class="sf-chapitre-sub">${st.termine}/${st.total} activité${st.total > 1 ? 's' : ''} obligatoire${st.total > 1 ? 's' : ''}</div>`}
+      </div>`;
       (c.lecons||[]).forEach(l => {
         const active = SF_CURRENT_LECON && SF_CURRENT_LECON.id === l.id;
-        html += `<div class="sf-lecon ${l.termine ? 'termine':''} ${active?'active':''}" data-lecon-id="${l.id}">
-          <span class="chk">${l.termine ? '✓' : ''}</span>
-          <span>${escH(l.titre)}</span>
-        </div>`;
+        html += `<button type="button" class="sf-lecon ${l.termine ? 'termine':''} ${active?'active':''}" data-lecon-id="${l.id}" ${active ? 'aria-current="true"' : ''}>
+          <span class="chk" aria-hidden="true">${l.termine ? '✓' : ''}</span>
+          <span>${l.quiz ? '📝 ' : ''}${escH(l.titre)}</span>
+          ${l.obligatoire === false ? '<span class="sf-opt">facultative</span>' : ''}
+        </button>`;
       });
     });
     modEl.innerHTML = html;
     list.appendChild(modEl);
   });
-  list.querySelectorAll('.sf-lecon').forEach(el => {
-    el.addEventListener('click', () => {
-      const id = Number(el.dataset.leconId);
-      const flat = flatLecons();
-      SF_CURRENT_LECON = flat.find(l => l.id === id);
-      sfRenderContent();
-      list.querySelectorAll('.sf-lecon').forEach(e => e.classList.remove('active'));
-      el.classList.add('active');
-    });
-  });
+  list.querySelectorAll('.sf-lecon').forEach(el => el.addEventListener('click', () => sfGoTo(Number(el.dataset.leconId))));
+  const rp = document.getElementById('sf-reprendre');
+  if (rp) rp.addEventListener('click', () => sfGoTo(Number(p.prochaine_lecon_id)));
+  sfRenderAttestation();
   sfRenderContent();
+}
+
+/* Document (attestation / certificat) : conditions restantes, ou accès au document une fois délivré. */
+function sfRenderAttestation(){
+  const zone = document.getElementById('sf-att-zone');
+  const a = SF_DATA.attestation;
+  if (!zone || !a || !a.active || SF_DATA.mode === 'apercu') { if (zone) zone.innerHTML = ''; return; }
+  if (a.delivree) {
+    const d = a.delivree;
+    zone.innerHTML = `<div class="sf-att ok"><h4>🎓 ${escH(d.type_label)} obtenu(e)</h4>
+      <a class="btn" style="width:100%;text-align:center;box-sizing:border-box;" href="attestation.html?code=${encodeURIComponent(d.code)}" target="_blank" rel="noopener">📄 Voir / imprimer</a>
+      <small>N° ${escH(d.code)}</small></div>`;
+    return;
+  }
+  zone.innerHTML = `<div class="sf-att"><h4>🎓 ${escH(a.type_label)}</h4>
+    <div>Pour l'obtenir :</div>
+    <ul>${(a.conditions||[]).map(c => `<li class="${c.ok ? 'ok' : ''}"><span aria-hidden="true">${c.ok ? '✓' : '○'}</span><span>${escH(c.libelle)}</span></li>`).join('')}</ul>
+    <small>${escH(a.avertissement || '')}</small></div>`;
 }
 
 function sfContentHtml(l){
@@ -184,7 +263,7 @@ function sfContentHtml(l){
     case 'telechargement':
       return `<div class="notice">📎 ${l.contenu_url ? (!l.telechargement_autorise ? 'Le téléchargement de ce document n\'est pas autorisé par le formateur.' : `<a href="${escH(l.contenu_url)}" target="_blank" rel="noopener">Télécharger le document</a>`) : 'Aucun fichier.'}</div>`;
     case 'quiz':
-      return `<div class="notice">📝 Quiz — bientôt disponible.</div>`;
+      return '<div id="sf-quiz-zone"></div>';
     case 'exercice':
     case 'travail_pratique':
     case 'etude_cas':
@@ -201,39 +280,132 @@ function sfRenderContent(){
   const idx = flat.findIndex(x => l && x.id === l.id);
   const prev = idx > 0 ? flat[idx-1] : null;
   const next = idx >= 0 && idx < flat.length - 1 ? flat[idx+1] : null;
+  const apprenant = SF_DATA.mode !== 'apercu';
+  /* Une leçon portant un quiz se valide en le RÉUSSISSANT (jamais d'un clic) : pas de bouton « terminé » pour elle. */
+  const validationParQuiz = l && l.quiz;
   el.innerHTML = `
-    <h2 style="margin-top:0;">${l ? escH(l.titre) : ''}</h2>
+    <h2 style="margin-top:0;">${l ? escH(l.titre) : ''}${l && l.obligatoire === false ? ' <span class="sf-opt" style="margin-left:8px;vertical-align:middle;">facultative</span>' : ''}</h2>
     ${l && l.description ? `<p style="color:var(--muted);">${escH(l.description)}</p>` : ''}
     ${sfContentHtml(l)}
     <div class="sf-nav-btns">
       <button class="btn secondary" ${!prev?'disabled':''} onclick="sfGoTo(${prev?prev.id:'null'})">← Précédent</button>
-      ${SF_DATA.mode !== 'apercu' && l ? `<button class="btn" onclick="sfToggleTermine(${l.id})">${l.termine ? '✓ Terminé' : 'Marquer comme terminé'}</button>` : ''}
+      ${apprenant && l && !validationParQuiz ? `<button class="btn" onclick="sfToggleTermine(${l.id})">${l.termine ? '✓ Terminé' : 'Marquer comme terminé'}</button>` : ''}
       <button class="btn secondary" ${!next?'disabled':''} onclick="sfGoTo(${next?next.id:'null'})">Suivant →</button>
     </div>
   `;
+  if (l && l.type === 'quiz') sfQuizLoad(l);
 }
 
 function sfGoTo(id){
   if (!id) return;
   const flat = flatLecons();
-  SF_CURRENT_LECON = flat.find(l => l.id === id);
-  document.querySelectorAll('.sf-lecon').forEach(e => e.classList.toggle('active', Number(e.dataset.leconId) === id));
+  SF_CURRENT_LECON = flat.find(l => Number(l.id) === Number(id));
+  document.querySelectorAll('.sf-lecon').forEach(e => { const on = Number(e.dataset.leconId) === Number(id); e.classList.toggle('active', on); if (on) e.setAttribute('aria-current','true'); else e.removeAttribute('aria-current'); });
   sfRenderContent();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function sfBanniereAttestation(a){
+  const zone = document.getElementById('sf-banner-zone');
+  if (!zone || !a) return;
+  zone.innerHTML = `<div class="sf-banner" role="status">🎉 Félicitations ! Votre ${escH(String(a.type_label).toLowerCase())} est disponible.
+    <a href="attestation.html?code=${encodeURIComponent(a.code)}" target="_blank" rel="noopener">Voir / imprimer</a></div>`;
 }
 
 async function sfToggleTermine(leconId){
   const flat = flatLecons();
-  const l = flat.find(x => x.id === leconId);
+  const l = flat.find(x => Number(x.id) === Number(leconId));
   const nouveauStatut = !l.termine;
+  const avant = SF_DATA.attestation && SF_DATA.attestation.delivree;
   const r = await fetch(`/api/formations/${formationId}/lecons/${leconId}/progression`, {
     method: 'POST', headers: {'Content-Type':'application/json'}, credentials:'same-origin',
     body: JSON.stringify({ termine: nouveauStatut })
   });
-  if (!r.ok) return;
+  if (!r.ok){
+    const err = await r.json().catch(()=>({}));
+    alert(err.error || 'Impossible d\'enregistrer votre progression.');
+    return;
+  }
   const data = await r.json();
-  l.termine = nouveauStatut;
-  SF_DATA.avancement_pct = data.avancement_pct;
-  sfRender();
+  await sfLoad(leconId);
+  if (data.attestation && !avant) sfBanniereAttestation(data.attestation);
+}
+
+/* ── Quiz : questions reçues SANS les bonnes réponses ; la correction et le seuil sont appliqués par le serveur ── */
+async function sfQuizLoad(l){
+  const zone = document.getElementById('sf-quiz-zone');
+  if (!zone) return;
+  if (!l.quiz){ zone.innerHTML = '<div class="notice">Aucun quiz n\'est encore rattaché à cette leçon.</div>'; return; }
+  if (SF_DATA.mode === 'apercu'){ zone.innerHTML = '<div class="notice">📝 Quiz « ' + escH(l.quiz.titre) + ' » — visible et passable par les apprenants inscrits.</div>'; return; }
+  zone.innerHTML = '<div class="notice" style="padding:30px;">Chargement du quiz…</div>';
+  const r = await fetch(`/api/formations/${formationId}/quiz/${l.quiz.id}/passer`, { credentials: 'same-origin' });
+  if (!r.ok){ const err = await r.json().catch(()=>({})); zone.innerHTML = `<div class="notice">${escH(err.error || 'Quiz indisponible.')}</div>`; return; }
+  const d = await r.json();
+  sfQuizRender(zone, l, d, null);
+}
+
+function sfQuizRender(zone, l, d, resultat){
+  const q = d.quiz;
+  const dejaReussi = (d.tentatives && d.tentatives.reussi) || (resultat && resultat.reussi);
+  const entete = `<p class="sf-quiz-meta">Seuil de réussite : <strong>${q.note_minimale}%</strong>${q.temps_limite_min ? ` · temps conseillé : ${q.temps_limite_min} min` : ''}
+    ${d.tentatives && d.tentatives.nb ? ` · ${d.tentatives.nb} tentative${d.tentatives.nb > 1 ? 's' : ''}${d.tentatives.meilleure_note != null ? `, meilleure note : ${d.tentatives.meilleure_note}%` : ''}` : ''}</p>`;
+  let verdict = '';
+  if (resultat) {
+    verdict = resultat.reussi
+      ? `<div class="sf-q-result ok" role="status">✅ Quiz réussi${resultat.note_pct != null ? ` — ${resultat.note_pct}%` : ''}. Cette activité est validée.${resultat.nb_non_notees ? ` (${resultat.nb_non_notees} réponse${resultat.nb_non_notees > 1 ? 's' : ''} libre${resultat.nb_non_notees > 1 ? 's' : ''} non notée${resultat.nb_non_notees > 1 ? 's' : ''})` : ''}</div>`
+      : `<div class="sf-q-result ko" role="status">❌ ${resultat.note_pct}% — il faut au moins ${resultat.seuil}% pour réussir. Relisez le cours puis réessayez : les bonnes réponses seront affichées une fois le quiz réussi.</div>`;
+  } else if (dejaReussi) {
+    verdict = '<div class="sf-q-result ok" role="status">✅ Vous avez déjà réussi ce quiz. Vous pouvez le repasser pour vous entraîner.</div>';
+  }
+  const detail = {};
+  if (resultat) (resultat.detail||[]).forEach(x => { detail[x.question_id] = x; });
+  const questions = (d.questions||[]).map((qu, i) => {
+    const dt = detail[qu.id];
+    const cls = dt && dt.note ? (dt.correct ? 'juste' : 'faux') : '';
+    let champ;
+    if (qu.type === 'texte_libre' || !qu.options.length) {
+      champ = `<input type="text" name="q${qu.id}" aria-label="Votre réponse" maxlength="500" autocomplete="off"><div class="hint">Réponse courte.</div>`;
+    } else {
+      const type = qu.multiple ? 'checkbox' : 'radio';
+      champ = qu.options.map((o, k) => `<label class="opt"><input type="${type}" name="q${qu.id}" value="${escH(o)}" id="q${qu.id}_${k}"> <span>${escH(o)}</span></label>`).join('') + (qu.multiple ? '<div class="hint">Plusieurs réponses possibles.</div>' : '');
+    }
+    const note = dt && dt.note ? `<div class="verdict">${dt.correct ? '✓ Bonne réponse' : '✗ Réponse incorrecte'}${dt.bonne_reponse ? ` — réponse attendue : ${escH(dt.bonne_reponse)}` : ''}</div>` : (dt && !dt.note ? '<div class="verdict" style="color:#64748b;">Réponse libre : non notée.</div>' : '');
+    return `<div class="sf-q ${cls}" data-qid="${qu.id}"><p class="sf-q-title">${i + 1}. ${escH(qu.question)} <span style="font-weight:400;color:#94a3b8;font-size:12px;">(${qu.points} pt${qu.points > 1 ? 's' : ''})</span></p>${champ}${note}</div>`;
+  }).join('');
+  zone.innerHTML = `<div class="sf-quiz"><h3 style="margin:0 0 6px;">📝 ${escH(q.titre)}</h3>${entete}${verdict}${q.commentaires ? `<p class="sf-quiz-meta">${escH(q.commentaires)}</p>` : ''}
+    <form id="sf-quiz-form" novalidate>${questions || '<div class="notice">Ce quiz ne contient pas encore de question.</div>'}
+    ${questions ? `<div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;"><button type="submit" class="btn" id="sf-quiz-submit">${resultat ? 'Valider une nouvelle tentative' : 'Valider mes réponses'}</button></div>` : ''}</form></div>`;
+  const form = document.getElementById('sf-quiz-form');
+  if (!form || !questions) return;
+  form.addEventListener('submit', async ev => {
+    ev.preventDefault();
+    const reponses = {};
+    (d.questions||[]).forEach(qu => {
+      const champs = form.querySelectorAll(`[name="q${qu.id}"]`);
+      if (!champs.length) return;
+      if (champs[0].type === 'text') reponses[qu.id] = champs[0].value;
+      else if (champs[0].type === 'checkbox') reponses[qu.id] = [...champs].filter(c => c.checked).map(c => c.value);
+      else { const c = [...champs].find(c => c.checked); reponses[qu.id] = c ? c.value : ''; }
+    });
+    const btn = document.getElementById('sf-quiz-submit'); btn.disabled = true; btn.textContent = 'Correction…';
+    const avant = SF_DATA.attestation && SF_DATA.attestation.delivree;
+    try {
+      const r = await fetch(`/api/formations/${formationId}/quiz/${q.id}/soumettre`, { method: 'POST', headers: {'Content-Type':'application/json'}, credentials: 'same-origin', body: JSON.stringify({ reponses }) });
+      const res = await r.json();
+      if (!r.ok) { alert(res.error || 'Impossible de corriger le quiz.'); btn.disabled = false; btn.textContent = 'Valider mes réponses'; return; }
+      /* On rafraîchit les jauges, puis on réaffiche le quiz avec le corrigé (réussite) ou le score (échec). */
+      await sfLoad(l.id);
+      const nouvelle = flatLecons().find(x => Number(x.id) === Number(l.id));
+      const zone2 = document.getElementById('sf-quiz-zone');
+      if (zone2 && nouvelle) {
+        const rr = await fetch(`/api/formations/${formationId}/quiz/${q.id}/passer`, { credentials: 'same-origin' });
+        const dd = rr.ok ? await rr.json() : d;
+        sfQuizRender(zone2, nouvelle, dd, res);
+        zone2.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+      if (res.attestation && !avant) sfBanniereAttestation(res.attestation);
+    } catch (e) { alert('Connexion impossible. Réessayez.'); btn.disabled = false; btn.textContent = 'Valider mes réponses'; }
+  });
 }
 
 sfLoad();

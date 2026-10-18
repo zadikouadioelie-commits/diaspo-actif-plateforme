@@ -3238,6 +3238,10 @@ require("./cartographie-competences").register({ route, db, sendJSON, getCurrent
 /* Partager un tuto vidéo sur le fil (2026-10-12) : POST /api/videos-tutoriels/:id/partager — voir server/tuto-partage.js. */
 const TutoPartage = require("./tuto-partage");
 TutoPartage.register({ route, db, sendJSON, getCurrentUser, SEC, nomCompteAffichage, getOrigin });
+/* Diaspo'Actif Formation, lot 1 (2026-10-18) : progression par chapitre + activités obligatoires, quiz corrigés côté serveur, attestations/certificats vérifiables — server/formation-parcours.js.
+   checkFormationOwner, creerNotif et nomCompteAffichage sont des déclarations de fonction (hissées). */
+const FormationParcours = require("./formation-parcours");
+FormationParcours.register({ route, db, sendJSON, getCurrentUser, SEC, checkFormationOwner, creerNotif, nomCompteAffichage });
 /* Envoyer un événement par e-mail (carte complète) + texte d'aperçu du lien (date, lieu) : server/partage-evenement.js. urlImagePartageEvenement est une déclaration de fonction (hissée). */
 const PartageEvenement = require("./partage-evenement");
 PartageEvenement.register({ route, db, sendJSON, getCurrentUser, SEC, nomCompteAffichage, getOrigin, urlImagePartageEvenement });
@@ -17729,29 +17733,26 @@ route("GET", "/api/formations/:id/suivre", async (req, res, params) => {
   const inscription = await db.prepare("SELECT * FROM formation_inscriptions WHERE formation_id=? AND user_id=? AND statut='active' AND COALESCE(paiement_statut,'paye')<>'en_attente'").get(params.id, user.id);
   if (!inscription && !isOwner) return sendJSON(res, 403, { error: "Vous devez être inscrit pour accéder à cette formation." });
 
-  const progressionRows = inscription
-    ? await db.prepare("SELECT lecon_id, termine FROM formation_lecons_progression WHERE inscription_id=?").all(inscription.id)
-    : [];
-  const progressionMap = {};
-  progressionRows.forEach(p => { progressionMap[p.lecon_id] = !!p.termine; });
-
-  const modules = await db.prepare("SELECT * FROM formation_modules WHERE formation_id=? ORDER BY ordre ASC, id ASC").all(params.id);
-  let totalLecons = 0, nbTermine = 0;
-  for (const m of modules) {
-    const chapitres = await db.prepare("SELECT * FROM formation_chapitres WHERE module_id=? ORDER BY ordre ASC, id ASC").all(m.id);
-    for (const c of chapitres) {
-      const lecons = await db.prepare("SELECT * FROM formation_lecons WHERE chapitre_id=? ORDER BY ordre ASC, id ASC").all(c.id);
-      lecons.forEach(l => {
-        l.termine = progressionMap[l.id] || false;
-        totalLecons++;
-        if (l.termine) nbTermine++;
-      });
-      c.lecons = lecons;
-    }
-    m.chapitres = chapitres;
+  /* Progression, jauge par chapitre, statut et prochaine activité : calculés côté serveur (server/formation-parcours.js). */
+  const parcours = await FormationParcours.construireParcours(db, f, inscription || null);
+  /* Document (attestation / certificat) : état et conditions restantes ; délivré ici dès que les conditions sont remplies (idempotent). */
+  let attestation = null;
+  if (inscription) {
+    const a = await FormationParcours.evaluerAttestation({ db, creerNotif, nomCompteAffichage }, inscription.id);
+    attestation = a ? FormationParcours.vueAttestation(a) : null;
   }
-  const avancement_pct = totalLecons ? Math.round((nbTermine / totalLecons) * 100) : 0;
-  sendJSON(res, 200, { formation: f, modules, avancement_pct, mode: inscription ? 'apprenant' : 'apercu', inscription_id: inscription ? inscription.id : null });
+  const typeDoc = FormationParcours.typeValide(f.certificat_type);
+  sendJSON(res, 200, {
+    formation: f, modules: parcours.modules, avancement_pct: parcours.avancement_pct, mode: inscription ? 'apprenant' : 'apercu', inscription_id: inscription ? inscription.id : null,
+    parcours: {
+      statut: parcours.statut, nb_total: parcours.nb_total, nb_termine: parcours.nb_termine, nb_restant: parcours.nb_restant,
+      chapitres_total: parcours.chapitres_total, chapitres_termines: parcours.chapitres_termines, prochaine_lecon_id: parcours.prochaine_lecon_id,
+    },
+    attestation: {
+      active: !!Number(f.certificat_actif), type: typeDoc, type_label: FormationParcours.TYPES[typeDoc].label,
+      conditions: parcours.conditions, delivree: attestation, avertissement: FormationParcours.AVERTISSEMENT,
+    },
+  });
 });
 
 /* Marquer une leçon comme terminée / non terminée */
@@ -17760,6 +17761,9 @@ route("POST", "/api/formations/:id/lecons/:leconId/progression", async (req, res
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const inscription = await db.prepare("SELECT * FROM formation_inscriptions WHERE formation_id=? AND user_id=? AND statut='active' AND COALESCE(paiement_statut,'paye')<>'en_attente'").get(params.id, user.id);
   if (!inscription) return sendJSON(res, 403, { error: "Vous devez être inscrit pour suivre cette formation." });
+  /* Une leçon portant un quiz ne se valide que par la RÉUSSITE du quiz (POST …/quiz/:quizId/soumettre) : un simple clic ne suffit pas. */
+  const quizLie = await db.prepare("SELECT id FROM formation_quiz WHERE formation_id=? AND lecon_id=?").get(params.id, params.leconId);
+  if (quizLie && body.termine) return sendJSON(res, 409, { error: "Cette activité est un quiz : elle se valide en le réussissant.", code: "quiz_requis", quiz_id: Number(quizLie.id) });
   const termine = body.termine ? 1 : 0;
   const existe = await db.prepare("SELECT id FROM formation_lecons_progression WHERE inscription_id=? AND lecon_id=?").get(inscription.id, params.leconId);
   if (existe) {
@@ -17767,16 +17771,12 @@ route("POST", "/api/formations/:id/lecons/:leconId/progression", async (req, res
   } else {
     await db.prepare("INSERT INTO formation_lecons_progression (inscription_id, lecon_id, termine, date_completion) VALUES (?,?,?,?)").run(inscription.id, params.leconId, termine, termine ? new Date().toISOString() : null);
   }
-  const totalLecons = (await db.prepare(`
-    SELECT COUNT(*) AS n FROM formation_lecons l
-    JOIN formation_chapitres c ON c.id=l.chapitre_id
-    JOIN formation_modules m ON m.id=c.module_id
-    WHERE m.formation_id=?
-  `).get(params.id))?.n || 0;
-  const nbTermine = (await db.prepare("SELECT COUNT(*) AS n FROM formation_lecons_progression WHERE inscription_id=? AND termine=1").get(inscription.id))?.n || 0;
-  const avancement_pct = totalLecons ? Math.round((nbTermine / totalLecons) * 100) : 0;
+  const fParcours = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
+  const parcours = await FormationParcours.construireParcours(db, fParcours, inscription);
+  const avancement_pct = parcours.avancement_pct;
   await db.prepare("UPDATE formation_inscriptions SET avancement_pct=?, derniere_activite_le=datetime('now'), relance_inactivite_le=NULL WHERE id=?").run(avancement_pct, inscription.id);
-  sendJSON(res, 200, { ok: true, avancement_pct });
+  const attestation = await FormationParcours.evaluerAttestation({ db, creerNotif, nomCompteAffichage }, inscription.id);
+  sendJSON(res, 200, { ok: true, avancement_pct, statut: parcours.statut, prochaine_lecon_id: parcours.prochaine_lecon_id, attestation: attestation ? FormationParcours.vueAttestation(attestation) : null });
 });
 route("POST", "/api/formations/:id/modules", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
@@ -17883,11 +17883,11 @@ route("POST", "/api/formations/:id/chapitres/:chapitreId/lecons", async (req, re
   const chapitre = await db.prepare("SELECT module_id FROM formation_chapitres WHERE id=?").get(params.chapitreId);
   if (!chapitre) return sendJSON(res, 404, { error: "Chapitre introuvable." });
   const { max } = await db.prepare("SELECT COALESCE(MAX(ordre),-1) AS max FROM formation_lecons WHERE chapitre_id=?").get(params.chapitreId);
-  const id = (await db.prepare(`INSERT INTO formation_lecons (module_id,chapitre_id,titre,description,type,duree_minutes,contenu_url,contenu_texte,ressources_json,image_url,ordre,telechargement_autorise,nb_pages)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+  const id = (await db.prepare(`INSERT INTO formation_lecons (module_id,chapitre_id,titre,description,type,duree_minutes,contenu_url,contenu_texte,ressources_json,image_url,ordre,telechargement_autorise,nb_pages,obligatoire)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
     chapitre.module_id, params.chapitreId, body.titre, body.description||null, body.type||'texte', body.duree_minutes||null,
     body.contenu_url||null, body.contenu_texte ? SEC.sanitizeRichHtml(body.contenu_texte) : null, body.ressources_json ? JSON.stringify(body.ressources_json) : null,
-    body.image_url||null, max+1, body.telechargement_autorise === false ? 0 : 1, body.nb_pages||null
+    body.image_url||null, max+1, body.telechargement_autorise === false ? 0 : 1, body.nb_pages||null, body.obligatoire === false ? 0 : 1
   )).lastInsertRowid;
   sendJSON(res, 201, { id });
 });
@@ -17902,10 +17902,11 @@ route("PUT", "/api/formations/:id/lecons/:leconId", async (req, res, params, bod
     titre=COALESCE(?,titre), description=COALESCE(?,description), type=COALESCE(?,type),
     duree_minutes=COALESCE(?,duree_minutes), contenu_url=COALESCE(?,contenu_url),
     contenu_texte=COALESCE(?,contenu_texte), ressources_json=COALESCE(?,ressources_json), image_url=COALESCE(?,image_url),
-    telechargement_autorise=COALESCE(?,telechargement_autorise), nb_pages=COALESCE(?,nb_pages)
+    telechargement_autorise=COALESCE(?,telechargement_autorise), nb_pages=COALESCE(?,nb_pages), obligatoire=COALESCE(?,obligatoire)
     WHERE id=?`).run(n(body.titre),n(body.description),n(body.type),n(body.duree_minutes),n(body.contenu_url),
     (body.contenu_texte === undefined ? null : SEC.sanitizeRichHtml(body.contenu_texte)), body.ressources_json?JSON.stringify(body.ressources_json):null, n(body.image_url),
-    body.telechargement_autorise === undefined ? null : (body.telechargement_autorise ? 1 : 0), n(body.nb_pages), params.leconId);
+    body.telechargement_autorise === undefined ? null : (body.telechargement_autorise ? 1 : 0), n(body.nb_pages),
+    body.obligatoire === undefined ? null : (body.obligatoire ? 1 : 0), params.leconId);
   sendJSON(res, 200, { ok: true });
 });
 route("DELETE", "/api/formations/:id/lecons/:leconId", async (req, res, params) => {
@@ -17934,9 +17935,9 @@ route("GET", "/api/formations/:id/quiz", async (req, res, params) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   /* Réservé au créateur de la formation (constructeur formations.html) — les questions
-     incluent reponse_correcte. Le passage de quiz côté élève n'est pas encore implémenté
-     (suivre-formation.html affiche "Quiz — bientôt disponible"), donc aucun usage légitime
-     élève à préserver ici ; n'importe quel compte connecté pouvait sinon lire le corrigé. */
+     incluent reponse_correcte. Les apprenants passent les quiz par GET …/quiz/:quizId/passer
+     (questions SANS corrigé) et POST …/soumettre (correction serveur), voir server/formation-parcours.js ;
+     n'importe quel compte connecté pouvait sinon lire le corrigé ici. */
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
   if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
   if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
@@ -18010,9 +18011,16 @@ route("PUT", "/api/formations/:id/certificat", async (req, res, params, body) =>
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
   if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
   if (!(await exigerPremium(user, res, "formations"))) return;
+  /* Type de document (lot 1 « Diaspo'Actif Formation ») : participation | suivi | reussite. Un certificat de RÉUSSITE suppose au moins une évaluation à réussir. */
+  const typeDoc = body.certificat_type === undefined ? FormationParcours.typeValide(f.certificat_type) : String(body.certificat_type);
+  if (!Object.prototype.hasOwnProperty.call(FormationParcours.TYPES, typeDoc)) return sendJSON(res, 400, { error: "Type de document inconnu (participation, suivi ou reussite)." });
+  if (body.certificat_actif && typeDoc === 'reussite') {
+    const nbQuiz = (await db.prepare("SELECT COUNT(*) AS n FROM formation_quiz WHERE formation_id=?").get(params.id))?.n || 0;
+    if (!Number(nbQuiz)) return sendJSON(res, 400, { error: "Un certificat de réussite nécessite au moins un quiz ou un examen final : créez-le d'abord dans l'onglet « Quiz », ou choisissez une attestation de suivi." });
+  }
   await db.prepare(`UPDATE formations SET certificat_actif=?, certificat_modele=COALESCE(?,certificat_modele),
-    certificat_conditions=COALESCE(?,certificat_conditions), certificat_qr=? WHERE id=?`)
-    .run(body.certificat_actif?1:0, body.certificat_modele||null, body.certificat_conditions||null, body.certificat_qr===false?0:1, params.id);
+    certificat_conditions=COALESCE(?,certificat_conditions), certificat_qr=?, certificat_type=? WHERE id=?`)
+    .run(body.certificat_actif?1:0, body.certificat_modele||null, body.certificat_conditions||null, body.certificat_qr===false?0:1, typeDoc, params.id);
   sendJSON(res, 200, { ok: true });
 });
 
@@ -18090,7 +18098,11 @@ route("POST", "/api/formations/:id/publier", async (req, res, params) => {
   if (f.mode_acces && f.mode_acces !== 'gratuit') {
     if (!f.prix || f.prix <= 0) erreurs.push("Le prix doit être défini pour une formation payante.");
   }
-  if (f.certificat_actif && !f.certificat_conditions) erreurs.push("Les conditions d'obtention du certificat ne sont pas définies.");
+  /* Les conditions d'obtention sont désormais celles du TYPE de document choisi (le texte libre devient une simple précision) ; un certificat de réussite exige une évaluation. */
+  if (f.certificat_actif && FormationParcours.typeValide(f.certificat_type) === 'reussite') {
+    const nbQuiz = (await db.prepare("SELECT COUNT(*) AS n FROM formation_quiz WHERE formation_id=?").get(params.id))?.n || 0;
+    if (!Number(nbQuiz)) erreurs.push("Le certificat de réussite nécessite au moins un quiz ou un examen final.");
+  }
   if (!f.mode_acces) erreurs.push("Le mode d'accès (gratuit / payant / adhérents / invitation) n'est pas défini.");
   if (erreurs.length) return sendJSON(res, 400, { error: "Formation incomplète.", details: erreurs });
 
