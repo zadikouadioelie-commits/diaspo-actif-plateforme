@@ -29,8 +29,13 @@
 <link rel="apple-touch-icon" href="assets/logo.png">
   <link rel="stylesheet" href="/assets/design-upgrade.v2.css">
   <link rel="stylesheet" href="/assets/theme-manager.css">
+  <!-- Design « Nuit dorée » (2026-10-18) : tableau de bord Utilisateur ; retour arrière : retirer ces 4 liens, le script dashboard-nuit-doree.js et class="nd" sur <body> -->
+  <link rel="stylesheet" href="/assets/theme-nuit-doree.css?v=8">
+  <link rel="stylesheet" href="/assets/dashboard-nuit-doree.css?v=4">
+  <link rel="stylesheet" href="/assets/profil-nuit-doree.css?v=9">
+  <link rel="stylesheet" href="/assets/dashboard-utilisateur-nuit-doree.css?v=1">
 </head>
-<body>
+<body class="nd">
 <div class="page">
 
   <header class="topbar">
@@ -1062,7 +1067,8 @@ function fmtDate(d){if(!d)return '';try{return new Date(d).toLocaleDateString('f
 <script src="assets/banner-presets.js"></script>
 <script src="assets/rich-editor.js"></script>
 <script src="assets/profil-checklist.js"></script>
-<script src="assets/carte-diaspoactif.js?v=3"></script>
+<script src="assets/carte-diaspoactif.js?v=4"></script>
+<script src="/assets/dashboard-nuit-doree.js?v=3" defer></script>
   <script src="/assets/theme-manager.js"></script>
 </body>
 </html>
