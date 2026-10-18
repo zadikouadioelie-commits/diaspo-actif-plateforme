@@ -431,6 +431,11 @@ textarea.rp-in{min-height:96px;resize:vertical}
       (tags.length ? '<div class="tags">' + tags.join('') + '</div>' : '') + '</div>' + etat +
       (desc ? '<div class="card pad rich">' + desc + '</div>' : '') +
       (facts.length ? '<div class="card pad">' + facts.map(([k, v]) => '<div class="kv"><span>' + esc(k) + '</span><span>' + esc(v) + '</span></div>').join('') + '</div>' : '') +
+      /* Identification officielle (2026-10-18) : numéros déclarés + pays où les vérifier — publics. */
+      ((i.identification_publique && (i.identification_publique.numeros || []).length) ? '<div class="card pad"><b>Identification officielle</b>' +
+        (i.identification_publique.nom_legal ? '<div class="kv"><span>Dénomination légale</span><span>' + esc(i.identification_publique.nom_legal) + '</span></div>' : '') +
+        i.identification_publique.numeros.map(n => '<div class="kv"><span>' + esc(n.libelle) + '</span><span><b>' + esc(n.numero) + '</b><br><span class="small muted">' + (n.confirme ? '✓ Confirmé par la plateforme' : 'Déclaré par la structure') + '</span>' + (n.lien ? '<br><a href="' + esc(A.attrUrl(n.lien)) + '" target="_blank" rel="noopener noreferrer">Vérifier au registre ↗</a>' : '') + '</span></div>').join('') +
+        (i.identification_publique.pays ? '<div class="kv"><span>Pays où vérifier</span><span>' + esc(i.identification_publique.pays) + '</span></div>' : '') + '</div>' : '') +
       (arr(i.services).length ? '<div class="h2">SERVICES PROPOSÉS</div><div class="card pad"><div class="tags" style="margin:0">' + arr(i.services).map(s => '<span class="badge">' + esc(s) + '</span>').join('') + '</div></div>' : '') +
       (arr(i.langues).length ? '<div class="h2">LANGUES</div><div class="card pad">' + esc(arr(i.langues).join(', ')) + '</div>' : '') +
       (recos.length ? '<div class="h2">RECOMMANDÉE PAR</div><div class="card pad">' + recos.map(x => '<div class="kv" style="display:block"><b>' + esc(x.nom) + '</b>' + (x.contenu ? '<div class="small muted" style="font-weight:400;text-align:left">« ' + esc(x.contenu) + ' »</div>' : '') + '</div>').join('') + '</div>' : '') +

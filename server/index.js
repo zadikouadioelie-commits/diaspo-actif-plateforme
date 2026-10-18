@@ -10401,6 +10401,10 @@ route("GET", "/api/mon-initiative", async (req, res, params, body, query) => {
 route("GET", "/api/initiatives/:id", async (req, res, params, body, query) => {
   const row = await getInitiativeByIdOrSlug(params.id);
   if (!row) return sendJSON(res, 404, { error: "Initiative introuvable." });
+  /* Numéros d'identification (RNA, SIREN, SIRET, RCCM, IFU, numéro fiscal…) + pays : PUBLICS (2026-10-18, demande explicite — n'importe qui doit
+     pouvoir les vérifier). Calculé AVANT assainirInitiativePublique, qui retire le numéro fiscal des champs bruts : seule cette liste structurée
+     l'expose. */
+  row.identification_publique = Immat.identificationPublique(row);
   /* Coordonnées privées retirées AVANT tout enrichissement, pour qu'aucune branche du
      traitement ne puisse les réintroduire par inadvertance. Le numéro du responsable est
      une donnée de gestion de compte : il était renvoyé publiquement, y compris dans la
@@ -40092,9 +40096,11 @@ ${jsonLd}
     const RESEAU_CHAMPS_PRIVES = ['email_responsable', 'tel_responsable', 'tel_responsable_2', 'tel_responsable_3', 'stripe_identity_session_id', 'numero_fiscal'];
     async function enrichInit(row, garderPrive) {
       if (!row) return null;
+      const identificationPublique = Immat.identificationPublique(row); // avant le retrait du numéro fiscal des champs bruts
       if (!garderPrive) { row = { ...row }; RESEAU_CHAMPS_PRIVES.forEach(k => { delete row[k]; }); }
       return {
         ...row,
+        identification_publique: identificationPublique,
         services: safeParseArray(row.services),
         langues: safeParseArray(row.langues),
         nationalites_concernees: safeParseArray(row.nationalites_concernees),

@@ -150,4 +150,34 @@ async function chercherRegistre(numero, fetchImpl) {
   } catch (e) { return { statut: 'indisponible' }; }
 }
 
-module.exports = { TYPES, compact, luhnValide, cleValide, formatImmatriculation, typeEffectif, validerSaisie, jetons, memeNom, nomsConcordent, chercherRegistre };
+/* ── Identification PUBLIQUE d'une structure (2026-10-18, demande explicite) ──
+   Tout numéro d'identification déclaré par une entreprise, une association ou une ONG (RNA, SIREN, SIRET, RCCM, IFU, numéro fiscal…) est
+   montré sur son profil public AVEC son libellé et le PAYS où le vérifier : n'importe qui doit pouvoir le contrôler lui-même. Un lien vers le
+   registre officiel est proposé quand il existe (registre français pour SIREN / SIRET / RNA). Renvoie null si rien n'est déclaré. */
+const REGISTRE_FR = 'https://annuaire-entreprises.data.gouv.fr';
+const LIENS_REGISTRE = {
+  SIREN: n => /^\d{9}$/.test(n) ? `${REGISTRE_FR}/entreprise/${n}` : '',
+  SIRET: n => /^\d{14}$/.test(n) ? `${REGISTRE_FR}/etablissement/${n}` : '',
+  RNA:   n => /^W\d{9}$/.test(n) ? `${REGISTRE_FR}/rechercher?terme=${n}` : '',
+};
+const NOMS_PAYS = { FR: 'France', BE: 'Belgique', CI: "Côte d'Ivoire", SN: 'Sénégal', CA: 'Canada', MA: 'Maroc', TN: 'Tunisie', CM: 'Cameroun', ML: 'Mali',
+  BF: 'Burkina Faso', MG: 'Madagascar', GA: 'Gabon', CG: 'Congo', CD: 'RDC', DE: 'Allemagne', GB: 'Royaume-Uni', US: 'États-Unis', CH: 'Suisse' };
+function identificationPublique(ini) {
+  if (!ini) return null;
+  const codePays = String(ini.pays_immatriculation || '').trim();
+  const pays = NOMS_PAYS[codePays.toUpperCase()] || codePays || String(ini.pays || '').trim();
+  const numeros = [];
+  const num = String(ini.numero_immatriculation || '').trim();
+  if (num) {
+    const type = typeEffectif(ini.type_immatriculation, num);
+    const lien = type && LIENS_REGISTRE[type] ? LIENS_REGISTRE[type](compact(num)) : '';
+    numeros.push({ type, libelle: type ? TYPES[type].libelle : "Numéro d'immatriculation", numero: num, confirme: !!ini.immat_verifiee_ligne,
+      lien, registre: lien ? 'Annuaire des entreprises (État français)' : '' });
+  }
+  const fiscal = String(ini.numero_fiscal || '').trim();
+  if (fiscal) numeros.push({ type: 'FISCAL', libelle: 'Numéro fiscal', numero: fiscal, confirme: false, lien: '', registre: '' });
+  if (!numeros.length) return null;
+  return { pays, nom_legal: String(ini.denomination_officielle || '').trim(), numeros };
+}
+
+module.exports = { identificationPublique, TYPES, compact, luhnValide, cleValide, formatImmatriculation, typeEffectif, validerSaisie, jetons, memeNom, nomsConcordent, chercherRegistre };

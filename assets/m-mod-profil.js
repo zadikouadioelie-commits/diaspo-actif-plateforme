@@ -155,6 +155,15 @@
       sec('Public concerné', chips(publics)),
       sec('Recherche actuellement', chips(besoins, 'o')),
       sec('Équipe', equipe.length ? equipe.map(m => `<a class="pf-eq" href="#/profil/${encodeURIComponent(m.user_id)}"><span class="pf-eqav">${m.photo_url ? `<img src="${attrUrl(m.photo_url)}" alt="" onerror="this.remove()">` : esc(initials(m.nom))}</span><span><b>${esc(m.nom)}</b><span class="small muted" style="display:block">${esc(m.fonction || '')}</span></span></a>`).join('') : ''),
+      /* Identification officielle : numéros déclarés (RNA, SIREN, SIRET, RCCM, IFU, numéro fiscal…) + pays où les vérifier — publics, pour que chacun puisse les contrôler. */
+      (() => {
+        const idp = r.identification_publique; if (!idp || !(idp.numeros || []).length) return '';
+        const lignes = [];
+        if (idp.nom_legal) lignes.push(['Dénomination légale', esc(idp.nom_legal)]);
+        idp.numeros.forEach(n => lignes.push([n.libelle, `<b>${esc(n.numero)}</b><br><span class="small muted">${n.confirme ? '✓ Confirmé par la plateforme' : 'Déclaré par la structure'}</span>${n.lien ? `<br><a href="${esc(attrUrl(n.lien))}" target="_blank" rel="noopener noreferrer">Vérifier au registre ↗</a>` : ''}`]));
+        if (idp.pays) lignes.push(['Pays où vérifier', esc(idp.pays)]);
+        return sec('Identification officielle', kvs(lignes) + '<p class="small muted" style="margin:8px 2px 0">Ces numéros sont publics : chacun peut les contrôler auprès du registre officiel du pays indiqué.</p>');
+      })(),
       sec('Informations pratiques', kvs(infos) + carteLien(adr)),
       sec('Statistiques', tuiles([[r.membres != null ? r.membres : 0, 'membres'], [r.abonnes != null ? r.abonnes : 0, 'abonnés'], [r.annee_creation, 'depuis'], ...statsPerso(r.stats_perso, STAT_INIT)])),
       sec('Labels et accréditations', labels.length ? labels.map(l => `<div class="pf-rev" style="padding:6px 0">${esc(l)}</div>`).join('') : ''),
