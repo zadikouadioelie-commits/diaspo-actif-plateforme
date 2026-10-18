@@ -47,3 +47,24 @@ html.m-site .auth-error { color: #B3261E; font-size: 13px; }
 /* aucun débordement horizontal */
 html.m-site body { overflow-x: hidden; }
 html.m-site img, html.m-site table { max-width: 100%; }
+
+/* ============================================================
+   Pages en design « Nuit dorée » (class="nd" sur <body>) — 2026-10-18, capture d'écran de l'utilisateur à l'appui :
+   sur téléphone, les titres et textes des profils étaient quasi invisibles. Cause : ce fichier force un fond CLAIR
+   (#EEF2F8) et des cartes crème sur TOUTE page habillée, alors que le design Nuit dorée écrit en blanc sur du verre
+   translucide pensé pour un fond sombre (contraste mesuré : 1,06:1 sur « Services proposés », « Informations
+   pratiques »… — 63 textes sur 85 illisibles sur le profil). Une page déjà en Nuit dorée garde donc ses couleurs
+   sombres ; seules la barre du haut de l'appli, la mise en page et les champs de saisie 16 px restent communs.
+   Les pages SANS class="nd" ne sont pas touchées : elles gardent l'habillage clair ci-dessus.
+   ============================================================ */
+html.m-site:has(body.nd), html.m-site body.nd { background: var(--nd-nuit, #060A14) !important; color: var(--nd-texte, #E8ECF6); }
+html.m-site body.nd :is(h1, h2, h3) { color: #fff; }
+html.m-site body.nd .sub, html.m-site body.nd p { color: var(--nd-doux, #A9B4CC); }
+html.m-site body.nd label { color: var(--nd-doux, #A9B4CC); }
+html.m-site body.nd a { color: var(--nd-or, #E3C06E); }
+html.m-site body.nd .card, html.m-site body.nd .auth-form-card {
+  background: var(--nd-verre, rgba(255, 255, 255, .045)) !important; border: 1px solid var(--nd-bord2, rgba(255, 255, 255, .09)) !important;
+  box-shadow: 0 26px 54px -34px #000 !important; color: var(--nd-texte, #E8ECF6); }
+html.m-site body.nd input:not([type=checkbox]):not([type=radio]):not([type=file]), html.m-site body.nd select, html.m-site body.nd textarea {
+  background: rgba(255, 255, 255, .06) !important; border: 1px solid rgba(255, 255, 255, .2) !important; color: var(--nd-texte, #E8ECF6); }
+html.m-site body.nd select option { background: #0B1226; color: #fff; }
