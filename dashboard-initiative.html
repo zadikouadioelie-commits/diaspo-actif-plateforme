@@ -3482,7 +3482,7 @@ async function initRelaisDiasporaWidget(me, api) {
           nécessitant une vérification seront disponibles dès que votre structure sera officiellement
           créée et que les informations administratives auront été complétées.
         </div>` : ''}
-        <div style="display:flex;flex-direction:column;gap:6px;font-size:13px;margin-bottom:10px;">
+        <div class="cockpit-etat-liste" style="display:flex;flex-direction:column;gap:6px;font-size:13px;margin-bottom:10px;">
           ${etatChecklist.map(x => `<div title="${(x.aide || '').replace(/"/g, '&quot;')}">${x.done ? '✔' : '⏳'} ${x.label}${(!x.done && x.lien) ? ` <a href="${x.lien}" style="font-size:11.5px;font-weight:600;color:#2563EB;margin-left:6px;">${x.lienTexte || 'Voir →'}</a>` : ''}</div>`).join('')}
         </div>
         <div style="background:var(--bg);border-radius:20px;height:8px;overflow:hidden;">
@@ -3531,6 +3531,27 @@ async function initRelaisDiasporaWidget(me, api) {
           <span style="font-size:20px;">🌐</span><div style="text-align:left;"><div style="font-weight:700;font-size:13px;">Réseau Pro</div><div style="font-size:11px;color:#0f766e;opacity:.8;">Affiliations &amp; annuaire</div></div>
         </a>
       </div>
+      <!-- Mise en page (2026-10-18, demande explicite) : les six éléments du haut (indicateurs + raccourcis) restent sur toute la largeur ;
+           tout le reste du cockpit passe sur DEUX colonnes (#cockpit-cols). Les longues listes (indice de fiabilité, profil public, état de
+           l'initiative) se répartissent elles-mêmes sur deux colonnes ; une carte seule sur sa ligne prend toute la largeur. -->
+      <style>
+        #cockpit-cols{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:16px;align-items:start}
+        #cockpit-cols>*{margin:0!important;min-width:0}
+        #cockpit-cols>#carte-profil-public,#cockpit-cols>#carte-indice-fiabilite{grid-column:1/-1}
+        #cockpit-cols>#carte-profil-public:not(:has(.pc-card)){display:none}
+        #cockpit-cols>:last-child:nth-child(odd){grid-column:1/-1}
+        #cockpit-cols #carte-indice-fiabilite .ts-detail{display:block!important;column-count:2;column-gap:24px}
+        #cockpit-cols #carte-indice-fiabilite .ts-detail>*{break-inside:avoid;margin:0 0 6px}
+        #cockpit-cols #carte-profil-public .pc-liste{display:block!important;column-count:2;column-gap:24px}
+        #cockpit-cols #carte-profil-public .pc-liste>*{break-inside:avoid;margin:0 0 6px}
+        #cockpit .cockpit-etat-liste{display:block!important;column-count:2;column-gap:24px}
+        #cockpit .cockpit-etat-liste>*{break-inside:avoid;margin:0 0 6px}
+        @media (max-width:900px){
+          #cockpit-cols{grid-template-columns:1fr}
+          #cockpit-cols #carte-indice-fiabilite .ts-detail,#cockpit-cols #carte-profil-public .pc-liste,#cockpit .cockpit-etat-liste{column-count:1}
+        }
+      </style>
+      <div id="cockpit-cols">
       <!-- ═══ MON INDICE DE FIABILITÉ ═══
            Les comptes Initiative disposent de deux critères que les particuliers n'ont pas
            (immatriculation et organisation vérifiée) : ils sont donc notés sur 100, là où
@@ -3567,6 +3588,7 @@ async function initRelaisDiasporaWidget(me, api) {
         <h3 style="margin:0 0 12px;font-size:15px;">💰 Centre Financier</h3>
         <div id="cockpit-financier-body" style="font-size:13px;color:var(--muted);">Chargement…</div>
       </div>
+      </div><!-- /#cockpit-cols -->
     </div>`;
     content.insertAdjacentHTML('afterbegin', cockpitHTML);
     loadCockpitFinancierWidget();
