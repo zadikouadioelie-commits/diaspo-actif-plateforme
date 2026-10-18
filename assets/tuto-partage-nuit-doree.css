@@ -1,0 +1,44 @@
+/* Design « Nuit dorée » — fenêtre « Partager ce tuto » (PROPOSITION 2026-10-12).
+   La fenêtre est posée par assets/tuto-partage.js avec ses propres styles (#tp-css) : cette feuille, plus spécifique (#tp-voile …), les remplace
+   sans toucher au script ni au balisage. Mêmes identifiants, mêmes boutons, mêmes actions. Retour arrière : retirer le lien de la feuille. */
+@import url("https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,500;6..96,600&family=Manrope:wght@400;500;600;700;800&display=swap");
+
+#tp-voile{background:rgba(3,6,14,.8)!important;backdrop-filter:blur(7px);font-family:'Manrope','Segoe UI',system-ui,sans-serif}
+#tp-voile .tp-box{
+  max-width:460px;border-radius:28px;color:#E8ECF6;font-family:inherit;border:1px solid rgba(227,192,110,.3);
+  background:
+    radial-gradient(ellipse 420px 260px at 100% 0%,rgba(227,192,110,.14),transparent 62%),
+    radial-gradient(ellipse 380px 280px at 0% 100%,rgba(63,123,255,.13),transparent 62%),
+    #0B1226;
+  box-shadow:0 50px 110px -34px rgba(0,0,0,.95),0 0 0 1px rgba(227,192,110,.08);
+  scrollbar-width:thin;scrollbar-color:rgba(227,192,110,.4) transparent}
+#tp-voile .tp-tete{padding:22px 26px 16px;border-bottom:1px solid rgba(255,255,255,.1)}
+#tp-voile .tp-box .tp-tete h2{font-family:'Bodoni Moda','Didot',Georgia,serif;font-weight:500;font-size:26px;letter-spacing:-.005em;color:#fff}
+#tp-voile .tp-x{color:#AEB8D0;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:999px;width:38px;height:38px;min-width:38px;min-height:38px;font-size:16px;transition:background .3s,color .3s}
+#tp-voile .tp-x:hover{background:rgba(255,255,255,.12);color:#fff}
+#tp-voile .tp-corps{padding:22px 26px 26px}
+
+/* la cartouche telle qu'elle sera partagée */
+#tp-voile .tp-carte{background:rgba(255,255,255,.05);border:1px solid rgba(227,192,110,.3);border-radius:20px;margin-bottom:22px;box-shadow:0 26px 50px -34px rgba(0,0,0,.95)}
+#tp-voile .tp-img{background:linear-gradient(135deg,#14234a,#0B1226)}
+#tp-voile .tp-play{background:linear-gradient(135deg,#F3DC9B,#B9893A);color:#1a1202;box-shadow:0 10px 26px -8px rgba(227,192,110,.7)}
+#tp-voile .tp-dur{background:rgba(6,10,20,.8);border:1px solid rgba(255,255,255,.14)}
+#tp-voile .tp-txt{padding:16px 18px 18px}
+#tp-voile .tp-invit{color:#fff;font-size:15px;line-height:1.5;font-weight:600;margin-bottom:8px}
+#tp-voile .tp-cat{display:inline-block;color:#E3C06E;font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase}
+
+/* trois façons de partager, bien espacées */
+#tp-voile .tp-actions{gap:12px}
+#tp-voile .tp-btn{min-height:52px;border-radius:999px;font-family:inherit;font-size:15px;font-weight:800;border:1px solid rgba(227,192,110,.3);background:rgba(255,255,255,.06);color:#E8ECF6;transition:transform .3s,background .3s,filter .3s}
+#tp-voile .tp-btn:hover{background:rgba(255,255,255,.11);transform:translateY(-1px)}
+#tp-voile .tp-btn.pri{background:linear-gradient(135deg,#F3DC9B 0%,#E3C06E 38%,#B9893A 100%);border-color:transparent;color:#1a1202;box-shadow:0 14px 30px -14px rgba(227,192,110,.75)}
+#tp-voile .tp-btn.pri:hover{filter:brightness(1.06);background:linear-gradient(135deg,#F3DC9B 0%,#E3C06E 38%,#B9893A 100%)}
+#tp-voile .tp-btn.wa{background:#25D366;border-color:transparent;color:#052e16;box-shadow:0 14px 30px -16px rgba(37,211,102,.6)}
+#tp-voile .tp-btn.wa:hover{background:#2be072}
+#tp-voile .tp-btn:focus-visible,#tp-voile .tp-x:focus-visible{outline:2px solid #E3C06E;outline-offset:3px}
+
+/* messages */
+#tp-voile .tp-info{color:#AEB8D0;font-size:14px}
+#tp-voile .tp-ok{background:rgba(143,224,176,.12);border:1px solid rgba(143,224,176,.38);color:#9BE8B8;border-radius:16px}
+#tp-voile .tp-err{background:rgba(255,154,143,.12);border:1px solid rgba(255,154,143,.4);color:#FFB3AA;border-radius:16px}
+@media (max-width:480px){#tp-voile{padding:10px}#tp-voile .tp-tete{padding:18px 20px 14px}#tp-voile .tp-corps{padding:18px 20px 22px}}

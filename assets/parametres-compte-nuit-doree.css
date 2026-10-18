@@ -1,0 +1,51 @@
+/* ============================================================
+   Paramètres du compte (parametres-compte.html) — design « Nuit dorée » sur deux colonnes (2026-10-18, demande explicite : « nouvelle DA sur deux colonnes »).
+   Complète theme-nuit-doree.css (fond, barre du haut, boutons). Tout est préfixé html body.nd.
+   Retour arrière : retirer les 2 <link> et class="nd" sur <body> de parametres-compte.html.
+   ============================================================ */
+
+/* Variables du site redéfinies dans la zone de contenu seulement (barre du haut intacte) */
+html body.nd main.container{
+  --bg:rgba(255,255,255,.06); --card:rgba(255,255,255,.045); --text:#EDEAE0; --muted:#AEB8D0; --border:rgba(255,255,255,.13);
+  color:var(--nd-texte);max-width:1240px;
+}
+
+html body.nd main.container h1{font-family:var(--nd-display)!important;font-weight:500!important;font-size:clamp(32px,3.6vw,46px)!important;letter-spacing:-.01em;color:#fff!important}
+html body.nd main.container .sub{color:var(--nd-doux)!important}
+
+/* ── Deux colonnes : les cartes se répartissent de haut en bas, colonne par colonne ── */
+html body.nd .pc-wrap{max-width:none}
+@media (min-width:980px){
+  html body.nd #pc-wrap{column-count:2;column-gap:22px}
+  html body.nd #pc-wrap>.pc-card,html body.nd #pc-wrap>.notice{break-inside:avoid;-webkit-column-break-inside:avoid;page-break-inside:avoid}
+}
+
+/* ── Cartes ── */
+html body.nd .pc-card{background:var(--nd-verre)!important;border:1px solid var(--nd-bord2)!important;border-radius:22px!important;padding:24px 26px;margin-bottom:22px;color:var(--nd-texte);box-shadow:0 26px 54px -36px #000}
+html body.nd .pc-card h2{font-family:var(--nd-display)!important;font-weight:500!important;font-size:22px!important;color:#fff!important;margin:0 0 6px}
+html body.nd .pc-card .pc-desc,html body.nd .pc-hint,html body.nd .pc-toggle-sub{color:var(--nd-doux)!important}
+
+/* ── Champs ── */
+html body.nd .pc-field label{color:var(--nd-doux)!important;letter-spacing:.08em}
+html body.nd .pc-field :is(input,select){background:rgba(255,255,255,.06)!important;border:1px solid var(--nd-bord2)!important;border-radius:14px!important;color:#fff!important;min-height:46px;color-scheme:dark}
+html body.nd .pc-field select option,html body.nd .pc-field select optgroup{background:#0f1a38;color:#fff}
+html body.nd .pc-field :is(input,select)::placeholder{color:var(--nd-faible)}
+html body.nd .pc-field :is(input,select):focus{outline:none;border-color:var(--nd-or)!important;box-shadow:0 0 0 3px rgba(227,192,110,.18)}
+
+/* ── Boutons ── */
+html body.nd .pc-btn-save{background:var(--nd-degore)!important;color:#1a1202!important;border-radius:999px!important;font-weight:800;padding:12px 24px;box-shadow:0 12px 26px -14px rgba(227,192,110,.7)}
+html body.nd .pc-btn-outline{background:transparent!important;color:var(--nd-or)!important;border:1px solid var(--nd-or)!important;border-radius:999px!important;font-weight:800}
+html body.nd .pc-btn-outline:hover{background:rgba(227,192,110,.12)!important}
+html body.nd :is(.pc-btn,.pc-field input,.pc-field select,.pc-switch input):focus-visible{outline:3px solid var(--nd-or);outline-offset:2px}
+
+/* ── Messages, pastilles, e-mail actuel, interrupteur ── */
+html body.nd .pc-msg-ok{color:#8FE0B0!important}
+html body.nd .pc-msg-err{color:#FF9A9A!important}
+html body.nd .pc-current-email{background:var(--nd-verre2)!important;color:var(--nd-texte);border:1px solid var(--nd-bord2)}
+html body.nd .pc-verified-badge{color:#7DE3B5!important;background:rgba(52,211,153,.16)!important}
+html body.nd .pc-unverified-badge{color:#F3C26B!important;background:rgba(227,192,110,.16)!important}
+html body.nd .pc-switch-track{background:rgba(255,255,255,.2)}
+html body.nd .pc-switch input:checked+.pc-switch-track{background:var(--nd-or)}
+html body.nd .pc-toggle-label{color:var(--nd-texte)}
+html body.nd main.container .notice{background:rgba(227,192,110,.08)!important;border:1px solid var(--nd-bord)!important;border-radius:18px!important;color:#F3E3B5!important}
+html body.nd main.container a:not([class*="btn"]){color:var(--nd-or)}
