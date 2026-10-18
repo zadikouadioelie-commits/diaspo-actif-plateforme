@@ -45,7 +45,8 @@ html.m-site a { color: #1E4F8A; }
 html.m-site .auth-error { color: #B3261E; font-size: 13px; }
 
 /* aucun débordement horizontal */
-html.m-site body { overflow-x: hidden; }
+/* clip et non hidden : hidden fait du <body> un conteneur de défilement (non scrollable) auquel la barre collante #m-site-top s'accrochait — elle défilait avec la page au lieu de rester en haut. */
+html.m-site body { overflow-x: clip; }
 html.m-site img, html.m-site table { max-width: 100%; }
 
 /* ============================================================

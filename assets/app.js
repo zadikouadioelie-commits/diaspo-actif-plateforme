@@ -1083,7 +1083,21 @@ function injectPoStyles() {
 #po-bandeau{position:fixed;top:0;left:0;right:0;z-index:9990;display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;padding:8px 14px;background:linear-gradient(135deg,#1e3a8a,#2563eb);color:#fff;font-size:13.5px;font-weight:600;box-shadow:0 2px 10px rgba(30,64,175,.35)}
 #po-bandeau b{font-weight:800}
 #po-bandeau button{border:none;border-radius:999px;padding:6px 14px;background:#fff;color:#1e3a8a;font-weight:800;font-size:12.5px;cursor:pointer}
-body.po-avec-bandeau{padding-top:44px}`;
+body.po-avec-bandeau{padding-top:var(--po-h,44px)}
+/* Barres collantes de la page (barre du site, barre de l'appli téléphone) : elles se calent SOUS le bandeau au lieu de passer dessous (2026-10-18, capture
+   d'écran de l'utilisateur : sur téléphone le bandeau, sur deux lignes, recouvrait la barre « Profil » et le haut du contenu). --po-h = hauteur mesurée. */
+body.po-avec-bandeau .topbar,body.po-avec-bandeau #m-site-top{top:var(--po-h,44px)!important}
+/* Tiroir latéral et bouton « Menu » des tableaux de bord (tous les types de compte) : calés à 58 px / 74 px du haut, soit sous la barre du site — donc à décaler du bandeau. */
+body.po-avec-bandeau .sidebar{top:calc(58px + var(--po-h,44px))!important;height:calc(100vh - 58px - var(--po-h,44px))!important}
+@media (max-width:768px){body.po-avec-bandeau .sidebar-toggle{top:calc(74px + var(--po-h,44px))!important}}
+#po-bandeau .po-court{display:none}
+@media (max-width:600px){
+  #po-bandeau{gap:8px;padding:6px 10px;font-size:12.5px;flex-wrap:nowrap;justify-content:space-between;padding-top:calc(6px + env(safe-area-inset-top))}
+  #po-bandeau .po-txt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #po-bandeau .po-long{display:none}
+  #po-bandeau .po-court{display:inline}
+  #po-bandeau button{flex:none;padding:6px 12px;min-height:32px}
+}`;
   document.head.appendChild(st);
 }
 
@@ -1098,14 +1112,23 @@ function poBandeau(g, versFiche) {
   }
   b.innerHTML = g.photo_seule
     ? `<span>📷 Une <b>photo de profil</b> est obligatoire pour utiliser Diaspo’Actif</span><button type="button" id="po-voir">Ajouter ma photo</button>`
-    : `<span>📋 État de votre profil : <b>${g.pct} %</b> — objectif <b>${g.seuil} %</b></span><button type="button" id="po-voir">Voir ce qu’il me reste à remplir</button>`;
+    : `<span class="po-txt">📋 <span class="po-long">État de votre profil</span><span class="po-court">Profil</span> : <b>${g.pct} %</b> — objectif <b>${g.seuil} %</b></span><button type="button" id="po-voir" aria-label="Voir ce qu’il me reste à remplir"><span class="po-long">Voir ce qu’il me reste à remplir</span><span class="po-court">Voir</span></button>`;
+  poMesurerBandeau();
   /* Page libre : le bouton mène à la fiche (la carte plein écran, sans fermeture, y est réservée). */
   b.querySelector('#po-voir').addEventListener('click', () => versFiche ? window.location.assign(versFiche) : poOuvrirCarte(g));
+}
+/* Hauteur réelle du bandeau (1 ou 2 lignes selon l'écran) : le contenu est décalé d'autant, les barres collantes se calent dessous. */
+function poMesurerBandeau() {
+  const b = document.getElementById('po-bandeau');
+  if (!b) return;
+  document.documentElement.style.setProperty('--po-h', b.offsetHeight + 'px');
+  if (!window.__poMesureLie) { window.__poMesureLie = true; window.addEventListener('resize', poMesurerBandeau); window.addEventListener('orientationchange', poMesurerBandeau); }
 }
 function poRetirerBandeau() {
   const b = document.getElementById('po-bandeau');
   if (b) b.remove();
   document.body.classList.remove('po-avec-bandeau');
+  document.documentElement.style.removeProperty('--po-h');
 }
 
 async function poDeconnexion() {
