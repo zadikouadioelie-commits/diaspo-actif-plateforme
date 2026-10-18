@@ -171,7 +171,7 @@ function sfRender(){
           ${apercu ? '<span class="sf-badge-apercu">👁️ Mode aperçu créateur</span>' : `
           <div class="sf-gauge-top"><span class="sf-gauge-pct">${SF_DATA.avancement_pct}%</span><span class="sf-statut ${statut}">${escH(STATUTS[statut] || statut)}</span></div>
           ${sfJauge(SF_DATA.avancement_pct, statut === 'termine')}
-          <div class="sf-gauge-sub">${p.nb_termine || 0} activité${(p.nb_termine||0) > 1 ? 's' : ''} obligatoire${(p.nb_total||0) > 1 ? 's' : ''} terminée${(p.nb_termine||0) > 1 ? 's' : ''} sur ${p.nb_total || 0} · ${p.chapitres_termines || 0}/${p.chapitres_total || 0} chapitre${(p.chapitres_total||0) > 1 ? 's' : ''}${p.nb_restant ? ` · il en reste ${p.nb_restant}` : ''}</div>
+          <div class="sf-gauge-sub">${p.nb_termine || 0} activité${(p.nb_termine||0) > 1 ? 's' : ''} obligatoire${(p.nb_termine||0) > 1 ? 's' : ''} terminée${(p.nb_termine||0) > 1 ? 's' : ''} sur ${p.nb_total || 0} · ${p.chapitres_termines || 0}/${p.chapitres_total || 0} chapitre${(p.chapitres_total||0) > 1 ? 's' : ''}${p.nb_restant ? ` · il en reste ${p.nb_restant}` : ''}</div>
           ${reprendre ? '<button type="button" class="btn sf-reprendre" id="sf-reprendre">▶ Reprendre ma formation</button>' : ''}`}
         </div>
         <div id="sf-modules-list"></div>

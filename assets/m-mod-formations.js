@@ -149,6 +149,8 @@
     const my = ++seq;
     if (!b) return screenCatalogue(my);
     if (b === 'mes') return screenMes(my);
+    if (b === 'parcours') return c && /^\d+$/.test(c) ? screenParcours(my, c) : screenParcoursListe(my);
+    if (b === 'cartes') return screenCartes(my);
     if (/^\d+$/.test(b)) {
       if (c === 'suivre') return screenSuivre(my, b);
       if (c && /^l\d+$/.test(c)) return screenLecon(my, b, Number(c.slice(1)));
@@ -182,6 +184,8 @@
       <div class="chips" role="tablist" aria-label="Rubriques">
         <button class="chip on" role="tab" aria-selected="true">Catalogue</button>
         <a class="chip" role="tab" aria-selected="false" href="#/formations/mes">${ic('book', 's')} Mes formations</a>
+        <a class="chip" role="tab" aria-selected="false" href="#/formations/parcours">🧭 Parcours</a>
+        <a class="chip" role="tab" aria-selected="false" href="#/formations/cartes">🧠 Cartes</a>
       </div>
       <div class="search">${ic('search', 's')}<input id="fm-q" type="search" placeholder="Rechercher une formation…" aria-label="Rechercher une formation" value="${esc(F.q)}"></div>
       <div class="chips" id="fm-chips"></div>
@@ -531,13 +535,35 @@
     if (!alive(my)) return;
     outlineSeen = String(id);
     const f = d.formation, items = flat(d), apercu = d.mode === 'apercu';
-    const done = items.filter(x => x.l.termine).length;
-    const next = items.find(x => !x.l.termine) || items[0];
+    const pc = d.parcours || {};
+    const nbTot = pc.nb_total != null ? pc.nb_total : items.length;
+    const done = pc.nb_termine != null ? pc.nb_termine : items.filter(x => x.l.termine).length;
+    const suivante = items.find(x => Number(x.l.id) === Number(pc.prochaine_lecon_id)) || items.find(x => !x.l.termine) || items[0];
     const p = apercu ? 0 : pct(d.avancement_pct);
+    const statut = pc.statut || 'non_commence';
+    const STATUTS = { non_commence: 'Non commencé', en_cours: 'En cours', en_attente_evaluation: 'En attente d’évaluation', termine: 'Terminé' };
     let html = `<div class="card"><div class="pad"><h2 style="margin:0 0 6px;font-size:20px;line-height:1.25">${esc(f.titre)}</h2>
-      ${apercu ? '<span class="badge o">Aperçu créateur</span>' : `<div class="row small" style="margin:8px 0 6px"><b class="sp">${p} % terminé</b><span class="muted">${done} / ${items.length} leçon${items.length > 1 ? 's' : ''}</span></div>
-      <div class="bar" role="progressbar" aria-valuenow="${p}" aria-valuemin="0" aria-valuemax="100"><i style="width:${p}%"></i></div>`}
-      ${items.length ? `<a class="btn block" style="margin-top:14px" href="#/formations/${esc(id)}/l${next.l.id}">${apercu ? 'Voir la première leçon' : done === 0 ? 'Commencer' : done >= items.length ? 'Revoir la formation' : 'Continuer'}</a>` : ''}</div></div>`;
+      ${apercu ? '<span class="badge o">Aperçu créateur</span>' : `<div class="row small" style="margin:8px 0 6px"><b class="sp">${p} % terminé</b><span class="badge ${statut === 'termine' ? 'g' : 'o'}">${esc(STATUTS[statut] || statut)}</span></div>
+      <div class="bar" role="progressbar" aria-valuenow="${p}" aria-valuemin="0" aria-valuemax="100" aria-label="Progression globale"><i style="width:${p}%"></i></div>
+      <div class="small muted" style="margin-top:6px">${done} activité${done > 1 ? 's' : ''} obligatoire${done > 1 ? 's' : ''} terminée${done > 1 ? 's' : ''} sur ${nbTot}${pc.chapitres_total ? ` · ${pc.chapitres_termines || 0}/${pc.chapitres_total} chapitre${pc.chapitres_total > 1 ? 's' : ''}` : ''}</div>`}
+      ${items.length ? `<a class="btn block" style="margin-top:14px" href="#/formations/${esc(id)}/l${suivante.l.id}">${apercu ? 'Voir la première leçon' : statut === 'termine' ? 'Revoir la formation' : done === 0 ? 'Commencer' : 'Reprendre ma formation'}</a>` : ''}</div></div>`;
+    /* Document (attestation / certificat) : conditions restantes, ou accès une fois délivré. */
+    const at = d.attestation;
+    if (!apercu && at && at.active) {
+      if (at.delivree) {
+        const dl = at.delivree;
+        html += `<div class="card"><div class="pad"><b>🎓 ${esc(dl.type_label)} obtenu(e)</b><div class="small muted" style="margin:4px 0 10px">N° ${esc(dl.code)}</div>
+          <a class="btn block" href="attestation.html?code=${encodeURIComponent(dl.code)}" target="_blank" rel="noopener">Voir / imprimer ${ic('out', 's')}</a></div></div>`;
+      } else {
+        html += `<div class="card"><div class="pad"><b>🎓 ${esc(at.type_label)}</b><div class="small" style="margin:6px 0 4px">Pour l’obtenir :</div>
+          <ul style="margin:0;padding-left:1.1em" class="small">${(at.conditions || []).map(c => `<li style="margin:0 0 3px;${c.ok ? 'color:var(--green)' : ''}">${c.ok ? '✓ ' : ''}${esc(c.libelle)}</li>`).join('')}</ul>
+          <div class="small muted" style="margin-top:8px">${esc(at.avertissement || '')}</div></div></div>`;
+      }
+    }
+    if ((d.cartes_mentales || []).length) {
+      html += `<div class="card"><div class="pad"><b>🧠 Carte${d.cartes_mentales.length > 1 ? 's' : ''} mentale${d.cartes_mentales.length > 1 ? 's' : ''}</b>
+        ${d.cartes_mentales.map(c => `<a class="btn out block" style="margin-top:10px" href="carte-mentale.html?id=${encodeURIComponent(c.id)}" target="_blank" rel="noopener">${esc(c.titre)} ${ic('out', 's')}</a>`).join('')}</div></div>`;
+    }
     if (!items.length) {
       html += `<div class="empty"><div class="ei">${ic('clock', 'l')}</div><b>Contenu en préparation</b>Le formateur n’a pas encore publié de leçon.</div>`;
     } else {
@@ -546,7 +572,10 @@
         if (!chs.length) return;
         html += `<div class="h2">${esc(String(m.titre || 'Module').toUpperCase())}</div>`;
         chs.forEach(c => {
-          html += `<div class="small muted" style="margin:0 6px 6px;font-weight:600">${esc(c.titre || '')}</div><div class="lst" style="margin-bottom:12px">${c.lecons.map(l => `<a class="fm-les ${l.termine ? 'done' : ''}" href="#/formations/${esc(id)}/l${esc(l.id)}"><span class="fm-ck" aria-hidden="true">${l.termine ? ic('check', 's') : ''}</span><span class="sp"><span class="t">${esc(l.titre)}</span><br><span class="d">${esc(lessonSub(l))}${l.termine ? ' · terminée' : ''}</span></span><span class="ch" style="color:#94a3b8">${ic('chev', 's')}</span></a>`).join('')}</div>`;
+          const st = c.stats;
+          html += `<div class="small muted" style="margin:0 6px 6px;font-weight:600">${esc(c.titre || '')}${st && !apercu ? ` — ${st.pct}%${st.total ? ` (${st.termine}/${st.total})` : ''}` : ''}</div>
+            ${st && !apercu ? `<div class="bar" style="margin:0 6px 8px" role="progressbar" aria-valuenow="${st.pct}" aria-valuemin="0" aria-valuemax="100" aria-label="Progression du chapitre ${esc(c.titre || '')}"><i style="width:${st.pct}%"></i></div>` : ''}
+            <div class="lst" style="margin-bottom:12px">${c.lecons.map(l => `<a class="fm-les ${l.termine ? 'done' : ''}" href="#/formations/${esc(id)}/l${esc(l.id)}"><span class="fm-ck" aria-hidden="true">${l.termine ? ic('check', 's') : ''}</span><span class="sp"><span class="t">${l.quiz ? (l.quiz.en_attente ? '⏳ ' : '📝 ') : ''}${esc(l.titre)}</span><br><span class="d">${esc(lessonSub(l))}${l.obligatoire === false ? ' · facultative' : ''}${l.termine ? ' · terminée' : l.quiz && l.quiz.en_attente ? ' · en attente de correction' : ''}</span></span><span class="ch" style="color:#94a3b8">${ic('chev', 's')}</span></a>`).join('')}</div>`;
         });
       });
     }
@@ -576,12 +605,72 @@
       case 'telechargement':
         return head + (!url ? noFile('Aucun fichier pour cette leçon.') : dl ? `<div class="card"><div class="pad"><a class="btn block" href="${url}" target="_blank" rel="noopener">Télécharger le document ${ic('out', 's')}</a></div></div>` : noFile('Le formateur n’autorise pas le téléchargement de ce document.'));
       case 'quiz':
-        return head + `<div class="fm-note"><b>Quiz : bientôt disponible.</b> Vous pourrez passer les quiz ici dès leur ouverture. Marquez la leçon comme terminée pour avancer.</div>`;
+        return head + '<div id="fm-quiz"></div>';
       default: { // texte, exercice, travail pratique, étude de cas
         const t = l.contenu_texte ? A.richHtml(l.contenu_texte) : '';
         return head + (t ? `<div class="card"><div class="pad rich">${t}</div></div>` : noFile(l.type && l.type !== 'texte' ? 'Aucune consigne fournie.' : 'Aucun contenu pour cette leçon.'));
       }
     }
+  }
+
+  /* ── Quiz (lot 1-2) : questions reçues SANS corrigé ; correction et seuil appliqués par le serveur ; devoirs corrigés par le formateur ── */
+  let LASTQ = null; // { leconId, res } : résultat de la dernière tentative, affiché une fois après le rechargement de la leçon
+  async function montrerQuiz(id, l, d) {
+    const zone = $('#fm-quiz'); if (!zone) return;
+    if (!l.quiz) { zone.innerHTML = noFile('Aucun quiz n’est encore rattaché à cette leçon.'); return; }
+    if (d.mode === 'apercu') { zone.innerHTML = noFile('Quiz « ' + l.quiz.titre + ' » : passable par les apprenants inscrits.'); return; }
+    zone.innerHTML = '<div class="sk skc" style="height:90px"></div>';
+    let q;
+    try { q = await api(`/api/formations/${encodeURIComponent(id)}/quiz/${encodeURIComponent(l.quiz.id)}/passer`); }
+    catch (e) { zone.innerHTML = noFile(e.message || 'Quiz indisponible.'); return; }
+    const res = LASTQ && LASTQ.leconId === Number(l.id) ? LASTQ.res : null; if (res) LASTQ = null;
+    const quiz = q.quiz, t = q.tentatives || {}, manuel = !!quiz.correction_manuelle;
+    const attente = !!t.en_attente, dejaReussi = !!t.reussi || !!(res && res.reussi);
+    const verrou = attente || (manuel && dejaReussi);
+    let verdict = '';
+    if (attente) verdict = '<div class="fm-note" style="background:#fffbeb;color:#92400e">⏳ Votre travail a été envoyé : il est en attente de correction par le formateur. Vous serez prévenu(e) dès qu’il sera corrigé.</div>';
+    else if (res && !res.en_attente_correction) verdict = res.reussi
+      ? `<div class="fm-note" style="background:#dcfce7;color:#14532d">✅ Quiz réussi${res.note_pct != null ? ' — ' + esc(res.note_pct) + '%' : ''}. Cette activité est validée.</div>`
+      : `<div class="fm-note" style="background:#fef2f2;color:#7f1d1d">❌ ${esc(res.note_pct)}% — il faut au moins ${esc(res.seuil)}%. Relisez le cours puis réessayez : les bonnes réponses s’affichent une fois le quiz réussi.</div>`;
+    else if (dejaReussi) verdict = '<div class="fm-note" style="background:#dcfce7;color:#14532d">✅ ' + (manuel ? 'Cette évaluation est validée.' : 'Vous avez déjà réussi ce quiz. Vous pouvez le repasser pour vous entraîner.') + '</div>';
+    else if (manuel && t.derniere && t.derniere.statut === 'corrige') verdict = `<div class="fm-note" style="background:#fef2f2;color:#7f1d1d">📝 Dernière correction : ${t.derniere.note_pct != null ? esc(t.derniere.note_pct) + '%' : '—'} (seuil ${esc(quiz.note_minimale)}%). Vous pouvez améliorer votre travail et le renvoyer.</div>`;
+    if (t.derniere && t.derniere.statut === 'corrige' && t.derniere.commentaire && !attente) verdict += `<div class="fm-note"><b>Commentaire du formateur :</b> ${esc(t.derniere.commentaire)}</div>`;
+    const detail = {}; if (res && res.detail) res.detail.forEach(x => { detail[x.question_id] = x; });
+    const qs = (q.questions || []).map((qu, i) => {
+      const dt = detail[qu.id];
+      let champ;
+      if (qu.type === 'texte_libre' || !(qu.options || []).length) champ = manuel
+        ? `<textarea class="fm-in" name="q${qu.id}" rows="4" maxlength="5000" aria-label="Votre réponse" ${verrou ? 'disabled' : ''}></textarea>`
+        : `<input class="fm-in" type="text" name="q${qu.id}" maxlength="500" autocomplete="off" aria-label="Votre réponse">`;
+      else champ = qu.options.map(o => `<label style="display:flex;gap:10px;align-items:center;min-height:44px"><input type="${qu.multiple ? 'checkbox' : 'radio'}" name="q${qu.id}" value="${esc(o)}" ${verrou ? 'disabled' : ''}> <span>${esc(o)}</span></label>`).join('') + (qu.multiple ? '<div class="small muted">Plusieurs réponses possibles.</div>' : '');
+      const note = dt && dt.note ? `<div class="small" style="margin-top:6px;font-weight:700;color:${dt.correct ? 'var(--green)' : 'var(--red)'}">${dt.correct ? '✓ Bonne réponse' : '✗ Réponse incorrecte'}${dt.bonne_reponse ? ' — attendue : ' + esc(dt.bonne_reponse) : ''}</div>` : '';
+      return `<div style="padding:12px 0;border-top:1px solid var(--border)"><div style="font-weight:700;margin-bottom:6px">${i + 1}. ${esc(qu.question)} <span class="small muted" style="font-weight:400">(${qu.points} pt${qu.points > 1 ? 's' : ''})</span></div>${champ}${note}</div>`;
+    }).join('');
+    zone.innerHTML = `<div class="card"><div class="pad"><b>📝 ${esc(quiz.titre)}</b>
+      <div class="small muted" style="margin:4px 0 10px">Seuil de réussite : ${esc(quiz.note_minimale)}%${t.nb ? ` · ${t.nb} tentative${t.nb > 1 ? 's' : ''}${t.meilleure_note != null ? ', meilleure note : ' + esc(t.meilleure_note) + '%' : ''}` : ''}</div>
+      ${verdict}<form id="fm-qf" novalidate>${qs || noFile('Ce quiz ne contient pas encore de question.')}
+      ${qs && !verrou ? `<button type="submit" class="btn block" id="fm-qs" style="margin-top:12px">${manuel ? 'Envoyer mon travail au formateur' : res ? 'Valider une nouvelle tentative' : 'Valider mes réponses'}</button>` : ''}</form></div></div>`;
+    const form = $('#fm-qf'); if (!form || !qs || verrou) return;
+    form.onsubmit = async ev => {
+      ev.preventDefault();
+      const reponses = {};
+      (q.questions || []).forEach(qu => {
+        const ch = $$(`[name="q${qu.id}"]`, form); if (!ch.length) return;
+        if (ch[0].type === 'text' || ch[0].tagName === 'TEXTAREA') reponses[qu.id] = ch[0].value;
+        else if (ch[0].type === 'checkbox') reponses[qu.id] = ch.filter(c => c.checked).map(c => c.value);
+        else { const c = ch.find(x => x.checked); reponses[qu.id] = c ? c.value : ''; }
+      });
+      const btn = $('#fm-qs'); btn.disabled = true; btn.textContent = 'Correction…';
+      try {
+        const r = await api(`/api/formations/${encodeURIComponent(id)}/quiz/${encodeURIComponent(quiz.id)}/soumettre`, { method: 'POST', body: { reponses } });
+        LASTQ = { leconId: Number(l.id), res: r };
+        await loadSuivi(id, true);
+        if (r.attestation) toast('🎉 Votre ' + String(r.attestation.type_label).toLowerCase() + ' est disponible !');
+        else if (r.en_attente_correction) toast('Travail envoyé ✓');
+        else toast(r.reussi ? 'Quiz réussi ✓' : 'Quiz non réussi', !r.reussi);
+        screenLecon(++seq, id, Number(l.id));
+      } catch (e) { toast(e.message, true); btn.disabled = false; btn.textContent = manuel ? 'Envoyer mon travail au formateur' : 'Valider mes réponses'; }
+    };
   }
 
   async function screenLecon(my, id, leconId) {
@@ -601,10 +690,11 @@
       ${lessonBody(l)}
       <a class="btn out block" style="margin-top:12px" href="#/formations/${esc(id)}/suivre">Plan de la formation</a>`;
     const foot = `<button class="btn out" id="fm-prev" aria-label="Leçon précédente" ${prev ? '' : 'disabled'}>${ic('back')}</button>
-      ${apercu ? '<span class="sp"></span>' : `<button class="btn ${l.termine ? 'out' : ''}" id="fm-done" style="flex:1;padding:0 10px">${l.termine ? '✓ Terminée · annuler' : next ? 'Terminer et continuer' : 'Terminer la leçon'}</button>`}
+      ${apercu || l.quiz ? '<span class="sp"></span>' : `<button class="btn ${l.termine ? 'out' : ''}" id="fm-done" style="flex:1;padding:0 10px">${l.termine ? '✓ Terminée · annuler' : next ? 'Terminer et continuer' : 'Terminer la leçon'}</button>`}
       <button class="btn out" id="fm-next" aria-label="Leçon suivante" ${next ? '' : 'disabled'}>${ic('chev')}</button>`;
     setPane(l.titre, html, foot);
 
+    if (l.type === 'quiz') montrerQuiz(id, l, d);
     $('#fm-prev').onclick = () => prev && goTo(prev);
     $('#fm-next').onclick = () => next && goTo(next);
     const dn = $('#fm-done');
@@ -612,7 +702,8 @@
       const val = !l.termine; dn.disabled = true;
       try {
         const r = await api(`/api/formations/${encodeURIComponent(id)}/lecons/${encodeURIComponent(l.id)}/progression`, { method: 'POST', body: { termine: val } });
-        l.termine = val; d.avancement_pct = r.avancement_pct; SF.at = Date.now();
+        l.termine = val; d.avancement_pct = r.avancement_pct; SF.at = 0;
+        if (r.attestation) toast('🎉 Votre ' + String(r.attestation.type_label).toLowerCase() + ' est disponible dans le plan de la formation !');
         if (!val) { toast('Leçon marquée comme non terminée'); return screenLecon(++seq, id, leconId); }
         if (next) { toast('Leçon terminée ✓'); return goTo(next); }
         toast(pct(r.avancement_pct) >= 100 ? 'Bravo, vous avez terminé la formation ! 🎉' : 'Leçon terminée ✓');
@@ -620,4 +711,74 @@
       } catch (e) { toast(e.message, true); dn.disabled = false; }
     };
   }
+  /* ============================================================
+     PARCOURS DE FORMATION (lot 3) : suites de formations, avec prérequis
+     ============================================================ */
+  const ST_PARCOURS = { termine: ['✅ Terminée', 'g'], en_cours: ['▶ En cours', 'o'], disponible: ['○ Disponible', ''], verrouille: ['🔒 Verrouillée', ''] };
+  async function screenParcoursListe(my) {
+    setPane('Parcours', '<div class="sk skc" style="height:110px"></div><div class="sk skc"></div>');
+    let r;
+    try { r = await api('/api/parcours-formation'); } catch (e) { if (alive(my)) fail('Parcours', e); return; }
+    if (!alive(my)) return;
+    const l = r.parcours || [];
+    setPane('Parcours', `<div class="chips"><a class="chip" href="#/formations">Catalogue</a><a class="chip on" href="#/formations/parcours">🧭 Parcours</a><a class="chip" href="#/formations/cartes">🧠 Cartes</a></div>
+      <p class="small muted" style="margin:0 4px 12px">Un parcours réunit plusieurs formations dans l’ordre pour atteindre un objectif. Certaines demandent d’avoir terminé la précédente.</p>
+      ${l.length ? l.map(p => `<a class="card" href="#/formations/parcours/${esc(p.id)}" style="display:block"><div class="pad"><b>🧭 ${esc(p.titre)}</b>${p.objectif ? `<div class="small" style="margin-top:4px">${esc(p.objectif)}</div>` : ''}
+        <div class="small muted" style="margin-top:6px">${p.nb_etapes} formations · ${p.termine ? '🏆 terminé' : p.nb_termine + '/' + p.nb_etapes + ' terminée' + (p.nb_termine > 1 ? 's' : '')}</div></div></a>`).join('') : `<div class="empty"><div class="ei">${ic('book', 'l')}</div><b>Aucun parcours pour le moment</b></div>`}`);
+  }
+  async function screenParcours(my, id) {
+    setPane('Parcours', '<div class="sk skc" style="height:110px"></div><div class="sk skc"></div>');
+    let d;
+    try { d = await api('/api/parcours-formation/' + encodeURIComponent(id)); } catch (e) { if (alive(my)) fail('Parcours', e); return; }
+    if (!alive(my)) return;
+    const p = d.parcours;
+    setPane(p.titre, `<div class="card"><div class="pad"><h2 style="margin:0 0 6px;font-size:20px">${esc(p.titre)}</h2>${p.objectif ? `<div class="small"><b>Objectif :</b> ${esc(p.objectif)}</div>` : ''}${p.description ? `<div class="small muted" style="margin-top:6px;white-space:pre-line">${esc(p.description)}</div>` : ''}
+      <div class="small" style="margin-top:8px;font-weight:700">${d.termine ? '🏆 Parcours terminé, bravo !' : d.nb_termine + '/' + d.nb_etapes + ' formation' + (d.nb_etapes > 1 ? 's' : '') + ' terminée' + (d.nb_termine > 1 ? 's' : '')}</div></div></div>
+      ${d.etapes.map((e, i) => {
+        const f = e.formation, st = ST_PARCOURS[e.statut] || ST_PARCOURS.disponible, prochaine = d.prochaine_formation_id === f.id;
+        return `<div class="card"${prochaine ? ' style="border:2px solid var(--orange)"' : ''}><div class="pad"><div class="small muted">Étape ${i + 1}${prochaine ? ' · <b style="color:var(--orange-d)">à suivre maintenant</b>' : ''}</div>
+          <b>${esc(f.titre)}</b><div class="small muted" style="margin:2px 0 8px">${f.gratuit ? 'Gratuite' : esc(price(f.prix, f.devise))}${f.niveau ? ' · ' + esc(f.niveau) : ''}</div>
+          <span class="badge ${st[1]}">${st[0]}${e.statut === 'en_cours' ? ' · ' + pct(e.avancement_pct) + '%' : ''}</span>
+          ${e.statut === 'verrouille' ? `<div class="small muted" style="margin-top:8px">🔒 À terminer d’abord : ${e.prerequis_manquants.map(m => '« ' + esc(m.titre) + ' »').join(', ')}</div>` : ''}
+          ${e.indisponible ? '<div class="small" style="margin-top:8px;color:var(--red)">Cette formation n’est plus disponible.</div>' : ''}
+          ${e.statut === 'disponible' && !e.indisponible ? (f.gratuit ? `<button class="btn block" style="margin-top:10px" data-insc="${esc(f.id)}">S’inscrire gratuitement</button>` : `<a class="btn block" style="margin-top:10px" href="#/formations/${esc(f.id)}">Voir la formation · ${esc(price(f.prix, f.devise))}</a>`) : ''}
+          ${e.statut === 'en_cours' || e.statut === 'termine' ? `<a class="btn ${e.statut === 'termine' ? 'out ' : ''}block" style="margin-top:10px" href="#/formations/${esc(f.id)}/suivre">${e.statut === 'termine' ? 'Revoir' : 'Continuer'}</a>` : ''}</div></div>`;
+      }).join('')}
+      <a class="btn out block" href="#/formations/parcours">Tous les parcours</a>`);
+    $$('[data-insc]').forEach(b => b.onclick = async () => {
+      if (!(await A.needLogin('Connectez-vous pour vous inscrire.'))) return;
+      b.disabled = true;
+      try { await api(`/api/formations/${encodeURIComponent(b.dataset.insc)}/inscrire`, { method: 'POST', body: {} }); toast('Inscription confirmée ✓'); F.items = null; screenParcours(++seq, id); }
+      catch (e) { toast(e.message, true); b.disabled = false; }
+    });
+  }
+
+  /* ============================================================
+     CARTES MENTALES (lot 3) : personnelles — l'éditeur est la page carte-mentale.html (adaptée au téléphone)
+     ============================================================ */
+  async function screenCartes(my) {
+    if (!S.me) return needLoginCard('Cartes mentales', 'Connectez-vous pour créer vos cartes mentales.');
+    setPane('Cartes mentales', '<div class="sk skc" style="height:80px"></div><div class="sk skc"></div>');
+    let r;
+    try { r = await api('/api/cartes-mentales'); } catch (e) { if (alive(my)) fail('Cartes mentales', e); return; }
+    if (!alive(my)) return;
+    const l = (r.cartes || []).filter(c => !c.formation_id);
+    setPane('Cartes mentales', `<div class="chips"><a class="chip" href="#/formations">Catalogue</a><a class="chip" href="#/formations/parcours">🧭 Parcours</a><a class="chip on" href="#/formations/cartes">🧠 Cartes</a></div>
+      <p class="small muted" style="margin:0 4px 12px">Résumez un cours ou préparez un projet : idées, sous-idées, notes et liens. Enregistrement automatique, export image ou PDF. Les cartes d’une formation suivie se trouvent dans son plan.</p>
+      <button class="btn block" id="fm-newcarte" style="margin-bottom:12px">+ Nouvelle carte</button>
+      ${l.length ? l.map(c => `<div class="card"><div class="pad"><b>🧠 ${esc(c.titre)}</b><div class="small muted" style="margin:2px 0 10px">${c.nb_noeuds} idée${c.nb_noeuds > 1 ? 's' : ''}</div>
+        <a class="btn block" href="carte-mentale.html?id=${encodeURIComponent(c.id)}">Ouvrir</a><button class="btn out block" style="margin-top:8px" data-del="${esc(c.id)}">Supprimer</button></div></div>`).join('') : `<div class="empty"><div class="ei">${ic('book', 'l')}</div><b>Aucune carte pour le moment</b></div>`}`);
+    $('#fm-newcarte').onclick = () => {
+      const close = A.openSheet(`<h2 style="margin:4px 0 2px;font-size:19px">Nouvelle carte mentale</h2><label class="fm-lab" for="fm-ct">Titre</label><input class="fm-in" id="fm-ct" maxlength="120" value="Ma carte mentale"><button class="btn block" id="fm-cgo" style="margin-top:16px">Créer et ouvrir</button>`);
+      $('#fm-cgo').onclick = async () => {
+        try { const n = await api('/api/cartes-mentales', { method: 'POST', body: { titre: $('#fm-ct').value.trim() } }); close(); location.href = 'carte-mentale.html?id=' + encodeURIComponent(n.id); }
+        catch (e) { toast(e.message, true); }
+      };
+    };
+    $$('[data-del]').forEach(b => b.onclick = async () => {
+      if (!confirm('Supprimer cette carte ?')) return;
+      try { await api('/api/cartes-mentales/' + encodeURIComponent(b.dataset.del), { method: 'DELETE' }); toast('Carte supprimée'); screenCartes(++seq); } catch (e) { toast(e.message, true); }
+    });
+  }
+
 })();
