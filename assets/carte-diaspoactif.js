@@ -109,6 +109,14 @@
       .cda-tags{display:flex;flex-wrap:wrap;gap:8px;}
       .cda-tag{background:#EEF2FF;color:#3730A3;font-size:11.5px;font-weight:700;padding:5px 12px;border-radius:99px;}
       .cda-muted{color:#94A3B8;font-size:12px;}
+      .cda-pp{border:1.5px dashed #F26422;background:rgba(242,100,34,.06);border-radius:14px;padding:14px 16px;margin:0 0 14px;}
+      .cda-pp-t{font-weight:800;font-size:14px;color:var(--tp,#0D1B2A);margin-bottom:4px;}
+      .cda-pp-s{margin:0 0 10px;font-size:12px;line-height:1.5;color:var(--ts,#64748B);}
+      .cda-pp-txt{white-space:pre-line;font-size:12.5px;line-height:1.6;color:var(--tp,#334155);background:var(--card,#fff);border:1px solid var(--border,#E5E9F0);border-radius:10px;padding:12px 14px;max-height:14em;overflow:auto;}
+      .cda-pp-btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}
+      .cda-pp-go{background:#F26422;color:#fff;border:none;border-radius:10px;font-weight:800;font-size:12.5px;padding:9px 16px;cursor:pointer;}
+      .cda-pp-go:hover{filter:brightness(1.06);}
+      .cda-pp-later{background:none;border:1.5px solid var(--border,#CBD5E1);color:var(--ts,#64748B);border-radius:10px;font-weight:700;font-size:12.5px;padding:9px 14px;cursor:pointer;}
       /* Centres d'intérêt (2026-10-09, demande explicite) : une petite cartouche bien distincte par centre d'intérêt */
       .cda-ci{display:flex;flex-wrap:wrap;gap:8px;}
       .cda-ci-item{display:inline-flex;align-items:center;gap:6px;background:#fff;border:1.5px solid #C7D2FE;border-left:4px solid #4F46E5;color:#1E1B4B;font-size:12px;font-weight:700;padding:6px 12px;border-radius:10px;box-shadow:0 1px 2px rgba(79,70,229,.12);}
@@ -254,6 +262,7 @@
               </div>`) : '';
     const hPubs = boite('cda-pubs-box', `
           <div class="cda-box-head"><span>📰 Publications</span>${isOwner ? `<button type="button" class="cda-edit-btn" id="cda-publier-btn" title="Créer une publication">✍️ Créer une publication</button>` : ''}</div>
+          ${isOwner ? '<div id="cda-premier-post"></div>' : ''}
           <div id="cda-publications-list"></div>`, 'margin:14px 20px 20px;');
     /* Reels du compte (2026-10-14) : leurs vidéos + « Créer un Reel » sur son propre profil ; la boîte se masque seule s'il n'y en a aucune (assets/reels-profil.js). */
     const hReels = boite('cda-reels-box', `
@@ -419,13 +428,32 @@
       const rb = document.getElementById('cda-reels-box');
       if (rb) { rb.style.display = 'none'; ReelsProfil.monter(document.getElementById('cda-reels-mount'), { auteurId: profil.id, estMoi: isOwner }).then(v => { if (v) rb.style.display = ''; }); }
     }
+    /* Première publication proposée : seulement sur son propre profil, tant que le compte n'a rien publié et n'a pas écarté la proposition. */
+    const cleMasque = 'da_premier_post_masque_' + profil.id;
+    const lireMasque = () => { try { return localStorage.getItem(cleMasque) === '1'; } catch (e) { return false; } };
+    function montrerPremierPost() {
+      const zone = q('#cda-premier-post');
+      if (!zone) return;
+      if (!isOwner || (profil.publications || []).length || lireMasque() || !window.Posts) { zone.innerHTML = ''; return; }
+      const texte = premierPostTexte(profil);
+      zone.innerHTML = `<div class="cda-pp">
+          <div class="cda-pp-t">✨ Votre première publication est prête</div>
+          <p class="cda-pp-s">Construite à partir de votre profil. Relisez-la, modifiez-la comme vous voulez (texte, photo, titre…) puis publiez-la.</p>
+          <div class="cda-pp-txt">${esc(texte)}</div>
+          <div class="cda-pp-btns"><button type="button" class="cda-pp-go" id="cda-pp-go">✍️ Modifier et publier</button><button type="button" class="cda-pp-later" id="cda-pp-later">Plus tard</button></div>
+        </div>`;
+      zone.querySelector('#cda-pp-go').addEventListener('click', () => window.Posts.openModal(null, { contenu: texte, visibilite: 'public' }));
+      zone.querySelector('#cda-pp-later').addEventListener('click', () => { try { localStorage.setItem(cleMasque, '1'); } catch (e) { /* sans stockage, la proposition revient au prochain affichage */ } zone.innerHTML = ''; });
+    }
     if (window.Posts) {
       window.Posts.renderFeed(profil.publications || [], 'cda-publications-list');
+      montrerPremierPost();
       window.CdaPublicationsRefresh = async () => {
         try {
           const r = await window.api('GET', `/profil/${profil.id}/publications`);
           profil.publications = r.publications || [];
           window.Posts.renderFeed(profil.publications, 'cda-publications-list');
+          montrerPremierPost();
         } catch (e) { /* liste non rafraîchie, pas bloquant */ }
       };
     }
@@ -569,6 +597,33 @@
     return out.slice(0, CI_MAX);
   }
   function ciMaj(t) { t = String(t || ''); return t.charAt(0).toUpperCase() + t.slice(1); }
+
+  /* Première publication proposée (2026-10-18, demande explicite) : un compte qui n'a encore rien publié reçoit un brouillon bâti sur sa biographie,
+     ses centres d'intérêt, ses compétences et son statut — il met le compte en valeur, dit l'envie de voir la suite de Diaspo'Actif et de s'y associer,
+     et la disponibilité pour toute prise de contact. Aucune IA : un modèle de texte, 100 % modifiable dans l'éditeur de publication avant d'être publié.
+     Formulations neutres (pas d'accord en genre : le profil n'a pas de champ sexe). */
+  function listeFr(a) { return a.length <= 1 ? (a[0] || '') : a.slice(0, -1).join(', ') + ' et ' + a[a.length - 1]; }
+  function premierPostTexte(profil) {
+    const prenom = String(profil.prenom || '').trim();
+    const plain = String(window.stripRichTags ? window.stripRichTags(profil.bio || '') : (profil.bio || '')).replace(/\s+/g, ' ').trim();
+    /* Une phrase de la biographie, reprise telle quelle, uniquement si elle est écrite à la première personne et reste courte. */
+    const phrase = (plain.match(/^.{20,200}?[.!?…](?=\s|$)/) || [''])[0].trim();
+    const bioPhrase = /^(je|j['’]|mon|ma|mes)\b/i.test(phrase) ? phrase : '';
+    const interets = ciListe(profil.centres_interet).filter(c => c.toLowerCase() !== 'autres').slice(0, 4).map(c => c.toLowerCase());
+    const comps = (Array.isArray(profil.competences) ? profil.competences : []).map(c => String(c || '').replace(/\s+/g, ' ').trim()).filter(c => c && c.length <= 32).slice(0, 3);
+    const parts = [];
+    parts.push(prenom ? `Bonjour à toutes et à tous, je suis ${prenom} et je rejoins la dynamique Diaspo'Actif.` : `Bonjour à toutes et à tous, je rejoins la dynamique Diaspo'Actif.`);
+    if (bioPhrase) parts.push(bioPhrase);
+    const lignes = [];
+    if (interets.length) lignes.push(`Mes centres d'intérêt : ${listeFr(interets)}.`);
+    if (comps.length) lignes.push(`Mes compétences : ${listeFr(comps)}.`);
+    if (profil.situation_pro === 'disponible' || profil.situation_pro === 'en_recherche') lignes.push(`Je suis actuellement disponible pour de nouvelles opportunités.`);
+    if (lignes.length) parts.push(lignes.join(' '));
+    parts.push(`J'ai hâte de découvrir la suite de ce qui se construit sur Diaspo'Actif et je souhaite prendre part à cette dynamique collective.`);
+    parts.push(`Je reste disponible pour toute prise de contact : n'hésitez pas à m'écrire !`);
+    parts.push(`#DiaspoActif #Diaspora`);
+    return parts.join('\n\n');
+  }
 
   function editCentresInteret(container, profil, opts) {
     let liste = ciListe(profil.centres_interet);

@@ -261,7 +261,7 @@ let currentUser = null;
 let feedVue = 'grille';
 try { if (localStorage.getItem('fil_vue') === 'liste') feedVue = 'liste'; } catch (_) {}
 function majBasculeVue() {
-  document.querySelectorAll('#fg-barre .fg-bascule button').forEach(b => {
+  document.querySelectorAll('#fg-barre .fg-bascule button[data-vue]').forEach(b => {
     const actif = b.dataset.vue === feedVue;
     b.classList.toggle('active', actif);
     b.setAttribute('aria-pressed', actif ? 'true' : 'false');
@@ -305,7 +305,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   FilGrille.init({ containerId: 'feed-list', currentUserId: currentUser?.id });
   majBasculeVue();
-  document.querySelectorAll('#fg-barre .fg-bascule button').forEach(b => {
+  document.querySelectorAll('#fg-barre .fg-bascule button[data-vue]').forEach(b => {
     b.addEventListener('click', () => {
       if (feedVue === b.dataset.vue) return;
       feedVue = b.dataset.vue;
@@ -554,7 +554,7 @@ window.PostsFeed = { refresh: loadFeed };
   <script src="/assets/theme-manager.js"></script>
 <script src="assets/back-button.js"></script>
 <!-- Reels (2026-10-13) : bouton à gauche des publications, vers l'univers des petites vidéos ; retour arrière : retirer cette ligne -->
-<script src="/assets/reels.js?v=20261014a" defer></script>
+<script src="/assets/reels.js?v=20261018a" defer></script>
 </body>
 </html>
 
