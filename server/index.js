@@ -38726,9 +38726,25 @@ ${jsonLd}
       let immatEnRevue = false;
       if (init) { try { immatEnRevue = !!(await db.prepare("SELECT 1 FROM verifications_organisation WHERE initiative_id=? AND statut='en_attente'").get(init.id)); } catch (_) {} }
 
-      /* ── Ancienneté : 15 pts, 1 par mois ── */
+      /* ═══ BARÈME À 100 POINTS EXACTEMENT (2026-10-18, demande explicite : « total à 100 exactement ») ═══
+         Le total des points DISPONIBLES vaut 100 pour chaque type de compte — [membre, structure]. Une structure (initiative, collectivité…)
+         a des critères en plus (événements, adhérents, immatriculation…) : les critères communs y pèsent donc moins, pour que le total
+         reste 100. Le temps de connexion (15), les connexions (6) et le partage de l'événement promo (3) sont identiques partout (valeurs
+         fixées par l'utilisateur). Un contrôle écrit dans le journal si une modification casse ce total. */
+      const BAREME = {
+        identite: [14, 9], profil: [10, 7], anciennete: [6, 3], rayonnement: [5, 3], temoignage: [3, 2], rencontre: [7, 4], signalements: [4, 3],
+        publications: [8, 4], commentaires: [3, 1], reactions: [3, 1], activite_recente: [3, 2], temps_connexion: [15, 15], connexions: [6, 6],
+        parrainage: [4, 3], achat: [3, 1], participation: [3, 1], partage_promo: [3, 3],
+        organisation: [0, 4], immatriculation: [0, 4], infos_admin: [0, 3], evenements: [0, 5], comptes_rendus: [0, 2], vente: [0, 2],
+        cagnotte_creee: [0, 2], dons_recus: [0, 3], adhesion_creee: [0, 2], adherents: [0, 5],
+      };
+      const P = {};
+      for (const k of Object.keys(BAREME)) P[k] = BAREME[k][porteUneStructure ? 1 : 0];
+      const V = (membre, structure) => porteUneStructure ? structure : membre;
+
+      /* ── Ancienneté : 1 point par mois ── */
       const mois = Math.max(0, user.months_old || 0);
-      const ptsAnciennete = Math.min(12, mois);
+      const ptsAnciennete = Math.min(P.anciennete, mois);
 
       /* Accréditations : critère RETIRÉ (2026-10-09, remarque de l'utilisateur) — le système
          d'accréditation n'existe plus, mais ses 12 points continuaient d'être comptés pour les
@@ -38774,7 +38790,7 @@ ${jsonLd}
           FROM invitations WHERE inviter_user_id=?`).get(userId);
         parrCrees = Number(p?.crees) || 0; parrUtilises = Number(p?.utilises) || 0; parrInscrits = Number(p?.inscrits) || 0;
       } catch (e) { /* table créée à la demande : absente tant que personne n'a utilisé le parrainage */ }
-      const ptsRayonnement = Math.min(12, nbCollabs * 2 + Math.floor(nbFollowers / 10));
+      const ptsRayonnement = Math.min(P.rayonnement, nbCollabs * 2 + Math.floor(nbFollowers / 10));
       /* Temps de connexion cumulé (2026-10-14, demande explicite) : somme de TOUTES les journées de user_sessions depuis la création du compte
          (battements envoyés par le site et par l'application téléphone, uniquement page visible — voir POST /api/session/heartbeat). */
       const secsConnexion = await N(`SELECT COALESCE(SUM(duree_sec),0) n FROM user_sessions WHERE user_id=?`, userId);
@@ -38798,7 +38814,7 @@ ${jsonLd}
         compl = { pct: ev.pct };
         manqueProfil = (ev.manquants || []).map(l => ({ libelle: l, lien: init ? 'dashboard-initiative.html' : 'profil.html' }));
       }
-      const ptsProfil = Math.round(compl.pct / 100 * 15);
+      const ptsProfil = Math.round(compl.pct / 100 * P.profil);
       const manquantsProfil = manqueProfil.slice(0, 4).map(m => m.libelle);
 
       const nbSignal = user.signalements_confirmes || 0;
@@ -38835,32 +38851,32 @@ ${jsonLd}
       /* Chaque critère porte son action : c'est ce qui transforme un verdict en marche à
          suivre. `applicable:false` retire le critère du total ET du dénominateur. */
       const criteres = [
-        { cle:'identite', icon:'🪪', label:'Identité vérifiée', pts: identiteOk ? 20 : 0, max:20, applicable:true,
+        { cle:'identite', icon:'🪪', label:'Identité vérifiée', pts: identiteOk ? P.identite : 0, max:P.identite, applicable:true,
           aide: identiteOk ? 'Vérifiée' : "Contrôle en ligne, quelques minutes.",
           action: identiteOk ? null : { texte:'Vérifier mon identité', href:'profil.html?verifier=identite' } },
 
-        { cle:'profil', icon:'👤', label:'Profil public rempli', pts: ptsProfil, max:15, applicable:true,
+        { cle:'profil', icon:'👤', label:'Profil public rempli', pts: ptsProfil, max:P.profil, applicable:true,
           aide: manqueProfil.length ? `Rempli à ${compl.pct} %. Il manque ${manqueProfil.length} élément${manqueProfil.length > 1 ? 's' : ''}.` : 'Profil entièrement renseigné.',
           /* Chaque élément manquant avec son lien direct : le widget en fait une liste de boutons « Remplir ». */
           manque: manqueProfil.slice(0, 25),
           action: manqueProfil.length ? { texte:'Compléter le prochain élément', href: manqueProfil[0].lien || 'profil.html' } : null },
 
-        { cle:'anciennete', icon:'🕐', label:'Ancienneté sur la plateforme', pts: ptsAnciennete, max:12, applicable:true,
-          aide: `${mois} mois — 1 point par mois, jusqu'à 12.`, action:null },
+        { cle:'anciennete', icon:'🕐', label:'Ancienneté sur la plateforme', pts: ptsAnciennete, max:P.anciennete, applicable:true,
+          aide: `${mois} mois — 1 point par mois, jusqu'à ${P.anciennete}.`, action:null },
 
-        { cle:'rayonnement', icon:'📣', label:'Rayonnement', pts: ptsRayonnement, max:12, applicable:true,
+        { cle:'rayonnement', icon:'📣', label:'Rayonnement', pts: ptsRayonnement, max:P.rayonnement, applicable:true,
           aide: `${nbFollowers} abonné(s), ${nbCollabs} collaboration(s). Publier régulièrement attire des abonnés.`,
-          action: ptsRayonnement >= 12 ? null : { texte:'Publier sur le fil', href:'fil-actualite.html' } },
+          action: ptsRayonnement >= P.rayonnement ? null : { texte:'Publier sur le fil', href:'fil-actualite.html' } },
 
         /* Ajouté le 2026-08-26 (demande explicite) : réutilise le même témoignage que la
            proposition périodique (voir POST /api/temoignage, initTemoignageWidget dans
            assets/app.js) — aucun nouveau formulaire, juste ce critère qui en récompense
            l'envoi. temoignage_statut vient de la ligne users déjà chargée ci-dessus. */
-        { cle:'temoignage', icon:'💬', label:'Témoignage partagé', pts: user.temoignage_statut === 'fourni' ? 5 : 0, max:5, applicable:true,
+        { cle:'temoignage', icon:'💬', label:'Témoignage partagé', pts: user.temoignage_statut === 'fourni' ? P.temoignage : 0, max:P.temoignage, applicable:true,
           aide: user.temoignage_statut === 'fourni' ? 'Merci pour votre témoignage !' : 'Partagez votre expérience de la plateforme.',
           action: user.temoignage_statut === 'fourni' ? null : { texte:'Partager mon témoignage', href:'index.html#temoignage' } },
 
-        { cle:'rencontre', icon:'🤝', label:'Rencontre Diaspo’Actif', pts: rencontreFaite ? 10 : 0, max:10, applicable:true,
+        { cle:'rencontre', icon:'🤝', label:'Rencontre Diaspo’Actif', pts: rencontreFaite ? P.rencontre : 0, max:P.rencontre, applicable:true,
           aide: AIDE_RENCONTRE[rencontre?.statut] || "Échangez avec un agent Diaspo’Actif, en personne ou en visioconférence.",
           statutRencontre: rencontre?.statut || null,
           enCours: rencontreEnCours,
@@ -38870,7 +38886,7 @@ ${jsonLd}
 
         { cle:'signalements', icon: nbSignal ? '⚠️' : '🛡️',
           label: nbSignal ? `${nbSignal} signalement(s) confirmé(s)` : 'Aucun signalement confirmé',
-          pts: nbSignal ? 0 : 6, max:6, applicable:true, alerte: nbSignal > 0,
+          pts: nbSignal ? 0 : P.signalements, max:P.signalements, applicable:true, alerte: nbSignal > 0,
           aide: nbSignal ? "Contactez la modération si vous contestez ces signalements." : 'Aucun signalement à ce jour.',
           action: nbSignal ? { texte:'Contacter la modération', href:'messagerie.html' } : null },
 
@@ -38880,7 +38896,7 @@ ${jsonLd}
            en ligne, voir POST /api/initiatives/verifier-immatriculation) ; "Organisation testée
            avec Stripe" est le contrôle KYC plus lourd exigé par Stripe pour autoriser de vrais
            paiements — d'où son barème supérieur (8 > 5). */
-        { cle:'organisation', icon:'🏢', label:'Organisation testée avec Stripe', pts: init?.organisation_verifiee ? 8 : 0, max:8,
+        { cle:'organisation', icon:'🏢', label:'Organisation testée avec Stripe', pts: init?.organisation_verifiee ? P.organisation : 0, max:P.organisation,
           applicable: porteUneStructure,
           aide: init?.organisation_verifiee ? 'Testée.' : "Contrôle effectué à l'activation des paiements.",
           action: init?.organisation_verifiee ? null : { texte:'Tester mon organisation avec Stripe', href:'dashboard-initiative.html#paiements' } },
@@ -38892,14 +38908,15 @@ ${jsonLd}
           const typeI = numeroI ? Immat.typeEffectif(init?.type_immatriculation, numeroI) : '';
           const confirmee = !!init?.immat_verifiee_ligne;
           const registre = typeI && Immat.TYPES[typeI] && Immat.TYPES[typeI].registre;
-          return { cle:'immatriculation', icon:'🏛️', label:'Immatriculation de la structure', pts: confirmee ? 5 : (numeroI && typeI ? 2 : 0), max:5,
+          const petit = Math.round(P.immatriculation * 2 / 5); // points du numéro simplement renseigné
+          return { cle:'immatriculation', icon:'🏛️', label:'Immatriculation de la structure', pts: confirmee ? P.immatriculation : (numeroI && typeI ? petit : 0), max:P.immatriculation,
             applicable: porteUneStructure,
-            regle: '+2 pts le numéro renseigné avec son type · +5 pts une fois confirmé (registre officiel, nom concordant, ou équipe sur justificatif)',
+            regle: `+${petit} pts le numéro renseigné avec son type · +${P.immatriculation} pts une fois confirmé (registre officiel, nom concordant, ou équipe sur justificatif)`,
             aide: confirmee ? `Confirmée${init.immat_nom_registre ? ' — ' + init.immat_nom_registre : ''}.`
               : immatEnRevue ? 'Le nom diffère de celui du registre : votre dossier est examiné par l’équipe (vous pouvez y joindre votre justificatif).'
-              : !numeroI ? 'Choisissez le type de votre numéro (RCCM, SIREN, SIRET, RNA, IFU…) et saisissez-le : +2 points, +5 une fois confirmé.'
-              : registre ? 'Numéro renseigné (+2) — confirmé automatiquement dans le registre officiel si le nom concorde (+3 de plus).'
-              : 'Numéro renseigné (+2). Pour les 3 points restants, envoyez votre justificatif (rubrique Paiements) : l’équipe le vérifie.',
+              : !numeroI ? `Choisissez le type de votre numéro (RCCM, SIREN, SIRET, RNA, IFU…) et saisissez-le : +${petit} points, +${P.immatriculation} une fois confirmé.`
+              : registre ? `Numéro renseigné (+${petit}) — confirmé automatiquement dans le registre officiel si le nom concorde (+${P.immatriculation - petit} de plus).`
+              : `Numéro renseigné (+${petit}). Pour les ${P.immatriculation - petit} points restants, envoyez votre justificatif (rubrique Paiements) : l’équipe le vérifie.`,
             action: confirmee ? null : { texte: numeroI ? 'Réessayer la vérification' : "Renseigner l'immatriculation", href:'reseau.html' } };
         })(),
 
@@ -38931,18 +38948,19 @@ ${jsonLd}
             cle, icon, label, pts: fait ? pts : 0, max: pts, applicable, regle: `+${pts} pts dès le premier`,
             aide: fait ? 'Acquis.' : aide, action: fait ? null : action });
           const S = porteUneStructure;
-          const parrPts = (parrCrees ? 2 : 0) + (parrUtilises ? 2 : 0) + (parrInscrits ? 3 : 0);
+          const [parrA, parrB, parrC] = V([1, 1, 2], [1, 1, 1]); // lien créé · lien utilisé · inscription (total = P.parrainage)
+          const parrPts = (parrCrees ? parrA : 0) + (parrUtilises ? parrB : 0) + (parrInscrits ? parrC : 0);
           return [
-            echelle('publications', '📝', 'Publications', nbPosts, [[1, 3], [10, 3], [30, 4]], { pas: 30, pts: 2 }, 16, ['publication', 'publications'], true,
+            echelle('publications', '📝', 'Publications', nbPosts, V([[1, 2], [10, 3], [30, 3]], [[1, 1], [10, 1], [30, 2]]), null, P.publications, ['publication', 'publications'], true,
               { texte: 'Publier sur le fil', href: 'fil-actualite.html' }),
-            echelle('commentaires', '💭', 'Commentaires', nbCommentaires, [[1, 2], [10, 2], [30, 2]], null, 6, ['commentaire', 'commentaires'], true,
+            echelle('commentaires', '💭', 'Commentaires', nbCommentaires, V([[1, 1], [10, 1], [30, 1]], [[1, 1]]), null, P.commentaires, ['commentaire', 'commentaires'], true,
               { texte: 'Commenter une publication', href: 'fil-actualite.html' }),
-            echelle('reactions', '👍', 'Réactions (j’aime ou non)', nbReactions, [[1, 2], [10, 2], [30, 2]], null, 6, ['réaction', 'réactions'], true,
+            echelle('reactions', '👍', 'Réactions (j’aime ou non)', nbReactions, V([[1, 1], [10, 1], [30, 1]], [[1, 1]]), null, P.reactions, ['réaction', 'réactions'], true,
               { texte: 'Réagir à une publication', href: 'fil-actualite.html' }),
-            { cle:'activite_recente', icon:'🔥', label:'Activité des 30 derniers jours', pts: Math.min(5, Math.ceil(nbRecents / 2)), max:5, applicable:true,
-              regle: '1 pt tous les 2 gestes (publication ou commentaire) sur 30 jours (plafond 5 pts)',
+            { cle:'activite_recente', icon:'🔥', label:'Activité des 30 derniers jours', pts: Math.min(P.activite_recente, Math.ceil(nbRecents / 2)), max:P.activite_recente, applicable:true,
+              regle: `1 pt tous les 2 gestes (publication ou commentaire) sur 30 jours (plafond ${P.activite_recente} pts)`,
               aide: `${nbRecents} geste(s) sur les 30 derniers jours.`,
-              action: nbRecents >= 10 ? null : { texte: 'Publier ou commenter', href: 'fil-actualite.html' } },
+              action: nbRecents >= 2 * P.activite_recente ? null : { texte: 'Publier ou commenter', href: 'fil-actualite.html' } },
             /* Temps de connexion cumulé : +10 pts dès 1 h, +5 pts de plus dès 5 h (15 pts au total). */
             (() => {
               const heures = secsConnexion / 3600;
@@ -38956,34 +38974,34 @@ ${jsonLd}
             })(),
             /* Connexions : +3 pts à la 10ᵉ, +3 pts de plus à la 20ᵉ (6 pts au total). */
             echelle('connexions', '🔑', 'Connexions au compte', nbConnexions, [[10, 3], [20, 3]], null, 6, ['connexion', 'connexions'], true, null),
-            echelle('evenements', '📅', 'Événements publiés', nbEvenements, [[1, 5], [3, 3], [10, 4]], null, 12, ['événement', 'événements'], S,
+            echelle('evenements', '📅', 'Événements publiés', nbEvenements, [[1, 2], [3, 1], [10, 2]], null, P.evenements, ['événement', 'événements'], S,
               { texte: 'Publier un événement', href: 'dashboard-initiative.html#evenements' }),
-            echelle('comptes_rendus', '🧾', 'Comptes rendus d’événement', nbComptesRendus, [[1, 5], [3, 3]], null, 8, ['compte rendu', 'comptes rendus'], S,
+            echelle('comptes_rendus', '🧾', 'Comptes rendus d’événement', nbComptesRendus, [[1, 1], [3, 1]], null, P.comptes_rendus, ['compte rendu', 'comptes rendus'], S,
               { texte: 'Faire un compte rendu', href: 'dashboard-initiative.html#evenements' }),
-            { cle:'parrainage', icon:'🤝', label:'Parrainage', pts: parrPts, max:7, applicable:true,
-              regle: 'lien créé : +2 · lien ouvert ou QR scanné : +2 · une inscription grâce à vous : +3',
-              aide: !parrCrees ? 'Créez votre lien de parrainage.' : !parrUtilises ? 'Lien créé — partagez-le : +2 dès que quelqu’un l’ouvre.' : !parrInscrits ? 'Votre lien a été ouvert — +3 dès qu’une personne s’inscrit grâce à lui.' : 'Parrainage abouti.',
-              action: parrPts >= 7 ? null : { texte: parrCrees ? 'Partager mon lien' : 'Créer mon lien', href: 'parrainage.html' } },
-            geste('achat', '🛒', 'A déjà acheté sur la plateforme', nbAchats > 0, 4, true, 'Une commande en boutique ou un billet d’événement.',
+            { cle:'parrainage', icon:'🤝', label:'Parrainage', pts: parrPts, max:P.parrainage, applicable:true,
+              regle: `lien créé : +${parrA} · lien ouvert ou QR scanné : +${parrB} · une inscription grâce à vous : +${parrC}`,
+              aide: !parrCrees ? 'Créez votre lien de parrainage.' : !parrUtilises ? `Lien créé — partagez-le : +${parrB} dès que quelqu’un l’ouvre.` : !parrInscrits ? `Votre lien a été ouvert — +${parrC} dès qu’une personne s’inscrit grâce à lui.` : 'Parrainage abouti.',
+              action: parrPts >= P.parrainage ? null : { texte: parrCrees ? 'Partager mon lien' : 'Créer mon lien', href: 'parrainage.html' } },
+            geste('achat', '🛒', 'A déjà acheté sur la plateforme', nbAchats > 0, P.achat, true, 'Une commande en boutique ou un billet d’événement.',
               { texte: 'Découvrir les boutiques', href: 'vitrines.html' }),
-            geste('vente', '💶', 'A déjà vendu sur la plateforme', nbVentes > 0, 5, S, 'Une commande reçue et traitée, ou un billet vendu.',
+            geste('vente', '💶', 'A déjà vendu sur la plateforme', nbVentes > 0, P.vente, S, 'Une commande reçue et traitée, ou un billet vendu.',
               { texte: 'Gérer ma boutique', href: 'dashboard-initiative.html#parametres-vitrine' }),
-            geste('cagnotte_creee', '🪙', 'A créé une cagnotte', nbCagnottes > 0, 4, S, 'Créez une cagnotte ou un don récurrent.',
+            geste('cagnotte_creee', '🪙', 'A créé une cagnotte', nbCagnottes > 0, P.cagnotte_creee, S, 'Créez une cagnotte ou un don récurrent.',
               { texte: 'Créer une cagnotte', href: 'dashboard-initiative.html#cagnottes' }),
-            echelle('dons_recus', '💚', 'Dons reçus', nbDonsRecus, [[1, 4], [10, 3]], null, 7, ['don reçu', 'dons reçus'], S,
+            echelle('dons_recus', '💚', 'Dons reçus', nbDonsRecus, [[1, 2], [10, 1]], null, P.dons_recus, ['don reçu', 'dons reçus'], S,
               { texte: 'Partager ma cagnotte', href: 'dashboard-initiative.html#cagnottes' }),
-            geste('participation', '🎁', 'A participé à une cagnotte', nbParticipations > 0, 4, true, 'Soutenez une cagnotte ou faites un don.',
+            geste('participation', '🎁', 'A participé à une cagnotte', nbParticipations > 0, P.participation, true, 'Soutenez une cagnotte ou faites un don.',
               { texte: 'Voir les cagnottes', href: 'cagnottes.html' }),
-            geste('adhesion_creee', '🎫', 'A créé une adhésion', nbFormules > 0, 4, S, 'Créez la formule d’adhésion de votre structure.',
+            geste('adhesion_creee', '🎫', 'A créé une adhésion', nbFormules > 0, P.adhesion_creee, S, 'Créez la formule d’adhésion de votre structure.',
               { texte: 'Créer mon adhésion', href: 'dashboard-initiative.html#adhesions-init' }),
-            echelle('adherents', '👥', 'Adhérents', nbAdherents, [[1, 4], [10, 3], [20, 3], [30, 4]], { pas: 30, pts: 2 }, 20, ['adhérent', 'adhérents'], S,
+            echelle('adherents', '👥', 'Adhérents', nbAdherents, [[1, 1], [10, 1], [20, 1], [30, 2]], null, P.adherents, ['adhérent', 'adhérents'], S,
               { texte: 'Faire adhérer des membres', href: 'dashboard-initiative.html#adhesions-init' }),
             /* Bonus unique "+3" (2026-10-09, demande explicite : "Partager cet événement va
                permettre de gagner 3 points de score de fiabilité. Ça ne se cumule pas.") — lu
                depuis promo_event_partages (clé primaire user_id), jamais compté deux fois quel
                que soit le nombre de partages réels. Concerne l'événement épinglé "3 mois de
                Premium offerts" uniquement, voir POST /api/evenements/:id/partage-promo. */
-            geste('partage_promo', '📤', 'A partagé l\'événement "3 mois de Premium offerts"', nbPartagePromo > 0, 3, true, 'Partagez l\'événement "3 mois de Premium offerts" depuis la page Événements.',
+            geste('partage_promo', '📤', 'A partagé l\'événement "3 mois de Premium offerts"', nbPartagePromo > 0, P.partage_promo, true, 'Partagez l\'événement "3 mois de Premium offerts" depuis la page Événements.',
               { texte: 'Voir l\'événement', href: 'evenements.html' }),
           ];
         })(),
@@ -38991,19 +39009,19 @@ ${jsonLd}
 
       /* Règles lisibles des critères historiques (le barème affiché aux membres les reprend). */
       const REGLES = {
-        identite: '+20 pts une fois l’identité vérifiée', profil: 'jusqu’à 15 pts, proportionnels au remplissage du profil public',
-        anciennete: '1 pt par mois (plafond 12 pts)', rayonnement: '2 pts par collaboration, 1 pt par tranche de 10 abonnés (plafond 12 pts)',
-        temoignage: '+5 pts dès le témoignage partagé', rencontre: '+10 pts après une rencontre validée par un agent',
-        signalements: '+6 pts tant qu’aucun signalement n’est confirmé', organisation: '+8 pts une fois l’organisation testée avec Stripe',
-        immatriculation: '+2 pts le numéro renseigné, +5 pts une fois confirmé', infos_admin: '+1 pt par information administrative',
+        identite: `+${P.identite} pts une fois l’identité vérifiée`, profil: `jusqu’à ${P.profil} pts, proportionnels au remplissage du profil public`,
+        anciennete: `1 pt par mois (plafond ${P.anciennete} pts)`, rayonnement: `2 pts par collaboration, 1 pt par tranche de 10 abonnés (plafond ${P.rayonnement} pts)`,
+        temoignage: `+${P.temoignage} pts dès le témoignage partagé`, rencontre: `+${P.rencontre} pts après une rencontre validée par un agent`,
+        signalements: `+${P.signalements} pts tant qu’aucun signalement n’est confirmé`, organisation: `+${P.organisation} pts une fois l’organisation testée avec Stripe`,
+        infos_admin: '+1 pt par information administrative',
       };
       criteres.forEach(c => { if (!c.regle) c.regle = REGLES[c.cle] || `${c.max} pts`; });
 
-      /* Points ABSOLUS, plafonnés à 100 : plus de dénominateur qui varie. Le total disponible
-         dépasse 100 (marge voulue) — `brut` dit combien de points sont cumulés au-delà du plafond. */
+      /* Points ABSOLUS : le total DISPONIBLE vaut exactement 100 (voir BAREME plus haut) — atteindre 100 demande donc de tout réussir. */
       const retenus = criteres.filter(c => c.applicable);
       const brut    = retenus.reduce((s, c) => s + c.pts, 0);
       const dispo   = retenus.reduce((s, c) => s + c.max, 0);
+      if (dispo !== 100) console.error(`[fiabilite] barème : total disponible ${dispo} au lieu de 100 (${porteUneStructure ? 'structure' : 'membre'}) — vérifier BAREME`);
       const score   = Math.min(100, Math.round(brut));
       const total   = score, sur = 100;
 
