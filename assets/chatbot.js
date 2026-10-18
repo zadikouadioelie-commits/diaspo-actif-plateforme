@@ -2098,11 +2098,12 @@
 }
 .cb-qr-btn {
   background: #fff; border: 1.5px solid var(--orange, #ff6b00);
-  color: var(--orange, #ff6b00); border-radius: 99px;
+  /* Encre fixe : sous le design « Nuit dorée », --orange devient doré (#E3C06E) → doré sur blanc, contraste 1,7:1 (audit 2026-10-18). */
+  color: #B84C1A; border-radius: 99px;
   padding: 5px 13px; font-size: 12px; cursor: pointer;
   transition: background .15s, color .15s; white-space: nowrap;
 }
-.cb-qr-btn:hover { background: var(--orange, #ff6b00); color: #fff; }
+.cb-qr-btn:hover { background: #B84C1A; border-color: #B84C1A; color: #fff; }
 
 .cb-input-row {
   display: flex; align-items: center; gap: 8px;

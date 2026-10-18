@@ -947,6 +947,18 @@ a.rp-ligne:hover,a.rp-ligne:focus-visible{background:#eff6ff;border-color:#2563e
 .rp-ligne.rp-fait{background:#f0fdf4;border-color:#bbf7d0;color:#15803d;box-shadow:none;}
 .rp-ligne.rp-fait .rp-lib{text-decoration:line-through;opacity:.8;}
 .rp-signature{margin:8px 0 6px;font-size:13.5px;font-style:italic;color:#3b5b8c;}
+/* La carte est CLAIRE (dégradé bleu pâle) et s'ajoute au <body> : sous le design « Nuit dorée » (class="nd"), les règles globales h1/h2 → blanc et, sur
+   téléphone, a/p → or / gris clair l'atteignaient (titre, texte et lignes quasi invisibles, capture d'écran du 2026-10-18). Elle restaure donc ses encres
+   foncées, quel que soit le thème de la page et l'habillage téléphone. */
+html body .rp-carte .rp-titre{color:#1e3a8a!important}
+html body .rp-carte .rp-texte{color:#1e3a5f!important}
+html body .rp-carte .rp-signature{color:#3b5b8c!important}
+html body .rp-carte a.rp-ligne,html body .rp-carte .rp-ligne{color:#1e3a8a!important}
+html body .rp-carte .rp-ligne.rp-fait{color:#15803d!important}
+html body .rp-carte .rp-ligne .rp-fleche{color:#2563eb!important}
+html body .rp-carte .rp-ok{color:#166534!important}
+html body .rp-carte .rp-bouton{color:#fff!important}
+html body .rp-carte .rp-plus-tard,html body .rp-carte .po-deco{color:#475f86!important}
 .rp-bouton{display:inline-block;margin-top:6px;padding:11px 24px;border:none;border-radius:999px;background:#2563eb;color:#fff;font-weight:800;font-size:15px;cursor:pointer;box-shadow:0 6px 16px rgba(37,99,235,.4);}
 .rp-bouton:hover{background:#1d4ed8;}
 .rp-plus-tard{display:block;margin:10px auto 0;background:none;border:none;color:#475f86;font-size:12.5px;text-decoration:underline;cursor:pointer;padding:6px;}

@@ -6,7 +6,10 @@
    navy #0D2B4E · bleu #1E4F8A / #4490E2 · orange #F26422 (boutons : #B84C1A) · fond #EEF2F8.
    Le fonctionnement de ces pages n'est pas touché : seul l'habillage change.
    ============================================================ */
-html.m-site, html.m-site body { background: #EEF2F8 !important; color: #0D2B4E; font-family: "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif; -webkit-text-size-adjust: 100%; }
+html.m-site, html.m-site body { font-family: "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif; -webkit-text-size-adjust: 100%; }
+/* Fond clair et texte bleu marine : sauf pour une page qui a son propre fond SOMBRE (classe .m-sombre, posée par assets/m-redirect.js après chargement) — la forcer en clair
+   rendait son texte clair invisible (page comptes-test, audit 2026-10-18). Les pages Nuit dorée ont leur règle dédiée plus bas. */
+html.m-site:not(.m-sombre), html.m-site:not(.m-sombre) body { background: #EEF2F8 !important; color: #0D2B4E; }
 
 /* barre du haut de l'appli, à la place de la barre du site */
 #m-site-top { position: sticky; top: 0; z-index: 50; background: #0D2B4E; color: #fff; padding: env(safe-area-inset-top) 14px 0; }
@@ -26,9 +29,9 @@ html.m-site nav.nav { display: none !important; }
 html.m-site .page { background: transparent !important; min-height: 0; }
 html.m-site main, html.m-site .container, html.m-site .insc-wrap { padding: 14px 12px 28px !important; margin: 0 auto !important; max-width: 560px !important; width: 100% !important; box-sizing: border-box; }
 html.m-site .card, html.m-site .auth-form-card { background: #F9F8F3 !important; border: 1px solid #DCE4EF !important; border-radius: 14px !important; box-shadow: 0 2px 10px rgba(13, 43, 78, .08) !important; padding: 20px 16px !important; margin: 0 0 12px !important; max-width: none !important; }
-html.m-site h1, html.m-site h2, html.m-site h3 { color: #0D2B4E; }
+/* Pas de couleur imposée sur les titres, paragraphes ni liens (2026-10-18, audit de 122 pages) : ces pages ont des sections SOMBRES à texte clair (site vitrine, bandeaux, héros) ;
+   un h1/h2 forcé en bleu marine et un p en gris y devenaient illisibles (contraste 1,0 à 1,6). Le texte hérite de la couleur de sa propre section, et du <body> (bleu marine) sinon. */
 html.m-site h2 { font-size: 20px; }
-html.m-site .sub, html.m-site p { color: #5b6472; }
 
 /* champs : 16 px (évite le zoom automatique du téléphone), coins arrondis comme dans l'appli */
 html.m-site input:not([type=checkbox]):not([type=radio]):not([type=file]), html.m-site select, html.m-site textarea {
@@ -41,7 +44,6 @@ html.m-site .btn, html.m-site button.btn, html.m-site button[type=submit] {
   min-height: 46px; border-radius: 30px !important; font-weight: 700; font-size: 15px; }
 html.m-site .btn-orange, html.m-site .btn-primary, html.m-site button[type=submit] { background: #B84C1A !important; border: 1.5px solid #B84C1A !important; color: #fff !important; }
 html.m-site .btn-outline, html.m-site .btn-secondary { background: #fff !important; color: #0D2B4E !important; border: 1.5px solid #DCE4EF !important; }
-html.m-site a { color: #1E4F8A; }
 html.m-site .auth-error { color: #B3261E; font-size: 13px; }
 
 /* aucun débordement horizontal */
@@ -54,18 +56,21 @@ html.m-site img, html.m-site table { max-width: 100%; }
    sur téléphone, les titres et textes des profils étaient quasi invisibles. Cause : ce fichier force un fond CLAIR
    (#EEF2F8) et des cartes crème sur TOUTE page habillée, alors que le design Nuit dorée écrit en blanc sur du verre
    translucide pensé pour un fond sombre (contraste mesuré : 1,06:1 sur « Services proposés », « Informations
-   pratiques »… — 63 textes sur 85 illisibles sur le profil). Une page déjà en Nuit dorée garde donc ses couleurs
-   sombres ; seules la barre du haut de l'appli, la mise en page et les champs de saisie 16 px restent communs.
+   pratiques »… — 63 textes sur 85 illisibles sur le profil). Une page déjà en Nuit dorée garde donc son fond, ses cartes et ses champs sombres ; le texte (titres, paragraphes, liens, libellés)
+   n'est plus imposé par ce fichier : il hérite de la page — y compris dans les composants CLAIRS que ces pages contiennent (assistant, formulaire de
+   témoignage, carte « Merci de renseigner… ») où un texte clair forcé redevenait invisible (audit de 122 pages, 2026-10-18).
    Les pages SANS class="nd" ne sont pas touchées : elles gardent l'habillage clair ci-dessus.
    ============================================================ */
 html.m-site:has(body.nd), html.m-site body.nd { background: var(--nd-nuit, #060A14) !important; color: var(--nd-texte, #E8ECF6); }
-html.m-site body.nd :is(h1, h2, h3) { color: #fff; }
-html.m-site body.nd .sub, html.m-site body.nd p { color: var(--nd-doux, #A9B4CC); }
-html.m-site body.nd label { color: var(--nd-doux, #A9B4CC); }
-html.m-site body.nd a { color: var(--nd-or, #E3C06E); }
 html.m-site body.nd .card, html.m-site body.nd .auth-form-card {
   background: var(--nd-verre, rgba(255, 255, 255, .045)) !important; border: 1px solid var(--nd-bord2, rgba(255, 255, 255, .09)) !important;
   box-shadow: 0 26px 54px -34px #000 !important; color: var(--nd-texte, #E8ECF6); }
 html.m-site body.nd input:not([type=checkbox]):not([type=radio]):not([type=file]), html.m-site body.nd select, html.m-site body.nd textarea {
   background: rgba(255, 255, 255, .06) !important; border: 1px solid rgba(255, 255, 255, .2) !important; color: var(--nd-texte, #E8ECF6); }
 html.m-site body.nd select option { background: #0B1226; color: #fff; }
+
+/* Éditeur de CV (body.nd-cv) : même principe — il a son propre design sombre « Nuit dorée » (assets/cv-nuit-doree.css, variables --cv-*). */
+html.m-site:has(body.nd-cv), html.m-site body.nd-cv { background: var(--cv-nuit, #060A14) !important; color: var(--cv-texte, #E8ECF6); }
+html.m-site body.nd-cv input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=color]):not([type=range]), html.m-site body.nd-cv select, html.m-site body.nd-cv textarea {
+  background: rgba(255, 255, 255, .06) !important; border: 1px solid rgba(255, 255, 255, .2) !important; color: var(--cv-texte, #E8ECF6); }
+html.m-site body.nd-cv select option { background: #0B1226; color: #fff; }

@@ -68,6 +68,31 @@
       document.body.insertBefore(t, document.body.firstChild);
     };
     if (document.body) barre(); else document.addEventListener('DOMContentLoaded', barre);
+    /* Page à fond SOMBRE d'origine (hors Nuit dorée, qui a sa propre règle) : une fois la page chargée, on regarde son fond sans l'habillage (la classe est retirée
+       puis remise dans la même tâche : rien ne se repeint entre-temps). Fond sombre → .m-sombre : le fond clair forcé n'est pas appliqué. */
+    window.addEventListener('load', function () {
+      try {
+        var h = document.documentElement;
+        if (!document.body || /(^|\s)nd(-cv)?(\s|$)/.test(document.body.className)) return;
+        h.classList.remove('m-site');
+        var lum = function (c) {
+          var m = String(c).match(/[\d.]+/g); if (!m || m.length < 3 || (m.length > 3 && +m[3] === 0)) return null;
+          var f = function (v) { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+          return 0.2126 * f(+m[0]) + 0.7152 * f(+m[1]) + 0.0722 * f(+m[2]);
+        };
+        var cb = getComputedStyle(document.body), ch = getComputedStyle(h);
+        var l = lum(cb.backgroundColor);
+        if (l === null) l = lum(ch.backgroundColor);
+        /* Fond en dégradé (pas de couleur unie) : luminance moyenne des couleurs du dégradé. */
+        if (l === null) {
+          var img = (cb.backgroundImage !== 'none' ? cb.backgroundImage : ch.backgroundImage) || '';
+          var cs = img.match(/rgba?\([^)]*\)/g);
+          if (cs && cs.length) { var s = 0, n = 0; cs.forEach(function (c) { var v = lum(c); if (v !== null) { s += v; n++; } }); if (n) l = s / n; }
+        }
+        h.classList.add('m-site');
+        if (l !== null && l < 0.18) h.classList.add('m-sombre');
+      } catch (e) { document.documentElement.classList.add('m-site'); }
+    });
   }
   root.MRedirect = { cible: cible, telephone: telephone, venantDeLApp: venantDeLApp, PAGES: PAGES,
     estTelephone: function () { try { return telephone(navigator.userAgent, Math.min(screen.width, screen.height), navigator.maxTouchPoints > 0) && !sessionStorage.getItem('da_version_ordinateur'); } catch (e) { return false; } } };
