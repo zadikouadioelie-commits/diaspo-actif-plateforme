@@ -137,6 +137,11 @@ html body.nd .ann-card *{color:inherit}
 html body.nd .ann-card-title,html body.nd .ann-card-responsable{color:#fff!important}
 html body.nd .ann-card-loc,html body.nd .ann-card-desc,html body.nd .ann-card-nats,html body.nd .ann-card-origs,html body.nd .ann-card-meta-row{color:var(--nd-doux)!important}
 html body.nd .ann-cat-badge,html body.nd .ann-type-badge,html body.nd .ann-ray-badge,html body.nd .ann-ray-locale{background:rgba(227,192,110,.14)!important;border:1px solid var(--nd-bord)!important;color:var(--nd-or)!important;border-radius:999px}
+/* Pastilles posées SUR l'image de couverture (catégorie, type Association/ONG/Utilisateur…) : un fond doré translucide devenait illisible sur une image claire (2026-10-18, retour utilisateur) → fond nuit quasi plein, texte or. */
+html body.nd .ann-cat-badge,html body.nd .ann-type-badge{background:rgba(6,10,20,.88)!important;border:1px solid rgba(227,192,110,.55)!important;color:#F0D68C!important;font-weight:800;box-shadow:0 2px 10px rgba(0,0,0,.4);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+/* « * {color:inherit} » ci-dessus écrasait la couleur propre des badges de vérification (texte clair sur fond clair). */
+html body.nd .ann-card .da-verif-org{color:#1D4ED8!important}
+html body.nd .ann-card .da-verif-resp{color:#6D28D9!important}
 html body.nd .ann-card-foot{border-top:1px solid var(--nd-bord2)!important;background:transparent!important}
 html body.nd .ann-card-btn{background:var(--nd-verre2)!important;border:1px solid var(--nd-bord)!important;color:var(--nd-texte)!important;border-radius:999px!important}
 html body.nd .ann-card-btn-primary,html body.nd .ann-card-btn-adherer{background:var(--nd-degore)!important;color:#1a1202!important;font-weight:700;border:0!important}

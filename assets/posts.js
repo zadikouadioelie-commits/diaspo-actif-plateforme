@@ -2090,3 +2090,49 @@ window.voirVitrineDepuisFil = function(initiativeId, sousType, ownerUserId) {
 };
 
 })();
+
+/* ── Aperçu d'une vidéo au survol, AVEC le son (2026-10-18, demande explicite : « quand on passe au-dessus d'une vidéo et qu'elle commence à
+   se lire pour attirer l'attention, il faut aussi joindre le son »). Vignettes du fil et vidéos des publications.
+   Les navigateurs n'autorisent le son sans clic que si la personne a déjà touché la page : sinon la lecture repart sans le son. */
+(function () {
+  if (window.__apercuSurvolVideo) return;
+  window.__apercuSurvolVideo = true;
+  if (!window.matchMedia || !window.matchMedia('(hover: hover)').matches) return;
+  var SEL = '.fg-thumb, .post-media-video';
+  var courant = null, minuteur = null;
+  function arreter(v) {
+    clearTimeout(minuteur);
+    if (!v || !v._survol) return;
+    v._survol = false;
+    try { v.pause(); } catch (e) {}
+    if (!v.controls) { v.muted = true; try { v.currentTime = 0.1; } catch (e) {} }
+    if (courant === v) courant = null;
+  }
+  function demarrer(v) {
+    if (courant && courant !== v) arreter(courant);
+    v._survol = true; courant = v;
+    v.muted = false; v.volume = 1;
+    var p = v.play();
+    if (p && p.catch) p.catch(function () { v.muted = true; v.play().catch(function () { v._survol = false; }); });
+  }
+  document.addEventListener('mouseover', function (e) {
+    var t = e.target && e.target.closest ? e.target.closest(SEL) : null;
+    if (!t || t.contains(e.relatedTarget)) return;
+    var v = t.querySelector('video');
+    if (!v || (!v.paused && !v._survol)) return;
+    clearTimeout(minuteur);
+    minuteur = setTimeout(function () { demarrer(v); }, 250);
+  });
+  document.addEventListener('mouseout', function (e) {
+    var t = e.target && e.target.closest ? e.target.closest(SEL) : null;
+    if (!t || t.contains(e.relatedTarget)) return;
+    arreter(t.querySelector('video'));
+  });
+  /* Un clic : sur une vignette il ouvre la visionneuse (qui joue sa propre vidéo → on coupe l'aperçu) ; sur une vidéo à commandes la personne reprend la main. */
+  document.addEventListener('pointerdown', function (e) {
+    var t = e.target && e.target.closest ? e.target.closest(SEL) : null;
+    var v = t && t.querySelector('video');
+    if (!v || !v._survol) return;
+    if (v.controls) { v._survol = false; } else { arreter(v); }
+  }, true);
+})();
