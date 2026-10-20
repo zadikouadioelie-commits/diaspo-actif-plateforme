@@ -2646,7 +2646,9 @@ function renderInitiativeCard(it){
   const origs   = daOrigineDeclaree(it);
   const ray     = it.rayonnement || '';
   const rayHtml = ray ? `<span class="ann-ray-badge ann-ray-${ray}">${RAY_ICON[ray]||'🌐'} ${RAY_LABEL[ray]||ray}</span>` : '';
-  const desc    = it.description || it.mission || '';
+  /* Texte simple : la description saisie dans l'éditeur riche contient des <p>/<strong> qui, dans un bloc à
+     troncature de lignes (-webkit-box), se superposaient (cartouche « Perform'Action Trajectoire », 2026-10-20). */
+  const desc    = stripRichTags(it.description || it.mission || '');
   const membres = it.membres ? `<span class="ann-membres">👥 ${it.membres}</span>` : '';
   // Le nom de la structure (it.nom) est deja le titre principal ; le responsable du compte
   // n'apparait qu'en information secondaire discrete (meme regle que renderOrganismeCard).
@@ -3074,7 +3076,7 @@ function renderPersonCard(u) {
       <div class="ann-card-nats">🏛 <strong>Nationalités :</strong> ${nats}</div>
       ${domaineLigneUser ? `<div class="ann-card-origs">🎯 <strong>Domaine d'activité :</strong> ${domaineLigneUser}</div>` : ''}
       ${sousDomaineLigneUser ? `<div class="ann-card-origs">${sousDomaineLigneUser}</div>` : ''}
-      ${u.titre_pro ? `<div class="ann-card-desc">${u.titre_pro}</div>` : ''}
+      ${u.titre_pro ? `<div class="ann-card-desc">${stripRichTags(u.titre_pro)}</div>` : ''}
       <div class="ann-card-foot" onclick="event.stopPropagation()">
         <a href="${profilHref}" class="ann-card-btn ann-card-btn-primary" onclick="event.stopPropagation()">👁 Voir le profil</a>
         <a href="${profilHref}#avis" class="ann-card-btn" onclick="event.stopPropagation()">⭐ Avis</a>
@@ -3147,7 +3149,7 @@ async function initAnnuaire(){
         <div class="ann-card-meta-row" style="justify-content:center;"><span class="ann-card-loc">📍 ${loc}</span></div>
         ${daOrigineDeclaree(o) ? `<div class="ann-card-origs">${daDrapeauListe(daOrigineDeclaree(o)) || '🌍'} <strong>Origine :</strong> ${daOrigineDeclaree(o)}</div>` : ''}
         ${responsableNom ? `<div class="ann-card-responsable">👤 Responsable : ${responsableNom}${o.fonction_responsable_etatique ? ` — ${o.fonction_responsable_etatique}` : ''}</div>` : ''}
-        ${o.bio ? `<div class="ann-card-desc">${o.bio}</div>` : ''}
+        ${o.bio ? `<div class="ann-card-desc">${stripRichTags(o.bio)}</div>` : ''}
         <div class="ann-card-foot" onclick="event.stopPropagation()">
           <a href="${profilHref}" class="ann-card-btn ann-card-btn-primary" onclick="event.stopPropagation()">👁 Voir le profil</a>
           <a href="${profilHref}#avis" class="ann-card-btn" onclick="event.stopPropagation()">⭐ Avis</a>
