@@ -167,6 +167,13 @@ function stripRichTags(value) {
   return s.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 }
 window.stripRichTags = stripRichTags;
+/* Texte enrichi -> texte simple en gardant les paragraphes (à afficher avec white-space:pre-line) : pour les fiches détaillées,
+   où aplatir tout sur une ligne ferait perdre la mise en forme. */
+function richToText(value) {
+  const s = String(value == null ? "" : value).replace(/<\s*br\s*\/?>/gi, "\n").replace(/<\/(p|div|li|h[1-6]|blockquote)>/gi, "\n");
+  return s.replace(/<[^>]*>/g, "").replace(/[ \t]+/g, " ").replace(/ *\n */g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+window.richToText = richToText;
 
 /* ========== BADGE INITIATIVE VÉRIFIÉE ========== */
 const CERTIF_NIVEAUX = {
@@ -3863,7 +3870,7 @@ async function initFicheInitiative(){
         <div class="tags" style="margin-bottom:14px;">
           ${(it.nationalites_concernees||[]).map(n=>`<span class="tag">👥 ${n}</span>`).join("")}
         </div>
-        <p>${it.description || ""}</p>
+        <div style="white-space:pre-line;line-height:1.6;">${richToText(it.description || "")}</div>
         <div class="stat-row" style="margin-top:18px;">
           <div class="stat-card"><div class="num">${it.membres || 0}</div><div class="label">Membres du réseau</div></div>
           <div class="stat-card"><div class="num">${it.abonnes || 0}</div><div class="label">Abonnés</div></div>
@@ -5239,7 +5246,7 @@ async function initFilActualite(){
   function renderPoSponsoredPost(p) {
     const nom = [p.prenom, p.nom].filter(Boolean).join(' ') || p.nom || '—';
     const domaines = (p.domaines_expertise || []).slice(0,2).join(' · ');
-    const desc = p.slogan || p.description_complete || p.bio || '';
+    const desc = stripRichTags(p.slogan || p.description_complete || p.bio || '');
     return `<div class="po-feed-card" onclick="window.location.href='profil.html?id=${p.user_id}';fetch('/api/partenaires/${p.id}/impression',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({event_type:'profile_visit',source:'feed'})})">
       <div class="po-feed-header">
         <div class="po-feed-avatar">${p.photo_url?`<img src="${p.photo_url}" alt="${nom}">`:(nom.charAt(0)||'?').toUpperCase()}</div>

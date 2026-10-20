@@ -64,6 +64,10 @@
 .ann-card-title{font-size:14px;font-weight:700;margin:0;line-height:1.3;color:var(--text);}
 .ann-card-desc{font-size:12.5px;color:var(--muted);margin:0;line-height:1.5;flex:1;
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+/* Garde-fou (2026-10-20) : dans un bloc à troncature de lignes, des paragraphes ou listes (texte enrichi) sortent de la zone et se
+   superposent au reste de la cartouche. Quel que soit le producteur du contenu, tout est remis « en ligne ». */
+.ann-card-desc p,.ann-card-desc div,.ann-card-desc ul,.ann-card-desc ol,.ann-card-desc li,.ann-card-desc h1,.ann-card-desc h2,.ann-card-desc h3,.ann-card-desc h4,.ann-card-desc blockquote{display:inline;margin:0;padding:0;}
+.ann-card-desc br{display:none;}
 /* Pied de carte (2026-09-05) : grille à colonnes égales plutôt qu'un flex-wrap en vrac —
    le nombre de boutons varie selon le type de compte (2 à 5 : profil, abonnement, message,
    adhésion, événements) et un flex-wrap les empile en lignes de largeurs inégales, la
