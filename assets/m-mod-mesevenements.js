@@ -1,5 +1,5 @@
 /* ============================================================
-   Diaspo'Actif — Version téléphone : module « Mes événements » (comptes Initiative)
+   Diaspo'Actif — Version téléphone : module « Mes événements » (comptes Initiative, Collectivité et Administrateur)
    Route : #/mesevenements            liste de mes événements (à venir · terminés · brouillons)
            #/mesevenements/nouveau    création (avec inscriptions ou événement flash)
            #/mesevenements/<id>       pilotage d'un événement
@@ -54,9 +54,10 @@
     document.head.appendChild(s);
   })();
 
-  /* Carte « ⚡ Événement flash » + « ? ». Réservée aux comptes Initiative, comme la création d'événement sur téléphone (gate()). */
+  /* Carte « ⚡ Événement flash » + « ? ». Réservée aux comptes qui peuvent créer un événement (Initiative, Collectivité, Administrateur — mêmes règles que le serveur), comme la création sur téléphone (gate()). */
+  const ROLES_CREATION = ['initiative', 'collectivite', 'administrateur'];
   function flashCarte() {
-    if (!S.me || S.me.role !== 'initiative') return '';
+    if (!S.me || !ROLES_CREATION.includes(S.me.role)) return '';
     return `<div class="mev-flash"><a href="#/mesevenements/flash"><span class="ei" aria-hidden="true">⚡</span><span><b>Événement flash</b><small>Une annonce publiée en quelques secondes</small></span></a>`
       + `<button type="button" data-flash-aide aria-label="Qu’est-ce qu’un événement flash ?">?</button></div>`;
   }
@@ -182,11 +183,11 @@
       const b = $('#go-login'); if (b) b.onclick = () => A.openLogin();
       return false;
     }
-    if (S.me.role !== 'initiative') {
-      setPane(titre, `<div class="empty"><div class="ei">${ic('lock', 'l')}</div><b>Réservé aux comptes Initiative</b>La gestion d’événements est proposée aux comptes Initiative. Vous êtes connecté avec un autre type de compte : changez de compte si vous en avez un lié.<br><br><a class="btn" href="#/moi">Retour à mon espace</a></div>`);
+    if (!ROLES_CREATION.includes(S.me.role)) {
+      setPane(titre, `<div class="empty"><div class="ei">${ic('lock', 'l')}</div><b>Réservé aux comptes organisateurs</b>La gestion d’événements est proposée aux comptes Initiative et Collectivité. Vous êtes connecté avec un autre type de compte : changez de compte si vous en avez un lié.<br><br><a class="btn" href="#/moi">Retour à mon espace</a></div>`);
       return false;
     }
-    if (A.premiumLocked(2)) { lockPane(titre); return false; }
+    if (S.me.role === 'initiative' && A.premiumLocked(2)) { lockPane(titre); return false; }
     return true;
   }
   function lockPane(titre) {
@@ -271,7 +272,7 @@
     ST.tab = g.avenir.length ? 'avenir' : g.brouillons.length ? 'brouillons' : g.termines.length ? 'termines' : 'avenir';
     ST.q = ''; ST.shown = 30;
     setPane(NOM, `${flashCarte()}<div id="mev-top"></div><div id="mev-list"></div>
-      <div class="mev-note" style="margin-top:6px"><b>Billetterie et billets payants</b>Les événements avec types de billets, ventes et finances se gèrent sur ordinateur.<br><a href="dashboard-initiative.html#evenements" style="text-decoration:underline;font-weight:700">Ouvrir sur ordinateur</a></div>`,
+      <div class="mev-note" style="margin-top:6px"><b>Inscriptions et billets</b>Recevez les inscriptions à vos événements avec une fiche d’inscription : billets, questions, QR codes.<br><a href="#/inscriptions" style="text-decoration:underline;font-weight:700">Mes fiches d’inscription</a></div>`,
     `<a class="btn block" href="#/mesevenements/nouveau">${ic('plus', 's')} Créer un événement</a>`);
     paintListe();
   }

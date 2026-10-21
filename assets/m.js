@@ -2124,7 +2124,8 @@
      r[rôle] : 0 absent · 1 libre · 2 Premium (verrouillé si expiré) · 3 libre, une partie est Premium
      ============================================================ */
   const MODS = [
-    { t: 'Mes événements', i: 'cal', h: '#/mesevenements', d: 'Créer et gérer vos événements', r: { initiative: 2 } },
+    { t: 'Mes événements', i: 'cal', h: '#/mesevenements', d: 'Créer et gérer vos événements', r: { initiative: 2, collectivite: 1, administrateur: 1 } },
+    { t: 'Fiches d’inscription', i: 'ticket', h: '#/inscriptions', d: 'Inscriptions à vos événements, billets, QR codes', r: { initiative: 2, collectivite: 1, administrateur: 1 } },
     { t: 'Cotisations et adhésions', i: 'people', h: '#/cotisations', d: 'Formules, adhérents, paiements', r: { initiative: 2 } },
     { t: 'Messages de la boutique', i: 'shop', h: '#/msgboutique', d: 'Demandes reçues via votre boutique', r: { initiative: 2 } },
     { t: 'Messagerie', i: 'chat', h: '#/messages', d: 'Vos conversations', r: { utilisateur: 1, initiative: 1 } },
@@ -2178,8 +2179,9 @@
   function premiumLocked(level) { return level === 2 && !!S.premium && S.premium.concerne && !S.premium.actif; }
   /* Lignes des modules visibles pour ce compte (type de compte + Premium) — partagées par l'onglet « Moi » et le menu rapide du haut. */
   function modulesHtml(m) {
-    const role = (m.role === 'utilisateur' || m.role === 'initiative') ? m.role : null;
-    const lvl = x => role ? (x.r[role] || 0) : (x.r.utilisateur === 1 && x.r.initiative === 1 ? 1 : 0);
+    const role = ['utilisateur', 'initiative', 'collectivite', 'administrateur'].includes(m.role) ? m.role : null;
+    const ouvertATous = x => x.r.utilisateur === 1 && x.r.initiative === 1 ? 1 : 0;
+    const lvl = x => role ? (x.r[role] || (role === 'collectivite' || role === 'administrateur' ? ouvertATous(x) : 0)) : ouvertATous(x);
     const li = x => {
       const l = lvl(x); if (!l) return '';
       const locked = premiumLocked(l), d = typeof x.d === 'object' ? (x.d[role] || x.d.utilisateur) : x.d;
@@ -2378,7 +2380,7 @@
     p.hidden = true; document.body.style.overflow = ''; clearInterval(S.chatTimer); S.pane = null;
     const f = $('#pane-foot'); if (f) { f.innerHTML = ''; f.hidden = true; }
   }
-  const SITE_PAGES = { boutique: 'vitrines.html', produit: 'vitrines.html', tracker: 'dashboard-initiative.html#tracker', mesevenements: 'dashboard-initiative.html#evenements', cotisations: 'dashboard-initiative.html#adhesions-init', mescagnottes: 'dashboard-initiative.html#cagnottes', msgboutique: 'dashboard-initiative.html#messages-vitrine', associe: 'mon-associe.html', reseaupro: 'reseau.html', businessplan: 'business-plan.html', formations: 'formations.html', cvlettres: 'dashboard-utilisateur.html', parrainage: 'parrainage.html', confidentialite: 'confidentialite.html', abonnement: 'mon-abonnement.html' };
+  const SITE_PAGES = { inscriptions: 'inscriptions-admin.html', boutique: 'vitrines.html', produit: 'vitrines.html', tracker: 'dashboard-initiative.html#tracker', mesevenements: 'dashboard-initiative.html#evenements', cotisations: 'dashboard-initiative.html#adhesions-init', mescagnottes: 'dashboard-initiative.html#cagnottes', msgboutique: 'dashboard-initiative.html#messages-vitrine', associe: 'mon-associe.html', reseaupro: 'reseau.html', businessplan: 'business-plan.html', formations: 'formations.html', cvlettres: 'dashboard-utilisateur.html', parrainage: 'parrainage.html', confidentialite: 'confidentialite.html', abonnement: 'mon-abonnement.html' };
   function openSheet(inner) {
     const sh = $('#sheet'); sh.hidden = false; const close = () => { sh.hidden = true; sh.innerHTML = ''; };
     sh.innerHTML = '<div class="sh" role="dialog" aria-modal="true"><div class="grip"></div><div class="sb">' + inner + '</div></div>';
