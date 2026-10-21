@@ -409,19 +409,14 @@
   </div>
 
   <!-- ═══ EMPLACEMENT PUBLICITAIRE (2026-09-29, demande explicite) — visible uniquement quand il
-       reste de la place à droite. Contenu de secours (vision Diaspo'Actif) tant qu'aucune
-       publicité active n'existe ; rotation toutes les 60s s'il y en a plusieurs (data-ad-rotate,
-       voir renderAllAdSlots() dans assets/app.js). Distinct de "vitrine_section" ci-dessus (bandeau
-       horizontal au-dessus de la grille), aucun conflit. ═══ -->
+       reste de la place à droite. En l'absence de publicité active, affiche des publications du
+       fil en rotation (2026-10-21, demande explicite — afficherPublicationsRelais() dans
+       assets/app.js) ; rotation toutes les 60s s'il y a plusieurs publicités actives
+       (data-ad-rotate, voir renderAllAdSlots() dans assets/app.js). Distinct de "vitrine_section"
+       ci-dessus (bandeau horizontal au-dessus de la grille), aucun conflit. ═══ -->
   <aside class="ann-ad-col">
     <div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:2px;">📢 Espace publicitaire</div>
-    <template id="ann-ad-fallback">
-      <div class="ann-ad-vision">
-        <strong>Pourquoi Diaspo'Actif ?</strong>
-        Une diaspora unie, actrice du développement. La diaspora africaine représente un levier de développement majeur. Pourtant, les initiatives restent dispersées, invisibles, sans réseau. Diaspo'Actif change ça.
-      </div>
-    </template>
-    <div id="ad-annuaire-sidebar" data-ad-emplacement="annuaire_sidebar" data-ad-fallback="ann-ad-fallback" data-ad-rotate="60000" style="margin-top:10px;"></div>
+    <div id="ad-annuaire-sidebar" data-ad-emplacement="annuaire_sidebar" data-ad-rotate="60000" style="margin-top:10px;"></div>
   </aside>
   </div>
 

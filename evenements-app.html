@@ -495,13 +495,9 @@
          panneau externe séparé — voir le commentaire CSS de .evt-ad-col. ═══ -->
     <aside class="evt-ad-col">
       <div class="evt-col-title">📢 Espace publicitaire</div>
-      <template id="evt-ad-fallback">
-        <div class="evt-ad-vision">
-          <strong>Pourquoi Diaspo'Actif ?</strong>
-          Une diaspora unie, actrice du développement. La diaspora africaine représente un levier de développement majeur. Pourtant, les initiatives restent dispersées, invisibles, sans réseau. Diaspo'Actif change ça.
-        </div>
-      </template>
-      <div id="ad-evenements-sidebar" data-ad-emplacement="evenements_sidebar" data-ad-fallback="evt-ad-fallback" data-ad-rotate="60000" style="margin-top:10px;"></div>
+      <!-- En l'absence de publicité active, cette case affiche désormais des publications du fil
+           en rotation (assets/app.js, afficherPublicationsRelais) — plus de gabarit statique ici. -->
+      <div id="ad-evenements-sidebar" data-ad-emplacement="evenements_sidebar" data-ad-rotate="60000" style="margin-top:10px;"></div>
     </aside>
 
     </div><!-- /.evt-right-stack -->

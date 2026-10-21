@@ -5396,20 +5396,61 @@ function initProjetsDiaspoActif(){
 /* ---------- Régie publicitaire : diffusion d'une publicité approuvée sur un emplacement ---------- */
 function trackAdClic(id){ fetch(`/api/ads/${id}/clic`, { method:"POST" }).catch(()=>{}); }
 
-/* opts.fallbackHtml (2026-09-29, demande explicite) : affiché à la place de l'emplacement au
-   lieu de le masquer quand aucune publicité active n'existe — utilisé pour "en attendant qu'il y
-   ait de la publicité, mets-y des informations sur la vision de Diaspo'Actif" (voir
-   evenements-app.html, data-ad-fallback). Sans fallbackHtml, comportement inchangé (masqué). */
+/* Relais publications en l'absence de publicité (2026-10-21, demande explicite : "en l'absence
+   de publicité, affiche les publications et fais-les tourner") — remplace l'ancien mécanisme
+   opt-in opts.fallbackHtml/data-ad-fallback (texte statique "Pourquoi Diaspo'Actif ?", dupliqué
+   sur seulement 2 des 11 emplacements, les 9 autres se masquaient simplement). TOUT emplacement
+   publicitaire vide affiche désormais un aperçu de publication réelle du fil, qui tourne toute
+   seule. Les publications sont chargées UNE SEULE FOIS par page (cache module) et partagées par
+   tous les emplacements vides, pour ne jamais multiplier les appels à /api/fil. */
+let _daPubRelaisCache = null;
+async function _daPubRelaisCharger(){
+  if (_daPubRelaisCache) return _daPubRelaisCache;
+  try {
+    const r = await fetch('/api/fil?mode=tous&page=1&limit=20').then(x => x.json());
+    /* id numérique uniquement : le mode "tous" peut aussi renvoyer des cartes de vitrine
+       (ex. id "vc-vitrine-13-aff") qui n'ont pas de page fil-actualite.html?post=... dédiée. */
+    _daPubRelaisCache = (r.posts || []).filter(p => p && /^\d+$/.test(String(p.id)) && (p.contenu || p.corps || p.medias));
+  } catch (e) { _daPubRelaisCache = []; }
+  return _daPubRelaisCache;
+}
+function _daPubRelaisTexte(s, n){
+  s = String(s || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+  return s.length > n ? s.slice(0, n - 1) + '…' : s;
+}
+async function afficherPublicationsRelais(el){
+  if (el._pubRelaisActif) return; // déjà en rotation sur cet emplacement, pas de 2e minuteur
+  const posts = await _daPubRelaisCharger();
+  if (!posts.length) { el.style.display = "none"; return; }
+  el._pubRelaisActif = true;
+  let idx = Math.floor(Math.random() * posts.length);
+  const rendre = () => {
+    const p = posts[idx % posts.length]; idx++;
+    let media = null;
+    try { media = (JSON.parse(p.medias || '[]')[0] || {}).url || null; } catch (e) {}
+    const texte = _daPubRelaisTexte(p.contenu || p.corps, 110);
+    const photo = (p.auteur_profil && p.auteur_profil.photo_url) || '/assets/logo.png';
+    el.innerHTML = `<a href="fil-actualite.html?post=${p.id}" style="display:block;text-decoration:none;color:inherit;background:var(--surface,#0F2A50);border:1px solid var(--border,rgba(255,255,255,.1));border-radius:12px;overflow:hidden;">
+      ${media ? `<img src="${media}" style="width:100%;height:110px;object-fit:cover;display:block;">` : ""}
+      <div style="padding:12px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+          <img src="${photo}" style="width:22px;height:22px;border-radius:50%;object-fit:cover;flex-shrink:0;">
+          <span style="font-size:11.5px;font-weight:700;">${escH(p.auteur_nom || "Diaspo'Actif")}</span>
+        </div>
+        <div style="font-size:12.5px;color:var(--muted,#94A3B8);line-height:1.4;">${escH(texte)}</div>
+      </div>
+    </a>`;
+    el.style.display = "";
+  };
+  rendre();
+  setInterval(rendre, 7000);
+}
 async function renderAdSlot(containerId, emplacement, opts = {}){
   const el = document.getElementById(containerId);
   if (!el) return;
   try {
     const r = await fetch(`/api/ads/servir?emplacement=${emplacement}`).then(x => x.json());
-    if (!r.ad) {
-      if (opts.fallbackHtml) { el.innerHTML = opts.fallbackHtml; el.style.display = ""; }
-      else el.style.display = "none";
-      return;
-    }
+    if (!r.ad) { afficherPublicationsRelais(el); return; }
     const ad = r.ad;
     const clic = `onclick="trackAdClic(${ad.id})"`;
     el.innerHTML = `<div style="display:flex;align-items:center;gap:14px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 16px;">
@@ -5425,28 +5466,24 @@ async function renderAdSlot(containerId, emplacement, opts = {}){
     </div>`;
     el.style.display = "";
   } catch(e) {
-    if (opts.fallbackHtml) { el.innerHTML = opts.fallbackHtml; el.style.display = ""; }
-    else el.style.display = "none";
+    afficherPublicationsRelais(el);
   }
 }
 
-/* data-ad-fallback="<id d'un <template>>" et data-ad-rotate="<ms>" (2026-09-29, demande
-   explicite : "chaque minute, il y a une nouvelle publicité qui va s'afficher") — deux attributs
-   optionnels lus ici, sans effet sur les emplacements existants qui ne les déclarent pas (aucun
-   changement de comportement pour eux). Le nouvel appel de /api/ads/servir à chaque tick choisit
-   déjà une publicité au hasard parmi les actives (ORDER BY RANDOM() côté serveur) : un simple
-   re-fetch périodique suffit à obtenir "une nouvelle" publicité sans logique de rotation dédiée. */
+/* data-ad-rotate="<ms>" (2026-09-29, demande explicite : "chaque minute, il y a une nouvelle
+   publicité qui va s'afficher") — optionnel, sans effet sur les emplacements qui ne le déclarent
+   pas. Le nouvel appel de /api/ads/servir à chaque tick choisit déjà une publicité au hasard
+   parmi les actives (ORDER BY RANDOM() côté serveur) : un simple re-fetch périodique suffit à
+   obtenir "une nouvelle" publicité sans logique de rotation dédiée. Si l'emplacement reste vide,
+   afficherPublicationsRelais() tourne déjà de son côté (son propre minuteur, voir plus haut) —
+   ce re-fetch ne fait alors que confirmer qu'il n'y a toujours pas de publicité, sans effet
+   visible grâce au garde-fou _pubRelaisActif. */
 function renderAllAdSlots(){
   document.querySelectorAll("[data-ad-emplacement]").forEach(el=>{
     if (!el.id) return;
-    const opts = {};
-    if (el.dataset.adFallback) {
-      const tpl = document.getElementById(el.dataset.adFallback);
-      if (tpl) opts.fallbackHtml = tpl.innerHTML;
-    }
-    renderAdSlot(el.id, el.dataset.adEmplacement, opts);
+    renderAdSlot(el.id, el.dataset.adEmplacement);
     const rotateMs = parseInt(el.dataset.adRotate, 10);
-    if (rotateMs > 0) setInterval(() => renderAdSlot(el.id, el.dataset.adEmplacement, opts), rotateMs);
+    if (rotateMs > 0) setInterval(() => renderAdSlot(el.id, el.dataset.adEmplacement), rotateMs);
   });
 }
 

@@ -30,13 +30,55 @@
      Une case n'appelle le serveur — donc ne compte une impression — que lorsqu'elle approche de l'écran ; sans publicité active elle disparaît. */
   const PUB_VUES = [];
   const pubSlot = slot => `<div class="mpub" data-slot="${slot}"></div>`;
+  /* Relais publications en l'absence de publicité (2026-10-21, demande explicite : "en l'absence
+     de publicité, affiche les publications et fais-les tourner") — même mécanisme que la version
+     ordinateur (assets/app.js, afficherPublicationsRelais) : remplace le el.remove() d'avant par
+     un aperçu de publication réelle du fil, qui tourne toute seule. Chargées une seule fois par
+     page, partagées par toutes les cases vides. */
+  let _mPubRelaisCache = null;
+  async function mPubRelaisCharger() {
+    if (_mPubRelaisCache) return _mPubRelaisCache;
+    try {
+      const r = await fetch('/api/fil?mode=tous&page=1&limit=20', { credentials: 'include' }).then(x => x.json());
+      /* id numérique uniquement : le mode "tous" peut aussi renvoyer des cartes de vitrine
+         (ex. id "vc-vitrine-13-aff") qui n'ont pas de page fil-actualite.html?post=... dédiée. */
+      _mPubRelaisCache = (r.posts || []).filter(p => p && /^\d+$/.test(String(p.id)) && (p.contenu || p.corps || p.medias));
+    } catch (e) { _mPubRelaisCache = []; }
+    return _mPubRelaisCache;
+  }
+  async function mPubRelaisAfficher(el) {
+    if (el._pubRelaisActif) return; // déjà en rotation sur cette case, pas de 2e minuteur
+    const posts = await mPubRelaisCharger();
+    if (!posts.length) { el.remove(); return; }
+    el._pubRelaisActif = true;
+    let idx = Math.floor(Math.random() * posts.length);
+    const rendre = () => {
+      const p = posts[idx % posts.length]; idx++;
+      let media = null;
+      try { media = (JSON.parse(p.medias || '[]')[0] || {}).url || null; } catch (e) {}
+      const texte = strip(p.contenu || p.corps || '').slice(0, 110);
+      const photo = (p.auteur_profil && p.auteur_profil.photo_url) || '/assets/logo.png';
+      el.innerHTML = `<a class="card pub-card" href="fil-actualite.html?post=${Number(p.id)}" style="display:block;text-decoration:none;color:inherit">
+        ${media ? `<img src="${attrUrl(media)}" loading="lazy" style="width:100%;max-height:220px;object-fit:cover;display:block">` : ''}
+        <div class="pad">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+            <img src="${attrUrl(photo)}" style="width:22px;height:22px;border-radius:50%;object-fit:cover;flex-shrink:0;">
+            <span class="small" style="font-weight:700;">${esc(p.auteur_nom || "Diaspo'Actif")}</span>
+          </div>
+          <div class="small muted">${esc(texte)}</div>
+        </div>
+      </a>`;
+    };
+    rendre();
+    setInterval(rendre, 7000);
+  }
   async function pubRemplir(el) {
     el.dataset.ok = '1';
     try {
       const excl = PUB_VUES.slice(-6).join(',');
       const r = await fetch('/api/ads/servir?emplacement=' + encodeURIComponent(el.dataset.slot) + (excl ? '&exclude=' + excl : ''), { credentials: 'include' }).then(x => x.json());
       const ad = r && r.ad;
-      if (!ad) { el.remove(); return; }
+      if (!ad) { mPubRelaisAfficher(el); return; }
       PUB_VUES.push(ad.id);
       const media = ad.media_url
         ? (ad.media_type === 'video'
@@ -47,7 +89,7 @@
       el.innerHTML = `<div class="card pub-card">${media}<div class="pad"><span class="badge pub-badge">📣 Sponsorisé</span>
         <div class="pub-t">${esc(ad.titre)}</div>${ad.description ? `<div class="small muted pub-d">${esc(ad.description)}</div>` : ''}
         ${lien ? `<a class="btn sm" href="${esc(lien)}" target="_blank" rel="noopener sponsored" data-pub-clic="${Number(ad.id)}">${esc(ad.cta || 'En savoir plus')}</a>` : ''}</div></div>`;
-    } catch (e) { el.remove(); }
+    } catch (e) { mPubRelaisAfficher(el); }
   }
   const pubObs = 'IntersectionObserver' in window
     ? new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { pubObs.unobserve(e.target); pubRemplir(e.target); } }), { rootMargin: '300px 0px' })
