@@ -21169,6 +21169,15 @@ route("GET", "/api/ads/servir", async (req, res, params, body, query) => {
     ORDER BY RANDOM()
   `).all(`%${emplacement}%`, now, now);
 
+  /* ?fenetre=<ms> (2026-10-24, demande explicite : « une publicité chaque heure, bien visible » en haut de l'annuaire) : au lieu du hasard,
+     UNE publicité par fenêtre de temps — la même pour tous les visiteurs pendant toute la fenêtre, puis la suivante (rotation équitable
+     par identifiant, sans état à stocker : le numéro de fenêtre = heure courante / durée). Sans ce paramètre : hasard, comme avant. */
+  const fenetre = Number(query.fenetre);
+  if (Number.isFinite(fenetre) && fenetre >= 60000 && candidates.length > 1) {
+    candidates.sort((a, b) => Number(a.id) - Number(b.id));
+    candidates.push(...candidates.splice(0, Math.floor(Date.now() / fenetre) % candidates.length));
+  }
+
   /* ?exclude=1,2 (2026-10-05) : publicités déjà affichées sur la page — évite de répéter la même
      dans deux cases voisines quand d'autres existent ; si TOUTES les candidates sont exclues,
      on les rend éligibles de nouveau plutôt que de laisser l'emplacement vide. */

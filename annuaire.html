@@ -400,7 +400,9 @@
   </div>
 
   <div style="max-width:1200px;margin:0 auto 16px;padding:0 24px;">
-    <div id="ad-vitrine-section" data-ad-emplacement="vitrine_section" style="display:none;"></div>
+    <!-- Espace du haut (2026-10-24, demande explicite) : UNE publicité par heure (data-ad-fenetre = 3 600 000 ms), changée à l'heure pile en ne repeignant que
+         cet emplacement, en bannière bien visible (data-ad-format). Sans publicité active : relais de publications du fil, comme avant. -->
+    <div id="ad-vitrine-section" data-ad-emplacement="vitrine_section" data-ad-fenetre="3600000" data-ad-format="banniere" style="display:none;"></div>
   </div>
 
   <section id="honneur-mur" style="display:none;" aria-label="Espace d'honneur"></section>

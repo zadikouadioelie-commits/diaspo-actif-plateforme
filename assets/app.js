@@ -5430,7 +5430,7 @@ async function afficherPublicationsRelais(el){
     el.style.display = "";
   };
   rendre();
-  setInterval(rendre, 60000); // une publication par minute (demande explicite 2026-10-24 : 7 s était trop rapide)
+  el._pubRelaisTimer = setInterval(rendre, 60000); // une publication par minute (demande explicite 2026-10-24 : 7 s était trop rapide)
 }
 /* Carte d'une publication du fil (relais en l'absence de publicité). Couleurs FIXES (2026-10-24, bug constaté sur l'annuaire) : la carte reprenait var(--surface) de la page — blanche sur l'annuaire — avec le texte clair hérité,
    d'où un nom d'auteur et un texte presque invisibles. Fond marine + texte clair explicites : lisible sur n'importe quelle page. */
@@ -5492,16 +5492,56 @@ async function renderAdSlotMulti(el, emplacement, n){
   el.innerHTML = cartes.join("");
   el.style.display = "flex"; el.style.flexDirection = "column"; el.style.gap = "12px";
 }
+/* Bannière « bien visible » (2026-10-24, demande explicite : « l'espace publicitaire en haut de l'annuaire, une publicité chaque heure, bien visible ») :
+   data-ad-format="banniere" sur l'emplacement. Grande carte horizontale à fond marine fixe et liseré doré (lisible sur n'importe quelle page, comme la
+   carte « publication » du même espace) : visuel large, mention « Sponsorisé », titre, description, bouton. Empilée sur téléphone. */
+function _daAdBanniereCss(){
+  if (document.getElementById('da-ad-ban-css')) return;
+  const st = document.createElement('style'); st.id = 'da-ad-ban-css';
+  st.textContent = `.da-ad-ban{display:flex;align-items:stretch;height:230px;background:#101B33;border:1.5px solid rgba(227,192,110,.6);border-radius:16px;overflow:hidden;box-shadow:0 0 0 4px rgba(227,192,110,.09),0 12px 32px rgba(0,0,0,.35);color:#E8ECF6;text-decoration:none}
+.da-ad-ban-media{flex:0 0 42%;max-width:42%;align-self:stretch;height:100%;background:#0b1326;position:relative;overflow:hidden}
+.da-ad-ban-media img,.da-ad-ban-media video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.da-ad-ban-txt{flex:1;min-width:0;padding:22px 28px;display:flex;flex-direction:column;justify-content:center;gap:10px}
+.da-ad-ban-tag{align-self:flex-start;background:#E3C06E;color:#101B33;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:3px 10px;border-radius:999px}
+.da-ad-ban-titre{font-size:24px;font-weight:700;line-height:1.2;color:#fff;overflow-wrap:anywhere}
+.da-ad-ban-desc{font-size:14.5px;line-height:1.5;color:#C5CFE2;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.da-ad-ban-cta{align-self:flex-start;margin-top:4px;background:#F26422;color:#fff;font-weight:700;font-size:15px;padding:11px 22px;border-radius:10px}
+@media(max-width:680px){.da-ad-ban{flex-direction:column;height:auto}.da-ad-ban-media{flex:none;max-width:none;width:100%;height:190px}.da-ad-ban-txt{padding:16px 18px}.da-ad-ban-titre{font-size:20px}}`;
+  document.head.appendChild(st);
+}
+function _daAdBanniereHtml(ad){
+  _daAdBanniereCss();
+  const a = s => escH(s).replace(/"/g, '&quot;');
+  const lien = /^https?:\/\//i.test(String(ad.lien_url || '')) ? ad.lien_url : '';
+  const media = ad.media_type === 'video'
+    ? `<video src="${a(ad.media_url)}" muted autoplay loop playsinline></video>`
+    : `<img src="${a(ad.media_url)}" alt="" onerror="this.remove()">`;
+  const corps = `<div class="da-ad-ban-media">${media}</div>
+    <div class="da-ad-ban-txt">
+      <span class="da-ad-ban-tag">Sponsorisé</span>
+      <div class="da-ad-ban-titre">${escH(ad.titre)}</div>
+      ${ad.description ? `<div class="da-ad-ban-desc">${escH(ad.description)}</div>` : ''}
+      ${lien ? `<span class="da-ad-ban-cta">${escH(ad.cta || 'Découvrir')} →</span>` : ''}
+    </div>`;
+  return lien
+    ? `<a class="da-ad-ban" href="${a(lien)}" target="_blank" rel="noopener sponsored" onclick="trackAdClic(${Number(ad.id)})">${corps}</a>`
+    : `<div class="da-ad-ban">${corps}</div>`;
+}
 async function renderAdSlot(containerId, emplacement, opts = {}){
   const el = document.getElementById(containerId);
   if (!el) return;
   const nbAds = parseInt(el.dataset.adCount, 10) || 1;
   if (nbAds > 1) return renderAdSlotMulti(el, emplacement, nbAds);
+  /* data-ad-fenetre="<ms>" : une seule publicité pendant toute la fenêtre (ex. 3600000 = une heure), la même pour tous les visiteurs, puis la suivante
+     (voir /api/ads/servir?fenetre=). Le renouvellement ne recharge QUE cet emplacement (renderAllAdSlots). */
+  const fenetreMs = parseInt(el.dataset.adFenetre, 10) || 0;
   try {
-    const r = await fetch(`/api/ads/servir?emplacement=${emplacement}`).then(x => x.json());
+    const r = await fetch(`/api/ads/servir?emplacement=${emplacement}${fenetreMs ? '&fenetre=' + fenetreMs : ''}`).then(x => x.json());
     if (!r.ad) { afficherPublicationsRelais(el); return; }
     const ad = r.ad;
-    el.innerHTML = _daAdCarteHtml(ad);
+    /* Une publicité arrive : le relais de publications de cet emplacement s'arrête, sinon son minuteur la recouvrirait dans la minute. */
+    if (el._pubRelaisTimer) { clearInterval(el._pubRelaisTimer); el._pubRelaisTimer = null; el._pubRelaisActif = false; }
+    el.innerHTML = el.dataset.adFormat === 'banniere' ? _daAdBanniereHtml(ad) : _daAdCarteHtml(ad);
     el.style.display = "";
   } catch(e) {
     afficherPublicationsRelais(el);
@@ -5522,6 +5562,15 @@ function renderAllAdSlots(){
     renderAdSlot(el.id, el.dataset.adEmplacement);
     const rotateMs = parseInt(el.dataset.adRotate, 10);
     if (rotateMs > 0) setInterval(() => renderAdSlot(el.id, el.dataset.adEmplacement), rotateMs);
+    /* Fenêtre alignée sur l'horloge (2026-10-24) : la publicité change à l'heure PILE (pas une heure après l'arrivée du visiteur), et seul cet
+       emplacement est repeint — jamais la page. Un onglet resté en arrière-plan (minuteurs ralentis) se remet à jour dès qu'on y revient. */
+    const fenetreMs = parseInt(el.dataset.adFenetre, 10);
+    if (fenetreMs > 0) {
+      el._adFenetreNum = Math.floor(Date.now() / fenetreMs);
+      const tour = () => { el._adFenetreNum = Math.floor(Date.now() / fenetreMs); renderAdSlot(el.id, el.dataset.adEmplacement); };
+      setTimeout(() => { tour(); setInterval(tour, fenetreMs); }, fenetreMs - (Date.now() % fenetreMs) + 1500);
+      document.addEventListener('visibilitychange', () => { if (!document.hidden && Math.floor(Date.now() / fenetreMs) !== el._adFenetreNum) tour(); });
+    }
   });
 }
 
