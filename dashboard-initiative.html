@@ -2723,6 +2723,7 @@ async function initRelaisDiasporaWidget(me, api) {
         fil_sidebar: "Fil d'actualité — colonne latérale",
         evenements_sidebar: 'Événements — colonne latérale',
         annuaire_sidebar: 'Annuaire — colonne latérale',
+        billetterie_haut: 'Billetterie — bandeau de Mes Billets',
       };
       document.getElementById('ad-emplacements').className = 'da-pill-group';
       document.getElementById('ad-emplacements').innerHTML = _adSlots.map(s => `
@@ -3010,6 +3011,14 @@ async function initRelaisDiasporaWidget(me, api) {
             ${_pvBloc(90)}
             <div>${[0, 1].map(() => `<div style="background:#fff;border:1px solid #DCE4EF;border-radius:8px;margin-bottom:7px;overflow:hidden;"><div style="height:34px;background:#DCE4EF;"></div>${_pvLignes()}<div style="height:6px;"></div></div>`).join('')}</div>
             <div>${_pvAd('📣 PUB', 46)}<div style="height:8px;"></div>${_pvBloc(40)}</div></div></div>`
+    },
+    billetterie_haut: {
+      titre: "Billetterie — bandeau de Mes Billets",
+      caption: "Bandeau en haut de la page « Mes Billets » : vu par toutes les personnes qui retrouvent leurs billets, à côté des événements à l'affiche sur Diaspo'Actif.",
+      html: `<div style="background:#F4F6FA;border-radius:10px;padding:12px;">${_pvTitre('🎟 MES BILLETS')}
+          <div style="display:grid;grid-template-columns:1.6fr 1fr;gap:8px;align-items:start;">
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;">${[0, 1, 2].map(() => `<div style="background:#fff;border:1px solid #DCE4EF;border-radius:8px;padding:8px;"><div style="height:6px;width:60%;background:#DCE4EF;border-radius:3px;margin-bottom:5px;"></div><div style="height:6px;width:85%;background:#EEF1F6;border-radius:3px;"></div></div>`).join('')}</div>
+            ${_pvAd('📣 PUB', 46)}</div></div>`
     },
     annuaire_sidebar: {
       titre: "Annuaire — colonne latérale",

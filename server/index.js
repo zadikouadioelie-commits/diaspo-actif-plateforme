@@ -20897,6 +20897,9 @@ const PUB_SLOTS = [
   // entre les publications de la grille du fil d'actualité ET entre les publications de la vue
   // dédiée (navigation verticale) — voir assets/fil-grille.js.
   "vue_publication_restreinte",
+  // "billetterie_haut" (2026-10-24, demande explicite : « un nouvel espace de publicité appelé billetterie / récap ») : bandeau en haut de « Mes Billets »,
+  // à côté des événements à l'affiche — assets/app.js (renderAdSlot) le remplit, mes-billets.html le déclare.
+  "billetterie_haut",
 ];
 const PUB_AD_CTA = ["En savoir plus", "Acheter", "Contacter", "S'inscrire"];
 /* 4 emplacements au maximum par publicité (2026-10-10, demande explicite). */

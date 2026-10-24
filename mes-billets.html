@@ -67,6 +67,18 @@
   </header>
 
   <main class="container" style="padding-top:32px;padding-bottom:60px;">
+    <!-- Bandeau du haut (2026-10-24, demande explicite) : événements à l'affiche sur Diaspo'Actif + espace publicitaire « Billetterie » (emplacement billetterie_haut). -->
+    <section class="bq-bandeau" id="bq-bandeau" aria-label="À l'affiche sur Diaspo'Actif">
+      <div class="bq-evts">
+        <div class="bq-ttl">À l'affiche sur Diaspo'Actif</div>
+        <div class="bq-evts-list" id="bq-evts-list"></div>
+        <a class="bq-tous" href="evenements.html">Tous les événements →</a>
+      </div>
+      <div class="bq-pub" id="bq-pub">
+        <span class="bq-pub-lbl">Publicité</span>
+        <div id="ad-billetterie-haut" data-ad-emplacement="billetterie_haut" data-ad-format="banniere" data-ad-rotate="60000" style="display:none;"></div>
+      </div>
+    </section>
     <div style="margin-bottom:24px;">
       <h1 style="margin:0;font-size:24px;">🎟 Mes Billets</h1>
       <p style="margin:4px 0 0;color:var(--muted);font-size:14px;">Retrouvez ici tous les billets que vous avez achetés pour des événements sur Diaspo'Actif.</p>
@@ -91,6 +103,28 @@ const TYPES_COLOR = { standard:'', vip:'vip', early:'early', sponsor:'sponsor' }
 function escH(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function fmtDate(d){ return d ? new Date(d).toLocaleDateString('fr',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : ''; }
 function closeMod(id){ document.getElementById(id).classList.remove('open'); }
+/* Bandeau « À l'affiche » : jusqu'à 3 événements publics à venir (épinglés d'abord, puis par date) ; sans événement, la colonne se masque. */
+async function chargerBandeauBillets(){
+  const liste = document.getElementById('bq-evts-list'), bloc = document.querySelector('.bq-evts'), pub = document.getElementById('ad-billetterie-haut'), cadre = document.getElementById('bq-bandeau');
+  if (!liste || !cadre) return;
+  try {
+    const auj = new Date().toISOString().slice(0, 10);
+    const r = await fetch('/api/evenements?date=' + auj).then(x => x.json());
+    const evts = (r.evenements || []).filter(e => e.statut !== 'annule' && e.statut !== 'brouillon' && e.visibilite !== 'boutique').slice(0, 3);
+    liste.innerHTML = evts.map(e => {
+      const d = e.date_evt ? new Date(e.date_evt + 'T12:00:00') : null;
+      const jour = d ? d.toLocaleDateString('fr', { day: '2-digit' }) : '', mois = d ? d.toLocaleDateString('fr', { month: 'short' }).replace('.', '') : '';
+      const img = e.image_url || e.image_couverture;
+      return `<a class="bq-evt" href="evenements.html?evt=${Number(e.id)}"><span class="bq-evt-date"><b>${escH(jour)}</b>${escH(mois)}</span><span class="bq-evt-txt"><strong>${escH(e.titre)}</strong><small>${escH([e.ville, e.pays].filter(Boolean).join(', ') || 'En ligne ou à préciser')}</small></span>${img ? `<img class="bq-evt-img" src="${escH(img)}" alt="" loading="lazy">` : ''}</a>`;
+    }).join('');
+    if (!evts.length) bloc.style.display = 'none';
+  } catch (e) { bloc.style.display = 'none'; }
+  /* La colonne publicité se masque seule tant qu'aucune publicité n'est servie. */
+  const maj = () => { const vide = !pub || pub.style.display === 'none' || !pub.innerHTML.trim(); cadre.classList.toggle('bq-sans-pub', vide); const evtsMasques = document.querySelector('.bq-evts').style.display === 'none'; cadre.style.display = (vide && evtsMasques) ? 'none' : ''; };
+  if (pub) new MutationObserver(maj).observe(pub, { attributes: true, childList: true, attributeFilter: ['style'] });
+  maj();
+}
+chargerBandeauBillets();
 
 /* Statut calculé du billet — jamais stocké en base, recalculé côté client à chaque affichage */
 function calculerStatutBillet(t) {
