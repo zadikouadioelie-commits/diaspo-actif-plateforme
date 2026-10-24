@@ -1,0 +1,64 @@
+/* ============================================================
+   Parrainage & Invitations (parrainage.html) — design « Nuit dorée » (2026-10-24, demande explicite : « adapte à la nouvelle D'A »)
+   + bandeau « Créez votre premier lien de parrainage et gagnez des points de fiabilité » (visible tant que la personne n'a créé aucune invitation).
+   Complète theme-nuit-doree.css et annuaire-nuit-doree.css (cartes « Mes invitations » = cartes de l'annuaire). Tout est préfixé html body.nd.
+   Le QR code reste sur fond blanc (lecture par scanner). Retour arrière : retirer les 3 <link>, le bandeau #pa-bandeau-premier et class="nd" sur <body>.
+   ============================================================ */
+
+html body.nd :is(main.container,.pa-modal-overlay){
+  --bg:rgba(255,255,255,.06); --card:rgba(255,255,255,.045); --text:#EDEAE0; --muted:#AEB8D0; --border:rgba(255,255,255,.13);
+  --orange:#E3C06E; --orange-light:rgba(227,192,110,.14); --green:#8FE0B0;
+  color:var(--nd-texte);
+}
+
+/* ── Titre ── */
+html body.nd main.container h1{font-family:var(--nd-display)!important;font-weight:500!important;font-size:clamp(30px,3.6vw,46px)!important;letter-spacing:-.01em;color:#fff!important}
+html body.nd main.container .sub{color:var(--nd-doux)!important}
+
+/* ── Bandeau « premier lien de parrainage » ── */
+html body.nd .pa-bandeau{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin:0 0 22px;padding:20px 24px;border-radius:24px;background:radial-gradient(380px 160px at 100% 0%,rgba(227,192,110,.2),transparent 70%),linear-gradient(135deg,rgba(227,192,110,.14),rgba(255,255,255,.04));border:1px solid var(--nd-bord);box-shadow:0 26px 54px -36px #000}
+html body.nd .pa-bandeau-ic{flex:none;width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:26px;background:var(--nd-verre2);border:1px solid var(--nd-bord)}
+html body.nd .pa-bandeau-txt{flex:1;min-width:240px}
+html body.nd .pa-bandeau-txt strong{display:block;font-family:var(--nd-display);font-weight:500;font-size:22px;line-height:1.25;color:#fff}
+html body.nd .pa-bandeau-txt span{display:block;margin-top:4px;font-size:13px;line-height:1.5;color:var(--nd-doux)}
+html body.nd .pa-bandeau-btn{flex:none;background:var(--nd-degore);color:#1a1202;border:0;border-radius:999px;padding:12px 24px;font-size:14px;font-weight:800;cursor:pointer;box-shadow:0 12px 26px -14px rgba(227,192,110,.7)}
+html body.nd .pa-bandeau-btn:focus-visible{outline:3px solid var(--nd-or);outline-offset:2px}
+
+/* ── Onglets ── */
+html body.nd .pa-tabs{border-bottom:1px solid var(--nd-bord2)}
+html body.nd .pa-tab{color:var(--nd-doux)}
+html body.nd .pa-tab:hover{color:#fff}
+html body.nd .pa-tab.active{color:var(--nd-or);border-bottom-color:var(--nd-or)}
+html body.nd .pa-tab:focus-visible{outline:3px solid var(--nd-or);outline-offset:2px}
+
+/* ── Chiffres, formulaire, cartes ── */
+html body.nd :is(.pa-stat-card,.pa-form,.pa-vc-card){background:var(--nd-verre)!important;border:1px solid var(--nd-bord2)!important;border-radius:22px!important;color:var(--nd-texte);box-shadow:0 26px 54px -36px #000}
+html body.nd .pa-vc-card{border-radius:18px!important}
+html body.nd .pa-stat-val{font-family:var(--nd-display);font-weight:500;font-size:32px;color:var(--nd-or)}
+html body.nd .pa-stat-lbl{color:var(--nd-doux)}
+html body.nd :is(.pa-form label,#pa-edit-overlay label){color:var(--nd-doux)!important;letter-spacing:.04em}
+html body.nd :is(.pa-form,#pa-edit-overlay) :is(input,select),html body.nd .pa-lien-box input{background:rgba(255,255,255,.06)!important;border:1px solid var(--nd-bord2)!important;border-radius:14px!important;color:#fff!important;color-scheme:dark}
+html body.nd :is(.pa-form,#pa-edit-overlay) select option,html body.nd :is(.pa-form,#pa-edit-overlay) select optgroup{background:#0f1a38;color:#fff}
+html body.nd :is(.pa-form,#pa-edit-overlay) :is(input,select):focus{outline:none;border-color:var(--nd-or)!important;box-shadow:0 0 0 3px rgba(227,192,110,.18)}
+html body.nd .pa-inv-code{background:var(--nd-verre2)!important;color:var(--nd-or)}
+html body.nd .pa-source-pill{background:var(--nd-verre2)!important;border-color:var(--nd-bord2)!important;color:var(--nd-texte)}
+html body.nd .pa-vc-avatar{background:var(--nd-verre2)}
+html body.nd .pa-empty{color:var(--nd-doux)}
+html body.nd .notice{background:rgba(227,192,110,.08)!important;border:1px solid var(--nd-bord)!important;border-radius:20px!important;color:#F3E3B5!important}
+
+/* ── Boutons ── */
+html body.nd .pa-btn-creer{background:var(--nd-degore)!important;color:#1a1202!important;border-radius:999px!important;font-weight:800;box-shadow:0 12px 26px -14px rgba(227,192,110,.7)}
+html body.nd .pa-icon-btn{background:transparent!important;color:var(--nd-or)!important;border:1px solid var(--nd-or)!important;border-radius:999px!important;font-weight:800}
+html body.nd .pa-icon-btn:hover{background:rgba(227,192,110,.12)!important}
+html body.nd .pa-card-btn-danger{background:rgba(220,38,38,.16)!important;color:#FF9A9A!important}
+html body.nd #pa-confirm-supprimer{background:#dc2626!important;color:#fff!important;border-color:#dc2626!important}
+html body.nd :is(.pa-btn-creer,.pa-icon-btn):focus-visible{outline:3px solid var(--nd-or);outline-offset:2px}
+
+/* ── Fenêtres ── */
+html body.nd .pa-modal-overlay{background:rgba(3,6,14,.8)!important;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+html body.nd .pa-modal{background:radial-gradient(420px 220px at 100% 0%,rgba(227,192,110,.14),transparent 66%),linear-gradient(160deg,#14234a 0%,#0B1226 62%)!important;border:1px solid rgba(227,192,110,.4);border-radius:26px!important;color:var(--nd-texte);box-shadow:0 40px 80px -30px #000}
+html body.nd .pa-modal h3{font-family:var(--nd-display)!important;font-weight:500;color:#fff!important}
+html body.nd .pa-modal p{color:var(--nd-doux)}
+html body.nd .pa-qr-wrap{background:#fff!important;border-color:var(--nd-bord)}
+html body.nd .pa-modal-close{color:var(--nd-doux)}
+html body.nd .pa-cover-preview{border-color:var(--nd-bord)}

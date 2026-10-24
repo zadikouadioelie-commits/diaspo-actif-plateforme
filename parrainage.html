@@ -21,6 +21,10 @@
      explicite, capture à l'appui), jamais une copie séparée qui pourrait diverger — voir
      assets/annuaire-cards.css. -->
 <link rel="stylesheet" href="/assets/annuaire-cards.css">
+<!-- Design « Nuit dorée » (2026-10-24) ; retour arrière : retirer ces 3 liens, le bandeau #pa-bandeau-premier et class="nd" sur <body> -->
+<link rel="stylesheet" href="/assets/theme-nuit-doree.css?v=8">
+<link rel="stylesheet" href="/assets/annuaire-nuit-doree.css?v=3">
+<link rel="stylesheet" href="/assets/parrainage-nuit-doree.css?v=1">
 <style>
   .pa-tabs{display:flex;gap:6px;border-bottom:1.5px solid var(--border);margin-bottom:22px;flex-wrap:wrap;}
   .pa-tab{background:none;border:none;padding:10px 16px;font-size:13.5px;font-weight:700;color:var(--muted);cursor:pointer;border-bottom:2.5px solid transparent;margin-bottom:-1.5px;}
@@ -78,7 +82,7 @@
   .pa-card-btn-danger:hover{background:#fecaca;}
 </style>
 </head>
-<body>
+<body class="nd">
 <div class="page">
 
   <header class="topbar">
@@ -102,6 +106,8 @@
   <main class="container" style="padding-top:30px;padding-bottom:40px;">
     <h1 style="margin:0 0 4px;">🤝 Parrainage & Invitations</h1>
     <p class="sub" style="margin:0 0 20px;">Faites découvrir Diaspo'Actif autour de vous et suivez les comptes créés grâce à vos invitations.</p>
+
+    <div id="pa-bandeau-premier"></div>
 
     <div class="pa-tabs">
       <button type="button" class="pa-tab active" data-tab="dashboard">📊 Tableau de bord</button>
@@ -278,6 +284,13 @@
         <div class="pa-stat-card"><div class="pa-stat-val">${s.total_vues}</div><div class="pa-stat-lbl">Vues cumulées</div></div>
         <div class="pa-stat-card"><div class="pa-stat-val">${s.total_scans}</div><div class="pa-stat-lbl">Scans QR Code</div></div>
         <div class="pa-stat-card"><div class="pa-stat-val">${s.total_inscriptions}</div><div class="pa-stat-lbl">Comptes créés</div></div>`;
+      /* Bandeau d'encouragement (2026-10-24, demande explicite) : tant qu'aucune invitation n'a été créée. */
+      const bandeau = document.getElementById('pa-bandeau-premier');
+      if (bandeau) {
+        bandeau.innerHTML = Number(s.nb_invitations) === 0 ? `<div class="pa-bandeau" role="note"><span class="pa-bandeau-ic" aria-hidden="true">🏅</span><div class="pa-bandeau-txt"><strong>Créez votre premier lien de parrainage et gagnez des points de fiabilité</strong><span>Chaque étape compte : lien créé, lien ouvert ou QR code scanné, puis une inscription grâce à vous.</span></div><button type="button" class="pa-bandeau-btn" id="pa-bandeau-btn">Créer mon premier lien</button></div>` : '';
+        const bb = document.getElementById('pa-bandeau-btn');
+        if (bb) bb.addEventListener('click', () => { const t = document.querySelector('.pa-tab[data-tab="creer"]'); if (t) t.click(); });
+      }
     } catch (e) {
       document.getElementById('pa-stats').innerHTML = '<div class="notice" style="color:#dc2626;">Erreur de chargement.</div>';
     }
@@ -380,6 +393,7 @@
       coverCreer.set(null);
       invitationsChargees = false;
       if (typeof showToast === 'function') showToast('Invitation créée !', 'success');
+      chargerDashboard(); // le bandeau « premier lien » disparaît dès la première invitation
     } catch (e) {
       err.textContent = (e && e.message) || "Impossible de créer l'invitation.";
     } finally {

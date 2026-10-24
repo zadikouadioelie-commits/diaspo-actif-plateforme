@@ -1,0 +1,98 @@
+/* ============================================================
+   Emplois & Stages (emplois-stages.html) — design « Nuit dorée » (2026-10-24, demande explicite : « propose nouvelle DA »).
+   Complète theme-nuit-doree.css (fond, barre du haut, boutons). Tout est préfixé html body.nd. Aucun changement de logique.
+   Retour arrière : retirer les 2 <link> et class="nd" sur <body> de emplois-stages.html.
+   ============================================================ */
+
+/* Variables du site redéfinies dans la page (barre du haut intacte, elle n'utilise pas ces variables en nuit) */
+html body.nd :is(.es-hero,.es-stats-strip,.es-home-section,.es-search-bar,.es-layout,.es-detail-overlay){
+  --bg:rgba(255,255,255,.06); --card:rgba(255,255,255,.045); --text:#EDEAE0; --muted:#AEB8D0; --border:rgba(255,255,255,.13);
+  --navy:#FFFFFF; --orange:#E3C06E; --orange-light:rgba(227,192,110,.14); --green:#8FE0B0; --navy-light:#14234a;
+}
+
+/* ── Héros ── */
+html body.nd .es-hero{background:radial-gradient(520px 320px at 85% 0%,rgba(227,192,110,.16),transparent 70%),linear-gradient(180deg,#0B1226 0%,#060A14 100%);border-bottom:1px solid var(--nd-bord2)}
+html body.nd .es-hero h1{font-family:var(--nd-display)!important;font-weight:500!important;font-size:clamp(30px,3.6vw,46px)!important;letter-spacing:-.01em;color:#fff}
+html body.nd .es-hero-mini{color:var(--nd-doux)}
+html body.nd .es-hero-mini strong{color:var(--nd-or);font-family:var(--nd-display);font-size:20px;font-weight:500}
+html body.nd .es-hero-illu{background:var(--nd-verre);border:1px solid var(--nd-bord);border-radius:26px;box-shadow:0 30px 60px -36px #000}
+html body.nd .es-illu-chrono{color:var(--nd-doux)}
+html body.nd .es-illu-chrono span{color:var(--nd-or)}
+html body.nd .es-illu-card{background:var(--nd-verre2);border:1px solid var(--nd-bord2);border-radius:16px}
+html body.nd .es-illu-card .txt small{color:var(--nd-doux)}
+
+/* ── Chiffres clés ── */
+html body.nd .es-stats-strip{background:transparent;border-bottom:1px solid var(--nd-bord2)}
+html body.nd .es-stat-card{background:var(--nd-verre)!important;border:1px solid var(--nd-bord2)!important;border-radius:22px;box-shadow:0 26px 54px -36px #000}
+html body.nd .es-stat-card .n{font-family:var(--nd-display);font-weight:500;font-size:30px;color:var(--nd-or)}
+html body.nd .es-stat-card .l{color:var(--nd-doux);letter-spacing:.1em}
+
+/* ── Sections d'accueil : catégories, recruteurs, métiers, pays ── */
+html body.nd .es-home-section h2{font-family:var(--nd-display);font-weight:500;font-size:26px;color:#fff}
+html body.nd :is(.es-cat-card,.es-recruiter-card,.es-pays-item,.es-metier-chip){background:var(--nd-verre)!important;border:1px solid var(--nd-bord2)!important;color:var(--nd-texte)}
+html body.nd :is(.es-cat-card,.es-recruiter-card){border-radius:20px}
+html body.nd .es-cat-card:hover{border-color:var(--nd-bord)!important;transform:translateY(-3px)}
+html body.nd :is(.es-cat-card .n,.es-recruiter-card .n,.es-pays-item,.es-metier-chip){color:#fff}
+html body.nd .es-metier-chip span{color:var(--nd-or)}
+
+/* ── Barre de recherche ── */
+html body.nd .es-search-bar{background:rgba(8,13,30,.82);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border-bottom:1px solid var(--nd-bord2);box-shadow:0 10px 30px -18px #000}
+html body.nd .es-search-inner input{background:rgba(255,255,255,.06)!important;border:1px solid var(--nd-bord2)!important;color:#fff!important;border-radius:999px;color-scheme:dark}
+html body.nd .es-type-toggle{background:var(--nd-verre)!important;border:1px solid var(--nd-bord2)}
+html body.nd .es-type-toggle button{color:var(--nd-doux)}
+html body.nd .es-type-toggle button.active{background:var(--nd-degore)!important;color:#1a1202!important;font-weight:800}
+html body.nd .btn-es-search{background:var(--nd-degore)!important;color:#1a1202!important;font-weight:800;box-shadow:0 12px 26px -14px rgba(227,192,110,.7)}
+
+/* ── Colonnes : documents, filtres, offres ── */
+html body.nd :is(.es-docs-box,.es-filters,.es-card){background:var(--nd-verre)!important;border:1px solid var(--nd-bord2)!important;border-radius:22px!important;box-shadow:0 26px 54px -36px #000;color:var(--nd-texte)}
+html body.nd .es-docs-box h4,html body.nd .es-filters h3{font-family:var(--nd-display);font-weight:500;font-size:17px;color:#fff}
+html body.nd .es-doc-item{border-bottom-color:var(--nd-bord2)}
+html body.nd .es-doc-item a{color:var(--nd-or)}
+html body.nd .es-doc-empty{color:var(--nd-doux)}
+html body.nd .es-alert-item{background:var(--nd-verre2);color:var(--nd-texte)}
+html body.nd .es-alert-item button{color:var(--nd-doux)}
+html body.nd :is(.es-filter-group select,.es-filter-group input[type=text],.es-filter-group input:not([type=checkbox]),.es-alert-form select,.es-alert-form input){background:rgba(255,255,255,.06)!important;border:1px solid var(--nd-bord2)!important;border-radius:14px!important;color:#fff!important;min-height:42px;color-scheme:dark}
+html body.nd :is(.es-filter-group,.es-alert-form) select option{background:#0f1a38;color:#fff}
+html body.nd :is(.es-filter-group,.es-alert-form) :is(input,select)::placeholder{color:var(--nd-faible)}
+html body.nd :is(.es-filter-group,.es-alert-form,.es-search-inner) :is(input,select):focus{outline:none;border-color:var(--nd-or)!important;box-shadow:0 0 0 3px rgba(227,192,110,.18)}
+html body.nd .es-filter-group label{color:var(--nd-doux);letter-spacing:.1em}
+html body.nd .es-filter-group.chk label{color:var(--nd-texte);letter-spacing:0}
+html body.nd .es-filter-group input[type=checkbox]{accent-color:var(--nd-or)}
+html body.nd .btn-es-reset{border-color:var(--nd-bord2)!important;color:var(--nd-doux)!important;border-radius:999px}
+html body.nd .btn-es-reset:hover{border-color:var(--nd-or)!important;color:var(--nd-or)!important}
+html body.nd .es-results-head span{color:var(--nd-doux)}
+
+/* ── Défilement doré des colonnes à défilement propre ── */
+html body.nd :is(.es-docs-col,.es-filters,.es-layout>main){scrollbar-width:thin;scrollbar-color:rgba(227,192,110,.55) transparent}
+html body.nd :is(.es-docs-col,.es-filters,.es-layout>main)::-webkit-scrollbar{width:8px}
+html body.nd :is(.es-docs-col,.es-filters,.es-layout>main)::-webkit-scrollbar-thumb{background:linear-gradient(180deg,#F0D68C,#B9893A);border-radius:999px}
+
+/* ── Cartes d'offres ── */
+html body.nd .es-card:hover{transform:translateY(-3px);border-color:var(--nd-bord)!important;box-shadow:0 30px 60px -34px #000}
+html body.nd .es-card-titre{font-family:var(--nd-display);font-weight:500;font-size:19px;color:#fff}
+html body.nd .es-org-name{color:var(--nd-texte)}
+html body.nd .es-card-desc{color:var(--nd-doux)}
+html body.nd .es-logo{background:var(--nd-verre2);border:1px solid var(--nd-bord2);color:var(--nd-or)}
+html body.nd .es-tag{background:var(--nd-verre2)!important;color:var(--nd-texte)!important;border:1px solid var(--nd-bord2)}
+html body.nd .es-tag.type{background:rgba(227,192,110,.14)!important;color:var(--nd-or)!important;border-color:var(--nd-bord)}
+html body.nd .es-card-foot{border-top-color:var(--nd-bord2);color:var(--nd-doux)}
+html body.nd .es-empty{color:var(--nd-doux)}
+
+/* ── Fenêtre de détail d'une offre ── */
+html body.nd .es-detail-overlay{background:rgba(3,6,14,.8);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+html body.nd .es-detail-box{background:radial-gradient(420px 220px at 100% 0%,rgba(227,192,110,.14),transparent 66%),linear-gradient(160deg,#14234a 0%,#0B1226 62%);border:1px solid rgba(227,192,110,.4);border-radius:26px;color:var(--nd-texte);box-shadow:0 40px 80px -30px #000}
+html body.nd .es-detail-head{background:transparent;border-bottom:1px solid var(--nd-bord2);border-radius:26px 26px 0 0}
+html body.nd .es-detail-titre{font-family:var(--nd-display);font-weight:500;font-size:28px;color:#fff}
+html body.nd .es-detail-tags span{background:var(--nd-verre2);border:1px solid var(--nd-bord2);color:var(--nd-texte)}
+html body.nd .es-detail-section h4{color:var(--nd-or);letter-spacing:.12em}
+html body.nd .es-detail-section :is(p,ul){color:var(--nd-texte)}
+html body.nd .es-cond-item{background:var(--nd-verre)!important;border:1px solid var(--nd-bord2);border-radius:16px}
+html body.nd .es-cond-item .k{color:var(--nd-doux)}
+html body.nd .es-cond-item .v{color:#fff}
+html body.nd .es-detail-actions{border-top-color:var(--nd-bord2)}
+
+/* ── Boutons du site utilisés dans la page ── */
+html body.nd :is(.es-hero,.es-layout,.es-detail-box,.es-home-section) :is(.btn-orange,.btn-primary,.btn-navy){background:var(--nd-degore)!important;color:#1a1202!important;border:0!important;border-radius:999px!important;font-weight:800}
+html body.nd :is(.es-hero,.es-layout,.es-detail-box,.es-home-section) .btn-outline{background:transparent!important;color:var(--nd-or)!important;border:1px solid var(--nd-or)!important;border-radius:999px!important;font-weight:800}
+html body.nd :is(.es-hero,.es-layout,.es-detail-box,.es-home-section) .btn-outline:hover{background:rgba(227,192,110,.12)!important}
+html body.nd :is(.btn-es-search,.btn-es-reset,.es-type-toggle button,.es-card,.es-cat-card):focus-visible{outline:3px solid var(--nd-or);outline-offset:2px}

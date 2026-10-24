@@ -1,0 +1,54 @@
+/* ============================================================
+   Pages « Mes Billets » (mes-billets.html) et « Mes demandes de devis » (mes-devis.html) — design « Nuit dorée » (2026-10-24, demande explicite : « nouvelle D'A »).
+   Complète theme-nuit-doree.css (fond, barre du haut, boutons). Tout est préfixé html body.nd. Aucun changement de logique.
+   Le QR code du billet reste volontairement sur fond blanc (lisibilité à la lecture par scanner).
+   Retour arrière : retirer les 2 <link> et class="nd" sur <body> de chaque page.
+   ============================================================ */
+
+/* Variables du site redéfinies dans la zone de contenu et les fenêtres (barre du haut intacte) */
+html body.nd :is(main.container,.modal-bg){
+  --bg:rgba(255,255,255,.06); --card:rgba(255,255,255,.045); --text:#EDEAE0; --muted:#AEB8D0; --border:rgba(255,255,255,.13);
+  --orange:#E3C06E; --orange-light:rgba(227,192,110,.14); --green:#8FE0B0;
+  color:var(--nd-texte);
+}
+
+/* ── Titre ── */
+html body.nd main.container h1{font-family:var(--nd-display)!important;font-weight:500!important;font-size:clamp(30px,3.4vw,42px)!important;letter-spacing:-.01em;color:#fff!important}
+html body.nd main.container h1+p{color:var(--nd-doux)!important}
+html body.nd main.container a:not([class*="btn"]){color:var(--nd-or)}
+
+/* ── Message « aucun billet / aucune demande » et états ── */
+html body.nd .notice{background:rgba(227,192,110,.08)!important;border:1px solid var(--nd-bord)!important;border-left:1px solid var(--nd-bord)!important;border-radius:22px!important;color:#F3E3B5!important;line-height:1.6}
+html body.nd .notice :is(strong,b,h3,h4){color:#fff!important;font-family:var(--nd-display);font-weight:500}
+
+/* ── Billets ── */
+html body.nd .ticket-card{background:var(--nd-verre)!important;border:1px dashed var(--nd-bord)!important;border-radius:24px!important;color:var(--nd-texte);box-shadow:0 26px 54px -36px #000}
+html body.nd .ticket-header{background:linear-gradient(135deg,rgba(227,192,110,.22),rgba(185,137,58,.12))!important;border:1px solid var(--nd-bord);border-radius:18px;color:#fff}
+html body.nd .ticket-info-row .lbl{color:var(--nd-doux)}
+html body.nd .ticket-info-row .val{color:#fff}
+html body.nd .tag-type{background:rgba(227,192,110,.14)!important;color:var(--nd-or)!important;border:1px solid var(--nd-bord)}
+html body.nd .tag-type.vip{background:rgba(180,140,255,.16)!important;color:#CDB6FF!important;border-color:rgba(180,140,255,.4)}
+html body.nd .tag-type.early{background:rgba(52,211,153,.14)!important;color:#7DE3B5!important;border-color:rgba(52,211,153,.4)}
+html body.nd .tag-type.sponsor{background:rgba(127,166,224,.16)!important;color:#A9C4F0!important;border-color:rgba(127,166,224,.4)}
+html body.nd .qr-box{background:#fff!important;border-radius:18px}
+
+/* ── Demandes de devis ── */
+html body.nd .devis-card{background:var(--nd-verre)!important;border:1px solid var(--nd-bord2)!important;border-radius:22px!important;color:var(--nd-texte);box-shadow:0 26px 54px -36px #000;transition:transform .5s var(--nd-ease),border-color .4s}
+html body.nd .devis-card:hover{transform:translateY(-3px);border-color:var(--nd-bord)!important;box-shadow:0 30px 60px -34px #000}
+html body.nd .devis-card :is(h3,h4,strong){color:#fff}
+
+/* ── Fenêtres ── */
+html body.nd .modal-bg{background:rgba(3,6,14,.8)!important;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+html body.nd .modal-box{background:radial-gradient(420px 220px at 100% 0%,rgba(227,192,110,.14),transparent 66%),linear-gradient(160deg,#14234a 0%,#0B1226 62%)!important;border:1px solid rgba(227,192,110,.4);border-radius:26px!important;color:var(--nd-texte);box-shadow:0 40px 80px -30px #000}
+html body.nd .modal-box :is(h2,h3){font-family:var(--nd-display)!important;font-weight:500;color:#fff!important}
+html body.nd .modal-box :is(input,select,textarea){background:rgba(255,255,255,.06)!important;border:1px solid var(--nd-bord2)!important;border-radius:14px!important;color:#fff!important;color-scheme:dark}
+html body.nd .modal-box button[onclick*="closeMod"]{color:var(--nd-doux)!important}
+
+/* ── Pastilles de statut : le texte blanc posé sur la couleur du statut reste lisible ── */
+html body.nd :is(.statut-pill,.devis-statut-pill){font-weight:800;letter-spacing:.04em}
+
+/* ── Boutons ── */
+html body.nd :is(main.container,.modal-box) :is(.btn-orange,.btn-primary){background:var(--nd-degore)!important;color:#1a1202!important;border:0!important;border-radius:999px!important;font-weight:800;box-shadow:0 12px 26px -14px rgba(227,192,110,.7)}
+html body.nd :is(main.container,.modal-box) .btn-outline{background:transparent!important;color:var(--nd-or)!important;border:1px solid var(--nd-or)!important;border-radius:999px!important;font-weight:800}
+html body.nd :is(main.container,.modal-box) .btn-outline:hover{background:rgba(227,192,110,.12)!important}
+html body.nd :is(main.container,.modal-box) :is(.btn,button,a):focus-visible{outline:3px solid var(--nd-or);outline-offset:2px}
