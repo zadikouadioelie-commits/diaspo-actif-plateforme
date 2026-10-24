@@ -146,24 +146,24 @@
    grille des 4 colonnes de comptes) — .ann-grid garde son max-width:1180px et son
    comportement/contenu inchangés (zéro risque de casse), la colonne pub n'apparaît QUE quand il
    reste vraiment de la place libre à droite (écran large). */
-#ann-page-row{display:flex;gap:24px;align-items:flex-start;justify-content:center;}
-.ann-ad-col{display:none;flex:1;min-width:280px;max-width:360px;background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;position:sticky;top:80px;}
-@media(min-width:1550px){
-  #ann-page-row{justify-content:flex-start;}
-  .ann-ad-col{display:block;}
+/* Page pleine largeur (2026-10-24, demande explicite : « il y a bien trop d'espace vide, utilise mieux l'espace ») : la grille occupe TOUT ce que la colonne publicitaire laisse
+   (plus de plafond à 1180px ni de centrage par marges automatiques, qui laissaient ~350px vides à gauche et ~370px entre la grille et la pub) ; les cartes se répartissent
+   d'elles-mêmes (4 colonnes sur grand écran, 3 sur portable). La zone publicitaire passe sur DEUX colonnes de publicités à partir de 1700px (4 publicités visibles),
+   une colonne de 2 entre 1280 et 1699px, et se range sous la grille en dessous. */
+#ann-page-row{display:flex;gap:24px;align-items:flex-start;padding:0 24px;box-sizing:border-box;}
+.ann-ad-col{display:none;background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;position:sticky;top:80px;max-height:calc(100vh - 100px);overflow-y:auto;}
+@media(min-width:1280px){
+  .ann-grid{flex:1 1 0;min-width:0;max-width:none;margin:0;padding:0 0 40px;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));}
+  .ann-ad-col{display:block;flex:0 0 300px;}
 }
-/* Portables et écrans moyens (2026-10-09, demande explicite : « abaisse les seuils d'affichage ») — la colonne pub
-   n'apparaissait qu'à partir de 1550px, donc jamais sur un portable courant (1366–1536px) : l'emplacement « annuaire_sidebar »
-   était invisible pour la plupart des visiteurs. De 1280 à 1549px la grille passe à 3 colonnes pour lui laisser la place ;
-   en dessous de 1280px elle se range sous la grille, pleine largeur, au lieu de disparaître. */
-@media(min-width:1280px) and (max-width:1549px){
-  #ann-page-row{justify-content:flex-start;}
-  .ann-grid{flex:1 1 0;min-width:0;margin:0;grid-template-columns:repeat(3,1fr);}
-  .ann-ad-col{display:block;flex:0 0 280px;min-width:0;max-width:280px;margin-right:24px;}
+@media(min-width:1700px){
+  .ann-ad-col{flex:0 0 600px;}
+  .ann-ad-col [data-ad-emplacement]{display:grid !important;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px !important;}
 }
 @media(max-width:1279px){
-  #ann-page-row{flex-direction:column;align-items:stretch;}
-  .ann-ad-col{display:block;position:static;min-width:0;max-width:none;margin:0 24px 32px;}
+  #ann-page-row{flex-direction:column;align-items:stretch;padding:0;}
+  .ann-ad-col{display:block;position:static;max-height:none;overflow:visible;margin:0 24px 32px;}
+  .ann-ad-col [data-ad-emplacement]{display:grid !important;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px !important;}
 }
 /* Carte pub en colonne étroite (2026-10-09) : la carte horizontale de renderAdSlot() (image 88px + texte + bouton) débordait d'une colonne de 226–300px — on l'empile verticalement ici. */
 .ann-ad-col [data-ad-emplacement] > div{flex-direction:column !important;align-items:stretch !important;gap:10px !important;}
@@ -399,10 +399,11 @@
     <p class="ann-section-desc">Explorez les actions inspirantes portées par des individus, des collectifs et des organisations qui œuvrent pour un changement positif.</p>
   </div>
 
-  <div style="max-width:1200px;margin:0 auto 16px;padding:0 24px;">
+  <div style="width:100%;box-sizing:border-box;max-width:1200px;margin:0 auto 16px;padding:0 24px;">
     <!-- Espace du haut (2026-10-24, demande explicite) : UNE publicité par heure (data-ad-fenetre = 3 600 000 ms), changée à l'heure pile en ne repeignant que
          cet emplacement, en bannière bien visible (data-ad-format). Sans publicité active : relais de publications du fil, comme avant. -->
-    <div id="ad-vitrine-section" data-ad-emplacement="vitrine_section" data-ad-fenetre="3600000" data-ad-format="banniere" style="display:none;"></div>
+    <!-- Puis (2026-10-24, nouvelle demande) : TROIS bandes de même taille, les unes au-dessus des autres (data-ad-count="3", data-ad-format="bandes"), remplacées chaque heure. -->
+    <div id="ad-vitrine-section" data-ad-emplacement="vitrine_section" data-ad-fenetre="3600000" data-ad-count="3" data-ad-format="bandes" style="display:none;"></div>
   </div>
 
   <section id="honneur-mur" style="display:none;" aria-label="Espace d'honneur"></section>
@@ -419,7 +420,7 @@
        ci-dessus (bandeau horizontal au-dessus de la grille), aucun conflit. ═══ -->
   <aside class="ann-ad-col">
     <div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:2px;">📢 Espace publicitaire</div>
-    <div id="ad-annuaire-sidebar" data-ad-emplacement="annuaire_sidebar" data-ad-count="2" data-ad-rotate="60000" style="margin-top:10px;"></div>
+    <div id="ad-annuaire-sidebar" data-ad-emplacement="annuaire_sidebar" data-ad-count="2" data-ad-count-large="4" data-ad-large-min="1700" data-ad-rotate="60000" style="margin-top:10px;"></div>
   </aside>
   </div>
 

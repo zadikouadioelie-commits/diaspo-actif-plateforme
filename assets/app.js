@@ -5473,12 +5473,17 @@ function _daAdCarteHtml(ad, visible){
    de data-ad-rotate (renderAllAdSlots) — pas de minuteur propre ici, donc rien qui écrase une publicité arrivée entre deux tours. */
 let _daRelaisDepart = null;
 async function renderAdSlotMulti(el, emplacement, n){
+  /* data-ad-format="bandes" (2026-10-24, demande explicite : « trois bandes de cette même taille, les unes au-dessus des autres, remplacées chaque heure ») : n bannières
+     empilées (la même carte que « banniere »). data-ad-fenetre = durée du lot : le serveur donne le MÊME lot à tous les visiteurs pendant toute la fenêtre
+     (?fenetre=&n=), puis le suivant. Sans ce format : colonnes à plusieurs publicités (cartes étroites). */
+  const bandes = el.dataset.adFormat === 'bandes';
+  const fenetreMs = parseInt(el.dataset.adFenetre, 10) || 0;
   let ads = [];
   try {
-    const r = await fetch(`/api/ads/servir?emplacement=${encodeURIComponent(emplacement)}&n=${n}`).then(x => x.json());
+    const r = await fetch(`/api/ads/servir?emplacement=${encodeURIComponent(emplacement)}&n=${n}${fenetreMs ? '&fenetre=' + fenetreMs : ''}`).then(x => x.json());
     ads = Array.isArray(r.ads) ? r.ads : (r.ad ? [r.ad] : []);
   } catch (e) { ads = []; }
-  const cartes = ads.slice(0, n).map(a => _daAdCarteHtml(a, true));
+  const cartes = ads.slice(0, n).map(a => bandes ? _daAdBanniereHtml(a) : _daAdCarteHtml(a, true));
   if (cartes.length < n) {
     const posts = await _daPubRelaisCharger();
     if (posts.length) {
@@ -5490,7 +5495,7 @@ async function renderAdSlotMulti(el, emplacement, n){
   }
   if (!cartes.length) { el.style.display = "none"; return; }
   el.innerHTML = cartes.join("");
-  el.style.display = "flex"; el.style.flexDirection = "column"; el.style.gap = "12px";
+  el.style.display = "flex"; el.style.flexDirection = "column"; el.style.gap = bandes ? "16px" : "12px";
 }
 /* Bannière « bien visible » (2026-10-24, demande explicite : « l'espace publicitaire en haut de l'annuaire, une publicité chaque heure, bien visible ») :
    data-ad-format="banniere" sur l'emplacement. Grande carte horizontale à fond marine fixe et liseré doré (lisible sur n'importe quelle page, comme la
@@ -5530,7 +5535,9 @@ function _daAdBanniereHtml(ad){
 async function renderAdSlot(containerId, emplacement, opts = {}){
   const el = document.getElementById(containerId);
   if (!el) return;
-  const nbAds = parseInt(el.dataset.adCount, 10) || 1;
+  /* Nombre de publicités selon la largeur (2026-10-24) : data-ad-count-large publicités à partir de data-ad-large-min px d'écran, data-ad-count en dessous. */
+  const nbBase = parseInt(el.dataset.adCount, 10) || 1, nbGrand = parseInt(el.dataset.adCountLarge, 10) || 0;
+  const nbAds = (nbGrand && window.innerWidth >= (parseInt(el.dataset.adLargeMin, 10) || 1700)) ? nbGrand : nbBase;
   if (nbAds > 1) return renderAdSlotMulti(el, emplacement, nbAds);
   /* data-ad-fenetre="<ms>" : une seule publicité pendant toute la fenêtre (ex. 3600000 = une heure), la même pour tous les visiteurs, puis la suivante
      (voir /api/ads/servir?fenetre=). Le renouvellement ne recharge QUE cet emplacement (renderAllAdSlots). */
@@ -5557,6 +5564,13 @@ async function renderAdSlot(containerId, emplacement, opts = {}){
    ce re-fetch ne fait alors que confirmer qu'il n'y a toujours pas de publicité, sans effet
    visible grâce au garde-fou _pubRelaisActif. */
 function renderAllAdSlots(){
+  /* Un emplacement à nombre variable est repeint une fois quand l'écran franchit son seuil (agrandissement, rotation d'une tablette…), pas à chaque pixel. */
+  document.querySelectorAll("[data-ad-count-large]").forEach(el=>{
+    if (!el.id) return;
+    const seuil = parseInt(el.dataset.adLargeMin, 10) || 1700;
+    let grand = window.innerWidth >= seuil, t = null;
+    window.addEventListener("resize", () => { clearTimeout(t); t = setTimeout(() => { const g = window.innerWidth >= seuil; if (g !== grand) { grand = g; renderAdSlot(el.id, el.dataset.adEmplacement); } }, 250); });
+  });
   document.querySelectorAll("[data-ad-emplacement]").forEach(el=>{
     if (!el.id) return;
     renderAdSlot(el.id, el.dataset.adEmplacement);

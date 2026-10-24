@@ -21178,7 +21178,9 @@ route("GET", "/api/ads/servir", async (req, res, params, body, query) => {
   const fenetre = Number(query.fenetre);
   if (Number.isFinite(fenetre) && fenetre >= 60000 && candidates.length > 1) {
     candidates.sort((a, b) => Number(a.id) - Number(b.id));
-    candidates.push(...candidates.splice(0, Math.floor(Date.now() / fenetre) % candidates.length));
+    /* Avec ?n= (2026-10-24) : le lot avance de n par fenêtre (3 nouvelles publicités chaque heure, pas une seule qui glisse). */
+    const pasLot = Math.min(6, Math.max(1, Number(query.n) || 1));
+    candidates.push(...candidates.splice(0, (Math.floor(Date.now() / fenetre) * pasLot) % candidates.length));
   }
 
   /* ?exclude=1,2 (2026-10-05) : publicités déjà affichées sur la page — évite de répéter la même
@@ -21190,7 +21192,7 @@ route("GET", "/api/ads/servir", async (req, res, params, body, query) => {
   }
 
   /* ?n=2 (2026-10-24) : colonnes à plusieurs publicités — jusqu'à 3 publicités DISTINCTES en un seul appel (champ `ads`) ; `ad` reste la première (compatibilité). */
-  const nbVoulu = Math.min(3, Math.max(1, Number(query.n) || 1));
+  const nbVoulu = Math.min(6, Math.max(1, Number(query.n) || 1));
   const ads = [];
   for (const c of candidates) {
     const zones = safeParseArray(c.cible_zones);
