@@ -116,7 +116,7 @@ function _logoLien(type) {
 }
 function _contactLine(icon, val) {
   if (!val) return '';
-  return `<span style="display:inline-flex;align-items:center;gap:4px;margin-right:10px;font-size:9pt;color:var(--cv-coord,inherit);">${icon} ${_e(val)}</span>`;
+  return `<span style="display:inline-flex;align-items:center;gap:4px;margin-right:10px;font-size:calc(9pt*var(--cv-coord-k,1));color:var(--cv-coord,inherit);font-family:var(--cv-coord-f,inherit);">${icon} ${_e(val)}</span>`;
 }
 function _skillBars(items, accent) {
   return items.map(s => `<div style="margin-bottom:5px;">
@@ -132,9 +132,16 @@ const _txt = s => (s && /^#[0-9a-f]{6}$/i.test(s.couleur_texte || '')) ? s.coule
    style.couleur_nom (nom + titre professionnel) et style.couleur_coord (coordonnées + nationalité). Absents = chaque gabarit garde sa couleur d'origine
    (chaque élément porte var(--cv-nom, <couleur d'origine>)). */
 const _hexCv = v => /^#[0-9a-f]{6}$/i.test(v || '');
+/* Police et taille du nom/titre et des coordonnées (2026-10-24, demande explicite : « la couleur, la forme, la grosseur des textes saisis »). Police : liste
+   fermée (jamais une valeur libre dans un attribut style). Taille : coefficient 0,7 à 1,6 appliqué aux tailles du modèle (calc(Xpt*var(--cv-nom-k))). */
+const POLICES_INFOS_CV = ['Segoe UI', 'Arial', 'Georgia, serif', 'Times New Roman, serif', 'Calibri, sans-serif', 'Garamond, serif', 'Trebuchet MS, sans-serif'];
+const _policeCv = v => POLICES_INFOS_CV.includes(v) ? v : '';
+const _tailleCv = v => { const n = Number(v); return n >= 0.7 && n <= 1.6 && n !== 1 ? n : 0; };
 const _txtVar = s => (s && _hexCv(s.couleur_texte) ? `--cv-txt:${s.couleur_texte};` : '')
   + (s && _hexCv(s.couleur_nom) ? `--cv-nom:${s.couleur_nom};` : '')
-  + (s && _hexCv(s.couleur_coord) ? `--cv-coord:${s.couleur_coord};` : '');
+  + (s && _hexCv(s.couleur_coord) ? `--cv-coord:${s.couleur_coord};` : '')
+  + (s && _policeCv(s.police_nom) ? `--cv-nom-f:${s.police_nom};` : '') + (s && _tailleCv(s.taille_nom) ? `--cv-nom-k:${_tailleCv(s.taille_nom)};` : '')
+  + (s && _policeCv(s.police_coord) ? `--cv-coord-f:${s.police_coord};` : '') + (s && _tailleCv(s.taille_coord) ? `--cv-coord-k:${_tailleCv(s.taille_coord)};` : '');
 
 function _tags(items, bg, color) {
   return items.map(s => `<span style="display:inline-block;background:${bg};color:${color};padding:2px 8px;border-radius:12px;font-size:8pt;margin:2px 2px 2px 0;">${_e(s)}</span>`).join('');
@@ -238,8 +245,8 @@ CV_TEMPLATES['moderne'] = {
   <div style="background:${s.couleur1};color:#fff;padding:24px 16px;">
     <div style="text-align:center;margin-bottom:16px;">
       ${_photoSlot(d.photo, s, d._edit, {dark:true})}
-      <div style="font-size:16pt;font-weight:800;margin-top:8px;line-height:1.2;color:var(--cv-nom,inherit);">${_e([inf.prenom,inf.nom].filter(Boolean).join(' ')||'Votre Nom')}</div>
-      ${inf.titre_pro ? `<div style="font-size:9pt;opacity:.8;margin-top:4px;color:var(--cv-nom,inherit);">${_e(inf.titre_pro)}</div>` : ''}
+      <div style="font-size:calc(16pt*var(--cv-nom-k,1));font-weight:800;margin-top:8px;line-height:1.2;color:var(--cv-nom,inherit);font-family:var(--cv-nom-f,inherit);">${_e([inf.prenom,inf.nom].filter(Boolean).join(' ')||'Votre Nom')}</div>
+      ${inf.titre_pro ? `<div style="font-size:calc(9pt*var(--cv-nom-k,1));opacity:.8;margin-top:4px;color:var(--cv-nom,inherit);font-family:var(--cv-nom-f,inherit);">${_e(inf.titre_pro)}</div>` : ''}
     </div>
     ${_qrWidget(d.media?.qr, true)}
     ${d.media?.audio ? _audioWidget(d.media.audio) : ''}
@@ -262,7 +269,7 @@ CV_TEMPLATES['moderne'] = {
       ${_sectionTitle("Centres d'intérêt", s, true)}
       <div style="display:flex;flex-wrap:wrap;gap:3px;">${d.interests.map(i=>`<span style="background:rgba(255,255,255,.15);padding:2px 8px;border-radius:10px;font-size:8pt;">${_e(i)}</span>`).join('')}</div>
     ` : ''}
-    ${inf.nationalite ? `<div style="margin-top:12px;font-size:8.5pt;opacity:.7;color:var(--cv-coord,inherit);">🌍 ${_e(inf.nationalite)}</div>` : ''}
+    ${inf.nationalite ? `<div style="margin-top:12px;font-size:calc(8.5pt*var(--cv-coord-k,1));opacity:.7;color:var(--cv-coord,inherit);font-family:var(--cv-coord-f,inherit);">🌍 ${_e(inf.nationalite)}</div>` : ''}
   </div>
   <!-- MAIN -->
   <div style="padding:24px 20px;background:#fff;">
@@ -291,9 +298,9 @@ CV_TEMPLATES['classique'] = {
   <!-- HEADER -->
   <div style="text-align:center;padding-bottom:16px;border-bottom:3px solid ${s.couleur1};margin-bottom:16px;">
     ${_photoSlot(d.photo, s, d._edit)}
-    <div style="font-size:22pt;font-weight:800;color:var(--cv-nom,${s.couleur1});letter-spacing:2px;margin-top:${(d.photo?.url&&d.photo?.show)||d._edit?'8px':'0'}">${_e([inf.prenom,inf.nom].filter(Boolean).join(' ')||'VOTRE NOM')}</div>
-    ${inf.titre_pro ? `<div style="font-size:12pt;color:var(--cv-nom,${s.couleur2});margin-top:4px;font-style:italic;">${_e(inf.titre_pro)}</div>` : ''}
-    <div style="margin-top:10px;font-size:9pt;color:var(--cv-coord,var(--cv-txt,#555));">
+    <div style="font-size:calc(22pt*var(--cv-nom-k,1));font-weight:800;color:var(--cv-nom,${s.couleur1});letter-spacing:2px;margin-top:${(d.photo?.url&&d.photo?.show)||d._edit?'8px':'0'};font-family:var(--cv-nom-f,inherit);">${_e([inf.prenom,inf.nom].filter(Boolean).join(' ')||'VOTRE NOM')}</div>
+    ${inf.titre_pro ? `<div style="font-size:calc(12pt*var(--cv-nom-k,1));color:var(--cv-nom,${s.couleur2});margin-top:4px;font-style:italic;font-family:var(--cv-nom-f,inherit);">${_e(inf.titre_pro)}</div>` : ''}
+    <div style="margin-top:10px;font-size:calc(9pt*var(--cv-coord-k,1));color:var(--cv-coord,var(--cv-txt,#555));font-family:var(--cv-coord-f,inherit);">
       ${[inf.email&&`✉ ${inf.email}`,inf.telephone&&`📞 ${inf.telephone}`,[inf.ville,inf.pays_residence].filter(Boolean).join(', ')&&`📍 ${[inf.ville,inf.pays_residence].filter(Boolean).join(', ')}`,inf.linkedin&&`${_logoLien('linkedin')} ${_e(inf.linkedin)}`,inf.diasporactif&&`${_logoLien('da')} ${_e(inf.diasporactif)}`].filter(Boolean).join(' &nbsp;·&nbsp; ')}
     </div>
   </div>
@@ -334,11 +341,11 @@ CV_TEMPLATES['elegant'] = {
   <div style="background:${s.couleur1};color:#fff;padding:28px 28px 20px;display:flex;align-items:center;gap:20px;">
     ${_photoSlot(d.photo, {...s, couleur2:'rgba(255,255,255,.5)'}, d._edit, {dark:true})}
     <div style="flex:1;">
-      <div style="font-size:20pt;font-weight:300;letter-spacing:3px;color:var(--cv-nom,inherit);">${_e((inf.prenom||'').toUpperCase())}</div>
-      <div style="font-size:22pt;font-weight:800;letter-spacing:2px;margin-top:-4px;color:var(--cv-nom,inherit);">${_e((inf.nom||'VOTRE NOM').toUpperCase())}</div>
-      ${inf.titre_pro ? `<div style="font-size:10pt;opacity:.8;margin-top:6px;border-top:1px solid rgba(255,255,255,.3);padding-top:6px;color:var(--cv-nom,inherit);">${_e(inf.titre_pro)}</div>` : ''}
+      <div style="font-size:calc(20pt*var(--cv-nom-k,1));font-weight:300;letter-spacing:3px;color:var(--cv-nom,inherit);font-family:var(--cv-nom-f,inherit);">${_e((inf.prenom||'').toUpperCase())}</div>
+      <div style="font-size:calc(22pt*var(--cv-nom-k,1));font-weight:800;letter-spacing:2px;margin-top:-4px;color:var(--cv-nom,inherit);font-family:var(--cv-nom-f,inherit);">${_e((inf.nom||'VOTRE NOM').toUpperCase())}</div>
+      ${inf.titre_pro ? `<div style="font-size:calc(10pt*var(--cv-nom-k,1));opacity:.8;margin-top:6px;border-top:1px solid rgba(255,255,255,.3);padding-top:6px;color:var(--cv-nom,inherit);font-family:var(--cv-nom-f,inherit);">${_e(inf.titre_pro)}</div>` : ''}
     </div>
-    <div style="text-align:right;font-size:8.5pt;opacity:.85;line-height:1.9;color:var(--cv-coord,inherit);">
+    <div style="text-align:right;font-size:calc(8.5pt*var(--cv-coord-k,1));opacity:.85;line-height:1.9;color:var(--cv-coord,inherit);font-family:var(--cv-coord-f,inherit);">
       ${inf.email?`✉ ${_e(inf.email)}<br>`:''}${inf.telephone?`📞 ${_e(inf.telephone)}<br>`:''}${(inf.ville||inf.pays_residence)?`📍 ${_e([inf.ville,inf.pays_residence].filter(Boolean).join(', '))}<br>`:''}${inf.linkedin?`${_logoLien('linkedin')} ${_e(inf.linkedin)}${inf.diasporactif?'<br>':''}`:''}${inf.diasporactif?`${_logoLien('da')} ${_e(inf.diasporactif)}`:''}
     </div>
   </div>
@@ -365,7 +372,7 @@ CV_TEMPLATES['elegant'] = {
       ${d.langues?.length ? `${_sectionTitle('Langues', s)}${d.langues.map(l=>`<div style="margin-bottom:6px;"><div style="font-size:9pt;font-weight:600;">${_e(l.langue)}</div><div style="height:3px;background:#eee;border-radius:2px;margin-top:2px;"><div style="height:100%;background:${s.couleur2};border-radius:2px;width:${{Débutant:'20%',Intermédiaire:'40%',Courant:'65%',Professionnel:'85%','Natif / Bilingue':'100%'}[l.niveau]||'50%'};"></div></div><div style="font-size:7.5pt;color:var(--cv-txt,#999);margin-top:1px;">${_e(l.niveau)}</div></div>`).join('')}` : ''}
       ${d.certifications?.length ? `${_sectionTitle('Certifications', s)}${d.certifications.map(c=>`<div style="margin-bottom:6px;font-size:8.5pt;"><strong style="color:${s.couleur1};">${_e(c.nom)}</strong><br>${c.organisme?`<span style="color:var(--cv-txt,#666);">${_e(c.organisme)}</span>`:''}</div>`).join('')}` : ''}
       ${d.interests?.length ? `${_sectionTitle("Intérêts", s)}<div>${_tags(d.interests, s.couleur2+'18', '#333')}</div>` : ''}
-      ${inf.nationalite ? `${_sectionTitle('Nationalité', s)}<div style="font-size:9pt;color:var(--cv-coord,inherit);">🌍 ${_e(inf.nationalite)}</div>` : ''}
+      ${inf.nationalite ? `${_sectionTitle('Nationalité', s)}<div style="font-size:calc(9pt*var(--cv-coord-k,1));color:var(--cv-coord,inherit);font-family:var(--cv-coord-f,inherit);">🌍 ${_e(inf.nationalite)}</div>` : ''}
     </div>
   </div>
   ${_qrFooter(d.media?.qr)}
@@ -387,12 +394,12 @@ CV_TEMPLATES['minimaliste'] = {
   <!-- EN-TÊTE minimal -->
   <div style="display:flex;justify-content:space-between;align-items:flex-end;padding-bottom:12px;border-bottom:2px solid ${s.couleur1};">
     <div>
-      <div style="font-size:26pt;font-weight:900;color:var(--cv-nom,${s.couleur1});letter-spacing:-1px;line-height:1;">${_e([inf.prenom,inf.nom].filter(Boolean).join(' ')||'Votre Nom')}</div>
-      ${inf.titre_pro ? `<div style="font-size:11pt;color:var(--cv-nom,${s.couleur2});margin-top:4px;">${_e(inf.titre_pro)}</div>` : ''}
+      <div style="font-size:calc(26pt*var(--cv-nom-k,1));font-weight:900;color:var(--cv-nom,${s.couleur1});letter-spacing:-1px;line-height:1;font-family:var(--cv-nom-f,inherit);">${_e([inf.prenom,inf.nom].filter(Boolean).join(' ')||'Votre Nom')}</div>
+      ${inf.titre_pro ? `<div style="font-size:calc(11pt*var(--cv-nom-k,1));color:var(--cv-nom,${s.couleur2});margin-top:4px;font-family:var(--cv-nom-f,inherit);">${_e(inf.titre_pro)}</div>` : ''}
     </div>
     ${_photoSlot(d.photo, s, d._edit)}
   </div>
-  <div style="font-size:8.5pt;color:var(--cv-coord,var(--cv-txt,#666));margin:8px 0 16px;display:flex;flex-wrap:wrap;gap:0;">
+  <div style="font-size:calc(8.5pt*var(--cv-coord-k,1));color:var(--cv-coord,var(--cv-txt,#666));margin:8px 0 16px;display:flex;flex-wrap:wrap;gap:0;font-family:var(--cv-coord-f,inherit);">
     ${inf.email?_contactLine('✉',inf.email):''}${inf.telephone?_contactLine('📞',inf.telephone):''}${(inf.ville||inf.pays_residence)?_contactLine('📍',[inf.ville,inf.pays_residence].filter(Boolean).join(', ')):''}${inf.linkedin?_contactLine(_logoLien('linkedin'),inf.linkedin):''}${inf.diasporactif?_contactLine(_logoLien('da'),inf.diasporactif):''}
   </div>
   ${d.media?.audio ? _audioWidget(d.media.audio) : ''}
@@ -434,13 +441,13 @@ CV_TEMPLATES['diaspora'] = {
   <div style="background:#1a2b4a;color:#fff;padding:20px 24px;display:flex;align-items:center;gap:16px;">
     ${_photoSlot(d.photo, {...s, couleur2: ac}, d._edit, {dark:true})}
     <div style="flex:1;">
-      <div style="font-size:18pt;font-weight:800;color:var(--cv-nom,inherit);">${_e([inf.prenom,inf.nom].filter(Boolean).join(' ')||'Votre Nom')}</div>
-      ${inf.titre_pro ? `<div style="font-size:10pt;color:var(--cv-nom,${ac});margin-top:3px;">${_e(inf.titre_pro)}</div>` : ''}
-      <div style="font-size:8.5pt;opacity:.75;margin-top:8px;color:var(--cv-coord,inherit);">
+      <div style="font-size:calc(18pt*var(--cv-nom-k,1));font-weight:800;color:var(--cv-nom,inherit);font-family:var(--cv-nom-f,inherit);">${_e([inf.prenom,inf.nom].filter(Boolean).join(' ')||'Votre Nom')}</div>
+      ${inf.titre_pro ? `<div style="font-size:calc(10pt*var(--cv-nom-k,1));color:var(--cv-nom,${ac});margin-top:3px;font-family:var(--cv-nom-f,inherit);">${_e(inf.titre_pro)}</div>` : ''}
+      <div style="font-size:calc(8.5pt*var(--cv-coord-k,1));opacity:.75;margin-top:8px;color:var(--cv-coord,inherit);font-family:var(--cv-coord-f,inherit);">
         ${[inf.email,inf.telephone,[inf.ville,inf.pays_residence].filter(Boolean).join(', ')].filter(Boolean).join(' · ')}
       </div>
     </div>
-    ${inf.nationalite ? `<div style="text-align:center;background:rgba(255,255,255,.1);padding:10px;border-radius:8px;font-size:8.5pt;color:var(--cv-coord,inherit);"><div style="font-size:20px;">🌍</div>${_e(inf.nationalite)}</div>` : ''}
+    ${inf.nationalite ? `<div style="text-align:center;background:rgba(255,255,255,.1);padding:10px;border-radius:8px;font-size:calc(8.5pt*var(--cv-coord-k,1));color:var(--cv-coord,inherit);font-family:var(--cv-coord-f,inherit);"><div style="font-size:20px;">🌍</div>${_e(inf.nationalite)}</div>` : ''}
   </div>
   <div style="background:${ac};height:4px;"></div>
   ${d.media?.audio ? `<div style="padding:8px 24px 0;">${_audioWidget(d.media.audio)}</div>` : ''}
@@ -494,11 +501,11 @@ CV_TEMPLATES['corporate'] = {
     <div style="display:flex;align-items:center;gap:14px;">
       ${_photoSlot(d.photo, {...s, couleur2:'#fff'}, d._edit, {dark:true})}
       <div>
-        <div style="font-size:17pt;font-weight:700;color:var(--cv-nom,inherit);">${_e([inf.prenom,inf.nom].filter(Boolean).join(' ')||'Votre Nom')}</div>
-        ${inf.titre_pro ? `<div style="font-size:9.5pt;color:var(--cv-nom,${s.couleur2});font-weight:600;">${_e(inf.titre_pro)}</div>` : ''}
+        <div style="font-size:calc(17pt*var(--cv-nom-k,1));font-weight:700;color:var(--cv-nom,inherit);font-family:var(--cv-nom-f,inherit);">${_e([inf.prenom,inf.nom].filter(Boolean).join(' ')||'Votre Nom')}</div>
+        ${inf.titre_pro ? `<div style="font-size:calc(9.5pt*var(--cv-nom-k,1));color:var(--cv-nom,${s.couleur2});font-weight:600;font-family:var(--cv-nom-f,inherit);">${_e(inf.titre_pro)}</div>` : ''}
       </div>
     </div>
-    <div style="text-align:right;font-size:8pt;opacity:.85;line-height:1.7;color:var(--cv-coord,inherit);">
+    <div style="text-align:right;font-size:calc(8pt*var(--cv-coord-k,1));opacity:.85;line-height:1.7;color:var(--cv-coord,inherit);font-family:var(--cv-coord-f,inherit);">
       ${inf.email?`${_e(inf.email)}<br>`:''}${inf.telephone?`${_e(inf.telephone)}<br>`:''}${(inf.ville||inf.pays_residence)?_e([inf.ville,inf.pays_residence].filter(Boolean).join(', ')):''}
     </div>
   </div>
@@ -538,12 +545,12 @@ CV_TEMPLATES['creatif'] = {
   <div style="position:relative;padding:28px;display:flex;align-items:center;gap:18px;">
     ${_photoSlot({...d.photo, shape:'round'}, s, d._edit)}
     <div>
-      <div style="font-size:24pt;font-weight:900;color:var(--cv-nom,${s.couleur1});line-height:1;">${_e(inf.prenom||'Votre')}</div>
-      <div style="font-size:24pt;font-weight:900;color:var(--cv-nom,${s.couleur2});line-height:1.1;">${_e(inf.nom||'Nom')}</div>
-      ${inf.titre_pro ? `<div style="display:inline-block;margin-top:8px;background:${s.couleur1};color:var(--cv-nom,#fff);padding:4px 12px;border-radius:20px;font-size:9pt;font-weight:700;">${_e(inf.titre_pro)}</div>` : ''}
+      <div style="font-size:calc(24pt*var(--cv-nom-k,1));font-weight:900;color:var(--cv-nom,${s.couleur1});line-height:1;font-family:var(--cv-nom-f,inherit);">${_e(inf.prenom||'Votre')}</div>
+      <div style="font-size:calc(24pt*var(--cv-nom-k,1));font-weight:900;color:var(--cv-nom,${s.couleur2});line-height:1.1;font-family:var(--cv-nom-f,inherit);">${_e(inf.nom||'Nom')}</div>
+      ${inf.titre_pro ? `<div style="display:inline-block;margin-top:8px;background:${s.couleur1};color:var(--cv-nom,#fff);padding:4px 12px;border-radius:20px;font-size:calc(9pt*var(--cv-nom-k,1));font-weight:700;font-family:var(--cv-nom-f,inherit);">${_e(inf.titre_pro)}</div>` : ''}
     </div>
   </div>
-  <div style="position:relative;padding:0 28px 28px;font-size:8.5pt;color:var(--cv-coord,var(--cv-txt,#666));display:flex;flex-wrap:wrap;gap:12px;margin-bottom:6px;">
+  <div style="position:relative;padding:0 28px 28px;font-size:calc(8.5pt*var(--cv-coord-k,1));color:var(--cv-coord,var(--cv-txt,#666));display:flex;flex-wrap:wrap;gap:12px;margin-bottom:6px;font-family:var(--cv-coord-f,inherit);">
     ${inf.email?_contactLine('✉',inf.email):''}${inf.telephone?_contactLine('📞',inf.telephone):''}${(inf.ville||inf.pays_residence)?_contactLine('📍',[inf.ville,inf.pays_residence].filter(Boolean).join(', ')):''}${inf.linkedin?_contactLine(_logoLien('linkedin'),inf.linkedin):''}${inf.diasporactif?_contactLine(_logoLien('da'),inf.diasporactif):''}
   </div>
   <div style="position:relative;padding:0 28px;display:grid;grid-template-columns:1fr 1fr;gap:20px;">
@@ -576,8 +583,8 @@ CV_TEMPLATES['international'] = {
 <div style="font-family:${s.font||'Arial'};color:${_txt(s)};${_txtVar(s)}font-size:${s.fontSize||10}pt;background:#fff;min-height:297mm;display:grid;grid-template-columns:1fr 200px;">
   <div style="padding:26px 24px;">
     <div style="border-bottom:3px solid ${s.couleur1};padding-bottom:12px;margin-bottom:14px;">
-      <div style="font-size:20pt;font-weight:800;color:var(--cv-nom,${s.couleur1});">${_e([inf.prenom,inf.nom].filter(Boolean).join(' ')||'Full Name')}</div>
-      ${inf.titre_pro ? `<div style="font-size:11pt;color:var(--cv-nom,var(--cv-txt,#555));margin-top:2px;">${_e(inf.titre_pro)}</div>` : ''}
+      <div style="font-size:calc(20pt*var(--cv-nom-k,1));font-weight:800;color:var(--cv-nom,${s.couleur1});font-family:var(--cv-nom-f,inherit);">${_e([inf.prenom,inf.nom].filter(Boolean).join(' ')||'Full Name')}</div>
+      ${inf.titre_pro ? `<div style="font-size:calc(11pt*var(--cv-nom-k,1));color:var(--cv-nom,var(--cv-txt,#555));margin-top:2px;font-family:var(--cv-nom-f,inherit);">${_e(inf.titre_pro)}</div>` : ''}
     </div>
     ${_hasText(d.resume) ? `${_sectionTitle('Profile / Profil', s)}<div class="cv-rich" style="font-size:9.5pt;color:var(--cv-txt,#333);line-height:1.6;">${_rich(d.resume)}</div>` : ''}
     ${d.experiences?.length ? `${_sectionTitle('Work Experience / Expériences', s)}${d.experiences.map(_expBlock).join('')}` : ''}
@@ -589,10 +596,10 @@ CV_TEMPLATES['international'] = {
     ${_photoSlot(d.photo, {...s, couleur2:'#fff'}, d._edit, {dark:true})}
     ${_qrWidget(d.media?.qr, true)}
     ${_sectionTitle('Contact', s, true)}
-    <div style="font-size:8.5pt;line-height:1.9;color:var(--cv-coord,inherit);">
+    <div style="font-size:calc(8.5pt*var(--cv-coord-k,1));line-height:1.9;color:var(--cv-coord,inherit);font-family:var(--cv-coord-f,inherit);">
       ${inf.email?`✉ ${_e(inf.email)}<br>`:''}${inf.telephone?`📞 ${_e(inf.telephone)}<br>`:''}${(inf.ville||inf.pays_residence)?`📍 ${_e([inf.ville,inf.pays_residence].filter(Boolean).join(', '))}<br>`:''}${inf.linkedin?`${_logoLien('linkedin')} ${_e(inf.linkedin)}${inf.diasporactif?'<br>':''}`:''}${inf.diasporactif?`${_logoLien('da')} ${_e(inf.diasporactif)}`:''}
     </div>
-    ${inf.nationalite ? `${_sectionTitle('Nationality / Nationalité', s, true)}<div style="font-size:9pt;color:var(--cv-coord,inherit);">${_e(inf.nationalite)}</div>` : ''}
+    ${inf.nationalite ? `${_sectionTitle('Nationality / Nationalité', s, true)}<div style="font-size:calc(9pt*var(--cv-coord-k,1));color:var(--cv-coord,inherit);font-family:var(--cv-coord-f,inherit);">${_e(inf.nationalite)}</div>` : ''}
     ${d.langues?.length ? `${_sectionTitle('Languages / Langues', s, true)}${d.langues.map(l=>`<div style="display:flex;justify-content:space-between;font-size:8.5pt;margin-bottom:4px;"><span>${_e(l.langue)}</span><span style="opacity:.7;">${_e(l.niveau)}</span></div>`).join('')}` : ''}
     ${[...(d.competences?.tech||[]),...(d.competences?.metier||[]),...(d.competences?.num||[])].length ? `${_sectionTitle('Skills / Compétences', s, true)}${[...(d.competences?.tech||[]),...(d.competences?.metier||[]),...(d.competences?.num||[])].map(c=>`<div style="font-size:8pt;margin-bottom:3px;">• ${_e(c)}</div>`).join('')}` : ''}
     ${d.certifications?.length ? `${_sectionTitle('Certifications', s, true)}${d.certifications.map(c=>`<div style="font-size:8pt;margin-bottom:4px;">${_e(c.nom)}</div>`).join('')}` : ''}

@@ -290,8 +290,14 @@ const CV_COULEURS_INFOS = [
   { cle: 'couleur_nom', id: 'color-nom' },
   { cle: 'couleur_coord', id: 'color-coord' }
 ];
+/* Police et taille du nom/titre et des coordonnées (2026-10-24) : style.police_nom / taille_nom / police_coord / taille_coord. Absents = ceux du modèle. */
+const CV_POLICES_INFOS = [
+  { cle: 'police_nom', id: 'police-nom', nombre: false }, { cle: 'taille_nom', id: 'taille-nom', nombre: true },
+  { cle: 'police_coord', id: 'police-coord', nombre: false }, { cle: 'taille_coord', id: 'taille-coord', nombre: true }
+];
 function renderCouleursInfos() {
   const s = CVB.data.style;
+  CV_POLICES_INFOS.forEach(({ cle, id }) => { const el = document.getElementById(id); if (el) el.value = s[cle] != null ? String(s[cle]) : ''; });
   CV_COULEURS_INFOS.forEach(({ cle, id }) => {
     const choisie = /^#[0-9a-f]{6}$/i.test(s[cle] || '');
     const inp = document.getElementById(id); if (inp) inp.value = choisie ? s[cle] : '#222222';
@@ -378,6 +384,13 @@ function setupDesignListeners() {
     delete CVB.data.style.couleur_texte;
     const ct = document.getElementById('color-texte'); if (ct) ct.value = '#222222';
     render(); CVB.dirty = true;
+  });
+  CV_POLICES_INFOS.forEach(({ cle, id, nombre }) => {
+    document.getElementById(id)?.addEventListener('change', e => {
+      const v = e.target.value;
+      if (!v) delete CVB.data.style[cle]; else CVB.data.style[cle] = nombre ? parseFloat(v) : v;
+      render(); CVB.dirty = true;
+    });
   });
   CV_COULEURS_INFOS.forEach(({ cle, id }) => {
     document.getElementById(id)?.addEventListener('input', e => {
