@@ -2272,7 +2272,8 @@ const DA_NAT_PAYS = {
   "belge":"Belgique","suisse":"Suisse","canadienne":"Canada","portugaise":"Portugal",
   "espagnole":"Espagne","italienne":"Italie","allemande":"Allemagne","britannique":"Royaume-Uni",
 };
-const _daNorm = s => String(s || '').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+/* Apostrophes typographiques (’ saisie au téléphone) et tirets (« CÔTE-D'IVOIRE ») ramenés à la forme de la table, sinon « Côte d’Ivoire » n'avait pas de drapeau. */
+const _daNorm = s => String(s || '').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[’‘ʼ`´]/g, "'").replace(/[-‐‑–_]+/g, ' ').replace(/\s+/g, ' ');
 
 /* Emoji drapeau construit depuis le code ISO — pas d'image, donc pas de requête réseau
    ni de dépendance à un service extérieur. */
@@ -2295,7 +2296,7 @@ function daDrapeauImg(pays) {
   if (!iso || !/^[a-z]{2}$/i.test(iso)) return '';
   iso = iso.toLowerCase();
   const nom = brut.replace(/[<>"&]/g, '');
-  return '<img class="da-flag" src="https://flagcdn.com/24x18/' + iso + '.png" srcset="https://flagcdn.com/48x36/' + iso + '.png 2x" width="20" height="15" alt="' + nom + '" title="' + nom + '" loading="lazy" style="width:20px;height:15px;object-fit:cover;border-radius:2px;border:1px solid rgba(120,130,150,.55);vertical-align:-2px;margin-right:5px;flex:none">';
+  return '<img class="da-flag" src="https://flagcdn.com/24x18/' + iso + '.png" srcset="https://flagcdn.com/48x36/' + iso + '.png 2x" width="20" height="15" alt="' + nom + '" title="' + nom + '" loading="lazy" style="width:20px;height:15px;object-fit:cover;border-radius:2px;border:1px solid rgba(120,130,150,.55);display:inline-block;vertical-align:-2px;margin-right:5px;flex:none">';
 }
 /* Plusieurs pays séparés par « · », « • », « , » ou « / » : un drapeau chacun. */
 function daDrapeauListe(txt) {
