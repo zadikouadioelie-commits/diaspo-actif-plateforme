@@ -55,11 +55,11 @@
     const rendre = () => {
       const p = posts[idx % posts.length]; idx++;
       let media = null;
-      try { media = (JSON.parse(p.medias || '[]')[0] || {}).url || null; } catch (e) {}
+      try { const m0 = JSON.parse(p.medias || '[]')[0] || {}; media = (m0.type === 'video' || /\.(mp4|webm|mov|m3u8)(\?|$)/i.test(m0.url || '')) ? (m0.poster || null) : (m0.url || null); } catch (e) {}
       const texte = strip(p.contenu || p.corps || '').slice(0, 110);
       const photo = (p.auteur_profil && p.auteur_profil.photo_url) || '/assets/logo.png';
       el.innerHTML = `<a class="card pub-card" href="fil-actualite.html?post=${Number(p.id)}" style="display:block;text-decoration:none;color:inherit">
-        ${media ? `<img src="${attrUrl(media)}" loading="lazy" style="width:100%;max-height:220px;object-fit:cover;display:block">` : ''}
+        ${media ? `<img src="${attrUrl(media)}" loading="lazy" onerror="this.remove()" style="width:100%;max-height:220px;object-fit:cover;display:block">` : ''}
         <div class="pad">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
             <img src="${attrUrl(photo)}" style="width:22px;height:22px;border-radius:50%;object-fit:cover;flex-shrink:0;">
@@ -70,7 +70,7 @@
       </a>`;
     };
     rendre();
-    setInterval(rendre, 7000);
+    setInterval(rendre, 60000); // une publication par minute (demande explicite 2026-10-24 : 7 s était trop rapide)
   }
   async function pubRemplir(el) {
     el.dataset.ok = '1';

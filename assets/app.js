@@ -5427,11 +5427,11 @@ async function afficherPublicationsRelais(el){
   const rendre = () => {
     const p = posts[idx % posts.length]; idx++;
     let media = null;
-    try { media = (JSON.parse(p.medias || '[]')[0] || {}).url || null; } catch (e) {}
+    try { const m0 = JSON.parse(p.medias || '[]')[0] || {}; media = (m0.type === 'video' || /\.(mp4|webm|mov|m3u8)(\?|$)/i.test(m0.url || '')) ? (m0.poster || null) : (m0.url || null); } catch (e) {}
     const texte = _daPubRelaisTexte(p.contenu || p.corps, 110);
     const photo = (p.auteur_profil && p.auteur_profil.photo_url) || '/assets/logo.png';
     el.innerHTML = `<a href="fil-actualite.html?post=${p.id}" style="display:block;text-decoration:none;color:inherit;background:var(--surface,#0F2A50);border:1px solid var(--border,rgba(255,255,255,.1));border-radius:12px;overflow:hidden;">
-      ${media ? `<img src="${media}" style="width:100%;height:110px;object-fit:cover;display:block;">` : ""}
+      ${media ? `<img src="${media}" onerror="this.remove()" style="width:100%;height:110px;object-fit:cover;display:block;">` : ""}
       <div style="padding:12px;">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
           <img src="${photo}" style="width:22px;height:22px;border-radius:50%;object-fit:cover;flex-shrink:0;">
@@ -5443,7 +5443,7 @@ async function afficherPublicationsRelais(el){
     el.style.display = "";
   };
   rendre();
-  setInterval(rendre, 7000);
+  setInterval(rendre, 60000); // une publication par minute (demande explicite 2026-10-24 : 7 s était trop rapide)
 }
 async function renderAdSlot(containerId, emplacement, opts = {}){
   const el = document.getElementById(containerId);
