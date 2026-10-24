@@ -541,11 +541,19 @@
     /* Bouton « Reels » (2026-10-13, demande explicite) : une petite caméra stylisée, qui apparaît toute seule dès qu'il existe au moins une vidéo
        publique ; il ouvre l'univers des petites vidéos de la plateforme (visionneur plein écran, mode Reels). */
     const reelsBtn = `<button type="button" class="chip reels" id="reels-open" aria-label="Reels, les petites vidéos">${(window.MediaViewer && MediaViewer.iconeReels) ? MediaViewer.iconeReels() : ''}<span>Reels</span></button>`;
-    el.innerHTML = `<div class="chips" role="tablist">${reelsBtn}${FIL_MODES.map(([k, l]) => `<button class="chip ${S.fil.mode === k ? 'on' : ''}" data-mode="${k}" role="tab" aria-selected="${S.fil.mode === k}">${l}</button>`).join('')}</div>${pubSlot('between_posts')}<div id="fil-list"></div><div id="fil-more"></div>`;
+    /* Bouton « Créer » (2026-10-21, demande explicite : « donne la possibilité de créer des
+       actualités depuis le téléphone et des reels également ») — la création de Reels existait
+       déjà (visionneur Reels → ＋ Créer) mais seulement depuis l'intérieur du visionneur ; ce
+       point d'entrée unique sur l'onglet Fil propose maintenant les deux, pour que ce soit
+       découvrable sans avoir à d'abord ouvrir les Reels. Voir ouvrirChoixCreation() plus bas. */
+    const creerBtn = `<button type="button" class="chip creer" id="fil-creer" aria-label="Créer une publication ou un Reel">✍️<span>Créer</span></button>`;
+    el.innerHTML = `<div class="chips" role="tablist">${creerBtn}${reelsBtn}${FIL_MODES.map(([k, l]) => `<button class="chip ${S.fil.mode === k ? 'on' : ''}" data-mode="${k}" role="tab" aria-selected="${S.fil.mode === k}">${l}</button>`).join('')}</div>${pubSlot('between_posts')}<div id="fil-list"></div><div id="fil-more"></div>`;
     const rb = $('#reels-open', el);
     if (rb) {
       rb.onclick = () => { if (window.MediaViewer && MediaViewer.openReels) MediaViewer.openReels(MV_OPTS); };
     }
+    const cb = $('#fil-creer', el);
+    if (cb) cb.onclick = () => ouvrirChoixCreation();
     $$('.chip[data-mode]', el).forEach(c => c.onclick = async () => {
       if (c.dataset.mode === 'suivis' && !(await needLogin('Connectez-vous pour voir les publications de vos abonnements.'))) return;
       S.fil = { mode: c.dataset.mode, page: 1, pages: 1, posts: [], loaded: false }; viewFil();
@@ -692,6 +700,66 @@
       send.disabled = true;
       try { await api(`/api/fil/${id}/commentaires`, { method: 'POST', body: { contenu: txt } }); ta.value = ''; ta.style.height = 'auto'; await load(txt); const l = $('#cmlist'); l.scrollTop = l.scrollHeight; }
       catch (e) { toast(e.message, true); send.disabled = false; }
+    };
+  }
+
+  /* ============================================================
+     CRÉER (publication / Reel) — 2026-10-21, demande explicite : « donne la possibilité de
+     créer des actualités depuis le téléphone et des reels également ». Publication : nouveau
+     compose (texte + photo facultative), mêmes champs/route que le site (POST /api/fil, voir
+     assets/posts.js submitPost() sur ordinateur). Reel : réutilise tel quel le module déjà
+     construit assets/reels-creer.js (window.ReelsCreer.ouvrir), chargé à la demande — même
+     mécanique que assets/media-viewer.js:creer(), pas de duplication.
+     ============================================================ */
+  async function ouvrirChoixCreation() {
+    if (!(await needLogin('Connectez-vous pour publier sur Diaspo’Actif.'))) return;
+    const close = openSheet(`<h2 style="margin:2px 0 10px;font-size:19px">Créer</h2>
+      <div class="cr-choix">
+        <button type="button" class="btn out block" id="creer-pub" style="text-align:left;flex-direction:column;align-items:flex-start;gap:2px;padding:14px 16px">📝 Publication<small style="margin:0">Texte, avec une photo si vous voulez</small></button>
+        <button type="button" class="btn out block" id="creer-reel" style="text-align:left;flex-direction:column;align-items:flex-start;gap:2px;padding:14px 16px">🎬 Reel<small style="margin:0">Petite vidéo verticale</small></button>
+      </div>`);
+    $('#creer-pub').onclick = () => { close(); ouvrirComposerPublication(); };
+    $('#creer-reel').onclick = () => { close(); ouvrirCreerReel(); };
+  }
+  function ouvrirCreerReel() {
+    const lancer = () => window.ReelsCreer.ouvrir({ onPublie: () => refreshTab('accueil') });
+    if (window.ReelsCreer) { lancer(); return; }
+    const sc = document.createElement('script'); sc.src = '/assets/reels-creer.js?v=20261014a'; sc.onload = lancer;
+    sc.onerror = () => toast('Impossible d’ouvrir la création pour le moment.', true);
+    document.head.appendChild(sc);
+  }
+  function ouvrirComposerPublication() {
+    let photoFile = null;
+    const close = openSheet(`<h2 style="margin:2px 0 10px;font-size:19px">Nouvelle publication</h2>
+      <textarea id="comp-texte" rows="5" maxlength="3000" placeholder="Qu’avez-vous envie de partager ?" style="width:100%;border:1px solid var(--border);border-radius:12px;padding:10px 12px;font-size:16px;background:var(--card);resize:vertical"></textarea>
+      <div id="comp-apercu"></div>
+      <label class="btn out block" style="margin-top:10px;justify-content:center;cursor:pointer">📷 Ajouter une photo<input type="file" id="comp-photo" accept="image/jpeg,image/png,image/webp,image/gif" style="display:none"></label>
+      <button type="button" class="btn block" id="comp-go" style="margin-top:12px">Publier</button>`);
+    const photoInput = $('#comp-photo'), apercu = $('#comp-apercu');
+    photoInput.onchange = () => {
+      const f = photoInput.files[0]; if (!f) return;
+      if (f.size > 10 * 1024 * 1024) { toast('Photo trop lourde (max 10 Mo).', true); photoInput.value = ''; return; }
+      photoFile = f;
+      const reader = new FileReader();
+      reader.onload = () => { apercu.innerHTML = `<img src="${reader.result}" style="width:100%;border-radius:10px;max-height:260px;object-fit:cover;display:block;margin-top:10px">`; };
+      reader.readAsDataURL(f);
+    };
+    $('#comp-go').onclick = async () => {
+      const texte = $('#comp-texte').value.trim();
+      if (!texte && !photoFile) { toast('Écrivez quelque chose ou ajoutez une photo.', true); return; }
+      const go = $('#comp-go'); go.disabled = true; go.textContent = 'Publication…';
+      try {
+        let mediaUrl = null;
+        if (photoFile) {
+          if (typeof uploadMedia !== 'function') throw new Error('Envoi de photo indisponible pour le moment.');
+          mediaUrl = await uploadMedia(photoFile, 'post');
+        }
+        await api('/api/fil', { method: 'POST', body: {
+          contenu: texte, pub_type: mediaUrl ? 'photo' : 'texte', media_url: mediaUrl,
+          medias: mediaUrl ? [{ type: 'image', url: mediaUrl }] : [], visibilite: 'public',
+        } });
+        close(); toast('Publié ✓'); refreshTab('accueil');
+      } catch (e) { toast(e.message, true); go.disabled = false; go.textContent = 'Publier'; }
     };
   }
 
