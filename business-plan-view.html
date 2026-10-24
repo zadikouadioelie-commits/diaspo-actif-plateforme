@@ -183,6 +183,19 @@
   .bpv-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
   .bpv-actions .btn{padding:9px 16px;font-size:13px;border-radius:12px;}
 
+  /* Réduire les informations du haut (2026-10-24, signalé : « l'espace de lecture est trop
+     restreint ») : masque fil d'Ariane, slogan, repères et le bandeau « exemple de référence »
+     pour rendre à la zone de lecture (et au sommaire, même rangée de grille) la hauteur qu'ils
+     prenaient — garde seulement le titre et les actions, toujours utiles en un coup d'œil.
+     Préférence mémorisée par appareil (localStorage), pas une donnée à synchroniser. */
+  .bpv-shell.bpv-head-reduit .bpv-crumb,
+  .bpv-shell.bpv-head-reduit .bpv-slogan,
+  .bpv-shell.bpv-head-reduit .bpv-meta,
+  .bpv-shell.bpv-head-reduit .bpv-exemple{display:none!important;}
+  .bpv-shell.bpv-head-reduit .bpv-titlerow h1{font-size:18px;}
+  .bpv-shell.bpv-head-reduit .bpv-actionbar{margin-bottom:0;}
+  #bpv-collapse-toggle{white-space:nowrap;}
+
   .bpv-toc{background:#fff;border:1px solid #E3E9F2;border-radius:18px;padding:18px 10px 14px;box-shadow:0 2px 12px rgba(13,43,78,.05);}
   .bpv-toc-title{padding:0 14px 10px;letter-spacing:.08em;}
   .bpv-toc a{gap:12px;padding:8px 12px;margin:2px 0;border-radius:12px;border-left:0;font-size:13px;}
@@ -371,6 +384,7 @@
         <button class="btn btn-outline btn-sm" onclick="window.print()" title="Impression rapide de cette page telle quelle, sans mise en page dédiée.">🖨️ Imprimer</button>
         <button class="btn btn-outline btn-sm" id="bpv-btn-pdf" onclick="bpvExportPDF()" title="Export PDF rapide de cette page de consultation, sans mise en page dédiée.">📥 Télécharger en PDF</button>
         <a class="btn btn-orange btn-sm" id="bpv-btn-edit" href="#" style="display:none;">✏️ Modifier</a>
+        <button type="button" class="btn btn-outline btn-sm" id="bpv-collapse-toggle" title="Réduire les informations du haut pour agrandir la zone de lecture">▾ Réduire</button>
       </div>
     </div>
 
@@ -1090,6 +1104,27 @@ function showError(msg){
   el.style.display = '';
   el.innerHTML = `<div style="font-size:40px;margin-bottom:10px;">🚫</div><p>${esc(msg)}</p><a href="business-plan.html" class="btn btn-outline" style="margin-top:12px;display:inline-block;">← Retour à mes Business Plans</a>`;
 }
+
+/* Réduire les informations du haut (2026-10-24, signalé : espace de lecture trop restreint) :
+   masque fil d'Ariane/slogan/repères/bandeau « exemple » pour agrandir la zone de lecture.
+   Préférence mémorisée par appareil — pure commodité d'affichage, jamais lue par le serveur. */
+function bpvAppliquerReduction(reduit){
+  const shell = document.getElementById('bpv-shell');
+  const btn = document.getElementById('bpv-collapse-toggle');
+  if (shell) shell.classList.toggle('bpv-head-reduit', reduit);
+  if (btn) btn.textContent = reduit ? '▸ Agrandir' : '▾ Réduire';
+}
+(function bpvInitReduction(){
+  let reduit = false;
+  try { reduit = localStorage.getItem('bpv-head-reduit') === '1'; } catch (_) { /* navigation privée */ }
+  bpvAppliquerReduction(reduit);
+  const btn = document.getElementById('bpv-collapse-toggle');
+  if (btn) btn.onclick = () => {
+    const nouveau = !document.getElementById('bpv-shell').classList.contains('bpv-head-reduit');
+    bpvAppliquerReduction(nouveau);
+    try { localStorage.setItem('bpv-head-reduit', nouveau ? '1' : '0'); } catch (_) { /* navigation privée */ }
+  };
+})();
 
 init();
 </script>
