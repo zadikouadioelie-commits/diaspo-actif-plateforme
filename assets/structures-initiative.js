@@ -71,6 +71,8 @@
     transport_logistique: ['Transport de personnes', 'Livraison', 'Transport de marchandises', 'Déménagement', 'Entreposage', 'Transit', 'Import-export', 'Logistique internationale'],
     commerce_distribution: ['Vente en gros', 'Vente au détail', 'Boutiques', 'Supermarchés', 'Commerce en ligne', 'Grossistes', 'Importateurs', 'Distributeurs'],
     conseil_services: ['Conseil', 'Comptabilité', 'Juridique', 'Recrutement', 'Marketing', 'Communication', 'Formation professionnelle', 'Études', 'Audit', 'Gestion administrative'],
+    restauration: ['Restaurants', 'Traiteurs', 'Cafés', 'Restauration rapide', 'Boulangerie-pâtisserie'],
+    agroalimentaire: ['Transformation alimentaire', 'Conserverie', 'Boissons et jus', 'Produits laitiers', 'Épicerie fine', 'Emballage alimentaire'],
     restauration_agroalimentaire: ['Restaurants', 'Traiteurs', 'Cafés'],
     hotellerie_hebergement: ['Hôtels', 'Hébergement touristique', "Gîtes et chambres d'hôtes"],
     tourisme_voyage: ['Agences de voyages', 'Guides touristiques', 'Loisirs'],

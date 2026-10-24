@@ -11,6 +11,7 @@
    ══════════════════════════════════════════════════════════════════════ */
 window.DOMAINES_ACTIVITE = [
   ['agriculture',                '🌾', 'Agriculture'],
+  ['agroalimentaire',            '🥫', 'Agroalimentaire'],
   ['artisanat',                  '🧵', 'Artisanat'],
   ['associations_vie_citoyenne', '🏛️', 'Associations & Vie citoyenne'],
   ['assurance_prevoyance',       '🛡️', 'Assurance & Prévoyance'],
@@ -40,7 +41,7 @@ window.DOMAINES_ACTIVITE = [
   ['mode_beaute',                '👗', 'Mode & Beauté'],
   ['numerique_technologie',      '💻', 'Numérique & Technologie'],
   ['recherche_innovation',       '🔬', 'Recherche & Innovation'],
-  ['restauration_agroalimentaire','🍽️', 'Restauration & Agroalimentaire'],
+  ['restauration',               '🍽️', 'Restauration'],
   ['sante',                      '🩺', 'Santé'],
   ['sante_mentale',              '🧠', 'Santé mentale'],
   ['securite_gardiennage',       '🔐', 'Sécurité & Gardiennage'],
@@ -54,8 +55,15 @@ window.DOMAINES_ACTIVITE = [
   ['autre',                      '🏢', 'Autre'],
 ];
 
+/* Ancienne catégorie « Restauration & Agroalimentaire » (2026-10-20, demande explicite : « sépare restauration et agroalimentaire, en deux catégories »).
+   Des comptes réels stockent encore sa clé (jamais renommée) : elle n'est plus proposée à la sélection mais reste lue et affichée telle quelle.
+   Seule une personne qui l'a déjà la voit dans sa liste, jusqu'à ce qu'elle choisisse l'une des deux nouvelles catégories. */
+window.DOMAINES_ACTIVITE_ANCIENS = [
+  ['restauration_agroalimentaire','🍽️', 'Restauration & Agroalimentaire'],
+];
+
 function domaineActiviteInfo(cle) {
-  const d = window.DOMAINES_ACTIVITE.find(x => x[0] === cle);
+  const d = window.DOMAINES_ACTIVITE.find(x => x[0] === cle) || (window.DOMAINES_ACTIVITE_ANCIENS || []).find(x => x[0] === cle);
   return d ? { cle: d[0], icone: d[1], label: d[2] } : null;
 }
 function domaineActiviteLabel(cle) {
@@ -89,6 +97,8 @@ function domaineActiviteOptionsHTML(selectedCle) {
       `<option value="${cle}"${cle === selectedCle ? ' selected' : ''}>${icone} ${label}</option>`
     ).join('')
   }</optgroup>`).join('');
+  const ancien = (window.DOMAINES_ACTIVITE_ANCIENS || []).find(d => d[0] === selectedCle);
+  if (ancien) html += `<option value="${ancien[0]}" selected>${ancien[1]} ${ancien[2]} (à remplacer)</option>`;
   const autre = window.DOMAINES_ACTIVITE.find(d => d[0] === 'autre');
   if (autre) html += `<option value="autre"${selectedCle === 'autre' ? ' selected' : ''}>${autre[1]} ${autre[2]}</option>`;
   return html;

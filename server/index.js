@@ -31617,6 +31617,7 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
     {
       const DOMAINES_SEED = [
         ['agriculture', '🌾', 'Agriculture'],
+        ['agroalimentaire', '🥫', 'Agroalimentaire'],
         ['associations_vie_citoyenne', '🏛️', 'Associations & Vie citoyenne'],
         ['automobile_mobilite', '🚗', 'Automobile & Mobilité'],
         ['banque_microfinance', '🏦', 'Banque & Microfinance'],
@@ -31640,7 +31641,7 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
         ['mode_beaute', '👗', 'Mode & Beauté'],
         ['numerique_technologie', '💻', 'Numérique & Technologie'],
         ['recherche_innovation', '🔬', 'Recherche & Innovation'],
-        ['restauration_agroalimentaire', '🍽️', 'Restauration & Agroalimentaire'],
+        ['restauration', '🍽️', 'Restauration'],
         ['sante', '🩺', 'Santé'],
         ['sante_mentale', '🧠', 'Santé mentale'],
         ['social_famille', '👶', 'Social & Famille'],
@@ -31654,6 +31655,9 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
         try { await db.prepare("INSERT OR IGNORE INTO parrainage_domaines (cle, nom, icone, ordre) VALUES (?,?,?,?)").run(cle, nom, icone, i); }
         catch (e) { console.error('[migrateParrainageInvitations] seed domaine', cle, e.message); }
       }
+      /* « Restauration & Agroalimentaire » est scindée en deux catégories (2026-10-20) : l'ancienne ligne reste en base (des invitations la référencent) mais n'est plus proposée. */
+      try { await db.prepare("UPDATE parrainage_domaines SET actif=0 WHERE cle='restauration_agroalimentaire'").run(); }
+      catch (e) { console.error('[migrateParrainageInvitations] retrait ancien domaine', e.message); }
       // Preuve de concept de la hiérarchie domaine → sous-domaines (cahier des charges, exemple
       // « Santé ») — les autres domaines restent sans sous-domaine prédéfini tant qu'un futur
       // panneau d'administration (Phase 3) ne les complète pas ; le formulaire retombe alors sur
