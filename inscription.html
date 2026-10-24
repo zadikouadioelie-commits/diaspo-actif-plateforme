@@ -34,6 +34,9 @@
 .insc-side-col{position:sticky;top:78px;max-height:calc(100vh - 96px);overflow-y:auto;display:flex;flex-direction:column;gap:16px;padding-top:32px;}
 .insc-events-widget{border:1px solid var(--border);border-radius:12px;padding:14px;background:var(--surface,#fff);}
 .insc-events-widget h4{margin:0 0 10px;font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);}
+.insc-talents h4{margin:0 0 10px;font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);}
+.insc-talents-grid{display:grid;grid-template-columns:1fr;gap:12px;}
+.insc-talents-grid>*{min-width:0;}
 .evt-card{border:1px solid var(--border);border-radius:10px;overflow:hidden;background:#fff;}
 .evt-img{width:100%;height:90px;object-fit:cover;background:linear-gradient(135deg,#0D2B4E,#1B3A6B);display:flex;align-items:center;justify-content:center;font-size:26px;}
 .evt-body{padding:8px 10px;}
@@ -187,6 +190,7 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
   <link rel="stylesheet" href="/assets/design-upgrade.v2.css">
   <link rel="stylesheet" href="/assets/theme-manager.css">
   <link rel="stylesheet" href="/assets/guided-tour.css">
+  <link rel="stylesheet" href="/assets/annuaire-cards.css">
 </head>
 <body>
 <div class="page">
@@ -211,9 +215,9 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
   </div>
 </header>
 <div class="insc-page-grid">
-  <aside class="insc-side-col">
-    <div id="ad-insc-gauche" data-ad-emplacement="inscription_sidebar_gauche" style="display:none;"></div>
-  </aside>
+  <!-- Colonne de gauche laissée vide (2026-10-24, demande explicite : « mets 2 cartouches à droite pour les publicités ») : les deux cartouches sont dans la colonne de droite.
+       Pour revenir en arrière : remettre <div id="ad-insc-gauche" data-ad-emplacement="inscription_sidebar_gauche" style="display:none;"></div> ici et retirer data-ad-count/data-ad-rotate à droite. -->
+  <aside class="insc-side-col"></aside>
 <main class="insc-wrap">
   <div style="text-align:center;margin-bottom:28px">
     <h2 style="margin:0 0 6px">Creer un compte Diaspo'Actif</h2>
@@ -1000,7 +1004,12 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
   </div>
 </main>
   <aside class="insc-side-col">
-    <div id="ad-insc-droite" data-ad-emplacement="inscription_sidebar_droite" style="display:none;"></div>
+    <div id="ad-insc-droite" data-ad-emplacement="inscription_sidebar_droite" data-ad-count="2" data-ad-rotate="60000" style="display:none;"></div>
+    <!-- 4 vrais comptes (2 initiatives + 2 utilisateurs, avec photo, mêmes règles et mêmes cartouches que « Des profils qui inspirent » de l'accueil : GET /api/talents-diaspora) -->
+    <div class="insc-talents" id="insc-talents" style="display:none;">
+      <h4>👥 Des comptes à découvrir</h4>
+      <div class="insc-talents-grid" id="insc-talents-grid"></div>
+    </div>
     <div class="insc-events-widget" id="insc-events-widget" style="display:none;">
       <h4>📅 Prochains événements</h4>
       <div id="insc-events-list"></div>
@@ -1082,6 +1091,23 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/geo.js"></script>
 <script src="assets/app.js?v=13"></script>
+<script>
+/* Colonne de droite : 4 comptes réels à découvrir (2 initiatives + 2 utilisateurs avec photo), tirés par le serveur comme sur l'accueil (/api/talents-diaspora,
+   rotation stable 2 h) et présentés avec les vraies cartouches de l'annuaire. Sans réponse ou sans compte : le bloc reste caché. */
+(async function () {
+  const bloc = document.getElementById('insc-talents'), grille = document.getElementById('insc-talents-grid');
+  if (!bloc || !grille) return;
+  try {
+    const r = await fetch('/api/talents-diaspora'); if (!r.ok) return;
+    const { talents } = await r.json();
+    if (!talents || !talents.length) return;
+    grille.innerHTML = talents.slice(0, 4).map(t => t.type === 'initiative' ? renderInitiativeCard(t.data) : window.annRenderPersonCard(t.data)).join('');
+    if (typeof initBoutonsRelation === 'function') initBoutonsRelation(grille);
+    if (window.Soutenir && window.Soutenir.hydrate) window.Soutenir.hydrate(grille);
+    bloc.style.display = '';
+  } catch (e) { /* bloc masqué */ }
+})();
+</script>
 <script src="/assets/rich-editor.js"></script>
 <script src="/assets/upload-media.js"></script>
 <script>
