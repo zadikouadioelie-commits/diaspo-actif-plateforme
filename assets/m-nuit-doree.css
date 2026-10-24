@@ -1,0 +1,292 @@
+/* ============================================================
+   DIASPO'ACTIF — Version téléphone (m.html) en « Nuit dorée » (2026-10-24, demande explicite : « habille le téléphone avec la nouvelle DA »)
+   Feuille de surcharge chargée APRÈS assets/m.css : elle redéfinit les jetons de couleur puis corrige les endroits où le marine servait de FOND.
+   Tout est préfixé html body.nd. Retour arrière : retirer la ligne <link> de m.html et class="nd" du <body>.
+   Les couleurs claires posées en ligne par les modules sont converties par assets/m-nuit-doree.js (attributs data-nd-*).
+   ============================================================ */
+:root{
+  --nd-nuit:#060A14; --nd-nuit2:#0B1226;
+  --nd-texte:#E8ECF6; --nd-doux:#A9B4CC; --nd-faible:#7C88A4;
+  --nd-or:#E3C06E; --nd-or2:#B9893A; --nd-bleu:#3F7BFF; --nd-bleu2:#7FA6E0;
+  --nd-verre:rgba(255,255,255,.045); --nd-verre2:rgba(255,255,255,.08);
+  --nd-bord:rgba(227,192,110,.24); --nd-bord2:rgba(255,255,255,.09);
+  --nd-degore:linear-gradient(135deg,#F3DC9B 0%,#E3C06E 38%,#B9893A 100%);
+  --nd-display:"Bodoni Moda","Didot",Georgia,serif;
+  --nd-sans:"Manrope","Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;
+}
+
+/* ---------- jetons : tout ce qui est écrit var(--…) bascule d'un coup ---------- */
+html body.nd{
+  --navy:#E8ECF6;            /* le marine servait surtout d'ENCRE : il devient l'encre claire (les fonds marine sont repris plus bas) */
+  --navy2:#7FA6E0;
+  --sky:#7FA6E0; --sky-l:rgba(127,166,224,.14);
+  --orange:#E3C06E; --orange-d:#E3C06E; --orange-l:rgba(227,192,110,.13);
+  --bg:#060A14; --card:rgba(255,255,255,.055); --ivory:rgba(255,255,255,.055);
+  --text:#E8ECF6; --muted:#A9B4CC; --border:rgba(255,255,255,.1);
+  --green:#8FE0B0; --green-l:rgba(143,224,176,.13);
+  --red:#FFA79D; --red-l:rgba(255,154,143,.13);
+  --shadow:0 18px 36px -24px #000;
+  background:var(--nd-nuit);color:var(--nd-texte);font-family:var(--nd-sans);-webkit-font-smoothing:antialiased;
+}
+html body.nd,html body.nd #app{background:var(--nd-nuit)}
+html body.nd #app{box-shadow:0 0 0 1px rgba(227,192,110,.08)}
+@media (min-width:600px){html body.nd{background:#03060d}html body.nd #app{box-shadow:0 0 60px rgba(0,0,0,.6),0 0 0 1px rgba(227,192,110,.12)}}
+html body.nd :focus-visible{outline:3px solid var(--nd-or)}
+
+/* fond lumineux fixe (même halo que le site) */
+body.nd::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:
+   radial-gradient(420px 420px at -6% 12%,rgba(40,80,190,.40),transparent 70%),
+   radial-gradient(380px 380px at 106% 42%,rgba(150,105,25,.28),transparent 70%),
+   radial-gradient(360px 360px at 40% 108%,rgba(30,70,170,.32),transparent 70%),
+   radial-gradient(ellipse at 50% -10%,#14234a 0%,var(--nd-nuit) 62%)}
+html body.nd #app{position:relative;z-index:0;background:transparent}
+
+/* titres en Bodoni */
+html body.nd .sec-t,html body.nd .phead h2,html body.nd .ev .tt,html body.nd .pub-t,html body.nd .crn-t,html body.nd .me .nm{font-family:var(--nd-display);font-weight:500;letter-spacing:-.005em}
+html body.nd .sec-t{font-size:21px}
+html body.nd .ev .tt{font-size:19px}
+
+/* ---------- barre du haut ---------- */
+html body.nd #top{background:rgba(8,13,30,.78);backdrop-filter:blur(16px) saturate(140%);-webkit-backdrop-filter:blur(16px) saturate(140%);border-bottom:1px solid var(--nd-bord);box-shadow:0 14px 30px -22px #000;color:#fff}
+html body.nd #top h1{font-family:var(--nd-display);font-weight:600}
+html body.nd .ibtn{color:var(--nd-texte)}
+html body.nd .ibtn:active{background:var(--nd-verre2)}
+html body.nd .dot{background:var(--nd-degore);color:#1a1202;border-color:var(--nd-nuit)}
+html body.nd .pill-cta{background:var(--nd-degore);color:#1a1202;box-shadow:0 8px 20px -10px rgba(227,192,110,.7)}
+html body.nd .pill-cta.ghost{background:transparent;color:var(--nd-or);border:1.5px solid var(--nd-bord);box-shadow:none}
+html body.nd .menu-btn{background:var(--nd-degore);border-color:rgba(255,255,255,.18);color:#1a1202}
+html body.nd #top .reels-top{color:var(--nd-or)}
+
+/* ---------- filtres, recherche ---------- */
+html body.nd .chip{background:var(--nd-verre);border-color:var(--nd-bord2);color:var(--nd-doux)}
+html body.nd .chip.on{background:var(--nd-degore);border-color:transparent;color:#1a1202}
+html body.nd .chip.reels{background:linear-gradient(135deg,#14234a,#0B1226);border-color:rgba(227,192,110,.55);color:var(--nd-or)}
+html body.nd .search{background:var(--nd-verre);border-color:var(--nd-bord2);color:var(--nd-doux)}
+html body.nd .search input,html body.nd .fi,html body.nd .composer textarea{color:var(--nd-texte);caret-color:var(--nd-or)}
+html body.nd input::placeholder,html body.nd textarea::placeholder{color:var(--nd-faible)}
+html body.nd .fi{background:var(--nd-verre);border-color:var(--nd-bord2)}
+html body.nd .fl{color:var(--nd-doux)}
+html body.nd select,html body.nd input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]),html body.nd textarea{color-scheme:dark}
+html body.nd select option{background:#0B1226;color:var(--nd-texte)}
+
+/* ---------- cartes ---------- */
+html body.nd .card{background:var(--nd-verre);border:1px solid var(--nd-bord2);box-shadow:0 22px 44px -30px #000;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+html body.nd .h2{color:var(--nd-or);letter-spacing:.14em;text-transform:uppercase;font-size:11.5px}
+html body.nd .post .lnk,html body.nd .shop-links .lnk,html body.nd .ann-links .lnk,html body.nd .crn-plus,html body.nd .sec-more{color:var(--nd-or)}
+html body.nd .post .when{color:var(--nd-faible)}
+html body.nd .acts{border-top-color:var(--nd-bord2)}
+html body.nd .acts button:active{background:var(--nd-verre2)}
+html body.nd .acts button.liked,html body.nd .acts button.liked svg{color:var(--nd-or)}
+html body.nd .acts button.liked svg{fill:var(--nd-or)}
+html body.nd .promo{background:var(--nd-verre);border-color:var(--nd-bord2)}
+html body.nd .pub-badge{background:rgba(127,166,224,.16);color:#A9C4FF}
+html body.nd .hero{background:linear-gradient(135deg,rgba(255,255,255,.07),rgba(227,192,110,.14))}
+
+/* ---------- boutons ---------- */
+html body.nd .btn{background:var(--nd-degore);border-color:transparent;color:#1a1202;box-shadow:0 10px 22px -12px rgba(227,192,110,.65)}
+html body.nd .btn.out{background:var(--nd-verre);border:1px solid var(--nd-bord);color:var(--nd-texte);box-shadow:none}
+html body.nd .btn.navy{background:var(--nd-verre2);border:1px solid var(--nd-bord);color:var(--nd-or);box-shadow:none}
+html body.nd .btn.sub,html body.nd .btn.navy.sub,html body.nd .ann-act3 .btn.sub,html body.nd .ann-act2 .btn.sub{background:var(--green-l);border:1px solid rgba(143,224,176,.5);color:var(--green);box-shadow:none}
+/* Adhérer en violet / Soutenir en vert : les couleurs de rôle restent, avec du texte clair */
+html body.nd .btn[data-adh]:not(.adh-bientot){background:#7C3AED;border-color:#7C3AED;color:#fff;box-shadow:none}
+html body.nd .btn[data-sup],html body.nd .btn[data-soutenir-owner]{background:#16A34A;border-color:#16A34A;color:#fff;box-shadow:none}
+html body.nd .ann-act2 .aff-etat{background:var(--nd-verre);color:var(--nd-doux);border-color:var(--nd-bord2)}
+html body.nd .ann-act2 .aff-etat.sub{background:var(--green-l);color:var(--green);border-color:rgba(143,224,176,.5)}
+html body.nd .send,html body.nd .unr{background:var(--nd-degore);color:#1a1202}
+
+/* pastilles de statut */
+html body.nd .badge{background:rgba(127,166,224,.16);color:#A9C4FF}
+html body.nd .badge.g{background:var(--green-l);color:var(--green)}
+html body.nd .badge.o{background:var(--orange-l);color:var(--nd-or)}
+html body.nd .badge.r{background:var(--red-l);color:var(--red)}
+html body.nd .prem{color:#1a1202}
+
+/* ---------- avatars, médias ---------- */
+html body.nd .av,html body.nd .shop .lg{background:linear-gradient(135deg,#1E4F8A,#14234a);color:#fff;box-shadow:0 0 0 1px var(--nd-bord)}
+html body.nd .me .av{background:rgba(255,255,255,.1);border:2px solid var(--nd-bord)}
+html body.nd .media{background:#0B1226}
+html body.nd .media .more,html body.nd .vsh,html body.nd .vd{background:rgba(6,10,20,.82);color:var(--nd-or)}
+html body.nd .vsh:active{background:var(--nd-or);color:#1a1202}
+html body.nd .vth{background:linear-gradient(135deg,#14234a,#0B1226)}
+html body.nd .vp{background:var(--nd-degore);color:#1a1202}
+html body.nd .vsoon{background:#0B1226}
+
+/* ---------- événements ---------- */
+html body.nd .ev .dt{background:rgba(6,10,20,.82);border:1px solid var(--nd-bord);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+html body.nd .ev .dt b{color:#fff;font-family:var(--nd-display)}
+html body.nd .ev .dt span{color:var(--nd-or)}
+html body.nd .ev .ev-share{background:rgba(6,10,20,.82);color:var(--nd-or);border:1px solid var(--nd-bord)}
+html body.nd .card.ev-fini{background:linear-gradient(135deg,#2a303d 0%,#161b26 52%,#222836 100%);border-color:rgba(255,255,255,.22);box-shadow:0 0 0 1px rgba(255,255,255,.08) inset,0 14px 30px -18px #000}
+
+/* ---------- boutiques, produits ---------- */
+html body.nd .prods .ph{background:rgba(255,255,255,.06)}
+html body.nd .prods .pp{color:var(--nd-or)}
+
+/* ---------- messages ---------- */
+html body.nd .conv{border-bottom-color:var(--nd-bord2)}
+html body.nd .conv:active,html body.nd .li:active{background:var(--nd-verre2)}
+html body.nd .convw{border-bottom-color:var(--nd-bord2)}
+html body.nd .conv-more{color:var(--nd-doux)}
+html body.nd .conv-more:active{background:var(--nd-verre2)}
+html body.nd .b.in{background:var(--nd-verre2);border-color:var(--nd-bord2);color:var(--nd-texte)}
+html body.nd .b.out{background:var(--nd-degore);color:#1a1202}
+html body.nd .day{background:var(--nd-verre2);color:var(--nd-doux)}
+html body.nd .composer{background:rgba(8,13,30,.92);border-top-color:var(--nd-bord)}
+html body.nd .composer textarea{background:var(--nd-verre);border-color:var(--nd-bord2)}
+
+/* ---------- menu Moi, listes ---------- */
+html body.nd .me{background:radial-gradient(360px 200px at 100% 0%,rgba(227,192,110,.26),transparent 66%),linear-gradient(145deg,#14234a 0%,#0B1226 72%);border:1px solid rgba(227,192,110,.4);color:#fff;box-shadow:0 22px 40px -26px #000}
+html body.nd .me .sub{color:#C7D4E8}
+html body.nd .lst{background:var(--nd-verre);border-color:var(--nd-bord2)}
+html body.nd .li{border-bottom-color:var(--nd-bord2)}
+html body.nd .li .ic{background:rgba(227,192,110,.12);color:var(--nd-or)}
+html body.nd .li.dim .ic{background:var(--nd-verre2);color:var(--nd-faible)}
+html body.nd .li .ch{color:var(--nd-faible)}
+html body.nd .toggle{border-color:var(--nd-bord);color:var(--nd-doux)}
+html body.nd button.li{color:inherit}
+
+/* ---------- panneau plein écran ---------- */
+html body.nd #pane{background:var(--nd-nuit)}
+html body.nd #pane::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(380px 380px at -6% 12%,rgba(40,80,190,.34),transparent 70%),radial-gradient(340px 340px at 106% 60%,rgba(150,105,25,.24),transparent 70%),radial-gradient(ellipse at 50% -10%,#14234a 0%,var(--nd-nuit) 62%)}
+html body.nd .phead{background:rgba(8,13,30,.82);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid var(--nd-bord);color:#fff}
+html body.nd .pfoot{background:rgba(8,13,30,.92);border-top-color:var(--nd-bord)}
+html body.nd .rich a{color:var(--nd-or)}
+
+/* ---------- billets, clé-valeur ---------- */
+html body.nd .tk{background:var(--nd-verre);border-color:var(--nd-bord2)}
+html body.nd .qr{background:#fff;border-color:var(--nd-bord)}   /* un QR code doit rester noir sur blanc pour être lu */
+html body.nd .kv{border-bottom-color:var(--nd-bord2)}
+
+/* ---------- barre d'onglets ---------- */
+html body.nd #tabs{background:rgba(8,13,30,.9);backdrop-filter:blur(18px) saturate(140%);-webkit-backdrop-filter:blur(18px) saturate(140%);border-top:1px solid var(--nd-bord);box-shadow:0 -14px 30px -20px #000}
+html body.nd #tabs button{color:var(--nd-faible)}
+html body.nd #tabs button.on{color:var(--nd-or)}
+html body.nd #tabs button.on::before{background:var(--nd-degore)}
+html body.nd #tabs button.on svg{stroke:var(--nd-or)}
+html body.nd #tabs .dot{border-color:var(--nd-nuit2)}
+
+/* ---------- feuille du bas ---------- */
+html body.nd #sheet{background:rgba(3,6,13,.72);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+html body.nd #sheet .sh{background:linear-gradient(180deg,#101a36 0%,#0B1226 100%);border:1px solid var(--nd-bord);border-bottom:0;box-shadow:0 -24px 50px -20px #000}
+html body.nd #sheet .grip{background:var(--nd-bord)}
+html body.nd .cm{border-bottom-color:var(--nd-bord2)}
+/* menu des modules : même sombre, lignes en verre (au lieu des lignes blanches) et premium doré conservé */
+html body.nd #sheet .sh.dark{background:linear-gradient(180deg,#101a36 0%,#0B1226 100%);color:var(--nd-doux)}
+html body.nd #sheet .sh.dark .grip{background:var(--nd-bord)}
+html body.nd #sheet .sh.dark .row div{color:#fff}
+html body.nd #sheet .sh.dark .muted,html body.nd #sheet .sh.dark .small.muted{color:var(--nd-doux)}
+html body.nd .mdark{background:rgba(255,255,255,.035);border:1px solid var(--nd-bord2)}
+html body.nd #sheet .sh.dark .h2,html body.nd .mdark .h2{color:var(--nd-or);opacity:.85}
+html body.nd #sheet .sh.dark .li,html body.nd .mdark .li{background:var(--nd-verre2);color:var(--nd-texte);border:1px solid var(--nd-bord2)}
+html body.nd #sheet .sh.dark .li:active,html body.nd .mdark .li:active{background:rgba(255,255,255,.14)}
+html body.nd #sheet .sh.dark .li .d,html body.nd .mdark .li .d{color:var(--nd-doux)}
+html body.nd .li.gold{background:var(--nd-degore)!important;color:#1a1202!important;border-color:transparent!important}
+html body.nd .li.gold .d{color:#4a3200!important}
+html body.nd .li.gold .ic{background:rgba(255,255,255,.42);color:#1a1202}
+html body.nd .li.gold .ch{color:#1a1202}
+
+/* ---------- états ---------- */
+html body.nd .empty .ei{background:rgba(227,192,110,.12);color:var(--nd-or)}
+html body.nd .empty b{color:#fff;font-family:var(--nd-display);font-weight:500;font-size:18px}
+html body.nd .sk{background:linear-gradient(90deg,rgba(255,255,255,.04) 25%,rgba(255,255,255,.1) 50%,rgba(255,255,255,.04) 75%);background-size:200% 100%}
+html body.nd .bar{background:rgba(255,255,255,.1)}
+html body.nd .bar i{background:var(--nd-degore)}
+html body.nd #toast{background:#101a36;color:#fff;border:1px solid var(--nd-bord);box-shadow:0 14px 30px -12px #000}
+html body.nd #toast.err{background:#3a1512;border-color:rgba(255,154,143,.5);color:#FFD2CC}
+html body.nd #maj-banner{background:#101a36;border:1px solid var(--nd-bord)}
+html body.nd #maj-banner button{background:var(--nd-degore);color:#1a1202}
+html body.nd #desk-banner{background:#2a2108;color:#F3E3B5;border-bottom-color:var(--nd-or)}
+html body.nd #desk-banner button{background:var(--nd-or);color:#1a1202}
+html body.nd #test-ribbon{background:var(--nd-degore);color:#1a1202}
+html body.nd .avz{background:rgba(3,6,13,.985)}
+
+/* ---------- accueil : titres de rubrique ---------- */
+html body.nd .sec::before{background:var(--nd-bord2)}
+html body.nd .sec::after{background:var(--nd-degore)}
+html body.nd .sec-t{color:#fff}
+html body.nd .sec-t .sic{background:rgba(227,192,110,.14);color:var(--nd-or);box-shadow:inset 0 0 0 1px var(--nd-bord)}
+html body.nd .sec-sub{color:var(--nd-doux)}
+html body.nd .mc{background:var(--nd-verre);border-color:var(--nd-bord2)}
+html body.nd #home-videos{border:1px solid var(--nd-bord);background:radial-gradient(360px 200px at 100% 0%,rgba(227,192,110,.2),transparent 66%),linear-gradient(160deg,#14234a 0%,#0B1226 100%);box-shadow:0 22px 40px -26px #000}
+html body.nd #home-videos .sec-t .sic{background:var(--nd-degore);color:#1a1202;box-shadow:none}
+html body.nd #home-videos .sec-more{color:var(--nd-or)}
+html body.nd .vrow{background:var(--nd-verre);border-color:var(--nd-bord2)}
+html body.nd .mapcard{border-color:var(--nd-bord)}
+
+/* ---------- annuaire ---------- */
+html body.nd .ann-info div{background:rgba(255,255,255,.05)}
+html body.nd .ann-desc{color:var(--nd-texte)}
+
+/* ---------- cartouches de compte-rendu / actualités : leurs bandes colorées gardent leur identité, seuls les textes sombres passent en clair ---------- */
+html body.nd .cr-agir{background:linear-gradient(180deg,rgba(227,192,110,.14),rgba(255,255,255,.04) 70%);border-color:var(--nd-bord);box-shadow:0 0 0 4px rgba(227,192,110,.07),0 22px 40px -26px #000}
+html body.nd .cr-agir-t,html body.nd .crn-t,html body.nd .cr-s-head h2,html body.nd .cr-s-h,html body.nd .cr-s-cat b{color:#fff}
+html body.nd .cr-agir-d,html body.nd .cr-agir small,html body.nd .cr-choix small,html body.nd .cr-s-resume>b{color:var(--nd-doux)}
+html body.nd .cr-s-resume,html body.nd .cr-s-etape{background:var(--nd-verre2);color:var(--nd-texte)}
+html body.nd .cr-s-kpis>div{background:rgba(63,123,255,.13);color:var(--nd-texte)}
+html body.nd .cr-s-kpis span{color:#A9C4FF}
+html body.nd .cr-s-cat{border-bottom-color:var(--nd-bord2)}
+html body.nd .cr-s-head img,html body.nd .cr-s-parts img,html body.nd .cr-s-parts .ini{background:#fff;border-color:var(--nd-bord2)}
+html body.nd .cr-s-parts .ini{color:#13369C}
+html body.nd .crn{border-color:rgba(63,123,255,.6)}
+html body.nd .post.actu{border-color:rgba(143,224,176,.55)}
+html body.nd .cr-qm{background:#101a36;border-color:#7FA6E0;color:#A9C4FF}
+
+/* ---------- cartouche « Premium offerts » de l'accueil : or luisant + texte NUIT (le texte clair ne se lirait plus) ---------- */
+html body.nd .promo-or{border:1px solid rgba(227,192,110,.7);background:linear-gradient(135deg,#FFE88A 0%,#F7CF4A 38%,#E2A90F 68%,#FFD966 100%);box-shadow:0 0 0 3px rgba(227,192,110,.25),0 22px 40px -18px rgba(184,134,11,.7)}
+html body.nd .promo-or .pad,html body.nd .promo-or h3{color:#1a1202}
+html body.nd .promo-or .muted{color:rgba(26,18,2,.88)}
+html body.nd .promo-or .po-badge{background:#0B1226;color:#F5D061}
+html body.nd .promo-or .tags .badge{background:rgba(26,18,2,.1);color:#1a1202;border:1px solid rgba(26,18,2,.35)}
+html body.nd .promo-or .po-note{background:#0B1226;color:#fff}
+html body.nd .promo-or .btn.navy{background:#0B1226;border-color:#0B1226;color:#F5D061;box-shadow:none}
+html body.nd .promo-or .btn.out{background:rgba(255,255,255,.55);border:1.5px solid #1a1202;color:#1a1202;box-shadow:none}
+
+/* ---------- fonds marine posés EN LIGNE par les modules : le marine devenant clair, on les remet en nuit ---------- */
+html body.nd [style*="background:var(--navy)"],
+html body.nd [style*="background: var(--navy)"]{background:#14234a!important}
+html body.nd [style*="background:var(--navy2)"],
+html body.nd [style*="background: var(--navy2)"]{background:#1E4F8A!important}
+html body.nd [style*="linear-gradient(135deg,var(--navy),var(--navy2))"]{background:radial-gradient(360px 200px at 100% 0%,rgba(227,192,110,.22),transparent 66%),linear-gradient(145deg,#14234a 0%,#0B1226 72%)!important;border:1px solid var(--nd-bord)}
+html body.nd [style*="background:var(--navy)"][style*="color:#fff"],
+html body.nd [style*="background:var(--navy2)"][style*="color:#fff"],
+html body.nd [style*="linear-gradient(135deg,var(--navy),var(--navy2))"]{color:#fff}
+/* fonds orange posés en ligne (boutons / bandeaux) : or avec texte nuit */
+html body.nd [style*="background:var(--orange-d)"],html body.nd [style*="background:var(--orange)"]{background:var(--nd-degore)!important;color:#1a1202!important}
+
+/* ---------- fonds marine posés par les feuilles propres aux modules (profil, formations, parrainage, réseau pro, Tracker) ---------- */
+html body.nd .pf-av,html body.nd .pf-eqav,html body.nd .rp-logo{background:linear-gradient(135deg,#1E4F8A,#14234a);color:#fff;box-shadow:0 0 0 1px var(--nd-bord)}
+html body.nd .fm-cov,html body.nd .fm-thumb,html body.nd .pa-thumb{background:linear-gradient(135deg,#14234a,#0B1226);color:rgba(255,255,255,.85)}
+html body.nd .tk-nav .on,html body.nd .tk-tuile .b button.plus,html body.nd .tk-fab{background:var(--nd-degore);color:#1a1202;border-color:transparent}
+
+html body.nd .mev-dt{background:rgba(6,10,20,.82);border:1px solid var(--nd-bord);color:#fff}
+html body.nd .mev-dt b{color:#fff}
+html body.nd .mev-dt span{color:var(--nd-or)}
+html body.nd .fm-star{background:rgba(6,10,20,.82);color:var(--nd-or);border:1px solid var(--nd-bord)}
+html body.nd .cf-sel{background-color:var(--nd-verre);color:var(--nd-texte);border-color:var(--nd-bord2);color-scheme:dark}
+
+/* champs de saisie de tous les modules : verre sombre, texte clair (les modules les posaient en blanc) */
+html body.nd :is(input,textarea,select):not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):not([type=color]):not([type=submit]):not([type=button]){background-color:var(--nd-verre);color:var(--nd-texte);border-color:var(--nd-bord2);color-scheme:dark}
+html body.nd .search input{background:none;border:none}
+html body.nd :is(input,textarea,select):focus{border-color:var(--nd-or);outline:none;box-shadow:0 0 0 3px rgba(227,192,110,.2)}
+html body.nd .search input:focus{box-shadow:none}
+
+/* ---------- couleurs claires posées en ligne, repérées par assets/m-nuit-doree.js ---------- */
+html body.nd [data-nd-fond="neutre"]{background:var(--nd-verre)!important;border-color:var(--nd-bord2)!important}
+html body.nd [data-nd-fond="or"]{background:rgba(227,192,110,.12)!important;border-color:var(--nd-bord)!important}
+html body.nd [data-nd-fond="rouge"]{background:rgba(255,154,143,.12)!important;border-color:rgba(255,154,143,.35)!important}
+html body.nd [data-nd-fond="vert"]{background:rgba(143,224,176,.12)!important;border-color:rgba(143,224,176,.32)!important}
+html body.nd [data-nd-fond="bleu"]{background:rgba(63,123,255,.13)!important;border-color:rgba(63,123,255,.35)!important}
+html body.nd [data-nd-fond="violet"]{background:rgba(167,139,250,.12)!important;border-color:rgba(167,139,250,.35)!important}
+html body.nd [data-nd-bord]{border-color:var(--nd-bord2)!important}
+html body.nd [data-nd-encre="texte"]{color:var(--nd-texte)!important}
+html body.nd [data-nd-encre="doux"]{color:var(--nd-doux)!important}
+html body.nd [data-nd-encre="rouge"]{color:#FFA79D!important}
+html body.nd [data-nd-encre="or"]{color:#F3E3B5!important}
+html body.nd [data-nd-encre="vert"]{color:#9BE8B8!important}
+html body.nd [data-nd-encre="bleu"]{color:#A9C4FF!important}
+html body.nd [data-nd-encre="violet"]{color:#CFC1FF!important}
+/* les cartouches or gardent leur texte nuit */
+html body.nd .li.gold [data-nd-encre],html body.nd .promo-or [data-nd-encre]{color:#1a1202!important}
+/* zones qui doivent rester telles quelles (QR, carte, vidéos) */
+html body.nd [data-nd-skip],html body.nd [data-nd-skip] *{--keep:1}
