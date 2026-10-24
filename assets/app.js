@@ -5415,7 +5415,7 @@ async function _daPubRelaisCharger(){
   return _daPubRelaisCache;
 }
 function _daPubRelaisTexte(s, n){
-  s = String(s || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+  s = String(s || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\*\*/g, '').replace(/\s+/g, ' ').trim(); // ** = gras du fil, illisible tel quel
   return s.length > n ? s.slice(0, n - 1) + '…' : s;
 }
 async function afficherPublicationsRelais(el){
@@ -5430,14 +5430,16 @@ async function afficherPublicationsRelais(el){
     try { const m0 = JSON.parse(p.medias || '[]')[0] || {}; media = (m0.type === 'video' || /\.(mp4|webm|mov|m3u8)(\?|$)/i.test(m0.url || '')) ? (m0.poster || null) : (m0.url || null); } catch (e) {}
     const texte = _daPubRelaisTexte(p.contenu || p.corps, 110);
     const photo = (p.auteur_profil && p.auteur_profil.photo_url) || '/assets/logo.png';
-    el.innerHTML = `<a href="fil-actualite.html?post=${p.id}" style="display:block;text-decoration:none;color:inherit;background:var(--surface,#0F2A50);border:1px solid var(--border,rgba(255,255,255,.1));border-radius:12px;overflow:hidden;">
+    /* Couleurs FIXES (2026-10-24, bug constaté sur l'annuaire) : la carte reprenait var(--surface) de la page — blanche sur l'annuaire — avec le texte clair hérité,
+       d'où un nom d'auteur et un texte presque invisibles. Fond marine + texte clair explicites : lisible sur n'importe quelle page. */
+    el.innerHTML = `<a href="fil-actualite.html?post=${p.id}" style="display:block;text-decoration:none;color:#E8ECF6;background:#101B33;border:1px solid rgba(227,192,110,.28);border-radius:12px;overflow:hidden;">
       ${media ? `<img src="${media}" onerror="this.remove()" style="width:100%;height:110px;object-fit:cover;display:block;">` : ""}
       <div style="padding:12px;">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
           <img src="${photo}" style="width:22px;height:22px;border-radius:50%;object-fit:cover;flex-shrink:0;">
-          <span style="font-size:11.5px;font-weight:700;">${escH(p.auteur_nom || "Diaspo'Actif")}</span>
+          <span style="font-size:11.5px;font-weight:700;color:#F3DC9B;">${escH(p.auteur_nom || "Diaspo'Actif")}</span>
         </div>
-        <div style="font-size:12.5px;color:var(--muted,#94A3B8);line-height:1.4;">${escH(texte)}</div>
+        <div style="font-size:12.5px;color:#C5CFE2;line-height:1.4;">${escH(texte)}</div>
       </div>
     </a>`;
     el.style.display = "";
