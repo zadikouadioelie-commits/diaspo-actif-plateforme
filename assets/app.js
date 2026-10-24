@@ -5426,13 +5426,20 @@ async function afficherPublicationsRelais(el){
   let idx = Math.floor(Math.random() * posts.length);
   const rendre = () => {
     const p = posts[idx % posts.length]; idx++;
-    let media = null;
-    try { const m0 = JSON.parse(p.medias || '[]')[0] || {}; media = (m0.type === 'video' || /\.(mp4|webm|mov|m3u8)(\?|$)/i.test(m0.url || '')) ? (m0.poster || null) : (m0.url || null); } catch (e) {}
-    const texte = _daPubRelaisTexte(p.contenu || p.corps, 110);
-    const photo = (p.auteur_profil && p.auteur_profil.photo_url) || '/assets/logo.png';
-    /* Couleurs FIXES (2026-10-24, bug constaté sur l'annuaire) : la carte reprenait var(--surface) de la page — blanche sur l'annuaire — avec le texte clair hérité,
-       d'où un nom d'auteur et un texte presque invisibles. Fond marine + texte clair explicites : lisible sur n'importe quelle page. */
-    el.innerHTML = `<a href="fil-actualite.html?post=${p.id}" style="display:block;text-decoration:none;color:#E8ECF6;background:#101B33;border:1px solid rgba(227,192,110,.28);border-radius:12px;overflow:hidden;">
+    el.innerHTML = _daPubRelaisCarte(p);
+    el.style.display = "";
+  };
+  rendre();
+  setInterval(rendre, 60000); // une publication par minute (demande explicite 2026-10-24 : 7 s était trop rapide)
+}
+/* Carte d'une publication du fil (relais en l'absence de publicité). Couleurs FIXES (2026-10-24, bug constaté sur l'annuaire) : la carte reprenait var(--surface) de la page — blanche sur l'annuaire — avec le texte clair hérité,
+   d'où un nom d'auteur et un texte presque invisibles. Fond marine + texte clair explicites : lisible sur n'importe quelle page. */
+function _daPubRelaisCarte(p){
+  let media = null;
+  try { const m0 = JSON.parse(p.medias || '[]')[0] || {}; media = (m0.type === 'video' || /\.(mp4|webm|mov|m3u8)(\?|$)/i.test(m0.url || '')) ? (m0.poster || null) : (m0.url || null); } catch (e) {}
+  const texte = _daPubRelaisTexte(p.contenu || p.corps, 110);
+  const photo = (p.auteur_profil && p.auteur_profil.photo_url) || '/assets/logo.png';
+  return `<a href="fil-actualite.html?post=${p.id}" style="display:block;text-decoration:none;color:#E8ECF6;background:#101B33;border:1px solid rgba(227,192,110,.28);border-radius:12px;overflow:hidden;">
       ${media ? `<img src="${media}" onerror="this.remove()" style="width:100%;height:110px;object-fit:cover;display:block;">` : ""}
       <div style="padding:12px;">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
@@ -5442,20 +5449,12 @@ async function afficherPublicationsRelais(el){
         <div style="font-size:12.5px;color:#C5CFE2;line-height:1.4;">${escH(texte)}</div>
       </div>
     </a>`;
-    el.style.display = "";
-  };
-  rendre();
-  setInterval(rendre, 60000); // une publication par minute (demande explicite 2026-10-24 : 7 s était trop rapide)
 }
-async function renderAdSlot(containerId, emplacement, opts = {}){
-  const el = document.getElementById(containerId);
-  if (!el) return;
-  try {
-    const r = await fetch(`/api/ads/servir?emplacement=${emplacement}`).then(x => x.json());
-    if (!r.ad) { afficherPublicationsRelais(el); return; }
-    const ad = r.ad;
-    const clic = `onclick="trackAdClic(${ad.id})"`;
-    el.innerHTML = `<div style="display:flex;align-items:center;gap:14px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 16px;">
+
+/* Carte d'une publicité servie par /api/ads/servir. `visible` (colonnes à deux publicités) ajoute un liseré doré pour la détacher du fond. */
+function _daAdCarteHtml(ad, visible){
+  const clic = `onclick="trackAdClic(${ad.id})"`;
+  return `<div style="display:flex;align-items:center;gap:14px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 16px;${visible ? 'box-shadow:0 0 0 1px rgba(227,192,110,.45);' : ''}">
       ${ad.media_type === "video"
         ? `<video src="${ad.media_url}" style="width:88px;height:64px;object-fit:cover;border-radius:8px;flex-shrink:0;" muted autoplay loop playsinline></video>`
         : `<img src="${ad.media_url}" alt="" style="width:88px;height:64px;object-fit:cover;border-radius:8px;flex-shrink:0;">`}
@@ -5466,6 +5465,43 @@ async function renderAdSlot(containerId, emplacement, opts = {}){
       </div>
       ${ad.lien_url ? `<a href="${ad.lien_url}" target="_blank" rel="noopener sponsored" class="btn btn-orange" style="flex-shrink:0;font-size:13px;" ${clic}>${ad.cta}</a>` : ""}
     </div>`;
+}
+
+/* Colonnes à PLUSIEURS publicités (2026-10-24, demande explicite : « dans la colonne d'espace publicitaire affiche deux publicités, une en dessous
+   de l'autre et bien visible, tu rafraîchiras chaque minute ») : data-ad-count="2" sur l'emplacement. Un seul appel serveur (?n=2) rend jusqu'à
+   n publicités DISTINCTES ; s'il en manque, on complète avec des publications du fil (jamais de case vide). Le renouvellement chaque minute vient
+   de data-ad-rotate (renderAllAdSlots) — pas de minuteur propre ici, donc rien qui écrase une publicité arrivée entre deux tours. */
+let _daRelaisDepart = null;
+async function renderAdSlotMulti(el, emplacement, n){
+  let ads = [];
+  try {
+    const r = await fetch(`/api/ads/servir?emplacement=${encodeURIComponent(emplacement)}&n=${n}`).then(x => x.json());
+    ads = Array.isArray(r.ads) ? r.ads : (r.ad ? [r.ad] : []);
+  } catch (e) { ads = []; }
+  const cartes = ads.slice(0, n).map(a => _daAdCarteHtml(a, true));
+  if (cartes.length < n) {
+    const posts = await _daPubRelaisCharger();
+    if (posts.length) {
+      if (_daRelaisDepart === null) _daRelaisDepart = Math.floor(Math.random() * posts.length);
+      const manque = Math.min(n - cartes.length, posts.length);
+      for (let i = 0; i < manque; i++) cartes.push(_daPubRelaisCarte(posts[(_daRelaisDepart + i) % posts.length]));
+      _daRelaisDepart = (_daRelaisDepart + manque) % posts.length;
+    }
+  }
+  if (!cartes.length) { el.style.display = "none"; return; }
+  el.innerHTML = cartes.join("");
+  el.style.display = "flex"; el.style.flexDirection = "column"; el.style.gap = "12px";
+}
+async function renderAdSlot(containerId, emplacement, opts = {}){
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  const nbAds = parseInt(el.dataset.adCount, 10) || 1;
+  if (nbAds > 1) return renderAdSlotMulti(el, emplacement, nbAds);
+  try {
+    const r = await fetch(`/api/ads/servir?emplacement=${emplacement}`).then(x => x.json());
+    if (!r.ad) { afficherPublicationsRelais(el); return; }
+    const ad = r.ad;
+    el.innerHTML = _daAdCarteHtml(ad);
     el.style.display = "";
   } catch(e) {
     afficherPublicationsRelais(el);

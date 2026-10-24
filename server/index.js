@@ -21177,7 +21177,9 @@ route("GET", "/api/ads/servir", async (req, res, params, body, query) => {
     for (let i = candidates.length - 1; i >= 0; i--) if (exclureIds.has(Number(candidates[i].id))) candidates.splice(i, 1);
   }
 
-  let ad = null;
+  /* ?n=2 (2026-10-24) : colonnes à plusieurs publicités — jusqu'à 3 publicités DISTINCTES en un seul appel (champ `ads`) ; `ad` reste la première (compatibilité). */
+  const nbVoulu = Math.min(3, Math.max(1, Number(query.n) || 1));
+  const ads = [];
   for (const c of candidates) {
     const zones = safeParseArray(c.cible_zones);
     if (zones.length && !zones.includes('international')) {
@@ -21201,21 +21203,20 @@ route("GET", "/api/ads/servir", async (req, res, params, body, query) => {
       const membre = await db.prepare(`SELECT 1 FROM listes_diffusion_contacts WHERE liste_id IN (${ph}) AND user_id=? LIMIT 1`).get(...cibleListes, user.id);
       if (!membre) continue;
     }
-    ad = c;
-    break;
+    ads.push(c);
+    if (ads.length >= nbVoulu) break;
   }
-  if (!ad) return sendJSON(res, 200, { ad: null });
+  const ad = ads[0] || null;
+  if (!ad) return sendJSON(res, 200, { ad: null, ads: [] });
 
   /* ?peek=1 : savoir seulement s'il existe une publicité à servir (la grille du fil décide ainsi
      d'y réserver des cases ou non) — ne compte AUCUNE impression, l'annonceur n'est facturé/compté
      que pour une publicité réellement affichée. */
   if (query.peek) return sendJSON(res, 200, { ad: { id: ad.id } });
 
-  await db.prepare("UPDATE publicites SET nb_impressions=nb_impressions+1, updated_at=datetime('now') WHERE id=?").run(ad.id);
-  sendJSON(res, 200, { ad: {
-    id: ad.id, media_type: ad.media_type, media_url: ad.media_url,
-    titre: ad.titre, description: ad.description, cta: ad.cta, lien_url: ad.lien_url,
-  }});
+  for (const a of ads) await db.prepare("UPDATE publicites SET nb_impressions=nb_impressions+1, updated_at=datetime('now') WHERE id=?").run(a.id);
+  const vue = a => ({ id: a.id, media_type: a.media_type, media_url: a.media_url, titre: a.titre, description: a.description, cta: a.cta, lien_url: a.lien_url });
+  sendJSON(res, 200, { ad: vue(ad), ads: ads.map(vue) });
 });
 
 route("POST", "/api/ads/:id/clic", async (req, res, params) => {

@@ -167,7 +167,8 @@
 }
 /* Carte pub en colonne étroite (2026-10-09) : la carte horizontale de renderAdSlot() (image 88px + texte + bouton) débordait d'une colonne de 226–300px — on l'empile verticalement ici. */
 .ann-ad-col [data-ad-emplacement] > div{flex-direction:column !important;align-items:stretch !important;gap:10px !important;}
-.ann-ad-col [data-ad-emplacement] img,.ann-ad-col [data-ad-emplacement] video{width:100% !important;height:auto !important;max-height:150px;}
+/* Seulement les images des PUBLICITÉS (cartes <div>), pas la photo de l'auteur d'une publication relais (2026-10-24). */
+.ann-ad-col [data-ad-emplacement] > div img,.ann-ad-col [data-ad-emplacement] > div video{width:100% !important;height:auto !important;max-height:150px;}
 .ann-ad-col [data-ad-emplacement] .btn{align-self:flex-start;}
 .ann-ad-vision{font-size:12.5px;color:var(--muted);line-height:1.6;}
 .ann-ad-vision strong{display:block;color:var(--text);font-size:13.5px;margin-bottom:6px;}
@@ -416,7 +417,7 @@
        ci-dessus (bandeau horizontal au-dessus de la grille), aucun conflit. ═══ -->
   <aside class="ann-ad-col">
     <div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:2px;">📢 Espace publicitaire</div>
-    <div id="ad-annuaire-sidebar" data-ad-emplacement="annuaire_sidebar" data-ad-rotate="60000" style="margin-top:10px;"></div>
+    <div id="ad-annuaire-sidebar" data-ad-emplacement="annuaire_sidebar" data-ad-count="2" data-ad-rotate="60000" style="margin-top:10px;"></div>
   </aside>
   </div>
 
