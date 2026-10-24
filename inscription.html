@@ -1622,7 +1622,14 @@ async function submitForm(btnId,errId,body){
     document.getElementById("success-identity-box").style.display = (role==="utilisateur") ? "block" : "none";
     goToStep(3);
   }catch(err){
-    errBox.textContent=err.message||"Inscription impossible.";
+    /* Bug réel signalé (2026-10-24, capture : "Failed to fetch" affiché tel quel sur le
+       formulaire) : err.status n'existe QUE pour une vraie réponse HTTP (voir api(), assets/app.js) —
+       quand fetch() échoue au niveau réseau (coupure, bascule wifi/4G en cours de saisie…), l'erreur
+       JS brute du navigateur ("Failed to fetch", "Load failed", "NetworkError…") remontait telle
+       quelle, en anglais et incompréhensible pour qui tente de créer un compte. */
+    errBox.textContent = (err.status===undefined)
+      ? "Connexion au serveur impossible. Vérifiez votre connexion internet et réessayez."
+      : (err.message||"Inscription impossible.");
     errBox.style.display="block";btn.disabled=false;btn.textContent=orig;
     errBox.scrollIntoView({block:"center"});
   }
