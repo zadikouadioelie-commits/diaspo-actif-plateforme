@@ -267,9 +267,9 @@ html body.nd .cf-sel{background-color:var(--nd-verre);color:var(--nd-texte);bord
 
 /* champs de saisie de tous les modules : verre sombre, texte clair (les modules les posaient en blanc) */
 html body.nd :is(input,textarea,select):not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):not([type=color]):not([type=submit]):not([type=button]){background-color:var(--nd-verre);color:var(--nd-texte);border-color:var(--nd-bord2);color-scheme:dark}
-html body.nd .search input{background:none;border:none}
+html body.nd .search input:not(#_){background:none;border:none}
 html body.nd :is(input,textarea,select):focus{border-color:var(--nd-or);outline:none;box-shadow:0 0 0 3px rgba(227,192,110,.2)}
-html body.nd .search input:focus{box-shadow:none}
+html body.nd .search input:not(#_):focus{box-shadow:none}
 
 /* ---------- couleurs claires posées en ligne, repérées par assets/m-nuit-doree.js ---------- */
 html body.nd [data-nd-fond="neutre"]{background:var(--nd-verre)!important;border-color:var(--nd-bord2)!important}
