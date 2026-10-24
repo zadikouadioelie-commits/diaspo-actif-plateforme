@@ -5433,20 +5433,23 @@ async function afficherPublicationsRelais(el){
   el._pubRelaisTimer = setInterval(rendre, 60000); // une publication par minute (demande explicite 2026-10-24 : 7 s était trop rapide)
 }
 /* Carte d'une publication du fil (relais en l'absence de publicité). Couleurs FIXES (2026-10-24, bug constaté sur l'annuaire) : la carte reprenait var(--surface) de la page — blanche sur l'annuaire — avec le texte clair hérité,
-   d'où un nom d'auteur et un texte presque invisibles. Fond marine + texte clair explicites : lisible sur n'importe quelle page. */
+   d'où un nom d'auteur et un texte presque invisibles. Fond marine + texte clair explicites : lisible sur n'importe quelle page.
+   Agrandie (2026-10-24, demande explicite : « agrandis les cartouches sans toucher à l'espace de l'annuaire, rends plus visible
+   le contenu des publications ») — image/texte/auteur plus grands, pour mieux remplir la largeur de colonne existante (.ann-ad-col
+   reste à 280-360px, inchangée : c'est la carte qui grandit EN HAUTEUR dedans, pas la colonne elle-même). */
 function _daPubRelaisCarte(p){
   let media = null;
   try { const m0 = JSON.parse(p.medias || '[]')[0] || {}; media = (m0.type === 'video' || /\.(mp4|webm|mov|m3u8)(\?|$)/i.test(m0.url || '')) ? (m0.poster || null) : (m0.url || null); } catch (e) {}
-  const texte = _daPubRelaisTexte(p.contenu || p.corps, 110);
+  const texte = _daPubRelaisTexte(p.contenu || p.corps, 220);
   const photo = (p.auteur_profil && p.auteur_profil.photo_url) || '/assets/logo.png';
-  return `<a href="fil-actualite.html?post=${p.id}" style="display:block;text-decoration:none;color:#E8ECF6;background:#101B33;border:1px solid rgba(227,192,110,.28);border-radius:12px;overflow:hidden;">
-      ${media ? `<img src="${media}" onerror="this.remove()" style="width:100%;height:110px;object-fit:cover;display:block;">` : ""}
-      <div style="padding:12px;">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-          <img src="${photo}" style="width:22px;height:22px;border-radius:50%;object-fit:cover;flex-shrink:0;">
-          <span style="font-size:11.5px;font-weight:700;color:#F3DC9B;">${escH(p.auteur_nom || "Diaspo'Actif")}</span>
+  return `<a class="da-pub-rel" href="fil-actualite.html?post=${p.id}" style="display:block;text-decoration:none;color:#E8ECF6;background:#101B33;border:1px solid rgba(227,192,110,.28);border-radius:14px;overflow:hidden;">
+      ${media ? `<img src="${media}" onerror="this.remove()" style="width:100%;height:190px;object-fit:cover;display:block;">` : ""}
+      <div style="padding:18px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+          <img src="${photo}" style="width:34px;height:34px;border-radius:50%;object-fit:cover;flex-shrink:0;">
+          <span style="font-size:14px;font-weight:700;color:#F3DC9B;">${escH(p.auteur_nom || "Diaspo'Actif")}</span>
         </div>
-        <div style="font-size:12.5px;color:#C5CFE2;line-height:1.4;">${escH(texte)}</div>
+        <div style="font-size:15px;color:#DCE3F2;line-height:1.55;">${escH(texte)}</div>
       </div>
     </a>`;
 }
