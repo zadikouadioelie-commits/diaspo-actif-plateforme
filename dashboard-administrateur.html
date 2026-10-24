@@ -11547,7 +11547,7 @@ async function submitAccordDirect(){
       const st = statutMembre(m.statut_verification);
       return `
       <tr style="border-bottom:1px solid var(--border);">
-        <td style="padding:8px;font-weight:600;">${esc(m.nom||'')} ${esc(m.prenom||'')}</td>
+        <td style="padding:8px;font-weight:600;">${m.nom_structure ? `${esc(m.nom_structure)}<br><span style="font-weight:400;color:var(--muted);font-size:11px;">👤 ${esc(m.nom||'')} ${esc(m.prenom||'')}</span>` : `${esc(m.nom||'')} ${esc(m.prenom||'')}`}</td>
         <td style="padding:8px;"><a href="mailto:${esc(m.email)}" style="color:#2563EB;text-decoration:none;">${esc(m.email)}</a></td>
         <td style="padding:8px;">${m.telephone ? `<a href="tel:${esc(m.telephone)}" style="color:var(--text);text-decoration:none;">${esc(m.telephone)}</a>` : '<span style="color:var(--muted)">—</span>'}</td>
         <td style="padding:8px;">${esc(m.role)}</td>
@@ -11567,7 +11567,7 @@ async function submitAccordDirect(){
     const q = normaliserRech(document.getElementById('membres-recherche')?.value);
     let liste = _filtreRoleMembre ? _adminMembres.filter(m => m.role === _filtreRoleMembre) : _adminMembres;
     if (q) liste = liste.filter(m =>
-      normaliserRech(`${m.nom||''} ${m.prenom||''} ${m.email||''} ${m.telephone||''} ${m.role||''}`).includes(q));
+      normaliserRech(`${m.nom||''} ${m.prenom||''} ${m.nom_structure||''} ${m.email||''} ${m.telephone||''} ${m.role||''}`).includes(q));
     document.getElementById('membres-tbody').innerHTML = membresLignes(liste);
     const c = document.getElementById('membres-compte');
     const pluriel = n => `${n} membre${n > 1 ? 's' : ''}`;
@@ -11591,7 +11591,7 @@ async function submitAccordDirect(){
         <div id="membres-chips" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">${membresChips()}</div>
         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
           <input id="membres-recherche" type="search" class="input-field" oninput="filtrerMembres()"
-                 placeholder="🔍 Rechercher un membre (nom, e-mail, téléphone, rôle)…"
+                 placeholder="🔍 Rechercher un membre (nom, structure, e-mail, téléphone, rôle)…"
                  style="flex:1;min-width:260px;font-size:13px;padding:9px 12px;">
           <span id="membres-compte" style="font-size:12px;color:var(--muted);white-space:nowrap;"></span>
         </div>

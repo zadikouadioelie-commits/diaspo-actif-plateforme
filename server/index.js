@@ -26227,11 +26227,20 @@ route("GET", "/api/admin/membres", async (req, res, params, body, query) => {
   const q = query.q ? `%${query.q.toLowerCase()}%` : null;
   // Les comptes déjà anonymisés (email @diaspoactif.invalid) ne sont plus des "membres" à gérer —
   // ils apparaissent uniquement dans l'historique des suppressions (voir route dédiée ci-dessous).
-  let sql = "SELECT id,nom,prenom,email,telephone,role,ville,pays,statut_verification,created_at FROM users WHERE email NOT LIKE '%@diaspoactif.invalid'";
+  /* Nom de structure (2026-10-24, bug réel constaté : chercher "COFINA SERVICES FRANCE" ici ne
+     trouvait rien, alors que la fiche s'appelle bien ainsi dans l'annuaire — seuls nom/prénom/
+     e-mail du RESPONSABLE du compte étaient cherchés/affichés, jamais le nom de la structure.
+     Même source que la correction déjà faite pour l'annuaire/profil public, voir
+     project_priorisation_nom_organisme : initiatives.nom pour role='initiative',
+     users.nom_institution pour role='collectivite'. */
+  let sql = `SELECT u.id,u.nom,u.prenom,u.email,u.telephone,u.role,u.ville,u.pays,u.statut_verification,u.created_at,
+                    COALESCE(i.nom, u.nom_institution) AS nom_structure
+             FROM users u LEFT JOIN initiatives i ON i.owner_user_id = u.id
+             WHERE u.email NOT LIKE '%@diaspoactif.invalid'`;
   const args = [];
-  if (role) { sql += " AND role=?"; args.push(role); }
-  if (q) { sql += " AND (LOWER(nom) LIKE ? OR LOWER(prenom) LIKE ? OR LOWER(email) LIKE ?)"; args.push(q, q, q); }
-  sql += " ORDER BY created_at DESC LIMIT 200";
+  if (role) { sql += " AND u.role=?"; args.push(role); }
+  if (q) { sql += " AND (LOWER(u.nom) LIKE ? OR LOWER(u.prenom) LIKE ? OR LOWER(u.email) LIKE ? OR LOWER(COALESCE(i.nom, u.nom_institution)) LIKE ?)"; args.push(q, q, q, q); }
+  sql += " ORDER BY u.created_at DESC LIMIT 200";
   const rows = await db.prepare(sql).all(...args);
   sendJSON(res, 200, { membres: rows });
 });
