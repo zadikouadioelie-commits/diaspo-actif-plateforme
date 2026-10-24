@@ -3000,6 +3000,18 @@
           <div style="flex:1;"><h2 style="margin:0;">💬 Ils ont rejoint Diaspo'Actif — Modération</h2></div>
           <button onclick="loadTemoignagesAdmin()" style="background:#1e3a8a;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer;">↻ Actualiser</button>
         </div>
+        <!-- Lien à partager pour recueillir des avis (2026-10-24, demande explicite) : page publique avis.html -->
+        <div class="card" style="margin-bottom:20px;">
+          <h3 style="margin:0 0 6px;">🔗 Lien pour recueillir des avis</h3>
+          <p style="margin:0 0 12px;font-size:13px;color:var(--muted);line-height:1.5;">Partagez ce lien (WhatsApp, e-mail, réseaux) : la personne se connecte ou crée son compte, puis le formulaire d’avis s’ouvre tout seul. Chaque avis arrive ensuite dans la liste ci-dessous, en attente de votre validation.</p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+            <input id="avis-lien" type="text" readonly aria-label="Lien de la page d’avis" style="flex:1;min-width:220px;border:1px solid var(--border);border-radius:8px;padding:9px 12px;font:inherit;font-size:13px;">
+            <button type="button" class="btn btn-sm btn-orange" id="avis-btn-copier" onclick="avisCopierLien()">📋 Copier le lien</button>
+            <button type="button" class="btn btn-sm btn-outline" onclick="avisPartager('whatsapp')">WhatsApp</button>
+            <button type="button" class="btn btn-sm btn-outline" onclick="avisPartager('email')">✉ E-mail</button>
+            <a class="btn btn-sm btn-outline" href="avis.html" target="_blank" rel="noopener">Ouvrir la page</a>
+          </div>
+        </div>
         <div id="temoignages-admin-stats" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:20px;"></div>
         <div style="overflow-x:auto;">
           <table style="width:100%;border-collapse:collapse;font-size:13px;">
@@ -14626,7 +14638,22 @@ const STATUT_LABEL = { en_attente:'🕐 En attente', approuve:'✅ Approuvé', r
 const STATUT_COLOR = { en_attente:'#92400e', approuve:'#15803d', rejete:'#dc2626', signale:'#9333ea' };
 const STATUT_BG    = { en_attente:'#fef3c7', approuve:'#f0fdf4', rejete:'#fef2f2', signale:'#f3e8ff' };
 
+/* Lien pour recueillir des avis (2026-10-24) : page publique avis.html — le formulaire est celui du témoignage (POST /api/temoignage), validé ici avant publication. */
+const AVIS_MESSAGE = "Donnez votre avis sur Diaspo'Actif : notez la plateforme et partagez votre expérience en deux minutes.";
+function avisLien() { return location.origin + '/avis.html'; }
+function avisInitLien() { const i = document.getElementById('avis-lien'); if (i) i.value = avisLien(); }
+async function avisCopierLien() {
+  const b = document.getElementById('avis-btn-copier'), i = document.getElementById('avis-lien');
+  try { await navigator.clipboard.writeText(avisLien()); } catch (e) { if (i) { i.select(); document.execCommand('copy'); } }
+  if (b) { const t = b.textContent; b.textContent = '✓ Lien copié'; setTimeout(() => { b.textContent = t; }, 2000); }
+}
+function avisPartager(canal) {
+  const texte = AVIS_MESSAGE + ' ' + avisLien();
+  if (canal === 'whatsapp') window.open('https://wa.me/?text=' + encodeURIComponent(texte), '_blank', 'noopener');
+  else window.location.href = 'mailto:?subject=' + encodeURIComponent("Votre avis sur Diaspo'Actif") + '&body=' + encodeURIComponent(texte);
+}
 async function loadTemoignagesAdmin() {
+  avisInitLien();
   const tbody = document.getElementById('temoignages-admin-tbody');
   const stats = document.getElementById('temoignages-admin-stats');
   try {
