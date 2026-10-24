@@ -237,6 +237,10 @@
   .bpv-shell .bpv-doc{padding:0;display:flex;flex-direction:column;overflow:hidden;}
   .bpv-page{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:clamp(22px,3vw,44px) clamp(20px,3.6vw,76px) 36px;scroll-behavior:smooth;}
   .bpv-page .bpv-section{border-top:0;padding:6px 0 0;}
+  /* Défilement de la page sur ordinateur (2026-10-24, signalé : « je n'arrive pas à scroller pour descendre plus bas ») : la règle générale
+     « .bpv-doc > :first-child { overflow:visible } » (plus spécifique que .bpv-page) annulait overflow-y:auto — tout ce qui dépassait de la zone
+     était coupé, sans barre ni molette. Sélecteur plus fort, réservé à l'affichage ordinateur (sur téléphone la page défile avec la fenêtre). */
+  @media(min-width:861px){.bpv-shell .bpv-doc > .bpv-page{overflow-y:auto;overflow-x:hidden;}}
   .bpv-page .bpv-field-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:30px 56px;}
   .bpv-section-head{align-items:center;}
   .bpv-section-head h2{flex:1;min-width:0;}
