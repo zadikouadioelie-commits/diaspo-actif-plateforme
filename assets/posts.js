@@ -517,7 +517,7 @@ let _tutoFilmPromesse = null;
 function _chargerFilmTuto() {
   if (window.InscriptionFilm) return Promise.resolve();
   if (!_tutoFilmPromesse) _tutoFilmPromesse = new Promise(resolve => {
-    const s = document.createElement('script'); s.src = '/assets/inscription-film.js?v=18'; s.onload = () => resolve(); s.onerror = () => resolve(); document.head.appendChild(s);
+    const s = document.createElement('script'); s.src = '/assets/inscription-film.js?v=19'; s.onload = () => resolve(); s.onerror = () => resolve(); document.head.appendChild(s);
   });
   return _tutoFilmPromesse;
 }
@@ -537,7 +537,7 @@ async function _ouvrirTutoInline(id) {
   if (!t) { if (typeof showToast === 'function') showToast('Ce tuto n\'est plus disponible.', 'error'); return; }
   if (t.type_source === 'bientot') { if (typeof showToast === 'function') showToast('Cette vidéo est en préparation — revenez bientôt !', 'info'); return; }
   if (t.type_source === 'film') {
-    const version = t.url === 'inscription-court' ? 'court' : (t.url === 'evenement-flash' || t.url === 'flash') ? 'flash' : t.url === 'telephone-initiative' ? 'telephone' : t.url === 'business-plan' ? 'businessplan' : undefined;
+    const version = t.url === 'inscription-court' ? 'court' : (t.url === 'evenement-flash' || t.url === 'flash') ? 'flash' : t.url === 'telephone-initiative' ? 'telephone' : t.url === 'business-plan' ? 'businessplan' : t.url === 'fiche-inscription' ? 'fiche' : undefined;
     await _chargerFilmTuto();
     if (window.InscriptionFilm) window.InscriptionFilm.ouvrir(version ? { version } : undefined);
     else window.location.href = t.lien;

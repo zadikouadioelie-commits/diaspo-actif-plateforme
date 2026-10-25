@@ -11,14 +11,14 @@
 
    API :  TutoLecture.monter(zone, video, options)      — monte le lecteur d'un tuto dans `zone` (YouTube, fichier ou film)
           TutoLecture.ouvrirFilm(version, options)      — ouvre un film animé (depuis une carte) avec l'écran de fin
-          TutoLecture.versionFilm(url)                  — 'court' | 'flash' | 'telephone' | 'businessplan' | 'long' d'après l'adresse du film
+          TutoLecture.versionFilm(url)                  — 'court' | 'flash' | 'telephone' | 'businessplan' | 'fiche' | 'long' d'après l'adresse du film
    options : { accueil, inscription, autres, connecte (booléen ou fonction/promesse) }
    ============================================================ */
 (function () {
   'use strict';
   if (window.TutoLecture) return;
 
-  const FILM_SCRIPT = '/assets/inscription-film.js?v=18';
+  const FILM_SCRIPT = '/assets/inscription-film.js?v=19';
   const CSS = `
 .tl-zone{position:relative;width:100%;background:#000;overflow:hidden}
 .tl-zone>iframe,.tl-zone>video{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000;object-fit:contain}
@@ -43,7 +43,7 @@
   const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   const ytId = url => { const m = String(url || '').match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([A-Za-z0-9_-]{11})/); return m ? m[1] : null; };
   const estIos = () => /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-  const versionFilm = url => url === 'inscription-court' ? 'court' : url === 'evenement-flash' ? 'flash' : url === 'telephone-initiative' ? 'telephone' : url === 'business-plan' ? 'businessplan' : 'long';
+  const versionFilm = url => url === 'inscription-court' ? 'court' : url === 'evenement-flash' ? 'flash' : url === 'telephone-initiative' ? 'telephone' : url === 'business-plan' ? 'businessplan' : url === 'fiche-inscription' ? 'fiche' : 'long';
   const vers = (fn, ...a) => { try { return Promise.resolve(typeof fn === 'function' ? fn(...a) : fn); } catch (e) { return Promise.resolve(false); } };
 
   /* ---------- écran de fin ---------- */
@@ -144,7 +144,7 @@
       await chargerFilm();
       const lancer = () => window.InscriptionFilm.ouvrir({ version: version || 'long', onFin: () => ecranFin(document.body, o, () => { try { window.InscriptionFilm.lecture(); } catch (e) { /* film fermé */ } }, true, () => { try { window.InscriptionFilm.fermer(); } catch (e) { /* déjà fermé */ } }) });
       lancer();
-    } catch (e) { window.location.href = version === 'flash' ? 'evenements.html' : version === 'telephone' ? 'm.html' : version === 'businessplan' ? 'business-plan.html' : 'inscription.html'; }
+    } catch (e) { window.location.href = version === 'flash' ? 'evenements.html' : version === 'telephone' ? 'm.html' : version === 'businessplan' ? 'business-plan.html' : version === 'fiche' ? 'inscriptions-admin.html' : 'inscription.html'; }
   }
   function monterFilm(zone, v, o) {
     const version = versionFilm(v.url);

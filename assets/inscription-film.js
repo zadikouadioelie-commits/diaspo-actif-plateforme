@@ -357,6 +357,72 @@
 .fb-act div.rd{border-color:#b42318;color:#b42318;margin-bottom:0}
 .fb-stp{position:absolute;left:0;top:0;width:146px;border-radius:14px 14px 4px 4px;background:linear-gradient(180deg,#FDEBA8 0%,#E8B22E 40%,#B67E14 100%);box-shadow:0 14px 34px rgba(0,0,0,.4);display:flex;align-items:flex-start;justify-content:center;padding-top:12px;font-family:'Cinzel','Georgia',serif;font-size:34px;font-weight:800;color:#5a3a00}
 .fb-lbl{padding:12px 28px;border-radius:999px;background:rgba(255,255,255,.12);border:2px solid #FDEBA8;font-family:'Cinzel','Georgia',serif;font-size:28px;font-weight:800;color:#FDEBA8;white-space:nowrap;box-shadow:0 0 34px rgba(253,235,168,.55)}
+/* ── Tuto « Créer une fiche d'inscription » (maquettes fictives) ── */
+.fn-win{width:1000px;height:470px;border-radius:16px;overflow:hidden;background:#f4f1ee;border:3px solid #E2A929;box-shadow:0 24px 70px rgba(0,0,0,.5);color:#10294f;font-family:'Segoe UI',system-ui,-apple-system,Roboto,sans-serif}
+.fn-win *{box-sizing:border-box}
+.fn-bar{height:38px;background:#e8e3df;display:flex;align-items:center;gap:7px;padding:0 14px;border-bottom:1px solid #d6cfc9}
+.fn-bar i{width:11px;height:11px;border-radius:50%;background:#c9c2bb}.fn-bar i:nth-child(1){background:#ec6a5e}.fn-bar i:nth-child(2){background:#f4bf4f}.fn-bar i:nth-child(3){background:#61c554}
+.fn-bar span{margin-left:14px;font-size:13px;color:#6b6460;background:#fff;border-radius:8px;padding:4px 14px;flex:1;max-width:420px}
+.fn-body{position:relative;width:100%;height:432px}
+.fn-p{position:absolute;inset:0;padding:20px 28px;opacity:0}
+.fn-ti{font-size:26px;font-weight:800;margin-bottom:12px}
+.fn-btns{display:flex;gap:10px;margin-bottom:16px}
+.fn-b{padding:9px 16px;border-radius:10px;border:1.5px solid #cfc8c2;background:#fff;font-size:14px;font-weight:700;color:#33425b;white-space:nowrap}
+.fn-b.dark{background:#10294f;border-color:#10294f;color:#fff}
+.fn-cards{display:flex;gap:16px}
+.fn-c{width:300px;border-radius:14px;background:#fff;border:1px solid #e3ddd7;overflow:hidden}
+.fn-c .im{height:92px}.fn-c .tx{padding:12px 14px}
+.fn-c b{display:block;font-size:17px}.fn-c small{color:#7a746f;font-size:13px}
+.fn-c .st{float:right;font-size:11.5px;font-weight:800;color:#15803d;background:#dcfce7;border-radius:999px;padding:3px 10px}
+.fn-modal{position:absolute;inset:0;background:rgba(16,41,79,.45);display:flex;align-items:center;justify-content:center;opacity:0}
+.fn-mbox{width:420px;background:#fff;border-radius:16px;padding:22px 24px;box-shadow:0 20px 50px rgba(0,0,0,.35)}
+.fn-mbox h4{margin:0 0 14px;font-size:20px}.fn-mbox label{display:block;font-size:13px;font-weight:700;color:#6b6460;margin-bottom:6px}
+.fn-in{height:46px;border-radius:10px;border:2px solid #3b82f6;background:#fff;padding:0 14px;display:flex;align-items:center;font-size:18px;margin-bottom:14px;box-shadow:0 0 0 3px rgba(59,130,246,.2)}
+.fn-btn{height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;color:#fff;background:#10294f}
+.fn-fh{display:flex;align-items:center;gap:12px;margin-bottom:12px}.fn-fh b{font-size:26px}
+.fn-badge{font-size:12.5px;font-weight:800;border-radius:999px;padding:4px 12px;background:#e5e2df;color:#57514c}
+.fn-badge.g{background:#dcfce7;color:#15803d;border:1px solid #86efac}.fn-badge.pub{background:#16a34a;color:#fff}
+.fn-tabs{display:flex;gap:6px;border-bottom:2px solid #e3ddd7;margin-bottom:14px}
+.fn-tabs span{padding:9px 16px;font-size:15px;font-weight:800;color:#15803d;border-bottom:4px solid transparent;margin-bottom:-2px}
+.fn-tabs span.on{border-bottom-color:#16a34a}
+.fn-sub{position:absolute;left:28px;right:28px;top:112px;opacity:0}
+.fn-kp{display:flex;gap:12px;margin-bottom:12px}
+.fn-k{flex:1;background:#fff;border:1px solid #e3ddd7;border-radius:12px;padding:12px 16px}
+.fn-k small{display:block;font-size:12.5px;color:#7a746f}.fn-k b{font-size:30px;font-weight:700}
+.fn-lien{background:#fff;border:1px solid #e3ddd7;border-radius:12px;padding:12px 16px;display:flex;align-items:center;gap:12px;font-size:14px}
+.fn-lien code{flex:1;background:#f4f1ee;border-radius:8px;padding:8px 12px;font-size:13px;color:#33425b}
+.fn-ty{display:flex;gap:16px}
+.fn-tyc{width:300px;border:2px solid #10294f;background:#fff;border-radius:14px;padding:14px 16px}
+.fn-tyc b{font-size:19px}.fn-tyc .ok{float:right;font-size:12px;font-weight:800;color:#15803d;background:#dcfce7;border-radius:999px;padding:3px 10px}
+.fn-tyc small{display:block;color:#7a746f;font-size:13.5px;margin-top:6px}
+.fn-tyd{flex:1;background:#fff;border:1px solid #e3ddd7;border-radius:14px;padding:14px 18px;display:grid;grid-template-columns:1fr 1fr;gap:10px 18px}
+.fn-tyd small{display:block;font-size:12px;color:#7a746f;font-weight:700}.fn-tyd b{font-size:20px}
+.fn-chk{grid-column:1/-1;font-size:14px;font-weight:600;color:#33425b}
+.fn-ch{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.fn-ch span{padding:7px 14px;border-radius:999px;background:#a21caf;color:#fff;font-size:14px;font-weight:800}
+.fn-ch span.o{background:#fff;color:#a21caf;border:1.5px solid #a21caf}
+.fn-lia{border:2px solid #c026d3;background:#fdf4ff;border-radius:14px;padding:12px 16px}
+.fn-lia h5{margin:0 0 4px;font-size:17px;color:#86198f}.fn-lia p{margin:0 0 8px;font-size:13px;color:#7e22ce}
+.fn-lia .ev{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid #e9d5ff;border-radius:10px;padding:8px 12px;font-size:14px;font-weight:700;margin-bottom:8px}
+.fn-lia .ev i{width:18px;height:18px;border:2px solid #9ca3af;border-radius:4px;background:#fff;display:flex;align-items:center;justify-content:center;font-style:normal;font-size:13px;color:#fff}
+.fn-lia .ev i.on{background:#7e22ce;border-color:#7e22ce}
+.fn-new{float:right;font-size:14px;font-weight:800;color:#10294f}
+.fn-ef{display:grid;grid-template-columns:1fr 1fr;gap:12px 20px;margin-top:6px}
+.fn-ef .full{grid-column:1/-1}.fn-ef label{display:block;font-size:12.5px;font-weight:800;color:#6b6460;margin-bottom:5px;letter-spacing:.04em}
+.fn-ef .v{height:42px;border-radius:10px;background:#fff;border:2px solid #cfc8c2;padding:0 12px;display:flex;align-items:center;font-size:17px}
+.fn-pub{display:flex;gap:18px;align-items:flex-start}
+.fn-pv{width:380px;background:#fff;border:1px solid #e3ddd7;border-radius:14px;overflow:hidden}
+.fn-pv .im{height:96px;background:linear-gradient(120deg,#0B2A5B,#1d57ad 50%,#c2410c)}
+.fn-pv .tx{padding:14px 16px}.fn-pv b{font-size:20px}
+.fn-pv .ty{margin-top:10px;display:flex;align-items:center;justify-content:space-between;border:1px solid #e3ddd7;border-radius:12px;padding:10px 14px}
+.fn-pv .ty span{font-size:14px;color:#57514c}.fn-pv .ty em{font-style:normal;background:#10294f;color:#fff;font-weight:800;border-radius:10px;padding:8px 16px;font-size:15px}
+.fn-toast{padding:14px 28px;border-radius:14px;background:#16a34a;color:#fff;font-size:22px;font-weight:800;box-shadow:0 12px 36px rgba(22,163,74,.5);white-space:nowrap}
+.fn-chips{display:flex;gap:7px;width:1180px;justify-content:center}
+.fn-chip{width:76px;height:50px;border-radius:12px;background:rgba(255,255,255,.1);border:2px solid rgba(226,169,41,.4);display:flex;align-items:center;justify-content:center;gap:5px;color:#dbe8ff;font-weight:800;font-size:15px}
+.fn-chip i{font-style:normal;font-size:17px}
+.fn-vig{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:10px;text-align:center}
+.fn-vig .ic{width:120px;height:120px;border-radius:30px;background:#fff;border:3px solid #E2A929;display:flex;align-items:center;justify-content:center;font-size:64px;box-shadow:0 14px 34px rgba(0,0,0,.2)}
+.fn-vig .nb{font-size:15px;font-weight:800;letter-spacing:.14em;color:#8a5a00}.fn-vig h3{margin:0;font-size:42px;font-family:'Cinzel','Georgia',serif}.fn-vig p{margin:0;font-size:29px;font-weight:600;color:#33425b;max-width:800px;line-height:1.3}
 @media (max-width:640px){.fi-titre{display:none!important}.fi-top{justify-content:flex-end}}
 @media (prefers-reduced-motion:reduce){.fi-ov{animation:none}}
 `;
@@ -1572,7 +1638,178 @@
   }
 
   FILMS.businessplan = { id: 'businessplan', stage: 'businessplan', etiquette: '50 s', titre: 'TUTO · BUSINESS PLAN', aria: "Tuto vidéo : le module Business Plan de Diaspo'Actif, de l'idée à l'exécution", cta: { label: 'Créer mon business plan', href: 'business-plan.html' }, voix: 'assets/media/business-plan-voix.mp3?v=1', fin: 52.0, dvoix: 46.72, caps: CAPS_BP, scenes: SCENES_BP, sfx: SFX_BP, swell: [38, 47] };
-  function rendre(av) { return FILM.id === 'long' ? rendreLong(av) : FILM.id === 'flash' ? rendreFlash(av) : FILM.id === 'telephone' ? rendreTel(av) : FILM.id === 'businessplan' ? rendreBP(av) : rendreCourt(av); }
+  /* ═══ Tuto « Créer une fiche d'inscription » (2026-10-24) : décor, sous-titres, effets, scènes ═══
+     Écrans = maquettes HTML fidèles au module « Formulaires de réponse et d'inscription », données 100 % FICTIVES (Gala annuel 2027…).
+     Voix : prise unique Perle (57,28 s) accélérée de 6 % (atempo 1,06 → 54,04 s) pour tenir en moins d'une minute ; temps = transcription horodatée
+     (Scribe) divisée par 1,06. Si la voix est régénérée, REMESURER. */
+  const STEPS_FI = [[4, '🎓', 'Candidature', 'Un parcours de candidature pour vos événements'], [5, '📋', 'Traitement des candidatures', 'Enregistrer votre décision sur chaque dossier'], [6, '✅', 'Validation', 'Acceptation automatique ou manuelle'], [7, '🌐', 'Aperçu public', 'La fiche vue par vos visiteurs'],
+    [8, '📅', 'Programme', 'Horaires et temps forts de la journée'], [9, '💬', 'Communication', 'Écrire à tous vos inscrits'], [10, '🎫', 'Contrôle QR', "Scanner les billets à l'entrée"], [11, '👥', 'Présences', 'Qui est réellement venu'], [12, '💰', 'Finances', 'Les paiements reçus'], [13, '📈', 'Gestion', 'Les inscriptions dans le temps'], [14, '📜', 'Historique', 'Toutes les actions effectuées']];
+  const ICONES_FI = ['📊', '🎫', '📝'].concat(STEPS_FI.map(s => s[1]));
+  const STAGE_FI_HTML = `
+<div class="fi-bg"></div>
+<div class="fi-blob b1" data-r="b1"></div><div class="fi-blob b2" data-r="b2"></div>
+<div data-r="parts"></div>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <linearGradient id="fiGold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FDEBA8"/><stop offset=".5" stop-color="#E8B22E"/><stop offset="1" stop-color="#B67E14"/></linearGradient>
+</defs></svg>
+<svg class="fi-globe" data-r="rub" viewBox="0 0 1280 720" width="1280" height="720" aria-hidden="true">
+  <path d="M0 690 C 300 662, 640 712, 1280 680 L1280 720 L0 720 Z" fill="#061633" opacity=".94"/>
+  <path d="M0 690 C 300 662, 640 712, 1280 680" fill="none" stroke="url(#fiGold)" stroke-width="4"/>
+</svg>
+<div class="fi-abs fi-head" data-r="head"><img src="assets/media/logo-film.webp" alt=""><span>Diaspo<i>'</i>Actif</span></div>
+<div class="fi-abs ft-h gold" data-r="nh" style="font-size:34px;width:900px"></div>
+
+<div class="fi-abs ft-h gold" data-r="nti" style="font-size:58px;width:1000px;line-height:1.1">La fiche d'inscription</div>
+<div class="fi-abs ft-sub" data-r="nts" style="width:900px;font-size:19px">UN OUTIL · TOUT AU MÊME ENDROIT</div>
+<div class="fi-abs fn-c" data-r="np0" style="width:190px"><div class="im" style="height:46px;background:#d6e3ff"></div><div class="tx"><b>Liste papier</b><small>Inscrit·e ?</small></div></div>
+<div class="fi-abs fn-c" data-r="np1" style="width:190px"><div class="im" style="height:46px;background:#fde68a"></div><div class="tx"><b>Messages</b><small>« Je m'inscris »</small></div></div>
+<div class="fi-abs fn-c" data-r="np2" style="width:190px"><div class="im" style="height:46px;background:#bbf7d0"></div><div class="tx"><b>Tableur</b><small>Colonnes à jour ?</small></div></div>
+<div class="fi-abs fn-c" data-r="np3" style="width:190px"><div class="im" style="height:46px;background:#fbcfe8"></div><div class="tx"><b>Paiements</b><small>Qui a réglé ?</small></div></div>
+
+<div class="fi-abs fn-win" data-r="nwin"><div class="fn-bar"><i></i><i></i><i></i><span>diaspoactif.com/inscriptions-admin.html</span></div>
+ <div class="fn-body">
+  <div class="fn-p" data-r="nP1">
+    <div class="fn-ti">Formulaires de réponse et d'inscription</div>
+    <div class="fn-btns"><span class="fn-b">⚙️ Partenaires & sponsors par défaut</span><span class="fn-b">📥 Formulaires partagés avec moi (2)</span><span class="fn-b dark" data-r="nCre">+ Créer une fiche d'inscription</span></div>
+    <div class="fn-cards"><div class="fn-c"><div class="im" style="background:linear-gradient(120deg,#0B2A5B,#c2410c)"></div><div class="tx"><span class="st">Publiée</span><b>Journée portes ouvertes</b><small>Inscrits : 24</small></div></div>
+      <div class="fn-c"><div class="im" style="background:linear-gradient(120deg,#0f766e,#fde68a)"></div><div class="tx"><span class="st">Publiée</span><b>Gala annuel 2026</b><small>Inscrits : 58</small></div></div></div>
+    <div class="fn-modal" data-r="nMod"><div class="fn-mbox"><h4>+ Créer une fiche d'inscription</h4><label>Nom de la fiche</label><div class="fn-in"><span data-r="nNom"></span></div><div class="fn-btn" data-r="nOk">Créer</div></div></div>
+  </div>
+  <div class="fn-p" data-r="nP2">
+    <div class="fn-fh"><b>Gala annuel 2027</b><span class="fn-badge" data-r="nBadge">Brouillon</span><span class="fn-badge g" data-r="nEtape">Création — étape 1/3</span></div>
+    <div class="fn-tabs"><span data-r="nT0">1. 📊 Vue d'ensemble</span><span data-r="nT1">2. 🎫 Types d'inscription</span><span data-r="nT2">3. 📝 Formulaire</span></div>
+    <div class="fn-sub" data-r="nS1"><div class="fn-kp"><div class="fn-k"><small>Total inscriptions</small><b>0</b></div><div class="fn-k"><small>Types actifs</small><b>0</b></div><div class="fn-k"><small>Fonds gelés</small><b>— €</b></div><div class="fn-k"><small>Places restantes</small><b>0</b></div></div>
+      <div class="fn-lien"><span>Lien public</span><code>diaspoactif.com/inscription-publique.html?slug=gala-annuel-2027</code><span class="fn-b dark">Copier</span></div></div>
+    <div class="fn-sub" data-r="nS2"><div class="fn-ty"><div class="fn-tyc"><b>Participant</b><span class="ok">Ouvert</span><small>20 € · 0/12 places · Validation automatique</small></div>
+      <div class="fn-tyd"><div><small>TARIF</small><b>20 €</b></div><div><small>PLACES</small><b>0/12 places</b></div><div><small>VALIDATION</small><b>Automatique</b></div><div><small>PÉRIODE</small><b>Période de la fiche</b></div><div class="fn-chk">☑ Activer la liste d'attente une fois complet</div></div></div></div>
+    <div class="fn-sub" data-r="nS3"><div class="fn-ch"><span>Identité</span><span>Contact</span><span>Profession</span><span>Diaspora</span><span>Événement</span><span>Médias</span><span class="o">Option payante</span><span class="o">Sondage</span><span class="o">Don / Cagnotte</span></div>
+      <div class="fn-lia" data-r="nLia"><h5>🔗 Étape essentielle — Liaison à un événement</h5><p>Le bouton « S'inscrire » de votre événement mène vers cette fiche. <span class="fn-new" data-r="nNew">+ Créer un nouvel événement →</span></p><div class="ev"><i></i>Aucun événement lié pour le moment</div></div></div>
+    <div class="fn-sub" data-r="nS4"><div class="fn-pub"><div class="fn-pv"><div class="im"></div><div class="tx"><b>Gala annuel 2027</b><div class="ty"><span>Participant · 20 € · 12 places restantes</span><em data-r="nIns">S'inscrire</em></div></div></div>
+      <div class="fn-lia" style="flex:1"><h5>✅ Fiche liée à l'événement</h5><p>Dès la liaison, la fiche sort du brouillon : elle est publiée automatiquement.</p><div class="ev"><i class="on">✓</i>Gala annuel 2027 — 07/11/2027</div></div></div></div>
+  </div>
+  <div class="fn-p" data-r="nP3">
+    <div class="fn-ti">⚡ Créer un événement</div>
+    <div class="fn-ef"><div class="full"><label>TITRE *</label><div class="v"><span data-r="eT"></span></div></div><div><label>DATE *</label><div class="v"><span data-r="eD"></span></div></div><div><label>ADRESSE *</label><div class="v"><span data-r="eA"></span></div></div>
+      <div class="full"><label>DESCRIPTION</label><div class="v"><span data-r="eS"></span></div></div></div>
+    <div class="fn-btns" style="margin-top:18px"><span class="fn-b">← Modifier</span><span class="fn-b dark" data-r="ePub">✅ Confirmer et publier</span></div>
+  </div>
+  <div class="fn-p" data-r="nP5"><div class="fn-vig"><div class="ic" data-r="vIc"></div><div class="nb" data-r="vNb"></div><h3 data-r="vTi"></h3><p data-r="vSu"></p></div></div>
+ </div></div>
+<div class="fi-abs fn-toast" data-r="nToast">✅ Événement publié</div>
+<div class="fi-abs fn-chips" data-r="nChips">${ICONES_FI.map((ic, i) => `<div class="fn-chip"><span>${i + 1}</span><i>${ic}</i></div>`).join('')}</div>
+
+<div class="fi-abs" data-r="lauG">${laurier(false)}</div><div class="fi-abs" data-r="lauD">${laurier(true)}</div>
+<div class="fi-abs fi-logo" data-r="logoF" style="width:200px;height:200px;margin:0"><img src="assets/media/logo-film.webp" alt="" style="width:100%;height:100%;border-radius:50%"></div>
+<div class="fi-abs fi-big" data-r="t1">Une fiche, <span class="gold">un lien</span></div>
+<div class="fi-abs fi-script" data-r="t0">plus de tableurs</div>
+<div class="fi-abs" data-r="t3"><span class="fi-cta">Créer ma fiche</span></div>
+<div class="fi-abs fi-url" data-r="t4">DIASPOACTIF.COM</div>
+<div class="fi-abs" data-r="fade" style="width:${W}px;height:${H}px;background:#061633;opacity:0"></div>`;
+
+  const CAPS_FI = [
+    [0.0, 2.04, "Organiser un événement, c'est une chose."], [2.42, 4.64, "Gérer ses inscriptions, c'en est une autre."], [4.83, 8.15, "Avec la fiche d'inscription, tout se règle en quatorze étapes."],
+    [8.19, 11.77, "Ouvrez « Formulaires de réponse et d'inscription », créez votre fiche."], [12.0, 13.66, "Un : la vue d'ensemble."], [13.7, 16.75, "Deux : vos types d'inscription, gratuits ou payants."],
+    [16.83, 18.49, "Trois : votre formulaire."], [18.57, 21.74, "Reliez-la à un événement, ou créez-le d'ici, puis publiez :"], [22.0, 23.92, "votre fiche est publiée en même temps."],
+    [23.96, 27.1, "Candidature : pour créer des candidatures sur vos événements."], [27.2, 29.6, "Traitement : décidez pour chaque dossier."], [29.74, 32.5, "Validation : acceptation automatique ou manuelle."],
+    [32.68, 35.6, "Aperçu public : la fiche vue par vos visiteurs."], [35.81, 38.1, "Programme : horaires et temps forts."], [38.19, 40.2, "Communication : écrivez à vos inscrits."],
+    [40.3, 42.3, "Contrôle QR : scannez les billets."], [42.38, 44.0, "Présences : qui est venu."], [44.07, 45.85, "Finances : les paiements reçus."], [45.92, 48.2, "Gestion : les inscriptions dans le temps."],
+    [48.26, 49.96, "Historique : toutes les actions."], [50.04, 52.45, "Une fiche, un lien, plus de tableurs."], [52.49, 54.12, "Créez la vôtre dès maintenant."],
+  ];
+  const SCENES_FI = [[-LEAD, 8.2], [8.2, 12.0], [12.0, 18.57], [18.57, 22.0], [22.0, 23.96], [23.96, 50.0], [50.0, 57.0 - LEAD]];
+  const SFX_FI = [[0.4, 'pop'], [7.1, 'chime'], [8.25, 'pop'], [10.6, 'clic'], [11.0, 'tic'], [11.9, 'clic'], [12.05, 'pop'], [13.75, 'pop'], [16.9, 'pop'], [18.6, 'pop'], [20.0, 'clic'], [21.8, 'clic'], [22.1, 'chime'], [22.45, 'pop'], [23.0, 'clic'], [50.1, 'chime']];
+  const HEADS_FI = [[8.2, 12.0, 'Créer sa fiche'], [12.0, 13.7, "Étape 1 · Vue d'ensemble"], [13.7, 16.83, "Étape 2 · Types d'inscription"], [16.83, 18.57, 'Étape 3 · Formulaire'], [18.57, 20.0, 'Liaison à un événement'], [20.0, 22.0, "Création de l'événement"], [22.0, 23.96, 'Publication'], [23.96, 50.0, 'Étapes 4 à 14 : la gestion']];
+  const STEP_T = [23.96, 27.2, 29.74, 32.68, 35.81, 38.19, 40.3, 42.38, 44.07, 45.92, 48.26];
+
+  function rendreFI(av) {
+    let a = av;
+    if (calme) { const s = FILM.scenes.find(x => av >= x[0] && av < x[1]) || FILM.scenes[FILM.scenes.length - 1]; a = s[1] - 0.02; }
+    const pic = (a0, a1) => P(a, a0, a0 + 0.25, E.lin) * (1 - P(a, a1 - 0.25, a1, E.lin));
+    const glow = (el, g) => { el.style.boxShadow = g > 0.05 ? `0 0 0 3px rgba(255,248,200,${g}),0 0 ${g * 26}px rgba(226,169,41,${g * 0.9})` : ''; };
+    if (!R._fi) {
+      R._fi = true; R._hd = -1; R._vg = -2;
+      R.pnl = { 1: R.nP1, 2: R.nP2, 3: R.nP3, 5: R.nP5 }; R.sub = [R.nS1, R.nS2, R.nS3, R.nS4]; R.tab = [R.nT0, R.nT1, R.nT2];
+      R.chip = [...R.nChips.children]; R.pile = [R.np0, R.np1, R.np2, R.np3];
+    }
+    R.b1.style.transform = `translate(${Math.sin(a * .2) * 60}px,${Math.cos(a * .17) * 40}px)`;
+    R.b2.style.transform = `translate(${Math.cos(a * .15) * -70}px,${Math.sin(a * .21) * -50}px)`;
+    R.pa.forEach((e, i) => {
+      const sx = (i * 197.3) % W, sy = (i * 83.7) % H, v = 8 + (i % 5) * 4;
+      e.el.style.transform = `translate(${(sx + Math.sin(a * .3 + i) * 30) % W}px,${((sy - a * v) % H + H) % H}px)`;
+      e.el.style.opacity = .25 + .35 * Math.abs(Math.sin(a * .8 + i));
+    });
+    const dec = P(a, -1.2, -0.3), fin0 = P(a, 49.8, 50.3);
+    R.rub.style.opacity = dec;
+    place(R.head, 200, 46, 1, P(a, 8.0, 8.8) * (1 - fin0));
+
+    /* Accroche : une pile d'outils éparpillés qui se range en UNE fiche */
+    const intro = (1 - P(a, 7.6, 8.3));
+    place(R.nti, 640, 250, lerp(0.92, 1, P(a, 0.2, 1.4, E.back)), P(a, 0.2, 1.2) * intro);
+    place(R.nts, 640, 330, 1, P(a, 1.0, 2.0) * intro);
+    const rg = [[220, 470, -9], [470, 505, 6], [800, 470, -5], [1050, 505, 8]];
+    R.pile.forEach((el, i) => {
+      const e = P(a, 2.4 + i * 0.3, 3.3 + i * 0.3, E.back), m = P(a, 5.4, 7.0, E.inout);
+      place(el, lerp(rg[i][0], 640, m), lerp(rg[i][1] + 80, rg[i][1], e) - m * 40, lerp(0.9, 1, e) * lerp(1, 0.78, m), e * intro * (1 - 0.5 * m), lerp(rg[i][2], 0, m));
+    });
+    const hd = HEADS_FI.findIndex(h => a >= h[0] && a < h[1]);
+    if (hd !== R._hd) { R._hd = hd; R.nh.textContent = hd >= 0 ? HEADS_FI[hd][2] : ''; }
+    place(R.nh, 640, 66, 1, hd >= 0 ? P(a, HEADS_FI[hd][0], HEADS_FI[hd][0] + 0.3) * (1 - P(a, HEADS_FI[hd][1] - 0.25, HEADS_FI[hd][1])) : 0);
+
+    /* Les 14 étapes : la barre apparaît puis s'allume au mot de la voix */
+    const t14 = [12.0, 13.7, 16.83].concat(STEP_T);
+    place(R.nChips, 640, 632, 1, P(a, 6.8, 7.8) * (1 - fin0));
+    R.chip.forEach((el, k) => {
+      const t = t14[k], nxt = t14[k + 1] || 50.0;
+      const on = pic(t, Math.max(nxt, t + 0.9)), done = a >= t ? 1 : 0;
+      el.style.background = on > 0.05 ? 'linear-gradient(135deg,#FDEBA8,#E8B22E)' : (done ? 'rgba(226,169,41,.28)' : 'rgba(255,255,255,.1)');
+      el.style.color = on > 0.05 ? '#2a1d02' : '#dbe8ff'; el.style.borderColor = on > 0.05 ? '#fff3bf' : 'rgba(226,169,41,.4)';
+      el.style.transform = `scale(${1 + 0.12 * on})`; el.style.boxShadow = on > 0.05 ? `0 0 ${on * 24}px rgba(253,235,168,${on * 0.9})` : '';
+    });
+
+    /* La fenêtre du module */
+    const win = P(a, 8.2, 9.0, E.back) * (1 - P(a, 49.8, 50.3));
+    place(R.nwin, 640, 345, lerp(0.95, 1.06, P(a, 8.2, 9.0, E.back)), win);
+    const show = (el, a0, a1) => { el.style.opacity = P(a, a0, a0 + 0.25) * (1 - P(a, a1 - 0.25, a1)); };
+    show(R.pnl[1], 8.2, 12.2);
+    R.pnl[2].style.opacity = Math.max(P(a, 11.95, 12.2) * (1 - P(a, 19.85, 20.1)), P(a, 22.15, 22.4) * (1 - P(a, 23.85, 24.1)));
+    show(R.pnl[3], 19.9, 22.3); show(R.pnl[5], 23.9, 50);
+    /* Liste : bouton « Créer », fenêtre « Nom de la fiche » */
+    glow(R.nCre, pic(10.3, 11.1));
+    R.nMod.style.opacity = P(a, 10.9, 11.15) * (1 - P(a, 11.8, 12.05));
+    R.nNom.textContent = tape('Gala annuel 2027', a, 11.1, 11.75); glow(R.nOk, pic(11.6, 12.1));
+    /* Fiche : onglets et sous-écrans */
+    const st = a < 13.7 ? 0 : a < 16.83 ? 1 : a < 22.3 ? 2 : 3;
+    R.tab.forEach((el, i) => { el.className = i === Math.min(st, 2) ? 'on' : ''; });
+    R.nEtape.textContent = a >= 22.3 ? 'Liée à un événement' : 'Création — étape ' + (Math.min(st, 2) + 1) + '/3';
+    const pubOk = a >= 22.5;
+    R.nBadge.textContent = pubOk ? 'Publiée' : 'Brouillon'; R.nBadge.className = 'fn-badge' + (pubOk ? ' pub' : '');
+    R.sub.forEach((el, i) => {
+      const a0 = [11.95, 13.6, 16.75, 22.15][i], a1 = [13.8, 16.95, 19.95, 24.0][i];
+      el.style.opacity = P(a, a0, a0 + 0.25) * (1 - P(a, a1 - 0.2, a1));
+    });
+    glow(R.nLia, pic(18.57, 20.0) * 0.9); glow(R.nNew, 0); R.nNew.style.textDecoration = a >= 19.4 ? 'underline' : 'none'; R.nNew.style.color = a >= 19.4 && a < 20.0 ? '#7e22ce' : '#10294f';
+    R.nNew.style.transform = `scale(${1 + 0.1 * pic(19.4, 20.0)})`; R.nNew.style.display = 'inline-block';
+    /* Événement : saisie rapide puis « Confirmer et publier » */
+    R.eT.textContent = tape('Gala annuel 2027', a, 20.0, 20.4); R.eD.textContent = tape('07/11/2027', a, 20.4, 20.65); R.eA.textContent = tape('12 rue des Lilas, Lyon', a, 20.65, 21.0); R.eS.textContent = tape('Soirée de rencontre de la diaspora', a, 21.0, 21.4);
+    glow(R.ePub, pic(21.2, 22.0)); R.ePub.style.transform = `scale(${1 + 0.05 * pic(21.2, 22.0) - 0.07 * P(a, 21.7, 21.78, E.lin) * (1 - P(a, 21.82, 21.95, E.lin))})`;
+    place(R.nToast, 640, 520, lerp(0.85, 1, P(a, 21.8, 22.2, E.back)), P(a, 21.8, 22.1) * (1 - P(a, 23.2, 23.8)) * (a < 23.9 ? 1 : 0));
+    glow(R.nIns, pic(22.8, 24.0)); R.nIns.style.transform = `scale(${1 + 0.1 * pic(22.8, 24.0)})`;
+    /* Vignette des étapes 4 à 14 */
+    const k = a < STEP_T[0] ? -1 : STEP_T.filter(t => a >= t).length - 1;
+    if (k !== R._vg) { R._vg = k; const s = STEPS_FI[Math.max(0, k)]; R.vIc.textContent = s[1]; R.vNb.textContent = 'ÉTAPE ' + s[0] + ' SUR 14'; R.vTi.textContent = s[2]; R.vSu.textContent = s[3]; }
+    if (k >= 0) { const p = P(a, STEP_T[k], STEP_T[k] + 0.3); R.vIc.style.transform = `scale(${lerp(0.8, 1, p)})`; }
+
+    /* Conclusion */
+    const f1 = P(a, 50.0, 50.7);
+    place(R.lauG, 250, 330, 1, f1 * 0.9); place(R.lauD, 1030, 330, 1, f1 * 0.9);
+    place(R.logoF, 640, 190, lerp(0.7, 1, P(a, 50.1, 51.0, E.back)), f1);
+    place(R.t1, 640, 360, 1, P(a, 50.3, 51.0)); place(R.t0, 640, 440, 1, P(a, 51.4, 52.1));
+    place(R.t3, 640, 540, lerp(0.9, 1, P(a, 52.5, 53.2, E.back)) * (1 + 0.04 * Math.sin(a * 5) * P(a, 53.2, 54)), P(a, 52.5, 53.2));
+    place(R.t4, 640, 600, 1, P(a, 53.3, 54.0));
+    R.fade.style.opacity = P(a, 54.6, 55.2);
+  }
+
+  FILMS.fiche = { id: 'fiche', stage: 'fiche', etiquette: '57 s', titre: "TUTO · CRÉER UNE FICHE D'INSCRIPTION", aria: "Tuto vidéo : créer une fiche d'inscription sur Diaspo'Actif", cta: { label: 'Créer ma fiche', href: 'inscriptions-admin.html' }, voix: 'assets/media/fiche-inscription-voix.mp3?v=2', fin: 57.0, dvoix: 54.04, caps: CAPS_FI, scenes: SCENES_FI, sfx: SFX_FI, swell: [45, 53] };
+  function rendre(av) { return FILM.id === 'long' ? rendreLong(av) : FILM.id === 'flash' ? rendreFlash(av) : FILM.id === 'telephone' ? rendreTel(av) : FILM.id === 'businessplan' ? rendreBP(av) : FILM.id === 'fiche' ? rendreFI(av) : rendreCourt(av); }
 
   /* ── Sous-titres ── */
   function majCaption(a) {
@@ -1673,7 +1910,7 @@
     if (ov) return;
     options = options || {};
     surFin = typeof options.onFin === 'function' ? options.onFin : null;
-    FILM = options.version === 'court' ? FILMS.court : options.version === 'flash' ? FILMS.flash : options.version === 'telephone' ? FILMS.telephone : options.version === 'businessplan' ? FILMS.businessplan : FILMS.long;
+    FILM = options.version === 'court' ? FILMS.court : options.version === 'flash' ? FILMS.flash : options.version === 'telephone' ? FILMS.telephone : options.version === 'businessplan' ? FILMS.businessplan : options.version === 'fiche' ? FILMS.fiche : FILMS.long;
     if (!document.getElementById('fi-css')) { const st = document.createElement('style'); st.id = 'fi-css'; st.textContent = CSS; document.head.appendChild(st); }
     if (!document.getElementById('fi-fonts')) { const l = document.createElement('link'); l.id = 'fi-fonts'; l.rel = 'stylesheet'; l.href = 'https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Cinzel:wght@600;800&display=swap'; document.head.appendChild(l); }
     calme = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -1682,7 +1919,7 @@
     const surInscription = /(^|\/)inscription(\.html)?$/.test(location.pathname);
     ov.innerHTML = `<div class="fi-box">
       <div class="fi-top"><span class="fi-titre">▶ ${FILM.titre || 'COMMENT ÇA MARCHE'} · ${FILM.etiquette}</span><span style="display:flex;gap:8px"><button class="fi-btn or" data-r="cta" type="button">${FILM.cta ? FILM.cta.label : 'Créer mon compte'}</button><button class="fi-btn" data-r="fermer" type="button" aria-label="Fermer le film">✕ Fermer</button></span></div>
-      <div class="fi-win" data-r="win"><div class="fi-stage" data-r="stage">${FILM.stage === 'flash' ? STAGE_FLASH_HTML : FILM.stage === 'telephone' ? STAGE_TEL_HTML : FILM.stage === 'businessplan' ? STAGE_BP_HTML : STAGE_HTML}</div></div>
+      <div class="fi-win" data-r="win"><div class="fi-stage" data-r="stage">${FILM.stage === 'flash' ? STAGE_FLASH_HTML : FILM.stage === 'telephone' ? STAGE_TEL_HTML : FILM.stage === 'businessplan' ? STAGE_BP_HTML : FILM.stage === 'fiche' ? STAGE_FI_HTML : STAGE_HTML}</div></div>
       <div class="fi-cap" data-r="cap" aria-live="off"></div>
       <div class="fi-ctl"><button class="fi-btn" data-r="play" type="button">▶ Lecture</button><button class="fi-btn" data-r="son" type="button">🔊 Son</button>
         <div class="fi-prog" data-r="prog" role="slider" tabindex="0" aria-label="Position dans le film" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i data-r="progf"></i><b data-r="progb"></b></div><span class="t" data-r="temps">0:00 / ${fmt(FILM.fin)}</span></div></div>`;
