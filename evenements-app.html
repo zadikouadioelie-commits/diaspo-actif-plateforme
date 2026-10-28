@@ -668,6 +668,8 @@
     <!-- Image de couverture -->
     <div style="margin-bottom:14px;">
       <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:6px;">🖼️ Image de couverture</label>
+      <!-- Consigne (2026-10-28, demande explicite) : privilégier les images RECTANGULAIRES (paysage). -->
+      <div style="font-size:12.5px;line-height:1.5;color:var(--muted);margin:0 0 8px;">📐 <b>Privilégiez une image rectangulaire</b> (format paysage, par exemple 1200 × 630 px) : elle s'affiche en entier sur la carte et sur la page de l'événement. Une image carrée ou verticale serait rognée.</div>
       <div id="cover-drop" style="border:2px dashed var(--border);border-radius:10px;padding:20px;text-align:center;cursor:pointer;transition:border-color .15s;background:#FAFAFA;" onclick="document.getElementById('cover-file').click()">
         <div id="cover-preview" style="display:none;margin-bottom:8px;"><img id="cover-img" style="max-height:120px;border-radius:8px;max-width:100%;object-fit:cover;"></div>
         <div id="cover-placeholder"><span style="font-size:28px;">📷</span><br><span style="font-size:13px;color:var(--muted);">Cliquer pour choisir une image de couverture</span><br><span style="font-size:11px;color:#aaa;">JPG, PNG, WebP · max 2 Mo</span></div>
