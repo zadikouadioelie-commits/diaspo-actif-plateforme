@@ -6401,6 +6401,124 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     // local tel quel, comme avant cette demande.
     const richMenu = !!(sidebar && sidebar.hasAttribute("data-full-menu"));
 
+    // ── Menu complet « sur place » (2026-10-28, demande explicite : « peu importe où je me
+    // trouve, le bouton menu ne doit envoyer nulle part, il doit simplement ouvrir la
+    // visibilité sur les modules »). Depuis les pages sans le vrai tiroir des ~30 modules
+    // (fiches d'inscription, profil, agenda…), ce bouton redirigeait jusqu'ici vers le tableau
+    // de bord (#da-menu) : on perdait la page en cours (et un formulaire à moitié rempli). Le
+    // menu s'ouvre désormais PAR-DESSUS la page courante : on lit le menu du tableau de bord du
+    // rôle (fichier statique, même origine), on en tire une copie dans un tiroir temporaire, et
+    // ce n'est qu'un clic sur un module qui change de page. Les modules « à section » du
+    // tableau de bord (data-section / data-usection) pointent vers dest#da-go=attr:valeur ;
+    // le tableau de bord, une fois chargé, clique alors lui-même le bon lien (voir plus bas).
+    let menuIci = null, menuIciFond = null, menuIciHistoire = false;
+    const menuIciCache = {};
+    function destMenuIci() { return (CURRENT_USER && ROLE_DASHBOARD[CURRENT_USER.role]) || null; }
+    async function remplirMenuIci(zone, dest) {
+      let source = null;
+      if (dest) {
+        try {
+          if (!menuIciCache[dest]) {
+            const r = await fetch(dest, { credentials: "same-origin" });
+            if (!r.ok) throw new Error("HTTP " + r.status);
+            const doc = new DOMParser().parseFromString(await r.text(), "text/html");
+            const aside = doc.querySelector("aside[data-full-menu]");
+            if (!aside) throw new Error("menu introuvable dans " + dest);
+            menuIciCache[dest] = aside;
+          }
+          source = menuIciCache[dest];
+        } catch (err) { console.error("menu des modules (sur place)", err); }
+      }
+      if (!menuIci) return; // refermé pendant le chargement
+      zone.textContent = "";
+      if (source) {
+        const copie = document.importNode(source, true);
+        copie.querySelectorAll("script,.sidebar-close,.brand,input,select,textarea,form").forEach(n => n.remove());
+        copie.querySelectorAll("a,button").forEach(n => { if (/déconnexion/i.test(n.textContent || "")) n.remove(); });
+        // Plus aucun id ni gestionnaire inline : les ids existent déjà dans la page courante
+        // (doublons) et les onclick visaient des éléments du tableau de bord, absents ici.
+        copie.querySelectorAll("*").forEach(n => {
+          Array.from(n.attributes).forEach(at => { if (at.name === "id" || /^on/i.test(at.name)) n.removeAttribute(at.name); });
+        });
+        copie.querySelectorAll("a").forEach(a => {
+          const cle = Array.from(a.attributes).find(at => /^data-[a-z]*section$/.test(at.name));
+          if (cle) {
+            a.setAttribute("href", dest + (cle.name === "data-section" ? "#" + cle.value : "#da-go=" + cle.name + ":" + encodeURIComponent(cle.value)));
+            a.removeAttribute(cle.name);
+          } else {
+            const h = a.getAttribute("href") || "";
+            if (h === "" || h === "#") a.setAttribute("href", dest);
+            else if (h.charAt(0) === "#") a.setAttribute("href", dest + h);
+          }
+          a.classList.remove("active");
+        });
+        while (copie.firstChild) zone.appendChild(copie.firstChild);
+      } else {
+        // Menu du tableau de bord illisible (réseau, rôle sans tableau de bord…) : accès de secours.
+        [["index.html", "🏠 Accueil"], [dest || "login.html", dest ? "📊 Mon tableau de bord" : "🔑 Se connecter"]].forEach(([href, txt]) => {
+          const a = document.createElement("a"); a.href = href; a.textContent = txt; zone.appendChild(a);
+        });
+      }
+      const pageCourante = location.pathname.split("/").pop() || "index.html";
+      zone.querySelectorAll("a").forEach(a => { if ((a.getAttribute("href") || "").split(/[?#]/)[0] === pageCourante) a.classList.add("active"); });
+      const sortie = document.createElement("a");
+      sortie.href = "#"; sortie.textContent = "🚪 Déconnexion";
+      sortie.addEventListener("click", async (e) => {
+        e.preventDefault();
+        try { await api("POST", "/auth/logout"); } catch (err) { /* ignore */ }
+        window.location.href = "index.html";
+      });
+      zone.appendChild(sortie);
+    }
+    function fermerMenuIci(viaNavigation) {
+      if (!menuIci) return;
+      menuIci.remove(); menuIciFond.remove();
+      menuIci = menuIciFond = null;
+      document.body.style.overflow = "";
+      if (toggle) toggle.textContent = "☰";
+      if (navToggleIcon) navToggleIcon.textContent = "☰";
+      if (navToggle) navToggle.classList.remove("active");
+      // Même logique que closeSidebar() : "retour" du téléphone ferme le menu sans quitter la
+      // page ; lors d'une vraie navigation (clic sur un module) on ne dépile rien.
+      if (menuIciHistoire && !viaNavigation) { menuIciHistoire = false; history.back(); }
+      else if (viaNavigation) menuIciHistoire = false;
+    }
+    function ouvrirMenuIci() {
+      if (menuIci) return;
+      menuIciFond = document.createElement("div");
+      menuIciFond.className = "sidebar-backdrop open";
+      menuIciFond.addEventListener("click", () => fermerMenuIci());
+      menuIci = document.createElement("aside");
+      menuIci.className = "sidebar";
+      menuIci.setAttribute("aria-label", "Menu des modules");
+      const croix = document.createElement("button");
+      croix.className = "sidebar-close"; croix.setAttribute("aria-label", "Fermer"); croix.textContent = "×";
+      croix.addEventListener("click", () => fermerMenuIci());
+      const marque = document.createElement("div");
+      marque.className = "brand"; marque.textContent = "Menu des Modules";
+      const zone = document.createElement("div");
+      zone.style.cssText = "color:#aeb3c2;font-size:13px;padding:6px 8px;";
+      zone.textContent = "Chargement des modules…";
+      zone.addEventListener("click", (e) => { if (e.target.closest("a[href]") && e.target.closest("a").getAttribute("href") !== "#") fermerMenuIci(true); });
+      menuIci.append(croix, marque, zone);
+      document.body.append(menuIciFond, menuIci);
+      void menuIci.offsetWidth; // fige l'état « hors écran » avant la classe .open, pour que le tiroir glisse
+      menuIci.classList.add("open");
+      document.body.style.overflow = "hidden";
+      if (toggle) toggle.textContent = "✕";
+      if (navToggleIcon) navToggleIcon.textContent = "✕";
+      if (navToggle) navToggle.classList.add("active");
+      history.pushState({ daMenuOpen: true }, "", location.href);
+      menuIciHistoire = true;
+      remplirMenuIci(zone, destMenuIci()).then(() => { if (menuIci) zone.style.cssText = ""; });
+    }
+    function basculerMenuIci(e) {
+      if (e) e.preventDefault();
+      if (menuIci) fermerMenuIci(); else ouvrirMenuIci();
+    }
+    window.addEventListener("popstate", () => { if (menuIci) { menuIciHistoire = false; fermerMenuIci(); } });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") fermerMenuIci(); });
+
     // Aucun tiroir dédié sur cette page : on bascule alors l'affichage mobile de la nav
     // existante du topbar plutôt que d'exiger un tiroir dupliqué par page — la nav contient
     // déjà les bons liens pour cette page précise.
@@ -6416,11 +6534,11 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     // propre menu automatiquement (voir plus bas, juste après la définition d'openSidebar) —
     // même contenu réel, un aller-retour de page en plus depuis les pages qui n'ont pas ce
     // contenu nativement, plutôt qu'un contenu tronqué ou dupliqué à l'identique ailleurs.
+    // (2026-10-28) Ce « Menu » ne redirige plus : il ouvre le menu complet SUR PLACE (voir
+    // ouvrirMenuIci ci-dessus). Une page avec tiroir (riche ou non) gère son propre clic plus bas.
     if (navToggle) navToggle.addEventListener("click", (e) => {
-      if (sidebar) return; // cette page a déjà le vrai menu, rien à rediriger
-      e.preventDefault();
-      const dest = (CURRENT_USER && ROLE_DASHBOARD[CURRENT_USER.role]) || "index.html";
-      window.location.href = dest + "#da-menu";
+      if (sidebar) return;
+      basculerMenuIci(e);
     });
 
     if (!sidebar) {
@@ -6436,12 +6554,11 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       // invisible jusqu'ici (voir l'ancienne classe sidebar-toggle--no-sidebar, retirée), il
       // apparaît désormais comme un accès rapide au menu complet depuis n'importe quelle
       // page qui n'a pas son propre tiroir.
-      if (toggle) {
-        toggle.addEventListener("click", (e) => {
-          e.preventDefault();
-          const dest = (CURRENT_USER && ROLE_DASHBOARD[CURRENT_USER.role]) || "index.html";
-          window.location.href = dest + "#da-menu";
-        });
+      if (toggle) toggle.addEventListener("click", basculerMenuIci);
+      // Arrivée par un ancien lien « …#da-menu » : on ouvre le menu sur place, sans rien déplacer.
+      if (location.hash === "#da-menu") {
+        history.replaceState(null, "", location.pathname + location.search);
+        ouvrirMenuIci();
       }
       return;
     }
@@ -6554,14 +6671,12 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       if (richMenu) {
         toggle.addEventListener("click", toggleSidebar);
       } else {
-        toggle.addEventListener("click", (e) => {
-          e.preventDefault();
-          const dest = (CURRENT_USER && ROLE_DASHBOARD[CURRENT_USER.role]) || "index.html";
-          window.location.href = dest + "#da-menu";
-        });
+        toggle.addEventListener("click", basculerMenuIci);
       }
     }
-    if (navToggle) navToggle.addEventListener("click", toggleSidebar);
+    // Petit tiroir local (pas le vrai menu des modules) : mobile aussi ouvre le menu complet sur
+    // place, pour montrer les mêmes modules partout (2026-10-28).
+    if (navToggle) navToggle.addEventListener("click", richMenu ? toggleSidebar : basculerMenuIci);
     if (close)    close.addEventListener("click", () => closeSidebar(true));
     if (backdrop) backdrop.addEventListener("click", () => closeSidebar(true));
 
@@ -6577,14 +6692,47 @@ document.addEventListener("DOMContentLoaded", async ()=>{
 
     // Préférence mémorisée : ne rouvre au chargement que si l'utilisateur avait
     // explicitement laissé la sidebar ouverte lors de sa dernière visite.
-    if (localStorage.getItem(LS_KEY) === "0") openSidebar(false);
+    // Réservé au vrai menu des modules : le petit tiroir local n'est plus jamais ouvert par le
+    // bouton menu (2026-10-28) — il se rouvrirait seul ici avec une préférence venue d'un
+    // tableau de bord.
+    if (richMenu && localStorage.getItem(LS_KEY) === "0") openSidebar(false);
 
-    // Ouverture automatique du menu à l'arrivée depuis une page sans .sidebar propre (voir
-    // #da-menu posé plus haut dans cette même fonction) — repère retiré de l'URL aussitôt
-    // utilisé pour ne pas rouvrir le menu à chaque rechargement de cette page ensuite.
+    // Ouverture automatique du menu à l'arrivée par un ancien lien « …#da-menu » — repère
+    // retiré de l'URL aussitôt utilisé pour ne pas rouvrir le menu à chaque rechargement.
     if (location.hash === "#da-menu") {
-      openSidebar(false);
       history.replaceState(null, "", location.pathname + location.search);
+      if (richMenu) openSidebar(false); else ouvrirMenuIci();
+    }
+
+    // Arrivée depuis le menu ouvert « sur place » (voir ouvrirMenuIci) : un module à section du
+    // tableau de bord est visé par #da-go=data-section:valeur. On clique le vrai lien de ce
+    // tiroir une fois que le tableau de bord a branché ses gestionnaires (variable selon la
+    // page : souvent après un appel réseau).
+    // Les tableaux de bord qui lisent déjà le hash (initiative, collectivité, administrateur)
+    // reçoivent #valeur tout court ; les autres #da-go=attribut:valeur. Dans les deux cas on
+    // double d'un clic sur le vrai lien tant qu'il n'est pas actif (6 essais au plus, arrêt au
+    // premier geste de l'utilisateur), et le repère n'est retiré de l'URL qu'à la fin.
+    let aller = /^#da-go=(data-[a-z]*section):(.+)$/.exec(location.hash);
+    if (!aller) {
+      const brut = /^#([a-z0-9_-]+)$/i.exec(location.hash);
+      if (brut && sidebar.querySelector('a[data-section="' + brut[1] + '"]')) aller = [brut[0], "data-section", brut[1]];
+    }
+    if (aller && richMenu) {
+      let valeur = aller[2];
+      try { valeur = decodeURIComponent(valeur); } catch (e) { /* valeur brute */ }
+      valeur = valeur.replace(/["\\]/g, "");
+      const hashOrigine = location.hash;
+      let ticks = 0, clics = 0, geste = false;
+      const stopGeste = () => { geste = true; };
+      ["pointerdown", "keydown"].forEach(ev => document.addEventListener(ev, stopGeste, { once: true, capture: true }));
+      const cherche = setInterval(() => {
+        const lien = sidebar.querySelector("a[" + aller[1] + '="' + valeur + '"]');
+        if (lien && !geste && clics < 6 && ticks >= 2 && !lien.classList.contains("active")) { clics++; lien.click(); }
+        if (++ticks > 24 || geste) {
+          clearInterval(cherche);
+          if (location.hash === hashOrigine) history.replaceState(null, "", location.pathname + location.search);
+        }
+      }, 250);
     }
   })();
 

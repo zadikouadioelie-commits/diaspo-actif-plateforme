@@ -511,21 +511,11 @@
      ce module ait fini de s'initialiser (même événement DOMContentLoaded, enregistré après lui
      donc exécuté après), puis on clone le bouton pour retirer son gestionnaire et le remplace par
      le même comportement "redirection #da-menu" que sur les pages sans tiroir (ex. profil.html). */
-  document.addEventListener('DOMContentLoaded', function(){
-    var oldBtn = document.getElementById('sidebar-toggle');
-    if (!oldBtn) return;
-    var newBtn = oldBtn.cloneNode(true);
-    oldBtn.parentNode.replaceChild(newBtn, oldBtn);
-    newBtn.addEventListener('click', function(e){
-      e.preventDefault();
-      fetch('/api/auth/me', {credentials:'same-origin'}).then(function(r){ return r.json(); })
-        .then(function(d){
-          var dash = {utilisateur:'dashboard-utilisateur.html', initiative:'dashboard-initiative.html', administrateur:'dashboard-administrateur.html', collectivite:'dashboard-collectivite.html'};
-          var dest = (d && d.user && dash[d.user.role]) || 'index.html';
-          window.location.href = dest + '#da-menu';
-        }).catch(function(){ window.location.href = 'index.html'; });
-    });
-  });
+  /* 2026-10-28 (demande explicite : « le bouton menu ne doit pas envoyer où que ce soit ») : le clonage
+     du bouton et la redirection #da-menu qui suivaient ici sont supprimés. Le module partagé traite
+     désormais cette page comme toute page sans le vrai tiroir : ☰ ouvre le menu complet SUR PLACE
+     (assets/app.js, ouvrirMenuIci). Garder un second gestionnaire ici l'aurait fait s'ouvrir puis se
+     refermer au même clic. */
   </script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js" defer></script>
