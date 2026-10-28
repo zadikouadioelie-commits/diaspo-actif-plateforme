@@ -18,7 +18,8 @@
     .icrop-box {
       --icrop-alt:#F1F5F9; --icrop-border:#CBD5E1; --icrop-ink:#0D1B2A; --icrop-muted:#475569;
       background:#fff; border-radius:16px; width:100%; max-width:560px;
-      box-shadow:0 20px 60px rgba(0,0,0,.35); overflow:hidden;
+      box-shadow:0 20px 60px rgba(0,0,0,.35); overflow-x:hidden; overflow-y:auto;
+      max-height:calc(100vh - 32px); max-height:calc(100dvh - 32px);
       transform:scale(.94); transition:transform .18s;
     }
     .icrop-overlay.show .icrop-box { transform:scale(1); }
@@ -57,7 +58,9 @@
       box-shadow:0 0 0 1.5px #1565C0, 0 2px 6px rgba(0,0,0,.35); cursor:pointer;
     }
     .icrop-zoom-label { font-size:16px; color:var(--icrop-muted); user-select:none; }
-    .icrop-actions { padding:18px 20px 20px; display:flex; gap:10px; justify-content:flex-end; }
+    /* Boutons toujours atteignables (2026-10-28) : avec une bannière haute ou le sélecteur de couleur ouvert, la fenêtre dépasse l'écran —
+       elle défile et la barre Annuler / Valider reste collée en bas. */
+    .icrop-actions { position:sticky; bottom:0; background:#fff; border-top:1px solid #E2E8F0; margin-top:16px; padding:14px 20px 16px; display:flex; gap:10px; justify-content:flex-end; }
     .icrop-btn { padding:10px 20px; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer; border:1.5px solid transparent; }
     .icrop-btn-cancel { background:#fff; color:var(--icrop-ink); border-color:var(--icrop-border); }
     .icrop-btn-cancel:hover { background:#F8FAFC; border-color:#94A3B8; }
@@ -66,7 +69,28 @@
     .icrop-btn-reset { background:#fff; color:#1565C0; border-color:#BFDBFE; padding:6px 12px; font-size:11.5px; font-weight:700; white-space:nowrap; }
     .icrop-btn-reset:hover { background:#EAF2FE; }
     .icrop-fillrow { display:flex; align-items:center; gap:10px; }
-    .icrop-swatches { display:flex; gap:9px; }
+    .icrop-swatches { display:flex; flex-wrap:wrap; gap:9px; }
+    /* Pastille « autre couleur » (2026-10-28, demande explicite : noir, vert et un diagramme de couleurs
+       à la souris pour choisir des nuances) : cercle arc-en-ciel qui ouvre le sélecteur ci-dessous. */
+    .icrop-swatch-custom { background:conic-gradient(from 0deg,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00); }
+    .icrop-swatch-custom.active::after { content:""; display:block; width:10px; height:10px; margin:auto; border-radius:50%; background:var(--icrop-pick,#fff); border:2px solid #fff; box-shadow:0 0 0 1px rgba(0,0,0,.4); }
+    .icrop-picker { margin-top:12px; }
+    .icrop-picker[hidden] { display:none; }
+    .icrop-sv { position:relative; height:150px; border-radius:8px; overflow:hidden; border:1px solid var(--icrop-border); cursor:crosshair; touch-action:none; }
+    .icrop-sv canvas { display:block; width:100%; height:100%; }
+    .icrop-sv-dot { position:absolute; width:16px; height:16px; margin:-8px 0 0 -8px; border-radius:50%; border:2px solid #fff; box-shadow:0 0 0 1.5px rgba(0,0,0,.55), 0 1px 4px rgba(0,0,0,.4); pointer-events:none; }
+    .icrop-picker input.icrop-hue { display:block; width:100%; margin:12px 0 0; height:14px; border-radius:99px; -webkit-appearance:none; appearance:none; outline:none; cursor:pointer;
+      background:linear-gradient(90deg,#f00 0%,#ff0 17%,#0f0 33%,#0ff 50%,#00f 67%,#f0f 83%,#f00 100%); border:1px solid var(--icrop-border); }
+    .icrop-picker input.icrop-hue::-webkit-slider-runnable-track { height:14px; background:transparent; }
+    .icrop-picker input.icrop-hue::-webkit-slider-thumb { -webkit-appearance:none; appearance:none; width:22px; height:22px; margin-top:-4px; border-radius:50%; background:var(--icrop-hue-c,#fff); border:3px solid #fff; box-shadow:0 0 0 1.5px rgba(0,0,0,.55), 0 2px 6px rgba(0,0,0,.35); cursor:pointer; }
+    .icrop-picker input.icrop-hue::-moz-range-track { height:14px; background:transparent; }
+    .icrop-picker input.icrop-hue::-moz-range-thumb { width:18px; height:18px; border-radius:50%; background:var(--icrop-hue-c,#fff); border:3px solid #fff; box-shadow:0 0 0 1.5px rgba(0,0,0,.55), 0 2px 6px rgba(0,0,0,.35); cursor:pointer; }
+    .icrop-hexrow { display:flex; align-items:center; gap:10px; margin-top:12px; flex-wrap:wrap; }
+    .icrop-hex-prev { width:30px; height:30px; border-radius:8px; border:2px solid var(--icrop-border); flex:none; }
+    .icrop-hex { width:96px; padding:7px 10px; font:700 13px/1 ui-monospace,Consolas,monospace; text-transform:uppercase; color:var(--icrop-ink); background:#fff; border:1.5px solid var(--icrop-border); border-radius:8px; }
+    .icrop-hex:focus { outline:none; border-color:#1565C0; box-shadow:0 0 0 3px rgba(21,101,192,.2); }
+    .icrop-hex.bad { border-color:#DC2626; }
+    .icrop-picker-hint { font-size:11.5px; color:var(--icrop-muted); flex:1; min-width:140px; }
     .icrop-swatch { width:28px; height:28px; border-radius:50%; border:2px solid var(--icrop-border); cursor:pointer; padding:0; box-shadow:0 0 0 1px rgba(0,0,0,.05) inset; transition:transform .1s; }
     .icrop-swatch:hover { transform:scale(1.08); }
     .icrop-swatch.active { border-color:#1565C0; box-shadow:0 0 0 3px rgba(21,101,192,.22); }
@@ -129,6 +153,18 @@
                 <button type="button" class="icrop-swatch" data-color="#E2E8F0" style="background:#E2E8F0" title="Gris clair"></button>
                 <button type="button" class="icrop-swatch" data-color="#0D2B4E" style="background:#0D2B4E" title="Bleu marine"></button>
                 <button type="button" class="icrop-swatch" data-color="#F26422" style="background:#F26422" title="Orange"></button>
+                <button type="button" class="icrop-swatch" data-color="#000000" style="background:#000000" title="Noir"></button>
+                <button type="button" class="icrop-swatch" data-color="#16A34A" style="background:#16A34A" title="Vert"></button>
+                <button type="button" class="icrop-swatch icrop-swatch-custom" title="Autre couleur : choisir une nuance à la souris" aria-expanded="false"></button>
+              </div>
+            </div>
+            <div class="icrop-picker" hidden>
+              <div class="icrop-sv"><canvas width="300" height="150"></canvas><span class="icrop-sv-dot"></span></div>
+              <input type="range" class="icrop-hue" min="0" max="360" value="210" step="1" aria-label="Teinte">
+              <div class="icrop-hexrow">
+                <span class="icrop-hex-prev"></span>
+                <input type="text" class="icrop-hex" maxlength="7" value="#FFFFFF" spellcheck="false" aria-label="Code de la couleur">
+                <span class="icrop-picker-hint">Cliquez ou glissez dans le carré pour choisir la nuance, la barre arc-en-ciel change la teinte.</span>
               </div>
             </div>
           </div>
@@ -149,7 +185,15 @@
       const btnCancel = overlay.querySelector('.icrop-btn-cancel');
       const btnClose   = overlay.querySelector('.icrop-close');
       const btnReset   = overlay.querySelector('.icrop-btn-reset');
-      const swatches   = overlay.querySelectorAll('.icrop-swatch');
+      const swatches   = overlay.querySelectorAll('.icrop-swatch:not(.icrop-swatch-custom)');
+      const customBtn  = overlay.querySelector('.icrop-swatch-custom');
+      const picker     = overlay.querySelector('.icrop-picker');
+      const svBox      = overlay.querySelector('.icrop-sv');
+      const svCanvas   = svBox.querySelector('canvas');
+      const svDot      = svBox.querySelector('.icrop-sv-dot');
+      const hueEl      = overlay.querySelector('.icrop-hue');
+      const hexEl      = overlay.querySelector('.icrop-hex');
+      const hexPrev    = overlay.querySelector('.icrop-hex-prev');
 
       let img = new Image();
       let imgLoaded = false;
@@ -224,11 +268,93 @@
         draw();
       });
 
+      /* ----- sélecteur de nuances (teinte / saturation / luminosité), sans dépendance ----- */
+      let pH = 210, pS = 0, pV = 1; // teinte 0-360, saturation et luminosité 0-1
+      function hsv2hex(h, s, v) {
+        const f = (n) => { const k = (n + h / 60) % 6; return v - v * s * Math.max(0, Math.min(k, 4 - k, 1)); };
+        return '#' + [f(5), f(3), f(1)].map((x) => Math.round(x * 255).toString(16).padStart(2, '0')).join('').toUpperCase();
+      }
+      function hex2hsv(hex) {
+        const m = /^#?([0-9a-f]{6})$/i.exec(String(hex).trim());
+        if (!m) return null;
+        const n = parseInt(m[1], 16);
+        const r = (n >> 16 & 255) / 255, g = (n >> 8 & 255) / 255, b = (n & 255) / 255;
+        const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+        let h = 0;
+        if (d) h = mx === r ? ((g - b) / d + 6) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+        return { h: h * 60, s: mx ? d / mx : 0, v: mx };
+      }
+      function drawSV() {
+        const c = svCanvas.getContext('2d'), w = svCanvas.width, h = svCanvas.height;
+        c.fillStyle = hsv2hex(pH, 1, 1); c.fillRect(0, 0, w, h);
+        const gw = c.createLinearGradient(0, 0, w, 0); gw.addColorStop(0, '#fff'); gw.addColorStop(1, 'rgba(255,255,255,0)');
+        c.fillStyle = gw; c.fillRect(0, 0, w, h);
+        const gb = c.createLinearGradient(0, 0, 0, h); gb.addColorStop(0, 'rgba(0,0,0,0)'); gb.addColorStop(1, '#000');
+        c.fillStyle = gb; c.fillRect(0, 0, w, h);
+      }
+      function paintPicker(fromHexField) {
+        const hex = hsv2hex(pH, pS, pV);
+        svDot.style.left = (pS * 100) + '%';
+        svDot.style.top = ((1 - pV) * 100) + '%';
+        hueEl.value = Math.round(pH);
+        hueEl.style.setProperty('--icrop-hue-c', hsv2hex(pH, 1, 1));
+        hexPrev.style.background = hex;
+        if (!fromHexField) { hexEl.value = hex; hexEl.classList.remove('bad'); }
+        return hex;
+      }
+      function applyCustom(fromHexField) {
+        drawSV();
+        fillColor = paintPicker(fromHexField);
+        swatches.forEach((b) => b.classList.remove('active'));
+        customBtn.classList.add('active');
+        customBtn.style.setProperty('--icrop-pick', fillColor);
+        draw();
+      }
+      function syncPickerTo(hex) {
+        const p = hex2hsv(hex);
+        if (!p) return;
+        // un gris/noir/blanc n'a pas de teinte propre : on garde la teinte précédente pour ne pas faire sauter la barre
+        if (p.s > 0.001 && p.v > 0.001) pH = p.h;
+        pS = p.s; pV = p.v;
+        drawSV(); paintPicker(false);
+      }
+      function svFromEvent(e) {
+        const r = svBox.getBoundingClientRect();
+        pS = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+        pV = 1 - Math.min(1, Math.max(0, (e.clientY - r.top) / r.height));
+        applyCustom(false);
+      }
+      let svDrag = false;
+      svBox.addEventListener('pointerdown', (e) => { svDrag = true; try { svBox.setPointerCapture(e.pointerId); } catch (_) {} svFromEvent(e); e.preventDefault(); });
+      svBox.addEventListener('pointermove', (e) => { if (svDrag) svFromEvent(e); });
+      const svEnd = () => { svDrag = false; };
+      svBox.addEventListener('pointerup', svEnd);
+      svBox.addEventListener('pointercancel', svEnd);
+      hueEl.addEventListener('input', () => { pH = Number(hueEl.value); applyCustom(false); });
+      hexEl.addEventListener('input', () => {
+        let v = hexEl.value.trim();
+        if (v && v[0] !== '#') v = '#' + v;
+        const p = hex2hsv(v);
+        hexEl.classList.toggle('bad', !p);
+        if (!p) return;
+        if (p.s > 0.001 && p.v > 0.001) pH = p.h;
+        pS = p.s; pV = p.v;
+        applyCustom(true);
+      });
+      customBtn.addEventListener('click', () => {
+        const open = picker.hidden;
+        picker.hidden = !open;
+        customBtn.setAttribute('aria-expanded', String(open));
+        if (open) { syncPickerTo(fillColor); customBtn.classList.add('active'); swatches.forEach((b) => b.classList.remove('active')); customBtn.style.setProperty('--icrop-pick', fillColor); }
+      });
+
       swatches.forEach((btn) => {
         btn.addEventListener('click', () => {
           fillColor = btn.getAttribute('data-color');
           swatches.forEach((b) => b.classList.remove('active'));
+          customBtn.classList.remove('active');
           btn.classList.add('active');
+          if (!picker.hidden) syncPickerTo(fillColor);
           draw();
         });
       });
