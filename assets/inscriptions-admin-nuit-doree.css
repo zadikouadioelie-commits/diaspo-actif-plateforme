@@ -1,0 +1,169 @@
+/* Design « Nuit dorée » — espace « Formulaires de réponse et d'inscription » (inscriptions-admin.html), 2026-10-28.
+   La page construit presque tout en styles posés en ligne (oklch clairs, fonds blancs) : cette feuille les ré-habille par sélecteurs d'attribut,
+   tous préfixés html body.nd #ia-root — rien d'autre sur le site n'est touché. Les teintes de sens sont conservées (vert = création / publié,
+   bleu = gestion, rouge = erreur, ambre = alerte) mais passées en versions lumineuses lisibles sur fond nuit.
+   Retour arrière : retirer class="nd" sur <body> et les 2 liens de feuille dans le <head>. */
+@import url("https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,500;6..96,600&family=Manrope:wght@400;500;600;700;800&display=swap");
+
+html body.nd{--ia-or:#E3C06E;--ia-or2:#B9893A;--ia-texte:#E8ECF6;--ia-doux:#AEB8D0;--ia-verre:rgba(255,255,255,.05);--ia-verre2:rgba(255,255,255,.08);
+  --ia-bord:rgba(227,192,110,.3);--ia-bord2:rgba(255,255,255,.13);--ia-degore:linear-gradient(135deg,#F3DC9B 0%,#E3C06E 38%,#B9893A 100%)}
+
+html body.nd #ia-root{background:transparent!important;color:var(--ia-texte);font-family:'Manrope','Segoe UI',system-ui,sans-serif;min-height:calc(100vh - 60px);
+  --bg:rgba(255,255,255,.06);--card:rgba(255,255,255,.05);--text:#EDEAE0;--muted:#AEB8D0;--border:rgba(255,255,255,.14);--navy:#FFFFFF;--orange:#E3C06E}
+html body.nd #ia-root :is(button,input,select,textarea){font-family:inherit}
+
+/* ── titres et liens ── */
+html body.nd #ia-root :is(h1,h2,h3,h4){font-family:'Bodoni Moda','Didot',Georgia,serif;font-weight:500;color:#fff!important;letter-spacing:-.005em}
+html body.nd #ia-root h1{font-size:clamp(26px,3.2vw,36px)!important}
+html body.nd #ia-root a{color:var(--ia-or)}
+
+/* ── surfaces blanches → verre ── */
+html body.nd #ia-root :is([style*="background:#fff"],[style*="background:white"]){background:var(--ia-verre)!important;border-color:var(--ia-bord2)!important;color:var(--ia-texte)}
+html body.nd #ia-root :is(header,nav){background:rgba(8,13,30,.72)!important;backdrop-filter:blur(14px);border-color:var(--ia-bord)!important}
+html body.nd #ia-root [style*="solid oklch("]{border-color:var(--ia-bord2)!important}
+html body.nd #ia-root [style*="solid #E"]{border-color:var(--ia-bord2)!important}
+html body.nd #ia-root [style*="border-radius:16px"]{border-radius:22px!important}
+html body.nd #ia-root [style*="border-radius:12px"]{border-radius:16px!important}
+html body.nd #ia-root :is([style*="background:#fff"],[style*="background:white"])[style*="border-radius:16px"]{box-shadow:0 24px 50px -36px rgba(0,0,0,.9)}
+
+/* ── gris clairs et pastels en ligne → verre / teintes lumineuses (placés APRÈS la règle blanche : ils la corrigent) ── */
+html body.nd #ia-root :is([style*="background:oklch(0.96 "],[style*="background:oklch(0.97 "],[style*="background:oklch(0.965"],[style*="background:oklch(0.99 "],[style*="background:oklch(0.93 "],[style*="background:#F1F5F9"],[style*="background:#f1f5f9"],[style*="background:#f8fafc"],[style*="background:#fafafa"]){background:rgba(255,255,255,.07)!important;color:var(--ia-texte)}
+html body.nd #ia-root :is([style*="background:oklch(0.95 0.03 258)"],[style*="background:oklch(0.97 0.01 258)"],[style*="background:oklch(0.94 0.04 258)"],[style*="background:#EAF2FE"],[style*="background:#EFF6FF"],[style*="background:#eff6ff"],[style*="background:#dbeafe"]){background:rgba(63,123,255,.16)!important;border-color:rgba(63,123,255,.45)!important}
+html body.nd #ia-root :is([style*="background:oklch(0.94 0.05 150)"],[style*="background:oklch(0.9 0.05 150)"],[style*="background:#F0FDF4"],[style*="background:#f0fdf4"],[style*="background:#DCFCE7"],[style*="background:#dcfce7"]){background:rgba(52,199,120,.15)!important;border-color:rgba(52,199,120,.45)!important}
+html body.nd #ia-root :is([style*="background:oklch(0.94 0.05 20)"],[style*="background:#FEF2F2"],[style*="background:#fef2f2"],[style*="background:#fee2e2"]){background:rgba(255,154,143,.14)!important;border-color:rgba(255,154,143,.45)!important}
+html body.nd #ia-root :is([style*="background:oklch(0.95 0.04 85)"],[style*="background:oklch(0.94 0.05 85)"],[style*="background:#FEF9C3"],[style*="background:#fef9c3"],[style*="background:#fffbeb"],[style*="background:#fff7ed"],[style*="background:#FFF7ED"]){background:rgba(227,192,110,.14)!important;border-color:var(--ia-bord)!important}
+/* fond de repli d'une image de couverture (visible tant que l'image charge, ou si elle manque) */
+html body.nd #ia-root :is([style*="background:oklch(0.9 0.004"],[style*="background:oklch(0.92 "],[style*="background:oklch(0.88 "]){background-color:rgba(255,255,255,.07)!important}
+/* barre de progression de création : piste et remplissage */
+html body.nd #ia-root [style*="background:oklch(0.4 0.13 150)"]{background:linear-gradient(90deg,#39d98a,#9BE8B8)!important}
+
+/* ── textes en ligne : sombres → clairs, discrets → doux ── */
+html body.nd #ia-root :is([style*="color:oklch(0.2 "],[style*="color:oklch(0.25 0.006"],[style*="color:oklch(0.3 "],[style*="color:oklch(0.35 "],[style*="color:oklch(0.4 0.006"],[style*="color:#1f2937"],[style*="color:#111"],[style*="color:#1E293B"],[style*="color:#334155"]){color:var(--ia-texte)!important}
+html body.nd #ia-root :is([style*="color:oklch(0.45 "],[style*="color:oklch(0.5 0.006"],[style*="color:oklch(0.55 "],[style*="color:oklch(0.6 "],[style*="color:oklch(0.65 "],[style*="color:#64748B"],[style*="color:#6b7280"],[style*="color:#475569"]){color:var(--ia-doux)!important}
+html body.nd #ia-root :is([style*="color:oklch(0.32 0.09 258)"],[style*="color:oklch(0.25 0.09 258)"],[style*="color:oklch(0.5 0.14 258)"],[style*="color:oklch(0.4 0.1 258)"],[style*="color:#1565C0"],[style*="color:#0A2F7A"],[style*="color:#0369A1"],[style*="color:#CFE6FF"]){color:var(--ia-or)!important}
+html body.nd #ia-root :is([style*="color:oklch(0.5 0.16 20)"],[style*="color:oklch(0.42 0.16 20)"],[style*="color:#DC2626"],[style*="color:#dc2626"],[style*="color:#B91C1C"],[style*="color:#7F1D1D"]){color:#FFB3AA!important}
+html body.nd #ia-root :is([style*="color:oklch(0.4 0.13 150)"],[style*="color:#15803d"],[style*="color:#1C8A0E"]){color:#9BE8B8!important}
+html body.nd #ia-root :is([style*="color:oklch(0.42 0.13 85)"],[style*="color:oklch(0.4 0.13 85)"],[style*="color:#8A5A00"],[style*="color:#92400E"]){color:#F3E3B5!important}
+html body.nd #ia-root :is([style*="color:#6B0FA3"],[style*="color:#8B12D6"],[style*="color:#7A3FA8"]){color:#D2B4FF!important}
+
+/* ── action principale : l'ancien « bleu marine » devient l'or ── */
+html body.nd #ia-root :is([style*="background:oklch(0.32 0.09 258)"],[style*="background:oklch(0.45 0.09 258)"]){background:var(--ia-degore)!important;color:#1a1202!important;border-color:transparent!important}
+html body.nd #ia-root :is(button,a)[style*="background:oklch(0.32 0.09 258)"]{box-shadow:0 10px 24px -12px rgba(227,192,110,.7);font-weight:800}
+html body.nd #ia-root :is(button,a)[style*="background:#8B12D6"]{background:linear-gradient(135deg,#9B6BFF,#6D28D9)!important;color:#fff!important}
+html body.nd #ia-root button[style*="border-radius:8px"]{border-radius:999px!important}
+html body.nd #ia-root button{transition:background .3s,border-color .3s,transform .3s}
+html body.nd #ia-root button:not([style*="background:oklch(0.32"]):hover{border-color:var(--ia-or)!important}
+html body.nd #ia-root .gt-launch-btn{background:var(--ia-verre2)!important;color:var(--ia-or)!important;border:1px solid var(--ia-bord)!important;border-radius:999px!important;box-shadow:none!important;font-weight:700}
+html body.nd #ia-root :is(button,a):focus-visible{outline:2px solid var(--ia-or);outline-offset:2px}
+
+/* ── onglets : un nom par étape, le soulignement néon (vert = création, bleu = gestion) est gardé ── */
+html body.nd #ia-root nav button[data-action="selectTab"]{color:var(--ia-doux)}
+html body.nd #ia-root nav button[data-action="selectTab"][style*="#0C8B24"]{color:#8BF0AE!important}
+html body.nd #ia-root nav button[data-action="selectTab"][style*="#0057B8"]{color:#9CC4FF!important}
+html body.nd #ia-root nav button[data-action="selectTab"]:hover{background:var(--ia-verre)!important;border-color:transparent!important}
+
+/* ── champs ── */
+html body.nd #ia-root :is(input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=color]):not([type=range]),select,textarea){background:rgba(255,255,255,.06)!important;color:#fff!important;border:1px solid var(--ia-bord2)!important;border-radius:12px!important;color-scheme:dark}
+html body.nd #ia-root :is(input,textarea)::placeholder{color:#7C88A4}
+html body.nd #ia-root :is(input,select,textarea):focus{outline:none;border-color:var(--ia-or)!important;box-shadow:0 0 0 3px rgba(227,192,110,.18)}
+html body.nd #ia-root select option{background:#0B1226;color:#fff}
+html body.nd #ia-root :is(input[type=checkbox],input[type=radio]){accent-color:#B9893A}
+html body.nd #ia-root label{color:var(--ia-texte)!important}
+
+/* ── tableaux ── */
+html body.nd #ia-root table{color:var(--ia-texte);border-color:var(--ia-bord2)}
+html body.nd #ia-root th{background:var(--ia-verre2)!important;color:var(--ia-or)!important;border-color:var(--ia-bord2)!important}
+html body.nd #ia-root td{border-color:var(--ia-bord2)!important}
+html body.nd #ia-root tr:hover td{background:var(--ia-verre)}
+
+/* ── encarts spéciaux de la page : on garde leur couleur d'identité, sur fond nuit ── */
+html body.nd #ia-root .ia-liaison-essentielle{background:linear-gradient(135deg,rgba(188,19,254,.16),rgba(120,40,200,.12))!important;color:var(--ia-texte)}
+html body.nd #ia-root .ia-parrainage-essentielle{background:linear-gradient(135deg,rgba(0,174,239,.16),rgba(30,120,220,.12))!important;color:var(--ia-texte)}
+html body.nd #ia-root .ia-liaison-essentielle::after,html body.nd #ia-root .ia-parrainage-essentielle::after{background:linear-gradient(115deg,transparent,rgba(255,255,255,.22),transparent)}
+html body.nd #ia-root .ia-evt-ligne{background:var(--ia-verre)!important;border-color:var(--ia-bord2)!important;color:var(--ia-texte)}
+html body.nd #ia-root .ia-evt-ligne:has(.ia-evt-checkbox:checked){background:rgba(227,192,110,.14)!important;border-color:var(--ia-or)!important}
+
+/* ── aperçu public : la carte « page publique » reste une vraie carte sombre, l'en-tête rayé aussi ── */
+html body.nd #ia-root [style*="repeating-linear-gradient"]{background:repeating-linear-gradient(45deg,rgba(227,192,110,.10),rgba(227,192,110,.10) 10px,rgba(255,255,255,.04) 10px,rgba(255,255,255,.04) 20px)!important}
+html body.nd #ia-root .rich-content{color:var(--ia-texte)!important}
+
+/* ── fenêtres (créer une fiche, liaison, partage, programme, modifier un type…) : fond nuit flouté, boîte opaque, titres Bodoni ── */
+html body.nd :is([style*="position:fixed"][style*="rgba(20,20,30"],[style*="position:fixed"][style*="rgba(13,27,42"]){background:rgba(3,6,14,.82)!important;backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px)}
+html body.nd :is([style*="position:fixed"][style*="rgba(20,20,30"],[style*="position:fixed"][style*="rgba(13,27,42"])>div{background:radial-gradient(ellipse 520px 300px at 100% 0%,rgba(227,192,110,.13),transparent 62%),radial-gradient(ellipse 460px 320px at 0% 100%,rgba(63,123,255,.12),transparent 62%),#0B1226!important;
+  border:1px solid rgba(227,192,110,.3)!important;border-radius:26px!important;box-shadow:0 50px 110px -34px rgba(0,0,0,.95);color:#E8ECF6;max-height:92vh;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(227,192,110,.4) transparent;
+  --bg:rgba(255,255,255,.06);--card:rgba(255,255,255,.05);--text:#EDEAE0;--muted:#AEB8D0;--border:rgba(255,255,255,.14);--navy:#FFFFFF;--orange:#E3C06E}
+html body.nd :is([style*="position:fixed"][style*="rgba(20,20,30"],[style*="position:fixed"][style*="rgba(13,27,42"])>div :is(h2,h3,h4){font-family:'Bodoni Moda','Didot',Georgia,serif;font-weight:500;color:#fff!important}
+html body.nd :is([style*="position:fixed"][style*="rgba(20,20,30"],[style*="position:fixed"][style*="rgba(13,27,42"])>div label{color:var(--ia-texte,#E8ECF6)!important}
+html body.nd :is([style*="position:fixed"][style*="rgba(20,20,30"],[style*="position:fixed"][style*="rgba(13,27,42"])>div :is(input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=color]),select,textarea){background:rgba(255,255,255,.06)!important;color:#fff!important;border:1px solid rgba(255,255,255,.13)!important;border-radius:12px!important;color-scheme:dark}
+html body.nd :is([style*="position:fixed"][style*="rgba(20,20,30"],[style*="position:fixed"][style*="rgba(13,27,42"])>div :is(input,textarea)::placeholder{color:#7C88A4}
+html body.nd :is([style*="position:fixed"][style*="rgba(20,20,30"],[style*="position:fixed"][style*="rgba(13,27,42"])>div :is(input,select,textarea):focus{outline:none;border-color:#E3C06E!important;box-shadow:0 0 0 3px rgba(227,192,110,.18)}
+html body.nd :is([style*="position:fixed"][style*="rgba(20,20,30"],[style*="position:fixed"][style*="rgba(13,27,42"])>div select option{background:#0B1226;color:#fff}
+
+/* (même chose pour les fenêtres posées DANS #ia-root : la spécificité de l'identifiant doit l'emporter sur les règles de teinte générées) */
+html body.nd #ia-root :is([style*="position:fixed"][style*="rgba(20,20,30"],[style*="position:fixed"][style*="rgba(13,27,42"]){background:rgba(3,6,14,.82)!important;backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px)}
+html body.nd #ia-root :is([style*="position:fixed"][style*="rgba(20,20,30"],[style*="position:fixed"][style*="rgba(13,27,42"])>div{background:radial-gradient(ellipse 520px 300px at 100% 0%,rgba(227,192,110,.13),transparent 62%),radial-gradient(ellipse 460px 320px at 0% 100%,rgba(63,123,255,.12),transparent 62%),#0B1226!important;
+  border:1px solid rgba(227,192,110,.3)!important;border-radius:26px!important;box-shadow:0 50px 110px -34px rgba(0,0,0,.95);color:#E8ECF6;max-height:92vh;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(227,192,110,.4) transparent;
+  --bg:rgba(255,255,255,.06);--card:rgba(255,255,255,.05);--text:#EDEAE0;--muted:#AEB8D0;--border:rgba(255,255,255,.14);--navy:#FFFFFF;--orange:#E3C06E}
+html body.nd #ia-root :is([style*="position:fixed"][style*="rgba(20,20,30"],[style*="position:fixed"][style*="rgba(13,27,42"])>div :is(h2,h3,h4){font-family:'Bodoni Moda','Didot',Georgia,serif;font-weight:500;color:#fff!important}
+html body.nd #ia-root :is([style*="position:fixed"][style*="rgba(20,20,30"],[style*="position:fixed"][style*="rgba(13,27,42"])>div label{color:var(--ia-texte,#E8ECF6)!important}
+html body.nd #ia-root :is([style*="position:fixed"][style*="rgba(20,20,30"],[style*="position:fixed"][style*="rgba(13,27,42"])>div :is(input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=color]),select,textarea){background:rgba(255,255,255,.06)!important;color:#fff!important;border:1px solid rgba(255,255,255,.13)!important;border-radius:12px!important;color-scheme:dark}
+html body.nd #ia-root :is([style*="position:fixed"][style*="rgba(20,20,30"],[style*="position:fixed"][style*="rgba(13,27,42"])>div :is(input,textarea)::placeholder{color:#7C88A4}
+html body.nd #ia-root :is([style*="position:fixed"][style*="rgba(20,20,30"],[style*="position:fixed"][style*="rgba(13,27,42"])>div :is(input,select,textarea):focus{outline:none;border-color:#E3C06E!important;box-shadow:0 0 0 3px rgba(227,192,110,.18)}
+html body.nd #ia-root :is([style*="position:fixed"][style*="rgba(20,20,30"],[style*="position:fixed"][style*="rgba(13,27,42"])>div select option{background:#0B1226;color:#fff}
+
+/* ── GÉNÉRÉ : toutes les teintes oklch réellement présentes dans la page, classées par rôle (fonds clairs → verre/teintes ; textes sombres → clairs) ── */
+html body.nd #ia-root :is([style*="background:oklch(0.9 0.05 150)"],[style*="background:oklch(0.94 0.05 150)"],[style*="background:oklch(0.95 0.05 150)"]){background:rgba(52,199,120,.15)!important;border-color:rgba(52,199,120,.45)!important}
+html body.nd #ia-root :is([style*="background:oklch(0.93 0.004 30)"],[style*="background:oklch(0.95 0.02 258)"],[style*="background:oklch(0.96 0.004 30)"],[style*="background:oklch(0.965 0.002 30)"],[style*="background:oklch(0.97 0.002 30)"],[style*="background:oklch(0.97 0.004 258)"],[style*="background:oklch(0.97 0.004 30)"],[style*="background:oklch(0.97 0.01 258)"],[style*="background:oklch(0.99 0.001 30)"]){background:rgba(255,255,255,.07)!important}
+html body.nd #ia-root :is([style*="background:oklch(0.94 0.04 258)"],[style*="background:oklch(0.95 0.03 258)"]){background:rgba(63,123,255,.16)!important;border-color:rgba(63,123,255,.45)!important}
+html body.nd #ia-root :is([style*="background:oklch(0.94 0.05 20)"]){background:rgba(255,154,143,.14)!important;border-color:rgba(255,154,143,.45)!important}
+html body.nd #ia-root :is([style*="background:oklch(0.94 0.07 90)"],[style*="background:oklch(0.95 0.04 85)"],[style*="background:oklch(0.96 0.07 85)"]){background:rgba(227,192,110,.14)!important;border-color:var(--ia-bord)!important}
+html body.nd #ia-root :is([style*="color:oklch(0.2 0.006 30)"],[style*="color:oklch(0.3 0.006 30)"],[style*="color:oklch(0.35 0.006 30)"],[style*="color:oklch(0.4 0.006 30)"],[style*="color:oklch(0.45 0.006 30)"]){color:var(--ia-texte)!important}
+html body.nd #ia-root :is([style*="color:oklch(0.25 0.09 258)"],[style*="color:oklch(0.28 0.08 258)"],[style*="color:oklch(0.32 0.09 258)"],[style*="color:oklch(0.4 0.13 258)"],[style*="color:oklch(0.5 0.09 258)"],[style*="color:oklch(0.5 0.14 258)"]){color:var(--ia-or)!important}
+html body.nd #ia-root :is([style*="color:oklch(0.32 0.1 150)"],[style*="color:oklch(0.4 0.13 150)"],[style*="color:oklch(0.6 0.13 150)"]){color:#9BE8B8!important}
+html body.nd #ia-root :is([style*="color:oklch(0.4 0.13 85)"],[style*="color:oklch(0.42 0.13 85)"],[style*="color:oklch(0.42 0.15 90)"]){color:#F3E3B5!important}
+html body.nd #ia-root :is([style*="color:oklch(0.4 0.16 20)"],[style*="color:oklch(0.42 0.16 20)"],[style*="color:oklch(0.5 0.16 20)"]){color:#FFB3AA!important}
+html body.nd #ia-root :is([style*="color:oklch(0.5 0.006 30)"],[style*="color:oklch(0.55 0.006 30)"],[style*="color:oklch(0.6 0.006 30)"],[style*="color:oklch(0.65 0.006 30)"]){color:var(--ia-doux)!important}
+
+/* ── téléphone : mêmes éléments, plus compacts (en-tête, boutons d'action, marges, onglets) ── */
+@media (max-width:720px){
+  html body.nd #ia-root header{padding:14px 16px!important}
+  html body.nd #ia-root header div[style*="display:flex; gap:10px"],html body.nd #ia-root header div[style*="display:flex;gap:10px"]{flex-wrap:wrap!important;gap:8px!important;width:100%}
+  html body.nd #ia-root header button{padding:8px 13px!important;font-size:12.5px!important;white-space:nowrap}
+  html body.nd #ia-root header h1{font-size:24px!important}
+  html body.nd #ia-root header div[style*="margin-top:10px"]{gap:6px 14px!important;font-size:12.5px!important}
+  html body.nd #ia-root nav{padding:0 10px!important}
+  html body.nd #ia-root nav button[data-action="selectTab"]{padding:13px 11px!important;font-size:13px!important}
+  html body.nd #ia-root main{padding:18px 14px!important}
+  html body.nd #ia-root [style*="padding:14px 28px 0"]{padding:12px 14px 0!important}
+  html body.nd #ia-root :is(div,section)[style*="padding:24px"]{padding:18px!important}
+  html body.nd #ia-root [style*="max-width:640px"]{max-width:100%!important}
+  html body.nd #ia-root button[style*="padding:9px 16px"],html body.nd #ia-root button[style*="padding:10px 18px"]{padding:9px 14px!important}
+  html body.nd #ia-root main [style*="display:flex"][style*="gap:14px"]{flex-wrap:wrap!important}
+  html body.nd #ia-root main [style*="gap:14px"]>div[style*="flex:1"]{flex:1 1 200px!important;min-width:0}
+  html body.nd #ia-root .ia-mascotte-wrap{transform:scale(.8);transform-origin:top right}
+  html body.nd #ia-root [style*="grid-template-columns:repeat(4"],html body.nd #ia-root [style*="grid-template-columns: repeat(4"]{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+}
+
+/* ── GÉNÉRÉ : fonds hexadécimaux clairs réellement présents (insensibles à la casse), classés par teinte ── */
+html body.nd #ia-root :is([style*="background:#dcfce7" i]){background:rgba(52,199,120,.15)!important;border-color:rgba(52,199,120,.45)!important}
+html body.nd #ia-root :is([style*="background:#eaf2fe" i],[style*="background:#eef4ff" i]){background:rgba(63,123,255,.16)!important;border-color:rgba(63,123,255,.45)!important}
+html body.nd #ia-root :is([style*="background:#f0fdf4" i],[style*="background:#f1f5f9" i],[style*="background:#fef2f2" i]){background:rgba(255,255,255,.07)!important}
+html body.nd #ia-root :is([style*="background:#fee2e2" i],[style*="background:#fef9c3" i],[style*="background:#fffbea" i]){background:rgba(227,192,110,.14)!important;border-color:var(--ia-bord)!important}
+
+html body.nd #ia-root :is([style*="background:#fee2e2" i],[style*="background:#fef2f2" i]){background:rgba(255,154,143,.14)!important;border-color:rgba(255,154,143,.45)!important}
+html body.nd #ia-root [style*="background:#f0fdf4" i]{background:rgba(52,199,120,.15)!important;border-color:rgba(52,199,120,.45)!important}
+html body.nd #ia-root :is([style*="color:#0284c7" i],[style*="color:#0369a1" i],[style*="color:#0b6e6e" i]){color:#8FD8F5!important}
+html body.nd #ia-root :is([style*="color:#166534" i],[style*="color:#15803d" i],[style*="color:#1c8a0e" i]){color:#9BE8B8!important}
+html body.nd #ia-root :is([style*="color:#dc2626" i],[style*="color:#b91c1c" i],[style*="color:#7f1d1d" i]){color:#FFB3AA!important}
+
+/* boutons pleins de couleur vive (lien de parrainage, orange…) : encre foncée pour rester lisible */
+html body.nd #ia-root :is([style*="background:#00AEEF" i],[style*="background:#F26422" i]){color:#07141f!important;font-weight:800}
+html body.nd #ia-root [style*="background:#0D2B4E" i]{border:1px solid var(--ia-bord)!important}
+
+/* boutons Ordinateur / Téléphone du choix de couleur du billet (états par classe, pas en ligne) */
+html body.nd #ia-root .ia-bt{background:var(--ia-verre)!important;color:var(--ia-texte)!important;border:1px solid var(--ia-bord2)!important;border-radius:999px!important}
+html body.nd #ia-root .ia-bt.on{background:var(--ia-degore)!important;color:#1a1202!important;border-color:transparent!important;font-weight:800}
+
+/* ── défilement discret ── */
+html body.nd #ia-root nav{scrollbar-width:thin;scrollbar-color:rgba(227,192,110,.4) transparent}
+@media (prefers-reduced-motion:reduce){html body.nd #ia-root *{transition:none!important}}
