@@ -445,6 +445,12 @@
              complémentaires), au lieu d'un cercle gris générique qui semblait flotter à part. -->
         <button type="button" onclick="alert('Événement flash : publiez en quelques secondes une simple annonce (photo, adresse, dates, description) pour prévenir rapidement la communauté. Purement informatif — aucune inscription n\'est proposée. Pour un événement où les gens peuvent s\'inscrire, utilisez plutôt « 📢 Créer un événement ».')" title="À quoi sert le bouton ⚡ Événement flash ?" style="width:24px;height:24px;border-radius:0 8px 8px 0;border:none;border-left:1px solid rgba(5,46,15,.25);background:#7BE87B;color:#052e0f;font-size:13px;font-weight:800;cursor:pointer;line-height:1;padding:0;flex-shrink:0;">?</button>
       </span>
+      <!-- Brouillons (2026-10-28, demande explicite : « lorsque la création d'un événement a été mise en brouillon, fais apparaître ici un bouton Brouillon pour pouvoir le récupérer et continuer ») :
+           visible seulement s'il existe au moins un brouillon à soi (voir chargerBrouillons) ; un seul brouillon → la modale s'ouvre directement, plusieurs → liste à choisir. -->
+      <span id="btn-brouillon-wrap" style="display:none;position:relative;">
+        <button type="button" class="btn btn-outline" id="btn-brouillon" style="font-size:12.5px;" aria-haspopup="true" aria-expanded="false">💾 Brouillon <span id="btn-brouillon-nb" style="font-weight:800;"></span></button>
+        <div id="brouillon-liste" role="menu" style="display:none;position:absolute;top:calc(100% + 6px);right:0;z-index:50;min-width:280px;max-width:360px;background:var(--card,#fff);border:1px solid var(--border,#e2e8f0);border-radius:12px;padding:8px;box-shadow:0 12px 32px rgba(0,0,0,.35);"></div>
+      </span>
       <button class="btn btn-orange" id="btn-creer" style="display:none">📢 Créer un événement</button>
     </div>
   </div>
@@ -1600,8 +1606,10 @@ function ouvrirModaleEdition(id) {
   ficheChoisie = null;
   document.getElementById('fiche-choisie-cartouche').style.display = 'none';
   document.getElementById('fiche-picker-panel').style.display = 'none';
-  document.getElementById('modal-evt-titre').textContent = '✏️ Modifier l\'événement';
-  document.getElementById('btn-save').textContent = '💾 Enregistrer les modifications';
+  /* Un brouillon repris (2026-10-28) : « Publier » le met en ligne, « Enregistrer en brouillon » le garde tel quel. */
+  const estBrouillon = evt.statut === 'brouillon';
+  document.getElementById('modal-evt-titre').textContent = estBrouillon ? '💾 Reprendre mon brouillon' : '✏️ Modifier l\'événement';
+  document.getElementById('btn-save').textContent = estBrouillon ? '📢 Publier l\'événement' : '💾 Enregistrer les modifications';
   document.getElementById('modal-bg').classList.add('open');
 }
 /* Ouverture directe depuis un lien externe (ex. bouton "Créer un événement" du module
@@ -1978,6 +1986,7 @@ async function enregistrerEvenement(statutVise) {
     }
     evenementEnEditionId = null;
     loadEvts();
+    chargerBrouillons();
   } catch(e) { errBox.textContent=e.message||'Erreur.'; errBox.style.display='block'; }
 }
 document.getElementById('btn-save').addEventListener('click', () => enregistrerEvenement('ouvert'));
@@ -2768,6 +2777,50 @@ function cdFermerCalendrier() {
   document.getElementById('modal-cd-bg').classList.remove('open');
 }
 
+/* ─── Brouillons d'événements (2026-10-28) ─── */
+let mesBrouillons = [];
+async function chargerBrouillons() {
+  const wrap = document.getElementById('btn-brouillon-wrap');
+  if (!wrap) return;
+  if (!(typeof CURRENT_USER !== 'undefined' && CURRENT_USER && ['initiative','administrateur','collectivite'].includes(CURRENT_USER.role))) { wrap.style.display = 'none'; return; }
+  try {
+    const r = await api('GET', '/evenements?owner=' + encodeURIComponent(CURRENT_USER.id));
+    mesBrouillons = (r.evenements || []).filter(e => e.statut === 'brouillon' && Number(e.owner_user_id) === Number(CURRENT_USER.id));
+  } catch (e) { mesBrouillons = []; }
+  document.getElementById('btn-brouillon-nb').textContent = mesBrouillons.length > 1 ? '(' + mesBrouillons.length + ')' : '';
+  wrap.style.display = mesBrouillons.length ? 'inline-flex' : 'none';
+  fermerListeBrouillons();
+}
+function fermerListeBrouillons() {
+  const l = document.getElementById('brouillon-liste'), b = document.getElementById('btn-brouillon');
+  if (l) l.style.display = 'none';
+  if (b) b.setAttribute('aria-expanded', 'false');
+}
+function reprendreBrouillon(id) {
+  const evt = mesBrouillons.find(e => Number(e.id) === Number(id));
+  if (!evt) return;
+  fermerListeBrouillons();
+  // ouvrirModaleEdition() cherche l'événement dans allEvts (la liste publique n'inclut jamais les brouillons) : on l'y ajoute le temps de l'édition.
+  if (!allEvts.some(e => Number(e.id) === Number(id))) allEvts.push(evt);
+  ouvrirModaleEdition(id);
+}
+document.getElementById('btn-brouillon').addEventListener('click', e => {
+  e.stopPropagation();
+  if (mesBrouillons.length === 1) return reprendreBrouillon(mesBrouillons[0].id);
+  const l = document.getElementById('brouillon-liste');
+  if (l.style.display !== 'none') return fermerListeBrouillons();
+  l.innerHTML = '<div style="font-size:11.5px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted,#64748B);padding:4px 8px 6px;">Mes brouillons</div>'
+    + mesBrouillons.map(b => {
+      const d = b.date_evt ? new Date(b.date_evt + 'T12:00:00Z').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Europe/Paris' }) : 'date à fixer';
+      return '<button type="button" role="menuitem" class="btn btn-outline" data-brouillon="' + Number(b.id) + '" style="display:block;width:100%;text-align:left;margin-bottom:4px;font-size:12.5px;"><b>' + esc(b.titre || 'Sans titre') + '</b><br><span style="color:var(--muted,#64748B);">' + esc(d) + '</span></button>';
+    }).join('');
+  l.querySelectorAll('[data-brouillon]').forEach(x => x.addEventListener('click', () => reprendreBrouillon(x.dataset.brouillon)));
+  l.style.display = 'block';
+  document.getElementById('btn-brouillon').setAttribute('aria-expanded', 'true');
+});
+document.addEventListener('click', e => { if (!e.target.closest('#btn-brouillon-wrap')) fermerListeBrouillons(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') fermerListeBrouillons(); });
+
 /* ─── Init ─── */
 (async () => {
   await applyAuthState();
@@ -2779,6 +2832,7 @@ function cdFermerCalendrier() {
       ['initiative','administrateur','collectivite'].includes(CURRENT_USER.role)) {
     document.getElementById('btn-creer').style.display = 'inline-flex';
     document.getElementById('btn-flash-wrap').style.display = 'inline-flex';
+    chargerBrouillons();
   }
   chargerAgendaIds();
   await Promise.all([syncFiltreDomaineOptions(), loadEvts(), chargerEvenementEpingle(), (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? loadMesEvts() : Promise.resolve(), initSuggestions(), initPublicationsOrganisations()]);
