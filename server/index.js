@@ -26002,6 +26002,32 @@ route("GET", "/api/admin/videos-tutoriels/stats", async (req, res) => {
   sendJSON(res, 200, { total, publiees: g('publie'), brouillons: g('brouillon'), depubliees: g('depublie'), totalVues, totalCommentaires, totalReactions });
 });
 
+/* Publication d'un tuto vidéo → fil d'actualité ET cloche (2026-10-28, demande explicite : « notification (cloche) ou publication automatique dans le fil ? les deux »).
+   Au premier passage à « publié » seulement : le marqueur diffuse_le est posé AVANT l'envoi (double clic, dépublier puis republier = jamais de second envoi).
+   1. Une publication ordinaire du fil, au nom du compte qui publie, même forme que « Partager ce tuto » (affiche + « <nom> vous invite à voir le tuto « … » »).
+   2. Une notification dans la cloche de chaque compte actif (type « tuto_publie »), sans push téléphone : tout le monde recevrait une alerte sur son téléphone à chaque tuto. */
+async function tutoDiffuserPublication(videoId, user) {
+  try {
+    const v = await db.prepare("SELECT id, titre, statut, diffuse_le FROM da_videos_tutoriels WHERE id=?").get(videoId);
+    if (!v || v.statut !== "publie" || v.diffuse_le) return;
+    const pris = await db.prepare("UPDATE da_videos_tutoriels SET diffuse_le=datetime('now') WHERE id=? AND diffuse_le IS NULL").run(videoId);
+    if (!pris.changes) return;
+    const { carteTutoPost, texteInvitation } = require("./tuto-partage");
+    const carte = await carteTutoPost(db, videoId);
+    if (!carte) return;
+    const nom = (await nomCompteAffichage(user.id)) || "Diaspo'Actif";
+    const medias = carte.image ? JSON.stringify([{ type: "image", url: carte.image }]) : "[]";
+    const pub = carte.image ? "photo" : "texte";
+    const postId = Number((await db.prepare(`INSERT INTO fil_posts
+      (auteur_id, auteur_nom, type, pub_type, categorie, contenu, media_url, media_type, visibilite, medias, hashtags, statut, tuto_video_id)
+      VALUES (?, ?, ?, ?, 'Tuto', ?, ?, ?, 'public', ?, '[]', 'publie', ?)`)
+      .run(user.id, nom, pub, pub, texteInvitation(nom, carte.titre), null, carte.image ? "image" : null, medias, carte.id)).lastInsertRowid);
+    await db.prepare(`INSERT INTO notifications (user_id,type,titre,contenu,data_json)
+      SELECT id, 'tuto_publie', 'Nouveau tuto', ?, ? FROM users WHERE id<>? AND COALESCE(suspendu_definitif,0)=0`)
+      .run(String(carte.titre || "").slice(0, 140), JSON.stringify({ video_id: Number(carte.id), post_id: postId, lien: `fil-actualite.html?post=${postId}`, lien_m: `#/post/${postId}` }), user.id);
+  } catch (e) { console.error("[tutoDiffuserPublication]", e.message); }
+}
+
 route("POST", "/api/admin/videos-tutoriels", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user || !(await AdminJunior.hasAdminPermission(user, 'videos_tutoriels.gerer', db))) return sendJSON(res, 403, { error: "Réservé aux administrateurs autorisés." });
@@ -26017,6 +26043,7 @@ route("POST", "/api/admin/videos-tutoriels", async (req, res, params, body) => {
   const r = await db.prepare("INSERT INTO da_videos_tutoriels (titre,description,icone,type_source,url,duree_secondes,categorie,miniature_url,statut,actif,ordre) VALUES (?,?,?,?,?,?,?,?,?,?,?)").run(
     titre, description ? SEC.sanitizeRichHtml(description) : null, icone, type_source, url || '', duree_secondes | 0, categorie, miniature_url || null, statut, statut === 'publie' ? 1 : 0, maxOrdre + 1
   );
+  if (statut === 'publie') await tutoDiffuserPublication(Number(r.lastInsertRowid), user);
   await AdminJunior.journaliserActionSiJunior(db, user, 'videos_tutoriels.gerer', `Vidéo ajoutée : ${titre}`);
   sendJSON(res, 201, { id: r.lastInsertRowid });
 });
@@ -26042,6 +26069,7 @@ route("PUT", "/api/admin/videos-tutoriels/:id", async (req, res, params, body) =
     .run(titre || null, description ? SEC.sanitizeRichHtml(description) : (description ?? null), icone || null, estFilm ? null : (type_source || null), estFilm ? null : (url || null), categorie || null,
          miniature_url ?? null, statut || null, statut ? (statut === 'publie' ? 1 : 0) : null,
          (duree_secondes === undefined || duree_secondes === null) ? null : (duree_secondes | 0), params.id);
+  if (statut === 'publie') await tutoDiffuserPublication(params.id, user);
   await AdminJunior.journaliserActionSiJunior(db, user, 'videos_tutoriels.gerer', `Vidéo #${params.id} modifiée`);
   sendJSON(res, 200, { ok: true });
 });
@@ -26050,6 +26078,7 @@ route("POST", "/api/admin/videos-tutoriels/:id/publier", async (req, res, params
   const user = await getCurrentUser(req);
   if (!user || !(await AdminJunior.hasAdminPermission(user, 'videos_tutoriels.gerer', db))) return sendJSON(res, 403, { error: "Réservé aux administrateurs autorisés." });
   await db.prepare("UPDATE da_videos_tutoriels SET statut='publie', actif=1, updated_at=datetime('now') WHERE id=?").run(params.id);
+  await tutoDiffuserPublication(params.id, user);
   await AdminJunior.journaliserActionSiJunior(db, user, 'videos_tutoriels.gerer', `Vidéo #${params.id} publiée`);
   sendJSON(res, 200, { ok: true });
 });
@@ -31634,6 +31663,12 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
    toPg() (server/db-pg.js) à chaque db.prepare(...).run(), contrairement à une colonne ajoutée
    après coup sur une table existante (voir le piège documenté dans la mémoire
    feedback_reparer_schema_apres_migration — sans objet ici). */
+/* Tutos déjà publiés avant la diffusion automatique : marqués « déjà diffusés » pour qu'une republication ne notifie pas tout le monde rétroactivement. */
+(async function migrerTutosDiffusion() {
+  try { await db.prepare("UPDATE da_videos_tutoriels SET diffuse_le=COALESCE(updated_at,created_at,datetime('now')) WHERE statut='publie' AND diffuse_le IS NULL").run(); }
+  catch (e) { console.error('[migrerTutosDiffusion]', e.message); }
+})();
+
 (async function migrateParrainageInvitations() {
   try {
     await db.prepare(`CREATE TABLE IF NOT EXISTS parrainage_domaines (
