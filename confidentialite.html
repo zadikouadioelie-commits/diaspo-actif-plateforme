@@ -184,6 +184,43 @@
      n'a rien à voir avec la vérification d'identité d'une personne physique. Avant cette
      carte, ce champ n'était écrit qu'une fois, à l'inscription, sans aucun moyen de le
      corriger ensuite. */
+  /* Mon numéro de téléphone (2026-10-28, demande explicite : « dans confidentialité, ajoute la possibilité de modifier le numéro de téléphone »).
+     Carte séparée de « Mes informations déclarées » : changer son numéro n'invalide jamais le badge d'identité. Même route que « Mes coordonnées »
+     du profil (POST /api/profil/telephone) : format contrôlé, obligatoire pour un compte Initiative, effaçable pour les autres. */
+  {
+    const zoneTel = document.createElement('div');
+    zoneTel.id = 'telephone-zone';
+    zone.insertAdjacentElement('afterend', zoneTel);
+    const obligatoire = inf.role === 'initiative';
+    zoneTel.innerHTML = `
+      <div class="codes-card" id="telephone-card" style="max-width:560px;margin-top:16px;">
+        <h4>📞 Mon numéro de téléphone</h4>
+        <p class="codes-sub">Numéro actuel : <strong id="tel-actuel">${inf.telephone ? esc(inf.telephone) : 'non renseigné'}</strong>. ${obligatoire ? 'Il est obligatoire pour un compte Initiative.' : 'Vous pouvez aussi le retirer en laissant le champ vide.'} Le modifier n'affecte pas votre badge d'identité.</p>
+        <label for="tel-input" style="font-size:12px;font-weight:700;">Nouveau numéro (avec l'indicatif, ex. +33612345678)</label>
+        <input id="tel-input" type="tel" autocomplete="tel" inputmode="tel" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;margin-top:4px;" value="${esc(inf.telephone || '')}">
+        <div id="tel-err" class="ds-err" role="alert"></div>
+        <div id="tel-ok" style="display:none;background:#f0fdf4;border:1.5px solid #22c55e;border-radius:8px;padding:8px 12px;font-size:12px;color:#166534;margin-top:10px;"></div>
+        <div class="codes-btn-row" style="margin-top:14px;">
+          <button class="codes-btn green" id="tel-save" onclick="window._saveTelephone()" style="background:linear-gradient(135deg,#2563EB,#1d4ed8);color:#fff;border-color:#2563EB;">💾 Enregistrer le numéro</button>
+        </div>
+      </div>`;
+    window._saveTelephone = async function() {
+      const err = document.getElementById('tel-err'), ok = document.getElementById('tel-ok'), btn = document.getElementById('tel-save');
+      err.style.display = 'none'; ok.style.display = 'none';
+      btn.disabled = true;
+      try {
+        const res = await api('POST', '/profil/telephone', { telephone: document.getElementById('tel-input').value.trim() });
+        document.getElementById('tel-actuel').textContent = res.telephone || 'non renseigné';
+        document.getElementById('tel-input').value = res.telephone || '';
+        ok.textContent = res.telephone ? '✅ Numéro de téléphone mis à jour.' : '✅ Numéro de téléphone retiré.';
+        ok.style.display = 'block';
+      } catch (e) {
+        err.textContent = e.message || 'Erreur lors de l’enregistrement.';
+        err.style.display = 'block';
+      } finally { btn.disabled = false; }
+    };
+  }
+
   if (['collectivite', 'institutionnel', 'officiel'].includes(inf.role)) {
     const zoneOI = document.getElementById('origine-institution-zone');
     zoneOI.innerHTML = `
