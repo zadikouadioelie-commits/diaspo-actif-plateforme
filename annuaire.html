@@ -173,6 +173,27 @@
 .ann-ad-vision{font-size:12.5px;color:var(--muted);line-height:1.6;}
 .ann-ad-vision strong{display:block;color:var(--text);font-size:13.5px;margin-bottom:6px;}
 
+/* Espace du haut en petites cartouches côte à côte (2026-10-28, demande explicite : « les
+   affiches... doivent être dans des petites cartouches rectangles allant de la gauche vers la
+   droite, pas du haut vers le bas ») — remplace l'empilement vertical des « bandes » posé le
+   2026-10-24 (renderAdSlotMulti, assets/app.js, met flex-direction:column en ligne : cette
+   règle avec !important gagne, même principe déjà utilisé pour .ann-ad-col ci-dessus). */
+#ad-vitrine-section{display:grid !important;grid-template-columns:repeat(3,1fr) !important;gap:16px !important;}
+@media(max-width:860px){
+  /* Toujours horizontal, jamais empilé : 3 colonnes à largeur fixe qui débordent avec défilement
+     tactile plutôt que de repasser en une seule colonne verticale. */
+  #ad-vitrine-section{grid-auto-flow:column !important;grid-template-columns:none !important;grid-auto-columns:82% !important;overflow-x:auto !important;scroll-snap-type:x mandatory;padding-bottom:4px;}
+  #ad-vitrine-section > *{scroll-snap-align:start;}
+}
+/* Bannière compacte quand plusieurs se partagent la largeur (vs. pleine largeur unique sur mes-billets.html, non concernée) : image au-dessus du texte, hauteur réduite. */
+#ad-vitrine-section .da-ad-ban{flex-direction:column;height:auto;}
+#ad-vitrine-section .da-ad-ban-media{flex:none;max-width:none;width:100%;height:120px;}
+#ad-vitrine-section .da-ad-ban-txt{padding:14px 16px;gap:6px;}
+#ad-vitrine-section .da-ad-ban-titre{font-size:16px;}
+#ad-vitrine-section .da-ad-ban-desc{-webkit-line-clamp:2;}
+/* Publication du fil en relais (quand il manque une publicité) : déjà une carte verticale compacte (image + texte), juste besoin de ne plus être forcée en pleine largeur par le flex-direction:column posé en JS. */
+#ad-vitrine-section .da-pub-rel img{height:110px !important;}
+
 /* Styles de la carte (.ann-card et son contenu) : extraits dans assets/annuaire-cards.css
    (2026-09-20) pour être réutilisés tels quels par toute autre page qui appelle
    renderInitiativeCard()/renderPersonCard()/renderOrganismeCard() (assets/app.js) — voir
