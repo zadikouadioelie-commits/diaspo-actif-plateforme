@@ -212,7 +212,7 @@
         const res = await api('POST', '/profil/telephone', { telephone: document.getElementById('tel-input').value.trim() });
         document.getElementById('tel-actuel').textContent = res.telephone || 'non renseigné';
         document.getElementById('tel-input').value = res.telephone || '';
-        ok.textContent = res.telephone ? '✅ Numéro de téléphone mis à jour.' : '✅ Numéro de téléphone retiré.';
+        ok.textContent = res.telephone ? '✅ Numéro mis à jour sur tout votre compte (profil, inscriptions, adhésions, billets, paiements).' : '✅ Numéro retiré de votre compte et des fiches qui portaient ce numéro.';
         ok.style.display = 'block';
       } catch (e) {
         err.textContent = e.message || 'Erreur lors de l’enregistrement.';

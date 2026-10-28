@@ -19431,20 +19431,67 @@ route("POST", "/api/profil/email", async (req, res, params, body) => {
 /* POST /api/profil/telephone — changer son numéro de téléphone depuis Confidentialité (2026-10-16).
    Pas de mot de passe (simple coordonnée de contact, sans effet sur la connexion), mais format contrôlé et
    numéro obligatoire pour un compte Initiative (exigé à l'inscription). Aucun SMS de confirmation n'existe sur la plateforme. */
+/* Le téléphone du compte s'applique PARTOUT (2026-10-28, demande explicite : « assure-toi que le numéro renseigné soit appliqué automatiquement au compte
+   partout, y compris pour les paiements et autres récapitulatifs »).
+   Les modules qui lisent users.telephone au moment d'agir (demandes, inscriptions rapides, profil…) voient déjà le nouveau numéro. Ici on corrige les COPIES
+   gardées à l'écriture : fiches d'inscription, registres d'adhésion, billetterie, devis, rencontres, fiches CRM liées à ce compte, numéro du responsable
+   d'une initiative — et le client Stripe (reçus et paiements). Règle prudente : une copie n'est remplacée que si elle porte l'ANCIEN numéro du compte ou
+   si elle est vide ; un autre numéro saisi exprès (celui d'un proche, d'un contact) n'est jamais écrasé. Retrait du numéro : seules les copies identiques à
+   l'ancien sont effacées. Contacts professionnels distincts (ambassade, partenariat, publicité, boutique) volontairement exclus. */
+const TEL_COPIES = [
+  ["evenements_participants", "user_id", "telephone"],
+  ["evenements_inscriptions_rapides", "user_id", "telephone"],
+  ["insc_inscriptions", "user_id", "telephone"],
+  ["insc_candidature_declarations", "user_id", "telephone"],
+  ["formulaire_inscriptions", "user_id", "telephone"],
+  ["adhesion_membres", "linked_user_id", "telephone"],
+  ["association_membres", "user_id", "telephone"],
+  ["asso_adherents", "da_user_id", "telephone"],
+  ["initiative_partenaires", "linked_user_id", "telephone"],
+  ["crm_contacts", "linked_user_id", "telephone"],
+  ["rencontres_diaspoactif", "user_id", "telephone"],
+  ["devis_demandes", "requester_user_id", "requester_phone"],
+  ["initiatives", "owner_user_id", "tel_responsable"],
+];
+async function propagerTelephoneCompte(userId, ancien, nouveau) {
+  const norm = v => String(v == null ? "" : v).replace(/[\s.\-()]/g, "");
+  const ancienNorm = norm(ancien);
+  let total = 0;
+  for (const [table, colUser, colTel] of TEL_COPIES) {
+    try {
+      const egalAncien = ancienNorm ? ` OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(${colTel},' ',''),'-',''),'.',''),'(',''),')','')=?` : "";
+      const vide = nouveau ? `${colTel} IS NULL OR ${colTel}=''` : `1=0`;
+      const args = [nouveau || null, userId];
+      if (ancienNorm) args.push(ancienNorm);
+      const r = await db.prepare(`UPDATE ${table} SET ${colTel}=? WHERE ${colUser}=? AND (${vide}${egalAncien})`).run(...args);
+      total += Number(r && r.changes) || 0;
+    } catch (e) { /* table ou colonne pas encore migrée (production) : on passe à la suivante */ }
+  }
+  /* Paiements : le client Stripe du compte (reçus, factures) porte le même numéro. Au mieux, jamais bloquant. */
+  try {
+    const { stripe } = require("./stripe-client");
+    const ligne = await db.prepare("SELECT stripe_customer_id FROM users WHERE id=?").get(userId);
+    if (stripe && ligne && ligne.stripe_customer_id) await stripe.customers.update(ligne.stripe_customer_id, { phone: nouveau || "" });
+  } catch (e) { console.error("[telephone] mise à jour du client Stripe :", e.message); }
+  return total;
+}
 route("POST", "/api/profil/telephone", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const lim = SEC.rateLimit(`profil-tel:${user.id}`, 20, 15 * 60 * 1000);
   if (!lim.allowed) return sendJSON(res, 429, { error: `Trop de tentatives. Réessayez dans ${lim.retryAfter}s.` });
   const brut = String((body && body.telephone) == null ? "" : body.telephone).replace(/[\s.\-()]/g, "");
+  const avant = (await db.prepare("SELECT telephone FROM users WHERE id=?").get(user.id))?.telephone || null;
   if (!brut) {
     if (user.role === "initiative") return sendJSON(res, 400, { error: "Un numéro de téléphone est obligatoire pour un compte Initiative." });
     await db.prepare("UPDATE users SET telephone=NULL WHERE id=?").run(user.id);
-    return sendJSON(res, 200, { ok: true, telephone: null });
+    const propage = await propagerTelephoneCompte(user.id, avant, null);
+    return sendJSON(res, 200, { ok: true, telephone: null, propage });
   }
   if (!/^\+?\d{6,15}$/.test(brut)) return sendJSON(res, 400, { error: "Numéro invalide. Utilisez uniquement des chiffres, avec l'indicatif du pays si possible (ex. +33612345678)." });
   await db.prepare("UPDATE users SET telephone=? WHERE id=?").run(brut, user.id);
-  sendJSON(res, 200, { ok: true, telephone: brut });
+  const propage = await propagerTelephoneCompte(user.id, avant, brut);
+  sendJSON(res, 200, { ok: true, telephone: brut, propage });
 });
 
 /* Maracana Tracker (2026-10-17) — suivi des performances d'une association sportive : toutes ses routes sont dans server/tracker-routes.js. */

@@ -31,11 +31,12 @@ async function getOrCreateStripeCustomer(db, user) {
   if (!stripe) throw new Error("Module Stripe désactivé (clé absente).");
   /* Ne pas se fier à `user.stripe_customer_id` : certains appelants (ex. getCurrentUser)
      ne sélectionnent pas cette colonne — on relit toujours la valeur autoritative en base. */
-  const row = await db.prepare("SELECT stripe_customer_id FROM users WHERE id=?").get(user.id);
+  const row = await db.prepare("SELECT stripe_customer_id, telephone FROM users WHERE id=?").get(user.id);
   if (row && row.stripe_customer_id) return row.stripe_customer_id;
   const customer = await stripe.customers.create({
     email: user.email || undefined,
     name: [user.prenom, user.nom].filter(Boolean).join(" ") || user.nom || undefined,
+    phone: (row && row.telephone) || user.telephone || undefined, /* le téléphone du compte suit aussi les paiements (2026-10-28) */
     metadata: { diaspoactif_user_id: String(user.id) },
   });
   await db.prepare("UPDATE users SET stripe_customer_id=? WHERE id=?").run(customer.id, user.id);
