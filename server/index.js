@@ -50022,9 +50022,16 @@ route("POST", "/api/insc/fiches", async (req, res, params, body) => {
 route("GET", "/api/insc/fiches/:id", async (req, res, params) => {
   const { erreur, msg, fiche } = await inscFicheProprietaire(req, params.id);
   if (erreur) return sendJSON(res, erreur, { error: msg });
+  /* Colonnes étendues (2026-10-28, demande explicite : "récupérer des informations... le
+     descriptif... l'adresse... saisit le maximum d'informations déjà présentes") — sert à la
+     fois la cartouche de l'événement affichée dans Vue d'ensemble ET le bouton "Reprendre les
+     informations de l'événement" (reprendreInfosEvenement côté client), sans route séparée. */
   const evenements = await db.prepare(`
-    SELECT e.id, e.titre, e.date_evt, e.ville, e.pays FROM insc_fiches_evenements fe
-    JOIN evenements e ON e.id = fe.evenement_id WHERE fe.fiche_id=?`).all(fiche.id);
+    SELECT e.id, e.titre, e.statut, e.date_evt, e.date_fin, e.heure_debut, e.heure_fin, e.ville, e.pays, e.lieu,
+           e.description, e.image_couverture, e.image_url, e.galerie_photos, e.video1_url, e.video1_titre,
+           e.video2_url, e.video2_titre, e.pdf_url, e.pdf_nom
+    FROM insc_fiches_evenements fe
+    JOIN evenements e ON e.id = fe.evenement_id WHERE fe.fiche_id=? ORDER BY fe.id ASC`).all(fiche.id);
   const types = await db.prepare("SELECT * FROM insc_types WHERE fiche_id=? ORDER BY ordre ASC, id ASC").all(fiche.id);
   for (const t of types) {
     t.champs = await db.prepare("SELECT * FROM insc_champs WHERE type_id=? ORDER BY position ASC, id ASC").all(t.id);
@@ -50048,6 +50055,45 @@ route("GET", "/api/insc/fiches/:id", async (req, res, params) => {
     candidature = { config: candConfig, documents, nb_declarations: nbDeclarations };
   }
   sendJSON(res, 200, { fiche, evenements, types, medias, candidature });
+});
+
+/* Reprendre la galerie/vidéos/PDF déjà déposés sur l'événement lié dans "Documents & médias"
+   de la fiche (2026-10-28, demande explicite : "éviter de faire doublon à chaque fois") —
+   mêmes URLs réutilisées (pas de ré-upload, pas de copie de fichier), seulement une nouvelle
+   ligne insc_fiches_medias qui pointe dessus ; ignore ce qui est déjà présent (même URL) pour
+   rester idempotent si le bouton est cliqué plusieurs fois. Respecte les mêmes plafonds que
+   l'ajout manuel (7 photos, 4 vidéos — voir renderMedias côté client), le PDF n'a pas de plafond. */
+route("POST", "/api/insc/fiches/:id/reprendre-medias-evenement", async (req, res, params) => {
+  const { erreur, msg, fiche } = await inscFicheProprietaire(req, params.id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const evt = await db.prepare(`
+    SELECT e.galerie_photos, e.video1_url, e.video1_titre, e.video2_url, e.video2_titre, e.pdf_url, e.pdf_nom
+    FROM insc_fiches_evenements fe JOIN evenements e ON e.id = fe.evenement_id
+    WHERE fe.fiche_id=? ORDER BY fe.id ASC LIMIT 1`).get(fiche.id);
+  if (!evt) return sendJSON(res, 200, { medias_ajoutes: 0 });
+  const existants = await db.prepare("SELECT type, url FROM insc_fiches_medias WHERE fiche_id=?").all(fiche.id);
+  const urlsExistantes = new Set(existants.map(m => m.url));
+  let nbPhotos = existants.filter(m => m.type === 'photo').length;
+  let nbVideos = existants.filter(m => m.type === 'video').length;
+  let photos = [];
+  try { photos = JSON.parse(evt.galerie_photos || '[]'); } catch (e) {}
+  const candidats = [
+    ...photos.filter(Boolean).map(url => ({ type: 'photo', url, libelle: null })),
+    ...(evt.video1_url ? [{ type: 'video', url: evt.video1_url, libelle: evt.video1_titre || null }] : []),
+    ...(evt.video2_url ? [{ type: 'video', url: evt.video2_url, libelle: evt.video2_titre || null }] : []),
+    ...(evt.pdf_url ? [{ type: 'pdf', url: evt.pdf_url, libelle: evt.pdf_nom || null }] : []),
+  ];
+  let ajoutes = 0;
+  for (const m of candidats) {
+    if (urlsExistantes.has(m.url)) continue;
+    if (m.type === 'photo' && nbPhotos >= 7) continue;
+    if (m.type === 'video' && nbVideos >= 4) continue;
+    await db.prepare("INSERT INTO insc_fiches_medias (fiche_id, type, url, libelle) VALUES (?,?,?,?)").run(fiche.id, m.type, m.url, m.libelle);
+    urlsExistantes.add(m.url);
+    if (m.type === 'photo') nbPhotos++; else if (m.type === 'video') nbVideos++;
+    ajoutes++;
+  }
+  sendJSON(res, 200, { medias_ajoutes: ajoutes });
 });
 
 /* Programme déjà saisi sur l'événement (fiche conceptuelle, « Programme / Déroulé ») des événements liés à
