@@ -4990,14 +4990,30 @@ async function initRelaisDiasporaWidget(me, api) {
     const el = document.getElementById('billetterie-init');
     el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);">Chargement…</div>';
     try {
-      const [rEv, rWallet] = await Promise.all([
+      const [rEv, rWallet, rMesBillets] = await Promise.all([
         api('GET', '/events?organisateur_id='+me.id+'&all=1'),
-        api('GET', '/wallet/balance').catch(() => ({ balance: 0, historique: [] }))
+        api('GET', '/wallet/balance').catch(() => ({ balance: 0, historique: [] })),
+        api('GET', '/tickets/mes').catch(() => ({ tickets: [] }))
       ]);
       const r = rEv;
       const events = r.events || [];
       const balance = rWallet.balance || 0;
       const walletHist = rWallet.historique || [];
+      /* Mes billets EN TANT QUE PARTICIPANT (pas organisateur) — demande explicite 2026-10-28 :
+         exposer ici les billets achetés sur Diaspo'Actif, cliquables pour les présenter au scan,
+         puis basculés dans un petit historique une fois utilisés/l'événement passé. Même logique
+         de classement que calculerStatutBillet() dans mes-billets.html, en plus compact ici. */
+      const initClasserBillet = t => {
+        if (t.payment_status === 'refunded' || t.payment_status === 'failed') return 'historique';
+        if (t.statut === 'cancelled' || t.statut === 'used') return 'historique';
+        if (t.validation_manuelle_statut === 'refuse') return 'historique';
+        const fin = t.date_fin ? new Date(t.date_fin) : (t.date_debut ? new Date(new Date(t.date_debut).getTime()+86400000) : null);
+        if (fin && fin < new Date()) return 'historique';
+        return 'actif';
+      };
+      const mesBillets = rMesBillets.tickets || [];
+      const mesBilletsActifs = mesBillets.filter(t => initClasserBillet(t) === 'actif').sort((a,b)=>new Date(a.date_debut)-new Date(b.date_debut));
+      const mesBilletsHistorique = mesBillets.filter(t => initClasserBillet(t) === 'historique');
       const badge = document.getElementById('init-billets-badge');
       const pubCount = events.filter(e=>e.statut==='publie').length;
       if (badge && pubCount > 0) { badge.textContent = pubCount; badge.style.display = ''; }
@@ -5072,6 +5088,23 @@ async function initRelaisDiasporaWidget(me, api) {
             <div><div style="font-weight:800;font-size:13px;">Billetterie</div><div style="font-size:11px;color:var(--muted);">Événements & ventes</div></div>
           </a>
         </div>
+
+        <!-- Mes billets EN TANT QUE PARTICIPANT (achetés sur Diaspo'Actif, pas ceux que je vends) -->
+        <div style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+          <strong style="font-size:14px;">🎫 Mes billets (en tant que participant)</strong>
+          <a class="btn btn-sm btn-outline" href="mes-billets.html" target="_blank" style="text-decoration:none;">Tout voir →</a>
+        </div>
+        <div style="margin-bottom:8px;">
+          ${mesBilletsActifs.length ? mesBilletsActifs.slice(0,4).map(t=>`
+            <div class="card" style="margin-bottom:8px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;" onclick="window.open('mes-billets.html?ticket=${t.id}','_blank')">
+              <div style="min-width:0;">
+                <strong style="font-size:13px;">${escH(t.event_titre||'Événement')}</strong>
+                <div style="font-size:11.5px;color:var(--muted);">${t.date_debut ? new Date(t.date_debut).toLocaleDateString('fr-FR') : ''} · ${escH(t.type_nom||'Billet')}</div>
+              </div>
+              <span style="font-size:11px;font-weight:700;color:#2563EB;flex:none;">🔍 Voir →</span>
+            </div>`).join('') : `<div class="card" style="padding:14px;text-align:center;color:var(--muted);font-size:13px;">Aucun billet actif pour le moment.</div>`}
+        </div>
+        ${mesBilletsHistorique.length ? `<div style="text-align:center;margin-bottom:20px;"><a href="mes-billets.html" target="_blank" style="font-size:12px;color:var(--muted);text-decoration:underline;">🕓 Historique (${mesBilletsHistorique.length}) →</a></div>` : '<div style="margin-bottom:20px;"></div>'}
 
         <!-- Tableau des événements avec stats -->
         <div style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">

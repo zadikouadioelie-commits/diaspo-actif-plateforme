@@ -164,6 +164,33 @@ function normaliserInscription(ins) {
   };
 }
 
+/* Un billet rejoint l'historique une fois utilisé (scanné à l'entrée), son événement passé, ou son
+   statut devenu définitif (annulé/remboursé/refusé) — tout le reste reste dans "Billets actifs"
+   (2026-10-28, demande explicite : séparer actifs / historique). */
+function billetEstHistorique(t, st) {
+  return ['Utilisé','Expiré','Remboursé','Annulé','Refusé','Paiement échoué'].includes(st.label);
+}
+function carteBillet(t) {
+  const st = calculerStatutBillet(t);
+  return `
+    <div class="ticket-card" style="max-width:none;cursor:pointer;" onclick="openTicket('${t._kind}',${t.id})">
+      <div style="background:${st.color};border-radius:10px;padding:14px;color:#fff;margin-bottom:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+          <div><div style="font-weight:800;font-size:15px;">${escH(t.event_titre)}</div>
+            <div style="font-size:12px;opacity:.9;margin-top:2px;">${fmtDate(t.date_debut)}</div></div>
+          <span class="statut-pill" style="font-size:10px;background:rgba(255,255,255,.25);">${escH(st.label).toUpperCase()}</span>
+        </div>
+      </div>
+      <div style="font-size:13px;">
+        <div class="ticket-info-row"><span class="lbl">📍 Lieu</span><span class="val">${escH(t.ville||'—')}${t.pays?', '+escH(t.pays):''}</span></div>
+        <div class="ticket-info-row"><span class="lbl">🎟️ Type</span><span class="val"><span class="tag-type ${TYPES_COLOR[t.type_cat]||''}">${t.type_cat?.toUpperCase()||'STANDARD'}</span> ${escH(t.type_nom)}</span></div>
+        <div class="ticket-info-row"><span class="lbl">💶 Prix</span><span class="val">${t.prix_paye===0?'Gratuit':t.prix_paye.toFixed(2)+' €'}</span></div>
+      </div>
+      <div style="text-align:center;margin-top:12px;">
+        <button class="btn btn-sm btn-orange" onclick="event.stopPropagation();openTicket('${t._kind}',${t.id})">🔍 Voir le billet</button>
+      </div>
+    </div>`;
+}
 async function loadMesBillets() {
   if (!ME) { document.getElementById('mes-billets-list').innerHTML='<div class="notice">🔐 <a href="login.html">Connectez-vous</a> pour voir vos billets.</div>'; return; }
   try {
@@ -173,7 +200,7 @@ async function loadMesBillets() {
     ]);
     const billets = (rTickets.tickets || []).map(t => ({ ...t, _kind: 'billet' }));
     const inscriptions = (rInsc.inscriptions || []).map(normaliserInscription);
-    const tous = [...billets, ...inscriptions].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    const tous = [...billets, ...inscriptions];
     const list = document.getElementById('mes-billets-list');
     if (!tous.length) {
       list.innerHTML = `<div class="notice">
@@ -184,25 +211,29 @@ async function loadMesBillets() {
       </div>`;
       return;
     }
-    list.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;">` +
-      tous.map(t => { const st = calculerStatutBillet(t); return `
-        <div class="ticket-card" style="max-width:none;cursor:pointer;" onclick="openTicket('${t._kind}',${t.id})">
-          <div style="background:${st.color};border-radius:10px;padding:14px;color:#fff;margin-bottom:14px;">
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-              <div><div style="font-weight:800;font-size:15px;">${escH(t.event_titre)}</div>
-                <div style="font-size:12px;opacity:.9;margin-top:2px;">${fmtDate(t.date_debut)}</div></div>
-              <span class="statut-pill" style="font-size:10px;background:rgba(255,255,255,.25);">${escH(st.label).toUpperCase()}</span>
-            </div>
-          </div>
-          <div style="font-size:13px;">
-            <div class="ticket-info-row"><span class="lbl">📍 Lieu</span><span class="val">${escH(t.ville||'—')}${t.pays?', '+escH(t.pays):''}</span></div>
-            <div class="ticket-info-row"><span class="lbl">🎟️ Type</span><span class="val"><span class="tag-type ${TYPES_COLOR[t.type_cat]||''}">${t.type_cat?.toUpperCase()||'STANDARD'}</span> ${escH(t.type_nom)}</span></div>
-            <div class="ticket-info-row"><span class="lbl">💶 Prix</span><span class="val">${t.prix_paye===0?'Gratuit':t.prix_paye.toFixed(2)+' €'}</span></div>
-          </div>
-          <div style="text-align:center;margin-top:12px;">
-            <button class="btn btn-sm btn-orange" onclick="event.stopPropagation();openTicket('${t._kind}',${t.id})">🔍 Voir le billet</button>
-          </div>
-        </div>`; }).join('') + '</div>';
+    const actifs = [], historique = [];
+    tous.forEach(t => (billetEstHistorique(t, calculerStatutBillet(t)) ? historique : actifs).push(t));
+    actifs.sort((a, b) => new Date(a.date_debut) - new Date(b.date_debut));
+    historique.sort((a, b) => new Date(b.date_debut) - new Date(a.date_debut));
+    const grille = arr => `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;">${arr.map(carteBillet).join('')}</div>`;
+    list.innerHTML = `
+      <h2 style="margin:0 0 12px;font-size:16px;">🎟️ Billets actifs</h2>
+      ${actifs.length ? grille(actifs) : `<div class="notice" style="padding:24px;">Aucun billet actif pour le moment.</div>`}
+      ${historique.length ? `
+      <div style="margin-top:28px;">
+        <button type="button" id="mb-hist-toggle" class="btn btn-outline btn-sm">🕓 Afficher l'historique (${historique.length})</button>
+        <div id="mb-hist-zone" style="display:none;margin-top:14px;">${grille(historique)}</div>
+      </div>` : ''}`;
+    const tgl = document.getElementById('mb-hist-toggle');
+    if (tgl) tgl.onclick = () => {
+      const z = document.getElementById('mb-hist-zone');
+      const show = z.style.display === 'none';
+      z.style.display = show ? '' : 'none';
+      tgl.textContent = (show ? "🕓 Masquer l'historique (" : "🕓 Afficher l'historique (") + historique.length + ')';
+    };
+    /* Lien direct depuis un autre module (dashboard-initiative.html…) : ?ticket=123 ouvre le billet en grand. */
+    const tid = new URLSearchParams(location.search).get('ticket');
+    if (tid) openTicket('billet', parseInt(tid, 10));
   } catch(e) { document.getElementById('mes-billets-list').innerHTML='<div class="notice">Erreur chargement billets.</div>'; }
 }
 

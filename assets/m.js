@@ -2240,7 +2240,7 @@
     { t: 'Centre Financier', i: 'card', h: '#/centrefinancier', d: 'Revenus, retraits, comptes de réception', r: { initiative: 1 } },
     { t: 'Messages de la boutique', i: 'shop', h: '#/msgboutique', d: 'Demandes reçues via votre boutique', r: { initiative: 2 } },
     { t: 'Messagerie', i: 'chat', h: '#/messages', d: 'Vos conversations', r: { utilisateur: 1, initiative: 1 } },
-    { t: 'Mes billets', i: 'ticket', h: '#/billets', d: 'Inscriptions et QR codes d’entrée', r: { utilisateur: 1, initiative: 1 } },
+    { t: 'Mes billets', i: 'ticket', h: '#/billets', d: 'Inscriptions et QR codes d’entrée', r: { utilisateur: 1, initiative: 1, collectivite: 1, administrateur: 1 } },
     { t: 'Mon agenda', i: 'cal', h: '#/agenda', d: 'Vos événements personnels et ceux ajoutés', r: { utilisateur: 1, initiative: 1 } },
     { t: 'Cagnottes et dons', i: 'heart', h: '#/cagnottes', d: { utilisateur: 'Soutenir les cagnottes ouvertes', initiative: 'Vos cagnottes et les dons reçus' }, r: { initiative: 2 } },
     { t: 'Mon Associé', i: 'people', h: '#/associe', d: { utilisateur: 'Consulter les annonces, candidater', initiative: 'Annonces d’associés · publier = Premium' }, r: { utilisateur: 1, initiative: 3 } },
@@ -2378,12 +2378,33 @@
     try { paid = (await api('/api/tickets/mes')).tickets || []; } catch (e) { }
     try { free = (await api('/api/evenements/participants/mine')).inscriptions || []; } catch (e) { }
     const items = [
-      ...paid.map(t => ({ k: 't', id: t.id, titre: t.event_titre, date: t.date_debut, lieu: [t.ville, t.pays].filter(Boolean).join(', '), lib: t.type_nom || 'Billet', col: t.type_couleur || '#1E4F8A', statut: t.statut })),
-      ...free.map(i => ({ k: 'p', id: i.id, titre: i.event_titre, date: i.date_evt, lieu: [i.ville, i.pays].filter(Boolean).join(', '), lib: 'Inscription gratuite', col: '#1A7A52', statut: 'valide' }))
+      ...paid.map(t => ({ k: 't', id: t.id, titre: t.event_titre, date: t.date_debut, fin: t.date_fin, lieu: [t.ville, t.pays].filter(Boolean).join(', '), lib: t.type_nom || 'Billet', col: t.type_couleur || '#1E4F8A', statut: t.statut, paiement: t.payment_status, validation: t.validation_manuelle_statut })),
+      ...free.map(i => ({ k: 'p', id: i.id, titre: i.event_titre, date: i.date_evt, fin: i.date_fin, lieu: [i.ville, i.pays].filter(Boolean).join(', '), lib: 'Inscription gratuite', col: '#1A7A52', statut: 'valide', paiement: 'paid', validation: null }))
     ];
-    const html = items.length ? items.map(i => `<a class="tk" href="#/billet/${i.k}/${i.id}"><div class="h" style="background:${esc(/^#[0-9a-f]{3,8}$/i.test(i.col) ? i.col : '#1E4F8A')}"><b>${esc(i.titre)}</b><span>${esc(i.lib)}</span></div><div class="b2"><span>${esc(dateLong(i.date) || '')}</span><span class="ell">${esc(i.lieu)}</span></div></a>`).join('')
+    /* Même classement actif/historique que mes-billets.html (2026-10-28, demande explicite : un
+       billet rejoint l'historique une fois utilisé, l'événement passé, ou son statut définitif). */
+    const estHistorique = i => {
+      if (i.statut === 'used' || i.statut === 'cancelled') return true;
+      if (i.paiement === 'refunded' || i.paiement === 'failed') return true;
+      if (i.validation === 'refuse') return true;
+      const fin = i.fin ? new Date(i.fin) : (i.date ? new Date(new Date(i.date).getTime() + 86400000) : null);
+      return !!(fin && fin < new Date());
+    };
+    const actifs = items.filter(i => !estHistorique(i)).sort((a, b) => new Date(a.date) - new Date(b.date));
+    const historique = items.filter(estHistorique).sort((a, b) => new Date(b.date) - new Date(a.date));
+    const carte = i => `<a class="tk" href="#/billet/${i.k}/${i.id}"><div class="h" style="background:${esc(/^#[0-9a-f]{3,8}$/i.test(i.col) ? i.col : '#1E4F8A')}"><b>${esc(i.titre)}</b><span>${esc(i.lib)}</span></div><div class="b2"><span>${esc(dateLong(i.date) || '')}</span><span class="ell">${esc(i.lieu)}</span></div></a>`;
+    const html = items.length ? `
+      ${actifs.length ? actifs.map(carte).join('') : `<div class="empty"><div class="ei">${ic('ticket', 'l')}</div><b>Aucun billet actif</b>Inscrivez-vous à un événement : votre billet et son QR code apparaîtront ici.<br><br><a class="btn" href="#/evenements">Voir les événements</a></div>`}
+      ${historique.length ? `<div class="h2" style="margin-top:14px">HISTORIQUE</div><button type="button" class="btn out sm" id="mb-hist-toggle" style="margin:4px 0 10px">Afficher l’historique (${historique.length})</button><div id="mb-hist-zone" style="display:none">${historique.map(carte).join('')}</div>` : ''}`
       : `<div class="empty"><div class="ei">${ic('ticket', 'l')}</div><b>Aucun billet pour le moment</b>Inscrivez-vous à un événement : votre billet et son QR code apparaîtront ici.<br><br><a class="btn" href="#/evenements">Voir les événements</a></div>`;
     setPane('Mes billets', html);
+    const tgl = $('#mb-hist-toggle');
+    if (tgl) tgl.onclick = () => {
+      const z = $('#mb-hist-zone');
+      const show = z.style.display === 'none';
+      z.style.display = show ? '' : 'none';
+      tgl.textContent = (show ? 'Masquer' : 'Afficher') + ' l’historique (' + historique.length + ')';
+    };
   }
   async function paneBillet(kind, id) {
     if (!S.me) { location.hash = '#/billets'; return; }
