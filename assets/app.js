@@ -5443,11 +5443,16 @@ function _daPubRelaisCarte(p){
   try { const m0 = JSON.parse(p.medias || '[]')[0] || {}; media = (m0.type === 'video' || /\.(mp4|webm|mov|m3u8)(\?|$)/i.test(m0.url || '')) ? (m0.poster || null) : (m0.url || null); } catch (e) {}
   const texte = _daPubRelaisTexte(p.contenu || p.corps, 220);
   const photo = (p.auteur_profil && p.auteur_profil.photo_url) || '/assets/logo.png';
+  /* Classes distinctes sur les DEUX <img> de cette carte (2026-10-28, bug réel : une règle CSS
+     externe ciblant ".da-pub-rel img" — pensée pour l'image principale — s'appliquait aussi au
+     petit avatar rond, l'étirant en ovale puisque seule la hauteur était forcée, jamais la
+     largeur). "da-pub-rel-media" = l'image principale, "da-pub-rel-avatar" = l'avatar de
+     l'auteur : toute règle externe doit viser l'une des deux, jamais un <img> générique. */
   return `<a class="da-pub-rel" href="fil-actualite.html?post=${p.id}" style="display:block;text-decoration:none;color:#E8ECF6;background:#101B33;border:1px solid rgba(227,192,110,.28);border-radius:14px;overflow:hidden;">
-      ${media ? `<img src="${media}" onerror="this.remove()" style="width:100%;height:190px;object-fit:cover;display:block;">` : ""}
+      ${media ? `<img class="da-pub-rel-media" src="${media}" onerror="this.remove()" style="width:100%;height:190px;object-fit:cover;display:block;">` : ""}
       <div style="padding:18px;">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-          <img src="${photo}" style="width:34px;height:34px;border-radius:50%;object-fit:cover;flex-shrink:0;">
+          <img class="da-pub-rel-avatar" src="${photo}" style="width:34px;height:34px;border-radius:50%;object-fit:cover;flex-shrink:0;">
           <span style="font-size:14px;font-weight:700;color:#F3DC9B;">${escH(p.auteur_nom || "Diaspo'Actif")}</span>
         </div>
         <div style="font-size:15px;color:#DCE3F2;line-height:1.55;">${escH(texte)}</div>

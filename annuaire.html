@@ -191,8 +191,10 @@
 #ad-vitrine-section .da-ad-ban-txt{padding:14px 16px;gap:6px;}
 #ad-vitrine-section .da-ad-ban-titre{font-size:16px;}
 #ad-vitrine-section .da-ad-ban-desc{-webkit-line-clamp:2;}
-/* Publication du fil en relais (quand il manque une publicité) : déjà une carte verticale compacte (image + texte), juste besoin de ne plus être forcée en pleine largeur par le flex-direction:column posé en JS. */
-#ad-vitrine-section .da-pub-rel img{height:110px !important;}
+/* Publication du fil en relais (quand il manque une publicité) : déjà une carte verticale compacte (image + texte), juste besoin de ne plus être forcée en pleine largeur par le flex-direction:column posé en JS.
+   Cible UNIQUEMENT l'image principale (2026-10-28, bug réel : ".da-pub-rel img" visait aussi le petit avatar rond de l'auteur, qui n'a que 34px de large — en lui imposant 110px de haut sans toucher
+   sa largeur, il devenait un ovale au lieu d'un cercle, voir assets/app.js _daPubRelaisCarte). */
+#ad-vitrine-section .da-pub-rel-media{height:110px !important;}
 
 /* Styles de la carte (.ann-card et son contenu) : extraits dans assets/annuaire-cards.css
    (2026-09-20) pour être réutilisés tels quels par toute autre page qui appelle
