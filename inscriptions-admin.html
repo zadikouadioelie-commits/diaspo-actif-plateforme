@@ -1747,7 +1747,7 @@ function renderInfosGenerales(fiche) {
       <div style="background:#fff; border:1px solid oklch(0.9 0.004 30); border-radius:12px; padding:16px 20px; margin-bottom:16px; display:flex; gap:16px; align-items:center;">
         <div style="width:64px; height:64px; border-radius:8px; flex-shrink:0; background:${fiche.affiche_url ? `url('${escH(fiche.affiche_url)}') center/cover` : 'oklch(0.95 0.004 30)'};"></div>
         <div style="flex:1; min-width:0;">
-          <div style="font-size:13px; color:oklch(0.5 0.006 30); overflow:hidden; text-overflow:ellipsis;">${escH(stripRichTags(fiche.description) || 'Aucune description.')}</div>
+          <div class="rich-content" style="font-size:13px; color:oklch(0.5 0.006 30);">${fiche.description ? renderRichText(fiche.description) : 'Aucune description.'}</div>
           <div style="font-size:11.5px; color:oklch(0.6 0.006 30); margin-top:2px;">Organisateur : ${escH(fiche.organisateur || "cet organisateur")}${fiche.contact_email ? ' · ' + escH(fiche.contact_email) : ''}</div>
         </div>
         <button style="background:#fff; border:1px solid oklch(0.8 0.006 30); color:oklch(0.2 0.006 30); font-size:12.5px; font-weight:600; padding:8px 14px; border-radius:8px; cursor:pointer; white-space:nowrap;" data-action="toggleEditionInfos">✏️ Modifier</button>
