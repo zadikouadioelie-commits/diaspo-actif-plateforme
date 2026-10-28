@@ -247,6 +247,7 @@ const state = {
   activeTab: 'overview',
   selectedTypeId: null,
   champCategorieOuverte: null,
+  appliquerAutresTypes: false,  // case « Appliquer aussi aux autres types d'inscription » (onglet Formulaire)
   editionInfosOuverte: false,
   /* Modale "Créer une fiche d'inscription" (2026-10-11, bug réel signalé : "ce bouton marche pas")
      — remplace l'ancien prompt() natif, muet sans aucune erreur en PWA installée sur iPhone
@@ -2094,6 +2095,7 @@ function renderFields() {
   const type = selectedType();
   if (!type) return `${iaConsigne("Choisissez les informations que vous demandez à vos participants (identité, contact, etc.), en plus de nom/prénom/e-mail/téléphone toujours demandés.")}<div style="color:oklch(0.55 0.006 30);">Créez d'abord un type d'inscription (onglet précédent).</div>`;
   const fields = type.champs || [];
+  const autresTypes = types.filter(t => Number(t.id) !== Number(type.id));
   const fieldsHtml = fields.map((f, i) => {
     let nbUniverselles = 0;
     if (f.type_champ === 'options_payantes' || f.type_champ === 'liens_utiles') {
@@ -2164,7 +2166,11 @@ function renderFields() {
         </div>
         ${panelSuggestions}
       </div>
-      <div style="margin-top:20px; padding-top:16px; border-top:1px solid oklch(0.92 0.004 30); display:flex; justify-content:flex-end;">
+      <div style="margin-top:20px; padding-top:16px; border-top:1px solid oklch(0.92 0.004 30); display:flex; justify-content:space-between; align-items:center; gap:14px; flex-wrap:wrap;">
+        ${autresTypes.length ? `<label style="display:flex; align-items:flex-start; gap:10px; flex:1; min-width:260px; font-size:12.5px; cursor:pointer; padding:10px 12px; background:${state.appliquerAutresTypes ? '#EEF4FF' : 'oklch(0.97 0.004 30)'}; border:1.5px solid ${state.appliquerAutresTypes ? '#1565C0' : 'oklch(0.9 0.004 30)'}; border-radius:8px;">
+          <input type="checkbox" ${state.appliquerAutresTypes ? 'checked' : ''} data-action="toggleAppliquerAutresTypes" style="width:17px; height:17px; accent-color:#1565C0; flex-shrink:0; margin-top:1px; cursor:pointer;"/>
+          <span><strong>Appliquer aussi ce formulaire aux autres types d'inscription</strong> (${autresTypes.map(t => escH(t.name)).join(', ')}) — à l'enregistrement, les champs manquants y sont ajoutés et le caractère obligatoire est aligné. Chaque type reste ensuite modifiable séparément. Les options payantes et les liens utiles ne sont pas copiés (utilisez 🌐 « Étendre à tous les types » dessus).</span>
+        </label>` : '<span></span>'}
         <button style="background:oklch(0.32 0.09 258); border:none; color:#fff; font-size:13px; font-weight:700; padding:10px 22px; border-radius:8px; cursor:pointer;" data-action="enregistrerFormulaire">Enregistrer</button>
       </div>
     </div>
@@ -3343,7 +3349,45 @@ const actions = {
      bouton n'a donc rien à sauvegarder. Il existe uniquement parce qu'un organisateur cherche
      par réflexe un "Enregistrer" avant de continuer (demande explicite du 2026-09-09) ; le
      ramener aux types évite qu'il se sente bloqué sans action à faire. */
-  enregistrerFormulaire() { ia_toast('Formulaire enregistré.', true); state.activeTab = 'types'; },
+  toggleAppliquerAutresTypes(el) { state.appliquerAutresTypes = !!el.checked; },
+  /* Case « Appliquer aussi aux autres types » (2026-10-28, demande explicite : « cela restera tout de même modifiable sur ces fiches »).
+     COPIE indépendante (jamais un lien) : pour chaque autre type de la fiche, on ajoute les champs absents (rapprochés par `nom`,
+     clé stable dérivée du libellé — les conditions s'y réfèrent donc restent valides) et on aligne « obligatoire » sur les champs
+     déjà présents. Réutilise POST/PUT /insc/…/champs tels quels (aucun changement serveur). Options payantes et liens utiles exclus :
+     ils ont déjà leur propre mécanisme 🌐 « universelle ». La case se décoche après application. */
+  async enregistrerFormulaire() {
+    if (!state.appliquerAutresTypes) { ia_toast('Formulaire enregistré.', true); state.activeTab = 'types'; return; }
+    state.appliquerAutresTypes = false;
+    const source = selectedType();
+    const cibles = currentTypes().filter(t => source && Number(t.id) !== Number(source.id));
+    const champs = (source?.champs || []).filter(f => f.actif !== 0 && f.type_champ !== 'options_payantes' && f.type_champ !== 'liens_utiles');
+    let ajoutes = 0, alignes = 0, echecs = 0;
+    const json = (s, defaut) => { try { return JSON.parse(s); } catch (e) { return defaut; } };
+    for (const cible of cibles) {
+      const existants = cible.champs || [];
+      for (const f of champs) {
+        const present = existants.find(c => c.nom === f.nom);
+        try {
+          if (present) {
+            if (!!present.obligatoire !== !!f.obligatoire) { await api('PUT', '/insc/champs/' + present.id, { obligatoire: f.obligatoire ? 1 : 0 }); alignes++; }
+          } else {
+            await api('POST', `/insc/types/${cible.id}/champs`, {
+              libelle: f.libelle, nom: f.nom, type_champ: f.type_champ, obligatoire: !!f.obligatoire,
+              description_aide: f.description_aide, valeur_defaut: f.valeur_defaut, placeholder: f.placeholder,
+              options: json(f.options_json, []), regle_validation: f.regle_validation,
+              condition: f.condition_json ? json(f.condition_json, null) : null, image_url: f.image_url
+            });
+            ajoutes++;
+          }
+        } catch (e) { echecs++; }
+      }
+    }
+    await iaChargerFiche(state.selectedFicheId);
+    if (!cibles.length) ia_toast('Formulaire enregistré — aucun autre type d\'inscription à qui l\'appliquer.', true);
+    else if (echecs) ia_toast(`Formulaire appliqué avec ${echecs} échec(s) : ${ajoutes} champ(s) ajouté(s), ${alignes} aligné(s).`, false);
+    else ia_toast(`Formulaire enregistré et appliqué à ${cibles.length} autre(s) type(s) : ${ajoutes} champ(s) ajouté(s), ${alignes} aligné(s).`, true);
+    state.activeTab = 'types';
+  },
   // Assistant de création — Suivant/Brouillon/Continuer (2026-09-25, demande explicite).
   // Sur l'étape "Vue d'ensemble", si le panneau d'édition des infos générales est ouvert, on
   // l'enregistre d'abord (réutilise enregistrerInfos) avant d'avancer ou de quitter — sinon la
