@@ -86,6 +86,18 @@
 .mv-comm-f input:focus{border-color:#E3C06E}
 .mv-comm-f button{border:0;border-radius:99px;padding:0 20px;background:linear-gradient(135deg,#F3DC9B,#E3C06E 45%,#B9893A);color:#1a1202;font:800 14px/1 inherit;cursor:pointer}
 @media (min-width:760px){.mv-comm{left:50%;right:auto;width:min(480px,100%);transform:translateX(-50%);border-radius:22px 22px 0 0}}
+/* Grand écran (2026-10-28, demande : « ouvre les réactions sur la droite, pas en dessous ») : les commentaires s'ouvrent dans un panneau à DROITE, pleine hauteur ;
+   la vidéo, ses boutons et les flèches se recentrent dans la place restante au lieu de passer sous le panneau. Sous 1100 px (tablette, petite fenêtre) : tiroir du bas, comme avant. */
+@keyframes mvInR{from{opacity:0;transform:translateX(34px)}to{opacity:1;transform:none}}
+@media (min-width:1100px){
+  .mv-comm{left:auto;right:0;top:0;bottom:0;width:440px;max-height:none;transform:none;border-radius:0;border-top:0;border-left:1px solid #E3C06E55;box-shadow:-24px 0 56px #000a;animation:mvInR .25s ease-out}
+  .mv-comm-h{padding:20px 20px 12px}
+  .mv-comm-l{padding:4px 20px 8px}
+  .mv:has(.mv-comm) .mv-stage{margin-right:440px}
+  .mv:has(.mv-comm) .mv-top{right:440px}
+  .mv:has(.mv-comm) .mv-fleches{right:464px}
+  .mv:has(.mv-comm) .mv-info{right:440px}
+}
 
 /* ── Reels : création, réactions (2026-10-14) ── */
 .mv-reels .mv-creer{margin-left:auto;display:inline-flex;align-items:center;gap:6px;height:40px;padding:0 16px;border-radius:999px;border:0;background:linear-gradient(135deg,#F3DC9A,#B9893A);color:#1a1202;font:800 14px/1 inherit;cursor:pointer;box-shadow:0 8px 20px -10px rgba(227,192,110,.8)}
