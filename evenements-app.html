@@ -183,6 +183,14 @@
    cohérent avec le reste de la plateforme) ; une carte SANS image du tout (icône seule) garde
    le dégradé de .evt-img, inchangé. */
 .evt-img img.loaded{background:#000}
+/* Cartouche qui épouse l'affiche (2026-10-28, demande explicite : « adapter automatiquement les cartouches pour qu'on les voie entièrement — rectangulaire
+   si l'affiche est rectangulaire, mais entière ») — le cadre figé à 140 px ne montrait qu'une vignette de l'affiche, noyée dans du noir. Avec une image,
+   le cadre prend la hauteur naturelle de l'affiche (largeur de la carte, ratio d'origine) : paysage, carrée ou portrait, on la voit en entier. Plafond à
+   560 px pour une affiche très haute (elle reste alors entière, centrée sur fond noir). Les cartes d'une même rangée n'ont plus la même hauteur : chacune
+   garde la sienne (align-items:start) plutôt que de laisser du vide. Sans image (icône seule), le cadre de 140 px et son dégradé restent inchangés. */
+.evt-img:has(> img){height:auto;min-height:120px}
+.evt-img:has(> img) img{height:auto;max-height:560px}
+.evt-grid{align-items:start}
 .evt-body{padding:16px}
 .evt-date{font-size:12px;color:#2563EB;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
 .evt-title{font-size:16px;font-weight:700;margin:0 0 8px;line-height:1.3}
