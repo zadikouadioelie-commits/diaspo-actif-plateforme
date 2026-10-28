@@ -1337,7 +1337,7 @@ function iaCarteFiche(f, ctx) {
     return `
       <div style="background:#fff;${Number(f.est_bouton_action) ? 'border:2px solid #2E8BFF;box-shadow:0 0 14px rgba(46,139,255,.45);' : 'border:1px solid oklch(0.9 0.004 30);'}border-radius:12px;overflow:hidden;cursor:pointer;position:relative;" ${ctx === 'recue' ? 'data-action="ouvrirFicheRecue"' : 'data-action="selectFiche"'} data-id="${f.id}">
         ${ctx === 'liste' ? `<button title="Supprimer la fiche" data-action="supprimerFicheListe" data-id="${f.id}" data-nom="${escH(f.nom)}" style="position:absolute;top:8px;right:8px;z-index:1;width:28px;height:28px;border-radius:50%;border:none;background:rgba(0,0,0,.45);color:#fff;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;">🗑</button>` : ''}
-        <div style="height:120px;background:${f.affiche_url ? `oklch(0.9 0.004 30) center/cover no-repeat url('${escH(f.affiche_url)}')` : 'oklch(0.94 0.01 258)'};display:flex;align-items:center;justify-content:center;">
+        <div style="height:120px;background:${f.affiche_url ? `oklch(0.9 0.004 30) center/contain no-repeat url('${escH(f.affiche_url)}')` : 'oklch(0.94 0.01 258)'};display:flex;align-items:center;justify-content:center;">
           ${f.affiche_url ? '' : '<span style="font-size:28px;opacity:.5;">📅</span>'}
         </div>
         <div style="padding:18px;">
@@ -1372,34 +1372,46 @@ function iaCarteFiche(f, ctx) {
               : `<span>📅 ${f.date_ouverture_inscriptions ? escH(f.date_ouverture_inscriptions.slice(0,10)) : 'Ouverture à définir'} → ${f.date_fermeture_inscriptions ? escH(f.date_fermeture_inscriptions.slice(0,10)) : 'fermeture à définir'}</span>`}
             <span style="margin-left:auto;flex-shrink:0;">✏️</span>
           </div>
-          <div style="display:flex;gap:12px;padding-top:12px;border-top:1px solid oklch(0.93 0.004 30);align-items:center;flex-wrap:wrap;">
-            <div><div style="font-size:11px;color:oklch(0.55 0.006 30);">Inscrits</div><div style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600;">${f.nb_inscriptions}</div></div>
+          <div style="padding-top:12px;border-top:1px solid oklch(0.93 0.004 30);">
 ${ctx === 'recue' ? `
-            <div style="flex:1;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">
-              <button data-action="gererFicheRecue" data-id="${f.id}" style="background:oklch(0.32 0.09 258);border:none;color:#fff;font-size:11.5px;font-weight:700;padding:6px 12px;border-radius:20px;cursor:pointer;white-space:nowrap;">🗂️ Gérer</button>
-              <button data-action="ouvrirFicheRecue" data-id="${f.id}" style="background:#fff;border:1px solid oklch(0.8 0.006 30);color:oklch(0.2 0.006 30);font-size:11.5px;font-weight:600;padding:6px 11px;border-radius:20px;cursor:pointer;white-space:nowrap;">✏️ Modifier</button>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+              <div><div style="font-size:11px;color:oklch(0.55 0.006 30);">Inscrits</div><div style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600;">${f.nb_inscriptions}</div></div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button data-action="gererFicheRecue" data-id="${f.id}" style="background:oklch(0.32 0.09 258);border:none;color:#fff;font-size:11.5px;font-weight:700;padding:6px 12px;border-radius:20px;cursor:pointer;white-space:nowrap;">🗂️ Gérer</button>
+                <button data-action="ouvrirFicheRecue" data-id="${f.id}" style="background:#fff;border:1px solid oklch(0.8 0.006 30);color:oklch(0.2 0.006 30);font-size:11.5px;font-weight:600;padding:6px 11px;border-radius:20px;cursor:pointer;white-space:nowrap;">✏️ Modifier</button>
+              </div>
+            </div>
+            <div style="margin-top:10px;">
               ${Number(f.partage_accepte)
-                ? `<span style="font-size:11px;font-weight:700;color:oklch(0.4 0.13 150);align-self:center;">✓ Dans votre liste principale</span>`
-                : `<button data-action="afficherDansListePrincipale" data-id="${f.id}" style="background:oklch(0.94 0.05 150);border:1px solid oklch(0.4 0.13 150);color:oklch(0.4 0.13 150);font-size:11.5px;font-weight:700;padding:6px 11px;border-radius:20px;cursor:pointer;white-space:nowrap;">📥 Afficher dans ma liste principale</button>`}
+                ? `<span style="font-size:11px;font-weight:700;color:oklch(0.4 0.13 150);">✓ Dans votre liste principale</span>`
+                : `<button data-action="afficherDansListePrincipale" data-id="${f.id}" style="width:100%;background:oklch(0.94 0.05 150);border:1px solid oklch(0.4 0.13 150);color:oklch(0.4 0.13 150);font-size:11.5px;font-weight:700;padding:8px 11px;border-radius:20px;cursor:pointer;">📥 Afficher dans ma liste principale</button>`}
             </div>
 ` : `
-            <div style="flex:1;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+              <div><div style="font-size:11px;color:oklch(0.55 0.006 30);">Inscrits</div><div style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600;">${f.nb_inscriptions}</div></div>
               <!-- Accès rapide "Gérer"/"Modifier" (2026-09-26, demande explicite : "évite de
                    rentrer encore une fois dans la fiche pour aller chercher à l'intérieur") —
                    Gérer saute directement sur l'onglet Validation (inscrits, relances...),
                    Modifier retombe sur les 3 étapes de création (Vue d'ensemble/Types/Formulaire),
                    réutilise selectFiche() déjà existant (même comportement que cliquer la carte). -->
-              <button data-action="gererFicheListe" data-id="${f.id}" style="background:oklch(0.32 0.09 258);border:none;color:#fff;font-size:11.5px;font-weight:700;padding:6px 12px;border-radius:20px;cursor:pointer;white-space:nowrap;">🗂️ Gérer</button>
-              <button data-action="selectFiche" data-id="${f.id}" style="background:#fff;border:1px solid oklch(0.8 0.006 30);color:oklch(0.2 0.006 30);font-size:11.5px;font-weight:600;padding:6px 11px;border-radius:20px;cursor:pointer;white-space:nowrap;">✏️ Modifier</button>
-              ${f.nb_evenements ? `<button data-action="ouvrirLiaisonEvenement" data-id="${f.id}" style="background:oklch(0.95 0.03 258);border:1px solid oklch(0.85 0.05 258);color:oklch(0.32 0.09 258);font-size:11.5px;font-weight:600;padding:6px 11px;border-radius:20px;cursor:pointer;white-space:nowrap;">📅 ${f.nb_evenements} événement${f.nb_evenements > 1 ? 's' : ''} lié${f.nb_evenements > 1 ? 's' : ''}</button>` : ''}
-              <button data-action="ouvrirLiaisonEvenement" data-id="${f.id}" style="background:#fff;border:1px solid oklch(0.8 0.006 30);color:oklch(0.2 0.006 30);font-size:11.5px;font-weight:600;padding:6px 11px;border-radius:20px;cursor:pointer;white-space:nowrap;">🔗 Lier à un événement</button>
-              <button data-action="ouvrirPartage" data-id="${f.id}" style="background:#fff;border:1px solid oklch(0.8 0.006 30);color:oklch(0.2 0.006 30);font-size:11.5px;font-weight:600;padding:6px 11px;border-radius:20px;cursor:pointer;white-space:nowrap;">🤝 Fiche partagée</button>
-              ${(f.statut === 'brouillon' || f.statut === 'fermee')
-                ? `<button data-action="ouvrirFicheListe" data-id="${f.id}" style="background:oklch(0.94 0.05 150);border:1px solid oklch(0.4 0.13 150);color:oklch(0.4 0.13 150);font-size:11.5px;font-weight:700;padding:6px 11px;border-radius:20px;cursor:pointer;white-space:nowrap;">🔓 Ouvrir la fiche</button>`
-                : f.statut === 'publiee'
-                ? `<button data-action="fermerFicheListe" data-id="${f.id}" style="background:#fff;border:1px solid #dc2626;color:#dc2626;font-size:11.5px;font-weight:600;padding:6px 11px;border-radius:20px;cursor:pointer;white-space:nowrap;">🔒 Fermer la fiche</button>`
-                : ''}
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button data-action="gererFicheListe" data-id="${f.id}" style="background:oklch(0.32 0.09 258);border:none;color:#fff;font-size:11.5px;font-weight:700;padding:6px 12px;border-radius:20px;cursor:pointer;white-space:nowrap;">🗂️ Gérer</button>
+                <button data-action="selectFiche" data-id="${f.id}" style="background:#fff;border:1px solid oklch(0.8 0.006 30);color:oklch(0.2 0.006 30);font-size:11.5px;font-weight:600;padding:6px 11px;border-radius:20px;cursor:pointer;white-space:nowrap;">✏️ Modifier</button>
+              </div>
             </div>
+            <!-- Actions secondaires regroupées sur leur propre ligne (2026-10-28, demande
+                 explicite : réorganiser la cartouche — le mélange stats + boutons dans un seul
+                 flex-wrap faisait retomber les boutons dans un ordre différent selon la largeur
+                 du texte de chaque fiche). -->
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              ${f.nb_evenements ? `<button data-action="ouvrirLiaisonEvenement" data-id="${f.id}" style="background:oklch(0.95 0.03 258);border:1px solid oklch(0.85 0.05 258);color:oklch(0.32 0.09 258);font-size:11.5px;font-weight:600;padding:6px 11px;border-radius:20px;cursor:pointer;white-space:nowrap;">📅 ${f.nb_evenements} événement${f.nb_evenements > 1 ? 's' : ''} lié${f.nb_evenements > 1 ? 's' : ''}</button>` : `<button data-action="ouvrirLiaisonEvenement" data-id="${f.id}" style="background:#fff;border:1px solid oklch(0.8 0.006 30);color:oklch(0.2 0.006 30);font-size:11.5px;font-weight:600;padding:6px 11px;border-radius:20px;cursor:pointer;white-space:nowrap;">🔗 Lier à un événement</button>`}
+              <button data-action="ouvrirPartage" data-id="${f.id}" style="background:#fff;border:1px solid oklch(0.8 0.006 30);color:oklch(0.2 0.006 30);font-size:11.5px;font-weight:600;padding:6px 11px;border-radius:20px;cursor:pointer;white-space:nowrap;">🤝 Fiche partagée</button>
+            </div>
+            ${(f.statut === 'brouillon' || f.statut === 'fermee')
+              ? `<button data-action="ouvrirFicheListe" data-id="${f.id}" style="width:100%;margin-top:10px;background:oklch(0.94 0.05 150);border:1px solid oklch(0.4 0.13 150);color:oklch(0.4 0.13 150);font-size:12px;font-weight:700;padding:8px 11px;border-radius:20px;cursor:pointer;">🔓 Ouvrir la fiche</button>`
+              : f.statut === 'publiee'
+              ? `<button data-action="fermerFicheListe" data-id="${f.id}" style="width:100%;margin-top:10px;background:#fff;border:1px solid #dc2626;color:#dc2626;font-size:12px;font-weight:600;padding:8px 11px;border-radius:20px;cursor:pointer;">🔒 Fermer la fiche</button>`
+              : ''}
 `}
           </div>
         </div>
