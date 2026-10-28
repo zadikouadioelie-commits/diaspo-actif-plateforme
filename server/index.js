@@ -27502,6 +27502,25 @@ route("GET", "/api/fil", async (req, res, params, body, query) => {
     scored.forEach(({ p }) => { if (!orderedIds.has(p.id)) { orderedIds.add(p.id); allPosts.push({ ...p, source: "fil" }); } });
   }
 
+  /* 4) Brassage du fil (2026-10-28, demande explicite : « donner l'impression qu'il y a une certaine activité… faire remonter
+     de vieilles actualités, même en gardant la date de diffusion… affiche les quatre premières, les plus récentes, et tu bouges
+     tout ce qui est en dessous »). Annonces officielles et promotions ciblées restent épinglées tout en haut ; ensuite les 4
+     publications les plus récentes ; tout le reste est brassé. Ordre déterministe : clé = hash(période de FIL_BRASSAGE_HEURES h + id
+     de la publication), donc identique pour tout le monde pendant la période (la pagination ne saute pas) et une nouvelle publication
+     ne rebat pas les autres. La date affichée (created_at) n'est jamais modifiée. Désactivé quand une catégorie est filtrée. */
+  if (!catFiltre) {
+    const FIL_BRASSAGE_HEURES = 6, FIL_TETE_RECENTE = 4;
+    const periode = Math.floor(Date.now() / (FIL_BRASSAGE_HEURES * 3600 * 1000));
+    const cle = p => crypto.createHash("md5").update(`${periode}:${p.id}`).digest("hex");
+    const epingles = allPosts.filter(p => p.source === "annonce" || p.source === "promo");
+    const autres = allPosts.filter(p => p.source !== "annonce" && p.source !== "promo");
+    autres.sort((a, b) => (new Date(b.created_at).getTime() || 0) - (new Date(a.created_at).getTime() || 0));
+    const tete = autres.slice(0, FIL_TETE_RECENTE);
+    const reste = autres.slice(FIL_TETE_RECENTE).map(p => ({ p, k: cle(p) })).sort((a, b) => (a.k < b.k ? -1 : a.k > b.k ? 1 : 0)).map(x => x.p);
+    allPosts.length = 0;
+    allPosts.push(...epingles, ...tete, ...reste);
+  }
+
   // 5) Cartes vitrine (vitrines/catalogues/promotions/meilleures ventes) — intercalées, plafonnées à ~30%
   // Ignorées quand un filtre de catégorie est actif : ce ne sont pas des fil_posts et
   // elles n'ont pas de catégorie à faire correspondre au filtre choisi.
