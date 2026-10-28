@@ -54,6 +54,10 @@ const cfg = () => ({
   hote: String(process.env.BUNNY_STREAM_HOSTNAME || "").trim().replace(/^https?:\/\//, "").replace(/\/+$/, ""),
   base: String(process.env.BUNNY_STREAM_API_BASE || "https://video.bunnycdn.com").replace(/\/+$/, ""),
 });
+/* Vidéo courte d'un ÉVÉNEMENT (2026-10-28, demande explicite : « une vidéo courte, 2 minutes maximum ») : même hébergement et même envoi direct que les Reels,
+   seule la durée change. Règles distinctes, jamais modifiables par le navigateur : c'est le serveur qui choisit quelle règle s'applique. */
+const SPEC_EVENEMENT = Object.freeze({ ...SPEC, duree_min: 1, duree_max: 120, duree_ideale: [30, 90], taille_max_mo: 600, cadre_recommande: "16:9", resolution_recommandee: "1280x720" });
+const specDe = usage => (usage === "evenement" ? SPEC_EVENEMENT : SPEC);
 const actif = () => { const c = cfg(); return !!(c.lib && c.cle && c.hote); };
 
 const secret = () => process.env.AUTH_SECRET || "diaspo-actif-2026-secret";
@@ -93,7 +97,8 @@ const cadreDe = (l, h) => { if (!l || !h) return null; const r = l / h; return r
 
 /* État d'une vidéo envoyée. Codes Bunny : 0 créée · 1 envoyée · 2 analyse · 3 encodage · 4 terminée · 5 erreur · 6 envoi échoué.
    Les règles de durée / définition sont appliquées ici sur les mesures de Bunny ; une vidéo hors règle est SUPPRIMÉE. */
-async function etatVideo(guid) {
+async function etatVideo(guid, regles) {
+  const SPEC = regles || module.exports.SPEC;
   const v = await appelBunny("GET", `/videos/${encodeURIComponent(guid)}`);
   const duree = Math.round((Number(v.length) || 0) * 10) / 10, largeur = Number(v.width) || 0, hauteur = Number(v.height) || 0;
   const base = { guid, duree, largeur, hauteur, cadre: cadreDe(largeur, hauteur), statut_bunny: v.status };
@@ -118,8 +123,9 @@ async function supprimerVideo(guid) {
 
 function registerReelsUpload({ route, sendJSON, getCurrentUser }) {
   /* Règles publiques : lues par le navigateur (écran d'envoi) et par l'univers des Reels. */
-  route("GET", "/api/reels/config", async (req, res) => {
-    sendJSON(res, 200, { actif: actif(), ...SPEC, taille_max_octets: SPEC.taille_max_mo * 1024 * 1024 });
+  route("GET", "/api/reels/config", async (req, res, params, body, query) => {
+    const sp = specDe(query && query.usage);
+    sendJSON(res, 200, { actif: actif(), ...sp, taille_max_octets: sp.taille_max_mo * 1024 * 1024 });
   });
 
   /* Ouvre un envoi : crée l'objet vidéo chez Bunny et renvoie de quoi envoyer le fichier directement (jamais la clé d'API). */
@@ -129,9 +135,10 @@ function registerReelsUpload({ route, sendJSON, getCurrentUser }) {
     if (!actif()) return sendJSON(res, 503, { error: "L’envoi de reels sera disponible très bientôt.", code: "reels_inactif" });
     const lim = SEC.rateLimit(`reels-session:${user.id}`, 12, 3600000);
     if (!lim.allowed) return sendJSON(res, 429, { error: "Trop d’envois en peu de temps. Réessayez dans un moment." });
+    const SP = specDe(body && body.usage);
     const taille = Number(body && body.taille), type = String((body && body.type) || "").toLowerCase();
     if (!Number.isFinite(taille) || taille <= 0) return sendJSON(res, 400, { error: "Taille du fichier inconnue." });
-    if (taille > SPEC.taille_max_mo * 1024 * 1024) return sendJSON(res, 400, { error: `Fichier trop volumineux (maximum ${SPEC.taille_max_mo} Mo). Exportez la vidéo en 1080×1920 : un reel de 90 s dépasse rarement 150 Mo.` });
+    if (taille > SP.taille_max_mo * 1024 * 1024) return sendJSON(res, 400, { error: `Fichier trop volumineux (maximum ${SP.taille_max_mo} Mo). ${SP === SPEC ? "Exportez la vidéo en 1080×1920 : un reel de 90 s dépasse rarement 150 Mo." : "Réduisez la définition (720p suffit) ou la durée de la vidéo."}` });
     if (type && !SPEC.formats.includes(type)) return sendJSON(res, 400, { error: "Format non pris en charge. Utilisez une vidéo MP4 ou MOV." });
     const titre = String((body && body.titre) || "Reel").replace(/[\r\n]+/g, " ").trim().slice(0, 80) || "Reel";
     try {
@@ -153,7 +160,7 @@ function registerReelsUpload({ route, sendJSON, getCurrentUser }) {
     if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
     if (!actif()) return sendJSON(res, 503, { error: "Indisponible.", code: "reels_inactif" });
     if (!guidValide(params.guid) || !jetonValide(user.id, params.guid, query && query.jeton)) return sendJSON(res, 403, { error: "Envoi inconnu." });
-    try { sendJSON(res, 200, await etatVideo(params.guid)); }
+    try { sendJSON(res, 200, await etatVideo(params.guid, specDe(query && query.usage))); }
     catch (e) { if (e.status === 404) return sendJSON(res, 404, { error: "Vidéo introuvable." }); sendJSON(res, 500, SEC.safeError(e, "reels statut")); }
   });
 
@@ -166,4 +173,21 @@ function registerReelsUpload({ route, sendJSON, getCurrentUser }) {
   });
 }
 
-module.exports = { registerReelsUpload, SPEC, actif, urlsLecture, etatVideo, supprimerVideo, jetonValide, jetonPour, guidValide };
+/* Vérifie l'envoi d'une vidéo d'ÉVÉNEMENT (preuve guid + jeton du compte, vidéo prête, durée réelle ≤ 2 min mesurée par Bunny) et renvoie l'adresse de lecture
+   construite par le serveur — le navigateur ne fournit jamais l'adresse. → { url } ou { erreur, code }. */
+async function verifierVideoEvenement(userId, guid, jeton) {
+  if (!actif()) return { erreur: "L’envoi de vidéos n’est pas encore activé.", code: 503 };
+  if (!guidValide(guid) || !jetonValide(userId, guid, jeton)) return { erreur: "Envoi de vidéo inconnu.", code: 403 };
+  let e;
+  try { e = await etatVideo(guid, SPEC_EVENEMENT); } catch (err) { return { erreur: "La vidéo n’a pas pu être vérifiée. Réessayez.", code: 502 }; }
+  if (!e || e.etat !== "pret") return { erreur: e && e.erreur ? e.erreur : "Votre vidéo n’est pas encore prête. Patientez quelques instants puis réessayez.", code: 409 };
+  return { url: e.urls.mp4 };
+}
+/* Supprime de l'hébergement une vidéo d'événement remplacée ou retirée (seulement si l'adresse est bien celle de NOTRE bibliothèque). */
+async function supprimerVideoParUrl(url) {
+  const h = cfg().hote; if (!h || !url) return false;
+  const pref = "https://" + h + "/"; if (!String(url).startsWith(pref)) return false;
+  return supprimerVideo(String(url).slice(pref.length).split("/")[0]);
+}
+
+module.exports = { verifierVideoEvenement, supprimerVideoParUrl, SPEC_EVENEMENT, registerReelsUpload, SPEC, actif, urlsLecture, etatVideo, supprimerVideo, jetonValide, jetonPour, guidValide };

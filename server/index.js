@@ -24104,7 +24104,15 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
   // Galerie réduite à 1 photo + couverture (2026-09-09, demande explicite) — le reste des
   // médias (photos/vidéos/documents) vit désormais sur la fiche d'inscription liée, voir
   // enrichirAvecFicheMedia() plus haut.
-  const galerie = Array.isArray(galerie_photos) ? JSON.stringify(galerie_photos.slice(0,1)) : (galerie_photos || '[]');
+  const galerie = Array.isArray(galerie_photos) ? JSON.stringify(galerie_photos.slice(0,2)) : (galerie_photos || '[]');
+  /* Vidéo courte de 2 min maximum (2026-10-28) : envoyée directement à l'hébergeur vidéo par le navigateur ; le serveur ne reçoit que la preuve (video_guid + video_jeton),
+     contrôle la durée réelle mesurée et fixe lui-même l'adresse (voir verifierVideoEvenement). Une adresse envoyée à la main dans video1_url n'est plus acceptée. */
+  let video1UrlVerifiee = null;
+  if (body.video_guid) {
+    const vv = await require("./reels-upload").verifierVideoEvenement(user.id, body.video_guid, body.video_jeton);
+    if (vv.erreur) return sendJSON(res, vv.code || 409, { error: vv.erreur });
+    video1UrlVerifiee = vv.url;
+  }
   // Brouillon (2026-09-23, demande explicite : "un bouton brouillon... pour le conserver sans
   // le publier") — statut passe désormais par le body au lieu d'être figé sur 'ouvert', mais
   // reste strictement limité à ces deux valeurs (jamais un statut arbitraire venu du client).
@@ -24131,7 +24139,7 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
       inscription_ouverte!==false?1:0, lien_inscription||null, coverImg, statutFinal, user.id,
       heure_debut||null, heure_fin||null, date_fin||null, lien_visio||null, visibilite||'public',
       coverImg, galerie,
-      video1_url||null, video1_titre||null, video2_url||null, video2_titre||null,
+      video1UrlVerifiee, null, video2_url||null, video2_titre||null,
       pdf_url||null, pdf_nom||null, pdf_acces||'public',
       langue||'francais', mode_participation||'presentiel', region||null, departement||null,
       masquer_inscrits?1:0, whatsapp_lien||null, lieu_gps||null, public_concerne||null, masquer_boutique?1:0,
@@ -24201,7 +24209,7 @@ route("PUT", "/api/evenements/:id", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   await ensureEvenementsFlashExtras();
-  const evt = await db.prepare("SELECT id, owner_user_id, statut, programme_json, inscription_rapide_active, lien_plus_info FROM evenements WHERE id=?").get(params.id);
+  const evt = await db.prepare("SELECT id, owner_user_id, statut, programme_json, inscription_rapide_active, lien_plus_info, video1_url FROM evenements WHERE id=?").get(params.id);
   if (!evt) return sendJSON(res, 404, { error: "Événement introuvable." });
   if (Number(evt.owner_user_id) !== Number(user.id) && user.role !== "administrateur") {
     return sendJSON(res, 403, { error: "Vous ne pouvez modifier que vos propres événements." });
@@ -24218,7 +24226,16 @@ route("PUT", "/api/evenements/:id", async (req, res, params, body) => {
      jamais l'éditeur client (assets/rich-editor.js). */
   const descriptionSafe = SEC.sanitizeRichHtml(description);
   const coverImg = image_couverture || image_url || null;
-  const galerie = Array.isArray(galerie_photos) ? JSON.stringify(galerie_photos.slice(0, 1)) : (galerie_photos || "[]");
+  const galerie = Array.isArray(galerie_photos) ? JSON.stringify(galerie_photos.slice(0, 2)) : (galerie_photos || "[]");
+  /* Vidéo courte (2026-10-28) : `video_guid` + `video_jeton` = nouvelle vidéo envoyée ; `video_retirer` = la retirer ; rien d'envoyé = on conserve l'existante.
+     L'ancienne vidéo hébergée chez nous est supprimée de l'hébergement une fois remplacée ou retirée. */
+  let video1Url = evt.video1_url || null;
+  if (body.video_retirer) video1Url = null;
+  if (body.video_guid) {
+    const vv = await require("./reels-upload").verifierVideoEvenement(user.id, body.video_guid, body.video_jeton);
+    if (vv.erreur) return sendJSON(res, vv.code || 409, { error: vv.erreur });
+    video1Url = vv.url;
+  }
   // Brouillon (2026-09-23) : permet de publier un brouillon existant (statut:'ouvert' envoyé
   // par le bouton "Publier") ou de repasser un événement publié en brouillon ("Enregistrer en
   // brouillon" depuis l'édition) — conserve le statut actuel si rien n'est envoyé (défensif,
@@ -24237,15 +24254,16 @@ route("PUT", "/api/evenements/:id", async (req, res, params, body) => {
   await db.prepare(`UPDATE evenements SET
     titre=?, date_evt=?, heure_debut=?, heure_fin=?, type_evt=?, domaine=?, zone_diffusion=?, type_participation=?, ouverture_inscriptions=?, statut=?, pays=?, lieu=?, ville=?, lieu_gps=?,
     origine=?, description=?, places_max=?, masquer_inscrits=?, visibilite=?, lien_visio=?, whatsapp_lien=?,
-    image_couverture=?, image_url=?, galerie_photos=?, programme_json=?, inscription_rapide_active=?, lien_plus_info=?
+    image_couverture=?, image_url=?, galerie_photos=?, programme_json=?, inscription_rapide_active=?, lien_plus_info=?, video1_url=?
     WHERE id=?`)
     .run(
       titre, date_evt, heure_debut || null, heure_fin || null, type_evt || "evenement", domaine || null, zone_diffusion || null,
       ['payant','partiellement_payant'].includes(type_participation) ? type_participation : 'gratuit', ouverture_inscriptions || null, statutFinal,
       pays || null, lieu || null, ville || null, lieu_gps || null, origine || null, descriptionSafe || null,
       places_max || null, masquer_inscrits ? 1 : 0, visibilite || "public", lien_visio || null, whatsapp_lien || null,
-      coverImg, coverImg, galerie, programmeJson, inscriptionRapideActive, lienInfo, evt.id
+      coverImg, coverImg, galerie, programmeJson, inscriptionRapideActive, lienInfo, video1Url, evt.id
     );
+  if (evt.video1_url && evt.video1_url !== video1Url) require("./reels-upload").supprimerVideoParUrl(evt.video1_url).catch(() => {});
   if (evt.statut === 'brouillon' && statutFinal === 'ouvert') alertesEvenementDeclencher(evt.id);
   sendJSON(res, 200, { id: evt.id });
 });

@@ -705,17 +705,44 @@
          et documents supplémentaires vivent désormais sur la fiche d'inscription liée à
          l'événement, voir le bouton "📝 Fiche d'inscription" plus haut. -->
     <div style="margin-bottom:16px;">
-      <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:6px;">🖼️ Photo supplémentaire <span style="font-weight:400;text-transform:none;color:#aaa;">(JPG, PNG, WebP)</span></label>
-      <div style="display:flex;flex-wrap:nowrap;gap:8px;max-width:120px;" id="gallery-slots">
+      <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:6px;">🖼️ Photos supplémentaires <span style="font-weight:400;text-transform:none;color:#aaa;">(2 maximum · JPG, PNG, WebP)</span></label>
+      <div style="display:flex;flex-wrap:nowrap;gap:8px;max-width:250px;" id="gallery-slots">
         <div id="gslot-0" style="flex:1;min-width:0;aspect-ratio:1;border:2px dashed var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;background:#FAFAFA;position:relative;" onclick="document.getElementById('gfile-0').click()">
           <span style="font-size:20px;color:#ccc;" id="gph-0">＋</span>
           <img id="gimg-0" style="display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;" alt="">
           <button id="gdel-0" onclick="event.stopPropagation();clearPhoto(0)" style="display:none;position:absolute;top:3px;right:3px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:12px;cursor:pointer;line-height:1;z-index:2;">×</button>
           <input type="file" id="gfile-0" accept="image/jpeg,image/png,image/webp" style="display:none">
         </div>
+        <div id="gslot-1" style="flex:1;min-width:0;aspect-ratio:1;border:2px dashed var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;background:#FAFAFA;position:relative;" onclick="document.getElementById('gfile-1').click()">
+          <span style="font-size:20px;color:#ccc;" id="gph-1">＋</span>
+          <img id="gimg-1" style="display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;" alt="">
+          <button id="gdel-1" onclick="event.stopPropagation();clearPhoto(1)" style="display:none;position:absolute;top:3px;right:3px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:12px;cursor:pointer;line-height:1;z-index:2;">×</button>
+          <input type="file" id="gfile-1" accept="image/jpeg,image/png,image/webp" style="display:none">
+        </div>
       </div>
-      <div id="gallery-progress" style="display:none;margin-top:6px;max-width:120px;"><div style="height:4px;background:#f0f0f0;border-radius:2px;overflow:hidden;"><div id="gallery-bar" style="height:100%;background:linear-gradient(135deg,#2563EB,#1d4ed8);width:0%;transition:width .3s;"></div></div></div>
-      <p style="font-size:11px;color:#aaa;margin:6px 0 0;">Besoin de plus de photos, d'une vidéo ou d'un document (programme, affiche…) ? Ajoutez-les depuis la fiche d'inscription liée à l'événement (bouton « 📝 Fiche d'inscription » ci-dessus) — ils s'afficheront automatiquement sur la fiche publique de l'événement.</p>
+      <div id="gallery-progress" style="display:none;margin-top:6px;max-width:250px;"><div style="height:4px;background:#f0f0f0;border-radius:2px;overflow:hidden;"><div id="gallery-bar" style="height:100%;background:linear-gradient(135deg,#2563EB,#1d4ed8);width:0%;transition:width .3s;"></div></div></div>
+      <!-- Vidéo courte (2026-10-28, demande explicite : « une vidéo courte, 2 minutes maximum ») — envoyée directement à l'hébergeur vidéo (assets/reels-upload.js, usage « evenement »). -->
+      <div style="margin-top:16px;">
+        <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:6px;">🎬 Vidéo courte <span style="font-weight:400;text-transform:none;color:#aaa;">(MP4 ou MOV · 2 minutes maximum)</span></label>
+        <div id="evt-video-zone" style="border:2px dashed var(--border);border-radius:10px;padding:12px;background:transparent;">
+          <div id="evt-video-vide">
+            <button type="button" class="btn btn-outline" id="evt-video-btn" style="font-size:12.5px;">＋ Choisir une vidéo</button>
+            <div id="evt-video-indispo" style="display:none;font-size:12px;color:var(--muted);margin-top:6px;">L'envoi de vidéos sera disponible très bientôt.</div>
+          </div>
+          <div id="evt-video-prog" style="display:none;">
+            <div id="evt-video-msg" style="font-size:12.5px;font-weight:600;margin-bottom:6px;">Envoi de la vidéo… 0 %</div>
+            <div style="height:6px;background:#f0f0f0;border-radius:3px;overflow:hidden;"><div id="evt-video-bar" style="height:100%;background:linear-gradient(135deg,#2563EB,#1d4ed8);width:0%;transition:width .3s;"></div></div>
+          </div>
+          <div id="evt-video-prete" style="display:none;">
+            <video id="evt-video-lecteur" controls preload="metadata" playsinline style="display:none;width:100%;max-height:220px;border-radius:8px;background:#000;"></video>
+            <div id="evt-video-externe" style="display:none;font-size:12.5px;word-break:break-all;"></div>
+            <button type="button" class="btn btn-outline" id="evt-video-retirer" style="font-size:12px;margin-top:8px;" onclick="retirerVideoEvt()">✕ Retirer la vidéo</button>
+          </div>
+        </div>
+        <input type="file" id="evt-video-file" accept="video/mp4,video/quicktime,.mp4,.mov" style="display:none">
+        <div id="evt-video-err" style="display:none;font-size:12.5px;color:#b91c1c;margin-top:6px;" role="alert"></div>
+      </div>
+      <p style="font-size:11px;color:#aaa;margin:10px 0 0;">Besoin de plus de photos, de vidéos ou d'un document (programme, affiche…) ? Ajoutez-les depuis la fiche d'inscription liée à l'événement — ils s'afficheront automatiquement sur la fiche publique de l'événement.</p>
     </div>
 
     <div class="section-divider">Fonctionnalités activées</div>
@@ -1545,6 +1572,8 @@ function resetModaleEvenement() {
   majToggleParticipation();
   document.getElementById('e-heure').value = '09:00';
   clearPhoto(0);
+  clearPhoto(1);
+  reinitialiserVideoEvt();
   coverData = null;
   document.getElementById('cover-preview').style.display = 'none';
   document.getElementById('cover-placeholder').style.display = '';
@@ -1631,6 +1660,11 @@ function ouvrirModaleEdition(id) {
     document.getElementById('cover-preview').style.display = '';
     document.getElementById('cover-placeholder').style.display = 'none';
   }
+  /* Photos supplémentaires et vidéo déjà enregistrées (2026-10-28) : sans ce pré-remplissage, enregistrer une modification les aurait effacées. */
+  let galExistante = [];
+  try { galExistante = Array.isArray(evt.galerie_photos) ? evt.galerie_photos : JSON.parse(evt.galerie_photos || '[]'); } catch (e) { galExistante = []; }
+  galExistante.filter(Boolean).slice(0, 2).forEach((src, i) => remplirPhoto(i, src));
+  if (evt.video1_url) { videoEvt = { url: evt.video1_url }; afficherVideoEvt(); }
   document.getElementById('modele-standard-notice').style.display = 'none';
   ficheChoisie = null;
   document.getElementById('fiche-choisie-cartouche').style.display = 'none';
@@ -1747,7 +1781,7 @@ window.detacherFiche = function() {
 ══════════════════════════════════════════ */
 // Galerie réduite à 1 photo + couverture (2026-09-09) — vidéos et PDF retirés de ce module,
 // voir le bouton "📝 Fiche d'inscription" plus haut pour ces contenus.
-const galleryData = [null]; // base64 ou null
+const galleryData = [null, null]; // base64 (ou adresse d'une photo déjà enregistrée) ou null — 2 photos supplémentaires (2026-10-28)
 let coverData = null;
 
 // Compression image via Canvas
@@ -1930,8 +1964,16 @@ document.getElementById('cover-file').addEventListener('change', async function(
   document.getElementById('cover-drop').style.borderColor = 'var(--orange)';
 });
 
-// Galerie photos (1 seul emplacement, voir plus haut)
-[0].forEach(i => {
+// Galerie photos (2 emplacements, voir plus haut)
+function remplirPhoto(i, src) {
+  galleryData[i] = src;
+  document.getElementById('gimg-'+i).src = src;
+  document.getElementById('gimg-'+i).style.display = '';
+  document.getElementById('gph-'+i).style.display = 'none';
+  document.getElementById('gdel-'+i).style.display = '';
+  document.getElementById('gslot-'+i).style.borderColor = 'var(--orange)';
+}
+[0, 1].forEach(i => {
   document.getElementById('gfile-'+i).addEventListener('change', async function() {
     const file = this.files[0]; if (!file) return;
     if (file.size > 10*1024*1024) { alert('Image trop lourde (max 10 Mo).'); return; }
@@ -1944,11 +1986,7 @@ document.getElementById('cover-file').addEventListener('change', async function(
     galleryData[i] = b64;
     bar.style.width = '100%';
     setTimeout(() => document.getElementById('gallery-progress').style.display = 'none', 600);
-    document.getElementById('gimg-'+i).src = b64;
-    document.getElementById('gimg-'+i).style.display = '';
-    document.getElementById('gph-'+i).style.display = 'none';
-    document.getElementById('gdel-'+i).style.display = '';
-    document.getElementById('gslot-'+i).style.borderColor = 'var(--orange)';
+    remplirPhoto(i, b64);
   });
 });
 window.clearPhoto = function(i) {
@@ -1959,6 +1997,63 @@ window.clearPhoto = function(i) {
   document.getElementById('gfile-'+i).value = '';
   document.getElementById('gslot-'+i).style.borderColor = '';
 };
+
+/* ── Vidéo courte de l'événement (2026-10-28, demande explicite : « une vidéo courte, 2 minutes maximum ») ──
+   La vidéo part directement du navigateur vers l'hébergeur vidéo (jamais par notre serveur : limite de 4,5 Mo de l'hébergeur du site). À l'enregistrement, seule la preuve de l'envoi
+   (video_guid + video_jeton) est transmise : le serveur contrôle la durée réelle (120 s maximum) et fixe lui-même l'adresse. */
+let videoEvt = null;          // { url, guid?, jeton? } — guid/jeton seulement pour une vidéo envoyée dans cette fenêtre
+let videoEvtRetiree = false;  // une vidéo déjà enregistrée a été retirée
+let videoEvtEnvoi = false;    // envoi en cours : on n'enregistre pas avant la fin
+const VIDEO_EVT_LISIBLE = /\.(mp4|mov|webm)(\?|$)/i;
+function afficherVideoEvt() {
+  const vide = document.getElementById('evt-video-vide'), prog = document.getElementById('evt-video-prog'), prete = document.getElementById('evt-video-prete');
+  vide.style.display = (!videoEvt && !videoEvtEnvoi) ? '' : 'none';
+  prog.style.display = videoEvtEnvoi ? '' : 'none';
+  prete.style.display = (videoEvt && !videoEvtEnvoi) ? '' : 'none';
+  const lect = document.getElementById('evt-video-lecteur'), ext = document.getElementById('evt-video-externe');
+  if (videoEvt && VIDEO_EVT_LISIBLE.test(videoEvt.url)) { if (lect.getAttribute('src') !== videoEvt.url) lect.src = videoEvt.url; lect.style.display = ''; ext.style.display = 'none'; }
+  else {
+    lect.removeAttribute('src'); lect.style.display = 'none';
+    ext.style.display = videoEvt ? '' : 'none'; ext.textContent = videoEvt ? '🎬 Vidéo déjà liée : ' + videoEvt.url : '';
+  }
+  document.getElementById('evt-video-zone').style.borderColor = videoEvt ? 'var(--orange)' : '';
+}
+function erreurVideoEvt(msg) { const e = document.getElementById('evt-video-err'); e.textContent = msg || ''; e.style.display = msg ? '' : 'none'; }
+window.retirerVideoEvt = function() {
+  if (videoEvt && videoEvt.guid && window.ReelsUpload) ReelsUpload.annuler(videoEvt.guid, videoEvt.jeton).catch(() => {});
+  if (videoEvt && !videoEvt.guid) videoEvtRetiree = true;   // vidéo déjà enregistrée : le serveur la retirera à l'enregistrement
+  videoEvt = null; erreurVideoEvt(''); afficherVideoEvt();
+};
+function reinitialiserVideoEvt() {
+  if (videoEvt && videoEvt.guid && window.ReelsUpload) ReelsUpload.annuler(videoEvt.guid, videoEvt.jeton).catch(() => {});   // envoyée mais jamais enregistrée : on libère l'hébergement
+  videoEvt = null; videoEvtRetiree = false; videoEvtEnvoi = false; erreurVideoEvt(''); afficherVideoEvt();
+}
+(function() {
+  const charger = () => window.ReelsUpload ? Promise.resolve() : new Promise((ok, ko) => { const s = document.createElement('script'); s.src = 'assets/reels-upload.js?v=2'; s.onload = ok; s.onerror = () => ko(new Error('Module d’envoi indisponible.')); document.head.appendChild(s); });
+  document.getElementById('evt-video-btn').addEventListener('click', async () => {
+    erreurVideoEvt('');
+    try { await charger(); const spec = await ReelsUpload.config('evenement'); if (!spec.actif) { document.getElementById('evt-video-indispo').style.display = ''; return; } }
+    catch (e) { erreurVideoEvt(e.message); return; }
+    document.getElementById('evt-video-file').click();
+  });
+  document.getElementById('evt-video-file').addEventListener('change', async function() {
+    const file = this.files[0]; this.value = ''; if (!file) return;
+    const msg = document.getElementById('evt-video-msg'), bar = document.getElementById('evt-video-bar');
+    erreurVideoEvt('');
+    try {
+      await charger();
+      const diag = await ReelsUpload.inspecter(file, 'evenement'); if (!diag.ok) throw new Error(diag.erreur);
+      videoEvtEnvoi = true; msg.textContent = 'Envoi de la vidéo… 0 %'; bar.style.width = '0%'; afficherVideoEvt();
+      const env = await ReelsUpload.envoyer(file, { usage: 'evenement', titre: 'Événement', onProgress: p => { msg.textContent = 'Envoi de la vidéo… ' + p + ' %'; bar.style.width = p + '%'; } });
+      msg.textContent = 'Préparation de la vidéo…'; bar.style.width = '100%';
+      const pret = await ReelsUpload.attendrePret(env.guid, env.jeton, { usage: 'evenement' });
+      if (videoEvt && videoEvt.guid) ReelsUpload.annuler(videoEvt.guid, videoEvt.jeton).catch(() => {});
+      if (videoEvt && !videoEvt.guid) videoEvtRetiree = true;
+      videoEvt = { url: pret.urls.mp4, guid: env.guid, jeton: env.jeton };
+    } catch (e) { erreurVideoEvt(e.message || 'La vidéo n’a pas pu être envoyée.'); }
+    finally { videoEvtEnvoi = false; afficherVideoEvt(); }
+  });
+})();
 
 /* ══ Sauvegarde événement ══ */
 // Brouillon (2026-09-23, demande explicite) : même formulaire, même validation que "Publier" —
@@ -1981,6 +2076,7 @@ async function enregistrerEvenement(statutVise, options = {}) {
   // reste affiché pour guider vers la fiche, sans plus jamais empêcher l'enregistrement.
   try {
     const galerie = galleryData.filter(Boolean);
+    if (videoEvtEnvoi) throw new Error('La vidéo est encore en cours d’envoi : patientez la fin de l’envoi, puis enregistrez.');
     const champsCommuns = {
       titre,
       date_evt:      date,
@@ -2005,6 +2101,8 @@ async function enregistrerEvenement(statutVise, options = {}) {
       lien_plus_info: document.getElementById('e-lien-info').value.trim() || null,
       image_couverture: coverData,
       galerie_photos:   galerie,
+      ...(videoEvt && videoEvt.guid ? { video_guid: videoEvt.guid, video_jeton: videoEvt.jeton } : {}),
+      ...(!videoEvt && videoEvtRetiree ? { video_retirer: true } : {}),
       statut:        statutVise,
     };
     // Édition (2026-09-22) : ni fiche_choisie_id ni appliquer_fiche_standard — ce sont des
@@ -2020,6 +2118,7 @@ async function enregistrerEvenement(statutVise, options = {}) {
               ? document.getElementById('e-appliquer-modele').checked : false
           ),
         });
+    videoEvt = null;   // enregistrée avec l'événement : ne plus la libérer à la réinitialisation de la fenêtre
     if (options.versFiche) {
       location.href = 'inscriptions-admin.html?creer_nom=' + encodeURIComponent(titre) + '&evenement=' + encodeURIComponent(evenementEnEditionId || r.id);
       return;
@@ -2057,6 +2156,7 @@ window.previewEvent = function() {
   const galerie = galleryData.filter(Boolean);
   const cover = coverData || (galerie.length ? galerie[0] : null);
   const fake = {
+    video1_url:  videoEvt ? videoEvt.url : null,
     titre:       document.getElementById('e-titre').value || 'Titre de l\'événement',
     date_evt:    document.getElementById('e-date').value,
     heure_debut: document.getElementById('e-heure').value,

@@ -25,8 +25,9 @@
     return j;
   }
 
-  let _config = null;
-  function config() { return _config || (_config = api('GET', '/api/reels/config').catch(e => { _config = null; throw e; })); }
+  /* usage « evenement » (2026-10-28) : vidéo courte d'un événement, 2 minutes maximum — les règles viennent du serveur (jamais choisies par la page). */
+  const _config = {};
+  function config(usage) { const k = usage || 'reel'; return _config[k] || (_config[k] = api('GET', '/api/reels/config' + (usage ? '?usage=' + encodeURIComponent(usage) : '')).catch(e => { delete _config[k]; throw e; })); }
 
   const cadreDe = (l, h) => { if (!l || !h) return null; const r = l / h; return r < 0.7 ? 'vertical' : r < 0.9 ? '4:5' : r <= 1.15 ? 'carre' : 'horizontal'; };
 
@@ -44,19 +45,19 @@
     });
   }
 
-  async function inspecter(file) {
-    const spec = await config();
+  async function inspecter(file, usage) {
+    const spec = await config(usage);
     const ext = (String(file.name || '').split('.').pop() || '').toLowerCase();
     const typeOk = spec.formats.includes(String(file.type || '').toLowerCase()) || (!file.type && spec.extensions.includes(ext));
     if (!typeOk) return { ok: false, erreur: 'Format non pris en charge. Utilisez une vidéo MP4 ou MOV.' };
-    if (file.size > spec.taille_max_octets) return { ok: false, erreur: `Fichier trop volumineux (${Math.round(file.size / 1048576)} Mo, maximum ${spec.taille_max_mo} Mo). Exportez la vidéo en 1080×1920 : un reel de 90 s dépasse rarement 150 Mo.` };
+    if (file.size > spec.taille_max_octets) return { ok: false, erreur: `Fichier trop volumineux (${Math.round(file.size / 1048576)} Mo, maximum ${spec.taille_max_mo} Mo). ${usage === 'evenement' ? 'Réduisez la définition (720p suffit) ou la durée de la vidéo.' : 'Exportez la vidéo en 1080×1920 : un reel de 90 s dépasse rarement 150 Mo.'}` };
     const m = await lireMetadonnees(file), avert = [];
     if (!m) return { ok: true, avertissements: ['Aperçu impossible sur cet appareil : la durée sera contrôlée après l’envoi.'], duree: null };
     const d = Math.round(m.duree * 10) / 10, cadre = cadreDe(m.largeur, m.hauteur);
     if (d > spec.duree_max + 0.5) return { ok: false, erreur: `Vidéo trop longue : ${Math.round(d)} s (maximum ${spec.duree_max} s).`, duree: d };
     if (d && d < spec.duree_min) return { ok: false, erreur: `Vidéo trop courte : ${d} s (minimum ${spec.duree_min} s).`, duree: d };
     if (Math.min(m.largeur, m.hauteur) < spec.cote_min_px) return { ok: false, erreur: `Définition trop faible (${m.largeur}×${m.hauteur}). Minimum ${spec.cote_min_px} px sur le plus petit côté.` };
-    if (cadre && cadre !== 'vertical') avert.push('Cadre ' + (cadre === 'horizontal' ? 'horizontal' : cadre === 'carre' ? 'carré' : '4:5') + ' : un cadre vertical 9:16 (1080×1920) remplit tout l’écran du téléphone.');
+    if (usage !== 'evenement' && cadre && cadre !== 'vertical') avert.push('Cadre ' + (cadre === 'horizontal' ? 'horizontal' : cadre === 'carre' ? 'carré' : '4:5') + ' : un cadre vertical 9:16 (1080×1920) remplit tout l’écran du téléphone.');
     return { ok: true, avertissements: avert, duree: d, largeur: m.largeur, hauteur: m.hauteur, cadre };
   }
 
@@ -89,8 +90,8 @@
 
   async function envoyer(file, opts) {
     opts = opts || {};
-    const diag = await inspecter(file); if (!diag.ok) throw new Error(diag.erreur);
-    const s = await api('POST', '/api/reels/upload-session', { titre: opts.titre || 'Reel', taille: file.size, type: file.type || 'video/mp4' });
+    const diag = await inspecter(file, opts.usage); if (!diag.ok) throw new Error(diag.erreur);
+    const s = await api('POST', '/api/reels/upload-session', { titre: opts.titre || 'Reel', taille: file.size, type: file.type || 'video/mp4', usage: opts.usage });
     try { await envoyerTus(file, s.tus, opts.onProgress, opts.signal); }
     catch (e) { api('POST', '/api/reels/upload/' + s.guid + '/annuler', { jeton: s.jeton }).catch(() => {}); throw e; }
     return { guid: s.guid, jeton: s.jeton, diagnostic: diag };
@@ -100,7 +101,7 @@
   async function attendrePret(guid, jeton, opts) {
     opts = opts || {}; const fin = Date.now() + (opts.delaiMax || 10 * 60 * 1000);
     for (;;) {
-      const e = await api('GET', '/api/reels/upload/' + guid + '/statut?jeton=' + encodeURIComponent(jeton));
+      const e = await api('GET', '/api/reels/upload/' + guid + '/statut?jeton=' + encodeURIComponent(jeton) + (opts.usage ? '&usage=' + encodeURIComponent(opts.usage) : ''));
       if (opts.onEtat) opts.onEtat(e);
       if (e.etat === 'pret') return e;
       if (e.etat === 'refuse' || e.etat === 'erreur') throw new Error(e.erreur || 'La vidéo n’a pas pu être traitée.');
