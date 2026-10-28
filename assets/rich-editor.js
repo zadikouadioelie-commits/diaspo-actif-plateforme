@@ -46,6 +46,9 @@
     { cmd: 'bold', label: '<b>G</b>', title: 'Gras (Ctrl+B)' },
     { cmd: 'italic', label: '<i>I</i>', title: 'Italique (Ctrl+I)' },
     { cmd: 'underline', label: '<u>S</u>', title: 'Souligné (Ctrl+U)' },
+    /* Couleur de l'écriture (2026-10-28, demande explicite : « ajoute la possibilité de colorer les écritures dans la gestion de texte ») : disponible dans TOUS les éditeurs
+       (palette, couleur libre, « Automatique »). Le serveur garde les couleurs valides (#rgb, #rrggbb, rgb()) et supprime tout le reste (SEC.sanitizeRichHtml). */
+    { couleur: 'foreColor', label: '<span class="re-teinte" data-teinte="texte">A</span>', title: "Couleur de l'écriture" },
     { sep: true },
     { block: 'H2', label: 'Titre', title: 'Titre' },
     { block: 'H3', label: 'Sous-titre', title: 'Sous-titre' },
@@ -352,7 +355,7 @@
       document.addEventListener('mousedown', clicHors, true);
       document.addEventListener('keydown', echap, true);
     }
-    if (avance) document.addEventListener('selectionchange', surSelectionChange);
+    if (avance || barre.some(i => i.couleur)) document.addEventListener('selectionchange', surSelectionChange);
 
     barre.forEach(item => {
       if (item.sep) { toolbarEl.appendChild(Object.assign(document.createElement('span'), { className: 'rich-editor-sep' })); return; }

@@ -365,6 +365,18 @@
 .evt-epingle-ctas a,.evt-epingle-ctas button{display:inline-flex;align-items:center;gap:7px;font-weight:700;font-size:13px;padding:9px 16px;border-radius:10px;text-decoration:none;cursor:pointer;border:none}
 .evt-epingle-cta-primary{background:#F26422;color:#fff}
 .evt-epingle-cta-secondary{background:rgba(255,255,255,.06);color:#F5D061;border:1px solid rgba(245,208,97,.4) !important}
+/* Éditeur de la description d'un événement (2026-10-28, demande explicite : « écrit blanc sur un fond bleu nuit ») : la zone d'écriture était blanche avec un texte gris-bleu pâle,
+   presque illisible. Ici : fond bleu nuit, texte blanc, barre d'outils assortie. Une couleur choisie par l'auteur (style en ligne) garde toujours la priorité. */
+#modal-bg .rich-editor-wrap{background:#0F1B33;border-color:rgba(227,192,110,.4);}
+#modal-bg .rich-editor-toolbar{background:#16233F;border-bottom-color:rgba(255,255,255,.14);}
+#modal-bg .rich-editor-toolbar button{color:#E8ECF6;}
+#modal-bg .rich-editor-toolbar button:hover{background:rgba(255,255,255,.14);}
+#modal-bg .rich-editor-toolbar button.active{background:#E3C06E;color:#101B33;}
+#modal-bg .rich-editor-toolbar .rich-editor-sep{background:rgba(255,255,255,.22);}
+#modal-bg .rich-editor-area,#modal-bg .rich-editor-area p,#modal-bg .rich-editor-area li,#modal-bg .rich-editor-area h2,#modal-bg .rich-editor-area h3,#modal-bg .rich-editor-area strong,#modal-bg .rich-editor-area b,#modal-bg .rich-editor-area em,#modal-bg .rich-editor-area i,#modal-bg .rich-editor-area u{color:#fff;}
+#modal-bg .rich-editor-area:empty::before{color:#8FA0BF;}
+#modal-bg .rich-editor-area blockquote{background:rgba(255,255,255,.07);color:#E8ECF6;border-left-color:#E3C06E;}
+#modal-bg .rich-editor-area a{color:#F3DC9B;}
 </style>
   <link rel="stylesheet" href="/assets/design-upgrade.v2.css">
   <link rel="stylesheet" href="/assets/theme-manager.css">

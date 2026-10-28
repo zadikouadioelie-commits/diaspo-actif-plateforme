@@ -232,6 +232,9 @@ const RICH_HTML_OPTIONS = {
     // (execCommand justifyLeft/Center/Right agit sur le bloc englobant le curseur, quel qu'il
     // soit parmi ceux-ci).
     p: ["style"], h2: ["style"], h3: ["style"], h4: ["style"], blockquote: ["style"], li: ["style"], span: ["style"],
+    /* 2026-10-28 (bug trouvé en testant la couleur de l'écriture) : quand la sélection coïncide exactement avec un passage en gras/italique/souligné, le navigateur pose la couleur
+       SUR cette balise (<strong style="color:…">) au lieu d'ajouter un <span> — la couleur disparaissait alors à l'enregistrement. Mêmes valeurs autorisées (allowedStyles) que pour <span>. */
+    strong: ["style"], b: ["style"], em: ["style"], i: ["style"], u: ["style"], s: ["style"], strike: ["style"], sub: ["style"], sup: ["style"],
   },
   // http(s)/mailto uniquement — bloque javascript:/data: et autres schémas actifs.
   allowedSchemes: ["http", "https", "mailto"],
