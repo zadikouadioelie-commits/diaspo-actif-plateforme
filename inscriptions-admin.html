@@ -2731,7 +2731,95 @@ function renderPublic() {
         ${iaRenderLogosApercu('Nos sponsors', fiche.sponsors_json)}
         ${iaRenderLogosApercu('Nos partenaires', fiche.partenaires_json)}
       </div>
+    </div>
+    ${iaRenderBilletCouleur(types, fiche)}`;
+}
+/* Billet de confirmation — les 4 couleurs côte à côte, à choisir (2026-10-28, demande explicite : « ces 4 propositions bien visibles dans Prévisualiser, avec le bouton
+   pour sélectionner l'aspect du billet », « et pareil sur téléphone »). Chaque vignette est la vraie page du billet (même gabarit que le billet reçu par les inscrits),
+   réduite à la taille de la carte ; « Choisir cette couleur » la mémorise pour la fiche (insc_fiches.billet_theme). Les boutons Ordinateur / Téléphone changent le
+   format affiché des 4 billets (mise en page large, ou mise en page téléphone). */
+const IA_BILLET_THEMES = [['dore', 'Nuit dorée', '#0B1226', '#E3C06E'], ['bordeaux', 'Bordeaux', '#3A0F1F', '#E9C79C'], ['gris', 'Gris', '#252A33', '#DADFE7'], ['bleu', 'Bleu', '#0E2A66', '#A8CBFF']];
+const IA_BILLET_FORMATS = { pc: { w: 900, h: 480 }, tel: { w: 390, h: 1060 } };
+function iaRenderBilletCouleur(types, fiche) {
+  const t = (types || [])[0];
+  if (!t || !fiche) return '';
+  const actuel = fiche.billet_theme || 'dore';
+  const fm = IA_BILLET_FORMATS.pc;
+  const cartes = IA_BILLET_THEMES.map(([k, nom, c1, c2]) => `
+    <div style="background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:16px;padding:12px;">
+      <div class="ia-billet-vignette" data-w="${fm.w}" data-h="${fm.h}" style="position:relative;width:100%;aspect-ratio:${fm.w}/${fm.h};overflow:hidden;border-radius:10px;background:#060A14;">
+        <iframe src="/api/insc/types/${Number(t.id)}/apercu-billet?embed=1&solo=1&theme=${k}" title="Billet — ${nom}" tabindex="-1" style="position:absolute;top:0;left:0;width:${fm.w}px;height:${fm.h}px;border:0;max-width:none !important;transform-origin:0 0;pointer-events:none;"></iframe>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:13.5px;"><i style="display:inline-block;width:18px;height:18px;border-radius:50%;border:1px solid rgba(255,255,255,.4);background:linear-gradient(135deg,${c1} 50%,${c2} 50%);"></i>${nom}</div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <a href="/api/insc/types/${Number(t.id)}/apercu-billet?theme=${k}" target="_blank" rel="noopener" style="font-size:12px;font-weight:600;">Voir en grand</a>
+          <button type="button" class="ia-billet-choisir" data-theme="${k}" onclick="iaBilletChoisir('${k}', ${Number(fiche.id)})" style="background:oklch(0.32 0.09 258);border:none;color:#fff;font-size:12.5px;font-weight:700;padding:8px 14px;border-radius:8px;cursor:pointer;">Choisir cette couleur</button>
+        </div>
+      </div>
+    </div>`).join('');
+  return `
+    <div style="max-width:1100px;margin:18px auto 0;background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:16px;padding:20px;">
+      <h3 style="margin:0 0 4px;font-size:16px;font-weight:700;">🎫 Billet de confirmation — choisissez sa couleur</h3>
+      <div style="font-size:12.5px;color:oklch(0.5 0.006 30);margin-bottom:12px;">Voici les 4 aspects possibles du billet reçu par vos inscrits. Cliquez sur « Choisir cette couleur » : elle sera utilisée pour tous les billets de cette fiche.</div>
+      <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center;">
+        <button type="button" id="billet-btn-pc" class="ia-bt on" onclick="iaBilletAppareil('pc')">🖥️ Ordinateur</button>
+        <button type="button" id="billet-btn-tel" class="ia-bt" onclick="iaBilletAppareil('tel')">📱 Téléphone</button>
+        <span id="ia-billet-msg" role="status" style="font-size:12.5px;color:oklch(0.5 0.006 30);margin-left:6px;"></span>
+      </div>
+      <style>
+        .ia-billet-choisir[disabled]{opacity:.75;cursor:default !important;}
+        .ia-bt{font-size:12.5px;font-weight:600;padding:7px 14px;border-radius:8px;cursor:pointer;border:1px solid oklch(0.8 0.006 30);background:#fff;color:oklch(0.2 0.006 30);}
+        .ia-bt.on{border-color:oklch(0.32 0.09 258);background:oklch(0.32 0.09 258);color:#fff;}
+        #ia-billet-grille{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;}
+        #ia-billet-grille.tel{grid-template-columns:repeat(4,minmax(0,1fr));}
+        @media (max-width:760px){#ia-billet-grille,#ia-billet-grille.tel{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}}
+        @media (max-width:520px){#ia-billet-grille,#ia-billet-grille.tel{grid-template-columns:1fr;}}
+      </style>
+      <div id="ia-billet-grille">${cartes}</div>
+      <img alt="" width="1" height="1" style="position:absolute;opacity:0;pointer-events:none;" src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" onload="iaBilletAppareil(window.__iaBilletFormat||'pc'); iaBilletMarquer('${actuel}')">
     </div>`;
+}
+/* échelle : chaque iframe garde la taille « vraie » de son format, réduite pour tenir dans sa carte */
+function iaBilletEchelle() {
+  document.querySelectorAll('.ia-billet-vignette').forEach(v => {
+    const f = v.firstElementChild, w = Number(v.dataset.w) || 900;
+    if (f && v.clientWidth) f.style.transform = 'scale(' + (v.clientWidth / w) + ')';
+  });
+}
+window.addEventListener('resize', () => { try { iaBilletEchelle(); } catch (e) {} });
+function iaBilletAppareil(v) {
+  const fm = IA_BILLET_FORMATS[v === 'tel' ? 'tel' : 'pc'];
+  window.__iaBilletFormat = v === 'tel' ? 'tel' : 'pc';
+  const grille = document.getElementById('ia-billet-grille'); if (!grille) return;
+  grille.classList.toggle('tel', v === 'tel');
+  grille.querySelectorAll('.ia-billet-vignette').forEach(vg => {
+    vg.dataset.w = fm.w; vg.dataset.h = fm.h; vg.style.aspectRatio = fm.w + '/' + fm.h;
+    const f = vg.firstElementChild; if (f) { f.style.width = fm.w + 'px'; f.style.height = fm.h + 'px'; }
+  });
+  document.getElementById('billet-btn-pc')?.classList.toggle('on', v !== 'tel');
+  document.getElementById('billet-btn-tel')?.classList.toggle('on', v === 'tel');
+  iaBilletEchelle();
+  requestAnimationFrame(iaBilletEchelle);
+}
+/* état des 4 boutons : la couleur utilisée est marquée, les autres proposent « Choisir cette couleur » */
+function iaBilletMarquer(theme) {
+  document.querySelectorAll('.ia-billet-choisir').forEach(b => {
+    const actif = b.dataset.theme === theme;
+    b.disabled = actif; b.textContent = actif ? '✓ Couleur utilisée' : 'Choisir cette couleur';
+  });
+}
+async function iaBilletChoisir(theme, ficheId) {
+  const msg = document.getElementById('ia-billet-msg');
+  if (msg) msg.textContent = 'Enregistrement…';
+  try {
+    const r = await fetch('/api/insc/fiches/' + ficheId + '/billet-theme', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ theme }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || 'Enregistrement impossible.');
+    const f = selectedFiche(); if (f) f.billet_theme = theme;
+    iaBilletMarquer(theme);
+    if (msg) msg.textContent = '✓ Couleur enregistrée : les prochains billets de cette fiche l\'utiliseront.';
+  } catch (e) { if (msg) msg.textContent = e.message || 'Enregistrement impossible.'; }
 }
 /* Même contenu que ipRenderLogos() (inscription-publique.html) — pas de scope JS partagé entre
    les deux pages, dupliqué volontairement plutôt qu'extrait dans un fichier commun pour un rendu

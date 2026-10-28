@@ -51778,32 +51778,252 @@ route("GET", "/api/insc/inscriptions/:id/qr", async (req, res, params, body, que
 /* Gabarit HTML du billet de confirmation — factorisé (2026-09-09) pour être partagé entre la
    vraie confirmation envoyée aux inscrits ET l'aperçu (sans inscription réelle) demandé pour
    chaque type, afin que l'aperçu montre EXACTEMENT le même rendu que ce qui part par e-mail,
-   jamais une reconstruction approximative qui pourrait diverger. */
-function genererHtmlBillet({ ficheNom, prenom, nom, typeLabel, reference, statut, evt, qrPayload, apercu }) {
+   jamais une reconstruction approximative qui pourrait diverger.
+   Présentation « billet de train » Nuit dorée (2026-10-28, demande explicite : « QR code doré, logo
+   de l'initiative, inspire-toi de ces mises en forme ») : bandeau doré avec le logo de l'initiative,
+   lieu → date en grand, souche détachable (perforation + encoches) portant le QR code doré.
+   Le QR reste foncé sur plaque ivoire (ocre très sombre #85580F) : un QR clair sur fond sombre n'est
+   pas lu par tous les lecteurs, le contrôle à l'entrée doit rester fiable. */
+/* Couleurs du billet (2026-10-28, demande explicite : « 4 variantes : nuit dorée, bordeaux, gris et bleu » — l'organisateur choisit dans l'aperçu, le choix est mémorisé
+   par fiche dans insc_fiches.billet_theme). Le QR reste toujours foncé sur plaque ivoire (encre propre à chaque teinte) pour rester lisible par tous les lecteurs. */
+const BILLET_THEMES = {
+  dore:     { nom: "Nuit dorée", nuit: "6,10,20",   nuit2: "#0B1226", or1: "227,192,110", or2: "#B9893A", doux: "#A9B1C6", halo: "67,97,238",   qr: "#85580F", encre: "#5b4210", pastille: ["#0B1226", "#E3C06E"] },
+  bordeaux: { nom: "Bordeaux",   nuit: "20,6,11",   nuit2: "#3A0F1F", or1: "233,199,156", or2: "#B8765B", doux: "#CDB3B9", halo: "170,30,70",   qr: "#6B1A2B", encre: "#5a2a30", pastille: ["#3A0F1F", "#E9C79C"] },
+  gris:     { nom: "Gris",       nuit: "15,17,21",  nuit2: "#252A33", or1: "218,223,231", or2: "#8D97A8", doux: "#B3BAC7", halo: "140,150,170", qr: "#2B3342", encre: "#3C4656", pastille: ["#252A33", "#DADFE7"] },
+  bleu:     { nom: "Bleu",       nuit: "5,14,36",   nuit2: "#0E2A66", or1: "168,203,255", or2: "#4F86E6", doux: "#AFC2E3", halo: "60,120,255",  qr: "#153E8A", encre: "#1F3F78", pastille: ["#0E2A66", "#A8CBFF"] },
+};
+const BILLET_THEME_CLES = Object.keys(BILLET_THEMES);
+function genererHtmlBillet({ ficheNom, prenom, nom, typeLabel, reference, statut, evt, qrPayload, apercu, organisateurNom, logoUrl, theme, themeEnregistre, apercuFicheId, embed, solo }) {
   const esc = s => String(s || "").replace(/</g, "&lt;");
-  return `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
+  const themeCle = BILLET_THEME_CLES.includes(theme) ? theme : "dore";
+  const T = BILLET_THEMES[themeCle];
+  const varsTheme = `--nuit-rgb:${T.nuit};--nuit:rgb(${T.nuit});--nuit2:${T.nuit2};--or1-rgb:${T.or1};--or1:rgb(${T.or1});--or2:${T.or2};--doux:${T.doux};--halo-rgb:${T.halo};--encre:${T.encre};`;
+  const attr = s => String(s || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+  const logoSur = typeof logoUrl === "string" && /^(https?:\/\/|\/)/i.test(logoUrl.trim()) ? logoUrl.trim() : "";
+  /* Barre « Couleur du billet » : seulement dans l'aperçu (jamais sur le vrai billet envoyé aux inscrits) */
+  const lienTheme = k => `?${embed ? "embed=1&" : ""}theme=${k}`;
+  const dejaUtilisee = themeCle === (BILLET_THEME_CLES.includes(themeEnregistre) ? themeEnregistre : "dore");
+  const barreCouleurs = apercu && apercuFicheId && !solo ? `<div class="outil"><span class="outil-t">Couleur du billet</span>
+      <div class="pastilles">${BILLET_THEME_CLES.map(k => `<a href="${lienTheme(k)}" class="pas${k === themeCle ? " on" : ""}" title="${attr(BILLET_THEMES[k].nom)}"><i style="background:linear-gradient(135deg,${BILLET_THEMES[k].pastille[0]} 50%,${BILLET_THEMES[k].pastille[1]} 50%)"></i>${esc(BILLET_THEMES[k].nom)}</a>`).join("")}</div>
+      <button type="button" id="utiliser" class="util"${dejaUtilisee ? " disabled" : ""}>${dejaUtilisee ? "✓ Couleur utilisée" : "Utiliser cette couleur"}</button><span id="util-msg" role="status"></span></div>` : "";
+  const orgNom = String(organisateurNom || ficheNom || "").trim();
+  const initiales = orgNom.split(/\s+/).filter(Boolean).slice(0, 2).map(m => m[0]).join("").toUpperCase() || "DA";
+  const libelleStatut = { confirme: "Confirmée", inscrit: "Inscrit(e)", present: "Présent(e)", absent: "Absent(e)", annule: "Annulée", liste_attente: "Liste d'attente" }[statut] || String(statut || "");
+  let dateLongue = "", dateCourte = "";
+  if (evt?.date_evt) {
+    const d = new Date(String(evt.date_evt).slice(0, 10) + "T12:00:00");
+    if (!isNaN(d)) {
+      dateLongue = d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+      dateCourte = d.toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" }).replace(".", "");
+    } else dateLongue = dateCourte = String(evt.date_evt);
+  }
+  /* Image de couverture de l'événement : couverture, sinon image, sinon première photo de la galerie (data: accepté, c'est ce que stocke la création d'événement) */
+  let couv = evt?.image_couverture || evt?.image_url || "";
+  if (!couv && evt?.galerie_photos) { try { couv = JSON.parse(evt.galerie_photos)[0] || ""; } catch (e) {} }
+  const couvSure = typeof couv === "string" && /^(https?:\/\/|\/|data:image\/(png|jpe?g|webp|gif);base64,)/i.test(couv.trim()) ? couv.trim() : "";
+  const adresse = [...new Set([evt?.lieu, evt?.ville, evt?.pays].map(v => String(v || "").trim()).filter(Boolean))].join(", ");
+  const lieuGrand = String(evt?.ville || evt?.lieu || "").trim();
+  const titreEvt = String(evt?.titre || "").trim();
+  const sousTitre = titreEvt && titreEvt.toLowerCase() !== String(ficheNom || "").trim().toLowerCase() ? titreEvt : "";
+  return `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
     <title>Confirmation d'inscription — ${esc(ficheNom)}</title>
-    <style>@page{size:A4;margin:20mm} body{font-family:Arial,sans-serif;color:#20242E;max-width:700px;margin:0 auto;padding:20px}
-    h1{color:#0D2B4E;font-size:22px} .badge{display:inline-block;background:#F0F4FF;color:#1B3A6B;border-radius:99px;padding:4px 14px;font-size:12px;font-weight:700;margin-bottom:16px}
-    .ligne{padding:8px 0;border-bottom:1px solid #E2E8F0;} .label{color:#64748B;font-size:12px;} .valeur{font-weight:700;}
-    #insc-qr{margin:20px 0;text-align:center;}
-    .bandeau-apercu{background:#FFF7ED;border:1px solid #FDBA74;color:#9A3412;font-size:13px;font-weight:700;text-align:center;padding:10px 14px;border-radius:8px;margin-bottom:18px;}</style>
+    <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,wght@0,500;0,700;1,500&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+    :root{${varsTheme}--encoche:14px;--ivoire:#FFF9EA;--texte:#F4EFE3}
+    *{box-sizing:border-box}
+    @page{size:A4 landscape;margin:12mm}
+    html{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    body{margin:0;min-height:100vh;padding:28px 16px 56px;font-family:Manrope,Arial,sans-serif;color:var(--texte);
+      background:radial-gradient(900px 480px at 15% -10%,rgba(var(--or1-rgb),.12),transparent 60%),radial-gradient(800px 500px at 100% 110%,rgba(var(--halo-rgb),.10),transparent 60%),var(--nuit)}
+    .page{max-width:940px;margin:0 auto}
+    .bandeau-apercu{background:rgba(var(--or1-rgb),.08);border:1px solid rgba(var(--or1-rgb),.45);color:var(--or1);font-size:13px;font-weight:700;text-align:center;padding:10px 14px;border-radius:12px;margin-bottom:22px}
+    .outil{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;background:rgba(255,255,255,.045);border:1px solid rgba(var(--or1-rgb),.35);border-radius:16px;padding:12px 16px;margin:0 0 18px}
+    .outil-t{font-size:11px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--or1)}
+    .pastilles{display:flex;gap:12px;flex-wrap:wrap}
+    .pas{display:flex;flex-direction:column;align-items:center;gap:4px;text-decoration:none;color:var(--doux);font-size:11px;font-weight:700}
+    .pas i{display:block;width:36px;height:36px;border-radius:50%;border:2px solid rgba(255,255,255,.3)}
+    .pas.on{color:var(--or1)}
+    .pas.on i{border-color:var(--or1);box-shadow:0 0 0 3px rgba(var(--or1-rgb),.35)}
+    .util{margin-left:auto;background:linear-gradient(100deg,var(--or1),var(--or2));color:var(--nuit);border:0;border-radius:10px;padding:10px 16px;font:800 13px Manrope,Arial,sans-serif;cursor:pointer}
+    .util[disabled]{opacity:.55;cursor:default}
+    #util-msg{flex-basis:100%;font-size:12px;color:var(--or1);min-height:1em}
+    body.embed{min-height:0;padding-top:12px;padding-bottom:20px}
+    body.solo{padding:10px 10px 6px;background:var(--nuit)}
+    html:has(body.solo){overflow:hidden}
+    .confirme{display:flex;justify-content:center;margin:0 0 18px}
+    .badge{display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(var(--or1-rgb),.5);color:var(--or1);border-radius:99px;padding:6px 16px;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;background:rgba(255,255,255,.045)}
+    .badge i{width:8px;height:8px;border-radius:50%;background:var(--or1);box-shadow:0 0 0 4px rgba(var(--or1-rgb),.18)}
+    .billet{display:grid;grid-template-columns:minmax(0,1fr) 296px;filter:drop-shadow(0 22px 34px rgba(0,0,0,.55))}
+    .principal{position:relative;overflow:hidden;border-radius:22px 0 0 22px;background:linear-gradient(160deg,var(--nuit2),var(--nuit) 70%);border:1px solid rgba(var(--or1-rgb),.28);border-right:0;
+      -webkit-mask:radial-gradient(circle var(--encoche) at 100% 0,transparent calc(var(--encoche) - 1px),#000 var(--encoche)) top/100% 51% no-repeat,radial-gradient(circle var(--encoche) at 100% 100%,transparent calc(var(--encoche) - 1px),#000 var(--encoche)) bottom/100% 51% no-repeat;
+      mask:radial-gradient(circle var(--encoche) at 100% 0,transparent calc(var(--encoche) - 1px),#000 var(--encoche)) top/100% 51% no-repeat,radial-gradient(circle var(--encoche) at 100% 100%,transparent calc(var(--encoche) - 1px),#000 var(--encoche)) bottom/100% 51% no-repeat}
+    .principal::before{content:"";position:absolute;inset:0;z-index:1;background-image:radial-gradient(rgba(var(--or1-rgb),.13) 1.2px,transparent 1.4px);background-size:16px 16px;-webkit-mask-image:linear-gradient(120deg,transparent 35%,#000 100%);mask-image:linear-gradient(120deg,transparent 35%,#000 100%);pointer-events:none}
+    .couv{position:absolute;inset:0;background-size:cover;background-position:center;opacity:.30;
+      -webkit-mask-image:linear-gradient(100deg,rgba(0,0,0,.25) 0%,#000 75%);mask-image:linear-gradient(100deg,rgba(0,0,0,.25) 0%,#000 75%)}
+    .couv::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(var(--nuit-rgb),.55),rgba(var(--nuit-rgb),.1) 40%,rgba(var(--nuit-rgb),.7))}
+    .adresse{position:relative;display:flex;align-items:flex-start;gap:10px;margin:2px 0 4px;color:var(--or1)}
+    .adresse svg{flex:none;margin-top:14px}
+    .adresse .lib{font-size:10.5px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--doux);margin-top:6px}
+    .adresse .val-adr{font-size:14px;font-weight:600;color:var(--ivoire);line-height:1.4;overflow-wrap:anywhere}
+    .entete{position:relative;display:flex;align-items:center;gap:16px;padding:14px 26px;background:linear-gradient(100deg,var(--or1),var(--or2));color:var(--nuit)}
+    .logo{flex:none;width:62px;height:62px;border-radius:50%;background:var(--ivoire);border:3px solid var(--nuit);display:grid;place-items:center;overflow:hidden;font-family:"Bodoni Moda",serif;font-weight:700;font-size:22px;color:var(--or2)}
+    .logo img{width:100%;height:100%;object-fit:cover;display:block}
+    .entete .org{min-width:0;flex:1}
+    .entete .petit{font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;opacity:.75}
+    .entete .nom{font-size:18px;font-weight:800;line-height:1.2;overflow-wrap:anywhere}
+    .entete .cat{flex:none;text-align:right}
+    .entete .cat b{display:block;font-family:"Bodoni Moda",serif;font-size:20px;line-height:1.1}
+    .corps{position:relative;z-index:1;padding:26px 28px 22px}
+    .kicker{font-size:11px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--or1)}
+    h1{margin:6px 0 4px;font-family:"Bodoni Moda",Georgia,serif;font-weight:700;font-size:clamp(26px,4.2vw,40px);line-height:1.1;color:var(--ivoire);text-wrap:balance;overflow-wrap:anywhere}
+    .sous-titre{margin:0;color:var(--doux);font-size:14px}
+    .trajet{display:grid;grid-template-columns:minmax(0,auto) minmax(40px,1fr) minmax(0,auto);align-items:end;gap:16px;margin:26px 0 18px}
+    .trajet .lib{font-size:10.5px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--doux);margin-bottom:2px}
+    .trajet .val{font-family:"Bodoni Moda",serif;font-weight:700;font-size:clamp(22px,3.4vw,32px);line-height:1.05;color:var(--or1);text-transform:uppercase;overflow-wrap:anywhere}
+    .trajet .lib.d,.trajet .val.date{text-align:right}
+    .trajet .val.date{text-transform:none}
+    .pied .droite{text-align:right}
+    .trajet .det{font-size:12px;color:var(--doux);margin-top:3px}
+    .trajet .det.d{text-align:right}
+    .fil{position:relative;height:22px;margin-bottom:6px}
+    .fil::before{content:"";position:absolute;left:0;right:0;top:50%;border-top:2px dashed rgba(var(--or1-rgb),.55)}
+    .fil::after{content:"";position:absolute;left:50%;top:50%;width:11px;height:11px;transform:translate(-50%,-50%) rotate(45deg);background:var(--or1);box-shadow:0 0 0 5px var(--nuit2)}
+    .pied{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin-top:20px;font-size:12px;color:var(--doux)}
+    .pied b{color:var(--or1)}
+    .lignes{display:flex;flex-direction:column;gap:5px}
+    .lignes span{display:block;height:3px;border-radius:2px;background:linear-gradient(90deg,var(--or1),transparent);transform:skewX(-35deg)}
+    .lignes span:nth-child(1){width:150px}.lignes span:nth-child(2){width:118px}.lignes span:nth-child(3){width:86px}
+    .souche{position:relative;border-radius:0 22px 22px 0;background:linear-gradient(170deg,var(--or1),var(--or2));color:var(--nuit);padding:20px 22px 18px;display:flex;flex-direction:column;
+      -webkit-mask:radial-gradient(circle var(--encoche) at 0 0,transparent calc(var(--encoche) - 1px),#000 var(--encoche)) top/100% 51% no-repeat,radial-gradient(circle var(--encoche) at 0 100%,transparent calc(var(--encoche) - 1px),#000 var(--encoche)) bottom/100% 51% no-repeat;
+      mask:radial-gradient(circle var(--encoche) at 0 0,transparent calc(var(--encoche) - 1px),#000 var(--encoche)) top/100% 51% no-repeat,radial-gradient(circle var(--encoche) at 0 100%,transparent calc(var(--encoche) - 1px),#000 var(--encoche)) bottom/100% 51% no-repeat}
+    .souche::before{content:"";position:absolute;left:0;top:calc(var(--encoche) + 8px);bottom:calc(var(--encoche) + 8px);border-left:2px dashed rgba(var(--nuit-rgb),.4)}
+    .souche .lib{font-size:10px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;opacity:.7}
+    .souche .nomp{font-size:19px;font-weight:800;line-height:1.2;margin:2px 0 12px;overflow-wrap:anywhere}
+    .grille{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px;margin-bottom:14px}
+    .grille .v{font-weight:800;font-size:14px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+    .grille .plein{grid-column:1/-1}
+    .plaque{margin:auto auto 0;background:var(--ivoire);border-radius:16px;padding:10px;border:2px solid var(--nuit);text-align:center;width:min(100%,176px)}
+    #insc-qr{display:flex;justify-content:center;min-height:100px;align-items:center}
+    #insc-qr img,#insc-qr canvas{display:block;width:100%;max-width:100%;height:auto !important}
+    .plaque small{display:block;margin-top:4px;font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--encre)}
+    .plaque .vide{font-size:12px;color:var(--encre);font-weight:700;padding:18px 6px}
+    .programme{margin-top:22px;background:rgba(255,255,255,.045);border:1px solid rgba(var(--or1-rgb),.28);border-radius:16px;padding:16px 20px}
+    .programme .lib{font-size:11px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--or1);margin-bottom:6px}
+    .programme .txt{white-space:pre-line;font-size:14px;line-height:1.7;color:var(--texte)}
+    @media (max-width:760px){
+      body{padding:18px 12px 40px}
+      .billet{grid-template-columns:1fr}
+      .principal{border-radius:20px 20px 0 0;border-right:1px solid rgba(var(--or1-rgb),.28);border-bottom:0;
+        -webkit-mask:radial-gradient(circle var(--encoche) at 0 100%,transparent calc(var(--encoche) - 1px),#000 var(--encoche)) left/51% 100% no-repeat,radial-gradient(circle var(--encoche) at 100% 100%,transparent calc(var(--encoche) - 1px),#000 var(--encoche)) right/51% 100% no-repeat;
+        mask:radial-gradient(circle var(--encoche) at 0 100%,transparent calc(var(--encoche) - 1px),#000 var(--encoche)) left/51% 100% no-repeat,radial-gradient(circle var(--encoche) at 100% 100%,transparent calc(var(--encoche) - 1px),#000 var(--encoche)) right/51% 100% no-repeat}
+      .souche{border-radius:0 0 20px 20px;
+        -webkit-mask:radial-gradient(circle var(--encoche) at 0 0,transparent calc(var(--encoche) - 1px),#000 var(--encoche)) left/51% 100% no-repeat,radial-gradient(circle var(--encoche) at 100% 0,transparent calc(var(--encoche) - 1px),#000 var(--encoche)) right/51% 100% no-repeat;
+        mask:radial-gradient(circle var(--encoche) at 0 0,transparent calc(var(--encoche) - 1px),#000 var(--encoche)) left/51% 100% no-repeat,radial-gradient(circle var(--encoche) at 100% 0,transparent calc(var(--encoche) - 1px),#000 var(--encoche)) right/51% 100% no-repeat}
+      .souche::before{left:calc(var(--encoche) + 8px);right:calc(var(--encoche) + 8px);top:0;bottom:auto;border-left:0;border-top:2px dashed rgba(var(--nuit-rgb),.4)}
+      /* Mobile : le QR passe en premier dans la souche (c'est ce qu'on présente à l'entrée), plus grand ; lieu et date restent côte à côte */
+      .page{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
+      .bandeau-apercu{font-size:12px;padding:8px 12px;margin-bottom:14px}
+      .confirme{margin-bottom:12px}
+      .badge{font-size:11px;padding:5px 13px}
+      .entete{padding:12px 16px;gap:12px}
+      .logo{width:50px;height:50px;font-size:18px;border-width:2px}
+      .entete .nom{font-size:16px}
+      .entete .cat b{font-size:16px}
+      .corps{padding:20px 18px 16px}
+      h1{font-size:clamp(26px,8.4vw,34px)}
+      .trajet{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;margin:20px 0 14px}
+      .trajet .val{font-size:clamp(20px,6.4vw,26px)}
+      .fil{display:none}
+      .adresse{padding:10px 12px;border:1px solid rgba(var(--or1-rgb),.3);border-radius:12px;background:rgba(var(--nuit-rgb),.5);margin-top:0}
+      .adresse svg{margin-top:8px}
+      .pied{flex-direction:column-reverse;align-items:flex-start;margin-top:14px}
+      .pied .droite{text-align:left}
+      .lignes{display:none}
+      .souche{padding:22px 18px 20px}
+      .souche .plaque{order:-1;width:min(100%,250px);margin:0 auto 16px}
+      .souche .nomp{font-size:20px}
+      .grille{grid-template-columns:1fr 1fr}
+      .programme{margin-top:16px;padding:14px 16px}
+    }
+    @media print{
+      body{background:#fff;padding:0;min-height:0}
+      .billet{filter:none}
+      .bandeau-apercu{border-color:#B9893A}
+      .programme{background:#fff;border-color:#B9893A;color:#20242E}.programme .txt{color:#20242E}
+      .confirme,.outil{display:none}
+    }
+    </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    </head><body>
-    ${apercu ? `<div class="bandeau-apercu">🔍 Aperçu — ceci n'est pas une vraie inscription, juste un exemple du rendu envoyé par e-mail.</div>` : ""}
-    <div class="badge">✅ Inscription confirmée</div>
-    <h1>${esc(ficheNom)}</h1>
-    <div class="ligne"><div class="label">Nom</div><div class="valeur">${esc(prenom)} ${esc(nom)}</div></div>
-    <div class="ligne"><div class="label">Type d'inscription</div><div class="valeur">${esc(typeLabel)}</div></div>
-    <div class="ligne"><div class="label">Numéro d'inscription</div><div class="valeur">${esc(reference)}</div></div>
-    <div class="ligne"><div class="label">Statut</div><div class="valeur">${esc(statut)}</div></div>
-    ${evt ? `<div class="ligne"><div class="label">Événement</div><div class="valeur">${esc(evt.titre)}</div></div>
-    <div class="ligne"><div class="label">Date</div><div class="valeur">${esc(evt.date_evt)} ${esc(evt.heure_debut||"")}</div></div>
-    <div class="ligne"><div class="label">Lieu</div><div class="valeur">${esc(evt.lieu||"")} ${esc(evt.ville||"")} ${esc(evt.pays||"")}</div></div>` : ""}
-    ${evt?.programme ? `<div class="ligne"><div class="label">Programme</div><div class="valeur" style="white-space:pre-line;">${esc(evt.programme)}</div></div>` : ""}
-    ${qrPayload ? `<div id="insc-qr"></div><script>try{new QRCode(document.getElementById('insc-qr'),{text:${JSON.stringify(qrPayload)},width:180,height:180,colorDark:'#0D2B4E',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.H});}catch(e){}</script>` : ""}
-    ${apercu ? "" : `<script>setTimeout(()=>window.print(), 350)</script>`}
+    </head><body${embed ? ` class="embed${solo ? " solo" : ""}"` : ""}><div class="page">
+    ${barreCouleurs}
+    ${apercu && !embed ? `<div class="bandeau-apercu">🔍 Aperçu — ceci n'est pas une vraie inscription, juste un exemple du rendu envoyé par e-mail.</div>` : ""}
+    ${solo ? "" : `<div class="confirme"><div class="badge"><i></i>Inscription confirmée</div></div>`}
+    <div class="billet">
+      <div class="principal">
+        ${couvSure ? `<div class="couv" style="background-image:url('${attr(couvSure).replace(/'/g, "%27")}')"></div>` : ""}
+        <div class="entete">
+          <div class="logo">${logoSur ? `<img src="${attr(logoSur)}" alt="" onerror="this.remove()">` : ""}<span>${esc(initiales)}</span></div>
+          <div class="org"><div class="petit">Billet d'inscription</div><div class="nom">${esc(orgNom)}</div></div>
+          <div class="cat"><div class="petit">Billet</div><b>${esc(typeLabel)}</b></div>
+        </div>
+        <div class="corps">
+          <div class="kicker">Vous êtes inscrit(e) à</div>
+          <h1>${esc(ficheNom)}</h1>
+          ${sousTitre ? `<p class="sous-titre">${esc(sousTitre)}</p>` : ""}
+          ${(lieuGrand || dateCourte) ? `<div class="trajet">
+            <div><div class="lib">Lieu</div><div class="val">${esc(lieuGrand || "À venir")}</div></div>
+            <div class="fil" aria-hidden="true"></div>
+            <div><div class="lib d">Date</div><div class="val date">${esc(dateCourte || "À venir")}</div>${evt?.heure_debut ? `<div class="det d">à ${esc(evt.heure_debut)}</div>` : ""}</div>
+          </div>` : ""}
+          ${adresse ? `<div class="adresse"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 22s7-6.3 7-12a7 7 0 0 0-14 0c0 5.7 7 12 7 12Z" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="10" r="2.6" fill="currentColor"/></svg><div><div class="lib">Adresse</div><div class="val-adr">${esc(adresse)}</div></div></div>` : ""}
+          <div class="pied">
+            <div class="lignes" aria-hidden="true"><span></span><span></span><span></span></div>
+            <div class="droite">Présentez ce billet à l'entrée — le QR code est personnel.<br><b>Diaspo'Actif</b> · diaspoactif.com</div>
+          </div>
+        </div>
+      </div>
+      <div class="souche">
+        <div class="lib">Participant</div>
+        <div class="nomp">${esc(prenom)} ${esc(nom)}</div>
+        <div class="grille">
+          ${dateLongue ? `<div class="plein"><div class="lib">Date</div><div class="v" style="text-transform:capitalize">${esc(dateLongue)}${evt?.heure_debut ? " · " + esc(evt.heure_debut) : ""}</div></div>` : ""}
+          <div class="plein"><div class="lib">N° d'inscription</div><div class="v">${esc(reference)}</div></div>
+          <div><div class="lib">Statut</div><div class="v">${esc(libelleStatut)}</div></div>
+          <div><div class="lib">Type</div><div class="v">${esc(typeLabel)}</div></div>
+        </div>
+        <div class="plaque">${qrPayload ? `<div id="insc-qr"></div><small>Scannez à l'entrée</small>` : `<div class="vide">QR code disponible dès la confirmation de l'inscription.</div>`}</div>
+      </div>
+    </div>
+    ${evt?.programme && !solo ? `<div class="programme"><div class="lib">Programme</div><div class="txt">${esc(evt.programme)}</div></div>` : ""}
+    </div>
+    ${qrPayload ? `<script>try{new QRCode(document.getElementById('insc-qr'),{text:${JSON.stringify(qrPayload)},width:240,height:240,colorDark:'${T.qr}',colorLight:'#FFF9EA',correctLevel:QRCode.CorrectLevel.H});}catch(e){}</script>` : ""}
+    ${apercu ? "" : `<script>setTimeout(()=>window.print(), 900)</script>`}
+    ${barreCouleurs ? `<script>(function(){var b=document.getElementById('utiliser'),m=document.getElementById('util-msg');if(!b)return;b.addEventListener('click',function(){b.disabled=true;m.textContent='Enregistrement…';
+      fetch('/api/insc/fiches/'+${JSON.stringify(Number(apercuFicheId))}+'/billet-theme',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({theme:${JSON.stringify(themeCle)}})})
+      .then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error||'Erreur');return j;});})
+      .then(function(){b.textContent='✓ Couleur utilisée';m.textContent='Les prochains billets de cette fiche utiliseront cette couleur.';})
+      .catch(function(e){b.disabled=false;m.textContent=e.message||'Enregistrement impossible.';});});})();</script>` : ""}
     </body></html>`;
+}
+
+/* Logo et nom de l'initiative organisatrice, pour le billet : fiche → initiative liée, sinon la première initiative du propriétaire, sinon le logo du compte. */
+async function inscOrganisateurBillet(ficheId) {
+  try {
+    const f = await db.prepare("SELECT owner_user_id, initiative_id, organisateur FROM insc_fiches WHERE id=?").get(ficheId);
+    if (!f) return {};
+    let ini = f.initiative_id ? await db.prepare("SELECT nom, logo_url FROM initiatives WHERE id=?").get(f.initiative_id) : null;
+    if (!ini) ini = await db.prepare("SELECT nom, logo_url FROM initiatives WHERE owner_user_id=? ORDER BY id LIMIT 1").get(f.owner_user_id);
+    let logoUrl = ini?.logo_url || null;
+    if (!logoUrl) logoUrl = (await db.prepare("SELECT logo_url FROM users WHERE id=?").get(f.owner_user_id))?.logo_url || null;
+    return { organisateurNom: f.organisateur || ini?.nom || null, logoUrl };
+  } catch (e) { return {}; }
+}
+
+/* Couleur choisie pour les billets d'une fiche (colonne ajoutée par migration : on retombe sur « dore » si elle n'existe pas encore). */
+async function inscThemeFiche(ficheId) {
+  try { return (await db.prepare("SELECT billet_theme FROM insc_fiches WHERE id=?").get(ficheId))?.billet_theme || "dore"; }
+  catch (e) { return "dore"; }
 }
 
 /* Page de confirmation imprimable (A4, window.print()) — même pattern que l'ancien module et
@@ -51821,6 +52041,8 @@ route("GET", "/api/insc/inscriptions/:id/confirmation.pdf", async (req, res, par
   res.end(genererHtmlBillet({
     ficheNom: ficheOwner?.nom, prenom: insc.prenom, nom: insc.nom, typeLabel: type?.label,
     reference: insc.reference, statut: insc.statut, evt, qrPayload, apercu: false,
+    ...(await inscOrganisateurBillet(insc.fiche_id)),
+    theme: await inscThemeFiche(insc.fiche_id),
   }));
 });
 
@@ -51830,7 +52052,7 @@ route("GET", "/api/insc/inscriptions/:id/confirmation.pdf", async (req, res, par
    l'aperçu est signé contre un identifiant d'inscription qui n'existera jamais (0) : si
    quelqu'un le scannait quand même via /api/controle, il serait rejeté "inscription
    introuvable" comme n'importe quel QR invalide — jamais un vrai accès. */
-route("GET", "/api/insc/types/:id/apercu-billet", async (req, res, params) => {
+route("GET", "/api/insc/types/:id/apercu-billet", async (req, res, params, body, query) => {
   const type = await db.prepare("SELECT * FROM insc_types WHERE id=?").get(params.id);
   if (!type) return send(res, 404, "Type introuvable.");
   const { erreur, msg, fiche } = await inscFicheProprietaire(req, type.fiche_id);
@@ -51844,7 +52066,20 @@ route("GET", "/api/insc/types/:id/apercu-billet", async (req, res, params) => {
   res.end(genererHtmlBillet({
     ficheNom: fiche.nom, prenom: "Prénom", nom: "Nom (exemple)", typeLabel: type.label,
     reference: "DA-2026-000000", statut: "confirme", evt: evtLien, qrPayload, apercu: true,
+    ...(await inscOrganisateurBillet(fiche.id)),
+    theme: query?.theme || fiche.billet_theme, themeEnregistre: fiche.billet_theme, apercuFicheId: fiche.id, embed: query?.embed === "1", solo: query?.solo === "1",
   }));
+});
+
+/* Couleur du billet de confirmation d'une fiche (2026-10-28) : choisie dans l'aperçu du billet, mémorisée ici, lue par la vraie confirmation. */
+route("POST", "/api/insc/fiches/:id/billet-theme", async (req, res, params, body) => {
+  const { erreur, msg, fiche, user } = await inscFicheProprietaire(req, params.id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const theme = String((body && body.theme) || "");
+  if (!BILLET_THEME_CLES.includes(theme)) return sendJSON(res, 400, { error: "Couleur inconnue." });
+  await db.prepare("UPDATE insc_fiches SET billet_theme=? WHERE id=?").run(theme, fiche.id);
+  await inscJournaliser(fiche.id, user, "billet_theme", `Couleur du billet : ${BILLET_THEMES[theme].nom}`);
+  sendJSON(res, 200, { ok: true, theme });
 });
 
 /* ═══════════════════════════════════════════════════════════════════

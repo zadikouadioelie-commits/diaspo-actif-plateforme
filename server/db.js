@@ -2156,6 +2156,7 @@ const MIGRATIONS = [
   ["fil_posts", "tuto_video_id INTEGER"],
   ["da_videos_tutoriels", "diffuse_le TEXT"], /* première diffusion (fil + cloche) d'un tuto publié (2026-10-28) */
   ["insc_fiches", "programme_texte TEXT"],
+  ["insc_fiches", "billet_theme TEXT DEFAULT 'dore'"], /* couleur du billet de confirmation : dore | bordeaux | gris | bleu (2026-10-28) */
   ["insc_fiches", "programme_fichier_url TEXT"],
   ["insc_fiches", "programme_fichier_nom TEXT"],
   // Formulaire « Bouton d'action » créé depuis un compte-rendu (2026-10-07) : cartouche bleue pailletée, titre du bouton, nom de l'événement.
