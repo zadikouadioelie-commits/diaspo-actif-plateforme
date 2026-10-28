@@ -16,7 +16,7 @@
     '': '#/accueil', 'index.html': '#/accueil',
     'annuaire.html': '#/annuaire', 'evenements-app.html': '#/evenements', 'vitrines.html': '#/boutiques',
     'messagerie.html': '#/messages', 'mes-billets.html': '#/billets', 'formations.html': '#/formations',
-    'parrainage.html': '#/parrainage', 'mon-abonnement.html': '#/abonnement', 'confidentialite.html': '#/confidentialite',
+    'parrainage.html': '#/parrainage', 'mon-abonnement.html': '#/abonnement', 'confidentialite.html': '#/confidentialite', 'centre-financier.html': '#/centrefinancier',
     'reseau.html': '#/reseaupro', 'business-plan.html': '#/businessplan', 'mon-associe.html': '#/associe',
     'videos-tutoriels.html': '#/videos', 'cagnottes.html': '#/cagnottes', 'agenda.html': '#/agenda',
     'fil-actualite.html': '#/accueil', 'fil-actualite-app.html': '#/accueil', 'evenements.html': '#/evenements'
@@ -27,6 +27,8 @@
     var f = String(pathname || '').replace(/^\//, '').split('/').pop();
     /* Tableaux de bord Utilisateur / Initiative : ouverts « nus », ils renvoient dans l'appli (écran « Moi ») ; avec un ancre
        (#evenements, #cagnottes…) ils restent ouverts, car ce sont les outils qui n'ont pas encore d'écran dans l'appli. */
+    /* Retour de l'onboarding Stripe Connect (?connect=retour|refresh) : on rouvre l'onglet « Comptes » du Centre Financier (2026-10-28). */
+    if (f === 'dashboard-initiative.html' && /[?&]connect=(retour|refresh)\b/.test(String(search || ''))) return '#/centrefinancier/comptes';
     if ((f === 'dashboard-utilisateur.html' || f === 'dashboard-initiative.html') && !String(hash || '').replace(/^#/, '')) return '#/moi';
     var q = {}; String(search || '').replace(/^\?/, '').split('&').forEach(function (kv) { var p = kv.split('='); if (p[0]) q[decodeURIComponent(p[0])] = decodeURIComponent(p[1] || ''); });
     if (f === 'initiative.html' && q.id) return '#/profil/i/' + encodeURIComponent(q.id);

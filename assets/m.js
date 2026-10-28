@@ -2237,6 +2237,7 @@
     { t: 'Mes événements', i: 'cal', h: '#/mesevenements', d: 'Créer et gérer vos événements', r: { initiative: 2, collectivite: 1, administrateur: 1 } },
     { t: 'Fiches d’inscription', i: 'ticket', h: '#/inscriptions', d: 'Inscriptions à vos événements, billets, QR codes', r: { initiative: 2, collectivite: 1, administrateur: 1 } },
     { t: 'Cotisations et adhésions', i: 'people', h: '#/cotisations', d: 'Formules, adhérents, paiements', r: { initiative: 2 } },
+    { t: 'Centre Financier', i: 'card', h: '#/centrefinancier', d: 'Revenus, retraits, comptes de réception', r: { initiative: 1 } },
     { t: 'Messages de la boutique', i: 'shop', h: '#/msgboutique', d: 'Demandes reçues via votre boutique', r: { initiative: 2 } },
     { t: 'Messagerie', i: 'chat', h: '#/messages', d: 'Vos conversations', r: { utilisateur: 1, initiative: 1 } },
     { t: 'Mes billets', i: 'ticket', h: '#/billets', d: 'Inscriptions et QR codes d’entrée', r: { utilisateur: 1, initiative: 1 } },
@@ -2490,7 +2491,7 @@
     p.hidden = true; document.body.style.overflow = ''; clearInterval(S.chatTimer); S.pane = null;
     const f = $('#pane-foot'); if (f) { f.innerHTML = ''; f.hidden = true; }
   }
-  const SITE_PAGES = { inscriptions: 'inscriptions-admin.html', boutique: 'vitrines.html', produit: 'vitrines.html', tracker: 'dashboard-initiative.html#tracker', mesevenements: 'dashboard-initiative.html#evenements', cotisations: 'dashboard-initiative.html#adhesions-init', mescagnottes: 'dashboard-initiative.html#cagnottes', msgboutique: 'dashboard-initiative.html#messages-vitrine', associe: 'mon-associe.html', reseaupro: 'reseau.html', businessplan: 'business-plan.html', formations: 'formations.html', cvlettres: 'dashboard-utilisateur.html', parrainage: 'parrainage.html', confidentialite: 'confidentialite.html', abonnement: 'mon-abonnement.html' };
+  const SITE_PAGES = { inscriptions: 'inscriptions-admin.html', boutique: 'vitrines.html', produit: 'vitrines.html', tracker: 'dashboard-initiative.html#tracker', mesevenements: 'dashboard-initiative.html#evenements', cotisations: 'dashboard-initiative.html#adhesions-init', mescagnottes: 'dashboard-initiative.html#cagnottes', msgboutique: 'dashboard-initiative.html#messages-vitrine', associe: 'mon-associe.html', reseaupro: 'reseau.html', businessplan: 'business-plan.html', formations: 'formations.html', cvlettres: 'dashboard-utilisateur.html', parrainage: 'parrainage.html', confidentialite: 'confidentialite.html', abonnement: 'mon-abonnement.html', centrefinancier: 'centre-financier.html' };
   function openSheet(inner) {
     const sh = $('#sheet'); sh.hidden = false; const close = () => { sh.hidden = true; sh.innerHTML = ''; };
     sh.innerHTML = '<div class="sh" role="dialog" aria-modal="true"><div class="grip"></div><div class="sb">' + inner + '</div></div>';
