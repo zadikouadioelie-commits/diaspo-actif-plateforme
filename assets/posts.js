@@ -1080,8 +1080,11 @@ body:has(.pd-overlay:not([style*="display: none"])) #da-cookie-banner{display:no
 .pd-texte-corps{font-size:1.08rem;line-height:1.65;white-space:pre-wrap;word-break:break-word;}
 .pd-texte a{color:#fff!important;text-decoration:underline;}
 .pd-texte .post-media-docs,.pd-texte .post-media-audio,.pd-texte .post-link-preview{margin-top:20px;}
-.pd-media > .post-media-video:only-child{width:100%;height:100%;}
-.pd-media > .post-media-video:only-child video{width:100%!important;height:100%!important;max-height:none!important;border-radius:0!important;}
+/* Vidéo seule dans la fenêtre de lecture : elle occupe toute la zone (2026-10-28, signalé : toutes les vidéos étaient minuscules face à l'espace).
+   « :only-child » ne marchait plus depuis que le bouton « Plein écran » (media-viewer.js) est ajouté À CÔTÉ de la vidéo : la règle ne s'appliquait plus
+   et le style en ligne (hauteur max. 300 px) reprenait la main. « :only-of-type » ne compte que les <div> : le bouton ne gêne plus. */
+.pd-media > .post-media-video:only-of-type{width:100%;height:100%;}
+.pd-media > .post-media-video:only-of-type video{width:100%!important;height:100%!important;max-height:none!important;border-radius:0!important;}
 @media(max-width:760px){.pd-texte{padding:28px 20px;}.pd-texte-titre{font-size:1.35rem;}}
 .pd-statsbar{display:flex;gap:14px;padding:8px 16px;font-size:.8rem;color:#6b7280;border-bottom:1px solid #f0f1f3;flex:none;}
 .pd-actions{display:flex;align-items:center;padding:4px 10px;gap:2px;border-bottom:1px solid #f0f1f3;flex:none;flex-wrap:wrap;}
