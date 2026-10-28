@@ -200,6 +200,10 @@
 .filters{display:flex;flex-wrap:wrap;gap:10px;margin:16px 0;align-items:center}
 .filters select,.filters input{height:36px;padding:0 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:#fff}
 .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100;align-items:center;justify-content:center;padding:16px;}
+/* Aperçu de l'événement (2026-10-28, bug signalé : « le bouton Prévisualiser ne fonctionne pas ») — il s'ouvre PAR-DESSUS le formulaire de création, dont la
+   fenêtre est à z-index 2500 (assets/evenement-flash-nuit-doree.css, au-dessus de la barre du bas du téléphone) : à 100, l'aperçu s'ouvrait derrière
+   et rien n'apparaissait. */
+#modal-preview-bg{z-index:2600 !important;}
 .modal-bg.open{display:flex}
 .modal{background:#fff;border-radius:16px;padding:28px;width:100%;max-width:600px;max-height:92vh;overflow-y:auto;position:relative;}
 .modal h3{margin:0 0 18px;display:flex;align-items:center;gap:8px;}
