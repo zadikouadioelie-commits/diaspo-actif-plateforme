@@ -1071,6 +1071,9 @@ async function iaConfirmerCreerFiche() {
   if (!nom) { ia_toast('Donnez un nom à la fiche.', false); return; }
   try {
     const { fiche } = await api('POST', '/insc/fiches', { nom });
+    /* Liaison par PUT (et non à la création) : seul ce chemin règle aussi le bouton « S'inscrire » de l'événement (lien_inscription), comme « Lier à un événement ». */
+    if (state.modalCreerFicheEvenementId) { try { await api('PUT', '/insc/fiches/' + fiche.id, { evenement_ids: [state.modalCreerFicheEvenementId] }); } catch (e2) { ia_toast("Fiche créée, mais l'événement n'a pas pu être lié : " + e2.message, false); } }
+    state.modalCreerFicheEvenementId = null;
     state.modalCreerFicheOuvert = false;
     state.selectedFicheId = fiche.id; state.view = 'detail'; state.activeTab = 'overview';
     state.icModeGestion = false; state.icTransitionVisible = false;
@@ -1813,6 +1816,7 @@ function renderModalCreerFiche() {
           <h3 style="margin:0; font-size:17px;">+ Créer une fiche d'inscription</h3>
           <button data-action="fermerModalCreerFiche" style="background:none; border:none; font-size:20px; cursor:pointer; color:oklch(0.55 0.006 30); flex-shrink:0;">✕</button>
         </div>
+        ${state.modalCreerFicheEvenementId ? '<div style="font-size:12px; margin-bottom:12px; padding:8px 10px; border-radius:8px; background:oklch(0.95 0.03 258); color:oklch(0.32 0.09 258);">🔗 Cette fiche sera reliée automatiquement à l\'événement que vous venez d\'enregistrer.</div>' : ''}
         <label style="font-size:12.5px; font-weight:700; display:block; margin-bottom:6px;">Nom de la fiche</label>
         <input id="ia-creer-fiche-nom" type="text" value="${escH(state.modalCreerFicheNom)}" placeholder="ex. Journée portes ouvertes 2027" style="width:100%; height:42px; border:1px solid oklch(0.8 0.006 30); border-radius:10px; padding:0 12px; font-size:13.5px; box-sizing:border-box; margin-bottom:16px;">
         <button data-action="confirmerCreerFiche" style="width:100%; background:oklch(0.32 0.09 258); border:none; color:#fff; font-size:13.5px; font-weight:700; padding:11px 14px; border-radius:24px; cursor:pointer;">Créer</button>
@@ -4104,6 +4108,9 @@ root.addEventListener('change', function (e) {
        choix (2026-09-30, demande explicite) — ?creer_nom=<titre de l'événement en cours de
        création> déclenche directement la création plutôt que la liste, nom pré-rempli. */
     const creerNomParam = new URLSearchParams(location.search).get('creer_nom');
+    /* ?evenement=<id> (2026-10-28) : la fiche créée sera liée à cet événement (bouton « Créer la fiche d'inscription » de la fenêtre de création d'événement). */
+    const evtLieParam = parseInt(new URLSearchParams(location.search).get('evenement'), 10);
+    if (creerNomParam && evtLieParam > 0) state.modalCreerFicheEvenementId = evtLieParam;
     if (creerNomParam) await iaCreerFiche(creerNomParam);
     render();
   }

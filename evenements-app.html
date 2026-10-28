@@ -736,6 +736,7 @@
            son propriétaire (et l'admin), jamais dans la liste publique, voir GET /api/evenements
            et GET /api/evenements/:id côté serveur. -->
       <button class="btn btn-outline" id="btn-save-brouillon">💾 Enregistrer en brouillon</button>
+      <button class="btn btn-orange" id="btn-creer-fiche" title="Enregistre l'événement puis ouvre le module de création de fiches d'inscription, déjà relié à cet événement">📝 Créer une fiche d'inscription pour pouvoir publier</button>
       <button class="btn btn-orange" id="btn-save">📢 Publier l'événement</button>
     </div>
     <div style="font-size:.72rem;color:#aaa;text-align:center;margin-top:10px;">
@@ -1557,6 +1558,7 @@ async function ouvrirModaleCreation() {
   ficheChoisie = null;
   document.getElementById('fiche-choisie-cartouche').style.display = 'none';
   document.getElementById('fiche-picker-panel').style.display = 'none';
+  majBoutonsPublication();
   try {
     const { fiche } = await api('GET', '/insc/modele-standard');
     const notice = document.getElementById('modele-standard-notice');
@@ -1569,6 +1571,7 @@ async function ouvrirModaleCreation() {
       notice.style.display = 'none';
     }
   } catch (e) { document.getElementById('modele-standard-notice').style.display = 'none'; }
+  majBoutonsPublication();
 }
 document.getElementById('btn-creer').addEventListener('click', ouvrirModaleCreation);
 // "Nouveau Trophée" (2026-09-23, demande explicite) : déplacé dans renderEvts()/
@@ -1636,6 +1639,7 @@ function ouvrirModaleEdition(id) {
   const estBrouillon = evt.statut === 'brouillon';
   document.getElementById('modal-evt-titre').textContent = estBrouillon ? '💾 Reprendre mon brouillon' : '✏️ Modifier l\'événement';
   document.getElementById('btn-save').textContent = estBrouillon ? '📢 Publier l\'événement' : '💾 Enregistrer les modifications';
+  majBoutonsPublication();
   document.getElementById('modal-bg').classList.add('open');
 }
 /* Ouverture directe depuis un lien externe (ex. bouton "Créer un événement" du module
@@ -1677,6 +1681,18 @@ document.querySelectorAll('input[name="e-gratuit-payant"]').forEach(r => r.addEv
    automatiquement "Appliquer ma fiche standard" (le serveur applique de toute façon la même
    priorité, voir POST /api/evenements — cette synchronisation est juste pour que l'affichage
    ne mente jamais sur ce qui va réellement se passer à l'enregistrement). */
+/* ─── Publier = avoir une fiche d'inscription (2026-10-28, demande explicite : « pour publier un événement qui n'est pas un événement flash, il faut une fiche d'inscription ») ───
+   « Publier l'événement » n'apparaît que si l'événement a (ou va avoir) une fiche : fiche choisie dans la fenêtre, fiche déjà liée à l'événement modifié, ou modèle standard appliqué
+   automatiquement. Sinon, le bouton principal est « Créer une fiche d'inscription pour pouvoir publier ». Un événement DÉJÀ publié garde son bouton « Enregistrer les modifications ». */
+function majBoutonsPublication() {
+  const evtEdite = evenementEnEditionId ? allEvts.find(e => Number(e.id) === Number(evenementEnEditionId)) : null;
+  const notice = document.getElementById('modele-standard-notice'), modele = document.getElementById('e-appliquer-modele');
+  const dejaPublie = !!(evtEdite && evtEdite.statut && evtEdite.statut !== 'brouillon');
+  const ficheOk = !!(ficheChoisie || (evtEdite && evtEdite.fiche_id) || (notice && notice.style.display !== 'none' && modele && modele.checked));
+  const peutPublier = dejaPublie || ficheOk;
+  document.getElementById('btn-save').style.display = peutPublier ? '' : 'none';
+  document.getElementById('btn-creer-fiche').style.display = peutPublier ? 'none' : '';
+}
 let ficheChoisie = null;
 document.getElementById('btn-fiche-inscription').addEventListener('click', async () => {
   const panel = document.getElementById('fiche-picker-panel');
@@ -1715,6 +1731,7 @@ window.choisirFiche = function(id, nom, statut) {
   // Mutuellement exclusif avec le modèle standard, voir commentaire ci-dessus.
   const modele = document.getElementById('e-appliquer-modele');
   if (modele) modele.checked = false;
+  majBoutonsPublication();
 };
 /* Détacher (2026-09-10, demande explicite) : retire la fiche choisie sans en reproposer une
    autre automatiquement — l'utilisateur peut soit recocher "Appliquer ma fiche standard" (si
@@ -1722,6 +1739,7 @@ window.choisirFiche = function(id, nom, statut) {
 window.detacherFiche = function() {
   ficheChoisie = null;
   document.getElementById('fiche-choisie-cartouche').style.display = 'none';
+  majBoutonsPublication();
 };
 
 /* ══════════════════════════════════════════
@@ -1947,7 +1965,7 @@ window.clearPhoto = function(i) {
 // factorisé en une fonction prenant le statut visé, plutôt que dupliquer toute la collecte des
 // champs pour le second bouton. "brouillon" n'est jamais montré publiquement (voir GET
 // /api/evenements et GET /api/evenements/:id, filtrés côté serveur sur le propriétaire).
-async function enregistrerEvenement(statutVise) {
+async function enregistrerEvenement(statutVise, options = {}) {
   const titre = document.getElementById('e-titre').value.trim();
   const date  = document.getElementById('e-date').value;
   const errBox = document.getElementById('e-error');
@@ -1996,12 +2014,16 @@ async function enregistrerEvenement(statutVise) {
       ? await api('PUT', '/evenements/' + evenementEnEditionId, champsCommuns)
       : await api('POST', '/evenements', {
           ...champsCommuns,
-          fiche_choisie_id: ficheChoisie ? ficheChoisie.id : null,
-          appliquer_fiche_standard: ficheChoisie ? false : (
+          fiche_choisie_id: (ficheChoisie && !options.versFiche) ? ficheChoisie.id : null,
+          appliquer_fiche_standard: (ficheChoisie || options.versFiche) ? false : (
             document.getElementById('modele-standard-notice').style.display !== 'none'
               ? document.getElementById('e-appliquer-modele').checked : false
           ),
         });
+    if (options.versFiche) {
+      location.href = 'inscriptions-admin.html?creer_nom=' + encodeURIComponent(titre) + '&evenement=' + encodeURIComponent(evenementEnEditionId || r.id);
+      return;
+    }
     document.getElementById('modal-bg').classList.remove('open');
     if (r.fiche_appliquee && typeof showToast === 'function') {
       showToast(`⭐ Fiche d'inscription « ${r.fiche_appliquee.nom} » créée automatiquement pour cet événement.`, 'success');
@@ -2017,6 +2039,18 @@ async function enregistrerEvenement(statutVise) {
 }
 document.getElementById('btn-save').addEventListener('click', () => enregistrerEvenement('ouvert'));
 document.getElementById('btn-save-brouillon').addEventListener('click', () => enregistrerEvenement('brouillon'));
+/* « Créer une fiche d'inscription pour pouvoir publier » : enregistre l'événement (en brouillon s'il est nouveau, sans changer le statut de celui qu'on modifie), puis envoie vers le module de
+   création de fiches (inscriptions-admin.html) avec le nom déjà rempli et l'événement à lier — la fiche créée est alors liée automatiquement à cet événement. */
+document.getElementById('btn-creer-fiche').addEventListener('click', () => {
+  const evtEdite = evenementEnEditionId ? allEvts.find(e => Number(e.id) === Number(evenementEnEditionId)) : null;
+  const ficheId = (ficheChoisie && ficheChoisie.id) || (evtEdite && evtEdite.fiche_id) || null;
+  if (ficheId) {
+    if (confirm("Cet événement a déjà une fiche d'inscription. L'ouvrir pour la gérer ?")) window.open('inscriptions-admin.html?fiche=' + ficheId, '_blank');
+    return;
+  }
+  enregistrerEvenement(evtEdite && evtEdite.statut ? evtEdite.statut : 'brouillon', { versFiche: true });
+});
+document.getElementById('e-appliquer-modele').addEventListener('change', majBoutonsPublication);
 
 /* ══ Prévisualisation ══ */
 window.previewEvent = function() {
