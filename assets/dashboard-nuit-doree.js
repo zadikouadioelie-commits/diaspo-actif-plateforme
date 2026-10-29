@@ -7,7 +7,8 @@
   if (!document.body || !document.body.classList.contains('nd')) return;
 
   var ZONES = 'main.content,.modal-back,.modal-overlay,.modal-box,[id^="modal-"]';
-  var SKIP = '#pv-card-preview-mount,iframe,canvas,img,svg,video,.pqr-canvas-wrap,[data-nd-skip]';
+  /* .rich-editor-area : la zone de saisie du traitement de texte reste BLANCHE — l'encre choisie par l'auteur (noir compris) doit s'y voir telle quelle */
+  var SKIP = '#pv-card-preview-mount,iframe,canvas,img,svg,video,.pqr-canvas-wrap,.rich-editor-area,[data-nd-skip]';
   var COLOR_RE = /#[0-9a-f]{3,8}\b|rgba?\([^)]*\)/gi;
 
   function toRGB(c) {

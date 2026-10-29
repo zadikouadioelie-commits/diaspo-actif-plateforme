@@ -126,7 +126,7 @@
       .rich-editor-toolbar{display:flex;flex-wrap:wrap;gap:2px;padding:6px;background:#F5F7FA;border-bottom:1.5px solid var(--border,#D6DEE8);}
       .rich-editor-toolbar button{border:none;background:transparent;border-radius:6px;padding:6px 9px;font-size:13px;cursor:pointer;color:#102A43;font-family:inherit;min-width:30px;}
       .rich-editor-toolbar button:hover{background:#E2E8F0;}
-      .rich-editor-toolbar button.active{background:var(--navy,#0D2B4E);color:#fff;}
+      .rich-editor-toolbar button.active{background:#0D2B4E;color:#fff;}
       .rich-editor-toolbar .rich-editor-sep{width:1px;background:var(--border,#D6DEE8);margin:4px 3px;}
       .rich-editor-area{min-height:140px;max-height:420px;overflow-y:auto;padding:12px 14px;font-size:14px;line-height:1.65;color:#102A43;outline:none;}
       .rich-editor-area p{margin:0 0 12px;}

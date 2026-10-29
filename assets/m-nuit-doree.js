@@ -7,7 +7,7 @@
   if (!document.body || !document.body.classList.contains('nd')) return;
 
   /* on ne touche ni aux QR codes, ni aux images, ni aux zones marquées, ni aux cartouches qui portent leur propre identité colorée */
-  var SKIP = 'iframe,canvas,img,svg,video,.qr,.mapcard,.cr-bleu,.cr-synth,.cr-agir-btn,.crn-band,.actu-band,.promo-or,.ev-promo,.li.gold,.menu-btn,.vdispo,[data-nd-skip]';
+  var SKIP = 'iframe,canvas,img,svg,video,.qr,.mapcard,.cr-bleu,.cr-synth,.cr-agir-btn,.crn-band,.actu-band,.promo-or,.ev-promo,.li.gold,.menu-btn,.vdispo,.rich-editor-area,[data-nd-skip]';
   var COLOR_RE = /#[0-9a-f]{3,8}\b|rgba?\([^)]*\)/gi;
 
   function toRGB(c) {

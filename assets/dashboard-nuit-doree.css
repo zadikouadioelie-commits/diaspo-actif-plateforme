@@ -233,3 +233,10 @@ html body.nd .pc-fait{color:#9BE8B8!important}
 html body.nd .pc-bascule{background:var(--nd-verre)!important;border-color:var(--nd-bord)!important;color:var(--nd-texte)!important}
 html body.nd .pc-bascule:hover{background:var(--nd-verre2)!important}
 html body.nd .pc-erreur,html body.nd .pc-chargement{color:var(--nd-doux)!important}
+
+/* ── Traitement de texte (RichEditor) : la zone de saisie reste une feuille BLANCHE, son encre par défaut est donc sombre (2026-10-29).
+   Sans ça, la règle « main.content p » ci-dessus grisait le texte tapé en gris clair sur blanc. Les couleurs choisies par l'auteur
+   (balises <span style="color:…">) ne sont pas touchées : seuls les blocs sans couleur propre reprennent l'encre sombre. */
+html body.nd.nd.nd .rich-editor-wrap .rich-editor-area :is(p,li,ul,ol,div,h1,h2,h3,h4,blockquote){color:#102A43!important}
+html body.nd.nd.nd .rich-editor-wrap .rich-editor-area blockquote{color:#4A3B2E!important}
+html body.nd.nd.nd .rich-editor-wrap .rich-editor-area a{color:#B84C1A!important}
