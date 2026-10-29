@@ -49967,7 +49967,7 @@ async function inscEnrichirFiche(f) {
     // Aperçu date/lieu depuis le premier événement lié, uniquement pour l'affichage de la carte —
     // la fiche peut être liée à plusieurs événements (voir l'onglet Vue d'ensemble pour le détail).
     const evtApercu = await db.prepare(`
-      SELECT e.date_evt, e.ville, e.pays FROM insc_fiches_evenements fe
+      SELECT e.date_evt, e.ville, e.pays, e.statut FROM insc_fiches_evenements fe
       JOIN evenements e ON e.id=fe.evenement_id WHERE fe.fiche_id=? ORDER BY e.date_evt ASC LIMIT 1`).get(f.id);
     // Nombre d'événements liés (2026-09-22, demande explicite) : distinct de apercu_date/lieu
     // ci-dessus (qui ne regardent que le premier) — sert à afficher un bouton "Événements
@@ -49982,7 +49982,7 @@ async function inscEnrichirFiche(f) {
     // fiche_origine_id pointe vers CETTE fiche — jamais vers une table à part (voir la refonte
     // "3 fiches indépendantes" ci-dessus), donc toujours juste même si une trace a été supprimée.
     const nbPartages = Number((await db.prepare("SELECT COUNT(*) n FROM insc_fiches WHERE fiche_origine_id=? AND partage_role='envoi_trace'").get(f.id))?.n) || 0;
-  return { ...f, nb_inscriptions: nb, nb_evenements: nbEvt, apercu_date: evtApercu?.date_evt || null, apercu_lieu: evtApercu ? [evtApercu.ville, evtApercu.pays].filter(Boolean).join(", ") : null, a_types_payants: nbTypesPayants > 0, nb_partages: nbPartages };
+  return { ...f, nb_inscriptions: nb, nb_evenements: nbEvt, apercu_date: evtApercu?.date_evt || null, apercu_lieu: evtApercu ? [evtApercu.ville, evtApercu.pays].filter(Boolean).join(", ") : null, apercu_evenement_statut: evtApercu?.statut || null, a_types_payants: nbTypesPayants > 0, nb_partages: nbPartages };
 }
 
 route("GET", "/api/insc/fiches", async (req, res) => {
