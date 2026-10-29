@@ -1271,6 +1271,8 @@ const COLONNES_MIGRATION = [
        colonne ajoutée côté SQLite, ou GET /api/insc/* casse en 500 sur Postgres. */
     ['insc_fiches', 'sponsors_json', "TEXT DEFAULT '[]'"],
     ['insc_fiches', 'partenaires_json', "TEXT DEFAULT '[]'"],
+    /* Inscription payante mise volontairement en brouillon : jamais supprimée au bout de 24 h (2026-10-29). */
+    ['insc_inscriptions', 'brouillon', 'INTEGER DEFAULT 0'],
     /* Refus PAR DOCUMENT de candidature (2026-09-28, demande explicite) — distinct du statut de
        la candidature entière (insc_candidature_declarations.statut) : permet de marquer un
        document précis "à refaire" avec un motif, sans trancher toute la candidature. Mirroir de

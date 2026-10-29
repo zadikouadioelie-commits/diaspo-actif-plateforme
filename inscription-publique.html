@@ -415,6 +415,9 @@ function ipRecalculerTotal() {
   });
   const btn = document.querySelector('#ip-form-champs button[type=submit]');
   if (btn && !btn.disabled) btn.textContent = total > 0 ? `💳 Payer ${total.toFixed(2)} € et confirmer` : 'Confirmer mon inscription';
+  /* Le brouillon n'a de sens que s'il y a quelque chose à payer. */
+  const zoneBrouillon = document.getElementById('ip-zone-brouillon');
+  if (zoneBrouillon) zoneBrouillon.style.display = total > 0 ? '' : 'none';
 }
 
 function ipOuvrirType(typeId) {
@@ -462,7 +465,11 @@ function ipOuvrirType(typeId) {
       <div id="ip-erreur" style="color:oklch(0.5 0.16 20);font-size:13px;margin-bottom:12px;display:none;"></div>
       ${IP_APERCU
         ? `<div style="background:oklch(0.95 0.04 85); border:1px solid oklch(0.8 0.08 85); color:oklch(0.4 0.13 85); font-size:12.5px; padding:10px 12px; border-radius:8px;">🔍 Fiche non publiée — ce bouton s'activera une fois la fiche publiée.</div>`
-        : `<button type="submit" class="ip-btn" style="width:100%;height:46px;font-size:14.5px;">${type.gratuit ? 'Confirmer mon inscription' : '💳 Payer ' + (type.prix != null ? type.prix.toFixed(2) + ' €' : '') + ' et confirmer'}</button>`}
+        : `<button type="submit" class="ip-btn" style="width:100%;height:46px;font-size:14.5px;">${type.gratuit ? 'Confirmer mon inscription' : '💳 Payer ' + (type.prix != null ? type.prix.toFixed(2) + ' €' : '') + ' et confirmer'}</button>
+           <div id="ip-zone-brouillon" style="margin-top:10px;${type.gratuit ? 'display:none;' : ''}">
+             <button type="submit" data-brouillon="1" class="ip-btn outline" style="width:100%;height:42px;font-size:13px;">📝 Garder en brouillon (payer plus tard)</button>
+             <p style="font-size:11.5px;color:oklch(0.5 0.006 30);margin:8px 0 0;text-align:center;">Une inscription non payée est conservée 24 h, puis supprimée — sauf si vous la gardez en brouillon.</p>
+           </div>`}
     </form>`;
   document.getElementById('ip-form-champs').addEventListener('input', ipReevaluerConditions);
   document.getElementById('ip-form-champs').addEventListener('change', ipReevaluerConditions);
@@ -522,18 +529,27 @@ async function ipSoumettre(ev) {
   // personnalisé équivalent sert alors d'e-mail/téléphone pour la confirmation et le billet.
   if (!email) { const c = IP_TYPE_ACTIF.champs.find(c => c.type_champ === 'email'); if (c) email = reponses[c.nom]; }
   if (!telephone) { const c = IP_TYPE_ACTIF.champs.find(c => c.type_champ === 'telephone'); if (c) telephone = reponses[c.nom]; }
-  const btn = form.querySelector('button[type=submit]');
-  btn.disabled = true; btn.textContent = 'Envoi…';
+  /* « Garder en brouillon » = second bouton d'envoi du formulaire (data-brouillon) : mêmes champs,
+     mêmes contrôles, mais aucun paiement (2026-10-29). */
+  const brouillon = !!(ev.submitter && ev.submitter.dataset && ev.submitter.dataset.brouillon === '1');
+  if (brouillon && !email) { errEl.textContent = 'Indiquez votre adresse e-mail pour pouvoir retrouver votre brouillon.'; errEl.style.display = 'block'; return false; }
+  const btn = brouillon ? ev.submitter : form.querySelector('button[type=submit]');
+  const libelleBtn = btn.textContent;
+  form.querySelectorAll('button[type=submit]').forEach(b => { b.disabled = true; });
+  btn.textContent = 'Envoi…';
   try {
-    const payload = { type_id: IP_TYPE_ACTIF.id, evenement_id: evenementId || null, nom, prenom, email: email || null, telephone: telephone || null, reponses };
+    const payload = { type_id: IP_TYPE_ACTIF.id, evenement_id: evenementId || null, nom, prenom, email: email || null, telephone: telephone || null, reponses, ...(brouillon ? { brouillon: true } : {}) };
     const r = await fetch(`/api/insc/public/${IP_SLUG}/inscriptions`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) });
     const d = await r.json();
-    if (!r.ok) throw new Error(d.error || 'Erreur');
+    if (!r.ok) { const err = new Error(d.error || 'Erreur'); err.reprise = !!d.reprise_possible; throw err; }
     if (d.checkout_url) { window.location.href = d.checkout_url; return; }
     ipRenderConfirmation(d);
   } catch (e) {
     errEl.textContent = e.message; errEl.style.display = 'block';
-    btn.disabled = false; ipRecalculerTotal();
+    /* Inscription déjà commencée mais jamais payée : on propose de la retrouver et de continuer. */
+    if (e.reprise) ipAjouterBoutonReprise(errEl, { email: email || '', type_id: IP_TYPE_ACTIF.id });
+    form.querySelectorAll('button[type=submit]').forEach(b => { b.disabled = false; });
+    btn.textContent = libelleBtn; ipRecalculerTotal();
   }
 }
 
@@ -659,7 +675,48 @@ function ipRenderSideColonne() {
     </div>`;
 }
 
+/* Retrouver une inscription payante restée sans paiement et reprendre le paiement (2026-10-29,
+   demande explicite). `cle` = { email, type_id } (formulaire) ou { reference } (lien d'annulation
+   Stripe, écran de brouillon). Le montant est toujours recalculé côté serveur. */
+async function ipReprendre(cle, btn, errEl) {
+  const libelle = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Recherche de votre inscription…'; }
+  try {
+    const r = await fetch(`/api/insc/public/${IP_SLUG}/inscriptions/reprendre`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(cle) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Erreur');
+    window.location.href = d.checkout_url;
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = libelle; }
+    if (errEl) { errEl.textContent = e.message; errEl.style.display = 'block'; }
+    else alert(e.message);
+  }
+}
+/* Bouton « Retrouver mon inscription et continuer » (sous le message d'erreur du formulaire). */
+function ipAjouterBoutonReprise(errEl, cle) {
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'ip-btn'; b.style.cssText = 'margin-top:10px;width:100%;height:44px;';
+  b.textContent = '🔁 Retrouver mon inscription et continuer';
+  b.onclick = () => ipReprendre(cle, b, errEl);
+  errEl.appendChild(b);
+}
+function ipRenderBrouillon(d) {
+  document.getElementById('ip-root').innerHTML = `
+    <div class="ip-confirmation">
+      <div class="grand">📝</div>
+      <h2 style="font-size:19px;font-weight:700;margin:0 0 8px;">Inscription gardée en brouillon</h2>
+      <p style="color:oklch(0.5 0.006 30);font-size:13.5px;">Numéro d'inscription : <strong style="font-family:'IBM Plex Mono',monospace;">${escH(d.reference)}</strong></p>
+      <p style="font-size:13px;color:oklch(0.5 0.006 30);margin-top:8px;">Rien n'a été payé et votre place n'est pas confirmée. Pour la retrouver plus tard, remplissez de nouveau le formulaire avec la même adresse e-mail et cliquez sur « Retrouver mon inscription et continuer ».</p>
+      <button class="ip-btn" id="ip-brouillon-payer" style="margin-top:16px;">💳 Payer et confirmer maintenant</button>
+      <div id="ip-brouillon-err" style="color:oklch(0.5 0.16 20);font-size:13px;margin-top:10px;display:none;"></div>
+    </div>
+    <button class="ip-btn outline" style="margin-top:18px;" onclick="ipRenderAccueil()">← Retour à la fiche</button>`;
+  const b = document.getElementById('ip-brouillon-payer');
+  b.onclick = () => ipReprendre({ reference: d.reference }, b, document.getElementById('ip-brouillon-err'));
+}
+
 function ipRenderConfirmation(d) {
+  if (d.brouillon) return ipRenderBrouillon(d);
   /* Statut "inscrit" = validation manuelle activée par l'organisateur (validation_auto=0,
      demande explicite du 2026-09-09) : ne JAMAIS afficher "Inscription confirmée" ni un lien
      QR dans ce cas — l'inscription n'est pas encore réellement confirmée, le QR ne serait pas
@@ -1135,7 +1192,17 @@ const IP_PAIEMENT_REF = new URLSearchParams(location.search).get('insc');
     if (IP_PAIEMENT_STATUT === 'annule') {
       const notice = document.createElement('div');
       notice.style.cssText = 'background:oklch(0.95 0.04 85);border:1px solid oklch(0.8 0.08 85);color:oklch(0.4 0.13 85);font-size:12.5px;padding:10px 12px;border-radius:8px;margin-bottom:16px;';
-      notice.textContent = '⚠️ Paiement annulé — vous pouvez réessayer ci-dessous.';
+      notice.textContent = '⚠️ Paiement annulé — votre inscription est gardée 24 h : vous pouvez reprendre le paiement.';
+      /* La référence (lien de retour de Stripe) suffit à retrouver l'inscription : un seul clic. */
+      if (IP_PAIEMENT_REF) {
+        const errReprise = document.createElement('div');
+        errReprise.style.cssText = 'color:oklch(0.5 0.16 20);font-size:12.5px;margin-top:8px;display:none;';
+        const bReprise = document.createElement('button');
+        bReprise.type = 'button'; bReprise.className = 'ip-btn'; bReprise.style.cssText = 'display:block;margin-top:10px;width:100%;height:44px;';
+        bReprise.textContent = '🔁 Retrouver mon inscription et continuer';
+        bReprise.onclick = () => ipReprendre({ reference: IP_PAIEMENT_REF }, bReprise, errReprise);
+        notice.append(bReprise, errReprise);
+      }
       document.getElementById('ip-root').prepend(notice);
     }
   } catch (e) {

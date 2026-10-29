@@ -1544,6 +1544,12 @@ route("GET", "/api/parrainage/mon-tableau-de-bord", async (req, res) => {
       if (!cols.includes('archive_le')) {
         try { await db.prepare("ALTER TABLE insc_inscriptions ADD COLUMN archive_le TEXT").run(); } catch (e) {}
       }
+      /* Brouillon d'inscription (2026-10-29, demande explicite) : une inscription payante laissée sans
+         paiement est supprimée au bout de 24 h, SAUF si la personne l'a volontairement mise en
+         brouillon (bouton « Garder en brouillon »). Colonne séparée pour la même raison que `archive`. */
+      if (!cols.includes('brouillon')) {
+        try { await db.prepare("ALTER TABLE insc_inscriptions ADD COLUMN brouillon INTEGER DEFAULT 0").run(); } catch (e) {}
+      }
     }
   } catch (e) { console.error('[migrateInscInscriptionsArchive]', e.message); }
 })();
@@ -33568,6 +33574,19 @@ async function handleRequest(req, res) {
      À la date choisie : la formation est ARCHIVÉE (pas supprimée) — retirée du catalogue et des
      inscriptions, mais son contenu/statistiques/certificats sont conservés pour traçabilité.
      Après le délai de rétention (par défaut 60 jours après l'archivage) : suppression définitive. */
+  /* ── GET /api/cron/insc-non-abouties — supprime les inscriptions payantes jamais payées depuis plus
+     de 24 h (hors brouillons voulus), 2026-10-29. Le même nettoyage tourne aussi à chaque nouvelle
+     inscription sur la fiche concernée : ce cron ne sert qu'à ne pas laisser traîner les restes. */
+  if (pathname === '/api/cron/insc-non-abouties') {
+    const cronSecret = process.env.CRON_SECRET;
+    const authHeader = req.headers['authorization'] || '';
+    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+      return sendJSON(res, 401, { error: "Non autorisé." });
+    }
+    const supprimees = await inscPurgerNonAbouties(null);
+    return sendJSON(res, 200, { ok: true, supprimees });
+  }
+
   if (pathname === '/api/cron/formation-suppressions') {
     const cronSecret = process.env.CRON_SECRET;
     const authHeader = req.headers['authorization'] || '';
@@ -51637,8 +51656,52 @@ route("GET", "/api/insc/public/:slug", async (req, res, params) => {
       if (invitation && invitation.statut === 'active') parrainage = { code: invitation.code, nom: invitation.nom };
     } catch (e) { console.error('[insc-public-parrainage]', e.message); }
   }
-  sendJSON(res, 200, { fiche, evenements, types, medias, apercu: modeApercu, autres_evenements: autresEvenements, candidature, parrainage });
+  sendJSON(res, 200, { fiche, evenements, types, medias, apercu: modeApercu, autres_evenements: autresEvenements, comptes_rendus: comptesRendus, candidature, parrainage });
 });
+
+/* ── Inscriptions payantes non abouties : reprise 24 h puis suppression (2026-10-29, demande
+   explicite : « un bouton qui permettra de retrouver l'inscription et continuer — possible que 24
+   heures ; après, supprimer l'inscription non aboutie si elle n'a pas été intentionnellement mise en
+   brouillon »). « Non abouti » = ligne créée avant Stripe (statut_paiement 'en_attente') qui n'a
+   jamais reçu son paiement, ou dont la session Stripe a expiré ('echec'). Avant ce changement, une
+   telle ligne bloquait à vie le même e-mail (« Une inscription existe déjà… »). */
+const INSC_PAIEMENT_NON_ABOUTI = ["en_attente", "echec"];
+const INSC_DELAI_REPRISE_MS = 24 * 3600 * 1000;
+/* created_at : « AAAA-MM-JJ HH:MM:SS » en UTC (SQLite datetime('now')), ou un Date côté Postgres. */
+function inscDateMs(v) {
+  if (!v) return NaN;
+  if (v instanceof Date) return v.getTime();
+  const s = String(v);
+  return new Date(/[zZ]$|[+-]\d\d:?\d\d$/.test(s) ? s : s.replace(" ", "T") + "Z").getTime();
+}
+/* Supprime les inscriptions non abouties de plus de 24 h, sauf brouillons voulus. Garde-fou argent :
+   une session Stripe déjà « complete » (paiement différé en cours) n'est jamais supprimée, pour ne
+   pas perdre l'inscription d'une personne qui a payé ; une session encore ouverte est expirée avant
+   suppression pour qu'elle ne puisse plus être payée dans le vide. */
+async function inscPurgerNonAbouties(ficheId) {
+  try {
+    const args = []; let filtre = "";
+    if (ficheId) { filtre = " AND fiche_id=?"; args.push(ficheId); }
+    const lignes = await db.prepare(`SELECT id, created_at, transaction_ref FROM insc_inscriptions WHERE statut_paiement IN ('en_attente','echec') AND statut!='annule' AND COALESCE(brouillon,0)=0${filtre}`).all(...args);
+    const limite = Date.now() - INSC_DELAI_REPRISE_MS;
+    const { stripe } = require("./stripe-client");
+    let supprimees = 0;
+    for (const l of lignes) {
+      if (!(inscDateMs(l.created_at) < limite)) continue; // date illisible : on conserve
+      if (stripe && l.transaction_ref && String(l.transaction_ref).startsWith("cs_")) {
+        try {
+          const s = await stripe.checkout.sessions.retrieve(l.transaction_ref);
+          if (s.status === "complete") continue;
+          if (s.status === "open") { try { await stripe.checkout.sessions.expire(l.transaction_ref); } catch (e) {} }
+        } catch (e) { if (e?.code !== "resource_missing") continue; } // Stripe injoignable : on réessaiera
+      }
+      try { await db.prepare("DELETE FROM insc_checkins WHERE inscription_id=?").run(l.id); } catch (e) {}
+      await db.prepare("DELETE FROM insc_inscriptions WHERE id=?").run(l.id);
+      supprimees++;
+    }
+    return supprimees;
+  } catch (e) { console.error("[insc-purge-non-abouties]", e.message); return 0; }
+}
 
 route("POST", "/api/insc/public/:slug/inscriptions", async (req, res, params, body) => {
   const ip = SEC.clientIp(req);
@@ -51733,8 +51796,24 @@ route("POST", "/api/insc/public/:slug/inscriptions", async (req, res, params, bo
 
   // Anti-doublon léger (même e-mail sur le même type, hors annulés)
   if (body.email) {
-    const doublon = await db.prepare("SELECT id FROM insc_inscriptions WHERE type_id=? AND LOWER(email)=? AND statut!='annule'").get(type.id, String(body.email).toLowerCase().trim());
-    if (doublon) return sendJSON(res, 400, { error: "Une inscription existe déjà avec cette adresse e-mail pour cette catégorie." });
+    /* Les inscriptions payantes jamais payées depuis plus de 24 h (et non gardées en brouillon) sont
+       supprimées ici d'abord : elles ne bloquent donc plus une nouvelle tentative. */
+    await inscPurgerNonAbouties(fiche.id);
+    const doublons = await db.prepare("SELECT id, statut_paiement, brouillon FROM insc_inscriptions WHERE type_id=? AND LOWER(email)=? AND statut!='annule'").all(type.id, String(body.email).toLowerCase().trim());
+    if (doublons.length) {
+      /* Dernière tentative restée sans paiement (Stripe fermé, carte refusée, onglet quitté) : on ne
+         bloque plus la personne, on lui propose de la RETROUVER et de continuer (route /reprendre). */
+      if (doublons.every(d => INSC_PAIEMENT_NON_ABOUTI.includes(d.statut_paiement))) {
+        const brouillon = doublons.some(d => Number(d.brouillon) === 1);
+        return sendJSON(res, 409, {
+          error: brouillon
+            ? "Votre inscription est gardée en brouillon avec cette adresse e-mail : retrouvez-la ci-dessous pour la finaliser."
+            : "Une inscription a déjà été commencée avec cette adresse e-mail, mais le paiement n'a pas été terminé. Retrouvez-la ci-dessous pour la finaliser (possible pendant 24 h après sa création).",
+          reprise_possible: true,
+        });
+      }
+      return sendJSON(res, 400, { error: "Une inscription existe déjà avec cette adresse e-mail pour cette catégorie." });
+    }
   }
 
   const user = await getCurrentUser(req);
@@ -51782,6 +51861,24 @@ route("POST", "/api/insc/public/:slug/inscriptions", async (req, res, params, bo
     return sendJSON(res, 201, { id, reference, statut: statutInitial });
   }
 
+  /* Brouillon VOLONTAIRE (2026-10-29, demande explicite) : la personne choisit de garder son
+     inscription payante de côté sans payer maintenant. Aucune session Stripe, rien n'est notifié à
+     l'organisateur ; elle n'est jamais supprimée par le nettoyage des 24 h (brouillon=1) et se
+     retrouve avec le même e-mail (route /reprendre). Il faut donc un e-mail. */
+  if (body.brouillon === true) {
+    if (!body.email) return sendJSON(res, 400, { error: "Indiquez votre adresse e-mail pour pouvoir retrouver votre brouillon." });
+    const idBrouillon = (await db.prepare(`
+      INSERT INTO insc_inscriptions (fiche_id, type_id, evenement_id, user_id, reference, nom, prenom, email, telephone,
+        reponses_json, statut, statut_paiement, consentements_json, ip_creation, brouillon)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)
+    `).run(fiche.id, type.id, evenementId, user?.id || null, reference,
+      String(body.nom).trim(), String(body.prenom).trim(), body.email, body.telephone || null,
+      JSON.stringify(reponses), statutInitial, "en_attente",
+      JSON.stringify(body.consentements || {}), ip
+    )).lastInsertRowid;
+    return sendJSON(res, 201, { id: idBrouillon, reference, statut: statutInitial, brouillon: true });
+  }
+
   /* Montant total dû (type + options payantes) — rien n'est confirmé/notifié tant que Stripe n'a
      pas confirmé le paiement (mêmes conventions que POST /api/events/:id/buy : ligne créée en
      amont pour réserver la place/référence, split commission/wallet et notifications faits
@@ -51821,6 +51918,77 @@ route("POST", "/api/insc/public/:slug/inscriptions", async (req, res, params, bo
   } catch (e) {
     await db.prepare(`DELETE FROM insc_inscriptions WHERE id=?`).run(id);
     sendJSON(res, 500, SEC.safeError(e, "insc-checkout"));
+  }
+});
+
+/* Retrouver une inscription payante restée sans paiement et relancer le paiement (2026-10-29).
+   Deux façons de la retrouver : la référence (dans le lien d'annulation Stripe) ou l'e-mail + la
+   catégorie. Rien de personnel n'est renvoyé : seulement un lien de paiement pour le montant
+   recalculé côté serveur (jamais celui du client), exactement comme à la création. */
+route("POST", "/api/insc/public/:slug/inscriptions/reprendre", async (req, res, params, body) => {
+  const ip = SEC.clientIp(req);
+  const ipLimit = SEC.rateLimit(`insc_reprise:ip:${ip}`, 10, 15 * 60 * 1000);
+  if (!ipLimit.allowed) return sendJSON(res, 429, { error: `Trop de tentatives. Réessayez dans ${ipLimit.retryAfter}s.` });
+  if (body?.site_perso) return sendJSON(res, 400, { error: "Requête invalide." });
+
+  const fiche = await db.prepare("SELECT * FROM insc_fiches WHERE slug=?").get(params.slug);
+  if (!fiche || fiche.statut !== "publiee") return sendJSON(res, 404, { error: "Fiche introuvable ou non publiée." });
+  if (fiche.gele_le) return sendJSON(res, 403, { error: "Cette fiche est temporairement suspendue." });
+  if (fiche.date_fermeture_inscriptions && new Date(fiche.date_fermeture_inscriptions) < new Date()) return sendJSON(res, 400, { error: "Les inscriptions pour cet événement sont désormais fermées." });
+
+  await inscPurgerNonAbouties(fiche.id);
+  const ref = String(body?.reference || "").trim();
+  const email = String(body?.email || "").toLowerCase().trim();
+  let insc = null;
+  if (ref) {
+    insc = await db.prepare("SELECT * FROM insc_inscriptions WHERE fiche_id=? AND reference=? AND statut!='annule'").get(fiche.id, ref);
+  } else if (email && body?.type_id) {
+    insc = await db.prepare("SELECT * FROM insc_inscriptions WHERE fiche_id=? AND type_id=? AND LOWER(email)=? AND statut!='annule' AND statut_paiement IN ('en_attente','echec') ORDER BY id DESC").get(fiche.id, body.type_id, email);
+  } else {
+    return sendJSON(res, 400, { error: "Indiquez votre adresse e-mail pour retrouver votre inscription." });
+  }
+  if (insc && insc.statut_paiement === "paye") return sendJSON(res, 409, { error: "Cette inscription est déjà payée : votre confirmation vous a été envoyée par e-mail." });
+  if (!insc || !INSC_PAIEMENT_NON_ABOUTI.includes(insc.statut_paiement)) {
+    return sendJSON(res, 404, { error: "Aucune inscription à reprendre : le délai de 24 h est peut-être dépassé. Vous pouvez en créer une nouvelle." });
+  }
+
+  const type = await db.prepare("SELECT * FROM insc_types WHERE id=? AND fiche_id=? AND actif=1").get(insc.type_id, fiche.id);
+  if (!type) return sendJSON(res, 400, { error: "Cette catégorie d'inscription n'est plus disponible." });
+  if (type.date_fermeture && new Date(type.date_fermeture) < new Date()) return sendJSON(res, 400, { error: `Les inscriptions « ${type.label} » sont fermées.` });
+  const champs = await getChampsPourType(type.id, fiche.id);
+  let reponses = {};
+  try { reponses = JSON.parse(insc.reponses_json || "{}"); } catch (e) {}
+  const { total: montantOptions } = calculerMontantOptionsPayantes(champs, reponses);
+  const montantTotal = parseFloat(((type.gratuit ? 0 : (Number(type.prix) || 0)) + montantOptions).toFixed(2));
+  if (montantTotal <= 0) return sendJSON(res, 400, { error: "Cette inscription n'a plus de montant à payer : contactez l'organisateur." });
+
+  const { stripe } = require("./stripe-client");
+  if (!stripe) return sendJSON(res, 503, { error: "Paiements momentanément indisponibles." });
+  try {
+    /* L'ancienne session ne doit plus pouvoir être payée en double. */
+    if (insc.transaction_ref && String(insc.transaction_ref).startsWith("cs_")) {
+      try { await stripe.checkout.sessions.expire(insc.transaction_ref); } catch (e) {}
+    }
+    const origin = getOrigin(req);
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      ...(insc.email ? { customer_email: insc.email } : {}),
+      line_items: [{
+        price_data: {
+          currency: "eur",
+          unit_amount: Math.round(montantTotal * 100),
+          product_data: { name: `${fiche.nom} — ${type.label}` },
+        },
+        quantity: 1,
+      }],
+      metadata: { diaspoactif_insc_inscription_id: String(insc.id) },
+      success_url: `${origin}/inscription-publique.html?slug=${encodeURIComponent(fiche.slug)}&paiement=succes&insc=${encodeURIComponent(insc.reference)}`,
+      cancel_url: `${origin}/inscription-publique.html?slug=${encodeURIComponent(fiche.slug)}&paiement=annule&insc=${encodeURIComponent(insc.reference)}`,
+    });
+    await db.prepare("UPDATE insc_inscriptions SET transaction_ref=?, statut_paiement='en_attente', updated_at=datetime('now') WHERE id=?").run(session.id, insc.id);
+    sendJSON(res, 200, { checkout_url: session.url, reference: insc.reference });
+  } catch (e) {
+    sendJSON(res, 500, SEC.safeError(e, "insc-reprise"));
   }
 });
 
