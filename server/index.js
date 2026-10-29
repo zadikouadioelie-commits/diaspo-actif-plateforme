@@ -23837,6 +23837,7 @@ route("GET", "/api/evenements/recommandes", async (req, res, params, body, query
 });
 
 route("GET", "/api/evenements", async (req, res, params, body, query) => {
+  await publierEvenementsProgrammesEchus();
   /* epingle_permanent (2026-10-09, demande explicite) : un événement ainsi marqué reste TOUJOURS
      en premier, quels que soient les autres événements créés ensuite — même idiome que
      produits_vitrine.mis_en_avant/cagnottes.est_vedette (tri par indicateur avant la date),
@@ -24266,6 +24267,69 @@ route("PUT", "/api/evenements/:id", async (req, res, params, body) => {
   if (evt.video1_url && evt.video1_url !== video1Url) require("./reels-upload").supprimerVideoParUrl(evt.video1_url).catch(() => {});
   if (evt.statut === 'brouillon' && statutFinal === 'ouvert') alertesEvenementDeclencher(evt.id);
   sendJSON(res, 200, { id: evt.id });
+});
+
+/* Publication programmée d'un événement brouillon (2026-10-28, demande explicite, depuis la
+   liaison fiche↔événement d'inscriptions-admin.html — « Publier immédiatement » / « Programmer
+   la publication »). Vérification paresseuse (pas de cron) : appelée au début de GET /api/evenements
+   et GET /api/evenements/:id, elle fait sortir du brouillon tout événement dont l'échéance est
+   dépassée. publication_programmee_le est la SEULE source de programmation pour cette table (voir
+   MIGRATIONS, server/db.js) — un nouvel appel à /programmer-publication l'écrase sans condition,
+   ce qui lui donne par construction la priorité sur toute programmation précédente. */
+async function publierEvenementsProgrammesEchus() {
+  try {
+    const dus = await db.prepare("SELECT id, publication_programmee_le FROM evenements WHERE statut='brouillon' AND publication_programmee_le IS NOT NULL").all();
+    const maintenant = Date.now();
+    for (const e of dus) {
+      const echeance = new Date(e.publication_programmee_le).getTime();
+      if (!isNaN(echeance) && echeance <= maintenant) {
+        await db.prepare("UPDATE evenements SET statut='ouvert', publication_programmee_le=NULL WHERE id=?").run(e.id);
+        alertesEvenementDeclencher(e.id).catch(() => {});
+      }
+    }
+  } catch (err) { console.error('[publierEvenementsProgrammesEchus]', err.message); }
+}
+
+/* PATCH /api/evenements/:id/publier — bascule un brouillon en « ouvert » sans passer par le
+   formulaire complet (PUT ci-dessus, qui réécrit tous les champs et exige titre/date) : ne
+   touche QUE statut/publication_programmee_le, donc aucun risque d'effacer un champ déjà saisi
+   (programme, médias, liaison à la fiche d'inscription…). Objectif explicite : publier
+   l'événement tel qu'il est déjà, avec sa fiche d'inscription déjà liée. */
+route("PATCH", "/api/evenements/:id/publier", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const evt = await db.prepare("SELECT id, owner_user_id, statut FROM evenements WHERE id=?").get(params.id);
+  if (!evt) return sendJSON(res, 404, { error: "Événement introuvable." });
+  if (Number(evt.owner_user_id) !== Number(user.id) && user.role !== "administrateur") {
+    return sendJSON(res, 403, { error: "Vous ne pouvez publier que vos propres événements." });
+  }
+  await db.prepare("UPDATE evenements SET statut='ouvert', publication_programmee_le=NULL WHERE id=?").run(evt.id);
+  if (evt.statut === 'brouillon') alertesEvenementDeclencher(evt.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* PATCH /api/evenements/:id/programmer-publication — l'événement reste en brouillon (invisible
+   du public) jusqu'à la date/heure donnée, où il bascule automatiquement (voir
+   publierEvenementsProgrammesEchus ci-dessus). Écrase sans condition toute valeur déjà posée. */
+route("PATCH", "/api/evenements/:id/programmer-publication", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const evt = await db.prepare("SELECT id, owner_user_id FROM evenements WHERE id=?").get(params.id);
+  if (!evt) return sendJSON(res, 404, { error: "Événement introuvable." });
+  if (Number(evt.owner_user_id) !== Number(user.id) && user.role !== "administrateur") {
+    return sendJSON(res, 403, { error: "Vous ne pouvez programmer que vos propres événements." });
+  }
+  // date vide/absente = annule une programmation déjà posée, sans publier (reste brouillon).
+  if (body?.date === null || body?.date === "") {
+    await db.prepare("UPDATE evenements SET publication_programmee_le=NULL WHERE id=?").run(evt.id);
+    return sendJSON(res, 200, { ok: true, publication_programmee_le: null });
+  }
+  const date = String(body?.date || "").trim();
+  const quand = new Date(date).getTime();
+  if (!date || isNaN(quand)) return sendJSON(res, 400, { error: "Date de publication invalide." });
+  if (quand <= Date.now()) return sendJSON(res, 400, { error: "La date de publication doit être dans le futur — utilisez « Publier immédiatement » sinon." });
+  await db.prepare("UPDATE evenements SET publication_programmee_le=? WHERE id=?").run(date, evt.id);
+  sendJSON(res, 200, { ok: true, publication_programmee_le: date });
 });
 
 /* POST /api/evenements/:id/inscription-rapide — réservé aux événements flash
@@ -25524,6 +25588,7 @@ route("DELETE", "/api/cagnottes/:id/actualites/:actuId", async (req, res, params
 });
 
 route("GET", "/api/evenements/:id", async (req, res, params) => {
+  await publierEvenementsProgrammesEchus();
   /* init_id/init_type/init_adhesions_ouvertes (2026-09-28, demande explicite) : ajoutés pour
      que le bouton public "Adhérer à l'initiative" (même mécanisme que initiative.html/profil
      public/annuaire, formule est_officielle, demanderAdhesion() dans assets/app.js) puisse

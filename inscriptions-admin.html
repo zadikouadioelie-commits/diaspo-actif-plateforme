@@ -1091,9 +1091,15 @@ async function iaChargerFiche(id) {
   if (!state.selectedTypeId || !data.types.some(t => Number(t.id) === Number(state.selectedTypeId))) {
     state.selectedTypeId = data.types[0]?.id || null;
   }
-  if (!state.mesEvenements.length) {
-    try { const r = await api('GET', '/evenements?owner=' + IA_ME.id); state.mesEvenements = r.evenements || []; } catch (e) {}
-  }
+  if (!state.mesEvenements.length) await iaRechargerMesEvenements();
+}
+// Rechargement FORCÉ de state.mesEvenements (2026-10-28) — iaChargerFiche() ci-dessus ne
+// récupère la liste qu'une fois (if (!state.mesEvenements.length)) : insuffisant après une
+// action qui change le statut/la programmation d'un événement (publierEvenementImmediat,
+// confirmerProgrammerPublication, annulerProgrammationPublication) et doit se refléter tout de
+// suite dans l'encart de la liaison.
+async function iaRechargerMesEvenements() {
+  try { const r = await api('GET', '/evenements?owner=' + IA_ME.id); state.mesEvenements = r.evenements || []; } catch (e) {}
 }
 async function iaChargerPublic() {
   const fiche = selectedFiche(); if (!fiche) return;
@@ -1805,25 +1811,38 @@ function renderLiaisonEvenements() {
   if (!mesEvenements.length) {
     return `<div style="font-size:12px; color:oklch(0.55 0.006 30);">Aucun événement créé sur votre compte — ${lienCreation} pour pouvoir le lier à cette fiche.</div>`;
   }
-  /* Miniature + badge brouillon + encart publication (2026-09-26, demande explicite) — même
-     fallback de couverture que renderModalLiaison() ci-dessous. Ces événements (table native
-     evenements, créés depuis evenements.html) n'ont que deux statuts possibles ('ouvert' ou
-     'brouillon' — voir PUT /api/evenements/:id) : pas de publication programmée pour cette
-     table (ça n'existe que pour la table events/Billetterie, un système différent). L'encart
-     ouvre donc evenements.html#evt-<id> plutôt que d'appeler l'API directement : cette route
-     réécrit tous les champs de l'événement sans fusion partielle (titre/date requis), donc
-     seul le vrai formulaire — qui a déjà toutes les données chargées — peut publier sans
-     risquer d'effacer des champs. */
+  /* Miniature + badge brouillon + encart publication (2026-09-26, demande explicite). Ces
+     événements (table native evenements, créés depuis evenements.html) n'ont que deux statuts
+     possibles ('ouvert' ou 'brouillon' — voir PUT /api/evenements/:id) : le simple lien
+     "Ouvrir et publier →" vers evenements.html#evt-<id> (seul moyen avant le 2026-10-28, cette
+     route réécrivant tous les champs sans fusion partielle) est remplacé par deux actions
+     directes, APPELÉES UNIQUEMENT une fois la liaison fiche↔événement réellement enregistrée
+     (e vient de evenementsLies, c-à-d state.ficheDetail.evenements, jamais d'une case cochée
+     mais pas encore sauvegardée) — publier ici publie l'événement tel qu'il est déjà, avec sa
+     fiche d'inscription déjà liée : PATCH /publier et /programmer-publication ne touchent QUE
+     statut/publication_programmee_le, zéro risque d'effacer un champ. */
   const badgeStatut = (e) => e.statut === 'brouillon'
     ? ' <span style="font-size:10.5px; font-weight:700; padding:1px 7px; border-radius:20px; background:#FEF9C3; color:#92400E;">🟡 Brouillon</span>' : '';
+  const fmtProgrammation = (d) => { try { return new Date(d).toLocaleString('fr-FR', { dateStyle: 'long', timeStyle: 'short', timeZone: 'Europe/Paris' }); } catch (e) { return d; } };
   const encartPublication = (e) => {
     if (e.statut !== 'brouillon') return '';
+    const programmee = e.publication_programmee_le;
+    const selecteurOuvert = state.programmerPublicationOuvert === e.id;
     return `
       <div style="background:#FEF9C3; border:1px solid #FDE68A; border-radius:8px; padding:9px 11px; margin:2px 0 6px 46px; font-size:11.5px; color:#92400E;">
-        Cet événement est en brouillon — il n'est pas encore visible du public.
-        <div style="margin-top:6px;">
-          <a href="evenements.html#evt-${e.id}" target="_blank" rel="noopener" style="background:#8B12D6; border:none; color:#fff; font-size:11px; font-weight:600; padding:6px 12px; border-radius:6px; text-decoration:none; display:inline-block;">🚀 Ouvrir et publier →</a>
+        ${programmee
+          ? `🗓️ Publication programmée pour le <strong>${fmtProgrammation(programmee)}</strong> — l'événement reste en brouillon jusque-là.`
+          : `Cet événement est en brouillon — il n'est pas encore visible du public.`}
+        <div style="margin-top:6px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+          <button type="button" data-action="publierEvenementImmediat" data-id="${e.id}" style="background:#8B12D6; border:none; color:#fff; font-size:11px; font-weight:600; padding:6px 12px; border-radius:6px; cursor:pointer;">🚀 Publier immédiatement</button>
+          <button type="button" data-action="toggleProgrammerPublication" data-id="${e.id}" style="background:#fff; border:1px solid #D97706; color:#92400E; font-size:11px; font-weight:600; padding:6px 12px; border-radius:6px; cursor:pointer;">🗓️ ${programmee ? 'Modifier la programmation' : 'Programmer la publication'}</button>
+          ${programmee ? `<button type="button" data-action="annulerProgrammationPublication" data-id="${e.id}" style="background:none; border:none; color:#92400E; font-size:11px; text-decoration:underline; cursor:pointer; padding:0;">Annuler la programmation</button>` : ''}
         </div>
+        ${selecteurOuvert ? `
+        <div style="margin-top:8px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+          <input type="datetime-local" id="prog-pub-${e.id}" style="height:34px; border:1px solid #D97706; border-radius:6px; padding:0 8px; font-size:12px;">
+          <button type="button" data-action="confirmerProgrammerPublication" data-id="${e.id}" style="background:#D97706; border:none; color:#fff; font-size:11px; font-weight:700; padding:7px 12px; border-radius:6px; cursor:pointer;">Confirmer</button>
+        </div>` : ''}
       </div>`;
   };
   return `
@@ -3672,6 +3691,48 @@ const actions = {
   },
   reporterLiaisonEvenements() { state.liaisonEvenementReportee = true; },
   reprendreLiaisonEvenements() { state.liaisonEvenementReportee = false; },
+  async publierEvenementImmediat(el) {
+    try {
+      await api('PATCH', `/evenements/${el.dataset.id}/publier`);
+      ia_toast('Événement publié — visible du public.', true);
+      state.programmerPublicationOuvert = null;
+      await iaRechargerMesEvenements();
+      await iaChargerFiche(state.selectedFicheId);
+    } catch (e) { ia_toast(e.message, false); }
+  },
+  toggleProgrammerPublication(el) {
+    const id = parseInt(el.dataset.id);
+    const ouvre = state.programmerPublicationOuvert !== id;
+    state.programmerPublicationOuvert = ouvre ? id : null;
+    // La liste d'événements défile dans sa propre zone (max-height:260px) — le sélecteur
+    // date/heure qui s'ajoute sous la ligne peut donc apparaître hors de cette zone visible.
+    // Après le prochain rendu (dispatch() appelle render() juste après cette fonction), on
+    // fait défiler UNIQUEMENT cette zone interne (jamais scrollIntoView : sur un conteneur
+    // imbriqué, il peut aussi réinitialiser le défilement de la page entière).
+    if (ouvre) setTimeout(() => {
+      const input = document.getElementById('prog-pub-' + id);
+      const zone = input?.closest('div[style*="max-height:260px"]');
+      if (zone) zone.scrollTop = zone.scrollHeight;
+    }, 0);
+  },
+  async confirmerProgrammerPublication(el) {
+    const id = el.dataset.id;
+    const valeur = document.getElementById('prog-pub-' + id)?.value;
+    if (!valeur) { ia_toast('Choisissez une date et une heure.', false); return; }
+    try {
+      await api('PATCH', `/evenements/${id}/programmer-publication`, { date: valeur });
+      ia_toast('Publication programmée.', true);
+      state.programmerPublicationOuvert = null;
+      await iaRechargerMesEvenements();
+    } catch (e) { ia_toast(e.message, false); }
+  },
+  async annulerProgrammationPublication(el) {
+    try {
+      await api('PATCH', `/evenements/${el.dataset.id}/programmer-publication`, { date: null });
+      ia_toast('Programmation annulée — l\'événement reste en brouillon.', true);
+      await iaRechargerMesEvenements();
+    } catch (e) { ia_toast(e.message, false); }
+  },
   async ouvrirSelecteurParrainage() {
     try {
       const r = await api('GET', '/parrainage/invitations');

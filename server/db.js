@@ -2651,6 +2651,14 @@ const MIGRATIONS = [
   ["users", "relais_invite_expire_le TEXT"],
   ["users", "relais_invite_permissions_json TEXT DEFAULT '{}'"],
   ["users", "relais_invite_cree_par_user_id INTEGER"],
+  // Publication programmée d'un événement brouillon (2026-10-28, demande explicite, depuis la
+  // liaison fiche↔événement d'inscriptions-admin.html) : seule source de programmation pour la
+  // table evenements (aucune autre n'existe à ce jour) — écrasée à chaque nouvel appel de
+  // PATCH /api/evenements/:id/programmer-publication, donc par construction toujours prioritaire
+  // sur toute programmation précédente. Vérifiée paresseusement (pas de cron) à chaque lecture
+  // publique (GET /api/evenements et GET /api/evenements/:id) : passée l'échéance, l'événement
+  // bascule statut='ouvert' et ce champ est effacé.
+  ["evenements", "publication_programmee_le TEXT"],
 ];
 
 /* Initialise updated_at pour les initiatives déjà existantes (jamais modifiées depuis) —
