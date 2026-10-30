@@ -6,6 +6,11 @@
 (function () {
   'use strict';
 
+  /* O-Z MASQUÉ SUR TOUS LES SUPPORTS, POUR TOUS LES COMPTES (2026-10-30, demande explicite : « nous le retravaillerons plus tard, Kofi aura peut-être une extension
+     sur tout Diaspo'Actif »). Rien n'est supprimé : le code reste en place. Pour le réactiver, passer cet interrupteur à false (même interrupteur dans assets/oz.js). */
+  const OZ_MASQUE = true;
+  if (OZ_MASQUE) return;
+
   /* ─── Détection du profil connecté ─────────────────────────────
      Lit le rôle depuis localStorage (clé 'da_role') ou l'URL     */
   function getProfile() {

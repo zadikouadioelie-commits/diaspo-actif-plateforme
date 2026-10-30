@@ -1,6 +1,9 @@
 /* assets/oz.js — O-Z, Intelligence Artificielle officielle de Diaspo'Actif */
 (function () {
   'use strict';
+  /* O-Z MASQUÉ SUR TOUS LES SUPPORTS, POUR TOUS LES COMPTES (2026-10-30, demande explicite) — code conservé ; passer à false pour réactiver (même interrupteur dans assets/chatbot.js). */
+  const OZ_MASQUE = true;
+  if (OZ_MASQUE) return;
   if (window.__OZ_LOADED) return;
   window.__OZ_LOADED = true;
 
