@@ -159,6 +159,7 @@
 .ip-affiche{width:100%;max-height:220px;object-fit:cover;border-radius:16px;margin-bottom:18px;}
 .ip-titre{font-size:22px;font-weight:700;margin:0 0 6px;}
 .ip-desc{color:oklch(0.5 0.006 30);font-size:14px;line-height:1.6;margin:0 0 22px;}
+.ip-detail{margin:26px 0 6px;padding-top:20px;border-top:1px solid oklch(0.92 0.004 30);}
 .ip-statut-card{border-radius:16px;padding:32px 24px;text-align:center;margin-bottom:8px;}
 .ip-statut-icon{font-size:42px;margin-bottom:12px;}
 .ip-statut-msg{font-size:15.5px;font-weight:700;margin:0 0 8px;}
@@ -1305,7 +1306,6 @@ function ipRenderAccueil() {
     ${IP_APERCU ? IP_BANDEAU_APERCU : ''}
     ${f.affiche_url ? `<img class="ip-affiche" src="${escH(f.affiche_url)}" alt="">` : ''}
     <h1 class="ip-titre">${escH(f.nom)}</h1>
-    ${f.description ? `<div class="ip-desc rich-content">${renderRichText(f.description)}</div>` : ''}
     ${ipRenderVisuels()}
     ${ipRenderParrainage()}
     <div id="ip-don-lie"></div>
@@ -1323,10 +1323,14 @@ function ipRenderAccueil() {
         </div>`).join('')}
     </div>
     ${ipRenderCandidature()}
+    ${ipRenderMedias()}
+    ${f.description ? `<section class="ip-detail" aria-label="Détail de l'événement"><div class="ip-visuels-titre">Détail de l'événement</div><div class="ip-desc rich-content">${renderRichText(f.description)}</div></section>` : ''}
     ${ipRenderLogos('Nos sponsors', f.sponsors_json)}
-    ${ipRenderLogos('Nos partenaires', f.partenaires_json)}
-    ${ipRenderMedias()}`;
+    ${ipRenderLogos('Nos partenaires', f.partenaires_json)}`;
 }
+/* Ordre de la page (2026-10-30, demande explicite : « présente d'abord les documents, les types d'inscription
+   et ensuite le descriptif de l'événement en dessous — pour tomber directement sur les inscriptions ») :
+   affiche + titre, photos/vidéos, don, TYPES D'INSCRIPTION, documents & médias, puis le descriptif. */
 
 const IP_SLUG = new URLSearchParams(location.search).get('slug') || location.pathname.split('/').pop();
 const IP_PAIEMENT_STATUT = new URLSearchParams(location.search).get('paiement');
