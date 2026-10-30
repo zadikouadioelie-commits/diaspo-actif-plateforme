@@ -23,6 +23,10 @@
 <link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
 <link rel="stylesheet" href="/assets/design-upgrade.v2.css">
 <link rel="stylesheet" href="/assets/theme-manager.css">
+<!-- Design « Nuit dorée » (2026-10-30) : retour arrière = retirer ces 3 liens et les classes « nd nd-bp » de la balise body -->
+<link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,500;0,6..96,600;1,6..96,500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/theme-nuit-doree.css?v=8">
+<link rel="stylesheet" href="/assets/bp-nuit-doree.css?v=2">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Public+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;600&display=swap">
 <style>
 /* ============================================================
@@ -149,7 +153,7 @@ body.dp-inst{--dp-mono:Arial,Helvetica,sans-serif;--dp-display:Arial,Helvetica,s
 }
 </style>
 </head>
-<body>
+<body class="nd nd-bp">
 <div class="page">
 
   <header class="topbar">
@@ -1783,6 +1787,8 @@ function showError(msg){
 
 init();
 </script>
+<!-- Gabarit « Nuit dorée — prestige » (2026-10-30) : s'ajoute à la liste des gabarits ; le gabarit par défaut ne change pas -->
+<script src="assets/bp-dossier-nuit-doree.js?v=1"></script>
 <script src="assets/back-button.js"></script>
 </body>
 </html>

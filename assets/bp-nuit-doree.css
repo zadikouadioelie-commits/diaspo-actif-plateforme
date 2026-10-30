@@ -231,6 +231,8 @@ body.nd-bp :is(.bp-main,.bp-sidebar,#bpa-panel) [style*="background:#fef3c7"]{ba
 body.nd-bp :is(.bp-main,.bp-sidebar,#bpa-panel) [style*="background:#fee2e2"],
 body.nd-bp :is(.bp-main,.bp-sidebar,#bpa-panel) [style*="background:#fef2f2"]{background:rgba(255,154,143,.12)!important;border-color:rgba(255,154,143,.35)!important;color:#FFB3AA!important}
 body.nd-bp :is(.bp-main,.bp-sidebar,#bpa-panel) [style*="background:#d1fae5"],
+body.nd-bp :is(.bp-main,.bp-sidebar,#bpa-panel) [style*="background:#f0fdf4"],
+body.nd-bp :is(.bp-main,.bp-sidebar,#bpa-panel) [style*="background:#ecfdf5"],
 body.nd-bp :is(.bp-main,.bp-sidebar,#bpa-panel) [style*="background:#dcfce7"]{background:rgba(143,224,176,.12)!important;border-color:rgba(143,224,176,.32)!important;color:#9BE8B8!important}
 body.nd-bp :is(.bp-main,.bp-sidebar,#bpa-panel) [style*="background:#dbeafe"]{background:rgba(63,123,255,.14)!important;border-color:rgba(63,123,255,.38)!important;color:#A9C4FF!important}
 body.nd-bp :is(.bp-main,.bp-sidebar,#bpa-panel) [style*="background:#f5f3ff"],
@@ -318,6 +320,33 @@ body.nd-bp .bpv-doc [style*="background:#fee2e2"]{background:linear-gradient(160
 body.nd-bp .bpv-doc [style*="background:#dbeafe"]{background:linear-gradient(160deg,rgba(63,123,255,.34),rgba(63,123,255,.12))!important;border:1px solid rgba(110,150,255,.75);border-radius:16px!important;color:#EDEAE0}
 body.nd-bp .bpv-doc [style*="background:#fef3c7"]{background:linear-gradient(160deg,rgba(227,192,110,.28),rgba(227,192,110,.09))!important;border:1px solid rgba(227,192,110,.7);border-radius:16px!important;color:#EDEAE0}
 body.nd-bp .bpv-doc [style*="background:#d1fae5"] h4,body.nd-bp .bpv-doc [style*="background:#fee2e2"] h4,body.nd-bp .bpv-doc [style*="background:#dbeafe"] h4,body.nd-bp .bpv-doc [style*="background:#fef3c7"] h4{color:#fff}
+/* page « Informations générales », pastilles de chapitre, sommaire, pied de navigation : encres et fonds clairs du thème d'origine → nuit dorée */
+body.nd-bp .bpv-ig-item .ico{color:var(--bp-or)}
+body.nd-bp .bpv-ig-item .k{color:var(--bp-or);opacity:.9}
+body.nd-bp .bpv-ig-item .v{color:#F1EEE4}
+body.nd-bp .bpv-num{color:var(--bp-or)}
+body.nd-bp .bpv-pagetag{background:rgba(227,192,110,.12);color:var(--bp-or);border:1px solid var(--bp-bord)}
+body.nd-bp .bpv-section-head .ic,body.nd-bp .bpv-devise-title .ic,body.nd-bp .bpv-pj-file .ic{background:rgba(227,192,110,.14);border:1px solid var(--bp-bord);color:var(--bp-or)}
+body.nd-bp .bpv-toc a .n{background:rgba(255,255,255,.07);color:var(--bp-or)}
+body.nd-bp .bpv-toc a.active .n{background:rgba(227,192,110,.2)}
+body.nd-bp .bpv-toc a .t{color:inherit}
+body.nd-bp .bpv-toc a .p{color:var(--bp-doux)}
+body.nd-bp .bpv-toc a.active .p{color:var(--bp-or)}
+body.nd-bp .bpv-pager{background:rgba(6,10,20,.55);border-top:1px solid var(--bp-bord);box-shadow:none}
+body.nd-bp .bpv-pg-btn{background:var(--bp-verre);border:1px solid var(--bp-bord);color:#F1EEE4}
+body.nd-bp .bpv-pg-btn small{color:var(--bp-doux)}
+body.nd-bp .bpv-pg-btn:hover:not([disabled]){background:rgba(227,192,110,.14);border-color:var(--bp-or);color:#fff}
+body.nd-bp .bpv-pg-btn.primary{background:var(--bp-degore);border-color:var(--bp-or);color:#1a1202}
+body.nd-bp .bpv-pg-btn.primary small{color:rgba(26,18,2,.72)}
+body.nd-bp .bpv-pg-btn.primary:hover:not([disabled]){background:var(--bp-or);border-color:#fff;color:#1a1202}
+body.nd-bp .bpv-pg-sel,body.nd-bp .bpv-pg-mid{color:var(--bp-doux)}
+body.nd-bp .bpv-pg-sel select{background:rgba(255,255,255,.07);border:1px solid var(--bp-bord);color:#fff}
+body.nd-bp .bpv-pg-sel select option{background:#0B1226;color:#fff}
+body.nd-bp .bpv-chip{background:var(--bp-verre);border:1px solid var(--bp-bord2);color:var(--bp-doux)}
+body.nd-bp .bpv-chip:hover{border-color:var(--bp-or);color:var(--bp-or)}
+body.nd-bp .bpv-chip.on{background:var(--bp-degore);border-color:var(--bp-or);color:#1a1202}
+body.nd-bp .bpv-pg-btn:focus-visible,body.nd-bp .bpv-chip:focus-visible,body.nd-bp .bpv-pg-sel select:focus-visible{outline:3px solid var(--bp-or)}
+@media(max-width:900px){body.nd-bp .bpv-pager{box-shadow:0 -10px 24px rgba(0,0,0,.6)}}
 
 /* ═══ SIMULATION DE PRÉSENTATION ═══ */
 body.nd-bp .simu-shell h1,body.nd-bp .simu-shell h2,body.nd-bp .simu-shell h3{color:#fff}
@@ -407,6 +436,41 @@ html[data-dp-tpl="nuit_doree"] body.nd-bp .sheet [style*="rgba(75,81,96,.09)"]{b
 html[data-dp-tpl="nuit_doree"] body.nd-bp .sheet :is([style*="background:#fff"],[style*="background:#FFF"],[style*="background:white"]){background:rgba(255,255,255,.07)!important}
 html[data-dp-tpl="nuit_doree"] body.nd-bp .sheet [style*="border:1px solid var(--dp-line)"],html[data-dp-tpl="nuit_doree"] body.nd-bp .sheet [style*="border-bottom:1px solid var(--dp-line)"]{border-color:var(--dp-line)!important}
 @media print{html[data-dp-tpl="nuit_doree"] body.nd-bp .sheet{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+
+/* ═══ CARTOUCHE « EXEMPLE DE RÉFÉRENCE » de la liste (2026-10-17) : verre sombre cerclé d'or, au lieu du jaune pâle ═══ */
+body.nd-bp .bpx{background:linear-gradient(135deg,rgba(227,192,110,.16),rgba(255,255,255,.04) 55%,rgba(63,123,255,.10));border:1px solid rgba(227,192,110,.55);border-radius:24px;box-shadow:0 0 0 1px rgba(227,192,110,.14),0 28px 60px -34px rgba(0,0,0,.95),0 0 70px -28px rgba(227,192,110,.35)}
+body.nd-bp .bpx-media{background:radial-gradient(circle at 50% 40%,#E3C06E 0%,#8A6A2C 45%,#0B1226 100%)}
+body.nd-bp .bpx-body{color:var(--bp-texte);padding:22px 26px}
+body.nd-bp .bpx-tag{background:var(--bp-degore);color:#1a1202;letter-spacing:.14em}
+body.nd-bp .bpx-body h2{font-family:var(--bp-titres);font-weight:500;font-size:clamp(22px,2.2vw,28px);color:#fff}
+body.nd-bp .bpx-slogan{color:var(--bp-or)}
+body.nd-bp .bpx-desc{color:#D5DBEA}
+body.nd-bp .bpx-chips{gap:8px}
+body.nd-bp .bpx-chips i{background:rgba(255,255,255,.06);border:1px solid var(--bp-bord);color:var(--bp-or)}
+body.nd-bp .bpx-foot{gap:10px}
+body.nd-bp .bp-tag[style*="background:#fef3c7"]{background:rgba(227,192,110,.16)!important;color:var(--bp-or)!important;border:1px solid var(--bp-bord)}
+
+/* ═══ « TESTER MON BUSINESS PLAN » (éditeur) : cartes d'interlocuteur et questions posées en verre sombre ═══ */
+body.nd-bp .bpt-card{background:var(--bp-verre);border:1px solid var(--bp-bord2);border-radius:20px;color:var(--bp-texte)}
+body.nd-bp .bpt-card:hover{border-color:var(--bp-or);background:rgba(227,192,110,.1);box-shadow:0 18px 40px -22px rgba(0,0,0,.9),0 0 0 3px rgba(227,192,110,.12)}
+body.nd-bp .bpt-card b{color:#fff}
+body.nd-bp .bpt-card .sub{color:var(--bp-or)}
+body.nd-bp .bpt-card .desc{color:var(--bp-doux)}
+body.nd-bp .bpt-card .meta{color:var(--bp-texte)}
+body.nd-bp .bpt-card .meta em{color:#F3C77A}
+body.nd-bp .bpt-hist th{color:var(--bp-or)}
+body.nd-bp .bpt-top{color:var(--bp-doux)}
+body.nd-bp .bpt-bar{background:rgba(255,255,255,.1)}
+body.nd-bp .bpt-bar i{background:var(--bp-degore)}
+body.nd-bp .bpt-q{background:var(--bp-verre);border:1px solid var(--bp-bord);box-shadow:0 30px 60px -36px rgba(0,0,0,.95)}
+body.nd-bp .bpt-q .niv{background:rgba(227,192,110,.14);color:var(--bp-or)}
+body.nd-bp .bpt-q h3{color:#fff;font-family:var(--bp-titres);font-weight:500}
+body.nd-bp .bpt-q label{color:var(--bp-doux)!important}
+body.nd-bp .bpt-ind{background:rgba(227,192,110,.1);border-color:var(--bp-bord);color:#EBD9A8}
+body.nd-bp .bpt-lacune{background:rgba(255,120,90,.12);border-color:rgba(255,120,90,.5);color:#FFC3B0}
+body.nd-bp .bpt-rate button{background:var(--bp-verre);border:1px solid var(--bp-bord2);color:var(--bp-texte)}
+body.nd-bp .bpt-rate button:hover{border-color:var(--bp-or)}
+body.nd-bp .bpt-rate button.on{border-color:var(--bp-or);background:rgba(227,192,110,.16);color:#fff}
 
 /* scrollbars discrètes */
 body.nd-bp *{scrollbar-width:thin;scrollbar-color:rgba(227,192,110,.4) transparent}
