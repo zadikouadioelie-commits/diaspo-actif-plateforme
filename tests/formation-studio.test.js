@@ -217,6 +217,53 @@ test('studio : sauvegarde, versions, publication, lecture', async (t) => {
   });
 
 
+  /* ───── Bibliothèque de médias du formateur ───── */
+  await t.test('médias : un fichier envoyé par le compte entre dans sa bibliothèque, réutilisable, sans doublon', async () => {
+    const uF = sql('select id from users where email=?', H.compte(rnd, 'Formateur', 'utilisateur').email)[0].id;
+    const cdn = 'https://diaspoactif-media.b-cdn.net';
+    assert.equal((await call(anon, 'GET', '/api/formateur/medias')).status, 401);
+    let r = await call(jarF, 'POST', '/api/formateur/medias', { type: 'document', url: `${cdn}/documents/${uF}-1700000000000.xlsx`, nom: 'Budget 2026.xlsx', taille: 52000 });
+    assert.equal(r.status, 201, JSON.stringify(r.data)); const idDoc = r.data.media.id;
+    r = await call(jarF, 'POST', '/api/formateur/medias', { type: 'image', url: `${cdn}/posts/${uF}-1700000000001.jpg`, nom: 'Couverture' });
+    assert.equal(r.status, 201, JSON.stringify(r.data));
+    r = await call(jarF, 'POST', '/api/formateur/medias', { type: 'document', url: `${cdn}/documents/${uF}-1700000000000.xlsx` });
+    assert.equal(r.status, 200); assert.equal(r.data.deja, true, 'la même adresse n\'est pas ajoutée deux fois');
+    r = await call(jarF, 'GET', '/api/formateur/medias');
+    assert.equal(r.data.medias.length, 2);
+    assert.equal((await call(jarF, 'GET', '/api/formateur/medias?type=image')).data.medias.length, 1);
+    assert.equal((await call(jarF, 'GET', '/api/formateur/medias?q=budget')).data.medias[0].nom, 'Budget 2026.xlsx');
+    r = await call(jarF, 'PATCH', `/api/formateur/medias/${idDoc}`, { nom: 'Budget prévisionnel' });
+    assert.equal(r.status, 200);
+    assert.equal((await call(jarF, 'GET', '/api/formateur/medias?q=prévisionnel')).data.medias.length, 1);
+    /* une autre personne ne voit ni ne touche à cette bibliothèque */
+    assert.equal((await call(jarA, 'GET', '/api/formateur/medias')).data.medias.length, 0);
+    assert.equal((await call(jarA, 'PATCH', `/api/formateur/medias/${idDoc}`, { nom: 'x' })).status, 404);
+    assert.equal((await call(jarA, 'DELETE', `/api/formateur/medias/${idDoc}`)).status, 404);
+  });
+
+  await t.test('médias : les fichiers des autres, les hôtes étrangers et les adresses non sûres sont refusés', async () => {
+    const uF = sql('select id from users where email=?', H.compte(rnd, 'Formateur', 'utilisateur').email)[0].id;
+    const cdn = 'https://diaspoactif-media.b-cdn.net';
+    const essai = body => call(jarF, 'POST', '/api/formateur/medias', body);
+    assert.equal((await essai({ type: 'image', url: `${cdn}/posts/${uF + 999}-1700000000002.jpg` })).status, 400, 'fichier d\'un autre compte');
+    assert.equal((await essai({ type: 'document', url: `https://exemple.org/documents/${uF}-1700000000003.pdf` })).status, 400, 'hôte étranger');
+    assert.equal((await essai({ type: 'document', url: `${cdn}/autre/${uF}-1700000000004.pdf` })).status, 400, 'dossier inattendu');
+    assert.equal((await essai({ type: 'document', url: `http://diaspoactif-media.b-cdn.net/documents/${uF}-1700000000005.pdf` })).status, 400, 'https obligatoire');
+    assert.equal((await essai({ type: 'image', url: 'javascript:alert(1)' })).status, 400);
+    assert.equal((await essai({ type: 'bidon', url: `${cdn}/posts/${uF}-1.jpg` })).status, 400);
+    /* vidéos et audios : adresse https libre (YouTube, fichier hébergé) */
+    assert.equal((await essai({ type: 'video', url: 'https://www.youtube.com/watch?v=abcdefghijk', nom: 'Présentation' })).status, 201);
+    assert.equal((await essai({ type: 'audio', url: 'https://exemple.org/podcast.mp3', nom: 'Épisode 1' })).status, 201);
+  });
+
+  await t.test('médias : suppression de la bibliothèque (le fichier utilisé dans un module reste lisible)', async () => {
+    const liste = (await call(jarF, 'GET', '/api/formateur/medias')).data.medias;
+    const doc = liste.find(m => /Budget/.test(m.nom));
+    assert.equal((await call(jarF, 'DELETE', `/api/formateur/medias/${doc.id}`)).status, 200);
+    assert.ok(!(await call(jarF, 'GET', '/api/formateur/medias')).data.medias.some(m => m.id === doc.id));
+  });
+
+
   await t.test('dépublier : plus rien pour l\'apprenant, le brouillon et l\'historique restent', async () => {
     assert.equal((await call(jarF, 'POST', base + '/depublier')).status, 200);
     assert.equal((await call(jarA, 'GET', base + '/lecture')).status, 404);

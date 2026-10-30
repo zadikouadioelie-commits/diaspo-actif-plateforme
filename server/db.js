@@ -4938,6 +4938,19 @@ db.exec(`
     UNIQUE(doc_id, version)
   );
 `);
+/* Bibliothèque de médias du formateur (2026-10-30) : les fichiers envoyés depuis le Studio, réutilisables dans toutes ses formations. L'entrée ne contient que l'adresse (le fichier reste sur le CDN). */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS formation_medias (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    nom TEXT NOT NULL,
+    url TEXT NOT NULL,
+    type TEXT NOT NULL DEFAULT 'document',
+    taille INTEGER,
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(user_id, url)
+  );
+`);
 ;['studio INTEGER DEFAULT 0'].forEach(col => { try { db.exec(`ALTER TABLE formation_lecons ADD COLUMN ${col}`); } catch(_) {} });
 ;['prix REAL','vendable_seul INTEGER DEFAULT 0'].forEach(col => { try { db.exec(`ALTER TABLE formation_modules ADD COLUMN ${col}`); } catch(_) {} });
 ;['explication TEXT'].forEach(col => { try { db.exec(`ALTER TABLE formation_quiz_questions ADD COLUMN ${col}`); } catch(_) {} });

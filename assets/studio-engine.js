@@ -31,7 +31,7 @@
       { t: 'video', n: 'Vidéo', i: '🎬', w: 640, h: 360, props: { url: '', titre: '' } },
       { t: 'audio', n: 'Audio', i: '🎧', w: 480, h: 96, props: { url: '', titre: '' } } ] },
     { cat: 'Documents', items: [
-      { t: 'document', n: 'Document PDF', i: '📄', w: 760, h: 520, props: { nom: '', url: '', mode: 'lecteur' } },
+      { t: 'document', n: 'Document (PDF, Excel, Word…)', i: '📄', w: 760, h: 520, props: { nom: '', url: '', mode: 'lecteur' } },
       { t: 'fichier', n: 'Fichier à télécharger', i: '📎', w: 440, h: 72, props: { nom: '', url: '', description: '' } } ] },
     { cat: 'Évaluations', items: [
       { t: 'quiz', n: 'Quiz · questionnaire · exercice', i: '📝', w: 760, h: 150, props: { quiz_id: 0, libelle: '' } } ] },
@@ -480,23 +480,28 @@
         ${select('Alignement', 'align', p.align || 'left', [['left', 'À gauche'], ['center', 'Centré'], ['right', 'À droite'], ['justify', 'Justifié']])}
         <label class="st-f" style="display:flex;gap:8px;align-items:center"><input type="checkbox" data-p="gras" data-k="bool" ${p.gras ? 'checked' : ''}> <span style="margin:0">Tout en gras</span></label>`;
     } else if (t === 'image') {
-      h += `<div class="st-btns"><button class="st-b or" data-up="image">${p.url ? 'Remplacer l\'image' : 'Importer une image'}</button>${p.url ? '<button class="st-b dg" data-vide="url">Retirer</button>' : ''}</div>
+      h += `<div class="st-btns"><button class="st-b or" data-up="image">${p.url ? 'Remplacer l\'image' : 'Importer une image'}</button><button class="st-b" data-lib="image">📚 Ma bibliothèque</button>${p.url ? '<button class="st-b dg" data-vide="url">Retirer</button>' : ''}</div>
         ${champ('ou adresse (https) de l\'image', 'url', p.url, 'url', 'placeholder="https://…"')}${champ('Texte alternatif (accessibilité)', 'alt', p.alt)}${champ('Légende', 'legende', p.legende)}
         ${select('Ajustement', 'ajust', p.ajust, [['contain', 'Image entière'], ['cover', 'Remplir le cadre (recadre les bords)']])}
         ${select('Alignement', 'align', p.align, [['left', 'À gauche'], ['center', 'Centré'], ['right', 'À droite']])}${champ('Arrondi des coins (px)', 'rayon', p.rayon, 'number', 'min="0" max="60"')}`;
     } else if (t === 'video') {
-      h += `${champ('Adresse de la vidéo (YouTube ou fichier https)', 'url', p.url, 'url', 'placeholder="https://www.youtube.com/watch?v=…"')}${champ('Titre de la vidéo', 'titre', p.titre)}
+      h += `<div class="st-btns"><button class="st-b" data-lib="video">📚 Ma bibliothèque</button></div>${champ('Adresse de la vidéo (YouTube ou fichier https)', 'url', p.url, 'url', 'placeholder="https://www.youtube.com/watch?v=…"')}${champ('Titre de la vidéo', 'titre', p.titre)}
         <p class="st-aide">Les vidéos importées depuis votre ordinateur arrivent avec la bibliothèque de médias (étape suivante) ; pour l'instant, collez l'adresse d'une vidéo hébergée.</p>`;
     } else if (t === 'audio') {
-      h += `${champ('Adresse du fichier audio (https)', 'url', p.url, 'url', 'placeholder="https://…/audio.mp3"')}${champ('Titre', 'titre', p.titre)}`;
+      h += `<div class="st-btns"><button class="st-b" data-lib="audio">📚 Ma bibliothèque</button></div>${champ('Adresse du fichier audio (https)', 'url', p.url, 'url', 'placeholder="https://…/audio.mp3"')}${champ('Titre', 'titre', p.titre)}`;
     } else if (t === 'fichier') {
-      h += `<div class="st-btns"><button class="st-b or" data-up="document">${p.url ? 'Remplacer le fichier' : 'Importer un fichier'}</button></div><p class="st-aide">PDF, Word, Excel, PowerPoint ou image — 15 Mo maximum.</p>
+      h += `<div class="st-btns"><button class="st-b or" data-up="document">${p.url ? 'Remplacer le fichier' : 'Importer un fichier'}</button><button class="st-b" data-lib="document,image">📚 Ma bibliothèque</button></div><p class="st-aide">PDF, Word, Excel, PowerPoint ou image — 4 Mo maximum par fichier.</p>
         ${champ('Nom affiché', 'nom', p.nom)}${champ('Description', 'description', p.description)}${champ('ou adresse (https) du fichier', 'url', p.url, 'url')}`;
     } else if (t === 'document') {
-      h += `<div class="st-btns"><button class="st-b or" data-up="document">${p.url ? 'Remplacer le document' : 'Importer un document'}</button></div><p class="st-aide">PDF, Word, Excel, PowerPoint ou image — 15 Mo maximum.</p>
-        ${select('Présentation', 'mode', p.mode, [['lecteur', 'Lecteur intégré dans la page (PDF)'], ['telechargement', 'Carte à télécharger']])}
-        ${champ('Nom affiché', 'nom', p.nom)}${champ('ou adresse (https) du document', 'url', p.url, 'url')}
-        ${p.url && p.mode === 'lecteur' && !/\.pdf(\?|#|$)/i.test(p.url) ? '<p class="st-aide" style="color:#fca5a5">Le lecteur intégré ne lit que les PDF. Pour un PowerPoint ou un Word : exportez-le en PDF (Fichier › Exporter), ou choisissez « Carte à télécharger ».</p>' : ''}`;
+      const fam = R.typeFichier(p.url);
+      const conseil = !p.url || p.mode !== 'lecteur' ? '' : fam === 'pdf' || fam === 'image' ? '' : fam === 'ppt' || fam === 'word'
+        ? '<p class="st-aide" style="color:#fca5a5">Un PowerPoint ou un Word ne peut pas être lu dans la page : exportez-le en PDF (Fichier › Exporter › PDF) puis importez le PDF, ou choisissez « Carte à télécharger ».</p>'
+        : '<p class="st-aide" style="color:#fca5a5">Un tableur Excel se télécharge (il ne s\'affiche pas dans la page). Pour montrer quelques chiffres directement, utilisez l\'outil « Tableau ».</p>';
+      h += `<div class="st-btns"><button class="st-b or" data-up="document">${p.url ? 'Remplacer le fichier' : 'Importer un fichier'}</button><button class="st-b" data-lib="document,image">📚 Ma bibliothèque</button></div>
+        <p class="st-aide">PDF, Word, Excel, PowerPoint ou image (JPEG, PNG, WebP, GIF) — 4 Mo maximum par fichier.</p>
+        ${p.url ? `<p class="st-aide">${R.FAMILLES[fam][0]} ${esc(R.FAMILLES[fam][1])}</p>` : ''}
+        ${select('Présentation', 'mode', p.mode, [['lecteur', 'Afficher dans la page (PDF et images)'], ['telechargement', 'Carte à télécharger']])}
+        ${champ('Nom affiché', 'nom', p.nom)}${champ('ou adresse (https) du fichier', 'url', p.url, 'url')}${conseil}`;
     } else if (t === 'quiz') {
       if (!p.quiz_id) h += `<p class="st-aide">Choisissez le type d'activité à créer. Elle sera corrigée par le serveur ; réussir l'activité valide la leçon.</p><div class="st-btns" style="flex-direction:column">
         <button class="st-b or" data-act-new="questionnaire">📝 Quiz / questionnaire noté</button><button class="st-b or" data-act-new="evaluation">🎓 Évaluation (examen)</button><button class="st-b or" data-act-new="exercice">🛠 Exercice pratique (devoir à rendre)</button></div>`;
@@ -550,6 +555,7 @@
     if (b.dataset.al) return aligner(b.dataset.al);
     if (b.dataset.ord) return ordre(b.dataset.ord);
     if (b.dataset.pa) return actionPage(b.dataset.pa);
+    if (b.dataset.lib) return bibliotheque(b.dataset.lib.split(','), S.sel[0]);
     if (b.dataset.actNew) return creerActivite(b.dataset.actNew);
     if (b.dataset.act === 'edit-act') return editeurActivite();
     if (b.dataset.act === 'dupliquer') return dupliquer();
@@ -572,18 +578,80 @@
     toast('Choisissez une image…');
     const url = await pickAndUpload('post', { maxW: 1600, maxH: 1600, maxMo: 5 });
     if (!url) return; const e = el(id); if (!e) return;
-    modifier(() => { e.props.url = url; if (!e.props.alt) e.props.alt = ''; }); choisir([id]); toast('Image ajoutée');
+    modifier(() => { e.props.url = url; if (!e.props.alt) e.props.alt = ''; }); choisir([id]); toast('Image ajoutée'); rangerEnBibliotheque('image', url, 'Image du ' + new Date().toLocaleDateString('fr-FR'));
   }
+  const ACCEPT = '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.webp,.gif,image/*';
+  const MAX_FICHIER = 4 * 1024 * 1024; /* limite de l'hébergeur pour un envoi : au-delà, la plateforme refuserait la requête */
+  /* Envoie un fichier (image compressée ou document) et le range dans la bibliothèque. Renvoie { url, type, nom } ou lève une erreur lisible. */
+  async function importerFichier(f) {
+    const fam = R.typeFichier(f.name);
+    if (fam === 'autre') throw new Error('Format non pris en charge : PDF, Word, Excel, PowerPoint ou image (JPEG, PNG, WebP, GIF). Pour une vidéo ou un audio, ajoutez son adresse.');
+    let url, type;
+    if (fam === 'image') { const comp = await compressImageFile(f, 1600, 1600, 0.85); if (comp.size > MAX_FICHIER) throw new Error('Image encore trop lourde après compression (4 Mo maximum).'); url = await uploadMedia(comp, 'post'); type = 'image'; }
+    else { if (f.size > MAX_FICHIER) throw new Error('Fichier trop lourd (4 Mo maximum). Réduisez-le, ou hébergez-le ailleurs et collez son adresse.'); url = await uploadMedia(f, 'document'); type = 'document'; }
+    rangerEnBibliotheque(type, url, f.name, f.size);
+    return { url, type, nom: f.name };
+  }
+  function rangerEnBibliotheque(type, url, nom, taille) { api('POST', '/api/formateur/medias', { type, url, nom, taille }).catch(() => { /* la bibliothèque est un confort : l'échec n'empêche pas d'utiliser le fichier */ }); }
   function choisirDocument(id) {
-    const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,image/*'; inp.style.display = 'none'; document.body.appendChild(inp);
+    const inp = document.createElement('input'); inp.type = 'file'; inp.accept = ACCEPT; inp.style.display = 'none'; document.body.appendChild(inp);
     inp.onchange = async () => {
       const f = inp.files[0]; inp.remove(); if (!f) return;
-      if (f.size > 15 * 1024 * 1024) { toast('Fichier trop volumineux (15 Mo maximum).'); return; }
       toast('Envoi du fichier…');
-      try { const url = await uploadMedia(f, 'document'); const e = el(id); if (!e) return; modifier(() => { e.props.url = url; if (!e.props.nom) e.props.nom = f.name; }); choisir([id]); toast('Fichier ajouté'); }
+      try { const r = await importerFichier(f); const e = el(id); if (!e) return; modifier(() => { e.props.url = r.url; if (!e.props.nom) e.props.nom = r.nom; }); choisir([id]); toast('Fichier ajouté'); }
       catch (err) { toast(err.message || 'Envoi impossible.'); }
     };
     inp.click();
+  }
+
+  /* ───────── bibliothèque de médias ───────── */
+  const NOMS_TYPE = { image: 'Images', document: 'Documents', video: 'Vidéos', audio: 'Audios' };
+  const tailleTxt = o => (o == null ? '' : o > 1048576 ? (o / 1048576).toFixed(1) + ' Mo' : Math.max(1, Math.round(o / 1024)) + ' Ko');
+  /* types : types proposés ; cibleId : élément qui recevra le choix (absent = simple gestion de la bibliothèque) */
+  async function bibliotheque(types, cibleId) {
+    types = (types && types.length ? types : ['image', 'document', 'video', 'audio']);
+    let filtre = types.length === 1 ? types[0] : '', mot = '';
+    boite('m-info', `<h2>📚 Ma bibliothèque de médias</h2><p>Vos fichiers, réutilisables dans toutes vos formations. ${cibleId ? 'Cliquez sur « Utiliser » pour l\'insérer dans l\'élément sélectionné.' : ''}</p>
+      <div class="st-row"><label class="st-f"><span>Rechercher</span><input type="text" id="bi-q" placeholder="Nom du fichier…"></label><label class="st-f"><span>Type</span><select id="bi-t"><option value="">Tous</option>${types.map(x => `<option value="${x}" ${filtre === x ? 'selected' : ''}>${NOMS_TYPE[x]}</option>`).join('')}</select></label></div>
+      <div class="st-btns"><button class="st-b or" id="bi-import">⬆ Importer un fichier</button><button class="st-b" id="bi-url">＋ Ajouter une adresse (vidéo, audio…)</button></div>
+      <div id="bi-liste"><p class="st-aide">Chargement…</p></div><div class="st-btns"><button class="st-b" id="bi-x">Fermer</button></div>`, true);
+    const rafraichir = async () => {
+      try {
+        const qs = new URLSearchParams(); if (filtre) qs.set('type', filtre); if (mot) qs.set('q', mot);
+        let { medias } = await api('GET', '/api/formateur/medias?' + qs.toString()); medias = medias.filter(m => types.includes(m.type));
+        $('#bi-liste').innerHTML = medias.length ? `<ul class="st-liste">${medias.map(m => `<li><div style="display:flex;gap:10px;align-items:center">${m.type === 'image' ? `<img src="${esc(m.url)}" alt="" style="width:54px;height:40px;object-fit:cover;border-radius:6px;background:#fff">` : `<span style="font-size:26px;width:54px;text-align:center">${m.type === 'video' ? '🎬' : m.type === 'audio' ? '🎧' : R.FAMILLES[R.typeFichier(m.url)][0]}</span>`}<div><b>${esc(m.nom)}</b><small>${NOMS_TYPE[m.type]}${m.taille ? ' · ' + tailleTxt(m.taille) : ''}</small></div></div>
+          ${cibleId ? `<button class="st-b or" data-use="${m.id}">Utiliser</button>` : ''}<button class="st-b" data-ren="${m.id}" title="Renommer">✏️</button><button class="st-b dg" data-del="${m.id}" title="Retirer de la bibliothèque">🗑</button></li>`).join('')}</ul>`
+          : '<p class="st-aide">Aucun fichier pour le moment. Importez-en un, ou ajoutez l\'adresse d\'une vidéo ou d\'un audio.</p>';
+        $$('[data-use]', $('#bi-liste')).forEach(b => b.addEventListener('click', () => { const m = medias.find(x => x.id === Number(b.dataset.use)), e = el(cibleId); if (!m || !e) return; utiliserMedia(e, m); fermer('m-info'); }));
+        $$('[data-ren]', $('#bi-liste')).forEach(b => b.addEventListener('click', async () => { const m = medias.find(x => x.id === Number(b.dataset.ren)); const n = prompt('Nouveau nom :', m.nom); if (!n || !n.trim()) return; try { await api('PATCH', '/api/formateur/medias/' + m.id, { nom: n.trim() }); rafraichir(); } catch (e) { toast(e.message); } }));
+        $$('[data-del]', $('#bi-liste')).forEach(b => b.addEventListener('click', async () => { if (!confirm('Retirer ce fichier de la bibliothèque ? Les modules qui l\'utilisent déjà le gardent.')) return; try { await api('DELETE', '/api/formateur/medias/' + b.dataset.del); rafraichir(); } catch (e) { toast(e.message); } }));
+      } catch (e) { $('#bi-liste').innerHTML = `<p class="st-aide" style="color:#fca5a5">${esc(e.message)}</p>`; }
+    };
+    $('#bi-x').onclick = () => fermer('m-info');
+    $('#bi-q').oninput = ev => { mot = ev.target.value.trim(); rafraichir(); };
+    $('#bi-t').onchange = ev => { filtre = ev.target.value; rafraichir(); };
+    $('#bi-import').onclick = () => {
+      const inp = document.createElement('input'); inp.type = 'file'; inp.accept = ACCEPT; inp.multiple = true; inp.style.display = 'none'; document.body.appendChild(inp);
+      inp.onchange = async () => { const fs = [...inp.files]; inp.remove(); for (const f of fs) { toast('Envoi de ' + f.name + '…'); try { await importerFichier(f); } catch (e) { toast(f.name + ' : ' + e.message); await new Promise(r => setTimeout(r, 1800)); } } setTimeout(rafraichir, 400); };
+      inp.click();
+    };
+    $('#bi-url').onclick = () => {
+      const choix = types.filter(x => x === 'video' || x === 'audio'); if (!choix.length) { toast('Pour des images et des documents, utilisez « Importer un fichier ».'); return; }
+      const url = prompt('Adresse (https://…) de la vidéo ou de l\'audio :', 'https://'); if (!url) return;
+      const type = choix.length === 1 ? choix[0] : (/\.(mp3|wav|ogg|m4a|aac)(\?|$)/i.test(url) ? 'audio' : 'video');
+      const nom = prompt('Nom à afficher :', ''); if (nom === null) return;
+      api('POST', '/api/formateur/medias', { type, url: url.trim(), nom: nom.trim() }).then(rafraichir).catch(e => toast(e.message));
+    };
+    rafraichir();
+  }
+  function utiliserMedia(e, m) {
+    modifier(() => {
+      e.props.url = m.url;
+      if (e.type === 'document' || e.type === 'fichier') e.props.nom = m.nom;
+      else if (e.type === 'video' || e.type === 'audio') e.props.titre = m.nom;
+      else if (e.type === 'image' && !e.props.alt) e.props.alt = m.nom;
+    });
+    choisir([e.id]); toast('« ' + m.nom + ' » ajouté');
   }
 
   /* ───────── activité évaluée : quiz, questionnaire, exercice (moteur de quiz existant, piloté d'ici) ───────── */
@@ -767,6 +835,7 @@
     $('#st-zoom-m').onclick = () => zoomer(1 / 1.15); $('#st-zoom-p').onclick = () => zoomer(1.15); $('#st-ajuster').onclick = ajuster;
     $('#st-aimant').onclick = () => { S.aimant = !S.aimant; majBarre(); toast(S.aimant ? 'Aimantation activée (repères et alignements)' : 'Aimantation désactivée'); };
     $$('.st-al').forEach(b => { b.onclick = () => aligner(b.dataset.al); });
+    $('#st-medias').onclick = () => bibliotheque(['image', 'document', 'video', 'audio'], null);
     $('#st-apercu').onclick = apercu; $('#st-histo').onclick = historique; $('#st-publier').onclick = publier;
     $('#st-retour').onclick = async () => { if (S.dirty) await sauver(); location.href = 'formations.html'; };
     $('#st-btn-outils').onclick = () => { libEl.classList.toggle('open'); propsEl.classList.remove('open'); };
@@ -792,6 +861,6 @@
     } else if (!S.existe) choixMode();
     setEtat(S.existe ? 'Enregistré' : 'Nouveau module', S.existe ? 'ok' : '');
   }
-  window.StudioDebug = { S, el, pg, ajouterOutil, sauver, convertir };
+  window.StudioDebug = { S, el, pg, ajouterOutil, sauver, convertir, bibliotheque };
   demarrer();
 })();

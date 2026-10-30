@@ -18,6 +18,17 @@
     const m = String(url || '').match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{6,})/);
     return m ? m[1] : '';
   }
+  /* Famille d'un fichier d'après son extension (le serveur n'accepte que PDF, Word, Excel, PowerPoint et images pour les documents). */
+  function typeFichier(url) {
+    const m = String(url || '').split('?')[0].split('#')[0].match(/\.([a-z0-9]{2,5})$/i), x = m ? m[1].toLowerCase() : '';
+    if (x === 'pdf') return 'pdf';
+    if (['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(x)) return 'image';
+    if (['xls', 'xlsx'].includes(x)) return 'excel';
+    if (['doc', 'docx'].includes(x)) return 'word';
+    if (['ppt', 'pptx'].includes(x)) return 'ppt';
+    return 'autre';
+  }
+  const FAMILLES = { pdf: ['📕', 'Document PDF'], image: ['🖼️', 'Image'], excel: ['📗', 'Tableur Excel'], word: ['📘', 'Document Word'], ppt: ['📙', 'Présentation PowerPoint'], autre: ['📄', 'Fichier'] };
   const placeholder = (icone, texte) => `<div class="st-ph"><span>${icone}</span><small>${esc(texte)}</small></div>`;
 
   /* Contenu d'un élément. ctx = { edit: bool, lecture: bool } */
@@ -65,13 +76,15 @@
       }
       case 'fichier':
         return p.url
-          ? `<div class="st-file"><span class="st-file-i">📎</span><div class="st-file-t"><strong>${esc(p.nom) || 'Fichier'}</strong>${p.description ? `<small>${esc(p.description)}</small>` : ''}</div>${ctx.edit ? '<span class="st-file-b">Télécharger</span>' : `<a class="st-file-b" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer" download>Télécharger</a>`}</div>`
+          ? `<div class="st-file"><span class="st-file-i">${FAMILLES[typeFichier(p.url)][0]}</span><div class="st-file-t"><strong>${esc(p.nom) || 'Fichier'}</strong>${p.description ? `<small>${esc(p.description)}</small>` : ''}</div>${ctx.edit ? '<span class="st-file-b">Télécharger</span>' : `<a class="st-file-b" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer" download>Télécharger</a>`}</div>`
           : placeholder('📎', 'Fichier à ajouter');
       case 'document': {
         if (!p.url) return placeholder('📄', 'Document à ajouter');
-        const pdf = /\.pdf(\?|#|$)/i.test(p.url);
-        const carte = `<div class="st-file"><span class="st-file-i">📄</span><div class="st-file-t"><strong>${esc(p.nom) || 'Document'}</strong>${pdf ? '' : '<small>À télécharger</small>'}</div>${ctx.edit ? '<span class="st-file-b">Télécharger</span>' : `<a class="st-file-b" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer" download>Télécharger</a>`}</div>`;
-        if (p.mode !== 'lecteur' || !pdf) return carte;
+        const fam = typeFichier(p.url), F = FAMILLES[fam];
+        const carte = `<div class="st-file"><span class="st-file-i">${F[0]}</span><div class="st-file-t"><strong>${esc(p.nom) || F[1]}</strong><small>${F[1]} · à télécharger</small></div>${ctx.edit ? '<span class="st-file-b">Télécharger</span>' : `<a class="st-file-b" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer" download>Télécharger</a>`}</div>`;
+        if (p.mode !== 'lecteur') return carte;
+        if (fam === 'image') return `<figure class="st-fig"><img src="${esc(p.url)}" alt="${esc(p.nom)}" draggable="false" style="object-fit:contain">${p.nom ? `<figcaption>${esc(p.nom)}</figcaption>` : ''}</figure>`;
+        if (fam !== 'pdf') return carte;
         return `<div class="st-doc${ctx.edit ? ' st-inerte' : ''}"><iframe src="${esc(p.url)}#toolbar=1&view=FitH" title="${esc(p.nom) || 'Document PDF'}" loading="lazy"></iframe>${ctx.edit ? '' : `<a class="st-doc-dl" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer" download>⬇ Télécharger le document</a>`}</div>`;
       }
       case 'quiz':
@@ -162,5 +175,5 @@
     return { destroy() { if (ro) ro.disconnect(); }, goTo: afficher };
   }
 
-  window.StudioRender = { PAGE_W, PAGE_H, FLUX_W, TEXTE, esc, ytId, inner, elHtml, pageHtml, hauteurPage, lecture };
+  window.StudioRender = { PAGE_W, PAGE_H, FLUX_W, TEXTE, esc, ytId, typeFichier, FAMILLES, inner, elHtml, pageHtml, hauteurPage, lecture };
 })();

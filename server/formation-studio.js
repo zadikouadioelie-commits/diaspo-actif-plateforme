@@ -170,7 +170,28 @@ function lireQuestion(b) {
   return { vals: { question, type, options_json: options ? JSON.stringify(options) : null, reponse_correcte: reponse, points, explication } };
 }
 
-module.exports = { TYPES, KINDS, nettoyerDoc, problemes, lireQuestion };
+/* ── Bibliothèque de médias ── */
+const TYPES_MEDIA = ["image", "document", "video", "audio"];
+const HOTES_CDN = new Set(["diaspoactif-media.b-cdn.net"]);
+try { if (process.env.BUNNY_CDN_URL) HOTES_CDN.add(new URL(process.env.BUNNY_CDN_URL).hostname); } catch (_) { /* variable mal formée : hôte par défaut seul */ }
+
+/* Valide une entrée de bibliothèque. Images et documents : uniquement NOTRE CDN, et seulement un fichier envoyé par ce compte (nom « <id du compte>-<horodatage>.<ext> »)
+   — personne ne peut ranger dans sa bibliothèque le fichier d'un autre. Vidéos et audios : n'importe quelle adresse https (YouTube, fichier hébergé). */
+function lireMedia(b, userId) {
+  const type = choix(b && b.type, TYPES_MEDIA, "");
+  if (!type) return { erreur: "Type de média inconnu (image, document, vidéo ou audio)." };
+  const url = urlHttps(b.url);
+  if (!url) return { erreur: "Adresse invalide : elle doit commencer par https://." };
+  if (type === "image" || type === "document") {
+    const u = new URL(url);
+    const m = u.pathname.match(/^\/(posts|documents)\/(\d+)-\d+\.[a-z0-9]{2,5}$/i);
+    if (!HOTES_CDN.has(u.hostname) || !m || Number(m[2]) !== Number(userId)) return { erreur: "Seuls les fichiers que vous avez envoyés depuis votre compte peuvent entrer dans votre bibliothèque." };
+  }
+  const brut = txt(b.nom, 150).trim() || decodeURIComponent(url.split("/").pop().split("?")[0] || "").slice(0, 150) || "Fichier";
+  return { vals: { type, url, nom: brut, taille: Number.isFinite(Number(b.taille)) && Number(b.taille) > 0 ? Math.floor(Number(b.taille)) : null } };
+}
+
+module.exports = { TYPES, KINDS, nettoyerDoc, problemes, lireQuestion, lireMedia };
 
 module.exports.register = function register(deps) {
   const { route, db, sendJSON, getCurrentUser, SEC, checkFormationOwner } = deps;
@@ -379,6 +400,50 @@ module.exports.register = function register(deps) {
     const q = await quizDeLecon(c); if (!q) return sendJSON(res, 404, { error: "Aucune activité évaluée dans cette leçon." });
     await db.prepare("DELETE FROM formation_quiz_questions WHERE id=? AND quiz_id=?").run(params.qid, q.id);
     sendJSON(res, 200, { quiz: await detailQuiz(q) });
+  });
+
+  /* ── Bibliothèque de médias du formateur : ses fichiers, réutilisables dans toutes ses formations ── */
+  const vueMedia = r => ({ id: Number(r.id), nom: r.nom, url: r.url, type: r.type, taille: r.taille == null ? null : Number(r.taille), date: r.created_at });
+  async function compteMedia(req, res) {
+    const user = await getCurrentUser(req);
+    if (!user) { sendJSON(res, 401, { error: "Connexion requise." }); return null; }
+    const lim = SEC.rateLimit(`studio-medias:${user.id}`, 300, 600000);
+    if (!lim.allowed) { sendJSON(res, 429, { error: `Trop de requêtes. Réessayez dans ${lim.retryAfter}s.` }); return null; }
+    return user;
+  }
+  route("GET", "/api/formateur/medias", async (req, res) => {
+    const user = await compteMedia(req, res); if (!user) return;
+    const q = new URL(req.url, "http://localhost").searchParams;
+    const type = TYPES_MEDIA.includes(q.get("type")) ? q.get("type") : null, mot = String(q.get("q") || "").trim().toLowerCase().slice(0, 80);
+    let rows = await db.prepare("SELECT * FROM formation_medias WHERE user_id=? ORDER BY id DESC LIMIT 500").all(user.id);
+    if (type) rows = rows.filter(r => r.type === type);
+    if (mot) rows = rows.filter(r => String(r.nom).toLowerCase().includes(mot));
+    sendJSON(res, 200, { medias: rows.map(vueMedia) });
+  });
+  route("POST", "/api/formateur/medias", async (req, res, params, body) => {
+    const user = await compteMedia(req, res); if (!user) return;
+    const r = lireMedia(body, user.id); if (r.erreur) return sendJSON(res, 400, { error: r.erreur });
+    const v = r.vals;
+    const deja = await db.prepare("SELECT * FROM formation_medias WHERE user_id=? AND url=?").get(user.id, v.url);
+    if (deja) return sendJSON(res, 200, { media: vueMedia(deja), deja: true });
+    const nb = Number((await db.prepare("SELECT COUNT(*) AS n FROM formation_medias WHERE user_id=?").get(user.id)).n) || 0;
+    if (nb >= 500) return sendJSON(res, 400, { error: "Votre bibliothèque est pleine (500 fichiers) : supprimez-en avant d'en ajouter." });
+    const id = (await db.prepare("INSERT INTO formation_medias (user_id, nom, url, type, taille) VALUES (?,?,?,?,?)").run(user.id, v.nom, v.url, v.type, v.taille)).lastInsertRowid;
+    sendJSON(res, 201, { media: vueMedia(await db.prepare("SELECT * FROM formation_medias WHERE id=?").get(id)) });
+  });
+  route("PATCH", "/api/formateur/medias/:id", async (req, res, params, body) => {
+    const user = await compteMedia(req, res); if (!user) return;
+    const nom = txt(body && body.nom, 150).trim(); if (!nom) return sendJSON(res, 400, { error: "Le nom ne peut pas être vide." });
+    const m = await db.prepare("SELECT id FROM formation_medias WHERE id=? AND user_id=?").get(params.id, user.id); if (!m) return sendJSON(res, 404, { error: "Fichier introuvable." });
+    await db.prepare("UPDATE formation_medias SET nom=? WHERE id=?").run(nom, m.id);
+    sendJSON(res, 200, { ok: true, nom });
+  });
+  /* Retire le fichier de la bibliothèque. Les modules qui l'utilisent déjà gardent leur copie de l'adresse : rien ne casse dans les formations existantes. */
+  route("DELETE", "/api/formateur/medias/:id", async (req, res, params) => {
+    const user = await compteMedia(req, res); if (!user) return;
+    const m = await db.prepare("SELECT id FROM formation_medias WHERE id=? AND user_id=?").get(params.id, user.id); if (!m) return sendJSON(res, 404, { error: "Fichier introuvable." });
+    await db.prepare("DELETE FROM formation_medias WHERE id=?").run(m.id);
+    sendJSON(res, 200, { ok: true });
   });
 
   /* GET …/lecture — le module tel que lu par l'apprenant : la VERSION PUBLIÉE, jamais le brouillon (sauf ?brouillon=1 pour le propriétaire : prévisualisation).
