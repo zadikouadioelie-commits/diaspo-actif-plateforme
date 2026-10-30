@@ -25,6 +25,7 @@
       vitrineTitre: 'Koffi, votre tuteur personnel', vitrineTexte: 'Posez vos questions sur le cours à tout moment et obtenez une réponse claire, avec la source dans votre formation. Réservé aux comptes Premium et aux personnes majeures (18 ans ou plus).',
       majTitre: 'Koffi est réservé aux personnes majeures', majTexte: 'Pour utiliser Koffi, confirmez que vous avez 18 ans ou plus. Vous pouvez suivre toutes vos formations sans lui.', majCase: 'Je confirme avoir 18 ans ou plus', majBtn: 'Confirmer',
       mineur: 'Koffi est réservé aux personnes de 18 ans ou plus. Toutes vos formations restent accessibles sans lui.',
+      deplacer: 'Glissez pour déplacer ce bouton', agrandir: 'Agrandir', reduire: 'Réduire',
       exemple: 'Exemple fictif', exQ: 'Quelle est la différence entre un prêt et une subvention ?', exR: 'Un prêt doit être remboursé, avec ou sans intérêts, alors qu\'une subvention est une aide qui n\'est pas à rembourser [1].', exSrc: 'Module 2 › Financer son projet › Les sources de financement',
       premium: 'Passer Premium', rechargeTitre: 'Vos questions sont épuisées', rechargeTexte: function (f) { return 'Rechargez ' + f.questions + ' questions pour ' + Number(f.prix_eur).toFixed(2).replace('.', ',') + ' € : valables ' + f.validite_mois + ' mois, utilisables dans toutes vos formations. Les questions achetées ne sont pas remboursables.'; },
       recharger: function (f) { return 'Recharger ' + f.questions + ' questions — ' + Number(f.prix_eur).toFixed(2).replace('.', ',') + ' €'; }, rechargerCourt: 'Recharger', paiementOuvre: 'Ouverture du paiement sécurisé…', paiementRecu: 'Paiement reçu : vos questions sont en cours de crédit…', paiementOk: 'Vos questions sont créditées. Bonne étude !', paiementAttente: 'Le crédit peut prendre quelques instants : rouvrez Koffi dans une minute.', paiementAnnule: 'Paiement annulé : rien n\'a été débité.', stockGarde: function (n) { return 'Vos ' + n + ' questions achetées sont conservées : elles servent de nouveau dès que votre Premium est actif.'; }, desactive: 'Koffi est désactivé sur cette formation.', indispo: 'Koffi est momentanément indisponible. Réessayez un peu plus tard.',
@@ -45,6 +46,7 @@
       vitrineTitre: 'Koffi, your personal tutor', vitrineTexte: 'Ask your questions about the course at any time and get a clear answer with the source in your course. For Premium accounts and adults (18 or older) only.',
       majTitre: 'Koffi is for adults only', majTexte: 'To use Koffi, please confirm that you are 18 or older. You can follow all your courses without it.', majCase: 'I confirm that I am 18 or older', majBtn: 'Confirm',
       mineur: 'Koffi is reserved for people aged 18 or older. All your courses remain available without it.',
+      deplacer: 'Drag to move this button', agrandir: 'Enlarge', reduire: 'Shrink',
       exemple: 'Fictional example', exQ: 'What is the difference between a loan and a grant?', exR: 'A loan must be repaid, with or without interest, whereas a grant is aid that does not have to be repaid [1].', exSrc: 'Module 2 › Financing your project › Funding sources',
       premium: 'Go Premium', rechargeTitre: 'You have run out of questions', rechargeTexte: function (f) { return 'Top up ' + f.questions + ' questions for ' + Number(f.prix_eur).toFixed(2).replace('.', ',') + ' €: valid for ' + f.validite_mois + ' months, usable in all your courses. Purchased questions are non-refundable.'; },
       recharger: function (f) { return 'Top up ' + f.questions + ' questions — ' + Number(f.prix_eur).toFixed(2).replace('.', ',') + ' €'; }, rechargerCourt: 'Top up', paiementOuvre: 'Opening secure payment…', paiementRecu: 'Payment received: your questions are being credited…', paiementOk: 'Your questions are credited. Happy studying!', paiementAttente: 'Crediting can take a moment: reopen Koffi in a minute.', paiementAnnule: 'Payment cancelled: nothing was charged.', stockGarde: function (n) { return 'Your ' + n + ' purchased questions are kept: they work again as soon as your Premium is active.'; }, desactive: 'Koffi is turned off for this course.', indispo: 'Koffi is temporarily unavailable. Please try again later.',
@@ -56,10 +58,10 @@
   var CSS = [
     '.kf-root,.kf-root *{box-sizing:border-box}',
     '.kf-root{position:fixed;right:18px;bottom:18px;z-index:9000;font-family:inherit;color:#0f172a}',
-    '.kf-btn{display:flex;align-items:center;gap:10px;border:0;cursor:pointer;background:#0D2B4E;color:#fff;border-radius:999px;padding:5px 18px 5px 5px;box-shadow:0 8px 26px rgba(13,43,78,.38),0 0 0 2px #F26422;font:700 14px/1.2 inherit;font-family:inherit}',
-    '.kf-btn:hover{transform:translateY(-1px)}.kf-btn:focus-visible{outline:3px solid #F26422;outline-offset:3px}',
+    '.kf-btn{display:flex;align-items:center;gap:10px;border:0;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;background:#0D2B4E;color:#fff;border-radius:999px;padding:5px 18px 5px 5px;box-shadow:0 8px 26px rgba(13,43,78,.38),0 0 0 2px #F26422;font:700 14px/1.2 inherit;font-family:inherit}',
+    '.kf-btn:hover{transform:translateY(-1px)}.kf-btn:focus-visible{outline:3px solid #F26422;outline-offset:3px}.kf-btn.kf-glisse{cursor:grabbing;transform:scale(1.07);transition:none}',
     '.kf-btn img{width:52px;height:52px;border-radius:50%;display:block;background:#fff}',
-    '.kf-panel{position:absolute;right:0;bottom:0;width:392px;max-width:calc(100vw - 24px);height:min(640px,calc(100vh - 36px));background:#fff;border-radius:18px;box-shadow:0 20px 60px rgba(2,12,27,.45),0 0 0 1px rgba(13,43,78,.15);display:none;flex-direction:column;overflow:hidden;color:#0f172a}',
+    '.kf-panel{position:fixed;right:0;bottom:0;width:392px;max-width:calc(100vw - 24px);height:min(640px,calc(100vh - 36px));background:#fff;border-radius:18px;box-shadow:0 20px 60px rgba(2,12,27,.45),0 0 0 1px rgba(13,43,78,.15);display:none;flex-direction:column;overflow:hidden;color:#0f172a}',
     '.kf-root.open .kf-panel{display:flex}.kf-root.open .kf-btn{display:none}',
     '.kf-head{display:flex;align-items:center;gap:10px;padding:10px 12px;background:#0D2B4E;color:#fff;flex:none}',
     '.kf-head img{width:44px;height:44px;border-radius:50%;background:#fff;flex:none}',
@@ -94,11 +96,16 @@
     '.kf-ex{margin-top:10px;border:1px dashed #94a3b8;border-radius:12px;padding:10px;background:#f8fafc;position:relative}',
     '.kf-ex .tag{position:absolute;top:-9px;left:10px;background:#e2e8f0;color:#475569;font-size:10.5px;font-weight:800;padding:1px 8px;border-radius:99px}',
     '.kf-ex .q{font-weight:700;margin:4px 0 6px}',
-    '@media (max-width:560px){.kf-form textarea{font-size:16px}.kf-root{right:10px;bottom:calc(10px + env(safe-area-inset-bottom))}.kf-btn span{display:none}.kf-btn{padding:4px}.kf-panel{position:fixed;inset:0;width:auto;max-width:none;height:auto;border-radius:0}.kf-root.open{right:0;bottom:0}}',
-    /* Appli téléphone (m.html) : bouton compact au-dessus du pied de page des panneaux (précédent/suivant), panneau plein écran dans la largeur de l'appli. */
-    '.kf-tel{right:max(10px,calc((100vw - 560px)/2 + 10px));bottom:calc(78px + env(safe-area-inset-bottom))}.kf-tel .kf-btn span{display:none}.kf-tel .kf-btn{padding:4px}',
+    /* Le panneau ne couvre jamais la leçon : grand écran = volet fixe à droite sous l'en-tête (la page se décale de sa largeur) ; petit écran et téléphone = feuille en bas, à moitié de hauteur (la page remonte au-dessus), agrandissable. */
+    '.kf-root.dock-d .kf-panel{top:var(--kf-haut,0px);right:0;bottom:0;left:auto;width:392px;max-width:none;height:auto;margin:0;border-radius:14px 0 0 14px}',
+    '.kf-root.dock-b .kf-panel{top:auto;left:0;right:0;bottom:var(--kf-bas,0px);width:100%;max-width:var(--kf-maxw,640px);margin:0 auto;height:46vh;height:46dvh;min-height:250px;max-height:calc(100vh - 70px);border-radius:16px 16px 0 0}',
+    '.kf-root.dock-b.plein .kf-panel{top:0;bottom:0;height:auto;max-height:none;border-radius:0}',
+    '.kf-root.dock-d [data-act="taille"]{display:none}',
+    'html.kf-r-d body{padding-right:var(--kf-r,0px) !important}html.kf-r-b body{padding-bottom:var(--kf-r,0px) !important}',
+    '@media (max-width:560px){.kf-form textarea{font-size:16px}.kf-root{right:10px;bottom:calc(10px + env(safe-area-inset-bottom))}.kf-btn span{display:none}.kf-btn{padding:4px}}',
+    /* Appli téléphone (m.html) : bouton compact au-dessus du pied de page des panneaux (précédent/suivant), feuille dans la largeur de l'appli. */
+    '.kf-tel{right:max(10px,calc((100vw - 560px)/2 + 10px));bottom:calc(78px + env(safe-area-inset-bottom));--kf-maxw:560px}.kf-tel .kf-btn span{display:none}.kf-tel .kf-btn{padding:4px}',
     '.kf-tel .kf-form textarea{font-size:16px}', /* 16 px : en dessous, iPhone zoome sur la page à la saisie */
-    '.kf-tel .kf-panel{position:fixed;top:0;bottom:0;left:0;right:0;margin:0 auto;width:100%;max-width:560px;height:auto;border-radius:0}.kf-tel.open{right:0;bottom:0}',
     '@media (prefers-reduced-motion:no-preference){.kf-btn{transition:transform .15s}}'
   ].join('\n');
 
@@ -219,7 +226,7 @@
   function traduireUI() {
     var t = T();
     $('.kf-head .t b').textContent = t.nom; $('.kf-head .t span').textContent = t.sous;
-    $('.kf-btn span').textContent = t.nom; $('.kf-btn').setAttribute('aria-label', t.ouvrir);
+    $('.kf-btn span').textContent = t.nom; $('.kf-btn').setAttribute('aria-label', t.ouvrir); $('.kf-btn').title = t.ouvrir + ' — ' + t.deplacer; majBoutonTaille();
     $('[data-act="fermer"]').setAttribute('aria-label', t.fermer); $('[data-act="fermer"]').title = t.fermer;
     $('[data-act="nouvelle"]').title = t.nouvelle; $('[data-act="supprimer"]').title = t.supprimer;
     $('.kf-form textarea').placeholder = t.placeholder; $('.kf-send').textContent = t.envoyer;
@@ -239,11 +246,107 @@
     });
   }
 
+  /* ── Bouton déplaçable ─────────────────────────────────────────────────────────────────────────────
+     La personne peut le glisser ailleurs (souris ou doigt) si sa place gêne la lecture ; la position est mémorisée (en proportion de l'écran : elle survit au
+     changement de taille). Au clavier : flèches pour le bouger (Maj = plus loin), Début pour le remettre à sa place d'origine. */
+  var POS_CLE = 'koffi_pos_v2';
+  function lirePos() {
+    try { var p = JSON.parse(lsGet(POS_CLE) || 'null'); if (p && isFinite(p.x) && isFinite(p.y)) return p; } catch (e) { /* position illisible : place par défaut */ }
+    return null;
+  }
+  function dimsEcran() { return { w: document.documentElement.clientWidth || window.innerWidth, h: window.innerHeight }; }
+  function placerBouton(x, y) {
+    var btn = $('.kf-btn'), e = dimsEcran(), w = btn.offsetWidth || 60, h = btn.offsetHeight || 60, m = 6;
+    x = Math.min(Math.max(x, m), Math.max(e.w - w - m, m)); y = Math.min(Math.max(y, m), Math.max(e.h - h - m, m));
+    S.root.style.left = x + 'px'; S.root.style.top = y + 'px'; S.root.style.right = 'auto'; S.root.style.bottom = 'auto';
+    return { x: x, y: y, w: w, h: h, m: m, ew: e.w, eh: e.h };
+  }
+  function memoriserPos(d) {
+    var pw = Math.max(d.ew - d.w - 2 * d.m, 1), ph = Math.max(d.eh - d.h - 2 * d.m, 1);
+    lsSet(POS_CLE, JSON.stringify({ x: Math.round((d.x - d.m) / pw * 1000) / 1000, y: Math.round((d.y - d.m) / ph * 1000) / 1000 }));
+  }
+  /* Remet le bouton là où il a été rangé (ou à sa place d'origine, définie par le CSS, s'il n'a jamais été déplacé). */
+  function appliquerPos() {
+    if (!S.root || S.root.classList.contains('open')) return;
+    var p = lirePos();
+    if (!p) { S.root.style.left = S.root.style.top = S.root.style.right = S.root.style.bottom = ''; return; }
+    var btn = $('.kf-btn'), e = dimsEcran(), w = btn.offsetWidth || 60, h = btn.offsetHeight || 60, m = 6;
+    placerBouton(m + Math.min(Math.max(p.x, 0), 1) * Math.max(e.w - w - 2 * m, 0), m + Math.min(Math.max(p.y, 0), 1) * Math.max(e.h - h - 2 * m, 0));
+  }
+  function brancherDeplacement(btn) {
+    var d = null;
+    btn.addEventListener('pointerdown', function (ev) {
+      if (ev.button !== undefined && ev.button !== 0) return;
+      var r = S.root.getBoundingClientRect();
+      d = { id: ev.pointerId, sx: ev.clientX, sy: ev.clientY, ox: r.left, oy: r.top, bouge: false };
+      try { btn.setPointerCapture(ev.pointerId); } catch (e) { /* capture indisponible : le glisser fonctionne quand même */ }
+    });
+    btn.addEventListener('pointermove', function (ev) {
+      if (!d || ev.pointerId !== d.id) return;
+      var dx = ev.clientX - d.sx, dy = ev.clientY - d.sy;
+      if (!d.bouge && Math.sqrt(dx * dx + dy * dy) < 6) return; /* en dessous : c'est un simple appui */
+      d.bouge = true; btn.classList.add('kf-glisse'); placerBouton(d.ox + dx, d.oy + dy); ev.preventDefault();
+    });
+    function fin(ev) {
+      if (!d || ev.pointerId !== d.id) return;
+      var avait = d.bouge; d = null; btn.classList.remove('kf-glisse');
+      try { btn.releasePointerCapture(ev.pointerId); } catch (e) { /* déjà relâché */ }
+      if (avait) { var r = S.root.getBoundingClientRect(); memoriserPos(placerBouton(r.left, r.top)); S.glisse = true; setTimeout(function () { S.glisse = false; }, 60); }
+    }
+    btn.addEventListener('pointerup', fin); btn.addEventListener('pointercancel', fin);
+    /* Un glisser ne doit pas ouvrir la discussion à la fin du geste. */
+    btn.addEventListener('click', function (ev) { if (S.glisse) { ev.stopImmediatePropagation(); ev.preventDefault(); } }, true);
+    btn.addEventListener('keydown', function (ev) {
+      var pas = ev.shiftKey ? 64 : 16, dx = 0, dy = 0;
+      if (ev.key === 'ArrowLeft') dx = -pas; else if (ev.key === 'ArrowRight') dx = pas; else if (ev.key === 'ArrowUp') dy = -pas; else if (ev.key === 'ArrowDown') dy = pas;
+      else if (ev.key === 'Home') { ev.preventDefault(); lsSet(POS_CLE, ''); appliquerPos(); return; }
+      else return;
+      ev.preventDefault(); var r = S.root.getBoundingClientRect(); memoriserPos(placerBouton(r.left + dx, r.top + dy));
+    });
+  }
+
+  /* ── Le panneau ne gêne jamais la lecture ─────────────────────────────────────────────────────────
+     Grand écran : volet fixe à droite, sous l'en-tête du site ; la page se décale de sa largeur. Petit écran et téléphone : feuille en bas (moitié de hauteur) ; la page
+     remonte au-dessus d'elle et, sur téléphone, elle reste au-dessus des boutons « précédent / suivant ». Un bouton l'agrandit en plein écran. La page hôte peut
+     fournir opts.reserver(cote, pixels) pour faire elle-même de la place (zone défilante propre), et opts.decalageBas() (hauteur d'un pied de page fixe). */
+  var LARGEUR_VOLET = 392;
+  function modeDock() { return (S.opts && S.opts.telephone) || dimsEcran().w < 1000 ? 'b' : 'd'; }
+  function reserver(cote, px) {
+    var h = document.documentElement;
+    if (S.opts && typeof S.opts.reserver === 'function') { try { S.opts.reserver(cote, px); } catch (e) { /* page hôte : sans importance */ } return; }
+    h.classList.remove('kf-r-d', 'kf-r-b');
+    if (cote && px) { h.style.setProperty('--kf-r', px + 'px'); h.classList.add(cote === 'd' ? 'kf-r-d' : 'kf-r-b'); } else h.style.removeProperty('--kf-r');
+  }
+  /* Le volet se cale sous l'en-tête du site ; si celui-ci défile hors de l'écran, le volet remonte avec lui. */
+  function majHaut() {
+    var haut = 0, en = document.querySelector('.topbar');
+    if (en) { var b = en.getBoundingClientRect(); if (b.bottom > 0 && b.bottom < 200) haut = Math.round(b.bottom); }
+    S.root.style.setProperty('--kf-haut', haut + 'px');
+  }
+  function majDock() {
+    var r = S.root; if (!r) return;
+    var m = modeDock(); r.classList.toggle('dock-d', m === 'd'); r.classList.toggle('dock-b', m === 'b');
+    if (!r.classList.contains('open')) { reserver(null, 0); return; }
+    if (m === 'd') {
+      majHaut();
+      reserver('d', LARGEUR_VOLET);
+    } else {
+      var bas = S.opts && typeof S.opts.decalageBas === 'function' ? Math.max(0, Math.round(Number(S.opts.decalageBas()) || 0)) : 0;
+      r.style.setProperty('--kf-bas', bas + 'px');
+      reserver('b', r.classList.contains('plein') ? 0 : Math.round($('.kf-panel').getBoundingClientRect().height));
+    }
+  }
+  function majBoutonTaille() {
+    var b = $('[data-act="taille"]'); if (!b) return; var plein = S.root.classList.contains('plein');
+    b.textContent = plein ? '⤡' : '⤢'; b.setAttribute('aria-pressed', String(plein)); b.title = plein ? T().reduire : T().agrandir; b.setAttribute('aria-label', b.title);
+  }
+  function basculerTaille() { S.root.classList.toggle('plein'); majBoutonTaille(); majDock(); }
+
   function ouvrirPanneau() {
-    S.root.classList.add('open');
+    S.root.classList.add('open'); majDock();
     chargerEtat().then(chargerConversation).then(function () { traduireUI(); construireCorps(); var ta = $('.kf-form textarea'); if (ta && !ta.disabled && $('.kf-foot').style.display !== 'none') ta.focus(); });
   }
-  function fermerPanneau() { S.root.classList.remove('open'); var b = $('.kf-btn'); if (b) b.focus(); }
+  function fermerPanneau() { S.root.classList.remove('open', 'plein'); majBoutonTaille(); majDock(); appliquerPos(); var b = $('.kf-btn'); if (b) b.focus(); }
 
   function demarrerConversation() {
     if (S.conv) return Promise.resolve(S.conv);
@@ -315,7 +418,7 @@
   function retourPaiement() {
     var p = new URLSearchParams(location.search), k = p.get('kofi'); if (!k) return;
     try { p.delete('kofi'); var q = p.toString(); history.replaceState(null, '', location.pathname + (q ? '?' + q : '') + location.hash); } catch (e) { /* sans importance */ }
-    S.root.classList.add('open'); traduireUI();
+    S.root.classList.add('open'); majDock(); traduireUI();
     var corps = $('.kf-body'); corps.innerHTML = '';
     if (k === 'annule') { chargerEtat().then(chargerConversation).then(function () { construireCorps(); messageAchat(T().paiementAnnule); }); return; }
     corps.appendChild(carteMessage('Koffi', T().paiementRecu)); $('.kf-foot').style.display = 'none';
@@ -339,12 +442,18 @@
       '<section class="kf-panel" role="dialog" aria-label="Koffi" aria-modal="false">' +
         '<div class="kf-head"><img src="/assets/koffi-avatar-96.webp" width="44" height="44" alt=""><div class="t"><b></b><span></span></div>' +
           '<button type="button" class="kf-ic" data-lg="fr" title="Français">FR</button><button type="button" class="kf-ic" data-lg="en" title="English">EN</button>' +
-          '<button type="button" class="kf-ic" data-act="nouvelle">＋</button><button type="button" class="kf-ic" data-act="supprimer">🗑</button><button type="button" class="kf-ic" data-act="fermer">✕</button></div>' +
+          '<button type="button" class="kf-ic" data-act="nouvelle">＋</button><button type="button" class="kf-ic" data-act="supprimer">🗑</button><button type="button" class="kf-ic" data-act="taille" aria-pressed="false">⤢</button><button type="button" class="kf-ic" data-act="fermer">✕</button></div>' +
         '<div class="kf-body" aria-live="polite"></div>' +
         '<div class="kf-foot"><div class="kf-meta"><span><span class="kf-count"></span> <button type="button" class="kf-link kf-recharge-lien" data-act="acheter" style="display:none"></button></span><span class="kf-ret"></span></div>' +
           '<form class="kf-form"><textarea rows="1" maxlength="1500" aria-label="Question"></textarea><button type="submit" class="kf-send"></button></form></div>' +
       '</section>';
     document.body.appendChild(root); S.root = root;
+    brancherDeplacement(root.querySelector('.kf-btn')); appliquerPos(); majDock();
+    if (!window.__kfRedim) {
+      window.__kfRedim = true; var attente = false;
+      window.addEventListener('resize', function () { if (S.root) { appliquerPos(); majDock(); } });
+      window.addEventListener('scroll', function () { if (attente || !S.root || !S.root.classList.contains('dock-d') || !S.root.classList.contains('open')) return; attente = true; requestAnimationFrame(function () { attente = false; if (S.root) majHaut(); }); }, { passive: true });
+    }
 
     root.addEventListener('click', function (ev) {
       var t = ev.target.closest('[data-act],[data-lg],[data-ref],[data-lecon],[data-note]'); if (!t) return;
@@ -354,6 +463,7 @@
       if (act === 'compris') { lsSet('koffi_info_vue_v2', '1'); return construireCorps(); }
       if (act === 'acheter') return acheterForfait();
       if (act === 'majorite') return confirmerMajorite();
+      if (act === 'taille') return basculerTaille();
       if (act === 'nouvelle') { S.conv = null; S.msgs = []; if (S.etat && S.etat.etat !== 'recharge') { construireCorps(); } return; }
       if (act === 'supprimer') {
         if (!S.conv) return; if (!window.confirm(T().confirmSuppr)) return;
@@ -365,7 +475,7 @@
       if (ref) { var bloc = t.closest('.kf-msg'); var l = bloc && bloc.querySelector('.kf-src button[data-n="' + ref + '"]'); if (l) l.click(); return; }
       if (t.hasAttribute('data-lecon')) {
         var id = t.getAttribute('data-lecon');
-        if (typeof S.opts.ouvrirLecon === 'function') { S.opts.ouvrirLecon(id); if (S.opts.telephone || window.matchMedia('(max-width:560px)').matches) fermerPanneau(); }
+        if (typeof S.opts.ouvrirLecon === 'function') { S.opts.ouvrirLecon(id); if (S.root.classList.contains('plein')) fermerPanneau(); /* volet ou feuille : la leçon reste visible à côté, on laisse la discussion ouverte */ }
         else location.href = t.getAttribute('data-url');
         return;
       }
@@ -397,6 +507,7 @@
     /* Appli téléphone : l'écran change sans recharger la page — on retire le bouton et on oublie l'état de la formation quittée. */
     demonter: function () {
       jeton++;
+      if (S.root) reserver(null, 0);
       if (S.root && S.root.parentNode) S.root.parentNode.removeChild(S.root);
       S.root = null; S.etat = null; S.conv = null; S.msgs = []; S.occupe = false; S.opts = null;
     },

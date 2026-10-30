@@ -551,7 +551,7 @@
   function chargerKoffi() {
     if (window.KoffiWidget) return Promise.resolve();
     if (!koffiScript) koffiScript = new Promise(ok => {
-      const sc = document.createElement('script'); sc.src = '/assets/koffi-widget.js?v=9';
+      const sc = document.createElement('script'); sc.src = '/assets/koffi-widget.js?v=11';
       sc.onload = ok; sc.onerror = () => { koffiScript = null; ok(); }; document.head.appendChild(sc);
     });
     return koffiScript;
@@ -562,7 +562,12 @@
     const K = window.KoffiWidget; if (!K) return;
     if (K.estMonte(id)) return;      // déjà là pour cette formation : la leçon courante est relue à chaque question
     K.demonter();
-    K.monter({ formationId: id, telephone: true, leconId: () => koffiLecon, ouvrirLecon: l => { location.hash = '#/formations/' + id + '/l' + l; }, premiumUrl: '#/abonnement' });
+    K.monter({
+      formationId: id, telephone: true, leconId: () => koffiLecon, ouvrirLecon: l => { location.hash = '#/formations/' + id + '/l' + l; }, premiumUrl: '#/abonnement',
+      /* La discussion est une feuille en bas, au-dessus des boutons précédent/suivant ; la leçon défile au-dessus d'elle (marge ajoutée sous son contenu). */
+      decalageBas: () => { const f = $('#pane-foot'); return f && !f.hidden ? Math.round(f.getBoundingClientRect().height) : 0; },
+      reserver: (cote, px) => { const b = $('#pane-body'); if (b) b.style.paddingBottom = px ? (px + 12) + 'px' : ''; },
+    });
   }
   function demonterKoffi() { if (window.KoffiWidget) window.KoffiWidget.demonter(); koffiLecon = null; }
   window.addEventListener('hashchange', () => { if (!/^#\/formations\/\d+\/(suivre|l\d+)(\/|$)/.test(location.hash)) demonterKoffi(); });
