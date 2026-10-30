@@ -47,7 +47,7 @@ function dvtPartager(id) {
   if (!_dvtPartagePromesse) {
     _dvtPartagePromesse = window.TutoPartage ? Promise.resolve() : new Promise((ok, ko) => {
       const sc = document.createElement('script');
-      sc.src = '/assets/tuto-partage.js?v=1';
+      sc.src = '/assets/tuto-partage.js?v=2';
       sc.onload = ok; sc.onerror = () => { _dvtPartagePromesse = null; ko(new Error('chargement du partage')); };
       document.head.appendChild(sc);
     });

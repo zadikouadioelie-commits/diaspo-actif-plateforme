@@ -43,6 +43,9 @@
       .tp-err{background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;border-radius:12px;padding:10px 14px;font-size:13.5px;margin-bottom:10px}
       @media (prefers-reduced-motion:no-preference){.tp-box{animation:tp-in .18s ease-out}@keyframes tp-in{from{transform:translateY(12px);opacity:0}to{opacity:1}}}`;
     document.head.appendChild(s);
+    /* Design « Nuit dorée » (2026-10-30) : feuille plus spécifique (#tp-voile …) qui remplace l'habillage ci-dessus ; retour arrière : retirer ces 3 lignes */
+    const nd = document.createElement('link'); nd.id = 'tp-css-nd'; nd.rel = 'stylesheet'; nd.href = '/assets/tuto-partage-nuit-doree.css?v=1';
+    document.head.appendChild(nd);
   }
 
   function fermer() {
