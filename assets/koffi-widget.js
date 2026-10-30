@@ -13,7 +13,7 @@
   var TXT = {
     fr: {
       nom: 'Koffi', sous: 'Tuteur de la formation', ouvrir: 'Poser une question à Koffi', fermer: 'Fermer', nouvelle: 'Nouvelle conversation',
-      supprimer: 'Supprimer cette conversation', confirmSuppr: 'Supprimer cette conversation ? Cette action est définitive.', placeholder: 'Posez votre question sur le cours…', envoyer: 'Envoyer',
+      supprimer: 'Supprimer cette conversation', confirmSuppr: 'Supprimer cette conversation ? Cette action est définitive.', placeholder: 'Posez votre question…', envoyer: 'Envoyer',
       reflechit: 'Koffi cherche dans le cours…', accueil: 'Bonjour ! Je suis Koffi. Posez-moi une question sur ce cours : je réponds uniquement à partir des supports auxquels vous avez accès, et je cite la source.',
       info1: 'Koffi répond uniquement à partir des supports de cette formation auxquels vous avez accès. Il n\'utilise aucune autre source.',
       info2: 'Vos conversations sont conservées 60 jours au maximum, puis supprimées automatiquement. Vous pouvez les supprimer à tout moment.',
@@ -30,7 +30,7 @@
     },
     en: {
       nom: 'Koffi', sous: 'Course tutor', ouvrir: 'Ask Koffi a question', fermer: 'Close', nouvelle: 'New conversation',
-      supprimer: 'Delete this conversation', confirmSuppr: 'Delete this conversation? This cannot be undone.', placeholder: 'Ask your question about the course…', envoyer: 'Send',
+      supprimer: 'Delete this conversation', confirmSuppr: 'Delete this conversation? This cannot be undone.', placeholder: 'Ask your question…', envoyer: 'Send',
       reflechit: 'Koffi is searching the course…', accueil: 'Hello! I\'m Koffi. Ask me a question about this course: I only answer from the materials you have access to, and I cite my sources.',
       info1: 'Koffi answers only from the materials of this course that you have access to. It uses no other source.',
       info2: 'Your conversations are kept for 60 days at most, then deleted automatically. You can delete them at any time.',
@@ -88,11 +88,16 @@
     '.kf-ex{margin-top:10px;border:1px dashed #94a3b8;border-radius:12px;padding:10px;background:#f8fafc;position:relative}',
     '.kf-ex .tag{position:absolute;top:-9px;left:10px;background:#e2e8f0;color:#475569;font-size:10.5px;font-weight:800;padding:1px 8px;border-radius:99px}',
     '.kf-ex .q{font-weight:700;margin:4px 0 6px}',
-    '@media (max-width:560px){.kf-root{right:10px;bottom:calc(10px + env(safe-area-inset-bottom))}.kf-btn span{display:none}.kf-btn{padding:4px}.kf-panel{position:fixed;inset:0;width:auto;max-width:none;height:auto;border-radius:0}.kf-root.open{right:0;bottom:0}}',
+    '@media (max-width:560px){.kf-form textarea{font-size:16px}.kf-root{right:10px;bottom:calc(10px + env(safe-area-inset-bottom))}.kf-btn span{display:none}.kf-btn{padding:4px}.kf-panel{position:fixed;inset:0;width:auto;max-width:none;height:auto;border-radius:0}.kf-root.open{right:0;bottom:0}}',
+    /* Appli téléphone (m.html) : bouton compact au-dessus du pied de page des panneaux (précédent/suivant), panneau plein écran dans la largeur de l'appli. */
+    '.kf-tel{right:max(10px,calc((100vw - 560px)/2 + 10px));bottom:calc(78px + env(safe-area-inset-bottom))}.kf-tel .kf-btn span{display:none}.kf-tel .kf-btn{padding:4px}',
+    '.kf-tel .kf-form textarea{font-size:16px}', /* 16 px : en dessous, iPhone zoome sur la page à la saisie */
+    '.kf-tel .kf-panel{position:fixed;top:0;bottom:0;left:0;right:0;margin:0 auto;width:100%;max-width:560px;height:auto;border-radius:0}.kf-tel.open{right:0;bottom:0}',
     '@media (prefers-reduced-motion:no-preference){.kf-btn{transition:transform .15s}}'
   ].join('\n');
 
   var S = { opts: null, etat: null, conv: null, lg: 'fr', occupe: false, root: null, msgs: [] };
+  var jeton = 0, ecouteEchap = false;
   var T = function () { return TXT[S.lg] || TXT.fr; };
   var esc = function (s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); };
   var $ = function (sel) { return S.root.querySelector(sel); };
@@ -276,7 +281,7 @@
     }).then(function (accepte) {
       if (!accepte) { S.occupe = false; return; }
       messageAchat(T().paiementOuvre);
-      return api('POST', '/api/kofi/forfait/acheter', { formation_id: S.opts.formationId, accepte_non_remboursable: true }).then(function (r) {
+      return api('POST', '/api/kofi/forfait/acheter', { formation_id: S.opts.formationId, accepte_non_remboursable: true, retour: S.opts.telephone ? 'telephone' : undefined }).then(function (r) {
         if (r.ok && r.data.checkout_url) { location.href = r.data.checkout_url; return; }
         S.occupe = false; messageAchat((r.data && r.data.error) || T().erreur);
       });
@@ -303,8 +308,8 @@
   }
 
   function construire() {
-    var st = document.createElement('style'); st.textContent = CSS; document.head.appendChild(st);
-    var root = document.createElement('div'); root.className = 'kf-root'; root.setAttribute('data-koffi', '1');
+    if (!document.getElementById('kf-style')) { var st = document.createElement('style'); st.id = 'kf-style'; st.textContent = CSS; document.head.appendChild(st); }
+    var root = document.createElement('div'); root.className = 'kf-root' + (S.opts && S.opts.telephone ? ' kf-tel' : ''); root.setAttribute('data-koffi', '1');
     root.innerHTML =
       '<button type="button" class="kf-btn" data-act="ouvrir"><img src="/assets/koffi-avatar-96.webp" width="52" height="52" alt=""><span></span></button>' +
       '<section class="kf-panel" role="dialog" aria-label="Koffi" aria-modal="false">' +
@@ -335,7 +340,7 @@
       if (ref) { var bloc = t.closest('.kf-msg'); var l = bloc && bloc.querySelector('.kf-src button[data-n="' + ref + '"]'); if (l) l.click(); return; }
       if (t.hasAttribute('data-lecon')) {
         var id = t.getAttribute('data-lecon');
-        if (typeof S.opts.ouvrirLecon === 'function') { S.opts.ouvrirLecon(id); if (window.matchMedia('(max-width:560px)').matches) fermerPanneau(); }
+        if (typeof S.opts.ouvrirLecon === 'function') { S.opts.ouvrirLecon(id); if (S.opts.telephone || window.matchMedia('(max-width:560px)').matches) fermerPanneau(); }
         else location.href = t.getAttribute('data-url');
         return;
       }
@@ -349,7 +354,7 @@
     var ta = root.querySelector('.kf-form textarea');
     ta.addEventListener('keydown', function (ev) { if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); envoyer(); } });
     ta.addEventListener('input', function () { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 110) + 'px'; });
-    document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && S.root.classList.contains('open')) fermerPanneau(); });
+    if (!ecouteEchap) { ecouteEchap = true; document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && S.root && S.root.classList.contains('open')) fermerPanneau(); }); }
   }
 
   window.KoffiWidget = {
@@ -358,10 +363,18 @@
       if (S.root) return;
       S.opts = opts || {};
       S.lg = lsGet('koffi_langue') === 'en' ? 'en' : 'fr';
+      var mien = ++jeton;
       return chargerEtat().then(function (r) {
-        if (!r.ok) return;
+        if (!r.ok || mien !== jeton || S.root) return; /* démonté ou remonté entre-temps : réponse périmée */
         construire(); traduireUI(); retourPaiement();
       });
-    }
+    },
+    /* Appli téléphone : l'écran change sans recharger la page — on retire le bouton et on oublie l'état de la formation quittée. */
+    demonter: function () {
+      jeton++;
+      if (S.root && S.root.parentNode) S.root.parentNode.removeChild(S.root);
+      S.root = null; S.etat = null; S.conv = null; S.msgs = []; S.occupe = false; S.opts = null;
+    },
+    estMonte: function (formationId) { return !!S.root && (formationId == null || (S.opts && String(S.opts.formationId) === String(formationId))); }
   };
 })();

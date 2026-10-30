@@ -103,6 +103,7 @@ test('Koffi — forfait de questions', async (t) => {
     session1 = sessionsStripe().find(s => s.metadata && s.metadata.diaspoactif_kofi_commande_id === String(cmd1));
     assert.ok(session1, 'session Stripe créée'); assert.equal(session1.montant, 250);
     assert.equal(session1.custom_text.submit.message, Kofi.TEXTE_FORFAIT_NON_REMBOURSABLE);
+    assert.ok(session1.success_url.endsWith('/suivre-formation.html?id=' + fid + '&kofi=succes'), 'site : retour sur la page de suivi');
     assert.equal(stock(a), avant, 'aucune question créditée avant le paiement');
     assert.deepEqual((await call(jarA, 'GET', `/api/kofi/etat?formation_id=${fid}`)).data.achat, { statut: 'en_attente' }, 'l\'écran de retour attend le webhook');
   });
@@ -152,6 +153,17 @@ test('Koffi — forfait de questions', async (t) => {
     assert.equal(await webhook('checkout.session.expired', { id: s2.id, metadata: { diaspoactif_kofi_commande_id: String(cmd2) } }), 200);
     assert.equal(sql('select statut from kofi_commandes where id=?', cmd2)[0].statut, 'expiree');
     assert.equal(stock(uid('Alpha')), 1004);
+    /* Achat depuis l'appli téléphone : Stripe ramène dans m.html (plan de la formation). Seul un drapeau est accepté, jamais une adresse fournie par le client. */
+    const r3 = await acheter(jarA, { accepte_non_remboursable: true, retour: 'telephone' });
+    assert.equal(r3.status, 201, JSON.stringify(r3.data));
+    const s3 = sessionsStripe().find(x => x.metadata && x.metadata.diaspoactif_kofi_commande_id === String(r3.data.commande_id));
+    assert.ok(s3.success_url.endsWith('/m.html?kofi=succes#/formations/' + fid + '/suivre'), s3.success_url); assert.ok(s3.cancel_url.endsWith('/m.html?kofi=annule#/formations/' + fid + '/suivre'), s3.cancel_url);
+    assert.equal(await webhook('checkout.session.expired', { id: s3.id, metadata: { diaspoactif_kofi_commande_id: String(r3.data.commande_id) } }), 200);
+    const r4 = await acheter(jarA, { accepte_non_remboursable: true, retour: 'https://pirate.example/vol' });
+    assert.equal(r4.status, 201, JSON.stringify(r4.data));
+    const s4 = sessionsStripe().find(x => x.metadata && x.metadata.diaspoactif_kofi_commande_id === String(r4.data.commande_id));
+    assert.ok(!/pirate/.test(s4.success_url + s4.cancel_url), 'une adresse envoyée par le client est ignorée'); assert.ok(s4.success_url.includes('/suivre-formation.html?id=' + fid), s4.success_url);
+    assert.equal(await webhook('checkout.session.expired', { id: s4.id, metadata: { diaspoactif_kofi_commande_id: String(r4.data.commande_id) } }), 200);
     /* une commande expirée ne peut plus être créditée */
     assert.equal(await webhook('checkout.session.completed', { id: s2.id, amount_total: 250, metadata: { diaspoactif_kofi_commande_id: String(cmd2) } }), 200);
     assert.equal(stock(uid('Alpha')), 1004);

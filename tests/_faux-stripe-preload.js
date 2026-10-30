@@ -14,7 +14,7 @@ const fauxStripe = {
     sessions: {
       async create(o) {
         const id = 'cs_test_faux_' + (++compteur);
-        sessions[id] = { id, status: 'open', url: 'https://stripe.test/pay/' + id, metadata: o.metadata, custom_text: o.custom_text, montant: o.line_items[0].price_data.unit_amount };
+        sessions[id] = { id, status: 'open', url: 'https://stripe.test/pay/' + id, metadata: o.metadata, custom_text: o.custom_text, success_url: o.success_url, cancel_url: o.cancel_url, montant: o.line_items[0].price_data.unit_amount };
         /* Optionnel : un test peut relire les sessions créées (le serveur est un autre processus) via FAUX_STRIPE_LOG=<fichier>. */
         if (process.env.FAUX_STRIPE_LOG) { try { require('node:fs').appendFileSync(process.env.FAUX_STRIPE_LOG, JSON.stringify(sessions[id]) + '\n'); } catch (e) { /* sans importance */ } }
         return sessions[id];

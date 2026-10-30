@@ -479,14 +479,17 @@ module.exports.register = function register(deps) {
       const c = await db.prepare("INSERT INTO kofi_commandes (user_id, formation_id, questions, montant, statut) VALUES (?,?,?,?,'en_attente')").run(user.id, ctx.f.id, r.forfait_questions, r.forfait_prix_eur);
       commandeId = c.lastInsertRowid;
       const retour = `${getOrigin(req)}/suivre-formation.html?id=${encodeURIComponent(ctx.f.id)}`;
+      /* Achat fait depuis l'appli téléphone : on y revient (m.html), sur le plan de la formation, au lieu de la page du site. Seul un drapeau est accepté, jamais une adresse. */
+      const telephone = body && body.retour === "telephone";
+      const retourTel = `${getOrigin(req)}/m.html`, ancreTel = `#/formations/${encodeURIComponent(ctx.f.id)}/suivre`;
       const session = await stripe.checkout.sessions.create({
         mode: "payment",
         customer: await getOrCreateStripeCustomer(db, user),
         line_items: [{ price_data: { currency: "eur", unit_amount: Math.round(r.forfait_prix_eur * 100), product_data: { name: `Koffi — ${r.forfait_questions} questions (valables ${r.forfait_validite_mois} mois)` } }, quantity: 1 }],
         metadata: { diaspoactif_kofi_commande_id: String(commandeId), consentement_non_remboursable: VERSION_CONSENTEMENT_FORFAIT },
         custom_text: { submit: { message: TEXTE_FORFAIT_NON_REMBOURSABLE } },
-        success_url: retour + "&kofi=succes",
-        cancel_url: retour + "&kofi=annule",
+        success_url: telephone ? `${retourTel}?kofi=succes${ancreTel}` : retour + "&kofi=succes",
+        cancel_url: telephone ? `${retourTel}?kofi=annule${ancreTel}` : retour + "&kofi=annule",
       });
       await db.prepare("UPDATE kofi_commandes SET stripe_session_id=?, consentement_le=? WHERE id=?").run(session.id, `${new Date().toISOString()} v${VERSION_CONSENTEMENT_FORFAIT}`, commandeId);
       sendJSON(res, 201, { checkout_url: session.url, commande_id: Number(commandeId) });

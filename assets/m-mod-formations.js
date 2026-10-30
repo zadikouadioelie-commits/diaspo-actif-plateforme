@@ -514,6 +514,31 @@
   }
 
   /* ============================================================
+     KOFFI : le tuteur IA de la formation (assets/koffi-widget.js, même fenêtre que sur le site)
+     Monté sur le plan de la formation et sur les leçons ; retiré dès qu'on quitte ces écrans. Le serveur décide seul de ce qui s'affiche
+     (élève inscrit / aperçu du créateur : discussion ; compte non Premium : présentation ; sinon : rien).
+     ============================================================ */
+  let koffiLecon = null, koffiScript = null;
+  function chargerKoffi() {
+    if (window.KoffiWidget) return Promise.resolve();
+    if (!koffiScript) koffiScript = new Promise(ok => {
+      const sc = document.createElement('script'); sc.src = '/assets/koffi-widget.js?v=7';
+      sc.onload = ok; sc.onerror = () => { koffiScript = null; ok(); }; document.head.appendChild(sc);
+    });
+    return koffiScript;
+  }
+  async function monterKoffi(id, leconId) {
+    koffiLecon = leconId || null;
+    await chargerKoffi();
+    const K = window.KoffiWidget; if (!K) return;
+    if (K.estMonte(id)) return;      // déjà là pour cette formation : la leçon courante est relue à chaque question
+    K.demonter();
+    K.monter({ formationId: id, telephone: true, leconId: () => koffiLecon, ouvrirLecon: l => { location.hash = '#/formations/' + id + '/l' + l; }, premiumUrl: '#/abonnement' });
+  }
+  function demonterKoffi() { if (window.KoffiWidget) window.KoffiWidget.demonter(); koffiLecon = null; }
+  window.addEventListener('hashchange', () => { if (!/^#\/formations\/\d+\/(suivre|l\d+)(\/|$)/.test(location.hash)) demonterKoffi(); });
+
+  /* ============================================================
      SUIVI : plan de la formation puis leçons
      ============================================================ */
   async function loadSuivi(id, force) {
@@ -594,6 +619,7 @@
     html += `<a class="btn out block" href="#/formations/${esc(id)}">Fiche de la formation</a>`;
     setPane(f.titre, html);
     brancherEnregistrer(id, () => screenSuivre(++seq, id));
+    monterKoffi(id, null);
   }
 
   const noFile = msg => `<div class="card"><div class="pad muted">${esc(msg)}</div></div>`;
@@ -809,6 +835,7 @@
       ${apercu || l.quiz || libre ? '<span class="sp"></span>' : manuel ? `<button class="btn ${fait ? 'out' : ''}" id="fm-done" style="flex:1;padding:0 10px">${fait ? '✓ Cochée · décocher' : 'Cocher comme terminée'}</button>` : `<button class="btn ${l.termine ? 'out' : ''}" id="fm-done" style="flex:1;padding:0 10px">${l.termine ? '✓ Terminée · annuler' : next ? 'Terminer et continuer' : 'Terminer la leçon'}</button>`}
       <button class="btn out" id="fm-next" aria-label="Leçon suivante" ${next ? '' : 'disabled'}>${ic('chev')}</button>`;
     setPane(l.titre, html, foot);
+    monterKoffi(id, l.id);
 
     if (l.type === 'quiz') montrerQuiz(id, l, d);
     monterDocuments(id, null, apercu);
