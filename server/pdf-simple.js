@@ -68,6 +68,8 @@ function decouper(texte, police, taille, largeur) {
 
 class Page {
   constructor(pdf, largeur, hauteur) { this.pdf = pdf; this.l = largeur; this.h = hauteur; this.ops = []; this.polices = new Set(); this.etats = new Set(); this.liens = []; }
+  /* Image déjà déclarée avec pdf.ajouterImage() : posée dans le rectangle (x, y, w, h). */
+  image(id, x, y, w, h) { return this._op(`q ${nombre(w)} 0 0 ${nombre(h)} ${nombre(x)} ${nombre(this.y(y + h))} cm /Im${id} Do Q`); }
   y(v) { return this.h - v; }
   _op(s) { this.ops.push(s); return this; }
   /* rectangle plein et/ou contour */
@@ -135,7 +137,9 @@ class Page {
 }
 
 class Pdf {
-  constructor(infos) { this.pages = []; this.infos = infos || {}; }
+  constructor(infos) { this.pages = []; this.images = []; this.infos = infos || {}; }
+  /* Image RVB 8 bits (octets bruts, ligne par ligne) avec, en option, son canal de transparence (un octet par pixel). Renvoie son numéro. */
+  ajouterImage(img) { this.images.push(img); return this.images.length - 1; }
   page(largeur, hauteur) { const p = new Page(this, largeur, hauteur); this.pages.push(p); return p; }
   build() {
     const objets = [null]; /* 1..n, l'index 0 est inutilisé */
@@ -147,7 +151,14 @@ class Pdf {
     this.pages.forEach(p => p.etats.forEach(a => etatsTous.add(a)));
     const etats = {};
     [...etatsTous].forEach(a => { etats[a] = ajouter(Buffer.from(`<< /Type /ExtGState /ca ${nombre(a / 100)} /CA ${nombre(a / 100)} >>`)); });
-    const ressources = `<< /Font << ${Object.keys(polices).map(i => `/F${i} ${polices[i]} 0 R`).join(" ")} >>${Object.keys(etats).length ? ` /ExtGState << ${Object.keys(etats).map(a => `/G${a} ${etats[a]} 0 R`).join(" ")} >>` : ""} >>`;
+    const xobjets = {};
+    const flux = (dico, donnees) => { const z = zlib.deflateSync(donnees); return Buffer.concat([Buffer.from(`<< ${dico} /Filter /FlateDecode /Length ${z.length} >>\nstream\n`), z, Buffer.from("\nendstream")]); };
+    this.images.forEach((im, i) => {
+      const base = `/Type /XObject /Subtype /Image /Width ${im.w} /Height ${im.h} /BitsPerComponent 8`;
+      const masque = im.alpha ? ` /SMask ${ajouter(flux(base + " /ColorSpace /DeviceGray", im.alpha))} 0 R` : "";
+      xobjets[i] = ajouter(flux(base + " /ColorSpace /DeviceRGB" + masque, im.rgb));
+    });
+    const ressources = `<< /Font << ${Object.keys(polices).map(i => `/F${i} ${polices[i]} 0 R`).join(" ")} >>${Object.keys(xobjets).length ? ` /XObject << ${Object.keys(xobjets).map(i => `/Im${i} ${xobjets[i]} 0 R`).join(" ")} >>` : ""}${Object.keys(etats).length ? ` /ExtGState << ${Object.keys(etats).map(a => `/G${a} ${etats[a]} 0 R`).join(" ")} >>` : ""} >>`;
     const refsPages = [];
     for (const p of this.pages) {
       const flux = zlib.deflateSync(Buffer.from(p.ops.join("\n"), "latin1"));

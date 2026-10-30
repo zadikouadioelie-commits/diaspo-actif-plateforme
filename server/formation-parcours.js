@@ -15,7 +15,7 @@
 "use strict";
 const crypto = require("crypto");
 const Droits = require("./formation-droits");
-const { certificatPdf } = require("./formation-certificat-pdf");
+const { certificatPdf, chargerLogo } = require("./formation-certificat-pdf");
 
 const TYPES = {
   participation: { label: "Attestation de participation", mention: "A participé à la formation" },
@@ -624,6 +624,7 @@ module.exports.register = function register(deps) {
     const buf = certificatPdf({ ...vueAttestation(a), apprenant_nom: a.apprenant_nom }, {
       urlVerif: `${origine}/verifier-attestation.html?code=${encodeURIComponent(a.code)}`,
       qr: !fq || fq.certificat_qr == null || Number(fq.certificat_qr) !== 0,
+      logo: await chargerLogo(),
     });
     res.writeHead(200, {
       "Content-Type": "application/pdf", "Content-Length": buf.length, "X-Content-Type-Options": "nosniff", "Cache-Control": "private, no-store",

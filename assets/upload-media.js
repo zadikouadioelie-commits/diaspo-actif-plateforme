@@ -23,6 +23,8 @@ async function uploadMedia(file, type = 'avatar') {
     document:    '/api/upload/document',
     /* Documents de cours (PDF, Word, Excel, PowerPoint) : stockage privé, adresse jamais livrée aux apprenants (lot F, 2026-10-30). */
     'document-cours': '/api/formateur/document-cours',
+    /* Audio de cours (MP3, M4A, OGG, WAV ; 4 Mo au plus). */
+    'audio-cours': '/api/formateur/audio-cours',
     'video-tutoriel': '/api/upload/video-tutoriel',
     invitation:  '/api/upload/invitation'
   }[type] || '/api/upload/avatar';

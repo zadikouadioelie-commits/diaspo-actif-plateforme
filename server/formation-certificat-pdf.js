@@ -8,6 +8,8 @@
 
 const { Pdf, MM, largeurTexte } = require("./pdf-simple");
 const { encoder } = require("./qr-code");
+const fs = require("fs");
+const path = require("path");
 
 const NAVY = "#0D2B4E", ORANGE = "#F26422", OR = "#B8893B", ENCRE = "#1e293b", GRIS = "#64748b";
 const PX = 0.75; /* la page imprimable est dessinée en pixels CSS : 1 px = 0,75 pt */
@@ -17,6 +19,21 @@ function dateFr(iso) {
   const brut = String(iso || "");
   const d = new Date(brut.includes("T") || /Z|\+/.test(brut) ? brut : brut.replace(" ", "T") + "Z");
   return isNaN(d) ? brut.slice(0, 10) : d.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Paris" });
+}
+
+/* Logo de la plateforme (assets/logo.png) réduit à 240 px, en RVB + transparence : chargé une fois, puis gardé en mémoire. null si le fichier est absent ou illisible (le certificat s'écrit alors sans logo). */
+let logoEnCache;
+async function chargerLogo() {
+  if (logoEnCache !== undefined) return logoEnCache;
+  try {
+    const fichier = path.join(__dirname, "..", "assets", "logo.png");
+    if (!fs.existsSync(fichier)) { logoEnCache = null; return null; }
+    const { data, info } = await require("sharp")(fichier).resize(240, 240, { fit: "inside", withoutEnlargement: true }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    const n = info.width * info.height, rgb = Buffer.alloc(n * 3), alpha = Buffer.alloc(n);
+    for (let i = 0; i < n; i++) { rgb[i * 3] = data[i * 4]; rgb[i * 3 + 1] = data[i * 4 + 1]; rgb[i * 3 + 2] = data[i * 4 + 2]; alpha[i] = data[i * 4 + 3]; }
+    logoEnCache = { w: info.width, h: info.height, rgb, alpha };
+  } catch (_) { logoEnCache = null; }
+  return logoEnCache;
 }
 
 function certificatPdf(a, options) {
@@ -58,8 +75,17 @@ function certificatPdf(a, options) {
 
   /* marque (modèles classique et premium) */
   if (!gauche) {
-    p.texte("DIASPO'ACTIF", centre, y + 12 * PX, { police: "Helvetica-Bold", taille: 15 * PX, couleur: c.marque, align: "center", espacement: 15 * PX * 0.06 });
-    y += 24 * PX;
+    const tailleMarque = 15 * PX, espMarque = tailleMarque * 0.06;
+    if (o.logo) {
+      /* logo à gauche du nom, l'ensemble centré sur la page */
+      const cote = 34, ecart = 8, lt = largeurTexte("DIASPO'ACTIF", "Helvetica-Bold", tailleMarque, espMarque), x = centre - (cote + ecart + lt) / 2;
+      p.image(pdf.ajouterImage(o.logo), x, y - 5, cote, cote * o.logo.h / o.logo.w);
+      p.texte("DIASPO'ACTIF", x + cote + ecart, y + 17, { police: "Helvetica-Bold", taille: tailleMarque, couleur: c.marque, espacement: espMarque });
+      y += 38 * PX;
+    } else {
+      p.texte("DIASPO'ACTIF", centre, y + 12 * PX, { police: "Helvetica-Bold", taille: tailleMarque, couleur: c.marque, align: "center", espacement: espMarque });
+      y += 24 * PX;
+    }
   }
 
   /* titre du document */
@@ -129,4 +155,4 @@ function certificatPdf(a, options) {
   return pdf.build();
 }
 
-module.exports = { certificatPdf, dateFr };
+module.exports = { certificatPdf, chargerLogo, dateFr };

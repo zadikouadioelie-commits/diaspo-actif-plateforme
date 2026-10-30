@@ -392,13 +392,13 @@
   }
 
   /* Inscription : gratuite = immédiate ; payante = le serveur crée la session Stripe et renvoie son adresse. */
-  async function inscrire(f, code, btn) {
+  async function inscrire(f, code, btn, coupon) {
     if (!(await A.needLogin('Connectez-vous pour vous inscrire à une formation.'))) return false;
     const label = btn ? btn.textContent : '';
     if (btn) { btn.disabled = true; btn.textContent = 'Inscription…'; }
     try {
       /* Aucun remboursement : le consentement exprès est demandé si le serveur le réclame (achat payant) — assets/formation-achat-consent.js. */
-      const appel = extra => api(`/api/formations/${encodeURIComponent(f.id)}/inscrire`, { method: 'POST', body: Object.assign(code ? { code } : {}, extra) });
+      const appel = extra => api(`/api/formations/${encodeURIComponent(f.id)}/inscrire`, { method: 'POST', body: Object.assign(code ? { code } : {}, coupon ? { coupon } : {}, extra) });
       const r = window.FormationConsent ? await window.FormationConsent.appeler(appel, { titre: f.titre }) : await appel({});
       if (r.checkout_url) {
         if (!/^https:\/\/[^\s"'<>]+$/i.test(r.checkout_url)) throw new Error('Adresse de paiement invalide. Réessayez ou contactez l’assistance.');
@@ -426,17 +426,46 @@
       <p class="muted" style="margin:0 0 10px">${esc(f.titre)}</p>
       <div class="kv"><span>Montant</span><span>${promoDe(f) ? `<s class="muted">${esc(price(f.prix_catalogue != null ? f.prix_catalogue : f.prix, f.devise))}</s> ` : ''}${esc(price(prixFinal(f), f.devise))}</span></div>${promoDe(f) ? `<div class="kv"><span>Promotion</span><span>−${esc(promoDe(f))} %</span></div>` : ''}
       ${window.FormationConsent ? window.FormationConsent.mention() : ''}
+      <label class="fm-lab" for="fm-coupon">Code de réduction (facultatif)</label>
+      <div class="row" style="gap:8px"><input class="fm-in" id="fm-coupon" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Votre code" style="flex:1"><button type="button" class="btn out" id="fm-cok" style="flex:none;padding:0 16px">Appliquer</button></div>
+      <p class="small" id="fm-cmsg" role="status" style="margin:6px 2px 0;min-height:18px"></p>
       ${membres ? `<label class="fm-lab" for="fm-code">Code d’accès membre (facultatif)</label>
         <input class="fm-in" id="fm-code" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Votre code">
         <p class="small muted" style="margin:6px 2px 0">Un code valide rend l’inscription gratuite. Sans code, ou avec un code non valide, vous réglez le tarif normal.</p>` : ''}
       <p class="small muted" style="margin:12px 2px">Le règlement se fait sur la page sécurisée de notre prestataire de paiement (Stripe). Votre accès est activé dès que le paiement est confirmé, puis vous suivez la formation depuis votre téléphone.</p>
       <button class="btn block" id="fm-go">Continuer vers le paiement</button>
       <button class="btn out block" id="fm-no" style="margin-top:10px">Annuler</button>`);
-    const code = $('#fm-code'), go = $('#fm-go');
-    if (code) code.oninput = () => { go.textContent = code.value.trim() ? 'S’inscrire avec mon code' : 'Continuer vers le paiement'; };
+    const code = $('#fm-code'), go = $('#fm-go'), cp = $('#fm-coupon'), cmsg = $('#fm-cmsg'), montant = $('#sheet .kv span:last-child');
+    const montantInitial = montant ? montant.innerHTML : '';
+    let coupon = '';
+    const libelleBouton = () => { go.textContent = coupon && gratuitAvecCoupon ? 'S’inscrire gratuitement avec mon code' : (code && code.value.trim() ? 'S’inscrire avec mon code' : 'Continuer vers le paiement'); };
+    let gratuitAvecCoupon = false;
+    if (code) code.oninput = libelleBouton;
+    /* Un code de réduction se vérifie avant le paiement : le nouveau montant s'affiche ; le serveur le recalcule de toute façon au paiement. */
+    const dire = (txt, bon) => { cmsg.textContent = txt; cmsg.style.color = bon ? '#16a34a' : '#dc2626'; };
+    const appliquer = async () => {
+      const c = cp.value.trim();
+      coupon = ''; gratuitAvecCoupon = false; if (montant) montant.innerHTML = montantInitial; libelleBouton();
+      if (!c) { dire('', true); return; }
+      if (!(await A.needLogin('Connectez-vous pour utiliser un code de réduction.'))) return;
+      $('#fm-cok').disabled = true;
+      try {
+        const r = await api(`/api/formations/${encodeURIComponent(f.id)}/coupon/verifier`, { method: 'POST', body: { code: c } });
+        if (r.valide) {
+          coupon = r.code || c; gratuitAvecCoupon = Number(r.prix_final) <= 0;
+          if (montant) montant.innerHTML = `<s class="muted">${esc(price(prixFinal(f), f.devise))}</s> <b>${esc(price(r.prix_final, f.devise))}</b>`;
+          dire('Code appliqué : −' + price(r.remise, f.devise) + '.', true); libelleBouton();
+        } else dire(r.erreur || 'Ce code n’est pas valable.', false);
+      } catch (e) { dire(e.message || 'Vérification impossible.', false); }
+      $('#fm-cok').disabled = false;
+    };
+    $('#fm-cok').onclick = appliquer;
+    cp.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); appliquer(); } };
+    /* le code modifié après vérification n'est plus appliqué tant qu'on ne le revérifie pas */
+    cp.oninput = () => { if (coupon) { coupon = ''; gratuitAvecCoupon = false; if (montant) montant.innerHTML = montantInitial; dire('', true); libelleBouton(); } };
     $('#fm-no').onclick = close;
     go.onclick = async () => {
-      const ok = await inscrire(f, code ? code.value.trim() : '', go);
+      const ok = await inscrire(f, code ? code.value.trim() : '', go, coupon || (cp && cp.value.trim()) || '');
       if (ok) close();
     };
   }

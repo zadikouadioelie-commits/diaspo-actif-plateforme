@@ -7,7 +7,7 @@
 
    Ce qu'il ne fait PAS (limites à connaître) : aucune macro n'est lue ni exécutée (un classeur .xlsm est refusé) ; les formules ne sont pas recalculées (on montre la
    dernière valeur enregistrée par Excel, et le texte de la formule) ; graphiques, images, formes, tableaux croisés dynamiques, mises en forme conditionnelles, bordures
-   et couleurs de thème ne sont pas dessinés (les valeurs des tableaux croisés sont lues comme de simples cellules) ; l'ancien format .xls n'est pas lu.
+   et couleurs de thème ne sont pas dessinés (les valeurs des tableaux croisés sont lues comme de simples cellules) ; l'ancien format .xls est lu par server/xls-lecteur.js.
 
    Défenses : taille de l'archive, nombre d'entrées, taille décompressée par entrée et au total (bombe de décompression), nombre de cellules.
    ═════════════════════════════════════════════════ */
@@ -339,4 +339,4 @@ function exporterTexte(cl, maxCar) {
   return out.join("\n");
 }
 
-module.exports = { ouvrir, resume, fenetre, exporterTexte, formaterNombre, colNom, refVers, ErreurClasseur, MAX_COLONNES };
+module.exports = { ouvrir, resume, fenetre, exporterTexte, formaterNombre, colNom, refVers, ErreurClasseur, MAX_COLONNES, MAX_CELLULES, FORMATS_INTEGRES };

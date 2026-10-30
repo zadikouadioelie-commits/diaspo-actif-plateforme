@@ -12,6 +12,7 @@ const path = require('node:path');
 const H = require('./_formation-harness');
 const F = require('./_documents-fabrique');
 const Docs = require('../server/formation-documents');
+const { xls } = require('./_xls-fabrique');
 
 let env; const DOSSIER = path.join(__dirname, '..', 'server', 'uploads'); const crees = [];
 const ecrire = (nom, buf) => { fs.mkdirSync(DOSSIER, { recursive: true }); fs.writeFileSync(path.join(DOSSIER, nom), buf); crees.push(nom); return '/uploads/' + nom; };
@@ -41,7 +42,7 @@ test('documents : accès, PDF, Excel, téléchargement', async (t) => {
     await lecon('pdf', { type: 'pdf', contenu_url: ecrire('doc' + sfx + '.pdf', pdf) });
     await lecon('xlsx', { contenu_url: ecrire('classeur' + sfx + '.xlsx', classeur), doc_integre: true, doc_hauteur: 500, telechargement_autorise: false });
     await lecon('xlsx_pj', { contenu_url: ecrire('classeur2' + sfx + '.xlsx', classeur), doc_integre: false, telechargement_autorise: true });
-    await lecon('xls', { contenu_url: ecrire('ancien' + sfx + '.xls', Buffer.concat([Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]), Buffer.alloc(600)])), doc_integre: true });
+    await lecon('xls', { contenu_url: ecrire('ancien' + sfx + '.xls', xls()), doc_integre: true });
     await lecon('macros', { contenu_url: ecrire('macros' + sfx + '.xlsm', F.classeur({ macros: true, feuilles: [{ nom: 'A', lignes: [['x']] }] })), doc_integre: true });
     await lecon('faux', { type: 'pdf', contenu_url: ecrire('faux' + sfx + '.pdf', Buffer.from('<html><script>alert(1)</script></html>')) });
     await lecon('macros_deguises', { contenu_url: ecrire('deguise' + sfx + '.xlsx', F.classeur({ macros: true, feuilles: [{ nom: 'A', lignes: [['x']] }] })), doc_integre: true });
@@ -84,7 +85,7 @@ test('documents : accès, PDF, Excel, téléchargement', async (t) => {
     r = (await call(jarA, 'GET', base(L.xlsx_pj) + '/infos')).data;
     assert.equal(r.integre, false); assert.equal(r.peut_telecharger, true); assert.equal(r.erreur, undefined);
     assert.equal((await call(jarF, 'GET', base(L.xlsx) + '/infos')).data.peut_telecharger, true, 'le propriétaire récupère toujours son fichier');
-    r = (await call(jarA, 'GET', base(L.xls) + '/infos')).data; assert.equal(r.erreur.code, 'xls'); assert.match(r.erreur.message, /\.xlsx/);
+    r = (await call(jarA, 'GET', base(L.xls) + '/infos')).data; assert.equal(r.famille, 'excel', 'un ancien classeur se montre dans la visionneuse Excel'); assert.equal(r.format, 'xls'); assert.equal(r.erreur, undefined);
     r = (await call(jarA, 'GET', base(L.macros) + '/infos')).data; assert.equal(r.erreur.code, 'macros');
   });
 
@@ -117,7 +118,8 @@ test('documents : accès, PDF, Excel, téléchargement', async (t) => {
     assert.equal((await call(jarA, 'GET', base(L.xlsx) + '/feuille?feuille=7')).status, 404);
     assert.equal((await call(jarX, 'GET', base(L.xlsx) + '/classeur')).status, 403);
     assert.equal((await call(anon, 'GET', base(L.xlsx) + '/feuille')).status, 401);
-    let r = await call(jarA, 'GET', base(L.xls) + '/classeur'); assert.equal(r.status, 415); assert.equal(r.data.code, 'xls');
+    let r = await call(jarA, 'GET', base(L.xls) + '/classeur'); assert.equal(r.status, 200); assert.deepEqual(r.data.feuilles.map(f => f.nom), ['Prévisions', 'Détail']);
+    const wx = (await call(jarA, 'GET', base(L.xls) + '/feuille?feuille=0&debut=0&n=100')).data; assert.equal(wx.lignes[0][0].t, 'Prévision financière'); assert.equal(wx.merges.length, 1);
     r = await call(jarA, 'GET', base(L.macros) + '/classeur'); assert.equal(r.status, 415); assert.equal(r.data.code, 'macros');
     r = await call(jarA, 'GET', base(L.macros_deguises) + '/classeur'); assert.equal(r.status, 413, 'un classeur à macros renommé en .xlsx est refusé sur son contenu'); assert.equal(r.data.code, 'macros');
     r = await call(jarA, 'GET', base(L.pdf) + '/classeur'); assert.equal(r.status, 415);

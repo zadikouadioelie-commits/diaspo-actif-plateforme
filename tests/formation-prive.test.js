@@ -188,3 +188,29 @@ test('migration : repérage et réécriture des documents (fonctions pures du sc
   assert.equal(M.reecrireStudio('pas du json', { a: 'b' }), null);
   assert.match(Prive.creerRef(42, 'PDF'), Prive.REF); assert.notEqual(Prive.creerRef(42, 'pdf'), Prive.creerRef(42, 'pdf'));
 });
+
+test('audio de cours : type vérifié sur les octets, réservé aux créateurs', async () => {
+  const rnd = Math.random().toString(36).slice(2, 9);
+  const jarF = H.cookieJar(), jarA = H.cookieJar(), anon = H.cookieJar();
+  await H.creerFormateur(env, jarF, rnd, 'FormateurAudio'); await H.creerApprenant(env, jarA, rnd, 'ApprenantAudio');
+  const audio = async (jar, nom, buf) => {
+    const fd = new FormData(); fd.append('audio', new Blob([buf]), nom);
+    const h = {}; jar.apply(h);
+    const r = await fetch(env.base + '/api/formateur/audio-cours', { method: 'POST', headers: h, body: fd });
+    return { status: r.status, data: await r.json().catch(() => null) };
+  };
+  const mp3 = Buffer.concat([Buffer.from('ID3'), Buffer.alloc(40)]);
+  assert.equal(Prive.typeAudio(mp3), 'mp3');
+  assert.equal(Prive.typeAudio(Buffer.concat([Buffer.from([0xff, 0xfb, 0x90, 0x64]), Buffer.alloc(40)])), 'mp3', 'MP3 sans étiquette ID3');
+  assert.equal(Prive.typeAudio(Buffer.concat([Buffer.alloc(4), Buffer.from('ftypM4A '), Buffer.alloc(20)])), 'm4a');
+  assert.equal(Prive.typeAudio(Buffer.concat([Buffer.from('OggS'), Buffer.alloc(40)])), 'ogg');
+  assert.equal(Prive.typeAudio(Buffer.concat([Buffer.from('RIFF'), Buffer.alloc(4), Buffer.from('WAVEfmt '), Buffer.alloc(20)])), 'wav');
+  assert.equal(Prive.typeAudio(Buffer.from('<html><script>alert(1)</script></html>')), '', 'une page web n\'est pas un audio');
+  assert.equal(Prive.typeAudio(Buffer.from('%PDF-1.4 ................')), '');
+  assert.equal((await audio(anon, 'a.mp3', mp3)).status, 401);
+  assert.equal((await audio(jarA, 'a.mp3', mp3)).status, 403, 'un apprenant sans formation ne dépose rien');
+  assert.equal((await audio(jarF, 'a.mp3', Buffer.from('<html>pas un audio, même renommé en mp3</html>'))).status, 400);
+  assert.equal((await audio(jarF, 'gros.mp3', Buffer.concat([mp3, Buffer.alloc(4.5 * 1024 * 1024)]))).status, 413, 'au-delà de 4 Mo');
+  const bon = await audio(jarF, 'cours.mp3', mp3);
+  assert.equal(bon.status, 500, 'type accepté : l\'envoi vers le CDN est tenté (échoue ici faute de clé Bunny dans le banc d\'essai) — jamais un refus 400');
+});

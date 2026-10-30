@@ -24,7 +24,7 @@ Le navigateur **ne reçoit jamais l'adresse brute** du fichier pour le lire. Tou
 
 | Route | Rôle |
 |---|---|
-| `/infos` | famille (pdf / excel / xls / xlsm / autre), intégré, téléchargeable, hauteur, erreur éventuelle |
+| `/infos` | famille (pdf / excel / xlsm / autre ; `format: "xls"` signale un ancien classeur lu comme un classeur), intégré, téléchargeable, hauteur, erreur éventuelle |
 | `/fichier` | le PDF, en entier ou par morceaux (`Range`) — seulement si l'affichage intégré est activé (ou aperçu du propriétaire) |
 | `/classeur` | liste des feuilles, styles, limites d'affichage (jamais les cellules) |
 | `/feuille?feuille=i&debut=r&n=100` | une fenêtre de lignes (500 au plus) : valeurs formatées, formules, cellules fusionnées, largeurs |
@@ -49,7 +49,7 @@ Le serveur ouvre l'archive .xlsx (zlib de Node), lit feuilles, chaînes partagé
 au défilement ; un clic sur une cellule montre son adresse, sa formule et sa valeur (barre de formule, lecture seule). Onglets de feuilles, taille du texte A− / A+, plein écran, téléchargement si autorisé.
 
 **Limites assumées** (affichées dans la visionneuse, bouton ⓘ) : formules **non recalculées** ; graphiques, images, formes, tableaux croisés dynamiques et mises en forme conditionnelles non dessinés ;
-couleurs de thème et bordures non reprises ; feuilles masquées non montrées ; **.xls (ancien format) non lu** (message + téléchargement si autorisé) ; **.xlsm refusé** — les macros ne sont jamais lues ni exécutées
+couleurs de thème et bordures non reprises ; feuilles masquées non montrées ; **.xls (Excel 97-2003) lu par server/xls-lecteur.js** : valeurs, résultats enregistrés des formules (sans leur texte), formats de nombres et de dates, gras, italique, alignement, fusions, largeurs, lignes et feuilles masquées — sans couleurs ni bordures ; les .xls protégés par mot de passe ou d'avant Excel 97 sont refusés avec un message clair ; **.xlsm refusé** — les macros ne sont jamais lues ni exécutées
 (un classeur à macros renommé en .xlsx est refusé sur son contenu). Défenses : nombre d'entrées, taille décompressée par entrée (60 Mo) et au total (200 Mo), 600 000 cellules au plus, 200 colonnes au plus.
 
 ## 5. Interface avec l'assistant pédagogique (Koffi)
@@ -66,7 +66,7 @@ Exemple : « Explique-moi comment est calculé le bénéfice net » → le texte
 
 ## 6. Ce qui n'est pas fait
 
-- Fichiers **.xls** (ancien format binaire) : demandent un lecteur dédié ou une bibliothèque tierce (SheetJS) — décision à prendre.
+- Texte des formules des anciens **.xls** (seule leur dernière valeur est montrée).
 - **Fichiers vraiment privés** : l'adresse du fichier reste publique sur l'hébergeur pour qui la connaît (et reste présente dans les données de la leçon, dont dépend la version téléphone).
   Une protection complète demande un stockage privé avec adresses signées.
 - Version **téléphone** (`assets/m-mod-formations.js`) : non adaptée (lot E).

@@ -139,8 +139,9 @@ test('route /api/attestations/mon/:code/pdf', async (t) => {
     }
     const minuscule = await telecharger(jarA, 'pdfroute-1');
     assert.equal(minuscule.status, 200, 'le code est insensible à la casse');
-    const flux = lirePdf((await telecharger(jarA, 'PDFROUTE-1')).buf).flux[0];
+    const flux = lirePdf((await telecharger(jarA, 'PDFROUTE-1')).buf).flux.at(-1);
     assert.ok(flux.includes('(91,2 %) Tj'));
+    assert.ok(lirePdf((await telecharger(jarA, 'PDFROUTE-1')).buf).s.includes('/Subtype /Image'), 'le logo est dans le PDF téléchargé');
     assert.ok(lirePdf((await telecharger(jarA, 'PDFROUTE-3')).buf).s.includes('/ca 0.28'), 'document révoqué : filigrane');
   });
   await t.test('accès refusé aux autres, accepté à l’administrateur', async () => {
@@ -157,4 +158,27 @@ test('route /api/attestations/mon/:code/pdf', async (t) => {
     const sans = lirePdf((await telecharger(jarA, 'PDFROUTE-1')).buf).s;
     assert.ok(!sans.includes('/Subtype /Link'));
   });
+});
+
+test('certificat : logo de la plateforme intégré (image RVB + transparence)', async () => {
+  const { chargerLogo } = require('../server/formation-certificat-pdf');
+  const logo = await chargerLogo();
+  assert.ok(logo && logo.w > 0 && logo.w <= 240 && logo.rgb.length === logo.w * logo.h * 3 && logo.alpha.length === logo.w * logo.h, 'logo chargé et réduit');
+  assert.equal(await chargerLogo(), logo, 'chargé une seule fois');
+  const a = { code: 'DA-LOGO', type: 'suivi', type_label: 'Attestation de suivi', formation_titre: 'F', organisme: 'O', date_emission: '2026-10-30 09:00:00', avertissement: 'x', statut: 'valide', apprenant_nom: 'N' };
+  for (const modele of ['classique', 'premium']) {
+    const { s, flux } = lirePdf(certificatPdf({ ...a, modele }, { logo, urlVerif: 'https://x.test/v', qr: true }));
+    assert.ok(s.includes('/Subtype /Image') && s.includes('/SMask') && s.includes('/XObject'), modele + ' : image et masque déclarés');
+    assert.ok(/\/Im0 Do/.test(flux.at(-1)), modele + ' : logo dessiné');
+  }
+  const moderne = lirePdf(certificatPdf({ ...a, modele: 'moderne' }, { logo, urlVerif: 'https://x.test/v', qr: true }));
+  assert.ok(!/\/Im0 Do/.test(moderne.flux.at(-1)), 'le modèle moderne n\'affiche pas le logo (comme la page imprimable)');
+  const sans = lirePdf(certificatPdf({ ...a, modele: 'classique' }, { urlVerif: 'https://x.test/v', qr: true }));
+  assert.ok(!sans.s.includes('/Subtype /Image'), 'sans logo : aucune image');
+  /* petite image synthétique : 2×2 pixels */
+  const pdf = new Pdf({ Title: 't' }); const p = pdf.page(100, 100);
+  const id = pdf.ajouterImage({ w: 2, h: 2, rgb: Buffer.from([255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255]), alpha: Buffer.from([255, 128, 64, 0]) });
+  p.image(id, 10, 10, 40, 40);
+  const lu = lirePdf(pdf.build());
+  assert.ok(/\/Width 2 \/Height 2/.test(lu.s) && /\/ColorSpace \/DeviceGray/.test(lu.s) && /\/ColorSpace \/DeviceRGB/.test(lu.s));
 });

@@ -1064,7 +1064,7 @@
 <script src="assets/app.js?v=14"></script>
 <script src="assets/formation-achat-consent.js?v=1"></script>
 <script src="/assets/rich-editor.js"></script>
-<script src="/assets/upload-media.js?v=2"></script>
+<script src="/assets/upload-media.js?v=3"></script>
 <script src="/assets/formation-koffi-reglages.js?v=1"></script>
 <script>
   // ── Infobulles d'aide (?) : au clic (fiable sur tous les appareils, contrairement au title au survol) ──
@@ -2745,6 +2745,13 @@
         const r = await fetch('/api/upload/video', { method: 'POST', credentials: 'same-origin', body: file });
         data = await r.json();
         if (!r.ok) throw new Error(data.error || "Échec de l'envoi.");
+      } else if (type === 'audio') {
+        /* Audio de cours (lot G) : MP3, M4A, OGG ou WAV, 4 Mo au plus. */
+        const fd = new FormData();
+        fd.append('audio', file);
+        const r = await fetch('/api/formateur/audio-cours', { method: 'POST', credentials: 'same-origin', body: fd });
+        data = await r.json();
+        if (!r.ok) throw new Error(data.error || 'Échec de l\'envoi.');
       } else if ((type === 'pdf' || type === 'telechargement') && !/^image\//.test(file.type || '')) {
         /* Documents de cours (lot F) : stockage privé — l'adresse n'est jamais livrée aux apprenants, ils lisent le fichier par la visionneuse de la plateforme. */
         const fd = new FormData();

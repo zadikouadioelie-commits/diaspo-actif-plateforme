@@ -20,6 +20,7 @@ const path = require("node:path");
 const Droits = require("./formation-droits");
 const Prive = require("./formation-prive");
 const XL = require("./xlsx-lecteur");
+const XLS = require("./xls-lecteur");
 
 const MAX_OCTETS = 4.4 * 1024 * 1024;   /* limite d'une réponse de l'hébergeur du site (4,5 Mo) : au-delà, repli sur l'affichage direct */
 const MAX_OCTETS_CLASSEUR = 12 * 1024 * 1024;
@@ -28,7 +29,7 @@ const LIMITES_EXCEL = [
   "Les formules ne sont pas recalculées : la dernière valeur enregistrée par Excel est affichée, avec le texte de la formule.",
   "Graphiques, images, formes, tableaux croisés dynamiques et mises en forme conditionnelles ne sont pas dessinés.",
   "Les couleurs de thème et les bordures ne sont pas reprises ; gras, italique, couleurs et fonds simples le sont.",
-  "Les anciens fichiers .xls et les classeurs à macros (.xlsm) ne s'affichent pas dans la page.",
+  "Les anciens fichiers .xls (Excel 97-2003) s'affichent sans le texte des formules, sans couleurs ni bordures ; les classeurs à macros (.xlsm) et les classeurs protégés par mot de passe ne s'affichent pas.",
 ];
 
 const famille = url => {
@@ -84,7 +85,7 @@ function typeReel(buf) {
 function classeurDe(url, buf) {
   const cle = url + "#" + buf.length; const c = cacheClasseurs.get(cle);
   if (c) { lru(cacheClasseurs, cle, c, 4); return c; }
-  const cl = XL.ouvrir(buf);
+  const cl = typeReel(buf) === "ole" ? XLS.ouvrir(buf) : XL.ouvrir(buf);
   lru(cacheClasseurs, cle, cl, 4);
   return cl;
 }
@@ -152,9 +153,9 @@ module.exports.register = function register(deps) {
   route("GET", BASE + "/infos", async (req, res, params, body, query) => {
     const c = await contexte(req, res, params, query); if (!c) return;
     const peutDl = c.d.telechargeable || c.proprietaire;
-    const info = { nom: c.d.nom, famille: c.fam, integre: c.d.integre, telechargeable: c.d.telechargeable, hauteur: c.d.hauteur, peut_telecharger: peutDl };
+    /* Un ancien classeur .xls se montre comme un classeur : la visionneuse Excel le lit (le format réel est signalé à part). */
+    const info = { nom: c.d.nom, famille: c.fam === "xls" ? "excel" : c.fam, format: c.fam === "xls" ? "xls" : undefined, integre: c.d.integre, telechargeable: c.d.telechargeable, hauteur: c.d.hauteur, peut_telecharger: peutDl };
     if (!c.d.integre) { /* simple pièce jointe : pas de visionneuse, donc rien à signaler sur le format */ }
-    else if (c.fam === "xls") info.erreur = { code: "xls", message: "Les anciens classeurs .xls ne s'affichent pas dans la page. Enregistrez-le au format .xlsx (Fichier › Enregistrer sous) puis importez-le de nouveau." };
     else if (c.fam === "xlsm") info.erreur = { code: "macros", message: "Les classeurs à macros (.xlsm) ne sont pas affichés : les macros ne sont jamais exécutées." };
     else if (c.fam === "autre") info.erreur = { code: "format", message: "Ce type de fichier ne peut pas s'afficher dans la page." };
     sendJSON(res, 200, info);
@@ -194,12 +195,12 @@ module.exports.register = function register(deps) {
 
   /* Classeur Excel : liste des feuilles + styles (jamais les cellules). */
   async function classeurAccessible(c, res) {
-    if (c.fam === "xls") { sendJSON(res, 415, { error: "Les anciens classeurs .xls ne s'affichent pas dans la page. Enregistrez-le au format .xlsx.", code: "xls" }); return null; }
     if (c.fam === "xlsm") { sendJSON(res, 415, { error: "Les classeurs à macros (.xlsm) ne sont pas affichés : les macros ne sont jamais exécutées.", code: "macros" }); return null; }
-    if (c.fam !== "excel") { sendJSON(res, 415, { error: "Ce fichier n'est pas un classeur Excel.", code: "format" }); return null; }
+    if (c.fam !== "excel" && c.fam !== "xls") { sendJSON(res, 415, { error: "Ce fichier n'est pas un classeur Excel.", code: "format" }); return null; }
     if (!c.d.integre && !c.proprietaire) { sendJSON(res, 403, { error: "L'affichage dans la page n'est pas activé pour ce document.", code: "non_integre" }); return null; }
     const buf = await lireOctets(c.d.url, c.hote);
-    if (typeReel(buf) !== "zip") { sendJSON(res, 415, { error: "Ce fichier n'est pas un classeur Excel (.xlsx) valide.", code: "format" }); return null; }
+    const reel = typeReel(buf);
+    if (reel !== (c.fam === "xls" ? "ole" : "zip")) { sendJSON(res, 415, { error: `Ce fichier n'est pas un classeur Excel (${c.fam === "xls" ? ".xls" : ".xlsx"}) valide.`, code: "format" }); return null; }
     return classeurDe(c.d.url, buf);
   }
   route("GET", BASE + "/classeur", async (req, res, params, body, query) => {
@@ -225,10 +226,11 @@ module.exports.register = function register(deps) {
   module.exports.texteDeDocument = async function texteDeDocument(lecon, doc, elementId, hoteSite, maxCar) {
     const d = decrire(lecon, doc, elementId); if (!d) return null;
     const fam = famille(d.url);
-    if (fam === "pdf") return { type: "pdf", nom: d.nom, url: d.url, texte: null, note: "PDF : à lire nativement (pages numérotées)." };
-    if (fam !== "excel") return { type: fam, nom: d.nom, texte: null, note: "Format non lisible." };
+    /* PDF : les octets sont fournis (un fichier du stockage privé n'a pas d'adresse lisible de l'extérieur) ; l'adresse n'est donnée que si elle est publique. */
+    if (fam === "pdf") { const octets = await lireOctets(d.url, hoteSite).catch(() => null); return { type: "pdf", nom: d.nom, url: Prive.estRef(d.url) ? null : d.url, octets, texte: null, note: "PDF : à lire nativement (pages numérotées)." }; }
+    if (fam !== "excel" && fam !== "xls") return { type: fam, nom: d.nom, texte: null, note: "Format non lisible." };
     const buf = await lireOctets(d.url, hoteSite);
-    if (typeReel(buf) !== "zip") return { type: "excel", nom: d.nom, texte: null, note: "Fichier invalide." };
+    if (typeReel(buf) !== (fam === "xls" ? "ole" : "zip")) return { type: "excel", nom: d.nom, texte: null, note: "Fichier invalide." };
     const cl = classeurDe(d.url, buf);
     return { type: "excel", nom: d.nom, texte: XL.exporterTexte(cl, maxCar), feuilles: cl.feuilles.map(f => f.nom) };
   };

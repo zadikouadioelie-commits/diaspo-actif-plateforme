@@ -584,7 +584,7 @@
         ${champ('ou adresse de la vidéo (YouTube, Vimeo ou fichier https)', 'url', p.url, 'url', 'placeholder="https://www.youtube.com/watch?v=…"')}${champ('Titre de la vidéo', 'titre', p.titre)}
         ${p.url && R.ytId(p.url) ? '<p class="st-aide">Le suivi du visionnage n\'est pas possible pour une vidéo YouTube : importez la vidéo (MP4 / MOV) pour pouvoir l\'exiger.</p>' : `<label class="st-f" style="display:flex;gap:8px;align-items:center"><input type="checkbox" data-p="exiger" data-k="bool" ${p.exiger ? 'checked' : ''}> <span style="margin:0">Exiger le visionnage (90 %) pour valider la leçon</span></label><p class="st-aide">Seuls comptent les passages regardés en continu : sauter dans la vidéo ne valide rien. L'apprenant reprend là où il s'est arrêté.</p>`}`;
     } else if (t === 'audio') {
-      h += `<div class="st-btns"><button class="st-b" data-lib="audio">📚 Ma bibliothèque</button></div>${champ('Adresse du fichier audio (https)', 'url', p.url, 'url', 'placeholder="https://…/audio.mp3"')}${champ('Titre', 'titre', p.titre)}`;
+      h += `<div class="st-btns"><button class="st-b or" data-up="audio">${p.url ? 'Remplacer l’audio' : '⬆ Importer un audio'}</button><button class="st-b" data-lib="audio">📚 Ma bibliothèque</button></div><p class="st-aide">MP3, M4A, OGG ou WAV — 4 Mo au plus (environ 4 minutes de MP3). Pour un enregistrement plus long, collez l’adresse d’un fichier hébergé ailleurs.</p>${champ('ou adresse du fichier audio (https)', 'url', p.url, 'url', 'placeholder="https://…/audio.mp3"')}${champ('Titre', 'titre', p.titre)}`;
     } else if (t === 'fichier') {
       h += `<div class="st-btns"><button class="st-b or" data-up="document">${p.url ? 'Remplacer le fichier' : 'Importer un fichier'}</button><button class="st-b" data-lib="document,image">📚 Ma bibliothèque</button></div><p class="st-aide">PDF, Word, Excel, PowerPoint ou image — 4 Mo maximum par fichier.</p>
         ${champ('Nom affiché', 'nom', p.nom)}${champ('Description', 'description', p.description)}${champ('ou adresse (https) du fichier', 'url', p.url, 'url')}`;
@@ -673,6 +673,7 @@
     if (b.dataset.up === 'image') return choisirImage(S.sel[0]);
     if (b.dataset.up === 'video') return choisirVideo(S.sel[0]);
     if (b.dataset.up === 'document') return choisirDocument(S.sel[0]);
+    if (b.dataset.up === 'audio') return choisirAudio(S.sel[0]);
     if (b.dataset.tab) {
       const e = selection()[0], L = e.props.lignes, n = L[0].length;
       modifier(() => { if (b.dataset.tab === '+l') L.push(new Array(n).fill('')); else if (b.dataset.tab === '-l' && L.length > 1) L.pop(); else if (b.dataset.tab === '+c' && n < 8) L.forEach(r => r.push('')); else if (b.dataset.tab === '-c' && n > 1) L.forEach(r => r.pop()); }); renderProps();
@@ -732,6 +733,22 @@
       try {
         const v = await importerVideo(f); const e = el(id); if (!e) { toast('La vidéo est dans votre bibliothèque.'); return; }
         modifier(() => { e.props.url = v.url; e.props.titre = e.props.titre || v.nom; e.props.miniature = v.miniature || ''; }); choisir([id]); toast('Vidéo prête et ajoutée');
+      } catch (err) { toast(err.message || 'Envoi impossible.'); }
+    };
+    inp.click();
+  }
+  function choisirAudio(id) {
+    const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.mp3,.m4a,.aac,.ogg,.wav,audio/*'; inp.style.display = 'none'; document.body.appendChild(inp);
+    inp.onchange = async () => {
+      const f = inp.files[0]; inp.remove(); if (!f) return;
+      if (!/\.(mp3|m4a|aac|ogg|wav)$/i.test(f.name)) { toast('Format non pris en charge : MP3, M4A, OGG ou WAV.'); return; }
+      if (f.size > MAX_FICHIER) { toast('Audio trop lourd (4 Mo maximum). Compressez-le, ou hébergez-le ailleurs et collez son adresse.'); return; }
+      toast('Envoi de l’audio…');
+      try {
+        const url = await uploadMedia(f, 'audio-cours'); const nom = f.name.replace(/\.[^.]+$/, '');
+        rangerEnBibliotheque('audio', url, nom, f.size);
+        const e = el(id); if (!e) { toast('L’audio est dans votre bibliothèque.'); return; }
+        modifier(() => { e.props.url = url; if (!e.props.titre) e.props.titre = nom; }); choisir([id]); toast('Audio ajouté');
       } catch (err) { toast(err.message || 'Envoi impossible.'); }
     };
     inp.click();
