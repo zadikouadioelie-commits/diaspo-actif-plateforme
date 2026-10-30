@@ -1,0 +1,159 @@
+/* Design « Nuit dorée » — fiche publique d'inscription (inscription-publique.html), proposition 2026-10-30.
+   Complète assets/theme-nuit-doree.css (barre du haut, menu, boutons, pied de page).
+   La page construit son contenu en JavaScript, avec beaucoup de styles posés en ligne (oklch clairs, fonds blancs) :
+   cette feuille les ré-habille par sélecteurs d'attribut, tous préfixés html body.nd — sans class="nd" sur <body>, la page garde son design actuel.
+   Les teintes de sens sont conservées (vert = compte rendu / validé, ambre = attente, rouge = fermé / erreur) en versions lumineuses.
+   Retour arrière : retirer class="nd" sur <body> et les 3 liens de feuille dans le <head>. */
+@import url("https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,500;6..96,600&family=Manrope:wght@400;500;600;700;800&display=swap");
+
+html body.nd{--ip-or:#E3C06E;--ip-or2:#B9893A;--ip-texte:#E8ECF6;--ip-doux:#AEB8D0;--ip-faible:#8591AD;--ip-verre:rgba(255,255,255,.05);--ip-verre2:rgba(255,255,255,.085);
+  --ip-bord:rgba(227,192,110,.3);--ip-bord2:rgba(255,255,255,.13);--ip-degore:linear-gradient(135deg,#F3DC9B 0%,#E3C06E 38%,#B9893A 100%);
+  --ip-vert:#7BE87B;--ip-ambre:#F5C56B;--ip-rouge:#FF9C9C}
+
+/* ═══ socle : texte, colonnes ═══ */
+html body.nd #ip-root,html body.nd .ip-side{font-family:'Manrope','Segoe UI',system-ui,sans-serif;color:var(--ip-texte)}
+html body.nd #ip-root{--bg:rgba(255,255,255,.06);--card:rgba(255,255,255,.05);--text:#EDEAE0;--muted:#AEB8D0;--border:rgba(255,255,255,.14);--navy:#FFFFFF;--orange:#E3C06E}
+html body.nd #ip-root :is(button,input,select,textarea){font-family:inherit}
+html body.nd .ip-layout{padding-top:6px}
+html body.nd .ip-wrap{padding-top:36px}
+html body.nd #ip-root :is(h1,h2,h3,h4),html body.nd .ip-side :is(h1,h2,h3,h4){font-family:'Bodoni Moda','Didot',Georgia,serif;font-weight:500;color:#fff;letter-spacing:-.005em}
+
+/* ═══ colonne de droite : titre, organisateur, descriptif, programme ═══ */
+html body.nd #ip-right .ip-titre{font-family:'Bodoni Moda','Didot',Georgia,serif;font-weight:500;font-size:clamp(28px,2.8vw,38px);line-height:1.12;color:#fff;margin:0 0 10px}
+html body.nd #ip-right>p[style*="font-size:12.5px"]{color:var(--ip-or)!important;font-weight:700;letter-spacing:.04em;text-transform:uppercase;font-size:11.5px!important}
+html body.nd .ip-right-section{background:var(--ip-verre);border:1px solid var(--ip-bord2);border-radius:20px;padding:20px 22px;box-shadow:0 24px 50px -36px rgba(0,0,0,.9)}
+html body.nd .ip-right-section-titre{font-family:'Manrope',sans-serif!important;font-size:11.5px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--ip-or)!important}
+html body.nd .ip-desc{color:#CBD3E6;font-size:14.5px;line-height:1.7}
+html body.nd .ip-desc :is(p,li,span,div,em,td,th){color:inherit!important;background:transparent!important}
+html body.nd .ip-desc :is(strong,b){color:#fff!important}
+html body.nd .ip-desc :is(h1,h2,h3,h4){color:#F3E3B5!important}
+html body.nd .ip-desc a{color:var(--ip-or)!important}
+html body.nd .ip-desc hr{border:0;border-top:1px solid var(--ip-bord2)}
+html body.nd .ip-detail{border-top:1px solid var(--ip-bord2)}
+html body.nd .ip-programme-item{color:#CBD3E6}
+html body.nd .ip-programme-item::before{color:var(--ip-or)}
+html body.nd .ip-programme-fichier{border:1px solid var(--ip-bord2);background:var(--ip-verre);color:var(--ip-texte)}
+html body.nd .ip-programme-fichier[style*="color"] *{color:var(--ip-texte)!important}
+
+/* ═══ colonne de gauche : encadrés Informations / Calendrier ═══ */
+html body.nd .ip-side-box{background:var(--ip-verre);border:1px solid var(--ip-bord2);border-radius:20px;padding:18px;box-shadow:0 24px 50px -36px rgba(0,0,0,.9);backdrop-filter:blur(8px)}
+html body.nd .ip-side-title{color:var(--ip-or);font-size:11.5px;font-weight:800;letter-spacing:.14em}
+html body.nd .ip-info-label{color:var(--ip-faible);letter-spacing:.1em}
+html body.nd .ip-info-value{color:var(--ip-texte);font-size:13.5px}
+html body.nd .ip-info-icon{filter:saturate(.85)}
+html body.nd .ip-ics-btn{background:rgba(227,192,110,.08);border:1px solid var(--ip-bord);color:#F3E3B5;border-radius:999px;transition:background .2s,border-color .2s,transform .2s}
+html body.nd .ip-ics-btn:hover{background:rgba(227,192,110,.16);border-color:var(--ip-or);color:#fff;transform:translateY(-1px)}
+
+/* calendrier */
+html body.nd .ip-cal-head{color:#fff;font-family:'Bodoni Moda','Didot',Georgia,serif;font-weight:500;font-size:15px}
+html body.nd :is(.ip-cal-nav,.ip-cal-auj){background:var(--ip-verre);border:1px solid var(--ip-bord2);color:var(--ip-texte);border-radius:999px}
+html body.nd :is(.ip-cal-nav,.ip-cal-auj):hover:not(:disabled){border-color:var(--ip-or);color:var(--ip-or)}
+html body.nd .ip-cal-dow{color:var(--ip-faible)}
+html body.nd .ip-cal-day{color:#B7C0D6;border-radius:999px}
+html body.nd .ip-cal-day.has-event{background:rgba(63,123,255,.2);color:#BFD3FF;border:1px solid rgba(127,166,224,.35)}
+html body.nd .ip-cal-day.has-event:hover{background:rgba(63,123,255,.34)}
+html body.nd .ip-cal-day.has-event.passe{background:rgba(255,255,255,.05);color:var(--ip-faible);border-color:transparent}
+html body.nd .ip-cal-day.today{box-shadow:inset 0 0 0 1.5px var(--ip-or)}
+html body.nd .ip-cal-day.courant{background:var(--ip-degore);color:#1a1405;border-color:transparent;font-weight:800;box-shadow:0 8px 18px -10px rgba(227,192,110,.8)}
+html body.nd .ip-cal-day.courant:hover{background:var(--ip-degore);filter:brightness(1.06)}
+html body.nd .ip-cal-day.choisi{box-shadow:0 0 0 2px var(--ip-or)}
+html body.nd .ip-cal-day.a-cr::after{background:var(--ip-vert)}
+html body.nd :is(.ip-cal-day.has-event:focus-visible,.ip-cal-nav:focus-visible,.ip-cal-auj:focus-visible,.ip-photo:focus-visible){outline:2px solid var(--ip-or);outline-offset:2px}
+html body.nd .ip-cal-legende{color:var(--ip-doux)}
+html body.nd .ip-cal-aide{color:var(--ip-faible)}
+html body.nd .ip-cal-jour-titre{color:#fff}
+html body.nd .ip-jour-evt{background:rgba(255,255,255,.04);border:1px solid var(--ip-bord2);border-radius:14px}
+html body.nd .ip-jour-evt-titre{color:#fff}
+html body.nd .ip-jour-evt-meta{color:var(--ip-doux)}
+html body.nd .ip-jour-btn{background:transparent;border:1px solid var(--ip-bord);color:#F3E3B5;border-radius:999px}
+html body.nd .ip-jour-btn:hover{border-color:var(--ip-or);color:#fff}
+html body.nd .ip-jour-btn.plein{background:var(--ip-degore);border-color:transparent;color:#1a1405}
+html body.nd .ip-jour-btn.cr{border-color:rgba(123,232,123,.5);color:var(--ip-vert)}
+html body.nd .ip-badge-courant{background:rgba(227,192,110,.16);color:var(--ip-or);border-radius:999px;padding:2px 9px}
+
+/* autres événements du même organisme / comptes rendus */
+html body.nd :is(.ip-autre-card,.ip-cr-card){background:rgba(255,255,255,.035);border:1px solid var(--ip-bord2);border-radius:14px;color:var(--ip-texte)}
+html body.nd :is(.ip-autre-card:hover,.ip-autre-card.ip-autre-surlignee){border-color:var(--ip-or)}
+html body.nd .ip-cr-card:hover,html body.nd .ip-cr-card:focus-visible{border-color:rgba(123,232,123,.6)}
+html body.nd .ip-autre-card.passe:hover{border-color:var(--ip-bord2)}
+html body.nd :is(.ip-autre-img,.ip-cr-card .ip-autre-img){background:rgba(255,255,255,.07)}
+html body.nd .ip-autre-titre{color:#fff}
+html body.nd :is(.ip-autre-meta,.ip-cr-resume){color:var(--ip-doux)}
+html body.nd .ip-cr-lien{color:var(--ip-vert)}
+html body.nd .ip-autre-badge-terminee{background:rgba(255,255,255,.08);color:var(--ip-doux);border-radius:999px;padding:1px 8px}
+
+/* ═══ centre : affiche, types d'inscription ═══ */
+html body.nd .ip-affiche{border:1px solid var(--ip-bord);border-radius:22px;box-shadow:0 30px 60px -34px rgba(0,0,0,.95),0 0 0 6px rgba(227,192,110,.05)}
+html body.nd .ip-types{gap:14px}
+html body.nd .ip-type-card{background:var(--ip-verre);border:1px solid var(--ip-bord2);border-radius:20px;padding:18px 20px;color:var(--ip-texte);box-shadow:0 24px 50px -38px rgba(0,0,0,.9);transition:border-color .2s,transform .2s,background .2s}
+html body.nd .ip-type-card:not(.complet):hover{border-color:var(--ip-bord);background:var(--ip-verre2);transform:translateY(-2px)}
+html body.nd .ip-type-card.complet{opacity:.55}
+html body.nd .ip-type-label{font-family:'Bodoni Moda','Didot',Georgia,serif;font-weight:500;font-size:18px;color:#fff}
+html body.nd :is(.ip-type-prix,.ip-type-places){color:var(--ip-doux);font-size:13px}
+html body.nd .ip-type-prix{font-variant-numeric:tabular-nums}
+
+/* boutons : doré plein pour l'action principale, verre pour le reste */
+html body.nd .ip-btn{background:var(--ip-degore);color:#1a1405;font-weight:800;border-radius:999px;padding:11px 22px;box-shadow:0 12px 26px -14px rgba(227,192,110,.75);transition:filter .2s,transform .2s,box-shadow .2s}
+html body.nd .ip-btn:hover:not(:disabled){filter:brightness(1.07);transform:translateY(-1px);box-shadow:0 16px 30px -14px rgba(227,192,110,.9)}
+html body.nd .ip-btn.outline{background:var(--ip-verre);border:1px solid var(--ip-bord);color:#F3E3B5;box-shadow:none}
+html body.nd .ip-btn.outline:hover:not(:disabled){background:rgba(227,192,110,.12);border-color:var(--ip-or);color:#fff}
+html body.nd .ip-btn:focus-visible{outline:2px solid #fff;outline-offset:2px}
+
+/* ═══ documents & médias, visuels, logos (styles posés en ligne par le JS) ═══ */
+html body.nd #ip-root div[style*="border-top:1px solid oklch"]{border-top-color:var(--ip-bord2)!important}
+html body.nd #ip-root div[style*="text-transform:uppercase"]{color:var(--ip-or)!important;font-weight:800!important;letter-spacing:.14em!important;font-size:11.5px!important}
+html body.nd #ip-root div[style*="font-size:12.5px"][style*="font-weight:600"]{color:#fff!important}
+html body.nd #ip-root a[style*="border:1px solid oklch"]{background:var(--ip-verre);border-color:var(--ip-bord2)!important;border-radius:14px!important;transition:border-color .2s,background .2s}
+html body.nd #ip-root a[style*="border:1px solid oklch"]:hover{border-color:var(--ip-bord)!important;background:var(--ip-verre2)}
+html body.nd #ip-root a[style*="border:1px solid oklch"] span{color:var(--ip-texte)!important}
+html body.nd #ip-root div[style*="background:oklch(0.94 0.05 20)"]{background:rgba(255,120,120,.14)!important;color:var(--ip-rouge)!important}
+html body.nd #ip-root video{border:1px solid var(--ip-bord2);border-radius:16px!important}
+html body.nd .ip-visuels-titre,html body.nd .ip-logos-titre{color:var(--ip-or);font-weight:800;letter-spacing:.14em;font-size:11.5px}
+html body.nd .ip-photo{background:rgba(255,255,255,.06);border-radius:14px}
+html body.nd .ip-photo-plus{background:rgba(6,10,20,.66)}
+html body.nd .ip-video-titre{color:#fff}
+html body.nd .ip-video-cadre{border:1px solid var(--ip-bord2);border-radius:16px;background:#000}
+html body.nd .ip-logo-item img{background:rgba(255,255,255,.92);border:1px solid var(--ip-bord2);border-radius:14px}
+html body.nd .ip-logo-item span{color:var(--ip-doux)}
+
+/* ═══ formulaire d'inscription ═══ */
+html body.nd .ip-champ label{color:#E6EAF5!important;font-weight:700}
+html body.nd .ip-champ .aide{color:var(--ip-faible)}
+html body.nd .ip-oblig{color:var(--ip-or)}
+html body.nd .ip-champ :is(input[type=text],input[type=email],input[type=tel],input[type=number],input[type=date],input[type=time],input[type=url],textarea,select){
+  background:rgba(255,255,255,.06)!important;border:1px solid var(--ip-bord2)!important;border-radius:12px;color:#fff!important;color-scheme:dark;transition:border-color .2s,box-shadow .2s,background .2s}
+html body.nd .ip-champ :is(input,textarea,select)::placeholder{color:var(--ip-faible)}
+html body.nd .ip-champ :is(input,textarea,select):focus{outline:none;border-color:var(--ip-or)!important;box-shadow:0 0 0 3px rgba(227,192,110,.2);background:rgba(255,255,255,.09)!important}
+html body.nd .ip-champ select option{background:#0B1226;color:#fff}
+html body.nd .ip-confirmation{color:var(--ip-texte)}
+html body.nd .ip-confirmation :is(h2,h3){color:#fff}
+
+/* ═══ états : en attente, fermée, candidature, parrainage ═══ */
+html body.nd .ip-statut-card{border-radius:22px;backdrop-filter:blur(8px)}
+html body.nd .ip-statut-attente{background:rgba(245,197,107,.09);border:1px solid rgba(245,197,107,.4)}
+html body.nd .ip-statut-attente .ip-statut-msg{color:var(--ip-ambre)}
+html body.nd .ip-statut-attente .ip-statut-date{color:#E9CFA0}
+html body.nd .ip-statut-fermee{background:rgba(255,120,120,.08);border:1px solid rgba(255,140,140,.35)}
+html body.nd .ip-statut-fermee .ip-statut-msg{color:var(--ip-rouge)}
+html body.nd .ip-statut-fermee .ip-statut-date{color:#F0C2C2}
+html body.nd .ip-cand-box{background:rgba(188,19,254,.08);border:1px solid rgba(214,120,255,.45);border-radius:20px;box-shadow:none;color:var(--ip-texte)}
+html body.nd .ip-cand-titre{color:#E7B8FF;font-family:'Bodoni Moda','Didot',Georgia,serif;font-weight:500}
+html body.nd .ip-cand-doc{background:var(--ip-verre);border:1px solid var(--ip-bord2);border-radius:12px;color:var(--ip-texte)}
+html body.nd .ip-cand-doc:hover{border-color:rgba(214,120,255,.7)}
+html body.nd .ip-cand-doc-titre{color:#fff}
+html body.nd .ip-cand-email{background:rgba(255,255,255,.05);border:1px dashed var(--ip-bord2);border-radius:12px;color:var(--ip-doux)}
+html body.nd .ip-cand-declare-btn{background:linear-gradient(135deg,#C06BFF,#8B12D6);border-radius:999px}
+html body.nd .ip-cand-declare-btn:disabled{background:rgba(123,232,123,.12);color:var(--ip-vert);border:1px solid rgba(123,232,123,.5)}
+html body.nd .ip-parrainage-box{background:rgba(0,174,239,.1);border:1px solid rgba(80,200,255,.5);border-radius:20px;box-shadow:none;color:#BFE9FF}
+html body.nd .ip-parrainage-box:hover{background:rgba(0,174,239,.18)}
+html body.nd .ip-parrainage-box strong{color:#fff}
+
+/* retour (bouton « Retour » au-dessus de la barre) : même langage que les pages déjà habillées */
+html body.nd .ip-lightbox{background:rgba(3,6,14,.94)}
+html body.nd .ip-lightbox button{background:rgba(255,255,255,.1);border:1px solid var(--ip-bord2)}
+html body.nd .ip-lightbox button:hover{background:rgba(227,192,110,.25)}
+
+@media (prefers-reduced-motion:reduce){
+  html body.nd :is(.ip-type-card,.ip-btn,.ip-ics-btn){transition:none}
+  html body.nd :is(.ip-type-card:hover,.ip-btn:hover,.ip-ics-btn:hover){transform:none!important}
+}
