@@ -31,6 +31,21 @@
   dd{margin:0;font-weight:700;word-break:break-word}
   .avert{margin-top:16px;font-size:12px;color:var(--muted);border-top:1px solid #e2e8f0;padding-top:12px}
   .mention{margin-top:12px;font-size:13px;background:#fffbeb;border-radius:10px;padding:10px 12px;color:#92400e}
+  /* Nuit dorée (2026-10-30, demande explicite : « applique la nouvelle DA sur tout le module ») */
+  body{background:radial-gradient(1000px 520px at 85% -8%,rgba(227,192,110,.16),transparent 60%),linear-gradient(#060A14,#0B1226);color:#E8ECF6;min-height:100vh}
+  header{background:rgba(8,13,30,.8);border-bottom:1px solid rgba(227,192,110,.24);color:#E3C06E}
+  h1{color:#fff;font-family:"Bodoni Moda","Didot",Georgia,serif;font-weight:500}
+  .lead{color:#A9B4CC}
+  input{background:rgba(255,255,255,.06);border-color:rgba(227,192,110,.3);color:#fff}
+  input:focus{outline:3px solid rgba(227,192,110,.35);border-color:#E3C06E}
+  button{background:linear-gradient(135deg,#F3DC9B 0%,#E3C06E 38%,#B9893A 100%);color:#1a1202}
+  .carte{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.1);box-shadow:none}
+  .carte.ok{border-color:rgba(52,211,153,.55)}.carte.alerte{border-color:rgba(251,191,36,.55)}.carte.ko{border-color:rgba(248,113,113,.55)}
+  .ok .etat{color:#7DE3B5}.alerte .etat{color:#FCD34D}.ko .etat{color:#FCA5A5}
+  dt{color:#A9B4CC}dd{color:#fff}
+  .avert{color:#7C88A4;border-top-color:rgba(255,255,255,.1)}
+  .mention{background:rgba(227,192,110,.12);color:#E3C06E}
+  .carte p.sous{color:#A9B4CC !important}
 </style>
 </head>
 <body>
@@ -63,7 +78,7 @@ async function verifier(code){
   const etat = revoque ? '✗ Document révoqué' : declaree ? '⚠ Mention déclarée par le titulaire' : '✓ Document authentique';
   res.innerHTML = `<div class="carte ${classe}">
     <p class="etat">${etat}</p>
-    <p style="margin:0;color:#475569">${revoque ? 'Ce document a existé mais n\'est plus valable.' : declaree ? 'Cette mention n\'a pas été délivrée par Diaspo\'Actif.' : 'Ce document a bien été délivré par Diaspo\'Actif.'}</p>
+    <p class="sous" style="margin:0;color:#475569">${revoque ? 'Ce document a existé mais n\'est plus valable.' : declaree ? 'Cette mention n\'a pas été délivrée par Diaspo\'Actif.' : 'Ce document a bien été délivré par Diaspo\'Actif.'}</p>
     <dl>
       <dt>Type</dt><dd>${esc(d.type_label || '')}</dd>
       ${d.beneficiaire ? `<dt>Titulaire</dt><dd>${esc(d.beneficiaire)}</dd>` : ''}

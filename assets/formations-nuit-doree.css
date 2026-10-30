@@ -97,3 +97,81 @@ html body.nd [id^="modal-"]>.card{background:radial-gradient(420px 220px at 100%
 html body.nd [id^="modal-"]>.card :is(h2,h3){font-family:var(--nd-display)!important;font-weight:500;color:#fff!important}
 html body.nd [id^="modal-"]>.card{width:min(580px,calc(100% - 32px));max-width:580px;margin:8vh auto 0!important;padding:24px 26px!important}
 @media (max-width:640px){html body.nd [id^="modal-"]>.card{margin:4vh auto 0!important}}
+
+/* ============================================================
+   Lecteur de formation (suivre-formation.html) — design « Nuit dorée » (2026-10-30, demande explicite : « applique la nouvelle DA sur tout le module »).
+   Tout est préfixé html body.nd ; les règles de la page (couleurs claires en dur) sont surchargées ici, sans toucher à la logique.
+   Retour arrière : retirer les 2 <link> Nuit dorée et class="nd" sur <body> de suivre-formation.html.
+   ============================================================ */
+html body.nd .sf-wrap{background:transparent;color:var(--nd-texte)}
+html body.nd .sf-sidebar{background:rgba(8,13,30,.78)!important;border-right:1px solid var(--nd-bord)!important;backdrop-filter:blur(14px);color:var(--nd-texte)}
+html body.nd .sf-sidebar-head{border-bottom:1px solid var(--nd-bord2)!important}
+html body.nd .sf-sidebar-head>div:first-child{font-family:var(--nd-display);font-weight:500;font-size:18px;color:#fff}
+html body.nd .sf-progress-bar,html body.nd .sf-chapitre-bar{background:rgba(255,255,255,.1)!important}
+html body.nd .sf-progress-fill,html body.nd .sf-chapitre-bar>div{background:var(--nd-degore)!important}
+html body.nd .sf-progress-fill.ok,html body.nd .sf-chapitre-bar>div.ok{background:#34D399!important}
+html body.nd .sf-gauge-pct{color:var(--nd-or)!important;font-family:var(--nd-display)}
+html body.nd .sf-gauge-sub,html body.nd .sf-chapitre-sub{color:var(--nd-faible)!important}
+html body.nd .sf-statut{background:rgba(255,255,255,.1)!important;color:var(--nd-doux)!important}
+html body.nd .sf-statut.en_cours{background:rgba(227,192,110,.16)!important;color:var(--nd-or)!important}
+html body.nd .sf-statut.en_attente_evaluation{background:rgba(251,191,36,.16)!important;color:#FCD34D!important}
+html body.nd .sf-statut.termine{background:rgba(52,211,153,.16)!important;color:#7DE3B5!important}
+html body.nd .sf-badge-apercu{background:rgba(227,192,110,.16)!important;color:var(--nd-or)!important;border:1px solid var(--nd-bord)}
+html body.nd .sf-module{border-bottom:1px solid var(--nd-bord2)!important}
+html body.nd .sf-module-title{background:rgba(255,255,255,.05)!important;color:var(--nd-or)!important;font-family:var(--nd-display);font-weight:500;letter-spacing:.01em}
+html body.nd .sf-chapitre-title{color:var(--nd-doux)!important}
+html body.nd .sf-chapitre-title .done{color:#7DE3B5!important}
+html body.nd .sf-lecon{color:var(--nd-texte)!important}
+html body.nd .sf-lecon:hover{background:var(--nd-verre2)!important}
+html body.nd .sf-lecon.active{background:rgba(227,192,110,.14)!important;color:var(--nd-or)!important;font-weight:800}
+html body.nd .sf-lecon .chk{border-color:var(--nd-faible)!important}
+html body.nd .sf-lecon.termine .chk{background:#34D399!important;border-color:#34D399!important;color:#06231a!important}
+html body.nd .sf-opt{background:rgba(255,255,255,.1)!important;color:var(--nd-doux)!important}
+html body.nd .sf-main{color:var(--nd-texte)}
+html body.nd .sf-main :is(h2,h3,h4){color:#fff!important;font-family:var(--nd-display);font-weight:500}
+html body.nd .sf-main h2{font-size:clamp(26px,3vw,36px)}
+html body.nd .sf-main :is(p,li,small)[style*="color:var(--muted"],html body.nd .sf-main p[style*="var(--muted"]{color:var(--nd-doux)!important}
+html body.nd .sf-main a:not(.btn){color:var(--nd-or)}
+html body.nd .sf-main .rich-content,html body.nd .sf-main .rich-content *{color:var(--nd-texte)}
+html body.nd .sf-main .rich-content :is(h1,h2,h3,h4){color:#fff}
+html body.nd .sf-content-pdf iframe,html body.nd .sf-content-ppt iframe{border:1px solid var(--nd-bord)!important;background:#fff}
+html body.nd .sf-fullscreen-btn{background:transparent!important;color:var(--nd-or)!important;border:1px solid var(--nd-bord)!important}
+html body.nd .sf-nav-btns .btn{border-radius:999px;min-height:44px}
+html body.nd .sf-nav-btns .btn:not(.secondary){background:var(--nd-degore)!important;color:#1a1202!important;border:0!important;font-weight:800}
+html body.nd .sf-nav-btns .btn.secondary,html body.nd .sf-ask .btn.secondary{background:transparent!important;color:var(--nd-or)!important;border:1px solid var(--nd-bord)!important;border-radius:999px}
+html body.nd .sf-ask small{color:var(--nd-faible)!important}
+html body.nd .sf-verrou-carte{background:var(--nd-verre)!important;border:1px dashed var(--nd-bord)!important;color:var(--nd-texte)}
+html body.nd .sf-att{background:var(--nd-verre)!important;border:1px solid var(--nd-bord2)!important;color:var(--nd-texte)}
+html body.nd .sf-att.ok{background:rgba(52,211,153,.1)!important;border-color:rgba(52,211,153,.45)!important}
+html body.nd .sf-att li{color:var(--nd-doux)!important}
+html body.nd .sf-att li.ok{color:#7DE3B5!important}
+html body.nd .sf-att small{color:var(--nd-faible)!important}
+html body.nd .sf-banner{background:rgba(52,211,153,.14)!important;border-bottom:1px solid rgba(52,211,153,.4)!important;color:#7DE3B5!important}
+html body.nd .sf-banner a{color:#7DE3B5!important}
+html body.nd .sf-timer{background:rgba(63,123,255,.14)!important;color:#A9C4FF!important}
+html body.nd .sf-timer.urgent{background:rgba(248,113,113,.16)!important;color:#FCA5A5!important}
+html body.nd .sf-save-bar{background:#0B1226!important;border-top:1px solid var(--nd-bord)}
+/* quiz et évaluations */
+html body.nd .sf-quiz{background:var(--nd-verre)!important;border:1px solid var(--nd-bord2)!important;border-radius:22px;color:var(--nd-texte)}
+html body.nd .sf-quiz-meta{color:var(--nd-doux)!important}
+html body.nd .sf-q{border-top:1px solid var(--nd-bord2)!important}
+html body.nd .sf-q input[type=text],html body.nd .sf-ech-form textarea,html body.nd .sf-ech-formrep textarea{background:rgba(255,255,255,.06)!important;color:#fff!important;border:1px solid var(--nd-bord2)!important}
+html body.nd .sf-q .hint,html body.nd .sf-ech-hint,html body.nd .sf-ech-date,html body.nd .sf-ech-vide{color:var(--nd-faible)!important}
+html body.nd .sf-q.juste{background:rgba(52,211,153,.1)!important}
+html body.nd .sf-q.faux{background:rgba(248,113,113,.1)!important}
+html body.nd .sf-q-result.ok{background:rgba(52,211,153,.14)!important;color:#7DE3B5!important}
+html body.nd .sf-q-result.ko{background:rgba(248,113,113,.14)!important;color:#FCA5A5!important}
+html body.nd .sf-q input[type=radio],html body.nd .sf-q input[type=checkbox]{accent-color:var(--nd-or)}
+/* espace d'échange */
+html body.nd .sf-ech{border-top:1px solid var(--nd-bord2)!important}
+html body.nd .sf-ech-onglets button{background:transparent!important;border:1px solid var(--nd-bord2)!important;color:var(--nd-doux)!important}
+html body.nd .sf-ech-onglets button.on{background:var(--nd-degore)!important;border-color:transparent!important;color:#1a1202!important}
+html body.nd .sf-ech-info{background:rgba(227,192,110,.12)!important;color:var(--nd-or)!important}
+html body.nd .sf-ech-msg{background:var(--nd-verre)!important;border:1px solid var(--nd-bord2)!important;color:var(--nd-texte)}
+html body.nd .sf-ech-msg.rep{background:rgba(255,255,255,.025)!important}
+html body.nd .sf-ech-act{color:var(--nd-doux)!important}
+html body.nd .sf-ech-act.danger{color:#FCA5A5!important}
+html body.nd .sf-badge-form{background:var(--nd-degore)!important;color:#1a1202!important}
+html body.nd .sf-badge-ok{background:rgba(52,211,153,.16)!important;color:#7DE3B5!important}
+html body.nd .sf-badge-masque{background:rgba(248,113,113,.16)!important;color:#FCA5A5!important}
+html body.nd .page{background:transparent}

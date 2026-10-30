@@ -58,6 +58,26 @@
     #print-zone h1{font-size:18px;color:#0D2B4E;margin:0 0 8px}
     #print-zone svg{width:100%;height:auto;max-height:175mm}
   }
+  /* Nuit dorée (2026-10-30, demande explicite : « applique la nouvelle DA sur tout le module ») — barres et panneau en bleu nuit et or ; le plan reste une feuille claire (les couleurs de branches et le texte restent lisibles, et l'impression est inchangée). */
+  body{background:#0B1226;color:#E8ECF6}
+  header.barre,.outils{background:rgba(8,13,30,.96);border-bottom:1px solid rgba(227,192,110,.24)}
+  header.barre a.retour{color:#E3C06E}
+  #titre{color:#fff}#titre:hover:not([readonly]){border-color:rgba(227,192,110,.3)}#titre:focus{outline:2px solid #E3C06E;background:rgba(255,255,255,.06)}
+  .etat{color:#A9B4CC}.etat.ko{color:#FCA5A5}
+  .btn{background:transparent;border:1px solid rgba(227,192,110,.3);color:#E3C06E}
+  .btn:hover:not(:disabled){border-color:#E3C06E;color:#fff;background:rgba(227,192,110,.1)}
+  .btn.prim{background:linear-gradient(135deg,#F3DC9B 0%,#E3C06E 38%,#B9893A 100%);border-color:transparent;color:#1a1202}
+  .btn.prim:hover:not(:disabled){color:#1a1202}
+  .outils .sep{background:rgba(227,192,110,.24)}
+  #toile{border:1px solid rgba(227,192,110,.3)}
+  aside.panneau{background:rgba(8,13,30,.96);border-left:1px solid rgba(227,192,110,.24);color:#E8ECF6}
+  aside.panneau h2{color:#E3C06E}aside.panneau label{color:#A9B4CC}
+  aside.panneau input[type=text],aside.panneau textarea,aside.panneau select{background:rgba(255,255,255,.06);border:1px solid rgba(227,192,110,.3);color:#fff}
+  .pastille{border-color:#0B1226}.pastille.on{box-shadow:0 0 0 3px #E3C06E}
+  .aide{color:#7C88A4;border-top-color:rgba(255,255,255,.1)}
+  .lecture-note{background:rgba(255,255,255,.05);border-color:rgba(227,192,110,.24);color:#E8ECF6}
+  .msg{color:#A9B4CC}.msg a{color:#E3C06E}
+  @media print{body{background:#fff;color:#1e293b}}
 </style>
 </head>
 <body>
