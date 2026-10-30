@@ -4940,6 +4940,7 @@ db.exec(`
 `);
 ;['studio INTEGER DEFAULT 0'].forEach(col => { try { db.exec(`ALTER TABLE formation_lecons ADD COLUMN ${col}`); } catch(_) {} });
 ;['prix REAL','vendable_seul INTEGER DEFAULT 0'].forEach(col => { try { db.exec(`ALTER TABLE formation_modules ADD COLUMN ${col}`); } catch(_) {} });
+;['explication TEXT'].forEach(col => { try { db.exec(`ALTER TABLE formation_quiz_questions ADD COLUMN ${col}`); } catch(_) {} });
 ;['duree_acces_jours INTEGER'].forEach(col => { try { db.exec(`ALTER TABLE formations ADD COLUMN ${col}`); } catch(_) {} });
 ;["portee TEXT DEFAULT 'formation'"].forEach(col => { try { db.exec(`ALTER TABLE formation_inscriptions ADD COLUMN ${col}`); } catch(_) {} });
 /* Rattrapage (SQLite) : chaque inscription existante reçoit son droit « formation complète » — idempotent ; côté Postgres, server/formation-droits.js le refait par compte à la demande. */

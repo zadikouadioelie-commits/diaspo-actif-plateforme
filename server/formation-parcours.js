@@ -552,6 +552,7 @@ module.exports.register = function register(deps) {
         if (!d.note) return;
         const q = questions.find(x => Number(x.id) === d.question_id);
         d.bonne_reponse = String(q.reponse_correcte || "").split("|").map(s => s.trim()).filter(Boolean).join(" / ");
+        if (q.explication) d.explication = String(q.explication);
       });
     }
     const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);

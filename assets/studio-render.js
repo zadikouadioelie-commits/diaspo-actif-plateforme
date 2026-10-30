@@ -67,6 +67,16 @@
         return p.url
           ? `<div class="st-file"><span class="st-file-i">📎</span><div class="st-file-t"><strong>${esc(p.nom) || 'Fichier'}</strong>${p.description ? `<small>${esc(p.description)}</small>` : ''}</div>${ctx.edit ? '<span class="st-file-b">Télécharger</span>' : `<a class="st-file-b" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer" download>Télécharger</a>`}</div>`
           : placeholder('📎', 'Fichier à ajouter');
+      case 'document': {
+        if (!p.url) return placeholder('📄', 'Document à ajouter');
+        const pdf = /\.pdf(\?|#|$)/i.test(p.url);
+        const carte = `<div class="st-file"><span class="st-file-i">📄</span><div class="st-file-t"><strong>${esc(p.nom) || 'Document'}</strong>${pdf ? '' : '<small>À télécharger</small>'}</div>${ctx.edit ? '<span class="st-file-b">Télécharger</span>' : `<a class="st-file-b" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer" download>Télécharger</a>`}</div>`;
+        if (p.mode !== 'lecteur' || !pdf) return carte;
+        return `<div class="st-doc${ctx.edit ? ' st-inerte' : ''}"><iframe src="${esc(p.url)}#toolbar=1&view=FitH" title="${esc(p.nom) || 'Document PDF'}" loading="lazy"></iframe>${ctx.edit ? '' : `<a class="st-doc-dl" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer" download>⬇ Télécharger le document</a>`}</div>`;
+      }
+      case 'quiz':
+        if (ctx.edit || ctx.apercu) return `<div class="st-quizcard"><span>📝</span><div><strong>${esc(p.libelle) || (p.quiz_id ? 'Activité évaluée' : 'Quiz / questionnaire / exercice')}</strong><small>${p.quiz_id ? (ctx.apercu ? 'Les apprenants passent cette activité ici (sa correction est faite par le serveur).' : 'Cliquez pour modifier les questions et les réglages.') : 'À créer : choisissez le type d\'activité dans le panneau de droite.'}</small></div></div>`;
+        return '<div id="sf-quiz-zone" class="st-quiz-slot"></div>';
       case 'tableau': {
         const l = Array.isArray(p.lignes) ? p.lignes : [];
         const corps = l.map((r, i) => `<tr>${r.map(c => (i === 0 && p.entete !== false ? `<th>${esc(c)}</th>` : `<td>${esc(c)}</td>`)).join('')}</tr>`).join('');
@@ -81,7 +91,7 @@
   function elHtml(e, mode, ctx) {
     const ll = mode === 'libre';
     const st = ll ? `left:${e.x}px;top:${e.y}px;width:${e.w}px;height:${e.h}px;z-index:${e.z || 1}` : `max-width:${Math.min(e.w || FLUX_W, FLUX_W)}px`;
-    const largeur = !ll && ['image', 'video', 'tableau', 'bouton', 'lien', 'fichier', 'audio', 'validation'].includes(e.type);
+    const largeur = !ll && ['image', 'video', 'tableau', 'bouton', 'lien', 'fichier', 'audio', 'validation', 'document', 'quiz'].includes(e.type);
     return `<div class="st-el st-t-${e.type}${e.locked ? ' st-lock' : ''}${largeur ? ' st-flux-' + (e.type === 'image' ? 'img' : e.type === 'video' ? 'vid' : 'bloc') : ''}" data-id="${esc(e.id)}" data-type="${esc(e.type)}" style="${st}">${inner(e, ctx)}${ctx.edit && e.locked ? '<span class="st-lockbadge" title="Élément verrouillé">🔒</span>' : ''}</div>`;
   }
 
@@ -128,13 +138,14 @@
     }
     function afficher(n) {
       i = Math.max(0, Math.min(pages.length - 1, n)); vues.add(i);
-      ech.innerHTML = pageHtml(pages[i], mode, { lecture: true });
+      ech.innerHTML = pageHtml(pages[i], mode, { lecture: true, apercu: !!opts.apercu });
       ech.querySelectorAll('input[data-valid]').forEach(c => { c.checked = valides.has(c.dataset.valid); });
       pos.textContent = pages.length > 1 ? `Page ${i + 1} / ${pages.length}` : '';
       container.querySelector('.st-lect-nav').style.display = pages.length > 1 ? '' : 'none';
       container.querySelector('[data-n="-1"]').disabled = i === 0;
       container.querySelector('[data-n="1"]').disabled = i === pages.length - 1;
       echelle(); progres();
+      if (opts.onPage) opts.onPage(ech, i);
     }
     container.addEventListener('click', ev => {
       const nb = ev.target.closest('.st-nb'); if (nb) { afficher(i + Number(nb.dataset.n)); return; }

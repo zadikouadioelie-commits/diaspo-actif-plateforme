@@ -18157,9 +18157,9 @@ route("POST", "/api/formations/:id/quiz/:quizId/questions", async (req, res, par
   if (!quiz) return sendJSON(res, 404, { error: "Quiz introuvable dans cette formation." });
   if (!body.question) return sendJSON(res, 400, { error: "L'énoncé de la question est requis." });
   const { max } = await db.prepare("SELECT COALESCE(MAX(ordre),-1) AS max FROM formation_quiz_questions WHERE quiz_id=?").get(params.quizId);
-  const id = (await db.prepare(`INSERT INTO formation_quiz_questions (quiz_id,question,type,options_json,reponse_correcte,points,ordre)
-    VALUES (?,?,?,?,?,?,?)`).run(params.quizId, body.question, body.type||'qcm',
-    body.options ? JSON.stringify(body.options) : null, body.reponse_correcte||null, body.points||1, max+1)).lastInsertRowid;
+  const id = (await db.prepare(`INSERT INTO formation_quiz_questions (quiz_id,question,type,options_json,reponse_correcte,points,ordre,explication)
+    VALUES (?,?,?,?,?,?,?,?)`).run(params.quizId, body.question, body.type||'qcm',
+    body.options ? JSON.stringify(body.options) : null, body.reponse_correcte||null, body.points||1, max+1, body.explication ? String(body.explication).slice(0, 500) : null)).lastInsertRowid;
   sendJSON(res, 201, { id });
 });
 route("DELETE", "/api/formations/:id/quiz/:quizId/questions/:questionId", async (req, res, params) => {

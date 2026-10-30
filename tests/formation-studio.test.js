@@ -133,6 +133,90 @@ test('studio : sauvegarde, versions, publication, lecture', async (t) => {
     assert.equal((await call(jarF, 'POST', base + '/restaurer', { version: 999 })).status, 404);
   });
 
+  /* ───── Activité évaluée (quiz / questionnaire / exercice) ───── */
+  let lid2, base2, quizId, qid1;
+  await t.test('activité : création réservée au formateur, un seul type reconnu, une seule par leçon', async () => {
+    const ch = sql('select chapitre_id c from formation_lecons where id=?', lid)[0].c;
+    lid2 = (await call(jarF, 'POST', `/api/formations/${fid}/chapitres/${ch}/lecons`, { titre: 'Leçon avec quiz', type: 'texte' })).data.id;
+    base2 = `/api/formations/${fid}/lecons/${lid2}/studio`;
+    assert.equal((await call(jarA, 'POST', base2 + '/activite', { kind: 'questionnaire' })).status, 403);
+    assert.equal((await call(jarF, 'POST', base2 + '/activite', { kind: 'bidon' })).status, 400);
+    let r = await call(jarF, 'POST', base2 + '/activite', { kind: 'questionnaire', titre: 'Mon questionnaire' });
+    assert.equal(r.status, 201, JSON.stringify(r.data)); quizId = r.data.quiz.id;
+    assert.equal(r.data.quiz.kind, 'questionnaire'); assert.equal(r.data.quiz.note_minimale, 50);
+    assert.equal(sql('select lecon_id l, type t from formation_quiz where id=?', quizId)[0].l, lid2);
+    assert.equal((await call(jarF, 'POST', base2 + '/activite', { kind: 'evaluation' })).status, 409);
+  });
+
+  await t.test('réglages : bornes contrôlées côté serveur', async () => {
+    assert.equal((await call(jarF, 'PUT', base2 + '/activite', { note_minimale: 150 })).status, 400);
+    assert.equal((await call(jarF, 'PUT', base2 + '/activite', { max_tentatives: 99 })).status, 400);
+    assert.equal((await call(jarF, 'PUT', base2 + '/activite', { depot_fichier: 'obligatoire' })).status, 400, 'dépôt réservé aux exercices corrigés à la main');
+    const r = await call(jarF, 'PUT', base2 + '/activite', { note_minimale: 60, max_tentatives: 3, melanger: true });
+    assert.equal(r.status, 200); assert.equal(r.data.quiz.note_minimale, 60); assert.equal(r.data.quiz.max_tentatives, 3); assert.equal(r.data.quiz.melanger, true);
+  });
+
+  await t.test('questions : validation (choix, bonnes réponses, vrai/faux) puis ajout, modification, suppression', async () => {
+    const q = body => call(jarF, 'POST', base2 + '/activite/questions', body);
+    assert.equal((await q({ question: '', type: 'qcm' })).status, 400);
+    assert.equal((await q({ question: 'Q ?', type: 'qcm', options: ['A'], bonnes: ['A'] })).status, 400, 'au moins deux choix');
+    assert.equal((await q({ question: 'Q ?', type: 'qcm', options: ['A', 'B'], bonnes: [] })).status, 400, 'au moins une bonne réponse');
+    assert.equal((await q({ question: 'Q ?', type: 'vrai_faux' })).status, 400);
+    let r = await q({ question: 'Capitale de la France ?', type: 'qcm', options: ['Lyon', 'Paris', 'Nice'], bonnes: ['Paris'], points: 2, explication: 'Paris est la capitale.' });
+    assert.equal(r.status, 201, JSON.stringify(r.data)); qid1 = r.data.id;
+    assert.equal(r.data.quiz.questions[0].reponse_correcte, 'Paris');
+    r = await q({ question: 'La Terre est ronde.', type: 'vrai_faux', bonne: 'Vrai' }); assert.equal(r.status, 201);
+    r = await call(jarF, 'PUT', base2 + `/activite/questions/${qid1}`, { question: 'Capitale de la France ?', type: 'qcm', options: ['Lyon', 'Paris', 'Nice', 'Lille'], bonnes: ['Paris'], points: 2, explication: 'Paris, bien sûr.' });
+    assert.equal(r.status, 200); assert.equal(r.data.quiz.questions[0].options.length, 4); assert.equal(r.data.quiz.questions[0].explication, 'Paris, bien sûr.');
+    r = await q({ question: 'À supprimer', type: 'texte_libre' }); const aSup = r.data.id;
+    r = await call(jarF, 'DELETE', base2 + `/activite/questions/${aSup}`); assert.equal(r.data.quiz.questions.length, 2);
+  });
+
+  await t.test("publication : le quiz doit être placé dans une page, un quiz d'une autre leçon est ignoré", async () => {
+    let r = await call(jarF, 'PUT', base2, { mode: 'structure', pages: [page('p1', [titre('e1', '<p>Cours</p>')])] });
+    assert.equal(r.status, 200); let rev2 = r.data.rev;
+    r = await call(jarF, 'POST', base2 + '/publier');
+    assert.equal(r.status, 400); assert.ok(r.data.problemes.some(p => /n'est placée dans aucune page/.test(p)), JSON.stringify(r.data));
+    r = await call(jarF, 'PUT', base2, { mode: 'structure', rev: rev2, pages: [page('p1', [titre('e1', '<p>Cours</p>'), { id: 'q1', type: 'quiz', props: { quiz_id: 99999 } }, { id: 'q2', type: 'quiz', props: { quiz_id: quizId } }])] });
+    assert.equal(r.status, 200); rev2 = r.data.rev;
+    assert.equal(r.data.doc.pages[0].elements.filter(e => e.type === 'quiz').length, 1, 'un seul élément quiz par module');
+    assert.equal(r.data.doc.pages[0].elements.find(e => e.type === 'quiz').props.quiz_id, 0, 'quiz_id étranger remis à zéro');
+    r = await call(jarF, 'PUT', base2, { mode: 'structure', rev: rev2, pages: [page('p1', [titre('e1', '<p>Cours</p>'), { id: 'q1', type: 'quiz', props: { quiz_id: quizId } }])] });
+    assert.equal(r.data.doc.pages[0].elements.find(e => e.type === 'quiz').props.quiz_id, quizId, 'le quiz de la leçon est conservé');
+    r = await call(jarF, 'POST', base2 + '/publier'); assert.equal(r.status, 200, JSON.stringify(r.data));
+  });
+
+  await t.test("apprenant : passe le quiz de la leçon, le corrigé et l'explication ne viennent qu'après la réussite", async () => {
+    const quizUrl = `/api/formations/${fid}/quiz/${quizId}`;
+    let r = await call(jarA, 'GET', quizUrl + '/passer'); assert.equal(r.status, 200, JSON.stringify(r.data));
+    assert.ok(!JSON.stringify(r.data).includes('Paris, bien sûr'), "jamais l'explication avant la réussite");
+    const qs = r.data.questions; const q1 = qs.find(x => /Capitale/.test(x.question)), q2 = qs.find(x => /Terre/.test(x.question));
+    r = await call(jarA, 'POST', quizUrl + '/soumettre', { reponses: { [q1.id]: 'Lyon', [q2.id]: 'Faux' } });
+    assert.equal(r.status, 200); assert.equal(r.data.reussi, false);
+    assert.ok(!JSON.stringify(r.data.detail).includes('explication'), "raté : pas d'explication");
+    r = await call(jarA, 'POST', quizUrl + '/soumettre', { reponses: { [q1.id]: 'Paris', [q2.id]: 'Vrai' } });
+    assert.equal(r.status, 200, JSON.stringify(r.data)); assert.equal(r.data.reussi, true);
+    assert.ok(r.data.detail.some(d => d.explication === 'Paris, bien sûr.'), 'explication révélée après réussite');
+    assert.equal(sql('select termine t from formation_lecons_progression where lecon_id=?', lid2)[0].t, 1, 'réussir le quiz valide la leçon');
+  });
+
+  await t.test("supprimer l'activité : questions et résultats effacés, la leçon redevient libre", async () => {
+    assert.equal((await call(jarA, 'DELETE', base2 + '/activite')).status, 403);
+    assert.equal((await call(jarF, 'DELETE', base2 + '/activite')).status, 200);
+    assert.equal(sql('select count(*) n from formation_quiz where id=?', quizId)[0].n, 0);
+    assert.equal(sql('select count(*) n from formation_quiz_questions where quiz_id=?', quizId)[0].n, 0);
+    assert.equal((await call(jarF, 'GET', base2 + '/activite')).data.quiz, null);
+  });
+
+  await t.test('document : seul un fichier https est conservé, le mode est contrôlé', async () => {
+    let r = await call(jarF, 'GET', base2);
+    r = await call(jarF, 'PUT', base2, { mode: 'structure', rev: r.data.rev, pages: [page('p1', [{ id: 'd1', type: 'document', props: { url: 'http://exemple.org/x.pdf', nom: 'Guide', mode: 'bizarre' } }, { id: 'd2', type: 'document', props: { url: 'https://diaspoactif-media.b-cdn.net/documents/1-1.pdf', nom: 'Guide', mode: 'telechargement' } }])] });
+    assert.equal(r.status, 200);
+    const [d1, d2] = r.data.doc.pages[0].elements; assert.equal(d1.props.url, ''); assert.equal(d1.props.mode, 'lecteur'); assert.equal(d2.props.mode, 'telechargement');
+    assert.ok((await call(jarF, 'POST', base2 + '/publier')).data.problemes.some(p => /un document n'a pas de fichier/.test(p)));
+  });
+
+
   await t.test('dépublier : plus rien pour l\'apprenant, le brouillon et l\'historique restent', async () => {
     assert.equal((await call(jarF, 'POST', base + '/depublier')).status, 200);
     assert.equal((await call(jarA, 'GET', base + '/lecture')).status, 404);

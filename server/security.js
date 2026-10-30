@@ -59,7 +59,8 @@ const CSP = [
      sans cette directive, "default-src 'self'" bloque silencieusement tout <iframe> vers un
      domaine externe, y compris youtube.com. */
   /* + player.vimeo.com (2026-10-17) : vidéos jointes aux rubriques d'un business plan (liens YouTube / Vimeo intégrés). */
-  "frame-src 'self' https://www.youtube.com https://player.vimeo.com",
+  /* + *.b-cdn.net (2026-10-30) : lecteur PDF intégré des leçons de formation et du Studio (documents hébergés sur le CDN Bunny). */
+  "frame-src 'self' https://www.youtube.com https://player.vimeo.com https://*.b-cdn.net",
   "frame-ancestors 'self'",
   "base-uri 'self'",
   "form-action 'self'",

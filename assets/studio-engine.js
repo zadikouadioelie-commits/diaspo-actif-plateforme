@@ -31,7 +31,10 @@
       { t: 'video', n: 'Vidéo', i: '🎬', w: 640, h: 360, props: { url: '', titre: '' } },
       { t: 'audio', n: 'Audio', i: '🎧', w: 480, h: 96, props: { url: '', titre: '' } } ] },
     { cat: 'Documents', items: [
-      { t: 'fichier', n: 'Fichier / document', i: '📎', w: 440, h: 72, props: { nom: '', url: '', description: '' } } ] },
+      { t: 'document', n: 'Document PDF', i: '📄', w: 760, h: 520, props: { nom: '', url: '', mode: 'lecteur' } },
+      { t: 'fichier', n: 'Fichier à télécharger', i: '📎', w: 440, h: 72, props: { nom: '', url: '', description: '' } } ] },
+    { cat: 'Évaluations', items: [
+      { t: 'quiz', n: 'Quiz · questionnaire · exercice', i: '📝', w: 760, h: 150, props: { quiz_id: 0, libelle: '' } } ] },
     { cat: 'Interactions', items: [
       { t: 'bouton', n: 'Bouton', i: '🔘', w: 240, h: 54, props: { libelle: 'Mon bouton', action: 'lien', url: '', page: '', couleur: '#e6b84a', couleur_texte: '#0b1226', rayon: 10 } },
       { t: 'lien', n: 'Lien externe', i: '🔗', w: 320, h: 40, props: { libelle: 'Mon lien', url: '' } },
@@ -212,6 +215,7 @@
   /* ajout d'un outil (glisser-déposer ou toucher) */
   function ajouterOutil(type, pos) {
     const T = outil(type); if (!T) return;
+    if (type === 'quiz' && S.doc.pages.some(p => p.elements.some(x => x.type === 'quiz'))) { toast('Ce module a déjà une activité évaluée (une seule par module). Créez une autre leçon pour en ajouter une.'); return; }
     if (S.editing) finEdition();
     const e = { id: uid('e_'), type, x: 0, y: 0, w: T.w, h: T.h, z: 1, locked: false, props: copie(T.props) };
     if (R.TEXTE.includes(type)) Object.assign(e.props, { police: '', taille: 0, couleur: '', fond: '', align: 'left', interligne: 0, gras: false });
@@ -382,14 +386,20 @@
   function supprimer() {
     const ids = selection().filter(e => !e.locked).map(e => e.id);
     if (!ids.length) { if (S.sel.length) toast('Déverrouillez l\'élément pour le supprimer.'); return; }
+    const quiz = selection().find(e => e.type === 'quiz' && Number(e.props.quiz_id) > 0);
+    if (quiz) {
+      if (!confirm('Supprimer cette activité supprime aussi ses questions et les résultats des apprenants (action définitive). Continuer ?')) return;
+      actApi('DELETE', '').then(() => { modifier(() => { pg().elements = pg().elements.filter(e => !ids.includes(e.id)); }); choisir([]); toast('Activité supprimée'); }).catch(e => toast(e.message));
+      return;
+    }
     modifier(() => { pg().elements = pg().elements.filter(e => !ids.includes(e.id)); }); choisir([]);
   }
   function dupliquer() {
-    const src = selection(); if (!src.length) return; const nouveaux = [];
+    const src = selection().filter(e => e.type !== 'quiz'); if (!src.length) { if (S.sel.length) toast('L\'activité évaluée ne se duplique pas (une seule par module).'); return; } const nouveaux = [];
     modifier(() => { src.forEach(e => { const c = copie(e); c.id = uid('e_'); c.locked = false; if (libre()) { c.x += 24; c.y += 24; c.z = (c.z || 1) + 1; } const i = pg().elements.findIndex(x => x.id === e.id); pg().elements.splice(libre() ? pg().elements.length : i + 1, 0, c); nouveaux.push(c.id); }); });
     choisir(nouveaux);
   }
-  function copier() { S.clip = selection().map(copie); S.pasteN = 0; if (S.clip.length) toast(S.clip.length > 1 ? S.clip.length + ' éléments copiés' : 'Élément copié'); majBarre(); }
+  function copier() { S.clip = selection().filter(e => e.type !== 'quiz').map(copie); S.pasteN = 0; if (S.clip.length) toast(S.clip.length > 1 ? S.clip.length + ' éléments copiés' : 'Élément copié'); majBarre(); }
   function coller() {
     if (!S.clip.length) return; S.pasteN++; const nouveaux = [];
     modifier(() => { S.clip.forEach(e => { const c = copie(e); c.id = uid('e_'); c.locked = false; if (libre()) { c.x += 24 * S.pasteN; c.y += 24 * S.pasteN; } pg().elements.push(c); nouveaux.push(c.id); }); });
@@ -437,6 +447,8 @@
     else if (s.length > 1) h = `<h3 class="st-pt">${s.length} éléments sélectionnés</h3><p class="st-ps">Déplacez-les ensemble, alignez-les ou supprimez-les.</p>${libre() ? alignerHtml('Aligner sur la sélection') : ''}${actionsComm(s)}`;
     else h = propsElement(s[0]);
     propsEl.innerHTML = h;
+    const q = s.length === 1 && s[0].type === 'quiz' && Number(s[0].props.quiz_id) > 0 ? s[0] : null;
+    if (q) resumeActivite();
   }
   const alignerHtml = t => `<span class="st-h3" style="display:block">${t}</span><div class="st-btns"><button class="st-b" data-al="g" title="Aligner à gauche">⇤ Gauche</button><button class="st-b" data-al="c" title="Centrer horizontalement">⇔ Centre</button><button class="st-b" data-al="d" title="Aligner à droite">⇥ Droite</button><button class="st-b" data-al="h" title="Aligner en haut">⤒ Haut</button><button class="st-b" data-al="m" title="Centrer verticalement">⇕ Milieu</button><button class="st-b" data-al="b" title="Aligner en bas">⤓ Bas</button></div>`;
   function propsPage() {
@@ -480,6 +492,15 @@
     } else if (t === 'fichier') {
       h += `<div class="st-btns"><button class="st-b or" data-up="document">${p.url ? 'Remplacer le fichier' : 'Importer un fichier'}</button></div><p class="st-aide">PDF, Word, Excel, PowerPoint ou image — 15 Mo maximum.</p>
         ${champ('Nom affiché', 'nom', p.nom)}${champ('Description', 'description', p.description)}${champ('ou adresse (https) du fichier', 'url', p.url, 'url')}`;
+    } else if (t === 'document') {
+      h += `<div class="st-btns"><button class="st-b or" data-up="document">${p.url ? 'Remplacer le document' : 'Importer un document'}</button></div><p class="st-aide">PDF, Word, Excel, PowerPoint ou image — 15 Mo maximum.</p>
+        ${select('Présentation', 'mode', p.mode, [['lecteur', 'Lecteur intégré dans la page (PDF)'], ['telechargement', 'Carte à télécharger']])}
+        ${champ('Nom affiché', 'nom', p.nom)}${champ('ou adresse (https) du document', 'url', p.url, 'url')}
+        ${p.url && p.mode === 'lecteur' && !/\.pdf(\?|#|$)/i.test(p.url) ? '<p class="st-aide" style="color:#fca5a5">Le lecteur intégré ne lit que les PDF. Pour un PowerPoint ou un Word : exportez-le en PDF (Fichier › Exporter), ou choisissez « Carte à télécharger ».</p>' : ''}`;
+    } else if (t === 'quiz') {
+      if (!p.quiz_id) h += `<p class="st-aide">Choisissez le type d'activité à créer. Elle sera corrigée par le serveur ; réussir l'activité valide la leçon.</p><div class="st-btns" style="flex-direction:column">
+        <button class="st-b or" data-act-new="questionnaire">📝 Quiz / questionnaire noté</button><button class="st-b or" data-act-new="evaluation">🎓 Évaluation (examen)</button><button class="st-b or" data-act-new="exercice">🛠 Exercice pratique (devoir à rendre)</button></div>`;
+      else h += `<div id="st-act-resume" class="st-aide">Chargement…</div><div class="st-btns"><button class="st-b or" data-act="edit-act">✏️ Questions et réglages</button></div><p class="st-aide">Une seule activité évaluée par module. Pour supprimer l'activité, supprimez cet élément.</p>`;
     } else if (t === 'bouton') {
       h += `${champ('Texte du bouton', 'libelle', p.libelle)}${select('Action', 'action', p.action, [['lien', 'Ouvrir un lien'], ['page', 'Aller à une page du module'], ['fichier', 'Télécharger un fichier']])}
         ${p.action === 'page' ? select('Page de destination', 'page', p.page, [['', '— choisir —'], ...S.doc.pages.map((x, i) => [x.id, `Page ${i + 1}${x.titre ? ' — ' + x.titre : ''}`])]) : champ(p.action === 'fichier' ? 'Adresse (https) du fichier' : 'Adresse du lien', 'url', p.url, 'url', 'placeholder="https://…"')}
@@ -529,6 +550,8 @@
     if (b.dataset.al) return aligner(b.dataset.al);
     if (b.dataset.ord) return ordre(b.dataset.ord);
     if (b.dataset.pa) return actionPage(b.dataset.pa);
+    if (b.dataset.actNew) return creerActivite(b.dataset.actNew);
+    if (b.dataset.act === 'edit-act') return editeurActivite();
     if (b.dataset.act === 'dupliquer') return dupliquer();
     if (b.dataset.act === 'verrou') return verrouiller();
     if (b.dataset.act === 'suppr') return supprimer();
@@ -562,6 +585,78 @@
     };
     inp.click();
   }
+
+  /* ───────── activité évaluée : quiz, questionnaire, exercice (moteur de quiz existant, piloté d'ici) ───────── */
+  const KINDS = { questionnaire: ['📝', 'Quiz / questionnaire'], evaluation: ['🎓', 'Évaluation'], exercice: ['🛠', 'Exercice pratique'] };
+  const actApi = (m, chemin, corps) => api(m, API + '/activite' + chemin, corps);
+  const quizEl = () => { for (const p of S.doc.pages) for (const e of p.elements) if (e.type === 'quiz') return e; return null; };
+  async function creerActivite(kind) {
+    const e = selection()[0]; if (!e || e.type !== 'quiz') return;
+    try {
+      const r = await actApi('POST', '', { kind });
+      modifier(() => { e.props.quiz_id = r.quiz.id; e.props.libelle = KINDS[kind][1] + ' · 0 question'; });
+      choisir([e.id]); await sauver(); editeurActivite();
+    } catch (err) { toast(err.message); }
+  }
+  async function resumeActivite() {
+    const z = $('#st-act-resume'); if (!z) return;
+    try {
+      const { quiz } = await actApi('GET', ''); if (!$('#st-act-resume')) return;
+      if (!quiz) { $('#st-act-resume').textContent = 'Cette activité n\'existe plus : supprimez cet élément et recréez-la.'; return; }
+      $('#st-act-resume').innerHTML = `<b>${esc(KINDS[quiz.kind][0] + ' ' + quiz.titre)}</b><br>${quiz.questions.length} question${quiz.questions.length > 1 ? 's' : ''} · seuil ${quiz.note_minimale} %${quiz.max_tentatives ? ' · ' + quiz.max_tentatives + ' tentatives' : ''}${quiz.temps_limite_min ? ' · ' + quiz.temps_limite_min + ' min' : ''}${quiz.kind === 'exercice' ? ' · corrigé par vous' : ''}`;
+      const e = quizEl(), lib = `${KINDS[quiz.kind][1]} · ${quiz.questions.length} question${quiz.questions.length > 1 ? 's' : ''}`;
+      if (e && e.props.libelle !== lib) { e.props.libelle = lib; modifie(); remplacerNoeud(e); }
+    } catch (err) { $('#st-act-resume').textContent = err.message; }
+  }
+  const lignesOpt = (o, bonnes) => (o && o.length ? o : ['', '']).map((v, i) => `<div class="st-act-opt"><input type="checkbox" data-bonne="${i}" title="Bonne réponse" ${bonnes.includes(v) && v ? 'checked' : ''}><input type="text" data-opt="${i}" maxlength="200" placeholder="Choix ${i + 1}" value="${esc(v)}"></div>`).join('');
+  async function editeurActivite(questionEnEdition) {
+    let quiz; try { quiz = (await actApi('GET', '')).quiz; } catch (e) { toast(e.message); return; }
+    if (!quiz) { toast('Activité introuvable.'); return; }
+    const qe = questionEnEdition ? quiz.questions.find(x => x.id === questionEnEdition) : null;
+    const exo = quiz.kind === 'exercice', type = qe ? qe.type : 'qcm';
+    const liste = quiz.questions.length ? quiz.questions.map((x, i) => `<div class="st-act-q"><div><b>${i + 1}. ${esc(x.question)}</b><small>${{ qcm: 'Choix multiples', vrai_faux: 'Vrai / faux', texte_libre: 'Réponse libre' }[x.type]} · ${x.points} pt${x.points > 1 ? 's' : ''}${x.reponse_correcte ? '' : ' · non notée'}</small></div><button class="st-b" data-qe="${x.id}">Modifier</button><button class="st-b dg" data-qd="${x.id}">🗑</button></div>`).join('') : '<p class="st-aide">Aucune question pour le moment.' + (exo ? ' Un exercice peut aussi se limiter à un fichier à déposer (voir « Dépôt de fichier »).' : '') + '</p>';
+    boite('m-info', `<h2>${KINDS[quiz.kind][0]} ${esc(KINDS[quiz.kind][1])}</h2><p>Les réponses sont corrigées par le serveur : l'apprenant ne voit jamais le corrigé avant d'avoir réussi.</p>
+      <div class="st-row"><label class="st-f"><span>Titre</span><input type="text" id="ac-titre" maxlength="120" value="${esc(quiz.titre)}"></label><label class="st-f"><span>Seuil de réussite (%)</span><input type="number" id="ac-seuil" min="0" max="100" value="${quiz.note_minimale}"></label></div>
+      <div class="st-row3"><label class="st-f"><span>Tentatives max.</span><input type="number" id="ac-tent" min="1" max="20" placeholder="illimitées" value="${quiz.max_tentatives == null ? '' : quiz.max_tentatives}"></label><label class="st-f"><span>Durée (min)</span><input type="number" id="ac-duree" min="1" max="480" placeholder="sans limite" value="${quiz.temps_limite_min == null ? '' : quiz.temps_limite_min}"></label>
+        ${exo ? `<label class="st-f"><span>Dépôt de fichier</span><select id="ac-depot">${[['non', 'Non'], ['optionnel', 'Facultatif'], ['obligatoire', 'Obligatoire']].map(o => `<option value="${o[0]}" ${quiz.depot_fichier === o[0] ? 'selected' : ''}>${o[1]}</option>`).join('')}</select></label>` : `<label class="st-f" style="display:flex;gap:8px;align-items:center;margin-top:20px"><input type="checkbox" id="ac-mel" ${quiz.melanger ? 'checked' : ''} style="width:auto"> <span style="margin:0">Mélanger</span></label>`}</div>
+      <div class="st-btns"><button class="st-b or" id="ac-save">Enregistrer les réglages</button></div>
+      <h3 class="st-h3">Questions (${quiz.questions.length})</h3>${liste}
+      <div class="st-act-form"><b>${qe ? 'Modifier la question' : 'Ajouter une question'}</b>
+        <label class="st-f" style="margin-top:8px"><span>Énoncé</span><textarea id="aq-enonce" rows="2" maxlength="500">${qe ? esc(qe.question) : ''}</textarea></label>
+        <div class="st-row"><label class="st-f"><span>Type</span><select id="aq-type"><option value="qcm" ${type === 'qcm' ? 'selected' : ''}>Choix multiples (une ou plusieurs bonnes réponses)</option><option value="vrai_faux" ${type === 'vrai_faux' ? 'selected' : ''}>Vrai ou faux</option><option value="texte_libre" ${type === 'texte_libre' ? 'selected' : ''}>Réponse libre</option></select></label>
+          <label class="st-f"><span>Points</span><input type="number" id="aq-points" min="1" max="20" value="${qe ? qe.points : 1}"></label></div>
+        <div id="aq-zone"></div>
+        <label class="st-f"><span>Explication (affichée après la réussite)</span><textarea id="aq-expl" rows="2" maxlength="500">${qe ? esc(qe.explication) : ''}</textarea></label>
+        <div class="st-btns"><button class="st-b or" id="aq-save">${qe ? 'Enregistrer la question' : 'Ajouter la question'}</button>${qe ? '<button class="st-b" id="aq-annuler">Annuler la modification</button>' : ''}</div></div>
+      <div class="st-btns" style="margin-top:12px"><button class="st-b" id="ac-fermer">Fermer</button></div>`, true);
+    const zone = () => $('#aq-zone');
+    const dessiner = () => {
+      const tp = $('#aq-type').value;
+      if (tp === 'qcm') zone().innerHTML = `<span class="st-h3" style="display:block">Choix — cochez la ou les bonnes réponses</span><div id="aq-opts">${lignesOpt(qe && qe.type === 'qcm' ? qe.options : null, qe ? qe.bonnes : [])}</div><button type="button" class="st-b" id="aq-plus">＋ Ajouter un choix</button>`;
+      else if (tp === 'vrai_faux') zone().innerHTML = `<label class="st-f"><span>Bonne réponse</span><select id="aq-vf"><option>Vrai</option><option ${qe && qe.reponse_correcte === 'Faux' ? 'selected' : ''}>Faux</option></select></label>`;
+      else zone().innerHTML = `<label class="st-f"><span>Réponse attendue (facultative — sans réponse, la question n'est pas notée)</span><input type="text" id="aq-libre" maxlength="300" placeholder="Plusieurs réponses acceptées : séparez-les par |" value="${qe && qe.type === 'texte_libre' ? esc(qe.reponse_correcte) : ''}"></label>`;
+      const plus = $('#aq-plus'); if (plus) plus.onclick = () => { const n = $$('#aq-opts .st-act-opt').length; if (n >= 8) return toast('8 choix au maximum.'); $('#aq-opts').insertAdjacentHTML('beforeend', lignesOpt([''], []).replace(/data-bonne="0"/, `data-bonne="${n}"`).replace(/data-opt="0"/, `data-opt="${n}"`).replace(/Choix 1/, `Choix ${n + 1}`)); };
+    };
+    dessiner(); $('#aq-type').onchange = dessiner;
+    $('#ac-fermer').onclick = () => { fermer('m-info'); resumeActivite(); renderProps(); };
+    $('#ac-save').onclick = async () => {
+      const nb = v => (v === '' ? null : Number(v));
+      const corps = { titre: $('#ac-titre').value, note_minimale: Number($('#ac-seuil').value), max_tentatives: nb($('#ac-tent').value), temps_limite_min: nb($('#ac-duree').value) };
+      if ($('#ac-depot')) corps.depot_fichier = $('#ac-depot').value; if ($('#ac-mel')) corps.melanger = $('#ac-mel').checked;
+      try { await actApi('PUT', '', corps); toast('Réglages enregistrés'); } catch (e) { toast(e.message); }
+    };
+    $('#aq-save').onclick = async () => {
+      const tp = $('#aq-type').value, corps = { question: $('#aq-enonce').value, type: tp, points: Number($('#aq-points').value) || 1, explication: $('#aq-expl').value };
+      if (tp === 'qcm') { const ops = $$('#aq-opts [data-opt]').map(i => i.value.trim()); corps.options = ops.filter(Boolean); corps.bonnes = $$('#aq-opts [data-bonne]').filter(c => c.checked).map(c => ops[Number(c.dataset.bonne)]).filter(Boolean); }
+      else if (tp === 'vrai_faux') corps.bonne = $('#aq-vf').value; else corps.reponse_attendue = $('#aq-libre').value;
+      try { if (qe) await actApi('PUT', '/questions/' + qe.id, corps); else await actApi('POST', '/questions', corps); toast(qe ? 'Question modifiée' : 'Question ajoutée'); editeurActivite(); } catch (e) { toast(e.message); }
+    };
+    if (qe) $('#aq-annuler').onclick = () => editeurActivite();
+    $$('[data-qe]', $('#m-info')).forEach(b => b.addEventListener('click', () => editeurActivite(Number(b.dataset.qe))));
+    $$('[data-qd]', $('#m-info')).forEach(b => b.addEventListener('click', async () => { if (!confirm('Supprimer cette question ?')) return; try { await actApi('DELETE', '/questions/' + b.dataset.qd); editeurActivite(); } catch (e) { toast(e.message); } }));
+  }
+  /* un clic sur l'élément « quiz » ouvre directement l'éditeur */
+  zi.addEventListener('dblclick', ev => { const n = ev.target.closest('.st-el[data-type="quiz"]'); if (n) { const e = el(n.dataset.id); if (e && Number(e.props.quiz_id) > 0) editeurActivite(); } });
 
   /* ───────── clavier ───────── */
   document.addEventListener('keydown', ev => {
@@ -613,7 +708,7 @@
     boite('m-info', `<h2>Aperçu — comme l'apprenant</h2><div class="st-prev-bar"><button class="st-b on" data-dev="1100">🖥️ Ordinateur</button><button class="st-b" data-dev="768">📱 Tablette</button><button class="st-b" data-dev="390">📞 Smartphone</button><span class="grow"></span><button class="st-b" id="pv-x">Fermer</button></div>
       <div class="st-prev-zone"><div class="st-prev-cadre" id="pv-cadre" style="width:1100px;max-width:100%"></div></div><p class="st-aide">Les boutons, les validations et la navigation entre les pages fonctionnent comme pour l'apprenant.</p>`, true);
     let inst = null;
-    const monter = () => { if (inst) inst.destroy(); inst = R.lecture($('#pv-cadre'), { mode: S.doc.mode, pages: copie(S.doc.pages) }, {}); };
+    const monter = () => { if (inst) inst.destroy(); inst = R.lecture($('#pv-cadre'), { mode: S.doc.mode, pages: copie(S.doc.pages) }, { apercu: true }); };
     $$('[data-dev]', $('#m-info')).forEach(b => b.addEventListener('click', () => { $$('[data-dev]', $('#m-info')).forEach(x => x.classList.remove('on')); b.classList.add('on'); $('#pv-cadre').style.width = b.dataset.dev + 'px'; monter(); }));
     $('#pv-x').onclick = () => { if (inst) inst.destroy(); fermer('m-info'); }; monter();
   }

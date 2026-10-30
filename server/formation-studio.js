@@ -14,7 +14,7 @@
 const Droits = require("./formation-droits");
 
 const TYPES_TEXTE = ["titre", "soustitre", "paragraphe", "citation", "encadre"];
-const TYPES = [...TYPES_TEXTE, "image", "video", "audio", "separateur", "lien", "bouton", "fichier", "tableau", "validation"];
+const TYPES = [...TYPES_TEXTE, "image", "video", "audio", "separateur", "lien", "bouton", "fichier", "document", "tableau", "validation", "quiz"];
 const POLICES = ["Arial", "Georgia", "Times New Roman", "Verdana", "Trebuchet MS", "Garamond", "Calibri", "Segoe UI", "Courier New", "sans-serif", "serif"];
 const MAX_PAGES = 60, MAX_ELEMENTS = 200, MAX_JSON = 900 * 1024;
 const LARG = 1280, HAUT = 720;
@@ -65,6 +65,11 @@ function nettoyerElement(e, SEC, pagesIds) {
     o.couleur = couleur(p.couleur); o.couleur_texte = couleur(p.couleur_texte); o.rayon = Math.round(nbr(p.rayon, 0, 60, 10));
   } else if (e.type === "fichier") {
     o.nom = txt(p.nom, 150); o.url = urlHttps(p.url); o.description = txt(p.description, 200);
+  } else if (e.type === "document") {
+    o.nom = txt(p.nom, 150); o.url = urlHttps(p.url); o.mode = choix(p.mode, ["lecteur", "telechargement"], "lecteur");
+  } else if (e.type === "quiz") {
+    o.quiz_id = Math.max(0, Math.floor(Number(p.quiz_id)) || 0); /* vérifié contre la leçon au moment de l'enregistrement (PUT) */
+    o.libelle = txt(p.libelle, 120); /* texte de la carte dans l'éditeur (titre + nombre de questions), purement informatif */
   } else if (e.type === "tableau") {
     const lignes = (Array.isArray(p.lignes) ? p.lignes : []).slice(0, 30).map(l => (Array.isArray(l) ? l : []).slice(0, 8).map(c => txt(c, 200)));
     o.lignes = lignes.length ? lignes : [["", ""], ["", ""]];
@@ -118,6 +123,7 @@ function problemes(doc) {
       if (e.type === "video" && !p.url) liste.push(`${n} : une vidéo n'a pas d'adresse.`);
       if (e.type === "audio" && !p.url) liste.push(`${n} : un audio n'a pas de fichier.`);
       if (e.type === "fichier" && !p.url) liste.push(`${n} : un fichier téléchargeable n'a pas de fichier.`);
+      if (e.type === "document" && !p.url) liste.push(`${n} : un document n'a pas de fichier.`);
       if (e.type === "lien" && (!p.url || !p.libelle)) liste.push(`${n} : un lien est incomplet (texte ou adresse manquants).`);
       if (e.type === "bouton") {
         if (!p.libelle) liste.push(`${n} : un bouton n'a pas de texte.`);
@@ -131,7 +137,40 @@ function problemes(doc) {
 const parse = s => { try { return JSON.parse(s); } catch (_) { return null; } };
 const docVide = () => ({ mode: "structure", pages: [{ id: "p_" + Math.random().toString(36).slice(2, 10), titre: "", fond: "", elements: [] }] });
 
-module.exports = { TYPES, nettoyerDoc, problemes };
+/* Types de question du moteur de quiz existant et bornes — partagés avec les routes d'activité ci-dessous. */
+const KINDS = {
+  questionnaire: { type: "intermediaire", correction_auto: 1, note_minimale: 50, depot_fichier: "non", titre: "Questionnaire" },
+  evaluation: { type: "examen_final", correction_auto: 1, note_minimale: 70, depot_fichier: "non", titre: "Évaluation" },
+  exercice: { type: "exercice", correction_auto: 0, note_minimale: 50, depot_fichier: "optionnel", titre: "Exercice pratique" },
+};
+const kindDe = q => (Number(q.correction_auto) === 0 ? "exercice" : q.type === "examen_final" ? "evaluation" : "questionnaire");
+
+/* Valide une question envoyée par l'éditeur du Studio. Renvoie { vals } ou { erreur }. */
+function lireQuestion(b) {
+  const question = txt(b && b.question, 500).trim();
+  if (!question) return { erreur: "Écrivez l'énoncé de la question." };
+  const type = choix(b.type, ["qcm", "vrai_faux", "texte_libre"], "");
+  if (!type) return { erreur: "Type de question inconnu." };
+  const points = Math.round(nbr(b.points, 1, 20, 1));
+  const explication = txt(b.explication, 500).trim() || null;
+  let options = null, reponse = null;
+  if (type === "qcm") {
+    options = [...new Set((Array.isArray(b.options) ? b.options : []).map(o => txt(o, 200).trim()).filter(Boolean))].slice(0, 8);
+    if (options.length < 2) return { erreur: "Proposez au moins deux choix différents." };
+    const bonnes = (Array.isArray(b.bonnes) ? b.bonnes : []).map(o => txt(o, 200).trim());
+    const ok = options.filter(o => bonnes.includes(o));
+    if (!ok.length) return { erreur: "Cochez au moins une bonne réponse." };
+    reponse = ok.join("|");
+  } else if (type === "vrai_faux") {
+    reponse = b.bonne === "Faux" ? "Faux" : b.bonne === "Vrai" ? "Vrai" : null;
+    if (!reponse) return { erreur: "Indiquez si l'affirmation est vraie ou fausse." };
+  } else {
+    reponse = txt(b.reponse_attendue, 300).trim() || null; /* vide = réponse libre non notée (ou corrigée par le formateur) */
+  }
+  return { vals: { question, type, options_json: options ? JSON.stringify(options) : null, reponse_correcte: reponse, points, explication } };
+}
+
+module.exports = { TYPES, KINDS, nettoyerDoc, problemes, lireQuestion };
 
 module.exports.register = function register(deps) {
   const { route, db, sendJSON, getCurrentUser, SEC, checkFormationOwner } = deps;
@@ -169,6 +208,14 @@ module.exports.register = function register(deps) {
     if (!lim.allowed) return sendJSON(res, 429, { error: `Trop d'enregistrements. Réessayez dans ${lim.retryAfter}s.` });
     const r = nettoyerDoc(body, SEC);
     if (r.erreur) return sendJSON(res, 400, { error: r.erreur });
+    const quizLecon = await db.prepare("SELECT id FROM formation_quiz WHERE lecon_id=? AND formation_id=?").get(c.lecon.id, c.f.id);
+    let quizVu = false;
+    r.doc.pages.forEach(pg => { pg.elements = pg.elements.filter(e => {
+      if (e.type !== "quiz") return true;
+      if (quizVu) return false; /* un seul quiz / questionnaire / exercice par module */
+      quizVu = true; e.props.quiz_id = quizLecon && Number(e.props.quiz_id) === Number(quizLecon.id) ? Number(quizLecon.id) : 0;
+      return true;
+    }); });
     const json = JSON.stringify(r.doc);
     const d = await chargerDoc(c.lecon.id);
     if (!d) {
@@ -234,6 +281,14 @@ module.exports.register = function register(deps) {
     if (!d) return sendJSON(res, 400, { error: "Le module est vide : ajoutez au moins un élément.", problemes: ["Le module est vide : ajoutez au moins un élément."] });
     const doc = parse(d.contenu_json) || docVide();
     const liste = problemes(doc);
+    const quizLecon = await db.prepare("SELECT * FROM formation_quiz WHERE lecon_id=? AND formation_id=?").get(c.lecon.id, c.f.id);
+    const placeQuiz = doc.pages.map((p, i) => p.elements.some(e => e.type === "quiz" && Number(e.props.quiz_id) > 0 && quizLecon && Number(e.props.quiz_id) === Number(quizLecon.id)) ? i + 1 : 0).find(Boolean);
+    doc.pages.forEach((p, i) => p.elements.forEach(e => { if (e.type === "quiz" && !(quizLecon && Number(e.props.quiz_id) === Number(quizLecon.id))) liste.push(`Page ${i + 1} : l'activité évaluée n'est pas encore créée (choisissez Quiz, Questionnaire ou Exercice).`); }));
+    if (quizLecon && !placeQuiz) liste.push("Cette leçon a une activité évaluée (quiz, questionnaire ou exercice) qui n'est placée dans aucune page : ajoutez-la dans une page, ou supprimez-la.");
+    if (quizLecon && placeQuiz) {
+      const nbQ = Number((await db.prepare("SELECT COUNT(*) AS n FROM formation_quiz_questions WHERE quiz_id=?").get(quizLecon.id)).n) || 0;
+      if (!nbQ && !(Number(quizLecon.correction_auto) === 0 && quizLecon.depot_fichier && quizLecon.depot_fichier !== "non")) liste.push(`Page ${placeQuiz} : l'activité « ${quizLecon.titre} » n'a encore aucune question.`);
+    }
     if (liste.length) return sendJSON(res, 400, { error: "Le module n'est pas prêt à être publié.", problemes: liste });
     const version = await creerVersion(d, d.contenu_json, d.mode, true, c.user.id, "Publication");
     await db.prepare("UPDATE formation_studio_docs SET publiee_version=? WHERE id=?").run(version, d.id);
@@ -247,6 +302,83 @@ module.exports.register = function register(deps) {
     if (!d || d.publiee_version == null) return sendJSON(res, 409, { error: "Ce module n'est pas publié." });
     await db.prepare("UPDATE formation_studio_docs SET publiee_version=NULL WHERE id=?").run(d.id);
     sendJSON(res, 200, { ok: true });
+  });
+
+  /* ── Activité évaluée de la leçon (quiz, questionnaire, exercice) : le moteur de quiz existant, piloté depuis le Studio. Une seule par leçon. ── */
+  const detailQuiz = async q => {
+    const qs = await db.prepare("SELECT * FROM formation_quiz_questions WHERE quiz_id=? ORDER BY ordre ASC, id ASC").all(q.id);
+    return { id: Number(q.id), kind: kindDe(q), titre: q.titre, note_minimale: Number(q.note_minimale), max_tentatives: q.max_tentatives == null ? null : Number(q.max_tentatives),
+      temps_limite_min: q.temps_limite_min == null ? null : Number(q.temps_limite_min), melanger: !!Number(q.melanger), depot_fichier: q.depot_fichier || "non", correction_auto: Number(q.correction_auto) !== 0,
+      questions: qs.map(x => { let o = []; try { o = JSON.parse(x.options_json || "[]") || []; } catch (_) {} return { id: Number(x.id), question: x.question, type: x.type, options: o, bonnes: String(x.reponse_correcte || "").split("|").filter(Boolean), reponse_correcte: x.reponse_correcte || "", points: Number(x.points) || 1, explication: x.explication || "" }; }) };
+  };
+  const quizDeLecon = (c) => db.prepare("SELECT * FROM formation_quiz WHERE lecon_id=? AND formation_id=?").get(c.lecon.id, c.f.id);
+
+  route("GET", BASE + "/activite", async (req, res, params) => {
+    const c = await contexteProprietaire(req, res, params, false); if (!c) return;
+    const q = await quizDeLecon(c);
+    sendJSON(res, 200, { quiz: q ? await detailQuiz(q) : null });
+  });
+  route("POST", BASE + "/activite", async (req, res, params, body) => {
+    const c = await contexteProprietaire(req, res, params, true); if (!c) return;
+    const K = KINDS[body && body.kind]; if (!K) return sendJSON(res, 400, { error: "Choisissez Quiz / questionnaire, Évaluation ou Exercice pratique." });
+    if (c.f.suivi_mode === "aucun") return sendJSON(res, 400, { error: "Cette formation est réglée « sans suivi de progression » : elle ne peut pas contenir d'activité évaluée.", code: "suivi_desactive" });
+    if (await quizDeLecon(c)) return sendJSON(res, 409, { error: "Cette leçon a déjà une activité évaluée : créez une autre leçon pour en ajouter une." });
+    const titre = txt(body.titre, 120).trim() || K.titre;
+    const id = (await db.prepare("INSERT INTO formation_quiz (formation_id,lecon_id,titre,type,note_minimale,correction_auto,depot_fichier) VALUES (?,?,?,?,?,?,?)").run(c.f.id, c.lecon.id, titre, K.type, K.note_minimale, K.correction_auto, K.depot_fichier)).lastInsertRowid;
+    sendJSON(res, 201, { quiz: await detailQuiz(await db.prepare("SELECT * FROM formation_quiz WHERE id=?").get(id)) });
+  });
+  route("PUT", BASE + "/activite", async (req, res, params, body) => {
+    const c = await contexteProprietaire(req, res, params, true); if (!c) return;
+    const q = await quizDeLecon(c); if (!q) return sendJSON(res, 404, { error: "Aucune activité évaluée dans cette leçon." });
+    const b = body || {}; const sets = {};
+    const entier = (v, min, max, nom) => { if (v === null || v === "") return { v: null }; const n = Math.floor(Number(v)); if (!Number.isFinite(n) || n < min || n > max) return { erreur: `${nom} doit être compris entre ${min} et ${max} (ou vide pour aucune limite).` }; return { v: n }; };
+    if (b.titre !== undefined) { const t2 = txt(b.titre, 120).trim(); if (!t2) return sendJSON(res, 400, { error: "Le titre ne peut pas être vide." }); sets.titre = t2; }
+    if (b.note_minimale !== undefined) { const r = entier(b.note_minimale, 0, 100, "Le seuil de réussite"); if (r.erreur || r.v == null) return sendJSON(res, 400, { error: r.erreur || "Indiquez le seuil de réussite (0 à 100 %)." }); sets.note_minimale = r.v; }
+    if (b.max_tentatives !== undefined) { const r = entier(b.max_tentatives, 1, 20, "Le nombre de tentatives"); if (r.erreur) return sendJSON(res, 400, { error: r.erreur }); sets.max_tentatives = r.v; }
+    if (b.temps_limite_min !== undefined) { const r = entier(b.temps_limite_min, 1, 480, "La durée"); if (r.erreur) return sendJSON(res, 400, { error: r.erreur }); sets.temps_limite_min = r.v; }
+    if (b.melanger !== undefined) sets.melanger = b.melanger ? 1 : 0;
+    if (b.depot_fichier !== undefined) {
+      if (!["non", "optionnel", "obligatoire"].includes(b.depot_fichier)) return sendJSON(res, 400, { error: "Dépôt de fichier inconnu (non, optionnel ou obligatoire)." });
+      if (Number(q.correction_auto) !== 0 && b.depot_fichier !== "non") return sendJSON(res, 400, { error: "Le dépôt de fichier est réservé aux exercices corrigés par le formateur." });
+      sets.depot_fichier = b.depot_fichier;
+    }
+    for (const k of Object.keys(sets)) await db.prepare(`UPDATE formation_quiz SET ${k}=? WHERE id=?`).run(sets[k], q.id);
+    sendJSON(res, 200, { quiz: await detailQuiz(await db.prepare("SELECT * FROM formation_quiz WHERE id=?").get(q.id)) });
+  });
+  route("DELETE", BASE + "/activite", async (req, res, params) => {
+    const c = await contexteProprietaire(req, res, params, true); if (!c) return;
+    const q = await quizDeLecon(c); if (!q) return sendJSON(res, 404, { error: "Aucune activité évaluée dans cette leçon." });
+    await db.prepare("DELETE FROM formation_quiz_tentatives WHERE quiz_id=?").run(q.id);
+    await db.prepare("DELETE FROM formation_quiz_sessions WHERE quiz_id=?").run(q.id);
+    await db.prepare("DELETE FROM formation_quiz_questions WHERE quiz_id=?").run(q.id);
+    await db.prepare("DELETE FROM formation_quiz WHERE id=?").run(q.id);
+    sendJSON(res, 200, { ok: true });
+  });
+  route("POST", BASE + "/activite/questions", async (req, res, params, body) => {
+    const c = await contexteProprietaire(req, res, params, true); if (!c) return;
+    const q = await quizDeLecon(c); if (!q) return sendJSON(res, 404, { error: "Créez d'abord l'activité évaluée." });
+    const r = lireQuestion(body); if (r.erreur) return sendJSON(res, 400, { error: r.erreur });
+    const nb = Number((await db.prepare("SELECT COUNT(*) AS n FROM formation_quiz_questions WHERE quiz_id=?").get(q.id)).n) || 0;
+    if (nb >= 60) return sendJSON(res, 400, { error: "Une activité est limitée à 60 questions." });
+    const { m } = await db.prepare("SELECT COALESCE(MAX(ordre),-1) AS m FROM formation_quiz_questions WHERE quiz_id=?").get(q.id);
+    const v = r.vals;
+    const id = (await db.prepare("INSERT INTO formation_quiz_questions (quiz_id,question,type,options_json,reponse_correcte,points,ordre,explication) VALUES (?,?,?,?,?,?,?,?)").run(q.id, v.question, v.type, v.options_json, v.reponse_correcte, v.points, Number(m) + 1, v.explication)).lastInsertRowid;
+    sendJSON(res, 201, { id: Number(id), quiz: await detailQuiz(q) });
+  });
+  route("PUT", BASE + "/activite/questions/:qid", async (req, res, params, body) => {
+    const c = await contexteProprietaire(req, res, params, true); if (!c) return;
+    const q = await quizDeLecon(c); if (!q) return sendJSON(res, 404, { error: "Aucune activité évaluée dans cette leçon." });
+    const ex = await db.prepare("SELECT id FROM formation_quiz_questions WHERE id=? AND quiz_id=?").get(params.qid, q.id); if (!ex) return sendJSON(res, 404, { error: "Question introuvable." });
+    const r = lireQuestion(body); if (r.erreur) return sendJSON(res, 400, { error: r.erreur });
+    const v = r.vals;
+    await db.prepare("UPDATE formation_quiz_questions SET question=?, type=?, options_json=?, reponse_correcte=?, points=?, explication=? WHERE id=?").run(v.question, v.type, v.options_json, v.reponse_correcte, v.points, v.explication, ex.id);
+    sendJSON(res, 200, { quiz: await detailQuiz(q) });
+  });
+  route("DELETE", BASE + "/activite/questions/:qid", async (req, res, params) => {
+    const c = await contexteProprietaire(req, res, params, true); if (!c) return;
+    const q = await quizDeLecon(c); if (!q) return sendJSON(res, 404, { error: "Aucune activité évaluée dans cette leçon." });
+    await db.prepare("DELETE FROM formation_quiz_questions WHERE id=? AND quiz_id=?").run(params.qid, q.id);
+    sendJSON(res, 200, { quiz: await detailQuiz(q) });
   });
 
   /* GET …/lecture — le module tel que lu par l'apprenant : la VERSION PUBLIÉE, jamais le brouillon (sauf ?brouillon=1 pour le propriétaire : prévisualisation).
