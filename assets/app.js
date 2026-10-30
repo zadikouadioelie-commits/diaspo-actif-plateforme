@@ -7550,3 +7550,64 @@ document.addEventListener('load', function (e) {
     e.target.classList.add('loaded');
   }
 }, true);
+
+/* ── Barre des accès rapides (.nav du bandeau) : la remplir tant qu'il reste de la place ──
+   (2026-10-30, demande explicite : « sur toutes les pages, là où il y a de l'espace, afficher plus
+   d'outils — là on n'en voit que 3 »). Chaque page écrit sa propre liste en dur (de 2 à 7 liens),
+   si bien que sur un grand écran certaines pages laissaient un grand vide à côté de 3 liens seulement.
+   Ici on complète la liste avec les accès de base manquants, puis on retire — par la fin — ceux qui ne
+   tiennent pas, pour que la barre ne défile que si même la liste d'origine déborde. Jamais de lien
+   retiré à une page : seuls les liens ajoutés ici peuvent disparaître. Une page qui veut sa barre
+   telle quelle pose data-nav-fixe sur <nav class="nav">. Les pages à barre vide ou à un seul lien
+   (connexion, pilote…) ne sont pas touchées. */
+(function () {
+  var ACCES = [
+    { href: 'index.html', label: 'Accueil' },
+    { href: 'annuaire.html', label: 'Annuaire' },
+    { href: 'vitrines.html', label: 'Boutiques' },
+    { href: 'fil-actualite.html', label: "Fil d'actualité" },
+    { href: 'formations.html', label: 'Formations' },
+    { href: 'evenements.html', label: 'Autres événements' }
+  ];
+  function nomPage(h) { return String(h || '').split('#')[0].split('?')[0]; }
+
+  function completer() {
+    var nav = document.querySelector('.topbar .nav, header .nav');
+    if (!nav || nav.hasAttribute('data-nav-fixe')) return;
+    var liens = nav.querySelectorAll('a');
+    if (liens.length < 2) return;
+    var presents = {};
+    liens.forEach(function (a) { presents[nomPage(a.getAttribute('href'))] = true; });
+    var ajoutes = [];
+    ACCES.forEach(function (it) {
+      if (presents[it.href]) return;
+      var a = document.createElement('a');
+      a.href = it.href;
+      a.textContent = it.label;
+      a.setAttribute('data-nav-ajout', '1');
+      nav.appendChild(a);
+      ajoutes.push(a);
+    });
+    if (!ajoutes.length) return;
+    try { if (typeof applyTranslations === 'function') applyTranslations(); } catch (e) { /* libellés en français */ }
+
+    /* Ajuste : trop étroit → on retire les ajouts par la fin ; assez large → on les remet. */
+    function ajuster() {
+      var i;
+      for (i = 0; i < ajoutes.length; i++) ajoutes[i].style.display = '';
+      for (i = ajoutes.length - 1; i >= 0 && nav.scrollWidth > nav.clientWidth + 1; i--) ajoutes[i].style.display = 'none';
+    }
+    ajuster();
+    var t = null;
+    window.addEventListener('resize', function () { clearTimeout(t); t = setTimeout(ajuster, 120); });
+    /* le bloc compte (connexion, pastilles, bascule de compte) se remplit après coup et change la largeur dispo */
+    var zone = document.querySelector('.topbar-right');
+    if (zone && window.MutationObserver) {
+      new MutationObserver(function () { clearTimeout(t); t = setTimeout(ajuster, 120); })
+        .observe(zone, { childList: true, subtree: true });
+    }
+    setTimeout(ajuster, 1200);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', completer);
+  else completer();
+})();
