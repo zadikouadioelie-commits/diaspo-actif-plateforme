@@ -18,6 +18,7 @@ cette date, pas un objectif théorique — les manques sont marqués comme tels 
 | Sécurité et prévention des fraudes | Intérêt légitime | Art. 6.1.f | Logs IP, tentatives de connexion | Vercel, Neon | 12 mois (logs) |
 | Envoi d'e-mails transactionnels | Exécution du contrat | Art. 6.1.b | E-mail, nom | Resend (sous-traitant e-mail) | Durée du compte |
 | Statistiques de fréquentation | Intérêt légitime | Art. 6.1.f | IP hachée à sens unique, change chaque jour | Interne uniquement | 1 jour (pas de persistance identifiante) |
+| Koffi, tuteur IA des formations (ajouté le 2026-10-30) | Exécution du contrat (service demandé par l'élève Premium) | Art. 6.1.b | Texte libre des questions et réponses ; envoyés au prestataire d'IA : question, 6 derniers messages, extraits du cours autorisés — JAMAIS nom, e-mail, identifiant | Anthropic, PBC (sous-traitant IA, États-Unis) ; Vercel, Neon | Conversations : 60 jours max puis purge automatique (cron `/api/cron/kofi-purge`), effacées à la suppression du compte ; achats : 10 ans ; compteurs d'usage (sans contenu) : durée du compte |
 
 Source publique correspondante : [politique-confidentialite.html](politique-confidentialite.html) §2-4.
 **Manque identifié :** ce tableau n'existait sous aucune forme consolidée avant ce jour — à tenir à jour à chaque nouveau traitement de données.
@@ -65,8 +66,9 @@ pratique (qui a les accès Neon, sous quelle procédure) plutôt qu'en code.
 | Stripe | Paiements (Premium, boutique, cagnottes) | États-Unis / international | Données de paiement (jamais la carte complète côté Diaspo'Actif) |
 | PayPal | Paiements (en préparation, pas encore en production) | International | — (pas encore utilisé) |
 | Bunny.net | CDN / stockage des fichiers déposés (photos, logos, documents, médias) | International (diffusion par point de présence le plus proche) | Fichiers uploadés par les utilisateurs — ajouté le 2026-10-12, oublié jusque-là |
+| Anthropic, PBC | Intelligence artificielle de Koffi (modèle Haiku, appelé côté serveur uniquement ; clé `ANTHROPIC_API_KEY` jamais côté navigateur) | États-Unis | Question de l'élève, 6 derniers messages, extraits du cours auxquels il a accès ; AUCUNE donnée d'identité. Suppression chez le prestataire sous 30 jours (API), pas d'entraînement sur ces contenus (conditions commerciales) — ajouté le 2026-10-30, à l'activation de Koffi |
 
-Source publique correspondante : [politique-confidentialite.html](politique-confidentialite.html) §5, [mentions-legales.html](mentions-legales.html) (hébergement).
+Source publique correspondante : [politique-confidentialite.html](politique-confidentialite.html) §5 et §5 bis (Koffi), [mentions-legales.html](mentions-legales.html) (hébergement et intelligence artificielle).
 
 ## 6. Accords de traitement des données (DPA) avec les prestataires
 
@@ -76,6 +78,8 @@ contrats externes que je n'ai pas la visibilité pour vérifier. Les quatre pres
 proposent un DPA standard (souvent via leurs conditions générales + clauses contractuelles
 types UE), généralement activable depuis le tableau de bord de chaque compte — à confirmer
 et archiver une copie signée/acceptée de chacun.
+
+**Anthropic (ajouté le 2026-10-30) :** d'après la documentation du prestataire, son accord de traitement (DPA), qui inclut les clauses contractuelles types, est automatiquement intégré à ses conditions commerciales : il suffit d'avoir accepté ces conditions à la création du compte API. **À faire par l'utilisateur à la création du compte Anthropic :** accepter les conditions commerciales (pas les conditions grand public), archiver la copie du DPA, et vérifier dans la console que le partage de données pour l'amélioration des modèles reste désactivé.
 
 ## 7. Procédure de gestion des demandes RGPD (droit d'accès, rectification, suppression…)
 
@@ -121,7 +125,7 @@ avec quels modèles de communication) au-delà de l'obligation CNIL elle-même.
 
 Déjà publié et exact : [politique-confidentialite.html](politique-confidentialite.html) §4
 (compte actif : durée d'utilisation + 3 ans ; compte supprimé : 30 jours ; logs : 12 mois ;
-messages privés : jusqu'à suppression par les parties ; facturation : 10 ans).
+messages privés : jusqu'à suppression par les parties ; facturation : 10 ans ; conversations Koffi : 60 jours max).
 Rien à ajouter ici — ce point est déjà couvert publiquement ET correspond à l'état réel du code.
 
 ## 12. Procédure de contrôle des accès et de revue des permissions

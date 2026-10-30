@@ -318,4 +318,27 @@ test('Koffi — règles du socle', async (t) => {
     assert.equal(ligne.statut, 'non_exploitable'); assert.equal(ligne.raison, 'video_sans_transcription'); assert.equal(ligne.extraits, 0);
     assert.ok(idx.data.lecons.find(x => x.id === l1).extraits >= 1);
   });
+
+  await t.test('suppression de compte (RGPD) : conversations et retours de l\'élève effacés, ceux des autres intacts ; achats et compteurs d\'usage conservés', async () => {
+    const a = uid('Alpha'), b = uid('Beta');
+    const msgA = sql("select id from kofi_messages where conversation_id=? and role='assistant' order by id limit 1", convA)[0].id;
+    const msgB = sql("select id from kofi_messages where conversation_id=? and role='assistant' order by id limit 1", convB)[0].id;
+    assert.equal((await call(jarA, 'POST', '/api/kofi/feedback', { message_id: msgA, note: 1 })).status, 200);
+    assert.equal((await call(jarB, 'POST', '/api/kofi/feedback', { message_id: msgB, note: 1 })).status, 200);
+    sql("INSERT INTO kofi_commandes (user_id, formation_id, questions, montant, statut) VALUES (?,?,?,?,'payee')", a, fid, 1000, 2.5);
+    const compte = (table, col, id) => sql(`select count(*) n from ${table} where ${col}=?`, id)[0].n;
+    const usageA = compte('kofi_usage', 'user_id', a), usageB = compte('kofi_usage', 'user_id', b);
+    assert.ok(compte('kofi_conversations', 'user_id', a) >= 1 && usageA >= 1);
+    const msgsB = compte('kofi_messages', 'conversation_id', convB);
+    assert.equal((await call(jarF, 'DELETE', `/api/admin/membres/${a}`)).status, 200);
+    assert.equal(compte('kofi_conversations', 'user_id', a), 0, 'conversations effacées');
+    assert.equal(compte('kofi_messages', 'conversation_id', convA), 0, 'messages effacés (texte libre de l\'élève)');
+    assert.equal(compte('kofi_feedback', 'user_id', a), 0, 'retours effacés');
+    assert.equal(compte('kofi_usage', 'user_id', a), usageA, 'compteurs d\'usage conservés : aucun contenu, ils servent la réserve d\'IA');
+    assert.equal(compte('kofi_commandes', 'user_id', a), 1, 'achat conservé (comptabilité)');
+    assert.equal(compte('kofi_conversations', 'user_id', b) >= 1, true, 'les autres comptes ne sont pas touchés');
+    assert.equal(compte('kofi_messages', 'conversation_id', convB), msgsB);
+    assert.equal(compte('kofi_feedback', 'user_id', b), 1);
+    assert.equal(compte('kofi_usage', 'user_id', b), usageB);
+  });
 });

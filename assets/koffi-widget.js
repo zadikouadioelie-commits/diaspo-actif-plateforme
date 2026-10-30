@@ -18,6 +18,7 @@
       info1: 'Koffi répond uniquement à partir des supports de cette formation auxquels vous avez accès. Il n\'utilise aucune autre source.',
       info2: 'Vos conversations sont conservées 60 jours au maximum, puis supprimées automatiquement. Vous pouvez les supprimer à tout moment.',
       info3: 'Koffi peut se tromper : vérifiez toujours dans le cours, grâce aux sources indiquées. Il ne modifie jamais vos notes ni vos validations.',
+      info4: 'Votre question, l\'historique récent de la conversation et les extraits du cours utilisés pour répondre sont envoyés à notre prestataire d\'intelligence artificielle, Anthropic (États-Unis), sans votre nom ni votre e-mail. Ne saisissez aucune donnée sensible (santé, religion, opinions…).', infoLien: 'En savoir plus : politique de confidentialité',
       compris: 'J\'ai compris', restantes: function (n) { return n + ' question' + (n > 1 ? 's' : '') + ' restante' + (n > 1 ? 's' : ''); }, apercu: 'Aperçu formateur : aucune question décomptée',
       gratuites: function (n) { return n + ' question' + (n > 1 ? 's' : '') + ' offerte' + (n > 1 ? 's' : ''); }, sources: 'Sources', utile: 'Utile', pasUtile: 'Pas utile', merci: 'Merci !',
       sansRef: 'Aucune source n\'est citée pour cette réponse : vérifiez-la dans le cours.', hors: 'Cette information ne figure pas dans vos supports.',
@@ -35,6 +36,7 @@
       info1: 'Koffi answers only from the materials of this course that you have access to. It uses no other source.',
       info2: 'Your conversations are kept for 60 days at most, then deleted automatically. You can delete them at any time.',
       info3: 'Koffi can make mistakes: always check in the course using the sources shown. It never changes your grades or validations.',
+      info4: 'Your question, the recent conversation history and the course excerpts used to answer are sent to our artificial-intelligence provider, Anthropic (United States), without your name or e-mail. Do not enter any sensitive data (health, religion, opinions…).', infoLien: 'Learn more: privacy policy',
       compris: 'Got it', restantes: function (n) { return n + ' question' + (n > 1 ? 's' : '') + ' left'; }, apercu: 'Trainer preview: no question counted',
       gratuites: function (n) { return n + ' free question' + (n > 1 ? 's' : ''); }, sources: 'Sources', utile: 'Helpful', pasUtile: 'Not helpful', merci: 'Thanks!',
       sansRef: 'No source is cited for this answer: please check it in the course.', hors: 'This information is not in your materials.',
@@ -149,7 +151,7 @@
 
   function carteInfo() {
     var d = document.createElement('div'); d.className = 'kf-card';
-    d.innerHTML = '<h4>Koffi</h4><ul><li>' + T().info1 + '</li><li>' + T().info2 + '</li><li>' + T().info3 + '</li></ul><button type="button" class="kf-cta sec" data-act="compris">' + T().compris + '</button>';
+    d.innerHTML = '<h4>Koffi</h4><ul><li>' + T().info1 + '</li><li>' + T().info2 + '</li><li>' + T().info3 + '</li><li>' + T().info4 + '</li></ul><p style="margin:0 0 10px;font-size:12.5px"><a href="/politique-confidentialite.html#koffi" target="_blank" rel="noopener" style="color:#b84c1a;font-weight:700">' + T().infoLien + '</a></p><button type="button" class="kf-cta sec" data-act="compris">' + T().compris + '</button>';
     return d;
   }
   function carteVitrine() {
@@ -182,7 +184,7 @@
     if (e.etat === 'desactive') { body.appendChild(carteMessage('Koffi', T().desactive)); foot.style.display = 'none'; return; }
     if (e.etat === 'indisponible') { body.appendChild(carteMessage('Koffi', T().indispo)); foot.style.display = 'none'; return; }
     if (e.etat === 'evaluation') { body.appendChild(carteMessage('Koffi', T().evaluation)); foot.style.display = 'none'; return; }
-    if (!lsGet('koffi_info_vue_v1') && !e.apercu) { body.appendChild(carteInfo()); foot.style.display = 'none'; return; }
+    if (!lsGet('koffi_info_vue_v2') && !e.apercu) { body.appendChild(carteInfo()); foot.style.display = 'none'; return; }
     S.msgs.forEach(function (m) { ajouterMessage(m, true); });
     if (!S.msgs.length) ajouterMessage({ role: 'assistant', contenu: T().accueil, flags: ['accueil'] }, false);
     if (e.etat === 'recharge') { body.appendChild(carteRecharge()); }
@@ -327,7 +329,7 @@
       var act = t.getAttribute('data-act');
       if (act === 'ouvrir') return ouvrirPanneau();
       if (act === 'fermer') return fermerPanneau();
-      if (act === 'compris') { lsSet('koffi_info_vue_v1', '1'); return construireCorps(); }
+      if (act === 'compris') { lsSet('koffi_info_vue_v2', '1'); return construireCorps(); }
       if (act === 'acheter') return acheterForfait();
       if (act === 'nouvelle') { S.conv = null; S.msgs = []; if (S.etat && S.etat.etat !== 'recharge') { construireCorps(); } return; }
       if (act === 'supprimer') {

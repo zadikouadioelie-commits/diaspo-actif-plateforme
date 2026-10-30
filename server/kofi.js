@@ -393,9 +393,20 @@ async function contexteAcces(db, deps, user, formationId) {
   return ctx;
 }
 
+/* ── Droit à l'effacement ─────────────────────────────────────────────────────────────────────────── */
+/* Suppression de compte : les conversations (texte libre de l'élève) et ses retours sont SUPPRIMÉS. Les achats de forfait (comptabilité, 10 ans) et les compteurs d'usage
+   (aucun contenu ; ils font baisser la réserve d'IA) restent, rattachés à un compte devenu anonyme. Appelée par executerSuppressionCompte() (server/index.js). */
+async function effacerCompte(db, userId) {
+  const id = Number(userId);
+  await db.prepare("DELETE FROM kofi_feedback WHERE user_id=? OR message_id IN (SELECT m.id FROM kofi_messages m JOIN kofi_conversations c ON c.id=m.conversation_id WHERE c.user_id=?)").run(id, id);
+  const m = await db.prepare("DELETE FROM kofi_messages WHERE conversation_id IN (SELECT id FROM kofi_conversations WHERE user_id=?)").run(id);
+  const c = await db.prepare("DELETE FROM kofi_conversations WHERE user_id=?").run(id);
+  return { messages: Number(m && m.changes) || 0, conversations: Number(c && c.changes) || 0 };
+}
+
 /* ── Routes ───────────────────────────────────────────────────────────────────────────────────────── */
 module.exports = {
-  NOM, DEFAUTS, reglages, ecrireReglage, budget, coutEstime, creditsDe, accorderGratuit, debiter, rendre, crediterForfait,
+  NOM, DEFAUTS, reglages, ecrireReglage, budget, coutEstime, creditsDe, accorderGratuit, debiter, rendre, crediterForfait, effacerCompte,
   texteDeHtml, morceler, tokens, scorer, analyserReponse, indexerFormation, texteDeStudio, systemePour, sqlDate,
   confirmerCommande, annulerCommande, TEXTE_FORFAIT_NON_REMBOURSABLE, TEXTE_FORFAIT_RETRACTATION, VERSION_CONSENTEMENT_FORFAIT,
 };

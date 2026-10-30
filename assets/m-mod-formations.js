@@ -522,7 +522,7 @@
   function chargerKoffi() {
     if (window.KoffiWidget) return Promise.resolve();
     if (!koffiScript) koffiScript = new Promise(ok => {
-      const sc = document.createElement('script'); sc.src = '/assets/koffi-widget.js?v=7';
+      const sc = document.createElement('script'); sc.src = '/assets/koffi-widget.js?v=8';
       sc.onload = ok; sc.onerror = () => { koffiScript = null; ok(); }; document.head.appendChild(sc);
     });
     return koffiScript;
