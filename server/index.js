@@ -24228,7 +24228,7 @@ route("PUT", "/api/evenements/:id", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   await ensureEvenementsFlashExtras();
-  const evt = await db.prepare("SELECT id, owner_user_id, statut, programme_json, inscription_rapide_active, lien_plus_info, video1_url FROM evenements WHERE id=?").get(params.id);
+  const evt = await db.prepare("SELECT id, owner_user_id, statut, programme_json, inscription_rapide_active, lien_plus_info, video1_url, date_evt, date_fin FROM evenements WHERE id=?").get(params.id);
   if (!evt) return sendJSON(res, 404, { error: "Événement introuvable." });
   if (Number(evt.owner_user_id) !== Number(user.id) && user.role !== "administrateur") {
     return sendJSON(res, 403, { error: "Vous ne pouvez modifier que vos propres événements." });
@@ -24236,11 +24236,26 @@ route("PUT", "/api/evenements/:id", async (req, res, params, body) => {
   await ensureEvenementsTypeParticipationCol();
   await ensureEvenementsOuvertureInscriptionsCol();
   const {
-    titre, date_evt, heure_debut, heure_fin, type_evt, domaine, zone_diffusion, type_participation, statut, ouverture_inscriptions, pays, lieu, ville, lieu_gps,
+    titre, date_evt, date_fin, heure_debut, heure_fin, type_evt, domaine, zone_diffusion, type_participation, statut, ouverture_inscriptions, pays, lieu, ville, lieu_gps,
     origine, description, places_max, masquer_inscrits, visibilite, lien_visio, whatsapp_lien,
     image_couverture, image_url, galerie_photos, programme, inscription_rapide_active, lien_plus_info
   } = body;
   if (!titre || !date_evt) return sendJSON(res, 400, { error: "Titre et date requis." });
+  /* Date de fin (2026-10-30, constaté en production : « samedi 21 novembre → 7 novembre ») : cette route n'écrivait JAMAIS date_fin. Un organisateur qui déplaçait son
+     événement (7 → 21 novembre) gardait donc l'ancienne date de fin, ce qui faussait l'affichage, le calendrier et le passage en « événement terminé ».
+     Règle : une date de fin envoyée s'applique (vide = journée unique) ; sinon, si la date de début change, un événement de plusieurs jours garde sa durée (la fin suit)
+     et une journée unique reste une journée unique ; une fin qui ne dépasse pas le début est supprimée. */
+  const jourDe = v => String(v || "").slice(0, 10);
+  const jourValide = v => /^\d{4}-\d{2}-\d{2}$/.test(v) && !isNaN(Date.parse(v + "T00:00:00Z"));
+  let dateFinFinale = jourDe(evt.date_fin) || null;
+  if (date_fin !== undefined) {
+    dateFinFinale = jourDe(date_fin) || null;
+    if (dateFinFinale && !jourValide(dateFinFinale)) return sendJSON(res, 400, { error: "La date de fin n'est pas valide." });
+  } else if (dateFinFinale && jourDe(date_evt) !== jourDe(evt.date_evt)) {
+    const duree = jourValide(jourDe(evt.date_evt)) ? Math.round((Date.parse(dateFinFinale + "T00:00:00Z") - Date.parse(jourDe(evt.date_evt) + "T00:00:00Z")) / 86400000) : 0;
+    dateFinFinale = duree > 0 && jourValide(jourDe(date_evt)) ? new Date(Date.parse(jourDe(date_evt) + "T00:00:00Z") + duree * 86400000).toISOString().slice(0, 10) : null;
+  }
+  if (dateFinFinale && dateFinFinale <= jourDe(date_evt)) dateFinFinale = null;
   /* Sanitisé avant écriture (2026-09-25, éditeur de texte enrichi) — seule vraie barrière,
      jamais l'éditeur client (assets/rich-editor.js). */
   const descriptionSafe = SEC.sanitizeRichHtml(description);
@@ -24271,12 +24286,12 @@ route("PUT", "/api/evenements/:id", async (req, res, params, body) => {
   const lienInfo = lien_plus_info === undefined ? evt.lien_plus_info : normaliserLienInfo(lien_plus_info);
   if (lienInfo === false) return sendJSON(res, 400, { error: "Le lien « Plus d'informations » n'est pas valide : indiquez une adresse complète, par exemple https://www.exemple.com/mon-evenement." });
   await db.prepare(`UPDATE evenements SET
-    titre=?, date_evt=?, heure_debut=?, heure_fin=?, type_evt=?, domaine=?, zone_diffusion=?, type_participation=?, ouverture_inscriptions=?, statut=?, pays=?, lieu=?, ville=?, lieu_gps=?,
+    titre=?, date_evt=?, date_fin=?, heure_debut=?, heure_fin=?, type_evt=?, domaine=?, zone_diffusion=?, type_participation=?, ouverture_inscriptions=?, statut=?, pays=?, lieu=?, ville=?, lieu_gps=?,
     origine=?, description=?, places_max=?, masquer_inscrits=?, visibilite=?, lien_visio=?, whatsapp_lien=?,
     image_couverture=?, image_url=?, galerie_photos=?, programme_json=?, inscription_rapide_active=?, lien_plus_info=?, video1_url=?
     WHERE id=?`)
     .run(
-      titre, date_evt, heure_debut || null, heure_fin || null, type_evt || "evenement", domaine || null, zone_diffusion || null,
+      titre, date_evt, dateFinFinale, heure_debut || null, heure_fin || null, type_evt || "evenement", domaine || null, zone_diffusion || null,
       ['payant','partiellement_payant'].includes(type_participation) ? type_participation : 'gratuit', ouverture_inscriptions || null, statutFinal,
       pays || null, lieu || null, ville || null, lieu_gps || null, origine || null, descriptionSafe || null,
       places_max || null, masquer_inscrits ? 1 : 0, visibilite || "public", lien_visio || null, whatsapp_lien || null,
