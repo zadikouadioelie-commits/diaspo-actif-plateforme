@@ -48,6 +48,14 @@ const DEFAUTS = {
   taux_usd_eur: 0.92,
 };
 const TEXTE_REGLAGES = new Set(["modele"]);
+/* Bornes [min, max] acceptées par l'administration. retention_jours plafonné à 60 : c'est la durée annoncée aux élèves (fenêtre, CGV, confidentialité) ;
+   forfait_prix_eur ≥ 0,50 € : minimum accepté par Stripe pour un paiement en euros. */
+const BORNES = {
+  actif_global: [0, 1], gratuit_questions: [0, 1000], forfait_questions: [1, 100000], forfait_prix_eur: [0.5, 1000], forfait_validite_mois: [1, 60],
+  retention_jours: [1, 60], plafond_jour_par_eleve: [1, 10000], plafond_jour_apercu: [1, 10000], budget_seuil_gratuit_eur: [0, 100000],
+  max_message_caracteres: [50, 5000], max_sortie_tokens: [100, 4000], nb_extraits: [1, 12],
+  prix_entree_usd_par_million: [0, 1000], prix_sortie_usd_par_million: [0, 1000], taux_usd_eur: [0.1, 10],
+};
 
 const sqlDate = d => d.toISOString().slice(0, 19).replace("T", " ");
 const aDate = s => { if (!s) return null; const t = String(s).replace(" ", "T"); const d = new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(t) ? t : t + "Z"); return isNaN(d) ? null : d; };
@@ -75,7 +83,9 @@ async function ecrireReglage(db, cle, valeur, userId) {
   if (cle === "modele") { if (!IA.MODELES_AUTORISES.includes(valeur)) throw Object.assign(new Error("Modèle non autorisé."), { status: 400 }); v = valeur; }
   else {
     const n = Number(valeur);
-    if (!Number.isFinite(n) || n < 0 || n > 1e6) throw Object.assign(new Error("Valeur invalide."), { status: 400 });
+    if (!Number.isFinite(n)) throw Object.assign(new Error("Valeur invalide."), { status: 400 });
+    const [min, max] = BORNES[cle] || [0, 1e6];
+    if (n < min || n > max) throw Object.assign(new Error(`Valeur hors limites pour « ${cle} » (entre ${min} et ${max}).`), { status: 400 });
     v = String(n);
   }
   const ex = await db.prepare("SELECT cle FROM kofi_reglages WHERE cle=?").get(cle);
@@ -701,7 +711,7 @@ module.exports.register = function register(deps) {
   async function admin(req, res) { const u = await exiger(req, res); if (!u) return null; if (!estAdmin(u)) { sendJSON(res, 403, { error: "Réservé à l'administration." }); return null; } return u; }
   route("GET", "/api/admin/kofi/reglages", async (req, res) => {
     if (!(await admin(req, res))) return;
-    sendJSON(res, 200, { reglages: await reglages(db, true), modeles_autorises: IA.MODELES_AUTORISES, fournisseur_configure: IA.configure() });
+    sendJSON(res, 200, { reglages: await reglages(db, true), defauts: DEFAUTS, bornes: BORNES, modeles_autorises: IA.MODELES_AUTORISES, fournisseur_configure: IA.configure() });
   });
   route("PUT", "/api/admin/kofi/reglages", async (req, res, params, body) => {
     const u = await admin(req, res); if (!u) return;
@@ -716,10 +726,13 @@ module.exports.register = function register(deps) {
     const cat = await db.prepare("SELECT categorie, COUNT(*) AS n, COALESCE(SUM(cout_eur),0) AS cout, COALESCE(SUM(jetons_entree),0) AS entree, COALESCE(SUM(jetons_sortie),0) AS sortie FROM kofi_usage GROUP BY categorie").all();
     const recharges = await db.prepare("SELECT id, type, montant_eur, reference, note, created_at FROM kofi_budget ORDER BY id DESC LIMIT 50").all();
     const comptes = await db.prepare("SELECT COUNT(DISTINCT user_id) AS n FROM kofi_credits WHERE origine='gratuit'").get();
+    const ventes = await db.prepare("SELECT COUNT(*) AS n, COALESCE(SUM(questions),0) AS q, COALESCE(SUM(montant),0) AS m FROM kofi_commandes WHERE statut='payee'").get();
     const jours = await db.prepare("SELECT SUBSTR(created_at,1,10) AS jour, COUNT(*) AS n, COALESCE(SUM(cout_eur),0) AS cout FROM kofi_usage WHERE created_at>=? GROUP BY SUBSTR(created_at,1,10) ORDER BY jour").all(sqlDate(new Date(Date.now() - 30 * 86400000)));
     sendJSON(res, 200, {
       reserve_eur: b.reserve_eur, alerte: b.alerte, seuil_gratuit_eur: r.budget_seuil_gratuit_eur,
       par_categorie: cat.map(c => ({ categorie: c.categorie, questions: Number(c.n), cout_eur: arrondi(c.cout, 4), jetons_entree: Number(c.entree), jetons_sortie: Number(c.sortie) })),
+      forfaits_vendus: { commandes: Number(ventes && ventes.n) || 0, questions: Number(ventes && ventes.q) || 0, encaisse_eur: arrondi(ventes && ventes.m, 2) },
+      fournisseur_configure: IA.configure(),
       comptes_avec_essai_gratuit: Number(comptes && comptes.n) || 0, trente_jours: jours.map(j => ({ jour: j.jour, questions: Number(j.n), cout_eur: arrondi(j.cout, 4) })), recharges,
     });
   });

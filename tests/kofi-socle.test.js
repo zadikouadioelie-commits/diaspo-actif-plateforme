@@ -271,6 +271,19 @@ test('Koffi — règles du socle', async (t) => {
     assert.equal((await call(jarF, 'PUT', '/api/admin/kofi/reglages', { modele: 'gpt-4' })).status, 400);
     assert.equal((await call(jarF, 'PUT', '/api/admin/kofi/reglages', { modele: 'claude-haiku-5-5', gratuit_questions: 5 })).status, 200);
     assert.equal((await call(jarB, 'PUT', '/api/admin/kofi/reglages', { gratuit_questions: 500 })).status, 403);
+    /* Bornes : conservation plafonnée à la durée annoncée aux élèves (60 j), prix ≥ minimum Stripe, rien de négatif ni de non numérique. */
+    for (const [cle, val] of [['retention_jours', 61], ['retention_jours', 0], ['forfait_prix_eur', 0.1], ['forfait_questions', 0], ['gratuit_questions', -1], ['taux_usd_eur', 50], ['nb_extraits', 'beaucoup'], ['inconnu', 1]]) {
+      const x = await call(jarF, 'PUT', '/api/admin/kofi/reglages', { [cle]: val });
+      assert.equal(x.status, 400, `${cle}=${val} doit être refusé : ${JSON.stringify(x.data)}`);
+    }
+    const bon = await call(jarF, 'PUT', '/api/admin/kofi/reglages', { retention_jours: 30, forfait_prix_eur: 0.5 });
+    assert.equal(bon.status, 200); assert.equal(bon.data.reglages.retention_jours, 30); assert.equal(bon.data.reglages.forfait_prix_eur, 0.5);
+    assert.equal((await call(jarF, 'PUT', '/api/admin/kofi/reglages', { retention_jours: 60, forfait_prix_eur: 2.5 })).status, 200);
+    /* Ce que la page « Budget IA » affiche : défauts, bornes, état du fournisseur, forfaits vendus. */
+    const g = await call(jarF, 'GET', '/api/admin/kofi/reglages');
+    assert.equal(g.data.defauts.forfait_questions, 1000); assert.deepEqual(g.data.bornes.retention_jours, [1, 60]); assert.equal(typeof g.data.fournisseur_configure, 'boolean');
+    const bb = await call(jarF, 'GET', '/api/admin/kofi/budget');
+    assert.equal(typeof bb.data.fournisseur_configure, 'boolean'); assert.ok(bb.data.forfaits_vendus && bb.data.forfaits_vendus.commandes === 0 && bb.data.forfaits_vendus.encaisse_eur === 0);
   });
 
   await t.test('conservation 60 jours : un message ancien disparaît de l\'écran, la purge (cron protégé) le supprime sans toucher aux récents', async () => {

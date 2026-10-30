@@ -58,6 +58,7 @@
       <a href="#analytics-trafic" data-section="analytics-trafic">📈 Analytics trafic</a>
       <a href="#messages-techniques" data-section="messages-techniques" style="display:flex;justify-content:space-between;align-items:center;">🛠️ Messages techniques <span id="support-badge" style="display:none;background:#ef4444;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;"></span></a>
       <a href="#formations" data-section="formations">📚 Formations</a>
+      <a href="#kofi-budget" data-section="kofi-budget">🤖 Koffi · Budget IA</a>
       <a href="#chatbot" data-section="chatbot">🧠 Mémoire Chatbot</a>
       <a href="#faq" data-section="faq">💡 Gestion FAQ</a>
       <a href="#faq-sr" data-section="faq-sr">❓ Questions sans réponse</a>
@@ -1664,6 +1665,17 @@
       </div>
 
       <!-- MÉMOIRE CHATBOT -->
+      <section id="section-kofi-budget" style="display:none;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:240px;">
+            <h2 style="margin:0;">🤖 Koffi · Budget IA</h2>
+            <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Le tuteur d'intelligence artificielle des formations : réserve de crédits d'IA, coût des questions, forfaits vendus et réglages.</p>
+          </div>
+          <button class="btn btn-outline" style="font-size:13px;" onclick="loadKofiBudget()">↺ Actualiser</button>
+        </div>
+        <div id="kb-contenu"></div>
+      </section>
+
       <section id="section-chatbot" style="display:none;">
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap;">
           <div style="flex:1;">
@@ -9743,6 +9755,8 @@ async function submitAccordDirect(){
   if (window.Posts) Posts.init(me.id);
 
   // Navigation sections — lazy-load les modules à la demande
+  /* Panneaux dont le script est chargé en bas de page : à l'ouverture directe par l'adresse (#section), le chargeur peut passer avant l'exécution du script → on attend la fin du chargement. */
+  const apresChargement = nom => () => (window[nom] ? window[nom]() : window.addEventListener("load", () => { if (window[nom]) window[nom](); }, { once: true }));
   const SECTION_LOADERS = {
     'regles-contact': () => { rcCharger(); adCharger(); },
     reseau:      () => loadReseau(),
@@ -9752,7 +9766,7 @@ async function submitAccordDirect(){
     'obs-coop':  () => loadObsCoop(),
     'obs-instit': () => loadObsInstit(),
     'revenus-diaspora': () => loadRevenusDiaspora(),
-    'cartographie-competences': () => window.loadCartoCompetences && window.loadCartoCompetences(),
+    'cartographie-competences': apresChargement('loadCartoCompetences'),
     'obs-recensement': () => loadObsRecensement(),
     finances:    () => loadFinances(),
     ventes:      () => loadTransactions(),
@@ -9766,6 +9780,7 @@ async function submitAccordDirect(){
     'reseau-pro': () => loadReseauPro(),
     initiatives: () => loadAdminInitiatives(),
     'avancement-criteres': () => avcCharger(),
+    'kofi-budget': apresChargement('loadKofiBudget'),
     chatbot:     () => switchCbTab('stats'),
     billetterie: () => loadAdminBilletterie(),
     faq:         () => loadFaqAdmin(),
@@ -15095,6 +15110,7 @@ async function diagEmail() {
   <script src="/assets/admin-parrainage-panel.js"></script>
   <script src="/assets/admin-avis-panel.js"></script>
   <script src="/assets/admin-cartographie-competences.js"></script>
+  <script src="/assets/admin-kofi.js?v=20261030b"></script>
 </body>
 </html>
 
