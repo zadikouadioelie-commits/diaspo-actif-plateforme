@@ -6860,12 +6860,21 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     if (!sidebar || sidebar.querySelector(".sb-install-group")) return;
     let installee = false;
     try { installee = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true; } catch (e) { /* détection impossible : on affiche le bouton */ }
+    /* Doré scintillant (2026-10-30, demande explicite) : même feuille que sur téléphone (assets/m.js) — dégradé d'or qui glisse + éclat qui balaie. */
+    if (!document.getElementById("da-or-css")) {
+      const st = document.createElement("style"); st.id = "da-or-css";
+      st.textContent = '.da-or{position:relative;overflow:hidden;background:linear-gradient(110deg,#A97A12 0%,#E8B923 22%,#FFF1A8 40%,#F2C94C 52%,#B8860B 78%,#E8B923 100%) !important;background-size:240% 100% !important;animation:da-or-glisse 4s ease-in-out infinite alternate;box-shadow:0 0 0 1px rgba(255,236,160,.55),0 4px 16px rgba(232,185,35,.45) !important;font-weight:800;}'
+        + '.da-or::after{content:"";position:absolute;top:0;bottom:0;left:-60%;width:40%;background:linear-gradient(100deg,transparent,rgba(255,250,220,.5),transparent);transform:skewX(-20deg);mix-blend-mode:soft-light;animation:da-or-eclat 2.8s ease-in-out infinite;pointer-events:none;}'
+        + '@keyframes da-or-glisse{0%{background-position:0% 50%}100%{background-position:100% 50%}}@keyframes da-or-eclat{0%{left:-60%}55%,100%{left:130%}}'
+        + '@media (prefers-reduced-motion:reduce){.da-or,.da-or::after{animation:none}}';
+      document.head.appendChild(st);
+    }
     const wrap = document.createElement("div");
     wrap.className = "sb-install-group";
     /* « Partager Diaspo'Actif » (2026-10-30, demande explicite : bouton « Télécharger » SOUS le bouton « Partager », comme sur téléphone) :
        invite quelqu'un à découvrir la plateforme (lien d'accueil, &via= = compte qui partage). Partage natif si disponible, sinon copie du lien. */
     const partageHtml = `<a href="#" id="sb-partage" role="button" style="display:flex!important;align-items:center;gap:8px;margin:8px 8px 0!important;padding:10px 12px!important;border-radius:10px;border:1px solid rgba(255,255,255,.35);color:#fff!important;font-weight:700;font-size:13px;text-decoration:none;">🔗 Partager Diaspo'Actif</a>`;
-    wrap.innerHTML = partageHtml + (installee ? "" : `<a href="#" id="sb-install" role="button" style="display:flex!important;align-items:center;gap:8px;margin:8px 8px 6px!important;padding:10px 12px!important;border-radius:10px;background:linear-gradient(135deg,#F59E0B,#E2A929)!important;color:#1A2332!important;font-weight:800;font-size:13px;text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,.25);">📲 Télécharger Diaspo'Actif</a>`);
+    wrap.innerHTML = partageHtml + (installee ? "" : `<a href="#" id="sb-install" class="da-or" role="button" style="display:flex!important;align-items:center;gap:8px;margin:8px 8px 6px!important;padding:10px 12px!important;border-radius:10px;background:linear-gradient(110deg,#A97A12 0%,#E8B923 22%,#FFF1A8 40%,#F2C94C 52%,#B8860B 78%,#E8B923 100%)!important;background-size:240% 100%!important;color:#1A2332!important;font-size:13px;text-decoration:none;">📲 Télécharger Diaspo'Actif</a>`);
     const anchor = sidebar.querySelector(".sb-search-wrap") || sidebar.querySelector(".brand");
     if (anchor) anchor.insertAdjacentElement("afterend", wrap); else sidebar.insertBefore(wrap, sidebar.firstChild);
     document.getElementById("sb-partage").addEventListener("click", async e => {
