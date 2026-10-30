@@ -96,7 +96,7 @@
           if (ctx.docBase && !ctx.edit) return `<div class="st-docview" data-element="${esc(e.id)}" data-nom="${esc(p.nom)}" data-hauteur="${Number(p.hauteur) || 640}"></div>`;
           return `<div class="st-docpre"><span>${F[0]}</span><div><strong>${esc(p.nom) || F[1]}</strong><small>${F[1]} · affiché dans la page${telech ? ' · téléchargeable' : ''} · hauteur ${Number(p.hauteur) || 640} px</small></div></div>`;
         }
-        const carte = `<div class="st-file"><span class="st-file-i">${F[0]}</span><div class="st-file-t"><strong>${esc(p.nom) || F[1]}</strong><small>${F[1]} · à télécharger</small></div>${ctx.edit ? '<span class="st-file-b">Télécharger</span>' : `<a class="st-file-b" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer" download>Télécharger</a>`}</div>`;
+        const carte = `<div class="st-file"><span class="st-file-i">${F[0]}</span><div class="st-file-t"><strong>${esc(p.nom) || F[1]}</strong><small>${F[1]} · à télécharger</small></div>${ctx.edit ? '<span class="st-file-b">Télécharger</span>' : (ctx.docBase && !telech ? '<span class="st-file-b" style="opacity:.55">Non téléchargeable</span>' : `<a class="st-file-b" href="${esc(lienDl)}" target="_blank" rel="noopener noreferrer" download>Télécharger</a>`)}</div>`;
         if (!integre) return carte;
         if (fam === 'image') return `<figure class="st-fig"><img src="${esc(p.url)}" alt="${esc(p.nom)}" draggable="false" style="object-fit:contain">${p.nom ? `<figcaption>${esc(p.nom)}</figcaption>` : ''}</figure>`;
         if (fam !== 'pdf') return carte;

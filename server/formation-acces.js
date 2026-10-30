@@ -167,7 +167,9 @@ module.exports.register = function register(deps) {
           if (offerte) nbApercu++;
           const base = { id: Number(l.id), titre: l.titre, type: l.type, duree_minutes: l.duree_minutes || null, apercu_gratuit: offerte };
           /* Contenu : uniquement pour une leçon offerte. */
-          return offerte ? { ...base, description: l.description || null, contenu_url: l.contenu_url || null, contenu_texte: l.contenu_texte || null } : base;
+          /* Les documents (PDF, « Document à télécharger ») ne livrent jamais leur adresse : ils passent par la visionneuse du serveur (lot F). */
+          const document = ["pdf", "telechargement"].includes(l.type) && l.contenu_url;
+          return offerte ? { ...base, studio: Number(l.studio) ? 1 : 0, description: l.description || null, contenu_url: document ? null : (l.contenu_url || null), ...(document ? { a_document: 1 } : {}), contenu_texte: l.contenu_texte || null } : base;
         });
       }
     }

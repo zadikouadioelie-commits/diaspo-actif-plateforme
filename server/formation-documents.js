@@ -18,6 +18,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const Droits = require("./formation-droits");
+const Prive = require("./formation-prive");
 const XL = require("./xlsx-lecteur");
 
 const MAX_OCTETS = 4.4 * 1024 * 1024;   /* limite d'une réponse de l'hébergeur du site (4,5 Mo) : au-delà, repli sur l'affichage direct */
@@ -47,7 +48,10 @@ async function lireOctets(url, hoteSite) {
   const cle = String(url); const c = cacheOctets.get(cle);
   if (c && Date.now() - c.t < 300000) return c.buf;
   let buf;
-  if (/^\/uploads\/[\w.\-]+$/.test(cle)) {
+  if (Prive.estRef(cle)) {
+    /* Fichier du stockage privé (lot F) : lu par le serveur seul. */
+    buf = await Prive.lire(cle, MAX_OCTETS_CLASSEUR);
+  } else if (/^\/uploads\/[\w.\-]+$/.test(cle)) {
     const p = path.join(__dirname, cle);
     if (!fs.existsSync(p)) throw Object.assign(new Error("Fichier introuvable."), { statut: 404, code: "introuvable" });
     const st = fs.statSync(p); if (st.size > MAX_OCTETS_CLASSEUR) throw Object.assign(new Error("Fichier trop volumineux pour s'afficher dans la page."), { statut: 413, code: "trop_gros" });

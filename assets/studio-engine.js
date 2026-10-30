@@ -691,13 +691,13 @@
   const ACCEPT = '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.webp,.gif,.mp4,.mov,image/*,video/mp4,video/quicktime';
   const MAX_FICHIER = 4 * 1024 * 1024; /* limite de l'hébergeur pour un envoi : au-delà, la plateforme refuserait la requête */
   /* Envoie un fichier (image compressée ou document) et le range dans la bibliothèque. Renvoie { url, type, nom } ou lève une erreur lisible. */
-  async function importerFichier(f) {
+  async function importerFichier(f, prive) {
     const fam = R.typeFichier(f.name);
     if (fam === 'video') { const v = await importerVideo(f); return { url: v.url, type: 'video', nom: v.nom, miniature: v.miniature }; }
     if (fam === 'autre') throw new Error('Format non pris en charge : PDF, Word, Excel, PowerPoint, image (JPEG, PNG, WebP, GIF) ou vidéo MP4 / MOV. Pour un audio, ajoutez son adresse.');
     let url, type;
     if (fam === 'image') { const comp = await compressImageFile(f, 1600, 1600, 0.85); if (comp.size > MAX_FICHIER) throw new Error('Image encore trop lourde après compression (4 Mo maximum).'); url = await uploadMedia(comp, 'post'); type = 'image'; }
-    else { if (f.size > MAX_FICHIER) throw new Error('Fichier trop lourd (4 Mo maximum). Réduisez-le, ou hébergez-le ailleurs et collez son adresse.'); url = await uploadMedia(f, 'document'); type = 'document'; }
+    else { if (f.size > MAX_FICHIER) throw new Error('Fichier trop lourd (4 Mo maximum). Réduisez-le, ou hébergez-le ailleurs et collez son adresse.'); url = await uploadMedia(f, prive ? 'document-cours' : 'document'); type = 'document'; }
     rangerEnBibliotheque(type, url, f.name, f.size);
     return { url, type, nom: f.name };
   }
@@ -741,7 +741,7 @@
     inp.onchange = async () => {
       const f = inp.files[0]; inp.remove(); if (!f) return;
       toast('Envoi du fichier…');
-      try { const r = await importerFichier(f); const e = el(id); if (!e) return; modifier(() => { e.props.url = r.url; if (!e.props.nom) e.props.nom = r.nom; }); choisir([id]); toast('Fichier ajouté'); }
+      try { const e0 = el(id); const r = await importerFichier(f, !!e0 && e0.type === 'document'); const e = el(id); if (!e) return; modifier(() => { e.props.url = r.url; if (!e.props.nom) e.props.nom = r.nom; }); choisir([id]); toast('Fichier ajouté'); }
       catch (err) { toast(err.message || 'Envoi impossible.'); }
     };
     inp.click();
@@ -775,7 +775,7 @@
     $('#bi-t').onchange = ev => { filtre = ev.target.value; rafraichir(); };
     $('#bi-import').onclick = () => {
       const inp = document.createElement('input'); inp.type = 'file'; inp.accept = types.includes('video') ? ACCEPT : ACCEPT.replace('.mp4,.mov,', '').replace(',video/mp4,video/quicktime', ''); inp.multiple = true; inp.style.display = 'none'; document.body.appendChild(inp);
-      inp.onchange = async () => { const fs = [...inp.files]; inp.remove(); for (const f of fs) { toast('Envoi de ' + f.name + '…'); try { await importerFichier(f); } catch (e) { toast(f.name + ' : ' + e.message); await new Promise(r => setTimeout(r, 1800)); } } setTimeout(rafraichir, 400); };
+      inp.onchange = async () => { const fs = [...inp.files]; inp.remove(); for (const f of fs) { toast('Envoi de ' + f.name + '…'); try { await importerFichier(f, true); } catch (e) { toast(f.name + ' : ' + e.message); await new Promise(r => setTimeout(r, 1800)); } } setTimeout(rafraichir, 400); };
       inp.click();
     };
     $('#bi-url').onclick = () => {
@@ -788,6 +788,7 @@
     rafraichir();
   }
   function utiliserMedia(e, m) {
+    if (/^prive:/.test(m.url) && e.type !== 'document') { toast('Ce fichier est privé : il ne peut servir que dans un élément « Document » (lecteur de la page).'); return; }
     modifier(() => {
       e.props.url = m.url;
       if (e.type === 'document' || e.type === 'fichier') e.props.nom = m.nom;

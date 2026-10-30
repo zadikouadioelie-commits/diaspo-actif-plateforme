@@ -21,6 +21,8 @@ async function uploadMedia(file, type = 'avatar') {
     evenement:   '/api/upload/evenement',
     publication: '/api/upload/post',
     document:    '/api/upload/document',
+    /* Documents de cours (PDF, Word, Excel, PowerPoint) : stockage privé, adresse jamais livrée aux apprenants (lot F, 2026-10-30). */
+    'document-cours': '/api/formateur/document-cours',
     'video-tutoriel': '/api/upload/video-tutoriel',
     invitation:  '/api/upload/invitation'
   }[type] || '/api/upload/avatar';

@@ -12,6 +12,7 @@
    ═════════════════════════════════════════════════ */
 "use strict";
 const Droits = require("./formation-droits");
+const Prive = require("./formation-prive");
 const ReelsUpload = require("./reels-upload");
 
 const TYPES_TEXTE = ["titre", "soustitre", "paragraphe", "citation", "encadre"];
@@ -92,7 +93,7 @@ function nettoyerElement(e, SEC, pagesIds) {
   } else if (e.type === "fichier") {
     o.nom = txt(p.nom, 150); o.url = urlHttps(p.url); o.description = txt(p.description, 200);
   } else if (e.type === "document") {
-    o.nom = txt(p.nom, 150); o.url = urlHttps(p.url);
+    o.nom = txt(p.nom, 150); o.url = Prive.REF.test(String(p.url || "")) ? String(p.url) : urlHttps(p.url); /* référence « prive:… » du stockage privé (lot F) ou adresse https */
     /* Affichage : « intégré » (visionneuse dans la page) et/ou « téléchargeable » (pièce jointe), les deux à la fois si besoin ; anciens documents : repli sur « mode ». */
     const ancienMode = choix(p.mode, ["lecteur", "telechargement"], "lecteur");
     o.integre = p.integre !== undefined ? !!p.integre : ancienMode === "lecteur";
@@ -213,11 +214,16 @@ try { if (process.env.BUNNY_CDN_URL) HOTES_CDN.add(new URL(process.env.BUNNY_CDN
 function lireMedia(b, userId) {
   const type = choix(b && b.type, TYPES_MEDIA, "");
   if (!type) return { erreur: "Type de média inconnu (image, document, vidéo ou audio)." };
+  /* Document du stockage privé (lot F) : la référence « prive:formations/<compte>/… » n'est acceptée que pour le compte qui l'a déposée. */
+  if (type === "document" && Prive.REF.test(String(b.url || ""))) {
+    if (Number(String(b.url).split("/")[1]) !== Number(userId)) return { erreur: "Seuls les fichiers que vous avez envoyés depuis votre compte peuvent entrer dans votre bibliothèque." };
+    return { vals: { type, url: String(b.url), nom: txt(b.nom, 150).trim() || "Document", taille: Number.isFinite(Number(b.taille)) && Number(b.taille) > 0 ? Math.floor(Number(b.taille)) : null } };
+  }
   const url = urlHttps(b.url);
   if (!url) return { erreur: "Adresse invalide : elle doit commencer par https://." };
   if (type === "image" || type === "document") {
     const u = new URL(url);
-    const m = u.pathname.match(/^\/(posts|documents)\/(\d+)-\d+\.[a-z0-9]{2,5}$/i);
+    const m = u.pathname.match(/^\/(posts|documents|formations-documents)\/(\d+)-\d+(?:-[a-f0-9]{32})?\.[a-z0-9]{2,5}$/i);
     if (!HOTES_CDN.has(u.hostname) || !m || Number(m[2]) !== Number(userId)) return { erreur: "Seuls les fichiers que vous avez envoyés depuis votre compte peuvent entrer dans votre bibliothèque." };
   }
   const brut = txt(b.nom, 150).trim() || decodeURIComponent(url.split("/").pop().split("?")[0] || "").slice(0, 150) || "Fichier";
@@ -574,7 +580,9 @@ module.exports.register = function register(deps) {
     if (d.publiee_version == null) return sendJSON(res, 404, { error: "Ce contenu n'est pas encore publié." });
     const v = await db.prepare("SELECT * FROM formation_studio_versions WHERE doc_id=? AND version=?").get(d.id, Number(d.publiee_version));
     if (!v) return sendJSON(res, 404, { error: "Contenu introuvable." });
-    const doc = parse(v.contenu_json) || docVide(); doc.mode = v.mode;
+    /* Lot F : l'adresse des éléments « Document » ne part pas chez l'apprenant (le propriétaire, lui, garde les vraies adresses : il modifie le contenu). */
+    const docBrut = parse(v.contenu_json) || docVide();
+    const doc = proprietaire ? docBrut : Prive.masquerStudio(docBrut); doc.mode = v.mode;
     const videos = {};
     if (user && !proprietaire && videosRequiseOuSuivie(doc)) {
       for (const r of await db.prepare("SELECT element_id, segments, pct, position FROM formation_studio_video WHERE user_id=? AND lecon_id=?").all(user.id, lecon.id)) videos[r.element_id] = { segments: r.segments, pct: Number(r.pct) || 0, position: Number(r.position) || 0 };

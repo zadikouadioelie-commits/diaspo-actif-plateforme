@@ -3312,6 +3312,10 @@ FormationDocuments.register({ route, db, sendJSON, getCurrentUser, SEC, checkFor
 /* Formation Diaspora, lot E : catégories modifiables par l’administration + enrichissement du catalogue — server/formation-catalogue.js. */
 const FormationCatalogue = require("./formation-catalogue");
 FormationCatalogue.register({ route, db, sendJSON, getCurrentUser });
+/* Formation Diaspora, lot F : fichiers privés des cours (envoi dans un stockage sans accès public, adresses jamais livrées aux apprenants) — server/formation-prive.js. */
+const FormationPrive = require("./formation-prive");
+FormationPrive.register({ route, db, sendJSON, getCurrentUser, SEC,
+  estCreateur: async u => u.role === "administrateur" || u.role === "partenaire" || await FormationAcces.estInvite(db, u.id) || !!(await db.prepare("SELECT id FROM formations WHERE owner_user_id=? LIMIT 1").get(u.id)) });
 /* Formation Diaspora, lot D : studio de création par glisser-déposer (documents, versions, publication) — server/formation-studio.js. */
 const FormationStudio = require("./formation-studio");
 FormationStudio.register({ route, db, sendJSON, getCurrentUser, SEC, checkFormationOwner, exigerPremium });
@@ -17892,6 +17896,8 @@ route("GET", "/api/formations/:id/suivre", async (req, res, params) => {
 
   /* Progression, jauge par chapitre, statut et prochaine activité : calculés côté serveur (server/formation-parcours.js). */
   const parcours = await FormationParcours.construireParcours(db, f, inscription || null);
+  /* Lot F : l'adresse des documents (PDF, « Document ») ne part jamais chez l'apprenant ; le créateur la garde pour modifier la leçon. */
+  if (!isOwner) FormationPrive.masquerLecons(parcours.modules);
   /* Document (attestation / certificat) : état et conditions restantes ; délivré ici dès que les conditions sont remplies (idempotent). */
   let attestation = null;
   if (inscription) {

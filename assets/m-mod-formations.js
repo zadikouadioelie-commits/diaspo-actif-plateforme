@@ -636,6 +636,49 @@
     });
     return VISIONNEUSE;
   }
+  /* Leçons du Studio (lot F) : le même rendu que sur ordinateur (assets/studio-render.js), chargé à la demande avec sa feuille de style ; mode libre mis à l'échelle de l'écran, mode structuré en colonne. */
+  let STUDIO = null;
+  function chargerStudio() {
+    if (window.StudioRender) return chargerVisionneuse().catch(() => {});
+    if (STUDIO) return STUDIO;
+    STUDIO = chargerVisionneuse().catch(() => { /* les documents intégrés se rabattent sur leur lien */ }).then(() => new Promise((ok, ko) => {
+      const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = 'assets/studio.css?v=3'; document.head.appendChild(css);
+      const js = document.createElement('script'); js.src = 'assets/studio-render.js?v=4'; js.onload = () => ok(); js.onerror = () => { STUDIO = null; ko(new Error('Rendu indisponible')); };
+      document.head.appendChild(js);
+    }));
+    return STUDIO;
+  }
+  /* ctx : { apercu (aperçu du créateur, brouillon), apprenant (suivi enregistré), suivi ('auto' | 'manuel' | 'aucun') } */
+  async function montrerStudio(id, l, zone, ctx) {
+    const enc = encodeURIComponent, base = `/api/formations/${enc(id)}/lecons/${enc(l.id)}`;
+    try { await chargerStudio(); } catch (e) { zone.innerHTML = noFile('Ce contenu ne peut pas s’afficher pour le moment : réessayez dans un instant.'); return; }
+    let data;
+    try { data = await api(`${base}/studio/lecture${ctx.apercu ? '?brouillon=1' : ''}`); }
+    catch (e) { if (zone.isConnected) zone.innerHTML = noFile(e.status === 404 ? 'Ce contenu n’est pas encore disponible : le formateur ne l’a pas encore publié.' : (e.message || 'Contenu indisponible.')); return; }
+    if (!zone.isConnected) return; // l'écran a changé pendant le chargement
+    const suivre = ctx.apprenant && ctx.suivi !== 'aucun';
+    let envoye = false;
+    window.StudioRender.lecture(zone, data.doc, {
+      videos: data.videos || {}, seuil: data.seuil_visionnage || 90, apercu: !!ctx.apercu, docBase: `${base}/document`, brouillon: !!ctx.apercu,
+      /* un échec est renvoyé tel quel : le rendu réessaie à la prochaine occasion */
+      videoSauver: suivre ? (elId, corps) => api(`${base}/studio/video/${enc(elId)}`, { method: 'PUT', body: corps }) : null,
+      /* Mode automatique : le module est terminé quand toutes les pages sont vues, les zones obligatoires cochées et les vidéos demandées regardées. */
+      onProgress: pr => {
+        if (!pr.termine || envoye || !suivre || l.termine || ctx.suivi !== 'auto' || l.quiz) return;
+        envoye = true;
+        api(`${base}/progression`, { method: 'POST', body: { termine: true } }).then(r => {
+          l.termine = true; if (ctx.d) ctx.d.avancement_pct = r.avancement_pct; if (SF) SF.at = 0;
+          const b = $('#fm-done'); if (b) { b.classList.add('out'); b.textContent = '✓ Terminée · annuler'; }
+          if (r.attestation) toast('🎉 Votre ' + String(r.attestation.type_label).toLowerCase() + ' est disponible dans le plan de la formation !');
+        }).catch(() => { envoye = false; /* vidéo à finir, ou réseau : la leçon pourra être terminée à la main */ });
+      },
+      /* Activité évaluée placée dans une page : le quiz de la leçon s'y affiche. */
+      onPage: ech => { if (!l.quiz || !ctx.d) return; const z = ech.querySelector('#sf-quiz-zone'); if (z) { z.id = 'fm-quiz'; montrerQuiz(id, l, ctx.d); } },
+    });
+    /* Filet de sécurité : une activité évaluée rattachée à la leçon mais absente de la version publiée reste passable sous le contenu. */
+    if (l.quiz && ctx.d && !data.doc.pages.some(pg => (pg.elements || []).some(e => e.type === 'quiz'))) { zone.insertAdjacentHTML('afterend', '<div id="fm-quiz" style="margin-top:18px"></div>'); montrerQuiz(id, l, ctx.d); }
+  }
+
   function monterDocuments(id, racine, brouillon) {
     const hotes = [...(racine || document).querySelectorAll('.fm-doc:not([data-monte])')];
     if (!hotes.length) return;
@@ -648,13 +691,14 @@
     const url = A.attrUrl(l.contenu_url || '');
     const dl = Number(l.telechargement_autorise) === 1;
     const head = l.description ? `<p class="muted" style="margin:0 0 12px">${esc(strip(l.description))}</p>` : '';
+    if (Number(l.studio)) return head + `<div class="fm-studio" data-lecon="${esc(l.id)}"><div class="sk skc" style="height:140px"></div></div>`;
     switch (l.type) {
       case 'video':
         return head + (url ? `<div class="media"><video controls playsinline preload="metadata" ${dl ? '' : 'controlsList="nodownload"'} src="${url}"></video></div>` : noFile('Cette vidéo n’est pas encore disponible.'));
       case 'audio':
         return head + (url ? `<div class="card"><div class="pad"><audio controls preload="metadata" ${dl ? '' : 'controlsList="nodownload"'} style="width:100%" src="${url}"></audio></div></div>` : noFile('Cet enregistrement n’est pas encore disponible.'));
       case 'pdf':
-        return head + (url ? docHote(l, `<div class="card"><div class="pad"><p style="margin:0 0 12px">Document PDF${Number(l.nb_pages) > 0 ? ' · ' + esc(plural(Number(l.nb_pages), 'page', 'pages')) : ''}</p><a class="btn block" href="${url}" target="_blank" rel="noopener">Lire le document ${ic('out', 's')}</a></div></div>`) : noFile('Ce document n’est pas encore disponible.'));
+        return head + (url || l.a_document ? docHote(l, !url ? noFile('Le document ne peut pas s’afficher pour le moment : réessayez dans un instant.') : `<div class="card"><div class="pad"><p style="margin:0 0 12px">Document PDF${Number(l.nb_pages) > 0 ? ' · ' + esc(plural(Number(l.nb_pages), 'page', 'pages')) : ''}</p><a class="btn block" href="${url}" target="_blank" rel="noopener">Lire le document ${ic('out', 's')}</a></div></div>`) : noFile('Ce document n’est pas encore disponible.'));
       case 'presentation': {
         if (!url) return head + noFile('Cette présentation n’est pas encore disponible.');
         let abs = ''; try { abs = new URL(l.contenu_url, location.href).href; } catch (e) { abs = ''; }
@@ -663,7 +707,7 @@
       case 'images':
         return head + (url ? A.mediaBlock(l.contenu_url, { alt: l.titre }) : noFile('Cette image n’est pas encore disponible.')) + (url && dl ? `<a class="btn out block" style="margin-top:10px" href="${url}" target="_blank" rel="noopener">Ouvrir l’image</a>` : '');
       case 'telechargement':
-        return head + (!url ? noFile('Aucun fichier pour cette leçon.') : docHote(l, dl ? `<div class="card"><div class="pad"><a class="btn block" href="${url}" target="_blank" rel="noopener">Télécharger le document ${ic('out', 's')}</a></div></div>` : noFile('Le formateur n’autorise pas le téléchargement de ce document.')));
+        return head + (!url && !l.a_document ? noFile('Aucun fichier pour cette leçon.') : docHote(l, !url ? noFile('Le document ne peut pas s’afficher pour le moment : réessayez dans un instant.') : dl ? `<div class="card"><div class="pad"><a class="btn block" href="${url}" target="_blank" rel="noopener">Télécharger le document ${ic('out', 's')}</a></div></div>` : noFile('Le formateur n’autorise pas le téléchargement de ce document.')));
       case 'quiz':
         return head + '<div id="fm-quiz"></div>';
       default: { // texte, exercice, travail pratique, étude de cas
@@ -839,6 +883,7 @@
 
     if (l.type === 'quiz') montrerQuiz(id, l, d);
     monterDocuments(id, null, apercu);
+    if (Number(l.studio)) { const zs = $('.fm-studio'); if (zs) montrerStudio(id, l, zs, { apercu, apprenant: d.mode === 'apprenant', suivi: mode, d }); }
     montrerEchanges(id, l);
     brancherEnregistrer(id, () => screenLecon(++seq, id, leconId));
     const ask = $('#fm-ask'); if (ask) ask.onclick = () => poserQuestion(id, l, m);
@@ -987,7 +1032,11 @@
       });
     });
     setPane(f.titre, html, `<a class="btn block" href="#/formations/${esc(id)}">S’inscrire à la formation</a>`);
-    document.querySelectorAll('details.card').forEach(dt => dt.addEventListener('toggle', () => { if (dt.open) monterDocuments(id, dt, false); }));
+    document.querySelectorAll('details.card').forEach(dt => dt.addEventListener('toggle', () => {
+      if (!dt.open) return;
+      monterDocuments(id, dt, false);
+      dt.querySelectorAll('.fm-studio:not([data-monte])').forEach(zs => { zs.dataset.monte = '1'; montrerStudio(id, { id: zs.dataset.lecon }, zs, { apercu: false, apprenant: false, suivi: 'aucun', d: null }); });
+    }));
   }
 
   /* ============================================================
