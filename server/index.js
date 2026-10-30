@@ -51514,6 +51514,77 @@ route("DELETE", "/api/insc/fiches/:id/historique", async (req, res, params, body
   sendJSON(res, 200, { ok: true, supprimees: r.changes });
 });
 
+/* Visuels, agenda et comptes rendus de la page publique d'inscription (2026-10-29, demande explicite :
+   "affiche les visuels de l'événement, photos et vidéos ; le calendrier doit être interactif ; présente les
+   comptes rendus disponibles des autres événements créés par ce compte"). Partagé par tous les écrans de la
+   page (ouverte, fermée, terminée, pas encore ouverte) pour que ni l'agenda ni les comptes rendus ne
+   disparaissent quand la fiche n'accepte plus d'inscription. Jamais bloquant : une requête qui échoue laisse
+   simplement la section vide. Aucune photo stockée en base64 de plus de 400 Ko n'est renvoyée (réponse trop lourde). */
+function inscPublicUrlLegere(u) {
+  if (!u || typeof u !== 'string') return null;
+  return (/^data:/i.test(u) && u.length > 400000) ? null : u;
+}
+function inscPublicPhotosEvenement(row) {
+  let g = [];
+  try { g = Array.isArray(row.galerie_photos) ? row.galerie_photos : JSON.parse(row.galerie_photos || '[]'); } catch (_) {}
+  const urls = [row.image_couverture, row.image_url, ...(Array.isArray(g) ? g : []).map(x => (x && typeof x === 'object') ? (x.url || x.src) : x)]
+    .map(inscPublicUrlLegere).filter(Boolean);
+  return [...new Set(urls)].slice(0, 12);
+}
+async function inscPublicContexteEvenement(fiche) {
+  let evenements = [];
+  try {
+    const rows = await db.prepare(`
+      SELECT e.id, e.titre, e.date_evt, e.date_fin, e.heure_debut, e.ville, e.pays, e.lieu, e.image_couverture, e.image_url, e.galerie_photos,
+             e.video1_url, e.video1_titre, e.video2_url, e.video2_titre FROM insc_fiches_evenements fe
+      JOIN evenements e ON e.id=fe.evenement_id WHERE fe.fiche_id=? ORDER BY e.date_evt ASC`).all(fiche.id);
+    evenements = rows.map(r => ({
+      id: r.id, titre: r.titre, date_evt: r.date_evt, date_fin: r.date_fin || null, heure_debut: r.heure_debut, ville: r.ville, pays: r.pays, lieu: r.lieu,
+      photos: inscPublicPhotosEvenement(r),
+      videos: [{ url: r.video1_url, libelle: r.video1_titre }, { url: r.video2_url, libelle: r.video2_titre }].filter(v => v.url),
+    }));
+  } catch (e) { console.error('[insc-public-evenements]', e.message); }
+  /* Autres événements du même organisateur (2026-09-27, demande explicite : "présente à droite
+     les événements du même compte pour que les différentes personnes sachent qu'ils peuvent
+     aussi s'inscrire à ces autres événements" + calendrier) — colonne latérale de découverte,
+     jamais bloquante pour l'inscription elle-même si la requête échoue.
+     Inclut aussi les événements récemment passés (2026-09-28, demande explicite : "prends en
+     compte... les événements déjà passés... mets-les en gris... pour éviter de saturer
+     d'informations inutiles") — auparavant strictement filtrés (date_evt >= date('now')), donc
+     invisibles ; le front les affiche désormais mais grisés/non cliquables (voir
+     ipRenderSideColonne côté public) pour donner une image d'activité réelle de l'initiative
+     sans laisser croire qu'on peut encore s'y inscrire. Fenêtre de 90 jours en arrière pour ne
+     jamais faire grossir indéfiniment la liste d'un organisateur actif depuis des années. */
+  let autresEvenements = [];
+  {
+    try {
+      const dejaLies = new Set(evenements.map(e => Number(e.id)));
+      const candidats = await db.prepare(`
+        SELECT id, titre, date_evt, heure_debut, ville, pays, lieu, image_couverture, image_url
+        FROM evenements
+        WHERE owner_user_id=? AND statut='ouvert' AND (visibilite IS NULL OR visibilite='public') AND date_evt >= date('now', '-90 days')
+        ORDER BY date_evt ASC LIMIT 20`).all(fiche.owner_user_id);
+      autresEvenements = await enrichirAvecFicheMedia(candidats.filter(e => !dejaLies.has(Number(e.id))));
+    } catch (e) { console.error('[insc-public-autres-evenements]', e.message); }
+  }
+  let comptesRendus = [];
+  try {
+    const crs = await db.prepare(`
+      SELECT c.evenement_id, c.titre, c.resume, c.published_at, e.titre AS evt_titre, e.date_evt, e.ville, e.pays, e.image_couverture, e.image_url, e.galerie_photos
+      FROM evenement_comptes_rendus c JOIN evenements e ON e.id=c.evenement_id
+      WHERE e.owner_user_id=? AND c.statut='publie' AND (e.visibilite IS NULL OR e.visibilite='public')
+      ORDER BY e.date_evt DESC LIMIT 12`).all(fiche.owner_user_id);
+    const courants = new Set(evenements.map(e => Number(e.id)));
+    comptesRendus = crs.map(c => ({
+      evenement_id: c.evenement_id, titre: c.titre || c.evt_titre, evenement_titre: c.evt_titre, date_evt: c.date_evt, ville: c.ville, pays: c.pays,
+      resume: String(c.resume || '').replace(/\s+/g, ' ').trim().slice(0, 180),
+      image: inscPublicPhotosEvenement(c)[0] || null,
+      courant: courants.has(Number(c.evenement_id)),
+    }));
+  } catch (e) { console.error('[insc-public-comptes-rendus]', e.message); }
+  return { evenements, autres_evenements: autresEvenements, comptes_rendus: comptesRendus };
+}
+
 /* ── PUBLIC : lecture, soumission, upload ── */
 route("GET", "/api/insc/public/:slug", async (req, res, params) => {
   const fiche = await db.prepare("SELECT * FROM insc_fiches WHERE slug=?").get(params.slug);
@@ -51539,7 +51610,7 @@ route("GET", "/api/insc/public/:slug", async (req, res, params) => {
     const now = new Date();
     if (fiche.statut === "fermee" || (fiche.date_fermeture_inscriptions && new Date(fiche.date_fermeture_inscriptions) < now)) {
       const medias = await db.prepare("SELECT * FROM insc_fiches_medias WHERE fiche_id=? ORDER BY position ASC, id ASC").all(fiche.id);
-      return sendJSON(res, 200, { fiche, fermee: true, message: "Les inscriptions pour cet événement sont désormais fermées.", medias });
+      return sendJSON(res, 200, { fiche, fermee: true, message: "Les inscriptions pour cet événement sont désormais fermées.", medias, ...(await inscPublicContexteEvenement(fiche)) });
     }
     /* Fiche liée à au moins un événement (2026-09-28, demande explicite : "si cette note est de
        toute façon liée à un événement, la question ne se pose plus. Automatiquement, la note est
@@ -51554,38 +51625,15 @@ route("GET", "/api/insc/public/:slug", async (req, res, params) => {
     const tousLiesTermines = [...evenementsLies, ...evenementsBilletterieLies];
     if (tousLiesTermines.length && tousLiesTermines.every(evenementEstTermine)) {
       const medias = await db.prepare("SELECT * FROM insc_fiches_medias WHERE fiche_id=? ORDER BY position ASC, id ASC").all(fiche.id);
-      return sendJSON(res, 200, { fiche, fermee: true, message: "Cet événement est terminé : les inscriptions sont closes.", medias });
+      return sendJSON(res, 200, { fiche, fermee: true, message: "Cet événement est terminé : les inscriptions sont closes.", medias, ...(await inscPublicContexteEvenement(fiche)) });
     }
     if (!estLieeAUnEvenement && fiche.date_ouverture_inscriptions && new Date(fiche.date_ouverture_inscriptions) > now) {
       const medias = await db.prepare("SELECT * FROM insc_fiches_medias WHERE fiche_id=? ORDER BY position ASC, id ASC").all(fiche.id);
-      return sendJSON(res, 200, { fiche, pas_encore_ouverte: true, message: "Les inscriptions ne sont pas encore ouvertes.", medias });
+      return sendJSON(res, 200, { fiche, pas_encore_ouverte: true, message: "Les inscriptions ne sont pas encore ouvertes.", medias, ...(await inscPublicContexteEvenement(fiche)) });
     }
   }
   const now = new Date();
-  const evenements = await db.prepare(`
-    SELECT e.id, e.titre, e.date_evt, e.heure_debut, e.ville, e.pays, e.lieu FROM insc_fiches_evenements fe
-    JOIN evenements e ON e.id=fe.evenement_id WHERE fe.fiche_id=? ORDER BY e.date_evt ASC`).all(fiche.id);
-  /* Autres événements du même organisateur (2026-09-27, demande explicite : "présente à droite
-     les événements du même compte pour que les différentes personnes sachent qu'ils peuvent
-     aussi s'inscrire à ces autres événements" + calendrier) — colonne latérale de découverte,
-     jamais bloquante pour l'inscription elle-même si la requête échoue.
-     Inclut aussi les événements récemment passés (2026-09-28, demande explicite : "prends en
-     compte... les événements déjà passés... mets-les en gris... pour éviter de saturer
-     d'informations inutiles") — auparavant strictement filtrés (date_evt >= date('now')), donc
-     invisibles ; le front les affiche désormais mais grisés/non cliquables (voir
-     ipRenderSideColonne côté public) pour donner une image d'activité réelle de l'initiative
-     sans laisser croire qu'on peut encore s'y inscrire. Fenêtre de 90 jours en arrière pour ne
-     jamais faire grossir indéfiniment la liste d'un organisateur actif depuis des années. */
-  let autresEvenements = [];
-  try {
-    const dejaLies = new Set(evenements.map(e => Number(e.id)));
-    const candidats = await db.prepare(`
-      SELECT id, titre, date_evt, heure_debut, ville, pays, lieu, image_couverture, image_url
-      FROM evenements
-      WHERE owner_user_id=? AND statut='ouvert' AND (visibilite IS NULL OR visibilite='public') AND date_evt >= date('now', '-90 days')
-      ORDER BY date_evt ASC LIMIT 20`).all(fiche.owner_user_id);
-    autresEvenements = await enrichirAvecFicheMedia(candidats.filter(e => !dejaLies.has(Number(e.id))));
-  } catch (e) { console.error('[insc-public-autres-evenements]', e.message); }
+  const { evenements, autres_evenements: autresEvenements, comptes_rendus: comptesRendus } = await inscPublicContexteEvenement(fiche);
   const types = await db.prepare("SELECT * FROM insc_types WHERE fiche_id=? AND actif=1 ORDER BY ordre ASC, id ASC").all(fiche.id);
   for (const t of types) {
     t.champs = await getChampsPourType(t.id, fiche.id);
