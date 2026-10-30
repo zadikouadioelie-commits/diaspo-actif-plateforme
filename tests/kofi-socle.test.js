@@ -218,6 +218,11 @@ test('Koffi — règles du socle', async (t) => {
     assert.equal((await etat(jarA)).data.etat, 'utilisable', 'le formateur a autorisé Koffi pendant l\'évaluation');
     sql('DELETE FROM formation_quiz_sessions WHERE inscription_id=?', insc);
     assert.equal((await call(jarA, 'GET', `/api/formations/${fid}/kofi-reglages`)).status, 403, 'réglages réservés au formateur');
+    const rg = await call(jarF, 'GET', `/api/formations/${fid}/kofi-reglages`);
+    assert.equal(rg.data.publiee, true, 'formation publiée : le formateur peut essayer Koffi');
+    sql("UPDATE formations SET statut='brouillon' WHERE id=?", fid);
+    assert.equal((await call(jarF, 'GET', `/api/formations/${fid}/kofi-reglages`)).data.publiee, false, 'brouillon : Koffi ne sert pas encore');
+    sql("UPDATE formations SET statut='publiee' WHERE id=?", fid);
     assert.equal((await call(jarF, 'PUT', `/api/formations/${fid}/kofi-reglages`, { actif: false })).status, 200);
     assert.equal((await etat(jarA)).data.etat, 'desactive');
     assert.equal((await poser(jarA, convA, 'tontine solidaire')).status, 403);

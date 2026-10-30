@@ -681,7 +681,7 @@ module.exports.register = function register(deps) {
   route("GET", "/api/formations/:id/kofi-reglages", async (req, res, params) => {
     const x = await formationDuFormateur(req, res, params.id); if (!x) return;
     const p = await db.prepare("SELECT * FROM kofi_formations WHERE formation_id=?").get(x.f.id);
-    sendJSON(res, 200, { actif: !p || Number(p.actif) !== 0, desactive_evaluation: !p || Number(p.desactive_evaluation) !== 0, consignes: (p && p.consignes) || "" });
+    sendJSON(res, 200, { actif: !p || Number(p.actif) !== 0, desactive_evaluation: !p || Number(p.desactive_evaluation) !== 0, consignes: (p && p.consignes) || "", publiee: (x.f.statut || "publiee") === "publiee" });
   });
   route("PUT", "/api/formations/:id/kofi-reglages", async (req, res, params, body) => {
     const x = await formationDuFormateur(req, res, params.id); if (!x) return;
