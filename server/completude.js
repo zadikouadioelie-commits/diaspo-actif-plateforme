@@ -110,6 +110,15 @@ function texte(rang, pct, manquants) {
   return MESSAGES[Math.min(rang - 1, MESSAGES.length - 1)].replace('{pct}', String(pct)).replace('{liste}', liste);
 }
 
+/* Titre de la notification/push : le pourcentage seul ne dit pas quoi faire, et sur téléphone le
+   contenu (ci-dessus) peut être tronqué avant la liste complète — le titre doit donc déjà nommer
+   le premier élément manquant, pas seulement afficher un chiffre (2026-10-30, demande explicite). */
+function titreRelance(pct, manquants) {
+  if (!manquants.length) return `Votre profil est rempli à ${pct} %`;
+  const reste = manquants.length - 1;
+  return `Il manque : ${manquants[0]}${reste > 0 ? ` (+${reste} autre${reste > 1 ? 's' : ''})` : ''}`;
+}
+
 function lienProfil(role, ligne, idCompte, origine) {
   if (role === 'initiative') return `${origine}/initiative.html?id=${encodeURIComponent(ligne.slug || ligne.id)}&completer=profil`;
   if (role === 'collectivite') return `${origine}/profil-collectivite.html?id=${idCompte}&completer=profil`;
@@ -167,11 +176,11 @@ async function relancerProfilsIncomplets({ db, creerNotif, origine, maintenant =
 
     const rang = ((dernier && Number(dernier.rang)) || 0) + 1;
     await db.prepare('INSERT INTO completude_relances (user_id, rang, pourcentage) VALUES (?,?,?)').run(c.userId, rang, ev.pct);
-    await creerNotif(c.userId, 'profil_completude_relance', `Votre profil est rempli à ${ev.pct} %`,
+    await creerNotif(c.userId, 'profil_completude_relance', titreRelance(ev.pct, ev.manquants),
       texte(rang, ev.pct, ev.manquants), { lien: lienProfil(c.role, c.ligne, c.userId, origine), rang, pourcentage: ev.pct });
     bilan.relances++;
   }
   return bilan;
 }
 
-module.exports = { SEUIL_PCT, CRITERES, evaluer, champRempli, relancerProfilsIncomplets, texte };
+module.exports = { SEUIL_PCT, CRITERES, evaluer, champRempli, relancerProfilsIncomplets, texte, titreRelance };

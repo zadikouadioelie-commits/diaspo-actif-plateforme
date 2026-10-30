@@ -15,6 +15,9 @@
   const ENT = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
   const deent = s => { for (let i = 0; i < 6 && /&(?:#\d+|#x[0-9a-f]+|amp|lt|gt|quot|apos|nbsp);/i.test(s); i++) s = s.replace(/&(#\d+|#x[0-9a-f]+|amp|lt|gt|quot|apos|nbsp);/gi, (m, e) => { if (e[0] !== '#') return ENT[e.toLowerCase()]; try { return String.fromCodePoint(e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10)); } catch (x) { return m; } }); return s; };
   const strip = v => deent(String(v == null ? '' : v).replace(/@\[([^\]]+)\]\([uic]:\d+\)/g, '$1').replace(/<[^>]*>/g, ' ')).replace(/[ \t]+/g, ' ').replace(/ ?\n ?/g, '\n').trim();
+  /* Tronque à max caractères SANS couper un mot en plein milieu (ex. notifications de complétude de
+     profil : la liste des champs manquants ne doit jamais s'arrêter sur un mot coupé). */
+  const tronqMot = (s, max) => s.length <= max ? s : s.slice(0, max).replace(/\s+\S*$/, '') + '…';
   const md = v => String(v == null ? '' : v).replace(/\*\*([^*]+)\*\*/g, '$1');
   const linkify = t => esc(t).replace(/((?:https?:\/\/)?(?:[a-z0-9-]+\.)+(?:com|fr|org|net|io|app)(?:\/[^\s<]*)?)/gi, u => { const h = /^https?:/i.test(u) ? u : 'https://' + u; return '<a href="' + h + '" target="_blank" rel="noopener" style="color:var(--navy2);text-decoration:underline;word-break:break-all">' + u + '</a>'; });
   const initials = n => (String(n || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0] || '').join('') || '?').toUpperCase();
@@ -2442,7 +2445,7 @@
         if (d.cta === 'passer_premium') return '#/abonnement';
         return '#/accueil';
       };
-      const html = l.length ? `<div class="lst">${l.map(n => `<a class="li" ${n.data && n.data.with_user_id ? `href="#" data-write="${esc(n.data.with_user_id)}"` : `href="${esc(href(n))}"`} style="${n.lue ? '' : 'background:var(--orange-l)'}"><span class="ic">${ic('bell')}</span><span class="sp"><span class="t">${esc(n.titre)}</span><br><span class="d">${esc(strip(n.contenu || '').slice(0, 110))} · ${esc(ago(n.created_at))}</span></span></a>`).join('')}</div>` : `<div class="empty"><div class="ei">${ic('bell', 'l')}</div><b>Aucune notification</b>Vous êtes à jour.</div>`;
+      const html = l.length ? `<div class="lst">${l.map(n => `<a class="li" ${n.data && n.data.with_user_id ? `href="#" data-write="${esc(n.data.with_user_id)}"` : `href="${esc(href(n))}"`} style="${n.lue ? '' : 'background:var(--orange-l)'}"><span class="ic">${ic('bell')}</span><span class="sp"><span class="t">${esc(n.titre)}</span><br><span class="d">${esc(tronqMot(strip(n.contenu || ''), 160))} · ${esc(ago(n.created_at))}</span></span></a>`).join('')}</div>` : `<div class="empty"><div class="ei">${ic('bell', 'l')}</div><b>Aucune notification</b>Vous êtes à jour.</div>`;
       setPane('Notifications', html);
       /* Activation en douceur (2026-10-13) : si cet appareil n'a pas encore les notifications, un bandeau propose de les activer ici. */
       if (window.DaNotifInvite) window.DaNotifInvite.proposable(S.me).then(ok => {
