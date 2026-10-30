@@ -2052,7 +2052,16 @@ document.getElementById('cover-file').addEventListener('change', async function 
 window.supprimerCouverture = function () { coverData = null; document.getElementById('cover-file').value = ''; majCoverUI(); };
 window.recadrerCouverture = async function () {
   if (!coverData) return;
-  try { const blob = await (await fetch(coverData)).blob(); await traiterCouverture(new File([blob], 'couverture.jpg', { type: blob.type || 'image/jpeg' })); }
+  try {
+    // Une image déjà enregistrée (coverData = l'URL Bunny CDN, pas un data:) ne peut pas être
+    // rechargée par un fetch() direct depuis le navigateur : Bunny ne renvoie pas d'en-tête
+    // Access-Control-Allow-Origin, donc le fetch échouait silencieusement (CORS) — toujours
+    // "Impossible de recadrer cette image ici" (2026-10-30, capture utilisateur à l'appui).
+    // Passe par notre propre serveur (GET /api/media/proxy), qui lui n'a pas cette limite.
+    const src = /^https?:\/\//i.test(coverData) ? '/api/media/proxy?url=' + encodeURIComponent(coverData) : coverData;
+    const blob = await (await fetch(src)).blob();
+    await traiterCouverture(new File([blob], 'couverture.jpg', { type: blob.type || 'image/jpeg' }));
+  }
   catch (e) { alert("Impossible de recadrer cette image ici : cliquez sur « Changer l'image » et choisissez-la de nouveau."); }
 };
 

@@ -3134,6 +3134,34 @@ route("POST", "/api/upload/evenement", async (req, res) => {
   } catch (e) { sendJSON(res, 500, SEC.safeError(e, "upload evenement")); }
 });
 
+/* GET /api/media/proxy?url=... — recharge une image déjà hébergée, en passant par notre propre
+   serveur (2026-10-30, demande explicite : « fais en sorte que ce soit possible de recadrer
+   sans problème »). Bunny CDN ne renvoie pas d'en-tête Access-Control-Allow-Origin : un fetch()
+   direct depuis le navigateur vers b-cdn.net échoue silencieusement (CORS), ce qui empêchait
+   "✂️ Recadrer / changer de format" sur une image de couverture déjà enregistrée
+   (evenements-app.html, recadrerCouverture()) — le bouton se contentait d'une alerte générique
+   sans jamais pouvoir recharger l'image existante. Même limitation, même allowlist d'hôtes que
+   crTextePdf() plus haut (jamais un relais ouvert vers une adresse quelconque). */
+route("GET", "/api/media/proxy", async (req, res, params, body, query) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  let u;
+  try { u = new URL(String(query.url || "")); } catch (e) { return sendJSON(res, 400, { error: "URL invalide." }); }
+  if (u.protocol !== "https:" || !["diaspoactif-media.b-cdn.net", "diaspoactif.com", "www.diaspoactif.com"].includes(u.hostname.toLowerCase())) {
+    return sendJSON(res, 400, { error: "Hôte non autorisé." });
+  }
+  try {
+    const r = await fetch(u.href, { signal: AbortSignal.timeout(8000) });
+    if (!r.ok) return sendJSON(res, 502, { error: "Image introuvable." });
+    const ct = r.headers.get("content-type") || "";
+    if (!/^image\//i.test(ct)) return sendJSON(res, 400, { error: "Ce n'est pas une image." });
+    const buf = Buffer.from(await r.arrayBuffer());
+    if (buf.length > 10 * 1024 * 1024) return sendJSON(res, 400, { error: "Image trop volumineuse." });
+    res.writeHead(200, { "Content-Type": ct, "Cache-Control": "private, max-age=300" });
+    return res.end(buf);
+  } catch (e) { return sendJSON(res, 502, { error: "Échec du chargement de l'image." }); }
+});
+
 /* POST /api/upload/cagnotte — image principale d'une cagnotte.
    Route manquante jusqu'ici (2026-08-18) : assets/upload-media.js appelait déjà
    pickAndUpload('cagnotte', ...), mais uploadMedia() n'avait pas d'entrée 'cagnotte' dans sa
