@@ -4938,6 +4938,23 @@ db.exec(`
     UNIQUE(doc_id, version)
   );
 `);
+/* Questions privées de l'élève au formateur (2026-10-30) : le lien entre un message de la messagerie et la formation / le module / la leçon concernés, avec son état de traitement. */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS formation_questions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    formation_id INTEGER NOT NULL,
+    module_id INTEGER NOT NULL,
+    lecon_id INTEGER,
+    eleve_id INTEGER NOT NULL,
+    formateur_id INTEGER NOT NULL,
+    conversation_id INTEGER NOT NULL,
+    message_id INTEGER,
+    statut TEXT DEFAULT 'ouverte',
+    created_at TEXT DEFAULT (datetime('now')),
+    traitee_le TEXT
+  );
+`);
+;['questions_actives INTEGER DEFAULT 0'].forEach(col => { try { db.exec(`ALTER TABLE formation_modules ADD COLUMN ${col}`); } catch(_) {} });
 /* Bibliothèque de médias du formateur (2026-10-30) : les fichiers envoyés depuis le Studio, réutilisables dans toutes ses formations. L'entrée ne contient que l'adresse (le fichier reste sur le CDN). */
 db.exec(`
   CREATE TABLE IF NOT EXISTS formation_medias (

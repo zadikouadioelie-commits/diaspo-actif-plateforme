@@ -3270,6 +3270,9 @@ FormationDroits.register({ route, db, sendJSON, getCurrentUser, SEC, checkFormat
 /* Formation Diaspora, lot D : studio de création par glisser-déposer (documents, versions, publication) — server/formation-studio.js. */
 const FormationStudio = require("./formation-studio");
 FormationStudio.register({ route, db, sendJSON, getCurrentUser, SEC, checkFormationOwner, exigerPremium });
+/* Questions privées de l'élève au formateur, reçues dans l'onglet « Messages de formation » de la messagerie — server/formation-questions.js. creerNotif, nomCompteAffichage et contactBloque sont des déclarations de fonction (hissées). */
+const FormationQuestions = require("./formation-questions");
+FormationQuestions.register({ route, db, sendJSON, getCurrentUser, SEC, creerNotif, nomCompteAffichage, contactBloque });
 /* Envoyer un événement par e-mail (carte complète) + texte d'aperçu du lien (date, lieu) : server/partage-evenement.js. urlImagePartageEvenement est une déclaration de fonction (hissée). */
 const PartageEvenement = require("./partage-evenement");
 PartageEvenement.register({ route, db, sendJSON, getCurrentUser, SEC, nomCompteAffichage, getOrigin, urlImagePartageEvenement });
@@ -15461,10 +15464,14 @@ route("GET", "/api/conversations", async (req, res, params, body, query) => {
     aDesAutos = autoIds.size > 0 || !!(await db.prepare("SELECT 1 FROM initiatives WHERE owner_user_id=?").get(user.id));
   } catch (_) {}
 
+  /* « Messages de formation » : questions privées des élèves aux formateurs (server/formation-questions.js). Ces conversations quittent la liste classique
+     (sauf si une vraie discussion existait déjà entre les deux comptes) et ont leur propre onglet, visible dès qu'on a posé ou reçu une question. */
+  const fq = await FormationQuestions.resume(db, user.id);
   let filtered = rows.map(r => {
     const { nb_messages, nb_messages_autre, premier_message, premier_message_id, ...reste } = r;
     return {
       ...reste,
+      formation_ouvertes: fq.ouvertes[Number(r.id)] || 0,
       archive: r.user1_id === user.id ? !!r.archive_u1 : !!r.archive_u2,
       archive_dossier: r.user1_id === user.id ? r.archive_dossier_u1 : r.archive_dossier_u2,
       automatique: (estOfficiel && Number(nb_messages) === 1 && Number(nb_messages_autre) === 0
@@ -15472,6 +15479,8 @@ route("GET", "/api/conversations", async (req, res, params, body, query) => {
         || (Number(nb_messages) === 1 && Number(nb_messages_autre) === 0 && autoIds.has(Number(premier_message_id))),
     };
   });
+  if (query.formation === "1") filtered = filtered.filter(r => fq.convIds.has(Number(r.id)));
+  else filtered = filtered.filter(r => r.contexte !== "formation");
   const nbAutomatiques = filtered.filter(r => r.automatique && !r.archive).length;
   const nbClassiques = filtered.filter(r => !r.automatique && !r.archive).length;
   if ((estOfficiel || aDesAutos) && (query.onglet === "automatique" || query.onglet === "classique")) {
@@ -15499,7 +15508,7 @@ route("GET", "/api/conversations", async (req, res, params, body, query) => {
     (r.derniere||"").toLowerCase().includes(q)
   );
 
-  sendJSON(res, 200, { conversations: filtered, onglets: (estOfficiel || aDesAutos) ? { actifs: true, automatiques: nbAutomatiques, classiques: nbClassiques, modeles: aDesAutos } : { actifs: false } });
+  sendJSON(res, 200, { conversations: filtered, formation: { actif: fq.actif, a_traiter: fq.aTraiter }, onglets: (estOfficiel || aDesAutos) ? { actifs: true, automatiques: nbAutomatiques, classiques: nbClassiques, modeles: aDesAutos } : { actifs: false } });
 });
 
 /* POST /api/conversations — créer ou retrouver une conversation */
@@ -16288,7 +16297,7 @@ route("GET", "/api/conversations/:id/messages", async (req, res, params) => {
     "SELECT id, owner_id, produit_nom, produit_reference, quantity, desired_date, description, dimensions, additional_information, attachment_url, attachment_nom, statut FROM devis_demandes WHERE conversation_id=? ORDER BY id DESC LIMIT 1"
   ).get(params.id);
 
-  sendJSON(res, 200, { messages, autre, conversation: conv, devis: devis || null });
+  sendJSON(res, 200, { messages, autre, conversation: conv, devis: devis || null, questions_formation: await FormationQuestions.questionsDeConversation(db, conv.id, user.id) });
 });
 
 /* POST /api/conversations/:id/messages — envoyer un message */
@@ -16318,7 +16327,7 @@ route("POST", "/api/conversations/:id/messages", async (req, res, params, body) 
      initiale ne tenait que le temps où la vitrine restait active ; la désactiver plus tard
      (même après un échange réel et suivi) refermait l'échange sans qu'aucune des deux
      parties n'ait rien fait pour ça. Signalé le 2026-08-17. */
-  if (conv.contexte !== "vitrine" && !(await peutEcrireDirectement(user, autreId))) {
+  if (conv.contexte !== "vitrine" && conv.contexte !== "formation" && !(await peutEcrireDirectement(user, autreId))) {
     return sendJSON(res, 403, {
       code: "contact_requis",
       error: "Vous n'êtes plus en contact avec ce compte. Envoyez une nouvelle demande pour reprendre l'échange.",
@@ -16350,6 +16359,8 @@ route("POST", "/api/conversations/:id/messages", async (req, res, params, body) 
   // Notifier le destinataire
   const otherId = conv.user1_id === user.id ? conv.user2_id : conv.user1_id;
   creerNotif(otherId, "message", "Nouveau message", `${await nomCompteAffichage(user.id)} vous a envoyé un message`, { conversation_id: conv.id, produit_id: produitId });
+  /* Le formateur répond à un élève : ses questions de formation ouvertes dans cette conversation passent à « traitée ». */
+  try { await FormationQuestions.apresMessage(db, conv.id, user.id); } catch (_) { /* le suivi des questions ne doit jamais empêcher un message */ }
   sendJSON(res, 201, { message: msg });
 });
 
@@ -17934,6 +17945,8 @@ route("PUT", "/api/formations/:id/modules/:moduleId", async (req, res, params, b
   if (!courant) return sendJSON(res, 404, { error: "Module introuvable." });
   await db.prepare("UPDATE formation_modules SET titre=COALESCE(?,titre), description=COALESCE(?,description) WHERE id=? AND formation_id=?")
     .run(body.titre||null, body.description||null, params.moduleId, params.id);
+  /* Questions des élèves au formateur : l'interrupteur du module (désactivé par défaut). */
+  if (body.questions_actives !== undefined) await db.prepare("UPDATE formation_modules SET questions_actives=? WHERE id=? AND formation_id=?").run(body.questions_actives ? 1 : 0, params.moduleId, params.id);
   /* Vente du module seul : n'est touchée que si le corps le demande (vendable_seul ou prix présents). */
   if (body.vendable_seul !== undefined || body.prix !== undefined) {
     const vente = lireVenteModule({ vendable_seul: body.vendable_seul !== undefined ? body.vendable_seul : courant.vendable_seul, prix: body.prix !== undefined ? body.prix : courant.prix }, f);

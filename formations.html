@@ -2189,6 +2189,7 @@
           </div>
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:8px 0 0 26px;font-size:13px;">
             <label style="display:flex;gap:6px;align-items:center;"><input type="checkbox" class="fb-mod-vendable" data-id="${m.id}" ${Number(m.vendable_seul) ? 'checked' : ''}> Vendre ce module séparément</label>
+            <label style="display:flex;gap:6px;align-items:center;" title="Les élèves qui suivent ce module voient un bouton « Poser une question au formateur » ; leurs questions arrivent dans votre messagerie, onglet « Messages de formation »."><input type="checkbox" class="fb-mod-questions" data-id="${m.id}" ${Number(m.questions_actives) ? 'checked' : ''}> ❓ Questions des élèves</label>
             <span class="fb-mod-vente" data-id="${m.id}" style="display:${Number(m.vendable_seul) ? 'inline-flex' : 'none'};gap:6px;align-items:center;">
               <input type="number" min="0" step="0.01" class="input-field fb-mod-prix" data-id="${m.id}" value="${m.prix == null ? '' : m.prix}" placeholder="Prix" style="width:100px;"> € <span style="color:var(--muted);">(0 = gratuit)</span>
               <button type="button" class="btn btn-sm btn-outline fb-mod-vente-save" data-id="${m.id}">Enregistrer</button>
@@ -2251,6 +2252,12 @@
   });
 
   function fbWireModuleEvents(){
+    document.querySelectorAll('.fb-mod-questions').forEach(cb => cb.addEventListener('change', async () => {
+      try {
+        await api('PUT', `/formations/${fbFormationId}/modules/${cb.dataset.id}`, { questions_actives: cb.checked });
+        showMsg(cb.checked ? 'Les élèves peuvent maintenant vous poser des questions sur ce module (messagerie › Messages de formation).' : 'Les questions sont désactivées sur ce module.', 'success');
+      } catch(e){ showMsg(e.message || 'Erreur.', 'danger'); cb.checked = !cb.checked; }
+    }));
     document.querySelectorAll('.fb-mod-vendable').forEach(cb => cb.addEventListener('change', async () => {
       const zone = document.querySelector(`.fb-mod-vente[data-id="${cb.dataset.id}"]`);
       if(cb.checked){ zone.style.display = 'inline-flex'; zone.querySelector('.fb-mod-prix').focus(); return; }

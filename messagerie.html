@@ -297,6 +297,12 @@
         <button type="button" class="msg-tab" id="onglet-modeles" style="display:none;">⚙️ Mes messages automatiques</button>
       </div>
 
+      <!-- Messages de formation (2026-10-30) : questions privées des élèves aux formateurs — l'onglet apparaît dès qu'on en a posé ou reçu (GET /api/conversations → formation.actif). -->
+      <div class="msg-tabs" id="onglets-formation" style="display:none;">
+        <button class="msg-tab active" data-fq="0">💬 Messages</button>
+        <button class="msg-tab" data-fq="1">🎓 Messages de formation <span id="fq-count" class="onglet-count"></span></button>
+      </div>
+
       <div class="msg-tabs">
         <button class="msg-tab active" data-filtre="tous">Tous</button>
         <button class="msg-tab" data-filtre="non_lus">Non lus <span id="tab-nonlus-count" style="display:none;"></span></button>
@@ -347,6 +353,7 @@
         <!-- Panneau demande de devis (module « 📩 Demander un devis » — conversation issue d'une
              fiche produit, voir POST /api/produits/:id/devis). Rempli/affiché par loadMessages()
              uniquement quand la réponse porte un champ devis non nul. -->
+        <div id="fq-panel" style="display:none;background:#EFF6FF;border-bottom:1.5px solid #BFDBFE;padding:10px 16px;font-size:12.5px;color:#1e3a5f;"></div>
         <div id="devis-panel" style="display:none;background:#FFF7ED;border-bottom:1.5px solid #FED7AA;padding:12px 16px;font-size:12.5px;color:#334155;"></div>
 
         <!-- Panel recherche dans conv -->
@@ -497,6 +504,7 @@ let activeConvId = null;
 let pollTimer = null;
 let filtre = "tous";
 let onglet = "classique"; // "classique" | "automatique" — sans effet hors compte Diaspo'Actif Officiel
+let ongletFormation = new URLSearchParams(location.search).get("onglet") === "formation"; // « Messages de formation » : questions privées élève ↔ formateur
 let listeFiltre = "";
 let pendingAttach = null; // { type, icon, nom, url }
 const EMOJI_LIST = ["👍","😊","🙏","💪","🎉","❤️","😂","👏","🔥","✅","💡","🤝"];
@@ -584,6 +592,7 @@ async function loadConvList(searchQ){
   loadMsgNotifPanel(); // panneau "À traiter" (grand écran) — indépendant du filtre/onglet actif ici
   const list=document.getElementById("conv-list");
   const params=new URLSearchParams({filtre, onglet});
+  if(ongletFormation) params.set("formation","1");
   if(searchQ) params.set("q",searchQ);
   if(listeFiltre) params.set("liste_id",listeFiltre);
   let data;
@@ -591,6 +600,15 @@ async function loadConvList(searchQ){
   catch(e){ list.innerHTML=`<div style="padding:16px;color:#D33;font-size:13px;">${e.message}</div>`; return; }
   const convs=data.conversations||[];
 
+  const barreFormation=document.getElementById("onglets-formation");
+  if(barreFormation){
+    const fq=data.formation||{};
+    barreFormation.style.display=fq.actif?"":"none";
+    if(fq.actif){
+      const cf=document.getElementById("fq-count"); if(cf) cf.textContent=fq.a_traiter>0?"("+fq.a_traiter+")":""; cf.title=fq.a_traiter>0?fq.a_traiter+" question(s) à traiter":"";
+      barreFormation.querySelectorAll("[data-fq]").forEach(b=>b.classList.toggle("active",(b.dataset.fq==="1")===ongletFormation));
+    }
+  }
   const barreOnglets=document.getElementById("onglets-auto");
   if(barreOnglets){
     const o=data.onglets||{};
@@ -711,6 +729,7 @@ async function loadMessages(convId){
   catch(e){ document.getElementById("msg-body").innerHTML=`<div style="color:#D33;padding:16px;">${e.message}</div>`; return; }
 
   const {messages,autre,conversation,devis}=data;
+  renderFormationPanel(data.questions_formation||[]);
 
   // Header
   document.getElementById("hd-avatar").textContent=avatarLetter(autre?.nom);
@@ -732,6 +751,33 @@ async function loadMessages(convId){
     proposerClassementContact(autre.id, autre.nom, convId);
   }
 }
+
+/* Panneau « 🎓 Questions de formation » : pour le formateur, chaque question avec sa formation / son module / sa leçon et un bouton pour la clore ou la rouvrir ;
+   pour l'élève, l'état de ses questions. Répondre dans la conversation clôt automatiquement les questions ouvertes. */
+function renderFormationPanel(questions){
+  const panel=document.getElementById("fq-panel");
+  if(!panel) return;
+  if(!questions.length){ panel.style.display="none"; panel.innerHTML=""; return; }
+  panel.innerHTML=questions.map(q=>{
+    const ou=[q.formation,q.module,q.lecon].filter(Boolean).map(escHtml).join(" › ");
+    const etat=q.statut==="ouverte"?"🟠 À traiter":"✅ Traitée";
+    const action=q.en_tant_que==="formateur"
+      ? `<button type="button" class="hd-btn" style="margin-left:8px;" onclick="fqStatut(${q.id},'${q.statut==="ouverte"?"traitee":"ouverte"}')">${q.statut==="ouverte"?"Marquer comme traitée":"Rouvrir"}</button>` : "";
+    return `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:2px 0;"><strong>🎓 ${ou}</strong>${q.extrait?`<em style="color:#475569;">« ${escHtml(q.extrait)}${q.extrait.length>=80?"…":""} »</em>`:""}<span>${etat}</span>${action}</div>`;
+  }).join("");
+  panel.style.cssText+=";max-height:150px;overflow:auto;";
+  panel.style.display="block";
+}
+async function fqStatut(id,statut){
+  try{
+    await api("PATCH",`/formation-questions/${id}`,{statut});
+    await loadMessages(activeConvId);
+    loadConvList(document.getElementById("conv-search").value.trim()||undefined);
+  }catch(e){ alert("Erreur : "+e.message); }
+}
+document.querySelectorAll("#onglets-formation [data-fq]").forEach(b=>{
+  b.addEventListener("click",()=>{ ongletFormation=b.dataset.fq==="1"; loadConvList(); });
+});
 
 /* Panneau « 📩 Demande de devis » — affiché quand la conversation est issue d'une demande de
    devis (voir POST /api/produits/:id/devis, GET /api/conversations/:id/messages étendue). Le

@@ -64,6 +64,8 @@
 .notice{text-align:center;padding:60px 20px;color:var(--muted);}
 .sf-att{margin:14px 16px 20px;border:1px solid var(--border);border-radius:12px;background:#fff;padding:12px 14px;font-size:12.5px;}
 .sf-att.ok{border-color:#86efac;background:#f0fdf4;}
+.sf-ask{margin:18px 0 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+.sf-ask small{color:var(--muted);font-size:12px;}
 .sf-att h4{margin:0 0 6px;font-size:13px;}
 .sf-att ul{list-style:none;margin:6px 0 0;padding:0;}
 .sf-att li{padding:3px 0;color:#475569;display:flex;gap:6px;}
@@ -408,6 +410,7 @@ function sfRenderContent(){
     <h2 style="margin-top:0;">${l ? escH(l.titre) : ''}${l && !sansSuivi() && l.obligatoire === false ? ' <span class="sf-opt" style="margin-left:8px;vertical-align:middle;">facultative</span>' : ''}</h2>
     ${l && l.description && !l.verrouille ? `<p style="color:var(--muted);">${escH(l.description)}</p>` : ''}
     ${sfContentHtml(l)}
+    ${apprenant && l && !l.verrouille && sfQuestionsActives(l) ? '<div class="sf-ask"><button type="button" class="btn secondary" onclick="sfQuestion()">❓ Poser une question au formateur</button><small>Votre question reste privée : elle arrive dans la messagerie du formateur.</small></div>' : ''}
     <div class="sf-nav-btns">
       <button class="btn secondary" ${!prev?'disabled':''} onclick="sfGoTo(${prev?prev.id:'null'})">← Précédent</button>
       ${apprenant && l && !validationParQuiz && !sansSuivi() ? sfBoutonTermine(l) : ''}
@@ -423,6 +426,44 @@ function sfRenderContent(){
     if (media) media.addEventListener('ended', async () => { await sfAutoTerminer(l.id); sfMajBoutonTermine(); });
   }
   if (echanges && l) sfEchangesLoad();
+}
+
+/* Questions privées au formateur : le bouton n'apparaît que si le formateur a activé le canal sur le module de la leçon ; le serveur le revérifie à l'envoi. */
+function sfQuestionsActives(l){
+  const m = ((SF_DATA && SF_DATA.modules) || []).find(x => Number(x.id) === Number(l.module_id));
+  return !!(m && Number(m.questions_actives));
+}
+function sfQuestion(){
+  const l = SF_CURRENT_LECON; if (!l) return;
+  const m = SF_DATA.modules.find(x => Number(x.id) === Number(l.module_id));
+  const fond = document.createElement('div');
+  fond.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:300;display:flex;align-items:center;justify-content:center;padding:16px;';
+  fond.innerHTML = `<div role="dialog" aria-modal="true" aria-labelledby="sf-q-t" style="background:#fff;border-radius:14px;max-width:520px;width:100%;padding:20px;box-shadow:0 20px 60px rgba(0,0,0,.35);">
+    <h3 id="sf-q-t" style="margin:0 0 4px;">❓ Question au formateur</h3>
+    <p style="margin:0 0 10px;color:var(--muted);font-size:13px;">Module « ${escH(m ? m.titre : '')} » · leçon « ${escH(l.titre)} ». Seul le formateur la verra ; vous recevrez sa réponse dans votre messagerie.</p>
+    <textarea id="sf-q-texte" rows="5" maxlength="1000" placeholder="Écrivez votre question…" style="width:100%;box-sizing:border-box;padding:10px;border:1px solid var(--border);border-radius:10px;font:inherit;resize:vertical;"></textarea>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;font-size:12px;color:var(--muted);"><span id="sf-q-cpt">0 / 1000</span><span id="sf-q-err" style="color:#b91c1c;" role="alert"></span></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;"><button type="button" class="btn secondary" id="sf-q-annuler">Annuler</button><button type="button" class="btn" id="sf-q-envoyer">Envoyer ma question</button></div></div>`;
+  document.body.appendChild(fond);
+  const ta = fond.querySelector('#sf-q-texte'), err = fond.querySelector('#sf-q-err'), env = fond.querySelector('#sf-q-envoyer');
+  const fermer = () => fond.remove();
+  ta.focus();
+  ta.addEventListener('input', () => { fond.querySelector('#sf-q-cpt').textContent = ta.value.length + ' / 1000'; err.textContent = ''; });
+  fond.querySelector('#sf-q-annuler').onclick = fermer;
+  fond.addEventListener('mousedown', ev => { if (ev.target === fond) fermer(); });
+  env.onclick = async () => {
+    const texte = ta.value.trim();
+    if (texte.length < 5) { err.textContent = 'Écrivez votre question (5 caractères au minimum).'; return; }
+    env.disabled = true; env.textContent = 'Envoi…';
+    try {
+      const r = await fetch(`/api/formations/${formationId}/modules/${l.module_id}/question`, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ texte, lecon_id: l.id }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || 'Envoi impossible pour le moment.');
+      fond.querySelector('div').innerHTML = `<h3 style="margin:0 0 6px;">✅ Question envoyée</h3><p style="color:var(--muted);">Le formateur l'a reçue dans sa messagerie. Vous serez prévenu(e) dès qu'il répond : retrouvez l'échange dans <strong>Messagerie › Messages de formation</strong>.</p>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;"><button type="button" class="btn secondary" id="sf-q-ok">Fermer</button><a class="btn" href="messagerie.html?onglet=formation">Ouvrir ma messagerie</a></div>`;
+      fond.querySelector('#sf-q-ok').onclick = fermer;
+    } catch (e) { err.textContent = e.message; env.disabled = false; env.textContent = 'Envoyer ma question'; }
+  };
 }
 
 /* Lecture d'un module du Studio : la version publiée (ou le brouillon pour le créateur en mode aperçu). Terminé = toutes les pages vues + zones de validation obligatoires cochées. */
