@@ -3260,6 +3260,7 @@
           <button class="btn btn-outline" id="adm-ftab-all" onclick="admFormTab('all')">Toutes</button>
           <button class="btn btn-outline" id="adm-ftab-stats" onclick="admFormTab('stats')">📊 Statistiques</button>
           <button class="btn btn-outline" id="adm-ftab-invites" onclick="admFormTab('invites')">🎓 Formateurs invités</button>
+          <button class="btn btn-outline" id="adm-ftab-finances" onclick="admFormTab('finances')">💶 Finances</button>
         </div>
 
         <!-- Panel en attente -->
@@ -3284,6 +3285,31 @@
         <!-- Panel statistiques -->
         <div id="adm-fpanel-stats" style="display:none;">
           <div id="adm-fstats"><div class="card" style="padding:16px;color:var(--muted);">Chargement…</div></div>
+        </div>
+
+        <!-- Panel finances : ventes, commissions, codes de réduction -->
+        <div id="adm-fpanel-finances" style="display:none;">
+          <div class="card" style="padding:14px 16px;margin-bottom:14px;">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;">
+              <div><label style="font-size:11.5px;font-weight:700;display:block;">Du</label><input type="date" id="adm-fin-du" class="input-field"></div>
+              <div><label style="font-size:11.5px;font-weight:700;display:block;">Au (inclus)</label><input type="date" id="adm-fin-au" class="input-field"></div>
+              <button type="button" class="btn btn-sm btn-orange" onclick="loadAdmFinances()">Afficher</button>
+              <a class="btn btn-sm btn-outline" id="adm-fin-csv" href="/api/admin/formations/finances?format=csv" download>⬇ Exporter (tableur)</a>
+            </div>
+            <p style="font-size:12px;color:var(--muted);margin:10px 0 0;">Aucune formation ne se rembourse. « Encaissé » = ce que les apprenants ont réellement payé, après promotion et code de réduction ; les accès gratuits n'y figurent pas.</p>
+          </div>
+          <div id="adm-fin-res"><div class="card" style="padding:16px;color:var(--muted);">Chargement…</div></div>
+          <h3 style="margin:22px 0 8px;font-size:15px;">Commission par formateur</h3>
+          <div class="card" style="padding:14px 16px;">
+            <p id="adm-fin-comdef" style="font-size:12.5px;color:var(--muted);margin:0 0 10px;"></p>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-bottom:12px;">
+              <div><label style="font-size:11.5px;font-weight:700;display:block;">Formateur</label><select id="adm-fin-form" class="input-field" style="min-width:220px;"></select></div>
+              <div><label style="font-size:11.5px;font-weight:700;display:block;">Commission (%)</label><input type="number" id="adm-fin-pct" class="input-field" min="0" max="30" step="0.1" style="width:110px;" placeholder="ex : 1.5"></div>
+              <div style="flex:1;min-width:180px;"><label style="font-size:11.5px;font-weight:700;display:block;">Note (facultatif)</label><input type="text" id="adm-fin-note" class="input-field" maxlength="300" style="width:100%;" placeholder="ex : partenaire historique"></div>
+              <button type="button" class="btn btn-sm btn-orange" onclick="admFinEnregistrerCommission()">Enregistrer</button>
+            </div>
+            <div id="adm-fin-comlist"></div>
+          </div>
         </div>
 
         <!-- Panel formateurs invités -->
@@ -7019,7 +7045,7 @@ let _admFormTab = 'en_attente';
 
 function admFormTab(tab) {
   _admFormTab = tab;
-  ['en_attente','publiee','codes','all','stats','invites'].forEach(t => {
+  ['en_attente','publiee','codes','all','stats','invites','finances'].forEach(t => {
     const btn = document.getElementById(`adm-ftab-${t}`);
     const panel = document.getElementById(`adm-fpanel-${t}`);
     if (btn) btn.className = t === tab ? 'btn btn-orange' : 'btn btn-outline';
@@ -7028,7 +7054,73 @@ function admFormTab(tab) {
   if (tab === 'codes') loadAdmCodes();
   else if (tab === 'stats') loadAdmFormStats();
   else if (tab === 'invites') loadAdmInvites();
+  else if (tab === 'finances') loadAdmFinances();
   else loadAdmFormations(tab);
+}
+
+/* Finances de Diaspo Formation : ventes, commission, remises, par formateur et par formation ; commission propre à un formateur. */
+const finEur = n => (Number(n) || 0).toFixed(2).replace('.', ',') + ' €';
+async function loadAdmFinances() {
+  const el = document.getElementById('adm-fin-res');
+  if (!el) return;
+  const du = document.getElementById('adm-fin-du').value, au = document.getElementById('adm-fin-au').value;
+  const qs = new URLSearchParams(); if (du) qs.set('du', du); if (au) qs.set('au', au);
+  document.getElementById('adm-fin-csv').href = '/api/admin/formations/finances?format=csv' + (qs.toString() ? '&' + qs : '');
+  el.innerHTML = '<div class="card" style="padding:16px;color:var(--muted);">Chargement…</div>';
+  try {
+    const d = await api('GET', '/admin/formations/finances' + (qs.toString() ? '?' + qs : ''));
+    const t = d.totaux;
+    const carte = (n, l) => `<div class="card" style="padding:14px;text-align:center;"><div style="font-size:24px;font-weight:900;">${n}</div><div style="font-size:12px;color:var(--muted);margin-top:4px;">${l}</div></div>`;
+    const tab = (titre, entetes, lignes, vide) => `<h3 style="margin:20px 0 8px;font-size:15px;">${titre}</h3><div class="card" style="padding:0;overflow-x:auto;">${lignes.length ? `<table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="background:#f8fafc;border-bottom:2px solid var(--border);">${entetes.map(h => `<th style="padding:9px 12px;text-align:left;">${h}</th>`).join('')}</tr></thead><tbody>${lignes.map(l => `<tr style="border-bottom:1px solid var(--border);">${l.map(c => `<td style="padding:9px 12px;">${c}</td>`).join('')}</tr>`).join('')}</tbody></table>` : `<div style="padding:16px;color:var(--muted);">${vide}</div>`}</div>`;
+    el.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;">
+        ${carte(t.nb, 'Ventes')}${carte(finEur(t.brut), 'Encaissé')}${carte(finEur(t.remises), 'Remises accordées')}${carte(finEur(t.commission), 'Commission de la plateforme')}${carte(finEur(t.net), 'Reversé aux formateurs')}
+      </div>`
+      + tab('Par formateur', ['Formateur', 'Ventes', 'Encaissé', 'Commission', 'Taux', 'Net formateur', ''], d.par_formateur.map(f => [esc(f.formateur), f.nb, finEur(f.brut), finEur(f.commission), f.commission_pct + ' %' + (f.personnalisee ? ' <span title="Taux fixé par l\'administration" style="color:#b45309;">●</span>' : ''), finEur(f.net),
+          `<button type="button" class="btn btn-sm btn-outline" onclick="admFinChoisir(${f.formateur_id})">Modifier le taux</button>`]), 'Aucune vente sur cette période.')
+      + tab('Par mois', ['Mois', 'Ventes', 'Encaissé', 'Commission', 'Net'], d.par_mois.map(m => [esc(m.mois), m.nb, finEur(m.brut), finEur(m.commission), finEur(m.net)]), 'Aucune vente.')
+      + tab('Formations les plus vendues', ['Formation', 'Ventes', 'Encaissé', 'Commission'], d.par_formation.slice(0, 10).map(f => [esc(f.formation), f.nb, finEur(f.brut), finEur(f.commission)]), 'Aucune vente.')
+      + tab('Codes de réduction', ['Code', 'Utilisations', 'Remises accordées', 'Encaissé'], d.par_coupon.map(c => [esc(c.code), c.nb, finEur(c.remises), finEur(c.brut)]), 'Aucun code utilisé sur cette période.')
+      + tab('Dernières ventes' + (d.nb_total > d.ventes.length ? ` (${d.ventes.length} sur ${d.nb_total} — le fichier contient tout)` : ''), ['Date', 'Formateur', 'Offre', 'Acheteur', 'Payé', 'Remise', 'Commission'],
+          d.ventes.slice(0, 30).map(v => [esc(String(v.date || '').slice(0, 10).split('-').reverse().join('/')), esc(v.formateur), esc(v.libelle), esc(v.acheteur), '<strong>' + finEur(v.montant) + '</strong>', v.remise ? '−' + finEur(v.remise) + (v.coupon ? ' ' + esc(v.coupon) : '') : '—', finEur(v.commission) + ' (' + v.commission_pct + ' %)']), 'Aucune vente.');
+    await loadAdmCommissions();
+  } catch (e) {
+    el.innerHTML = `<div class="card" style="padding:16px;color:red;">Erreur : ${esc(e.message || 'chargement impossible')}</div>`;
+  }
+}
+let _finCommissions = null;
+async function loadAdmCommissions() {
+  const d = await api('GET', '/admin/formations/commissions');
+  _finCommissions = d;
+  document.getElementById('adm-fin-comdef').innerHTML = `Taux par défaut : <strong>${d.defaut} %</strong> du prix payé, pour tous les formateurs. Un taux propre à un formateur (0 à ${d.max} %) s'applique à ses <strong>prochaines</strong> ventes : les ventes déjà faites gardent le taux de leur jour.`;
+  const sel = document.getElementById('adm-fin-form');
+  const choix = sel.value;
+  sel.innerHTML = '<option value="">— choisir un formateur —</option>' + d.formateurs.map(f => `<option value="${f.id}">${esc(f.nom)} (${f.nb_formations} formation${f.nb_formations > 1 ? 's' : ''})</option>`).join('');
+  if (choix) sel.value = choix;
+  document.getElementById('adm-fin-comlist').innerHTML = d.commissions.length
+    ? `<table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="background:#f8fafc;border-bottom:2px solid var(--border);"><th style="padding:8px 12px;text-align:left;">Formateur</th><th style="padding:8px 12px;text-align:left;">Taux</th><th style="padding:8px 12px;text-align:left;">Note</th><th></th></tr></thead><tbody>${d.commissions.map(c => `<tr style="border-bottom:1px solid var(--border);"><td style="padding:8px 12px;">${esc(c.nom)}</td><td style="padding:8px 12px;font-weight:800;">${c.pct} %</td><td style="padding:8px 12px;color:var(--muted);">${esc(c.note)}</td><td style="padding:8px 12px;text-align:right;"><button type="button" class="btn btn-sm btn-outline" onclick="admFinRetablir(${c.user_id})">Rétablir ${d.defaut} %</button></td></tr>`).join('')}</tbody></table>`
+    : '<div style="font-size:12.5px;color:var(--muted);">Aucun taux particulier : tous les formateurs sont à ' + d.defaut + ' %.</div>';
+}
+function admFinChoisir(id) {
+  const sel = document.getElementById('adm-fin-form');
+  sel.value = String(id);
+  const c = _finCommissions && _finCommissions.commissions.find(x => x.user_id === id);
+  document.getElementById('adm-fin-pct').value = c ? c.pct : '';
+  document.getElementById('adm-fin-note').value = c ? c.note : '';
+  document.getElementById('adm-fin-pct').focus();
+  sel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+async function admFinEnregistrerCommission() {
+  const id = document.getElementById('adm-fin-form').value, pct = document.getElementById('adm-fin-pct').value;
+  if (!id || pct === '') { alert('Choisissez un formateur et saisissez un taux.'); return; }
+  try {
+    await api('PUT', '/admin/formations/commissions/' + id, { pct: parseFloat(pct), note: document.getElementById('adm-fin-note').value });
+    document.getElementById('adm-fin-pct').value = ''; document.getElementById('adm-fin-note').value = '';
+    await loadAdmFinances();
+  } catch (e) { alert(e.message || 'Erreur.'); }
+}
+async function admFinRetablir(id) {
+  if (!confirm('Rétablir le taux par défaut pour ce formateur ? Cela ne change pas ses ventes passées.')) return;
+  try { await api('DELETE', '/admin/formations/commissions/' + id); await loadAdmFinances(); } catch (e) { alert(e.message || 'Erreur.'); }
 }
 
 /* Vue d'ensemble de Diaspo Formation : formations, inscriptions, documents délivrés (attestations / certificats vérifiables), évaluations. */

@@ -3267,6 +3267,9 @@ FormationAcces.register({ route, db, sendJSON, getCurrentUser, SEC, checkFormati
 /* Formation Diaspora, lot A : droits d'accès par formation ou par module, commandes, expiration — server/formation-droits.js. getOrigin est une déclaration de fonction (hissée). */
 const FormationDroits = require("./formation-droits");
 FormationDroits.register({ route, db, sendJSON, getCurrentUser, SEC, checkFormationOwner, creerNotif, getOrigin, ParcoursFormation });
+/* Formation Diaspora, lot B (l'argent) : coupons étendus, promotion appliquée au paiement, commission par formateur, vues « Ventes et revenus » et financière — server/formation-finances.js. */
+const FormationFinances = require("./formation-finances");
+FormationFinances.register({ route, db, sendJSON, getCurrentUser, SEC, exigerPremium });
 /* Formation Diaspora, lot D : studio de création par glisser-déposer (documents, versions, publication) — server/formation-studio.js. */
 const FormationStudio = require("./formation-studio");
 FormationStudio.register({ route, db, sendJSON, getCurrentUser, SEC, checkFormationOwner, exigerPremium });
@@ -17682,48 +17685,7 @@ route("PUT", "/api/formations/:id", async (req, res, params, body) => {
   sendJSON(res, 200, { ok: true });
 });
 
-/* ── Coupons de réduction sur une formation payante (propriétaire uniquement) ── */
-route("GET", "/api/formations/:id/coupons", async (req, res, params) => {
-  const user = await getCurrentUser(req);
-  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  const f = await db.prepare("SELECT owner_user_id FROM formations WHERE id=?").get(params.id);
-  if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
-  if (f.owner_user_id !== user.id && user.role !== 'administrateur') return sendJSON(res, 403, { error: "Interdit." });
-  if (!(await exigerPremium(user, res, "formations"))) return;
-  const coupons = await db.prepare("SELECT * FROM formation_coupons WHERE formation_id=? ORDER BY created_at DESC").all(params.id);
-  sendJSON(res, 200, { coupons });
-});
-
-route("POST", "/api/formations/:id/coupons", async (req, res, params, body) => {
-  const user = await getCurrentUser(req);
-  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  const f = await db.prepare("SELECT owner_user_id FROM formations WHERE id=?").get(params.id);
-  if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
-  if (f.owner_user_id !== user.id && user.role !== 'administrateur') return sendJSON(res, 403, { error: "Interdit." });
-  if (!(await exigerPremium(user, res, "formations"))) return;
-  const code = (body.code||'').trim().toUpperCase();
-  const reduction = parseFloat(body.reduction_pct);
-  if (!code) return sendJSON(res, 400, { error: "Le code du coupon est requis." });
-  if (!reduction || reduction <= 0 || reduction > 100) return sendJSON(res, 400, { error: "La réduction doit être comprise entre 1 et 100 %." });
-  try {
-    const id = (await db.prepare(`INSERT INTO formation_coupons (formation_id, code, reduction_pct, max_utilisations)
-      VALUES (?,?,?,?)`).run(params.id, code, reduction, body.max_utilisations ? parseInt(body.max_utilisations) : null)).lastInsertRowid;
-    sendJSON(res, 201, { id });
-  } catch(e) {
-    sendJSON(res, 400, { error: "Ce code de coupon existe déjà pour cette formation." });
-  }
-});
-
-route("DELETE", "/api/formations/:id/coupons/:couponId", async (req, res, params) => {
-  const user = await getCurrentUser(req);
-  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  const f = await db.prepare("SELECT owner_user_id FROM formations WHERE id=?").get(params.id);
-  if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
-  if (f.owner_user_id !== user.id && user.role !== 'administrateur') return sendJSON(res, 403, { error: "Interdit." });
-  if (!(await exigerPremium(user, res, "formations"))) return;
-  await db.prepare("DELETE FROM formation_coupons WHERE id=? AND formation_id=?").run(params.couponId, params.id);
-  sendJSON(res, 200, { ok: true });
-});
+/* Coupons de formation (pourcentage ou montant fixe, dates, limites, coupons globaux d'un formateur) : server/formation-finances.js (lot B). */
 
 async function cascadeDeleteFormation(id) {
   const quizIds = (await db.prepare("SELECT id FROM formation_quiz WHERE formation_id=?").all(id)).map(q => q.id);
@@ -20104,11 +20066,13 @@ route("GET", "/api/identity/status", async (req, res) => {
 /* POST /api/stripe/webhook — événements Identity (vérification) + Connect (comptes vendeurs).
    Appelé AVANT readBody() global (nécessite le corps BRUT pour vérifier la signature). */
 /* Crédite le propriétaire d'une formation de sa vente (commission plateforme 3 %, comme Boutique / Billetterie) — commune aux paiements historiques et aux commandes du lot A. */
-async function crediterVenteFormation(f, montant) {
+async function crediterVenteFormation(f, montant, commandeId) {
   if (!f || !f.owner_user_id || !(montant > 0)) return;
-  const COMMISSION_RATE = 0.03;
-  const platform_fee = parseFloat((montant * COMMISSION_RATE).toFixed(2));
-  const organizer_amount = parseFloat((montant - platform_fee).toFixed(2));
+  /* Taux de l'administration pour ce formateur (3 % par défaut), écrit sur la commande : changer le taux plus tard ne réécrit pas cette vente. */
+  const vente = await FormationFinances.enregistrerVente(db, f, montant, commandeId);
+  const COMMISSION_RATE = vente.pct / 100;
+  const platform_fee = vente.commission;
+  const organizer_amount = vente.net;
   await db.prepare(`INSERT INTO wallet_transactions (type,beneficiaire_id,montant,commission_rate,prix_billet,platform_fee,organizer_amount) VALUES ('platform_fee',NULL,?,?,?,?,?)`)
     .run(platform_fee, COMMISSION_RATE, montant, platform_fee, organizer_amount);
   await db.prepare(`INSERT INTO wallet_transactions (type,beneficiaire_id,montant,commission_rate,prix_billet,platform_fee,organizer_amount) VALUES ('organizer_credit',?,?,?,?,?,?)`)
@@ -20433,7 +20397,7 @@ async function handleStripeWebhook(req, res) {
       const session = event.data.object;
       const conf = await FormationDroits.confirmerCommande(db, Number(session.metadata.diaspoactif_formation_commande_id), (session.amount_total || 0) / 100);
       if (conf) {
-        await crediterVenteFormation(conf.formation, conf.montant);
+        await crediterVenteFormation(conf.formation, conf.montant, conf.commande.id);
         creerNotif(conf.commande.user_id, "formation", "Paiement confirmé ✅", `Votre paiement pour « ${conf.formation?.titre || ''} » est confirmé : votre accès est ouvert.`, { formation_id: conf.commande.formation_id });
         try {
           const exists = await db.prepare("SELECT id FROM user_formations_suivi WHERE user_id=? AND formation_id=?").get(conf.commande.user_id, conf.commande.formation_id);

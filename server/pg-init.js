@@ -997,6 +997,21 @@ const COLONNES_MIGRATION = [
     ['formation_lecons', 'studio', 'INTEGER DEFAULT 0'], // Studio de création (lot D)
     ['formation_quiz_questions', 'explication', 'TEXT'], // Studio : explication affichée après réussite
     ['formation_modules', 'questions_actives', 'INTEGER DEFAULT 0'], // questions privées de l'élève au formateur
+    // Formation Diaspora — lot B (2026-10-30) : coupons étendus, trace des ventes sur les commandes
+    ['formation_coupons', 'type_reduction', "TEXT DEFAULT 'pourcentage'"],
+    ['formation_coupons', 'montant_fixe', 'REAL'],
+    ['formation_coupons', 'date_debut', 'TEXT'],
+    ['formation_coupons', 'date_fin', 'TEXT'],
+    ['formation_coupons', 'max_par_utilisateur', 'INTEGER DEFAULT 1'],
+    ['formation_commandes', 'prix_initial', 'REAL'],
+    ['formation_commandes', 'remise', 'REAL DEFAULT 0'],
+    ['formation_commandes', 'coupon_code', 'TEXT'],
+    ['formation_commandes', 'coupon_source', 'TEXT'],
+    ['formation_commandes', 'coupon_id', 'INTEGER'],
+    ['formation_commandes', 'promo_pct', 'REAL'],
+    ['formation_commandes', 'commission_pct', 'REAL'],
+    ['formation_commandes', 'commission', 'REAL'],
+    ['formation_commandes', 'net_formateur', 'REAL'],
     ['formation_modules', 'prix', 'REAL'],
     ['formation_modules', 'vendable_seul', 'INTEGER DEFAULT 0'],
     ['formations', 'duree_acces_jours', 'INTEGER'],

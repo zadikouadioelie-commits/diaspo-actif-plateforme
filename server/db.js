@@ -4955,6 +4955,34 @@ db.exec(`
   );
 `);
 ;['questions_actives INTEGER DEFAULT 0'].forEach(col => { try { db.exec(`ALTER TABLE formation_modules ADD COLUMN ${col}`); } catch(_) {} });
+/* Formation Diaspora — lot B, l'argent (2026-10-30) : coupons étendus (montant fixe, dates, limite par personne), coupons valables sur toutes les formations d'un formateur, commission propre à un formateur, et trace de chaque vente (prix avant remise, remise, commission, net) sur la commande. Aucun remboursement de formation (décision du 2026-10-30). */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS formation_coupons_globaux (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    owner_user_id INTEGER NOT NULL,
+    code TEXT NOT NULL,
+    type_reduction TEXT DEFAULT 'pourcentage',
+    reduction_pct REAL NOT NULL DEFAULT 0,
+    montant_fixe REAL,
+    date_debut TEXT,
+    date_fin TEXT,
+    max_utilisations INTEGER,
+    max_par_utilisateur INTEGER DEFAULT 1,
+    actif INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(owner_user_id, code)
+  );
+  CREATE TABLE IF NOT EXISTS formation_commissions_formateurs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL UNIQUE,
+    pct REAL NOT NULL,
+    note TEXT,
+    modifie_par INTEGER,
+    updated_at TEXT DEFAULT (datetime('now'))
+  );
+`);
+;['type_reduction TEXT DEFAULT \'pourcentage\'','montant_fixe REAL','date_debut TEXT','date_fin TEXT','max_par_utilisateur INTEGER DEFAULT 1'].forEach(col => { try { db.exec(`ALTER TABLE formation_coupons ADD COLUMN ${col}`); } catch(_) {} });
+;['prix_initial REAL','remise REAL DEFAULT 0','coupon_code TEXT','coupon_source TEXT','coupon_id INTEGER','promo_pct REAL','commission_pct REAL','commission REAL','net_formateur REAL'].forEach(col => { try { db.exec(`ALTER TABLE formation_commandes ADD COLUMN ${col}`); } catch(_) {} });
 /* Bibliothèque de médias du formateur (2026-10-30) : les fichiers envoyés depuis le Studio, réutilisables dans toutes ses formations. L'entrée ne contient que l'adresse (le fichier reste sur le CDN). */
 db.exec(`
   CREATE TABLE IF NOT EXISTS formation_medias (

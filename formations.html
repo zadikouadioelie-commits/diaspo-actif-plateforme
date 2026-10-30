@@ -289,6 +289,25 @@
         <h3 style="margin:0 0 10px;">🎛️ Centre de commande</h3>
         <div class="fb-dash-grid" id="fb-dash-grid"><div class="notice">Chargement du tableau de bord…</div></div>
 
+        <h3 style="margin:20px 0 10px;">💶 Ventes et revenus</h3>
+        <div class="card" style="padding:14px 16px;margin-bottom:6px;">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-bottom:12px;">
+            <div><label style="font-size:11.5px;font-weight:700;display:block;">Du</label><input type="date" id="fv-du" class="input-field"></div>
+            <div><label style="font-size:11.5px;font-weight:700;display:block;">Au (inclus)</label><input type="date" id="fv-au" class="input-field"></div>
+            <div><label style="font-size:11.5px;font-weight:700;display:block;">Formation</label><select id="fv-formation" class="input-field"><option value="">Toutes</option></select></div>
+            <button type="button" class="btn btn-sm btn-orange" id="fv-appliquer">Afficher</button>
+            <a class="btn btn-sm btn-outline" id="fv-csv" href="/api/formateur/ventes?format=csv" download>⬇ Exporter (tableur)</a>
+          </div>
+          <div class="fb-dash-grid" id="fv-cartes"></div>
+          <div id="fv-detail"></div>
+        </div>
+        <h3 style="margin:20px 0 10px;">🏷️ Coupons sur toutes mes formations</h3>
+        <div class="card" style="padding:14px 16px;margin-bottom:6px;">
+          <p style="font-size:12.5px;color:var(--muted);margin:0 0 10px;">Un code créé ici fonctionne sur toutes vos formations payantes (pourcentage ou montant fixe, avec dates et limites). Pour un code limité à une seule formation, ouvrez la formation, onglet « Tarification ».</p>
+          <div id="cg-liste" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;"></div>
+          <div id="cg-form"></div>
+        </div>
+
         <h3 style="margin:20px 0 10px;">Mes formations</h3>
         <div id="mes-formations-list"><div class="notice">Chargement…</div></div>
       </div>
@@ -605,16 +624,12 @@
               <div>
                 <div class="flex-between"><label style="font-size:13px;font-weight:700;">Coupons de réduction <span class="fb-help" title="Codes que les apprenants peuvent saisir au paiement pour obtenir une réduction ponctuelle.">?</span></label></div>
                 <div id="mfw-coupons-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;"></div>
-                <div style="display:flex;gap:8px;">
-                  <input id="mfw-coupon-code" class="input-field" style="flex:1;" placeholder="CODE20">
-                  <input id="mfw-coupon-pct" type="number" min="1" max="100" class="input-field" style="width:80px;" placeholder="%">
-                  <input id="mfw-coupon-max" type="number" min="1" class="input-field" style="width:90px;" placeholder="Max util.">
-                  <button class="btn btn-sm btn-outline" id="btn-mfw-add-coupon" type="button">+ Ajouter</button>
-                </div>
+                <div id="mfw-coupon-form"></div>
+                <p style="font-size:11.5px;color:var(--muted);margin:6px 0 0;">Le code se saisit sur la fiche de la formation, avant le paiement. Pour un code valable sur <strong>toutes</strong> vos formations, utilisez « Coupons sur toutes mes formations » dans le Centre de commande.</p>
               </div>
             </div>
-            <div style="background:#f8fafc;border-radius:8px;padding:10px 14px;font-size:12.5px;color:var(--muted);">
-              💰 Commission Diaspo'Actif : <strong id="mfw-commission-pct">5%</strong> · Revenu net estimé : <strong id="mfw-revenu-net">—</strong>
+            <div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);border-radius:8px;padding:10px 14px;font-size:12.5px;">
+              💰 Commission Diaspo'Actif : <strong id="mfw-commission-pct">…</strong> · Revenu net estimé : <strong id="mfw-revenu-net">—</strong>
               <span class="fb-help" title="Pourcentage prélevé par Diaspo'Actif sur chaque vente de formation payante.">?</span>
             </div>
         </div>
@@ -1545,14 +1560,20 @@
     document.getElementById("mfw-promo-block").style.display = this.checked ? "flex" : "none";
   });
   ["new-form-prix","new-form-devise"].forEach(id=>document.getElementById(id).addEventListener("input", mfwUpdateCommissionPreview));
+  /* Le vrai taux (3 % par défaut, ou le taux fixé par l'administration pour ce compte). */
+  let MFW_COMMISSION = 3;
+  api('GET', '/formateur/commission').then(r => { MFW_COMMISSION = Number(r.pct); mfwUpdateCommissionPreview(); }).catch(()=>{});
   function mfwUpdateCommissionPreview(){
     const gratuit = document.getElementById("new-form-gratuit").checked;
     const prix = parseFloat(document.getElementById("new-form-prix").value)||0;
     const devise = document.getElementById("new-form-devise").value;
-    const pct = gratuit ? 0 : 5;
+    const pct = gratuit ? 0 : MFW_COMMISSION;
     document.getElementById('mfw-commission-pct').textContent = pct + '%';
-    document.getElementById('mfw-revenu-net').textContent = gratuit ? '—' : (prix * (1 - pct/100)).toFixed(2) + ' ' + devise;
+    const promo = document.getElementById('new-form-promo-active').checked ? (parseFloat(document.getElementById('new-form-promo-pct').value)||0) : 0;
+    const prixVente = promo > 0 && promo < 100 ? prix * (1 - promo/100) : prix;
+    document.getElementById('mfw-revenu-net').textContent = gratuit ? '—' : (prixVente * (1 - pct/100)).toFixed(2) + ' ' + devise + (promo > 0 ? ' (prix promo ' + prixVente.toFixed(2) + ')' : '');
   }
+  ['new-form-promo-active','new-form-promo-pct'].forEach(id=>{ const e = document.getElementById(id); if(e){ e.addEventListener('input', mfwUpdateCommissionPreview); e.addEventListener('change', mfwUpdateCommissionPreview); } });
 
   document.getElementById("new-form-acces-type").addEventListener("change", async function(){
     const wrap = document.getElementById('mfw-acces-liste-wrap');
@@ -1568,36 +1589,103 @@
     }
   });
 
+  /* ── Coupons : formulaire commun (une formation OU toutes les formations du formateur) ── */
+  const cpEur = n => (Number(n)||0).toFixed(2).replace('.', ',') + ' €';
+  const cpDate = s => String(s||'').slice(0,10).split('-').reverse().join('/');
+  function cpFormHtml(p){
+    const champ = 'class="input-field" style="width:100%;margin-top:3px;"';
+    return `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;align-items:end;">
+      <div><label style="font-size:11.5px;font-weight:700;">Code</label><input id="${p}-code" ${champ} maxlength="30" placeholder="RENTREE20"></div>
+      <div><label style="font-size:11.5px;font-weight:700;">Type de réduction</label><select id="${p}-type" ${champ}><option value="pourcentage">Pourcentage (%)</option><option value="montant">Montant fixe (€)</option></select></div>
+      <div><label style="font-size:11.5px;font-weight:700;" id="${p}-val-lbl">Réduction (%)</label><input id="${p}-val" type="number" min="1" step="any" ${champ} placeholder="20"></div>
+      <div><label style="font-size:11.5px;font-weight:700;">Valable à partir du</label><input id="${p}-debut" type="date" ${champ}></div>
+      <div><label style="font-size:11.5px;font-weight:700;">Jusqu'au (inclus)</label><input id="${p}-fin" type="date" ${champ}></div>
+      <div><label style="font-size:11.5px;font-weight:700;">Utilisations au total</label><input id="${p}-max" type="number" min="1" ${champ} placeholder="illimité"></div>
+      <div><label style="font-size:11.5px;font-weight:700;">Par personne</label><input id="${p}-pers" type="number" min="0" ${champ} value="1" title="0 = illimité"></div>
+      <div><button class="btn btn-sm btn-orange" id="${p}-add" type="button" style="width:100%;">+ Ajouter</button></div>
+    </div>`;
+  }
+  function cpFormInit(p, envoyer){
+    const q = id => document.getElementById(p + '-' + id);
+    q('type').addEventListener('change', ()=>{ const m = q('type').value === 'montant'; q('val-lbl').textContent = m ? 'Réduction (€)' : 'Réduction (%)'; q('val').placeholder = m ? '10' : '20'; });
+    q('add').addEventListener('click', async ()=>{
+      const montant = q('type').value === 'montant';
+      const corps = { code: q('code').value.trim(), type_reduction: q('type').value, date_debut: q('debut').value || null, date_fin: q('fin').value || null,
+        max_utilisations: q('max').value || null, max_par_utilisateur: q('pers').value === '' ? 1 : q('pers').value };
+      if(montant) corps.montant_fixe = parseFloat(q('val').value); else corps.reduction_pct = parseFloat(q('val').value);
+      if(!corps.code || !q('val').value){ showMsg('Le code et la valeur de la réduction sont requis.', 'danger'); return; }
+      try {
+        await envoyer(corps);
+        ['code','val','debut','fin','max'].forEach(k => q(k).value = ''); q('pers').value = 1;
+      } catch(e){ showMsg(e.message||'Erreur.', 'danger'); }
+    });
+  }
+  function cpLigneHtml(c, lecture){
+    const val = c.type_reduction === 'montant' ? '−' + cpEur(c.montant_fixe) : '−' + c.reduction_pct + ' %';
+    const dates = (c.date_debut || c.date_fin) ? ' · ' + (c.date_debut ? 'dès le ' + cpDate(c.date_debut) : '') + (c.date_debut && c.date_fin ? ' ' : '') + (c.date_fin ? 'jusqu\'au ' + cpDate(c.date_fin) : '') : '';
+    const parPers = c.max_par_utilisateur == null ? 1 : Number(c.max_par_utilisateur);
+    const lim = ' · utilisé ' + c.nb_utilises + (c.max_utilisations ? ' / ' + c.max_utilisations : '') + (c.nb_utilises ? ' (' + cpEur(c.remises_accordees) + ' offerts)' : '') + (parPers > 0 ? ' · ' + parPers + ' par personne' : '');
+    const inactif = c.actif != null && !Number(c.actif);
+    return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12.5px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.16);border-radius:8px;padding:8px 12px;${inactif ? 'opacity:.55;' : ''}">
+      🏷️ <strong>${escQ(c.code)}</strong> <span>${val}</span><span style="color:var(--muted);">${dates}${lim}</span>${inactif ? ' <em style="color:#fbbf24;">désactivé</em>' : ''}${c.date_fin && String(c.date_fin).slice(0,10) < new Date().toISOString().slice(0,10) ? ' <em style="color:#fbbf24;">expiré</em>' : ''}
+      ${lecture ? '<span style="margin-left:auto;font-size:11px;color:var(--muted);">toutes vos formations</span>' : `<span style="margin-left:auto;display:flex;gap:6px;">
+        <button type="button" class="cp-bascule" data-id="${c.id}" data-actif="${inactif ? 1 : 0}" style="border:1px solid rgba(255,255,255,.3);background:none;color:inherit;border-radius:6px;cursor:pointer;font-size:11.5px;padding:2px 8px;">${inactif ? 'Réactiver' : 'Désactiver'}</button>
+        <button type="button" class="cp-suppr" data-id="${c.id}" aria-label="Supprimer le coupon" style="border:none;background:none;color:#dc2626;cursor:pointer;">✕</button></span>`}
+    </div>`;
+  }
+  function cpBranche(el, base, recharger){
+    el.querySelectorAll('.cp-bascule').forEach(b=>b.addEventListener('click', async ()=>{ try { await api('PATCH', `${base}/${b.dataset.id}`, { actif: b.dataset.actif === '1' }); recharger(); } catch(e){ showMsg(e.message||'Erreur.', 'danger'); } }));
+    el.querySelectorAll('.cp-suppr').forEach(b=>b.addEventListener('click', async ()=>{ if(!confirm('Supprimer ce coupon ? Les ventes déjà faites avec ce code restent dans vos revenus.')) return; try { await api('DELETE', `${base}/${b.dataset.id}`); recharger(); } catch(e){ showMsg(e.message||'Erreur.', 'danger'); } }));
+  }
+
   async function mfwRenderCoupons(){
     const el = document.getElementById('mfw-coupons-list');
+    const form = document.getElementById('mfw-coupon-form');
+    if(form && !form.dataset.pret){ form.innerHTML = cpFormHtml('mfwc'); form.dataset.pret = '1'; cpFormInit('mfwc', async corps => { if(!fbFormationId) return; await api('POST', `/formations/${fbFormationId}/coupons`, corps); mfwRenderCoupons(); }); }
     if(!fbFormationId){ el.innerHTML = ''; return; }
     try {
-      const { coupons } = await api('GET', `/formations/${fbFormationId}/coupons`);
-      el.innerHTML = (coupons||[]).map(c=>
-        `<div style="display:flex;align-items:center;gap:8px;font-size:12.5px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:6px 10px;">
-          🏷️ <strong>${c.code}</strong> — ${c.reduction_pct}% ${c.max_utilisations?`(max ${c.max_utilisations})`:''}
-          <button type="button" class="mfw-del-coupon" data-id="${c.id}" style="margin-left:auto;border:none;background:none;color:#dc2626;cursor:pointer;">✕</button>
-        </div>`).join('') || '<div style="font-size:12px;color:var(--muted);">Aucun coupon.</div>';
-      el.querySelectorAll('.mfw-del-coupon').forEach(b=>b.addEventListener('click', async ()=>{
-        await api('DELETE', `/formations/${fbFormationId}/coupons/${b.dataset.id}`);
-        mfwRenderCoupons();
-      }));
+      const { coupons, globaux } = await api('GET', `/formations/${fbFormationId}/coupons`);
+      el.innerHTML = (coupons||[]).map(c => cpLigneHtml(c, false)).join('') + (globaux||[]).map(c => cpLigneHtml(c, true)).join('') || '<div style="font-size:12px;color:var(--muted);">Aucun coupon.</div>';
+      cpBranche(el, `/formations/${fbFormationId}/coupons`, mfwRenderCoupons);
     } catch(_) {}
   }
-  document.getElementById('btn-mfw-add-coupon').addEventListener('click', async ()=>{
-    if(!fbFormationId) return;
-    const code = document.getElementById('mfw-coupon-code').value.trim();
-    const pct = document.getElementById('mfw-coupon-pct').value;
-    const max = document.getElementById('mfw-coupon-max').value;
-    if(!code || !pct){ showMsg('Code et pourcentage de réduction requis.', 'danger'); return; }
+
+  /* ── Centre de commande : coupons sur toutes mes formations ── */
+  async function loadCouponsGlobaux(){
+    const form = document.getElementById('cg-form'), el = document.getElementById('cg-liste');
+    if(!form) return;
+    if(!form.dataset.pret){ form.innerHTML = cpFormHtml('cg'); form.dataset.pret = '1'; cpFormInit('cg', async corps => { await api('POST', '/formateur/coupons-globaux', corps); loadCouponsGlobaux(); }); }
     try {
-      await api('POST', `/formations/${fbFormationId}/coupons`, { code, reduction_pct: parseFloat(pct), max_utilisations: max?parseInt(max):null });
-      document.getElementById('mfw-coupon-code').value = '';
-      document.getElementById('mfw-coupon-pct').value = '';
-      document.getElementById('mfw-coupon-max').value = '';
-      mfwRenderCoupons();
-    } catch(e){ showMsg(e.message||'Erreur.', 'danger'); }
-  });
+      const { coupons } = await api('GET', '/formateur/coupons-globaux');
+      el.innerHTML = coupons.map(c => cpLigneHtml(c, false)).join('') || '<div style="font-size:12px;color:var(--muted);">Aucun coupon global.</div>';
+      cpBranche(el, '/formateur/coupons-globaux', loadCouponsGlobaux);
+    } catch(e){ el.innerHTML = ''; }
+  }
+
+  /* ── Centre de commande : « Ventes et revenus » ── */
+  async function loadVentesFormateur(){
+    const el = document.getElementById('fv-detail'), cartes = document.getElementById('fv-cartes');
+    if(!el) return;
+    const du = document.getElementById('fv-du').value, au = document.getElementById('fv-au').value, fo = document.getElementById('fv-formation').value;
+    const qs = new URLSearchParams(); if(du) qs.set('du', du); if(au) qs.set('au', au); if(fo) qs.set('formation_id', fo);
+    try {
+      const d = await api('GET', '/formateur/ventes' + (qs.toString() ? '?' + qs : ''));
+      const sel = document.getElementById('fv-formation');
+      if(sel.options.length <= 1) d.mes_formations.forEach(f => sel.insertAdjacentHTML('beforeend', `<option value="${f.id}">${escQ(f.titre)}</option>`));
+      const t = d.totaux;
+      cartes.innerHTML = [[t.nb, 'Ventes'], [cpEur(t.brut), 'Encaissé'], [cpEur(t.remises), 'Remises accordées'], [cpEur(t.commission), 'Commission Diaspo\'Actif (' + d.commission_pct + ' %)'], [cpEur(t.net), 'Pour vous (net)'], [cpEur(d.solde_wallet), 'Solde de votre portefeuille']]
+        .map(([n,l]) => `<div class="fb-dash-card"><div class="fb-dash-num">${n}</div><div class="fb-dash-lbl">${l}</div></div>`).join('');
+      const tab = (titre, entetes, lignes) => lignes.length ? `<h4 style="margin:16px 0 6px;font-size:13.5px;">${titre}</h4><div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12.5px;"><thead><tr>${entetes.map(h=>`<th style="text-align:left;padding:6px 8px;border-bottom:2px solid rgba(227,192,110,.4);background:rgba(227,192,110,.12);color:#f4d98a;">${h}</th>`).join('')}</tr></thead><tbody>${lignes.map(l=>`<tr>${l.map(c=>`<td style="padding:6px 8px;border-bottom:1px solid var(--border);">${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>` : '';
+      el.innerHTML = (t.nb ? '' : '<div class="notice" style="margin-top:12px;">Aucune vente sur cette période. Les accès gratuits et les codes à 100 % ne comptent pas dans les ventes.</div>')
+        + tab('Par mois', ['Mois','Ventes','Encaissé','Commission','Net'], d.par_mois.map(m => [m.mois, m.nb, cpEur(m.brut), cpEur(m.commission), cpEur(m.net)]))
+        + tab('Par formation', ['Formation','Ventes','Encaissé','Commission','Net'], d.par_formation.map(f => [escQ(f.formation), f.nb, cpEur(f.brut), cpEur(f.commission), cpEur(f.net)]))
+        + tab('Codes de réduction utilisés', ['Code','Utilisations','Remises accordées','Encaissé'], d.par_coupon.map(c => [escQ(c.code), c.nb, cpEur(c.remises), cpEur(c.brut)]))
+        + tab('Dernières ventes' + (d.nb_total > d.ventes.length ? ' (' + d.ventes.length + ' sur ' + d.nb_total + ' — le fichier contient tout)' : ''), ['Date','Offre','Acheteur','Prix','Remise','Payé','Commission','Net'],
+          d.ventes.map(v => [cpDate(v.date), escQ(v.libelle), escQ(v.acheteur), cpEur(v.prix_initial) + (v.promo_pct ? ' <small>(promo −' + v.promo_pct + ' %)</small>' : ''), v.remise ? '−' + cpEur(v.remise) + (v.coupon ? ' <small>' + escQ(v.coupon) + '</small>' : '') : '—', '<strong>' + cpEur(v.montant) + '</strong>', cpEur(v.commission) + ' <small>(' + v.commission_pct + ' %)</small>', cpEur(v.net)]));
+      document.getElementById('fv-csv').href = '/api/formateur/ventes?format=csv' + (qs.toString() ? '&' + qs : '');
+    } catch(e){ el.innerHTML = '<div class="notice">' + escQ(e.message || 'Erreur de chargement des ventes.') + '</div>'; }
+  }
+  document.getElementById('fv-appliquer')?.addEventListener('click', loadVentesFormateur);
 
   document.getElementById("btn-creer-formation")?.addEventListener("click", async ()=>{
     try {
@@ -1875,6 +1963,7 @@
       ];
       el.innerHTML = cards.map(([num,lbl]) => `<div class="fb-dash-card"><div class="fb-dash-num">${num}</div><div class="fb-dash-lbl">${lbl}</div></div>`).join('');
     } catch(e){ el.innerHTML = '<div class="notice">Erreur de chargement du tableau de bord.</div>'; }
+    loadVentesFormateur(); loadCouponsGlobaux();
   }
 
   async function openSuiviFormation(id, titre){

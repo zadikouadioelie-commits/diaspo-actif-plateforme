@@ -9,6 +9,7 @@
    - Tout est contrôlé ICI, côté serveur. Un paiement n'est validé que par le retour sécurisé du prestataire (webhook Stripe → confirmerCommande).
    ═════════════════════════════════════════════════ */
 "use strict";
+const Finances = require("./formation-finances");
 
 /* Pas d'état « remboursé » : décision du 2026-10-30, aucune formation ne se rembourse. */
 const STATUTS_ACCES = ["en_attente", "actif", "expire", "revoque"];
@@ -176,7 +177,11 @@ module.exports.register = function register(deps) {
     /* Prix et code d'accès */
     let montant = 0, acces_gratuit = 0, code_valide = null;
     const mode = f.mode_acces || "gratuit";
-    const prixBase = cle === 0 ? (mode === "gratuit" ? 0 : Number(f.prix) || 0) : D.prixModule(f, module);
+    /* Formation complète : prix catalogue, puis promotion en cours (lot B) ; module : son prix. */
+    const pf = Finances.prixFormation(f);
+    const prixCatalogue = cle === 0 ? pf.catalogue : D.prixModule(f, module);
+    const promoPct = cle === 0 ? pf.promo_pct : null;
+    const prixBase = cle === 0 ? pf.prix : D.prixModule(f, module);
     if (mode === "payant_sauf_membres" && prixBase > 0) {
       const code = String((body && body.code) || "").trim().toUpperCase();
       const codeRow = code ? await db.prepare("SELECT * FROM formation_codes_acces WHERE code=? AND actif=1").get(code) : null;
@@ -186,6 +191,15 @@ module.exports.register = function register(deps) {
         await db.prepare("UPDATE formation_codes_acces SET nb_utilisations=nb_utilisations+1 WHERE id=?").run(codeRow.id);
       } else montant = prixBase;
     } else montant = prixBase;
+    /* Coupon de réduction (lot B) : calculé ici, jamais par le navigateur. Un code refusé arrête l'achat plutôt que de faire payer le plein tarif sans le dire. */
+    let coupon = null, remise = 0;
+    const codeCoupon = String((body && body.coupon) || "").trim();
+    if (codeCoupon && montant > 0) {
+      const ev = await Finances.evaluerCoupon(db, f, codeCoupon, user.id, montant);
+      if (!ev.ok) return sendJSON(res, 400, { error: ev.erreur, code: "coupon_refuse" });
+      coupon = ev.coupon; remise = ev.remise; montant = ev.prix_final;
+    }
+    const colsVente = [prixCatalogue, remise, coupon ? coupon.code : null, coupon ? coupon.source : null, coupon ? coupon.id : null, promoPct];
     const libelle = cle === 0 ? f.titre : `${f.titre} — ${module.titre}`;
     const portee = cle === 0 ? "formation" : "modules";
     const expiration = D.dateExpiration(f);
@@ -221,9 +235,9 @@ module.exports.register = function register(deps) {
     if (montant <= 0) {
       try {
         const { insc } = await assurerInscription("paye");
-        const r = await db.prepare("INSERT INTO formation_commandes (user_id,formation_id,montant,statut,code_acces,paye_le) VALUES (?,?,0,'payee',?,datetime('now'))").run(user.id, f.id, code_valide);
+        const r = await db.prepare("INSERT INTO formation_commandes (user_id,formation_id,montant,statut,code_acces,paye_le,prix_initial,remise,coupon_code,coupon_source,coupon_id,promo_pct) VALUES (?,?,0,'payee',?,datetime('now'),?,?,?,?,?,?)").run(user.id, f.id, code_valide, ...colsVente);
         await db.prepare("INSERT INTO formation_commande_lignes (commande_id,module_id,libelle,prix) VALUES (?,?,?,0)").run(r.lastInsertRowid, cle || null, libelle);
-        await poserDroit("actif", code_valide ? "code" : "gratuit", insc.id, r.lastInsertRowid);
+        await poserDroit("actif", code_valide || coupon ? "code" : "gratuit", insc.id, r.lastInsertRowid);
         await D.synchroniserInscription(db, user.id, f.id);
         const eff = await db.prepare("SELECT * FROM formation_inscriptions WHERE id=?").get(insc.id);
         if (eff && (eff.paiement_statut || "paye") !== "paye") await db.prepare("UPDATE formation_inscriptions SET paiement_statut='paye' WHERE id=?").run(eff.id);
@@ -259,9 +273,9 @@ module.exports.register = function register(deps) {
     try {
       const { insc, creee } = await assurerInscription("en_attente");
       if (creee) inscCreee = insc.id;
-      const c = await db.prepare("INSERT INTO formation_commandes (user_id,formation_id,montant,statut,code_acces) VALUES (?,?,?,'en_attente',?)").run(user.id, f.id, montant, code_valide);
+      const c = await db.prepare("INSERT INTO formation_commandes (user_id,formation_id,montant,statut,code_acces,prix_initial,remise,coupon_code,coupon_source,coupon_id,promo_pct) VALUES (?,?,?,'en_attente',?,?,?,?,?,?,?)").run(user.id, f.id, montant, code_valide, ...colsVente);
       commandeId = c.lastInsertRowid;
-      await db.prepare("INSERT INTO formation_commande_lignes (commande_id,module_id,libelle,prix) VALUES (?,?,?,?)").run(commandeId, cle || null, libelle, montant);
+      await db.prepare("INSERT INTO formation_commande_lignes (commande_id,module_id,libelle,prix) VALUES (?,?,?,?)").run(commandeId, cle || null, libelle, prixCatalogue);
       /* poserDroit lit « actuel » ; si la ligne en attente vient d'être supprimée, on repart d'une insertion. */
       if (droitActuel) { await db.prepare("UPDATE formation_acces SET statut='en_attente', type_acces='paye', montant_paye=0, commande_id=?, inscription_id=?, date_debut=NULL, date_expiration=NULL, motif=NULL WHERE id=?").run(commandeId, insc.id, droitActuel.id); droitId = droitActuel.id; }
       else droitId = (await db.prepare("INSERT INTO formation_acces (user_id,formation_id,module_cle,type_acces,statut,montant_paye,commande_id,inscription_id) VALUES (?,?,?,'paye','en_attente',0,?,?)").run(user.id, f.id, cle, commandeId, insc.id)).lastInsertRowid;
@@ -314,7 +328,7 @@ module.exports.register = function register(deps) {
       }
     }
     sendJSON(res, 200, {
-      formation: { id: Number(f.id), titre: f.titre, prix: gratuite ? 0 : Number(f.prix) || 0, gratuite, mode_acces: f.mode_acces || "gratuit", devise: f.devise || "EUR", duree_acces_jours: f.duree_acces_jours ? Number(f.duree_acces_jours) : null },
+      formation: { id: Number(f.id), titre: f.titre, prix: gratuite ? 0 : Finances.prixFormation(f).prix, prix_catalogue: gratuite ? 0 : Finances.prixFormation(f).catalogue, promo_pct: gratuite ? null : Finances.prixFormation(f).promo_pct, promo_date_fin: Finances.prixFormation(f).promo_pct ? (f.promo_date_fin || null) : null, gratuite, mode_acces: f.mode_acces || "gratuit", devise: f.devise || "EUR", duree_acces_jours: f.duree_acces_jours ? Number(f.duree_acces_jours) : null },
       modules: modules.map(m => ({
         id: Number(m.id), titre: m.titre, description: m.description || "", nb_lecons: Number((parModule[Number(m.id)] || {}).nb) || 0, duree_minutes: Number((parModule[Number(m.id)] || {}).minutes) || 0,
         vendable_seul: !!Number(m.vendable_seul), prix: D.prixModule(f, m), gratuit: D.prixModule(f, m) <= 0,

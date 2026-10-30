@@ -51,6 +51,14 @@
 .ff-btn[disabled]{opacity:.6;cursor:wait;}
 .ff-aide{font-size:12.5px;color:#9fb0d4;margin:10px 0 0;line-height:1.5;}
 .ff-erreur{margin-top:10px;font-size:13px;color:#fca5a5;}
+.ff-barre{font-size:16px;font-weight:600;color:#9fb0d4;text-decoration:line-through;margin-right:8px;}
+.ff-promo{display:inline-block;font-size:12px;font-weight:800;padding:3px 9px;border-radius:99px;background:rgba(34,197,94,.15);color:#86efac;border:1px solid rgba(34,197,94,.4);vertical-align:middle;}
+.ff-code{display:flex;gap:8px;margin:0 0 12px;}
+html body.nd .ff-code input{flex:1;min-width:0;box-sizing:border-box;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06) !important;color:#fff !important;padding:10px 12px;font-size:14px;text-transform:uppercase;}
+.ff-code input::placeholder{text-transform:none;color:#7c88a4;}
+.ff-code button{border-radius:10px;border:1px solid rgba(230,184,74,.5);background:transparent;color:#f4d98a;font-weight:800;padding:0 14px;cursor:pointer;}
+.ff-code-msg{font-size:12.5px;margin:-6px 0 12px;min-height:1em;}
+.ff-code-msg.ok{color:#86efac;}.ff-code-msg.ko{color:#fca5a5;}
 .ff-sig{text-align:center;margin-top:26px;color:#9fb0d4;font-size:13px;letter-spacing:.06em;}
 </style>
 </head>
@@ -100,6 +108,8 @@ function ffVideo(url){
 const dureeTxt = m => !m ? '' : (m >= 60 ? Math.floor(m / 60) + ' h' + (m % 60 ? ' ' + String(m % 60).padStart(2, '0') : '') : m + ' min');
 const lignes = txt => String(txt || '').split(/\r?\n|;/).map(s => s.trim()).filter(Boolean);
 
+let COUPON = null; /* code appliqué et prix recalculé par le serveur (le calcul définitif se refait à l'achat) */
+
 function ffRender(){
   const f = FF, o = OFFRE;
   const mon = o.mon_acces || { formation: null, modules: {} };
@@ -110,6 +120,11 @@ function ffRender(){
   const complet = mon.formation && mon.formation.statut === 'actif';
   const enAttente = mon.formation && mon.formation.statut === 'en_attente';
   const prixF = o.formation.gratuite ? 0 : o.formation.prix;
+  const promo = !o.formation.gratuite && o.formation.promo_pct ? o.formation.promo_pct : 0;
+  const prixAffiche = COUPON ? COUPON.prix_final : prixF;
+  const prixHtml = o.formation.gratuite ? 'Gratuit'
+    : ((promo || COUPON) ? `<span class="ff-barre">${euro(o.formation.prix_catalogue || prixF)}</span>` : '') + (COUPON && COUPON.prix_final === 0 ? 'Gratuit' : euro(prixAffiche))
+      + (promo ? ` <span class="ff-promo">−${promo} %</span>` : '');
 
   const modulesHtml = o.modules.map(m => {
     const a = mon.modules[m.id];
@@ -129,7 +144,7 @@ function ffRender(){
         <h1 class="ff-titre">${esc(f.titre)}</h1>
         ${f.sous_titre || f.description_courte ? `<p class="ff-sous">${esc(f.sous_titre || f.description_courte)}</p>` : ''}
         <div class="ff-meta">
-          <span class="ff-chip">${o.formation.gratuite ? 'GRATUIT' : euro(prixF)}</span>
+          <span class="ff-chip">${o.formation.gratuite ? 'GRATUIT' : euro(prixF)}${promo ? ' · promo −' + promo + ' %' : ''}</span>
           <span class="ff-chip">${o.modules.length} module${o.modules.length > 1 ? 's' : ''}</span>
           ${duree ? `<span class="ff-chip">⏱ ${esc(duree)}</span>` : ''}
           ${f.niveau ? `<span class="ff-chip">${esc(f.niveau)}</span>` : ''}
@@ -151,8 +166,11 @@ function ffRender(){
       <aside class="ff-offre">
         <div class="ff-card">
           <h2>Formation complète</h2>
-          <div class="ff-prix">${o.formation.gratuite ? 'Gratuit' : euro(prixF)}</div>
+          <div class="ff-prix">${prixHtml}</div>
+          ${promo && o.formation.promo_date_fin ? `<div class="ff-mod-s" style="margin-bottom:6px;">Promotion jusqu'au ${esc(String(o.formation.promo_date_fin).slice(0, 10).split('-').reverse().join('/'))}</div>` : ''}
+          ${COUPON ? `<div class="ff-mod-s" style="margin-bottom:6px;color:#86efac;">Code ${esc(COUPON.code)} : −${euro(COUPON.remise)}</div>` : ''}
           <div class="ff-mod-s" style="margin-bottom:12px;">Tous les modules, le suivi de progression${f.certificat_actif ? ' et le document de fin de formation' : ''}.</div>
+          ${!o.formation.gratuite && !complet && !enAttente ? `<div class="ff-code"><input id="ff-code" type="text" maxlength="30" placeholder="Code de réduction" autocomplete="off" value="${COUPON ? esc(COUPON.code) : ''}"><button type="button" id="ff-code-ok">Appliquer</button></div><div class="ff-code-msg" id="ff-code-msg" role="status"></div>` : ''}
           ${complet ? `<a class="ff-btn" href="suivre-formation.html?id=${encodeURIComponent(f.id)}">Accéder à ma formation →</a>`
             : enAttente ? '<button type="button" class="ff-btn" id="ff-reprendre">Finaliser mon paiement</button>'
             : `<button type="button" class="ff-btn" id="ff-complete">${o.formation.gratuite ? 'Accéder gratuitement' : 'Obtenir la formation complète'}</button>`}
@@ -165,6 +183,24 @@ function ffRender(){
     <div class="ff-sig">Apprendre • Évoluer • Réussir</div>`;
 
   const aller = (cible, corps) => ffAcquerir(cible, corps);
+  const ok = document.getElementById('ff-code-ok');
+  if (ok) {
+    const saisie = document.getElementById('ff-code'), msg = document.getElementById('ff-code-msg');
+    const dire = (txt, bon) => { msg.textContent = txt; msg.className = 'ff-code-msg ' + (bon ? 'ok' : 'ko'); };
+    const appliquer = async () => {
+      const code = saisie.value.trim();
+      if (!code) { COUPON = null; ffRender(); return; }
+      if (!CONNECTE) { dire('Connectez-vous pour utiliser un code de réduction.', false); return; }
+      ok.disabled = true;
+      try {
+        const d = await ffJson(`/formations/${encodeURIComponent(FF_ID)}/coupon/verifier`, { method: 'POST', body: JSON.stringify({ code }) });
+        if (d.valide) { COUPON = { code: d.code, remise: d.remise, prix_final: d.prix_final }; ffRender(); const m2 = document.getElementById('ff-code-msg'); m2.textContent = 'Code appliqué.'; m2.className = 'ff-code-msg ok'; }
+        else { COUPON = null; ok.disabled = false; dire(d.erreur || 'Ce code n’est pas valable.', false); }
+      } catch (e) { ok.disabled = false; dire(e.message, false); }
+    };
+    ok.addEventListener('click', appliquer);
+    saisie.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); appliquer(); } });
+  }
   const bc = document.getElementById('ff-complete'); if (bc) bc.addEventListener('click', () => aller(bc, {}));
   const br = document.getElementById('ff-reprendre'); if (br) br.addEventListener('click', () => aller(br, {}));
   document.querySelectorAll('[data-module]').forEach(b => b.addEventListener('click', () => aller(b, { module_id: Number(b.dataset.module) })));
@@ -175,6 +211,8 @@ async function ffAcquerir(bouton, corps){
   if (!CONNECTE) { location.href = 'login.html?redirect=' + encodeURIComponent(location.pathname + location.search); return; }
   bouton.disabled = true;
   try {
+    const saisi = document.getElementById('ff-code'), code = (COUPON && COUPON.code) || (saisi && saisi.value.trim()) || '';
+    if (code) corps = { ...corps, coupon: code };
     const d = await ffJson(`/formations/${encodeURIComponent(FF_ID)}/acquerir`, { method: 'POST', body: JSON.stringify(corps) });
     if (d.checkout_url) { location.href = d.checkout_url; return; }
     location.href = `suivre-formation.html?id=${encodeURIComponent(FF_ID)}`;
