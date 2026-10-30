@@ -5021,6 +5021,21 @@ db.exec(`
 `);
 ;['relances_off INTEGER DEFAULT 0','relance_derniere_le TEXT'].forEach(col => { try { db.exec(`ALTER TABLE formation_inscriptions ADD COLUMN ${col}`); } catch(_) {} });
 ;['relances_defaut INTEGER DEFAULT 1'].forEach(col => { try { db.exec(`ALTER TABLE formations ADD COLUMN ${col}`); } catch(_) {} });
+/* Studio — suivi de visionnage des vidéos (2026-10-30) : les morceaux de 5 s réellement regardés (chaîne de 0 et de 1), par apprenant, leçon et élément vidéo. */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS formation_studio_video (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    lecon_id INTEGER NOT NULL,
+    element_id TEXT NOT NULL,
+    segments TEXT NOT NULL DEFAULT '',
+    pct INTEGER NOT NULL DEFAULT 0,
+    position REAL DEFAULT 0,
+    duree REAL DEFAULT 0,
+    updated_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(user_id, lecon_id, element_id)
+  );
+`);
 /* Bibliothèque de médias du formateur (2026-10-30) : les fichiers envoyés depuis le Studio, réutilisables dans toutes ses formations. L'entrée ne contient que l'adresse (le fichier reste sur le CDN). */
 db.exec(`
   CREATE TABLE IF NOT EXISTS formation_medias (

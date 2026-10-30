@@ -17866,6 +17866,11 @@ route("POST", "/api/formations/:id/lecons/:leconId/progression", async (req, res
   /* Une leçon portant un quiz ne se valide que par la RÉUSSITE du quiz (POST …/quiz/:quizId/soumettre) : un simple clic ne suffit pas. */
   const quizLie = await db.prepare("SELECT id FROM formation_quiz WHERE formation_id=? AND lecon_id=?").get(params.id, params.leconId);
   if (quizLie && body.termine) return sendJSON(res, 409, { error: "Cette activité est un quiz : elle se valide en le réussissant.", code: "quiz_requis", quiz_id: Number(quizLie.id) });
+  /* Studio : une vidéo marquée « à regarder » doit avoir été regardée (suivi enregistré par le serveur) avant de valider la leçon. */
+  if (body.termine) {
+    const manquantes = await FormationStudio.videosManquantes(params.leconId, user.id);
+    if (manquantes.length) return sendJSON(res, 409, { error: `Regardez d'abord la vidéo « ${manquantes[0].titre} » (${manquantes[0].pct} % vu, 90 % demandés).`, code: "video_requise", videos: manquantes });
+  }
   const termine = body.termine ? 1 : 0;
   const existe = await db.prepare("SELECT id FROM formation_lecons_progression WHERE inscription_id=? AND lecon_id=?").get(inscription.id, params.leconId);
   if (existe) {

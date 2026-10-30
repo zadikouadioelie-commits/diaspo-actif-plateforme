@@ -51,6 +51,12 @@
       case 'image': {
         if (!p.url) return placeholder('🖼️', 'Image à ajouter');
         const al = p.align === 'left' ? 'flex-start' : p.align === 'right' ? 'flex-end' : 'center';
+        const c = p.crop;
+        if (c && c.ratio > 0 && c.w > 0 && c.h > 0) {
+          /* Recadrage : on montre seulement la partie (x, y, w, h en % de l'image) ; la proportion de la partie est conservée, jamais déformée. */
+          const img = `<img src="${esc(p.url)}" alt="${esc(p.alt)}" draggable="false" style="position:absolute;left:${-c.x * 100 / c.w}%;top:${-c.y * 100 / c.h}%;width:${10000 / c.w}%;height:${10000 / c.h}%;max-width:none;max-height:none;flex:none">`;
+          return `<figure class="st-fig st-fig-crop" style="align-items:${al}"><div class="st-cropbox" style="justify-content:${al}"><div class="st-crop" style="--r:${Number(c.ratio)};border-radius:${Number(p.rayon) || 0}px">${img}</div></div>${p.legende ? `<figcaption>${esc(p.legende)}</figcaption>` : ''}</figure>`;
+        }
         return `<figure class="st-fig" style="align-items:${al}"><img src="${esc(p.url)}" alt="${esc(p.alt)}" draggable="false" style="object-fit:${p.ajust === 'cover' ? 'cover' : 'contain'};border-radius:${Number(p.rayon) || 0}px">${p.legende ? `<figcaption>${esc(p.legende)}</figcaption>` : ''}</figure>`;
       }
       case 'video': {
@@ -134,6 +140,13 @@
     let i = 0, vues = new Set([0]);
     const valides = new Set();
     const requis = pages.flatMap(p => (p.elements || []).filter(e => e.type === 'validation' && (e.props || {}).obligatoire !== false).map(e => e.id));
+    /* Vidéos à regarder (fichiers lus par la page : pas YouTube) et état du visionnage de chaque vidéo suivie : morceaux de 5 s réellement regardés. */
+    const seuil = Number(opts.seuil) || 90;
+    const videosReq = pages.flatMap(p => (p.elements || []).filter(e => e.type === 'video' && (e.props || {}).exiger && e.props.url && !ytId(e.props.url)).map(e => e.id));
+    const etats = {};
+    Object.keys(opts.videos || {}).forEach(k => { const v = opts.videos[k]; etats[k] = { segs: String(v.segments || '').split(''), pct: Number(v.pct) || 0, srv: Number(v.pct) || 0, position: Number(v.position) || 0, dernierEnvoi: 0 }; });
+    /* Une vidéo compte comme regardée quand le SERVEUR l'a confirmé (sinon la validation de la leçon partirait avant l'enregistrement et serait refusée). */
+    const videosOk = () => opts.apercu || videosReq.every(id => { const e = etats[id]; return e && (opts.videoSauver ? e.srv : e.pct) >= seuil; });
     container.innerHTML = `<div class="st-lect">
       <div class="st-lect-nav"><button type="button" class="st-nb" data-n="-1" aria-label="Page précédente">‹</button><span class="st-lect-pos" aria-live="polite"></span><button type="button" class="st-nb" data-n="1" aria-label="Page suivante">›</button></div>
       <div class="st-lect-vue"><div class="st-lect-echelle"></div></div>
@@ -147,13 +160,61 @@
     }
     function progres() {
       const fin = i === pages.length - 1 || vues.size === pages.length;
-      const ok = requis.every(id => valides.has(id));
-      if (opts.onProgress) opts.onProgress({ vue: vues.size, total: pages.length, validations: valides.size, validations_total: requis.length, termine: fin && vues.size === pages.length && ok });
+      const ok = requis.every(id => valides.has(id)) && videosOk();
+      if (opts.onProgress) opts.onProgress({ vue: vues.size, total: pages.length, validations: valides.size, validations_total: requis.length, videos_requises: videosReq.length, videos_ok: videosReq.filter(id => etats[id] && (opts.videoSauver ? etats[id].srv : etats[id].pct) >= seuil).length, termine: fin && vues.size === pages.length && ok });
+    }
+    /* Suivi d'une vidéo : seuls les morceaux lus en continu comptent (un saut dans la vidéo ne coche rien) ; envoi régulier, à la pause et à la fin. */
+    function badge(v, id) {
+      if (!videosReq.includes(id)) return null;
+      const box = v.closest('.st-video'); if (!box) return null;
+      let b = box.querySelector('.st-video-etat');
+      if (!b) { b = document.createElement('div'); b.className = 'st-video-etat'; b.setAttribute('role', 'status'); box.appendChild(b); }
+      const e = etats[id] || { pct: 0 };
+      b.classList.toggle('ok', e.pct >= seuil);
+      b.textContent = e.pct >= seuil ? '✓ Vidéo regardée' : `À regarder en entier : ${e.pct} % vu (${seuil} % demandés)`;
+      return b;
+    }
+    function suivreVideos(racine) {
+      racine.querySelectorAll('video[data-suivi]').forEach(v => {
+        const holder = v.closest('.st-el'); const id = holder && holder.dataset.id; if (!id) return;
+        const e = etats[id] || (etats[id] = { segs: null, pct: 0, srv: 0, position: 0, dernierEnvoi: 0 });
+        let n = 0, dernierT = null, aEnvoyer = false;
+        const init = () => {
+          if (!isFinite(v.duration) || v.duration <= 0) return false;
+          n = Math.min(1000, Math.max(1, Math.ceil(v.duration / 5)));
+          if (!e.segs || e.segs.length !== n) e.segs = new Array(n).fill('0');
+          return true;
+        };
+        const pourcent = () => Math.floor(e.segs.filter(c => c === '1').length * 100 / e.segs.length);
+        const envoyer = () => {
+          if (!aEnvoyer || !e.segs || !opts.videoSauver || opts.apercu) return;
+          aEnvoyer = false; e.dernierEnvoi = Date.now();
+          Promise.resolve(opts.videoSauver(id, { segments: e.segs.join(''), position: v.currentTime || 0, duree: v.duration || 0 })).then(r => {
+            if (r && typeof r.pct === 'number') { e.pct = Math.max(e.pct, r.pct); e.srv = Math.max(e.srv, r.pct); badge(v, id); progres(); }
+          }).catch(() => { aEnvoyer = true; });
+        };
+        badge(v, id);
+        v.addEventListener('loadedmetadata', () => { if (init() && e.position > 5 && e.position < v.duration - 3) { try { v.currentTime = e.position; } catch (_) { /* sans importance */ } } });
+        v.addEventListener('timeupdate', () => {
+          if (v.paused || v.seeking || !init()) return;
+          const t = v.currentTime;
+          if (dernierT != null && Math.abs(t - dernierT) <= 1.6) {
+            const k = Math.min(n - 1, Math.floor(t / (v.duration / n)));
+            if (e.segs[k] !== '1') { e.segs[k] = '1'; aEnvoyer = true; const p = pourcent(); if (p > e.pct) { const franchi = p >= seuil && e.pct < seuil; e.pct = p; badge(v, id); if (franchi) envoyer(); else progres(); } }
+          }
+          dernierT = t;
+          if (aEnvoyer && Date.now() - e.dernierEnvoi > 10000) envoyer();
+        });
+        v.addEventListener('seeking', () => { dernierT = null; });
+        v.addEventListener('pause', () => { dernierT = null; envoyer(); });
+        v.addEventListener('ended', () => { dernierT = null; envoyer(); });
+      });
     }
     function afficher(n) {
       i = Math.max(0, Math.min(pages.length - 1, n)); vues.add(i);
       ech.innerHTML = pageHtml(pages[i], mode, { lecture: true, apercu: !!opts.apercu });
       ech.querySelectorAll('input[data-valid]').forEach(c => { c.checked = valides.has(c.dataset.valid); });
+      suivreVideos(ech);
       pos.textContent = pages.length > 1 ? `Page ${i + 1} / ${pages.length}` : '';
       container.querySelector('.st-lect-nav').style.display = pages.length > 1 ? '' : 'none';
       container.querySelector('[data-n="-1"]').disabled = i === 0;

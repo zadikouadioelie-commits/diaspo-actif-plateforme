@@ -18,7 +18,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="stylesheet" href="assets/styles.v2.css">
 <link rel="stylesheet" href="/assets/responsive.v2.css?v=2">
-<link rel="stylesheet" href="/assets/studio.css?v=1">
+<link rel="stylesheet" href="/assets/studio.css?v=2">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#ff6b00">
 <style>
@@ -162,7 +162,7 @@
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js?v=13"></script>
 <script src="assets/formation-achat-consent.js?v=1"></script>
-<script src="assets/studio-render.js?v=1"></script>
+<script src="assets/studio-render.js?v=2"></script>
 <script>
 function escH(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 const params = new URLSearchParams(location.search);
@@ -506,9 +506,11 @@ async function sfStudioLoad(l, apprenant){
     const d = await r.json().catch(() => ({}));
     if (!r.ok) { zone.innerHTML = `<div class="notice">${escH(r.status === 404 ? "Ce contenu n'est pas encore disponible : le formateur ne l'a pas encore publié." : (d.error || 'Contenu indisponible.'))}</div>`; return; }
     let envoye = false;
-    SF_STUDIO = StudioRender.lecture(zone, d.doc, { onProgress: p => {
+    SF_STUDIO = StudioRender.lecture(zone, d.doc, { videos: d.videos || {}, seuil: d.seuil_visionnage || 90, apercu: SF_DATA.mode === 'apercu',
+      videoSauver: apprenant && !sansSuivi() ? (elId, corps) => fetch(`/api/formations/${formationId}/lecons/${l.id}/studio/video/${encodeURIComponent(elId)}`, { method: 'PUT', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corps) }).then(r => r.ok ? r.json() : null) : null,
+      onProgress: p => {
       if (!p.termine || envoye || !apprenant || l.termine || sansSuivi() || suiviMode() !== 'auto' || l.quiz) return;
-      envoye = true; sfAutoTerminer(l.id).then(() => sfMajBoutonTermine());
+      envoye = true; sfAutoTerminer(l.id, true).then(() => sfMajBoutonTermine());
     }, onPage: ech => { if (l.quiz && ech.querySelector('#sf-quiz-zone')) sfQuizLoad(l); } });
     /* Filet de sécurité : une activité évaluée rattachée à la leçon mais absente de la version publiée (ajoutée au brouillon, pas encore republiée) reste passable sous le contenu — sans elle, la leçon ne pourrait jamais être validée. */
     if (l.quiz && !d.doc.pages.some(p => p.elements.some(e => e.type === 'quiz'))) { zone.insertAdjacentHTML('afterend', '<div id="sf-quiz-zone" style="margin-top:18px;"></div>'); sfQuizLoad(l); }
@@ -528,7 +530,7 @@ function sfGoTo(id){
 /* « Suivant » : en mode automatique, la leçon qu'on quitte est validée (sauf un quiz, qui se réussit). */
 async function sfSuivant(id){
   const l = SF_CURRENT_LECON;
-  if (SF_DATA.mode === 'apprenant' && suiviMode() === 'auto' && l && !l.quiz && !l.termine) await sfAutoTerminer(l.id);
+  if (SF_DATA.mode === 'apprenant' && suiviMode() === 'auto' && l && !l.quiz && !l.termine) { if ((await sfAutoTerminer(l.id)) === 'video') return; }
   sfGoTo(id);
 }
 
@@ -539,15 +541,20 @@ function sfBanniereAttestation(a){
     <a href="attestation.html?code=${encodeURIComponent(a.code)}" target="_blank" rel="noopener">Voir / imprimer</a></div>`;
 }
 
-async function sfAutoTerminer(leconId){
+async function sfAutoTerminer(leconId, silencieux){
   const avant = SF_DATA.attestation && SF_DATA.attestation.delivree;
   try {
     const r = await fetch(`/api/formations/${formationId}/lecons/${leconId}/progression`, { method: 'POST', headers: {'Content-Type':'application/json'}, credentials: 'same-origin', body: JSON.stringify({ termine: true }) });
-    if (!r.ok) return;
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      if (err.code === 'video_requise') { if (!silencieux) alert(err.error || 'Regardez d\'abord la vidéo de cette leçon.'); return 'video'; }
+      return false;
+    }
     const data = await r.json();
     await sfRafraichir();
     if (data.attestation && !avant) sfBanniereAttestation(data.attestation);
-  } catch (e) { /* silencieux : la leçon pourra être validée à la main */ }
+    return true;
+  } catch (e) { return false; /* silencieux : la leçon pourra être validée à la main */ }
 }
 
 async function sfToggleTermine(leconId){

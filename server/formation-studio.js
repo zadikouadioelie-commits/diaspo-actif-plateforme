@@ -26,6 +26,29 @@ const couleur = v => (/^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(String(v || "")) ? St
 const choix = (v, liste, def) => (liste.includes(v) ? v : def);
 function urlHttps(v) { try { const u = new URL(String(v || "")); return u.protocol === "https:" && String(v).length <= 600 ? u.toString() : ""; } catch (_) { return ""; } }
 function urlWeb(v) { try { const u = new URL(String(v || "")); return (u.protocol === "https:" || u.protocol === "http:") && String(v).length <= 600 ? u.toString() : ""; } catch (_) { return ""; } }
+/* Recadrage d'une image : la partie visible, en % de l'image d'origine (x, y, w, h) + le rapport largeur/hauteur de cette partie. Incohérent → pas de recadrage. */
+function lireCrop(c) {
+  if (!c || typeof c !== "object") return null;
+  const x = nbr(c.x, 0, 100, NaN), y = nbr(c.y, 0, 100, NaN), w = nbr(c.w, 0, 100, NaN), h = nbr(c.h, 0, 100, NaN), ratio = nbr(c.ratio, 0, 100, NaN);
+  if ([x, y, w, h, ratio].some(Number.isNaN)) return null;
+  if (w < 3 || h < 3 || x + w > 100.05 || y + h > 100.05 || ratio < 0.1 || ratio > 10) return null;
+  if (x < 0.05 && y < 0.05 && w > 99.9 && h > 99.9) return null; /* image entière : rien à recadrer */
+  const r2 = v => Math.round(v * 100) / 100;
+  return { x: r2(x), y: r2(y), w: r2(Math.min(w, 100 - x)), h: r2(Math.min(h, 100 - y)), ratio: r2(ratio) };
+}
+/* Une vidéo dont on peut suivre le visionnage = un fichier lu par la page (pas YouTube, qui est un cadre extérieur). */
+function suivable(url) {
+  if (!url) return false;
+  try { return !/(^|\.)(youtube\.com|youtu\.be|youtube-nocookie\.com)$/i.test(new URL(url).hostname); } catch (_) { return false; }
+}
+const SEUIL_VISIONNAGE = 90; /* % de la vidéo à avoir réellement regardé */
+/* Éléments vidéo à regarder (id → titre) dans un document nettoyé. */
+function videosRequises(doc) {
+  const l = [];
+  (doc && doc.pages || []).forEach(pg => (pg.elements || []).forEach(e => { if (e.type === "video" && e.props && e.props.exiger && suivable(e.props.url)) l.push({ id: e.id, titre: e.props.titre || "Vidéo" }); }));
+  return l;
+}
+const videosRequiseOuSuivie = doc => (doc.pages || []).some(pg => (pg.elements || []).some(e => e.type === "video" && suivable(e.props && e.props.url)));
 const idOk = v => (/^[A-Za-z0-9_-]{1,40}$/.test(String(v || "")) ? String(v) : "");
 
 function nettoyerElement(e, SEC, pagesIds) {
@@ -51,8 +74,10 @@ function nettoyerElement(e, SEC, pagesIds) {
   } else if (e.type === "image") {
     o.url = urlHttps(p.url); o.alt = txt(p.alt, 200); o.legende = txt(p.legende, 200);
     o.ajust = choix(p.ajust, ["cover", "contain"], "contain"); o.rayon = Math.round(nbr(p.rayon, 0, 60, 0)); o.align = choix(p.align, ["left", "center", "right"], "center");
+    o.crop = lireCrop(p.crop);
   } else if (e.type === "video") {
     o.url = urlHttps(p.url); o.titre = txt(p.titre, 120); o.miniature = urlHttps(p.miniature);
+    o.exiger = !!p.exiger && suivable(o.url); /* visionnage obligatoire : seulement pour un fichier vidéo (le suivi de YouTube n'est pas possible) */
   } else if (e.type === "audio") {
     o.url = urlHttps(p.url); o.titre = txt(p.titre, 120);
   } else if (e.type === "separateur") {
@@ -192,7 +217,7 @@ function lireMedia(b, userId) {
   return { vals: { type, url, nom: brut, taille: Number.isFinite(Number(b.taille)) && Number(b.taille) > 0 ? Math.floor(Number(b.taille)) : null } };
 }
 
-module.exports = { TYPES, KINDS, nettoyerDoc, problemes, lireQuestion, lireMedia };
+module.exports = { TYPES, KINDS, nettoyerDoc, problemes, lireQuestion, lireMedia, lireCrop, suivable, videosRequises, SEUIL_VISIONNAGE };
 
 module.exports.register = function register(deps) {
   const { route, db, sendJSON, getCurrentUser, SEC, checkFormationOwner } = deps;
@@ -212,6 +237,61 @@ module.exports.register = function register(deps) {
   }
   const chargerDoc = leconId => db.prepare("SELECT * FROM formation_studio_docs WHERE lecon_id=?").get(Number(leconId));
   const BASE = "/api/formations/:id/lecons/:leconId/studio";
+
+  /* Le document PUBLIÉ d'une leçon (celui que lisent les apprenants), ou null. */
+  async function docPublie(leconId) {
+    const d = await chargerDoc(leconId);
+    if (!d || d.publiee_version == null) return null;
+    const v = await db.prepare("SELECT * FROM formation_studio_versions WHERE doc_id=? AND version=?").get(d.id, Number(d.publiee_version));
+    return v ? (parse(v.contenu_json) || null) : null;
+  }
+  /* Vidéos à regarder dans cette leçon que l'apprenant n'a pas assez regardées : [{ element_id, titre, pct }]. */
+  async function videosManquantes(leconId, userId) {
+    const doc = await docPublie(leconId); if (!doc) return [];
+    const requises = videosRequises(doc); if (!requises.length) return [];
+    const rows = await db.prepare("SELECT element_id, pct FROM formation_studio_video WHERE user_id=? AND lecon_id=?").all(Number(userId), Number(leconId));
+    const vu = {}; rows.forEach(r => { vu[r.element_id] = Number(r.pct) || 0; });
+    return requises.filter(v => (vu[v.id] || 0) < SEUIL_VISIONNAGE).map(v => ({ element_id: v.id, titre: v.titre, pct: vu[v.id] || 0 }));
+  }
+  module.exports.videosManquantes = videosManquantes;
+
+  /* PUT …/video/:elementId { segments, position, duree } — l'apprenant enregistre ce qu'il a regardé. Les morceaux regardés ne se perdent jamais (fusion OU) ; le navigateur n'est qu'un témoin :
+     ce suivi décourage de sauter la vidéo, il ne prétend pas arrêter quelqu'un qui forge ses requêtes. */
+  route("PUT", BASE + "/video/:elementId", async (req, res, params, body) => {
+    const user = await getCurrentUser(req);
+    if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+    const lim = SEC.rateLimit(`studio-video:${user.id}`, 400, 600000);
+    if (!lim.allowed) return sendJSON(res, 429, { error: `Trop de requêtes. Réessayez dans ${lim.retryAfter}s.` });
+    const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
+    if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
+    const lecon = await db.prepare("SELECT l.* FROM formation_lecons l JOIN formation_modules m ON m.id=l.module_id WHERE l.id=? AND m.formation_id=?").get(params.leconId, f.id);
+    if (!lecon || !Number(lecon.studio)) return sendJSON(res, 404, { error: "Contenu introuvable." });
+    await Droits.balayerExpirations(db, { userId: user.id, formationId: f.id });
+    const insc = await db.prepare("SELECT * FROM formation_inscriptions WHERE formation_id=? AND user_id=? AND statut='active' AND COALESCE(paiement_statut,'paye')='paye'").get(f.id, user.id);
+    if (!insc || !(await Droits.leconPermise(db, insc, f.id, lecon.id))) return sendJSON(res, 403, { error: "Vous n'avez pas accès à ce contenu." });
+    const doc = await docPublie(lecon.id);
+    const video = doc && doc.pages.flatMap(pg => pg.elements).find(e => e.id === params.elementId && e.type === "video" && suivable(e.props.url));
+    if (!video) return sendJSON(res, 404, { error: "Vidéo introuvable dans la version publiée." });
+    const seg = String((body && body.segments) || "");
+    if (!/^[01]{1,1000}$/.test(seg)) return sendJSON(res, 400, { error: "Suivi de visionnage invalide." });
+    const duree = nbr(body && body.duree, 0, 86400, 0), position = nbr(body && body.position, 0, 86400, 0);
+    /* Deux envois presque simultanés (pause + fin de vidéo) peuvent arriver ensemble : le second retombe sur la ligne que le premier vient de créer. */
+    let fusion = seg, pct = 0;
+    for (let essai = 0; essai < 2; essai++) {
+      const avant = await db.prepare("SELECT segments FROM formation_studio_video WHERE user_id=? AND lecon_id=? AND element_id=?").get(user.id, lecon.id, params.elementId);
+      fusion = seg;
+      if (avant && avant.segments && avant.segments.length === seg.length) fusion = seg.split("").map((c, i) => (c === "1" || avant.segments[i] === "1" ? "1" : "0")).join("");
+      pct = Math.floor(fusion.split("").filter(c => c === "1").length * 100 / fusion.length);
+      try {
+        if (avant) await db.prepare("UPDATE formation_studio_video SET segments=?, pct=?, position=?, duree=?, updated_at=datetime('now') WHERE user_id=? AND lecon_id=? AND element_id=?").run(fusion, pct, position, duree, user.id, lecon.id, params.elementId);
+        else await db.prepare("INSERT INTO formation_studio_video (user_id, lecon_id, element_id, segments, pct, position, duree) VALUES (?,?,?,?,?,?,?)").run(user.id, lecon.id, params.elementId, fusion, pct, position, duree);
+        break;
+      } catch (e) {
+        if (essai === 1 || !/unique|duplicate/i.test(String(e && e.message))) return sendJSON(res, 500, SEC.safeError(e, "studio-video"));
+      }
+    }
+    sendJSON(res, 200, { ok: true, pct, segments: fusion, seuil: SEUIL_VISIONNAGE });
+  });
 
   /* GET — le brouillon (un document vide, non enregistré, si la leçon n'a pas encore de studio). */
   route("GET", BASE, async (req, res, params) => {
@@ -488,6 +568,10 @@ module.exports.register = function register(deps) {
     const v = await db.prepare("SELECT * FROM formation_studio_versions WHERE doc_id=? AND version=?").get(d.id, Number(d.publiee_version));
     if (!v) return sendJSON(res, 404, { error: "Contenu introuvable." });
     const doc = parse(v.contenu_json) || docVide(); doc.mode = v.mode;
-    sendJSON(res, 200, { doc, version: Number(v.version) });
+    const videos = {};
+    if (user && !proprietaire && videosRequiseOuSuivie(doc)) {
+      for (const r of await db.prepare("SELECT element_id, segments, pct, position FROM formation_studio_video WHERE user_id=? AND lecon_id=?").all(user.id, lecon.id)) videos[r.element_id] = { segments: r.segments, pct: Number(r.pct) || 0, position: Number(r.position) || 0 };
+    }
+    sendJSON(res, 200, { doc, version: Number(v.version), videos, seuil_visionnage: SEUIL_VISIONNAGE });
   });
 };

@@ -133,6 +133,8 @@ module.exports.register = function register(deps) {
       const id = Number(e && e.id), termine = e && e.termine ? 1 : 0;
       if (!valides.has(id)) { ignorees++; continue; }
       if (termine && quizLecons.has(id)) { refusees.push(id); continue; }
+      /* Studio : une vidéo « à regarder » doit avoir été regardée avant de valider la leçon (même règle que la validation à l'unité). */
+      if (termine && (await require("./formation-studio").videosManquantes(id, user.id)).length) { refusees.push(id); continue; }
       const ex = await db.prepare("SELECT id FROM formation_lecons_progression WHERE inscription_id=? AND lecon_id=?").get(inscription.id, id);
       if (ex) await db.prepare("UPDATE formation_lecons_progression SET termine=?, date_completion=? WHERE id=?").run(termine, termine ? new Date().toISOString() : null, ex.id);
       else await db.prepare("INSERT INTO formation_lecons_progression (inscription_id, lecon_id, termine, date_completion) VALUES (?,?,?,?)").run(inscription.id, id, termine, termine ? new Date().toISOString() : null);

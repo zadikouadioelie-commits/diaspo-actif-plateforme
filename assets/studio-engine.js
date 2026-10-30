@@ -269,7 +269,7 @@
     const h = ev.target.closest('.st-h'); if (h) return debutRedim(ev, h.dataset.h);
     const g = ev.target.closest('.st-grip'); if (g) return debutReordre(ev);
     const n = ev.target.closest('.st-el');
-    if (!n) { if (!ev.shiftKey) choisir([]); return; }
+    if (!n) { if (libre() && ev.pointerType !== 'touch') return debutRectangle(ev); if (!ev.shiftKey) choisir([]); return; }
     const id = n.dataset.id;
     if (ev.shiftKey) choisir(S.sel.includes(id) ? S.sel.filter(x => x !== id) : [...S.sel, id]);
     else if (!S.sel.includes(id)) choisir([id]);
@@ -353,6 +353,99 @@
       const els = pg().elements, de = els.findIndex(x => x.id === id), [m] = els.splice(de, 1); els.splice(cible, 0, m);
       if (snap() !== avant) { pousserUndo(avant); modifie(); renderTout(); choisir([id]); } else { renderScene(); }
     });
+  }
+
+  /* ───────── sélection par rectangle (souris / stylet, mode libre) ───────── */
+  function debutRectangle(ev) {
+    const page = zi.firstElementChild; if (!page) return;
+    ev.preventDefault();
+    const pr = page.getBoundingClientRect(), dep = { x: ev.clientX, y: ev.clientY }, base = ev.shiftKey ? S.sel.slice() : [];
+    const cadre = document.createElement('div'); cadre.className = 'st-marquee'; page.appendChild(cadre);
+    const pt = e2 => ({ x: (e2.clientX - pr.left) / S.zoom, y: (e2.clientY - pr.top) / S.zoom });
+    const a = pt(ev); let actif = false;
+    ecouter(e2 => {
+      if (!actif && Math.hypot(e2.clientX - dep.x, e2.clientY - dep.y) < 4) return; actif = true;
+      const b = pt(e2), x1 = Math.min(a.x, b.x), y1 = Math.min(a.y, b.y), x2 = Math.max(a.x, b.x), y2 = Math.max(a.y, b.y);
+      Object.assign(cadre.style, { display: 'block', left: x1 + 'px', top: y1 + 'px', width: (x2 - x1) + 'px', height: (y2 - y1) + 'px' });
+      const ids = pg().elements.filter(e => e.x < x2 && e.x + e.w > x1 && e.y < y2 && e.y + e.h > y1).map(e => e.id);
+      S.sel = [...new Set([...base, ...ids])]; decorer();
+    }, () => { cadre.remove(); if (!actif) { if (!ev.shiftKey) choisir([]); return; } choisir(S.sel.slice()); });
+  }
+
+  /* ───────── recadrage précis d'une image ───────── */
+  function recadrer(id) {
+    const e = el(id); if (!e || e.type !== 'image' || !e.props.url) { toast('Ajoutez d\'abord une image.'); return; }
+    const im = new Image();
+    im.onload = () => ouvrirRecadrage(e, im);
+    im.onerror = () => toast('Impossible de charger l\'image pour la recadrer.');
+    im.src = e.props.url;
+  }
+  function ouvrirRecadrage(e, im) {
+    const nw = im.naturalWidth, nh = im.naturalHeight; if (!nw || !nh) { toast('Image illisible.'); return; }
+    const c0 = e.props.crop;
+    let r = c0 ? { x: c0.x / 100, y: c0.y / 100, w: c0.w / 100, h: c0.h / 100 } : { x: 0.1, y: 0.1, w: 0.8, h: 0.8 };
+    let verrou = null; /* rapport largeur / hauteur imposé (en pixels de l'image), ou null */
+    const MIN = 0.05, PRESETS = [['', 'Libre'], ['1', '1 : 1'], ['1.3333', '4 : 3'], ['1.7778', '16 : 9'], ['0.75', '3 : 4'], ['orig', 'Comme l\'image']];
+    boite('m-info', `<h2>✂ Recadrer l'image</h2><p>Déplacez le cadre ou tirez ses poignées. L'image d'origine est conservée : vous pourrez toujours revenir à l'image entière.</p>
+      <div class="st-rc-chips" id="rc-chips">${PRESETS.map((p, i) => `<button type="button" class="st-b${i === 0 ? ' on' : ''}" data-rc="${p[0]}">${p[1]}</button>`).join('')}</div>
+      <div class="st-rc" id="rc-zone"><img src="${esc(e.props.url)}" alt="" draggable="false"><div class="st-rc-cadre" id="rc-cadre">${['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'].map(h => `<i class="st-rc-h" data-h="${h}"></i>`).join('')}</div></div>
+      <p class="st-aide" id="rc-info"></p>
+      <div class="st-btns"><button class="st-b or" id="rc-ok">Appliquer le recadrage</button><button class="st-b" id="rc-entiere">Image entière</button><button class="st-b" id="rc-non">Annuler</button></div>`);
+    const zone = $('#rc-zone'), cadre = $('#rc-cadre'), info = $('#rc-info');
+    const dessiner = () => {
+      Object.assign(cadre.style, { left: r.x * 100 + '%', top: r.y * 100 + '%', width: r.w * 100 + '%', height: r.h * 100 + '%' });
+      info.textContent = `Partie conservée : ${Math.round(r.w * nw)} × ${Math.round(r.h * nh)} px sur ${nw} × ${nh} (${Math.round(r.w * 100)} % de la largeur, ${Math.round(r.h * 100)} % de la hauteur).`;
+    };
+    /* Redimensionne en gardant le rapport : (ax, ay) = position du point fixe dans le cadre (0, 0.5 ou 1), (X, Y) = ses coordonnées dans l'image, w = largeur voulue. */
+    function fixerRapport(X, Y, ax, ay, w) {
+      const k = nw / (nh * verrou); /* h = w * k */
+      let wmax = 1; if (ax > 0) wmax = Math.min(wmax, X / ax); if (ax < 1) wmax = Math.min(wmax, (1 - X) / (1 - ax));
+      let hmax = 1; if (ay > 0) hmax = Math.min(hmax, Y / ay); if (ay < 1) hmax = Math.min(hmax, (1 - Y) / (1 - ay));
+      w = Math.max(MIN, Math.min(w, wmax, hmax / k)); const h = w * k;
+      r = { x: X - ax * w, y: Y - ay * h, w, h };
+    }
+    function imposer() {
+      if (!verrou) return;
+      fixerRapport(r.x + r.w / 2, r.y + r.h / 2, 0.5, 0.5, r.w);
+    }
+    $('#rc-chips').addEventListener('click', ev => {
+      const b = ev.target.closest('[data-rc]'); if (!b) return;
+      $$('#rc-chips .st-b').forEach(x => x.classList.toggle('on', x === b));
+      const v = b.dataset.rc; verrou = v === '' ? null : v === 'orig' ? nw / nh : Number(v); imposer(); dessiner();
+    });
+    cadre.addEventListener('pointerdown', ev => {
+      ev.preventDefault(); ev.stopPropagation();
+      const h = ev.target.dataset.h || '', zr = zone.getBoundingClientRect(), o = { ...r }, dep = { x: ev.clientX, y: ev.clientY };
+      ecouter(e2 => {
+        const dx = (e2.clientX - dep.x) / zr.width, dy = (e2.clientY - dep.y) / zr.height;
+        if (!h) { r.x = clamp(o.x + dx, 0, 1 - o.w); r.y = clamp(o.y + dy, 0, 1 - o.h); dessiner(); return; }
+        let x1 = o.x, y1 = o.y, x2 = o.x + o.w, y2 = o.y + o.h;
+        if (h.includes('w')) x1 = clamp(o.x + dx, 0, x2 - MIN); if (h.includes('e')) x2 = clamp(o.x + o.w + dx, x1 + MIN, 1);
+        if (h.includes('n')) y1 = clamp(o.y + dy, 0, y2 - MIN); if (h.includes('s')) y2 = clamp(o.y + o.h + dy, y1 + MIN, 1);
+        r = { x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
+        if (verrou) {
+          const ax = h.includes('w') ? 1 : h.includes('e') ? 0 : 0.5, ay = h.includes('n') ? 1 : h.includes('s') ? 0 : 0.5;
+          const X = ax === 1 ? o.x + o.w : ax === 0 ? o.x : o.x + o.w / 2, Y = ay === 1 ? o.y + o.h : ay === 0 ? o.y : o.y + o.h / 2;
+          const w = (h === 'n' || h === 's') ? r.h * verrou * nh / nw : r.w;
+          fixerRapport(X, Y, ax, ay, w);
+        }
+        dessiner();
+      });
+    });
+    $('#rc-non').onclick = () => fermer('m-info');
+    $('#rc-entiere').onclick = () => { fermer('m-info'); modifier(() => { delete e.props.crop; }); remplacerNoeud(e); renderProps(); toast('Image entière rétablie'); };
+    $('#rc-ok').onclick = () => {
+      fermer('m-info');
+      const ratio = (r.w * nw) / (r.h * nh);
+      const entiere = r.x < 0.0005 && r.y < 0.0005 && r.w > 0.9995 && r.h > 0.9995;
+      const r2 = v => Math.round(v * 10000) / 100;
+      modifier(() => {
+        if (entiere) delete e.props.crop;
+        else { e.props.crop = { x: r2(r.x), y: r2(r.y), w: r2(r.w), h: r2(r.h), ratio: Math.round(ratio * 1000) / 1000 }; if (libre()) e.h = clamp(Math.round(e.w / ratio), 20, 4000); }
+      });
+      remplacerNoeud(e); renderProps(); fitPage(); toast(entiere ? 'Image entière' : 'Image recadrée');
+    };
+    dessiner();
   }
 
   /* édition du texte directement dans la page */
@@ -482,12 +575,14 @@
     } else if (t === 'image') {
       h += `<div class="st-btns"><button class="st-b or" data-up="image">${p.url ? 'Remplacer l\'image' : 'Importer une image'}</button><button class="st-b" data-lib="image">📚 Ma bibliothèque</button>${p.url ? '<button class="st-b dg" data-vide="url">Retirer</button>' : ''}</div>
         ${champ('ou adresse (https) de l\'image', 'url', p.url, 'url', 'placeholder="https://…"')}${champ('Texte alternatif (accessibilité)', 'alt', p.alt)}${champ('Légende', 'legende', p.legende)}
-        ${select('Ajustement', 'ajust', p.ajust, [['contain', 'Image entière'], ['cover', 'Remplir le cadre (recadre les bords)']])}
+        ${p.url ? `<div class="st-btns"><button class="st-b" data-act="recadrer">✂ Recadrer…</button>${p.crop ? '<button class="st-b dg" data-act="raz-crop">Image entière</button>' : ''}</div>${p.crop ? `<p class="st-aide">Recadrée : ${Math.round(p.crop.w)} % × ${Math.round(p.crop.h)} % de l'image d'origine.</p>` : ''}` : ''}
+        ${p.crop ? '' : select('Ajustement', 'ajust', p.ajust, [['contain', 'Image entière'], ['cover', 'Remplir le cadre (recadre les bords)']])}
         ${select('Alignement', 'align', p.align, [['left', 'À gauche'], ['center', 'Centré'], ['right', 'À droite']])}${champ('Arrondi des coins (px)', 'rayon', p.rayon, 'number', 'min="0" max="60"')}`;
     } else if (t === 'video') {
       h += `<div class="st-btns"><button class="st-b or" data-up="video">${p.url ? 'Remplacer la vidéo' : '⬆ Importer une vidéo'}</button><button class="st-b" data-lib="video">📚 Ma bibliothèque</button></div>
         <p class="st-aide">Depuis votre ordinateur : MP4 ou MOV, 1 h et 1 Go au maximum. La vidéo part directement vers notre hébergeur vidéo (lecture adaptée à chaque connexion) ; vous pouvez continuer à travailler pendant l'envoi.</p>
-        ${champ('ou adresse de la vidéo (YouTube, Vimeo ou fichier https)', 'url', p.url, 'url', 'placeholder="https://www.youtube.com/watch?v=…"')}${champ('Titre de la vidéo', 'titre', p.titre)}`;
+        ${champ('ou adresse de la vidéo (YouTube, Vimeo ou fichier https)', 'url', p.url, 'url', 'placeholder="https://www.youtube.com/watch?v=…"')}${champ('Titre de la vidéo', 'titre', p.titre)}
+        ${p.url && R.ytId(p.url) ? '<p class="st-aide">Le suivi du visionnage n\'est pas possible pour une vidéo YouTube : importez la vidéo (MP4 / MOV) pour pouvoir l\'exiger.</p>' : `<label class="st-f" style="display:flex;gap:8px;align-items:center"><input type="checkbox" data-p="exiger" data-k="bool" ${p.exiger ? 'checked' : ''}> <span style="margin:0">Exiger le visionnage (90 %) pour valider la leçon</span></label><p class="st-aide">Seuls comptent les passages regardés en continu : sauter dans la vidéo ne valide rien. L'apprenant reprend là où il s'est arrêté.</p>`}`;
     } else if (t === 'audio') {
       h += `<div class="st-btns"><button class="st-b" data-lib="audio">📚 Ma bibliothèque</button></div>${champ('Adresse du fichier audio (https)', 'url', p.url, 'url', 'placeholder="https://…/audio.mp3"')}${champ('Titre', 'titre', p.titre)}`;
     } else if (t === 'fichier') {
@@ -559,6 +654,8 @@
     if (b.dataset.lib) return bibliotheque(b.dataset.lib.split(','), S.sel[0]);
     if (b.dataset.actNew) return creerActivite(b.dataset.actNew);
     if (b.dataset.act === 'edit-act') return editeurActivite();
+    if (b.dataset.act === 'recadrer') return recadrer(S.sel[0]);
+    if (b.dataset.act === 'raz-crop') { const e = selection()[0]; if (e) { modifier(() => { delete e.props.crop; }); renderProps(); } return; }
     if (b.dataset.act === 'dupliquer') return dupliquer();
     if (b.dataset.act === 'verrou') return verrouiller();
     if (b.dataset.act === 'suppr') return supprimer();
