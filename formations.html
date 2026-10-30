@@ -29,7 +29,7 @@
   <!-- Design « Nuit dorée » (2026-10-14) : surcharges chargées en dernier, tout est préfixé html body.nd ; retour arrière : retirer ces 2 lignes et class="nd" sur <body> -->
   <link rel="stylesheet" href="/assets/theme-nuit-doree.css?v=7">
   <link rel="stylesheet" href="/assets/formations-nuit-doree.css?v=2">
-  <link rel="stylesheet" href="/assets/catalogue-formations.css?v=3">
+  <link rel="stylesheet" href="/assets/catalogue-formations.css?v=6">
 <style>
 .mf-cat-pill{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600;background:#fff;border:2px solid var(--border);border-radius:99px;padding:8px 14px;cursor:pointer;transition:all .15s;user-select:none;}
 .mf-cat-pill:hover{border-color:#ff6b00;}
@@ -151,7 +151,7 @@
     <main class="content">
 
       <div id="volet-catalogue">
-      <!-- Catalogue refait d'après la maquette « Formation Diaspora » (lot E, 2026-10-30) : bandeau héros au globe doré, pastilles de catégories (tenues par l'administration), tri, cartes. Rendu : initFormations() dans assets/app.js ; styles : assets/catalogue-formations.css -->
+      <!-- Catalogue refait d'après la maquette « Formation Diaspora » (lot E, 2026-10-30) : bandeau héros avec la carte du monde animée de l'accueil (assets/carte-monde-anime.js), pastilles de catégories (tenues par l'administration), tri, cartes. Rendu : initFormations() dans assets/app.js ; styles : assets/catalogue-formations.css -->
       <section class="cat-hero" aria-labelledby="cat-titre-page">
         <div class="cat-hero-texte">
           <p class="cat-sur">La plateforme de formation de la diaspora</p>
@@ -164,27 +164,7 @@
           </div>
           <span class="cat-compteur" id="formations-count-badge">—</span>
         </div>
-        <div class="cat-globe" aria-hidden="true">
-          <svg viewBox="0 0 340 340" xmlns="http://www.w3.org/2000/svg" focusable="false">
-            <defs>
-              <radialGradient id="cg-sphere" cx="38%" cy="32%" r="75%"><stop offset="0" stop-color="#27407a" stop-opacity=".95"/><stop offset=".55" stop-color="#0f1c40"/><stop offset="1" stop-color="#060A14"/></radialGradient>
-              <linearGradient id="cg-or" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F3DC9B"/><stop offset=".5" stop-color="#E3C06E"/><stop offset="1" stop-color="#B9893A"/></linearGradient>
-              <radialGradient id="cg-halo" cx="50%" cy="50%" r="50%"><stop offset=".62" stop-color="#E3C06E" stop-opacity=".30"/><stop offset="1" stop-color="#E3C06E" stop-opacity="0"/></radialGradient>
-            </defs>
-            <circle cx="170" cy="170" r="168" fill="url(#cg-halo)"/>
-            <circle cx="170" cy="170" r="138" fill="url(#cg-sphere)" stroke="url(#cg-or)" stroke-width="2"/>
-            <g fill="none" stroke="url(#cg-or)" stroke-width="1" opacity=".62">
-              <ellipse cx="170" cy="170" rx="138" ry="48"/><ellipse cx="170" cy="170" rx="138" ry="96"/>
-              <ellipse cx="170" cy="170" rx="48" ry="138"/><ellipse cx="170" cy="170" rx="96" ry="138"/>
-              <line x1="32" y1="170" x2="308" y2="170"/><line x1="170" y1="32" x2="170" y2="308"/>
-            </g>
-            <g class="cat-globe-liens" fill="none" stroke="#F3DC9B" stroke-width="1.6" stroke-linecap="round" stroke-dasharray="3 6">
-              <path d="M104 118 Q168 64 244 112"/><path d="M104 118 Q132 196 196 232"/><path d="M244 112 Q268 184 196 232"/><path d="M104 118 Q184 150 244 112"/>
-            </g>
-            <g fill="#F3DC9B"><circle cx="104" cy="118" r="5"/><circle cx="244" cy="112" r="5"/><circle cx="196" cy="232" r="5"/><circle cx="142" cy="170" r="3.4"/><circle cx="222" cy="168" r="3.4"/></g>
-            <g fill="none" stroke="#fff" stroke-opacity=".5"><circle cx="104" cy="118" r="10"/><circle cx="244" cy="112" r="10"/><circle cx="196" cy="232" r="10"/></g>
-          </svg>
-        </div>
+        <div class="cat-carte" aria-hidden="true"><canvas data-carte-monde data-transparent></canvas></div>
       </section>
 
       <div class="cat-pastilles" id="cat-pastilles" role="group" aria-label="Catégories de formations"></div>
@@ -3405,6 +3385,9 @@ function showMsg(msg, type='info') {
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js" defer></script>
 <script src="assets/gsap-animations.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js" defer></script>
+<script src="assets/carte-monde-anime.js?v=1" defer></script>
 <script src="assets/chatbot.js"></script>
 <script src="/assets/cookies-banner.js"></script>
   <script src="/assets/theme-manager.js"></script>
