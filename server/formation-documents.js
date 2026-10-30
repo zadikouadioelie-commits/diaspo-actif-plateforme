@@ -40,6 +40,14 @@ const famille = url => {
 };
 const nomFichier = (url, nom) => { const n = String(nom || "").trim(); if (n) return n.slice(0, 150); try { return decodeURIComponent(path.basename(new URL(String(url), "http://x").pathname)).slice(0, 150) || "document"; } catch (_) { return "document"; } };
 const typesMime = { pdf: "application/pdf", excel: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", xls: "application/vnd.ms-excel" };
+/* Pièces jointes : extension → { type réel attendu d'après les octets, type MIME }. « zip » = Office moderne, « ole » = Office 97-2003. */
+const TELECHARGEABLES = {
+  pdf: ["pdf", "application/pdf"], xlsx: ["zip", typesMime.excel], xlsm: ["zip", "application/vnd.ms-excel.sheet.macroEnabled.12"], xls: ["ole", typesMime.xls],
+  docx: ["zip", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"], doc: ["ole", "application/msword"],
+  pptx: ["zip", "application/vnd.openxmlformats-officedocument.presentationml.presentation"], ppt: ["ole", "application/vnd.ms-powerpoint"],
+  jpg: ["jpg", "image/jpeg"], jpeg: ["jpg", "image/jpeg"], png: ["png", "image/png"], webp: ["webp", "image/webp"], gif: ["gif", "image/gif"],
+};
+const extensionDe = url => { let p = ""; try { p = new URL(String(url || ""), "http://x").pathname; } catch (_) { p = String(url || ""); } return ((/\.([a-z0-9]{2,5})$/i.exec(p) || [])[1] || "").toLowerCase(); };
 const nomSur = s => String(s).replace(/[^\w.\- àâäçéèêëîïôöùûüÿœ()]/gi, "_").slice(0, 120);
 
 /* ── Octets : cache mémoire court (le lecteur PDF demande plusieurs morceaux d'un même fichier) ── */
@@ -79,6 +87,10 @@ function typeReel(buf) {
   if (buf.length >= 5 && buf.slice(0, 1024).includes("%PDF-")) return "pdf";
   if (buf.length >= 4 && buf[0] === 0x50 && buf[1] === 0x4b && (buf[2] === 3 || buf[2] === 5 || buf[2] === 7)) return "zip";
   if (buf.length >= 8 && buf[0] === 0xd0 && buf[1] === 0xcf && buf[2] === 0x11 && buf[3] === 0xe0) return "ole";
+  if (buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return "jpg";
+  if (buf.length >= 8 && buf.slice(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return "png";
+  if (buf.length >= 12 && buf.slice(0, 4).toString("latin1") === "RIFF" && buf.slice(8, 12).toString("latin1") === "WEBP") return "webp";
+  if (buf.length >= 6 && /^GIF8[79]a$/.test(buf.slice(0, 6).toString("latin1"))) return "gif";
   return "autre";
 }
 
@@ -93,9 +105,11 @@ function classeurDe(url, buf) {
 /* Le document décrit par une leçon (classique) ou un élément du Studio. Renvoie null s'il n'y en a pas. */
 function decrire(lecon, doc, elementId) {
   if (Number(lecon.studio)) {
-    const el = doc && (doc.pages || []).flatMap(p => p.elements || []).find(e => e.id === elementId && e.type === "document");
+    const el = doc && (doc.pages || []).flatMap(p => p.elements || []).find(e => e.id === elementId && (e.type === "document" || e.type === "fichier"));
     if (!el || !el.props || !el.props.url) return null;
     const p = el.props;
+    /* « Fichier à télécharger » (lot I) : toujours une pièce jointe, jamais affichée dans la page. */
+    if (el.type === "fichier") return { url: p.url, nom: nomFichier(p.url, p.nom), integre: false, telechargeable: true, hauteur: 640 };
     return { url: p.url, nom: nomFichier(p.url, p.nom), integre: p.integre !== undefined ? !!p.integre : p.mode !== "telechargement", telechargeable: p.telechargeable !== undefined ? !!p.telechargeable : p.mode === "telechargement", hauteur: Math.min(1600, Math.max(200, Number(p.hauteur) || 640)) };
   }
   if (!lecon.contenu_url || !["pdf", "telechargement", "presentation"].includes(lecon.type)) return null;
@@ -187,8 +201,10 @@ module.exports.register = function register(deps) {
     if (!c.d.telechargeable && !c.proprietaire) return sendJSON(res, 403, { error: "Le téléchargement de ce document n'est pas autorisé par le formateur.", code: "non_telechargeable" });
     try {
       const buf = await lireOctets(c.d.url, c.hote); const t = typeReel(buf);
-      const ext = t === "pdf" ? "pdf" : c.fam === "xls" ? "xls" : "xlsx";
-      res.writeHead(200, { "Content-Type": typesMime[t === "pdf" ? "pdf" : c.fam === "xls" ? "xls" : "excel"] || "application/octet-stream", "Content-Length": buf.length, "Content-Disposition": `attachment; filename="${nomSur(c.d.nom.replace(/\.[a-z0-9]{2,5}$/i, ""))}.${ext}"`, "X-Content-Type-Options": "nosniff", "Cache-Control": "private, no-store" });
+      /* Le type du fichier se lit sur ses octets ; l'extension annoncée doit y correspondre (un .docx est un conteneur « zip », un .doc un conteneur « ole »…). */
+      const ext = extensionDe(c.d.url), att = TELECHARGEABLES[ext];
+      if (!att || att[0] !== t) return sendJSON(res, 415, { error: "Ce fichier n'est pas du type annoncé : il ne peut pas être téléchargé.", code: "format" });
+      res.writeHead(200, { "Content-Type": att[1], "Content-Length": buf.length, "Content-Disposition": `attachment; filename="${nomSur(c.d.nom.replace(/\.[a-z0-9]{2,5}$/i, ""))}.${ext}"`, "X-Content-Type-Options": "nosniff", "Cache-Control": "private, no-store" });
       res.end(buf);
     } catch (e) { erreur(res, e); }
   });

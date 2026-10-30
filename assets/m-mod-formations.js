@@ -677,7 +677,7 @@
     if (STUDIO) return STUDIO;
     STUDIO = chargerVisionneuse().catch(() => { /* les documents intégrés se rabattent sur leur lien */ }).then(() => new Promise((ok, ko) => {
       const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = 'assets/studio.css?v=4'; document.head.appendChild(css);
-      const js = document.createElement('script'); js.src = 'assets/studio-render.js?v=5'; js.onload = () => ok(); js.onerror = () => { STUDIO = null; ko(new Error('Rendu indisponible')); };
+      const js = document.createElement('script'); js.src = 'assets/studio-render.js?v=6'; js.onload = () => ok(); js.onerror = () => { STUDIO = null; ko(new Error('Rendu indisponible')); };
       document.head.appendChild(js);
     }));
     return STUDIO;

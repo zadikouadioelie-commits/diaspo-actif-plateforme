@@ -758,7 +758,7 @@
     inp.onchange = async () => {
       const f = inp.files[0]; inp.remove(); if (!f) return;
       toast('Envoi du fichier…');
-      try { const e0 = el(id); const r = await importerFichier(f, !!e0 && e0.type === 'document'); const e = el(id); if (!e) return; modifier(() => { e.props.url = r.url; if (!e.props.nom) e.props.nom = r.nom; }); choisir([id]); toast('Fichier ajouté'); }
+      try { const e0 = el(id); const r = await importerFichier(f, !!e0 && (e0.type === 'document' || e0.type === 'fichier')); const e = el(id); if (!e) return; modifier(() => { e.props.url = r.url; if (!e.props.nom) e.props.nom = r.nom; }); choisir([id]); toast('Fichier ajouté'); }
       catch (err) { toast(err.message || 'Envoi impossible.'); }
     };
     inp.click();
@@ -805,7 +805,7 @@
     rafraichir();
   }
   function utiliserMedia(e, m) {
-    if (/^prive:/.test(m.url) && e.type !== 'document') { toast('Ce fichier est privé : il ne peut servir que dans un élément « Document » (lecteur de la page).'); return; }
+    if (/^prive:/.test(m.url) && e.type !== 'document' && e.type !== 'fichier') { toast('Ce fichier est privé : il ne peut servir que dans un élément « Document » ou « Fichier à télécharger ».'); return; }
     modifier(() => {
       e.props.url = m.url;
       if (e.type === 'document' || e.type === 'fichier') e.props.nom = m.nom;

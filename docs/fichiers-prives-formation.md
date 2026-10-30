@@ -29,3 +29,11 @@ Une leçon du Studio s'affiche dans `m.html` avec le même rendu que sur ordinat
 - Mode « automatique » : la leçon se termine seule quand toutes les pages sont vues, les zones obligatoires cochées et les vidéos demandées regardées ; modes « manuel » / « aucun » respectés.
 - Aperçu gratuit : leçon repliée, montée à l'ouverture (`studio: 1` ajouté aux leçons offertes de `/decouverte`).
 - Aperçu du créateur : version brouillon, sans suivi.
+
+## Lot I — « Fichier à télécharger » du Studio et téléchargements (2026-10-30)
+
+- L'élément **« Fichier à télécharger »** du Studio accepte maintenant une référence privée, exactement comme l'élément « Document » : l'envoi passe par `document-cours`, l'apprenant ne reçoit qu'une adresse factice (`document:<id>.<ext>`) et le lien « Télécharger » passe par `…/document/telecharger?element=<id>` (accès contrôlé : inscrit avec droit sur le module, propriétaire, administrateur, leçon offerte). Une adresse https extérieure reste un lien direct, non masqué.
+- **Propriété des références :** à l'enregistrement du Studio, une référence privée n'est acceptée que si elle a été déposée par le compte qui enregistre ou par le propriétaire de la formation ; sinon l'adresse est vidée (l'élément « sans fichier » bloque alors la publication).
+- **Correction d'un défaut du lot F :** la route de téléchargement servait tout fichier comme un Excel (extension `.xlsx`, type MIME Excel) sauf les PDF : un Word ou un PowerPoint privé se téléchargeait donc sous un mauvais nom. Elle déduit maintenant l'extension et le type MIME de l'extension déclarée (pdf, xls/xlsx/xlsm, doc/docx, ppt/pptx, jpg/png/webp/gif) et **vérifie que les octets correspondent** (Office moderne = conteneur zip, Office 97-2003 = conteneur OLE, images par leur signature) ; sinon 415 « format ».
+- **Migration :** `server/migrer-documents-prives.js` traite aussi les éléments « Fichier » du Studio (documents de cours seulement, jamais les images). Toujours à lancer en simulation d'abord.
+- Reste public : images, vidéos, audios, fichiers à adresse extérieure.

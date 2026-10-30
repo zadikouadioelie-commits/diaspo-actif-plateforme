@@ -73,7 +73,7 @@ function masquerLecons(modules) {
 function masquerStudio(doc) {
   const copie = JSON.parse(JSON.stringify(doc || {}));
   for (const p of copie.pages || []) for (const e of p.elements || []) {
-    if (e.type === "document" && e.props && e.props.url) {
+    if ((e.type === "document" || (e.type === "fichier" && estRef(e.props && e.props.url))) && e.props && e.props.url) {
       const m = String(e.props.url).split("?")[0].split("#")[0].match(/\.([a-z0-9]{2,5})$/i);
       e.props.url = `document:${String(e.id).replace(/[^\w-]/g, "")}${m ? "." + m[1].toLowerCase() : ""}`;
     }

@@ -91,10 +91,14 @@
         if (!p.url) return `<span class="st-btn" style="${st};opacity:.6">${lib}</span>`;
         return `<a class="st-btn" style="${st}" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">${lib}</a>`;
       }
-      case 'fichier':
+      case 'fichier': {
+        /* Fichier privé (lot I) : le lien passe par le serveur, qui contrôle l'accès ; une adresse https publique reste un lien direct. */
+        const prive = /^(prive|document):/.test(String(p.url || '')) && ctx.docBase;
+        const lienF = prive ? `${ctx.docBase}/telecharger?element=${encodeURIComponent(e.id)}${ctx.brouillon ? '&brouillon=1' : ''}` : p.url;
         return p.url
-          ? `<div class="st-file"><span class="st-file-i">${FAMILLES[typeFichier(p.url)][0]}</span><div class="st-file-t"><strong>${esc(p.nom) || 'Fichier'}</strong>${p.description ? `<small>${esc(p.description)}</small>` : ''}</div>${ctx.edit ? '<span class="st-file-b">Télécharger</span>' : `<a class="st-file-b" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer" download>Télécharger</a>`}</div>`
+          ? `<div class="st-file"><span class="st-file-i">${FAMILLES[typeFichier(p.url)][0]}</span><div class="st-file-t"><strong>${esc(p.nom) || 'Fichier'}</strong>${p.description ? `<small>${esc(p.description)}</small>` : ''}</div>${ctx.edit ? '<span class="st-file-b">Télécharger</span>' : `<a class="st-file-b" href="${esc(lienF)}" target="_blank" rel="noopener noreferrer" download>Télécharger</a>`}</div>`
           : placeholder('📎', 'Fichier à ajouter');
+      }
       case 'document': {
         if (!p.url) return placeholder('📄', 'Document à ajouter');
         const fam = typeFichier(p.url), F = FAMILLES[fam];

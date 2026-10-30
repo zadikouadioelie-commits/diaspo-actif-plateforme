@@ -144,6 +144,58 @@ test('fichiers privés des cours', async (t) => {
     assert.equal((await brut(jarX, base(lStudio) + '/fichier?element=doc1')).status, 403);
   });
 
+  await t.test('lot I — « Fichier à télécharger » privé : masqué, servi par la plateforme avec le bon type (Word, PowerPoint), contrôle des octets et de la propriété', async () => {
+    const zip = n => Buffer.concat([Buffer.from([0x50, 0x4b, 0x03, 0x04]), Buffer.from('contenu office ' + n + ' '.repeat(40))]);
+    const docx = zip('word'), pptx = zip('powerpoint');
+    const rd = await envoyer(jarF, 'Consignes.docx', docx), rp = await envoyer(jarF, 'Cours.pptx', pptx);
+    assert.equal(rd.status, 200, JSON.stringify(rd.data)); assert.equal(rd.data.prive, true); assert.equal(rp.status, 200);
+    const l = (await call(jarF, 'POST', `/api/formations/${fid}/chapitres/${ch}/lecons`, { titre: 'Fichiers', type: 'texte' })).data.id;
+    const g = await call(jarF, 'GET', `/api/formations/${fid}/lecons/${l}/studio`);
+    const faussaire = 'prive:formations/99999/' + 'a'.repeat(32) + '.docx';
+    const elements = [
+      { id: 'f1', type: 'fichier', x: 0, y: 0, w: 440, h: 72, z: 1, props: { url: rd.data.url, nom: 'Consignes' } },
+      { id: 'f2', type: 'fichier', x: 0, y: 0, w: 440, h: 72, z: 1, props: { url: rp.data.url, nom: 'Cours' } },
+      { id: 'f3', type: 'fichier', x: 0, y: 0, w: 440, h: 72, z: 1, props: { url: faussaire, nom: 'Volé' } },
+      { id: 'f4', type: 'fichier', x: 0, y: 0, w: 440, h: 72, z: 1, props: { url: 'https://exemple.org/public.pdf', nom: 'Public' } },
+      { id: 'd1', type: 'document', x: 0, y: 0, w: 700, h: 500, z: 1, props: { url: rd.data.url, nom: 'Consignes en pièce jointe', integre: false, telechargeable: true } }];
+    const r = await call(jarF, 'PUT', `/api/formations/${fid}/lecons/${l}/studio`, { mode: 'structure', rev: g.data.rev, pages: [{ id: 'p1', titre: '', elements }] });
+    assert.equal(r.status, 200, JSON.stringify(r.data));
+    const urls = Object.fromEntries(r.data.doc.pages[0].elements.map(e => [e.id, e.props.url]));
+    assert.equal(urls.f1, rd.data.url, 'référence privée conservée'); assert.equal(urls.f3, '', 'la référence privée d\'un autre compte est refusée'); assert.equal(urls.f4, 'https://exemple.org/public.pdf', 'une adresse https extérieure reste un lien direct');
+    const sans = await call(jarF, 'PUT', `/api/formations/${fid}/lecons/${l}/studio`, { mode: 'structure', rev: r.data.rev, pages: [{ id: 'p1', titre: '', elements: r.data.doc.pages[0].elements.filter(e => e.id !== 'f3') }] });
+    assert.equal(sans.status, 200, JSON.stringify(sans.data));
+    assert.equal((await call(jarF, 'POST', `/api/formations/${fid}/lecons/${l}/studio/publier`, {})).status, 200);
+    const lecture = await call(jarA, 'GET', `/api/formations/${fid}/lecons/${l}/studio/lecture`);
+    assert.equal(lecture.status, 200); assert.ok(!JSON.stringify(lecture.data).includes('prive:'), 'rien de privé dans la lecture de l\'apprenant');
+    const vu = Object.fromEntries(lecture.data.doc.pages[0].elements.map(e => [e.id, e.props.url]));
+    assert.equal(vu.f1, 'document:f1.docx'); assert.equal(vu.f2, 'document:f2.pptx'); assert.equal(vu.f4, 'https://exemple.org/public.pdf', 'le lien public n\'est pas masqué');
+    const proprio = await call(jarF, 'GET', `/api/formations/${fid}/lecons/${l}/studio/lecture?brouillon=1`);
+    assert.equal(proprio.data.doc.pages[0].elements[0].props.url, rd.data.url, 'le propriétaire garde la vraie référence');
+    /* téléchargement : bon type MIME et bonne extension, octets identiques */
+    const w = await brut(jarA, base(l) + '/telecharger?element=f1');
+    assert.equal(w.status, 200); assert.equal(w.entetes.get('content-type'), 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    assert.match(w.entetes.get('content-disposition'), /Consignes\.docx"/); assert.ok(w.buf.equals(docx));
+    const p = await brut(jarA, base(l) + '/telecharger?element=f2');
+    assert.equal(p.status, 200); assert.equal(p.entetes.get('content-type'), 'application/vnd.openxmlformats-officedocument.presentationml.presentation'); assert.match(p.entetes.get('content-disposition'), /Cours\.pptx"/);
+    const d = await brut(jarA, base(l) + '/telecharger?element=d1');
+    assert.equal(d.status, 200, 'un élément « Document » Word est lui aussi servi avec le bon type'); assert.match(d.entetes.get('content-disposition'), /\.docx"/);
+    assert.equal((await brut(jarX, base(l) + '/telecharger?element=f1')).status, 403, 'un non-inscrit ne télécharge rien');
+    assert.equal((await brut(anon, base(l) + '/telecharger?element=f1')).status, 401);
+    assert.equal((await brut(jarA, base(l) + '/fichier?element=f1')).status, 415, 'une pièce jointe Word ne se lit pas comme un PDF');
+    const inf = await call(jarA, 'GET', base(l) + '/infos?element=f1'); assert.equal(inf.status, 200); assert.equal(inf.data.peut_telecharger, true); assert.equal(inf.data.integre, false);
+    /* le contenu doit correspondre à l'extension : un PDF déguisé en .docx n'est pas servi */
+    const cle = [...fichiers.keys()].find(k => k.includes(rd.data.url.split('/').pop())); assert.ok(cle, 'fichier retrouvé dans le faux stockage');
+    fichiers.set(cle, pdf);
+    /* le cache d'octets du serveur garde un fichier 5 minutes : on teste donc la fraude sur un second fichier, jamais lu avant */
+    const rx = await envoyer(jarF, 'Autre.docx', zip('autre')); fichiers.set([...fichiers.keys()].find(k => k.includes(rx.data.url.split('/').pop())), pdf);
+    const g2 = await call(jarF, 'GET', `/api/formations/${fid}/lecons/${l}/studio`);
+    const m = await call(jarF, 'PUT', `/api/formations/${fid}/lecons/${l}/studio`, { mode: 'structure', rev: g2.data.rev, pages: [{ id: 'p1', titre: '', elements: [...g2.data.doc.pages[0].elements, { id: 'f5', type: 'fichier', x: 0, y: 0, w: 440, h: 72, z: 1, props: { url: rx.data.url, nom: 'Faux' } }] }] });
+    assert.equal(m.status, 200, JSON.stringify(m.data));
+    assert.equal((await call(jarF, 'POST', `/api/formations/${fid}/lecons/${l}/studio/publier`, {})).status, 200);
+    const faux2 = await brut(jarA, base(l) + '/telecharger?element=f5');
+    assert.equal(faux2.status, 415, 'contenu PDF sous une extension .docx : refusé');
+  });
+
   await t.test('bibliothèque de médias : une référence privée n\'entre que dans la bibliothèque de son déposant', async () => {
     const ok = await call(jarF, 'POST', '/api/formateur/medias', { type: 'document', url: refPdf, nom: 'Support privé', taille: pdf.length });
     assert.equal(ok.status, 201, JSON.stringify(ok.data));
@@ -178,12 +230,12 @@ test('migration : repérage et réécriture des documents (fonctions pures du sc
     { id: 'b', type: 'document', props: { url: 'https://x.b-cdn.net/documents/1-2.xlsx' } },
     { id: 'c', type: 'image', props: { url: 'https://x.b-cdn.net/posts/1-3.png' } },
     { id: 'd', type: 'fichier', props: { url: 'https://x.b-cdn.net/documents/1-4.pdf' } }] }] });
-  assert.deepEqual(M.urlsDuStudio(json), ['https://x.b-cdn.net/documents/1-1.pdf', 'https://x.b-cdn.net/documents/1-2.xlsx'], 'seuls les éléments « Document »');
+  assert.deepEqual(M.urlsDuStudio(json), ['https://x.b-cdn.net/documents/1-1.pdf', 'https://x.b-cdn.net/documents/1-2.xlsx', 'https://x.b-cdn.net/documents/1-4.pdf'], 'éléments « Document » et « Fichier à télécharger », jamais les images');
   const ref = 'prive:formations/1/' + 'c'.repeat(32) + '.pdf';
   const neuf = JSON.parse(M.reecrireStudio(json, { 'https://x.b-cdn.net/documents/1-1.pdf': ref }));
   const e = Object.fromEntries(neuf.pages[0].elements.map(x => [x.id, x.props.url]));
   assert.equal(e.a, ref); assert.equal(e.b, 'https://x.b-cdn.net/documents/1-2.xlsx', 'adresse non copiée : laissée telle quelle');
-  assert.equal(e.c, 'https://x.b-cdn.net/posts/1-3.png'); assert.equal(e.d, 'https://x.b-cdn.net/documents/1-4.pdf', 'un « fichier » du Studio reste public');
+  assert.equal(e.c, 'https://x.b-cdn.net/posts/1-3.png'); assert.equal(e.d, 'https://x.b-cdn.net/documents/1-4.pdf', 'adresse non copiée : laissée telle quelle');
   assert.equal(M.reecrireStudio(json, {}), null, 'rien à changer : pas de réécriture');
   assert.equal(M.reecrireStudio('pas du json', { a: 'b' }), null);
   assert.match(Prive.creerRef(42, 'PDF'), Prive.REF); assert.notEqual(Prive.creerRef(42, 'pdf'), Prive.creerRef(42, 'pdf'));

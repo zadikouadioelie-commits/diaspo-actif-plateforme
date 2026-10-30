@@ -91,7 +91,7 @@ function nettoyerElement(e, SEC, pagesIds) {
     o.page = o.action === "page" && pagesIds.has(String(p.page)) ? String(p.page) : "";
     o.couleur = couleur(p.couleur); o.couleur_texte = couleur(p.couleur_texte); o.rayon = Math.round(nbr(p.rayon, 0, 60, 10));
   } else if (e.type === "fichier") {
-    o.nom = txt(p.nom, 150); o.url = urlHttps(p.url); o.description = txt(p.description, 200);
+    o.nom = txt(p.nom, 150); o.url = Prive.REF.test(String(p.url || "")) ? String(p.url) : urlHttps(p.url); o.description = txt(p.description, 200); /* référence « prive:… » (lot I) ou adresse https */
   } else if (e.type === "document") {
     o.nom = txt(p.nom, 150); o.url = Prive.REF.test(String(p.url || "")) ? String(p.url) : urlHttps(p.url); /* référence « prive:… » du stockage privé (lot F) ou adresse https */
     /* Affichage : « intégré » (visionneuse dans la page) et/ou « téléchargeable » (pièce jointe), les deux à la fois si besoin ; anciens documents : repli sur « mode ». */
@@ -323,6 +323,11 @@ module.exports.register = function register(deps) {
     if (!lim.allowed) return sendJSON(res, 429, { error: `Trop d'enregistrements. Réessayez dans ${lim.retryAfter}s.` });
     const r = nettoyerDoc(body, SEC);
     if (r.erreur) return sendJSON(res, 400, { error: r.erreur });
+    /* Une référence de fichier privé n'est acceptée que si elle a été déposée par le compte qui enregistre ou par le propriétaire de la formation (jamais celle d'un tiers). */
+    r.doc.pages.forEach(pg => pg.elements.forEach(e => {
+      const u = e.props && e.props.url;
+      if ((e.type === "document" || e.type === "fichier") && Prive.REF.test(String(u || "")) && ![Number(c.user.id), Number(c.f.owner_user_id)].includes(Number(String(u).split("/")[1]))) e.props.url = "";
+    }));
     const quizLecon = await db.prepare("SELECT id FROM formation_quiz WHERE lecon_id=? AND formation_id=?").get(c.lecon.id, c.f.id);
     let quizVu = false;
     r.doc.pages.forEach(pg => { pg.elements = pg.elements.filter(e => {

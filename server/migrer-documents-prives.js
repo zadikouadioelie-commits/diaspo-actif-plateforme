@@ -22,18 +22,18 @@ const MAX = 15 * 1024 * 1024;
 const extDe = url => { const m = String(url).split("?")[0].split("#")[0].match(/\.([a-z0-9]{2,5})$/i); return m ? m[1].toLowerCase() : ""; };
 const migrable = url => typeof url === "string" && HOTE_CDN.test(url) && EXT_OK.includes(extDe(url));
 
-/* Adresses publiques des éléments « Document » d'un document du Studio (texte JSON). */
+/* Adresses publiques des éléments « Document » et « Fichier à télécharger » d'un document du Studio (texte JSON) ; une image n'est jamais concernée (migrable() ne retient que les documents de cours). */
 function urlsDuStudio(json) {
   let doc; try { doc = JSON.parse(json); } catch (_) { return []; }
   const urls = [];
-  for (const p of (doc && doc.pages) || []) for (const e of p.elements || []) if (e.type === "document" && e.props && migrable(e.props.url)) urls.push(e.props.url);
+  for (const p of (doc && doc.pages) || []) for (const e of p.elements || []) if ((e.type === "document" || e.type === "fichier") && e.props && migrable(e.props.url)) urls.push(e.props.url);
   return urls;
 }
 /* Même document, adresses remplacées d'après la table { adresse publique → référence privée } ; null si rien ne change. */
 function reecrireStudio(json, table) {
   let doc; try { doc = JSON.parse(json); } catch (_) { return null; }
   let change = false;
-  for (const p of (doc && doc.pages) || []) for (const e of p.elements || []) if (e.type === "document" && e.props && table[e.props.url]) { e.props.url = table[e.props.url]; change = true; }
+  for (const p of (doc && doc.pages) || []) for (const e of p.elements || []) if ((e.type === "document" || e.type === "fichier") && e.props && table[e.props.url]) { e.props.url = table[e.props.url]; change = true; }
   return change ? JSON.stringify(doc) : null;
 }
 
