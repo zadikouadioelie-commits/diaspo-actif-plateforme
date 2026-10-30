@@ -207,3 +207,11 @@ body.st-body button{font:inherit;}
 /* envoi d'une vidéo : progression visible en bas à gauche pendant qu'on continue à travailler */
 .st-envoi{position:fixed;left:14px;bottom:14px;width:min(340px,86vw);background:var(--st-nuit);border:1px solid var(--st-or);border-radius:12px;padding:10px 12px;z-index:220;display:none;color:#fff;font-size:13px;}
 .st-envoi.on{display:block;} .st-envoi-b{height:6px;background:var(--st-nuit2);border-radius:99px;margin-top:7px;overflow:hidden;} .st-envoi-b>div{height:100%;width:0;background:var(--st-or);transition:width .3s;}
+
+/* Page libre lue sur un écran étroit : remise en colonne (affichage adapté), 2026-10-30 */
+.st-adapte{padding:18px 16px;min-height:0;gap:12px;box-shadow:none;}
+.st-adapte .st-txt-titre{font-size:28px;} .st-adapte .st-txt-soustitre{font-size:22px;} .st-adapte .st-txt-paragraphe{font-size:17px;}
+.st-adapte .st-el{width:100%;} .st-adapte .st-btn{width:100%;min-width:0;justify-content:center;}
+.st-lect-mode{text-align:center;padding:6px 8px;background:#0b1226;}
+.st-lect-mode[hidden]{display:none;}
+.st-lien-mode{background:none;border:0;color:#f4d98a;font-size:12.5px;text-decoration:underline;cursor:pointer;padding:4px 8px;}

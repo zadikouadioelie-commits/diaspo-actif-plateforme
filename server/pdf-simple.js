@@ -16,17 +16,35 @@ const MM = 72 / 25.4;
 const SPECIAUX = { "€": 0x80, "‚": 0x82, "ƒ": 0x83, "„": 0x84, "…": 0x85, "†": 0x86, "‡": 0x87, "ˆ": 0x88, "‰": 0x89, "Š": 0x8a, "‹": 0x8b, "Œ": 0x8c, "Ž": 0x8e,
   "‘": 0x91, "’": 0x92, "“": 0x93, "”": 0x94, "•": 0x95, "–": 0x96, "—": 0x97, "˜": 0x98, "™": 0x99, "š": 0x9a, "›": 0x9b, "œ": 0x9c, "ž": 0x9e, "Ÿ": 0x9f };
 /* caractères invisibles ou séparateurs de ligne, sans valeur dans un PDF (écrits par code : un séparateur de ligne littéral casserait le fichier) */
-const INVISIBLES = new RegExp("[" + [0xad, 0x200b, 0x200c, 0x200d, 0x200e, 0x200f, 0x2028, 0x2029].map(c => String.fromCharCode(c)).join("") + "]", "g");
+const INVISIBLES = new RegExp("[" + [0xad, 0x2060, 0x200b, 0x200c, 0x200d, 0x200e, 0x200f, 0x2028, 0x2029].map(c => String.fromCharCode(c)).join("") + "]", "g");
+/* Lettres que WinAnsi ne connaît pas et que les noms de la diaspora emploient : alphabets africains (ɛ ɔ ŋ ɓ ɗ…), Europe centrale, traits d'union et guillemets typographiques.
+   On les remplace par la lettre de base la plus proche (Ɛ → E) plutôt que par « ? » : le nom reste lisible, l'écran garde l'orthographe exacte. */
+const LETTRES_PROCHES = { "Ɛ": "E", "ɛ": "e", "Ɔ": "O", "ɔ": "o", "Ɓ": "B", "ɓ": "b", "Ɗ": "D", "ɗ": "d", "Ɖ": "D", "ɖ": "d", "Ŋ": "N", "ŋ": "n", "Ɣ": "G", "ɣ": "g", "Ʋ": "V", "ʋ": "v",
+  "Ə": "E", "ə": "e", "Ɨ": "I", "ɨ": "i", "Ʉ": "U", "ʉ": "u", "Ƴ": "Y", "ƴ": "y", "Ƙ": "K", "ƙ": "k", "Ɲ": "N", "ɲ": "n", "Ƭ": "T", "ƭ": "t", "ɑ": "a", "Ɑ": "A", "ʃ": "s", "Ʃ": "S",
+  "Ł": "L", "ł": "l", "Đ": "D", "đ": "d", "Ħ": "H", "ħ": "h", "ı": "i", "İ": "I", "Ŀ": "L", "ŀ": "l", "ĸ": "k", "ſ": "s", "Ŧ": "T", "ŧ": "t",
+  "‐": "-", "‑": "-", "‒": "-", "−": "-", "′": "'", "″": '"', "‵": "'" };
+/* Un caractère hors WinAnsi : lettre proche, ou lettre de base sans accent (ą → a, ř → r), ou « ? ». */
+function repli(c) {
+  if (LETTRES_PROCHES[c] !== undefined) return LETTRES_PROCHES[c];
+  if (/^[̀-ͯ]$/.test(c)) return "";
+  const base = c.normalize("NFD").replace(/[̀-ͯ]/g, "");
+  return base !== c && /^[\x20-\x7e\xa0-\xff]+$/.test(base) ? base : "?";
+}
 function versOctets(texte) {
   const sortie = [];
-  for (const c of String(texte == null ? "" : texte).replace(INVISIBLES, "")) {
+  const pousser = c => {
     const code = c.codePointAt(0);
     if (c === "\n" || c === "\t") sortie.push(0x20);
     else if (code >= 0x20 && code < 0x7f) sortie.push(code);
     else if (code >= 0xa0 && code <= 0xff) sortie.push(code);
     else if (SPECIAUX[c] !== undefined) sortie.push(SPECIAUX[c]);
-    else if (code === 0xa0 || code === 0x202f) sortie.push(0x20);
-    else sortie.push(0x3f);
+    else if (code === 0x202f) sortie.push(0x20);
+    else return false;
+    return true;
+  };
+  for (const c of String(texte == null ? "" : texte).normalize("NFC").replace(INVISIBLES, "")) {
+    if (pousser(c)) continue;
+    for (const r of repli(c)) if (!pousser(r)) sortie.push(0x3f);
   }
   return sortie;
 }

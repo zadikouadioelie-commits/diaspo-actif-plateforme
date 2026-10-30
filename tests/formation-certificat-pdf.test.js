@@ -83,6 +83,16 @@ test('PDF : structure, accents, texte pivoté, transparence, lien', () => {
   assert.ok(c.includes('/G28 gs'));
 });
 
+test('PDF : lettres hors WinAnsi remplacées par la lettre proche (noms africains, Europe centrale), « ? » seulement pour les autres alphabets', () => {
+  const t = s => Buffer.from(require('../server/pdf-simple').versOctets(s)).toString('latin1');
+  assert.equal(t('Ɛwɛ Ɔkɔ Ŋkrumah Ɓaba Ɗiallo'), 'Ewe Oko Nkrumah Baba Diallo', 'alphabets africains');
+  assert.equal(t('Kɔ́ffi'), 'Koffi', 'accent combinant sur une lettre africaine : ignoré');
+  assert.equal(t('Łukasz Dvořák Ćirić Ångström'), 'Lukasz Dvor\xe1k Ciric \xc5ngstr\xf6m', 'lettres d’Europe centrale ramenées à la lettre de base ; á ö Å conservés');
+  assert.equal(t('élie'), '\xe9lie', 'accent écrit en deux caractères recomposé');
+  assert.equal(t('a‑b − c'), 'a-b - c', 'trait d’union insécable et signe moins');
+  assert.equal(t('Мария 张伟'), '????? ??', 'autres alphabets : un « ? » par lettre (limite connue)');
+});
+
 test('PDF : dates en français', () => {
   assert.equal(dateFr('2026-10-30 09:15:00'), '30 octobre 2026');
   assert.equal(dateFr('2026-01-01T23:30:00Z'), '2 janvier 2026', 'heure de Paris');

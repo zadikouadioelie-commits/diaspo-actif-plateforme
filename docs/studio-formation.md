@@ -94,3 +94,12 @@ node --test tests/formation-studio.test.js tests/formation-studio-video.test.js
 ```
 
 Chaque test démarre un vrai serveur sur une **copie isolée** de la base de développement (`tests/_formation-harness.js`) ; aucune clé de service réelle n'est utilisée.
+
+## Pages libres sur téléphone (lot H, 2026-10-30)
+
+Une page en **mode libre** est dessinée pour 1280 px de large. Sur un écran de moins de 720 px, la lecture (`StudioRender.lecture`, partagée par suivre-formation.html, l'aperçu et m.html) ne la réduit plus à l'échelle (texte illisible) : elle la remet **en colonne**, dans l'ordre de lecture (de haut en bas ; les éléments à moins de 40 px d'écart vertical forment une rangée lue de gauche à droite).
+
+- Les tailles de texte sont réduites (48 px → 32 px, jamais sous 15 px) ; les boutons prennent toute la largeur ; images, vidéos, quiz, validations et documents gardent leur comportement (mêmes `data-id`, donc suivi des vidéos et cases à cocher inchangés).
+- Un bouton « Voir la mise en page d'origine » (visible seulement sur écran étroit) revient à la page réduite ; « Affichage adapté au téléphone » repasse en colonne.
+- Le passage d'un mode à l'autre se fait aussi quand la fenêtre change de largeur (tablette qu'on tourne) ; la page courante est redessinée, les validations déjà cochées sont conservées.
+- Ordinateur et mode « structuré » : aucun changement.

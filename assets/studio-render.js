@@ -9,10 +9,20 @@
    ═════════════════════════════════════════════════ */
 (function () {
   'use strict';
-  const PAGE_W = 1280, PAGE_H = 720, FLUX_W = 900;
+  const PAGE_W = 1280, PAGE_H = 720, FLUX_W = 900, SEUIL_ETROIT = 720;
   const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   const TEXTE = ['titre', 'soustitre', 'paragraphe', 'citation', 'encadre'];
   const ESPACE = { titre: 'Votre titre', soustitre: 'Votre sous-titre', paragraphe: 'Écrivez votre texte ici…', citation: 'Une citation…', encadre: 'Un point important à retenir…' };
+
+  /* Affichage adapté au téléphone : un texte posé pour une page de 1280 px est réduit (40 px → 28 px) mais jamais sous 15 px. */
+  const tailleAdaptee = t => (t > 18 ? Math.round(Math.max(15, 18 + (t - 18) * 0.45)) : Math.max(15, t));
+  /* Ordre de lecture d'une page libre : de haut en bas, et de gauche à droite pour les éléments posés sur la même rangée (à moins de 40 px d'écart). */
+  function ordreLecture(elements) {
+    const tri = (elements || []).slice().sort((a, b) => ((a.y || 0) - (b.y || 0)) || ((a.x || 0) - (b.x || 0)) || ((a.z || 0) - (b.z || 0)));
+    const rangees = [];
+    tri.forEach(e => { const r = rangees[rangees.length - 1]; if (r && (e.y || 0) < r.y0 + 40) r.els.push(e); else rangees.push({ y0: e.y || 0, els: [e] }); });
+    return rangees.flatMap(r => r.els.sort((a, b) => ((a.x || 0) - (b.x || 0)) || ((a.y || 0) - (b.y || 0))));
+  }
 
   function ytId(url) {
     const m = String(url || '').match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{6,})/);
@@ -38,7 +48,7 @@
     if (TEXTE.includes(e.type)) {
       const st = [];
       if (p.police) st.push(`font-family:${p.police}`);
-      if (p.taille) st.push(`font-size:${Number(p.taille)}px`);
+      if (p.taille) st.push(`font-size:${ctx.adapte ? tailleAdaptee(Number(p.taille)) : Number(p.taille)}px`);
       if (p.couleur) st.push(`color:${esc(p.couleur)}`);
       if (p.fond) st.push(`background:${esc(p.fond)}`);
       if (p.align) st.push(`text-align:${esc(p.align)}`);
@@ -118,7 +128,7 @@
 
   function elHtml(e, mode, ctx) {
     const ll = mode === 'libre';
-    const st = ll ? `left:${e.x}px;top:${e.y}px;width:${e.w}px;height:${e.h}px;z-index:${e.z || 1}` : `max-width:${Math.min(e.w || FLUX_W, FLUX_W)}px`;
+    const st = ll ? `left:${e.x}px;top:${e.y}px;width:${e.w}px;height:${e.h}px;z-index:${e.z || 1}` : ctx.adapte ? '' : `max-width:${Math.min(e.w || FLUX_W, FLUX_W)}px`;
     const largeur = !ll && ['image', 'video', 'tableau', 'bouton', 'lien', 'fichier', 'audio', 'validation', 'document', 'quiz'].includes(e.type);
     return `<div class="st-el st-t-${e.type}${e.locked ? ' st-lock' : ''}${largeur ? ' st-flux-' + (e.type === 'image' ? 'img' : e.type === 'video' ? 'vid' : 'bloc') : ''}" data-id="${esc(e.id)}" data-type="${esc(e.type)}" style="${st}">${inner(e, ctx)}${ctx.edit && e.locked ? '<span class="st-lockbadge" title="Élément verrouillé">🔒</span>' : ''}</div>`;
   }
@@ -133,8 +143,13 @@
   /* HTML d'une page. ctx : { edit } */
   function pageHtml(page, mode, ctx) {
     ctx = ctx || {};
-    const els = (page.elements || []).map(e => elHtml(e, mode, ctx)).join('');
     const fond = page.fond ? `background:${esc(page.fond)};` : '';
+    /* « adapte » : une page libre lue sur un écran étroit est remise en colonne, dans l'ordre de lecture, au lieu d'être réduite. */
+    if (mode === 'adapte') {
+      const c = Object.assign({}, ctx, { adapte: true });
+      return `<div class="st-page st-flux st-adapte" data-page="${esc(page.id)}" style="${fond}">${ordreLecture(page.elements).map(e => elHtml(e, 'structure', c)).join('')}</div>`;
+    }
+    const els = (page.elements || []).map(e => elHtml(e, mode, ctx)).join('');
     if (mode === 'libre') return `<div class="st-page st-libre" data-page="${esc(page.id)}" style="${fond}width:${PAGE_W}px;height:${hauteurPage(page, mode)}px">${els}</div>`;
     return `<div class="st-page st-flux" data-page="${esc(page.id)}" style="${fond}max-width:${FLUX_W}px">${els || (ctx.edit ? '<div class="st-vide-page">Glissez un outil ici pour commencer cette page</div>' : '')}</div>`;
   }
@@ -157,14 +172,21 @@
     const videosOk = () => opts.apercu || videosReq.every(id => { const e = etats[id]; return e && (opts.videoSauver ? e.srv : e.pct) >= seuil; });
     container.innerHTML = `<div class="st-lect">
       <div class="st-lect-nav"><button type="button" class="st-nb" data-n="-1" aria-label="Page précédente">‹</button><span class="st-lect-pos" aria-live="polite"></span><button type="button" class="st-nb" data-n="1" aria-label="Page suivante">›</button></div>
+      <div class="st-lect-mode" hidden><button type="button" class="st-lien-mode"></button></div>
       <div class="st-lect-vue"><div class="st-lect-echelle"></div></div>
     </div>`;
-    const vue = container.querySelector('.st-lect-vue'), ech = container.querySelector('.st-lect-echelle'), pos = container.querySelector('.st-lect-pos');
+    const vue = container.querySelector('.st-lect-vue'), ech = container.querySelector('.st-lect-echelle'), pos = container.querySelector('.st-lect-pos'), basc = container.querySelector('.st-lect-mode');
+    /* Page libre sur écran étroit : affichage adapté (colonne) par défaut, la mise en page d'origine reste un bouton. */
+    let origine = false, affMode = mode;
+    const etroit = () => mode === 'libre' && vue.clientWidth > 0 && vue.clientWidth < SEUIL_ETROIT;
+    const modeVu = () => (etroit() && !origine ? 'adapte' : mode);
     function echelle() {
-      if (mode !== 'libre') { ech.style.transform = ''; ech.style.width = ''; vue.style.height = ''; return; }
+      if (modeVu() !== affMode) { afficher(i); return; }
+      basc.hidden = !etroit(); basc.firstChild.textContent = origine ? '📱 Affichage adapté au téléphone' : '🖥️ Voir la mise en page d’origine';
+      if (affMode !== 'libre') { ech.style.transform = ''; ech.style.width = ''; vue.style.height = ''; return; }
       const s = Math.min(1, vue.clientWidth / PAGE_W || 1);
       ech.style.transformOrigin = 'top left'; ech.style.transform = `scale(${s})`; ech.style.width = PAGE_W + 'px';
-      vue.style.height = Math.round(hauteurPage(pages[i], mode) * s) + 'px';
+      vue.style.height = Math.round(hauteurPage(pages[i], 'libre') * s) + 'px';
     }
     function progres() {
       const fin = i === pages.length - 1 || vues.size === pages.length;
@@ -229,7 +251,8 @@
     }
     function afficher(n) {
       i = Math.max(0, Math.min(pages.length - 1, n)); vues.add(i);
-      ech.innerHTML = pageHtml(pages[i], mode, { lecture: true, apercu: !!opts.apercu, docBase: opts.docBase, brouillon: !!opts.brouillon });
+      affMode = modeVu();
+      ech.innerHTML = pageHtml(pages[i], affMode, { lecture: true, apercu: !!opts.apercu, docBase: opts.docBase, brouillon: !!opts.brouillon });
       monterDocuments(ech);
       ech.querySelectorAll('input[data-valid]').forEach(c => { c.checked = valides.has(c.dataset.valid); });
       suivreVideos(ech);
@@ -241,6 +264,7 @@
       if (opts.onPage) opts.onPage(ech, i);
     }
     container.addEventListener('click', ev => {
+      if (ev.target.closest('.st-lien-mode')) { origine = !origine; afficher(i); return; }
       const nb = ev.target.closest('.st-nb'); if (nb) { afficher(i + Number(nb.dataset.n)); return; }
       const g = ev.target.closest('[data-goto]'); if (g) { const k = pages.findIndex(p => p.id === g.dataset.goto); if (k >= 0) afficher(k); }
     });
