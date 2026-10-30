@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FORMATION DIASPORA — Studio de création</title>
+<link rel="icon" href="/assets/logo.png">
+<meta name="theme-color" content="#0b1226">
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="/assets/studio.css?v=1">
+</head>
+<body class="st-body">
+<div class="st-app">
+  <header class="st-top">
+    <button class="st-b" id="st-retour" title="Retour à mes formations">← Retour</button>
+    <span class="st-marque">Formation Diaspora · Studio</span>
+    <span class="st-ariane" id="st-ariane"></span>
+    <button class="st-b st-only-compact" id="st-btn-outils">＋ Outils</button>
+    <span class="st-grow"></span>
+    <div class="st-sel-mode" id="st-modes" role="group" aria-label="Mode de création"><button data-mode="structure" title="Pages structurées (type PowerPoint)">🧱 Pages structurées</button><button data-mode="libre" title="Page libre (type Canva)">🎨 Page libre</button></div>
+    <span class="st-pub" id="st-pub">Brouillon</span>
+    <span class="st-etat" id="st-etat" role="status" aria-live="polite"></span>
+    <button class="st-b" id="st-apercu" title="Voir le module comme un apprenant">👁 Prévisualiser</button>
+    <button class="st-b" id="st-histo" title="Historique des versions">🕘 Historique</button>
+    <button class="st-b or" id="st-publier" title="Publier le module pour les apprenants">Publier</button>
+    <button class="st-b st-only-compact" id="st-btn-props">⚙ Propriétés</button>
+  </header>
+
+  <div class="st-main">
+    <aside class="st-lib" id="st-lib" aria-label="Bibliothèque d'outils"></aside>
+    <aside class="st-thumbs" id="st-thumbs" aria-label="Pages du module"></aside>
+    <section class="st-centre">
+      <div class="st-barre" id="st-barre">
+        <button class="st-b" id="st-annuler" title="Annuler (Ctrl+Z)">↶ Annuler</button>
+        <button class="st-b" id="st-retablir" title="Rétablir (Ctrl+Y)">↷ Rétablir</button>
+        <button class="st-b" id="st-copier" title="Copier (Ctrl+C)">Copier</button>
+        <button class="st-b" id="st-coller" title="Coller (Ctrl+V)">Coller</button>
+        <button class="st-b" id="st-dupliquer" title="Dupliquer (Ctrl+D)">⧉</button>
+        <button class="st-b" id="st-verrou" title="Verrouiller / déverrouiller">🔒</button>
+        <button class="st-b dg" id="st-suppr" title="Supprimer (Suppr)">🗑</button>
+        <span class="st-grow"></span>
+        <button class="st-b st-al" data-al="g" title="Aligner à gauche">⇤</button><button class="st-b st-al" data-al="c" title="Centrer horizontalement">⇔</button><button class="st-b st-al" data-al="d" title="Aligner à droite">⇥</button>
+        <button class="st-b st-al" data-al="h" title="Aligner en haut">⤒</button><button class="st-b st-al" data-al="m" title="Centrer verticalement">⇕</button><button class="st-b st-al" data-al="b" title="Aligner en bas">⤓</button>
+        <button class="st-b" id="st-aimant" title="Aimantation sur les repères (maintenez Alt pour la suspendre)">🧲</button>
+        <button class="st-b" id="st-zoom-m" title="Zoom arrière">−</button><span class="st-zoom" id="st-zoom">100 %</span><button class="st-b" id="st-zoom-p" title="Zoom avant">＋</button><button class="st-b" id="st-ajuster" title="Ajuster la page à l'écran">Ajuster</button>
+      </div>
+      <div class="st-stage" id="st-stage"><div class="st-zw" id="st-zw"><div class="st-zi" id="st-zi"></div></div></div>
+    </section>
+    <aside class="st-props" id="st-props" aria-label="Propriétés"></aside>
+  </div>
+</div>
+
+<div class="st-mod" id="m-info"></div>
+<div class="st-toast" id="st-toast" role="status"></div>
+
+<script src="/assets/upload-media.js"></script>
+<script src="/assets/studio-render.js?v=1"></script>
+<script src="/assets/studio-engine.js?v=1"></script>
+</body>
+</html>

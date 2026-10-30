@@ -18,6 +18,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="stylesheet" href="assets/styles.v2.css">
 <link rel="stylesheet" href="/assets/responsive.v2.css?v=2">
+<link rel="stylesheet" href="/assets/studio.css?v=1">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#ff6b00">
 <style>
@@ -155,6 +156,7 @@
 <script src="assets/data.js"></script>
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js?v=13"></script>
+<script src="assets/studio-render.js?v=1"></script>
 <script>
 function escH(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 const params = new URLSearchParams(location.search);
@@ -336,6 +338,8 @@ function sfContentHtml(l){
   if (l.verrouille) return `<div class="sf-verrou-carte"><div style="font-size:42px;">🔒</div><h3 style="margin:8px 0;">Cette leçon est réservée aux personnes inscrites</h3>
     <p style="color:var(--muted);margin:0 0 14px;">Les leçons marquées 🎁 sont offertes. Inscrivez-vous pour accéder à toute la formation.</p>
     <a class="btn" href="formations.html">Voir la formation et s'inscrire</a></div>`;
+  /* Module créé dans le Studio (glisser-déposer) : rendu par assets/studio-render.js, version PUBLIÉE seulement (sfStudioLoad). */
+  if (Number(l.studio)) return '<div id="sf-studio" class="sf-studio"><div class="notice">Chargement…</div></div>';
   switch (l.type){
     case 'video':
       return `<div class="sf-content-video"><video controls controlsList="${!l.telechargement_autorise ? 'nodownload' : ''}" src="${escH(l.contenu_url||'')}"></video></div>`;
@@ -412,12 +416,30 @@ function sfRenderContent(){
     ${echanges && l ? '<section class="sf-ech" id="sf-echanges" aria-label="Questions et échanges"></section>' : ''}
   `;
   if (l && l.type === 'quiz' && !l.verrouille) sfQuizLoad(l);
+  if (l && Number(l.studio) && !l.verrouille) sfStudioLoad(l, apprenant);
   /* Mode automatique : une vidéo ou un audio mené jusqu'au bout valide la leçon. */
   if (apprenant && suiviMode() === 'auto' && l && !l.termine && !l.quiz) {
     const media = el.querySelector('video, audio');
     if (media) media.addEventListener('ended', async () => { await sfAutoTerminer(l.id); sfMajBoutonTermine(); });
   }
   if (echanges && l) sfEchangesLoad();
+}
+
+/* Lecture d'un module du Studio : la version publiée (ou le brouillon pour le créateur en mode aperçu). Terminé = toutes les pages vues + zones de validation obligatoires cochées. */
+let SF_STUDIO = null;
+async function sfStudioLoad(l, apprenant){
+  const zone = document.getElementById('sf-studio'); if (!zone) return;
+  if (SF_STUDIO) { SF_STUDIO.destroy(); SF_STUDIO = null; }
+  try {
+    const r = await fetch(`/api/formations/${formationId}/lecons/${l.id}/studio/lecture${SF_DATA.mode === 'apercu' ? '?brouillon=1' : ''}`, { credentials: 'same-origin' });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) { zone.innerHTML = `<div class="notice">${escH(r.status === 404 ? "Ce contenu n'est pas encore disponible : le formateur ne l'a pas encore publié." : (d.error || 'Contenu indisponible.'))}</div>`; return; }
+    let envoye = false;
+    SF_STUDIO = StudioRender.lecture(zone, d.doc, { onProgress: p => {
+      if (!p.termine || envoye || !apprenant || l.termine || sansSuivi() || suiviMode() !== 'auto' || l.quiz) return;
+      envoye = true; sfAutoTerminer(l.id).then(() => sfMajBoutonTermine());
+    } });
+  } catch (e) { zone.innerHTML = '<div class="notice">Contenu indisponible pour le moment.</div>'; }
 }
 
 function sfGoTo(id){

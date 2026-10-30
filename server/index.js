@@ -3267,6 +3267,9 @@ FormationAcces.register({ route, db, sendJSON, getCurrentUser, SEC, checkFormati
 /* Formation Diaspora, lot A : droits d'accès par formation ou par module, commandes, expiration — server/formation-droits.js. getOrigin est une déclaration de fonction (hissée). */
 const FormationDroits = require("./formation-droits");
 FormationDroits.register({ route, db, sendJSON, getCurrentUser, SEC, checkFormationOwner, creerNotif, getOrigin, ParcoursFormation });
+/* Formation Diaspora, lot D : studio de création par glisser-déposer (documents, versions, publication) — server/formation-studio.js. */
+const FormationStudio = require("./formation-studio");
+FormationStudio.register({ route, db, sendJSON, getCurrentUser, SEC, checkFormationOwner, exigerPremium });
 /* Envoyer un événement par e-mail (carte complète) + texte d'aperçu du lien (date, lieu) : server/partage-evenement.js. urlImagePartageEvenement est une déclaration de fonction (hissée). */
 const PartageEvenement = require("./partage-evenement");
 PartageEvenement.register({ route, db, sendJSON, getCurrentUser, SEC, nomCompteAffichage, getOrigin, urlImagePartageEvenement });

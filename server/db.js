@@ -4911,6 +4911,34 @@ db.exec(`
     UNIQUE(user_id, formation_id, module_cle)
   );
 `);
+/* Studio de création (lot D, 2026-10-30) : brouillon courant d'un module studio (une leçon = un document) et son historique de versions. */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS formation_studio_docs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    lecon_id INTEGER NOT NULL UNIQUE,
+    formation_id INTEGER NOT NULL,
+    mode TEXT DEFAULT 'structure',
+    contenu_json TEXT,
+    rev INTEGER DEFAULT 1,
+    publiee_version INTEGER,
+    updated_at TEXT DEFAULT (datetime('now')),
+    updated_by INTEGER,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+  CREATE TABLE IF NOT EXISTS formation_studio_versions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    doc_id INTEGER NOT NULL,
+    version INTEGER NOT NULL,
+    mode TEXT,
+    contenu_json TEXT,
+    publiee INTEGER DEFAULT 0,
+    auteur_id INTEGER,
+    libelle TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(doc_id, version)
+  );
+`);
+;['studio INTEGER DEFAULT 0'].forEach(col => { try { db.exec(`ALTER TABLE formation_lecons ADD COLUMN ${col}`); } catch(_) {} });
 ;['prix REAL','vendable_seul INTEGER DEFAULT 0'].forEach(col => { try { db.exec(`ALTER TABLE formation_modules ADD COLUMN ${col}`); } catch(_) {} });
 ;['duree_acces_jours INTEGER'].forEach(col => { try { db.exec(`ALTER TABLE formations ADD COLUMN ${col}`); } catch(_) {} });
 ;["portee TEXT DEFAULT 'formation'"].forEach(col => { try { db.exec(`ALTER TABLE formation_inscriptions ADD COLUMN ${col}`); } catch(_) {} });

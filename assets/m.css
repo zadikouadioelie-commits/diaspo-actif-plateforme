@@ -39,20 +39,6 @@ svg.i.l{width:28px;height:28px}
    « Créer un compte » avait disparu du bandeau de l'accueil mobile — seule la connexion y était). */
 .top-auth{display:flex;align-items:center;gap:6px}
 .pill-cta.ghost{background:transparent;border:1.5px solid rgba(255,255,255,.55);padding:7.5px 12px;font-size:12.5px}
-/* Débordement horizontal signalé sur « d'autres téléphones » (2026-10-30) : sur un écran
-   étroit (≤340px CSS — iPhone en mode d'affichage Zoomé, ou petits Android d'entrée de
-   gamme), logo + icône Reels + les deux pilules « Créer un compte »/« Connexion » (239px à
-   elles deux, white-space:nowrap) dépassaient la largeur de l'écran de ~29px, poussant toute
-   la page en défilement horizontal — "Connexion" se retrouvait coupé au bord droit, invisible
-   sans faire défiler. Resserré ici (gaps, padding, tailles) plutôt que tronqué/masqué : les
-   deux boutons restent entièrement lisibles et cliquables, juste plus compacts. */
-@media (max-width:340px){
-  #top{padding-left:10px;padding-right:10px;gap:6px}
-  #top .logo{width:28px;height:28px}
-  .top-auth{gap:4px}
-  .pill-cta{padding:7px 12px;font-size:12.5px}
-  .pill-cta.ghost{padding:5.5px 9px;font-size:11px}
-}
 
 /* ---------- contenu ---------- */
 #view{padding:12px 12px calc(var(--nav-h) + env(safe-area-inset-bottom) + 18px)}

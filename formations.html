@@ -2209,6 +2209,7 @@
                     <div class="fb-lecon-row" draggable="true" data-lecon-id="${l.id}">
                       <span class="fb-drag-handle">⠿</span>
                       <span style="flex:1;">${(FB_LECON_TYPES.find(t=>t[0]===l.type)||['','?'])[1]} — ${l.titre}${l.duree_minutes?` (${l.duree_minutes} min)`:''}${(l.obligatoire===0||l.obligatoire===false)?'<span class="fb-opt-tag">facultative</span>':''}${Number(l.apercu_gratuit)===1?'<span class="fb-opt-tag" style="background:#dcfce7;color:#166534;">🎁 offerte</span>':''}</span>
+                      <a class="btn btn-sm btn-outline" href="formation-studio.html?formation=${fbFormationId}&lecon=${l.id}" title="Ouvrir cette leçon dans le Studio de création (glisser-déposer)" style="text-decoration:none;">🎨 Studio${Number(l.studio) ? ' ✓' : ''}</a>
                       <button class="btn btn-sm btn-outline fb-edit-lecon" data-id="${l.id}" data-chapitre-id="${c.id}">✏️</button>
                       <button class="btn btn-sm btn-outline fb-del-lecon" data-id="${l.id}">🗑️</button>
                     </div>`).join('')}

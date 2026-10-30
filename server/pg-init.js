@@ -994,6 +994,7 @@ const COLONNES_MIGRATION = [
     ['formation_inscriptions', 'relance_75_le', 'TEXT'],
     ['formation_inscriptions', 'relance_inactivite_le', 'TEXT'],
     // Formation Diaspora — lot A (2026-10-30) : achat par module, durée d'accès, portée de l'inscription
+    ['formation_lecons', 'studio', 'INTEGER DEFAULT 0'], // Studio de création (lot D)
     ['formation_modules', 'prix', 'REAL'],
     ['formation_modules', 'vendable_seul', 'INTEGER DEFAULT 0'],
     ['formations', 'duree_acces_jours', 'INTEGER'],
