@@ -117,7 +117,11 @@ html body.nd main.content [style*="border-left:4px solid"]{border-left-color:var
 html body.nd .sidebar a{background:rgba(255,255,255,.04)!important;color:var(--nd-texte)!important;border:1px solid transparent;font-weight:600;transition:background .35s var(--nd-ease),border-color .35s var(--nd-ease)}
 html body.nd .sidebar a:hover{background:var(--nd-verre2)!important;border-color:var(--nd-bord2);filter:none}
 html body.nd .sidebar a.active{background:rgba(227,192,110,.14)!important;color:#fff!important;border-color:var(--nd-or);box-shadow:none}
-html body.nd .sidebar a.premium-locked{opacity:.7}
+/* Modules Premium en cartouches dorées (2026-10-30, demande explicite) : la règle ci-dessus (fond sombre !important) l'emportait sur le doré posé par design-upgrade.v2.css
+   depuis le passage en Nuit dorée (2026-10-13), et ces liens étaient en plus assombris à 70 %. Le cadre doré à couronne (sidebar-premium-cadre.js) les entoure. */
+html body.nd .sidebar a.premium-locked{background:linear-gradient(135deg,#FFD166,#B8860B)!important;color:#2a1e00!important;font-weight:800;border-color:rgba(255,243,191,.55)}
+html body.nd .sidebar a.premium-locked:hover{background:linear-gradient(135deg,#FFDE85,#946f08)!important;border-color:#fff3bf}
+html body.nd .sidebar a.premium-locked.active{background:linear-gradient(135deg,#FFDE85,#C79A1B)!important;color:#2a1e00!important;border-color:#fff;box-shadow:0 0 0 2px rgba(255,243,191,.6)}
 html body.nd .sidebar .sb-group-lbl{color:var(--nd-or)!important;letter-spacing:.14em;opacity:.85}
 html body.nd .sidebar .pill{background:var(--nd-degore)!important;color:#1a1202!important;border:0!important;font-weight:800}
 html body.nd .sidebar .brand{font-family:var(--nd-display);font-weight:600}

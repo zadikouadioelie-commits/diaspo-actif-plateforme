@@ -6408,7 +6408,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       if (window.sidebarPremiumCadre) { monter(); return; }
       if (document.getElementById("sbp-js")) return; // chargement déjà en cours : le script se monte seul à son arrivée
       const s = document.createElement("script");
-      s.id = "sbp-js"; s.src = "assets/sidebar-premium-cadre.js?v=6"; s.onload = monter;
+      s.id = "sbp-js"; s.src = "assets/sidebar-premium-cadre.js?v=7"; s.onload = monter;
       document.head.appendChild(s);
     }
     async function remplirMenuIci(zone, dest) {

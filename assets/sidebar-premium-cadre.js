@@ -32,6 +32,11 @@
 @keyframes sbp-etincelle{0%,100%{opacity:0;transform:scale(.4)}45%,55%{opacity:1;transform:scale(1.15)}}
 .sbp-couronne{position:absolute;left:14px;top:-17px;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:19px;line-height:1;
   background:linear-gradient(135deg,#FDEBA8 0%,#E8B22E 52%,#B67E14 100%);border:2px solid #fff3bf;box-shadow:0 4px 14px rgba(0,0,0,.45),0 0 16px rgba(247,222,138,.7)}
+/* Tous les liens du groupe sont dorés (2026-10-30, demande explicite : « tous les modules premium dans le menu dans un ensemble de cartouches dorées ») : le doré posé
+   par les tableaux de bord dépend du type de compte (Association, Entreprise…), des liens du groupe restaient donc sombres à l'intérieur du cadre. */
+html body .sidebar a.sbp-or,html body.nd .sidebar a.sbp-or{background:linear-gradient(135deg,#FFD166,#B8860B)!important;color:#2a1e00!important;font-weight:800;border-color:rgba(255,243,191,.55)}
+html body .sidebar a.sbp-or:hover,html body.nd .sidebar a.sbp-or:hover{background:linear-gradient(135deg,#FFDE85,#946f08)!important;border-color:#fff3bf}
+html body.nd .sidebar a.sbp-or.active{background:linear-gradient(135deg,#FFDE85,#C79A1B)!important;color:#2a1e00!important;border-color:#fff;box-shadow:0 0 0 2px rgba(255,243,191,.6)}
 @media (prefers-reduced-motion:reduce){.sbp-cadre,.sbp-cadre.on,.sbp-cadre::before,.sbp-cadre i{animation:none!important}.sbp-cadre i{opacity:.8}}
 `;
     document.head.appendChild(st);
@@ -73,6 +78,7 @@
     obs.disconnect();                       // nos propres changements de style ne doivent pas relancer le calage
     try {
       const { titre, liens } = lienDuGroupe();
+      liens.forEach(a => a.classList.add('sbp-or'));
       const vus = liens.filter(visible);
       if (!titre || !visible(titre) || !vus.length) { cadre.classList.remove('on'); return; }
       if (getComputedStyle(sb).position === 'static') sb.style.position = 'relative';
