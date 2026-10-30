@@ -53,7 +53,7 @@
       const precedent = document.activeElement;
       const fond = document.createElement('div');
       fond.className = 'fcs-fond';
-      const quoi = opts.titre ? `<p class="fcs-quoi">${esc(opts.titre)}${opts.prix > 0 ? ` · <b>${esc(String(opts.prix).replace('.', ','))} €</b>` : ''}</p>` : '';
+      const quoi = opts.titre ? `<p class="fcs-quoi">${esc(opts.titre)}${opts.prix > 0 ? ` · <b>${esc((Number(opts.prix) % 1 ? Number(opts.prix).toFixed(2) : String(opts.prix)).replace('.', ','))} €</b>` : ''}</p>` : '';
       fond.innerHTML = `<div class="fcs-carte" role="dialog" aria-modal="true" aria-labelledby="fcs-titre">
         <h2 id="fcs-titre">Avant de payer</h2>${quoi}
         <div class="fcs-avis">🚫 ${esc(opts.texte || TEXTE)}</div>

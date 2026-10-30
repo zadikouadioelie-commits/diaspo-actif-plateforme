@@ -5135,6 +5135,21 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_kofi_usage_user ON kofi_usage(user_id, created_at);
   CREATE INDEX IF NOT EXISTS idx_kofi_chunks_formation ON kofi_chunks(formation_id, lecon_id);
   CREATE UNIQUE INDEX IF NOT EXISTS ux_kofi_credits_gratuit ON kofi_credits(user_id) WHERE origine='gratuit';
+  /* Achats du forfait de questions (Stripe) : une ligne par tentative ; le crédit n'est posé qu'à la confirmation du paiement (webhook). */
+  CREATE TABLE IF NOT EXISTS kofi_commandes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    formation_id INTEGER,
+    questions INTEGER NOT NULL,
+    montant REAL NOT NULL,
+    statut TEXT NOT NULL DEFAULT 'en_attente',
+    stripe_session_id TEXT,
+    consentement_le TEXT,
+    credit_id INTEGER,
+    created_at TEXT DEFAULT (datetime('now')),
+    paye_le TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_kofi_commandes_user ON kofi_commandes(user_id, statut);
 `);
 
 /* Documents PDF / Excel affichés dans la page du cours (2026-10-30) : doc_integre = NULL → par défaut selon le type (PDF : affiché ; autre : pièce jointe) ; doc_hauteur = hauteur d'affichage en px. */

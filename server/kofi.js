@@ -22,6 +22,12 @@ const Droits = require("./formation-droits");
 
 const NOM = "Koffi";
 
+/* Forfait de questions : AUCUN remboursement (décision du 2026-10-30). Même mécanique que l'achat d'une formation : le consentement exprès (accès immédiat + renonciation
+   à la rétractation, contenu numérique) est exigé ICI, côté serveur, avant toute commande ; l'interface (assets/formation-achat-consent.js) ne fait que le demander. */
+const TEXTE_FORFAIT_NON_REMBOURSABLE = "Achat définitif : les questions Koffi achetées ne donnent lieu à aucun remboursement, qu'elles soient utilisées ou non. Elles sont valables 12 mois. Réfléchissez bien avant d'acheter.";
+const TEXTE_FORFAIT_RETRACTATION = "Je demande l'utilisation immédiate de mes questions et je reconnais que je perds mon droit de rétractation dès que le forfait est crédité.";
+const VERSION_CONSENTEMENT_FORFAIT = "2026-10-30";
+
 /* Réglages modifiables par l'administration (kofi_reglages). Valeurs par défaut = décisions du propriétaire du 2026-10-30. */
 const DEFAUTS = {
   actif_global: 1,
@@ -124,6 +130,25 @@ async function crediterForfait(db, userId, r, reference) {
   const x = await db.prepare("INSERT INTO kofi_credits (user_id, origine, questions_total, questions_restantes, expire_le, reference) VALUES (?,?,?,?,?,?)")
     .run(Number(userId), "achat", r.forfait_questions, r.forfait_questions, sqlDate(fin), reference || null);
   return x.lastInsertRowid;
+}
+
+/* Paiement confirmé par Stripe (webhook) : crédite le forfait. Idempotent : seule une commande « en_attente » est traitée, une seule fois (mise à jour conditionnelle),
+   et le montant réellement payé doit couvrir le prix de la commande. Renvoie { commande, credit_id, questions } ou null (déjà traitée / inconnue / montant insuffisant). */
+async function confirmerCommande(db, commandeId, montantPaye) {
+  const cmd = await db.prepare("SELECT * FROM kofi_commandes WHERE id=?").get(Number(commandeId));
+  if (!cmd || cmd.statut !== "en_attente") return null;
+  if (!(Number(montantPaye) + 0.005 >= Number(cmd.montant))) { console.error("[Koffi] paiement insuffisant pour la commande", cmd.id, montantPaye, cmd.montant); return null; }
+  const pris = await db.prepare("UPDATE kofi_commandes SET statut='payee', paye_le=datetime('now') WHERE id=? AND statut='en_attente'").run(cmd.id);
+  if (!pris || Number(pris.changes) !== 1) return null;
+  const r = await reglages(db, true);
+  const fin = new Date(); fin.setMonth(fin.getMonth() + r.forfait_validite_mois);
+  const x = await db.prepare("INSERT INTO kofi_credits (user_id, origine, questions_total, questions_restantes, expire_le, reference) VALUES (?,?,?,?,?,?)")
+    .run(Number(cmd.user_id), "achat", Number(cmd.questions), Number(cmd.questions), sqlDate(fin), "commande " + cmd.id);
+  await db.prepare("UPDATE kofi_commandes SET credit_id=? WHERE id=?").run(x.lastInsertRowid || null, cmd.id);
+  return { commande: cmd, credit_id: x.lastInsertRowid || null, questions: Number(cmd.questions) };
+}
+async function annulerCommande(db, commandeId, statut) {
+  await db.prepare("UPDATE kofi_commandes SET statut=? WHERE id=? AND statut='en_attente'").run(statut || "expiree", Number(commandeId));
 }
 
 /* ── Texte du cours : HTML → texte, extraits, recherche ───────────────────────────────────────────── */
@@ -362,10 +387,11 @@ async function contexteAcces(db, deps, user, formationId) {
 module.exports = {
   NOM, DEFAUTS, reglages, ecrireReglage, budget, coutEstime, creditsDe, accorderGratuit, debiter, rendre, crediterForfait,
   texteDeHtml, morceler, tokens, scorer, analyserReponse, indexerFormation, texteDeStudio, systemePour, sqlDate,
+  confirmerCommande, annulerCommande, TEXTE_FORFAIT_NON_REMBOURSABLE, TEXTE_FORFAIT_RETRACTATION, VERSION_CONSENTEMENT_FORFAIT,
 };
 
 module.exports.register = function register(deps) {
-  const { route, db, sendJSON, getCurrentUser, SEC } = deps;
+  const { route, db, sendJSON, getCurrentUser, SEC, getOrigin, creerNotif } = deps;
   const D = module.exports;
   const estAdmin = u => u && u.role === "administrateur";
 
@@ -380,6 +406,9 @@ module.exports.register = function register(deps) {
   async function etatPublic(user, ctx) {
     const r = ctx.r;
     const cr = await creditsDe(db, user.id, r);
+    /* Dernier achat de forfait (moins de 3 h) : l'écran de retour de Stripe l'interroge pour savoir quand le webhook a crédité les questions. */
+    const dernier = await db.prepare("SELECT statut, created_at FROM kofi_commandes WHERE user_id=? ORDER BY id DESC LIMIT 1").get(user.id);
+    const recent = dernier && (Date.now() - (aDate(dernier.created_at) || new Date(0)).getTime()) < 3 * 3600 * 1000;
     let etat = ctx.etat;
     if (etat === "utilisable" && ctx.mode === "eleve" && cr.restants <= 0 && (cr.gratuit_deja_accorde || (ctx.budget && ctx.budget.reserve_eur < r.budget_seuil_gratuit_eur))) etat = "recharge";
     return {
@@ -387,7 +416,8 @@ module.exports.register = function register(deps) {
       formation: { id: Number(ctx.f.id), titre: ctx.f.titre },
       premium: ctx.premium,
       credits: cr,
-      forfait: { questions: r.forfait_questions, prix_eur: r.forfait_prix_eur, validite_mois: r.forfait_validite_mois },
+      achat: recent ? { statut: dernier.statut } : null,
+      forfait: { questions: r.forfait_questions, prix_eur: r.forfait_prix_eur, validite_mois: r.forfait_validite_mois, texte: TEXTE_FORFAIT_NON_REMBOURSABLE, retractation: TEXTE_FORFAIT_RETRACTATION, achetable: !ctx.proprietaire && ctx.premium.actif && ctx.etat !== "indisponible" && ctx.etat !== "desactive" },
       retention_jours: r.retention_jours,
       portee: ctx.mode === "apercu" ? "toute la formation (aperçu formateur)" : (ctx.autorises ? "modules" : "formation"),
     };
@@ -398,6 +428,62 @@ module.exports.register = function register(deps) {
     const ctx = await contexteAcces(db, deps, user, query.formation_id);
     if (ctx.code) return ressortirErreur(res, ctx);
     sendJSON(res, 200, await etatPublic(user, ctx));
+  });
+
+  /* ═════ Achat du forfait de questions (Stripe) : aucune question n'est créditée avant la confirmation du paiement par le webhook ═════ */
+  route("POST", "/api/kofi/forfait/acheter", async (req, res, params, body) => {
+    const user = await exiger(req, res); if (!user) return;
+    const ctx = await contexteAcces(db, deps, user, body && body.formation_id);
+    if (ctx.code) return ressortirErreur(res, ctx);
+    const r = ctx.r;
+    if (ctx.mode !== "eleve") return sendJSON(res, 400, { error: "L'aperçu formateur n'utilise pas de questions : aucun forfait à acheter." });
+    /* Réservé aux comptes Premium (stock conservé mais inutilisable sinon : on ne vend pas ce qui ne peut pas servir). */
+    if (!ctx.premium.actif) return sendJSON(res, 402, { error: "Koffi est réservé aux comptes Premium.", code: "premium_requis" });
+    if (ctx.etat === "desactive") return sendJSON(res, 403, { error: "Koffi est désactivé sur cette formation.", code: "desactive" });
+    /* Pas de vente quand le service ne peut pas répondre (réserve d'IA épuisée). */
+    if (ctx.etat === "indisponible") return sendJSON(res, 503, { error: "Koffi est momentanément indisponible : l'achat est suspendu. Réessayez plus tard.", code: "indisponible" });
+    /* Consentement exprès, côté serveur : une interface qui l'oublierait ne contourne rien. */
+    if (!body || body.accepte_non_remboursable !== true) {
+      return sendJSON(res, 409, { error: "Avant de payer, confirmez que vous avez compris que cet achat n'est pas remboursable.", code: "consentement_requis", texte: TEXTE_FORFAIT_NON_REMBOURSABLE, retractation: TEXTE_FORFAIT_RETRACTATION, montant: r.forfait_prix_eur });
+    }
+    const lim = SEC.rateLimit("kofi-achat:" + user.id, 10, 3600000);
+    if (!lim.allowed) return sendJSON(res, 429, { error: "Trop de tentatives. Réessayez plus tard." });
+    const { stripe, getOrCreateStripeCustomer } = require("./stripe-client");
+    if (!stripe) return sendJSON(res, 503, { error: "Paiements momentanément indisponibles." });
+    /* Double clic ou retour en arrière : on reprend le paiement en cours plutôt que d'en créer un second. */
+    const enCours = await db.prepare("SELECT * FROM kofi_commandes WHERE user_id=? AND statut='en_attente' ORDER BY id DESC LIMIT 1").get(user.id);
+    if (enCours) {
+      if (enCours.stripe_session_id) {
+        try {
+          const s = await stripe.checkout.sessions.retrieve(enCours.stripe_session_id);
+          if (s && s.status === "open" && s.url) return sendJSON(res, 200, { checkout_url: s.url, repris: true });
+          if (s && s.status === "complete") return sendJSON(res, 409, { error: "Votre paiement est en cours de validation : vos questions seront créditées dans quelques instants." });
+        } catch (e) { if (!e || e.code !== "resource_missing") return sendJSON(res, 502, { error: "Impossible de vérifier votre paiement en cours. Réessayez dans un instant." }); }
+        await annulerCommande(db, enCours.id, "expiree");
+      } else if (Date.now() - (aDate(enCours.created_at) || new Date(0)).getTime() < 120000) {
+        return sendJSON(res, 409, { error: "Une demande de paiement est déjà en cours d'initialisation. Réessayez dans un instant." });
+      } else { await annulerCommande(db, enCours.id, "expiree"); }
+    }
+    let commandeId = null;
+    try {
+      const c = await db.prepare("INSERT INTO kofi_commandes (user_id, formation_id, questions, montant, statut) VALUES (?,?,?,?,'en_attente')").run(user.id, ctx.f.id, r.forfait_questions, r.forfait_prix_eur);
+      commandeId = c.lastInsertRowid;
+      const retour = `${getOrigin(req)}/suivre-formation.html?id=${encodeURIComponent(ctx.f.id)}`;
+      const session = await stripe.checkout.sessions.create({
+        mode: "payment",
+        customer: await getOrCreateStripeCustomer(db, user),
+        line_items: [{ price_data: { currency: "eur", unit_amount: Math.round(r.forfait_prix_eur * 100), product_data: { name: `Koffi — ${r.forfait_questions} questions (valables ${r.forfait_validite_mois} mois)` } }, quantity: 1 }],
+        metadata: { diaspoactif_kofi_commande_id: String(commandeId), consentement_non_remboursable: VERSION_CONSENTEMENT_FORFAIT },
+        custom_text: { submit: { message: TEXTE_FORFAIT_NON_REMBOURSABLE } },
+        success_url: retour + "&kofi=succes",
+        cancel_url: retour + "&kofi=annule",
+      });
+      await db.prepare("UPDATE kofi_commandes SET stripe_session_id=?, consentement_le=? WHERE id=?").run(session.id, `${new Date().toISOString()} v${VERSION_CONSENTEMENT_FORFAIT}`, commandeId);
+      sendJSON(res, 201, { checkout_url: session.url, commande_id: Number(commandeId) });
+    } catch (e) {
+      try { if (commandeId) await db.prepare("DELETE FROM kofi_commandes WHERE id=?").run(commandeId); } catch (_) { /* le nettoyage ne doit pas masquer l'erreur d'origine */ }
+      sendJSON(res, 500, SEC.safeError(e, "kofi-forfait-checkout"));
+    }
   });
 
   /* Conversations de l'élève sur cette formation (dans la durée de conservation). */

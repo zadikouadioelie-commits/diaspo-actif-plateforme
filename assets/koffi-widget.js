@@ -24,7 +24,7 @@
       vitrineTitre: 'Koffi, votre tuteur personnel', vitrineTexte: 'Posez vos questions sur le cours à tout moment et obtenez une réponse claire, avec la source dans votre formation. Réservé aux comptes Premium.',
       exemple: 'Exemple fictif', exQ: 'Quelle est la différence entre un prêt et une subvention ?', exR: 'Un prêt doit être remboursé, avec ou sans intérêts, alors qu\'une subvention est une aide qui n\'est pas à rembourser [1].', exSrc: 'Module 2 › Financer son projet › Les sources de financement',
       premium: 'Passer Premium', rechargeTitre: 'Vos questions sont épuisées', rechargeTexte: function (f) { return 'Rechargez ' + f.questions + ' questions pour ' + Number(f.prix_eur).toFixed(2).replace('.', ',') + ' € : valables ' + f.validite_mois + ' mois, utilisables dans toutes vos formations. Les questions achetées ne sont pas remboursables.'; },
-      rechargeBientot: 'La recharge sera disponible très prochainement.', desactive: 'Koffi est désactivé sur cette formation.', indispo: 'Koffi est momentanément indisponible. Réessayez un peu plus tard.',
+      recharger: function (f) { return 'Recharger ' + f.questions + ' questions — ' + Number(f.prix_eur).toFixed(2).replace('.', ',') + ' €'; }, rechargerCourt: 'Recharger', paiementOuvre: 'Ouverture du paiement sécurisé…', paiementRecu: 'Paiement reçu : vos questions sont en cours de crédit…', paiementOk: 'Vos questions sont créditées. Bonne étude !', paiementAttente: 'Le crédit peut prendre quelques instants : rouvrez Koffi dans une minute.', paiementAnnule: 'Paiement annulé : rien n\'a été débité.', stockGarde: function (n) { return 'Vos ' + n + ' questions achetées sont conservées : elles servent de nouveau dès que votre Premium est actif.'; }, desactive: 'Koffi est désactivé sur cette formation.', indispo: 'Koffi est momentanément indisponible. Réessayez un peu plus tard.',
       evaluation: 'Koffi est coupé pendant une évaluation. Il sera de nouveau disponible ensuite.', erreur: 'Une erreur est survenue. Réessayez.', trop: 'Doucement : patientez quelques secondes avant la question suivante.',
       lueDans: 'Voir dans le cours', langue: 'Langue', retention: 'Conversations conservées 60 jours', hist: 'Conversation'
     },
@@ -41,7 +41,7 @@
       vitrineTitre: 'Koffi, your personal tutor', vitrineTexte: 'Ask your questions about the course at any time and get a clear answer with the source in your course. For Premium accounts only.',
       exemple: 'Fictional example', exQ: 'What is the difference between a loan and a grant?', exR: 'A loan must be repaid, with or without interest, whereas a grant is aid that does not have to be repaid [1].', exSrc: 'Module 2 › Financing your project › Funding sources',
       premium: 'Go Premium', rechargeTitre: 'You have run out of questions', rechargeTexte: function (f) { return 'Top up ' + f.questions + ' questions for ' + Number(f.prix_eur).toFixed(2).replace('.', ',') + ' €: valid for ' + f.validite_mois + ' months, usable in all your courses. Purchased questions are non-refundable.'; },
-      rechargeBientot: 'Top-ups will be available very soon.', desactive: 'Koffi is turned off for this course.', indispo: 'Koffi is temporarily unavailable. Please try again later.',
+      recharger: function (f) { return 'Top up ' + f.questions + ' questions — ' + Number(f.prix_eur).toFixed(2).replace('.', ',') + ' €'; }, rechargerCourt: 'Top up', paiementOuvre: 'Opening secure payment…', paiementRecu: 'Payment received: your questions are being credited…', paiementOk: 'Your questions are credited. Happy studying!', paiementAttente: 'Crediting can take a moment: reopen Koffi in a minute.', paiementAnnule: 'Payment cancelled: nothing was charged.', stockGarde: function (n) { return 'Your ' + n + ' purchased questions are kept: they work again as soon as your Premium is active.'; }, desactive: 'Koffi is turned off for this course.', indispo: 'Koffi is temporarily unavailable. Please try again later.',
       evaluation: 'Koffi is turned off during an assessment. It will be available again afterwards.', erreur: 'Something went wrong. Please try again.', trop: 'Slow down: please wait a few seconds before the next question.',
       lueDans: 'See in the course', langue: 'Language', retention: 'Conversations kept for 60 days', hist: 'Conversation'
     }
@@ -74,7 +74,7 @@
     '.kf-typing{align-self:flex-start;color:#475569;font-size:13px;background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:8px 12px}',
     '.kf-foot{flex:none;background:#fff;border-top:1px solid #e2e8f0;padding:8px 10px 10px}',
     '.kf-meta{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:11.5px;color:#475569;margin-bottom:6px}',
-    '.kf-meta .kf-link{border:0;background:none;color:#475569;text-decoration:underline;cursor:pointer;font:inherit;padding:0}',
+    '.kf-meta .kf-link{border:0;background:none;color:#b84c1a;text-decoration:underline;cursor:pointer;font:inherit;font-weight:700;padding:0 0 0 6px}',
     '.kf-form{display:flex;gap:8px;align-items:flex-end}',
     '.kf-form textarea{flex:1;resize:none;border:1px solid #cbd5e1;border-radius:12px;padding:9px 11px;font:14px/1.4 inherit;font-family:inherit;max-height:110px;min-height:42px;background:#fff;color:#0f172a}',
     '.kf-form textarea:focus{outline:2px solid #F26422;border-color:#F26422}',
@@ -139,6 +139,7 @@
   }
   function majMeta() {
     var m = $('.kf-count'); if (m) m.textContent = compteur();
+    var lien = $('.kf-recharge-lien'); if (lien) { var ok = S.etat && S.etat.forfait && S.etat.forfait.achetable && S.etat.etat === 'utilisable'; lien.style.display = ok ? '' : 'none'; lien.textContent = T().rechargerCourt; }
   }
 
   function carteInfo() {
@@ -150,13 +151,14 @@
     var d = document.createElement('div'); d.className = 'kf-card';
     d.innerHTML = '<h4>' + T().vitrineTitre + '</h4><div>' + T().vitrineTexte + '</div>' +
       '<div class="kf-ex"><span class="tag">' + T().exemple + '</span><div class="q">' + esc(T().exQ) + '</div><div>' + formaterTexte(T().exR, [{ n: 1 }]) + '</div><div class="kf-src">[1] ' + esc(T().exSrc) + '</div></div>' +
+      ((S.etat && S.etat.credits && Number(S.etat.credits.restants) > 0 && S.etat.premium && !S.etat.premium.actif) ? '<div class="kf-note" style="margin-top:10px">' + esc(T().stockGarde(Number(S.etat.credits.restants))) + '</div>' : '') +
       '<p style="margin:12px 0 0"><a class="kf-cta" href="' + esc(S.opts.premiumUrl || 'premium.html') + '">⭐ ' + T().premium + '</a></p>';
     return d;
   }
   function carteRecharge() {
     var f = (S.etat && S.etat.forfait) || { questions: 1000, prix_eur: 2.5, validite_mois: 12 };
     var d = document.createElement('div'); d.className = 'kf-card';
-    d.innerHTML = '<h4>' + T().rechargeTitre + '</h4><div>' + esc(T().rechargeTexte(f)) + '</div><p style="margin:12px 0 0"><button type="button" class="kf-cta sec" disabled>' + esc(T().rechargeBientot) + '</button></p>';
+    d.innerHTML = '<h4>' + T().rechargeTitre + '</h4><div>' + esc(T().rechargeTexte(f)) + '</div>' + (f.achetable === false ? '' : '<p style="margin:12px 0 0"><button type="button" class="kf-cta sec" data-act="acheter">' + esc(T().recharger(f)) + '</button></p>') + '<div class="kf-note" role="status" id="kf-achat-msg" style="display:none"></div>';
     return d;
   }
   function carteMessage(titre, texte) {
@@ -252,6 +254,54 @@
     }).then(function () { S.occupe = false; var e = S.etat && S.etat.etat !== 'recharge'; $('.kf-send').disabled = !e; if (e) ta.focus(); });
   }
 
+  /* Message d'achat : dans la carte de recharge si elle est affichée, sinon en bulle dans la conversation. */
+  function messageAchat(texte) {
+    var z = S.root.querySelector('#kf-achat-msg');
+    if (z) { z.style.display = ''; z.textContent = texte; return; }
+    ajouterMessage({ role: 'assistant', contenu: texte }, false);
+  }
+  function chargerConsentement() {
+    if (window.FormationConsent) return Promise.resolve();
+    return new Promise(function (ok) {
+      var sc = document.createElement('script'); sc.src = '/assets/formation-achat-consent.js?v=2'; sc.onload = ok; sc.onerror = ok; document.head.appendChild(sc);
+    });
+  }
+  /* Le consentement « achat non remboursable » est demandé À L'ÉCRAN, mais c'est le serveur qui l'exige (409 sans lui). */
+  function acheterForfait() {
+    if (S.occupe || !S.etat || !S.etat.forfait) return;
+    var f = S.etat.forfait; S.occupe = true;
+    chargerConsentement().then(function () {
+      if (!window.FormationConsent) return false;
+      return window.FormationConsent.demander({ titre: 'Koffi — ' + f.questions + ' questions', prix: f.prix_eur, texte: f.texte, retractation: f.retractation });
+    }).then(function (accepte) {
+      if (!accepte) { S.occupe = false; return; }
+      messageAchat(T().paiementOuvre);
+      return api('POST', '/api/kofi/forfait/acheter', { formation_id: S.opts.formationId, accepte_non_remboursable: true }).then(function (r) {
+        if (r.ok && r.data.checkout_url) { location.href = r.data.checkout_url; return; }
+        S.occupe = false; messageAchat((r.data && r.data.error) || T().erreur);
+      });
+    }).catch(function () { S.occupe = false; messageAchat(T().erreur); });
+  }
+  /* Retour de Stripe (?kofi=succes) : le crédit arrive par le webhook, quelques secondes plus tard — on interroge jusqu'à voir les questions. */
+  function retourPaiement() {
+    var p = new URLSearchParams(location.search), k = p.get('kofi'); if (!k) return;
+    try { p.delete('kofi'); var q = p.toString(); history.replaceState(null, '', location.pathname + (q ? '?' + q : '') + location.hash); } catch (e) { /* sans importance */ }
+    S.root.classList.add('open'); traduireUI();
+    var corps = $('.kf-body'); corps.innerHTML = '';
+    if (k === 'annule') { chargerEtat().then(chargerConversation).then(function () { construireCorps(); messageAchat(T().paiementAnnule); }); return; }
+    corps.appendChild(carteMessage('Koffi', T().paiementRecu)); $('.kf-foot').style.display = 'none';
+    /* On interroge l'état du DERNIER ACHAT (et non le solde) : le webhook peut avoir crédité avant ou après le retour sur cette page. */
+    var essais = 0;
+    (function boucle() {
+      chargerEtat().then(function () {
+        var st = S.etat && S.etat.achat && S.etat.achat.statut;
+        if (st === 'payee' || st === 'expiree' || ++essais >= 12) {
+          chargerConversation().then(function () { construireCorps(); messageAchat(st === 'payee' ? T().paiementOk : T().paiementAttente); });
+        } else setTimeout(boucle, 2500);
+      });
+    })();
+  }
+
   function construire() {
     var st = document.createElement('style'); st.textContent = CSS; document.head.appendChild(st);
     var root = document.createElement('div'); root.className = 'kf-root'; root.setAttribute('data-koffi', '1');
@@ -262,7 +312,7 @@
           '<button type="button" class="kf-ic" data-lg="fr" title="Français">FR</button><button type="button" class="kf-ic" data-lg="en" title="English">EN</button>' +
           '<button type="button" class="kf-ic" data-act="nouvelle">＋</button><button type="button" class="kf-ic" data-act="supprimer">🗑</button><button type="button" class="kf-ic" data-act="fermer">✕</button></div>' +
         '<div class="kf-body" aria-live="polite"></div>' +
-        '<div class="kf-foot"><div class="kf-meta"><span class="kf-count"></span><span class="kf-ret"></span></div>' +
+        '<div class="kf-foot"><div class="kf-meta"><span><span class="kf-count"></span> <button type="button" class="kf-link kf-recharge-lien" data-act="acheter" style="display:none"></button></span><span class="kf-ret"></span></div>' +
           '<form class="kf-form"><textarea rows="1" maxlength="1500" aria-label="Question"></textarea><button type="submit" class="kf-send"></button></form></div>' +
       '</section>';
     document.body.appendChild(root); S.root = root;
@@ -273,6 +323,7 @@
       if (act === 'ouvrir') return ouvrirPanneau();
       if (act === 'fermer') return fermerPanneau();
       if (act === 'compris') { lsSet('koffi_info_vue_v1', '1'); return construireCorps(); }
+      if (act === 'acheter') return acheterForfait();
       if (act === 'nouvelle') { S.conv = null; S.msgs = []; if (S.etat && S.etat.etat !== 'recharge') { construireCorps(); } return; }
       if (act === 'supprimer') {
         if (!S.conv) return; if (!window.confirm(T().confirmSuppr)) return;
@@ -309,7 +360,7 @@
       S.lg = lsGet('koffi_langue') === 'en' ? 'en' : 'fr';
       return chargerEtat().then(function (r) {
         if (!r.ok) return;
-        construire(); traduireUI();
+        construire(); traduireUI(); retourPaiement();
       });
     }
   };

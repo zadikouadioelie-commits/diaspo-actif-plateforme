@@ -3285,7 +3285,7 @@ const FormationQuestions = require("./formation-questions");
 FormationQuestions.register({ route, db, sendJSON, getCurrentUser, SEC, creerNotif, nomCompteAffichage, contactBloque });
 /* Koffi, tuteur IA des formations (2026-10-30) — server/kofi.js. getPremiumStatut est une déclaration de fonction (hissée). */
 const Kofi = require("./kofi");
-Kofi.register({ route, db, sendJSON, getCurrentUser, SEC, getPremiumStatut });
+Kofi.register({ route, db, sendJSON, getCurrentUser, SEC, getPremiumStatut, getOrigin, creerNotif });
 /* Envoyer un événement par e-mail (carte complète) + texte d'aperçu du lien (date, lieu) : server/partage-evenement.js. urlImagePartageEvenement est une déclaration de fonction (hissée). */
 const PartageEvenement = require("./partage-evenement");
 PartageEvenement.register({ route, db, sendJSON, getCurrentUser, SEC, nomCompteAffichage, getOrigin, urlImagePartageEvenement });
@@ -20411,6 +20411,13 @@ async function handleStripeWebhook(req, res) {
       for (const ligne of lignes) await finaliserCommandeVitrinePayee(Number(ligne.id));
     } else if (event.type === "checkout.session.expired" && event.data.object.metadata?.diaspoactif_panier_checkout === "1") {
       await db.prepare(`UPDATE commandes_vitrine SET paiement_statut=? WHERE stripe_session_id=? AND paiement_statut='en_attente'`).run(require("./payments").STATUT_PAIEMENT.EXPIRE, event.data.object.id);
+    } else if (event.type === "checkout.session.completed" && event.data.object.metadata?.diaspoactif_kofi_commande_id) {
+      /* Forfait de questions Koffi : crédité UNIQUEMENT ici, sur la confirmation signée de Stripe. Idempotent (Kofi.confirmerCommande ne traite qu'une commande « en_attente »). */
+      const session = event.data.object;
+      const conf = await Kofi.confirmerCommande(db, Number(session.metadata.diaspoactif_kofi_commande_id), (session.amount_total || 0) / 100);
+      if (conf) creerNotif(conf.commande.user_id, "formation", "Koffi : questions créditées ✅", `Votre forfait de ${conf.questions} questions est crédité (valable 12 mois, dans toutes vos formations).`, { formation_id: conf.commande.formation_id });
+    } else if (event.type === "checkout.session.expired" && event.data.object.metadata?.diaspoactif_kofi_commande_id) {
+      await Kofi.annulerCommande(db, Number(event.data.object.metadata.diaspoactif_kofi_commande_id), "expiree");
     } else if (event.type === "checkout.session.completed" && event.data.object.metadata?.diaspoactif_formation_commande_id) {
       /* Formation Diaspora, lot A : commande de formation complète OU de module. Idempotent (confirmerCommande ne traite qu'une commande « en_attente »). */
       const session = event.data.object;
