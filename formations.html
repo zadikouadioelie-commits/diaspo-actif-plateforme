@@ -1001,6 +1001,17 @@
       <label>Nombre de pages (PDF, facultatif) <span class="fb-help" title="Affiché à l'apprenant dans le lecteur PDF, ex: « Document PDF — 12 pages ».">?</span></label>
       <input type="number" id="fb-lecon-nb-pages" min="1">
     </div>
+    <div class="fb-field" id="fb-lecon-doc-field" style="display:none;">
+      <label style="display:flex;align-items:center;gap:8px;font-weight:600;">
+        <input type="checkbox" id="fb-lecon-integre" checked style="width:auto;">
+        Afficher directement dans le cours (PDF, Excel .xlsx)
+        <span class="fb-help" title="Le document est lisible dans la page dès l'ouverture de la leçon, sans clic sur une pièce jointe : défilement, zoom, plein écran, recherche (PDF) ou feuilles (Excel). Vous pouvez aussi cocher « Autoriser le téléchargement » : les deux fonctionnent ensemble.">?</span>
+      </label>
+      <div id="fb-lecon-hauteur-wrap" style="margin-top:6px;">
+        <label style="font-size:12.5px;">Hauteur d'affichage (px) <span class="fb-help" title="Entre 200 et 1600. Par défaut 640. La position du document dans le chapitre est celle de la leçon : déplacez la leçon pour le placer avant ou après un autre contenu.">?</span></label>
+        <input type="number" id="fb-lecon-hauteur" min="200" max="1600" step="20" placeholder="640" style="width:120px;">
+      </div>
+    </div>
     <div class="fb-field" id="fb-lecon-telechargement-field" style="display:none;">
       <label style="display:flex;align-items:center;gap:8px;font-weight:600;">
         <input type="checkbox" id="fb-lecon-telechargement" checked style="width:auto;">
@@ -2377,7 +2388,7 @@
   const FB_LECON_TYPES = [
     ['video','🎬 Vidéo'],['texte','📄 Texte'],['pdf','📑 PDF'],['quiz','📝 Quiz'],
     ['audio','🎧 Audio'],['presentation','📊 Présentation'],['images','🖼️ Images'],
-    ['telechargement','⬇️ Téléchargement'],['exercice','✏️ Exercice'],['etude_cas','🔎 Étude de cas'],
+    ['telechargement','📎 Document (PDF, Excel…)'],['exercice','✏️ Exercice'],['etude_cas','🔎 Étude de cas'],
     ['travail_pratique','🛠️ Travail pratique'],['classe_virtuelle','🖥️ Classe virtuelle'],['session_direct','🔴 Session en direct']
   ];
 
@@ -2570,11 +2581,14 @@
   const FB_TYPES_AVEC_FICHIER = ['video','pdf','audio','presentation','images','telechargement'];
   let fbLeconModalCtx = { chapitreId: null, leconId: null, lecon: null };
 
+  document.getElementById('fb-lecon-integre').addEventListener('change', fbUpdateLeconModalFields);
   function fbUpdateLeconModalFields(){
     const type = document.getElementById('fb-lecon-type').value;
     document.getElementById('fb-lecon-texte-field').style.display = (type==='texte' || ['exercice','etude_cas','travail_pratique'].includes(type)) ? '' : 'none';
     document.getElementById('fb-lecon-fichier-field').style.display = FB_TYPES_AVEC_FICHIER.includes(type) ? '' : 'none';
     document.getElementById('fb-lecon-pages-field').style.display = type==='pdf' ? '' : 'none';
+    document.getElementById('fb-lecon-doc-field').style.display = (type==='pdf' || type==='telechargement') ? '' : 'none';
+    document.getElementById('fb-lecon-hauteur-wrap').style.display = document.getElementById('fb-lecon-integre').checked ? '' : 'none';
     document.getElementById('fb-lecon-telechargement-field').style.display = FB_TYPES_AVEC_FICHIER.includes(type) ? '' : 'none';
     document.getElementById('fb-lecon-apercu-field').style.display = type === 'quiz' ? 'none' : '';
   }
@@ -2594,6 +2608,7 @@
     document.getElementById('fb-lecon-upload-status').textContent = '';
     document.getElementById('fb-lecon-nb-pages').value = '';
     document.getElementById('fb-lecon-telechargement').checked = true;
+    document.getElementById('fb-lecon-integre').checked = true; document.getElementById('fb-lecon-hauteur').value = '';
     document.getElementById('fb-lecon-obligatoire').checked = true;
     document.getElementById('fb-lecon-apercu').checked = false;
     typeSel.value = 'texte';
@@ -2608,6 +2623,8 @@
       document.getElementById('fb-lecon-contenu-url').value = l.contenu_url || '';
       document.getElementById('fb-lecon-nb-pages').value = l.nb_pages || '';
       document.getElementById('fb-lecon-telechargement').checked = l.telechargement_autorise !== 0 && l.telechargement_autorise !== false;
+      document.getElementById('fb-lecon-integre').checked = l.doc_integre != null ? Number(l.doc_integre) === 1 : (l.type || 'texte') === 'pdf';
+      document.getElementById('fb-lecon-hauteur').value = l.doc_hauteur || '';
       document.getElementById('fb-lecon-obligatoire').checked = l.obligatoire !== 0 && l.obligatoire !== false;
       document.getElementById('fb-lecon-apercu').checked = Number(l.apercu_gratuit) === 1;
       typeSel.value = l.type || 'texte';
@@ -2678,6 +2695,7 @@
       contenu_url: document.getElementById('fb-lecon-contenu-url').value || null,
       nb_pages: document.getElementById('fb-lecon-nb-pages').value ? parseInt(document.getElementById('fb-lecon-nb-pages').value) : null,
       telechargement_autorise: document.getElementById('fb-lecon-telechargement').checked,
+      ...((type === 'pdf' || type === 'telechargement') ? { doc_integre: document.getElementById('fb-lecon-integre').checked, doc_hauteur: document.getElementById('fb-lecon-hauteur').value ? parseInt(document.getElementById('fb-lecon-hauteur').value) : null } : {}),
       obligatoire: document.getElementById('fb-lecon-obligatoire').checked,
       apercu_gratuit: type !== 'quiz' && document.getElementById('fb-lecon-apercu').checked,
     };

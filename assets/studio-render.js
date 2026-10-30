@@ -88,8 +88,16 @@
       case 'document': {
         if (!p.url) return placeholder('📄', 'Document à ajouter');
         const fam = typeFichier(p.url), F = FAMILLES[fam];
+        const integre = p.integre !== undefined ? !!p.integre : p.mode !== 'telechargement';
+        const telech = p.telechargeable !== undefined ? !!p.telechargeable : p.mode === 'telechargement';
+        /* En lecture, le téléchargement passe par le serveur (autorisation du formateur) ; dans l'éditeur ou l'aperçu simple, l'adresse directe. */
+        const lienDl = ctx.docBase ? `${ctx.docBase}/telecharger?element=${encodeURIComponent(e.id)}${ctx.brouillon ? '&brouillon=1' : ''}` : p.url;
+        if (integre && (fam === 'pdf' || fam === 'excel')) {
+          if (ctx.docBase && !ctx.edit) return `<div class="st-docview" data-element="${esc(e.id)}" data-nom="${esc(p.nom)}" data-hauteur="${Number(p.hauteur) || 640}"></div>`;
+          return `<div class="st-docpre"><span>${F[0]}</span><div><strong>${esc(p.nom) || F[1]}</strong><small>${F[1]} · affiché dans la page${telech ? ' · téléchargeable' : ''} · hauteur ${Number(p.hauteur) || 640} px</small></div></div>`;
+        }
         const carte = `<div class="st-file"><span class="st-file-i">${F[0]}</span><div class="st-file-t"><strong>${esc(p.nom) || F[1]}</strong><small>${F[1]} · à télécharger</small></div>${ctx.edit ? '<span class="st-file-b">Télécharger</span>' : `<a class="st-file-b" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer" download>Télécharger</a>`}</div>`;
-        if (p.mode !== 'lecteur') return carte;
+        if (!integre) return carte;
         if (fam === 'image') return `<figure class="st-fig"><img src="${esc(p.url)}" alt="${esc(p.nom)}" draggable="false" style="object-fit:contain">${p.nom ? `<figcaption>${esc(p.nom)}</figcaption>` : ''}</figure>`;
         if (fam !== 'pdf') return carte;
         return `<div class="st-doc${ctx.edit ? ' st-inerte' : ''}"><iframe src="${esc(p.url)}#toolbar=1&view=FitH" title="${esc(p.nom) || 'Document PDF'}" loading="lazy"></iframe>${ctx.edit ? '' : `<a class="st-doc-dl" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer" download>⬇ Télécharger le document</a>`}</div>`;
@@ -163,6 +171,15 @@
       const ok = requis.every(id => valides.has(id)) && videosOk();
       if (opts.onProgress) opts.onProgress({ vue: vues.size, total: pages.length, validations: valides.size, validations_total: requis.length, videos_requises: videosReq.length, videos_ok: videosReq.filter(id => etats[id] && (opts.videoSauver ? etats[id].srv : etats[id].pct) >= seuil).length, termine: fin && vues.size === pages.length && ok });
     }
+    /* Documents PDF / Excel intégrés : visionneuse chargée à la demande (assets/doc-viewer.js). */
+    const docs = [];
+    function monterDocuments(racine) {
+      docs.splice(0).forEach(d => { try { d.detruire && d.detruire(); } catch (_) { /* sans importance */ } });
+      if (!opts.docBase || !window.DocViewer) return;
+      racine.querySelectorAll('.st-docview').forEach(n => {
+        Promise.resolve(window.DocViewer.monter(n, { base: opts.docBase, element: n.dataset.element, nom: n.dataset.nom || undefined, hauteur: Number(n.dataset.hauteur) || undefined, brouillon: !!opts.brouillon })).then(inst => { if (inst) docs.push(inst); });
+      });
+    }
     /* Suivi d'une vidéo : seuls les morceaux lus en continu comptent (un saut dans la vidéo ne coche rien) ; envoi régulier, à la pause et à la fin. */
     function badge(v, id) {
       if (!videosReq.includes(id)) return null;
@@ -212,7 +229,8 @@
     }
     function afficher(n) {
       i = Math.max(0, Math.min(pages.length - 1, n)); vues.add(i);
-      ech.innerHTML = pageHtml(pages[i], mode, { lecture: true, apercu: !!opts.apercu });
+      ech.innerHTML = pageHtml(pages[i], mode, { lecture: true, apercu: !!opts.apercu, docBase: opts.docBase, brouillon: !!opts.brouillon });
+      monterDocuments(ech);
       ech.querySelectorAll('input[data-valid]').forEach(c => { c.checked = valides.has(c.dataset.valid); });
       suivreVideos(ech);
       pos.textContent = pages.length > 1 ? `Page ${i + 1} / ${pages.length}` : '';
@@ -234,7 +252,7 @@
     const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(echelle) : null;
     if (ro) ro.observe(vue);
     afficher(0);
-    return { destroy() { if (ro) ro.disconnect(); }, goTo: afficher };
+    return { destroy() { if (ro) ro.disconnect(); docs.splice(0).forEach(d => { try { d.detruire && d.detruire(); } catch (_) { /* sans importance */ } }); }, goTo: afficher };
   }
 
   window.StudioRender = { PAGE_W, PAGE_H, FLUX_W, TEXTE, esc, ytId, typeFichier, FAMILLES, inner, elHtml, pageHtml, hauteurPage, lecture };

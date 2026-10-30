@@ -3274,6 +3274,9 @@ FormationFinances.register({ route, db, sendJSON, getCurrentUser, SEC, exigerPre
 const FormationRelances = require("./formation-relances");
 const { signAuthToken: signerJetonRelance, verifyAuthToken: verifierJetonRelance } = require("./auth");
 FormationRelances.register({ route, db, sendJSON, getCurrentUser, SEC, exigerPremium, creerNotif, getOrigin, signAuthToken: signerJetonRelance, verifyAuthToken: verifierJetonRelance });
+/* Documents PDF et Excel affichés DANS la page du cours (visionneuse, accès contrôlé, lecture par fenêtres) — server/formation-documents.js. checkFormationOwner est une déclaration de fonction (hissée). */
+const FormationDocuments = require("./formation-documents");
+FormationDocuments.register({ route, db, sendJSON, getCurrentUser, SEC, checkFormationOwner });
 /* Formation Diaspora, lot D : studio de création par glisser-déposer (documents, versions, publication) — server/formation-studio.js. */
 const FormationStudio = require("./formation-studio");
 FormationStudio.register({ route, db, sendJSON, getCurrentUser, SEC, checkFormationOwner, exigerPremium });
@@ -17784,6 +17787,9 @@ route("GET", "/api/formations/:id/modules", async (req, res, params) => {
   }
   sendJSON(res, 200, { modules });
 });
+/* Documents PDF / Excel : affichage dans la page (0/1, NULL = par défaut selon le type) et hauteur d'affichage (200–1600 px). */
+const docIntegre = v => (v === undefined || v === null ? null : (v ? 1 : 0));
+const docHauteur = v => { const n = Math.round(Number(v)); return Number.isFinite(n) && n > 0 ? Math.min(1600, Math.max(200, n)) : null; };
 function checkFormationOwner(f, user) { return f && (f.owner_user_id === user.id || user.role === 'administrateur'); }
 
 /* Suppression d'un quiz avec tout ce qui en dépend (clés étrangères Postgres : tentatives, sessions chronométrées et questions d'abord). */
@@ -18014,11 +18020,12 @@ route("POST", "/api/formations/:id/chapitres/:chapitreId/lecons", async (req, re
   const chapitre = await db.prepare("SELECT c.module_id FROM formation_chapitres c JOIN formation_modules m ON m.id=c.module_id WHERE c.id=? AND m.formation_id=?").get(params.chapitreId, params.id);
   if (!chapitre) return sendJSON(res, 404, { error: "Chapitre introuvable." });
   const { max } = await db.prepare("SELECT COALESCE(MAX(ordre),-1) AS max FROM formation_lecons WHERE chapitre_id=?").get(params.chapitreId);
-  const id = (await db.prepare(`INSERT INTO formation_lecons (module_id,chapitre_id,titre,description,type,duree_minutes,contenu_url,contenu_texte,ressources_json,image_url,ordre,telechargement_autorise,nb_pages,obligatoire,apercu_gratuit)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+  const id = (await db.prepare(`INSERT INTO formation_lecons (module_id,chapitre_id,titre,description,type,duree_minutes,contenu_url,contenu_texte,ressources_json,image_url,ordre,telechargement_autorise,nb_pages,obligatoire,apercu_gratuit,doc_integre,doc_hauteur)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
     chapitre.module_id, params.chapitreId, body.titre, body.description||null, body.type||'texte', body.duree_minutes||null,
     body.contenu_url||null, body.contenu_texte ? SEC.sanitizeRichHtml(body.contenu_texte) : null, body.ressources_json ? JSON.stringify(body.ressources_json) : null,
-    body.image_url||null, max+1, body.telechargement_autorise === false ? 0 : 1, body.nb_pages||null, body.obligatoire === false ? 0 : 1, body.apercu_gratuit ? 1 : 0
+    body.image_url||null, max+1, body.telechargement_autorise === false ? 0 : 1, body.nb_pages||null, body.obligatoire === false ? 0 : 1, body.apercu_gratuit ? 1 : 0,
+    docIntegre(body.doc_integre), docHauteur(body.doc_hauteur)
   )).lastInsertRowid;
   sendJSON(res, 201, { id });
 });
@@ -18038,12 +18045,12 @@ route("PUT", "/api/formations/:id/lecons/:leconId", async (req, res, params, bod
     duree_minutes=COALESCE(?,duree_minutes), contenu_url=COALESCE(?,contenu_url),
     contenu_texte=COALESCE(?,contenu_texte), ressources_json=COALESCE(?,ressources_json), image_url=COALESCE(?,image_url),
     telechargement_autorise=COALESCE(?,telechargement_autorise), nb_pages=COALESCE(?,nb_pages), obligatoire=COALESCE(?,obligatoire),
-    apercu_gratuit=COALESCE(?,apercu_gratuit)
+    apercu_gratuit=COALESCE(?,apercu_gratuit), doc_integre=COALESCE(?,doc_integre), doc_hauteur=COALESCE(?,doc_hauteur)
     WHERE id=?`).run(n(body.titre),n(body.description),n(body.type),n(body.duree_minutes),n(body.contenu_url),
     (body.contenu_texte === undefined ? null : SEC.sanitizeRichHtml(body.contenu_texte)), body.ressources_json?JSON.stringify(body.ressources_json):null, n(body.image_url),
     body.telechargement_autorise === undefined ? null : (body.telechargement_autorise ? 1 : 0), n(body.nb_pages),
     body.obligatoire === undefined ? null : (body.obligatoire ? 1 : 0),
-    typeFinal === 'quiz' ? 0 : (body.apercu_gratuit === undefined ? null : (body.apercu_gratuit ? 1 : 0)), params.leconId);
+    typeFinal === 'quiz' ? 0 : (body.apercu_gratuit === undefined ? null : (body.apercu_gratuit ? 1 : 0)), docIntegre(body.doc_integre), docHauteur(body.doc_hauteur), params.leconId);
   sendJSON(res, 200, { ok: true });
 });
 route("DELETE", "/api/formations/:id/lecons/:leconId", async (req, res, params) => {

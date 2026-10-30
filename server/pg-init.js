@@ -1017,6 +1017,9 @@ const COLONNES_MIGRATION = [
     ['formation_inscriptions', 'relances_off', 'INTEGER DEFAULT 0'],
     ['formation_inscriptions', 'relance_derniere_le', 'TEXT'],
     ['formations', 'relances_defaut', 'INTEGER DEFAULT 1'],
+    // Documents PDF / Excel affichés dans la page du cours (2026-10-30)
+    ['formation_lecons', 'doc_integre', 'INTEGER'],
+    ['formation_lecons', 'doc_hauteur', 'INTEGER'],
     ['formation_modules', 'prix', 'REAL'],
     ['formation_modules', 'vendable_seul', 'INTEGER DEFAULT 0'],
     ['formations', 'duree_acces_jours', 'INTEGER'],

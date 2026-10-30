@@ -5137,6 +5137,8 @@ db.exec(`
   CREATE UNIQUE INDEX IF NOT EXISTS ux_kofi_credits_gratuit ON kofi_credits(user_id) WHERE origine='gratuit';
 `);
 
+/* Documents PDF / Excel affichés dans la page du cours (2026-10-30) : doc_integre = NULL → par défaut selon le type (PDF : affiché ; autre : pièce jointe) ; doc_hauteur = hauteur d'affichage en px. */
+;['doc_integre INTEGER','doc_hauteur INTEGER'].forEach(col => { try { db.exec(`ALTER TABLE formation_lecons ADD COLUMN ${col}`); } catch(_) {} });
 /* Studio — suivi de visionnage des vidéos (2026-10-30) : les morceaux de 5 s réellement regardés (chaîne de 0 et de 1), par apprenant, leçon et élément vidéo. */
 db.exec(`
   CREATE TABLE IF NOT EXISTS formation_studio_video (

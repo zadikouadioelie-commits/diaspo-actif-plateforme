@@ -31,7 +31,7 @@
       { t: 'video', n: 'Vidéo', i: '🎬', w: 640, h: 360, props: { url: '', titre: '' } },
       { t: 'audio', n: 'Audio', i: '🎧', w: 480, h: 96, props: { url: '', titre: '' } } ] },
     { cat: 'Documents', items: [
-      { t: 'document', n: 'Document (PDF, Excel, Word…)', i: '📄', w: 760, h: 520, props: { nom: '', url: '', mode: 'lecteur' } },
+      { t: 'document', n: 'Document (PDF, Excel, Word…)', i: '📄', w: 760, h: 520, props: { nom: '', url: '', mode: 'lecteur', integre: true, telechargeable: false, hauteur: 640 } },
       { t: 'fichier', n: 'Fichier à télécharger', i: '📎', w: 440, h: 72, props: { nom: '', url: '', description: '' } } ] },
     { cat: 'Évaluations', items: [
       { t: 'quiz', n: 'Quiz · questionnaire · exercice', i: '📝', w: 760, h: 150, props: { quiz_id: 0, libelle: '' } } ] },
@@ -590,13 +590,22 @@
         ${champ('Nom affiché', 'nom', p.nom)}${champ('Description', 'description', p.description)}${champ('ou adresse (https) du fichier', 'url', p.url, 'url')}`;
     } else if (t === 'document') {
       const fam = R.typeFichier(p.url);
-      const conseil = !p.url || p.mode !== 'lecteur' ? '' : fam === 'pdf' || fam === 'image' ? '' : fam === 'ppt' || fam === 'word'
-        ? '<p class="st-aide" style="color:#fca5a5">Un PowerPoint ou un Word ne peut pas être lu dans la page : exportez-le en PDF (Fichier › Exporter › PDF) puis importez le PDF, ou choisissez « Carte à télécharger ».</p>'
-        : '<p class="st-aide" style="color:#fca5a5">Un tableur Excel se télécharge (il ne s\'affiche pas dans la page). Pour montrer quelques chiffres directement, utilisez l\'outil « Tableau ».</p>';
+      /* Documents créés avant l'option « intégré / téléchargeable » : on reprend l'ancien « mode » une fois, pour que les deux cases reflètent la réalité. */
+      if (p.integre === undefined) p.integre = p.mode !== 'telechargement';
+      if (p.telechargeable === undefined) p.telechargeable = p.mode === 'telechargement';
+      if (!p.hauteur) p.hauteur = 640;
+      const affichable = fam === 'pdf' || fam === 'excel' || fam === 'image';
+      const conseil = !p.url || !p.integre || affichable ? ''
+        : fam === 'ppt' || fam === 'word' ? '<p class="st-aide" style="color:#fca5a5">Un PowerPoint ou un Word ne peut pas être lu dans la page : exportez-le en PDF (Fichier › Exporter › PDF) puis importez le PDF, ou choisissez « Document téléchargeable » seulement.</p>'
+        : '<p class="st-aide" style="color:#fca5a5">Ce type de fichier ne peut pas s’afficher dans la page : il sera proposé en téléchargement.</p>';
       h += `<div class="st-btns"><button class="st-b or" data-up="document">${p.url ? 'Remplacer le fichier' : 'Importer un fichier'}</button><button class="st-b" data-lib="document,image">📚 Ma bibliothèque</button></div>
-        <p class="st-aide">PDF, Word, Excel, PowerPoint ou image (JPEG, PNG, WebP, GIF) — 4 Mo maximum par fichier.</p>
+        <p class="st-aide">PDF, Excel (.xlsx), Word, PowerPoint ou image (JPEG, PNG, WebP, GIF) — 4 Mo maximum par fichier.</p>
         ${p.url ? `<p class="st-aide">${R.FAMILLES[fam][0]} ${esc(R.FAMILLES[fam][1])}</p>` : ''}
-        ${select('Présentation', 'mode', p.mode, [['lecteur', 'Afficher dans la page (PDF et images)'], ['telechargement', 'Carte à télécharger']])}
+        <label class="st-f" style="display:flex;gap:8px;align-items:center"><input type="checkbox" data-p="integre" data-k="bool" ${p.integre ? 'checked' : ''}> <span style="margin:0">Afficher directement dans le cours (PDF, Excel, image)</span></label>
+        <label class="st-f" style="display:flex;gap:8px;align-items:center"><input type="checkbox" data-p="telechargeable" data-k="bool" ${p.telechargeable ? 'checked' : ''}> <span style="margin:0">Document téléchargeable</span></label>
+        ${!p.integre && !p.telechargeable ? '<p class="st-aide" style="color:#fca5a5">Choisissez au moins un des deux : sinon le document sera proposé en téléchargement.</p>' : ''}
+        ${p.integre && (fam === 'pdf' || fam === 'excel') ? champ('Hauteur d’affichage (px)', 'hauteur', p.hauteur, 'number', 'min="200" max="1600" step="20"') : ''}
+        ${p.integre && fam === 'excel' ? '<p class="st-aide">Excel : lecture seule, par feuilles ; les graphiques, images et mises en forme conditionnelles ne sont pas affichés, les macros ne sont jamais exécutées. Seuls les fichiers .xlsx sont lus dans la page.</p>' : ''}
         ${champ('Nom affiché', 'nom', p.nom)}${champ('ou adresse (https) du fichier', 'url', p.url, 'url')}${conseil}`;
     } else if (t === 'quiz') {
       if (!p.quiz_id) h += `<p class="st-aide">Choisissez le type d'activité à créer. Elle sera corrigée par le serveur ; réussir l'activité valide la leçon.</p><div class="st-btns" style="flex-direction:column">
@@ -639,7 +648,7 @@
       remplacerNoeud(e);
     }
     if (!fin) { modifie(); return; }
-    validerProp(f.dataset.p === 'action' || f.dataset.p === 'obligatoire');
+    validerProp(['action', 'obligatoire', 'integre', 'telechargeable', 'url'].includes(f.dataset.p));
   }
   function validerProp(rerendre) {
     if (S.propSnap != null && S.propSnap !== snap()) { pousserUndo(S.propSnap); modifie(); }

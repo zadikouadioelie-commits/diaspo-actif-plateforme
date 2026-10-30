@@ -92,7 +92,14 @@ function nettoyerElement(e, SEC, pagesIds) {
   } else if (e.type === "fichier") {
     o.nom = txt(p.nom, 150); o.url = urlHttps(p.url); o.description = txt(p.description, 200);
   } else if (e.type === "document") {
-    o.nom = txt(p.nom, 150); o.url = urlHttps(p.url); o.mode = choix(p.mode, ["lecteur", "telechargement"], "lecteur");
+    o.nom = txt(p.nom, 150); o.url = urlHttps(p.url);
+    /* Affichage : « intégré » (visionneuse dans la page) et/ou « téléchargeable » (pièce jointe), les deux à la fois si besoin ; anciens documents : repli sur « mode ». */
+    const ancienMode = choix(p.mode, ["lecteur", "telechargement"], "lecteur");
+    o.integre = p.integre !== undefined ? !!p.integre : ancienMode === "lecteur";
+    o.telechargeable = p.telechargeable !== undefined ? !!p.telechargeable : ancienMode === "telechargement";
+    if (!o.integre && !o.telechargeable) o.telechargeable = true; /* un document doit rester accessible d'une façon ou d'une autre */
+    o.hauteur = Math.round(nbr(p.hauteur, 200, 1600, 640));
+    o.mode = o.integre ? "lecteur" : "telechargement"; /* compatibilité avec l'ancien champ */
   } else if (e.type === "quiz") {
     o.quiz_id = Math.max(0, Math.floor(Number(p.quiz_id)) || 0); /* vérifié contre la leçon au moment de l'enregistrement (PUT) */
     o.libelle = txt(p.libelle, 120); /* texte de la carte dans l'éditeur (titre + nombre de questions), purement informatif */

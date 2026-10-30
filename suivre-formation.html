@@ -18,7 +18,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="stylesheet" href="assets/styles.v2.css">
 <link rel="stylesheet" href="/assets/responsive.v2.css?v=2">
-<link rel="stylesheet" href="/assets/studio.css?v=2">
+<link rel="stylesheet" href="/assets/studio.css?v=3">
+<link rel="stylesheet" href="/assets/doc-viewer.css?v=2">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#ff6b00">
 <style>
@@ -162,7 +163,8 @@
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js?v=13"></script>
 <script src="assets/formation-achat-consent.js?v=1"></script>
-<script src="assets/studio-render.js?v=2"></script>
+<script src="assets/doc-viewer.js?v=1"></script>
+<script src="assets/studio-render.js?v=3"></script>
 <script src="assets/koffi-widget.js?v=3" defer></script>
 <script>
 function escH(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -380,18 +382,9 @@ function sfContentHtml(l){
       return `<div class="sf-content-video"><video controls controlsList="${!l.telechargement_autorise ? 'nodownload' : ''}" src="${escH(l.contenu_url||'')}"></video></div>`;
     case 'audio':
       return `<audio controls controlsList="${!l.telechargement_autorise ? 'nodownload' : ''}" style="width:100%;" src="${escH(l.contenu_url||'')}"></audio>`;
-    case 'pdf': {
-      if (!l.contenu_url) return '<div class="notice">Aucun fichier PDF.</div>';
-      const src = `${escH(l.contenu_url)}#toolbar=1&view=FitH`;
-      return `<div class="sf-content-pdf">
-        <div class="sf-pdf-toolbar">
-          <span>📑 Document PDF${l.nb_pages ? ` — ${l.nb_pages} page${l.nb_pages>1?'s':''}` : ''}</span>
-          <button class="sf-fullscreen-btn" onclick="document.getElementById('sf-pdf-frame').requestFullscreen && document.getElementById('sf-pdf-frame').requestFullscreen()">⛶ Plein écran</button>
-          ${!l.telechargement_autorise ? '' : `<a href="${escH(l.contenu_url)}" target="_blank" rel="noopener">⬇️ Télécharger</a>`}
-        </div>
-        <iframe id="sf-pdf-frame" src="${src}"></iframe>
-      </div>`;
-    }
+    case 'pdf':
+      if (!l.contenu_url && !l.a_document) return '<div class="notice">Aucun fichier PDF.</div>';
+      return `<div class="sf-docblock" id="sf-docblock" data-lecon="${l.id}"></div>`;
     case 'presentation':
       if (!l.contenu_url) return '<div class="notice">Aucune présentation PowerPoint.</div>';
       return `<div class="sf-content-ppt">
@@ -404,7 +397,8 @@ function sfContentHtml(l){
     case 'images':
       return `<div class="sf-content-image"><img src="${escH(l.contenu_url||'')}" alt="">${!l.telechargement_autorise ? '' : `<div style="margin-top:8px;"><a href="${escH(l.contenu_url||'')}" target="_blank" rel="noopener">⬇️ Télécharger l'image</a></div>`}</div>`;
     case 'telechargement':
-      return `<div class="notice">📎 ${l.contenu_url ? (!l.telechargement_autorise ? 'Le téléchargement de ce document n\'est pas autorisé par le formateur.' : `<a href="${escH(l.contenu_url)}" target="_blank" rel="noopener">Télécharger le document</a>`) : 'Aucun fichier.'}</div>`;
+      if (!l.contenu_url && !l.a_document) return '<div class="notice">📎 Aucun fichier.</div>';
+      return `<div class="sf-docblock" id="sf-docblock" data-lecon="${l.id}"></div>`;
     case 'quiz':
       return '<div id="sf-quiz-zone"></div>';
     case 'exercice':
@@ -453,6 +447,7 @@ function sfRenderContent(){
   `;
   if (l && l.type === 'quiz' && !l.verrouille) sfQuizLoad(l);
   if (l && Number(l.studio) && !l.verrouille) sfStudioLoad(l, apprenant);
+  if (l && !Number(l.studio) && !l.verrouille && ['pdf', 'telechargement'].includes(l.type) && (l.contenu_url || l.a_document)) sfMonterDocument(l);
   /* Mode automatique : une vidéo ou un audio mené jusqu'au bout valide la leçon. */
   if (apprenant && suiviMode() === 'auto' && l && !l.termine && !l.quiz) {
     const media = el.querySelector('video, audio');
@@ -499,6 +494,12 @@ function sfQuestion(){
   };
 }
 
+/* Document PDF / Excel d'une leçon classique : visionneuse intégrée (assets/doc-viewer.js) ou pièce jointe, selon les réglages du formateur. L'accès passe par le serveur (jamais l'adresse brute du fichier). */
+function sfMonterDocument(l){
+  const zone = document.getElementById('sf-docblock'); if (!zone || !window.DocViewer) return;
+  DocViewer.monter(zone, { base: `/api/formations/${formationId}/lecons/${l.id}/document`, nom: l.titre, hauteur: l.doc_hauteur || undefined, brouillon: SF_DATA && SF_DATA.mode === 'apercu' });
+}
+
 /* Lecture d'un module du Studio : la version publiée (ou le brouillon pour le créateur en mode aperçu). Terminé = toutes les pages vues + zones de validation obligatoires cochées. */
 let SF_STUDIO = null;
 async function sfStudioLoad(l, apprenant){
@@ -509,7 +510,7 @@ async function sfStudioLoad(l, apprenant){
     const d = await r.json().catch(() => ({}));
     if (!r.ok) { zone.innerHTML = `<div class="notice">${escH(r.status === 404 ? "Ce contenu n'est pas encore disponible : le formateur ne l'a pas encore publié." : (d.error || 'Contenu indisponible.'))}</div>`; return; }
     let envoye = false;
-    SF_STUDIO = StudioRender.lecture(zone, d.doc, { videos: d.videos || {}, seuil: d.seuil_visionnage || 90, apercu: SF_DATA.mode === 'apercu',
+    SF_STUDIO = StudioRender.lecture(zone, d.doc, { videos: d.videos || {}, seuil: d.seuil_visionnage || 90, apercu: SF_DATA.mode === 'apercu', docBase: `/api/formations/${formationId}/lecons/${l.id}/document`, brouillon: SF_DATA.mode === 'apercu',
       videoSauver: apprenant && !sansSuivi() ? (elId, corps) => fetch(`/api/formations/${formationId}/lecons/${l.id}/studio/video/${encodeURIComponent(elId)}`, { method: 'PUT', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corps) }).then(r => r.ok ? r.json() : null) : null,
       onProgress: p => {
       if (!p.termine || envoye || !apprenant || l.termine || sansSuivi() || suiviMode() !== 'auto' || l.quiz) return;
