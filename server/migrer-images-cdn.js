@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-/* Migration des images d'événement stockées en base64 vers le CDN (2026-10-30, demande explicite : « occupe-toi des images sur le CDN »).
+/* Migration des images stockées en base64 vers le CDN (2026-10-30, demande explicite : « occupe-toi des images sur le CDN »).
+   Tables traitées : evenements (couverture, image_url, galerie) et insc_fiches_medias (photos copiées depuis la galerie d'un événement avant la migration).
 
    Usage (depuis le dossier du site) :
      node --env-file=.env server/migrer-images-cdn.js --scan                 → compte rendu en LECTURE SEULE : colonnes de toute la base contenant des images base64
@@ -51,6 +52,10 @@ async function retablir(c, fichier) {
     await c.query("UPDATE evenements SET image_couverture=$1, image_url=$2, galerie_photos=$3 WHERE id=$4", [l.image_couverture, l.image_url, l.galerie_photos, l.id]);
     console.log("rétabli : événement", l.id);
   }
+  for (const m of sauv.medias || []) {
+    await c.query("UPDATE insc_fiches_medias SET url=$1 WHERE id=$2", [m.url, m.id]);
+    console.log("rétabli : média de fiche", m.id);
+  }
 }
 
 async function dimensions(valeur, rogner) {
@@ -72,15 +77,17 @@ async function dimensions(valeur, rogner) {
 
     const lignes = (await c.query(
       "SELECT id, titre, owner_user_id, image_couverture, image_url, galerie_photos FROM evenements WHERE image_couverture LIKE 'data:image/%' OR image_url LIKE 'data:image/%' OR galerie_photos LIKE '%data:image/%' ORDER BY id")).rows;
-    console.log(`${lignes.length} événement(s) avec des images en base64.`);
-    if (!lignes.length) return;
+    const medias = (await c.query(
+      "SELECT m.id, m.fiche_id, m.type, m.url, f.owner_user_id FROM insc_fiches_medias m LEFT JOIN insc_fiches f ON f.id=m.fiche_id WHERE m.url LIKE 'data:image/%' ORDER BY m.id")).rows;
+    console.log(`${lignes.length} événement(s) et ${medias.length} média(s) de fiche avec des images en base64.`);
+    if (!lignes.length && !medias.length) return;
 
     const dossier = path.join(__dirname, "..", "..", "sauvegardes-migration-images");
     let sauvegarde = null;
     if (APPLIQUER) {
       fs.mkdirSync(dossier, { recursive: true });
-      const fichier = path.join(dossier, "evenements-" + new Date().toISOString().replace(/[:.]/g, "-") + ".json");
-      sauvegarde = { date: new Date().toISOString(), lignes: lignes.map(l => ({ id: l.id, titre: l.titre, image_couverture: l.image_couverture, image_url: l.image_url, galerie_photos: l.galerie_photos })) };
+      const fichier = path.join(dossier, "images-" + new Date().toISOString().replace(/[:.]/g, "-") + ".json");
+      sauvegarde = { date: new Date().toISOString(), lignes: lignes.map(l => ({ id: l.id, titre: l.titre, image_couverture: l.image_couverture, image_url: l.image_url, galerie_photos: l.galerie_photos })), medias: medias.map(m => ({ id: m.id, fiche_id: m.fiche_id, url: m.url })) };
       fs.writeFileSync(fichier, JSON.stringify(sauvegarde));
       console.log("Sauvegarde écrite :", fichier, `(${ko(fs.statSync(fichier).size)})`);
       console.log("Pour revenir en arrière : node --env-file=.env server/migrer-images-cdn.js --retablir \"" + fichier + "\"");
@@ -113,7 +120,17 @@ async function dimensions(valeur, rogner) {
         [nCouv, nUrl, nGal, l.id, l.image_couverture, l.image_url, l.galerie_photos]);
       if (r.rowCount === 1) { total.ok++; console.log("   ✅ migré"); } else { total.ignorees++; console.log("   ⏭️ modifié entre-temps, laissé tel quel"); }
     }
-    if (APPLIQUER) console.log(`Terminé : ${total.ok} événement(s) migré(s), ${total.ignorees} laissé(s) tel(s) quel(s).`);
+    /* Photos de fiche d'inscription (insc_fiches_medias) : jamais rognées — ce sont des documents, pas des affiches. */
+    const totalM = { ok: 0, ignorees: 0 };
+    for (const m of medias) {
+      console.log(`média #${m.id} (fiche ${m.fiche_id}, ${m.type})`);
+      if (!APPLIQUER) { const d = await dimensions(m.url, false); console.log(`   [simulation] ${d ? d.avant + " · " + d.poids : "illisible"}`); continue; }
+      const url = await imageVersCdn(m.url, m.owner_user_id, { dossier: "insc-medias" });
+      if (url === m.url || (await HEAD(url)) !== 200) { totalM.ignorees++; console.log("   ⏭️ non migré (conservé)"); continue; }
+      const r = await c.query("UPDATE insc_fiches_medias SET url=$1 WHERE id=$2 AND url=$3", [url, m.id, m.url]);
+      if (r.rowCount === 1) { totalM.ok++; console.log("   ✅ migré"); } else { totalM.ignorees++; console.log("   ⏭️ modifié entre-temps, laissé tel quel"); }
+    }
+    if (APPLIQUER) console.log(`Terminé : ${total.ok} événement(s) et ${totalM.ok} média(s) de fiche migré(s), ${total.ignorees + totalM.ignorees} laissé(s) tel(s) quel(s).`);
     else console.log("Simulation terminée : rien n'a été écrit. Relancez avec --appliquer pour migrer.");
   } finally { await c.end(); }
 })().catch(e => { console.error("ERREUR :", e.message); process.exit(1); });
