@@ -163,6 +163,7 @@
 <script src="assets/app.js?v=13"></script>
 <script src="assets/formation-achat-consent.js?v=1"></script>
 <script src="assets/studio-render.js?v=2"></script>
+<script src="assets/koffi-widget.js?v=3" defer></script>
 <script>
 function escH(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 const params = new URLSearchParams(location.search);
@@ -215,6 +216,8 @@ async function sfLoad(keepLeconId){
   SF_CURRENT_LECON = (demande && flat.find(l => Number(l.id) === demande))
     || (DECOUVERTE ? flat.find(l => !l.verrouille) : flat.find(l => !l.termine)) || flat[0] || null;
   sfRender();
+  /* Koffi (tuteur IA) : le serveur décide s'il apparaît (inscrit, ou formateur en aperçu) et ce que le compte peut en faire. Idempotent. */
+  if (!DECOUVERTE) { const monterKoffi = () => window.KoffiWidget && window.KoffiWidget.monter({ formationId, leconId: () => (SF_CURRENT_LECON ? SF_CURRENT_LECON.id : null), ouvrirLecon: id => sfGoTo(id), premiumUrl: 'premium.html' }); if (window.KoffiWidget) monterKoffi(); else window.addEventListener('load', monterKoffi); }
 }
 
 /* Rafraîchit uniquement le plan et les jauges (la leçon affichée ne bouge pas : une vidéo en cours n'est pas relancée). */
@@ -768,7 +771,8 @@ async function sfEchangesLoad(){
   try { r = await fetch(`/api/formations/${formationId}/discussions?lecon_id=${cible}`, { credentials: 'same-origin' }); } catch (e) { zone.innerHTML = ''; return; }
   if (!r.ok) { zone.innerHTML = ''; return; }
   const d = await r.json();
-  if (!document.getElementById('sf-echanges') || l !== SF_CURRENT_LECON) return;
+  /* La zone d'échanges est recréée à chaque affichage de la leçon : une réponse tardive d'un ancien chargement ne doit pas écrire dans l'ancienne zone (détachée). */
+  if (document.getElementById('sf-echanges') !== zone || l !== SF_CURRENT_LECON) return;
   const bouton = (action, id, libelle, classe) => `<button type="button" class="sf-ech-act ${classe || ''}" data-act="${action}" data-id="${id}">${libelle}</button>`;
   const msg = (m, reponse) => {
     const actions = [];
