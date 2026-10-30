@@ -371,6 +371,47 @@ test('Koffi — règles du socle', async (t) => {
     sql('UPDATE users SET date_naissance=NULL WHERE id=?', a);
   });
 
+  await t.test('pays : Koffi fermé hors de la liste du fournisseur d\'IA (185 pays, territoires inclus), pays inconnu autorisé, interrupteur d\'administration', async () => {
+    const Pays = require('../server/kofi-pays');
+    assert.equal(Pays.CODES.length, 185); assert.equal(new Set(Pays.CODES).size, 185);
+    for (const [parent] of Object.entries(Pays.TERRITOIRES)) assert.ok(Pays.CODES.includes(parent), 'parent listé : ' + parent);
+    for (const c of ['FR', 'BJ', 'CI', 'DZ', 'BE', 'CA', 'US', 'GB', 'GP', 'MQ', 'GF', 'RE', 'PR']) assert.equal(Pays.priseEnCharge(c), true, c);
+    for (const c of ['CN', 'RU', 'HK', 'MO', 'IR', 'KP', 'SY', 'CU', 'VE']) assert.equal(Pays.priseEnCharge(c), false, c);
+    assert.equal(Pays.priseEnCharge(null), null);
+    /* Appels réels avec l'en-tête posé par l'hébergeur. */
+    const avec = async (jar, pays, method, url, body) => {
+      const headers = { 'Content-Type': 'application/json' }; if (pays) headers['x-vercel-ip-country'] = pays; jar.apply(headers);
+      const r = await fetch(env.base + url, { method, headers, body: body ? JSON.stringify(body) : undefined });
+      let data = null; try { data = await r.json(); } catch (e) { /* vide */ } return { status: r.status, data };
+    };
+    const lireEtat = (pays) => avec(jarA, pays, 'GET', `/api/kofi/etat?formation_id=${fid}`);
+    const ia0 = nbAppelsIA(), conv = (await ouvrir(jarA)).data.id;
+    for (const ok of ['FR', 'GP', 'BJ', 'US', 'fr']) assert.equal((await lireEtat(ok)).data.etat, 'utilisable', ok);
+    for (const inconnu of [null, 'XX', 'T1', 'zz9', '']) assert.equal((await lireEtat(inconnu)).data.etat, 'utilisable', 'pays inconnu autorisé : ' + inconnu);
+    for (const ko of ['CN', 'RU', 'HK', 'cn']) assert.equal((await lireEtat(ko)).data.etat, 'pays', ko);
+    /* Fermé partout où Koffi lit ou écrit, sauf la suppression ; aucun appel IA. */
+    /* (la limite de questions par minute s'applique avant : on utilise un compte qui n'en a pas posé) */
+    const convE = (await ouvrir(jarE)).data.id;
+    let r = await avec(jarE, 'CN', 'POST', `/api/kofi/conversations/${convE}/messages`, { texte: 'Comment fonctionne la tontine solidaire ?' });
+    assert.equal(r.status, 403, JSON.stringify(r.data)); assert.equal(r.data.code, 'pays_non_pris_en_charge');
+    assert.equal((await avec(jarA, 'CN', 'POST', '/api/kofi/conversations', { formation_id: fid })).status, 403);
+    assert.equal((await avec(jarA, 'CN', 'GET', `/api/kofi/conversations/${conv}`)).status, 403);
+    assert.equal((await avec(jarA, 'CN', 'POST', '/api/kofi/forfait/acheter', { formation_id: fid, accepte_non_remboursable: true })).data.code, 'pays_non_pris_en_charge');
+    assert.equal(nbAppelsIA(), ia0, 'aucun appel au fournisseur d\'IA depuis un pays hors liste');
+    /* L'aperçu du formateur est soumis à la même règle (c'est aussi un usage de l'IA). */
+    assert.equal((await avec(jarF, 'CN', 'GET', `/api/kofi/etat?formation_id=${fid}`)).data.etat, 'pays');
+    /* Administration : la liste, le pays détecté, l'interrupteur. */
+    r = await avec(jarF, 'CI', 'GET', '/api/admin/kofi/reglages');
+    assert.equal(r.data.pays.codes.length, 185); assert.equal(r.data.pays.detecte, 'CI'); assert.equal(r.data.pays.detecte_pris_en_charge, true); assert.ok(/anthropic\.com\/supported-countries/.test(r.data.pays.source));
+    assert.equal(r.data.reglages.pays_filtre_actif, 1);
+    assert.equal((await avec(jarF, 'CN', 'GET', '/api/admin/kofi/reglages')).data.pays.detecte_pris_en_charge, false);
+    assert.equal((await avec(jarF, null, 'PUT', '/api/admin/kofi/reglages', { pays_filtre_actif: 2 })).status, 400, 'valeur hors bornes');
+    assert.equal((await avec(jarF, null, 'PUT', '/api/admin/kofi/reglages', { pays_filtre_actif: 0 })).status, 200);
+    assert.equal((await lireEtat('CN')).data.etat, 'utilisable', 'filtre désactivé par l\'administration');
+    assert.equal((await avec(jarF, null, 'PUT', '/api/admin/kofi/reglages', { pays_filtre_actif: 1 })).status, 200);
+    assert.equal((await lireEtat('CN')).data.etat, 'pays', 'filtre réactivé');
+  });
+
   await t.test('suppression de compte (RGPD) : conversations et retours de l\'élève effacés, ceux des autres intacts ; achats et compteurs d\'usage conservés', async () => {
     const a = uid('Alpha'), b = uid('Beta');
     const msgA = sql("select id from kofi_messages where conversation_id=? and role='assistant' order by id limit 1", convA)[0].id;

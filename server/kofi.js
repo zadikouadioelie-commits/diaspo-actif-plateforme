@@ -19,6 +19,7 @@
 const crypto = require("node:crypto");
 const IA = require("./kofi-ia");
 const Droits = require("./formation-droits");
+const Pays = require("./kofi-pays");
 
 const NOM = "Koffi";
 
@@ -60,6 +61,7 @@ async function statutMajorite(db, userId) {
 /* Réglages modifiables par l'administration (kofi_reglages). Valeurs par défaut = décisions du propriétaire du 2026-10-30. */
 const DEFAUTS = {
   actif_global: 1,
+  pays_filtre_actif: 1, /* 1 = Koffi fermé aux personnes connectées depuis un pays hors de la liste du fournisseur d'IA (server/kofi-pays.js) */
   modele: IA.MODELE_PAR_DEFAUT,
   gratuit_questions: 5,
   forfait_questions: 1000,
@@ -80,7 +82,7 @@ const TEXTE_REGLAGES = new Set(["modele"]);
 /* Bornes [min, max] acceptées par l'administration. retention_jours plafonné à 60 : c'est la durée annoncée aux élèves (fenêtre, CGV, confidentialité) ;
    forfait_prix_eur ≥ 0,50 € : minimum accepté par Stripe pour un paiement en euros. */
 const BORNES = {
-  actif_global: [0, 1], gratuit_questions: [0, 1000], forfait_questions: [1, 100000], forfait_prix_eur: [0.5, 1000], forfait_validite_mois: [1, 60],
+  actif_global: [0, 1], pays_filtre_actif: [0, 1], gratuit_questions: [0, 1000], forfait_questions: [1, 100000], forfait_prix_eur: [0.5, 1000], forfait_validite_mois: [1, 60],
   retention_jours: [1, 60], plafond_jour_par_eleve: [1, 10000], plafond_jour_apercu: [1, 10000], budget_seuil_gratuit_eur: [0, 100000],
   max_message_caracteres: [50, 5000], max_sortie_tokens: [100, 4000], nb_extraits: [1, 12],
   prix_entree_usd_par_million: [0, 1000], prix_sortie_usd_par_million: [0, 1000], taux_usd_eur: [0.1, 10],
@@ -395,13 +397,14 @@ async function evaluationEnCours(db, inscription) {
   const rows = await db.prepare("SELECT s.debut FROM formation_quiz_sessions s WHERE s.inscription_id=?").all(Number(inscription.id));
   return rows.some(x => { const d = aDate(x.debut); return d && Date.now() - d.getTime() < 6 * 3600 * 1000; });
 }
-async function contexteAcces(db, deps, user, formationId) {
+async function contexteAcces(db, deps, user, formationId, req) {
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(Number(formationId));
   if (!f || (f.statut || "publiee") !== "publiee") return { code: 404, erreur: "Formation introuvable." };
   const r = await reglages(db);
   const prefs = await db.prepare("SELECT * FROM kofi_formations WHERE formation_id=?").get(f.id);
   const proprietaire = Number(f.owner_user_id) === Number(user.id) || user.role === "administrateur";
-  const ctx = { f, r, prefs, proprietaire, mode: proprietaire ? "apercu" : "eleve", inscription: null, autorises: null, premium: { actif: false, decouverte: false } };
+  const codePays = Pays.codePaysDe(req);
+  const ctx = { f, r, prefs, proprietaire, pays: Number(r.pays_filtre_actif) ? Pays.priseEnCharge(codePays) : null, mode: proprietaire ? "apercu" : "eleve", inscription: null, autorises: null, premium: { actif: false, decouverte: false } };
   if (!proprietaire) {
     await Droits.balayerExpirations(db, { userId: user.id, formationId: f.id });
     ctx.inscription = await db.prepare("SELECT * FROM formation_inscriptions WHERE formation_id=? AND user_id=? AND statut='active' AND COALESCE(paiement_statut,'paye')='paye'").get(f.id, user.id);
@@ -414,6 +417,7 @@ async function contexteAcces(db, deps, user, formationId) {
   /* L'état dit ce que le compte peut faire MAINTENANT (ordre = priorité). */
   if (!r.actif_global || (prefs && Number(prefs.actif) === 0)) ctx.etat = "desactive";
   else if (!proprietaire && !ctx.premium.actif) ctx.etat = "vitrine";
+  else if (ctx.pays === false) ctx.etat = "pays"; /* connecté depuis un pays hors liste : Koffi fermé (la plateforme, elle, reste ouverte) */
   else if (!proprietaire && (ctx.majorite = await statutMajorite(db, user.id)) !== "ok") ctx.etat = ctx.majorite === "mineur" ? "mineur" : "majorite";
   else if (!proprietaire && (!prefs || Number(prefs.desactive_evaluation) !== 0) && await evaluationEnCours(db, ctx.inscription)) ctx.etat = "evaluation";
   else {
@@ -455,8 +459,9 @@ module.exports.register = function register(deps) {
     return user;
   }
   const ressortirErreur = (res, c) => sendJSON(res, c.code, { error: c.erreur, raison: c.raison || null });
-  /* Koffi est réservé aux majeurs : refus (true = réponse déjà envoyée). Appliqué partout où Koffi lit ou écrit du contenu, sauf la suppression d'une conversation. */
+  /* Koffi est réservé aux majeurs et aux pays pris en charge : refus (true = réponse déjà envoyée). Appliqué partout où Koffi lit ou écrit du contenu, sauf la suppression d'une conversation. */
   function refuserSiMineur(res, ctx) {
+    if (ctx.etat === "pays") { sendJSON(res, 403, { error: "Koffi n'est pas disponible dans votre pays pour le moment. Vos formations restent accessibles.", code: "pays_non_pris_en_charge" }); return true; }
     if (ctx.etat === "mineur") { sendJSON(res, 403, { error: "Koffi est réservé aux personnes majeures (18 ans ou plus).", code: "mineur" }); return true; }
     if (ctx.etat === "majorite") { sendJSON(res, 403, { error: "Confirmez avoir 18 ans ou plus pour utiliser Koffi.", code: "majorite_requise", texte: TEXTE_MAJORITE }); return true; }
     return false;
@@ -486,7 +491,7 @@ module.exports.register = function register(deps) {
 
   route("GET", "/api/kofi/etat", async (req, res, params, body, query) => {
     const user = await exiger(req, res); if (!user) return;
-    const ctx = await contexteAcces(db, deps, user, query.formation_id);
+    const ctx = await contexteAcces(db, deps, user, query.formation_id, req);
     if (ctx.code) return ressortirErreur(res, ctx);
     sendJSON(res, 200, await etatPublic(user, ctx));
   });
@@ -506,7 +511,7 @@ module.exports.register = function register(deps) {
   /* ═════ Achat du forfait de questions (Stripe) : aucune question n'est créditée avant la confirmation du paiement par le webhook ═════ */
   route("POST", "/api/kofi/forfait/acheter", async (req, res, params, body) => {
     const user = await exiger(req, res); if (!user) return;
-    const ctx = await contexteAcces(db, deps, user, body && body.formation_id);
+    const ctx = await contexteAcces(db, deps, user, body && body.formation_id, req);
     if (ctx.code) return ressortirErreur(res, ctx);
     const r = ctx.r;
     if (ctx.mode !== "eleve") return sendJSON(res, 400, { error: "L'aperçu formateur n'utilise pas de questions : aucun forfait à acheter." });
@@ -566,7 +571,7 @@ module.exports.register = function register(deps) {
   /* Conversations de l'élève sur cette formation (dans la durée de conservation). */
   route("GET", "/api/kofi/conversations", async (req, res, params, body, query) => {
     const user = await exiger(req, res); if (!user) return;
-    const ctx = await contexteAcces(db, deps, user, query.formation_id);
+    const ctx = await contexteAcces(db, deps, user, query.formation_id, req);
     if (ctx.code) return ressortirErreur(res, ctx);
     if (ctx.etat === "vitrine") return sendJSON(res, 402, { error: "Koffi est réservé aux comptes Premium.", code: "premium_requis" });
     if (refuserSiMineur(res, ctx)) return;
@@ -577,7 +582,7 @@ module.exports.register = function register(deps) {
 
   route("POST", "/api/kofi/conversations", async (req, res, params, body) => {
     const user = await exiger(req, res); if (!user) return;
-    const ctx = await contexteAcces(db, deps, user, body && body.formation_id);
+    const ctx = await contexteAcces(db, deps, user, body && body.formation_id, req);
     if (ctx.code) return ressortirErreur(res, ctx);
     if (ctx.etat === "vitrine") return sendJSON(res, 402, { error: "Koffi est réservé aux comptes Premium.", code: "premium_requis" });
     if (refuserSiMineur(res, ctx)) return;
@@ -597,7 +602,7 @@ module.exports.register = function register(deps) {
     const c = await conversationDe(user, params.id);
     if (!c) return sendJSON(res, 404, { error: "Conversation introuvable." });
     /* Les droits sont revérifiés à la lecture : un accès retiré ne laisse pas relire d'anciens contenus devenus interdits. */
-    const ctx = await contexteAcces(db, deps, user, c.formation_id);
+    const ctx = await contexteAcces(db, deps, user, c.formation_id, req);
     if (ctx.code) return ressortirErreur(res, ctx);
     if (ctx.etat === "vitrine") return sendJSON(res, 402, { error: "Koffi est réservé aux comptes Premium.", code: "premium_requis" });
     if (refuserSiMineur(res, ctx)) return;
@@ -622,7 +627,7 @@ module.exports.register = function register(deps) {
     if (!lim.allowed) return sendJSON(res, 429, { error: `Doucement : réessayez dans ${lim.retryAfter}s.`, code: "trop_vite" });
     const conv = await conversationDe(user, params.id);
     if (!conv) return sendJSON(res, 404, { error: "Conversation introuvable." });
-    const ctx = await contexteAcces(db, deps, user, conv.formation_id);
+    const ctx = await contexteAcces(db, deps, user, conv.formation_id, req);
     if (ctx.code) return ressortirErreur(res, ctx);
     const r = ctx.r;
     const lg = langue((body && body.langue) || conv.langue);
@@ -782,7 +787,7 @@ module.exports.register = function register(deps) {
   async function admin(req, res) { const u = await exiger(req, res); if (!u) return null; if (!estAdmin(u)) { sendJSON(res, 403, { error: "Réservé à l'administration." }); return null; } return u; }
   route("GET", "/api/admin/kofi/reglages", async (req, res) => {
     if (!(await admin(req, res))) return;
-    sendJSON(res, 200, { reglages: await reglages(db, true), defauts: DEFAUTS, bornes: BORNES, modeles_autorises: IA.MODELES_AUTORISES, fournisseur_configure: IA.configure() });
+    sendJSON(res, 200, { pays: { codes: Pays.CODES, territoires: Pays.TERRITOIRES, source: Pays.SOURCE, releve_le: Pays.RELEVE_LE, detecte: Pays.codePaysDe(req), detecte_pris_en_charge: Pays.priseEnCharge(Pays.codePaysDe(req)) }, reglages: await reglages(db, true), defauts: DEFAUTS, bornes: BORNES, modeles_autorises: IA.MODELES_AUTORISES, fournisseur_configure: IA.configure() });
   });
   route("PUT", "/api/admin/kofi/reglages", async (req, res, params, body) => {
     const u = await admin(req, res); if (!u) return;

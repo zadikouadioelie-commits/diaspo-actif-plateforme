@@ -32,6 +32,9 @@
       { cle: 'actif_global', lib: 'Koffi activé', type: 'bool', aide: 'Interrupteur général. Désactivé, Koffi répond « momentanément indisponible » dans toutes les formations ; rien n\'est supprimé.' },
       { cle: 'modele', lib: 'Modèle d\'IA', type: 'select', aide: 'Choisi côté serveur parmi une liste fermée ; jamais depuis le navigateur. Haiku 5.5 est le modèle prévu (le moins coûteux).' },
     ] },
+    { titre: '🌍 Pays', champs: [
+      { cle: 'pays_filtre_actif', lib: 'Fermer Koffi hors des pays pris en charge', type: 'bool', aide: 'Oui (recommandé) : une personne connectée depuis un pays absent de la liste du fournisseur d\'IA ne peut pas utiliser Koffi. Non : aucun contrôle (à ne faire que si la liste est périmée et en attendant sa mise à jour).' },
+    ] },
     { titre: '🎁 Questions offertes', champs: [
       { cle: 'gratuit_questions', lib: 'Questions offertes par compte', unite: 'questions', aide: 'Accordées une seule fois par compte, à sa première question. Une modification ne concerne que les comptes pas encore servis.' },
       { cle: 'budget_seuil_gratuit_eur', lib: 'Seuil de réserve pour offrir', unite: '€', step: 0.5, aide: 'Sous ce seuil, plus aucun nouveau compte ne reçoit ses questions offertes, et les comptes qui les ont épuisées voient l\'offre de recharge. Réserve à zéro : Koffi est indisponible pour tous.' },
@@ -82,6 +85,7 @@
       .kb-champs{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:4px 16px}
       .kb-champ small{display:block;color:var(--muted);font-size:11.5px;line-height:1.4;margin-top:3px}
       .kb-champ .u{display:flex;align-items:center;gap:8px}.kb-champ .u em{font-style:normal;color:var(--muted);font-size:12px;white-space:nowrap}
+      .kb-pays{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}.kb-pays span{border:1px solid var(--border);border-radius:99px;padding:2px 10px;font-size:12px}
       .kb-note{background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:9px 11px;font-size:12.5px;color:#475569;margin:0 0 6px;line-height:1.5}
       .kb-groupe h4{margin:18px 0 4px;font-size:14px}
     `;
@@ -161,6 +165,22 @@
     return '<div class="kb-champ"><label for="kbr-' + c.cle + '">' + esc(c.lib) + '</label>' + champ + '<small>' + esc((c.aide || '') + defaut).trim() + '</small></div>';
   }
 
+  /* Pays où le fournisseur d'IA est disponible (server/kofi-pays.js) : la liste en clair, le pays de la connexion actuelle, la source et la date du relevé. */
+  function nomPays(c) { try { return new Intl.DisplayNames(['fr'], { type: 'region' }).of(c) || c; } catch (e) { return c; } }
+  function blocPays() {
+    const P = R && R.pays; if (!P) return '';
+    const noms = P.codes.map(c => ({ c, n: nomPays(c) })).sort((a, b) => a.n.localeCompare(b.n, 'fr'));
+    const jour = String(P.releve_le || '').split('-').reverse().join('/');
+    const det = P.detecte
+      ? 'Votre connexion actuelle est détectée depuis <b>' + esc(nomPays(P.detecte)) + ' (' + esc(P.detecte) + ')</b> : Koffi y est ' + (P.detecte_pris_en_charge ? '<b style="color:#22c55e">disponible</b>' : '<b style="color:#f87171">fermé</b>') + '.'
+      : 'Pays de votre connexion : non détecté (normal en local ; en production l\'hébergeur le fournit). Un pays inconnu est autorisé.';
+    return '<div class="card" style="margin-bottom:16px"><h3 style="margin:0 0 6px;font-size:15px;">🌍 Pays où Koffi est disponible</h3>'
+      + '<p style="margin:0 0 8px;color:var(--muted);font-size:12.5px;line-height:1.55;">Le fournisseur d\'IA n\'est disponible que dans <b>' + nb(P.codes.length) + ' pays</b>. Le contrat interdit de l\'utiliser depuis un pays non listé, y compris par les élèves d\'un client. Koffi se ferme donc pour une personne connectée depuis un autre pays ; le reste de la plateforme reste ouvert partout. Le pays est déduit de l\'adresse IP par l\'hébergeur (il n\'est ni stocké ni journalisé) ; un VPN peut le contourner. Les territoires d\'un pays listé (Guadeloupe, Martinique, Guyane, La Réunion…) sont couverts.</p>'
+      + '<p style="margin:0 0 8px;font-size:13px">' + det + '</p>'
+      + '<details><summary style="cursor:pointer;font-weight:700;font-size:13px">Voir les ' + nb(P.codes.length) + ' pays</summary><div class="kb-pays">' + noms.map(x => '<span title="' + esc(x.c) + '">' + esc(x.n) + '</span>').join('') + '</div></details>'
+      + '<p style="margin:10px 0 0;color:var(--muted);font-size:12px;line-height:1.5;">Liste relevée le ' + esc(jour) + ' sur <a href="' + esc(P.source) + '" target="_blank" rel="noopener">' + esc(P.source) + '</a>. ⚠️ La politique du fournisseur annonce une nouvelle version <b>le 12 novembre 2026</b> : relisez cette page à cette date et faites mettre la liste à jour si elle change.</p></div>';
+  }
+
   function blocReglages() {
     const g = GROUPES.map(gr => '<div class="kb-groupe"><h4>' + gr.titre + '</h4>' + (gr.note ? '<p class="kb-note">' + esc(gr.note) + '</p>' : '') + '<div class="kb-champs">' + gr.champs.map(champ).join('') + '</div></div>').join('');
     return '<div class="card kb-form" style="margin-bottom:20px"><h3 style="margin:0;font-size:15px;">🎛️ Réglages de Koffi</h3>' + g
@@ -169,7 +189,7 @@
 
   function rendre() {
     const zone = el('kb-contenu'); if (!zone) return;
-    zone.innerHTML = alertes() + kpis() + '<div class="kb-grille">' + formRecharge() + blocCategories() + '</div>' + blocJours() + blocHistorique() + blocReglages();
+    zone.innerHTML = alertes() + kpis() + '<div class="kb-grille">' + formRecharge() + blocCategories() + '</div>' + blocJours() + blocHistorique() + blocPays() + blocReglages();
     el('kb-btn-recharge').onclick = recharger;
     el('kb-btn-reglages').onclick = enregistrerReglages;
     el('kb-btn-defauts').onclick = () => {
