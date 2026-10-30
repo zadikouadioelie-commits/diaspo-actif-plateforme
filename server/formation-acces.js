@@ -9,6 +9,7 @@
    ═════════════════════════════════════════════════ */
 "use strict";
 
+const Droits = require("./formation-droits");
 const SUIVI_MODES = ["auto", "manuel", "aucun"];
 
 /* Un compte invité actif peut créer des formations. */
@@ -91,6 +92,14 @@ module.exports.register = function register(deps) {
     if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
     if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
     if (!(await exiger(user, res, "formations"))) return;
+    /* Durée d'accès des apprenants (jours ; vide = illimitée) : réglable à tout moment, elle ne s'applique qu'aux accès ouverts ensuite. */
+    if (body && body.duree_acces_jours !== undefined && body.suivi_mode === undefined) {
+      const brut = body.duree_acces_jours;
+      const j = brut === null || brut === "" ? null : Math.floor(Number(brut));
+      if (j !== null && (!Number.isFinite(j) || j < 1 || j > 3650)) return sendJSON(res, 400, { error: "La durée d'accès doit être comprise entre 1 et 3650 jours (ou vide pour un accès illimité)." });
+      await db.prepare("UPDATE formations SET duree_acces_jours=? WHERE id=?").run(j, params.id);
+      return sendJSON(res, 200, { ok: true, duree_acces_jours: j });
+    }
     if (!["brouillon", "refusee"].includes(f.statut || "brouillon") && user.role !== "administrateur") return sendJSON(res, 400, { error: "Le mode de suivi ne se change que sur une formation en brouillon ou refusée : des apprenants peuvent déjà la suivre." });
     const mode = String((body && body.suivi_mode) || "");
     if (!SUIVI_MODES.includes(mode)) return sendJSON(res, 400, { error: "Mode de suivi inconnu (auto, manuel ou aucun)." });
@@ -111,11 +120,13 @@ module.exports.register = function register(deps) {
     if (!lim.allowed) return sendJSON(res, 429, { error: `Trop d'enregistrements. Réessayez dans ${lim.retryAfter}s.` });
     const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
     if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
+    await Droits.balayerExpirations(db, { userId: user.id, formationId: f.id });
     const inscription = await db.prepare("SELECT * FROM formation_inscriptions WHERE formation_id=? AND user_id=? AND statut='active' AND COALESCE(paiement_statut,'paye')<>'en_attente'").get(params.id, user.id);
     if (!inscription) return sendJSON(res, 403, { error: "Vous devez être inscrit pour suivre cette formation." });
     if (f.suivi_mode === "aucun") return sendJSON(res, 409, { error: "Cette formation n'enregistre pas de progression.", code: "suivi_desactive" });
     const liste = Array.isArray(body && body.lecons) ? body.lecons.slice(0, 300) : [];
-    const valides = new Set((await db.prepare("SELECT l.id FROM formation_lecons l JOIN formation_modules m ON m.id=l.module_id WHERE m.formation_id=?").all(params.id)).map(l => Number(l.id)));
+    const autorises = await Droits.modulesAutorises(db, inscription);
+    const valides = new Set((await db.prepare("SELECT l.id, l.module_id FROM formation_lecons l JOIN formation_modules m ON m.id=l.module_id WHERE m.formation_id=?").all(params.id)).filter(l => !autorises || autorises.has(Number(l.module_id))).map(l => Number(l.id)));
     const quizLecons = new Set((await db.prepare("SELECT lecon_id FROM formation_quiz WHERE formation_id=? AND lecon_id IS NOT NULL").all(params.id)).map(q => Number(q.lecon_id)));
     let appliquees = 0, ignorees = 0; const refusees = [];
     for (const e of liste) {

@@ -993,6 +993,11 @@ const COLONNES_MIGRATION = [
     ['formation_inscriptions', 'relance_50_le', 'TEXT'],
     ['formation_inscriptions', 'relance_75_le', 'TEXT'],
     ['formation_inscriptions', 'relance_inactivite_le', 'TEXT'],
+    // Formation Diaspora — lot A (2026-10-30) : achat par module, durée d'accès, portée de l'inscription
+    ['formation_modules', 'prix', 'REAL'],
+    ['formation_modules', 'vendable_seul', 'INTEGER DEFAULT 0'],
+    ['formations', 'duree_acces_jours', 'INTEGER'],
+    ['formation_inscriptions', 'portee', "TEXT DEFAULT 'formation'"],
     // Module Diaspo Formation — extension de la table formations (jamais migrée en Postgres jusqu'ici)
     ['formations', 'statut', "TEXT DEFAULT 'brouillon'"],
     // Lot 1 « Diaspo'Actif Formation » (2026-10-18)

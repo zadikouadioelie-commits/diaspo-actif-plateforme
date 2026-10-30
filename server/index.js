@@ -3264,6 +3264,9 @@ const FormationEchanges = require("./formation-echanges");
 FormationEchanges.register({ route, db, sendJSON, getCurrentUser, SEC, checkFormationOwner, creerNotif });
 const FormationAcces = require("./formation-acces");
 FormationAcces.register({ route, db, sendJSON, getCurrentUser, SEC, checkFormationOwner, FormationParcours, exigerPremium, hasAccreditation, creerNotif, nomCompteAffichage });
+/* Formation Diaspora, lot A : droits d'accès par formation ou par module, commandes, expiration — server/formation-droits.js. getOrigin est une déclaration de fonction (hissée). */
+const FormationDroits = require("./formation-droits");
+FormationDroits.register({ route, db, sendJSON, getCurrentUser, SEC, checkFormationOwner, creerNotif, getOrigin, ParcoursFormation });
 /* Envoyer un événement par e-mail (carte complète) + texte d'aperçu du lien (date, lieu) : server/partage-evenement.js. urlImagePartageEvenement est une déclaration de fonction (hissée). */
 const PartageEvenement = require("./partage-evenement");
 PartageEvenement.register({ route, db, sendJSON, getCurrentUser, SEC, nomCompteAffichage, getOrigin, urlImagePartageEvenement });
@@ -17842,6 +17845,7 @@ route("GET", "/api/formations/:id/suivre", async (req, res, params) => {
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
   if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
   const isOwner = checkFormationOwner(f, user);
+  await FormationDroits.balayerExpirations(db, { userId: user.id, formationId: f.id });
   const inscription = await db.prepare("SELECT * FROM formation_inscriptions WHERE formation_id=? AND user_id=? AND statut='active' AND COALESCE(paiement_statut,'paye')<>'en_attente'").get(params.id, user.id);
   if (!inscription && !isOwner) return sendJSON(res, 403, { error: "Vous devez être inscrit pour accéder à cette formation." });
 
@@ -17856,7 +17860,7 @@ route("GET", "/api/formations/:id/suivre", async (req, res, params) => {
   const typeDoc = FormationParcours.typeValide(f.certificat_type);
   const cartesMentales = await CartesMentales.cartesDeFormation(db, f.id);
   sendJSON(res, 200, {
-    formation: f, modules: parcours.modules, cartes_mentales: cartesMentales, avancement_pct: parcours.avancement_pct, mode: inscription ? 'apprenant' : 'apercu', inscription_id: inscription ? inscription.id : null,
+    formation: f, modules: parcours.modules, modules_verrouilles: parcours.modules_verrouilles || [], portee: inscription ? (inscription.portee || 'formation') : 'formation', cartes_mentales: cartesMentales, avancement_pct: parcours.avancement_pct, mode: inscription ? 'apprenant' : 'apercu', inscription_id: inscription ? inscription.id : null,
     parcours: {
       statut: parcours.statut, nb_total: parcours.nb_total, nb_termine: parcours.nb_termine, nb_restant: parcours.nb_restant,
       chapitres_total: parcours.chapitres_total, chapitres_termines: parcours.chapitres_termines, prochaine_lecon_id: parcours.prochaine_lecon_id,
@@ -17872,8 +17876,10 @@ route("GET", "/api/formations/:id/suivre", async (req, res, params) => {
 route("POST", "/api/formations/:id/lecons/:leconId/progression", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  await FormationDroits.balayerExpirations(db, { userId: user.id, formationId: params.id });
   const inscription = await db.prepare("SELECT * FROM formation_inscriptions WHERE formation_id=? AND user_id=? AND statut='active' AND COALESCE(paiement_statut,'paye')<>'en_attente'").get(params.id, user.id);
   if (!inscription) return sendJSON(res, 403, { error: "Vous devez être inscrit pour suivre cette formation." });
+  if (!(await FormationDroits.leconPermise(db, inscription, params.id, params.leconId))) return sendJSON(res, 403, { error: "Cette activité fait partie d'un module que vous n'avez pas obtenu.", code: "module_non_acquis" });
   const fSuivi = await db.prepare("SELECT suivi_mode FROM formations WHERE id=?").get(params.id);
   if (fSuivi && fSuivi.suivi_mode === 'aucun') return sendJSON(res, 409, { error: "Cette formation n'enregistre pas de progression.", code: "suivi_desactive" });
   /* Une leçon portant un quiz ne se valide que par la RÉUSSITE du quiz (POST …/quiz/:quizId/soumettre) : un simple clic ne suffit pas. */
@@ -17893,6 +17899,14 @@ route("POST", "/api/formations/:id/lecons/:leconId/progression", async (req, res
   const attestation = await FormationParcours.evaluerAttestation({ db, creerNotif, nomCompteAffichage }, inscription.id);
   sendJSON(res, 200, { ok: true, avancement_pct, statut: parcours.statut, prochaine_lecon_id: parcours.prochaine_lecon_id, attestation: attestation ? FormationParcours.vueAttestation(attestation) : null });
 });
+/* Vente d'un module seul : vendable_seul (0/1) et prix (€, 0 = gratuit). Dans une formation payante, le prix doit être posé explicitement : jamais de module offert par oubli. */
+function lireVenteModule(body, f) {
+  const vendable = body && body.vendable_seul ? 1 : 0;
+  if (!vendable) return { vendable_seul: 0, prix: body && body.prix != null && body.prix !== "" && Number.isFinite(Number(body.prix)) && Number(body.prix) >= 0 ? Number(body.prix) : null };
+  if ((f.mode_acces || "gratuit") === "gratuit") return { vendable_seul: 1, prix: 0 };
+  if (body.prix == null || body.prix === "" || !Number.isFinite(Number(body.prix)) || Number(body.prix) < 0 || Number(body.prix) > 100000) return { erreur: "Indiquez le prix du module (en euros, 0 pour l'offrir) pour le proposer séparément." };
+  return { vendable_seul: 1, prix: Math.round(Number(body.prix) * 100) / 100 };
+}
 route("POST", "/api/formations/:id/modules", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
@@ -17901,8 +17915,10 @@ route("POST", "/api/formations/:id/modules", async (req, res, params, body) => {
   if (!(await exigerPremium(user, res, "formations"))) return;
   if (!body.titre) return sendJSON(res, 400, { error: "Le titre du module est requis." });
   const { max } = await db.prepare("SELECT COALESCE(MAX(ordre),-1) AS max FROM formation_modules WHERE formation_id=?").get(params.id);
-  const id = (await db.prepare("INSERT INTO formation_modules (formation_id,titre,description,ordre) VALUES (?,?,?,?)")
-    .run(params.id, body.titre, body.description||null, max+1)).lastInsertRowid;
+  const vente = lireVenteModule(body, f);
+  if (vente.erreur) return sendJSON(res, 400, { error: vente.erreur });
+  const id = (await db.prepare("INSERT INTO formation_modules (formation_id,titre,description,ordre,prix,vendable_seul) VALUES (?,?,?,?,?,?)")
+    .run(params.id, body.titre, body.description||null, max+1, vente.prix, vente.vendable_seul)).lastInsertRowid;
   sendJSON(res, 201, { id });
 });
 route("PUT", "/api/formations/:id/modules/:moduleId", async (req, res, params, body) => {
@@ -17911,8 +17927,16 @@ route("PUT", "/api/formations/:id/modules/:moduleId", async (req, res, params, b
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
   if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
   if (!(await exigerPremium(user, res, "formations"))) return;
+  const courant = await db.prepare("SELECT * FROM formation_modules WHERE id=? AND formation_id=?").get(params.moduleId, params.id);
+  if (!courant) return sendJSON(res, 404, { error: "Module introuvable." });
   await db.prepare("UPDATE formation_modules SET titre=COALESCE(?,titre), description=COALESCE(?,description) WHERE id=? AND formation_id=?")
     .run(body.titre||null, body.description||null, params.moduleId, params.id);
+  /* Vente du module seul : n'est touchée que si le corps le demande (vendable_seul ou prix présents). */
+  if (body.vendable_seul !== undefined || body.prix !== undefined) {
+    const vente = lireVenteModule({ vendable_seul: body.vendable_seul !== undefined ? body.vendable_seul : courant.vendable_seul, prix: body.prix !== undefined ? body.prix : courant.prix }, f);
+    if (vente.erreur) return sendJSON(res, 400, { error: vente.erreur });
+    await db.prepare("UPDATE formation_modules SET prix=?, vendable_seul=? WHERE id=? AND formation_id=?").run(vente.prix, vente.vendable_seul, params.moduleId, params.id);
+  }
   sendJSON(res, 200, { ok: true });
 });
 route("DELETE", "/api/formations/:id/modules/:moduleId", async (req, res, params) => {
@@ -18264,75 +18288,7 @@ route("POST", "/api/formations/:id/publier", async (req, res, params, body) => {
   sendJSON(res, 200, { ok: true });
 });
 
-/* S'inscrire à une formation */
-route("POST", "/api/formations/:id/inscrire", async (req, res, params, body) => {
-  const user = await getCurrentUser(req);
-  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
-  if (!f || f.statut !== 'publiee') return sendJSON(res, 404, { error: "Formation introuvable ou non publiée." });
-  if (f.date_suppression_prevue) return sendJSON(res, 400, { error: "Les inscriptions sont fermées : cette formation sera bientôt retirée du catalogue." });
-  const deja = await db.prepare("SELECT id FROM formation_inscriptions WHERE formation_id=? AND user_id=?").get(params.id, user.id);
-  if (deja) return sendJSON(res, 409, { error: "Déjà inscrit." });
-  /* Prérequis (lot 3) : les formations exigées doivent être terminées AVANT l'inscription — contrôle serveur. */
-  const manquants = await ParcoursFormation.prerequisManquants(db, f.id, user.id);
-  if (manquants.length) return sendJSON(res, 403, { error: `Cette formation demande d'abord de terminer : ${manquants.map(m => `« ${m.titre} »`).join(', ')}.`, code: 'prerequis_manquants', prerequis: manquants });
-  let montant = 0, acces_gratuit = 0, code_valide = null;
-  if (f.mode_acces === 'payant_sauf_membres') {
-    const code = (body.code||'').trim().toUpperCase();
-    const codeRow = code ? await db.prepare("SELECT * FROM formation_codes_acces WHERE code=? AND actif=1").get(code) : null;
-    if (codeRow && (!codeRow.date_expiration || codeRow.date_expiration > new Date().toISOString())
-        && (!codeRow.limite_utilisations || codeRow.nb_utilisations < codeRow.limite_utilisations)) {
-      acces_gratuit = 1;
-      code_valide = code;
-      await db.prepare("UPDATE formation_codes_acces SET nb_utilisations=nb_utilisations+1 WHERE id=?").run(codeRow.id);
-    } else {
-      montant = f.prix || 0;
-    }
-  } else if (f.mode_acces === 'payant') {
-    montant = f.prix || 0;
-  }
-
-  /* Formation gratuite (ou code d'accès valide) : inscription immédiate, comme avant. */
-  if (montant <= 0) {
-    await db.prepare(`INSERT INTO formation_inscriptions
-      (formation_id,user_id,montant_paye,acces_gratuit_membre,code_acces,paiement_statut)
-      VALUES (?,?,0,?,?,'paye')`).run(params.id, user.id, acces_gratuit, code_valide);
-    creerNotif(user.id, 'formation', 'Inscription confirmée', `Vous êtes inscrit à la formation « ${f.titre} ».`, { formation_id: params.id });
-    return sendJSON(res, 201, { ok: true, acces_gratuit });
-  }
-
-  /* Formation payante : rien n'est confirmé tant que Stripe n'a pas validé le paiement.
-     Même modèle que la billetterie/boutique — voir handleStripeWebhook(). */
-  const { stripe, getOrCreateStripeCustomer } = require('./stripe-client');
-  if (!stripe) return sendJSON(res, 503, { error: "Paiements momentanément indisponibles." });
-  const inscriptionId = (await db.prepare(`INSERT INTO formation_inscriptions
-    (formation_id,user_id,montant_paye,acces_gratuit_membre,code_acces,paiement_statut)
-    VALUES (?,?,0,?,?,'en_attente')`).run(params.id, user.id, acces_gratuit, code_valide)).lastInsertRowid;
-  try {
-    const origin = getOrigin(req);
-    const stripeCustomerId = await getOrCreateStripeCustomer(db, user);
-    const session = await stripe.checkout.sessions.create({
-      mode: 'payment',
-      customer: stripeCustomerId,
-      line_items: [{
-        price_data: {
-          currency: 'eur',
-          unit_amount: Math.round(montant * 100),
-          product_data: { name: f.titre, description: f.organisme || undefined },
-        },
-        quantity: 1,
-      }],
-      metadata: { diaspoactif_formation_inscription_id: String(inscriptionId) },
-      success_url: `${origin}/formations.html?paiement=succes&inscription=${inscriptionId}`,
-      cancel_url: `${origin}/formations.html?paiement=annule&inscription=${inscriptionId}`,
-    });
-    await db.prepare(`UPDATE formation_inscriptions SET stripe_session_id=? WHERE id=?`).run(session.id, inscriptionId);
-    sendJSON(res, 201, { checkout_url: session.url, en_attente_paiement: true });
-  } catch (e) {
-    await db.prepare(`DELETE FROM formation_inscriptions WHERE id=?`).run(inscriptionId);
-    sendJSON(res, 500, SEC.safeError(e, 'formation-checkout'));
-  }
-});
+/* S'inscrire à une formation (POST …/inscrire) et acheter un module (POST …/acquerir) : server/formation-droits.js (lot A, 2026-10-30). */
 
 /* Ajouter un avis */
 route("POST", "/api/formations/:id/avis", async (req, res, params, body) => {
@@ -20130,6 +20086,21 @@ route("GET", "/api/identity/status", async (req, res) => {
 
 /* POST /api/stripe/webhook — événements Identity (vérification) + Connect (comptes vendeurs).
    Appelé AVANT readBody() global (nécessite le corps BRUT pour vérifier la signature). */
+/* Crédite le propriétaire d'une formation de sa vente (commission plateforme 3 %, comme Boutique / Billetterie) — commune aux paiements historiques et aux commandes du lot A. */
+async function crediterVenteFormation(f, montant) {
+  if (!f || !f.owner_user_id || !(montant > 0)) return;
+  const COMMISSION_RATE = 0.03;
+  const platform_fee = parseFloat((montant * COMMISSION_RATE).toFixed(2));
+  const organizer_amount = parseFloat((montant - platform_fee).toFixed(2));
+  await db.prepare(`INSERT INTO wallet_transactions (type,beneficiaire_id,montant,commission_rate,prix_billet,platform_fee,organizer_amount) VALUES ('platform_fee',NULL,?,?,?,?,?)`)
+    .run(platform_fee, COMMISSION_RATE, montant, platform_fee, organizer_amount);
+  await db.prepare(`INSERT INTO wallet_transactions (type,beneficiaire_id,montant,commission_rate,prix_billet,platform_fee,organizer_amount) VALUES ('organizer_credit',?,?,?,?,?,?)`)
+    .run(f.owner_user_id, organizer_amount, COMMISSION_RATE, montant, platform_fee, organizer_amount);
+  await db.prepare(`UPDATE users SET wallet_balance = COALESCE(wallet_balance,0) + ? WHERE id = ?`).run(organizer_amount, f.owner_user_id);
+  await db.prepare(`UPDATE platform_wallet SET total_commissions = total_commissions + ?, total_transactions = total_transactions + 1, updated_at = datetime('now') WHERE id = 1`).run(platform_fee);
+  creerNotif(f.owner_user_id, "commande_vendue", "Nouvelle inscription payante 🎓", `« ${f.titre} » vendue (+${organizer_amount}€).`, { formation_id: f.id });
+}
+
 async function handleStripeWebhook(req, res) {
   const { stripe } = require("./stripe-client");
   /* Deux destinations webhook distinctes existent côté Stripe (chacune avec sa propre clé de
@@ -20440,6 +20411,20 @@ async function handleStripeWebhook(req, res) {
       for (const ligne of lignes) await finaliserCommandeVitrinePayee(Number(ligne.id));
     } else if (event.type === "checkout.session.expired" && event.data.object.metadata?.diaspoactif_panier_checkout === "1") {
       await db.prepare(`UPDATE commandes_vitrine SET paiement_statut=? WHERE stripe_session_id=? AND paiement_statut='en_attente'`).run(require("./payments").STATUT_PAIEMENT.EXPIRE, event.data.object.id);
+    } else if (event.type === "checkout.session.completed" && event.data.object.metadata?.diaspoactif_formation_commande_id) {
+      /* Formation Diaspora, lot A : commande de formation complète OU de module. Idempotent (confirmerCommande ne traite qu'une commande « en_attente »). */
+      const session = event.data.object;
+      const conf = await FormationDroits.confirmerCommande(db, Number(session.metadata.diaspoactif_formation_commande_id), (session.amount_total || 0) / 100);
+      if (conf) {
+        await crediterVenteFormation(conf.formation, conf.montant);
+        creerNotif(conf.commande.user_id, "formation", "Paiement confirmé ✅", `Votre paiement pour « ${conf.formation?.titre || ''} » est confirmé : votre accès est ouvert.`, { formation_id: conf.commande.formation_id });
+        try {
+          const exists = await db.prepare("SELECT id FROM user_formations_suivi WHERE user_id=? AND formation_id=?").get(conf.commande.user_id, conf.commande.formation_id);
+          if (!exists && conf.formation) await db.prepare("INSERT INTO user_formations_suivi (user_id,formation_id,titre,organisme) VALUES (?,?,?,?)").run(conf.commande.user_id, conf.commande.formation_id, conf.formation.titre, conf.formation.organisme||null);
+        } catch(_) {}
+      }
+    } else if (event.type === "checkout.session.expired" && event.data.object.metadata?.diaspoactif_formation_commande_id) {
+      await FormationDroits.annulerCommande(db, Number(event.data.object.metadata.diaspoactif_formation_commande_id), "expiree");
     } else if (event.type === "checkout.session.completed" && event.data.object.metadata?.diaspoactif_formation_inscription_id) {
       /* Paiement formation confirmé — même modèle que Boutique/Billetterie (commission 3%,
          crédit wallet_balance au propriétaire de la formation). Idempotent : ne traite que si
@@ -20451,18 +20436,8 @@ async function handleStripeWebhook(req, res) {
         const session = event.data.object;
         const montant = (session.amount_total || 0) / 100;
         await db.prepare(`UPDATE formation_inscriptions SET paiement_statut='paye', montant_paye=? WHERE id=?`).run(montant, inscriptionId);
-        if (f?.owner_user_id) {
-          const COMMISSION_RATE = 0.03;
-          const platform_fee = parseFloat((montant * COMMISSION_RATE).toFixed(2));
-          const organizer_amount = parseFloat((montant - platform_fee).toFixed(2));
-          await db.prepare(`INSERT INTO wallet_transactions (type,beneficiaire_id,montant,commission_rate,prix_billet,platform_fee,organizer_amount) VALUES ('platform_fee',NULL,?,?,?,?,?)`)
-            .run(platform_fee, COMMISSION_RATE, montant, platform_fee, organizer_amount);
-          await db.prepare(`INSERT INTO wallet_transactions (type,beneficiaire_id,montant,commission_rate,prix_billet,platform_fee,organizer_amount) VALUES ('organizer_credit',?,?,?,?,?,?)`)
-            .run(f.owner_user_id, organizer_amount, COMMISSION_RATE, montant, platform_fee, organizer_amount);
-          await db.prepare(`UPDATE users SET wallet_balance = COALESCE(wallet_balance,0) + ? WHERE id = ?`).run(organizer_amount, f.owner_user_id);
-          await db.prepare(`UPDATE platform_wallet SET total_commissions = total_commissions + ?, total_transactions = total_transactions + 1, updated_at = datetime('now') WHERE id = 1`).run(platform_fee);
-          creerNotif(f.owner_user_id, "commande_vendue", "Nouvelle inscription payante 🎓", `« ${f.titre} » vendue (+${organizer_amount}€).`, { formation_id: f.id });
-        }
+        await FormationDroits.activerDepuisInscription(db, inscriptionId, montant);
+        await crediterVenteFormation(f, montant);
         creerNotif(insc.user_id, "formation", "Inscription confirmée ✅", `Votre paiement pour « ${f?.titre||''} » est confirmé. Accédez à la formation depuis « Mes inscriptions ».`, { formation_id: insc.formation_id });
         /* Alimente aussi le suivi de progression (« Mes inscriptions ») — pour le parcours gratuit
            c'est le frontend qui l'appelle juste après l'inscription instantanée ; ici, côté paiement
@@ -20475,6 +20450,7 @@ async function handleStripeWebhook(req, res) {
       }
     } else if (event.type === "checkout.session.expired" && event.data.object.metadata?.diaspoactif_formation_inscription_id) {
       const inscriptionId = Number(event.data.object.metadata.diaspoactif_formation_inscription_id);
+      await db.prepare(`DELETE FROM formation_acces WHERE inscription_id=? AND module_cle=0 AND statut='en_attente'`).run(inscriptionId);
       await db.prepare(`DELETE FROM formation_inscriptions WHERE id=? AND paiement_statut='en_attente'`).run(inscriptionId);
     } else if (event.type === "checkout.session.completed" && event.data.object.metadata?.diaspoactif_adhesion_paiement_id) {
       /* Paiement Cotisations & Adhésions confirmé (one-off ou 1ère facture d'une subscription).

@@ -272,14 +272,35 @@ function sfRenderSidebar(){
     });
     html += '</div>';
   });
+  html += sfBlocVerrouilles();
   html += '</div><div id="sf-att-zone"></div><div id="sf-cartes-zone"></div>';
   aside.innerHTML = html;
+  aside.querySelectorAll('.sf-obtenir').forEach(b => b.addEventListener('click', () => sfObtenir(b)));
   aside.querySelectorAll('.sf-lecon').forEach(el => el.addEventListener('click', () => sfGoTo(Number(el.dataset.leconId))));
   const rp = document.getElementById('sf-reprendre');
   if (rp) rp.addEventListener('click', () => sfGoTo(Number(p.prochaine_lecon_id)));
   sfRenderAttestation();
   sfRenderCartes();
   sfMajBarreEnregistrement();
+}
+
+/* Modules que l'apprenant n'a pas (encore) obtenus : plan sans contenu, avec achat séparé quand le formateur le propose, et accès à la fiche pour la formation complète (lot A). */
+function sfBlocVerrouilles(){
+  const l = (SF_DATA && SF_DATA.modules_verrouilles) || [];
+  if (!l.length || DECOUVERTE) return '';
+  return `<div class="sf-module"><div class="sf-module-title">🔒 Modules non obtenus</div>${l.map(m => `<div class="sf-chapitre"><div class="sf-chapitre-title"><span>${escH(m.titre)}</span></div>
+    ${m.vendable_seul ? `<button type="button" class="btn btn-sm btn-orange sf-obtenir" data-module-id="${m.id}" style="margin-top:6px;">${m.prix > 0 ? `Obtenir ce module · ${m.prix} €` : 'Obtenir ce module · gratuit'}</button>` : '<div class="sf-chapitre-sub">Inclus dans la formation complète.</div>'}</div>`).join('')}
+    <div class="sf-chapitre"><a class="btn btn-sm btn-outline" style="display:block;text-align:center;box-sizing:border-box;" href="formation-fiche.html?id=${encodeURIComponent(formationId)}">Voir la formation complète</a></div></div>`;
+}
+async function sfObtenir(btn){
+  btn.disabled = true;
+  try {
+    const r = await fetch(`/api/formations/${formationId}/acquerir`, { method: 'POST', headers: {'Content-Type':'application/json'}, credentials: 'same-origin', body: JSON.stringify({ module_id: Number(btn.dataset.moduleId) }) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || 'Impossible pour le moment.');
+    if (d.checkout_url) { location.href = d.checkout_url; return; }
+    location.reload();
+  } catch(e){ btn.disabled = false; alert(e.message); }
 }
 
 /* Cartes mentales rattachées à la formation par le formateur : consultables (et exportables) par les apprenants inscrits. */
@@ -295,6 +316,8 @@ function sfRenderAttestation(){
   const zone = document.getElementById('sf-att-zone');
   const a = SF_DATA.attestation;
   if (!zone || !a || !a.active || SF_DATA.mode === 'apercu' || sansSuivi()) { if (zone) zone.innerHTML = ''; return; }
+  /* Accès limité à quelques modules : le document de fin de FORMATION n'est délivré qu'avec la formation complète (jamais présenté comme atteignable ici). */
+  if (SF_DATA.portee === 'modules') { zone.innerHTML = `<div class="sf-att"><h4>🎓 ${escH(a.type_label)}</h4><div>Ce document est délivré avec la <strong>formation complète</strong>. Vous suivez ici les modules que vous avez obtenus.</div></div>`; return; }
   if (a.delivree) {
     const d = a.delivree;
     zone.innerHTML = `<div class="sf-att ok"><h4>🎓 ${escH(d.type_label)} obtenu(e)</h4>

@@ -14,6 +14,7 @@
    ═════════════════════════════════════════════════ */
 "use strict";
 const crypto = require("crypto");
+const Droits = require("./formation-droits");
 
 const TYPES = {
   participation: { label: "Attestation de participation", mention: "A participé à la formation" },
@@ -63,8 +64,20 @@ function corriger(q, reponse) {
 
 /* ── Parcours d'un apprenant ── */
 async function construireParcours(db, f, inscription) {
-  const modules = await db.prepare("SELECT * FROM formation_modules WHERE formation_id=? ORDER BY ordre ASC, id ASC").all(f.id);
-  const quizRows = await db.prepare("SELECT id, lecon_id, titre, type, note_minimale, correction_auto, temps_limite_min, max_tentatives, melanger, depot_fichier FROM formation_quiz WHERE formation_id=? ORDER BY ordre ASC, id ASC").all(f.id);
+  let modules = await db.prepare("SELECT * FROM formation_modules WHERE formation_id=? ORDER BY ordre ASC, id ASC").all(f.id);
+  /* Accès limité à des modules acquis (lot A) : seuls ceux-là entrent dans le parcours, la progression et les évaluations ; les autres sont listés à part, sans contenu. */
+  const autorises = await Droits.modulesAutorises(db, inscription);
+  let modules_verrouilles = [];
+  if (autorises) {
+    modules_verrouilles = modules.filter(m => !autorises.has(Number(m.id))).map(m => ({ id: Number(m.id), titre: m.titre, description: m.description || "", prix: Droits.prixModule(f, m), vendable_seul: !!Number(m.vendable_seul) }));
+    modules = modules.filter(m => autorises.has(Number(m.id)));
+  }
+  let quizRows = await db.prepare("SELECT id, lecon_id, titre, type, note_minimale, correction_auto, temps_limite_min, max_tentatives, melanger, depot_fichier FROM formation_quiz WHERE formation_id=? ORDER BY ordre ASC, id ASC").all(f.id);
+  if (autorises) {
+    const idsLecons = new Set((await db.prepare("SELECT l.id FROM formation_lecons l JOIN formation_modules m ON m.id=l.module_id WHERE m.formation_id=?").all(f.id)).filter(l => true).map(l => Number(l.id)));
+    const lecModule = {}; (await db.prepare("SELECT l.id, l.module_id FROM formation_lecons l JOIN formation_modules m ON m.id=l.module_id WHERE m.formation_id=?").all(f.id)).forEach(l => { lecModule[Number(l.id)] = Number(l.module_id); });
+    quizRows = quizRows.filter(q => q.lecon_id != null && idsLecons.has(Number(q.lecon_id)) && autorises.has(lecModule[Number(q.lecon_id)]));
+  }
   const termines = new Set();
   const tentativesParQuiz = {};
   if (inscription) {
@@ -128,7 +141,7 @@ async function construireParcours(db, f, inscription) {
 
   const suivante = toutes.find(l => l.obligatoire && !l.termine) || toutes.find(l => !l.termine) || null;
   return {
-    modules, avancement_pct, statut, nb_total: total, nb_termine: nbTermine, nb_restant: Math.max(0, total - nbTermine),
+    modules, modules_verrouilles, avancement_pct, statut, nb_total: total, nb_termine: nbTermine, nb_restant: Math.max(0, total - nbTermine),
     chapitres_total: chapitres.length, chapitres_termines,
     prochaine_lecon_id: suivante ? Number(suivante.id) : null,
     resultat_pct: ev.resultat_pct, conditions: ev.conditions, conditions_ok: ev.ok, quiz: quizRows,
@@ -166,6 +179,8 @@ async function evaluerAttestation(deps, inscriptionId) {
   const { db, creerNotif } = deps;
   const inscription = await db.prepare("SELECT * FROM formation_inscriptions WHERE id=?").get(inscriptionId);
   if (!inscription || inscription.statut !== "active" || inscription.paiement_statut === "en_attente" || inscription.paiement_statut === "echoue") return null;
+  /* Un accès limité à quelques modules ne donne pas droit au document de FORMATION (attestation / certificat) : il faut la formation complète. */
+  if ((inscription.portee || "formation") === "modules") return null;
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(inscription.formation_id);
   if (!f || !Number(f.certificat_actif) || f.suivi_mode === "aucun") return null;
   const deja = await db.prepare("SELECT * FROM formation_attestations WHERE inscription_id=?").get(inscriptionId);
@@ -340,6 +355,7 @@ module.exports.register = function register(deps) {
   const { route, db, sendJSON, getCurrentUser, SEC, checkFormationOwner } = deps;
 
   async function inscriptionActive(formationId, userId) {
+    await Droits.balayerExpirations(db, { userId, formationId });
     return await db.prepare("SELECT * FROM formation_inscriptions WHERE formation_id=? AND user_id=? AND statut='active' AND COALESCE(paiement_statut,'paye')='paye'").get(formationId, userId);
   }
 
@@ -420,6 +436,7 @@ module.exports.register = function register(deps) {
     if (!inscription) return sendJSON(res, 403, { error: "Vous devez être inscrit pour passer ce quiz." });
     const quiz = await db.prepare("SELECT * FROM formation_quiz WHERE id=? AND formation_id=?").get(params.quizId, params.id);
     if (!quiz) return sendJSON(res, 404, { error: "Quiz introuvable." });
+    if (!(await Droits.quizPermis(db, inscription, quiz))) return sendJSON(res, 403, { error: "Ce quiz fait partie d'un module que vous n'avez pas obtenu.", code: "module_non_acquis" });
     sendJSON(res, 200, await etatQuiz(inscription, quiz, false));
   });
 
@@ -431,6 +448,7 @@ module.exports.register = function register(deps) {
     if (!inscription) return sendJSON(res, 403, { error: "Vous devez être inscrit pour passer ce quiz." });
     const quiz = await db.prepare("SELECT * FROM formation_quiz WHERE id=? AND formation_id=?").get(params.quizId, params.id);
     if (!quiz) return sendJSON(res, 404, { error: "Quiz introuvable." });
+    if (!(await Droits.quizPermis(db, inscription, quiz))) return sendJSON(res, 403, { error: "Ce quiz fait partie d'un module que vous n'avez pas obtenu.", code: "module_non_acquis" });
     if (!limiteMin(quiz)) return sendJSON(res, 400, { error: "Ce quiz n'a pas de temps imparti." });
     const etat = await etatQuiz(inscription, quiz, true);
     if (etat.bloque) return sendJSON(res, 409, { error: etat.bloque === "tentatives_epuisees" ? "Vous avez utilisé toutes vos tentatives pour ce quiz." : "Ce quiz n'est plus disponible pour le moment.", code: etat.bloque, ...etat });
@@ -448,6 +466,7 @@ module.exports.register = function register(deps) {
     if (!inscription) return sendJSON(res, 403, { error: "Vous devez être inscrit pour passer ce quiz." });
     const quiz = await db.prepare("SELECT * FROM formation_quiz WHERE id=? AND formation_id=?").get(params.quizId, params.id);
     if (!quiz) return sendJSON(res, 404, { error: "Quiz introuvable." });
+    if (!(await Droits.quizPermis(db, inscription, quiz))) return sendJSON(res, 403, { error: "Ce quiz fait partie d'un module que vous n'avez pas obtenu.", code: "module_non_acquis" });
     const reponses = body && typeof body.reponses === "object" && body.reponses ? body.reponses : {};
     const questions = await db.prepare("SELECT * FROM formation_quiz_questions WHERE quiz_id=? ORDER BY ordre ASC, id ASC").all(quiz.id);
     const manuel = Number(quiz.correction_auto) === 0;

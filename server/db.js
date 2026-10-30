@@ -4871,6 +4871,52 @@ db.exec(`
   );
 `);
 
+/* Formation Diaspora — lot A (2026-10-30) : commandes, droits d'accès par formation OU par module, expiration.
+   formation_acces est la source des droits (états : en_attente, actif, expire, revoque — pas de remboursement de formation) ; module_cle = 0 pour la formation complète, sinon l'id du module
+   (colonne ordinaire plutôt qu'une expression NULL : l'unicité fonctionne pareil en SQLite et en Postgres). formation_inscriptions reste le « parcours » (progression). */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS formation_commandes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    formation_id INTEGER NOT NULL,
+    montant REAL DEFAULT 0,
+    devise TEXT DEFAULT 'EUR',
+    statut TEXT DEFAULT 'en_attente',
+    code_acces TEXT,
+    stripe_session_id TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    paye_le TEXT
+  );
+  CREATE TABLE IF NOT EXISTS formation_commande_lignes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    commande_id INTEGER NOT NULL,
+    module_id INTEGER,
+    libelle TEXT,
+    prix REAL DEFAULT 0
+  );
+  CREATE TABLE IF NOT EXISTS formation_acces (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    formation_id INTEGER NOT NULL,
+    module_cle INTEGER NOT NULL DEFAULT 0,
+    type_acces TEXT DEFAULT 'gratuit',
+    statut TEXT DEFAULT 'en_attente',
+    montant_paye REAL DEFAULT 0,
+    commande_id INTEGER,
+    inscription_id INTEGER,
+    date_debut TEXT,
+    date_expiration TEXT,
+    motif TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(user_id, formation_id, module_cle)
+  );
+`);
+;['prix REAL','vendable_seul INTEGER DEFAULT 0'].forEach(col => { try { db.exec(`ALTER TABLE formation_modules ADD COLUMN ${col}`); } catch(_) {} });
+;['duree_acces_jours INTEGER'].forEach(col => { try { db.exec(`ALTER TABLE formations ADD COLUMN ${col}`); } catch(_) {} });
+;["portee TEXT DEFAULT 'formation'"].forEach(col => { try { db.exec(`ALTER TABLE formation_inscriptions ADD COLUMN ${col}`); } catch(_) {} });
+/* Rattrapage (SQLite) : chaque inscription existante reçoit son droit « formation complète » — idempotent ; côté Postgres, server/formation-droits.js le refait par compte à la demande. */
+try { require("./formation-droits").rattrapageSQL(db); } catch(_) {}
+
 /* L'accréditation createur_formations est supprimée : la création de formations est désormais
    réservée aux comptes Premium (accréditation utilisateur_abonne / initiative_abonne), plus besoin
    de demande séparée. On nettoie les définitions résiduelles pour les bases déjà seedées. */

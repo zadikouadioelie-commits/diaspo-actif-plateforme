@@ -8,6 +8,8 @@ const sessions = {};
 let compteur = 0;
 
 const fauxStripe = {
+  /* Les tests envoient un événement JSON non signé à POST /api/stripe/webhook (STRIPE_WEBHOOK_SECRET factice posé par le test) : aucune vérification de signature ici, jamais en production. */
+  webhooks: { constructEvent(brut) { return JSON.parse(Buffer.isBuffer(brut) ? brut.toString('utf8') : String(brut)); } },
   checkout: {
     sessions: {
       async create(o) {

@@ -644,6 +644,14 @@
             <input id="fb-new-module-titre" class="input-field" style="flex:1;" placeholder="Titre du nouveau module">
             <button class="btn btn-orange btn-sm" id="fb-add-module">+ Ajouter un module</button>
           </div>
+          <div class="card" style="margin-bottom:14px;padding:12px;">
+            <label style="font-size:13px;font-weight:700;" for="fb-duree-acces">⏳ Durée d'accès des apprenants <span class="fb-help" title="Nombre de jours pendant lesquels un apprenant garde l'accès après son inscription ou son achat. Vide = accès illimité. S'applique aux accès ouverts ensuite.">?</span></label>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px;">
+              <input id="fb-duree-acces" type="number" min="1" max="3650" class="input-field" style="width:140px;" placeholder="Illimitée">
+              <span style="font-size:13px;color:var(--muted);">jours</span>
+              <button type="button" class="btn btn-sm btn-outline" id="fb-duree-acces-save">Enregistrer</button>
+            </div>
+          </div>
           <div id="fb-modules-list"></div>
         </div>
 
@@ -1643,9 +1651,20 @@
     if(!await requireLoginForVolet()){ el.innerHTML = '<div class="notice">Connectez-vous pour voir vos inscriptions.</div>'; return; }
     try {
       const rows = await api('GET', '/formations/suivi');
-      if(!rows.length){ el.innerHTML = '<div class="notice">Vous n\'êtes inscrit à aucune formation pour le moment. Explorez le catalogue !</div>'; return; }
+      /* « Mes accès » (lot A) : chaque formation ou module détenu, avec son état et son échéance. */
+      let accesHtml = '';
+      try {
+        const { acces } = await api('GET', '/mes-acces');
+        const ETAT = { actif:['✅ Actif','#166534'], en_attente:['⏳ Paiement en attente','#92400e'], expire:['⌛ Expiré','#64748b'], revoque:['⛔ Retiré','#b91c1c'] };
+        const fmt = d => d ? new Date(String(d).replace(' ','T') + 'Z').toLocaleDateString('fr-FR') : '';
+        if(acces.length) accesHtml = `<div class="card" style="margin-bottom:16px;"><h3 style="margin:0 0 10px;">🔑 Mes accès</h3>${acces.map(a => { const e = ETAT[a.statut] || [a.statut,'#64748b']; return `<div class="flex-between" style="gap:8px;flex-wrap:wrap;padding:8px 0;border-top:1px solid var(--border);align-items:center;">
+            <div style="flex:1;min-width:200px;"><strong>${a.formation_titre}</strong>${a.module_titre ? ' — ' + a.module_titre : ' <span class="tag">Formation complète</span>'}<div style="font-size:12px;color:var(--muted);">${a.type_acces === 'paye' ? 'Payé' + (a.montant_paye ? ' · ' + a.montant_paye + ' €' : '') : a.type_acces === 'code' ? 'Code d\'accès' : 'Gratuit'}${a.date_expiration ? ' · jusqu\'au ' + fmt(a.date_expiration) : ''}</div></div>
+            <span style="font-size:12px;font-weight:800;color:${e[1]};">${e[0]}</span>
+            ${a.statut === 'actif' ? `<a class="btn btn-sm btn-orange" href="suivre-formation.html?id=${a.formation_id}">▶ Ouvrir</a>` : `<a class="btn btn-sm btn-outline" href="formation-fiche.html?id=${a.formation_id}">Voir la fiche</a>`}</div>`; }).join('')}</div>`;
+      } catch(_) {}
+      if(!rows.length){ el.innerHTML = accesHtml + '<div class="notice">Vous n\'êtes inscrit à aucune formation pour le moment. Explorez le catalogue !</div>'; return; }
       const STATUT_LBL = { en_cours:'🟠 En cours', termine:'✅ Terminée', abandonne:'⏸️ Abandonnée', certifie:'📜 Certifiée' };
-      el.innerHTML = rows.map(r => `
+      el.innerHTML = accesHtml + rows.map(r => `
         <div class="card" style="margin-bottom:14px;">
           <div class="flex-between" style="align-items:flex-start;flex-wrap:wrap;gap:8px;">
             <div style="flex:1;">
@@ -2156,6 +2175,7 @@
     el.innerHTML = '<div class="notice">Chargement…</div>';
     try {
       const { modules } = await api('GET', `/formations/${fbFormationId}/modules`);
+      fbChargerDureeAcces();
       fbUpdateOrganisationStats();
       if(!modules.length){ el.innerHTML = '<div class="notice">Aucun module. Ajoutez-en un ci-dessus.</div>'; return; }
       el.innerHTML = modules.map(m => `
@@ -2166,6 +2186,13 @@
               <strong>${m.titre}</strong>
             </div>
             <button class="btn btn-sm btn-outline fb-del-module" data-id="${m.id}">🗑️</button>
+          </div>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:8px 0 0 26px;font-size:13px;">
+            <label style="display:flex;gap:6px;align-items:center;"><input type="checkbox" class="fb-mod-vendable" data-id="${m.id}" ${Number(m.vendable_seul) ? 'checked' : ''}> Vendre ce module séparément</label>
+            <span class="fb-mod-vente" data-id="${m.id}" style="display:${Number(m.vendable_seul) ? 'inline-flex' : 'none'};gap:6px;align-items:center;">
+              <input type="number" min="0" step="0.01" class="input-field fb-mod-prix" data-id="${m.id}" value="${m.prix == null ? '' : m.prix}" placeholder="Prix" style="width:100px;"> € <span style="color:var(--muted);">(0 = gratuit)</span>
+              <button type="button" class="btn btn-sm btn-outline fb-mod-vente-save" data-id="${m.id}">Enregistrer</button>
+            </span>
           </div>
           <div class="fb-chapitres" data-module-id="${m.id}">
             ${(m.chapitres||[]).map(c => `
@@ -2209,7 +2236,32 @@
     } catch(e){ showMsg(e.message||'Erreur.', 'danger'); }
   });
 
+  /* Durée d'accès (jours) — chargée avec la formation, enregistrée via PUT …/reglages. */
+  async function fbChargerDureeAcces(){
+    try {
+      const { formation } = await api('GET', `/formations/${fbFormationId}`);
+      document.getElementById('fb-duree-acces').value = formation.duree_acces_jours || '';
+    } catch(_) {}
+  }
+  document.getElementById('fb-duree-acces-save').addEventListener('click', async () => {
+    const v = document.getElementById('fb-duree-acces').value.trim();
+    try { await api('PUT', `/formations/${fbFormationId}/reglages`, { duree_acces_jours: v === '' ? null : Number(v) }); showMsg(v === '' ? 'Accès illimité enregistré.' : `Durée d'accès : ${v} jour${Number(v) > 1 ? 's' : ''}.`, 'success'); }
+    catch(e){ showMsg(e.message || 'Erreur.', 'danger'); }
+  });
+
   function fbWireModuleEvents(){
+    document.querySelectorAll('.fb-mod-vendable').forEach(cb => cb.addEventListener('change', async () => {
+      const zone = document.querySelector(`.fb-mod-vente[data-id="${cb.dataset.id}"]`);
+      if(cb.checked){ zone.style.display = 'inline-flex'; zone.querySelector('.fb-mod-prix').focus(); return; }
+      zone.style.display = 'none';
+      try { await api('PUT', `/formations/${fbFormationId}/modules/${cb.dataset.id}`, { vendable_seul: 0 }); showMsg('Ce module n\'est plus vendu séparément.', 'success'); }
+      catch(e){ showMsg(e.message || 'Erreur.', 'danger'); cb.checked = true; zone.style.display = 'inline-flex'; }
+    }));
+    document.querySelectorAll('.fb-mod-vente-save').forEach(b => b.addEventListener('click', async () => {
+      const prix = document.querySelector(`.fb-mod-prix[data-id="${b.dataset.id}"]`).value.trim();
+      try { await api('PUT', `/formations/${fbFormationId}/modules/${b.dataset.id}`, { vendable_seul: 1, prix: prix === '' ? null : Number(prix) }); showMsg('Vente du module enregistrée.', 'success'); }
+      catch(e){ showMsg(e.message || 'Erreur.', 'danger'); }
+    }));
     document.querySelectorAll('.fb-del-module').forEach(b=>b.addEventListener('click', async ()=>{
       if(!confirm('Supprimer ce module, ses chapitres et toutes leurs leçons ?')) return;
       await api('DELETE', `/formations/${fbFormationId}/modules/${b.dataset.id}`);
@@ -2999,7 +3051,7 @@
     const params = new URLSearchParams(window.location.search);
     const paiement = params.get('paiement');
     if (!paiement) return;
-    if (paiement === 'succes') showMsg('Paiement confirmé ! Votre inscription est active dans « Mes inscriptions ».', 'success');
+    if (paiement === 'succes') showMsg('Merci ! Votre accès s\'ouvre dès que le paiement est confirmé par notre prestataire (quelques instants) : retrouvez-le dans « Mes accès ».', 'success');
     else if (paiement === 'annule') showMsg('Paiement annulé — vous n\'avez pas été inscrit(e) à cette formation.', 'warning');
     window.history.replaceState({}, '', window.location.pathname);
     if (paiement === 'succes') document.getElementById('sb-tab-inscriptions').click();

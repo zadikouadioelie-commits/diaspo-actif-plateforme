@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<script src="/assets/m-redirect.js"></script>
+<meta charset="UTF-8">
+<link rel="icon" href="/assets/logo.png">
+<title>FORMATION DIASPORA — Fiche de la formation</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="stylesheet" href="assets/styles.v2.css">
+<link rel="stylesheet" href="/assets/responsive.v2.css?v=2">
+<link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0b1226">
+<link rel="apple-touch-icon" href="assets/logo.png">
+<link rel="stylesheet" href="/assets/design-upgrade.v2.css">
+<link rel="stylesheet" href="/assets/theme-manager.css">
+<!-- Design « Nuit dorée » : bleu nuit + or, comme le reste du module Formation -->
+<link rel="stylesheet" href="/assets/theme-nuit-doree.css?v=7">
+<link rel="stylesheet" href="/assets/formations-nuit-doree.css?v=1">
+<style>
+/* Fiche de formation (lot A, 2026-10-30) — tout est préfixé ff- ; couleurs : bleu nuit #0b1226 / #14213f, or #e6b84a, texte blanc */
+.ff-wrap{max-width:1040px;margin:0 auto;padding:20px 16px 60px;color:#fff;}
+.ff-hero{position:relative;border-radius:18px;overflow:hidden;border:1px solid rgba(230,184,74,.35);background:#14213f;min-height:200px;}
+.ff-hero img{display:block;width:100%;max-height:340px;object-fit:cover;}
+.ff-hero-txt{padding:18px 20px 22px;}
+.ff-marque{font-size:11px;font-weight:800;letter-spacing:.14em;color:#e6b84a;text-transform:uppercase;}
+.ff-titre{margin:6px 0 4px;font-size:clamp(22px,4vw,32px);line-height:1.2;color:#fff;}
+.ff-sous{margin:0;color:#c9d3ea;font-size:15px;}
+.ff-meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;}
+.ff-chip{font-size:12.5px;font-weight:700;padding:5px 12px;border-radius:99px;background:rgba(230,184,74,.14);border:1px solid rgba(230,184,74,.4);color:#f4d98a;}
+.ff-grid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:20px;margin-top:20px;align-items:start;}
+@media(max-width:860px){.ff-grid{grid-template-columns:1fr;}}
+.ff-card{background:#14213f;border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:16px 18px;margin-bottom:16px;}
+.ff-card h2{margin:0 0 10px;font-size:16px;color:#e6b84a;}
+.ff-card p,.ff-card li,.ff-card div{color:#e6ecfa;}
+.ff-card ul{margin:0;padding-left:20px;}
+.ff-video{position:relative;padding-top:56.25%;border-radius:12px;overflow:hidden;background:#000;}
+.ff-video iframe,.ff-video video{position:absolute;inset:0;width:100%;height:100%;border:0;}
+.ff-mod{display:flex;gap:10px;align-items:flex-start;justify-content:space-between;padding:12px 0;border-top:1px solid rgba(255,255,255,.08);flex-wrap:wrap;}
+.ff-mod:first-of-type{border-top:0;}
+.ff-mod-t{flex:1;min-width:200px;}
+.ff-mod-t strong{color:#fff;}
+.ff-mod-s{font-size:12.5px;color:#9fb0d4;margin-top:2px;}
+.ff-mod-acces{font-size:12px;font-weight:800;padding:3px 10px;border-radius:99px;background:rgba(34,197,94,.15);color:#86efac;border:1px solid rgba(34,197,94,.4);white-space:nowrap;}
+.ff-offre{position:sticky;top:76px;}
+.ff-prix{font-size:30px;font-weight:900;color:#f4d98a;margin:4px 0 2px;}
+.ff-prix small{font-size:13px;font-weight:600;color:#9fb0d4;}
+.ff-btn{display:block;width:100%;box-sizing:border-box;text-align:center;font-weight:800;font-size:14.5px;border-radius:10px;padding:12px 14px;cursor:pointer;border:1px solid #e6b84a;background:linear-gradient(180deg,#f4d98a,#e6b84a);color:#0b1226;text-decoration:none;}
+.ff-btn:hover{filter:brightness(1.06);}
+.ff-btn.sec{background:transparent;color:#f4d98a;}
+.ff-btn[disabled]{opacity:.6;cursor:wait;}
+.ff-aide{font-size:12.5px;color:#9fb0d4;margin:10px 0 0;line-height:1.5;}
+.ff-erreur{margin-top:10px;font-size:13px;color:#fca5a5;}
+.ff-sig{text-align:center;margin-top:26px;color:#9fb0d4;font-size:13px;letter-spacing:.06em;}
+</style>
+</head>
+<body class="nd">
+<div class="page">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Menu">&#9776;</button>
+      <div class="logo"><img loading="lazy" class="logo-img" src="assets/logo.png" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+      <nav class="nav">
+        <a href="index.html">Accueil</a>
+        <a href="formations.html" class="active">Formations</a>
+      </nav>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="ff-wrap" id="ff-root"><div class="notice" style="text-align:center;padding:60px 0;color:#9fb0d4;">Chargement…</div></main>
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/app.js?v=13"></script>
+<script>
+const FF_ID = new URLSearchParams(location.search).get('id');
+const esc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const euro = n => (Math.round(Number(n) * 100) / 100).toLocaleString('fr-FR', { minimumFractionDigits: Number(n) % 1 ? 2 : 0, maximumFractionDigits: 2 }) + ' €';
+let FF = null, OFFRE = null, CONNECTE = false;
+
+async function ffJson(url, opts){
+  const r = await fetch('/api' + url, Object.assign({ credentials: 'same-origin', headers: { 'Content-Type': 'application/json' } }, opts || {}));
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) { const e = new Error(d.error || 'Une erreur est survenue.'); e.status = r.status; e.data = d; throw e; }
+  return d;
+}
+
+/* Vidéo de présentation : YouTube intégrée, fichier vidéo lu directement, sinon simple lien. */
+function ffVideo(url){
+  if (!url) return '';
+  const yt = String(url).match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{6,})/);
+  if (yt) return `<div class="ff-video"><iframe src="https://www.youtube.com/embed/${esc(yt[1])}" title="Présentation de la formation" allow="accelerometer; encrypted-media; picture-in-picture" allowfullscreen loading="lazy"></iframe></div>`;
+  if (/^https:\/\/.+\.(mp4|webm|ogg)(\?.*)?$/i.test(url)) return `<div class="ff-video"><video controls preload="metadata" src="${esc(url)}"></video></div>`;
+  return /^https?:\/\//i.test(url) ? `<p><a href="${esc(url)}" target="_blank" rel="noopener">▶ Voir la vidéo de présentation</a></p>` : '';
+}
+const dureeTxt = m => !m ? '' : (m >= 60 ? Math.floor(m / 60) + ' h' + (m % 60 ? ' ' + String(m % 60).padStart(2, '0') : '') : m + ' min');
+const lignes = txt => String(txt || '').split(/\r?\n|;/).map(s => s.trim()).filter(Boolean);
+
+function ffRender(){
+  const f = FF, o = OFFRE;
+  const mon = o.mon_acces || { formation: null, modules: {} };
+  const totalMin = o.modules.reduce((a, m) => a + m.duree_minutes, 0);
+  const duree = f.duree || (totalMin ? dureeTxt(totalMin) : '');
+  const image = f.banniere_url || f.image_url;
+  const objectifs = f.objectifs, competences = lignes(f.competences_acquises);
+  const complet = mon.formation && mon.formation.statut === 'actif';
+  const enAttente = mon.formation && mon.formation.statut === 'en_attente';
+  const prixF = o.formation.gratuite ? 0 : o.formation.prix;
+
+  const modulesHtml = o.modules.map(m => {
+    const a = mon.modules[m.id];
+    const actif = complet || (a && a.statut === 'actif');
+    const action = actif
+      ? '<span class="ff-mod-acces">✓ Accès ouvert</span>'
+      : (m.vendable_seul ? `<button type="button" class="ff-btn" style="width:auto;padding:8px 14px;font-size:13px;" data-module="${m.id}">${m.gratuit ? 'Obtenir gratuitement' : 'Obtenir · ' + euro(m.prix)}</button>` : '<span class="ff-mod-s">Inclus dans la formation complète</span>');
+    return `<div class="ff-mod"><div class="ff-mod-t"><strong>${esc(m.titre)}</strong><div class="ff-mod-s">${m.nb_lecons} activité${m.nb_lecons > 1 ? 's' : ''}${m.duree_minutes ? ' · ' + dureeTxt(m.duree_minutes) : ''}</div>${m.description ? `<div class="ff-mod-s">${esc(m.description)}</div>` : ''}</div>${action}</div>`;
+  }).join('');
+
+  document.title = 'FORMATION DIASPORA — ' + f.titre;
+  document.getElementById('ff-root').innerHTML = `
+    <div class="ff-hero">
+      ${image ? `<img src="${esc(image)}" alt="">` : ''}
+      <div class="ff-hero-txt">
+        <div class="ff-marque">Formation Diaspora · Apprendre • Évoluer • Réussir</div>
+        <h1 class="ff-titre">${esc(f.titre)}</h1>
+        ${f.sous_titre || f.description_courte ? `<p class="ff-sous">${esc(f.sous_titre || f.description_courte)}</p>` : ''}
+        <div class="ff-meta">
+          <span class="ff-chip">${o.formation.gratuite ? 'GRATUIT' : euro(prixF)}</span>
+          <span class="ff-chip">${o.modules.length} module${o.modules.length > 1 ? 's' : ''}</span>
+          ${duree ? `<span class="ff-chip">⏱ ${esc(duree)}</span>` : ''}
+          ${f.niveau ? `<span class="ff-chip">${esc(f.niveau)}</span>` : ''}
+          ${f.auteur_nom || f.organisme ? `<span class="ff-chip">Par ${esc(f.organisme || f.auteur_nom)}</span>` : ''}
+          ${o.formation.duree_acces_jours ? `<span class="ff-chip">Accès ${o.formation.duree_acces_jours} jours</span>` : ''}
+        </div>
+      </div>
+    </div>
+    <div class="ff-grid">
+      <div>
+        ${f.video_intro ? `<div class="ff-card"><h2>Présentation en vidéo</h2>${ffVideo(f.video_intro)}</div>` : ''}
+        ${f.description ? `<div class="ff-card"><h2>Présentation générale</h2><div>${f.description}</div></div>` : ''}
+        ${objectifs ? `<div class="ff-card"><h2>Objectifs pédagogiques</h2><div>${objectifs}</div></div>` : ''}
+        ${competences.length ? `<div class="ff-card"><h2>Compétences à acquérir</h2><ul>${competences.map(c => `<li>${esc(c)}</li>`).join('')}</ul></div>` : ''}
+        ${f.public_concerne ? `<div class="ff-card"><h2>À qui s'adresse cette formation</h2><p>${esc(f.public_concerne)}</p></div>` : ''}
+        <div class="ff-card"><h2>Les modules</h2>${modulesHtml || '<p>Le contenu sera bientôt disponible.</p>'}</div>
+        ${f.auteur_nom || f.organisme ? `<div class="ff-card"><h2>Le formateur</h2><p><strong>${esc(f.organisme || f.auteur_nom)}</strong></p></div>` : ''}
+      </div>
+      <aside class="ff-offre">
+        <div class="ff-card">
+          <h2>Formation complète</h2>
+          <div class="ff-prix">${o.formation.gratuite ? 'Gratuit' : euro(prixF)}</div>
+          <div class="ff-mod-s" style="margin-bottom:12px;">Tous les modules, le suivi de progression${f.certificat_actif ? ' et le document de fin de formation' : ''}.</div>
+          ${complet ? `<a class="ff-btn" href="suivre-formation.html?id=${encodeURIComponent(f.id)}">Accéder à ma formation →</a>`
+            : enAttente ? '<button type="button" class="ff-btn" id="ff-reprendre">Finaliser mon paiement</button>'
+            : `<button type="button" class="ff-btn" id="ff-complete">${o.formation.gratuite ? 'Accéder gratuitement' : 'Obtenir la formation complète'}</button>`}
+          ${o.modules.some(m => m.vendable_seul) && !complet ? '<p class="ff-aide">Vous pouvez aussi obtenir un seul module : choisissez-le dans la liste ci-contre. Vous n\'aurez accès qu\'au module obtenu.</p>' : ''}
+          ${!o.formation.gratuite ? '<p class="ff-aide">🔒 Paiement sécurisé par Stripe. Votre accès s\'ouvre dès que le paiement est confirmé.</p>' : ''}
+          <div class="ff-erreur" id="ff-erreur" role="alert"></div>
+        </div>
+      </aside>
+    </div>
+    <div class="ff-sig">Apprendre • Évoluer • Réussir</div>`;
+
+  const aller = (cible, corps) => ffAcquerir(cible, corps);
+  const bc = document.getElementById('ff-complete'); if (bc) bc.addEventListener('click', () => aller(bc, {}));
+  const br = document.getElementById('ff-reprendre'); if (br) br.addEventListener('click', () => aller(br, {}));
+  document.querySelectorAll('[data-module]').forEach(b => b.addEventListener('click', () => aller(b, { module_id: Number(b.dataset.module) })));
+}
+
+async function ffAcquerir(bouton, corps){
+  const err = document.getElementById('ff-erreur'); err.textContent = '';
+  if (!CONNECTE) { location.href = 'login.html?redirect=' + encodeURIComponent(location.pathname + location.search); return; }
+  bouton.disabled = true;
+  try {
+    const d = await ffJson(`/formations/${encodeURIComponent(FF_ID)}/acquerir`, { method: 'POST', body: JSON.stringify(corps) });
+    if (d.checkout_url) { location.href = d.checkout_url; return; }
+    location.href = `suivre-formation.html?id=${encodeURIComponent(FF_ID)}`;
+  } catch (e) {
+    bouton.disabled = false;
+    if (e.status === 409 && /déjà/i.test(e.message)) { await ffCharger(); return; }
+    err.textContent = e.message;
+  }
+}
+
+async function ffCharger(){
+  try {
+    const [{ formation }, offre] = await Promise.all([ffJson('/formations/' + encodeURIComponent(FF_ID)), ffJson(`/formations/${encodeURIComponent(FF_ID)}/offre`)]);
+    FF = formation; OFFRE = offre;
+    ffRender();
+  } catch (e) {
+    document.getElementById('ff-root').innerHTML = `<div class="ff-card" style="text-align:center;">${esc(e.status === 404 ? 'Cette formation est introuvable ou n\'est pas publiée.' : e.message)} <p><a href="formations.html">← Retour au catalogue</a></p></div>`;
+  }
+}
+
+(async function(){
+  if (!FF_ID) { document.getElementById('ff-root').innerHTML = '<div class="ff-card">Formation introuvable.</div>'; return; }
+  try { CONNECTE = !!(await fetchCurrentUser()); } catch (_) { CONNECTE = false; }
+  await ffCharger();
+})();
+</script>
+</body>
+</html>
