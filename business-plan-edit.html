@@ -198,6 +198,65 @@ html,body{height:100%;overflow:hidden;}
   .swot-grid{grid-template-columns:1fr;}
 }
 
+/* ===== ÉDITEUR SUR TÉLÉPHONE (2026-10-30, demande explicite : « possible par téléphone… ergonomique et accessible ») =====
+   Avant : le menu des 20 étapes glissait hors écran (left:-260px) SANS aucun bouton pour l'ouvrir — on restait bloqué sur une seule étape.
+   Maintenant : barre « Les étapes » toujours visible en haut (étape en cours, précédente/suivante), menu des étapes en tiroir avec voile,
+   boutons Précédente/Suivante en bas de chaque étape, cibles tactiles de 44 px, assistant IA fermé au départ et à la largeur de l'écran. */
+#bp-mobbar,#bp-scrim,.bp-mobnav,.bp-sidebar-close{display:none;}
+@media(max-width:768px){
+  .bp-shell{height:calc(100dvh - 56px);}
+  .bp-main{overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;}
+  .bp-content{flex:none;overflow:visible;padding:16px 14px 110px;}
+  .bp-topbar{flex-wrap:wrap;padding:10px 14px;}
+  .bp-topbar .bp-title-input{flex:1 1 100%;font-size:17px;padding:6px 0;}
+  #bp-mobbar{display:flex;position:sticky;top:0;z-index:30;align-items:center;gap:8px;padding:8px 12px;background:#fff;border-bottom:1px solid var(--border);box-shadow:0 2px 10px rgba(0,0,0,.08);flex:none;}
+  #bp-mobbar button{min-height:44px;border-radius:12px;border:1px solid var(--border);background:var(--surface2,#f3f4f6);color:var(--text);font:700 14px/1.1 inherit;font-family:inherit;cursor:pointer;}
+  #bp-mobbar .mb-etapes{padding:0 14px;white-space:nowrap;background:#2563EB;border-color:#2563EB;color:#fff;}
+  #bp-mobbar .mb-cur{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;}
+  #bp-mobbar .mb-cur b{font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  #bp-mobbar .mb-cur small{font-size:11px;color:var(--muted);}
+  #bp-mobbar .mb-arrow{width:44px;font-size:20px;}
+  #bp-mobbar button[disabled]{opacity:.35;}
+  .bp-sidebar{position:fixed;top:0;bottom:0;left:-110%;width:min(88vw,340px);height:auto;z-index:2147483001;box-shadow:6px 0 30px rgba(0,0,0,.35);overflow-y:auto;}
+  .bp-sidebar.open{left:0;}
+  html body .bp-sidebar-close{display:flex;align-items:center;justify-content:center;position:absolute!important;top:8px;right:8px;width:44px;height:44px;border-radius:12px;border:1px solid var(--border);background:var(--surface2,#f3f4f6);color:var(--text);font-size:18px;cursor:pointer;z-index:2;}
+  .bp-sidebar-head{padding-right:60px;}
+  .bp-nav-item{padding:13px 16px;font-size:15px;}
+  #bp-scrim{position:fixed;inset:0;z-index:2147483000;background:rgba(0,0,0,.55);}
+  #bp-scrim.open{display:block;}
+  .bp-mobnav{display:flex;gap:10px;margin:6px 0 0;}
+  .bp-mobnav button{flex:1;min-height:48px;border-radius:14px;border:1px solid var(--border);background:var(--surface2,#f3f4f6);color:var(--text);font:700 14px/1.2 inherit;font-family:inherit;cursor:pointer;}
+  .bp-mobnav button.suiv{background:#2563EB;border-color:#2563EB;color:#fff;}
+  .bp-mobnav button[disabled]{opacity:.35;}
+  #bpa-widget{right:12px;bottom:84px;}
+  #bpa-panel{width:calc(100vw - 24px);max-height:62vh;}
+  .bp-content input:not([type=checkbox]):not([type=radio]):not([type=range]),.bp-content select,.bp-content textarea{font-size:16px;min-height:44px;}
+  /* Habillage « Nuit dorée » (la page porte body.nd-bp) : mêmes teintes que la barre du haut */
+  html body.nd-bp #bp-mobbar{background:rgba(8,13,30,.97);border-bottom:1px solid var(--bp-bord);box-shadow:0 6px 18px rgba(0,0,0,.5);}
+  html body.nd-bp #bp-mobbar .mb-cur b{color:#fff;}
+  html body.nd-bp #bp-mobbar .mb-cur small{color:var(--bp-doux);}
+  html body.nd-bp #bp-mobbar button:not(.mb-etapes),html body.nd-bp .bp-sidebar-close,html body.nd-bp .bp-mobnav button{background:var(--bp-verre2);border:1px solid var(--bp-bord);color:var(--bp-texte);}
+  html body.nd-bp #bp-mobbar .mb-etapes,html body.nd-bp .bp-mobnav button.suiv{background:var(--bp-degore);border:0;color:#1a1202;}
+  html body.nd-bp .bp-sidebar{background:#0A1024;}
+  html body.nd-bp .bp-nav-item{padding:13px 12px;}
+  html body.nd-bp .bp-topbar{padding:10px 14px;gap:8px 10px;}
+  html body.nd-bp .bp-topbar .bp-title-input{flex:1 1 100%;min-width:0;}
+  /* Marges réduites : à 375 px les cartes (28 px de marge) ne laissaient que 253 px aux tableaux et aux champs */
+  html body.nd-bp .bp-card-inner{padding:16px 14px;border-radius:16px;}
+  .bp-content{padding:14px 10px 110px;}
+}
+
+/* Fenêtres Collaborateurs / Historique / Complétude (2026-10-30) : carte blanche en ligne + texte et champs clairs du thème Nuit dorée = illisible ;
+   largeur fixe de 500 px = débordement sur téléphone. Carte sombre cohérente avec la page ; sur téléphone, panneau qui monte du bas, pleine largeur. */
+html body.nd-bp .modal-bg > div{background:#0E1530!important;color:var(--bp-texte);border:1px solid var(--bp-bord);max-width:calc(100vw - 20px);}
+@media(max-width:768px){
+  html body.nd-bp .modal-bg{align-items:flex-end!important;}
+  html body.nd-bp .modal-bg > div{width:100%!important;max-width:100%!important;max-height:88dvh!important;border-radius:18px 18px 0 0!important;border-bottom:0;}
+  html body.nd-bp .modal-bg input,html body.nd-bp .modal-bg select{min-height:44px;font-size:16px;}
+  html body.nd-bp #modal-collab > div > div:nth-child(2) > div:first-child{flex-wrap:wrap;}
+  html body.nd-bp #modal-collab #collab-search{flex:1 1 100%;}
+}
+
 /* ===== ASSISTANT BP ===== */
 #bpa-widget{position:fixed;bottom:24px;right:24px;z-index:400;display:flex;flex-direction:column;align-items:flex-end;gap:10px;}
 #bpa-toggle{width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#6d28d9,#a78bfa);border:none;cursor:pointer;box-shadow:0 4px 20px rgba(109,40,217,.4);display:flex;align-items:center;justify-content:center;font-size:26px;transition:transform .2s;position:relative;}
@@ -366,7 +425,9 @@ body.bp-type-agriculture .bp-conditionnel-agriculture { display: block; }
   <div class="bp-shell" id="bp-shell">
 
     <!-- SIDEBAR navigation -->
+    <div id="bp-scrim" onclick="bpMobEtapes(false)"></div>
     <div class="bp-sidebar" id="bp-sidebar">
+      <button type="button" class="bp-sidebar-close" onclick="bpMobEtapes(false)" aria-label="Fermer la liste des étapes">✕</button>
       <div class="bp-sidebar-head">
         <div class="bp-name" id="sidebar-name">Chargement…</div>
         <div class="prog-bar"><div class="fill" id="sidebar-prog" style="width:0%"></div></div>
@@ -388,6 +449,12 @@ body.bp-type-agriculture .bp-conditionnel-agriculture { display: block; }
 
     <!-- ZONE PRINCIPALE -->
     <div class="bp-main" id="bp-main">
+      <div id="bp-mobbar">
+        <button type="button" class="mb-etapes" onclick="bpMobEtapes(true)" aria-controls="bp-sidebar">☰ Étapes</button>
+        <div class="mb-cur"><b id="mb-cur-n">—</b><small id="mb-cur-i"></small></div>
+        <button type="button" class="mb-arrow" id="mb-prev" onclick="bpMobPas(-1)" aria-label="Étape précédente">‹</button>
+        <button type="button" class="mb-arrow" id="mb-next" onclick="bpMobPas(1)" aria-label="Étape suivante">›</button>
+      </div>
       <div class="bp-topbar">
         <input class="bp-title-input" id="bp-title-input" placeholder="Nom du projet…" onchange="patchMeta()">
         <span class="bp-save-status" id="save-status">✓ Sauvegardé</span>
@@ -894,6 +961,8 @@ async function loadBP() {
     appliquerNiveauProfondeur(bp.niveau_profondeur || 'essentiel');
     document.getElementById('bp-niveau-select').value = bp.niveau_profondeur || 'essentiel';
     bpAppliquerConditionnels();
+    const s0 = new URLSearchParams(location.search).get('s');   /* ?s=<étape> : ouvre directement cette étape (liens de l'appli téléphone) */
+    if (s0 && SECTIONS.some(x => x.key === s0)) currentSection = s0;
     buildNav();
     updateProgress(bp.progression||0);
     renderSection(currentSection);
@@ -958,6 +1027,7 @@ function buildNav() {
       <span class="check">${check ? (ok?'✅':'⚠️') : ''}</span>
     </div>`;
   }).join('');
+  bpMobMaj();
 }
 
 function navToBase(key) {
@@ -966,6 +1036,36 @@ function navToBase(key) {
   buildNav();
   renderSection(key);
   loadComments(key);
+  bpMobEtapes(false);
+  const bm = document.getElementById('bp-main'); if (bm) bm.scrollTop = 0;
+}
+
+/* ---- Téléphone : liste des étapes en tiroir, étape précédente / suivante (2026-10-30) ---- */
+function bpMobEtapes(ouvrir) {
+  const sb = document.getElementById('bp-sidebar'), sc = document.getElementById('bp-scrim');
+  if (sb) sb.classList.toggle('open', !!ouvrir);
+  if (sc) sc.classList.toggle('open', !!ouvrir);
+  if (ouvrir) { const a = document.querySelector('#bp-nav .bp-nav-item.active'); if (a && a.scrollIntoView) a.scrollIntoView({ block: 'center' }); }
+}
+function bpMobPas(d) {
+  const i = SECTIONS.findIndex(s => s.key === currentSection), n = SECTIONS[i + d];
+  if (n) navTo(n.key);
+}
+function bpMobMaj() {
+  const i = SECTIONS.findIndex(s => s.key === currentSection), def = SECTIONS[i];
+  const n = document.getElementById('mb-cur-n'), k = document.getElementById('mb-cur-i');
+  if (n && def) n.textContent = def.icon + ' ' + def.label;
+  if (k) k.textContent = i >= 0 ? 'Étape ' + (i + 1) + ' sur ' + SECTIONS.length : '';
+  const pv = document.getElementById('mb-prev'), nx = document.getElementById('mb-next');
+  if (pv) pv.disabled = i <= 0;
+  if (nx) nx.disabled = i < 0 || i >= SECTIONS.length - 1;
+}
+function bpMobNavHtml() {
+  const i = SECTIONS.findIndex(s => s.key === currentSection), pr = SECTIONS[i - 1], nx = SECTIONS[i + 1];
+  return `<div class="bp-mobnav">
+    <button type="button" onclick="bpMobPas(-1)" ${pr ? '' : 'disabled'}>‹ ${pr ? pr.label : 'Précédente'}</button>
+    <button type="button" class="suiv" onclick="bpMobPas(1)" ${nx ? '' : 'disabled'}>${nx ? nx.label : 'Suivante'} ›</button>
+  </div>`;
 }
 
 /* ---- Auto-save ---- */
@@ -1179,6 +1279,7 @@ function renderSection(key) {
         </div>
       </div>`);
   }
+  content.insertAdjacentHTML('beforeend', bpMobNavHtml());   /* visible seulement sur téléphone (CSS) */
   content.scrollTop = 0;
 }
 
@@ -5636,6 +5737,7 @@ window.addEventListener('beforeunload', (e) => {
   setInterval(saveCurrentSection, 60000);
   // Ouvrir l'assistant automatiquement après 1.5s
   setTimeout(() => {
+    if (window.innerWidth <= 768) return;   /* téléphone : l'assistant couvrirait l'écran, on l'ouvre au toucher du bouton */
     toggleBPA();
     bpaUpdateContext();
   }, 1500);

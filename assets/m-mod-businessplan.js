@@ -13,10 +13,11 @@
 
    Toutes les données viennent de la vraie API (/api/business-plans*). Le plan est stocké côté
    serveur (colonne sections_json) : rien n'est local au navigateur.
-   Ce qui reste « sur ordinateur » : tableaux financiers détaillés, listes (produits, risques,
-   phases, annexes, dettes, immobilisations…), outils stratégiques, génération du dossier
-   PDF/PowerPoint, simulation de présentation et défense par l'IA, transmission à Diaspo'Actif,
-   versions, collaborateurs, pièces jointes, médias.
+   Tout se fait sur téléphone (2026-10-30, demande explicite : « enlève la restriction d'ordinateur… ergonomique et accessible par téléphone ») :
+   les champs texte, la création, la copie et la transmission à Diaspo'Actif sont natifs ici ; les tableaux financiers détaillés, listes (produits,
+   risques, phases, annexes, dettes, immobilisations…), outils stratégiques, versions, collaborateurs, pièces jointes et médias se complètent dans
+   l'éditeur complet du site, ouvert directement sur l'étape voulue (business-plan-edit.html?id=…&s=<étape>) et adapté au téléphone
+   (liste des étapes en tiroir, étape précédente/suivante). Dossier PDF/PowerPoint et simulation de présentation : pages du site, également adaptées.
    ============================================================ */
 (function () {
   'use strict';
@@ -196,7 +197,7 @@ textarea.bpm-in{min-height:96px;resize:vertical;line-height:1.45}
     impact: ['economique', 'social', 'environnemental', 'territorial', 'kpi_impact'],
     financement: ['utilisation', 'contreparties', 'roi', 'recherche_active', 'calendrier_decaissement', 'financement_par_etapes', 'scenario_financement_50', 'scenario_financement_100', 'scenario_financement_150', 'strategie_sortie', 'roi_sortie']
   };
-  /* Étapes dont une partie (listes, chiffres, outils) n'est pas modifiable sur téléphone. */
+  /* Étapes dont une partie (listes, chiffres, outils) se complète dans l'éditeur complet (adapté au téléphone) plutôt qu'ici. */
   const PARTIEL = new Set(['infos_generales', 'presentation', 'probleme', 'solution', 'marche', 'business_model', 'strategie_marketing', 'plan_commercial', 'plan_operationnel', 'organisation', 'rh', 'impact', 'financement']);
   const SEULEMENT_ORDI = new Set(['produits', 'calendrier', 'plan_financier', 'risques', 'annexes']);
 
@@ -211,7 +212,7 @@ textarea.bpm-in{min-height:96px;resize:vertical;line-height:1.45}
   const alive = my => my === nav && !!S.pane && S.pane.k === 'businessplan';
   const go = h => { location.hash = h; };
   const SITE_LISTE = 'business-plan.html';
-  const siteEdit = id => 'business-plan-edit.html?id=' + encodeURIComponent(id);
+  const siteEdit = (id, etape) => 'business-plan-edit.html?id=' + encodeURIComponent(id) + (etape ? '&s=' + encodeURIComponent(etape) : '');
   const siteView = id => 'business-plan-view.html?id=' + encodeURIComponent(id);
   const siteDossier = id => 'business-plan-dossier.html?id=' + encodeURIComponent(id);
   const siteSimu = id => 'business-plan-simulation.html?bp=' + encodeURIComponent(id);
@@ -260,7 +261,8 @@ textarea.bpm-in{min-height:96px;resize:vertical;line-height:1.45}
   const group = (titre, inner) => inner ? `<div class="bpm-g">${esc(titre)}</div>${inner}` : '';
   const mini = (titre, rows) => `<div class="bpm-mc"><b>${esc(titre || 'Sans nom')}</b>${rows.filter(r => has(r[1])).map(r => `<div class="bpm-r"><span>${esc(r[0])} :</span> ${esc(r[1])}</div>`).join('')}</div>`;
   const wrap = inner => `<div class="card"><div class="pad">${inner}</div></div>`;
-  const deskNote = (id, texte) => `<div class="bpm-note"><b>À finir sur ordinateur.</b> ${esc(texte)} <a href="${siteEdit(id)}" style="text-decoration:underline;font-weight:700">Ouvrir l’éditeur du site</a></div>`;
+  /* Passage vers l'éditeur complet (adapté au téléphone), directement sur l'étape voulue. */
+  const editorNote = (id, texte, etape) => `<div class="bpm-note">${esc(texte)}</div><a class="btn block" style="margin:0 0 12px" href="${siteEdit(id, etape)}">${ic('desk', 's')} Ouvrir dans l’éditeur complet</a>`;
   const badge = (txt, cls) => `<span class="badge ${cls || ''}">${esc(txt)}</span>`;
 
   /* ---------- lecture d'une étape ---------- */
@@ -377,7 +379,7 @@ textarea.bpm-in{min-height:96px;resize:vertical;line-height:1.45}
         <div class="kv"><span>Chiffre d’affaires</span><span>${esc(mny(y.ca, bp))}</span></div>
         ${y.avecCharges ? `<div class="kv"><span>Charges saisies</span><span>${esc(mny(y.charges, bp))}</span></div>
         <div class="kv"><span>Résultat estimé</span><span style="font-weight:800;color:${y.resultat >= 0 ? 'var(--green)' : 'var(--red)'}">${esc(mny(y.resultat, bp))}</span></div>` : '<div class="small muted">Charges non renseignées</div>'}</div>`).join('')
-        + (ans.some(y => y.avecCharges) ? `<p class="small muted" style="margin:0 0 12px">Résultat estimé avant amortissements et intérêts d’emprunt : le calcul complet se fait sur ordinateur.</p>` : '');
+        + (ans.some(y => y.avecCharges) ? `<p class="small muted" style="margin:0 0 12px">Résultat estimé avant amortissements et intérêts d’emprunt : le calcul complet se fait dans l’éditeur complet.</p>` : '');
     }
     const ress = Object.keys(PF_RESS).filter(k => has(pf[k]));
     const emp = Object.keys(PF_EMP).filter(k => has(pf[k]));
@@ -468,7 +470,7 @@ textarea.bpm-in{min-height:96px;resize:vertical;line-height:1.45}
     };
     const draw = () => {
       setPane(T, `${ex.map(exempleCartouche).join('')}<div class="chips" role="tablist">${tabs.map(t => `<button class="chip ${listTab === t[0] ? 'on' : ''}" role="tab" aria-selected="${listTab === t[0]}" data-t="${t[0]}">${esc(t[1])}${t[2] ? ' (' + t[2] + ')' : ''}</button>`).join('')}</div>${corps()}
-        <div class="bpm-note" style="margin-top:14px">Transmission à Diaspo’Actif, dossier investisseur (PDF et PowerPoint), simulation de présentation et aide de l’IA : <a href="${SITE_LISTE}" style="text-decoration:underline;font-weight:700">à faire sur ordinateur</a>.</div>`,
+        <div class="bpm-note" style="margin-top:14px">Transmission à Diaspo’Actif, dossier investisseur (PDF et PowerPoint), simulation de présentation et aide de l’IA : ouvrez un plan, tout se trouve dans « Actions » et « Aller plus loin ».</div>`,
         `<a class="btn block" href="#/businessplan/new">${ic('plus', 's')} Nouveau business plan</a>`);
       $$('#pane-body .chip').forEach(c => c.onclick = () => { listTab = c.dataset.t; draw(); });
       const g = $('#bpm-goex'); if (g) g.onclick = () => { const x = $('#bpm-exemple'); if (x) x.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
@@ -492,7 +494,7 @@ textarea.bpm-in{min-height:96px;resize:vertical;line-height:1.45}
           <select class="bpm-in" id="bpm-sec"><option value="">Choisir…</option>${SECTEURS.map(s => `<option>${esc(s)}</option>`).join('')}</select></div>
         <div class="bpm-lbl" id="bpm-tpl-l">Modèle de business plan</div>
         <div class="bpm-tpl" role="radiogroup" aria-labelledby="bpm-tpl-l">${MODELES.map((m, i) => `<label class="bpm-tp ${i === 0 ? 'on' : ''}"><input type="radio" name="bpm-tpl" value="${m[0]}" ${i === 0 ? 'checked' : ''}><b>${esc(m[1])}</b><small>${esc(m[2])}</small></label>`).join('')}</div>
-        <p class="small muted" style="margin:0 0 4px">Vous pourrez ensuite remplir chaque étape ici, sur téléphone, ou continuer sur ordinateur.</p>
+        <p class="small muted" style="margin:0 0 4px">Vous remplirez ensuite chaque étape directement sur votre téléphone.</p>
       </form></div></div>`,
       `<button class="btn block" id="bpm-create">Créer le business plan</button>`);
     if (!alive(my)) return;
@@ -596,17 +598,19 @@ textarea.bpm-in{min-height:96px;resize:vertical;line-height:1.45}
         ${proprio ? `<button class="btn out block bpm-danger" id="bpm-del" style="margin-top:10px">Supprimer ce plan</button>` : ''}
       </div></div>
 
-      <div class="bpm-note"><b>À finir sur ordinateur.</b> Tableaux financiers détaillés, listes (produits, risques, phases, annexes), outils stratégiques, versions, collaborateurs, pièces jointes et médias.</div>
+      <div class="h2">ALLER PLUS LOIN</div>
+      ${modif ? `<div class="bpm-note"><b>Tout se fait sur téléphone.</b> Les étapes texte se modifient ici ; les tableaux financiers, listes (produits, risques, phases, annexes), outils stratégiques, versions, collaborateurs, pièces jointes et médias se complètent dans l’éditeur complet, adapté au téléphone.</div>` : ''}
       <div class="lst">
         ${bp.is_public ? '' : `<a class="li" href="${siteDossier(id)}"><span class="ic">${ic('file')}</span><span class="sp"><span class="t">Dossier investisseur</span><br><span class="d">Génération PDF et PowerPoint</span></span><span class="ch">${ic('out', 's')}</span></a>`}
         ${modif ? `<a class="li" href="${siteEdit(id)}"><span class="ic">${ic('desk')}</span><span class="sp"><span class="t">Éditeur complet</span><br><span class="d">Toutes les étapes, aide de l’IA, versions</span></span><span class="ch">${ic('out', 's')}</span></a>` : ''}
         ${proprio ? `<a class="li" href="${siteSimu(id)}"><span class="ic">${ic('people')}</span><span class="sp"><span class="t">Simulation de présentation</span><br><span class="d">S’entraîner à défendre son projet</span></span><span class="ch">${ic('out', 's')}</span></a>
-        <a class="li" href="${SITE_LISTE}"><span class="ic">${ic('send')}</span><span class="sp"><span class="t">Transmettre à Diaspo’Actif</span><br><span class="d">Depuis la page « Mes business plans »</span></span><span class="ch">${ic('out', 's')}</span></a>` : ''}
+        <button type="button" class="li" id="bpm-transmettre" style="width:100%;text-align:left;background:none;border:0;font:inherit;color:inherit"><span class="ic">${ic('send')}</span><span class="sp"><span class="t">Transmettre à Diaspo’Actif</span><br><span class="d">Demander un financement ou un accompagnement</span></span><span class="ch">${ic('chev', 's')}</span></button>` : ''}
         <a class="li" href="${siteView(id)}"><span class="ic">${ic('doc')}</span><span class="sp"><span class="t">Version document complète</span><br><span class="d">${bp.is_public ? 'Mise en page du site, lecture seule' : 'Mise en page du site, impression'}</span></span><span class="ch">${ic('out', 's')}</span></a>
       </div>`;
     setPane(bp.nom_projet || 'Business plan', html);
 
     const rn = $('#bpm-rename'); if (rn) rn.onclick = () => renameSheet(bp, () => planScreen(id));
+    const tr = $('#bpm-transmettre'); if (tr) tr.onclick = () => transmettreSheet(bp, () => planScreen(id));
     $('#bpm-dup').onclick = async ev => {
       if (!confirm(bp.is_public ? 'Créer une copie de cet exemple dans vos business plans ?' : 'Créer une copie de « ' + (bp.nom_projet || 'ce plan') + ' » dans vos business plans ?')) return;
       const b = ev.currentTarget; b.disabled = true;
@@ -638,6 +642,86 @@ textarea.bpm-in{min-height:96px;resize:vertical;line-height:1.45}
       catch (e) { b.disabled = false; b.textContent = 'Enregistrer'; err.textContent = (e.message || 'L’enregistrement a échoué.') + ' Réessayez.'; }
     };
     setTimeout(() => { const f = $('#bpm-rn'); if (f) { f.focus(); f.select(); } }, 80);
+  }
+
+  /* ============================================================
+     TRANSMISSION À DIASPO'ACTIF (2026-10-30) — équivalent téléphone de la fenêtre de business-plan.html :
+     formulaire → récapitulatif → envoi (POST /api/business-plans/:id/transmettre). Pièce jointe : à ajouter depuis l'éditeur complet.
+     ============================================================ */
+  const BESOINS = [['financement', '💰 Recherche de financement'], ['accompagnement', '🤝 Recherche d’accompagnement'], ['organisme_financier', '🏦 Recherche d’un organisme financier'],
+    ['partenaires', '👥 Recherche de partenaires'], ['visibilite', '📢 Recherche de visibilité'], ['orientation', '🧭 Besoin d’orientation'],
+    ['financement_accompagnement', '🔄 Financement + accompagnement'], ['autre', '✏️ Autre']];
+  function transmettreSheet(bp, after) {
+    const nom = bp.nom_projet || 'Sans titre';
+    const actif = arr(bp.transmissions).find(x => !['abouti', 'sans_suite'].includes(x.statut));
+    if (actif) {
+      const close = A.openSheet(`<h2 style="margin:4px 0 8px;font-size:19px">Transmettre à Diaspo’Actif</h2>
+        <p class="small muted" style="margin:0 0 12px">Une transmission est déjà en cours pour « ${esc(nom)} » (statut : ${esc(TRANSMISSION[actif.statut] || actif.statut)}). Vous pourrez en faire une nouvelle une fois le dossier clôturé.</p>
+        <button class="btn out block" id="bpm-tr-ok">Fermer</button>`);
+      $('#bpm-tr-ok').onclick = close;
+      return;
+    }
+    const s = obj(bp.sections), pf = obj(s.plan_financier);
+    const rec = has(pf.financement_recherche) ? pf.financement_recherche : obj(s.financement).montant;
+    const nb = Number(String(rec == null ? '' : rec).replace(/\s/g, '').replace(',', '.'));
+    const st = { orga: '', laisser: false, besoins: [], montant: has(rec) && isFinite(nb) ? nb : '', msg: '' };
+    let close = null, busy = false;
+    const lire = () => {
+      if ($('#bpm-tr-orga')) st.orga = $('#bpm-tr-orga').value.trim();
+      if ($('#bpm-tr-montant')) { const v = $('#bpm-tr-montant').value; st.montant = v === '' ? '' : Number(v); }
+      if ($('#bpm-tr-msg')) st.msg = $('#bpm-tr-msg').value.trim().slice(0, 1000);
+    };
+    const vue = html => { if (close) close(); close = A.openSheet(html); };
+    const formulaire = () => {
+      vue(`<h2 style="margin:4px 0 2px;font-size:19px">Transmettre à Diaspo’Actif</h2>
+        <p class="small muted" style="margin:0 0 12px">« ${esc(nom)} »</p>
+        <div class="bpm-fld"><label class="bpm-lbl" for="bpm-tr-orga">🎯 Organismes visés</label>
+          <textarea class="bpm-in" id="bpm-tr-orga" rows="2" maxlength="500" placeholder="Ex : Banque X, fonds d’investissement Y…" ${st.laisser ? 'disabled' : ''}>${esc(st.orga)}</textarea></div>
+        <label style="display:flex;gap:10px;align-items:flex-start;margin:0 0 14px;padding:12px;border:1px solid var(--border);border-radius:12px;cursor:pointer">
+          <input type="checkbox" id="bpm-tr-laisser" ${st.laisser ? 'checked' : ''} style="width:22px;height:22px;flex:none;margin-top:1px">
+          <span><b>Je laisse Diaspo’Actif identifier l’organisme le plus adapté</b><br><small>Diaspo’Actif analysera votre projet et vous orientera.</small></span></label>
+        <div class="bpm-lbl">Type de demande</div>
+        <div style="display:flex;flex-direction:column;gap:8px;margin:0 0 14px">${BESOINS.map(b => `<label style="display:flex;gap:10px;align-items:center;min-height:44px;padding:6px 12px;border:1px solid var(--border);border-radius:12px;cursor:pointer"><input type="checkbox" class="bpm-tr-b" value="${b[0]}" ${st.besoins.includes(b[0]) ? 'checked' : ''} style="width:22px;height:22px;flex:none"><span>${esc(b[1])}</span></label>`).join('')}</div>
+        <div class="bpm-fld"><label class="bpm-lbl" for="bpm-tr-montant">💰 Montant recherché (${esc(dev(bp))})${st.montant !== '' && has(rec) ? ' — repris de votre plan' : ''}</label>
+          <input class="bpm-in" id="bpm-tr-montant" type="number" inputmode="decimal" min="0" value="${st.montant === '' ? '' : esc(st.montant)}"></div>
+        <div class="bpm-fld"><label class="bpm-lbl" for="bpm-tr-msg">💬 Message (facultatif)</label>
+          <textarea class="bpm-in" id="bpm-tr-msg" rows="3" maxlength="1000" placeholder="Précisions sur votre projet, votre besoin de financement ou d’accompagnement…">${esc(st.msg)}</textarea></div>
+        <button class="btn block" id="bpm-tr-go">Continuer</button>
+        <button class="btn out block" id="bpm-tr-no" style="margin-top:10px">Annuler</button>`);
+      $('#bpm-tr-no').onclick = () => close();
+      $('#bpm-tr-laisser').onchange = e => { lire(); st.laisser = e.target.checked; formulaire(); };
+      $$('.bpm-tr-b').forEach(c => c.onchange = () => { st.besoins = $$('.bpm-tr-b').filter(x => x.checked).map(x => x.value); });
+      $('#bpm-tr-go').onclick = () => { lire(); st.besoins = $$('.bpm-tr-b').filter(x => x.checked).map(x => x.value); recap(); };
+    };
+    const recap = () => {
+      const typ = st.besoins.map(v => (BESOINS.find(b => b[0] === v) || [v, v])[1]).join(', ') || '—';
+      vue(`<h2 style="margin:4px 0 12px;font-size:19px">Vérifiez avant d’envoyer</h2>
+        <div class="card"><div class="pad" style="line-height:1.6;font-size:14.5px">
+          <div><b>📄 Business plan</b><br>${esc(nom)}</div>
+          <div style="margin-top:8px"><b>🎯 Organismes visés</b><br>${st.laisser ? 'Diaspo’Actif choisira l’organisme le plus adapté' : (esc(st.orga) || '—')}</div>
+          <div style="margin-top:8px"><b>💰 Besoin</b><br>${st.montant !== '' && isFinite(st.montant) ? esc(Number(st.montant).toLocaleString('fr-FR')) + ' ' + esc(dev(bp)) : '—'}</div>
+          <div style="margin-top:8px"><b>🤝 Demande</b><br>${esc(typ)}</div>
+          <div style="margin-top:8px"><b>💬 Message</b><br>${esc(st.msg) || '—'}</div></div></div>
+        <div class="bpm-err" id="bpm-tr-err" role="alert" style="margin-top:10px"></div>
+        <button class="btn block" id="bpm-tr-send" style="margin-top:10px">📤 Transmettre à Diaspo’Actif</button>
+        <button class="btn out block" id="bpm-tr-back" style="margin-top:10px">← Modifier</button>`);
+      $('#bpm-tr-back').onclick = formulaire;
+      $('#bpm-tr-send').onclick = async () => {
+        if (busy) return; busy = true;
+        const b = $('#bpm-tr-send'); b.disabled = true; b.textContent = 'Envoi…';
+        try {
+          await api(`${API}/${bp.id}/transmettre`, { method: 'POST', body: {
+            organismes_vises_texte: st.orga, laisser_da_choisir: st.laisser, commentaire_transmission: st.msg, besoins: st.besoins,
+            budget_estime: st.montant !== '' && isFinite(st.montant) ? st.montant : null } });
+          if (close) close(); toast('Business plan transmis à Diaspo’Actif ✓'); after();
+        } catch (e) {
+          busy = false; b.disabled = false; b.textContent = '📤 Transmettre à Diaspo’Actif';
+          if (e.status === 402) { if (close) close(); A.premiumSheet(MOD); return; }
+          $('#bpm-tr-err').textContent = (e.message || 'L’envoi a échoué.') + ' Réessayez.';
+        }
+      };
+    };
+    formulaire();
   }
 
   /* ============================================================
@@ -689,7 +773,7 @@ textarea.bpm-in{min-height:96px;resize:vertical;line-height:1.45}
     const corps = financeHtml(bp);
     setPane(T, `<div class="small muted" style="margin:0 4px 10px">${esc(bp.nom_projet || 'Sans titre')} · montants en ${esc(dev(bp))}</div>
       ${corps ? wrap(corps) : `<div class="empty"><div class="ei">${ic('card', 'l')}</div><b>Aucun chiffre pour l’instant</b>Le plan financier n’est pas encore rempli.</div>`}
-      ${peutModifier(bp) ? deskNote(id, 'Le compte de résultat détaillé, la trésorerie mois par mois, les dettes, les immobilisations et les ratios se saisissent sur grand écran.') : ''}
+      ${peutModifier(bp) ? editorNote(id, 'Le compte de résultat détaillé, la trésorerie mois par mois, les dettes, les immobilisations et les ratios se saisissent dans l’éditeur complet, adapté au téléphone.', 'plan_financier') : ''}
       <a class="btn out block" href="#/businessplan/${esc(id)}">Retour au plan</a>`);
   }
 
@@ -712,9 +796,9 @@ textarea.bpm-in{min-height:96px;resize:vertical;line-height:1.45}
 
     const html = `<div class="small muted" style="margin:0 4px 10px">${esc(bp.nom_projet || 'Sans titre')} · étape ${idx + 1} sur ${SECTIONS.length}</div>
       ${bp.is_public ? `<div class="bpm-note"><b>Exemple de référence, en lecture seule.</b></div>` : ''}
-      ${contenu ? wrap(contenu) : `<div class="empty"><div class="ei">${ic('file', 'l')}</div><b>Étape non renseignée</b>${editable ? 'Touchez « Modifier cette étape » pour commencer à la rédiger.' : (SEULEMENT_ORDI.has(key) && modif ? 'Cette étape se remplit sur ordinateur.' : 'Rien n’a encore été saisi ici.')}</div>`}
-      ${modif && SEULEMENT_ORDI.has(key) ? deskNote(id, key === 'plan_financier' ? 'Le plan financier se saisit sur ordinateur (tableaux, trésorerie, dettes…). Le résumé ci-dessus reprend ce qui est déjà renseigné.' : 'Cette étape est faite de listes et de tableaux : elle se complète sur ordinateur.') : ''}
-      ${modif && PARTIEL.has(key) ? deskNote(id, 'Les nombres, listes et outils de cette étape (tableaux, matrices) se complètent sur ordinateur.') : ''}
+      ${contenu ? wrap(contenu) : `<div class="empty"><div class="ei">${ic('file', 'l')}</div><b>Étape non renseignée</b>${editable ? 'Touchez « Modifier cette étape » pour commencer à la rédiger.' : (SEULEMENT_ORDI.has(key) && modif ? 'Touchez « Ouvrir dans l’éditeur complet » pour la remplir.' : 'Rien n’a encore été saisi ici.')}</div>`}
+      ${modif && SEULEMENT_ORDI.has(key) ? editorNote(id, key === 'plan_financier' ? 'Le plan financier (tableaux, trésorerie, dettes…) se saisit dans l’éditeur complet, adapté au téléphone. Le résumé ci-dessus reprend ce qui est déjà renseigné.' : 'Cette étape est faite de listes et de tableaux : elle se complète dans l’éditeur complet, adapté au téléphone.', key) : ''}
+      ${modif && PARTIEL.has(key) ? editorNote(id, 'Les nombres, listes et outils de cette étape (tableaux, matrices) se complètent dans l’éditeur complet, adapté au téléphone.', key) : ''}
       ${key === 'plan_financier' ? `<a class="btn out block" style="margin-bottom:12px" href="#/businessplan/${esc(id)}/finances">Voir le résumé financier</a>` : ''}
       <div class="bpm-nav">
         ${prev ? `<a class="btn out sm" href="#/businessplan/${esc(id)}/${prev.key}" aria-label="Étape précédente : ${esc(prev.label)}">‹ Précédente</a>` : '<span style="flex:1"></span>'}

@@ -49,6 +49,18 @@ html,body{background:#EDEFF3;}
 .dossier-back:hover{color:var(--orange);}
 .dossier-toolbar select{border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:12.5px;font-weight:600;}
 .dossier-stage{max-width:900px;margin:32px auto 100px;}
+/* Téléphone (2026-10-30, demande explicite : tout le business plan possible et ergonomique sur téléphone) : la barre d'outils passe sur plusieurs lignes
+   (listes et boutons à 44 px) et la feuille A4 (210 mm = 794 px) est réduite à la largeur de l'écran par le script en bas de page (zoom). */
+@media(max-width:840px){
+  .dossier-toolbar{padding:10px 12px;position:static;}
+  .dossier-toolbar .left{flex-wrap:wrap;width:100%;gap:8px;}
+  .dossier-toolbar .left .dossier-back{flex:1 1 100%;padding:6px 0;}
+  .dossier-toolbar select{flex:1 1 150px;min-height:44px;font-size:14px;min-width:0;}
+  .dossier-toolbar > div:last-child{width:100%;}
+  .dossier-toolbar > div:last-child .btn{flex:1;min-height:44px;}
+  .dossier-stage{margin:12px auto 100px;}
+}
+@media print{.dossier-stage{zoom:1!important;}}
 #dossier-loading,#dossier-error{max-width:600px;margin:100px auto;text-align:center;color:var(--muted);}
 
 :root{
@@ -1784,6 +1796,12 @@ function showError(msg){
   el.style.display = '';
   el.innerHTML = `<div style="font-size:40px;margin-bottom:10px;">🚫</div><p>${esc(msg)}</p><a href="business-plan.html" class="btn btn-outline" style="margin-top:12px;display:inline-block;">← Retour à mes Business Plans</a>`;
 }
+
+/* Téléphone : la feuille A4 est mise à l'échelle de l'écran (le pincement permet encore de zoomer pour lire). */
+(function dossierAjuster(){
+  const fit = () => { const st = document.getElementById('dossier-stage'); if (!st) return; const w = window.innerWidth; st.style.zoom = w < 840 ? String(Math.max(0.3, (w - 16) / 794)) : ''; };
+  fit(); window.addEventListener('resize', fit); window.addEventListener('orientationchange', fit);
+})();
 
 init();
 </script>
