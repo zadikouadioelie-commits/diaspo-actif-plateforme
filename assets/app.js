@@ -6858,12 +6858,26 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   (function initSidebarTelecharger() {
     const sidebar = document.querySelector(".sidebar");
     if (!sidebar || sidebar.querySelector(".sb-install-group")) return;
-    try { if (matchMedia("(display-mode: standalone)").matches || navigator.standalone === true) return; } catch (e) { /* détection impossible : on affiche le bouton */ }
+    let installee = false;
+    try { installee = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true; } catch (e) { /* détection impossible : on affiche le bouton */ }
     const wrap = document.createElement("div");
     wrap.className = "sb-install-group";
-    wrap.innerHTML = `<a href="#" id="sb-install" role="button" style="display:flex!important;align-items:center;gap:8px;margin:8px 8px 6px!important;padding:10px 12px!important;border-radius:10px;background:linear-gradient(135deg,#F59E0B,#E2A929)!important;color:#1A2332!important;font-weight:800;font-size:13px;text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,.25);">📲 Télécharger Diaspo'Actif</a>`;
+    /* « Partager Diaspo'Actif » (2026-10-30, demande explicite : bouton « Télécharger » SOUS le bouton « Partager », comme sur téléphone) :
+       invite quelqu'un à découvrir la plateforme (lien d'accueil, &via= = compte qui partage). Partage natif si disponible, sinon copie du lien. */
+    const partageHtml = `<a href="#" id="sb-partage" role="button" style="display:flex!important;align-items:center;gap:8px;margin:8px 8px 0!important;padding:10px 12px!important;border-radius:10px;border:1px solid rgba(255,255,255,.35);color:#fff!important;font-weight:700;font-size:13px;text-decoration:none;">🔗 Partager Diaspo'Actif</a>`;
+    wrap.innerHTML = partageHtml + (installee ? "" : `<a href="#" id="sb-install" role="button" style="display:flex!important;align-items:center;gap:8px;margin:8px 8px 6px!important;padding:10px 12px!important;border-radius:10px;background:linear-gradient(135deg,#F59E0B,#E2A929)!important;color:#1A2332!important;font-weight:800;font-size:13px;text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,.25);">📲 Télécharger Diaspo'Actif</a>`);
     const anchor = sidebar.querySelector(".sb-search-wrap") || sidebar.querySelector(".brand");
     if (anchor) anchor.insertAdjacentElement("afterend", wrap); else sidebar.insertBefore(wrap, sidebar.firstChild);
+    document.getElementById("sb-partage").addEventListener("click", async e => {
+      e.preventDefault();
+      let uid = ""; try { const u = await fetchCurrentUser(); if (u && u.id) uid = "via=" + u.id + "&"; } catch (er) { /* partage sans parrain */ }
+      const url = location.origin + "/?" + uid + "r=" + Date.now().toString(36);
+      try { if (navigator.share) { await navigator.share({ title: "Diaspo'Actif", text: "Diaspo'Actif — la plateforme mondiale de la diaspora engagée", url }); return; } }
+      catch (er) { if (er && er.name === "AbortError") return; }
+      try { await navigator.clipboard.writeText(url); alert("Lien copié ✓ — collez-le dans un message pour inviter vos proches."); }
+      catch (er) { window.prompt("Copiez ce lien pour inviter vos proches :", url); }
+    });
+    if (installee) return;
     let promesse = null;
     document.getElementById("sb-install").addEventListener("click", e => {
       e.preventDefault();
