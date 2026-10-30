@@ -1154,7 +1154,7 @@ function renderEvts() {
           <button class="btn btn-outline" style="font-size:12px" onclick="openDetail(${evt.id})">Voir</button>
           <button class="btn btn-outline" style="font-size:12px" onclick="partagerEvenement(${evt.id})">📤 Partager</button>
           ${agendaBouton(evt.id, 12)}
-          ${evt.est_termine ? evtBoutonTermine(evt, inscrit, 12) + evtBoutonCompteRendu(evt, peutGerer, 12) : evt.inscription_ouverte === 0
+          ${!inscriptionsOuvertes(evt) ? evtBoutonTermine(evt, inscrit, 12) + evtBoutonCompteRendu(evt, peutGerer, 12) : evt.inscription_ouverte === 0
             ? `<span class="btn btn-outline" style="font-size:12px;cursor:default;opacity:.75;" title="Événement informatif, sans inscription">ℹ️ Informatif</span>`
             : (evt.lien_inscription
             ? `<a class="btn btn-orange" style="font-size:12px;text-decoration:none;" href="${esc(evt.lien_inscription)}" target="_blank" rel="noopener">↗ S'inscrire</a>`
@@ -1173,6 +1173,7 @@ function renderEvts() {
             )
             )
           }
+          ${peutGerer ? prolongerInscriptionsHtml(evt, 12) : ''}
         </div>
         ${peutGerer ? `<div class="evt-actions-gerer">${promouvoirHtml}${modifierHtml}${gererHtml}${lierFicheHtml}${gererTarifHtml}</div>` : ''}
       </div>
@@ -1296,6 +1297,34 @@ function inscriptionsPasEncoreOuvertes(evt) {
 function ouvertureInscriptionsTexte(evt) {
   const dt = new Date(evt.ouverture_inscriptions);
   return isNaN(dt) ? '' : dt.toLocaleString('fr-FR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+}
+/* Prolongation des inscriptions (2026-10-30, demande explicite : « pouvoir prolonger la durée
+   des inscriptions quand la date est arrivée à terme »). Même portée que ci-dessus : seulement
+   le formulaire minimal intégré (sans fiche liée, sans lien externe) — une fiche liée garde sa
+   propre fermeture, déjà modifiable depuis inscriptions-admin.html. evt.est_termine reste
+   calculé normalement côté serveur (compte-rendu, Billetterie...) ; seul le bouton
+   "S'inscrire" réapparaît tant que la prolongation est dans le futur. */
+function inscriptionsOuvertes(evt) {
+  if (!evt.est_termine) return true;
+  return !!(evt.inscriptions_prolongees_jusquau && new Date(evt.inscriptions_prolongees_jusquau) > new Date());
+}
+function prolongationTexte(evt) {
+  const dt = new Date(evt.inscriptions_prolongees_jusquau);
+  return isNaN(dt) ? '' : dt.toLocaleString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+/* Bouton + pastille, visibles uniquement par l'organisateur (peutGerer), une fois l'événement
+   terminé — qu'il soit déjà prolongé ou non. Volontairement affiché à côté de "Terminé"/
+   "Compte-rendu" plutôt qu'à leur place : ces deux-là restent corrects quel que soit l'état de
+   la prolongation (l'événement a bien eu lieu). */
+function prolongerInscriptionsHtml(evt, taille) {
+  if (!evt.est_termine || evt.fiche_id || evt.lien_inscription) return '';
+  const active = inscriptionsOuvertes(evt);
+  return `<span id="prolong-zone-${evt.id}" style="display:inline-flex;gap:6px;flex-wrap:wrap;">
+    ${active
+      ? `<span class="btn btn-outline" style="font-size:${taille}px;cursor:default;color:#166534;border-color:#86EFAC;background:#F0FDF4;">✅ Inscriptions prolongées jusqu'au ${esc(prolongationTexte(evt))}</span>`
+      : `<span class="btn btn-outline" style="font-size:${taille}px;cursor:default;color:#B45309;border-color:#FCD34D;background:#FFFBEB;">⏰ Inscriptions : date dépassée</span>`}
+    <button type="button" class="btn btn-outline" style="font-size:${taille}px;" onclick="ouvrirModaleProlongerInscriptions(${evt.id})" title="Choisir une nouvelle date de clôture des inscriptions">⏳ Prolonger la durée de l'inscription</button>
+  </span>`;
 }
 
 /* Adresse exacte / GPS → lien Google Maps (2026-09-09). Accepte indifféremment une adresse
@@ -2389,6 +2418,48 @@ window.ouvrirModaleLierFiche = async function(evtId, titre, ficheIdActuelle) {
   });
 };
 
+/* Prolonger la durée de l'inscription (2026-10-30, demande explicite) — ouvert depuis le bouton
+   posé par prolongerInscriptionsHtml() ci-dessus (liste et détail), accessible dès que
+   l'événement est terminé, prolongation déjà active ou non. Rafraîchit la liste et, si la fiche
+   détail est ouverte sur ce même événement, la rouvre pour refléter le nouvel état. */
+window.ouvrirModaleProlongerInscriptions = async function(evtId) {
+  const bg = document.createElement('div');
+  bg.className = 'modal-bg open';
+  bg.innerHTML = `
+    <div class="modal" style="max-width:420px;">
+      <button onclick="this.closest('.modal-bg').remove()" style="position:absolute;top:14px;right:16px;background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted);">×</button>
+      <h3 style="margin:0 0 4px;font-size:16px;">⏳ Prolonger la durée de l'inscription</h3>
+      <p style="margin:0 0 14px;font-size:12.5px;color:var(--muted);">L'événement est terminé, mais vous pouvez garder le formulaire d'inscription ouvert jusqu'à une nouvelle date.</p>
+      <label style="display:block;font-size:12px;font-weight:600;margin-bottom:6px;">Nouvelle date de clôture des inscriptions</label>
+      <input type="datetime-local" id="mpi-date" style="width:100%;height:38px;padding:0 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;box-sizing:border-box;margin-bottom:14px;">
+      <div id="mpi-err" style="display:none;color:#dc2626;font-size:12.5px;margin-bottom:10px;"></div>
+      <div style="display:flex;gap:8px;">
+        <button type="button" class="btn btn-orange" id="mpi-confirmer" style="flex:1;">Prolonger</button>
+        <button type="button" class="btn btn-outline" id="mpi-annuler-prolongation" title="Retirer la prolongation déjà posée">Annuler la prolongation</button>
+      </div>
+    </div>`;
+  bg.addEventListener('click', e => { if (e.target === bg) bg.remove(); });
+  document.body.appendChild(bg);
+
+  async function envoyer(jusquau) {
+    const err = bg.querySelector('#mpi-err');
+    err.style.display = 'none';
+    try {
+      await api('PATCH', `/evenements/${evtId}/prolonger-inscriptions`, { jusquau });
+      bg.remove();
+      loadEvts();
+      if (document.getElementById('modal-detail-bg')?.classList.contains('open') && evtDetailCourant?.id === evtId) openDetail(evtId);
+      if (typeof showToast === 'function') showToast(jusquau ? '⏳ Inscriptions prolongées.' : 'Prolongation retirée.');
+    } catch (e) { err.textContent = e.message || 'Erreur.'; err.style.display = 'block'; }
+  }
+  bg.querySelector('#mpi-confirmer').addEventListener('click', () => {
+    const v = bg.querySelector('#mpi-date').value;
+    if (!v) { const err = bg.querySelector('#mpi-err'); err.textContent = 'Choisissez une date.'; err.style.display = 'block'; return; }
+    envoyer(v);
+  });
+  bg.querySelector('#mpi-annuler-prolongation').addEventListener('click', () => envoyer(''));
+};
+
 window.openDetail = async function(id) {
   document.getElementById('evt-detail-content').innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted);">⏳ Chargement…</div>';
   document.getElementById('modal-detail-bg').classList.add('open');
@@ -2623,7 +2694,7 @@ function renderEventDetail(evt, isPreview) {
         <strong style="font-size:13px;color:#166534;">Rejoindre la chaîne WhatsApp de l'événement</strong>
       </a>` : ''}
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">
-        ${evt.est_termine ? evtBoutonTermine(evt, inscritSet.has(evt.id), 13) + evtBoutonCompteRendu(evt, peutGererDetail && !isPreview, 13) : evt.inscription_ouverte === 0
+        ${!inscriptionsOuvertes(evt) ? evtBoutonTermine(evt, inscritSet.has(evt.id), 13) + evtBoutonCompteRendu(evt, peutGererDetail && !isPreview, 13) : evt.inscription_ouverte === 0
           ? `<span class="btn btn-outline" style="font-size:13px;cursor:default;opacity:.75;" title="Événement informatif, sans inscription">ℹ️ Événement informatif — sans inscription</span>`
           : (evt.lien_inscription
           ? `<a class="btn btn-orange" style="font-size:13px;text-decoration:none;" href="${esc(evt.lien_inscription)}" target="_blank" rel="noopener">↗ S'inscrire</a>`
@@ -2639,6 +2710,7 @@ function renderEventDetail(evt, isPreview) {
           )
           )
         }
+        ${(!isPreview && peutGererDetail) ? prolongerInscriptionsHtml(evt, 13) : ''}
         <button class="btn btn-outline" style="font-size:13px;" ${isPreview ? 'disabled title="Disponible une fois l\'événement enregistré"' : `onclick="partagerEvenement(${evt.id})"`}>📤 Partager</button>
         ${isPreview ? '' : agendaBouton(evt.id, 13)}
         ${modifierDetailHtml}

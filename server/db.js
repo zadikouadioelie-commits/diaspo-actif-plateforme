@@ -2659,6 +2659,14 @@ const MIGRATIONS = [
   // publique (GET /api/evenements et GET /api/evenements/:id) : passée l'échéance, l'événement
   // bascule statut='ouvert' et ce champ est effacé.
   ["evenements", "publication_programmee_le TEXT"],
+  // Prolongation des inscriptions (2026-10-30, demande explicite : « pouvoir prolonger la durée
+  // des inscriptions quand la date est arrivée à terme ») — concerne uniquement le formulaire
+  // d'inscription minimal intégré à l'événement (sans fiche liée, sans lien externe) : une fiche
+  // liée garde sa propre date de fermeture (insc_fiches.date_fermeture_inscriptions, déjà
+  // modifiable depuis inscriptions-admin.html). Tant que cette date est dans le futur, le
+  // bouton "S'inscrire" reste proposé même si l'événement est par ailleurs "terminé"
+  // (evenementEstTermine) — voir inscriptionsProlongeesActives() côté serveur.
+  ["evenements", "inscriptions_prolongees_jusquau TEXT"],
 ];
 
 /* Initialise updated_at pour les initiatives déjà existantes (jamais modifiées depuis) —

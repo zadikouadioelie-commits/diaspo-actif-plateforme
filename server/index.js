@@ -22197,6 +22197,13 @@ function statutTemporelEvenement(evt) {
 function evenementEstTermine(evt) {
   return statutTemporelEvenement(evt) === 'termine';
 }
+/* Prolongation des inscriptions (2026-10-30, demande explicite) — distincte de evenementEstTermine
+   ci-dessus (qui reste la seule mesure de "l'événement a-t-il vraiment eu lieu", utilisée pour le
+   compte-rendu et la Billetterie, jamais modifiée ici) : ne concerne QUE si le formulaire
+   d'inscription minimal intégré doit encore proposer "S'inscrire" une fois l'événement terminé. */
+function inscriptionsProlongeesActives(evt) {
+  return !!(evt.inscriptions_prolongees_jusquau && new Date(evt.inscriptions_prolongees_jusquau) > new Date());
+}
 function avecStatutTemporel(r) {
   const st = statutTemporelEvenement(r);
   /* promo_active : design « J-7 » affiché tant que la promotion est lancée ET l'événement pas
@@ -24321,6 +24328,34 @@ route("PATCH", "/api/evenements/:id/programmer-publication", async (req, res, pa
   sendJSON(res, 200, { ok: true, publication_programmee_le: date });
 });
 
+/* PATCH /api/evenements/:id/prolonger-inscriptions — prolonge la durée du formulaire
+   d'inscription minimal intégré à l'événement (2026-10-30, demande explicite : « pouvoir
+   prolonger la durée des inscriptions quand la date est arrivée à terme... accessible même
+   quand la date est déjà dépassée »). Volontairement accessible quel que soit l'état de
+   l'événement (terminé ou non) — même esprit que /publier et /programmer-publication
+   ci-dessus : ne touche QUE cette seule colonne. "jusquau" vide/absent annule une prolongation
+   déjà posée (retour à l'état "terminé" normal) ; une fiche liée n'est pas concernée, elle
+   garde sa propre date de fermeture (insc_fiches.date_fermeture_inscriptions). */
+route("PATCH", "/api/evenements/:id/prolonger-inscriptions", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const evt = await db.prepare("SELECT id, owner_user_id FROM evenements WHERE id=?").get(params.id);
+  if (!evt) return sendJSON(res, 404, { error: "Événement introuvable." });
+  if (Number(evt.owner_user_id) !== Number(user.id) && user.role !== "administrateur") {
+    return sendJSON(res, 403, { error: "Vous ne pouvez prolonger que vos propres événements." });
+  }
+  if (body?.jusquau === null || body?.jusquau === "") {
+    await db.prepare("UPDATE evenements SET inscriptions_prolongees_jusquau=NULL WHERE id=?").run(evt.id);
+    return sendJSON(res, 200, { ok: true, inscriptions_prolongees_jusquau: null });
+  }
+  const jusquau = String(body?.jusquau || "").trim();
+  const quand = new Date(jusquau).getTime();
+  if (!jusquau || isNaN(quand)) return sendJSON(res, 400, { error: "Date de prolongation invalide." });
+  if (quand <= Date.now()) return sendJSON(res, 400, { error: "La date de prolongation doit être dans le futur." });
+  await db.prepare("UPDATE evenements SET inscriptions_prolongees_jusquau=? WHERE id=?").run(jusquau, evt.id);
+  sendJSON(res, 200, { ok: true, inscriptions_prolongees_jusquau: jusquau });
+});
+
 /* POST /api/evenements/:id/inscription-rapide — réservé aux événements flash
    (inscription_rapide_active, activé par l'organisateur), 2026-10-14, demande explicite :
    "déclencher une inscription rapide avec inscription dans l'agenda des personnes ayant un
@@ -25699,7 +25734,7 @@ route("POST", "/api/evenements/:id/rejoindre", async (req, res, params, body) =>
   const evt = await db.prepare("SELECT * FROM evenements WHERE id=?").get(params.id);
   if (!evt) return sendJSON(res, 404, { error: "Événement introuvable." });
   if (!evt.inscription_ouverte) return sendJSON(res, 400, { error: "Les inscriptions sont fermées." });
-  if (evenementEstTermine(evt)) return sendJSON(res, 400, { error: "Cet événement est terminé : les inscriptions sont closes." });
+  if (evenementEstTermine(evt) && !inscriptionsProlongeesActives(evt)) return sendJSON(res, 400, { error: "Cet événement est terminé : les inscriptions sont closes." });
   // Heure d'ouverture programmée (2026-09-25, demande explicite) — voir
   // ensureEvenementsOuvertureInscriptionsCol() : ne s'applique qu'ici, jamais réévaluée côté
   // fiche (chacune garde son propre réglage). Pas de 'Z' ajouté, même convention que
