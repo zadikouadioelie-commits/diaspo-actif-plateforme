@@ -28,7 +28,8 @@
     { "path": "/api/cron/honneur", "schedule": "0 6 * * *" },
     { "path": "/api/cron/immatriculations", "schedule": "30 6 * * *" },
     { "path": "/api/cron/fiabilite", "schedule": "45 6 * * *" },
-    { "path": "/api/cron/insc-non-abouties", "schedule": "15 7 * * *" }
+    { "path": "/api/cron/insc-non-abouties", "schedule": "15 7 * * *" },
+    { "path": "/api/cron/kofi-purge", "schedule": "20 4 * * *" }
   ],
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api/index" },

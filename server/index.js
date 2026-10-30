@@ -3280,6 +3280,9 @@ FormationStudio.register({ route, db, sendJSON, getCurrentUser, SEC, checkFormat
 /* Questions privées de l'élève au formateur, reçues dans l'onglet « Messages de formation » de la messagerie — server/formation-questions.js. creerNotif, nomCompteAffichage et contactBloque sont des déclarations de fonction (hissées). */
 const FormationQuestions = require("./formation-questions");
 FormationQuestions.register({ route, db, sendJSON, getCurrentUser, SEC, creerNotif, nomCompteAffichage, contactBloque });
+/* Koffi, tuteur IA des formations (2026-10-30) — server/kofi.js. getPremiumStatut est une déclaration de fonction (hissée). */
+const Kofi = require("./kofi");
+Kofi.register({ route, db, sendJSON, getCurrentUser, SEC, getPremiumStatut });
 /* Envoyer un événement par e-mail (carte complète) + texte d'aperçu du lien (date, lieu) : server/partage-evenement.js. urlImagePartageEvenement est une déclaration de fonction (hissée). */
 const PartageEvenement = require("./partage-evenement");
 PartageEvenement.register({ route, db, sendJSON, getCurrentUser, SEC, nomCompteAffichage, getOrigin, urlImagePartageEvenement });
@@ -31376,7 +31379,7 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
    sur cette base, donc migrateChatbot() ressort immédiatement sans rejouer son contenu) —
    CREATE TABLE IF NOT EXISTS est sans risque à rejouer à chaque démarrage, donc pas besoin
    de gating par marqueur ici. */
-(async function migrateVideosTutoriels() {
+const migrationVideosTutoriels = (async function migrateVideosTutoriels() {
   try {
     await db.prepare(`CREATE TABLE IF NOT EXISTS da_videos_tutoriels (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -31702,6 +31705,9 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
    feedback_reparer_schema_apres_migration — sans objet ici). */
 /* Tutos déjà publiés avant la diffusion automatique : marqués « déjà diffusés » pour qu'une republication ne notifie pas tout le monde rétroactivement. */
 (async function migrerTutosDiffusion() {
+  /* Sur une base neuve la table des tutos est créée par migrateVideosTutoriels() : on l'attend, et la colonne (ALTER de db.js sans effet faute de table) est posée ici. */
+  try { await migrationVideosTutoriels; } catch (e) { /* déjà journalisé */ }
+  try { if (!(await db.prepare("PRAGMA table_info(da_videos_tutoriels)").all()).some(c => c.name === 'diffuse_le')) await db.prepare('ALTER TABLE da_videos_tutoriels ADD COLUMN diffuse_le TEXT').run(); } catch (e) { /* colonne déjà là */ }
   try { await db.prepare("UPDATE da_videos_tutoriels SET diffuse_le=COALESCE(updated_at,created_at,datetime('now')) WHERE statut='publie' AND diffuse_le IS NULL").run(); }
   catch (e) { console.error('[migrerTutosDiffusion]', e.message); }
 })();

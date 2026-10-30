@@ -5021,6 +5021,122 @@ db.exec(`
 `);
 ;['relances_off INTEGER DEFAULT 0','relance_derniere_le TEXT'].forEach(col => { try { db.exec(`ALTER TABLE formation_inscriptions ADD COLUMN ${col}`); } catch(_) {} });
 ;['relances_defaut INTEGER DEFAULT 1'].forEach(col => { try { db.exec(`ALTER TABLE formations ADD COLUMN ${col}`); } catch(_) {} });
+/* KOFFI — tuteur IA des formations (2026-10-30) : socle (server/kofi.js). Tables 100 % additives.
+   kofi_reglages : réglages modifiables par l'administration (modèle, questions gratuites, forfait, conservation, plafonds…) ;
+   kofi_formations : réglage par formation (activée ? coupée pendant une évaluation ? consignes du formateur) ;
+   kofi_conversations / kofi_messages / kofi_feedback : échanges, conservés 60 jours puis purgés ;
+   kofi_credits : QUESTIONS de l'élève, au niveau du COMPTE (valables dans toutes ses formations) : lot « gratuit » (une fois) ou « achat » (12 mois) ;
+   kofi_usage + kofi_budget : coût estimé de chaque appel et recharges des crédits chez le fournisseur → registre « Budget IA » ;
+   kofi_chunks / kofi_indexation : extraits du cours (UNIQUEMENT du contenu publié ; jamais de quiz ni de corrigé), filtrés par droits à CHAQUE question. */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS kofi_reglages (
+    cle TEXT PRIMARY KEY,
+    valeur TEXT,
+    updated_at TEXT DEFAULT (datetime('now')),
+    updated_by INTEGER
+  );
+  CREATE TABLE IF NOT EXISTS kofi_formations (
+    formation_id INTEGER PRIMARY KEY,
+    actif INTEGER DEFAULT 1,
+    desactive_evaluation INTEGER DEFAULT 1,
+    consignes TEXT,
+    updated_at TEXT DEFAULT (datetime('now')),
+    updated_by INTEGER
+  );
+  CREATE TABLE IF NOT EXISTS kofi_conversations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    formation_id INTEGER NOT NULL,
+    contexte TEXT DEFAULT 'formation',
+    langue TEXT DEFAULT 'fr',
+    statut TEXT DEFAULT 'ouverte',
+    created_at TEXT DEFAULT (datetime('now')),
+    derniere_activite TEXT DEFAULT (datetime('now'))
+  );
+  CREATE TABLE IF NOT EXISTS kofi_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    conversation_id INTEGER NOT NULL,
+    role TEXT NOT NULL,
+    contenu TEXT NOT NULL,
+    citations_json TEXT,
+    modele TEXT,
+    jetons_entree INTEGER DEFAULT 0,
+    jetons_sortie INTEGER DEFAULT 0,
+    flags TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+  CREATE TABLE IF NOT EXISTS kofi_feedback (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    message_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    note INTEGER,
+    type TEXT,
+    commentaire TEXT,
+    traite_le TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(message_id, user_id)
+  );
+  CREATE TABLE IF NOT EXISTS kofi_credits (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    origine TEXT NOT NULL,
+    questions_total INTEGER NOT NULL,
+    questions_restantes INTEGER NOT NULL,
+    expire_le TEXT,
+    reference TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+  CREATE TABLE IF NOT EXISTS kofi_usage (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    formation_id INTEGER,
+    conversation_id INTEGER,
+    message_id INTEGER,
+    categorie TEXT NOT NULL,
+    jetons_entree INTEGER DEFAULT 0,
+    jetons_sortie INTEGER DEFAULT 0,
+    cout_eur REAL DEFAULT 0,
+    modele TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+  CREATE TABLE IF NOT EXISTS kofi_budget (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    type TEXT NOT NULL,
+    montant_eur REAL NOT NULL,
+    reference TEXT,
+    note TEXT,
+    created_by INTEGER,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+  CREATE TABLE IF NOT EXISTS kofi_chunks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    formation_id INTEGER NOT NULL,
+    module_id INTEGER,
+    chapitre_id INTEGER,
+    lecon_id INTEGER NOT NULL,
+    ordre INTEGER DEFAULT 0,
+    titre TEXT,
+    chemin TEXT,
+    texte TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+  CREATE TABLE IF NOT EXISTS kofi_indexation (
+    lecon_id INTEGER PRIMARY KEY,
+    formation_id INTEGER NOT NULL,
+    empreinte TEXT,
+    statut TEXT DEFAULT 'pret',
+    raison TEXT,
+    nb_chunks INTEGER DEFAULT 0,
+    indexe_le TEXT DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_kofi_conversations_user ON kofi_conversations(user_id, formation_id);
+  CREATE INDEX IF NOT EXISTS idx_kofi_messages_conv ON kofi_messages(conversation_id);
+  CREATE INDEX IF NOT EXISTS idx_kofi_credits_user ON kofi_credits(user_id);
+  CREATE INDEX IF NOT EXISTS idx_kofi_usage_user ON kofi_usage(user_id, created_at);
+  CREATE INDEX IF NOT EXISTS idx_kofi_chunks_formation ON kofi_chunks(formation_id, lecon_id);
+  CREATE UNIQUE INDEX IF NOT EXISTS ux_kofi_credits_gratuit ON kofi_credits(user_id) WHERE origine='gratuit';
+`);
+
 /* Studio — suivi de visionnage des vidéos (2026-10-30) : les morceaux de 5 s réellement regardés (chaîne de 0 et de 1), par apprenant, leçon et élément vidéo. */
 db.exec(`
   CREATE TABLE IF NOT EXISTS formation_studio_video (
