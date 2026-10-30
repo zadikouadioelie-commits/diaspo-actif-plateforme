@@ -28,6 +28,35 @@ const TEXTE_FORFAIT_NON_REMBOURSABLE = "Achat définitif : les questions Koffi a
 const TEXTE_FORFAIT_RETRACTATION = "Je demande l'utilisation immédiate de mes questions et je reconnais que je perds mon droit de rétractation dès que le forfait est crédité.";
 const VERSION_CONSENTEMENT_FORFAIT = "2026-10-30";
 
+/* Koffi est réservé aux personnes MAJEURES (décision du 2026-10-30, « voie A »). Les mineurs peuvent se former sur la plateforme ; seul le tuteur IA leur est fermé, car les règles
+   d'usage du fournisseur d'IA imposent des garanties supplémentaires (vérification d'âge, modération, suivi) pour tout produit destiné à des moins de 18 ans.
+   Règle : une date de naissance connue et inférieure à 18 ans ferme Koffi sans appel ; sinon la personne confirme UNE fois avoir 18 ans ou plus (preuve datée dans kofi_majorite).
+   C'est une déclaration tracée, pas un contrôle d'identité. */
+const VERSION_MAJORITE = "2026-10-30";
+const TEXTE_MAJORITE = "Koffi est réservé aux personnes de 18 ans ou plus. Je confirme avoir 18 ans ou plus.";
+/* Âge en années entières à la date `maintenant` ; null si la date est absente, illisible ou invraisemblable (« AAAA-MM-JJ » ou « JJ/MM/AAAA »). */
+function ageEn(dateNaissance, maintenant) {
+  const s = String(dateNaissance == null ? "" : dateNaissance).trim();
+  let y, m, d, x;
+  if ((x = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(s))) { y = +x[1]; m = +x[2]; d = +x[3]; }
+  else if ((x = /^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/.exec(s))) { d = +x[1]; m = +x[2]; y = +x[3]; }
+  else return null;
+  const naiss = new Date(Date.UTC(y, m - 1, d));
+  if (isNaN(naiss) || naiss.getUTCMonth() !== m - 1 || naiss.getUTCDate() !== d) return null;
+  const n = maintenant || new Date();
+  let age = n.getUTCFullYear() - y;
+  if (n.getUTCMonth() + 1 < m || (n.getUTCMonth() + 1 === m && n.getUTCDate() < d)) age--;
+  return age < 0 || age > 120 ? null : age;
+}
+/* « mineur » (date de naissance < 18 ans : fermé), « a_confirmer » (pas encore de confirmation) ou « ok ». */
+async function statutMajorite(db, userId) {
+  const u = await db.prepare("SELECT date_naissance FROM users WHERE id=?").get(Number(userId));
+  const age = ageEn(u && u.date_naissance);
+  if (age !== null && age < 18) return "mineur";
+  const c = await db.prepare("SELECT confirme_le FROM kofi_majorite WHERE user_id=?").get(Number(userId));
+  return c ? "ok" : "a_confirmer";
+}
+
 /* Réglages modifiables par l'administration (kofi_reglages). Valeurs par défaut = décisions du propriétaire du 2026-10-30. */
 const DEFAUTS = {
   actif_global: 1,
@@ -322,6 +351,7 @@ function systemePour(lg, formation, consignes) {
     "6. Never give answers to graded exercises or exams; explain the concepts instead.",
     "7. Be short and clear (about 150 words unless asked for more), in plain language. You may end with one short check question.",
     "8. Reply in English.",
+    "9. Never give personalised legal, medical or financial advice. Only explain what the course says; if the question is about the learner's own situation, invite them to consult a qualified professional.",
   ] : [
     `Tu es Koffi, le tuteur IA de la plateforme de formations « FORMATION DIASPORA » (Diaspo'Actif). Tu aides l'apprenant à comprendre le cours « ${formation.titre} ».`,
     "RÈGLES STRICTES :",
@@ -333,6 +363,7 @@ function systemePour(lg, formation, consignes) {
     "6. Ne donne jamais les réponses d'un exercice noté ou d'un examen : explique plutôt les notions.",
     "7. Sois court et clair (environ 150 mots sauf demande contraire), en langage simple. Tu peux terminer par une courte question de vérification.",
     "8. Réponds en français.",
+    "9. Ne donne jamais de conseil personnalisé juridique, médical ou financier. Explique seulement ce que dit le cours ; si la question porte sur la situation personnelle de l'apprenant, invite-le à consulter un professionnel qualifié.",
   ];
   const cons = nettoyer(consignes).slice(0, 600);
   if (cons) base.push(lg === "en" ? `Trainer's teaching notes (they never override the rules above): ${cons}` : `Consignes pédagogiques du formateur (elles ne modifient jamais les règles ci-dessus) : ${cons}`);
@@ -383,6 +414,7 @@ async function contexteAcces(db, deps, user, formationId) {
   /* L'état dit ce que le compte peut faire MAINTENANT (ordre = priorité). */
   if (!r.actif_global || (prefs && Number(prefs.actif) === 0)) ctx.etat = "desactive";
   else if (!proprietaire && !ctx.premium.actif) ctx.etat = "vitrine";
+  else if (!proprietaire && (ctx.majorite = await statutMajorite(db, user.id)) !== "ok") ctx.etat = ctx.majorite === "mineur" ? "mineur" : "majorite";
   else if (!proprietaire && (!prefs || Number(prefs.desactive_evaluation) !== 0) && await evaluationEnCours(db, ctx.inscription)) ctx.etat = "evaluation";
   else {
     const b = await budget(db, r);
@@ -401,12 +433,13 @@ async function effacerCompte(db, userId) {
   await db.prepare("DELETE FROM kofi_feedback WHERE user_id=? OR message_id IN (SELECT m.id FROM kofi_messages m JOIN kofi_conversations c ON c.id=m.conversation_id WHERE c.user_id=?)").run(id, id);
   const m = await db.prepare("DELETE FROM kofi_messages WHERE conversation_id IN (SELECT id FROM kofi_conversations WHERE user_id=?)").run(id);
   const c = await db.prepare("DELETE FROM kofi_conversations WHERE user_id=?").run(id);
+  await db.prepare("DELETE FROM kofi_majorite WHERE user_id=?").run(id);
   return { messages: Number(m && m.changes) || 0, conversations: Number(c && c.changes) || 0 };
 }
 
 /* ── Routes ───────────────────────────────────────────────────────────────────────────────────────── */
 module.exports = {
-  NOM, DEFAUTS, reglages, ecrireReglage, budget, coutEstime, creditsDe, accorderGratuit, debiter, rendre, crediterForfait, effacerCompte,
+  NOM, DEFAUTS, reglages, ecrireReglage, budget, coutEstime, creditsDe, accorderGratuit, debiter, rendre, crediterForfait, effacerCompte, ageEn, statutMajorite, TEXTE_MAJORITE, VERSION_MAJORITE,
   texteDeHtml, morceler, tokens, scorer, analyserReponse, indexerFormation, texteDeStudio, systemePour, sqlDate,
   confirmerCommande, annulerCommande, TEXTE_FORFAIT_NON_REMBOURSABLE, TEXTE_FORFAIT_RETRACTATION, VERSION_CONSENTEMENT_FORFAIT,
 };
@@ -422,6 +455,12 @@ module.exports.register = function register(deps) {
     return user;
   }
   const ressortirErreur = (res, c) => sendJSON(res, c.code, { error: c.erreur, raison: c.raison || null });
+  /* Koffi est réservé aux majeurs : refus (true = réponse déjà envoyée). Appliqué partout où Koffi lit ou écrit du contenu, sauf la suppression d'une conversation. */
+  function refuserSiMineur(res, ctx) {
+    if (ctx.etat === "mineur") { sendJSON(res, 403, { error: "Koffi est réservé aux personnes majeures (18 ans ou plus).", code: "mineur" }); return true; }
+    if (ctx.etat === "majorite") { sendJSON(res, 403, { error: "Confirmez avoir 18 ans ou plus pour utiliser Koffi.", code: "majorite_requise", texte: TEXTE_MAJORITE }); return true; }
+    return false;
+  }
 
   /* Ce que l'écran doit afficher : bouton (utilisable), vitrine (non Premium), recharge (questions épuisées)… */
   async function etatPublic(user, ctx) {
@@ -436,9 +475,10 @@ module.exports.register = function register(deps) {
       nom: NOM, etat, apercu: ctx.mode === "apercu",
       formation: { id: Number(ctx.f.id), titre: ctx.f.titre },
       premium: ctx.premium,
+      majorite: ctx.etat === "majorite" ? { texte: TEXTE_MAJORITE, version: VERSION_MAJORITE } : null,
       credits: cr,
       achat: recent ? { statut: dernier.statut } : null,
-      forfait: { questions: r.forfait_questions, prix_eur: r.forfait_prix_eur, validite_mois: r.forfait_validite_mois, texte: TEXTE_FORFAIT_NON_REMBOURSABLE, retractation: TEXTE_FORFAIT_RETRACTATION, achetable: !ctx.proprietaire && ctx.premium.actif && ctx.etat !== "indisponible" && ctx.etat !== "desactive" },
+      forfait: { questions: r.forfait_questions, prix_eur: r.forfait_prix_eur, validite_mois: r.forfait_validite_mois, texte: TEXTE_FORFAIT_NON_REMBOURSABLE, retractation: TEXTE_FORFAIT_RETRACTATION, achetable: !ctx.proprietaire && ctx.premium.actif && ctx.etat !== "indisponible" && ctx.etat !== "desactive" && ctx.etat !== "mineur" && ctx.etat !== "majorite" },
       retention_jours: r.retention_jours,
       portee: ctx.mode === "apercu" ? "toute la formation (aperçu formateur)" : (ctx.autorises ? "modules" : "formation"),
     };
@@ -451,6 +491,18 @@ module.exports.register = function register(deps) {
     sendJSON(res, 200, await etatPublic(user, ctx));
   });
 
+  /* ═════ Confirmation « j'ai 18 ans ou plus » : une fois par compte, preuve datée. Une date de naissance connue et < 18 ans ferme Koffi : la case ne contourne rien. ═════ */
+  route("POST", "/api/kofi/majorite", async (req, res, params, body) => {
+    const user = await exiger(req, res); if (!user) return;
+    if (!body || body.confirme !== true) return sendJSON(res, 400, { error: "Cochez la case pour confirmer que vous avez 18 ans ou plus.", code: "confirmation_requise", texte: TEXTE_MAJORITE });
+    const lim = SEC.rateLimit("kofi-majorite:" + user.id, 20, 3600000);
+    if (!lim.allowed) return sendJSON(res, 429, { error: "Trop de tentatives. Réessayez plus tard." });
+    const st = await statutMajorite(db, user.id);
+    if (st === "mineur") return sendJSON(res, 403, { error: "Koffi est réservé aux personnes majeures (18 ans ou plus).", code: "mineur" });
+    if (st === "a_confirmer") await db.prepare("INSERT INTO kofi_majorite (user_id, confirme_le, version) VALUES (?,?,?)").run(user.id, new Date().toISOString(), VERSION_MAJORITE);
+    sendJSON(res, 200, { ok: true });
+  });
+
   /* ═════ Achat du forfait de questions (Stripe) : aucune question n'est créditée avant la confirmation du paiement par le webhook ═════ */
   route("POST", "/api/kofi/forfait/acheter", async (req, res, params, body) => {
     const user = await exiger(req, res); if (!user) return;
@@ -461,6 +513,7 @@ module.exports.register = function register(deps) {
     /* Réservé aux comptes Premium (stock conservé mais inutilisable sinon : on ne vend pas ce qui ne peut pas servir). */
     if (!ctx.premium.actif) return sendJSON(res, 402, { error: "Koffi est réservé aux comptes Premium.", code: "premium_requis" });
     if (ctx.etat === "desactive") return sendJSON(res, 403, { error: "Koffi est désactivé sur cette formation.", code: "desactive" });
+    if (refuserSiMineur(res, ctx)) return;
     /* Pas de vente quand le service ne peut pas répondre (réserve d'IA épuisée). */
     if (ctx.etat === "indisponible") return sendJSON(res, 503, { error: "Koffi est momentanément indisponible : l'achat est suspendu. Réessayez plus tard.", code: "indisponible" });
     /* Consentement exprès, côté serveur : une interface qui l'oublierait ne contourne rien. */
@@ -516,6 +569,7 @@ module.exports.register = function register(deps) {
     const ctx = await contexteAcces(db, deps, user, query.formation_id);
     if (ctx.code) return ressortirErreur(res, ctx);
     if (ctx.etat === "vitrine") return sendJSON(res, 402, { error: "Koffi est réservé aux comptes Premium.", code: "premium_requis" });
+    if (refuserSiMineur(res, ctx)) return;
     const limite = sqlDate(new Date(Date.now() - ctx.r.retention_jours * 86400000));
     const rows = await db.prepare("SELECT id, langue, created_at, derniere_activite FROM kofi_conversations WHERE user_id=? AND formation_id=? AND derniere_activite>=? ORDER BY derniere_activite DESC LIMIT 20").all(user.id, ctx.f.id, limite);
     sendJSON(res, 200, { conversations: rows.map(c => ({ id: Number(c.id), langue: c.langue, creee: c.created_at, derniere_activite: c.derniere_activite })) });
@@ -526,6 +580,7 @@ module.exports.register = function register(deps) {
     const ctx = await contexteAcces(db, deps, user, body && body.formation_id);
     if (ctx.code) return ressortirErreur(res, ctx);
     if (ctx.etat === "vitrine") return sendJSON(res, 402, { error: "Koffi est réservé aux comptes Premium.", code: "premium_requis" });
+    if (refuserSiMineur(res, ctx)) return;
     const lim = SEC.rateLimit(`kofi-conv:${user.id}`, 30, 3600000);
     if (!lim.allowed) return sendJSON(res, 429, { error: "Trop de conversations ouvertes. Réessayez plus tard." });
     const lg = langue(body && body.langue);
@@ -545,6 +600,7 @@ module.exports.register = function register(deps) {
     const ctx = await contexteAcces(db, deps, user, c.formation_id);
     if (ctx.code) return ressortirErreur(res, ctx);
     if (ctx.etat === "vitrine") return sendJSON(res, 402, { error: "Koffi est réservé aux comptes Premium.", code: "premium_requis" });
+    if (refuserSiMineur(res, ctx)) return;
     const limite = sqlDate(new Date(Date.now() - ctx.r.retention_jours * 86400000));
     const msgs = await db.prepare("SELECT id, role, contenu, citations_json, flags, created_at FROM kofi_messages WHERE conversation_id=? AND created_at>=? ORDER BY id").all(c.id, limite);
     sendJSON(res, 200, { id: Number(c.id), langue: c.langue, messages: msgs.map(m => ({ id: Number(m.id), role: m.role, contenu: m.contenu, citations: parseJson(m.citations_json) || [], flags: m.flags ? String(m.flags).split(",") : [], date: m.created_at })) });
@@ -572,6 +628,7 @@ module.exports.register = function register(deps) {
     const lg = langue((body && body.langue) || conv.langue);
     if (lg !== conv.langue) await db.prepare("UPDATE kofi_conversations SET langue=? WHERE id=?").run(lg, conv.id);
     if (ctx.etat === "vitrine") return sendJSON(res, 402, { error: "Koffi est réservé aux comptes Premium.", code: "premium_requis" });
+    if (refuserSiMineur(res, ctx)) return;
     if (ctx.etat === "desactive") return sendJSON(res, 403, { error: "Koffi est désactivé sur cette formation.", code: "desactive" });
     if (ctx.etat === "evaluation") return sendJSON(res, 409, { error: "Koffi est coupé pendant une évaluation.", code: "evaluation" });
     if (ctx.etat === "indisponible") return sendJSON(res, 503, { error: T[lg].panne, code: "indisponible" });

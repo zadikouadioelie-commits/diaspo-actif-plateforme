@@ -58,6 +58,8 @@ test('Koffi — règles du socle', async (t) => {
   /* Tout nouveau compte reçoit 3 mois de découverte Premium : pour tester la différence, les comptes sont « vieillis » (découverte écoulée), puis seuls A, B et E reçoivent un abonnement payant. */
   const vieillir = userId => { sql("UPDATE users SET created_at=datetime('now','-2 year') WHERE id=?", userId); sql('DELETE FROM user_accreditations WHERE user_id=?', userId); };
   const premium = (userId) => sql("INSERT INTO user_accreditations (user_id, accred_id, statut, date_expiration, type_tarif, montant_paye) VALUES (?, (SELECT id FROM accred_definitions WHERE type='utilisateur_abonne'), 'active', datetime('now','+30 day'), 'mensuel', 9)", userId);
+  /* Koffi est réservé aux majeurs : les comptes de test qui l'utilisent ont déjà confirmé (le parcours de confirmation a son propre test, plus bas). */
+  const majeur = userId => sql("INSERT OR IGNORE INTO kofi_majorite (user_id, confirme_le, version) VALUES (?, datetime('now'), 'test')", userId);
   const ouvrir = async (jar, extra) => (await call(jar, 'POST', '/api/kofi/conversations', { formation_id: fid, ...extra }));
   const poser = (jar, conv, texte, extra) => call(jar, 'POST', `/api/kofi/conversations/${conv}/messages`, { texte, ...extra });
   const etat = (jar) => call(jar, 'GET', `/api/kofi/etat?formation_id=${fid}`);
@@ -79,7 +81,7 @@ test('Koffi — règles du socle', async (t) => {
     assert.equal(r.status, 201, JSON.stringify(r.data)); assert.equal(await paye(r.data.commande_id, 30), 200);
     r = await call(jarC, 'POST', `/api/formations/${fid}/acquerir`, {});
     assert.equal(r.status, 201, JSON.stringify(r.data)); assert.equal(await paye(r.data.commande_id, 30), 200);
-    premium(uid('Alpha')); premium(uid('Beta'));
+    premium(uid('Alpha')); premium(uid('Beta')); majeur(uid('Alpha')); majeur(uid('Beta'));
     assert.equal(sql('select statut from formation_inscriptions where user_id=? and formation_id=?', uid('Alpha'), fid)[0].statut, 'active');
   });
 
@@ -257,7 +259,7 @@ test('Koffi — règles du socle', async (t) => {
 
   await t.test('budget : sous le seuil les essais gratuits s\'arrêtent ; réserve épuisée, tout s\'arrête ; le registre détaille les coûts', async () => {
     let r = await call(jarE, 'POST', `/api/formations/${fid}/acquerir`, {}); assert.equal(await paye(r.data.commande_id, 30), 200);
-    premium(uid('Epsilon'));
+    premium(uid('Epsilon')); majeur(uid('Epsilon'));
     const b = await call(jarF, 'GET', '/api/admin/kofi/budget');
     assert.equal(b.status, 200); assert.ok(b.data.reserve_eur < 10 && b.data.reserve_eur > 9.9, 'le coût réel (≈ centimes) est déduit : ' + b.data.reserve_eur);
     assert.ok(b.data.par_categorie.find(c => c.categorie === 'gratuit') && b.data.par_categorie.find(c => c.categorie === 'apercu'));
@@ -317,6 +319,56 @@ test('Koffi — règles du socle', async (t) => {
     const ligne = idx.data.lecons.find(x => x.id === vide);
     assert.equal(ligne.statut, 'non_exploitable'); assert.equal(ligne.raison, 'video_sans_transcription'); assert.equal(ligne.extraits, 0);
     assert.ok(idx.data.lecons.find(x => x.id === l1).extraits >= 1);
+  });
+
+  await t.test('Koffi réservé aux MAJEURS : confirmation exigée une fois (preuve datée), date de naissance < 18 ans = fermé sans appel, aucun appel IA tant que non confirmé', async () => {
+    const Kofi = require('../server/kofi');
+    /* Calcul de l'âge : jour d'anniversaire exact, deux formats, valeurs absurdes ignorées. */
+    const ref = new Date('2026-10-30T12:00:00Z');
+    assert.equal(Kofi.ageEn('2008-10-30', ref), 18); assert.equal(Kofi.ageEn('2008-10-31', ref), 17); assert.equal(Kofi.ageEn('30/10/2008', ref), 18);
+    assert.equal(Kofi.ageEn('1990-05-12', ref), 36);
+    for (const faux of [null, '', 'abc', '2030-01-01', '1990-02-31', '1800-01-01']) assert.equal(Kofi.ageEn(faux, ref), null, String(faux));
+
+    const a = uid('Alpha'); const ia0 = nbAppelsIA();
+    sql('DELETE FROM user_accreditations WHERE user_id=?', a); premium(a); /* un test précédent avait fait expirer l'abonnement d'Alpha */
+    const conv = (await ouvrir(jarA)).data.id;
+    sql('DELETE FROM kofi_majorite WHERE user_id=?', a);
+    /* Non confirmé : Koffi propose la confirmation et refuse tout le reste. */
+    let r = await etat(jarA);
+    assert.equal(r.data.etat, 'majorite'); assert.equal(r.data.majorite.texte, Kofi.TEXTE_MAJORITE); assert.equal(r.data.forfait.achetable, false);
+    assert.equal((await ouvrir(jarA)).status, 403);
+    r = await poser(jarA, conv, 'Comment fonctionne la tontine solidaire ?');
+    assert.equal(r.status, 403); assert.equal(r.data.code, 'majorite_requise');
+    assert.equal((await call(jarA, 'GET', `/api/kofi/conversations/${conv}`)).status, 403);
+    assert.equal((await call(jarA, 'GET', `/api/kofi/conversations?formation_id=${fid}`)).status, 403);
+    assert.equal((await call(jarA, 'POST', '/api/kofi/forfait/acheter', { formation_id: fid, accepte_non_remboursable: true })).data.code, 'majorite_requise');
+    assert.equal(nbAppelsIA(), ia0, 'aucun appel au fournisseur d\'IA');
+    assert.equal((await etat(jarF)).data.etat === 'majorite', false, 'l\'aperçu du formateur n\'est pas concerné');
+    assert.equal((await etat(jarC)).data.etat, 'vitrine', 'un compte non Premium voit la vitrine, comme avant');
+    /* Confirmation : la case est exigée (valeur strictement true), une seule ligne datée. */
+    assert.equal((await call(jarA, 'POST', '/api/kofi/majorite', {})).data.code, 'confirmation_requise');
+    assert.equal((await call(jarA, 'POST', '/api/kofi/majorite', { confirme: 'true' })).status, 400);
+    assert.equal((await call(anon, 'POST', '/api/kofi/majorite', { confirme: true })).status, 401);
+    assert.equal(sql('select count(*) n from kofi_majorite where user_id=?', a)[0].n, 0);
+    assert.equal((await call(jarA, 'POST', '/api/kofi/majorite', { confirme: true })).status, 200);
+    assert.equal((await call(jarA, 'POST', '/api/kofi/majorite', { confirme: true })).status, 200, 'idempotent');
+    const lignes = sql('select * from kofi_majorite where user_id=?', a);
+    assert.equal(lignes.length, 1); assert.match(String(lignes[0].confirme_le), /^\d{4}-\d{2}-\d{2}T/); assert.equal(lignes[0].version, Kofi.VERSION_MAJORITE);
+    assert.equal((await etat(jarA)).data.etat, 'utilisable');
+    assert.equal((await poser(jarA, conv, 'Comment fonctionne la tontine solidaire ?')).status, 200);
+    /* Date de naissance connue et < 18 ans : fermé, même avec la case cochée ; supprimer ses conversations reste possible. */
+    const naissance = ans => new Date(Date.now() - ans * 365.25 * 86400000).toISOString().slice(0, 10);
+    sql('UPDATE users SET date_naissance=? WHERE id=?', naissance(15), a);
+    r = await etat(jarA); assert.equal(r.data.etat, 'mineur');
+    r = await poser(jarA, conv, 'Quelle est la règle de la tontine solidaire ?'); assert.equal(r.status, 403); assert.equal(r.data.code, 'mineur');
+    assert.equal((await call(jarA, 'POST', '/api/kofi/majorite', { confirme: true })).data.code, 'mineur');
+    assert.equal((await call(jarA, 'GET', `/api/kofi/conversations/${conv}`)).status, 403);
+    assert.equal((await call(jarA, 'POST', '/api/kofi/forfait/acheter', { formation_id: fid, accepte_non_remboursable: true })).data.code, 'mineur');
+    assert.equal((await call(jarA, 'DELETE', `/api/kofi/conversations/${conv}`)).status, 200, 'le droit de supprimer ses conversations reste ouvert');
+    /* Majeur par la date de naissance : Koffi redevient utilisable ; la confirmation faite avant reste valable. */
+    sql('UPDATE users SET date_naissance=? WHERE id=?', naissance(36), a);
+    assert.equal((await etat(jarA)).data.etat, 'utilisable');
+    sql('UPDATE users SET date_naissance=NULL WHERE id=?', a);
   });
 
   await t.test('suppression de compte (RGPD) : conversations et retours de l\'élève effacés, ceux des autres intacts ; achats et compteurs d\'usage conservés', async () => {

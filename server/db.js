@@ -5158,6 +5158,12 @@ db.exec(`
     paye_le TEXT
   );
   CREATE INDEX IF NOT EXISTS idx_kofi_commandes_user ON kofi_commandes(user_id, statut);
+  /* Koffi réservé aux personnes MAJEURES (2026-10-30) : preuve datée de la confirmation « j'ai 18 ans ou plus » (une ligne par compte). */
+  CREATE TABLE IF NOT EXISTS kofi_majorite (
+    user_id INTEGER PRIMARY KEY,
+    confirme_le TEXT NOT NULL,
+    version TEXT
+  );
 `);
 
 /* Documents PDF / Excel affichés dans la page du cours (2026-10-30) : doc_integre = NULL → par défaut selon le type (PDF : affiché ; autre : pièce jointe) ; doc_hauteur = hauteur d'affichage en px. */

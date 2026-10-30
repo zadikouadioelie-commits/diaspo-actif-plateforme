@@ -22,7 +22,9 @@
       compris: 'J\'ai compris', restantes: function (n) { return n + ' question' + (n > 1 ? 's' : '') + ' restante' + (n > 1 ? 's' : ''); }, apercu: 'Aperçu formateur : aucune question décomptée',
       gratuites: function (n) { return n + ' question' + (n > 1 ? 's' : '') + ' offerte' + (n > 1 ? 's' : ''); }, sources: 'Sources', utile: 'Utile', pasUtile: 'Pas utile', merci: 'Merci !',
       sansRef: 'Aucune source n\'est citée pour cette réponse : vérifiez-la dans le cours.', hors: 'Cette information ne figure pas dans vos supports.',
-      vitrineTitre: 'Koffi, votre tuteur personnel', vitrineTexte: 'Posez vos questions sur le cours à tout moment et obtenez une réponse claire, avec la source dans votre formation. Réservé aux comptes Premium.',
+      vitrineTitre: 'Koffi, votre tuteur personnel', vitrineTexte: 'Posez vos questions sur le cours à tout moment et obtenez une réponse claire, avec la source dans votre formation. Réservé aux comptes Premium et aux personnes majeures (18 ans ou plus).',
+      majTitre: 'Koffi est réservé aux personnes majeures', majTexte: 'Pour utiliser Koffi, confirmez que vous avez 18 ans ou plus. Vous pouvez suivre toutes vos formations sans lui.', majCase: 'Je confirme avoir 18 ans ou plus', majBtn: 'Confirmer',
+      mineur: 'Koffi est réservé aux personnes de 18 ans ou plus. Toutes vos formations restent accessibles sans lui.',
       exemple: 'Exemple fictif', exQ: 'Quelle est la différence entre un prêt et une subvention ?', exR: 'Un prêt doit être remboursé, avec ou sans intérêts, alors qu\'une subvention est une aide qui n\'est pas à rembourser [1].', exSrc: 'Module 2 › Financer son projet › Les sources de financement',
       premium: 'Passer Premium', rechargeTitre: 'Vos questions sont épuisées', rechargeTexte: function (f) { return 'Rechargez ' + f.questions + ' questions pour ' + Number(f.prix_eur).toFixed(2).replace('.', ',') + ' € : valables ' + f.validite_mois + ' mois, utilisables dans toutes vos formations. Les questions achetées ne sont pas remboursables.'; },
       recharger: function (f) { return 'Recharger ' + f.questions + ' questions — ' + Number(f.prix_eur).toFixed(2).replace('.', ',') + ' €'; }, rechargerCourt: 'Recharger', paiementOuvre: 'Ouverture du paiement sécurisé…', paiementRecu: 'Paiement reçu : vos questions sont en cours de crédit…', paiementOk: 'Vos questions sont créditées. Bonne étude !', paiementAttente: 'Le crédit peut prendre quelques instants : rouvrez Koffi dans une minute.', paiementAnnule: 'Paiement annulé : rien n\'a été débité.', stockGarde: function (n) { return 'Vos ' + n + ' questions achetées sont conservées : elles servent de nouveau dès que votre Premium est actif.'; }, desactive: 'Koffi est désactivé sur cette formation.', indispo: 'Koffi est momentanément indisponible. Réessayez un peu plus tard.',
@@ -40,7 +42,9 @@
       compris: 'Got it', restantes: function (n) { return n + ' question' + (n > 1 ? 's' : '') + ' left'; }, apercu: 'Trainer preview: no question counted',
       gratuites: function (n) { return n + ' free question' + (n > 1 ? 's' : ''); }, sources: 'Sources', utile: 'Helpful', pasUtile: 'Not helpful', merci: 'Thanks!',
       sansRef: 'No source is cited for this answer: please check it in the course.', hors: 'This information is not in your materials.',
-      vitrineTitre: 'Koffi, your personal tutor', vitrineTexte: 'Ask your questions about the course at any time and get a clear answer with the source in your course. For Premium accounts only.',
+      vitrineTitre: 'Koffi, your personal tutor', vitrineTexte: 'Ask your questions about the course at any time and get a clear answer with the source in your course. For Premium accounts and adults (18 or older) only.',
+      majTitre: 'Koffi is for adults only', majTexte: 'To use Koffi, please confirm that you are 18 or older. You can follow all your courses without it.', majCase: 'I confirm that I am 18 or older', majBtn: 'Confirm',
+      mineur: 'Koffi is reserved for people aged 18 or older. All your courses remain available without it.',
       exemple: 'Fictional example', exQ: 'What is the difference between a loan and a grant?', exR: 'A loan must be repaid, with or without interest, whereas a grant is aid that does not have to be repaid [1].', exSrc: 'Module 2 › Financing your project › Funding sources',
       premium: 'Go Premium', rechargeTitre: 'You have run out of questions', rechargeTexte: function (f) { return 'Top up ' + f.questions + ' questions for ' + Number(f.prix_eur).toFixed(2).replace('.', ',') + ' €: valid for ' + f.validite_mois + ' months, usable in all your courses. Purchased questions are non-refundable.'; },
       recharger: function (f) { return 'Top up ' + f.questions + ' questions — ' + Number(f.prix_eur).toFixed(2).replace('.', ',') + ' €'; }, rechargerCourt: 'Top up', paiementOuvre: 'Opening secure payment…', paiementRecu: 'Payment received: your questions are being credited…', paiementOk: 'Your questions are credited. Happy studying!', paiementAttente: 'Crediting can take a moment: reopen Koffi in a minute.', paiementAnnule: 'Payment cancelled: nothing was charged.', stockGarde: function (n) { return 'Your ' + n + ' purchased questions are kept: they work again as soon as your Premium is active.'; }, desactive: 'Koffi is turned off for this course.', indispo: 'Koffi is temporarily unavailable. Please try again later.',
@@ -168,6 +172,22 @@
     d.innerHTML = '<h4>' + T().rechargeTitre + '</h4><div>' + esc(T().rechargeTexte(f)) + '</div>' + (f.achetable === false ? '' : '<p style="margin:12px 0 0"><button type="button" class="kf-cta sec" data-act="acheter">' + esc(T().recharger(f)) + '</button></p>') + '<div class="kf-note" role="status" id="kf-achat-msg" style="display:none"></div>';
     return d;
   }
+  /* Koffi est réservé aux majeurs : une confirmation (case + bouton), une seule fois par compte ; la date de naissance, si elle est connue, a le dernier mot (serveur). */
+  function carteMajorite() {
+    var d = document.createElement('div'); d.className = 'kf-card';
+    d.innerHTML = '<h4>' + T().majTitre + '</h4><div>' + esc(T().majTexte) + '</div>' +
+      '<label style="display:flex;gap:8px;align-items:flex-start;margin:12px 0 0;cursor:pointer"><input type="checkbox" data-maj="case" style="margin-top:3px"><span>' + esc(T().majCase) + '</span></label>' +
+      '<p style="margin:12px 0 0"><button type="button" class="kf-cta sec" data-act="majorite" disabled>' + esc(T().majBtn) + '</button></p>';
+    var c = d.querySelector('[data-maj="case"]'), b = d.querySelector('[data-act="majorite"]');
+    c.addEventListener('change', function () { b.disabled = !c.checked; });
+    return d;
+  }
+  function confirmerMajorite() {
+    var c = S.root.querySelector('[data-maj="case"]'); if (!c || !c.checked || S.occupe) return;
+    S.occupe = true;
+    api('POST', '/api/kofi/majorite', { confirme: true }).then(function () { S.occupe = false; return chargerEtat().then(chargerConversation).then(construireCorps); })
+      .catch(function () { S.occupe = false; });
+  }
   function carteMessage(titre, texte) {
     var d = document.createElement('div'); d.className = 'kf-card'; d.innerHTML = '<h4>' + esc(titre) + '</h4><div>' + esc(texte) + '</div>'; return d;
   }
@@ -181,6 +201,8 @@
     S.root.querySelectorAll('[data-act="nouvelle"],[data-act="supprimer"]').forEach(function (b) { b.style.display = gerer ? '' : 'none'; });
     if (!e) { body.appendChild(carteMessage('Koffi', T().indispo)); foot.style.display = 'none'; return; }
     if (e.etat === 'vitrine') { body.appendChild(carteVitrine()); foot.style.display = 'none'; return; }
+    if (e.etat === 'majorite') { body.appendChild(carteMajorite()); foot.style.display = 'none'; return; }
+    if (e.etat === 'mineur') { body.appendChild(carteMessage('Koffi', T().mineur)); foot.style.display = 'none'; return; }
     if (e.etat === 'desactive') { body.appendChild(carteMessage('Koffi', T().desactive)); foot.style.display = 'none'; return; }
     if (e.etat === 'indisponible') { body.appendChild(carteMessage('Koffi', T().indispo)); foot.style.display = 'none'; return; }
     if (e.etat === 'evaluation') { body.appendChild(carteMessage('Koffi', T().evaluation)); foot.style.display = 'none'; return; }
@@ -331,6 +353,7 @@
       if (act === 'fermer') return fermerPanneau();
       if (act === 'compris') { lsSet('koffi_info_vue_v2', '1'); return construireCorps(); }
       if (act === 'acheter') return acheterForfait();
+      if (act === 'majorite') return confirmerMajorite();
       if (act === 'nouvelle') { S.conv = null; S.msgs = []; if (S.etat && S.etat.etat !== 'recharge') { construireCorps(); } return; }
       if (act === 'supprimer') {
         if (!S.conv) return; if (!window.confirm(T().confirmSuppr)) return;
