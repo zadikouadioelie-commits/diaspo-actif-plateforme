@@ -1972,34 +1972,13 @@ async function applyAuthState() {
         <span><span style="font-size:14px;">👑</span> Passer à Premium</span>
         <span style="font-size:9.5px;font-weight:700;color:#000;opacity:.85;">${premiumSousTitres[user.role]}</span>
       </a>` : '';
-    /* Aperçu multi-appareils — outil de contrôle de mise en page (défini en fin de fichier).
-       Masqué à l'intérieur de son propre cadre (?apercu=1), sinon l'outil se proposerait
-       récursivement dans sa propre prévisualisation. Réservé à l'administrateur et au compte
-       diaspo.actif@gmail.com (compte officiel de test, role='initiative' donc pas couvert par
-       le seul contrôle de rôle) — demande explicite du 2026-08-10, ce bouton était visible à
-       tous les comptes connectés jusque-là. */
-    const apercuAutorise = user.role === 'administrateur' || user.email === 'diaspo.actif@gmail.com';
-    const apercuBtnHtml = (apercuAutorise && !apercuEstDansLeCadre()) ? `
-      <button type="button" id="apercu-appareils-btn" onclick="openApercuAppareils()" title="Prévisualiser cette page en mobile, tablette et ordinateur" style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#0F2A50;color:#fff;font-weight:800;font-size:12.5px;padding:7px 12px;border-radius:14px;white-space:nowrap;border:1px solid rgba(255,255,255,.25);box-shadow:0 1px 4px rgba(0,0,0,.25);">
-        <span style="font-size:14px;">📱</span> Aperçu
-      </button>` : '';
+    /* 2026-10-30, demande explicite (« libérer de l'espace sur le grand bandeau ») : retirés du bandeau — le bouton
+       « 📱 Aperçu » (outil multi-appareils, openApercuAppareils() reste défini en fin de fichier), l'icône orange
+       « Découvrir une publication » (fil-actualite.html?decouvrir=1, toujours géré par fil-actualite-app.html) et le
+       bouton « Rafraîchir la page ». Le sélecteur de langue est masqué dans le bandeau par styles.v2.css. */
     el.innerHTML = `
       ${demoBtnHtml}
       ${premiumBtnHtml}
-      ${apercuBtnHtml}
-      <!-- Bouton « Actualités » (2026-10-12, demande explicite) : remplace la loupe, qui menait à l'Annuaire — lequel a déjà son
-           lien dans le menu principal. Ouvre le fil d'actualité (publications, comptes rendus, cagnottes, boutiques…, façon réseau social).
-           ?decouvrir=1 (2026-10-13, demande explicite) : ouvre directement une publication AU HASARD en vue plein écran (Posts.openDetail,
-           voir fil-actualite-app.html) au lieu de la simple liste — jamais toujours la même, pour donner envie de balayer vers les autres.
-           Icône redessinée (rayons + ▶ centré, couleurs Diaspo'Actif) pour se distinguer des icônes neutres du bandeau : un vrai bouton
-           de découverte, pas une simple icône de document. -->
-      <a href="fil-actualite.html?decouvrir=1" class="topbar-icon-btn" title="Découvrir une publication" aria-label="Découvrir une publication">
-        <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-          <g stroke="#F26422" stroke-width="2" stroke-linecap="round"><line x1="12" y1="1" x2="12" y2="4"></line><line x1="12" y1="20" x2="12" y2="23"></line><line x1="1" y1="12" x2="4" y2="12"></line><line x1="20" y1="12" x2="23" y2="12"></line><line x1="4.2" y1="4.2" x2="6.3" y2="6.3"></line><line x1="17.7" y1="17.7" x2="19.8" y2="19.8"></line><line x1="4.2" y1="19.8" x2="6.3" y2="17.7"></line><line x1="17.7" y1="6.3" x2="19.8" y2="4.2"></line></g>
-          <circle cx="12" cy="12" r="6.5" fill="#F26422"></circle>
-          <path d="M10.3 9.2v5.6l4.6-2.8z" fill="#fff"></path>
-        </svg>
-      </a>
       <a href="messagerie.html" class="topbar-icon-btn" title="Messagerie">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:middle;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
         <span id="msg-topbar-badge" style="display:none;position:absolute;top:-6px;right:-8px;background:var(--orange);color:#fff;border-radius:50%;width:16px;height:16px;font-size:10px;font-weight:700;align-items:center;justify-content:center;"></span>
@@ -2018,15 +1997,6 @@ async function applyAuthState() {
         </button>
         <div class="notif-dropdown" id="notif-dropdown"></div>
       </div>
-      <!-- Rafraîchir la page (2026-10-12, demande explicite, capture à l'appui) : l'app est
-           installée en PWA ("display":"standalone" dans manifest.json) — sans barre d'adresse
-           ni bouton de rechargement du navigateur, donc aucun moyen natif de recharger une page
-           qui semble figée/périmée une fois ouverte en plein écran. Icône normale du bandeau
-           (pas dans "Plus d'options", masqué au-delà de 1180px — ce bouton doit rester
-           joignable en permanence, desktop compris). -->
-      <button type="button" class="topbar-icon-btn" title="Rafraîchir la page" onclick="location.reload()">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
-      </button>
       <!-- Bouton dédié vers le tableau de bord (icône maison) : la pastille d'identité
            juste après y mène déjà, mais rien n'indiquait visuellement que ce lien existait
            (demandé le 2026-08-19, capture à l'appui). Icône remplacée le 2026-09-20 (demande

@@ -149,6 +149,9 @@ button{font-family:inherit;cursor:pointer;}
 .topbar-right{display:flex;align-items:center;gap:12px;}
 .lang-select{border:1px solid rgba(255,255,255,.3);border-radius:20px;padding:6px 10px;font-size:12px;font-weight:700;color:#000;background:rgba(255,255,255,.85);}
 .lang-select option{color:#000;}
+/* 2026-10-30, demande explicite : sélecteur de langue retiré du bandeau pour libérer de la place. Seul le bandeau est visé : le
+   sélecteur reste dans le DOM (app.js le peuple, et le menu compact « plus d'options » / le tiroir mobile le reprennent). */
+.topbar .lang-select{display:none!important;}
 .role-switch{display:flex;background:rgba(255,255,255,.1);border-radius:30px;padding:3px;gap:2px;border:1px solid rgba(255,255,255,.2);}
 .role-switch button{border:none;background:transparent;padding:6px 12px;border-radius:24px;font-size:12px;font-weight:700;color:rgba(255,255,255,.7);}
 .role-switch button.active{background:#fff;color:var(--navy);}
