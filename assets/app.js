@@ -6384,6 +6384,32 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     let menuIci = null, menuIciFond = null, menuIciHistoire = false;
     const menuIciCache = {};
     function destMenuIci() { return (CURRENT_USER && ROLE_DASHBOARD[CURRENT_USER.role]) || null; }
+    /* Modules Premium du menu ouvert sur place (2026-10-30, signalé : « tous les modules premium dans le menu sont censés être dans un ensemble de cartouches
+       dorées, et ce n'est plus le cas »). Cause : depuis le 2026-10-28 (de420ea) le bouton ☰ n'envoie plus au tableau de bord mais en fabrique ICI une copie
+       à partir de son HTML brut. Or ce qui rend le groupe doré n'est pas dans ce HTML : la cartouche à couronne est dessinée par
+       assets/sidebar-premium-cadre.js, et le doré des liens vient du CSS propre au tableau de bord (.sb-premium) ou d'une classe posée par son script
+       (Initiative). On rejoue donc ici les deux : liens du groupe en doré + cartouche. */
+    function habillerPremiumMenuIci(zone) {
+      if (!document.getElementById("menu-ici-premium-css")) {
+        const st = document.createElement("style");
+        st.id = "menu-ici-premium-css";
+        st.textContent = 'aside[aria-label="Menu des modules"] a.sb-premium{background:linear-gradient(135deg,#FFD166,#B8860B)!important;color:#3D2B00!important;font-weight:800!important}'
+          + 'aside[aria-label="Menu des modules"] a.sb-premium:hover{background:linear-gradient(135deg,#FFDE85,#946f08)!important}';
+        document.head.appendChild(st);
+      }
+      const titre = Array.from(zone.querySelectorAll(".sb-group-lbl")).find(e => /MODULES PREMIUM/i.test(e.textContent));
+      if (titre) {
+        for (let el = titre.nextElementSibling; el && !(el.classList && el.classList.contains("sb-group-lbl")); el = el.nextElementSibling) {
+          if (el.tagName === "A") el.classList.add("sb-premium");
+        }
+      }
+      const monter = () => { if (menuIci && window.sidebarPremiumCadre) window.sidebarPremiumCadre(menuIci); };
+      if (window.sidebarPremiumCadre) { monter(); return; }
+      if (document.getElementById("sbp-js")) return; // chargement déjà en cours : le script se monte seul à son arrivée
+      const s = document.createElement("script");
+      s.id = "sbp-js"; s.src = "assets/sidebar-premium-cadre.js?v=6"; s.onload = monter;
+      document.head.appendChild(s);
+    }
     async function remplirMenuIci(zone, dest) {
       let source = null;
       if (dest) {
@@ -6439,6 +6465,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         window.location.href = "index.html";
       });
       zone.appendChild(sortie);
+      habillerPremiumMenuIci(zone);
     }
     function fermerMenuIci(viaNavigation) {
       if (!menuIci) return;

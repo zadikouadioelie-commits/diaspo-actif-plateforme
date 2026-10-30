@@ -8,7 +8,10 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 (function () {
   'use strict';
-  const sb = document.querySelector('.sidebar');
+  /* monter(sb) équipe UN menu (idempotent). Exposée en window.sidebarPremiumCadre : le « Menu des modules » ouvert sur place depuis n'importe quelle page
+     (assets/app.js, ouvrirMenuIci — copie du menu du tableau de bord, fabriquée au clic) n'existe pas au chargement de ce script, et perdait donc sa
+     cartouche dorée depuis le 2026-10-28 (le bouton ☰ n'envoyait plus au tableau de bord). */
+  function monter(sb) {
   if (!sb || sb.dataset.cadrePremium) return;
   sb.dataset.cadrePremium = '1';
 
@@ -45,8 +48,10 @@
 
   /* Les liens du groupe : tout <a> direct situé entre le titre « MODULES PREMIUM » et le titre de groupe suivant. */
   function lienDuGroupe() {
-    const fils = Array.from(sb.children);
-    const i = fils.findIndex(el => el.classList && el.classList.contains('sb-group-lbl') && /MODULES PREMIUM/i.test(el.textContent));
+    /* Le titre n'est pas forcément un enfant direct du menu (dans la copie ouverte sur place, les liens sont dans un conteneur) : on prend ses frères. */
+    const t0 = Array.from(sb.querySelectorAll('.sb-group-lbl')).find(el => /MODULES PREMIUM/i.test(el.textContent));
+    const fils = t0 ? Array.from(t0.parentElement.children) : [];
+    const i = fils.indexOf(t0);
     if (i < 0) return { titre: null, liens: [] };
     const liens = [];
     for (let k = i + 1; k < fils.length; k++) {
@@ -84,10 +89,15 @@
     }
   }
 
-  window.addEventListener('resize', planifier);
+  /* Un menu ouvert sur place est retiré à sa fermeture : on débranche alors les écouteurs (un par ouverture sinon). */
+  function surRedimension() { if (!sb.isConnected) { window.removeEventListener('resize', surRedimension); obs.disconnect(); return; } planifier(); }
+  window.addEventListener('resize', surRedimension);
   if (window.ResizeObserver) new ResizeObserver(planifier).observe(sb);
   /* Le menu se complète après le chargement (statut Premium, recherche de module, ordre personnalisé) : on recale à plusieurs reprises. */
   [0, 400, 1200, 2800, 6000].forEach(ms => setTimeout(planifier, ms));
   obs.observe(sb, options);
   planifier();
+  }
+  window.sidebarPremiumCadre = monter;
+  monter(document.querySelector('.sidebar'));
 })();
