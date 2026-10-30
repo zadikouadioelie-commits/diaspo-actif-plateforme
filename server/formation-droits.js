@@ -143,8 +143,11 @@ async function activerDepuisInscription(db, inscriptionId, montant) {
   await db.prepare("UPDATE formation_acces SET statut='actif', type_acces='paye', montant_paye=?, date_debut=datetime('now') WHERE inscription_id=? AND module_cle=0 AND statut='en_attente'").run(Number(montant) || 0, Number(inscriptionId));
 }
 
+/* Mode TEST (2026-10-30) : FORMATION_PAIEMENT_SIMULE=1 → « payer » ouvre l'accès tout de suite, sans Stripe. Jamais actif sur Vercel (production), quoi qu'on y configure. */
+function paiementSimule() { return process.env.FORMATION_PAIEMENT_SIMULE === "1" && !process.env.VERCEL; }
+
 module.exports = {
-  TEXTE_NON_REMBOURSABLE, TEXTE_RETRACTATION, VERSION_CONSENTEMENT, STATUTS_ACCES, TYPES_ACCES, rattrapageSQL, rattrapageCompte, dateExpiration, prixModule, synchroniserInscription, balayerExpirations,
+  paiementSimule, TEXTE_NON_REMBOURSABLE, TEXTE_RETRACTATION, VERSION_CONSENTEMENT, STATUTS_ACCES, TYPES_ACCES, rattrapageSQL, rattrapageCompte, dateExpiration, prixModule, synchroniserInscription, balayerExpirations,
   modulesAutorises, leconPermise, quizPermis, confirmerCommande, annulerCommande, activerDepuisInscription,
 };
 
@@ -263,7 +266,30 @@ module.exports.register = function register(deps) {
       return sendJSON(res, 409, { error: "Avant de payer, confirmez que vous avez compris que cet achat n'est pas remboursable.", code: "consentement_requis", texte: TEXTE_NON_REMBOURSABLE, retractation: TEXTE_RETRACTATION, montant });
     }
     const { stripe, getOrCreateStripeCustomer } = require("./stripe-client");
-    if (!stripe) return sendJSON(res, 503, { error: "Paiements momentanément indisponibles." });
+    if (!D.paiementSimule() && !stripe) return sendJSON(res, 503, { error: "Paiements momentanément indisponibles." });
+    if (D.paiementSimule() && actuel && actuel.statut === "en_attente" && actuel.commande_id) {
+      /* « Finaliser mon paiement » en mode test : la commande restée en attente est considérée comme payée. */
+      const conf = await D.confirmerCommande(db, actuel.commande_id, null);
+      if (conf) return sendJSON(res, 200, { ok: true, paiement_simule: true, portee });
+    }
+    if (D.paiementSimule()) {
+      /* Mode test : la commande est créée normalement, puis confirmée aussitôt, comme le ferait le webhook Stripe. */
+      try {
+        if (actuel && actuel.statut === "en_attente") await db.prepare("DELETE FROM formation_acces WHERE id=? AND statut='en_attente'").run(actuel.id);
+        const { insc } = await assurerInscription("en_attente");
+        const c = await db.prepare("INSERT INTO formation_commandes (user_id,formation_id,montant,statut,code_acces,prix_initial,remise,coupon_code,coupon_source,coupon_id,promo_pct) VALUES (?,?,?,'en_attente',?,?,?,?,?,?,?)").run(user.id, f.id, montant, code_valide, ...colsVente);
+        await db.prepare("INSERT INTO formation_commande_lignes (commande_id,module_id,libelle,prix) VALUES (?,?,?,?)").run(c.lastInsertRowid, cle || null, libelle, prixCatalogue);
+        if (actuel && actuel.statut !== "en_attente") await db.prepare("UPDATE formation_acces SET statut='en_attente', type_acces='paye', montant_paye=0, commande_id=?, inscription_id=?, date_debut=NULL, date_expiration=NULL, motif=NULL WHERE id=?").run(c.lastInsertRowid, insc.id, actuel.id);
+        else await db.prepare("INSERT INTO formation_acces (user_id,formation_id,module_cle,type_acces,statut,montant_paye,commande_id,inscription_id) VALUES (?,?,?,'paye','en_attente',0,?,?)").run(user.id, f.id, cle, c.lastInsertRowid, insc.id);
+        await db.prepare("UPDATE formation_commandes SET consentement_le=? WHERE id=?").run(`${new Date().toISOString()} v${VERSION_CONSENTEMENT} (paiement simulé)`, c.lastInsertRowid);
+        await D.confirmerCommande(db, c.lastInsertRowid, montant);
+        creerNotif(user.id, "formation", "Inscription confirmée", cle === 0 ? `Vous êtes inscrit à la formation « ${f.titre} » (paiement simulé).` : `Vous avez accès au module « ${module.titre} » de « ${f.titre} » (paiement simulé).`, { formation_id: f.id });
+        return sendJSON(res, 201, { ok: true, paiement_simule: true, commande_id: Number(c.lastInsertRowid), portee });
+      } catch (e) {
+        if (/unique|duplicate/i.test(String(e && e.message))) return sendJSON(res, 409, { error: "Une demande est déjà en cours pour cette formation. Réessayez dans un instant." });
+        return sendJSON(res, 500, SEC.safeError(e, "formation-paiement-simule"));
+      }
+    }
     if (actuel && actuel.statut === "en_attente") {
       /* Double clic ou retour en arrière : on reprend le paiement en cours plutôt que d'en créer un second. */
       const cmdEnCours = actuel.commande_id ? await db.prepare("SELECT * FROM formation_commandes WHERE id=? AND statut='en_attente'").get(actuel.commande_id) : null;
