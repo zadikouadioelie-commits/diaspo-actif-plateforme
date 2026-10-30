@@ -12,6 +12,7 @@
    ═════════════════════════════════════════════════ */
 "use strict";
 const Droits = require("./formation-droits");
+const ReelsUpload = require("./reels-upload");
 
 const TYPES_TEXTE = ["titre", "soustitre", "paragraphe", "citation", "encadre"];
 const TYPES = [...TYPES_TEXTE, "image", "video", "audio", "separateur", "lien", "bouton", "fichier", "document", "tableau", "validation", "quiz"];
@@ -430,6 +431,20 @@ module.exports.register = function register(deps) {
     if (nb >= 500) return sendJSON(res, 400, { error: "Votre bibliothèque est pleine (500 fichiers) : supprimez-en avant d'en ajouter." });
     const id = (await db.prepare("INSERT INTO formation_medias (user_id, nom, url, type, taille) VALUES (?,?,?,?,?)").run(user.id, v.nom, v.url, v.type, v.taille)).lastInsertRowid;
     sendJSON(res, 201, { media: vueMedia(await db.prepare("SELECT * FROM formation_medias WHERE id=?").get(id)) });
+  });
+  /* POST /api/formateur/medias/video { guid, jeton, nom } — enregistre dans la bibliothèque une vidéo envoyée DIRECTEMENT à l'hébergeur vidéo (le fichier ne passe jamais par ce serveur : limite de 4,5 Mo).
+     L'adresse est construite ICI à partir de l'identifiant vérifié (preuve du compte + durée réelle mesurée par l'hébergeur) ; le navigateur ne fournit jamais l'adresse. */
+  route("POST", "/api/formateur/medias/video", async (req, res, params, body) => {
+    const user = await compteMedia(req, res); if (!user) return;
+    const v = await ReelsUpload.verifierVideoFormation(user.id, body && body.guid, body && body.jeton);
+    if (v.erreur) return sendJSON(res, v.code || 400, { error: v.erreur });
+    const nom = txt(body && body.nom, 150).trim() || "Vidéo";
+    const deja = await db.prepare("SELECT * FROM formation_medias WHERE user_id=? AND url=?").get(user.id, v.url);
+    if (deja) return sendJSON(res, 200, { media: vueMedia(deja), miniature: v.miniature, duree: v.duree, deja: true });
+    const nb = Number((await db.prepare("SELECT COUNT(*) AS n FROM formation_medias WHERE user_id=?").get(user.id)).n) || 0;
+    if (nb >= 500) return sendJSON(res, 400, { error: "Votre bibliothèque est pleine (500 fichiers) : supprimez-en avant d'en ajouter." });
+    const id = (await db.prepare("INSERT INTO formation_medias (user_id, nom, url, type, taille) VALUES (?,?,?,'video',NULL)").run(user.id, nom, v.url)).lastInsertRowid;
+    sendJSON(res, 201, { media: vueMedia(await db.prepare("SELECT * FROM formation_medias WHERE id=?").get(id)), miniature: v.miniature, duree: v.duree });
   });
   route("PATCH", "/api/formateur/medias/:id", async (req, res, params, body) => {
     const user = await compteMedia(req, res); if (!user) return;

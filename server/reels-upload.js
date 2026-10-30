@@ -57,7 +57,10 @@ const cfg = () => ({
 /* Vidéo courte d'un ÉVÉNEMENT (2026-10-28, demande explicite : « une vidéo courte, 2 minutes maximum ») : même hébergement et même envoi direct que les Reels,
    seule la durée change. Règles distinctes, jamais modifiables par le navigateur : c'est le serveur qui choisit quelle règle s'applique. */
 const SPEC_EVENEMENT = Object.freeze({ ...SPEC, duree_min: 1, duree_max: 120, duree_ideale: [30, 90], taille_max_mo: 600, cadre_recommande: "16:9", resolution_recommandee: "1280x720" });
-const specDe = usage => (usage === "evenement" ? SPEC_EVENEMENT : SPEC);
+/* Vidéo de COURS d'une formation (Studio, 2026-10-30) : même hébergement et même envoi direct, mais des règles de cours — jusqu'à 1 h, cadre horizontal 16:9 recommandé,
+   définition minimale plus souple. Règles choisies ICI (jamais par le navigateur). */
+const SPEC_FORMATION = Object.freeze({ ...SPEC, duree_min: 1, duree_max: 3600, duree_ideale: [120, 1200], taille_max_mo: 1024, cote_min_px: 360, cadre_recommande: "16:9", resolution_recommandee: "1920x1080", cadres_acceptes: ["16:9", "9:16", "4:5", "1:1"] });
+const specDe = usage => (usage === "evenement" ? SPEC_EVENEMENT : usage === "formation" ? SPEC_FORMATION : SPEC);
 const actif = () => { const c = cfg(); return !!(c.lib && c.cle && c.hote); };
 
 const secret = () => process.env.AUTH_SECRET || "diaspo-actif-2026-secret";
@@ -183,6 +186,15 @@ async function verifierVideoEvenement(userId, guid, jeton) {
   if (!e || e.etat !== "pret") return { erreur: e && e.erreur ? e.erreur : "Votre vidéo n’est pas encore prête. Patientez quelques instants puis réessayez.", code: 409 };
   return { url: e.urls.mp4 };
 }
+/* Vérifie l'envoi d'une vidéo de FORMATION (même preuve guid + jeton du compte ; durée et définition réelles mesurées par Bunny contre SPEC_FORMATION). → { url, miniature, duree } ou { erreur, code }. */
+async function verifierVideoFormation(userId, guid, jeton) {
+  if (!actif()) return { erreur: "L’envoi de vidéos n’est pas encore activé.", code: 503 };
+  if (!guidValide(guid) || !jetonValide(userId, guid, jeton)) return { erreur: "Envoi de vidéo inconnu.", code: 403 };
+  let e;
+  try { e = await etatVideo(guid, SPEC_FORMATION); } catch (err) { return { erreur: "La vidéo n’a pas pu être vérifiée. Réessayez.", code: 502 }; }
+  if (!e || e.etat !== "pret") return { erreur: e && e.erreur ? e.erreur : "Votre vidéo n’est pas encore prête. Patientez quelques instants puis réessayez.", code: 409 };
+  return { url: e.urls.mp4, miniature: e.urls.miniature, duree: e.duree };
+}
 /* Supprime de l'hébergement une vidéo d'événement remplacée ou retirée (seulement si l'adresse est bien celle de NOTRE bibliothèque). */
 async function supprimerVideoParUrl(url) {
   const h = cfg().hote; if (!h || !url) return false;
@@ -190,4 +202,4 @@ async function supprimerVideoParUrl(url) {
   return supprimerVideo(String(url).slice(pref.length).split("/")[0]);
 }
 
-module.exports = { verifierVideoEvenement, supprimerVideoParUrl, SPEC_EVENEMENT, registerReelsUpload, SPEC, actif, urlsLecture, etatVideo, supprimerVideo, jetonValide, jetonPour, guidValide };
+module.exports = { verifierVideoEvenement, verifierVideoFormation, supprimerVideoParUrl, SPEC_EVENEMENT, SPEC_FORMATION, registerReelsUpload, SPEC, actif, urlsLecture, etatVideo, supprimerVideo, jetonValide, jetonPour, guidValide };

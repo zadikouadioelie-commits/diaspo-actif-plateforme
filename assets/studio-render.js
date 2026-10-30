@@ -24,11 +24,12 @@
     if (x === 'pdf') return 'pdf';
     if (['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(x)) return 'image';
     if (['xls', 'xlsx'].includes(x)) return 'excel';
+    if (['mp4', 'mov', 'm4v'].includes(x)) return 'video';
     if (['doc', 'docx'].includes(x)) return 'word';
     if (['ppt', 'pptx'].includes(x)) return 'ppt';
     return 'autre';
   }
-  const FAMILLES = { pdf: ['📕', 'Document PDF'], image: ['🖼️', 'Image'], excel: ['📗', 'Tableur Excel'], word: ['📘', 'Document Word'], ppt: ['📙', 'Présentation PowerPoint'], autre: ['📄', 'Fichier'] };
+  const FAMILLES = { video: ['🎬', 'Vidéo'], pdf: ['📕', 'Document PDF'], image: ['🖼️', 'Image'], excel: ['📗', 'Tableur Excel'], word: ['📘', 'Document Word'], ppt: ['📙', 'Présentation PowerPoint'], autre: ['📄', 'Fichier'] };
   const placeholder = (icone, texte) => `<div class="st-ph"><span>${icone}</span><small>${esc(texte)}</small></div>`;
 
   /* Contenu d'un élément. ctx = { edit: bool, lecture: bool } */

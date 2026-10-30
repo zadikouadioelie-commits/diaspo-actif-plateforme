@@ -485,8 +485,9 @@
         ${select('Ajustement', 'ajust', p.ajust, [['contain', 'Image entière'], ['cover', 'Remplir le cadre (recadre les bords)']])}
         ${select('Alignement', 'align', p.align, [['left', 'À gauche'], ['center', 'Centré'], ['right', 'À droite']])}${champ('Arrondi des coins (px)', 'rayon', p.rayon, 'number', 'min="0" max="60"')}`;
     } else if (t === 'video') {
-      h += `<div class="st-btns"><button class="st-b" data-lib="video">📚 Ma bibliothèque</button></div>${champ('Adresse de la vidéo (YouTube ou fichier https)', 'url', p.url, 'url', 'placeholder="https://www.youtube.com/watch?v=…"')}${champ('Titre de la vidéo', 'titre', p.titre)}
-        <p class="st-aide">Les vidéos importées depuis votre ordinateur arrivent avec la bibliothèque de médias (étape suivante) ; pour l'instant, collez l'adresse d'une vidéo hébergée.</p>`;
+      h += `<div class="st-btns"><button class="st-b or" data-up="video">${p.url ? 'Remplacer la vidéo' : '⬆ Importer une vidéo'}</button><button class="st-b" data-lib="video">📚 Ma bibliothèque</button></div>
+        <p class="st-aide">Depuis votre ordinateur : MP4 ou MOV, 1 h et 1 Go au maximum. La vidéo part directement vers notre hébergeur vidéo (lecture adaptée à chaque connexion) ; vous pouvez continuer à travailler pendant l'envoi.</p>
+        ${champ('ou adresse de la vidéo (YouTube, Vimeo ou fichier https)', 'url', p.url, 'url', 'placeholder="https://www.youtube.com/watch?v=…"')}${champ('Titre de la vidéo', 'titre', p.titre)}`;
     } else if (t === 'audio') {
       h += `<div class="st-btns"><button class="st-b" data-lib="audio">📚 Ma bibliothèque</button></div>${champ('Adresse du fichier audio (https)', 'url', p.url, 'url', 'placeholder="https://…/audio.mp3"')}${champ('Titre', 'titre', p.titre)}`;
     } else if (t === 'fichier') {
@@ -564,6 +565,7 @@
     if (b.dataset.raz) { const f = b.dataset.raz; if (b.dataset.scope === 'page') modifier(() => { pg()[f] = ''; }); else { const e = selection()[0]; modifier(() => { e.props[f] = ''; }); } renderProps(); return; }
     if (b.dataset.vide) { const e = selection()[0]; modifier(() => { e.props[b.dataset.vide] = ''; }); renderProps(); return; }
     if (b.dataset.up === 'image') return choisirImage(S.sel[0]);
+    if (b.dataset.up === 'video') return choisirVideo(S.sel[0]);
     if (b.dataset.up === 'document') return choisirDocument(S.sel[0]);
     if (b.dataset.tab) {
       const e = selection()[0], L = e.props.lignes, n = L[0].length;
@@ -580,12 +582,13 @@
     if (!url) return; const e = el(id); if (!e) return;
     modifier(() => { e.props.url = url; if (!e.props.alt) e.props.alt = ''; }); choisir([id]); toast('Image ajoutée'); rangerEnBibliotheque('image', url, 'Image du ' + new Date().toLocaleDateString('fr-FR'));
   }
-  const ACCEPT = '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.webp,.gif,image/*';
+  const ACCEPT = '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.webp,.gif,.mp4,.mov,image/*,video/mp4,video/quicktime';
   const MAX_FICHIER = 4 * 1024 * 1024; /* limite de l'hébergeur pour un envoi : au-delà, la plateforme refuserait la requête */
   /* Envoie un fichier (image compressée ou document) et le range dans la bibliothèque. Renvoie { url, type, nom } ou lève une erreur lisible. */
   async function importerFichier(f) {
     const fam = R.typeFichier(f.name);
-    if (fam === 'autre') throw new Error('Format non pris en charge : PDF, Word, Excel, PowerPoint ou image (JPEG, PNG, WebP, GIF). Pour une vidéo ou un audio, ajoutez son adresse.');
+    if (fam === 'video') { const v = await importerVideo(f); return { url: v.url, type: 'video', nom: v.nom, miniature: v.miniature }; }
+    if (fam === 'autre') throw new Error('Format non pris en charge : PDF, Word, Excel, PowerPoint, image (JPEG, PNG, WebP, GIF) ou vidéo MP4 / MOV. Pour un audio, ajoutez son adresse.');
     let url, type;
     if (fam === 'image') { const comp = await compressImageFile(f, 1600, 1600, 0.85); if (comp.size > MAX_FICHIER) throw new Error('Image encore trop lourde après compression (4 Mo maximum).'); url = await uploadMedia(comp, 'post'); type = 'image'; }
     else { if (f.size > MAX_FICHIER) throw new Error('Fichier trop lourd (4 Mo maximum). Réduisez-le, ou hébergez-le ailleurs et collez son adresse.'); url = await uploadMedia(f, 'document'); type = 'document'; }
@@ -593,6 +596,40 @@
     return { url, type, nom: f.name };
   }
   function rangerEnBibliotheque(type, url, nom, taille) { api('POST', '/api/formateur/medias', { type, url, nom, taille }).catch(() => { /* la bibliothèque est un confort : l'échec n'empêche pas d'utiliser le fichier */ }); }
+  /* ── Vidéo : envoi DIRECT navigateur → hébergeur vidéo (le serveur ne reçoit jamais le fichier : limite de 4,5 Mo de l'hébergeur du site) ── */
+  let envoiVideo = false;
+  function progresEnvoi(texte, pct) { const z = $('#st-envoi'); if (!texte) { z.classList.remove('on'); return; } z.classList.add('on'); $('#st-envoi-t').textContent = texte; $('#st-envoi-p').style.width = (pct == null ? 0 : pct) + '%'; }
+  /* Miniature de l'hébergeur vidéo : elle se déduit de l'adresse du fichier (…/<id>/play_720p.mp4 → …/<id>/thumbnail.jpg). */
+  const miniatureDe = url => { const m = String(url || '').match(/^(https:\/\/[^/]+\/[0-9a-f-]{36})\/play_\d+p\.mp4$/i); return m ? m[1] + '/thumbnail.jpg' : ''; };
+  async function importerVideo(f) {
+    if (envoiVideo) throw new Error('Une vidéo est déjà en cours d\'envoi : attendez qu\'elle soit terminée.');
+    if (!window.ReelsUpload) throw new Error('Le module d\'envoi de vidéos n\'a pas pu se charger : rechargez la page.');
+    const spec = await ReelsUpload.config('formation');
+    if (!spec.actif) throw new Error('L\'envoi de vidéos depuis l\'ordinateur n\'est pas encore activé sur ce site. En attendant, collez l\'adresse d\'une vidéo hébergée (YouTube, Vimeo…).');
+    const diag = await ReelsUpload.inspecter(f, 'formation'); if (!diag.ok) throw new Error(diag.erreur);
+    envoiVideo = true; const nom = f.name.replace(/\.[a-z0-9]{2,4}$/i, '');
+    try {
+      progresEnvoi('Envoi de la vidéo… 0 %', 0);
+      const env = await ReelsUpload.envoyer(f, { usage: 'formation', titre: nom, onProgress: p => progresEnvoi('Envoi de « ' + nom + ' »… ' + p + ' %', p) });
+      progresEnvoi('Préparation de la vidéo (encodage)…', 100);
+      const pret = await ReelsUpload.attendrePret(env.guid, env.jeton, { usage: 'formation', delaiMax: 40 * 60 * 1000, onEtat: e => { if (e.etat === 'traitement') progresEnvoi('Préparation de la vidéo… ' + Math.round(e.progression || 0) + ' %', e.progression || 0); } });
+      const r = await api('POST', '/api/formateur/medias/video', { guid: env.guid, jeton: env.jeton, nom });
+      progresEnvoi('');
+      return { url: r.media.url, nom, miniature: r.miniature || (pret.urls && pret.urls.miniature) || miniatureDe(r.media.url), duree: r.duree };
+    } catch (e) { progresEnvoi(''); throw e; }
+    finally { envoiVideo = false; }
+  }
+  function choisirVideo(id) {
+    const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.mp4,.mov,video/mp4,video/quicktime'; inp.style.display = 'none'; document.body.appendChild(inp);
+    inp.onchange = async () => {
+      const f = inp.files[0]; inp.remove(); if (!f) return;
+      try {
+        const v = await importerVideo(f); const e = el(id); if (!e) { toast('La vidéo est dans votre bibliothèque.'); return; }
+        modifier(() => { e.props.url = v.url; e.props.titre = e.props.titre || v.nom; e.props.miniature = v.miniature || ''; }); choisir([id]); toast('Vidéo prête et ajoutée');
+      } catch (err) { toast(err.message || 'Envoi impossible.'); }
+    };
+    inp.click();
+  }
   function choisirDocument(id) {
     const inp = document.createElement('input'); inp.type = 'file'; inp.accept = ACCEPT; inp.style.display = 'none'; document.body.appendChild(inp);
     inp.onchange = async () => {
@@ -631,7 +668,7 @@
     $('#bi-q').oninput = ev => { mot = ev.target.value.trim(); rafraichir(); };
     $('#bi-t').onchange = ev => { filtre = ev.target.value; rafraichir(); };
     $('#bi-import').onclick = () => {
-      const inp = document.createElement('input'); inp.type = 'file'; inp.accept = ACCEPT; inp.multiple = true; inp.style.display = 'none'; document.body.appendChild(inp);
+      const inp = document.createElement('input'); inp.type = 'file'; inp.accept = types.includes('video') ? ACCEPT : ACCEPT.replace('.mp4,.mov,', '').replace(',video/mp4,video/quicktime', ''); inp.multiple = true; inp.style.display = 'none'; document.body.appendChild(inp);
       inp.onchange = async () => { const fs = [...inp.files]; inp.remove(); for (const f of fs) { toast('Envoi de ' + f.name + '…'); try { await importerFichier(f); } catch (e) { toast(f.name + ' : ' + e.message); await new Promise(r => setTimeout(r, 1800)); } } setTimeout(rafraichir, 400); };
       inp.click();
     };
@@ -648,7 +685,7 @@
     modifier(() => {
       e.props.url = m.url;
       if (e.type === 'document' || e.type === 'fichier') e.props.nom = m.nom;
-      else if (e.type === 'video' || e.type === 'audio') e.props.titre = m.nom;
+      else if (e.type === 'video' || e.type === 'audio') { e.props.titre = m.nom; if (e.type === 'video') e.props.miniature = miniatureDe(m.url); }
       else if (e.type === 'image' && !e.props.alt) e.props.alt = m.nom;
     });
     choisir([e.id]); toast('« ' + m.nom + ' » ajouté');
@@ -861,6 +898,6 @@
     } else if (!S.existe) choixMode();
     setEtat(S.existe ? 'Enregistré' : 'Nouveau module', S.existe ? 'ok' : '');
   }
-  window.StudioDebug = { S, el, pg, ajouterOutil, sauver, convertir, bibliotheque };
+  window.StudioDebug = { S, el, pg, ajouterOutil, sauver, convertir, bibliotheque, importerVideo, importerFichier };
   demarrer();
 })();

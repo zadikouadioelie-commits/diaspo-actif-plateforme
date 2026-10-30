@@ -9,9 +9,34 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const H = require('./_formation-harness');
 
+const http = require('node:http');
+const crypto = require('node:crypto');
+/* Faux Bunny Stream (aucun réseau, aucune vraie clé) : « long » dans le titre = 4000 s, « court » = 0,4 s, sinon 95 s en 1080p. */
+const fauxBunny = { videos: {}, srv: null };
+function demarrerFauxBunny() {
+  return new Promise(resolve => {
+    fauxBunny.srv = http.createServer((req, res) => {
+      req.resume(); let corps = ''; req.on('data', c => { corps += c; });
+      req.on('end', () => {
+        const m = req.url.match(/^\/library\/[^/]+\/videos(?:\/([^/?]+))?/);
+        const j = (o, s) => { res.writeHead(s || 200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(o)); };
+        if (!m) return j({}, 404);
+        if (req.method === 'POST' && !m[1]) { const guid = crypto.randomUUID(); let titre = ''; try { titre = JSON.parse(corps || '{}').title || ''; } catch (_) {} fauxBunny.videos[guid] = { titre }; return j({ guid }); }
+        if (req.method === 'GET' && m[1]) { const v = fauxBunny.videos[m[1]]; if (!v) return j({}, 404); return j({ status: 4, length: /long/.test(v.titre) ? 4000 : /court/.test(v.titre) ? 0.4 : 95, width: 1920, height: 1080, availableResolutions: '720p,1080p' }); }
+        if (req.method === 'DELETE' && m[1]) { delete fauxBunny.videos[m[1]]; return j({}); }
+        j({}, 404);
+      });
+    }).listen(0, '127.0.0.1', () => resolve(fauxBunny.srv.address().port));
+  });
+}
 let env;
-test.before(async () => { env = await H.demarrer('studio'); });
-test.after(() => { if (env) env.stop(); });
+test.before(async () => {
+  const port = await demarrerFauxBunny();
+  process.env.BUNNY_STREAM_LIBRARY_ID = '123'; process.env.BUNNY_STREAM_API_KEY = 'cle-secrete-test'; process.env.BUNNY_STREAM_HOSTNAME = 'vz-test.b-cdn.net';
+  process.env.BUNNY_STREAM_API_BASE = `http://127.0.0.1:${port}`;
+  env = await H.demarrer('studio');
+});
+test.after(() => { if (env) env.stop(); if (fauxBunny.srv) fauxBunny.srv.close(); });
 
 const sql = (req, ...args) => { const db = new H.DatabaseSync(env.dbPath); try { return req.trim().toLowerCase().startsWith('select') ? db.prepare(req).all(...args) : db.prepare(req).run(...args); } finally { db.close(); } };
 
@@ -261,6 +286,44 @@ test('studio : sauvegarde, versions, publication, lecture', async (t) => {
     const doc = liste.find(m => /Budget/.test(m.nom));
     assert.equal((await call(jarF, 'DELETE', `/api/formateur/medias/${doc.id}`)).status, 200);
     assert.ok(!(await call(jarF, 'GET', '/api/formateur/medias')).data.medias.some(m => m.id === doc.id));
+  });
+
+
+  /* ───── Vidéos envoyées directement à l'hébergeur vidéo (faux Bunny Stream local) ───── */
+  await t.test('vidéo : les règles « formation » sont publiées par le serveur (1 h, 1 Go)', async () => {
+    const r = await call(jarF, 'GET', '/api/reels/config?usage=formation');
+    assert.equal(r.status, 200); assert.equal(r.data.actif, true);
+    assert.equal(r.data.duree_max, 3600); assert.equal(r.data.taille_max_mo, 1024); assert.equal(r.data.cadre_recommande, '16:9');
+    assert.equal((await call(jarF, 'GET', '/api/reels/config')).data.duree_max, 90, 'les reels gardent leurs règles');
+  });
+
+  await t.test('vidéo : envoi ouvert, puis enregistrée dans la bibliothèque avec une adresse construite par le serveur', async () => {
+    let s = await call(jarF, 'POST', '/api/reels/upload-session', { usage: 'formation', taille: 50 * 1024 * 1024, type: 'video/mp4', titre: 'Cours 1' });
+    assert.equal(s.status, 200, JSON.stringify(s.data)); assert.ok(s.data.guid && s.data.jeton && s.data.tus.endpoint);
+    assert.ok(!JSON.stringify(s.data).includes('cle-secrete-test'), 'la clé d\'API ne sort jamais');
+    assert.equal((await call(jarF, 'POST', '/api/reels/upload-session', { usage: 'formation', taille: 2 * 1024 * 1024 * 1024, type: 'video/mp4' })).status, 400, 'au-delà de 1 Go');
+    /* preuve du compte : une autre personne ni un mauvais jeton ne peuvent enregistrer cette vidéo */
+    assert.equal((await call(jarF, 'POST', '/api/formateur/medias/video', { guid: s.data.guid, jeton: 'x'.repeat(32), nom: 'Pirate' })).status, 403);
+    assert.equal((await call(jarA, 'POST', '/api/formateur/medias/video', { guid: s.data.guid, jeton: s.data.jeton, nom: 'Volée' })).status, 403);
+    assert.equal((await call(anon, 'POST', '/api/formateur/medias/video', { guid: s.data.guid, jeton: s.data.jeton })).status, 401);
+    const r = await call(jarF, 'POST', '/api/formateur/medias/video', { guid: s.data.guid, jeton: s.data.jeton, nom: 'Cours 1 — introduction' });
+    assert.equal(r.status, 201, JSON.stringify(r.data));
+    assert.equal(r.data.media.url, `https://vz-test.b-cdn.net/${s.data.guid}/play_720p.mp4`, 'adresse construite par le serveur, qualité 720p');
+    assert.equal(r.data.miniature, `https://vz-test.b-cdn.net/${s.data.guid}/thumbnail.jpg`);
+    assert.equal(r.data.media.type, 'video'); assert.equal(r.data.duree, 95);
+    assert.ok((await call(jarF, 'GET', '/api/formateur/medias?type=video')).data.medias.some(m => m.nom === 'Cours 1 — introduction'));
+    const encore = await call(jarF, 'POST', '/api/formateur/medias/video', { guid: s.data.guid, jeton: s.data.jeton, nom: 'Doublon' });
+    assert.equal(encore.status, 200); assert.equal(encore.data.deja, true, 'jamais deux fois la même vidéo');
+  });
+
+  await t.test('vidéo : trop longue (> 1 h) ou trop courte (< 1 s) → refusée et retirée de l\'hébergeur', async () => {
+    for (const [titre, motif] of [['long essai', /trop longue/], ['court essai', /trop courte/]]) {
+      const s = await call(jarF, 'POST', '/api/reels/upload-session', { usage: 'formation', taille: 1024 * 1024, type: 'video/mp4', titre });
+      assert.equal(s.status, 200);
+      const r = await call(jarF, 'POST', '/api/formateur/medias/video', { guid: s.data.guid, jeton: s.data.jeton, nom: titre });
+      assert.equal(r.status, 409, JSON.stringify(r.data)); assert.match(r.data.error, motif);
+      assert.ok(!fauxBunny.videos[s.data.guid], 'la vidéo refusée est supprimée de l\'hébergeur');
+    }
   });
 
 
