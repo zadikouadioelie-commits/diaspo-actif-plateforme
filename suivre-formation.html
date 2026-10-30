@@ -361,6 +361,7 @@ function sfRenderAttestation(){
     const d = a.delivree;
     zone.innerHTML = `<div class="sf-att ok"><h4>🎓 ${escH(d.type_label)} obtenu(e)</h4>
       <a class="btn" style="width:100%;text-align:center;box-sizing:border-box;" href="attestation.html?code=${encodeURIComponent(d.code)}" target="_blank" rel="noopener">📄 Voir / imprimer</a>
+      <a class="btn" style="width:100%;text-align:center;box-sizing:border-box;margin-top:6px;" href="/api/attestations/mon/${encodeURIComponent(d.code)}/pdf" download>⬇ Télécharger en PDF</a>
       <small>N° ${escH(d.code)}</small></div>`;
     return;
   }
@@ -542,7 +543,7 @@ function sfBanniereAttestation(a){
   const zone = document.getElementById('sf-banner-zone');
   if (!zone || !a) return;
   zone.innerHTML = `<div class="sf-banner" role="status">🎉 Félicitations ! Votre ${escH(String(a.type_label).toLowerCase())} est disponible.
-    <a href="attestation.html?code=${encodeURIComponent(a.code)}" target="_blank" rel="noopener">Voir / imprimer</a></div>`;
+    <a href="attestation.html?code=${encodeURIComponent(a.code)}" target="_blank" rel="noopener">Voir / imprimer</a> · <a href="/api/attestations/mon/${encodeURIComponent(a.code)}/pdf" download>PDF</a></div>`;
 }
 
 async function sfAutoTerminer(leconId, silencieux){

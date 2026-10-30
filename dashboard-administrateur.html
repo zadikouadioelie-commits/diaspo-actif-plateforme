@@ -3274,6 +3274,7 @@
           <button class="btn btn-outline" id="adm-ftab-invites" onclick="admFormTab('invites')">🎓 Formateurs invités</button>
           <button class="btn btn-outline" id="adm-ftab-finances" onclick="admFormTab('finances')">💶 Finances</button>
           <button class="btn btn-outline" id="adm-ftab-relances" onclick="admFormTab('relances')">🔔 Relances</button>
+          <button class="btn btn-outline" id="adm-ftab-categories" onclick="admFormTab('categories')">🏷️ Catégories</button>
         </div>
 
         <!-- Panel en attente -->
@@ -3328,6 +3329,19 @@
         <!-- Panel relances : ce que les formateurs envoient à leurs apprenants -->
         <div id="adm-fpanel-relances" style="display:none;">
           <div id="adm-rel-res"><div class="card" style="padding:16px;color:var(--muted);">Chargement…</div></div>
+        </div>
+
+        <!-- Panel catégories du catalogue (lot E) : liste de choix des formateurs et pastilles du catalogue -->
+        <div id="adm-fpanel-categories" style="display:none;">
+          <div class="card" style="padding:14px 16px;margin-bottom:14px;">
+            <p style="font-size:12.5px;color:var(--muted);margin:0 0 12px;line-height:1.5;">Les catégories proposées aux formateurs et affichées en pastilles dans le catalogue. Renommer une catégorie met à jour toutes les formations qui l'utilisent ; une catégorie désactivée n'est plus proposée mais reste visible sur les formations qui l'utilisent déjà ; la supprimer n'est possible que lorsque plus aucune formation ne s'en sert.</p>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;">
+              <div><label style="font-size:11.5px;font-weight:700;display:block;">Icône</label><input type="text" id="adm-cat-icone" class="input-field" maxlength="8" style="width:70px;text-align:center;" placeholder="📚"></div>
+              <div style="flex:1;min-width:200px;"><label style="font-size:11.5px;font-weight:700;display:block;">Nouvelle catégorie</label><input type="text" id="adm-cat-nom" class="input-field" maxlength="60" style="width:100%;" placeholder="ex : Entrepreneuriat" onkeydown="if(event.key==='Enter')admCatAjouter()"></div>
+              <button type="button" class="btn btn-sm btn-orange" onclick="admCatAjouter()">+ Ajouter</button>
+            </div>
+          </div>
+          <div id="adm-cat-liste"><div class="card" style="padding:16px;color:var(--muted);">Chargement…</div></div>
         </div>
 
         <!-- Panel formateurs invités -->
@@ -7063,7 +7077,7 @@ let _admFormTab = 'en_attente';
 
 function admFormTab(tab) {
   _admFormTab = tab;
-  ['en_attente','publiee','codes','all','stats','invites','finances','relances'].forEach(t => {
+  ['en_attente','publiee','codes','all','stats','invites','finances','relances','categories'].forEach(t => {
     const btn = document.getElementById(`adm-ftab-${t}`);
     const panel = document.getElementById(`adm-fpanel-${t}`);
     if (btn) btn.className = t === tab ? 'btn btn-orange' : 'btn btn-outline';
@@ -7074,7 +7088,52 @@ function admFormTab(tab) {
   else if (tab === 'invites') loadAdmInvites();
   else if (tab === 'finances') loadAdmFinances();
   else if (tab === 'relances') loadAdmRelances();
+  else if (tab === 'categories') loadAdmCategories();
   else loadAdmFormations(tab);
+}
+
+/* Catégories du catalogue (lot E) : ajout, renommage, icône, activation, ordre, suppression. */
+let _admCats = [];
+async function loadAdmCategories() {
+  const el = document.getElementById('adm-cat-liste');
+  if (!el) return;
+  try { _admCats = (await api('GET', '/admin/formation-categories')).categories; } catch (e) { el.innerHTML = '<div class="card" style="padding:16px;">' + esc(e.message || 'Erreur de chargement.') + '</div>'; return; }
+  admCatDessiner();
+}
+function admCatDessiner() {
+  const el = document.getElementById('adm-cat-liste');
+  const n = _admCats.length;
+  el.innerHTML = n ? `<div class="card" style="padding:0;overflow:hidden;"><table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="background:#f8fafc;border-bottom:2px solid var(--border);"><th style="padding:8px 12px;text-align:left;">Icône</th><th style="padding:8px 12px;text-align:left;">Nom</th><th style="padding:8px 12px;text-align:left;">Formations</th><th style="padding:8px 12px;text-align:left;">Proposée</th><th style="padding:8px 12px;text-align:right;">Actions</th></tr></thead><tbody>${_admCats.map((c, i) => `<tr style="border-bottom:1px solid var(--border);${c.actif ? '' : 'opacity:.6;'}">
+    <td style="padding:8px 12px;"><input type="text" value="${esc(c.icone)}" maxlength="8" class="input-field" style="width:62px;text-align:center;" aria-label="Icône de ${esc(c.nom)}" onchange="admCatModifier(${c.id}, { icone: this.value })"></td>
+    <td style="padding:8px 12px;"><input type="text" value="${esc(c.nom)}" maxlength="60" class="input-field" style="min-width:180px;width:100%;font-weight:700;" aria-label="Nom de la catégorie" onchange="admCatModifier(${c.id}, { nom: this.value })"></td>
+    <td style="padding:8px 12px;color:var(--muted);">${c.nb_publiees} publiée${c.nb_publiees > 1 ? 's' : ''}${c.nb_formations > c.nb_publiees ? ' · ' + (c.nb_formations - c.nb_publiees) + ' autre' + (c.nb_formations - c.nb_publiees > 1 ? 's' : '') : ''}</td>
+    <td style="padding:8px 12px;"><label style="display:inline-flex;gap:6px;align-items:center;cursor:pointer;"><input type="checkbox" ${c.actif ? 'checked' : ''} onchange="admCatModifier(${c.id}, { actif: this.checked ? 1 : 0 })"> ${c.actif ? 'Oui' : 'Non'}</label></td>
+    <td style="padding:8px 12px;text-align:right;white-space:nowrap;"><button type="button" class="btn btn-sm btn-outline" ${i === 0 ? 'disabled' : ''} onclick="admCatDeplacer(${i}, -1)" aria-label="Monter">↑</button> <button type="button" class="btn btn-sm btn-outline" ${i === n - 1 ? 'disabled' : ''} onclick="admCatDeplacer(${i}, 1)" aria-label="Descendre">↓</button> <button type="button" class="btn btn-sm btn-outline" style="color:#dc2626;border-color:#fca5a5;" onclick="admCatSupprimer(${c.id})">Supprimer</button></td></tr>`).join('')}</tbody></table></div>` : '<div class="card" style="padding:16px;color:var(--muted);">Aucune catégorie.</div>';
+}
+async function admCatAjouter() {
+  const nom = document.getElementById('adm-cat-nom'), ico = document.getElementById('adm-cat-icone');
+  if (!nom.value.trim()) { nom.focus(); return; }
+  try { _admCats = (await api('POST', '/admin/formation-categories', { nom: nom.value, icone: ico.value })).categories; nom.value = ''; ico.value = ''; admCatDessiner(); }
+  catch (e) { alert(e.message || 'Erreur.'); }
+}
+async function admCatModifier(id, champs) {
+  try { _admCats = (await api('PATCH', '/admin/formation-categories/' + id, champs)).categories; }
+  catch (e) { alert(e.message || 'Erreur.'); await loadAdmCategories(); return; }
+  admCatDessiner();
+}
+async function admCatDeplacer(i, sens) {
+  const j = i + sens;
+  if (j < 0 || j >= _admCats.length) return;
+  const ids = _admCats.map(c => c.id);
+  [ids[i], ids[j]] = [ids[j], ids[i]];
+  try { _admCats = (await api('PUT', '/admin/formation-categories/ordre', { ids })).categories; admCatDessiner(); }
+  catch (e) { alert(e.message || 'Erreur.'); }
+}
+async function admCatSupprimer(id) {
+  const c = _admCats.find(x => x.id === id);
+  if (!c || !confirm('Supprimer la catégorie « ' + c.nom + ' » ?')) return;
+  try { _admCats = (await api('DELETE', '/admin/formation-categories/' + id)).categories; admCatDessiner(); }
+  catch (e) { alert(e.message || 'Erreur.'); }
 }
 
 /* Relances des formateurs : volumes des 30 derniers jours, règles les plus actives, blocage d'une règle abusive. */

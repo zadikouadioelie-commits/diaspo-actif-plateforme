@@ -5177,6 +5177,17 @@ db.exec(`
     UNIQUE(user_id, lecon_id, element_id)
   );
 `);
+/* Catégories de formations modifiables par l’administration (lot E, 2026-10-30) : formations.domaine reste un texte ; cette table fournit la liste de choix, l’ordre et l’icône. */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS formation_categories (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nom TEXT NOT NULL UNIQUE,
+    icone TEXT DEFAULT '📚',
+    ordre INTEGER DEFAULT 0,
+    actif INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+`);
 /* Bibliothèque de médias du formateur (2026-10-30) : les fichiers envoyés depuis le Studio, réutilisables dans toutes ses formations. L'entrée ne contient que l'adresse (le fichier reste sur le CDN). */
 db.exec(`
   CREATE TABLE IF NOT EXISTS formation_medias (

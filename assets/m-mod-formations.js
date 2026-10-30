@@ -83,10 +83,14 @@
     if (f.mode_acces === 'payant_sauf_membres') return 'membres';
     return 'libre';
   }
+  /* Prix à payer aujourd'hui : le serveur applique la promotion de la formation (lot B) et le donne dans prix_final ; sans lui, le prix du catalogue. */
+  const prixFinal = f => (f.prix_final != null && Number.isFinite(Number(f.prix_final)) ? Number(f.prix_final) : Number(f.prix) || 0);
+  const promoDe = f => (Number(f.promo_pct) > 0 && prixFinal(f) < (Number(f.prix_catalogue != null ? f.prix_catalogue : f.prix) || 0) ? Number(f.promo_pct) : 0);
   function priceBadges(f) {
     const m = payMode(f);
     if (m === 'libre') return '<span class="badge g">Gratuite</span>';
-    return `<span class="badge o">${esc(price(f.prix, f.devise))}</span>` + (m === 'membres' ? '<span class="badge g">Gratuite pour les membres</span>' : '');
+    const promo = promoDe(f);
+    return (promo ? `<s class="small muted">${esc(price(f.prix_catalogue != null ? f.prix_catalogue : f.prix, f.devise))}</s> ` : '') + `<span class="badge o">${esc(price(prixFinal(f), f.devise))}</span>` + (promo ? `<span class="badge g">−${esc(promo)} %</span>` : '') + (m === 'membres' ? '<span class="badge g">Gratuite pour les membres</span>' : '');
   }
   /* Champs « liste » saisis en texte libre (séparés par des retours à la ligne ou des points-virgules). */
   function toList(v) {
@@ -322,7 +326,7 @@
     else if (owner && f.statut !== 'publiee') foot = `<a class="btn block" href="#/formations/${esc(f.id)}/suivre">Voir l’aperçu élève</a>`;
     else if (ferme) foot = '<button class="btn block" disabled>Inscriptions fermées</button>';
     else if (mode === 'libre') foot = '<button class="btn block" id="fm-join">S’inscrire gratuitement</button>';
-    else foot = `<button class="btn block" id="fm-pay">S’inscrire · ${esc(price(f.prix, f.devise))}</button>`;
+    else foot = `<button class="btn block" id="fm-pay">S’inscrire · ${esc(price(prixFinal(f), f.devise))}${promoDe(f) ? ` (−${esc(promoDe(f))} %)` : ''}</button>`;
 
     const facts = [
       ['Type', f.type_formation], ['Catégorie', catOf(f)], ['Niveau', f.niveau], ['Langue', f.langue],
@@ -356,7 +360,7 @@
     else if (etat === 'attente') etatNote = '<div class="fm-note"><b>Paiement en cours de confirmation.</b> Si vous n’avez pas terminé le règlement, la tentative expirera d’elle-même sous environ 24 h et vous pourrez recommencer. Sinon, votre accès s’active dès la confirmation.</div>';
     else if (etat === 'inactive') etatNote = `<div class="fm-note">Votre inscription à cette formation est <b>${ins.statut === 'expiree' ? 'expirée' : 'annulée'}</b>. Contactez le formateur ou l’équipe Diaspo’Actif pour la réactiver.</div>`;
     else if (ferme) etatNote = '<div class="fm-note">Les inscriptions sont fermées : cette formation sera bientôt retirée du catalogue.</div>';
-    else if (mode === 'membres') etatNote = `<div class="fm-note"><b>${esc(price(f.prix, f.devise))}</b> · gratuite pour les membres disposant d’un code d’accès (à saisir à l’inscription).</div>`;
+    else if (mode === 'membres') etatNote = `<div class="fm-note"><b>${esc(price(prixFinal(f), f.devise))}</b> · gratuite pour les membres disposant d’un code d’accès (à saisir à l’inscription).</div>`;
     if (owner) etatNote += `<div class="fm-note">Vous êtes l’auteur de cette formation. Sa gestion se fait <a href="formations.html" style="text-decoration:underline">sur ordinateur</a>.</div>`;
     if (f.accessible_mobile === 0) etatNote += '<div class="fm-note">Cette formation est surtout conçue pour être suivie sur ordinateur.</div>';
 
@@ -420,7 +424,7 @@
     const close = A.openSheet(`
       <h2 style="margin:4px 0 4px;font-size:19px">Inscription payante</h2>
       <p class="muted" style="margin:0 0 10px">${esc(f.titre)}</p>
-      <div class="kv"><span>Montant</span><span>${esc(price(f.prix, f.devise))}</span></div>
+      <div class="kv"><span>Montant</span><span>${promoDe(f) ? `<s class="muted">${esc(price(f.prix_catalogue != null ? f.prix_catalogue : f.prix, f.devise))}</s> ` : ''}${esc(price(prixFinal(f), f.devise))}</span></div>${promoDe(f) ? `<div class="kv"><span>Promotion</span><span>−${esc(promoDe(f))} %</span></div>` : ''}
       ${window.FormationConsent ? window.FormationConsent.mention() : ''}
       ${membres ? `<label class="fm-lab" for="fm-code">Code d’accès membre (facultatif)</label>
         <input class="fm-in" id="fm-code" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Votre code">
@@ -560,7 +564,8 @@
       if (at.delivree) {
         const dl = at.delivree;
         html += `<div class="card"><div class="pad"><b>🎓 ${esc(dl.type_label)} obtenu(e)</b><div class="small muted" style="margin:4px 0 10px">N° ${esc(dl.code)}</div>
-          <a class="btn block" href="attestation.html?code=${encodeURIComponent(dl.code)}" target="_blank" rel="noopener">Voir / imprimer ${ic('out', 's')}</a></div></div>`;
+          <a class="btn block" href="/api/attestations/mon/${encodeURIComponent(dl.code)}/pdf" download>Télécharger en PDF ${ic('out', 's')}</a>
+          <a class="btn out block" style="margin-top:8px" href="attestation.html?code=${encodeURIComponent(dl.code)}" target="_blank" rel="noopener">Voir la page du document</a></div></div>`;
       } else {
         html += `<div class="card"><div class="pad"><b>🎓 ${esc(at.type_label)}</b><div class="small" style="margin:6px 0 4px">Pour l’obtenir :</div>
           <ul style="margin:0;padding-left:1.1em" class="small">${(at.conditions || []).map(c => `<li style="margin:0 0 3px;${c.ok ? 'color:var(--green)' : ''}">${c.ok ? '✓ ' : ''}${esc(c.libelle)}</li>`).join('')}</ul>
@@ -592,6 +597,27 @@
   }
 
   const noFile = msg => `<div class="card"><div class="pad muted">${esc(msg)}</div></div>`;
+  /* Documents de cours (lot E) : la visionneuse PDF / Excel du site (assets/doc-viewer.js) est chargée à la demande et remplace le repli (lien) dès qu'elle est prête. */
+  const docHote = (l, repli) => `<div class="fm-doc" data-lecon="${esc(l.id)}" data-nom="${esc(l.titre || '')}" data-hauteur="${esc(l.doc_hauteur || '')}">${repli}</div>`;
+  let VISIONNEUSE = null;
+  function chargerVisionneuse() {
+    if (window.DocViewer) return Promise.resolve();
+    if (VISIONNEUSE) return VISIONNEUSE;
+    VISIONNEUSE = new Promise((ok, ko) => {
+      const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = 'assets/doc-viewer.css?v=1'; document.head.appendChild(css);
+      const js = document.createElement('script'); js.src = 'assets/doc-viewer.js?v=1'; js.onload = () => ok(); js.onerror = () => { VISIONNEUSE = null; ko(new Error('Visionneuse indisponible')); };
+      document.head.appendChild(js);
+    });
+    return VISIONNEUSE;
+  }
+  function monterDocuments(id, racine, brouillon) {
+    const hotes = [...(racine || document).querySelectorAll('.fm-doc:not([data-monte])')];
+    if (!hotes.length) return;
+    chargerVisionneuse().then(() => hotes.forEach(h => {
+      if (h.dataset.monte) return; h.dataset.monte = '1';
+      window.DocViewer.monter(h, { base: `/api/formations/${encodeURIComponent(id)}/lecons/${encodeURIComponent(h.dataset.lecon)}/document`, nom: h.dataset.nom, hauteur: Number(h.dataset.hauteur) || undefined, brouillon: !!brouillon });
+    })).catch(() => { /* le lien de repli reste affiché */ });
+  }
   function lessonBody(l) {
     const url = A.attrUrl(l.contenu_url || '');
     const dl = Number(l.telechargement_autorise) === 1;
@@ -602,7 +628,7 @@
       case 'audio':
         return head + (url ? `<div class="card"><div class="pad"><audio controls preload="metadata" ${dl ? '' : 'controlsList="nodownload"'} style="width:100%" src="${url}"></audio></div></div>` : noFile('Cet enregistrement n’est pas encore disponible.'));
       case 'pdf':
-        return head + (url ? `<div class="card"><div class="pad"><p style="margin:0 0 12px">Document PDF${Number(l.nb_pages) > 0 ? ' · ' + esc(plural(Number(l.nb_pages), 'page', 'pages')) : ''}</p><a class="btn block" href="${url}" target="_blank" rel="noopener">Lire le document ${ic('out', 's')}</a></div></div>` : noFile('Ce document n’est pas encore disponible.'));
+        return head + (url ? docHote(l, `<div class="card"><div class="pad"><p style="margin:0 0 12px">Document PDF${Number(l.nb_pages) > 0 ? ' · ' + esc(plural(Number(l.nb_pages), 'page', 'pages')) : ''}</p><a class="btn block" href="${url}" target="_blank" rel="noopener">Lire le document ${ic('out', 's')}</a></div></div>`) : noFile('Ce document n’est pas encore disponible.'));
       case 'presentation': {
         if (!url) return head + noFile('Cette présentation n’est pas encore disponible.');
         let abs = ''; try { abs = new URL(l.contenu_url, location.href).href; } catch (e) { abs = ''; }
@@ -611,7 +637,7 @@
       case 'images':
         return head + (url ? A.mediaBlock(l.contenu_url, { alt: l.titre }) : noFile('Cette image n’est pas encore disponible.')) + (url && dl ? `<a class="btn out block" style="margin-top:10px" href="${url}" target="_blank" rel="noopener">Ouvrir l’image</a>` : '');
       case 'telechargement':
-        return head + (!url ? noFile('Aucun fichier pour cette leçon.') : dl ? `<div class="card"><div class="pad"><a class="btn block" href="${url}" target="_blank" rel="noopener">Télécharger le document ${ic('out', 's')}</a></div></div>` : noFile('Le formateur n’autorise pas le téléchargement de ce document.'));
+        return head + (!url ? noFile('Aucun fichier pour cette leçon.') : docHote(l, dl ? `<div class="card"><div class="pad"><a class="btn block" href="${url}" target="_blank" rel="noopener">Télécharger le document ${ic('out', 's')}</a></div></div>` : noFile('Le formateur n’autorise pas le téléchargement de ce document.')));
       case 'quiz':
         return head + '<div id="fm-quiz"></div>';
       default: { // texte, exercice, travail pratique, étude de cas
@@ -785,6 +811,7 @@
     setPane(l.titre, html, foot);
 
     if (l.type === 'quiz') montrerQuiz(id, l, d);
+    monterDocuments(id, null, apercu);
     montrerEchanges(id, l);
     brancherEnregistrer(id, () => screenLecon(++seq, id, leconId));
     const ask = $('#fm-ask'); if (ask) ask.onclick = () => poserQuestion(id, l, m);
@@ -933,6 +960,7 @@
       });
     });
     setPane(f.titre, html, `<a class="btn block" href="#/formations/${esc(id)}">S’inscrire à la formation</a>`);
+    document.querySelectorAll('details.card').forEach(dt => dt.addEventListener('toggle', () => { if (dt.open) monterDocuments(id, dt, false); }));
   }
 
   /* ============================================================

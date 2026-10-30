@@ -5843,127 +5843,142 @@ async function initProfilUtilisateur(){
   }
 }
 
-/* ---------- Formations (catalogue, branché API) ---------- */
+/* ---------- Formations (catalogue, branché API) ----------
+   Lot E (2026-10-30) : catalogue refait d'après la maquette « Formation Diaspora » — pastilles de catégories (liste tenue par l'administration),
+   tri, cartes (image, titre, description, modules, durée, « Par … », prix ou Gratuit, prix promotionnel, badge Populaire, bouton « Accéder à la formation »). */
 async function initFormations() {
   const grid = document.getElementById("formations-grid");
   const count = document.getElementById("formations-count");
   if (!grid) return;
 
-  let all = [];
+  let all = [], categories = [];
   try {
-    const r = await api("GET", "/formations");
-    all = r.formations;
+    const [r, c] = await Promise.all([api("GET", "/formations"), api("GET", "/formation-categories").catch(() => ({ categories: [] }))]);
+    all = r.formations || [];
+    categories = c.categories || [];
   } catch (e) {
     grid.innerHTML = `<div class="empty">Impossible de charger les formations.</div>`;
     return;
   }
 
+  const BADGES = { nouveau: "⭐ Nouveau", tres_demande: "🔥 Très demandé", certification: "🏆 Certification", professionnel: "💼 Professionnel", debutant: "🎓 Débutant", intensif: "🚀 Intensif" };
+  const E = esc2Rp;
+  const etat = { domaine: "" };
+  const devise = f => { const d = String(f.devise || "").trim().toUpperCase(); return !d || d === "EUR" || d === "€" ? "€" : d === "USD" ? "$" : d; };
+  const prix = (n, f) => `${Number(n).toLocaleString("fr-FR", { minimumFractionDigits: Number(n) % 1 ? 2 : 0, maximumFractionDigits: 2 })} ${devise(f)}`;
+  const duree = f => f.duree || (f.duree_heures ? `${f.duree_heures} h` : "");
+
   function renderCard(f) {
-    const desc = stripRichTags(f.description_courte || f.description || "").slice(0, 160);
-    let mediaHtml;
-    if (f.image_url) {
-      mediaHtml = `<div class="fc-media" style="background-image:url('${f.image_url}');"></div>`;
-    } else if (f.video_intro) {
-      mediaHtml = `<div class="fc-media fc-media-video"><video src="${f.video_intro}" muted loop playsinline preload="metadata" onmouseover="this.play().catch(()=>{})" onmouseout="this.pause()"></video><span class="fc-play-icon">▶</span></div>`;
-    } else {
-      mediaHtml = `<div class="fc-media fc-media-placeholder"><span>${(f.type_formation || "Formation").charAt(0)}</span></div>`;
-    }
-    const logoHtml = f.logo_url ? `<img class="fc-logo" src="${f.logo_url}" alt="">` : "";
+    const desc = stripRichTags(f.description_courte || f.sous_titre || f.description || "").slice(0, 150);
+    const lien = `formation-fiche.html?id=${f.id}`;
+    let media;
+    const image = f.image_url || f.banniere_url;
+    if (image) media = `<div class="cat-media" style="background-image:url('${E(image)}');"></div>`;
+    else if (f.video_intro) media = `<div class="cat-media cat-media-video"><video src="${E(f.video_intro)}" muted loop playsinline preload="metadata" onmouseover="this.play().catch(()=>{})" onmouseout="this.pause()"></video></div>`;
+    else media = `<div class="cat-media cat-media-vide"><span>${E((f.domaine || f.type_formation || "F").charAt(0))}</span></div>`;
+    const badges = [f.populaire ? `<span class="cat-badge cat-badge-pop">★ Populaire</span>` : "", BADGES[f.badge] ? `<span class="cat-badge">${BADGES[f.badge]}</span>` : ""].join("");
+    const gratuit = f.gratuit || f.mode_acces === "gratuit" || !(Number(f.prix_final ?? f.prix) > 0);
+    let blocPrix;
+    if (gratuit) blocPrix = `<span class="cat-prix cat-prix-gratuit">Gratuit</span>`;
+    else if (f.promo_pct) blocPrix = `<span class="cat-prix-barre">${prix(f.prix_catalogue, f)}</span><span class="cat-prix">${prix(f.prix_final, f)}</span><span class="cat-promo">−${f.promo_pct} %</span>`;
+    else blocPrix = `<span class="cat-prix">${prix(f.prix_final ?? f.prix, f)}</span>`;
+    const infos = [
+      f.nb_modules ? `<li>📚 ${f.nb_modules} module${f.nb_modules > 1 ? "s" : ""}</li>` : "",
+      duree(f) ? `<li>⏱ ${E(duree(f))}</li>` : "",
+      f.nb_inscrits ? `<li>👥 ${f.nb_inscrits}</li>` : "",
+      f.note_moyenne ? `<li>★ ${String(f.note_moyenne).replace(".", ",")}</li>` : ""
+    ].join("");
     return `
-    <div class="card formation-card" style="margin-bottom:16px;padding:0;overflow:hidden;display:flex;flex-wrap:wrap;gap:0;">
-      <div class="fc-media-wrap">
-        ${mediaHtml}
-        ${logoHtml}
+    <article class="cat-carte" data-id="${f.id}">
+      <a class="cat-img" href="${lien}" tabindex="-1" aria-hidden="true">${media}<div class="cat-badges">${badges}</div></a>
+      <button type="button" class="cat-fav btn-favori-formation" data-id="${f.id}" title="Ajouter aux favoris" aria-label="Ajouter aux favoris">☆</button>
+      <div class="cat-corps">
+        <div class="cat-ligne">
+          <span class="cat-type">${E(f.type_formation || "Formation")}</span>
+          ${f.niveau ? `<span class="cat-niveau">${E(f.niveau)}</span>` : ""}
+        </div>
+        <h3 class="cat-titre"><a href="${lien}">${E(f.titre)}</a></h3>
+        ${desc ? `<p class="cat-desc">${E(desc)}</p>` : ""}
+        ${infos ? `<ul class="cat-infos">${infos}</ul>` : ""}
+        ${f.formateur_affiche ? `<div class="cat-par">Par <strong>${E(f.formateur_affiche)}</strong></div>` : ""}
+        <div class="cat-pied">
+          <div class="cat-prixbloc">${blocPrix}</div>
+          <a class="cat-btn" href="${lien}">Accéder à la formation</a>
+        </div>
+        ${f.nb_apercu > 0 ? `<a class="cat-apercu" href="suivre-formation.html?id=${f.id}&decouverte=1">🎁 Aperçu gratuit (${f.nb_apercu} leçon${f.nb_apercu > 1 ? "s" : ""})</a>` : ""}
       </div>
-      <div style="flex:1;min-width:240px;padding:16px;">
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px;">
-          <span class="feed-cat">${f.type_formation || "Formation"}</span>
-          ${f.gratuit ? `<span class="badge badge-asso">Gratuite</span>` : `<span class="badge badge-ent">${(f.prix||0).toFixed(0)} €</span>`}
-          ${f.niveau ? `<span class="tag">${f.niveau}</span>` : ""}
-        </div>
-        <h3 style="margin:0 0 4px;">${f.titre}</h3>
-        <p style="margin:0;color:var(--muted);font-size:13px;">${f.organisme || ""} ${f.domaine ? "· " + f.domaine : ""} ${f.langue ? "· " + f.langue : ""}</p>
-        ${desc ? `<p style="margin:10px 0 0;font-size:13.5px;">${desc}</p>` : ""}
-        <div class="tags" style="margin-top:10px;">
-          ${f.duree ? `<span class="tag">⏱ ${f.duree}</span>` : ""}
-          ${f.places ? `<span class="tag">👥 ${f.places} places</span>` : ""}
-          ${f.nationalite && f.nationalite !== "Toutes nationalités" ? `<span class="tag">🌍 ${f.nationalite}</span>` : ""}
-        </div>
-        <div style="margin-top:12px;display:flex;gap:8px;">
-          <button class="btn btn-orange btn-sm btn-inscrire" data-id="${f.id}" data-titre="${f.titre}">S'inscrire</button>
-          <a class="btn btn-outline btn-sm" href="formation-fiche.html?id=${f.id}" title="Présentation, modules et choix : un module seul ou la formation complète">Voir la fiche</a>
-          ${f.nb_apercu > 0 ? `<a class="btn btn-outline btn-sm" href="suivre-formation.html?id=${f.id}&decouverte=1" title="Lire gratuitement quelques leçons avant de vous inscrire">🎁 Aperçu gratuit (${f.nb_apercu} leçon${f.nb_apercu > 1 ? 's' : ''})</a>` : ''}
-          <button class="btn btn-outline btn-sm btn-favori-formation" data-id="${f.id}" title="Ajouter aux favoris">☆</button>
-        </div>
-      </div>
-    </div>`;
+    </article>`;
   }
 
-  async function refreshFavoriButtons(){
+  async function refreshFavoriButtons() {
     try {
       const me = await fetchCurrentUser();
       if (!me) return;
       const { favoris } = await api("GET", "/formation-favoris");
-      const ids = new Set((favoris||[]).map(f=>f.id));
-      grid.querySelectorAll(".btn-favori-formation").forEach(btn=>{
+      const ids = new Set((favoris || []).map(f => f.id));
+      grid.querySelectorAll(".btn-favori-formation").forEach(btn => {
         const isFav = ids.has(+btn.dataset.id);
         btn.textContent = isFav ? "★" : "☆";
         btn.dataset.fav = isFav ? "1" : "0";
         btn.title = isFav ? "Retirer des favoris" : "Ajouter aux favoris";
+        btn.setAttribute("aria-label", btn.title);
+        btn.classList.toggle("on", isFav);
       });
-    } catch(_) {}
+    } catch (_) {}
+  }
+
+  const norm = s => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  const TRIS = {
+    recent: (a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")) || b.id - a.id,
+    populaire: (a, b) => (b.nb_inscrits || 0) - (a.nb_inscrits || 0) || (b.populaire || 0) - (a.populaire || 0) || b.id - a.id,
+    note: (a, b) => (b.note_moyenne || 0) - (a.note_moyenne || 0) || (b.nb_avis || 0) - (a.nb_avis || 0),
+    prix_asc: (a, b) => (a.prix_final || 0) - (b.prix_final || 0) || a.id - b.id,
+    prix_desc: (a, b) => (b.prix_final || 0) - (a.prix_final || 0) || a.id - b.id,
+    titre: (a, b) => String(a.titre || "").localeCompare(String(b.titre || ""), "fr")
+  };
+
+  function pastilles() {
+    const el = document.getElementById("cat-pastilles");
+    if (!el) return;
+    const compte = new Map();
+    all.forEach(f => { if (f.domaine) compte.set(f.domaine, (compte.get(f.domaine) || 0) + 1); });
+    const liste = categories.filter(c => compte.has(c.nom)).map(c => ({ nom: c.nom, icone: c.icone || "📚", n: compte.get(c.nom) }));
+    /* Une catégorie retirée de la liste de choix reste visible tant que des formations l'utilisent. */
+    compte.forEach((n, nom) => { if (!liste.some(c => c.nom === nom)) liste.push({ nom, icone: "📚", n }); });
+    el.innerHTML = [{ nom: "", icone: "✨", n: all.length, label: "Toutes" }].concat(liste).map(c =>
+      `<button type="button" class="cat-pastille${c.nom === etat.domaine ? " on" : ""}" data-domaine="${E(c.nom)}" aria-pressed="${c.nom === etat.domaine}"><span class="cat-pi">${E(c.icone)}</span>${E(c.label || c.nom)}<span class="cat-pn">${c.n}</span></button>`).join("");
+    el.querySelectorAll(".cat-pastille").forEach(b => b.addEventListener("click", () => { etat.domaine = b.dataset.domaine; pastilles(); apply(); }));
   }
 
   function apply() {
-    const q = (document.getElementById("f-form-q")?.value || "").toLowerCase();
-    const dom = document.getElementById("f-form-domaine")?.value || "";
+    const q = norm(document.getElementById("f-form-q")?.value);
     const type = document.getElementById("f-form-type")?.value || "";
     const niv = document.getElementById("f-form-niveau")?.value || "";
     const gratOnly = document.getElementById("f-form-gratuit")?.checked || false;
+    const tri = document.getElementById("f-form-tri")?.value || "recent";
 
     const filtered = all.filter(f => {
-      if (q && !(f.titre + (f.description || "") + (f.organisme || "")).toLowerCase().includes(q)) return false;
-      if (dom && f.domaine !== dom) return false;
+      if (q && !norm([f.titre, f.sous_titre, f.description, f.organisme, f.mots_cles, f.domaine, f.sous_categorie, f.formateur_affiche].join(" ")).includes(q)) return false;
+      if (etat.domaine && f.domaine !== etat.domaine) return false;
       if (type && f.type_formation !== type) return false;
       if (niv && f.niveau !== niv) return false;
-      if (gratOnly && !f.gratuit) return false;
+      if (gratOnly && !(f.gratuit || f.mode_acces === "gratuit")) return false;
       return true;
-    });
+    }).sort(TRIS[tri] || TRIS.recent);
 
     if (count) count.textContent = filtered.length;
+    const badgeEl = document.getElementById("formations-count-badge");
+    if (badgeEl) badgeEl.textContent = `${filtered.length} formation${filtered.length > 1 ? "s" : ""}`;
     grid.innerHTML = filtered.length
       ? filtered.map(renderCard).join("")
-      : `<div class="empty">Aucune formation ne correspond à ces critères.</div>`;
-
-    grid.querySelectorAll(".btn-inscrire").forEach(btn => {
-      btn.addEventListener("click", async () => {
-        const me = await fetchCurrentUser();
-        if (!me) { showMsg("Connectez-vous pour vous inscrire à une formation.", "warning"); return; }
-        btn.disabled = true;
-        try {
-          /* Aucun remboursement : le consentement exprès est demandé si le serveur le réclame (achat payant) — le script est chargé à la demande. */
-          if (!window.FormationConsent) await new Promise(res => { const s = document.createElement("script"); s.src = "assets/formation-achat-consent.js?v=1"; s.onload = res; s.onerror = res; document.head.appendChild(s); });
-          const appelInscrire = extra => api("POST", `/formations/${btn.dataset.id}/inscrire`, extra);
-          const r = window.FormationConsent ? await FormationConsent.appeler(appelInscrire) : await appelInscrire({});
-          if (r.checkout_url) {
-            showMsg("Redirection vers le paiement sécurisé Stripe…", "success");
-            window.location.href = r.checkout_url;
-            return;
-          }
-          try { await api("POST", "/formations/suivi", { formation_id: +btn.dataset.id }); } catch(_) {}
-          btn.textContent = "✓ Inscrit !";
-          btn.classList.remove("btn-orange");
-          btn.classList.add("btn-outline");
-          showMsg("Inscription confirmée ! Retrouvez-la dans « Mes inscriptions ».", "success");
-        } catch(e) {
-          if (e.annule) { btn.disabled = false; return; } // achat annulé à la fenêtre « Avant de payer » : rien à dire
-          if (e.message && e.message.includes("Déjà inscrit")) {
-            btn.textContent = "✓ Déjà inscrit";
-            btn.classList.remove("btn-orange"); btn.classList.add("btn-outline");
-          } else { showMsg(e.message || "Erreur lors de l'inscription.", "danger"); btn.disabled = false; }
-        }
-      });
+      : `<div class="empty cat-vide">Aucune formation ne correspond à ces critères. <button type="button" class="cat-btn cat-btn-sec" id="cat-reinit">Tout afficher</button></div>`;
+    document.getElementById("cat-reinit")?.addEventListener("click", () => {
+      etat.domaine = "";
+      ["f-form-q", "f-form-type", "f-form-niveau"].forEach(id => { const e = document.getElementById(id); if (e) e.value = ""; });
+      const g = document.getElementById("f-form-gratuit"); if (g) g.checked = false;
+      pastilles(); apply();
     });
+
     grid.querySelectorAll(".btn-favori-formation").forEach(btn => {
       btn.addEventListener("click", async () => {
         const me = await fetchCurrentUser();
@@ -5975,24 +5990,31 @@ async function initFormations() {
           btn.textContent = isFav ? "☆" : "★";
           btn.dataset.fav = isFav ? "0" : "1";
           btn.title = isFav ? "Ajouter aux favoris" : "Retirer des favoris";
-        } catch(e) { showMsg(e.message || "Erreur.", "danger"); }
+          btn.setAttribute("aria-label", btn.title);
+          btn.classList.toggle("on", !isFav);
+        } catch (e) { showMsg(e.message || "Erreur.", "danger"); }
       });
     });
     refreshFavoriButtons();
   }
 
-  // Peupler filtres
-  const domainesSet = [...new Set(all.map(f => f.domaine).filter(Boolean))].sort();
+  // Peupler filtres (type, niveau) à partir des formations réellement publiées
   const typesSet = [...new Set(all.map(f => f.type_formation).filter(Boolean))].sort();
   const niveauxSet = [...new Set(all.map(f => f.niveau).filter(Boolean))];
-  const selDom = document.getElementById("f-form-domaine");
   const selType = document.getElementById("f-form-type");
   const selNiv = document.getElementById("f-form-niveau");
-  if (selDom) domainesSet.forEach(d => { const o = document.createElement("option"); o.value = d; o.textContent = d; selDom.appendChild(o); });
   if (selType) typesSet.forEach(t => { const o = document.createElement("option"); o.value = t; o.textContent = t; selType.appendChild(o); });
   if (selNiv) niveauxSet.forEach(n => { const o = document.createElement("option"); o.value = n; o.textContent = n; selNiv.appendChild(o); });
 
-  ["f-form-q","f-form-domaine","f-form-type","f-form-niveau"].forEach(id => {
+  /* Lien direct : formations.html?categorie=Santé&q=… */
+  try {
+    const p = new URLSearchParams(location.search);
+    const cat = p.get("categorie");
+    if (cat && all.some(f => f.domaine === cat)) etat.domaine = cat;
+    const qq = p.get("q"); const champ = document.getElementById("f-form-q"); if (qq && champ) champ.value = qq;
+  } catch (_) {}
+
+  ["f-form-q", "f-form-type", "f-form-niveau", "f-form-tri"].forEach(id => {
     const el = document.getElementById(id);
     if (el) { el.addEventListener("input", apply); el.addEventListener("change", apply); }
   });
@@ -6001,6 +6023,7 @@ async function initFormations() {
   const btnSearch = document.getElementById("btn-form-search");
   if (btnSearch) btnSearch.addEventListener("click", apply);
 
+  pastilles();
   apply();
 }
 

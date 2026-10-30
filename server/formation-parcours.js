@@ -15,6 +15,7 @@
 "use strict";
 const crypto = require("crypto");
 const Droits = require("./formation-droits");
+const { certificatPdf } = require("./formation-certificat-pdf");
 
 const TYPES = {
   participation: { label: "Attestation de participation", mention: "A participé à la formation" },
@@ -604,6 +605,31 @@ module.exports.register = function register(deps) {
     /* Le formateur peut retirer le QR code de la feuille (formations.certificat_qr) ; le code imprimé reste vérifiable à la main. */
     const fq = await db.prepare("SELECT certificat_qr FROM formations WHERE id=?").get(a.formation_id);
     sendJSON(res, 200, { attestation: { ...vueAttestation(a), apprenant_nom: a.apprenant_nom, qr: !fq || fq.certificat_qr == null || Number(fq.certificat_qr) !== 0 } });
+  });
+
+  /* GET /api/attestations/mon/:code/pdf — le même document en PDF, à télécharger (lot E, 2026-10-30).
+     Même contrôle d'accès que la page imprimable : le titulaire (ou un administrateur). */
+  route("GET", "/api/attestations/mon/:code/pdf", async (req, res, params) => {
+    const user = await getCurrentUser(req);
+    if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+    const lim = SEC.rateLimit(`attestation-pdf:${user.id}`, 20, 600000);
+    if (!lim.allowed) return sendJSON(res, 429, { error: `Trop de téléchargements. Réessayez dans ${lim.retryAfter}s.` });
+    const a = await db.prepare("SELECT * FROM formation_attestations WHERE code=?").get(String(params.code || "").toUpperCase());
+    if (!a || (Number(a.user_id) !== Number(user.id) && user.role !== "administrateur")) return sendJSON(res, 404, { error: "Document introuvable." });
+    const fq = await db.prepare("SELECT certificat_qr FROM formations WHERE id=?").get(a.formation_id);
+    const hote = req.headers.host || "localhost:3000";
+    const local = /^(localhost|127\.0\.0\.1)(:\d+)?$/.test(hote);
+    const origine = `${local ? (req.headers["x-forwarded-proto"] || "http") : "https"}://${hote}`;
+    const code = String(a.code).replace(/[^A-Z0-9_-]/gi, "");
+    const buf = certificatPdf({ ...vueAttestation(a), apprenant_nom: a.apprenant_nom }, {
+      urlVerif: `${origine}/verifier-attestation.html?code=${encodeURIComponent(a.code)}`,
+      qr: !fq || fq.certificat_qr == null || Number(fq.certificat_qr) !== 0,
+    });
+    res.writeHead(200, {
+      "Content-Type": "application/pdf", "Content-Length": buf.length, "X-Content-Type-Options": "nosniff", "Cache-Control": "private, no-store",
+      "Content-Disposition": `attachment; filename="attestation-${code}.pdf"`,
+    });
+    res.end(buf);
   });
 
   /* GET /api/attestations/verifier/:code — PUBLIC : confirme l'authenticité d'un document sans exposer de donnée personnelle superflue

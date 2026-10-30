@@ -3279,6 +3279,9 @@ FormationRelances.register({ route, db, sendJSON, getCurrentUser, SEC, exigerPre
 /* Documents PDF et Excel affichés DANS la page du cours (visionneuse, accès contrôlé, lecture par fenêtres) — server/formation-documents.js. checkFormationOwner est une déclaration de fonction (hissée). */
 const FormationDocuments = require("./formation-documents");
 FormationDocuments.register({ route, db, sendJSON, getCurrentUser, SEC, checkFormationOwner });
+/* Formation Diaspora, lot E : catégories modifiables par l’administration + enrichissement du catalogue — server/formation-catalogue.js. */
+const FormationCatalogue = require("./formation-catalogue");
+FormationCatalogue.register({ route, db, sendJSON, getCurrentUser });
 /* Formation Diaspora, lot D : studio de création par glisser-déposer (documents, versions, publication) — server/formation-studio.js. */
 const FormationStudio = require("./formation-studio");
 FormationStudio.register({ route, db, sendJSON, getCurrentUser, SEC, checkFormationOwner, exigerPremium });
@@ -17417,8 +17420,10 @@ route("GET", "/api/formations", async (req, res, params, body, query) => {
   if (query.owner) rows = rows.filter(r => Number(r.owner_user_id) === Number(query.owner));
   if (query.q) {
     const q = query.q.toLowerCase();
-    rows = rows.filter(r => ((r.titre||'') + (r.description||'') + (r.organisme||'')).toLowerCase().includes(q));
+    rows = rows.filter(r => ((r.titre||'') + (r.description||'') + (r.organisme||'') + (r.mots_cles||'') + (r.sous_titre||'')).toLowerCase().includes(q));
   }
+  /* Lot E : modules, leçons, inscrits, prix promotionnel, formateur affiché, « Populaire » — de quoi dessiner les cartes du catalogue. */
+  rows = await FormationCatalogue.enrichir(db, rows);
   sendJSON(res, 200, { formations: rows });
 });
 
@@ -17432,7 +17437,9 @@ route("GET", "/api/formations/:id", async (req, res, params) => {
   const avis = await db.prepare("SELECT a.*, u.nom AS auteur FROM formation_avis a JOIN users u ON u.id=a.user_id WHERE a.formation_id=? ORDER BY a.created_at DESC").all(params.id);
   const nb_inscrits = (await db.prepare("SELECT COUNT(*) AS n FROM formation_inscriptions WHERE formation_id=? AND statut='active'").get(params.id))?.n;
   const nb_apercu = (await db.prepare("SELECT COUNT(*) AS n FROM formation_lecons l JOIN formation_modules m ON m.id=l.module_id WHERE m.formation_id=? AND l.apercu_gratuit=1 AND l.type<>'quiz'").get(params.id))?.n || 0;
-  sendJSON(res, 200, { formation: { ...row, avis, nb_inscrits, nb_apercu } });
+  /* Prix à payer aujourd'hui, promotion comprise (même calcul que le paiement) — affiché sur la fiche, le catalogue et le téléphone. */
+  const prixAffiche = FormationFinances.prixFormation(row);
+  sendJSON(res, 200, { formation: { ...row, avis, nb_inscrits, nb_apercu, prix_catalogue: prixAffiche.catalogue, promo_pct: prixAffiche.promo_pct, prix_final: prixAffiche.prix } });
 });
 
 /* Mes formations (créateur) */
@@ -17452,10 +17459,18 @@ route("GET", "/api/mes-formations", async (req, res) => {
 });
 
 /* Centre de commande du formateur — tableau de bord agrégé sur toutes ses formations */
-route("GET", "/api/mes-formations/dashboard", async (req, res) => {
+route("GET", "/api/mes-formations/dashboard", async (req, res, params, body, query) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  const formations = await db.prepare("SELECT id, statut FROM formations WHERE owner_user_id=?").all(user.id);
+  /* Lot E — tableau de bord filtrable : une formation, un statut, une catégorie, une période (sur la date d’inscription des apprenants). Sans filtre : tout, comme avant. */
+  let formations = await db.prepare("SELECT id, statut, domaine FROM formations WHERE owner_user_id=?").all(user.id);
+  const filtreFormation = query && query.formation_id ? Number(query.formation_id) : 0;
+  if (filtreFormation) formations = formations.filter(f => Number(f.id) === filtreFormation);
+  if (query && query.statut) formations = formations.filter(f => (f.statut || 'brouillon') === query.statut);
+  if (query && query.domaine) formations = formations.filter(f => f.domaine === query.domaine);
+  const jourOk = s => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
+  const du = query && jourOk(query.du) ? query.du : '';
+  const au = query && jourOk(query.au) ? query.au : '';
   const ids = formations.map(f => f.id);
   const nb = { total: formations.length, publiees: 0, brouillons: 0, archivees: 0 };
   for (const f of formations) {
@@ -17472,7 +17487,8 @@ route("GET", "/api/mes-formations/dashboard", async (req, res) => {
   };
   if (ids.length) {
     const placeholders = ids.map(() => '?').join(',');
-    const inscriptions = await db.prepare(`SELECT * FROM formation_inscriptions WHERE formation_id IN (${placeholders}) AND statut='active'`).all(...ids);
+    let inscriptions = await db.prepare(`SELECT * FROM formation_inscriptions WHERE formation_id IN (${placeholders}) AND statut='active'`).all(...ids);
+    if (du || au) inscriptions = inscriptions.filter(i => { const j = String(i.date_inscription || i.created_at || '').slice(0, 10); return (!du || j >= du) && (!au || j <= au); });
     const uniqueUsers = new Set(inscriptions.map(i => i.user_id));
     stats.nb_eleves = uniqueUsers.size;
     const sevenDaysAgo = new Date(Date.now() - 7*24*3600*1000).toISOString();
@@ -17593,10 +17609,11 @@ route("POST", "/api/formations", async (req, res, params, body) => {
           devise, promo_active, promo_reduction_pct, promo_date_fin,
           acces_type, acces_liste_id, banniere_url, image_url } = body;
   if (!titre) return sendJSON(res, 400, { error: "Le titre est requis." });
+  if (!(await FormationCatalogue.domaineAccepte(db, domaine, null))) return sendJSON(res, 400, { error: "Cette catégorie n’existe pas (ou n’est plus proposée). Choisissez-en une dans la liste." });
   const modeAcces = mode_acces || 'gratuit';
   const commission = modeAcces === 'gratuit' ? 0 : modeAcces === 'payant_sauf_membres' ? 2 : 3;
   const gratuit = modeAcces === 'gratuit' ? 1 : 0;
-  const init = await db.prepare("SELECT id FROM initiatives WHERE owner_user_id = ?").get(user.id);
+  const init =await db.prepare("SELECT id FROM initiatives WHERE owner_user_id = ?").get(user.id);
   const id = (await db.prepare(`
     INSERT INTO formations (titre, type_formation, organisme, domaine, nationalite, langue, niveau, description,
       prix, gratuit, duree, duree_heures, places, initiative_id, owner_user_id,
@@ -17634,6 +17651,7 @@ route("PUT", "/api/formations/:id", async (req, res, params, body) => {
   if (!['brouillon','refusee'].includes(f.statut||'brouillon') && user.role !== 'administrateur') {
     return sendJSON(res, 400, { error: "Seules les formations en brouillon ou refusées peuvent être modifiées." });
   }
+  if (body.domaine !== undefined && !(await FormationCatalogue.domaineAccepte(db, body.domaine, f.domaine))) return sendJSON(res, 400, { error: "Cette catégorie n’existe pas (ou n’est plus proposée). Choisissez-en une dans la liste." });
   const n = v => (v === undefined ? null : v);
   const nr = v => (v === undefined || v === null ? null : SEC.sanitizeRichHtml(v));
   const modeAcces = body.mode_acces || f.mode_acces || 'gratuit';

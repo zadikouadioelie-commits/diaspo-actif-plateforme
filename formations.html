@@ -29,6 +29,7 @@
   <!-- Design « Nuit dorée » (2026-10-14) : surcharges chargées en dernier, tout est préfixé html body.nd ; retour arrière : retirer ces 2 lignes et class="nd" sur <body> -->
   <link rel="stylesheet" href="/assets/theme-nuit-doree.css?v=7">
   <link rel="stylesheet" href="/assets/formations-nuit-doree.css?v=2">
+  <link rel="stylesheet" href="/assets/catalogue-formations.css?v=3">
 <style>
 .mf-cat-pill{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600;background:#fff;border:2px solid var(--border);border-radius:99px;padding:8px 14px;cursor:pointer;transition:all .15s;user-select:none;}
 .mf-cat-pill:hover{border-color:#ff6b00;}
@@ -150,53 +151,55 @@
     <main class="content">
 
       <div id="volet-catalogue">
-      <div class="flex-between" style="margin-bottom:16px;">
-        <div>
-          <h1 style="margin:0;">Plateforme de formations</h1>
-          <p style="margin:4px 0 0;color:var(--muted);font-size:13.5px;">Toutes les formations de la diaspora mondiale centralisées sur Diaspo'Actif</p>
+      <!-- Catalogue refait d'après la maquette « Formation Diaspora » (lot E, 2026-10-30) : bandeau héros au globe doré, pastilles de catégories (tenues par l'administration), tri, cartes. Rendu : initFormations() dans assets/app.js ; styles : assets/catalogue-formations.css -->
+      <section class="cat-hero" aria-labelledby="cat-titre-page">
+        <div class="cat-hero-texte">
+          <p class="cat-sur">La plateforme de formation de la diaspora</p>
+          <h1 id="cat-titre-page">Formation <em>Diaspora</em></h1>
+          <p class="cat-signature">Apprendre <i>•</i> Évoluer <i>•</i> Réussir</p>
+          <p class="cat-intro">Les formations de la diaspora mondiale réunies sur Diaspo'Actif : gratuites ou payantes, avec une attestation vérifiable à la clé.</p>
+          <div class="cat-recherche" role="search">
+            <input id="f-form-q" class="input-field" type="search" placeholder="Un thème, un formateur, un mot-clé…" aria-label="Rechercher une formation">
+            <button id="btn-form-search" class="btn btn-orange" type="button">Chercher</button>
+          </div>
+          <span class="cat-compteur" id="formations-count-badge">—</span>
         </div>
-        <span class="badge badge-asso" id="formations-count-badge">—</span>
-      </div>
+        <div class="cat-globe" aria-hidden="true">
+          <svg viewBox="0 0 340 340" xmlns="http://www.w3.org/2000/svg" focusable="false">
+            <defs>
+              <radialGradient id="cg-sphere" cx="38%" cy="32%" r="75%"><stop offset="0" stop-color="#27407a" stop-opacity=".95"/><stop offset=".55" stop-color="#0f1c40"/><stop offset="1" stop-color="#060A14"/></radialGradient>
+              <linearGradient id="cg-or" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F3DC9B"/><stop offset=".5" stop-color="#E3C06E"/><stop offset="1" stop-color="#B9893A"/></linearGradient>
+              <radialGradient id="cg-halo" cx="50%" cy="50%" r="50%"><stop offset=".62" stop-color="#E3C06E" stop-opacity=".30"/><stop offset="1" stop-color="#E3C06E" stop-opacity="0"/></radialGradient>
+            </defs>
+            <circle cx="170" cy="170" r="168" fill="url(#cg-halo)"/>
+            <circle cx="170" cy="170" r="138" fill="url(#cg-sphere)" stroke="url(#cg-or)" stroke-width="2"/>
+            <g fill="none" stroke="url(#cg-or)" stroke-width="1" opacity=".62">
+              <ellipse cx="170" cy="170" rx="138" ry="48"/><ellipse cx="170" cy="170" rx="138" ry="96"/>
+              <ellipse cx="170" cy="170" rx="48" ry="138"/><ellipse cx="170" cy="170" rx="96" ry="138"/>
+              <line x1="32" y1="170" x2="308" y2="170"/><line x1="170" y1="32" x2="170" y2="308"/>
+            </g>
+            <g class="cat-globe-liens" fill="none" stroke="#F3DC9B" stroke-width="1.6" stroke-linecap="round" stroke-dasharray="3 6">
+              <path d="M104 118 Q168 64 244 112"/><path d="M104 118 Q132 196 196 232"/><path d="M244 112 Q268 184 196 232"/><path d="M104 118 Q184 150 244 112"/>
+            </g>
+            <g fill="#F3DC9B"><circle cx="104" cy="118" r="5"/><circle cx="244" cy="112" r="5"/><circle cx="196" cy="232" r="5"/><circle cx="142" cy="170" r="3.4"/><circle cx="222" cy="168" r="3.4"/></g>
+            <g fill="none" stroke="#fff" stroke-opacity=".5"><circle cx="104" cy="118" r="10"/><circle cx="244" cy="112" r="10"/><circle cx="196" cy="232" r="10"/></g>
+          </svg>
+        </div>
+      </section>
 
-      <div class="notice" style="margin-bottom:20px;">
-        📚 Toute organisation souhaitant proposer une formation doit passer par Diaspo'Actif pour la publication et la mise à disposition de ses contenus. Les formations gratuites sont diffusées sans commission. Les formations payantes font l'objet d'un accord de partenariat.
-      </div>
+      <div class="cat-pastilles" id="cat-pastilles" role="group" aria-label="Catégories de formations"></div>
 
-      <!-- Filtres -->
-      <div class="card" style="margin-bottom:20px;">
-        <div class="grid grid-2" style="gap:12px;">
-          <div>
-            <label style="font-size:12.5px;font-weight:700;color:var(--muted);text-transform:uppercase;">Recherche libre</label>
-            <div style="display:flex;gap:8px;margin-top:4px;">
-              <input id="f-form-q" class="input-field" style="flex:1;" placeholder="Mot-clé, organisme, thème…">
-              <button id="btn-form-search" class="btn btn-orange">Chercher</button>
-            </div>
-          </div>
-          <div style="display:flex;gap:8px;align-items:center;margin-top:20px;">
-            <input type="checkbox" id="f-form-gratuit">
-            <label for="f-form-gratuit" style="font-size:13px;font-weight:700;">Formations gratuites uniquement</label>
-          </div>
-        </div>
-        <div class="grid grid-3" style="gap:10px;margin-top:12px;">
-          <div>
-            <label style="font-size:12px;color:var(--muted);font-weight:700;">Domaine</label>
-            <select id="f-form-domaine" class="input-field" style="margin-top:4px;width:100%;">
-              <option value="">Tous les domaines</option>
-            </select>
-          </div>
-          <div>
-            <label style="font-size:12px;color:var(--muted);font-weight:700;">Type</label>
-            <select id="f-form-type" class="input-field" style="margin-top:4px;width:100%;">
-              <option value="">Tous les types</option>
-            </select>
-          </div>
-          <div>
-            <label style="font-size:12px;color:var(--muted);font-weight:700;">Niveau</label>
-            <select id="f-form-niveau" class="input-field" style="margin-top:4px;width:100%;">
-              <option value="">Tous les niveaux</option>
-            </select>
-          </div>
-        </div>
+      <div class="cat-outils">
+        <label class="cat-champ"><span>Type</span>
+          <select id="f-form-type" class="input-field"><option value="">Tous les types</option></select></label>
+        <label class="cat-champ"><span>Niveau</span>
+          <select id="f-form-niveau" class="input-field"><option value="">Tous les niveaux</option></select></label>
+        <label class="cat-champ"><span>Trier par</span>
+          <select id="f-form-tri" class="input-field">
+            <option value="recent">Plus récentes</option><option value="populaire">Plus suivies</option><option value="note">Mieux notées</option>
+            <option value="prix_asc">Prix croissant</option><option value="prix_desc">Prix décroissant</option><option value="titre">Titre (A → Z)</option>
+          </select></label>
+        <label class="cat-gratuit"><input type="checkbox" id="f-form-gratuit"> Gratuites uniquement</label>
       </div>
 
       <div id="devenir-formateur-banner" style="display:none;margin-bottom:16px;padding:16px 20px;border-radius:12px;background:linear-gradient(135deg,#fffbeb,#fff7e0);border:1.5px solid #f2c94c;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
@@ -207,17 +210,17 @@
         <a id="btn-devenir-formateur" href="premium.html" style="background:linear-gradient(135deg,#c8960c,#f2c94c);color:#2a1e00;font-weight:800;border:none;padding:11px 20px;border-radius:8px;text-decoration:none;white-space:nowrap;">🎉 Passer à Premium</a>
       </div>
 
-      <div class="flex-between" style="margin-bottom:12px;">
-        <span style="font-size:13.5px;color:var(--muted);"><strong id="formations-count">—</strong> formations disponibles</span>
-        <div style="display:flex;gap:8px;">
-          <button class="btn btn-sm btn-outline" id="btn-proposer">💡 Exprimer un besoin en formation</button>
-        </div>
+      <div class="cat-entete-liste">
+        <span><strong id="formations-count">—</strong> formations disponibles</span>
+        <button class="btn btn-sm btn-outline" id="btn-proposer" type="button">💡 Exprimer un besoin en formation</button>
       </div>
 
       <!-- Grille de formations -->
-      <div id="formations-grid">
+      <div id="formations-grid" class="cat-grille">
         <div class="notice">Chargement des formations…</div>
       </div>
+
+      <p class="cat-mention">📚 Toute organisation souhaitant proposer une formation passe par Diaspo'Actif pour la publication et la mise à disposition de ses contenus. Les formations gratuites sont diffusées sans commission ; les formations payantes font l'objet d'un accord de partenariat.</p>
       </div><!-- /volet-catalogue -->
 
       <!-- Volet Besoins en formation -->
@@ -287,6 +290,16 @@
 
         <!-- Centre de commande du formateur : tableau de bord synthétique -->
         <h3 style="margin:0 0 10px;">🎛️ Centre de commande</h3>
+        <div class="fb-filtres" id="fb-filtres" role="group" aria-label="Filtrer le tableau de bord">
+          <label><span>Formation</span><select id="fbf-formation" class="input-field"><option value="">Toutes mes formations</option></select></label>
+          <label><span>Statut</span><select id="fbf-statut" class="input-field"><option value="">Tous les statuts</option></select></label>
+          <label><span>Catégorie</span><select id="fbf-domaine" class="input-field"><option value="">Toutes les catégories</option></select></label>
+          <label><span>Inscrits du</span><input type="date" id="fbf-du" class="input-field"></label>
+          <label><span>au (inclus)</span><input type="date" id="fbf-au" class="input-field"></label>
+          <label class="fb-filtre-q"><span>Rechercher</span><input type="search" id="fbf-q" class="input-field" placeholder="Titre de formation…"></label>
+          <button type="button" class="btn btn-sm btn-outline" id="fbf-reset">Réinitialiser</button>
+        </div>
+        <p class="fb-filtres-note" id="fbf-note"></p>
         <div class="fb-dash-grid" id="fb-dash-grid"><div class="notice">Chargement du tableau de bord…</div></div>
 
         <h3 style="margin:20px 0 10px;">💶 Ventes et revenus</h3>
@@ -378,6 +391,7 @@
             <button class="btn btn-sm fb-tab" data-tab="carte">🧠 Carte mentale <span class="fb-help" title="Un résumé visuel de votre formation, que vos apprenants consultent et exportent.">?</span></button>
             <button class="btn btn-sm fb-tab" data-tab="prerequis">🧭 Prérequis <span class="fb-help" title="Les formations à terminer avant de pouvoir s'inscrire à celle-ci.">?</span></button>
             <button class="btn btn-sm fb-tab" data-tab="apercu">👁️ Aperçu <span class="fb-help" title="Voyez votre formation exactement comme la verra un apprenant, avant de la publier.">?</span></button>
+            <button class="btn btn-sm fb-tab" data-tab="kofi">🤖 Koffi <span class="fb-help" title="Le tuteur IA de votre formation : activez-le ou coupez-le, donnez-lui des consignes de ton et voyez ce qu'il sait de votre cours.">?</span></button>
             <button class="btn btn-sm fb-tab" data-tab="soumission">📤 Soumission <span class="fb-help" title="Vérifiez que tout est prêt puis envoyez votre formation à l'équipe Diaspo'Actif pour validation.">?</span></button>
           </nav>
           <div class="fb-panels-area">
@@ -793,6 +807,11 @@
           <div id="fb-apercu-content" class="card"></div>
         </div>
 
+        <!-- Onglet Koffi (tuteur IA) : rendu par assets/formation-koffi-reglages.js -->
+        <div class="fb-panel" data-fb-panel="kofi" style="display:none;">
+          <div id="fb-kofi-zone"></div>
+        </div>
+
         <!-- Onglet Soumission -->
         <div class="fb-panel" data-fb-panel="soumission" style="display:none;">
           <div class="card" style="margin-bottom:16px;">
@@ -1042,10 +1061,11 @@
 
 <script src="assets/data.js"></script>
 <script src="assets/demo.js?v=2"></script>
-<script src="assets/app.js?v=13"></script>
+<script src="assets/app.js?v=14"></script>
 <script src="assets/formation-achat-consent.js?v=1"></script>
 <script src="/assets/rich-editor.js"></script>
 <script src="/assets/upload-media.js"></script>
+<script src="/assets/formation-koffi-reglages.js?v=1"></script>
 <script>
   // ── Infobulles d'aide (?) : au clic (fiable sur tous les appareils, contrairement au title au survol) ──
   (function(){
@@ -1073,12 +1093,21 @@
     });
   })();
 
-  const countEl = document.getElementById("formations-count");
-  const badgeEl = document.getElementById("formations-count-badge");
-  function syncBadge() { if(badgeEl && countEl && countEl.textContent !== '—') badgeEl.textContent = countEl.textContent; }
-  if(countEl && badgeEl) {
-    new MutationObserver(syncBadge).observe(countEl, {childList:true, characterData:true, subtree:true});
-  }
+  /* Le compteur du bandeau (« N formations ») est tenu à jour par initFormations() (assets/app.js) — lot E. */
+
+  /* Liste de choix des catégories : tenue par l'administration (lot E). Le formulaire (deux listes portent le même identifiant) garde ses dix choix d'origine si la liste ne répond pas. */
+  const fbSelectsDomaine = () => [...document.querySelectorAll('select[id="new-form-domaine"]')];
+  (async function fbChargerCategories(){
+    try {
+      const { categories } = await api('GET', '/formation-categories');
+      if(!categories || !categories.length) return;
+      fbSelectsDomaine().forEach(sel => {
+        const actuel = sel.value;
+        sel.innerHTML = categories.map(c => `<option value="${escQ(c.nom)}">${escQ(c.nom)}</option>`).join('');
+        if(actuel && [...sel.options].some(o => o.value === actuel)) sel.value = actuel;
+      });
+    } catch(_) {}
+  })();
 
   // ── Infos / Catégorie / Tarification / Accès : sections libres de l'espace de travail, sauvegarde automatique ──
   function mfwCollectPayload(){
@@ -1982,6 +2011,7 @@
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;">
               <a class="btn btn-sm btn-orange" href="attestation.html?code=${encodeURIComponent(a.code)}" target="_blank" rel="noopener">📄 Voir / imprimer</a>
+              <a class="btn btn-sm btn-outline" href="/api/attestations/mon/${encodeURIComponent(a.code)}/pdf" download>⬇ PDF</a>
               <a class="btn btn-sm btn-outline" href="verifier-attestation.html?code=${encodeURIComponent(a.code)}" target="_blank" rel="noopener">🔎 Vérifier</a>
             </div>
           </div>
@@ -2001,8 +2031,54 @@
     const el = document.getElementById('mes-formations-list');
     if(!await requireLoginForVolet()){ el.innerHTML = '<div class="notice">Connectez-vous pour accéder à votre Espace Formateur.</div>'; return; }
     try {
-      const { formations } = await api('GET', '/mes-formations');
-      if(!formations.length){ el.innerHTML = '<div class="notice">Vous n\'avez encore créé aucune formation. Cliquez sur « + Créer une nouvelle formation ».</div>'; return; }
+      const { formations: toutes } = await api('GET', '/mes-formations');
+      fbToutes = toutes; fbPreparerFiltres(toutes);
+      dessinerMesFormations();
+    } catch(e){ el.innerHTML = '<div class="notice">Erreur de chargement.</div>'; }
+    loadDashboardCentreCommande();
+  }
+
+  /* ── Tableau de bord filtrable (lot E) : formation, statut, catégorie, titre pour la liste ; période et filtres pour les chiffres ── */
+  let fbToutes = [];
+  const fbV = id => (document.getElementById(id) || {}).value || '';
+  const fbNorm = t => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  function fbFiltrer(liste){
+    const fo = fbV('fbf-formation'), st = fbV('fbf-statut'), dom = fbV('fbf-domaine'), q = fbNorm(fbV('fbf-q'));
+    return liste.filter(f => (!fo || String(f.id) === fo) && (!st || (f.statut || 'brouillon') === st) && (!dom || f.domaine === dom) && (!q || fbNorm(f.titre).includes(q)));
+  }
+  function fbPreparerFiltres(liste){
+    const remplir = (id, valeurs, vide) => {
+      const sel = document.getElementById(id); if(!sel) return;
+      const courant = sel.value;
+      sel.innerHTML = `<option value="">${vide}</option>` + valeurs.map(([v, l]) => `<option value="${escQ(String(v))}">${escQ(l)}</option>`).join('');
+      if(courant && valeurs.some(([v]) => String(v) === courant)) sel.value = courant;
+    };
+    remplir('fbf-formation', liste.map(f => [f.id, f.titre]), 'Toutes mes formations');
+    remplir('fbf-statut', [...new Set(liste.map(f => f.statut || 'brouillon'))].map(s => [s, FB_STATUT_LBL[s] || s]), 'Tous les statuts');
+    remplir('fbf-domaine', [...new Set(liste.map(f => f.domaine).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'fr')).map(d => [d, d]), 'Toutes les catégories');
+  }
+  function fbQueryFiltres(){
+    const qs = new URLSearchParams();
+    [['formation_id', 'fbf-formation'], ['statut', 'fbf-statut'], ['domaine', 'fbf-domaine'], ['du', 'fbf-du'], ['au', 'fbf-au']].forEach(([k, id]) => { if(fbV(id)) qs.set(k, fbV(id)); });
+    return qs.toString();
+  }
+  function fbAppliquerFiltres(statsSeulement){
+    if(!statsSeulement) dessinerMesFormations();
+    const actifs = ['fbf-formation', 'fbf-statut', 'fbf-domaine', 'fbf-du', 'fbf-au', 'fbf-q'].some(id => fbV(id));
+    const note = document.getElementById('fbf-note');
+    if(note) note.textContent = actifs ? (fbFiltrer(fbToutes).length + ' formation(s) sur ' + fbToutes.length + (fbV('fbf-du') || fbV('fbf-au') ? ' · la période porte sur la date d’inscription des apprenants' : '') + '.') : '';
+    loadDashboardCentreCommande(true);
+  }
+  ['fbf-formation', 'fbf-statut', 'fbf-domaine', 'fbf-du', 'fbf-au'].forEach(id => document.getElementById(id)?.addEventListener('change', () => fbAppliquerFiltres()));
+  document.getElementById('fbf-q')?.addEventListener('input', () => { dessinerMesFormations(); const n = document.getElementById('fbf-note'); if(n) n.textContent = fbV('fbf-q') ? (fbFiltrer(fbToutes).length + ' formation(s) sur ' + fbToutes.length + '.') : ''; });
+  document.getElementById('fbf-reset')?.addEventListener('click', () => { ['fbf-formation', 'fbf-statut', 'fbf-domaine', 'fbf-du', 'fbf-au', 'fbf-q'].forEach(id => { const e = document.getElementById(id); if(e) e.value = ''; }); fbAppliquerFiltres(); });
+
+  function dessinerMesFormations(){
+    const el = document.getElementById('mes-formations-list');
+    const formations = fbFiltrer(fbToutes);
+    {
+      if(!fbToutes.length){ el.innerHTML = '<div class="notice">Vous n\'avez encore créé aucune formation. Cliquez sur « + Créer une nouvelle formation ».</div>'; return; }
+      if(!formations.length){ el.innerHTML = '<div class="notice">Aucune de vos formations ne correspond à ces filtres. <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById(\'fbf-reset\').click()">Réinitialiser les filtres</button></div>'; return; }
       el.innerHTML = formations.map(f => `
         <div class="card" style="margin-bottom:14px;">
           <div class="flex-between" style="align-items:flex-start;flex-wrap:wrap;gap:8px;">
@@ -2041,8 +2117,7 @@
           catch(e){ showMsg(e.message||'Erreur.', 'danger'); }
         });
       });
-    } catch(e){ el.innerHTML = '<div class="notice">Erreur de chargement.</div>'; }
-    loadDashboardCentreCommande();
+    }
   }
 
   let suppressionCtx = null;
@@ -2083,11 +2158,12 @@
     } catch(e){ errEl.textContent = e.message||'Erreur.'; errEl.style.display = 'block'; }
   });
 
-  async function loadDashboardCentreCommande(){
+  async function loadDashboardCentreCommande(seulementChiffres){
     const el = document.getElementById('fb-dash-grid');
     if(!el) return;
     try {
-      const { stats: s } = await api('GET', '/mes-formations/dashboard');
+      const qf = fbQueryFiltres();
+      const { stats: s } = await api('GET', '/mes-formations/dashboard' + (qf ? '?' + qf : ''));
       const cards = [
         [s.nb_formations, 'Formations'], [s.nb_publiees, 'Publiées'], [s.nb_brouillons, 'En brouillon'], [s.nb_archivees, 'Archivées'],
         [s.nb_eleves, 'Élèves'], [s.nb_nouveaux_eleves_7j, 'Nouveaux (7j)'], [s.nb_formations_terminees, 'Formations terminées'],
@@ -2097,6 +2173,7 @@
       ];
       el.innerHTML = cards.map(([num,lbl]) => `<div class="fb-dash-card"><div class="fb-dash-num">${num}</div><div class="fb-dash-lbl">${lbl}</div></div>`).join('');
     } catch(e){ el.innerHTML = '<div class="notice">Erreur de chargement du tableau de bord.</div>'; }
+    if(seulementChiffres) return;
     loadVentesFormateur(); loadCouponsGlobaux(); loadRelances();
   }
 
@@ -2291,7 +2368,10 @@
       set('new-form-nb-lecons', f.nombre_lecons_approx);
       set('new-form-places', f.places);
       if(f.type_formation) set('new-form-type', f.type_formation);
-      if(f.domaine) set('new-form-domaine', f.domaine);
+      if(f.domaine){
+        /* Catégorie désactivée depuis : on la garde sélectionnable pour cette formation (le serveur l'accepte tant qu'elle ne change pas). */
+        fbSelectsDomaine().forEach(sel => { if(![...sel.options].some(o => o.value === f.domaine)) sel.add(new Option(f.domaine + ' (n’est plus proposée)', f.domaine)); sel.value = f.domaine; });
+      }
       set('new-form-sous-categorie', f.sous_categorie);
       set('new-form-secteur', f.secteur_activite);
       set('new-form-pays', f.pays_concerne);
@@ -2380,6 +2460,7 @@
     else if(tab==='carte') fbLoadCartes();
     else if(tab==='prerequis') fbLoadPrerequis();
     else if(tab==='apercu') fbLoadApercu();
+    else if(tab==='kofi') { if(window.FormateurKoffi) FormateurKoffi.monter(document.getElementById('fb-kofi-zone'), fbFormationId); }
     else if(tab==='soumission') fbLoadMessages();
     else if(tab==='tarification') mfwRenderCoupons();
   }
