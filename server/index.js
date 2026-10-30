@@ -51531,11 +51531,12 @@ async function inscPublicContexteEvenement(fiche) {
   let evenements = [];
   try {
     const rows = await db.prepare(`
-      SELECT e.id, e.titre, e.date_evt, e.date_fin, e.heure_debut, e.ville, e.pays, e.lieu, e.image_couverture, e.image_url, e.galerie_photos,
+      SELECT e.id, e.titre, e.date_evt, e.date_fin, e.heure_debut, e.heure_fin, e.ville, e.pays, e.lieu, e.mode_participation, e.image_couverture, e.image_url, e.galerie_photos,
              e.video1_url, e.video1_titre, e.video2_url, e.video2_titre FROM insc_fiches_evenements fe
       JOIN evenements e ON e.id=fe.evenement_id WHERE fe.fiche_id=? ORDER BY e.date_evt ASC`).all(fiche.id);
     evenements = rows.map(r => ({
-      id: r.id, titre: r.titre, date_evt: r.date_evt, date_fin: r.date_fin || null, heure_debut: r.heure_debut, ville: r.ville, pays: r.pays, lieu: r.lieu,
+      id: r.id, titre: r.titre, date_evt: r.date_evt, date_fin: r.date_fin || null, heure_debut: r.heure_debut, heure_fin: r.heure_fin,
+      ville: r.ville, pays: r.pays, lieu: r.lieu, mode_participation: r.mode_participation,
       photos: inscPublicPhotosEvenement(r),
       videos: [{ url: r.video1_url, libelle: r.video1_titre }, { url: r.video2_url, libelle: r.video2_titre }].filter(v => v.url),
     }));
