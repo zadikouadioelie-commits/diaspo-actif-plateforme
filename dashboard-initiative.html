@@ -75,6 +75,8 @@
       <div class="sb-group-lbl">⭐ MODULES PREMIUM</div>
       <a href="#crm" data-section="crm" data-aide="crm">🤝 CRM</a>
       <a href="#paiement" data-section="paiement" data-aide="paiement_initiative">💳 Module paiement</a>
+      <!-- Module premium « Formation Diaspora » (2026-10-31, demande explicite) : formations suivies + onglet Formateur (accès sur demande). Doré mais jamais verrouillé : un élève doit toujours retrouver ses formations (badgeOnly). -->
+      <a href="#formation-diaspora" data-section="formation-diaspora">🎓 Formation Diaspora</a>
       <a href="#formations-gestion" data-section="formations-gestion" id="sb-formations-gestion" data-aide="diaspo_formation" style="display:none;">🎓 Diaspo Formation <span class="pill" id="formations-badge" style="display:none;"></span></a>
       <a href="#publicites-init" data-section="publicites-init" data-aide="publicites">📣 Publicités <span class="pill" id="init-pub-badge" style="display:none;"></span></a>
       <a href="#evenements" data-section="evenements" data-aide="evenements">📅 Mes événements</a>
@@ -166,6 +168,7 @@
 <script src="/assets/upload-media.js"></script>
 <script src="/assets/carte-proto.js?v=1"></script>
 <script src="/assets/rich-editor.js"></script>
+<script src="/assets/formation-diaspora.js"></script>
 <script>
 /* Catalogue accréditations DA — défini ici pour éviter les problèmes de cache data.js */
 if (typeof ACCREDITATIONS_DA === 'undefined') {
@@ -869,6 +872,9 @@ async function initRelaisDiasporaWidget(me, api) {
       </a>
       <div id="recrutement-content"><p style="color:var(--muted);font-size:13px;">Chargement…</p></div>
     </div>
+
+    <!-- ════ FORMATION DIASPORA — formations suivies + onglet Formateur (assets/formation-diaspora.js) ════ -->
+    <div class="card" style="margin-bottom:20px;display:none;" id="formation-diaspora"></div>
 
     <!-- ════ DIASPO FORMATION — GESTION DES FORMATIONS ════ -->
     <div class="card" style="margin-bottom:20px;display:none;" id="formations-gestion">
@@ -3692,7 +3698,7 @@ async function initRelaisDiasporaWidget(me, api) {
      levé, quel que soit le statut Premium. Symptôme signalé : clic sur "Diaspo Formation"
      sans effet, restait sur les cartes "Paiements boutique"/"Vérification organisation"
      (visibles par ailleurs en permanence, voir commentaire plus bas dans cette fonction). */
-  const INIT_SECTIONS = ['cockpit','crm','presentation','publications','cagnottes','avancement','soumission-da','evenements','billetterie-init','zones','stats-impact','paiement','accreditations','publicites-init','offres-emploi','recrutement','deals','messages-vitrine','parametres-vitrine','partenaires-liste','adhesions-init','votes-init','tracker','asso-accreditation','asso-documents','expansion-catalogue','formations-gestion'];
+  const INIT_SECTIONS = ['cockpit','crm','presentation','publications','cagnottes','avancement','soumission-da','evenements','billetterie-init','zones','stats-impact','paiement','accreditations','publicites-init','offres-emploi','recrutement','deals','messages-vitrine','parametres-vitrine','partenaires-liste','adhesions-init','votes-init','tracker','asso-accreditation','asso-documents','expansion-catalogue','formations-gestion','formation-diaspora'];
   window.initShowSection = function(name) {
     /* L'ancien module « Affiliation » est désormais l'onglet « Membres affiliés » de Cotisations & Adhésions (2026-10-08) — les anciens liens (#affiliation, notifications d'invitation) y mènent. */
     let ouvrirOngletAffil = false;
@@ -3721,6 +3727,7 @@ async function initRelaisDiasporaWidget(me, api) {
     if (name === 'evenements') window.renderInitEvenements?.();
     if (name === 'billetterie-init') renderInitBilletterie();
     if (name === 'cagnottes') renderCagnottes();
+    if (name === 'formation-diaspora' && window.FormationDiaspora) FormationDiaspora.monter(document.getElementById('formation-diaspora'), { role: 'initiative' });
     if (name === 'avancement') renderAvancement();
     if (name === 'soumission-da') SoumissionDA.load();
     if (name === 'messages-vitrine') renderMessagesVitrine();
@@ -11218,6 +11225,7 @@ async function initPremiumGates() {
     { href: '#crm', context: 'crm', intercept: true },
     { href: '#paiement', context: 'paiement_boutique' },
     { href: '#cagnottes', context: 'cagnottes', intercept: true },
+    { href: '#formation-diaspora', context: 'formation_diaspora', badgeOnly: true },
     { href: '#formations-gestion', context: 'espace_formateur', intercept: true },
     { href: '#publicites-init', context: 'publicites' },
     { href: '#evenements', context: 'evenements' },

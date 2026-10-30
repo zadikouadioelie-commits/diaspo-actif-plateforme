@@ -68,6 +68,8 @@
       <!-- Modules Premium regroupés (2026-10-13) : assets/sidebar-premium-cadre.js dessine la cartouche dorée autour de ce groupe -->
       <div class="sb-group-lbl">👑 MODULES PREMIUM</div>
       <a href="reseau.html" class="sb-premium" data-aide="reseau_pro" title="Module premium — réservé aux comptes Abonné" style="display:none;">👑 Mon Réseau Pro <span class="pill" id="u-reseau-badge" style="display:none;"></span></a>
+      <!-- Module premium « Formation Diaspora » (2026-10-31) : formations suivies ; jamais verrouillé (un élève doit toujours retrouver ses formations). Pas d'onglet Formateur ici : réservé aux comptes Initiative. -->
+      <a href="#" data-usection="formation-diaspora" class="sb-premium">👑 Formation Diaspora</a>
       <a href="business-plan.html" class="sb-premium" title="Module premium — réservé aux comptes Abonné" data-aide="business_plans">👑 Business Plans</a>
       <a href="#" data-usection="projets" class="sb-premium" title="Module premium — réservé aux comptes Abonné" style="display:none;">👑 Mes projets <span class="pill" id="u-projets-pill" style="display:none;"></span></a>
 
@@ -180,6 +182,10 @@
       </section>
 
       <!-- ── SECTION PROJETS / INITIATIVES ── -->
+      <section id="usec-formation-diaspora" style="display:none;">
+        <div class="card" id="u-formation-diaspora"></div>
+      </section>
+
       <section id="usec-projets" style="display:none;">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
           <div>
@@ -356,6 +362,7 @@
 <script src="assets/data.js"></script>
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js?v=13"></script>
+<script src="assets/formation-diaspora.js"></script>
 <script src="assets/subscription-required.js"></script>
 <script src="assets/sidebar-reorder.js"></script>
 <script src="assets/sidebar-premium-cadre.js?v=7"></script>
@@ -845,6 +852,7 @@ function fmtDate(d){if(!d)return '';try{return new Date(d).toLocaleDateString('f
     });
     /* Module CV, Lettres & Candidatures : accès libre (plus de restriction Premium). */
     if(name==='projets') loadMesProjets();
+    if(name==='formation-diaspora' && window.FormationDiaspora) FormationDiaspora.monter(document.getElementById('u-formation-diaspora'), { role: 'utilisateur' });
     if(name==='soumission-da') SoumissionDA.load();
     if(name==='apparence') renderThemeSelector();
   };
@@ -879,6 +887,7 @@ function fmtDate(d){if(!d)return '';try{return new Date(d).toLocaleDateString('f
   });
   /* Retour de l'éditeur de CV (« Terminer plus tard ») : on arrive directement sur la liste des CV. */
   if (location.hash === '#outils') uShowSection('outils');
+  if (location.hash === '#formation-diaspora') uShowSection('formation-diaspora');
 
   /* KPIs candidatures */
   try {

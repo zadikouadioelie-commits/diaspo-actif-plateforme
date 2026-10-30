@@ -19,7 +19,15 @@ async function estInvite(db, userId) {
   return !!r;
 }
 
-module.exports = { SUIVI_MODES, estInvite };
+/* Un compte Initiative ne crée des formations que s'il y a été AUTORISÉ par Diaspo'Actif (demande « Formation Diaspora », voir formation-demandes-formateur.js)
+   ou s'il en a déjà créé une (droits acquis : on ne retire rien à ceux qui forment déjà). Le Premium seul ne suffit plus (2026-10-31, demande explicite). */
+async function accesFormateurInitiative(db, userId) {
+  if (await estInvite(db, userId)) return "invite";
+  const f = await db.prepare("SELECT id FROM formations WHERE owner_user_id=? LIMIT 1").get(Number(userId));
+  return f ? "existant" : null;
+}
+
+module.exports = { SUIVI_MODES, estInvite, accesFormateurInitiative };
 
 module.exports.register = function register(deps) {
   const { route, db, sendJSON, getCurrentUser, SEC, checkFormationOwner, FormationParcours } = deps;
@@ -41,9 +49,10 @@ module.exports.register = function register(deps) {
     let source = null;
     if (user.role === "administrateur") source = "administration";
     else if (user.role === "partenaire") source = "partenaire";
+    else if (user.role === "initiative") source = await accesFormateurInitiative(db, user.id);
     else if (await estInvite(db, user.id)) source = "invite";
-    else if (user.role === "initiative" && await deps.hasAccreditation(user.id, "initiative_abonne")) source = "initiative_premium";
-    sendJSON(res, 200, { peut_creer: !!source, source, role: user.role, premium_requis: user.role === "initiative" && !source });
+    /* acces_requis : un compte Initiative sans autorisation doit la demander (module Formation Diaspora) — le Premium seul ne suffit plus. */
+    sendJSON(res, 200, { peut_creer: !!source, source, role: user.role, premium_requis: false, acces_requis: user.role === "initiative" && !source });
   });
 
   route("GET", "/api/admin/formateurs-invites", async (req, res) => {

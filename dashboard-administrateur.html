@@ -90,6 +90,7 @@
       <a href="#accreditations" data-section="accreditations" style="display:flex;justify-content:space-between;align-items:center;">🏛️ Accréditations <span id="accred-pending-badge" style="display:none;background:#f59e0b;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;min-width:18px;text-align:center;"></span></a>
       <a href="#certifications" data-section="certifications">🛡️ Certifications</a>
       <a href="#verifications-organisation" data-section="verifications-organisation" style="display:flex;justify-content:space-between;align-items:center;">🏢 Vérifications d'organisation <span id="vo-pending-badge" style="display:none;background:#f59e0b;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;min-width:18px;text-align:center;"></span></a>
+      <a href="#demandes-formateur" data-section="demandes-formateur" style="display:flex;justify-content:space-between;align-items:center;">🎓 Demandes de compte formateur <span id="df-pending-badge" style="display:none;background:#f59e0b;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;min-width:18px;text-align:center;"></span></a>
       <a href="#demandes-passage" data-section="demandes-passage" style="display:flex;justify-content:space-between;align-items:center;">🚀 Passage « Existante » <span id="dp-pending-badge" style="display:none;background:#f59e0b;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;min-width:18px;text-align:center;"></span></a>
       <a href="#rencontres" data-section="rencontres" style="display:flex;justify-content:space-between;align-items:center;">🤝 Rencontres D'A <span id="rdv-badge" style="display:none;background:#f59e0b;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;min-width:18px;text-align:center;"></span></a>
       <a href="#parrainage-admin" data-section="parrainage-admin">🔗 Parrainage &amp; Invitations</a>
@@ -3455,6 +3456,19 @@
       </section>
 
       <!-- STATUT DE L'INITIATIVE — demandes de passage En création → Existante -->
+      <section id="section-demandes-formateur" style="display:none;">
+        <div style="margin-bottom:20px;">
+          <h2 style="margin:0;">🎓 Demandes de compte formateur</h2>
+          <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Les comptes Initiative qui demandent l'accès à l'espace formateur de Formation Diaspora. Accepter leur permet de créer des formations ; refuser n'appelle aucun motif.</p>
+        </div>
+        <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;">
+          <button class="btn btn-sm btn-orange" id="df-filtre-en_attente" onclick="loadDemandesFormateur('en_attente')">⏳ En attente</button>
+          <button class="btn btn-sm btn-outline" id="df-filtre-acceptee" onclick="loadDemandesFormateur('acceptee')">✅ Acceptées</button>
+          <button class="btn btn-sm btn-outline" id="df-filtre-refusee" onclick="loadDemandesFormateur('refusee')">❌ Refusées</button>
+        </div>
+        <div id="df-list"><p class="notice">Chargement…</p></div>
+      </section>
+
       <section id="section-demandes-passage" style="display:none;">
         <div style="margin-bottom:20px;">
           <h2 style="margin:0;">🚀 Passage « Existante »</h2>
@@ -9647,6 +9661,52 @@ function voAdminRejeterPrompt(id){
 
 /* ── STATUT DE L'INITIATIVE — demandes de passage En création → Existante ── */
 let _dpAdminFiltre = 'en_attente';
+/* Demandes de compte formateur (Formation Diaspora) : le compteur du menu est tenu à jour à l'ouverture du tableau de bord, la liste à l'ouverture du module. */
+let _dfFiltre = 'en_attente';
+function dfMajBadge(n) {
+  const b = document.getElementById('df-pending-badge');
+  if (!b) return;
+  if (n > 0) { b.textContent = n; b.style.display = 'inline-block'; } else b.style.display = 'none';
+}
+async function dfCharger() {
+  try { const r = await api('GET', '/admin/demandes-formateur?statut=en_attente'); dfMajBadge(r.nb_en_attente || 0); } catch (_) {}
+}
+async function loadDemandesFormateur(statut) {
+  if (statut) _dfFiltre = statut;
+  const el = document.getElementById('df-list');
+  if (!el) return;
+  el.innerHTML = '<p class="notice">Chargement…</p>';
+  ['en_attente', 'acceptee', 'refusee'].forEach(v => {
+    const b = document.getElementById('df-filtre-' + v);
+    if (b) { b.classList.toggle('btn-orange', v === _dfFiltre); b.classList.toggle('btn-outline', v !== _dfFiltre); }
+  });
+  try {
+    const r = await api('GET', '/admin/demandes-formateur?statut=' + _dfFiltre);
+    dfMajBadge(r.nb_en_attente || 0);
+    const demandes = r.demandes || [];
+    if (!demandes.length) { el.innerHTML = '<p class="notice">Aucune demande dans cette catégorie.</p>'; return; }
+    el.innerHTML = demandes.map(d => `
+      <div class="card" style="margin-bottom:12px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+          <div>
+            <div style="font-weight:700;">${esc(d.nom)}</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:2px;">${esc(d.email || '')} · compte n°${d.user_id} · demande du ${new Date(String(d.cree_le).replace(' ', 'T')).toLocaleDateString('fr-FR')}${d.decide_le ? ' · réponse du ' + new Date(String(d.decide_le).replace(' ', 'T')).toLocaleDateString('fr-FR') : ''}</div>
+          </div>
+          ${d.statut === 'en_attente' ? `<div style="display:flex;gap:8px;">
+            <button class="btn btn-sm btn-orange" onclick="dfDecider(${d.id}, 'accepter', this)">✅ Accepter</button>
+            <button class="btn btn-sm btn-outline" style="color:#dc2626;" onclick="dfDecider(${d.id}, 'refuser', this)">❌ Refuser</button>
+          </div>` : `<span style="font-size:12px;font-weight:700;color:${d.statut === 'acceptee' ? '#16a34a' : '#dc2626'};">${d.statut === 'acceptee' ? 'Acceptée' : 'Refusée'}</span>`}
+        </div>
+      </div>`).join('');
+  } catch (e) { el.innerHTML = '<p class="notice" style="color:red;">Erreur : ' + esc(e.message || 'chargement impossible') + '</p>'; }
+}
+async function dfDecider(id, action, btn) {
+  if (btn) btn.disabled = true;
+  try { await api('POST', '/admin/demandes-formateur/' + id + '/' + action); }
+  catch (e) { alert(e.message || 'Erreur.'); }
+  loadDemandesFormateur();
+}
+
 async function loadDemandesPassage(statut){
   if (statut) _dpAdminFiltre = statut;
   const el = document.getElementById('dp-admin-list');
@@ -9861,6 +9921,7 @@ async function submitAccordDirect(){
     origines:    () => origCharger(),
     'verifications-organisation': () => loadVerificationsOrganisation(),
     'demandes-passage': () => loadDemandesPassage(),
+    'demandes-formateur': () => loadDemandesFormateur(),
     'administrateurs-junior': () => loadAdminsJunior(),
     'support-pilote': () => loadSupportPilote(),
     'partenariat-admin': () => loadPartenariatAdmin(),
@@ -9875,6 +9936,8 @@ async function submitAccordDirect(){
     if (target) target.style.display = "";
     if (SECTION_LOADERS[a.dataset.section]) SECTION_LOADERS[a.dataset.section]();
   }));
+
+  dfCharger();
 
   // Ouvrir directement une section si l'URL arrive avec un hash (ex: bouton flottant admin)
   if (location.hash) {

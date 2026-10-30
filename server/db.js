@@ -4877,6 +4877,15 @@ db.exec(`
     created_at TEXT DEFAULT (datetime('now')),
     revoque_le TEXT
   );
+
+  CREATE TABLE IF NOT EXISTS formation_demandes_formateur (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    statut TEXT DEFAULT 'en_attente',
+    created_at TEXT DEFAULT (datetime('now')),
+    decide_le TEXT,
+    decide_par INTEGER
+  );
 `);
 
 /* Formation Diaspora — lot A (2026-10-30) : commandes, droits d'accès par formation OU par module, expiration.

@@ -555,6 +555,8 @@ const NOTIF_ICONS = {
   candidature_traitee: "🗂️",
   admin_acces_demande: "🔐",
   admin_acces_reponse: "🔐",
+  formation_demande_formateur: "🎓",
+  formation_formateur_reponse: "🎓",
 };
 
 // Destinations pour les data.cta envoyés par certains types de notifications

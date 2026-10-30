@@ -1848,7 +1848,14 @@
       /* Le serveur décide qui peut créer des formations : administration, partenaire, formateur invité par Diaspo'Actif ou Initiative Premium. */
       const st = await api('GET', '/formateur/statut');
       if (st.peut_creer) { document.getElementById('sb-tab-espace-formateur').style.display = ''; return; }
-      if (st.premium_requis) document.getElementById('devenir-formateur-banner').style.display = 'flex';
+      if (st.acces_requis) {
+        /* Compte Initiative sans autorisation : la création de formations s'obtient sur demande (module Formation Diaspora), plus par le seul Premium. */
+        const ban = document.getElementById('devenir-formateur-banner');
+        ban.querySelector('p').textContent = "L'espace formateur est ouvert par Diaspo'Actif, sur demande : faites votre demande dans le module Formation Diaspora (onglet Formateur).";
+        const lien = document.getElementById('btn-devenir-formateur');
+        lien.href = 'dashboard-initiative.html#formation-diaspora'; lien.textContent = "🧑‍🏫 Demander l'accès formateur";
+        ban.style.display = 'flex';
+      } else if (st.premium_requis) document.getElementById('devenir-formateur-banner').style.display = 'flex';
     } catch(e) { /* silencieux : bannière simplement non affichée */ }
   }
 
