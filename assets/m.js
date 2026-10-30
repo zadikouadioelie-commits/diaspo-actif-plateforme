@@ -1788,13 +1788,13 @@
     if (!S.me) { el.innerHTML = loginCard('Connectez-vous pour lire et envoyer vos messages.'); $('#go-login').onclick = () => openLogin(); return; }
     el.innerHTML = '<div class="sk skc" style="height:70px"></div><div class="sk skc" style="height:70px"></div>';
     try {
-      const r = await api('/api/conversations' + (S.msgArch ? '?filtre=archives' : '')); const tout = r.conversations || []; tout.forEach(x => { S.convNames[x.id] = x.avec_nom; });
-      if (!S.msgArch) { S.unreadMsg = tout.reduce((n, x) => n + (Number(x.non_lus) || 0), 0); paintBadges(); }
+      const r = await api('/api/conversations' + (S.msgArch ? '?filtre=archives' : S.msgFormation ? '?formation=1' : '')); const tout = r.conversations || []; tout.forEach(x => { S.convNames[x.id] = x.avec_nom; });
+      if (!S.msgArch && !S.msgFormation) { S.unreadMsg = tout.reduce((n, x) => n + (Number(x.non_lus) || 0), 0) + (Number(r.formation && r.formation.non_lus) || 0); paintBadges(); }
       /* Onglets Classiques / Automatiques (2026-10-08) — uniquement pour le compte Diaspo'Actif Officiel (le serveur ne les active que pour lui) :
          les messages de bienvenue envoyés aux nouveaux comptes sont rangés à part. Le badge de non-lus ci-dessus compte tout. */
       const onglets = r.onglets && r.onglets.actifs ? r.onglets : null;
       const mode = onglets && S.msgOnglet === 'automatique' ? 'automatique' : 'classique';
-      const c0 = onglets && !S.msgArch ? tout.filter(x => !!x.automatique === (mode === 'automatique')) : tout;
+      const c0 = onglets && !S.msgArch && !S.msgFormation ? tout.filter(x => !!x.automatique === (mode === 'automatique')) : tout;
       /* Archivage par thème (2026-10-08) : « Messages » / « Archivés », puis un bouton par thème créé (le thème est un nom libre propre à chaque personne). */
       const themes = [...new Set(tout.map(x => x.archive_dossier).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'fr'));
       if (S.msgArch && S.msgTheme && S.msgTheme !== '__sans' && !themes.includes(S.msgTheme)) S.msgTheme = '';
@@ -1802,12 +1802,15 @@
       const filtres = '<div class="chips" role="tablist"><button class="chip ' + (!S.msgArch ? 'on' : '') + '" data-msg-arch="0">💬 Messages</button><button class="chip ' + (S.msgArch ? 'on' : '') + '" data-msg-arch="1">' + ic('folder', 's') + ' Archivés</button></div>'
         + (S.msgArch && (themes.length || tout.some(x => !x.archive_dossier)) ? '<div class="chips"><button class="chip ' + (!S.msgTheme ? 'on' : '') + '" data-msg-theme="">Tous les thèmes</button>' + themes.map(t => '<button class="chip ' + (S.msgTheme === t ? 'on' : '') + '" data-msg-theme="' + esc(t) + '">📁 ' + esc(t) + '</button>').join('') + (themes.length && tout.some(x => !x.archive_dossier) ? '<button class="chip ' + (S.msgTheme === '__sans' ? 'on' : '') + '" data-msg-theme="__sans">Sans thème</button>' : '') + '</div>' : '');
       const barre = onglets ? `<div class="chips" role="tablist"><button class="chip ${mode === 'classique' ? 'on' : ''}" data-msg-onglet="classique" role="tab" aria-selected="${mode === 'classique'}">💬 Classiques <span class="n">${onglets.classiques || 0}</span></button><button class="chip ${mode === 'automatique' ? 'on' : ''}" data-msg-onglet="automatique" role="tab" aria-selected="${mode === 'automatique'}">🤖 Automatiques <span class="n">${onglets.automatiques || 0}</span></button>${onglets.modeles ? '<button class="chip" data-msg-modeles type="button">⚙️ Mes messages automatiques</button>' : ''}</div>` : '';
-      el.innerHTML = filtres + (S.msgArch ? '' : barre) + (c.length ? `<div class="lst">${c.map(x => `<div class="convw"><a class="conv ${x.non_lus > 0 ? 'unread' : ''}" href="#/conv/${x.id}"><div class="av">${x.avec_photo ? `<img src="${attrUrl(x.avec_photo)}" alt="" onerror="this.remove()">` : esc(initials(x.avec_nom))}</div>
+      el.innerHTML = (r.formation && r.formation.actif && !S.msgArch ? '<div class="chips" role="tablist"><button class="chip ' + (!S.msgFormation ? 'on' : '') + '" data-msg-fq="0" role="tab">💬 Messages</button><button class="chip ' + (S.msgFormation ? 'on' : '') + '" data-msg-fq="1" role="tab">🎓 Messages de formation' + (r.formation.a_traiter ? ' <span class="n">' + r.formation.a_traiter + '</span>' : '') + '</button></div>' : '') + (S.msgFormation ? '' : filtres + (S.msgArch ? '' : barre)) + (c.length ? `<div class="lst">${c.map(x => `<div class="convw"><a class="conv ${x.non_lus > 0 ? 'unread' : ''}" href="#/conv/${x.id}"><div class="av">${x.avec_photo ? `<img src="${attrUrl(x.avec_photo)}" alt="" onerror="this.remove()">` : esc(initials(x.avec_nom))}</div>
         <div class="sp"><div class="row"><span class="nm ell sp">${esc(x.avec_nom)}</span><span class="tm">${esc(ago(x.derniere_date))}</span></div><div class="pv ell">${esc(x.derniere_type && x.derniere_type !== 'text' ? '📎 Pièce jointe' : strip(x.derniere || x.sujet || 'Nouvelle conversation'))}</div></div>${x.non_lus > 0 ? `<span class="unr">${x.non_lus}</span>` : ''}</a><button type="button" class="conv-more" data-cmore="${x.id}" aria-label="Actions sur cette conversation">${ic('more')}</button></div>`).join('')}</div>`
         : `<div class="empty"><div class="ei">${ic('chat', 'l')}</div><b>${S.msgArch ? 'Aucune conversation archivée' : mode === 'automatique' ? 'Aucun message automatique' : 'Aucune conversation'}</b>${mode === 'automatique' ? 'Les messages de bienvenue sans réponse apparaissent ici.' : 'Contactez une boutique ou un membre depuis son profil pour démarrer un échange.'}</div>`);
+      /* Messages de formation (2026-10-30) : questions privées des élèves aux formateurs — mêmes règles que messagerie.html. */
+      el.querySelectorAll('[data-msg-fq]').forEach(b => { b.onclick = () => { S.msgFormation = b.dataset.msgFq === '1'; S.msgArch = false; viewMessages(); }; });
+      el.querySelectorAll('a.conv').forEach(a => { const x = tout.find(y => String(y.id) === String(a.getAttribute('href').split('/').pop())); const nm = a.querySelector('.nm'); if (x && Number(x.formation_ouvertes) > 0 && nm) nm.insertAdjacentHTML('afterend', '<span class="badge o" style="margin-left:6px;flex:none">🎓 À traiter</span>'); });
       el.querySelectorAll('[data-msg-onglet]').forEach(b => { b.onclick = () => { S.msgOnglet = b.dataset.msgOnglet; viewMessages(); }; });
       el.querySelectorAll('[data-msg-modeles]').forEach(b => { b.onclick = () => { if (window.MessagesAuto) MessagesAuto.ouvrir(); }; });
-      el.querySelectorAll('[data-msg-arch]').forEach(b => { b.onclick = () => { S.msgArch = b.dataset.msgArch === '1'; S.msgTheme = ''; viewMessages(); }; });
+      el.querySelectorAll('[data-msg-arch]').forEach(b => { b.onclick = () => { S.msgArch = b.dataset.msgArch === '1'; S.msgTheme = ''; S.msgFormation = false; viewMessages(); }; });
       el.querySelectorAll('[data-msg-theme]').forEach(b => { b.onclick = () => { S.msgTheme = b.dataset.msgTheme; viewMessages(); }; });
       el.querySelectorAll('[data-cmore]').forEach(b => { b.onclick = e => { e.preventDefault(); e.stopPropagation(); const x = tout.find(y => String(y.id) === b.dataset.cmore); if (x) convActions({ id: x.id, avec_nom: x.avec_nom, archive: !!x.archive, theme: x.archive_dossier || '' }, viewMessages); }; });
     } catch (e) { el.innerHTML = `<div class="empty"><b>Messagerie indisponible</b>${esc(e.message)}</div>`; }
@@ -1854,6 +1857,11 @@
     inp.oninput = () => { cr.disabled = !inp.value.trim(); };
     cr.onclick = () => faire(inp.value.trim()); $('#th-none').onclick = () => faire('');
   }
+  /* Questions de formation liées à la conversation : le formateur les clôt ou les rouvre ; l'élève voit leur état. */
+  function fqBarHtml(list) {
+    const l = (list || []).slice(0, 3), plus = (list || []).length - l.length;
+    return l.map(q => `<div style="padding:8px 14px;background:#eff6ff;border-bottom:1px solid #bfdbfe;font-size:12.5px;color:#1e3a5f;line-height:1.35"><b>🎓 ${[q.formation, q.module, q.lecon].filter(Boolean).map(esc).join(' › ')}</b>${q.extrait ? `<div style="font-style:italic;color:#475569">« ${esc(q.extrait)}${q.extrait.length >= 80 ? '…' : ''} »</div>` : ''}<div style="margin-top:4px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span>${q.statut === 'ouverte' ? '🟠 À traiter' : '✅ Traitée'}</span>${q.en_tant_que === 'formateur' ? `<button type="button" class="btn out sm" data-fqs="${q.id}:${q.statut === 'ouverte' ? 'traitee' : 'ouverte'}" style="min-height:40px">${q.statut === 'ouverte' ? 'Marquer comme traitée' : 'Rouvrir'}</button>` : ''}</div></div>`).join('') + (plus > 0 ? `<div style="padding:6px 14px;font-size:12px;color:#475569;background:#eff6ff">+ ${plus} autre${plus > 1 ? 's' : ''} question${plus > 1 ? 's' : ''} de formation</div>` : '');
+  }
   async function paneConv(id) {
     if (!S.me) { location.hash = '#/messages'; return; }
     setPane('Conversation', '<div class="sk skc" style="height:80px"></div>');
@@ -1881,11 +1889,16 @@
       });
       const list = $('#chat'); const atBottom = !list || (list.parentNode.scrollHeight - list.parentNode.scrollTop - list.parentNode.clientHeight < 120);
       if (!list) {
-        setPane(S.convNames[id] || autre.nom || 'Conversation', `<div class="chat" id="chat">${html || '<div class="empty"><b>Aucun message</b>Écrivez le premier message.</div>'}</div>`, null, true);
+        setPane(S.convNames[id] || autre.nom || 'Conversation', `<div id="fqbar"></div><div class="chat" id="chat">${html || '<div class="empty"><b>Aucun message</b>Écrivez le premier message.</div>'}</div>`, null, true);
         mountComposer(id, render);
         const cv = r.conversation || {}, moi1 = Number(cv.user1_id) === Number(S.me.id);
         paneMore(() => convActions({ id, avec_nom: S.convNames[id] || autre.nom || '', archive: !!(moi1 ? cv.archive_u1 : cv.archive_u2), theme: (moi1 ? cv.archive_dossier_u1 : cv.archive_dossier_u2) || '' }, () => { location.hash = '#/messages'; }));
       } else { list.innerHTML = html; }
+      const fqb = $('#fqbar');
+      if (fqb) {
+        fqb.innerHTML = fqBarHtml(r.questions_formation);
+        fqb.querySelectorAll('[data-fqs]').forEach(b => { b.onclick = async () => { const [qid, st] = b.dataset.fqs.split(':'); b.disabled = true; try { await api('/api/formation-questions/' + qid, { method: 'PATCH', body: { statut: st } }); toast(st === 'traitee' ? 'Question marquée comme traitée' : 'Question rouverte'); render(false); } catch (e) { toast(e.message, true); b.disabled = false; } }; });
+      }
       if (window.CvCarte && $('#chat')) window.CvCarte.hydrater($('#chat'));
       const body = $('.pbody'); if (body && (scroll || atBottom)) body.scrollTop = body.scrollHeight;
     };

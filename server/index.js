@@ -15467,6 +15467,7 @@ route("GET", "/api/conversations", async (req, res, params, body, query) => {
   /* « Messages de formation » : questions privées des élèves aux formateurs (server/formation-questions.js). Ces conversations quittent la liste classique
      (sauf si une vraie discussion existait déjà entre les deux comptes) et ont leur propre onglet, visible dès qu'on a posé ou reçu une question. */
   const fq = await FormationQuestions.resume(db, user.id);
+  const nonLusFormation = rows.filter(r => r.contexte === "formation" && !(Number(r.user1_id) === Number(user.id) ? r.archive_u1 : r.archive_u2)).reduce((n, r) => n + (Number(r.non_lus) || 0), 0);
   let filtered = rows.map(r => {
     const { nb_messages, nb_messages_autre, premier_message, premier_message_id, ...reste } = r;
     return {
@@ -15508,7 +15509,7 @@ route("GET", "/api/conversations", async (req, res, params, body, query) => {
     (r.derniere||"").toLowerCase().includes(q)
   );
 
-  sendJSON(res, 200, { conversations: filtered, formation: { actif: fq.actif, a_traiter: fq.aTraiter }, onglets: (estOfficiel || aDesAutos) ? { actifs: true, automatiques: nbAutomatiques, classiques: nbClassiques, modeles: aDesAutos } : { actifs: false } });
+  sendJSON(res, 200, { conversations: filtered, formation: { actif: fq.actif, a_traiter: fq.aTraiter, non_lus: nonLusFormation }, onglets: (estOfficiel || aDesAutos) ? { actifs: true, automatiques: nbAutomatiques, classiques: nbClassiques, modeles: aDesAutos } : { actifs: false } });
 });
 
 /* POST /api/conversations — créer ou retrouver une conversation */

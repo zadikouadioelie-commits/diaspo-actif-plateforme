@@ -735,6 +735,27 @@
     }
   }
 
+  /* Question privée au formateur (2026-10-30) : le serveur revérifie l'interrupteur du module, l'inscription, l'accès au module, le débit et les doublons. */
+  function poserQuestion(id, l, m) {
+    const close = A.openSheet(`<h3 style="margin:0 0 4px">❓ Question au formateur</h3>
+      <p class="small muted" style="margin:0 0 10px">Module « ${esc(m.titre || '')} » · leçon « ${esc(l.titre)} ». Seul le formateur la verra ; sa réponse arrivera dans votre messagerie.</p>
+      <textarea id="fq-t" class="fm-in" rows="5" maxlength="1000" placeholder="Écrivez votre question…" aria-label="Votre question"></textarea>
+      <div class="fm-err" id="fq-e" role="alert"></div>
+      <button type="button" class="btn block" id="fq-go">Envoyer ma question</button>`);
+    const ta = $('#fq-t'), err = $('#fq-e'), go = $('#fq-go');
+    ta.oninput = () => { err.textContent = ''; };
+    go.onclick = async () => {
+      const texte = ta.value.trim();
+      if (texte.length < 5) { err.textContent = 'Écrivez votre question (5 caractères au minimum).'; return; }
+      go.disabled = true; go.textContent = 'Envoi…';
+      try {
+        await api(`/api/formations/${encodeURIComponent(id)}/modules/${encodeURIComponent(l.module_id)}/question`, { method: 'POST', body: { texte, lecon_id: l.id } });
+        close(); toast('Question envoyée au formateur ✓');
+        A.openSheet(`<h3 style="margin:0 0 6px">✅ Question envoyée</h3><p class="small muted" style="margin:0 0 12px">Le formateur l'a reçue. Vous serez prévenu(e) dès qu'il répond : retrouvez l'échange dans <b>Messages › Messages de formation</b>.</p><button type="button" class="btn block" id="fq-msg">Ouvrir mes messages</button>`);
+        const b = $('#fq-msg'); if (b) b.onclick = () => { S.msgFormation = true; S.msgArch = false; $('#sheet').hidden = true; $('#sheet').innerHTML = ''; location.hash = '#/messages'; };
+      } catch (e) { err.textContent = e.message; go.disabled = false; go.textContent = 'Envoyer ma question'; }
+    };
+  }
   async function screenLecon(my, id, leconId) {
     if (!S.me) return needLoginCard('Leçon', 'Connectez-vous pour suivre vos formations.');
     setPane('Leçon', '<div class="sk skc" style="height:60px"></div><div class="sk skc"></div>');
@@ -751,6 +772,7 @@
     const html = `<div class="small muted" style="margin:0 2px 8px">${esc(m.titre || '')}${c.titre ? ' · ' + esc(c.titre) : ''} — leçon ${i + 1} sur ${items.length}</div>
       <h2 style="margin:0 0 12px;font-size:21px;line-height:1.25">${esc(l.titre)}</h2>
       ${lessonBody(l)}${manuel && !apercu ? carteEnregistrer(id) : ''}
+      ${d.mode === 'apprenant' && Number(m.questions_actives) ? '<button type="button" class="btn out block" id="fm-ask" style="margin-top:14px">❓ Poser une question au formateur</button><div class="small muted" style="margin:6px 2px 0">Votre question reste privée : elle arrive dans la messagerie du formateur.</div>' : ''}
       <div id="fm-ech" style="margin-top:18px"></div>
       <a class="btn out block" style="margin-top:12px" href="#/formations/${esc(id)}/suivre">Plan de la formation</a>`;
     const foot = `<button class="btn out" id="fm-prev" aria-label="Leçon précédente" ${prev ? '' : 'disabled'}>${ic('back')}</button>
@@ -761,6 +783,7 @@
     if (l.type === 'quiz') montrerQuiz(id, l, d);
     montrerEchanges(id, l);
     brancherEnregistrer(id, () => screenLecon(++seq, id, leconId));
+    const ask = $('#fm-ask'); if (ask) ask.onclick = () => poserQuestion(id, l, m);
     $('#fm-prev').onclick = () => prev && goTo(prev);
     /* Mode automatique : la leçon qu'on quitte en avançant est validée (sauf un quiz, qui se réussit). */
     $('#fm-next').onclick = async () => {
