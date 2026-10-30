@@ -24119,11 +24119,12 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
   /* Sanitisé avant écriture (2026-09-25, éditeur de texte enrichi) — seule vraie barrière,
      jamais l'éditeur client (assets/rich-editor.js). */
   const descriptionSafe = SEC.sanitizeRichHtml(description);
-  const coverImg = image_couverture || image_url || null;
+  /* Images → CDN (2026-10-30) : une image reçue en base64 est envoyée sur le CDN et seule son adresse est enregistrée (voir server/images-cdn.js). */
+  const coverImg = await require("./images-cdn").imageVersCdn(image_couverture || image_url || null, user.id);
   // Galerie réduite à 1 photo + couverture (2026-09-09, demande explicite) — le reste des
   // médias (photos/vidéos/documents) vit désormais sur la fiche d'inscription liée, voir
   // enrichirAvecFicheMedia() plus haut.
-  const galerie = Array.isArray(galerie_photos) ? JSON.stringify(galerie_photos.slice(0,2)) : (galerie_photos || '[]');
+  const galerie = await require("./images-cdn").galerieVersCdn(galerie_photos, user.id);
   /* Vidéo courte de 2 min maximum (2026-10-28) : envoyée directement à l'hébergeur vidéo par le navigateur ; le serveur ne reçoit que la preuve (video_guid + video_jeton),
      contrôle la durée réelle mesurée et fixe lui-même l'adresse (voir verifierVideoEvenement). Une adresse envoyée à la main dans video1_url n'est plus acceptée. */
   let video1UrlVerifiee = null;
@@ -24259,8 +24260,9 @@ route("PUT", "/api/evenements/:id", async (req, res, params, body) => {
   /* Sanitisé avant écriture (2026-09-25, éditeur de texte enrichi) — seule vraie barrière,
      jamais l'éditeur client (assets/rich-editor.js). */
   const descriptionSafe = SEC.sanitizeRichHtml(description);
-  const coverImg = image_couverture || image_url || null;
-  const galerie = Array.isArray(galerie_photos) ? JSON.stringify(galerie_photos.slice(0, 2)) : (galerie_photos || "[]");
+  /* Images → CDN (2026-10-30) : une image reçue en base64 est envoyée sur le CDN et seule son adresse est enregistrée (voir server/images-cdn.js). */
+  const coverImg = await require("./images-cdn").imageVersCdn(image_couverture || image_url || null, user.id);
+  const galerie = await require("./images-cdn").galerieVersCdn(galerie_photos, user.id);
   /* Vidéo courte (2026-10-28) : `video_guid` + `video_jeton` = nouvelle vidéo envoyée ; `video_retirer` = la retirer ; rien d'envoyé = on conserve l'existante.
      L'ancienne vidéo hébergée chez nous est supprimée de l'hébergement une fois remplacée ou retirée. */
   let video1Url = evt.video1_url || null;
