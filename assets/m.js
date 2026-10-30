@@ -2265,7 +2265,7 @@
     { t: 'Formations', i: 'book', h: '#/formations', d: 'Catalogue et formations suivies', r: { utilisateur: 1, initiative: 1 } },
     { t: 'CV, lettres, candidatures', i: 'doc', h: '#/cvlettres', d: 'Vos documents de candidature', r: { utilisateur: 1 } },
     { t: 'Parrainage', i: 'gift', h: '#/parrainage', d: 'Invitez vos proches', r: { utilisateur: 1, initiative: 1 } },
-    { t: 'Maracana Tracker', i: 'star', h: '#/tracker', d: 'Matchs, présences, notes et prix', r: { initiative: 1 } }
+    { t: 'Maracana Tracker', i: 'star', h: '#/tracker', d: 'Matchs, présences, notes et prix', r: { initiative: 1 }, tracker: 1 }
   ];
   const MODS_COMPTE = [
     { t: 'Confidentialité', i: 'lock', h: '#/confidentialite', d: 'Vos données et votre visibilité', r: { utilisateur: 1, initiative: 1 } },
@@ -2311,6 +2311,7 @@
     const lvl = x => role ? (x.r[role] || (role === 'collectivite' || role === 'administrateur' ? ouvertATous(x) : 0)) : ouvertATous(x);
     const li = x => {
       const l = lvl(x); if (!l) return '';
+      if (x.tracker && !m.tracker_disponible) return ''; /* Maracana Tracker : phase de test, réservé au compte officiel */
       const locked = premiumLocked(l), d = typeof x.d === 'object' ? (x.d[role] || x.d.utilisateur) : x.d;
       const tag = l === 2 ? `<span class="prem">${locked ? '🔒' : '👑'} Premium</span>` : (l === 3 && S.premium && S.premium.concerne && !S.premium.actif ? '<span class="prem">👑 publier</span>' : '');
       const inner = `<span class="ic">${ic(locked ? 'lock' : x.i)}</span><span class="sp"><span class="t">${esc(x.t)}</span> ${tag}<br><span class="d">${esc(d)}</span></span><span class="ch">${ic('chev', 's')}</span>`;

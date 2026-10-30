@@ -85,7 +85,7 @@
       <a href="business-plan.html" data-aide="business_plans">📋 Business Plans</a>
       <a href="#adhesions-init" data-section="adhesions-init" data-aide="cotisations_adhesions">🎫 Cotisations &amp; Adhésions</a>
       <a href="#votes-init" data-section="votes-init" data-aide="votes_securises">🗳️ Votes sécurisés</a>
-      <a href="#tracker" data-section="tracker">⚽ Maracana Tracker</a>
+      <a href="#tracker" data-section="tracker" id="lien-tracker">⚽ Maracana Tracker</a>
       <a href="#billetterie-init" data-section="billetterie-init" data-aide="billetterie">🎟️ Billetterie <span class="pill" id="init-billets-badge" style="display:none;"></span></a>
       <a href="#messages-vitrine" data-section="messages-vitrine" data-aide="messages_vitrine">🛍️ Messages de la boutique <span class="pill" id="vitrine-msg-count" style="display:none;"></span></a>
       <a href="#offres-emploi" data-section="offres-emploi" data-aide="emplois_stages">💼 Emplois & Stages</a>
@@ -152,6 +152,15 @@
 <script src="assets/app.js?v=13"></script>
 <script src="assets/sidebar-reorder.js"></script>
 <script src="assets/tracker-ui.js?v=20261017a"></script>
+<!-- Phase de test (2026-10-30) : le menu n'affiche le Maracana Tracker qu'au compte officiel Diaspo'Actif (serveur : drapeau tracker_disponible de /api/auth/me, accès refusé aux autres par /api/tracker/*). -->
+<style>#lien-tracker:not(.trk-ok){display:none !important;}</style>
+<script>
+  fetch('/api/auth/me', { credentials: 'same-origin' }).then(r => r.json()).then(d => {
+    const dispo = !!(d && d.user && d.user.tracker_disponible);
+    const lien = document.getElementById('lien-tracker'); if (lien && dispo) lien.classList.add('trk-ok');
+    if (!dispo && location.hash === '#tracker') location.hash = '#cockpit';
+  }).catch(() => {});
+</script>
 <script src="assets/sidebar-premium-cadre.js?v=7"></script>
 <script src="assets/soumission-da.js"></script>
 <script src="/assets/upload-media.js"></script>

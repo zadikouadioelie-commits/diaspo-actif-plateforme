@@ -2862,6 +2862,8 @@ route("GET", "/api/auth/me", async (req, res) => {
     catch (e) { pub.profil_obligatoire = null; logError(e, "profil obligatoire", req); }
     /* Documents légaux dont la nouvelle version doit être acceptée (2026-10-12) : vide en temps normal, sans requête. */
     try { pub.legal_a_accepter = await legal.aAccepter(user.id); } catch (e) { pub.legal_a_accepter = []; logError(e, "documents légaux à accepter", req); }
+    /* Maracana Tracker en phase de test (2026-10-30) : le menu ne le propose qu'au compte officiel Diaspo'Actif. */
+    pub.tracker_disponible = _trackerModule ? await _trackerModule.disponible(user) : false;
     /* Ouverture de la page Premium après le profil rempli (voir ProfilObligatoire.abonnementDu) : jamais pour un compte déjà abonné en payant. */
     pub.ouverture_abonnement = false;
     try {
@@ -6066,6 +6068,7 @@ function remplacerPlaceholders(template, vars) {
    da_initiative_officielle_id via /api/admin/parametres nécessite un
    redémarrage pour être repris (cas rarissime, valeur quasi permanente). */
 let _daInitiativeOfficielleIdCache = null;
+let _trackerModule = null; // renseigné au montage des routes du Maracana Tracker
 async function getInitiativeOfficielleId() {
   const envOverride = parseInt(process.env.DA_INITIATIVE_OFFICIELLE_ID, 10);
   if (!isNaN(envOverride)) return envOverride;
@@ -19455,7 +19458,8 @@ route("POST", "/api/profil/telephone", async (req, res, params, body) => {
 });
 
 /* Maracana Tracker (2026-10-17) — suivi des performances d'une association sportive : toutes ses routes sont dans server/tracker-routes.js. */
-require("./tracker-routes")({ route, db, sendJSON, getCurrentUser, SEC, computeAdhesionStatut });
+/* Phase de test (2026-10-30) : le module n'est ouvert qu'à l'initiative officielle Diaspo'Actif (voir TRACKER_RESERVE_OFFICIEL dans tracker-routes.js). */
+_trackerModule = require("./tracker-routes")({ route, db, sendJSON, getCurrentUser, SEC, computeAdhesionStatut, getInitiativeOfficielleId });
 
 /* ---------- Changement de mot de passe (compte connecté) ----------
    N'existait pas avant ce module (seul le flux "mot de passe oublié" par e-mail existait,

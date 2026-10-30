@@ -11,7 +11,7 @@
 'use strict';
 const calcul = require('./tracker-calcul');
 
-module.exports = function monterTracker({ route, db, sendJSON, getCurrentUser, SEC, computeAdhesionStatut }) {
+module.exports = function monterTracker({ route, db, sendJSON, getCurrentUser, SEC, computeAdhesionStatut, getInitiativeOfficielleId }) {
   const { MODELES, POSTES, classer } = calcul;
   const txt = (v, max) => SEC.sanitizeString(String(v == null ? '' : v), max).replace(/[<>]/g, '').trim();
   const entier = (v, max = 999) => { const x = Math.floor(Number(v)); return Number.isFinite(x) && x >= 0 ? Math.min(x, max) : 0; };
@@ -24,6 +24,31 @@ module.exports = function monterTracker({ route, db, sendJSON, getCurrentUser, S
     let a = t.getUTCFullYear() - y;
     if (t.getUTCMonth() + 1 < m || (t.getUTCMonth() + 1 === m && t.getUTCDate() < j)) a--;
     return a;
+  }
+
+  /* Phase de test (2026-10-30, demande explicite) : le module n'est ouvert qu'à l'initiative officielle Diaspo'Actif (son propriétaire
+     et son bureau). Retirer cette restriction (TRACKER_RESERVE_OFFICIEL) pour l'ouvrir à toutes les associations. */
+  const TRACKER_RESERVE_OFFICIEL = true;
+  async function initiativeAutorisee(init) {
+    if (!TRACKER_RESERVE_OFFICIEL) return true;
+    if (!init) return false;
+    let officielle = null;
+    try { officielle = getInitiativeOfficielleId ? await getInitiativeOfficielleId() : null; } catch (e) { officielle = null; }
+    return officielle != null && Number(init.id) === Number(officielle);
+  }
+  async function initiativeDe(user) {
+    let init = null;
+    if (user.role === 'initiative') init = await db.prepare('SELECT id, nom, owner_user_id FROM initiatives WHERE owner_user_id=?').get(user.id);
+    if (!init) {
+      const b = await db.prepare('SELECT initiative_id FROM tracker_bureau WHERE user_id=? ORDER BY id').get(user.id);
+      if (b) init = await db.prepare('SELECT id, nom, owner_user_id FROM initiatives WHERE id=?').get(b.initiative_id);
+    }
+    return init;
+  }
+  /* Vrai si ce compte voit le module (menu du site et du téléphone) — lu par /api/auth/me. */
+  async function disponible(user) {
+    if (!user) return false;
+    try { return await initiativeAutorisee(await initiativeDe(user)); } catch (e) { return false; }
   }
 
   /* Bureau : propriétaire d'une initiative, sinon membre du bureau d'une initiative. */
@@ -40,6 +65,7 @@ module.exports = function monterTracker({ route, db, sendJSON, getCurrentUser, S
       if (b) init = await db.prepare('SELECT id, nom, owner_user_id FROM initiatives WHERE id=?').get(b.initiative_id);
     }
     if (!init) { sendJSON(res, 403, { error: 'Réservé au bureau de l’association (compte Initiative ou membre du bureau).' }); return null; }
+    if (!(await initiativeAutorisee(init))) { sendJSON(res, 403, { error: 'Le Maracana Tracker est en phase de test : il n’est pas encore ouvert à votre association.' }); return null; }
     return { user, init, estProprietaire };
   }
   async function journal(ctx, action, cible, detail) {
@@ -682,4 +708,5 @@ module.exports = function monterTracker({ route, db, sendJSON, getCurrentUser, S
   });
 
   require('./tracker-seances')({ route, db, sendJSON, acces, journal, poste, txt, entier, dateIso, calcul, pastilles, marquer, cartonsDeLaJournee });
+  return { disponible };
 };
