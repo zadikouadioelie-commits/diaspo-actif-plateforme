@@ -308,6 +308,21 @@
           <div id="cg-form"></div>
         </div>
 
+        <h3 style="margin:20px 0 10px;">🔔 Relances automatiques</h3>
+        <div class="card" style="padding:14px 16px;margin-bottom:6px;">
+          <p style="font-size:12.5px;color:var(--muted);margin:0 0 10px;line-height:1.5;">Chaque matin, Diaspo'Actif relance vos apprenants selon les règles que vous écrivez ici (notification et/ou e-mail). Une relance n'est jamais envoyée deux fois pour le même cas, et personne ne reçoit plus de <strong>2 relances par jour</strong>. Chaque apprenant peut couper les rappels d'une formation. Tout ce qui part est visible dans le journal.</p>
+          <div id="rl-defauts" style="margin-bottom:12px;"></div>
+          <div id="rl-liste" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px;"></div>
+          <button type="button" class="btn btn-sm btn-orange" id="rl-nouvelle">+ Nouvelle relance</button>
+          <div id="rl-form" style="display:none;margin-top:12px;padding:14px;border:1px solid rgba(255,255,255,.16);border-radius:10px;background:rgba(255,255,255,.04);"></div>
+          <h4 style="margin:18px 0 6px;font-size:13.5px;">Journal des envois</h4>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+            <select id="rl-j-statut" class="input-field"><option value="">Tous les résultats</option><option value="envoye">Envoyés</option><option value="echec">Échecs</option><option value="ignore">Ignorés (e-mails coupés)</option></select>
+            <select id="rl-j-formation" class="input-field"><option value="">Toutes les formations</option></select>
+          </div>
+          <div id="rl-journal"></div>
+        </div>
+
         <h3 style="margin:20px 0 10px;">Mes formations</h3>
         <div id="mes-formations-list"><div class="notice">Chargement…</div></div>
       </div>
@@ -1688,6 +1703,113 @@
   }
   document.getElementById('fv-appliquer')?.addEventListener('click', loadVentesFormateur);
 
+  /* ── Centre de commande : relances automatiques (lot C) ── */
+  let RL = null;
+  const rlPhrase = (ev, n) => ({ inactivite: `Sans activité depuis ${n} jour${n > 1 ? 's' : ''}`, jamais_commence: `Rien commencé ${n} jour${n > 1 ? 's' : ''} après l'inscription`, palier: `A atteint ${n} % de progression`, avant_expiration: `Accès qui expire dans ${n} jour${n > 1 ? 's' : ''}`, non_terminee: `Pas terminé ${n} jour${n > 1 ? 's' : ''} après l'inscription` })[ev] || ev;
+  const rlDateHeure = s => { const d = new Date(String(s).replace(' ', 'T') + 'Z'); return isNaN(d) ? '' : d.toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }); };
+
+  async function loadRelances(){
+    const liste = document.getElementById('rl-liste');
+    if(!liste) return;
+    try {
+      RL = await api('GET', '/formateur/relances');
+    } catch(e){ liste.innerHTML = '<div class="notice">' + escQ(e.message || 'Relances indisponibles.') + '</div>'; return; }
+    const sel = document.getElementById('rl-j-formation');
+    if(sel.options.length <= 1) RL.formations.forEach(f => sel.insertAdjacentHTML('beforeend', `<option value="${f.id}">${escQ(f.titre)}</option>`));
+    document.getElementById('rl-defauts').innerHTML = `<div style="font-size:12px;font-weight:700;margin-bottom:6px;">Relances de base (25 %, 50 %, 75 %, 7 jours d'inactivité, dernière leçon)</div>`
+      + (RL.formations.map(f => `<label class="fb-switch" style="font-size:12.5px;display:flex;align-items:center;gap:8px;margin:4px 0;"><input type="checkbox" class="rl-defaut" data-id="${f.id}" ${f.relances_defaut ? 'checked' : ''}><span class="fb-switch-track"></span> ${escQ(f.titre)}</label>`).join('') || '<div style="font-size:12px;color:var(--muted);">Aucune formation.</div>');
+    document.querySelectorAll('.rl-defaut').forEach(c => c.addEventListener('change', async () => {
+      try { await api('PATCH', `/formations/${c.dataset.id}/relances-defaut`, { actif: c.checked }); showMsg(c.checked ? 'Relances de base rétablies pour cette formation.' : 'Relances de base coupées pour cette formation.', 'success'); }
+      catch(e){ c.checked = !c.checked; showMsg(e.message || 'Erreur.', 'danger'); }
+    }));
+    liste.innerHTML = RL.regles.map(r => {
+      const portee = r.formation_id ? (RL.formations.find(f => Number(f.id) === Number(r.formation_id)) || {}).titre || 'Formation' : 'Toutes mes formations';
+      const canaux = [Number(r.canal_notif) ? '🔔 notification' : '', Number(r.canal_email) ? '✉️ e-mail' : ''].filter(Boolean).join(' + ');
+      const rep = Number(r.repetition_jours) > 0 ? ` · puis tous les ${r.repetition_jours} jours (${r.max_envois} envois au plus)` : ' · une seule fois';
+      const bloque = Number(r.bloque_admin), actif = Number(r.actif);
+      return `<div style="border:1px solid rgba(255,255,255,.16);border-radius:10px;padding:10px 12px;background:rgba(255,255,255,.05);${actif && !bloque ? '' : 'opacity:.6;'}">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><strong>${escQ(r.nom)}</strong>
+          ${bloque ? '<em style="color:#fca5a5;font-size:12px;">suspendue par l\'administration' + (r.motif_admin ? ' : ' + escQ(r.motif_admin) : '') + '</em>' : (!actif ? '<em style="color:#fbbf24;font-size:12px;">en pause</em>' : '')}
+          <span style="margin-left:auto;font-size:12px;color:var(--muted);">${r.stats30j.envoye} envoyé${r.stats30j.envoye > 1 ? 's' : ''} sur 30 j${r.stats30j.echec ? ' · <span style="color:#fca5a5;">' + r.stats30j.echec + ' échec' + (r.stats30j.echec > 1 ? 's' : '') + '</span>' : ''}</span></div>
+        <div style="font-size:12.5px;color:var(--muted);margin:4px 0 8px;">${escQ(rlPhrase(r.evenement, r.valeur))} · ${escQ(portee)} · ${canaux}${rep}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button type="button" class="btn btn-sm btn-outline rl-qui" data-id="${r.id}">Qui serait relancé ?</button>
+          <button type="button" class="btn btn-sm btn-outline rl-test" data-id="${r.id}">M'envoyer un essai</button>
+          ${bloque ? '' : `<button type="button" class="btn btn-sm btn-outline rl-edit" data-id="${r.id}">Modifier</button><button type="button" class="btn btn-sm btn-outline rl-pause" data-id="${r.id}" data-actif="${actif ? 0 : 1}">${actif ? 'Mettre en pause' : 'Réactiver'}</button>`}
+          <button type="button" class="btn btn-sm btn-outline rl-suppr" data-id="${r.id}" style="color:#fca5a5;">Supprimer</button></div>
+        <div class="rl-resultat" id="rl-res-${r.id}" style="font-size:12.5px;margin-top:6px;"></div></div>`;
+    }).join('') || '<div style="font-size:12.5px;color:var(--muted);">Aucune relance personnalisée. Créez-en une : par exemple « sans activité depuis 7 jours ».</div>';
+    liste.querySelectorAll('.rl-qui').forEach(b => b.addEventListener('click', async () => {
+      const el = document.getElementById('rl-res-' + b.dataset.id);
+      try { const c = await api('GET', `/formateur/relances/${b.dataset.id}/concernes`);
+        el.innerHTML = c.nb ? `<strong>${c.nb}</strong> personne${c.nb > 1 ? 's' : ''} seraient relancée${c.nb > 1 ? 's' : ''} au prochain passage : ` + c.apercu.map(x => escQ(x.nom) + (x.formation ? ' <small>(' + escQ(x.formation) + ')</small>' : '')).join(', ') + (c.nb > c.apercu.length ? '…' : '') : 'Personne n\'est concerné pour le moment.';
+      } catch(e){ el.textContent = e.message || 'Erreur.'; }
+    }));
+    liste.querySelectorAll('.rl-test').forEach(b => b.addEventListener('click', async () => {
+      const el = document.getElementById('rl-res-' + b.dataset.id);
+      try { const r = await api('POST', `/formateur/relances/${b.dataset.id}/test`, {}); el.textContent = r.avertissement || ('Essai envoyé à vous seul (' + r.envoye.join(' + ') + ').'); }
+      catch(e){ el.textContent = e.message || 'Erreur.'; }
+    }));
+    liste.querySelectorAll('.rl-pause').forEach(b => b.addEventListener('click', async () => { try { await api('PATCH', `/formateur/relances/${b.dataset.id}`, { actif: b.dataset.actif === '1' }); loadRelances(); } catch(e){ showMsg(e.message || 'Erreur.', 'danger'); } }));
+    liste.querySelectorAll('.rl-suppr').forEach(b => b.addEventListener('click', async () => { if(!confirm('Supprimer cette relance ? Le journal des envois déjà faits est conservé.')) return; try { await api('DELETE', `/formateur/relances/${b.dataset.id}`); loadRelances(); } catch(e){ showMsg(e.message || 'Erreur.', 'danger'); } }));
+    liste.querySelectorAll('.rl-edit').forEach(b => b.addEventListener('click', () => rlOuvrirForm(RL.regles.find(r => String(r.id) === b.dataset.id))));
+    loadRelancesJournal();
+  }
+
+  function rlOuvrirForm(r){
+    const f = document.getElementById('rl-form');
+    const ev = Object.keys(RL.evenements);
+    const champ = 'class="input-field" style="width:100%;margin-top:3px;"';
+    const v = r || { nom: '', evenement: 'inactivite', valeur: 7, canal_notif: 1, canal_email: 0, objet: RL.evenements.inactivite.objet, message: RL.evenements.inactivite.message, repetition_jours: 0, max_envois: 1, formation_id: null };
+    f.dataset.id = r ? r.id : '';
+    f.style.display = 'block';
+    f.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:10px;">
+      <div><label style="font-size:11.5px;font-weight:700;">Nom (pour vous)</label><input id="rl-nom" ${champ} maxlength="80" value="${escQ(v.nom)}" placeholder="ex : Inactifs depuis une semaine"></div>
+      <div><label style="font-size:11.5px;font-weight:700;">Formation</label><select id="rl-formation" ${champ}><option value="">Toutes mes formations</option>${RL.formations.map(x => `<option value="${x.id}" ${Number(v.formation_id) === Number(x.id) ? 'selected' : ''}>${escQ(x.titre)}</option>`).join('')}</select></div>
+      <div><label style="font-size:11.5px;font-weight:700;">Quand ?</label><select id="rl-evenement" ${champ}>${ev.map(k => `<option value="${k}" ${v.evenement === k ? 'selected' : ''}>${escQ(RL.evenements[k].label.replace('{n}', '…'))}</option>`).join('')}</select></div>
+      <div><label style="font-size:11.5px;font-weight:700;" id="rl-valeur-lbl">Nombre de jours</label><input id="rl-valeur" type="number" ${champ} value="${v.valeur}"></div>
+      <div><label style="font-size:11.5px;font-weight:700;">Répétition</label><select id="rl-repet" ${champ}><option value="0">Une seule fois</option><option value="3">Tous les 3 jours</option><option value="7">Toutes les semaines</option><option value="14">Tous les 15 jours (14 j)</option></select></div>
+      <div><label style="font-size:11.5px;font-weight:700;">Envois au plus</label><input id="rl-max" type="number" min="1" max="10" ${champ} value="${v.max_envois || 1}"></div></div>
+      <div style="margin:10px 0 4px;display:flex;gap:16px;flex-wrap:wrap;font-size:13px;"><label><input type="checkbox" id="rl-notif" ${Number(v.canal_notif) ? 'checked' : ''}> 🔔 Notification Diaspo'Actif</label><label><input type="checkbox" id="rl-email" ${Number(v.canal_email) ? 'checked' : ''}> ✉️ E-mail</label></div>
+      <div id="rl-objet-wrap"><label style="font-size:11.5px;font-weight:700;">Objet (titre de la notification et de l'e-mail)</label><input id="rl-objet" ${champ} maxlength="150" value="${escQ(v.objet || '')}"></div>
+      <div style="margin-top:8px;"><label style="font-size:11.5px;font-weight:700;">Message</label><textarea id="rl-message" rows="5" ${champ} maxlength="1500">${escQ(v.message)}</textarea>
+        <div style="margin-top:6px;font-size:11.5px;color:var(--muted);">Cliquez pour insérer : ${RL.variables.map(x => `<button type="button" class="rl-var" data-v="${x}" style="border:1px solid rgba(255,255,255,.25);background:none;color:inherit;border-radius:6px;padding:1px 7px;margin:0 3px 3px 0;cursor:pointer;font-size:11.5px;">{${x}}</button>`).join('')}</div></div>
+      <div id="rl-apercu" style="margin:10px 0;padding:10px;border-radius:8px;background:rgba(227,192,110,.08);font-size:12.5px;white-space:pre-wrap;display:none;"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;"><button type="button" class="btn btn-sm btn-outline" id="rl-voir">Voir un aperçu</button><button type="button" class="btn btn-sm btn-orange" id="rl-enreg">Enregistrer</button><button type="button" class="btn btn-sm btn-outline" id="rl-annuler">Annuler</button></div>`;
+    const q = id => document.getElementById(id);
+    q('rl-repet').value = String([0, 3, 7, 14].includes(Number(v.repetition_jours)) ? v.repetition_jours : 0);
+    const maj = () => { const e = RL.evenements[q('rl-evenement').value]; q('rl-valeur-lbl').textContent = e.unite === '%' ? 'Pourcentage de progression' : 'Nombre de jours'; q('rl-valeur').min = e.min; q('rl-valeur').max = e.max; q('rl-max').disabled = q('rl-repet').value === '0'; };
+    q('rl-evenement').addEventListener('change', () => { const e = RL.evenements[q('rl-evenement').value]; q('rl-valeur').value = e.defaut; if(!r){ q('rl-message').value = e.message; q('rl-objet').value = e.objet; } maj(); });
+    q('rl-repet').addEventListener('change', maj); maj();
+    f.querySelectorAll('.rl-var').forEach(b => b.addEventListener('click', () => { const t = q('rl-message'); const s = t.selectionStart || t.value.length; t.value = t.value.slice(0, s) + '{' + b.dataset.v + '}' + t.value.slice(t.selectionEnd || s); t.focus(); }));
+    const corps = () => ({ nom: q('rl-nom').value, formation_id: q('rl-formation').value || null, evenement: q('rl-evenement').value, valeur: Number(q('rl-valeur').value), canal_notif: q('rl-notif').checked, canal_email: q('rl-email').checked,
+      objet: q('rl-objet').value, message: q('rl-message').value, repetition_jours: Number(q('rl-repet').value), max_envois: Number(q('rl-max').value) || 1 });
+    q('rl-voir').addEventListener('click', async () => {
+      try { const a = await api('POST', '/formateur/relances/apercu', { objet: q('rl-objet').value, message: q('rl-message').value }); const z = q('rl-apercu'); z.style.display = 'block';
+        z.textContent = (a.objet ? a.objet + '\n\n' : '') + a.message + (a.variables_inconnues.length ? '\n\n⚠ Variable inconnue : ' + a.variables_inconnues.map(x => '{' + x + '}').join(', ') : ''); } catch(e){ showMsg(e.message || 'Erreur.', 'danger'); }
+    });
+    q('rl-annuler').addEventListener('click', () => { f.style.display = 'none'; });
+    q('rl-enreg').addEventListener('click', async () => {
+      try { if(f.dataset.id) await api('PUT', `/formateur/relances/${f.dataset.id}`, corps()); else await api('POST', '/formateur/relances', corps());
+        f.style.display = 'none'; showMsg('Relance enregistrée.', 'success'); loadRelances(); } catch(e){ showMsg(e.message || 'Erreur.', 'danger'); }
+    });
+    f.scrollIntoView({ block: 'nearest' });
+  }
+  document.getElementById('rl-nouvelle')?.addEventListener('click', () => { if(RL) rlOuvrirForm(null); });
+
+  async function loadRelancesJournal(){
+    const el = document.getElementById('rl-journal');
+    if(!el) return;
+    const qs = new URLSearchParams(); const s = document.getElementById('rl-j-statut').value, fo = document.getElementById('rl-j-formation').value;
+    if(s) qs.set('statut', s); if(fo) qs.set('formation_id', fo); qs.set('limite', 30);
+    try {
+      const d = await api('GET', '/formateur/relances/journal?' + qs);
+      const ST = { envoye: ['envoyé', '#86efac'], echec: ['échec', '#fca5a5'], ignore: ['ignoré', '#fbbf24'] };
+      el.innerHTML = d.lignes.length ? `<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12.5px;"><thead><tr>${['Date', 'Apprenant', 'Relance', 'Formation', 'Canal', 'Résultat'].map(h => `<th style="text-align:left;padding:6px 8px;border-bottom:2px solid rgba(227,192,110,.4);background:rgba(227,192,110,.12);color:#f4d98a;">${h}</th>`).join('')}</tr></thead><tbody>${d.lignes.map(l => `<tr>${[rlDateHeure(l.date), escQ(l.apprenant), escQ(l.regle), escQ(l.formation), l.canal === 'email' ? '✉️ e-mail' : '🔔 notification', `<span style="color:${(ST[l.statut] || ['', ''])[1]};">${(ST[l.statut] || [l.statut])[0]}</span>${l.erreur ? ' <small title="' + escQ(l.erreur) + '">ⓘ</small>' : ''}`].map(c => `<td style="padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.1);">${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>${d.total > d.lignes.length ? `<div style="font-size:12px;color:var(--muted);margin-top:6px;">${d.lignes.length} derniers envois sur ${d.total}.</div>` : ''}` : '<div style="font-size:12.5px;color:var(--muted);">Aucun envoi pour le moment.</div>';
+    } catch(e){ el.innerHTML = ''; }
+  }
+  ['rl-j-statut', 'rl-j-formation'].forEach(id => document.getElementById(id)?.addEventListener('change', loadRelancesJournal));
+
   document.getElementById("btn-creer-formation")?.addEventListener("click", async ()=>{
     try {
       const titre = 'Nouvelle formation';
@@ -1964,7 +2086,7 @@
       ];
       el.innerHTML = cards.map(([num,lbl]) => `<div class="fb-dash-card"><div class="fb-dash-num">${num}</div><div class="fb-dash-lbl">${lbl}</div></div>`).join('');
     } catch(e){ el.innerHTML = '<div class="notice">Erreur de chargement du tableau de bord.</div>'; }
-    loadVentesFormateur(); loadCouponsGlobaux();
+    loadVentesFormateur(); loadCouponsGlobaux(); loadRelances();
   }
 
   async function openSuiviFormation(id, titre){

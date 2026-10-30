@@ -281,7 +281,7 @@ function sfRenderSidebar(){
     html += '</div>';
   });
   html += sfBlocVerrouilles();
-  html += '</div><div id="sf-att-zone"></div><div id="sf-cartes-zone"></div>';
+  html += '</div><div id="sf-att-zone"></div><div id="sf-cartes-zone"></div><div id="sf-rappels-zone"></div>';
   aside.innerHTML = html;
   aside.querySelectorAll('.sf-obtenir').forEach(b => b.addEventListener('click', () => sfObtenir(b)));
   aside.querySelectorAll('.sf-lecon').forEach(el => el.addEventListener('click', () => sfGoTo(Number(el.dataset.leconId))));
@@ -289,7 +289,29 @@ function sfRenderSidebar(){
   if (rp) rp.addEventListener('click', () => sfGoTo(Number(p.prochaine_lecon_id)));
   sfRenderAttestation();
   sfRenderCartes();
+  sfRenderRappels();
   sfMajBarreEnregistrement();
+}
+
+/* Rappels de la formation (lot C) : l'apprenant peut couper ou rétablir les relances automatiques (notifications et e-mails) de CETTE formation. */
+let SF_RAPPELS_OFF = null;
+async function sfRenderRappels(){
+  const zone = document.getElementById('sf-rappels-zone');
+  if (!zone || !SF_DATA || SF_DATA.mode === 'apercu' || SF_DATA.mode === 'decouverte' || sansSuivi()) return;
+  try {
+    if (SF_RAPPELS_OFF === null) {
+      const r = await fetch('/api/formations/' + encodeURIComponent(SF_DATA.formation.id) + '/relances/etat', { credentials: 'same-origin' });
+      const d = await r.json();
+      if (!r.ok || !d.inscrit) return;
+      SF_RAPPELS_OFF = !!d.off;
+    }
+    zone.innerHTML = `<div class="sf-gauge-sub" style="padding:12px 16px;border-top:1px solid rgba(255,255,255,.1);">${SF_RAPPELS_OFF ? 'Les rappels de cette formation sont coupés.' : 'Vous recevez des rappels pour vous aider à avancer.'}
+      <button type="button" id="sf-rappels-btn" style="background:none;border:none;color:inherit;text-decoration:underline;cursor:pointer;font-size:inherit;padding:0 0 0 4px;">${SF_RAPPELS_OFF ? 'Les rétablir' : 'Ne plus en recevoir'}</button></div>`;
+    document.getElementById('sf-rappels-btn').onclick = async () => {
+      const r = await fetch('/api/formations/' + encodeURIComponent(SF_DATA.formation.id) + '/relances/silence', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ off: !SF_RAPPELS_OFF }) });
+      if (r.ok) { SF_RAPPELS_OFF = !SF_RAPPELS_OFF; sfRenderRappels(); }
+    };
+  } catch (_) { /* sans importance : le reste de la page n'en dépend pas */ }
 }
 
 /* Modules que l'apprenant n'a pas (encore) obtenus : plan sans contenu, avec achat séparé quand le formateur le propose, et accès à la fiche pour la formation complète (lot A). */

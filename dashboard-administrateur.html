@@ -3261,6 +3261,7 @@
           <button class="btn btn-outline" id="adm-ftab-stats" onclick="admFormTab('stats')">📊 Statistiques</button>
           <button class="btn btn-outline" id="adm-ftab-invites" onclick="admFormTab('invites')">🎓 Formateurs invités</button>
           <button class="btn btn-outline" id="adm-ftab-finances" onclick="admFormTab('finances')">💶 Finances</button>
+          <button class="btn btn-outline" id="adm-ftab-relances" onclick="admFormTab('relances')">🔔 Relances</button>
         </div>
 
         <!-- Panel en attente -->
@@ -3310,6 +3311,11 @@
             </div>
             <div id="adm-fin-comlist"></div>
           </div>
+        </div>
+
+        <!-- Panel relances : ce que les formateurs envoient à leurs apprenants -->
+        <div id="adm-fpanel-relances" style="display:none;">
+          <div id="adm-rel-res"><div class="card" style="padding:16px;color:var(--muted);">Chargement…</div></div>
         </div>
 
         <!-- Panel formateurs invités -->
@@ -7045,7 +7051,7 @@ let _admFormTab = 'en_attente';
 
 function admFormTab(tab) {
   _admFormTab = tab;
-  ['en_attente','publiee','codes','all','stats','invites','finances'].forEach(t => {
+  ['en_attente','publiee','codes','all','stats','invites','finances','relances'].forEach(t => {
     const btn = document.getElementById(`adm-ftab-${t}`);
     const panel = document.getElementById(`adm-fpanel-${t}`);
     if (btn) btn.className = t === tab ? 'btn btn-orange' : 'btn btn-outline';
@@ -7055,7 +7061,34 @@ function admFormTab(tab) {
   else if (tab === 'stats') loadAdmFormStats();
   else if (tab === 'invites') loadAdmInvites();
   else if (tab === 'finances') loadAdmFinances();
+  else if (tab === 'relances') loadAdmRelances();
   else loadAdmFormations(tab);
+}
+
+/* Relances des formateurs : volumes des 30 derniers jours, règles les plus actives, blocage d'une règle abusive. */
+async function loadAdmRelances() {
+  const el = document.getElementById('adm-rel-res');
+  if (!el) return;
+  try {
+    const d = await api('GET', '/admin/formations/relances');
+    const tot = (c, s) => d.par_statut.filter(x => x.canal === c && x.statut === s).reduce((a, x) => a + x.n, 0);
+    const carte = (n, l, alerte) => `<div class="card" style="padding:14px;text-align:center;${alerte ? 'border-color:#f59e0b;background:#fffbeb;' : ''}"><div style="font-size:24px;font-weight:900;">${n}</div><div style="font-size:12px;color:var(--muted);margin-top:4px;">${l}</div></div>`;
+    const tab = (titre, entetes, lignes, vide) => `<h3 style="margin:20px 0 8px;font-size:15px;">${titre}</h3><div class="card" style="padding:0;overflow-x:auto;">${lignes.length ? `<table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="background:#f8fafc;border-bottom:2px solid var(--border);">${entetes.map(h => `<th style="padding:9px 12px;text-align:left;">${h}</th>`).join('')}</tr></thead><tbody>${lignes.map(l => `<tr style="border-bottom:1px solid var(--border);">${l.map(c => `<td style="padding:9px 12px;">${c}</td>`).join('')}</tr>`).join('')}</tbody></table>` : `<div style="padding:16px;color:var(--muted);">${vide}</div>`}</div>`;
+    el.innerHTML = `<p style="font-size:12.5px;color:var(--muted);margin:0 0 12px;">Relances automatiques écrites par les formateurs, sur les 30 derniers jours. Chaque apprenant reçoit au plus ${d.plafond_jour} relances par jour et peut couper les rappels d'une formation.</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;">
+        ${carte(tot('notif', 'envoye'), 'Notifications envoyées')}${carte(tot('email', 'envoye'), 'E-mails envoyés')}${carte(tot('email', 'ignore'), 'E-mails ignorés (réglage du compte)')}${carte(tot('email', 'echec') + tot('notif', 'echec'), 'Échecs', tot('email', 'echec') + tot('notif', 'echec') > 0)}${carte(d.apprenants_ayant_coupe, 'Apprenants ayant coupé les rappels')}
+      </div>`
+      + tab('Règles des formateurs', ['Formateur', 'Règle', 'Déclencheur', 'Canaux', 'Envois (30 j)', 'État', ''], d.regles.map(r => [esc(r.formateur || '—'), esc(r.nom), esc(r.evenement_label), (r.canal_notif ? '🔔 ' : '') + (r.canal_email ? '✉️' : ''), r.envois30j, r.bloque_admin ? '<span style="color:#b91c1c;font-weight:700;">Bloquée</span>' + (r.motif_admin ? ' <small>' + esc(r.motif_admin) + '</small>' : '') : (r.actif ? 'Active' : 'En pause'),
+          r.bloque_admin ? `<button type="button" class="btn btn-sm btn-outline" onclick="admRelBloquer(${r.id}, false)">Débloquer</button>` : `<button type="button" class="btn btn-sm btn-outline" style="color:#b91c1c;" onclick="admRelBloquer(${r.id}, true)">Bloquer</button>`]), 'Aucune règle créée pour le moment.')
+      + tab('Formateurs les plus actifs', ['Formateur', 'Envois (30 j)'], d.par_formateur.map(x => [esc(x.formateur), x.n]), 'Aucun envoi sur les 30 derniers jours.');
+  } catch (e) {
+    el.innerHTML = `<div class="card" style="padding:16px;color:red;">Erreur : ${esc(e.message || 'chargement impossible')}</div>`;
+  }
+}
+async function admRelBloquer(id, bloque) {
+  let motif = '';
+  if (bloque) { motif = prompt('Motif du blocage (visible par le formateur) :', 'Envois trop fréquents ou contenu inadapté'); if (motif === null) return; }
+  try { await api('PATCH', '/admin/formations/relances/' + id, { bloque, motif }); await loadAdmRelances(); } catch (e) { alert(e.message || 'Erreur.'); }
 }
 
 /* Finances de Diaspo Formation : ventes, commission, remises, par formateur et par formation ; commission propre à un formateur. */

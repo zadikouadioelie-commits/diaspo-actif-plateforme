@@ -4983,6 +4983,44 @@ db.exec(`
 `);
 ;['type_reduction TEXT DEFAULT \'pourcentage\'','montant_fixe REAL','date_debut TEXT','date_fin TEXT','max_par_utilisateur INTEGER DEFAULT 1'].forEach(col => { try { db.exec(`ALTER TABLE formation_coupons ADD COLUMN ${col}`); } catch(_) {} });
 ;['prix_initial REAL','remise REAL DEFAULT 0','coupon_code TEXT','coupon_source TEXT','coupon_id INTEGER','promo_pct REAL','commission_pct REAL','commission REAL','net_formateur REAL','consentement_le TEXT'].forEach(col => { try { db.exec(`ALTER TABLE formation_commandes ADD COLUMN ${col}`); } catch(_) {} });
+/* Formation Diaspora — lot C, relances programmables (2026-10-30) : règles écrites par le formateur + journal de chaque envoi (le journal sert aussi de verrou : (règle, inscription, canal, rang) est unique). */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS formation_relances_regles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    owner_user_id INTEGER NOT NULL,
+    formation_id INTEGER,
+    nom TEXT NOT NULL,
+    evenement TEXT NOT NULL,
+    valeur INTEGER NOT NULL,
+    canal_notif INTEGER DEFAULT 1,
+    canal_email INTEGER DEFAULT 0,
+    objet TEXT,
+    message TEXT NOT NULL,
+    repetition_jours INTEGER DEFAULT 0,
+    max_envois INTEGER DEFAULT 1,
+    actif INTEGER DEFAULT 1,
+    bloque_admin INTEGER DEFAULT 0,
+    motif_admin TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+  );
+  CREATE TABLE IF NOT EXISTS formation_relances_journal (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    regle_id INTEGER NOT NULL DEFAULT 0,
+    libelle TEXT,
+    formation_id INTEGER NOT NULL,
+    inscription_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    canal TEXT NOT NULL DEFAULT 'notif',
+    statut TEXT NOT NULL DEFAULT 'envoye',
+    erreur TEXT,
+    rang INTEGER NOT NULL DEFAULT 1,
+    envoye_le TEXT DEFAULT (datetime('now')),
+    UNIQUE(regle_id, inscription_id, canal, rang)
+  );
+`);
+;['relances_off INTEGER DEFAULT 0','relance_derniere_le TEXT'].forEach(col => { try { db.exec(`ALTER TABLE formation_inscriptions ADD COLUMN ${col}`); } catch(_) {} });
+;['relances_defaut INTEGER DEFAULT 1'].forEach(col => { try { db.exec(`ALTER TABLE formations ADD COLUMN ${col}`); } catch(_) {} });
 /* Bibliothèque de médias du formateur (2026-10-30) : les fichiers envoyés depuis le Studio, réutilisables dans toutes ses formations. L'entrée ne contient que l'adresse (le fichier reste sur le CDN). */
 db.exec(`
   CREATE TABLE IF NOT EXISTS formation_medias (

@@ -3270,6 +3270,10 @@ FormationDroits.register({ route, db, sendJSON, getCurrentUser, SEC, checkFormat
 /* Formation Diaspora, lot B (l'argent) : coupons étendus, promotion appliquée au paiement, commission par formateur, vues « Ventes et revenus » et financière — server/formation-finances.js. */
 const FormationFinances = require("./formation-finances");
 FormationFinances.register({ route, db, sendJSON, getCurrentUser, SEC, exigerPremium });
+/* Formation Diaspora, lot C : relances programmables du formateur (règles, journal, désinscription) — server/formation-relances.js. getOrigin est une déclaration de fonction (hissée). */
+const FormationRelances = require("./formation-relances");
+const { signAuthToken: signerJetonRelance, verifyAuthToken: verifierJetonRelance } = require("./auth");
+FormationRelances.register({ route, db, sendJSON, getCurrentUser, SEC, exigerPremium, creerNotif, getOrigin, signAuthToken: signerJetonRelance, verifyAuthToken: verifierJetonRelance });
 /* Formation Diaspora, lot D : studio de création par glisser-déposer (documents, versions, publication) — server/formation-studio.js. */
 const FormationStudio = require("./formation-studio");
 FormationStudio.register({ route, db, sendJSON, getCurrentUser, SEC, checkFormationOwner, exigerPremium });
@@ -33640,7 +33644,10 @@ async function handleRequest(req, res) {
         SELECT i.*, f.titre AS formation_titre
         FROM formation_inscriptions i
         JOIN formations f ON f.id=i.formation_id
+        JOIN users u ON u.id=i.user_id
         WHERE i.statut='active' AND i.avancement_pct < 100
+          AND COALESCE(i.relances_off,0)=0 AND COALESCE(f.relances_defaut,1)=1
+          AND u.nom != 'Compte supprimé' AND (u.is_demo IS NULL OR u.is_demo=FALSE) AND COALESCE(u.suspendu_definitif,0)=0
       `).all();
       let relancesEnvoyees = 0;
       const now = new Date();
@@ -33657,6 +33664,7 @@ async function handleRequest(req, res) {
           if (pct >= p.seuil && !insc[p.col]) {
             creerNotif(insc.user_id, 'formation_relance', '🎓 Progression de votre formation', p.msg(insc.formation_titre), { formation_id: insc.formation_id, inscription_id: insc.id });
             await db.prepare(`UPDATE formation_inscriptions SET ${p.col}=datetime('now') WHERE id=?`).run(insc.id);
+            await FormationRelances.journaliserDefaut(db, insc, `Palier ${p.seuil} % (relance de base)`);
             relancesEnvoyees++;
           }
         }
@@ -33669,6 +33677,7 @@ async function handleRequest(req, res) {
             `Vous n'avez pas repris la formation « ${insc.formation_titre} » depuis ${joursInactif} jours. Votre progression est sauvegardée — reprenez en un clic.`,
             { formation_id: insc.formation_id, inscription_id: insc.id });
           await db.prepare("UPDATE formation_inscriptions SET relance_inactivite_le=datetime('now') WHERE id=?").run(insc.id);
+          await FormationRelances.journaliserDefaut(db, insc, 'Inactivité de 7 jours (relance de base)');
           relancesEnvoyees++;
         }
 
@@ -33680,15 +33689,20 @@ async function handleRequest(req, res) {
           WHERE m.formation_id=?
         `).get(insc.formation_id))?.n || 0;
         const nbTermine = (await db.prepare("SELECT COUNT(*) AS n FROM formation_lecons_progression WHERE inscription_id=? AND termine=1").get(insc.id))?.n || 0;
-        if (totalLecons > 1 && totalLecons - nbTermine === 1 && !insc.relance_75_le) {
+        if (totalLecons > 1 && totalLecons - nbTermine === 1 && !insc.relance_derniere_le) {
           creerNotif(insc.user_id, 'formation_relance', '🏁 Dernière ligne droite',
             `Il ne vous reste qu'une leçon avant de terminer la formation « ${insc.formation_titre} » !`,
             { formation_id: insc.formation_id, inscription_id: insc.id });
-          await db.prepare("UPDATE formation_inscriptions SET relance_75_le=datetime('now') WHERE id=?").run(insc.id);
+          await db.prepare("UPDATE formation_inscriptions SET relance_derniere_le=datetime('now') WHERE id=?").run(insc.id);
+          await FormationRelances.journaliserDefaut(db, insc, 'Dernière leçon (relance de base)');
           relancesEnvoyees++;
         }
       }
-      sendJSON(res, 200, { ok: true, relancesEnvoyees });
+      /* Lot C : les relances écrites par les formateurs (notification et/ou e-mail), avec journal et plafond de 2 par personne et par jour. */
+      let reglesBilan = null;
+      try { reglesBilan = await FormationRelances.executer({ db, creerNotif, sendEmail: require('./mailer').sendEmail, signAuthToken: signerJetonRelance, origine: process.env.PUBLIC_ORIGIN || 'https://diaspo-actif-plateforme.vercel.app' }); }
+      catch (e) { console.error('[formation-relances/règles]', e.stack || e.message); reglesBilan = { erreur: e.message }; }
+      sendJSON(res, 200, { ok: true, relancesEnvoyees, regles: reglesBilan });
     } catch (e) {
       sendJSON(res, 500, SEC.safeError(e, "cron formation-relances"));
     }

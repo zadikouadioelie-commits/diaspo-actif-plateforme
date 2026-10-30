@@ -1013,6 +1013,10 @@ const COLONNES_MIGRATION = [
     ['formation_commandes', 'commission', 'REAL'],
     ['formation_commandes', 'net_formateur', 'REAL'],
     ['formation_commandes', 'consentement_le', 'TEXT'],   // preuve du consentement « achat non remboursable » (date + version du texte)
+    // Formation Diaspora — lot C (2026-10-30) : relances programmables
+    ['formation_inscriptions', 'relances_off', 'INTEGER DEFAULT 0'],
+    ['formation_inscriptions', 'relance_derniere_le', 'TEXT'],
+    ['formations', 'relances_defaut', 'INTEGER DEFAULT 1'],
     ['formation_modules', 'prix', 'REAL'],
     ['formation_modules', 'vendable_seul', 'INTEGER DEFAULT 0'],
     ['formations', 'duree_acces_jours', 'INTEGER'],
