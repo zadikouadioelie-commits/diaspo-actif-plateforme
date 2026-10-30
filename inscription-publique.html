@@ -46,42 +46,14 @@
    elle a réellement du contenu (classes posées par JS, ipAppliquerLayout()), pour ne jamais
    laisser une colonne vide béante : fiche sans événement lié/sans contact → pas de colonne
    gauche ; fiche sans description ni programme → pas de colonne droite. */
-/* width:100% explicite — bug réel trouvé à l'exécution : .ip-layout est un enfant de .page, qui
-   est en display:flex (pas le flux "block" normal supposé jusqu'ici) sans align-items:stretch
-   effectif à cet endroit. Un enfant flex sans largeur explicite se dimensionne à son CONTENU
-   (fit-content), pas à l'espace disponible : la piste minmax(…,1fr) de la grille se résolvait
-   donc systématiquement à son plancher (480px) au lieu de se partager l'espace restant, même
-   quand le conteneur avait largement la place d'aller jusqu'à max-width. Avec width:100%,
-   .ip-layout remplit enfin son conteneur (dans la limite de max-width) et 1fr fonctionne
-   normalement — condition réelle pour que « élargis-le vers la droite » utilise de la place
-   neuve au lieu de retomber sur le plancher de la colonne centrale à chaque fois. */
-.ip-layout.ip-layout--has-left,.ip-layout.ip-layout--has-right{max-width:1600px;width:100%;}
-/* Seuil des 3 colonnes relevé à 1320px (2026-10-30) — voir le commentaire détaillé juste
-   au-dessus de grid-template-columns ci-dessous : en dessous de cette largeur, le trio
-   280px + plancher 480px + 420px ne tient plus, d'où le repli sur l'empilement mobile
-   (@media max-width:1319px) plutôt qu'un 3-colonnes qui déborderait. */
-@media (min-width:1320px){
+.ip-layout.ip-layout--has-left,.ip-layout.ip-layout--has-right{max-width:1280px;}
+@media (min-width:900px){
   .ip-layout.ip-layout--has-left,.ip-layout.ip-layout--has-right{display:grid;gap:28px;align-items:start;}
   .ip-layout.ip-layout--has-left:not(.ip-layout--has-right){grid-template-columns:280px minmax(0,1fr);}
-  /* Colonne droite élargie (2026-10-30, demande explicite : « élargis un peu cette bande...
-     rends-le un peu plus large l'espace utilisé pour écrire le descriptif »), puis corrigée le
-     même jour (demande explicite : « élargis-le vers la droite, pour ne pas qu'il ait d'impact
-     sur tout ce qui existe à gauche ») — un premier essai (max-width 1280→1360, tout juste
-     assez pour compenser 340px→420px) ne protégeait la colonne centrale qu'à pleine largeur ;
-     sur un écran plus étroit que le max-width, minmax(0,1fr) cède du terrain au premier besoin,
-     donc TOUTE largeur ajoutée à droite se reprenait sur la colonne centrale.
-     Un plancher seul (minmax(480px,1fr)) sans relever le seuil ci-dessus a été testé et écarté :
-     bug réel trouvé à l'exécution (capture à l'appui) — sous ~1236px de large, .ip-layout
-     débordait de son conteneur, mais un ancêtre en overflow masqué (page/corps) rognait ce
-     débordement SANS barre de défilement : la colonne droite devenait purement et simplement
-     invisible, pire que la compression d'origine. D'où les deux mesures combinées : le plancher
-     protège la colonne centrale, et le seuil relevé garantit qu'il y a toujours assez de place
-     pour les trois colonnes + leur plancher avant de les proposer, avec une marge de sécurité
-     (280+28+480+28+420=1236, seuil posé à 1320). */
-  .ip-layout.ip-layout--has-right:not(.ip-layout--has-left){grid-template-columns:minmax(480px,1fr) 420px;}
-  .ip-layout.ip-layout--has-left.ip-layout--has-right{grid-template-columns:280px minmax(480px,1fr) 420px;}
+  .ip-layout.ip-layout--has-right:not(.ip-layout--has-left){grid-template-columns:minmax(0,1fr) 340px;}
+  .ip-layout.ip-layout--has-left.ip-layout--has-right{grid-template-columns:280px minmax(0,1fr) 340px;}
 }
-@media (max-width:1319px){
+@media (max-width:899px){
   /* Empilé : types d'inscription d'abord (accès direct à l'inscription), puis le descriptif/
      programme, le calendrier/infos pratiques en dernier (déjà la logique retenue le 2026-10-30
      dans ipRenderAccueil() pour l'ordre desktop : types avant descriptif). "order" n'a d'effet
@@ -95,14 +67,14 @@
 }
 .ip-wrap{padding:32px 16px 60px;}
 .ip-layout--has-left .ip-wrap,.ip-layout--has-right .ip-wrap{padding-left:0;}
-@media (max-width:1319px){.ip-layout--has-left .ip-wrap,.ip-layout--has-right .ip-wrap{padding-left:16px;}}
+@media (max-width:899px){.ip-layout--has-left .ip-wrap,.ip-layout--has-right .ip-wrap{padding-left:16px;}}
 .ip-side{display:none;}
 .ip-layout--has-left #ip-side,.ip-layout--has-right #ip-right{display:flex;flex-direction:column;gap:18px;}
-@media (min-width:1320px){
+@media (min-width:900px){
   .ip-layout--has-left #ip-side{padding:32px 0 20px 16px;position:sticky;top:20px;}
   .ip-layout--has-right #ip-right{padding:32px 16px 20px 0;position:sticky;top:20px;}
 }
-@media (max-width:1319px){
+@media (max-width:899px){
   .ip-layout--has-left #ip-side,.ip-layout--has-right #ip-right{padding:0 16px 28px;}
 }
 .ip-side-box{background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:14px;padding:16px;}
@@ -125,22 +97,6 @@
 .ip-programme-fichier{display:flex;align-items:center;gap:10px;border:1px solid oklch(0.9 0.004 30);border-radius:8px;padding:8px 10px;text-decoration:none;margin-top:14px;}
 .ip-right-section{margin:0 0 26px;}
 .ip-right-section-titre{font-size:13px;font-weight:700;margin:0 0 12px;display:flex;align-items:center;gap:7px;}
-/* Aperçu du descriptif + "Voir plus" (2026-10-30, demande explicite : « mets un aperçu du
-   descriptif avec un bouton en voir plus pour éviter que tout soit déroulé ») — mask-image
-   plutôt qu'un dégradé peint sur une couleur de fond fixe : fonctionne pareil quel que soit le
-   thème (clair, sombre/Nuit dorée) sans avoir à deviner la couleur de fond exacte. Le bouton
-   reste caché (ipAjusterApercuDescription()) tant que le texte tient déjà dans l'aperçu — pas
-   de "Voir plus" qui ne ferait rien. */
-.ip-desc-wrap[data-collapsed="1"] .ip-desc{max-height:210px;overflow:hidden;-webkit-mask-image:linear-gradient(to bottom,#000 70%,transparent 100%);mask-image:linear-gradient(to bottom,#000 70%,transparent 100%);}
-.ip-desc-plus{display:inline-flex;align-items:center;gap:5px;margin-top:2px;background:none;border:none;padding:0;font:inherit;font-weight:700;font-size:13px;color:oklch(0.32 0.09 258);cursor:pointer;}
-.ip-desc-plus:hover{text-decoration:underline;}
-/* Bug réel trouvé à l'exécution (pas un artefact d'outil) : display:inline-flex posé juste
-   au-dessus s'applique inconditionnellement — en CSS, une règle d'auteur l'emporte toujours sur
-   la feuille de style par défaut du navigateur, quelle que soit la spécificité ; l'attribut
-   hidden (qui repose sur [hidden]{display:none} dans cette feuille par défaut) se retrouvait
-   donc sans effet, et "Voir plus" restait visible même sur un descriptif court qui n'en a pas
-   besoin. Règle explicite, plus spécifique, pour le réaffirmer. */
-.ip-desc-plus[hidden]{display:none;}
 .ip-cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;font-size:13px;font-weight:700;text-transform:capitalize;}
 .ip-cal-nav{background:none;border:1px solid oklch(0.88 0.004 30);border-radius:6px;cursor:pointer;font-size:13px;color:oklch(0.4 0.006 30);width:24px;height:24px;line-height:1;padding:0;}
 .ip-cal-nav:disabled{opacity:.35;cursor:default;}
@@ -1516,32 +1472,8 @@ function ipRenderColonneDroite() {
   document.getElementById('ip-right').innerHTML = `
     <h1 class="ip-titre">${escH(f.nom)}</h1>
     ${f.organisateur ? `<p style="font-size:12.5px;color:oklch(0.5 0.006 30);margin:0 0 18px;">Organisé par ${escH(f.organisateur)}</p>` : ''}
-    ${f.description ? `<section class="ip-right-section" aria-label="Détail de l'événement">
-      <h3 class="ip-right-section-titre">Description</h3>
-      <div class="ip-desc-wrap" id="ip-desc-wrap"><div class="ip-desc rich-content" id="ip-desc">${renderRichText(f.description)}</div></div>
-      <button type="button" class="ip-desc-plus" id="ip-desc-plus" onclick="ipToggleDescription()" hidden>Voir plus ↓</button>
-    </section>` : ''}
+    ${f.description ? `<section class="ip-right-section" aria-label="Détail de l'événement"><h3 class="ip-right-section-titre">Description</h3><div class="ip-desc rich-content">${renderRichText(f.description)}</div></section>` : ''}
     ${ipRenderProgramme()}`;
-  ipAjusterApercuDescription();
-}
-/* Aperçu + "Voir plus" du descriptif — le clamp (ip-desc-wrap[data-collapsed="1"]) doit être posé
-   AVANT de mesurer (requestAnimationFrame : après le prochain repaint, une fois le CSS appliqué),
-   sinon scrollHeight == clientHeight tout le temps et le bouton resterait injustement masqué. */
-function ipAjusterApercuDescription() {
-  const wrap = document.getElementById('ip-desc-wrap'), desc = document.getElementById('ip-desc'), btn = document.getElementById('ip-desc-plus');
-  if (!wrap || !desc || !btn) return;
-  wrap.dataset.collapsed = '1';
-  requestAnimationFrame(() => {
-    if (desc.scrollHeight > desc.clientHeight + 4) btn.hidden = false;
-    else wrap.dataset.collapsed = '0'; // texte déjà entièrement visible : pas de bouton qui ne ferait rien
-  });
-}
-function ipToggleDescription() {
-  const wrap = document.getElementById('ip-desc-wrap'), btn = document.getElementById('ip-desc-plus');
-  const etaitReplie = wrap.dataset.collapsed === '1';
-  wrap.dataset.collapsed = etaitReplie ? '0' : '1';
-  btn.textContent = etaitReplie ? 'Voir moins ↑' : 'Voir plus ↓';
-  if (etaitReplie) wrap.scrollIntoView({ block: 'nearest' });
 }
 function ipRenderAccueil() {
   const f = IP_FICHE;

@@ -6494,6 +6494,10 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       });
       zone.appendChild(sortie);
       habillerPremiumMenuIci(zone);
+      // Barre de recherche des modules, comme dans le vrai tiroir (elle est fabriquée par app.js, pas copiée avec le menu).
+      if (menuIci && window.daRechercheMenu) window.daRechercheMenu(menuIci);
+      // Boutons « Partager » et « Télécharger Diaspo'Actif » du vrai tiroir, eux aussi fabriqués par app.js.
+      if (menuIci && window.daPartageMenu) window.daPartageMenu(menuIci);
     }
     function fermerMenuIci(viaNavigation) {
       if (!menuIci) return;
@@ -6782,8 +6786,8 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   applyTranslations();
 
   // ── Barre de recherche des modules (sidebar) : suggestions floues au fil de la frappe
-  (function initSidebarSearch() {
-    const sidebar = document.querySelector(".sidebar");
+  // Réutilisable : le menu des modules ouvert « sur place » (initSidebarMobile) l'appelle sur son propre tiroir une fois ses modules chargés.
+  window.daRechercheMenu = function initSidebarSearch(sidebar) {
     const brand = sidebar && sidebar.querySelector(".brand");
     if (!sidebar || !brand || sidebar.querySelector(".sb-search-wrap")) return;
 
@@ -6871,15 +6875,15 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       if (e.key === "Escape") { input.value = ""; results.style.display = "none"; results.innerHTML = ""; input.blur(); }
     });
     document.addEventListener("click", e => { if (!wrap.contains(e.target)) results.style.display = "none"; });
-  })();
+  };
+  window.daRechercheMenu(document.querySelector(".sidebar"));
 
   // ── Groupe "Bandeau" dans la sidebar : reprend sur mobile les actions du bandeau du haut
   // qui n'ont plus de place à cet endroit (nav masquée, sélecteur de langue masqué, etc.)
   /* « Télécharger Diaspo'Actif » (2026-10-13, demande explicite) : bouton en tête du menu des modules qui installe l'application (raccourci sur
      l'écran du téléphone ou de l'ordinateur) — installation native en un clic quand le navigateur l'offre, sinon guide adapté + fichier
      raccourci (assets/telecharger-app.js, chargé seulement au clic). Absent une fois l'application installée. */
-  (function initSidebarTelecharger() {
-    const sidebar = document.querySelector(".sidebar");
+  window.daPartageMenu = function initSidebarTelecharger(sidebar) {
     if (!sidebar || sidebar.querySelector(".sb-install-group")) return;
     let installee = false;
     try { installee = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true; } catch (e) { /* détection impossible : on affiche le bouton */ }
@@ -6920,7 +6924,8 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       });
       promesse.then(() => window.DAInstall.ouvrir()).catch(() => alert("Installation indisponible pour le moment. Réessayez dans un instant."));
     });
-  })();
+  };
+  window.daPartageMenu(document.querySelector(".sidebar"));
 
   (async function initSidebarBandeau() {
     const sidebar = document.querySelector(".sidebar");
