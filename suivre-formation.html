@@ -161,6 +161,7 @@
 <script src="assets/data.js"></script>
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js?v=13"></script>
+<script src="assets/formation-achat-consent.js?v=1"></script>
 <script src="assets/studio-render.js?v=1"></script>
 <script>
 function escH(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -295,19 +296,23 @@ function sfRenderSidebar(){
 function sfBlocVerrouilles(){
   const l = (SF_DATA && SF_DATA.modules_verrouilles) || [];
   if (!l.length || DECOUVERTE) return '';
-  return `<div class="sf-module"><div class="sf-module-title">🔒 Modules non obtenus</div>${l.map(m => `<div class="sf-chapitre"><div class="sf-chapitre-title"><span>${escH(m.titre)}</span></div>
+  return `<div class="sf-module"><div class="sf-module-title">🔒 Modules non obtenus</div>${l.some(m => m.vendable_seul && m.prix > 0) ? FormationConsent.mention() : ''}${l.map(m => `<div class="sf-chapitre"><div class="sf-chapitre-title"><span>${escH(m.titre)}</span></div>
     ${m.vendable_seul ? `<button type="button" class="btn btn-sm btn-orange sf-obtenir" data-module-id="${m.id}" style="margin-top:6px;">${m.prix > 0 ? `Obtenir ce module · ${m.prix} €` : 'Obtenir ce module · gratuit'}</button>` : '<div class="sf-chapitre-sub">Inclus dans la formation complète.</div>'}</div>`).join('')}
     <div class="sf-chapitre"><a class="btn btn-sm btn-outline" style="display:block;text-align:center;box-sizing:border-box;" href="formation-fiche.html?id=${encodeURIComponent(formationId)}">Voir la formation complète</a></div></div>`;
 }
 async function sfObtenir(btn){
   btn.disabled = true;
   try {
-    const r = await fetch(`/api/formations/${formationId}/acquerir`, { method: 'POST', headers: {'Content-Type':'application/json'}, credentials: 'same-origin', body: JSON.stringify({ module_id: Number(btn.dataset.moduleId) }) });
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(d.error || 'Impossible pour le moment.');
+    /* Aucun remboursement : le consentement exprès est demandé si le serveur le réclame (module payant). */
+    const d = await FormationConsent.appeler(async extra => {
+      const r = await fetch(`/api/formations/${formationId}/acquerir`, { method: 'POST', headers: {'Content-Type':'application/json'}, credentials: 'same-origin', body: JSON.stringify({ module_id: Number(btn.dataset.moduleId), ...extra }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw Object.assign(new Error(j.error || 'Impossible pour le moment.'), { status: r.status, data: j });
+      return j;
+    });
     if (d.checkout_url) { location.href = d.checkout_url; return; }
     location.reload();
-  } catch(e){ btn.disabled = false; alert(e.message); }
+  } catch(e){ btn.disabled = false; if (!e.annule) alert(e.message); }
 }
 
 /* Cartes mentales rattachées à la formation par le formateur : consultables (et exportables) par les apprenants inscrits. */

@@ -4982,7 +4982,7 @@ db.exec(`
   );
 `);
 ;['type_reduction TEXT DEFAULT \'pourcentage\'','montant_fixe REAL','date_debut TEXT','date_fin TEXT','max_par_utilisateur INTEGER DEFAULT 1'].forEach(col => { try { db.exec(`ALTER TABLE formation_coupons ADD COLUMN ${col}`); } catch(_) {} });
-;['prix_initial REAL','remise REAL DEFAULT 0','coupon_code TEXT','coupon_source TEXT','coupon_id INTEGER','promo_pct REAL','commission_pct REAL','commission REAL','net_formateur REAL'].forEach(col => { try { db.exec(`ALTER TABLE formation_commandes ADD COLUMN ${col}`); } catch(_) {} });
+;['prix_initial REAL','remise REAL DEFAULT 0','coupon_code TEXT','coupon_source TEXT','coupon_id INTEGER','promo_pct REAL','commission_pct REAL','commission REAL','net_formateur REAL','consentement_le TEXT'].forEach(col => { try { db.exec(`ALTER TABLE formation_commandes ADD COLUMN ${col}`); } catch(_) {} });
 /* Bibliothèque de médias du formateur (2026-10-30) : les fichiers envoyés depuis le Studio, réutilisables dans toutes ses formations. L'entrée ne contient que l'adresse (le fichier reste sur le CDN). */
 db.exec(`
   CREATE TABLE IF NOT EXISTS formation_medias (

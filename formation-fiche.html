@@ -84,6 +84,7 @@ html body.nd .ff-code input{flex:1;min-width:0;box-sizing:border-box;border-radi
 
 <script src="assets/data.js"></script>
 <script src="assets/app.js?v=13"></script>
+<script src="assets/formation-achat-consent.js?v=1"></script>
 <script>
 const FF_ID = new URLSearchParams(location.search).get('id');
 const esc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -175,7 +176,7 @@ function ffRender(){
             : enAttente ? '<button type="button" class="ff-btn" id="ff-reprendre">Finaliser mon paiement</button>'
             : `<button type="button" class="ff-btn" id="ff-complete">${o.formation.gratuite ? 'Accéder gratuitement' : 'Obtenir la formation complète'}</button>`}
           ${o.modules.some(m => m.vendable_seul) && !complet ? '<p class="ff-aide">Vous pouvez aussi obtenir un seul module : choisissez-le dans la liste ci-contre. Vous n\'aurez accès qu\'au module obtenu.</p>' : ''}
-          ${!o.formation.gratuite ? '<p class="ff-aide">🔒 Paiement sécurisé par Stripe. Votre accès s\'ouvre dès que le paiement est confirmé.</p>' : ''}
+          ${!o.formation.gratuite ? '<p class="ff-aide">🔒 Paiement sécurisé par Stripe. Votre accès s\'ouvre dès que le paiement est confirmé.</p>' + FormationConsent.mention() : ''}
           <div class="ff-erreur" id="ff-erreur" role="alert"></div>
         </div>
       </aside>
@@ -213,7 +214,16 @@ async function ffAcquerir(bouton, corps){
   try {
     const saisi = document.getElementById('ff-code'), code = (COUPON && COUPON.code) || (saisi && saisi.value.trim()) || '';
     if (code) corps = { ...corps, coupon: code };
-    const d = await ffJson(`/formations/${encodeURIComponent(FF_ID)}/acquerir`, { method: 'POST', body: JSON.stringify(corps) });
+    const url = `/formations/${encodeURIComponent(FF_ID)}/acquerir`;
+    let d;
+    try { d = await ffJson(url, { method: 'POST', body: JSON.stringify(corps) }); }
+    catch (e0) {
+      /* Aucun remboursement : le serveur exige le consentement exprès avant tout paiement ; on le demande, puis on rejoue l'achat. */
+      if (!(e0.data && e0.data.code === 'consentement_requis')) throw e0;
+      const oui = await FormationConsent.demander({ titre: FF && FF.titre, prix: e0.data.montant, texte: e0.data.texte, retractation: e0.data.retractation });
+      if (!oui) { bouton.disabled = false; return; }
+      d = await ffJson(url, { method: 'POST', body: JSON.stringify({ ...corps, accepte_non_remboursable: true }) });
+    }
     if (d.checkout_url) { location.href = d.checkout_url; return; }
     location.href = `suivre-formation.html?id=${encodeURIComponent(FF_ID)}`;
   } catch (e) {

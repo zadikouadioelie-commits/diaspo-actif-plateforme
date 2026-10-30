@@ -5941,7 +5941,10 @@ async function initFormations() {
         if (!me) { showMsg("Connectez-vous pour vous inscrire à une formation.", "warning"); return; }
         btn.disabled = true;
         try {
-          const r = await api("POST", `/formations/${btn.dataset.id}/inscrire`, {});
+          /* Aucun remboursement : le consentement exprès est demandé si le serveur le réclame (achat payant) — le script est chargé à la demande. */
+          if (!window.FormationConsent) await new Promise(res => { const s = document.createElement("script"); s.src = "assets/formation-achat-consent.js?v=1"; s.onload = res; s.onerror = res; document.head.appendChild(s); });
+          const appelInscrire = extra => api("POST", `/formations/${btn.dataset.id}/inscrire`, extra);
+          const r = window.FormationConsent ? await FormationConsent.appeler(appelInscrire) : await appelInscrire({});
           if (r.checkout_url) {
             showMsg("Redirection vers le paiement sécurisé Stripe…", "success");
             window.location.href = r.checkout_url;
@@ -5953,6 +5956,7 @@ async function initFormations() {
           btn.classList.add("btn-outline");
           showMsg("Inscription confirmée ! Retrouvez-la dans « Mes inscriptions ».", "success");
         } catch(e) {
+          if (e.annule) { btn.disabled = false; return; } // achat annulé à la fenêtre « Avant de payer » : rien à dire
           if (e.message && e.message.includes("Déjà inscrit")) {
             btn.textContent = "✓ Déjà inscrit";
             btn.classList.remove("btn-orange"); btn.classList.add("btn-outline");

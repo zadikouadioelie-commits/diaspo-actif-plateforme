@@ -1012,6 +1012,7 @@ const COLONNES_MIGRATION = [
     ['formation_commandes', 'commission_pct', 'REAL'],
     ['formation_commandes', 'commission', 'REAL'],
     ['formation_commandes', 'net_formateur', 'REAL'],
+    ['formation_commandes', 'consentement_le', 'TEXT'],   // preuve du consentement « achat non remboursable » (date + version du texte)
     ['formation_modules', 'prix', 'REAL'],
     ['formation_modules', 'vendable_seul', 'INTEGER DEFAULT 0'],
     ['formations', 'duree_acces_jours', 'INTEGER'],

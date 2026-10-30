@@ -1017,6 +1017,7 @@
 <script src="assets/data.js"></script>
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js?v=13"></script>
+<script src="assets/formation-achat-consent.js?v=1"></script>
 <script src="/assets/rich-editor.js"></script>
 <script src="/assets/upload-media.js"></script>
 <script>
@@ -2851,10 +2852,11 @@
       c.querySelectorAll('.pd-inscrire').forEach(b => b.addEventListener('click', async () => {
         if(!await requireLoginForVolet()) return;
         try {
-          const r = await api('POST', `/formations/${b.dataset.id}/inscrire`, {});
+          /* Aucun remboursement : le consentement exprès est demandé si le serveur le réclame (achat payant). */
+          const r = await FormationConsent.appeler(extra => api('POST', `/formations/${b.dataset.id}/inscrire`, extra));
           if(r.checkout_url){ location.href = r.checkout_url; return; }
           showMsg('Inscription confirmée.', 'success'); ouvrirParcours(id); loadParcours();
-        } catch(e){ showMsg(e.message||'Inscription impossible.', 'danger'); }
+        } catch(e){ if (e.annule) return; showMsg(e.message||'Inscription impossible.', 'danger'); }
       }));
     } catch(e){ c.innerHTML = `<div class="notice">${escQ(e.message || 'Parcours introuvable.')}</div>`; }
   }

@@ -11,6 +11,14 @@
 "use strict";
 const Finances = require("./formation-finances");
 
+/* Aucun remboursement (décision du 2026-10-30, « à préciser partout ») : une formation achetée appartient à l'élève, qu'il la suive ou non.
+   Ces deux textes sont la SOURCE UNIQUE : renvoyés au navigateur (assets/formation-achat-consent.js les affiche) et posés sur la page de paiement Stripe.
+   Droit de la consommation (UE) : pour un contenu numérique à accès immédiat, le consommateur doit demander l'accès immédiat ET reconnaître qu'il perd
+   son droit de rétractation — d'où la case à cocher exigée côté serveur, jamais seulement dans l'interface. */
+const TEXTE_NON_REMBOURSABLE = "Achat définitif : une formation achetée vous appartient, que vous la suiviez ou non, et ne donne lieu à aucun remboursement. Réfléchissez bien avant d'acheter.";
+const TEXTE_RETRACTATION = "Je demande l'accès immédiat au contenu et je reconnais que je perds mon droit de rétractation dès que l'accès est ouvert.";
+const VERSION_CONSENTEMENT = "2026-10-30";
+
 /* Pas d'état « remboursé » : décision du 2026-10-30, aucune formation ne se rembourse. */
 const STATUTS_ACCES = ["en_attente", "actif", "expire", "revoque"];
 const TYPES_ACCES = ["gratuit", "paye", "code"];
@@ -136,7 +144,7 @@ async function activerDepuisInscription(db, inscriptionId, montant) {
 }
 
 module.exports = {
-  STATUTS_ACCES, TYPES_ACCES, rattrapageSQL, rattrapageCompte, dateExpiration, prixModule, synchroniserInscription, balayerExpirations,
+  TEXTE_NON_REMBOURSABLE, TEXTE_RETRACTATION, VERSION_CONSENTEMENT, STATUTS_ACCES, TYPES_ACCES, rattrapageSQL, rattrapageCompte, dateExpiration, prixModule, synchroniserInscription, balayerExpirations,
   modulesAutorises, leconPermise, quizPermis, confirmerCommande, annulerCommande, activerDepuisInscription,
 };
 
@@ -250,6 +258,10 @@ module.exports.register = function register(deps) {
     }
 
     /* ── Payant : rien n'est accordé tant que Stripe n'a pas confirmé le paiement ── */
+    /* Aucun remboursement : le consentement exprès est exigé ICI, côté serveur, avant toute commande (une interface qui l'oublierait ne contournerait rien). */
+    if (!body || body.accepte_non_remboursable !== true) {
+      return sendJSON(res, 409, { error: "Avant de payer, confirmez que vous avez compris que cet achat n'est pas remboursable.", code: "consentement_requis", texte: TEXTE_NON_REMBOURSABLE, retractation: TEXTE_RETRACTATION, montant });
+    }
     const { stripe, getOrCreateStripeCustomer } = require("./stripe-client");
     if (!stripe) return sendJSON(res, 503, { error: "Paiements momentanément indisponibles." });
     if (actuel && actuel.statut === "en_attente") {
@@ -285,11 +297,13 @@ module.exports.register = function register(deps) {
         mode: "payment",
         customer: stripeCustomerId,
         line_items: [{ price_data: { currency: "eur", unit_amount: Math.round(montant * 100), product_data: { name: libelle, description: f.organisme || undefined } }, quantity: 1 }],
-        metadata: { diaspoactif_formation_commande_id: String(commandeId) },
+        metadata: { diaspoactif_formation_commande_id: String(commandeId), consentement_non_remboursable: VERSION_CONSENTEMENT },
+        /* Rappel sur la page de paiement elle-même, juste au-dessus du bouton Payer. */
+        custom_text: { submit: { message: TEXTE_NON_REMBOURSABLE } },
         success_url: `${origin}/formations.html?paiement=succes&commande=${commandeId}`,
         cancel_url: `${origin}/formations.html?paiement=annule&commande=${commandeId}`,
       });
-      await db.prepare("UPDATE formation_commandes SET stripe_session_id=? WHERE id=?").run(session.id, commandeId);
+      await db.prepare("UPDATE formation_commandes SET stripe_session_id=?, consentement_le=? WHERE id=?").run(session.id, `${new Date().toISOString()} v${VERSION_CONSENTEMENT}`, commandeId);
       return sendJSON(res, 201, { checkout_url: session.url, en_attente_paiement: true, commande_id: Number(commandeId), portee });
     } catch (e) {
       /* Retour arrière complet : aucune trace d'un paiement qui n'a pas démarré. */

@@ -393,7 +393,9 @@
     const label = btn ? btn.textContent : '';
     if (btn) { btn.disabled = true; btn.textContent = 'Inscription…'; }
     try {
-      const r = await api(`/api/formations/${encodeURIComponent(f.id)}/inscrire`, { method: 'POST', body: code ? { code } : {} });
+      /* Aucun remboursement : le consentement exprès est demandé si le serveur le réclame (achat payant) — assets/formation-achat-consent.js. */
+      const appel = extra => api(`/api/formations/${encodeURIComponent(f.id)}/inscrire`, { method: 'POST', body: Object.assign(code ? { code } : {}, extra) });
+      const r = window.FormationConsent ? await window.FormationConsent.appeler(appel, { titre: f.titre }) : await appel({});
       if (r.checkout_url) {
         if (!/^https:\/\/[^\s"'<>]+$/i.test(r.checkout_url)) throw new Error('Adresse de paiement invalide. Réessayez ou contactez l’assistance.');
         toast('Redirection vers le paiement sécurisé…');
@@ -406,6 +408,7 @@
       screenDetail(++seq, f.id);
       return true;
     } catch (e) {
+      if (e.annule) { if (btn) { btn.disabled = false; btn.textContent = label; } return false; } // achat annulé à la fenêtre « Avant de payer »
       toast(e.message, true);
       if (e.status === 409) screenDetail(++seq, f.id); // déjà inscrit : on rafraîchit l'état affiché
       else if (btn) { btn.disabled = false; btn.textContent = label; }
@@ -418,6 +421,7 @@
       <h2 style="margin:4px 0 4px;font-size:19px">Inscription payante</h2>
       <p class="muted" style="margin:0 0 10px">${esc(f.titre)}</p>
       <div class="kv"><span>Montant</span><span>${esc(price(f.prix, f.devise))}</span></div>
+      ${window.FormationConsent ? window.FormationConsent.mention() : ''}
       ${membres ? `<label class="fm-lab" for="fm-code">Code d’accès membre (facultatif)</label>
         <input class="fm-in" id="fm-code" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Votre code">
         <p class="small muted" style="margin:6px 2px 0">Un code valide rend l’inscription gratuite. Sans code, ou avec un code non valide, vous réglez le tarif normal.</p>` : ''}

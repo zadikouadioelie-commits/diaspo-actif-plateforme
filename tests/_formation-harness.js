@@ -48,6 +48,9 @@ async function demarrer(tag) {
     setTimeout(() => { if (!demarre) reject(new Error('Timeout démarrage serveur de test :\n' + out)); }, 20000);
   });
   async function call(jar, method, urlPath, body) {
+    /* Aucun remboursement (2026-10-30) : le serveur refuse tout achat payant sans consentement exprès. Les tests le donnent par défaut ;
+       pour tester le refus, passer explicitement { accepte_non_remboursable: false } (tests/formation-non-remboursable.test.js). */
+    if (method === 'POST' && /^\/api\/formations\/\d+\/(acquerir|inscrire)$/.test(urlPath) && body && typeof body === 'object' && body.accepte_non_remboursable === undefined) body = { ...body, accepte_non_remboursable: true };
     const headers = { 'Content-Type': 'application/json' };
     if (jar) jar.apply(headers);
     const res = await fetch(base + urlPath, { method, headers, body: body ? JSON.stringify(body) : undefined });
