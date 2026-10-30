@@ -29,7 +29,7 @@
     { cat: 'Médias', items: [
       { t: 'image', n: 'Image', i: '🖼️', w: 400, h: 280, props: { url: '', alt: '', legende: '', ajust: 'contain', rayon: 0, align: 'center' } },
       { t: 'video', n: 'Vidéo', i: '🎬', w: 640, h: 360, props: { url: '', titre: '' } },
-      { t: 'audio', n: 'Audio', i: '🎧', w: 480, h: 96, props: { url: '', titre: '' } } ] },
+      { t: 'audio', n: 'Audio', i: '🎧', w: 480, h: 96, props: { url: '', titre: '', telechargeable: true } } ] },
     { cat: 'Documents', items: [
       { t: 'document', n: 'Document (PDF, Excel, Word…)', i: '📄', w: 760, h: 520, props: { nom: '', url: '', mode: 'lecteur', integre: true, telechargeable: false, hauteur: 640 } },
       { t: 'fichier', n: 'Fichier à télécharger', i: '📎', w: 440, h: 72, props: { nom: '', url: '', description: '' } } ] },
@@ -584,7 +584,9 @@
         ${champ('ou adresse de la vidéo (YouTube, Vimeo ou fichier https)', 'url', p.url, 'url', 'placeholder="https://www.youtube.com/watch?v=…"')}${champ('Titre de la vidéo', 'titre', p.titre)}
         ${p.url && R.ytId(p.url) ? '<p class="st-aide">Le suivi du visionnage n\'est pas possible pour une vidéo YouTube : importez la vidéo (MP4 / MOV) pour pouvoir l\'exiger.</p>' : `<label class="st-f" style="display:flex;gap:8px;align-items:center"><input type="checkbox" data-p="exiger" data-k="bool" ${p.exiger ? 'checked' : ''}> <span style="margin:0">Exiger le visionnage (90 %) pour valider la leçon</span></label><p class="st-aide">Seuls comptent les passages regardés en continu : sauter dans la vidéo ne valide rien. L'apprenant reprend là où il s'est arrêté.</p>`}`;
     } else if (t === 'audio') {
-      h += `<div class="st-btns"><button class="st-b or" data-up="audio">${p.url ? 'Remplacer l’audio' : '⬆ Importer un audio'}</button><button class="st-b" data-lib="audio">📚 Ma bibliothèque</button></div><p class="st-aide">MP3, M4A, OGG ou WAV — 4 Mo au plus (environ 4 minutes de MP3). Pour un enregistrement plus long, collez l’adresse d’un fichier hébergé ailleurs.</p>${champ('ou adresse du fichier audio (https)', 'url', p.url, 'url', 'placeholder="https://…/audio.mp3"')}${champ('Titre', 'titre', p.titre)}`;
+      h += `<div class="st-btns"><button class="st-b or" data-up="audio">${p.url ? 'Remplacer l’audio' : '⬆ Importer un audio'}</button><button class="st-b" data-lib="audio">📚 Ma bibliothèque</button></div><p class="st-aide">MP3, M4A, OGG ou WAV — 4 Mo au plus (environ 4 minutes de MP3). Pour un enregistrement plus long, collez l’adresse d’un fichier hébergé ailleurs.</p>${champ('ou adresse du fichier audio (https)', 'url', p.url, 'url', 'placeholder="https://…/audio.mp3"')}${champ('Titre', 'titre', p.titre)}
+        <label class="st-f" style="display:flex;gap:8px;align-items:center"><input type="checkbox" data-p="telechargeable" data-k="bool" ${p.telechargeable !== false ? 'checked' : ''}> <span style="margin:0">Les apprenants peuvent télécharger cet audio</span></label>
+        <p class="st-aide">Un audio importé depuis votre ordinateur reste privé : il n'est lisible que par les personnes ayant accès à la leçon. Décochez pour qu'il ne soit qu'écouté.</p>`;
     } else if (t === 'fichier') {
       h += `<div class="st-btns"><button class="st-b or" data-up="document">${p.url ? 'Remplacer le fichier' : 'Importer un fichier'}</button><button class="st-b" data-lib="document,image">📚 Ma bibliothèque</button></div><p class="st-aide">PDF, Word, Excel, PowerPoint ou image — 4 Mo maximum par fichier.</p>
         ${champ('Nom affiché', 'nom', p.nom)}${champ('Description', 'description', p.description)}${champ('ou adresse (https) du fichier', 'url', p.url, 'url')}`;
@@ -805,7 +807,7 @@
     rafraichir();
   }
   function utiliserMedia(e, m) {
-    if (/^prive:/.test(m.url) && e.type !== 'document' && e.type !== 'fichier') { toast('Ce fichier est privé : il ne peut servir que dans un élément « Document » ou « Fichier à télécharger ».'); return; }
+    if (/^prive:/.test(m.url) && e.type !== 'document' && e.type !== 'fichier' && e.type !== 'audio') { toast('Ce fichier est privé : il ne peut servir que dans un élément « Document », « Fichier à télécharger » ou « Audio ».'); return; }
     modifier(() => {
       e.props.url = m.url;
       if (e.type === 'document' || e.type === 'fichier') e.props.nom = m.nom;

@@ -676,8 +676,8 @@
     if (window.StudioRender) return chargerVisionneuse().catch(() => {});
     if (STUDIO) return STUDIO;
     STUDIO = chargerVisionneuse().catch(() => { /* les documents intégrés se rabattent sur leur lien */ }).then(() => new Promise((ok, ko) => {
-      const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = 'assets/studio.css?v=4'; document.head.appendChild(css);
-      const js = document.createElement('script'); js.src = 'assets/studio-render.js?v=6'; js.onload = () => ok(); js.onerror = () => { STUDIO = null; ko(new Error('Rendu indisponible')); };
+      const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = 'assets/studio.css?v=5'; document.head.appendChild(css);
+      const js = document.createElement('script'); js.src = 'assets/studio-render.js?v=7'; js.onload = () => ok(); js.onerror = () => { STUDIO = null; ko(new Error('Rendu indisponible')); };
       document.head.appendChild(js);
     }));
     return STUDIO;
@@ -714,6 +714,12 @@
   }
 
   function monterDocuments(id, racine, brouillon) {
+    (racine || document).querySelectorAll('audio.fm-audio-prive:not([data-monte])').forEach(a => {
+      a.dataset.monte = '1';
+      const b = `/api/formations/${encodeURIComponent(id)}/lecons/${encodeURIComponent(a.dataset.lecon)}/document`, q = brouillon ? '?brouillon=1' : '';
+      a.src = `${b}/audio${q}`;
+      if (a.dataset.dl) { const p = document.createElement('p'); p.style.margin = '8px 0 0'; p.innerHTML = `<a href="${b}/telecharger${q}" download>⬇ Télécharger l’audio</a>`; a.insertAdjacentElement('afterend', p); }
+    });
     const hotes = [...(racine || document).querySelectorAll('.fm-doc:not([data-monte])')];
     if (!hotes.length) return;
     chargerVisionneuse().then(() => hotes.forEach(h => {
@@ -730,6 +736,8 @@
       case 'video':
         return head + (url ? `<div class="media"><video controls playsinline preload="metadata" ${dl ? '' : 'controlsList="nodownload"'} src="${url}"></video></div>` : noFile('Cette vidéo n’est pas encore disponible.'));
       case 'audio':
+        /* Audio privé (lot K) : la source est posée par monterDocuments() (route de la plateforme, accès contrôlé). */
+        if (l.a_document || /^prive:/.test(l.contenu_url || '')) return head + `<div class="card"><div class="pad"><audio class="fm-audio-prive" data-lecon="${esc(l.id)}" data-dl="${dl ? '1' : ''}" controls preload="metadata" ${dl ? '' : 'controlsList="nodownload"'} style="width:100%"></audio></div></div>`;
         return head + (url ? `<div class="card"><div class="pad"><audio controls preload="metadata" ${dl ? '' : 'controlsList="nodownload"'} style="width:100%" src="${url}"></audio></div></div>` : noFile('Cet enregistrement n’est pas encore disponible.'));
       case 'pdf':
         return head + (url || l.a_document ? docHote(l, !url ? noFile('Le document ne peut pas s’afficher pour le moment : réessayez dans un instant.') : `<div class="card"><div class="pad"><p style="margin:0 0 12px">Document PDF${Number(l.nb_pages) > 0 ? ' · ' + esc(plural(Number(l.nb_pages), 'page', 'pages')) : ''}</p><a class="btn block" href="${url}" target="_blank" rel="noopener">Lire le document ${ic('out', 's')}</a></div></div>`) : noFile('Ce document n’est pas encore disponible.'));

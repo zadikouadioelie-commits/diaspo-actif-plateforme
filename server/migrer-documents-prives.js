@@ -17,7 +17,7 @@ const fs = require("fs");
 const path = require("path");
 
 const HOTE_CDN = /^https:\/\/[a-z0-9.-]+\.b-cdn\.net\//i;
-const EXT_OK = ["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx"];
+const EXT_OK = ["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "mp3", "m4a", "ogg", "wav"];
 const MAX = 15 * 1024 * 1024;
 const extDe = url => { const m = String(url).split("?")[0].split("#")[0].match(/\.([a-z0-9]{2,5})$/i); return m ? m[1].toLowerCase() : ""; };
 const migrable = url => typeof url === "string" && HOTE_CDN.test(url) && EXT_OK.includes(extDe(url));
@@ -26,14 +26,14 @@ const migrable = url => typeof url === "string" && HOTE_CDN.test(url) && EXT_OK.
 function urlsDuStudio(json) {
   let doc; try { doc = JSON.parse(json); } catch (_) { return []; }
   const urls = [];
-  for (const p of (doc && doc.pages) || []) for (const e of p.elements || []) if ((e.type === "document" || e.type === "fichier") && e.props && migrable(e.props.url)) urls.push(e.props.url);
+  for (const p of (doc && doc.pages) || []) for (const e of p.elements || []) if ((e.type === "document" || e.type === "fichier" || e.type === "audio") && e.props && migrable(e.props.url)) urls.push(e.props.url);
   return urls;
 }
 /* Même document, adresses remplacées d'après la table { adresse publique → référence privée } ; null si rien ne change. */
 function reecrireStudio(json, table) {
   let doc; try { doc = JSON.parse(json); } catch (_) { return null; }
   let change = false;
-  for (const p of (doc && doc.pages) || []) for (const e of p.elements || []) if ((e.type === "document" || e.type === "fichier") && e.props && table[e.props.url]) { e.props.url = table[e.props.url]; change = true; }
+  for (const p of (doc && doc.pages) || []) for (const e of p.elements || []) if ((e.type === "document" || e.type === "fichier" || e.type === "audio") && e.props && table[e.props.url]) { e.props.url = table[e.props.url]; change = true; }
   return change ? JSON.stringify(doc) : null;
 }
 
@@ -57,7 +57,7 @@ if (require.main !== module) return;
     }
     if (!Prive.configure()) { console.error("Stockage privé non configuré : définissez BUNNY_PRIVATE_ZONE et BUNNY_PRIVATE_KEY."); process.exit(1); }
     const lecons = (await c.query(`SELECT l.id, l.contenu_url, f.owner_user_id AS proprio FROM formation_lecons l JOIN formation_modules m ON m.id=l.module_id JOIN formations f ON f.id=m.formation_id
-      WHERE l.type IN ('pdf','telechargement') AND l.contenu_url LIKE 'https://%b-cdn.net/%'`)).rows.filter(l => migrable(l.contenu_url));
+      WHERE l.type IN ('pdf','telechargement','audio') AND l.contenu_url LIKE 'https://%b-cdn.net/%'`)).rows.filter(l => migrable(l.contenu_url));
     const docs = (await c.query("SELECT d.id, d.contenu_json, f.owner_user_id AS proprio FROM formation_studio_docs d JOIN formations f ON f.id=d.formation_id WHERE d.contenu_json LIKE '%b-cdn.net%'")).rows;
     const versions = (await c.query("SELECT v.id, v.contenu_json, f.owner_user_id AS proprio FROM formation_studio_versions v JOIN formation_studio_docs d ON d.id=v.doc_id JOIN formations f ON f.id=d.formation_id WHERE v.contenu_json LIKE '%b-cdn.net%'")).rows;
     /* adresses à copier, par propriétaire : la référence porte le numéro du compte */

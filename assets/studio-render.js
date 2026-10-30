@@ -77,8 +77,14 @@
           : `<video controls preload="metadata" ${p.miniature ? `poster="${esc(p.miniature)}"` : ''} src="${esc(p.url)}" ${ctx.edit ? '' : 'data-suivi="1"'}></video>`;
         return `<div class="st-video${ctx.edit ? ' st-inerte' : ''}">${cadre}</div>`;
       }
-      case 'audio':
-        return p.url ? `<div class="st-audio${ctx.edit ? ' st-inerte' : ''}">${p.titre ? `<div class="st-audio-t">🎧 ${esc(p.titre)}</div>` : ''}<audio controls preload="none" src="${esc(p.url)}"></audio></div>` : placeholder('🎧', 'Audio à ajouter');
+      case 'audio': {
+        /* Audio privé (lot K) : lu par la plateforme (accès contrôlé), jamais par son adresse de stockage ; téléchargeable seulement si le formateur l'a permis. */
+        const prive = /^(prive|document):/.test(String(p.url || ''));
+        const base = ctx.docBase && !ctx.edit ? `${ctx.docBase}%S?element=${encodeURIComponent(e.id)}${ctx.brouillon ? '&brouillon=1' : ''}` : '';
+        const src = prive ? (base ? base.replace('%S', '/audio') : '') : p.url;
+        const dlOk = prive && base && p.telechargeable !== false;
+        return p.url ? `<div class="st-audio${ctx.edit ? ' st-inerte' : ''}">${p.titre ? `<div class="st-audio-t">🎧 ${esc(p.titre)}</div>` : ''}<audio controls preload="none" ${prive && p.telechargeable === false ? 'controlsList="nodownload"' : ''} ${src ? `src="${esc(src)}"` : ''}></audio>${dlOk ? `<a class="st-audio-dl" href="${esc(base.replace('%S', '/telecharger'))}" target="_blank" rel="noopener noreferrer" download>⬇ Télécharger l'audio</a>` : ''}</div>` : placeholder('🎧', 'Audio à ajouter');
+      }
       case 'separateur':
         return `<div class="st-sep"><hr style="border:0;border-top:${Number(p.epaisseur) || 2}px ${p.style === 'pointille' ? 'dotted' : p.style === 'double' ? 'double' : 'solid'} ${esc(p.couleur) || '#e6b84a'}"></div>`;
       case 'lien':

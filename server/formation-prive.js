@@ -65,6 +65,7 @@ async function lire(ref, maxOctets) {
 function masquerLecons(modules) {
   for (const m of modules || []) for (const c of m.chapitres || []) for (const l of c.lecons || []) {
     if (["pdf", "telechargement"].includes(l.type) && l.contenu_url) { l.contenu_url = null; l.a_document = 1; }
+    else if (l.type === "audio" && estRef(l.contenu_url)) { l.contenu_url = null; l.a_document = 1; } /* audio privé (lot K) ; une adresse https extérieure reste telle quelle */
   }
   return modules;
 }
@@ -73,7 +74,7 @@ function masquerLecons(modules) {
 function masquerStudio(doc) {
   const copie = JSON.parse(JSON.stringify(doc || {}));
   for (const p of copie.pages || []) for (const e of p.elements || []) {
-    if ((e.type === "document" || (e.type === "fichier" && estRef(e.props && e.props.url))) && e.props && e.props.url) {
+    if ((e.type === "document" || ((e.type === "fichier" || e.type === "audio") && estRef(e.props && e.props.url))) && e.props && e.props.url) {
       const m = String(e.props.url).split("?")[0].split("#")[0].match(/\.([a-z0-9]{2,5})$/i);
       e.props.url = `document:${String(e.id).replace(/[^\w-]/g, "")}${m ? "." + m[1].toLowerCase() : ""}`;
     }
@@ -116,9 +117,11 @@ module.exports.register = function register(deps) {
     const type = typeAudio(r.f.buffer);
     if (!type) return sendJSON(res, 400, { error: "Format non supporté (MP3, M4A, OGG ou WAV requis)." });
     try {
-      const url = await require("./upload").uploadToBunny(r.f.buffer, `${r.user.id}-${Date.now()}-${crypto.randomBytes(16).toString("hex")}.${type}`, "formations-audios");
-      SEC.logSecurity("upload", { uid: Number(r.user.id), kind: "audio-cours", type, size: r.f.buffer.length });
-      sendJSON(res, 200, { url });
+      let url, prive = false;
+      if (configure()) { url = creerRef(r.user.id, type); await ecrire(r.f.buffer, url); prive = true; } /* lot K : l'audio va dans le stockage privé, lu par le serveur seul */
+      else url = await require("./upload").uploadToBunny(r.f.buffer, `${r.user.id}-${Date.now()}-${crypto.randomBytes(16).toString("hex")}.${type}`, "formations-audios");
+      SEC.logSecurity("upload", { uid: Number(r.user.id), kind: "audio-cours", type, size: r.f.buffer.length, prive });
+      sendJSON(res, 200, { url, prive });
     } catch (e) { sendJSON(res, 500, SEC.safeError(e, "upload audio de cours")); }
   });
 

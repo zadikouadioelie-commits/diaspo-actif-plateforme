@@ -45,8 +45,11 @@ const TELECHARGEABLES = {
   pdf: ["pdf", "application/pdf"], xlsx: ["zip", typesMime.excel], xlsm: ["zip", "application/vnd.ms-excel.sheet.macroEnabled.12"], xls: ["ole", typesMime.xls],
   docx: ["zip", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"], doc: ["ole", "application/msword"],
   pptx: ["zip", "application/vnd.openxmlformats-officedocument.presentationml.presentation"], ppt: ["ole", "application/vnd.ms-powerpoint"],
+  mp3: ["mp3", "audio/mpeg"], m4a: ["m4a", "audio/mp4"], ogg: ["ogg", "audio/ogg"], wav: ["wav", "audio/wav"],
   jpg: ["jpg", "image/jpeg"], jpeg: ["jpg", "image/jpeg"], png: ["png", "image/png"], webp: ["webp", "image/webp"], gif: ["gif", "image/gif"],
 };
+/* Audios lus par la route /audio (type MIME par extension ; les octets doivent correspondre : Prive.typeAudio). */
+const AUDIOS = { mp3: "audio/mpeg", m4a: "audio/mp4", ogg: "audio/ogg", wav: "audio/wav" };
 const extensionDe = url => { let p = ""; try { p = new URL(String(url || ""), "http://x").pathname; } catch (_) { p = String(url || ""); } return ((/\.([a-z0-9]{2,5})$/i.exec(p) || [])[1] || "").toLowerCase(); };
 const nomSur = s => String(s).replace(/[^\w.\- àâäçéèêëîïôöùûüÿœ()]/gi, "_").slice(0, 120);
 
@@ -91,7 +94,19 @@ function typeReel(buf) {
   if (buf.length >= 8 && buf.slice(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return "png";
   if (buf.length >= 12 && buf.slice(0, 4).toString("latin1") === "RIFF" && buf.slice(8, 12).toString("latin1") === "WEBP") return "webp";
   if (buf.length >= 6 && /^GIF8[79]a$/.test(buf.slice(0, 6).toString("latin1"))) return "gif";
+  const audio = Prive.typeAudio(buf); if (audio) return audio;
   return "autre";
+}
+
+/* Envoie des octets en entier ou par morceaux (en-tête Range : lecture progressive, avance rapide d'un audio). */
+function servir(req, res, buf, ent) {
+  const m = /^bytes=(\d*)-(\d*)$/.exec(String(req.headers.range || ""));
+  if (m && (m[1] !== "" || m[2] !== "")) {
+    const a = m[1] === "" ? Math.max(0, buf.length - Number(m[2])) : Number(m[1]); const b = m[1] === "" || m[2] === "" ? buf.length - 1 : Math.min(Number(m[2]), buf.length - 1);
+    if (a > b || a >= buf.length) { res.writeHead(416, { "Content-Range": `bytes */${buf.length}` }); return res.end(); }
+    res.writeHead(206, { ...ent, "Content-Range": `bytes ${a}-${b}/${buf.length}`, "Content-Length": b - a + 1 }); return res.end(buf.slice(a, b + 1));
+  }
+  res.writeHead(200, { ...ent, "Content-Length": buf.length }); res.end(buf);
 }
 
 function classeurDe(url, buf) {
@@ -105,14 +120,16 @@ function classeurDe(url, buf) {
 /* Le document décrit par une leçon (classique) ou un élément du Studio. Renvoie null s'il n'y en a pas. */
 function decrire(lecon, doc, elementId) {
   if (Number(lecon.studio)) {
-    const el = doc && (doc.pages || []).flatMap(p => p.elements || []).find(e => e.id === elementId && (e.type === "document" || e.type === "fichier"));
+    const el = doc && (doc.pages || []).flatMap(p => p.elements || []).find(e => e.id === elementId && (e.type === "document" || e.type === "fichier" || e.type === "audio"));
     if (!el || !el.props || !el.props.url) return null;
     const p = el.props;
     /* « Fichier à télécharger » (lot I) : toujours une pièce jointe, jamais affichée dans la page. */
+    /* Audio du Studio (lot K) : écouté dans la page ; téléchargeable seulement si le formateur l'a autorisé. */
+    if (el.type === "audio") return { url: p.url, nom: nomFichier(p.url, p.titre), integre: false, telechargeable: p.telechargeable !== false, hauteur: 640 };
     if (el.type === "fichier") return { url: p.url, nom: nomFichier(p.url, p.nom), integre: false, telechargeable: true, hauteur: 640 };
     return { url: p.url, nom: nomFichier(p.url, p.nom), integre: p.integre !== undefined ? !!p.integre : p.mode !== "telechargement", telechargeable: p.telechargeable !== undefined ? !!p.telechargeable : p.mode === "telechargement", hauteur: Math.min(1600, Math.max(200, Number(p.hauteur) || 640)) };
   }
-  if (!lecon.contenu_url || !["pdf", "telechargement", "presentation"].includes(lecon.type)) return null;
+  if (!lecon.contenu_url || !["pdf", "telechargement", "presentation", "audio"].includes(lecon.type)) return null;
   const integre = lecon.doc_integre != null ? !!Number(lecon.doc_integre) : lecon.type === "pdf";
   return { url: lecon.contenu_url, nom: nomFichier(lecon.contenu_url, lecon.titre), integre, telechargeable: lecon.telechargement_autorise == null || !!Number(lecon.telechargement_autorise), hauteur: Math.min(1600, Math.max(200, Number(lecon.doc_hauteur) || 640)) };
 }
@@ -173,6 +190,18 @@ module.exports.register = function register(deps) {
     else if (c.fam === "xlsm") info.erreur = { code: "macros", message: "Les classeurs à macros (.xlsm) ne sont pas affichés : les macros ne sont jamais exécutées." };
     else if (c.fam === "autre") info.erreur = { code: "format", message: "Ce type de fichier ne peut pas s'afficher dans la page." };
     sendJSON(res, 200, info);
+  });
+
+  /* Lecture d'un audio (leçon audio ou élément « Audio » du Studio), par morceaux : même contrôle d'accès que le cours, type vérifié sur les octets. */
+  route("GET", BASE + "/audio", async (req, res, params, body, query) => {
+    const c = await contexte(req, res, params, query); if (!c) return;
+    const ext = extensionDe(c.d.url);
+    if (!AUDIOS[ext]) return sendJSON(res, 415, { error: "Ce fichier n'est pas un audio lisible par la plateforme.", code: "format" });
+    try {
+      const buf = await lireOctets(c.d.url, c.hote);
+      if (Prive.typeAudio(buf) !== ext) return sendJSON(res, 415, { error: "Ce fichier n'est pas un audio valide.", code: "format" });
+      servir(req, res, buf, { "Content-Type": AUDIOS[ext], "Accept-Ranges": "bytes", "Content-Disposition": `inline; filename="${nomSur(c.d.nom.replace(/\.[a-z0-9]{2,5}$/i, ""))}.${ext}"`, "X-Content-Type-Options": "nosniff", "Cache-Control": "private, max-age=300", "Content-Security-Policy": "sandbox" });
+    } catch (e) { erreur(res, e); }
   });
 
   /* Le PDF : octets servis par morceaux (Range). Uniquement si l'affichage intégré est activé (ou en aperçu par le formateur). */

@@ -212,6 +212,7 @@ body.st-body button{font:inherit;}
 .st-adapte{padding:18px 16px;min-height:0;gap:12px;box-shadow:none;}
 .st-adapte .st-txt-titre{font-size:28px;} .st-adapte .st-txt-soustitre{font-size:22px;} .st-adapte .st-txt-paragraphe{font-size:17px;}
 .st-adapte .st-el{width:100%;} .st-adapte .st-btn{width:100%;min-width:0;justify-content:center;}
+.st-audio-dl{display:inline-block;margin-top:8px;font-size:13px;color:#7c5a00;text-decoration:underline;}
 .st-lect-mode{text-align:center;padding:6px 8px;background:#0b1226;}
 .st-lect-mode[hidden]{display:none;}
 .st-lien-mode{background:none;border:0;color:#f4d98a;font-size:12.5px;text-decoration:underline;cursor:pointer;padding:4px 8px;}

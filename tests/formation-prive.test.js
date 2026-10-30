@@ -196,6 +196,67 @@ test('fichiers privés des cours', async (t) => {
     assert.equal(faux2.status, 415, 'contenu PDF sous une extension .docx : refusé');
   });
 
+  await t.test('lot K — audio privé : stockage privé, adresse jamais livrée, lecture par morceaux sous contrôle d\'accès, téléchargement au choix du formateur', async () => {
+    const mp3 = Buffer.concat([Buffer.from('ID3'), Buffer.from('audio du cours '.repeat(40))]);
+    const audio = async (nom, buf) => { const fd = new FormData(); fd.append('audio', new Blob([buf]), nom); const h = {}; jarF.apply(h); const r = await fetch(env.base + '/api/formateur/audio-cours', { method: 'POST', headers: h, body: fd }); return { status: r.status, data: await r.json().catch(() => null) }; };
+    const up = await audio('Cours.mp3', mp3);
+    assert.equal(up.status, 200, JSON.stringify(up.data)); assert.equal(up.data.prive, true); assert.match(up.data.url, Prive.REF);
+    const ref = up.data.url;
+    const lecon = async extra => { const r = await call(jarF, 'POST', `/api/formations/${fid}/chapitres/${ch}/lecons`, { titre: 'Audio', ...extra }); assert.equal(r.status, 201, JSON.stringify(r.data)); return r.data.id; };
+    const lSans = await lecon({ type: 'audio', contenu_url: ref, telechargement_autorise: false });
+    const lAvec = await lecon({ type: 'audio', contenu_url: ref, telechargement_autorise: true });
+    const lStu = await lecon({ type: 'texte' });
+    /* adresse masquée pour l'apprenant, intacte pour le propriétaire */
+    const plan = await call(jarA, 'GET', `/api/formations/${fid}/suivre`);
+    assert.ok(!JSON.stringify(plan.data).includes(ref), 'la référence privée n\'est pas livrée à l\'apprenant');
+    const les = plan.data.modules.flatMap(m => m.chapitres.flatMap(c => c.lecons)).find(x => x.id === lSans);
+    assert.equal(les.contenu_url, null); assert.equal(les.a_document, 1);
+    assert.equal((await call(jarF, 'GET', `/api/formations/${fid}/suivre`)).data.modules.flatMap(m => m.chapitres.flatMap(c => c.lecons)).find(x => x.id === lSans).contenu_url, ref);
+    /* lecture : octets identiques, par morceaux, accès contrôlé */
+    const a = await brut(jarA, base(lSans) + '/audio');
+    assert.equal(a.status, 200); assert.equal(a.entetes.get('content-type'), 'audio/mpeg'); assert.equal(a.entetes.get('accept-ranges'), 'bytes'); assert.ok(a.buf.equals(mp3));
+    const m = await brut(jarA, base(lSans) + '/audio', { Range: 'bytes=0-9' });
+    assert.equal(m.status, 206); assert.equal(m.buf.length, 10); assert.match(m.entetes.get('content-range'), /^bytes 0-9\/\d+$/);
+    assert.equal((await brut(jarA, base(lSans) + '/audio', { Range: 'bytes=-5' })).buf.length, 5, 'les derniers octets (avance rapide)');
+    assert.equal((await brut(jarA, base(lSans) + '/audio', { Range: 'bytes=999999-' })).status, 416);
+    assert.equal((await brut(jarX, base(lSans) + '/audio')).status, 403, 'un non-inscrit n\'écoute rien');
+    assert.equal((await brut(anon, base(lSans) + '/audio')).status, 401);
+    /* téléchargement : seulement si le formateur l'a permis */
+    assert.equal((await brut(jarA, base(lSans) + '/telecharger')).status, 403, 'téléchargement non autorisé');
+    const dl = await brut(jarA, base(lAvec) + '/telecharger');
+    assert.equal(dl.status, 200); assert.equal(dl.entetes.get('content-type'), 'audio/mpeg'); assert.match(dl.entetes.get('content-disposition'), /^attachment; filename=".+\.mp3"$/); assert.ok(dl.buf.equals(mp3));
+    /* Studio : élément « Audio » */
+    const g = await call(jarF, 'GET', `/api/formations/${fid}/lecons/${lStu}/studio`);
+    const el = (id, props) => ({ id, type: 'audio', x: 0, y: 0, w: 480, h: 96, z: 1, props });
+    const faussaire = 'prive:formations/99999/' + 'a'.repeat(32) + '.mp3';
+    const r = await call(jarF, 'PUT', `/api/formations/${fid}/lecons/${lStu}/studio`, { mode: 'structure', rev: g.data.rev, pages: [{ id: 'p1', titre: '', elements: [
+      el('a1', { url: ref, titre: 'Introduction', telechargeable: true }), el('a2', { url: ref, titre: 'Écoute seule', telechargeable: false }), el('a3', { url: faussaire, titre: 'Volé' }), el('a4', { url: 'https://exemple.org/public.mp3', titre: 'Public' })] }] });
+    assert.equal(r.status, 200, JSON.stringify(r.data));
+    const urls = Object.fromEntries(r.data.doc.pages[0].elements.map(e => [e.id, e.props.url]));
+    assert.equal(urls.a1, ref); assert.equal(urls.a3, '', 'la référence privée d\'un autre compte est refusée'); assert.equal(urls.a4, 'https://exemple.org/public.mp3');
+    const sans = await call(jarF, 'PUT', `/api/formations/${fid}/lecons/${lStu}/studio`, { mode: 'structure', rev: r.data.rev, pages: [{ id: 'p1', titre: '', elements: r.data.doc.pages[0].elements.filter(e => e.id !== 'a3') }] });
+    assert.equal(sans.status, 200, JSON.stringify(sans.data));
+    assert.equal((await call(jarF, 'POST', `/api/formations/${fid}/lecons/${lStu}/studio/publier`, {})).status, 200);
+    const lecture = await call(jarA, 'GET', `/api/formations/${fid}/lecons/${lStu}/studio/lecture`);
+    assert.ok(!JSON.stringify(lecture.data).includes('prive:'), 'rien de privé dans la lecture de l\'apprenant');
+    const vu = Object.fromEntries(lecture.data.doc.pages[0].elements.map(e => [e.id, e.props]));
+    assert.equal(vu.a1.url, 'document:a1.mp3'); assert.equal(vu.a2.telechargeable, false); assert.equal(vu.a4.url, 'https://exemple.org/public.mp3');
+    const e1 = await brut(jarA, base(lStu) + '/audio?element=a1');
+    assert.equal(e1.status, 200); assert.ok(e1.buf.equals(mp3));
+    assert.equal((await brut(jarA, base(lStu) + '/telecharger?element=a1')).status, 200, 'élément téléchargeable');
+    assert.equal((await brut(jarA, base(lStu) + '/telecharger?element=a2')).status, 403, 'élément en écoute seule');
+    assert.equal((await brut(jarX, base(lStu) + '/audio?element=a1')).status, 403);
+    assert.equal((await brut(jarA, base(lStu) + '/audio?element=inconnu')).status, 404);
+    /* le contenu doit être un vrai audio : un PDF déguisé en .mp3 n'est pas servi */
+    const faux = await audio('Autre.mp3', Buffer.concat([Buffer.from('ID3'), Buffer.from('autre audio '.repeat(20))]));
+    fichiers.set([...fichiers.keys()].find(k => k.includes(faux.data.url.split('/').pop())), pdf);
+    const l2 = await lecon({ type: 'audio', contenu_url: faux.data.url, telechargement_autorise: true });
+    assert.equal((await brut(jarA, base(l2) + '/audio')).status, 415, 'contenu non audio refusé');
+    /* bibliothèque : une référence audio privée n'entre que dans la bibliothèque de son déposant */
+    assert.equal((await call(jarF, 'POST', '/api/formateur/medias', { type: 'audio', url: ref, nom: 'Cours' })).status, 201);
+    assert.equal((await call(jarF, 'POST', '/api/formateur/medias', { type: 'audio', url: faussaire, nom: 'Volé' })).status, 400);
+  });
+
   await t.test('bibliothèque de médias : une référence privée n\'entre que dans la bibliothèque de son déposant', async () => {
     const ok = await call(jarF, 'POST', '/api/formateur/medias', { type: 'document', url: refPdf, nom: 'Support privé', taille: pdf.length });
     assert.equal(ok.status, 201, JSON.stringify(ok.data));
@@ -225,6 +286,8 @@ test('migration : repérage et réécriture des documents (fonctions pures du sc
   assert.equal(M.migrable('https://diaspoactif-media.b-cdn.net/posts/1-2.png'), false, 'une image n\'est pas un document de cours');
   assert.equal(M.migrable('https://exemple.org/a.pdf'), false, 'hôte extérieur');
   assert.equal(M.migrable('prive:formations/1/' + 'a'.repeat(32) + '.pdf'), false, 'déjà migré');
+  assert.equal(M.migrable('https://diaspoactif-media.b-cdn.net/formations-audios/1-2-' + 'a'.repeat(32) + '.mp3'), true, 'lot K : les audios de cours migrent aussi');
+  assert.deepEqual(M.urlsDuStudio(JSON.stringify({ pages: [{ elements: [{ id: 'a', type: 'audio', props: { url: 'https://x.b-cdn.net/formations-audios/1-2.mp3' } }, { id: 'b', type: 'audio', props: { url: 'https://youtube.com/x.mp3' } }] }] })), ['https://x.b-cdn.net/formations-audios/1-2.mp3'], 'seuls les audios de notre CDN');
   const json = JSON.stringify({ pages: [{ elements: [
     { id: 'a', type: 'document', props: { url: 'https://x.b-cdn.net/documents/1-1.pdf', nom: 'A' } },
     { id: 'b', type: 'document', props: { url: 'https://x.b-cdn.net/documents/1-2.xlsx' } },
@@ -264,5 +327,6 @@ test('audio de cours : type vérifié sur les octets, réservé aux créateurs',
   assert.equal((await audio(jarF, 'a.mp3', Buffer.from('<html>pas un audio, même renommé en mp3</html>'))).status, 400);
   assert.equal((await audio(jarF, 'gros.mp3', Buffer.concat([mp3, Buffer.alloc(4.5 * 1024 * 1024)]))).status, 413, 'au-delà de 4 Mo');
   const bon = await audio(jarF, 'cours.mp3', mp3);
-  assert.equal(bon.status, 500, 'type accepté : l\'envoi vers le CDN est tenté (échoue ici faute de clé Bunny dans le banc d\'essai) — jamais un refus 400');
+  assert.equal(bon.status, 200, JSON.stringify(bon.data)); assert.equal(bon.data.prive, true, 'avec un stockage privé configuré, l\'audio n\'est plus envoyé sur le CDN public');
+  assert.match(bon.data.url, Prive.REF); assert.match(bon.data.url, /\.mp3$/);
 });

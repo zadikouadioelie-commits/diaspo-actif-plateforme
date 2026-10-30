@@ -80,7 +80,8 @@ function nettoyerElement(e, SEC, pagesIds) {
     o.url = urlHttps(p.url); o.titre = txt(p.titre, 120); o.miniature = urlHttps(p.miniature);
     o.exiger = !!p.exiger && suivable(o.url); /* visionnage obligatoire : seulement pour un fichier vidéo (le suivi de YouTube n'est pas possible) */
   } else if (e.type === "audio") {
-    o.url = urlHttps(p.url); o.titre = txt(p.titre, 120);
+    o.url = Prive.REF.test(String(p.url || "")) ? String(p.url) : urlHttps(p.url); o.titre = txt(p.titre, 120); /* référence « prive:… » (lot K) ou adresse https */
+    o.telechargeable = p.telechargeable !== false; /* le formateur choisit : audio téléchargeable ou seulement écoutable */
   } else if (e.type === "separateur") {
     o.style = choix(p.style, ["trait", "pointille", "double"], "trait"); o.couleur = couleur(p.couleur); o.epaisseur = Math.round(nbr(p.epaisseur, 1, 12, 2));
   } else if (e.type === "lien") {
@@ -215,7 +216,7 @@ function lireMedia(b, userId) {
   const type = choix(b && b.type, TYPES_MEDIA, "");
   if (!type) return { erreur: "Type de média inconnu (image, document, vidéo ou audio)." };
   /* Document du stockage privé (lot F) : la référence « prive:formations/<compte>/… » n'est acceptée que pour le compte qui l'a déposée. */
-  if (type === "document" && Prive.REF.test(String(b.url || ""))) {
+  if ((type === "document" || type === "audio") && Prive.REF.test(String(b.url || ""))) {
     if (Number(String(b.url).split("/")[1]) !== Number(userId)) return { erreur: "Seuls les fichiers que vous avez envoyés depuis votre compte peuvent entrer dans votre bibliothèque." };
     return { vals: { type, url: String(b.url), nom: txt(b.nom, 150).trim() || "Document", taille: Number.isFinite(Number(b.taille)) && Number(b.taille) > 0 ? Math.floor(Number(b.taille)) : null } };
   }
@@ -326,7 +327,7 @@ module.exports.register = function register(deps) {
     /* Une référence de fichier privé n'est acceptée que si elle a été déposée par le compte qui enregistre ou par le propriétaire de la formation (jamais celle d'un tiers). */
     r.doc.pages.forEach(pg => pg.elements.forEach(e => {
       const u = e.props && e.props.url;
-      if ((e.type === "document" || e.type === "fichier") && Prive.REF.test(String(u || "")) && ![Number(c.user.id), Number(c.f.owner_user_id)].includes(Number(String(u).split("/")[1]))) e.props.url = "";
+      if ((e.type === "document" || e.type === "fichier" || e.type === "audio") && Prive.REF.test(String(u || "")) && ![Number(c.user.id), Number(c.f.owner_user_id)].includes(Number(String(u).split("/")[1]))) e.props.url = "";
     }));
     const quizLecon = await db.prepare("SELECT id FROM formation_quiz WHERE lecon_id=? AND formation_id=?").get(c.lecon.id, c.f.id);
     let quizVu = false;
