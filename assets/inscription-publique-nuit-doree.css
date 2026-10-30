@@ -147,6 +147,12 @@ html body.nd .ip-cand-declare-btn:disabled{background:rgba(123,232,123,.12);colo
 html body.nd .ip-parrainage-box{background:rgba(0,174,239,.1);border:1px solid rgba(80,200,255,.5);border-radius:20px;box-shadow:none;color:#BFE9FF}
 html body.nd .ip-parrainage-box:hover{background:rgba(0,174,239,.18)}
 html body.nd .ip-parrainage-box strong{color:#fff}
+/* cadre « Lien(s) de parrainage » (2026-10-30) : même bleu que le bouton de parrainage, pour ne jamais confondre avec une inscription */
+html body.nd .ip-lp-cadre{background:rgba(0,174,239,.08);border:1.5px solid rgba(80,200,255,.55);border-radius:16px}
+html body.nd .ip-lp-titre{color:#7FD6FF}
+html body.nd .ip-lp-ok{background:rgba(123,232,123,.14);color:var(--ip-vert,#7BE87B);border:1px solid rgba(123,232,123,.45)}
+html body.nd .ip-lp-note{color:#BFE9FF}
+html body.nd .ip-lp-inactif{background:rgba(255,120,120,.14);color:#FFA8A8;border:1px solid rgba(255,120,120,.45)}
 
 /* retour (bouton « Retour » au-dessus de la barre) : même langage que les pages déjà habillées */
 html body.nd .ip-lightbox{background:rgba(3,6,14,.94)}

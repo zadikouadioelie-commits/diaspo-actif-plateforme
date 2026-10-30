@@ -49976,6 +49976,31 @@ async function getChampsPourType(typeId, ficheId) {
   return propres.concat(universellesFusionnees);
 }
 
+/* Liens de parrainage dans les « Liens utiles » (2026-10-30, demande explicite : les encadrer et
+   les marquer « lien de parrainage » sur la fiche d'inscription publique, pour ne pas les confondre
+   avec une inscription). Un lien est un lien de parrainage s'il est de la forme <notre domaine>/join/CODE ;
+   o.parrainage vaut alors 'verifie' (le code existe ET l'invitation est active) ou 'inactif' (code connu mais
+   désactivé). Un /join/ vers un autre domaine, ou un code inconnu, reste un lien ordinaire — jamais
+   marqué « vérifié » sur la seule apparence de l'adresse. Lecture seule, au seul affichage public. */
+async function marquerLiensParrainage(champs) {
+  for (const c of champs) {
+    if (c.type_champ !== "liens_utiles") continue;
+    let liens = [];
+    try { liens = JSON.parse(c.options_json || "[]"); } catch (e) { continue; }
+    if (!Array.isArray(liens)) continue;
+    for (const l of liens) {
+      let u; try { u = new URL(String(l?.url || "")); } catch (e) { continue; }
+      const h = u.hostname.toLowerCase();
+      if (!(h === "diaspoactif.com" || h.endsWith(".diaspoactif.com") || h === "localhost" || h === "127.0.0.1")) continue;
+      const m = /^\/join\/([A-Za-z0-9_-]+)\/?$/.exec(u.pathname);
+      if (!m) continue;
+      const inv = await db.prepare("SELECT statut FROM invitations WHERE code=?").get(m[1]);
+      if (inv) l.parrainage = inv.statut === "active" ? "verifie" : "inactif";
+    }
+    c.options_json = JSON.stringify(liens);
+  }
+}
+
 /* Options payantes (2026-09-25, demande explicite) : catalogue libre d'extras (libellé + prix +
    photo optionnelle) défini par l'organisateur sur un champ de type "options_payantes"
    (insc_champs.options_json = [{libelle, photo_url, prix}]) — le participant coche des
@@ -51708,6 +51733,7 @@ route("GET", "/api/insc/public/:slug", async (req, res, params) => {
   const types = await db.prepare("SELECT * FROM insc_types WHERE fiche_id=? AND actif=1 ORDER BY ordre ASC, id ASC").all(fiche.id);
   for (const t of types) {
     t.champs = await getChampsPourType(t.id, fiche.id);
+    await marquerLiensParrainage(t.champs);
     const nb = (await db.prepare("SELECT COUNT(*) n FROM insc_inscriptions WHERE type_id=? AND statut NOT IN ('annule','liste_attente')").get(t.id))?.n || 0;
     t.places_restantes = t.places_max != null ? Math.max(0, t.places_max - nb) : null;
     t.complet = t.places_max != null && nb >= t.places_max;
