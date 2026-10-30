@@ -9,7 +9,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const XL = require('../server/xlsx-lecteur');
 const XLS = require('../server/xls-lecteur');
-const { xls, LONGUE } = require('./_xls-fabrique');
+const { xls, LONGUE, FORMULES, SANS_TEXTE } = require('./_xls-fabrique');
 
 const sans = s => String(s).replace(/[\s  ]/g, '');
 
@@ -38,6 +38,31 @@ test('xls : feuilles, valeurs, formats, styles, fusions, largeurs', () => {
   assert.equal(cl.styles[1].b, 1); assert.equal(cl.styles[0].b, undefined);
   assert.equal(cl.styles[5].b, 1, 'la police d\'indice 5 est la 5e enregistrée'); assert.equal(cl.styles[5].al, 'right');
   assert.equal(cl.styles[6].i, 1); assert.equal(cl.styles[6].al, 'center'); assert.equal(cl.styles[6].wrap, 1);
+});
+
+test('xls : texte des formules (opérateurs, parenthèses, SUM, IF, plages absolues, autres feuilles, formules partagées) ; illisible = aucune formule inventée', () => {
+  const d = XLS.ouvrir(xls()).feuilles[1];
+  const cellule = k => { const [r, c] = k.split(',').map(Number); return d.lignes.get(r) && d.lignes.get(r).get(c); };
+  for (const [k, attendu] of Object.entries(FORMULES)) assert.equal(cellule(k).f, attendu, 'formule en ' + k);
+  assert.equal(cellule('3,0').t, 'non', 'la valeur enregistrée reste affichée, aussi pour une formule qui rend du texte');
+  assert.equal(cellule('2,0').v, 5);
+  for (const k of SANS_TEXTE) { assert.ok(cellule(k), 'la cellule existe'); assert.equal(cellule(k).f, undefined, 'fonction inconnue ou nom défini : pas de texte approximatif (' + k + ')'); }
+  assert.match(XL.exporterTexte(XLS.ouvrir(xls()), 30000), /C3 = 3 \[formule : =SUM\(\$A\$2:B2\)\]/, 'texte transmis à l\'assistant avec sa formule');
+});
+
+test('xls : décodeur de formules — jetons invalides ou piégés ne produisent ni exception ni texte', () => {
+  const { decompiler } = require('../server/xls-formules');
+  const ou = { r: 0, c: 0 };
+  assert.equal(decompiler(Buffer.from([0x03]), ou, {}), null, 'opérateur sans opérandes');
+  assert.equal(decompiler(Buffer.from([0x1e, 1]), ou, {}), null, 'entier tronqué');
+  assert.equal(decompiler(Buffer.from([0x1e, 1, 0, 0x1e, 2, 0]), ou, {}), null, 'deux valeurs sans opérateur');
+  assert.equal(decompiler(Buffer.from([0xff]), ou, {}), null, 'jeton inconnu');
+  assert.equal(decompiler(Buffer.from([0x3a, 9, 0, 0, 0, 0, 0]), ou, { xti: [], feuilles: [] }), null, 'lien de feuille inexistant');
+  assert.equal(decompiler(Buffer.from([0x01, 0, 0, 0, 0]), ou, { partagees: () => Buffer.from([0x01, 0, 0, 0, 0]) }), null, 'formule partagée qui renvoie à elle-même');
+  assert.equal(decompiler(Buffer.alloc(0), ou, {}), null);
+  assert.equal(decompiler(Buffer.from([0x1e, 7, 0]), ou, {}), '7');
+  let germe = 99; const alea = () => { germe = (germe * 1103515245 + 12345) & 0x7fffffff; return germe; };
+  for (let k = 0; k < 3000; k++) { const b = Buffer.alloc(1 + alea() % 40); for (let i = 0; i < b.length; i++) b[i] = alea() & 0xff; const t = decompiler(b, ou, { xti: [[0, 0]], feuilles: ['A'], partagees: () => null }); assert.ok(t === null || typeof t === 'string'); }
 });
 
 test('xls : même interface que les classeurs .xlsx (résumé, fenêtres, texte pour l\'assistant)', () => {

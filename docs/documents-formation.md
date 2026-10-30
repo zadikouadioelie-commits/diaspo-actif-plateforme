@@ -49,7 +49,7 @@ Le serveur ouvre l'archive .xlsx (zlib de Node), lit feuilles, chaînes partagé
 au défilement ; un clic sur une cellule montre son adresse, sa formule et sa valeur (barre de formule, lecture seule). Onglets de feuilles, taille du texte A− / A+, plein écran, téléchargement si autorisé.
 
 **Limites assumées** (affichées dans la visionneuse, bouton ⓘ) : formules **non recalculées** ; graphiques, images, formes, tableaux croisés dynamiques et mises en forme conditionnelles non dessinés ;
-couleurs de thème et bordures non reprises ; feuilles masquées non montrées ; **.xls (Excel 97-2003) lu par server/xls-lecteur.js** : valeurs, résultats enregistrés des formules (sans leur texte), formats de nombres et de dates, gras, italique, alignement, fusions, largeurs, lignes et feuilles masquées — sans couleurs ni bordures ; les .xls protégés par mot de passe ou d'avant Excel 97 sont refusés avec un message clair ; **.xlsm refusé** — les macros ne sont jamais lues ni exécutées
+couleurs de thème et bordures non reprises ; feuilles masquées non montrées ; **.xls (Excel 97-2003) lu par server/xls-lecteur.js** : valeurs, résultats enregistrés des formules **et leur texte** quand il est courant (lot J : server/xls-formules.js ; noms définis, fonctions récentes et matrices en ligne : valeur seule, jamais un texte approximatif), formats de nombres et de dates, gras, italique, alignement, fusions, largeurs, lignes et feuilles masquées — sans couleurs ni bordures ; les .xls protégés par mot de passe ou d'avant Excel 97 sont refusés avec un message clair ; **.xlsm refusé** — les macros ne sont jamais lues ni exécutées
 (un classeur à macros renommé en .xlsx est refusé sur son contenu). Défenses : nombre d'entrées, taille décompressée par entrée (60 Mo) et au total (200 Mo), 600 000 cellules au plus, 200 colonnes au plus.
 
 ## 5. Interface avec l'assistant pédagogique (Koffi)
@@ -66,7 +66,7 @@ Exemple : « Explique-moi comment est calculé le bénéfice net » → le texte
 
 ## 6. Ce qui n'est pas fait
 
-- Texte des formules des anciens **.xls** (seule leur dernière valeur est montrée).
+- Texte des formules des anciens **.xls** employant des noms définis, des fonctions récentes (_xlfn) ou des matrices en ligne (seule leur dernière valeur est montrée) ; la table des fonctions de server/xls-formules.js ne contient que des index certains.
 - **Fichiers vraiment privés** : l'adresse du fichier reste publique sur l'hébergeur pour qui la connaît (et reste présente dans les données de la leçon, dont dépend la version téléphone).
   Une protection complète demande un stockage privé avec adresses signées.
 - Version **téléphone** (`assets/m-mod-formations.js`) : non adaptée (lot E).

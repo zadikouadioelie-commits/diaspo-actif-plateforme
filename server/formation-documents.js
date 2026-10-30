@@ -29,7 +29,7 @@ const LIMITES_EXCEL = [
   "Les formules ne sont pas recalculées : la dernière valeur enregistrée par Excel est affichée, avec le texte de la formule.",
   "Graphiques, images, formes, tableaux croisés dynamiques et mises en forme conditionnelles ne sont pas dessinés.",
   "Les couleurs de thème et les bordures ne sont pas reprises ; gras, italique, couleurs et fonds simples le sont.",
-  "Les anciens fichiers .xls (Excel 97-2003) s'affichent sans le texte des formules, sans couleurs ni bordures ; les classeurs à macros (.xlsm) et les classeurs protégés par mot de passe ne s'affichent pas.",
+  "Les anciens fichiers .xls (Excel 97-2003) s'affichent sans couleurs ni bordures (le texte des formules courantes est lu ; celles qui emploient des noms définis ou des fonctions récentes montrent seulement leur dernière valeur) ; les classeurs à macros (.xlsm) et les classeurs protégés par mot de passe ne s'affichent pas.",
 ];
 
 const famille = url => {

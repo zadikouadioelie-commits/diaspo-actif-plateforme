@@ -42,12 +42,53 @@ const rk = (r, c, xfi, v) => rec(0x027e, u16(r), u16(c), u16(xfi), u32(v));
 const boolerr = (r, c, xfi, v, err) => rec(0x0205, u16(r), u16(c), u16(xfi), Buffer.from([v, err ? 1 : 0]));
 const formuleNombre = (r, c, xfi, v) => rec(0x0006, u16(r), u16(c), u16(xfi), f64(v), u16(0), u32(0), u16(0));
 const formuleTexte = (r, c, xfi, texte) => Buffer.concat([rec(0x0006, u16(r), u16(c), u16(xfi), Buffer.from([0, 0, 0, 0, 0, 0, 0xff, 0xff]), u16(0), u32(0), u16(0)), rec(0x0207, u16(texte.length), Buffer.from([0]), Buffer.from(texte, 'latin1'))]);
+/* Formules avec leurs jetons (lot J) : rgce = octets des jetons. REL = indicateurs « ligne et colonne relatives » (bits 15 et 14 du champ colonne). */
+const REL = 0xc000;
+const formuleF = (r, c, xfi, v, rgce) => rec(0x0006, u16(r), u16(c), u16(xfi), f64(v), u16(0), u32(0), u16(rgce.length), rgce);
+const formuleS = (r, c, xfi, texte, rgce) => Buffer.concat([rec(0x0006, u16(r), u16(c), u16(xfi), Buffer.from([0, 0, 0, 0, 0, 0, 0xff, 0xff]), u16(0), u32(0), u16(rgce.length), rgce), rec(0x0207, u16(texte.length), Buffer.from([0]), Buffer.from(texte, 'latin1'))]);
+const T = {
+  ref: (r, c, f) => Buffer.concat([Buffer.from([0x24]), u16(r), u16(c | f)]),
+  refN: (dr, dc) => Buffer.concat([Buffer.from([0x2c]), u16(dr & 0xffff), u16(REL | (dc & 0xff))]),
+  area: (r1, r2, c1, f1, c2, f2) => Buffer.concat([Buffer.from([0x25]), u16(r1), u16(r2), u16(c1 | f1), u16(c2 | f2)]),
+  ref3d: (x, r, c) => Buffer.concat([Buffer.from([0x3a]), u16(x), u16(r), u16(c | REL)]),
+  int: n => Buffer.concat([Buffer.from([0x1e]), u16(n)]),
+  str: s => Buffer.concat([Buffer.from([0x17, s.length, 0]), Buffer.from(s, 'latin1')]),
+  op: n => Buffer.from([n]),
+  attr: (t, d) => Buffer.concat([Buffer.from([0x19, t]), u16(d || 0)]),
+  funcVar: (nb, idx) => Buffer.concat([Buffer.from([0x22, nb]), u16(idx)]),
+  exp: (r, c) => Buffer.concat([Buffer.from([0x01]), u16(r), u16(c)]),
+  tous: (...b) => Buffer.concat(b),
+};
+/* Formules de la feuille « Détail » et texte attendu (clé « ligne,colonne »). */
+const FORMULES = { '2,0': 'A2+B2*2', '2,1': 'SUM(A2:B2)', '2,2': 'SUM($A$2:B2)', '3,0': 'IF(A2>1,"oui","non")', '3,1': 'Prévisions!B2', '3,2': 'Prévisions:Détail!A1', '4,0': '(A2+1)/2', '4,1': '"a""b"&A2', '6,2': 'A2*10', '7,2': 'A3*10' };
+/* Formules sans texte attendu : fonction inconnue, nom défini (la valeur enregistrée reste montrée). */
+const SANS_TEXTE = ['5,0', '5,1'];
+function formulesDetail() {
+  const lenSh = T.tous(T.refN(-5, -2), T.int(10), T.op(0x05)).length;
+  return Buffer.concat([
+    formuleF(2, 0, 0, 5, T.tous(T.ref(1, 0, REL), T.ref(1, 1, REL), T.int(2), T.op(0x05), T.op(0x03))),
+    formuleF(2, 1, 0, 3, T.tous(T.area(1, 1, 0, REL, 1, REL), T.attr(0x10))),
+    formuleF(2, 2, 0, 3, T.tous(T.area(1, 1, 0, 0, 1, REL), T.funcVar(1, 4))),
+    formuleS(3, 0, 0, 'non', T.tous(T.ref(1, 0, REL), T.int(1), T.op(0x0d), T.attr(0x02, 10), T.str('oui'), T.attr(0x08, 12), T.str('non'), T.attr(0x08, 3), T.funcVar(3, 1))),
+    formuleF(3, 1, 0, 120000, T.ref3d(0, 1, 1)),
+    formuleF(3, 2, 0, 0, T.ref3d(1, 0, 0)),
+    formuleF(4, 0, 0, 1, T.tous(T.ref(1, 0, REL), T.int(1), T.op(0x03), T.op(0x15), T.int(2), T.op(0x06))),
+    formuleS(4, 1, 0, 'a"b1', T.tous(T.str('a"b'), T.ref(1, 0, REL), T.op(0x08))),
+    formuleF(5, 0, 0, 0, T.tous(T.int(1), T.funcVar(1, 9999))),
+    formuleF(5, 1, 0, 0, Buffer.concat([Buffer.from([0x23]), u32(1)])),
+    formuleF(6, 2, 0, 10, T.exp(6, 2)),
+    rec(0x04bc, u16(6), u16(7), Buffer.from([2, 2, 0, 2]), u16(lenSh), T.tous(T.refN(-5, -2), T.int(10), T.op(0x05))),
+    formuleF(7, 2, 0, 20, T.exp(6, 2)),
+  ]);
+}
 const ligneMasquee = r => rec(0x0208, u16(r), u16(0), u16(1), u16(255), u16(0), u16(0), u16(0x20), u16(0));
 
 function classeurBiff({ chiffre, biff5 }) {
   const chaines = ['Prévision financière', 'Chiffre d’affaires', 'Charges', 'Bénéfice net', 'Texte masqué', LONGUE, 'x', 'y', 'Fin'];
   const iLongue = 5;
   const globals = [Buffer.concat([rec(0x0809, u16(biff5 ? 0x0500 : 0x0600), u16(5), u16(0x0dbb), u16(0x07cc), u32(0), u32(6)), rec(0x0022, u16(0))])];
+  /* liens de feuilles pour les formules 3D : SUPBOOK « ce classeur » + EXTERNSHEET (0 → Prévisions, 1 → Prévisions à Détail) */
+  globals.push(rec(0x01ae, u16(3), u16(0x0401)), rec(0x0017, u16(2), u16(0), u16(0), u16(0), u16(0), u16(0), u16(1)));
   if (chiffre) globals.push(rec(0x002f, u16(1), u16(1), u16(1), Buffer.alloc(48)));
   /* polices d'indices 0, 1 (gras), 2 (italique), 3, puis 5 (gras) : l'indice 4 n'existe pas dans Excel */
   globals.push(police(false), police(true), police(false, true), police(false), police(true));
@@ -68,7 +109,7 @@ function classeurBiff({ chiffre, biff5 }) {
     ligneMasquee(7), labelsst(7, 0, 0, 4),
     rec(0x00e5, u16(1), u16(0), u16(0), u16(0), u16(2)), rec(0x007d, u16(0), u16(0), u16(28 * 256), u16(0), u16(0), u16(0)),
     eof()]);
-  const f2 = Buffer.concat([bof(0x0010), labelsst(0, 0, 0, 6), labelsst(0, 1, 0, 7), nombre(1, 0, 0, 1), nombre(1, 1, 0, 2), eof()]);
+  const f2 = Buffer.concat([bof(0x0010), labelsst(0, 0, 0, 6), labelsst(0, 1, 0, 7), nombre(1, 0, 0, 1), nombre(1, 1, 0, 2), formulesDetail(), eof()]);
   const f3 = Buffer.concat([bof(0x0010), labelsst(0, 0, 0, 8), eof()]);
   const base = avantFeuilles.length;
   const offsets = [base, base + f1.length, base + f1.length + f2.length];
@@ -108,4 +149,4 @@ function ole(flux, { macros }) {
 
 function xls(opts) { opts = opts || {}; return ole(classeurBiff(opts), opts); }
 
-module.exports = { xls, LONGUE };
+module.exports = { xls, LONGUE, FORMULES, SANS_TEXTE };

@@ -90,7 +90,9 @@ test('PDF : lettres hors WinAnsi remplacées par la lettre proche (noms africain
   assert.equal(t('Łukasz Dvořák Ćirić Ångström'), 'Lukasz Dvor\xe1k Ciric \xc5ngstr\xf6m', 'lettres d’Europe centrale ramenées à la lettre de base ; á ö Å conservés');
   assert.equal(t('élie'), '\xe9lie', 'accent écrit en deux caractères recomposé');
   assert.equal(t('a‑b − c'), 'a-b - c', 'trait d’union insécable et signe moins');
-  assert.equal(t('Мария 张伟'), '????? ??', 'autres alphabets : un « ? » par lettre (limite connue)');
+  assert.equal(t('Мария Щербаков Їжак'), 'Mariya Shcherbakov Yizhak', 'cyrillique : translittération usuelle, la lettre accentuée Ї n’est pas perdue');
+  assert.equal(t('Γιώργος Παπαδόπουλος ΟΥΡΑΝΟΣ'), 'Giorgos Papadopoulos OURANOS', 'grec : accents ignorés, « ου » = « ou »');
+  assert.equal(t('محمد 张伟'), '???? ??', 'arabe, chinois… : un « ? » par lettre (limite connue : il faudrait intégrer une police)');
 });
 
 test('PDF : dates en français', () => {

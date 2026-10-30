@@ -5,12 +5,13 @@
    Ce qu'il lit : le conteneur OLE2 (secteurs, tables d'allocation, petit flux), les feuilles visibles, les chaînes partagées (avec leurs suites), les nombres (dont les
    formats RK), les booléens et erreurs, les résultats enregistrés des formules, les cellules fusionnées, les largeurs de colonnes, les lignes masquées, les formats de nombres
    et de dates, le gras, l'italique, l'alignement et le retour à la ligne.
-   Ce qu'il ne fait pas : les formules ne sont ni recalculées ni décompilées (seule leur dernière valeur est montrée) ; couleurs de fond et de texte, bordures, graphiques, images
+   Ce qu'il ne fait pas : les formules ne sont pas recalculées (la dernière valeur enregistrée est montrée ; leur texte est relu par server/xls-formules.js quand elles sont courantes) ; couleurs de fond et de texte, bordures, graphiques, images
    et tableaux croisés ne sont pas repris ; aucune macro n'est lue ni exécutée (un classeur qui en contient est refusé) ; les classeurs protégés par mot de passe et le format
    d'avant Excel 97 (BIFF5) sont refusés avec un message clair.
    Défenses : taille du fichier, nombre et boucle de secteurs, nombre de cellules et de colonnes.
    ═════════════════════════════════════════════════ */
 "use strict";
+const FM = require("./xls-formules");
 const XL = require("./xlsx-lecteur");
 const { ErreurClasseur, formaterNombre } = XL;
 
@@ -129,6 +130,7 @@ function lire(buf) {
   /* ── Partie « globale » : feuilles, chaînes partagées, formats, polices, styles ── */
   const cl = { date1904: false, styles: [], partages: [], feuilles: [], nbCellules: 0 };
   const defs = [], formats = {}, polices = []; const xfs = [];
+  const supInternes = [], xti = []; /* « liens » de feuilles utilisés par les formules (Feuille2!A1) */
   for (const r of enregistrements(wb, 0)) {
     if (r.type === 0x002f) throw new ErreurClasseur("chiffre", "Ce classeur est protégé par un mot de passe : il ne peut pas s'afficher dans la page.");
     if (r.type === 0x0022) cl.date1904 = r.d.readUInt16LE(0) === 1;
@@ -146,6 +148,11 @@ function lire(buf) {
         }
       } catch (_) { /* table tronquée : on garde ce qui a été lu */ }
     }
+    else if (r.type === 0x01ae && r.d.length >= 4) supInternes.push(r.d.readUInt16LE(2) === 0x0401); /* 0x0401 = ce classeur lui-même */
+    else if (r.type === 0x0017 && r.d.length >= 2) {
+      const n = Math.min(r.d.readUInt16LE(0), Math.floor((r.d.length - 2) / 6));
+      for (let k = 0; k < n; k++) { const p = 2 + k * 6; xti.push(supInternes[r.d.readUInt16LE(p)] ? [r.d.readUInt16LE(p + 2), r.d.readUInt16LE(p + 4)] : null); }
+    }
     else if (r.type === 0x000a) break; /* fin de la partie globale */
   }
   if (!defs.length) throw new ErreurClasseur("pas_xls", "Ce classeur ne contient aucune feuille.");
@@ -159,12 +166,21 @@ function lire(buf) {
     if (def.etat !== 0 || def.genre !== 0) continue; /* masquées ou feuilles de graphique : non montrées */
     const f = { nom: def.nom || "Feuille", lignes: new Map(), nbLignes: 0, nbColonnes: 0, merges: [], largeurs: {} };
     const masquees = new Set(); let nbC = 0, derniere = null, debut = true;
+    const partagees = new Map(), attente = []; /* formules partagées / matricielles : le texte est dans un enregistrement à part, résolu en fin de feuille */
     const poser = (r, c, cell) => {
-      if (c >= XL.MAX_COLONNES || !cell) return;
+      if (c >= XL.MAX_COLONNES || !cell) return null;
       let m = f.lignes.get(r); if (!m) { m = new Map(); f.lignes.set(r, m); }
       m.set(c, cell); nbC++;
       if (nbC > XL.MAX_CELLULES) throw new ErreurClasseur("trop_gros", `Cette feuille contient plus de ${XL.MAX_CELLULES.toLocaleString("fr-FR")} cellules : elle est trop volumineuse pour s'afficher dans la page.`);
       if (c + 1 > f.nbColonnes) f.nbColonnes = c + 1; if (r + 1 > f.nbLignes) f.nbLignes = r + 1;
+      return cell;
+    };
+    const contexteF = { feuilles: defs.map(x => x.nom), xti, partagees: (r, c) => partagees.get(r + "," + c) };
+    /* Texte de formule posé sur la cellule : tout de suite, ou en fin de feuille pour une formule partagée (jeton « Exp »). */
+    const formule = (cell, rgce, lig, c) => {
+      if (!cell || !rgce || !rgce.length) return;
+      if (rgce[0] === 0x01) attente.push({ cell, rgce, ou: { r: lig, c } });
+      else { const t = FM.decompiler(rgce, { r: lig, c }, contexteF); if (t) cell.f = t; }
     };
     const nombre = (xf, v) => { const st = cl.styles[xf] || cl.styles[0]; return { t: formaterNombre(v, st.fmt, cl.date1904), v, ...(xf ? { s: xf } : {}) }; };
     const texte = (xf, t) => (t === "" ? null : { t, ...(xf ? { s: xf } : {}) });
@@ -188,14 +204,17 @@ function lire(buf) {
       else if (r.type === 0x0006) {
         /* formule : seule la dernière valeur enregistrée est montrée */
         const lig = d.readUInt16LE(0), c = d.readUInt16LE(2), xf = d.readUInt16LE(4);
+        const cce = d.length >= 22 ? d.readUInt16LE(20) : 0, rgce = cce && d.length >= 22 + cce ? d.subarray(22, 22 + cce) : null;
         if (d.readUInt16LE(12) === 0xffff) {
           const g = d[6];
-          if (g === 0) derniere = { lig, c, xf }; /* le texte suit dans un enregistrement STRING */
-          else if (g === 1) poser(lig, c, { t: d[8] ? "VRAI" : "FAUX", y: "b", ...(xf ? { s: xf } : {}) });
-          else if (g === 2) poser(lig, c, { t: "#ERREUR", y: "e", ...(xf ? { s: xf } : {}) });
-        } else poser(lig, c, nombre(xf, d.readDoubleLE(6)));
+          if (g === 0) derniere = { lig, c, xf, rgce }; /* le texte suit dans un enregistrement STRING */
+          else if (g === 1) formule(poser(lig, c, { t: d[8] ? "VRAI" : "FAUX", y: "b", ...(xf ? { s: xf } : {}) }), rgce, lig, c);
+          else if (g === 2) formule(poser(lig, c, { t: "#ERREUR", y: "e", ...(xf ? { s: xf } : {}) }), rgce, lig, c);
+        } else formule(poser(lig, c, nombre(xf, d.readDoubleLE(6))), rgce, lig, c);
       }
-      else if (r.type === 0x0207 && derniere) { const t = chaineSimple(d, 0, 2); poser(derniere.lig, derniere.c, texte(derniere.xf, t.texte)); derniere = null; }
+      else if (r.type === 0x0207 && derniere) { const t = chaineSimple(d, 0, 2); formule(poser(derniere.lig, derniere.c, texte(derniere.xf, t.texte)), derniere.rgce, derniere.lig, derniere.c); derniere = null; }
+      else if (r.type === 0x04bc && d.length >= 10) { const cce = d.readUInt16LE(8); if (d.length >= 10 + cce) partagees.set(d.readUInt16LE(0) + "," + d[4], d.subarray(10, 10 + cce)); } /* formule partagée : ancre = première cellule de la plage */
+      else if (r.type === 0x0221 && d.length >= 14) { const cce = d.readUInt16LE(12); if (d.length >= 14 + cce) partagees.set(d.readUInt16LE(0) + "," + d[4], d.subarray(14, 14 + cce)); } /* formule matricielle */
       else if (r.type === 0x00e5) {
         const n = d.readUInt16LE(0);
         for (let k = 0; k < n && 2 + k * 8 + 8 <= d.length; k++) {
@@ -209,6 +228,7 @@ function lire(buf) {
       }
       else if (r.type === 0x0208 && d.length >= 14) { if (d.readUInt16LE(12) & 0x20) masquees.add(d.readUInt16LE(0)); }
     }
+    for (const a of attente) { const t = FM.decompiler(a.rgce, a.ou, contexteF); if (t) a.cell.f = t; }
     masquees.forEach(r => f.lignes.delete(r));
     f.nbLignes = 0; f.lignes.forEach((_, r) => { if (r + 1 > f.nbLignes) f.nbLignes = r + 1; });
     for (const m of f.merges) { if (m.r + m.rs > f.nbLignes) f.nbLignes = m.r + m.rs; if (Math.min(m.c + m.cs, XL.MAX_COLONNES) > f.nbColonnes) f.nbColonnes = Math.min(m.c + m.cs, XL.MAX_COLONNES); }

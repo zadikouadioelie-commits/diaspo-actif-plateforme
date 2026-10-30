@@ -23,11 +23,24 @@ const LETTRES_PROCHES = { "Ɛ": "E", "ɛ": "e", "Ɔ": "O", "ɔ": "o", "Ɓ": "B",
   "Ə": "E", "ə": "e", "Ɨ": "I", "ɨ": "i", "Ʉ": "U", "ʉ": "u", "Ƴ": "Y", "ƴ": "y", "Ƙ": "K", "ƙ": "k", "Ɲ": "N", "ɲ": "n", "Ƭ": "T", "ƭ": "t", "ɑ": "a", "Ɑ": "A", "ʃ": "s", "Ʃ": "S",
   "Ł": "L", "ł": "l", "Đ": "D", "đ": "d", "Ħ": "H", "ħ": "h", "ı": "i", "İ": "I", "Ŀ": "L", "ŀ": "l", "ĸ": "k", "ſ": "s", "Ŧ": "T", "ŧ": "t",
   "‐": "-", "‑": "-", "‒": "-", "−": "-", "′": "'", "″": '"', "‵": "'" };
+/* Translittération usuelle (type BGN/PCGN, sans diacritiques) du cyrillique (russe, ukrainien, bulgare, serbe, biélorusse) et du grec : « Мария » → « Maria », « Γιώργος » → « Giorgos ». */
+const TRANSLIT = {};
+[["а", "a"], ["б", "b"], ["в", "v"], ["г", "g"], ["д", "d"], ["е", "e"], ["ё", "e"], ["ж", "zh"], ["з", "z"], ["и", "i"], ["й", "y"], ["к", "k"], ["л", "l"], ["м", "m"], ["н", "n"], ["о", "o"],
+  ["п", "p"], ["р", "r"], ["с", "s"], ["т", "t"], ["у", "u"], ["ф", "f"], ["х", "kh"], ["ц", "ts"], ["ч", "ch"], ["ш", "sh"], ["щ", "shch"], ["ъ", ""], ["ы", "y"], ["ь", ""], ["э", "e"], ["ю", "yu"],
+  ["я", "ya"], ["і", "i"], ["ї", "yi"], ["є", "ye"], ["ґ", "g"], ["ў", "u"], ["ј", "j"], ["љ", "lj"], ["њ", "nj"], ["ћ", "c"], ["ђ", "dj"], ["џ", "dzh"],
+  ["α", "a"], ["β", "v"], ["γ", "g"], ["δ", "d"], ["ε", "e"], ["ζ", "z"], ["η", "i"], ["θ", "th"], ["ι", "i"], ["κ", "k"], ["λ", "l"], ["μ", "m"], ["ν", "n"], ["ξ", "x"], ["ο", "o"], ["π", "p"],
+  ["ρ", "r"], ["σ", "s"], ["ς", "s"], ["τ", "t"], ["υ", "y"], ["φ", "f"], ["χ", "ch"], ["ψ", "ps"], ["ω", "o"]].forEach(([k, v]) => { TRANSLIT[k] = v; });
+function translitere(c) {
+  const bas = c.toLowerCase(); const t = TRANSLIT[bas]; if (t === undefined) return undefined;
+  return c !== bas ? t.charAt(0).toUpperCase() + t.slice(1) : t;
+}
 /* Un caractère hors WinAnsi : lettre proche, ou lettre de base sans accent (ą → a, ř → r), ou « ? ». */
 function repli(c) {
   if (LETTRES_PROCHES[c] !== undefined) return LETTRES_PROCHES[c];
+  { const t0 = translitere(c); if (t0 !== undefined) return t0; } /* avant la décomposition : « Ї » ne doit pas devenir « I » */
   if (/^[̀-ͯ]$/.test(c)) return "";
   const base = c.normalize("NFD").replace(/[̀-ͯ]/g, "");
+  if (base) { let o = ""; for (const x of base) { const t = translitere(x); if (t === undefined) { o = null; break; } o += t; } if (o !== null) return o; } /* cyrillique, grec (accentué ou non) */
   return base !== c && /^[\x20-\x7e\xa0-\xff]+$/.test(base) ? base : "?";
 }
 function versOctets(texte) {
@@ -42,7 +55,7 @@ function versOctets(texte) {
     else return false;
     return true;
   };
-  for (const c of String(texte == null ? "" : texte).normalize("NFC").replace(INVISIBLES, "")) {
+  for (const c of String(texte == null ? "" : texte).normalize("NFC").replace(INVISIBLES, "").replace(/([οόΟΌ])([υύΥΎ])/g, (m, a, b) => (a === a.toUpperCase() ? (b === b.toUpperCase() ? "OU" : "Ou") : "ou"))) { /* grec « ου » = « ou » */
     if (pousser(c)) continue;
     for (const r of repli(c)) if (!pousser(r)) sortie.push(0x3f);
   }

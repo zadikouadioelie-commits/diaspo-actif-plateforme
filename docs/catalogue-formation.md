@@ -34,4 +34,5 @@ Dans l'aperçu gratuit, une leçon repliée n'est montée qu'à l'ouverture. Le 
 ## Noms et lettres hors WinAnsi sur le certificat PDF (lot H, 2026-10-30)
 
 Le PDF utilise les polices standard (alphabet WinAnsi/cp1252). Les lettres que cet alphabet ne connaît pas sont désormais **ramenées à la lettre proche** au lieu d'un « ? » : alphabets africains (Ɛ→E, Ɔ→O, Ŋ→N, Ɓ→B, Ɗ→D, ɣ→g…), Europe centrale (Ł→L, Ř→R, Ć→C…), traits d'union insécables et signe moins (→ « - »), accents écrits en deux caractères (recomposés). Les accents combinants isolés sont ignorés.
-**Limite connue :** les autres alphabets (arabe, cyrillique, chinois…) donnent encore un « ? » par lettre dans le PDF ; la page imprimable et la page de vérification, elles, affichent le nom exact. Les écrire dans le PDF demanderait d'intégrer une police (TrueType) au fichier.
+**Lot J :** le cyrillique (russe, ukrainien, bulgare, serbe) et le grec sont translittérés (« Мария » → « Maria », « Παπαδόπουλος » → « Papadopoulos », « ου » = « ou »).
+**Limite connue :** l'arabe, le chinois et les autres écritures donnent encore un « ? » par lettre dans le PDF ; la page imprimable et la page de vérification, elles, affichent le nom exact. Les écrire dans le PDF demanderait d'intégrer une police (TrueType) au fichier.
