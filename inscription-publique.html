@@ -46,17 +46,42 @@
    elle a réellement du contenu (classes posées par JS, ipAppliquerLayout()), pour ne jamais
    laisser une colonne vide béante : fiche sans événement lié/sans contact → pas de colonne
    gauche ; fiche sans description ni programme → pas de colonne droite. */
-.ip-layout.ip-layout--has-left,.ip-layout.ip-layout--has-right{max-width:1360px;}
-@media (min-width:900px){
+/* width:100% explicite — bug réel trouvé à l'exécution : .ip-layout est un enfant de .page, qui
+   est en display:flex (pas le flux "block" normal supposé jusqu'ici) sans align-items:stretch
+   effectif à cet endroit. Un enfant flex sans largeur explicite se dimensionne à son CONTENU
+   (fit-content), pas à l'espace disponible : la piste minmax(…,1fr) de la grille se résolvait
+   donc systématiquement à son plancher (480px) au lieu de se partager l'espace restant, même
+   quand le conteneur avait largement la place d'aller jusqu'à max-width. Avec width:100%,
+   .ip-layout remplit enfin son conteneur (dans la limite de max-width) et 1fr fonctionne
+   normalement — condition réelle pour que « élargis-le vers la droite » utilise de la place
+   neuve au lieu de retomber sur le plancher de la colonne centrale à chaque fois. */
+.ip-layout.ip-layout--has-left,.ip-layout.ip-layout--has-right{max-width:1600px;width:100%;}
+/* Seuil des 3 colonnes relevé à 1320px (2026-10-30) — voir le commentaire détaillé juste
+   au-dessus de grid-template-columns ci-dessous : en dessous de cette largeur, le trio
+   280px + plancher 480px + 420px ne tient plus, d'où le repli sur l'empilement mobile
+   (@media max-width:1319px) plutôt qu'un 3-colonnes qui déborderait. */
+@media (min-width:1320px){
   .ip-layout.ip-layout--has-left,.ip-layout.ip-layout--has-right{display:grid;gap:28px;align-items:start;}
   .ip-layout.ip-layout--has-left:not(.ip-layout--has-right){grid-template-columns:280px minmax(0,1fr);}
   /* Colonne droite élargie (2026-10-30, demande explicite : « élargis un peu cette bande...
-     rends-le un peu plus large l'espace utilisé pour écrire le descriptif ») — 340px→420px,
-     le texte du descriptif/programme respire davantage avant de passer à la ligne. */
-  .ip-layout.ip-layout--has-right:not(.ip-layout--has-left){grid-template-columns:minmax(0,1fr) 420px;}
-  .ip-layout.ip-layout--has-left.ip-layout--has-right{grid-template-columns:280px minmax(0,1fr) 420px;}
+     rends-le un peu plus large l'espace utilisé pour écrire le descriptif »), puis corrigée le
+     même jour (demande explicite : « élargis-le vers la droite, pour ne pas qu'il ait d'impact
+     sur tout ce qui existe à gauche ») — un premier essai (max-width 1280→1360, tout juste
+     assez pour compenser 340px→420px) ne protégeait la colonne centrale qu'à pleine largeur ;
+     sur un écran plus étroit que le max-width, minmax(0,1fr) cède du terrain au premier besoin,
+     donc TOUTE largeur ajoutée à droite se reprenait sur la colonne centrale.
+     Un plancher seul (minmax(480px,1fr)) sans relever le seuil ci-dessus a été testé et écarté :
+     bug réel trouvé à l'exécution (capture à l'appui) — sous ~1236px de large, .ip-layout
+     débordait de son conteneur, mais un ancêtre en overflow masqué (page/corps) rognait ce
+     débordement SANS barre de défilement : la colonne droite devenait purement et simplement
+     invisible, pire que la compression d'origine. D'où les deux mesures combinées : le plancher
+     protège la colonne centrale, et le seuil relevé garantit qu'il y a toujours assez de place
+     pour les trois colonnes + leur plancher avant de les proposer, avec une marge de sécurité
+     (280+28+480+28+420=1236, seuil posé à 1320). */
+  .ip-layout.ip-layout--has-right:not(.ip-layout--has-left){grid-template-columns:minmax(480px,1fr) 420px;}
+  .ip-layout.ip-layout--has-left.ip-layout--has-right{grid-template-columns:280px minmax(480px,1fr) 420px;}
 }
-@media (max-width:899px){
+@media (max-width:1319px){
   /* Empilé : types d'inscription d'abord (accès direct à l'inscription), puis le descriptif/
      programme, le calendrier/infos pratiques en dernier (déjà la logique retenue le 2026-10-30
      dans ipRenderAccueil() pour l'ordre desktop : types avant descriptif). "order" n'a d'effet
@@ -70,14 +95,14 @@
 }
 .ip-wrap{padding:32px 16px 60px;}
 .ip-layout--has-left .ip-wrap,.ip-layout--has-right .ip-wrap{padding-left:0;}
-@media (max-width:899px){.ip-layout--has-left .ip-wrap,.ip-layout--has-right .ip-wrap{padding-left:16px;}}
+@media (max-width:1319px){.ip-layout--has-left .ip-wrap,.ip-layout--has-right .ip-wrap{padding-left:16px;}}
 .ip-side{display:none;}
 .ip-layout--has-left #ip-side,.ip-layout--has-right #ip-right{display:flex;flex-direction:column;gap:18px;}
-@media (min-width:900px){
+@media (min-width:1320px){
   .ip-layout--has-left #ip-side{padding:32px 0 20px 16px;position:sticky;top:20px;}
   .ip-layout--has-right #ip-right{padding:32px 16px 20px 0;position:sticky;top:20px;}
 }
-@media (max-width:899px){
+@media (max-width:1319px){
   .ip-layout--has-left #ip-side,.ip-layout--has-right #ip-right{padding:0 16px 28px;}
 }
 .ip-side-box{background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:14px;padding:16px;}
