@@ -189,3 +189,7 @@ html body.nd .sf-esp-champ{background:rgba(255,255,255,.06)!important;color:#fff
 html body.nd .sf-esp-idees button{border:1px dashed var(--nd-bord)!important;color:var(--nd-doux)!important}
 html body.nd .sf-esp-idees button:hover{color:var(--nd-or)!important;border-color:var(--nd-or)!important}
 html body.nd .sf-esp-retour{color:var(--nd-or)!important}
+html body.nd .sf-esp-barre{background:rgba(5,9,22,.96)!important;border-top:1px solid var(--nd-or)!important;color:#fff!important}
+html body.nd .sf-esp-barre:hover{background:rgba(227,192,110,.14)!important}
+html body.nd .sf-esp-h{color:#fff!important;font-family:var(--nd-display);font-weight:500;font-size:17px}
+html body.nd .sf-esp-aide{color:var(--nd-faible)!important}
