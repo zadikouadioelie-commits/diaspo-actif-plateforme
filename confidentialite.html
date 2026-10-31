@@ -45,8 +45,12 @@
   .history-action{font-weight:700;}
   .history-meta{color:var(--muted);text-align:right;}
 </style>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,500;0,6..96,600;1,6..96,500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/theme-nuit-doree.css?v=8">
+  <link rel="stylesheet" href="/assets/confidentialite-nuit-doree.css?v=1">
 </head>
-<body>
+<body class="nd">
 <div class="page">
 
   <header class="topbar">
@@ -70,6 +74,7 @@
   </header>
 
   <main class="container" style="padding-top:30px;padding-bottom:40px;">
+    <div id="code-secret-zone"></div>
     <div id="mes-infos-zone"></div>
     <div id="origine-institution-zone"></div>
     <div id="identite-verif-zone"></div>
@@ -1055,6 +1060,7 @@ function openDeleteAccountModal() {
   };
 }
 </script>
+<script src="assets/confidentialite-code-secret.js?v=1"></script>
 <script src="assets/back-button.js"></script>
 </body>
 </html>
