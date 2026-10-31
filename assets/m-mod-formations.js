@@ -914,7 +914,8 @@
     }).join('');
     const depot = !verrou && quiz.depot_fichier && quiz.depot_fichier !== 'non';
     const depotHtml = depot ? `<div style="padding:12px 0;border-top:1px solid var(--border)"><div style="font-weight:700;margin-bottom:6px">📎 Votre fichier ${quiz.depot_fichier === 'obligatoire' ? '<span class="small" style="color:var(--red)">(obligatoire)</span>' : '<span class="small muted">(facultatif)</span>'}</div>
-      <input type="file" id="fm-fichier" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.webp" aria-label="Fichier à rendre"><div class="small muted" style="margin-top:4px">PDF, Word, Excel, PowerPoint ou image — 15 Mo maximum.</div></div>` : '';
+      <input type="file" id="fm-fichier" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.webp" aria-label="Fichier à rendre"><div class="small muted" style="margin-top:4px">PDF, Word, Excel, PowerPoint ou image — 15 Mo maximum.</div>
+      ${manuel ? '<div class="small muted" style="margin-top:6px">ℹ️ Votre formateur lit votre dépôt et vous répond. Il peut s’aider de Koffi (assistant IA) pour préparer sa réponse, qu’il relit toujours lui-même ; votre nom n’est jamais transmis.</div>' : ''}</div>` : '';
     const libelle = essai ? (res ? 'Refaire l’essai' : 'Tester mes réponses') : manuel ? 'Envoyer mon travail au formateur' : res ? 'Valider une nouvelle tentative' : 'Valider mes réponses';
     zone.innerHTML = `<div class="card"><div class="pad"><b>📝 ${esc(quiz.titre)}</b>
       <div class="small muted" style="margin:4px 0 10px">${meta}</div>

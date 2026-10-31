@@ -16,6 +16,7 @@ const IA = require("./kofi-ia");
 const Pays = require("./kofi-pays");
 const Carte = require("./kofi-carte");
 const Competences = require("./kofi-competences");
+const Brouillon = require("./kofi-brouillon");
 const { GUIDE } = require("./kofi-createur-guide");
 
 const TEXTE_FORFAIT_NON_REMBOURSABLE = "Achat définitif : les messages de l'assistant de création achetés ne donnent lieu à aucun remboursement, qu'ils soient utilisés ou non. Ils sont valables 12 mois. Réfléchissez bien avant d'acheter.";
@@ -543,6 +544,64 @@ module.exports.register = function register(deps) {
     await db.prepare("UPDATE kofi_conversations SET derniere_activite=datetime('now') WHERE id=?").run(conv.id);
     await db.prepare("INSERT INTO kofi_usage (user_id, formation_id, conversation_id, message_id, categorie, jetons_entree, jetons_sortie, cout_eur, modele) VALUES (?,?,?,?,?,?,?,?,?)").run(user.id, ctx.f.id, conv.id, msgId, categorie, rep.entree, rep.sortie, cout, r.modele);
     sendJSON(res, 200, { conversation_id: conv.id, message: { id: msgId, role: "assistant", contenu: reponse, actions, missions_rejetees: rejetees.length }, credits: await credits(user, ctx) });
+  });
+
+  /* ═════ Brouillon de réponse à un devoir déposé (2026-10-31) : débrief + avis + note suggérée, à relire par le formateur. Rien n'est envoyé à l'apprenant. ═════ */
+  route("POST", "/api/formations/:id/tentatives/:tentativeId/brouillon-koffi", async (req, res, params, body) => {
+    const user = await exiger(req, res); if (!user) return;
+    const lim = SEC.rateLimit(`kofi-brouillon:${user.id}`, 10, 60000);
+    if (!lim.allowed) return sendJSON(res, 429, { error: `Doucement : réessayez dans ${lim.retryAfter}s.`, code: "trop_vite" });
+    const ctx = await contexte(user, params.id, req);
+    if (ctx.code) return sendJSON(res, ctx.code, { error: ctx.erreur });
+    if (refuser(res, ctx)) return;
+    const r = ctx.r;
+    const langue = body && body.langue === "en" ? "en" : "fr";
+    const t = await db.prepare("SELECT t.id, t.statut, t.reponses_json, t.fichier_url, q.id AS quiz_id, q.titre, q.note_minimale FROM formation_quiz_tentatives t JOIN formation_quiz q ON q.id=t.quiz_id WHERE t.id=? AND q.formation_id=?").get(Number(params.tentativeId), ctx.f.id);
+    if (!t) return sendJSON(res, 404, { error: "Travail introuvable." });
+    if (t.statut !== "a_corriger") return sendJSON(res, 409, { error: "Ce travail a déjà reçu son rendu.", code: "deja_corrige" });
+    const debutJour = sqlDate(new Date(Date.now() - 24 * 3600 * 1000));
+    const nbJour = Number((await db.prepare("SELECT COUNT(*) AS n FROM kofi_usage WHERE user_id=? AND categorie IN ('createur_gratuit','createur_forfait') AND created_at>=?").get(user.id, debutJour)).n) || 0;
+    if (nbJour >= r.plafond_jour_createur) return sendJSON(res, 429, { error: "Vous avez atteint la limite de messages pour aujourd'hui. Revenez demain.", code: "plafond_jour" });
+
+    /* Débit : gratuit du jour d'abord, puis forfait. Un échec de l'IA rend le message. */
+    const cr = await credits(user, ctx);
+    let lot = null, categorie = null;
+    if (cr.gratuits_restants > 0) categorie = "createur_gratuit";
+    else { lot = await K.debiter(db, user.id, "createur"); if (lot) categorie = "createur_forfait"; }
+    if (!categorie) return sendJSON(res, 402, { error: "Vos messages gratuits du jour sont épuisés.", code: "credits_epuises", forfait: forfaitPublic(r) });
+    const rendre = async () => { if (lot) await K.rendre(db, lot.id); };
+
+    const questions = await db.prepare("SELECT id, question, points, reponse_correcte FROM formation_quiz_questions WHERE quiz_id=? ORDER BY ordre ASC, id ASC").all(t.quiz_id);
+    const reps = parseJson(t.reponses_json) || {};
+    const fichier = await Brouillon.preparerFichier(t.fichier_url);
+    const contenu = Brouillon.construireMessage({
+      formation: ctx.f.titre, quiz: { titre: t.titre, seuil: t.note_minimale }, langue,
+      questions: questions.map(q => ({ question: q.question, points: q.points, attendue: q.reponse_correcte ? String(q.reponse_correcte).split("|").join(" / ") : null })),
+      reponses: questions.map(q => ({ reponse: reps[String(q.id)] == null ? "" : reps[String(q.id)] })),
+      fichierBloc: fichier.bloc || null, fichierNote: fichier.note,
+    });
+    let rep;
+    try {
+      rep = await IA.repondre({ modele: r.modele, systeme: Brouillon.systeme(langue), messages: [{ role: "user", content: contenu }], maxSortie: 1800 });
+    } catch (e) {
+      await rendre();
+      if (e instanceof IA.KofiIAErreur) {
+        if (e.code !== "limite") console.error("[Koffi brouillon] IA :", e.code, e.message);
+        return sendJSON(res, e.code === "limite" ? 429 : 503, { error: "Koffi est momentanément indisponible. Votre message n'a pas été décompté : réessayez dans un instant.", code: e.code === "limite" ? "limite" : "indisponible" });
+      }
+      throw e;
+    }
+    const cout = K.coutEstime(rep.entree, rep.sortie, r);
+    const noterUsage = cat => db.prepare("INSERT INTO kofi_usage (user_id, formation_id, categorie, jetons_entree, jetons_sortie, cout_eur, modele) VALUES (?,?,?,?,?,?,?)").run(user.id, ctx.f.id, cat, rep.entree, rep.sortie, cout, r.modele);
+    const analyse = rep.refus ? null : Brouillon.analyserSortie(rep.texte);
+    if (!analyse) {
+      await rendre(); await noterUsage("createur_refus");
+      return sendJSON(res, 503, { error: rep.refus ? "Koffi ne peut pas traiter ce dépôt. Corrigez-le vous-même." : "Koffi n'a pas pu préparer un brouillon exploitable. Votre message n'a pas été décompté : réessayez.", code: "brouillon_invalide" });
+    }
+    const brouillon = { debrief: analyse.debrief, note_pct: analyse.note_pct, avis: analyse.avis, langue, fichier_lu: !!fichier.bloc, fichier_note: fichier.bloc ? null : (t.fichier_url ? fichier.note : null), cree_le: sqlDate(new Date()) };
+    await db.prepare("UPDATE formation_quiz_tentatives SET kofi_brouillon_json=?, kofi_brouillon_le=datetime('now') WHERE id=?").run(JSON.stringify(brouillon), t.id);
+    await noterUsage(categorie);
+    sendJSON(res, 200, { brouillon, credits: await credits(user, ctx) });
   });
 
   /* ═════ Appliquer / annuler une mission ═════ */

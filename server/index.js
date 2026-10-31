@@ -2159,7 +2159,7 @@ async function executerSuppressionCompte(userId, drId) {
   try { await db.prepare("UPDATE formation_attestations SET apprenant_nom='Compte supprimé' WHERE user_id=?").run(userId); } catch (_) {}
   try { await db.prepare("DELETE FROM cartes_mentales WHERE owner_user_id=? AND formation_id IS NULL").run(userId); } catch (_) {}
   try { await db.prepare("UPDATE formation_discussions SET contenu='Message supprimé (compte fermé)', statut='masque' WHERE user_id=?").run(userId); } catch (_) {}
-  try { await db.prepare("UPDATE formation_quiz_tentatives SET fichier_url=NULL, fichier_nom=NULL, retour_fichier_url=NULL, retour_fichier_nom=NULL WHERE inscription_id IN (SELECT id FROM formation_inscriptions WHERE user_id=?)").run(userId); } catch (_) {}
+  try { await db.prepare("UPDATE formation_quiz_tentatives SET fichier_url=NULL, fichier_nom=NULL, retour_fichier_url=NULL, retour_fichier_nom=NULL, kofi_brouillon_json=NULL WHERE inscription_id IN (SELECT id FROM formation_inscriptions WHERE user_id=?)").run(userId); } catch (_) {}
   /* Koffi (tuteur IA) : les conversations et les retours de l'élève sont supprimés (texte libre) ; achats et compteurs d'usage restent, sans contenu. */
   try { await Kofi.effacerCompte(db, userId); } catch (_) {}
 

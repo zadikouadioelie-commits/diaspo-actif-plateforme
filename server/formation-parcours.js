@@ -769,7 +769,7 @@ module.exports.register = function register(deps) {
     if (!aNote && !commentaire && !fu) return sendJSON(res, 400, { error: "Indiquez une note, écrivez un avis ou joignez un PDF.", code: "rendu_vide" });
     const fichierNom = fu ? (String((body && body.fichier_nom) || "Rendu").trim().slice(0, 120) || "Rendu") : null;
     const reussi = aNote && note >= nombre(t.note_minimale);
-    await db.prepare("UPDATE formation_quiz_tentatives SET note_pct=?, reussi=?, statut='corrige', commentaire_formateur=?, corrige_par=?, corrige_le=datetime('now'), retour_fichier_url=?, retour_fichier_nom=?, retour_envoye_le=datetime('now'), retour_lu_le=NULL WHERE id=?")
+    await db.prepare("UPDATE formation_quiz_tentatives SET note_pct=?, reussi=?, statut='corrige', kofi_brouillon_json=NULL, commentaire_formateur=?, corrige_par=?, corrige_le=datetime('now'), retour_fichier_url=?, retour_fichier_nom=?, retour_envoye_le=datetime('now'), retour_lu_le=NULL WHERE id=?")
       .run(aNote ? Math.round(note * 10) / 10 : null, reussi ? 1 : 0, commentaire || null, user.id, fu ? fu.slice(0, 500) : null, fichierNom, t.id);
     const inscription = await db.prepare("SELECT * FROM formation_inscriptions WHERE id=?").get(t.inscription_id);
     if (reussi && t.lecon_id != null) {
@@ -823,7 +823,7 @@ module.exports.register = function register(deps) {
     if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
     if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
     const rows = await db.prepare(`SELECT t.id, t.quiz_id, t.reponses_json, t.created_at, t.fichier_url, t.fichier_nom, t.statut, t.note_pct, t.reussi, t.commentaire_formateur, t.corrige_le, t.corrige_par,
-        t.retour_fichier_url, t.retour_fichier_nom, t.retour_envoye_le, t.retour_lu_le, q.titre AS quiz_titre, q.note_minimale, u.nom AS u_nom, u.prenom AS u_prenom
+        t.retour_fichier_url, t.retour_fichier_nom, t.retour_envoye_le, t.retour_lu_le, t.kofi_brouillon_json, q.titre AS quiz_titre, q.note_minimale, u.nom AS u_nom, u.prenom AS u_prenom
       FROM formation_quiz_tentatives t
       JOIN formation_quiz q ON q.id=t.quiz_id
       JOIN formation_inscriptions i ON i.id=t.inscription_id
@@ -841,6 +841,7 @@ module.exports.register = function register(deps) {
       depots.push({
         id: Number(t.id), quiz_id: Number(t.quiz_id), quiz_titre: t.quiz_titre, seuil: nombre(t.note_minimale), soumis_le: t.created_at, statut: enAttente ? "a_corriger" : "corrige",
         apprenant: [t.u_prenom, t.u_nom].filter(Boolean).join(" ") || "Apprenant", fichier_url: t.fichier_url || null, fichier_nom: t.fichier_nom || null,
+        brouillon: enAttente && t.kofi_brouillon_json ? (() => { try { return JSON.parse(t.kofi_brouillon_json); } catch (_) { return null; } })() : null,
         reponses: questions.map(q => ({ question: q.question, type: q.type, points: nombre(q.points) || 1, reponse: reps[String(q.id)] == null ? "" : reps[String(q.id)], attendue: q.reponse_correcte ? String(q.reponse_correcte).split("|").join(" / ") : null })),
         rendu: enAttente ? null : { note_pct: t.note_pct != null ? Number(t.note_pct) : null, reussi: Number(t.reussi) === 1, commentaire: t.commentaire_formateur || null, fichier_url: t.retour_fichier_url || null, fichier_nom: t.retour_fichier_nom || null,
           envoye_le: t.retour_envoye_le || t.corrige_le || null, lu_le: t.retour_lu_le || null },

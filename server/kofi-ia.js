@@ -56,9 +56,32 @@ function reponseFausseCreateur({ systeme, messages }) {
   return { texte, entree, sortie: Math.ceil(texte.length / 4), lecture_cache: 0, refus: false, arret: "end_turn" };
 }
 
+/* Brouillon de correction d'un devoir (système marqué ASSISTANT_CORRECTION) : JSON déterministe selon un mot-clé du dépôt. Le contenu peut être une liste de blocs (texte + fichier joint). */
+function reponseFausseCorrection({ systeme, messages }) {
+  const c = (messages[messages.length - 1] || {}).content;
+  const dernier = Array.isArray(c) ? c.filter(b => b.type === "text").map(b => b.text).join("\n") : String(c || "");
+  const entree = Math.ceil((String(systeme).length + dernier.length) / 4);
+  if (process.env.KOFI_FAUX_LOG) { try { fs.appendFileSync(process.env.KOFI_FAUX_LOG, JSON.stringify({ systeme, texte: dernier, blocs: Array.isArray(c) ? c.map(b => b.type) : [] }) + "\n"); } catch (e) { /* sans importance */ } }
+  if (/PANNEFAUSSE/.test(dernier)) throw new KofiIAErreur("indisponible", "Panne simulée.");
+  if (/LIMITEFAUSSE/.test(dernier)) throw new KofiIAErreur("limite", "Limite simulée.");
+  if (/REFUSFAUX/.test(dernier)) return { texte: "", entree, sortie: 5, lecture_cache: 0, refus: true, arret: "refusal" };
+  const en = /<langue_du_brouillon>en</.test(dernier);
+  let texte;
+  if (/JSONFAUX/.test(dernier)) texte = "Voici mon avis, sans structure.";
+  else if (/NOTEHORS/.test(dernier)) texte = JSON.stringify({ debrief: "Note hors limites.", note_pct: 250, avis: "Bon travail." });
+  else if (/SANSNOTE/.test(dernier)) texte = JSON.stringify({ debrief: "Dépôt trop court pour être noté.", note_pct: null, avis: en ? "Good start. Please add more detail." : "Bon début. Ajoutez plus de détails." });
+  else texte = "```json\n" + JSON.stringify({
+    debrief: "L'apprenant a répondu à la consigne" + (/fichier de l.apprenant est joint/.test(dernier) ? " et joint un fichier lu par Koffi" : "") + ". Points à vérifier : les dates.",
+    note_pct: 70,
+    avis: en ? "Good work: your plan is clear. Please add your dates and one concrete example, then send a new version." : "Bon travail : votre plan est clair. Ajoutez vos dates et un exemple concret, puis renvoyez une nouvelle version.",
+  }) + "\n```";
+  return { texte, entree, sortie: Math.ceil(texte.length / 4), lecture_cache: 0, refus: false, arret: "end_turn" };
+}
+
 /* Réponse déterministe pour les tests : cite le premier extrait, ou se comporte selon un mot-clé de la question. */
 function reponseFausse({ systeme, messages }) {
   if (/ASSISTANT_FORMATEUR/.test(String(systeme))) return reponseFausseCreateur({ systeme, messages });
+  if (/ASSISTANT_CORRECTION/.test(String(systeme))) return reponseFausseCorrection({ systeme, messages });
   if (process.env.KOFI_FAUX_LOG) { try { fs.appendFileSync(process.env.KOFI_FAUX_LOG, JSON.stringify({ systeme, messages }) + "\n"); } catch (e) { /* sans importance */ } }
   const dernier = String((messages[messages.length - 1] || {}).content || "");
   const question = (dernier.split("<question>")[1] || dernier).split("</question>")[0];

@@ -913,7 +913,8 @@ function sfQuizRender(zone, l, d, resultat){
   const depot = !verrouille && q.depot_fichier && q.depot_fichier !== 'non';
   const depotHtml = depot ? `<div class="sf-q" id="sf-depot"><p class="sf-q-title">📎 Votre fichier ${q.depot_fichier === 'obligatoire' ? '<span style="color:#b91c1c;font-size:12px;">(obligatoire)</span>' : '<span style="color:#94a3b8;font-size:12px;">(facultatif)</span>'}</p>
     <input type="file" id="sf-fichier" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.webp" aria-label="Fichier à rendre">
-    <div class="hint">PDF, Word, Excel, PowerPoint ou image — 15 Mo maximum.</div></div>` : '';
+    <div class="hint">PDF, Word, Excel, PowerPoint ou image — 15 Mo maximum.</div>
+    ${manuel ? `<div class="hint" style="margin-top:4px;">ℹ️ Votre formateur lit votre dépôt et vous répond. Il peut s'aider de Koffi (assistant IA) pour préparer sa réponse, qu'il relit toujours lui-même ; votre nom n'est jamais transmis. <a href="politique-confidentialite.html#koffi" target="_blank" rel="noopener">En savoir plus</a></div>` : ''}</div>` : '';
   const sansQuestion = !questions && !depot;
   zone.innerHTML = `<div class="sf-quiz"><h3 style="margin:0 0 6px;">📝 ${escH(q.titre)}</h3>${ch && ch.demarre && !verrouille ? '<div class="sf-timer" id="sf-timer" role="timer" aria-live="off">⏱ Temps restant : <strong id="sf-timer-txt"></strong></div>' : ''}${entete}${verdict}${q.commentaires ? `<p class="sf-quiz-meta">${escH(q.commentaires)}</p>` : ''}
     <form id="sf-quiz-form" novalidate>${questions || (sansQuestion && !epuise ? '<div class="notice">Ce quiz ne contient pas encore de question.</div>' : '')}${depotHtml}

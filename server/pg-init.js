@@ -1053,6 +1053,8 @@ const COLONNES_MIGRATION = [
     ['formation_quiz_tentatives', 'retour_fichier_nom', 'TEXT'],
     ['formation_quiz_tentatives', 'retour_envoye_le', 'TEXT'],
     ['formation_quiz_tentatives', 'retour_lu_le', 'TEXT'],
+    ['formation_quiz_tentatives', 'kofi_brouillon_json', 'TEXT'],
+    ['formation_quiz_tentatives', 'kofi_brouillon_le', 'TEXT'],
     ['formation_attestations', 'modele', 'TEXT'],
     ['formations', 'suivi_mode', "TEXT DEFAULT 'auto'"],
     ['formations', 'droits_confirmes_le', 'TEXT'],
