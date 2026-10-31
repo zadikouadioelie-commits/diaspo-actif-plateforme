@@ -25850,7 +25850,10 @@ route("DELETE", "/api/evenements/:id", async (req, res, params) => {
   if (inscInscriptions > 0 && !estAdmin) {
     return sendJSON(res, 400, { error: `Cet événement a déjà ${inscInscriptions} inscription(s) via sa fiche liée — contactez l'administration plutôt que de le supprimer, pour ne pas perdre cet historique.` });
   }
-  if (inscInscriptions > 0) await db.prepare("DELETE FROM insc_inscriptions WHERE evenement_id=?").run(params.id);
+  if (inscInscriptions > 0) {
+    await db.prepare("DELETE FROM insc_checkins WHERE inscription_id IN (SELECT id FROM insc_inscriptions WHERE evenement_id=?)").run(params.id);
+    await db.prepare("DELETE FROM insc_inscriptions WHERE evenement_id=?").run(params.id);
+  }
   await db.prepare("DELETE FROM insc_liens_controle WHERE evenement_id=?").run(params.id);
   await db.prepare("DELETE FROM insc_fiches_evenements WHERE evenement_id=?").run(params.id);
   await db.prepare("UPDATE formulaires_inscription SET evenement_id=NULL WHERE evenement_id=?").run(params.id);
@@ -50693,8 +50696,15 @@ route("PUT", "/api/insc/candidature/documents/:id", async (req, res, params, bod
 route("DELETE", "/api/insc/candidature/documents/:id", async (req, res, params) => {
   const { erreur, msg, doc, fiche, user } = await inscCandidatureDocProprietaire(req, params.id);
   if (erreur) return sendJSON(res, erreur, { error: msg });
+  /* Dépôts des candidats d'abord (2026-10-31, bug remonté : « erreur serveur » à la suppression d'un document déjà
+     rempli par des candidats) — insc_candidature_uploads et insc_candidature_visiteur_uploads pointent vers ce document
+     sans suppression en cascade, la base refusait donc de le supprimer (même ordre que DELETE /api/insc/fiches/:id). */
+  const nbDepots = ((await db.prepare("SELECT COUNT(*) n FROM insc_candidature_uploads WHERE document_id=?").get(doc.id))?.n || 0)
+    + ((await db.prepare("SELECT COUNT(*) n FROM insc_candidature_visiteur_uploads WHERE document_id=?").get(doc.id))?.n || 0);
+  await db.prepare("DELETE FROM insc_candidature_uploads WHERE document_id=?").run(doc.id);
+  await db.prepare("DELETE FROM insc_candidature_visiteur_uploads WHERE document_id=?").run(doc.id);
   await db.prepare("DELETE FROM insc_candidature_documents WHERE id=?").run(doc.id);
-  await inscJournaliser(fiche.id, user, "candidature_document_supprime", `Document « ${doc.titre} » supprimé de la candidature.`);
+  await inscJournaliser(fiche.id, user, "candidature_document_supprime", `Document « ${doc.titre} » supprimé de la candidature${nbDepots ? ` (${nbDepots} dépôt(s) de candidats supprimé(s) avec lui)` : ""}.`);
   sendJSON(res, 200, { ok: true });
 });
 
@@ -51687,6 +51697,9 @@ route("DELETE", "/api/insc/inscriptions/:id", async (req, res, params) => {
   if (!insc) return sendJSON(res, 404, { error: "Inscription introuvable." });
   const { erreur, msg, user } = await inscFicheProprietaire(req, insc.fiche_id);
   if (erreur) return sendJSON(res, erreur, { error: msg });
+  /* Pointages d'abord (2026-10-31) : insc_checkins référence l'inscription sans cascade — une inscription déjà scannée à
+     l'entrée ne pouvait plus être supprimée (erreur serveur). */
+  await db.prepare("DELETE FROM insc_checkins WHERE inscription_id=?").run(insc.id);
   await db.prepare("DELETE FROM insc_inscriptions WHERE id=?").run(insc.id);
   await inscJournaliser(insc.fiche_id, user, "suppression_inscription", `Inscription #${insc.id} (${insc.nom} ${insc.prenom}) supprimée définitivement.`, insc.evenement_id);
   sendJSON(res, 200, { ok: true });
@@ -51714,6 +51727,7 @@ route("DELETE", "/api/insc/fiches/:id/inscriptions", async (req, res, params) =>
   const { erreur, msg, fiche, user } = await inscFicheProprietaire(req, params.id);
   if (erreur) return sendJSON(res, erreur, { error: msg });
   const count = (await db.prepare("SELECT COUNT(*) n FROM insc_inscriptions WHERE fiche_id=?").get(fiche.id))?.n || 0;
+  await db.prepare("DELETE FROM insc_checkins WHERE inscription_id IN (SELECT id FROM insc_inscriptions WHERE fiche_id=?)").run(fiche.id);
   await db.prepare("DELETE FROM insc_inscriptions WHERE fiche_id=?").run(fiche.id);
   await inscJournaliser(fiche.id, user, "suppression_masse_inscriptions", `${count} inscription(s) supprimée(s) définitivement.`);
   sendJSON(res, 200, { ok: true, count });

@@ -3679,7 +3679,9 @@ const actions = {
     } catch (e) { ia_toast(e.message, false); }
   },
   async supprimerCandidatureDoc(el) {
-    if (!confirm(`Supprimer le document « ${el.dataset.titre} » ?`)) return;
+    if (!confirm(`Supprimer le document « ${el.dataset.titre} » ?
+
+Si des candidats ont déjà déposé leur version remplie de ce document, ces dépôts seront supprimés avec lui.`)) return;
     try {
       await api('DELETE', `/insc/candidature/documents/${el.dataset.id}`);
       ia_toast('Document supprimé.', true);
