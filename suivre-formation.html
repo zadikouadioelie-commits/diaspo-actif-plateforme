@@ -80,6 +80,10 @@
 .sf-att small{display:block;margin-top:8px;color:#94a3b8;line-height:1.4;}
 .sf-banner{position:sticky;top:64px;z-index:30;background:#dcfce7;border-bottom:1px solid #86efac;color:#14532d;padding:12px 20px;font-weight:700;font-size:14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
 .sf-banner a{color:#14532d;text-decoration:underline;}
+.sf-rendus-banner{background:#fff7ed;border-bottom:1px solid #fdba74;color:#7c2d12;}
+.sf-rendu-new{display:inline-block;background:#ef4444;color:#fff;border-radius:99px;padding:1px 9px;font-size:11.5px;font-weight:800;margin-left:6px;vertical-align:middle;}
+.sf-rendu-carte{border:1px solid #fdba74;background:#fff7ed;color:#431407;border-radius:12px;padding:14px 16px;margin-bottom:12px;}
+.sf-rendu-carte.lu{border-color:#e2e8f0;background:#f8fafc;color:#1e293b;}
 /* Quiz */
 .sf-quiz{border:1px solid var(--border);border-radius:14px;padding:18px;background:#fff;}
 .sf-quiz-meta{font-size:13px;color:#64748b;margin:0 0 14px;line-height:1.5;}
@@ -216,6 +220,7 @@ html body.nd .st-quiz-slot .sf-q .opt span{color:inherit!important;}
   </header>
 
   <div id="sf-banner-zone"></div>
+  <div id="sf-rendus-zone"></div>
   <div id="sf-root"><div class="notice">Chargement…</div></div>
 
 </div>
@@ -281,6 +286,7 @@ async function sfLoad(keepLeconId){
     || (DECOUVERTE ? flat.find(l => !l.verrouille) : flat.find(l => !l.termine)) || flat[0] || null;
   sfRender();
   sfChargerFin();
+  sfChargerRendus();
   /* Koffi (tuteur IA) : le serveur décide s'il apparaît (inscrit, ou formateur en aperçu) et ce que le compte peut en faire. Idempotent. */
   if (!DECOUVERTE) { const monterKoffi = () => window.KoffiWidget && window.KoffiWidget.monter({ formationId, leconId: () => (SF_CURRENT_LECON ? SF_CURRENT_LECON.id : null), ouvrirLecon: id => sfGoTo(id), premiumUrl: 'premium.html' }); if (window.KoffiWidget) monterKoffi(); else window.addEventListener('load', monterKoffi); }
 }
@@ -668,6 +674,66 @@ async function sfSuivant(id){
   sfGoTo(id);
 }
 
+/* ── Rendus du formateur (2026-10-31) : réponse à un devoir (note, avis écrit, PDF). Ouvrir un rendu le marque « lu » : la cloche de la cartouche baisse. ── */
+let SF_RENDUS = { rendus: [], non_lus: 0 };
+async function sfChargerRendus(){
+  if (DECOUVERTE || !formationId || !SF_DATA || SF_DATA.mode !== 'apprenant') return;
+  try {
+    const r = await fetch(`/api/formations/${formationId}/rendus`, { credentials: 'same-origin' });
+    if (!r.ok) return;
+    SF_RENDUS = await r.json();
+  } catch (_) { return; }
+  sfPeindreRendus();
+}
+function sfPeindreRendus(){
+  const zone = document.getElementById('sf-rendus-zone'); if (!zone) return;
+  const n = SF_RENDUS.non_lus || 0, total = (SF_RENDUS.rendus || []).length;
+  zone.innerHTML = total ? `<div class="sf-banner sf-rendus-banner" role="status">${n ? `🔔 <strong>${n}</strong> réponse${n > 1 ? 's' : ''} du formateur disponible${n > 1 ? 's' : ''}.` : '📬 Vos rendus du formateur'}
+    <button type="button" class="btn" onclick="sfOuvrirRendu()">📬 Voir ${n ? (n > 1 ? 'les réponses' : 'la réponse') : 'mes rendus'}</button></div>` : '';
+}
+function sfRenduCarte(r){
+  const lecon = r.lecon_id ? flatLecons().find(l => Number(l.id) === Number(r.lecon_id)) : null;
+  let date = ''; if (r.envoye_le) { const t = String(r.envoye_le); const dt = new Date(t.replace(' ', 'T') + (/Z|\+/.test(t) ? '' : 'Z')); if (!isNaN(dt)) date = dt.toLocaleString('fr-FR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' }); }
+  const note = r.note_pct != null ? `<p style="margin:6px 0 0;font-weight:800;">Note : ${r.note_pct} % — ${r.reussi ? '✅ activité validée' : '⚠ sous le seuil (' + r.seuil + ' %) : vous pouvez redéposer une version améliorée'}</p>` : '<p style="margin:6px 0 0;font-weight:700;">Avis du formateur (sans note) : l\u2019activité n\u2019est pas encore validée, vous pouvez redéposer une version améliorée.</p>';
+  return `<div class="sf-rendu-carte ${r.lu ? 'lu' : ''}" data-rendu="${r.id}">
+    <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:baseline;"><strong>📝 ${escH(r.quiz_titre)}</strong><span style="font-size:12px;opacity:.75;">${escH(date)}${r.lu ? '' : '<span class="sf-rendu-new">nouveau</span>'}</span></div>
+    ${note}
+    ${r.commentaire ? `<div style="white-space:pre-wrap;margin-top:8px;">${escH(r.commentaire)}</div>` : ''}
+    ${r.fichier_url ? `<p style="margin:10px 0 0;"><a class="btn" href="${escH(r.fichier_url)}" target="_blank" rel="noopener noreferrer">📄 ${escH(r.fichier_nom || 'Document du formateur')}</a></p>` : ''}
+    ${lecon ? `<p style="margin:10px 0 0;"><button type="button" class="btn secondary" data-aller="${lecon.id}">Ouvrir le devoir</button></p>` : ''}
+  </div>`;
+}
+async function sfOuvrirRendu(quizId){
+  if (!SF_RENDUS.rendus.length) await sfChargerRendus();
+  const tous = SF_RENDUS.rendus || [];
+  const cible = quizId ? tous.filter(r => Number(r.quiz_id) === Number(quizId)) : tous;
+  const autres = quizId ? tous.filter(r => Number(r.quiz_id) !== Number(quizId)) : [];
+  const fond = document.createElement('div');
+  fond.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:300;display:flex;align-items:center;justify-content:center;padding:16px;';
+  fond.innerHTML = `<div role="dialog" aria-modal="true" aria-labelledby="sf-r-t" style="background:#fff;color:#0f172a;border-radius:14px;max-width:620px;width:100%;max-height:88vh;overflow-y:auto;padding:20px;box-shadow:0 20px 60px rgba(0,0,0,.35);">
+    <h3 id="sf-r-t" style="margin:0 0 12px;">📬 Rendu du formateur</h3>
+    ${cible.length ? cible.map(sfRenduCarte).join('') : '<div class="notice">Aucune réponse du formateur pour le moment.</div>'}
+    ${autres.length ? `<details style="margin-top:6px;"><summary style="cursor:pointer;font-weight:700;">Mes autres rendus (${autres.length})</summary><div style="margin-top:10px;">${autres.map(sfRenduCarte).join('')}</div></details>` : ''}
+    <div style="display:flex;justify-content:flex-end;margin-top:12px;"><button type="button" class="btn secondary" id="sf-r-fermer" style="color:#0f172a;border:1px solid #cbd5e1;">Fermer</button></div></div>`;
+  document.body.appendChild(fond);
+  const fermer = () => fond.remove();
+  fond.querySelector('#sf-r-fermer').onclick = fermer;
+  fond.addEventListener('mousedown', ev => { if (ev.target === fond) fermer(); });
+  fond.querySelectorAll('[data-aller]').forEach(b => b.onclick = () => { fermer(); sfGoTo(Number(b.dataset.aller)); });
+  /* Les rendus affichés sont maintenant lus : la cloche et les pastilles « nouveau » baissent. */
+  for (const r of cible) {
+    if (r.lu) continue;
+    try {
+      const rep = await fetch(`/api/formations/${formationId}/rendus/${r.id}/lu`, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      if (!rep.ok) continue;
+      const d = await rep.json().catch(() => ({}));
+      r.lu = true; SF_RENDUS.non_lus = d.non_lus != null ? d.non_lus : Math.max(0, (SF_RENDUS.non_lus || 1) - 1);
+      document.querySelectorAll('[data-rendu-dot="' + r.id + '"]').forEach(x => x.remove());
+    } catch (_) { /* il restera « nouveau » */ }
+  }
+  sfPeindreRendus();
+}
+
 function sfBanniereAttestation(a){
   const zone = document.getElementById('sf-banner-zone');
   if (!zone || !a) return;
@@ -802,10 +868,13 @@ function sfQuizRender(zone, l, d, resultat){
   } else if (dejaReussi) {
     verdict += manuel ? '<div class="sf-q-result ok" role="status">✅ Cette évaluation est validée.</div>' : '<div class="sf-q-result ok" role="status">✅ Vous avez déjà réussi ce quiz. Vous pouvez le repasser pour vous entraîner.</div>';
   } else if (der && der.statut === 'corrige' && manuel) {
-    verdict += `<div class="sf-q-result ko" role="status">📝 Dernière correction : ${der.note_pct != null ? der.note_pct + '%' : '—'} (seuil ${q.note_minimale}%). Vous pouvez améliorer votre travail et le renvoyer.</div>`;
+    verdict += `<div class="sf-q-result ko" role="status">📝 Dernière correction : ${der.note_pct != null ? der.note_pct + '%' : 'avis du formateur, sans note'} (seuil ${q.note_minimale}%). Vous pouvez améliorer votre travail et le renvoyer.</div>`;
+  }
+  if (der && der.rendu && !enAttente && !d.essai) {
+    verdict += `<div style="margin-bottom:14px;"><button type="button" class="btn" onclick="sfOuvrirRendu(${q.id})">📬 Rendu du formateur${der.rendu.lu ? '' : '<span class="sf-rendu-new" data-rendu-dot="' + der.rendu.id + '">nouveau</span>'}</button></div>`;
   }
   if (epuise && !(resultat && resultat.reussi)) verdict += '<div class="sf-q-result ko" role="status">🔒 Vous avez utilisé toutes vos tentatives pour ce quiz. Posez la question au formateur dans l\'espace « Questions et échanges » ci-dessous : il peut vous en redonner.</div>';
-  if (der && der.statut === 'corrige' && der.commentaire && !enAttente) {
+  if (der && der.statut === 'corrige' && der.commentaire && !enAttente && !der.rendu) {
     verdict += `<div class="sf-quiz-meta" style="background:#f8fafc;border-radius:10px;padding:10px 12px;"><strong>Commentaire du formateur :</strong> ${escH(der.commentaire)}</div>`;
   }
   /* Quiz chronométré, pas encore commencé : les questions restent cachées jusqu'au clic. */

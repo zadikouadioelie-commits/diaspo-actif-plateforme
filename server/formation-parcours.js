@@ -378,6 +378,8 @@ module.exports.register = function register(deps) {
       return !!m && Number(m[1]) === Number(userId);
     } catch (_) { return false; }
   }
+  /* Dépôt de fichier d'un devoir à correction manuelle : toujours possible (2026-10-31). Le réglage « obligatoire » du formateur est conservé ; « non » (valeur historique) vaut désormais « optionnel » (facultatif). */
+  const depotDe = (quiz, manuel) => (!manuel ? "non" : (quiz.depot_fichier && quiz.depot_fichier !== "non" ? quiz.depot_fichier : "optionnel"));
   const questionPublique = q => {
     const options = optionsDe(q);
     return { id: Number(q.id), question: q.question, type: q.type, options: q.type === "vrai_faux" && !options.length ? ["Vrai", "Faux"] : options, points: nombre(q.points) || 1, multiple: q.type === "qcm" && options.length > 0 && attenduesDe(q).length > 1 };
@@ -400,7 +402,7 @@ module.exports.register = function register(deps) {
     /* Temps écoulé sans envoi : la tentative est comptée (note 0) — recharger la page ne redonne pas un chronomètre neuf. */
     if (session && resteSec(session, quiz) < -GRACE_SEC) { await clotureHorsDelai(inscription, quiz, rows); session = null; expire = true; }
     const t = await db.prepare("SELECT COUNT(*) AS n, MAX(note_pct) AS meilleure, MAX(reussi) AS reussi FROM formation_quiz_tentatives WHERE inscription_id=? AND quiz_id=? AND COALESCE(statut,'corrige')<>'archive'").get(inscription.id, quiz.id);
-    const derniere = await db.prepare("SELECT statut, note_pct, reussi, commentaire_formateur, corrige_le FROM formation_quiz_tentatives WHERE inscription_id=? AND quiz_id=? AND COALESCE(statut,'corrige')<>'archive' ORDER BY id DESC LIMIT 1").get(inscription.id, quiz.id);
+    const derniere = await db.prepare("SELECT id, statut, note_pct, reussi, commentaire_formateur, corrige_le, corrige_par, retour_fichier_url, retour_fichier_nom, retour_envoye_le, retour_lu_le FROM formation_quiz_tentatives WHERE inscription_id=? AND quiz_id=? AND COALESCE(statut,'corrige')<>'archive' ORDER BY id DESC LIMIT 1").get(inscription.id, quiz.id);
     const nb = nombre(t && t.n), reussi = !!(t && Number(t.reussi) === 1), attente = !!(derniere && derniere.statut === "a_corriger");
     let bloque = null;
     if (attente) bloque = "en_attente";
@@ -421,10 +423,12 @@ module.exports.register = function register(deps) {
     }
     return {
       quiz: { id: Number(quiz.id), titre: quiz.titre, type: quiz.type, note_minimale: nombre(quiz.note_minimale), temps_limite_min: lim || null, max_tentatives: mx || null, melanger: Number(quiz.melanger) === 1,
-        depot_fichier: manuel ? (quiz.depot_fichier || "non") : "non", commentaires: quiz.commentaires_personnalises || null, correction_manuelle: manuel, nb_questions: rows.length },
+        depot_fichier: depotDe(quiz, manuel), commentaires: quiz.commentaires_personnalises || null, correction_manuelle: manuel, nb_questions: rows.length },
       questions,
       tentatives: { nb, restantes: mx && !reussi ? Math.max(0, mx - nb) : null, meilleure_note: t && t.meilleure != null ? Number(t.meilleure) : null, reussi, en_attente: attente,
-        derniere: derniere ? { statut: derniere.statut || "corrige", note_pct: derniere.note_pct != null ? Number(derniere.note_pct) : null, reussi: Number(derniere.reussi) === 1, commentaire: derniere.commentaire_formateur || null } : null },
+        derniere: derniere ? { statut: derniere.statut || "corrige", note_pct: derniere.note_pct != null ? Number(derniere.note_pct) : null, reussi: Number(derniere.reussi) === 1, commentaire: derniere.commentaire_formateur || null,
+          /* Rendu du formateur (bouton « Rendu » de l'apprenant) : présent seulement pour une correction faite à la main. */
+          rendu: derniere.corrige_par != null && (derniere.commentaire_formateur || derniere.retour_fichier_url || derniere.note_pct != null) ? { id: Number(derniere.id), fichier_url: derniere.retour_fichier_url || null, fichier_nom: derniere.retour_fichier_nom || null, envoye_le: derniere.retour_envoye_le || derniere.corrige_le || null, lu: !!derniere.retour_lu_le } : null } : null },
       chrono: lim ? { minutes: lim, demarre: !!session, reste_sec: session ? Math.max(0, resteSec(session, quiz)) : null, expire_enregistre: expire } : null,
       bloque,
     };
@@ -518,7 +522,7 @@ module.exports.register = function register(deps) {
     const reponses = body && typeof body.reponses === "object" && body.reponses ? body.reponses : {};
     const questions = await db.prepare("SELECT * FROM formation_quiz_questions WHERE quiz_id=? ORDER BY ordre ASC, id ASC").all(quiz.id);
     const manuel = Number(quiz.correction_auto) === 0;
-    const depot = manuel ? (quiz.depot_fichier || "non") : "non";
+    const depot = depotDe(quiz, manuel);
     if (!questions.length && depot !== "obligatoire") return sendJSON(res, 400, { error: "Ce quiz ne contient pas encore de question." });
 
     const aggr = await db.prepare("SELECT COUNT(*) AS n, MAX(reussi) AS reussi FROM formation_quiz_tentatives WHERE inscription_id=? AND quiz_id=? AND COALESCE(statut,'corrige')<>'archive'").get(inscription.id, quiz.id);
@@ -753,12 +757,20 @@ module.exports.register = function register(deps) {
       WHERE t.id=? AND q.formation_id=?`).get(params.tentativeId, params.id);
     if (!t) return sendJSON(res, 404, { error: "Travail introuvable." });
     if (t.statut !== "a_corriger") return sendJSON(res, 409, { error: "Ce travail a déjà été corrigé." });
-    const note = Number(body && body.note_pct);
-    if (!Number.isFinite(note) || note < 0 || note > 100) return sendJSON(res, 400, { error: "Indiquez une note entre 0 et 100." });
+    /* Rendu du formateur (2026-10-31) : une NOTE (valide ou non l'activité), et/ou un AVIS écrit, et/ou un PDF de consignes. Sans note, c'est un avis d'orientation : l'activité
+       n'est pas validée et l'apprenant peut redéposer une version améliorée. */
+    const brute = body && body.note_pct;
+    const aNote = brute !== undefined && brute !== null && String(brute).trim() !== "";
+    const note = aNote ? Number(brute) : null;
+    if (aNote && (!Number.isFinite(note) || note < 0 || note > 100)) return sendJSON(res, 400, { error: "Indiquez une note entre 0 et 100." });
     const commentaire = String((body && body.commentaire) || "").trim().slice(0, 2000);
-    const reussi = note >= nombre(t.note_minimale);
-    await db.prepare("UPDATE formation_quiz_tentatives SET note_pct=?, reussi=?, statut='corrige', commentaire_formateur=?, corrige_par=?, corrige_le=datetime('now') WHERE id=?")
-      .run(Math.round(note * 10) / 10, reussi ? 1 : 0, commentaire || null, user.id, t.id);
+    const fu = String((body && body.fichier_url) || "").trim();
+    if (fu && !fichierAutorise(fu, user.id)) return sendJSON(res, 400, { error: "Fichier non valide : joignez-le depuis le formulaire du rendu (PDF, Word, Excel, PowerPoint ou image, 15 Mo maximum).", code: "fichier_invalide" });
+    if (!aNote && !commentaire && !fu) return sendJSON(res, 400, { error: "Indiquez une note, écrivez un avis ou joignez un PDF.", code: "rendu_vide" });
+    const fichierNom = fu ? (String((body && body.fichier_nom) || "Rendu").trim().slice(0, 120) || "Rendu") : null;
+    const reussi = aNote && note >= nombre(t.note_minimale);
+    await db.prepare("UPDATE formation_quiz_tentatives SET note_pct=?, reussi=?, statut='corrige', commentaire_formateur=?, corrige_par=?, corrige_le=datetime('now'), retour_fichier_url=?, retour_fichier_nom=?, retour_envoye_le=datetime('now'), retour_lu_le=NULL WHERE id=?")
+      .run(aNote ? Math.round(note * 10) / 10 : null, reussi ? 1 : 0, commentaire || null, user.id, fu ? fu.slice(0, 500) : null, fichierNom, t.id);
     const inscription = await db.prepare("SELECT * FROM formation_inscriptions WHERE id=?").get(t.inscription_id);
     if (reussi && t.lecon_id != null) {
       const ex = await db.prepare("SELECT id FROM formation_lecons_progression WHERE inscription_id=? AND lecon_id=?").get(t.inscription_id, t.lecon_id);
@@ -769,11 +781,115 @@ module.exports.register = function register(deps) {
     await db.prepare("UPDATE formation_inscriptions SET avancement_pct=? WHERE id=?").run(p.avancement_pct, inscription.id);
     const attestation = await evaluerAttestation(deps, inscription.id);
     if (typeof deps.creerNotif === "function") {
-      deps.creerNotif(inscription.user_id, "formation", reussi ? "✅ Votre travail a été corrigé" : "📝 Votre travail a été corrigé",
-        reussi ? `« ${t.quiz_titre} » : ${Math.round(note)} % — validé.` : `« ${t.quiz_titre} » : ${Math.round(note)} % (seuil ${nombre(t.note_minimale)} %). Vous pouvez le repasser.`,
-        { formation_id: Number(f.id), quiz_id: Number(t.quiz_id) });
+      const texte = !aNote ? `« ${t.quiz_titre} » : votre formateur vous a répondu. Ouvrez le bouton « Rendu » de la formation « ${f.titre} ».`
+        : reussi ? `« ${t.quiz_titre} » : ${Math.round(note)} % — validé. Ouvrez « Rendu » pour lire la réponse du formateur.` : `« ${t.quiz_titre} » : ${Math.round(note)} % (seuil ${nombre(t.note_minimale)} %). Ouvrez « Rendu » pour lire la réponse du formateur ; vous pouvez le repasser.`;
+      deps.creerNotif(inscription.user_id, "formation", reussi ? "✅ Réponse du formateur : travail validé" : "📬 Une réponse du formateur est disponible", texte,
+        { formation_id: Number(f.id), quiz_id: Number(t.quiz_id), rendu_id: Number(t.id), lien: `suivre-formation.html?id=${Number(f.id)}` });
     }
     sendJSON(res, 200, { ok: true, reussi, avancement_pct: p.avancement_pct, attestation: attestation ? vueAttestation(attestation) : null });
+  });
+
+  /* PUT /api/formations/:id/tentatives/:tentativeId/rendu { commentaire, fichier_url, fichier_nom, retirer_fichier } — le formateur corrige SON rendu (texte, PDF) tant que l'apprenant ne l'a pas ouvert.
+     La note ne change pas ici : elle a déjà produit ses effets (validation, document délivré). */
+  route("PUT", "/api/formations/:id/tentatives/:tentativeId/rendu", async (req, res, params, body) => {
+    const user = await getCurrentUser(req);
+    if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+    const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
+    if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
+    if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
+    const t = await db.prepare("SELECT t.* FROM formation_quiz_tentatives t JOIN formation_quiz q ON q.id=t.quiz_id WHERE t.id=? AND q.formation_id=?").get(params.tentativeId, params.id);
+    if (!t) return sendJSON(res, 404, { error: "Travail introuvable." });
+    if (t.statut !== "corrige" || t.corrige_par == null) return sendJSON(res, 409, { error: "Ce travail n'a pas encore reçu de rendu." });
+    if (t.retour_lu_le) return sendJSON(res, 409, { error: "L'apprenant a déjà ouvert votre rendu : il ne peut plus être modifié.", code: "rendu_lu" });
+    const commentaire = String((body && body.commentaire !== undefined ? body.commentaire : t.commentaire_formateur) || "").trim().slice(0, 2000);
+    let url = t.retour_fichier_url || null, nom = t.retour_fichier_nom || null;
+    if (body && body.retirer_fichier) { url = null; nom = null; }
+    const fu = String((body && body.fichier_url) || "").trim();
+    if (fu) {
+      if (!fichierAutorise(fu, user.id)) return sendJSON(res, 400, { error: "Fichier non valide : joignez-le depuis le formulaire du rendu.", code: "fichier_invalide" });
+      url = fu.slice(0, 500); nom = String((body && body.fichier_nom) || "Rendu").trim().slice(0, 120) || "Rendu";
+    }
+    if (!commentaire && !url && t.note_pct == null) return sendJSON(res, 400, { error: "Un rendu ne peut pas être vide : écrivez un avis ou joignez un PDF.", code: "rendu_vide" });
+    await db.prepare("UPDATE formation_quiz_tentatives SET commentaire_formateur=?, retour_fichier_url=?, retour_fichier_nom=?, retour_envoye_le=datetime('now') WHERE id=?").run(commentaire || null, url, nom, t.id);
+    sendJSON(res, 200, { ok: true });
+  });
+
+  /* GET /api/formations/:id/depots?statut=a_corriger|corriges|tous — BOÎTE DE RÉCEPTION du formateur : tous les devoirs à correction manuelle déposés par les apprenants,
+     avec le texte, le fichier joint et, une fois corrigés, le rendu envoyé et son état (lu ou non). */
+  route("GET", "/api/formations/:id/depots", async (req, res, params, body, query) => {
+    const user = await getCurrentUser(req);
+    if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+    const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
+    if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
+    if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
+    const rows = await db.prepare(`SELECT t.id, t.quiz_id, t.reponses_json, t.created_at, t.fichier_url, t.fichier_nom, t.statut, t.note_pct, t.reussi, t.commentaire_formateur, t.corrige_le, t.corrige_par,
+        t.retour_fichier_url, t.retour_fichier_nom, t.retour_envoye_le, t.retour_lu_le, q.titre AS quiz_titre, q.note_minimale, u.nom AS u_nom, u.prenom AS u_prenom
+      FROM formation_quiz_tentatives t
+      JOIN formation_quiz q ON q.id=t.quiz_id
+      JOIN formation_inscriptions i ON i.id=t.inscription_id
+      JOIN users u ON u.id=i.user_id
+      WHERE q.formation_id=? AND (t.statut='a_corriger' OR (t.statut='corrige' AND t.corrige_par IS NOT NULL))
+      ORDER BY CASE WHEN t.statut='a_corriger' THEN 0 ELSE 1 END, t.created_at DESC, t.id DESC LIMIT 300`).all(params.id);
+    const filtre = String((query && query.statut) || "tous");
+    const depots = [];
+    for (const t of rows) {
+      const enAttente = t.statut === "a_corriger";
+      if (filtre === "a_corriger" && !enAttente) continue;
+      if (filtre === "corriges" && enAttente) continue;
+      let reps = {}; try { reps = JSON.parse(t.reponses_json || "{}") || {}; } catch (_) { reps = {}; }
+      const questions = await db.prepare("SELECT * FROM formation_quiz_questions WHERE quiz_id=? ORDER BY ordre ASC, id ASC").all(t.quiz_id);
+      depots.push({
+        id: Number(t.id), quiz_id: Number(t.quiz_id), quiz_titre: t.quiz_titre, seuil: nombre(t.note_minimale), soumis_le: t.created_at, statut: enAttente ? "a_corriger" : "corrige",
+        apprenant: [t.u_prenom, t.u_nom].filter(Boolean).join(" ") || "Apprenant", fichier_url: t.fichier_url || null, fichier_nom: t.fichier_nom || null,
+        reponses: questions.map(q => ({ question: q.question, type: q.type, points: nombre(q.points) || 1, reponse: reps[String(q.id)] == null ? "" : reps[String(q.id)], attendue: q.reponse_correcte ? String(q.reponse_correcte).split("|").join(" / ") : null })),
+        rendu: enAttente ? null : { note_pct: t.note_pct != null ? Number(t.note_pct) : null, reussi: Number(t.reussi) === 1, commentaire: t.commentaire_formateur || null, fichier_url: t.retour_fichier_url || null, fichier_nom: t.retour_fichier_nom || null,
+          envoye_le: t.retour_envoye_le || t.corrige_le || null, lu_le: t.retour_lu_le || null },
+      });
+    }
+    sendJSON(res, 200, { depots, a_corriger: depots.filter(d => d.statut === "a_corriger").length, corriges: depots.filter(d => d.statut === "corrige").length });
+  });
+
+  /* ── Côté apprenant : « Rendu » du formateur, cloche de la cartouche ── */
+  /* Rendus = corrections faites À LA MAIN (corrige_par renseigné) qui portent une réponse (note, avis ou PDF). Une correction automatique n'en fait jamais partie. */
+  const RENDUS_SQL = `SELECT t.id, t.quiz_id, t.note_pct, t.reussi, t.commentaire_formateur, t.corrige_le, t.retour_fichier_url, t.retour_fichier_nom, t.retour_envoye_le, t.retour_lu_le, q.titre AS quiz_titre, q.note_minimale, q.lecon_id
+      FROM formation_quiz_tentatives t JOIN formation_quiz q ON q.id=t.quiz_id
+      WHERE t.inscription_id=? AND t.statut='corrige' AND t.corrige_par IS NOT NULL AND (t.commentaire_formateur IS NOT NULL OR t.retour_fichier_url IS NOT NULL OR t.note_pct IS NOT NULL)
+      ORDER BY COALESCE(t.retour_envoye_le, t.corrige_le) DESC, t.id DESC`;
+  const vueRendu = t => ({ id: Number(t.id), quiz_id: Number(t.quiz_id), quiz_titre: t.quiz_titre, lecon_id: t.lecon_id != null ? Number(t.lecon_id) : null, note_pct: t.note_pct != null ? Number(t.note_pct) : null, seuil: nombre(t.note_minimale),
+    reussi: Number(t.reussi) === 1, commentaire: t.commentaire_formateur || null, fichier_url: t.retour_fichier_url || null, fichier_nom: t.retour_fichier_nom || null, envoye_le: t.retour_envoye_le || t.corrige_le || null, lu: !!t.retour_lu_le });
+
+  route("GET", "/api/formations/:id/rendus", async (req, res, params) => {
+    const user = await getCurrentUser(req);
+    if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+    const inscription = await inscriptionActive(params.id, user.id);
+    if (!inscription) return sendJSON(res, 403, { error: "Vous devez être inscrit à cette formation." });
+    const rendus = (await db.prepare(RENDUS_SQL).all(inscription.id)).map(vueRendu);
+    sendJSON(res, 200, { rendus, non_lus: rendus.filter(r => !r.lu).length });
+  });
+  /* Ouvrir un rendu le marque comme lu (la cloche baisse). Seul l'apprenant concerné peut le marquer. */
+  route("POST", "/api/formations/:id/rendus/:tentativeId/lu", async (req, res, params) => {
+    const user = await getCurrentUser(req);
+    if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+    const inscription = await inscriptionActive(params.id, user.id);
+    if (!inscription) return sendJSON(res, 403, { error: "Vous devez être inscrit à cette formation." });
+    const t = await db.prepare("SELECT t.id FROM formation_quiz_tentatives t JOIN formation_quiz q ON q.id=t.quiz_id WHERE t.id=? AND t.inscription_id=? AND q.formation_id=? AND t.corrige_par IS NOT NULL").get(params.tentativeId, inscription.id, params.id);
+    if (!t) return sendJSON(res, 404, { error: "Rendu introuvable." });
+    await db.prepare("UPDATE formation_quiz_tentatives SET retour_lu_le=datetime('now') WHERE id=? AND retour_lu_le IS NULL").run(t.id);
+    const n = (await db.prepare(RENDUS_SQL).all(inscription.id)).filter(r => !r.retour_lu_le).length;
+    sendJSON(res, 200, { ok: true, non_lus: n });
+  });
+  /* Cloche des cartouches : nombre de rendus non lus par formation, toutes inscriptions confondues. */
+  route("GET", "/api/mes-rendus", async (req, res) => {
+    const user = await getCurrentUser(req);
+    if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+    const rows = await db.prepare(`SELECT q.formation_id AS fid, COUNT(*) AS n
+      FROM formation_quiz_tentatives t JOIN formation_quiz q ON q.id=t.quiz_id JOIN formation_inscriptions i ON i.id=t.inscription_id
+      WHERE i.user_id=? AND i.statut='active' AND t.statut='corrige' AND t.corrige_par IS NOT NULL AND t.retour_lu_le IS NULL
+        AND (t.commentaire_formateur IS NOT NULL OR t.retour_fichier_url IS NOT NULL OR t.note_pct IS NOT NULL)
+      GROUP BY q.formation_id`).all(user.id);
+    const formations = {}; let total = 0;
+    rows.forEach(r => { formations[String(r.fid)] = Number(r.n); total += Number(r.n); });
+    sendJSON(res, 200, { total, formations });
   });
 
   /* GET /api/admin/formation-stats — vue d'ensemble de la plateforme (administration). */

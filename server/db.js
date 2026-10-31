@@ -4746,6 +4746,8 @@ try { db.exec('ALTER TABLE formation_lecons ADD COLUMN obligatoire INTEGER DEFAU
 ;['apercu_gratuit INTEGER DEFAULT 0'].forEach(col => { try { db.exec(`ALTER TABLE formation_lecons ADD COLUMN ${col}`); } catch(_) {} });
 ;['max_tentatives INTEGER','melanger INTEGER DEFAULT 0',"depot_fichier TEXT DEFAULT 'non'"].forEach(col => { try { db.exec(`ALTER TABLE formation_quiz ADD COLUMN ${col}`); } catch(_) {} });
 ;['fichier_url TEXT','fichier_nom TEXT'].forEach(col => { try { db.exec(`ALTER TABLE formation_quiz_tentatives ADD COLUMN ${col}`); } catch(_) {} });
+/* Rendu du formateur (2026-10-31) : réponse jointe à une correction manuelle (texte = commentaire_formateur + PDF), date d'envoi et de première ouverture par l'apprenant (cloche de la cartouche). */
+;['retour_fichier_url TEXT','retour_fichier_nom TEXT','retour_envoye_le TEXT','retour_lu_le TEXT'].forEach(col => { try { db.exec(`ALTER TABLE formation_quiz_tentatives ADD COLUMN ${col}`); } catch(_) {} });
 ;['modele TEXT'].forEach(col => { try { db.exec(`ALTER TABLE formation_attestations ADD COLUMN ${col}`); } catch(_) {} });
 ;["suivi_mode TEXT DEFAULT 'auto'",'droits_confirmes_le TEXT','droits_confirmes_par INTEGER'].forEach(col => { try { db.exec(`ALTER TABLE formations ADD COLUMN ${col}`); } catch(_) {} });
 /* Lot 2 (2026-10-18) : correction manuelle d'un quiz par le formateur (statut a_corriger -> corrige) ; ALTER pour une base SQLite qui possède déjà la table du lot 1. */

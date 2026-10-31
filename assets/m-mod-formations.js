@@ -544,9 +544,11 @@
   async function screenMes(my) {
     if (!S.me) return needLoginCard('Mes formations', 'Connectez-vous pour retrouver vos formations et votre progression.');
     setPane('Mes formations', '<div class="sk skc" style="height:120px"></div><div class="sk skc" style="height:120px"></div>');
-    let mine, suivi = [];
+    let mine, suivi = [], cloches = {};
     try {
       mine = (await api('/api/mes-inscriptions')).inscriptions || [];
+      // Cloche de la cartouche : réponses du formateur (rendus de devoirs) pas encore lues, par formation.
+      try { cloches = (await api('/api/mes-rendus')).formations || {}; } catch (e) { cloches = {}; }
       // « Mon suivi » personnel (formations suivies hors plateforme ou notées à la main) : facultatif.
       try { const r = await api('/api/formations/suivi'); suivi = Array.isArray(r) ? r : (r.suivi || []); } catch (e) { suivi = []; }
     } catch (e) { if (alive(my)) fail('Mes formations', e); return; }
@@ -560,13 +562,15 @@
     const attente = mine.filter(i => i.paiement_statut === 'en_attente');
     const inactives = mine.filter(i => i.statut !== 'active' && i.paiement_statut !== 'en_attente');
 
+    const nbCloche = i => Number(cloches[String(i.formation_id)]) || 0;
+    const cloche = i => { const n = nbCloche(i); return n ? `<span class="badge r" style="font-weight:800" aria-label="${n} réponse${n > 1 ? 's' : ''} du formateur à lire">🔔 ${n}</span>` : ''; };
     const row = (i, badge, cta) => `<article class="card"><a class="row" href="#/formations/${esc(i.formation_id)}" style="padding:12px 14px">
         <div class="fm-thumb">${i.image_url ? `<img src="${A.attrUrl(i.image_url)}" alt="" loading="lazy" onerror="this.remove()">` : ic('book', 'l')}</div>
-        <div class="sp"><b style="line-height:1.25;display:block">${esc(i.titre)}</b><div class="tags" style="margin:4px 0 0">${badge}</div></div>${ic('chev', 's')}</a>
+        <div class="sp"><b style="line-height:1.25;display:block">${esc(i.titre)}</b><div class="tags" style="margin:4px 0 0">${badge}${cloche(i)}</div></div>${ic('chev', 's')}</a>
         ${i.statut === 'active' && i.paiement_statut !== 'en_attente' ? `<div style="padding:0 14px 6px"><div class="bar" role="progressbar" aria-valuenow="${pct(i.avancement_pct)}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct(i.avancement_pct)}%"></i></div>
         <div class="small muted" style="margin-top:4px">${pct(i.avancement_pct)} % terminé${i.date_inscription ? ' · inscrit le ' + esc(shortDate(i.date_inscription)) : ''}</div></div>` : ''}
         ${cta ? `<div style="padding:6px 14px 14px">${cta}</div>` : '<div style="height:12px"></div>'}</article>`;
-    const go = (i, txt) => `<a class="btn block sm" href="#/formations/${esc(i.formation_id)}/suivre">${txt}</a>`;
+    const go = (i, txt) => `<a class="btn block sm" href="#/formations/${esc(i.formation_id)}/suivre">${nbCloche(i) ? '🔔 Lire la réponse du formateur' : txt}</a>`;
     const STAT = { en_cours: ['En cours', ''], termine: ['Terminée', 'g'], abandonne: ['Abandonnée', ''], certifie: ['Certifiée', 'g'] };
 
     let html = `<div class="chips"><a class="chip" href="#/formations">Catalogue</a><button class="chip on" aria-current="page">${ic('book', 's')} Mes formations</button></div>`;
@@ -839,6 +843,24 @@
     const res = LASTQ && LASTQ.leconId === Number(l.id) ? LASTQ.res : null; if (res) LASTQ = null;
     rendreQuiz(zone, id, l, d, q, res);
   }
+  /* Rendu du formateur (2026-10-31) : réponse à un devoir corrigé à la main (note, avis écrit, PDF). L'ouvrir le marque « lu » : la cloche baisse. */
+  async function ouvrirRendu(id, quizId, apres) {
+    let data;
+    try { data = await api(`/api/formations/${encodeURIComponent(id)}/rendus`); } catch (e) { toast(e.message || 'Rendu indisponible.', true); return; }
+    const tous = data.rendus || [];
+    const cible = quizId ? tous.filter(r => Number(r.quiz_id) === Number(quizId)) : tous;
+    const carte = r => `<div class="fm-note" style="margin:0 0 10px;text-align:left"><div class="row"><b class="sp">📝 ${esc(r.quiz_titre)}</b><span class="small muted">${r.envoye_le ? esc(shortDate(r.envoye_le)) : ''}</span></div>
+      <div style="margin-top:6px;font-weight:700">${r.note_pct != null ? 'Note : ' + esc(r.note_pct) + ' % — ' + (r.reussi ? '✅ activité validée' : '⚠ sous le seuil (' + esc(r.seuil) + ' %) : vous pouvez redéposer une version améliorée') : 'Avis du formateur (sans note) : vous pouvez redéposer une version améliorée.'}</div>
+      ${r.commentaire ? `<div style="white-space:pre-wrap;margin-top:8px">${esc(r.commentaire)}</div>` : ''}
+      ${r.fichier_url ? `<a class="btn block sm" style="margin-top:10px" href="${A.attrUrl(r.fichier_url)}" target="_blank" rel="noopener noreferrer">📄 ${esc(r.fichier_nom || 'Document du formateur')}</a>` : ''}</div>`;
+    const close = A.openSheet(`<h3 style="margin:0 0 10px">📬 Rendu du formateur</h3>${cible.length ? cible.map(carte).join('') : '<p class="small muted">Aucune réponse du formateur pour le moment.</p>'}<button type="button" class="btn block" id="fm-rfermer" style="margin-top:6px">Fermer</button>`);
+    const fermer = $('#fm-rfermer'); if (fermer) fermer.onclick = () => close();
+    for (const r of cible) {
+      if (r.lu) continue;
+      try { await api(`/api/formations/${encodeURIComponent(id)}/rendus/${encodeURIComponent(r.id)}/lu`, { method: 'POST', body: {} }); } catch (e) { /* il restera « nouveau » */ }
+    }
+    if (apres) apres();
+  }
   function rendreQuiz(zone, id, l, d, q, res) {
     clearInterval(QTIMER); QTIMER = null;
     const quiz = q.quiz, t = q.tentatives || {}, ch = q.chrono, manuel = !!quiz.correction_manuelle;
@@ -860,9 +882,11 @@
       ? note('#dcfce7', '#14532d', '✅ Quiz réussi' + (res.note_pct != null ? ' — ' + esc(res.note_pct) + '%' : '') + '. Cette activité est validée.')
       : note('#fef2f2', '#7f1d1d', '❌ ' + esc(res.note_pct) + '% — il faut au moins ' + esc(res.seuil) + '%. Relisez le cours puis réessayez : les bonnes réponses s’affichent une fois le quiz réussi.');
     else if (dejaReussi) verdict += note('#dcfce7', '#14532d', '✅ ' + (manuel ? 'Cette évaluation est validée.' : 'Vous avez déjà réussi ce quiz. Vous pouvez le repasser pour vous entraîner.'));
-    else if (manuel && t.derniere && t.derniere.statut === 'corrige') verdict += note('#fef2f2', '#7f1d1d', '📝 Dernière correction : ' + (t.derniere.note_pct != null ? esc(t.derniere.note_pct) + '%' : '—') + ' (seuil ' + esc(quiz.note_minimale) + '%). Vous pouvez améliorer votre travail et le renvoyer.');
+    else if (manuel && t.derniere && t.derniere.statut === 'corrige') verdict += note('#fef2f2', '#7f1d1d', '📝 Dernière correction : ' + (t.derniere.note_pct != null ? esc(t.derniere.note_pct) + '%' : 'avis du formateur, sans note') + ' (seuil ' + esc(quiz.note_minimale) + '%). Vous pouvez améliorer votre travail et le renvoyer.');
     if (epuise && !(res && res.reussi)) verdict += note('#fef2f2', '#7f1d1d', '🔒 Vous avez utilisé toutes vos tentatives. Posez la question au formateur dans « Questions et échanges » ci-dessous : il peut vous en redonner.');
-    if (t.derniere && t.derniere.statut === 'corrige' && t.derniere.commentaire && !attente) verdict += `<div class="fm-note"><b>Commentaire du formateur :</b> ${esc(t.derniere.commentaire)}</div>`;
+    const rendu = !essai && !attente && t.derniere && t.derniere.rendu ? t.derniere.rendu : null;
+    if (rendu) verdict += `<button type="button" class="btn block" id="fm-rendu" style="margin-bottom:10px">📬 Rendu du formateur${rendu.lu ? '' : ' <span class="badge r" style="font-weight:800;background:#ef4444;color:#fff">nouveau</span>'}</button>`;
+    else if (t.derniere && t.derniere.statut === 'corrige' && t.derniere.commentaire && !attente) verdict += `<div class="fm-note"><b>Commentaire du formateur :</b> ${esc(t.derniere.commentaire)}</div>`;
     const meta = `Seuil de réussite : ${esc(quiz.note_minimale)}%${quiz.temps_limite_min ? ' · temps imparti : ' + esc(quiz.temps_limite_min) + ' min' : ''}${quiz.max_tentatives ? ' · tentatives : ' + Math.min(t.nb || 0, quiz.max_tentatives) + '/' + quiz.max_tentatives : (t.nb ? ' · ' + t.nb + ' tentative' + (t.nb > 1 ? 's' : '') : '')}${t.meilleure_note != null ? ', meilleure note : ' + esc(t.meilleure_note) + '%' : ''}${quiz.melanger ? ' · ordre aléatoire' : ''}`;
     /* Quiz chronométré pas encore commencé : questions cachées jusqu'au clic. */
     if (ch && !ch.demarre && !verrou) {
@@ -897,6 +921,7 @@
       ${ch && ch.demarre && !verrou ? '<div class="fm-note" id="fm-timer" style="background:#eff6ff;color:#1e3a8a;font-weight:700;position:sticky;top:0;z-index:5">⏱ Temps restant : <span id="fm-timer-txt"></span></div>' : ''}
       ${verdict}<form id="fm-qf" novalidate>${qs || (!depot && !epuise ? noFile('Ce quiz ne contient pas encore de question.') : '')}${depotHtml}
       ${(qs || depot) && !verrou ? `<button type="submit" class="btn block" id="fm-qs" style="margin-top:12px">${libelle}</button>` : ''}</form></div></div>`;
+    const bRendu = $('#fm-rendu'); if (bRendu) bRendu.onclick = () => ouvrirRendu(id, quiz.id, () => rendreQuiz(zone, id, l, d, Object.assign({}, q, { tentatives: Object.assign({}, t, { derniere: Object.assign({}, t.derniere, { rendu: Object.assign({}, t.derniere.rendu, { lu: true }) }) }) }), res));
     const form = $('#fm-qf'); if (!form || (!qs && !depot) || verrou) return;
     let envoye = false;
     const soumettre = async auto => {

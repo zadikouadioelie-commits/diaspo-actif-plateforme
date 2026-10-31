@@ -695,8 +695,7 @@
               </select>
               <label style="display:flex;gap:8px;align-items:center;font-size:13px;"><input type="checkbox" id="fb-quiz-melanger" style="width:auto;"> Mélanger l'ordre des questions pour chaque apprenant</label>
               <select id="fb-quiz-depot" class="input-field" style="display:none;" title="Réservé aux devoirs corrigés par vous.">
-                <option value="non">Pas de fichier à rendre</option>
-                <option value="optionnel">Dépôt de fichier facultatif</option>
+                <option value="optionnel">Dépôt de fichier facultatif (PDF, Word…)</option>
                 <option value="obligatoire">Dépôt de fichier obligatoire (devoir)</option>
               </select>
               <select id="fb-quiz-lecon" class="input-field" style="grid-column:1/-1;"><option value="">Aucune leçon (évaluation indépendante, ex. examen final)</option></select>
@@ -1795,6 +1794,9 @@
     if(!await requireLoginForVolet()){ el.innerHTML = '<div class="notice">Connectez-vous pour voir vos inscriptions.</div>'; return; }
     try {
       const rows = await api('GET', '/formations/suivi');
+      /* Cloche des cartouches (2026-10-31) : réponses du formateur (rendus de devoirs) pas encore lues, par formation. */
+      const clochesR = await api('GET', '/mes-rendus').catch(() => ({ formations: {} }));
+      const clocheR = fid => { const n = Number((clochesR.formations || {})[String(fid)]) || 0; return n ? `<a href="suivre-formation.html?id=${fid}" title="${n} réponse${n>1?'s':''} du formateur à lire" aria-label="${n} réponse${n>1?'s':''} du formateur disponible${n>1?'s':''}" style="display:inline-flex;align-items:center;gap:5px;background:#ef4444;color:#fff;border-radius:99px;padding:3px 11px 3px 8px;font-weight:800;font-size:13px;text-decoration:none;box-shadow:0 2px 8px rgba(239,68,68,.45);"><span style="font-size:15px;line-height:1;">🔔</span>${n}</a>` : ''; };
       /* « Mes accès » (lot A) : chaque formation ou module détenu, avec son état et son échéance. */
       let accesHtml = '';
       try {
@@ -1802,7 +1804,7 @@
         const ETAT = { actif:['✅ Actif','#166534'], en_attente:['⏳ Paiement en attente','#92400e'], expire:['⌛ Expiré','#64748b'], revoque:['⛔ Retiré','#b91c1c'] };
         const fmt = d => d ? new Date(String(d).replace(' ','T') + 'Z').toLocaleDateString('fr-FR') : '';
         if(acces.length) accesHtml = `<div class="card" style="margin-bottom:16px;"><h3 style="margin:0 0 10px;">🔑 Mes accès</h3>${acces.map(a => { const e = ETAT[a.statut] || [a.statut,'#64748b']; return `<div class="flex-between" style="gap:8px;flex-wrap:wrap;padding:8px 0;border-top:1px solid var(--border);align-items:center;">
-            <div style="flex:1;min-width:200px;"><strong>${a.formation_titre}</strong>${a.module_titre ? ' — ' + a.module_titre : ' <span class="tag">Formation complète</span>'}<div style="font-size:12px;color:var(--muted);">${a.type_acces === 'paye' ? 'Payé' + (a.montant_paye ? ' · ' + a.montant_paye + ' €' : '') : a.type_acces === 'code' ? 'Code d\'accès' : 'Gratuit'}${a.date_expiration ? ' · jusqu\'au ' + fmt(a.date_expiration) : ''}</div></div>
+            <div style="flex:1;min-width:200px;"><strong>${a.formation_titre}</strong>${a.module_titre ? ' — ' + a.module_titre : ' <span class="tag">Formation complète</span>'} ${clocheR(a.formation_id)}<div style="font-size:12px;color:var(--muted);">${a.type_acces === 'paye' ? 'Payé' + (a.montant_paye ? ' · ' + a.montant_paye + ' €' : '') : a.type_acces === 'code' ? 'Code d\'accès' : 'Gratuit'}${a.date_expiration ? ' · jusqu\'au ' + fmt(a.date_expiration) : ''}</div></div>
             <span style="font-size:12px;font-weight:800;color:${e[1]};">${e[0]}</span>
             ${a.statut === 'actif' ? `<a class="btn btn-sm btn-orange" href="suivre-formation.html?id=${a.formation_id}">▶ Ouvrir</a>` : `<a class="btn btn-sm btn-outline" href="formation-fiche.html?id=${a.formation_id}">Voir la fiche</a>`}</div>`; }).join('')}</div>`;
       } catch(_) {}
@@ -1812,7 +1814,7 @@
         <div class="card" style="margin-bottom:14px;">
           <div class="flex-between" style="align-items:flex-start;flex-wrap:wrap;gap:8px;">
             <div style="flex:1;">
-              <h3 style="margin:0 0 4px;">${r.titre}</h3>
+              <h3 style="margin:0 0 4px;">${r.titre} ${clocheR(r.formation_id)}</h3>
               <p style="margin:0;color:var(--muted);font-size:13px;">${r.organisme||''} ${r.domaine?'· '+r.domaine:''}</p>
             </div>
             <span class="tag">${STATUT_LBL[r.statut]||r.statut}</span>
@@ -2131,7 +2133,7 @@
           </tbody>
         </table>` : '<div class="notice">Aucun élève inscrit pour le moment.</div>'}
       `;
-      if (a.a_corriger > 0) fbChargerACorriger(id, titre);
+      fbChargerACorriger(id, titre);
       el.querySelectorAll('.fb-redonner').forEach(btn => btn.addEventListener('click', async () => {
         if (!confirm('Redonner des tentatives à cet apprenant ? Les précédentes sont archivées (conservées, mais ne comptent plus).')) return;
         try { await api('POST', `/formations/${id}/quiz/${btn.dataset.quiz}/reinitialiser`, { inscription_id: Number(btn.dataset.insc) }); showMsg('Tentatives rendues à l\'apprenant.', 'success'); openSuiviFormation(id, titre); }
@@ -2182,35 +2184,92 @@
     openSuiviFormation(formationId, titre);
   }
 
-  /* Travaux à corriger : réponses de l'apprenant en regard des questions, note + commentaire ; la correction valide (ou non) l'activité et peut délivrer le document. */
+  /* BOÎTE DE RÉCEPTION des devoirs (2026-10-31) : tous les dépôts des apprenants (texte + fichier), à corriger puis corrigés.
+     Le formateur répond par une note (facultative), un avis écrit et/ou un PDF ; l'apprenant le retrouve dans le bouton « Rendu » et la cloche de sa cartouche.
+     Sans note, c'est un avis d'orientation : l'activité n'est pas validée et l'élève peut redéposer. Un rendu reste modifiable tant que l'élève ne l'a pas ouvert. */
+  let FB_DEPOTS_FILTRE = 'a_corriger';
+  const fbHeure = v => { if (!v) return ''; const t = String(v); const d = new Date(t.replace(' ', 'T') + (/Z|\+/.test(t) ? '' : 'Z')); return isNaN(d) ? escQ(t.slice(0, 10)) : escQ(d.toLocaleString('fr-FR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' })); };
+  const fbLienFichier = (url, nom, icone) => url ? `<a href="${escQ(url)}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline" style="margin-top:6px;">${icone || '📎'} ${escQ(nom || 'Fichier')}</a>` : '';
+  async function fbTeleverserRendu(input) {
+    const f = input && input.files && input.files[0]; if (!f) return null;
+    if (f.size > 15 * 1024 * 1024) throw new Error('Fichier trop volumineux (15 Mo maximum).');
+    const fd = new FormData(); fd.append('document', f);
+    const r = await fetch('/api/upload/document', { method: 'POST', credentials: 'same-origin', body: fd });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.url) throw new Error(d.error || 'Le fichier n’a pas pu être envoyé.');
+    return { url: d.url, nom: f.name };
+  }
   async function fbChargerACorriger(formationId, titre){
     const zone = document.getElementById('suivi-a-corriger');
     if (!zone) return;
     try {
-      const { travaux } = await api('GET', `/formations/${formationId}/a-corriger`);
-      if (!travaux.length) { zone.innerHTML = ''; return; }
-      zone.innerHTML = `<h3 style="margin:0 0 10px;">📝 Travaux à corriger (${travaux.length})</h3>` + travaux.map(t => `
-        <div class="card" style="margin-bottom:14px;border-left:4px solid #f59e0b;" data-travail="${t.id}">
-          <div class="flex-between" style="gap:8px;flex-wrap:wrap;"><strong>${escQ(t.apprenant)} — ${escQ(t.quiz_titre)}</strong><span style="font-size:12px;color:var(--muted);">rendu le ${escQ((t.soumis_le||'').slice(0,10))} · seuil ${t.seuil}%</span></div>
-          ${t.reponses.map((r, i) => `<div style="margin-top:10px;font-size:13px;"><div style="font-weight:700;">${i+1}. ${escQ(r.question)} <span style="font-weight:400;color:var(--muted);">(${r.points} pt${r.points>1?'s':''})</span></div>
-            <div style="white-space:pre-wrap;background:rgba(127,127,127,.14);border:1px solid rgba(127,127,127,.35);color:inherit;border-radius:8px;padding:8px 10px;margin-top:4px;">${escQ(Array.isArray(r.reponse) ? r.reponse.join(', ') : r.reponse) || '<em style="color:var(--muted);">Pas de réponse</em>'}</div>
-            ${r.attendue ? `<div style="font-size:11.5px;color:var(--muted);margin-top:3px;">Réponse attendue : ${escQ(r.attendue)}</div>` : ''}</div>`).join('')}
+      const { depots, a_corriger, corriges } = await api('GET', `/formations/${formationId}/depots`);
+      if (!depots.length) { zone.innerHTML = ''; return; }
+      if ((FB_DEPOTS_FILTRE === 'a_corriger' && !a_corriger) || (FB_DEPOTS_FILTRE === 'corriges' && !corriges)) FB_DEPOTS_FILTRE = a_corriger ? 'a_corriger' : 'corriges';
+      const liste = depots.filter(d => (FB_DEPOTS_FILTRE === 'a_corriger') === (d.statut === 'a_corriger'));
+      const champsRendu = (d, edition) => `
           <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start;margin-top:12px;">
-            <input type="number" min="0" max="100" step="1" class="input-field fb-corr-note" placeholder="Note (%)" style="width:110px;" aria-label="Note sur 100">
-            <textarea class="fb-corr-com" rows="2" placeholder="Commentaire pour l'apprenant (facultatif)" style="flex:1;min-width:200px;border-radius:10px;border:1px solid var(--border);padding:8px;font-family:inherit;"></textarea>
-            <button class="btn btn-sm btn-orange fb-corr-save" data-id="${t.id}">Enregistrer la correction</button>
+            ${edition ? '' : `<input type="number" min="0" max="100" step="1" class="input-field fb-corr-note" placeholder="Note (%) — facultative" style="width:170px;" aria-label="Note sur 100, facultative">`}
+            <textarea class="fb-corr-com" rows="3" placeholder="Votre avis, des conseils pour orienter l'élève…" style="flex:1;min-width:220px;border-radius:10px;border:1px solid var(--border);padding:8px;font-family:inherit;">${edition ? escQ(d.rendu.commentaire || '') : ''}</textarea>
           </div>
-        </div>`).join('');
-      zone.querySelectorAll('.fb-corr-save').forEach(btn => btn.addEventListener('click', async () => {
-        const carteT = btn.closest('[data-travail]');
-        const note = carteT.querySelector('.fb-corr-note').value;
-        if (note === '' || Number(note) < 0 || Number(note) > 100) { showMsg('Indiquez une note entre 0 et 100.', 'danger'); return; }
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:8px;">
+            <label style="font-size:12.5px;color:var(--muted);">📎 PDF de consignes / corrections (facultatif) <input type="file" class="fb-corr-fichier" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.webp" style="display:block;margin-top:4px;"></label>
+            ${edition && d.rendu.fichier_url ? `<label style="font-size:12.5px;"><input type="checkbox" class="fb-corr-retirer" style="width:auto;"> Retirer le fichier actuel (${escQ(d.rendu.fichier_nom || 'Rendu')})</label>` : ''}
+            <button class="btn btn-sm btn-orange ${edition ? 'fb-corr-maj' : 'fb-corr-save'}" data-id="${d.id}" style="margin-left:auto;">${edition ? 'Enregistrer la modification' : '📬 Envoyer le rendu'}</button>
+          </div>
+          ${edition ? '' : `<p style="font-size:11.5px;color:var(--muted);margin:6px 0 0;">Avec une note : l'activité est validée si le seuil (${d.seuil} %) est atteint. Sans note : c'est un avis, l'élève pourra redéposer une version améliorée.</p>`}`;
+      const carteDepot = d => d.statut === 'a_corriger' ? `
+        <div class="card" style="margin-bottom:14px;border-left:4px solid #f59e0b;" data-travail="${d.id}">
+          <div class="flex-between" style="gap:8px;flex-wrap:wrap;"><strong>${escQ(d.apprenant)} — ${escQ(d.quiz_titre)}</strong><span style="font-size:12px;color:var(--muted);">déposé le ${fbHeure(d.soumis_le)} · seuil ${d.seuil}%</span></div>
+          ${d.fichier_url ? `<div>${fbLienFichier(d.fichier_url, d.fichier_nom, '📎 Fichier déposé :')}</div>` : ''}
+          ${d.reponses.map((r, i) => `<div style="margin-top:10px;font-size:13px;"><div style="font-weight:700;">${i+1}. ${escQ(r.question)} <span style="font-weight:400;color:var(--muted);">(${r.points} pt${r.points>1?'s':''})</span></div>
+            <div style="white-space:pre-wrap;background:rgba(127,127,127,.14);border:1px solid rgba(127,127,127,.35);color:inherit;border-radius:8px;padding:8px 10px;margin-top:4px;">${escQ(Array.isArray(r.reponse) ? r.reponse.join(', ') : r.reponse) || '<em style="color:var(--muted);">Pas de réponse écrite</em>'}</div>
+            ${r.attendue ? `<div style="font-size:11.5px;color:var(--muted);margin-top:3px;">Réponse attendue : ${escQ(r.attendue)}</div>` : ''}</div>`).join('')}
+          ${champsRendu(d, false)}
+        </div>` : `
+        <div class="card" style="margin-bottom:14px;border-left:4px solid ${d.rendu.reussi ? '#16a34a' : '#64748b'};" data-travail="${d.id}">
+          <div class="flex-between" style="gap:8px;flex-wrap:wrap;"><strong>${escQ(d.apprenant)} — ${escQ(d.quiz_titre)}</strong>
+            <span class="fb-statut-pill ${d.rendu.lu_le ? 'terminee' : 'active'}" title="${d.rendu.lu_le ? 'Ouvert le ' + fbHeure(d.rendu.lu_le) : 'L’élève n’a pas encore ouvert votre rendu'}">${d.rendu.lu_le ? '👁 Lu le ' + fbHeure(d.rendu.lu_le) : '✉ Pas encore lu'}</span></div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px;">déposé le ${fbHeure(d.soumis_le)} · rendu envoyé le ${fbHeure(d.rendu.envoye_le)}${d.rendu.note_pct != null ? ' · note ' + d.rendu.note_pct + ' %' + (d.rendu.reussi ? ' (validé)' : ' (sous le seuil)') : ' · avis sans note'}</div>
+          ${d.fichier_url ? `<div>${fbLienFichier(d.fichier_url, d.fichier_nom, '📎 Fichier déposé :')}</div>` : ''}
+          ${d.reponses.filter(r => r.reponse && String(r.reponse).trim()).map(r => `<div style="margin-top:8px;font-size:13px;"><div style="font-weight:700;">${escQ(r.question)}</div><div style="white-space:pre-wrap;background:rgba(127,127,127,.14);border:1px solid rgba(127,127,127,.35);border-radius:8px;padding:8px 10px;margin-top:4px;">${escQ(Array.isArray(r.reponse) ? r.reponse.join(', ') : r.reponse)}</div></div>`).join('')}
+          <div style="margin-top:10px;padding:10px 12px;border-radius:10px;background:rgba(242,100,34,.10);border:1px solid rgba(242,100,34,.35);">
+            <div style="font-size:12px;font-weight:700;margin-bottom:4px;">📬 Votre rendu</div>
+            <div style="white-space:pre-wrap;font-size:13px;">${d.rendu.commentaire ? escQ(d.rendu.commentaire) : '<em style="color:var(--muted);">Pas de texte</em>'}</div>
+            ${fbLienFichier(d.rendu.fichier_url, d.rendu.fichier_nom, '📄')}
+          </div>
+          ${d.rendu.lu_le ? '' : `<div style="margin-top:8px;"><button class="btn btn-sm btn-outline fb-corr-edit" data-id="${d.id}">✏️ Modifier mon rendu</button> <span style="font-size:11.5px;color:var(--muted);">Possible tant que l'élève ne l'a pas ouvert.</span></div><div class="fb-corr-edition" hidden>${champsRendu(d, true)}</div>`}
+        </div>`;
+      zone.innerHTML = `<h3 style="margin:0 0 10px;">📥 Boîte de réception des devoirs</h3>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+          <button class="btn btn-sm ${FB_DEPOTS_FILTRE === 'a_corriger' ? 'btn-orange' : 'btn-outline'} fb-dep-filtre" data-f="a_corriger">📝 À corriger (${a_corriger})</button>
+          <button class="btn btn-sm ${FB_DEPOTS_FILTRE === 'corriges' ? 'btn-orange' : 'btn-outline'} fb-dep-filtre" data-f="corriges">📬 Rendus envoyés (${corriges})</button>
+        </div>
+        ${liste.length ? liste.map(carteDepot).join('') : '<div class="notice">Rien dans cette liste.</div>'}`;
+      zone.querySelectorAll('.fb-dep-filtre').forEach(b => b.addEventListener('click', () => { FB_DEPOTS_FILTRE = b.dataset.f; fbChargerACorriger(formationId, titre); }));
+      const envoyer = async (btn, methode, chemin, corps, ok) => {
+        const carteT = btn.closest('[data-travail]'); btn.disabled = true; const txt = btn.textContent; btn.textContent = 'Envoi…';
         try {
-          const r = await api('POST', `/formations/${formationId}/tentatives/${btn.dataset.id}/corriger`, { note_pct: Number(note), commentaire: carteT.querySelector('.fb-corr-com').value.trim() });
-          showMsg(r.reussi ? 'Correction enregistrée : activité validée.' + (r.attestation ? ' Le document a été délivré à l\'apprenant.' : '') : 'Correction enregistrée : sous le seuil, l\'apprenant pourra repasser.', 'success');
+          const f = await fbTeleverserRendu(carteT.querySelector(btn.classList.contains('fb-corr-maj') ? '.fb-corr-edition .fb-corr-fichier' : '.fb-corr-fichier'));
+          if (f) { corps.fichier_url = f.url; corps.fichier_nom = f.nom; }
+          const r = await api(methode, chemin, corps);
+          showMsg(ok(r), 'success');
           openSuiviFormation(formationId, titre);
           loadDashboardCentreCommande();
-        } catch (e) { showMsg(e.message || 'Erreur.', 'danger'); }
+        } catch (e) { showMsg(e.message || 'Erreur.', 'danger'); btn.disabled = false; btn.textContent = txt; }
+      };
+      zone.querySelectorAll('.fb-corr-save').forEach(btn => btn.addEventListener('click', () => {
+        const carteT = btn.closest('[data-travail]');
+        const note = carteT.querySelector('.fb-corr-note').value, com = carteT.querySelector('.fb-corr-com').value.trim(), fic = carteT.querySelector('.fb-corr-fichier').files.length;
+        if (note !== '' && (Number(note) < 0 || Number(note) > 100)) { showMsg('La note doit être comprise entre 0 et 100.', 'danger'); return; }
+        if (note === '' && !com && !fic) { showMsg('Indiquez une note, écrivez un avis ou joignez un PDF.', 'danger'); return; }
+        envoyer(btn, 'POST', `/formations/${formationId}/tentatives/${btn.dataset.id}/corriger`, { note_pct: note === '' ? null : Number(note), commentaire: com },
+          r => note === '' ? 'Rendu envoyé : l’élève est prévenu (avis sans note, il pourra redéposer).' : (r.reussi ? 'Rendu envoyé : activité validée.' + (r.attestation ? ' Le document a été délivré à l’apprenant.' : '') : 'Rendu envoyé : sous le seuil, l’apprenant pourra repasser.'));
+      }));
+      zone.querySelectorAll('.fb-corr-edit').forEach(b => b.addEventListener('click', () => { const e = b.closest('[data-travail]').querySelector('.fb-corr-edition'); e.hidden = !e.hidden; }));
+      zone.querySelectorAll('.fb-corr-maj').forEach(btn => btn.addEventListener('click', () => {
+        const ed = btn.closest('.fb-corr-edition'), retirer = ed.querySelector('.fb-corr-retirer');
+        envoyer(btn, 'PUT', `/formations/${formationId}/tentatives/${btn.dataset.id}/rendu`, { commentaire: ed.querySelector('.fb-corr-com').value.trim(), retirer_fichier: !!(retirer && retirer.checked) }, () => 'Rendu modifié.');
       }));
     } catch (e) { zone.innerHTML = ''; }
   }
@@ -2730,7 +2789,7 @@
               <input type="number" min="1" max="480" class="input-field fb-rg-temps" placeholder="Temps imparti (min, vide = aucun)" value="${q.temps_limite_min||''}">
               <input type="number" min="1" max="20" class="input-field fb-rg-tent" placeholder="Tentatives max (vide = illimité)" value="${q.max_tentatives||''}">
               <label style="display:flex;gap:8px;align-items:center;font-size:13px;"><input type="checkbox" class="fb-rg-melange" style="width:auto;" ${Number(q.melanger)===1?'checked':''}> Mélanger les questions</label>
-              ${Number(q.correction_auto)===0 ? `<select class="input-field fb-rg-depot"><option value="non" ${(q.depot_fichier||'non')==='non'?'selected':''}>Pas de fichier</option><option value="optionnel" ${q.depot_fichier==='optionnel'?'selected':''}>Fichier facultatif</option><option value="obligatoire" ${q.depot_fichier==='obligatoire'?'selected':''}>Fichier obligatoire</option></select>` : '<span style="font-size:12px;color:var(--muted);align-self:center;">Dépôt de fichier : devoirs à correction manuelle uniquement.</span>'}
+              ${Number(q.correction_auto)===0 ? `<select class="input-field fb-rg-depot"><option value="optionnel" ${q.depot_fichier!=='obligatoire'?'selected':''}>Fichier facultatif (PDF, Word…)</option><option value="obligatoire" ${q.depot_fichier==='obligatoire'?'selected':''}>Fichier obligatoire</option></select>` : '<span style="font-size:12px;color:var(--muted);align-self:center;">Dépôt de fichier : devoirs à correction manuelle uniquement.</span>'}
               <button class="btn btn-sm btn-orange fb-rg-save" data-id="${q.id}" style="grid-column:1/-1;justify-self:start;">💾 Enregistrer ces réglages</button>
             </div></details>
           <div id="fb-quiz-q-${q.id}">
@@ -2808,7 +2867,7 @@
   document.getElementById('fb-quiz-correction').addEventListener('change', function(){
     const manuelle = this.value === 'manuelle';
     document.getElementById('fb-quiz-depot').style.display = manuelle ? '' : 'none';
-    if (!manuelle) document.getElementById('fb-quiz-depot').value = 'non';
+    if (!manuelle) document.getElementById('fb-quiz-depot').value = 'optionnel';
   });
   document.getElementById('fb-add-quiz').addEventListener('click', async ()=>{
     const titre = document.getElementById('fb-quiz-titre').value.trim();

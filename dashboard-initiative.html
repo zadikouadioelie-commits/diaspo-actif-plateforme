@@ -11048,6 +11048,7 @@ window.ouvrirMesFormationsSuivies = async function() {
   const zone = document.getElementById('mes-formations-suivies-liste');
   try {
     const { inscriptions } = await api('GET', '/mes-inscriptions');
+    const clochesR = await api('GET', '/mes-rendus').catch(() => ({ formations: {} }));
     if (!inscriptions.length) {
       zone.innerHTML = `<p style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0;">Aucune formation suivie pour le moment.</p>`;
       return;
@@ -11060,6 +11061,7 @@ window.ouvrirMesFormationsSuivies = async function() {
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:2px;">
             <strong style="font-size:13.5px;">${escH(i.titre)}</strong>
             <span style="font-size:10.5px;font-weight:700;color:${st.color};">${st.label}</span>
+            ${(Number((clochesR.formations || {})[String(i.formation_id)]) || 0) ? `<a href="suivre-formation.html?id=${i.formation_id}" target="_blank" rel="noopener" title="Réponse du formateur à lire" style="display:inline-flex;align-items:center;gap:4px;background:#ef4444;color:#fff;border-radius:99px;padding:2px 9px 2px 7px;font-weight:800;font-size:12px;text-decoration:none;">🔔 ${Number(clochesR.formations[String(i.formation_id)])}</a>` : ''}
           </div>
           <div style="height:5px;background:var(--bg);border-radius:99px;overflow:hidden;margin:4px 0;"><div style="height:100%;width:${i.avancement_pct||0}%;background:var(--orange);"></div></div>
           <div style="font-size:11px;color:var(--muted);display:flex;justify-content:space-between;">

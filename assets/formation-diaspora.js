@@ -34,7 +34,7 @@
       <div class="fd-corps"><p style="color:var(--muted);font-size:13px;">Chargement…</p></div>`;
     const corps = conteneur.querySelector(".fd-corps");
     try {
-      const { inscriptions } = await api("GET", "/mes-inscriptions");
+      const [{ inscriptions }, cloches] = await Promise.all([api("GET", "/mes-inscriptions"), api("GET", "/mes-rendus").catch(() => ({ formations: {} }))]);
       if (!inscriptions || !inscriptions.length) {
         corps.innerHTML = `<div style="text-align:center;padding:26px 8px;">
           <div style="font-size:34px;">📚</div>
@@ -45,17 +45,20 @@
       corps.innerHTML = inscriptions.map(i => {
         const st = STATUTS[i.statut] || STATUTS.active;
         const pct = Number(i.avancement_pct) || 0;
-        return `<div class="card" style="margin-bottom:10px;padding:12px 14px;display:flex;gap:12px;align-items:center;">
+        /* Cloche (2026-10-31) : nombre de réponses du formateur (rendus de devoirs) pas encore lues pour cette formation. */
+        const nb = Number((cloches.formations || {})[String(i.formation_id)]) || 0;
+        const cloche = nb ? `<a href="suivre-formation.html?id=${Number(i.formation_id)}" class="fd-cloche" title="${nb} réponse${nb > 1 ? "s" : ""} du formateur à lire" aria-label="${nb} réponse${nb > 1 ? "s" : ""} du formateur disponible${nb > 1 ? "s" : ""}" style="position:absolute;top:8px;right:10px;display:inline-flex;align-items:center;gap:5px;background:#ef4444;color:#fff;border-radius:99px;padding:4px 11px 4px 9px;font-weight:800;font-size:13px;text-decoration:none;box-shadow:0 2px 8px rgba(239,68,68,.45);"><span style="font-size:16px;line-height:1;">🔔</span>${nb}</a>` : "";
+        return `<div class="card" style="margin-bottom:10px;padding:12px 14px;display:flex;gap:12px;align-items:center;position:relative;">${cloche}
           ${i.image_url ? `<img src="${esc(i.image_url)}" alt="" style="width:64px;height:64px;border-radius:8px;object-fit:cover;flex:none;">` : `<div style="width:64px;height:64px;border-radius:8px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:24px;flex:none;">🎓</div>`}
           <div style="flex:1;min-width:0;">
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:2px;">
-              <strong style="font-size:14px;">${esc(i.titre)}</strong>
+              <strong style="font-size:14px;${nb ? "padding-right:70px;" : ""}">${esc(i.titre)}</strong>
               <span style="font-size:11px;font-weight:700;color:${st.color};">${st.label}</span>
             </div>
             <div style="height:5px;background:var(--bg);border-radius:99px;overflow:hidden;margin:5px 0;"><div style="height:100%;width:${pct}%;background:var(--orange);"></div></div>
             <div style="font-size:11.5px;color:var(--muted);display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;">
               <span>${pct}% complété · inscrit le ${i.date_inscription ? dateFr(i.date_inscription) : "—"}</span>
-              <a href="suivre-formation.html?id=${Number(i.formation_id)}" style="font-weight:700;">Continuer →</a>
+              <a href="suivre-formation.html?id=${Number(i.formation_id)}" style="font-weight:700;">${nb ? "Lire la réponse →" : "Continuer →"}</a>
             </div>
           </div>
         </div>`;
