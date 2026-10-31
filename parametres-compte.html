@@ -237,6 +237,21 @@
       <p class="pc-msg" id="pc-msg-pwd"></p>
     </div>
 
+    <div class="pc-card" id="pc-card-multi">
+      <h2>🔑 Code secret multi-connexion</h2>
+      <p class="pc-desc">Si vous êtes connecté à plus d'un endroit, chaque heure il vous sera demandé de reconfirmer qu'il s'agit de vous et que votre compte n'est pas passé entre les mains d'une autre personne. Ce code à 4 chiffres sert à cette confirmation. Il ne permet pas de changer votre mot de passe : s'il a été utilisé à tort, changez-le simplement.</p>
+      <div class="pc-field"><label>Votre code actuel</label>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <input id="pc-multi-actuel" type="password" readonly placeholder="Aucun code" aria-label="Code secret multi-connexion actuel" style="max-width:150px;text-align:center;letter-spacing:.3em;">
+          <button type="button" class="pc-btn" id="pc-multi-voir">Rendre visible</button>
+        </div>
+      </div>
+      <div class="pc-field"><label>Nouveau code (4 chiffres)</label><input id="pc-multi-nouveau" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" placeholder="••••" style="max-width:150px;text-align:center;letter-spacing:.3em;"></div>
+      <p class="pc-desc" style="margin:4px 0 0;">Modifier le code déconnecte vos autres connexions : elles devront se reconfirmer avec le nouveau code. Vous pouvez aussi le créer dès maintenant, avant toute connexion multiple.</p>
+      <button type="button" class="pc-btn pc-btn-save" id="pc-btn-multi">Enregistrer le code</button>
+      <p class="pc-msg" id="pc-msg-multi"></p>
+    </div>
+
     <div class="pc-card">
       <h2>🔔 Notifications</h2>
       <div class="pc-toggle-row">
@@ -413,6 +428,32 @@
     } catch(e) { showMsg('pc-msg-pwd', e.message || 'Erreur.', false); }
     finally { btn.disabled = false; }
   });
+
+  /* Code secret multi-connexion (2026-10-31, demande explicite) : visible en un clic (« Rendre visible »), modifiable à volonté.
+     Voir server/multi-connexion.js — le code ne permet pas de changer le mot de passe ; le modifier coupe les autres connexions. */
+  (function () {
+    const champ = document.getElementById('pc-multi-actuel'), voir = document.getElementById('pc-multi-voir');
+    const nouveau = document.getElementById('pc-multi-nouveau'), save = document.getElementById('pc-btn-multi');
+    if (!champ || !voir || !nouveau || !save) return;
+    let visible = false, code = null, charge = false;
+    const maj = () => { champ.type = visible ? 'text' : 'password'; champ.value = code || ''; voir.textContent = visible ? 'Masquer' : 'Rendre visible'; };
+    voir.addEventListener('click', async () => {
+      if (!charge) { try { const r = await api('GET', '/multi-connexion/code'); code = r.code || null; charge = true; } catch (e) { showMsg('pc-msg-multi', e.message || 'Erreur.', false); return; } }
+      if (!code) { showMsg('pc-msg-multi', "Aucun code pour l'instant : créez-le ci-dessous.", false); return; }
+      visible = !visible; maj();
+    });
+    nouveau.addEventListener('input', () => { nouveau.value = nouveau.value.replace(/\D/g, '').slice(0, 4); });
+    save.addEventListener('click', async () => {
+      if (!/^\d{4}$/.test(nouveau.value)) { showMsg('pc-msg-multi', 'Le code doit comporter exactement 4 chiffres.', false); return; }
+      save.disabled = true;
+      try {
+        const r = await api('PUT', '/multi-connexion/code', { code: nouveau.value });
+        code = nouveau.value; charge = true; nouveau.value = ''; maj();
+        showMsg('pc-msg-multi', 'Code enregistré ✓' + (r.deconnectees ? ' — ' + r.deconnectees + ' autre(s) connexion(s) déconnectée(s).' : ''), true);
+      } catch (e) { showMsg('pc-msg-multi', e.message || 'Erreur.', false); }
+      finally { save.disabled = false; }
+    });
+  })();
 
   /* Mes données et mes droits (2026-10-12, demande explicite) : documents acceptés (avec leur version) et exercice des droits RGPD. */
   (function () {

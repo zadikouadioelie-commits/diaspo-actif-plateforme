@@ -3337,6 +3337,9 @@ FormationFinances.register({ route, db, sendJSON, getCurrentUser, SEC, exigerPre
 const FormationRelances = require("./formation-relances");
 const { signAuthToken: signerJetonRelance, verifyAuthToken: verifierJetonRelance } = require("./auth");
 FormationRelances.register({ route, db, sendJSON, getCurrentUser, SEC, exigerPremium, creerNotif, getOrigin, signAuthToken: signerJetonRelance, verifyAuthToken: verifierJetonRelance });
+/* Connexion à plusieurs endroits : question « est-ce vous ? » chaque heure + code secret 4 chiffres (server/multi-connexion.js). */
+const MultiConnexion = require("./multi-connexion");
+MultiConnexion.register({ route, db, sendJSON, getCurrentUser, creerNotif, SEC });
 /* Documents PDF et Excel affichés DANS la page du cours (visionneuse, accès contrôlé, lecture par fenêtres) — server/formation-documents.js. checkFormationOwner est une déclaration de fonction (hissée). */
 const FormationDocuments = require("./formation-documents");
 FormationDocuments.register({ route, db, sendJSON, getCurrentUser, SEC, checkFormationOwner });
@@ -34909,6 +34912,10 @@ ${jsonLd}
         return sendJSON(res, 429, { error: "Trop de requêtes sur les listes, réessayez dans quelques instants." }, { "Retry-After": String(_listesLimit.retryAfter) });
       }
     }
+
+    /* Connexion à plusieurs endroits (2026-10-31) : tant que le titulaire n'a pas confirmé « c'est bien moi », toute l'API est refusée
+       pour ce compte (assets/multi-connexion.js affiche la question). Exemptés : /api/auth/*, /api/multi-connexion/*, Stripe, cron. */
+    { const _mc = await MultiConnexion.garde(db, req, pathname); if (_mc) return sendJSON(res, 403, _mc); }
 
     // Enregistrer l'activité de l'utilisateur connecté (pour DAU/WAU/MAU)
     if (req.method === "GET") trackActivity(req);

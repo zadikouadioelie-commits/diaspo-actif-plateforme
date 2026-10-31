@@ -1798,6 +1798,17 @@ function chargerConnexionsUI() {
   document.head.appendChild(sc);
 }
 
+/* Connexion à plusieurs endroits (2026-10-31) : fenêtre « Est-ce vous ? » chaque heure — voir assets/multi-connexion.js
+   et server/multi-connexion.js. Chargé à la demande, une seule fois par page, une fois l'utilisateur connu. */
+function chargerMultiConnexionUI() {
+  if (window.__mcChargement) return;
+  window.__mcChargement = true;
+  const sc = document.createElement('script');
+  sc.src = '/assets/multi-connexion.js?v=3';
+  sc.defer = true;
+  document.head.appendChild(sc);
+}
+
 /* Relais Diaspora — badge « Accès invité » (prototype local, 2026-10-13) : visible sur TOUTE page
    authentifiée tant que le compte est un accès invité temporaire (relais_invite_fiche_id posé),
    même emplacement que le widget de comptes liés ci-dessous puisque c'est le seul point commun
@@ -2075,6 +2086,7 @@ async function applyAuthState() {
     injecterBadgeAccesInvite(user);
     initCompactMenu();
     chargerConnexionsUI();
+    chargerMultiConnexionUI();
     // Bouton "Passer à Premium" : visible seulement si pas déjà abonné — retiré pour le
     // rôle utilisateur (2026-07-26, voir module "Bientôt disponible"), gardé pour initiative
     if (user.role === 'initiative') {

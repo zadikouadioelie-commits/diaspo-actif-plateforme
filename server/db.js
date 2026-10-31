@@ -6707,6 +6707,21 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_connexions_appareil ON connexions(appareil_id, revoque_at);
 `);
 
+/* Connexion à plusieurs endroits à la fois (2026-10-31, demande explicite) — voir server/multi-connexion.js.
+   Une ligne par compte : code secret à 4 chiffres (lisible à dessein, « Rendre visible » dans les paramètres de sécurité :
+   il ne permet pas de changer le mot de passe), fin de la dernière confirmation d'une heure, compteur d'essais et verrou. */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS multi_connexion (
+    user_id         INTEGER PRIMARY KEY,
+    code            TEXT,
+    ok_jusqua       TEXT,
+    essais          INTEGER DEFAULT 0,
+    verrou_jusqua   TEXT,
+    code_cree_at    TEXT,
+    code_modifie_at TEXT
+  );
+`);
+
 /* ═══════════════════════════════════════════════════════════════════════════
    CONFIRMATION D'UN NOUVEL APPAREIL (2026-10-05, étape 2 du chantier sécurité des connexions).
    Quand le bon mot de passe est saisi depuis un appareil inconnu alors que le compte est déjà ouvert
