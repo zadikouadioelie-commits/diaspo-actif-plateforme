@@ -2253,6 +2253,7 @@
     { t: 'Mes événements', i: 'cal', h: '#/mesevenements', d: 'Créer et gérer vos événements', r: { initiative: 2, collectivite: 1, administrateur: 1 } },
     { t: 'Fiches d’inscription', i: 'ticket', h: '#/inscriptions', d: 'Inscriptions à vos événements, billets, QR codes', r: { initiative: 2, collectivite: 1, administrateur: 1 } },
     { t: 'Cotisations et adhésions', i: 'people', h: '#/cotisations', d: 'Formules, adhérents, paiements', r: { initiative: 2 } },
+    { t: 'Création de formation', i: 'book', h: '#/creationformation', d: 'Créer et vendre vos formations (avec l’autorisation de Diaspo’Actif)', r: { initiative: 2 }, formateur: 1 },
     { t: 'Centre Financier', i: 'card', h: '#/centrefinancier', d: 'Revenus, retraits, comptes de réception', r: { initiative: 1 } },
     { t: 'Messages de la boutique', i: 'shop', h: '#/msgboutique', d: 'Demandes reçues via votre boutique', r: { initiative: 2 } },
     { t: 'Messagerie', i: 'chat', h: '#/messages', d: 'Vos conversations', r: { utilisateur: 1, initiative: 1 } },
@@ -2301,7 +2302,12 @@
   }
   async function loadPremium() {
     try { S.premium = await api('/api/premium/statut'); } catch (e) { S.premium = null; }
+    /* Un formateur invité par Diaspo'Actif crée des formations sans Premium (règle du serveur) : son module n'est pas verrouillé. */
+    S.formateurInvite = false;
+    if (S.me && S.me.role === 'initiative') { try { S.formateurInvite = (await api('/api/formateur/demande')).source === 'invite'; } catch (e) { /* inconnu : verrou standard */ } }
     if (S.tab === 'moi') viewMoi();
+    const boiteOutils = S.pane && S.pane.k === 'outils' && $('#outils-box'); /* « Mes outils » déjà ouvert : les cadenas arrivent avec le statut */
+    if (boiteOutils && S.me) renderOutils(boiteOutils);
   }
   function premiumLocked(level) { return level === 2 && !!S.premium && S.premium.concerne && !S.premium.actif; }
   /* Lignes des modules visibles pour ce compte (type de compte + Premium) — partagées par l'onglet « Moi » et le menu rapide du haut. */
@@ -2312,7 +2318,7 @@
     const li = x => {
       const l = lvl(x); if (!l) return '';
       if (x.tracker && !m.tracker_disponible) return ''; /* Maracana Tracker : phase de test, réservé au compte officiel */
-      const locked = premiumLocked(l), d = typeof x.d === 'object' ? (x.d[role] || x.d.utilisateur) : x.d;
+      const locked = premiumLocked(l) && !(x.formateur && S.formateurInvite), d = typeof x.d === 'object' ? (x.d[role] || x.d.utilisateur) : x.d;
       const tag = l === 2 ? `<span class="prem">${locked ? '🔒' : '👑'} Premium</span>` : (l === 3 && S.premium && S.premium.concerne && !S.premium.actif ? '<span class="prem">👑 publier</span>' : '');
       const inner = `<span class="ic">${ic(locked ? 'lock' : x.i)}</span><span class="sp"><span class="t">${esc(x.t)}</span> ${tag}<br><span class="d">${esc(d)}</span></span><span class="ch">${ic('chev', 's')}</span>`;
       if (locked) return `<a class="li gold locked" href="#" data-lock="1" data-name="${esc(x.t)}">${inner}</a>`;
@@ -2529,7 +2535,7 @@
     p.hidden = true; document.body.style.overflow = ''; clearInterval(S.chatTimer); S.pane = null;
     const f = $('#pane-foot'); if (f) { f.innerHTML = ''; f.hidden = true; }
   }
-  const SITE_PAGES = { inscriptions: 'inscriptions-admin.html', boutique: 'vitrines.html', produit: 'vitrines.html', tracker: 'dashboard-initiative.html#tracker', mesevenements: 'dashboard-initiative.html#evenements', cotisations: 'dashboard-initiative.html#adhesions-init', mescagnottes: 'dashboard-initiative.html#cagnottes', msgboutique: 'dashboard-initiative.html#messages-vitrine', associe: 'mon-associe.html', reseaupro: 'reseau.html', businessplan: 'business-plan.html', formations: 'formations.html', cvlettres: 'dashboard-utilisateur.html', parrainage: 'parrainage.html', confidentialite: 'confidentialite.html', abonnement: 'mon-abonnement.html', centrefinancier: 'centre-financier.html' };
+  const SITE_PAGES = { inscriptions: 'inscriptions-admin.html', boutique: 'vitrines.html', produit: 'vitrines.html', tracker: 'dashboard-initiative.html#tracker', mesevenements: 'dashboard-initiative.html#evenements', cotisations: 'dashboard-initiative.html#adhesions-init', mescagnottes: 'dashboard-initiative.html#cagnottes', msgboutique: 'dashboard-initiative.html#messages-vitrine', associe: 'mon-associe.html', reseaupro: 'reseau.html', businessplan: 'business-plan.html', formations: 'formations.html', creationformation: 'dashboard-initiative.html#formations-gestion', cvlettres: 'dashboard-utilisateur.html', parrainage: 'parrainage.html', confidentialite: 'confidentialite.html', abonnement: 'mon-abonnement.html', centrefinancier: 'centre-financier.html' };
   function openSheet(inner) {
     const sh = $('#sheet'); sh.hidden = false; const close = () => { sh.hidden = true; sh.innerHTML = ''; };
     sh.innerHTML = '<div class="sh" role="dialog" aria-modal="true"><div class="grip"></div><div class="sb">' + inner + '</div></div>';

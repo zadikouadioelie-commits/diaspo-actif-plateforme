@@ -5,7 +5,8 @@
    Routes : #/formations · #/formations/<id> · #/formations/mes · #/formations/<id>/suivre
             · #/formations/<id>/l<idLeçon>
    Mêmes routes d'API que le site (formations.html, suivre-formation.html). La création et la
-   gestion de formations (Diaspo Formation, Premium) restent sur ordinateur.
+   gestion de formations (Diaspo Formation, Premium) restent sur ordinateur ; le module Premium « Création de formation »
+   (assets/m-mod-creation-formation.js) en porte l'accès sur téléphone.
    ============================================================ */
 (function () {
   'use strict';
@@ -117,7 +118,7 @@
     const g = $('#go-login'); if (g) g.onclick = () => A.openLogin(); // la connexion relance la route toute seule
   }
   const initiativeLink = () => S.me && S.me.role === 'initiative'
-    ? `<p class="small muted" style="text-align:center;margin:18px 6px 4px">Créer ou gérer vos propres formations (Création de formation) : <a href="formations.html" style="text-decoration:underline">à faire sur ordinateur</a>.</p>` : '';
+    ? `<p class="small muted" style="text-align:center;margin:18px 6px 4px">Créer ou gérer vos propres formations : <a href="#/creationformation" style="text-decoration:underline">module Premium « Création de formation »</a>.</p>` : '';
 
   /* ---------- données partagées ---------- */
   async function loadFavs(force) {
