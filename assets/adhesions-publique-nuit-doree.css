@@ -1,0 +1,115 @@
+/* Design « Nuit dorée » — page publique Cotisations & Adhésions (adhesions.html), proposition 2026-10-31.
+   Complète assets/theme-nuit-doree.css (barre du haut, boutons, menu, pied de page).
+   Ne touche PAS à assets/adhesions-nuit-doree.css (section Adhésions du tableau de bord Initiative) : feuille distincte.
+   La page construit son contenu en JavaScript avec des styles posés en ligne (bulles bleues, fonds gris clair, pastel orangé) :
+   cette feuille les ré-habille par sélecteurs d'attribut, tous préfixés html body.nd — sans class="nd" sur <body>, la page garde son design actuel.
+   Les couleurs de sens sont conservées (vert = à jour / confirmé, rouge = non à jour / erreur / complet, ambre = attente) en versions lumineuses.
+   Retour arrière : retirer class="nd" sur <body> et les 3 liens de feuille dans le <head>. */
+@import url("https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,500;6..96,600&family=Manrope:wght@400;500;600;700;800&display=swap");
+
+html body.nd{--ap-or:#E3C06E;--ap-or2:#B9893A;--ap-texte:#E8ECF6;--ap-doux:#AEB8D0;--ap-faible:#8591AD;--ap-verre:rgba(255,255,255,.05);--ap-verre2:rgba(255,255,255,.085);
+  --ap-bord:rgba(227,192,110,.3);--ap-bord2:rgba(255,255,255,.13);--ap-degore:linear-gradient(135deg,#F3DC9B 0%,#E3C06E 38%,#B9893A 100%);
+  --ap-vert:#7BE87B;--ap-ambre:#F5C56B;--ap-rouge:#FF9C9C;--ap-serif:'Bodoni Moda','Didot',Georgia,serif}
+
+/* ═══ socle : variables du site redéfinies dans la page et ses fenêtres ═══ */
+html body.nd :is(#app,.modal-overlay){--bg:rgba(255,255,255,.06);--card:rgba(255,255,255,.05);--text:#EDEAE0;--muted:#AEB8D0;--border:rgba(255,255,255,.14);--navy:#FFFFFF;--orange:#E3C06E}
+html body.nd #app{color:var(--ap-texte);min-height:100vh}
+html body.nd #app :is(button,input,select,textarea){font-family:inherit}
+
+/* ═══ en-tête de page ═══ */
+html body.nd #app .container{max-width:1180px}
+html body.nd #app .container>.flex-between{align-items:flex-end;padding-top:14px;margin-bottom:26px!important}
+html body.nd #app .container h1{font-family:var(--ap-serif);font-weight:500;font-size:clamp(30px,3.6vw,46px);line-height:1.1;letter-spacing:-.01em;color:#fff!important;border:0!important}
+html body.nd #adh-init-nom{color:var(--ap-or)!important;font-size:12px!important;font-weight:800;letter-spacing:.16em;text-transform:uppercase;margin-top:8px!important}
+html body.nd #btn-ma-carte{padding:0 22px;height:44px}
+
+/* ═══ cartes de formules ═══ */
+html body.nd .adh-grid{grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:22px;margin-top:6px}
+html body.nd .adh-card{position:relative;display:flex;flex-direction:column;overflow:hidden;padding:20px;background:var(--ap-verre);
+  border:1px solid var(--ap-bord2);border-top-width:3px;border-radius:22px;box-shadow:0 24px 50px -34px rgba(0,0,0,.95);backdrop-filter:blur(8px);
+  transition:transform .35s cubic-bezier(.22,.61,.36,1),border-color .35s,box-shadow .35s}
+html body.nd .adh-card:hover{transform:translateY(-3px);border-color:var(--ap-bord);box-shadow:0 30px 56px -30px rgba(0,0,0,.95),0 0 0 1px rgba(227,192,110,.12)}
+html body.nd .adh-media-photo,html body.nd .adh-media-video-wrap{width:calc(100% + 40px);margin:-20px -20px 16px;border-radius:0;aspect-ratio:16/10;box-shadow:inset 0 -60px 50px -40px rgba(6,10,20,.9)}
+html body.nd .adh-media-play{background:rgba(6,10,20,.7);border:1px solid var(--ap-bord);color:var(--ap-or)}
+html body.nd .adh-icon{display:grid;place-items:center;width:56px;height:56px;margin-bottom:14px;font-size:28px;border-radius:16px;background:rgba(227,192,110,.1);border:1px solid var(--ap-bord)}
+html body.nd .adh-nom{font-family:var(--ap-serif);font-weight:500;font-size:21px;line-height:1.2;color:#fff;margin:0 0 6px}
+html body.nd .adh-type{font-size:11px;font-weight:800;letter-spacing:.16em;color:var(--ap-faible);margin-bottom:14px}
+html body.nd .adh-montant{font-family:var(--ap-serif);font-weight:500;font-size:30px;line-height:1;letter-spacing:-.01em;margin-bottom:14px;
+  background:var(--ap-degore);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:var(--ap-or)!important;font-variant-numeric:lining-nums tabular-nums}
+html body.nd .adh-desc{font-size:13.5px;line-height:1.65;color:#C9D1E4;margin-bottom:18px}
+html body.nd .adh-desc :is(strong,b){color:#fff}
+html body.nd .adh-card>:is(button,.btn){margin-top:auto;height:46px;font-size:14px}
+html body.nd .adh-card .btn[disabled]{opacity:.55;cursor:default;box-shadow:none}
+/* places restantes / complet : la couleur est posée en ligne */
+html body.nd .adh-card div[style*="#dc2626"]{color:var(--ap-rouge)!important;font-weight:700}
+html body.nd .adh-card div[style*="var(--muted)"]{color:var(--ap-doux)!important}
+
+/* ═══ bandeaux d'information (.notice, bulles bleues « se connecter / créer un compte ») ═══ */
+html body.nd .notice{background:rgba(245,197,107,.09)!important;border:1px solid rgba(245,197,107,.35)!important;border-radius:16px;color:var(--ap-texte);font-size:13.5px;line-height:1.55;padding:14px 18px}
+html body.nd .notice[style*="#eff6ff"]{background:rgba(63,123,255,.12)!important;border-color:rgba(127,166,224,.4)!important;color:#D6E3FF}
+html body.nd .notice a:not(.btn){color:var(--ap-or)}
+html body.nd .notice strong{color:#fff}
+html body.nd #adh-public-formules>div[style*="text-align:center"]{color:var(--ap-doux)!important}
+
+/* ═══ fenêtres (formulaire d'adhésion, paiement, messages) ═══ */
+html body.nd .modal-overlay{background:rgba(3,6,14,.8)!important;backdrop-filter:blur(6px)}
+html body.nd .modal-overlay .modal-box{background:linear-gradient(160deg,#101a36,#0B1226)!important;color:var(--ap-texte);border:1px solid var(--ap-bord);border-radius:24px;box-shadow:0 34px 80px -34px rgba(0,0,0,.95);color-scheme:dark;text-align:left}
+html body.nd .modal-overlay .modal-box h3{font-family:var(--ap-serif);font-weight:500;font-size:22px;line-height:1.2;color:#fff!important;border:0!important;margin-bottom:10px!important}
+html body.nd .modal-overlay .modal-box p{color:var(--ap-doux)}
+html body.nd .modal-overlay .modal-box p strong,html body.nd .modal-overlay .modal-box strong{color:#fff}
+/* bulle bleue « vous adhérez sans compte » */
+html body.nd .modal-overlay .modal-box p[style*="#eff6ff"]{background:rgba(63,123,255,.12)!important;border:1px solid rgba(127,166,224,.4)!important;border-radius:14px!important;color:#D6E3FF!important;line-height:1.55}
+html body.nd .modal-overlay .modal-box p[style*="#eff6ff"] a{color:var(--ap-or)!important}
+/* conditions (fond gris clair), règlement et rubriques dépliantes (filet gris clair) */
+html body.nd .modal-overlay .modal-box div[style*="#f9fafb"]{background:var(--ap-verre)!important;border:1px solid var(--ap-bord2);border-radius:14px!important;color:var(--ap-doux)!important}
+html body.nd .modal-overlay .modal-box div[style*="#f9fafb"] :is(div,span){color:#F3E3B5!important}
+html body.nd .modal-overlay .modal-box details{background:var(--ap-verre);border:1px solid var(--ap-bord2)!important;border-radius:14px!important}
+html body.nd .modal-overlay .modal-box details summary{color:#fff;list-style:none}
+html body.nd .modal-overlay .modal-box details summary::-webkit-details-marker{display:none}
+html body.nd .modal-overlay .modal-box details[open] summary{color:var(--ap-or)}
+html body.nd .modal-overlay .modal-box details div[style*="#374151"]{color:#C9D1E4!important}
+html body.nd .modal-overlay .modal-box label[style*="#374151"],html body.nd .modal-overlay .modal-box label[style*="cursor:pointer"]{color:#D5DCEC!important}
+html body.nd .modal-overlay .modal-box div[style*="font-weight:700"][style*="font-size:12.5px"]{color:#F3E3B5}
+html body.nd .modal-overlay .modal-box a[style*="#2563eb"]{color:var(--ap-or)!important;text-decoration-color:rgba(227,192,110,.5)}
+html body.nd .modal-overlay .modal-box #adh-form-err{color:var(--ap-rouge)!important;font-weight:700}
+html body.nd .modal-overlay .modal-box input[type=checkbox]{accent-color:#E3C06E}
+
+/* champs : « styles.v2.css » impose des fonds clairs avec !important */
+html body.nd .modal-overlay .modal-box :is(.input,input[type=text],input[type=email],input[type=date],input[type=number],select,textarea){
+  background:rgba(255,255,255,.07)!important;border:1px solid rgba(255,255,255,.22)!important;color:#fff!important;border-radius:12px!important;min-height:44px;padding:10px 14px;color-scheme:dark}
+html body.nd .modal-overlay .modal-box textarea{min-height:76px}
+html body.nd .modal-overlay .modal-box :is(.input,input,select,textarea)::placeholder{color:#7C88A4!important}
+html body.nd .modal-overlay .modal-box :is(.input,input,select,textarea):focus{outline:none;border-color:var(--ap-or)!important;box-shadow:0 0 0 3px rgba(227,192,110,.22)!important}
+html body.nd .modal-overlay .modal-box select option{background:#0B1226;color:#fff}
+html body.nd .modal-overlay .modal-box input[type=file]{color:var(--ap-doux)!important;background:transparent!important;border:1px dashed var(--ap-bord)!important;padding:10px;border-radius:12px}
+html body.nd .modal-overlay .modal-box label{color:#E6EAF5!important;font-weight:700;letter-spacing:.01em}
+html body.nd .modal-overlay .modal-box #adh-form-champs label{display:block;font-size:12.5px!important;margin-bottom:2px}
+html body.nd .modal-overlay .modal-box :is(h3,p){text-align:left}
+html body.nd .modal-overlay .modal-box .btn{height:44px;padding:0 22px}
+
+/* ═══ zone « Ma carte de membre » ═══ */
+html body.nd #adh-carte-zone h3{font-family:var(--ap-serif);font-weight:500;font-size:24px;color:#fff!important;border:0!important}
+html body.nd .carte-membre{background:linear-gradient(150deg,#14224a 0%,#0B1226 62%,#1b1a12 100%);border:1px solid var(--ap-bord);border-radius:22px;box-shadow:0 34px 70px -36px rgba(0,0,0,.95),inset 0 1px 0 rgba(255,255,255,.08)}
+html body.nd .carte-membre .cm-nom{font-family:var(--ap-serif);font-weight:500;font-size:24px;color:#fff}
+html body.nd .carte-membre .cm-init{color:var(--ap-or);opacity:1;font-weight:700}
+html body.nd .carte-membre .cm-meta{color:var(--ap-doux);opacity:1}
+html body.nd .cm-statut.a_jour{background:rgba(123,232,123,.16);color:var(--ap-vert);border:1px solid rgba(123,232,123,.4)}
+html body.nd .cm-statut.non_a_jour{background:rgba(255,156,156,.14);color:var(--ap-rouge);border:1px solid rgba(255,156,156,.4)}
+html body.nd .cm-statut.en_attente{background:rgba(255,255,255,.08);color:var(--ap-doux);border:1px solid var(--ap-bord2)}
+/* aperçu de la carte imprimée */
+html body.nd .cp-merci{background:linear-gradient(135deg,rgba(227,192,110,.12),rgba(227,192,110,.04));border:1px solid var(--ap-bord);border-radius:20px;color:var(--ap-texte)}
+html body.nd .cp-merci h3{font-family:var(--ap-serif);font-weight:500;font-size:22px;color:#F3E3B5!important}
+html body.nd .cp-merci p{color:#CBD3E6}
+html body.nd .cp-card{box-shadow:0 26px 54px -30px rgba(0,0,0,.95);outline:1px solid rgba(227,192,110,.25)}
+html body.nd .cp-legende{color:var(--ap-faible)}
+
+/* ═══ mouvement réduit ═══ */
+@media (prefers-reduced-motion:reduce){html body.nd .adh-card{transition:none}html body.nd .adh-card:hover{transform:none}html body.nd .modal-overlay{backdrop-filter:none}}
+
+/* ═══ téléphone ═══ */
+@media (max-width:640px){
+  html body.nd .adh-grid{grid-template-columns:1fr;gap:16px}
+  html body.nd #app .container>.flex-between{align-items:flex-start}
+  html body.nd #btn-ma-carte{width:100%}
+  html body.nd .adh-montant{font-size:27px}
+}
