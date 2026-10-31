@@ -93,12 +93,12 @@
      sinon sur toute règle externe, même dans une media query — nécessaire ici pour laisser la
      grille s'élargir et accueillir la colonne pub sans la comprimer. */
   #evt-page-row>main{max-width:1750px!important;}
-  .evt-layout{grid-template-columns:230px 1fr 300px 288px;}
+  .evt-layout{grid-template-columns:230px 1fr 300px;}
   .evt-ad-col{display:block;}
 }
 @media(min-width:2000px){
   #evt-page-row>main{max-width:2060px!important;}
-  .evt-layout{grid-template-columns:230px 1fr 300px 288px 290px;}
+  .evt-layout{grid-template-columns:230px 1fr 300px 288px;}
   .evt-pub-col{display:block;}
 }
 /* Portables et écrans moyens (2026-10-09, demande explicite : « abaisse les seuils d'affichage ») — la colonne pub n'apparaissait
@@ -510,13 +510,8 @@
       <div class="evt-grid" id="evt-list"></div>
     </div>
 
-    <!-- ═══ COLONNE DROITE : SUGGESTIONS D'INITIATIVES (+ espace publicitaire, voir .evt-right-stack) ═══ -->
+    <!-- ═══ COLONNE DROITE : espace publicitaire (voir .evt-right-stack). La carte « Découvrir des initiatives » a été retirée le 2026-10-31 (demande explicite : donner plus de place aux événements). ═══ -->
     <div class="evt-right-stack">
-    <aside class="evt-suggest-col">
-      <div class="evt-col-title">✨ Découvrir des initiatives</div>
-      <div id="sugg-list" style="margin-top:10px;font-size:12.5px;color:var(--muted);">Chargement…</div>
-    </aside>
-
     <!-- ═══ EMPLACEMENT PUBLICITAIRE (2026-09-29, demande explicite) — visible uniquement quand
          il reste de la place à droite (voir @media(min-width:1700px) ci-dessus), jamais au
          détriment de la mise en page ci-dessus. Contenu de secours (vision Diaspo'Actif) tant
@@ -3140,7 +3135,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') fermerListeB
     chargerBrouillons();
   }
   chargerAgendaIds();
-  await Promise.all([syncFiltreDomaineOptions(), loadEvts(), chargerEvenementEpingle(), (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? loadMesEvts() : Promise.resolve(), initSuggestions(), initPublicationsOrganisations()]);
+  await Promise.all([syncFiltreDomaineOptions(), loadEvts(), chargerEvenementEpingle(), (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? loadMesEvts() : Promise.resolve(), initPublicationsOrganisations()]);
   /* Lien direct vers la fiche complète d'un événement (2026-09-10, demande explicite : bouton
      "En savoir plus" depuis la mini-fenêtre "Événements" de l'annuaire) — reprend le format
      d'ancre déjà utilisé par notifUrl() (assets/app.js) pour les notifications liées à un
