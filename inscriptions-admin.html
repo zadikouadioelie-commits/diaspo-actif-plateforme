@@ -121,6 +121,7 @@
 <script src="assets/data.js"></script>
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js?v=13"></script>
+<script src="assets/prolonger-fiche.js?v=1"></script>
 <script src="/assets/rich-editor.js"></script>
 <script src="assets/upload-media.js"></script>
 <script>
@@ -1455,6 +1456,7 @@ ${ctx === 'recue' ? `
             <div style="display:flex;gap:8px;flex-wrap:wrap;">
               ${f.nb_evenements ? `<button data-action="ouvrirLiaisonEvenement" data-id="${f.id}" style="background:oklch(0.95 0.03 258);border:1px solid oklch(0.85 0.05 258);color:oklch(0.32 0.09 258);font-size:11.5px;font-weight:600;padding:6px 11px;border-radius:20px;cursor:pointer;white-space:nowrap;">📅 ${f.nb_evenements} événement${f.nb_evenements > 1 ? 's' : ''} lié${f.nb_evenements > 1 ? 's' : ''}${f.apercu_evenement_statut ? ` · ${escH(EVT_STATUT_LABEL[f.apercu_evenement_statut] || f.apercu_evenement_statut)}` : ''}</button>` : `<button data-action="ouvrirLiaisonEvenement" data-id="${f.id}" style="background:#fff;border:1px solid oklch(0.8 0.006 30);color:oklch(0.2 0.006 30);font-size:11.5px;font-weight:600;padding:6px 11px;border-radius:20px;cursor:pointer;white-space:nowrap;">🔗 Lier à un événement</button>`}
               <button data-action="ouvrirPartage" data-id="${f.id}" style="background:#fff;border:1px solid oklch(0.8 0.006 30);color:oklch(0.2 0.006 30);font-size:11.5px;font-weight:600;padding:6px 11px;border-radius:20px;cursor:pointer;white-space:nowrap;">🤝 Fiche partagée</button>
+              ${(f.statut === 'publiee' || f.statut === 'fermee') ? `<button data-action="prolongerFicheListe" data-id="${f.id}" title="Choisir une nouvelle date de fin des inscriptions et des candidatures" style="background:#fff;border:1px solid oklch(0.8 0.006 30);color:oklch(0.2 0.006 30);font-size:11.5px;font-weight:600;padding:6px 11px;border-radius:20px;cursor:pointer;white-space:nowrap;">⏳ Prolonger</button>` : ''}
             </div>
             ${(f.statut === 'brouillon' || f.statut === 'fermee')
               ? `<button data-action="ouvrirFicheListe" data-id="${f.id}" style="width:100%;margin-top:10px;background:oklch(0.94 0.05 150);border:1px solid oklch(0.4 0.13 150);color:oklch(0.4 0.13 150);font-size:12px;font-weight:700;padding:8px 11px;border-radius:20px;cursor:pointer;">🔓 Ouvrir la fiche</button>`
@@ -3492,6 +3494,11 @@ const actions = {
       ia_toast('Fiche ouverte.', true);
       await iaChargerListe();
     } catch (e) { ia_toast(e.message, false); }
+  },
+  /* Prolonger les inscriptions et la candidature d'une fiche (2026-10-31, demande explicite : « allonger le
+     temps des candidatures ») — fenêtre partagée : assets/prolonger-fiche.js. */
+  prolongerFicheListe(el) {
+    ouvrirModaleProlongerFiche(el.dataset.id, { onDone: () => iaChargerListe() });
   },
   async fermerFicheListe(el) {
     try {

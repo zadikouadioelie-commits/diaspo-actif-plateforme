@@ -2669,6 +2669,11 @@ const MIGRATIONS = [
   // bouton "S'inscrire" reste proposé même si l'événement est par ailleurs "terminé"
   // (evenementEstTermine) — voir inscriptionsProlongeesActives() côté serveur.
   ["evenements", "inscriptions_prolongees_jusquau TEXT"],
+  // Prolongation d'une fiche d'inscription (2026-10-31, demande explicite : pouvoir prolonger aussi
+  // les fiches liées et leurs candidatures, par ex. Trophée Ngovu) — pose la nouvelle date de
+  // fermeture dans date_fermeture_inscriptions ; cette colonne en garde la trace pour que la fiche
+  // reste ouverte même si l'événement lié est déjà terminé (voir GET /api/insc/public/:slug).
+  ["insc_fiches", "prolongee_jusquau TEXT"],
 ];
 
 /* Initialise updated_at pour les initiatives déjà existantes (jamais modifiées depuis) —

@@ -907,6 +907,7 @@
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/evt-temporel.js"></script>
 <script src="assets/app.js?v=13"></script>
+<script src="assets/prolonger-fiche.js?v=1"></script>
 <script src="assets/profile-qr.js"></script>
 <script>
 const DOMAINE_ICON = {Entrepreneuriat:'💼',Formation:'📚',Culture:'🎭',Sante:'🏥',Agriculture:'🌱',Technologie:'💻',Sport:'⚽','Action Sociale':'🤝',Business:'🏢',Diaspora:'🌍',Gastronomie:'🍽️',Economique:'📈',Politique:'🏛️',Panafricanisme:'✊',Autre:'📅'};
@@ -1108,6 +1109,7 @@ function renderEvts() {
        (règle déjà appliquée par le formulaire de création/édition). Sans fiche liée, "Gérer le
        tarif" n'a rien à ouvrir : seul "Lier une fiche" est proposé dans ce cas. */
     const lierFicheHtml = peutGerer ? `<button type="button" class="btn btn-outline" style="font-size:12px;" onclick="ouvrirModaleLierFiche(${evt.id},'${esc(evt.titre).replace(/'/g,"\\'")}',${evt.fiche_id || 'null'})" title="${evt.fiche_id ? 'Changer la fiche liée' : 'Lier ou créer une fiche pour cet événement'}">🔗 ${evt.fiche_id ? 'Fiche liée' : 'Lier une fiche'}</button>` : '';
+    const prolongerFicheHtml = (peutGerer && evt.fiche_id) ? prolongerFicheBouton(evt, 12) : '';
     const gererTarifHtml = (peutGerer && evt.fiche_id) ? `<a class="btn btn-outline" style="font-size:12px;text-decoration:none;" href="inscriptions-admin.html?fiche=${evt.fiche_id}" title="Gérer les tarifs de la fiche liée">💶 ${evt.prix_min ? 'Gérer le tarif' : 'Passer en payant'}</a>` : '';
     // Cachet "Trophée" (2026-09-23, demande explicite : "cartouches dorées et scintillantes...
     // titre Trophée bien visible comme un cachet") — voir .evt-card-trophee/.trophee-cachet.
@@ -1173,7 +1175,7 @@ function renderEvts() {
           }
           ${peutGerer ? prolongerInscriptionsHtml(evt, 12) : ''}
         </div>
-        ${peutGerer ? `<div class="evt-actions-gerer">${promouvoirHtml}${modifierHtml}${gererHtml}${lierFicheHtml}${gererTarifHtml}</div>` : ''}
+        ${peutGerer ? `<div class="evt-actions-gerer">${promouvoirHtml}${modifierHtml}${gererHtml}${lierFicheHtml}${gererTarifHtml}${prolongerFicheHtml}</div>` : ''}
       </div>
     </div>`;
   }).join('') + (actif === 'termine' && tousOnglet.length > evtTerminesMax
@@ -1304,7 +1306,10 @@ function ouvertureInscriptionsTexte(evt) {
    "S'inscrire" réapparaît tant que la prolongation est dans le futur. */
 function inscriptionsOuvertes(evt) {
   if (!evt.est_termine) return true;
-  return !!(evt.inscriptions_prolongees_jusquau && new Date(evt.inscriptions_prolongees_jusquau) > new Date());
+  /* fiche_prolongee_jusquau (2026-10-31) : prolongation d'une fiche liée, posée par « Prolonger » (assets/prolonger-fiche.js). */
+  var maintenant = new Date();
+  return !!((evt.inscriptions_prolongees_jusquau && new Date(evt.inscriptions_prolongees_jusquau) > maintenant)
+    || (evt.fiche_prolongee_jusquau && new Date(evt.fiche_prolongee_jusquau) > maintenant));
 }
 function prolongationTexte(evt) {
   const dt = new Date(evt.inscriptions_prolongees_jusquau);
@@ -1324,6 +1329,20 @@ function prolongerInscriptionsHtml(evt, taille) {
     <button type="button" class="btn btn-outline" style="font-size:${taille}px;" onclick="ouvrirModaleProlongerInscriptions(${evt.id})" title="Choisir une nouvelle date de clôture des inscriptions">⏳ Prolonger la durée de l'inscription</button>
   </span>`;
 }
+
+/* Prolonger une fiche d'inscription liée + sa candidature (2026-10-31, demande explicite : « allonger le
+   temps des candidatures », cas du Trophée Ngovu) — contrairement à prolongerInscriptionsHtml() ci-dessus
+   (formulaire minimal), concerne les événements qui ont une fiche. Disponible à tout moment pour
+   l'organisateur, fiche déjà fermée ou non ; la fenêtre vient de assets/prolonger-fiche.js. */
+function prolongerFicheBouton(evt, taille) {
+  return `<button type="button" class="btn btn-outline" style="font-size:${taille}px;" onclick="prolongerFicheEvenement(${evt.id},${evt.fiche_id})" title="Choisir une nouvelle date de fin des inscriptions et des candidatures">⏳ Prolonger les inscriptions</button>`;
+}
+window.prolongerFicheEvenement = function(evtId, ficheId) {
+  ouvrirModaleProlongerFiche(ficheId, { onDone: function() {
+    loadEvts();
+    if (document.getElementById('modal-detail-bg')?.classList.contains('open') && evtDetailCourant?.id === evtId) openDetail(evtId);
+  } });
+};
 
 /* Adresse exacte / GPS → lien Google Maps (2026-09-09). Accepte indifféremment une adresse
    complète, des coordonnées "lat,lng", ou un lien déjà tout fait (ex: collé depuis WhatsApp) —
@@ -2729,6 +2748,7 @@ function renderEventDetail(evt, isPreview) {
   // Mêmes boutons "Lier une fiche"/"Gérer le tarif" que dans renderEvts() ci-dessus, voir leur
   // commentaire pour le détail de la règle Payant/Gratuit.
   const lierFicheDetailHtml = (!isPreview && peutGererDetail) ? `<button type="button" class="btn btn-outline" style="font-size:13px;" onclick="ouvrirModaleLierFiche(${evt.id},'${esc(evt.titre).replace(/'/g,"\\'")}',${evt.fiche_id || 'null'})" title="${evt.fiche_id ? 'Changer la fiche liée' : 'Lier ou créer une fiche pour cet événement'}">🔗 ${evt.fiche_id ? 'Fiche liée' : 'Lier une fiche'}</button>` : '';
+  const prolongerFicheDetailHtml = (!isPreview && peutGererDetail && evt.fiche_id) ? prolongerFicheBouton(evt, 13) : '';
   const gererTarifDetailHtml = (!isPreview && peutGererDetail && evt.fiche_id) ? `<a class="btn btn-outline" style="font-size:13px;text-decoration:none;" href="inscriptions-admin.html?fiche=${evt.fiche_id}" title="Gérer les tarifs de la fiche liée">💶 ${evt.prix_min ? 'Gérer le tarif' : 'Passer en payant'}</a>` : '';
 
   return `
@@ -2790,6 +2810,7 @@ function renderEventDetail(evt, isPreview) {
         ${gererDetailHtml}
         ${lierFicheDetailHtml}
         ${gererTarifDetailHtml}
+        ${prolongerFicheDetailHtml}
       </div>
     </div>
     ${Array.isArray(evt.cagnottes) && evt.cagnottes.length ? `
