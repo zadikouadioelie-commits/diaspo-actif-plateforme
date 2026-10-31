@@ -1678,7 +1678,7 @@ async function initRelaisDiasporaWidget(me, api) {
         <details id="adh-f-relances-details" open style="margin:4px 0 14px;border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;">
           <summary style="cursor:pointer;font-size:12px;font-weight:700;">⏰ Délais de relance (quand relancer l'adhérent, et par quel moyen)</summary>
           <div style="margin-top:12px;">
-            <p style="font-size:12px;color:var(--muted);margin:0 0 12px;line-height:1.5;">Cliquez sur les moments où un rappel doit partir, par rapport à la date d'expiration de l'adhésion : <b>J-8</b> = 8 jours avant, <b>J+3</b> = 3 jours après (jusqu'à J+10). Vous pouvez en choisir plusieurs, 10 au plus. Un seul rappel par moment et par cycle d'adhésion.</p>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px;line-height:1.5;">Cliquez sur les moments où un rappel doit partir, par rapport à la date d'expiration de l'adhésion : <b>J-8</b> = 8 jours avant, <b>J+3</b> = 3 jours après (jusqu'à J+10). Vous pouvez en choisir plusieurs, 10 au plus. Un seul rappel par moment et par cycle d'adhésion.<br>🔔 <b>Année glissante :</b> un rappel <b>J-5</b> part en plus, automatiquement, par e-mail <b>et</b> notification Diaspo'Actif, pour toute adhésion dont la durée court à partir du jour d'adhésion (pas pour les formules à calendrier fixe).</p>
             <div id="adh-f-relances-chips"></div>
             <div id="adh-f-relances-apercu" style="font-size:12.5px;font-weight:700;margin:12px 0 10px;"></div>
             <div style="font-size:11.5px;color:var(--muted);margin-bottom:6px;">Un autre délai ? Saisissez un nombre de jours : positif = avant (jusqu'à 90), négatif = après (jusqu'à -10).</div>

@@ -33360,6 +33360,7 @@ async function handleRequest(req, res) {
       const { sendEmail } = require('./mailer');
       const membres = await db.prepare(`
         SELECT m.*, f.nom AS formule_nom, i.nom AS init_nom, u.email AS user_email,
+          f.mode_validite AS formule_mode,
           i.adhesion_relances_jours AS relances_config_json, i.adhesion_modele_relance AS modele_relance
         FROM adhesion_membres m
         JOIN adhesion_formules f ON f.id = m.formule_id
@@ -33394,6 +33395,15 @@ async function handleRequest(req, res) {
           canalRappel = 'les_deux';
           try { joursConfig = JSON.parse(m.relances_config_json || '[30,7,0,-1]'); }
           catch (e) { joursConfig = [30, 7, 0, -1]; }
+        }
+        /* Rappel automatique J-5 pour l'année glissante (2026-10-31, demande explicite) : une adhésion
+           dont la durée court à partir du jour d'adhésion (formule « individuel », hors calendrier fixe)
+           reçoit TOUJOURS un rappel 5 jours avant son échéance, par e-mail ET notification Diaspo'Actif,
+           en plus des délais choisis par l'association. Si l'association a elle-même choisi J-5, c'est son
+           canal qui s'applique ; sinon ce rappel part sur les deux canaux. */
+        if (m.formule_mode !== 'collectif' && joursRestants === 5 && !(Array.isArray(joursConfig) && joursConfig.includes(5))) {
+          joursConfig = [...(Array.isArray(joursConfig) ? joursConfig : []), 5];
+          canalRappel = 'les_deux';
         }
         if (!Array.isArray(joursConfig) || !joursConfig.length) continue;
         if (!joursConfig.includes(joursRestants)) continue;
