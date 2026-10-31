@@ -1,0 +1,25 @@
+/* Design « Nuit dorée » — tableau de bord Administrateur et Administrateur junior (2026-10-31).
+   Complète assets/theme-nuit-doree.css, assets/dashboard-nuit-doree.css et assets/dashboard-nuit-doree.js (déjà utilisés par le tableau de bord Initiative) : ces trois
+   fichiers font l'essentiel. Cette feuille ne règle que les cas propres à l'administration. Tout est préfixé html body.nd : sans class="nd" sur <body>, la page garde
+   son ancien design. Retour arrière : retirer les liens (thème, tableau de bord, cette feuille), le script dashboard-nuit-doree.js et class="nd" sur <body>. */
+
+/* ═══ graphiques dessinés à la main (assets : drawSparkline / drawDualSparkline) ═══
+   Leur code trace en encres sombres (#6b7280, #1f2937) : ils restent donc sur une tuile claire, arrondie, plutôt que d'être redessinés. */
+html body.nd main.content canvas[id^="chart-"]{
+  display:block;box-sizing:border-box;width:100%;max-width:100%;height:auto;background:#F6F3EA!important;border:1px solid rgba(227,192,110,.4);border-radius:14px;padding:6px}
+
+/* ═══ Koffi — Budget IA : alertes et notes (feuille injectée par admin-kofi.js, fonds pastel) ═══ */
+html body.nd .kb-alerte{border-color:rgba(255,255,255,.18)}
+html body.nd .kb-alerte.rouge{background:rgba(239,68,68,.12)!important;border-color:rgba(248,113,113,.5)!important;color:#FECACA!important}
+html body.nd .kb-alerte.orange{background:rgba(227,192,110,.12)!important;border-color:rgba(227,192,110,.5)!important;color:#F3DC9B!important}
+html body.nd .kb-alerte.vert{background:rgba(52,211,153,.1)!important;border-color:rgba(110,231,183,.45)!important;color:#A7F3D0!important}
+html body.nd .kb-note{background:rgba(255,255,255,.05)!important;border-color:rgba(255,255,255,.13)!important;color:#C5CEE3!important}
+
+/* ═══ boutons secondaires / à fond clair restants dans les rubriques ═══ */
+html body.nd main.content :is(.btn-secondary,.btn-outline){background:rgba(255,255,255,.06)!important;color:#F3E3B5!important;border:1px solid rgba(227,192,110,.4)!important}
+html body.nd main.content :is(.btn-secondary,.btn-outline):hover{background:rgba(227,192,110,.14)!important}
+html body.nd main.content #rp-tab-stats:not(.btn-outline){background:var(--nd-degore)!important;color:#1a1405!important;border:none!important}
+
+/* ═══ tableaux et champs : lisibilité sur fond nuit ═══ */
+html body.nd main.content table{color:var(--nd-texte)}
+html body.nd main.content :is(input,select,textarea):not([type=checkbox]):not([type=radio]):not([type=range]){color-scheme:dark}
