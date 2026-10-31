@@ -2074,7 +2074,7 @@
       const zone = $('#home-honneur'); if (zone) { hydraterAdhesionsM(zone); hydraterSoutienM(zone); }
     });
     safe(async () => {
-      let v = []; try { v = (await api('/api/videos-tutoriels?limit=8')).videos || []; } catch (e) { /* le film d'inscription reste affiché */ }
+      let v = []; try { v = (await api('/api/videos-tutoriels?limit=20')).videos || []; } catch (e) { /* le film d'inscription reste affiché */ }
       homeBlock('home-videos', 'Tutoriels vidéo', `<div class="hs">${v.map(x => videoCard(x)).join('')}</div>`, '<a href="#/videos" class="sec-more">Tout voir ›</a>', 'Apprenez à utiliser Diaspo’Actif en quelques minutes.');
     });
     /* Trophée de la Diaspora — « Prochainement » (2026-10-09) : occupe l'emplacement de l'ancien bloc « Initiatives à découvrir »
