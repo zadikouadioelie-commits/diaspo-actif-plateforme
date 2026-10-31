@@ -183,13 +183,15 @@
    cohérent avec le reste de la plateforme) ; une carte SANS image du tout (icône seule) garde
    le dégradé de .evt-img, inchangé. */
 .evt-img img.loaded{background:#000}
+.cov-fmt{background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:16px;padding:4px 12px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit}
+.cov-fmt.on{border-color:var(--orange);color:var(--orange);font-weight:800}
 /* Cartouche qui épouse l'affiche (2026-10-28, demande explicite : « adapter automatiquement les cartouches pour qu'on les voie entièrement — rectangulaire
    si l'affiche est rectangulaire, mais entière ») — le cadre figé à 140 px ne montrait qu'une vignette de l'affiche, noyée dans du noir. Avec une image,
    le cadre prend la hauteur naturelle de l'affiche (largeur de la carte, ratio d'origine) : paysage, carrée ou portrait, on la voit en entier. Plafond à
    560 px pour une affiche très haute (elle reste alors entière, centrée sur fond noir). Les cartes d'une même rangée n'ont plus la même hauteur : chacune
    garde la sienne (align-items:start) plutôt que de laisser du vide. Sans image (icône seule), le cadre de 140 px et son dégradé restent inchangés. */
 .evt-img:has(> img){height:auto;min-height:120px}
-.evt-img:has(> img) img{height:auto;max-height:560px}
+.evt-img:has(> img) img{height:auto;max-height:700px}
 .evt-grid{align-items:start}
 .evt-body{padding:16px}
 .evt-date{font-size:12px;color:#2563EB;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
@@ -691,10 +693,16 @@
     <div style="margin-bottom:14px;">
       <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:6px;">🖼️ Image de couverture</label>
       <!-- Consigne (2026-10-28, demande explicite) : privilégier les images RECTANGULAIRES (paysage). -->
-      <div style="font-size:12.5px;line-height:1.5;color:var(--muted);margin:0 0 8px;">📐 <b>Privilégiez une image rectangulaire</b> (format paysage, par exemple 1200 × 630 px) : elle s'affiche en entier sur la carte et sur la page de l'événement. Une image carrée ou verticale serait rognée.</div>
+      <div style="font-size:12.5px;line-height:1.5;color:var(--muted);margin:0 0 8px;">📐 <b>Paysage ou portrait, au choix</b> : votre affiche s'affiche toujours en entier, sans être rognée, sur la carte et sur la page de l'événement. <b>Format recommandé : rectangle vertical 4:5 (1080 × 1350 px)</b> — c'est celui qui occupe le plus de place sur la carte et que l'on remarque le mieux.</div>
+      <div id="cover-format" role="group" aria-label="Format de l'affiche" style="display:flex;gap:6px;flex-wrap:wrap;margin:0 0 8px;align-items:center;"><span style="font-size:12px;color:var(--muted);font-weight:600;">Format de l'affiche :</span><button type="button" class="cov-fmt on" data-fmt="auto">Automatique</button><button type="button" class="cov-fmt" data-fmt="paysage">▭ Paysage</button><button type="button" class="cov-fmt" data-fmt="portrait">▯ Portrait</button></div>
       <div id="cover-drop" style="border:2px dashed var(--border);border-radius:10px;padding:20px;text-align:center;cursor:pointer;transition:border-color .15s;background:#FAFAFA;" onclick="document.getElementById('cover-file').click()">
-        <div id="cover-preview" style="display:none;margin-bottom:8px;"><img id="cover-img" style="max-height:120px;border-radius:8px;max-width:100%;object-fit:cover;"></div>
+        <div id="cover-preview" style="display:none;margin-bottom:8px;"><img id="cover-img" style="max-height:260px;border-radius:8px;max-width:100%;object-fit:contain;"></div>
         <div id="cover-placeholder"><span style="font-size:28px;">📷</span><br><span style="font-size:13px;color:var(--muted);">Cliquer pour choisir une image de couverture</span><br><span style="font-size:11px;color:#aaa;">JPG, PNG, WebP · max 2 Mo</span></div>
+      </div>
+      <div id="cover-actions" style="display:none;gap:8px;flex-wrap:wrap;margin-top:8px;">
+        <button type="button" class="btn btn-outline" style="font-size:12.5px;" onclick="document.getElementById('cover-file').click()">🔄 Changer l'image</button>
+        <button type="button" class="btn btn-outline" style="font-size:12.5px;" onclick="recadrerCouverture()">✂️ Recadrer / changer de format</button>
+        <button type="button" class="btn btn-outline" style="font-size:12.5px;" onclick="supprimerCouverture()">🗑 Supprimer</button>
       </div>
       <input type="file" id="cover-file" accept="image/jpeg,image/png,image/webp" style="display:none">
     </div>
@@ -703,18 +711,18 @@
          et documents supplémentaires vivent désormais sur la fiche d'inscription liée à
          l'événement, voir le bouton "📝 Fiche d'inscription" plus haut. -->
     <div style="margin-bottom:16px;">
-      <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:6px;">🖼️ Photos supplémentaires <span style="font-weight:400;text-transform:none;color:#aaa;">(2 maximum · JPG, PNG, WebP)</span></label>
+      <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:6px;">🖼️ Photos supplémentaires <span style="font-weight:400;text-transform:none;color:#aaa;">(2 maximum · JPG, PNG, WebP — cliquez sur une photo pour la remplacer, « × » pour la supprimer)</span></label>
       <div style="display:flex;flex-wrap:nowrap;gap:8px;max-width:250px;" id="gallery-slots">
         <div id="gslot-0" style="flex:1;min-width:0;aspect-ratio:1;border:2px dashed var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;background:#FAFAFA;position:relative;" onclick="document.getElementById('gfile-0').click()">
           <span style="font-size:20px;color:#ccc;" id="gph-0">＋</span>
-          <img id="gimg-0" style="display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;" alt="">
-          <button id="gdel-0" onclick="event.stopPropagation();clearPhoto(0)" style="display:none;position:absolute;top:3px;right:3px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:12px;cursor:pointer;line-height:1;z-index:2;">×</button>
+          <img id="gimg-0" style="display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:contain;" alt="">
+          <button id="gdel-0" onclick="event.stopPropagation();clearPhoto(0)" style="display:none;position:absolute;top:3px;right:3px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:26px;height:26px;font-size:15px;cursor:pointer;line-height:1;z-index:2;" title="Supprimer cette photo" aria-label="Supprimer cette photo">×</button>
           <input type="file" id="gfile-0" accept="image/jpeg,image/png,image/webp" style="display:none">
         </div>
         <div id="gslot-1" style="flex:1;min-width:0;aspect-ratio:1;border:2px dashed var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;background:#FAFAFA;position:relative;" onclick="document.getElementById('gfile-1').click()">
           <span style="font-size:20px;color:#ccc;" id="gph-1">＋</span>
-          <img id="gimg-1" style="display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;" alt="">
-          <button id="gdel-1" onclick="event.stopPropagation();clearPhoto(1)" style="display:none;position:absolute;top:3px;right:3px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:12px;cursor:pointer;line-height:1;z-index:2;">×</button>
+          <img id="gimg-1" style="display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:contain;" alt="">
+          <button id="gdel-1" onclick="event.stopPropagation();clearPhoto(1)" style="display:none;position:absolute;top:3px;right:3px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:26px;height:26px;font-size:15px;cursor:pointer;line-height:1;z-index:2;" title="Supprimer cette photo" aria-label="Supprimer cette photo">×</button>
           <input type="file" id="gfile-1" accept="image/jpeg,image/png,image/webp" style="display:none">
         </div>
       </div>
@@ -1154,7 +1162,7 @@ function renderEvts() {
           <button class="btn btn-outline" style="font-size:12px" onclick="openDetail(${evt.id})">Voir</button>
           <button class="btn btn-outline" style="font-size:12px" onclick="partagerEvenement(${evt.id})">📤 Partager</button>
           ${agendaBouton(evt.id, 12)}
-          ${evt.est_termine ? evtBoutonTermine(evt, inscrit, 12) + evtBoutonCompteRendu(evt, peutGerer, 12) : evt.inscription_ouverte === 0
+          ${!inscriptionsOuvertes(evt) ? evtBoutonTermine(evt, inscrit, 12) + evtBoutonCompteRendu(evt, peutGerer, 12) : evt.inscription_ouverte === 0
             ? `<span class="btn btn-outline" style="font-size:12px;cursor:default;opacity:.75;" title="Événement informatif, sans inscription">ℹ️ Informatif</span>`
             : (evt.lien_inscription
             ? `<a class="btn btn-orange" style="font-size:12px;text-decoration:none;" href="${esc(evt.lien_inscription)}" target="_blank" rel="noopener">↗ S'inscrire</a>`
@@ -1173,6 +1181,7 @@ function renderEvts() {
             )
             )
           }
+          ${peutGerer ? prolongerInscriptionsHtml(evt, 12) : ''}
         </div>
         ${peutGerer ? `<div class="evt-actions-gerer">${promouvoirHtml}${modifierHtml}${gererHtml}${lierFicheHtml}${gererTarifHtml}</div>` : ''}
       </div>
@@ -1296,6 +1305,34 @@ function inscriptionsPasEncoreOuvertes(evt) {
 function ouvertureInscriptionsTexte(evt) {
   const dt = new Date(evt.ouverture_inscriptions);
   return isNaN(dt) ? '' : dt.toLocaleString('fr-FR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+}
+/* Prolongation des inscriptions (2026-10-30, demande explicite : « pouvoir prolonger la durée
+   des inscriptions quand la date est arrivée à terme »). Même portée que ci-dessus : seulement
+   le formulaire minimal intégré (sans fiche liée, sans lien externe) — une fiche liée garde sa
+   propre fermeture, déjà modifiable depuis inscriptions-admin.html. evt.est_termine reste
+   calculé normalement côté serveur (compte-rendu, Billetterie...) ; seul le bouton
+   "S'inscrire" réapparaît tant que la prolongation est dans le futur. */
+function inscriptionsOuvertes(evt) {
+  if (!evt.est_termine) return true;
+  return !!(evt.inscriptions_prolongees_jusquau && new Date(evt.inscriptions_prolongees_jusquau) > new Date());
+}
+function prolongationTexte(evt) {
+  const dt = new Date(evt.inscriptions_prolongees_jusquau);
+  return isNaN(dt) ? '' : dt.toLocaleString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+/* Bouton + pastille, visibles uniquement par l'organisateur (peutGerer), une fois l'événement
+   terminé — qu'il soit déjà prolongé ou non. Volontairement affiché à côté de "Terminé"/
+   "Compte-rendu" plutôt qu'à leur place : ces deux-là restent corrects quel que soit l'état de
+   la prolongation (l'événement a bien eu lieu). */
+function prolongerInscriptionsHtml(evt, taille) {
+  if (!evt.est_termine || evt.fiche_id || evt.lien_inscription) return '';
+  const active = inscriptionsOuvertes(evt);
+  return `<span id="prolong-zone-${evt.id}" style="display:inline-flex;gap:6px;flex-wrap:wrap;">
+    ${active
+      ? `<span class="btn btn-outline" style="font-size:${taille}px;cursor:default;color:#166534;border-color:#86EFAC;background:#F0FDF4;">✅ Inscriptions prolongées jusqu'au ${esc(prolongationTexte(evt))}</span>`
+      : `<span class="btn btn-outline" style="font-size:${taille}px;cursor:default;color:#B45309;border-color:#FCD34D;background:#FFFBEB;">⏰ Inscriptions : date dépassée</span>`}
+    <button type="button" class="btn btn-outline" style="font-size:${taille}px;" onclick="ouvrirModaleProlongerInscriptions(${evt.id})" title="Choisir une nouvelle date de clôture des inscriptions">⏳ Prolonger la durée de l'inscription</button>
+  </span>`;
 }
 
 /* Adresse exacte / GPS → lien Google Maps (2026-09-09). Accepte indifféremment une adresse
@@ -1565,8 +1602,8 @@ function resetModaleEvenement() {
   clearPhoto(1);
   reinitialiserVideoEvt();
   coverData = null;
-  document.getElementById('cover-preview').style.display = 'none';
-  document.getElementById('cover-placeholder').style.display = '';
+  coverFormat = 'auto';
+  majCoverUI();
 }
 async function ouvrirModaleCreation() {
   evenementEnEditionId = null;
@@ -1644,12 +1681,7 @@ function ouvrirModaleEdition(id) {
   ).checked = true;
   majToggleParticipation();
   const cover = evt.image_couverture || evt.image_url || null;
-  if (cover) {
-    coverData = cover;
-    document.getElementById('cover-img').src = cover;
-    document.getElementById('cover-preview').style.display = '';
-    document.getElementById('cover-placeholder').style.display = 'none';
-  }
+  if (cover) { coverData = cover; majCoverUI(); }
   /* Photos supplémentaires et vidéo déjà enregistrées (2026-10-28) : sans ce pré-remplissage, enregistrer une modification les aurait effacées. */
   let galExistante = [];
   try { galExistante = Array.isArray(evt.galerie_photos) ? evt.galerie_photos : JSON.parse(evt.galerie_photos || '[]'); } catch (e) { galExistante = []; }
@@ -1773,6 +1805,47 @@ window.detacherFiche = function() {
 // voir le bouton "📝 Fiche d'inscription" plus haut pour ces contenus.
 const galleryData = [null, null]; // base64 (ou adresse d'une photo déjà enregistrée) ou null — 2 photos supplémentaires (2026-10-28)
 let coverData = null;
+
+/* Bandes vides autour d'une couverture (2026-10-30, demande explicite : « les petites affiches ne sont pas à la même taille »).
+   Avant le 30/10, toute couverture était enfermée dans un cadre fixe 2:1 (1200×600) : une affiche moins large y était centrée avec de grandes
+   bandes unies (blanches ou marine) à gauche et à droite, et paraissait donc toute petite sur la carte. Ces bandes sont retirées à l'AFFICHAGE
+   (jamais dans la base). Garde-fous, pour ne jamais rogner une affiche légitime à fond uni : image au format exact de l'ancien cadre (≈ 2:1),
+   bandes uniquement latérales, symétriques (le recadreur centrait l'affiche), de la couleur des 4 coins, et bord de l'affiche net (la colonne qui
+   suit la bande diffère de celle-ci sur au moins le quart de la hauteur). Images d'un autre site (CDN) : illisibles par le navigateur, laissées
+   telles quelles — ce sont les envois récents, qui épousent déjà la forme de l'affiche. */
+function daRognerBandes(img) {
+  if (!img || img.dataset.rogne) return;
+  img.dataset.rogne = '1';
+  const src = img.currentSrc || img.src || '';
+  if (!/^data:image\//.test(src) && src.indexOf(location.origin) !== 0) return;
+  const W = img.naturalWidth, H = img.naturalHeight;
+  if (!W || !H || Math.abs(W / H - 2) > 0.06) return;
+  try {
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(img, 0, 0);
+    const px = (a, b) => x.getImageData(a, b, 1, 1).data, k = px(1, 1);
+    const seuil = 36, ecart = d => Math.abs(d[0] - k[0]) + Math.abs(d[1] - k[1]) + Math.abs(d[2] - k[2]);
+    for (const [a, b] of [[W - 2, 1], [1, H - 2], [W - 2, H - 2]]) if (ecart(px(a, b)) >= seuil) return;
+    /* part de la colonne `a` qui diffère de la couleur de la bande (0 = bande unie, 1 = entièrement différente) */
+    const diff = a => { const d = x.getImageData(a, 0, 1, H).data; let n = 0, t = 0; for (let i = 0; i < H; i += 2) { t++; if (ecart(d.subarray(i * 4, i * 4 + 3)) >= seuil) n++; } return n / t; };
+    let g = 0, d = W - 1;
+    while (g < W / 2 && diff(g) === 0) g++;
+    while (d > W / 2 && diff(d) === 0) d--;
+    const gauche = g, droite = W - 1 - d;
+    if (gauche < W * 0.03 || Math.abs(gauche - droite) > W * 0.04) return;            // pas de vraies bandes, ou bandes asymétriques
+    const bord = Math.min(Math.max(diff(g), diff(g + 1), diff(g + 2)), Math.max(diff(d), diff(d - 1), diff(d - 2)));
+    if (bord < 0.25) return;                                                            // pas de bord net : fond uni d'une affiche, on n'y touche pas
+    const cw = d - g + 1;
+    if (cw < W * 0.4) return;
+    const o = document.createElement('canvas'); o.width = cw; o.height = H;
+    o.getContext('2d').drawImage(c, g, 0, cw, H, 0, 0, cw, H);
+    img.src = o.toDataURL('image/jpeg', 0.9);
+  } catch (e) { /* image illisible : affichée telle quelle */ }
+}
+document.addEventListener('load', e => {
+  const i = e.target;
+  if (i && i.tagName === 'IMG' && i.closest && i.closest('.evt-img, .carousel-slide')) daRognerBandes(i);
+}, true);
 
 // Compression image via Canvas
 function compressImage(file, maxW, maxH, quality) {
@@ -1942,17 +2015,55 @@ async function flashPublier() {
 }
 
 // Cover
-document.getElementById('cover-file').addEventListener('change', async function() {
-  const file = this.files[0]; if (!file) return;
+/* Format de l'affiche (2026-10-30, demande explicite : « je dois pouvoir afficher une image en paysage, et une image en portrait », « modifier la photo de couverture »).
+   Automatique = forme de l'image (bornes 2:3 → 2:1) ; Paysage = 2:1 (1200×600) ; Portrait = 4:5 (1080×1350). Le recadreur propose toujours l'image ENTIÈRE par défaut. */
+let coverFormat = 'auto';
+function lireDimensions(file) {
+  return new Promise(r => { const i = new Image(), u = URL.createObjectURL(file); i.onload = () => { URL.revokeObjectURL(u); r({ w: i.width, h: i.height }); }; i.onerror = () => r(null); i.src = u; });
+}
+function cadreAffiche(dim, format) {
+  const aspect = format === 'paysage' ? 2 : format === 'portrait' ? 0.8 : (dim && dim.w && dim.h ? Math.min(2, Math.max(0.66, dim.w / dim.h)) : 2);
+  const outW = aspect < 1 ? 1080 : 1200;
+  return { aspect, outW, outH: Math.round(outW / aspect) };
+}
+function majCoverUI() {
+  const a = !!coverData;
+  if (a) document.getElementById('cover-img').src = coverData;
+  document.getElementById('cover-preview').style.display = a ? '' : 'none';
+  document.getElementById('cover-placeholder').style.display = a ? 'none' : '';
+  document.getElementById('cover-actions').style.display = a ? 'flex' : 'none';
+  document.getElementById('cover-drop').style.borderColor = a ? 'var(--orange)' : '';
+  document.querySelectorAll('#cover-format .cov-fmt').forEach(b => b.classList.toggle('on', b.dataset.fmt === coverFormat));
+}
+document.getElementById('cover-format').addEventListener('click', e => { const b = e.target.closest('.cov-fmt'); if (!b) return; coverFormat = b.dataset.fmt; majCoverUI(); });
+async function traiterCouverture(file) {
   if (file.size > 10*1024*1024) { alert('Image trop lourde (max 10 Mo).'); return; }
-  const recadree = await flashRecadrer(file, { shape: 'rect', aspect: 1200/600, outW: 1200, outH: 600 });
+  const c = cadreAffiche(await lireDimensions(file), coverFormat);
+  const recadree = await flashRecadrer(file, { shape: 'rect', aspect: c.aspect, outW: c.outW, outH: c.outH });
   if (!recadree) return; // recadrage annulé par la personne
-  coverData = await compressImage(recadree, 1200, 600, 0.82);
-  document.getElementById('cover-img').src = coverData;
-  document.getElementById('cover-preview').style.display = '';
-  document.getElementById('cover-placeholder').style.display = 'none';
-  document.getElementById('cover-drop').style.borderColor = 'var(--orange)';
+  coverData = await compressImage(recadree, 1200, 1800, 0.82);
+  majCoverUI();
+}
+document.getElementById('cover-file').addEventListener('change', async function () {
+  const file = this.files[0]; if (!file) return;
+  await traiterCouverture(file);
+  this.value = ''; // permet de rechoisir le même fichier
 });
+window.supprimerCouverture = function () { coverData = null; document.getElementById('cover-file').value = ''; majCoverUI(); };
+window.recadrerCouverture = async function () {
+  if (!coverData) return;
+  try {
+    // Une image déjà enregistrée (coverData = l'URL Bunny CDN, pas un data:) ne peut pas être
+    // rechargée par un fetch() direct depuis le navigateur : Bunny ne renvoie pas d'en-tête
+    // Access-Control-Allow-Origin, donc le fetch échouait silencieusement (CORS) — toujours
+    // "Impossible de recadrer cette image ici" (2026-10-30, capture utilisateur à l'appui).
+    // Passe par notre propre serveur (GET /api/media/proxy), qui lui n'a pas cette limite.
+    const src = /^https?:\/\//i.test(coverData) ? '/api/media/proxy?url=' + encodeURIComponent(coverData) : coverData;
+    const blob = await (await fetch(src)).blob();
+    await traiterCouverture(new File([blob], 'couverture.jpg', { type: blob.type || 'image/jpeg' }));
+  }
+  catch (e) { alert("Impossible de recadrer cette image ici : cliquez sur « Changer l'image » et choisissez-la de nouveau."); }
+};
 
 // Galerie photos (2 emplacements, voir plus haut)
 function remplirPhoto(i, src) {
@@ -1967,12 +2078,13 @@ function remplirPhoto(i, src) {
   document.getElementById('gfile-'+i).addEventListener('change', async function() {
     const file = this.files[0]; if (!file) return;
     if (file.size > 10*1024*1024) { alert('Image trop lourde (max 10 Mo).'); return; }
-    const recadree = await flashRecadrer(file, { shape: 'rect', aspect: 1, outW: 800, outH: 800 });
+    const cg = cadreAffiche(await lireDimensions(file), 'auto'); // photo entière (plus de carré imposé)
+    const recadree = await flashRecadrer(file, { shape: 'rect', aspect: cg.aspect, outW: cg.outW, outH: cg.outH });
     if (!recadree) return; // recadrage annulé par la personne
     const bar = document.getElementById('gallery-bar');
     document.getElementById('gallery-progress').style.display = '';
     bar.style.width = '30%';
-    const b64 = await compressImage(recadree, 800, 800, 0.78);
+    const b64 = await compressImage(recadree, 1200, 1800, 0.8);
     galleryData[i] = b64;
     bar.style.width = '100%';
     setTimeout(() => document.getElementById('gallery-progress').style.display = 'none', 600);
@@ -2389,6 +2501,48 @@ window.ouvrirModaleLierFiche = async function(evtId, titre, ficheIdActuelle) {
   });
 };
 
+/* Prolonger la durée de l'inscription (2026-10-30, demande explicite) — ouvert depuis le bouton
+   posé par prolongerInscriptionsHtml() ci-dessus (liste et détail), accessible dès que
+   l'événement est terminé, prolongation déjà active ou non. Rafraîchit la liste et, si la fiche
+   détail est ouverte sur ce même événement, la rouvre pour refléter le nouvel état. */
+window.ouvrirModaleProlongerInscriptions = async function(evtId) {
+  const bg = document.createElement('div');
+  bg.className = 'modal-bg open';
+  bg.innerHTML = `
+    <div class="modal" style="max-width:420px;">
+      <button onclick="this.closest('.modal-bg').remove()" style="position:absolute;top:14px;right:16px;background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted);">×</button>
+      <h3 style="margin:0 0 4px;font-size:16px;">⏳ Prolonger la durée de l'inscription</h3>
+      <p style="margin:0 0 14px;font-size:12.5px;color:var(--muted);">L'événement est terminé, mais vous pouvez garder le formulaire d'inscription ouvert jusqu'à une nouvelle date.</p>
+      <label style="display:block;font-size:12px;font-weight:600;margin-bottom:6px;">Nouvelle date de clôture des inscriptions</label>
+      <input type="datetime-local" id="mpi-date" style="width:100%;height:38px;padding:0 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;box-sizing:border-box;margin-bottom:14px;">
+      <div id="mpi-err" style="display:none;color:#dc2626;font-size:12.5px;margin-bottom:10px;"></div>
+      <div style="display:flex;gap:8px;">
+        <button type="button" class="btn btn-orange" id="mpi-confirmer" style="flex:1;">Prolonger</button>
+        <button type="button" class="btn btn-outline" id="mpi-annuler-prolongation" title="Retirer la prolongation déjà posée">Annuler la prolongation</button>
+      </div>
+    </div>`;
+  bg.addEventListener('click', e => { if (e.target === bg) bg.remove(); });
+  document.body.appendChild(bg);
+
+  async function envoyer(jusquau) {
+    const err = bg.querySelector('#mpi-err');
+    err.style.display = 'none';
+    try {
+      await api('PATCH', `/evenements/${evtId}/prolonger-inscriptions`, { jusquau });
+      bg.remove();
+      loadEvts();
+      if (document.getElementById('modal-detail-bg')?.classList.contains('open') && evtDetailCourant?.id === evtId) openDetail(evtId);
+      if (typeof showToast === 'function') showToast(jusquau ? '⏳ Inscriptions prolongées.' : 'Prolongation retirée.');
+    } catch (e) { err.textContent = e.message || 'Erreur.'; err.style.display = 'block'; }
+  }
+  bg.querySelector('#mpi-confirmer').addEventListener('click', () => {
+    const v = bg.querySelector('#mpi-date').value;
+    if (!v) { const err = bg.querySelector('#mpi-err'); err.textContent = 'Choisissez une date.'; err.style.display = 'block'; return; }
+    envoyer(v);
+  });
+  bg.querySelector('#mpi-annuler-prolongation').addEventListener('click', () => envoyer(''));
+};
+
 window.openDetail = async function(id) {
   document.getElementById('evt-detail-content').innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted);">⏳ Chargement…</div>';
   document.getElementById('modal-detail-bg').classList.add('open');
@@ -2623,7 +2777,7 @@ function renderEventDetail(evt, isPreview) {
         <strong style="font-size:13px;color:#166534;">Rejoindre la chaîne WhatsApp de l'événement</strong>
       </a>` : ''}
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">
-        ${evt.est_termine ? evtBoutonTermine(evt, inscritSet.has(evt.id), 13) + evtBoutonCompteRendu(evt, peutGererDetail && !isPreview, 13) : evt.inscription_ouverte === 0
+        ${!inscriptionsOuvertes(evt) ? evtBoutonTermine(evt, inscritSet.has(evt.id), 13) + evtBoutonCompteRendu(evt, peutGererDetail && !isPreview, 13) : evt.inscription_ouverte === 0
           ? `<span class="btn btn-outline" style="font-size:13px;cursor:default;opacity:.75;" title="Événement informatif, sans inscription">ℹ️ Événement informatif — sans inscription</span>`
           : (evt.lien_inscription
           ? `<a class="btn btn-orange" style="font-size:13px;text-decoration:none;" href="${esc(evt.lien_inscription)}" target="_blank" rel="noopener">↗ S'inscrire</a>`
@@ -2639,6 +2793,7 @@ function renderEventDetail(evt, isPreview) {
           )
           )
         }
+        ${(!isPreview && peutGererDetail) ? prolongerInscriptionsHtml(evt, 13) : ''}
         <button class="btn btn-outline" style="font-size:13px;" ${isPreview ? 'disabled title="Disponible une fois l\'événement enregistré"' : `onclick="partagerEvenement(${evt.id})"`}>📤 Partager</button>
         ${isPreview ? '' : agendaBouton(evt.id, 13)}
         ${modifierDetailHtml}
