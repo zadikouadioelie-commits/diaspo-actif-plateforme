@@ -5093,8 +5093,20 @@ db.exec(`
     langue TEXT DEFAULT 'fr',
     statut TEXT DEFAULT 'ouverte',
     created_at TEXT DEFAULT (datetime('now')),
+    derniere_activite TEXT DEFAULT (datetime('now')),
+    dossier_id INTEGER,
+    titre TEXT
+  );
+  /* Assistant du formateur : des DOSSIERS pour ranger les discussions (ex. « Module 3 »), chacun pouvant contenir plusieurs discussions. */
+  CREATE TABLE IF NOT EXISTS kofi_dossiers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    formation_id INTEGER NOT NULL,
+    nom TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
     derniere_activite TEXT DEFAULT (datetime('now'))
   );
+  CREATE INDEX IF NOT EXISTS idx_kofi_dossiers_user ON kofi_dossiers(user_id, formation_id);
   CREATE TABLE IF NOT EXISTS kofi_messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     conversation_id INTEGER NOT NULL,
@@ -5126,7 +5138,8 @@ db.exec(`
     questions_restantes INTEGER NOT NULL,
     expire_le TEXT,
     reference TEXT,
-    created_at TEXT DEFAULT (datetime('now'))
+    created_at TEXT DEFAULT (datetime('now')),
+    portee TEXT DEFAULT 'eleve'
   );
   CREATE TABLE IF NOT EXISTS kofi_usage (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -5189,9 +5202,27 @@ db.exec(`
     consentement_le TEXT,
     credit_id INTEGER,
     created_at TEXT DEFAULT (datetime('now')),
-    paye_le TEXT
+    paye_le TEXT,
+    portee TEXT DEFAULT 'eleve'
   );
   CREATE INDEX IF NOT EXISTS idx_kofi_commandes_user ON kofi_commandes(user_id, statut);
+  /* Assistant du formateur (2026-10-31) : chaque mission que Koffi PROPOSE (ajouter un module, une leçon, une carte mentale, importer un texte) est une ligne ici ;
+     rien n'est écrit dans la formation tant que le formateur n'a pas cliqué « Appliquer » (statut proposee → appliquee | annulee | echec). */
+  CREATE TABLE IF NOT EXISTS kofi_actions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    conversation_id INTEGER NOT NULL,
+    message_id INTEGER,
+    user_id INTEGER NOT NULL,
+    formation_id INTEGER NOT NULL,
+    type TEXT NOT NULL,
+    titre TEXT,
+    params_json TEXT NOT NULL,
+    statut TEXT NOT NULL DEFAULT 'proposee',
+    resultat_json TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    applique_le TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_kofi_actions_conv ON kofi_actions(conversation_id, statut);
   /* Koffi réservé aux personnes MAJEURES (2026-10-30) : preuve datée de la confirmation « j'ai 18 ans ou plus » (une ligne par compte). */
   CREATE TABLE IF NOT EXISTS kofi_majorite (
     user_id INTEGER PRIMARY KEY,
@@ -5199,6 +5230,11 @@ db.exec(`
     version TEXT
   );
 `);
+/* Dossiers de discussion de l'assistant du formateur : colonnes ajoutées aux conversations (déjà dans le CREATE TABLE : PostgreSQL les crée seul ; SQLite local déjà créé : ici). */
+;['dossier_id INTEGER', 'titre TEXT'].forEach(col => { try { db.exec(`ALTER TABLE kofi_conversations ADD COLUMN ${col}`); } catch(_) {} });
+/* Assistant du formateur : « portee » sépare les crédits / commandes de l'ÉLÈVE (questions du tuteur) de ceux du FORMATEUR (messages de l'assistant de création). Déjà dans les CREATE TABLE
+   ci-dessus (PostgreSQL : self-healing par ajouterColonnesManquantes) ; ces lignes ne servent qu'au SQLite local déjà créé. */
+;['kofi_credits', 'kofi_commandes'].forEach(t => { try { db.exec(`ALTER TABLE ${t} ADD COLUMN portee TEXT DEFAULT 'eleve'`); } catch(_) {} });
 
 /* Documents PDF / Excel affichés dans la page du cours (2026-10-30) : doc_integre = NULL → par défaut selon le type (PDF : affiché ; autre : pièce jointe) ; doc_hauteur = hauteur d'affichage en px. */
 ;['doc_integre INTEGER','doc_hauteur INTEGER'].forEach(col => { try { db.exec(`ALTER TABLE formation_lecons ADD COLUMN ${col}`); } catch(_) {} });

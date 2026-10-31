@@ -3327,7 +3327,7 @@ const FormationQuestions = require("./formation-questions");
 FormationQuestions.register({ route, db, sendJSON, getCurrentUser, SEC, creerNotif, nomCompteAffichage, contactBloque });
 /* Koffi, tuteur IA des formations (2026-10-30) — server/kofi.js. getPremiumStatut est une déclaration de fonction (hissée). */
 const Kofi = require("./kofi");
-Kofi.register({ route, db, sendJSON, getCurrentUser, SEC, getPremiumStatut, getOrigin, creerNotif });
+Kofi.register({ route, db, sendJSON, getCurrentUser, SEC, getPremiumStatut, getOrigin, creerNotif, checkFormationOwner, exigerPremium });
 /* Envoyer un événement par e-mail (carte complète) + texte d'aperçu du lien (date, lieu) : server/partage-evenement.js. urlImagePartageEvenement est une déclaration de fonction (hissée). */
 const PartageEvenement = require("./partage-evenement");
 PartageEvenement.register({ route, db, sendJSON, getCurrentUser, SEC, nomCompteAffichage, getOrigin, urlImagePartageEvenement });

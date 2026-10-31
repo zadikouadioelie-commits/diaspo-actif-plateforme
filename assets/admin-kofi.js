@@ -23,7 +23,7 @@
     const t = String(s).replace(' ', 'T'), d = new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(t) ? t : t + 'Z');
     return isNaN(d) ? esc(s) : d.toLocaleString('fr-FR', { timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   };
-  const CATEGORIES = { gratuit: 'Questions offertes', forfait: 'Questions du forfait', apercu: 'Aperçu (formateurs et administration)' };
+  const CATEGORIES = { gratuit: 'Questions offertes', forfait: 'Questions du forfait', apercu: 'Aperçu (formateurs et administration)', createur_gratuit: 'Assistant de création — messages offerts', createur_forfait: 'Assistant de création — messages du forfait', createur_refus: 'Assistant de création — refus du fournisseur' };
   const TYPES_BUDGET = { recharge: 'Recharge', ajustement: 'Ajustement' };
 
   /* Réglages affichés : { cle, lib, aide, unite?, step? } — les bornes et les valeurs par défaut viennent du serveur. */
@@ -43,6 +43,15 @@
       { cle: 'forfait_questions', lib: 'Questions par forfait', unite: 'questions' },
       { cle: 'forfait_prix_eur', lib: 'Prix du forfait', unite: '€', step: 0.05, aide: 'Minimum 0,50 € (limite de Stripe). Aucune commission Diaspo\'Actif : seuls les frais Stripe s\'appliquent.' },
       { cle: 'forfait_validite_mois', lib: 'Validité', unite: 'mois' },
+    ] },
+    { titre: '🤖 Assistant de création (formateurs)', note: 'Koffi aide les formateurs à créer leur formation. Compteur séparé de celui des élèves ; un formateur reçoit des messages offerts chaque jour, puis peut acheter un forfait.', champs: [
+      { cle: 'createur_gratuit_jour', lib: 'Messages offerts par jour et par formateur', unite: 'messages', aide: 'Fenêtre glissante de 24 h. À 0, seul le forfait permet d\'utiliser l\'assistant.' },
+      { cle: 'createur_forfait_messages', lib: 'Messages par forfait', unite: 'messages' },
+      { cle: 'createur_forfait_prix_eur', lib: 'Prix du forfait', unite: '€', step: 0.05, aide: 'Minimum 0,50 € (limite de Stripe). Aucune commission Diaspo\'Actif : seuls les frais Stripe s\'appliquent. Si vous modifiez ce prix, relisez l\'article 6 ter des CGV.' },
+      { cle: 'createur_forfait_validite_mois', lib: 'Validité du forfait', unite: 'mois' },
+      { cle: 'createur_max_message_caracteres', lib: 'Longueur maximale d\'un message', unite: 'caractères', aide: 'Permet de coller un module entier d\'un seul coup. Plus c\'est long, plus chaque message coûte.' },
+      { cle: 'createur_max_sortie_tokens', lib: 'Longueur maximale d\'une réponse', unite: 'jetons' },
+      { cle: 'plafond_jour_createur', lib: 'Messages par jour et par formateur (plafond absolu)', unite: 'messages', aide: 'Protège la réserve contre un usage abusif, forfait compris.' },
     ] },
     { titre: '🛡️ Plafonds et limites', champs: [
       { cle: 'plafond_jour_par_eleve', lib: 'Questions par jour et par élève', unite: 'questions', aide: 'Protège la réserve contre un usage abusif ou automatisé.' },

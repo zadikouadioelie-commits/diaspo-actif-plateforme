@@ -77,6 +77,14 @@ const DEFAUTS = {
   prix_entree_usd_par_million: 0.10,
   prix_sortie_usd_par_million: 0.50,
   taux_usd_eur: 0.92,
+  /* Assistant du formateur (2026-10-31) : un peu plus que les 5 questions de l'élève, puis un forfait payé par le formateur (compteur séparé de celui des élèves). */
+  createur_gratuit_jour: 20,       /* messages offerts par jour (fenêtre glissante de 24 h) à tout formateur Premium */
+  createur_forfait_messages: 1000,
+  createur_forfait_prix_eur: 5,
+  createur_forfait_validite_mois: 12,
+  createur_max_message_caracteres: 30000, /* un module entier collé d'un coup */
+  createur_max_sortie_tokens: 3500,
+  plafond_jour_createur: 300,      /* anti-abus : messages par 24 h, forfait compris */
 };
 const TEXTE_REGLAGES = new Set(["modele"]);
 /* Bornes [min, max] acceptées par l'administration. retention_jours plafonné à 60 : c'est la durée annoncée aux élèves (fenêtre, CGV, confidentialité) ;
@@ -86,6 +94,8 @@ const BORNES = {
   retention_jours: [1, 60], plafond_jour_par_eleve: [1, 10000], plafond_jour_apercu: [1, 10000], budget_seuil_gratuit_eur: [0, 100000],
   max_message_caracteres: [50, 5000], max_sortie_tokens: [100, 4000], nb_extraits: [1, 12],
   prix_entree_usd_par_million: [0, 1000], prix_sortie_usd_par_million: [0, 1000], taux_usd_eur: [0.1, 10],
+  createur_gratuit_jour: [0, 1000], createur_forfait_messages: [1, 100000], createur_forfait_prix_eur: [0.5, 1000], createur_forfait_validite_mois: [1, 60],
+  createur_max_message_caracteres: [500, 60000], createur_max_sortie_tokens: [500, 8000], plafond_jour_createur: [1, 10000],
 };
 
 const sqlDate = d => d.toISOString().slice(0, 19).replace("T", " ");
@@ -137,9 +147,10 @@ function coutEstime(entree, sortie, r) {
 }
 
 /* ── Questions (crédits) : au niveau du compte, toutes formations ─────────────────────────────────── */
-async function lotsValides(db, userId) {
-  return db.prepare(`SELECT * FROM kofi_credits WHERE user_id=? AND questions_restantes>0 AND (expire_le IS NULL OR expire_le>?)
-    ORDER BY CASE WHEN origine='gratuit' THEN 0 ELSE 1 END, expire_le IS NULL, expire_le, id`).all(Number(userId), sqlDate(new Date()));
+/* portee = 'eleve' (questions du tuteur, par défaut) ou 'createur' (messages de l'assistant du formateur) : deux compteurs qui ne se mélangent jamais. */
+async function lotsValides(db, userId, portee) {
+  return db.prepare(`SELECT * FROM kofi_credits WHERE user_id=? AND COALESCE(portee,'eleve')=? AND questions_restantes>0 AND (expire_le IS NULL OR expire_le>?)
+    ORDER BY CASE WHEN origine='gratuit' THEN 0 ELSE 1 END, expire_le IS NULL, expire_le, id`).all(Number(userId), portee || "eleve", sqlDate(new Date()));
 }
 async function creditsDe(db, userId, r) {
   const lots = await lotsValides(db, userId);
@@ -158,8 +169,8 @@ async function accorderGratuit(db, userId, r) {
   catch (e) { if (/unique|duplicate/i.test(String(e && e.message))) return false; throw e; }
 }
 /* Retire UNE question du premier lot valide (gratuit d'abord, puis l'échéance la plus proche). Atomique ; renvoie le lot ou null. */
-async function debiter(db, userId) {
-  for (const lot of await lotsValides(db, userId)) {
+async function debiter(db, userId, portee) {
+  for (const lot of await lotsValides(db, userId, portee)) {
     const res = await db.prepare("UPDATE kofi_credits SET questions_restantes=questions_restantes-1 WHERE id=? AND questions_restantes>0").run(lot.id);
     if (res && Number(res.changes) === 1) return lot;
   }
@@ -182,9 +193,10 @@ async function confirmerCommande(db, commandeId, montantPaye) {
   const pris = await db.prepare("UPDATE kofi_commandes SET statut='payee', paye_le=datetime('now') WHERE id=? AND statut='en_attente'").run(cmd.id);
   if (!pris || Number(pris.changes) !== 1) return null;
   const r = await reglages(db, true);
-  const fin = new Date(); fin.setMonth(fin.getMonth() + r.forfait_validite_mois);
-  const x = await db.prepare("INSERT INTO kofi_credits (user_id, origine, questions_total, questions_restantes, expire_le, reference) VALUES (?,?,?,?,?,?)")
-    .run(Number(cmd.user_id), "achat", Number(cmd.questions), Number(cmd.questions), sqlDate(fin), "commande " + cmd.id);
+  const portee = cmd.portee === "createur" ? "createur" : "eleve";
+  const fin = new Date(); fin.setMonth(fin.getMonth() + (portee === "createur" ? r.createur_forfait_validite_mois : r.forfait_validite_mois));
+  const x = await db.prepare("INSERT INTO kofi_credits (user_id, origine, questions_total, questions_restantes, expire_le, reference, portee) VALUES (?,?,?,?,?,?,?)")
+    .run(Number(cmd.user_id), "achat", Number(cmd.questions), Number(cmd.questions), sqlDate(fin), "commande " + cmd.id, portee);
   await db.prepare("UPDATE kofi_commandes SET credit_id=? WHERE id=?").run(x.lastInsertRowid || null, cmd.id);
   return { commande: cmd, credit_id: x.lastInsertRowid || null, questions: Number(cmd.questions) };
 }
@@ -437,19 +449,22 @@ async function effacerCompte(db, userId) {
   await db.prepare("DELETE FROM kofi_feedback WHERE user_id=? OR message_id IN (SELECT m.id FROM kofi_messages m JOIN kofi_conversations c ON c.id=m.conversation_id WHERE c.user_id=?)").run(id, id);
   const m = await db.prepare("DELETE FROM kofi_messages WHERE conversation_id IN (SELECT id FROM kofi_conversations WHERE user_id=?)").run(id);
   const c = await db.prepare("DELETE FROM kofi_conversations WHERE user_id=?").run(id);
+  await db.prepare("DELETE FROM kofi_actions WHERE user_id=?").run(id); /* missions proposées par l'assistant du formateur (elles contiennent le texte collé) */
   await db.prepare("DELETE FROM kofi_majorite WHERE user_id=?").run(id);
   return { messages: Number(m && m.changes) || 0, conversations: Number(c && c.changes) || 0 };
 }
 
 /* ── Routes ───────────────────────────────────────────────────────────────────────────────────────── */
 module.exports = {
-  NOM, DEFAUTS, reglages, ecrireReglage, budget, coutEstime, creditsDe, accorderGratuit, debiter, rendre, crediterForfait, effacerCompte, ageEn, statutMajorite, TEXTE_MAJORITE, VERSION_MAJORITE,
+  NOM, DEFAUTS, reglages, ecrireReglage, budget, coutEstime, creditsDe, lotsValides, accorderGratuit, debiter, rendre, crediterForfait, effacerCompte, ageEn, statutMajorite, TEXTE_MAJORITE, VERSION_MAJORITE,
   texteDeHtml, morceler, tokens, scorer, analyserReponse, indexerFormation, texteDeStudio, systemePour, sqlDate,
   confirmerCommande, annulerCommande, TEXTE_FORFAIT_NON_REMBOURSABLE, TEXTE_FORFAIT_RETRACTATION, VERSION_CONSENTEMENT_FORFAIT,
 };
 
 module.exports.register = function register(deps) {
   const { route, db, sendJSON, getCurrentUser, SEC, getOrigin, creerNotif } = deps;
+  /* Assistant du formateur (2026-10-31) : ses routes vivent dans server/kofi-createur.js (même socle : réglages, crédits, budget, majorité, pays). */
+  require("./kofi-createur").register(deps);
   const D = module.exports;
   const estAdmin = u => u && u.role === "administrateur";
 
@@ -576,7 +591,7 @@ module.exports.register = function register(deps) {
     if (ctx.etat === "vitrine") return sendJSON(res, 402, { error: "Koffi est réservé aux comptes Premium.", code: "premium_requis" });
     if (refuserSiMineur(res, ctx)) return;
     const limite = sqlDate(new Date(Date.now() - ctx.r.retention_jours * 86400000));
-    const rows = await db.prepare("SELECT id, langue, created_at, derniere_activite FROM kofi_conversations WHERE user_id=? AND formation_id=? AND derniere_activite>=? ORDER BY derniere_activite DESC LIMIT 20").all(user.id, ctx.f.id, limite);
+    const rows = await db.prepare("SELECT id, langue, created_at, derniere_activite FROM kofi_conversations WHERE user_id=? AND formation_id=? AND COALESCE(contexte,'formation')='formation' AND derniere_activite>=? ORDER BY derniere_activite DESC LIMIT 20").all(user.id, ctx.f.id, limite);
     sendJSON(res, 200, { conversations: rows.map(c => ({ id: Number(c.id), langue: c.langue, creee: c.created_at, derniere_activite: c.derniere_activite })) });
   });
 
@@ -594,7 +609,8 @@ module.exports.register = function register(deps) {
   });
 
   async function conversationDe(user, id) {
-    const c = await db.prepare("SELECT * FROM kofi_conversations WHERE id=? AND user_id=?").get(Number(id), user.id);
+    /* Les conversations de l'assistant du formateur (contexte « createur ») ont leurs propres routes : jamais lues par celles du tuteur. */
+    const c = await db.prepare("SELECT * FROM kofi_conversations WHERE id=? AND user_id=? AND COALESCE(contexte,'formation')='formation'").get(Number(id), user.id);
     return c || null;
   }
   route("GET", "/api/kofi/conversations/:id", async (req, res, params) => {
@@ -827,6 +843,7 @@ module.exports.register = function register(deps) {
     const limite = sqlDate(new Date(Date.now() - r.retention_jours * 86400000));
     await db.prepare("DELETE FROM kofi_feedback WHERE message_id IN (SELECT id FROM kofi_messages WHERE created_at<?)").run(limite);
     const m = await db.prepare("DELETE FROM kofi_messages WHERE created_at<?").run(limite);
+    await db.prepare("DELETE FROM kofi_actions WHERE created_at<?").run(limite); /* missions de l'assistant du formateur : même durée de conservation */
     const c = await db.prepare("DELETE FROM kofi_conversations WHERE derniere_activite<? AND id NOT IN (SELECT DISTINCT conversation_id FROM kofi_messages)").run(limite);
     return { messages: Number(m && m.changes) || 0, conversations: Number(c && c.changes) || 0, limite };
   }

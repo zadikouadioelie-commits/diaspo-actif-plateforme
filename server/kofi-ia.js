@@ -34,8 +34,31 @@ function client() {
   return _client;
 }
 
+/* Assistant du formateur (système marqué ASSISTANT_FORMATEUR) : réponses déterministes selon un mot-clé du message, avec ou sans missions <actions>. */
+function reponseFausseCreateur({ systeme, messages }) {
+  const dernier = String((messages[messages.length - 1] || {}).content || "");
+  const q = (dernier.split("<message_du_formateur>")[1] || dernier).split("</message_du_formateur>")[0];
+  const entree = Math.ceil((String(systeme).length + messages.reduce((a, m) => a + String(m.content).length, 0)) / 4);
+  if (/PANNEFAUSSE/.test(q)) throw new KofiIAErreur("indisponible", "Panne simulée.");
+  if (/LIMITEFAUSSE/.test(q)) throw new KofiIAErreur("limite", "Limite simulée.");
+  if (/REFUSFAUX/.test(q)) return { texte: "", entree, sortie: 5, lecture_cache: 0, refus: true, arret: "refusal" };
+  const chap = (/\[chapitre_id=(\d+)\]/.exec(dernier) || [])[1];
+  const mod = (/\[module_id=(\d+)\]/.exec(dernier) || [])[1];
+  const nbP = Math.max(0, ...[...dernier.matchAll(/\[P(\d+)\]/g)].map(m => Number(m[1])));
+  let texte;
+  if (/CARTEFAUSSE/.test(q)) texte = `Voici une carte mentale pour le module. Vérifiez-la, puis cliquez sur « Appliquer ». <actions>[{"type":"creer_carte_mentale","titre":"Carte du module 1","centre":"Module 1","branches":[{"titre":"Idée A","enfants":["a1","a2"]},{"titre":"Idée B","enfants":["b1"]}]${chap ? `,"chapitre_id":${chap}` : ""}}]</actions>`;
+  else if (/PLANFAUX/.test(q)) { const mid = Math.max(1, Math.floor(nbP / 2)); texte = `Je vous propose ce plan. <actions>[{"type":"importer_texte","nouveau_module":"Module importé","plan":[{"chapitre":"Chapitre un","lecons":[{"titre":"Première leçon","de":1,"a":${mid}},{"titre":"Seconde leçon","de":${mid + 1},"a":${nbP}}]}]}]</actions>`; }
+  else if (/IDFAUX/.test(q)) texte = 'Je vous propose ceci. <actions>[{"type":"ajouter_chapitre","module_id":999999,"titre":"Chapitre fantôme"},{"type":"ajouter_chapitre","module_id":' + (mod || 0) + ',"titre":"Chapitre réel"}]</actions>';
+  else if (/INFOSFAUX/.test(q)) texte = 'Voici les infos que je vous propose. <actions>[{"type":"renseigner_infos","champs":{"titre":"Formation sur la gestion financière","niveau":"Débutant","duree_heures":4,"public_concerne":"Les entrepreneurs","description":"<p>Une formation <strong>pratique</strong>.</p><script>alert(1)</script>","inconnu":"ignoré"}}]</actions>';
+  else if (/MODULEFAUX/.test(q)) texte = 'Je vous propose de créer ce module. <actions>[{"type":"ajouter_module","titre":"Module test","description":"Créé par Koffi"}]</actions>';
+  else if (/LECONFAUSSE/.test(q)) texte = `Voici une leçon. <actions>[{"type":"ajouter_lecon","chapitre_id":${chap || 0},"titre":"Leçon test","contenu_html":"<p>Un paragraphe.</p><script>alert(1)</script>","duree_minutes":3}]</actions>`;
+  else texte = "Pour cela, utilisez l'onglet « Quiz & Évaluations » de l'éditeur de formation.";
+  return { texte, entree, sortie: Math.ceil(texte.length / 4), lecture_cache: 0, refus: false, arret: "end_turn" };
+}
+
 /* Réponse déterministe pour les tests : cite le premier extrait, ou se comporte selon un mot-clé de la question. */
 function reponseFausse({ systeme, messages }) {
+  if (/ASSISTANT_FORMATEUR/.test(String(systeme))) return reponseFausseCreateur({ systeme, messages });
   if (process.env.KOFI_FAUX_LOG) { try { fs.appendFileSync(process.env.KOFI_FAUX_LOG, JSON.stringify({ systeme, messages }) + "\n"); } catch (e) { /* sans importance */ } }
   const dernier = String((messages[messages.length - 1] || {}).content || "");
   const question = (dernier.split("<question>")[1] || dernier).split("</question>")[0];

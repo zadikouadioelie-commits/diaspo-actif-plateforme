@@ -82,13 +82,6 @@
 .fb-switch input[type=checkbox]:checked + .fb-switch-track{background:#ff6b00;}
 .fb-switch input[type=checkbox]:checked + .fb-switch-track::after{transform:translateX(18px);}
 .fb-switch input[type=checkbox]:focus-visible + .fb-switch-track{outline:2px solid #ff6b00;outline-offset:2px;}
-.fb-ai-msg{max-width:85%;padding:8px 11px;border-radius:10px;line-height:1.4;white-space:pre-wrap;}
-.fb-ai-msg.bot{align-self:flex-start;background:#f1f5f9;color:#1e293b;}
-.fb-ai-msg.user{align-self:flex-end;background:#ff6b00;color:#fff;}
-.fb-ai-msg .fb-ai-filled{display:block;margin-top:4px;font-size:11px;color:#059669;font-weight:700;}
-#fb-ai-mic.recording{background:#dc2626;color:#fff;border-color:#dc2626;animation:fbMicPulse 1.2s infinite;}
-@keyframes fbMicPulse{0%{box-shadow:0 0 0 0 rgba(220,38,38,.5);}70%{box-shadow:0 0 0 8px rgba(220,38,38,0);}100%{box-shadow:0 0 0 0 rgba(220,38,38,0);}}
-.fb-ai-highlight{animation:fbAiFieldGlow 1.6s ease-out;}
 .fb-dash-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;}
 .fb-dash-card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px 14px;}
 .fb-dash-num{font-size:20px;font-weight:800;color:#ff6b00;}
@@ -100,7 +93,6 @@
 .fb-statut-pill.active{background:#dbeafe;color:#1e40af;}
 .fb-statut-pill.terminee{background:#dcfce7;color:#166534;}
 .fb-statut-pill.non-commencee{background:#f1f5f9;color:#64748b;}
-@keyframes fbAiFieldGlow{0%{background-color:#fff3c4;box-shadow:0 0 0 3px #fbbf24;}100%{background-color:transparent;box-shadow:0 0 0 0 rgba(251,191,36,0);}}
 @media (max-width:1100px){
   [data-fb-panel="infos"]{flex-direction:column !important;}
   .fb-preview-card{width:100%;position:static;}
@@ -833,21 +825,6 @@
         </div>
       </div>
 
-      <!-- Assistant IA Formation : bouton flottant + fenêtre de chat -->
-      <button class="btn btn-orange" id="fb-ai-toggle" style="position:fixed;bottom:24px;right:24px;z-index:500;border-radius:99px;padding:12px 18px;box-shadow:0 4px 16px rgba(0,0,0,.2);display:none;">🤖 Assistant IA Formation</button>
-      <div id="fb-ai-window" style="display:none;position:fixed;bottom:24px;right:24px;z-index:500;width:340px;max-width:calc(100vw - 32px);height:460px;background:#fff;border-radius:16px;box-shadow:0 8px 30px rgba(0,0,0,.25);flex-direction:column;overflow:hidden;">
-        <div style="background:linear-gradient(135deg,#ff6b00,#ff9f43);color:#fff;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;">
-          <strong>🤖 Assistant IA Formation</strong>
-          <button id="fb-ai-close" style="background:none;border:none;color:#fff;font-size:16px;cursor:pointer;">✕</button>
-        </div>
-        <div id="fb-ai-messages" style="flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px;font-size:13px;"></div>
-        <div style="display:flex;gap:6px;padding:10px;border-top:1px solid var(--border);">
-          <input id="fb-ai-input" class="input-field" style="flex:1;" placeholder="Décrivez votre formation…">
-          <button class="btn btn-sm btn-outline" id="fb-ai-mic" title="Parler à l'assistant">🎤</button>
-          <button class="btn btn-sm btn-orange" id="fb-ai-send">➤</button>
-        </div>
-      </div>
-
       <!-- Modal exprimer un besoin en formation -->
       <div id="modal-besoin" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;overflow-y:auto;">
         <div class="card" style="max-width:520px;margin:60px auto;padding:24px;">
@@ -1060,6 +1037,7 @@
 <script src="/assets/rich-editor.js"></script>
 <script src="/assets/upload-media.js?v=3"></script>
 <script src="/assets/formation-koffi-reglages.js?v=1"></script>
+<script src="/assets/koffi-createur.js?v=2"></script>
 <script>
   // ── Infobulles d'aide (?) : au clic (fiable sur tous les appareils, contrairement au title au survol) ──
   (function(){
@@ -1288,286 +1266,7 @@
     if(CURRENT_USER && CURRENT_USER.id) window.open(`profil.html?id=${CURRENT_USER.id}`, '_blank');
   });
 
-  // ── Assistant IA Formation (Lot 1 : conversation guidée, sans IA générative — détection de motifs, gratuit) ──
-  const FB_AI_STEPS = ['sujet','public','duree','niveau','objectifs','competences'];
-  let fbAiStepIndex = 0;
-  let fbAiStarted = false;
-  const FB_AI_QUESTIONS = {
-    sujet: "Quel est le sujet de votre formation ? (ex: « Je veux créer une formation sur la gestion financière pour les associations. »)",
-    public: "Très bien ! À qui s'adresse cette formation ? (ex: « Le public est constitué d'entrepreneurs. »)",
-    duree: "Combien de temps doit durer la formation ? (ex: « Elle dure 4 semaines. »)",
-    niveau: "Quel niveau visez-vous : débutant, intermédiaire, avancé ou tous niveaux ?",
-    objectifs: "Que devront être capables de faire les apprenants à la fin ? (ex: « Les participants apprendront à créer une entreprise. »)",
-    competences: "Et pour finir : à la fin, ils sauront faire quoi concrètement ? (ex: « À la fin ils sauront établir un business plan. »)"
-  };
-  const FB_AI_DONE_MSG = "C'est noté, merci ! J'ai rempli les champs correspondants dans « Infos générales » — vous pouvez les modifier à tout moment. Continuez à me parler si vous voulez préciser d'autres points (catégorie, durée en heures, prérequis…), ou complétez directement le formulaire.";
-
-  function fbAiAddMsg(text, who, filledLabel){
-    const box = document.getElementById('fb-ai-messages');
-    const div = document.createElement('div');
-    div.className = 'fb-ai-msg ' + who;
-    div.textContent = text;
-    if(filledLabel){ const s = document.createElement('span'); s.className='fb-ai-filled'; s.textContent = '✅ ' + filledLabel; div.appendChild(s); }
-    box.appendChild(div);
-    box.scrollTop = box.scrollHeight;
-  }
-
-  function fbAiSetField(id, value, triggerEvent){
-    const el = document.getElementById(id);
-    if(!el || !value) return false;
-    el.value = value;
-    if(triggerEvent !== false) el.dispatchEvent(new Event('change', { bubbles: true }));
-    fbAiHighlightField(el);
-    return true;
-  }
-
-  // Bascule sur l'onglet Infos générales et fait un halo visuel sur le champ pour que
-  // l'utilisateur voie le formulaire se remplir en direct pendant qu'il parle à l'assistant.
-  function fbAiHighlightField(el){
-    if(document.querySelector('.fb-tab[data-tab="infos"]') && !document.querySelector('.fb-tab[data-tab="infos"]').classList.contains('active')){
-      fbSwitchTab('infos');
-    }
-    el.classList.remove('fb-ai-highlight');
-    void el.offsetWidth; // relance l'animation même si le champ vient déjà d'être surligné
-    el.classList.add('fb-ai-highlight');
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }
-
-  // Extraction par motifs (regex) — pas d'IA générative, détection de formulations courantes en français
-  function fbAiExtract(text){
-    const filled = [];
-    const lower = text.toLowerCase();
-
-    // Sujet / titre : "formation sur X", "formation de X", "je veux créer une formation sur X"
-    const sujetMatch = text.match(/formation\s+(?:sur|de|en)\s+(.+?)(?:[.!]|$)/i);
-    if(sujetMatch && sujetMatch[1].trim().length > 2){
-      const sujet = sujetMatch[1].trim().replace(/^(la|le|les|l')\s+/i,'');
-      if(fbAiSetField('new-form-titre', sujet.charAt(0).toUpperCase()+sujet.slice(1))) filled.push('Titre');
-      if(fbAiSetField('new-form-desc-courte', text.trim())) filled.push('Description courte');
-    }
-
-    // Durée : "dure 4 semaines", "durée : 3 jours", "2h", "12 heures"
-    const dureeMatch = text.match(/(\d+)\s*(semaines?|jours?|mois|heures?|h\b)/i);
-    if(dureeMatch){
-      const n = dureeMatch[1], unit = dureeMatch[2].toLowerCase();
-      if(fbAiSetField('new-form-duree', `${n} ${unit}`)) filled.push('Durée');
-      if(/heures?|h\b/.test(unit)) if(fbAiSetField('new-form-duree-heures', n)) filled.push('Nombre d\'heures');
-    }
-
-    // Public : "public est/sont X", "s'adresse à X", "pour les X", "destiné à X"
-    const publicMatch = text.match(/(?:public(?:\s+est|\s+sont|\s+concerné)?|s'adresse\s+à|destiné(?:e)?\s+à|pour\s+les)\s+(?:des\s+|de\s+|constitué\s+de\s+|constitué\s+d['’])?(.+?)(?:[.!]|$)/i);
-    if(publicMatch && publicMatch[1].trim().length > 2 && !/formation|semaine|jour|heure/i.test(publicMatch[1])){
-      if(fbAiSetField('new-form-public', publicMatch[1].trim())) filled.push('Public concerné');
-    }
-
-    // Niveau
-    if(/débutant/i.test(text)){ if(fbAiSetField('new-form-niveau', 'Débutant')) filled.push('Niveau'); }
-    else if(/intermédiaire/i.test(text)){ if(fbAiSetField('new-form-niveau', 'Intermédiaire')) filled.push('Niveau'); }
-    else if(/avancé/i.test(text)){ if(fbAiSetField('new-form-niveau', 'Avancé')) filled.push('Niveau'); }
-    else if(/tous\s+niveaux/i.test(text)){ if(fbAiSetField('new-form-niveau', 'Tous niveaux')) filled.push('Niveau'); }
-
-    // Objectifs : "apprendront à X", "sauront X", "objectif est de X"
-    const objMatch = text.match(/(?:apprendront\s+à|pourront|seront\s+capables\s+de|objectifs?\s+(?:est|sont)?\s*(?:de|:)?)\s+(.+?)(?:[.!]|$)/i);
-    if(objMatch && objMatch[1].trim().length > 3){
-      if(fbAiSetField('new-form-objectifs', text.trim())) filled.push('Objectifs pédagogiques');
-    }
-
-    // Compétences : "sauront établir/faire/créer X", "à la fin ils sauront X"
-    const compMatch = text.match(/sauront\s+(.+?)(?:[.!]|$)/i);
-    if(compMatch && compMatch[1].trim().length > 3){
-      if(fbAiSetField('new-form-competences', text.trim())) filled.push('Compétences acquises');
-    }
-
-    // Gratuit / payant
-    if(/gratuit/i.test(text)){ document.getElementById('new-form-gratuit').checked = true; document.getElementById('new-form-gratuit').dispatchEvent(new Event('change')); filled.push('Tarification (gratuite)'); }
-    const prixMatch = text.match(/(\d+)\s*(€|eur|euros?|\$|usd|fcfa|xof)/i);
-    if(prixMatch){
-      document.getElementById('new-form-gratuit').checked = false;
-      document.getElementById('new-form-gratuit').dispatchEvent(new Event('change'));
-      if(fbAiSetField('new-form-prix', prixMatch[1])) filled.push('Prix');
-    }
-
-    // Prérequis
-    const prereqMatch = text.match(/pr[ée]requis?\s*:?\s*(.+?)(?:[.!]|$)/i);
-    if(prereqMatch && prereqMatch[1].trim().length > 2){
-      if(fbAiSetField('new-form-prerequis', prereqMatch[1].trim())) filled.push('Prérequis');
-    }
-
-    if(filled.length) fbUpdatePreview();
-    return filled;
-  }
-
-  function fbAiNextQuestion(){
-    if(fbAiStepIndex >= FB_AI_STEPS.length){
-      fbAiAddMsg(FB_AI_DONE_MSG, 'bot');
-      return;
-    }
-    fbAiAddMsg(FB_AI_QUESTIONS[FB_AI_STEPS[fbAiStepIndex]], 'bot');
-  }
-
-  // ── « Je veux commencer par X » : l'utilisateur choisit librement la rubrique à remplir,
-  // au lieu de suivre l'ordre des questions par défaut. ──
-  const FB_AI_FIELD_MAP = [
-    { id: 'new-form-sous-titre', label: 'sous-titre', kw: ['sous-titre','sous titre'] },
-    { id: 'new-form-desc-courte', label: 'description courte', kw: ['description courte','résumé','resume'] },
-    { id: 'new-form-desc', label: 'description complète', kw: ['description complète','description complete','description'] },
-    { id: 'new-form-resultats', label: 'résultats attendus', kw: ['résultats attendus','resultats attendus','résultats','resultats'] },
-    { id: 'new-form-objectifs', label: 'objectifs pédagogiques', kw: ['objectifs pédagogiques','objectifs'] },
-    { id: 'new-form-competences', label: 'compétences acquises', kw: ['compétences acquises','competences acquises','compétences','competences'] },
-    { id: 'new-form-public', label: 'public concerné', kw: ['public concerné','public concerne','public'] },
-    { id: 'new-form-prerequis', label: 'prérequis', kw: ['prérequis','prerequis'] },
-    { id: 'new-form-duree', label: 'durée', kw: ['durée estimée','duree estimee','durée','duree'] },
-    { id: 'new-form-niveau', label: 'niveau', kw: ['niveau'] },
-    { id: 'new-form-mots-cles', label: 'mots-clés', kw: ['mots-clés','mots cles','mots clés','tags'] },
-    { id: 'new-form-titre', label: 'titre', kw: ['titre'] },
-  ].sort((a,b) => Math.max(...b.kw.map(k=>k.length)) - Math.max(...a.kw.map(k=>k.length))); // motifs les plus précis en premier (ex: "description courte" avant "description")
-
-  let fbAiPendingField = null;
-
-  function fbAiDetectStartIntent(text){
-    const m = text.match(/(?:je\s+veux|j'aimerais|on\s+va|commen[çc]ons|commencer)\s+(?:d'abord\s+)?par\s+(?:le|la|les|l['’])?\s*(.+?)(?:[.!]|$)/i);
-    if(!m) return null;
-    const phrase = m[1].toLowerCase();
-    for(const field of FB_AI_FIELD_MAP){
-      if(field.kw.some(k => phrase.includes(k))) return field;
-    }
-    return null;
-  }
-
-  function fbAiAddFilledMsg(labels){
-    const s = document.createElement('div');
-    s.className = 'fb-ai-msg bot';
-    s.innerHTML = `J'ai rempli : ${labels.map(f=>`<span class="fb-ai-filled" style="display:inline;margin-right:6px;">✅ ${f}</span>`).join('')}`;
-    document.getElementById('fb-ai-messages').appendChild(s);
-    document.getElementById('fb-ai-messages').scrollTop = document.getElementById('fb-ai-messages').scrollHeight;
-  }
-
-  function fbAiHandleUserMessage(text){
-    fbAiAddMsg(text, 'user');
-
-    // 1) Une rubrique était en attente de réponse directe (l'utilisateur a choisi par quoi commencer)
-    if(fbAiPendingField){
-      const field = fbAiPendingField;
-      fbAiPendingField = null;
-      if(fbAiSetField(field.id, text.trim())){
-        fbUpdatePreview();
-        fbAiAddFilledMsg([field.label.charAt(0).toUpperCase()+field.label.slice(1)]);
-      }
-      fbAiAddMsg("Autre chose que vous voulez préciser ? Dites-moi « je veux commencer par… » pour une autre rubrique, ou continuons avec mes questions.", 'bot');
-      fbAiNextQuestion();
-      return;
-    }
-
-    // 2) « Je veux commencer par le sous-titre / la description courte / etc. »
-    const startField = fbAiDetectStartIntent(text);
-    if(startField){
-      fbAiPendingField = startField;
-      fbAiAddMsg(`D'accord, commençons par « ${startField.label} ». Dites-moi ce que vous voulez y écrire :`, 'bot');
-      return;
-    }
-
-    // 3) Sinon, détection par motifs habituelle + progression dans les questions par défaut
-    const filled = fbAiExtract(text);
-    if(filled.length) fbAiAddFilledMsg(filled);
-    fbAiStepIndex++;
-    fbAiNextQuestion();
-    document.getElementById('fb-ai-messages').scrollTop = document.getElementById('fb-ai-messages').scrollHeight;
-  }
-
-  document.getElementById('fb-ai-toggle').addEventListener('click', ()=>{
-    document.getElementById('fb-ai-window').style.display = 'flex';
-    document.getElementById('fb-ai-toggle').style.display = 'none';
-    if(!fbAiStarted){
-      fbAiStarted = true;
-      fbAiAddMsg("Bonjour ! Je suis votre Assistant IA Formation. Je vais vous poser quelques questions pour remplir automatiquement les informations générales de votre formation — vous pourrez tout modifier ensuite manuellement.", 'bot');
-      fbAiNextQuestion();
-    }
-  });
-  document.getElementById('fb-ai-close').addEventListener('click', ()=>{
-    document.getElementById('fb-ai-window').style.display = 'none';
-    document.getElementById('fb-ai-toggle').style.display = '';
-  });
-  function fbAiSend(){
-    const input = document.getElementById('fb-ai-input');
-    const text = input.value.trim();
-    if(!text) return;
-    input.value = '';
-    window.fbAiResetMicBeforeSend && window.fbAiResetMicBeforeSend();
-    fbAiHandleUserMessage(text);
-  }
-  document.getElementById('fb-ai-send').addEventListener('click', fbAiSend);
-  document.getElementById('fb-ai-input').addEventListener('keydown', (e)=>{ if(e.key==='Enter') fbAiSend(); });
-
-  // Visualisation en temps réel : dès que le texte tapé/dicté correspond à un motif reconnu,
-  // les champs se remplissent sous les yeux de l'utilisateur, sans attendre l'envoi du message.
-  let fbAiLiveTimer = null;
-  document.getElementById('fb-ai-input').addEventListener('input', (e) => {
-    clearTimeout(fbAiLiveTimer);
-    fbAiLiveTimer = setTimeout(() => { fbAiExtract(e.target.value); }, 500);
-  });
-
-  // ── Commande vocale : reconnaissance vocale native du navigateur (gratuite, aucune clé API) ──
-  (function fbAiInitMic(){
-    const micBtn = document.getElementById('fb-ai-mic');
-    const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if(!SpeechRecognitionAPI){
-      micBtn.style.display = 'none'; // navigateur non compatible (ex: Firefox) : on masque simplement le bouton
-      return;
-    }
-    const recognition = new SpeechRecognitionAPI();
-    recognition.lang = 'fr-FR';
-    recognition.interimResults = true;
-    recognition.continuous = true; // ne pas couper à la première pause : l'utilisateur décide quand il a fini
-    let listening = false;
-    let stoppedManually = false;
-    let finalTranscript = '';
-
-    recognition.addEventListener('result', (e) => {
-      let interim = '';
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        if (e.results[i].isFinal) finalTranscript += e.results[i][0].transcript;
-        else interim += e.results[i][0].transcript;
-      }
-      document.getElementById('fb-ai-input').value = (finalTranscript + ' ' + interim).trim();
-    });
-    // Certains navigateurs déclenchent 'end' après un court silence même en mode continu :
-    // on relance automatiquement tant que l'utilisateur n'a pas cliqué sur le micro pour arrêter.
-    recognition.addEventListener('end', () => {
-      if (!stoppedManually) {
-        try { recognition.start(); return; } catch(_) {}
-      }
-      listening = false;
-      micBtn.classList.remove('recording');
-    });
-    recognition.addEventListener('error', (e) => {
-      if (e.error === 'no-speech' || e.error === 'aborted') return; // on laisse 'end' gérer le redémarrage
-      listening = false;
-      stoppedManually = true;
-      micBtn.classList.remove('recording');
-    });
-
-    micBtn.addEventListener('click', () => {
-      if (listening) {
-        stoppedManually = true;
-        recognition.stop();
-        return;
-      }
-      listening = true;
-      stoppedManually = false;
-      finalTranscript = '';
-      micBtn.classList.add('recording');
-      document.getElementById('fb-ai-input').value = '';
-      try { recognition.start(); } catch(_) { listening = false; micBtn.classList.remove('recording'); }
-    });
-
-    // Appelé avant l'envoi d'un message : si le micro écoutait encore, on l'arrête et on
-    // vide la transcription en mémoire pour que la prochaine dictée reparte de zéro
-    // (sans quoi la phrase précédente réapparaissait au début de la suivante).
-    window.fbAiResetMicBeforeSend = () => {
-      finalTranscript = '';
-      if (listening) { stoppedManually = true; recognition.stop(); }
-    };
-  })();
+  // (L'ancien « Assistant IA Formation » à motifs a été remplacé par Koffi, l'assistant de création : assets/koffi-createur.js.)
 
   let fbAutosaveTimer = null;
   function fbScheduleAutosave(){
@@ -2042,8 +1741,8 @@
       const titre = 'Nouvelle formation';
       const { id } = await api('POST', '/formations', { titre, mode_acces: 'payant' });
       await openFormationBuilder(id, titre, 'brouillon');
-      document.getElementById('fb-ai-toggle').click(); // ouvre directement l'assistant IA, prêt à décrire la formation
-      document.getElementById('new-form-titre').focus();
+      if(window.KoffiCreateur) KoffiCreateur.ouvrir('Je veux créer une formation sur '); // ouvre directement Koffi, prêt à décrire la formation
+
     } catch(e){ showMsg(e.message||'Erreur.', 'danger'); }
   });
 
@@ -2537,7 +2236,6 @@
     document.getElementById('fb-autosave-status').textContent = '';
     document.getElementById('volet-espace-formateur').style.display = 'none';
     document.getElementById('fb-view').style.display = 'block';
-    document.getElementById('fb-ai-toggle').style.display = '';
     await fbPopulateInfosFromServer();
     fbSwitchTab('infos');
   }
@@ -2638,9 +2336,16 @@
   document.getElementById('fb-back').addEventListener('click', ()=>{
     document.getElementById('fb-view').style.display = 'none';
     document.getElementById('volet-espace-formateur').style.display = '';
-    document.getElementById('fb-ai-toggle').style.display = 'none';
-    document.getElementById('fb-ai-window').style.display = 'none';
     loadMesFormations();
+  });
+  /* Koffi, assistant de création (2026-10-31) : visible tant que l'éditeur est ouvert ; après une mission appliquée, on recharge modules et cartes pour que le résultat apparaisse sans rafraîchir la page. */
+  if(window.KoffiCreateur) KoffiCreateur.monter({
+    formationId: ()=> fbFormationId,
+    visible: ()=>{ const v = document.getElementById('fb-view'); return !!(v && v.style.display === 'block' && fbFormationId); },
+    apresMission: (a)=>{
+      if(a && a.type === 'renseigner_infos'){ try { fbPopulateInfosFromServer(); fbSwitchTab('infos'); } catch(e){} } /* les champs se remplissent sous les yeux du formateur */
+      try { fbLoadModules(); } catch(e){} try { fbLoadCartes(); } catch(e){}
+    }
   });
   function fbSwitchTab(tab){
     document.querySelectorAll('.fb-tab').forEach(b=>b.classList.toggle('active', b.dataset.tab===tab));
