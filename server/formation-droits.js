@@ -356,7 +356,10 @@ module.exports.register = function register(deps) {
     const lim = SEC.rateLimit(`formation-offre:${SEC.clientIp(req)}`, 200, 600000);
     if (!lim.allowed) return sendJSON(res, 429, { error: `Trop de requêtes. Réessayez dans ${lim.retryAfter}s.` });
     const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
-    if (!f || f.statut !== "publiee") return sendJSON(res, 404, { error: "Formation introuvable ou non publiée." });
+    /* Un brouillon se relit comme une fiche pour son propriétaire et l'administration (jamais pour un autre compte) ; l'obtention reste refusée tant qu'il n'est pas publié. */
+    const lecteur = f && f.statut !== "publiee" ? await getCurrentUser(req) : null;
+    const apercuProprietaire = !!(lecteur && f.statut === "brouillon" && (Number(lecteur.id) === Number(f.owner_user_id) || lecteur.role === "administrateur"));
+    if (!f || (f.statut !== "publiee" && !apercuProprietaire)) return sendJSON(res, 404, { error: "Formation introuvable ou non publiée." });
     const modules = await db.prepare("SELECT id, titre, description, ordre, prix, vendable_seul FROM formation_modules WHERE formation_id=? ORDER BY ordre ASC, id ASC").all(f.id);
     const stats = await db.prepare("SELECT l.module_id, COUNT(*) AS nb, COALESCE(SUM(l.duree_minutes),0) AS minutes FROM formation_lecons l JOIN formation_modules m ON m.id=l.module_id WHERE m.formation_id=? GROUP BY l.module_id").all(f.id);
     const parModule = {}; stats.forEach(s => { parModule[Number(s.module_id)] = s; });

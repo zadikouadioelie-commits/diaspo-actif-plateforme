@@ -17486,14 +17486,19 @@ route("PATCH", "/api/formations/suivi/:id", async (req, res, params, body) => {
 });
 
 route("GET", "/api/formations", async (req, res, params, body, query) => {
+  /* Le catalogue ne montre que les formations publiées ; son propriétaire (et l'administration) voit en plus ses brouillons, marqués comme tels,
+     pour pouvoir les relire comme un apprenant. Personne d'autre ne les voit. */
+  const visiteur = await getCurrentUser(req);
+  const brouillons = !visiteur ? "" : visiteur.role === 'administrateur' ? " OR COALESCE(f.statut,'publiee') = 'brouillon'" : " OR (f.statut = 'brouillon' AND f.owner_user_id = ?)";
+  const args = visiteur && visiteur.role !== 'administrateur' ? [visiteur.id] : [];
   let rows = await db.prepare(`
     SELECT f.*, u.nom AS auteur_nom,
       (SELECT COUNT(*) FROM formation_lecons l JOIN formation_modules m ON m.id=l.module_id WHERE m.formation_id=f.id AND l.apercu_gratuit=1 AND l.type<>'quiz') AS nb_apercu
     FROM formations f
     LEFT JOIN users u ON u.id = f.owner_user_id
-    WHERE COALESCE(f.statut,'publiee') = 'publiee'
+    WHERE COALESCE(f.statut,'publiee') = 'publiee'${brouillons}
     ORDER BY f.created_at DESC
-  `).all();
+  `).all(...args);
   if (query.domaine) rows = rows.filter(r => r.domaine === query.domaine);
   if (query.categorie) rows = rows.filter(r => r.categorie === query.categorie);
   if (query.type) rows = rows.filter(r => r.type_formation === query.type);

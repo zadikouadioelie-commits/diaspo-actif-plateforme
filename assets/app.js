@@ -5933,7 +5933,8 @@ async function initFormations() {
     else if (f.video_intro) media = `<div class="cat-media cat-media-video"><video src="${E(f.video_intro)}" muted loop playsinline preload="metadata" onmouseover="this.play().catch(()=>{})" onmouseout="this.pause()"></video></div>`;
     else media = `<div class="cat-media cat-media-vide"><span>${E((f.domaine || f.type_formation || "F").charAt(0))}</span></div>`;
     const gratuitBadge = f.gratuit || f.mode_acces === "gratuit" || !(Number(f.prix_final ?? f.prix) > 0);
-    const badges = [gratuitBadge ? `<span class="cat-badge cat-badge-gratuit">🎁 Gratuit</span>` : "", f.populaire ? `<span class="cat-badge cat-badge-pop">★ Populaire</span>` : "", BADGES[f.badge] ? `<span class="cat-badge">${BADGES[f.badge]}</span>` : ""].join("");
+    const enBrouillon = f.statut && f.statut !== "publiee";
+    const badges = [enBrouillon ? `<span class="cat-badge" style="background:#111827;color:#fde68a;">🔒 Brouillon · visible par vous seul</span>` : "", gratuitBadge ? `<span class="cat-badge cat-badge-gratuit">🎁 Gratuit</span>` : "", f.populaire ? `<span class="cat-badge cat-badge-pop">★ Populaire</span>` : "", BADGES[f.badge] ? `<span class="cat-badge">${BADGES[f.badge]}</span>` : ""].join("");
     const gratuit = f.gratuit || f.mode_acces === "gratuit" || !(Number(f.prix_final ?? f.prix) > 0);
     let blocPrix;
     if (gratuit) blocPrix = `<span class="cat-prix cat-prix-gratuit">Gratuit</span>`;
@@ -5963,7 +5964,7 @@ async function initFormations() {
           <div class="cat-prixbloc">${blocPrix}</div>
           <a class="cat-btn" href="${lien}">Accéder à la formation</a>
         </div>
-        ${f.nb_apercu > 0 ? `<a class="cat-apercu" href="suivre-formation.html?id=${f.id}&decouverte=1">🎁 Aperçu gratuit (${f.nb_apercu} leçon${f.nb_apercu > 1 ? "s" : ""})</a>` : ""}
+        ${f.nb_apercu > 0 && !enBrouillon ? `<a class="cat-apercu" href="suivre-formation.html?id=${f.id}&decouverte=1">🎁 Aperçu gratuit (${f.nb_apercu} leçon${f.nb_apercu > 1 ? "s" : ""})</a>` : ""}
       </div>
     </article>`;
   }

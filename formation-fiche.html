@@ -141,7 +141,9 @@ function ffRender(){
   }).join('');
 
   document.title = 'FORMATION DIASPORA — ' + f.titre;
+  const brouillon = f.statut && f.statut !== 'publiee';
   document.getElementById('ff-root').innerHTML = `
+    ${brouillon ? '<div class="ff-card" style="background:#111827;color:#fde68a;border:1px solid #f59e0b;margin-bottom:14px;">🔒 <strong>Brouillon — visible par vous seul.</strong> Voici la fiche telle que l\'apprenant la verra. Personne d\'autre ne peut ouvrir cette formation tant qu\'elle n\'est pas publiée.</div>' : ''}
     <div class="ff-hero">
       ${image ? `<img src="${esc(image)}" alt="">` : ''}
       <div class="ff-hero-txt">
@@ -179,6 +181,7 @@ function ffRender(){
           ${!o.formation.gratuite && !(MT && MT.gratuit) && !complet && !enAttente ? `<div class="ff-code"><input id="ff-code" type="text" maxlength="30" placeholder="Code de réduction" autocomplete="off" value="${COUPON ? esc(COUPON.code) : ''}"><button type="button" id="ff-code-ok">Appliquer</button></div><div class="ff-code-msg" id="ff-code-msg" role="status"></div>` : ''}
           ${complet ? `<a class="ff-btn" href="suivre-formation.html?id=${encodeURIComponent(f.id)}">Accéder à ma formation →</a>`
             : enAttente ? '<button type="button" class="ff-btn" id="ff-reprendre">Finaliser mon paiement</button>'
+            : brouillon ? `<a class="ff-btn" href="suivre-formation.html?id=${encodeURIComponent(f.id)}">Relire le parcours (aperçu)</a>`
             : `<button type="button" class="ff-btn" id="ff-complete">${o.formation.gratuite || (MT && MT.gratuit) ? 'Accéder gratuitement' : 'Obtenir la formation complète'}</button>`}
           ${o.modules.some(m => m.vendable_seul) && !complet ? '<p class="ff-aide">Vous pouvez aussi obtenir un seul module : choisissez-le dans la liste ci-contre. Vous n\'aurez accès qu\'au module obtenu.</p>' : ''}
           ${!o.formation.gratuite && !(MT && MT.gratuit) ? '<p class="ff-aide">🔒 Paiement sécurisé par Stripe. Votre accès s\'ouvre dès que le paiement est confirmé.</p>' + FormationConsent.mention() : ''}
