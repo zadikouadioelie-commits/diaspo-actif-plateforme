@@ -26,3 +26,6 @@ Personnes qui en ont profité (comptées une fois), accès gratuits ouverts, ré
 
 ## Mise en ligne
 Nouvelle table `formation_regles_membres` : après le déploiement, lancer `reparerSchema()` sur Neon (avec la colonne `formation_coupons.type_code` des codes générés). Tests : `node --test tests/formation-regles-membres.test.js`.
+
+## Points de fiabilité (2026-10-31)
+Tout compte qui crée des réductions pour les membres de l'initiative officielle Diaspo'Actif (gratuité ou pourcentage, sur une formation ou sur toutes) gagne des points dans l'indice de fiabilité (`computeTrustScore`, critère `reductions_membres`) : **+2 dès la première réduction, +1 à la 5ᵉ, +2 à la 15ᵉ** (5 points au total). Une réduction visant une autre initiative ne compte pas. Les points suivent l'état réel : supprimer une règle peut faire redescendre sous un palier. Le total disponible reste **exactement 100** (membre et structure) : les 5 points sont pris sur identité (−1), profil public (−1), ancienneté (−1), rencontre (−1) et signalements (−1). Test : `tests/formation-fiabilite-reductions.test.js`.

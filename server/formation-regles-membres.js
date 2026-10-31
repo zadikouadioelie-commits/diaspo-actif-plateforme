@@ -157,6 +157,8 @@ module.exports.register = function register(deps) {
     return rows.map(r => ({ id: Number(r.id), initiative_id: Number(r.initiative_id), initiative_nom: r.initiative_nom, initiative_logo: r.initiative_logo || null, mode: r.mode, reduction_pct: Number(r.reduction_pct) || 0,
       actif: !!Number(r.actif), formation_cle: Number(r.formation_cle), texte: M.libelle(r), stats: stats.get(Number(r.id)) }));
   }
+  /* Le score de fiabilité compte les réductions créées pour les membres Diaspo'Actif : on invalide son cache pour que les points apparaissent aussitôt. */
+  const rafraichirScore = async ownerId => { try { await db.prepare("DELETE FROM trust_cache WHERE user_id=?").run(Number(ownerId)); } catch (_) { /* cache absent */ } };
   async function creer(res, ownerId, cle, body) {
     const b = body || {};
     const mode = b.mode === "gratuit" ? "gratuit" : "pourcentage";
@@ -178,12 +180,14 @@ module.exports.register = function register(deps) {
     const existante = await db.prepare("SELECT id FROM formation_regles_membres WHERE owner_user_id=? AND formation_cle=? AND initiative_id=?").get(Number(ownerId), Number(cle), initiativeId);
     if (existante) {
       await db.prepare("UPDATE formation_regles_membres SET mode=?, reduction_pct=?, actif=1 WHERE id=?").run(mode, pct, existante.id);
+      await rafraichirScore(ownerId);
       return sendJSON(res, 200, { id: Number(existante.id), mis_a_jour: true });
     }
     const n = await db.prepare("SELECT COUNT(*) AS n FROM formation_regles_membres WHERE owner_user_id=? AND formation_cle=?").get(Number(ownerId), Number(cle));
     if (Number(n && n.n) >= M.REGLES_MAX) return sendJSON(res, 400, { error: `Vous pouvez avoir ${M.REGLES_MAX} règles au plus ici. Supprimez-en une.` });
     try {
       const id = (await db.prepare("INSERT INTO formation_regles_membres (owner_user_id, formation_cle, initiative_id, mode, reduction_pct) VALUES (?,?,?,?,?)").run(Number(ownerId), Number(cle), initiativeId, mode, pct)).lastInsertRowid;
+      await rafraichirScore(ownerId);
       sendJSON(res, 201, { id: Number(id) });
     } catch (e) {
       if (/unique|duplicate/i.test(String(e && e.message))) return sendJSON(res, 409, { error: "Cette règle existe déjà." });
@@ -197,6 +201,7 @@ module.exports.register = function register(deps) {
   }
   async function supprimer(res, ownerId, cle, id) {
     await db.prepare("DELETE FROM formation_regles_membres WHERE id=? AND owner_user_id=? AND formation_cle=?").run(Number(id), Number(ownerId), Number(cle));
+    await rafraichirScore(ownerId);
     sendJSON(res, 200, { ok: true });
   }
 

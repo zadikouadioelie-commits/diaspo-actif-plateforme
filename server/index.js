@@ -39364,7 +39364,8 @@ ${jsonLd}
          reste 100. Le temps de connexion (15), les connexions (6) et le partage de l'événement promo (3) sont identiques partout (valeurs
          fixées par l'utilisateur). Un contrôle écrit dans le journal si une modification casse ce total. */
       const BAREME = {
-        identite: [14, 9], profil: [10, 7], anciennete: [6, 3], rayonnement: [5, 3], temoignage: [3, 2], rencontre: [7, 4], signalements: [4, 3],
+        identite: [13, 8], profil: [9, 6], anciennete: [5, 2], rayonnement: [5, 3], temoignage: [3, 2], rencontre: [6, 3], signalements: [3, 2],
+        reductions_membres: [5, 5], /* 2026-10-31 : 5 pts pris sur identité, profil, ancienneté, rencontre, signalements pour garder le total à 100 */
         publications: [8, 4], commentaires: [3, 1], reactions: [3, 1], activite_recente: [3, 2], temps_connexion: [15, 15], connexions: [6, 6],
         parrainage: [4, 3], achat: [3, 1], participation: [3, 1], partage_promo: [3, 3],
         organisation: [0, 4], immatriculation: [0, 4], infos_admin: [0, 3], evenements: [0, 5], comptes_rendus: [0, 2], vente: [0, 2],
@@ -39427,6 +39428,10 @@ ${jsonLd}
          (battements envoyés par le site et par l'application téléphone, uniquement page visible — voir POST /api/session/heartbeat). */
       const secsConnexion = await N(`SELECT COALESCE(SUM(duree_sec),0) n FROM user_sessions WHERE user_id=?`, userId);
       const nbConnexions = Number(user.nb_connexions) || 0;
+      /* Réductions créées pour les membres Diaspo'Actif (2026-10-31, demande explicite) : règles « tarif membres » visant l'initiative officielle
+         (gratuité ou pourcentage, sur une formation ou sur toutes). Lu en direct : 1ʳᵉ réduction, 5ᵉ, 15ᵉ. Voir server/formation-regles-membres.js. */
+      const initOfficielleId = await getInitiativeOfficielleId();
+      const nbReductionsMembres = initOfficielleId ? await N(`SELECT COUNT(*) n FROM formation_regles_membres WHERE owner_user_id=? AND initiative_id=?`, userId, initOfficielleId) : 0;
 
       /* ── Profil public rempli : 15 pts, PROPORTIONNELS au niveau de remplissage ──
          Même mesure que les alertes « profil incomplet » (server/completude.js) : une seule
@@ -39606,6 +39611,9 @@ ${jsonLd}
             })(),
             /* Connexions : +3 pts à la 10ᵉ, +3 pts de plus à la 20ᵉ (6 pts au total). */
             echelle('connexions', '🔑', 'Connexions au compte', nbConnexions, [[10, 3], [20, 3]], null, 6, ['connexion', 'connexions'], true, null),
+            /* Tout compte qui crée des réductions pour les membres Diaspo'Actif : +2 dès la première, +1 à la 5ᵉ, +2 à la 15ᵉ (5 pts au total). */
+            echelle('reductions_membres', '🎓', 'Réductions créées pour les membres Diaspo’Actif', nbReductionsMembres, [[1, 2], [5, 1], [15, 2]], null, P.reductions_membres, ['réduction', 'réductions'], true,
+              { texte: 'Créer une réduction pour les membres', href: 'formations.html' }),
             echelle('evenements', '📅', 'Événements publiés', nbEvenements, [[1, 2], [3, 1], [10, 2]], null, P.evenements, ['événement', 'événements'], S,
               { texte: 'Publier un événement', href: 'dashboard-initiative.html#evenements' }),
             echelle('comptes_rendus', '🧾', 'Comptes rendus d’événement', nbComptesRendus, [[1, 1], [3, 1]], null, P.comptes_rendus, ['compte rendu', 'comptes rendus'], S,
