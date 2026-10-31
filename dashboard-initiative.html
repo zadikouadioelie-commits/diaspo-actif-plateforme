@@ -77,7 +77,8 @@
       <a href="#paiement" data-section="paiement" data-aide="paiement_initiative">💳 Module paiement</a>
       <!-- Module premium « Suivi de formation » (2026-10-31, demande explicite) : UNIQUEMENT les formations suivies. La création est dans « Création de formation » juste en dessous. Doré mais jamais verrouillé : un élève doit toujours retrouver ses formations (badgeOnly). -->
       <a href="#formation-diaspora" data-section="formation-diaspora">🎓 Suivi de formation</a>
-      <a href="#formations-gestion" data-section="formations-gestion" id="sb-formations-gestion" data-aide="diaspo_formation" style="display:none;">🎓 Création de formation <span class="pill" id="formations-badge" style="display:none;"></span></a>
+      <!-- « Création de formation » = module Premium comme les autres (2026-10-31, demande explicite) : toujours présent dans ce groupe (jamais caché, y compris dans la copie « menu sur place »), doré, cadenas + invitation Premium pour un compte non Premium. L'autorisation de Diaspo'Actif reste exigée en plus (voir ouvrirCreationFormation). -->
+      <a href="#formations-gestion" data-section="formations-gestion" id="sb-formations-gestion" data-aide="diaspo_formation">🎓 Création de formation <span class="pill" id="formations-badge" style="display:none;"></span></a>
       <a href="#publicites-init" data-section="publicites-init" data-aide="publicites">📣 Publicités <span class="pill" id="init-pub-badge" style="display:none;"></span></a>
       <a href="#evenements" data-section="evenements" data-aide="evenements">📅 Mes événements</a>
       <!-- Module « Formulaires de réponse et d'inscription » (2026-10-07, demande explicite : « accessible en Premium et en doré »).
@@ -10900,13 +10901,33 @@ async function expansionActiverModule(slug) {
 async function ouvrirCreationFormation() {
   const acces = document.getElementById('fc-acces'), corps = document.getElementById('fc-corps'), nouvelle = document.getElementById('fc-btn-nouvelle');
   if (!acces || !corps) return;
-  let autorise = true;
-  try { autorise = !!(await api('GET', '/formateur/demande')).peut_creer; } catch(_) {}
+  let autorise = true, source = null;
+  try { const e = await api('GET', '/formateur/demande'); autorise = !!e.peut_creer; source = e.source || null; } catch(_) {}
+  /* Mêmes conditions que les autres modules Premium : sans Premium actif, carte verrouillée + invitation (sauf formateur invité par Diaspo'Actif, que le serveur laisse créer sans Premium). */
+  let premium = window._daPremiumInitiative;
+  if (premium === undefined) {
+    try { premium = ((await api('GET', '/accreditations/mes')).accreditations || []).some(a => a.type === 'initiative_abonne' && a.statut === 'active'); } catch(_) { premium = true; }
+  }
+  if (!premium && source !== 'invite' && !window.daBypassActive?.('espace_formateur')) {
+    acces.innerHTML = premiumLockedCardHtml('espace_formateur');
+    acces.style.display = ''; corps.style.display = 'none';
+    if (nouvelle) nouvelle.style.display = 'none';
+    return;
+  }
   acces.style.display = autorise ? 'none' : '';
   corps.style.display = autorise ? '' : 'none';
   if (nouvelle) nouvelle.style.display = autorise ? '' : 'none';
   if (autorise) loadMesFormations();
   else if (window.FormationDiaspora) FormationDiaspora.monterAccesFormateur(acces, { onAutorise: ouvrirCreationFormation });
+}
+
+/* Retire le cadenas et l'interception Premium du lien « Création de formation » (formateur invité) ; sans effet tant que le lien n'est pas verrouillé. */
+function deverrouillerLienFormateur() {
+  const sb = document.getElementById('sb-formations-gestion');
+  if (!sb) return;
+  delete sb.dataset.premiumContext;
+  const t = Array.from(sb.childNodes).find(n => n.nodeType === 3 && n.textContent.includes('🔒'));
+  if (t) t.textContent = t.textContent.replace('🔒 ', '');
 }
 
 async function initFormationsSidebar() {
@@ -10915,6 +10936,9 @@ async function initFormationsSidebar() {
     const sb = document.getElementById('sb-formations-gestion');
     if (sb) sb.style.display = '';
     const etat = await api('GET', '/formateur/demande');
+    /* Formateur invité par Diaspo'Actif : le serveur le laisse créer sans Premium, donc pas de cadenas sur son lien. */
+    window._daFormateurInvite = etat.source === 'invite';
+    if (window._daFormateurInvite) deverrouillerLienFormateur();
     if (etat.peut_creer) loadMesFormations();
   } catch(_) {}
 }
@@ -11141,7 +11165,7 @@ const PREMIUM_UPSELL_CONTEXTS = {
   business_plans: { title:'Débloquez les Business Plans', intro:"Le module Business Plans complet est réservé aux comptes Premium." },
   paiement_boutique: { title:'Activez les paiements réels', intro:"Les paiements réels de votre boutique (Stripe Connect) sont réservés aux comptes Premium." },
   paiement_billetterie: { title:'Activez le module de paiement', intro:"Le module de paiement billetterie & cotisations est réservé aux comptes Premium." },
-  espace_formateur: { title:'Devenez créateur de formations', intro:"L'Espace Formateur (créer et vendre vos propres formations) est réservé aux comptes Premium." },
+  espace_formateur: { title:'Devenez créateur de formations', intro:"Le module Création de formation (créer et vendre vos propres formations) est réservé aux comptes Premium, avec l'autorisation de Diaspo'Actif." },
   adhesions: { title:'Gérez cotisations & adhésions', intro:"Le module Cotisations & Adhésions est réservé aux comptes Premium." },
   cagnottes: { title:'Lancez vos cagnottes', intro:"La création et la gestion de cagnottes sont réservées aux comptes Premium." },
   votes: { title:'Organisez des votes sécurisés', intro:"Le module Votes sécurisés est réservé aux comptes Premium." },
@@ -11239,7 +11263,8 @@ async function initPremiumGates() {
     { href: '#paiement', context: 'paiement_boutique' },
     { href: '#cagnottes', context: 'cagnottes', intercept: true },
     { href: '#formation-diaspora', context: 'formation_diaspora', badgeOnly: true },
-    { href: '#formations-gestion', context: 'espace_formateur', badgeOnly: true },
+    /* Création de formation : verrouillage Premium réel (le serveur exige aussi Premium, POST /api/formations → 402), comme CRM ou Publicités. */
+    { href: '#formations-gestion', context: 'espace_formateur', intercept: true },
     { href: '#publicites-init', context: 'publicites' },
     { href: '#evenements', context: 'evenements' },
     { href: 'business-plan.html', context: 'business_plans', intercept: true },
@@ -11325,6 +11350,7 @@ async function initPremiumGates() {
       if (intercept) link.dataset.premiumContext = context;
     }
   });
+  if (window._daFormateurInvite) deverrouillerLienFormateur();
   /* « Cotisations & Adhésions » et « Votes sécurisés » n'existent pour aucune colonne du
      type Entreprise (ni socle, ni premium) — masqués entièrement plutôt que dorés, à défaut
      d'être déjà couverts par la liste par type ci-dessus OU par le module Expansion (voir
