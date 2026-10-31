@@ -190,6 +190,7 @@ module.exports.register = function register(deps) {
   const F = module.exports;
   const estAdmin = u => u && u.role === "administrateur";
   require("./formation-regles-membres").register(deps); /* tarifs réservés aux membres d'une initiative (2026-10-31) */
+  require("./formation-recap-module").register(deps); /* récapitulatif PDF et carte mentale de fin de module (2026-10-31) */
 
   /* Un coupon : champs validés (pourcentage ou montant fixe, dates, limites). Renvoie { err } ou { v }. */
   function lireCoupon(body) {

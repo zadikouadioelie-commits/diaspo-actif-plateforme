@@ -354,6 +354,14 @@ function construire() {
   }
   btn('t-replier', '⊟ Replier / déplier', replier, 'Espace');
   sep(); btn('t-moins', '−', () => zoomer(0.8), 'Zoom arrière'); btn('t-plus', '+', () => zoomer(1.25), 'Zoom avant'); btn('t-fit', '⤢ Tout afficher', ajuster);
+  if (!edition) btn('t-copier', '📥 Copier dans mes cartes', async () => {
+    try {
+      const r = await fetch('/api/cartes-mentales/' + encodeURIComponent(carte.id) + '/copier', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || 'Copie impossible.');
+      location.href = 'carte-mentale.html?id=' + d.id;
+    } catch (e) { alert(e.message); }
+  }, 'Crée une copie que vous pouvez modifier et compléter');
   if (formation) { const s = document.createElement('span'); s.style.cssText = 'margin-left:auto;font-size:12px;color:#64748b'; s.textContent = 'Formation : ' + formation.titre; outils.appendChild(s); }
   document.getElementById('b-png').addEventListener('click', exporterPNG);
   document.getElementById('b-pdf').addEventListener('click', imprimer);

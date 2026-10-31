@@ -611,6 +611,8 @@
     outlineSeen = String(id);
     const f = d.formation, items = flat(d), apercu = d.mode === 'apercu';
     const mode = modeSuivi(d), libre = mode === 'aucun';
+    /* Fin de module (options du créateur) : récapitulatif PDF et carte mentale. Sans eux, l'écran reste inchangé. */
+    let fin = null; try { fin = await api('/api/formations/' + encodeURIComponent(id) + '/fin-de-module'); } catch (e) { /* option absente ou accès refusé */ }
     const pc = d.parcours || {};
     const nbTot = pc.nb_total != null ? pc.nb_total : items.length;
     const done = pc.nb_termine != null ? pc.nb_termine : items.filter(x => x.l.termine).length;
@@ -655,12 +657,32 @@
             ${st && !apercu && !libre ? `<div class="bar" style="margin:0 6px 8px" role="progressbar" aria-valuenow="${st.pct}" aria-valuemin="0" aria-valuemax="100" aria-label="Progression du chapitre ${esc(c.titre || '')}"><i style="width:${st.pct}%"></i></div>` : ''}
             <div class="lst" style="margin-bottom:12px">${c.lecons.map(l => `<a class="fm-les ${!libre && faite(id, l) ? 'done' : ''}" href="#/formations/${esc(id)}/l${esc(l.id)}"><span class="fm-ck" aria-hidden="true">${!libre && faite(id, l) ? ic('check', 's') : ''}</span><span class="sp"><span class="t">${l.quiz ? (l.quiz.en_attente ? '⏳ ' : '📝 ') : ''}${esc(l.titre)}</span><br><span class="d">${esc(lessonSub(l))}${!libre && l.obligatoire === false ? ' · facultative' : ''}${libre ? '' : (Object.prototype.hasOwnProperty.call(pendDe(id), l.id) ? ' · à enregistrer' : l.termine ? ' · terminée' : '')}${!libre && !l.termine && l.quiz && l.quiz.en_attente ? ' · en attente de correction' : ''}</span></span><span class="ch" style="color:#94a3b8">${ic('chev', 's')}</span></a>`).join('')}</div>`;
         });
+        html += finModuleHtml(fin, m, id);
       });
     }
     html += `<a class="btn out block" href="#/formations/${esc(id)}">Fiche de la formation</a>`;
     setPane(f.titre, html);
+    brancherFin(id);
     brancherEnregistrer(id, () => screenSuivre(++seq, id));
     monterKoffi(id, null);
+  }
+
+  /* ── Fin de module : récapitulatif PDF et carte mentale ── */
+  function finModuleHtml(fin, m, id) {
+    const x = fin && (fin.carte || fin.recap) ? (fin.modules || []).find(k => Number(k.id) === Number(m.id)) : null;
+    if (!x) return '';
+    if (!x.disponible) return `<div class="small muted" style="margin:0 6px 14px">🔒 Terminez ce module pour obtenir ${fin.recap && fin.carte ? 'votre récapitulatif et votre carte mentale' : fin.recap ? 'votre récapitulatif' : 'votre carte mentale'}.</div>`;
+    return `<div class="card" style="margin-bottom:14px"><div class="pad"><b>🎓 ${x.apercu ? 'Fin de module (aperçu formateur)' : 'Module terminé : vos documents'}</b>
+      ${fin.recap ? `<a class="btn block" style="margin-top:10px" href="/api/formations/${encodeURIComponent(id)}/modules/${encodeURIComponent(m.id)}/recapitulatif.pdf" target="_blank" rel="noopener">Récapitulatif (PDF)</a>` : ''}
+      ${fin.carte ? `<button type="button" class="btn out block fm-fin-carte" style="margin-top:8px" data-module="${esc(m.id)}">Carte mentale</button>` : ''}</div></div>`;
+  }
+  function brancherFin(id) {
+    document.querySelectorAll('.fm-fin-carte').forEach(b => b.addEventListener('click', async () => {
+      const w = window.open('', '_blank'); b.disabled = true;
+      try { const r = await api('/api/formations/' + encodeURIComponent(id) + '/modules/' + encodeURIComponent(b.dataset.module) + '/carte', { method: 'POST', body: {} }); if (w) w.location.href = 'carte-mentale.html?id=' + encodeURIComponent(r.id); }
+      catch (e) { if (w) w.close(); toast(e.message, true); }
+      b.disabled = false;
+    }));
   }
 
   const noFile = msg => `<div class="card"><div class="pad muted">${esc(msg)}</div></div>`;

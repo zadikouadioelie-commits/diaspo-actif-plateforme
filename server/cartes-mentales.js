@@ -180,6 +180,23 @@ module.exports.register = function register({ route, db, sendJSON, getCurrentUse
     sendJSON(res, 200, { ok: true, nb_noeuds: nettoye.nb_noeuds, data: nettoye.arbre });
   });
 
+  /* POST /api/cartes-mentales/:id/copier — une copie personnelle (modifiable) d'une carte que le compte peut lire (carte d'un module, d'une formation…). */
+  route("POST", "/api/cartes-mentales/:id/copier", async (req, res, params) => {
+    const user = await getCurrentUser(req);
+    if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+    const limite = SEC.rateLimit(`carte-creer:${user.id}`, 30, 3600000);
+    if (!limite.allowed) return sendJSON(res, 429, { error: `Trop de créations. Réessayez dans ${limite.retryAfter}s.` });
+    const c = await db.prepare("SELECT * FROM cartes_mentales WHERE id=?").get(params.id);
+    if (!c || !(await droits(db, c, user)).lecture) return sendJSON(res, 404, { error: "Carte introuvable." });
+    const n = (await db.prepare("SELECT COUNT(*) AS n FROM cartes_mentales WHERE owner_user_id=?").get(user.id))?.n || 0;
+    if (Number(n) >= MAX_CARTES_PAR_COMPTE) return sendJSON(res, 400, { error: `Vous avez atteint la limite de ${MAX_CARTES_PAR_COMPTE} cartes : supprimez-en une pour en créer une nouvelle.` });
+    let data; try { data = JSON.parse(c.data_json); } catch (_) { return sendJSON(res, 400, { error: "Carte illisible." }); }
+    const { arbre, nb_noeuds } = nettoyerArbre(data);
+    const titre = propre(`${c.titre} (ma copie)`, 120);
+    const id = (await db.prepare("INSERT INTO cartes_mentales (owner_user_id, formation_id, titre, data_json, nb_noeuds) VALUES (?,?,?,?,?)").run(user.id, null, titre, JSON.stringify(arbre), nb_noeuds)).lastInsertRowid;
+    sendJSON(res, 201, { id: Number(id) });
+  });
+
   route("DELETE", "/api/cartes-mentales/:id", async (req, res, params) => {
     const user = await getCurrentUser(req);
     if (!user) return sendJSON(res, 401, { error: "Connexion requise." });

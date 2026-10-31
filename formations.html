@@ -727,6 +727,17 @@
             <div id="fb-suivi-note" style="font-size:12px;color:var(--muted);margin-top:6px;line-height:1.5;"></div>
             <button class="btn btn-orange btn-sm" id="fb-save-suivi" style="margin-top:10px;">💾 Enregistrer le mode de suivi</button>
           </div>
+          <div class="card" style="margin-bottom:16px;">
+            <h3 style="margin:0 0 6px;">🗺️ Fin de module <span class="fb-help" title="Deux documents créés automatiquement pour chaque module, sans rien rédiger : ils reprennent les titres, vos blocs « À retenir » et vos « Exercice ». L'apprenant les reçoit quand il a terminé le module.">?</span></h3>
+            <label class="fb-switch" style="font-size:13.5px;font-weight:700;margin:6px 0;"><input type="checkbox" id="fb-opt-carte"><span class="fb-switch-track"></span> Carte mentale à la fin de chaque module</label>
+            <label class="fb-switch" style="font-size:13.5px;font-weight:700;margin:6px 0;"><input type="checkbox" id="fb-opt-recap"><span class="fb-switch-track"></span> Récapitulatif téléchargeable (PDF) à la fin de chaque module</label>
+            <p style="font-size:12px;color:var(--muted);margin:8px 0 0;line-height:1.5;">Le contenu est fabriqué à partir de votre plan. Pour qu'une leçon alimente le récapitulatif, donnez à un bloc le titre <strong>« À retenir »</strong> (points clés) et à un autre <strong>« Exercice »</strong> (mise en pratique). Sans ces blocs, seuls les titres apparaissent. Réglage modifiable à tout moment, même une fois la formation publiée.</p>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;">
+              <select id="fb-opt-module" class="input-field" style="flex:1;min-width:180px;"></select>
+              <button type="button" class="btn btn-outline btn-sm" id="fb-opt-voir-recap">👁 Voir le récapitulatif (aperçu)</button>
+              <button type="button" class="btn btn-outline btn-sm" id="fb-opt-voir-carte">👁 Voir la carte (aperçu)</button>
+            </div>
+          </div>
           <div class="card">
             <label class="fb-switch" style="font-size:14px;font-weight:700;margin-bottom:14px;">
               <input type="checkbox" id="fb-cert-actif"><span class="fb-switch-track"></span> Délivrer un document à la fin de cette formation
@@ -3343,8 +3354,36 @@
       document.getElementById('fb-cert-qr').checked = formation.certificat_qr !== 0;
       document.getElementById('fb-suivi-mode').value = ['auto','manuel','aucun'].includes(formation.suivi_mode) ? formation.suivi_mode : 'auto';
       fbMajNoteSuivi();
+      /* Fin de module : options et aperçu */
+      document.getElementById('fb-opt-carte').checked = Number(formation.carte_module) === 1;
+      document.getElementById('fb-opt-recap').checked = Number(formation.recap_module) === 1;
+      try {
+        const { modules } = await api('GET', `/formations/${fbFormationId}/modules`);
+        document.getElementById('fb-opt-module').innerHTML = (modules || []).map(m => `<option value="${m.id}">${escQ(m.titre)}</option>`).join('') || '<option value="">Aucun module</option>';
+      } catch(_) {}
     } catch(e){}
   }
+  async function fbEnregistrerOptionsFin(){
+    try {
+      const r = await api('PUT', `/formations/${fbFormationId}/reglages`, { carte_module: document.getElementById('fb-opt-carte').checked, recap_module: document.getElementById('fb-opt-recap').checked });
+      showMsg('Options de fin de module enregistrées.', 'success'); return r;
+    } catch(e){ showMsg(e.message||'Erreur.', 'danger'); }
+  }
+  document.getElementById('fb-opt-carte').addEventListener('change', fbEnregistrerOptionsFin);
+  document.getElementById('fb-opt-recap').addEventListener('change', fbEnregistrerOptionsFin);
+  document.getElementById('fb-opt-voir-recap').addEventListener('click', () => {
+    const m = document.getElementById('fb-opt-module').value;
+    if (!document.getElementById('fb-opt-recap').checked) { showMsg('Cochez d\'abord « Récapitulatif téléchargeable ».', 'danger'); return; }
+    if (m) window.open(`/api/formations/${fbFormationId}/modules/${m}/recapitulatif.pdf`, '_blank');
+  });
+  document.getElementById('fb-opt-voir-carte').addEventListener('click', async () => {
+    const m = document.getElementById('fb-opt-module').value;
+    if (!document.getElementById('fb-opt-carte').checked) { showMsg('Cochez d\'abord « Carte mentale ».', 'danger'); return; }
+    if (!m) return;
+    const w = window.open('', '_blank');
+    try { const { id } = await api('POST', `/formations/${fbFormationId}/modules/${m}/carte`, {}); w.location.href = 'carte-mentale.html?id=' + id; }
+    catch(e){ if (w) w.close(); showMsg(e.message||'Erreur.', 'danger'); }
+  });
   const FB_NOTES_TYPE_DOC = {
     participation: 'Délivrée dès que l\'apprenant a terminé au moins une activité. Elle atteste uniquement de sa participation.',
     suivi: 'Délivrée quand l\'apprenant a terminé toutes les activités obligatoires. Elle atteste qu\'il a suivi le parcours, sans évaluer ses acquis.',

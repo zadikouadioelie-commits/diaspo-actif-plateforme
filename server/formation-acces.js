@@ -101,6 +101,14 @@ module.exports.register = function register(deps) {
     if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
     if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
     if (!(await exiger(user, res, "formations"))) return;
+    /* Fin de module (2026-10-31) : deux options cochables par tout créateur, modifiables à tout moment — une carte mentale et un récapitulatif PDF générés automatiquement. */
+    if (body && (body.carte_module !== undefined || body.recap_module !== undefined) && body.suivi_mode === undefined && body.duree_acces_jours === undefined) {
+      const sets = [], vals = [];
+      for (const k of ["carte_module", "recap_module"]) if (body[k] !== undefined) { sets.push(`${k}=?`); vals.push(body[k] === true || body[k] === 1 || body[k] === "1" ? 1 : 0); }
+      await db.prepare(`UPDATE formations SET ${sets.join(", ")} WHERE id=?`).run(...vals, params.id);
+      const maj = await db.prepare("SELECT carte_module, recap_module FROM formations WHERE id=?").get(params.id);
+      return sendJSON(res, 200, { ok: true, carte_module: Number(maj.carte_module) || 0, recap_module: Number(maj.recap_module) || 0 });
+    }
     /* Durée d'accès des apprenants (jours ; vide = illimitée) : réglable à tout moment, elle ne s'applique qu'aux accès ouverts ensuite. */
     if (body && body.duree_acces_jours !== undefined && body.suivi_mode === undefined) {
       const brut = body.duree_acces_jours;

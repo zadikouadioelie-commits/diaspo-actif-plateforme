@@ -5021,6 +5021,9 @@ db.exec(`
   );
 `);
 ;['type_reduction TEXT DEFAULT \'pourcentage\'','montant_fixe REAL','date_debut TEXT','date_fin TEXT','max_par_utilisateur INTEGER DEFAULT 1','type_code TEXT'].forEach(col => { try { db.exec(`ALTER TABLE formation_coupons ADD COLUMN ${col}`); } catch(_) {} }); /* type_code : codes générés en un clic (2026-10-31) */
+/* Fin de module (2026-10-31) : options « carte mentale » et « récapitulatif PDF » de la formation ; carte automatique rattachée à son module. */
+;['carte_module INTEGER DEFAULT 0','recap_module INTEGER DEFAULT 0'].forEach(col => { try { db.exec(`ALTER TABLE formations ADD COLUMN ${col}`); } catch(_) {} });
+;['module_id INTEGER'].forEach(col => { try { db.exec(`ALTER TABLE cartes_mentales ADD COLUMN ${col}`); } catch(_) {} });
 ;['prix_initial REAL','remise REAL DEFAULT 0','coupon_code TEXT','coupon_source TEXT','coupon_id INTEGER','promo_pct REAL','commission_pct REAL','commission REAL','net_formateur REAL','consentement_le TEXT'].forEach(col => { try { db.exec(`ALTER TABLE formation_commandes ADD COLUMN ${col}`); } catch(_) {} });
 /* Formation Diaspora — lot C, relances programmables (2026-10-30) : règles écrites par le formateur + journal de chaque envoi (le journal sert aussi de verrou : (règle, inscription, canal, rang) est unique). */
 db.exec(`

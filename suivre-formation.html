@@ -39,6 +39,12 @@
 .sf-reprendre{width:100%;margin-top:12px;}
 .sf-module{border-bottom:1px solid var(--border);}
 .sf-module-title{padding:12px 16px;font-weight:800;font-size:13px;color:#334155;background:#f1f5f9;}
+.sf-fin{margin:10px 12px 12px;padding:12px;border-radius:12px;background:linear-gradient(145deg,#fff8e1,#fff3cd);border:1px solid #e3c06e;display:flex;flex-direction:column;gap:8px;}
+.sf-fin-t{font-weight:800;font-size:13px;color:#7a5a00;}
+.sf-fin .sf-fin-b{display:block;text-align:center;text-decoration:none;font-size:13px;font-weight:800;padding:9px 12px;border-radius:999px;cursor:pointer;background:#0d2b4e!important;color:#f3d58a!important;border:1px solid #0d2b4e!important;}
+.sf-fin .sf-fin-b:hover{filter:brightness(1.15);}
+.sf-fin-t{color:#7a5a00!important;}
+.sf-fin-verrou{font-size:12px;color:#64748b;background:#f8fafc;border:1px dashed #cbd5e1;display:block;}
 .sf-chapitre{padding:10px 16px 4px;}
 .sf-chapitre-title{display:flex;justify-content:space-between;gap:8px;font-weight:700;font-size:12px;color:#475569;text-transform:uppercase;}
 .sf-chapitre-title .done{color:#16a34a;}
@@ -218,6 +224,7 @@ const formationId = params.get('id');
 const DECOUVERTE = params.get('decouverte') === '1';   // aperçu gratuit avant inscription : plan complet, contenu des seules leçons offertes
 let SF_DATA = null;
 let SF_CURRENT_LECON = null;
+let SF_FIN = {}; // fin de module : { carte, recap, modules: { id: { termine, disponible, apercu } } }
 let SF_PENDING = {};     // mode « manuel » : leçon -> terminée ? (modifications pas encore enregistrées)
 let SF_TIMER = null;     // quiz chronométré
 let SF_ECH_SCOPE = 'lecon';
@@ -263,8 +270,42 @@ async function sfLoad(keepLeconId){
   SF_CURRENT_LECON = (demande && flat.find(l => Number(l.id) === demande))
     || (DECOUVERTE ? flat.find(l => !l.verrouille) : flat.find(l => !l.termine)) || flat[0] || null;
   sfRender();
+  sfChargerFin();
   /* Koffi (tuteur IA) : le serveur décide s'il apparaît (inscrit, ou formateur en aperçu) et ce que le compte peut en faire. Idempotent. */
   if (!DECOUVERTE) { const monterKoffi = () => window.KoffiWidget && window.KoffiWidget.monter({ formationId, leconId: () => (SF_CURRENT_LECON ? SF_CURRENT_LECON.id : null), ouvrirLecon: id => sfGoTo(id), premiumUrl: 'premium.html' }); if (window.KoffiWidget) monterKoffi(); else window.addEventListener('load', monterKoffi); }
+}
+
+/* ── Fin de module : récapitulatif PDF et carte mentale (options du créateur) ── */
+async function sfChargerFin(){
+  if (DECOUVERTE || !formationId) return;
+  try {
+    const r = await fetch(`/api/formations/${formationId}/fin-de-module`, { credentials: 'same-origin' });
+    if (!r.ok) return;
+    const d = await r.json();
+    SF_FIN = { carte: !!d.carte, recap: !!d.recap, modules: {} };
+    (d.modules || []).forEach(m => { SF_FIN.modules[m.id] = m; });
+    sfRenderSidebar();
+  } catch (_) { /* sans ces documents, la formation reste utilisable */ }
+}
+function sfFinModule(m){
+  const x = SF_FIN.modules && SF_FIN.modules[m.id];
+  if (!x || (!SF_FIN.carte && !SF_FIN.recap)) return '';
+  if (!x.disponible) return `<div class="sf-fin sf-fin-verrou">🔒 Terminez ce module pour obtenir ${SF_FIN.recap && SF_FIN.carte ? 'votre récapitulatif et votre carte mentale' : SF_FIN.recap ? 'votre récapitulatif' : 'votre carte mentale'}.</div>`;
+  return `<div class="sf-fin">
+    <div class="sf-fin-t">🎓 ${x.apercu ? 'Fin de module (aperçu formateur)' : 'Module terminé : vos documents'}</div>
+    ${SF_FIN.recap ? `<a class="btn sf-fin-b" href="/api/formations/${formationId}/modules/${m.id}/recapitulatif.pdf" target="_blank" rel="noopener">⬇ Récapitulatif (PDF)</a>` : ''}
+    ${SF_FIN.carte ? `<button type="button" class="btn sf-fin-b sf-fin-carte" data-module="${m.id}">🗺 Carte mentale</button>` : ''}
+  </div>`;
+}
+async function sfOuvrirCarte(btn){
+  const w = window.open('', '_blank'); btn.disabled = true;
+  try {
+    const r = await fetch(`/api/formations/${formationId}/modules/${btn.dataset.module}/carte`, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || 'Carte indisponible.');
+    if (w) w.location.href = 'carte-mentale.html?id=' + d.id;
+  } catch (e) { if (w) w.close(); alert(e.message); }
+  btn.disabled = false;
 }
 
 /* Rafraîchit uniquement le plan et les jauges (la leçon affichée ne bouge pas : une vidéo en cours n'est pas relancée). */
@@ -275,6 +316,7 @@ async function sfRafraichir(){
   SF_DATA = await r.json();
   SF_CURRENT_LECON = flatLecons().find(l => l.id === courante) || SF_CURRENT_LECON;
   sfRenderSidebar();
+  sfChargerFin();
 }
 
 function sfJauge(pct, ok){
@@ -350,12 +392,14 @@ function sfRenderSidebar(){
         </button>`;
       });
     });
+    html += sfFinModule(m);
     html += '</div>';
   });
   html += sfBlocVerrouilles();
   html += '</div><div id="sf-att-zone"></div><div id="sf-cartes-zone"></div><div id="sf-rappels-zone"></div>';
   aside.innerHTML = html;
   aside.querySelectorAll('.sf-obtenir').forEach(b => b.addEventListener('click', () => sfObtenir(b)));
+  aside.querySelectorAll('.sf-fin-carte').forEach(b => b.addEventListener('click', () => sfOuvrirCarte(b)));
   aside.querySelectorAll('.sf-lecon').forEach(el => el.addEventListener('click', () => sfGoTo(Number(el.dataset.leconId))));
   const rp = document.getElementById('sf-reprendre');
   if (rp) rp.addEventListener('click', () => sfGoTo(Number(p.prochaine_lecon_id)));
