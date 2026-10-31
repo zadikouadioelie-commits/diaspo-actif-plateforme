@@ -206,7 +206,7 @@ module.exports.register = function register(deps) {
     let coupon = null, remise = 0;
     const codeCoupon = String((body && body.coupon) || "").trim();
     if (codeCoupon && montant > 0) {
-      const ev = await Finances.evaluerCoupon(db, f, codeCoupon, user.id, montant);
+      const ev = await Finances.evaluerCoupon(db, f, codeCoupon, user.id, montant, cle === 0 ? prixCatalogue : null);
       if (!ev.ok) return sendJSON(res, 400, { error: ev.erreur, code: "coupon_refuse" });
       coupon = ev.coupon; remise = ev.remise; montant = ev.prix_final;
     }

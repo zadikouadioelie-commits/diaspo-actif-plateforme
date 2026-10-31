@@ -4998,7 +4998,7 @@ db.exec(`
     updated_at TEXT DEFAULT (datetime('now'))
   );
 `);
-;['type_reduction TEXT DEFAULT \'pourcentage\'','montant_fixe REAL','date_debut TEXT','date_fin TEXT','max_par_utilisateur INTEGER DEFAULT 1'].forEach(col => { try { db.exec(`ALTER TABLE formation_coupons ADD COLUMN ${col}`); } catch(_) {} });
+;['type_reduction TEXT DEFAULT \'pourcentage\'','montant_fixe REAL','date_debut TEXT','date_fin TEXT','max_par_utilisateur INTEGER DEFAULT 1','type_code TEXT'].forEach(col => { try { db.exec(`ALTER TABLE formation_coupons ADD COLUMN ${col}`); } catch(_) {} }); /* type_code : codes générés en un clic (2026-10-31) */
 ;['prix_initial REAL','remise REAL DEFAULT 0','coupon_code TEXT','coupon_source TEXT','coupon_id INTEGER','promo_pct REAL','commission_pct REAL','commission REAL','net_formateur REAL','consentement_le TEXT'].forEach(col => { try { db.exec(`ALTER TABLE formation_commandes ADD COLUMN ${col}`); } catch(_) {} });
 /* Formation Diaspora — lot C, relances programmables (2026-10-30) : règles écrites par le formateur + journal de chaque envoi (le journal sert aussi de verrou : (règle, inscription, canal, rang) est unique). */
 db.exec(`

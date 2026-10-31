@@ -632,6 +632,7 @@
               </div>
               <div>
                 <div class="flex-between"><label style="font-size:13px;font-weight:700;">Coupons de réduction <span class="fb-help" title="Codes que les apprenants peuvent saisir au paiement pour obtenir une réduction ponctuelle.">?</span></label></div>
+                <div id="mfw-gen"></div>
                 <div id="mfw-coupons-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;"></div>
                 <div id="mfw-coupon-form"></div>
                 <p style="font-size:11.5px;color:var(--muted);margin:6px 0 0;">Le code se saisit sur la fiche de la formation, avant le paiement. Pour un code valable sur <strong>toutes</strong> vos formations, utilisez « Coupons sur toutes mes formations » dans le Centre de commande.</p>
@@ -1661,19 +1662,84 @@
     const lim = ' · utilisé ' + c.nb_utilises + (c.max_utilisations ? ' / ' + c.max_utilisations : '') + (c.nb_utilises ? ' (' + cpEur(c.remises_accordees) + ' offerts)' : '') + (parPers > 0 ? ' · ' + parPers + ' par personne' : '');
     const inactif = c.actif != null && !Number(c.actif);
     return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12.5px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.16);border-radius:8px;padding:8px 12px;${inactif ? 'opacity:.55;' : ''}">
-      🏷️ <strong>${escQ(c.code)}</strong> <span>${val}</span><span style="color:var(--muted);">${dates}${lim}</span>${inactif ? ' <em style="color:#fbbf24;">désactivé</em>' : ''}${c.date_fin && String(c.date_fin).slice(0,10) < new Date().toISOString().slice(0,10) ? ' <em style="color:#fbbf24;">expiré</em>' : ''}
+      🏷️ <strong>${escQ(c.code)}</strong> <button type="button" class="cp-copie" data-code="${escQ(c.code)}" title="Copier le code" aria-label="Copier le code" style="border:none;background:none;color:inherit;cursor:pointer;font-size:13px;">📋</button> <span>${val}</span>${c.type_code ? ` <span style="font-size:11px;padding:1px 8px;border-radius:999px;border:1px solid rgba(227,192,110,.5);">${c.type_code === 'individuel' ? 'individuel' : 'collectif'}</span>` : ''}<span style="color:var(--muted);">${dates}${lim}</span>${c.max_utilisations && c.nb_utilises >= c.max_utilisations ? ' <em style="color:#fbbf24;">épuisé</em>' : (c.type_code && !c.nb_utilises && !inactif ? ' <em style="color:#7de3b5;">en attente</em>' : '')}${inactif ? ' <em style="color:#fbbf24;">désactivé</em>' : ''}${c.date_fin && String(c.date_fin).slice(0,10) < new Date().toISOString().slice(0,10) ? ' <em style="color:#fbbf24;">expiré</em>' : ''}
       ${lecture ? '<span style="margin-left:auto;font-size:11px;color:var(--muted);">toutes vos formations</span>' : `<span style="margin-left:auto;display:flex;gap:6px;">
         <button type="button" class="cp-bascule" data-id="${c.id}" data-actif="${inactif ? 1 : 0}" style="border:1px solid rgba(255,255,255,.3);background:none;color:inherit;border-radius:6px;cursor:pointer;font-size:11.5px;padding:2px 8px;">${inactif ? 'Réactiver' : 'Désactiver'}</button>
         <button type="button" class="cp-suppr" data-id="${c.id}" aria-label="Supprimer le coupon" style="border:none;background:none;color:#dc2626;cursor:pointer;">✕</button></span>`}
     </div>`;
   }
   function cpBranche(el, base, recharger){
+    el.querySelectorAll('.cp-copie').forEach(b=>b.addEventListener('click', ()=>cpCopier(b.dataset.code)));
     el.querySelectorAll('.cp-bascule').forEach(b=>b.addEventListener('click', async ()=>{ try { await api('PATCH', `${base}/${b.dataset.id}`, { actif: b.dataset.actif === '1' }); recharger(); } catch(e){ showMsg(e.message||'Erreur.', 'danger'); } }));
     el.querySelectorAll('.cp-suppr').forEach(b=>b.addEventListener('click', async ()=>{ if(!confirm('Supprimer ce coupon ? Les ventes déjà faites avec ce code restent dans vos revenus.')) return; try { await api('DELETE', `${base}/${b.dataset.id}`); recharger(); } catch(e){ showMsg(e.message||'Erreur.', 'danger'); } }));
   }
 
+
+  /* ── Générer des codes de promotion en un clic (2026-10-31) : individuel (1 utilisation) ou collectif (N personnes / illimité) ── */
+  async function cpCopier(texte){
+    try { await navigator.clipboard.writeText(texte); }
+    catch(_) { const t = document.createElement('textarea'); t.value = texte; t.style.position = 'fixed'; t.style.opacity = '0'; document.body.appendChild(t); t.select(); try { document.execCommand('copy'); } catch(__) {} t.remove(); }
+    showMsg(texte.includes('\n') ? 'Codes copiés ✓' : 'Code copié ✓', 'success');
+  }
+  function mfwGenInit(){
+    const box = document.getElementById('mfw-gen');
+    if(!box || box.dataset.pret) return;
+    box.dataset.pret = '1';
+    const champ = 'class="input-field" style="width:100%;margin-top:3px;"', lbl = 'style="font-size:11.5px;font-weight:700;color:rgba(255,255,255,.8);"';
+    box.innerHTML = `<div style="background:rgba(255,255,255,.06);border:1px solid rgba(227,192,110,.4);border-radius:10px;padding:12px 14px;margin-bottom:10px;">
+      <div style="font-weight:800;font-size:13.5px;margin-bottom:8px;">⚡ Générer un code de promotion</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;align-items:end;">
+        <div><label ${lbl}>Type de code</label><select id="mfwg-type" ${champ}><option value="individuel">Individuel — 1 seule utilisation</option><option value="collectif">Collectif — plusieurs personnes</option></select></div>
+        <div id="mfwg-qte-b"><label ${lbl}>Nombre de codes</label><input id="mfwg-qte" type="number" min="1" max="50" value="1" ${champ}></div>
+        <div id="mfwg-pers-b" style="display:none;"><label ${lbl}>Nombre de personnes</label><input id="mfwg-pers" type="number" min="2" ${champ} placeholder="ex : 25"><label style="font-size:11.5px;display:flex;gap:6px;align-items:center;margin-top:4px;"><input type="checkbox" id="mfwg-illim" checked> Illimité</label></div>
+        <div><label ${lbl}>Réduction</label><select id="mfwg-rt" ${champ}><option value="pourcentage">Pourcentage (%)</option><option value="montant">Montant fixe (€)</option></select></div>
+        <div><label ${lbl} id="mfwg-val-l">Valeur (%)</label><input id="mfwg-val" type="number" min="1" step="any" ${champ} placeholder="20"></div>
+        <div><label ${lbl}>Valable jusqu'au (facultatif)</label><input id="mfwg-fin" type="date" ${champ}></div>
+        <div><button type="button" class="btn btn-sm btn-orange" id="mfwg-go" style="width:100%;">⚡ Générer</button></div>
+      </div>
+      <p style="font-size:11.5px;color:var(--muted);margin:8px 0 0;">Le code est enregistré dès qu'il est créé : copiez-le et envoyez-le à qui vous voulez. Chaque personne ne peut l'utiliser qu'une fois. 100 % offre la formation. Ne se cumule pas avec la promotion en cours : la meilleure des deux offres s'applique.</p>
+      <div id="mfwg-res"></div>
+    </div>`;
+    const q = id => document.getElementById('mfwg-' + id);
+    const maj = () => {
+      const coll = q('type').value === 'collectif';
+      q('qte-b').style.display = coll ? 'none' : ''; q('pers-b').style.display = coll ? '' : 'none';
+      q('pers').style.display = q('illim').checked ? 'none' : '';
+      const m = q('rt').value === 'montant'; q('val-l').textContent = m ? 'Valeur (€)' : 'Valeur (%)'; q('val').placeholder = m ? '10' : '20';
+    };
+    ['type', 'illim', 'rt'].forEach(k => q(k).addEventListener('change', maj)); maj();
+    q('go').addEventListener('click', async () => {
+      if(!fbFormationId){ showMsg('Enregistrez d\'abord la formation.', 'danger'); return; }
+      const coll = q('type').value === 'collectif', montant = q('rt').value === 'montant';
+      if(!q('val').value){ showMsg('Indiquez la valeur de la réduction.', 'danger'); return; }
+      const corps = { type: q('type').value, type_reduction: q('rt').value, date_fin: q('fin').value || null };
+      if(montant) corps.montant_fixe = parseFloat(q('val').value); else corps.reduction_pct = parseFloat(q('val').value);
+      if(coll){ if(q('illim').checked) corps.illimite = true; else { if(!q('pers').value){ showMsg('Indiquez le nombre de personnes, ou cochez « Illimité ».', 'danger'); return; } corps.max_personnes = parseInt(q('pers').value, 10); } }
+      else corps.quantite = parseInt(q('qte').value, 10) || 1;
+      q('go').disabled = true;
+      try {
+        const { codes } = await api('POST', `/formations/${fbFormationId}/coupons/generer`, corps);
+        const val = montant ? cpEur(corps.montant_fixe) : corps.reduction_pct + ' %';
+        q('res').innerHTML = `<div style="margin-top:10px;display:flex;flex-direction:column;gap:6px;">
+          ${codes.map(c => `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:rgba(125,227,181,.1);border:1px solid rgba(125,227,181,.45);border-radius:8px;padding:7px 12px;"><strong style="font-family:monospace;font-size:14px;letter-spacing:.04em;">${escQ(c.code)}</strong><span style="font-size:12px;color:var(--muted);">−${val} · ${coll ? (c.max_utilisations ? c.max_utilisations + ' personnes' : 'illimité') : '1 utilisation'}</span><button type="button" class="btn btn-sm btn-outline cp-copie" data-code="${escQ(c.code)}" style="margin-left:auto;">📋 Copier</button></div>`).join('')}
+          ${codes.length > 1 ? `<div style="display:flex;gap:8px;flex-wrap:wrap;"><button type="button" class="btn btn-sm btn-orange" id="mfwg-copy-all">📋 Copier les ${codes.length} codes</button><button type="button" class="btn btn-sm btn-outline" id="mfwg-csv">⬇ Télécharger (.csv)</button></div>` : ''}
+        </div>`;
+        q('res').querySelectorAll('.cp-copie').forEach(b => b.addEventListener('click', () => cpCopier(b.dataset.code)));
+        const all = q('res').querySelector('#mfwg-copy-all'); if(all) all.addEventListener('click', () => cpCopier(codes.map(c => c.code).join('\n')));
+        const csv = q('res').querySelector('#mfwg-csv');
+        if(csv) csv.addEventListener('click', () => {
+          const lignes = ['Code;Type;Réduction;Valable jusqu\'au'].concat(codes.map(c => [c.code, coll ? 'collectif' : 'individuel', '−' + val, c.date_fin ? cpDate(c.date_fin) : ''].join(';')));
+          const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['\uFEFF' + lignes.join('\r\n')], { type: 'text/csv;charset=utf-8' })); a.download = 'codes-promotion.csv'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+        });
+        mfwRenderCoupons();
+      } catch(e){ showMsg(e.message || 'Génération impossible.', 'danger'); }
+      q('go').disabled = false;
+    });
+  }
+
   async function mfwRenderCoupons(){
     const el = document.getElementById('mfw-coupons-list');
+    mfwGenInit();
     const form = document.getElementById('mfw-coupon-form');
     if(form && !form.dataset.pret){ form.innerHTML = cpFormHtml('mfwc'); form.dataset.pret = '1'; cpFormInit('mfwc', async corps => { if(!fbFormationId) return; await api('POST', `/formations/${fbFormationId}/coupons`, corps); mfwRenderCoupons(); }); }
     if(!fbFormationId){ el.innerHTML = ''; return; }
@@ -1847,11 +1913,11 @@
       const st = await api('GET', '/formateur/statut');
       if (st.peut_creer) { document.getElementById('sb-tab-espace-formateur').style.display = ''; return; }
       if (st.acces_requis) {
-        /* Compte Initiative sans autorisation : la création de formations s'obtient sur demande (module Formation Diaspora), plus par le seul Premium. */
+        /* Compte Initiative sans autorisation : la création de formations s'obtient sur demande (module Création de formation), plus par le seul Premium. */
         const ban = document.getElementById('devenir-formateur-banner');
-        ban.querySelector('p').textContent = "L'espace formateur est ouvert par Diaspo'Actif, sur demande : faites votre demande dans le module Formation Diaspora (onglet Formateur).";
+        ban.querySelector('p').textContent = "L'espace formateur est ouvert par Diaspo'Actif, sur demande : faites votre demande dans le module Création de formation de votre tableau de bord.";
         const lien = document.getElementById('btn-devenir-formateur');
-        lien.href = 'dashboard-initiative.html#formation-diaspora'; lien.textContent = "🧑‍🏫 Demander l'accès formateur";
+        lien.href = 'dashboard-initiative.html#formations-gestion'; lien.textContent = "🧑‍🏫 Demander l'accès formateur";
         ban.style.display = 'flex';
       } else if (st.premium_requis) document.getElementById('devenir-formateur-banner').style.display = 'flex';
     } catch(e) { /* silencieux : bannière simplement non affichée */ }

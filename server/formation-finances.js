@@ -65,7 +65,8 @@ async function utilisations(db, source, couponId, userId) {
 }
 
 /* Vérifie un code pour (formation, apprenant) et calcule le prix à payer. Ne modifie rien. Renvoie { ok, erreur } ou { ok, coupon, remise, prix_final }. */
-async function evaluerCoupon(db, f, codeBrut, userId, prixBase) {
+/* prixCatalogue (facultatif) : prix avant promotion. Un code GÉNÉRÉ ne se cumule pas avec la promotion en cours : la meilleure des deux offres s'applique. */
+async function evaluerCoupon(db, f, codeBrut, userId, prixBase, prixCatalogue) {
   const code = codeNormalise(codeBrut);
   if (!code) return { ok: false, erreur: "Saisissez un code." };
   if (!(Number(prixBase) > 0)) return { ok: false, erreur: "Cette formation est gratuite : aucun code n'est nécessaire." };
@@ -80,9 +81,12 @@ async function evaluerCoupon(db, f, codeBrut, userId, prixBase) {
   if (c.max_utilisations && u.total >= Number(c.max_utilisations)) return { ok: false, erreur: "Ce code a atteint sa limite d'utilisations." };
   const parPersonne = c.max_par_utilisateur == null ? 1 : Number(c.max_par_utilisateur);
   if (parPersonne > 0 && userId && u.moi >= parPersonne) return { ok: false, erreur: "Vous avez déjà utilisé ce code." };
-  const remise = remiseDe(c, prixBase);
+  const generation = !!c.type_code && Number(prixCatalogue) > Number(prixBase);
+  const baseCode = generation ? Number(prixCatalogue) : Number(prixBase);
+  const prixFinal = arrondi(Math.max(0, baseCode - remiseDe(c, baseCode)));
+  if (generation && !(prixFinal < Number(prixBase))) return { ok: false, erreur: "La promotion en cours est déjà plus avantageuse que ce code : vous n'en avez pas besoin." };
+  const remise = arrondi(Number(prixBase) - prixFinal);
   if (!(remise > 0)) return { ok: false, erreur: "Ce code n'accorde aucune réduction sur cette offre." };
-  const prixFinal = arrondi(Math.max(0, Number(prixBase) - remise));
   if (prixFinal > 0 && prixFinal < PAIEMENT_MINIMUM) return { ok: false, erreur: "Avec ce code, le prix passerait sous le minimum de paiement (0,50 €)." };
   return { ok: true, coupon: { source, id: Number(c.id), code }, remise, prix_final: prixFinal };
 }
@@ -245,6 +249,49 @@ module.exports.register = function register(deps) {
     }
   });
 
+  /* ── Générer des codes en un clic (2026-10-31) : individuel = une seule utilisation ; collectif = N personnes ou illimité. Chaque code est enregistré aussitôt. ── */
+  const ALPHABET_CODE = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; /* sans I, L, O, 0, 1 : aucune confusion à la lecture ou à la dictée */
+  const morceau = n => Array.from({ length: n }, () => ALPHABET_CODE[require("crypto").randomInt(ALPHABET_CODE.length)]).join("");
+  const prefixeDe = titre => { const p = String(titre || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4); return p.length >= 3 ? p : "PROMO"; };
+  route("POST", "/api/formations/:id/coupons/generer", async (req, res, params, body) => {
+    const ctx = await proprietaire(req, res, params.id); if (!ctx) return;
+    const lim = SEC.rateLimit(`formation-coupon-gen:${ctx.user.id}`, 30, 600000);
+    if (!lim.allowed) return sendJSON(res, 429, { error: `Trop de générations. Réessayez dans ${lim.retryAfter}s.` });
+    const b = body || {};
+    const type = b.type === "collectif" ? "collectif" : b.type === "individuel" ? "individuel" : null;
+    if (!type) return sendJSON(res, 400, { error: "Choisissez un code individuel ou un code collectif." });
+    /* La réduction et la date limite passent par le même contrôle que les codes saisis à la main (le code fictif n'est jamais enregistré). */
+    const { err, v } = lireCoupon({ code: "TEMOIN", type_reduction: b.type_reduction, reduction_pct: b.reduction_pct, montant_fixe: b.montant_fixe, date_fin: b.date_fin });
+    if (err) return sendJSON(res, 400, { error: err });
+    let quantite = 1, max = 1;
+    if (type === "individuel") {
+      quantite = b.quantite == null || b.quantite === "" ? 1 : Math.floor(Number(b.quantite));
+      if (!(quantite >= 1 && quantite <= 50)) return sendJSON(res, 400, { error: "Vous pouvez générer de 1 à 50 codes individuels à la fois." });
+    } else if (b.illimite === true || b.max_personnes == null || b.max_personnes === "") max = null;
+    else {
+      max = Math.floor(Number(b.max_personnes));
+      if (!(max >= 2 && max <= 1000000)) return sendJSON(res, 400, { error: "Un code collectif doit pouvoir servir à au moins 2 personnes (sinon choisissez « individuel »)." });
+    }
+    const prefixe = prefixeDe(ctx.f.titre), crees = [];
+    try {
+      for (let i = 0; i < quantite; i++) {
+        let ok = false;
+        for (let essai = 0; essai < 12 && !ok; essai++) {
+          const code = `${prefixe}-${morceau(4)}-${morceau(4)}`;
+          if (await db.prepare("SELECT id FROM formation_coupons_globaux WHERE owner_user_id=? AND code=?").get(ctx.f.owner_user_id, code)) continue;
+          try {
+            const id = (await db.prepare("INSERT INTO formation_coupons (formation_id, code, reduction_pct, max_utilisations, type_reduction, montant_fixe, date_debut, date_fin, max_par_utilisateur, type_code) VALUES (?,?,?,?,?,?,?,?,?,?)")
+              .run(ctx.f.id, code, v.pct, max, v.type, v.montant, null, v.fin, 1, type)).lastInsertRowid;
+            crees.push({ id: Number(id), code, type_code: type, max_utilisations: max, type_reduction: v.type, reduction_pct: v.pct, montant_fixe: v.montant, date_fin: v.fin });
+            ok = true;
+          } catch (e) { if (!/unique|duplicate/i.test(String(e && e.message))) throw e; }
+        }
+        if (!ok) return sendJSON(res, 500, { error: "Impossible de générer un code unique. Réessayez." });
+      }
+    } catch (e) { return sendJSON(res, 500, SEC.safeError(e, "formation-coupon-generer")); }
+    sendJSON(res, 201, { codes: crees });
+  });
+
   route("PATCH", "/api/formations/:id/coupons/:couponId", async (req, res, params, body) => {
     const ctx = await proprietaire(req, res, params.id); if (!ctx) return;
     const actif = body && body.actif ? 1 : 0;
@@ -312,7 +359,7 @@ module.exports.register = function register(deps) {
       if (!m) return sendJSON(res, 404, { error: "Module introuvable dans cette formation." });
       base = (f.mode_acces || "gratuit") === "gratuit" ? 0 : Math.max(0, Number(m.prix) || 0);
     } else base = F.prixFormation(f).prix;
-    const r = await F.evaluerCoupon(db, f, body && body.code, user.id, base);
+    const r = await F.evaluerCoupon(db, f, body && body.code, user.id, base, body && body.module_id ? null : F.prixFormation(f).catalogue);
     if (!r.ok) return sendJSON(res, 200, { valide: false, erreur: r.erreur });
     sendJSON(res, 200, { valide: true, code: r.coupon.code, prix_avant: base, remise: r.remise, prix_final: r.prix_final });
   });
