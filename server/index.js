@@ -51716,7 +51716,7 @@ async function inscPublicContexteEvenement(fiche) {
     const courants = new Set(evenements.map(e => Number(e.id)));
     comptesRendus = crs.map(c => ({
       evenement_id: c.evenement_id, titre: c.titre || c.evt_titre, evenement_titre: c.evt_titre, date_evt: c.date_evt, ville: c.ville, pays: c.pays,
-      resume: String(c.resume || '').replace(/\s+/g, ' ').trim().slice(0, 180),
+      resume: crBrut(c.resume).replace(/\s+/g, ' ').trim().slice(0, 180),
       image: inscPublicPhotosEvenement(c)[0] || null,
       courant: courants.has(Number(c.evenement_id)),
     }));

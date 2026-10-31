@@ -21,6 +21,9 @@
 <link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
 <link rel="stylesheet" href="/assets/design-upgrade.v2.css">
 <link rel="stylesheet" href="/assets/theme-manager.css">
+<!-- Cartouche bleue scintillante des comptes rendus (2026-10-30, consigne explicite, identité visuelle à
+     respecter partout où un compte rendu est affiché) — même composant fc-band/fc-cr que le fil d'actualité. -->
+<link rel="stylesheet" href="/assets/fil-cartouches.css">
 <!-- Design « Nuit dorée » (2026-10-30) : retour arrière = retirer ces 3 liens et la classe « nd » de la balise body -->
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,500;0,6..96,600;1,6..96,500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -46,39 +49,51 @@
    elle a réellement du contenu (classes posées par JS, ipAppliquerLayout()), pour ne jamais
    laisser une colonne vide béante : fiche sans événement lié/sans contact → pas de colonne
    gauche ; fiche sans description ni programme → pas de colonne droite. */
-.ip-layout.ip-layout--has-left,.ip-layout.ip-layout--has-right{max-width:1280px;}
-@media (min-width:900px){
-  .ip-layout.ip-layout--has-left,.ip-layout.ip-layout--has-right{display:grid;gap:28px;align-items:start;}
-  .ip-layout.ip-layout--has-left:not(.ip-layout--has-right){grid-template-columns:280px minmax(0,1fr);}
-  .ip-layout.ip-layout--has-right:not(.ip-layout--has-left){grid-template-columns:minmax(0,1fr) 340px;}
-  .ip-layout.ip-layout--has-left.ip-layout--has-right{grid-template-columns:280px minmax(0,1fr) 340px;}
-}
-@media (max-width:899px){
-  /* Empilé : types d'inscription d'abord (accès direct à l'inscription), puis le descriptif/
-     programme, le calendrier/infos pratiques en dernier (déjà la logique retenue le 2026-10-30
-     dans ipRenderAccueil() pour l'ordre desktop : types avant descriptif). "order" n'a d'effet
-     que sur les enfants directs d'un conteneur flex/grid — .ip-layout est en display:block par
-     défaut (bug réel trouvé à l'exécution : sans ceci, les 3 colonnes gardaient leur ordre DOM
-     normal, calendrier d'abord), d'où le display:flex ajouté ici spécifiquement. */
-  .ip-layout.ip-layout--has-left,.ip-layout.ip-layout--has-right{display:flex;flex-direction:column;}
-  #ip-root{order:1;}
-  #ip-right{order:2;}
-  #ip-side{order:3;}
-}
+/* width:100% explicite — bug réel trouvé à l'exécution : .ip-layout est un enfant de .page, qui
+   est en display:flex (pas le flux "block" normal supposé jusqu'ici) sans align-items:stretch
+   effectif à cet endroit. Un enfant flex sans largeur explicite se dimensionne à son CONTENU
+   (fit-content), pas à l'espace disponible : la piste minmax(…,1fr) de la grille se résolvait
+   donc systématiquement à son plancher (480px) au lieu de se partager l'espace restant, même
+   quand le conteneur avait largement la place d'aller jusqu'à max-width. Avec width:100%,
+   .ip-layout remplit enfin son conteneur (dans la limite de max-width) et 1fr fonctionne
+   normalement — condition réelle pour que « élargis-le vers la droite » utilise de la place
+   neuve au lieu de retomber sur le plancher de la colonne centrale à chaque fois. */
+/* Mise en page à colonnes (infos / centre / description / programme), désormais pilotée en JS
+   (ipAppliquerLayout, assets embarqués plus bas) plutôt qu'en CSS pur media-query (2026-10-30,
+   demande explicite : « tu crées une colonne à droite de description pour le programme. Sans
+   diminuer tout le rendu »). Avec jusqu'à 4 colonnes possibles, écrire toutes les combinaisons de
+   grid-template-columns par tranche de largeur en CSS pur serait ingérable et fragile — deux bugs
+   réels avaient déjà été trouvés à l'exécution sur la version 3-colonnes plus simple (débordement
+   invisible sous un seuil trop bas, colonne centrale qui ne récupérait jamais l'espace libre).
+   Le JS recalcule donc, à partir des colonnes RÉELLEMENT présentes : le gabarit de colonnes, le
+   seuil d'activation de la grille (= largeur minimale nécessaire + 84px de marge — même marge de
+   sécurité qui avait corrigé le débordement invisible) et le max-width, y compris au redimensionnement.
+   display:grid / display:flex (empilé) ne dépend donc que de la classe .ip-layout--grid. */
+.ip-layout.ip-layout--has-left,.ip-layout.ip-layout--has-right,.ip-layout.ip-layout--has-programme{width:100%;display:flex;flex-direction:column;}
+.ip-layout.ip-layout--grid{display:grid;gap:28px;align-items:start;}
+/* Empilé : types d'inscription d'abord (accès direct à l'inscription), puis descriptif, puis
+   programme, puis calendrier/infos pratiques en dernier. "order" n'a d'effet que sur les enfants
+   directs d'un conteneur flex/grid, d'où le display:flex ci-dessus en mode empilé. */
+#ip-root{order:1;}
+#ip-right{order:2;}
+#ip-programme-col{order:3;}
+#ip-side{order:4;}
+.ip-layout--grid #ip-root,.ip-layout--grid #ip-right,.ip-layout--grid #ip-programme-col,.ip-layout--grid #ip-side{order:initial;}
 .ip-wrap{padding:32px 16px 60px;}
-.ip-layout--has-left .ip-wrap,.ip-layout--has-right .ip-wrap{padding-left:0;}
-@media (max-width:899px){.ip-layout--has-left .ip-wrap,.ip-layout--has-right .ip-wrap{padding-left:16px;}}
+.ip-layout--grid.ip-layout--has-left .ip-wrap,.ip-layout--grid.ip-layout--has-right .ip-wrap,.ip-layout--grid.ip-layout--has-programme .ip-wrap{padding-left:0;}
 .ip-side{display:none;}
-.ip-layout--has-left #ip-side,.ip-layout--has-right #ip-right{display:flex;flex-direction:column;gap:18px;}
-@media (min-width:900px){
-  .ip-layout--has-left #ip-side{padding:32px 0 20px 16px;position:sticky;top:20px;}
-  .ip-layout--has-right #ip-right{padding:32px 16px 20px 0;position:sticky;top:20px;}
-}
-@media (max-width:899px){
-  .ip-layout--has-left #ip-side,.ip-layout--has-right #ip-right{padding:0 16px 28px;}
-}
+.ip-layout--has-left #ip-side,.ip-layout--has-right #ip-right,.ip-layout--has-programme #ip-programme-col{display:flex;flex-direction:column;gap:18px;padding:0 16px 28px;}
+.ip-layout--grid #ip-side{padding:32px 0 20px 16px;position:sticky;top:20px;}
+.ip-layout--grid #ip-right{padding:32px 16px 20px 0;position:sticky;top:20px;}
+.ip-layout--grid.ip-layout--has-programme #ip-right{padding-right:0;}
+.ip-layout--grid #ip-programme-col{padding:32px 16px 20px 0;position:sticky;top:20px;}
 .ip-side-box{background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:14px;padding:16px;}
 .ip-side-title{font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:oklch(0.5 0.006 30);margin:0 0 12px;}
+/* Cartouche bleue scintillante des comptes rendus (2026-10-30, consigne explicite, à conserver partout où
+   un compte rendu est affiché) — bandeau fc-band/fc-cr du fil d'actualité, étendu en plein bord de la carte. */
+.ip-side-box--cr{padding:0;overflow:hidden;}
+.ip-cr-band{border-radius:13px 13px 0 0;}
+.ip-side-box--cr .ip-cr-liste{padding:14px 16px 16px;}
 /* Informations pratiques (2026-10-30, demande explicite) : date/heure, lieu, mode de
    participation, renseignements (coordonnées de la fiche) — dérivées de l'événement lié et de
    insc_fiches.contact_*, aucune nouvelle saisie requise côté organisateur. */
@@ -91,12 +106,35 @@
 .ip-ics-btn:hover{border-color:oklch(0.32 0.09 258);color:oklch(0.32 0.09 258);}
 /* Programme (2026-10-30) : insc_fiches.programme_texte, une ligne par temps fort (voir
    inscriptions-admin.html, renderProgramme()) — jamais affiché publiquement jusqu'ici. */
-.ip-programme-list{display:flex;flex-direction:column;gap:10px;margin:0;padding:0;list-style:none;}
-.ip-programme-item{display:flex;gap:10px;align-items:flex-start;font-size:13px;line-height:1.5;color:oklch(0.25 0.006 30);}
-.ip-programme-item::before{content:"•";color:oklch(0.32 0.09 258);font-weight:700;flex-shrink:0;}
+/* Programme en bulles heure/étape (2026-10-30, demande explicite : « tu mets les heures à gauche
+   et ce qui va se passer à droite [...] dans une même bulle »), voir ipParseProgramme/ipRenderProgramme. */
+.ip-programme-list{display:flex;flex-direction:column;gap:12px;}
+.ip-prog-etape{display:flex;gap:12px;align-items:flex-start;background:oklch(0.97 0.004 30);border:1px solid oklch(0.91 0.004 30);border-radius:12px;padding:10px 12px;}
+.ip-prog-heures{flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:oklch(0.94 0.05 258);color:oklch(0.28 0.1 258);border-radius:10px;padding:8px 10px;font-size:12.5px;font-weight:700;line-height:1.4;min-width:56px;text-align:center;}
+.ip-prog-heures span+span{padding-top:3px;margin-top:3px;border-top:1px solid oklch(0.82 0.06 258);}
+.ip-prog-corps{min-width:0;flex:1;}
+.ip-prog-titre{font-size:13px;font-weight:700;color:oklch(0.22 0.006 30);}
+.ip-prog-detail{font-size:12.5px;color:oklch(0.42 0.006 30);line-height:1.45;margin-top:2px;}
 .ip-programme-fichier{display:flex;align-items:center;gap:10px;border:1px solid oklch(0.9 0.004 30);border-radius:8px;padding:8px 10px;text-decoration:none;margin-top:14px;}
 .ip-right-section{margin:0 0 26px;}
 .ip-right-section-titre{font-size:13px;font-weight:700;margin:0 0 12px;display:flex;align-items:center;gap:7px;}
+/* Aperçu du descriptif + "Voir plus" (2026-10-30, demande explicite : « montre deux tiers du
+   descriptif et mets un bouton voir plus ») — la hauteur repliée est calculée en JS comme 2/3 de
+   la hauteur réelle du texte (ipAjusterApercuDescription), pas une valeur fixe : un descriptif
+   court reste court, un très long descriptif est vraiment coupé aux deux tiers. mask-image
+   plutôt qu'un dégradé peint sur une couleur de fond fixe : fonctionne pareil quel que soit le
+   thème (clair, sombre/Nuit dorée) sans avoir à deviner la couleur de fond exacte. Le bouton
+   reste caché tant que le texte tient déjà dans l'aperçu — pas de "Voir plus" qui ne ferait rien. */
+.ip-desc-wrap[data-collapsed="1"] .ip-desc,.ip-prog-wrap[data-collapsed="1"] .ip-programme-list{max-height:var(--ip-collapsed-h,210px);overflow:hidden;-webkit-mask-image:linear-gradient(to bottom,#000 70%,transparent 100%);mask-image:linear-gradient(to bottom,#000 70%,transparent 100%);}
+.ip-desc-plus{display:inline-flex;align-items:center;gap:5px;margin-top:2px;background:none;border:none;padding:0;font:inherit;font-weight:700;font-size:13px;color:oklch(0.32 0.09 258);cursor:pointer;}
+.ip-desc-plus:hover{text-decoration:underline;}
+/* Bug réel trouvé à l'exécution (pas un artefact d'outil) : display:inline-flex posé juste
+   au-dessus s'applique inconditionnellement — en CSS, une règle d'auteur l'emporte toujours sur
+   la feuille de style par défaut du navigateur, quelle que soit la spécificité ; l'attribut
+   hidden (qui repose sur [hidden]{display:none} dans cette feuille par défaut) se retrouvait
+   donc sans effet, et "Voir plus" restait visible même sur un descriptif court qui n'en a pas
+   besoin. Règle explicite, plus spécifique, pour le réaffirmer. */
+.ip-desc-plus[hidden]{display:none;}
 .ip-cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;font-size:13px;font-weight:700;text-transform:capitalize;}
 .ip-cal-nav{background:none;border:1px solid oklch(0.88 0.004 30);border-radius:6px;cursor:pointer;font-size:13px;color:oklch(0.4 0.006 30);width:24px;height:24px;line-height:1;padding:0;}
 .ip-cal-nav:disabled{opacity:.35;cursor:default;}
@@ -140,10 +178,10 @@
 .ip-badge-courant{display:inline-block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:oklch(0.32 0.09 258);background:oklch(0.94 0.05 258);border-radius:4px;padding:1px 6px;margin-left:6px;vertical-align:1px;}
 .ip-cr-liste{display:flex;flex-direction:column;gap:10px;}
 .ip-cr-card{display:flex;gap:10px;text-decoration:none;color:inherit;border:1px solid oklch(0.92 0.004 30);border-radius:10px;padding:8px;transition:border-color .15s;}
-.ip-cr-card:hover,.ip-cr-card:focus-visible{border-color:oklch(0.5 0.14 150);}
-.ip-cr-card .ip-autre-img{background:oklch(0.95 0.03 150);}
+.ip-cr-card:hover,.ip-cr-card:focus-visible{border-color:#1558C8;}
+.ip-cr-card .ip-autre-img{background:#EFF4FF;}
 .ip-cr-resume{font-size:11.5px;color:oklch(0.45 0.006 30);line-height:1.4;margin-top:3px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
-.ip-cr-lien{font-size:11px;font-weight:700;color:oklch(0.38 0.12 150);margin-top:4px;}
+.ip-cr-lien{font-size:11px;font-weight:700;color:#1558C8;margin-top:4px;}
 .ip-visuels{margin:18px 0;}
 .ip-visuels-titre{font-size:12px;font-weight:600;color:oklch(0.5 0.006 30);margin-bottom:10px;text-transform:uppercase;letter-spacing:.03em;}
 .ip-photos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;}
@@ -164,6 +202,18 @@
 .ip-lightbox .lb-p{left:12px;top:50%;margin-top:-22px;}
 .ip-lightbox .lb-n{right:12px;top:50%;margin-top:-22px;}
 .ip-lightbox .lb-c{position:absolute;bottom:16px;left:0;right:0;text-align:center;color:#fff;font-size:12.5px;}
+/* Documents & médias — photos en « vrais cadres » (2026-10-30, demande explicite : « affiche les
+   photos entières. En petit, mais entière [...] de sorte à ce qu'on puisse cliquer dessus pour les
+   découvrir ») — remplace l'ancienne vignette 36×36 rognée (object-fit:cover) par un cadre qui
+   montre l'image ENTIÈRE (object-fit:contain, lettré sur un fond neutre plutôt que recadré), assez
+   grand pour être lisible, cliquable pour ouvrir en grand dans la même visionneuse que les photos
+   de l'événement (ipOuvrirPhoto, réutilisée avec IP_DOC_PHOTOS). */
+.ip-docs-photos{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-bottom:12px;}
+.ip-docs-photo{display:flex;flex-direction:column;gap:6px;border:1px solid oklch(0.9 0.004 30);border-radius:10px;padding:8px;background:#fff;cursor:pointer;text-align:left;font:inherit;}
+.ip-docs-photo:hover,.ip-docs-photo:focus-visible{border-color:oklch(0.32 0.09 258);}
+.ip-docs-photo-frame{width:100%;aspect-ratio:1/1;border-radius:6px;background:oklch(0.96 0.004 30);display:flex;align-items:center;justify-content:center;overflow:hidden;}
+.ip-docs-photo-frame img{max-width:100%;max-height:100%;object-fit:contain;display:block;}
+.ip-docs-photo-label{font-size:11.5px;color:oklch(0.4 0.006 30);line-height:1.3;}
 .ip-autres-list{display:flex;flex-direction:column;gap:10px;}
 .ip-autre-card{display:flex;gap:10px;text-decoration:none;color:inherit;border:1px solid oklch(0.92 0.004 30);border-radius:10px;padding:8px;transition:border-color .15s;scroll-margin-top:20px;}
 .ip-autre-card:hover,.ip-autre-card.ip-autre-surlignee{border-color:oklch(0.32 0.09 258);}
@@ -276,6 +326,7 @@
     <div style="text-align:center;padding:60px 0;color:oklch(0.55 0.006 30);">Chargement…</div>
   </main>
   <aside class="ip-side" id="ip-right"></aside>
+  <aside class="ip-side" id="ip-programme-col"></aside>
 </div>
 </div>
 
@@ -287,25 +338,45 @@
 <script>
 const IP_TYPE_ICONS = {texte_court:'text',texte_long:'textarea',nombre:'number',email:'email',telephone:'tel',date:'date',heure:'time',adresse:'text',url:'url'};
 let IP_FICHE=null, IP_TYPES=[], IP_EVENEMENTS=[], IP_TYPE_ACTIF=null, IP_APERCU=false, IP_MEDIAS=[], IP_CANDIDATURE=null, IP_PARRAINAGE=null;
+let IP_DOC_PHOTOS = [];
+/* Documents & médias (2026-10-30, demande explicite : « créer deux véritables cadres [...] affiche
+   les photos entières. En petit, mais entière [...] de sorte à ce qu'on puisse cliquer dessus pour
+   les découvrir. Pas juste en zoomant. [...] éventuellement la vidéo [...] même principe que les
+   Reels : si on met la souris dessus, tu enclenches la lecture ») — les photos de cette section
+   avaient jusqu'ici une vignette 36×36 rognée (object-fit:cover), remplacée par de vrais cadres
+   (object-fit:contain, rien n'est coupé) cliquables vers la visionneuse plein écran déjà utilisée
+   pour les photos de l'événement (ipOuvrirPhoto, ici avec sa propre liste IP_DOC_PHOTOS pour ne
+   jamais mélanger les deux galeries — une photo de cette section n'est jamais dans celle de
+   l'événement, voir ipRenderVisuels()). Les vidéos restent lues au clic (controls, comme avant)
+   mais démarrent aussi dès le survol, en muet (lecture non muette bloquée par les navigateurs sans
+   geste de l'utilisateur), et se remettent en pause au départ de la souris — aperçu, pas lecture
+   complète automatique. */
 function ipRenderMedias() {
   if (!IP_MEDIAS.length) return '';
   const videos = IP_MEDIAS.filter(m => m.type === 'video');
-  const autres = IP_MEDIAS.filter(m => m.type !== 'video');
+  const photos = IP_MEDIAS.filter(m => m.type === 'photo');
+  const autres = IP_MEDIAS.filter(m => m.type !== 'video' && m.type !== 'photo');
+  IP_DOC_PHOTOS = photos;
   return `
     <div style="margin:22px 0; padding-top:18px; border-top:1px solid oklch(0.92 0.004 30);">
       <div style="font-size:12px; font-weight:600; color:oklch(0.5 0.006 30); margin-bottom:10px; text-transform:uppercase; letter-spacing:.03em;">Documents &amp; médias</div>
       ${videos.map(m => `
         <div style="margin-bottom:10px;">
           ${m.libelle ? `<div style="font-size:12.5px; font-weight:600; margin-bottom:6px;">${escH(m.libelle)}</div>` : ''}
-          <video src="${escH(m.url)}" controls preload="metadata" style="width:100%; border-radius:10px; background:#000; display:block;"></video>
+          <video src="${escH(m.url)}" controls muted preload="metadata" playsinline style="width:100%; border-radius:10px; background:#000; display:block;" onmouseenter="this.play().catch(()=>{})" onmouseleave="this.pause();this.currentTime=0;"></video>
         </div>`).join('')}
+      ${photos.length ? `<div class="ip-docs-photos">
+        ${photos.map((m, i) => `
+          <button type="button" class="ip-docs-photo" onclick="ipOuvrirPhoto(${i}, IP_DOC_PHOTOS)" aria-label="Agrandir ${ipAttr(m.libelle || 'la photo')}">
+            <span class="ip-docs-photo-frame"><img src="${ipAttr(m.url)}" alt="${ipAttr(m.libelle || 'Photo')}" loading="lazy"></span>
+            ${m.libelle ? `<span class="ip-docs-photo-label">${escH(m.libelle)}</span>` : ''}
+          </button>`).join('')}
+      </div>` : ''}
       <div style="display:flex; flex-direction:column; gap:8px;">
         ${autres.map(m => `
           <a href="${escH(m.url)}" target="_blank" rel="noopener" style="display:flex; align-items:center; gap:10px; border:1px solid oklch(0.9 0.004 30); border-radius:8px; padding:8px 10px; text-decoration:none;">
-            ${m.type === 'photo'
-              ? `<img src="${escH(m.url)}" style="width:36px;height:36px;border-radius:6px;object-fit:cover;flex-shrink:0;">`
-              : `<div style="width:36px;height:36px;border-radius:6px;background:oklch(0.94 0.05 20);color:oklch(0.42 0.16 20);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">📄</div>`}
-            <span style="font-size:13px; color:oklch(0.2 0.006 30);">${escH(m.libelle || (m.type === 'photo' ? 'Photo' : 'Document PDF'))}</span>
+            <div style="width:36px;height:36px;border-radius:6px;background:oklch(0.94 0.05 20);color:oklch(0.42 0.16 20);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">📄</div>
+            <span style="font-size:13px; color:oklch(0.2 0.006 30);">${escH(m.libelle || 'Document PDF')}</span>
           </a>`).join('')}
       </div>
     </div>`;
@@ -925,8 +996,8 @@ function ipRenderSideColonne() {
         }).join('')}
       </div>
     </div>` : ''}
-    ${IP_COMPTES_RENDUS.length ? `<div class="ip-side-box">
-      <div class="ip-side-title">📄 Comptes rendus disponibles</div>
+    ${IP_COMPTES_RENDUS.length ? `<div class="ip-side-box ip-side-box--cr fc-cr">
+      <div class="fc-band ip-cr-band"><span>📄</span><b>COMPTES RENDUS DISPONIBLES</b></div>
       <div class="ip-cr-liste">
         ${IP_COMPTES_RENDUS.map(c => `
           <a class="ip-cr-card" href="compte-rendu.html?evt=${Number(c.evenement_id)}" target="_blank" rel="noopener">
@@ -941,18 +1012,52 @@ function ipRenderSideColonne() {
       </div>
     </div>` : ''}`;
 }
-/* Classes de grille posées une fois le contenu réel connu (jamais à l'avance) : chaque colonne
-   latérale n'apparaît que si elle a quelque chose à montrer — voir le commentaire CSS sur
-   .ip-layout--has-left/--has-right. Appelée une première fois après ipRenderSideColonne() (les
-   3 écrans d'état — fermée, pas encore ouverte, paiement — n'ont pas de colonne droite), puis de
-   nouveau après ipRenderColonneDroite() sur le parcours normal. */
+/* Classes + gabarit de grille posés une fois le contenu réel connu (jamais à l'avance) : chaque
+   colonne n'apparaît que si elle a quelque chose à montrer — voir le commentaire CSS sur
+   .ip-layout--has-left/--has-right/--has-programme. Appelée une première fois après
+   ipRenderSideColonne() (les 3 écrans d'état — fermée, pas encore ouverte, paiement — n'ont pas de
+   colonne droite), puis de nouveau après ipRenderColonneDroite() et ipRenderColonneProgramme() sur
+   le parcours normal, et à chaque redimensionnement (seuil calculé dynamiquement, voir le
+   commentaire CSS juste avant .ip-layout.ip-layout--has-left). */
+const IP_COL = { left: 280, right: 420, prog: 360, gap: 28, centreMin: 480 };
+function ipGabaritColonnes(hasLeft, hasRight, hasProg) {
+  const cols = [];
+  if (hasLeft) cols.push(IP_COL.left + 'px');
+  cols.push('minmax(' + IP_COL.centreMin + 'px,1fr)');
+  if (hasRight) cols.push(IP_COL.right + 'px');
+  if (hasProg) cols.push(IP_COL.prog + 'px');
+  return cols.join(' ');
+}
 function ipAppliquerLayout() {
   const layout = document.getElementById('ip-layout');
   const side = document.getElementById('ip-side');
   const right = document.getElementById('ip-right');
-  layout.classList.toggle('ip-layout--has-left', !!side.innerHTML.trim());
-  layout.classList.toggle('ip-layout--has-right', !!right.innerHTML.trim());
+  const prog = document.getElementById('ip-programme-col');
+  if (!layout || !side || !right) return;
+  const hasLeft = !!side.innerHTML.trim();
+  const hasRight = !!right.innerHTML.trim();
+  const hasProg = !!(prog && prog.innerHTML.trim());
+  layout.classList.toggle('ip-layout--has-left', hasLeft);
+  layout.classList.toggle('ip-layout--has-right', hasRight);
+  layout.classList.toggle('ip-layout--has-programme', hasProg);
+  if (!hasLeft && !hasRight && !hasProg) {
+    layout.classList.remove('ip-layout--grid');
+    layout.style.gridTemplateColumns = '';
+    layout.style.maxWidth = '';
+    return;
+  }
+  const totalMin = (hasLeft ? IP_COL.left + IP_COL.gap : 0) + IP_COL.centreMin
+    + (hasRight ? IP_COL.right + IP_COL.gap : 0) + (hasProg ? IP_COL.prog + IP_COL.gap : 0);
+  layout.style.maxWidth = (totalMin + 364) + 'px';
+  const enGrille = window.innerWidth >= (totalMin + 84);
+  layout.classList.toggle('ip-layout--grid', enGrille);
+  layout.style.gridTemplateColumns = enGrille ? ipGabaritColonnes(hasLeft, hasRight, hasProg) : '';
 }
+let IP_LAYOUT_RESIZE_RAF = null;
+window.addEventListener('resize', () => {
+  if (IP_LAYOUT_RESIZE_RAF) return;
+  IP_LAYOUT_RESIZE_RAF = requestAnimationFrame(() => { IP_LAYOUT_RESIZE_RAF = null; ipAppliquerLayout(); });
+});
 
 /* ── Visuels de l'événement : photos (diaporama plein écran) et vidéos (2026-10-29, demande explicite :
    "affiche les visuels de l'événement, photos et vidéos"). Alimentés par l'événement relié à la fiche
@@ -1005,8 +1110,15 @@ function ipRenderVisuels() {
       </div>` : ''}
     </section>`;
 }
-function ipOuvrirPhoto(i) {
-  if (!IP_PHOTOS.length) return;
+/* Visionneuse plein écran, réutilisable par n'importe quelle liste de photos (2026-10-30 : d'abord
+   IP_PHOTOS pour les photos/vidéos de l'événement, désormais aussi IP_DOC_PHOTOS pour les photos de
+   « Documents & médias », demande explicite « cliquer dessus pour les découvrir ») — IP_LB_PHOTOS
+   retient la liste ouverte pour que la navigation précédent/suivant et Échap fonctionnent pareil
+   quelle que soit la source. */
+let IP_LB_PHOTOS = [];
+function ipOuvrirPhoto(i, photos) {
+  IP_LB_PHOTOS = photos || IP_PHOTOS;
+  if (!IP_LB_PHOTOS.length) return;
   IP_LB_INDEX = i;
   let lb = document.getElementById('ip-lightbox');
   if (!lb) {
@@ -1020,16 +1132,16 @@ function ipOuvrirPhoto(i) {
 }
 function ipRenderPhoto() {
   const lb = document.getElementById('ip-lightbox'); if (!lb) return;
-  const p = IP_PHOTOS[IP_LB_INDEX];
+  const p = IP_LB_PHOTOS[IP_LB_INDEX];
   lb.innerHTML = `
     <img src="${ipAttr(p.url)}" alt="${ipAttr(p.libelle || '')}">
     <button type="button" class="lb-x" onclick="ipFermerPhoto()" aria-label="Fermer">✕</button>
-    ${IP_PHOTOS.length > 1 ? `<button type="button" class="lb-p" onclick="ipPhotoSuivante(-1)" aria-label="Photo précédente">‹</button>
+    ${IP_LB_PHOTOS.length > 1 ? `<button type="button" class="lb-p" onclick="ipPhotoSuivante(-1)" aria-label="Photo précédente">‹</button>
     <button type="button" class="lb-n" onclick="ipPhotoSuivante(1)" aria-label="Photo suivante">›</button>` : ''}
-    <div class="lb-c">${IP_LB_INDEX + 1} / ${IP_PHOTOS.length}</div>`;
+    <div class="lb-c">${IP_LB_INDEX + 1} / ${IP_LB_PHOTOS.length}</div>`;
   const x = lb.querySelector('.lb-x'); if (x) x.focus();
 }
-function ipPhotoSuivante(d) { IP_LB_INDEX = (IP_LB_INDEX + d + IP_PHOTOS.length) % IP_PHOTOS.length; ipRenderPhoto(); }
+function ipPhotoSuivante(d) { IP_LB_INDEX = (IP_LB_INDEX + d + IP_LB_PHOTOS.length) % IP_LB_PHOTOS.length; ipRenderPhoto(); }
 function ipFermerPhoto() {
   const lb = document.getElementById('ip-lightbox'); if (lb) lb.remove();
   document.removeEventListener('keydown', ipToucheLightbox);
@@ -1037,8 +1149,8 @@ function ipFermerPhoto() {
 function ipToucheLightbox(e) {
   if (!document.getElementById('ip-lightbox')) return;
   if (e.key === 'Escape') ipFermerPhoto();
-  else if (e.key === 'ArrowLeft' && IP_PHOTOS.length > 1) ipPhotoSuivante(-1);
-  else if (e.key === 'ArrowRight' && IP_PHOTOS.length > 1) ipPhotoSuivante(1);
+  else if (e.key === 'ArrowLeft' && IP_LB_PHOTOS.length > 1) ipPhotoSuivante(-1);
+  else if (e.key === 'ArrowRight' && IP_LB_PHOTOS.length > 1) ipPhotoSuivante(1);
 }
 
 /* Retrouver une inscription payante restée sans paiement et reprendre le paiement (2026-10-29,
@@ -1447,34 +1559,112 @@ function ipRenderParrainage() {
       <span>Pas encore de compte Diaspo'Actif ? <strong>Créez-en un</strong>${IP_PARRAINAGE.nom ? ` via ${escH(IP_PARRAINAGE.nom)}` : ''} →</span>
     </a>`;
 }
-/* Programme (2026-10-30, demande explicite) : insc_fiches.programme_texte, une ligne par temps
-   fort (même champ que renderProgramme() dans inscriptions-admin.html, ici affiché pour la
-   première fois côté public — jusqu'ici saisi par l'organisateur mais jamais montré au visiteur). */
+/* Programme (2026-10-30, demande explicite) : insc_fiches.programme_texte, une ligne libre par
+   temps fort (même champ que renderProgramme() dans inscriptions-admin.html, ici affiché pour la
+   première fois côté public). Ré-agencé le même jour (demande explicite : « tu mets les heures à
+   gauche et ce qui va se passer à droite [...] dans une même bulle ») : le texte libre est
+   regroupé par étape en détectant les lignes qui ne contiennent qu'une heure ("10h00", "10:00") —
+   deux heures consécutives = début puis fin d'un créneau, tout le texte qui suit (jusqu'à la
+   prochaine heure) est le contenu de cette étape. Une ligne de texte rencontrée avant toute heure
+   (ex. un titre de section libre) reste une étape sans heure, affichée sans bulle. Format tolérant
+   à l'ancien texte saisi avant cette mise en forme : sans aucune heure reconnue, tout redevient une
+   seule étape "sans heure" (comportement identique à l'ancien rendu en liste). */
+function ipParseProgramme(lignes) {
+  const reHeure = /^(\d{1,2})\s*[h:]\s*(\d{2})$/i;
+  const etapes = [];
+  let courante = null;
+  /* true juste après avoir lu une heure de début, tant que l'heure de fin n'est pas encore
+     arrivée. Piloté par une variable dédiée plutôt que déduit de courante.debut/fin : un texte
+     d'intro SANS heure (ex. "Déroulement de la matinée") crée une première étape avec debut=null,
+     et sans cette variable séparée, la condition « courante.debut && courante.fin » restait
+     bloquée à faux pour toujours — chaque heure suivante tombait alors dans aucune des deux
+     branches et disparaissait silencieusement (bug réel trouvé à l'exécution : aucune heure
+     n'apparaissait nulle part dans le rendu, pas même comme texte). */
+  let attenteFin = false;
+  lignes.forEach(l => {
+    const m = l.match(reHeure);
+    if (m) {
+      const heure = m[1].padStart(2, '0') + 'h' + m[2];
+      if (attenteFin && courante) { courante.fin = heure; attenteFin = false; }
+      else { courante = { debut: heure, fin: null, textes: [] }; etapes.push(courante); attenteFin = true; }
+    } else {
+      attenteFin = false;
+      if (!courante) { courante = { debut: null, fin: null, textes: [] }; etapes.push(courante); }
+      courante.textes.push(l);
+    }
+  });
+  return etapes.filter(e => e.debut || e.textes.length);
+}
 function ipRenderProgramme() {
   const f = IP_FICHE;
   const texte = String(f.programme_texte || '').trim();
   const fichier = f.programme_fichier_url;
   if (!texte && !fichier) return '';
   const lignes = texte.split('\n').map(l => l.trim()).filter(Boolean);
+  const etapes = ipParseProgramme(lignes);
   return `
     <section class="ip-right-section" aria-label="Programme">
       <h3 class="ip-right-section-titre">📋 Au programme</h3>
-      ${lignes.length ? `<ul class="ip-programme-list">${lignes.map(l => `<li class="ip-programme-item">${escH(l)}</li>`).join('')}</ul>` : ''}
+      ${etapes.length ? `
+        <div class="ip-prog-wrap" id="ip-prog-wrap"><div class="ip-programme-list" id="ip-prog-list">${etapes.map(e => `
+          <div class="ip-prog-etape">
+            ${e.debut ? `<div class="ip-prog-heures"><span>${escH(e.debut)}</span>${e.fin ? `<span>${escH(e.fin)}</span>` : ''}</div>` : ''}
+            <div class="ip-prog-corps">${e.textes.map((t, i) => `<div class="${i === 0 ? 'ip-prog-titre' : 'ip-prog-detail'}">${escH(t)}</div>`).join('')}</div>
+          </div>`).join('')}</div></div>
+        <button type="button" class="ip-desc-plus" id="ip-prog-plus" onclick="ipToggleProgramme()" hidden>Voir plus ↓</button>` : ''}
       ${fichier ? `<a class="ip-programme-fichier" href="${escH(fichier)}" target="_blank" rel="noopener">📄 <span>${escH(f.programme_fichier_nom || 'Programme (PDF)')}</span></a>` : ''}
     </section>`;
 }
-/* Colonne de droite (2026-10-30, demande explicite : « à droite, le descriptif de l'événement.
-   Et le programme. ») — titre + organisateur + description + programme, séparés des visuels et
-   des types d'inscription (colonne centrale, ipRenderAccueil()) pour suivre exactement la mise
-   en page demandée. */
+/* Colonne « description » (2026-10-30, demande explicite : « à droite, le descriptif de
+   l'événement » — puis, le même jour, correction explicite : « tu crées une colonne à droite de
+   description pour le programme », le programme ne doit plus partager cette colonne). */
 function ipRenderColonneDroite() {
   const f = IP_FICHE;
   document.getElementById('ip-right').innerHTML = `
     <h1 class="ip-titre">${escH(f.nom)}</h1>
     ${f.organisateur ? `<p style="font-size:12.5px;color:oklch(0.5 0.006 30);margin:0 0 18px;">Organisé par ${escH(f.organisateur)}</p>` : ''}
-    ${f.description ? `<section class="ip-right-section" aria-label="Détail de l'événement"><h3 class="ip-right-section-titre">Description</h3><div class="ip-desc rich-content">${renderRichText(f.description)}</div></section>` : ''}
-    ${ipRenderProgramme()}`;
+    ${f.description ? `<section class="ip-right-section" aria-label="Détail de l'événement">
+      <h3 class="ip-right-section-titre">Description</h3>
+      <div class="ip-desc-wrap" id="ip-desc-wrap"><div class="ip-desc rich-content" id="ip-desc">${renderRichText(f.description)}</div></div>
+      <button type="button" class="ip-desc-plus" id="ip-desc-plus" onclick="ipToggleDescription()" hidden>Voir plus ↓</button>
+    </section>` : ''}`;
+  ipAjusterApercuDescription();
 }
+/* Colonne « programme », distincte de la description (2026-10-30, demande explicite, voir
+   commentaire ci-dessus). */
+function ipRenderColonneProgramme() {
+  document.getElementById('ip-programme-col').innerHTML = ipRenderProgramme();
+  ipAjusterApercuProgramme();
+}
+/* Aperçu + "Voir plus" — générique (description : 2/3, demande explicite ; programme : 3/4 "voire
+   davantage", demande explicite) : le clamp doit être posé AVANT de mesurer (requestAnimationFrame :
+   après le prochain repaint, une fois le CSS appliqué), sinon scrollHeight == clientHeight tout le
+   temps et le bouton resterait injustement masqué. La hauteur repliée est calculée depuis la
+   hauteur RÉELLE du contenu (pas une valeur fixe) : un texte court n'est jamais inutilement coupé. */
+function ipAjusterApercu(wrapId, innerId, btnId, ratio, seuilMin) {
+  const wrap = document.getElementById(wrapId), inner = document.getElementById(innerId), btn = document.getElementById(btnId);
+  if (!wrap || !inner || !btn) return;
+  wrap.dataset.collapsed = '0';
+  requestAnimationFrame(() => {
+    const hauteurTotale = inner.scrollHeight;
+    if (hauteurTotale <= seuilMin) { btn.hidden = true; return; }
+    wrap.style.setProperty('--ip-collapsed-h', Math.round(hauteurTotale * ratio) + 'px');
+    wrap.dataset.collapsed = '1';
+    btn.hidden = false;
+    btn.textContent = 'Voir plus ↓';
+  });
+}
+function ipAjusterApercuDescription() { ipAjusterApercu('ip-desc-wrap', 'ip-desc', 'ip-desc-plus', 2 / 3, 240); }
+function ipAjusterApercuProgramme() { ipAjusterApercu('ip-prog-wrap', 'ip-prog-list', 'ip-prog-plus', 3 / 4, 320); }
+function ipToggleApercu(wrapId, btnId) {
+  const wrap = document.getElementById(wrapId), btn = document.getElementById(btnId);
+  const etaitReplie = wrap.dataset.collapsed === '1';
+  wrap.dataset.collapsed = etaitReplie ? '0' : '1';
+  btn.textContent = etaitReplie ? 'Voir moins ↑' : 'Voir plus ↓';
+  if (etaitReplie) wrap.scrollIntoView({ block: 'nearest' });
+}
+function ipToggleDescription() { ipToggleApercu('ip-desc-wrap', 'ip-desc-plus'); }
+function ipToggleProgramme() { ipToggleApercu('ip-prog-wrap', 'ip-prog-plus'); }
 function ipRenderAccueil() {
   const f = IP_FICHE;
   document.getElementById('ip-root').innerHTML = `
@@ -1501,6 +1691,7 @@ function ipRenderAccueil() {
     ${ipRenderLogos('Nos sponsors', f.sponsors_json)}
     ${ipRenderLogos('Nos partenaires', f.partenaires_json)}`;
   ipRenderColonneDroite();
+  ipRenderColonneProgramme();
   ipAppliquerLayout();
 }
 /* Ordre de la page (2026-10-30, demande explicite : « présente d'abord les documents, les types d'inscription
