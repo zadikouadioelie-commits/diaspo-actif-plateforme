@@ -1634,6 +1634,23 @@ async function submitForm(btnId,errId,body){
     errBox.scrollIntoView({block:"center"});
   }
 }
+/* Nom d'initiative déjà pris : avertit dès que la personne quitte le champ, sans attendre l'envoi. */
+(function(){
+  const champ=document.getElementById("i-nom");if(!champ)return;
+  const msg=document.createElement("div");
+  msg.style.cssText="display:none;color:#dc2626;font-size:12.5px;font-weight:600;margin-top:4px;";
+  msg.setAttribute("role","alert");champ.insertAdjacentElement("afterend",msg);
+  let derniere=0;
+  champ.addEventListener("input",()=>{msg.style.display="none";champ.classList.remove("di-champ-manquant");});
+  champ.addEventListener("blur",async()=>{
+    const v=champ.value.trim();if(!v)return;const n=++derniere;
+    try{
+      const d=await api("GET","/initiative-nom-disponible?nom="+encodeURIComponent(v));
+      if(n!==derniere)return;
+      if(d&&d.disponible===false){msg.textContent="⚠️ "+d.message;msg.style.display="block";champ.classList.add("di-champ-manquant");}
+    }catch(e){}
+  });
+})();
 /* Collecte une erreur de champ obligatoire au lieu d'interrompre la validation (voir
    afficherErreursFormulaire ci-dessous) — pousse dans `erreurs` plutôt que de jeter. */
 function req(erreurs,v,label,elId){if(!v)erreurs.push({msg:"Le champ « "+label+" » est obligatoire.",id:elId});}
@@ -1755,6 +1772,8 @@ document.getElementById("i-submit").addEventListener("click",async()=>{
     if(pwd&&pwd2&&pwd!==pwd2)erreurs.push({msg:"Les mots de passe ne correspondent pas.",id:"i-pwd2"});
     if(pwd&&pwd.length<8)erreurs.push({msg:"Le mot de passe doit comporter au moins 8 caracteres.",id:"i-pwd"});
     if(!document.getElementById("i-charte").checked)erreurs.push({msg:"Vous devez lire et accepter la Charte Institutionnelle pour créer un compte.",id:"i-charte"});
+    /* Deux initiatives ne peuvent pas porter le même nom : contrôle avant l'envoi (le serveur le refuse aussi). */
+    if(nom){try{const d=await api("GET","/initiative-nom-disponible?nom="+encodeURIComponent(nom));if(d&&d.disponible===false)erreurs.push({msg:d.message,id:"i-nom"});}catch(e){}}
     if(erreurs.length){afficherErreursFormulaire(erreurs,"i-error");return;}
     const rs=document.getElementById("i-rs").value.trim();
     const rayonnement=document.querySelector('input[name="i-ray"]:checked')?.value||'locale';

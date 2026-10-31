@@ -545,6 +545,30 @@ async function nomCompteAffichage(userId) {
   }
   return [user.prenom, user.nom].filter(Boolean).join(' ') || user.nom || '';
 }
+/* Unicité du nom d'initiative (demande explicite, 2026-10-31) : deux initiatives ne peuvent pas
+   porter le même nom sur Diaspo'Actif — sinon une personne ne sait plus laquelle elle suit, soutient
+   ou paie. La comparaison ignore la casse, les accents, la ponctuation et les espaces en trop
+   (« Solidarité-Diaspora », « solidarite diaspora » et « SOLIDARITÉ  DIASPORA » sont le même nom).
+   Comparée en JavaScript plutôt qu'en SQL : LOWER() et les accents ne se comportent pas pareil
+   entre SQLite (local) et PostgreSQL (production). Référence UNIQUE — toute création ou
+   modification d'un nom d'initiative passe par nomInitiativeDejaPris(). */
+const MSG_NOM_INITIATIVE_PRIS = "Cette initiative existe déjà. Ce nom est déjà utilisé. Modifiez ce nom.";
+function nomInitiativeNormalise(s) {
+  return String(s == null ? "" : s).normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+/* Retourne la ligne d'initiative qui porte déjà ce nom, ou null.
+   exclureOwnerId / exclureInitiativeId : ignorer l'initiative du compte qui se renomme lui-même. */
+async function nomInitiativeDejaPris(nom, exclureOwnerId, exclureInitiativeId) {
+  const cle = nomInitiativeNormalise(nom);
+  if (!cle) return null;
+  const rows = await db.prepare("SELECT id, nom, owner_user_id FROM initiatives").all();
+  return rows.find(r => {
+    if (exclureInitiativeId != null && Number(r.id) === Number(exclureInitiativeId)) return false;
+    if (exclureOwnerId != null && r.owner_user_id != null && Number(r.owner_user_id) === Number(exclureOwnerId)) return false;
+    return nomInitiativeNormalise(r.nom) === cle;
+  }) || null;
+}
 /* Équivalent SQL de nomCompteAffichage(), pour les LISTES — évite un aller-retour DB par ligne.
    `alias` = alias de la table users dans la requête ; `initAlias` = alias d'un
    LEFT JOIN initiatives {initAlias} ON {initAlias}.owner_user_id = {alias}.id
@@ -688,6 +712,10 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
   /* Sécurité : le rôle "administrateur" ne peut PAS être créé via l'inscription publique.
      Un admin ne peut être promu que manuellement en base (ou par un admin existant). */
   if (!["utilisateur", "initiative", "collectivite"].includes(role)) return sendJSON(res, 400, { error: "Rôle invalide." });
+  /* Un nom d'initiative est unique : refusé AVANT toute création de compte, pour ne rien laisser derrière. */
+  if (role === "initiative" && await nomInitiativeDejaPris(nom_institution || nom)) {
+    return sendJSON(res, 409, { error: MSG_NOM_INITIATIVE_PRIS, code: "nom_initiative_deja_pris" });
+  }
 
   /* Pays d'origine et pays de résidence sont le socle de la mise en relation entre
      diasporas : la plateforme ne sait rien proposer de pertinent sans eux. La règle est
@@ -11559,6 +11587,21 @@ route("PUT", "/api/initiatives/:id/profil-public", async (req, res, params, body
   sendJSON(res, 200, { ok: true });
 });
 
+/* GET /api/initiative-nom-disponible?nom=… — contrôle en direct dans les formulaires (inscription,
+   paramètres du compte) pour avertir AVANT l'envoi. Public : l'inscription n'a pas encore de session,
+   et le nom d'une initiative est de toute façon public (annuaire). Si la personne est connectée, sa
+   propre initiative n'est pas comptée (elle peut garder son nom). */
+route("GET", "/api/initiative-nom-disponible", async (req, res, params, body, query) => {
+  const limite = SEC.rateLimit(`nom-initiative:ip:${SEC.clientIp(req)}`, 60, 60000);
+  if (!limite.allowed) return sendJSON(res, 429, { error: "Trop de vérifications. Réessayez dans quelques secondes." });
+  const nom = String((query && query.nom) || "").trim();
+  if (!nom) return sendJSON(res, 200, { disponible: true });
+  const user = await getCurrentUser(req).catch(() => null);
+  const pris = await nomInitiativeDejaPris(nom, user && user.role === "initiative" ? user.id : null);
+  if (pris) return sendJSON(res, 200, { disponible: false, message: MSG_NOM_INITIATIVE_PRIS });
+  sendJSON(res, 200, { disponible: true });
+});
+
 route("POST", "/api/initiatives", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user || !["initiative", "collectivite", "administrateur"].includes(user.role)) return sendJSON(res, 403, { error: "Seul un compte Initiative, Collectivité ou Administrateur peut créer une initiative." });
@@ -11572,6 +11615,7 @@ route("POST", "/api/initiatives", async (req, res, params, body) => {
     site_web, membres,
     statut_creation, denomination_officielle, forme_juridique, date_creation_structure, numero_fiscal } = body;
   if (!nom) return sendJSON(res, 400, { error: "Le nom de l'initiative est requis." });
+  if (await nomInitiativeDejaPris(nom)) return sendJSON(res, 409, { error: MSG_NOM_INITIATIVE_PRIS, code: "nom_initiative_deja_pris" });
   const slug = nom.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") + "-" + Date.now();
   const id = (await db.prepare(`
     INSERT INTO initiatives (slug, nom, sigle, pays, pays_origine, region, ville, commune, departement, zone,
@@ -19270,6 +19314,9 @@ route("PUT", "/api/profil", async (req, res, params, body) => {
     if (user.role === "collectivite" || user.role === "administrateur") {
       fields.push("nom_institution=?"); vals.push(nomStructure || null);
     } else if (user.role === "initiative" && nomStructure) {
+      if (await nomInitiativeDejaPris(nomStructure, user.id)) {
+        return sendJSON(res, 409, { error: MSG_NOM_INITIATIVE_PRIS, code: "nom_initiative_deja_pris" });
+      }
       await db.prepare("UPDATE initiatives SET nom=? WHERE owner_user_id=?").run(nomStructure, user.id);
     }
   }
@@ -26742,6 +26789,7 @@ route("POST", "/api/admin/relais-diaspora/producteurs", async (req, res, params,
   const emailNorm = SEC.normalizeEmail(email);
   const existing = await db.prepare("SELECT id FROM users WHERE LOWER(email)=?").get(emailNorm);
   if (existing) return sendJSON(res, 409, { error: "Un compte existe déjà avec cet e-mail." });
+  if (await nomInitiativeDejaPris(nom)) return sendJSON(res, 409, { error: MSG_NOM_INITIATIVE_PRIS, code: "nom_initiative_deja_pris" });
   const { hash, salt } = hashPassword(password);
   const dsId = await dsIdUniqueGenerer();
   /* statut_verification='valide' directement : cette route EST la validation (admin, par
