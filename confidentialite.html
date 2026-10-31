@@ -553,7 +553,7 @@ function urlBase64ToUint8Array(base64String) {
   zone.innerHTML = `
     <div class="codes-card">
       <h4>🔐 Code de Sécurité Diaspo'Actif (DS-ID)</h4>
-      <p class="codes-sub">Votre signature numérique personnelle, permanente et non modifiable · jamais visible par un administrateur · utilisée pour signer des deals, partenariats et <strong>votes sécurisés</strong>. Consultable uniquement par vous, 30 secondes à la fois, une fois par heure.</p>
+      <p class="codes-sub">Votre signature numérique personnelle, permanente et non modifiable · jamais visible par un administrateur · utilisée pour signer des deals, partenariats et <strong>votes sécurisés</strong>. Consultable uniquement par vous, 45 secondes à la fois ; nouvelle consultation possible après 1 minute, puis 5 minutes entre chaque consultation suivante.</p>
       <div id="ds-masked-view">
         <div class="ds-masked">••••••••••••••••••••</div>
         <div class="codes-btn-row">
@@ -607,8 +607,8 @@ function urlBase64ToUint8Array(base64String) {
     const maj = () => {
       const restant = Math.max(0, Math.round((fin - Date.now()) / 1000));
       if (restant <= 0) { clearInterval(_dsMinuteur); btn.disabled = false; msg.style.display = 'none'; return; }
-      const h = Math.floor(restant / 3600), m = Math.floor((restant % 3600) / 60);
-      msg.textContent = `🔒 Nouvelle consultation possible dans ${h > 0 ? h + ' h ' : ''}${m} min.`;
+      const h = Math.floor(restant / 3600), m = Math.floor((restant % 3600) / 60), s = restant % 60;
+      msg.textContent = `🔒 Nouvelle consultation possible dans ${h > 0 ? h + ' h ' : ''}${m > 0 ? m + ' min ' : ''}${h > 0 ? '' : s + ' s'}.`.replace(/\s+\./, '.');
     };
     maj();
     _dsMinuteur = setInterval(maj, 1000);
@@ -639,13 +639,13 @@ function urlBase64ToUint8Array(base64String) {
   });
   window._cancelDsId = function() { document.getElementById('ds-pwd-form').style.display = 'none'; };
 
-  /* Affichage 30 secondes puis masquage automatique — "Aucune action supplémentaire
+  /* Affichage 45 secondes (durée donnée par le serveur) puis masquage automatique — "Aucune action supplémentaire
      n'est nécessaire : le reverrouillage est automatique" (aucun bouton "Masquer"). */
-  function _dsAfficherPuisMasquer(code) {
+  function _dsAfficherPuisMasquer(code, dureeSecondes) {
     document.getElementById('ds-value').textContent = code;
     document.getElementById('ds-masked-view').style.display = 'none';
     document.getElementById('ds-revealed-view').style.display = '';
-    let restant = 30;
+    let restant = Number(dureeSecondes) > 0 ? Number(dureeSecondes) : 45;
     const compteur = document.getElementById('ds-compte-rebours');
     compteur.textContent = restant;
     const tick = setInterval(() => {
@@ -655,7 +655,8 @@ function urlBase64ToUint8Array(base64String) {
         document.getElementById('ds-revealed-view').style.display = 'none';
         document.getElementById('ds-masked-view').style.display = '';
         document.getElementById('ds-value').textContent = '';
-        _dsAppliquerAttente(3600);
+        /* L'attente (1 min puis 5 min) est décidée par le serveur : on la lui redemande. */
+        api('GET', '/profil/ds-id/status').then(st => _dsAppliquerAttente(st.secondes_restantes || 0)).catch(() => _dsAppliquerAttente(60));
         return;
       }
       compteur.textContent = restant;
@@ -670,14 +671,14 @@ function urlBase64ToUint8Array(base64String) {
     try {
       const r = await api('POST', '/profil/ds-id/reveal', { password: pwd });
       document.getElementById('ds-pwd-form').style.display = 'none';
-      _dsAfficherPuisMasquer(r.ds_id);
+      _dsAfficherPuisMasquer(r.ds_id, r.duree_affichage_secondes);
       loadDsHistory();
     } catch(e) {
-      /* 429 : le délai d'1h a expiré entre l'ouverture du formulaire et la validation
-         (onglet resté ouvert) — on l'affiche comme un délai, pas comme une erreur de saisie. */
+      /* 429 : le délai d'attente n'est pas écoulé (onglet resté ouvert, autre appareil) —
+         on l'affiche comme un délai, pas comme une erreur de saisie. */
       if (e.data?.minutes_restantes !== undefined) {
         document.getElementById('ds-pwd-form').style.display = 'none';
-        _dsAppliquerAttente(e.data.minutes_restantes * 60);
+        _dsAppliquerAttente(e.data.secondes_restantes || e.data.minutes_restantes * 60);
       } else {
         err.textContent = e.message || 'Erreur de validation.';
         err.style.display = 'block';

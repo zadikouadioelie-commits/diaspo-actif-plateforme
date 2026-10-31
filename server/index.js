@@ -11768,7 +11768,22 @@ route("GET", "/api/account/by-da-id/:daId", async (req, res, params) => {
    Aucune route n'expose le code a un administrateur ; ds_id_history ne journalise
    jamais la valeur elle-meme, seulement l'action, la date et le contexte. */
 
-const DS_ID_DELAI_MS = 60 * 60 * 1000; // 1 heure entre deux consultations reussies
+/* Délais revus le 2026-10-31 (demande explicite) : avant, une seule consultation par heure, code visible 30 s.
+   Maintenant : code visible 45 s ; après une PREMIÈRE consultation, on peut recommencer au bout de 1 minute ;
+   si une consultation précédente a eu lieu dans l'heure qui précédait la dernière (c'est-à-dire dès la
+   « fois suivante »), l'attente passe à 5 minutes. Une heure sans consultation remet le compteur à zéro
+   (retour au délai de 1 minute). Le mot de passe reste exigé à chaque fois. */
+const DS_ID_DUREE_AFFICHAGE_S = 45;
+const DS_ID_DELAI_PREMIERE_MS = 1 * 60 * 1000;   // après une première consultation
+const DS_ID_DELAI_SUIVANTES_MS = 5 * 60 * 1000;  // après les consultations suivantes
+const DS_ID_FENETRE_SERIE_MS = 60 * 60 * 1000;   // au-delà, on repart de zéro
+
+function dsIdVersMs(v) {
+  if (!v) return null;
+  const d = (v instanceof Date) ? v : new Date(String(v).replace(' ', 'T') + 'Z');
+  const t = d.getTime();
+  return Number.isFinite(t) ? t : null;
+}
 
 /* Dernier moment ou une consultation a reellement abouti, ou null si aucune. */
 async function derniereConsultationDsId(userId) {
@@ -11788,22 +11803,36 @@ async function derniereConsultationDsId(userId) {
   return d.getTime();
 }
 
+/* Délai d'attente applicable maintenant : 1 minute après une première consultation, 5 minutes si la
+   consultation précédente remonte à moins d'une heure avant la dernière. */
+async function delaiDsId(userId) {
+  const lignes = await db.prepare(
+    `SELECT created_at FROM ds_id_history WHERE user_id=? AND action='consultation' ORDER BY created_at DESC LIMIT 2`
+  ).all(userId);
+  const derniere = dsIdVersMs(lignes[0] && lignes[0].created_at);
+  if (derniere === null) return { derniere: null, delaiMs: 0 };
+  const precedente = dsIdVersMs(lignes[1] && lignes[1].created_at);
+  const enSerie = precedente !== null && (derniere - precedente) < DS_ID_FENETRE_SERIE_MS;
+  return { derniere, delaiMs: enSerie ? DS_ID_DELAI_SUIVANTES_MS : DS_ID_DELAI_PREMIERE_MS };
+}
+
 /* ══ DS-ID — Statut : le bouton peut-il s'afficher actif, ou combien de temps reste-t-il ? ══
    Sans cette route, l'interface ne pourrait savoir que le bouton est bloque qu'apres
    avoir essuye un rejet - moins clair pour le titulaire que de le voir deja desactive. */
 route("GET", "/api/profil/ds-id/status", async (req, res) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: 'Connexion requise.' });
-  const derniere = await derniereConsultationDsId(user.id);
+  const { derniere, delaiMs } = await delaiDsId(user.id);
   const ecoule = derniere ? Date.now() - derniere : Infinity;
-  const disponible = ecoule >= DS_ID_DELAI_MS;
+  const disponible = ecoule >= delaiMs;
   sendJSON(res, 200, {
     disponible,
-    secondes_restantes: disponible ? 0 : Math.ceil((DS_ID_DELAI_MS - ecoule) / 1000),
+    secondes_restantes: disponible ? 0 : Math.ceil((delaiMs - ecoule) / 1000),
+    duree_affichage_secondes: DS_ID_DUREE_AFFICHAGE_S,
   });
 });
 
-/* ══ DS-ID — Consultation : mot de passe requis, 1 par heure, jamais plus ══ */
+/* ══ DS-ID — Consultation : mot de passe requis, attente de 1 min puis 5 min entre deux consultations ══ */
 route("POST", "/api/profil/ds-id/reveal", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: 'Connexion requise.' });
@@ -11811,12 +11840,14 @@ route("POST", "/api/profil/ds-id/reveal", async (req, res, params, body) => {
   /* Le delai s'applique AVANT toute verification de mot de passe : la specification
      est explicite ("aucune nouvelle consultation n'est possible, meme avec le mot de
      passe") - un mur absolu, pas conditionne a la qualite des identifiants fournis. */
-  const derniere = await derniereConsultationDsId(user.id);
-  if (derniere && (Date.now() - derniere) < DS_ID_DELAI_MS) {
-    const minutesRestantes = Math.ceil((DS_ID_DELAI_MS - (Date.now() - derniere)) / 60000);
+  const { derniere, delaiMs } = await delaiDsId(user.id);
+  if (derniere && (Date.now() - derniere) < delaiMs) {
+    const secondesRestantes = Math.ceil((delaiMs - (Date.now() - derniere)) / 1000);
+    const minutesRestantes = Math.ceil(secondesRestantes / 60);
     return sendJSON(res, 429, {
-      error: `Pour des raisons de sécurité, votre Code de Sécurité Diaspo'Actif ne pourra être consulté de nouveau qu'après 1 heure.`,
+      error: `Pour des raisons de sécurité, votre Code de Sécurité Diaspo'Actif ne pourra être consulté de nouveau qu'après ${Math.round(delaiMs / 60000)} minute${delaiMs > 60000 ? 's' : ''}.`,
       minutes_restantes: minutesRestantes,
+      secondes_restantes: secondesRestantes,
     });
   }
 
@@ -11849,7 +11880,7 @@ route("POST", "/api/profil/ds-id/reveal", async (req, res, params, body) => {
   }
 
   await db.prepare(`INSERT INTO ds_id_history (user_id, action, ip, user_agent) VALUES (?,?,?,?)`).run(user.id, 'consultation', req.socket?.remoteAddress || null, req.headers['user-agent'] || null);
-  sendJSON(res, 200, { ds_id: dsId, duree_affichage_secondes: 30 });
+  sendJSON(res, 200, { ds_id: dsId, duree_affichage_secondes: DS_ID_DUREE_AFFICHAGE_S });
 });
 
 /* ══ DS-ID — Historique ══

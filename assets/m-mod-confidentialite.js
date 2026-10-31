@@ -152,7 +152,7 @@
   }
 
   /* ---------- Code de sécurité (DS-ID) : mêmes règles que confidentialite.html (2026-10-08, demande explicite) ----------
-     Mot de passe requis à chaque consultation, affichage 30 secondes puis masquage automatique, une seule consultation par heure (le délai
+     Mot de passe requis à chaque consultation, affichage 45 secondes puis masquage automatique, attente de 1 minute puis 5 minutes entre deux consultations (le délai
      est appliqué par le serveur AVANT le mot de passe : routes /api/profil/ds-id/status et /reveal). Le code n'est jamais gardé ailleurs que
      dans cette feuille et il en est effacé à la fermeture. */
   function feuilleDsId() {
@@ -162,21 +162,26 @@
     const sh = $('#sheet'); if (sh) sh.onclick = e => { if (e.target === sh) close(); };   /* fermeture par le fond : on efface aussi le code */
     const zone = () => $('#ds-zone');
     const entete = '<h2 class="cf-sheet-t">Code de sécurité (DS-ID)</h2>';
-    const duree = s => { const tot = Math.max(1, Math.ceil(s / 60)), h = Math.floor(tot / 60), m = tot % 60; return (h > 0 ? h + ' h' : '') + (h > 0 && m > 0 ? ' ' : '') + (m > 0 || !h ? m + ' min' : ''); };
+    const duree = s => { s = Math.max(1, Math.ceil(s)); if (s < 60) return s + ' s'; const tot = Math.ceil(s / 60), h = Math.floor(tot / 60), m = tot % 60; return (h > 0 ? h + ' h' : '') + (h > 0 && m > 0 ? ' ' : '') + (m > 0 || !h ? m + ' min' : ''); };
     const attente = secondes => {
       clearInterval(minuteur);
       if (!zone()) return;
-      zone().innerHTML = `${entete}<div class="cf-alert o" style="margin-bottom:12px">🔒 Nouvelle consultation possible dans ${esc(duree(secondes))}.</div><p class="cf-sheet-p">Pour protéger votre signature numérique, le DS-ID ne peut être consulté qu’une seule fois par heure, même avec le mot de passe.</p><button class="btn out block" id="ds-fermer">Fermer</button>`;
+      zone().innerHTML = `${entete}<div class="cf-alert o" style="margin-bottom:12px">🔒 Nouvelle consultation possible dans ${esc(duree(secondes))}.</div><p class="cf-sheet-p">Pour protéger votre signature numérique, le DS-ID ne peut être consulté de nouveau qu’après un temps d’attente (1 minute, puis 5 minutes), même avec le mot de passe.</p><button class="btn out block" id="ds-fermer">Fermer</button>`;
       $('#ds-fermer').onclick = close;
     };
-    const afficher = code => {
+    const afficher = (code, dureeS) => {
       clearInterval(minuteur);
-      zone().innerHTML = `${entete}<div class="cf-ds-code" id="ds-code" aria-live="polite">${esc(code)}</div><p class="cf-hint" style="text-align:center">Masquage automatique dans <b id="ds-sec">30</b> s. Notez-le ou gardez cet écran ouvert : il ne s’affichera plus avant 1 heure.</p><button class="btn out block" id="ds-fermer" style="margin-top:12px">Masquer maintenant</button>`;
+      zone().innerHTML = `${entete}<div class="cf-ds-code" id="ds-code" aria-live="polite">${esc(code)}</div><p class="cf-hint" style="text-align:center">Masquage automatique dans <b id="ds-sec">${dureeS}</b> s. Notez-le ou gardez cet écran ouvert : il ne pourra être affiché de nouveau qu’après un temps d’attente (1 minute, puis 5 minutes).</p><button class="btn out block" id="ds-fermer" style="margin-top:12px">Masquer maintenant</button>`;
       $('#ds-fermer').onclick = close;
-      let reste = 30;
+      let reste = dureeS;
       minuteur = setInterval(() => {
         reste--;
-        if (reste <= 0) { attente(3600); return; }
+        if (reste <= 0) {
+          clearInterval(minuteur);
+          /* L'attente (1 min puis 5 min) est décidée par le serveur : on la lui redemande. */
+          api('/api/profil/ds-id/status').then(st => attente(st.secondes_restantes || 0)).catch(() => attente(60));
+          return;
+        }
         const c = $('#ds-sec'); if (c) c.textContent = reste; else clearInterval(minuteur);
       }, 1000);
     };
@@ -184,7 +189,7 @@
       zone().innerHTML = `${entete}<p class="cf-sheet-p">Votre DS-ID est votre signature numérique personnelle : permanente, non modifiable, jamais visible par un administrateur. Elle sert à signer des partenariats et des <b>votes sécurisés</b>, et à autoriser un nouvel appareil.</p>
         <label class="cf-lbl" for="ds-pwd">Votre mot de passe</label>
         <div class="cf-pwd"><input class="cf-in" id="ds-pwd" type="password" autocomplete="current-password" placeholder="Mot de passe"><button type="button" id="ds-oeil" aria-label="Afficher le mot de passe">👁</button></div>
-        <p class="cf-hint">Le code s’affiche 30 secondes, une seule fois par heure.</p>
+        <p class="cf-hint">Le code s’affiche 45 secondes ; nouvelle consultation possible après 1 minute, puis 5 minutes.</p>
         <p id="ds-err" class="small" style="color:var(--red);min-height:20px;margin:6px 2px" role="alert"></p>
         <button class="btn block" id="ds-ok">Afficher mon DS-ID</button><button class="btn out block" id="ds-non" style="margin-top:10px">Annuler</button>`;
       $('#ds-non').onclick = close;
@@ -195,10 +200,10 @@
         err.textContent = ''; const b = $('#ds-ok'); b.disabled = true; b.textContent = 'Vérification…';
         try {
           const r = await api('/api/profil/ds-id/reveal', { method: 'POST', body: { password: pwd } });
-          afficher(r.ds_id);
+          afficher(r.ds_id, Number(r.duree_affichage_secondes) > 0 ? Number(r.duree_affichage_secondes) : 45);
         } catch (e) {
           if (e.status === 401) { close(); await sessionExpiree(); return; }
-          if (e.data && e.data.minutes_restantes !== undefined) { attente(e.data.minutes_restantes * 60); return; }   /* le délai d'1 h est écoulé ailleurs : on l'affiche comme un délai */
+          if (e.data && e.data.minutes_restantes !== undefined) { attente(e.data.secondes_restantes || e.data.minutes_restantes * 60); return; }   /* le délai d'attente court encore (autre appareil) : on l'affiche comme un délai */
           err.textContent = e.message || 'Erreur de validation.'; b.disabled = false; b.textContent = 'Afficher mon DS-ID';
         }
       };
