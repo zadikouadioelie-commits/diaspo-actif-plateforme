@@ -2163,6 +2163,8 @@ const MIGRATIONS = [
   ["insc_fiches", "est_bouton_action INTEGER DEFAULT 0"],
   ["insc_fiches", "action_bouton_titre TEXT"],
   ["insc_fiches", "action_evenement_titre TEXT"],
+  // Places restantes visibles des inscrits seulement si l'organisateur coche l'option (2026-10-31) : 0 = masquées (défaut).
+  ["insc_fiches", "afficher_places INTEGER DEFAULT 0"],
   // Compte-rendu : logo de l'organisateur, partenaires (nom/logo/lien) et personnes mises en lumière (alimentent les graphiques) — 2026-10-06.
   ["evenement_comptes_rendus", "logo_url TEXT"],
   ["evenement_comptes_rendus", "partenaires_json TEXT DEFAULT '[]'"],

@@ -486,6 +486,8 @@ const COLONNES_MIGRATION = [
     ['insc_fiches', 'est_bouton_action', 'INTEGER DEFAULT 0'],
     ['insc_fiches', 'action_bouton_titre', 'TEXT'],
     ['insc_fiches', 'action_evenement_titre', 'TEXT'],
+    // Places restantes visibles des inscrits (2026-10-31) — miroir exact de l'ALTER db.js.
+    ['insc_fiches', 'afficher_places', 'INTEGER DEFAULT 0'],
     // Compte-rendu : logo organisateur, partenaires, personnes mises en lumière (2026-10-06) — miroir des ALTER db.js.
     ['evenement_comptes_rendus', 'logo_url', 'TEXT'],
     ['evenement_comptes_rendus', 'partenaires_json', "TEXT DEFAULT '[]'"],

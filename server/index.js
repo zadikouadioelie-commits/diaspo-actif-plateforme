@@ -20431,7 +20431,14 @@ async function handleStripeWebhook(req, res) {
         const COMMISSION_RATE = 0.03;
         const platform_fee = parseFloat((montant * COMMISSION_RATE).toFixed(2));
         const organizer_amount = parseFloat((montant - platform_fee).toFixed(2));
-        await db.prepare(`UPDATE insc_inscriptions SET statut_paiement='paye' WHERE id=?`).run(inscriptionId);
+        /* Quota revérifié au moment du paiement (2026-10-31) : une inscription non payée ne retient
+           plus de place, donc deux personnes ont pu payer la dernière place en même temps. La seconde
+           passe alors en liste d'attente (pas de billet confirmé) et l'organisateur est prévenu :
+           l'argent est bien reçu, le remboursement éventuel reste SA décision (jamais automatique). */
+        const quotaDepasse = !!type && type.places_max != null && insc.statut !== "liste_attente"
+          && await inscPlacesPrises(type.id, inscriptionId) >= type.places_max;
+        const statutFinal = quotaDepasse ? "liste_attente" : insc.statut;
+        await db.prepare(`UPDATE insc_inscriptions SET statut_paiement='paye', statut=? WHERE id=?`).run(statutFinal, inscriptionId);
         await db.prepare(`INSERT INTO wallet_transactions (insc_inscription_id,type,beneficiaire_id,montant,commission_rate,prix_billet,platform_fee,organizer_amount) VALUES (?,'platform_fee',NULL,?,?,?,?,?)`)
           .run(inscriptionId, platform_fee, COMMISSION_RATE, montant, platform_fee, organizer_amount);
         await db.prepare(`INSERT INTO wallet_transactions (insc_inscription_id,type,beneficiaire_id,montant,commission_rate,prix_billet,platform_fee,organizer_amount) VALUES (?,'organizer_credit',?,?,?,?,?,?)`)
@@ -20443,9 +20450,11 @@ async function handleStripeWebhook(req, res) {
             .run(insc.user_id, montant, 'inscription_evenement', new Date().toISOString());
         } catch (e) { /* table transactions peut avoir schema différent */ }
 
-        if (insc.statut === "confirme") await envoyerConfirmationInscription(inscriptionId);
-        const notifTitre = insc.statut === "inscrit" ? "⏳ Inscription en attente de validation" : "📝 Nouvelle inscription";
-        const notifContenu = insc.statut === "inscrit"
+        if (statutFinal === "confirme") await envoyerConfirmationInscription(inscriptionId);
+        const notifTitre = quotaDepasse ? "⚠️ Paiement reçu, catégorie complète" : insc.statut === "inscrit" ? "⏳ Inscription en attente de validation" : "📝 Nouvelle inscription";
+        const notifContenu = quotaDepasse
+          ? `${insc.prenom} ${insc.nom} a payé (${type?.label || ''}) à « ${fiche.nom} » alors que la catégorie venait d'être remplie (+${organizer_amount.toFixed(2)}€). Cette personne est en liste d'attente : acceptez-la ou remboursez-la.`
+          : insc.statut === "inscrit"
           ? `${insc.prenom} ${insc.nom} s'est inscrit·e (${type?.label || ''}) à « ${fiche.nom} » — en attente de votre validation.`
           : `${insc.prenom} ${insc.nom} vient de s'inscrire (${type?.label || ''}) à « ${fiche.nom} » (+${organizer_amount.toFixed(2)}€).`;
         // ?inscription=<id> : même amélioration que POST /api/insc/public/:slug/inscriptions
@@ -50257,7 +50266,7 @@ route("GET", "/api/insc/fiches/:id", async (req, res, params) => {
   const types = await db.prepare("SELECT * FROM insc_types WHERE fiche_id=? ORDER BY ordre ASC, id ASC").all(fiche.id);
   for (const t of types) {
     t.champs = await db.prepare("SELECT * FROM insc_champs WHERE type_id=? ORDER BY position ASC, id ASC").all(t.id);
-    t.nb_inscrits = (await db.prepare("SELECT COUNT(*) n FROM insc_inscriptions WHERE type_id=? AND statut NOT IN ('annule','liste_attente')").get(t.id))?.n || 0;
+    t.nb_inscrits = await inscPlacesPrises(t.id);
   }
   const medias = await db.prepare("SELECT * FROM insc_fiches_medias WHERE fiche_id=? ORDER BY position ASC, id ASC").all(fiche.id);
   /* Nom du lien de parrainage lié (2026-09-28, demande explicite) — champ additif sur `fiche`,
@@ -50343,6 +50352,8 @@ route("PUT", "/api/insc/fiches/:id", async (req, res, params, body) => {
     set.push(`${c}=?`);
     vals.push(c === "description" ? (body[c] ? SEC.sanitizeRichHtml(body[c]) : null) : (body[c] || null));
   }
+  /* Places restantes visibles des inscrits (2026-10-31) : booléen, jamais « null » (0 = masquées). */
+  if (body.afficher_places !== undefined) { set.push("afficher_places=?"); vals.push(body.afficher_places ? 1 : 0); }
   /* Sponsors / Partenaires (2026-09-28, demande explicite) : tableaux [{nom, logo_url}],
      sérialisés dans les colonnes JSON dédiées — même mécanique que options_json, gérée à part
      du tableau `champs` générique ci-dessus car ce ne sont pas de simples chaînes. */
@@ -51777,9 +51788,15 @@ route("GET", "/api/insc/public/:slug", async (req, res, params) => {
   for (const t of types) {
     t.champs = await getChampsPourType(t.id, fiche.id);
     await marquerLiensParrainage(t.champs);
-    const nb = (await db.prepare("SELECT COUNT(*) n FROM insc_inscriptions WHERE type_id=? AND statut NOT IN ('annule','liste_attente')").get(t.id))?.n || 0;
+    const nb = await inscPlacesPrises(t.id);
     t.places_restantes = t.places_max != null ? Math.max(0, t.places_max - nb) : null;
     t.complet = t.places_max != null && nb >= t.places_max;
+    /* Places masquées par défaut (2026-10-31, demande explicite : les inscrits ne doivent pas voir
+       le nombre de places, sauf si l'organisateur a coché « Afficher les places restantes »). Le
+       nombre n'est pas seulement caché à l'écran : il ne quitte plus le serveur. Seul « complet »
+       reste, sinon la personne ne comprendrait pas pourquoi elle ne peut pas s'inscrire.
+       L'aperçu du propriétaire voit ce que verra le public (même règle). */
+    if (!Number(fiche.afficher_places)) { delete t.places_restantes; delete t.places_max; }
     let ouvert = true;
     if (t.date_ouverture && new Date(t.date_ouverture) > now) ouvert = false;
     if (t.date_fermeture && new Date(t.date_fermeture) < now) ouvert = false;
@@ -51855,6 +51872,17 @@ route("GET", "/api/insc/public/:slug", async (req, res, params) => {
    telle ligne bloquait à vie le même e-mail (« Une inscription existe déjà… »). */
 const INSC_PAIEMENT_NON_ABOUTI = ["en_attente", "echec"];
 const INSC_DELAI_REPRISE_MS = 24 * 3600 * 1000;
+/* Places réellement prises (2026-10-31, demande explicite : « tu comptabilises une inscription
+   uniquement au paiement ») : une inscription gratuite compte tout de suite, une inscription payante
+   seulement une fois payée. Un paiement commencé mais jamais terminé (en_attente / echec), un
+   brouillon ou un remboursement ne retient plus de place. « litige » et « partiellement_rembourse »
+   comptent encore (la personne a payé). Une seule définition, utilisée par la page publique, le
+   contrôle de quota à l'inscription et la confirmation du paiement. */
+const INSC_PAIEMENTS_QUI_COMPTENT = "'non_concerne','paye','litige','partiellement_rembourse'";
+async function inscPlacesPrises(typeId, sauf = null) {
+  const r = await db.prepare(`SELECT COUNT(*) n FROM insc_inscriptions WHERE type_id=? AND statut NOT IN ('annule','liste_attente') AND statut_paiement IN (${INSC_PAIEMENTS_QUI_COMPTENT})${sauf ? " AND id<>?" : ""}`).get(...(sauf ? [typeId, sauf] : [typeId]));
+  return Number(r?.n) || 0;
+}
 /* created_at : « AAAA-MM-JJ HH:MM:SS » en UTC (SQLite datetime('now')), ou un Date côté Postgres. */
 function inscDateMs(v) {
   if (!v) return NaN;
@@ -51975,7 +52003,7 @@ route("POST", "/api/insc/public/:slug/inscriptions", async (req, res, params, bo
   }
 
   // Quota / liste d'attente
-  const nbActuel = (await db.prepare("SELECT COUNT(*) n FROM insc_inscriptions WHERE type_id=? AND statut NOT IN ('annule','liste_attente')").get(type.id))?.n || 0;
+  const nbActuel = await inscPlacesPrises(type.id); // payées ou gratuites seulement (voir inscPlacesPrises)
   let statutInitial = type.validation_auto ? "confirme" : "inscrit";
   if (type.places_max != null && nbActuel >= type.places_max) {
     if (!type.liste_attente_active) return sendJSON(res, 400, { error: "Cette catégorie est complète." });
@@ -52143,6 +52171,11 @@ route("POST", "/api/insc/public/:slug/inscriptions/reprendre", async (req, res, 
   const type = await db.prepare("SELECT * FROM insc_types WHERE id=? AND fiche_id=? AND actif=1").get(insc.type_id, fiche.id);
   if (!type) return sendJSON(res, 400, { error: "Cette catégorie d'inscription n'est plus disponible." });
   if (type.date_fermeture && new Date(type.date_fermeture) < new Date()) return sendJSON(res, 400, { error: `Les inscriptions « ${type.label} » sont fermées.` });
+  /* Une inscription non payée ne retient plus de place : avant de rouvrir un paiement, on revérifie
+     que la catégorie n'a pas été remplie entre-temps (sauf si la personne est déjà en liste d'attente). */
+  if (type.places_max != null && insc.statut !== "liste_attente" && await inscPlacesPrises(type.id) >= type.places_max) {
+    return sendJSON(res, 400, { error: "Cette catégorie est désormais complète : votre paiement n'a pas été ouvert." });
+  }
   const champs = await getChampsPourType(type.id, fiche.id);
   let reponses = {};
   try { reponses = JSON.parse(insc.reponses_json || "{}"); } catch (e) {}
