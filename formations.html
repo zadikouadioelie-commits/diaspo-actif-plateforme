@@ -2590,7 +2590,8 @@
     document.getElementById('fb-lecon-telechargement').checked = true;
     document.getElementById('fb-lecon-integre').checked = true; document.getElementById('fb-lecon-hauteur').value = '';
     document.getElementById('fb-lecon-obligatoire').checked = true;
-    document.getElementById('fb-lecon-apercu').checked = false;
+    /* Aperçu gratuit automatique : coché d'office pour les 3 premières leçons de la formation (le créateur peut le décocher). */
+    document.getElementById('fb-lecon-apercu').checked = !leconId && document.querySelectorAll('.fb-lecon-row').length < 3;
     typeSel.value = 'texte';
 
     const populate = (l) => {

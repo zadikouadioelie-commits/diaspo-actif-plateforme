@@ -5910,7 +5910,7 @@ async function initFormations() {
           <div class="cat-prixbloc">${blocPrix}</div>
           <a class="cat-btn" href="${lien}">Accéder à la formation</a>
         </div>
-        ${f.nb_apercu > 0 ? `<a class="cat-apercu" href="suivre-formation.html?id=${f.id}&decouverte=1">🎁 Aperçu gratuit (${f.nb_apercu} leçon${f.nb_apercu > 1 ? "s" : ""})</a>` : ""}
+        ${f.nb_apercu > 0 && !gratuit ? `<a class="cat-apercu" href="suivre-formation.html?id=${f.id}&decouverte=1">🎁 Aperçu gratuit (${f.nb_apercu} leçon${f.nb_apercu > 1 ? "s" : ""})</a>` : ""}
       </div>
     </article>`;
   }

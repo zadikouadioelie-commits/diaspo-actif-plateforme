@@ -18130,11 +18130,17 @@ route("POST", "/api/formations/:id/chapitres/:chapitreId/lecons", async (req, re
   const chapitre = await db.prepare("SELECT c.module_id FROM formation_chapitres c JOIN formation_modules m ON m.id=c.module_id WHERE c.id=? AND m.formation_id=?").get(params.chapitreId, params.id);
   if (!chapitre) return sendJSON(res, 404, { error: "Chapitre introuvable." });
   const { max } = await db.prepare("SELECT COALESCE(MAX(ordre),-1) AS max FROM formation_lecons WHERE chapitre_id=?").get(params.chapitreId);
+  /* Aperçu gratuit automatique : les 3 premières leçons d'une formation sont offertes par défaut (le créateur peut les retirer). Un choix explicite (apercu_gratuit vrai ou faux) est toujours respecté ; un quiz n'est jamais offert. */
+  let apercuDefaut = body.apercu_gratuit ? 1 : 0;
+  if (body.apercu_gratuit === undefined && (body.type || 'texte') !== 'quiz') {
+    const deja = await db.prepare("SELECT COUNT(*) AS n FROM formation_lecons l JOIN formation_modules m ON m.id=l.module_id WHERE m.formation_id=?").get(params.id);
+    if (Number(deja && deja.n) < 3) apercuDefaut = 1;
+  }
   const id = (await db.prepare(`INSERT INTO formation_lecons (module_id,chapitre_id,titre,description,type,duree_minutes,contenu_url,contenu_texte,ressources_json,image_url,ordre,telechargement_autorise,nb_pages,obligatoire,apercu_gratuit,doc_integre,doc_hauteur)
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
     chapitre.module_id, params.chapitreId, body.titre, body.description||null, body.type||'texte', body.duree_minutes||null,
     body.contenu_url||null, body.contenu_texte ? SEC.sanitizeRichHtml(body.contenu_texte) : null, body.ressources_json ? JSON.stringify(body.ressources_json) : null,
-    body.image_url||null, max+1, body.telechargement_autorise === false ? 0 : 1, body.nb_pages||null, body.obligatoire === false ? 0 : 1, body.apercu_gratuit ? 1 : 0,
+    body.image_url||null, max+1, body.telechargement_autorise === false ? 0 : 1, body.nb_pages||null, body.obligatoire === false ? 0 : 1, apercuDefaut,
     docIntegre(body.doc_integre), docHauteur(body.doc_hauteur)
   )).lastInsertRowid;
   sendJSON(res, 201, { id });
