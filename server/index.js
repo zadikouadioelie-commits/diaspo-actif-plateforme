@@ -22377,12 +22377,12 @@ async function enrichirAvecFicheMedia(rows) {
        (qui n'accepte qu'un slug, jamais un id, voir GET /api/insc/public/:slug), donc ce bouton
        retombait TOUJOURS sur l'ancien formulaire minimal (rejoindre()) même quand une vraie
        fiche existait — jamais vérifié côté client faute de cette donnée. */
-    const fiches = await db.prepare(`SELECT id, slug, statut, affiche_url FROM insc_fiches WHERE id IN (${ph3})`).all(...ficheIds);
+    const fiches = await db.prepare(`SELECT id, slug, statut, affiche_url, prolongee_jusquau FROM insc_fiches WHERE id IN (${ph3})`).all(...ficheIds);
     /* id ajouté (2026-09-25, demande explicite : "supprimer des documents et images" depuis la
        page publique de l'événement) — manquait pour que le client puisse cibler
        DELETE /api/insc/medias/:id, jusqu'ici réservé à inscriptions-admin.html. */
     const medias = await db.prepare(`SELECT id, fiche_id, type, url, libelle FROM insc_fiches_medias WHERE fiche_id IN (${ph3}) ORDER BY position ASC`).all(...ficheIds);
-    fiches.forEach(f => { fichesById[f.id] = { slug: f.slug, statut: f.statut, affiche_url: f.affiche_url, medias: [] }; });
+    fiches.forEach(f => { fichesById[f.id] = { slug: f.slug, statut: f.statut, affiche_url: f.affiche_url, prolongee_jusquau: f.prolongee_jusquau || null, medias: [] }; });
     medias.forEach(m => { if (fichesById[m.fiche_id]) fichesById[m.fiche_id].medias.push({ id: m.id, type: m.type, url: m.url, libelle: m.libelle }); });
   }
 
@@ -22396,7 +22396,7 @@ async function enrichirAvecFicheMedia(rows) {
        si elle est réellement publiée — une fiche encore en brouillon resterait invisible pour
        un visiteur (voir GET /api/insc/public/:slug), le bouton doit alors garder l'ancien
        formulaire minimal plutôt que de mener à une impasse "Fiche introuvable". */
-    return avecStatutTemporel({ ...r, fiche_media: fiche, fiche_id: fid || null, fiche_slug: (fiche && fiche.statut === 'publiee') ? fiche.slug : null, cr_statut: crParEvt[r.id] || null });
+    return avecStatutTemporel({ ...r, fiche_media: fiche, fiche_id: fid || null, fiche_slug: (fiche && fiche.statut === 'publiee') ? fiche.slug : null, fiche_prolongee_jusquau: fiche ? fiche.prolongee_jusquau : null, cr_statut: crParEvt[r.id] || null });
   });
 }
 
@@ -51146,6 +51146,40 @@ route("DELETE", "/api/insc/fiches/:id", async (req, res, params) => {
   sendJSON(res, 200, { ok: true });
 });
 
+/* PATCH /api/insc/fiches/:id/prolonger — prolonge une fiche d'inscription arrivée à terme, et sa
+   candidature (2026-10-31, demande explicite : « pouvoir prolonger aussi les candidatures »,
+   cas du Trophée Ngovu). Complète la prolongation du formulaire minimal d'un événement
+   (PATCH /api/evenements/:id/prolonger-inscriptions), qui ne concerne pas les fiches liées.
+   La nouvelle date des inscriptions est obligatoire : la fermeture de la fiche masque aussi la
+   candidature (voir GET /api/insc/public/:slug). Une fiche fermée à la main est rouverte ; la
+   date des candidatures, facultative, ne peut pas dépasser celle de la fiche. Ne touche ni aux
+   types, ni aux inscrits, ni aux documents de candidature. */
+route("PATCH", "/api/insc/fiches/:id/prolonger", async (req, res, params, body) => {
+  const { erreur, msg, fiche, user } = await inscFicheProprietaire(req, params.id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const lireDate = (v) => {
+    const s = String(v || "").trim();
+    const t = new Date(s).getTime();
+    return s && !isNaN(t) ? { s, t } : null;
+  };
+  const insc = lireDate(body?.inscriptions_jusquau);
+  if (!insc) return sendJSON(res, 400, { error: "Choisissez la nouvelle date de fermeture des inscriptions." });
+  if (insc.t <= Date.now()) return sendJSON(res, 400, { error: "La nouvelle date doit être dans le futur." });
+  let cand = null;
+  if (body?.candidatures_jusquau) {
+    cand = lireDate(body.candidatures_jusquau);
+    if (!cand) return sendJSON(res, 400, { error: "Date des candidatures invalide." });
+    if (cand.t <= Date.now()) return sendJSON(res, 400, { error: "La date des candidatures doit être dans le futur." });
+    if (cand.t > insc.t) return sendJSON(res, 400, { error: "Les candidatures ne peuvent pas rester ouvertes plus longtemps que la fiche." });
+  }
+  const config = await db.prepare("SELECT id FROM insc_candidature_config WHERE fiche_id=?").get(fiche.id);
+  if (cand && !config) return sendJSON(res, 400, { error: "Aucune candidature n'est configurée sur cette fiche." });
+  await db.prepare("UPDATE insc_fiches SET date_fermeture_inscriptions=?, prolongee_jusquau=?, statut=CASE WHEN statut='fermee' THEN 'publiee' ELSE statut END, updated_at=datetime('now') WHERE id=?").run(insc.s, insc.s, fiche.id);
+  if (cand) await db.prepare("UPDATE insc_candidature_config SET date_fermeture=?, updated_at=datetime('now') WHERE id=?").run(cand.s, config.id);
+  await inscJournaliser(fiche.id, user, "fiche_prolongee", `Inscriptions prolongées jusqu'au ${insc.s.replace("T", " ")}${cand ? ` · candidatures jusqu'au ${cand.s.replace("T", " ")}` : ""}.`);
+  sendJSON(res, 200, { ok: true, inscriptions_jusquau: insc.s, candidatures_jusquau: cand ? cand.s : null, rouverte: fiche.statut === "fermee" });
+});
+
 route("PATCH", "/api/insc/fiches/:id/statut", async (req, res, params, body) => {
   const { erreur, msg, fiche, user } = await inscFicheProprietaire(req, params.id);
   if (erreur) return sendJSON(res, erreur, { error: msg });
@@ -51866,7 +51900,7 @@ route("GET", "/api/insc/public/:slug", async (req, res, params) => {
        ouverte tant qu'au moins un est à venir (le visiteur choisit alors l'événement). */
     const evenementsBilletterieLies = await db.prepare("SELECT id, date_debut, date_fin FROM events WHERE insc_fiche_id=?").all(fiche.id);
     const tousLiesTermines = [...evenementsLies, ...evenementsBilletterieLies];
-    if (tousLiesTermines.length && tousLiesTermines.every(evenementEstTermine)) {
+    if (tousLiesTermines.length && tousLiesTermines.every(evenementEstTermine) && !(fiche.prolongee_jusquau && new Date(fiche.prolongee_jusquau) > now)) {
       const medias = await db.prepare("SELECT * FROM insc_fiches_medias WHERE fiche_id=? ORDER BY position ASC, id ASC").all(fiche.id);
       return sendJSON(res, 200, { fiche, fermee: true, message: "Cet événement est terminé : les inscriptions sont closes.", medias, ...(await inscPublicContexteEvenement(fiche)) });
     }
