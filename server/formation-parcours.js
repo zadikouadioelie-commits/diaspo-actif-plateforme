@@ -442,6 +442,52 @@ module.exports.register = function register(deps) {
     sendJSON(res, 200, await etatQuiz(inscription, quiz, false));
   });
 
+  /* ESSAI À BLANC — le propriétaire de la formation (ou un administrateur) passe l'activité comme un apprenant, sans inscription : rien n'est enregistré, ni tentative, ni progression, ni attestation.
+     Les questions sont exposées SANS corrigé comme à l'apprenant ; le corrigé n'est donné qu'à la correction, à ce seul rôle. */
+  async function proprietaireOuAdmin(req, res, params) {
+    const user = await getCurrentUser(req);
+    if (!user) { sendJSON(res, 401, { error: "Connexion requise." }); return null; }
+    const f = await db.prepare("SELECT id, owner_user_id FROM formations WHERE id=?").get(params.id);
+    if (!f || (Number(f.owner_user_id) !== Number(user.id) && user.role !== "administrateur")) { sendJSON(res, 404, { error: "Formation introuvable." }); return null; }
+    const quiz = await db.prepare("SELECT * FROM formation_quiz WHERE id=? AND formation_id=?").get(params.quizId, params.id);
+    if (!quiz) { sendJSON(res, 404, { error: "Quiz introuvable." }); return null; }
+    return { user, quiz };
+  }
+  route("GET", "/api/formations/:id/quiz/:quizId/apercu", async (req, res, params) => {
+    const ctx = await proprietaireOuAdmin(req, res, params); if (!ctx) return;
+    const { quiz } = ctx;
+    const rows = await db.prepare("SELECT * FROM formation_quiz_questions WHERE quiz_id=? ORDER BY ordre ASC, id ASC").all(quiz.id);
+    const manuel = Number(quiz.correction_auto) === 0;
+    sendJSON(res, 200, {
+      essai: true,
+      quiz: { id: Number(quiz.id), titre: quiz.titre, type: quiz.type, note_minimale: nombre(quiz.note_minimale), temps_limite_min: null, max_tentatives: null, melanger: false,
+        depot_fichier: "non", commentaires: quiz.commentaires_personnalises || null, correction_manuelle: manuel, nb_questions: rows.length },
+      questions: rows.map(questionPublique),
+      tentatives: { nb: 0, restantes: null, meilleure_note: null, reussi: false, en_attente: false, derniere: null },
+      chrono: null, bloque: null,
+    });
+  });
+  route("POST", "/api/formations/:id/quiz/:quizId/apercu-corriger", async (req, res, params, body) => {
+    const ctx = await proprietaireOuAdmin(req, res, params); if (!ctx) return;
+    const { quiz } = ctx;
+    const reponses = body && typeof body.reponses === "object" && body.reponses ? body.reponses : {};
+    const questions = await db.prepare("SELECT * FROM formation_quiz_questions WHERE quiz_id=? ORDER BY ordre ASC, id ASC").all(quiz.id);
+    if (Number(quiz.correction_auto) === 0) return sendJSON(res, 200, { ok: true, essai: true, en_attente_correction: true });
+    let total = 0, obtenus = 0, nonNotees = 0;
+    const detail = [];
+    for (const q of questions) {
+      const pts = nombre(q.points) || 1;
+      const donnee = reponses[String(q.id)];
+      const r = corriger(q, donnee == null ? "" : (Array.isArray(donnee) ? donnee.slice(0, 20).map(x => String(x).slice(0, 500)) : String(donnee).slice(0, 1000)));
+      if (!r.note) { nonNotees++; detail.push({ question_id: Number(q.id), note: false }); continue; }
+      total += pts; if (r.ok) obtenus += pts;
+      detail.push({ question_id: Number(q.id), note: true, correct: r.ok, bonne_reponse: String(q.reponse_correcte || "").split("|").map(s => s.trim()).filter(Boolean).join(" / "), explication: q.explication ? String(q.explication) : undefined });
+    }
+    const note = total > 0 ? Math.round((obtenus / total) * 1000) / 10 : null;
+    const reussi = total > 0 ? note >= nombre(quiz.note_minimale) : true;
+    sendJSON(res, 200, { ok: true, essai: true, note_pct: note, reussi, seuil: nombre(quiz.note_minimale), points_obtenus: obtenus, points_total: total, nb_non_notees: nonNotees, detail });
+  });
+
   /* POST /api/formations/:id/quiz/:quizId/demarrer — lance le chronomètre d'un quiz à temps imparti ; reprendre une session en cours ne remet pas le compteur à zéro. */
   route("POST", "/api/formations/:id/quiz/:quizId/demarrer", async (req, res, params) => {
     const user = await getCurrentUser(req);

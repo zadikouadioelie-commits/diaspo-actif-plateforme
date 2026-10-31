@@ -19,9 +19,22 @@
 <link rel="stylesheet" href="/assets/formations-nuit-doree.css?v=2">
 <style>
 /* Fiche de formation (lot A, 2026-10-30) — tout est préfixé ff- ; couleurs : bleu nuit #0b1226 / #14213f, or #e6b84a, texte blanc */
-.ff-wrap{max-width:1040px;margin:0 auto;padding:20px 16px 60px;color:#fff;}
+.ff-wrap{max-width:1760px;margin:0 auto;padding:16px 24px 48px;color:#fff;}
 .ff-hero{position:relative;border-radius:18px;overflow:hidden;border:1px solid rgba(230,184,74,.35);background:#14213f;min-height:200px;}
 .ff-hero img{display:block;width:100%;max-height:560px;object-fit:contain;background:#14213f;}
+/* Écran large : trois colonnes — bandeau (image + titre) sur deux colonnes, offre et bouton d'accès en haut de la troisième, puis le contenu réparti sur trois colonnes */
+.ff-page{display:grid;gap:20px;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr);grid-template-areas:"bandeau bandeau offre" "c1 c2 c3";align-items:start;}
+.ff-page>.ff-hero{grid-area:bandeau;align-self:stretch;display:grid;grid-template-columns:minmax(0,1fr);}
+.ff-page>.ff-hero.avec-img{grid-template-columns:minmax(0,5fr) minmax(0,6fr);}
+.ff-page>.ff-hero.avec-img img{height:100%;max-height:420px;}
+.ff-page>.ff-hero .ff-hero-txt{align-self:center;}
+.ff-page>.ff-offre{grid-area:offre;}
+.ff-page>.ff-offre .ff-card{margin-bottom:0;}
+.ff-c1{grid-area:c1;}.ff-c2{grid-area:c2;}.ff-c3{grid-area:c3;}
+.ff-c1>.ff-card:last-child,.ff-c2>.ff-card:last-child,.ff-c3>.ff-card:last-child{margin-bottom:0;}
+.ff-offre .ff-btn{font-size:16px;padding:15px 14px;box-shadow:0 6px 18px rgba(230,184,74,.28);}
+@media(max-width:1180px){.ff-page{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"bandeau bandeau" "offre c3" "c1 c2";}}
+@media(max-width:720px){.ff-page{grid-template-columns:minmax(0,1fr);grid-template-areas:"bandeau" "offre" "c1" "c2" "c3";}.ff-page>.ff-hero.avec-img{grid-template-columns:minmax(0,1fr);}.ff-page>.ff-hero.avec-img img{height:auto;}.ff-wrap{padding:14px 12px 40px;}}
 .ff-hero-txt{padding:18px 20px 22px;}
 .ff-marque{font-size:11px;font-weight:800;letter-spacing:.14em;color:#e6b84a;text-transform:uppercase;}
 .ff-titre{margin:6px 0 4px;font-size:clamp(22px,4vw,32px);line-height:1.2;color:#fff;}
@@ -42,7 +55,7 @@
 .ff-mod-t strong{color:#fff;}
 .ff-mod-s{font-size:12.5px;color:#9fb0d4;margin-top:2px;}
 .ff-mod-acces{font-size:12px;font-weight:800;padding:3px 10px;border-radius:99px;background:rgba(34,197,94,.15);color:#86efac;border:1px solid rgba(34,197,94,.4);white-space:nowrap;}
-.ff-offre{position:sticky;top:76px;}
+.ff-offre{min-width:0;}
 .ff-prix{font-size:30px;font-weight:900;color:#f4d98a;margin:4px 0 2px;}
 .ff-prix small{font-size:13px;font-weight:600;color:#9fb0d4;}
 .ff-btn{display:block;width:100%;box-sizing:border-box;text-align:center;font-weight:800;font-size:14.5px;border-radius:10px;padding:12px 14px;cursor:pointer;border:1px solid #e6b84a;background:linear-gradient(180deg,#f4d98a,#e6b84a);color:#0b1226;text-decoration:none;}
@@ -144,7 +157,8 @@ function ffRender(){
   const brouillon = f.statut && f.statut !== 'publiee';
   document.getElementById('ff-root').innerHTML = `
     ${brouillon ? '<div class="ff-card" style="background:#111827;color:#fde68a;border:1px solid #f59e0b;margin-bottom:14px;">🔒 <strong>Brouillon — visible par vous seul.</strong> Voici la fiche telle que l\'apprenant la verra. Personne d\'autre ne peut ouvrir cette formation tant qu\'elle n\'est pas publiée.</div>' : ''}
-    <div class="ff-hero">
+    <div class="ff-page">
+    <div class="ff-hero${image ? ' avec-img' : ''}">
       ${image ? `<img src="${esc(image)}" alt="">` : ''}
       <div class="ff-hero-txt">
         <div class="ff-marque">Formation Diaspora · Apprendre • Évoluer • Réussir</div>
@@ -160,16 +174,6 @@ function ffRender(){
         </div>
       </div>
     </div>
-    <div class="ff-grid">
-      <div>
-        ${f.video_intro ? `<div class="ff-card"><h2>Présentation en vidéo</h2>${ffVideo(f.video_intro)}</div>` : ''}
-        ${f.description ? `<div class="ff-card"><h2>Présentation générale</h2><div>${f.description}</div></div>` : ''}
-        ${objectifs ? `<div class="ff-card"><h2>Objectifs pédagogiques</h2><div>${objectifs}</div></div>` : ''}
-        ${competences.length ? `<div class="ff-card"><h2>Compétences à acquérir</h2><ul>${competences.map(c => `<li>${esc(c)}</li>`).join('')}</ul></div>` : ''}
-        ${f.public_concerne ? `<div class="ff-card"><h2>À qui s'adresse cette formation</h2><p>${esc(f.public_concerne)}</p></div>` : ''}
-        <div class="ff-card"><h2>Les modules</h2>${modulesHtml || '<p>Le contenu sera bientôt disponible.</p>'}</div>
-        ${f.auteur_nom || f.organisme ? `<div class="ff-card"><h2>Le formateur</h2><p><strong>${esc(f.organisme || f.auteur_nom)}</strong></p></div>` : ''}
-      </div>
       <aside class="ff-offre">
         <div class="ff-card">
           <h2>Formation complète</h2>
@@ -188,6 +192,19 @@ function ffRender(){
           <div class="ff-erreur" id="ff-erreur" role="alert"></div>
         </div>
       </aside>
+      <div class="ff-c1">
+        ${f.video_intro ? `<div class="ff-card"><h2>Présentation en vidéo</h2>${ffVideo(f.video_intro)}</div>` : ''}
+        ${f.description ? `<div class="ff-card"><h2>Présentation générale</h2><div>${f.description}</div></div>` : ''}
+      </div>
+      <div class="ff-c2">
+        ${objectifs ? `<div class="ff-card"><h2>Objectifs pédagogiques</h2><div>${objectifs}</div></div>` : ''}
+        ${competences.length ? `<div class="ff-card"><h2>Compétences à acquérir</h2><ul>${competences.map(c => `<li>${esc(c)}</li>`).join('')}</ul></div>` : ''}
+        ${f.public_concerne ? `<div class="ff-card"><h2>À qui s'adresse cette formation</h2><p>${esc(f.public_concerne)}</p></div>` : ''}
+        ${f.auteur_nom || f.organisme ? `<div class="ff-card"><h2>Le formateur</h2><p><strong>${esc(f.organisme || f.auteur_nom)}</strong></p></div>` : ''}
+      </div>
+      <div class="ff-c3">
+        <div class="ff-card"><h2>Les modules</h2>${modulesHtml || '<p>Le contenu sera bientôt disponible.</p>'}</div>
+      </div>
     </div>
     <div class="ff-sig">Apprendre • Évoluer • Réussir</div>`;
 
@@ -257,5 +274,12 @@ async function ffCharger(){
   await ffCharger();
 })();
 </script>
+<style>
+.ff-accueil{position:fixed;left:14px;bottom:14px;z-index:55;display:inline-flex;align-items:center;gap:8px;padding:9px 14px 9px 10px;border-radius:99px;background:#0b1226;border:1px solid #e6b84a;color:#f4d98a;font:800 13px/1 system-ui,sans-serif;text-decoration:none;box-shadow:0 6px 18px rgba(0,0,0,.35);}
+.ff-accueil:hover{background:#14213f;color:#fff;}
+.ff-accueil span.ic{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:linear-gradient(180deg,#f4d98a,#e6b84a);color:#0b1226;font-size:14px;}
+@media(max-width:560px){.ff-accueil{padding:8px;}.ff-accueil b{display:none;}}
+</style>
+<a class="ff-accueil" href="formations.html" aria-label="Accueil formation : toutes les formations" title="Accueil formation — toutes les formations"><span class="ic" aria-hidden="true">🎓</span><b>Accueil formation</b></a>
 </body>
 </html>

@@ -95,6 +95,16 @@
 .sf-q-result{border-radius:12px;padding:14px 16px;margin-bottom:14px;font-weight:700;}
 .sf-q-result.ok{background:#dcfce7;color:#14532d;}
 .sf-q-result.ko{background:#fef2f2;color:#7f1d1d;}
+/* QCM posé dans une page du Studio (fond de page clair) : le texte hérite de la page au lieu du blanc du thème sombre (questions et corrigé étaient illisibles) */
+html body.nd .st-quiz-slot .sf-quiz{background:transparent!important;color:inherit!important;border:1px solid rgba(100,116,139,.35)!important;}
+html body.nd .st-quiz-slot .sf-quiz-meta,html body.nd .st-quiz-slot .sf-q .hint{color:inherit!important;opacity:.78;}
+html body.nd .st-quiz-slot .sf-q{border-top:1px solid rgba(100,116,139,.3)!important;}
+html body.nd .st-quiz-slot .sf-q.juste{background:#dcfce7!important;color:#14532d!important;}
+html body.nd .st-quiz-slot .sf-q.faux{background:#fee2e2!important;color:#7f1d1d!important;}
+html body.nd .st-quiz-slot .sf-q-result.ok{background:#dcfce7!important;color:#14532d!important;}
+html body.nd .st-quiz-slot .sf-q-result.ko{background:#fee2e2!important;color:#7f1d1d!important;}
+html body.nd .st-quiz-slot .sf-q input[type=text],html body.nd .st-quiz-slot .sf-q textarea{background:#fff!important;color:#111827!important;border:1px solid #cbd5e1!important;}
+html body.nd .st-quiz-slot .sf-q .opt span{color:inherit!important;}
 @media (max-width:820px){
   .sf-wrap{flex-direction:column;}
   .sf-sidebar{width:100%;max-height:none;position:static;border-right:0;border-bottom:1px solid var(--border);}
@@ -215,7 +225,7 @@
 <script src="assets/app.js?v=13"></script>
 <script src="assets/formation-achat-consent.js?v=2"></script>
 <script src="assets/doc-viewer.js?v=1"></script>
-<script src="assets/studio-render.js?v=7"></script>
+<script src="assets/studio-render.js?v=8"></script>
 <script src="assets/koffi-widget.js?v=13" defer></script>
 <script>
 function escH(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -370,7 +380,7 @@ function sfRenderSidebar(){
   else tete = `<div class="sf-gauge-top"><span class="sf-gauge-pct">${SF_DATA.avancement_pct}%</span><span class="sf-statut ${statut}">${escH(STATUTS[statut] || statut)}</span></div>
     ${sfJauge(SF_DATA.avancement_pct, statut === 'termine')}
     <div class="sf-gauge-sub">${p.nb_termine || 0} activité${(p.nb_termine||0) > 1 ? 's' : ''} obligatoire${(p.nb_termine||0) > 1 ? 's' : ''} terminée${(p.nb_termine||0) > 1 ? 's' : ''} sur ${p.nb_total || 0} · ${p.chapitres_termines || 0}/${p.chapitres_total || 0} chapitre${(p.chapitres_total||0) > 1 ? 's' : ''}${p.nb_restant ? ` · il en reste ${p.nb_restant}` : ''}</div>
-    ${suiviMode() === 'manuel' ? '<div class="sf-gauge-sub">Mode manuel : cochez vos leçons puis cliquez sur « Enregistrer ma progression ».</div>' : ''}
+    ${suiviMode() === 'manuel' ? '<div class="sf-gauge-sub">Votre progression s\'enregistre automatiquement.</div>' : ''}
     ${reprendre ? '<button type="button" class="btn sf-reprendre" id="sf-reprendre">▶ Reprendre ma formation</button>' : ''}`;
   let html = `<div class="sf-sidebar-head"><div style="font-weight:800;">${escH(f.titre)}</div>${tete}</div><div id="sf-modules-list">`;
   (SF_DATA.modules||[]).forEach(m => {
@@ -685,10 +695,10 @@ async function sfToggleTermine(leconId){
   const flat = flatLecons();
   const l = flat.find(x => Number(x.id) === Number(leconId));
   if (suiviMode() === 'manuel') {
-    /* Mode manuel : on coche localement ; rien n'est enregistré avant « Enregistrer ma progression ». */
+    /* Mode manuel : on coche localement, puis la progression s'enregistre toute seule après un court instant (plus besoin de cliquer sur « Enregistrer »). */
     const nouveau = !etatTermine(l);
     if (nouveau === !!l.termine) delete SF_PENDING[l.id]; else SF_PENDING[l.id] = nouveau;
-    sfRenderSidebar(); sfMajBoutonTermine();
+    sfRenderSidebar(); sfMajBoutonTermine(); sfPlanifierEnregistrement();
     return;
   }
   const nouveauStatut = !l.termine;
@@ -713,13 +723,24 @@ function sfMajBarreEnregistrement(){
   const n = nbPending();
   if (!n) { if (bar) bar.remove(); return; }
   if (!bar) { bar = document.createElement('div'); bar.id = 'sf-save-bar'; bar.className = 'sf-save-bar'; bar.setAttribute('role', 'status'); document.body.appendChild(bar); }
-  bar.innerHTML = `<span><strong>${n}</strong> modification${n > 1 ? 's' : ''} non enregistrée${n > 1 ? 's' : ''}</span>
+  bar.innerHTML = `<span>Enregistrement automatique de <strong>${n}</strong> modification${n > 1 ? 's' : ''}…</span>
     <button type="button" class="btn" id="sf-save-go">💾 Enregistrer ma progression</button>
     <button type="button" class="btn secondary" id="sf-save-cancel">Annuler</button>`;
   document.getElementById('sf-save-go').onclick = sfEnregistrer;
   document.getElementById('sf-save-cancel').onclick = () => { SF_PENDING = {}; sfRenderSidebar(); sfMajBoutonTermine(); };
 }
+/* Enregistrement automatique : un court délai après la dernière coche, ou dès qu'on quitte la page. */
+let SF_AUTO = null;
+function sfPlanifierEnregistrement(){ clearTimeout(SF_AUTO); SF_AUTO = setTimeout(() => { if (nbPending()) sfEnregistrer(); }, 800); }
+function sfEnvoyerEnQuittant(){
+  if (!nbPending() || !SF_DATA || SF_DATA.mode !== 'apprenant') return;
+  const lecons = Object.keys(SF_PENDING).map(id => ({ id: Number(id), termine: !!SF_PENDING[id] }));
+  try { fetch(`/api/formations/${formationId}/progression-lot`, { method: 'POST', keepalive: true, headers: {'Content-Type':'application/json'}, credentials: 'same-origin', body: JSON.stringify({ lecons }) }); SF_PENDING = {}; } catch (e) {}
+}
+window.addEventListener('pagehide', sfEnvoyerEnQuittant);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') sfEnvoyerEnQuittant(); });
 async function sfEnregistrer(){
+  if (!nbPending()) return;
   const btn = document.getElementById('sf-save-go');
   if (btn) { btn.disabled = true; btn.textContent = 'Enregistrement…'; }
   const avant = SF_DATA.attestation && SF_DATA.attestation.delivree;
@@ -741,9 +762,10 @@ async function sfQuizLoad(l){
   const zone = document.getElementById('sf-quiz-zone');
   if (!zone) return;
   if (!l.quiz){ zone.innerHTML = '<div class="notice">Aucun quiz n\'est encore rattaché à cette leçon.</div>'; return; }
-  if (SF_DATA.mode === 'apercu'){ zone.innerHTML = '<div class="notice">📝 Quiz « ' + escH(l.quiz.titre) + ' » — visible et passable par les apprenants inscrits.</div>'; return; }
   zone.innerHTML = '<div class="notice" style="padding:30px;">Chargement du quiz…</div>';
-  const r = await fetch(`/api/formations/${formationId}/quiz/${l.quiz.id}/passer`, { credentials: 'same-origin' });
+  /* Aperçu du propriétaire / de l'administration : essai à blanc, rien n'est enregistré. */
+  const essai = SF_DATA.mode === 'apercu';
+  const r = await fetch(`/api/formations/${formationId}/quiz/${l.quiz.id}/${essai ? 'apercu' : 'passer'}`, { credentials: 'same-origin' });
   if (!r.ok){ const err = await r.json().catch(()=>({})); zone.innerHTML = `<div class="notice">${escH(err.error || 'Quiz indisponible.')}</div>`; return; }
   const d = await r.json();
   sfQuizRender(zone, l, d, null);
@@ -760,7 +782,8 @@ function sfQuizRender(zone, l, d, resultat){
   const epuise = d.bloque === 'tentatives_epuisees';
   const verrouille = enAttente || epuise || (manuel && dejaReussi);
   const der = t.derniere;
-  const entete = `<p class="sf-quiz-meta">Seuil de réussite : <strong>${q.note_minimale}%</strong>
+  const bandeauEssai = d.essai ? '<div class="sf-q-result" style="background:#eff6ff;color:#1e3a8a;" role="status">🧪 Essai à blanc (aperçu formateur) : vous passez l\'activité comme un apprenant, mais rien n\'est enregistré.</div>' : '';
+  const entete = bandeauEssai + `<p class="sf-quiz-meta">Seuil de réussite : <strong>${q.note_minimale}%</strong>
     ${q.temps_limite_min ? ` · temps imparti : <strong>${q.temps_limite_min} min</strong>` : ''}
     ${q.max_tentatives ? ` · tentatives : <strong>${Math.min(t.nb || 0, q.max_tentatives)}/${q.max_tentatives}</strong>${t.restantes != null ? ` (${t.restantes} restante${t.restantes > 1 ? 's' : ''})` : ''}` : (t.nb ? ` · ${t.nb} tentative${t.nb > 1 ? 's' : ''}` : '')}
     ${t.meilleure_note != null ? ` · meilleure note : ${t.meilleure_note}%` : ''}${q.melanger ? ' · questions dans un ordre aléatoire' : ''}</p>`;
@@ -770,6 +793,8 @@ function sfQuizRender(zone, l, d, resultat){
     verdict += '<div class="sf-q-result" style="background:#fffbeb;color:#92400e;" role="status">⏳ Votre travail a été envoyé : il est en attente de correction par le formateur. Vous serez prévenu(e) dès que le travail sera corrigé.</div>';
   } else if (resultat && resultat.hors_delai) {
     verdict += '<div class="sf-q-result ko" role="status">⌛ Temps écoulé : votre envoi est arrivé après l\'échéance. La tentative est comptée sans note.</div>';
+  } else if (resultat && d.essai) {
+    verdict += `<div class="sf-q-result ${resultat.reussi ? 'ok' : 'ko'}" role="status">${resultat.reussi ? '✅ Réussi' : '❌ Non réussi'}${resultat.note_pct != null ? ` — ${resultat.note_pct}%` : ''} (seuil ${resultat.seuil}%). Essai à blanc : rien n'est enregistré, le corrigé est affiché ci-dessous.</div>`;
   } else if (resultat) {
     verdict += resultat.reussi
       ? `<div class="sf-q-result ok" role="status">✅ Quiz réussi${resultat.note_pct != null ? ` — ${resultat.note_pct}%` : ''}. Cette activité est validée.${resultat.nb_non_notees ? ` (${resultat.nb_non_notees} réponse${resultat.nb_non_notees > 1 ? 's' : ''} libre${resultat.nb_non_notees > 1 ? 's' : ''} non notée${resultat.nb_non_notees > 1 ? 's' : ''})` : ''}</div>`
@@ -854,6 +879,15 @@ function sfQuizRender(zone, l, d, resultat){
         const upd = await up.json().catch(()=>({}));
         if (!up.ok || !upd.url) { alert(upd.error || 'Le fichier n\'a pas pu être envoyé.'); envoye = false; if (btn) { btn.disabled = false; btn.textContent = manuel ? 'Envoyer mon travail au formateur' : 'Valider mes réponses'; } return; }
         corps.fichier_url = upd.url; corps.fichier_nom = fichier.name;
+      }
+      if (d.essai) {
+        /* Essai à blanc : correction par le serveur, aucune écriture ; on réaffiche le quiz avec le résultat et le corrigé. */
+        const re = await fetch(`/api/formations/${formationId}/quiz/${q.id}/apercu-corriger`, { method: 'POST', headers: {'Content-Type':'application/json'}, credentials: 'same-origin', body: JSON.stringify({ reponses }) });
+        const rese = await re.json().catch(()=>({}));
+        if (!re.ok) { alert(rese.error || 'Impossible de corriger le quiz.'); envoye = false; if (btn) { btn.disabled = false; btn.textContent = 'Valider mes réponses'; } return; }
+        if (rese.en_attente_correction) { alert('Ce travail est à correction manuelle : un apprenant l\'enverrait au formateur. Rien n\'est enregistré dans cet essai.'); sfQuizLoad(l); return; }
+        sfQuizRender(zone, l, d, rese); zone.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        return;
       }
       const r = await fetch(`/api/formations/${formationId}/quiz/${q.id}/soumettre`, { method: 'POST', headers: {'Content-Type':'application/json'}, credentials: 'same-origin', body: JSON.stringify(corps) });
       const res = await r.json();
@@ -1116,5 +1150,13 @@ setInterval(() => { if (!document.hidden && SF_DATA) sfEspaceCharger(); }, 45000
 
 sfLoad();
 </script>
+<!-- Bouton toujours accessible : retour à l'accueil des formations sans passer par « Retour » -->
+<style>
+.ff-accueil{position:fixed;left:14px;bottom:14px;z-index:55;display:inline-flex;align-items:center;gap:8px;padding:9px 14px 9px 10px;border-radius:99px;background:#0b1226;border:1px solid #e6b84a;color:#f4d98a;font:800 13px/1 system-ui,sans-serif;text-decoration:none;box-shadow:0 6px 18px rgba(0,0,0,.35);}
+.ff-accueil:hover{background:#14213f;color:#fff;}
+.ff-accueil span.ic{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:linear-gradient(180deg,#f4d98a,#e6b84a);color:#0b1226;font-size:14px;}
+@media(max-width:560px){.ff-accueil{padding:8px;}.ff-accueil b{display:none;}}
+</style>
+<a class="ff-accueil" href="formations.html" aria-label="Accueil formation : toutes les formations" title="Accueil formation — toutes les formations"><span class="ic" aria-hidden="true">🎓</span><b>Accueil formation</b></a>
 </body>
 </html>

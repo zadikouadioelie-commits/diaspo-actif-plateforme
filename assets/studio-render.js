@@ -123,7 +123,7 @@
         return `<div class="st-doc${ctx.edit ? ' st-inerte' : ''}"><iframe src="${esc(p.url)}#toolbar=1&view=FitH" title="${esc(p.nom) || 'Document PDF'}" loading="lazy"></iframe>${ctx.edit ? '' : `<a class="st-doc-dl" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer" download>⬇ Télécharger le document</a>`}</div>`;
       }
       case 'quiz':
-        if (ctx.edit || ctx.apercu) return `<div class="st-quizcard"><span>📝</span><div><strong>${esc(p.libelle) || (p.quiz_id ? 'Activité évaluée' : 'Quiz / questionnaire / exercice')}</strong><small>${p.quiz_id ? (ctx.apercu ? 'Les apprenants passent cette activité ici (sa correction est faite par le serveur).' : 'Cliquez pour modifier les questions et les réglages.') : 'À créer : choisissez le type d\'activité dans le panneau de droite.'}</small></div></div>`;
+        if (ctx.edit || (ctx.apercu && !ctx.brouillon)) return `<div class="st-quizcard"><span>📝</span><div><strong>${esc(p.libelle) || (p.quiz_id ? 'Activité évaluée' : 'Quiz / questionnaire / exercice')}</strong><small>${p.quiz_id ? (ctx.apercu ? 'Les apprenants passent cette activité ici (sa correction est faite par le serveur).' : 'Cliquez pour modifier les questions et les réglages.') : 'À créer : choisissez le type d\'activité dans le panneau de droite.'}</small></div></div>`;
         return '<div id="sf-quiz-zone" class="st-quiz-slot"></div>';
       case 'tableau': {
         const l = Array.isArray(p.lignes) ? p.lignes : [];
