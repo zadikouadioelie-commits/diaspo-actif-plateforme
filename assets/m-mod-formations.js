@@ -117,7 +117,7 @@
     const g = $('#go-login'); if (g) g.onclick = () => A.openLogin(); // la connexion relance la route toute seule
   }
   const initiativeLink = () => S.me && S.me.role === 'initiative'
-    ? `<p class="small muted" style="text-align:center;margin:18px 6px 4px">Créer ou gérer vos propres formations (Diaspo Formation) : <a href="formations.html" style="text-decoration:underline">à faire sur ordinateur</a>.</p>` : '';
+    ? `<p class="small muted" style="text-align:center;margin:18px 6px 4px">Créer ou gérer vos propres formations (Création de formation) : <a href="formations.html" style="text-decoration:underline">à faire sur ordinateur</a>.</p>` : '';
 
   /* ---------- données partagées ---------- */
   async function loadFavs(force) {

@@ -43,7 +43,7 @@ window.MODULE_AIDE = {
   crm: { titre: "🤝 CRM", texte: "Suivez vos contacts, prospects et membres dans un fichier relationnel centralisé, propre à votre initiative." },
   cagnottes: { titre: "🪙 Cagnottes et dons", texte: "Créez des cagnottes de collecte pour vos projets et suivez les dons reçus en temps réel." },
   recensement: { titre: "📋 Recensement", texte: "Lancez une campagne de dénombrement auprès de la diaspora (identité, mineurs déclarés, vérification d'identité en option) et suivez les déclarations reçues. Réservé aux Initiatives Premium pour la création." },
-  diaspo_formation: { titre: "🎓 Diaspo Formation", texte: "Créez et gérez vos propres formations (contenu, inscriptions, suivi des participants) — distinct du catalogue public où l'on achète une formation existante. Réservé aux Initiatives Premium." },
+  diaspo_formation: { titre: "🎓 Création de formation", texte: "Créez et gérez vos propres formations (contenu, inscriptions, suivi des participants). Réservé aux comptes Initiative autorisés par Diaspo'Actif : la demande se fait dans ce module. Pour retrouver les formations que vous suivez, ouvrez « Suivi de formation »." },
   avancement_initiative: { titre: "📈 Avancement de mon initiative", texte: "Suivez la progression de votre initiative sur la plateforme : étapes complétées, indicateurs et prochaines actions." },
 
   /* ── Dashboard Utilisateur ── */

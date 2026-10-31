@@ -17635,7 +17635,7 @@ route("POST", "/api/formations", async (req, res, params, body) => {
     }
     /* Formation Diaspora (2026-10-31) : le Premium seul ne suffit plus — un compte Initiative doit avoir été autorisé par Diaspo'Actif (ou déjà former). */
     if (!(await FormationAcces.accesFormateurInitiative(db, user.id))) {
-      return sendJSON(res, 403, { error: "Pour créer des formations, demandez l'accès formateur dans le module Formation Diaspora (onglet Formateur) : Diaspo'Actif doit vous y autoriser.", acces_formateur_requis: true });
+      return sendJSON(res, 403, { error: "Pour créer des formations, demandez l'accès formateur dans le module « Création de formation » : Diaspo'Actif doit vous y autoriser.", acces_formateur_requis: true });
     }
     if (!(await hasAccreditation(user.id, 'initiative_abonne'))) {
       return sendJSON(res, 402, { error: "La création de formations est réservée aux comptes Initiative Premium.", accred_type: 'initiative_abonne' });

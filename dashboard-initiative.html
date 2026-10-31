@@ -75,9 +75,9 @@
       <div class="sb-group-lbl">⭐ MODULES PREMIUM</div>
       <a href="#crm" data-section="crm" data-aide="crm">🤝 CRM</a>
       <a href="#paiement" data-section="paiement" data-aide="paiement_initiative">💳 Module paiement</a>
-      <!-- Module premium « Formation Diaspora » (2026-10-31, demande explicite) : formations suivies + onglet Formateur (accès sur demande). Doré mais jamais verrouillé : un élève doit toujours retrouver ses formations (badgeOnly). -->
-      <a href="#formation-diaspora" data-section="formation-diaspora">🎓 Formation Diaspora</a>
-      <a href="#formations-gestion" data-section="formations-gestion" id="sb-formations-gestion" data-aide="diaspo_formation" style="display:none;">🎓 Diaspo Formation <span class="pill" id="formations-badge" style="display:none;"></span></a>
+      <!-- Module premium « Suivi de formation » (2026-10-31, demande explicite) : UNIQUEMENT les formations suivies. La création est dans « Création de formation » juste en dessous. Doré mais jamais verrouillé : un élève doit toujours retrouver ses formations (badgeOnly). -->
+      <a href="#formation-diaspora" data-section="formation-diaspora">🎓 Suivi de formation</a>
+      <a href="#formations-gestion" data-section="formations-gestion" id="sb-formations-gestion" data-aide="diaspo_formation" style="display:none;">🎓 Création de formation <span class="pill" id="formations-badge" style="display:none;"></span></a>
       <a href="#publicites-init" data-section="publicites-init" data-aide="publicites">📣 Publicités <span class="pill" id="init-pub-badge" style="display:none;"></span></a>
       <a href="#evenements" data-section="evenements" data-aide="evenements">📅 Mes événements</a>
       <!-- Module « Formulaires de réponse et d'inscription » (2026-10-07, demande explicite : « accessible en Premium et en doré »).
@@ -873,19 +873,21 @@ async function initRelaisDiasporaWidget(me, api) {
       <div id="recrutement-content"><p style="color:var(--muted);font-size:13px;">Chargement…</p></div>
     </div>
 
-    <!-- ════ FORMATION DIASPORA — formations suivies + onglet Formateur (assets/formation-diaspora.js) ════ -->
+    <!-- ════ SUIVI DE FORMATION — formations suivies (assets/formation-diaspora.js) ════ -->
     <div class="card" style="margin-bottom:20px;display:none;" id="formation-diaspora"></div>
 
-    <!-- ════ DIASPO FORMATION — GESTION DES FORMATIONS ════ -->
+    <!-- ════ CRÉATION DE FORMATION — créer et gérer SES formations (demande d’accès formateur tant que le compte n’est pas autorisé) ════ -->
     <div class="card" style="margin-bottom:20px;display:none;" id="formations-gestion">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
-        <h3 style="margin:0;">🎓 Gestion des formations</h3>
+        <h3 style="margin:0;">🎓 Création de formation</h3>
         <div style="display:flex;gap:8px;">
-          <button class="btn btn-outline" onclick="ouvrirMesFormationsSuivies()">🎓 Mes formations suivies</button>
-          <button class="btn btn-orange" onclick="openFormationForm()">+ Nouvelle formation</button>
+          <button class="btn btn-orange" id="fc-btn-nouvelle" onclick="openFormationForm()">+ Nouvelle formation</button>
         </div>
       </div>
-      <p style="font-size:13px;color:var(--muted);margin:0 0 16px;">Créez, gérez et suivez vos formations sur Diaspo Formation.</p>
+      <!-- Compte pas encore autorisé : seule la demande d'accès formateur s'affiche (assets/formation-diaspora.js) -->
+      <div id="fc-acces" style="display:none;margin-top:14px;"></div>
+      <div id="fc-corps">
+      <p style="font-size:13px;color:var(--muted);margin:0 0 16px;">Créez, gérez et publiez vos formations. Pour les formations que vous suivez, ouvrez « Suivi de formation ».</p>
 
       <!-- Widgets stats -->
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:20px;" id="form-stats-row">
@@ -2263,6 +2265,7 @@ async function initRelaisDiasporaWidget(me, api) {
       <div id="verification-organisation-body"><div style="text-align:center;padding:20px;color:var(--muted);">Chargement…</div></div>
     </div>
 
+      </div><!-- /fc-corps -->
     </div>`;
 
   /* Moyens de paiement */
@@ -3727,7 +3730,8 @@ async function initRelaisDiasporaWidget(me, api) {
     if (name === 'evenements') window.renderInitEvenements?.();
     if (name === 'billetterie-init') renderInitBilletterie();
     if (name === 'cagnottes') renderCagnottes();
-    if (name === 'formation-diaspora' && window.FormationDiaspora) FormationDiaspora.monter(document.getElementById('formation-diaspora'), { role: 'initiative' });
+    if (name === 'formation-diaspora' && window.FormationDiaspora) FormationDiaspora.monterSuivi(document.getElementById('formation-diaspora'));
+    if (name === 'formations-gestion') ouvrirCreationFormation();
     if (name === 'avancement') renderAvancement();
     if (name === 'soumission-da') SoumissionDA.load();
     if (name === 'messages-vitrine') renderMessagesVitrine();
@@ -10890,16 +10894,27 @@ async function expansionActiverModule(slug) {
   }
 }
 
+/* Module « Création de formation » (2026-10-31) : réservé aux comptes AUTORISÉS par Diaspo'Actif (voir /api/formateur/demande). Les autres y voient seulement la demande d'accès.
+   En cas d'erreur réseau on n'interdit rien à tort : le serveur reste juge à chaque création. */
+async function ouvrirCreationFormation() {
+  const acces = document.getElementById('fc-acces'), corps = document.getElementById('fc-corps'), nouvelle = document.getElementById('fc-btn-nouvelle');
+  if (!acces || !corps) return;
+  let autorise = true;
+  try { autorise = !!(await api('GET', '/formateur/demande')).peut_creer; } catch(_) {}
+  acces.style.display = autorise ? 'none' : '';
+  corps.style.display = autorise ? '' : 'none';
+  if (nouvelle) nouvelle.style.display = autorise ? '' : 'none';
+  if (autorise) loadMesFormations();
+  else if (window.FormationDiaspora) FormationDiaspora.monterAccesFormateur(acces, { onAutorise: ouvrirCreationFormation });
+}
+
 async function initFormationsSidebar() {
   try {
-    /* La création de formations (Espace Formateur) est réservée aux comptes Premium.
-       Le lien reste toujours visible : doré + verrouillé si non Premium (voir initPremiumGates),
-       sinon actif et mène à la gestion des formations. */
-    const { accreditations } = await api('GET', '/accreditations/mes');
-    const has = (accreditations||[]).some(a => a.type === 'initiative_abonne' && a.statut === 'active');
+    /* Le lien reste toujours visible ; les formations (et le compteur du menu) ne se chargent que pour un compte autorisé. */
     const sb = document.getElementById('sb-formations-gestion');
     if (sb) sb.style.display = '';
-    if (has) loadMesFormations();
+    const etat = await api('GET', '/formateur/demande');
+    if (etat.peut_creer) loadMesFormations();
   } catch(_) {}
 }
 
@@ -11112,10 +11127,7 @@ async function supprimerFormation(id, titre) {
   } catch(e) { alert('Erreur : ' + (e.error || e.message)); }
 }
 
-/* Navigation formations */
-document.querySelector('[data-section="formations-gestion"]')?.addEventListener('click', () => {
-  setTimeout(loadMesFormations, 150);
-});
+/* Navigation « Création de formation » : voir ouvrirCreationFormation(), appelée par initShowSection (clic OU lien direct #formations-gestion). */
 
 /* ── Modules réservés aux comptes Premium (initiative_abonne) ──
    Bouton doré + modal d'upsell partagé, appliqué à : Publicités, Événements, Business Plans,
@@ -11226,7 +11238,7 @@ async function initPremiumGates() {
     { href: '#paiement', context: 'paiement_boutique' },
     { href: '#cagnottes', context: 'cagnottes', intercept: true },
     { href: '#formation-diaspora', context: 'formation_diaspora', badgeOnly: true },
-    { href: '#formations-gestion', context: 'espace_formateur', intercept: true },
+    { href: '#formations-gestion', context: 'espace_formateur', badgeOnly: true },
     { href: '#publicites-init', context: 'publicites' },
     { href: '#evenements', context: 'evenements' },
     { href: 'business-plan.html', context: 'business_plans', intercept: true },

@@ -68,8 +68,8 @@
       <!-- Modules Premium regroupés (2026-10-13) : assets/sidebar-premium-cadre.js dessine la cartouche dorée autour de ce groupe -->
       <div class="sb-group-lbl">👑 MODULES PREMIUM</div>
       <a href="reseau.html" class="sb-premium" data-aide="reseau_pro" title="Module premium — réservé aux comptes Abonné" style="display:none;">👑 Mon Réseau Pro <span class="pill" id="u-reseau-badge" style="display:none;"></span></a>
-      <!-- Module premium « Formation Diaspora » (2026-10-31) : formations suivies ; jamais verrouillé (un élève doit toujours retrouver ses formations). Pas d'onglet Formateur ici : réservé aux comptes Initiative. -->
-      <a href="#" data-usection="formation-diaspora" class="sb-premium">👑 Formation Diaspora</a>
+      <!-- Module premium « Suivi de formation » (2026-10-31) : formations suivies ; jamais verrouillé (un élève doit toujours retrouver ses formations). Pas de création de formation ici : réservée aux comptes Initiative. -->
+      <a href="#" data-usection="formation-diaspora" class="sb-premium">👑 Suivi de formation</a>
       <a href="business-plan.html" class="sb-premium" title="Module premium — réservé aux comptes Abonné" data-aide="business_plans">👑 Business Plans</a>
       <a href="#" data-usection="projets" class="sb-premium" title="Module premium — réservé aux comptes Abonné" style="display:none;">👑 Mes projets <span class="pill" id="u-projets-pill" style="display:none;"></span></a>
 
@@ -852,7 +852,7 @@ function fmtDate(d){if(!d)return '';try{return new Date(d).toLocaleDateString('f
     });
     /* Module CV, Lettres & Candidatures : accès libre (plus de restriction Premium). */
     if(name==='projets') loadMesProjets();
-    if(name==='formation-diaspora' && window.FormationDiaspora) FormationDiaspora.monter(document.getElementById('u-formation-diaspora'), { role: 'utilisateur' });
+    if(name==='formation-diaspora' && window.FormationDiaspora) FormationDiaspora.monterSuivi(document.getElementById('u-formation-diaspora'));
     if(name==='soumission-da') SoumissionDA.load();
     if(name==='apparence') renderThemeSelector();
   };

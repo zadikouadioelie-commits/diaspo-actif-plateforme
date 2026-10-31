@@ -1,5 +1,5 @@
 /* ═════════════════════════════════════════════════
-   server/formation-demandes-formateur.js — Module « Formation Diaspora » : demande d'accès à l'espace formateur (2026-10-31)
+   server/formation-demandes-formateur.js — Module « Création de formation » : demande d'accès formateur (2026-10-31)
 
    - Seul un compte INITIATIVE peut demander à devenir formateur : un compte Utilisateur n'a pas d'onglet formateur et la route le refuse.
    - La demande avertit les administrateurs (notification = la petite cloche) et apparaît dans leur module « Demandes de compte formateur ».
@@ -61,7 +61,7 @@ module.exports.register = function register(deps) {
     const admins = await db.prepare("SELECT id FROM users WHERE role='administrateur'").all();
     for (const a of admins) {
       await creerNotif(a.id, "formation_demande_formateur", "🎓 Demande de compte formateur",
-        `${nom} demande l'accès à l'espace formateur de Formation Diaspora.`, { lien: "dashboard-administrateur.html#demandes-formateur", demande_id_formateur: id });
+        `${nom} demande l'accès au module Création de formation (compte formateur).`, { lien: "dashboard-administrateur.html#demandes-formateur", demande_id_formateur: id });
     }
     sendJSON(res, 201, { ok: true, id });
   });
@@ -99,9 +99,9 @@ module.exports.register = function register(deps) {
     await db.prepare("UPDATE formation_demandes_formateur SET statut=?, decide_le=datetime('now'), decide_par=? WHERE id=?").run(accepter ? "acceptee" : "refusee", admin.id, Number(d.id));
     await creerNotif(d.user_id, "formation_formateur_reponse",
       accepter ? "🎓 Vous êtes formateur" : "Demande de compte formateur",
-      accepter ? "Diaspo'Actif a accepté votre demande : l'onglet « Formateur » de Formation Diaspora est ouvert, vous pouvez créer des formations."
+      accepter ? "Diaspo'Actif a accepté votre demande : le module « Création de formation » est ouvert, vous pouvez créer des formations."
                : "Diaspo'Actif n'a pas retenu votre demande de compte formateur.",
-      { lien: "dashboard-initiative.html#formation-diaspora" });
+      { lien: "dashboard-initiative.html#formations-gestion" });
     sendJSON(res, 200, { ok: true, statut: accepter ? "acceptee" : "refusee" });
   }
   route("POST", "/api/admin/demandes-formateur/:id/accepter", (req, res, params) => decider(req, res, params, true));
