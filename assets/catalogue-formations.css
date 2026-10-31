@@ -83,6 +83,7 @@ html body.nd .cat-infos{list-style:none;margin:0;padding:0;display:flex;flex-wra
 html body.nd .cat-par{font-size:13px;color:var(--nd-doux)}
 html body.nd .cat-par strong{color:#fff;font-weight:800}
 html body.nd .cat-pied{margin-top:auto;padding-top:12px;display:grid;gap:10px;border-top:1px solid var(--nd-bord2)}
+html body.nd .cat-membres{font-size:12.5px;font-weight:700;color:#7DE3B5;line-height:1.35}
 html body.nd .cat-prixbloc{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
 html body.nd .cat-prix{font-family:var(--nd-display);font-size:26px;line-height:1;color:#fff}
 html body.nd .cat-prix-gratuit{color:#7DE3B5}

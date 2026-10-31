@@ -88,7 +88,7 @@ async function evaluerCoupon(db, f, codeBrut, userId, prixBase, prixCatalogue) {
   const remise = arrondi(Number(prixBase) - prixFinal);
   if (!(remise > 0)) return { ok: false, erreur: "Ce code n'accorde aucune réduction sur cette offre." };
   if (prixFinal > 0 && prixFinal < PAIEMENT_MINIMUM) return { ok: false, erreur: "Avec ce code, le prix passerait sous le minimum de paiement (0,50 €)." };
-  return { ok: true, coupon: { source, id: Number(c.id), code }, remise, prix_final: prixFinal };
+  return { ok: true, coupon: { source, id: Number(c.id), code, sur_catalogue: generation }, remise, prix_final: prixFinal };
 }
 
 /* ── Écriture d'une vente : commission et net sur la commande (à l'instant du paiement) ── */
@@ -158,6 +158,11 @@ function parMois(liste) {
 function parFormation(liste) {
   return [...grouper(liste, v => v.formation_id)].map(([id, l]) => ({ formation_id: id, formation: l[0].formation, ...totaux(l) })).sort((a, b) => b.brut - a.brut);
 }
+/* Promotions en cours (prix barré) : nombre d'achats, réductions accordées, encaissé — par taux. */
+function parPromo(liste) {
+  const avec = liste.filter(v => v.promo_pct != null);
+  return [...grouper(avec, v => v.promo_pct)].map(([pct, l]) => ({ pct: Number(pct), nb: l.length, remises: arrondi(l.reduce((s, v) => s + Math.max(0, v.prix_initial - v.montant - (v.remise || 0)), 0)), brut: somme(l, "montant") })).sort((a, b) => b.nb - a.nb);
+}
 function parCoupon(liste) {
   const avec = liste.filter(v => v.coupon);
   return [...grouper(avec, v => v.coupon)].map(([code, l]) => ({ code, nb: l.length, remises: somme(l, "remise"), brut: somme(l, "montant") })).sort((a, b) => b.nb - a.nb);
@@ -177,13 +182,14 @@ function exportCsv(ventes, avecFormateur) {
 
 module.exports = {
   COMMISSION_DEFAUT, COMMISSION_MAX, PAIEMENT_MINIMUM, arrondi, partager, commissionPour, promoEnCours, prixFormation, remiseDe, evaluerCoupon, enregistrerVente,
-  lireVentes, totaux, parMois, parFormation, parCoupon, exportCsv,
+  lireVentes, totaux, parMois, parFormation, parCoupon, parPromo, exportCsv,
 };
 
 module.exports.register = function register(deps) {
   const { route, db, sendJSON, getCurrentUser, SEC, exigerPremium } = deps;
   const F = module.exports;
   const estAdmin = u => u && u.role === "administrateur";
+  require("./formation-regles-membres").register(deps); /* tarifs réservés aux membres d'une initiative (2026-10-31) */
 
   /* Un coupon : champs validés (pourcentage ou montant fixe, dates, limites). Renvoie { err } ou { v }. */
   function lireCoupon(body) {
@@ -361,6 +367,9 @@ module.exports.register = function register(deps) {
     } else base = F.prixFormation(f).prix;
     const r = await F.evaluerCoupon(db, f, body && body.code, user.id, base, body && body.module_id ? null : F.prixFormation(f).catalogue);
     if (!r.ok) return sendJSON(res, 200, { valide: false, erreur: r.erreur });
+    /* Pas de cumul : si le tarif membre de cette personne est au moins aussi bon, le code n'apporte rien (et n'est pas consommé). */
+    const om = await require("./formation-regles-membres").offreMembre(db, f, user.id, body && body.module_id ? base : F.prixFormation(f).catalogue, base);
+    if (om && om.prix_final <= r.prix_final) return sendJSON(res, 200, { valide: false, erreur: "Votre tarif membre est déjà plus avantageux que ce code : il s'appliquera automatiquement." });
     sendJSON(res, 200, { valide: true, code: r.coupon.code, prix_avant: base, remise: r.remise, prix_final: r.prix_final });
   });
 
@@ -389,7 +398,7 @@ module.exports.register = function register(deps) {
     const solde = await db.prepare("SELECT COALESCE(wallet_balance,0) AS s FROM users WHERE id=?").get(user.id);
     sendJSON(res, 200, {
       commission_pct: commission, commission_personnalisee: commission !== COMMISSION_DEFAUT, solde_wallet: F.arrondi(solde && solde.s),
-      totaux: F.totaux(ventes), par_mois: F.parMois(ventes), par_formation: F.parFormation(ventes), par_coupon: F.parCoupon(ventes),
+      totaux: F.totaux(ventes), par_mois: F.parMois(ventes), par_formation: F.parFormation(ventes), par_coupon: F.parCoupon(ventes), par_promo: F.parPromo(ventes),
       ventes: ventes.slice(0, 200), nb_total: ventes.length, mes_formations: mesFormations,
     });
   });

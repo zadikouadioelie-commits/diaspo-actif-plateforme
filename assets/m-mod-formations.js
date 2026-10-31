@@ -309,6 +309,9 @@
     let etat = 'libre';
     if (ins) etat = ins.paiement_statut === 'en_attente' ? 'attente' : ins.statut === 'active' ? 'inscrit' : 'inactive';
     const mode = payMode(f), ferme = !!f.date_suppression_prevue;
+    /* Tarif réservé aux membres d'une initiative : calculé par le serveur, affiché ici pour que le prix annoncé soit le prix facturé. */
+    let tarifM = null, mentionsM = [];
+    if (mode !== 'libre') { try { const o = await api('/api/formations/' + encodeURIComponent(f.id) + '/offre'); mentionsM = o.tarifs_membres || []; tarifM = o.mon_tarif_membre && o.mon_tarif_membre.formation; } catch (e) { /* sans tarif membre */ } if (!alive(my)) return; }
     const fav = !!(F.favs && F.favs.has(Number(f.id)));
     const cov = cover(f);
     const who = prov(f);
@@ -325,9 +328,13 @@
     else if (etat === 'inactive') foot = '<button class="btn block" disabled>Inscription non active</button>';
     else if (owner && f.statut !== 'publiee') foot = `<a class="btn block" href="#/formations/${esc(f.id)}/suivre">Voir l’aperçu élève</a>`;
     else if (ferme) foot = '<button class="btn block" disabled>Inscriptions fermées</button>';
+    else if (tarifM && tarifM.gratuit) foot = '<button class="btn block" id="fm-join">S’inscrire gratuitement · tarif membre</button>';
     else if (mode === 'libre') foot = '<button class="btn block" id="fm-join">S’inscrire gratuitement</button>';
+    else if (tarifM) foot = `<button class="btn block" id="fm-pay">S’inscrire · ${esc(price(tarifM.prix, f.devise))} (tarif membre)</button>`;
     else foot = `<button class="btn block" id="fm-pay">S’inscrire · ${esc(price(prixFinal(f), f.devise))}${promoDe(f) ? ` (−${esc(promoDe(f))} %)` : ''}</button>`;
 
+    const mentionM = tarifM ? tarifM.libelle : (mentionsM.length ? mentionsM.map(t => t.texte).join(' · ') : '');
+    if (mentionM && etat !== 'inscrit') foot = `<div class="small muted" style="text-align:center;margin:0 0 6px">🤝 ${esc(mentionM)}</div>` + foot;
     const facts = [
       ['Type', f.type_formation], ['Catégorie', catOf(f)], ['Niveau', f.niveau], ['Langue', f.langue],
       ['Durée', f.duree || (f.duree_heures ? f.duree_heures + ' h' : '')],
@@ -387,7 +394,7 @@
     // Actions
     const star = $('#pane-body [data-fav][data-txt]'); if (star) star.onclick = () => toggleFav(Number(f.id));
     const j = $('#fm-join'); if (j) j.onclick = () => inscrire(f, '', j);
-    const p = $('#fm-pay'); if (p) p.onclick = () => openPaySheet(f, mode === 'membres');
+    const p = $('#fm-pay'); if (p) p.onclick = () => openPaySheet(tarifM ? { ...f, prix_final: tarifM.prix, promo_pct: 0 } : f, mode === 'membres');
     const av = $('#fm-avis'); if (av) av.onclick = () => openAvisSheet(f, monAvis);
   }
 

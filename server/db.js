@@ -4991,6 +4991,18 @@ db.exec(`
     created_at TEXT DEFAULT (datetime('now')),
     UNIQUE(owner_user_id, code)
   );
+  /* Tarifs réservés aux membres d'une initiative (2026-10-31) : formation_cle = 0 → toutes les formations du formateur. */
+  CREATE TABLE IF NOT EXISTS formation_regles_membres (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    owner_user_id INTEGER NOT NULL,
+    formation_cle INTEGER NOT NULL DEFAULT 0,
+    initiative_id INTEGER NOT NULL,
+    mode TEXT NOT NULL DEFAULT 'pourcentage',
+    reduction_pct REAL NOT NULL DEFAULT 0,
+    actif INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(owner_user_id, formation_cle, initiative_id)
+  );
   CREATE TABLE IF NOT EXISTS formation_commissions_formateurs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL UNIQUE,

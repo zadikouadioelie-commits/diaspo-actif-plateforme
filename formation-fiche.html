@@ -123,16 +123,20 @@ function ffRender(){
   const prixF = o.formation.gratuite ? 0 : o.formation.prix;
   const promo = !o.formation.gratuite && o.formation.promo_pct ? o.formation.promo_pct : 0;
   const prixAffiche = COUPON ? COUPON.prix_final : prixF;
+  const MTf = o.mon_tarif_membre && o.mon_tarif_membre.formation;
+  const MT = MTf && !(COUPON && COUPON.prix_final < MTf.prix) ? MTf : null; /* tarif membre calculé par le serveur ; un code encore meilleur l'emporte */
   const prixHtml = o.formation.gratuite ? 'Gratuit'
+    : MT ? `<span class="ff-barre">${euro(o.formation.prix_catalogue || prixF)}</span>${MT.gratuit ? 'Gratuit' : euro(MT.prix)} <span class="ff-promo">Tarif membre</span>`
     : ((promo || COUPON) ? `<span class="ff-barre">${euro(o.formation.prix_catalogue || prixF)}</span>` : '') + (COUPON && COUPON.prix_final === 0 ? 'Gratuit' : euro(prixAffiche))
       + (promo ? ` <span class="ff-promo">−${promo} %</span>` : '');
 
   const modulesHtml = o.modules.map(m => {
     const a = mon.modules[m.id];
+    const mm = o.mon_tarif_membre && o.mon_tarif_membre.modules && o.mon_tarif_membre.modules[m.id];
     const actif = complet || (a && a.statut === 'actif');
     const action = actif
       ? '<span class="ff-mod-acces">✓ Accès ouvert</span>'
-      : (m.vendable_seul ? `<button type="button" class="ff-btn" style="width:auto;padding:8px 14px;font-size:13px;" data-module="${m.id}">${m.gratuit ? 'Obtenir gratuitement' : 'Obtenir · ' + euro(m.prix)}</button>` : '<span class="ff-mod-s">Inclus dans la formation complète</span>');
+      : (m.vendable_seul ? `<button type="button" class="ff-btn" style="width:auto;padding:8px 14px;font-size:13px;" data-module="${m.id}">${m.gratuit || (mm && mm.gratuit) ? 'Obtenir gratuitement' + (mm ? ' (tarif membre)' : '') : 'Obtenir · ' + (mm ? euro(mm.prix) + ' (tarif membre)' : euro(m.prix))}</button>` : '<span class="ff-mod-s">Inclus dans la formation complète</span>');
     return `<div class="ff-mod"><div class="ff-mod-t"><strong>${esc(m.titre)}</strong><div class="ff-mod-s">${m.nb_lecons} activité${m.nb_lecons > 1 ? 's' : ''}${m.duree_minutes ? ' · ' + dureeTxt(m.duree_minutes) : ''}</div>${m.description ? `<div class="ff-mod-s">${esc(m.description)}</div>` : ''}</div>${action}</div>`;
   }).join('');
 
@@ -168,15 +172,16 @@ function ffRender(){
         <div class="ff-card">
           <h2>Formation complète</h2>
           <div class="ff-prix">${prixHtml}</div>
+          ${MT ? `<div class="ff-mod-s" style="margin-bottom:6px;color:#86efac;">🤝 ${esc(MT.libelle)}</div>` : ((o.tarifs_membres || []).length && !o.formation.gratuite ? `<div class="ff-mod-s" style="margin-bottom:8px;">🤝 ${o.tarifs_membres.map(t => esc(t.texte)).join('<br>🤝 ')}</div>` : '')}
           ${promo && o.formation.promo_date_fin ? `<div class="ff-mod-s" style="margin-bottom:6px;">Promotion jusqu'au ${esc(String(o.formation.promo_date_fin).slice(0, 10).split('-').reverse().join('/'))}</div>` : ''}
           ${COUPON ? `<div class="ff-mod-s" style="margin-bottom:6px;color:#86efac;">Code ${esc(COUPON.code)} : −${euro(COUPON.remise)}</div>` : ''}
           <div class="ff-mod-s" style="margin-bottom:12px;">Tous les modules, le suivi de progression${f.certificat_actif ? ' et le document de fin de formation' : ''}.</div>
-          ${!o.formation.gratuite && !complet && !enAttente ? `<div class="ff-code"><input id="ff-code" type="text" maxlength="30" placeholder="Code de réduction" autocomplete="off" value="${COUPON ? esc(COUPON.code) : ''}"><button type="button" id="ff-code-ok">Appliquer</button></div><div class="ff-code-msg" id="ff-code-msg" role="status"></div>` : ''}
+          ${!o.formation.gratuite && !(MT && MT.gratuit) && !complet && !enAttente ? `<div class="ff-code"><input id="ff-code" type="text" maxlength="30" placeholder="Code de réduction" autocomplete="off" value="${COUPON ? esc(COUPON.code) : ''}"><button type="button" id="ff-code-ok">Appliquer</button></div><div class="ff-code-msg" id="ff-code-msg" role="status"></div>` : ''}
           ${complet ? `<a class="ff-btn" href="suivre-formation.html?id=${encodeURIComponent(f.id)}">Accéder à ma formation →</a>`
             : enAttente ? '<button type="button" class="ff-btn" id="ff-reprendre">Finaliser mon paiement</button>'
-            : `<button type="button" class="ff-btn" id="ff-complete">${o.formation.gratuite ? 'Accéder gratuitement' : 'Obtenir la formation complète'}</button>`}
+            : `<button type="button" class="ff-btn" id="ff-complete">${o.formation.gratuite || (MT && MT.gratuit) ? 'Accéder gratuitement' : 'Obtenir la formation complète'}</button>`}
           ${o.modules.some(m => m.vendable_seul) && !complet ? '<p class="ff-aide">Vous pouvez aussi obtenir un seul module : choisissez-le dans la liste ci-contre. Vous n\'aurez accès qu\'au module obtenu.</p>' : ''}
-          ${!o.formation.gratuite ? '<p class="ff-aide">🔒 Paiement sécurisé par Stripe. Votre accès s\'ouvre dès que le paiement est confirmé.</p>' + FormationConsent.mention() : ''}
+          ${!o.formation.gratuite && !(MT && MT.gratuit) ? '<p class="ff-aide">🔒 Paiement sécurisé par Stripe. Votre accès s\'ouvre dès que le paiement est confirmé.</p>' + FormationConsent.mention() : ''}
           <div class="ff-erreur" id="ff-erreur" role="alert"></div>
         </div>
       </aside>

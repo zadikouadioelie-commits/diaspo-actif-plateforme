@@ -29,7 +29,7 @@
   <!-- Design « Nuit dorée » (2026-10-14) : surcharges chargées en dernier, tout est préfixé html body.nd ; retour arrière : retirer ces 2 lignes et class="nd" sur <body> -->
   <link rel="stylesheet" href="/assets/theme-nuit-doree.css?v=7">
   <link rel="stylesheet" href="/assets/formations-nuit-doree.css?v=2">
-  <link rel="stylesheet" href="/assets/catalogue-formations.css?v=8">
+  <link rel="stylesheet" href="/assets/catalogue-formations.css?v=9">
 <style>
 .mf-cat-pill{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600;background:#fff;border:2px solid var(--border);border-radius:99px;padding:8px 14px;cursor:pointer;transition:all .15s;user-select:none;}
 .mf-cat-pill:hover{border-color:#ff6b00;}
@@ -297,6 +297,7 @@
         <h3 style="margin:20px 0 10px;">🏷️ Coupons sur toutes mes formations</h3>
         <div class="card" style="padding:14px 16px;margin-bottom:6px;">
           <p style="font-size:12.5px;color:var(--muted);margin:0 0 10px;">Un code créé ici fonctionne sur toutes vos formations payantes (pourcentage ou montant fixe, avec dates et limites). Pour un code limité à une seule formation, ouvrez la formation, onglet « Tarification ».</p>
+          <div id="cg-membres"></div>
           <div id="cg-liste" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;"></div>
           <div id="cg-form"></div>
         </div>
@@ -632,6 +633,7 @@
               </div>
               <div>
                 <div class="flex-between"><label style="font-size:13px;font-weight:700;">Coupons de réduction <span class="fb-help" title="Codes que les apprenants peuvent saisir au paiement pour obtenir une réduction ponctuelle.">?</span></label></div>
+                <div id="mfw-membres"></div>
                 <div id="mfw-gen"></div>
                 <div id="mfw-coupons-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;"></div>
                 <div id="mfw-coupon-form"></div>
@@ -1042,7 +1044,7 @@
 
 <script src="assets/data.js"></script>
 <script src="assets/demo.js?v=2"></script>
-<script src="assets/app.js?v=15"></script>
+<script src="assets/app.js?v=16"></script>
 <script src="assets/formation-achat-consent.js?v=1"></script>
 <script src="/assets/rich-editor.js"></script>
 <script src="/assets/upload-media.js?v=3"></script>
@@ -1737,9 +1739,137 @@
     });
   }
 
+
+  /* ── Tarifs réservés aux membres d'une initiative (2026-10-31) : trois boutons rapides + suivi de l'impact ── */
+  const RM = {};
+  function rmMonter(boiteId, getBase, portee){
+    const boite = document.getElementById(boiteId);
+    if(!boite) return;
+    if(!boite.dataset.pret){
+      boite.dataset.pret = '1';
+      const champ = 'class="input-field" style="width:100%;margin-top:3px;"', lbl = 'style="font-size:11.5px;font-weight:700;color:rgba(255,255,255,.8);"';
+      boite.innerHTML = `<div style="background:rgba(255,255,255,.06);border:1px solid rgba(125,227,181,.45);border-radius:10px;padding:12px 14px;margin-bottom:10px;">
+        <div style="font-weight:800;font-size:13.5px;margin-bottom:8px;">🤝 Tarifs réservés aux membres <span style="font-weight:600;font-size:11.5px;color:var(--muted);">— ${portee}</span></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button type="button" class="btn btn-sm btn-orange" data-rm="gratuit">🎁 Gratuit pour les membres Diaspo'Actif</button>
+          <button type="button" class="btn btn-sm btn-orange" data-rm="promo">🏷️ Promotion membres Diaspo'Actif</button>
+          <button type="button" class="btn btn-sm btn-outline" data-rm="init">🤝 Promotion liée à une initiative</button>
+        </div>
+        <div data-rm-zone></div>
+        <p style="font-size:11.5px;color:var(--muted);margin:8px 0 0;">Les personnes affiliées à l'initiative (affiliation acceptée) obtiennent leur tarif <strong>automatiquement</strong>, sans code. La meilleure offre s'applique : jamais de cumul avec une promotion ou un code.</p>
+        <div data-rm-liste style="display:flex;flex-direction:column;gap:6px;margin-top:10px;"></div>
+      </div>`;
+      const zone = boite.querySelector('[data-rm-zone]');
+      const fermer = () => { zone.innerHTML = ''; };
+      const poster = async corps => {
+        try { await api('POST', getBase(), corps); showMsg('Tarif membres enregistré ✓', 'success'); fermer(); recharger(); }
+        catch(e){ showMsg(e.message || 'Enregistrement impossible.', 'danger'); }
+      };
+      const nomPortee = portee.includes('toutes') ? 'toutes vos formations (y compris les prochaines)' : 'cette formation';
+      boite.querySelector('[data-rm="gratuit"]').addEventListener('click', async () => {
+        if(!getBase()){ showMsg('Enregistrez d\'abord la formation.', 'danger'); return; }
+        if(!confirm(`Vous renoncez à vos revenus : les membres de Diaspo'Actif accéderont GRATUITEMENT à ${nomPortee}, quel qu'en soit le prix.\n\nConfirmer ?`)) return;
+        await poster({ officielle: true, mode: 'gratuit', confirme: true });
+      });
+      boite.querySelector('[data-rm="promo"]').addEventListener('click', () => {
+        if(!getBase()){ showMsg('Enregistrez d\'abord la formation.', 'danger'); return; }
+        zone.innerHTML = `<div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-top:10px;">
+          <div style="width:150px;"><label ${lbl}>Réduction pour les membres Diaspo'Actif (%)</label><input id="${boiteId}-pct" type="number" min="1" max="99" ${champ} placeholder="ex : 20"></div>
+          <button type="button" class="btn btn-sm btn-orange" id="${boiteId}-ok">Appliquer</button>
+          <button type="button" class="btn btn-sm btn-outline" id="${boiteId}-non">Annuler</button></div>`;
+        document.getElementById(boiteId + '-non').addEventListener('click', fermer);
+        document.getElementById(boiteId + '-ok').addEventListener('click', () => {
+          const pct = parseFloat(document.getElementById(boiteId + '-pct').value);
+          if(!(pct >= 1 && pct <= 99)){ showMsg('Indiquez un pourcentage entre 1 et 99.', 'danger'); return; }
+          poster({ officielle: true, mode: 'pourcentage', reduction_pct: pct });
+        });
+      });
+      boite.querySelector('[data-rm="init"]').addEventListener('click', () => {
+        if(!getBase()){ showMsg('Enregistrez d\'abord la formation.', 'danger'); return; }
+        let choisie = null, minuteur = null;
+        zone.innerHTML = `<div style="margin-top:10px;display:grid;gap:8px;">
+          <div style="position:relative;"><label ${lbl}>Initiative visée (la vôtre ou une autre)</label>
+            <input id="${boiteId}-q" ${champ} placeholder="Tapez le nom d'une initiative, par exemple Segom" autocomplete="off">
+            <div id="${boiteId}-sugg" role="listbox" style="display:none;position:absolute;left:0;right:0;z-index:20;background:#101a36;border:1px solid rgba(255,255,255,.25);border-radius:8px;max-height:260px;overflow:auto;margin-top:2px;"></div></div>
+          <div id="${boiteId}-choisie" style="font-size:12.5px;"></div>
+          <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
+            <div style="width:150px;"><label ${lbl}>Réduction (%)</label><input id="${boiteId}-pct" type="number" min="1" max="99" ${champ} placeholder="ex : 10"></div>
+            <label style="font-size:12.5px;display:flex;gap:6px;align-items:center;padding-bottom:8px;"><input type="checkbox" id="${boiteId}-grat"> Gratuité (au lieu d'un pourcentage)</label>
+            <button type="button" class="btn btn-sm btn-orange" id="${boiteId}-ok">Appliquer</button>
+            <button type="button" class="btn btn-sm btn-outline" id="${boiteId}-non">Annuler</button></div></div>`;
+        const q = document.getElementById(boiteId + '-q'), sugg = document.getElementById(boiteId + '-sugg'), ch = document.getElementById(boiteId + '-choisie');
+        const grat = document.getElementById(boiteId + '-grat'), pct = document.getElementById(boiteId + '-pct');
+        grat.addEventListener('change', () => { pct.disabled = grat.checked; if(grat.checked) pct.value = ''; });
+        document.getElementById(boiteId + '-non').addEventListener('click', fermer);
+        const montrerChoix = () => { ch.innerHTML = choisie ? `✅ Initiative choisie : <strong>${escQ(choisie.nom)}</strong>${choisie.ville ? ' <span style="color:var(--muted);">· ' + escQ(choisie.ville) + (choisie.pays ? ', ' + escQ(choisie.pays) : '') + '</span>' : ''}` : ''; };
+        q.addEventListener('input', () => {
+          choisie = null; montrerChoix(); clearTimeout(minuteur);
+          const t = q.value.trim();
+          if(t.length < 2){ sugg.style.display = 'none'; return; }
+          minuteur = setTimeout(async () => {
+            try {
+              const { initiatives } = await api('GET', '/formateur/initiatives-recherche?q=' + encodeURIComponent(t));
+              if(!initiatives.length){ sugg.innerHTML = '<div style="padding:10px;font-size:12.5px;color:var(--muted);">Aucune initiative trouvée.</div>'; sugg.style.display = 'block'; return; }
+              sugg.innerHTML = initiatives.map(i => `<div role="option" tabindex="0" data-id="${i.id}" style="display:flex;gap:10px;align-items:center;padding:8px 10px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.08);">
+                ${i.logo_url ? `<img src="${escQ(i.logo_url)}" alt="" style="width:30px;height:30px;border-radius:50%;object-fit:cover;">` : '<span style="width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.12);display:inline-flex;align-items:center;justify-content:center;">🏛</span>'}
+                <span style="font-size:13px;"><strong>${escQ(i.nom)}</strong>${i.officielle ? ' <em style="color:#7de3b5;">· officielle</em>' : ''}<br><span style="color:var(--muted);font-size:11.5px;">${[i.ville, i.pays].filter(Boolean).map(escQ).join(', ')}</span></span></div>`).join('');
+              sugg.style.display = 'block';
+              sugg.querySelectorAll('[data-id]').forEach(el => {
+                const choisir = () => { choisie = initiatives.find(x => String(x.id) === el.dataset.id); q.value = choisie.nom; sugg.style.display = 'none'; montrerChoix(); };
+                el.addEventListener('click', choisir); el.addEventListener('keydown', e => { if(e.key === 'Enter') choisir(); });
+              });
+            } catch(e){ sugg.style.display = 'none'; showMsg(e.message || 'Recherche impossible.', 'danger'); }
+          }, 250);
+        });
+        document.getElementById(boiteId + '-ok').addEventListener('click', async () => {
+          if(!choisie){ showMsg('Choisissez une initiative dans la liste qui apparaît quand vous écrivez.', 'danger'); return; }
+          if(grat.checked){
+            if(!confirm(`Vous renoncez à vos revenus : toutes les personnes affiliées à « ${choisie.nom} » accéderont GRATUITEMENT à ${nomPortee}.\n\nConfirmer ?`)) return;
+            await poster({ initiative_id: choisie.id, mode: 'gratuit', confirme: true });
+          } else {
+            const v = parseFloat(pct.value);
+            if(!(v >= 1 && v <= 99)){ showMsg('Indiquez un pourcentage entre 1 et 99, ou cochez « Gratuité ».', 'danger'); return; }
+            await poster({ initiative_id: choisie.id, mode: 'pourcentage', reduction_pct: v });
+          }
+        });
+        q.focus();
+      });
+    }
+    const liste = boite.querySelector('[data-rm-liste]');
+    const plur = (n, s, p) => n + ' ' + (n > 1 ? p : s);
+    const ligne = (r, lecture) => {
+      const st = r.stats || {};
+      const mois = (st.par_mois || []).map(m => `<div>${escQ(m.mois)} : ${plur(m.personnes, 'personne', 'personnes')} · −${cpEur(m.remises)} · ${cpEur(m.encaisse)} encaissés</div>`).join('');
+      return `<div style="font-size:12.5px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.16);border-radius:8px;padding:8px 12px;${r.actif ? '' : 'opacity:.55;'}">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          ${r.initiative_logo ? `<img src="${escQ(r.initiative_logo)}" alt="" style="width:22px;height:22px;border-radius:50%;object-fit:cover;">` : '🤝'}
+          <strong>${escQ(r.texte)}</strong>${r.actif ? ' <em style="color:#7de3b5;">actif</em>' : ' <em style="color:#fbbf24;">désactivé</em>'}
+          ${lecture ? '<span style="margin-left:auto;font-size:11px;color:var(--muted);">toutes vos formations</span>' : `<span style="margin-left:auto;display:flex;gap:6px;">
+            <button type="button" class="rm-bascule" data-id="${r.id}" data-actif="${r.actif ? 0 : 1}" style="border:1px solid rgba(255,255,255,.3);background:none;color:inherit;border-radius:6px;cursor:pointer;font-size:11.5px;padding:2px 8px;">${r.actif ? 'Désactiver' : 'Réactiver'}</button>
+            <button type="button" class="rm-suppr" data-id="${r.id}" aria-label="Supprimer cette règle" style="border:none;background:none;color:#dc2626;cursor:pointer;">✕</button></span>`}
+        </div>
+        <div style="color:var(--muted);margin-top:4px;">👥 ${plur(st.personnes || 0, 'personne en a profité', 'personnes en ont profité')} · 🎁 ${plur(st.gratuits || 0, 'accès gratuit', 'accès gratuits')} · ${st.remises ? '−' : ''}${cpEur(st.remises || 0)} de réduction · ${cpEur(st.encaisse || 0)} encaissés${st.derniere ? ' · dernière utilisation le ' + cpDate(st.derniere) : ''}</div>
+        ${mois ? `<details style="margin-top:4px;"><summary style="cursor:pointer;color:var(--muted);">Détail par mois</summary><div style="color:var(--muted);padding:4px 0 0 12px;">${mois}</div></details>` : ''}
+      </div>`;
+    };
+    async function recharger(){
+      const base = getBase();
+      if(!base){ liste.innerHTML = ''; return; }
+      try {
+        const d = await api('GET', base);
+        liste.innerHTML = (d.regles || []).map(r => ligne(r, false)).join('') + (d.globales || []).map(r => ligne(r, true)).join('') || '<div style="font-size:12px;color:var(--muted);">Aucun tarif membres pour le moment.</div>';
+        liste.querySelectorAll('.rm-bascule').forEach(b => b.addEventListener('click', async () => { try { await api('PATCH', `${base}/${b.dataset.id}`, { actif: b.dataset.actif === '1' }); recharger(); } catch(e){ showMsg(e.message || 'Erreur.', 'danger'); } }));
+        liste.querySelectorAll('.rm-suppr').forEach(b => b.addEventListener('click', async () => { if(!confirm('Supprimer cette règle ? Les personnes déjà inscrites gardent leur accès.')) return; try { await api('DELETE', `${base}/${b.dataset.id}`); recharger(); } catch(e){ showMsg(e.message || 'Erreur.', 'danger'); } }));
+      } catch(_) {}
+    }
+    RM[boiteId] = recharger;
+    recharger();
+  }
+
   async function mfwRenderCoupons(){
     const el = document.getElementById('mfw-coupons-list');
     mfwGenInit();
+    rmMonter('mfw-membres', () => fbFormationId ? `/formations/${fbFormationId}/regles-membres` : null, 'cette formation');
     const form = document.getElementById('mfw-coupon-form');
     if(form && !form.dataset.pret){ form.innerHTML = cpFormHtml('mfwc'); form.dataset.pret = '1'; cpFormInit('mfwc', async corps => { if(!fbFormationId) return; await api('POST', `/formations/${fbFormationId}/coupons`, corps); mfwRenderCoupons(); }); }
     if(!fbFormationId){ el.innerHTML = ''; return; }
@@ -1753,6 +1883,7 @@
   /* ── Centre de commande : coupons sur toutes mes formations ── */
   async function loadCouponsGlobaux(){
     const form = document.getElementById('cg-form'), el = document.getElementById('cg-liste');
+    rmMonter('cg-membres', () => '/formateur/regles-membres', 'toutes vos formations');
     if(!form) return;
     if(!form.dataset.pret){ form.innerHTML = cpFormHtml('cg'); form.dataset.pret = '1'; cpFormInit('cg', async corps => { await api('POST', '/formateur/coupons-globaux', corps); loadCouponsGlobaux(); }); }
     try {
@@ -1779,7 +1910,8 @@
       el.innerHTML = (t.nb ? '' : '<div class="notice" style="margin-top:12px;">Aucune vente sur cette période. Les accès gratuits et les codes à 100 % ne comptent pas dans les ventes.</div>')
         + tab('Par mois', ['Mois','Ventes','Encaissé','Commission','Net'], d.par_mois.map(m => [m.mois, m.nb, cpEur(m.brut), cpEur(m.commission), cpEur(m.net)]))
         + tab('Par formation', ['Formation','Ventes','Encaissé','Commission','Net'], d.par_formation.map(f => [escQ(f.formation), f.nb, cpEur(f.brut), cpEur(f.commission), cpEur(f.net)]))
-        + tab('Codes de réduction utilisés', ['Code','Utilisations','Remises accordées','Encaissé'], d.par_coupon.map(c => [escQ(c.code), c.nb, cpEur(c.remises), cpEur(c.brut)]))
+        + tab('Promotions en cours (prix barré)', ['Promotion','Achats','Réductions accordées','Encaissé'], (d.par_promo || []).map(p => ['−' + p.pct + ' %', p.nb, cpEur(p.remises), cpEur(p.brut)]))
+        + tab('Codes de réduction et tarifs membres utilisés', ['Code','Utilisations','Remises accordées','Encaissé'], d.par_coupon.map(c => [escQ(c.code), c.nb, cpEur(c.remises), cpEur(c.brut)]))
         + tab('Dernières ventes' + (d.nb_total > d.ventes.length ? ' (' + d.ventes.length + ' sur ' + d.nb_total + ' — le fichier contient tout)' : ''), ['Date','Offre','Acheteur','Prix','Remise','Payé','Commission','Net'],
           d.ventes.map(v => [cpDate(v.date), escQ(v.libelle), escQ(v.acheteur), cpEur(v.prix_initial) + (v.promo_pct ? ' <small>(promo −' + v.promo_pct + ' %)</small>' : ''), v.remise ? '−' + cpEur(v.remise) + (v.coupon ? ' <small>' + escQ(v.coupon) + '</small>' : '') : '—', '<strong>' + cpEur(v.montant) + '</strong>', cpEur(v.commission) + ' <small>(' + v.commission_pct + ' %)</small>', cpEur(v.net)]));
       document.getElementById('fv-csv').href = '/api/formateur/ventes?format=csv' + (qs.toString() ? '&' + qs : '');

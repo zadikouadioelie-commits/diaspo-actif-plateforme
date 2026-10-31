@@ -5905,6 +5905,7 @@ async function initFormations() {
         ${f.formateur_affiche ? `<div class="cat-par">Par <strong>${E(f.formateur_affiche)}</strong></div>` : ""}
         ${desc ? `<p class="cat-desc">${E(desc)}</p>` : ""}
         ${infos ? `<ul class="cat-infos">${infos}</ul>` : ""}
+        ${(f.mentions_membres && f.mentions_membres.length) ? `<div class="cat-membres">🤝 ${E(f.mentions_membres[0].texte)}${f.mentions_membres.length > 1 ? ` <small>+${f.mentions_membres.length - 1} autre${f.mentions_membres.length > 2 ? "s" : ""}</small>` : ""}</div>` : ""}
         <div class="cat-pied">
           <div class="cat-prixbloc">${blocPrix}</div>
           <a class="cat-btn" href="${lien}">Accéder à la formation</a>

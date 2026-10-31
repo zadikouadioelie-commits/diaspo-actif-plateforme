@@ -10,6 +10,7 @@
 "use strict";
 
 const Finances = require("./formation-finances");
+const Regles = require("./formation-regles-membres");
 
 /* Catégories d'origine (celles que proposait le formulaire du constructeur) — semées une seule fois, ensuite l'administration décide. */
 const CATEGORIES_DEFAUT = [
@@ -103,6 +104,7 @@ async function enrichir(db, rows) {
   }
   const classement = [...inscrits.entries()].filter(([, n]) => n >= POPULAIRE_MIN_INSCRITS).sort((a, b) => b[1] - a[1]).slice(0, POPULAIRE_RANG_MAX).map(([id]) => id);
   const auteurs = await nomsAuteurs(db, rows.map(r => r.owner_user_id));
+  const mentions = await Regles.mentionsPourFormations(db, rows);
   return rows.map(r => {
     const id = Number(r.id);
     const p = Finances.prixFormation(r);
@@ -113,6 +115,7 @@ async function enrichir(db, rows) {
       prix_catalogue: p.catalogue, promo_pct: p.promo_pct, prix_final: p.prix,
       ...imposerAuteur({}, auteurs.get(Number(r.owner_user_id)) || r.auteur_nom || r.organisme || ""),
       populaire: classement.includes(id) ? 1 : 0,
+      mentions_membres: mentions.get(id) || [],
       note_moyenne: note ? note.moy : null, nb_avis: note ? note.n : 0
     };
   });

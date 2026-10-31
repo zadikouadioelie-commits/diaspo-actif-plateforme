@@ -10,6 +10,7 @@
    ═════════════════════════════════════════════════ */
 "use strict";
 const Finances = require("./formation-finances");
+const Regles = require("./formation-regles-membres");
 
 /* Aucun remboursement (décision du 2026-10-30, « à préciser partout ») : une formation achetée appartient à l'élève, qu'il la suive ou non.
    Ces deux textes sont la SOURCE UNIQUE : renvoyés au navigateur (assets/formation-achat-consent.js les affiche) et posés sur la page de paiement Stripe.
@@ -210,7 +211,10 @@ module.exports.register = function register(deps) {
       if (!ev.ok) return sendJSON(res, 400, { error: ev.erreur, code: "coupon_refuse" });
       coupon = ev.coupon; remise = ev.remise; montant = ev.prix_final;
     }
-    const colsVente = [prixCatalogue, remise, coupon ? coupon.code : null, coupon ? coupon.source : null, coupon ? coupon.id : null, promoPct];
+    /* Tarif réservé aux membres d'une initiative : automatique, vérifié ici (affiliation acceptée et valable). Jamais cumulé : la meilleure offre entre promotion, code et tarif membre. */
+    const offreM = await Regles.offreMembre(db, f, user.id, prixCatalogue, montant);
+    if (offreM) { coupon = Regles.traceCommande(offreM); remise = offreM.remise; montant = offreM.prix_final; }
+    const colsVente = [prixCatalogue, remise, coupon ? coupon.code : null, coupon ? coupon.source : null, coupon ? coupon.id : null, coupon && (coupon.source === "membre" || coupon.sur_catalogue) ? null : promoPct]; /* la promotion n'est comptée que si elle s'est vraiment appliquée */
     const libelle = cle === 0 ? f.titre : `${f.titre} — ${module.titre}`;
     const portee = cle === 0 ? "formation" : "modules";
     const expiration = D.dateExpiration(f);
@@ -367,6 +371,16 @@ module.exports.register = function register(deps) {
         else mes.modules[Number(a.module_cle)] = { statut: a.statut, date_expiration: a.date_expiration || null };
       }
     }
+    /* Tarifs membres : mentions publiques + tarif personnel de la personne connectée (affiliation vérifiée ici). */
+    const tarifsMembres = (await Regles.mentionsPourFormations(db, [f])).get(Number(f.id)) || [];
+    let monTarifMembre = null;
+    if (user && tarifsMembres.length && !gratuite) {
+      const pf = Finances.prixFormation(f);
+      const ofr = await Regles.offreMembre(db, f, user.id, pf.catalogue, pf.prix);
+      const mods = {};
+      for (const m of modules) { const p = D.prixModule(f, m); if (p > 0 && Number(m.vendable_seul)) { const om = await Regles.offreMembre(db, f, user.id, p, p); if (om) mods[Number(m.id)] = { prix: om.prix_final, gratuit: om.gratuit, libelle: om.libelle }; } }
+      if (ofr || Object.keys(mods).length) monTarifMembre = { formation: ofr ? { prix: ofr.prix_final, gratuit: ofr.gratuit, libelle: ofr.libelle } : null, modules: mods };
+    }
     sendJSON(res, 200, {
       formation: { id: Number(f.id), titre: f.titre, prix: gratuite ? 0 : Finances.prixFormation(f).prix, prix_catalogue: gratuite ? 0 : Finances.prixFormation(f).catalogue, promo_pct: gratuite ? null : Finances.prixFormation(f).promo_pct, promo_date_fin: Finances.prixFormation(f).promo_pct ? (f.promo_date_fin || null) : null, gratuite, mode_acces: f.mode_acces || "gratuit", devise: f.devise || "EUR", duree_acces_jours: f.duree_acces_jours ? Number(f.duree_acces_jours) : null },
       modules: modules.map(m => ({
@@ -374,6 +388,7 @@ module.exports.register = function register(deps) {
         vendable_seul: !!Number(m.vendable_seul), prix: D.prixModule(f, m), gratuit: D.prixModule(f, m) <= 0,
       })),
       mon_acces: user ? mes : null,
+      tarifs_membres: tarifsMembres, mon_tarif_membre: monTarifMembre,
     });
   });
 
