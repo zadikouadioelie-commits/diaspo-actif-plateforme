@@ -257,6 +257,7 @@ function scorer(question, chunks, max) {
   }).filter(x => x.trouves >= seuilMots && x.score > 0).sort((a, b2) => b2.score - a.score).slice(0, max);
 }
 const DEMANDE_DE_CONTEXTE = /\b(resum\w*|explique\w*\s+(ce|cet|cette|moi)|ce\s+(passage|chapitre|module|cours)|cette\s+(lecon|partie|page|section)|this\s+(passage|chapter|lesson|page|module)|summari[sz]e|explain\s+(this|it))\b/;
+const Competences = require("./kofi-competences");
 const SALUTATION = /^\s*(bonjour|bonsoir|salut|coucou|hello|hi|hey|merci|thanks?|thank you|ok|d'accord)\b[\s!.?,]*$/i;
 
 /* ── Phrases fixes (FR / EN) ──────────────────────────────────────────────────────────────────────── */
@@ -451,7 +452,18 @@ async function effacerCompte(db, userId) {
   const c = await db.prepare("DELETE FROM kofi_conversations WHERE user_id=?").run(id);
   await db.prepare("DELETE FROM kofi_actions WHERE user_id=?").run(id); /* missions proposées par l'assistant du formateur (elles contiennent le texte collé) */
   await db.prepare("DELETE FROM kofi_majorite WHERE user_id=?").run(id);
+  await db.prepare("DELETE FROM kofi_presentations WHERE user_id=?").run(id);
   return { messages: Number(m && m.changes) || 0, conversations: Number(c && c.changes) || 0 };
+}
+
+/* Présentation de Koffi (première connexion) : vue une fois par compte et par rôle. */
+async function presentationVue(db, userId, portee) {
+  return !!(await db.prepare("SELECT 1 AS x FROM kofi_presentations WHERE user_id=? AND portee=?").get(Number(userId), portee));
+}
+async function marquerPresentation(db, userId, portee) {
+  if (await presentationVue(db, userId, portee)) return;
+  try { await db.prepare("INSERT INTO kofi_presentations (user_id, portee, vue_le) VALUES (?,?,?)").run(Number(userId), portee, new Date().toISOString()); }
+  catch (e) { if (!/unique|duplicate|constraint/i.test(String(e && e.message))) throw e; }
 }
 
 /* ── Routes ───────────────────────────────────────────────────────────────────────────────────────── */
@@ -459,6 +471,7 @@ module.exports = {
   NOM, DEFAUTS, reglages, ecrireReglage, budget, coutEstime, creditsDe, lotsValides, accorderGratuit, debiter, rendre, crediterForfait, effacerCompte, ageEn, statutMajorite, TEXTE_MAJORITE, VERSION_MAJORITE,
   texteDeHtml, morceler, tokens, scorer, analyserReponse, indexerFormation, texteDeStudio, systemePour, sqlDate,
   confirmerCommande, annulerCommande, TEXTE_FORFAIT_NON_REMBOURSABLE, TEXTE_FORFAIT_RETRACTATION, VERSION_CONSENTEMENT_FORFAIT,
+  presentationVue, marquerPresentation,
 };
 
 module.exports.register = function register(deps) {
@@ -493,6 +506,7 @@ module.exports.register = function register(deps) {
     if (etat === "utilisable" && ctx.mode === "eleve" && cr.restants <= 0 && (cr.gratuit_deja_accorde || (ctx.budget && ctx.budget.reserve_eur < r.budget_seuil_gratuit_eur))) etat = "recharge";
     return {
       nom: NOM, etat, apercu: ctx.mode === "apercu",
+      presentation_vue: await presentationVue(db, user.id, "eleve"),
       formation: { id: Number(ctx.f.id), titre: ctx.f.titre },
       premium: ctx.premium,
       majorite: ctx.etat === "majorite" ? { texte: TEXTE_MAJORITE, version: VERSION_MAJORITE } : null,
@@ -520,6 +534,17 @@ module.exports.register = function register(deps) {
     const st = await statutMajorite(db, user.id);
     if (st === "mineur") return sendJSON(res, 403, { error: "Koffi est réservé aux personnes majeures (18 ans ou plus).", code: "mineur" });
     if (st === "a_confirmer") await db.prepare("INSERT INTO kofi_majorite (user_id, confirme_le, version) VALUES (?,?,?)").run(user.id, new Date().toISOString(), VERSION_MAJORITE);
+    sendJSON(res, 200, { ok: true });
+  });
+
+  /* ═════ Présentation de Koffi : la personne l'a vue (ou passée) — on ne la lui rejoue plus. Une seule ligne par compte et par rôle. ═════ */
+  route("POST", "/api/kofi/presentation", async (req, res, params, body) => {
+    const user = await exiger(req, res); if (!user) return;
+    const portee = body && body.portee;
+    if (portee !== "eleve" && portee !== "createur") return sendJSON(res, 400, { error: "Rôle inconnu." });
+    const lim = SEC.rateLimit("kofi-presentation:" + user.id, 30, 3600000);
+    if (!lim.allowed) return sendJSON(res, 429, { error: "Trop de tentatives. Réessayez plus tard." });
+    await marquerPresentation(db, user.id, portee);
     sendJSON(res, 200, { ok: true });
   });
 
@@ -678,6 +703,10 @@ module.exports.register = function register(deps) {
 
     /* 1. Salutation seule : accueil fixe, sans IA ni décompte. */
     if (SALUTATION.test(texte)) { const id = await enregistrer(T[lg].bienvenue, { flags: ["accueil"] }); return sendJSON(res, 200, await reponseJson(id, T[lg].bienvenue, [], ["accueil"])); }
+
+    /* 1 bis. Question sur ce que sait faire Koffi (2026-10-31, demande explicite : « toute question sur ses compétences ne doit pas compter dans les crédits ») :
+       réponse complète et fixe, sans IA, JAMAIS décomptée — même quand les questions sont épuisées. */
+    if (Competences.estQuestionCompetences(texte)) { const rep = Competences.reponseEleve(lg, r); const id = await enregistrer(rep, { flags: ["competences"] }); return sendJSON(res, 200, await reponseJson(id, rep, [], ["competences"])); }
 
     /* 2. Extraits : le filtre d'accès est appliqué AVANT toute lecture (porte fermée = jamais lue). */
     await assurerIndex(db, ctx.f.id);

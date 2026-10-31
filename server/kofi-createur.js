@@ -15,6 +15,7 @@
 const IA = require("./kofi-ia");
 const Pays = require("./kofi-pays");
 const Carte = require("./kofi-carte");
+const Competences = require("./kofi-competences");
 const { GUIDE } = require("./kofi-createur-guide");
 
 const TEXTE_FORFAIT_NON_REMBOURSABLE = "Achat définitif : les messages de l'assistant de création achetés ne donnent lieu à aucun remboursement, qu'ils soient utilisés ou non. Ils sont valables 12 mois. Réfléchissez bien avant d'acheter.";
@@ -300,7 +301,7 @@ module.exports.register = function register(deps) {
   async function messagesDe(convId, limite) {
     const msgs = await db.prepare("SELECT id, role, contenu, flags, created_at FROM kofi_messages WHERE conversation_id=? AND created_at>=? ORDER BY id").all(convId, limite);
     const acts = await db.prepare("SELECT * FROM kofi_actions WHERE conversation_id=? ORDER BY id").all(convId);
-    return msgs.map(m => ({ id: Number(m.id), role: m.role, contenu: m.contenu, date: m.created_at, actions: acts.filter(a => Number(a.message_id) === Number(m.id)).map(actionDto) }));
+    return msgs.map(m => ({ id: Number(m.id), role: m.role, contenu: m.contenu, date: m.created_at, gratuit: /competences/.test(String(m.flags || "")), actions: acts.filter(a => Number(a.message_id) === Number(m.id)).map(actionDto) }));
   }
   async function conversationDe(user, id) {
     return (await db.prepare("SELECT * FROM kofi_conversations WHERE id=? AND user_id=? AND contexte='createur'").get(Number(id), user.id)) || null;
@@ -341,6 +342,7 @@ module.exports.register = function register(deps) {
     sendJSON(res, 200, {
       nom: "Koffi", etat, formation: { id: Number(ctx.f.id), titre: ctx.f.titre, statut: ctx.f.statut },
       majorite: ctx.etat === "majorite" ? { texte: K.TEXTE_MAJORITE, version: K.VERSION_MAJORITE } : null,
+      presentation_vue: await K.presentationVue(db, user.id, "createur"),
       credits: cr, forfait: forfaitPublic(ctx.r), max_message: ctx.r.createur_max_message_caracteres, retention_jours: ctx.r.retention_jours, conversation, dossiers, discussions,
     });
   });
@@ -464,6 +466,19 @@ module.exports.register = function register(deps) {
     } else {
       const nbConv = Number((await db.prepare("SELECT COUNT(*) AS n FROM kofi_conversations WHERE user_id=? AND formation_id=? AND contexte='createur'").get(user.id, ctx.f.id)).n) || 0;
       if (nbConv >= MAX_DISCUSSIONS) return sendJSON(res, 400, { error: `Vous avez atteint la limite de ${MAX_DISCUSSIONS} discussions pour cette formation : supprimez-en une.`, code: "trop_de_discussions" });
+    }
+
+    /* Question sur ce que sait faire Koffi (2026-10-31, demande explicite : « toute question sur ses compétences ne doit pas compter dans les crédits ») : réponse complète et fixe,
+       sans IA, JAMAIS décomptée (ni message gratuit du jour ni forfait) — même quand les messages sont épuisés. */
+    if (Competences.estQuestionCompetences(texte)) {
+      if (!conv) { const x = await db.prepare("INSERT INTO kofi_conversations (user_id, formation_id, contexte, langue, dossier_id, titre) VALUES (?,?,?,?,?,?)").run(user.id, ctx.f.id, "createur", "fr", dossier ? dossier.id : null, court(texte, 60)); conv = { id: Number(x.lastInsertRowid) }; }
+      else if (!conv.titre) await db.prepare("UPDATE kofi_conversations SET titre=? WHERE id=?").run(court(texte, 60), conv.id);
+      if (dossier) await db.prepare("UPDATE kofi_dossiers SET derniere_activite=datetime('now') WHERE id=?").run(dossier.id);
+      await db.prepare("INSERT INTO kofi_messages (conversation_id, role, contenu) VALUES (?,?,?)").run(conv.id, "user", texte);
+      const reponseFixe = Competences.reponseCreateur(r);
+      const x = await db.prepare("INSERT INTO kofi_messages (conversation_id, role, contenu, flags) VALUES (?,?,?,?)").run(conv.id, "assistant", reponseFixe, "competences");
+      await db.prepare("UPDATE kofi_conversations SET derniere_activite=datetime('now') WHERE id=?").run(conv.id);
+      return sendJSON(res, 200, { conversation_id: conv.id, message: { id: Number(x.lastInsertRowid), role: "assistant", contenu: reponseFixe, actions: [], gratuit: true }, credits: await credits(user, ctx) });
     }
 
     /* Débit : gratuit du jour d'abord, puis forfait. Un échec de l'IA rend le message. */

@@ -29,7 +29,7 @@
       'Vos conversations sont conservées 60 jours au maximum, puis supprimées. Vous pouvez les supprimer à tout moment.'
     ],
     infoLien: 'En savoir plus : politique de confidentialité', compris: 'J\'ai compris',
-    suggestions: ['Comment ajouter un quiz et un examen final ?', 'Comment fixer le prix et créer un coupon ?', 'Quels sont les types de certificat ?', 'Crée une carte mentale du module 1'],
+    suggestions: ['Que sais-tu faire ?', 'Comment ajouter un quiz et un examen final ?', 'Comment fixer le prix et créer un coupon ?', 'Quels sont les types de certificat ?', 'Crée une carte mentale du module 1'],
     appliquer: 'Appliquer', ignorer: 'Ignorer', appliquee: '✅ Appliquée', annulee: 'Ignorée', echec: '⚠️ Échec', enCours: 'Application…',
     majTitre: 'Koffi est réservé aux personnes majeures', majTexte: 'Pour utiliser Koffi, confirmez que vous avez 18 ans ou plus. Tous vos outils de création restent disponibles sans lui.', majCase: 'Je confirme avoir 18 ans ou plus', majBtn: 'Confirmer',
     mineur: 'Koffi est réservé aux personnes de 18 ans ou plus. Vos outils de création restent disponibles sans lui.',
@@ -182,6 +182,8 @@
 
   function bulle(role, texte, extra) { var d = document.createElement('div'); d.className = 'kc-m ' + role + (extra || ''); d.textContent = texte; E.body.appendChild(d); return d; }
   function defiler() { E.body.scrollTop = E.body.scrollHeight; }
+  /* Réponse à « Que sais-tu faire ? » : gratuite, jamais décomptée — on le dit. */
+  function badgeGratuit(b) { var n = document.createElement('div'); n.className = 'kc-gratuit'; n.style.cssText = 'margin-top:8px;font-size:12px;font-weight:700;color:#166534;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:5px 8px;white-space:normal'; n.textContent = '✓ Question sur Koffi : gratuite, elle ne compte pas dans vos messages.'; b.appendChild(n); }
   function carteEtat(titre, texte) { var d = document.createElement('div'); d.className = 'kc-carte'; d.innerHTML = '<h4>' + esc(titre) + '</h4><p>' + esc(texte) + '</p>'; E.body.appendChild(d); return d; }
   function bloquer(oui) { E.input.disabled = oui; E.send.disabled = oui; }
 
@@ -223,7 +225,26 @@
     rendreVue();
   }
 
+  /* Présentation de Koffi à la première connexion (assets/koffi-presentation.js, chargé au besoin) : une scène jouée, puis la discussion habituelle. Si le fichier ne charge pas, on passe. */
+  var presEnCours = false;
+  function jouerPresentation(messages) {
+    if (presEnCours) return;
+    presEnCours = true; E.body.innerHTML = ''; E.foot.style.display = 'none'; pastilleCredits();
+    var fin = function (ok) {
+      if (!ok || !window.KoffiPresentation) { presEnCours = false; if (etat) etat.presentation_vue = true; rendreChat(messages); return; }
+      window.KoffiPresentation.monter(E.body, { role: 'createur', lg: 'fr', onFin: function () {
+        presEnCours = false; if (etat) etat.presentation_vue = true;
+        api('POST', '/api/kofi/presentation', { portee: 'createur' }).catch(function () { /* sera rejouée : sans gravité */ });
+        rendreChat(messages); if (E.input && !E.input.disabled && !petitEcran()) E.input.focus();
+      } });
+    };
+    if (window.KoffiPresentation) return fin(true);
+    var s = document.createElement('script'); s.src = '/assets/koffi-presentation.js?v=1'; s.onload = function () { fin(true); }; s.onerror = function () { fin(false); }; document.head.appendChild(s);
+  }
+
   function rendreChat(messages) {
+    if (presEnCours) return;
+    if (etat && etat.presentation_vue === false && !(messages || []).length) { jouerPresentation(messages); return; }
     E.body.innerHTML = ''; E.foot.style.display = ''; bloquer(false); pastilleCredits(); majOu();
     afficherInfo(false);
     var ms = messages || [];
@@ -238,7 +259,7 @@
   }
   function rendreMessage(m) {
     if (m.role === 'user') { bulle('user', m.contenu, m.contenu.length > 600 ? ' long' : ''); return; }
-    bulle('bot', m.contenu); (m.actions || []).forEach(rendreMission);
+    var b = bulle('bot', m.contenu); if (m.gratuit) badgeGratuit(b); (m.actions || []).forEach(rendreMission);
   }
 
   /* Liste : dossiers (dépliables) et discussions hors dossier. */
@@ -373,7 +394,7 @@
     api('POST', '/api/kofi/createur/messages', corps).then(function (r) {
       att.remove(); var nouvelle = !conversationId; conversationId = r.conversation_id; if (!titreCourant) titreCourant = texte.slice(0, 60);
       if (etat) { etat.credits = r.credits; pastilleCredits(); }
-      bulle('bot', r.message.contenu); (r.message.actions || []).forEach(rendreMission);
+      var bb = bulle('bot', r.message.contenu); if (r.message.gratuit) badgeGratuit(bb); (r.message.actions || []).forEach(rendreMission);
       if (r.message.missions_rejetees) bulle('bot', 'Une proposition n\'a pas pu être retenue (référence invalide) : reformulez ou précisez le module / chapitre concerné.');
       majOu(); defiler(); if (nouvelle) rafraichir();
     }).catch(function (er) {

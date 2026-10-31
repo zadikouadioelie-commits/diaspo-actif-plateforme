@@ -5236,6 +5236,13 @@ db.exec(`
     confirme_le TEXT NOT NULL,
     version TEXT
   );
+  /* Présentation de Koffi à la première connexion (2026-10-31) : une ligne par compte et par rôle (portee = 'eleve' ou 'createur'), écrite quand la personne a vu la scène. */
+  CREATE TABLE IF NOT EXISTS kofi_presentations (
+    user_id INTEGER NOT NULL,
+    portee TEXT NOT NULL,
+    vue_le TEXT NOT NULL,
+    PRIMARY KEY (user_id, portee)
+  );
 `);
 /* Dossiers de discussion de l'assistant du formateur : colonnes ajoutées aux conversations (déjà dans le CREATE TABLE : PostgreSQL les crée seul ; SQLite local déjà créé : ici). */
 ;['dossier_id INTEGER', 'titre TEXT'].forEach(col => { try { db.exec(`ALTER TABLE kofi_conversations ADD COLUMN ${col}`); } catch(_) {} });

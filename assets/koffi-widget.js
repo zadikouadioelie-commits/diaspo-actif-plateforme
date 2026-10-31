@@ -14,6 +14,7 @@
     fr: {
       nom: 'Koffi', sous: 'Tuteur de la formation', ouvrir: 'Poser une question à Koffi', fermer: 'Fermer', nouvelle: 'Nouvelle conversation',
       supprimer: 'Supprimer cette conversation', confirmSuppr: 'Supprimer cette conversation ? Cette action est définitive.', placeholder: 'Posez votre question…', envoyer: 'Envoyer',
+      gratuitNote: '✓ Question sur Koffi : gratuite, elle ne compte pas dans vos questions.',
       reflechit: 'Koffi cherche dans le cours…', accueil: 'Bonjour ! Je suis Koffi. Posez-moi une question sur ce cours : je réponds uniquement à partir des supports auxquels vous avez accès, et je cite la source.',
       info1: 'Koffi répond uniquement à partir des supports de cette formation auxquels vous avez accès. Il n\'utilise aucune autre source.',
       info2: 'Vos conversations sont conservées 60 jours au maximum, puis supprimées automatiquement. Vous pouvez les supprimer à tout moment.',
@@ -36,6 +37,7 @@
     en: {
       nom: 'Koffi', sous: 'Course tutor', ouvrir: 'Ask Koffi a question', fermer: 'Close', nouvelle: 'New conversation',
       supprimer: 'Delete this conversation', confirmSuppr: 'Delete this conversation? This cannot be undone.', placeholder: 'Ask your question…', envoyer: 'Send',
+      gratuitNote: '✓ Question about Koffi: free, it does not use any of your questions.',
       reflechit: 'Koffi is searching the course…', accueil: 'Hello! I\'m Koffi. Ask me a question about this course: I only answer from the materials you have access to, and I cite my sources.',
       info1: 'Koffi answers only from the materials of this course that you have access to. It uses no other source.',
       info2: 'Your conversations are kept for 60 days at most, then deleted automatically. You can delete them at any time.',
@@ -143,7 +145,8 @@
       }
       var fl = m.flags || [];
       if (fl.indexOf('sans_reference') >= 0) html += '<div class="kf-note">' + esc(T().sansRef) + '</div>';
-      if (avecAvis && m.id && fl.indexOf('accueil') < 0) html += '<div class="kf-fb" data-mid="' + m.id + '"><button type="button" data-note="1">👍 ' + T().utile + '</button><button type="button" data-note="-1">👎 ' + T().pasUtile + '</button></div>';
+      if (fl.indexOf('competences') >= 0) html += '<div class="kf-note" style="color:#166534;background:#f0fdf4;border-color:#bbf7d0">' + esc(T().gratuitNote) + '</div>';
+      if (avecAvis && m.id && fl.indexOf('accueil') < 0 && fl.indexOf('competences') < 0) html += '<div class="kf-fb" data-mid="' + m.id + '"><button type="button" data-note="1">👍 ' + T().utile + '</button><button type="button" data-note="-1">👎 ' + T().pasUtile + '</button></div>';
       el.innerHTML = html;
     }
     $('.kf-body').appendChild(el);
@@ -155,6 +158,8 @@
     var e = S.etat; if (!e) return '';
     if (e.apercu) return T().apercu;
     var c = e.credits || {};
+    /* Un nouvel élève n'a pas encore de lot : ses questions offertes sont accordées à sa première vraie question — on affiche « 5 questions offertes », pas « 0 restante ». */
+    if (!c.gratuit_deja_accorde && !(Number(c.restants) > 0) && Number(c.gratuits_offerts) > 0) return T().gratuites(Number(c.gratuits_offerts));
     return T().restantes(Number(c.restants) || 0);
   }
   function majMeta() {
@@ -201,7 +206,25 @@
     var d = document.createElement('div'); d.className = 'kf-card'; d.innerHTML = '<h4>' + esc(titre) + '</h4><div>' + esc(texte) + '</div>'; return d;
   }
 
+  /* Présentation de Koffi à la première connexion (assets/koffi-presentation.js, chargé au besoin) : une scène jouée, puis la fenêtre habituelle. Si le fichier ne charge pas, on passe. */
+  function jouerPresentation(body) {
+    if (S.presEnCours) return;
+    S.presEnCours = true;
+    var fin = function (ok) {
+      if (!ok || !window.KoffiPresentation) { S.presEnCours = false; if (S.etat) S.etat.presentation_vue = true; construireCorps(); return; }
+      body.innerHTML = '';
+      window.KoffiPresentation.monter(body, { role: 'eleve', lg: S.lg, onFin: function () {
+        S.presEnCours = false; if (S.etat) S.etat.presentation_vue = true;
+        api('POST', '/api/kofi/presentation', { portee: 'eleve' });
+        construireCorps(); var ta = $('.kf-form textarea'); if (ta && !ta.disabled) ta.focus();
+      } });
+    };
+    if (window.KoffiPresentation) return fin(true);
+    var s = document.createElement('script'); s.src = '/assets/koffi-presentation.js?v=1'; s.onload = function () { fin(true); }; s.onerror = function () { fin(false); }; document.head.appendChild(s);
+  }
+
   function construireCorps() {
+    if (S.presEnCours) return;
     var body = $('.kf-body'); body.innerHTML = '';
     var foot = $('.kf-foot'); var e = S.etat;
     foot.style.display = '';
@@ -216,6 +239,7 @@
     if (e.etat === 'desactive') { body.appendChild(carteMessage('Koffi', T().desactive)); foot.style.display = 'none'; return; }
     if (e.etat === 'indisponible') { body.appendChild(carteMessage('Koffi', T().indispo)); foot.style.display = 'none'; return; }
     if (e.etat === 'evaluation') { body.appendChild(carteMessage('Koffi', T().evaluation)); foot.style.display = 'none'; return; }
+    if (!e.apercu && e.presentation_vue === false && !S.msgs.length) { foot.style.display = 'none'; jouerPresentation(body); return; }
     if (!lsGet('koffi_info_vue_v2') && !e.apercu) { body.appendChild(carteInfo()); foot.style.display = 'none'; return; }
     S.msgs.forEach(function (m) { ajouterMessage(m, true); });
     if (!S.msgs.length) ajouterMessage({ role: 'assistant', contenu: T().accueil, flags: ['accueil'] }, false);
