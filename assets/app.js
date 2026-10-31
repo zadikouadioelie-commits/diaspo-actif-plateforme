@@ -7448,6 +7448,27 @@ function appliquerStatutRelation(el, userId, classe, st) {
    de requêtes simultanées et provoquait des 429 Too Many Requests). Voir
    GET /api/relation-statut-lot, même correctif déjà appliqué au don récurrent vedette
    (GET /api/cagnottes/vedette-lot). */
+/* Les routes « …-lot » du serveur ne répondent qu'aux 100 PREMIERS identifiants (garde-fou
+   volontaire, voir .slice(0, 100) dans server/index.js). Envoyer toute la liste d'un coup laissait
+   les cartouches au-delà de la 100e sans réponse, donc SANS bouton : 34 cartouches de l'annuaire
+   (134 affichées) n'offraient aucun moyen de contacter le compte (2026-10-31, signalé : un membre
+   n'arrivait pas à joindre quelqu'un). On découpe donc en tranches de 100 et on fusionne. Seule
+   l'erreur de la PREMIÈRE tranche est propagée (ex. non connecté) ; une tranche suivante en échec
+   n'efface pas les boutons déjà obtenus. */
+async function statutsParTranches(chemin, param, ids) {
+  const statuts = {};
+  for (let i = 0; i < ids.length; i += 100) {
+    try {
+      const r = await api('GET', `${chemin}?${param}=${ids.slice(i, i + 100).join(',')}`);
+      Object.assign(statuts, r.statuts || {});
+    } catch (e) {
+      if (i === 0) throw e;
+    }
+  }
+  return statuts;
+}
+window.statutsParTranches = statutsParTranches;
+
 window.initBoutonsRelation = async function (racine) {
   const cibles = [...(racine || document).querySelectorAll('[data-relation-user]:not([data-relation-prete])')];
   if (!cibles.length) return;
@@ -7468,8 +7489,7 @@ window.initBoutonsRelation = async function (racine) {
   const ids = [...new Set(aTraiter.map(el => el.getAttribute('data-relation-user')))];
   let statuts = {};
   try {
-    const r = await api('GET', `/relation-statut-lot?user_ids=${ids.join(',')}`);
-    statuts = r.statuts || {};
+    statuts = await statutsParTranches('/relation-statut-lot', 'user_ids', ids);
   } catch (e) {
     aTraiter.forEach(el => el.innerHTML = '');   // non connecté : on n'affiche rien
     return;
@@ -7539,7 +7559,7 @@ window.initBoutonsAffiliation = async function (racine) {
   if (elsUser.length) {
     const ids = [...new Set(elsUser.map(el => el.getAttribute('data-affiliation-user')))];
     let statuts = {};
-    try { statuts = (await api('GET', `/affiliation-statut-lot?user_ids=${ids.join(',')}`)).statuts || {}; } catch (e) {}
+    try { statuts = await statutsParTranches('/affiliation-statut-lot', 'user_ids', ids); } catch (e) {}
     elsUser.forEach(el => {
       const userId = el.getAttribute('data-affiliation-user');
       const classe = el.getAttribute('data-affiliation-classe') || 'ann-card-btn';
@@ -7561,7 +7581,7 @@ window.initBoutonsAffiliation = async function (racine) {
   if (elsInit.length) {
     const ids = [...new Set(elsInit.map(el => el.getAttribute('data-affiliation-initiative')))];
     let statuts = {};
-    try { statuts = (await api('GET', `/affiliation-statut-initiatives-lot?initiative_ids=${ids.join(',')}`)).statuts || {}; } catch (e) {}
+    try { statuts = await statutsParTranches('/affiliation-statut-initiatives-lot', 'initiative_ids', ids); } catch (e) {}
     elsInit.forEach(el => {
       const initiativeId = el.getAttribute('data-affiliation-initiative');
       const classe = el.getAttribute('data-affiliation-classe') || 'ann-card-btn';
