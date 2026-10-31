@@ -1686,6 +1686,8 @@ function injectComptesLiesSwitcherStyles() {
 .cl-switch-info{display:flex;flex-direction:column;line-height:1.3;}
 .cl-switch-nom{font-weight:700;color:#111;}
 .cl-switch-role{font-size:10.5px;color:#6b7280;}
+.cl-switch-lier{display:block;width:100%;text-align:center;font-size:12.5px;font-weight:700;background:none;border:none;border-top:1px solid #e5e7eb;color:#111;padding:9px 4px 3px;margin-top:4px;cursor:pointer;}
+.cl-switch-lier:hover{background:#f3f4f6;}
 .cl-switch-manage{display:block;text-align:center;font-size:11.5px;font-weight:600;color:var(--navy,#0D2B4E);text-decoration:none;padding:8px 4px 2px;margin-top:4px;border-top:1px solid #e5e7eb;}
 /* Déplacé vers la barre du bas sous 768px (#mobile-nav-comptes-toggle, voir
    renderMobileBottomNavAuto()) : le ▾ de la topbar y était difficile à atteindre (défilement
@@ -1871,7 +1873,10 @@ async function initComptesLiesSwitcher(user) {
     const r = await api('GET', '/comptes-lies');
     comptes = r.comptes || [];
   } catch (e) { return; }
-  if (comptes.length <= 1) return; // rien à afficher pour un compte non relié
+  /* Bouton visible AUSSI pour un compte non encore relié (2026-10-31, demande explicite) : le menu
+     montre alors le seul compte actuel et propose « Lier un compte » — on peut donc démarrer la
+     liaison depuis ce bouton sans passer par la page « Comptes liés ». */
+  if (!comptes.length) comptes = [{ id: user.id, nom: user.nom, role: user.role, photo_url: user.photo_url }];
   const wrap = document.getElementById('cl-switch-wrap');
   const btn = document.getElementById('cl-switch-btn');
   const dd = document.getElementById('cl-switch-dd');
@@ -1905,7 +1910,7 @@ async function initComptesLiesSwitcher(user) {
      !important concurrent trouvé après recherche exhaustive dans toutes les feuilles de style
      chargées). Un style inline gagne sur toute règle externe non-!important, quelle qu'en soit
      la source — filet de sécurité définitif, indépendant de la cause exacte. */
-  dd.innerHTML = comptes.map(c => {
+  function rendreMenu() { dd.innerHTML = comptes.map(c => {
     const estActuel = c.id === user.id;
     return `<button type="button" class="cl-switch-item" data-user-id="${c.id}" ${estActuel ? 'disabled' : ''} style="color:#111;">
       <span class="cl-switch-avatar">${c.photo_url ? `<img src="${c.photo_url}" alt="">` : '👤'}</span>
@@ -1914,7 +1919,48 @@ async function initComptesLiesSwitcher(user) {
         <span class="cl-switch-role" style="color:#6b7280;">${escH(ROLE_LABELS_CL[c.role] || c.role)}</span>
       </span>
     </button>`;
-  }).join('') + `<a href="comptes-lies.html" class="cl-switch-manage">🔗 Gérer mes comptes liés</a>`;
+  }).join('') + `<button type="button" class="cl-switch-lier" style="color:#111;">➕ Lier un compte</button>` + (comptes.length > 1 ? `<a href="comptes-lies.html" class="cl-switch-manage">🔗 Gérer mes comptes liés</a>` : ''); }
+  rendreMenu();
+  /* Liaison depuis le menu : même route que comptes-lies.html (POST /api/comptes-lies/lier, DS-ID du compte à relier). */
+  function ouvrirLiaison() {
+    if (document.getElementById('cl-lier-overlay')) return;
+    const ov = document.createElement('div');
+    ov.id = 'cl-lier-overlay';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:3000;display:flex;align-items:center;justify-content:center;padding:16px;';
+    ov.innerHTML = `<div style="background:#fff;color:#111;color-scheme:light;border-radius:14px;max-width:380px;width:100%;padding:22px;box-shadow:0 12px 40px rgba(0,0,0,.35);">
+      <h3 style="margin:0 0 8px;font-size:17px;color:#111;">🔒 Lier un compte</h3>
+      <p style="margin:0 0 12px;font-size:13px;line-height:1.5;color:#374151;">Saisissez le <strong>DS-ID</strong> (Code de Sécurité Diaspo'Actif) du compte à relier. Vous le trouvez dans les paramètres de confidentialité de ce compte.</p>
+      <input type="text" id="cl-lier-input" maxlength="10" autocomplete="off" placeholder="Ex. A1B2C3D4E5" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:15px;letter-spacing:1px;text-transform:uppercase;color:#111;background:#fff;">
+      <div id="cl-lier-err" style="color:#b91c1c;font-size:12.5px;min-height:18px;margin-top:6px;"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px;">
+        <button type="button" id="cl-lier-annuler" style="padding:9px 14px;border-radius:8px;border:1px solid #d1d5db;background:#fff;color:#111;cursor:pointer;font-size:13px;">Annuler</button>
+        <button type="button" id="cl-lier-ok" style="padding:9px 14px;border-radius:8px;border:none;background:linear-gradient(135deg,#c8960c,#f2c94c);color:#2a1e00;font-weight:700;cursor:pointer;font-size:13px;">Relier ce compte</button>
+      </div></div>`;
+    document.body.appendChild(ov);
+    const input = ov.querySelector('#cl-lier-input'), err = ov.querySelector('#cl-lier-err'), ok = ov.querySelector('#cl-lier-ok');
+    const fermer = () => ov.remove();
+    ov.addEventListener('click', e => { if (e.target === ov) fermer(); });
+    ov.querySelector('#cl-lier-annuler').addEventListener('click', fermer);
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') ok.click(); if (e.key === 'Escape') fermer(); });
+    ok.addEventListener('click', async () => {
+      const dsId = input.value.trim();
+      err.textContent = '';
+      if (!dsId) { err.textContent = 'Veuillez saisir un DS-ID.'; return; }
+      ok.disabled = true; ok.textContent = 'Vérification…';
+      try {
+        const r = await api('POST', '/comptes-lies/lier', { ds_id: dsId });
+        comptes = r.comptes || comptes;
+        rendreMenu();
+        btn.title = 'Changer de compte';
+        fermer();
+        if (typeof showToast === 'function') showToast('Compte relié avec succès.', 'success');
+      } catch (e) {
+        err.textContent = (e && e.message) ? e.message : 'Impossible de relier ce compte.';
+        ok.disabled = false; ok.textContent = 'Relier ce compte';
+      }
+    });
+    setTimeout(() => input.focus(), 50);
+  }
   // Logique d'ouverture commune aux deux déclencheurs (▾ topbar desktop, "Comptes" barre du
   // bas mobile) — seules les coordonnées de positionnement changent selon celui qui a été
   // cliqué (position:fixed, voir le commentaire sur .cl-switch-dd plus haut).
@@ -1952,6 +1998,7 @@ async function initComptesLiesSwitcher(user) {
   btn.addEventListener('click', (e) => { e.stopPropagation(); ouvrirClDd(btn); });
   if (btnMobile) btnMobile.addEventListener('click', (e) => { e.stopPropagation(); ouvrirClDd(btnMobile); });
   dd.addEventListener('click', async (e) => {
+    if (e.target.closest('.cl-switch-lier')) { dd.classList.remove('open'); ouvrirLiaison(); return; }
     const item = e.target.closest('.cl-switch-item');
     if (!item || item.disabled) return;
     const cibleId = Number(item.dataset.userId);
@@ -2083,7 +2130,7 @@ async function applyAuthState() {
         </span>
       </a>
       <span class="cl-switch-wrap" id="cl-switch-wrap" style="display:none;position:relative;">
-        <button type="button" id="cl-switch-btn" class="cl-switch-btn" title="Changer de compte">▾</button>
+        <button type="button" id="cl-switch-btn" class="cl-switch-btn" title="Changer de compte ou lier un compte">▾</button>
       </span>
       <!-- Pastille « Mes connexions » (2026-10-05) : nombre d'appareils sur lesquels le compte est
            ouvert, orange dès qu'il y en a plus d'un. Cachée tant que assets/connexions.js n'a pas
