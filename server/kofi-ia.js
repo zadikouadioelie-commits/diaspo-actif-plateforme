@@ -78,8 +78,32 @@ function reponseFausseCorrection({ systeme, messages }) {
   return { texte, entree, sortie: Math.ceil(texte.length / 4), lecture_cache: 0, refus: false, arret: "end_turn" };
 }
 
+/* Conseiller de l'Annuaire (système marqué ASSISTANT_ANNUAIRE) : JSON déterministe d'après des marqueurs de la demande — KW:mot (un concept), KW2:mot, VILLE:xxx, PAYS:xxx, TYPE:xxx. */
+function reponseFausseAnnuaire({ systeme, messages }) {
+  if (process.env.KOFI_FAUX_LOG) { try { fs.appendFileSync(process.env.KOFI_FAUX_LOG, JSON.stringify({ systeme, messages }) + "\n"); } catch (e) { /* sans importance */ } }
+  const dernier = String((messages[messages.length - 1] || {}).content || "");
+  const q =(dernier.split("<demande>")[1] || dernier).split("</demande>")[0];
+  const entree = Math.ceil((String(systeme).length + messages.reduce((a, m) => a + String(m.content).length, 0)) / 4);
+  if (/PANNEFAUSSE/.test(q)) throw new KofiIAErreur("indisponible", "Panne simulée.");
+  if (/LIMITEFAUSSE/.test(q)) throw new KofiIAErreur("limite", "Limite simulée.");
+  if (/REFUSFAUX/.test(q)) return { texte: "", entree, sortie: 5, lecture_cache: 0, refus: true, arret: "refusal" };
+  let texte;
+  if (/JSONFAUX/.test(q)) texte = "Voici ma réponse sans structure.";
+  else if (/VAGUEFAUX/.test(q)) texte = JSON.stringify({ action: "question", message: "Quel domaine ou quel type de compétence recherchez-vous ?" });
+  else {
+    const prise = re => (re.exec(q) || [])[1] || "";
+    const concepts = [prise(/KW:(\S+)/), prise(/KW2:(\S+)/)].filter(Boolean).map(m => [m.replace(/_/g, " ")]);
+    const prec = (/<criteres_precedents>([\s\S]*?)<\/criteres_precedents>/.exec(dernier) || [])[1];
+    let base = {}; try { base = prec ? JSON.parse(prec) : {}; } catch (e) { base = {}; }
+    const crit = { concepts: concepts.length ? concepts : (base.concepts || []), ville: prise(/VILLE:(\S+)/) || (/SANSVILLE/.test(q) ? "" : base.ville || ""), pays: prise(/PAYS:(\S+)/) || base.pays || "", type: prise(/TYPE:(\S+)/) || base.type || "" };
+    texte = "```json\n" + JSON.stringify({ action: "chercher", message: "Je cherche des profils correspondant à votre demande.", criteres: crit }) + "\n```";
+  }
+  return { texte, entree, sortie: Math.ceil(texte.length / 4), lecture_cache: 0, refus: false, arret: "end_turn" };
+}
+
 /* Réponse déterministe pour les tests : cite le premier extrait, ou se comporte selon un mot-clé de la question. */
 function reponseFausse({ systeme, messages }) {
+  if (/ASSISTANT_ANNUAIRE/.test(String(systeme))) return reponseFausseAnnuaire({ systeme, messages });
   if (/ASSISTANT_FORMATEUR/.test(String(systeme))) return reponseFausseCreateur({ systeme, messages });
   if (/ASSISTANT_CORRECTION/.test(String(systeme))) return reponseFausseCorrection({ systeme, messages });
   if (process.env.KOFI_FAUX_LOG) { try { fs.appendFileSync(process.env.KOFI_FAUX_LOG, JSON.stringify({ systeme, messages }) + "\n"); } catch (e) { /* sans importance */ } }

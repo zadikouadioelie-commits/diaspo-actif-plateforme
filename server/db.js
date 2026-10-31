@@ -2604,6 +2604,8 @@ const MIGRATIONS = [
   // fonctionnel (connexion, messages...), juste absent de l'annuaire public le temps choisi.
   ["users", "invisible_annuaire_jusqu_au TEXT"],
   ["users", "invisible_annuaire_definitif INTEGER DEFAULT 0"],
+  // Koffi, conseiller de l'Annuaire (2026-10-31) : 1 = le compte a choisi de NE PAS être proposé par Koffi (et, par réciprocité, ne peut pas utiliser le conseiller). Décoché par défaut.
+  ["users", "kofi_non_propose INTEGER DEFAULT 0"],
   // Collaboration CRM (2026-09-24, demande explicite : "crée une affiliation au CRM bien
   // spécifique") — "à qui appartient ce contact/cette opportunité/cette tâche" au sein d'une
   // équipe, une fois que le CRM n'est plus mono-utilisateur (voir crm_collaborateurs,
@@ -5246,6 +5248,21 @@ db.exec(`
     vue_le TEXT NOT NULL,
     PRIMARY KEY (user_id, portee)
   );
+  /* Portefeuille de Koffi (2026-10-31) : UN solde en euros pour tout Koffi (tuteur, assistant de création, conseiller de l'Annuaire).
+     origine « mensuel » = crédit offert du mois civil (mois = AAAA-MM, un seul par compte et par mois) ; « achat » = recharge payée (valable 12 mois). */
+  CREATE TABLE IF NOT EXISTS kofi_solde (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    origine TEXT NOT NULL,
+    mois TEXT,
+    montant_total REAL NOT NULL,
+    montant_restant REAL NOT NULL,
+    expire_le TEXT,
+    reference TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_kofi_solde_user ON kofi_solde(user_id);
+  CREATE UNIQUE INDEX IF NOT EXISTS ux_kofi_solde_mensuel ON kofi_solde(user_id, mois) WHERE origine='mensuel';
 `);
 /* Dossiers de discussion de l'assistant du formateur : colonnes ajoutées aux conversations (déjà dans le CREATE TABLE : PostgreSQL les crée seul ; SQLite local déjà créé : ici). */
 ;['dossier_id INTEGER', 'titre TEXT'].forEach(col => { try { db.exec(`ALTER TABLE kofi_conversations ADD COLUMN ${col}`); } catch(_) {} });

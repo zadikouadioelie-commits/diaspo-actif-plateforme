@@ -20635,7 +20635,7 @@ async function handleStripeWebhook(req, res) {
       /* Forfait de questions Koffi : crédité UNIQUEMENT ici, sur la confirmation signée de Stripe. Idempotent (Kofi.confirmerCommande ne traite qu'une commande « en_attente »). */
       const session = event.data.object;
       const conf = await Kofi.confirmerCommande(db, Number(session.metadata.diaspoactif_kofi_commande_id), (session.amount_total || 0) / 100);
-      if (conf) creerNotif(conf.commande.user_id, "formation", "Koffi : questions créditées ✅", `Votre forfait de ${conf.questions} questions est crédité (valable 12 mois, dans toutes vos formations).`, { formation_id: conf.commande.formation_id });
+      if (conf) creerNotif(conf.commande.user_id, "formation", "Koffi : crédit ajouté ✅", conf.credit_eur ? `Votre recharge est créditée : ${String(conf.credit_eur.toFixed(2)).replace(".", ",")} € d'utilisation Koffi (valable 12 mois, pour tout Koffi).` : `Votre forfait de ${conf.questions} questions est crédité (valable 12 mois, dans toutes vos formations).`, { formation_id: conf.commande.formation_id });
     } else if (event.type === "checkout.session.expired" && event.data.object.metadata?.diaspoactif_kofi_commande_id) {
       await Kofi.annulerCommande(db, Number(event.data.object.metadata.diaspoactif_kofi_commande_id), "expiree");
     } else if (event.type === "checkout.session.completed" && event.data.object.metadata?.diaspoactif_formation_commande_id) {

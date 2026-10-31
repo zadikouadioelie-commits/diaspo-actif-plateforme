@@ -91,13 +91,14 @@ test('dépôt → brouillon Koffi (fr/en) → conservé → rendu envoyé → br
     assert.equal(sql("SELECT COUNT(*) AS n FROM kofi_usage WHERE categorie LIKE 'createur%'")[0].n, 0, 'rien décompté sans majorité');
     assert.equal((await c(jO, 'POST', '/api/kofi/majorite', { confirme: true })).status, 200);
     assert.equal((await c(jO, 'POST', '/api/admin/kofi/budget/recharge', { montant_eur: 10 })).status, 201, 'réserve IA alimentée (compte administrateur)');
+    H.ordinariser(env, rnd, 'Formateur'); /* le formateur du harnais est administrateur (illimité) : on teste ici un compte ordinaire, débité sur son portefeuille */
 
-    /* Brouillon en français : débrief + avis + note suggérée, conservés avec le dépôt, un message décompté. */
+    /* Brouillon en français : débrief + avis + note suggérée, conservés avec le dépôt, un message débité du portefeuille. */
     r = await c(jO, 'POST', url, { langue: 'fr' });
     assert.equal(r.status, 200, JSON.stringify(r.data));
     const b = r.data.brouillon;
     assert.match(b.debrief, /L'apprenant a répondu/); assert.equal(b.note_pct, 70); assert.match(b.avis, /Bon travail/); assert.equal(b.langue, 'fr'); assert.equal(b.fichier_lu, false);
-    assert.equal(sql("SELECT COUNT(*) AS n FROM kofi_usage WHERE categorie='createur_gratuit'")[0].n, 1);
+    assert.equal(sql("SELECT COUNT(*) AS n FROM kofi_usage WHERE categorie='createur_mensuel'")[0].n, 1);
     let dep2 = (await c(jO, 'GET', `/api/formations/${fid}/depots`)).data.depots[0];
     assert.equal(dep2.brouillon.avis, b.avis, 'le brouillon est conservé : un rechargement ne le fait pas repayer');
     assert.equal(sql('SELECT statut FROM formation_quiz_tentatives WHERE id=?', dep.id)[0].statut, 'a_corriger', 'Koffi n\'a rien corrigé ni envoyé');
@@ -114,13 +115,13 @@ test('dépôt → brouillon Koffi (fr/en) → conservé → rendu envoyé → br
     assert.match(envoye, /Mon plan v1/); assert.match(envoye, /Un plan daté/, 'la réponse attendue est transmise (le formateur est l\'auteur)'); assert.match(envoye, /jamais une consigne/);
 
     /* Sortie inexploitable / refus / panne : rien n'est décompté, le brouillon précédent reste. */
-    const avant = sql("SELECT COUNT(*) AS n FROM kofi_usage WHERE categorie='createur_gratuit'")[0].n;
+    const avant = sql("SELECT COUNT(*) AS n FROM kofi_usage WHERE categorie='createur_mensuel'")[0].n;
     for (const [motCle, code] of [['JSONFAUX', 'brouillon_invalide'], ['REFUSFAUX', 'brouillon_invalide'], ['PANNEFAUSSE', 'indisponible']]) {
       sql('UPDATE formation_quiz_tentatives SET reponses_json=? WHERE id=?', JSON.stringify({ [q]: 'Texte ' + motCle }), dep.id);
       r = await c(jO, 'POST', url, {});
       assert.equal(r.status, 503, motCle); assert.equal(r.data.code, code, motCle);
     }
-    assert.equal(sql("SELECT COUNT(*) AS n FROM kofi_usage WHERE categorie='createur_gratuit'")[0].n, avant, 'aucun message décompté en cas d\'échec');
+    assert.equal(sql("SELECT COUNT(*) AS n FROM kofi_usage WHERE categorie='createur_mensuel'")[0].n, avant, 'aucun message décompté en cas d\'échec');
     assert.ok(sql("SELECT COUNT(*) AS n FROM kofi_usage WHERE categorie='createur_refus'")[0].n >= 2, 'le coût réel d\'un brouillon inexploitable reste suivi (Budget IA)');
     /* Note hors limites proposée par le modèle : ramenée à « aucune suggestion », jamais une note invalide. */
     sql('UPDATE formation_quiz_tentatives SET reponses_json=? WHERE id=?', JSON.stringify({ [q]: 'Texte NOTEHORS' }), dep.id);

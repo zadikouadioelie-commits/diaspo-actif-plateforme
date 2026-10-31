@@ -47,11 +47,14 @@ async function demarrer(tag) {
     proc.once('exit', code => { if (!demarre) reject(new Error('Serveur arrêté avant démarrage (code ' + code + ') :\n' + out)); });
     setTimeout(() => { if (!demarre) reject(new Error('Timeout démarrage serveur de test :\n' + out)); }, 20000);
   });
+  let nbInscriptions = 0;
   async function call(jar, method, urlPath, body) {
     /* Aucun remboursement (2026-10-30) : le serveur refuse tout achat payant sans consentement exprès. Les tests le donnent par défaut ;
        pour tester le refus, passer explicitement { accepte_non_remboursable: false } (tests/formation-non-remboursable.test.js). */
     if (method === 'POST' && /^\/api\/formations\/\d+\/(acquerir|inscrire)$/.test(urlPath) && body && typeof body === 'object' && body.accepte_non_remboursable === undefined) body = { ...body, accepte_non_remboursable: true };
     const headers = { 'Content-Type': 'application/json' };
+    /* L'inscription est limitée à 5 par heure et par adresse : une adresse distincte par inscription pour les tests qui créent beaucoup de comptes. */
+    if (method === 'POST' && urlPath === '/api/auth/signup') { nbInscriptions++; headers['X-Forwarded-For'] = `10.77.${(nbInscriptions >> 8) & 255}.${nbInscriptions & 255}`; }
     if (jar) jar.apply(headers);
     const res = await fetch(base + urlPath, { method, headers, body: body ? JSON.stringify(body) : undefined });
     if (jar) jar.capture(res);
@@ -88,4 +91,19 @@ function publier(env, formationId) {
   sq.close();
 }
 
-module.exports = { demarrer, cookieJar, compte, creerFormateur, creerApprenant, publier, DatabaseSync };
+/* Le formateur du harnais est ADMINISTRATEUR (donc illimité pour Koffi, décision du 2026-10-31). Pour tester le portefeuille, ce helper en fait un compte ordinaire,
+   Premium payant, qui a confirmé sa majorité — à appeler APRÈS les actions réservées à l'administration (budget d'IA, réglages). */
+function ordinariser(env, rnd, nom, { majeur = true } = {}) {
+  const c = compte(rnd, nom, 'utilisateur');
+  const sq = new DatabaseSync(env.dbPath);
+  try {
+    const u = sq.prepare("SELECT id FROM users WHERE email=?").get(c.email);
+    sq.prepare("UPDATE users SET role='utilisateur', created_at=datetime('now','-2 year') WHERE id=?").run(u.id);
+    sq.prepare("DELETE FROM user_accreditations WHERE user_id=?").run(u.id);
+    sq.prepare("INSERT INTO user_accreditations (user_id, accred_id, statut, date_expiration, type_tarif, montant_paye) VALUES (?, (SELECT id FROM accred_definitions WHERE type='utilisateur_abonne'), 'active', datetime('now','+30 day'), 'mensuel', 9)").run(u.id);
+    if (majeur) sq.prepare("INSERT OR IGNORE INTO kofi_majorite (user_id, confirme_le, version) VALUES (?, datetime('now'), 'test')").run(u.id);
+    return u.id;
+  } finally { sq.close(); }
+}
+
+module.exports = { demarrer, cookieJar, compte, creerFormateur, creerApprenant, ordinariser, publier, DatabaseSync };

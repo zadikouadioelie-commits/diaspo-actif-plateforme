@@ -266,7 +266,7 @@ module.exports.register = function register(deps) {
     if (!f) return { code: 404, erreur: "Formation introuvable." };
     if (!checkFormationOwner(f, user)) return { code: 403, erreur: "Interdit." };
     const r = await K.reglages(db);
-    const ctx = { f, r, etat: "utilisable", pays: Number(r.pays_filtre_actif) ? Pays.priseEnCharge(Pays.codePaysDe(req)) : null };
+    const ctx = { f, r, etat: "utilisable", pays: Number(r.pays_filtre_actif) ? Pays.priseEnCharge(Pays.codePaysDe(req)) : null, premium: await K.estPremiumKoffi(deps, user) };
     if (!r.actif_global) ctx.etat = "desactive";
     else if (ctx.pays === false) ctx.etat = "pays";
     else if ((ctx.majorite = await K.statutMajorite(db, user.id)) !== "ok") ctx.etat = ctx.majorite === "mineur" ? "mineur" : "majorite";
@@ -282,18 +282,26 @@ module.exports.register = function register(deps) {
     return false;
   };
 
-  /* Crédits du formateur : messages gratuits du jour (fenêtre de 24 h) + forfait acheté (compteur « createur »). */
-  async function credits(user, ctx) {
-    const r = ctx.r;
-    const debut = sqlDate(new Date(Date.now() - 24 * 3600 * 1000));
-    const utilises = Number((await db.prepare("SELECT COUNT(*) AS n FROM kofi_usage WHERE user_id=? AND categorie='createur_gratuit' AND created_at>=?").get(user.id, debut)).n) || 0;
-    const budgetBas = ctx.budget && ctx.budget.reserve_eur < r.budget_seuil_gratuit_eur;
-    const lots = await K.lotsValides(db, user.id, "createur");
-    const achetes = lots.reduce((a, l) => a + Number(l.questions_restantes), 0);
-    const expire = lots.map(l => l.expire_le).filter(Boolean).sort()[0] || null;
-    return { gratuits_jour: r.createur_gratuit_jour, gratuits_restants: budgetBas ? 0 : Math.max(0, r.createur_gratuit_jour - utilises), achetes_restants: achetes, expire_prochain: expire };
+  /* Portefeuille du formateur : le MÊME solde en euros que le tuteur et le conseiller de l'Annuaire (server/kofi-portefeuille.js). */
+  async function credits(user, ctx) { return K.portefeuilleDe(db, user, ctx); }
+  /* Décompte d'un message : questions offertes (comptes sans Premium) retirées tout de suite ; sinon le portefeuille, débité APRÈS l'appel au coût réel (facturer). */
+  async function reserver(user, ctx) {
+    const pf = await K.portefeuilleDe(db, user, ctx);
+    let lot = null;
+    if (K.Portefeuille.offertesDispo(pf)) {
+      if (!pf.offertes.accorde) await K.accorderGratuit(db, user.id, ctx.r);
+      lot = await K.debiterGratuit(db, user.id);
+    }
+    if (lot) return { pf, lot, categorie: "createur_offert" };
+    if (K.Portefeuille.peutAppeler(pf)) return { pf, lot: null, categorie: pf.illimite ? "createur_illimite" : "portefeuille" };
+    return { pf, erreur: true };
   }
-  const forfaitPublic = r => ({ messages: r.createur_forfait_messages, prix_eur: r.createur_forfait_prix_eur, validite_mois: r.createur_forfait_validite_mois, texte: TEXTE_FORFAIT_NON_REMBOURSABLE, retractation: TEXTE_FORFAIT_RETRACTATION });
+  async function facturer(user, ctx, resv, cout) {
+    if (resv.categorie !== "portefeuille") return resv.categorie;
+    const d = await K.Portefeuille.debiter(db, user.id, cout * ctx.r.coefficient_cout, { avecMensuel: resv.pf.premium && !resv.pf.reserve_basse });
+    return d.depuis_achat ? "createur_achat" : "createur_mensuel";
+  }
+  const rechargePublic = () => ({ achetable: true, texte: K.Portefeuille.TEXTE_RECHARGE_NON_REMBOURSABLE, retractation: K.Portefeuille.TEXTE_RECHARGE_RETRACTATION });
 
   const actionDto = a => {
     const p = parseJson(a.params_json) || {};
@@ -327,7 +335,7 @@ module.exports.register = function register(deps) {
     if (ctx.code) return sendJSON(res, ctx.code, { error: ctx.erreur });
     const cr = ctx.etat === "utilisable" ? await credits(user, ctx) : null;
     let etat = ctx.etat;
-    if (etat === "utilisable" && cr.gratuits_restants <= 0 && cr.achetes_restants <= 0) etat = "recharge";
+    if (etat === "utilisable" && !K.Portefeuille.peutUtiliser(cr)) etat = "recharge";
     /* Dossiers et discussions de CETTE formation (le formateur retrouve tout, rangé) ; la discussion ouverte est celle demandée, sinon la plus récente. */
     let conversation = null, dossiers = [], discussions = [];
     if (["utilisable", "recharge"].includes(etat)) {
@@ -344,7 +352,7 @@ module.exports.register = function register(deps) {
       nom: "Koffi", etat, formation: { id: Number(ctx.f.id), titre: ctx.f.titre, statut: ctx.f.statut },
       majorite: ctx.etat === "majorite" ? { texte: K.TEXTE_MAJORITE, version: K.VERSION_MAJORITE } : null,
       presentation_vue: await K.presentationVue(db, user.id, "createur"),
-      credits: cr, forfait: forfaitPublic(ctx.r), max_message: ctx.r.createur_max_message_caracteres, retention_jours: ctx.r.retention_jours, conversation, dossiers, discussions,
+      credits: cr, recharge: rechargePublic(), max_message: ctx.r.createur_max_message_caracteres, retention_jours: ctx.r.retention_jours, conversation, dossiers, discussions,
     });
   });
 
@@ -450,8 +458,8 @@ module.exports.register = function register(deps) {
     if (!texte) return sendJSON(res, 400, { error: "Écrivez votre message." });
     if (texte.length > r.createur_max_message_caracteres) return sendJSON(res, 400, { error: `Message trop long (${r.createur_max_message_caracteres} caractères au maximum). Collez le texte en plusieurs fois.`, code: "trop_long" });
     const debutJour = sqlDate(new Date(Date.now() - 24 * 3600 * 1000));
-    const nbJour = Number((await db.prepare("SELECT COUNT(*) AS n FROM kofi_usage WHERE user_id=? AND categorie IN ('createur_gratuit','createur_forfait') AND created_at>=?").get(user.id, debutJour)).n) || 0;
-    if (nbJour >= r.plafond_jour_createur) return sendJSON(res, 429, { error: "Vous avez atteint la limite de messages pour aujourd'hui. Revenez demain.", code: "plafond_jour" });
+    const nbJour = Number((await db.prepare("SELECT COUNT(*) AS n FROM kofi_usage WHERE user_id=? AND categorie IN ('createur_offert','createur_mensuel','createur_achat','createur_illimite') AND created_at>=?").get(user.id, debutJour)).n) || 0;
+    if (!(await K.Portefeuille.estIllimite(db, { userId: user.id, role: user.role, r })) && nbJour >= r.plafond_jour_createur) return sendJSON(res, 429, { error: "Vous avez atteint la limite de messages pour aujourd'hui. Revenez demain.", code: "plafond_jour" });
 
     /* Conversation : celle qu'on continue (à soi, de cette formation) ou une nouvelle. */
     let conv = null, dossier = null;
@@ -482,12 +490,10 @@ module.exports.register = function register(deps) {
       return sendJSON(res, 200, { conversation_id: conv.id, message: { id: Number(x.lastInsertRowid), role: "assistant", contenu: reponseFixe, actions: [], gratuit: true }, credits: await credits(user, ctx) });
     }
 
-    /* Débit : gratuit du jour d'abord, puis forfait. Un échec de l'IA rend le message. */
-    const cr = await credits(user, ctx);
-    let lot = null, categorie = null;
-    if (cr.gratuits_restants > 0) categorie = "createur_gratuit";
-    else { lot = await K.debiter(db, user.id, "createur"); if (lot) categorie = "createur_forfait"; }
-    if (!categorie) return sendJSON(res, 402, { error: "Vos messages gratuits du jour sont épuisés.", code: "credits_epuises", forfait: forfaitPublic(r) });
+    /* Décompte : questions offertes (comptes sans Premium), puis portefeuille en euros (débité après l'appel, au coût réel). Un échec de l'IA ne retire rien. */
+    const resv = await reserver(user, ctx);
+    if (resv.erreur) return sendJSON(res, 402, { error: "Votre crédit Koffi est épuisé.", code: "credits_epuises", credits: resv.pf });
+    const lot = resv.lot; let categorie = resv.categorie;
 
     /* Texte long : numéroté par le serveur (c'est ce numéro que le modèle cite dans son plan). */
     const paras = paragraphes(texte);
@@ -527,6 +533,8 @@ module.exports.register = function register(deps) {
       return sendJSON(res, 200, { conversation_id: conv.id, message: { id: Number(x.lastInsertRowid), role: "assistant", contenu: refus, actions: [] }, credits: await credits(user, ctx) });
     }
 
+    categorie = await facturer(user, ctx, resv, cout);
+
     /* Les missions : seules celles qui passent la validation (identifiants vrais, contenus bornés) sont conservées. */
     const sortie = parserSortie(rep.texte);
     const vctx = { modulesIds: etat.modulesIds, chapitres: etat.chapitres, paras: numerote ? paras : null, f: ctx.f };
@@ -560,15 +568,13 @@ module.exports.register = function register(deps) {
     if (!t) return sendJSON(res, 404, { error: "Travail introuvable." });
     if (t.statut !== "a_corriger") return sendJSON(res, 409, { error: "Ce travail a déjà reçu son rendu.", code: "deja_corrige" });
     const debutJour = sqlDate(new Date(Date.now() - 24 * 3600 * 1000));
-    const nbJour = Number((await db.prepare("SELECT COUNT(*) AS n FROM kofi_usage WHERE user_id=? AND categorie IN ('createur_gratuit','createur_forfait') AND created_at>=?").get(user.id, debutJour)).n) || 0;
-    if (nbJour >= r.plafond_jour_createur) return sendJSON(res, 429, { error: "Vous avez atteint la limite de messages pour aujourd'hui. Revenez demain.", code: "plafond_jour" });
+    const nbJour = Number((await db.prepare("SELECT COUNT(*) AS n FROM kofi_usage WHERE user_id=? AND categorie IN ('createur_offert','createur_mensuel','createur_achat','createur_illimite') AND created_at>=?").get(user.id, debutJour)).n) || 0;
+    if (!(await K.Portefeuille.estIllimite(db, { userId: user.id, role: user.role, r })) && nbJour >= r.plafond_jour_createur) return sendJSON(res, 429, { error: "Vous avez atteint la limite de messages pour aujourd'hui. Revenez demain.", code: "plafond_jour" });
 
-    /* Débit : gratuit du jour d'abord, puis forfait. Un échec de l'IA rend le message. */
-    const cr = await credits(user, ctx);
-    let lot = null, categorie = null;
-    if (cr.gratuits_restants > 0) categorie = "createur_gratuit";
-    else { lot = await K.debiter(db, user.id, "createur"); if (lot) categorie = "createur_forfait"; }
-    if (!categorie) return sendJSON(res, 402, { error: "Vos messages gratuits du jour sont épuisés.", code: "credits_epuises", forfait: forfaitPublic(r) });
+    /* Décompte : questions offertes (comptes sans Premium), puis portefeuille en euros (débité après l'appel, au coût réel). Un échec de l'IA ne retire rien. */
+    const resv = await reserver(user, ctx);
+    if (resv.erreur) return sendJSON(res, 402, { error: "Votre crédit Koffi est épuisé.", code: "credits_epuises", credits: resv.pf });
+    const lot = resv.lot; let categorie = resv.categorie;
     const rendre = async () => { if (lot) await K.rendre(db, lot.id); };
 
     const questions = await db.prepare("SELECT id, question, points, reponse_correcte FROM formation_quiz_questions WHERE quiz_id=? ORDER BY ordre ASC, id ASC").all(t.quiz_id);
@@ -600,6 +606,7 @@ module.exports.register = function register(deps) {
     }
     const brouillon = { debrief: analyse.debrief, note_pct: analyse.note_pct, avis: analyse.avis, langue, fichier_lu: !!fichier.bloc, fichier_note: fichier.bloc ? null : (t.fichier_url ? fichier.note : null), cree_le: sqlDate(new Date()) };
     await db.prepare("UPDATE formation_quiz_tentatives SET kofi_brouillon_json=?, kofi_brouillon_le=datetime('now') WHERE id=?").run(JSON.stringify(brouillon), t.id);
+    categorie = await facturer(user, ctx, resv, cout);
     await noterUsage(categorie);
     sendJSON(res, 200, { brouillon, credits: await credits(user, ctx) });
   });
@@ -734,52 +741,5 @@ module.exports.register = function register(deps) {
     const x = await db.prepare("UPDATE kofi_actions SET statut='annulee' WHERE id=? AND statut='proposee'").run(a.id);
     if (!x || Number(x.changes) !== 1) return sendJSON(res, 409, { error: "Cette mission n'est plus en attente.", code: "deja_traitee" });
     sendJSON(res, 200, { ok: true });
-  });
-
-  /* ═════ Achat d'un forfait de messages (Stripe) — compteur « createur » ; crédité seulement à la confirmation du webhook (K.confirmerCommande) ═════ */
-  route("POST", "/api/kofi/createur/forfait/acheter", async (req, res, params, body) => {
-    const user = await exiger(req, res); if (!user) return;
-    const ctx = await contexte(user, body && body.formation_id, req);
-    if (ctx.code) return sendJSON(res, ctx.code, { error: ctx.erreur });
-    if (refuser(res, ctx)) return;
-    const r = ctx.r;
-    if (!body || body.accepte_non_remboursable !== true) return sendJSON(res, 409, { error: "Avant de payer, confirmez que vous avez compris que cet achat n'est pas remboursable.", code: "consentement_requis", texte: TEXTE_FORFAIT_NON_REMBOURSABLE, retractation: TEXTE_FORFAIT_RETRACTATION, montant: r.createur_forfait_prix_eur });
-    const lim = SEC.rateLimit("kofi-createur-achat:" + user.id, 10, 3600000);
-    if (!lim.allowed) return sendJSON(res, 429, { error: "Trop de tentatives. Réessayez plus tard." });
-    const { stripe, getOrCreateStripeCustomer } = require("./stripe-client");
-    if (!stripe) return sendJSON(res, 503, { error: "Paiements momentanément indisponibles." });
-    const enCours = await db.prepare("SELECT * FROM kofi_commandes WHERE user_id=? AND statut='en_attente' AND portee='createur' ORDER BY id DESC LIMIT 1").get(user.id);
-    if (enCours) {
-      if (enCours.stripe_session_id) {
-        try {
-          const s = await stripe.checkout.sessions.retrieve(enCours.stripe_session_id);
-          if (s && s.status === "open" && s.url) return sendJSON(res, 200, { checkout_url: s.url, repris: true });
-          if (s && s.status === "complete") return sendJSON(res, 409, { error: "Votre paiement est en cours de validation : vos messages seront crédités dans quelques instants." });
-        } catch (e) { if (!e || e.code !== "resource_missing") return sendJSON(res, 502, { error: "Impossible de vérifier votre paiement en cours. Réessayez dans un instant." }); }
-        await K.annulerCommande(db, enCours.id, "expiree");
-      } else if (Date.now() - (aDate(enCours.created_at) || new Date(0)).getTime() < 120000) {
-        return sendJSON(res, 409, { error: "Une demande de paiement est déjà en cours d'initialisation. Réessayez dans un instant." });
-      } else { await K.annulerCommande(db, enCours.id, "expiree"); }
-    }
-    let commandeId = null;
-    try {
-      const c = await db.prepare("INSERT INTO kofi_commandes (user_id, formation_id, questions, montant, statut, portee) VALUES (?,?,?,?,'en_attente','createur')").run(user.id, ctx.f.id, r.createur_forfait_messages, r.createur_forfait_prix_eur);
-      commandeId = c.lastInsertRowid;
-      const retour = `${getOrigin(req)}/formations.html`;
-      const session = await stripe.checkout.sessions.create({
-        mode: "payment",
-        customer: await getOrCreateStripeCustomer(db, user),
-        line_items: [{ price_data: { currency: "eur", unit_amount: Math.round(r.createur_forfait_prix_eur * 100), product_data: { name: `Koffi, assistant de création — ${r.createur_forfait_messages} messages (valables ${r.createur_forfait_validite_mois} mois)` } }, quantity: 1 }],
-        metadata: { diaspoactif_kofi_commande_id: String(commandeId), consentement_non_remboursable: VERSION_CONSENTEMENT },
-        custom_text: { submit: { message: TEXTE_FORFAIT_NON_REMBOURSABLE } },
-        success_url: `${retour}?kofi_createur=succes&formation=${encodeURIComponent(ctx.f.id)}`,
-        cancel_url: `${retour}?kofi_createur=annule&formation=${encodeURIComponent(ctx.f.id)}`,
-      });
-      await db.prepare("UPDATE kofi_commandes SET stripe_session_id=?, consentement_le=? WHERE id=?").run(session.id, `${new Date().toISOString()} v${VERSION_CONSENTEMENT}`, commandeId);
-      sendJSON(res, 201, { checkout_url: session.url, commande_id: Number(commandeId) });
-    } catch (e) {
-      try { if (commandeId) await db.prepare("DELETE FROM kofi_commandes WHERE id=?").run(commandeId); } catch (_) { /* le nettoyage ne doit pas masquer l'erreur d'origine */ }
-      sendJSON(res, 500, SEC.safeError(e, "kofi-createur-checkout"));
-    }
   });
 };

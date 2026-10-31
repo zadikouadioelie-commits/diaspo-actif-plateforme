@@ -6,9 +6,8 @@
      « Je ne trouve pas cette information dans les supports auxquels vous avez accès » (donc aucun coût, aucune question décomptée).
    - Portée = tout ce à quoi le compte a accès : formation entière → toute la formation ; modules achetés → ces modules ; un module ou chapitre non obtenu est une
      « porte fermée » : ses extraits ne sont JAMAIS lus, cités ni envoyés au modèle (filtre par Droits.modulesAutorises, appliqué à chaque question).
-   - Réservé aux comptes Premium (initiative / utilisateur), découverte comprise ; les comptes non Premium voient Koffi mais ne peuvent pas l'utiliser (vitrine).
-   - 5 questions gratuites par compte (une fois), puis forfait (1 000 questions, 12 mois, au niveau du COMPTE, toutes formations). Découverte terminée sans
-     abonnement : inutilisable, mais le stock de questions est conservé.
+   - Portefeuille unique en euros (2026-10-31, server/kofi-portefeuille.js) : crédit mensuel offert aux comptes Premium (0,50 €), 15 questions offertes une fois aux comptes sans
+     Premium, puis recharge (3 € payés = 1 € d'utilisation). Le même solde sert au tuteur, à l'assistant de création et au conseiller de l'Annuaire.
    - Aucune commission Diaspo'Actif sur l'argent de Koffi. Coût IA suivi question par question (kofi_usage) ; recharges enregistrées (kofi_budget) ;
      sans réserve, ou sous un seuil, les questions gratuites s'arrêtent d'abord, puis tout.
    - Conversations conservées 60 jours maximum (purge quotidienne) ; l'élève en est informé.
@@ -63,7 +62,7 @@ const DEFAUTS = {
   actif_global: 1,
   pays_filtre_actif: 1, /* 1 = Koffi fermé aux personnes connectées depuis un pays hors de la liste du fournisseur d'IA (server/kofi-pays.js) */
   modele: IA.MODELE_PAR_DEFAUT,
-  gratuit_questions: 5,
+  gratuit_questions: 15,           /* comptes SANS Premium : 15 questions offertes au total, jamais renouvelées (2026-10-31) */
   forfait_questions: 1000,
   forfait_prix_eur: 2.5,
   forfait_validite_mois: 12,
@@ -85,6 +84,20 @@ const DEFAUTS = {
   createur_max_message_caracteres: 30000, /* un module entier collé d'un coup */
   createur_max_sortie_tokens: 3500,
   plafond_jour_createur: 300,      /* anti-abus : messages par 24 h, forfait compris */
+  /* Portefeuille en euros (2026-10-31) — voir server/kofi-portefeuille.js */
+  credit_mensuel_utilisateur_eur: 0.5,   /* crédit d'utilisation offert chaque mois civil à un compte Premium */
+  credit_mensuel_initiative_eur: 0.5,
+  credit_mensuel_collectivite_eur: 0.5,
+  compte_officiel_id: 0,           /* identifiant du compte « Diaspo'Actif Officiel » (0 = aucun) : illimité pour Koffi, comme les administrateurs (voir server/kofi-portefeuille.js) */
+  recharge_min_eur: 3,             /* montant minimum PAYÉ pour une recharge */
+  recharge_ratio: 3,               /* euros payés pour 1 € de crédit d'utilisation reçu (3 € payés = 1 € d'utilisation) */
+  coefficient_cout: 1,             /* le coût réel de chaque appel est multiplié par ce coefficient avant d'être décompté */
+  alerte_solde_pct: 20,            /* « crédit bas » : solde ≤ ce pourcentage du crédit mensuel */
+  /* Conseiller de l'Annuaire */
+  annuaire_max_message_caracteres: 800,
+  annuaire_max_sortie_tokens: 1000,
+  annuaire_nb_candidats: 25,       /* profils examinés par Koffi à chaque recherche */
+  plafond_jour_annuaire: 60,       /* anti-abus : messages par 24 h */
 };
 const TEXTE_REGLAGES = new Set(["modele"]);
 /* Bornes [min, max] acceptées par l'administration. retention_jours plafonné à 60 : c'est la durée annoncée aux élèves (fenêtre, CGV, confidentialité) ;
@@ -96,6 +109,9 @@ const BORNES = {
   prix_entree_usd_par_million: [0, 1000], prix_sortie_usd_par_million: [0, 1000], taux_usd_eur: [0.1, 10],
   createur_gratuit_jour: [0, 1000], createur_forfait_messages: [1, 100000], createur_forfait_prix_eur: [0.5, 1000], createur_forfait_validite_mois: [1, 60],
   createur_max_message_caracteres: [500, 60000], createur_max_sortie_tokens: [500, 8000], plafond_jour_createur: [1, 10000],
+  compte_officiel_id: [0, 2147483647], credit_mensuel_utilisateur_eur: [0, 100], credit_mensuel_initiative_eur: [0, 100], credit_mensuel_collectivite_eur: [0, 100],
+  recharge_min_eur: [0.5, 1000], recharge_ratio: [1, 100], coefficient_cout: [0.1, 100], alerte_solde_pct: [1, 100],
+  annuaire_max_message_caracteres: [50, 3000], annuaire_max_sortie_tokens: [200, 4000], annuaire_nb_candidats: [5, 60], plafond_jour_annuaire: [1, 10000],
 };
 
 const sqlDate = d => d.toISOString().slice(0, 19).replace("T", " ");
@@ -177,6 +193,13 @@ async function debiter(db, userId, portee) {
   return null;
 }
 const rendre = (db, lotId) => db.prepare("UPDATE kofi_credits SET questions_restantes=questions_restantes+1 WHERE id=? AND questions_restantes<questions_total").run(lotId);
+/* Retire UNE question offerte (comptes sans Premium : 15 au total, jamais renouvelées). Atomique ; renvoie le lot ou null. */
+async function debiterGratuit(db, userId) {
+  const lot = await db.prepare("SELECT * FROM kofi_credits WHERE user_id=? AND origine='gratuit' AND questions_restantes>0").get(Number(userId));
+  if (!lot) return null;
+  const res = await db.prepare("UPDATE kofi_credits SET questions_restantes=questions_restantes-1 WHERE id=? AND questions_restantes>0").run(lot.id);
+  return res && Number(res.changes) === 1 ? lot : null;
+}
 async function crediterForfait(db, userId, r, reference) {
   const fin = new Date(); fin.setMonth(fin.getMonth() + r.forfait_validite_mois);
   const x = await db.prepare("INSERT INTO kofi_credits (user_id, origine, questions_total, questions_restantes, expire_le, reference) VALUES (?,?,?,?,?,?)")
@@ -193,6 +216,13 @@ async function confirmerCommande(db, commandeId, montantPaye) {
   const pris = await db.prepare("UPDATE kofi_commandes SET statut='payee', paye_le=datetime('now') WHERE id=? AND statut='en_attente'").run(cmd.id);
   if (!pris || Number(pris.changes) !== 1) return null;
   const r = await reglages(db, true);
+  /* Recharge du portefeuille (2026-10-31) : « questions » contient ici le crédit d'utilisation en CENTIMES (3 € payés = 100 centimes = 1 € d'utilisation). */
+  if (cmd.portee === "portefeuille") {
+    const credit = Number(cmd.questions) / 100;
+    const id = await Portefeuille.crediterAchat(db, cmd.user_id, credit, r.forfait_validite_mois, "commande " + cmd.id);
+    await db.prepare("UPDATE kofi_commandes SET credit_id=? WHERE id=?").run(id || null, cmd.id);
+    return { commande: cmd, credit_id: id || null, questions: Number(cmd.questions), credit_eur: credit };
+  }
   const portee = cmd.portee === "createur" ? "createur" : "eleve";
   const fin = new Date(); fin.setMonth(fin.getMonth() + (portee === "createur" ? r.createur_forfait_validite_mois : r.forfait_validite_mois));
   const x = await db.prepare("INSERT INTO kofi_credits (user_id, origine, questions_total, questions_restantes, expire_le, reference, portee) VALUES (?,?,?,?,?,?,?)")
@@ -258,6 +288,7 @@ function scorer(question, chunks, max) {
 }
 const DEMANDE_DE_CONTEXTE = /\b(resum\w*|explique\w*\s+(ce|cet|cette|moi)|ce\s+(passage|chapitre|module|cours)|cette\s+(lecon|partie|page|section)|this\s+(passage|chapter|lesson|page|module)|summari[sz]e|explain\s+(this|it))\b/;
 const Competences = require("./kofi-competences");
+const Portefeuille = require("./kofi-portefeuille");
 const SALUTATION = /^\s*(bonjour|bonsoir|salut|coucou|hello|hi|hey|merci|thanks?|thank you|ok|d'accord)\b[\s!.?,]*$/i;
 
 /* ── Phrases fixes (FR / EN) ──────────────────────────────────────────────────────────────────────── */
@@ -429,7 +460,6 @@ async function contexteAcces(db, deps, user, formationId, req) {
   }
   /* L'état dit ce que le compte peut faire MAINTENANT (ordre = priorité). */
   if (!r.actif_global || (prefs && Number(prefs.actif) === 0)) ctx.etat = "desactive";
-  else if (!proprietaire && !ctx.premium.actif) ctx.etat = "vitrine";
   else if (ctx.pays === false) ctx.etat = "pays"; /* connecté depuis un pays hors liste : Koffi fermé (la plateforme, elle, reste ouverte) */
   else if (!proprietaire && (ctx.majorite = await statutMajorite(db, user.id)) !== "ok") ctx.etat = ctx.majorite === "mineur" ? "mineur" : "majorite";
   else if (!proprietaire && (!prefs || Number(prefs.desactive_evaluation) !== 0) && await evaluationEnCours(db, ctx.inscription)) ctx.etat = "evaluation";
@@ -440,6 +470,29 @@ async function contexteAcces(db, deps, user, formationId, req) {
     else ctx.etat = "utilisable";
   }
   return ctx;
+}
+
+/* Compte Premium actif au sens de Koffi (administration comprise). Le crédit MENSUEL n'est offert qu'à ces comptes. */
+async function estPremiumKoffi(deps, user) {
+  if (await Portefeuille.estIllimite(deps.db, { userId: user.id, role: user.role, r: await reglages(deps.db) })) return true;
+  const st = await deps.getPremiumStatut(user.id, user.role);
+  return !!(st && st.concerne && st.actif);
+}
+/* Contexte commun hors formation (conseiller de l'Annuaire, recharge) : réglages, Premium, pays, majorité, réserve d'IA. */
+async function contexteKoffi(db, deps, user, req) {
+  const r = await reglages(db);
+  const ctx = { r, premium: await estPremiumKoffi(deps, user), etat: "utilisable", pays: Number(r.pays_filtre_actif) ? Pays.priseEnCharge(Pays.codePaysDe(req)) : null };
+  if (!r.actif_global) ctx.etat = "desactive";
+  else if (ctx.pays === false) ctx.etat = "pays";
+  else if ((ctx.majorite = await statutMajorite(db, user.id)) !== "ok") ctx.etat = ctx.majorite === "mineur" ? "mineur" : "majorite";
+  else { ctx.budget = await budget(db, r); if (ctx.budget.alerte === "epuise") ctx.etat = "indisponible"; }
+  return ctx;
+}
+/* Le portefeuille d'un compte (un seul solde pour tout Koffi). ctx.premium : booléen (contexteKoffi) ou { actif } (contexte d'une formation). */
+async function portefeuilleDe(db, user, ctx) {
+  const r = ctx.r, b = ctx.budget || await budget(db, r);
+  const premium = typeof ctx.premium === "object" && ctx.premium ? !!ctx.premium.actif : !!ctx.premium;
+  return Portefeuille.etat(db, { userId: user.id, role: user.role, r, premium, reserveBasse: b.reserve_eur < r.budget_seuil_gratuit_eur });
 }
 
 /* ── Droit à l'effacement ─────────────────────────────────────────────────────────────────────────── */
@@ -472,12 +525,15 @@ module.exports = {
   texteDeHtml, morceler, tokens, scorer, analyserReponse, indexerFormation, texteDeStudio, systemePour, sqlDate,
   confirmerCommande, annulerCommande, TEXTE_FORFAIT_NON_REMBOURSABLE, TEXTE_FORFAIT_RETRACTATION, VERSION_CONSENTEMENT_FORFAIT,
   presentationVue, marquerPresentation,
+  Portefeuille, debiterGratuit, estPremiumKoffi, contexteKoffi, portefeuilleDe,
 };
 
 module.exports.register = function register(deps) {
   const { route, db, sendJSON, getCurrentUser, SEC, getOrigin, creerNotif } = deps;
   /* Assistant du formateur (2026-10-31) : ses routes vivent dans server/kofi-createur.js (même socle : réglages, crédits, budget, majorité, pays). */
   require("./kofi-createur").register(deps);
+  /* Conseiller d'orientation de l'Annuaire (2026-10-31) : server/kofi-annuaire.js. */
+  require("./kofi-annuaire").register(deps);
   const D = module.exports;
   const estAdmin = u => u && u.role === "administrateur";
 
@@ -495,26 +551,30 @@ module.exports.register = function register(deps) {
     return false;
   }
 
-  /* Ce que l'écran doit afficher : bouton (utilisable), vitrine (non Premium), recharge (questions épuisées)… */
+  /* Ce que l'écran doit afficher : bouton (utilisable), recharge (crédit épuisé)… Le portefeuille est UN solde en euros pour tout Koffi (voir server/kofi-portefeuille.js). */
+  /* Dernière recharge (moins de 3 h) : l'écran de retour de Stripe l'interroge pour savoir quand le webhook a crédité le portefeuille. */
+  async function achatRecent(userId) {
+    const dernier = await db.prepare("SELECT statut, created_at FROM kofi_commandes WHERE user_id=? ORDER BY id DESC LIMIT 1").get(userId);
+    const recent = dernier && (Date.now() - (aDate(dernier.created_at) || new Date(0)).getTime()) < 3 * 3600 * 1000;
+    return recent ? { statut: dernier.statut } : null;
+  }
   async function etatPublic(user, ctx) {
     const r = ctx.r;
-    const cr = await creditsDe(db, user.id, r);
-    /* Dernier achat de forfait (moins de 3 h) : l'écran de retour de Stripe l'interroge pour savoir quand le webhook a crédité les questions. */
-    const dernier = await db.prepare("SELECT statut, created_at FROM kofi_commandes WHERE user_id=? ORDER BY id DESC LIMIT 1").get(user.id);
-    const recent = dernier && (Date.now() - (aDate(dernier.created_at) || new Date(0)).getTime()) < 3 * 3600 * 1000;
+    const apercu = ctx.mode === "apercu";
+    const pf = apercu ? null : await portefeuilleDe(db, user, ctx);
     let etat = ctx.etat;
-    if (etat === "utilisable" && ctx.mode === "eleve" && cr.restants <= 0 && (cr.gratuit_deja_accorde || (ctx.budget && ctx.budget.reserve_eur < r.budget_seuil_gratuit_eur))) etat = "recharge";
+    if (etat === "utilisable" && ctx.mode === "eleve" && !Portefeuille.peutUtiliser(pf)) etat = "recharge";
     return {
-      nom: NOM, etat, apercu: ctx.mode === "apercu",
+      nom: NOM, etat, apercu,
       presentation_vue: await presentationVue(db, user.id, "eleve"),
       formation: { id: Number(ctx.f.id), titre: ctx.f.titre },
       premium: ctx.premium,
       majorite: ctx.etat === "majorite" ? { texte: TEXTE_MAJORITE, version: VERSION_MAJORITE } : null,
-      credits: cr,
-      achat: recent ? { statut: dernier.statut } : null,
-      forfait: { questions: r.forfait_questions, prix_eur: r.forfait_prix_eur, validite_mois: r.forfait_validite_mois, texte: TEXTE_FORFAIT_NON_REMBOURSABLE, retractation: TEXTE_FORFAIT_RETRACTATION, achetable: !ctx.proprietaire && ctx.premium.actif && ctx.etat !== "indisponible" && ctx.etat !== "desactive" && ctx.etat !== "mineur" && ctx.etat !== "majorite" },
+      portefeuille: pf,
+      achat: await achatRecent(user.id),
+      recharge: { achetable: !ctx.proprietaire && !["indisponible", "desactive", "mineur", "majorite", "pays"].includes(ctx.etat), texte: Portefeuille.TEXTE_RECHARGE_NON_REMBOURSABLE, retractation: Portefeuille.TEXTE_RECHARGE_RETRACTATION },
       retention_jours: r.retention_jours,
-      portee: ctx.mode === "apercu" ? "toute la formation (aperçu formateur)" : (ctx.autorises ? "modules" : "formation"),
+      portee: apercu ? "toute la formation (aperçu formateur)" : (ctx.autorises ? "modules" : "formation"),
     };
   }
 
@@ -541,42 +601,49 @@ module.exports.register = function register(deps) {
   route("POST", "/api/kofi/presentation", async (req, res, params, body) => {
     const user = await exiger(req, res); if (!user) return;
     const portee = body && body.portee;
-    if (portee !== "eleve" && portee !== "createur") return sendJSON(res, 400, { error: "Rôle inconnu." });
+    if (portee !== "eleve" && portee !== "createur" && portee !== "annuaire") return sendJSON(res, 400, { error: "Rôle inconnu." });
     const lim = SEC.rateLimit("kofi-presentation:" + user.id, 30, 3600000);
     if (!lim.allowed) return sendJSON(res, 429, { error: "Trop de tentatives. Réessayez plus tard." });
     await marquerPresentation(db, user.id, portee);
     sendJSON(res, 200, { ok: true });
   });
 
-  /* ═════ Achat du forfait de questions (Stripe) : aucune question n'est créditée avant la confirmation du paiement par le webhook ═════ */
-  route("POST", "/api/kofi/forfait/acheter", async (req, res, params, body) => {
+  /* ═════ Portefeuille : l'état (hors formation, pour l'Annuaire et le téléphone) et la recharge (Stripe) ═════ */
+  const rechargeInfo = ctx => ({ achetable: !["indisponible", "desactive", "mineur", "majorite", "pays"].includes(ctx.etat), texte: Portefeuille.TEXTE_RECHARGE_NON_REMBOURSABLE, retractation: Portefeuille.TEXTE_RECHARGE_RETRACTATION });
+  route("GET", "/api/kofi/portefeuille", async (req, res) => {
     const user = await exiger(req, res); if (!user) return;
-    const ctx = await contexteAcces(db, deps, user, body && body.formation_id, req);
-    if (ctx.code) return ressortirErreur(res, ctx);
+    const ctx = await contexteKoffi(db, deps, user, req);
+    sendJSON(res, 200, { nom: NOM, etat: ctx.etat, premium: ctx.premium, portefeuille: await portefeuilleDe(db, user, ctx), achat: await achatRecent(user.id), recharge: rechargeInfo(ctx) });
+  });
+
+  /* Recharge du portefeuille : aucun crédit n'est posé avant la confirmation du paiement par le webhook Stripe. Disponible pour tout compte (Premium ou non). */
+  route("POST", "/api/kofi/portefeuille/recharger", async (req, res, params, body) => {
+    const user = await exiger(req, res); if (!user) return;
+    const ctx = await contexteKoffi(db, deps, user, req);
     const r = ctx.r;
-    if (ctx.mode !== "eleve") return sendJSON(res, 400, { error: "L'aperçu formateur n'utilise pas de questions : aucun forfait à acheter." });
-    /* Réservé aux comptes Premium (stock conservé mais inutilisable sinon : on ne vend pas ce qui ne peut pas servir). */
-    if (!ctx.premium.actif) return sendJSON(res, 402, { error: "Koffi est réservé aux comptes Premium.", code: "premium_requis" });
-    if (ctx.etat === "desactive") return sendJSON(res, 403, { error: "Koffi est désactivé sur cette formation.", code: "desactive" });
-    if (refuserSiMineur(res, ctx)) return;
-    /* Pas de vente quand le service ne peut pas répondre (réserve d'IA épuisée). */
-    if (ctx.etat === "indisponible") return sendJSON(res, 503, { error: "Koffi est momentanément indisponible : l'achat est suspendu. Réessayez plus tard.", code: "indisponible" });
+    if (ctx.etat === "desactive") return sendJSON(res, 403, { error: "Koffi est désactivé pour le moment.", code: "desactive" });
+    if (ctx.etat === "pays") return sendJSON(res, 403, { error: "Koffi n'est pas disponible dans votre pays pour le moment.", code: "pays_non_pris_en_charge" });
+    if (ctx.etat === "mineur") return sendJSON(res, 403, { error: "Koffi est réservé aux personnes majeures (18 ans ou plus).", code: "mineur" });
+    if (ctx.etat === "majorite") return sendJSON(res, 403, { error: "Confirmez avoir 18 ans ou plus pour utiliser Koffi.", code: "majorite_requise", texte: TEXTE_MAJORITE });
+    if (ctx.etat === "indisponible") return sendJSON(res, 503, { error: "Koffi est momentanément indisponible : la recharge est suspendue. Réessayez plus tard.", code: "indisponible" });
+    const offre = Portefeuille.offresRecharge(r).find(o => Math.abs(o.paye_eur - Number(body && body.montant_eur)) < 0.005);
+    if (!offre) return sendJSON(res, 400, { error: "Choisissez l'un des montants proposés.", code: "montant_invalide", offres: Portefeuille.offresRecharge(r) });
     /* Consentement exprès, côté serveur : une interface qui l'oublierait ne contourne rien. */
     if (!body || body.accepte_non_remboursable !== true) {
-      return sendJSON(res, 409, { error: "Avant de payer, confirmez que vous avez compris que cet achat n'est pas remboursable.", code: "consentement_requis", texte: TEXTE_FORFAIT_NON_REMBOURSABLE, retractation: TEXTE_FORFAIT_RETRACTATION, montant: r.forfait_prix_eur });
+      return sendJSON(res, 409, { error: "Avant de payer, confirmez que vous avez compris que cet achat n'est pas remboursable.", code: "consentement_requis", texte: Portefeuille.TEXTE_RECHARGE_NON_REMBOURSABLE, retractation: Portefeuille.TEXTE_RECHARGE_RETRACTATION, offre });
     }
-    const lim = SEC.rateLimit("kofi-achat:" + user.id, 10, 3600000);
+    const lim = SEC.rateLimit("kofi-recharge:" + user.id, 10, 3600000);
     if (!lim.allowed) return sendJSON(res, 429, { error: "Trop de tentatives. Réessayez plus tard." });
     const { stripe, getOrCreateStripeCustomer } = require("./stripe-client");
     if (!stripe) return sendJSON(res, 503, { error: "Paiements momentanément indisponibles." });
     /* Double clic ou retour en arrière : on reprend le paiement en cours plutôt que d'en créer un second. */
-    const enCours = await db.prepare("SELECT * FROM kofi_commandes WHERE user_id=? AND statut='en_attente' ORDER BY id DESC LIMIT 1").get(user.id);
+    const enCours = await db.prepare("SELECT * FROM kofi_commandes WHERE user_id=? AND statut='en_attente' AND portee='portefeuille' ORDER BY id DESC LIMIT 1").get(user.id);
     if (enCours) {
       if (enCours.stripe_session_id) {
         try {
           const s = await stripe.checkout.sessions.retrieve(enCours.stripe_session_id);
-          if (s && s.status === "open" && s.url) return sendJSON(res, 200, { checkout_url: s.url, repris: true });
-          if (s && s.status === "complete") return sendJSON(res, 409, { error: "Votre paiement est en cours de validation : vos questions seront créditées dans quelques instants." });
+          if (s && s.status === "open" && s.url && Math.abs(Number(enCours.montant) - offre.paye_eur) < 0.005) return sendJSON(res, 200, { checkout_url: s.url, repris: true });
+          if (s && s.status === "complete") return sendJSON(res, 409, { error: "Votre paiement est en cours de validation : votre crédit sera ajouté dans quelques instants." });
         } catch (e) { if (!e || e.code !== "resource_missing") return sendJSON(res, 502, { error: "Impossible de vérifier votre paiement en cours. Réessayez dans un instant." }); }
         await annulerCommande(db, enCours.id, "expiree");
       } else if (Date.now() - (aDate(enCours.created_at) || new Date(0)).getTime() < 120000) {
@@ -585,26 +652,29 @@ module.exports.register = function register(deps) {
     }
     let commandeId = null;
     try {
-      const c = await db.prepare("INSERT INTO kofi_commandes (user_id, formation_id, questions, montant, statut) VALUES (?,?,?,?,'en_attente')").run(user.id, ctx.f.id, r.forfait_questions, r.forfait_prix_eur);
+      const formationId = Number(body && body.formation_id) || null;
+      const c = await db.prepare("INSERT INTO kofi_commandes (user_id, formation_id, questions, montant, statut, portee) VALUES (?,?,?,?,'en_attente','portefeuille')").run(user.id, formationId, Math.round(offre.credit_eur * 100), offre.paye_eur);
       commandeId = c.lastInsertRowid;
-      const retour = `${getOrigin(req)}/suivre-formation.html?id=${encodeURIComponent(ctx.f.id)}`;
-      /* Achat fait depuis l'appli téléphone : on y revient (m.html), sur le plan de la formation, au lieu de la page du site. Seul un drapeau est accepté, jamais une adresse. */
-      const telephone = body && body.retour === "telephone";
-      const retourTel = `${getOrigin(req)}/m.html`, ancreTel = `#/formations/${encodeURIComponent(ctx.f.id)}/suivre`;
+      /* Retour après le paiement : uniquement des destinations connues, jamais une adresse fournie par le navigateur. */
+      const origine = getOrigin(req), page = body && body.page;
+      let retour;
+      if (page === "telephone") retour = `${origine}/m.html?kofi=`;
+      else if (page === "annuaire") retour = `${origine}/annuaire.html?kofi=`;
+      else if (page === "createur") retour = `${origine}/formations.html?kofi=`;
+      else retour = formationId ? `${origine}/suivre-formation.html?id=${encodeURIComponent(formationId)}&kofi=` : `${origine}/formations.html?kofi=`;
       const session = await stripe.checkout.sessions.create({
         mode: "payment",
         customer: await getOrCreateStripeCustomer(db, user),
-        line_items: [{ price_data: { currency: "eur", unit_amount: Math.round(r.forfait_prix_eur * 100), product_data: { name: `Koffi — ${r.forfait_questions} questions (valables ${r.forfait_validite_mois} mois)` } }, quantity: 1 }],
-        metadata: { diaspoactif_kofi_commande_id: String(commandeId), consentement_non_remboursable: VERSION_CONSENTEMENT_FORFAIT },
-        custom_text: { submit: { message: TEXTE_FORFAIT_NON_REMBOURSABLE } },
-        success_url: telephone ? `${retourTel}?kofi=succes${ancreTel}` : retour + "&kofi=succes",
-        cancel_url: telephone ? `${retourTel}?kofi=annule${ancreTel}` : retour + "&kofi=annule",
+        line_items: [{ price_data: { currency: "eur", unit_amount: Math.round(offre.paye_eur * 100), product_data: { name: `Koffi — recharge de ${Portefeuille.eur(offre.credit_eur)} d'utilisation (valable ${r.forfait_validite_mois} mois)` } }, quantity: 1 }],
+        metadata: { diaspoactif_kofi_commande_id: String(commandeId), consentement_non_remboursable: Portefeuille.VERSION_CONSENTEMENT_RECHARGE },
+        custom_text: { submit: { message: Portefeuille.TEXTE_RECHARGE_NON_REMBOURSABLE } },
+        success_url: retour + "succes", cancel_url: retour + "annule",
       });
-      await db.prepare("UPDATE kofi_commandes SET stripe_session_id=?, consentement_le=? WHERE id=?").run(session.id, `${new Date().toISOString()} v${VERSION_CONSENTEMENT_FORFAIT}`, commandeId);
+      await db.prepare("UPDATE kofi_commandes SET stripe_session_id=?, consentement_le=? WHERE id=?").run(session.id, `${new Date().toISOString()} v${Portefeuille.VERSION_CONSENTEMENT_RECHARGE}`, commandeId);
       sendJSON(res, 201, { checkout_url: session.url, commande_id: Number(commandeId) });
     } catch (e) {
       try { if (commandeId) await db.prepare("DELETE FROM kofi_commandes WHERE id=?").run(commandeId); } catch (_) { /* le nettoyage ne doit pas masquer l'erreur d'origine */ }
-      sendJSON(res, 500, SEC.safeError(e, "kofi-forfait-checkout"));
+      sendJSON(res, 500, SEC.safeError(e, "kofi-recharge-checkout"));
     }
   });
 
@@ -698,7 +768,7 @@ module.exports.register = function register(deps) {
     };
     const reponseJson = async (id, reponse, citations, flags) => {
       const st = await etatPublic(user, { ...ctx, etat: ctx.etat });
-      return { message: { id, role: "assistant", contenu: reponse, citations, flags }, credits: st.credits, etat: st.etat, langue: lg };
+      return { message: { id, role: "assistant", contenu: reponse, citations, flags }, portefeuille: st.portefeuille, etat: st.etat, langue: lg };
     };
 
     /* 1. Salutation seule : accueil fixe, sans IA ni décompte. */
@@ -732,13 +802,18 @@ module.exports.register = function register(deps) {
       return sendJSON(res, 200, await reponseJson(id, T[lg].introuvable, [], ["hors_cours"]));
     }
 
-    /* 3. Une question est décomptée (l'aperçu du formateur ne consomme pas de questions d'élève). */
-    let lot = null, categorie = "apercu";
+    /* 3. Décompte (l'aperçu du formateur ne consomme rien). Comptes sans Premium : d'abord leurs questions offertes (15 au total), décomptées tout de suite et rendues si l'IA échoue ;
+       ensuite — et pour tous les autres — le portefeuille en euros, décompté APRÈS l'appel au coût réel. */
+    let lot = null, categorie = "apercu", pf = null;
     if (ctx.mode === "eleve") {
-      if (!(await creditsDe(db, user.id, r)).gratuit_deja_accorde && ctx.budget.reserve_eur >= r.budget_seuil_gratuit_eur) await accorderGratuit(db, user.id, r);
-      lot = await debiter(db, user.id);
-      if (!lot) return sendJSON(res, 402, { error: "Vos questions sont épuisées.", code: "credits_epuises", forfait: { questions: r.forfait_questions, prix_eur: r.forfait_prix_eur } });
-      categorie = lot.origine === "gratuit" ? "gratuit" : "forfait";
+      pf = await portefeuilleDe(db, user, ctx);
+      if (Portefeuille.offertesDispo(pf)) {
+        if (!pf.offertes.accorde) await accorderGratuit(db, user.id, r);
+        lot = await debiterGratuit(db, user.id);
+      }
+      if (lot) categorie = "gratuit";
+      else if (Portefeuille.peutAppeler(pf)) categorie = pf.illimite ? "eleve_illimite" : "portefeuille";
+      else return sendJSON(res, 402, { error: "Votre crédit Koffi est épuisé.", code: "credits_epuises", portefeuille: pf });
     }
 
     /* 4. L'appel à l'IA : en cas d'échec, la question est rendue. */
@@ -762,11 +837,16 @@ module.exports.register = function register(deps) {
     }
     const cout = coutEstime(rep.entree, rep.sortie, r);
     if (rep.refus) {
-      /* Refus de sécurité du fournisseur : la question est rendue, mais l'appel a coûté. */
+      /* Refus de sécurité du fournisseur : la question est rendue (rien n'est retiré du portefeuille), mais l'appel a coûté. */
       if (lot) await rendre(db, lot.id);
+      if (categorie === "portefeuille") categorie = "eleve_refus";
       await db.prepare("INSERT INTO kofi_usage (user_id, formation_id, conversation_id, categorie, jetons_entree, jetons_sortie, cout_eur, modele) VALUES (?,?,?,?,?,?,?,?)").run(user.id, ctx.f.id, conv.id, categorie, rep.entree, rep.sortie, cout, r.modele);
       const id = await enregistrer(T[lg].refus, { flags: ["refus"], modele: r.modele });
       return sendJSON(res, 200, await reponseJson(id, T[lg].refus, [], ["refus"]));
+    }
+    if (categorie === "portefeuille") {
+      const d = await Portefeuille.debiter(db, user.id, cout * r.coefficient_cout, { avecMensuel: pf.premium && !pf.reserve_basse });
+      categorie = d.depuis_achat ? "eleve_achat" : "eleve_mensuel";
     }
     const a = analyserReponse(rep.texte, choisis, ctx.f.id);
     const flags = [];

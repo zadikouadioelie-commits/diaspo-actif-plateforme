@@ -92,6 +92,7 @@ test('Koffi créateur — assistant du formateur', async (t) => {
     cid = (await call(jarF, 'POST', `/api/formations/${fid}/modules/${mid}/chapitres`, { titre: 'Chapitre un' })).data.id;
     await call(jarF, 'POST', `/api/formations/${fid}/chapitres/${cid}/lecons`, { titre: 'Leçon existante', type: 'texte', contenu_texte: '<p>Contenu de départ.</p>' });
     assert.equal((await call(jarF, 'POST', '/api/admin/kofi/budget/recharge', { montant_eur: 10 })).status, 201);
+    H.ordinariser(env, rnd, 'Formateur', { majeur: false }); /* le formateur du harnais est administrateur (illimité) : on teste ici un compte ordinaire à portefeuille */
   });
 
   await t.test('accès : visiteur 401 ; un autre compte 403 ; majorité à confirmer avant tout message', async () => {
@@ -102,8 +103,8 @@ test('Koffi créateur — assistant du formateur', async (t) => {
     let r = await etat(); assert.equal(r.data.etat, 'majorite'); assert.ok(r.data.majorite.texte);
     r = await dire('Bonjour'); assert.equal(r.status, 403); assert.equal(r.data.code, 'majorite_requise');
     assert.equal((await call(jarF, 'POST', '/api/kofi/majorite', { confirme: true })).status, 200);
-    r = await etat(); assert.equal(r.data.etat, 'utilisable'); assert.equal(r.data.credits.gratuits_jour, 20); assert.equal(r.data.credits.gratuits_restants, 20);
-    assert.equal(r.data.forfait.messages, 1000); assert.equal(r.data.forfait.prix_eur, 5);
+    r = await etat(); assert.equal(r.data.etat, 'utilisable'); assert.equal(r.data.credits.type, 'euros'); assert.equal(r.data.credits.mensuel_eur, 0.5); assert.equal(r.data.credits.solde_eur, 0.5);
+    assert.equal(r.data.recharge.achetable, true); assert.deepEqual(r.data.credits.recharge.offres.map(o => o.paye_eur), [3, 6, 15]);
   });
 
   let conv;
@@ -111,8 +112,8 @@ test('Koffi créateur — assistant du formateur', async (t) => {
     const r = await dire('Comment créer un examen final ?');
     assert.equal(r.status, 200, JSON.stringify(r.data));
     assert.match(r.data.message.contenu, /Quiz & Évaluations/); assert.deepEqual(r.data.message.actions, []);
-    assert.equal(r.data.credits.gratuits_restants, 19); conv = r.data.conversation_id; assert.ok(conv);
-    const u = sql("select * from kofi_usage where categorie='createur_gratuit'"); assert.equal(u.length, 1);
+    assert.ok(r.data.credits.solde_eur < 0.5 && r.data.credits.solde_eur > 0.49, JSON.stringify(r.data.credits)); conv = r.data.conversation_id; assert.ok(conv);
+    const u = sql("select * from kofi_usage where categorie='createur_mensuel'"); assert.equal(u.length, 1);
     assert.equal(sql('select contexte from kofi_conversations where id=?', conv)[0].contexte, 'createur');
   });
 
@@ -208,10 +209,10 @@ test('Koffi créateur — assistant du formateur', async (t) => {
 
   await t.test('pannes du fournisseur : le message gratuit n\'est PAS décompté', async () => {
     await new Promise(r => setTimeout(r, 61000)); /* limite de rythme : 12 messages par minute et par compte */
-    const avant = (await etat()).data.credits.gratuits_restants;
+    const avant = (await etat()).data.credits.solde_eur;
     assert.equal((await dire('PANNEFAUSSE', { conversation_id: conv })).status, 503);
     assert.equal((await dire('LIMITEFAUSSE', { conversation_id: conv })).status, 429);
-    assert.equal((await etat()).data.credits.gratuits_restants, avant);
+    assert.equal((await etat()).data.credits.solde_eur, avant);
     const r = await dire('REFUSFAUX', { conversation_id: conv }); assert.equal(r.status, 200); assert.match(r.data.message.contenu, /ne peux pas/);
   });
 
@@ -225,40 +226,44 @@ test('Koffi créateur — assistant du formateur', async (t) => {
     assert.equal((await call(jarF, 'POST', `/api/kofi/conversations/${conv}/messages`, { texte: 'test' })).status, 404);
   });
 
-  await t.test('forfait : messages gratuits épuisés → 402 ; les questions d\'ÉLÈVE n\'y servent pas ; un lot « createur » oui', async () => {
-    sql("INSERT OR REPLACE INTO kofi_reglages (cle, valeur) VALUES ('createur_gratuit_jour','0')");
-    await new Promise(r => setTimeout(r, 11000)); /* le cache des réglages dure 10 s */
-    let r = await dire('Bonjour', { conversation_id: conv });
-    assert.equal(r.status, 402, JSON.stringify(r.data)); assert.equal(r.data.code, 'credits_epuises'); assert.equal(r.data.forfait.prix_eur, 5);
-    assert.equal((await etat()).data.etat, 'recharge');
+  await t.test('portefeuille : solde épuisé → 402 ; un crédit acheté sert à l\'assistant ; les questions d\'ÉLÈVE offertes n\'y servent pas', async () => {
     const u = uid('Formateur');
-    sql("INSERT INTO kofi_credits (user_id, origine, questions_total, questions_restantes, expire_le, reference, portee) VALUES (?, 'achat', 50, 50, datetime('now','+1 year'), 'test-eleve', 'eleve')", u);
-    r = await dire('Bonjour', { conversation_id: conv }); assert.equal(r.status, 402, 'un lot d\'élève ne sert pas à l\'assistant');
-    sql("INSERT INTO kofi_credits (user_id, origine, questions_total, questions_restantes, expire_le, reference, portee) VALUES (?, 'achat', 5, 5, datetime('now','+1 year'), 'test-createur', 'createur')", u);
+    sql("UPDATE kofi_solde SET montant_restant=0 WHERE user_id=?", u);
+    let r = await dire('Bonjour', { conversation_id: conv });
+    assert.equal(r.status, 402, JSON.stringify(r.data)); assert.equal(r.data.code, 'credits_epuises'); assert.equal(r.data.credits.epuise, true);
+    assert.equal((await etat()).data.etat, 'recharge');
+    sql("INSERT INTO kofi_credits (user_id, origine, questions_total, questions_restantes, reference, portee) VALUES (?, 'achat', 50, 50, 'test-eleve', 'eleve')", u);
+    r = await dire('Bonjour', { conversation_id: conv }); assert.equal(r.status, 402, 'un ancien lot de questions ne sert plus : seul le portefeuille compte');
+    sql("INSERT INTO kofi_solde (user_id, origine, montant_total, montant_restant, expire_le, reference) VALUES (?, 'achat', 0.5, 0.5, datetime('now','+1 year'), 'test-achat')", u);
     r = await dire('Bonjour', { conversation_id: conv }); assert.equal(r.status, 200, JSON.stringify(r.data));
-    assert.equal(sql("select questions_restantes n from kofi_credits where reference='test-createur'")[0].n, 4, 'le message est pris sur le lot du formateur');
-    assert.equal(sql("select questions_restantes n from kofi_credits where reference='test-eleve'")[0].n, 50, 'les questions d\'élève sont intactes');
-    assert.equal(sql("select count(*) n from kofi_usage where categorie='createur_forfait'")[0].n, 1);
-    const e = await etat(); assert.equal(e.data.credits.achetes_restants, 4);
+    const reste = sql("select montant_restant n from kofi_solde where reference='test-achat'")[0].n;
+    assert.ok(reste < 0.5 && reste > 0.49, 'le message est pris sur le crédit acheté, au coût réel : ' + reste);
+    assert.equal(sql("select questions_restantes n from kofi_credits where reference='test-eleve'")[0].n, 50, 'les anciennes questions sont intactes');
+    assert.equal(sql("select count(*) n from kofi_usage where categorie='createur_achat'")[0].n, 1);
+    const e = await etat(); assert.ok(e.data.credits.achete_restant_eur > 0.49 && e.data.credits.achete_restant_eur < 0.5);
   });
 
   let cmd, session;
-  await t.test('achat du forfait : consentement exigé ; session Stripe 5 € ; rien crédité avant le webhook ; puis 1 000 messages « createur »', async () => {
-    let r = await call(jarF, 'POST', '/api/kofi/createur/forfait/acheter', { formation_id: fid, accepte_non_remboursable: false });
-    assert.equal(r.status, 409); assert.equal(r.data.code, 'consentement_requis'); assert.equal(r.data.montant, 5);
-    assert.equal(sql('select count(*) n from kofi_commandes')[0].n, 0);
-    r = await call(jarF, 'POST', '/api/kofi/createur/forfait/acheter', { formation_id: fid, accepte_non_remboursable: true });
-    assert.equal(r.status, 201, JSON.stringify(r.data)); cmd = r.data.commande_id;
-    const c = sql('select * from kofi_commandes where id=?', cmd)[0]; assert.equal(c.portee, 'createur'); assert.equal(c.questions, 1000); assert.equal(c.montant, 5);
-    session = sessionsStripe().find(s => s.metadata && s.metadata.diaspoactif_kofi_commande_id === String(cmd));
-    assert.ok(session); assert.equal(session.montant, 500); assert.ok(session.success_url.includes('kofi_createur=succes'));
+  await t.test('recharge : montant imposé, consentement exigé ; session Stripe 3 € ; rien crédité avant le webhook ; puis 1 € d\'utilisation', async () => {
     const u = uid('Formateur');
-    const avantC = sql("select COALESCE(SUM(questions_restantes),0) n from kofi_credits where user_id=? and portee='createur'", u)[0].n;
-    assert.equal(await webhook('checkout.session.completed', { id: session.id, amount_total: 500, metadata: { diaspoactif_kofi_commande_id: String(cmd) } }), 200);
-    assert.equal(sql("select COALESCE(SUM(questions_restantes),0) n from kofi_credits where user_id=? and portee='createur'", u)[0].n, avantC + 1000);
-    assert.equal(sql("select COALESCE(SUM(questions_restantes),0) n from kofi_credits where user_id=? and portee='eleve'", u)[0].n, 50, 'le compteur des élèves n\'a pas bougé');
-    assert.equal(await webhook('checkout.session.completed', { id: session.id, amount_total: 500, metadata: { diaspoactif_kofi_commande_id: String(cmd) } }), 200);
-    assert.equal(sql("select COALESCE(SUM(questions_restantes),0) n from kofi_credits where user_id=? and portee='createur'", u)[0].n, avantC + 1000, 'rejouer ne crédite pas deux fois');
+    let r = await call(jarF, 'POST', '/api/kofi/portefeuille/recharger', { montant_eur: 2, accepte_non_remboursable: true, page: 'createur' });
+    assert.equal(r.status, 400); assert.equal(r.data.code, 'montant_invalide'); assert.deepEqual(r.data.offres.map(o => o.paye_eur), [3, 6, 15]);
+    r = await call(jarF, 'POST', '/api/kofi/portefeuille/recharger', { montant_eur: 3, accepte_non_remboursable: false, page: 'createur' });
+    assert.equal(r.status, 409); assert.equal(r.data.code, 'consentement_requis'); assert.equal(r.data.offre.credit_eur, 1);
+    assert.equal(sql('select count(*) n from kofi_commandes')[0].n, 0);
+    r = await call(jarF, 'POST', '/api/kofi/portefeuille/recharger', { montant_eur: 3, accepte_non_remboursable: true, page: 'createur' });
+    assert.equal(r.status, 201, JSON.stringify(r.data)); cmd = r.data.commande_id;
+    const c = sql('select * from kofi_commandes where id=?', cmd)[0]; assert.equal(c.portee, 'portefeuille'); assert.equal(c.questions, 100); assert.equal(c.montant, 3);
+    session = sessionsStripe().find(s => s.metadata && s.metadata.diaspoactif_kofi_commande_id === String(cmd));
+    assert.ok(session); assert.equal(session.montant, 300); assert.ok(session.success_url.includes('formations.html?kofi=succes'));
+    const achete = () => sql("select COALESCE(SUM(montant_restant),0) n from kofi_solde where user_id=? and origine='achat'", u)[0].n;
+    const avant = achete();
+    assert.equal(await webhook('checkout.session.completed', { id: session.id, amount_total: 100, metadata: { diaspoactif_kofi_commande_id: String(cmd) } }), 200);
+    assert.equal(achete(), avant, 'paiement partiel : rien n\'est crédité');
+    assert.equal(await webhook('checkout.session.completed', { id: session.id, amount_total: 300, metadata: { diaspoactif_kofi_commande_id: String(cmd) } }), 200);
+    assert.ok(Math.abs(achete() - (avant + 1)) < 1e-9, '3 € payés = 1 € d\'utilisation');
+    assert.equal(await webhook('checkout.session.completed', { id: session.id, amount_total: 300, metadata: { diaspoactif_kofi_commande_id: String(cmd) } }), 200);
+    assert.ok(Math.abs(achete() - (avant + 1)) < 1e-9, 'rejouer ne crédite pas deux fois');
   });
 
   await t.test('dossiers : créer, ranger plusieurs discussions étanches, renommer, déplacer ; un autre compte n\'y touche pas', async () => {

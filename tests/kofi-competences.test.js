@@ -28,11 +28,16 @@ test('Koffi compétences — détection (fonction pure)', () => {
     'Comment créer un module ?', 'Crée une carte mentale du module 1', 'Bonjour', 'merci', '', 'x'.repeat(500)];
   oui.forEach(q => assert.ok(Comp.estQuestionCompetences(q), 'doit être reconnue : ' + q));
   non.forEach(q => assert.ok(!Comp.estQuestionCompetences(q), 'ne doit PAS être reconnue : ' + q.slice(0, 40)));
-  const e = Comp.reponseEleve('fr', { gratuit_questions: 5, forfait_questions: 100, forfait_prix_eur: 5, retention_jours: 60 });
-  assert.match(e, /source/); assert.match(e, /résume ce chapitre/); assert.match(e, /5 questions offertes/); assert.match(e, /ne décompte aucune/);
-  assert.match(Comp.reponseEleve('en', { gratuit_questions: 1 }), /1 question is offered/);
-  const c = Comp.reponseCreateur({ createur_gratuit_jour: 20, createur_forfait_messages: 1000, createur_forfait_prix_eur: 5 });
-  ['Infos générales', 'carte mentale', 'sans changer un seul mot', 'Appliquer', 'publier', '20 messages offerts', '1000 messages à 5 €'].forEach(x => assert.ok(c.includes(x), 'la liste contient : ' + x));
+  const reg = { gratuit_questions: 15, credit_mensuel_utilisateur_eur: 0.5, recharge_min_eur: 3, recharge_ratio: 3, retention_jours: 60 };
+  const e = Comp.reponseEleve('fr', reg);
+  assert.match(e, /source/); assert.match(e, /résume ce chapitre/); assert.match(e, /15 questions offertes/); assert.match(e, /0,50 €/); assert.match(e, /3 € payés = 1 € d'utilisation/); assert.match(e, /ne retire rien de votre solde/);
+  assert.match(e, /conseiller de l'Annuaire/);
+  assert.match(Comp.reponseEleve('en', { gratuit_questions: 1 }), /1 question once, for good/);
+  const c = Comp.reponseCreateur(reg);
+  ['Infos générales', 'carte mentale', 'sans changer un seul mot', 'Appliquer', 'publier', '0,50 €', 'un seul solde en euros', 'conseiller d\'orientation'].forEach(x => assert.ok(c.includes(x), 'la liste contient : ' + x));
+  const an = Comp.reponseAnnuaire(reg);
+  ['au moins trois', 'pourcentage', 'ne pas être proposés par Koffi', 'photo de profil', '0,50 €', 'ne retire rien de votre solde'].forEach(x => assert.ok(an.includes(x), 'la liste Annuaire contient : ' + x));
+  assert.ok(!/e-mail|téléphone/.test(an.replace(/\(e-mail, téléphone, messages\)/, '')), 'le conseiller ne promet aucune donnée privée');
 });
 
 test('Koffi compétences — présentation et questions gratuites', async (t) => {
@@ -59,6 +64,7 @@ test('Koffi compétences — présentation et questions gratuites', async (t) =>
     sql("INSERT OR IGNORE INTO kofi_majorite (user_id, confirme_le, version) VALUES (?, datetime('now'), 'test')", uid('Alpha'));
     assert.equal((await call(jarF, 'POST', '/api/kofi/majorite', { confirme: true })).status, 200);
     assert.equal((await call(jarF, 'POST', '/api/admin/kofi/budget/recharge', { montant_eur: 10 })).status, 201);
+    H.ordinariser(env, rnd, 'Formateur'); /* le formateur du harnais est administrateur (illimité) : on teste ici un compte ordinaire à portefeuille */
   });
 
   await t.test('présentation : à la première connexion (élève ET formateur), puis plus jamais ; un rôle ne vaut pas pour l\'autre', async () => {
@@ -75,26 +81,25 @@ test('Koffi compétences — présentation et questions gratuites', async (t) =>
   });
 
   await t.test('formateur : « Que sais-tu faire ? » → réponse complète, sans IA, RIEN décompté', async () => {
-    const avant = (await etatF()).data.credits.gratuits_restants; assert.equal(avant, 20);
+    const avant = (await etatF()).data.credits.solde_eur; assert.equal(avant, 0.5);
     const r = await dire('Que sais-tu faire ?');
     assert.equal(r.status, 200, JSON.stringify(r.data));
     assert.equal(r.data.message.gratuit, true); assert.deepEqual(r.data.message.actions, []);
-    assert.match(r.data.message.contenu, /Infos générales/); assert.match(r.data.message.contenu, /Appliquer/); assert.match(r.data.message.contenu, /ne décompte aucun de vos messages/);
-    assert.equal(r.data.credits.gratuits_restants, 20, 'aucun message gratuit consommé');
+    assert.match(r.data.message.contenu, /Infos générales/); assert.match(r.data.message.contenu, /Appliquer/); assert.match(r.data.message.contenu, /ne retire rien de votre solde/);
+    assert.equal(r.data.credits.solde_eur, avant, 'aucun euro consommé');
     assert.equal(sql("select count(*) n from kofi_usage where categorie like 'createur%'")[0].n, 0, 'aucune ligne d\'usage : aucun appel à l\'IA');
     const conv = r.data.conversation_id; assert.ok(conv);
     const g = await call(jarF, 'GET', `/api/kofi/createur/conversations/${conv}`);
     assert.equal(g.status, 200); assert.equal(g.data.messages.length, 2);
     /* une vraie question d'outil, elle, est décomptée — la détection ne l'a pas confondue */
     const q = await dire('Comment créer un examen final ?', { conversation_id: conv });
-    assert.equal(q.status, 200); assert.equal(q.data.credits.gratuits_restants, 19);
+    assert.equal(q.status, 200); assert.ok(q.data.credits.solde_eur < avant, 'le portefeuille baisse'); const apres = q.data.credits.solde_eur;
     /* la même question, plusieurs fois : toujours gratuite */
-    for (const t2 of ['Qu\'est-ce que tu peux faire ?', 'À quoi sers-tu ?', 'Présente-toi']) { const x = await dire(t2, { conversation_id: conv }); assert.equal(x.status, 200); assert.equal(x.data.message.gratuit, true); assert.equal(x.data.credits.gratuits_restants, 19); }
+    for (const t2 of ['Qu\'est-ce que tu peux faire ?', 'À quoi sers-tu ?', 'Présente-toi']) { const x = await dire(t2, { conversation_id: conv }); assert.equal(x.status, 200); assert.equal(x.data.message.gratuit, true); assert.equal(x.data.credits.solde_eur, apres); }
   });
 
-  await t.test('formateur : messages épuisés → une question de contenu est refusée (402), « Que sais-tu faire ? » est TOUJOURS servie', async () => {
-    sql("UPDATE kofi_credits SET questions_restantes=0 WHERE user_id=?", uid('Formateur'));
-    for (let i = 0; i < 20; i++) sql("INSERT INTO kofi_usage (user_id, formation_id, categorie, jetons_entree, jetons_sortie, cout_eur, modele) VALUES (?,?,?,?,?,?,?)", uid('Formateur'), fid, 'createur_gratuit', 1, 1, 0, 'x');
+  await t.test('formateur : portefeuille épuisé → une question de contenu est refusée (402), « Que sais-tu faire ? » est TOUJOURS servie', async () => {
+    sql("UPDATE kofi_solde SET montant_restant=0 WHERE user_id=?", uid('Formateur'));
     const e = await etatF(); assert.equal(e.data.etat, 'recharge');
     const refus = await dire('Comment fixer le prix ?'); assert.equal(refus.status, 402); assert.equal(refus.data.code, 'credits_epuises');
     const ok = await dire('Que sais-tu faire ?'); assert.equal(ok.status, 200, JSON.stringify(ok.data)); assert.equal(ok.data.message.gratuit, true);
@@ -103,17 +108,17 @@ test('Koffi compétences — présentation et questions gratuites', async (t) =>
   await t.test('élève : « Que sais-tu faire ? » → réponse complète, sans IA, aucune question décomptée ; une vraie question, elle, l\'est', async () => {
     const c = (await call(jarA, 'POST', '/api/kofi/conversations', { formation_id: fid })).data.id; assert.ok(c);
     const q = (texte, langue) => call(jarA, 'POST', `/api/kofi/conversations/${c}/messages`, { texte, langue: langue || 'fr' });
-    const avant = (await etatA()).data.credits;
+    const avant = (await etatA()).data.portefeuille; assert.equal(avant.solde_eur, 0.5);
     const r = await q('Que sais-tu faire ?');
     assert.equal(r.status, 200, JSON.stringify(r.data)); assert.deepEqual(r.data.message.flags, ['competences']); assert.deepEqual(r.data.message.citations, []);
-    assert.match(r.data.message.contenu, /source citée/); assert.match(r.data.message.contenu, /résume ce chapitre/); assert.match(r.data.message.contenu, /ne décompte aucune/);
-    assert.deepEqual(r.data.credits, avant, 'aucune question décomptée (ni gratuite ni forfait)');
+    assert.match(r.data.message.contenu, /source citée/); assert.match(r.data.message.contenu, /résume ce chapitre/); assert.match(r.data.message.contenu, /ne retire rien de votre solde/);
+    assert.deepEqual(r.data.portefeuille, avant, 'rien n\'est décompté du portefeuille');
     assert.equal(sql('select count(*) n from kofi_usage where user_id=?', uid('Alpha'))[0].n, 0, 'aucun appel à l\'IA');
-    const en = await q('What can you do?', 'en'); assert.equal(en.status, 200); assert.match(en.data.message.contenu, /Here is everything I can do/); assert.deepEqual(en.data.credits, avant);
+    const en = await q('What can you do?', 'en'); assert.equal(en.status, 200); assert.match(en.data.message.contenu, /Here is everything I can do/); assert.deepEqual(en.data.portefeuille, avant);
     const vraie = await q('Comment fonctionne la tontine solidaire ?');
-    assert.equal(vraie.status, 200, JSON.stringify(vraie.data)); assert.equal(vraie.data.credits.restants, 4, 'une vraie question est décomptée (5 offertes − 1)'); assert.equal(avant.restants, 0, 'avant : le lot gratuit n’existe pas encore (créé à la première vraie question)');
-    /* à court de questions : la question sur Koffi reste servie */
-    sql("UPDATE kofi_credits SET questions_restantes=0 WHERE user_id=?", uid('Alpha'));
+    assert.equal(vraie.status, 200, JSON.stringify(vraie.data)); assert.ok(vraie.data.portefeuille.solde_eur < 0.5 && vraie.data.portefeuille.solde_eur > 0.49, 'une vraie question est débitée au coût réel');
+    /* à court de crédit : la question sur Koffi reste servie */
+    sql("UPDATE kofi_solde SET montant_restant=0 WHERE user_id=?", uid('Alpha'));
     const epuise = await q('Comment fonctionne la tontine solidaire ?'); assert.equal(epuise.status, 402); assert.equal(epuise.data.code, 'credits_epuises');
     const encore = await q('Que sais-tu faire ?'); assert.equal(encore.status, 200); assert.deepEqual(encore.data.message.flags, ['competences']);
     /* l'historique garde le drapeau (l'écran s'en sert pour dire « gratuit ») */

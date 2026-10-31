@@ -3,7 +3,7 @@
    ===========================================================
    Fournisseur d'IA REMPLACÉ par le faux (KOFI_IA_FAUSSE=1) : aucun réseau, aucune clé, aucun coût. On vérifie les RÈGLES, côté serveur :
    - Premium uniquement ; les autres voient Koffi mais ne peuvent pas l'utiliser (402, aucune ligne créée) ;
-   - le budget (réserve IA) conditionne l'ouverture ; les 5 questions gratuites ne sont accordées qu'une fois ;
+   - le budget (réserve IA) conditionne l'ouverture ; les 15 questions offertes (comptes sans Premium) ne sont accordées qu'une fois ;
    - la portée suit l'accès : module non acheté = porte fermée (aucun extrait lu, rien envoyé au modèle, aucune question décomptée) ;
    - pas d'extrait pertinent = réponse fixe sans IA ; références inventées retirées ; panne ou refus = question rendue ;
    - aperçu du formateur sans décompte ; coupure pendant une évaluation et par formation ; plafond de questions épuisées ;
@@ -63,7 +63,9 @@ test('Koffi — règles du socle', async (t) => {
   const ouvrir = async (jar, extra) => (await call(jar, 'POST', '/api/kofi/conversations', { formation_id: fid, ...extra }));
   const poser = (jar, conv, texte, extra) => call(jar, 'POST', `/api/kofi/conversations/${conv}/messages`, { texte, ...extra });
   const etat = (jar) => call(jar, 'GET', `/api/kofi/etat?formation_id=${fid}`);
-  const credits = id => sql('select COALESCE(SUM(questions_restantes),0) n from kofi_credits where user_id=?', id)[0].n;
+  /* Le portefeuille en euros (tous les lots de l'utilisateur) et, séparément, les questions offertes aux comptes sans Premium. */
+  const credits = id => sql('select COALESCE(SUM(montant_restant),0) n from kofi_solde where user_id=?', id)[0].n;
+  const offertes = id => sql("select COALESCE(SUM(questions_restantes),0) n from kofi_credits where user_id=? and origine='gratuit'", id)[0].n;
 
   await t.test('setup — formation payante, 3 modules au contenu distinct, A (module 1 seul), B (formation entière), C (non Premium)', async () => {
     await H.creerFormateur(env, jarF, rnd, 'Formateur');
@@ -91,14 +93,18 @@ test('Koffi — règles du socle', async (t) => {
     assert.equal(r.status, 403, JSON.stringify(r.data));
   });
 
-  await t.test('vitrine : un compte non Premium voit Koffi mais ne peut rien faire (402, aucune ligne créée, zéro appel IA)', async () => {
+  await t.test('compte sans Premium : voit son offre (15 questions offertes, recharge dès 3 €) mais doit d\'abord confirmer sa majorité ; rien n\'est créé, zéro appel IA', async () => {
     const r = await etat(jarC);
     assert.equal(r.status, 200, JSON.stringify(r.data));
-    assert.equal(r.data.etat, 'vitrine'); assert.equal(r.data.nom, 'Koffi');
-    assert.equal(r.data.forfait.questions, 1000); assert.equal(r.data.forfait.prix_eur, 2.5); assert.equal(r.data.retention_jours, 60);
+    assert.equal(r.data.etat, 'majorite'); assert.equal(r.data.nom, 'Koffi'); assert.equal(r.data.retention_jours, 60);
+    const pf = r.data.portefeuille;
+    assert.equal(pf.type, 'euros'); assert.equal(pf.premium, false); assert.equal(pf.solde_eur, 0);
+    assert.deepEqual(pf.offertes, { total: 15, restantes: 15, renouvelable: false, accorde: false });
+    assert.equal(pf.recharge.min_eur, 3); assert.deepEqual(pf.recharge.offres.map(o => [o.paye_eur, o.credit_eur]), [[3, 1], [6, 2], [15, 5]]);
     const o = await ouvrir(jarC);
-    assert.equal(o.status, 402); assert.equal(o.data.code, 'premium_requis');
+    assert.equal(o.status, 403); assert.equal(o.data.code, 'majorite_requise');
     assert.equal(sql('select count(*) n from kofi_conversations where user_id=?', uid('Gamma'))[0].n, 0);
+    assert.equal(sql('select count(*) n from kofi_credits where user_id=?', uid('Gamma'))[0].n, 0, 'les questions offertes ne sont accordées qu\'à la première question');
     assert.equal(nbAppelsIA(), 0);
   });
 
@@ -124,10 +130,39 @@ test('Koffi — règles du socle', async (t) => {
     assert.equal(r.data.message.citations[0].lecon_id, l1);
     assert.match(r.data.message.citations[0].chemin, /Tontines/);
     assert.equal(r.data.message.flags.length, 0);
-    assert.equal(r.data.credits.restants, 4, '5 gratuites − 1');
-    assert.equal(sql("select count(*) n from kofi_credits where user_id=? and origine='gratuit'", uid('Alpha'))[0].n, 1);
+    const pf = r.data.portefeuille;
+    assert.equal(pf.premium, true); assert.equal(pf.offertes, null, 'un compte Premium n\'a pas de questions offertes');
+    assert.ok(pf.solde_eur < 0.5 && pf.solde_eur > 0.49, 'crédit mensuel 0,50 € moins le coût réel de l\'échange : ' + pf.solde_eur);
+    assert.equal(sql("select count(*) n from kofi_credits where user_id=?", uid('Alpha'))[0].n, 0);
     const u = sql('select * from kofi_usage where user_id=?', uid('Alpha'));
-    assert.equal(u.length, 1); assert.equal(u[0].categorie, 'gratuit'); assert.ok(u[0].cout_eur > 0);
+    assert.equal(u.length, 1); assert.equal(u[0].categorie, 'eleve_mensuel'); assert.ok(u[0].cout_eur > 0);
+    assert.ok(Math.abs(credits(uid('Alpha')) - (0.5 - u[0].cout_eur)) < 1e-6, 'débité au coût réel');
+  });
+
+  await t.test('compte sans Premium : 15 questions offertes au total (jamais renouvelées), puis crédit acheté, puis recharge demandée', async () => {
+    const g = uid('Gamma'); majeur(g);
+    let r = await etat(jarC); assert.equal(r.data.etat, 'utilisable', JSON.stringify(r.data));
+    const o = await ouvrir(jarC); assert.equal(o.status, 201, JSON.stringify(o.data)); const conv = o.data.id;
+    r = await poser(jarC, conv, 'Comment fonctionne la tontine solidaire ?');
+    assert.equal(r.status, 200, JSON.stringify(r.data));
+    assert.deepEqual(r.data.portefeuille.offertes, { total: 15, restantes: 14, renouvelable: false, accorde: true });
+    assert.equal(sql('select categorie from kofi_usage where user_id=? order by id desc limit 1', g)[0].categorie, 'gratuit');
+    assert.equal(credits(g), 0, 'aucun euro n\'est touché par une question offerte');
+    assert.equal(sql("select count(*) n from kofi_solde where user_id=? and origine='mensuel'", g)[0].n, 0, 'pas de crédit mensuel sans Premium');
+    /* Les 15 sont épuisées : plus rien, jamais de renouvellement ; la recharge est proposée. */
+    sql("UPDATE kofi_credits SET questions_restantes=0 WHERE user_id=? AND origine='gratuit'", g);
+    r = await etat(jarC); assert.equal(r.data.etat, 'recharge'); assert.equal(r.data.portefeuille.epuise, true);
+    r = await poser(jarC, conv, 'Quelle est la règle de la tontine solidaire ?');
+    assert.equal(r.status, 402); assert.equal(r.data.code, 'credits_epuises'); assert.deepEqual(r.data.portefeuille.recharge.offres.map(x => x.paye_eur), [3, 6, 15]);
+    sql("UPDATE kofi_credits SET created_at=datetime('now','-2 month') WHERE user_id=?", g);
+    assert.equal((await poser(jarC, conv, 'Quelle est la règle de la tontine solidaire ?')).status, 402, 'les mois passent : rien n\'est renouvelé');
+    /* Un crédit acheté (1 € reçu pour 3 € payés) sert ensuite, au coût réel. */
+    sql("INSERT INTO kofi_solde (user_id, origine, montant_total, montant_restant, expire_le, reference) VALUES (?, 'achat', 1, 1, datetime('now','+1 year'), 'test-gamma')", g);
+    r = await poser(jarC, conv, 'Quelle est la règle de la tontine solidaire ?');
+    assert.equal(r.status, 200, JSON.stringify(r.data));
+    assert.equal(sql('select categorie from kofi_usage where user_id=? order by id desc limit 1', g)[0].categorie, 'eleve_achat');
+    assert.ok(credits(g) < 1 && credits(g) > 0.99);
+    assert.equal(offertes(g), 0, 'les questions offertes ne reviennent pas');
   });
 
   await t.test('PORTE FERMÉE : A (module 1 seul) interroge le module 2 → réponse fixe, AUCUN appel IA, aucune question décomptée, aucun mot du module 2 envoyé', async () => {
@@ -167,15 +202,15 @@ test('Koffi — règles du socle', async (t) => {
     assert.deepEqual(r.data.message.citations.map(c => c.n), [1]);
     r = await poser(jarB, convB, 'SANSSOURCE tontine solidaire cotisations');
     assert.deepEqual(r.data.message.flags, ['sans_reference']);
-    const cr1 = credits(uid('Beta')); assert.equal(cr1, cr0 - 2);
+    const cr1 = credits(uid('Beta')); assert.ok(cr1 < cr0, 'deux réponses : le portefeuille a baissé');
     r = await poser(jarB, convB, 'PANNEFAUSSE tontine solidaire');
     assert.equal(r.status, 503); assert.equal(r.data.code, 'indisponible');
-    assert.equal(credits(uid('Beta')), cr1, 'panne : question rendue');
+    assert.equal(credits(uid('Beta')), cr1, 'panne : rien n\'est décompté');
     r = await poser(jarB, convB, 'LIMITEFAUSSE tontine solidaire');
     assert.equal(r.status, 429); assert.equal(credits(uid('Beta')), cr1);
     r = await poser(jarB, convB, 'REFUSFAUX tontine solidaire');
     assert.equal(r.status, 200); assert.deepEqual(r.data.message.flags, ['refus']);
-    assert.equal(credits(uid('Beta')), cr1, 'refus : question rendue');
+    assert.equal(credits(uid('Beta')), cr1, 'refus : rien n\'est décompté');
     assert.equal(sql("select count(*) n from kofi_usage where user_id=? and jetons_sortie=5", uid('Beta'))[0].n, 1, 'mais l\'appel refusé a coûté : il est enregistré');
   });
 
@@ -231,30 +266,30 @@ test('Koffi — règles du socle', async (t) => {
     assert.equal((await call(jarF, 'PUT', `/api/formations/${fid}/kofi-reglages`, { actif: true })).status, 200);
   });
 
-  await t.test('questions épuisées : le serveur refuse (402) et propose le forfait ; un forfait acheté est débité après les gratuites', async () => {
+  await t.test('portefeuille épuisé : le serveur refuse (402) et propose la recharge ; un crédit acheté sert ; expiré, il ne sert plus', async () => {
     const a = uid('Alpha');
-    sql("UPDATE kofi_credits SET questions_restantes=0 WHERE user_id=? AND origine='gratuit'", a);
+    sql("UPDATE kofi_solde SET montant_restant=0 WHERE user_id=?", a);
     let r = await etat(jarA); assert.equal(r.data.etat, 'recharge');
     r = await poser(jarA, convA, 'Quelle est la règle de la tontine solidaire ?');
-    assert.equal(r.status, 402); assert.equal(r.data.code, 'credits_epuises'); assert.equal(r.data.forfait.questions, 1000);
-    /* Le forfait (achat Stripe : branché plus tard) est ici simulé par une ligne : débit après les gratuites, valable 12 mois. */
-    sql("INSERT INTO kofi_credits (user_id, origine, questions_total, questions_restantes, expire_le) VALUES (?, 'achat', 1000, 1000, datetime('now','+12 month'))", a);
+    assert.equal(r.status, 402); assert.equal(r.data.code, 'credits_epuises'); assert.equal(r.data.portefeuille.recharge.min_eur, 3);
+    /* La recharge (achat Stripe : testée dans kofi-forfait) est ici simulée par un lot : débit au coût réel, valable 12 mois. */
+    sql("INSERT INTO kofi_solde (user_id, origine, montant_total, montant_restant, expire_le, reference) VALUES (?, 'achat', 1, 1, datetime('now','+12 month'), 'test-alpha')", a);
     r = await poser(jarA, convA, 'Quelle est la règle de la tontine solidaire ?');
-    assert.equal(r.status, 200, JSON.stringify(r.data)); assert.equal(r.data.credits.restants, 999);
-    assert.equal(sql("select categorie from kofi_usage where user_id=? order by id desc limit 1", a)[0].categorie, 'forfait');
-    /* Un forfait expiré ne sert plus. */
-    sql("UPDATE kofi_credits SET expire_le=datetime('now','-1 day') WHERE user_id=? AND origine='achat'", a);
+    assert.equal(r.status, 200, JSON.stringify(r.data)); assert.ok(r.data.portefeuille.achete_restant_eur < 1 && r.data.portefeuille.achete_restant_eur > 0.99);
+    assert.equal(sql("select categorie from kofi_usage where user_id=? order by id desc limit 1", a)[0].categorie, 'eleve_achat');
+    /* Un crédit expiré ne sert plus. */
+    sql("UPDATE kofi_solde SET expire_le=datetime('now','-1 day') WHERE user_id=? AND origine='achat'", a);
     assert.equal((await poser(jarA, convA, 'Quelle est la règle de la tontine solidaire ?')).status, 402);
   });
 
-  await t.test('Premium terminé : Koffi inutilisable, mais le stock de questions est conservé', async () => {
+  await t.test('Premium terminé : le crédit mensuel n\'est plus accordé, le crédit acheté est conservé ; le compte retombe dans l\'offre sans Premium', async () => {
     const a = uid('Alpha');
-    sql("UPDATE kofi_credits SET expire_le=datetime('now','+10 month') WHERE user_id=? AND origine='achat'", a);
+    sql("UPDATE kofi_solde SET expire_le=datetime('now','+10 month') WHERE user_id=? AND origine='achat'", a);
     sql("UPDATE user_accreditations SET statut='expiree', date_expiration=datetime('now','-1 day') WHERE user_id=?", a);
-    const r = await etat(jarA);
-    assert.equal(r.data.etat, 'vitrine'); assert.equal(r.data.credits.restants, 999, 'le stock est intact');
-    assert.equal((await poser(jarA, convA, 'tontine solidaire')).status, 402);
-    assert.equal(credits(a), 999);
+    const r = await etat(jarA); const pf = r.data.portefeuille;
+    assert.equal(r.data.etat, 'utilisable'); assert.equal(pf.premium, false); assert.equal(pf.mensuel_restant_eur, 0);
+    assert.ok(pf.achete_restant_eur > 0.9, 'le crédit acheté est intact : ' + pf.achete_restant_eur);
+    assert.equal(pf.offertes.total, 15);
   });
 
   await t.test('budget : sous le seuil les essais gratuits s\'arrêtent ; réserve épuisée, tout s\'arrête ; le registre détaille les coûts', async () => {
@@ -269,6 +304,7 @@ test('Koffi — règles du socle', async (t) => {
     r = await poser(jarE, o.data.id, 'tontine solidaire cotisations');
     assert.equal(r.status, 402, JSON.stringify(r.data)); assert.equal(r.data.code, 'credits_epuises');
     assert.equal(sql("select count(*) n from kofi_credits where user_id=?", uid('Epsilon'))[0].n, 0, 'aucun essai gratuit accordé');
+    assert.equal(sql("select count(*) n from kofi_solde where user_id=?", uid('Epsilon'))[0].n, 0, 'réserve basse : pas de crédit mensuel non plus');
     assert.equal((await etat(jarE)).data.etat, 'recharge');
     /* Épuisée : tout s'arrête. */
     await call(jarF, 'POST', '/api/admin/kofi/budget/recharge', { montant_eur: -5, type: 'ajustement' });
@@ -335,16 +371,16 @@ test('Koffi — règles du socle', async (t) => {
     sql('DELETE FROM kofi_majorite WHERE user_id=?', a);
     /* Non confirmé : Koffi propose la confirmation et refuse tout le reste. */
     let r = await etat(jarA);
-    assert.equal(r.data.etat, 'majorite'); assert.equal(r.data.majorite.texte, Kofi.TEXTE_MAJORITE); assert.equal(r.data.forfait.achetable, false);
+    assert.equal(r.data.etat, 'majorite'); assert.equal(r.data.majorite.texte, Kofi.TEXTE_MAJORITE); assert.equal(r.data.recharge.achetable, false);
     assert.equal((await ouvrir(jarA)).status, 403);
     r = await poser(jarA, conv, 'Comment fonctionne la tontine solidaire ?');
     assert.equal(r.status, 403); assert.equal(r.data.code, 'majorite_requise');
     assert.equal((await call(jarA, 'GET', `/api/kofi/conversations/${conv}`)).status, 403);
     assert.equal((await call(jarA, 'GET', `/api/kofi/conversations?formation_id=${fid}`)).status, 403);
-    assert.equal((await call(jarA, 'POST', '/api/kofi/forfait/acheter', { formation_id: fid, accepte_non_remboursable: true })).data.code, 'majorite_requise');
+    assert.equal((await call(jarA, 'POST', '/api/kofi/portefeuille/recharger', { montant_eur: 3, accepte_non_remboursable: true })).data.code, 'majorite_requise');
     assert.equal(nbAppelsIA(), ia0, 'aucun appel au fournisseur d\'IA');
     assert.equal((await etat(jarF)).data.etat === 'majorite', false, 'l\'aperçu du formateur n\'est pas concerné');
-    assert.equal((await etat(jarC)).data.etat, 'vitrine', 'un compte non Premium voit la vitrine, comme avant');
+    assert.equal((await etat(jarC)).data.etat, 'utilisable', 'un compte sans Premium utilise ses questions offertes (sa majorité est déjà confirmée)');
     /* Confirmation : la case est exigée (valeur strictement true), une seule ligne datée. */
     assert.equal((await call(jarA, 'POST', '/api/kofi/majorite', {})).data.code, 'confirmation_requise');
     assert.equal((await call(jarA, 'POST', '/api/kofi/majorite', { confirme: 'true' })).status, 400);
@@ -363,7 +399,7 @@ test('Koffi — règles du socle', async (t) => {
     r = await poser(jarA, conv, 'Quelle est la règle de la tontine solidaire ?'); assert.equal(r.status, 403); assert.equal(r.data.code, 'mineur');
     assert.equal((await call(jarA, 'POST', '/api/kofi/majorite', { confirme: true })).data.code, 'mineur');
     assert.equal((await call(jarA, 'GET', `/api/kofi/conversations/${conv}`)).status, 403);
-    assert.equal((await call(jarA, 'POST', '/api/kofi/forfait/acheter', { formation_id: fid, accepte_non_remboursable: true })).data.code, 'mineur');
+    assert.equal((await call(jarA, 'POST', '/api/kofi/portefeuille/recharger', { montant_eur: 3, accepte_non_remboursable: true })).data.code, 'mineur');
     assert.equal((await call(jarA, 'DELETE', `/api/kofi/conversations/${conv}`)).status, 200, 'le droit de supprimer ses conversations reste ouvert');
     /* Majeur par la date de naissance : Koffi redevient utilisable ; la confirmation faite avant reste valable. */
     sql('UPDATE users SET date_naissance=? WHERE id=?', naissance(36), a);
@@ -396,7 +432,7 @@ test('Koffi — règles du socle', async (t) => {
     assert.equal(r.status, 403, JSON.stringify(r.data)); assert.equal(r.data.code, 'pays_non_pris_en_charge');
     assert.equal((await avec(jarA, 'CN', 'POST', '/api/kofi/conversations', { formation_id: fid })).status, 403);
     assert.equal((await avec(jarA, 'CN', 'GET', `/api/kofi/conversations/${conv}`)).status, 403);
-    assert.equal((await avec(jarA, 'CN', 'POST', '/api/kofi/forfait/acheter', { formation_id: fid, accepte_non_remboursable: true })).data.code, 'pays_non_pris_en_charge');
+    assert.equal((await avec(jarA, 'CN', 'POST', '/api/kofi/portefeuille/recharger', { montant_eur: 3, accepte_non_remboursable: true })).data.code, 'pays_non_pris_en_charge');
     assert.equal(nbAppelsIA(), ia0, 'aucun appel au fournisseur d\'IA depuis un pays hors liste');
     /* L'aperçu du formateur est soumis à la même règle (c'est aussi un usage de l'IA). */
     assert.equal((await avec(jarF, 'CN', 'GET', `/api/kofi/etat?formation_id=${fid}`)).data.etat, 'pays');

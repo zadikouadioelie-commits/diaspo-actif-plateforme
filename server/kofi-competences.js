@@ -51,6 +51,19 @@ function estQuestionCompetences(texte) {
 const euros = v => Number(v).toFixed(v % 1 ? 2 : 0).replace(".", ",") + " €";
 const pluriel = (n, un, plusieurs) => `${n} ${Number(n) > 1 ? plusieurs : un}`;
 
+/* Le portefeuille (2026-10-31) : UN solde en euros pour tout Koffi. Phrase donnée à la fin de chaque réponse « Que sais-tu faire ? ». */
+function phraseCredit(lg, r) {
+  r = r || {};
+  const num = (v, d) => (v == null ? d : Number(v));
+  const mensuel = num(r.credit_mensuel_utilisateur_eur, 0.5), offertes = num(r.gratuit_questions, 15);
+  const min = num(r.recharge_min_eur, 3), ratio = num(r.recharge_ratio, 3);
+  if (lg === "en") {
+    const e = v => euros(v).replace(",", ".");
+    return `Credit: one single balance in euros for all of Koffi (course tutor, course-creation assistant, Directory advisor). Premium accounts receive ${e(mensuel)} of Koffi use every month; other accounts get ${pluriel(offertes, "question", "questions")} once, for good. After that you can top up from ${e(min)} (${e(min)} paid = ${e(min / ratio)} of use). This question — like any question about what I can do — is free and takes nothing from your balance.`;
+  }
+  return `Crédit : un seul solde en euros pour tout Koffi (tuteur des formations, assistant de création, conseiller de l'Annuaire). Les comptes Premium reçoivent ${euros(mensuel)} d'utilisation Koffi chaque mois ; les autres comptes ont ${pluriel(offertes, "question offerte", "questions offertes")}, une seule fois. Ensuite, vous rechargez à partir de ${euros(min)} (${euros(min)} payés = ${euros(min / ratio)} d'utilisation). Cette question — comme toute question sur ce que je sais faire — est gratuite et ne retire rien de votre solde.`;
+}
+
 function reponseEleve(lg, r) {
   r = r || {};
   if (lg === "en") {
@@ -61,11 +74,12 @@ function reponseEleve(lg, r) {
       "• Summarise the lesson you are on: write “summarise this chapter”.",
       "• Help you revise: I can end with a short check question.",
       "• Answer in French or in English (FR / EN buttons).",
+      "• In the Directory (Premium accounts), I am also an advisor: describe who you are looking for and I suggest at least three profiles with a match percentage.",
       "• Keep your conversations for " + (r.retention_jours || 60) + " days — you can delete them whenever you want. You can also tell me whether an answer was helpful, or report a mistake.",
       "",
       "What I do not do: give the answers to a quiz or an exam (I am switched off during an assessment), talk about content you cannot access, or give personalised legal, medical or financial advice. If I cannot find the answer in the materials, I will tell you and suggest asking your trainer.",
       "",
-      `Questions: ${pluriel(r.gratuit_questions == null ? 5 : r.gratuit_questions, "question is", "questions are")} offered, then a pack of ${r.forfait_questions || 100} questions for ${euros(r.forfait_prix_eur == null ? 5 : r.forfait_prix_eur)}. This question — like any question about what I can do — is free and does not use any of your questions.`,
+      phraseCredit(lg, r),
     ].join("\n");
   }
   return [
@@ -75,11 +89,12 @@ function reponseEleve(lg, r) {
     "• Résumer la leçon en cours : écrivez « résume ce chapitre ».",
     "• Vous aider à réviser : je peux terminer par une courte question de vérification.",
     "• Répondre en français ou en anglais (boutons FR / EN).",
+    "• Dans l'Annuaire (comptes Premium), je suis aussi conseiller d'orientation : décrivez la personne que vous cherchez et je vous propose au moins trois profils, avec un pourcentage de correspondance.",
     "• Garder vos conversations " + (r.retention_jours || 60) + " jours — vous pouvez les supprimer quand vous voulez. Vous pouvez aussi me dire si une réponse vous a servi, ou signaler une erreur.",
     "",
     "Ce que je ne fais pas : donner les réponses d'un quiz ou d'un examen (je suis coupé pendant une évaluation), parler d'un contenu auquel vous n'avez pas accès, ni donner un conseil juridique, médical ou financier personnalisé. Si je ne trouve pas la réponse dans les supports, je vous le dis et je vous propose de demander à votre formateur.",
     "",
-    `Questions : ${pluriel(r.gratuit_questions == null ? 5 : r.gratuit_questions, "question offerte", "questions offertes")}, puis un forfait de ${r.forfait_questions || 100} questions à ${euros(r.forfait_prix_eur == null ? 5 : r.forfait_prix_eur)}. Cette question — comme toute question sur ce que je sais faire — est gratuite et ne décompte aucune de vos questions.`,
+    phraseCredit(lg, r),
   ].join("\n");
 }
 
@@ -102,10 +117,29 @@ function reponseCreateur(r) {
     "",
     "4) Ranger votre travail : vos discussions peuvent être classées dans des dossiers (par exemple « Module 3 »), chacune avec son propre fil.",
     "",
+    "5) Dans l'Annuaire (comptes Premium), je suis aussi conseiller d'orientation : décrivez la personne que vous cherchez et je vous propose au moins trois profils, avec un pourcentage de correspondance.",
+    "",
     "Ce que je ne peux pas faire : publier ou soumettre la formation, fixer ou changer un prix, rien supprimer, créer ou modifier des quiz et des questions, ajouter vos images ou vos vidéos (vous les ajoutez dans le Studio), envoyer des messages, ni voir vos apprenants. Pour tout cela, je vous indique l'onglet et les étapes.",
     "",
-    `Messages : ${pluriel(r.createur_gratuit_jour == null ? 20 : r.createur_gratuit_jour, "message offert", "messages offerts")} par jour, puis un forfait de ${r.createur_forfait_messages || 1000} messages à ${euros(r.createur_forfait_prix_eur == null ? 5 : r.createur_forfait_prix_eur)}. Cette question — comme toute question sur ce que je sais faire — est gratuite et ne décompte aucun de vos messages.`,
+    phraseCredit("fr", r),
   ].join("\n");
 }
 
-module.exports = { estQuestionCompetences, reponseEleve, reponseCreateur, normaliser };
+function reponseAnnuaire(r) {
+  return [
+    "Je suis votre conseiller d'orientation dans l'Annuaire. Voici tout ce que je sais faire :",
+    "• Comprendre ce que vous cherchez et votre situation, en quelques phrases (activité, compétence, projet, besoin).",
+    "• Vous poser les questions utiles pour préciser : ville, pays, type de profil (personne, initiative, collectivité), domaine d'activité.",
+    "• Parcourir les profils publics de l'Annuaire et vous en proposer au moins trois, avec un pourcentage de correspondance et la raison en une phrase. Le pourcentage est calculé par la plateforme d'après vos critères, il n'est pas inventé.",
+    "• Vous mener en un clic sur le profil public de la personne qui vous intéresse.",
+    "• Vous dire honnêtement quand je ne trouve pas trois bons profils, plutôt que d'en inventer.",
+    "",
+    "Ce que je ne fais pas : lire des informations privées (e-mail, téléphone, messages), contacter quelqu'un à votre place, ni proposer les comptes qui ont choisi de ne pas être proposés par Koffi. Je ne propose que les comptes Premium qui ont une photo de profil et un descriptif rempli ; pour les autres, utilisez la recherche manuelle et les filtres de l'Annuaire.",
+    "",
+    "Le conseiller est réservé aux comptes Premium qui acceptent eux-mêmes d'être proposés (réciprocité : cochez « Ne pas être proposé par Koffi » dans vos paramètres et vous ne pouvez plus l'utiliser).",
+    "",
+    phraseCredit("fr", r),
+  ].join("\n");
+}
+
+module.exports = { estQuestionCompetences, reponseEleve, reponseCreateur, reponseAnnuaire, phraseCredit, normaliser };

@@ -1310,6 +1310,8 @@ const COLONNES_MIGRATION = [
        cause distincte). */
     ['users', 'invisible_annuaire_jusqu_au', 'TEXT'],
     ['users', 'invisible_annuaire_definitif', 'INTEGER DEFAULT 0'],
+    /* Koffi, conseiller de l'Annuaire (2026-10-31) : le conseiller lit cette colonne dans son SELECT principal — toujours dupliquer ici tout ajout de colonne de users (voir server/db.js). */
+    ['users', 'kofi_non_propose', 'INTEGER DEFAULT 0'],
     /* Sponsors / Partenaires d'une fiche d'inscription (2026-09-28, demande explicite) — même
        principe que insc_champs.options_json : un tableau JSON ({nom, logo_url}), pas de table
        séparée. Mirroir de server/db.js (CREATE TABLE insc_fiches) — voir le commentaire du 2026-
