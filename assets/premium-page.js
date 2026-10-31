@@ -201,7 +201,10 @@
        utilisateur connecté passe directement aux tarifs — signalé le 2026-08-17. */
     let _mePremium = null;
     try { _mePremium = (await fetch('/api/auth/me', { credentials: 'same-origin' }).then(r => r.json())).user; } catch (e) {}
-    if (_mePremium) renderTarifs(false); else renderGate();
+    /* Saisie du DS-ID de parrainage (-50 %) MASQUÉE (2026-11-01) : remplacée par la réduction automatique « comptes liés ».
+       Le code de l'écran préalable est conservé ; mettre PARRAINAGE_OUVERT à true (et PARRAINAGE_NOUVEAUX_OUVERT=1 côté serveur) le rouvre. */
+    const PARRAINAGE_OUVERT = false;
+    if (_mePremium || !PARRAINAGE_OUVERT) renderTarifs(false); else renderGate();
 
     function renderGate() {
       el.innerHTML = `

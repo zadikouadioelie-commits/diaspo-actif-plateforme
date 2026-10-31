@@ -171,6 +171,10 @@ const fournisseurParrainageInitiative = {
   id: 'parrainage_initiative',
 
   async resoudre(db, user, def, options) {
+    /* FERMÉ aux nouveaux abonnements (2026-11-01, décision de l'utilisateur) : la réduction automatique « comptes liés »
+       (server/reduction-comptes-lies.js, plafond 20 %) la remplace, sans aucune démarche. Rien n'est supprimé : les
+       réductions déjà accordées et l'historique restent intacts. PARRAINAGE_NOUVEAUX_OUVERT=1 le rouvre. */
+    if (process.env.PARRAINAGE_NOUVEAUX_OUVERT !== '1') return null;
     const dsIdSaisi = (options?.parrainage_ds_id || '').trim().toUpperCase();
     if (!dsIdSaisi) return null; // aucun DS-ID proposé : ce fournisseur ne s'applique pas
     // -50% uniquement sur un Premium annuel — un achat mensuel ne doit jamais consommer la

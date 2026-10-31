@@ -10,6 +10,9 @@
    =========================================================== */
 const test = require('node:test');
 const assert = require('node:assert/strict');
+/* Le parrainage est FERMÉ aux nouveaux abonnements par défaut (2026-11-01) ; ces tests couvrent sa logique quand il est rouvert,
+   puis un test dédié vérifie la fermeture. */
+process.env.PARRAINAGE_NOUVEAUX_OUVERT = '1';
 const {
   fournisseurParrainageInitiative,
   fournisseurCodeAdhesionDA,
@@ -36,8 +39,10 @@ function makeFakeDb(state) {
         if (/FROM comptes_lies_membres WHERE user_id=\?/.test(sql)) {
           return state.comptesLies.find(c => c.user_id === args[0]);
         }
-        if (/FROM accred_definitions WHERE type='initiative_abonne'/.test(sql)) {
-          return state.accredDefinitions.find(d => d.type === 'initiative_abonne');
+        /* Depuis l'équivalence de rôle (2026-09-24) le module interroge « WHERE type=? » (initiative_abonne OU utilisateur_abonne selon la référence) ;
+           l'ancienne forme littérale n'existe plus, ce qui faisait échouer ces tests en « offre_indisponible » (corrigé 2026-11-01). */
+        if (/FROM accred_definitions WHERE type=\?/.test(sql)) {
+          return state.accredDefinitions.find(d => d.type === args[0]);
         }
         if (/FROM user_accreditations WHERE user_id=\? AND accred_id=\? AND statut='active'/.test(sql)) {
           return state.userAccreditations.find(a => a.user_id === args[0] && a.accred_id === args[1] && a.statut === 'active');
@@ -105,7 +110,7 @@ function baseState() {
       { user_id: 2, groupe_id: 100 },
       // user 3 volontairement absent — jamais lié à personne
     ],
-    accredDefinitions: [{ id: 10, type: 'initiative_abonne' }],
+    accredDefinitions: [{ id: 10, type: 'initiative_abonne' }, { id: 11, type: 'utilisateur_abonne' }],
     userAccreditations: [
       { user_id: 1, accred_id: 10, statut: 'active', reduction_pct_appliquee: 0, stripe_subscription_id: 'sub_ref_1', date_expiration: null },
     ],
@@ -163,8 +168,12 @@ for (const role of ['utilisateur', 'collectivite']) {
   test(`Cas D/E/F — rôle '${role}' (couvre Étatique) non éligible comme référence`, async () => {
     const state = baseState();
     state.users[0].role = role;
+    /* Équivalence de rôle (2026-09-24) : une référence Utilisateur reste valable pour un autre Utilisateur ; seul l'achat d'une INITIATIVE
+       sur une référence Utilisateur est refusé. On teste donc ce cas précis pour 'utilisateur' (le bénéficiaire devient une Initiative). */
+    const beneficiaire = role === 'utilisateur' ? { id: 2, role: 'initiative' } : BENEFICIAIRE;
+    if (role === 'utilisateur') state.initiatives.push({ id: 5, owner_user_id: 2, da_id: 'DA-INIT-2' });
     const db = makeFakeDb(state);
-    const res = await fournisseurParrainageInitiative.resoudre(db, BENEFICIAIRE, {}, {
+    const res = await fournisseurParrainageInitiative.resoudre(db, beneficiaire, {}, {
       parrainage_ds_id: 'REFDS0001A', type_tarif: 'annuel', stripeClient: fakeStripe(dansNJours(180)),
     });
     assert.equal(res.valide, false);
@@ -359,4 +368,17 @@ test('Sans stripeClient -> jamais d\'avantage "par défaut" sans durée vérifi�
   });
   assert.equal(res.valide, false);
   assert.equal(res.raison, 'verification_indisponible');
+});
+
+/* ── Fermeture aux nouveaux abonnements (2026-11-01) : sans PARRAINAGE_NOUVEAUX_OUVERT, aucun avantage, même avec un DS-ID valide ── */
+test('Parrainage fermé par défaut : un DS-ID valide ne donne plus aucune réduction', async () => {
+  const ouvert = process.env.PARRAINAGE_NOUVEAUX_OUVERT;
+  delete process.env.PARRAINAGE_NOUVEAUX_OUVERT;
+  try {
+    const db = makeFakeDb(baseState());
+    const res = await fournisseurParrainageInitiative.resoudre(db, BENEFICIAIRE, {}, {
+      parrainage_ds_id: 'REFDS0001A', type_tarif: 'annuel', stripeClient: fakeStripe(dansNJours(180)),
+    });
+    assert.equal(res, null);
+  } finally { process.env.PARRAINAGE_NOUVEAUX_OUVERT = ouvert; }
 });
