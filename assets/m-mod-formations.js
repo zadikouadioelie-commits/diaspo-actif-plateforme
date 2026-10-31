@@ -12,8 +12,10 @@
   'use strict';
   const A = window.MApp;
   if (!A) return;
-  const { S, api, esc, strip, ic, setPane, toast } = A;
+  const { S, api, esc, strip, ic, toast } = A;
   window.MMods = window.MMods || {};
+  /* Chaque écran du module passe par ce setPane : il pose (ou retire) le bouton « Accueil formation » de l'en-tête. */
+  const setPane = (title, html, foot, keepFoot) => { A.setPane(title, html, foot, keepFoot); paneHome(); };
 
   const $ = (s, r) => (r || document).querySelector(s);
   const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
@@ -48,6 +50,21 @@
       .fm-rate button.on{color:#f59e0b}
       .fm-gold{color:#f59e0b;letter-spacing:1px}
       .fm-note{background:var(--sky-l);color:var(--navy);border-radius:12px;padding:10px 12px;font-size:13.5px;margin-bottom:12px}
+      /* Quiz posé dans une page du Studio : la page est BLANCHE même en thème « Nuit dorée » (textes clairs par défaut) → couleurs lisibles imposées dans cet encart. */
+      html body.nd .st-quiz-slot .card{background:#f8fafc!important;border:1px solid #e2e8f0!important;box-shadow:none!important;color:#111827!important}
+      html body.nd .st-quiz-slot .muted{color:#475569!important}
+      html body.nd .st-quiz-slot .fm-note{background:#eff6ff!important;color:#1e3a8a!important}
+      html body.nd .st-quiz-slot .fm-note.fm-n-ok{background:#dcfce7!important;color:#14532d!important}
+      html body.nd .st-quiz-slot .fm-note.fm-n-ko{background:#fef2f2!important;color:#7f1d1d!important}
+      html body.nd .st-quiz-slot .fm-note.fm-n-wa{background:#fffbeb!important;color:#92400e!important}
+      html body.nd .st-quiz-slot .fm-in{background:#fff!important;color:#111827!important;border-color:#cbd5e1!important}
+      html body.nd .st-quiz-slot form > div{border-top-color:#e2e8f0!important}
+      html body.nd .st-quiz-slot [style*="var(--green)"]{color:#15803d!important}
+      html body.nd .st-quiz-slot [style*="var(--red)"]{color:#b91c1c!important}
+      .fm-home{display:flex;align-items:center;gap:6px;flex:none;min-height:40px;padding:0 10px;border-radius:20px;background:rgba(255,255,255,.16);color:#fff;font-weight:700;text-decoration:none}
+      .fm-home[hidden]{display:none}
+      .fm-home .fm-home-t{display:flex;flex-direction:column;font-size:11px;line-height:1.05;text-align:left}
+      .fm-home .fm-home-i{font-size:18px;line-height:1}
     `;
     document.head.appendChild(st);
   }
@@ -62,6 +79,22 @@
   /* Vrai tant que l'écran qui a lancé la requête est toujours celui que la personne regarde :
      sinon on rouvrirait le panneau par-dessus l'onglet qu'elle a retrouvé entre-temps. */
   const alive = my => my === seq && /^#\/formations(\/|$)/.test(location.hash);
+
+  /* Bouton « Accueil formation » : toujours à portée dans l'en-tête dès qu'on est dans une formation (fiche, plan, leçon), pour revenir au catalogue sans empiler les « retour ».
+     L'en-tête est partagé avec les autres modules : le bouton est caché dès que la route n'est plus une formation. */
+  const enFormation = () => /^#\/formations\/\d+/.test(location.hash);
+  function paneHome() {
+    const head = document.querySelector('#pane .phead'); if (!head) return;
+    let b = document.getElementById('fm-home');
+    if (!b) {
+      b = document.createElement('a'); b.id = 'fm-home'; b.className = 'fm-home'; b.href = '#/formations';
+      b.setAttribute('aria-label', 'Accueil formation : retour au catalogue de toutes les formations');
+      b.innerHTML = '<span class="fm-home-i" aria-hidden="true">🎓</span><span class="fm-home-t"><span>Accueil</span><span>formation</span></span>';
+      const ref = document.getElementById('pane-share'); head.insertBefore(b, ref || null);
+    }
+    b.hidden = !enFormation();
+  }
+  window.addEventListener('hashchange', () => { if (document.getElementById('fm-home')) paneHome(); });
 
   const norm = v => String(v == null ? '' : v).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
   const pct = v => Math.max(0, Math.min(100, Math.round(Number(v) || 0)));
@@ -626,7 +659,7 @@
       <div class="bar" role="progressbar" aria-valuenow="${p}" aria-valuemin="0" aria-valuemax="100" aria-label="Progression globale"><i style="width:${p}%"></i></div>
       <div class="small muted" style="margin-top:6px">${done} activité${done > 1 ? 's' : ''} obligatoire${done > 1 ? 's' : ''} terminée${done > 1 ? 's' : ''} sur ${nbTot}${pc.chapitres_total ? ` · ${pc.chapitres_termines || 0}/${pc.chapitres_total} chapitre${pc.chapitres_total > 1 ? 's' : ''}` : ''}</div>`}
       ${items.length ? `<a class="btn block" style="margin-top:14px" href="#/formations/${esc(id)}/l${suivante.l.id}">${apercu ? 'Voir la première leçon' : statut === 'termine' ? 'Revoir la formation' : done === 0 ? 'Commencer' : 'Reprendre ma formation'}</a>` : ''}</div></div>`;
-    if (mode === 'manuel' && !apercu) html += `<div class="fm-note" style="margin-bottom:0">Mode manuel : cochez vos leçons, puis enregistrez votre progression.</div>` + carteEnregistrer(id);
+    if (mode === 'manuel' && !apercu) html += `<div class="fm-note" style="margin-bottom:0">Mode manuel : cochez vos leçons, votre progression s’enregistre toute seule.</div>` + carteEnregistrer(id);
     /* Document (attestation / certificat) : conditions restantes, ou accès une fois délivré. */
     const at = d.attestation;
     if (!apercu && !libre && at && at.active) {
@@ -707,7 +740,7 @@
     if (STUDIO) return STUDIO;
     STUDIO = chargerVisionneuse().catch(() => { /* les documents intégrés se rabattent sur leur lien */ }).then(() => new Promise((ok, ko) => {
       const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = 'assets/studio.css?v=5'; document.head.appendChild(css);
-      const js = document.createElement('script'); js.src = 'assets/studio-render.js?v=7'; js.onload = () => ok(); js.onerror = () => { STUDIO = null; ko(new Error('Rendu indisponible')); };
+      const js = document.createElement('script'); js.src = 'assets/studio-render.js?v=8'; js.onload = () => ok(); js.onerror = () => { STUDIO = null; ko(new Error('Rendu indisponible')); };
       document.head.appendChild(js);
     }));
     return STUDIO;
@@ -797,10 +830,11 @@
     const zone = $('#fm-quiz'); if (!zone) return;
     clearInterval(QTIMER); QTIMER = null;
     if (!l.quiz) { zone.innerHTML = noFile('Aucun quiz n’est encore rattaché à cette leçon.'); return; }
-    if (d.mode === 'apercu') { zone.innerHTML = noFile('Quiz « ' + l.quiz.titre + ' » : passable par les apprenants inscrits.'); return; }
+    /* Aperçu du créateur : essai à blanc (le serveur corrige et donne le corrigé au seul créateur, rien n'est enregistré). */
+    const essai = d.mode === 'apercu';
     zone.innerHTML = '<div class="sk skc" style="height:90px"></div>';
     let q;
-    try { q = await api(`/api/formations/${encodeURIComponent(id)}/quiz/${encodeURIComponent(l.quiz.id)}/passer`); }
+    try { q = await api(`/api/formations/${encodeURIComponent(id)}/quiz/${encodeURIComponent(l.quiz.id)}/${essai ? 'apercu' : 'passer'}`); }
     catch (e) { zone.innerHTML = noFile(e.message || 'Quiz indisponible.'); return; }
     const res = LASTQ && LASTQ.leconId === Number(l.id) ? LASTQ.res : null; if (res) LASTQ = null;
     rendreQuiz(zone, id, l, d, q, res);
@@ -811,10 +845,16 @@
     const attente = !!t.en_attente, dejaReussi = !!t.reussi || !!(res && res.reussi);
     const epuise = q.bloque === 'tentatives_epuisees';
     const verrou = attente || epuise || (manuel && dejaReussi);
-    const note = (bg, fg, txt) => `<div class="fm-note" style="background:${bg};color:${fg}">${txt}</div>`;
-    let verdict = '';
-    if (ch && ch.expire_enregistre && !res) verdict += note('#fef2f2', '#7f1d1d', '⌛ Le temps imparti était écoulé : la tentative a été comptée sans note.');
-    if (attente) verdict += note('#fffbeb', '#92400e', '⏳ Votre travail a été envoyé : il est en attente de correction par le formateur. Vous serez prévenu(e) dès qu’il sera corrigé.');
+    const NOTE_CLS = { '#dcfce7': 'fm-n-ok', '#fef2f2': 'fm-n-ko', '#fffbeb': 'fm-n-wa' };
+    const note = (bg, fg, txt) => `<div class="fm-note ${NOTE_CLS[bg] || 'fm-n-in'}" style="background:${bg};color:${fg}">${txt}</div>`;
+    const essai = d.mode === 'apercu';
+    let verdict = essai ? note('#eff6ff', '#1e3a8a', '🧪 <b>Essai à blanc</b> : répondez comme un apprenant. La correction et le corrigé s’affichent ici, rien n’est enregistré.') : '';
+    if (essai && res) verdict += res.en_attente_correction
+      ? note('#fffbeb', '#92400e', '⏳ Évaluation corrigée à la main : chez un apprenant, ce travail partirait au formateur.')
+      : note(res.reussi ? '#dcfce7' : '#fef2f2', res.reussi ? '#14532d' : '#7f1d1d', (res.reussi ? '✅ Essai réussi' : '❌ Essai non réussi') + (res.note_pct != null ? ' — ' + esc(res.note_pct) + '%' : '') + ' (seuil ' + esc(res.seuil) + '%). Le corrigé est affiché sous chaque question.');
+    else if (ch && ch.expire_enregistre && !res) verdict += note('#fef2f2', '#7f1d1d', '⌛ Le temps imparti était écoulé : la tentative a été comptée sans note.');
+    if (essai) { /* verdict propre à l'essai posé ci-dessus */ }
+    else if (attente) verdict += note('#fffbeb', '#92400e', '⏳ Votre travail a été envoyé : il est en attente de correction par le formateur. Vous serez prévenu(e) dès qu’il sera corrigé.');
     else if (res && res.hors_delai) verdict += note('#fef2f2', '#7f1d1d', '⌛ Temps écoulé : votre envoi est arrivé après l’échéance. La tentative est comptée sans note.');
     else if (res && !res.en_attente_correction) verdict += res.reussi
       ? note('#dcfce7', '#14532d', '✅ Quiz réussi' + (res.note_pct != null ? ' — ' + esc(res.note_pct) + '%' : '') + '. Cette activité est validée.')
@@ -845,13 +885,13 @@
         ? `<textarea class="fm-in" name="q${qu.id}" rows="4" maxlength="5000" aria-label="Votre réponse" ${verrou ? 'disabled' : ''}></textarea>`
         : `<input class="fm-in" type="text" name="q${qu.id}" maxlength="500" autocomplete="off" aria-label="Votre réponse">`;
       else champ = qu.options.map(o => `<label style="display:flex;gap:10px;align-items:center;min-height:44px"><input type="${qu.multiple ? 'checkbox' : 'radio'}" name="q${qu.id}" value="${esc(o)}" ${verrou ? 'disabled' : ''}> <span>${esc(o)}</span></label>`).join('') + (qu.multiple ? '<div class="small muted">Plusieurs réponses possibles.</div>' : '');
-      const nt = dt && dt.note ? `<div class="small" style="margin-top:6px;font-weight:700;color:${dt.correct ? 'var(--green)' : 'var(--red)'}">${dt.correct ? '✓ Bonne réponse' : '✗ Réponse incorrecte'}${dt.bonne_reponse ? ' — attendue : ' + esc(dt.bonne_reponse) : ''}</div>` : '';
+      const nt = dt && dt.note ? `<div class="small" style="margin-top:6px;font-weight:700;color:${dt.correct ? 'var(--green)' : 'var(--red)'}">${dt.correct ? '✓ Bonne réponse' : '✗ Réponse incorrecte'}${dt.bonne_reponse ? ' — attendue : ' + esc(dt.bonne_reponse) : ''}</div>${dt.explication ? `<div class="small muted" style="margin-top:4px">${esc(dt.explication)}</div>` : ''}` : '';
       return `<div style="padding:12px 0;border-top:1px solid var(--border)"><div style="font-weight:700;margin-bottom:6px">${i + 1}. ${esc(qu.question)} <span class="small muted" style="font-weight:400">(${qu.points} pt${qu.points > 1 ? 's' : ''})</span></div>${champ}${nt}</div>`;
     }).join('');
     const depot = !verrou && quiz.depot_fichier && quiz.depot_fichier !== 'non';
     const depotHtml = depot ? `<div style="padding:12px 0;border-top:1px solid var(--border)"><div style="font-weight:700;margin-bottom:6px">📎 Votre fichier ${quiz.depot_fichier === 'obligatoire' ? '<span class="small" style="color:var(--red)">(obligatoire)</span>' : '<span class="small muted">(facultatif)</span>'}</div>
       <input type="file" id="fm-fichier" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.webp" aria-label="Fichier à rendre"><div class="small muted" style="margin-top:4px">PDF, Word, Excel, PowerPoint ou image — 15 Mo maximum.</div></div>` : '';
-    const libelle = manuel ? 'Envoyer mon travail au formateur' : res ? 'Valider une nouvelle tentative' : 'Valider mes réponses';
+    const libelle = essai ? (res ? 'Refaire l’essai' : 'Tester mes réponses') : manuel ? 'Envoyer mon travail au formateur' : res ? 'Valider une nouvelle tentative' : 'Valider mes réponses';
     zone.innerHTML = `<div class="card"><div class="pad"><b>📝 ${esc(quiz.titre)}</b>
       <div class="small muted" style="margin:4px 0 10px">${meta}</div>
       ${ch && ch.demarre && !verrou ? '<div class="fm-note" id="fm-timer" style="background:#eff6ff;color:#1e3a8a;font-weight:700;position:sticky;top:0;z-index:5">⏱ Temps restant : <span id="fm-timer-txt"></span></div>' : ''}
@@ -881,6 +921,10 @@
           const upd = await up.json().catch(() => ({}));
           if (!up.ok || !upd.url) { toast(upd.error || 'Le fichier n’a pas pu être envoyé.', true); return reset(); }
           corps.fichier_url = upd.url; corps.fichier_nom = fichier.name;
+        }
+        if (essai) { /* essai à blanc : correction par le serveur, rien d'enregistré, l'écran reste en place */
+          const e = await api(`/api/formations/${encodeURIComponent(id)}/quiz/${encodeURIComponent(quiz.id)}/apercu-corriger`, { method: 'POST', body: { reponses } });
+          return rendreQuiz(zone, id, l, d, q, e);
         }
         const r = await api(`/api/formations/${encodeURIComponent(id)}/quiz/${encodeURIComponent(quiz.id)}/soumettre`, { method: 'POST', body: corps });
         LASTQ = { leconId: Number(l.id), res: r.en_attente_correction ? null : r };
@@ -978,6 +1022,7 @@
         /* Mode manuel : coche locale, enregistrée d'un seul geste plus tard. */
         const p = pendDe(id), nouveau = !fait;
         if (nouveau === !!l.termine) delete p[l.id]; else p[l.id] = nouveau;
+        planifierAuto(id);
         return screenLecon(++seq, id, leconId);
       }
       const val = !l.termine; dn.disabled = true;
@@ -1000,26 +1045,69 @@
   const pendDe = id => (PEND[id] = PEND[id] || {});
   const nbPend = id => Object.keys(pendDe(id)).length;
   const faite = (id, l) => (Object.prototype.hasOwnProperty.call(pendDe(id), l.id) ? !!pendDe(id)[l.id] : !!l.termine);
+  /* Enregistrement AUTOMATIQUE (2026-10-31) : une coche part d'elle-même au bout de 0,8 s (plusieurs coches rapprochées = un seul envoi), et à la fermeture de la page.
+     Plus de bouton « Enregistrer » à presser ; il ne reparaît (« Réessayer ») que si l'envoi a échoué. */
+  const AUTO = { t: {}, busy: {}, err: {}, apres: {} };
   function carteEnregistrer(id) {
     const n = nbPend(id);
     if (!n) return '';
-    return `<div class="fm-note" id="fm-pend" style="margin-top:12px"><b>${n}</b> coche${n > 1 ? 's' : ''} non enregistrée${n > 1 ? 's' : ''} : elles ne comptent pas tant que vous n’avez pas enregistré.
-      <button class="btn block" id="fm-pend-go" style="margin-top:8px">💾 Enregistrer ma progression</button><button class="btn out block" id="fm-pend-cancel" style="margin-top:8px">Annuler les coches</button></div>`;
+    if (AUTO.err[id]) return `<div class="fm-note" id="fm-pend" style="margin-top:12px;background:#fffbeb;color:#92400e">⚠ Votre progression n’a pas pu être enregistrée (<b>${n}</b> coche${n > 1 ? 's' : ''} en attente). Vérifiez votre connexion.
+      <button class="btn block" id="fm-pend-go" style="margin-top:8px">Réessayer</button><button class="btn out block" id="fm-pend-cancel" style="margin-top:8px">Annuler les coches</button></div>`;
+    return `<div class="fm-note" id="fm-pend" style="margin-top:12px">💾 Enregistrement automatique de votre progression…</div>`;
+  }
+  /* Les leçons du suivi déjà chargé reflètent aussitôt ce qui vient d'être enregistré (l'écran affiché garde des objets à jour) ; le prochain affichage recharge. */
+  function appliquerAuSuivi(id, envoye, refusees) {
+    if (!SF || SF.id !== String(id)) return;
+    flat(SF.data).forEach(x => { const k = String(x.l.id); if (Object.prototype.hasOwnProperty.call(envoye, k) && !(refusees || []).includes(Number(x.l.id))) x.l.termine = !!envoye[k]; });
+    SF.at = 0;
+  }
+  function planifierAuto(id) {
+    clearTimeout(AUTO.t[id]);
+    if (nbPend(id)) AUTO.t[id] = setTimeout(() => enregistrerAuto(id), 800);
+  }
+  async function enregistrerAuto(id) {
+    clearTimeout(AUTO.t[id]);
+    if (AUTO.busy[id] || !nbPend(id)) return;
+    AUTO.busy[id] = true;
+    const envoye = Object.assign({}, pendDe(id));
+    try {
+      const lecons = Object.keys(envoye).map(k => ({ id: Number(k), termine: !!envoye[k] }));
+      const r = await api(`/api/formations/${encodeURIComponent(id)}/progression-lot`, { method: 'POST', body: { lecons } });
+      AUTO.err[id] = false;
+      const refusees = (r.refusees || []).map(Number), p = pendDe(id);
+      /* ce qui vient de partir n'est plus « à enregistrer » (sauf une coche changée entre-temps) ; les leçons du suivi chargé reflètent aussitôt l'état enregistré */
+      Object.keys(envoye).forEach(k => { if (p[k] === envoye[k]) delete p[k]; });
+      appliquerAuSuivi(id, envoye, refusees);
+      if (SF && SF.id === String(id) && r.avancement_pct != null) SF.data.avancement_pct = r.avancement_pct;
+      const el = $('#fm-pend'); if (el && !nbPend(id)) el.remove();
+      if (r.attestation) toast('🎉 Votre ' + String(r.attestation.type_label).toLowerCase() + ' est disponible dans le plan de la formation !');
+      else if (refusees.length) toast('Une leçon cochée n’a pas pu être validée : terminez d’abord son quiz ou sa vidéo.', true);
+      else toast('Progression enregistrée ✓');
+      /* leçon refusée → l'écran est remis d'aplomb sur l'état réel ; plan affiché → ses pastilles « à enregistrer » sont rafraîchies */
+      if ((refusees.length || location.hash === '#/formations/' + id + '/suivre') && AUTO.apres[id] && enFormation()) AUTO.apres[id]();
+    } catch (e) {
+      AUTO.err[id] = true; toast(e.message, true);
+      if (AUTO.apres[id] && enFormation()) AUTO.apres[id]();
+    }
+    AUTO.busy[id] = false;
+    if (nbPend(id) && !AUTO.err[id]) planifierAuto(id); // une coche est arrivée pendant l'envoi
   }
   function brancherEnregistrer(id, apres) {
+    AUTO.apres[id] = apres;
     const go = $('#fm-pend-go'), no = $('#fm-pend-cancel');
-    if (no) no.onclick = () => { delete PEND[id]; apres(); };
-    if (go) go.onclick = async () => {
-      go.disabled = true; go.textContent = 'Enregistrement…';
-      try {
-        const lecons = Object.keys(pendDe(id)).map(k => ({ id: Number(k), termine: !!pendDe(id)[k] }));
-        const r = await api(`/api/formations/${encodeURIComponent(id)}/progression-lot`, { method: 'POST', body: { lecons } });
-        delete PEND[id]; if (SF) SF.at = 0;
-        toast(r.attestation ? '🎉 Votre ' + String(r.attestation.type_label).toLowerCase() + ' est disponible !' : 'Progression enregistrée ✓');
-        apres();
-      } catch (e) { toast(e.message, true); go.disabled = false; go.textContent = '💾 Enregistrer ma progression'; }
-    };
+    if (no) no.onclick = () => { delete PEND[id]; AUTO.err[id] = false; apres(); };
+    if (go) go.onclick = () => { go.disabled = true; go.textContent = 'Enregistrement…'; AUTO.err[id] = false; enregistrerAuto(id); };
   }
+  /* Fermeture / mise en arrière-plan de la page : les coches en attente partent par un envoi qui survit à la page. */
+  function envoyerEnQuittant() {
+    Object.keys(PEND).forEach(id => {
+      if (!nbPend(id) || AUTO.busy[id]) return;
+      const lecons = Object.keys(PEND[id]).map(k => ({ id: Number(k), termine: !!PEND[id][k] }));
+      try { fetch(`/api/formations/${encodeURIComponent(id)}/progression-lot`, { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ lecons }) }); appliquerAuSuivi(id, PEND[id], []); delete PEND[id]; } catch (e) { /* il restera à réessayer */ }
+    });
+  }
+  window.addEventListener('pagehide', envoyerEnQuittant);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') envoyerEnQuittant(); });
 
   /* ── Espace d'échange : questions sous la leçon, réponses du formateur et des autres apprenants, signalement ── */
   const ECH = { scope: 'lecon' };
