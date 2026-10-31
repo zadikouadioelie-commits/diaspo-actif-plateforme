@@ -6,6 +6,8 @@
    - Les apprenants apparaissent sous « Prénom N. » (comme sur la page de vérification des documents) ; le formateur est reconnaissable à son badge.
    - Signalement : un compte ne signale un message qu'une fois ; à 3 signalements distincts, le message est masqué automatiquement en attendant le formateur.
    - Modération (formateur ou administration) : masquer / réafficher / supprimer. Un message masqué n'est lisible que par les modérateurs.
+   - Espace privé (2026-10-31) : des THÈMES (message racine avec titre, hors leçon) que tout inscrit peut ouvrir ; chaque réponse prévient les personnes déjà intervenues
+     dans le thème ; formation_discussion_vus garde le dernier message lu par personne (pastille « nouveau »).
    - Notifications utiles seulement : le formateur est prévenu d'une nouvelle QUESTION (pas de chaque réponse entre apprenants), l'auteur d'une question
      est prévenu quand quelqu'un lui répond, le formateur est prévenu d'un signalement.
    ═════════════════════════════════════════════════ */
@@ -44,7 +46,7 @@ module.exports.register = function register(deps) {
     const estFormateur = m.role === "formateur";
     return {
       id: Number(m.id), lecon_id: m.lecon_id != null ? Number(m.lecon_id) : null, parent_id: m.parent_id != null ? Number(m.parent_id) : null,
-      role: estFormateur ? "formateur" : "apprenant", auteur: nomCourt(u), est_moi: Number(m.user_id) === Number(a.user.id),
+      titre: m.titre || null, role: estFormateur ? "formateur" : "apprenant", auteur: nomCourt(u), est_moi: Number(m.user_id) === Number(a.user.id),
       contenu: cache ? "Ce message a été masqué par la modération." : m.contenu, masque, resolue: Number(m.resolue) === 1,
       nb_signalements: a.moderateur ? Number(m.nb_signalements) || 0 : undefined, created_at: m.created_at,
     };
@@ -56,7 +58,8 @@ module.exports.register = function register(deps) {
     const q = query || {};
     let sql = "SELECT * FROM formation_discussions WHERE formation_id=?";
     const args = [Number(params.id)];
-    if (q.lecon_id === "general") sql += " AND lecon_id IS NULL";
+    if (q.theme_id != null && q.theme_id !== "") { sql += " AND (id=? OR parent_id=?)"; args.push(Number(q.theme_id), Number(q.theme_id)); }
+    else if (q.lecon_id === "general") sql += " AND lecon_id IS NULL AND titre IS NULL";
     else if (q.lecon_id != null && q.lecon_id !== "") { sql += " AND (lecon_id=? OR parent_id IN (SELECT id FROM formation_discussions WHERE lecon_id=?))"; args.push(Number(q.lecon_id), Number(q.lecon_id)); }
     sql += " ORDER BY id ASC LIMIT 1000";
     const lignes = await db.prepare(sql).all(...args);
@@ -71,7 +74,39 @@ module.exports.register = function register(deps) {
       a_repondre: fils.filter(t => !t.masque && !t.resolue && t.role === "apprenant" && !t.reponses.some(r => r.role === "formateur")).length,
       masques: lignes.filter(m => (m.statut || "visible") !== "visible").length,
     } : undefined;
+    /* Ouvrir un thème = le marquer lu pour cette personne (efface la pastille « nouveau »). */
+    if (q.theme_id != null && q.theme_id !== "" && lignes.length) await marquerVu(a.user.id, Number(q.theme_id), Math.max(...lignes.map(m => Number(m.id))));
     sendJSON(res, 200, { fils, moderateur: a.moderateur, resume });
+  });
+
+  async function marquerVu(userId, themeId, jusquaId) {
+    await db.prepare("DELETE FROM formation_discussion_vus WHERE user_id=? AND discussion_id=?").run(Number(userId), Number(themeId));
+    await db.prepare("INSERT INTO formation_discussion_vus (user_id, discussion_id, vu_jusqu_id) VALUES (?,?,?)").run(Number(userId), Number(themeId), Number(jusquaId));
+  }
+
+  /* GET /api/formations/:id/themes — thèmes de l'espace privé (les plus actifs d'abord) avec, pour la personne connectée, le nombre de messages non lus. */
+  route("GET", "/api/formations/:id/themes", async (req, res, params) => {
+    const a = await acces(req, res, params.id); if (!a) return;
+    const racines = await db.prepare("SELECT * FROM formation_discussions WHERE formation_id=? AND parent_id IS NULL AND titre IS NOT NULL ORDER BY id ASC LIMIT 1000").all(Number(params.id));
+    const idsRacines = racines.map(t => Number(t.id));
+    const reponses = idsRacines.length ? await db.prepare(`SELECT * FROM formation_discussions WHERE parent_id IN (${idsRacines.map(() => "?").join(",")}) ORDER BY id ASC LIMIT 5000`).all(...idsRacines) : [];
+    const visible = m => (m.statut || "visible") === "visible" || a.moderateur;
+    const vus = {};
+    (await db.prepare("SELECT discussion_id, vu_jusqu_id FROM formation_discussion_vus WHERE user_id=?").all(a.user.id)).forEach(v => { vus[Number(v.discussion_id)] = Number(v.vu_jusqu_id); });
+    const ids = [...new Set([...racines, ...reponses].map(m => Number(m.user_id)))];
+    const auteurs = {};
+    if (ids.length) (await db.prepare(`SELECT id, nom, prenom FROM users WHERE id IN (${ids.map(() => "?").join(",")})`).all(...ids)).forEach(u => { auteurs[Number(u.id)] = u; });
+    const themes = racines.filter(visible).map(t => {
+      const msgs = [t, ...reponses.filter(x => Number(x.parent_id) === Number(t.id))].filter(visible);
+      const vuJusqua = vus[Number(t.id)] || 0;
+      return {
+        id: Number(t.id), titre: t.titre, auteur: nomCourt(auteurs[Number(t.user_id)]), role: t.role === "formateur" ? "formateur" : "apprenant", est_moi: Number(t.user_id) === Number(a.user.id),
+        nb_reponses: msgs.length - 1, derniere_id: Math.max(...msgs.map(x => Number(x.id))), created_at: t.created_at, masque: (t.statut || "visible") !== "visible",
+        nouveaux: msgs.filter(x => Number(x.id) > vuJusqua && Number(x.user_id) !== Number(a.user.id)).length,
+      };
+    }).sort((x, y) => y.derniere_id - x.derniere_id);
+    const nb = await db.prepare("SELECT COUNT(*) AS n FROM formation_inscriptions WHERE formation_id=? AND statut='active' AND COALESCE(paiement_statut,'paye')='paye'").get(Number(params.id));
+    sendJSON(res, 200, { themes, nb_membres: Number(nb && nb.n) || 0, non_lus: themes.filter(t => t.nouveaux > 0).length, moderateur: a.moderateur });
   });
 
   /* GET /api/formations/:id/discussions-resume — compteurs pour le tableau de bord du formateur (toute la formation). */
@@ -93,6 +128,9 @@ module.exports.register = function register(deps) {
     if (contenu.length < 2) return sendJSON(res, 400, { error: "Écrivez votre message." });
     if (contenu.length > LONGUEUR_MAX) return sendJSON(res, 400, { error: `Message trop long (${LONGUEUR_MAX} caractères maximum).` });
     let parent = null, leconId = null;
+    const titre = String((body && body.titre) || "").replace(/\s+/g, " ").trim();
+    if (titre && body.parent_id != null && body.parent_id !== "") return sendJSON(res, 400, { error: "Une réponse n'a pas de titre." });
+    if (titre && (titre.length < 3 || titre.length > 120)) return sendJSON(res, 400, { error: "Le titre du thème doit faire entre 3 et 120 caractères." });
     if (body && body.parent_id != null && body.parent_id !== "") {
       parent = await db.prepare("SELECT * FROM formation_discussions WHERE id=? AND formation_id=?").get(Number(body.parent_id), Number(params.id));
       if (!parent || parent.parent_id != null) return sendJSON(res, 404, { error: "Question introuvable." });
@@ -104,15 +142,23 @@ module.exports.register = function register(deps) {
       leconId = Number(l.id);
     }
     const role = a.moderateur ? "formateur" : "apprenant";
-    const r = await db.prepare("INSERT INTO formation_discussions (formation_id, lecon_id, user_id, parent_id, role, contenu) VALUES (?,?,?,?,?,?)")
-      .run(Number(params.id), leconId, a.user.id, parent ? Number(parent.id) : null, role, contenu);
+    if (titre) leconId = null; /* un thème appartient à la formation entière, jamais à une leçon */
+    const r = await db.prepare("INSERT INTO formation_discussions (formation_id, lecon_id, user_id, parent_id, role, contenu, titre) VALUES (?,?,?,?,?,?,?)")
+      .run(Number(params.id), leconId, a.user.id, parent ? Number(parent.id) : null, role, contenu, titre || null);
     const id = Number(r.lastInsertRowid);
     const note = typeof deps.creerNotif === "function" ? deps.creerNotif : null;
     if (note) {
       const meta = { formation_id: Number(a.f.id), discussion_id: parent ? Number(parent.id) : id };
-      if (!parent && role === "apprenant" && a.f.owner_user_id) note(a.f.owner_user_id, "formation", "💬 Nouvelle question dans votre formation", `Une question a été posée dans « ${a.f.titre} ».`, meta);
-      if (parent && Number(parent.user_id) !== Number(a.user.id)) note(parent.user_id, "formation", role === "formateur" ? "💬 Le formateur a répondu à votre question" : "💬 On a répondu à votre question", `Dans « ${a.f.titre} ».`, meta);
+      if (titre || (parent && parent.titre)) meta.lien = `suivre-formation.html?id=${Number(a.f.id)}&espace=${meta.discussion_id}`; /* la notification ouvre directement le thème */
+      if (!parent && role === "apprenant" && a.f.owner_user_id) note(a.f.owner_user_id, "formation", titre ? "💬 Nouveau thème dans l'espace privé de votre formation" : "💬 Nouvelle question dans votre formation", titre ? `Thème « ${titre} » dans « ${a.f.titre} ».` : `Une question a été posée dans « ${a.f.titre} ».`, meta);
+      if (parent && parent.titre) {
+        /* Thème de l'espace privé : toutes les personnes qui y ont écrit sont prévenues d'une nouvelle réponse (sauf l'auteur de celle-ci). */
+        const participants = new Set([Number(parent.user_id), ...(await db.prepare("SELECT DISTINCT user_id FROM formation_discussions WHERE parent_id=?").all(Number(parent.id))).map(x => Number(x.user_id))]);
+        participants.delete(Number(a.user.id));
+        for (const uid of participants) note(uid, "formation", `💬 Nouvelle réponse dans le thème « ${String(parent.titre).slice(0, 60)} »`, `Espace privé de « ${a.f.titre} ».`, meta);
+      } else if (parent && Number(parent.user_id) !== Number(a.user.id)) note(parent.user_id, "formation", role === "formateur" ? "💬 Le formateur a répondu à votre question" : "💬 On a répondu à votre question", `Dans « ${a.f.titre} ».`, meta);
     }
+    await marquerVu(a.user.id, parent ? Number(parent.id) : id, id);
     sendJSON(res, 201, { ok: true, id });
   });
 
@@ -169,6 +215,7 @@ module.exports.register = function register(deps) {
     const enfants = (await db.prepare("SELECT id FROM formation_discussions WHERE parent_id=?").all(m.id)).map(x => Number(x.id));
     for (const id of [...enfants, Number(m.id)]) {
       await db.prepare("DELETE FROM formation_discussion_signalements WHERE discussion_id=?").run(id);
+      await db.prepare("DELETE FROM formation_discussion_vus WHERE discussion_id=?").run(id);
       await db.prepare("DELETE FROM formation_discussions WHERE id=?").run(id);
     }
   }

@@ -175,3 +175,17 @@ html body.nd .sf-badge-form{background:var(--nd-degore)!important;color:#1a1202!
 html body.nd .sf-badge-ok{background:rgba(52,211,153,.16)!important;color:#7DE3B5!important}
 html body.nd .sf-badge-masque{background:rgba(248,113,113,.16)!important;color:#FCA5A5!important}
 html body.nd .page{background:transparent}
+/* Espace privé de la formation (2026-10-31) : panneau fixe sous le plan, thèmes de discussion */
+html body.nd .sf-espace{background:rgba(5,9,22,.9)!important;border-top:1px solid var(--nd-or)!important;color:var(--nd-texte)}
+html body.nd .sf-esp-titre{color:#fff!important;font-family:var(--nd-display);font-weight:500;font-size:15px}
+html body.nd .sf-esp-sous,html body.nd .sf-esp-theme .m,html body.nd .sf-esp-vide,html body.nd .sf-esp-carte .m{color:var(--nd-faible)!important}
+html body.nd .sf-esp-theme{color:var(--nd-texte)!important}
+html body.nd .sf-esp-theme:hover,html body.nd .sf-esp-theme.on{background:rgba(227,192,110,.14)!important;color:var(--nd-or)!important}
+html body.nd .sf-esp-pied button{background:transparent!important;border:1px solid var(--nd-bord)!important;color:var(--nd-or)!important}
+html body.nd .sf-esp-pied button.nv{background:var(--nd-degore)!important;border-color:transparent!important;color:#1a1202!important}
+html body.nd .sf-esp-carte{background:var(--nd-verre)!important;border:1px solid var(--nd-bord2)!important;color:var(--nd-texte)!important}
+html body.nd .sf-esp-carte:hover{border-color:var(--nd-or)!important}
+html body.nd .sf-esp-champ{background:rgba(255,255,255,.06)!important;color:#fff!important;border:1px solid var(--nd-bord2)!important}
+html body.nd .sf-esp-idees button{border:1px dashed var(--nd-bord)!important;color:var(--nd-doux)!important}
+html body.nd .sf-esp-idees button:hover{color:var(--nd-or)!important;border-color:var(--nd-or)!important}
+html body.nd .sf-esp-retour{color:var(--nd-or)!important}

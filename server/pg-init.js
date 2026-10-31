@@ -999,6 +999,7 @@ const COLONNES_MIGRATION = [
     ['formation_lecons', 'studio', 'INTEGER DEFAULT 0'], // Studio de création (lot D)
     ['formation_quiz_questions', 'explication', 'TEXT'], // Studio : explication affichée après réussite
     ['formation_modules', 'questions_actives', 'INTEGER DEFAULT 0'], // questions privées de l'élève au formateur
+    ['formation_discussions', 'titre', 'TEXT'], // espace privé de la formation : titre d'un thème de discussion
     // Formation Diaspora — lot B (2026-10-30) : coupons étendus, trace des ventes sur les commandes
     ['formation_coupons', 'type_reduction', "TEXT DEFAULT 'pourcentage'"],
     ['formation_coupons', 'montant_fixe', 'REAL'],

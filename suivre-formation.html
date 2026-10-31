@@ -128,13 +128,50 @@
 .sf-badge-masque{background:#fee2e2;color:#991b1b;font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:99px;}
 .sf-ech-vide{color:#94a3b8;text-align:center;padding:14px;margin:0;}
 @media (max-width:820px){.sf-timer{top:0;}.sf-ech-msg.rep{margin-left:14px;}}
+/* Espace privé de la formation : petit panneau toujours visible sous le plan (thèmes de discussion). */
+.sf-espace{flex:none;display:flex;flex-direction:column;border-top:2px solid var(--orange,#ff6b00);background:#fff;}
+.sf-espace[hidden]{display:none;}
+.sf-esp-tete{padding:10px 14px 6px;}
+.sf-esp-titre{display:flex;align-items:center;gap:8px;font-weight:800;font-size:13.5px;color:#0f172a;}
+.sf-esp-sous{font-size:11px;color:#64748b;margin-top:2px;}
+.sf-esp-pastille{background:#ef4444;color:#fff;border-radius:99px;font-size:11px;font-weight:800;padding:1px 7px;}
+.sf-esp-liste{overflow-y:auto;min-height:0;padding:2px 8px;overscroll-behavior:contain;}
+.sf-esp-theme{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:0;background:none;font-family:inherit;font-size:12.5px;color:#334155;padding:6px 6px;border-radius:8px;cursor:pointer;}
+.sf-esp-theme:hover,.sf-esp-theme.on{background:#fff3e6;}
+.sf-esp-theme .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;}
+.sf-esp-theme .m{font-size:11px;color:#94a3b8;white-space:nowrap;}
+.sf-esp-nouveau{background:#ef4444;color:#fff;border-radius:99px;font-size:10px;font-weight:800;padding:1px 7px;white-space:nowrap;}
+.sf-esp-vide{font-size:12px;color:#94a3b8;padding:6px;margin:0;}
+.sf-esp-pied{display:flex;gap:8px;padding:8px 10px 10px;}
+.sf-esp-pied button{flex:1;font-family:inherit;font-size:12px;font-weight:700;border-radius:99px;padding:7px 8px;cursor:pointer;border:1px solid var(--border);background:#fff;color:#334155;}
+.sf-esp-pied button.nv{background:var(--orange,#ff6b00);border-color:transparent;color:#fff;}
+.sf-esp-entete{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:6px;}
+.sf-esp-retour{border:0;background:none;color:inherit;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer;padding:0;margin-bottom:10px;text-decoration:underline;}
+.sf-esp-carte{display:flex;gap:12px;align-items:center;width:100%;text-align:left;font-family:inherit;border:1px solid var(--border);border-radius:12px;padding:12px 14px;background:#fff;cursor:pointer;margin-bottom:8px;color:#334155;}
+.sf-esp-carte:hover{border-color:var(--orange,#ff6b00);}
+.sf-esp-carte .t{font-weight:800;font-size:14.5px;}
+.sf-esp-carte .m{font-size:12px;color:#94a3b8;margin-top:2px;}
+.sf-esp-idees{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 10px;}
+.sf-esp-idees button{border:1px dashed var(--border);background:none;border-radius:99px;padding:4px 11px;font-family:inherit;font-size:12px;cursor:pointer;color:inherit;}
+.sf-esp-champ{width:100%;box-sizing:border-box;padding:10px;border:1px solid var(--border);border-radius:10px;font-family:inherit;font-size:14px;margin-bottom:8px;}
+/* Ordinateur : deux colonnes indépendantes — le plan (gauche) et la leçon (droite) défilent chacun
+   de leur côté, la page elle-même ne défile pas. La hauteur exacte est posée par sfAjusterColonnes(). */
+@media (min-width:821px){
+  .sf-wrap{height:calc(100vh - 80px);min-height:0;overflow:hidden;}
+  .sf-sidebar{position:static;max-height:none;height:100%;overflow:hidden;display:flex;flex-direction:column;}
+  .sf-plan{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;}
+  .sf-espace{max-height:48%;}
+  .sf-main{max-width:none;margin:0;overflow-y:auto;overscroll-behavior:contain;padding-bottom:96px;}
+  .sf-main>*{max-width:836px;margin-left:auto;margin-right:auto;}
+  .sf-timer{top:0;}
+}
 </style>
 <link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
 <link rel="stylesheet" href="/assets/design-upgrade.v2.css">
 <link rel="stylesheet" href="/assets/theme-manager.css">
 <!-- Design « Nuit dorée » (2026-10-30) : surcharges chargées en dernier, tout est préfixé html body.nd ; retour arrière : retirer ces 2 lignes et class="nd" sur <body> -->
 <link rel="stylesheet" href="/assets/theme-nuit-doree.css?v=7">
-<link rel="stylesheet" href="/assets/formations-nuit-doree.css?v=2">
+<link rel="stylesheet" href="/assets/formations-nuit-doree.css?v=3">
 </head>
 <body class="nd">
 <div class="page">
@@ -237,13 +274,35 @@ function sfJauge(pct, ok){
 }
 
 function sfRender(){
-  document.getElementById('sf-root').innerHTML = `<div class="sf-wrap"><aside class="sf-sidebar" id="sf-sidebar" aria-label="Plan de la formation"></aside><main class="sf-main" id="sf-content"></main></div>`;
+  document.getElementById('sf-root').innerHTML = `<div class="sf-wrap"><aside class="sf-sidebar" id="sf-sidebar" aria-label="Plan de la formation et espace privé"><div class="sf-plan" id="sf-plan"></div><section class="sf-espace" id="sf-espace" aria-label="Espace privé de la formation" hidden></section></aside><main class="sf-main" id="sf-content"></main></div>`;
   sfRenderSidebar();
   sfRenderContent();
+  sfEspacePanneau();
+  sfAjusterColonnes();
+  sfEspaceCharger().then(() => {
+    const cible = Number(params.get('espace'));
+    if (cible && !SF_ESPACE_AUTO && SF_ESPACE) { SF_ESPACE_AUTO = true; sfEspaceOuvrir(cible); }
+  });
+}
+
+/* Colonnes indépendantes (ordinateur) : la zone prend toute la hauteur restante sous l'en-tête et le bandeau. */
+function sfAjusterColonnes(){
+  const w = document.querySelector('.sf-wrap');
+  if (!w) return;
+  w.style.height = '';
+  if (window.innerWidth <= 820) return;
+  const haut = w.getBoundingClientRect().top + window.scrollY;
+  w.style.height = Math.max(240, window.innerHeight - haut) + 'px';
+}
+window.addEventListener('resize', sfAjusterColonnes);
+if (window.ResizeObserver) {
+  const ro = new ResizeObserver(sfAjusterColonnes);
+  ro.observe(document.querySelector('.topbar'));
+  ro.observe(document.getElementById('sf-banner-zone'));
 }
 
 function sfRenderSidebar(){
-  const aside = document.getElementById('sf-sidebar');
+  const aside = document.getElementById('sf-plan');
   if (!aside) return;
   const f = SF_DATA.formation;
   const p = SF_DATA.parcours || {};
@@ -430,6 +489,8 @@ function sfMajBoutonTermine(){
 
 function sfRenderContent(){
   clearInterval(SF_TIMER); SF_TIMER = null;
+  SF_VUE_ESPACE = null;
+  if (document.getElementById('sf-espace')) sfEspacePanneau();
   const el = document.getElementById('sf-content');
   const l = SF_CURRENT_LECON;
   const flat = flatLecons();
@@ -536,6 +597,8 @@ function sfGoTo(id){
   document.querySelectorAll('.sf-lecon').forEach(e => { const on = Number(e.dataset.leconId) === Number(id); e.classList.toggle('active', on); if (on) e.setAttribute('aria-current','true'); else e.removeAttribute('aria-current'); });
   sfRenderContent();
   window.scrollTo({ top: 0, behavior: 'smooth' });
+  const colonne = document.getElementById('sf-content');
+  if (colonne) colonne.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 /* « Suivant » : en mode automatique, la leçon qu'on quitte est validée (sauf un quiz, qui se réussit). */
@@ -845,6 +908,151 @@ async function sfEchangesLoad(){
     }
   });
 }
+
+/* ═══ Espace privé de la formation ═══
+   Petit panneau toujours visible sous le plan (colonne de gauche) : les thèmes de discussion de la formation, un bouton « Nouveau thème »,
+   une pastille quand un thème a des messages non lus. Un clic ouvre le thème dans la colonne de droite. Réservé aux inscrits et au formateur
+   (le serveur refuse tout autre accès). Une réponse dans un thème envoie une notification à celles et ceux qui y ont déjà écrit. */
+let SF_ESPACE = null;        /* dernier état connu : { themes, nb_membres, non_lus } */
+let SF_VUE_ESPACE = null;    /* null = la leçon est affichée ; 'liste' | 'nouveau' | identifiant d'un thème */
+let SF_ESPACE_AUTO = false;
+const SF_IDEES_THEMES = ['Une question sur le cours', 'Se présenter', 'Partager une ressource', 'Mon expérience', 'Besoin d\'aide'];
+
+async function sfEspacePost(url, method, corps){
+  const rr = await fetch(url, { method, headers: {'Content-Type':'application/json'}, credentials: 'same-origin', body: corps ? JSON.stringify(corps) : undefined });
+  const data = await rr.json().catch(() => ({}));
+  if (!rr.ok) { alert(data.error || 'Action impossible.'); return false; }
+  return data;
+}
+
+async function sfEspaceCharger(){
+  if (!SF_DATA || SF_DATA.mode === 'decouverte') return;
+  let r; try { r = await fetch(`/api/formations/${formationId}/themes`, { credentials: 'same-origin' }); } catch (e) { return; }
+  if (!r.ok) return;
+  SF_ESPACE = await r.json();
+  sfEspacePanneau();
+}
+
+function sfEspacePanneau(){
+  const zone = document.getElementById('sf-espace');
+  if (!zone) return;
+  if (!SF_DATA || SF_DATA.mode === 'decouverte') { zone.hidden = true; return; }
+  const e = SF_ESPACE || { themes: [], nb_membres: 0, non_lus: 0 };
+  const themes = e.themes || [];
+  zone.hidden = false;
+  zone.innerHTML = `<div class="sf-esp-tete"><div class="sf-esp-titre">💬 Espace privé de la formation${e.non_lus ? `<span class="sf-esp-pastille" title="Thèmes avec des messages non lus">${e.non_lus}</span>` : ''}</div>
+      <div class="sf-esp-sous">🔒 Réservé aux personnes qui suivent cette formation${e.nb_membres > 1 ? ` · ${e.nb_membres} membres` : ''}</div></div>
+    <div class="sf-esp-liste">${themes.length ? themes.slice(0, 5).map(t => `<button type="button" class="sf-esp-theme ${SF_VUE_ESPACE === t.id ? 'on' : ''}" data-esp="${t.id}" title="${escH(t.titre)}"><span class="t">${escH(t.titre)}</span>${t.nouveaux ? '<span class="sf-esp-nouveau">nouveau</span>' : `<span class="m">${t.nb_reponses} rép.</span>`}</button>`).join('') : '<p class="sf-esp-vide">Aucun thème pour l\'instant. Lancez la discussion !</p>'}</div>
+    <div class="sf-esp-pied"><button type="button" class="nv" data-esp="nouveau">+ Nouveau thème</button>${themes.length > 5 || themes.length ? `<button type="button" data-esp="liste">Tous (${themes.length})</button>` : ''}</div>`;
+  zone.querySelectorAll('[data-esp]').forEach(b => b.onclick = () => sfEspaceOuvrir(b.dataset.esp === 'nouveau' || b.dataset.esp === 'liste' ? b.dataset.esp : Number(b.dataset.esp)));
+  sfAjusterColonnes();
+}
+
+function sfEspaceOuvrir(vue){
+  SF_VUE_ESPACE = vue;
+  clearInterval(SF_TIMER); SF_TIMER = null;
+  document.querySelectorAll('.sf-lecon').forEach(x => { x.classList.remove('active'); x.removeAttribute('aria-current'); });
+  sfEspacePanneau();
+  sfEspaceRendre();
+}
+
+function sfEspaceRetourLecon(){
+  const l = SF_CURRENT_LECON;
+  if (l) sfGoTo(l.id); else { SF_VUE_ESPACE = null; sfRenderContent(); }
+}
+
+async function sfEspaceRendre(){
+  const el = document.getElementById('sf-content');
+  if (!el) return;
+  const v = SF_VUE_ESPACE;
+  if (v === 'nouveau') return sfEspaceNouveau(el);
+  if (typeof v === 'number') return sfEspaceTheme(el, v);
+  await sfEspaceCharger();
+  if (SF_VUE_ESPACE !== v) return;
+  const e = SF_ESPACE || { themes: [], nb_membres: 0 };
+  el.innerHTML = `<button type="button" class="sf-esp-retour" id="sf-esp-retour">← Retour à la leçon</button>
+    <div class="sf-esp-entete"><div><h2 style="margin:0 0 4px;">💬 Espace privé de la formation</h2>
+      <p style="margin:0;color:var(--muted);">🔒 Réservé aux personnes qui suivent cette formation${e.nb_membres > 1 ? ` (${e.nb_membres} membres)` : ''}. Posez une question, partagez une remarque ou un point de vue : choisissez un thème ou ouvrez-en un nouveau.</p></div>
+      <button type="button" class="btn" id="sf-esp-nv">+ Nouveau thème</button></div>
+    <div style="margin-top:16px;">${e.themes.length ? e.themes.map(t => `<button type="button" class="sf-esp-carte" data-esp="${t.id}"><div style="flex:1;min-width:0;"><div class="t">${escH(t.titre)}${t.masque ? ' <span class="sf-badge-masque">Masqué</span>' : ''}</div><div class="m">Ouvert par ${escH(t.auteur)}${t.role === 'formateur' ? ' (formateur)' : ''} · ${escH(sfDate(t.created_at))} · ${t.nb_reponses} réponse${t.nb_reponses > 1 ? 's' : ''}</div></div>${t.nouveaux ? '<span class="sf-esp-nouveau">nouveau</span>' : ''}</button>`).join('') : '<p class="sf-ech-vide">Aucun thème pour l\'instant. Soyez la première personne à en ouvrir un.</p>'}</div>`;
+  document.getElementById('sf-esp-retour').onclick = sfEspaceRetourLecon;
+  document.getElementById('sf-esp-nv').onclick = () => sfEspaceOuvrir('nouveau');
+  el.querySelectorAll('.sf-esp-carte').forEach(b => b.onclick = () => sfEspaceOuvrir(Number(b.dataset.esp)));
+}
+
+function sfEspaceNouveau(el){
+  el.innerHTML = `<button type="button" class="sf-esp-retour" id="sf-esp-retour">← Tous les thèmes</button>
+    <h2 style="margin:0 0 4px;">Nouveau thème de discussion</h2>
+    <p style="margin:0 0 10px;color:var(--muted);">Un thème rassemble les échanges sur un sujet de cette formation. Toutes les personnes qui la suivent pourront y répondre.</p>
+    <div class="sf-esp-idees">${SF_IDEES_THEMES.map(x => `<button type="button" data-idee="${escH(x)}">${escH(x)}</button>`).join('')}</div>
+    <form id="sf-esp-form"><input class="sf-esp-champ" id="sf-esp-titre" maxlength="120" placeholder="Titre du thème (ex. : Comment gérer le doute au travail ?)" aria-label="Titre du thème">
+      <textarea class="sf-esp-champ" id="sf-esp-texte" rows="5" maxlength="2000" placeholder="Votre message d'ouverture : question, remarque ou point de vue…" aria-label="Message d'ouverture"></textarea>
+      <div class="sf-ech-barre"><span class="sf-ech-hint">Restez courtois : un message peut être signalé et masqué par le formateur.</span><button type="submit" class="btn">Publier le thème</button></div></form>`;
+  document.getElementById('sf-esp-retour').onclick = () => sfEspaceOuvrir('liste');
+  el.querySelectorAll('[data-idee]').forEach(b => b.onclick = () => { const c = document.getElementById('sf-esp-titre'); c.value = b.dataset.idee; c.focus(); });
+  document.getElementById('sf-esp-form').onsubmit = async ev => {
+    ev.preventDefault();
+    const titre = document.getElementById('sf-esp-titre').value.trim(), contenu = document.getElementById('sf-esp-texte').value.trim();
+    if (titre.length < 3) { alert('Donnez un titre au thème (3 caractères au minimum).'); return; }
+    if (contenu.length < 2) { alert('Écrivez votre message d\'ouverture.'); return; }
+    const ok = await sfEspacePost(`/api/formations/${formationId}/discussions`, 'POST', { titre, contenu });
+    if (ok) { await sfEspaceCharger(); sfEspaceOuvrir(Number(ok.id)); }
+  };
+  document.getElementById('sf-esp-titre').focus();
+}
+
+async function sfEspaceTheme(el, id){
+  let r; try { r = await fetch(`/api/formations/${formationId}/discussions?theme_id=${id}`, { credentials: 'same-origin' }); } catch (e) { return; }
+  if (SF_VUE_ESPACE !== id) return;
+  const d = r.ok ? await r.json() : null;
+  const t = d && (d.fils || [])[0];
+  if (!t) { el.innerHTML = '<button type="button" class="sf-esp-retour" id="sf-esp-retour">← Tous les thèmes</button><p class="sf-ech-vide">Ce thème n\'existe plus.</p>'; document.getElementById('sf-esp-retour').onclick = () => sfEspaceOuvrir('liste'); sfEspaceCharger(); return; }
+  const bouton = (action, mid, libelle, classe) => `<button type="button" class="sf-ech-act ${classe || ''}" data-act="${action}" data-id="${mid}">${libelle}</button>`;
+  const msg = (m, reponse) => {
+    const actions = [];
+    if (!m.est_moi && !m.masque) actions.push(bouton('signaler', m.id, '🚩 Signaler'));
+    if (d.moderateur) actions.push(bouton(m.masque ? 'afficher' : 'masquer', m.id, m.masque ? '👁 Réafficher' : '🙈 Masquer'));
+    if (m.est_moi || d.moderateur) actions.push(bouton('supprimer', m.id, '🗑 Supprimer', 'danger'));
+    return `<div class="sf-ech-msg ${reponse ? 'rep' : ''} ${m.masque ? 'masque' : ''}" data-msg="${m.id}">
+      <div class="sf-ech-ent"><strong>${escH(m.auteur)}</strong>${m.role === 'formateur' ? ' <span class="sf-badge-form">Formateur</span>' : ''}${m.masque ? ' <span class="sf-badge-masque">Masqué</span>' : ''}<span class="sf-ech-date">${escH(sfDate(m.created_at))}</span></div>
+      <div class="sf-ech-txt">${escH(m.contenu)}</div><div class="sf-ech-actions">${actions.join('')}</div></div>`;
+  };
+  el.innerHTML = `<button type="button" class="sf-esp-retour" id="sf-esp-retour">← Tous les thèmes</button>
+    <h2 style="margin:0 0 4px;">${escH(t.titre)}</h2>
+    <p style="margin:0 0 12px;color:var(--muted);font-size:13px;">🔒 Espace privé de la formation · ${(t.reponses || []).length} réponse${(t.reponses || []).length > 1 ? 's' : ''}</p>
+    <div class="sf-ech-liste">${msg(t, false)}${(t.reponses || []).map(x => msg(x, true)).join('')}</div>
+    <form class="sf-ech-form" id="sf-esp-rep" style="margin-top:14px;"><textarea id="sf-esp-rep-txt" rows="3" maxlength="2000" placeholder="Votre réponse dans ce thème…" aria-label="Votre réponse"></textarea>
+      <div class="sf-ech-barre"><span class="sf-ech-hint">Les personnes déjà intervenues dans ce thème sont prévenues de votre réponse.</span><button type="submit" class="btn">Répondre</button></div></form>`;
+  document.getElementById('sf-esp-retour').onclick = () => sfEspaceOuvrir('liste');
+  document.getElementById('sf-esp-rep').onsubmit = async ev => {
+    ev.preventDefault();
+    const contenu = document.getElementById('sf-esp-rep-txt').value.trim();
+    if (contenu.length < 2) return;
+    if (await sfEspacePost(`/api/formations/${formationId}/discussions`, 'POST', { contenu, parent_id: id })) { await sfEspaceCharger(); if (SF_VUE_ESPACE === id) sfEspaceTheme(el, id); }
+  };
+  el.querySelectorAll('.sf-ech-act').forEach(b => b.onclick = async () => {
+    const mid = b.dataset.id, base = `/api/formations/${formationId}/discussions/${mid}`;
+    let ok = false;
+    switch (b.dataset.act) {
+      case 'signaler': { const motif = prompt('Pourquoi signalez-vous ce message ? (facultatif)'); if (motif === null) return; ok = await sfEspacePost(base + '/signaler', 'POST', { motif }); if (ok) alert('Merci, le message a été signalé au formateur.'); break; }
+      case 'masquer': ok = await sfEspacePost(base + '/moderer', 'POST', { action: 'masquer' }); break;
+      case 'afficher': ok = await sfEspacePost(base + '/moderer', 'POST', { action: 'afficher' }); break;
+      case 'supprimer': {
+        const racine = Number(mid) === id;
+        if (!confirm(racine ? 'Supprimer ce thème et toutes ses réponses ?' : 'Supprimer ce message ?')) return;
+        ok = await sfEspacePost(base, 'DELETE');
+        if (ok && racine) { await sfEspaceCharger(); sfEspaceOuvrir('liste'); return; }
+        break;
+      }
+    }
+    if (ok) { await sfEspaceCharger(); if (SF_VUE_ESPACE === id) sfEspaceTheme(el, id); }
+  });
+  el.scrollTop = 0;
+  sfEspaceCharger(); /* le thème vient d'être lu : la pastille « nouveau » disparaît du panneau */
+}
+
+/* Le panneau se rafraîchit seul (une réponse d'une autre personne fait apparaître « nouveau ») sans déranger la lecture. */
+setInterval(() => { if (!document.hidden && SF_DATA) sfEspaceCharger(); }, 45000);
 
 sfLoad();
 </script>

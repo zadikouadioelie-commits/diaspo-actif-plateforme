@@ -4870,6 +4870,14 @@ db.exec(`
     UNIQUE(discussion_id, user_id)
   );
 
+  /* Espace privé de la formation : jusqu'à quel message chaque personne a lu chaque thème (pastille « nouveau »). */
+  CREATE TABLE IF NOT EXISTS formation_discussion_vus (
+    user_id INTEGER NOT NULL,
+    discussion_id INTEGER NOT NULL,
+    vu_jusqu_id INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, discussion_id)
+  );
+
   CREATE TABLE IF NOT EXISTS formation_formateurs_invites (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL UNIQUE,
@@ -5235,6 +5243,7 @@ db.exec(`
 ;['explication TEXT'].forEach(col => { try { db.exec(`ALTER TABLE formation_quiz_questions ADD COLUMN ${col}`); } catch(_) {} });
 ;['duree_acces_jours INTEGER'].forEach(col => { try { db.exec(`ALTER TABLE formations ADD COLUMN ${col}`); } catch(_) {} });
 ;["portee TEXT DEFAULT 'formation'"].forEach(col => { try { db.exec(`ALTER TABLE formation_inscriptions ADD COLUMN ${col}`); } catch(_) {} });
+;['titre TEXT'].forEach(col => { try { db.exec(`ALTER TABLE formation_discussions ADD COLUMN ${col}`); } catch(_) {} }); /* thème de discussion de l'espace privé : message racine avec titre, hors leçon */
 /* Rattrapage (SQLite) : chaque inscription existante reçoit son droit « formation complète » — idempotent ; côté Postgres, server/formation-droits.js le refait par compte à la demande. */
 try { require("./formation-droits").rattrapageSQL(db); } catch(_) {}
 
