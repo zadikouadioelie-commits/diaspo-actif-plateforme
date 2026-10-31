@@ -17980,6 +17980,19 @@ route("POST", "/api/formations/:id/modules", async (req, res, params, body) => {
     .run(params.id, body.titre, body.description||null, max+1, vente.prix, vente.vendable_seul)).lastInsertRowid;
   sendJSON(res, 201, { id });
 });
+/* Routes fixes AVANT les routes à paramètre : sinon « reorder » est lu comme un identifiant et le glisser-déposer répond « introuvable » (2026-10-31). */
+route("PUT", "/api/formations/:id/modules/reorder", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
+  if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
+  if (!(await exigerPremium(user, res, "formations"))) return;
+  const ids = body.ordre || [];
+  /* Réordonnancement : la réponse ne doit pas partir avant que les positions soient
+     réellement enregistrées, sinon l'ordre affiché après rechargement peut être l'ancien. */
+  for (const [i, mid] of ids.entries()) await db.prepare("UPDATE formation_modules SET ordre=? WHERE id=? AND formation_id=?").run(i, mid, params.id);
+  sendJSON(res, 200, { ok: true });
+});
 route("PUT", "/api/formations/:id/modules/:moduleId", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
@@ -18015,18 +18028,6 @@ route("DELETE", "/api/formations/:id/modules/:moduleId", async (req, res, params
   await db.prepare("DELETE FROM formation_modules WHERE id=? AND formation_id=?").run(params.moduleId, params.id);
   sendJSON(res, 200, { ok: true });
 });
-route("PUT", "/api/formations/:id/modules/reorder", async (req, res, params, body) => {
-  const user = await getCurrentUser(req);
-  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
-  if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
-  if (!(await exigerPremium(user, res, "formations"))) return;
-  const ids = body.ordre || [];
-  /* Réordonnancement : la réponse ne doit pas partir avant que les positions soient
-     réellement enregistrées, sinon l'ordre affiché après rechargement peut être l'ancien. */
-  for (const [i, mid] of ids.entries()) await db.prepare("UPDATE formation_modules SET ordre=? WHERE id=? AND formation_id=?").run(i, mid, params.id);
-  sendJSON(res, 200, { ok: true });
-});
 
 /* ── Chapitres (regroupent les leçons à l'intérieur d'un module) ── */
 route("POST", "/api/formations/:id/modules/:moduleId/chapitres", async (req, res, params, body) => {
@@ -18040,6 +18041,17 @@ route("POST", "/api/formations/:id/modules/:moduleId/chapitres", async (req, res
   const id = (await db.prepare("INSERT INTO formation_chapitres (module_id,titre,description,ordre) VALUES (?,?,?,?)")
     .run(params.moduleId, body.titre, body.description||null, max+1)).lastInsertRowid;
   sendJSON(res, 201, { id });
+});
+/* Routes fixes AVANT les routes à paramètre : sinon « reorder » est lu comme un identifiant et le glisser-déposer répond « introuvable » (2026-10-31). */
+route("PUT", "/api/formations/:id/modules/:moduleId/chapitres/reorder", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
+  if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
+  if (!(await exigerPremium(user, res, "formations"))) return;
+  const ids = body.ordre || [];
+  for (const [i, cid] of ids.entries()) await db.prepare("UPDATE formation_chapitres SET ordre=? WHERE id=? AND module_id=?").run(i, cid, params.moduleId);
+  sendJSON(res, 200, { ok: true });
 });
 route("PUT", "/api/formations/:id/modules/:moduleId/chapitres/:chapitreId", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
@@ -18060,16 +18072,6 @@ route("DELETE", "/api/formations/:id/modules/:moduleId/chapitres/:chapitreId", a
   const lecons = await db.prepare("SELECT id FROM formation_lecons WHERE chapitre_id=?").all(params.chapitreId);
   for (const l of lecons) await retirerLecon(l.id);
   await db.prepare("DELETE FROM formation_chapitres WHERE id=? AND module_id=?").run(params.chapitreId, params.moduleId);
-  sendJSON(res, 200, { ok: true });
-});
-route("PUT", "/api/formations/:id/modules/:moduleId/chapitres/reorder", async (req, res, params, body) => {
-  const user = await getCurrentUser(req);
-  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
-  if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
-  if (!(await exigerPremium(user, res, "formations"))) return;
-  const ids = body.ordre || [];
-  for (const [i, cid] of ids.entries()) await db.prepare("UPDATE formation_chapitres SET ordre=? WHERE id=? AND module_id=?").run(i, cid, params.moduleId);
   sendJSON(res, 200, { ok: true });
 });
 
