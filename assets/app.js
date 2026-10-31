@@ -160,6 +160,47 @@ function renderRichText(value) {
 }
 window.renderRichText = renderRichText;
 
+/* ─── Garde-fou de lisibilité ───
+   Un texte dont la couleur (posée en ligne) se confond avec le fond sur lequel il s'affiche (noir sur bleu nuit, blanc sur blanc…) est « fantôme » : il prend de la
+   place mais ne se voit pas. On compare la couleur à celle du fond réellement derrière lui ; sous un contraste de 2,2 on retire la couleur (= « Automatique »),
+   et le texte reprend la couleur lisible de son contexte. Un blanc sur fond foncé, ou un rouge sur fond clair, ne bouge pas. */
+(function () {
+  function lireRgb(c) { const m = /rgba?\(\s*(\d+)[ ,]+(\d+)[ ,]+(\d+)(?:[ ,/]+([\d.]+))?/.exec(c || ''); return m ? [+m[1], +m[2], +m[3], m[4] === undefined ? 1 : +m[4]] : null; }
+  function luminance(r) { const f = v => { v /= 255; return v <= .03928 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4); }; return .2126 * f(r[0]) + .7152 * f(r[1]) + .0722 * f(r[2]); }
+  function contraste(a, b) { const x = luminance(a), y = luminance(b); return (Math.max(x, y) + .05) / (Math.min(x, y) + .05); }
+  function fondDerriere(el) {
+    for (let e = el; e && e.nodeType === 1; e = e.parentElement) {
+      const f = lireRgb(getComputedStyle(e).backgroundColor);
+      if (f && f[3] > .6) return f;
+    }
+    return [255, 255, 255, 1];
+  }
+  function rendreTexteLisible(racine) {
+    if (!racine || !racine.querySelectorAll) return 0;
+    let n = 0;
+    racine.querySelectorAll('[style*="color"]').forEach(el => {
+      if (!el.style.color) return;
+      const cs = getComputedStyle(el), txt = lireRgb(cs.color);
+      if (!txt) return;
+      const fond = fondDerriere(el);
+      if (contraste(txt, fond) < 2.2) { el.style.removeProperty('color'); if (!el.getAttribute('style')) el.removeAttribute('style'); n++; }
+    });
+    return n;
+  }
+  window.rendreTexteLisible = rendreTexteLisible;
+})();
+/* Application automatique à tout texte enrichi AFFICHÉ (.rich-content) : un texte déjà enregistré avec une couleur qui se confond avec le fond (noir collé sur une fiche
+   bleu nuit…) redevient lisible sans que l'auteur ait à le ressaisir. Une seule passe par bloc ; les blocs ajoutés plus tard (fenêtres, onglets) sont repris. */
+(function () {
+  function passer() {
+    document.querySelectorAll('.rich-content:not([data-lisible])').forEach(el => { el.setAttribute('data-lisible', '1'); try { rendreTexteLisible(el); } catch (e) {} });
+  }
+  let t = null;
+  function planifier() { clearTimeout(t); t = setTimeout(passer, 60); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => { passer(); new MutationObserver(planifier).observe(document.body, { childList: true, subtree: true }); });
+  else { passer(); new MutationObserver(planifier).observe(document.body, { childList: true, subtree: true }); }
+})();
+
 /* Dépouille les balises d'un champ texte enrichi pour un usage en texte brut (résumé chatbot,
    compteur de caractères…) — pas un rendu d'affichage, juste du texte simple. */
 function stripRichTags(value) {

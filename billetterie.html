@@ -1655,7 +1655,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Éditeur riche (2026-09-25, demande explicite) — le <textarea> caché reste la source lue par
   // le code de sauvegarde existant (.value, ligne "description: document.getElementById(...)"),
   // aucun changement nécessaire de son côté.
-  if (window.RichEditor) RichEditor.attach('ev-desc', { placeholder: "Présentation de l'événement…" });
+  if (window.RichEditor) RichEditor.attach('ev-desc', { avance: true, placeholder: "Présentation de l'événement…" });
   document.getElementById('blt-cover-file').addEventListener('change', async e => {
     const f = e.target.files[0]; if (!f) return;
     bltCoverB64 = await bltCompressImage(f, 1280, 720, 0.8);

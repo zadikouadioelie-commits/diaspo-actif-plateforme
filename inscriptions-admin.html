@@ -4322,7 +4322,7 @@ function render() {
   // entièrement reconstruit à chaque render() — l'attacher ici garantit qu'il est toujours
   // présent quand le panneau est ouvert, sans dupliquer si déjà attaché sur cet élément.
   if (window.RichEditor && state.view === 'detail' && state.activeTab === 'overview' && state.editionInfosOuverte) {
-    RichEditor.attach('ia-infos-description', { placeholder: 'Décrivez cette fiche…' })?.setHTML(selectedFiche()?.description || '');
+    RichEditor.attach('ia-infos-description', { avance: true, placeholder: 'Décrivez cette fiche…' })?.setHTML(selectedFiche()?.description || '');
   }
   // Modale "Créer une fiche d'inscription" (2026-10-11) : focus direct + Entrée pour valider,
   // même esprit que la recherche de partage juste en dessous.

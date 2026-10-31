@@ -4697,7 +4697,7 @@ async function initRelaisDiasporaWidget(me, api) {
        directement la valeur déjà posée dans le template (${v(e?.description)} etc. ci-dessus)
        au moment où il s'attache à ces éléments fraîchement créés. */
     if (window.RichEditor) {
-      RichEditor.attach('iev-desc', { placeholder: "Présentation de l'événement…" });
+      RichEditor.attach('iev-desc', { avance: true, placeholder: "Présentation de l'événement…" });
       RichEditor.attach('iev-fc-resume', { placeholder: 'Présentation générale de l\'événement, contexte, motivation…' });
       RichEditor.attach('iev-fc-objectifs', { placeholder: 'Objectifs principaux…' });
       RichEditor.attach('iev-fc-public', { placeholder: 'Diaspora, investisseurs, jeunes…' });

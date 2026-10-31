@@ -1590,7 +1590,7 @@ document.getElementById('btn-filtre-trophee').addEventListener('click', () => {
 // le <textarea> e-desc caché reste la source lue par enregistrerEvenement()/previewEvent(), sans
 // aucun changement de leur côté (RichEditor tient .value synchronisé à chaque frappe).
 function _evtDescRichEditor() {
-  return window.RichEditor ? window.RichEditor.attach('e-desc', { placeholder: "Décrivez l'événement : programme, objectifs, public cible…" }) : null;
+  return window.RichEditor ? window.RichEditor.attach('e-desc', { avance: true, placeholder: "Décrivez l'événement : programme, objectifs, public cible…" }) : null;
 }
 // Remet la modale à blanc (2026-09-22) : nécessaire maintenant qu'elle sert aussi à l'édition
 // (sans ça, ouvrir "Créer" après avoir fermé une édition, ou l'inverse, laissait les champs de

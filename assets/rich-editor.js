@@ -117,6 +117,70 @@
     [[('#ffffff'), .8], ['#ffffff', .6], ['#ffffff', .4], ['#000000', .25], ['#000000', .5]].forEach(m => rangs.push(vives.map(v => melange(v, m[0], m[1]))));
     return rangs;
   })();
+  /* ─── Collage « propre » (2026-10-31, demande explicite : « Mme Agnelli a collé un texte qui prend de l'espace mais ne paraît pas — une écriture fantôme ») ───
+     Un texte copié depuis Word, Google Docs, un site ou un e-mail arrive avec SES couleurs (le plus souvent du noir en dur, parfois du blanc) : dans une zone
+     d'écriture bleu nuit, ou sur une fiche à fond foncé, ce noir devient invisible. Au collage on garde donc la STRUCTURE (paragraphes, titres, listes, gras, italique,
+     souligné, barré, indice, exposant, liens, alignement) mais on abandonne couleur, surlignage, police et taille d'origine : le texte prend la couleur lisible de
+     l'éditeur, et l'auteur choisit ensuite SA couleur avec le bouton « A ». */
+  const IGNORER = /^(script|style|head|meta|link|title|svg|img|iframe|object|embed|noscript|button|input|select|textarea|form|canvas|audio|video)$/;
+  const BLOCS_VIDES = /<(p|h2|h3|li|blockquote)(?:\s[^>]*)?>(?:\s|&nbsp;|<br\s*\/?>)*<\/\1>/gi;
+  function echapper(t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  function enveloppe(inner, st) {
+    if (!inner) return inner;
+    const poids = st.fontWeight;
+    if (poids === 'bold' || poids === 'bolder' || +poids >= 600) inner = '<strong>' + inner + '</strong>';
+    if (st.fontStyle === 'italic') inner = '<em>' + inner + '</em>';
+    const deco = (st.textDecorationLine || st.textDecoration || '');
+    if (/underline/.test(deco)) inner = '<u>' + inner + '</u>';
+    if (/line-through/.test(deco)) inner = '<s>' + inner + '</s>';
+    return inner;
+  }
+  function nettoyerNoeud(n) {
+    if (n.nodeType === 3) return echapper(n.nodeValue.replace(/[\r\n\t  ]+/g, ' '));
+    if (n.nodeType !== 1) return '';
+    const tag = n.nodeName.toLowerCase();
+    if (IGNORER.test(tag)) return '';
+    const st = n.style || {};
+    const enfants = () => Array.from(n.childNodes).map(nettoyerNoeud).join('');
+    const align = /^(center|right|justify)$/.test(st.textAlign || '') ? ' style="text-align:' + st.textAlign + '"' : '';
+    switch (tag) {
+      case 'br': return '<br>';
+      case 'b': case 'strong': { const i = enfants(); const p = st.fontWeight; return (p === 'normal' || +p <= 400) ? i : (i ? '<strong>' + i + '</strong>' : i); }
+      case 'i': case 'em': case 'cite': { const i = enfants(); return i ? '<em>' + i + '</em>' : i; }
+      case 'u': case 'ins': { const i = enfants(); return i ? '<u>' + i + '</u>' : i; }
+      case 's': case 'strike': case 'del': { const i = enfants(); return i ? '<s>' + i + '</s>' : i; }
+      case 'sub': case 'sup': { const i = enfants(); return i ? '<' + tag + '>' + i + '</' + tag + '>' : i; }
+      case 'h1': case 'h2': { const i = enfants().replace(/<\/?p[^>]*>/g, ''); return i.trim() ? '<h2' + align + '>' + i + '</h2>' : ''; }
+      case 'h3': case 'h4': case 'h5': case 'h6': { const i = enfants().replace(/<\/?p[^>]*>/g, ''); return i.trim() ? '<h3' + align + '>' + i + '</h3>' : ''; }
+      case 'ul': case 'ol': { const i = enfants(); return i.trim() ? '<' + tag + '>' + i + '</' + tag + '>' : ''; }
+      case 'li': { const i = enfants().replace(/<\/p>\s*<p[^>]*>/g, '<br>').replace(/<\/?p[^>]*>/g, ''); return '<li' + align + '>' + i + '</li>'; }
+      case 'blockquote': { const i = enfants().replace(/<\/p>\s*<p[^>]*>/g, '<br>').replace(/<\/?p[^>]*>/g, ''); return i.trim() ? '<blockquote' + align + '>' + i + '</blockquote>' : ''; }
+      case 'a': {
+        const i = enfants(); const h = (n.getAttribute('href') || '').trim();
+        return /^(https?:\/\/|mailto:)/i.test(h) && i.trim() ? '<a href="' + h.replace(/"/g, '&quot;') + '">' + i + '</a>' : i;
+      }
+      case 'p': case 'div': case 'section': case 'article': case 'header': case 'footer': case 'main': case 'pre': case 'figure': case 'figcaption': case 'dt': case 'dd': {
+        const i = enveloppe(enfants(), st);
+        if (/<(p|h2|h3|ul|ol|blockquote)[\s>]/i.test(i)) return i;   // contient déjà ses propres blocs : ne pas les imbriquer
+        return i.replace(/(<br>|\s|&nbsp;)+/g, ' ').trim() ? '<p' + align + '>' + i + '</p>' : '';
+      }
+      case 'tr': { const i = enfants(); return i.trim() ? '<p>' + i.replace(/\s+—\s*$/, '') + '</p>' : ''; }
+      case 'td': case 'th': return enfants() + ' — ';
+      default: return enveloppe(enfants(), st);   // span, font, label… : on ne garde que gras/italique/souligné/barré
+    }
+  }
+  function nettoyerCollage(html) {
+    let doc;
+    try { doc = new DOMParser().parseFromString(html, 'text/html'); } catch (e) { return ''; }
+    let sortie = Array.from(doc.body.childNodes).map(nettoyerNoeud).join('');
+    sortie = sortie.replace(BLOCS_VIDES, '').replace(/<p([^>]*)>\s+/g, '<p$1>').replace(/\s+<\/p>/g, '</p>').replace(/(<br>\s*){3,}/g, '<br><br>');
+    return sortie.trim();
+  }
+  function texteVersHtml(t) {
+    const blocs = String(t || '').replace(/\r\n?/g, '\n').split(/\n{2,}/).map(b => b.trim()).filter(Boolean);
+    return blocs.map(b => '<p>' + echapper(b).replace(/\n/g, '<br>') + '</p>').join('');
+  }
+
   function injectStyles() {
     if (document.getElementById('rich-editor-style')) return;
     const s = document.createElement('style');
@@ -400,10 +464,27 @@
     function sync() { textarea.value = area.innerHTML; textarea.dispatchEvent(new Event('input', { bubbles: true })); }
     area.addEventListener('input', sync);
     area.addEventListener('blur', sync);
+    /* Collage propre (tous les éditeurs sauf le mode compact, qui colle déjà du texte brut) — voir nettoyerCollage(). */
+    if (!opts.compact) {
+      area.addEventListener('paste', e => {
+        const cd = e.clipboardData || window.clipboardData; if (!cd) return;
+        const html = cd.getData('text/html'), txt = cd.getData('text/plain') || cd.getData('text');
+        if (!html && !txt) return;   // rien de textuel (image seule…) : comportement du navigateur
+        e.preventDefault();
+        let propre = html ? nettoyerCollage(html) : '';
+        if (!propre) propre = texteVersHtml(txt);
+        if (!propre) return;
+        const unique = /^<p(?:\s[^>]*)?>((?:(?!<\/?p[\s>]).)*)<\/p>$/i.exec(propre);   // un seul paragraphe : inséré dans la ligne en cours, sans la couper
+        if (unique) propre = unique[1];
+        if (!document.execCommand('insertHTML', false, propre)) document.execCommand('insertText', false, txt || '');
+        sync();
+      });
+    }
 
     wrap.appendChild(toolbarEl);
     wrap.appendChild(area);
     textarea.parentNode.insertBefore(wrap, textarea.nextSibling);
+    if (window.rendreTexteLisible) window.rendreTexteLisible(area);   // texte déjà enregistré avec une couleur qui se confond avec le fond de la zone
     sync();
 
     const instance = {
@@ -411,7 +492,7 @@
       // Même repli que l'initialisation dans attach() ci-dessus, et pour la même raison — sinon
       // setHTML('') (rechargement à vide de la modale) écrasait le <p><br></p> déjà posé par
       // attach() juste avant, ramenant l'éditeur au cas bogué (bug réel constaté en testant).
-      setHTML: html => { area.innerHTML = html || (opts.compact ? '' : '<p><br></p>'); sync(); },
+      setHTML: html => { area.innerHTML = html || (opts.compact ? '' : '<p><br></p>'); if (window.rendreTexteLisible) window.rendreTexteLisible(area); sync(); },
       isEmpty: () => !area.textContent.trim(),
       focus: () => area.focus(),
     };
