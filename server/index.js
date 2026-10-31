@@ -37999,6 +37999,23 @@ ${jsonLd}
       const soldeDisponible = Math.max(0, mûri - dejaRetire);
       const soldeEnReserve = Math.max(0, balance - soldeDisponible);
 
+      /* « Dans combien de temps le dernier paiement sera retirable ? » (2026-10-31, demande
+         explicite) — le dernier paiement reçu (donc le plus récent, celui qui termine sa
+         maturation en dernier) fixe la date à laquelle TOUTE la réserve affichée ci-dessus aura
+         fini de mûrir. Même fenêtre glissante que soldeDisponible ci-dessus (timestamp non encore
+         mûr = reçu il y a moins de RESERVE_JOURS). */
+      let reserveDernierPaiementLe = null, reserveRetirableLe = null;
+      if (soldeEnReserve > 0) {
+        const dernier = await db.prepare(`
+          SELECT MAX(timestamp) AS t FROM wallet_transactions
+          WHERE beneficiaire_id=? AND type='organizer_credit' AND timestamp > datetime('now', '-${RESERVE_JOURS} days')
+        `).get(me.id);
+        if (dernier?.t) {
+          reserveDernierPaiementLe = dernier.t;
+          reserveRetirableLe = new Date(new Date(dernier.t).getTime() + RESERVE_JOURS * 86400000).toISOString();
+        }
+      }
+
       const fenetre = async (sql) => (await db.prepare(sql).get(me.id))?.total || 0;
       const aujourdhui = await fenetre(`SELECT COALESCE(SUM(montant),0) total FROM wallet_transactions WHERE beneficiaire_id=? AND type='organizer_credit' AND date(timestamp)=date('now')`);
       const semaine   = await fenetre(`SELECT COALESCE(SUM(montant),0) total FROM wallet_transactions WHERE beneficiaire_id=? AND type='organizer_credit' AND timestamp>=datetime('now','-7 days')`);
@@ -38040,6 +38057,7 @@ ${jsonLd}
       return sendJSON(res, 200, {
         balance, commission_rate: 0.03,
         solde_disponible: soldeDisponible, solde_en_reserve: soldeEnReserve, reserve_jours: RESERVE_JOURS,
+        reserve_dernier_paiement_le: reserveDernierPaiementLe, reserve_retirable_le: reserveRetirableLe,
         revenus: { aujourdhui, semaine, mois, annee, cumule },
         historique, connect,
         settings: settings || { devise_preferee: 'EUR', frequence_auto: 'manuel', seuil_auto: 0, notifications: 1 },

@@ -86,6 +86,16 @@
     const d = new Date(/[zZ]$|[+-]\d{2}:\d{2}$/.test(s) ? s.replace(' ', 'T') : s.replace(' ', 'T') + 'Z');
     return isNaN(d) ? '' : d.toLocaleString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
   }
+  /* « Dans combien de temps le dernier paiement sera retirable ? » (2026-10-31, demande explicite)
+     — reserve_retirable_le vient du serveur (GET /api/wallet/centre-financier), déjà en ISO. */
+  function dansCombien(iso) {
+    if (!iso) return '';
+    const ms = new Date(iso).getTime() - Date.now();
+    if (isNaN(ms)) return '';
+    if (ms <= 0) return "d'un instant à l'autre";
+    const jours = Math.ceil(ms / 86400000);
+    return jours <= 1 ? 'demain' : `dans ${jours} jours`;
+  }
   const STATUTS = {
     valide: ['g', 'Validé'], traite: ['g', 'Traité'], active: ['g', 'Actif'],
     en_attente: ['o', 'En attente'], demande: ['o', 'Demandé'], pending: ['o', 'En attente'],
@@ -146,7 +156,7 @@
       <div class="cf-sec">🔒 <b>Sécurité :</b> Diaspo’Actif ne stocke jamais vos coordonnées bancaires. Toutes les connexions et tous les virements passent par Stripe, prestataire de paiement certifié. Seuls le statut et les montants transitent sur nos serveurs.</div>
       <section class="cf-hero"><div class="k">Solde retirable</div><div class="big">${esc(eur(soldeRetirable(d)))}</div>
         <div class="s">Commission Diaspo’Actif : ${Math.round((d.commission_rate || 0) * 100)} %, prélevée automatiquement.</div>
-        ${d.solde_en_reserve > 0 ? `<div class="s">+ ${esc(eur(d.solde_en_reserve))} en réserve de sécurité : devient retirable ${esc(String(d.reserve_jours))} jours après réception.</div>` : ''}
+        ${d.solde_en_reserve > 0 ? `<div class="s">+ ${esc(eur(d.solde_en_reserve))} en réserve de sécurité : devient retirable ${esc(String(d.reserve_jours))} jours après réception${d.reserve_retirable_le ? ` (${esc(dansCombien(d.reserve_retirable_le))})` : ''}.</div>` : ''}
         <div class="cf-kpis">
           <div class="cf-kpi"><b>${esc(eur(r.aujourdhui))}</b><span>Aujourd’hui</span></div>
           <div class="cf-kpi"><b>${esc(eur(r.semaine))}</b><span>Cette semaine</span></div>
@@ -205,7 +215,7 @@
     setPane(NOM, `${entete('retrait')}
       <div class="cf-card"><h3>Demander un retrait</h3>
         <div class="kv"><span>Solde retirable</span><span><b>${esc(eur(solde))}</b></span></div>
-        ${d.solde_en_reserve > 0 ? `<div class="kv"><span>En réserve (${esc(String(d.reserve_jours))} jours)</span><span>${esc(eur(d.solde_en_reserve))}</span></div>` : ''}
+        ${d.solde_en_reserve > 0 ? `<div class="kv"><span>En réserve (${esc(String(d.reserve_jours))} jours)${d.reserve_retirable_le ? ` — ${esc(dansCombien(d.reserve_retirable_le))}` : ''}</span><span>${esc(eur(d.solde_en_reserve))}</span></div>` : ''}
         ${formulaire}</div>
       <div class="h2">HISTORIQUE DES RETRAITS</div>${histo}`);
     const b1 = $('#cf-retirer'), b2 = $('#cf-tout');
