@@ -6573,7 +6573,8 @@ function enrichirChampsFormule(f) {
 }
 
 route("GET", "/api/initiatives/:id/adhesion-formules", async (req, res, params) => {
-  const rows = await db.prepare(`SELECT * FROM adhesion_formules WHERE initiative_id=? AND actif=1 ORDER BY ordre ASC, id ASC`).all(params.id);
+  try { await adhPromouvoirFormuleUnique([params.id]); } catch (e) { logError(e, 'adh-promotion-formule-unique'); }
+  const rows =await db.prepare(`SELECT * FROM adhesion_formules WHERE initiative_id=? AND actif=1 ORDER BY ordre ASC, id ASC`).all(params.id);
   /* Places restantes (incrément 1, 2026-08-06) : comptées sur les membres en_attente/a_jour
      (un paiement en cours réserve déjà une place) — pas sur non_a_jour/suspendu, qui ont
      libéré la leur. */
@@ -6600,10 +6601,33 @@ route("GET", "/api/initiatives/:id/adhesion-formules", async (req, res, params) 
    d'adhésion OFFICIELLE (active). Le bouton « Adhérer à l'initiative » ne mène QUE vers cette formule :
    les cartes (annuaire, boutiques, profil, événement, téléphone) interrogent ici, en un seul appel, pour
    savoir si le bouton est actif ou s'il doit afficher « Adhésion bientôt disponible » (2026-10-08). */
+/* Adhésion officielle « implicite » (2026-10-31, signalé : Moov To Learn International avait créé sa
+   formule d'adhésion — la seule, active — mais la cartouche de l'annuaire affichait « Adhésion bientôt
+   disponible », faute d'avoir cliqué sur « ⭐ Définir comme adhésion officielle »). Quand une initiative
+   n'a qu'UNE formule active et aucune officielle, il n'y a rien à choisir : cette formule devient
+   l'adhésion officielle, celle que cible le bouton public « Adhérer à l'initiative ». Avec plusieurs
+   formules, le propriétaire garde la main (aucune promotion). Appelée à la lecture publique (guérit
+   aussi les formules créées avant l'existence du statut « officielle ») et à la création. */
+async function adhPromouvoirFormuleUnique(initiativeIds) {
+  const ids = [...new Set((initiativeIds || []).map(Number).filter(Boolean))];
+  if (!ids.length) return;
+  const ph = ids.map(() => "?").join(",");
+  const lignes = await db.prepare(
+    `SELECT initiative_id, COUNT(*) AS nb, MIN(id) AS id, SUM(CASE WHEN est_officielle=1 THEN 1 ELSE 0 END) AS nb_off
+     FROM adhesion_formules WHERE initiative_id IN (${ph}) AND actif=1 GROUP BY initiative_id`
+  ).all(...ids);
+  for (const l of lignes) {
+    if (Number(l.nb) === 1 && !Number(l.nb_off)) {
+      await db.prepare("UPDATE adhesion_formules SET est_officielle=1 WHERE id=?").run(Number(l.id));
+    }
+  }
+}
+
 route("GET", "/api/adhesions-officielles", async (req, res, params, body, query) => {
   const ids = [...new Set(String(query?.initiative_ids || "").split(",").map(Number).filter(Boolean))].slice(0, 100);
   const officielles = {};
   if (ids.length) {
+    try { await adhPromouvoirFormuleUnique(ids); } catch (e) { logError(e, 'adh-promotion-formule-unique'); }
     const ph = ids.map(() => "?").join(",");
     const lignes = await db.prepare(`SELECT initiative_id, id FROM adhesion_formules WHERE initiative_id IN (${ph}) AND actif=1 AND est_officielle=1 ORDER BY id ASC`).all(...ids);
     for (const l of lignes) if (officielles[l.initiative_id] == null) officielles[l.initiative_id] = Number(l.id);
@@ -6831,6 +6855,7 @@ route("POST", "/api/initiatives/:id/adhesion-formules", async (req, res, params,
   if (body.rubriques !== undefined) await db.prepare('UPDATE adhesion_formules SET rubriques_json=? WHERE id=?').run(sanitizeRubriques(body.rubriques), id);
   if (body.carte_proto !== undefined) await db.prepare('UPDATE adhesion_formules SET carte_proto_json=? WHERE id=?').run(carteProtoJson(body.carte_proto), id);
   if (body.est_officielle) await adhAppliquerOfficielle(id, params.id, true);
+  else if (body.est_officielle === undefined) { try { await adhPromouvoirFormuleUnique([params.id]); } catch (e) { logError(e, 'adh-promotion-formule-unique'); } }
   sendJSON(res, 201, { id });
 });
 
