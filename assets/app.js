@@ -5875,10 +5875,12 @@ async function initFormations() {
     const lien = `formation-fiche.html?id=${f.id}`;
     let media;
     const image = f.image_url || f.banniere_url;
-    if (image) media = `<div class="cat-media" style="background-image:url('${E(image)}');"></div>`;
+    /* Couverture entière (jamais rognée) : l'image est posée en « contain » sur son propre flou. */
+    if (image) media = `<div class="cat-media cat-media-photo" style="--cat-img:url('${E(image)}');"><img src="${E(image)}" alt="Couverture de la formation : ${E(f.titre)}" loading="lazy"></div>`;
     else if (f.video_intro) media = `<div class="cat-media cat-media-video"><video src="${E(f.video_intro)}" muted loop playsinline preload="metadata" onmouseover="this.play().catch(()=>{})" onmouseout="this.pause()"></video></div>`;
     else media = `<div class="cat-media cat-media-vide"><span>${E((f.domaine || f.type_formation || "F").charAt(0))}</span></div>`;
-    const badges = [f.populaire ? `<span class="cat-badge cat-badge-pop">★ Populaire</span>` : "", BADGES[f.badge] ? `<span class="cat-badge">${BADGES[f.badge]}</span>` : ""].join("");
+    const gratuitBadge = f.gratuit || f.mode_acces === "gratuit" || !(Number(f.prix_final ?? f.prix) > 0);
+    const badges = [gratuitBadge ? `<span class="cat-badge cat-badge-gratuit">🎁 Gratuit</span>` : "", f.populaire ? `<span class="cat-badge cat-badge-pop">★ Populaire</span>` : "", BADGES[f.badge] ? `<span class="cat-badge">${BADGES[f.badge]}</span>` : ""].join("");
     const gratuit = f.gratuit || f.mode_acces === "gratuit" || !(Number(f.prix_final ?? f.prix) > 0);
     let blocPrix;
     if (gratuit) blocPrix = `<span class="cat-prix cat-prix-gratuit">Gratuit</span>`;
@@ -5900,9 +5902,9 @@ async function initFormations() {
           ${f.niveau ? `<span class="cat-niveau">${E(f.niveau)}</span>` : ""}
         </div>
         <h3 class="cat-titre"><a href="${lien}">${E(f.titre)}</a></h3>
+        ${f.formateur_affiche ? `<div class="cat-par">Par <strong>${E(f.formateur_affiche)}</strong></div>` : ""}
         ${desc ? `<p class="cat-desc">${E(desc)}</p>` : ""}
         ${infos ? `<ul class="cat-infos">${infos}</ul>` : ""}
-        ${f.formateur_affiche ? `<div class="cat-par">Par <strong>${E(f.formateur_affiche)}</strong></div>` : ""}
         <div class="cat-pied">
           <div class="cat-prixbloc">${blocPrix}</div>
           <a class="cat-btn" href="${lien}">Accéder à la formation</a>

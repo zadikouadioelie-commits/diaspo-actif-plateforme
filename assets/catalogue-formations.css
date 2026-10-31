@@ -21,8 +21,8 @@ html body.nd .cat-recherche{display:flex;gap:8px;max-width:520px;margin-bottom:1
 html body.nd .cat-recherche .input-field{flex:1;min-width:0;border-radius:999px!important;min-height:46px;padding:0 18px}
 html body.nd .cat-recherche .btn{flex:none}
 html body.nd .cat-compteur{display:inline-block;padding:5px 14px;border-radius:999px;font-size:12.5px;font-weight:800;background:rgba(227,192,110,.12)!important;color:var(--nd-or)!important;border:1px solid var(--nd-bord)}
-html body.nd .cat-carte{position:relative;z-index:1;justify-self:center;width:min(100%,520px);aspect-ratio:155/114;-webkit-mask-image:radial-gradient(ellipse at center,#000 46%,transparent 98%);mask-image:radial-gradient(ellipse at center,#000 46%,transparent 98%)}
-html body.nd .cat-carte canvas{display:block;width:100%;height:100%}
+html body.nd .cat-monde{position:relative;z-index:1;justify-self:center;width:min(100%,520px);aspect-ratio:155/114;-webkit-mask-image:radial-gradient(ellipse at center,#000 46%,transparent 98%);mask-image:radial-gradient(ellipse at center,#000 46%,transparent 98%)}
+html body.nd .cat-monde canvas{display:block;width:100%;height:100%}
 
 /* ── Pastilles de catégories ── */
 html body.nd .cat-pastilles{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 16px}
@@ -54,6 +54,12 @@ html body.nd .cat-carte:hover{transform:translateY(-4px);border-color:var(--nd-b
 html body.nd .cat-img{position:relative;display:block;aspect-ratio:16/9;background:#0B1226;overflow:hidden}
 html body.nd .cat-media{position:absolute;inset:0;background-size:cover;background-position:center;transition:transform .8s var(--nd-ease)}
 html body.nd .cat-carte:hover .cat-media{transform:scale(1.05)}
+/* Couverture entière : l'image n'est jamais rognée, elle repose sur une copie floutée d'elle-même (pas de bandes vides). */
+html body.nd .cat-media-photo{overflow:hidden}
+html body.nd .cat-media-photo::before{content:"";position:absolute;inset:-14px;background:var(--cat-img) center/cover no-repeat;filter:blur(16px) brightness(.6)}
+html body.nd .cat-media-photo img{position:relative;display:block;width:100%;height:100%;object-fit:contain}
+html body.nd .cat-carte:hover .cat-media-photo{transform:none}
+html body.nd .cat-badge-gratuit{background:#0f5f3c;color:#d9ffec;border-color:rgba(125,227,181,.6);box-shadow:0 6px 18px -8px rgba(125,227,181,.8)}
 html body.nd .cat-media-video video{width:100%;height:100%;object-fit:cover}
 html body.nd .cat-media-vide{display:flex;align-items:center;justify-content:center;background:radial-gradient(240px 160px at 85% 0%,rgba(227,192,110,.38),transparent 70%),linear-gradient(145deg,#14234a 0%,#0B1226 80%)}
 html body.nd .cat-media-vide span{font-family:var(--nd-display);font-size:64px;color:var(--nd-or);opacity:.9}
@@ -94,7 +100,7 @@ html body.nd .cat-mention{margin:26px 0 0;padding:14px 18px;border-radius:18px;f
 /* ── Écrans étroits ── */
 @media (max-width:860px){
   html body.nd .cat-hero{grid-template-columns:1fr;padding:26px 22px}
-  html body.nd .cat-carte{width:100%;max-width:460px;margin-top:6px}
+  html body.nd .cat-monde{width:100%;max-width:460px;margin-top:6px}
 }
 @media (max-width:560px){
   html body.nd .cat-recherche{flex-direction:column}
