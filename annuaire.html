@@ -151,7 +151,13 @@
    d'elles-mêmes (4 colonnes sur grand écran, 3 sur portable). La zone publicitaire passe sur DEUX colonnes de publicités à partir de 1700px (4 publicités visibles),
    une colonne de 2 entre 1280 et 1699px, et se range sous la grille en dessous. */
 #ann-page-row{display:flex;gap:24px;align-items:flex-start;padding:0 24px;box-sizing:border-box;}
-.ann-ad-col{display:none;background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;position:sticky;top:80px;max-height:calc(100vh - 100px);overflow-y:auto;}
+.ann-ad-col{display:none;background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;position:sticky;top:80px;max-height:calc(100vh - 100px);overflow-y:auto;overscroll-behavior:contain;}
+/* Deux défilements séparés (2026-10-31, demande explicite) : la colonne de droite (suggestions) doit rester en place pendant qu'on descend l'annuaire, et défiler
+   seule quand on la survole. Cause du défaut : responsive.v2.css pose « overflow-x:hidden » sur html ET body — le body devient alors un conteneur de défilement
+   (jamais défilé, sa hauteur est automatique) et « position:sticky » s'y accroche en vain : la colonne partait avec la page. « clip » coupe le débordement
+   horizontal pareillement, sans créer de conteneur de défilement. Limité à cette page (les autres pages gardent « hidden »). overscroll-behavior:contain
+   (ci-dessus) empêche la molette de pousser la page quand la colonne arrive au bout de sa liste. */
+html,html body{overflow-x:clip;}
 @media(min-width:1280px){
   .ann-grid{flex:1 1 0;min-width:0;max-width:none;margin:0;padding:0 0 40px;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));}
   .ann-ad-col{display:block;flex:0 0 300px;}
