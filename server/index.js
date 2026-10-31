@@ -51451,13 +51451,20 @@ route("POST", "/api/insc/fiches/:id/types", async (req, res, params, body) => {
   if (erreur) return sendJSON(res, erreur, { error: msg });
   if (!body?.label || !String(body.label).trim()) return sendJSON(res, 400, { error: "Le nom du type est requis." });
   const cle = inscSlugify(body.cle || body.label) || `type-${Date.now()}`;
+  /* 2026-10-31 : « gratuit » accepté sous toutes ses formes (false, 0, "0", "false") — auparavant seul
+     le booléen false rendait un type payant, un 0 numérique l'enregistrait gratuit en silence.
+     Un type payant exige un prix > 0 ; un type gratuit n'a pas de prix. */
+  const gratuitNew = (body.gratuit === false || body.gratuit === 0 || body.gratuit === "0" || body.gratuit === "false") ? 0 : 1;
+  let prixNew = body.prix != null && body.prix !== "" ? Number(String(body.prix).replace(",", ".")) : null;
+  if (gratuitNew === 1) prixNew = null;
+  else if (!Number.isFinite(prixNew) || prixNew <= 0) return sendJSON(res, 400, { error: "Un type payant doit avoir un prix supérieur à 0 €." });
   try {
     const id = (await db.prepare(`
       INSERT INTO insc_types (fiche_id, cle, label, description, icone, gratuit, prix, places_max,
         liste_attente_active, validation_auto, date_ouverture, date_fermeture, ordre)
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
     `).run(fiche.id, cle, String(body.label).trim(), body.description || null, body.icone || null,
-      body.gratuit === false ? 0 : 1, body.prix != null ? Number(body.prix) : null,
+      gratuitNew, prixNew,
       body.places_max != null && body.places_max !== "" ? parseInt(body.places_max) : null,
       body.liste_attente_active ? 1 : 0, body.validation_auto === false ? 0 : 1,
       body.date_ouverture || null, body.date_fermeture || null, parseInt(body.ordre) || 0
@@ -51493,6 +51500,18 @@ route("PUT", "/api/insc/types/:id", async (req, res, params, body) => {
       if (v !== null) { v = parseInt(v, 10); if (!Number.isFinite(v) || v < 0) return sendJSON(res, 400, { error: c === "places_max" ? "Le nombre de places doit être un entier positif." : "Ordre invalide." }); }
     }
     set.push(`${c}=?`); vals.push(v);
+  }
+  /* Cohérence gratuit/prix (2026-10-31) : passer en payant exige un prix > 0 (sinon le type resterait
+     affiché sans tarif) ; passer en gratuit efface le prix pour qu'aucun ancien montant ne subsiste. */
+  const iG = set.indexOf("gratuit=?");
+  if (iG !== -1) {
+    const nouveauGratuit = vals[iG] === 1;
+    const iP = set.indexOf("prix=?");
+    if (nouveauGratuit) { if (iP === -1) { set.push("prix=?"); vals.push(null); } else vals[iP] = null; }
+    else {
+      const prixFinal = iP !== -1 ? vals[iP] : type.prix;
+      if (!(Number(prixFinal) > 0)) return sendJSON(res, 400, { error: "Un type payant doit avoir un prix supérieur à 0 €." });
+    }
   }
   if (set.length) { set.push("updated_at=datetime('now')"); await db.prepare(`UPDATE insc_types SET ${set.join(",")} WHERE id=?`).run(...vals, type.id); }
   await inscJournaliser(type.fiche_id, user, "modification_type", `Type « ${type.label} » modifié.`);
