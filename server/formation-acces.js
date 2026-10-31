@@ -183,7 +183,7 @@ module.exports.register = function register(deps) {
       }
     }
     sendJSON(res, 200, {
-      formation: { id: Number(f.id), titre: f.titre, organisme: f.organisme || null, mode_acces: f.mode_acces, gratuit: Number(f.gratuit) === 1, prix: f.prix, devise: f.devise || "EUR" },
+      formation: { id: Number(f.id), titre: f.titre, organisme: (await require("./formation-catalogue").nomAuteur(db, f.owner_user_id)) || f.organisme || null, mode_acces: f.mode_acces, gratuit: Number(f.gratuit) === 1, prix: f.prix, devise: f.devise || "EUR" },
       modules, nb_lecons: nbLecons, nb_apercu: nbApercu,
     });
   });

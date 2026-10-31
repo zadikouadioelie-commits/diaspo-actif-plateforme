@@ -61,6 +61,33 @@ async function domaineAccepte(db, domaine, actuel) {
   return liste.some(c => cle(c.nom) === cle(d));
 }
 
+/* ── Auteur d'une formation (décision du 2026-10-31) ──
+   L'auteur affiché est TOUJOURS le compte propriétaire : le nom de la structure pour une initiative, une collectivité ou l'administration,
+   « prénom nom » pour un particulier. Jamais le nom de la personne qui gère le compte d'une initiative, et jamais un nom saisi à la main :
+   sinon n'importe qui pourrait publier une formation au nom d'un autre. Même règle que nomCompteAffichage() de server/index.js. */
+function nomDeCompte(u, nomInitiative) {
+  if (!u) return "";
+  if (u.role === "initiative" && nomInitiative) return nomInitiative;
+  if ((u.role === "collectivite" || u.role === "administrateur") && u.nom_institution) return u.nom_institution;
+  return [u.prenom, u.nom].filter(Boolean).join(" ") || u.nom || "";
+}
+async function nomsAuteurs(db, ownerIds) {
+  const ids = [...new Set((ownerIds || []).map(Number).filter(n => Number.isFinite(n) && n > 0))];
+  const noms = new Map();
+  if (!ids.length) return noms;
+  const marques = ids.map(() => "?").join(",");
+  const users = await db.prepare(`SELECT id, nom, prenom, role, nom_institution FROM users WHERE id IN (${marques})`).all(...ids);
+  const inits = new Map((await db.prepare(`SELECT owner_user_id, nom FROM initiatives WHERE owner_user_id IN (${marques})`).all(...ids)).map(i => [Number(i.owner_user_id), i.nom]));
+  for (const u of users) noms.set(Number(u.id), nomDeCompte(u, inits.get(Number(u.id))));
+  return noms;
+}
+async function nomAuteur(db, ownerId) { return (await nomsAuteurs(db, [ownerId])).get(Number(ownerId)) || ""; }
+/* Remplace, sur une ligne de formation, tous les champs qui désignent « qui l'a faite » par le nom du compte propriétaire. */
+function imposerAuteur(row, nom) {
+  if (!row || !nom) return row;
+  return { ...row, auteur_nom: nom, organisme: nom, formateur_nom: nom, formateur_organisation: nom, formateur_affiche: nom };
+}
+
 /* Ajoute à chaque formation du catalogue ce que la carte affiche (une seule requête groupée par information). */
 async function enrichir(db, rows) {
   if (!rows.length) return rows;
@@ -75,6 +102,7 @@ async function enrichir(db, rows) {
     notes.set(Number(l.formation_id), { moy: Math.round((Number(l.moy) || 0) * 10) / 10, n: Number(l.n) || 0 });
   }
   const classement = [...inscrits.entries()].filter(([, n]) => n >= POPULAIRE_MIN_INSCRITS).sort((a, b) => b[1] - a[1]).slice(0, POPULAIRE_RANG_MAX).map(([id]) => id);
+  const auteurs = await nomsAuteurs(db, rows.map(r => r.owner_user_id));
   return rows.map(r => {
     const id = Number(r.id);
     const p = Finances.prixFormation(r);
@@ -83,14 +111,14 @@ async function enrichir(db, rows) {
       ...r,
       nb_modules: modules.get(id) || 0, nb_lecons: lecons.get(id) || 0, nb_inscrits: inscrits.get(id) || 0,
       prix_catalogue: p.catalogue, promo_pct: p.promo_pct, prix_final: p.prix,
-      formateur_affiche: r.formateur_nom || r.auteur_nom || r.organisme || "",
+      ...imposerAuteur({}, auteurs.get(Number(r.owner_user_id)) || r.auteur_nom || r.organisme || ""),
       populaire: classement.includes(id) ? 1 : 0,
       note_moyenne: note ? note.moy : null, nb_avis: note ? note.n : 0
     };
   });
 }
 
-module.exports = { CATEGORIES_DEFAUT, assurerCategories, lireCategories, domaineAccepte, enrichir, nettoyerNom, nettoyerIcone };
+module.exports = { nomDeCompte, nomsAuteurs, nomAuteur, imposerAuteur, CATEGORIES_DEFAUT, assurerCategories, lireCategories, domaineAccepte, enrichir, nettoyerNom, nettoyerIcone };
 
 module.exports.register = function register(deps) {
   const { route, db, sendJSON, getCurrentUser } = deps;

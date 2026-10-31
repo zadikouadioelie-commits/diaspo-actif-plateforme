@@ -488,9 +488,9 @@
             <div>
               <h4 class="fb-subsection-title">Formateur <button type="button" class="btn btn-sm btn-outline" id="fb-voir-profil-formateur" style="margin-left:10px;">👁 Voir le profil public du formateur</button></h4>
               <div class="grid grid-2" style="gap:10px;">
-                <div><label style="font-size:13px;font-weight:700;">Nom du formateur <span class="fb-help" title="Affiché par défaut : le nom de votre compte. Modifiable si la formation est portée par quelqu'un d'autre.">?</span></label><input id="new-form-formateur-nom" class="input-field" style="width:100%;margin-top:4px;" placeholder="Nom affiché"></div>
+                <div><label style="font-size:13px;font-weight:700;">Publiée au nom de <span class="fb-help" title="Une formation est toujours publiée au nom de votre compte (l'initiative elle-même, jamais la personne qui la gère). Ce nom est lié à votre compte et ne peut pas être modifié : personne ne peut publier au nom d'un autre.">🔒</span></label><input id="new-form-formateur-nom" class="input-field" readonly tabindex="-1" aria-readonly="true" style="width:100%;margin-top:4px;opacity:.85;cursor:not-allowed;" placeholder="Nom de votre compte"></div>
                 <div><label style="font-size:13px;font-weight:700;">Fonction <span class="fb-help" title="Le titre professionnel du formateur.">?</span></label><input id="new-form-formateur-fonction" class="input-field" style="width:100%;margin-top:4px;" placeholder="ex: Formatrice en gestion de projet"></div>
-                <div><label style="font-size:13px;font-weight:700;">Organisation <span class="fb-help" title="La structure ou l'initiative représentée.">?</span></label><input id="new-form-formateur-organisation" class="input-field" style="width:100%;margin-top:4px;" placeholder="ex: Diaspo'Actif"></div>
+                <div><label style="font-size:13px;font-weight:700;">Organisation <span class="fb-help" title="Liée à votre compte, non modifiable.">🔒</span></label><input id="new-form-formateur-organisation" class="input-field" readonly tabindex="-1" aria-readonly="true" style="width:100%;margin-top:4px;opacity:.85;cursor:not-allowed;" placeholder="Nom de votre compte"></div>
                 <div><label style="font-size:13px;font-weight:700;">Années d'expérience <span class="fb-help" title="Nombre d'années d'expérience dans le domaine enseigné.">?</span></label><input type="number" min="0" id="new-form-formateur-exp" class="input-field" style="width:100%;margin-top:4px;"></div>
                 <div><label style="font-size:13px;font-weight:700;">Site internet (optionnel) <span class="fb-help" title="Lien vers un site personnel ou professionnel.">?</span></label><input id="new-form-formateur-site" class="input-field" style="width:100%;margin-top:4px;" placeholder="https://…"></div>
                 <div><label style="font-size:13px;font-weight:700;">Réseaux sociaux (optionnel) <span class="fb-help" title="Liens vers les profils professionnels du formateur.">?</span></label><input id="new-form-formateur-reseaux" class="input-field" style="width:100%;margin-top:4px;" placeholder="LinkedIn, Twitter…"></div>
@@ -1145,12 +1145,10 @@
       police_dyslexie: document.getElementById("new-form-police-dyslexie").checked,
       formateur_bio: document.getElementById("new-form-formateur-bio").value.trim(),
       formateur_fonction: document.getElementById("new-form-formateur-fonction").value.trim(),
-      formateur_organisation: document.getElementById("new-form-formateur-organisation").value.trim(),
       formateur_annees_exp: parseInt(document.getElementById("new-form-formateur-exp").value)||null,
       formateur_site: document.getElementById("new-form-formateur-site").value.trim(),
       formateur_reseaux: document.getElementById("new-form-formateur-reseaux").value.trim(),
       formateur_photo_url: document.getElementById("new-form-formateur-photo-file").dataset.url || undefined,
-      formateur_nom: document.getElementById("new-form-formateur-nom") ? document.getElementById("new-form-formateur-nom").value.trim() : undefined,
     };
   }
 
@@ -2413,7 +2411,7 @@
       document.getElementById('new-form-transcription').checked = !!f.transcription;
       document.getElementById('new-form-lecteur-ecran').checked = !!f.lecteur_ecran;
       document.getElementById('new-form-police-dyslexie').checked = !!f.police_dyslexie;
-      set('new-form-formateur-nom', f.formateur_nom || (CURRENT_USER && CURRENT_USER.nom) || '');
+      set('new-form-formateur-nom', f.formateur_nom); /* nom du compte propriétaire, imposé par le serveur */
       set('new-form-formateur-fonction', f.formateur_fonction);
       set('new-form-formateur-organisation', f.formateur_organisation);
       set('new-form-formateur-exp', f.formateur_annees_exp);

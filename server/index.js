@@ -17476,7 +17476,7 @@ route("GET", "/api/formations/:id", async (req, res, params) => {
   const nb_apercu = (await db.prepare("SELECT COUNT(*) AS n FROM formation_lecons l JOIN formation_modules m ON m.id=l.module_id WHERE m.formation_id=? AND l.apercu_gratuit=1 AND l.type<>'quiz'").get(params.id))?.n || 0;
   /* Prix à payer aujourd'hui, promotion comprise (même calcul que le paiement) — affiché sur la fiche, le catalogue et le téléphone. */
   const prixAffiche = FormationFinances.prixFormation(row);
-  sendJSON(res, 200, { formation: { ...row, avis, nb_inscrits, nb_apercu, prix_catalogue: prixAffiche.catalogue, promo_pct: prixAffiche.promo_pct, prix_final: prixAffiche.prix } });
+  sendJSON(res, 200, { formation: { ...FormationCatalogue.imposerAuteur(row, await FormationCatalogue.nomAuteur(db, row.owner_user_id)), avis, nb_inscrits, nb_apercu, prix_catalogue: prixAffiche.catalogue, promo_pct: prixAffiche.promo_pct, prix_final: prixAffiche.prix } });
 });
 
 /* Mes formations (créateur) */
@@ -17667,7 +17667,7 @@ route("POST", "/api/formations", async (req, res, params, body) => {
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'brouillon',?,?,?,?,?,?,?,
       ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
   `).run(
-    titre, type_formation||null, organisme||null, domaine||null, nationalite||null, langue||'Français',
+    titre, type_formation||null, (await FormationCatalogue.nomAuteur(db, user.id)) || organisme || null, domaine||null, nationalite||null, langue||'Français',
     niveau||null, description ? SEC.sanitizeRichHtml(description) : null, prix||0, gratuit, duree||null, duree_heures||null, places||null,
     init?.id||null, user.id,
     modeAcces, commission, telecharge_autorise?1:0,
@@ -17750,9 +17750,9 @@ route("PUT", "/api/formations/:id", async (req, res, params, body) => {
     n(body.temps_conseille),n(body.badge),n(body.langues_disponibles_json ? JSON.stringify(body.langues_disponibles_json) : undefined),
     b('sous_titres'),b('transcription'),b('lecteur_ecran'),b('police_dyslexie'),
     n(body.formateur_bio !== undefined ? SEC.sanitizeRichHtml(body.formateur_bio) : undefined),n(body.formateur_fonction),
-    n(body.formateur_organisation),n(body.formateur_annees_exp),
+    (await FormationCatalogue.nomAuteur(db, f.owner_user_id)) || null,n(body.formateur_annees_exp),
     n(body.formateur_site),n(body.formateur_reseaux),n(body.formateur_photo_url),
-    n(body.formateur_nom), n(body.logo_url),
+    (await FormationCatalogue.nomAuteur(db, f.owner_user_id)) || null, n(body.logo_url),
     params.id);
   sendJSON(res, 200, { ok: true });
 });

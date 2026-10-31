@@ -191,7 +191,8 @@ async function evaluerAttestation(deps, inscriptionId) {
   const type = typeValide(f.certificat_type);
   const u = await db.prepare("SELECT nom, prenom FROM users WHERE id=?").get(inscription.user_id);
   const apprenant = [u && u.prenom, u && u.nom].filter(Boolean).join(" ") || "Apprenant";
-  const organisme = f.organisme || (await nomOrganisme(deps, f)) || "Diaspo'Actif";
+  /* Le certificat porte le nom du compte propriétaire, jamais un texte saisi à la main (décision du 2026-10-31). */
+  const organisme = (await nomOrganisme(deps, f)) || f.organisme || "Diaspo'Actif";
   let code = codeAttestation();
   for (let i = 0; i < 5 && await db.prepare("SELECT 1 FROM formation_attestations WHERE code=?").get(code); i++) code = codeAttestation();
   const resultat = type === "reussite" ? p.resultat_pct : null;
