@@ -170,8 +170,13 @@
 </style>
   <link rel="stylesheet" href="/assets/design-upgrade.v2.css">
   <link rel="stylesheet" href="/assets/theme-manager.css">
+  <!-- Design « Nuit dorée » (2026-11-01) : boutiques ; retour arrière : retirer ces lignes, nd-zone et class="nd" sur <body> -->
+  <link rel="stylesheet" href="/assets/theme-nuit-doree.css?v=8">
+  <link rel="stylesheet" href="/assets/pages-initiative-nuit-doree.css?v=1">
+  <link rel="stylesheet" href="/assets/vitrines-nuit-doree.css?v=4">
+  <script src="/assets/dashboard-nuit-doree.js?v=4" defer></script>
 </head>
-<body>
+<body class="nd">
 <div class="page">
 
   <header class="topbar">
@@ -209,7 +214,7 @@
   </aside>
 
   <!-- ===== HERO ===== -->
-  <div class="vit-hero">
+  <div class="vit-hero nd-zone">
     <div class="vit-hero-overlay"></div>
     <div class="vit-hero-content">
       <div class="vit-hero-text">
@@ -220,7 +225,7 @@
   </div>
 
   <!-- ===== STAT CHIPS ===== -->
-  <div class="vit-stat-band">
+  <div class="vit-stat-band nd-zone">
     <div class="vit-stat-band-inner">
       <div class="vit-stat-chip"><div class="vit-stat-icon">🏪</div><span>Des boutiques à découvrir</span></div>
       <div class="vit-stat-chip"><div class="vit-stat-icon">🛍️</div><span>Des produits et services</span></div>
@@ -229,7 +234,7 @@
   </div>
 
   <!-- ===== RECHERCHE PAR MOT-CLÉ ===== -->
-  <div class="vit-filters" style="padding-bottom:0;">
+  <div class="vit-filters nd-zone" style="padding-bottom:0;">
     <div class="vit-filters-inner" style="max-width:100%;">
       <div class="vit-filter-group" style="flex:1;min-width:260px;position:relative;">
         <label>🔍 Rechercher une boutique</label>
@@ -240,7 +245,7 @@
   </div>
 
   <!-- ===== FILTRES ===== -->
-  <div class="vit-filters">
+  <div class="vit-filters nd-zone">
     <div class="vit-filters-inner">
 
       <div class="vit-filter-group">
@@ -315,7 +320,7 @@
   </div>
 
   <!-- ===== CATALOGUE ===== -->
-  <div class="vit-section-head">
+  <div class="vit-section-head nd-zone">
     <div>
       <h2>Toutes les boutiques</h2>
       <div class="vit-result-count"><strong id="v-result-count">0</strong> boutique(s) trouvée(s)</div>
@@ -323,12 +328,12 @@
     <p class="vit-section-desc">Explorez les boutiques publiées par les comptes Initiative — entreprises, associations, coopératives et projets de la diaspora.</p>
   </div>
 
-  <div class="vit-grid" id="vit-list">
+  <div class="vit-grid nd-zone" id="vit-list">
     <div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted);">Chargement…</div>
   </div>
 
   <!-- ===== CTA ===== -->
-  <div class="vit-cta">
+  <div class="vit-cta nd-zone">
     <div class="vit-cta-inner">
       <div class="vit-cta-icon">🏪</div>
       <h3>Vous portez un projet ou une activité ?</h3>

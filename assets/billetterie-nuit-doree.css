@@ -1,0 +1,66 @@
+/* Design « Nuit dorée » — Billetterie (billetterie.html) (2026-11-01).
+   S'ajoute à assets/theme-nuit-doree.css et assets/pages-initiative-nuit-doree.css (zone de contenu « nd-zone » = .container). Tout est préfixé html body.nd.
+   Retour arrière : retirer les liens, le script, nd-zone et class="nd" sur <body>. */
+
+html body.nd .nd-zone{--border:rgba(255,255,255,.12);--muted:#AEB8D0;--text:#E8ECF6}
+html body.nd .nd-zone h1{font-family:var(--nd-display);font-weight:500;color:#fff;letter-spacing:-.01em}
+
+/* onglets */
+html body.nd .billet-nav{border-bottom:1px solid var(--nd-bord2)}
+html body.nd .billet-tab{color:var(--nd-doux)}
+html body.nd .billet-tab:hover{color:#fff}
+html body.nd .billet-tab.active{color:var(--nd-or);border-bottom-color:var(--nd-or)}
+
+/* filtres et champs */
+html body.nd .filters :is(select,input),html body.nd :is(.form-row,.tt-row) :is(input,textarea,select){background:rgba(255,255,255,.07)!important;border:1px solid rgba(255,255,255,.2)!important;color:#fff!important;border-radius:12px;color-scheme:dark}
+html body.nd .filters :is(select,input){border-radius:999px}
+html body.nd .filters select{width:auto;min-width:190px;max-width:100%}
+html body.nd .filters input::placeholder,html body.nd .form-row :is(input,textarea)::placeholder{color:#8F9BB8}
+html body.nd :is(.filters,.form-row,.tt-row) :is(select,input,textarea):focus{outline:none;border-color:var(--nd-or)!important;box-shadow:0 0 0 3px rgba(227,192,110,.18)}
+html body.nd .filters select option,html body.nd .form-row select option{background:#0E1730;color:#fff}
+html body.nd .form-row label{color:var(--nd-or);letter-spacing:.06em}
+
+/* cartes d'événements */
+html body.nd .evt-card{background:var(--nd-verre);border:1px solid var(--nd-bord2);border-radius:22px;box-shadow:0 26px 54px -34px #000}
+html body.nd .evt-card:hover{border-color:var(--nd-bord);box-shadow:0 30px 60px -32px #000;transform:translateY(-3px)}
+html body.nd .evt-cover{background:linear-gradient(135deg,#17254D,#0A1024)}
+html body.nd .evt-date{color:var(--nd-or)}
+html body.nd .evt-title{color:#fff}
+html body.nd .evt-meta{color:var(--nd-doux)}
+html body.nd .tag-type{background:rgba(227,192,110,.16);color:#F3DC9B;border:1px solid var(--nd-bord)}
+html body.nd .tag-type.vip{background:rgba(167,139,250,.16);color:#D8CCFF;border-color:rgba(167,139,250,.4)}
+html body.nd .tag-type.early{background:rgba(143,224,176,.14);color:#9BE8B8;border-color:rgba(143,224,176,.35)}
+html body.nd .tag-type.sponsor{background:rgba(63,123,255,.16);color:#BFD2FF;border-color:rgba(63,123,255,.4)}
+html body.nd .ticket-type-row{border-bottom-color:var(--nd-bord2)}
+html body.nd .dispo-ok{background:rgba(143,224,176,.14);color:#9BE8B8}
+html body.nd .dispo-low{background:rgba(227,192,110,.16);color:#F3DC9B}
+html body.nd .dispo-none{background:rgba(255,154,143,.14);color:#FFB3AA}
+
+/* billet avec QR code : la tuile du code reste claire (un QR doit rester lisible par une caméra) */
+html body.nd .ticket-card{background:var(--nd-verre);border:2px dashed var(--nd-bord);color:var(--nd-texte)}
+html body.nd .ticket-header{background:var(--nd-degore);color:#1a1405}
+html body.nd .qr-box{background:#F6F3EA;border-radius:14px}
+html body.nd .ticket-info-row .lbl{color:var(--nd-doux)}
+html body.nd .ticket-info-row .val{color:#fff}
+html body.nd .statut-valid{background:rgba(143,224,176,.14);color:#9BE8B8}
+html body.nd .statut-used{background:rgba(255,255,255,.08);color:var(--nd-doux)}
+html body.nd .statut-cancelled{background:rgba(255,154,143,.14);color:#FFB3AA}
+
+/* scanner */
+html body.nd .scan-overlay{border-color:var(--nd-or)}
+html body.nd .scan-ok{background:rgba(143,224,176,.12);border-color:rgba(143,224,176,.5);color:#9BE8B8}
+html body.nd .scan-err{background:rgba(255,154,143,.12);border-color:rgba(255,154,143,.5);color:#FFB3AA}
+html body.nd .notice{background:rgba(227,192,110,.1);border:1px solid var(--nd-bord);color:#F3DC9B}
+
+/* tableau de bord organisateur */
+html body.nd .stat-box{background:var(--nd-verre);border:1px solid var(--nd-bord2);border-radius:18px}
+html body.nd .stat-num{font-family:var(--nd-display);font-weight:500;background:var(--nd-degore);-webkit-background-clip:text;background-clip:text;color:transparent}
+html body.nd .stat-lbl{color:var(--nd-doux)}
+html body.nd :is(.attendee-row,.checkin-row){border-bottom-color:var(--nd-bord2);color:var(--nd-texte)}
+html body.nd .tt-list{border-color:var(--nd-bord2)}
+html body.nd .tt-row{border-bottom-color:var(--nd-bord2)}
+
+/* fenêtre (création d'événement, achat) */
+html body.nd .modal-bg{background:rgba(3,6,14,.74);backdrop-filter:blur(5px)}
+html body.nd .modal{background:linear-gradient(160deg,rgba(23,37,77,.97),rgba(10,16,36,.99));border:1px solid var(--nd-bord);box-shadow:0 40px 90px -30px #000;color:var(--nd-texte)}
+html body.nd .modal h3{font-family:var(--nd-display);font-weight:500;color:#fff}

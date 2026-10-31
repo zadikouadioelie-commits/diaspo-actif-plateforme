@@ -1,0 +1,86 @@
+/* Design « Nuit dorée » — Messagerie (messagerie.html) (2026-11-01).
+   Complète assets/theme-nuit-doree.css (fond, barre du haut, boutons, menu). Tout est préfixé html body.nd : sans class="nd" sur <body>, la page garde son ancien design.
+   Les variables du site (--bg, --text, --border…) ne sont redéfinies que dans la messagerie, jamais sur <body> (barre du haut intacte).
+   Retour arrière : retirer le lien vers cette feuille et class="nd" sur <body>. */
+
+html body.nd :is(.msg-shell,.msg-modal-bg){
+  --bg:rgba(255,255,255,.035); --card:rgba(255,255,255,.05); --text:#EDEAE0; --muted:#AEB8D0;
+  --border:rgba(255,255,255,.12); --orange:#E3C06E; --orange-light:rgba(227,192,110,.14); --surface:rgba(255,255,255,.05); --surface2:rgba(255,255,255,.08);
+}
+html body.nd .msg-shell{background:transparent;color:var(--nd-texte)}
+html body.nd .msg-shell :is(input,textarea,select){color-scheme:dark}
+
+/* panneaux : verre sombre, séparés par un liseré fin */
+html body.nd :is(.msg-left,.msg-notif-panel,.msg-chat-head,.msg-input-area){background:rgba(10,16,36,.72)!important;border-color:var(--nd-bord2)!important;color:var(--nd-texte)}
+html body.nd .msg-body{background:transparent}
+html body.nd .msg-left-head h2,html body.nd .mnp-head h3,html body.nd .msg-chat-head .hd-name{font-family:var(--nd-display);font-weight:500;color:#fff;letter-spacing:-.005em}
+html body.nd .msg-left-head h2{font-size:20px}
+
+/* recherche, champs */
+html body.nd :is(.msg-search input,.msg-modal-search input,.msg-input-box){background:rgba(255,255,255,.07)!important;border:1px solid rgba(255,255,255,.2)!important;color:#fff!important;border-radius:999px}
+html body.nd :is(.msg-search input,.msg-modal-search input,.msg-input-box)::placeholder{color:#8F9BB8}
+html body.nd :is(.msg-search input,.msg-modal-search input,.msg-input-box):focus{outline:none;border-color:var(--nd-or)!important;box-shadow:0 0 0 3px rgba(227,192,110,.2)}
+
+html body.nd .msg-shell select{background-color:rgba(255,255,255,.07)!important;border:1px solid rgba(255,255,255,.2)!important;color:#fff!important}
+html body.nd .msg-shell select option{background:#0E1730;color:#fff}
+
+/* onglets et rubriques */
+html body.nd .msg-tab{color:var(--nd-doux)}
+html body.nd .msg-tab.active{color:var(--nd-or);border-bottom-color:var(--nd-or)}
+html body.nd .msg-rubrique{color:var(--nd-doux)}
+html body.nd .msg-rubrique:hover{background:rgba(255,255,255,.07)}
+html body.nd .msg-rubrique.active{background:rgba(227,192,110,.16);color:#F3DC9B}
+html body.nd .rub-badge{background:#E5484D}
+
+/* conversations */
+html body.nd .msg-conv-item,html body.nd .mnp-item,html body.nd .msg-user-result,html body.nd .dc-carte{border-color:var(--nd-bord2)}
+html body.nd :is(.msg-conv-item,.mnp-item,.msg-user-result):hover{background:rgba(255,255,255,.07)}
+html body.nd .msg-conv-item.active{background:rgba(227,192,110,.13)}
+html body.nd :is(.msg-conv-item,.mnp-item) :is(.conv-name,.mnp-name,.u-name){color:#fff}
+html body.nd .msg-conv-item.unread .conv-name{color:#F3DC9B}
+html body.nd :is(.conv-avatar,.hd-avatar,.bubble-avatar,.mnp-avatar,.u-avatar,.dc-photo){background:linear-gradient(135deg,#F3DC9B,#B9893A)!important;color:#1a1405!important}
+html body.nd .unread-dot{background:var(--nd-degore);color:#1a1405}
+html body.nd .msg-empty{color:var(--nd-doux)}
+html body.nd .msg-empty svg{opacity:.4;color:var(--nd-or)}
+
+/* bulles */
+html body.nd .bubble.them{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);color:var(--nd-texte)}
+html body.nd .bubble.me{background:var(--nd-degore);color:#1a1405}
+html body.nd .bubble.me .bubble-link{color:#1a1405}
+html body.nd .bubble-time{opacity:.7}
+html body.nd .bubble-file{background:rgba(255,255,255,.08)}
+html body.nd .bubble.me .bubble-file{background:rgba(26,20,5,.12)}
+html body.nd .bubble-reply{background:rgba(255,255,255,.08)}
+html body.nd .bubble.me .bubble-reply{background:rgba(26,20,5,.12)}
+html body.nd :is(.bubble-reply .ra,.reply-preview .reply-author){color:var(--nd-or)}
+html body.nd .msg-day-sep span{background:#0A1024}
+
+/* barre de saisie, boutons d'action */
+html body.nd .msg-send-btn{background:var(--nd-degore);color:#1a1405}
+html body.nd .msg-action-btn{background:rgba(255,255,255,.08);color:var(--nd-texte)}
+html body.nd .msg-action-btn:hover{background:rgba(227,192,110,.2)}
+html body.nd .hd-btn{border-color:rgba(255,255,255,.2);color:var(--nd-doux)}
+html body.nd .hd-btn:hover{border-color:var(--nd-or);color:var(--nd-or)}
+html body.nd :is(.attach-panel){background:rgba(255,255,255,.06)}
+html body.nd :is(.attach-chip,.reaction-chip){background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.18);color:var(--nd-texte)}
+html body.nd :is(.attach-chip:hover,.reaction-chip:hover,.reaction-chip.mine){border-color:var(--nd-or)}
+html body.nd .reaction-picker{background:#0E1730;border-color:var(--nd-bord)}
+html body.nd .reply-preview{background:rgba(227,192,110,.1);border-left-color:var(--nd-or)}
+html body.nd .pinned-bar{background:rgba(227,192,110,.12);border-bottom-color:var(--nd-bord);color:#F3DC9B}
+html body.nd :is(.msg-search-panel,.fav-bar){background:rgba(255,255,255,.05);border-color:var(--nd-bord2)}
+html body.nd .search-result{border-color:var(--nd-bord2)}
+
+/* demandes de contact */
+html body.nd .dc-nom{color:#fff}
+html body.nd .dc-role{background:rgba(227,192,110,.16);color:#F3DC9B}
+html body.nd .dc-msg{background:rgba(255,255,255,.06);color:var(--nd-texte)}
+html body.nd .dc-btn{background:rgba(255,255,255,.06);color:var(--nd-texte);border-color:rgba(255,255,255,.22)}
+html body.nd .dc-btn.oui{background:var(--nd-degore);border-color:transparent;color:#1a1405}
+html body.nd .dc-btn.bloc{color:#FF9C9C;border-color:rgba(248,113,113,.5)}
+html body.nd .dc-btn.bloc:hover{background:rgba(239,68,68,.14)}
+
+/* fenêtre « nouvelle conversation » */
+html body.nd .msg-modal-bg{background:rgba(3,6,14,.74);backdrop-filter:blur(5px)}
+html body.nd .msg-modal{background:linear-gradient(160deg,rgba(23,37,77,.97),rgba(10,16,36,.99));border:1px solid var(--nd-bord);box-shadow:0 40px 90px -30px #000;color:var(--nd-texte)}
+html body.nd :is(.msg-modal-head,.msg-modal-search){border-color:var(--nd-bord2)}
+html body.nd .msg-modal-head h3{font-family:var(--nd-display);font-weight:500;color:#fff;font-size:20px}

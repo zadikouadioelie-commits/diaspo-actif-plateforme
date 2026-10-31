@@ -1,0 +1,82 @@
+/* Design « Nuit dorée » — Réseau professionnel (reseau.html) (2026-11-01).
+   S'ajoute à assets/theme-nuit-doree.css et assets/pages-initiative-nuit-doree.css (zone de contenu « nd-zone »). Tout est préfixé html body.nd.
+   Retour arrière : retirer les liens, le script, nd-zone et class="nd" sur <body>. */
+
+/* ═══ bandeau d'accueil (hero) ═══ */
+html body.nd .reseau-hero{background:radial-gradient(ellipse at 70% 40%,rgba(227,192,110,.14),transparent 60%),linear-gradient(160deg,#0B1226,#101a36 60%,#0B1226);border-bottom:1px solid var(--nd-bord2);padding:56px 24px 40px}
+html body.nd .reseau-hero::before{display:none}
+html body.nd .reseau-hero h1{font-family:var(--nd-display);font-weight:500;font-size:clamp(30px,3.6vw,46px);letter-spacing:-.01em;color:#fff}
+html body.nd .reseau-hero p{color:var(--nd-doux);opacity:1}
+html body.nd .hero-stat .val{font-family:var(--nd-display);font-weight:500;background:var(--nd-degore);-webkit-background-clip:text;background-clip:text;color:transparent}
+html body.nd .hero-stat .lbl{color:var(--nd-doux);opacity:1;letter-spacing:.1em}
+
+/* ═══ barre de recherche et onglets ═══ */
+html body.nd .search-bar{background:rgba(6,10,20,.88);backdrop-filter:blur(10px);border-bottom:1px solid var(--nd-bord2);box-shadow:none}
+html body.nd .search-bar :is(input,select){background:rgba(255,255,255,.06)!important;border:1px solid var(--nd-bord2)!important;color:#fff!important;border-radius:999px;color-scheme:dark}
+html body.nd .search-bar input::placeholder{color:#7C88A4}
+html body.nd .search-bar :is(input,select):focus{outline:none;border-color:var(--nd-or)!important;box-shadow:0 0 0 3px rgba(227,192,110,.18)}
+html body.nd .search-bar select option{background:#0B1226;color:#fff}
+html body.nd .btn-search{background:var(--nd-degore);color:#1a1405;border-radius:999px;font-weight:800}
+html body.nd .btn-search:hover{background:var(--nd-degore);filter:brightness(1.07)}
+html body.nd .btn-reset{border-color:var(--nd-bord);color:var(--nd-doux);border-radius:999px}
+html body.nd .rtab-bar{background:rgba(6,10,20,.88);backdrop-filter:blur(10px);border-bottom:1px solid var(--nd-bord2)}
+html body.nd .rtab{color:var(--nd-doux)}
+html body.nd .rtab:hover{color:#fff}
+html body.nd .rtab.active{color:var(--nd-or);border-bottom-color:var(--nd-or)}
+html body.nd .rtab-badge{background:#E5484D}
+
+/* ═══ cartes d'initiatives, de demandes, de listes, de statistiques ═══ */
+html body.nd :is(.init-net-card,.dem-card,.ld-card,.stat-box-r){background:var(--nd-verre)!important;border:1px solid var(--nd-bord2);border-radius:22px;box-shadow:0 26px 54px -34px #000;color:var(--nd-texte)}
+html body.nd :is(.init-net-card,.ld-card):hover{border-color:var(--nd-bord);box-shadow:0 30px 60px -32px #000;transform:translateY(-3px)}
+html body.nd :is(.init-card-nom,.dem-nom,.ld-card-nom,.ld-contact-nom,.rnet-empty .e-title){color:#fff}
+html body.nd :is(.init-card-type,.init-card-loc,.init-card-desc,.init-card-stat,.dem-sub,.ld-card-desc,.ld-card-meta,.ld-contact-sub,.ld-empty,.rnet-empty .e-sub,.stat-box-r .sl,.bar-count){color:var(--nd-doux)}
+html body.nd .init-logo-box,html body.nd .dem-card .dem-logo{background:rgba(255,255,255,.08);border-color:var(--nd-bord2)}
+html body.nd .stat-box-r .sv{font-family:var(--nd-display);font-weight:500;background:var(--nd-degore);-webkit-background-clip:text;background-clip:text;color:transparent}
+html body.nd .bar-label{color:var(--nd-texte)}
+html body.nd .bar-track{background:rgba(255,255,255,.1)}
+html body.nd .bar-fill{background:var(--nd-degore)}
+html body.nd .ld-card-meta{border-top-color:var(--nd-bord2)}
+html body.nd .ld-contact-row{border-bottom-color:var(--nd-bord2)}
+html body.nd .ld-contact-avatar{background:rgba(227,192,110,.16);color:#F3DC9B}
+
+/* étiquettes */
+html body.nd .init-tag{background:rgba(63,123,255,.14);color:#BFD2FF;border:1px solid rgba(63,123,255,.35)}
+html body.nd .init-tag.secteur{background:rgba(167,139,250,.14);color:#D8CCFF;border-color:rgba(167,139,250,.35)}
+html body.nd .init-tag.badge-verif{background:rgba(143,224,176,.12);color:#9BE8B8;border-color:rgba(143,224,176,.32)}
+html body.nd .init-tag.badge-partner{background:rgba(227,192,110,.14);color:#F3DC9B;border-color:var(--nd-bord)}
+html body.nd .tag-editor{border-color:var(--nd-bord2);background:rgba(255,255,255,.04)}
+html body.nd .tag-editor .te-tag{background:rgba(227,192,110,.16);color:#F3DC9B}
+html body.nd .tag-editor .te-tag button{color:#F3DC9B}
+html body.nd .tag-editor input{color:#fff!important;background:none!important;border:none!important}
+
+/* statuts des demandes */
+html body.nd .dem-en_attente{background:rgba(227,192,110,.16);color:#F3DC9B}
+html body.nd .dem-accepte{background:rgba(143,224,176,.14);color:#9BE8B8}
+html body.nd .dem-refuse{background:rgba(255,154,143,.14);color:#FFB3AA}
+html body.nd .dem-suspendu{background:rgba(255,255,255,.08);color:var(--nd-doux)}
+html body.nd .dem-info_demandee{background:rgba(63,123,255,.16);color:#BFD2FF}
+html body.nd .dem-msg{background:rgba(255,255,255,.05);border-left-color:var(--nd-or);color:var(--nd-texte)}
+
+/* boutons */
+html body.nd .btn-contact{background:var(--nd-degore);color:#1a1405;border-radius:999px;font-weight:800}
+html body.nd .btn-contact:hover{background:var(--nd-degore);filter:brightness(1.07)}
+html body.nd .btn-affil{background:rgba(255,255,255,.06);border-color:var(--nd-bord);color:#F3E3B5;border-radius:999px}
+html body.nd .btn-affil:hover{background:rgba(227,192,110,.16)}
+html body.nd .btn-affil.sent{border-color:var(--nd-bord2);color:var(--nd-doux)}
+html body.nd .btn-affil.membre{background:rgba(143,224,176,.12);border-color:rgba(143,224,176,.4);color:#9BE8B8}
+html body.nd .ld-btn{background:rgba(255,255,255,.06);border-color:var(--nd-bord2);color:var(--nd-texte);border-radius:999px}
+html body.nd .ld-btn:hover{background:rgba(227,192,110,.14);border-color:var(--nd-bord)}
+html body.nd .ld-btn.danger{color:#FF9C9C;border-color:rgba(248,113,113,.5)}
+html body.nd .ld-btn.danger:hover{background:rgba(239,68,68,.14)}
+html body.nd .star-btn{filter:grayscale(1) brightness(1.4)}
+html body.nd .star-btn.on{filter:none}
+
+/* sélecteurs d'icône et de couleur, bandeau d'immatriculation */
+html body.nd .icone-picker{background:rgba(255,255,255,.05)}
+html body.nd :is(.icone-picker span:hover,.icone-picker span.sel){background:rgba(227,192,110,.2)}
+html body.nd .couleur-picker span.sel{border-color:#fff;box-shadow:0 0 0 2px var(--nd-or)}
+html body.nd .immat-banner{background:rgba(227,192,110,.1);border:1px solid var(--nd-bord);color:#F3DC9B}
+html body.nd .form-field label{color:var(--nd-or)}
+
+/* fenêtre d'affiliation */
+html body.nd .modal-back{background:rgba(3,6,14,.74)!important;backdrop-filter:blur(5px)}

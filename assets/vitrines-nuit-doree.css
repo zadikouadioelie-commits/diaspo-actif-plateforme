@@ -1,0 +1,67 @@
+/* Design « Nuit dorée » — Boutiques / Vitrines (vitrines.html) (2026-11-01).
+   S'ajoute à assets/theme-nuit-doree.css et assets/pages-initiative-nuit-doree.css. La page n'a pas de conteneur unique : la classe « nd-zone » est posée sur chaque bloc de contenu
+   (bandeau, chiffres, filtres, en-tête, grille, appel à l'action), jamais sur la barre du haut. Tout est préfixé html body.nd.
+   Retour arrière : retirer les liens, le script, nd-zone et class="nd" sur <body>. */
+
+html body.nd .nd-zone{--border:rgba(255,255,255,.12);--muted:#AEB8D0;--text:#E8ECF6;--navy:#E3C06E;--bg:rgba(255,255,255,.06)}
+
+/* La feuille commune met les zones en fond transparent et arrondit tout élément dont la classe contient « -filter » :
+   on rend ici leur fond aux blocs de cette page et on remet les conteneurs de filtres à plat. */
+html body.nd .vit-hero.nd-zone{background-color:#060A14!important;background-image:url('/assets/hero-boutiques.png')!important;background-size:cover!important;background-position:center!important;background-repeat:no-repeat!important}
+html body.nd .vit-stat-band.nd-zone{background:#0B1226!important}
+html body.nd .vit-filters.nd-zone{background:rgba(6,10,20,.88)!important;border:0!important;border-bottom:1px solid var(--nd-bord2)!important;border-radius:0!important}
+html body.nd .vit-cta.nd-zone{background:radial-gradient(ellipse at 50% 0%,rgba(227,192,110,.14),transparent 65%),#0B1226!important}
+html body.nd .nd-zone :is(.vit-filters-inner,.vit-filter-group,.vit-filter-geo):not(select):not(input){background:none!important;border:0!important;border-radius:0!important;color:inherit!important}
+
+/* bandeau d'accueil : la photo reste, voile plus profond pour la lisibilité */
+html body.nd .vit-hero-overlay{background:linear-gradient(to top,rgba(6,10,20,.92) 0%,rgba(6,10,20,.45) 50%,rgba(6,10,20,.2) 100%)}
+html body.nd .vit-hero-text h1{font-family:var(--nd-display);font-weight:500;font-size:clamp(34px,4vw,52px);letter-spacing:-.01em;text-transform:none}
+
+/* bande de chiffres */
+html body.nd .vit-stat-band{background:#0B1226;border-top:1px solid var(--nd-bord2);border-bottom:1px solid var(--nd-bord2)}
+html body.nd .vit-stat-chip{color:var(--nd-texte);border-right-color:var(--nd-bord2)}
+html body.nd .vit-stat-icon{background:rgba(227,192,110,.14);border:1px solid var(--nd-bord)}
+
+/* recherche et filtres */
+html body.nd .vit-filters{background:rgba(6,10,20,.88);border-bottom:1px solid var(--nd-bord2)}
+html body.nd .vit-filter-group label{color:var(--nd-or);letter-spacing:.08em}
+html body.nd .vit-filter-group :is(select,input[type=text]){background:rgba(255,255,255,.07)!important;border:1px solid rgba(255,255,255,.2)!important;color:#fff!important;border-radius:999px;color-scheme:dark}
+html body.nd .vit-filter-group input::placeholder{color:#8F9BB8}
+html body.nd .vit-filter-group :is(select,input[type=text]):focus{outline:none;border-color:var(--nd-or)!important;box-shadow:0 0 0 3px rgba(227,192,110,.18)}
+html body.nd .vit-filter-group select option{background:#0E1730;color:#fff}
+html body.nd #v-motcle-suggestions{background:#0E1730!important;border:1px solid var(--nd-bord)!important;color:#fff}
+html body.nd .vit-sugg-item:hover{background:rgba(227,192,110,.14)}
+html body.nd .vit-btn-reset{background:rgba(255,255,255,.06);color:var(--nd-doux);border:1px solid var(--nd-bord);border-radius:999px}
+html body.nd .vit-btn-reset:hover{background:rgba(227,192,110,.14)}
+
+/* en-tête de section */
+html body.nd .vit-section-head h2{font-family:var(--nd-display);font-weight:500;color:#fff}
+html body.nd .vit-section-head h2::after{background:var(--nd-degore)}
+html body.nd :is(.vit-section-desc,.vit-result-count){color:var(--nd-doux)}
+
+/* cartes de boutiques */
+html body.nd .vit-card{background:var(--nd-verre)!important;border:1px solid var(--nd-bord2);border-radius:22px;box-shadow:0 26px 54px -34px #000;color:var(--nd-texte)}
+html body.nd .vit-card:hover{border-color:var(--nd-bord);box-shadow:0 30px 60px -32px #000;transform:translateY(-3px)}
+html body.nd .vit-card-title{color:#fff}
+html body.nd .vit-card-desc{color:var(--nd-doux)}
+html body.nd .vit-type-pill-outline{border-color:var(--nd-bord);color:var(--nd-doux)}
+html body.nd .vit-loc-chip{color:#F3DC9B;background:rgba(227,192,110,.12);border-color:var(--nd-bord)}
+html body.nd .vit-prod-mini-photo{background:rgba(255,255,255,.07)}
+html body.nd .vit-prod-mini-nom{color:var(--nd-texte)}
+html body.nd .vit-prod-mini-prix{color:#F3DC9B}
+html body.nd .vit-card-note{color:#F3DC9B}
+html body.nd .vit-card-foot{border-top-color:var(--nd-bord2)}
+html body.nd .vit-card-btn{background:rgba(227,192,110,.14);color:#F3DC9B;border:1px solid var(--nd-bord)}
+html body.nd .vit-card-btn:hover{opacity:1;background:rgba(227,192,110,.26)}
+html body.nd .vit-card-btn-adherer{background:var(--nd-degore);color:#1a1405;border-color:transparent}
+html body.nd .vit-card-btn-adherer:hover{background:var(--nd-degore);filter:brightness(1.07)}
+html body.nd .vit-card-foot{flex-wrap:wrap}
+html body.nd .vit-card-btn-adherer.adh-bientot{background:rgba(255,255,255,.06)!important;color:var(--nd-doux)!important;border:1px solid var(--nd-bord2)!important;white-space:normal;text-align:center;line-height:1.25;cursor:not-allowed}
+
+/* appel à l'action */
+html body.nd .vit-cta{background:radial-gradient(ellipse at 50% 0%,rgba(227,192,110,.14),transparent 65%),#0B1226;border-top:1px solid var(--nd-bord2)}
+html body.nd .vit-cta h3{font-family:var(--nd-display);font-weight:500;color:#fff}
+html body.nd .vit-cta p{color:var(--nd-doux)}
+html body.nd .vit-cta-icon{background:rgba(227,192,110,.14);border:1px solid var(--nd-bord)}
+html body.nd .vit-cta-btn{background:var(--nd-degore);color:#1a1405;border-radius:999px}
+html body.nd .vit-cta-btn:hover{background:var(--nd-degore);filter:brightness(1.07)}
