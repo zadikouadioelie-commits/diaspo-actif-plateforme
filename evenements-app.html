@@ -702,17 +702,21 @@
          l'événement, voir le bouton "📝 Fiche d'inscription" plus haut. -->
     <div style="margin-bottom:16px;">
       <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:6px;">🖼️ Photos supplémentaires <span style="font-weight:400;text-transform:none;color:#aaa;">(2 maximum · JPG, PNG, WebP — cliquez sur une photo pour la remplacer, « × » pour la supprimer)</span></label>
+      <div id="gallery-format" role="group" aria-label="Format des photos supplémentaires" style="display:flex;gap:6px;flex-wrap:wrap;margin:0 0 8px;align-items:center;"><span style="font-size:12px;color:var(--muted);font-weight:600;">Format de la photo :</span><button type="button" class="cov-fmt on" data-fmt="auto">Automatique</button><button type="button" class="cov-fmt" data-fmt="paysage">▭ Paysage</button><button type="button" class="cov-fmt" data-fmt="portrait">▯ Portrait</button></div>
+      <div style="font-size:11.5px;color:var(--muted);margin:0 0 8px;">Choisissez le format <b>avant</b> d'ajouter une photo, ou cliquez sur ✂ pour recadrer une photo déjà ajoutée.</div>
       <div style="display:flex;flex-wrap:nowrap;gap:8px;max-width:250px;" id="gallery-slots">
         <div id="gslot-0" style="flex:1;min-width:0;aspect-ratio:1;border:2px dashed var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;background:#FAFAFA;position:relative;" onclick="document.getElementById('gfile-0').click()">
           <span style="font-size:20px;color:#ccc;" id="gph-0">＋</span>
           <img id="gimg-0" style="display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:contain;" alt="">
           <button id="gdel-0" onclick="event.stopPropagation();clearPhoto(0)" style="display:none;position:absolute;top:3px;right:3px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:26px;height:26px;font-size:15px;cursor:pointer;line-height:1;z-index:2;" title="Supprimer cette photo" aria-label="Supprimer cette photo">×</button>
+          <button id="gcrop-0" onclick="event.stopPropagation();recadrerPhoto(0)" style="display:none;position:absolute;top:3px;left:3px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:26px;height:26px;font-size:13px;cursor:pointer;line-height:1;z-index:2;" title="Recadrer / changer de format" aria-label="Recadrer cette photo">✂</button>
           <input type="file" id="gfile-0" accept="image/jpeg,image/png,image/webp" style="display:none">
         </div>
         <div id="gslot-1" style="flex:1;min-width:0;aspect-ratio:1;border:2px dashed var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;background:#FAFAFA;position:relative;" onclick="document.getElementById('gfile-1').click()">
           <span style="font-size:20px;color:#ccc;" id="gph-1">＋</span>
           <img id="gimg-1" style="display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:contain;" alt="">
           <button id="gdel-1" onclick="event.stopPropagation();clearPhoto(1)" style="display:none;position:absolute;top:3px;right:3px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:26px;height:26px;font-size:15px;cursor:pointer;line-height:1;z-index:2;" title="Supprimer cette photo" aria-label="Supprimer cette photo">×</button>
+          <button id="gcrop-1" onclick="event.stopPropagation();recadrerPhoto(1)" style="display:none;position:absolute;top:3px;left:3px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:26px;height:26px;font-size:13px;cursor:pointer;line-height:1;z-index:2;" title="Recadrer / changer de format" aria-label="Recadrer cette photo">✂</button>
           <input type="file" id="gfile-1" accept="image/jpeg,image/png,image/webp" style="display:none">
         </div>
       </div>
@@ -2035,6 +2039,19 @@ function cadreAffiche(dim, format) {
   const outW = aspect < 1 ? 1080 : 1200;
   return { aspect, outW, outH: Math.round(outW / aspect) };
 }
+/* Relire une image déjà dans le formulaire pour la recadrer : une image fraîchement choisie est un « data: » (le navigateur refuse de la relire par fetch — règle de sécurité connect-src de la page, 2026-10-31),
+   on la décode donc directement ; une image déjà enregistrée est une adresse Bunny CDN, relue par notre serveur. */
+async function imageVersFichier(src, nom) {
+  const m = /^data:([^;,]+)?(;base64)?,(.*)$/s.exec(src);
+  if (m) {
+    const bin = m[2] ? atob(m[3]) : decodeURIComponent(m[3]);
+    const octets = new Uint8Array(bin.length);
+    for (let k = 0; k < bin.length; k++) octets[k] = bin.charCodeAt(k);
+    return new File([octets], nom, { type: m[1] || 'image/jpeg' });
+  }
+  const blob = await (await fetch(/^https?:\/\//i.test(src) ? '/api/media/proxy?url=' + encodeURIComponent(src) : src)).blob();
+  return new File([blob], nom, { type: blob.type || 'image/jpeg' });
+}
 function majCoverUI() {
   const a = !!coverData;
   if (a) document.getElementById('cover-img').src = coverData;
@@ -2067,9 +2084,7 @@ window.recadrerCouverture = async function () {
     // Access-Control-Allow-Origin, donc le fetch échouait silencieusement (CORS) — toujours
     // "Impossible de recadrer cette image ici" (2026-10-30, capture utilisateur à l'appui).
     // Passe par notre propre serveur (GET /api/media/proxy), qui lui n'a pas cette limite.
-    const src = /^https?:\/\//i.test(coverData) ? '/api/media/proxy?url=' + encodeURIComponent(coverData) : coverData;
-    const blob = await (await fetch(src)).blob();
-    await traiterCouverture(new File([blob], 'couverture.jpg', { type: blob.type || 'image/jpeg' }));
+    await traiterCouverture(await imageVersFichier(coverData, 'couverture.jpg'));
   }
   catch (e) { alert("Impossible de recadrer cette image ici : cliquez sur « Changer l'image » et choisissez-la de nouveau."); }
 };
@@ -2081,30 +2096,51 @@ function remplirPhoto(i, src) {
   document.getElementById('gimg-'+i).style.display = '';
   document.getElementById('gph-'+i).style.display = 'none';
   document.getElementById('gdel-'+i).style.display = '';
+  document.getElementById('gcrop-'+i).style.display = '';
   document.getElementById('gslot-'+i).style.borderColor = 'var(--orange)';
+}
+/* Format des photos supplémentaires (2026-10-31, demande explicite : « permets de choisir le format paysage ou portrait ») — même choix que pour l'affiche :
+   Automatique = forme de la photo, Paysage = 2:1, Portrait = 4:5. Le format sélectionné s'applique à la prochaine photo ajoutée ou recadrée. */
+let galFormat = 'auto';
+document.getElementById('gallery-format').addEventListener('click', e => {
+  const b = e.target.closest('.cov-fmt'); if (!b) return;
+  galFormat = b.dataset.fmt;
+  document.querySelectorAll('#gallery-format .cov-fmt').forEach(x => x.classList.toggle('on', x.dataset.fmt === galFormat));
+});
+async function traiterPhotoGalerie(i, file) {
+  if (file.size > 10*1024*1024) { alert('Image trop lourde (max 10 Mo).'); return; }
+  const cg = cadreAffiche(await lireDimensions(file), galFormat); // « Automatique » = photo entière (plus de carré imposé)
+  const recadree = await flashRecadrer(file, { shape: 'rect', aspect: cg.aspect, outW: cg.outW, outH: cg.outH });
+  if (!recadree) return; // recadrage annulé par la personne
+  const bar = document.getElementById('gallery-bar');
+  document.getElementById('gallery-progress').style.display = '';
+  bar.style.width = '30%';
+  const b64 = await compressImage(recadree, 1200, 1800, 0.8);
+  galleryData[i] = b64;
+  bar.style.width = '100%';
+  setTimeout(() => document.getElementById('gallery-progress').style.display = 'none', 600);
+  remplirPhoto(i, b64);
 }
 [0, 1].forEach(i => {
   document.getElementById('gfile-'+i).addEventListener('change', async function() {
     const file = this.files[0]; if (!file) return;
-    if (file.size > 10*1024*1024) { alert('Image trop lourde (max 10 Mo).'); return; }
-    const cg = cadreAffiche(await lireDimensions(file), 'auto'); // photo entière (plus de carré imposé)
-    const recadree = await flashRecadrer(file, { shape: 'rect', aspect: cg.aspect, outW: cg.outW, outH: cg.outH });
-    if (!recadree) return; // recadrage annulé par la personne
-    const bar = document.getElementById('gallery-bar');
-    document.getElementById('gallery-progress').style.display = '';
-    bar.style.width = '30%';
-    const b64 = await compressImage(recadree, 1200, 1800, 0.8);
-    galleryData[i] = b64;
-    bar.style.width = '100%';
-    setTimeout(() => document.getElementById('gallery-progress').style.display = 'none', 600);
-    remplirPhoto(i, b64);
+    await traiterPhotoGalerie(i, file);
+    this.value = ''; // permet de rechoisir le même fichier
   });
 });
+/* Recadrer une photo déjà ajoutée : une photo déjà enregistrée est une adresse Bunny CDN (pas de CORS) — on la relit par notre serveur (même principe que recadrerCouverture). */
+window.recadrerPhoto = async function(i) {
+  const s = galleryData[i]; if (!s) return;
+  try {
+    await traiterPhotoGalerie(i, await imageVersFichier(s, 'photo.jpg'));
+  } catch (e) { alert("Impossible de recadrer cette photo ici : cliquez dessus et choisissez-la de nouveau."); }
+};
 window.clearPhoto = function(i) {
   galleryData[i] = null;
   document.getElementById('gimg-'+i).style.display = 'none';
   document.getElementById('gph-'+i).style.display = '';
   document.getElementById('gdel-'+i).style.display = 'none';
+  document.getElementById('gcrop-'+i).style.display = 'none';
   document.getElementById('gfile-'+i).value = '';
   document.getElementById('gslot-'+i).style.borderColor = '';
 };
