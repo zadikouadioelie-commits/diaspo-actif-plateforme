@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════
    assets/admin-kofi.js — Koffi · Budget IA (2026-10-30)
    Tableau de bord administrateur : réserve de crédits d'IA (recharges chez le fournisseur − coût estimé des questions),
-   coût et volume des 30 derniers jours, forfaits vendus, journal des recharges et réglages de Koffi.
+   coût et volume des 30 derniers jours, recharges vendues, journal des recharges et réglages de Koffi.
    Données : GET /api/admin/kofi/budget · GET|PUT /api/admin/kofi/reglages · POST /api/admin/kofi/budget/recharge (server/kofi.js).
    Dépend de la fonction globale api() du tableau de bord.
    ═══════════════════════════════════════════════════════ */
@@ -23,7 +23,12 @@
     const t = String(s).replace(' ', 'T'), d = new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(t) ? t : t + 'Z');
     return isNaN(d) ? esc(s) : d.toLocaleString('fr-FR', { timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   };
-  const CATEGORIES = { gratuit: 'Questions offertes', forfait: 'Questions du forfait', apercu: 'Aperçu (formateurs et administration)', createur_gratuit: 'Assistant de création — messages offerts', createur_forfait: 'Assistant de création — messages du forfait', createur_refus: 'Assistant de création — refus du fournisseur' };
+  const CATEGORIES = {
+    gratuit: 'Tuteur — questions offertes (sans Premium)', apercu: 'Aperçu (formateurs et administration)', apercu_gratuit: 'Aperçu (formateurs et administration)',
+    eleve_mensuel: 'Tuteur — crédit mensuel Premium', eleve_achat: 'Tuteur — crédit acheté', eleve_illimite: 'Tuteur — compte illimité', eleve_refus: 'Tuteur — refus du fournisseur',
+    createur_offert: 'Assistant de création — messages offerts', createur_mensuel: 'Assistant de création — crédit mensuel Premium', createur_achat: 'Assistant de création — crédit acheté', createur_illimite: 'Assistant de création — compte illimité', createur_refus: 'Assistant de création — refus du fournisseur',
+    annuaire_mensuel: 'Conseiller de l\'Annuaire — crédit mensuel Premium', annuaire_achat: 'Conseiller de l\'Annuaire — crédit acheté', annuaire_illimite: 'Conseiller de l\'Annuaire — compte illimité', annuaire_refus: 'Conseiller de l\'Annuaire — refus du fournisseur', annuaire_illisible: 'Conseiller de l\'Annuaire — réponse illisible'
+  };
   const TYPES_BUDGET = { recharge: 'Recharge', ajustement: 'Ajustement' };
 
   /* Réglages affichés : { cle, lib, aide, unite?, step? } — les bornes et les valeurs par défaut viennent du serveur. */
@@ -35,23 +40,33 @@
     { titre: '🌍 Pays', champs: [
       { cle: 'pays_filtre_actif', lib: 'Fermer Koffi hors des pays pris en charge', type: 'bool', aide: 'Oui (recommandé) : une personne connectée depuis un pays absent de la liste du fournisseur d\'IA ne peut pas utiliser Koffi. Non : aucun contrôle (à ne faire que si la liste est périmée et en attendant sa mise à jour).' },
     ] },
-    { titre: '🎁 Questions offertes', champs: [
-      { cle: 'gratuit_questions', lib: 'Questions offertes par compte', unite: 'questions', aide: 'Accordées une seule fois par compte, à sa première question. Une modification ne concerne que les comptes pas encore servis.' },
+    { titre: '💶 Crédit Koffi (portefeuille unique en euros)', note: 'Un seul portefeuille alimente le tuteur des formations, l\'assistant de création et le conseiller de l\'Annuaire. Le coût réel de chaque appel est décompté en euros. Si vous modifiez la recharge ou la validité, relisez l\'article 6 ter des CGV (cgv.html) et la politique de confidentialité (§ Koffi), qui citent ces chiffres.', champs: [
+      { cle: 'credit_mensuel_utilisateur_eur', lib: 'Crédit mensuel Premium — personne', unite: '€', step: 0.05, aide: 'Offert au début de chaque mois civil à un compte Premium. Non reporté d\'un mois sur l\'autre.' },
+      { cle: 'credit_mensuel_initiative_eur', lib: 'Crédit mensuel Premium — initiative', unite: '€', step: 0.05 },
+      { cle: 'credit_mensuel_collectivite_eur', lib: 'Crédit mensuel Premium — collectivité', unite: '€', step: 0.05 },
+      { cle: 'alerte_solde_pct', lib: 'Alerte « crédit bas »', unite: '% du crédit mensuel', aide: 'Quand le solde passe sous ce pourcentage du crédit mensuel, la pastille de crédit devient orange et propose la recharge.' },
+      { cle: 'coefficient_cout', lib: 'Coefficient appliqué au coût réel', step: 0.05, aide: '1 = le coût réel est décompté tel quel. Par exemple 1,2 ajoute 20 % de marge de sécurité (variations du taux de change).' },
+      { cle: 'compte_officiel_id', lib: 'Compte « Diaspo\'Actif Officiel » (identifiant)', aide: 'Ce compte, comme les administrateurs, n\'a aucune limite d\'usage pour Koffi. 0 = aucun. Renseignez l\'identifiant numérique du compte (en production : 11595).' },
+    ] },
+    { titre: '🔁 Recharge payante', note: 'Les prix sont vérifiés côté serveur. Le crédit n\'arrive qu\'à la confirmation signée de Stripe. La recharge est non remboursable une fois le service fourni (renonciation au droit de rétractation acceptée avant paiement).', champs: [
+      { cle: 'recharge_min_eur', lib: 'Montant minimum payé', unite: '€', step: 0.5, aide: 'Minimum 0,50 € (limite de Stripe).' },
+      { cle: 'recharge_ratio', lib: 'Euros payés pour 1 € de crédit', unite: '€ payés', step: 0.5, aide: '3 : payer 3 € donne 1 € de crédit d\'utilisation (6 → 2, 15 → 5). La différence couvre les frais Stripe, la TVA, le coût réel et le fonctionnement.' },
+      { cle: 'forfait_validite_mois', lib: 'Validité du crédit acheté', unite: 'mois', aide: 'Annoncée avant le paiement (CGV art. 6 ter). S\'applique aux prochains achats ; les crédits déjà achetés ne changent pas.' },
+    ] },
+    { titre: '🎁 Questions offertes (comptes sans Premium)', champs: [
+      { cle: 'gratuit_questions', lib: 'Questions offertes par compte', unite: 'questions', aide: 'Accordées une seule fois par compte, jamais renouvelées. Une modification ne concerne que les comptes pas encore servis. « Que sais-tu faire ? » reste gratuit et illimité.' },
       { cle: 'budget_seuil_gratuit_eur', lib: 'Seuil de réserve pour offrir', unite: '€', step: 0.5, aide: 'Sous ce seuil, plus aucun nouveau compte ne reçoit ses questions offertes, et les comptes qui les ont épuisées voient l\'offre de recharge. Réserve à zéro : Koffi est indisponible pour tous.' },
     ] },
-    { titre: '🛒 Forfait de questions', note: 'S\'applique aux prochains achats ; les forfaits déjà achetés ne changent pas. Si vous modifiez ces valeurs, relisez l\'article 6 ter des CGV (cgv.html), qui cite le tarif.', champs: [
-      { cle: 'forfait_questions', lib: 'Questions par forfait', unite: 'questions' },
-      { cle: 'forfait_prix_eur', lib: 'Prix du forfait', unite: '€', step: 0.05, aide: 'Minimum 0,50 € (limite de Stripe). Aucune commission Diaspo\'Actif : seuls les frais Stripe s\'appliquent.' },
-      { cle: 'forfait_validite_mois', lib: 'Validité', unite: 'mois' },
-    ] },
-    { titre: '🤖 Assistant de création (formateurs)', note: 'Koffi aide les formateurs à créer leur formation. Compteur séparé de celui des élèves ; un formateur reçoit des messages offerts chaque jour, puis peut acheter un forfait.', champs: [
-      { cle: 'createur_gratuit_jour', lib: 'Messages offerts par jour et par formateur', unite: 'messages', aide: 'Fenêtre glissante de 24 h. À 0, seul le forfait permet d\'utiliser l\'assistant.' },
-      { cle: 'createur_forfait_messages', lib: 'Messages par forfait', unite: 'messages' },
-      { cle: 'createur_forfait_prix_eur', lib: 'Prix du forfait', unite: '€', step: 0.05, aide: 'Minimum 0,50 € (limite de Stripe). Aucune commission Diaspo\'Actif : seuls les frais Stripe s\'appliquent. Si vous modifiez ce prix, relisez l\'article 6 ter des CGV.' },
-      { cle: 'createur_forfait_validite_mois', lib: 'Validité du forfait', unite: 'mois' },
+    { titre: '🤖 Assistant de création (formateurs)', note: 'Koffi aide les formateurs à créer leur formation. Il puise dans le même portefeuille en euros que le tuteur.', champs: [
       { cle: 'createur_max_message_caracteres', lib: 'Longueur maximale d\'un message', unite: 'caractères', aide: 'Permet de coller un module entier d\'un seul coup. Plus c\'est long, plus chaque message coûte.' },
       { cle: 'createur_max_sortie_tokens', lib: 'Longueur maximale d\'une réponse', unite: 'jetons' },
-      { cle: 'plafond_jour_createur', lib: 'Messages par jour et par formateur (plafond absolu)', unite: 'messages', aide: 'Protège la réserve contre un usage abusif, forfait compris.' },
+      { cle: 'plafond_jour_createur', lib: 'Messages par jour et par formateur (plafond absolu)', unite: 'messages', aide: 'Protège la réserve contre un usage abusif.' },
+    ] },
+    { titre: '🧭 Conseiller de l\'Annuaire', note: 'Koffi pose des questions puis propose des profils publics (Premium, avec photo et descriptif, n\'ayant pas coché « Ne pas être proposé par Koffi »). Seuls les champs publics de ces profils sont transmis au fournisseur d\'IA.', champs: [
+      { cle: 'annuaire_max_message_caracteres', lib: 'Longueur maximale d\'un message', unite: 'caractères' },
+      { cle: 'annuaire_max_sortie_tokens', lib: 'Longueur maximale d\'une réponse', unite: 'jetons' },
+      { cle: 'annuaire_nb_candidats', lib: 'Profils examinés à chaque recherche', unite: 'profils', aide: 'Plus de profils = meilleures propositions, mais plus de jetons à payer.' },
+      { cle: 'plafond_jour_annuaire', lib: 'Messages par jour et par compte (plafond absolu)', unite: 'messages', aide: 'Protège la réserve contre un usage abusif.' },
     ] },
     { titre: '🛡️ Plafonds et limites', champs: [
       { cle: 'plafond_jour_par_eleve', lib: 'Questions par jour et par élève', unite: 'questions', aide: 'Protège la réserve contre un usage abusif ou automatisé.' },
@@ -122,8 +137,8 @@
       + carte(B.alerte === 'epuise' ? '#DC2626' : (B.alerte === 'bas' ? '#D97706' : '#059669'), 'Réserve d\'IA', eur(B.reserve_eur), 'recharges − coût estimé')
       + carte('#2563EB', 'Questions (30 jours)', nb(q))
       + carte('#7C3AED', 'Coût estimé (30 jours)', eur(c), q ? 'soit ' + eur(c / q, 4) + ' par question' : '')
-      + carte('#E87C3E', 'Forfaits vendus', nb(v.commandes), nb(v.questions) + ' questions · ' + eur(v.encaisse_eur) + ' brut, avant frais Stripe')
-      + carte('#0891B2', 'Comptes ayant reçu l\'essai', nb(B.comptes_avec_essai_gratuit))
+      + carte('#E87C3E', 'Recharges vendues', nb(v.commandes), eur(v.encaisse_eur) + ' brut, avant frais Stripe')
+      + carte('#0891B2', 'Comptes ayant reçu leurs questions offertes', nb(B.comptes_avec_essai_gratuit))
       + '</div>';
   }
 

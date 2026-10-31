@@ -35,9 +35,10 @@
     mineur: 'Koffi est réservé aux personnes de 18 ans ou plus. Vos outils de création restent disponibles sans lui.',
     pays: 'Koffi n\'est pas disponible dans votre pays pour le moment. Vos outils de création restent accessibles.',
     desactive: 'Koffi est désactivé pour le moment.', indisponible: 'Koffi est momentanément indisponible. Réessayez plus tard.',
-    rechargeTitre: 'Vos messages offerts du jour sont épuisés',
-    rechargeTexte: function (f) { return 'Reprenez demain (' + f.gratuits + ' messages offerts par jour), ou achetez un forfait de ' + f.messages + ' messages pour ' + String(f.prix_eur).replace('.', ',') + ' € (valable ' + f.validite_mois + ' mois).'; },
-    acheter: 'Acheter le forfait', erreur: 'Une erreur est survenue. Réessayez.', trop: 'Message trop long.',
+    rechargeTitre: 'Votre crédit Koffi est épuisé',
+    rechargeTexte: 'Rechargez votre crédit pour continuer : le même crédit sert à tout Koffi (cours, création de formation, Annuaire). Demander à Koffi ce qu\'il sait faire reste gratuit.',
+    rechargeTextePremium: 'Votre crédit du mois est utilisé : il est renouvelé le mois prochain. Vous pouvez aussi recharger dès maintenant ; le même crédit sert à tout Koffi.',
+    acheter: 'Recharger mon crédit', erreur: 'Une erreur est survenue. Réessayez.', trop: 'Message trop long.',
     nouvelleDisc: '＋ Nouvelle discussion', nouveauDossier: '📁 Nouveau dossier', nomDossier: 'Nom du dossier (ex. : Module 3)', renommer: 'Renommer', supprimer: 'Supprimer', deplacer: 'Ranger dans…', horsDossier: 'Hors dossier', sansDossier: 'Discussions hors dossier',
     aucune: 'Aucune discussion pour le moment.', plein: 'Agrandir', reduire: 'Réduire la hauteur', nomDisc: 'Nouveau titre'
   };
@@ -195,10 +196,19 @@
     d.querySelector('button').addEventListener('click', function () { try { localStorage.setItem('kc_info_v1', '1'); } catch (e) { /* sans importance */ } d.remove(); });
     E.body.insertBefore(d, E.body.firstChild);
   }
+  /* Le crédit : le même portefeuille que le tuteur et le conseiller de l'Annuaire (assets/koffi-credit.js) ; la pastille est cliquable (détail + recharge). */
+  function ouvrirCredit() { if (window.KoffiCredit) window.KoffiCredit.ouvrir({ lg: 'fr', page: 'createur', formationId: fid() }); }
+  function chargerCredit() {
+    if (window.KoffiCredit) return Promise.resolve();
+    return new Promise(function (ok) { var sc = document.createElement('script'); sc.src = '/assets/koffi-credit.js?v=2'; sc.onload = ok; sc.onerror = ok; document.head.appendChild(sc); });
+  }
   function pastilleCredits() {
-    var c = etat && etat.credits; if (!c) { E.cred.textContent = ''; return; }
-    var t = T.gratuits(c.gratuits_restants, c.gratuits_jour); if (c.achetes_restants > 0) t += ' · ' + T.achetes(c.achetes_restants);
-    E.cred.textContent = t;
+    var c = etat && etat.credits;
+    if (!c || !window.KoffiCredit) { E.cred.textContent = ''; E.credBtn = null; return; }
+    if (!E.credBtn || !E.cred.contains(E.credBtn)) {
+      E.cred.textContent = ''; E.credBtn = document.createElement('button'); E.credBtn.type = 'button'; E.credBtn.addEventListener('click', ouvrirCredit); E.cred.appendChild(E.credBtn);
+    }
+    window.KoffiCredit.appliquer(E.credBtn, c, 'fr');
   }
   function nomDossier(id) { var d = etat && (etat.dossiers || []).filter(function (x) { return x.id === id; })[0]; return d ? d.nom : ''; }
   function majOu() {
@@ -354,21 +364,13 @@
     ko.addEventListener('click', function () { ko.disabled = true; api('POST', '/api/kofi/createur/actions/' + a.id + '/annuler', {}).then(function () { fin({ statut: 'annulee' }); }).catch(function (er) { ko.disabled = false; alert(er.message); }); });
   }
 
+  /* Crédit épuisé : la carte explique et ouvre la fenêtre du crédit (offres, consentement exprès, paiement Stripe). Un Premium retrouve son crédit du mois le mois suivant. */
   function rendreRecharge() {
-    var f = etat.forfait, c = etat.credits || {};
-    var d = carteEtat(T.rechargeTitre, T.rechargeTexte({ gratuits: c.gratuits_jour, messages: f.messages, prix_eur: f.prix_eur, validite_mois: f.validite_mois }));
-    var l1 = document.createElement('label'); l1.innerHTML = '<input type="checkbox" class="a"> ' + esc(f.texte);
-    var l2 = document.createElement('label'); l2.innerHTML = '<input type="checkbox" class="b"> ' + esc(f.retractation);
-    var b = document.createElement('button'); b.type = 'button'; b.className = 'kc-ok'; b.textContent = T.acheter + ' — ' + String(f.prix_eur).replace('.', ',') + ' €'; b.disabled = true;
-    d.appendChild(l1); d.appendChild(l2); d.appendChild(b);
-    var maj = function () { b.disabled = !(l1.querySelector('input').checked && l2.querySelector('input').checked); };
-    l1.addEventListener('change', maj); l2.addEventListener('change', maj);
-    b.addEventListener('click', function () {
-      b.disabled = true;
-      api('POST', '/api/kofi/createur/forfait/acheter', { formation_id: fid(), accepte_non_remboursable: true }).then(function (r) { if (r.checkout_url) window.location.href = r.checkout_url; })
-        .catch(function (er) { b.disabled = false; alert(er.message); });
-    });
-    bloquer(true);
+    var premium = !!(etat && etat.credits && etat.credits.premium);
+    var d = carteEtat(T.rechargeTitre, premium ? T.rechargeTextePremium : T.rechargeTexte);
+    var b = document.createElement('button'); b.type = 'button'; b.className = 'kc-ok'; b.textContent = T.acheter; b.addEventListener('click', ouvrirCredit);
+    d.appendChild(b);
+    /* La saisie reste ouverte : « Que sais-tu faire ? » est toujours gratuit, même à zéro ; le serveur répond 402 à toute autre demande. */
   }
 
   function charger() {
@@ -399,10 +401,10 @@
       majOu(); defiler(); if (nouvelle) rafraichir();
     }).catch(function (er) {
       att.remove();
-      if (er.data && er.data.code === 'credits_epuises') { if (etat) { etat.etat = 'recharge'; if (er.data.forfait) etat.forfait = Object.assign({}, etat.forfait, er.data.forfait); } rendreRecharge(); }
+      if (er.data && er.data.code === 'credits_epuises') { if (etat) { etat.etat = 'recharge'; if (er.data.credits) etat.credits = er.data.credits; pastilleCredits(); } rendreRecharge(); }
       else bulle('bot', '⚠️ ' + er.message);
       defiler();
-    }).then(function () { occupe = false; if (!(etat && etat.etat === 'recharge')) E.send.disabled = false; });
+    }).then(function () { occupe = false; E.send.disabled = false; });
   }
 
   function ouvrir(prefill) {
@@ -414,17 +416,15 @@
 
   /* Retour du paiement Stripe : message clair, puis l'adresse est nettoyée. */
   function retourPaiement() {
-    try {
-      var p = new URLSearchParams(window.location.search), r = p.get('kofi_createur'); if (!r) return;
-      var msg = r === 'succes' ? 'Merci ! Vos messages Koffi seront crédités dans quelques instants, dès que le paiement est confirmé.' : 'Paiement annulé : aucun message n\'a été acheté.';
-      if (typeof window.showMsg === 'function') window.showMsg(msg, r === 'succes' ? 'success' : 'warning'); else alert(msg);
-      p.delete('kofi_createur'); p.delete('formation');
-      window.history.replaceState({}, '', window.location.pathname + (p.toString() ? '?' + p.toString() : ''));
-    } catch (e) { /* sans importance */ }
+    if (!window.KoffiCredit) return;
+    window.KoffiCredit.retourPaiement({ lg: 'fr', onFin: function (statut, msg) {
+      if (typeof window.showMsg === 'function') window.showMsg(msg, statut === 'ok' ? 'success' : (statut === 'annule' ? 'warning' : 'info')); else if (statut !== 'attente') alert(msg);
+      if (statut === 'ok' || statut === 'tard') { etat = null; if (ouvert()) charger(); }
+    } });
   }
 
   window.KoffiCreateur = {
-    monter: function (o) { opts = o || {}; monterDom(); retourPaiement(); },
+    monter: function (o) { opts = o || {}; monterDom(); chargerCredit().then(function () { pastilleCredits(); retourPaiement(); }); },
     ouvrir: function (prefill) { if (E.panel) ouvrir(prefill); },
     recharger: function () { etat = null; if (ouvert()) charger(); }
   };

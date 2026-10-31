@@ -100,6 +100,16 @@
       <div id="push-pref-zone"></div>
     </div>
 
+    <div id="koffi-annuaire-bloc" style="display:none;margin-top:32px;padding-top:20px;border-top:1px solid var(--border);">
+      <h3 style="font-size:14px;margin:0 0 6px;">🤖 Koffi, conseiller de l'Annuaire</h3>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 12px;">Koffi aide les membres Premium à trouver le bon interlocuteur dans l'Annuaire et peut proposer votre profil public (si vous êtes Premium et avez une photo et un descriptif). Il ne lit que les informations déjà publiques de votre profil, jamais votre e-mail, votre téléphone ni vos messages.</p>
+      <label style="display:flex;gap:10px;align-items:flex-start;font-size:13.5px;color:#374151;cursor:pointer;">
+        <input type="checkbox" id="koffi-non-propose" style="margin-top:3px;width:18px;height:18px;flex:none;">
+        <span><b>Ne pas être proposé par Koffi</b><br><span style="color:var(--muted);font-size:12.5px;">Décochée par défaut. Si vous la cochez, Koffi ne vous proposera plus aux autres membres et, par réciprocité, vous ne pourrez plus utiliser son conseiller dans l'Annuaire (la recherche manuelle reste disponible). Vous pouvez la décocher à tout moment.</span></span>
+      </label>
+      <p id="koffi-non-propose-msg" role="status" aria-live="polite" style="font-size:12.5px;margin:8px 0 0;min-height:18px;color:#166534;"></p>
+    </div>
+
     <div style="margin-top:32px;padding-top:20px;border-top:1px solid var(--border);">
       <h3 style="color:#dc2626;font-size:14px;margin:0 0 6px;">⚠️ Zone de danger</h3>
       <p style="font-size:13px;color:var(--muted);margin:0 0 12px;">Masquer votre compte rend votre profil public invisible aux autres utilisateurs. Vos données restent intactes : reconnectez-vous à tout moment pour le réafficher.</p>
@@ -288,6 +298,30 @@
    (liée depuis tous les tableaux de bord, quel que soit le rôle) : contrairement au panneau
    Confidentialité de profil-app.html, inatteignable pour le rôle Utilisateur (Carte
    Diaspo'Actif dédiée), c'est ici que le message affiché par la bannière renvoie vraiment. */
+/* ── Koffi, conseiller de l'Annuaire (2026-11-01) : « Ne pas être proposé par Koffi » — décochée par défaut ; cochée, le compte n'est plus proposé ET ne peut plus utiliser le conseiller (réciprocité, appliquée par le serveur). */
+(async function initKoffiNonPropose(){
+  const bloc = document.getElementById('koffi-annuaire-bloc'), cb = document.getElementById('koffi-non-propose'), msg = document.getElementById('koffi-non-propose-msg');
+  if (!bloc || !cb) return;
+  try {
+    const r = await fetch('/api/kofi/annuaire/visibilite', { credentials: 'same-origin' });
+    if (!r.ok) return;                      /* visiteur non connecté : rien à régler */
+    cb.checked = !!(await r.json()).non_propose;
+    bloc.style.display = '';
+  } catch(e) { return; }
+  cb.addEventListener('change', async () => {
+    const voulu = cb.checked; cb.disabled = true; msg.style.color = '#374151'; msg.textContent = '…';
+    try {
+      const r = await fetch('/api/kofi/annuaire/visibilite', { method: 'PUT', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ non_propose: voulu }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || 'Erreur.');
+      msg.style.color = '#166534';
+      msg.textContent = voulu ? '✓ Enregistré : Koffi ne vous proposera plus. Le conseiller de l\'Annuaire est fermé pour votre compte tant que cette case est cochée.' : '✓ Enregistré : Koffi peut de nouveau vous proposer (si vous êtes Premium avec photo et descriptif).';
+    } catch(e) {
+      cb.checked = !voulu; msg.style.color = '#b91c1c'; msg.textContent = e.message || 'Erreur : réessayez.';
+    } finally { cb.disabled = false; }
+  });
+})();
+
 (async function initPwaPrefZone(){
   const zone = document.getElementById('pwa-pref-zone');
   if (!zone) return;

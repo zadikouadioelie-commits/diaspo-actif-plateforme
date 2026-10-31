@@ -267,6 +267,10 @@
         <button class="cf-row" role="switch" aria-checked="false" id="cf-push" data-cf="push" disabled><span class="sp"><span class="t">Notifications sur ce téléphone</span><span class="d" id="cf-push-d">Vérification en cours…</span></span><span class="cf-sw" aria-hidden="true"></span></button>
         <button class="cf-row" role="switch" aria-checked="${pwaActive}" id="cf-pwa" data-cf="pwa"><span class="sp"><span class="t">Proposer le raccourci sur l’écran d’accueil</span><span class="d">Diaspo’Actif peut vous proposer, de temps en temps, d’ajouter un raccourci. Réglage lié à votre compte, valable sur tous vos appareils.</span></span><span class="cf-sw" aria-hidden="true"></span></button>
       </div>
+      <div class="h2">KOFFI, CONSEILLER DE L’ANNUAIRE</div>
+      <div class="cf-card">
+        <button class="cf-row" role="switch" aria-checked="false" id="cf-koffi" data-cf="koffi" disabled><span class="sp"><span class="t">Ne pas être proposé par Koffi</span><span class="d" id="cf-koffi-d">Vérification en cours…</span></span><span class="cf-sw" aria-hidden="true"></span></button>
+      </div>
       <div class="h2">À FINIR SUR LE SITE</div>
       <div class="cf-card">
         ${estInitiative() || role() === 'collectivite' ? ligne('gestionnaire', 'swap', 'Changer de gestionnaire du compte', 'Transférer la gestion à une autre personne') : ''}
@@ -277,6 +281,7 @@
     setPane('Confidentialité', html);
     brancherPrincipal();
     detecterPush();
+    detecterKoffi();
   }
 
   function brancherPrincipal() {
@@ -297,6 +302,7 @@
         case 'daid': feuilleDaId(); break;
         case 'push': basculerPush(b); break;
         case 'pwa': basculerPwa(b); break;
+        case 'koffi': basculerKoffi(b); break;
         case 'ds': feuilleDsId(); break;
         case 'gestionnaire': feuilleSite('Changer de gestionnaire du compte', `<p class="cf-sheet-p">Cette procédure transfère <b>définitivement</b> la gestion du compte à une autre personne : l’ancien gestionnaire est révoqué et un nouveau code confidentiel est généré.</p><p class="cf-sheet-p">Elle se déroule en plusieurs étapes verrouillées (codes reçus par e-mail, vérification d’identité, validation finale) avec un nombre de tentatives limité chaque mois.</p>`, 'Démarrer la procédure sur le site'); break;
         case 'masquer': feuilleSite('Masquer mon compte', `<p class="cf-sheet-p">Masquer votre compte rend votre profil public invisible aux autres utilisateurs. Vos données restent intactes : reconnectez-vous à tout moment pour le réafficher.</p><p class="cf-sheet-p">Par sécurité, cette action demande de confirmer avec votre mot de passe.</p>`, 'Masquer mon compte sur le site'); break;
@@ -334,6 +340,28 @@
       if (S.me) S.me.pwa_prompt_dismiss = actif;
       b.setAttribute('aria-checked', String(!actif));
       toast(actif ? 'Le raccourci ne vous sera plus proposé ✓' : 'Le raccourci pourra vous être proposé ✓');
+    } catch (e) { toast('Réglage non enregistré. ' + e.message, true); }
+    b.disabled = false;
+  }
+
+  /* ---------- Koffi, conseiller de l'Annuaire : « Ne pas être proposé par Koffi » (décoché par défaut) ----------
+     Coché : le compte n'est plus proposé ET, par réciprocité, ne peut plus utiliser le conseiller (règle appliquée par le serveur). */
+  const LIB_KOFFI_OFF = 'Koffi peut vous proposer aux membres Premium qui cherchent (si vous êtes Premium, avec photo et descriptif). Activez pour refuser : vous ne pourrez alors plus utiliser le conseiller de l’Annuaire.';
+  const LIB_KOFFI_ON = 'Koffi ne vous propose plus. Par réciprocité, le conseiller de l’Annuaire est fermé pour votre compte ; la recherche manuelle reste disponible.';
+  async function detecterKoffi() {
+    const b = $('#cf-koffi'), d = $('#cf-koffi-d'); if (!b || !d) return;
+    try {
+      const r = await api('/api/kofi/annuaire/visibilite');
+      b.setAttribute('aria-checked', String(!!r.non_propose)); d.textContent = r.non_propose ? LIB_KOFFI_ON : LIB_KOFFI_OFF; b.disabled = false;
+    } catch (e) { d.textContent = 'Réglage indisponible pour le moment.'; }
+  }
+  async function basculerKoffi(b) {
+    const actif = b.getAttribute('aria-checked') === 'true', d = $('#cf-koffi-d');
+    b.disabled = true;
+    try {
+      await api('/api/kofi/annuaire/visibilite', { method: 'PUT', body: { non_propose: !actif } });
+      b.setAttribute('aria-checked', String(!actif)); if (d) d.textContent = !actif ? LIB_KOFFI_ON : LIB_KOFFI_OFF;
+      toast(!actif ? 'Koffi ne vous proposera plus ✓' : 'Koffi peut de nouveau vous proposer ✓');
     } catch (e) { toast('Réglage non enregistré. ' + e.message, true); }
     b.disabled = false;
   }

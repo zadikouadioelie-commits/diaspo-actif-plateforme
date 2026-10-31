@@ -35,6 +35,17 @@
       creaGratuit: '✓ Une question sur Koffi est gratuite : elle ne compte pas dans vos messages.',
       creaFinTitre: 'À vous de jouer !', creaFinTexte: 'Décrivez-moi votre formation ou donnez-moi une petite mission. Pour tout savoir sur ce que je sais faire, écrivez-moi : « Que sais-tu faire ? »', creaCta: 'Commencer',
     },
+    /* Conseiller d'orientation de l'Annuaire (français seulement) : trois profils FICTIFS avec leur pourcentage de correspondance — rien de réel, aucun appel. */
+    an: {
+      anSous: 'Votre conseiller de l\'Annuaire. Regardez comment je trouve le bon interlocuteur.',
+      anQ1: 'Je cherche une avocate en droit des affaires, à Abidjan.',
+      anR1: 'Voici trois profils qui correspondent. Cliquez sur celui qui vous intéresse pour ouvrir son profil public. Pour affiner, précisez le type de profil (personne, initiative, collectivité).',
+      anP: [['Profil fictif A', 'Avocate · Abidjan, Côte d\'Ivoire', '94 %'], ['Profil fictif B', 'Cabinet juridique · Abidjan, Côte d\'Ivoire', '81 %'], ['Profil fictif C', 'Juriste d\'entreprise · Dakar, Sénégal', '63 %']],
+      anQ2: 'Que sais-tu faire ?',
+      anR2: 'Je vous aide à trouver, dans l\'Annuaire, des personnes, des initiatives ou des collectivités qui correspondent à votre besoin, avec un pourcentage de correspondance. Je ne propose que des comptes Premium qui ont une photo et un descriptif, et qui acceptent d\'être proposés. Demandez-moi autant de fois que vous voulez ce que je sais faire : c\'est gratuit.',
+      anGratuit: '✓ Une question sur Koffi est gratuite : elle ne compte pas dans votre crédit.',
+      anFinTitre: 'À vous de jouer !', anFinTexte: 'Décrivez ce que vous cherchez (un métier, un domaine, une ville…). Pour tout savoir sur ce que je sais faire, écrivez-moi : « Que sais-tu faire ? »', anCta: 'Lancer ma recherche'
+    },
     en: {
       titre: 'Meet Koffi', passer: 'Skip', revoir: 'Replay', exemple: 'Sample conversation — just to show you, nothing here is real',
       bonjour: 'Hello, I\'m Koffi 👋',
@@ -68,6 +79,10 @@
     '.kp-mission b{display:block;font-size:13.5px;color:#7c2d12}.kp-mission span{display:block;font-size:12px;color:#9a3412;margin:2px 0 8px}',
     '.kp-mission div{display:flex;gap:8px}.kp-mission em{font-style:normal;font-size:12px;font-weight:800;border-radius:8px;padding:5px 12px}',
     '.kp-mission em.ok{background:#F26422;color:#fff}.kp-mission em.ko{background:#fff;color:#9a3412;border:1px solid #fdba74}',
+    '.kp-props{align-self:stretch;display:flex;flex-direction:column;gap:6px;animation:kp-ap .28s ease both}',
+    '.kp-prop{display:flex;align-items:center;gap:10px;border:1px solid #e2e8f0;background:#fff;border-radius:12px;padding:8px 10px}',
+    '.kp-pct{flex:none;min-width:48px;text-align:center;font-weight:900;font-size:14px;color:#9a3412;background:#fff3e6;border:1px solid #fdba74;border-radius:99px;padding:3px 8px}',
+    '.kp-prop-t b{display:block;font-size:13.5px;color:#0D2B4E}.kp-prop-t small{display:block;font-size:12px;color:#475569}',
     '.kp-gratuit{align-self:flex-start;max-width:94%;font-size:12px;font-weight:700;color:#166534;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:6px 10px;animation:kp-ap .28s ease both}',
     '.kp-fin{border:1px solid #e2e8f0;border-radius:14px;background:#fff;padding:14px;animation:kp-ap .28s ease both}',
     '.kp-fin h4{margin:0 0 6px;font-size:15px;color:#0D2B4E}.kp-fin p{margin:0 0 12px;font-size:13.5px;line-height:1.55}',
@@ -78,7 +93,7 @@
     '.kp-bas{display:flex;justify-content:flex-end}',
     '@keyframes kp-ap{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}',
     '@keyframes kp-pt{0%,60%,100%{opacity:.3;transform:translateY(0)}30%{opacity:1;transform:translateY(-3px)}}',
-    '@media (prefers-reduced-motion:reduce){.kp-m,.kp-mission,.kp-gratuit,.kp-fin{animation:none}.kp-pts i{animation:none;opacity:.6}}'
+    '@media (prefers-reduced-motion:reduce){.kp-m,.kp-mission,.kp-props,.kp-gratuit,.kp-fin{animation:none}.kp-pts i{animation:none;opacity:.6}}'
   ].join('\n');
 
   function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
@@ -91,6 +106,10 @@
       { t: 'u', texte: T.creaQ1 }, { t: 'a', texte: T.creaR1 }, { t: 'mission' },
       { t: 'u', texte: T.creaQ2 }, { t: 'a', texte: T.creaR2 }, { t: 'gratuit', texte: T.creaGratuit },
     ];
+    if (role === 'annuaire') return [
+      { t: 'u', texte: T.anQ1 }, { t: 'a', texte: T.anR1 }, { t: 'props' },
+      { t: 'u', texte: T.anQ2 }, { t: 'a', texte: T.anR2 }, { t: 'gratuit', texte: T.anGratuit },
+    ];
     return [
       { t: 'u', texte: T.eleveQ1 }, { t: 'a', texte: T.eleveR1, src: true },
       { t: 'u', texte: T.eleveQ2 }, { t: 'a', texte: T.eleveR2 }, { t: 'gratuit', texte: T.eleveGratuit },
@@ -99,10 +118,10 @@
 
   function monter(conteneur, o) {
     o = o || {}; style();
-    var role = o.role === 'createur' ? 'createur' : 'eleve';
-    var T = TXT[o.lg === 'en' && role === 'eleve' ? 'en' : 'fr'];
+    var role = o.role === 'createur' ? 'createur' : (o.role === 'annuaire' ? 'annuaire' : 'eleve');
+    var T = role === 'annuaire' ? Object.assign({}, TXT.fr, TXT.an) : TXT[o.lg === 'en' && role === 'eleve' ? 'en' : 'fr'];
     var etapes = scenario(role, T);
-    var cle = role === 'createur' ? 'crea' : 'eleve';
+    var cle = role === 'createur' ? 'crea' : (role === 'annuaire' ? 'an' : 'eleve');
     var root = document.createElement('section'); root.className = 'kp-root'; root.setAttribute('aria-label', T.titre);
     root.innerHTML =
       '<div class="kp-tete"><img src="/assets/koffi-avatar-96.webp" alt="" onerror="this.style.display=\'none\'"><div><b>' + esc(T.bonjour) + '</b><span>' + esc(T[cle + 'Sous']) + '</span></div></div>' +
@@ -126,6 +145,9 @@
       } else if (etape.t === 'mission') {
         d.className = 'kp-mission'; d.setAttribute('aria-hidden', 'true');
         d.innerHTML = '<b>' + esc(T.creaMission) + '</b><span>' + esc(T.creaMissionSous) + '</span><div><em class="ok">' + esc(T.creaAppliquer) + '</em><em class="ko">' + esc(T.creaAnnuler) + '</em></div>';
+      } else if (etape.t === 'props') {
+        d.className = 'kp-props'; d.setAttribute('aria-hidden', 'true');
+        d.innerHTML = T.anP.map(function (p) { return '<div class="kp-prop"><span class="kp-pct">' + esc(p[2]) + '</span><span class="kp-prop-t"><b>' + esc(p[0]) + '</b><small>' + esc(p[1]) + '</small></span></div>'; }).join('');
       } else if (etape.t === 'gratuit') { d.className = 'kp-gratuit'; d.textContent = etape.texte; }
       scene.appendChild(d); descendre();
       return d;
@@ -135,7 +157,7 @@
       if (termine) return; termine = true; jeton++;
       clearTimeout(minuteur);
       scene.innerHTML = ''; etapes.forEach(function (e) { bulle(e, true); });
-      root.querySelectorAll('.kp-m,.kp-mission,.kp-gratuit').forEach(function (n) { n.style.animation = 'none'; });
+      root.querySelectorAll('.kp-m,.kp-mission,.kp-props,.kp-gratuit').forEach(function (n) { n.style.animation = 'none'; });
       bas.innerHTML = '';
       var f = document.createElement('div'); f.className = 'kp-fin';
       f.innerHTML = '<h4>' + esc(T[cle + 'FinTitre']) + '</h4><p>' + esc(T[cle + 'FinTexte']) + '</p><div class="kp-btns"><button type="button" class="kp-cta" data-a="fin">' + esc(T[cle + 'Cta']) + '</button><button type="button" class="kp-lien" data-a="revoir">' + esc(T.revoir) + '</button></div>';
