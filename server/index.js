@@ -17518,6 +17518,12 @@ route("GET", "/api/formations/:id", async (req, res, params) => {
     WHERE f.id=?
   `).get(params.id);
   if (!row) return sendJSON(res, 404, { error: "Formation introuvable." });
+  /* Une formation pas encore publiée (brouillon, soumise, à corriger, refusée, programmée) n'est visible que de son propriétaire et de l'administration :
+     sa fiche ne doit pas se lire par simple numéro. */
+  if (['brouillon', 'soumise', 'modifications_demandees', 'refusee', 'programmee'].includes(row.statut || 'brouillon')) {
+    const visiteur = await getCurrentUser(req);
+    if (!visiteur || (Number(visiteur.id) !== Number(row.owner_user_id) && visiteur.role !== 'administrateur')) return sendJSON(res, 404, { error: "Formation introuvable." });
+  }
   const avis = await db.prepare("SELECT a.*, u.nom AS auteur FROM formation_avis a JOIN users u ON u.id=a.user_id WHERE a.formation_id=? ORDER BY a.created_at DESC").all(params.id);
   const nb_inscrits = (await db.prepare("SELECT COUNT(*) AS n FROM formation_inscriptions WHERE formation_id=? AND statut='active'").get(params.id))?.n;
   const nb_apercu = (await db.prepare("SELECT COUNT(*) AS n FROM formation_lecons l JOIN formation_modules m ON m.id=l.module_id WHERE m.formation_id=? AND l.apercu_gratuit=1 AND l.type<>'quiz'").get(params.id))?.n || 0;
