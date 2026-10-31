@@ -3255,6 +3255,7 @@ async function initAnnuaire(){
       ville:    "Ville",
       nom:      "Nom",
       prenom:   "Prénom",
+      motCle:   "Mot-clé",
       forme:    "Forme juridique",
       taille:   "Taille",
       familleFin: "Famille financière",

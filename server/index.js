@@ -10110,6 +10110,41 @@ route("GET", "/api/annuaire/suggestions", async (req, res, params, body, query) 
   });
   const domaines = await db.prepare("SELECT DISTINCT domaine FROM initiatives WHERE domaine IS NOT NULL").all();
   domaines.forEach(d => { if (ANNUAIRE_NORMALISE(d.domaine).startsWith(qRaw)) suggestions.add(d.domaine); });
+
+  /* Noms de comptes (2026-11-01, demande explicite : « il y a un compte qui s'appelle
+     Paradigme, il aurait dû être identifié dans la recherche et présenté directement »)
+     — jusqu'ici cette route ne proposait que des mots-clés de domaine/synonymes : taper le
+     début d'un nom de compte ne le faisait jamais apparaître dans le menu déroulant pendant
+     la frappe, alors que la recherche elle-même (GET /annuaire/recherche) le trouve très bien
+     une fois validée. Mêmes filtres de visibilité (masqué/démo/supprimé/invisible) que
+     partout ailleurs dans l'annuaire. */
+  const nomsInitiatives = await db.prepare(
+    `SELECT i.nom, i.sigle, u.invisible_annuaire_definitif, u.invisible_annuaire_jusqu_au
+     FROM initiatives i LEFT JOIN users u ON u.id=i.owner_user_id
+     WHERE (u.id IS NULL OR ((u.is_demo IS NULL OR u.is_demo=FALSE) AND u.compte_masque=0 AND u.nom != 'Compte supprimé'))`
+  ).all();
+  nomsInitiatives.filter(r => !annuaireEstInvisible(r)).forEach(r => {
+    if (r.nom && ANNUAIRE_NORMALISE(r.nom).startsWith(qRaw)) suggestions.add(r.nom);
+    if (r.sigle && ANNUAIRE_NORMALISE(r.sigle).startsWith(qRaw)) suggestions.add(r.sigle);
+  });
+  const nomsOrganismes = await db.prepare(
+    `SELECT nom, nom_institution, invisible_annuaire_definitif, invisible_annuaire_jusqu_au FROM users
+     WHERE role IN ('collectivite','administrateur','institutionnel','officiel') AND compte_masque=0
+       AND nom != 'Compte supprimé' AND (is_demo IS NULL OR is_demo=FALSE)`
+  ).all();
+  nomsOrganismes.filter(r => !annuaireEstInvisible(r)).forEach(r => {
+    const libelle = r.nom_institution || r.nom;
+    if (libelle && ANNUAIRE_NORMALISE(libelle).startsWith(qRaw)) suggestions.add(libelle);
+  });
+  const nomsUtilisateurs = await db.prepare(
+    `SELECT nom, prenom, invisible_annuaire_definitif, invisible_annuaire_jusqu_au FROM users
+     WHERE role='utilisateur' AND compte_masque=0 AND nom != 'Compte supprimé' AND (is_demo IS NULL OR is_demo=FALSE)`
+  ).all();
+  nomsUtilisateurs.filter(r => !annuaireEstInvisible(r)).forEach(r => {
+    const complet = [r.prenom, r.nom].filter(Boolean).join(' ');
+    if (complet && ANNUAIRE_NORMALISE(complet).startsWith(qRaw)) suggestions.add(complet);
+  });
+
   sendJSON(res, 200, { suggestions: [...suggestions].slice(0, 8) });
 });
 
@@ -20635,7 +20670,7 @@ async function handleStripeWebhook(req, res) {
       /* Forfait de questions Koffi : crédité UNIQUEMENT ici, sur la confirmation signée de Stripe. Idempotent (Kofi.confirmerCommande ne traite qu'une commande « en_attente »). */
       const session = event.data.object;
       const conf = await Kofi.confirmerCommande(db, Number(session.metadata.diaspoactif_kofi_commande_id), (session.amount_total || 0) / 100);
-      if (conf) creerNotif(conf.commande.user_id, "formation", "Koffi : crédit ajouté ✅", conf.credit_eur ? `Votre recharge est créditée : ${String(conf.credit_eur.toFixed(2)).replace(".", ",")} € d'utilisation Koffi (valable 12 mois, pour tout Koffi).` : `Votre forfait de ${conf.questions} questions est crédité (valable 12 mois, dans toutes vos formations).`, { formation_id: conf.commande.formation_id });
+      if (conf) creerNotif(conf.commande.user_id, "formation", "Koffi : questions créditées ✅", `Votre forfait de ${conf.questions} questions est crédité (valable 12 mois, dans toutes vos formations).`, { formation_id: conf.commande.formation_id });
     } else if (event.type === "checkout.session.expired" && event.data.object.metadata?.diaspoactif_kofi_commande_id) {
       await Kofi.annulerCommande(db, Number(event.data.object.metadata.diaspoactif_kofi_commande_id), "expiree");
     } else if (event.type === "checkout.session.completed" && event.data.object.metadata?.diaspoactif_formation_commande_id) {
