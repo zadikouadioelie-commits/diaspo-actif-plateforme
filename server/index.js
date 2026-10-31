@@ -51421,8 +51421,24 @@ route("PUT", "/api/insc/types/:id", async (req, res, params, body) => {
   if (erreur) return sendJSON(res, erreur, { error: msg });
   const champs = ["label","description","icone","actif","gratuit","prix","places_max","liste_attente_active",
     "validation_auto","date_ouverture","date_fermeture","ordre"];
+  /* 2026-10-31 (signalé par le compte Move to Learn : « impossible de modifier le tarif d'un type ») :
+     la page envoyait gratuit=true/false, or les colonnes gratuit/actif/liste_attente_active/
+     validation_auto sont des ENTIER sur Postgres, qui refuse "true"/"false" (invalid input syntax
+     for type integer) — la modification échouait en production tout en passant en local (SQLite).
+     Les booléens sont donc ramenés à 1/0 ici, et les nombres validés avant écriture. */
+  const CHAMPS_ENTIERS_01 = new Set(["actif", "gratuit", "liste_attente_active", "validation_auto"]);
   const set = [], vals = [];
-  for (const c of champs) if (body[c] !== undefined) { set.push(`${c}=?`); vals.push(body[c] === "" ? null : body[c]); }
+  for (const c of champs) {
+    if (body[c] === undefined) continue;
+    let v = body[c] === "" ? null : body[c];
+    if (CHAMPS_ENTIERS_01.has(c)) v = (v === true || v === 1 || v === "1" || v === "true") ? 1 : 0;
+    else if (c === "prix") {
+      if (v !== null) { v = Number(String(v).replace(",", ".")); if (!Number.isFinite(v) || v < 0) return sendJSON(res, 400, { error: "Le prix doit être un nombre positif." }); }
+    } else if (c === "places_max" || c === "ordre") {
+      if (v !== null) { v = parseInt(v, 10); if (!Number.isFinite(v) || v < 0) return sendJSON(res, 400, { error: c === "places_max" ? "Le nombre de places doit être un entier positif." : "Ordre invalide." }); }
+    }
+    set.push(`${c}=?`); vals.push(v);
+  }
   if (set.length) { set.push("updated_at=datetime('now')"); await db.prepare(`UPDATE insc_types SET ${set.join(",")} WHERE id=?`).run(...vals, type.id); }
   await inscJournaliser(type.fiche_id, user, "modification_type", `Type « ${type.label} » modifié.`);
   // Le prix ou le statut gratuit/actif peut avoir changé — recalcule le prix minimum répercuté

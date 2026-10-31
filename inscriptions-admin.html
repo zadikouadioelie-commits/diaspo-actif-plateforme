@@ -335,6 +335,49 @@ function ia_choixGratuitPayant() {
     overlay.addEventListener('click', e => { if (e.target === overlay) cleanup(null); });
   });
 }
+/* Saisie d'une valeur dans une fenêtre de la page (2026-10-31, signalé par le compte Move to Learn :
+   le tarif d'un type ne se modifiait pas). Les prompt() natifs étaient utilisés ici ; or un
+   navigateur qui bloque les boîtes de dialogue (« empêcher cette page d'en créer d'autres »,
+   navigateurs intégrés, application installée) répond null sans rien afficher — le bouton
+   semblait alors ne rien faire. Même principe que ia_choixGratuitPayant : fenêtre dans la page.
+   champs = [{ cle, label, valeur, type ('text'|'number'|'date'), aide, min, step }] ;
+   retourne une Promise (objet { cle: valeur } ou null si annulé). */
+function ia_saisie(titre, champs, sousTitre) {
+  return new Promise(resolve => {
+    const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(13,27,42,.55);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;';
+    const lignes = champs.map((c, i) => `
+      <label style="display:block;text-align:left;margin-top:${i ? 14 : 4}px;">
+        <span style="display:block;font-size:12.5px;font-weight:700;margin-bottom:5px;">${esc(c.label)}</span>
+        <input data-cle="${esc(c.cle)}" type="${c.type || 'text'}" value="${esc(c.valeur == null ? '' : String(c.valeur))}"${c.min != null ? ` min="${c.min}"` : ''}${c.step ? ` step="${c.step}"` : ''}${c.type === 'number' ? ' inputmode="decimal"' : ''} style="width:100%;box-sizing:border-box;padding:11px 12px;border:1.5px solid #cbd5e1;border-radius:10px;font-size:16px;">
+        ${c.aide ? `<span style="display:block;font-size:11.5px;color:#64748b;margin-top:4px;">${esc(c.aide)}</span>` : ''}
+      </label>`).join('');
+    overlay.innerHTML = `
+      <form style="background:#fff;border-radius:16px;padding:24px;max-width:380px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.35);color:#0f172a;">
+        <h3 style="margin:0 0 2px;font-size:16px;">${esc(titre)}</h3>
+        ${sousTitre ? `<p style="margin:2px 0 6px;font-size:12.5px;color:#64748b;">${esc(sousTitre)}</p>` : ''}
+        ${lignes}
+        <div style="display:flex;gap:10px;margin-top:20px;">
+          <button type="button" data-annuler style="flex:1;padding:12px;border-radius:10px;border:1.5px solid #cbd5e1;background:#fff;font-weight:700;font-size:13.5px;cursor:pointer;">Annuler</button>
+          <button type="submit" style="flex:1;padding:12px;border-radius:10px;border:0;background:#1565C0;color:#fff;font-weight:700;font-size:13.5px;cursor:pointer;">Enregistrer</button>
+        </div>
+      </form>`;
+    document.body.appendChild(overlay);
+    const fin = (val) => { document.removeEventListener('keydown', onKey); overlay.remove(); resolve(val); };
+    const onKey = (e) => { if (e.key === 'Escape') fin(null); };
+    document.addEventListener('keydown', onKey);
+    overlay.querySelector('[data-annuler]').addEventListener('click', () => fin(null));
+    overlay.addEventListener('mousedown', e => { if (e.target === overlay) fin(null); });
+    overlay.querySelector('form').addEventListener('submit', e => {
+      e.preventDefault();
+      const out = {};
+      overlay.querySelectorAll('input[data-cle]').forEach(inp => { out[inp.dataset.cle] = inp.value; });
+      fin(out);
+    });
+    const premier = overlay.querySelector('input'); if (premier) { premier.focus(); premier.select && premier.select(); }
+  });
+}
 /* "💰 Option payante" (2026-09-25, demande explicite) — définit, pour un type d'inscription,
    un groupe d'options facultatives payantes (libellé libre + photo facultative + prix), ex.
    "Repas 15€", "Massage 20€". Enregistré comme un unique champ type_champ='options_payantes'
@@ -3906,9 +3949,9 @@ const actions = {
   async editNomType(el) {
     const id = parseInt(el.dataset.id);
     const type = currentTypes().find(t => Number(t.id) === id); if (!type) return;
-    const saisie = prompt("Nom du type d'inscription :", type.label || '');
-    if (saisie === null) return;
-    const label = saisie.trim();
+    const rep = await ia_saisie("Nom du type d'inscription", [{ cle: 'label', label: 'Nom', valeur: type.label || '' }]);
+    if (rep === null) return;
+    const label = rep.label.trim();
     if (!label) { ia_toast('Le nom ne peut pas être vide.', false); return; }
     try { await api('PUT', '/insc/types/' + id, { label }); await iaChargerFiche(state.selectedFicheId); }
     catch (e) { ia_toast(e.message, false); }
@@ -3920,29 +3963,34 @@ const actions = {
     if (gratuit === null) return;
     let prix = 0;
     if (!gratuit) {
-      const saisie = prompt('Prix en euros :', type.prix != null ? String(type.prix) : '0');
-      if (saisie === null) return;
-      prix = parseFloat(saisie) || 0;
+      const rep = await ia_saisie('Tarif de « ' + (type.label || 'ce type') + ' »', [{ cle: 'prix', label: 'Prix en euros', valeur: type.prix != null && Number(type.prix) > 0 ? String(type.prix) : '', type: 'number', min: 0, step: '0.01', aide: 'Exemple : 150 pour 150 €. Utilisez le point ou la virgule pour les centimes.' }]);
+      if (rep === null) return;
+      prix = parseFloat(String(rep.prix).replace(',', '.'));
+      if (!Number.isFinite(prix) || prix <= 0) { ia_toast('Indiquez un prix supérieur à 0 € (ou choisissez « Gratuit »).', false); return; }
     }
-    try { await api('PUT', '/insc/types/' + id, { gratuit, prix }); await iaChargerFiche(state.selectedFicheId); }
+    /* 1/0 et non true/false : ces colonnes sont des entiers sur Postgres (voir PUT /api/insc/types/:id). */
+    try { await api('PUT', '/insc/types/' + id, { gratuit: gratuit ? 1 : 0, prix: gratuit ? null : prix }); await iaChargerFiche(state.selectedFicheId); ia_toast(gratuit ? 'Type passé en gratuit.' : 'Tarif enregistré : ' + prix.toFixed(2).replace('.', ',') + ' €.', true); }
     catch (e) { ia_toast(e.message, false); }
   },
   async editPlaces(el) {
     const id = parseInt(el.dataset.id);
     const type = currentTypes().find(t => Number(t.id) === id); if (!type) return;
-    const saisie = prompt('Nombre de places maximum (laisser vide = illimité) :', type.places_max != null ? String(type.places_max) : '');
-    if (saisie === null) return;
-    const places_max = saisie.trim() ? parseInt(saisie.trim()) : null;
+    const rep = await ia_saisie('Nombre de places', [{ cle: 'places', label: 'Places maximum', valeur: type.places_max != null ? String(type.places_max) : '', type: 'number', min: 0, step: '1', aide: 'Laisser vide = places illimitées.' }]);
+    if (rep === null) return;
+    const places_max = rep.places.trim() ? parseInt(rep.places.trim(), 10) : null;
+    if (places_max !== null && !Number.isFinite(places_max)) { ia_toast('Indiquez un nombre entier de places.', false); return; }
     try { await api('PUT', '/insc/types/' + id, { places_max }); await iaChargerFiche(state.selectedFicheId); }
     catch (e) { ia_toast(e.message, false); }
   },
   async editPeriode(el) {
     const id = parseInt(el.dataset.id);
     const type = currentTypes().find(t => Number(t.id) === id); if (!type) return;
-    const ouverture = prompt("Date d'ouverture de ce type (AAAA-MM-JJ, laisser vide pour reprendre la période générale de la fiche) :", type.date_ouverture ? type.date_ouverture.slice(0,10) : '');
-    if (ouverture === null) return;
-    const fermeture = prompt('Date de fermeture (AAAA-MM-JJ, laisser vide = pas de fermeture spécifique) :', type.date_fermeture ? type.date_fermeture.slice(0,10) : '');
-    if (fermeture === null) return;
+    const rep = await ia_saisie('Période d\'ouverture', [
+      { cle: 'ouverture', label: "Date d'ouverture", type: 'date', valeur: type.date_ouverture ? type.date_ouverture.slice(0, 10) : '', aide: 'Laisser vide pour reprendre la période générale de la fiche.' },
+      { cle: 'fermeture', label: 'Date de fermeture', type: 'date', valeur: type.date_fermeture ? type.date_fermeture.slice(0, 10) : '', aide: 'Laisser vide = pas de fermeture spécifique.' }
+    ]);
+    if (rep === null) return;
+    const ouverture = rep.ouverture, fermeture = rep.fermeture;
     try {
       await api('PUT', '/insc/types/' + id, { date_ouverture: ouverture.trim() || null, date_fermeture: fermeture.trim() || null });
       await iaChargerFiche(state.selectedFicheId);
