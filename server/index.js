@@ -13390,8 +13390,18 @@ route("POST", "/api/comptes-lies/lier", async (req, res, params, body) => {
   await db.prepare(`INSERT INTO ds_id_validations (user_id, action_type, action_ref, succes, ip, user_agent) VALUES (?,?,?,?,?,?)`).run(user.id, 'comptes_lies_liaison', 'succes', 1, ip, req.headers['user-agent'] || null);
   await db.prepare(`INSERT INTO comptes_lies_journal (groupe_id, user_id, compte_concerne_id, action, details) VALUES (?,?,?,?,?)`).run(groupeId, user.id, cible.id, 'creation_liaison', `Compte ${cible.nom || cible.id} relié via DS-ID`);
 
+  /* Réduction automatique « comptes liés » : on PRÉVIENT tous les comptes du groupe au moment de la liaison
+     (demande explicite, 2026-10-31). Voir server/reduction-comptes-lies.js pour les règles (plafond 20 %). */
+  try {
+    const idsGroupe = (await db.prepare("SELECT user_id FROM comptes_lies_membres WHERE groupe_id=?").all(groupeId)).map(r => r.user_id);
+    for (const uid of idsGroupe) {
+      creerNotif(uid, 'comptes_lies_reduction_info', 'Comptes reliés : une réduction Premium est possible',
+        "Vos comptes sont maintenant reliés. Si au moins deux d'entre eux ont un abonnement Premium payant, une réduction (jusqu'à 20 % sur le moins cher) est appliquée automatiquement dès le mois suivant, sans aucune démarche de votre part.", { groupe_id: groupeId });
+    }
+  } catch (e) { logError(e, "comptes-lies-info-reduction", req); }
+
   const comptes = await comptesLiesListe(groupeId);
-  sendJSON(res, 200, { groupe_id: groupeId, comptes });
+  sendJSON(res, 200, { groupe_id: groupeId, comptes, info_reduction: "Si au moins deux de vos comptes ont un abonnement Premium payant, une réduction (jusqu'à 20 % sur le moins cher) s'applique automatiquement à partir du mois suivant." });
 });
 
 /* Bascule instantanée entre comptes liés (Étape 4). Aucune saisie de mot de passe :
@@ -13463,6 +13473,17 @@ route("DELETE", "/api/comptes-lies/:userId", async (req, res, params) => {
   if (Number(restants.n) === 0) {
     await db.prepare("DELETE FROM comptes_lies_groupes WHERE id=?").run(monMembre.groupe_id);
   }
+
+  /* Réduction « comptes liés » : la liaison change, on réévalue tout de suite (retire la réduction du compte délié, recalcule les rangs). */
+  try {
+    const { stripe } = require("./stripe-client");
+    if (stripe) {
+      const Reduc = require("./reduction-comptes-lies");
+      const ctxR = { db, stripe, creerNotif };
+      await Reduc.evaluerGroupe(ctxR, monMembre.groupe_id);
+      await Reduc.retirerOrphelins(ctxR);
+    }
+  } catch (e) { logError(e, "comptes-lies-reevaluation", req); }
 
   /* Si l'utilisateur vient de se retirer lui-même, il n'a plus de groupe à afficher. */
   const monMembreApres = await db.prepare("SELECT groupe_id FROM comptes_lies_membres WHERE user_id=?").get(user.id);
@@ -20889,6 +20910,12 @@ async function handleStripeWebhook(req, res) {
         journaliserAdhesion(adhMembre.initiative_id, adhMembre.id, 'renouvellement', null,
           `Renouvellement automatique de l'abonnement Stripe — ${montant} ${formule?.devise || 'EUR'}. Reçu ${numeroRecu}.`);
       }
+      /* Réduction « comptes liés » : on retient la date du PREMIER prélèvement réellement encaissé (jamais la période offerte,
+         facture à 0), toutes factures confondues y compris la toute première. Voir server/reduction-comptes-lies.js. */
+      if (Number(invoice.amount_paid || 0) > 0) {
+        try { await db.prepare("UPDATE user_accreditations SET premier_paiement_le=datetime('now') WHERE stripe_subscription_id=? AND premier_paiement_le IS NULL").run(invoice.subscription); }
+        catch (e) { logError(e, "premier-paiement-premium", null); }
+      }
       /* Renouvellement de l'abonnement Utilisateur Abonné (hors 1ère facture) */
       const accredUA = await db.prepare("SELECT * FROM user_accreditations WHERE stripe_subscription_id=?").get(invoice.subscription);
       if (accredUA && invoice.billing_reason !== "subscription_create") {
@@ -26812,6 +26839,33 @@ route("GET", "/api/admin/users", async (req, res, params, body, query) => {
   const role = query.role || "administrateur";
   const rows = await db.prepare("SELECT id,nom,prenom,email FROM users WHERE role=? ORDER BY nom").all(role);
   sendJSON(res, 200, { users: rows });
+});
+
+/* Comptes liés vus par l'administration (2026-10-31) : quels comptes sont reliés ensemble, combien de comptes une même personne
+   possède, lesquels sont Premium payants et quelle réduction automatique ils reçoivent. Réservé aux Administrateurs. */
+route("GET", "/api/admin/comptes-lies/groupes", async (req, res, params, body, query) => {
+  const user = await getCurrentUser(req);
+  if (!user || !(await AdminJunior.hasAdminPermission(user, 'moderation.comptes.consulter', db))) return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  const min = Math.max(1, Math.min(50, Number(query.min) || 2));
+  const groupes = await require("./reduction-comptes-lies").listerGroupesAdmin(db, { minComptes: min });
+  sendJSON(res, 200, { groupes, min, plafond_pct: require("./reduction-comptes-lies").PLAFOND_PCT });
+});
+/* Combien de comptes une personne possède-t-elle ? (interrogeable par les futures promotions). Même réserve administrateur. */
+route("GET", "/api/admin/comptes-lies/personne/:userId", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user || !(await AdminJunior.hasAdminPermission(user, 'moderation.comptes.consulter', db))) return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  const idCible = Number(params.userId);
+  if (!idCible) return sendJSON(res, 400, { error: "Compte manquant." });
+  sendJSON(res, 200, await require("./reduction-comptes-lies").nombreComptesDePersonne(db, idCible));
+});
+/* Simulation (jamais d'écriture) de ce que le prochain passage automatique ferait. */
+route("POST", "/api/admin/comptes-lies/reductions/simuler", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user || !(await AdminJunior.hasAdminPermission(user, 'moderation.comptes.consulter', db))) return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  const { stripe } = require("./stripe-client");
+  if (!stripe) return sendJSON(res, 503, { error: "Le prestataire de paiement n'est pas configuré sur ce serveur." });
+  const r = await require("./reduction-comptes-lies").evaluerTout({ db, stripe, creerNotif }, { simuler: true });
+  sendJSON(res, 200, r);
 });
 
 route("GET", "/api/admin/comptes", async (req, res, params, body, query) => {
@@ -34243,6 +34297,28 @@ async function handleRequest(req, res) {
       sendJSON(res, 200, { ok: true, alertesEnvoyees, periodesExaminees: periodes.length });
     } catch (e) {
       sendJSON(res, 500, SEC.safeError(e, "cron partenariat-echeances"));
+    }
+    return;
+  }
+
+  /* ── Réduction automatique « comptes liés » (2026-10-31) ──
+     Passe sur tous les groupes de comptes liés : pose, ajuste ou retire le coupon Stripe -20 % / -10 % selon les
+     abonnements Premium payants réellement actifs (plafond absolu 20 %). Idempotent, se répare seul : la vérité est
+     lue chez Stripe. Voir server/reduction-comptes-lies.js. */
+  if (pathname === '/api/cron/reductions-comptes-lies') {
+    const cronSecret = process.env.CRON_SECRET;
+    const authHeader = req.headers['authorization'] || '';
+    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) return sendJSON(res, 401, { error: "Non autorisé." });
+    try {
+      const { stripe } = require("./stripe-client");
+      if (!stripe) return sendJSON(res, 200, { ok: true, ignore: "stripe_indisponible" });
+      const Reduc = require("./reduction-comptes-lies");
+      const r = await Reduc.evaluerTout({ db, stripe, creerNotif });
+      const actions = r.groupes.reduce((n, g) => n + g.actions.length, 0) + r.orphelins.actions.length;
+      const erreurs = [...r.groupes.flatMap(g => g.erreurs), ...r.orphelins.erreurs];
+      sendJSON(res, 200, { ok: true, groupes: r.groupes.length, actions, erreurs });
+    } catch (e) {
+      sendJSON(res, 500, SEC.safeError(e, "cron reductions-comptes-lies"));
     }
     return;
   }

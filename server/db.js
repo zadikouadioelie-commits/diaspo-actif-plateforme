@@ -2483,6 +2483,9 @@ const MIGRATIONS = [
   // POST /api/accreditations/:type/payer) donc inutilisable seul pour cette question.
   ["accred_paiements", "reduction_pct_appliquee REAL DEFAULT 0"],
   ["user_accreditations", "reduction_pct_appliquee REAL DEFAULT 0"],
+  // Réduction automatique « comptes liés » (2026-10-31) — date du PREMIER prélèvement réel (jamais la gratuité),
+  // posée par le webhook invoice.payment_succeeded ; sert de délai de sécurité avant d'accorder la réduction.
+  ["user_accreditations", "premier_paiement_le TEXT"],
   // Rubrique Vitrines — date de dernière modification publique de la vitrine (tri "Dernière mise à jour")
   ["initiatives", "updated_at TEXT"],
   // Module Administrateurs Junior — suspension manuelle (réversible), distincte du verrouillage
@@ -6482,6 +6485,26 @@ db.exec(`
     created_at          TEXT DEFAULT (datetime('now')),
     FOREIGN KEY(user_id) REFERENCES users(id)
   );
+
+  /* Réduction automatique « comptes liés » (2026-10-31, server/reduction-comptes-lies.js) : une ligne par
+     réduction posée sur un abonnement Premium (statut 'active' tant qu'elle est en vigueur, 'retiree'
+     ensuite). Sert d'historique et d'état ; la vérité du coupon reste chez Stripe. Plafond absolu : 20 %. */
+  CREATE TABLE IF NOT EXISTS reductions_comptes_lies (
+    id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+    groupe_id              INTEGER,
+    user_id                INTEGER NOT NULL,
+    stripe_subscription_id TEXT,
+    pct                    REAL NOT NULL CHECK(pct > 0 AND pct <= 20),
+    rang                   INTEGER,
+    prix_mensuel_plein     REAL,
+    coupon_id              TEXT,
+    statut                 TEXT NOT NULL DEFAULT 'active' CHECK(statut IN ('active','retiree')),
+    motif_retrait          TEXT,
+    applique_le            TEXT DEFAULT (datetime('now')),
+    retire_le              TEXT,
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_reductions_cl_user ON reductions_comptes_lies(user_id, statut);
 `);
 
 /* ═══════════════════════════════════════════════════════════════════

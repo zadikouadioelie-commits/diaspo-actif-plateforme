@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Comptes liés et réductions</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<style>
+:root{
+  --fond:#0D1B2A; --carte:#14263A; --carte-2:#1B3149; --bord:rgba(255,255,255,.12);
+  --texte:#F1F5F9; --doux:#9FB1C5; --orange:#F26422; --ok:#34D399; --alerte:#FBBF24; --rouge:#FCA5A5;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{min-height:100vh;background:var(--fond);color:var(--texte);font-family:Inter,Arial,sans-serif;padding:24px 16px 60px}
+.wrap{max-width:980px;margin:0 auto}
+a{color:var(--orange)}
+h1{font-size:21px;font-weight:900;margin-bottom:4px}
+.sous{color:var(--doux);font-size:13px;margin-bottom:20px;line-height:1.5;max-width:70ch}
+.regle{background:var(--carte);border:1px solid var(--bord);border-radius:12px;padding:14px 16px;margin-bottom:18px;font-size:13px;line-height:1.6;max-width:80ch}
+.regle b{color:#fff}
+.tuiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:18px}
+.tuile{background:var(--carte);border:1px solid var(--bord);border-radius:12px;padding:12px 14px}
+.tuile .n{font-size:26px;font-weight:900;font-variant-numeric:tabular-nums}
+.tuile .l{font-size:12px;color:var(--doux);margin-top:2px}
+.outils{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.outils input,.outils select{background:var(--carte);color:var(--texte);border:1.5px solid var(--bord);border-radius:9px;padding:9px 11px;font-size:13px}
+.outils input{flex:1;min-width:200px}
+.btn{background:var(--orange);color:#fff;border:none;border-radius:9px;padding:9px 14px;font-size:13px;font-weight:700;cursor:pointer}
+.btn:hover{opacity:.9}.btn:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.btn.sec{background:rgba(255,255,255,.12)}
+.groupe{background:var(--carte);border:1px solid var(--bord);border-radius:14px;padding:14px 16px;margin-bottom:12px}
+.groupe-tete{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.groupe-tete b{font-size:15px}
+.groupe-tete span{font-size:12px;color:var(--doux)}
+.compte{display:grid;grid-template-columns:1fr auto;gap:4px 12px;background:var(--carte-2);border-radius:10px;padding:10px 12px;margin-bottom:6px;font-size:13px}
+.compte .nom{font-weight:700}
+.compte .meta{grid-column:1;font-size:11.5px;color:var(--doux);font-family:ui-monospace,Consolas,monospace;word-break:break-all}
+.compte .etat{grid-column:2;grid-row:1 / span 2;text-align:right;align-self:center;display:flex;flex-direction:column;gap:4px;align-items:flex-end}
+.pastille{display:inline-block;font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px;white-space:nowrap}
+.p-payant{background:rgba(52,211,153,.16);color:var(--ok)}
+.p-gratuit{background:rgba(251,191,36,.16);color:var(--alerte)}
+.p-aucun{background:rgba(255,255,255,.08);color:var(--doux)}
+.p-red{background:rgba(242,100,34,.2);color:#FDBA74}
+.vide,.msg{font-size:13px;color:var(--doux);padding:18px 4px}
+.msg.err{color:var(--rouge)}
+.simu{background:var(--carte);border:1px dashed var(--bord);border-radius:12px;padding:12px 14px;margin-bottom:14px;font-size:13px;line-height:1.6}
+.simu li{margin-left:18px}
+@media (max-width:560px){.compte{grid-template-columns:1fr}.compte .etat{grid-column:1;grid-row:auto;align-items:flex-start;text-align:left;flex-direction:row;flex-wrap:wrap}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p style="margin-bottom:10px"><a href="dashboard-administrateur.html">← Tableau de bord administrateur</a></p>
+  <h1>Comptes liés et réductions</h1>
+  <p class="sous">Voyez quelles personnes possèdent plusieurs comptes reliés par la liaison de comptes, lesquels sont en Premium payant, et quelle réduction automatique ils reçoivent.</p>
+
+  <div class="regle">
+    <b>Réduction automatique « comptes liés » :</b> dès que deux comptes reliés ont un Premium <b>payant</b>, le moins cher passe à <b>−20 %</b> au prélèvement suivant. À partir de trois comptes, le deuxième moins cher passe à <b>−10 %</b>. Le compte le plus cher reste au plein tarif. <b>Aucune réduction ne dépasse 20 %</b>, et elle ne se cumule jamais avec un code D'A ou un parrainage. Elle s'arrête si les comptes sont déliés ou si un abonnement s'arrête.
+  </div>
+
+  <div class="tuiles" id="tuiles" aria-live="polite"></div>
+
+  <div class="outils">
+    <input id="recherche" type="search" placeholder="Rechercher un nom, un e-mail ou un DS-ID" aria-label="Rechercher un compte relié">
+    <select id="min" aria-label="Nombre minimum de comptes">
+      <option value="2">2 comptes ou plus</option>
+      <option value="3">3 comptes ou plus</option>
+      <option value="4">4 comptes ou plus</option>
+      <option value="5">5 comptes ou plus</option>
+    </select>
+    <button class="btn sec" id="rafraichir" type="button">↻ Actualiser</button>
+    <button class="btn" id="simuler" type="button">Simuler le prochain passage</button>
+  </div>
+
+  <div id="simu"></div>
+  <div id="liste"><p class="vide">Chargement…</p></div>
+</div>
+
+<script>
+async function api(method, path, body) {
+  const res = await fetch('/api' + path, {
+    method, credentials: 'include',
+    headers: body ? { 'Content-Type': 'application/json' } : {},
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(res.status === 403 || res.status === 401 ? 'Réservé aux administrateurs : connectez-vous avec un compte Administrateur.' : (data.error || ('Erreur ' + res.status)));
+  return data;
+}
+function el(tag, props, ...enfants) {
+  const n = document.createElement(tag);
+  if (props) for (const [k, v] of Object.entries(props)) { if (k === 'class') n.className = v; else n.setAttribute(k, v); }
+  for (const e of enfants.flat()) if (e != null) n.append(e.nodeType ? e : document.createTextNode(String(e)));
+  return n;
+}
+const LIBELLE_ROLE = { utilisateur: 'Utilisateur', initiative: 'Initiative', collectivite: 'Collectivité' };
+let groupes = [];
+
+function tuile(n, l) { return el('div', { class: 'tuile' }, el('div', { class: 'n' }, n), el('div', { class: 'l' }, l)); }
+function afficherTuiles() {
+  const comptes = groupes.reduce((s, g) => s + g.nb_comptes, 0);
+  const payants = groupes.reduce((s, g) => s + g.nb_premium_payants, 0);
+  const reduits = groupes.reduce((s, g) => s + g.comptes.filter(c => c.reduction_pct > 0).length, 0);
+  document.getElementById('tuiles').replaceChildren(
+    tuile(groupes.length, 'personnes avec plusieurs comptes'), tuile(comptes, 'comptes reliés'),
+    tuile(payants, 'Premium payants'), tuile(reduits, 'réductions en cours'));
+}
+function pastillePremium(c) {
+  const txt = { payant: 'Premium payant', gratuit: 'Premium offert', aucun: 'Pas de Premium', suspendue: 'Premium suspendu', expiree: 'Premium expiré' }[c.premium] || c.premium;
+  return el('span', { class: 'pastille ' + (c.premium === 'payant' ? 'p-payant' : c.premium === 'gratuit' ? 'p-gratuit' : 'p-aucun') }, txt);
+}
+function afficherListe() {
+  const q = document.getElementById('recherche').value.trim().toLowerCase();
+  const liste = document.getElementById('liste');
+  const filtres = groupes.filter(g => !q || g.comptes.some(c => [c.nom, c.email, c.ds_id].some(v => String(v || '').toLowerCase().includes(q))));
+  if (!filtres.length) { liste.replaceChildren(el('p', { class: 'vide' }, groupes.length ? 'Aucun résultat pour cette recherche.' : 'Aucune personne n’a encore relié plusieurs comptes.')); return; }
+  liste.replaceChildren(...filtres.map(g => el('section', { class: 'groupe' },
+    el('div', { class: 'groupe-tete' }, el('b', null, g.nb_comptes + ' comptes reliés'), el('span', null, 'Groupe n° ' + g.groupe_id + ' · ' + g.nb_premium_payants + ' Premium payant(s)')),
+    g.comptes.map(c => el('div', { class: 'compte' },
+      el('div', { class: 'nom' }, c.nom, ' ', el('span', { class: 'pastille p-aucun' }, LIBELLE_ROLE[c.role] || c.role), c.compte_reel ? null : el('span', { class: 'pastille p-gratuit', style: 'margin-left:6px' }, 'démo / masqué')),
+      el('div', { class: 'etat' }, pastillePremium(c), c.reduction_pct > 0 ? el('span', { class: 'pastille p-red' }, '−' + c.reduction_pct + ' %') : null),
+      el('div', { class: 'meta' }, (c.email || '—') + ' · DS-ID ' + (c.ds_id || '—') + ' · relié le ' + String(c.date_liaison || '').slice(0, 10)))))));
+}
+async function charger() {
+  const liste = document.getElementById('liste');
+  try {
+    const r = await api('GET', '/admin/comptes-lies/groupes?min=' + document.getElementById('min').value);
+    groupes = r.groupes; afficherTuiles(); afficherListe();
+  } catch (e) { document.getElementById('tuiles').replaceChildren(); liste.replaceChildren(el('p', { class: 'msg err' }, e.message)); }
+}
+async function simuler() {
+  const zone = document.getElementById('simu');
+  zone.replaceChildren(el('p', { class: 'msg' }, 'Calcul en cours…'));
+  try {
+    const r = await api('POST', '/admin/comptes-lies/reductions/simuler', {});
+    const lignes = [];
+    for (const g of r.groupes) for (const a of g.actions) {
+      const c = g.comptes.find(x => x.user_id === a.user_id);
+      lignes.push(el('li', null, (c ? c.nom : 'Compte ' + a.user_id) + ' : ' + (a.action === 'retirer' ? 'réduction retirée' : a.action === 'modifier' ? 'passe de −' + a.de + ' % à −' + a.vers + ' %' : 'reçoit −' + a.vers + ' %') + ' (groupe n° ' + g.groupe_id + ')'));
+    }
+    for (const a of r.orphelins.actions) lignes.push(el('li', null, 'Compte ' + a.user_id + ' délié : réduction retirée'));
+    zone.replaceChildren(el('div', { class: 'simu' }, el('b', null, 'Simulation (rien n’est modifié)'), lignes.length ? el('ul', null, lignes) : el('p', null, 'Aucun changement à faire au prochain passage.')));
+  } catch (e) { zone.replaceChildren(el('p', { class: 'msg err' }, e.message)); }
+}
+document.getElementById('recherche').addEventListener('input', afficherListe);
+document.getElementById('min').addEventListener('change', charger);
+document.getElementById('rafraichir').addEventListener('click', charger);
+document.getElementById('simuler').addEventListener('click', simuler);
+charger();
+</script>
+</body>
+</html>

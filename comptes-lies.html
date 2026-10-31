@@ -114,6 +114,7 @@
         <div class="cl-step"><div class="cl-step-num">1</div><div>Reliez un compte grâce à son <strong>DS-ID</strong>, le code de sécurité personnel de Diaspo'Actif.</div></div>
         <div class="cl-step"><div class="cl-step-num">2</div><div>Tous les comptes reliés rejoignent un même groupe — une seule liaison suffit à les rendre accessibles entre eux.</div></div>
         <div class="cl-step"><div class="cl-step-num">3</div><div>Basculez d'un compte à l'autre en un clic, à tout moment.</div></div>
+        <div class="cl-step"><div class="cl-step-num">4</div><div><strong>Une réduction vous attend :</strong> si au moins deux de vos comptes reliés ont un abonnement Premium payant, le moins cher passe à <strong>−20 %</strong> dès le mois suivant, et le deuxième moins cher à <strong>−10 %</strong> si vous en avez trois. Aucune démarche à faire : c'est automatique, et cela dure tant que vos comptes restent reliés et abonnés.</div></div>
       </div>
     </div>
 
@@ -257,10 +258,10 @@
     btnConfirm.disabled = true;
     btnConfirm.textContent = 'Vérification…';
     try {
-      const { comptes, groupe_id } = await api('POST', '/comptes-lies/lier', { ds_id: dsId });
+      const { comptes, groupe_id, info_reduction } = await api('POST', '/comptes-lies/lier', { ds_id: dsId });
       renderListe(comptes, groupe_id);
       fermerModal();
-      if (typeof showToast === 'function') showToast('Compte relié avec succès.', 'success');
+      if (typeof showToast === 'function') showToast('Compte relié avec succès. ' + (info_reduction || ''), 'success');
     } catch(e) {
       errZone.textContent = (e && e.message) ? e.message : "Impossible de relier ce compte.";
     } finally {
