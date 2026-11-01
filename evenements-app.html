@@ -596,6 +596,13 @@
     </div>
     <div style="margin-bottom:10px;"><label>🔗 Lien visioconférence (si en ligne)</label><input type="url" id="e-visio-evt" placeholder="https://zoom.us/… ou https://meet.google.com/…"></div>
     <div style="margin-bottom:10px;"><label>🔗 Lien pour plus d'informations <span style="font-weight:400;color:var(--muted,#6b7280);">(facultatif)</span></label><input type="text" id="e-lien-info" inputmode="url" autocomplete="off" placeholder="https://www.exemple.com/mon-evenement"></div>
+    <!-- Programme + inscription rapide : réservés à l'événement flash (2026-11-01) — affichés par ouvrirModification(). -->
+    <div id="e-flash-extras" style="display:none;margin-bottom:10px;">
+      <label>📅 Programme <span style="font-weight:400;color:var(--muted,#6b7280);">(facultatif — le déroulé, jour par jour)</span></label>
+      <div id="e-prog-list"></div>
+      <button type="button" class="btn btn-outline" style="font-size:12.5px;margin-top:6px;" onclick="progAjouterJour('e-prog-list')">+ Ajouter une journée</button>
+      <label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer;margin-top:12px;"><input type="checkbox" id="e-insc-rapide" style="width:auto;margin-top:3px;flex-shrink:0;"><span><strong>Activer l'inscription rapide</strong><br><span style="font-weight:400;font-size:.78rem;color:var(--muted,#6b7280);">Les personnes confirment leur venue ; un compte Diaspo'Actif l'ajoute à son agenda.</span></span></label>
+    </div>
     <div style="margin-bottom:10px;"><label>💬 Lien WhatsApp (groupe ou chaîne de l'événement)</label><input type="url" id="e-whatsapp" placeholder="https://chat.whatsapp.com/… ou https://whatsapp.com/channel/…"></div>
 
     <!-- Type de participation — Gratuit/Partiellement payant/Payant (2026-09-22, demande
@@ -792,6 +799,11 @@
         <div style="grid-column:1/-1;"><label>Public concerné</label><input type="text" id="fl-public" placeholder="Ex : Étudiants, Familles, Entrepreneurs…"></div>
         <!-- Lien « Plus d'informations » (2026-10-14, demande explicite) : facultatif, page externe (site de l'organisateur, billetterie, article…) ; le serveur ajoute https:// si besoin. -->
         <div style="grid-column:1/-1;"><label>🔗 Lien pour plus d'informations <span style="font-weight:400;color:var(--muted,#6b7280);">(facultatif)</span></label><input type="text" id="fl-lien-info" inputmode="url" autocomplete="off" placeholder="https://www.exemple.com/mon-evenement"></div>
+        <!-- Programme + inscription rapide (2026-11-01, parité avec le téléphone) : le déroulé jour par jour, et une simple confirmation de venue. -->
+        <div style="grid-column:1/-1;"><label>📅 Programme <span style="font-weight:400;color:var(--muted,#6b7280);">(facultatif — le déroulé, jour par jour)</span></label>
+          <div id="fl-prog-list"></div>
+          <button type="button" class="btn btn-outline" style="font-size:12.5px;margin-top:6px;" onclick="progAjouterJour('fl-prog-list')">+ Ajouter une journée</button></div>
+        <div style="grid-column:1/-1;"><label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer;"><input type="checkbox" id="fl-insc-rapide" style="width:auto;margin-top:3px;flex-shrink:0;"><span><strong>Activer l'inscription rapide</strong><br><span style="font-weight:400;font-size:.78rem;color:var(--muted,#6b7280);">Les personnes confirment leur venue (nom, prénom, e-mail). Un compte Diaspo'Actif l'ajoute aussi à son agenda ; vous voyez la liste pour anticiper le nombre de personnes.</span></span></label></div>
         <!-- Organisateur relayé (2026-10-12, demande explicite) : "permettre à des personnes de
              signaler des événements qui ne sont pas les leurs... faire relais d'informations" —
              distinct du compte Diaspo'Actif qui publie (toujours affiché par ailleurs). Facultatif :
@@ -1610,6 +1622,9 @@ function resetModaleEvenement() {
   document.getElementById('e-masquer-inscrits').checked = false;
   document.getElementById('e-radio-gratuit').checked = true;
   majToggleParticipation();
+  document.getElementById('e-flash-extras').style.display = 'none';
+  progSet('e-prog-list', []);
+  document.getElementById('e-insc-rapide').checked = false;
   document.getElementById('e-heure').value = '09:00';
   clearPhoto(0);
   clearPhoto(1);
@@ -1682,6 +1697,13 @@ function ouvrirModaleEdition(id) {
   document.getElementById('e-visio-evt').value = evt.lien_visio || '';
   document.getElementById('e-whatsapp').value = evt.whatsapp_lien || '';
   document.getElementById('e-lien-info').value = evt.lien_plus_info || '';
+  /* Programme + inscription rapide : propres à l'événement flash (détecté comme partout ailleurs : inscription_ouverte === 0). */
+  const flashEdition = Number(evt.inscription_ouverte) === 0;
+  document.getElementById('e-flash-extras').style.display = flashEdition ? '' : 'none';
+  let progEdition = [];
+  try { progEdition = typeof evt.programme_json === 'string' ? JSON.parse(evt.programme_json || '[]') : (evt.programme_json || []); } catch (e) { progEdition = []; }
+  progSet('e-prog-list', progEdition);
+  document.getElementById('e-insc-rapide').checked = !!Number(evt.inscription_rapide_active);
   // Priorité à la fiche d'inscription liée (2026-09-23, demande explicite ; étendu à 3
   // catégories le 2026-09-24) : type_participation est désormais TOUJOURS synchronisé côté
   // serveur dès qu'une fiche liée a au moins un type de tarif actif (inscSyncPrixMinEvenements
@@ -1879,7 +1901,121 @@ function compressImage(file, maxW, maxH, quality) {
   });
 }
 
-/* ─── Événement flash (2026-09-30, demande explicite) ─── */
+/* ─── Programme (journées + étapes) et inscription rapide — événements flash (2026-11-01) ───
+   Même contenu que le téléphone (assets/m-mod-mesevenements.js) : [{ date_debut, date_fin, etapes:[{ titre, heure_debut, heure_fin }] }].
+   Le constructeur garde l'état en mémoire (PROG[idConteneur]) ; seuls l'ajout et le retrait redessinent, pour ne pas perdre le curseur en saisie. */
+const PROG = {};
+function progSet(id, prog) { PROG[id] = Array.isArray(prog) ? JSON.parse(JSON.stringify(prog)) : []; progRendre(id); }
+function progRendre(id) {
+  const box = document.getElementById(id); if (!box) return;
+  const champ = 'width:100%;box-sizing:border-box;padding:7px 9px;border:1px solid var(--border,#ddd);border-radius:8px;font:inherit;font-size:13px;';
+  const lib = 'font-size:11.5px;font-weight:600;color:var(--muted,#6b7280);display:block;margin-bottom:2px;';
+  box.innerHTML = (PROG[id] || []).map((j, i) => `<div style="border:1px solid var(--border,#e5e7eb);border-radius:10px;padding:10px 12px;margin-top:${i ? 10 : 6}px;background:var(--bg,#f8fafc);">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><strong style="font-size:13px;">Journée ${i + 1}</strong><button type="button" class="btn btn-outline" style="font-size:11.5px;padding:3px 9px;" onclick="progSupprimerJour('${id}',${i})">Supprimer</button></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
+      <div><span style="${lib}">Début de journée</span><input type="date" style="${champ}" data-pid="${id}" data-i="${i}" data-pf="db" value="${esc(j.date_debut || '')}" oninput="progSaisie(this)"></div>
+      <div><span style="${lib}">Fin de journée</span><input type="date" style="${champ}" data-pid="${id}" data-i="${i}" data-pf="df" value="${esc(j.date_fin || '')}" oninput="progSaisie(this)"></div></div>
+    ${(j.etapes || []).map((et, k) => `<div style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--border,#d1d5db);">
+      <span style="${lib}">Étape ${k + 1}</span><input type="text" style="${champ}" maxlength="160" placeholder="Ex. : Accueil" data-pid="${id}" data-i="${i}" data-k="${k}" data-pf="et-titre" value="${esc(et.titre || '')}" oninput="progSaisie(this)">
+      <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;margin-top:6px;align-items:end;">
+        <div><span style="${lib}">Début</span><input type="time" style="${champ}" data-pid="${id}" data-i="${i}" data-k="${k}" data-pf="et-hd" value="${esc(et.heure_debut || '')}" oninput="progSaisie(this)"></div>
+        <div><span style="${lib}">Fin</span><input type="time" style="${champ}" data-pid="${id}" data-i="${i}" data-k="${k}" data-pf="et-hf" value="${esc(et.heure_fin || '')}" oninput="progSaisie(this)"></div>
+        <button type="button" class="btn btn-outline" style="font-size:11.5px;padding:6px 9px;" onclick="progSupprimerEtape('${id}',${i},${k})" title="Retirer cette étape">✕</button></div></div>`).join('')}
+    <button type="button" class="btn btn-outline" style="font-size:12px;margin-top:10px;" onclick="progAjouterEtape('${id}',${i})">+ Ajouter une étape</button></div>`).join('');
+}
+function progAjouterJour(id) { (PROG[id] = PROG[id] || []).push({ date_debut: '', date_fin: '', etapes: [] }); progRendre(id); }
+function progSupprimerJour(id, i) { if (!confirm('Supprimer cette journée et toutes ses étapes ?')) return; PROG[id].splice(i, 1); progRendre(id); }
+function progAjouterEtape(id, i) { PROG[id][i].etapes = PROG[id][i].etapes || []; PROG[id][i].etapes.push({ titre: '', heure_debut: '', heure_fin: '' }); progRendre(id); }
+function progSupprimerEtape(id, i, k) { PROG[id][i].etapes.splice(k, 1); progRendre(id); }
+function progSaisie(el) {
+  const d = el.dataset, i = Number(d.i), j = PROG[d.pid] && PROG[d.pid][i]; if (!j) return;
+  if (d.pf === 'db') j.date_debut = el.value; else if (d.pf === 'df') j.date_fin = el.value;
+  else { const et = j.etapes[Number(d.k)]; if (!et) return; if (d.pf === 'et-titre') et.titre = el.value; else if (d.pf === 'et-hd') et.heure_debut = el.value; else if (d.pf === 'et-hf') et.heure_fin = el.value; }
+}
+/* Programme à envoyer : étapes sans titre et journées entièrement vides écartées. */
+function progLire(id) {
+  return (PROG[id] || []).map(j => ({
+    date_debut: j.date_debut || '', date_fin: j.date_fin || '',
+    etapes: (j.etapes || []).filter(e => (e.titre || '').trim()).map(e => ({ titre: e.titre.trim(), heure_debut: e.heure_debut || '', heure_fin: e.heure_fin || '' }))
+  })).filter(j => j.date_debut || j.date_fin || j.etapes.length);
+}
+/* Message d'erreur lisible, ou '' si le programme est cohérent. */
+function progValider(id) {
+  const l = progLire(id);
+  for (let i = 0; i < l.length; i++) {
+    const j = l[i];
+    if (j.date_debut && j.date_fin && j.date_fin < j.date_debut) return 'Journée ' + (i + 1) + ' : la fin de journée est avant le début.';
+    for (let k = 0; k < j.etapes.length; k++) {
+      const e = j.etapes[k];
+      if (e.heure_debut && e.heure_fin && e.heure_fin < e.heure_debut) return 'Journée ' + (i + 1) + ', étape ' + (k + 1) + ' : l\'heure de fin est avant l\'heure de début.';
+    }
+  }
+  return '';
+}
+/* Champs programme + inscription rapide à joindre à l'enregistrement d'un événement flash en modification ({} pour un autre événement). */
+function evtProgrammeExtras() {
+  const zone = document.getElementById('e-flash-extras');
+  if (!zone || zone.style.display === 'none') return {};
+  const err = progValider('e-prog-list'); if (err) throw new Error(err);
+  return { programme: progLire('e-prog-list'), inscription_rapide_active: document.getElementById('e-insc-rapide').checked };
+}
+function programmeDetailHtml(evt) {
+  let prog = evt.programme_json;
+  if (typeof prog === 'string') { try { prog = JSON.parse(prog); } catch (e) { prog = null; } }
+  if (!Array.isArray(prog) || !prog.length) return '';
+  const jour = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }) : '';
+  return `<div style="padding:0 20px 14px;"><div class="section-divider">📅 Programme</div>${prog.map((j, i) => `
+    <div style="margin-top:${i ? 12 : 4}px;${i ? 'border-top:1px solid var(--border,#e5e7eb);padding-top:10px;' : ''}">
+      <div style="font-weight:700;font-size:13px;">Journée ${i + 1}${j.date_debut ? ' — ' + esc(jour(j.date_debut)) : ''}${j.date_fin && j.date_fin !== j.date_debut ? ' au ' + esc(jour(j.date_fin)) : ''}</div>
+      ${(j.etapes || []).map(e => `<div style="display:flex;justify-content:space-between;gap:12px;font-size:13px;margin-top:6px;"><span>${esc(e.titre || '')}</span><span style="color:var(--muted,#6b7280);white-space:nowrap;">${esc(e.heure_debut || '')}${e.heure_fin ? ' – ' + esc(e.heure_fin) : ''}</span></div>`).join('')}
+    </div>`).join('')}</div>`;
+}
+function inscRapideDetailHtml(evt, isPreview) {
+  if (!Number(evt.inscription_rapide_active)) return '';
+  const connecte = typeof CURRENT_USER !== 'undefined' && !!CURRENT_USER;
+  const champ = (id, ph, type) => `<input id="${id}-${evt.id}" ${type ? 'type="' + type + '"' : ''} placeholder="${ph}" style="width:100%;box-sizing:border-box;padding:8px 11px;border:1px solid var(--border,#ddd);border-radius:8px;font:inherit;font-size:13px;margin-bottom:6px;">`;
+  const termine = !!evt.est_termine;
+  return `<div style="padding:0 20px 14px;"><div class="section-divider">✅ Inscription rapide</div>
+    ${termine ? '<p style="font-size:12.5px;color:var(--muted,#6b7280);margin:6px 0 0;">Cet événement est terminé.</p>' : `
+    <p style="font-size:12.5px;color:var(--muted,#6b7280);margin:6px 0 8px;">${connecte ? 'Confirmez votre venue — l\'événement est ajouté à votre agenda.' : 'Indiquez vos coordonnées pour confirmer votre venue.'}</p>
+    ${connecte ? '' : champ('ir-nom', 'Nom') + champ('ir-prenom', 'Prénom') + champ('ir-email', 'E-mail', 'email') + champ('ir-tel', 'Téléphone (facultatif)', 'tel') + champ('ir-ville', 'Ville (facultatif)')}
+    <button class="btn btn-orange" id="ir-btn-${evt.id}" style="font-size:13px;" ${isPreview ? 'disabled title="Disponible une fois l\'événement enregistré"' : `onclick="inscRapideEnvoyer(${evt.id})"`}>Je m'inscris</button>
+    <p id="ir-msg-${evt.id}" style="font-size:12.5px;margin:8px 0 0;color:var(--muted,#6b7280);"></p>`}
+    <div id="evt-ir-liste-${evt.id}"></div></div>`;
+}
+async function inscRapideEnvoyer(id) {
+  const btn = document.getElementById('ir-btn-' + id), msg = document.getElementById('ir-msg-' + id);
+  const v = k => { const el = document.getElementById(k + '-' + id); return el ? el.value.trim() : ''; };
+  let payload;
+  if (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) {
+    payload = { nom: CURRENT_USER.nom || '', prenom: CURRENT_USER.prenom || '', email: CURRENT_USER.email || '' };
+  } else {
+    payload = { nom: v('ir-nom'), prenom: v('ir-prenom'), email: v('ir-email'), telephone: v('ir-tel'), ville: v('ir-ville') };
+    if (!payload.nom || !payload.prenom) { msg.textContent = 'Nom et prénom sont requis.'; return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email)) { msg.textContent = 'Adresse e-mail invalide.'; return; }
+  }
+  btn.disabled = true;
+  try {
+    const r = await api('POST', '/evenements/' + id + '/inscription-rapide', payload);
+    btn.textContent = '✓ Inscription confirmée';
+    msg.style.color = '#166534';
+    msg.textContent = r.deja ? 'Vous étiez déjà inscrit.' : (r.ajoute_agenda ? 'Ajoutée à votre agenda ✓' : 'Merci, c\'est noté !');
+  } catch (e) { msg.style.color = '#dc2626'; msg.textContent = e.message || 'Erreur.'; btn.disabled = false; }
+}
+/* Liste des inscriptions rapides, pour l'organisateur seul (anticiper le nombre de personnes). */
+async function inscRapideChargerListe(evt) {
+  const zone = document.getElementById('evt-ir-liste-' + evt.id); if (!zone) return;
+  const peutGerer = typeof CURRENT_USER !== 'undefined' && CURRENT_USER && (Number(CURRENT_USER.id) === Number(evt.owner_user_id) || CURRENT_USER.role === 'administrateur');
+  if (!peutGerer) return;
+  try {
+    const r = await api('GET', '/evenements/' + evt.id + '/inscriptions-rapides');
+    const l = r.inscriptions || [];
+    zone.innerHTML = `<div style="margin-top:14px;padding-top:10px;border-top:1px solid var(--border,#e5e7eb);"><strong style="font-size:13px;">👥 ${l.length} inscription${l.length > 1 ? 's' : ''} rapide${l.length > 1 ? 's' : ''}</strong>
+      ${l.length ? `<div style="overflow-x:auto;margin-top:6px;"><table style="width:100%;border-collapse:collapse;font-size:12.5px;"><thead><tr style="text-align:left;color:var(--muted,#6b7280);"><th style="padding:4px 8px 4px 0;">Nom</th><th style="padding:4px 8px;">E-mail</th><th style="padding:4px 8px;">Téléphone</th><th style="padding:4px 8px;">Ville</th><th style="padding:4px 0 4px 8px;">Compte</th></tr></thead><tbody>${l.map(i => `<tr style="border-top:1px solid var(--border,#eee);"><td style="padding:5px 8px 5px 0;">${esc(i.prenom)} ${esc(i.nom)}</td><td style="padding:5px 8px;">${esc(i.email)}</td><td style="padding:5px 8px;">${esc(i.telephone || '')}</td><td style="padding:5px 8px;">${esc(i.ville || '')}</td><td style="padding:5px 0 5px 8px;">${i.user_id ? '✓' : '—'}</td></tr>`).join('')}</tbody></table></div>` : '<p style="font-size:12.5px;color:var(--muted,#6b7280);margin:6px 0 0;">Personne ne s\'est encore inscrit.</p>'}</div>`;
+  } catch (e) { /* liste réservée à l'organisateur : rien à afficher sinon */ }
+}
+
+/* ─── Événement flash (2026-09-30, demande explicite) ───/* ─── Événement flash (2026-09-30, demande explicite) ─── */
 let flashPhoto1 = null, flashPhoto2 = null, flashLogo = null;
 function flashOuvrir() {
   document.getElementById('fl-titre').value = '';
@@ -1890,6 +2026,8 @@ function flashOuvrir() {
   document.getElementById('fl-adresse').value = '';
   document.getElementById('fl-public').value = '';
   document.getElementById('fl-lien-info').value = '';
+  progSet('fl-prog-list', []);
+  document.getElementById('fl-insc-rapide').checked = false;
   document.getElementById('fl-organisateur').value = '';
   document.getElementById('fl-texte').value = '';
   document.getElementById('fl-compteur').textContent = '0/500';
@@ -1954,6 +2092,8 @@ function flashLireChamps() {
     public_concerne: document.getElementById('fl-public').value.trim() || null,
     lien_plus_info: document.getElementById('fl-lien-info').value.trim() || null,
     organisateur_externe_nom: document.getElementById('fl-organisateur').value.trim() || null,
+    programme: progLire('fl-prog-list'),
+    insc_rapide: document.getElementById('fl-insc-rapide').checked,
     description: document.getElementById('fl-texte').value.trim(),
     // Visibilité à 3 états (voir le commentaire HTML du bloc radio) — traduite ici en
     // (visibilite, masquer_boutique) pour POST /api/evenements.
@@ -1968,6 +2108,8 @@ function flashVoirRecap() {
     err.style.display = '';
     return;
   }
+  const errProg = progValider('fl-prog-list');
+  if (errProg) { err.textContent = errProg; err.style.display = ''; return; }
   err.style.display = 'none';
   const dateAffiche = new Date(c.date_evt + 'T00:00:00').toLocaleDateString('fr-FR', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
   const typeLabel = document.getElementById('fl-type').selectedOptions[0]?.textContent || c.type_evt;
@@ -1984,7 +2126,8 @@ function flashVoirRecap() {
     ${c.organisateur_externe_nom ? `<div style="display:flex;align-items:center;gap:6px;">${flashLogo ? `<img src="${flashLogo}" style="width:22px;height:22px;border-radius:50%;object-fit:cover;">` : ''}<strong>Organisateur :</strong> ${esc(c.organisateur_externe_nom)}</div>` : ''}
     <div style="margin-top:8px;"><strong>Description :</strong><br>${esc(c.description)}</div>
     <div style="margin-top:8px;color:#8B12D6;font-weight:600;">${visMsg}</div>
-    <div style="margin-top:10px;font-size:.78rem;color:var(--muted,#6b7280);">ℹ️ Événement informatif — aucune inscription ne sera proposée.</div>
+    ${c.programme.length ? `<div style="margin-top:8px;"><strong>Programme :</strong> ${c.programme.length} journée${c.programme.length > 1 ? 's' : ''}, ${c.programme.reduce((n, j) => n + j.etapes.length, 0)} étape(s)</div>` : ''}
+    <div style="margin-top:10px;font-size:.78rem;color:var(--muted,#6b7280);">${c.insc_rapide ? '✅ Inscription rapide activée : les personnes confirment leur venue (aucune réservation de place).' : 'ℹ️ Événement informatif — aucune inscription ne sera proposée.'}</div>
   `;
   document.getElementById('flash-step-form').style.display = 'none';
   document.getElementById('flash-step-recap').style.display = '';
@@ -2015,6 +2158,8 @@ async function flashPublier() {
       organisateur_externe_nom: c.organisateur_externe_nom,
       organisateur_externe_logo_url: flashLogo || null,
       lien_plus_info: c.lien_plus_info,
+      programme: c.programme,
+      inscription_rapide_active: c.insc_rapide,
     });
     flashFermer();
     if (typeof loadEvts === 'function') loadEvts();
@@ -2246,6 +2391,7 @@ async function enregistrerEvenement(statutVise, options = {}) {
       lien_visio:    document.getElementById('e-visio-evt').value || null,
       whatsapp_lien: document.getElementById('e-whatsapp').value || null,
       lien_plus_info: document.getElementById('e-lien-info').value.trim() || null,
+      ...evtProgrammeExtras(),
       image_couverture: coverData,
       galerie_photos:   galerie,
       ...(videoEvt && videoEvt.guid ? { video_guid: videoEvt.guid, video_jeton: videoEvt.jeton } : {}),
@@ -2606,6 +2752,7 @@ window.openDetail = async function(id) {
     document.getElementById('evt-detail-content').innerHTML = renderEventDetail(evt, false);
     initCarousel('detail-carousel');
     evtChargerZoneCr(evt);
+    inscRapideChargerListe(evt);
     /* Bouton "Faire un don" partagé (2026-09-28, demande explicite) — distinct du bloc
        "Cagnottes liées" ci-dessus (campagnes explicitement associées à CET événement) : ici,
        le don mis en avant "partout" par le compte organisateur, quelle que soit sa nature. */
@@ -2849,6 +2996,8 @@ function renderEventDetail(evt, isPreview) {
         ${prolongerFicheDetailHtml}
       </div>
     </div>
+    ${programmeDetailHtml(evt)}
+    ${inscRapideDetailHtml(evt, isPreview)}
     ${Array.isArray(evt.cagnottes) && evt.cagnottes.length ? `
     <div style="padding:16px 20px;">
       <div class="section-divider">🪙 Cagnottes liées</div>
