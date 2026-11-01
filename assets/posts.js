@@ -1430,7 +1430,7 @@ const Posts = {
       localisation_pays: document.getElementById('post-pays')?.value || '',
       localisation_ville: document.getElementById('post-ville')?.value || '',
       medias: JSON.stringify((window._postMedias||[]).filter(m=>m.url)),
-      programmed_at: programmedAt || null,
+      programmed_at: programmedAt ? new Date(programmedAt).toISOString() : null,   /* heure du navigateur -> UTC (ISO) */
     };
 
     try {

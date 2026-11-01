@@ -152,6 +152,7 @@ function reponseEvenements(r) {
     "• Chercher dans les événements publics à venir et vous en montrer les plus proches dans le temps, avec la date, le lieu et la mention gratuit / payant ; un clic ouvre la fiche de l'événement pour vous inscrire.",
     "• Vous expliquer comment fonctionnent les événements (événement complet, événement flash, qui peut en publier…).",
     "• Pour les comptes Initiative, Collectivité et Administrateur avec abonnement Premium : CRÉER un événement flash avec vous. Je vous pose les questions qui manquent (titre, date, lieu, image…), je rédige la description, je prépare un brouillon, et je ne le publie que quand vous confirmez (bouton « Publier » ou « oui »).",
+    "• Pour tout compte : ÉCRIRE une publication pour votre fil d'actualité avec vous, la publier tout de suite ou la PROGRAMMER (un jour et une heure précis, heure de Paris), avec une image si vous le souhaitez. Je rédige le texte avec vous, je vous montre l'aperçu et je ne publie qu'après votre accord. Pour une publication programmée, je vous préviens que l'heure est approximative : elle ne part jamais avant, mais peut avoir quelques minutes de retard.",
     "• Vous dire honnêtement quand je ne trouve rien, plutôt que d'inventer.",
     "",
     "Ce que je ne fais pas : vous inscrire à votre place, ni montrer les événements privés, réservés aux abonnés ou en brouillon, ni publier quoi que ce soit sans votre confirmation. Les filtres de la page restent disponibles pour tout parcourir.",

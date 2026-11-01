@@ -201,7 +201,7 @@
   function ouvrirCredit() { if (window.KoffiCredit) window.KoffiCredit.ouvrir({ lg: 'fr', page: 'createur', formationId: fid() }); }
   function chargerCredit() {
     if (window.KoffiCredit) return Promise.resolve();
-    return new Promise(function (ok) { var sc = document.createElement('script'); sc.src = '/assets/koffi-credit.js?v=2'; sc.onload = ok; sc.onerror = ok; document.head.appendChild(sc); });
+    return new Promise(function (ok) { var sc = document.createElement('script'); sc.src = '/assets/koffi-credit.js?v=3'; sc.onload = ok; sc.onerror = ok; document.head.appendChild(sc); });
   }
   function pastilleCredits() {
     var c = etat && etat.credits;
@@ -209,7 +209,7 @@
     if (!E.credBtn || !E.cred.contains(E.credBtn)) {
       E.cred.textContent = ''; E.credBtn = document.createElement('button'); E.credBtn.type = 'button'; E.credBtn.addEventListener('click', ouvrirCredit); E.cred.appendChild(E.credBtn);
     }
-    window.KoffiCredit.appliquer(E.credBtn, c, 'fr');
+    window.KoffiCredit.appliquer(E.credBtn, c, 'fr', 'createur');
   }
   function nomDossier(id) { var d = etat && (etat.dossiers || []).filter(function (x) { return x.id === id; })[0]; return d ? d.nom : ''; }
   function majOu() {

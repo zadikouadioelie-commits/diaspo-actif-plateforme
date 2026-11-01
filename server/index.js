@@ -11402,7 +11402,7 @@ route("GET", "/api/collectivites/:id/profil-public", async (req, res, params) =>
 /* GET /api/collectivites/:id/actualites — fil public de la collectivité */
 route("GET", "/api/collectivites/:id/actualites", async (req, res, params) => {
   const cu = await getCurrentUser(req);
-  const rows = await db.prepare("SELECT * FROM fil_posts WHERE auteur_id=? ORDER BY created_at DESC LIMIT 30").all(params.id);
+  const rows = await db.prepare("SELECT * FROM fil_posts WHERE auteur_id=? AND COALESCE(statut,'publie') NOT IN ('archive','brouillon','programme') ORDER BY created_at DESC LIMIT 30").all(params.id);
   const posts = await Promise.all(rows.map(p => enrichPost(p, cu)));
   sendJSON(res, 200, { posts });
 });
@@ -11448,7 +11448,7 @@ route("PUT", "/api/collectivites/:id/abonnement/prefs", async (req, res, params,
 /* GET /api/collectivites/:id/appels-projets — appels à projets / recherche de partenariats publiés */
 route("GET", "/api/collectivites/:id/appels-projets", async (req, res, params) => {
   const cu = await getCurrentUser(req);
-  const rows = await db.prepare("SELECT * FROM fil_posts WHERE auteur_id=? AND categorie IN ('appel_projets','recherche_partenaire') ORDER BY created_at DESC LIMIT 20").all(params.id);
+  const rows = await db.prepare("SELECT * FROM fil_posts WHERE auteur_id=? AND COALESCE(statut,'publie') NOT IN ('archive','brouillon','programme') AND categorie IN ('appel_projets','recherche_partenaire') ORDER BY created_at DESC LIMIT 20").all(params.id);
   const posts = await Promise.all(rows.map(p => enrichPost(p, cu)));
   sendJSON(res, 200, { posts });
 });
@@ -14745,6 +14745,9 @@ function validerMediasUtilisateur(user, medias, pub_type) {
   return null;
 }
 
+/* Publications programmées du fil (2026-11-01) : mise en ligne paresseuse + tâche quotidienne de secours — voir server/fil-programmes.js. */
+const FilProgrammes = require("./fil-programmes").creer({ db, creerNotif, nomCompteAffichage });
+
 route("POST", "/api/fil", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise pour publier." });
@@ -14780,7 +14783,16 @@ route("POST", "/api/fil", async (req, res, params, body) => {
   const contenu  = (body.contenu || "").trim();
   const article_titre   = (body.article_titre || "").trim();
   const article_contenu = (body.article_contenu || "").trim();
-  const statut   = body.statut || "publie"; // publie | brouillon | archive
+  const statut   = body.statut || "publie"; // publie | brouillon | archive | programme
+  /* Publication programmée (2026-11-01) : mise en ligne plus tard par server/fil-programmes.js. La date est stockée en UTC (ISO) ; une date absente, illisible ou passée est refusée. */
+  let programmedAtIso = null;
+  if (statut === "programme") {
+    const tProg = Date.parse(body.programmed_at);
+    if (!body.programmed_at || isNaN(tProg)) return sendJSON(res, 400, { error: "Choisissez le jour et l'heure de publication." });
+    if (tProg < Date.now() + 60000) return sendJSON(res, 400, { error: "Le jour et l'heure de publication doivent être dans le futur." });
+    if (tProg > Date.now() + 366 * 86400000) return sendJSON(res, 400, { error: "Vous pouvez programmer une publication un an à l'avance au plus." });
+    programmedAtIso = new Date(tProg).toISOString();
+  }
   const visibilite = body.visibilite || "public";
   const medias   = body.medias ? (typeof body.medias === "string" ? body.medias : JSON.stringify(body.medias)) : "[]";
   const hashtags = body.hashtags ? (typeof body.hashtags === "string" ? body.hashtags : JSON.stringify(body.hashtags)) : "[]";
@@ -14816,7 +14828,7 @@ route("POST", "/api/fil", async (req, res, params, body) => {
     article_contenu || null,
     body.video_duree || null,
     visibilite, medias, allHashtags, statut,
-    body.programmed_at || null,
+    statut === "programme" ? programmedAtIso : (body.programmed_at || null),
     body.localisation_pays || null,
     body.localisation_ville || null,
   )).lastInsertRowid;
@@ -15087,7 +15099,7 @@ route("GET", "/api/fil/medias", async (req, res, params, body, query) => {
   for (let tour = 0; tour < 6 && !limiteAtteinte && !epuise; tour++) {
     const args = [];
     let sql = `SELECT p.* FROM fil_posts p JOIN users u ON u.id=p.auteur_id
-      WHERE COALESCE(p.statut,'publie') NOT IN ('archive','brouillon') AND COALESCE(p.visibilite,'public')='public'
+      WHERE COALESCE(p.statut,'publie') NOT IN ('archive','brouillon','programme') AND COALESCE(p.visibilite,'public')='public'
         AND (u.is_demo IS NULL OR u.is_demo=FALSE) AND ((p.medias IS NOT NULL AND p.medias NOT IN ('[]','')) OR p.media_url IS NOT NULL)`;
     if (auteurId) { sql += " AND p.auteur_id=?"; args.push(auteurId); }
     if (curseur) { sql += plusRecents ? " AND p.id>?" : " AND p.id<?"; args.push(curseur); }
@@ -15237,7 +15249,7 @@ route("GET", "/api/fil/:id", async (req, res, params) => {
   const estAuteurPost = !!cu && (Number(cu.id) === Number(p.auteur_id) || cu.role === "administrateur");
   if (!estAuteurPost) {
     const vis = p.visibilite || "public";
-    if (["brouillon", "archive"].includes(p.statut) || vis === "prive" || (vis !== "public" && !cu)) return sendJSON(res, 404, { error: "Publication introuvable." });
+    if (["brouillon", "archive", "programme"].includes(p.statut) || vis === "prive" || (vis !== "public" && !cu)) return sendJSON(res, 404, { error: "Publication introuvable." });
   }
   // Enregistrer la vue
   if (cu) { try { await db.prepare("INSERT OR IGNORE INTO fil_post_views (post_id, user_id) VALUES (?,?)").run(p.id, cu.id); } catch(e){} }
@@ -19314,7 +19326,7 @@ route("GET", "/api/profil/:id", async (req, res, params) => {
     FROM fil_posts p
     LEFT JOIN fil_reactions r ON r.post_id = p.id
     LEFT JOIN fil_commentaires c ON c.post_id = p.id
-    WHERE p.auteur_id = ? AND COALESCE(p.statut,'publie') NOT IN ('archive','brouillon')
+    WHERE p.auteur_id = ? AND COALESCE(p.statut,'publie') NOT IN ('archive','brouillon','programme')
     GROUP BY p.id ORDER BY p.id DESC LIMIT 10`).all(u.id)).map(titrePostComplet);
   const po = await db.prepare("SELECT statut,domaines_expertise,pays_intervention,services,description_complete,site_web,liens_utiles,date_attribution FROM partenaires_officiels WHERE user_id=?").get(u.id);
   /* Affiliations officielles (module Initiative → Utilisateur, 2026-07-27) : uniquement les
@@ -19927,6 +19939,7 @@ route("GET", "/api/profil/:id/activite", async (req, res, params) => {
 
 /* ---------- Profil — Publications complètes ---------- */
 route("GET", "/api/profil/:id/publications", async (req, res, params) => {
+  await FilProgrammes.verifier();
   const uid = parseInt(params.id);
   const cu = await getCurrentUser(req);
   const query = new URL("http://x" + req.url).searchParams;
@@ -19936,9 +19949,9 @@ route("GET", "/api/profil/:id/publications", async (req, res, params) => {
   const LIMIT = 15, OFFSET = (page-1)*LIMIT;
   let rows;
   if (cat === 'all') {
-    rows = await db.prepare(`SELECT * FROM fil_posts WHERE auteur_id=? AND COALESCE(statut,'publie') NOT IN ('archive','brouillon') ORDER BY id DESC LIMIT ? OFFSET ?`).all(uid, LIMIT, OFFSET);
+    rows = await db.prepare(`SELECT * FROM fil_posts WHERE auteur_id=? AND COALESCE(statut,'publie') NOT IN ('archive','brouillon','programme') ORDER BY id DESC LIMIT ? OFFSET ?`).all(uid, LIMIT, OFFSET);
   } else {
-    rows = await db.prepare(`SELECT * FROM fil_posts WHERE auteur_id=? AND COALESCE(statut,'publie') NOT IN ('archive','brouillon') AND (categorie=? OR type=?) ORDER BY id DESC LIMIT ? OFFSET ?`).all(uid, cat, cat, LIMIT, OFFSET);
+    rows = await db.prepare(`SELECT * FROM fil_posts WHERE auteur_id=? AND COALESCE(statut,'publie') NOT IN ('archive','brouillon','programme') AND (categorie=? OR type=?) ORDER BY id DESC LIMIT ? OFFSET ?`).all(uid, cat, cat, LIMIT, OFFSET);
   }
   if (q) rows = rows.filter(r => (r.contenu||'').toLowerCase().includes(q));
   const isOwner = cu && Number(cu.id) === uid;
@@ -27841,6 +27854,7 @@ async function buildVitrineCards(cu, capCount) {
 }
 
 route("GET", "/api/fil", async (req, res, params, body, query) => {
+  await FilProgrammes.verifier();   /* publications programmées dont l'heure est venue */
   const cu = await getCurrentUser(req);
   const mode  = query.mode  || "tous";   // suivis | populaires | articles | tous
   const page  = Math.max(1, Number(query.page) || 1);
@@ -27856,7 +27870,7 @@ route("GET", "/api/fil", async (req, res, params, body, query) => {
   /* Post de promotion J-7 : retiré du fil dès que l'événement est terminé (calcul à la lecture,
      aucun cron — voir PROMO_FENETRE_JOURS). Même clause reprise par tous les modes du fil. */
   const promoExpireClause = ` AND (p.promo_evenement_id IS NULL OR EXISTS (SELECT 1 FROM evenements pe WHERE pe.id=p.promo_evenement_id AND COALESCE(NULLIF(pe.date_fin,''), pe.date_evt) >= '${dateParisISO()}'))` + TutoPartage.tutoClause;
-  const catClause = (catFiltre ? " AND p.categorie=?" : "") + " AND COALESCE(p.statut,'publie') NOT IN ('archive','brouillon')" + promoExpireClause;
+  const catClause = (catFiltre ? " AND p.categorie=?" : "") + " AND COALESCE(p.statut,'publie') NOT IN ('archive','brouillon','programme')" + promoExpireClause;
   const catArgs = catFiltre ? [catFiltre] : [];
 
   // ─── MODE SUIVIS ───────────────────────────────────────────────────────────
@@ -27937,7 +27951,7 @@ route("GET", "/api/fil", async (req, res, params, body, query) => {
     try {
       const actives = (await db.prepare("SELECT * FROM annonces_officielles WHERE statut='publiee' AND fil_post_id IS NOT NULL ORDER BY id DESC LIMIT 3").all()).filter(a => annonceEstActive(a));
       for (const a of actives) {
-        const p = await db.prepare("SELECT * FROM fil_posts WHERE id=? AND COALESCE(statut,'publie') NOT IN ('archive','brouillon')").get(a.fil_post_id);
+        const p = await db.prepare("SELECT * FROM fil_posts WHERE id=? AND COALESCE(statut,'publie') NOT IN ('archive','brouillon','programme')").get(a.fil_post_id);
         if (p && !orderedIds.has(p.id)) { orderedIds.add(p.id); allPosts.push({ ...p, source: "annonce" }); }
       }
     } catch (_) { /* épinglage facultatif : ne jamais faire échouer le fil */ }
@@ -34724,6 +34738,14 @@ async function handleRequest(req, res) {
     return;
   }
 
+  /* ── Publications programmées du fil (Vercel Cron, quotidien — filet de sécurité de la vérification paresseuse) ── */
+  if (pathname === '/api/cron/fil-programmes') {
+    const cronSecret = process.env.CRON_SECRET;
+    if (cronSecret && (req.headers['authorization'] || '') !== `Bearer ${cronSecret}`) return sendJSON(res, 401, { error: "Non autorisé." });
+    try { return sendJSON(res, 200, { ok: true, publiees: await FilProgrammes.verifier(true) }); }
+    catch (e) { return sendJSON(res, 500, SEC.safeError(e, "cron fil-programmes")); }
+  }
+
   /* ── Expiration des publicités (Vercel Cron, quotidien) ──
      Une publicité dure au maximum un mois (duree_jours ≤ 30, voir /api/ads/create et /approve).
      Passé sa date_fin, elle est supprimée définitivement : elle disparaît immédiatement de tous les
@@ -36781,6 +36803,7 @@ ${jsonLd}
     /* ── GET /api/events — liste publique ── */
     if (req.method === 'GET' && pathname === '/api/events') {
       autoPublierProgrammes(); // lazy auto-publish des événements programmés
+      FilProgrammes.verifier(); // idem pour les publications programmées du fil
       autoGererDossiersQR();  // lazy gestion dossiers QR (notification + suppression)
       const q = Object.fromEntries(new URL('http://x'+req.url).searchParams);
       // Champ calculé : statut_exposition
@@ -39803,10 +39826,10 @@ ${jsonLd}
              nbParticipations, nbFormules, nbAdherents, nbPartagePromo] = await Promise.all([
         N(`SELECT COUNT(*) n FROM candidatures WHERE user_id=? AND statut IN ('retenu','accepte')`, userId),
         N(`SELECT COUNT(*) n FROM user_follows WHERE followed_id=?`, userId),
-        N(`SELECT COUNT(*) n FROM fil_posts WHERE auteur_id=? AND COALESCE(statut,'publie') NOT IN ('archive','brouillon')`, userId),
+        N(`SELECT COUNT(*) n FROM fil_posts WHERE auteur_id=? AND COALESCE(statut,'publie') NOT IN ('archive','brouillon','programme')`, userId),
         N(`SELECT COUNT(*) n FROM fil_commentaires WHERE auteur_id=?`, userId),
         N(`SELECT COUNT(*) n FROM fil_reactions WHERE user_id=?`, userId),
-        N(`SELECT (SELECT COUNT(*) FROM fil_posts WHERE auteur_id=? AND COALESCE(statut,'publie') NOT IN ('archive','brouillon') AND created_at >= datetime('now','-30 days'))
+        N(`SELECT (SELECT COUNT(*) FROM fil_posts WHERE auteur_id=? AND COALESCE(statut,'publie') NOT IN ('archive','brouillon','programme') AND created_at >= datetime('now','-30 days'))
                 + (SELECT COUNT(*) FROM fil_commentaires WHERE auteur_id=? AND created_at >= datetime('now','-30 days')) AS n`, userId, userId),
         N(`SELECT COUNT(*) n FROM events WHERE organisateur_id=? AND statut IN ('publie','archive','ferme')`, userId),
         N(`SELECT COUNT(*) n FROM evenement_comptes_rendus WHERE auteur_id=? AND statut='publie'`, userId),

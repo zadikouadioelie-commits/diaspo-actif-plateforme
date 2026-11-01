@@ -154,6 +154,21 @@ function reponseFausseEvenements({ systeme, messages }) {
   if (/JSONFAUX/.test(q)) texte = "Voici ma réponse sans structure.";
   else if (/ABANDONFAUX/.test(q)) texte = JSON.stringify({ action: "abandonner", message: "" });
   else if (/EXPLIQUEFAUX/.test(q)) texte = JSON.stringify({ action: "repondre", message: "Les événements sont publiés par les comptes Initiative, Collectivité et Administrateur." });
+  else if (/PUBLICATIONFAUX/.test(q)) {
+    /* Publication du fil : brouillon COMPLET = brouillon précédent + champs donnés par marqueurs
+       P_TEXTE:, P_TITRE:, P_MODE:maintenant|programme, P_DATE:AAAA-MM-JJ ou +N (jours après la date du jour à Paris), P_HEURE:HH:MM, P_CATEGORIE:, P_VISIBILITE:, P_SANSIMAGE, P_AVECIMAGE ; CONFIRMEFAUX → confirme:true. Les _ valent des espaces. */
+    const prise = re => { const v = (re.exec(q) || [])[1]; return v == null ? null : v.replace(/_/g, " "); };
+    const prec = (/<brouillon_precedent>([\s\S]*?)<\/brouillon_precedent>/.exec(dernier) || [])[1];
+    let b = {}; try { b = prec ? JSON.parse(prec) : {}; } catch (e) { b = {}; }
+    const auj = (/Date du jour à Paris : (\d{4}-\d{2}-\d{2})/.exec(dernier) || [])[1] || "2026-01-01";
+    const set = (cle, v) => { if (v !== null) b[cle] = v; };
+    set("texte", prise(/P_TEXTE:(\S+)/)); set("titre", prise(/P_TITRE:(\S+)/)); set("mode", prise(/P_MODE:(\S+)/)); set("heure", prise(/P_HEURE:(\S+)/)); set("categorie", prise(/P_CATEGORIE:(\S+)/)); set("visibilite", prise(/P_VISIBILITE:(\S+)/));
+    const d = prise(/P_DATE:(\S+)/);
+    if (d) { if (/^\+\d+$/.test(d)) { const x = new Date(auj + "T00:00:00Z"); x.setUTCDate(x.getUTCDate() + Number(d.slice(1))); b.date = x.toISOString().slice(0, 10); } else b.date = d; }
+    if (/P_SANSIMAGE/.test(q)) b.image_choix = "sans";
+    if (/P_AVECIMAGE/.test(q)) b.image_choix = "avec";
+    texte = JSON.stringify({ action: "publication", message: "", brouillon: b, confirme: /CONFIRMEFAUX/.test(q) });
+  }
   else if (/FLASHFAUX/.test(q)) {
     /* Événement flash : brouillon COMPLET (comme le vrai modèle) = brouillon précédent + champs donnés par marqueurs
        F_TITRE:, F_DATE:AAAA-MM-JJ ou +N (jours après la date du jour), F_LIEU:, F_VILLE:, F_PAYS:, F_DESC:, F_HEURE:HH:MM, F_ENLIGNE, F_SANSIMAGE, F_AVECIMAGE ; CONFIRMEFAUX → confirme:true. Les _ valent des espaces. */

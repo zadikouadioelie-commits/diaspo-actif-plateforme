@@ -4,7 +4,7 @@
    Un SEUL solde pour tout Koffi (tuteur des formations, assistant de création, conseiller de l'Annuaire), site ET appli téléphone.
    Autonome (CSS injecté, préfixe .kcr-). Toutes les règles sont décidées par le SERVEUR (/api/kofi/portefeuille) : ici on ne fait qu'afficher et ouvrir le paiement.
 
-   KoffiCredit.appliquer(bouton, pf, lg)   → écrit le solde dans une pastille CLIQUABLE (couleur : normal / bas / épuisé / illimité)
+   KoffiCredit.appliquer(bouton, pf, lg, cle)   → écrit le solde dans une pastille CLIQUABLE (couleur : normal / bas / épuisé / illimité)
    KoffiCredit.libelle(pf, lg)             → texte court du solde (« 0,48 € », « 12 questions offertes », « Illimité »)
    KoffiCredit.ouvrir({ lg, page, formationId, pf })   → fenêtre du crédit : solde détaillé, alerte, offres de recharge, consentement, paiement Stripe
                                               page : 'telephone' | 'annuaire' | 'evenements' | 'createur' | (rien = page de la formation) — destination connue de retour après paiement
@@ -18,6 +18,7 @@
     fr: {
       titre: 'Votre crédit Koffi', fermer: 'Fermer', illimite: 'Illimité', illimiteTexte: 'Votre compte n\'a aucune limite d\'utilisation de Koffi : rien n\'est décompté.',
       offerte: function (n) { return n + ' question' + (n > 1 ? 's' : '') + ' offerte' + (n > 1 ? 's' : ''); },
+      approx: function (n) { return '≈ ' + n + ' question' + (n > 1 ? 's' : ''); },
       aria: function (l) { return 'Crédit Koffi : ' + l + '. Ouvrir le détail et recharger.'; }, titrePastille: 'Votre crédit Koffi — cliquez pour le détail et la recharge',
       solde: 'Solde disponible', mois: function (v, tot, date) { return 'Crédit du mois : ' + v + ' sur ' + tot + (date ? ' — renouvelé le ' + date : ''); },
       achete: function (v, date) { return 'Crédit acheté : ' + v + (date ? ' — valable jusqu\'au ' + date : ''); },
@@ -38,6 +39,7 @@
     en: {
       titre: 'Your Koffi credit', fermer: 'Close', illimite: 'Unlimited', illimiteTexte: 'Your account has no limit on Koffi: nothing is deducted.',
       offerte: function (n) { return n + ' free question' + (n > 1 ? 's' : ''); },
+      approx: function (n) { return '≈ ' + n + ' question' + (n > 1 ? 's' : ''); },
       aria: function (l) { return 'Koffi credit: ' + l + '. Open details and top up.'; }, titrePastille: 'Your Koffi credit — click for details and top-up',
       solde: 'Available balance', mois: function (v, tot, date) { return 'This month\'s credit: ' + v + ' of ' + tot + (date ? ' — renews on ' + date : ''); },
       achete: function (v, date) { return 'Purchased credit: ' + v + (date ? ' — valid until ' + date : ''); },
@@ -112,19 +114,23 @@
     if (pf.bas && !off) return 'bas';
     return 'ok';
   }
-  function libelle(pf, lg) {
+  /* `cle` : sorte d'usage utilisée pour estimer le nombre d'utilisations restantes (eleve | createur | annuaire ; annuaire par défaut : recherches, événements, Business Plan). */
+  function libelle(pf, lg, cle) {
     var t = T(lg);
     if (!pf) return '';
     if (pf.illimite) return t.illimite;
     var off = pf.offertes && Number(pf.offertes.restantes) > 0 ? t.offerte(Number(pf.offertes.restantes)) : '';
     var eu = Number(pf.solde_eur) >= 0.01 ? eurosFixes(pf.solde_eur, lg) : '';
+    /* Le nombre d'utilisations restantes est toujours visible : questions offertes en nombre, solde en euros suivi de son équivalent en questions (estimation). */
+    var n = pf.equivalent ? Number(pf.equivalent[cle || 'annuaire']) : 0;
+    if (eu && n >= 1) eu += ' (' + t.approx(n) + ')';
     if (off && eu) return off + ' + ' + eu;
     return off || eu || eurosFixes(0, lg);
   }
-  function appliquer(el, pf, lg) {
+  function appliquer(el, pf, lg, cle) {
     if (!el) return;
     css();
-    var l = libelle(pf, lg), t = T(lg), n = niveau(pf);
+    var l = libelle(pf, lg, cle), t = T(lg), n = niveau(pf);
     el.textContent = l; el.className = (el.className || '').replace(/\bkcr-(pastille|bas|epuise|illimite|ok)\b/g, '').trim() + ' kcr-pastille' + (n === 'ok' ? '' : ' kcr-' + n);
     el.setAttribute('aria-label', t.aria(l)); el.title = t.titrePastille; el.setAttribute('data-kc', n);
   }
@@ -153,7 +159,7 @@
     var lg = o.lg, t = T(lg), pf = d.portefeuille || {}, rc = d.recharge || {}, rg = pf.recharge || { offres: [], min_eur: 3, ratio: 3, validite_mois: 12 };
     var n = niveau(pf), h = '';
     h += '<div class="kcr-tete"><h2 id="kcr-titre">' + t.titre + '</h2><button type="button" class="kcr-x" data-kcr-act="fermer" aria-label="' + t.fermer + '">✕</button></div>';
-    h += '<div class="kcr-solde ' + n + '"><small>' + t.solde + '</small><b>' + esc(libelle(pf, lg)) + '</b></div>';
+    h += '<div class="kcr-solde ' + n + '"><small>' + t.solde + '</small><b>' + esc(libelle(Object.assign({}, pf, { equivalent: null }), lg)) + '</b></div>';
     if (pf.illimite) { h += '<p class="kcr-note">' + t.illimiteTexte + '</p>'; }
     else {
       h += '<ul class="kcr-lignes">';

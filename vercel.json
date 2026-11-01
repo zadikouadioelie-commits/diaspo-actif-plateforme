@@ -32,7 +32,8 @@
     { "path": "/api/cron/kofi-purge", "schedule": "20 4 * * *" },
     { "path": "/api/cron/reductions-comptes-lies", "schedule": "30 20 * * *" },
     { "path": "/api/cron/messages-securises", "schedule": "10 5 * * *" },
-    { "path": "/api/cron/kofi-admin-taches", "schedule": "0 6 * * *" }
+    { "path": "/api/cron/kofi-admin-taches", "schedule": "0 6 * * *" },
+    { "path": "/api/cron/fil-programmes", "schedule": "15 6 * * *" }
   ],
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api/index" },

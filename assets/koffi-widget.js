@@ -157,7 +157,7 @@
     if (a) a.textContent = e && e.apercu ? T().apercu : '';
     if (!p) return;
     p.style.display = pf && window.KoffiCredit ? '' : 'none';
-    if (pf && window.KoffiCredit) window.KoffiCredit.appliquer(p, pf, S.lg);
+    if (pf && window.KoffiCredit) window.KoffiCredit.appliquer(p, pf, S.lg, 'eleve');
   }
   function ouvrirCredit() {
     if (!window.KoffiCredit) return;
@@ -165,7 +165,7 @@
   }
   function chargerCredit() {
     if (window.KoffiCredit) return Promise.resolve();
-    return new Promise(function (ok) { var sc = document.createElement('script'); sc.src = '/assets/koffi-credit.js?v=2'; sc.onload = ok; sc.onerror = ok; document.head.appendChild(sc); });
+    return new Promise(function (ok) { var sc = document.createElement('script'); sc.src = '/assets/koffi-credit.js?v=3'; sc.onload = ok; sc.onerror = ok; document.head.appendChild(sc); });
   }
 
   function carteInfo() {

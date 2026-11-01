@@ -385,7 +385,7 @@
     /* Monte le bouton SEULEMENT pour un administrateur connecté (le serveur répond 401/403 aux autres : rien n'apparaît). */
     monter: function () {
       if (S.root) return;
-      return Promise.all([chargerEtat(), chargerScript('/assets/koffi-credit.js?v=2', function () { return !!window.KoffiCredit; })]).then(function (rs) {
+      return Promise.all([chargerEtat(), chargerScript('/assets/koffi-credit.js?v=3', function () { return !!window.KoffiCredit; })]).then(function (rs) {
         if (!rs[0].ok || S.root) return;
         construire(); traduireUI(); majMeta(); majBadge(); surveiller();
       });

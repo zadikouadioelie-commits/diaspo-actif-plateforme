@@ -96,7 +96,7 @@
     if (test()) return Promise.resolve();
     return new Promise(function (ok) { var sc = document.createElement('script'); sc.src = src; sc.onload = ok; sc.onerror = ok; document.head.appendChild(sc); });
   }
-  var chargerCredit = function () { return chargerScript('/assets/koffi-credit.js?v=3', function () { return !!window.KoffiCredit; }); };
+  var chargerCredit = function () { return chargerScript('/assets/koffi-credit.js?v=4', function () { return !!window.KoffiCredit; }); };
 
   /* ── Le crédit : pastille cliquable dans l'en-tête ── */
   function majMeta() {

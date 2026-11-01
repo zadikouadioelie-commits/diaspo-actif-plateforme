@@ -18,7 +18,7 @@
     return new Promise(ok => { const sc = document.createElement('script'); sc.src = src; sc.onload = ok; sc.onerror = ok; document.head.appendChild(sc); });
   }
   const chargerAnnuaire = () => charger('/assets/koffi-annuaire.js?v=5', () => !!window.KoffiAnnuaire);
-  const chargerEvenements = () => charger('/assets/koffi-evenements.js?v=3', () => !!window.KoffiEvenements);
+  const chargerEvenements = () => charger('/assets/koffi-evenements.js?v=4', () => !!window.KoffiEvenements);
 
   /* Tous les boutons Koffi du téléphone se déplacent au doigt ; une seule position mémorisée pour qu'il reste où on l'a posé d'un écran à l'autre. */
   const CLE_POS = 'da_koffi_pos_tel';
@@ -91,7 +91,7 @@
   /* ── Retour de Stripe ── */
   const p = new URLSearchParams(location.search);
   if (p.get('kofi')) {
-    charger('/assets/koffi-credit.js?v=2', () => !!window.KoffiCredit).then(() => {
+    charger('/assets/koffi-credit.js?v=3', () => !!window.KoffiCredit).then(() => {
       if (!window.KoffiCredit) return;
       window.KoffiCredit.retourPaiement({ lg: 'fr', onFin: (statut, msg) => { toast(msg, statut === 'tard'); } });
     });

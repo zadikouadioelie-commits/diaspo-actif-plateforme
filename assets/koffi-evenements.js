@@ -40,7 +40,10 @@
     suggestionFlash: 'Crée-moi un événement flash',
     joindre: 'Joindre une image', retirerImage: 'Retirer l\'image', imageIllisible: 'Cette image n\'a pas pu être lue. Essayez une image JPG ou PNG.',
     apercu: 'Aperçu de votre événement flash', manque: 'Il manque encore :', publier: 'Publier', abandonner: 'Abandonner ce brouillon', publication: 'Publication en cours…',
-    imageJointe: 'J\'ai joint l\'image.', photoApercu: 'Image de l\'événement'
+    imageJointe: 'J\'ai joint l\'image.', photoApercu: 'Image de l\'événement',
+    /* Écrire et publier (ou programmer) une publication du fil : ouvert à tout compte */
+    suggestionPub: 'Écris une publication pour mon fil', apercuPub: 'Aperçu de votre publication', programmer: 'Programmer', quandPub: 'Quand :',
+    photoPub: 'Image de la publication'
   };
 
   var CSS = [
@@ -96,6 +99,8 @@
     '.ke-bro p{margin:4px 0;overflow-wrap:anywhere}.ke-bro .ke-q{color:#9a3412;font-weight:700}',
     '.ke-bro .ke-man{margin:8px 0 0;padding:8px 10px;border-radius:10px;background:#fff7ed;color:#9a3412;font-weight:700}',
     '.ke-bro .ke-act{margin-top:10px}',
+    '.ke-bro .ke-txt{white-space:pre-wrap;color:#1e293b}',
+    '.ke-bro .ke-warn{margin:8px 0 0;padding:8px 10px;border-radius:10px;background:#fff7ed;border:1px solid #fdba74;color:#9a3412;font-weight:600}',
     '.ke-clip{border:1px solid #cbd5e1;background:#fff;color:#0D2B4E;border-radius:12px;height:42px;min-width:42px;font-size:18px;cursor:pointer;flex:none}.ke-clip:hover{border-color:#F26422;background:#fff7ed}.ke-clip:focus-visible{outline:2px solid #F26422}',
     '.ke-pj{display:flex;align-items:center;gap:8px;margin:0 0 6px;font-size:12px;color:#0D2B4E}.ke-pj img{width:40px;height:40px;border-radius:8px;object-fit:cover}.ke-pj button{border:0;background:#e2e8f0;border-radius:99px;width:24px;height:24px;cursor:pointer;color:#0f172a}',
     '@media (max-width:560px){.ke-root{right:10px;bottom:calc(10px + env(safe-area-inset-bottom))}.ke-btn span{display:none}.ke-btn{padding:4px}.ke-panel{right:0;bottom:0;left:0;width:100%;max-width:none;height:80vh;height:80dvh;border-radius:16px 16px 0 0}.ke-form textarea{font-size:16px}}',
@@ -128,7 +133,7 @@
     if (test()) return Promise.resolve();
     return new Promise(function (ok) { var sc = document.createElement('script'); sc.src = src; sc.onload = ok; sc.onerror = ok; document.head.appendChild(sc); });
   }
-  var chargerCredit = function () { return chargerScript('/assets/koffi-credit.js?v=2', function () { return !!window.KoffiCredit; }); };
+  var chargerCredit = function () { return chargerScript('/assets/koffi-credit.js?v=3', function () { return !!window.KoffiCredit; }); };
 
   /* ── Le crédit : pastille cliquable dans l'en-tête ── */
   function majMeta() {
@@ -159,6 +164,24 @@
   function carteBrouillon(b, messageId, actif) {
     var d = document.createElement('div'); d.className = 'ke-bro';
     var photo = photoSure(b.image_url);
+    if (b.type === 'publication') {
+      /* Publication du fil : le texte, le moment, et (si programmée) l'avertissement sur l'heure approximative, toujours visible avant le bouton. */
+      d.innerHTML = '<h4>' + esc(T.apercuPub) + '</h4>' + (photo ? '<img src="' + esc(photo) + '" alt="' + esc(T.photoPub) + '">' : '') +
+        (b.titre ? '<b>' + esc(b.titre) + '</b>' : '') + (b.texte ? '<p class="ke-txt">' + esc(b.texte) + '</p>' : '') +
+        (b.quand ? '<p class="ke-q">' + esc(T.quandPub) + ' ' + esc(b.quand) + '</p>' : '') +
+        '<p>' + esc([b.categorie, b.visibilite].filter(Boolean).join(' · ')) + '</p>' +
+        (b.avertissement ? '<p class="ke-warn">' + esc(b.avertissement) + '</p>' : '');
+      if (!actif) return d;
+      if (b.pret) {
+        var ap = document.createElement('div'); ap.className = 'ke-act';
+        var pb = bouton(b.bouton === 'Programmer' ? T.programmer : T.publier, 'flash-publier'); pb.setAttribute('data-id', String(messageId));
+        var xb = bouton(T.abandonner, 'flash-abandonner', true); xb.setAttribute('data-id', String(messageId));
+        ap.appendChild(pb); ap.appendChild(xb); d.appendChild(ap);
+      } else if (b.manquants && b.manquants.length) {
+        var mp = document.createElement('div'); mp.className = 'ke-man'; mp.textContent = T.manque + ' ' + b.manquants.join(', ') + '.'; d.appendChild(mp);
+      }
+      return d;
+    }
     d.innerHTML = '<h4>' + esc(T.apercu) + '</h4>' + (photo ? '<img src="' + esc(photo) + '" alt="' + esc(T.photoApercu) + '">' : '') +
       '<b>' + esc(b.titre || '…') + '</b>' + (b.quand ? '<p class="ke-q">' + esc(b.quand) + '</p>' : '') + (b.lieu ? '<p>📍 ' + esc(b.lieu) + '</p>' : '') +
       (b.type || b.domaine ? '<p>' + esc([b.type, b.domaine].filter(Boolean).join(' · ')) + '</p>' : '') + (b.description ? '<p>' + esc(b.description) + '</p>' : '') +
@@ -181,6 +204,11 @@
     if (m.role !== 'user' && m.gratuit) { var n = document.createElement('div'); n.className = 'ke-note'; n.textContent = T.gratuitNote; el.appendChild(n); }
     var corps = $('.ke-body'); corps.appendChild(el);
     if (m.role !== 'user' && m.brouillon) corps.appendChild(carteBrouillon(m.brouillon, m.id, !!actif));
+    if (m.role !== 'user' && m.lien && m.lien.url) {
+      var lk = document.createElement('a'); lk.className = 'ke-cta'; lk.href = m.lien.url; lk.textContent = m.lien.texte || ''; lk.style.display = 'inline-block'; lk.style.marginTop = '6px'; lk.style.textDecoration = 'none';
+      if (S.opts && S.opts.telephone) lk.addEventListener('click', function () { fermerPanneau(); });
+      corps.appendChild(lk);
+    }
     if (m.role !== 'user' && m.evenements && m.evenements.length) {
       var l = document.createElement('div'); l.className = 'ke-evts'; m.evenements.forEach(function (e) { l.appendChild(carteEvt(e)); }); corps.appendChild(l);
     }
@@ -221,7 +249,7 @@
     var body = $('.ke-body'); body.innerHTML = '';
     var foot = $('.ke-foot'), e = S.etat, ta = $('.ke-form textarea'), env = $('.ke-send');
     foot.style.display = ''; ta.disabled = false; env.disabled = false; majMeta();
-    var clip = S.root.querySelector('.ke-clip'); if (clip) clip.style.display = e && e.flash && e.flash.disponible ? '' : 'none';
+    var clip = S.root.querySelector('.ke-clip'); if (clip) clip.style.display = e && ((e.flash && e.flash.disponible) || (e.publication && e.publication.disponible)) ? '' : 'none';
     afficherPJ();
     $('.ke-av').textContent = (e && e.avertissement) || T.info1;
     S.root.querySelectorAll('[data-a="nouvelle"],[data-a="supprimer"]').forEach(function (b) { b.style.display = e && (e.etat === 'utilisable' || e.etat === 'recharge') ? '' : 'none'; });
@@ -234,7 +262,7 @@
     if (!S.msgs.length) {
       ajouterMessage({ role: 'assistant', contenu: T.accueil });
       var s = document.createElement('div'); s.className = 'ke-sug';
-      T.suggestions.concat(e.flash && e.flash.disponible ? [T.suggestionFlash] : []).forEach(function (x) { var b = document.createElement('button'); b.type = 'button'; b.textContent = x; b.addEventListener('click', function () { ta.value = x; envoyer(); }); s.appendChild(b); });
+      T.suggestions.concat(e.flash && e.flash.disponible ? [T.suggestionFlash] : []).concat(e.publication && e.publication.disponible ? [T.suggestionPub] : []).forEach(function (x) { var b = document.createElement('button'); b.type = 'button'; b.textContent = x; b.addEventListener('click', function () { ta.value = x; envoyer(); }); s.appendChild(b); });
       body.appendChild(s);
     }
     if (st === 'recharge') {
@@ -340,7 +368,7 @@
     var corps = $('.ke-body'); retirerActions(); corps.appendChild(att); corps.scrollTop = corps.scrollHeight;
     api('POST', '/api/kofi/evenements/flash/' + (act === 'publier' ? 'publier' : 'abandonner'), { message_id: id }).then(function (r) {
       att.remove();
-      if (r.ok && r.data && r.data.message) { S.msgs.push(r.data.message); ajouterMessage(r.data.message, true); if (act === 'publier') apresPublication(); }
+      if (r.ok && r.data && r.data.message) { S.msgs.push(r.data.message); ajouterMessage(r.data.message, true); if (act === 'publier' && !r.data.publication_id) apresPublication(); }
       else { ajouterMessage({ role: 'assistant', contenu: (r.data && r.data.error) || (r.status === 429 ? T.trop : T.erreur) }); chargerEtat().then(construireCorps); }
     }).catch(function () { att.remove(); ajouterMessage({ role: 'assistant', contenu: T.erreur }); })
       .then(function () { S.occupe = false; });

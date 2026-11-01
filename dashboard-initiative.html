@@ -231,7 +231,7 @@ async function initRelaisDiasporaWidget(me, api) {
         permissions: { voir_coordonnees: true, modifier_statut: document.getElementById('rd-modifier').checked },
       });
       msg.style.color = '#16A34A';
-      msg.textContent = `✅ Accès créé (DS-ID ${r.ds_id}). Transmettez l'e-mail et le mot de passe à l'organisme.`;
+      msg.textContent = `✅ Accès créé (Code ultra secret ${r.ds_id}). Transmettez l'e-mail et le mot de passe à l'organisme.`;
     } catch (e) { msg.style.color = '#DC2626'; msg.textContent = '❌ ' + e.message; }
   });
 }
@@ -1361,7 +1361,7 @@ async function initRelaisDiasporaWidget(me, api) {
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px;">
         <div>
           <h2 style="margin:0;">🗳️ Votes sécurisés</h2>
-          <p style="font-size:13px;color:var(--muted);margin:4px 0 0;">Organisez des assemblées générales, élections et consultations avec bulletin anonyme. Les électeurs signent leur vote avec leur Code de Sécurité Diaspo'Actif (DS-ID).</p>
+          <p style="font-size:13px;color:var(--muted);margin:4px 0 0;">Organisez des assemblées générales, élections et consultations avec bulletin anonyme. Les électeurs signent leur vote avec leur Code ultra secret.</p>
         </div>
         <button class="btn btn-orange" onclick="voOuvrirCreationScrutin()">➕ Nouveau scrutin</button>
       </div>
@@ -2483,8 +2483,8 @@ async function initRelaisDiasporaWidget(me, api) {
     try {
       const payload = {
         contenu, categorie, visibilite,
-        statut: mode === 'brouillon' ? 'brouillon' : 'publie',
-        programmed_at: mode === 'programme' ? document.getElementById('pub-programmed-at').value : null
+        statut: mode === 'brouillon' ? 'brouillon' : mode === 'programme' ? 'programme' : 'publie',
+        programmed_at: mode === 'programme' ? new Date(document.getElementById('pub-programmed-at').value).toISOString() : null
       };
       if (videoUrl) {
         payload.pub_type = 'video';
