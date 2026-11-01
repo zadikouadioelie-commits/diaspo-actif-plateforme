@@ -3341,6 +3341,9 @@ FormationRelances.register({ route, db, sendJSON, getCurrentUser, SEC, exigerPre
 /* Connexion à plusieurs endroits : question « est-ce vous ? » chaque heure + code secret 4 chiffres (server/multi-connexion.js). */
 const MultiConnexion = require("./multi-connexion");
 MultiConnexion.register({ route, db, sendJSON, getCurrentUser, creerNotif, SEC });
+/* Message sécurisé : lisible 2 minutes après saisie du DS-ID du destinataire, puis détruit (server/message-securise.js). */
+const MessageSecurise = require("./message-securise");
+MessageSecurise.register({ route, db, sendJSON, getCurrentUser, creerNotif, SEC, contactBloque, peutEcrireDirectement, nomCompteAffichage });
 /* Documents PDF et Excel affichés DANS la page du cours (visionneuse, accès contrôlé, lecture par fenêtres) — server/formation-documents.js. checkFormationOwner est une déclaration de fonction (hissée). */
 const FormationDocuments = require("./formation-documents");
 FormationDocuments.register({ route, db, sendJSON, getCurrentUser, SEC, checkFormationOwner });
@@ -16636,6 +16639,7 @@ route("GET", "/api/conversations/:id/messages", async (req, res, params) => {
     "SELECT id, owner_id, produit_nom, produit_reference, quantity, desired_date, description, dimensions, additional_information, attachment_url, attachment_nom, statut FROM devis_demandes WHERE conversation_id=? ORDER BY id DESC LIMIT 1"
   ).get(params.id);
 
+  try { await MessageSecurise.enrichir(db, messages, user.id); } catch (e) { console.error("[message-securise.enrichir]", e.message); }
   sendJSON(res, 200, { messages, autre, conversation: conv, devis: devis || null, questions_formation: await FormationQuestions.questionsDeConversation(db, conv.id, user.id) });
 });
 
@@ -16723,6 +16727,7 @@ route("PATCH", "/api/messages/:id", async (req, res, params, body) => {
   const msg = await db.prepare("SELECT * FROM messages WHERE id=?").get(params.id);
   if (!msg) return sendJSON(res, 404, { error: "Message introuvable." });
   if (Number(msg.sender_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Vous ne pouvez modifier que vos propres messages." });
+  if (msg.type === "securise") return sendJSON(res, 403, { error: "Un message sécurisé ne peut pas être modifié. Supprimez-le (dans les 10 minutes) et renvoyez-en un." });
   if (msg.deleted) return sendJSON(res, 400, { error: "Ce message a été supprimé." });
   if (messageAgeMs(msg.created_at) > MSG_EDIT_WINDOW_MS) return sendJSON(res, 403, { error: "Le délai de modification (10 minutes) est dépassé." });
 
@@ -34464,6 +34469,15 @@ async function handleRequest(req, res) {
      Passe sur tous les groupes de comptes liés : pose, ajuste ou retire le coupon Stripe -20 % / -10 % selon les
      abonnements Premium payants réellement actifs (plafond absolu 20 %). Idempotent, se répare seul : la vérité est
      lue chez Stripe. Voir server/reduction-comptes-lies.js. */
+  /* ── Messages sécurisés (2026-11-01) : effacement physique de tout ce qui est échu (fin de lecture, 30 jours sans ouverture, supprimé par l'expéditeur). ── */
+  if (pathname === '/api/cron/messages-securises') {
+    const cronSecret = process.env.CRON_SECRET;
+    const authHeader = req.headers['authorization'] || '';
+    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) return sendJSON(res, 401, { error: "Non autorisé." });
+    try { return sendJSON(res, 200, { ok: true, detruits: await MessageSecurise.purger(db, true) }); }
+    catch (e) { console.error("[cron messages-securises]", e.message); return sendJSON(res, 500, { error: "Échec de la purge." }); }
+  }
+
   if (pathname === '/api/cron/reductions-comptes-lies') {
     const cronSecret = process.env.CRON_SECRET;
     const authHeader = req.headers['authorization'] || '';

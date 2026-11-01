@@ -396,12 +396,14 @@
 
         <!-- Zone saisie -->
         <div class="msg-input-area">
+          <div id="ms-bandeau" hidden></div>
           <div class="msg-input-row">
             <div class="msg-input-actions">
               <button class="msg-action-btn" id="btn-attach-file" title="Joindre un fichier" onclick="document.getElementById('file-attach-input').click()">📎</button>
               <button class="msg-action-btn" id="btn-attach" title="Joindre un lien">🔗</button>
               <button class="msg-action-btn" id="btn-voice" title="Message vocal (maintenir ou cliquer)" onclick="toggleVoiceRecord()">🎤</button>
               <button class="msg-action-btn" id="btn-emoji" title="Emoji">😊</button>
+              <button class="msg-action-btn" id="btn-secure" type="button"></button>
             </div>
             <input type="file" id="file-attach-input" style="display:none" accept="image/*,audio/*,video/*,.pdf,.doc,.docx,.ppt,.pptx,.txt,.zip" onchange="attachFile(this)">
             <textarea class="msg-input-box" id="msg-input" placeholder="Écrire un message…" rows="1"></textarea>
@@ -865,8 +867,9 @@ async function pollMessages(convId){
   if(convId!==activeConvId) return;
   try{
     const data=await api("GET",`/conversations/${convId}/messages`);
-    if(data.messages.length!==lastMsgCount){
-      lastMsgCount=data.messages.length;
+    const sigMs=window.MessageSecurise?MessageSecurise.signature(data.messages):"";
+    if(data.messages.length!==lastMsgCount||sigMs!==window._msSig){
+      lastMsgCount=data.messages.length; window._msSig=sigMs;
       renderMessages(data.messages);
     }
     // Rafraîchir la liste (badges non lus des autres convs)
@@ -887,10 +890,12 @@ async function sendMessage(){
   const body={contenu,type:pendingAttach?.type||"text"};
   if(pendingAttach) body.fichier={nom:pendingAttach.nom,url:pendingAttach.url,type:pendingAttach.type};
   if(_pendingProduitId) body.produit_id=_pendingProduitId;
+  if(replyTo) body.parent_message_id=replyTo.id;
 
   try{
     await api("POST",`/conversations/${activeConvId}/messages`,body);
     _pendingProduitId=null;
+    cancelReply();
     input.value="";
     pendingAttach=null;
     showAttachPreview();
@@ -1304,6 +1309,7 @@ function renderMessages(msgs) {
     }
     const isMe=(m.sender_id!=null?m.sender_id:m.expediteur_id)===me.id;
     const nom=m.sender_nom||m.expediteur_nom||"?";
+    if(m.type==='securise'&&window.MessageSecurise){ html+=MessageSecurise.ligneSite(m,isMe,nom,{avatarLetter,timeLabel}); return; }
     const isDeleted=!!m.deleted;
     const isEdited=!!m.edited;
     let inner="";
@@ -1390,6 +1396,7 @@ function renderMessages(msgs) {
       </div>`;
   });
   body.innerHTML=html;
+  if(window.MessageSecurise) MessageSecurise.lier(body,()=>{ if(activeConvId) loadMessages(activeConvId); });
   if(window.CvCarte) CvCarte.hydrater(body);
   body.scrollTop=body.scrollHeight;
 
@@ -1843,29 +1850,8 @@ async function proposerClassementContact(contactId, contactNom, convId){
   document.getElementById('btn-show-pins').addEventListener('click', ()=>{ if(activeConvId) showPinnedMessages(); });
   document.getElementById('btn-show-favs').addEventListener('click', showFavoris);
 
-  // Remplacer le handler d'envoi pour supporter reply (parent_message_id)
-  const sendBtn = document.getElementById('msg-send');
-  sendBtn.onclick = null;
-  sendBtn.addEventListener('click', async () => {
-    if(!activeConvId) return;
-    const inp = document.getElementById('msg-input');
-    const contenu = inp.value.trim();
-    const attach = window.pendingAttach;
-    if(!contenu && !attach) return;
-    const body = { contenu };
-    if(attach) { body.fichier_type=attach.type; body.fichier_icon=attach.icon; body.fichier_nom=attach.nom; body.fichier_url=attach.url; }
-    if(replyTo) { body.parent_message_id=replyTo.id; }
-    try{
-      await api('POST', `/conversations/${activeConvId}/messages`, body);
-      inp.value=''; inp.style.height='auto';
-      cancelReply();
-      window.pendingAttach=null;
-      document.getElementById('attach-panel').style.display='none';
-      const msgs=await api('GET', `/conversations/${activeConvId}/messages`);
-      renderMessages(msgs);
-      await loadConvList();
-    }catch(e){ alert(e.message); }
-  });
+  // (Un second gestionnaire d'envoi, ajouté ici pour la réponse à un message, s'ajoutait à sendMessage au lieu de le remplacer :
+  //  un clic envoyait le message DEUX fois. Corrigé 2026-11-01 : sendMessage est le seul expéditeur et gère la réponse.)
 
   // Polling global pour le badge non-lus (topbar) — toutes les 30s
   setInterval(async()=>{
@@ -1874,6 +1860,31 @@ async function proposerClassementContact(contactId, contactNom, convId){
       updateTopbarBadge(r.total);
     }catch(e){}
   },30000);
+})();
+</script>
+<!-- Message sécurisé (2026-11-01) : cadenas dans la zone d'écriture ; lisible 2 minutes après saisie du DS-ID du destinataire, puis détruit. -->
+<script src="assets/message-securise.js?v=20261101c"></script>
+<script>
+(function(){
+  if(!window.MessageSecurise) return;
+  const zone=document.querySelector('.msg-input-row'), champ=document.getElementById('msg-input'), envoi=document.getElementById('msg-send');
+  const ctl=MessageSecurise.brancherComposeur({ bouton:document.getElementById('btn-secure'), bandeau:document.getElementById('ms-bandeau'), champ, envoi });
+  async function envoyerSecurise(){
+    if(!activeConvId) return;
+    const texte=champ.value.trim();
+    if(!texte) return;
+    if(window.pendingAttach||(typeof pendingAttach!=='undefined'&&pendingAttach)){ alert("Un message sécurisé ne peut pas contenir de pièce jointe. Retirez-la, ou désactivez le mode sécurisé."); return; }
+    envoi.disabled=true;
+    try{
+      await MessageSecurise.envoyer(activeConvId,texte);
+      champ.value=''; champ.style.height='auto'; ctl.reinitialiser();
+      await loadMessages(activeConvId); await loadConvList();
+    }catch(e){ alert(e.message); }
+    envoi.disabled=false;
+  }
+  /* Phase de capture sur le parent : en mode sécurisé, ni l'envoi ordinaire (clic ou Entrée) ne part, seul l'envoi sécurisé. */
+  zone.addEventListener('click',e=>{ if(ctl.actif()&&e.target.closest&&e.target.closest('#msg-send')){ e.stopPropagation(); e.preventDefault(); envoyerSecurise(); } },true);
+  zone.addEventListener('keydown',e=>{ if(ctl.actif()&&e.target===champ&&e.key==='Enter'&&!e.shiftKey){ e.stopPropagation(); e.preventDefault(); envoyerSecurise(); } },true);
 })();
 </script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>

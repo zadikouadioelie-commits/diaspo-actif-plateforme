@@ -1877,6 +1877,8 @@
     setPane('Conversation', '<div class="sk skc" style="height:80px"></div>');
     /* module des cartouches de CV, chargé à la demande (aucune modification de m.html) */
     if (!window.CvCarte) await new Promise(res => { const sc = document.createElement('script'); sc.src = 'assets/cv-carte.js?v=20261012a'; sc.onload = sc.onerror = res; document.head.appendChild(sc); });
+    /* Message sécurisé (2026-11-01) : module chargé à la demande, comme celui des cartouches de CV. */
+    if (!window.MessageSecurise) await new Promise(res => { const sc = document.createElement('script'); sc.src = 'assets/message-securise.js?v=20261101c'; sc.onload = sc.onerror = res; document.head.appendChild(sc); });
     const render = async (scroll) => {
       let r; try { r = await api(`/api/conversations/${encodeURIComponent(id)}/messages`); } catch (e) { return setPane('Conversation', `<div class="empty"><b>Conversation inaccessible</b>${esc(e.message)}</div>`); }
       const autre = r.autre || {}; const msgs = r.messages || [];
@@ -1884,6 +1886,7 @@
       msgs.forEach(m => {
         const d = dayLabel(m.created_at); if (d !== last) { html += `<div class="day">${esc(d)}</div>`; last = d; }
         const mine = Number(m.sender_id) === Number(S.me.id);
+        if (m.type === 'securise' && window.MessageSecurise) { html += window.MessageSecurise.ligneTel(m, mine, S.convNames[id] || autre.nom || '', hhmm(m.created_at)); return; }
         let body;
         if (m.deleted) body = '<i style="opacity:.75">Message supprimé</i>';
         else {
@@ -1910,18 +1913,25 @@
         fqb.querySelectorAll('[data-fqs]').forEach(b => { b.onclick = async () => { const [qid, st] = b.dataset.fqs.split(':'); b.disabled = true; try { await api('/api/formation-questions/' + qid, { method: 'PATCH', body: { statut: st } }); toast(st === 'traitee' ? 'Question marquée comme traitée' : 'Question rouverte'); render(false); } catch (e) { toast(e.message, true); b.disabled = false; } }; });
       }
       if (window.CvCarte && $('#chat')) window.CvCarte.hydrater($('#chat'));
+      if (window.MessageSecurise && $('#chat')) window.MessageSecurise.lier($('#chat'), () => render(false), { lienDsId: 'm.html#/confidentialite' });
       const body = $('.pbody'); if (body && (scroll || atBottom)) body.scrollTop = body.scrollHeight;
     };
     await render(true);
     clearInterval(S.chatTimer); S.chatTimer = setInterval(() => { if (S.pane && S.pane.k === 'conv') render(false); else clearInterval(S.chatTimer); }, 8000);
   }
   function mountComposer(id, rerender) {
-    const f = $('#pane-foot'); f.innerHTML = `<form class="composer" style="width:100%;border:none;background:none"><textarea id="msg" rows="1" placeholder="Votre message…" aria-label="Votre message"></textarea><button class="send" aria-label="Envoyer" disabled>${ic('send')}</button></form>`;
+    const ms = !!window.MessageSecurise;   // cadenas « message sécurisé » (2026-11-01) : absent si le module n'a pas pu se charger
+    const f = $('#pane-foot'); f.innerHTML = `<div class="ms-tel" style="width:100%">${ms ? '<div id="ms-bandeau" hidden style="margin:8px 10px 0"></div>' : ''}<form class="composer" style="width:100%;border:none;background:none">${ms ? '<button type="button" id="ms-lock"></button>' : ''}<textarea id="msg" rows="1" placeholder="Votre message…" aria-label="Votre message"></textarea><button class="send" aria-label="Envoyer" disabled>${ic('send')}</button></form></div>`;
     const ta = $('#msg'), btn = $('.send', f);
+    const secu = ms ? window.MessageSecurise.brancherComposeur({ bouton: $('#ms-lock', f), bandeau: $('#ms-bandeau', f), champ: ta, envoi: null }) : null;
     ta.oninput = () => { btn.disabled = !ta.value.trim(); ta.style.height = 'auto'; ta.style.height = Math.min(120, ta.scrollHeight) + 'px'; };
     $('form', f).onsubmit = async ev => {
       ev.preventDefault(); const t = ta.value.trim(); if (!t) return; btn.disabled = true;
-      try { await api(`/api/conversations/${encodeURIComponent(id)}/messages`, { method: 'POST', body: { contenu: t } }); ta.value = ''; ta.style.height = 'auto'; await rerender(true); if (window.DaNotifInvite) window.DaNotifInvite.proposer(S.me, { contexte: 'message' }); }
+      try {
+        if (secu && secu.actif()) { await window.MessageSecurise.envoyer(id, t); secu.reinitialiser(); toast('Message sécurisé envoyé'); }
+        else await api(`/api/conversations/${encodeURIComponent(id)}/messages`, { method: 'POST', body: { contenu: t } });
+        ta.value = ''; ta.style.height = 'auto'; await rerender(true); if (window.DaNotifInvite) window.DaNotifInvite.proposer(S.me, { contexte: 'message' });
+      }
       catch (e) { toast(e.message, true); btn.disabled = false; }
     };
   }

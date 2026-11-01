@@ -6810,6 +6810,32 @@ db.exec(`
   );
 `);
 
+/* Messages sécurisés (2026-11-01, demande explicite) — voir server/message-securise.js. Le texte n'est JAMAIS dans « messages » (qui ne porte que
+   le marqueur « 🔒 Message sécurisé », type='securise') : il vit chiffré ici, lisible 2 minutes après la saisie du DS-ID du destinataire, puis
+   effacé (iv/tag/chiffre mis à NULL, detruit_le renseigné). Le verrou de saisie est par COMPTE, pas par message. */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS messages_securises (
+    message_id      INTEGER PRIMARY KEY,
+    conversation_id INTEGER NOT NULL,
+    expediteur_id   INTEGER NOT NULL,
+    destinataire_id INTEGER NOT NULL,
+    iv              TEXT,
+    tag             TEXT,
+    chiffre         TEXT,
+    cree_le         TEXT NOT NULL,
+    ouvert_le       TEXT,
+    expire_le       TEXT,
+    detruit_le      TEXT,
+    detruit_motif   TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_msg_securises_dest ON messages_securises(destinataire_id, detruit_le);
+  CREATE TABLE IF NOT EXISTS messages_securises_verrous (
+    user_id         INTEGER PRIMARY KEY,
+    essais          INTEGER DEFAULT 0,
+    verrou_jusqua   TEXT
+  );
+`);
+
 /* ═══════════════════════════════════════════════════════════════════════════
    CONFIRMATION D'UN NOUVEL APPAREIL (2026-10-05, étape 2 du chantier sécurité des connexions).
    Quand le bon mot de passe est saisi depuis un appareil inconnu alors que le compte est déjà ouvert
