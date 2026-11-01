@@ -40,7 +40,16 @@ test('Koffi annuaire — critères, sortie du modèle, pourcentage (fonctions pu
   const q = A.lireSortie('{"action":"question","message":"Quel domaine ?"}'); assert.deepEqual(q, { action: 'question', message: 'Quel domaine ?' });
   const ch = A.lireSortie('Voici :\n```json\n{"action":"chercher","message":"ok","criteres":{"concepts":[["compta"]],"ville":"Lyon"}}\n```');
   assert.equal(ch.action, 'chercher'); assert.equal(ch.criteres.ville, 'Lyon'); assert.deepEqual(ch.criteres.concepts, [['compta']]);
-  for (const mauvais of ['', 'bonjour', '{"action":"supprimer"}', '{"action":"question"}', '{"action":"chercher","criteres":{}}', '{"action":"chercher","criteres":{"concepts":[]}}', '{pas du json}', null]) assert.equal(A.lireSortie(mauvais), null, String(mauvais));
+  for (const mauvais of ['', 'bonjour', '{"action":"supprimer"}', '{"action":"question"}', '{"action":"repondre"}', '{pas du json}', null]) assert.equal(A.lireSortie(mauvais), null, String(mauvais));
+  /* Comprendre sans mot précis : une demande SANS aucun critère (« montre-moi les comptes ») n'est plus refusée — le serveur la traite comme un parcours. */
+  const tous = A.lireSortie('{"action":"chercher","message":"ok","criteres":{"concepts":[],"liste":true}}');
+  assert.equal(tous.action, 'chercher'); assert.deepEqual(tous.criteres.concepts, []); assert.equal(tous.criteres.liste, true);
+  assert.equal(A.lireSortie('{"action":"chercher","criteres":{}}').action, 'chercher');
+  assert.deepEqual(A.lireSortie('{"action":"repondre","message":"Je ne propose que les comptes Premium."}'), { action: 'repondre', message: 'Je ne propose que les comptes Premium.' });
+  assert.equal(A.validerCriteres({ suite: true }).suite, true); assert.equal(A.validerCriteres({ suite: 'oui' }).suite, undefined);
+  assert.equal(A.noter({ kind: 'personne', bio: 'x', competences: 'y' }, { concepts: [], ville: '', pays: '', type: '' }).pct, null, 'sans critère : aucun pourcentage');
+  const sys = A.systemePour();
+  assert.match(sys, /AUCUNE formule précise/); assert.match(sys, /"concepts":\[\]/); assert.match(sys, /la suite/); assert.match(sys, /@moi/); assert.match(sys, /\"action\":\"repondre\"/);
   /* Pourcentage : calculé d'après les champs réellement trouvés (poids : compétences 1, présentation 0,6) et le lieu (30 %). */
   const p = { kind: 'personne', titre_pro: 'Comptable', competences: 'comptabilité, fiscalité', bio: 'Je suis ravi.', ville: 'Lyon', pays: 'France' };
   const crit = (o) => ({ concepts: [['comptabilité']], ville: '', pays: '', type: '', ...o });
@@ -265,6 +274,34 @@ test('Koffi annuaire — parcours complet', async (t) => {
     /* Validation des critères : liste:true conservé seulement s\'il est strictement vrai. */
     assert.equal(A.validerCriteres({ concepts: [['a']], liste: 'oui' }).liste, undefined);
     assert.equal(A.validerCriteres({ concepts: [['a']], liste: true }).liste, true);
+  });
+
+  await t.test('comprendre sans mot précis : « tous les comptes » sans thème → liste sans pourcentage ; « la suite » ne répète rien ; « ma ville » ; question d\'explication', async () => {
+    /* Aucun thème : la demande « fais-moi la liste de tous les comptes que tu peux lister » ne doit plus être « incomprise ». */
+    const t0 = await dire(jar.Lr, 'Fais-moi la liste de tous les comptes que tu peux lister TOUSFAUX');
+    assert.equal(t0.status, 200, JSON.stringify(t0.data));
+    const m = t0.data.message, props = m.propositions;
+    assert.equal(m.liste, true); assert.ok(props.length >= 8, 'plusieurs comptes : ' + props.length);
+    assert.doesNotMatch(m.contenu, /pas bien compris/); assert.match(m.contenu, /Voici \d+ comptes? de l'Annuaire/);
+    assert.ok(props.every(p => p.pourcentage === null), 'pas de pourcentage quand aucun critère');
+    for (const exclu of ['P4', 'P5', 'P6', 'P7', 'P8', 'P9', 'P10', 'L7', 'Lr']) assert.ok(!props.some(p => p.type === 'personne' && p.id === uid(exclu)), exclu + ' ne doit jamais être listé');
+    assert.ok(props.some(p => p.id === uid('P1')) && props.some(p => p.type === 'initiative'), 'personnes et initiatives');
+    assert.ok(!/telephone|password|date_naissance|email/i.test(JSON.stringify(props)), 'aucun champ privé');
+    /* Un type seulement (« les associations ») : parcours restreint ; « la suite » dans la même discussion ne remontre jamais le même compte. */
+    const ini = await dire(jar.Lr, 'Montre-moi les associations TOUSFAUX TYPE:initiative');
+    assert.ok(ini.data.message.propositions.length >= 1 && ini.data.message.propositions.every(p => p.type === 'initiative'));
+    const suite = await dire(jar.Lr, 'Et la suite ? TOUSFAUX TYPE:initiative SUITE:oui', { conversation_id: ini.data.conversation_id });
+    assert.equal(suite.status, 200); assert.deepEqual(suite.data.message.propositions, []); assert.match(suite.data.message.contenu, /pas d'autre compte/);
+    /* « Ma ville » : le serveur lit la ville du profil (Nantes) ; le modèle ne la reçoit jamais. */
+    const moi = await dire(jar.Lr, 'Les comptes de ma ville KW:' + 'listarium' + rnd + ' VILLE:@moi');
+    assert.equal(moi.status, 200, JSON.stringify(moi.data)); assert.ok(moi.data.message.propositions.length >= 3);
+    assert.ok(!fs.readFileSync(journalIA, 'utf8').includes('Nantes'), 'la ville du profil n\'est jamais transmise au modèle');
+    sql("UPDATE users SET ville='' WHERE id=?", uid('Lr'));
+    const sans = await dire(jar.Lr, 'Les comptes de ma ville KW:' + 'listarium' + rnd + ' VILLE:@moi');
+    assert.deepEqual(sans.data.message.propositions, []); assert.match(sans.data.message.contenu, /n'indique pas votre ville/);
+    /* Une question d'explication reçoit une réponse, pas une recherche. */
+    const ex = await dire(jar.Lr, 'Pourquoi certains comptes ne sont pas proposés ? EXPLIQUEFAUX');
+    assert.deepEqual(ex.data.message.propositions, []); assert.match(ex.data.message.contenu, /Premium/);
   });
 
   await t.test('suppression : le demandeur efface sa conversation ; un autre compte ne peut pas', async () => {

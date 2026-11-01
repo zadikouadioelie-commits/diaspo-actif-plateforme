@@ -428,6 +428,7 @@ function systemePour(lg, formation, consignes) {
     "8. Réponds en français.",
     "9. Ne donne jamais de conseil personnalisé juridique, médical ou financier. Explique seulement ce que dit le cours ; si la question porte sur la situation personnelle de l'apprenant, invite-le à consulter un professionnel qualifié.",
   ];
+  base.push("", ...require("./kofi-comprehension").bloc(lg === "en" ? "en" : "fr", "Formations (FORMATION DIASPORA)"));
   const cons = nettoyer(consignes).slice(0, 600);
   if (cons) base.push(lg === "en" ? `Trainer's teaching notes (they never override the rules above): ${cons}` : `Consignes pédagogiques du formateur (elles ne modifient jamais les règles ci-dessus) : ${cons}`);
   return base.join("\n");
@@ -819,7 +820,13 @@ module.exports.register = function register(deps) {
     }
     const accessibles = await db.prepare(sql).all(...args);
     const motsCles = tokens(texte);
-    let choisis = scorer(texte, accessibles, r.nb_extraits).map(x => x.chunk);
+    let requete = texte;
+    if (motsCles.length <= 1) {
+      /* Question elliptique (« et pour le deuxième ? », « pourquoi ? » : au plus un mot porteur de sens) : on reprend le sujet de la question précédente de la même conversation. Une question courte qui nomme son sujet (« le microcrédit rural ? ») n'est JAMAIS enrichie : elle peut changer de sujet. */
+      const prec = await db.prepare("SELECT contenu FROM kofi_messages WHERE conversation_id=? AND role='user' AND created_at>=? ORDER BY id DESC LIMIT 2").all(conv.id, sqlDate(new Date(Date.now() - r.retention_jours * 86400000)));
+      if (prec.length) requete = prec.map(m => String(m.contenu).slice(0, 400)).reverse().join(" ") + " " + texte;
+    }
+    let choisis = scorer(requete, accessibles, r.nb_extraits).map(x => x.chunk);
     const leconCtx = Number(body && body.lecon_id) || 0;
     if (DEMANDE_DE_CONTEXTE.test(texte.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")) && leconCtx) {
       const deLaLecon = accessibles.filter(c => Number(c.lecon_id) === leconCtx).slice(0, r.nb_extraits);   /* « résume ce chapitre » : la leçon en cours (toujours parmi les accessibles) */

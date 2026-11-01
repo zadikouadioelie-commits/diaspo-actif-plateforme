@@ -2637,6 +2637,6 @@
     if ('serviceWorker' in navigator) { /* le site est « réseau uniquement » : rien à enregistrer */ }
   }
   window.MMods = window.MMods || {};
-  window.MApp = { S, api, esc, strip, md, linkify, richHtml, ic, ICONS, setPane, paneShare, partagerLien, jetonPartage, closePane, openSheet, toast, needLogin, openLogin, loginCard, mediaBlock, videoBlock, money, dateLong, parseDay, ago, hhmm, dayLabel, initials, attrUrl, safeUrl, premiumLocked, premiumSheet, loadPremium, afterAuthChange, ROLE_LABEL, paintBadges };
+  window.MApp = { S, refreshTab, api, esc, strip, md, linkify, richHtml, ic, ICONS, setPane, paneShare, partagerLien, jetonPartage, closePane, openSheet, toast, needLogin, openLogin, loginCard, mediaBlock, videoBlock, money, dateLong, parseDay, ago, hhmm, dayLabel, initials, attrUrl, safeUrl, premiumLocked, premiumSheet, loadPremium, afterAuthChange, ROLE_LABEL, paintBadges };
   init();
 })();

@@ -232,6 +232,8 @@ function systemePour(f, dossier) {
     '- {"type":"creer_carte_mentale","titre":"…","centre":"…","branches":[{"titre":"…","enfants":["…","…"]}],"chapitre_id":N}   (chapitre_id facultatif ; 2 à 8 branches, 0 à 5 sous-idées chacune, textes très courts)',
     `- {"type":"importer_texte","module_id":N,"plan":[{"chapitre":"…","lecons":[{"titre":"…","de":1,"a":6}]}]}   (ou "nouveau_module":"titre" à la place de module_id ; de/a = numéros de paragraphes [P..], dans l'ordre, sans trou)`,
     "",
+    ...require("./kofi-comprehension").bloc("fr", "Formations (FORMATION DIASPORA)"),
+    "",
     GUIDE,
   ].join("\n");
 }

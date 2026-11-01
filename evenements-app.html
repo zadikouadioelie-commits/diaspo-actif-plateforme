@@ -3378,8 +3378,8 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') fermerListeB
 <script src="/assets/alertes-evenements.js?v=20261013a"></script>
 <script>AlertesEvt.poser(document.getElementById('btn-alertes-evt'));</script>
 <!-- Koffi, guide des événements (2026-11-01) : bouton affiché seulement aux personnes connectées ; le serveur décide de tout (assets/koffi-evenements.js). Retour arrière : retirer ces 2 lignes. -->
-<script src="/assets/koffi-evenements.js?v=1" defer></script>
-<script>window.addEventListener('load', function () { if (window.KoffiEvenements) KoffiEvenements.monter({}); });</script>
+<script src="/assets/koffi-evenements.js?v=3" defer></script>
+<script>window.addEventListener('load', function () { if (window.KoffiEvenements) KoffiEvenements.monter({ apresPublication: function () { if (typeof loadEvts === 'function') loadEvts(); if (typeof loadMesEvts === 'function') loadMesEvts(); } }); });</script>
 </body>
 </html>
 

@@ -16,8 +16,8 @@
     nom: 'Koffi', sous: 'Conseiller de l\'Annuaire', ouvrir: 'Demander à Koffi de trouver un profil', fermer: 'Fermer', nouvelle: 'Nouvelle recherche',
     supprimer: 'Supprimer cette conversation', confirmSuppr: 'Supprimer cette conversation ? Cette action est définitive.',
     placeholder: 'Que cherchez-vous ? (un métier, un domaine, une ville…)', envoyer: 'Envoyer', reflechit: 'Koffi cherche dans l\'Annuaire…',
-    accueil: 'Bonjour ! Je suis Koffi. Dites-moi ce que vous cherchez (un métier, un domaine, une ville ou un pays) : je vous propose au moins trois profils de l\'Annuaire, avec leur pourcentage de correspondance.',
-    suggestions: ['Que sais-tu faire ?', 'Je cherche un avocat à Abidjan', 'Une association d\'aide aux étudiants en France', 'Un expert en agriculture au Sénégal'],
+    accueil: 'Bonjour ! Je suis Koffi. Parlez-moi comme à une personne : ce que vous cherchez (un métier, un besoin, une ville, un pays) ou simplement « montre-moi les comptes que tu peux lister ». Je vous propose des profils de l\'Annuaire, avec leur pourcentage de correspondance quand vous cherchez quelque chose de précis.',
+    suggestions: ['Que sais-tu faire ?', 'Fais-moi la liste de tous les comptes que tu peux lister', 'Je cherche un avocat à Abidjan', 'Une association d\'aide aux étudiants en France', 'Un expert en agriculture au Sénégal'],
     gratuitNote: '✓ Question sur Koffi : gratuite, elle ne compte pas dans votre crédit.',
     info1: 'Koffi ne propose que les comptes Premium qui ont une photo de profil et un descriptif rempli, et qui acceptent d\'être proposés. Pour tous les autres comptes, utilisez la recherche et les filtres de l\'Annuaire.',
     info2: 'Koffi ne voit aucun profil : il transforme votre demande en critères de recherche. C\'est le serveur de Diaspo\'Actif qui cherche, calcule le pourcentage et affiche les profils.',
@@ -154,7 +154,7 @@
     var ph = photo ? '<img class="ka-ph" src="' + esc(photo) + '" alt="" loading="lazy" width="' + px + '" height="' + px + '">' : '<span class="ka-ph" aria-hidden="true">' + esc(String(p.nom || '?').charAt(0).toUpperCase()) + '</span>';
     var raisons = compact ? '' : (p.raisons || []).slice(0, 3).map(function (r) { return '<li>' + esc(r) + '</li>'; }).join('');
     a.innerHTML = ph + '<span class="ka-pi"><span class="ka-type">' + esc(T.types[p.type] || '') + '</span><b>' + esc(p.nom) + '</b><small>' + esc(p.sous_titre) + '</small>' + (raisons ? '<ul>' + raisons + '</ul>' : '') + '<span class="ka-voir">' + T.voir + ' →</span></span>' +
-      '<span class="ka-pct" aria-label="' + T.correspondance + ' ' + esc(p.pourcentage) + ' %">' + esc(p.pourcentage) + ' %</span>';
+      (p.pourcentage == null ? '' : '<span class="ka-pct" aria-label="' + T.correspondance + ' ' + esc(p.pourcentage) + ' %">' + esc(p.pourcentage) + ' %</span>');
     return a;
   }
   function ajouterMessage(m) {

@@ -123,7 +123,12 @@ function reponseFausseAnnuaire({ systeme, messages }) {
   let texte;
   if (/JSONFAUX/.test(q)) texte = "Voici ma réponse sans structure.";
   else if (/VAGUEFAUX/.test(q)) texte = JSON.stringify({ action: "question", message: "Quel domaine ou quel type de compétence recherchez-vous ?" });
-  else {
+  else if (/EXPLIQUEFAUX/.test(q)) texte = JSON.stringify({ action: "repondre", message: "Je ne propose que les comptes Premium qui ont une photo et un descriptif." });
+  else if (/TOUSFAUX/.test(q)) {
+    /* « montre-moi les comptes » : aucun thème — le modèle renvoie des critères vides (type facultatif : TYPE:xxx), et SUITE:oui pour « la suite ». */
+    const prise = re => (re.exec(q) || [])[1] || "";
+    texte = "```json\n" + JSON.stringify({ action: "chercher", message: "Je vous montre les comptes de l'Annuaire.", criteres: { concepts: [], ville: prise(/VILLE:(\S+)/), pays: "", type: prise(/TYPE:(\S+)/), liste: true, suite: /SUITE:oui/.test(q) } }) + "\n```";
+  } else {
     const prise = re => (re.exec(q) || [])[1] || "";
     const concepts = [prise(/KW:(\S+)/), prise(/KW2:(\S+)/)].filter(Boolean).map(m => [m.replace(/_/g, " ")]);
     const prec = (/<criteres_precedents>([\s\S]*?)<\/criteres_precedents>/.exec(dernier) || [])[1];
@@ -147,6 +152,24 @@ function reponseFausseEvenements({ systeme, messages }) {
   if (/REFUSFAUX/.test(q)) return { texte: "", entree, sortie: 5, lecture_cache: 0, refus: true, arret: "refusal" };
   let texte;
   if (/JSONFAUX/.test(q)) texte = "Voici ma réponse sans structure.";
+  else if (/ABANDONFAUX/.test(q)) texte = JSON.stringify({ action: "abandonner", message: "" });
+  else if (/EXPLIQUEFAUX/.test(q)) texte = JSON.stringify({ action: "repondre", message: "Les événements sont publiés par les comptes Initiative, Collectivité et Administrateur." });
+  else if (/FLASHFAUX/.test(q)) {
+    /* Événement flash : brouillon COMPLET (comme le vrai modèle) = brouillon précédent + champs donnés par marqueurs
+       F_TITRE:, F_DATE:AAAA-MM-JJ ou +N (jours après la date du jour), F_LIEU:, F_VILLE:, F_PAYS:, F_DESC:, F_HEURE:HH:MM, F_ENLIGNE, F_SANSIMAGE, F_AVECIMAGE ; CONFIRMEFAUX → confirme:true. Les _ valent des espaces. */
+    const prise = re => { const v = (re.exec(q) || [])[1]; return v == null ? null : v.replace(/_/g, " "); };
+    const prec = (/<brouillon_precedent>([\s\S]*?)<\/brouillon_precedent>/.exec(dernier) || [])[1];
+    let b = {}; try { b = prec ? JSON.parse(prec) : {}; } catch (e) { b = {}; }
+    const auj = (/Date du jour à Paris : (\d{4}-\d{2}-\d{2})/.exec(dernier) || [])[1] || "2026-01-01";
+    const set = (cle, v) => { if (v !== null) b[cle] = v; };
+    set("titre", prise(/F_TITRE:(\S+)/)); set("lieu", prise(/F_LIEU:(\S+)/)); set("ville", prise(/F_VILLE:(\S+)/)); set("pays", prise(/F_PAYS:(\S+)/)); set("description", prise(/F_DESC:(\S+)/)); set("heure_debut", prise(/F_HEURE:(\S+)/));
+    const d = prise(/F_DATE:(\S+)/);
+    if (d) { if (/^\+\d+$/.test(d)) { const x = new Date(auj + "T00:00:00Z"); x.setUTCDate(x.getUTCDate() + Number(d.slice(1))); b.date_evt = x.toISOString().slice(0, 10); } else b.date_evt = d; }
+    if (/F_ENLIGNE/.test(q)) b.en_ligne = true;
+    if (/F_SANSIMAGE/.test(q)) b.image_choix = "sans";
+    if (/F_AVECIMAGE/.test(q)) b.image_choix = "avec";
+    texte = JSON.stringify({ action: "flash", message: "", brouillon: b, confirme: /CONFIRMEFAUX/.test(q) });
+  }
   else {
     const prise = re => (re.exec(q) || [])[1] || "";
     const concepts = [prise(/KW:(\S+)/), prise(/KW2:(\S+)/)].filter(Boolean).map(m => [m.replace(/_/g, " ")]);

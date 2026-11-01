@@ -3359,7 +3359,23 @@ const FormationQuestions = require("./formation-questions");
 FormationQuestions.register({ route, db, sendJSON, getCurrentUser, SEC, creerNotif, nomCompteAffichage, contactBloque });
 /* Koffi, tuteur IA des formations (2026-10-30) — server/kofi.js. getPremiumStatut est une déclaration de fonction (hissée). */
 const Kofi = require("./kofi");
-Kofi.register({ route, db, sendJSON, getCurrentUser, SEC, getPremiumStatut, getOrigin, creerNotif, checkFormationOwner, exigerPremium });
+/* Appel interne d'une route déjà enregistrée (Koffi publie un événement flash par la MÊME route que le formulaire : mêmes droits, mêmes contrôles, mêmes notifications).
+   Réponse capturée : { status, data }. */
+async function appelerRoute(method, pathname, req, body) {
+  for (const r of routes) {
+    if (r.method !== method) continue;
+    const m = pathname.match(r.regex);
+    if (!m) continue;
+    const params = {};
+    r.keys.forEach((k, i) => params[k] = m[i + 1]);
+    const out = { status: 200, data: {} };
+    const resFactice = { headersSent: false, writeHead(st) { out.status = st; }, setHeader() {}, write() {}, on() {}, once() {}, end(d) { try { out.data = JSON.parse(d); } catch (_) { out.data = {}; } } };
+    await r.handler(req, resFactice, params, body || {}, {});
+    return out;
+  }
+  return { status: 404, data: { error: "Route introuvable." } };
+}
+Kofi.register({ route, db, sendJSON, getCurrentUser, SEC, getPremiumStatut, getOrigin, creerNotif, checkFormationOwner, exigerPremium, appelerRoute });
 /* Envoyer un événement par e-mail (carte complète) + texte d'aperçu du lien (date, lieu) : server/partage-evenement.js. urlImagePartageEvenement est une déclaration de fonction (hissée). */
 const PartageEvenement = require("./partage-evenement");
 PartageEvenement.register({ route, db, sendJSON, getCurrentUser, SEC, nomCompteAffichage, getOrigin, urlImagePartageEvenement });

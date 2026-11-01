@@ -17,8 +17,8 @@
     if (test()) return Promise.resolve();
     return new Promise(ok => { const sc = document.createElement('script'); sc.src = src; sc.onload = ok; sc.onerror = ok; document.head.appendChild(sc); });
   }
-  const chargerAnnuaire = () => charger('/assets/koffi-annuaire.js?v=4', () => !!window.KoffiAnnuaire);
-  const chargerEvenements = () => charger('/assets/koffi-evenements.js?v=1', () => !!window.KoffiEvenements);
+  const chargerAnnuaire = () => charger('/assets/koffi-annuaire.js?v=5', () => !!window.KoffiAnnuaire);
+  const chargerEvenements = () => charger('/assets/koffi-evenements.js?v=3', () => !!window.KoffiEvenements);
 
   /* Tous les boutons Koffi du téléphone se déplacent au doigt ; une seule position mémorisée pour qu'il reste où on l'a posé d'un écran à l'autre. */
   const CLE_POS = 'da_koffi_pos_tel';
@@ -55,7 +55,7 @@
     enCoursEv = true;
     try {
       await chargerEvenements();
-      if (window.KoffiEvenements && surEvenements() && S.me && !window.KoffiEvenements.estMonte()) { await window.KoffiEvenements.monter({ telephone: true }); const r = document.querySelector('.ke-root'); if (r) deplacable(r, r.querySelector('.ke-btn')); }
+      if (window.KoffiEvenements && surEvenements() && S.me && !window.KoffiEvenements.estMonte()) { await window.KoffiEvenements.monter({ telephone: true, apresPublication: () => { const A = window.MApp; if (A && A.refreshTab) A.refreshTab('evenements'); } }); const r = document.querySelector('.ke-root'); if (r) deplacable(r, r.querySelector('.ke-btn')); }
       if (window.KoffiEvenements && !surEvenements() && window.KoffiEvenements.estMonte()) window.KoffiEvenements.demonter();
     } finally { enCoursEv = false; }
   }

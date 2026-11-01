@@ -16,8 +16,8 @@
   var T = {
     nom: 'Koffi', sous: 'Guide des événements', ouvrir: 'Demander à Koffi de trouver un événement', fermer: 'Fermer', nouvelle: 'Nouvelle recherche',
     supprimer: 'Supprimer cette conversation', confirmSuppr: 'Supprimer cette conversation ? Cette action est définitive.',
-    placeholder: 'Une ville, une date, un thème…', envoyer: 'Envoyer', reflechit: 'Koffi cherche parmi les événements…',
-    accueil: 'Bonjour ! Je suis Koffi. Dites-moi quels événements vous intéressent (une ville, une période, un thème, gratuit ou payant, en ligne) : je vous montre les plus proches dans le temps.',
+    placeholder: 'Écrivez avec vos mots…', envoyer: 'Envoyer', reflechit: 'Koffi cherche parmi les événements…',
+    accueil: 'Bonjour ! Je suis Koffi. Parlez-moi avec vos mots : je trouve les événements qui vous intéressent (une ville, un jour, un thème, gratuit ou payant, en ligne), je vous explique comment ils fonctionnent et, si votre compte peut en publier, je prépare avec vous un événement flash.',
     suggestions: ['Que sais-tu faire ?', 'Quels sont les événements de ma ville cette semaine ?', 'Des événements gratuits ce week-end', 'Une conférence en ligne le mois prochain'],
     gratuitNote: '✓ Question sur Koffi : gratuite, elle ne compte pas dans votre crédit.',
     info1: 'Koffi ne propose que les événements publics à venir. Les événements privés, réservés aux abonnés ou en brouillon ne sont jamais montrés. Les filtres de la page permettent de tout parcourir.',
@@ -34,7 +34,13 @@
     rechargeTitre: 'Votre crédit Koffi est épuisé', rechargeTexte: 'Rechargez votre crédit pour continuer : le même crédit sert à tout Koffi (cours, création de formation, Annuaire, événements). Poser une question sur ce que sait faire Koffi reste gratuit.',
     rechargeTextePremium: 'Votre crédit du mois est utilisé : il est renouvelé le mois prochain. Vous pouvez aussi recharger dès maintenant ; le même crédit sert à tout Koffi.', recharger: 'Recharger mon crédit',
     erreur: 'Une erreur est survenue. Réessayez.', trop: 'Doucement : patientez quelques secondes avant le message suivant.',
-    paiementRecu: 'Paiement reçu : votre crédit est en cours d\'ajout…'
+    paiementRecu: 'Paiement reçu : votre crédit est en cours d\'ajout…',
+    /* Création d'un événement flash (comptes Initiative, Collectivité et Administrateur avec Premium) */
+    info5: 'Si vous créez un événement flash avec moi et joignez une image, elle est enregistrée sur nos serveurs pour illustrer l\'événement ; elle n\'est jamais envoyée à l\'intelligence artificielle. Rien n\'est publié sans votre confirmation.',
+    suggestionFlash: 'Crée-moi un événement flash',
+    joindre: 'Joindre une image', retirerImage: 'Retirer l\'image', imageIllisible: 'Cette image n\'a pas pu être lue. Essayez une image JPG ou PNG.',
+    apercu: 'Aperçu de votre événement flash', manque: 'Il manque encore :', publier: 'Publier', abandonner: 'Abandonner ce brouillon', publication: 'Publication en cours…',
+    imageJointe: 'J\'ai joint l\'image.', photoApercu: 'Image de l\'événement'
   };
 
   var CSS = [
@@ -82,6 +88,16 @@
     '.ke-cta{display:inline-block;border:0;background:#F26422;color:#fff;font-weight:800;padding:10px 18px;border-radius:10px;text-decoration:none;cursor:pointer;font-family:inherit;font-size:14px;margin:4px 8px 0 0}',
     '.ke-cta.sec{background:#fff;color:#0D2B4E;border:1.5px solid #0D2B4E}.ke-cta[disabled]{opacity:.55;cursor:not-allowed}',
     '.ke-cta:focus-visible{outline:3px solid #0D2B4E;outline-offset:2px}',
+    /* Brouillon d'événement flash et pièce jointe */
+    '.ke-bro{align-self:stretch;background:#fff;border:2px solid #F26422;border-radius:14px;padding:12px;font-size:13.5px;line-height:1.5;color:#0f172a}',
+    '.ke-bro h4{margin:0 0 8px;font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:#b84c1a}',
+    '.ke-bro img{display:block;width:100%;max-height:150px;object-fit:cover;border-radius:10px;margin:0 0 8px;background:#fff3e6}',
+    '.ke-bro b{display:block;font-size:15px;color:#0D2B4E;overflow-wrap:anywhere}',
+    '.ke-bro p{margin:4px 0;overflow-wrap:anywhere}.ke-bro .ke-q{color:#9a3412;font-weight:700}',
+    '.ke-bro .ke-man{margin:8px 0 0;padding:8px 10px;border-radius:10px;background:#fff7ed;color:#9a3412;font-weight:700}',
+    '.ke-bro .ke-act{margin-top:10px}',
+    '.ke-clip{border:1px solid #cbd5e1;background:#fff;color:#0D2B4E;border-radius:12px;height:42px;min-width:42px;font-size:18px;cursor:pointer;flex:none}.ke-clip:hover{border-color:#F26422;background:#fff7ed}.ke-clip:focus-visible{outline:2px solid #F26422}',
+    '.ke-pj{display:flex;align-items:center;gap:8px;margin:0 0 6px;font-size:12px;color:#0D2B4E}.ke-pj img{width:40px;height:40px;border-radius:8px;object-fit:cover}.ke-pj button{border:0;background:#e2e8f0;border-radius:99px;width:24px;height:24px;cursor:pointer;color:#0f172a}',
     '@media (max-width:560px){.ke-root{right:10px;bottom:calc(10px + env(safe-area-inset-bottom))}.ke-btn span{display:none}.ke-btn{padding:4px}.ke-panel{right:0;bottom:0;left:0;width:100%;max-width:none;height:80vh;height:80dvh;border-radius:16px 16px 0 0}.ke-form textarea{font-size:16px}}',
     /* Appli téléphone (m.html) : bouton compact au-dessus du pied de page, feuille dans la largeur de l'appli. */
     '.ke-tel{right:max(10px,calc((100vw - 560px)/2 + 10px));bottom:calc(78px + env(safe-area-inset-bottom))}.ke-tel .ke-btn span{display:none}.ke-tel .ke-btn{padding:4px}',
@@ -89,7 +105,7 @@
     '@media (prefers-reduced-motion:no-preference){.ke-btn{transition:transform .15s}}'
   ].join('\n');
 
-  var S = { opts: null, etat: null, conv: null, msgs: [], root: null, occupe: false };
+  var S = { opts: null, etat: null, conv: null, msgs: [], root: null, occupe: false, image: '' };
   var ecouteEchap = false;
   var esc = function (s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); };
   var $ = function (sel) { return S.root.querySelector(sel); };
@@ -139,12 +155,32 @@
     if (S.opts && S.opts.telephone) a.addEventListener('click', function () { fermerPanneau(); });
     return a;
   }
-  function ajouterMessage(m) {
+  /* Aperçu de l'événement flash en préparation : les boutons ne figurent que sur le DERNIER aperçu, et seulement quand rien ne manque. */
+  function carteBrouillon(b, messageId, actif) {
+    var d = document.createElement('div'); d.className = 'ke-bro';
+    var photo = photoSure(b.image_url);
+    d.innerHTML = '<h4>' + esc(T.apercu) + '</h4>' + (photo ? '<img src="' + esc(photo) + '" alt="' + esc(T.photoApercu) + '">' : '') +
+      '<b>' + esc(b.titre || '…') + '</b>' + (b.quand ? '<p class="ke-q">' + esc(b.quand) + '</p>' : '') + (b.lieu ? '<p>📍 ' + esc(b.lieu) + '</p>' : '') +
+      (b.type || b.domaine ? '<p>' + esc([b.type, b.domaine].filter(Boolean).join(' · ')) + '</p>' : '') + (b.description ? '<p>' + esc(b.description) + '</p>' : '') +
+      (b.inscription ? '<p>' + esc(b.inscription) + '</p>' : '') + (b.visibilite ? '<p>' + esc(b.visibilite) + '</p>' : '');
+    if (!actif) return d;
+    if (b.pret) {
+      var a = document.createElement('div'); a.className = 'ke-act';
+      var p = bouton(T.publier, 'flash-publier'); p.setAttribute('data-id', String(messageId));
+      var x = bouton(T.abandonner, 'flash-abandonner', true); x.setAttribute('data-id', String(messageId));
+      a.appendChild(p); a.appendChild(x); d.appendChild(a);
+    } else if (b.manquants && b.manquants.length) {
+      var m = document.createElement('div'); m.className = 'ke-man'; m.textContent = T.manque + ' ' + b.manquants.join(', ') + '.'; d.appendChild(m);
+    }
+    return d;
+  }
+  function ajouterMessage(m, actif) {
     var el = document.createElement('div');
     el.className = 'ke-msg ' + (m.role === 'user' ? 'u' : 'a');
     el.textContent = m.contenu;
     if (m.role !== 'user' && m.gratuit) { var n = document.createElement('div'); n.className = 'ke-note'; n.textContent = T.gratuitNote; el.appendChild(n); }
     var corps = $('.ke-body'); corps.appendChild(el);
+    if (m.role !== 'user' && m.brouillon) corps.appendChild(carteBrouillon(m.brouillon, m.id, !!actif));
     if (m.role !== 'user' && m.evenements && m.evenements.length) {
       var l = document.createElement('div'); l.className = 'ke-evts'; m.evenements.forEach(function (e) { l.appendChild(carteEvt(e)); }); corps.appendChild(l);
     }
@@ -162,7 +198,7 @@
   function bouton(texte, act, sec) { var b = document.createElement('button'); b.type = 'button'; b.className = 'ke-cta' + (sec ? ' sec' : ''); b.setAttribute('data-a', act); b.textContent = texte; return b; }
   function carteInfo() {
     var d = document.createElement('div'); d.className = 'ke-card';
-    d.innerHTML = '<h4>Koffi, guide des événements</h4><ul><li>' + esc(T.info1) + '</li><li>' + esc(T.info2) + '</li><li>' + esc(T.info3) + '</li><li>' + esc(T.info4) + '</li></ul>' +
+    d.innerHTML = '<h4>Koffi, guide des événements</h4><ul><li>' + esc(T.info1) + '</li><li>' + esc(T.info2) + '</li><li>' + esc(T.info3) + '</li><li>' + esc(T.info4) + '</li>' + (S.etat && S.etat.flash && S.etat.flash.disponible ? '<li>' + esc(T.info5) + '</li>' : '') + '</ul>' +
       '<p><a class="ke-l" href="/politique-confidentialite.html#koffi" target="_blank" rel="noopener">' + esc(T.infoLien) + '</a></p>';
     d.appendChild(bouton(T.compris, 'compris'));
     return d;
@@ -185,18 +221,20 @@
     var body = $('.ke-body'); body.innerHTML = '';
     var foot = $('.ke-foot'), e = S.etat, ta = $('.ke-form textarea'), env = $('.ke-send');
     foot.style.display = ''; ta.disabled = false; env.disabled = false; majMeta();
+    var clip = S.root.querySelector('.ke-clip'); if (clip) clip.style.display = e && e.flash && e.flash.disponible ? '' : 'none';
+    afficherPJ();
     $('.ke-av').textContent = (e && e.avertissement) || T.info1;
     S.root.querySelectorAll('[data-a="nouvelle"],[data-a="supprimer"]').forEach(function (b) { b.style.display = e && (e.etat === 'utilisable' || e.etat === 'recharge') ? '' : 'none'; });
     if (!e) { body.appendChild(carte('Koffi', T.indisponible)); foot.style.display = 'none'; return; }
     var st = e.etat;
     if (st === 'majorite') { body.appendChild(carteMajorite()); foot.style.display = 'none'; return; }
     if (st === 'mineur' || st === 'pays' || st === 'desactive' || st === 'indisponible') { body.appendChild(carte('Koffi', T[st] || T.indisponible, [bouton(T.manuel, 'manuel', true)])); foot.style.display = 'none'; return; }
-    if (!lsGet('koffi_evenements_info_v1')) { body.appendChild(carteInfo()); foot.style.display = 'none'; return; }
-    S.msgs.forEach(ajouterMessage);
+    if (!lsGet('koffi_evenements_info_v2')) { body.appendChild(carteInfo()); foot.style.display = 'none'; return; }
+    S.msgs.forEach(function (m, i) { ajouterMessage(m, i === S.msgs.length - 1); });
     if (!S.msgs.length) {
       ajouterMessage({ role: 'assistant', contenu: T.accueil });
       var s = document.createElement('div'); s.className = 'ke-sug';
-      T.suggestions.forEach(function (x) { var b = document.createElement('button'); b.type = 'button'; b.textContent = x; b.addEventListener('click', function () { ta.value = x; envoyer(); }); s.appendChild(b); });
+      T.suggestions.concat(e.flash && e.flash.disponible ? [T.suggestionFlash] : []).forEach(function (x) { var b = document.createElement('button'); b.type = 'button'; b.textContent = x; b.addEventListener('click', function () { ta.value = x; envoyer(); }); s.appendChild(b); });
       body.appendChild(s);
     }
     if (st === 'recharge') {
@@ -214,6 +252,7 @@
     $('[data-a="nouvelle"]').title = T.nouvelle; $('[data-a="nouvelle"]').setAttribute('aria-label', T.nouvelle);
     $('[data-a="supprimer"]').title = T.supprimer; $('[data-a="supprimer"]').setAttribute('aria-label', T.supprimer);
     $('.ke-form textarea').placeholder = T.placeholder; $('.ke-send').textContent = T.envoyer;
+    var clip = $('.ke-clip'); clip.title = T.joindre; clip.setAttribute('aria-label', T.joindre);
   }
 
   function chargerEtat() {
@@ -230,18 +269,21 @@
 
   function envoyer() {
     if (S.occupe) return;
-    var ta = $('.ke-form textarea'); var texte = ta.value.trim(); if (!texte || ta.disabled) return;
+    var ta = $('.ke-form textarea'); var texte = ta.value.trim(); if ((!texte && !S.image) || ta.disabled) return;
+    var image = S.image; if (!texte) texte = T.imageJointe;
     var max = S.etat && S.etat.max_message; if (max && texte.length > max) { ajouterMessage({ role: 'assistant', contenu: 'Message trop long (' + max + ' caractères au maximum).' }); return; }
     S.occupe = true; $('.ke-send').disabled = true;
     var corps = $('.ke-body');
     if (!S.msgs.length) corps.innerHTML = '';
-    var mu = { role: 'user', contenu: texte }; S.msgs.push(mu); ajouterMessage(mu);
+    var mu = { role: 'user', contenu: image ? texte + '\n📎 ' + T.photoApercu : texte }; S.msgs.push(mu); ajouterMessage(mu);
+    S.image = ''; afficherPJ();
     ta.value = ''; ta.style.height = 'auto';
     var att = document.createElement('div'); att.className = 'ke-typing'; att.setAttribute('role', 'status'); att.textContent = T.reflechit; corps.appendChild(att); corps.scrollTop = corps.scrollHeight;
-    api('POST', '/api/kofi/evenements/messages', { texte: texte, conversation_id: S.conv || undefined }).then(function (r) {
+    api('POST', '/api/kofi/evenements/messages', { texte: texte, conversation_id: S.conv || undefined, image: image || undefined }).then(function (r) {
       att.remove();
       if (r.ok) {
-        S.conv = r.data.conversation_id; S.msgs.push(r.data.message); ajouterMessage(r.data.message);
+        S.conv = r.data.conversation_id; S.msgs.push(r.data.message); retirerActions(); ajouterMessage(r.data.message, true);
+        if (r.data.message.publie) apresPublication();
         if (S.etat && r.data.portefeuille) S.etat.portefeuille = r.data.portefeuille;
         majMeta();
         if (S.etat && S.etat.etat === 'recharge') construireCorps();   /* la carte de recharge reste sous les derniers messages */
@@ -254,6 +296,54 @@
       }
     }).catch(function () { att.remove(); S.msgs.pop(); ajouterMessage({ role: 'assistant', contenu: T.erreur }); })
       .then(function () { S.occupe = false; var ok = S.etat && (S.etat.etat === 'utilisable' || S.etat.etat === 'recharge'); $('.ke-send').disabled = !ok; if (ok) ta.focus(); });
+  }
+
+  /* ── Image jointe : réduite dans le navigateur (le serveur lit au plus 1 Mo par envoi) ── */
+  function afficherPJ() {
+    var z = S.root && S.root.querySelector('.ke-pj'); if (!z) return;
+    z.innerHTML = ''; z.style.display = S.image ? 'flex' : 'none';
+    if (!S.image) return;
+    var i = document.createElement('img'); i.src = S.image; i.alt = '';
+    var b = document.createElement('button'); b.type = 'button'; b.setAttribute('data-a', 'pj-retirer'); b.setAttribute('aria-label', T.retirerImage); b.title = T.retirerImage; b.textContent = '✕';
+    var t = document.createElement('span'); t.textContent = T.photoApercu;
+    z.appendChild(i); z.appendChild(t); z.appendChild(b);
+  }
+  function reduireImage(fichier, fini) {
+    if (!fichier || !/^image\/(jpeg|png|webp)$/i.test(fichier.type)) return fini('');
+    var lecteur = new FileReader();
+    lecteur.onerror = function () { fini(''); };
+    lecteur.onload = function () {
+      var img = new Image();
+      img.onerror = function () { fini(''); };
+      img.onload = function () {
+        var largeur = 1280, qualite = 0.82, essai = 0, sortie = '';
+        while (essai < 6) {
+          var k = Math.min(1, largeur / Math.max(img.width, img.height));
+          var c = document.createElement('canvas'); c.width = Math.max(1, Math.round(img.width * k)); c.height = Math.max(1, Math.round(img.height * k));
+          var g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height);
+          sortie = c.toDataURL('image/jpeg', qualite);
+          if (sortie.length < 780000) return fini(sortie);
+          largeur = Math.round(largeur * 0.75); qualite = Math.max(0.55, qualite - 0.08); essai++;
+        }
+        fini('');
+      };
+      img.src = lecteur.result;
+    };
+    lecteur.readAsDataURL(fichier);
+  }
+  function retirerActions() { S.root.querySelectorAll('.ke-bro .ke-act, .ke-bro .ke-man').forEach(function (n) { n.remove(); }); }
+  function apresPublication() { try { if (S.opts && typeof S.opts.apresPublication === 'function') S.opts.apresPublication(); } catch (e) { /* sans importance */ } }
+  function actionBrouillon(act, id) {
+    if (S.occupe || !id) return;
+    S.occupe = true;
+    var att = document.createElement('div'); att.className = 'ke-typing'; att.setAttribute('role', 'status'); att.textContent = act === 'publier' ? T.publication : '…';
+    var corps = $('.ke-body'); retirerActions(); corps.appendChild(att); corps.scrollTop = corps.scrollHeight;
+    api('POST', '/api/kofi/evenements/flash/' + (act === 'publier' ? 'publier' : 'abandonner'), { message_id: id }).then(function (r) {
+      att.remove();
+      if (r.ok && r.data && r.data.message) { S.msgs.push(r.data.message); ajouterMessage(r.data.message, true); if (act === 'publier') apresPublication(); }
+      else { ajouterMessage({ role: 'assistant', contenu: (r.data && r.data.error) || (r.status === 429 ? T.trop : T.erreur) }); chargerEtat().then(construireCorps); }
+    }).catch(function () { att.remove(); ajouterMessage({ role: 'assistant', contenu: T.erreur }); })
+      .then(function () { S.occupe = false; });
   }
 
   function confirmerMajorite() {
@@ -282,7 +372,7 @@
         '<div class="ke-head"><img src="/assets/koffi-avatar-96.webp" width="42" height="42" alt=""><div class="ke-t"><b></b><span></span><button type="button" class="ke-credit" data-a="credit" style="display:none"></button></div>' +
           '<button type="button" class="ke-ic" data-a="nouvelle">＋</button><button type="button" class="ke-ic" data-a="supprimer">🗑</button><button type="button" class="ke-ic" data-a="fermer">✕</button></div>' +
         '<div class="ke-body" aria-live="polite"></div>' +
-        '<div class="ke-foot"><p class="ke-av"></p><form class="ke-form"><textarea rows="1" maxlength="1500" aria-label="Votre recherche d\'événements"></textarea><button type="submit" class="ke-send"></button></form></div>' +
+        '<div class="ke-foot"><p class="ke-av"></p><div class="ke-pj" style="display:none"></div><form class="ke-form"><button type="button" class="ke-clip" data-a="pj" style="display:none">📎</button><input type="file" class="ke-file" accept="image/jpeg,image/png,image/webp" hidden><textarea rows="1" maxlength="1500" aria-label="Votre recherche d\'événements"></textarea><button type="submit" class="ke-send"></button></form></div>' +
       '</section>';
     document.body.appendChild(root); S.root = root;
     root.addEventListener('click', function (ev) {
@@ -291,10 +381,14 @@
       if (act === 'ouvrir') return ouvrirPanneau();
       if (act === 'fermer') return fermerPanneau();
       if (act === 'credit') return ouvrirCredit();
-      if (act === 'compris') { lsSet('koffi_evenements_info_v1', '1'); return construireCorps(); }
+      if (act === 'compris') { lsSet('koffi_evenements_info_v2', '1'); return construireCorps(); }
       if (act === 'majorite') return confirmerMajorite();
+      if (act === 'flash-publier') return actionBrouillon('publier', Number(t.getAttribute('data-id')));
+      if (act === 'flash-abandonner') return actionBrouillon('abandonner', Number(t.getAttribute('data-id')));
+      if (act === 'pj-retirer') { S.image = ''; return afficherPJ(); }
+      if (act === 'pj') { var fi = S.root.querySelector('.ke-file'); if (fi) { fi.value = ''; fi.click(); } return; }
       if (act === 'manuel') return fermerEtFiltrer();
-      if (act === 'nouvelle') { S.conv = null; S.msgs = []; if (S.etat && S.etat.etat !== 'recharge') construireCorps(); return; }
+      if (act === 'nouvelle') { S.conv = null; S.msgs = []; S.image = ''; if (S.etat && S.etat.etat !== 'recharge') construireCorps(); return; }
       if (act === 'supprimer') {
         if (!S.conv) return; if (!window.confirm(T.confirmSuppr)) return;
         return api('DELETE', '/api/kofi/evenements/conversations/' + S.conv).then(function () { S.conv = null; S.msgs = []; construireCorps(); });
@@ -302,6 +396,10 @@
     });
     root.querySelector('.ke-form').addEventListener('submit', function (ev) { ev.preventDefault(); envoyer(); });
     var ta = root.querySelector('.ke-form textarea');
+    root.querySelector('.ke-file').addEventListener('change', function (ev) {
+      var fi = ev.target.files && ev.target.files[0]; if (!fi) return;
+      reduireImage(fi, function (d) { if (d) { S.image = d; afficherPJ(); } else ajouterMessage({ role: 'assistant', contenu: T.imageIllisible }); });
+    });
     ta.addEventListener('keydown', function (ev) { if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); envoyer(); } });
     ta.addEventListener('input', function () { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 110) + 'px'; });
     if (!ecouteEchap) { ecouteEchap = true; document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && S.root && S.root.classList.contains('open') && !document.querySelector('.kcr-fond')) fermerPanneau(); }); }
@@ -319,7 +417,7 @@
     },
     demonter: function () {
       if (S.root && S.root.parentNode) S.root.parentNode.removeChild(S.root);
-      S.root = null; S.etat = null; S.conv = null; S.msgs = []; S.occupe = false; S.opts = null;
+      S.root = null; S.etat = null; S.conv = null; S.msgs = []; S.occupe = false; S.opts = null; S.image = '';
     },
     estMonte: function () { return !!S.root; }
   };

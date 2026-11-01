@@ -131,7 +131,8 @@ function reponseAnnuaire(r) {
     "• Comprendre ce que vous cherchez et votre situation, en quelques phrases (activité, compétence, projet, besoin).",
     "• Vous poser les questions utiles pour préciser : ville, pays, type de profil (personne, initiative, collectivité), domaine d'activité.",
     "• Parcourir les profils publics de l'Annuaire et vous en proposer au moins trois, avec un pourcentage de correspondance et la raison en une phrase. Le pourcentage est calculé par la plateforme d'après vos critères, il n'est pas inventé.",
-    "• Établir une LISTE (jusqu'à 30 profils) quand vous la demandez : « fais-moi la liste des… ». Elle ne contient que les comptes proposables, avec leur pourcentage de correspondance ; un nombre limité de listes est possible chaque jour.",
+    "• Établir une LISTE (jusqu'à 30 profils) quand vous la demandez, avec vos propres mots : « fais-moi la liste des… », « montre-moi tous les comptes que tu peux lister », « et la suite ? ». Sans thème précis, je montre les profils les plus complets ; avec un thème, je les classe par pourcentage de correspondance. Elle ne contient que les comptes proposables ; un nombre limité de listes est possible chaque jour.",
+    "• Comprendre le sens de votre demande sans formule précise, et tenir compte de la conversation : « plutôt à Lyon », « seulement les associations », « ma ville » (lue dans votre profil par la plateforme, pas par moi).",
     "• Vous mener en un clic sur le profil public de la personne qui vous intéresse.",
     "• Vous dire honnêtement quand je ne trouve pas trois bons profils, plutôt que d'en inventer.",
     "",
@@ -149,9 +150,11 @@ function reponseEvenements(r) {
     "• Comprendre ce qui vous intéresse : un thème (conférence, entrepreneuriat, culture…), une ville ou un pays, une période (aujourd'hui, ce week-end, cette semaine, le mois prochain…), gratuit ou payant, en ligne ou sur place.",
     "• Répondre à des questions comme « quels sont les événements de ma ville cette semaine ? » : « ma ville » est lue dans votre profil par la plateforme, pas par moi.",
     "• Chercher dans les événements publics à venir et vous en montrer les plus proches dans le temps, avec la date, le lieu et la mention gratuit / payant ; un clic ouvre la fiche de l'événement pour vous inscrire.",
+    "• Vous expliquer comment fonctionnent les événements (événement complet, événement flash, qui peut en publier…).",
+    "• Pour les comptes Initiative, Collectivité et Administrateur avec abonnement Premium : CRÉER un événement flash avec vous. Je vous pose les questions qui manquent (titre, date, lieu, image…), je rédige la description, je prépare un brouillon, et je ne le publie que quand vous confirmez (bouton « Publier » ou « oui »).",
     "• Vous dire honnêtement quand je ne trouve rien, plutôt que d'inventer.",
     "",
-    "Ce que je ne fais pas : vous inscrire à votre place, ni montrer les événements privés, réservés aux abonnés ou en brouillon. Les filtres de la page restent disponibles pour tout parcourir.",
+    "Ce que je ne fais pas : vous inscrire à votre place, ni montrer les événements privés, réservés aux abonnés ou en brouillon, ni publier quoi que ce soit sans votre confirmation. Les filtres de la page restent disponibles pour tout parcourir.",
     "",
     phraseCredit("fr", r),
   ].join("\n");
@@ -189,4 +192,25 @@ function reponseAdmin() {
   ].join("\n");
 }
 
-module.exports = { estQuestionCompetences, reponseEleve, reponseCreateur, reponseAnnuaire, reponseEvenements, reponseBusinessPlan, reponseAdmin, phraseCredit, normaliser };
+/* Le MÊME Koffi partout (2026-11-01, demande explicite) : chaque réponse « Que sais-tu faire ? » rappelle aussi ce que Koffi sait faire ailleurs (carte commune : server/kofi-comprehension.js) et qu'aucune formule n'est nécessaire. */
+const Comprehension = require("./kofi-comprehension");
+function ailleurs(lg, lieu) {
+  return "\n" + [
+    "",
+    lg === "en" ? "I am the same Koffi everywhere on Diaspo'Actif. Elsewhere on the platform I can also:" : "Je suis le même Koffi partout sur Diaspo'Actif. Ailleurs sur la plateforme, je sais aussi :",
+    ...Comprehension.carteLignes(lg, lieu),
+    "",
+    lg === "en" ? "Talk to me in your own words: no special phrase is needed, I work out what you mean from your sentence and from our conversation." : "Parlez-moi avec vos propres mots : aucune formule n'est nécessaire, je comprends le sens de votre demande et de notre conversation.",
+  ].join("\n");
+}
+const LIEU_FORMATION = "Formations (FORMATION DIASPORA)";
+module.exports = {
+  estQuestionCompetences,
+  reponseEleve: (lg, r) => reponseEleve(lg, r) + ailleurs(lg === "en" ? "en" : "fr", LIEU_FORMATION),
+  reponseCreateur: r => reponseCreateur(r) + ailleurs("fr", LIEU_FORMATION),
+  reponseAnnuaire: r => reponseAnnuaire(r) + ailleurs("fr", "Annuaire"),
+  reponseEvenements: r => reponseEvenements(r) + ailleurs("fr", "Événements"),
+  reponseBusinessPlan: r => reponseBusinessPlan(r) + ailleurs("fr", "Business Plan"),
+  reponseAdmin: () => reponseAdmin() + ailleurs("fr", "Espace administrateur"),
+  phraseCredit, normaliser,
+};
