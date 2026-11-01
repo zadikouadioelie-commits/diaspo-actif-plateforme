@@ -601,7 +601,7 @@
       <label>📅 Programme <span style="font-weight:400;color:var(--muted,#6b7280);">(facultatif — le déroulé, jour par jour)</span></label>
       <div id="e-prog-list"></div>
       <button type="button" class="btn btn-outline" style="font-size:12.5px;margin-top:6px;" onclick="progAjouterJour('e-prog-list')">+ Ajouter une journée</button>
-      <label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer;margin-top:12px;"><input type="checkbox" id="e-insc-rapide" style="width:auto;margin-top:3px;flex-shrink:0;"><span><strong>Activer l'inscription rapide</strong><br><span style="font-weight:400;font-size:.78rem;color:var(--muted,#6b7280);">Les personnes confirment leur venue ; un compte Diaspo'Actif l'ajoute à son agenda.</span></span></label>
+      <label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer;margin-top:12px;"><input type="checkbox" id="e-insc-rapide" style="width:auto;margin-top:3px;flex-shrink:0;"><span><strong>Inscription rapide (facultative)</strong><br><span style="font-weight:400;font-size:.78rem;color:var(--muted,#6b7280);">Les personnes confirment leur venue ; un compte Diaspo'Actif l'ajoute à son agenda.</span></span></label>
     </div>
     <div style="margin-bottom:10px;"><label>💬 Lien WhatsApp (groupe ou chaîne de l'événement)</label><input type="url" id="e-whatsapp" placeholder="https://chat.whatsapp.com/… ou https://whatsapp.com/channel/…"></div>
 
@@ -803,7 +803,7 @@
         <div style="grid-column:1/-1;"><label>📅 Programme <span style="font-weight:400;color:var(--muted,#6b7280);">(facultatif — le déroulé, jour par jour)</span></label>
           <div id="fl-prog-list"></div>
           <button type="button" class="btn btn-outline" style="font-size:12.5px;margin-top:6px;" onclick="progAjouterJour('fl-prog-list')">+ Ajouter une journée</button></div>
-        <div style="grid-column:1/-1;"><label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer;"><input type="checkbox" id="fl-insc-rapide" style="width:auto;margin-top:3px;flex-shrink:0;"><span><strong>Activer l'inscription rapide</strong><br><span style="font-weight:400;font-size:.78rem;color:var(--muted,#6b7280);">Les personnes confirment leur venue (nom, prénom, e-mail). Un compte Diaspo'Actif l'ajoute aussi à son agenda ; vous voyez la liste pour anticiper le nombre de personnes.</span></span></label></div>
+        <div style="grid-column:1/-1;"><label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer;"><input type="checkbox" id="fl-insc-rapide" style="width:auto;margin-top:3px;flex-shrink:0;"><span><strong>Inscription rapide (facultative)</strong><br><span style="font-weight:400;font-size:.78rem;color:var(--muted,#6b7280);">Les personnes confirment leur venue (nom, prénom, e-mail). Un compte Diaspo'Actif l'ajoute aussi à son agenda ; vous voyez la liste pour anticiper le nombre de personnes.</span></span></label></div>
         <!-- Organisateur relayé (2026-10-12, demande explicite) : "permettre à des personnes de
              signaler des événements qui ne sont pas les leurs... faire relais d'informations" —
              distinct du compte Diaspo'Actif qui publie (toujours affiché par ailleurs). Facultatif :

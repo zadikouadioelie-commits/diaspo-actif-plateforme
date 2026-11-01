@@ -650,8 +650,8 @@
     const html = `<form id="mev-form" class="mev-f" novalidate autocomplete="off">
       <div class="mev-gerr" id="mev-gerr" role="alert"></div>
       ${edition ? '' : `<div class="h2" style="margin-top:2px">TYPE D’ÉVÉNEMENT <button type="button" class="mev-q" data-flash-aide aria-label="Qu’est-ce qu’un événement flash ?">?</button></div>
-        ${opt('mev-mode', 'inscriptions', 'Avec inscriptions', 'Les membres s’inscrivent depuis l’application ; vous suivez la liste des inscrits.', !flashInit)}
-        ${opt('mev-mode', 'flash', 'Événement flash', 'Informatif, sans inscription : pour prévenir vite la communauté.', flashInit)}`}
+        ${opt('mev-mode', 'inscriptions', 'Événement complet', 'Les membres s’inscrivent depuis l’application (places, QR code, fiche d’inscription possible) ; vous suivez la liste des inscrits.', !flashInit)}
+        ${opt('mev-mode', 'flash', 'Événement flash', 'Annonce informative, sans fiche d’inscription : pour prévenir vite la communauté. Une inscription rapide reste possible en option.', flashInit)}`}
       <div class="h2">L’ESSENTIEL</div>
       <label class="mev-l" for="mev-titre">Titre *</label>
       <input type="text" id="mev-titre" maxlength="160" value="${esc(v.titre || '')}" placeholder="Ex. : Soirée de la diaspora" aria-describedby="mev-e-titre"><div class="mev-err" id="mev-e-titre" role="alert"></div>
@@ -688,7 +688,7 @@
         <button type="button" class="btn out block" style="margin-top:10px" data-prog-add-j>+ Ajouter une journée</button>
       </div>
       <div id="mev-ir-wrap" ${mostraProgramme ? '' : 'hidden'}>
-        <label class="mev-opt ${v.inscription_rapide_active ? 'on' : ''}" style="margin-top:14px" id="mev-ir-opt"><input type="checkbox" id="mev-ir-ck" ${v.inscription_rapide_active ? 'checked' : ''}><span><b>Activer l’inscription rapide</b><small>Nom, prénom, e-mail (téléphone et ville facultatifs) pour confirmer sa venue — ajoutée automatiquement à l’agenda des personnes connectées ; une simple estimation du nombre de personnes pour les autres.</small></span></label>
+        <label class="mev-opt ${v.inscription_rapide_active ? 'on' : ''}" style="margin-top:14px" id="mev-ir-opt"><input type="checkbox" id="mev-ir-ck" ${v.inscription_rapide_active ? 'checked' : ''}><span><b>Inscription rapide (facultative)</b><small>Nom, prénom, e-mail (téléphone et ville facultatifs) pour confirmer sa venue — ajoutée automatiquement à l’agenda des personnes connectées ; une simple estimation du nombre de personnes pour les autres.</small></span></label>
       </div>
       ${edition ? `<div class="mev-note" style="margin-top:14px"><b>Visibilité : ${esc(visLabel(v))}</b>Elle se règle à la création ; pour la changer, ouvrez l’événement sur ordinateur.</div>` : `
       <div id="mev-b-part"><div class="h2">PARTICIPATION</div>
