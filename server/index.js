@@ -3332,6 +3332,7 @@ const FormationDroits = require("./formation-droits");
 FormationDroits.register({ route, db, sendJSON, getCurrentUser, SEC, checkFormationOwner, creerNotif, getOrigin, ParcoursFormation });
 /* Formation Diaspora, lot B (l'argent) : coupons étendus, promotion appliquée au paiement, commission par formateur, vues « Ventes et revenus » et financière — server/formation-finances.js. */
 const FormationFinances = require("./formation-finances");
+const { TAUX_COMMISSION_PCT, TAUX_COMMISSION } = require("./commission"); /* taux de commission unique de la plateforme (4 %) */
 FormationFinances.register({ route, db, sendJSON, getCurrentUser, SEC, exigerPremium });
 /* Formation Diaspora, lot C : relances programmables du formateur (règles, journal, désinscription) — server/formation-relances.js. getOrigin est une déclaration de fonction (hissée). */
 const FormationRelances = require("./formation-relances");
@@ -5528,7 +5529,7 @@ async function finaliserCommandeVitrinePayee(commandeId) {
     db.prepare(`SELECT * FROM produits_vitrine WHERE id=?`).get(cmd.produit_id),
     db.prepare(`SELECT * FROM initiatives WHERE id=?`).get(cmd.initiative_id),
   ]);
-  const COMMISSION_RATE = 0.03;
+  const COMMISSION_RATE = TAUX_COMMISSION;
   const montant = Number(cmd.montant_total) || 0;
   const platform_fee = parseFloat((montant * COMMISSION_RATE).toFixed(2));
   const organizer_amount = parseFloat((montant - platform_fee).toFixed(2));
@@ -5566,7 +5567,7 @@ async function finaliserCommandeVitrinePayee(commandeId) {
 /* POST /api/produits/:id/commander — visiteur connecté.
    Si le produit a un prix (prod.prix > 0) : vraie session de paiement (Stripe Checkout par défaut,
    ou PayPal si body.provider==='paypal' — même modèle que la Billetterie : paiement encaissé sur
-   le compte plateforme, crédité en wallet_balance à l'initiative moins 3% de commission, retiré
+   le compte plateforme, crédité en wallet_balance à l'initiative moins 4% de commission, retiré
    ensuite via le Centre Financier). Sinon (produit "sur devis"/service sans prix) : ancien flux de
    demande de contact inchangé. */
 route("POST", "/api/produits/:id/commander", async (req, res, params, body) => {
@@ -5847,7 +5848,7 @@ route("DELETE", "/api/panier", async (req, res) => {
    propre ligne commandes_vitrine ; si le panier contient plusieurs vendeurs, une seule session
    de paiement (Stripe ou PayPal) couvre toutes les lignes, qui sont ensuite créditées
    séparément par finaliserCommandeVitrinePayee (voir le webhook Stripe et le retour PayPal
-   ci-dessous) — même mécanique de commission 3%/wallet que l'achat direct, appliquée N fois. */
+   ci-dessous) — même mécanique de commission 4%/wallet que l'achat direct, appliquée N fois. */
 route("POST", "/api/panier/commander", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
@@ -11657,7 +11658,7 @@ route("GET", "/api/initiatives/:id/stats-impact", async (req, res, params) => {
     },
     paiements: {
       revenus_boutique:  ca,
-      commissions:       ca != null ? Math.round(ca * 0.03 * 100) / 100 : null,
+      commissions:       ca != null ? Math.round(ca * TAUX_COMMISSION * 100) / 100 : null,
       paiements_attente: await N("SELECT COUNT(*) c FROM commandes_vitrine WHERE initiative_id=? AND statut='en_attente'", iid),
       paiements_valides: await N("SELECT COUNT(*) c FROM commandes_vitrine WHERE initiative_id=? AND statut='traitee'", iid),
     },
@@ -17907,7 +17908,7 @@ route("POST", "/api/formations", async (req, res, params, body) => {
   if (!titre) return sendJSON(res, 400, { error: "Le titre est requis." });
   if (!(await FormationCatalogue.domaineAccepte(db, domaine, null))) return sendJSON(res, 400, { error: "Cette catégorie n’existe pas (ou n’est plus proposée). Choisissez-en une dans la liste." });
   const modeAcces = mode_acces || 'gratuit';
-  const commission = modeAcces === 'gratuit' ? 0 : modeAcces === 'payant_sauf_membres' ? 2 : 3;
+  const commission = modeAcces === 'gratuit' ? 0 : TAUX_COMMISSION_PCT;
   const gratuit = modeAcces === 'gratuit' ? 1 : 0;
   const init =await db.prepare("SELECT id FROM initiatives WHERE owner_user_id = ?").get(user.id);
   const id = (await db.prepare(`
@@ -17951,7 +17952,7 @@ route("PUT", "/api/formations/:id", async (req, res, params, body) => {
   const n = v => (v === undefined ? null : v);
   const nr = v => (v === undefined || v === null ? null : SEC.sanitizeRichHtml(v));
   const modeAcces = body.mode_acces || f.mode_acces || 'gratuit';
-  const commission = modeAcces === 'gratuit' ? 0 : modeAcces === 'payant_sauf_membres' ? 2 : 3;
+  const commission = modeAcces === 'gratuit' ? 0 : TAUX_COMMISSION_PCT;
   const gratuit = modeAcces === 'gratuit' ? 1 : 0;
   const newTelecharge = body.telecharge_autorise != null ? (body.telecharge_autorise ? 1 : 0) : null;
   const newPromoActive = body.promo_active != null ? (body.promo_active ? 1 : 0) : null;
@@ -20415,10 +20416,10 @@ route("GET", "/api/identity/status", async (req, res) => {
 
 /* POST /api/stripe/webhook — événements Identity (vérification) + Connect (comptes vendeurs).
    Appelé AVANT readBody() global (nécessite le corps BRUT pour vérifier la signature). */
-/* Crédite le propriétaire d'une formation de sa vente (commission plateforme 3 %, comme Boutique / Billetterie) — commune aux paiements historiques et aux commandes du lot A. */
+/* Crédite le propriétaire d'une formation de sa vente (commission plateforme 4 %, comme Boutique / Billetterie) — commune aux paiements historiques et aux commandes du lot A. */
 async function crediterVenteFormation(f, montant, commandeId) {
   if (!f || !f.owner_user_id || !(montant > 0)) return;
-  /* Taux de l'administration pour ce formateur (3 % par défaut), écrit sur la commande : changer le taux plus tard ne réécrit pas cette vente. */
+  /* Taux de l'administration pour ce formateur (4 % par défaut), écrit sur la commande : changer le taux plus tard ne réécrit pas cette vente. */
   const vente = await FormationFinances.enregistrerVente(db, f, montant, commandeId);
   const COMMISSION_RATE = vente.pct / 100;
   const platform_fee = vente.commission;
@@ -20583,7 +20584,7 @@ async function handleStripeWebhook(req, res) {
           .run(ticket.id, ticket.event_id, ticket.user_id);
 
         const ev = await db.prepare(`SELECT * FROM events WHERE id=?`).get(ticket.event_id);
-        const COMMISSION_RATE = 0.03;
+        const COMMISSION_RATE = TAUX_COMMISSION;
         const platform_fee = parseFloat((ticket.prix_paye * COMMISSION_RATE).toFixed(2));
         const organizer_amount = parseFloat((ticket.prix_paye - platform_fee).toFixed(2));
         await db.prepare(`INSERT INTO wallet_transactions (ticket_id,event_id,type,beneficiaire_id,montant,commission_rate,prix_billet,platform_fee,organizer_amount) VALUES (?,?,'platform_fee',NULL,?,?,?,?,?)`)
@@ -20611,7 +20612,7 @@ async function handleStripeWebhook(req, res) {
       const commandeTickets = await db.prepare(`SELECT * FROM tickets WHERE transaction_ref=? AND payment_status='pending'`).all(session.id);
       if (commandeTickets.length) {
         const ev = await db.prepare(`SELECT * FROM events WHERE id=?`).get(commandeTickets[0].event_id);
-        const COMMISSION_RATE = 0.03;
+        const COMMISSION_RATE = TAUX_COMMISSION;
         let totalOrganizer = 0, totalPlatform = 0;
         const promoUsageParCode = new Map(); // code_promo_id -> [{ticketId, userId}]
         for (const ticket of commandeTickets) {
@@ -20670,7 +20671,7 @@ async function handleStripeWebhook(req, res) {
       await db.prepare(`UPDATE tickets SET payment_status='failed' WHERE transaction_ref=? AND payment_status='pending'`).run(session.id);
     } else if (event.type === "checkout.session.completed" && event.data.object.metadata?.diaspoactif_insc_inscription_id) {
       /* Paiement d'une inscription payante confirmé (Formulaires & Inscriptions, 2026-09-22,
-         demande explicite) — même modèle que la Billetterie et la Boutique (commission 3%,
+         demande explicite) — même modèle que la Billetterie et la Boutique (commission 4%,
          crédit wallet_balance au propriétaire de la fiche, retrait ultérieur via le Centre
          Financier). Rien n'était confirmé/notifié à la création de la ligne (voir POST
          /api/insc/public/:slug/inscriptions) — fait ici, une fois le paiement réel confirmé.
@@ -20694,7 +20695,7 @@ async function handleStripeWebhook(req, res) {
         try { reponsesInsc = JSON.parse(insc.reponses_json || "{}"); } catch (e) {}
         const { total: montantOptionsWebhook } = calculerMontantOptionsPayantes(champs, reponsesInsc);
         const montant = parseFloat(((type?.gratuit ? 0 : (Number(type?.prix) || 0)) + montantOptionsWebhook).toFixed(2));
-        const COMMISSION_RATE = 0.03;
+        const COMMISSION_RATE = TAUX_COMMISSION;
         const platform_fee = parseFloat((montant * COMMISSION_RATE).toFixed(2));
         const organizer_amount = parseFloat((montant - platform_fee).toFixed(2));
         /* Quota revérifié au moment du paiement (2026-10-31) : une inscription non payée ne retient
@@ -20733,7 +20734,7 @@ async function handleStripeWebhook(req, res) {
       await db.prepare(`UPDATE insc_inscriptions SET statut_paiement='echec' WHERE transaction_ref=? AND statut_paiement='en_attente'`).run(session.id);
     } else if (event.type === "checkout.session.completed" && event.data.object.metadata?.diaspoactif_commande_vitrine_id) {
       /* Paiement Boutique confirmé — logique factorisée dans finaliserCommandeVitrinePayee()
-         (2026-09-29, réutilisée aussi par la capture PayPal) : commission 3%, crédit wallet_balance
+         (2026-09-29, réutilisée aussi par la capture PayPal) : commission 4%, crédit wallet_balance
          à l'initiative, retrait ultérieur via le Centre Financier. Idempotent (voir la fonction). */
       await finaliserCommandeVitrinePayee(Number(event.data.object.metadata.diaspoactif_commande_vitrine_id));
     } else if (event.type === "checkout.session.expired" && event.data.object.metadata?.diaspoactif_commande_vitrine_id) {
@@ -20773,7 +20774,7 @@ async function handleStripeWebhook(req, res) {
     } else if (event.type === "checkout.session.expired" && event.data.object.metadata?.diaspoactif_formation_commande_id) {
       await FormationDroits.annulerCommande(db, Number(event.data.object.metadata.diaspoactif_formation_commande_id), "expiree");
     } else if (event.type === "checkout.session.completed" && event.data.object.metadata?.diaspoactif_formation_inscription_id) {
-      /* Paiement formation confirmé — même modèle que Boutique/Billetterie (commission 3%,
+      /* Paiement formation confirmé — même modèle que Boutique/Billetterie (commission 4%,
          crédit wallet_balance au propriétaire de la formation). Idempotent : ne traite que si
          encore 'en_attente' (une session Stripe peut renvoyer plusieurs fois le même événement). */
       const inscriptionId = Number(event.data.object.metadata.diaspoactif_formation_inscription_id);
@@ -20801,7 +20802,7 @@ async function handleStripeWebhook(req, res) {
       await db.prepare(`DELETE FROM formation_inscriptions WHERE id=? AND paiement_statut='en_attente'`).run(inscriptionId);
     } else if (event.type === "checkout.session.completed" && event.data.object.metadata?.diaspoactif_adhesion_paiement_id) {
       /* Paiement Cotisations & Adhésions confirmé (one-off ou 1ère facture d'une subscription).
-         Même modèle commission 3%/wallet_balance que Boutique/Billetterie. Idempotent : ne traite que si 'en_attente'. */
+         Même modèle commission 4%/wallet_balance que Boutique/Billetterie. Idempotent : ne traite que si 'en_attente'. */
       const paiementId = Number(event.data.object.metadata.diaspoactif_adhesion_paiement_id);
       const session = event.data.object;
       const pay = await db.prepare(`SELECT * FROM adhesion_paiements WHERE id=? AND statut='en_attente'`).get(paiementId);
@@ -20811,7 +20812,7 @@ async function handleStripeWebhook(req, res) {
           db.prepare(`SELECT * FROM initiatives WHERE id=?`).get(pay.initiative_id),
           db.prepare(`SELECT * FROM adhesion_membres WHERE id=?`).get(pay.membre_id),
         ]);
-        const COMMISSION_RATE = 0.03;
+        const COMMISSION_RATE = TAUX_COMMISSION;
         const montant = Number(pay.montant) || 0;
         const platform_fee = parseFloat((montant * COMMISSION_RATE).toFixed(2));
         const organizer_amount = parseFloat((montant - platform_fee).toFixed(2));
@@ -21012,7 +21013,7 @@ async function handleStripeWebhook(req, res) {
         await db.prepare(`UPDATE adhesion_membres SET statut='a_jour', montant_paye=?, numero_recu=?, date_expiration=?, updated_at=datetime('now') WHERE id=?`)
           .run(montant, numeroRecu, calculerDateExpirationAdhesion(formule, months), adhMembre.id);
 
-        const COMMISSION_RATE = 0.03;
+        const COMMISSION_RATE = TAUX_COMMISSION;
         const platform_fee = parseFloat((montant * COMMISSION_RATE).toFixed(2));
         const organizer_amount = parseFloat((montant - platform_fee).toFixed(2));
         const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(adhMembre.initiative_id);
@@ -21066,7 +21067,7 @@ async function handleStripeWebhook(req, res) {
           `).run(premiereContribAbo.cagnotte_id, premiereContribAbo.user_id, premiereContribAbo.nom, premiereContribAbo.prenom,
                  premiereContribAbo.email, montantAbo, cAbo.devise || "EUR", premiereContribAbo.anonyme, null, invoice.subscription)).lastInsertRowid;
           await db.prepare("UPDATE cagnottes SET montant_collecte = montant_collecte + ?, updated_at=datetime('now') WHERE id=?").run(montantAbo, cAbo.id);
-          const COMMISSION_RATE = 0.03;
+          const COMMISSION_RATE = TAUX_COMMISSION;
           const platform_fee = parseFloat((montantAbo * COMMISSION_RATE).toFixed(2));
           const organizer_amount = parseFloat((montantAbo - platform_fee).toFixed(2));
           await db.prepare(`INSERT INTO wallet_transactions (cagnotte_contribution_id,type,beneficiaire_id,montant,commission_rate,prix_billet,platform_fee,organizer_amount) VALUES (?,'platform_fee',NULL,?,?,?,?,?)`)
@@ -21116,7 +21117,7 @@ async function handleStripeWebhook(req, res) {
         }
       }
     } else if (event.type === "checkout.session.completed" && event.data.object.metadata?.diaspoactif_cagnotte_contribution_id) {
-      /* Contribution à une cagnotte confirmée. Même modèle commission 3%/wallet_balance que
+      /* Contribution à une cagnotte confirmée. Même modèle commission 4%/wallet_balance que
          Boutique/Billetterie/Adhésions (2026-09-22, demande explicite — reversement au
          créateur enfin branché, voir migrateCagnottesWallet ci-dessus). Idempotent : ne
          traite que si 'en_attente'. */
@@ -21137,7 +21138,7 @@ async function handleStripeWebhook(req, res) {
           .run(contrib.montant, contrib.cagnotte_id);
         const c = await db.prepare("SELECT titre, owner_user_id, objectif_montant, montant_collecte, visibilite, slug FROM cagnottes WHERE id=?").get(contrib.cagnotte_id);
         if (c) {
-          const COMMISSION_RATE = 0.03;
+          const COMMISSION_RATE = TAUX_COMMISSION;
           const montant = Number(contrib.montant) || 0;
           const platform_fee = parseFloat((montant * COMMISSION_RATE).toFixed(2));
           const organizer_amount = parseFloat((montant - platform_fee).toFixed(2));
@@ -37143,13 +37144,13 @@ ${jsonLd}
       const fcContactSafe = SEC.sanitizeRichHtml(fc_contact);
       const fcNotesSafe = SEC.sanitizeRichHtml(fc_notes);
       const ts = new Date().toISOString();
-      /* Commission plateforme (2026-08-26 : 5% → 3%) — fixée explicitement ici plutôt que
+      /* Commission plateforme (2026-08-26 : 5% → 3% ; 2026-11-01 : 3% → 4%, taux unique dans server/commission.js) — fixée explicitement ici plutôt que
          de laisser events.commission_pct sur son DEFAULT de colonne : aucune route ne permet
          de la personnaliser par événement, donc le DEFAULT jouait en pratique le rôle d'une
          constante plateforme cachée. L'écrire ici la rend visible et modifiable au même endroit
          que COMMISSION_RATE (Boutique/Adhésions/Formations) et le "3" de la ligne 12642/12684
          (Formations, palier payant). */
-      const PLATFORM_COMMISSION_PCT = 3;
+      const PLATFORM_COMMISSION_PCT = TAUX_COMMISSION_PCT;
       const coverImg = image_couverture || image_b64 || null;
       // Galerie réduite à 1 photo + couverture (2026-09-09, demande explicite) — le reste des
   // médias (photos/vidéos/documents) vit désormais sur la fiche d'inscription liée, voir
@@ -37590,7 +37591,7 @@ ${jsonLd}
         reductionUnitaire = promo.type === 'montant_fixe' ? Math.min(promo.valeur, prixBase) : parseFloat((prixBase * promo.valeur / 100).toFixed(2));
       }
       const prixNetUnitaire = Math.max(0, parseFloat((prixBase - reductionUnitaire).toFixed(2)));
-      const commissionUnitaire = parseFloat((prixNetUnitaire * ev.commission_pct / 100).toFixed(2));
+      const commissionUnitaire = parseFloat((prixNetUnitaire * TAUX_COMMISSION).toFixed(2));
       const commandeId = crypto.randomUUID();
 
       /* Commande gratuite (prix net = 0 pour tous les billets, même type/même réduction) */
@@ -37745,12 +37746,12 @@ ${jsonLd}
       const platformLine = original.find(l => l.type === 'platform_fee');
       const organizerLine = original.find(l => l.type === 'organizer_credit');
       /* Filet de secours pour un billet dépourvu de ligne wallet_transactions d'origine
-         (cas exceptionnel) : recalcule au taux plateforme courant (3%, voir PLATFORM_COMMISSION_PCT
+         (cas exceptionnel) : recalcule au taux plateforme courant (4%, voir PLATFORM_COMMISSION_PCT
          / COMMISSION_RATE) plutôt qu'à l'ancien 5% -- le cas normal réutilise le montant réel
          perçu à l'époque via platformLine.montant, jamais recalculé. */
-      const platformFee = platformLine?.montant ?? parseFloat((ticket.prix_paye * 0.03).toFixed(2));
+      const platformFee = platformLine?.montant ?? parseFloat((ticket.prix_paye * TAUX_COMMISSION).toFixed(2));
       const organizerAmount = organizerLine?.montant ?? parseFloat((ticket.prix_paye - platformFee).toFixed(2));
-      const tauxRembourse = platformLine?.commission_rate ?? 0.03;
+      const tauxRembourse = platformLine?.commission_rate ?? TAUX_COMMISSION;
 
       await db.prepare(`INSERT INTO wallet_transactions (ticket_id,event_id,type,beneficiaire_id,montant,commission_rate,prix_billet,platform_fee,organizer_amount,sens) VALUES (?,?,'refund_platform_fee',NULL,?,?,?,?,?,'debit')`)
         .run(tid, ticket.event_id, platformFee, tauxRembourse, ticket.prix_paye, platformFee, organizerAmount);
@@ -38167,7 +38168,7 @@ ${jsonLd}
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const user = await db.prepare(`SELECT wallet_balance FROM users WHERE id=?`).get(me.id);
       const historique = await db.prepare(`SELECT wt.*, e.titre AS event_titre FROM wallet_transactions wt LEFT JOIN events e ON e.id=wt.event_id WHERE wt.beneficiaire_id=? AND wt.type='organizer_credit' ORDER BY wt.timestamp DESC LIMIT 50`).all(me.id);
-      return sendJSON(res, 200, { balance: user?.wallet_balance || 0, commission_rate: 0.03, historique });
+      return sendJSON(res, 200, { balance: user?.wallet_balance || 0, commission_rate: TAUX_COMMISSION, historique });
     }
 
     /* ── GET /api/wallet/centre-financier — vue consolidée (Centre Financier) ── */
@@ -38252,7 +38253,7 @@ ${jsonLd}
       const retraits = await db.prepare(`SELECT * FROM retraits WHERE user_id=? ORDER BY created_at DESC LIMIT 20`).all(me.id);
 
       return sendJSON(res, 200, {
-        balance, commission_rate: 0.03,
+        balance, commission_rate: TAUX_COMMISSION,
         solde_disponible: soldeDisponible, solde_en_reserve: soldeEnReserve, reserve_jours: RESERVE_JOURS,
         reserve_dernier_paiement_le: reserveDernierPaiementLe, reserve_retirable_le: reserveRetirableLe,
         revenus: { aujourdhui, semaine, mois, annee, cumule },

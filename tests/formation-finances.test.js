@@ -114,9 +114,9 @@ test('argent : promotion, coupons, commission, ventes', async (t) => {
     assert.equal(await paye(c.id, 72), 200);
     assert.equal(await paye(c.id, 72), 200, 'deuxième envoi du même événement : sans effet');
     const apres = commandeDe('Alpha');
-    assert.equal(apres.statut, 'payee'); assert.equal(apres.commission_pct, 3); assert.equal(apres.commission, 2.16); assert.equal(apres.net_formateur, 69.84);
+    assert.equal(apres.statut, 'payee'); assert.equal(apres.commission_pct, 4); assert.equal(apres.commission, 2.88); assert.equal(apres.net_formateur, 69.12);
     const w = sql('select wallet_balance w from users where id=?', formateurId)[0].w;
-    assert.equal(Math.round((w - avant) * 100) / 100, 69.84, 'le formateur est crédité du net, une seule fois');
+    assert.equal(Math.round((w - avant) * 100) / 100, 69.12, 'le formateur est crédité du net, une seule fois');
   });
 
   await t.test('limites : une fois par personne, limite totale (les paiements en cours comptent)', async () => {
@@ -175,7 +175,7 @@ test('argent : promotion, coupons, commission, ventes', async (t) => {
     assert.equal(r.data.valide, false);
   });
 
-  await t.test('commission : 3 % par défaut, taux propre à un formateur fixé par l\'administration, sans toucher aux ventes passées', async () => {
+  await t.test('commission : 4 % par défaut, taux propre à un formateur fixé par l\'administration, sans toucher aux ventes passées', async () => {
     assert.equal((await call(jarA, 'GET', '/api/admin/formations/commissions')).status, 403);
     assert.equal((await call(jarA, 'PUT', `/api/admin/formations/commissions/${formateurId}`, { pct: 0 })).status, 403, 'un apprenant ne fixe pas sa commission');
     assert.equal((await call(jarF, 'PUT', `/api/admin/formations/commissions/${formateurId}`, { pct: 45 })).status, 400, 'plafond');
@@ -187,9 +187,9 @@ test('argent : promotion, coupons, commission, ventes', async (t) => {
     assert.equal(await paye(cB.id, 72), 200);
     const b = commandeDe('Bravo');
     assert.equal(b.commission_pct, 10); assert.equal(b.commission, 7.2); assert.equal(b.net_formateur, 64.8);
-    assert.equal(commandeDe('Alpha').commission_pct, 3, 'la vente d\'avant garde son taux de 3 %');
+    assert.equal(commandeDe('Alpha').commission_pct, 4, 'la vente d\'avant garde son taux de 4 %');
     const liste = await call(jarF, 'GET', '/api/admin/formations/commissions');
-    assert.equal(liste.data.defaut, 3); assert.equal(liste.data.commissions.length, 1); assert.equal(liste.data.commissions[0].pct, 10);
+    assert.equal(liste.data.defaut, 4); assert.equal(liste.data.commissions.length, 1); assert.equal(liste.data.commissions[0].pct, 10);
     /* retour au taux par défaut */
     assert.equal((await call(jarF, 'DELETE', `/api/admin/formations/commissions/${formateurId}`)).status, 200);
     assert.equal((await call(jarF, 'GET', '/api/admin/formations/commissions')).data.commissions.length, 0);
@@ -198,12 +198,12 @@ test('argent : promotion, coupons, commission, ventes', async (t) => {
   await t.test('« Ventes et revenus » du formateur : totaux, par formation, par code, filtres, export', async () => {
     const r = await call(jarF, 'GET', '/api/formateur/ventes');
     assert.equal(r.status, 200, JSON.stringify(r.data));
-    /* Alpha 72 (3 %) + Bravo 72 (10 %) ; le coupon à 100 % n'est pas une vente ; la commande en attente de Charlie non plus */
+    /* Alpha 72 (4 %) + Bravo 72 (10 %) ; le coupon à 100 % n'est pas une vente ; la commande en attente de Charlie non plus */
     assert.equal(r.data.totaux.nb, 2); assert.equal(r.data.totaux.brut, 144); assert.equal(r.data.totaux.remises, 36);
-    assert.equal(r.data.totaux.commission, 9.36); assert.equal(r.data.totaux.net, 134.64);
+    assert.equal(r.data.totaux.commission, 10.08); assert.equal(r.data.totaux.net, 133.92);
     assert.equal(r.data.par_formation.length, 1); assert.equal(r.data.par_formation[0].brut, 144);
     assert.equal(r.data.par_coupon[0].code, 'PROMO20'); assert.equal(r.data.par_coupon[0].nb, 2);
-    assert.equal(r.data.commission_pct, 3);
+    assert.equal(r.data.commission_pct, 4);
     assert.equal(r.data.ventes[0].libelle.includes('Finances'), true);
     const filtre = await call(jarF, 'GET', `/api/formateur/ventes?du=${jour(1)}`);
     assert.equal(filtre.data.totaux.nb, 0, 'aucune vente après demain');
@@ -222,7 +222,7 @@ test('argent : promotion, coupons, commission, ventes', async (t) => {
     assert.equal((await call(anon, 'GET', '/api/admin/formations/finances')).status, 403);
     const r = await call(jarF, 'GET', '/api/admin/formations/finances');
     assert.equal(r.status, 200, JSON.stringify(r.data));
-    assert.ok(r.data.totaux.nb >= 2); assert.ok(r.data.totaux.commission >= 9.36);
+    assert.ok(r.data.totaux.nb >= 2); assert.ok(r.data.totaux.commission >= 10.08);
     const moi = r.data.par_formateur.find(x => x.formateur_id === Number(formateurId));
     assert.ok(moi && moi.brut >= 144); assert.equal(moi.personnalisee, false);
     assert.ok(Array.isArray(r.data.par_mois) && r.data.par_mois.length >= 1);

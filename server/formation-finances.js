@@ -5,13 +5,15 @@
      (elle ne concernait que l'affichage du formulaire). Elle porte sur la formation complète ; un module vendu seul garde son prix.
    - Coupons : pourcentage OU montant fixe, dates de début et de fin, limite totale et limite par personne ; un coupon vaut pour UNE formation
      ou pour TOUTES celles d'un formateur (« coupon global »). Le coupon se calcule ici, côté serveur : le navigateur n'envoie que le code.
-   - Commission : 3 % par défaut ; l'administration peut fixer un autre taux pour un formateur (formation_commissions_formateurs).
+   - Commission : 4 % par défaut (taux unique de la plateforme, server/commission.js) ; l'administration peut fixer un autre taux pour un formateur (formation_commissions_formateurs).
      Le taux appliqué est écrit sur la commande au moment du paiement : changer le taux plus tard ne réécrit jamais une vente passée.
    - Vues : « Ventes et revenus » du formateur, vue financière de l'administration. AUCUN remboursement de formation (décision du 2026-10-30).
    ═════════════════════════════════════════════════ */
 "use strict";
 
-const COMMISSION_DEFAUT = 3;
+const { TAUX_COMMISSION_PCT } = require("./commission");
+const COMMISSION_DEFAUT = TAUX_COMMISSION_PCT;
+const COMMISSION_HISTORIQUE = 3; /* taux de l'époque (avant le 2026-11-01) : ventes anciennes jamais réécrites */
 const COMMISSION_MAX = 30;
 const PAIEMENT_MINIMUM = 0.5; /* Stripe refuse un paiement inférieur à 0,50 € */
 
@@ -124,7 +126,7 @@ async function lireVentes(db, filtre) {
   for (const r of commandes) {
     const montant = Number(r.montant) || 0;
     /* Commande payée avant le lot B (ou paiement dont l'écriture a échoué) : taux de l'époque, 3 %. */
-    const pct = r.commission_pct != null ? Number(r.commission_pct) : COMMISSION_DEFAUT;
+    const pct = r.commission_pct != null ? Number(r.commission_pct) : COMMISSION_HISTORIQUE;
     const p = r.commission != null ? { commission: Number(r.commission), net: Number(r.net_formateur) } : partager(montant, pct);
     ventes.push({ source: "commande", id: Number(r.id), date: r.paye_le || r.created_at, formation_id: Number(r.formation_id), formation: r.formation_titre, formateur_id: Number(r.owner_user_id) || null,
       libelle: r.libelle || r.formation_titre, module_id: r.module_id ? Number(r.module_id) : null, acheteur: r.acheteur_nom || "—", acheteur_email: r.acheteur_email || "",
@@ -132,10 +134,10 @@ async function lireVentes(db, filtre) {
       montant, commission_pct: pct, commission: p.commission, net: p.net });
   }
   for (const r of anciennes) {
-    const montant = Number(r.montant) || 0, p = partager(montant, COMMISSION_DEFAUT);
+    const montant = Number(r.montant) || 0, p = partager(montant, COMMISSION_HISTORIQUE);
     ventes.push({ source: "inscription", id: Number(r.id), date: r.paye_le, formation_id: Number(r.formation_id), formation: r.formation_titre, formateur_id: Number(r.owner_user_id) || null,
       libelle: r.formation_titre, module_id: null, acheteur: r.acheteur_nom || "—", acheteur_email: r.acheteur_email || "", prix_initial: montant, promo_pct: null, remise: 0, coupon: null,
-      montant, commission_pct: COMMISSION_DEFAUT, commission: p.commission, net: p.net });
+      montant, commission_pct: COMMISSION_HISTORIQUE, commission: p.commission, net: p.net });
   }
   const du = f.du && jourValide(f.du) ? f.du : null, au = f.au && jourValide(f.au) ? f.au : null;
   const retenues = ventes.filter(v => { const j = String(v.date || "").slice(0, 10); return (!du || j >= du) && (!au || j <= au); });

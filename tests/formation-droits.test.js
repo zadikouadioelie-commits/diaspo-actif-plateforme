@@ -114,7 +114,7 @@ test('droits d\'accès : formation complète, modules vendus seuls, expiration, 
     const insc = sql('select statut, paiement_statut, portee, montant_paye from formation_inscriptions where formation_id=?', fid)[0];
     assert.equal(insc.statut, 'active'); assert.equal(insc.paiement_statut, 'paye'); assert.equal(insc.portee, 'modules'); assert.equal(insc.montant_paye, 10);
     const apres = sql('select wallet_balance w from users where id=?', proprietaire)[0].w;
-    assert.equal(Math.round((apres - avant) * 100), 970, '10 € moins 3 % de commission');
+    assert.equal(Math.round((apres - avant) * 100), 960, '10 € moins 4 % de commission');
     await paye(commande1, 10);
     assert.equal(sql('select wallet_balance w from users where id=?', proprietaire)[0].w, apres, 'événement rejoué : pas de second crédit');
   });

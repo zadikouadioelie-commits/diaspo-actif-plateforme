@@ -1595,7 +1595,7 @@
               <h3 style="margin:0;font-size:15px;">💰 Wallet Diaspo'Actif — Revenus plateforme</h3>
               <p style="margin:4px 0 0;font-size:12px;color:var(--muted);">5% prélevé automatiquement sur chaque billet vendu · Non modifiable</p>
             </div>
-            <span style="background:#fff3e0;color:#e65100;font-size:11px;font-weight:800;padding:4px 10px;border-radius:99px;">COMMISSION RATE : 5%</span>
+            <span style="background:#fff3e0;color:#e65100;font-size:11px;font-weight:800;padding:4px 10px;border-radius:99px;">COMMISSION RATE : 4%</span>
           </div>
           <div id="admin-wallet-kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px;"></div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;" class="responsive-grid-1">
@@ -14001,7 +14001,7 @@ async function loadAdminBilletterie() {
             <thead><tr style="background:var(--bg);position:sticky;top:0;">
               <th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--border);">Événement</th>
               <th style="padding:8px 10px;text-align:right;border-bottom:1px solid var(--border);">Prix billet</th>
-              <th style="padding:8px 10px;text-align:right;border-bottom:1px solid var(--border);">95% → Initiative</th>
+              <th style="padding:8px 10px;text-align:right;border-bottom:1px solid var(--border);">96% → Initiative</th>
               <th style="padding:8px 10px;text-align:right;border-bottom:1px solid var(--border);color:#2563EB;">5% → DA</th>
               <th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--border);">Date</th>
             </tr></thead>
@@ -14023,7 +14023,7 @@ async function loadAdminBilletterie() {
       <div class="card" style="padding:14px;text-align:center;"><div style="font-size:26px;font-weight:800;color:#10b981;">${s.publies||0}</div><div style="font-size:12px;color:var(--muted);">Publiés</div></div>
       <div class="card" style="padding:14px;text-align:center;"><div style="font-size:26px;font-weight:800;">${s.total_tickets||0}</div><div style="font-size:12px;color:var(--muted);">Billets vendus</div></div>
       <div class="card" style="padding:14px;text-align:center;"><div style="font-size:26px;font-weight:800;color:#2563EB;">${(s.revenu_total||0).toFixed(2)} €</div><div style="font-size:12px;color:var(--muted);">Revenus bruts</div></div>
-      <div class="card" style="padding:14px;text-align:center;"><div style="font-size:26px;font-weight:800;color:#8b5cf6;">${(s.commission_total||0).toFixed(2)} €</div><div style="font-size:12px;color:var(--muted);">Commission DA (5%)</div></div>`;
+      <div class="card" style="padding:14px;text-align:center;"><div style="font-size:26px;font-weight:800;color:#8b5cf6;">${(s.commission_total||0).toFixed(2)} €</div><div style="font-size:12px;color:var(--muted);">Commission DA (4%)</div></div>`;
     /* Par pays */
     const pays = s.par_pays||[];
     document.getElementById('admin-billet-pays').innerHTML = pays.length
@@ -14089,7 +14089,7 @@ function adminRenderBilletTable() {
             <td style="padding:10px;">${STATUTS[e.statut]||e.statut}</td>
             <td style="padding:10px;text-align:right;">${estBillet?(e.nb_billets||0):'—'}</td>
             <td style="padding:10px;text-align:right;font-weight:700;">${estBillet?(e.revenu||0).toFixed(2)+' €':'—'}</td>
-            <td style="padding:10px;text-align:right;color:#8b5cf6;">${estBillet?((e.revenu||0)*0.05).toFixed(2)+' €':'—'}</td>
+            <td style="padding:10px;text-align:right;color:#8b5cf6;">${estBillet?((e.revenu||0)*0.04).toFixed(2)+' €':'—'}</td>
             <td style="padding:10px;text-align:center;white-space:nowrap;">
               <a class="btn btn-sm btn-outline" href="evenements.html#evt-${e.id}" target="_blank" rel="noopener" title="Ouvrir la fiche événement — les mêmes boutons Modifier/Gérer que voit le propriétaire y apparaissent">✏️ Modifier</a>
               <button class="btn btn-sm btn-outline" onclick="adminObserverEvent(${e.id},'${e.source_table}')" title="Aperçu complet — image, description, toutes les informations, telles qu'affichées publiquement">👁️ Observer</button>

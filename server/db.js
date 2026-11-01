@@ -1569,7 +1569,7 @@ db.exec(`
     image_b64 TEXT,
     categorie TEXT DEFAULT 'Général',
     statut TEXT DEFAULT 'brouillon',        -- brouillon|publie|archive|ferme
-    commission_pct REAL DEFAULT 3.0,        -- % plateforme (2026-08-26 : 5% -> 3% ; le DEFAULT ne
+    commission_pct REAL DEFAULT 4.0,        -- % plateforme (2026-08-26 : 5% -> 3% ; 2026-11-01 : 3% -> 4% ; le DEFAULT ne
                                              -- sert que pour une base neuve, jamais rejoue sur une
                                              -- table existante -- voir la constante explicite
                                              -- PLATFORM_COMMISSION_PCT dans POST /api/events)
@@ -1746,7 +1746,7 @@ db.exec(`
     type TEXT NOT NULL,                       -- 'platform_fee' | 'organizer_credit'
     beneficiaire_id INTEGER,                  -- NULL = plateforme, sinon user.id initiative
     montant REAL NOT NULL,                    -- toujours positif
-    commission_rate REAL DEFAULT 0.05,
+    commission_rate REAL DEFAULT 0.04,
     prix_billet REAL NOT NULL,
     platform_fee REAL NOT NULL,               -- 5% du prix billet
     organizer_amount REAL NOT NULL,           -- 95% du prix billet
