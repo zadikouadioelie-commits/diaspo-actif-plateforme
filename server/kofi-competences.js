@@ -143,6 +143,20 @@ function reponseAnnuaire(r) {
   ].join("\n");
 }
 
+function reponseEvenements(r) {
+  return [
+    "Je suis votre guide des événements. Voici tout ce que je sais faire :",
+    "• Comprendre ce qui vous intéresse : un thème (conférence, entrepreneuriat, culture…), une ville ou un pays, une période (aujourd'hui, ce week-end, cette semaine, le mois prochain…), gratuit ou payant, en ligne ou sur place.",
+    "• Répondre à des questions comme « quels sont les événements de ma ville cette semaine ? » : « ma ville » est lue dans votre profil par la plateforme, pas par moi.",
+    "• Chercher dans les événements publics à venir et vous en montrer les plus proches dans le temps, avec la date, le lieu et la mention gratuit / payant ; un clic ouvre la fiche de l'événement pour vous inscrire.",
+    "• Vous dire honnêtement quand je ne trouve rien, plutôt que d'inventer.",
+    "",
+    "Ce que je ne fais pas : vous inscrire à votre place, ni montrer les événements privés, réservés aux abonnés ou en brouillon. Les filtres de la page restent disponibles pour tout parcourir.",
+    "",
+    phraseCredit("fr", r),
+  ].join("\n");
+}
+
 /* Assistant de l'administrateur : « Que sais-tu faire ? » — réponse fixe, gratuite. */
 function reponseAdmin() {
   return [
@@ -160,4 +174,4 @@ function reponseAdmin() {
   ].join("\n");
 }
 
-module.exports = { estQuestionCompetences, reponseEleve, reponseCreateur, reponseAnnuaire, reponseAdmin, phraseCredit, normaliser };
+module.exports = { estQuestionCompetences, reponseEleve, reponseCreateur, reponseAnnuaire, reponseEvenements, reponseAdmin, phraseCredit, normaliser };

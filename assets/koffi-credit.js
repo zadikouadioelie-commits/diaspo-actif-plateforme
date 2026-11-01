@@ -7,7 +7,7 @@
    KoffiCredit.appliquer(bouton, pf, lg)   → écrit le solde dans une pastille CLIQUABLE (couleur : normal / bas / épuisé / illimité)
    KoffiCredit.libelle(pf, lg)             → texte court du solde (« 0,48 € », « 12 questions offertes », « Illimité »)
    KoffiCredit.ouvrir({ lg, page, formationId, pf })   → fenêtre du crédit : solde détaillé, alerte, offres de recharge, consentement, paiement Stripe
-                                              page : 'telephone' | 'annuaire' | 'createur' | (rien = page de la formation) — destination connue de retour après paiement
+                                              page : 'telephone' | 'annuaire' | 'evenements' | 'createur' | (rien = page de la formation) — destination connue de retour après paiement
    KoffiCredit.retourPaiement({ lg, onFin })  → à appeler au chargement d'une page : traite ?kofi=succes|annule au retour de Stripe (attend le crédit par le webhook)
    ═════════════════════════════════════════════════ */
 (function () {

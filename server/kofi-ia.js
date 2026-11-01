@@ -135,10 +135,35 @@ function reponseFausseAnnuaire({ systeme, messages }) {
   return { texte, entree, sortie: Math.ceil(texte.length / 4), lecture_cache: 0, refus: false, arret: "end_turn" };
 }
 
+/* Guide des événements (système marqué ASSISTANT_EVENEMENTS) : JSON déterministe d'après des marqueurs de la demande —
+   KW:theme_avec_tirets_bas, VILLE:Lyon ou VILLE:@moi, PAYS:France, PERIODE:cette_semaine, DU:AAAA-MM-JJ AU:AAAA-MM-JJ, GRATUIT:gratuit|payant, MODE:en_ligne. */
+function reponseFausseEvenements({ systeme, messages }) {
+  if (process.env.KOFI_FAUX_LOG) { try { fs.appendFileSync(process.env.KOFI_FAUX_LOG, JSON.stringify({ systeme, messages }) + "\n"); } catch (e) { /* sans importance */ } }
+  const dernier = String((messages[messages.length - 1] || {}).content || "");
+  const q = (dernier.split("<demande>")[1] || dernier).split("</demande>")[0];
+  const entree = Math.ceil((String(systeme).length + messages.reduce((a, m) => a + String(m.content).length, 0)) / 4);
+  if (/PANNEFAUSSE/.test(q)) throw new KofiIAErreur("indisponible", "Panne simulée.");
+  if (/LIMITEFAUSSE/.test(q)) throw new KofiIAErreur("limite", "Limite simulée.");
+  if (/REFUSFAUX/.test(q)) return { texte: "", entree, sortie: 5, lecture_cache: 0, refus: true, arret: "refusal" };
+  let texte;
+  if (/JSONFAUX/.test(q)) texte = "Voici ma réponse sans structure.";
+  else {
+    const prise = re => (re.exec(q) || [])[1] || "";
+    const concepts = [prise(/KW:(\S+)/), prise(/KW2:(\S+)/)].filter(Boolean).map(m => [m.replace(/_/g, " ")]);
+    const prec = (/<criteres_precedents>([\s\S]*?)<\/criteres_precedents>/.exec(dernier) || [])[1];
+    let base = {}; try { base = prec ? JSON.parse(prec) : {}; } catch (e) { base = {}; }
+    const crit = { concepts: concepts.length ? concepts : (base.concepts || []), ville: prise(/VILLE:(\S+)/) || base.ville || "", pays: prise(/PAYS:(\S+)/) || base.pays || "", periode: prise(/PERIODE:(\S+)/) || base.periode || "",
+      du: prise(/DU:(\S+)/) || base.du || "", au: prise(/AU:(\S+)/) || base.au || "", gratuit: prise(/GRATUIT:(\S+)/) || base.gratuit || "", mode: prise(/MODE:(\S+)/) || base.mode || "" };
+    texte = "```json\n" + JSON.stringify({ action: "chercher", message: "Je cherche les événements correspondant à votre demande.", criteres: crit }) + "\n```";
+  }
+  return { texte, entree, sortie: Math.ceil(texte.length / 4), lecture_cache: 0, refus: false, arret: "end_turn" };
+}
+
 /* Réponse déterministe pour les tests : cite le premier extrait, ou se comporte selon un mot-clé de la question. */
 function reponseFausse({ systeme, messages }) {
   if (/ASSISTANT_ANNUAIRE/.test(String(systeme))) return reponseFausseAnnuaire({ systeme, messages });
   if (/ASSISTANT_ADMIN/.test(String(systeme))) return reponseFausseAdmin({ systeme, messages });
+  if (/ASSISTANT_EVENEMENTS/.test(String(systeme))) return reponseFausseEvenements({ systeme, messages });
   if (/ASSISTANT_FORMATEUR/.test(String(systeme))) return reponseFausseCreateur({ systeme, messages });
   if (/ASSISTANT_CORRECTION/.test(String(systeme))) return reponseFausseCorrection({ systeme, messages });
   if (process.env.KOFI_FAUX_LOG) { try { fs.appendFileSync(process.env.KOFI_FAUX_LOG, JSON.stringify({ systeme, messages }) + "\n"); } catch (e) { /* sans importance */ } }
