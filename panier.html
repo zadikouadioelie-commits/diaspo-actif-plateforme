@@ -59,8 +59,13 @@
 .pn-tab{padding:7px 14px;border-radius:99px;border:1.5px solid var(--border);background:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;}
 .pn-tab.active{background:#EEF2FF;color:#1d4ed8;border-color:#C7D2FE;}
 </style>
+  <!-- Design « Nuit dorée » (2026-11-01) : thème + feuilles de la page, zone nd-zone sur le contenu ; retour arrière : retirer ces lignes, nd-zone et class="nd" sur <body> -->
+  <link rel="stylesheet" href="/assets/theme-nuit-doree.css?v=8">
+  <link rel="stylesheet" href="/assets/pages-initiative-nuit-doree.css?v=1">
+  <link rel="stylesheet" href="/assets/panier-nuit-doree.css?v=1">
+  <script src="/assets/dashboard-nuit-doree.js?v=4" defer></script>
 </head>
-<body>
+<body class="nd">
 <div class="page">
 
   <header class="topbar">
@@ -82,7 +87,7 @@
     </div>
   </header>
 
-  <main class="pn-wrap">
+  <main class="pn-wrap nd-zone">
     <h1>🛒 Mon panier</h1>
     <p class="pn-sub">Vos articles en attente de paiement et l'historique de tous vos achats, boutiques et vendeurs confondus.</p>
 

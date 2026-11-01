@@ -1,0 +1,31 @@
+/* Design « Nuit dorée » — Mes inscriptions aux événements (mes-inscriptions-evt.html) (2026-11-01).
+   S'ajoute à assets/theme-nuit-doree.css. Les couleurs de la page sont posées en ligne en oklch (fil d'Ariane, titre, états vides) : on les reprend ici avec !important.
+   Tout est préfixé html body.nd. Aucun changement de logique. Retour arrière : retirer les 2 liens et class="nd" sur <body>. */
+
+html body.nd #mi-root{font-family:var(--nd-sans);color:var(--nd-texte);width:100%;box-sizing:border-box} /* width:100% : la page se rétrécissait à son contenu dans le conteneur flex, la grille de cartes tombait à 1 colonne */
+html body.nd #mi-root > div:first-child,html body.nd #mi-root > div:first-child span{color:var(--nd-doux)!important}
+html body.nd #mi-root > div:first-child span{color:var(--nd-or)!important;font-weight:600!important}
+html body.nd #mi-root h1{font-family:var(--nd-display)!important;font-weight:500!important;font-size:clamp(28px,3.2vw,40px)!important;letter-spacing:-.01em;color:#fff!important}
+html body.nd #mi-root > p{color:var(--nd-doux)!important}
+
+/* cartes d'inscription */
+html body.nd .mi-card{background:var(--nd-verre)!important;border:1px solid var(--nd-bord2);border-radius:22px;box-shadow:0 26px 54px -36px #000;color:var(--nd-texte);
+  transition:transform .5s var(--nd-ease),border-color .5s var(--nd-ease)}
+html body.nd .mi-card:hover{transform:translateY(-3px);border-color:var(--nd-bord)}
+html body.nd .mi-fiche{color:var(--nd-or);letter-spacing:.06em}
+html body.nd .mi-titre{font-family:var(--nd-display);font-weight:500;font-size:19px;color:#fff}
+html body.nd .mi-meta{color:var(--nd-doux)}
+html body.nd .mi-meta .ref{color:var(--nd-texte)}
+
+/* statuts */
+html body.nd .mi-badge-confirme{background:rgba(143,224,176,.14);color:#9BE8B8}
+html body.nd .mi-badge-inscrit,html body.nd .mi-badge-present{background:rgba(63,123,255,.16);color:#BFD2FF}
+html body.nd .mi-badge-liste_attente{background:rgba(227,192,110,.16);color:#F3DC9B}
+html body.nd .mi-badge-annule{background:rgba(255,154,143,.14);color:#FFB3AA}
+html body.nd .mi-badge-absent{background:rgba(255,255,255,.08);color:var(--nd-doux)}
+
+/* boutons et états vides */
+html body.nd .mi-qr-link,html body.nd #mi-list a[href="evenements.html"]{background:var(--nd-degore)!important;color:#1a1202!important;border-radius:999px!important;font-weight:800;box-shadow:0 12px 26px -14px rgba(227,192,110,.7)}
+html body.nd .mi-qr-link:hover,html body.nd #mi-list a[href="evenements.html"]:hover{filter:brightness(1.07)}
+html body.nd #mi-list > div[style*="grid-column"]{color:var(--nd-doux)!important}
+html body.nd #mi-root :is(a,button):focus-visible{outline:3px solid var(--nd-or);outline-offset:2px}

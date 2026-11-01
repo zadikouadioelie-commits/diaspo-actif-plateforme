@@ -1,0 +1,54 @@
+/* Design « Nuit dorée » — Mon panier (panier.html) (2026-11-01).
+   S'ajoute à assets/theme-nuit-doree.css et assets/pages-initiative-nuit-doree.css (zone « nd-zone » = .pn-wrap) : cette feuille règle cartes vendeur, lignes d'articles,
+   quantités, paiement, pastilles de statut et onglets propres à la page. Tout est préfixé html body.nd. Aucun changement de logique ni de paiement.
+   Retour arrière : retirer les liens et le script, nd-zone et class="nd" sur <body>. */
+
+html body.nd .pn-wrap{width:100%;box-sizing:border-box} /* la page se rétrécissait à son contenu dans le conteneur flex (max-width 960px jamais atteint) */
+html body.nd .pn-wrap h1{font-size:clamp(28px,3.2vw,40px)}
+html body.nd .pn-sub{color:var(--nd-doux)}
+
+/* cartes */
+html body.nd .pn-card{background:var(--nd-verre)!important;border:1px solid var(--nd-bord2);border-radius:22px;box-shadow:0 26px 54px -36px #000;color:var(--nd-texte)}
+html body.nd .pn-vendor{border-bottom-color:var(--nd-bord2)}
+html body.nd .pn-vendor-name{color:#fff}
+html body.nd .pn-vendor-name a:hover{color:var(--nd-or)}
+html body.nd .pn-vendor-tag{color:var(--nd-or);letter-spacing:.1em}
+html body.nd :is(.pn-line,.pn-hist-row){border-bottom-color:var(--nd-bord2)}
+html body.nd .pn-img{background:rgba(255,255,255,.07);border:1px solid var(--nd-bord2);border-radius:14px}
+html body.nd .pn-name{color:#fff}
+html body.nd :is(.pn-meta,.pn-empty){color:var(--nd-doux)}
+html body.nd .pn-price,html body.nd .pn-total{color:#fff}
+html body.nd .pn-total span:last-child{font-family:var(--nd-display);font-weight:500;font-size:1.3em;background:var(--nd-degore);-webkit-background-clip:text;background-clip:text;color:transparent}
+
+/* quantité, choix, champs */
+html body.nd .pn-qty{border:1px solid var(--nd-bord);border-radius:999px}
+html body.nd .pn-qty button{background:rgba(255,255,255,.08);color:var(--nd-or)}
+html body.nd .pn-qty button:hover{background:rgba(227,192,110,.2)}
+html body.nd .pn-qty span{color:#fff}
+html body.nd :is(.pn-sel,.pn-input){background:rgba(255,255,255,.07)!important;border:1px solid rgba(255,255,255,.2)!important;border-radius:12px!important;color:#fff!important;color-scheme:dark}
+html body.nd .pn-input::placeholder{color:#8F9BB8}
+html body.nd :is(.pn-sel,.pn-input):focus{outline:none;border-color:var(--nd-or)!important;box-shadow:0 0 0 3px rgba(227,192,110,.18)}
+html body.nd .pn-sel option{background:#0E1730;color:#fff}
+html body.nd .pn-pay label{background:rgba(255,255,255,.05);border:1px solid var(--nd-bord2);border-radius:14px;color:var(--nd-texte)}
+html body.nd .pn-pay label:has(input:checked){border-color:var(--nd-or);background:rgba(227,192,110,.1)}
+html body.nd .pn-pay input{accent-color:var(--nd-or)}
+html body.nd .pn-rm{color:#FF9C9C}
+html body.nd .pn-warn{color:#F3DC9B}
+
+/* bouton de paiement */
+html body.nd .pn-btn{background:var(--nd-degore)!important;color:#1a1202!important;border-radius:999px;box-shadow:0 12px 26px -14px rgba(227,192,110,.7)}
+html body.nd .pn-btn:hover:not(:disabled){filter:brightness(1.07)}
+
+/* messages et statuts */
+html body.nd .pn-banner.ok{background:rgba(143,224,176,.12);border:1px solid rgba(143,224,176,.45);color:#9BE8B8}
+html body.nd .pn-banner.ko{background:rgba(227,192,110,.1);border:1px solid var(--nd-bord);color:#F3DC9B}
+html body.nd .pn-badge.paye{background:rgba(143,224,176,.14);color:#9BE8B8}
+html body.nd .pn-badge.attente{background:rgba(227,192,110,.16);color:#F3DC9B}
+html body.nd .pn-badge.echoue{background:rgba(255,154,143,.14);color:#FFB3AA}
+html body.nd .pn-badge.livr{background:rgba(63,123,255,.16);color:#BFD2FF}
+
+/* onglets */
+html body.nd .pn-tab{background:rgba(255,255,255,.05)!important;border:1px solid var(--nd-bord2)!important;color:var(--nd-doux);border-radius:999px}
+html body.nd .pn-tab:hover{color:#fff}
+html body.nd .pn-tab.active{background:rgba(227,192,110,.16)!important;border-color:var(--nd-or)!important;color:var(--nd-or)}
+html body.nd .nd-zone :is(button,a,input,select):focus-visible{outline:3px solid var(--nd-or);outline-offset:2px}

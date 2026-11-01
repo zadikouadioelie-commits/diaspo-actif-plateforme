@@ -1,0 +1,40 @@
+/* Design « Nuit dorée » — Appels à contribution (collaborations.html) (2026-11-01).
+   S'ajoute à assets/theme-nuit-doree.css et assets/pages-initiative-nuit-doree.css (zone « nd-zone » = main.container) : cette feuille règle cartes, pastilles de type,
+   filtres et les deux fenêtres (publier un appel, postuler). Tout est préfixé html body.nd. Aucun changement de logique.
+   Retour arrière : retirer les liens et le script, nd-zone et class="nd" sur <body>. */
+
+html body.nd main.container.nd-zone{width:100%;box-sizing:border-box} /* la page se rétrécissait à son contenu dans le conteneur flex (max-width 1100px jamais atteint) */
+
+/* filtres */
+html body.nd .nd-zone :is(#f-type,#q){background:rgba(255,255,255,.07)!important;border:1px solid rgba(255,255,255,.2)!important;border-radius:999px!important;color:#fff!important;color-scheme:dark}
+html body.nd .nd-zone #q::placeholder{color:#8F9BB8}
+html body.nd .nd-zone :is(#f-type,#q):focus{outline:none;border-color:var(--nd-or)!important;box-shadow:0 0 0 3px rgba(227,192,110,.18)}
+html body.nd .nd-zone #f-type option{background:#0E1730;color:#fff}
+
+/* cartes d'appels */
+html body.nd .collab-card{background:var(--nd-verre)!important;border:1px solid var(--nd-bord2);border-radius:22px;box-shadow:0 26px 54px -36px #000;color:var(--nd-texte);
+  transition:transform .5s var(--nd-ease),border-color .5s var(--nd-ease)}
+html body.nd .collab-card:hover{transform:translateY(-3px);border-color:var(--nd-bord);box-shadow:0 30px 60px -34px #000}
+html body.nd .collab-card :is(h3,h4,strong){color:#fff}
+html body.nd .collab-type{background:rgba(255,255,255,.06);border:1px solid var(--nd-bord2);color:var(--nd-doux);font-weight:700;letter-spacing:.04em}
+html body.nd .collab-type.benevolat{border-color:rgba(143,224,176,.5);background:rgba(143,224,176,.12);color:#9BE8B8}
+html body.nd .collab-type.partenariat{border-color:rgba(63,123,255,.5);background:rgba(63,123,255,.14);color:#BFD2FF}
+html body.nd .collab-type.financement{border-color:var(--nd-bord);background:rgba(227,192,110,.12);color:var(--nd-or)}
+html body.nd .tag{background:rgba(255,255,255,.08);color:var(--nd-texte);border:1px solid var(--nd-bord2)}
+
+/* fenêtres */
+html body.nd .modal-bg{background:rgba(3,6,14,.8)!important;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+html body.nd .modal-bg .modal{background:radial-gradient(420px 220px at 100% 0%,rgba(227,192,110,.14),transparent 66%),linear-gradient(160deg,#14234a 0%,#0B1226 62%)!important;border:1px solid rgba(227,192,110,.4);border-radius:26px;
+  box-shadow:0 40px 90px -30px #000;color:var(--nd-texte);--text:#EDEAE0;--muted:#AEB8D0;--border:rgba(255,255,255,.13);--bg:rgba(255,255,255,.07);--card:rgba(255,255,255,.05)}
+html body.nd .modal-bg .modal h3{font-family:var(--nd-display);font-weight:500;font-size:1.5rem;color:#fff}
+html body.nd .modal-bg .modal label{display:block;margin-bottom:5px;color:var(--nd-or)!important;font-size:.78rem;font-weight:700;letter-spacing:.05em}
+html body.nd .modal-bg .modal :is(input,select,textarea){width:100%;box-sizing:border-box;padding:10px 14px;background:rgba(255,255,255,.07)!important;border:1px solid rgba(255,255,255,.2)!important;border-radius:14px!important;color:#fff!important;color-scheme:dark}
+html body.nd .modal-bg .modal :is(input,textarea)::placeholder{color:#8F9BB8}
+html body.nd .modal-bg .modal :is(input,select,textarea):focus{outline:none;border-color:var(--nd-or)!important;box-shadow:0 0 0 3px rgba(227,192,110,.18)}
+html body.nd .modal-bg .modal select option{background:#0E1730;color:#fff}
+html body.nd .modal-bg .modal [style*="color:#2563EB"]{color:var(--nd-or)!important}
+
+/* boutons */
+html body.nd .nd-zone .btn-orange,html body.nd .modal-bg .btn-orange{background:var(--nd-degore)!important;color:#1a1202!important;border:0!important;border-radius:999px!important;font-weight:800;box-shadow:0 12px 26px -14px rgba(227,192,110,.7)}
+html body.nd :is(.nd-zone,.modal-bg) .btn:not(.btn-orange){background:rgba(255,255,255,.06)!important;border:1px solid var(--nd-bord)!important;color:#F3E3B5!important;border-radius:999px!important}
+html body.nd :is(.nd-zone,.modal-bg) :is(.btn,button,a):focus-visible{outline:3px solid var(--nd-or);outline-offset:2px}
