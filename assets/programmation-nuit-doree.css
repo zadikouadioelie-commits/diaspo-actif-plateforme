@@ -1,0 +1,35 @@
+/* Design « Nuit dorée » — Programmation (programmation.html) (2026-11-01).
+   S'ajoute à assets/theme-nuit-doree.css et assets/pages-initiative-nuit-doree.css (zone « nd-zone » = .pg-wrap) : cette feuille règle les cartes, volets, puces et cases propres à la page.
+   Tout est préfixé html body.nd. Retour arrière : retirer le lien vers cette feuille avec ceux de la page. */
+
+html body.nd .nd-zone{--border:rgba(255,255,255,.12);--muted:#AEB8D0}
+html body.nd .pg-title{font-family:var(--nd-display);font-weight:500;font-size:clamp(28px,3.2vw,40px);color:#fff}
+html body.nd .pg-sub{color:var(--nd-doux)}
+
+/* volets */
+html body.nd .pg-volet-btn{background:rgba(255,255,255,.06);border:1px solid var(--nd-bord2);color:var(--nd-doux)}
+html body.nd .pg-volet-btn:not(.disabled):hover{color:#fff;border-color:var(--nd-bord)}
+html body.nd .pg-volet-btn.active{background:var(--nd-degore);color:#1a1405;border-color:transparent}
+
+/* cartes */
+html body.nd .pg-card{background:var(--nd-verre)!important;border:1px solid var(--nd-bord2);border-radius:22px;box-shadow:0 26px 54px -34px #000;color:var(--nd-texte)}
+html body.nd .pg-card h3{color:#fff!important}
+html body.nd .pg-card .pg-desc,html body.nd .pg-field label{color:var(--nd-doux)!important}
+
+/* puces de sélection */
+html body.nd .pg-chip{background:rgba(255,255,255,.06);border:1px solid var(--nd-bord2);color:var(--nd-texte)}
+html body.nd .pg-chip:hover{border-color:var(--nd-bord)}
+html body.nd .pg-chip.checked{background:rgba(227,192,110,.2);color:#F3DC9B;border-color:var(--nd-or)}
+
+/* champs */
+html body.nd .pg-field :is(input[type=text],select){background:rgba(255,255,255,.07)!important;border:1px solid rgba(255,255,255,.2)!important;color:#fff!important;color-scheme:dark}
+html body.nd .pg-field input::placeholder{color:#8F9BB8}
+html body.nd .pg-field :is(input,select):focus{outline:none;border-color:var(--nd-or)!important;box-shadow:0 0 0 3px rgba(227,192,110,.18)}
+
+/* lignes à cocher */
+html body.nd .pg-check-row{color:var(--nd-texte);border-bottom-color:var(--nd-bord2)}
+html body.nd .pg-check-row:hover{background:rgba(255,255,255,.05)}
+html body.nd .pg-check-row input[type=checkbox]{background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.35)}
+html body.nd .pg-check-row input[type=checkbox]:checked{background:var(--nd-degore);border-color:var(--nd-or)}
+html body.nd .pg-check-row input[type=checkbox]:checked::after{color:#1a1405}
+html body.nd .pg-saved-msg{color:#9BE8B8}

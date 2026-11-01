@@ -1,0 +1,13 @@
+/* Design « Nuit dorée » — Premium (premium.html) (2026-11-01).
+   S'ajoute à assets/theme-nuit-doree.css et assets/pages-initiative-nuit-doree.css (zone « nd-zone » = #premium-content) : cette feuille règle le bandeau et le sélecteur de type propres à la page.
+   Tout est préfixé html body.nd. Retour arrière : retirer le lien vers cette feuille avec ceux de la page. */
+
+html body.nd .prm-hero{background:radial-gradient(ellipse at 50% 0%,rgba(227,192,110,.18),transparent 65%),linear-gradient(160deg,#101a36,#0B1226 70%);border:1px solid var(--nd-bord);box-shadow:0 30px 70px -40px #000}
+html body.nd .prm-hero p{color:var(--nd-doux)}
+
+/* sélecteur « Compte Utilisateur / Compte Initiative » (existe en version claire dans le corps de la page) */
+html body.nd .prm-type-switch{background:rgba(255,255,255,.07);border:1px solid var(--nd-bord2)}
+html body.nd .prm-type-switch.prm-type-switch-light{background:rgba(255,255,255,.07)}
+html body.nd .prm-type-btn{color:var(--nd-doux)}
+html body.nd .prm-type-btn:hover{color:#fff}
+html body.nd .prm-type-btn.active{background:var(--nd-degore);color:#1a1405}

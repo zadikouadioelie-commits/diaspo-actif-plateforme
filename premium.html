@@ -23,8 +23,13 @@
 <link rel="stylesheet" href="assets/premium-page.css">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0D2B4E">
+  <!-- Design « Nuit dorée » (2026-11-01) : premium ; retour arrière : retirer ces lignes, nd-zone et class="nd" sur <body> -->
+  <link rel="stylesheet" href="/assets/theme-nuit-doree.css?v=8">
+  <link rel="stylesheet" href="/assets/pages-initiative-nuit-doree.css?v=1">
+  <link rel="stylesheet" href="/assets/premium-nuit-doree.css?v=1">
+  <script src="/assets/dashboard-nuit-doree.js?v=4" defer></script>
 </head>
-<body>
+<body class="nd">
 <div class="page">
   <header class="topbar">
     <div class="topbar-inner">
@@ -43,7 +48,7 @@
       </div>
     </div>
   </header>
-  <div id="premium-content"></div>
+  <div id="premium-content" class="nd-zone"></div>
 </div>
 
 <script src="assets/data.js"></script>
