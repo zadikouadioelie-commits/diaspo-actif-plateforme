@@ -7116,7 +7116,7 @@ function pvJumpToModule(key) {
    OPTIONS (bibliothèque plus bas). Changer de type = changement total de présentation : un avertissement liste ce qui est
    conservé, adapté ou rangé dans le « Bonus de la boutique » (jamais supprimé). Les routes type/ajouter et type/retirer
    répondent désormais 410. ── */
-const PV_TYPES_VISUEL_DEDIE = { commercial: true };   // types dont la présentation dédiée est construite ; les autres suivent, un visuel à la fois
+const PV_TYPES_VISUEL_DEDIE = { commercial: true, portfolio: true, video: true };   // types dont la présentation dédiée est construite ; les autres suivent, un visuel à la fois
 function renderPvTemplates() {
   const grid = document.getElementById('pv-templates-grid');
   if (!grid || !__pvRegistry) return;

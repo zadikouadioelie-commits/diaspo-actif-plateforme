@@ -1344,6 +1344,9 @@ const COLONNES_MIGRATION = [
     ['produits_vitrine', 'livraison_retrait', 'INTEGER DEFAULT 1'],
     ['produits_vitrine', 'livraison_expedition', 'INTEGER DEFAULT 0'],
     ['produits_vitrine', 'frais_expedition', 'REAL'],
+    ['produits_vitrine', 'video_url', 'TEXT'],
+    ['produits_vitrine', 'video_duree', 'INTEGER'],
+    ['produits_vitrine', 'video_type', 'TEXT'],
     ['commandes_vitrine', 'mode_livraison', 'TEXT'],
     // Paiement multi-prestataires (2026-09-29, rétabli 2026-10-09) — miroir de l'ALTER db.js
     ['commandes_vitrine', 'provider', "TEXT DEFAULT 'stripe'"],

@@ -3531,7 +3531,7 @@ route("POST", "/api/initiatives/:id/produits", async (req, res, params, body) =>
   const count = (await db.prepare("SELECT COUNT(*) n FROM produits_vitrine WHERE initiative_id=?").get(params.id))?.n || 0;
   if (Number(count) >= MAX_PRODUITS_VITRINE) return sendJSON(res, 400, { error: `Limite de ${MAX_PRODUITS_VITRINE} produits atteinte. Supprimez-en un pour en ajouter un nouveau.` });
 
-  const { nom, description, prix, devise, categorie, photos, statut, date_retour, reference, prix_promo, catalogue_id, devis_active, livraison_retrait, livraison_expedition, frais_expedition } = body;
+  const { nom, description, prix, devise, categorie, photos, statut, date_retour, reference, prix_promo, catalogue_id, devis_active, livraison_retrait, livraison_expedition, frais_expedition, video_url, video_duree, video_type } = body;
   if (!nom) return sendJSON(res, 400, { error: "Nom du produit requis." });
   let catId = null;
   if (catalogue_id != null && catalogue_id !== '') {
@@ -3555,10 +3555,11 @@ route("POST", "/api/initiatives/:id/produits", async (req, res, params, body) =>
   const livraisonRetraitVal = livraison_retrait === false || livraison_retrait === 0 ? 0 : 1;
   const livraisonExpeditionVal = livraison_expedition === true || livraison_expedition === 1 ? 1 : 0;
   const fraisExpeditionVal = frais_expedition != null && frais_expedition !== '' ? Number(frais_expedition) : null;
+  const videoChamps = champsVideoProduit({ video_url, video_duree, video_type });
   const id = (await db.prepare(`
-    INSERT INTO produits_vitrine (initiative_id, nom, description, prix, devise, disponible, statut, date_retour, reference, categorie, photos_json, ordre, prix_promo, catalogue_id, devis_active, livraison_retrait, livraison_expedition, frais_expedition)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-  `).run(params.id, nom, description || null, prix != null ? Number(prix) : null, devise || "EUR", dispo, st, date_retour || null, ref, categorie || null, JSON.stringify(photosArr), (Number(maxOrdre) || 0) + 1, prix_promo != null && prix_promo !== '' ? Number(prix_promo) : null, catId, devisActiveVal, livraisonRetraitVal, livraisonExpeditionVal, fraisExpeditionVal)).lastInsertRowid;
+    INSERT INTO produits_vitrine (initiative_id, nom, description, prix, devise, disponible, statut, date_retour, reference, categorie, photos_json, ordre, prix_promo, catalogue_id, devis_active, livraison_retrait, livraison_expedition, frais_expedition, video_url, video_duree, video_type)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+  `).run(params.id, nom, description || null, prix != null ? Number(prix) : null, devise || "EUR", dispo, st, date_retour || null, ref, categorie || null, JSON.stringify(photosArr), (Number(maxOrdre) || 0) + 1, prix_promo != null && prix_promo !== '' ? Number(prix_promo) : null, catId, devisActiveVal, livraisonRetraitVal, livraisonExpeditionVal, fraisExpeditionVal, videoChamps.url, videoChamps.duree, videoChamps.type)).lastInsertRowid;
   // Notifie les abonnés de la vitrine (sauf produit masqué)
   if (st !== 'masque') {
     notifierAbonnes(params.id, "vitrine_produit", "Nouveau produit en boutique",
@@ -3566,6 +3567,18 @@ route("POST", "/api/initiatives/:id/produits", async (req, res, params, body) =>
   }
   sendJSON(res, 201, { id });
 });
+
+/* Boutique vidéo (2026-11-01) : champs d'une vidéo à vendre. L'adresse doit être http(s) (aperçu), la durée est en secondes
+   (1 à 3600), le genre est « courte » (60 s ou moins), « explicative » (1 à 3 min) ou « serie » ; tout le reste est ignoré. */
+function champsVideoProduit(b) {
+  const u = String(b.video_url == null ? "" : b.video_url).trim();
+  const url = /^https?:\/\//i.test(u) && u.length <= 600 ? u : null;
+  const d = Math.round(Number(b.video_duree));
+  const duree = Number.isFinite(d) && d > 0 && d <= 3600 ? d : null;
+  const t = String(b.video_type == null ? "" : b.video_type).trim().toLowerCase();
+  const type = ["courte", "explicative", "serie"].includes(t) ? t : null;
+  return { url, duree, type };
+}
 
 /* PUT /api/produits/:id — owner only */
 route("PUT", "/api/produits/:id", async (req, res, params, body) => {
@@ -3576,7 +3589,7 @@ route("PUT", "/api/produits/:id", async (req, res, params, body) => {
   const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(prod.initiative_id);
   if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
 
-  const { nom, description, prix, devise, categorie, photos, statut, date_retour, reference, prix_promo, catalogue_id, devis_active, livraison_retrait, livraison_expedition, frais_expedition } = body;
+  const { nom, description, prix, devise, categorie, photos, statut, date_retour, reference, prix_promo, catalogue_id, devis_active, livraison_retrait, livraison_expedition, frais_expedition, video_url, video_duree, video_type } = body;
   const photosArr = Array.isArray(photos) ? photos.slice(0, 4) : safeParse(prod.photos_json || "[]");
   const livraisonRetraitVal = livraison_retrait !== undefined ? (livraison_retrait === false || livraison_retrait === 0 ? 0 : 1) : prod.livraison_retrait;
   const livraisonExpeditionVal = livraison_expedition !== undefined ? (livraison_expedition === true || livraison_expedition === 1 ? 1 : 0) : prod.livraison_expedition;
@@ -3603,7 +3616,7 @@ route("PUT", "/api/produits/:id", async (req, res, params, body) => {
     : prod.devis_active;
 
   await db.prepare(`
-    UPDATE produits_vitrine SET nom=?, description=?, prix=?, devise=?, disponible=?, statut=?, date_retour=?, reference=?, categorie=?, photos_json=?, prix_promo=?, catalogue_id=?, devis_active=?, livraison_retrait=?, livraison_expedition=?, frais_expedition=? WHERE id=?
+    UPDATE produits_vitrine SET nom=?, description=?, prix=?, devise=?, disponible=?, statut=?, date_retour=?, reference=?, categorie=?, photos_json=?, prix_promo=?, catalogue_id=?, devis_active=?, livraison_retrait=?, livraison_expedition=?, frais_expedition=?, video_url=?, video_duree=?, video_type=? WHERE id=?
   `).run(
     nom || prod.nom, description !== undefined ? description : prod.description,
     prix != null ? Number(prix) : prod.prix, devise || prod.devise, dispo,
@@ -3612,6 +3625,9 @@ route("PUT", "/api/produits/:id", async (req, res, params, body) => {
     categorie !== undefined ? categorie : prod.categorie, JSON.stringify(photosArr),
     prix_promo !== undefined ? (prix_promo === null || prix_promo === '' ? null : Number(prix_promo)) : prod.prix_promo,
     catId, devisActiveVal, livraisonRetraitVal, livraisonExpeditionVal, fraisExpeditionVal,
+    video_url !== undefined ? champsVideoProduit({ video_url, video_duree, video_type }).url : prod.video_url,
+    video_duree !== undefined ? champsVideoProduit({ video_url, video_duree, video_type }).duree : prod.video_duree,
+    video_type !== undefined ? champsVideoProduit({ video_url, video_duree, video_type }).type : prod.video_type,
     params.id
   );
 
@@ -4981,6 +4997,11 @@ const VITRINE_TEMPLATES = {
     label: "🎨 Portfolio", pour: "Photographes, artistes, designers, créateurs, artisans créatifs, réalisateurs",
     actifs: ["a_propos","contact","portfolio","galerie_photos","galerie_videos","realisations","temoignages","demande_devis","actualites"],
     optionnels: ["produits","reservation","evenements","formations_catalogue"],
+  },
+  video: {
+    label: "🎞️ Boutique vidéo", pour: "Vidéastes, créateurs et marques qui vendent des vidéos courtes (45 s à 1 min) prêtes à l'emploi",
+    actifs: ["produits","a_propos","contact","avis","temoignages","actualites","reseaux_sociaux"],
+    optionnels: ["galerie_videos","portfolio","formations_catalogue","evenements","demande_devis"],
   },
   blog: {
     label: "✍️ Blog", pour: "Auteurs, journalistes, experts et organisations qui publient régulièrement",

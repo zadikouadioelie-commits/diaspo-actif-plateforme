@@ -9103,6 +9103,10 @@ db.exec(`
   ["produits_vitrine", "livraison_retrait INTEGER DEFAULT 1"],
   ["produits_vitrine", "livraison_expedition INTEGER DEFAULT 0"],
   ["produits_vitrine", "frais_expedition REAL"],
+  /* Boutique vidéo (2026-11-01) : une vidéo à vendre est un produit de la boutique ; l'adresse de la vidéo (aperçu), sa durée en secondes et son genre (courte / explicative / série). */
+  ["produits_vitrine", "video_url TEXT"],
+  ["produits_vitrine", "video_duree INTEGER"],
+  ["produits_vitrine", "video_type TEXT"],
   ["commandes_vitrine", "mode_livraison TEXT"],
   ["commandes_vitrine", "livraison_nom TEXT"],
   ["commandes_vitrine", "livraison_adresse TEXT"],

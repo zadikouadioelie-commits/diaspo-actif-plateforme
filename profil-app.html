@@ -1245,6 +1245,7 @@ async function init() {
           const _ib = (await api('GET', '/initiatives/' + profil.initiative_id)).initiative;
           if (_ib && _ib.vitrine_type === 'commercial') { location.replace('boutique.html?id=' + encodeURIComponent(profil.initiative_id)); return; }
           if (_ib && _ib.vitrine_type === 'portfolio') { location.replace('portfolio.html?id=' + encodeURIComponent(profil.initiative_id)); return; }
+          if (_ib && _ib.vitrine_type === 'video') { location.replace('boutique-video.html?id=' + encodeURIComponent(profil.initiative_id)); return; }
         } catch (e) { /* repli : l'ancienne vue boutique */ }
       }
     }
@@ -5925,7 +5926,7 @@ function openProductModal(productId, presetCatalogueId) {
         <option value="">— Non classé —</option>
         ${(_cataloguesVitrine||[]).map(c => `<option value="${c.id}" ${currentCatId != null && Number(currentCatId)===Number(c.id)?'selected':''}>${esc(c.nom)}</option>`).join('')}
       </select>
-      <h2 style="margin:0 0 16px;font-size:17px;">${editing?'✏️ Modifier':'➕ Ajouter'} un produit</h2>
+      <h2 style="margin:0 0 16px;font-size:17px;">${editing?'✏️ Modifier':'➕ Ajouter'} ${_vitrineInit && _vitrineInit.vitrine_type === 'video' ? 'une vidéo' : 'un produit'}</h2>
       <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Nom *</label>
       <input type="text" id="pf-nom" value="${prod?esc(prod.nom):''}" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;margin-bottom:12px;">
       <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Description</label>
@@ -5942,6 +5943,26 @@ function openProductModal(productId, presetCatalogueId) {
       </div>
       <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Catégorie</label>
       <input type="text" id="pf-categorie" value="${prod?esc(prod.categorie||''):''}" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;margin-bottom:12px;">
+      ${_vitrineInit && _vitrineInit.vitrine_type === 'video' ? `
+      <div style="background:#FBF3F5;border:1.5px solid #EBC9D2;border-radius:10px;padding:12px;margin-bottom:12px;">
+        <div style="font-size:13px;font-weight:800;color:#7B1230;margin-bottom:8px;">🎞️ Boutique vidéo</div>
+        <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Adresse de la vidéo (aperçu) *</label>
+        <input type="url" id="pf-video-url" value="${prod?esc(prod.video_url||''):''}" placeholder="https://… (fichier .mp4, YouTube ou Vimeo)" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;margin-bottom:10px;">
+        <div style="display:flex;gap:10px;">
+          <div style="flex:1;">
+            <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Durée (secondes) *</label>
+            <input type="number" min="1" max="3600" id="pf-video-duree" value="${prod&&prod.video_duree?prod.video_duree:''}" placeholder="Ex : 45" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;">
+          </div>
+          <div style="flex:1;">
+            <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Type de vidéo</label>
+            <select id="pf-video-type" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;background:#fff;">
+              <option value="">Automatique (selon la durée)</option>
+              ${[['courte','Vidéo courte (≤ 60 s)'],['explicative','Vidéo explicative (1–3 min)'],['serie','Série / Épisode']].map(o => `<option value="${o[0]}" ${prod&&prod.video_type===o[0]?'selected':''}>${o[1]}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <p style="font-size:11px;color:#8A6D75;margin:6px 0 0;">La première photo ci-dessous sert de miniature. La catégorie ci-dessus classe la vidéo dans la barre du haut de votre boutique.</p>
+      </div>` : ''}
       <div style="display:flex;gap:10px;margin-bottom:12px;">
         <div style="flex:1;">
           <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Référence</label>
@@ -5964,6 +5985,7 @@ function openProductModal(productId, presetCatalogueId) {
         <option value="1" ${prod&&prod.devis_active!=null&&Number(prod.devis_active)===1?'selected':''}>☑ Autoriser les demandes de devis</option>
         <option value="0" ${prod&&prod.devis_active!=null&&Number(prod.devis_active)===0?'selected':''}>☐ Désactiver les demandes de devis</option>
       </select>
+      <div style="display:${_vitrineInit && _vitrineInit.vitrine_type === 'video' ? 'none' : 'block'};">
       <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:6px;">🚚 Livraison</label>
       <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;">
         <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#374151;cursor:pointer;">
@@ -5977,6 +5999,7 @@ function openProductModal(productId, presetCatalogueId) {
         <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Frais d'expédition</label>
         <input type="number" step="0.01" min="0" id="pf-frais-expedition" placeholder="0.00" value="${prod && prod.frais_expedition != null ? prod.frais_expedition : ''}" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;">
         <p style="font-size:11px;color:#aaa;margin:4px 0 0;">Ajoutés automatiquement au montant payé par l'acheteur s'il choisit l'expédition. Laissez vide pour une expédition gratuite.</p>
+      </div>
       </div>
       <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:6px;">Photos (jusqu'à 4)</label>
       <div class="prod-photo-slots" id="pf-photo-slots" style="margin-bottom:16px;"></div>
@@ -6047,6 +6070,12 @@ async function saveProduct(productId) {
     livraison_expedition: document.getElementById('pf-livraison-expedition').checked,
     frais_expedition: document.getElementById('pf-frais-expedition').value !== '' ? Number(document.getElementById('pf-frais-expedition').value) : null,
   };
+  if (document.getElementById('pf-video-url')) {
+    const vu = document.getElementById('pf-video-url').value.trim(), vd = Number(document.getElementById('pf-video-duree').value);
+    if (!/^https?:\/\//i.test(vu)) { err.textContent = "L'adresse de la vidéo (http…) est requise."; err.style.display = 'block'; return; }
+    if (!(vd >= 1 && vd <= 3600)) { err.textContent = 'La durée de la vidéo (en secondes, de 1 à 3600) est requise.'; err.style.display = 'block'; return; }
+    payload.video_url = vu; payload.video_duree = Math.round(vd); payload.video_type = document.getElementById('pf-video-type').value || null;
+  }
   try {
     if (productId) await api('PUT', `/produits/${productId}`, payload);
     else await api('POST', `/initiatives/${_vitrineInit.id}/produits`, payload);
