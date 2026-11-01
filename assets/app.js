@@ -2171,6 +2171,7 @@ async function applyAuthState() {
       window.location.href = "index.html";
     });
     initComptesLiesSwitcher(user);
+    injecterKoffiNavigation();
     injecterBadgeAccesInvite(user);
     initCompactMenu();
     chargerConnexionsUI();
@@ -7181,6 +7182,21 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   document.body.appendChild(s);
 })();
 
+/* ── Koffi, guide de navigation (2026-11-01) : « dans chaque onglet, Koffi peut aider à naviguer ».
+   Déclencheur masqué #kn-fab, repris par le concentrateur d'assistance ci-dessous (entrée « Koffi — où aller ? »). Le script de la fenêtre n'est chargé qu'au premier clic :
+   aucune requête, aucun appel à l'IA tant que la personne n'a pas ouvert Koffi. Compte connecté uniquement (appelé depuis l'en-tête connecté). ── */
+function injecterKoffiNavigation() {
+  if (document.getElementById('kn-fab')) return;
+  var b = document.createElement('button');
+  b.type = 'button'; b.id = 'kn-fab'; b.style.display = 'none'; b.setAttribute('aria-label', "Koffi, guide de navigation");
+  b.addEventListener('click', function () {
+    var ouvrir = function () { if (window.KoffiNavigation) window.KoffiNavigation.ouvrir({ telephone: false }); };
+    if (window.KoffiNavigation) return ouvrir();
+    var s = document.createElement('script'); s.src = '/assets/koffi-navigation.js?v=1'; s.onload = ouvrir; document.body.appendChild(s);
+  });
+  document.body.appendChild(b);
+}
+
 /* ── Concentrateur d'assistance : fusionne Support technique + Chatbot + O-Z
    en un seul bouton flottant (badge = nombre d'assistants disponibles),
    pour ne pas encombrer l'écran de 3 icônes séparées sur mobile. Les 3
@@ -7189,6 +7205,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
    internes n'est dupliquée. ── */
 (function buildAssistantHub(){
   var ASSISTANTS = [
+    {key:'koffi', label:'Koffi — où aller ?', icon:'🧭', sel:'#kn-fab'},
     {key:'support', label:'Signaler un problème', icon:'🛠️', sel:'#st-fab, #st-sidebar-link'},
     {key:'chatbot', label:"Chatbot Diaspo'Actif", icon:'💬', sel:'#cb-fab'},
     {key:'oz', label:'Assistant O-Z', icon:'🌍', sel:'#oz-bubble'}
@@ -7276,7 +7293,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       buildHub();
       renderMenu();
     }
-    if (attempts > 24) clearInterval(poll);
+    if (attempts > 60) clearInterval(poll);   /* 15 s : l'en-tête connecté (qui pose #kn-fab) peut arriver après les autres assistants */
   }, 250);
 })();
 
