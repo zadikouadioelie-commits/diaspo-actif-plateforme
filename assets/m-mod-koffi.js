@@ -15,7 +15,7 @@
     if (test()) return Promise.resolve();
     return new Promise(ok => { const sc = document.createElement('script'); sc.src = src; sc.onload = ok; sc.onerror = ok; document.head.appendChild(sc); });
   }
-  const chargerAnnuaire = () => charger('/assets/koffi-annuaire.js?v=2', () => !!window.KoffiAnnuaire);
+  const chargerAnnuaire = () => charger('/assets/koffi-annuaire.js?v=3', () => !!window.KoffiAnnuaire);
 
   /* ── Conseiller de l'Annuaire : monté sur l'onglet Annuaire seulement ── */
   let enCours = false;

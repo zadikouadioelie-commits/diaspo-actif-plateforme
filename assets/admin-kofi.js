@@ -27,7 +27,8 @@
     gratuit: 'Tuteur — questions offertes (sans Premium)', apercu: 'Aperçu (formateurs et administration)', apercu_gratuit: 'Aperçu (formateurs et administration)',
     eleve_mensuel: 'Tuteur — crédit mensuel Premium', eleve_achat: 'Tuteur — crédit acheté', eleve_illimite: 'Tuteur — compte illimité', eleve_refus: 'Tuteur — refus du fournisseur',
     createur_offert: 'Assistant de création — messages offerts', createur_mensuel: 'Assistant de création — crédit mensuel Premium', createur_achat: 'Assistant de création — crédit acheté', createur_illimite: 'Assistant de création — compte illimité', createur_refus: 'Assistant de création — refus du fournisseur',
-    annuaire_mensuel: 'Conseiller de l\'Annuaire — crédit mensuel Premium', annuaire_achat: 'Conseiller de l\'Annuaire — crédit acheté', annuaire_illimite: 'Conseiller de l\'Annuaire — compte illimité', annuaire_refus: 'Conseiller de l\'Annuaire — refus du fournisseur', annuaire_illisible: 'Conseiller de l\'Annuaire — réponse illisible'
+    annuaire_mensuel: 'Conseiller de l\'Annuaire — crédit mensuel Premium', annuaire_achat: 'Conseiller de l\'Annuaire — crédit acheté', annuaire_illimite: 'Conseiller de l\'Annuaire — compte illimité', annuaire_refus: 'Conseiller de l\'Annuaire — refus du fournisseur', annuaire_illisible: 'Conseiller de l\'Annuaire — réponse illisible',
+    admin_mensuel: 'Assistant de l\'administrateur — crédit mensuel Premium', admin_achat: 'Assistant de l\'administrateur — crédit acheté', admin_illimite: 'Assistant de l\'administrateur — compte illimité', admin_refus: 'Assistant de l\'administrateur — refus du fournisseur', admin_illisible: 'Assistant de l\'administrateur — réponse illisible'
   };
   const TYPES_BUDGET = { recharge: 'Recharge', ajustement: 'Ajustement' };
 
@@ -67,6 +68,12 @@
       { cle: 'annuaire_max_sortie_tokens', lib: 'Longueur maximale d\'une réponse', unite: 'jetons' },
       { cle: 'annuaire_nb_candidats', lib: 'Profils examinés à chaque recherche', unite: 'profils', aide: 'Plus de profils = meilleures propositions, mais plus de jetons à payer.' },
       { cle: 'plafond_jour_annuaire', lib: 'Messages par jour et par compte (plafond absolu)', unite: 'messages', aide: 'Protège la réserve contre un usage abusif.' },
+      { cle: 'plafond_jour_liste_annuaire', lib: 'Listes de comptes par jour et par compte', unite: 'listes', aide: '« Fais-moi la liste de… » (30 profils au plus). Limite le moissonnage de l\'Annuaire.' },
+    ] },
+    { titre: '🛠️ Assistant de l\'administrateur', note: 'Koffi aide les administrateurs : chiffres globaux de la plateforme, ouverture des modules, notifications aux membres et tâches programmées (Autonomie ou validation par l\'administrateur). Il ne voit que des chiffres agrégés, jamais de nom ni d\'e-mail.', champs: [
+      { cle: 'admin_max_message_caracteres', lib: 'Longueur maximale d\'un message', unite: 'caractères' },
+      { cle: 'admin_max_sortie_tokens', lib: 'Longueur maximale d\'une réponse', unite: 'jetons' },
+      { cle: 'plafond_jour_admin', lib: 'Messages par jour et par administrateur (plafond absolu)', unite: 'messages', aide: 'Protège la réserve contre un usage abusif.' },
     ] },
     { titre: '🛡️ Plafonds et limites', champs: [
       { cle: 'plafond_jour_par_eleve', lib: 'Questions par jour et par élève', unite: 'questions', aide: 'Protège la réserve contre un usage abusif ou automatisé.' },

@@ -66,6 +66,8 @@
     '.ka-voir{display:inline-block;margin-top:6px;font-size:12.5px;font-weight:800;color:#b84c1a;text-decoration:underline}',
     '.ka-pct{flex:none;align-self:flex-start;min-width:54px;text-align:center;font-weight:900;font-size:15px;color:#9a3412;background:#fff3e6;border:1.5px solid #fdba74;border-radius:99px;padding:3px 8px}',
     '.ka-type{display:inline-block;font-size:10.5px;font-weight:800;color:#475569;background:#e2e8f0;border-radius:99px;padding:0 7px;margin-bottom:3px}',
+    '.ka-props.liste{gap:5px}.ka-props.liste .ka-prop{align-items:center;gap:8px;padding:6px 9px;border-radius:11px}.ka-props.liste .ka-ph{width:34px;height:34px;font-size:14px}',
+    '.ka-props.liste .ka-pi b{font-size:13px}.ka-props.liste .ka-pi small{font-size:11.5px}.ka-props.liste .ka-pct{min-width:46px;font-size:13px;padding:2px 6px;align-self:center}.ka-props.liste .ka-voir{display:none}',
     '.ka-sug{display:flex;flex-wrap:wrap;gap:6px}.ka-sug button{background:#fff;border:1px solid #cbd5e1;border-radius:99px;padding:6px 11px;font-size:12.5px;cursor:pointer;color:#0D2B4E;text-align:left;font-family:inherit}',
     '.ka-sug button:hover{background:#fff7ed;border-color:#F26422}',
     '.ka-foot{flex:none;background:#fff;border-top:1px solid #e2e8f0;padding:8px 10px 10px}',
@@ -118,11 +120,11 @@
   function ouvrirCredit() { if (window.KoffiCredit) window.KoffiCredit.ouvrir({ lg: 'fr', page: S.opts && S.opts.telephone ? 'telephone' : 'annuaire' }); }
 
   /* ── Messages et propositions ── */
-  function carteProp(p) {
+  function carteProp(p, compact) {
     var a = document.createElement('a'); a.className = 'ka-prop'; a.href = lienSur(p.url); a.target = '_blank'; a.rel = 'noopener';
-    var photo = photoSure(p.photo_url);
-    var ph = photo ? '<img class="ka-ph" src="' + esc(photo) + '" alt="" loading="lazy" width="48" height="48">' : '<span class="ka-ph" aria-hidden="true">' + esc(String(p.nom || '?').charAt(0).toUpperCase()) + '</span>';
-    var raisons = (p.raisons || []).slice(0, 3).map(function (r) { return '<li>' + esc(r) + '</li>'; }).join('');
+    var photo = photoSure(p.photo_url), px = compact ? 34 : 48;
+    var ph = photo ? '<img class="ka-ph" src="' + esc(photo) + '" alt="" loading="lazy" width="' + px + '" height="' + px + '">' : '<span class="ka-ph" aria-hidden="true">' + esc(String(p.nom || '?').charAt(0).toUpperCase()) + '</span>';
+    var raisons = compact ? '' : (p.raisons || []).slice(0, 3).map(function (r) { return '<li>' + esc(r) + '</li>'; }).join('');
     a.innerHTML = ph + '<span class="ka-pi"><span class="ka-type">' + esc(T.types[p.type] || '') + '</span><b>' + esc(p.nom) + '</b><small>' + esc(p.sous_titre) + '</small>' + (raisons ? '<ul>' + raisons + '</ul>' : '') + '<span class="ka-voir">' + T.voir + ' →</span></span>' +
       '<span class="ka-pct" aria-label="' + T.correspondance + ' ' + esc(p.pourcentage) + ' %">' + esc(p.pourcentage) + ' %</span>';
     return a;
@@ -137,7 +139,7 @@
     }
     var corps = $('.ka-body'); corps.appendChild(el);
     if (m.role !== 'user' && m.propositions && m.propositions.length) {
-      var l = document.createElement('div'); l.className = 'ka-props'; m.propositions.forEach(function (p) { l.appendChild(carteProp(p)); }); corps.appendChild(l);
+      var l = document.createElement('div'); l.className = 'ka-props' + (m.liste ? ' liste' : ''); m.propositions.forEach(function (p) { l.appendChild(carteProp(p, !!m.liste)); }); corps.appendChild(l);
     }
     corps.scrollTop = corps.scrollHeight;
     return el;
