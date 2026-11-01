@@ -643,6 +643,24 @@ html, body { overflow-x:clip; }
    La carte Diaspo'Actif porte déjà son propre bandeau, collé à la photo de profil : le grand bandeau du haut est retiré (ses commandes sont déplacées
    sur celui de la carte, voir pvzDeplacerCommandesBandeau) et la carte porte seule le bandeau. */
 body.pp-carte-membre #p-banner { display:none !important; }
+/* Carte « Descriptif » (colonne de gauche de la boutique) : aperçu de 4 lignes + « En savoir plus ». Couleur du lien héritée du titre de la carte (lisible en thème clair comme en Nuit dorée). */
+.pvt-descriptif-clamp { display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden; }
+.pvt-descriptif-clamp.pvt-descriptif-ouvert { display:block; -webkit-line-clamp:unset; overflow:visible; }
+.pvt-descriptif-clamp p { margin:0 0 6px; }
+.pvt-descriptif-more { margin-top:6px; background:none; border:none; padding:6px 0; min-height:32px; font-size:12px; font-weight:700; color:inherit; text-decoration:underline; text-underline-offset:3px; cursor:pointer; font-family:inherit; }
+.pvt-descriptif-more:focus-visible { outline:3px solid var(--orange,#F26422); outline-offset:2px; }
+/* ===== COMPTES ORGANISME : PLUS DE GRAND BANDEAU (2026-11-01, demande explicite : « retire le grand bandeau en haut… tu laisses juste le petit rond et la cartouche avec les informations ») =====
+   Le bandeau (#p-banner, image de couverture ou image de la boutique) est masqué sur les deux onglets Profil / Boutique ; la classe est posée par renderVisitorProfile() à l'affichage de la cartouche.
+   La photo ronde chevauchait le bandeau (margin-top:-58px) : la cartouche descend donc d'autant pour que le rond ne remonte pas sous la barre du haut. */
+body.pp-sans-bandeau #p-banner { display:none !important; }
+body.pp-sans-bandeau .pvz-hero { margin-top:78px; }
+/* Logo en filigrane dans la cartouche (très léger) : conteneur découpé à part pour ne pas rogner le rond qui dépasse en haut de la cartouche. */
+.pvz-hero { position:relative; }
+.pvz-hero-fond { position:absolute; inset:0; overflow:hidden; border-radius:inherit; pointer-events:none; }
+.pvz-hero-fond img { position:absolute; right:-2%; top:50%; height:150%; width:auto; max-width:60%; object-fit:contain; transform:translateY(-50%); opacity:.05; filter:saturate(.8); }
+.pvz-hero-fond { z-index:0; }
+.pvz-hero > :not(.pvz-hero-fond) { position:relative; z-index:1; }
+@media (max-width:600px){ body.pp-sans-bandeau .pvz-hero { margin-top:64px; } .pvz-hero-fond img { height:110%; right:-12%; } }
 /* Colonnes latérales rendues à ce rôle (2026-10-09, demande explicite : « affiche les profils publics des utilisateurs de la même façon que ceux des initiatives, sur trois colonnes ») :
    la carte les remplit elle-même (opts.colGauche / opts.colDroite, assets/carte-diaspoactif.js) ; seul le grand bandeau du haut reste retiré. */
 /* Écran étroit (colonnes empilées) : sans cela, la biographie et les repères arriveraient APRÈS toute la liste des publications (plusieurs milliers de pixels plus bas).
@@ -2327,7 +2345,9 @@ function renderVisitorProfile() {
       <span class="pvz-rappel-fleche" aria-hidden="true">→</span>
     </button>` : '';
 
+  document.body.classList.add('pp-sans-bandeau');   /* grand bandeau du haut retiré (voir le style .pp-sans-bandeau) */
   const hero = `<div class="pvz-hero">
+    <div class="pvz-hero-fond" aria-hidden="true"><img src="${esc(profil.photo_url || 'assets/logo.png')}" alt=""></div>
     ${rappelPhoto}
     <div class="pvz-hero-top${rappelPhoto ? ' pvz-hero-top--sous-rappel' : ''}">
       <div class="pvz-avatar"${isOwn?' onclick="editAvatar()" style="cursor:pointer;" title="Changer la photo de profil"':''}>${avInner}${isOwn?'<span style="position:absolute;bottom:4px;right:4px;background:rgba(18,32,56,.75);color:#fff;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;">📷</span>':''}</div>
@@ -2977,6 +2997,20 @@ async function renderVitrineCols() {
       }</div>
     </div>` : '';
 
+  /* Descriptif (2026-11-01, demande explicite : « l'onglet Notre mission, modifie-le en descriptif, mets-le dans la colonne de gauche, un tout petit aperçu, et ajoute en savoir plus ») —
+     anciennement la section pleine largeur « 🎯 Notre mission » de renderVitrineVisitor(). Même champ (`mission`) et même éditeur (editVitrineText) ; seul l'affichage change :
+     aperçu de 4 lignes dans une carte compacte, bouton « En savoir plus » (bascule de classe, voir pvtToggleDescriptif) masqué quand le texte tient déjà en entier. */
+  const _modActifs = _vitrineInit.vitrine_modules_state || {};
+  const descriptifOn = _modActifs.mission ? !!_modActifs.mission.actif : true;
+  const descriptifTexte = _vitrineInit.mission || '';
+  const descriptifCard = ((descriptifTexte || isOwn) && descriptifOn) ? `<div class="pp-side-card" id="pv-descriptif">
+      <h4>📝 Descriptif${isOwn ? `<span style="display:flex;"><button class="edit-btn" onclick="editVitrineText('mission','Descriptif','Décrivez votre activité en quelques lignes…')" title="Modifier le descriptif">✏️</button></span>` : ''}</h4>
+      ${descriptifTexte
+        ? `<div id="pvt-descriptif-text" class="rich-content pvt-descriptif-clamp" style="margin:0;font-size:12.5px;line-height:1.55;">${renderRichText(descriptifTexte)}</div>
+           <button type="button" id="pvt-descriptif-more" class="pvt-descriptif-more" onclick="pvtToggleDescriptif(this)">En savoir plus ▾</button>`
+        : `<span style="font-size:12px;color:var(--muted);font-style:italic;">Aucun descriptif. Cliquez sur ✏️ pour en ajouter un.</span>`}
+    </div>` : '';
+
   /* ── COLONNE GAUCHE : réassurance + infos utiles ── */
   left.innerHTML = `
     <div class="pp-side-card">
@@ -2986,6 +3020,7 @@ async function renderVitrineCols() {
         ${prixMin != null ? `<div style="text-align:center;background:var(--bg);border-radius:8px;padding:9px;"><div style="font-size:18px;font-weight:800;">${prixMin}<span style="font-size:11px;">${esc2(devise)}</span></div><div style="font-size:10px;color:var(--muted);">À partir de</div></div>` : ''}
       </div>
     </div>
+    ${descriptifCard}
     ${servicesCard}
     <div class="pp-side-card">
       <h4>🔒 Acheter en confiance</h4>
@@ -3004,6 +3039,12 @@ async function renderVitrineCols() {
       ${wa ? `<a class="pp-join-btn" href="https://wa.me/${wa}" target="_blank">💬 WhatsApp</a>` : ''}
     </div>
   `;
+
+  /* « En savoir plus » seulement si l'aperçu est réellement tronqué (texte court = rien à développer). */
+  setTimeout(() => {
+    const t = document.getElementById('pvt-descriptif-text'), b = document.getElementById('pvt-descriptif-more');
+    if (t && b && t.clientHeight > 0 && t.scrollHeight <= t.clientHeight + 1) b.style.display = 'none';
+  }, 60);
 
   /* ── COLONNE DROITE : incitation à l'achat ── */
   right.innerHTML = `
@@ -3305,7 +3346,6 @@ async function renderVitrineVisitor(init) {
   // Sous-nav : uniquement les sections présentes ET actives (modules masqués exclus)
   const navItems = [];
   if ((init.description || isOwn) && modOn('a_propos'))      navItems.push(['presentation','Présentation']);
-  if ((init.mission || isOwn) && modOn('mission'))            navItems.push(['mission','Mission']);
   if ((init.historique || isOwn) && modOn('historique'))      navItems.push(['historique','Notre histoire']);
   if (aBandeFormations)                                       navItems.push(['formations-boutique','Formations']);
   if ((catalogues.length || isOwn) && modOn('catalogue'))     navItems.push(['collections','Catalogue']);
@@ -3417,12 +3457,7 @@ async function renderVitrineVisitor(init) {
      seul `historique` apparaissait côté téléphone, sous « Nos atouts » (assets/m-mod-profil.js).
      Même gabarit que la section Présentation ci-dessus : texte + bouton Modifier pour le
      titulaire, section masquée si vide et visiteur. */
-  const missionSec = ((init.mission || isOwn) && modOn('mission')) ? `<section id="pv-mission" class="pvt-section">
-    <div class="pvt-section-head" style="display:flex;justify-content:space-between;align-items:center;"><h3>🎯 Notre mission</h3>${isOwn?`<button onclick="editVitrineText('mission','Mission','Quelle est votre mission ?')" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">✏️ Modifier</button>`:''}</div>
-    <div class="pvt-section-body" style="padding:16px 20px;">
-      <div class="rich-content" style="margin:0;font-size:14px;">${init.mission ? renderRichText(init.mission) : `<span style="color:#94a3b8;font-style:italic;">Aucune mission renseignée. ${isOwn?'Cliquez sur Modifier pour en ajouter une.':''}</span>`}</div>
-    </div>
-  </section>` : '';
+  /* « Notre mission » (2026-11-01, demande explicite) : devenu la carte « 📝 Descriptif » de la colonne de gauche — voir renderVitrineCols(). Plus de section pleine largeur ici. */
 
   const historiqueSec = ((init.historique || isOwn) && modOn('historique')) ? `<section id="pv-historique" class="pvt-section">
     <div class="pvt-section-head" style="display:flex;justify-content:space-between;align-items:center;"><h3>📖 Notre histoire</h3>${isOwn?`<button onclick="editVitrineText('historique','Notre histoire','Votre histoire…')" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">✏️ Modifier</button>`:''}</div>
@@ -3956,7 +3991,7 @@ async function renderVitrineVisitor(init) {
     ['actualites', actualitesSec], ['galerie_videos', videosSec],
     ['portfolio', portfolioSec], ['reservation', reservationSec], ['equipe', equipeSec],
     ['realisations', realisationsSec], ['reseaux_sociaux', reseauxSociauxSec],
-    ['offre_flash', offreFlashSec], ['a_propos', presentation], ['mission', missionSec],
+    ['offre_flash', offreFlashSec], ['a_propos', presentation],
     ['historique', historiqueSec], ['expertise', expertiseSec],
     ['certifications', certificationsSec], ['vision_objectifs', visionSec], ['catalogue', collectionsSec],
     ['produits', produitsSec], ['pourquoi_choisir', pourquoiSec],
@@ -5106,6 +5141,15 @@ function pvtToggleDescription(btn) {
   btn.textContent = expanded ? 'Réduire ▴' : 'En savoir plus ▾';
 }
 
+/* Même bascule pour la carte « Descriptif » de la colonne de gauche (aperçu de 4 lignes ↔ texte entier). */
+function pvtToggleDescriptif(btn) {
+  const p = document.getElementById('pvt-descriptif-text');
+  if (!p) return;
+  const ouvert = p.classList.toggle('pvt-descriptif-ouvert');
+  btn.textContent = ouvert ? 'Réduire ▴' : 'En savoir plus ▾';
+  btn.setAttribute('aria-expanded', ouvert ? 'true' : 'false');
+}
+
 /* Pagination "3 par 3" (2026-09-19, demande explicite : "presente les articles 3 par 3 pour
    diminuer la longueure de scrool") — affiche un premier lot de 3 cartes plutôt que tout
    empiler d'un coup ; un bouton "Voir plus" en révèle 3 de plus à chaque clic. Le nombre déjà
@@ -5476,6 +5520,7 @@ async function editVitrineText(field, label, placeholder) {
       await vitrineSave({ [field]: val });
       _vitrineInit[field] = val;
       renderVitrineVisitor(_vitrineInit);
+      if (field === 'mission') renderVitrineCols();   /* le descriptif vit dans la colonne de gauche */
       ov.remove();
     } catch (e) { alert('Erreur : ' + (e.message || 'inconnue')); }
   };
