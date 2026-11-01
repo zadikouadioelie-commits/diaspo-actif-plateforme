@@ -48,7 +48,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,500;0,6..96,600;1,6..96,500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/assets/theme-nuit-doree.css?v=8">
-  <link rel="stylesheet" href="/assets/confidentialite-nuit-doree.css?v=1">
+  <link rel="stylesheet" href="/assets/confidentialite-nuit-doree.css?v=2">
 </head>
 <body class="nd">
 <div class="page">
@@ -74,12 +74,13 @@
   </header>
 
   <main class="container" style="padding-top:30px;padding-bottom:40px;">
+    <div id="ds-id-zone"></div>
     <div id="code-secret-zone"></div>
+    <div id="ds-histo-zone"></div>
     <div id="mes-infos-zone"></div>
     <div id="origine-institution-zone"></div>
     <div id="identite-verif-zone"></div>
     <div id="identite-publique-zone"></div>
-    <div id="ds-id-zone"></div>
 
     <h2 style="margin:0 0 4px;">Niveau de confidentialité des données</h2>
     <p class="sub">Dans Diaspo'Actif, les informations que vous partagez sont classées en trois catégories de visibilité.</p>
@@ -590,7 +591,7 @@ function urlBase64ToUint8Array(base64String) {
 
   const zone = document.getElementById('ds-id-zone');
   zone.innerHTML = `
-    <div class="codes-card">
+    <div class="codes-card cf-cadre cf-or">
       <h4>🔐 Code de Sécurité Diaspo'Actif (DS-ID)</h4>
       <p class="codes-sub">Votre signature numérique personnelle, permanente et non modifiable · jamais visible par un administrateur · utilisée pour signer des deals, partenariats et <strong>votes sécurisés</strong>. Consultable uniquement par vous, 45 secondes à la fois ; nouvelle consultation possible après 1 minute, puis 5 minutes entre chaque consultation suivante.</p>
       <div id="ds-masked-view">
@@ -621,6 +622,11 @@ function urlBase64ToUint8Array(base64String) {
         </div>
       </div>
     </div>
+  `;
+  /* L'historique est rangé à part (zone #ds-histo-zone, sous le code multi-connexion) pour que la carte bleue
+     reste juste à côté du DS-ID doré. */
+  const zoneHisto = document.getElementById('ds-histo-zone');
+  if (zoneHisto) zoneHisto.innerHTML = `
     <div class="codes-card">
       <h4>📋 Historique de sécurité</h4>
       <div id="ds-history-list"><p style="font-size:13px;color:var(--muted);">Chargement…</p></div>
@@ -1094,7 +1100,7 @@ function openDeleteAccountModal() {
   };
 }
 </script>
-<script src="assets/confidentialite-code-secret.js?v=1"></script>
+<script src="assets/confidentialite-code-secret.js?v=2"></script>
 <script src="assets/back-button.js"></script>
 </body>
 </html>
