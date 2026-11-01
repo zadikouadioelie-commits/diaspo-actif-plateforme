@@ -7383,6 +7383,8 @@ db.exec(`
   // source de vérité pour savoir quels modèles sont actifs — voir getVitrineTypesActifs().
   if (!initCols7.includes('vitrine_types_json'))              db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_types_json TEXT DEFAULT '[]'");
   if (!initCols7.includes('vitrine_modules_json'))            db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_modules_json TEXT DEFAULT '{}'");
+  // Bonus de la boutique (2026-11-01) : { rubrique: true } = éléments publiés pour les visiteurs.
+  if (!initCols7.includes('vitrine_bonus_json'))              db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_bonus_json TEXT DEFAULT '{}'");
   if (!initCols7.includes('vitrine_temoignages_json'))        db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_temoignages_json TEXT");
   if (!initCols7.includes('vitrine_vision_objectifs'))        db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_vision_objectifs TEXT");
   if (!initCols7.includes('vitrine_resultats_impact_json'))   db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_resultats_impact_json TEXT");

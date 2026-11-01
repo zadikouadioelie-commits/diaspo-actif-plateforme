@@ -4965,31 +4965,46 @@ const VITRINE_ADAPTATIONS = {
   temoignages:  [{ vers: "avis",         quoi: "Vos témoignages deviennent des avis." }],
 };
 
+/* TYPES DE BOUTIQUE (2026-11-01, demande explicite) : le TYPE est la forme globale de la boutique (présentation, couleurs,
+   icônes, rubriques principales) ; une boutique n'en a qu'UN. Sept types : Boutique de vente, Portfolio, Blog, Créateur de contenu,
+   Vente de formation, Événement, Projet / Impact. Les rubriques listées dans « optionnels » sont des OPTIONS : de simples lignes
+   horizontales ajoutées sous le contenu du type, qui ne changent pas son aspect. Tout contenu sans place dans le type choisi va dans
+   le « Bonus de la boutique » (voir calculerBonusVitrine). L'ordre des clés est l'ordre d'affichage dans les paramètres. */
 const VITRINE_TEMPLATES = {
+  commercial: {
+    label: "🛒 Boutique de vente", pour: "Entreprises, artisans, producteurs, créateurs souhaitant vendre en ligne",
+    actifs: ["a_propos","equipe","contact","produits","catalogue","services","demande_devis","avis","temoignages","actualites"],
+    optionnels: ["portfolio","realisations","formations_catalogue","evenements","galerie_photos","reservation","partenaires","resultats_impact"],
+  },
   portfolio: {
-    label: "🎨 Portfolio / Création", pour: "Photographes, artistes, designers, créateurs, artisans créatifs, réalisateurs",
+    label: "🎨 Portfolio", pour: "Photographes, artistes, designers, créateurs, artisans créatifs, réalisateurs",
     actifs: ["a_propos","contact","portfolio","galerie_photos","galerie_videos","realisations","temoignages","demande_devis","actualites"],
     optionnels: ["produits","reservation","evenements","formations_catalogue"],
+  },
+  blog: {
+    label: "✍️ Blog", pour: "Auteurs, journalistes, experts et organisations qui publient régulièrement",
+    actifs: ["a_propos","actualites","contact","reseaux_sociaux","temoignages"],
+    optionnels: ["galerie_photos","galerie_videos","portfolio","produits","formations_catalogue","evenements","equipe"],
+  },
+  createur: {
+    label: "🎬 Créateur de contenu", pour: "Vidéastes, podcasteurs, influenceurs, musiciens et artistes en ligne",
+    actifs: ["a_propos","galerie_videos","galerie_photos","portfolio","actualites","reseaux_sociaux","contact","temoignages","demande_partenariat"],
+    optionnels: ["produits","formations_catalogue","evenements","reservation"],
+  },
+  formation: {
+    label: "🎓 Vente de formation", pour: "Formateurs, centres de formation, programmes éducatifs",
+    actifs: ["a_propos","expertise","certifications","formations_catalogue","contact","temoignages","actualites"],
+    optionnels: ["produits","galerie_videos","evenements","portfolio"],
   },
   evenement: {
     label: "🎭 Événement", pour: "Festivals, conférences, rencontres, événements culturels, manifestations",
     actifs: ["a_propos","equipe","partenaires","evenements","galerie_photos","reservation","actualites","reseaux_sociaux"],
     optionnels: ["produits","documents"],
   },
-  commercial: {
-    label: "🛒 Commercial", pour: "Entreprises, artisans, producteurs, créateurs souhaitant vendre",
-    actifs: ["a_propos","equipe","contact","produits","catalogue","services","demande_devis","avis","temoignages","actualites"],
-    optionnels: ["galerie_photos","reservation","evenements","formations_catalogue"],
-  },
   projet: {
     label: "🌍 Projet / Impact", pour: "Projets sociaux, initiatives citoyennes, projets diaspora, projets territoriaux",
     actifs: ["a_propos","vision_objectifs","equipe","realisations","resultats_impact","besoins_projet","partenaires","actualites","galerie_photos","documents","contact","demande_partenariat"],
     optionnels: ["financement_participatif","evenements","formations_catalogue","produits"],
-  },
-  formation: {
-    label: "🎓 Formation", pour: "Formateurs, centres de formation, programmes éducatifs",
-    actifs: ["a_propos","expertise","certifications","formations_catalogue","contact","temoignages","actualites"],
-    optionnels: ["produits","galerie_videos","evenements"],
   },
 };
 
@@ -5001,11 +5016,15 @@ const VITRINE_TEMPLATES = {
    singulier (aucun trouvé côté affichage public à ce jour, mais coûte peu de le garder cohérent).
    Repli : une vitrine créée avant ce système n'a qu'un vitrine_type — jamais perdre ce choix. */
 function getVitrineTypesActifs(init, draft) {
+  /* Type UNIQUE (2026-11-01) : la sélection multiple est révoquée. Les anciennes boutiques à plusieurs types gardent le premier ;
+     leurs autres rubriques actives restent visibles comme options ou rejoignent le bonus (calculerBonusVitrine). La fonction rend
+     toujours un tableau (0 ou 1 élément) pour que les appelants existants continuent de fonctionner. */
   const d = draft || {};
+  const unique = d.type !== undefined ? d.type : init.vitrine_type;
+  if (unique && VITRINE_TEMPLATES[unique]) return [unique];
   const brut = d.types !== undefined ? d.types : safeParse(init.vitrine_types_json);
-  if (Array.isArray(brut) && brut.length) return brut.filter(t => VITRINE_TEMPLATES[t]);
-  const legacy = d.type !== undefined ? d.type : init.vitrine_type;
-  return legacy && VITRINE_TEMPLATES[legacy] ? [legacy] : [];
+  const premier = Array.isArray(brut) ? brut.filter(t => VITRINE_TEMPLATES[t])[0] : null;
+  return premier ? [premier] : [];
 }
 function unionModulesTypes(types) {
   const s = new Set();
@@ -10525,6 +10544,7 @@ route("GET", "/api/vitrines", async (req, res, params, body, query) => {
       id: r.id, owner_user_id: r.owner_user_id, slug: r.slug, nom: r.nom, type: r.type, domaine: r.domaine,
       domaines_secondaires: safeParseArray(r.domaines_secondaires_json), description: r.description,
       boutique_nom: r.boutique_nom || null, boutique_description: r.boutique_description || null,
+      vitrine_type: getVitrineTypesActifs(r, null)[0] || null,
       vitrine_theme: r.vitrine_theme || 'bordeaux',
       slogan: r.slogan, logo_url: r.logo_url, vitrine_banniere_url: r.vitrine_banniere_url,
       pays: r.pays, ville: r.ville,
@@ -10723,6 +10743,14 @@ route("GET", "/api/initiatives/:id", async (req, res, params, body, query) => {
     row.avancement_pourcentage = null;
   }
 
+  /* Bonus de la boutique : le propriétaire voit tout ; les visiteurs seulement ce qui a été publié. Calculé depuis la ligne brute
+     de la base, pas depuis « row » (déjà assaini pour le public). */
+  try {
+    const moiBonus = await getCurrentUser(req);
+    const brut = await db.prepare("SELECT * FROM initiatives WHERE id=?").get(row.id);
+    const estProprio = !!(moiBonus && Number(moiBonus.id) === Number(row.owner_user_id));
+    row.vitrine_bonus = await calculerBonusVitrine(brut, { draft: false, publieSeulement: !estProprio });
+  } catch (e) { row.vitrine_bonus = []; }
   sendJSON(res, 200, { initiative: row });
 });
 
@@ -10775,6 +10803,55 @@ async function moduleAContenu(init, cle) {
   }
   return false;
 }
+
+/* BONUS DE LA BOUTIQUE (2026-11-01) : contenu réel qui n'a pas de place dans le type choisi (ni rubrique principale, ni option).
+   Il n'est jamais supprimé. Le propriétaire le retrouve toujours dans les paramètres ; les visiteurs ne voient que les éléments qu'il a
+   publiés un par un (vitrine_bonus_json : { rubrique: true }). Les rubriques stockées en tables (produits, catalogue, avis) restent
+   gérées depuis leurs propres écrans : elles sont listées mais non publiables ici. */
+async function calculerBonusVitrine(init, { draft = false, publieSeulement = false } = {}) {
+  const types = getVitrineTypesActifs(init, draft ? resolveVitrineDraft(init) : null);
+  const tpl = VITRINE_TEMPLATES[types[0]];
+  if (!tpl) return [];
+  const futurs = new Set([...(tpl.actifs || []), ...(tpl.optionnels || [])]);
+  const drapeaux = safeParse(init.vitrine_bonus_json) || {};
+  const sortie = [];
+  for (const cle of Object.keys(VITRINE_CONTENU_MODULE)) {
+    if (futurs.has(cle)) continue;
+    const def = VITRINE_CONTENU_MODULE[cle];
+    if (!(await moduleAContenu(init, cle))) continue;
+    const publiable = !def.table;
+    const publie = publiable && !!drapeaux[cle];
+    if (publieSeulement && !publie) continue;
+    const item = { cle, label: def.label, publiable, publie };
+    if (publiable) { item.contenu = {}; for (const champ of def.champs || []) item.contenu[champ] = init[champ] === undefined ? null : init[champ]; }
+    sortie.push(item);
+  }
+  return sortie;
+}
+
+route("GET", "/api/initiatives/:id/vitrine/bonus", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT * FROM initiatives WHERE id=?").get(params.id);
+  if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
+  if (Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  sendJSON(res, 200, { bonus: await calculerBonusVitrine(init, { draft: true }) });
+});
+
+route("PUT", "/api/initiatives/:id/vitrine/bonus", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT * FROM initiatives WHERE id=?").get(params.id);
+  if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
+  if (Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const cle = String(body.cle || "");
+  const def = VITRINE_CONTENU_MODULE[cle];
+  if (!def || def.table) return sendJSON(res, 400, { error: "Cette rubrique ne peut pas être publiée dans le bonus." });
+  const drapeaux = safeParse(init.vitrine_bonus_json) || {};
+  if (body.publie) drapeaux[cle] = true; else delete drapeaux[cle];
+  await db.prepare("UPDATE initiatives SET vitrine_bonus_json=? WHERE id=?").run(JSON.stringify(drapeaux), init.id);
+  sendJSON(res, 200, { ok: true, bonus: await calculerBonusVitrine({ ...init, vitrine_bonus_json: JSON.stringify(drapeaux) }, { draft: true }) });
+});
 
 /* GET /api/initiatives/:id/vitrine/analyser-type?type= — que deviendrait mon contenu ?
    Interrogé AVANT de confirmer : l'utilisateur doit voir ce qu'il risque avant d'agir,
@@ -10841,6 +10918,7 @@ async function sauvegarderVitrine(init, typeAvant, typeApres, mode) {
    n'est jamais retiré — donc pas d'analyse ni de confirmation nécessaires, contrairement à
    POST .../changer-type (remplacement) ci-dessus. */
 route("POST", "/api/initiatives/:id/vitrine/type/ajouter", async (req, res, params, body) => {
+  return sendJSON(res, 410, { error: "Une boutique n'a plus qu'un seul type. Changez de type, puis ajoutez des options." });
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const init = await db.prepare("SELECT * FROM initiatives WHERE id=?").get(params.id);
@@ -10920,6 +10998,7 @@ route("GET", "/api/initiatives/:id/vitrine/analyser-retrait", async (req, res, p
 });
 
 route("POST", "/api/initiatives/:id/vitrine/type/retirer", async (req, res, params, body) => {
+  return sendJSON(res, 410, { error: "Une boutique n'a plus qu'un seul type. Changez de type, puis ajoutez des options." });
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const init = await db.prepare("SELECT * FROM initiatives WHERE id=?").get(params.id);
@@ -11078,7 +11157,7 @@ route("POST", "/api/initiatives/:id/vitrine/changer-type", async (req, res, para
       if (futurs.has(cle)) continue;
       if (!(await moduleAContenu(init, cle))) continue;
       const piste = (VITRINE_ADAPTATIONS[cle] || []).find(a => futurs.has(a.vers));
-      if (!piste) { journal.push("« " + VITRINE_CONTENU_MODULE[cle].label + " » conservé en base, sans emplacement dans ce type."); continue; }
+      if (!piste) { journal.push("« " + VITRINE_CONTENU_MODULE[cle].label + " » → Bonus de la boutique (conservé, sans mise en avant)."); continue; }
       const fait = await convertirContenu(init, cle, piste.vers);
       journal.push(fait ? "« " + VITRINE_CONTENU_MODULE[cle].label + " » → " + fait : "« " + VITRINE_CONTENU_MODULE[cle].label + " » conservé en base.");
     }
@@ -11086,8 +11165,14 @@ route("POST", "/api/initiatives/:id/vitrine/changer-type", async (req, res, para
 
   /* Le type ne s'applique qu'au BROUILLON : la vitrine publique ne change qu'à la
      publication, ce qui laisse le temps de vérifier l'aperçu (§5). */
-  const nouveauDraft = { ...draft, type: nouveau, modules: draft.modules || safeParse(init.vitrine_modules_json) || {} };
+  const nouveauDraft = { ...draft, type: nouveau, types: [nouveau], modules: draft.modules || safeParse(init.vitrine_modules_json) || {} };
   for (const m of tpl.actifs || []) nouveauDraft.modules[m] = true;
+  /* Rubriques sans place dans le nouveau type : elles quittent la présentation et vont dans « Bonus de la boutique »
+     (contenu conservé, jamais supprimé, non mis en avant, masqué aux visiteurs tant que le propriétaire ne l'a pas publié). */
+  for (const cle of Object.keys(VITRINE_CONTENU_MODULE)) {
+    if (futurs.has(cle)) continue;
+    if (await moduleAContenu(init, cle)) nouveauDraft.modules[cle] = false;
+  }
   await db.prepare("UPDATE initiatives SET vitrine_draft_json=? WHERE id=?").run(JSON.stringify(nouveauDraft), init.id);
   /* Le changement de type peut effacer/convertir du contenu public (mode "zero" ou adaptation) —
      compte comme une modification de la vitrine pour le tri "Dernière mise à jour". */

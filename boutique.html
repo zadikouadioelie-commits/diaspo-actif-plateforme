@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<script src="/assets/m-redirect.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Diaspo'Actif — Boutique</title>
+<meta name="description" content="Boutique de commerce et de vente sur Diaspo'Actif : produits, services, formations et accompagnements de la diaspora.">
+<link rel="icon" href="/assets/logo.png">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0A1B3C">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;0,800;1,500;1,600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/boutique-commerce.css?v=1">
+<!-- Boutique « commerce / vente » (2026-11-01, demande explicite : nouvelle présentation de toutes les boutiques de type commercial).
+     Page entièrement rendue par assets/boutique-commerce.js ; les données viennent des API existantes
+     (initiatives, produits, catalogues, avis, événements, formations, panier). -->
+</head>
+<body class="bq">
+<div id="bq-app" aria-live="polite"><p class="bq-chargement">Chargement de la boutique…</p></div>
+<div id="bq-toast" class="bq-toast" role="status" aria-live="polite"></div>
+<div id="bq-modal" class="bq-modal" hidden></div>
+<script src="/assets/boutique-commerce.js?v=1"></script>
+</body>
+</html>

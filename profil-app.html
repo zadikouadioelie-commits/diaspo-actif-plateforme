@@ -1219,6 +1219,15 @@ async function init() {
        détecte #vitrine et bascule dessus naturellement, sans risque d'être écrasé après coup. */
     if (new URLSearchParams(location.search).get('vitrine') === '1') {
       history.replaceState(null, '', window.location.pathname + window.location.search + '#vitrine');
+      /* Boutique de type « Boutique de vente » (2026-11-01) : les visiteurs voient la présentation dédiée (boutique.html).
+         Le propriétaire garde la vue d'édition ; les retours de paiement et l'aperçu de brouillon restent ici. */
+      const _qb = new URLSearchParams(location.search);
+      if (!isOwn && profil.initiative_id && !_qb.get('paiement') && !_qb.get('preview')) {
+        try {
+          const _ib = (await api('GET', '/initiatives/' + profil.initiative_id)).initiative;
+          if (_ib && _ib.vitrine_type === 'commercial') { location.replace('boutique.html?id=' + encodeURIComponent(profil.initiative_id)); return; }
+        } catch (e) { /* repli : l'ancienne vue boutique */ }
+      }
     }
     /* Bouton "Adhérer" (Associations/ONG) — même route que initiative.html, statut récupéré
        avant le rendu pour afficher directement le bon état (déjà membre / demande envoyée). */

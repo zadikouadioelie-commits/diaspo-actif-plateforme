@@ -954,6 +954,7 @@ const COLONNES_MIGRATION = [
     // ci-dessus reste synchronisé sur le premier type pour compat affichage.
     ['initiatives', 'vitrine_types_json', "TEXT DEFAULT '[]'"],
     ['initiatives', 'vitrine_modules_json', "TEXT DEFAULT '{}'"],
+    ['initiatives', 'vitrine_bonus_json', "TEXT DEFAULT '{}'"],
     ['initiatives', 'vitrine_temoignages_json', 'TEXT'],
     ['initiatives', 'vitrine_vision_objectifs', 'TEXT'],
     ['initiatives', 'vitrine_resultats_impact_json', 'TEXT'],
