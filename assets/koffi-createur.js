@@ -94,6 +94,7 @@
       '.kc-bar{display:flex;gap:6px;flex-wrap:wrap}',
       '.kc-doss{background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden}',
       '.kc-dh{display:flex;align-items:center;gap:4px;padding:8px 10px;background:#f1f5f9}.kc-dh button.kc-tog{flex:1;min-width:0;text-align:left;background:none;border:0;font:700 13.5px system-ui,sans-serif;color:#0F2342;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+      '.kc-dlg{position:absolute;inset:0;z-index:5;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;padding:16px;border-radius:inherit}.kc-dlg-c{background:#fff;border-radius:12px;padding:16px;width:100%;max-width:340px;box-shadow:0 10px 30px rgba(0,0,0,.3);color:#1e293b;font:14px system-ui,sans-serif}.kc-dlg-c p{margin:0 0 10px;line-height:1.4}.kc-dlg-c input{width:100%;box-sizing:border-box;padding:9px 10px;border:1.5px solid #cbd5e1;border-radius:8px;font:16px system-ui,sans-serif;margin-bottom:10px}.kc-dlg-b{display:flex;gap:8px;justify-content:flex-end}',
       '.kc-mini{background:none;border:0;cursor:pointer;font-size:14px;padding:3px 5px;border-radius:6px;color:#475569}.kc-mini:hover{background:#e2e8f0}',
       '.kc-disc{display:flex;align-items:center;gap:4px;padding:7px 10px;border-top:1px solid #eef2f7}.kc-disc.actuelle{background:#fff7e0}',
       '.kc-disc button.kc-ouvrir{flex:1;min-width:0;text-align:left;background:none;border:0;cursor:pointer;color:#1e293b;font:13px system-ui,sans-serif}.kc-disc .t{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.kc-disc small{display:block;color:#64748b;font-size:11px}',
@@ -228,7 +229,7 @@
       var c = carteEtat(T.majTitre, T.majTexte); var l = document.createElement('label'); l.innerHTML = '<input type="checkbox"> ' + esc(T.majCase); c.appendChild(l);
       var b = document.createElement('button'); b.type = 'button'; b.className = 'kc-ok'; b.textContent = T.majBtn; b.disabled = true; c.appendChild(b);
       l.querySelector('input').addEventListener('change', function (ev) { b.disabled = !ev.target.checked; });
-      b.addEventListener('click', function () { b.disabled = true; api('POST', '/api/kofi/majorite', { confirme: true }).then(charger).catch(function (er) { b.disabled = false; alert(er.message); }); });
+      b.addEventListener('click', function () { b.disabled = true; api('POST', '/api/kofi/majorite', { confirme: true }).then(charger).catch(function (er) { b.disabled = false; avertir(er.message); }); });
       bloquer(true); return;
     }
     if (e === 'mineur' || e === 'pays' || e === 'desactive' || e === 'indisponible') { carteEtat('Koffi', T[e]); bloquer(true); return; }
@@ -236,14 +237,23 @@
   }
 
   /* Présentation de Koffi à la première connexion (assets/koffi-presentation.js, chargé au besoin) : une scène jouée, puis la discussion habituelle. Si le fichier ne charge pas, on passe. */
-  var presEnCours = false;
+  var presEnCours = false, presScene = null;
+  /* Si la personne va vers la liste des dossiers ou ouvre une discussion pendant la scène, on l'arrête : sinon « presEnCours » restait vrai
+     et rendreChat() ignorait ensuite tous les appuis (le « ＋ » d'un dossier ne réagissait plus). La scène sera rejouée plus tard. */
+  function quitterPresentation() {
+    if (!presEnCours) return;
+    presEnCours = false;
+    if (presScene && presScene.arreter) { try { presScene.arreter(); } catch (_) {} }
+    presScene = null;
+    if (etat) etat.presentation_vue = true;
+  }
   function jouerPresentation(messages) {
     if (presEnCours) return;
     presEnCours = true; E.body.innerHTML = ''; E.foot.style.display = 'none'; pastilleCredits();
     var fin = function (ok) {
       if (!ok || !window.KoffiPresentation) { presEnCours = false; if (etat) etat.presentation_vue = true; rendreChat(messages); return; }
-      window.KoffiPresentation.monter(E.body, { role: 'createur', lg: 'fr', onFin: function () {
-        presEnCours = false; if (etat) etat.presentation_vue = true;
+      presScene = window.KoffiPresentation.monter(E.body, { role: 'createur', lg: 'fr', onFin: function () {
+        presEnCours = false; presScene = null; if (etat) etat.presentation_vue = true;
         api('POST', '/api/kofi/presentation', { portee: 'createur' }).catch(function () { /* sera rejouée : sans gravité */ });
         rendreChat(messages); if (E.input && !E.input.disabled && !petitEcran()) E.input.focus();
       } });
@@ -274,13 +284,16 @@
 
   /* Liste : dossiers (dépliables) et discussions hors dossier. */
   function rendreListe() {
+    quitterPresentation();
     E.body.innerHTML = ''; E.foot.style.display = 'none'; majOu();
     var barre = document.createElement('div'); barre.className = 'kc-bar';
     var bn = document.createElement('button'); bn.type = 'button'; bn.className = 'kc-ok'; bn.textContent = T.nouvelleDisc; bn.addEventListener('click', function () { nouvelleDiscussion(null); });
     var bd = document.createElement('button'); bd.type = 'button'; bd.className = 'kc-ko'; bd.textContent = T.nouveauDossier;
     bd.addEventListener('click', function () {
-      var nom = prompt(T.nomDossier); if (!nom || !nom.trim()) return;
-      api('POST', '/api/kofi/createur/dossiers', { formation_id: fid(), nom: nom.trim() }).then(function (r) { ouverts[r.id] = true; return rafraichir(); }).then(rendreListe).catch(function (er) { alert(er.message); });
+      demander(T.nomDossier, '').then(function (nom) {
+        if (!nom || !nom.trim()) return;
+        return api('POST', '/api/kofi/createur/dossiers', { formation_id: fid(), nom: nom.trim() }).then(function (r) { ouverts[r.id] = true; return rafraichir(); }).then(rendreListe);
+      }).catch(function (er) { avertir(er.message); });
     });
     barre.appendChild(bn); barre.appendChild(bd); E.body.appendChild(barre);
     var dossiers = etat.dossiers || [], disc = etat.discussions || [];
@@ -292,8 +305,8 @@
       tog.addEventListener('click', function () { ouverts[d.id] = !ouverts[d.id]; rendreListe(); });
       h.appendChild(tog);
       h.appendChild(mini('＋', 'Nouvelle discussion dans ce dossier', function () { nouvelleDiscussion(d.id); }));
-      h.appendChild(mini('✏️', T.renommer, function () { var n = prompt(T.nomDossier, d.nom); if (!n || !n.trim()) return; api('PATCH', '/api/kofi/createur/dossiers/' + d.id, { nom: n.trim() }).then(rafraichir).then(rendreListe).catch(function (er) { alert(er.message); }); }));
-      h.appendChild(mini('🗑️', T.supprimer, function () { if (!confirm(T.confirmDossier(contenu.length))) return; api('DELETE', '/api/kofi/createur/dossiers/' + d.id).then(function () { if (contenu.some(function (c) { return c.id === conversationId; })) { conversationId = null; dossierId = null; titreCourant = ''; } return rafraichir(); }).then(rendreListe).catch(function (er) { alert(er.message); }); }));
+      h.appendChild(mini('✏️', T.renommer, function () { demander(T.nomDossier, d.nom).then(function (n) { if (!n || !n.trim()) return; return api('PATCH', '/api/kofi/createur/dossiers/' + d.id, { nom: n.trim() }).then(rafraichir).then(rendreListe); }).catch(function (er) { avertir(er.message); }); }));
+      h.appendChild(mini('🗑️', T.supprimer, function () { confirmer(T.confirmDossier(contenu.length)).then(function (oui) { if (!oui) return; return api('DELETE', '/api/kofi/createur/dossiers/' + d.id).then(function () { if (contenu.some(function (c) { return c.id === conversationId; })) { conversationId = null; dossierId = null; titreCourant = ''; } return rafraichir(); }).then(rendreListe); }).catch(function (er) { avertir(er.message); }); }));
       bloc.appendChild(h);
       if (ouverts[d.id]) { if (!contenu.length) { var v = document.createElement('div'); v.className = 'kc-vide'; v.textContent = T.aucune; bloc.appendChild(v); } contenu.forEach(function (c) { bloc.appendChild(ligneDisc(c, dossiers)); }); }
       E.body.appendChild(bloc);
@@ -303,6 +316,35 @@
     if (!libres.length) { var v2 = document.createElement('div'); v2.className = 'kc-vide'; v2.textContent = T.aucune; E.body.appendChild(v2); }
     else { var bl = document.createElement('div'); bl.className = 'kc-doss'; libres.forEach(function (c) { bl.appendChild(ligneDisc(c, dossiers)); }); E.body.appendChild(bl); }
   }
+  /* Fenêtres de dialogue intégrées au panneau de Koffi : remplacent prompt()/confirm()/alert() du navigateur, qui sont bloqués
+     sans bruit dans certains cas (« empêcher cette page de créer d'autres boîtes de dialogue », appli installée, navigateur intégré). */
+  function dialogue(msg, o) {
+    return new Promise(function (ok) {
+      var fond = document.createElement('div'); fond.className = 'kc-dlg';
+      var carte = document.createElement('div'); carte.className = 'kc-dlg-c'; carte.setAttribute('role', 'dialog'); carte.setAttribute('aria-modal', 'true');
+      var t = document.createElement('p'); t.textContent = msg; carte.appendChild(t);
+      var champ = null;
+      if (o.champ) { champ = document.createElement('input'); champ.type = 'text'; champ.maxLength = 120; champ.value = o.valeur || ''; carte.appendChild(champ); }
+      var bar = document.createElement('div'); bar.className = 'kc-dlg-b';
+      var fini = false;
+      function fermerDlg(v) { if (fini) return; fini = true; document.removeEventListener('keydown', clav, true); fond.remove(); ok(v); }
+      var rien = o.champ ? null : false;
+      if (!o.sansAnnuler) { var an = document.createElement('button'); an.type = 'button'; an.className = 'kc-ko'; an.textContent = 'Annuler'; an.addEventListener('click', function () { fermerDlg(rien); }); bar.appendChild(an); }
+      var bo = document.createElement('button'); bo.type = 'button'; bo.className = 'kc-ok'; bo.textContent = 'OK';
+      bo.addEventListener('click', function () { fermerDlg(o.champ ? champ.value : true); }); bar.appendChild(bo);
+      carte.appendChild(bar); fond.appendChild(carte);
+      function clav(e) {
+        if (e.key === 'Escape') { e.stopPropagation(); fermerDlg(o.sansAnnuler ? true : rien); }
+        else if (e.key === 'Enter' && (champ || e.target === bo)) { e.preventDefault(); e.stopPropagation(); fermerDlg(o.champ ? champ.value : true); }
+      }
+      document.addEventListener('keydown', clav, true);
+      (E.panel || document.body).appendChild(fond);
+      setTimeout(function () { if (champ) { champ.focus(); champ.select(); } else bo.focus(); }, 0);
+    });
+  }
+  function demander(msg, valeur) { return dialogue(msg, { champ: true, valeur: valeur }); }
+  function confirmer(msg) { return dialogue(msg, {}); }
+  function avertir(msg) { return dialogue(String(msg), { sansAnnuler: true }); }
   function mini(txt, titre, fn) { var b = document.createElement('button'); b.type = 'button'; b.className = 'kc-mini'; b.textContent = txt; b.title = titre; b.setAttribute('aria-label', titre); b.addEventListener('click', function (e) { e.stopPropagation(); fn(); }); return b; }
   function ligneDisc(c, dossiers) {
     var l = document.createElement('div'); l.className = 'kc-disc' + (c.id === conversationId ? ' actuelle' : '');
@@ -313,18 +355,18 @@
     var o0 = document.createElement('option'); o0.value = ''; o0.textContent = T.deplacer; sel.appendChild(o0);
     var oh = document.createElement('option'); oh.value = '0'; oh.textContent = '— ' + T.horsDossier; sel.appendChild(oh);
     dossiers.forEach(function (d) { var op = document.createElement('option'); op.value = String(d.id); op.textContent = '📁 ' + d.nom; sel.appendChild(op); });
-    sel.addEventListener('change', function () { if (sel.value === '') return; var cible = sel.value === '0' ? null : Number(sel.value); api('PATCH', '/api/kofi/createur/conversations/' + c.id, { dossier_id: cible }).then(function () { if (c.id === conversationId) dossierId = cible; if (cible) ouverts[cible] = true; return rafraichir(); }).then(rendreListe).catch(function (er) { alert(er.message); }); });
+    sel.addEventListener('change', function () { if (sel.value === '') return; var cible = sel.value === '0' ? null : Number(sel.value); api('PATCH', '/api/kofi/createur/conversations/' + c.id, { dossier_id: cible }).then(function () { if (c.id === conversationId) dossierId = cible; if (cible) ouverts[cible] = true; return rafraichir(); }).then(rendreListe).catch(function (er) { avertir(er.message); }); });
     l.appendChild(sel);
-    l.appendChild(mini('✏️', T.renommer, function () { var n = prompt(T.nomDisc, c.titre); if (!n || !n.trim()) return; api('PATCH', '/api/kofi/createur/conversations/' + c.id, { titre: n.trim() }).then(function () { if (c.id === conversationId) titreCourant = n.trim(); return rafraichir(); }).then(rendreListe).catch(function (er) { alert(er.message); }); }));
-    l.appendChild(mini('🗑️', T.supprimer, function () { if (!confirm(T.confirmSuppr)) return; api('DELETE', '/api/kofi/createur/conversations/' + c.id).then(function () { if (c.id === conversationId) { conversationId = null; titreCourant = ''; } return rafraichir(); }).then(rendreListe).catch(function (er) { alert(er.message); }); }));
+    l.appendChild(mini('✏️', T.renommer, function () { demander(T.nomDisc, c.titre).then(function (n) { if (!n || !n.trim()) return; return api('PATCH', '/api/kofi/createur/conversations/' + c.id, { titre: n.trim() }).then(function () { if (c.id === conversationId) titreCourant = n.trim(); return rafraichir(); }).then(rendreListe); }).catch(function (er) { avertir(er.message); }); }));
+    l.appendChild(mini('🗑️', T.supprimer, function () { confirmer(T.confirmSuppr).then(function (oui) { if (!oui) return; return api('DELETE', '/api/kofi/createur/conversations/' + c.id).then(function () { if (c.id === conversationId) { conversationId = null; titreCourant = ''; } return rafraichir(); }).then(rendreListe); }).catch(function (er) { avertir(er.message); }); }));
     return l;
   }
   /* Nouvelle discussion : rien n'est créé côté serveur avant le premier message (pas de discussion vide qui traîne). */
-  function nouvelleDiscussion(dossier) { conversationId = null; dossierId = dossier || null; titreCourant = ''; vue = 'chat'; rendreChat([]); E.input.focus(); }
+  function nouvelleDiscussion(dossier) { quitterPresentation(); conversationId = null; dossierId = dossier || null; titreCourant = ''; vue = 'chat'; rendreChat([]); E.input.focus(); }
   function ouvrirDiscussion(id) {
     api('GET', '/api/kofi/createur/conversations/' + id).then(function (c) {
       conversationId = c.id; dossierId = c.dossier_id; titreCourant = c.titre; vue = 'chat'; rendreChat(c.messages); E.input.focus();
-    }).catch(function (er) { alert(er.message); });
+    }).catch(function (er) { avertir(er.message); });
   }
   function rafraichir() {
     return api('GET', '/api/kofi/createur/etat?formation_id=' + encodeURIComponent(fid())).then(function (d) { if (etat) { etat.dossiers = d.dossiers; etat.discussions = d.discussions; etat.credits = d.credits; etat.etat = d.etat; } });
@@ -361,7 +403,7 @@
       api('POST', '/api/kofi/createur/actions/' + a.id + '/appliquer', {}).then(function (r) { fin(r.action); if (opts && opts.apresMission) opts.apresMission(r.action); })
         .catch(function (er) { ok.disabled = false; ko.disabled = false; ok.textContent = T.appliquer; var m = document.createElement('div'); m.className = 'kc-st ko'; m.textContent = er.message; row.appendChild(m); });
     });
-    ko.addEventListener('click', function () { ko.disabled = true; api('POST', '/api/kofi/createur/actions/' + a.id + '/annuler', {}).then(function () { fin({ statut: 'annulee' }); }).catch(function (er) { ko.disabled = false; alert(er.message); }); });
+    ko.addEventListener('click', function () { ko.disabled = true; api('POST', '/api/kofi/createur/actions/' + a.id + '/annuler', {}).then(function () { fin({ statut: 'annulee' }); }).catch(function (er) { ko.disabled = false; avertir(er.message); }); });
   }
 
   /* Crédit épuisé : la carte explique et ouvre la fenêtre du crédit (offres, consentement exprès, paiement Stripe). Un Premium retrouve son crédit du mois le mois suivant. */
@@ -387,7 +429,7 @@
   function envoyer() {
     if (occupe) return;
     var texte = E.input.value.trim(); if (!texte) return;
-    if (etat && texte.length > etat.max_message) { alert(T.trop + ' (' + etat.max_message + ' caractères au maximum)'); return; }
+    if (etat && texte.length > etat.max_message) { avertir(T.trop + ' (' + etat.max_message + ' caractères au maximum)'); return; }
     if (E.arreterMicro) E.arreterMicro();
     occupe = true; E.send.disabled = true; E.input.value = ''; E.input.style.height = 'auto';
     var sug = E.body.querySelector('.kc-sug'); if (sug) sug.remove();
@@ -418,7 +460,7 @@
   function retourPaiement() {
     if (!window.KoffiCredit) return;
     window.KoffiCredit.retourPaiement({ lg: 'fr', onFin: function (statut, msg) {
-      if (typeof window.showMsg === 'function') window.showMsg(msg, statut === 'ok' ? 'success' : (statut === 'annule' ? 'warning' : 'info')); else if (statut !== 'attente') alert(msg);
+      if (typeof window.showMsg === 'function') window.showMsg(msg, statut === 'ok' ? 'success' : (statut === 'annule' ? 'warning' : 'info')); else if (statut !== 'attente') avertir(msg);
       if (statut === 'ok' || statut === 'tard') { etat = null; if (ouvert()) charger(); }
     } });
   }

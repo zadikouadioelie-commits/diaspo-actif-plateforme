@@ -7205,13 +7205,20 @@ function injecterKoffiNavigation() {
    internes n'est dupliquée. ── */
 (function buildAssistantHub(){
   var ASSISTANTS = [
-    {key:'koffi', label:'Koffi — où aller ?', icon:'🧭', sel:'#kn-fab'},
+    {key:'koffi', label:'Koffi — où aller ?', icon:'', sel:'#kn-fab'},
     {key:'support', label:'Signaler un problème', icon:'🛠️', sel:'#st-fab, #st-sidebar-link'},
     {key:'chatbot', label:"Chatbot Diaspo'Actif", icon:'💬', sel:'#cb-fab'},
     {key:'oz', label:'Assistant O-Z', icon:'🌍', sel:'#oz-bubble'}
   ];
   var found = {};
   var hubBtn = null, hubMenu = null;
+
+  /* Bouton Koffi déplaçable (souris ou doigt) : fonction commune assets/koffi-deplacable.js, chargée à la demande. */
+  function rendreDeplacable(el, cle){
+    var go = function(){ if (window.KoffiDeplacable) window.KoffiDeplacable(el, cle); };
+    if (window.KoffiDeplacable) return go();
+    var sc = document.createElement('script'); sc.src = '/assets/koffi-deplacable.js?v=1'; sc.onload = go; document.body.appendChild(sc);
+  }
 
   function buildHub(){
     if (document.getElementById('assist-hub-fab')) return;
@@ -7220,7 +7227,12 @@ function injecterKoffiNavigation() {
     hubBtn.type = 'button';
     hubBtn.setAttribute('aria-label', "Assistance Diaspo'Actif");
     hubBtn.innerHTML = '💬<span id="assist-hub-badge">0</span>';
-    hubBtn.addEventListener('click', function(e){ e.stopPropagation(); hubMenu.classList.toggle('open'); });
+    hubBtn.addEventListener('click', function(e){
+      e.stopPropagation();
+      /* Compte connecté : Koffi est l'assistant unique, le bouton l'ouvre directement. */
+      if (found.koffi) { var k = document.querySelector('#kn-fab'); if (k) k.click(); return; }
+      hubMenu.classList.toggle('open');
+    });
     document.body.appendChild(hubBtn);
 
     hubMenu = document.createElement('div');
@@ -7244,6 +7256,8 @@ function injecterKoffiNavigation() {
       '#assist-hub-menu .ic{font-size:19px;}'+
       '@media(max-width:600px){#assist-hub-fab{bottom:88px;right:14px;width:48px;height:48px;font-size:19px;}'+
       '#assist-hub-menu{bottom:146px;right:14px;}}'+
+      '#assist-hub-fab.koffi{background:#0D2B4E;padding:0;box-shadow:0 6px 18px rgba(13,43,78,.4),0 0 0 2px #F26422;}'+
+      '#assist-hub-fab.koffi img{width:100%;height:100%;border-radius:50%;display:block;background:#fff;}'+
       '.assist-hub-hidden{display:none !important;}';
     document.head.appendChild(style);
 
@@ -7269,6 +7283,16 @@ function injecterKoffiNavigation() {
     });
     var badge = document.getElementById('assist-hub-badge');
     if (badge) badge.textContent = keys.length;
+    /* Koffi disponible (compte connecté) : plus de pastille bleue ni de menu, le visage de Koffi à la place.
+       Les anciens assistants restent masqués (jamais supprimés). Visiteur sans Koffi : l'ancien concentrateur. */
+    if (found.koffi && hubBtn && !hubBtn.classList.contains('koffi')) {
+      hubBtn.classList.add('koffi');
+      hubBtn.innerHTML = '<img src="/assets/koffi-avatar-96.webp" alt="" width="52" height="52">';
+      hubBtn.setAttribute('aria-label', 'Koffi, votre assistant');
+      hubBtn.title = 'Koffi, votre assistant (glissez pour le déplacer)';
+      hubMenu.classList.remove('open');
+      rendreDeplacable(hubBtn, 'da_koffi_pos_pc');
+    }
   }
 
   var attempts = 0;
