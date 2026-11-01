@@ -7258,6 +7258,9 @@ function injecterKoffiNavigation() {
       '#assist-hub-menu{bottom:146px;right:14px;}}'+
       '#assist-hub-fab.koffi{background:#0D2B4E;padding:0;box-shadow:0 6px 18px rgba(13,43,78,.4),0 0 0 2px #F26422;}'+
       '#assist-hub-fab.koffi img{width:100%;height:100%;border-radius:50%;display:block;background:#fff;}'+
+      /* Un seul Koffi par écran : sur l'Annuaire (conseiller) et les Événements (guide), la page a déjà son propre Koffi, donc le visage global s'efface.
+         En CSS pur (:has) pour ne pas dépendre de l'ordre de chargement des scripts ; si le Koffi de la page est absent (compte non éligible), le global reste. */
+      'body:has(.ka-root, .ke-root) #assist-hub-fab{display:none !important;}'+
       '.assist-hub-hidden{display:none !important;}';
     document.head.appendChild(style);
 
