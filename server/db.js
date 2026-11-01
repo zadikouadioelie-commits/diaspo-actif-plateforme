@@ -5264,6 +5264,27 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_kofi_solde_user ON kofi_solde(user_id);
   CREATE UNIQUE INDEX IF NOT EXISTS ux_kofi_solde_mensuel ON kofi_solde(user_id, mois) WHERE origine='mensuel';
+  /* Koffi, assistant de l'administrateur (2026-11-01) : tâches proposées par Koffi, validées ou programmées par l'administrateur.
+     statut : proposee | planifiee (autonome, attend l'heure) | planifiee_validation (attend l'heure puis la validation) | a_valider | en_cours | executee | echec | annulee.
+     mode : « autonome » (Koffi l'exécute seul à l'heure dite) ou « a_valider » (l'administrateur valide lui-même). Historique conservé (preuve de ce qui a été fait). */
+  CREATE TABLE IF NOT EXISTS kofi_admin_taches (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    admin_id INTEGER NOT NULL,
+    conversation_id INTEGER,
+    type TEXT NOT NULL,
+    libelle TEXT,
+    params_json TEXT NOT NULL,
+    mode TEXT NOT NULL DEFAULT 'a_valider',
+    statut TEXT NOT NULL DEFAULT 'proposee',
+    planifiee_le TEXT,
+    executee_le TEXT,
+    resultat_json TEXT,
+    erreur TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_kofi_admin_taches_statut ON kofi_admin_taches(statut, planifiee_le);
+  CREATE INDEX IF NOT EXISTS idx_kofi_admin_taches_admin ON kofi_admin_taches(admin_id, id);
 `);
 /* Dossiers de discussion de l'assistant du formateur : colonnes ajoutées aux conversations (déjà dans le CREATE TABLE : PostgreSQL les crée seul ; SQLite local déjà créé : ici). */
 ;['dossier_id INTEGER', 'titre TEXT'].forEach(col => { try { db.exec(`ALTER TABLE kofi_conversations ADD COLUMN ${col}`); } catch(_) {} });

@@ -98,6 +98,11 @@ const DEFAUTS = {
   annuaire_max_sortie_tokens: 1000,
   annuaire_nb_candidats: 25,       /* profils examinés par Koffi à chaque recherche */
   plafond_jour_annuaire: 60,       /* anti-abus : messages par 24 h */
+  plafond_jour_liste_annuaire: 10, /* listes de comptes (« fais-moi la liste de… ») par compte et par 24 h : anti-moissonnage */
+  /* Assistant de l'administrateur (2026-11-01) : réservé au rôle administrateur, sans limite de crédit */
+  admin_max_message_caracteres: 2000,
+  admin_max_sortie_tokens: 1500,
+  plafond_jour_admin: 400,         /* anti-abus : messages par 24 h */
 };
 const TEXTE_REGLAGES = new Set(["modele"]);
 /* Bornes [min, max] acceptées par l'administration. retention_jours plafonné à 60 : c'est la durée annoncée aux élèves (fenêtre, CGV, confidentialité) ;
@@ -111,7 +116,8 @@ const BORNES = {
   createur_max_message_caracteres: [500, 60000], createur_max_sortie_tokens: [500, 8000], plafond_jour_createur: [1, 10000],
   compte_officiel_id: [0, 2147483647], credit_mensuel_utilisateur_eur: [0, 100], credit_mensuel_initiative_eur: [0, 100], credit_mensuel_collectivite_eur: [0, 100],
   recharge_min_eur: [0.5, 1000], recharge_ratio: [1, 100], coefficient_cout: [0.1, 100], alerte_solde_pct: [1, 100],
-  annuaire_max_message_caracteres: [50, 3000], annuaire_max_sortie_tokens: [200, 4000], annuaire_nb_candidats: [5, 60], plafond_jour_annuaire: [1, 10000],
+  annuaire_max_message_caracteres: [50, 3000], annuaire_max_sortie_tokens: [200, 4000], annuaire_nb_candidats: [5, 60], plafond_jour_annuaire: [1, 10000], plafond_jour_liste_annuaire: [1, 200],
+  admin_max_message_caracteres: [100, 10000], admin_max_sortie_tokens: [300, 4000], plafond_jour_admin: [1, 10000],
 };
 
 const sqlDate = d => d.toISOString().slice(0, 19).replace("T", " ");
@@ -503,6 +509,7 @@ async function effacerCompte(db, userId) {
   await db.prepare("DELETE FROM kofi_feedback WHERE user_id=? OR message_id IN (SELECT m.id FROM kofi_messages m JOIN kofi_conversations c ON c.id=m.conversation_id WHERE c.user_id=?)").run(id, id);
   const m = await db.prepare("DELETE FROM kofi_messages WHERE conversation_id IN (SELECT id FROM kofi_conversations WHERE user_id=?)").run(id);
   const c = await db.prepare("DELETE FROM kofi_conversations WHERE user_id=?").run(id);
+  await db.prepare("DELETE FROM kofi_admin_taches WHERE admin_id=?").run(id); /* tâches de l'assistant de l'administrateur */
   await db.prepare("DELETE FROM kofi_actions WHERE user_id=?").run(id); /* missions proposées par l'assistant du formateur (elles contiennent le texte collé) */
   await db.prepare("DELETE FROM kofi_majorite WHERE user_id=?").run(id);
   await db.prepare("DELETE FROM kofi_presentations WHERE user_id=?").run(id);
@@ -534,6 +541,8 @@ module.exports.register = function register(deps) {
   require("./kofi-createur").register(deps);
   /* Conseiller d'orientation de l'Annuaire (2026-10-31) : server/kofi-annuaire.js. */
   require("./kofi-annuaire").register(deps);
+  /* Assistant de l'administrateur (2026-11-01) : server/kofi-admin.js. */
+  require("./kofi-admin").register(deps);
   const D = module.exports;
   const estAdmin = u => u && u.role === "administrateur";
 

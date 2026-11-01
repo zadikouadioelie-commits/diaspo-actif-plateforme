@@ -131,6 +131,7 @@ function reponseAnnuaire(r) {
     "• Comprendre ce que vous cherchez et votre situation, en quelques phrases (activité, compétence, projet, besoin).",
     "• Vous poser les questions utiles pour préciser : ville, pays, type de profil (personne, initiative, collectivité), domaine d'activité.",
     "• Parcourir les profils publics de l'Annuaire et vous en proposer au moins trois, avec un pourcentage de correspondance et la raison en une phrase. Le pourcentage est calculé par la plateforme d'après vos critères, il n'est pas inventé.",
+    "• Établir une LISTE (jusqu'à 30 profils) quand vous la demandez : « fais-moi la liste des… ». Elle ne contient que les comptes proposables, avec leur pourcentage de correspondance ; un nombre limité de listes est possible chaque jour.",
     "• Vous mener en un clic sur le profil public de la personne qui vous intéresse.",
     "• Vous dire honnêtement quand je ne trouve pas trois bons profils, plutôt que d'en inventer.",
     "",
@@ -142,4 +143,21 @@ function reponseAnnuaire(r) {
   ].join("\n");
 }
 
-module.exports = { estQuestionCompetences, reponseEleve, reponseCreateur, reponseAnnuaire, phraseCredit, normaliser };
+/* Assistant de l'administrateur : « Que sais-tu faire ? » — réponse fixe, gratuite. */
+function reponseAdmin() {
+  return [
+    "Je suis votre assistant d'administrateur. Voici tout ce que je sais faire :",
+    "• Vous donner les chiffres de la plateforme : comptes par type, nouveaux inscrits, comptes actifs, pays les plus représentés, formations, événements, cagnottes, publications.",
+    "• Ouvrir un module du tableau de bord (par exemple « ouvre les Finances » ou « va dans la Modération »).",
+    "• Préparer une notification à des membres (tous, ou seulement un type de compte, un pays, ou un compte précis) : je rédige, vous voyez à combien de comptes elle ira, et rien ne part sans votre choix.",
+    "• Programmer un rappel pour vous, ou programmer une de ces tâches à une heure précise (aujourd'hui, demain…, heure de Paris).",
+    "",
+    "À chaque tâche, vous choisissez : « Je valide moi-même » (j'attends votre clic, ou je vous préviens à l'heure dite) ou « Autonomie » (je l'exécute seul, maintenant ou à l'heure programmée). Dites-le directement dans votre demande (« sans moi », « prépare, je validerai ») ou utilisez les boutons.",
+    "",
+    "Ce que je ne fais pas encore : suspendre ou supprimer un compte, publier à votre place, modifier des contenus ou des paiements. Pour cela, je vous ouvre le bon module. Une tâche programmée s'exécute dans les 5 minutes qui suivent l'heure choisie.",
+    "",
+    "Pour vous, aucune limite de crédit : cette question est de toute façon toujours gratuite.",
+  ].join("\n");
+}
+
+module.exports = { estQuestionCompetences, reponseEleve, reponseCreateur, reponseAnnuaire, reponseAdmin, phraseCredit, normaliser };

@@ -237,6 +237,36 @@ test('Koffi annuaire — parcours complet', async (t) => {
     assert.ok(props.some(p => p.id === uid('P1')) && props.some(p => p.id === uid('P2')));
   });
 
+  await t.test('liste : « fais-moi la liste de… » donne jusqu\'à 30 profils proposables, mêmes règles d\'exclusion, plafond quotidien, aucun champ privé', async () => {
+    const MOTL = 'listarium' + rnd, noms = ['L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7', 'Lr'];
+    for (const n of noms) { jar[n] = H.cookieJar(); await H.creerApprenant(env, jar[n], rnd, n); sql("UPDATE users SET created_at=datetime('now','-2 year') WHERE id=?", uid(n)); sql('DELETE FROM user_accreditations WHERE user_id=?', uid(n)); H.ordinariser(env, rnd, n); profil(n, { competences: n === 'Lr' ? '' : MOTL, ville: 'Nantes' }); }
+    sql('UPDATE users SET kofi_non_propose=1 WHERE id=?', uid('L7'));          /* refuse d\'être proposé : jamais dans la liste */
+    assert.equal((await call(jar.Lr, 'POST', '/api/kofi/majorite', { confirme: true })).status, 200);
+    /* Sans demande de liste : 5 profils au plus. */
+    const normal = await dire(jar.Lr, 'KW:' + MOTL);
+    assert.equal(normal.status, 200, JSON.stringify(normal.data));
+    assert.equal(normal.data.message.propositions.length, A.MAX_PROPOSITIONS); assert.equal(normal.data.message.liste, false);
+    /* Avec demande de liste : tous les profils proposables (6), triés, sans L7. */
+    const l = await dire(jar.Lr, 'Fais-moi la liste KW:' + MOTL + ' LISTE');
+    assert.equal(l.status, 200, JSON.stringify(l.data));
+    const props = l.data.message.propositions;
+    assert.equal(l.data.message.liste, true); assert.equal(props.length, 6, JSON.stringify(props.map(p => p.nom)));
+    assert.ok(!props.some(p => p.id === uid('L7')), 'L7 ne veut pas être proposé');
+    assert.ok(props.every((p, i) => i === 0 || props[i - 1].pourcentage >= p.pourcentage), 'triés par pourcentage');
+    assert.match(l.data.message.contenu, /Voici la liste : 6 profils/); assert.match(l.data.message.contenu, /Premium/);
+    assert.ok(!/telephone|password|date_naissance|email/i.test(JSON.stringify(props)), 'aucun champ privé');
+    assert.equal(A.MAX_LISTE, 30);
+    /* Plafond quotidien : au-delà, retour à la recherche habituelle (5 profils) avec explication. */
+    assert.equal((await call(jar.Adm, 'PUT', '/api/admin/kofi/reglages', { plafond_jour_liste_annuaire: 1 })).status, 200);
+    const plafonne = await dire(jar.Lr, 'Refais-moi la liste KW:' + MOTL + ' LISTE');
+    assert.equal(plafonne.status, 200); assert.equal(plafonne.data.message.liste, false); assert.equal(plafonne.data.message.propositions.length, A.MAX_PROPOSITIONS);
+    assert.match(plafonne.data.message.contenu, /nombre de listes autorisées/);
+    assert.equal((await call(jar.Adm, 'PUT', '/api/admin/kofi/reglages', { plafond_jour_liste_annuaire: 10 })).status, 200);
+    /* Validation des critères : liste:true conservé seulement s\'il est strictement vrai. */
+    assert.equal(A.validerCriteres({ concepts: [['a']], liste: 'oui' }).liste, undefined);
+    assert.equal(A.validerCriteres({ concepts: [['a']], liste: true }).liste, true);
+  });
+
   await t.test('suppression : le demandeur efface sa conversation ; un autre compte ne peut pas', async () => {
     assert.equal((await call(jar.Req2, 'DELETE', `/api/kofi/annuaire/conversations/${convReq}`)).status, 404);
     assert.equal((await call(jar.Req, 'DELETE', `/api/kofi/annuaire/conversations/${convReq}`)).status, 200);

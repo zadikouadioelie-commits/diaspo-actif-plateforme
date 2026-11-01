@@ -30,7 +30,8 @@
     { "path": "/api/cron/fiabilite", "schedule": "45 6 * * *" },
     { "path": "/api/cron/insc-non-abouties", "schedule": "15 7 * * *" },
     { "path": "/api/cron/kofi-purge", "schedule": "20 4 * * *" },
-    { "path": "/api/cron/reductions-comptes-lies", "schedule": "30 20 * * *" }
+    { "path": "/api/cron/reductions-comptes-lies", "schedule": "30 20 * * *" },
+    { "path": "/api/cron/kofi-admin-taches", "schedule": "0 6 * * *" }
   ],
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api/index" },

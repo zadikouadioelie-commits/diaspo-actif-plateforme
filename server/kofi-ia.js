@@ -78,6 +78,39 @@ function reponseFausseCorrection({ systeme, messages }) {
   return { texte, entree, sortie: Math.ceil(texte.length / 4), lecture_cache: 0, refus: false, arret: "end_turn" };
 }
 
+/* Assistant de l'administrateur (système marqué ASSISTANT_ADMIN) : JSON déterministe d'après des marqueurs de la demande — OUVRIR:section, RAPPEL:texte_avec_tirets_bas, NOTIF:titre CORPS:texte ROLES:utilisateur,initiative PAYS:France,
+   AUTO:oui|non, QUAND:AAAA-MM-JJ_HH:MM (heure de Paris), STATS. Sans marqueur : une simple réponse. */
+function reponseFausseAdmin({ systeme, messages }) {
+  if (process.env.KOFI_FAUX_LOG) { try { fs.appendFileSync(process.env.KOFI_FAUX_LOG, JSON.stringify({ systeme, messages }) + "\n"); } catch (e) { /* sans importance */ } }
+  const dernier = String((messages[messages.length - 1] || {}).content || "");
+  const q = (dernier.split("<demande>")[1] || dernier).split("</demande>")[0];
+  const entree = Math.ceil((String(systeme).length + messages.reduce((a, m) => a + String(m.content).length, 0)) / 4);
+  if (/PANNEFAUSSE/.test(q)) throw new KofiIAErreur("indisponible", "Panne simulée.");
+  if (/LIMITEFAUSSE/.test(q)) throw new KofiIAErreur("limite", "Limite simulée.");
+  if (/REFUSFAUX/.test(q)) return { texte: "", entree, sortie: 5, lecture_cache: 0, refus: true, arret: "refusal" };
+  const prise = re => (re.exec(q) || [])[1] || "";
+  const mots = s => s.replace(/_/g, " ");
+  let texte;
+  if (/JSONFAUX/.test(q)) texte = "Voici ma réponse sans structure.";
+  else {
+    const auto = /AUTO:oui/.test(q) ? true : /AUTO:non/.test(q) ? false : null;
+    const quand = prise(/QUAND:(\S+)/).replace("_", " ") || null;
+    const sortie = { action: "repondre", message: "Voici ma réponse.", ouvrir: null, taches: [] };
+    if (/STATS/.test(q)) sortie.message = "Il y a " + ((/comptes_total[^:]*: (\d+)/.exec(dernier) || [])[1] || "?") + " comptes.";
+    if (prise(/OUVRIR:(\S+)/)) { sortie.ouvrir = prise(/OUVRIR:(\S+)/); sortie.message = "Je vous ouvre le module."; }
+    if (prise(/RAPPEL:(\S+)/)) { sortie.action = "proposer"; sortie.message = "Je prépare ce rappel."; sortie.taches.push({ type: "rappel", libelle: "Rappel", params: { texte: mots(prise(/RAPPEL:(\S+)/)) }, autonomie: auto, quand }); }
+    if (prise(/NOTIF:(\S+)/)) {
+      const cible = { roles: prise(/ROLES:(\S+)/) ? prise(/ROLES:(\S+)/).split(",") : [] };
+      if (prise(/PAYS:(\S+)/)) cible.pays = mots(prise(/PAYS:(\S+)/));
+      if (prise(/USER:(\d+)/)) cible.user_id = Number(prise(/USER:(\d+)/));
+      sortie.action = "proposer"; sortie.message = "Je prépare cette notification.";
+      sortie.taches.push({ type: "envoyer_notification", libelle: "Notification", params: { titre: mots(prise(/NOTIF:(\S+)/)), contenu: mots(prise(/CORPS:(\S+)/)), cible }, autonomie: auto, quand });
+    }
+    texte = "```json\n" + JSON.stringify(sortie) + "\n```";
+  }
+  return { texte, entree, sortie: Math.ceil(texte.length / 4), lecture_cache: 0, refus: false, arret: "end_turn" };
+}
+
 /* Conseiller de l'Annuaire (système marqué ASSISTANT_ANNUAIRE) : JSON déterministe d'après des marqueurs de la demande — KW:mot (un concept), KW2:mot, VILLE:xxx, PAYS:xxx, TYPE:xxx. */
 function reponseFausseAnnuaire({ systeme, messages }) {
   if (process.env.KOFI_FAUX_LOG) { try { fs.appendFileSync(process.env.KOFI_FAUX_LOG, JSON.stringify({ systeme, messages }) + "\n"); } catch (e) { /* sans importance */ } }
@@ -96,6 +129,7 @@ function reponseFausseAnnuaire({ systeme, messages }) {
     const prec = (/<criteres_precedents>([\s\S]*?)<\/criteres_precedents>/.exec(dernier) || [])[1];
     let base = {}; try { base = prec ? JSON.parse(prec) : {}; } catch (e) { base = {}; }
     const crit = { concepts: concepts.length ? concepts : (base.concepts || []), ville: prise(/VILLE:(\S+)/) || (/SANSVILLE/.test(q) ? "" : base.ville || ""), pays: prise(/PAYS:(\S+)/) || base.pays || "", type: prise(/TYPE:(\S+)/) || base.type || "" };
+    if (/LISTE/.test(q)) crit.liste = true;
     texte = "```json\n" + JSON.stringify({ action: "chercher", message: "Je cherche des profils correspondant à votre demande.", criteres: crit }) + "\n```";
   }
   return { texte, entree, sortie: Math.ceil(texte.length / 4), lecture_cache: 0, refus: false, arret: "end_turn" };
@@ -104,6 +138,7 @@ function reponseFausseAnnuaire({ systeme, messages }) {
 /* Réponse déterministe pour les tests : cite le premier extrait, ou se comporte selon un mot-clé de la question. */
 function reponseFausse({ systeme, messages }) {
   if (/ASSISTANT_ANNUAIRE/.test(String(systeme))) return reponseFausseAnnuaire({ systeme, messages });
+  if (/ASSISTANT_ADMIN/.test(String(systeme))) return reponseFausseAdmin({ systeme, messages });
   if (/ASSISTANT_FORMATEUR/.test(String(systeme))) return reponseFausseCreateur({ systeme, messages });
   if (/ASSISTANT_CORRECTION/.test(String(systeme))) return reponseFausseCorrection({ systeme, messages });
   if (process.env.KOFI_FAUX_LOG) { try { fs.appendFileSync(process.env.KOFI_FAUX_LOG, JSON.stringify({ systeme, messages }) + "\n"); } catch (e) { /* sans importance */ } }

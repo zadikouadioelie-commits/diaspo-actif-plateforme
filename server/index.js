@@ -22131,6 +22131,7 @@ route("PUT", "/api/admin/demandes-passage/:id", async (req, res, params, body) =
 route("GET", "/api/notifications", async (req, res, params, body, query) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  try { await require("./kofi-admin").echeancesOpportunistes(); } catch (_) { /* sans importance */ }   /* tâches programmées de Koffi (assistant administrateur) */
   const limit = Math.min(Number(query.limit) || 20, 50);
   /* Les nouveaux messages de conversation ont leur propre indicateur (icône Messages) —
      on ne les duplique pas dans le centre de notifications. */
