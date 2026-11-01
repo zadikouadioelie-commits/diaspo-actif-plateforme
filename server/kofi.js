@@ -103,6 +103,9 @@ const DEFAUTS = {
   bp_max_plan_caracteres: 9000,      /* taille maximale du RÉSUMÉ du plan envoyé au prestataire */
   bp_nb_questions: 8,                /* questions d'une séance avant le bilan */
   plafond_jour_businessplan: 80,
+  navigation_max_message_caracteres: 600,   /* guide de navigation : longueur d'une question (GRATUIT, jamais décompté du crédit) */
+  navigation_max_sortie_tokens: 500,
+  plafond_jour_navigation: 40,       /* anti-abus : questions de navigation par compte et par 24 h */
   plafond_jour_evenements: 60,     /* anti-abus : messages par 24 h au guide des événements */
   annuaire_nb_candidats: 25,       /* profils examinés par Koffi à chaque recherche */
   plafond_jour_annuaire: 60,       /* anti-abus : messages par 24 h */
@@ -124,7 +127,7 @@ const BORNES = {
   createur_max_message_caracteres: [500, 60000], createur_max_sortie_tokens: [500, 8000], plafond_jour_createur: [1, 10000],
   compte_officiel_id: [0, 2147483647], credit_mensuel_utilisateur_eur: [0, 100], credit_mensuel_initiative_eur: [0, 100], credit_mensuel_collectivite_eur: [0, 100],
   recharge_min_eur: [0.5, 1000], recharge_ratio: [1, 100], coefficient_cout: [0.1, 100], alerte_solde_pct: [1, 100],
-  annuaire_max_message_caracteres: [50, 3000], annuaire_max_sortie_tokens: [200, 4000], evenements_max_message_caracteres: [50, 3000], evenements_max_sortie_tokens: [200, 4000], plafond_jour_evenements: [1, 10000], bp_max_message_caracteres: [100, 4000], bp_max_sortie_tokens: [300, 4000], bp_max_plan_caracteres: [2000, 20000], bp_nb_questions: [3, 15], plafond_jour_businessplan: [1, 10000], annuaire_nb_candidats: [5, 60], plafond_jour_annuaire: [1, 10000], plafond_jour_liste_annuaire: [1, 200],
+  annuaire_max_message_caracteres: [50, 3000], annuaire_max_sortie_tokens: [200, 4000], evenements_max_message_caracteres: [50, 3000], evenements_max_sortie_tokens: [200, 4000], plafond_jour_evenements: [1, 10000], bp_max_message_caracteres: [100, 4000], bp_max_sortie_tokens: [300, 4000], bp_max_plan_caracteres: [2000, 20000], bp_nb_questions: [3, 15], plafond_jour_businessplan: [1, 10000], navigation_max_message_caracteres: [50, 2000], navigation_max_sortie_tokens: [200, 2000], plafond_jour_navigation: [1, 10000], annuaire_nb_candidats: [5, 60], plafond_jour_annuaire: [1, 10000], plafond_jour_liste_annuaire: [1, 200],
   admin_max_message_caracteres: [100, 10000], admin_max_sortie_tokens: [300, 4000], plafond_jour_admin: [1, 10000],
 };
 
@@ -556,6 +559,8 @@ module.exports.register = function register(deps) {
   require("./kofi-evenements").register(deps);
   /* Koffi joue l'investisseur / le banquier / le client dans le Business Plan (2026-11-01) : server/kofi-businessplan.js. */
   require("./kofi-businessplan").register(deps);
+  /* Guide de navigation dans toutes les pages (2026-11-01), gratuit : server/kofi-navigation.js. */
+  require("./kofi-navigation").register(deps);
   const D = module.exports;
   const estAdmin = u => u && u.role === "administrateur";
 

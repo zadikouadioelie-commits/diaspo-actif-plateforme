@@ -30,6 +30,7 @@
     annuaire_mensuel: 'Conseiller de l\'Annuaire — crédit mensuel Premium', annuaire_achat: 'Conseiller de l\'Annuaire — crédit acheté', annuaire_illimite: 'Conseiller de l\'Annuaire — compte illimité', annuaire_refus: 'Conseiller de l\'Annuaire — refus du fournisseur', annuaire_illisible: 'Conseiller de l\'Annuaire — réponse illisible',
     evenements_mensuel: 'Guide des événements — crédit mensuel Premium', evenements_achat: 'Guide des événements — crédit acheté', evenements_illimite: 'Guide des événements — compte illimité', evenements_offert: 'Guide des événements — question offerte',
     businessplan_mensuel: 'Business Plan (Koffi joue un rôle) — crédit mensuel Premium', businessplan_achat: 'Business Plan — crédit acheté', businessplan_illimite: 'Business Plan — compte illimité', businessplan_offert: 'Business Plan — question offerte', businessplan_refus: 'Business Plan — refus du fournisseur', businessplan_illisible: 'Business Plan — réponse illisible', evenements_refus: 'Guide des événements — refus du fournisseur', evenements_illisible: 'Guide des événements — réponse illisible',
+    navigation: 'Guide de navigation (gratuit pour l\'utilisateur)', navigation_refus: 'Guide de navigation — refus du fournisseur', navigation_illisible: 'Guide de navigation — réponse illisible',
     admin_mensuel: 'Assistant de l\'administrateur — crédit mensuel Premium', admin_achat: 'Assistant de l\'administrateur — crédit acheté', admin_illimite: 'Assistant de l\'administrateur — compte illimité', admin_refus: 'Assistant de l\'administrateur — refus du fournisseur', admin_illisible: 'Assistant de l\'administrateur — réponse illisible'
   };
   const TYPES_BUDGET = { recharge: 'Recharge', ajustement: 'Ajustement' };
@@ -76,6 +77,11 @@
       { cle: 'evenements_max_message_caracteres', lib: 'Longueur maximale d\'un message', unite: 'caractères' },
       { cle: 'evenements_max_sortie_tokens', lib: 'Longueur maximale d\'une réponse', unite: 'jetons' },
       { cle: 'plafond_jour_evenements', lib: 'Messages par jour et par compte (plafond absolu)', unite: 'messages', aide: 'Protège la réserve contre un usage abusif.' },
+    ] },
+    { titre: '🧭 Guide de navigation (toutes les pages)', note: 'Koffi aide à trouver la bonne page (« où publier un événement ? »). Il ne voit que la liste des pages du site, aucune donnée de compte. Ces questions sont GRATUITES pour l\'utilisateur : leur coût réel est pris sur la réserve d\'IA.', champs: [
+      { cle: 'navigation_max_message_caracteres', lib: 'Longueur maximale d\'une question', unite: 'caractères' },
+      { cle: 'navigation_max_sortie_tokens', lib: 'Longueur maximale d\'une réponse', unite: 'jetons' },
+      { cle: 'plafond_jour_navigation', lib: 'Questions par jour et par compte (plafond absolu)', unite: 'questions', aide: 'Seul frein à l\'usage : ces questions ne consomment pas le crédit de l\'utilisateur.' },
     ] },
     { titre: '🎭 Business Plan : Koffi joue un rôle', note: 'Koffi joue l\'investisseur, le banquier ou le client et fait passer un grand oral au propriétaire du plan. Il lit un RÉSUMÉ du plan (jamais le plan entier) après consentement.', champs: [
       { cle: 'bp_nb_questions', lib: 'Questions par séance (avant le bilan)', unite: 'questions' },

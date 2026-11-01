@@ -159,6 +159,25 @@ function reponseFausseEvenements({ systeme, messages }) {
   return { texte, entree, sortie: Math.ceil(texte.length / 4), lecture_cache: 0, refus: false, arret: "end_turn" };
 }
 
+/* Guide de navigation (système marqué ASSISTANT_NAVIGATION) : JSON déterministe — PAGE:cle1,cle2 dans la demande → ces destinations ; sinon aucune. */
+function reponseFausseNavigation({ systeme, messages }) {
+  if (process.env.KOFI_FAUX_LOG) { try { fs.appendFileSync(process.env.KOFI_FAUX_LOG, JSON.stringify({ systeme, messages }) + "\n"); } catch (e) { /* sans importance */ } }
+  const dernier = String((messages[messages.length - 1] || {}).content || "");
+  const q = (dernier.split("<demande>")[1] || dernier).split("</demande>")[0];
+  const entree = Math.ceil((String(systeme).length + messages.reduce((a, m) => a + String(m.content).length, 0)) / 4);
+  if (/PANNEFAUSSE/.test(q)) throw new KofiIAErreur("indisponible", "Panne simulée.");
+  if (/LIMITEFAUSSE/.test(q)) throw new KofiIAErreur("limite", "Limite simulée.");
+  if (/REFUSFAUX/.test(q)) return { texte: "", entree, sortie: 5, lecture_cache: 0, refus: true, arret: "refusal" };
+  let texte;
+  if (/JSONFAUX/.test(q)) texte = "Voici ma réponse sans structure.";
+  else {
+    const m = /PAGE:(\S+)/.exec(q);
+    const dest = m ? m[1].split(",").filter(Boolean) : [];
+    texte = "```json\n" + JSON.stringify({ message: "Voici où aller.", destinations: dest }) + "\n```";
+  }
+  return { texte, entree, sortie: Math.ceil(texte.length / 4), lecture_cache: 0, refus: false, arret: "end_turn" };
+}
+
 /* Business Plan (système marqué ASSISTANT_BUSINESSPLAN) : réponses déterministes d'après l'<action> et la <progression> du dernier message.
    Marqueurs dans la réponse de la personne : PANNEFAUSSE, LIMITEFAUSSE, REFUSFAUX, JSONFAUX. Le plan lu (balises <plan>) est écrit en clair dans la réponse « question » pour que les tests vérifient ce qui est transmis. */
 function reponseFausseBusinessPlan({ systeme, messages }) {
@@ -188,6 +207,7 @@ function reponseFausse({ systeme, messages }) {
   if (/ASSISTANT_ADMIN/.test(String(systeme))) return reponseFausseAdmin({ systeme, messages });
   if (/ASSISTANT_EVENEMENTS/.test(String(systeme))) return reponseFausseEvenements({ systeme, messages });
   if (/ASSISTANT_BUSINESSPLAN/.test(String(systeme))) return reponseFausseBusinessPlan({ systeme, messages });
+  if (/ASSISTANT_NAVIGATION/.test(String(systeme))) return reponseFausseNavigation({ systeme, messages });
   if (/ASSISTANT_FORMATEUR/.test(String(systeme))) return reponseFausseCreateur({ systeme, messages });
   if (/ASSISTANT_CORRECTION/.test(String(systeme))) return reponseFausseCorrection({ systeme, messages });
   if (process.env.KOFI_FAUX_LOG) { try { fs.appendFileSync(process.env.KOFI_FAUX_LOG, JSON.stringify({ systeme, messages }) + "\n"); } catch (e) { /* sans importance */ } }
