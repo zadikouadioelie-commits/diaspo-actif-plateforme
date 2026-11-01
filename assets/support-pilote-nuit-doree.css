@@ -1,0 +1,12 @@
+/* Design « Nuit dorée » — Support Pilote (support-pilote.html) (2026-11-01).
+   S'ajoute à assets/theme-nuit-doree.css et assets/pages-initiative-nuit-doree.css : cette feuille ne règle que la carte du formulaire propre à la page.
+   Tout est préfixé html body.nd. Retour arrière : retirer le lien vers cette feuille avec ceux de la page. */
+
+html body.nd .sp-card{background:var(--nd-verre);border:1px solid var(--nd-bord2);border-radius:22px;box-shadow:0 26px 54px -34px #000;color:var(--nd-texte)}
+html body.nd .sp-card label{color:var(--nd-or);letter-spacing:.06em}
+html body.nd .sp-card :is(input,textarea){background:rgba(255,255,255,.07)!important;border:1px solid rgba(255,255,255,.2)!important;color:#fff!important;color-scheme:dark}
+html body.nd .sp-card :is(input,textarea)::placeholder{color:#8F9BB8}
+html body.nd .sp-card :is(input,textarea):focus{outline:none;border-color:var(--nd-or)!important;box-shadow:0 0 0 3px rgba(227,192,110,.18)}
+html body.nd .sp-card button:not(.btn){color:var(--nd-doux)}
+html body.nd #sp-form-error{color:#FFB3AA!important}
+html body.nd .sp-guarantees{color:var(--nd-doux)}

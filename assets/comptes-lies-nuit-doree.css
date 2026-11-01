@@ -1,0 +1,16 @@
+/* Design « Nuit dorée » — Liaison de comptes (comptes-lies.html) (2026-11-01).
+   S'ajoute à assets/theme-nuit-doree.css et assets/pages-initiative-nuit-doree.css : cette feuille ne règle que les fenêtres de la page (liaison, confirmation), posées hors de la zone de contenu.
+   Tout est préfixé html body.nd. Retour arrière : retirer le lien vers cette feuille avec ceux de la page. */
+
+html body.nd :is(.cl-modal,.cl-confirm-box){background:linear-gradient(160deg,rgba(23,37,77,.97),rgba(10,16,36,.99));border:1px solid var(--nd-bord);box-shadow:0 40px 90px -30px #000;color:var(--nd-texte);
+  --card:transparent;--bg:rgba(255,255,255,.07);--text:#E8ECF6;--muted:#AEB8D0;--border:rgba(255,255,255,.14)}
+html body.nd :is(.cl-modal-overlay,.cl-confirm-overlay){background:rgba(3,6,14,.74);backdrop-filter:blur(5px)}
+html body.nd :is(.cl-modal,.cl-confirm-box) h3{font-family:var(--nd-display);font-weight:500;color:#fff}
+html body.nd :is(.cl-modal,.cl-confirm-box) p{color:var(--nd-doux)}
+html body.nd .cl-modal input{background:rgba(255,255,255,.07)!important;border:1px solid rgba(255,255,255,.2)!important;color:#fff!important;color-scheme:dark}
+html body.nd .cl-modal input::placeholder{color:#8F9BB8}
+html body.nd .cl-modal input:focus{outline:none;border-color:var(--nd-or)!important;box-shadow:0 0 0 3px rgba(227,192,110,.18)}
+html body.nd .cl-modal-err{color:#FFB3AA}
+html body.nd :is(.cl-modal-cancel,.cl-confirm-cancel){background:rgba(255,255,255,.07)!important;color:var(--nd-texte)!important;border:1px solid var(--nd-bord)!important}
+html body.nd .cl-modal-confirm{background:var(--nd-degore)!important;color:#1a1405!important;border:0!important}
+html body.nd .cl-confirm-retirer{background:#E5484D;color:#fff}

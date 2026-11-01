@@ -1,0 +1,24 @@
+/* Design « Nuit dorée » — Synchronisation réseaux sociaux (reseaux-sociaux.html) (2026-11-01).
+   S'ajoute à assets/theme-nuit-doree.css et assets/pages-initiative-nuit-doree.css : cette feuille ne règle que les pastilles, onglets et interrupteurs propres à la page.
+   Tout est préfixé html body.nd. Retour arrière : retirer le lien vers cette feuille avec ceux de la page. */
+
+html body.nd .nd-zone{--card:rgba(255,255,255,.045);--border:rgba(255,255,255,.12);--muted:#AEB8D0}
+html body.nd .rs-tab{color:var(--nd-doux)}
+html body.nd .rs-tab.active{color:var(--nd-or);border-bottom-color:var(--nd-or)}
+html body.nd .rs-tabs{border-bottom-color:var(--nd-bord2)}
+html body.nd :is(.rs-card,.rs-net-card,.rs-detected-card){background:var(--nd-verre);border:1px solid var(--nd-bord2);border-radius:18px;color:var(--nd-texte)}
+html body.nd .rs-net-meta{color:var(--nd-doux)}
+html body.nd .rs-empty{color:var(--nd-doux)}
+html body.nd .rs-settings-row{border-bottom-color:var(--nd-bord2)}
+
+/* pastilles de statut */
+html body.nd .rs-net-status.on,html body.nd .rs-badge-status.importe{background:rgba(143,224,176,.14);color:#9BE8B8}
+html body.nd .rs-net-status.off,html body.nd .rs-badge-status.ignore{background:rgba(255,255,255,.08);color:var(--nd-doux)}
+html body.nd .rs-badge-status.detecte{background:rgba(227,192,110,.16);color:#F3DC9B}
+html body.nd .rs-badge-status.programme{background:rgba(63,123,255,.16);color:#BFD2FF}
+html body.nd .rs-badge-status.erreur{background:rgba(255,154,143,.14);color:#FFB3AA}
+
+/* interrupteurs : rail sombre, pastille dorée une fois activé */
+html body.nd .rs-switch .slider{background:rgba(255,255,255,.18)}
+html body.nd .rs-switch .slider:before{background:#F6F3EA}
+html body.nd .rs-switch input:checked + .slider{background:var(--nd-degore)}

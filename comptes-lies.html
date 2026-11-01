@@ -80,8 +80,13 @@
   .cl-modal-confirm{background:linear-gradient(135deg,#c8960c,#f2c94c);color:#2a1e00;}
   .cl-modal-confirm:disabled{opacity:.6;cursor:default;}
 </style>
+  <!-- Design « Nuit dorée » (2026-11-01) : comptes liés ; retour arrière : retirer ces lignes, nd-zone et class="nd" sur <body> -->
+  <link rel="stylesheet" href="/assets/theme-nuit-doree.css?v=8">
+  <link rel="stylesheet" href="/assets/pages-initiative-nuit-doree.css?v=1">
+  <link rel="stylesheet" href="/assets/comptes-lies-nuit-doree.css?v=1">
+  <script src="/assets/dashboard-nuit-doree.js?v=4" defer></script>
 </head>
-<body>
+<body class="nd">
 <div class="page">
 
   <header class="topbar">
@@ -103,7 +108,7 @@
     </div>
   </header>
 
-  <main class="container" style="padding-top:30px;padding-bottom:40px;">
+  <main class="container nd-zone" style="padding-top:30px;padding-bottom:40px;">
     <h1 style="margin:0 0 4px;">🔗 Liaison de comptes</h1>
     <p class="sub" style="margin:0 0 20px;">Gérez plusieurs comptes Diaspo'Actif (Utilisateur, Association, Entreprise, Initiative, Institution…) depuis une seule connexion.</p>
 
