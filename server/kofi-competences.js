@@ -157,6 +157,21 @@ function reponseEvenements(r) {
   ].join("\n");
 }
 
+function reponseBusinessPlan(r) {
+  return [
+    "Je peux jouer un interlocuteur pour tester la solidité de votre business plan. Voici comment cela se passe :",
+    "• Vous choisissez mon rôle : investisseur (ou financeur), banquier, client (ou bénéficiaire).",
+    "• Je lis un résumé de votre plan, rubrique par rubrique, puis je vous pose UNE question à la fois, adaptée à ce que vous avez écrit.",
+    "• Vous répondez ; je réagis comme le ferait mon personnage, puis je pose la question suivante.",
+    "• À tout moment, « Comment répondre ? » vous donne des conseils pour bien répondre à la question en cours.",
+    "• À la fin (ou quand vous le demandez), je fais un bilan : vos forces, vos points faibles avec la rubrique du plan à retravailler, et des pistes concrètes.",
+    "",
+    "Ce que je ne fais pas : modifier votre plan, donner un conseil juridique, fiscal ou d'investissement, ni garantir qu'un vrai investisseur réagira de la même façon. Seul vous pouvez lancer l'exercice sur votre plan, après avoir autorisé la lecture de son résumé.",
+    "",
+    phraseCredit("fr", r),
+  ].join("\n");
+}
+
 /* Assistant de l'administrateur : « Que sais-tu faire ? » — réponse fixe, gratuite. */
 function reponseAdmin() {
   return [
@@ -174,4 +189,4 @@ function reponseAdmin() {
   ].join("\n");
 }
 
-module.exports = { estQuestionCompetences, reponseEleve, reponseCreateur, reponseAnnuaire, reponseEvenements, reponseAdmin, phraseCredit, normaliser };
+module.exports = { estQuestionCompetences, reponseEleve, reponseCreateur, reponseAnnuaire, reponseEvenements, reponseBusinessPlan, reponseAdmin, phraseCredit, normaliser };

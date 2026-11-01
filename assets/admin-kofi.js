@@ -28,7 +28,8 @@
     eleve_mensuel: 'Tuteur — crédit mensuel Premium', eleve_achat: 'Tuteur — crédit acheté', eleve_illimite: 'Tuteur — compte illimité', eleve_refus: 'Tuteur — refus du fournisseur',
     createur_offert: 'Assistant de création — messages offerts', createur_mensuel: 'Assistant de création — crédit mensuel Premium', createur_achat: 'Assistant de création — crédit acheté', createur_illimite: 'Assistant de création — compte illimité', createur_refus: 'Assistant de création — refus du fournisseur',
     annuaire_mensuel: 'Conseiller de l\'Annuaire — crédit mensuel Premium', annuaire_achat: 'Conseiller de l\'Annuaire — crédit acheté', annuaire_illimite: 'Conseiller de l\'Annuaire — compte illimité', annuaire_refus: 'Conseiller de l\'Annuaire — refus du fournisseur', annuaire_illisible: 'Conseiller de l\'Annuaire — réponse illisible',
-    evenements_mensuel: 'Guide des événements — crédit mensuel Premium', evenements_achat: 'Guide des événements — crédit acheté', evenements_illimite: 'Guide des événements — compte illimité', evenements_offert: 'Guide des événements — question offerte', evenements_refus: 'Guide des événements — refus du fournisseur', evenements_illisible: 'Guide des événements — réponse illisible',
+    evenements_mensuel: 'Guide des événements — crédit mensuel Premium', evenements_achat: 'Guide des événements — crédit acheté', evenements_illimite: 'Guide des événements — compte illimité', evenements_offert: 'Guide des événements — question offerte',
+    businessplan_mensuel: 'Business Plan (Koffi joue un rôle) — crédit mensuel Premium', businessplan_achat: 'Business Plan — crédit acheté', businessplan_illimite: 'Business Plan — compte illimité', businessplan_offert: 'Business Plan — question offerte', businessplan_refus: 'Business Plan — refus du fournisseur', businessplan_illisible: 'Business Plan — réponse illisible', evenements_refus: 'Guide des événements — refus du fournisseur', evenements_illisible: 'Guide des événements — réponse illisible',
     admin_mensuel: 'Assistant de l\'administrateur — crédit mensuel Premium', admin_achat: 'Assistant de l\'administrateur — crédit acheté', admin_illimite: 'Assistant de l\'administrateur — compte illimité', admin_refus: 'Assistant de l\'administrateur — refus du fournisseur', admin_illisible: 'Assistant de l\'administrateur — réponse illisible'
   };
   const TYPES_BUDGET = { recharge: 'Recharge', ajustement: 'Ajustement' };
@@ -75,6 +76,13 @@
       { cle: 'evenements_max_message_caracteres', lib: 'Longueur maximale d\'un message', unite: 'caractères' },
       { cle: 'evenements_max_sortie_tokens', lib: 'Longueur maximale d\'une réponse', unite: 'jetons' },
       { cle: 'plafond_jour_evenements', lib: 'Messages par jour et par compte (plafond absolu)', unite: 'messages', aide: 'Protège la réserve contre un usage abusif.' },
+    ] },
+    { titre: '🎭 Business Plan : Koffi joue un rôle', note: 'Koffi joue l\'investisseur, le banquier ou le client et fait passer un grand oral au propriétaire du plan. Il lit un RÉSUMÉ du plan (jamais le plan entier) après consentement.', champs: [
+      { cle: 'bp_nb_questions', lib: 'Questions par séance (avant le bilan)', unite: 'questions' },
+      { cle: 'bp_max_message_caracteres', lib: 'Longueur maximale d\'une réponse', unite: 'caractères' },
+      { cle: 'bp_max_plan_caracteres', lib: 'Taille maximale du résumé du plan envoyé à l\'IA', unite: 'caractères', aide: 'Plus c\'est grand, plus chaque échange coûte cher.' },
+      { cle: 'bp_max_sortie_tokens', lib: 'Longueur maximale d\'une réponse de Koffi', unite: 'jetons' },
+      { cle: 'plafond_jour_businessplan', lib: 'Échanges par jour et par compte (plafond absolu)', unite: 'échanges' },
     ] },
     { titre: '🛠️ Assistant de l\'administrateur', note: 'Koffi aide les administrateurs : chiffres globaux de la plateforme, ouverture des modules, notifications aux membres et tâches programmées (Autonomie ou validation par l\'administrateur). Il ne voit que des chiffres agrégés, jamais de nom ni d\'e-mail.', champs: [
       { cle: 'admin_max_message_caracteres', lib: 'Longueur maximale d\'un message', unite: 'caractères' },

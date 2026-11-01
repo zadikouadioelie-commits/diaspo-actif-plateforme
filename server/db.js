@@ -5285,6 +5285,16 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_kofi_admin_taches_statut ON kofi_admin_taches(statut, planifiee_le);
   CREATE INDEX IF NOT EXISTS idx_kofi_admin_taches_admin ON kofi_admin_taches(admin_id, id);
+  /* Koffi joue l'investisseur / le banquier / le client dans le Business Plan (2026-11-01) : preuve du consentement du PROPRIÉTAIRE du plan, par plan
+     (le résumé du plan part chez le prestataire d'IA). Une ligne par plan et par personne ; version = version du texte accepté. */
+  CREATE TABLE IF NOT EXISTS kofi_bp_consentements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    bp_id INTEGER NOT NULL,
+    version TEXT NOT NULL,
+    consenti_le TEXT DEFAULT (datetime('now')),
+    UNIQUE(user_id, bp_id)
+  );
 `);
 /* Dossiers de discussion de l'assistant du formateur : colonnes ajoutées aux conversations (déjà dans le CREATE TABLE : PostgreSQL les crée seul ; SQLite local déjà créé : ici). */
 ;['dossier_id INTEGER', 'titre TEXT'].forEach(col => { try { db.exec(`ALTER TABLE kofi_conversations ADD COLUMN ${col}`); } catch(_) {} });

@@ -159,11 +159,35 @@ function reponseFausseEvenements({ systeme, messages }) {
   return { texte, entree, sortie: Math.ceil(texte.length / 4), lecture_cache: 0, refus: false, arret: "end_turn" };
 }
 
+/* Business Plan (système marqué ASSISTANT_BUSINESSPLAN) : réponses déterministes d'après l'<action> et la <progression> du dernier message.
+   Marqueurs dans la réponse de la personne : PANNEFAUSSE, LIMITEFAUSSE, REFUSFAUX, JSONFAUX. Le plan lu (balises <plan>) est écrit en clair dans la réponse « question » pour que les tests vérifient ce qui est transmis. */
+function reponseFausseBusinessPlan({ systeme, messages }) {
+  if (process.env.KOFI_FAUX_LOG) { try { fs.appendFileSync(process.env.KOFI_FAUX_LOG, JSON.stringify({ systeme, messages }) + "\n"); } catch (e) { /* sans importance */ } }
+  const dernier = String((messages[messages.length - 1] || {}).content || "");
+  const prise = nom => ((new RegExp("<" + nom + ">([\\s\\S]*?)</" + nom + ">")).exec(dernier) || [])[1] || "";
+  const action = prise("action").trim(), progression = prise("progression").trim(), reponse = prise("reponse").trim();
+  const entree = Math.ceil((String(systeme).length + messages.reduce((a, m) => a + String(m.content).length, 0)) / 4);
+  if (/PANNEFAUSSE/.test(dernier)) throw new KofiIAErreur("indisponible", "Panne simulée.");
+  if (/LIMITEFAUSSE/.test(dernier)) throw new KofiIAErreur("limite", "Limite simulée.");
+  if (/REFUSFAUX/.test(dernier)) return { texte: "", entree, sortie: 5, lecture_cache: 0, refus: true, arret: "refusal" };
+  let texte;
+  if (/JSONFAUX/.test(dernier)) texte = "Je vous réponds sans structure.";
+  else if (action === "bilan") texte = JSON.stringify({ type: "bilan", message: "Dans l'ensemble, un projet cohérent mais des chiffres à consolider.", forces: ["Problème clair"], faiblesses: [{ texte: "Chiffres peu étayés", rubrique: "plan_financier" }, { texte: "Concurrence peu traitée", rubrique: "inexistante" }], pistes: ["Documenter les hypothèses de ventes"] });
+  else if (action === "conseil") texte = JSON.stringify({ type: "conseil", message: "Citez un chiffre vérifiable et un exemple concret tirés de votre plan." });
+  else {
+    const n = (/question (\d+) sur/.exec(progression) || [])[1] || "1";
+    const role = (/Tu joues un (INVESTISSEUR|BANQUIER|CLIENT)/.exec(String(systeme)) || [])[1] || "INVESTISSEUR";
+    texte = JSON.stringify({ type: "question", reaction: action === "commencer" ? "" : "Merci, c'est noté : " + reponse.slice(0, 60), message: "(" + role + ") Question " + n + " : parlez-moi de votre marché." });
+  }
+  return { texte, entree, sortie: Math.ceil(texte.length / 4), lecture_cache: 0, refus: false, arret: "end_turn" };
+}
+
 /* Réponse déterministe pour les tests : cite le premier extrait, ou se comporte selon un mot-clé de la question. */
 function reponseFausse({ systeme, messages }) {
   if (/ASSISTANT_ANNUAIRE/.test(String(systeme))) return reponseFausseAnnuaire({ systeme, messages });
   if (/ASSISTANT_ADMIN/.test(String(systeme))) return reponseFausseAdmin({ systeme, messages });
   if (/ASSISTANT_EVENEMENTS/.test(String(systeme))) return reponseFausseEvenements({ systeme, messages });
+  if (/ASSISTANT_BUSINESSPLAN/.test(String(systeme))) return reponseFausseBusinessPlan({ systeme, messages });
   if (/ASSISTANT_FORMATEUR/.test(String(systeme))) return reponseFausseCreateur({ systeme, messages });
   if (/ASSISTANT_CORRECTION/.test(String(systeme))) return reponseFausseCorrection({ systeme, messages });
   if (process.env.KOFI_FAUX_LOG) { try { fs.appendFileSync(process.env.KOFI_FAUX_LOG, JSON.stringify({ systeme, messages }) + "\n"); } catch (e) { /* sans importance */ } }
