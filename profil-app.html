@@ -1226,6 +1226,7 @@ async function init() {
         try {
           const _ib = (await api('GET', '/initiatives/' + profil.initiative_id)).initiative;
           if (_ib && _ib.vitrine_type === 'commercial') { location.replace('boutique.html?id=' + encodeURIComponent(profil.initiative_id)); return; }
+          if (_ib && _ib.vitrine_type === 'portfolio') { location.replace('portfolio.html?id=' + encodeURIComponent(profil.initiative_id)); return; }
         } catch (e) { /* repli : l'ancienne vue boutique */ }
       }
     }
@@ -4316,7 +4317,7 @@ function pvtEditCertifications() {
    propose pas encore, et prétendre le contraire créerait des vitrines cassées. */
 function pvtEditVideos() {
   pvtOpenListEditor({ field:'vitrine_videos_json', title:'Galerie vidéos', itemLabel:'une vidéo',
-    itemFields:[{key:'url',label:'Lien de la vidéo (YouTube ou Vimeo)'},{key:'titre',label:'Titre (facultatif)'}] });
+    itemFields:[{key:'url',label:'Lien de la vidéo (YouTube ou Vimeo)'},{key:'titre',label:'Titre (facultatif)'},{key:'duree',label:'Durée (facultatif, ex : 3:20)'}] });
 }
 /* Portfolio — éditeur à upload réel (2026-09-29, demande explicite : "que ça lui permette
    d'avoir énormément de photos de la même façon qu'un compte photographe"). Remplace l'ancien
@@ -4353,14 +4354,16 @@ function pvtEditPortfolio() {
   </div>`;
   document.body.appendChild(overlay);
   overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
-  window._pvtPortfolioItems = items.map(it => ({ image: it.image || '', titre: it.titre || '', description: it.description || '', lien: it.lien || '' }));
+  window._pvtPortfolioItems = items.map(it => ({ image: it.image || '', titre: it.titre || '', categorie: it.categorie || '', description: it.description || '', lien: it.lien || '' }));
   pvtPortfolioRender();
 }
 function pvtPortfolioRender() {
   const grid = document.getElementById('pvt-portfolio-grid');
   if (!grid) return;
   const items = window._pvtPortfolioItems || [];
-  grid.innerHTML = items.map((it, i) => `
+  /* Catégories déjà saisies : proposées en suggestion pour garder des noms identiques (ce sont elles qui forment les filtres de la boutique Portfolio). */
+  const cats = [...new Set(items.map(it => (it.categorie || '').trim()).filter(Boolean))];
+  grid.innerHTML = '<datalist id="pvt-portfolio-cats">' + cats.map(c => `<option value="${esc(c)}"></option>`).join('') + '</datalist>' + items.map((it, i) => `
     <div style="border:1px solid #E2E8F0;border-radius:10px;overflow:hidden;display:flex;flex-direction:column;">
       <div style="position:relative;background:${it.image ? `#EDF1F6 url('${esc(it.image)}') center/cover` : '#EDF1F6'};height:130px;display:flex;align-items:center;justify-content:center;">
         ${it.image ? '' : '<span style="font-size:22px;opacity:.4;">🖼️</span>'}
@@ -4368,6 +4371,7 @@ function pvtPortfolioRender() {
       </div>
       <div style="padding:8px;display:flex;flex-direction:column;gap:6px;">
         <input data-k="titre" data-i="${i}" placeholder="Titre du projet" value="${esc(it.titre)}" oninput="pvtPortfolioMajChamp(${i},'titre',this.value)" style="width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid #E2E8F0;border-radius:6px;font-size:12.5px;">
+        <input data-k="categorie" data-i="${i}" list="pvt-portfolio-cats" maxlength="40" placeholder="Catégorie (ex : Photos, Vidéos, Affiches)" value="${esc(it.categorie || '')}" oninput="pvtPortfolioMajChamp(${i},'categorie',this.value)" style="width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid #E2E8F0;border-radius:6px;font-size:12.5px;">
         <input data-k="description" data-i="${i}" placeholder="Description courte" value="${esc(it.description)}" oninput="pvtPortfolioMajChamp(${i},'description',this.value)" style="width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid #E2E8F0;border-radius:6px;font-size:12.5px;">
         <input data-k="lien" data-i="${i}" placeholder="Lien externe (facultatif)" value="${esc(it.lien)}" oninput="pvtPortfolioMajChamp(${i},'lien',this.value)" style="width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid #E2E8F0;border-radius:6px;font-size:12.5px;">
       </div>
@@ -4381,7 +4385,7 @@ async function pvtPortfolioAjouterFichiers(fileList) {
   for (const file of fichiers) {
     // Place-tenant immédiat pendant l'envoi : sur une sélection de plusieurs dizaines de
     // photos, l'attente serait sinon totalement silencieuse jusqu'à la toute fin.
-    const item = { image: '', titre: '', description: '', lien: '', _envoi: true };
+    const item = { image: '', titre: '', categorie: '', description: '', lien: '', _envoi: true };
     window._pvtPortfolioItems.push(item);
     pvtPortfolioRender();
     try {
@@ -4412,7 +4416,7 @@ function pvtEditEquipe() {
 }
 function pvtEditRealisations() {
   pvtOpenListEditor({ field:'realisations_json', title:'Réalisations / Projets', itemLabel:'une réalisation',
-    itemFields:[{key:'titre',label:'Titre du projet'},{key:'description',label:'Description courte'},
+    itemFields:[{key:'titre',label:'Titre du projet'},{key:'categorie',label:'Catégorie (facultatif, ex : Film, Reportage)'},{key:'duree',label:'Durée (facultatif, ex : 12 min)'},{key:'description',label:'Description courte'},
                 {key:'image',label:"Lien de l'image (facultatif)"},{key:'lien',label:'Lien externe (facultatif)'}] });
 }
 /* Réseaux sociaux — objet {cle: url}, pas une liste : ne rentre pas dans pvtOpenListEditor

@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Diaspo'Actif — Boutique Portfolio</title>
+<meta name="description" content="Boutique Portfolio sur Diaspo'Actif : créations, réalisations, galerie, services et collaborations d'artistes, photographes, designers et créateurs de la diaspora.">
+<link rel="icon" href="/assets/logo.png">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0A1B3C">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;0,800;1,500;1,600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/boutique-portfolio.css?v=1">
+<!-- Boutique de type « Portfolio » (2026-11-01, demande explicite : maquettes « Portfolio créatif »).
+     Page entièrement rendue par assets/boutique-portfolio.js ; les données viennent des API existantes
+     (initiatives, produits, avis, événements, formations, panier). Paramètre d'adresse : ?id=… -->
+</head>
+<body class="pf">
+<div id="pf-app" aria-live="polite"><p class="pf-chargement">Chargement de la boutique…</p></div>
+<div id="pf-toast" class="pf-toast" role="status" aria-live="polite"></div>
+<div id="pf-modal" class="pf-modal" hidden></div>
+<script src="/assets/boutique-portfolio.js?v=1"></script>
+</body>
+</html>
