@@ -466,6 +466,7 @@ body.bp-type-agriculture .bp-conditionnel-agriculture { display: block; }
         <button class="btn btn-outline btn-sm" onclick="toggleComments()">💬 Commentaires</button>
         <button class="btn btn-outline btn-sm" onclick="showCompletude()">📊 Complétude</button>
         <button class="btn btn-outline btn-sm" onclick="showCollaborateurs()">👥 Collaborateurs</button>
+        <button class="btn btn-orange btn-sm" id="bp-koffi-btn" style="display:none;" onclick="bpOuvrirKoffi()" title="Koffi joue l'investisseur, le banquier ou le client">🎭 Koffi</button>
       </div>
       <div class="bp-content" id="bp-content">
         <div style="text-align:center;padding:60px;color:var(--muted);">Chargement du business plan…</div>
@@ -946,6 +947,17 @@ const HELP = {
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function g(id){ return sections[currentSection]?.[id]||''; }
 
+/* ---- Koffi joue l'investisseur, le banquier ou le client (2026-11-01) : propriétaire seulement, le serveur refuse tout autre compte ---- */
+function bpMonterKoffi() {
+  if (monRole !== 'proprietaire') return;
+  if (!window.KoffiBusinessPlan) { window.addEventListener('load', bpMonterKoffi, { once: true }); return; }   /* le script est chargé après celui-ci */
+  if (KoffiBusinessPlan.estMonte()) return;
+  /* sansBouton : le coin de l'écran est déjà pris par l'assistant du plan et l'aide ; on ouvre Koffi depuis la barre d'outils et l'onglet « Tester mon business plan ». */
+  KoffiBusinessPlan.monter({ planId: bpId, sansBouton: true, boutonHote: 'bp-koffi-btn', ouvrirRubrique: function (cle) { if (SECTIONS.some(s => s.key === cle)) navTo(cle); }, avantSeance: function () { return saveCurrentSection(); } })
+    .then(function () { const b = document.getElementById('bp-koffi-btn'); if (b && KoffiBusinessPlan.estMonte()) b.style.display = ''; if (currentSection === 'test_bp') renderSection('test_bp'); });
+}
+function bpOuvrirKoffi() { if (window.KoffiBusinessPlan && KoffiBusinessPlan.estMonte()) KoffiBusinessPlan.ouvrir(); }
+
 /* ---- Chargement initial ---- */
 async function loadBP() {
   bpId = new URLSearchParams(location.search).get('id');
@@ -966,6 +978,7 @@ async function loadBP() {
     buildNav();
     updateProgress(bp.progression||0);
     renderSection(currentSection);
+    bpMonterKoffi();
     if (new URLSearchParams(location.search).get('dl') === '1') {
       await openFinalReport();
       downloadReportHTML();
@@ -1998,6 +2011,9 @@ function bpTAccueil() {
       .bpt-card .desc{font-size:12.5px;color:var(--muted);line-height:1.5;} .bpt-card .meta{font-size:12px;color:#334155;margin-top:4px;} .bpt-card .meta em{font-style:normal;color:#b45309;font-weight:700;}
       .bpt-hist{width:100%;border-collapse:collapse;font-size:12.5px;} .bpt-hist td,.bpt-hist th{padding:7px 10px;border-bottom:1px solid var(--border);text-align:left;} .bpt-hist th{font-size:11px;text-transform:uppercase;color:var(--muted);}
     </style>
+    ${window.KoffiBusinessPlan && KoffiBusinessPlan.estMonte() ? `<div class="bp-card-inner" style="border:1.5px solid #F26422;"><h3 style="margin:0 0 6px;">🤖 Pas de partenaire sous la main ? Koffi joue l'interlocuteur</h3>
+      <p style="margin:0 0 10px;font-size:13.5px;line-height:1.6;color:#334155;">Koffi lit un résumé de votre plan et joue l'investisseur, le banquier ou le client : il pose ses questions une à la fois, réagit à vos réponses, vous aide à répondre si vous hésitez, puis fait le bilan et vous renvoie vers les rubriques à renforcer. Vous pouvez le faire à tout moment, aussi souvent que vous voulez.</p>
+      <button type="button" class="btn btn-orange btn-sm" onclick="bpOuvrirKoffi()">Lancer une séance avec Koffi</button></div>` : ''}
     <div class="bpt-grid">${cartes}</div>
     <div class="bp-card-inner"><h3 style="margin:0 0 8px;">Comment faire l'exercice ?</h3>
       <ol style="margin:0;padding-left:20px;font-size:13.5px;line-height:1.7;color:#334155;">
@@ -5749,6 +5765,7 @@ window.addEventListener('beforeunload', (e) => {
 <script src="/assets/cookies-banner.js"></script>
   <script src="/assets/theme-manager.js"></script>
 <script src="assets/back-button.js"></script>
+<script src="/assets/koffi-businessplan.js?v=2"></script>
 </body>
 </html>
 

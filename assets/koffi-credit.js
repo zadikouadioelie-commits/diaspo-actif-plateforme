@@ -210,7 +210,7 @@
       }).then(function (accepte) {
         if (!accepte) return libre('');
         if (msg) msg.textContent = t.ouverture;
-        return api('POST', '/api/kofi/portefeuille/recharger', { montant_eur: paye, accepte_non_remboursable: true, page: o.page || undefined, formation_id: o.formationId || undefined }).then(function (r) {
+        return api('POST', '/api/kofi/portefeuille/recharger', { montant_eur: paye, accepte_non_remboursable: true, page: o.page || undefined, formation_id: o.formationId || undefined, plan_id: o.planId || undefined }).then(function (r) {
           if (r.ok && r.data && r.data.checkout_url) { location.href = r.data.checkout_url; return; }
           libre((r.data && r.data.error) || t.erreur);
         });
