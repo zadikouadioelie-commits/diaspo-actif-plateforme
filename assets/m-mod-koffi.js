@@ -17,7 +17,7 @@
     if (test()) return Promise.resolve();
     return new Promise(ok => { const sc = document.createElement('script'); sc.src = src; sc.onload = ok; sc.onerror = ok; document.head.appendChild(sc); });
   }
-  const chargerAnnuaire = () => charger('/assets/koffi-annuaire.js?v=3', () => !!window.KoffiAnnuaire);
+  const chargerAnnuaire = () => charger('/assets/koffi-annuaire.js?v=4', () => !!window.KoffiAnnuaire);
   const chargerEvenements = () => charger('/assets/koffi-evenements.js?v=1', () => !!window.KoffiEvenements);
 
   /* Tous les boutons Koffi du téléphone se déplacent au doigt ; une seule position mémorisée pour qu'il reste où on l'a posé d'un écran à l'autre. */

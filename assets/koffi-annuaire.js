@@ -34,7 +34,15 @@
     rechargeTitre: 'Votre crédit Koffi est épuisé', rechargeTexte: 'Rechargez votre crédit pour continuer : le même crédit sert à tout Koffi (cours, création de formation, Annuaire). Poser une question sur ce que sait faire Koffi reste gratuit.',
     rechargeTextePremium: 'Votre crédit du mois est utilisé : il est renouvelé le mois prochain. Vous pouvez aussi recharger dès maintenant ; le même crédit sert à tout Koffi.', recharger: 'Recharger mon crédit',
     erreur: 'Une erreur est survenue. Réessayez.', trop: 'Doucement : patientez quelques secondes avant le message suivant.', retention: 'Conversations conservées 60 jours',
-    paiementRecu: 'Paiement reçu : votre crédit est en cours d\'ajout…'
+    paiementRecu: 'Paiement reçu : votre crédit est en cours d\'ajout…',
+    liste: 'Mes discussions et dossiers', retourChat: 'Revenir à la discussion',
+    nouvelleDisc: '＋ Nouvelle discussion', nouveauDossier: '📁 Nouveau dossier', nomDossier: 'Nom du dossier (ex. : Avocats, Recrutement…)', nomDisc: 'Nouveau titre',
+    renommer: 'Renommer', supprimerIt: 'Supprimer', deplacer: 'Ranger dans…', horsDossier: 'Hors dossier', sansDossier: 'Discussions hors dossier', aucune: 'Aucune discussion pour le moment.',
+    nouvelleDansDossier: 'Nouvelle discussion dans ce dossier', untitled: 'Nouvelle discussion',
+    confirmDossier: function (n) { return n ? 'Supprimer ce dossier et les ' + n + ' discussion' + (n > 1 ? 's' : '') + ' qu\'il contient ? Cette action est définitive.' : 'Supprimer ce dossier vide ?'; },
+    accueilDossier: function (n) { return 'Nouvelle discussion dans le dossier « ' + n + ' ». Dites-moi ce que vous cherchez : la discussion sera rangée ici.'; },
+    micro: 'Dicter votre message', microArret: 'Arrêter la dictée', microEcoute: 'Je vous écoute… parlez, puis touchez à nouveau le micro.',
+    microRefus: 'Le micro est bloqué. Autorisez-le dans votre navigateur pour dicter votre message.', microErreur: 'La dictée vocale n\'a pas pu démarrer. Vous pouvez écrire votre message.'
   };
 
   var CSS = [
@@ -72,10 +80,30 @@
     '.ka-sug button:hover{background:#fff7ed;border-color:#F26422}',
     '.ka-foot{flex:none;background:#fff;border-top:1px solid #e2e8f0;padding:8px 10px 10px}',
     '.ka-av{margin:0 0 6px;font-size:11px;color:#64748b;line-height:1.35}',
-    '.ka-form{display:flex;gap:8px;align-items:flex-end}',
-    '.ka-form textarea{flex:1;resize:none;border:1px solid #cbd5e1;border-radius:12px;padding:9px 11px;font:14px/1.4 inherit;font-family:inherit;max-height:110px;min-height:42px;background:#fff;color:#0f172a}',
+    '.ka-form{display:flex;gap:8px;align-items:stretch}',
+    /* Zone d'écriture : trois lignes d'emblée (on voit ce qu'on écrit), elle grandit jusqu'à 200 px puis défile. */
+    '.ka-form textarea{flex:1;min-width:0;resize:none;border:1px solid #cbd5e1;border-radius:12px;padding:10px 12px;font:15px/1.45 inherit;font-family:inherit;max-height:200px;min-height:92px;background:#fff;color:#0f172a}',
     '.ka-form textarea:focus{outline:2px solid #F26422;border-color:#F26422}',
+    '.ka-side{display:flex;flex-direction:column;gap:6px;justify-content:flex-end}',
     '.ka-send{border:0;background:#F26422;color:#fff;border-radius:12px;height:42px;padding:0 16px;font:800 14px inherit;font-family:inherit;cursor:pointer}.ka-send:disabled{opacity:.5;cursor:not-allowed}',
+    '.ka-mic{border:1.5px solid #cbd5e1;background:#fff;color:#0D2B4E;border-radius:12px;height:42px;font-size:19px;cursor:pointer;line-height:1}.ka-mic:hover{background:#fff7ed;border-color:#F26422}.ka-mic:focus-visible{outline:3px solid #F26422;outline-offset:2px}',
+    '.ka-mic.rec{background:#dc2626;border-color:#dc2626;color:#fff;animation:kaPulse 1.2s infinite}@keyframes kaPulse{50%{opacity:.65}}',
+    '.ka-micst{margin:0 0 6px;font-size:12px;font-weight:700;color:#b91c1c}.ka-micst:empty{display:none}',
+    /* Fil d'Ariane : dossier › discussion en cours ; un clic ouvre la liste. */
+    '.ka-ou{flex:none;display:none;width:100%;text-align:left;border:0;border-bottom:1px solid #e2e8f0;background:#fff;color:#0D2B4E;font:700 12.5px inherit;font-family:inherit;padding:7px 12px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+    '.ka-ou:hover{background:#fff7ed}.ka-ou.on{display:block}',
+    /* Liste des discussions et des dossiers */
+    '.ka-bar{display:flex;gap:6px;flex-wrap:wrap}',
+    '.ka-doss{background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden}',
+    '.ka-dh{display:flex;align-items:center;gap:4px;padding:8px 10px;background:#eef2f7}.ka-dh button.ka-tog{flex:1;min-width:0;text-align:left;background:none;border:0;font:800 13.5px inherit;font-family:inherit;color:#0D2B4E;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+    '.ka-mini{background:none;border:0;cursor:pointer;font-size:14px;padding:4px 6px;border-radius:6px;color:#475569}.ka-mini:hover{background:#e2e8f0}',
+    '.ka-disc{display:flex;align-items:center;gap:4px;padding:7px 10px;border-top:1px solid #eef2f7}.ka-disc.actuelle{background:#fff7ed}',
+    '.ka-disc button.ka-ouvrir{flex:1;min-width:0;text-align:left;background:none;border:0;cursor:pointer;color:#0f172a;font:13px inherit;font-family:inherit}.ka-disc .t{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ka-disc small{display:block;color:#64748b;font-size:11px}',
+    '.ka-vide{font-size:12.5px;color:#64748b;padding:8px 10px}',
+    '.ka-h5{font:800 12px inherit;font-family:inherit;text-transform:uppercase;letter-spacing:.4px;color:#64748b;margin:4px 2px 0}',
+    '.ka-root .ka-sel{font-size:12px;width:78px;max-width:78px;height:30px;padding:2px 4px;margin:0;flex:none;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#0f172a}',
+    '.ka-dlg{position:absolute;inset:0;z-index:5;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;padding:16px}.ka-dlg-c{background:#fff;border-radius:12px;padding:16px;width:100%;max-width:340px;box-shadow:0 10px 30px rgba(0,0,0,.3);color:#1e293b;font:14px inherit;font-family:inherit}.ka-dlg-c p{margin:0 0 10px;line-height:1.4}.ka-dlg-c input{width:100%;padding:9px 10px;border:1.5px solid #cbd5e1;border-radius:8px;font:16px inherit;font-family:inherit;margin-bottom:10px}.ka-dlg-b{display:flex;gap:8px;justify-content:flex-end}',
+    '.ka-ok{background:#F26422;color:#fff;border:0;border-radius:8px;padding:8px 16px;font:800 14px inherit;font-family:inherit;cursor:pointer}.ka-ko{background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:7px 13px;cursor:pointer;color:#475569;font:14px inherit;font-family:inherit}',
     '.ka-card{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:14px;font-size:13.5px;line-height:1.55;color:#0f172a}',
     '.ka-card h4{margin:0 0 6px;font-size:15px;color:#0D2B4E}.ka-card p{margin:0 0 8px;color:#0f172a}',
     '.ka-card ul{margin:8px 0 12px;padding-left:18px}.ka-card li{margin:4px 0}',
@@ -90,7 +118,7 @@
     '@media (prefers-reduced-motion:no-preference){.ka-btn{transition:transform .15s}}'
   ].join('\n');
 
-  var S = { opts: null, etat: null, conv: null, msgs: [], root: null, occupe: false, presEnCours: false };
+  var S = { opts: null, etat: null, conv: null, msgs: [], root: null, occupe: false, presEnCours: false, vue: 'chat', titre: '', dossier: null, ouverts: {}, arreterMicro: null };
   var ecouteEchap = false;
   var esc = function (s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); };
   var $ = function (sel) { return S.root.querySelector(sel); };
@@ -191,13 +219,177 @@
     chargerScript('/assets/koffi-presentation.js?v=2', function () { return !!window.KoffiPresentation; }).then(function () { fin(true); });
   }
 
+  /* ── Dossiers et discussions : la liste, pour ranger et retrouver ── */
+  function dateCourte(s) {
+    if (!s) return '';
+    var t = String(s).replace(' ', 'T'), d = new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(t) ? t : t + 'Z'); if (isNaN(d)) return '';
+    return d.toLocaleString('fr-FR', { timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  }
+  /* Fenêtres intégrées à la fenêtre de Koffi : prompt()/confirm() du navigateur sont parfois bloqués sans bruit (appli installée, navigateur intégré). */
+  function dialogue(msg, o) {
+    return new Promise(function (ok) {
+      var fond = document.createElement('div'); fond.className = 'ka-dlg';
+      var cart = document.createElement('div'); cart.className = 'ka-dlg-c'; cart.setAttribute('role', 'dialog'); cart.setAttribute('aria-modal', 'true');
+      var t = document.createElement('p'); t.textContent = msg; cart.appendChild(t);
+      var champ = null;
+      if (o.champ) { champ = document.createElement('input'); champ.type = 'text'; champ.maxLength = 60; champ.value = o.valeur || ''; cart.appendChild(champ); }
+      var bar = document.createElement('div'); bar.className = 'ka-dlg-b';
+      var fini = false, rien = o.champ ? null : false;
+      function fermerDlg(v) { if (fini) return; fini = true; document.removeEventListener('keydown', clav, true); fond.remove(); ok(v); }
+      if (!o.sansAnnuler) { var an = document.createElement('button'); an.type = 'button'; an.className = 'ka-ko'; an.textContent = 'Annuler'; an.addEventListener('click', function () { fermerDlg(rien); }); bar.appendChild(an); }
+      var bo = document.createElement('button'); bo.type = 'button'; bo.className = 'ka-ok'; bo.textContent = 'OK';
+      bo.addEventListener('click', function () { fermerDlg(o.champ ? champ.value : true); }); bar.appendChild(bo);
+      cart.appendChild(bar); fond.appendChild(cart);
+      function clav(e) {
+        if (e.key === 'Escape') { e.stopPropagation(); fermerDlg(o.sansAnnuler ? true : rien); }
+        else if (e.key === 'Enter' && (champ || e.target === bo)) { e.preventDefault(); e.stopPropagation(); fermerDlg(o.champ ? champ.value : true); }
+      }
+      document.addEventListener('keydown', clav, true);
+      S.root.querySelector('.ka-panel').appendChild(fond);
+      setTimeout(function () { if (champ) { champ.focus(); champ.select(); } else bo.focus(); }, 0);
+    });
+  }
+  var demander = function (msg, valeur) { return dialogue(msg, { champ: true, valeur: valeur }); };
+  var confirmer = function (msg) { return dialogue(msg, {}); };
+  var avertir = function (msg) { return dialogue(String(msg), { sansAnnuler: true }); };
+  function mini(txt, titre, fn) { var b = document.createElement('button'); b.type = 'button'; b.className = 'ka-mini'; b.textContent = txt; b.title = titre; b.setAttribute('aria-label', titre); b.addEventListener('click', function (e) { e.stopPropagation(); fn(); }); return b; }
+  function rafraichirListe() {
+    return api('GET', '/api/kofi/annuaire/discussions').then(function (r) { if (r.ok && S.etat) { S.etat.dossiers = r.data.dossiers || []; S.etat.discussions = r.data.discussions || []; } });
+  }
+  function nomDossier(id) { var d = S.etat && (S.etat.dossiers || []).filter(function (x) { return x.id === id; })[0]; return d ? d.nom : ''; }
+  /* Fil d'Ariane au-dessus de la discussion : « 📁 Dossier › titre » ; un clic ouvre la liste. */
+  function majFil() {
+    var b = $('.ka-ou'); if (!b) return;
+    var ok = S.vue === 'chat' && S.etat && (S.etat.etat === 'utilisable' || S.etat.etat === 'recharge') && !S.presEnCours && (S.conv || S.dossier);
+    if (!ok) { b.classList.remove('on'); return; }
+    var d = S.dossier ? nomDossier(S.dossier) : '';
+    b.textContent = (d ? '📁 ' + d + (S.titre ? ' › ' : '') : '') + (S.titre || (d ? '' : T.untitled));
+    b.title = T.liste; b.classList.add('on');
+  }
+  function aller(vue) { if (S.arreterMicro) S.arreterMicro(); S.vue = vue; construireCorps(); }
+  function ouvrirDiscussion(id) {
+    return api('GET', '/api/kofi/annuaire/conversations/' + id).then(function (r) {
+      if (!r.ok) { avertir((r.data && r.data.error) || T.erreur); return; }
+      S.conv = r.data.id; S.msgs = r.data.messages || []; S.titre = r.data.titre || ''; S.dossier = r.data.dossier_id || null;
+      aller('chat');
+    });
+  }
+  function nouvelleDiscussion(dossierId) { S.conv = null; S.msgs = []; S.titre = ''; S.dossier = dossierId || null; aller('chat'); }
+  function ligneDisc(c, dossiers) {
+    var l = document.createElement('div'); l.className = 'ka-disc' + (c.id === S.conv ? ' actuelle' : '');
+    var o = document.createElement('button'); o.type = 'button'; o.className = 'ka-ouvrir'; o.innerHTML = '<span class="t"></span><small></small>';
+    o.querySelector('.t').textContent = c.titre; o.querySelector('small').textContent = dateCourte(c.derniere_activite);
+    o.addEventListener('click', function () { ouvrirDiscussion(c.id); });
+    l.appendChild(o);
+    var sel = document.createElement('select'); sel.className = 'ka-sel'; sel.title = T.deplacer; sel.setAttribute('aria-label', T.deplacer);
+    var o0 = document.createElement('option'); o0.value = ''; o0.textContent = 'Ranger…'; sel.appendChild(o0);
+    var oh = document.createElement('option'); oh.value = '0'; oh.textContent = '— ' + T.horsDossier; sel.appendChild(oh);
+    dossiers.forEach(function (d) { var op = document.createElement('option'); op.value = String(d.id); op.textContent = '📁 ' + d.nom; sel.appendChild(op); });
+    sel.addEventListener('change', function () {
+      if (sel.value === '') return;
+      var cible = sel.value === '0' ? null : Number(sel.value);
+      api('PATCH', '/api/kofi/annuaire/conversations/' + c.id, { dossier_id: cible }).then(function (r) {
+        if (!r.ok) throw new Error((r.data && r.data.error) || T.erreur);
+        if (c.id === S.conv) S.dossier = cible; if (cible) S.ouverts[cible] = true; return rafraichirListe();
+      }).then(construireCorps).catch(function (er) { avertir(er.message); });
+    });
+    l.appendChild(sel);
+    l.appendChild(mini('✏️', T.renommer, function () {
+      demander(T.nomDisc, c.titre).then(function (n) {
+        if (!n || !n.trim()) return;
+        return api('PATCH', '/api/kofi/annuaire/conversations/' + c.id, { titre: n.trim() }).then(function (r) { if (!r.ok) throw new Error((r.data && r.data.error) || T.erreur); if (c.id === S.conv) S.titre = n.trim(); return rafraichirListe(); }).then(construireCorps);
+      }).catch(function (er) { avertir(er.message); });
+    }));
+    l.appendChild(mini('🗑️', T.supprimerIt, function () {
+      confirmer(T.confirmSuppr).then(function (oui) {
+        if (!oui) return;
+        return api('DELETE', '/api/kofi/annuaire/conversations/' + c.id).then(function () { if (c.id === S.conv) { S.conv = null; S.msgs = []; S.titre = ''; S.dossier = null; } return rafraichirListe(); }).then(construireCorps);
+      }).catch(function (er) { avertir(er.message); });
+    }));
+    return l;
+  }
+  function rendreListe() {
+    var body = $('.ka-body'); body.innerHTML = ''; $('.ka-foot').style.display = 'none'; majFil();
+    var barre = document.createElement('div'); barre.className = 'ka-bar';
+    var bn = document.createElement('button'); bn.type = 'button'; bn.className = 'ka-ok'; bn.textContent = T.nouvelleDisc; bn.addEventListener('click', function () { nouvelleDiscussion(null); });
+    var bd = document.createElement('button'); bd.type = 'button'; bd.className = 'ka-ko'; bd.textContent = T.nouveauDossier;
+    bd.addEventListener('click', function () {
+      demander(T.nomDossier, '').then(function (nom) {
+        if (!nom || !nom.trim()) return;
+        return api('POST', '/api/kofi/annuaire/dossiers', { nom: nom.trim() }).then(function (r) { if (!r.ok) throw new Error((r.data && r.data.error) || T.erreur); S.ouverts[r.data.id] = true; return rafraichirListe(); }).then(construireCorps);
+      }).catch(function (er) { avertir(er.message); });
+    });
+    barre.appendChild(bn); barre.appendChild(bd); body.appendChild(barre);
+    var dossiers = (S.etat && S.etat.dossiers) || [], disc = (S.etat && S.etat.discussions) || [];
+    dossiers.forEach(function (d) {
+      var contenu = disc.filter(function (c) { return c.dossier_id === d.id; });
+      var bloc = document.createElement('div'); bloc.className = 'ka-doss';
+      var h = document.createElement('div'); h.className = 'ka-dh';
+      var tog = document.createElement('button'); tog.type = 'button'; tog.className = 'ka-tog'; tog.textContent = (S.ouverts[d.id] ? '▾ 📁 ' : '▸ 📁 ') + d.nom + ' (' + contenu.length + ')';
+      tog.addEventListener('click', function () { S.ouverts[d.id] = !S.ouverts[d.id]; rendreListe(); });
+      h.appendChild(tog);
+      h.appendChild(mini('＋', T.nouvelleDansDossier, function () { nouvelleDiscussion(d.id); }));
+      h.appendChild(mini('✏️', T.renommer, function () {
+        demander(T.nomDossier, d.nom).then(function (n) {
+          if (!n || !n.trim()) return;
+          return api('PATCH', '/api/kofi/annuaire/dossiers/' + d.id, { nom: n.trim() }).then(function (r) { if (!r.ok) throw new Error((r.data && r.data.error) || T.erreur); return rafraichirListe(); }).then(construireCorps);
+        }).catch(function (er) { avertir(er.message); });
+      }));
+      h.appendChild(mini('🗑️', T.supprimerIt, function () {
+        confirmer(T.confirmDossier(contenu.length)).then(function (oui) {
+          if (!oui) return;
+          return api('DELETE', '/api/kofi/annuaire/dossiers/' + d.id).then(function () {
+            if (contenu.some(function (c) { return c.id === S.conv; })) { S.conv = null; S.msgs = []; S.titre = ''; }
+            if (S.dossier === d.id) S.dossier = null;
+            return rafraichirListe();
+          }).then(construireCorps);
+        }).catch(function (er) { avertir(er.message); });
+      }));
+      bloc.appendChild(h);
+      if (S.ouverts[d.id]) {
+        if (!contenu.length) { var v = document.createElement('div'); v.className = 'ka-vide'; v.textContent = T.aucune; bloc.appendChild(v); }
+        contenu.forEach(function (c) { bloc.appendChild(ligneDisc(c, dossiers)); });
+      }
+      body.appendChild(bloc);
+    });
+    var libres = disc.filter(function (c) { return !c.dossier_id; });
+    var t = document.createElement('div'); t.className = 'ka-h5'; t.textContent = T.sansDossier; body.appendChild(t);
+    if (!libres.length) { var v2 = document.createElement('div'); v2.className = 'ka-vide'; v2.textContent = T.aucune; body.appendChild(v2); }
+    else { var bl = document.createElement('div'); bl.className = 'ka-doss'; libres.forEach(function (c) { bl.appendChild(ligneDisc(c, dossiers)); }); body.appendChild(bl); }
+  }
+
+  /* ── Dictée vocale : reconnaissance native du navigateur (gratuite, aucune clé) ; le bouton disparaît si le navigateur ne la propose pas ── */
+  function initMicro() {
+    var btn = $('.ka-mic'), ta = $('.ka-form textarea'), st = $('.ka-micst'), SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { btn.style.display = 'none'; return; }
+    var rec = new SR(); rec.lang = 'fr-FR'; rec.interimResults = true; rec.continuous = true;
+    var ecoute = false, arret = false, base = '', final = '';
+    function fin() { ecoute = false; btn.classList.remove('rec'); btn.setAttribute('aria-label', T.micro); btn.title = T.micro; if (st.textContent === T.microEcoute) st.textContent = ''; }
+    rec.addEventListener('result', function (e) {
+      var interim = '';
+      for (var i = e.resultIndex; i < e.results.length; i++) { if (e.results[i].isFinal) final += e.results[i][0].transcript; else interim += e.results[i][0].transcript; }
+      ta.value = (base + ' ' + final + ' ' + interim).replace(/\s+/g, ' ').trim(); ta.dispatchEvent(new Event('input'));
+    });
+    rec.addEventListener('end', function () { if (!arret) { try { rec.start(); return; } catch (e) { /* on termine */ } } fin(); });
+    rec.addEventListener('error', function (e) {
+      if (e.error === 'no-speech' || e.error === 'aborted') return;
+      arret = true; fin(); st.textContent = (e.error === 'not-allowed' || e.error === 'service-not-allowed') ? T.microRefus : T.microErreur;
+    });
+    btn.addEventListener('click', function () {
+      if (ecoute) { arret = true; try { rec.stop(); } catch (e) { /* déjà arrêté */ } return; }
+      ecoute = true; arret = false; final = ''; base = ta.value.trim(); st.textContent = T.microEcoute; btn.classList.add('rec'); btn.setAttribute('aria-label', T.microArret); btn.title = T.microArret;
+      try { rec.start(); } catch (e) { arret = true; fin(); st.textContent = T.microErreur; }
+    });
+    S.arreterMicro = function () { final = ''; if (ecoute) { arret = true; try { rec.stop(); } catch (e) { /* déjà arrêté */ } } };
+  }
+
   function construireCorps() {
     if (S.presEnCours) return;
     var body = $('.ka-body'); body.innerHTML = '';
     var foot = $('.ka-foot'), e = S.etat, ta = $('.ka-form textarea'), env = $('.ka-send');
-    foot.style.display = ''; ta.disabled = false; env.disabled = false; majMeta();
+    foot.style.display = ''; ta.disabled = false; env.disabled = false; majMeta(); majFil();
     $('.ka-av').textContent = (e && e.avertissement) || T.info1;
-    S.root.querySelectorAll('[data-a="nouvelle"],[data-a="supprimer"]').forEach(function (b) { b.style.display = e && (e.etat === 'utilisable' || e.etat === 'recharge') ? '' : 'none'; });
+    S.root.querySelectorAll('[data-a="nouvelle"],[data-a="supprimer"],[data-a="liste"]').forEach(function (b) { b.style.display = e && (e.etat === 'utilisable' || e.etat === 'recharge') ? '' : 'none'; });
     if (!e) { body.appendChild(carte('Koffi', T.indisponible)); foot.style.display = 'none'; return; }
     var st = e.etat;
     if (st === 'premium_requis') { body.appendChild(carte(T.premiumTitre, e.message_etat || '', [lienBouton('⭐ ' + T.premium, (S.opts && S.opts.premiumUrl) || 'premium.html'), bouton(T.manuel, 'manuel', true)])); foot.style.display = 'none'; return; }
@@ -206,9 +398,10 @@
     if (st === 'mineur' || st === 'pays' || st === 'desactive' || st === 'indisponible') { body.appendChild(carte('Koffi', T[st], [bouton(T.manuel, 'manuel', true)])); foot.style.display = 'none'; return; }
     if (e.presentation_vue === false && !S.msgs.length) { foot.style.display = 'none'; jouerPresentation(body); return; }
     if (!lsGet('koffi_annuaire_info_v1')) { body.appendChild(carteInfo()); foot.style.display = 'none'; return; }
+    if (S.vue === 'liste') { rendreListe(); return; }
     S.msgs.forEach(ajouterMessage);
     if (!S.msgs.length) {
-      ajouterMessage({ role: 'assistant', contenu: T.accueil });
+      ajouterMessage({ role: 'assistant', contenu: S.dossier && nomDossier(S.dossier) ? T.accueilDossier(nomDossier(S.dossier)) : T.accueil });
       var s = document.createElement('div'); s.className = 'ka-sug';
       T.suggestions.forEach(function (x) { var b = document.createElement('button'); b.type = 'button'; b.textContent = x; b.addEventListener('click', function () { ta.value = x; envoyer(); }); s.appendChild(b); });
       body.appendChild(s);
@@ -228,34 +421,40 @@
     $('[data-a="nouvelle"]').title = T.nouvelle; $('[data-a="nouvelle"]').setAttribute('aria-label', T.nouvelle);
     $('[data-a="supprimer"]').title = T.supprimer; $('[data-a="supprimer"]').setAttribute('aria-label', T.supprimer);
     $('.ka-form textarea').placeholder = T.placeholder; $('.ka-send').textContent = T.envoyer;
+    $('[data-a="liste"]').title = T.liste; $('[data-a="liste"]').setAttribute('aria-label', T.liste);
+    $('.ka-mic').title = T.micro; $('.ka-mic').setAttribute('aria-label', T.micro);
   }
 
   function chargerEtat() {
     return api('GET', '/api/kofi/annuaire/etat').then(function (r) {
-      if (r.ok) { S.etat = r.data; S.conv = r.data.conversation ? r.data.conversation.id : null; S.msgs = r.data.conversation ? r.data.conversation.messages : []; }
+      if (r.ok) {
+        var c = r.data.conversation;
+        S.etat = r.data; S.conv = c ? c.id : null; S.msgs = c ? c.messages : []; S.titre = c ? (c.titre || '') : ''; S.dossier = c ? (c.dossier_id || null) : null;
+      }
       return r;
     });
   }
   function ouvrirPanneau() {
-    S.root.classList.add('open');
+    S.root.classList.add('open'); S.vue = 'chat';
     chargerEtat().then(function () { construireCorps(); var ta = $('.ka-form textarea'); if (ta && !ta.disabled && $('.ka-foot').style.display !== 'none' && window.innerWidth > 560) ta.focus(); });
   }
-  function fermerPanneau() { S.root.classList.remove('open'); var b = $('.ka-btn'); if (b) b.focus(); }
+  function fermerPanneau() { if (S.arreterMicro) S.arreterMicro(); S.root.classList.remove('open'); var b = $('.ka-btn'); if (b) b.focus(); }
 
   function envoyer() {
     if (S.occupe) return;
     var ta = $('.ka-form textarea'); var texte = ta.value.trim(); if (!texte || ta.disabled) return;
     var max = S.etat && S.etat.max_message; if (max && texte.length > max) { ajouterMessage({ role: 'assistant', contenu: 'Message trop long (' + max + ' caractères au maximum).' }); return; }
-    S.occupe = true; $('.ka-send').disabled = true;
+    S.occupe = true; $('.ka-send').disabled = true; if (S.arreterMicro) S.arreterMicro(); $('.ka-micst').textContent = '';
     var corps = $('.ka-body');
     if (!S.msgs.length) corps.innerHTML = '';
     var mu = { role: 'user', contenu: texte }; S.msgs.push(mu); ajouterMessage(mu);
     ta.value = ''; ta.style.height = 'auto';
     var att = document.createElement('div'); att.className = 'ka-typing'; att.setAttribute('role', 'status'); att.textContent = T.reflechit; corps.appendChild(att); corps.scrollTop = corps.scrollHeight;
-    api('POST', '/api/kofi/annuaire/messages', { texte: texte, conversation_id: S.conv || undefined }).then(function (r) {
+    api('POST', '/api/kofi/annuaire/messages', { texte: texte, conversation_id: S.conv || undefined, dossier_id: (!S.conv && S.dossier) ? S.dossier : undefined }).then(function (r) {
       att.remove();
       if (r.ok) {
-        S.conv = r.data.conversation_id; S.msgs.push(r.data.message); ajouterMessage(r.data.message);
+        if (!S.conv) { S.titre = texte.replace(/\s+/g, ' ').slice(0, 60); rafraichirListe().then(majFil); }
+        S.conv = r.data.conversation_id; S.msgs.push(r.data.message); ajouterMessage(r.data.message); majFil();
         if (S.etat && r.data.portefeuille) S.etat.portefeuille = r.data.portefeuille;
         majMeta();
         if (S.etat && S.etat.etat === 'recharge') construireCorps();   /* la carte de recharge reste sous les derniers messages */
@@ -294,9 +493,10 @@
       '<button type="button" class="ka-btn" data-a="ouvrir"><img src="/assets/koffi-avatar-96.webp" width="46" height="46" alt=""><span></span></button>' +
       '<section class="ka-panel" role="dialog" aria-label="Koffi, conseiller de l\'Annuaire" aria-modal="false">' +
         '<div class="ka-head"><img src="/assets/koffi-avatar-96.webp" width="42" height="42" alt=""><div class="ka-t"><b></b><span></span><button type="button" class="ka-credit" data-a="credit" style="display:none"></button></div>' +
-          '<button type="button" class="ka-ic" data-a="nouvelle">＋</button><button type="button" class="ka-ic" data-a="supprimer">🗑</button><button type="button" class="ka-ic" data-a="fermer">✕</button></div>' +
+          '<button type="button" class="ka-ic" data-a="liste">📁</button><button type="button" class="ka-ic" data-a="nouvelle">＋</button><button type="button" class="ka-ic" data-a="supprimer">🗑</button><button type="button" class="ka-ic" data-a="fermer">✕</button></div>' +
+        '<button type="button" class="ka-ou" data-a="liste"></button>' +
         '<div class="ka-body" aria-live="polite"></div>' +
-        '<div class="ka-foot"><p class="ka-av"></p><form class="ka-form"><textarea rows="1" maxlength="1500" aria-label="Votre recherche"></textarea><button type="submit" class="ka-send"></button></form></div>' +
+        '<div class="ka-foot"><p class="ka-av"></p><p class="ka-micst" role="status"></p><form class="ka-form"><textarea rows="3" maxlength="1500" aria-label="Votre recherche"></textarea><div class="ka-side"><button type="button" class="ka-mic" aria-label="Dicter votre message">🎤</button><button type="submit" class="ka-send"></button></div></form></div>' +
       '</section>';
     document.body.appendChild(root); S.root = root;
     root.addEventListener('click', function (ev) {
@@ -308,16 +508,25 @@
       if (act === 'compris') { lsSet('koffi_annuaire_info_v1', '1'); return construireCorps(); }
       if (act === 'majorite') return confirmerMajorite();
       if (act === 'manuel') return fermerEtChercher();
-      if (act === 'nouvelle') { S.conv = null; S.msgs = []; if (S.etat && S.etat.etat !== 'recharge') construireCorps(); return; }
+      if (act === 'liste') {
+        if (S.vue === 'liste') return aller('chat');
+        return rafraichirListe().then(function () { aller('liste'); });
+      }
+      if (act === 'nouvelle') { S.conv = null; S.msgs = []; S.titre = ''; S.dossier = null; S.vue = 'chat'; if (S.arreterMicro) S.arreterMicro(); construireCorps(); return; }
       if (act === 'supprimer') {
-        if (!S.conv) return; if (!window.confirm(T.confirmSuppr)) return;
-        return api('DELETE', '/api/kofi/annuaire/conversations/' + S.conv).then(function () { S.conv = null; S.msgs = []; construireCorps(); });
+        if (!S.conv) return;
+        var cible = S.conv;
+        return confirmer(T.confirmSuppr).then(function (oui) {
+          if (!oui) return;
+          return api('DELETE', '/api/kofi/annuaire/conversations/' + cible).then(function () { S.conv = null; S.msgs = []; S.titre = ''; S.dossier = null; return rafraichirListe(); }).then(construireCorps);
+        }).catch(function (er) { avertir(er.message); });
       }
     });
     root.querySelector('.ka-form').addEventListener('submit', function (ev) { ev.preventDefault(); envoyer(); });
     var ta = root.querySelector('.ka-form textarea');
     ta.addEventListener('keydown', function (ev) { if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); envoyer(); } });
-    ta.addEventListener('input', function () { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 110) + 'px'; });
+    ta.addEventListener('input', function () { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 200) + 'px'; });
+    initMicro();
     if (!ecouteEchap) { ecouteEchap = true; document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && S.root && S.root.classList.contains('open') && !document.querySelector('.kcr-fond')) fermerPanneau(); }); }
   }
 
@@ -333,7 +542,8 @@
     },
     demonter: function () {
       if (S.root && S.root.parentNode) S.root.parentNode.removeChild(S.root);
-      S.root = null; S.etat = null; S.conv = null; S.msgs = []; S.occupe = false; S.opts = null;
+      if (S.arreterMicro) S.arreterMicro();
+      S.root = null; S.etat = null; S.conv = null; S.msgs = []; S.occupe = false; S.opts = null; S.vue = 'chat'; S.titre = ''; S.dossier = null; S.arreterMicro = null;
     },
     estMonte: function () { return !!S.root; }
   };

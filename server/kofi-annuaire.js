@@ -23,6 +23,7 @@ const MAX_LISTE = 30;            /* « fais-moi la liste de… » : jamais plus 
 const MAX_VERIF_LISTE = 100;     /* profils Premium vérifiés au plus, pour une liste */
 const MIN_PROPOSITIONS = 3;
 const TYPES = ["personne", "initiative", "collectivite"];
+const MAX_DOSSIERS = 30, MAX_DISCUSSIONS = 100;   /* par personne ; les dossiers de l'Annuaire sont dans kofi_dossiers avec formation_id = 0 (comme les conversations) */
 
 const nettoyer = s => String(s == null ? "" : s).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "").replace(/\r\n/g, "\n").trim();
 const court = (s, max) => nettoyer(s).replace(/\s+/g, " ").slice(0, max);
@@ -231,12 +232,33 @@ module.exports.register = function register(deps) {
     const meta = parseJson(m.citations_json);
     return { id: Number(m.id), role: m.role, contenu: m.contenu, propositions: (meta && Array.isArray(meta.propositions)) ? meta.propositions : [], liste: !!(meta && meta.liste), gratuit: /competences/.test(String(m.flags || "")), date: m.created_at };
   };
-  async function derniereConversation(user, r) {
-    const limite = sqlDate(new Date(Date.now() - r.retention_jours * 86400000));
-    const c = await db.prepare("SELECT * FROM kofi_conversations WHERE user_id=? AND contexte='annuaire' AND derniere_activite>=? ORDER BY derniere_activite DESC, id DESC LIMIT 1").get(user.id, limite);
-    if (!c) return null;
+  const limiteDe = r => sqlDate(new Date(Date.now() - r.retention_jours * 86400000));
+  async function avecMessages(c, limite) {
     const msgs = await db.prepare("SELECT id, role, contenu, citations_json, flags, created_at FROM kofi_messages WHERE conversation_id=? AND created_at>=? ORDER BY id").all(c.id, limite);
-    return { id: Number(c.id), messages: msgs.map(dto) };
+    return { id: Number(c.id), titre: c.titre || "", dossier_id: c.dossier_id ? Number(c.dossier_id) : null, messages: msgs.map(dto) };
+  }
+  async function derniereConversation(user, r) {
+    const limite = limiteDe(r);
+    const c = await db.prepare("SELECT * FROM kofi_conversations WHERE user_id=? AND contexte='annuaire' AND derniere_activite>=? ORDER BY derniere_activite DESC, id DESC LIMIT 1").get(user.id, limite);
+    return c ? avecMessages(c, limite) : null;
+  }
+  /* Dossiers et discussions de la personne (pour ranger et ne pas se perdre) : les discussions rangées dans un dossier restent listées tant que leurs messages sont conservés. */
+  async function listeRangee(user, r) {
+    const limite = limiteDe(r);
+    const dossiers = (await db.prepare("SELECT id, nom, derniere_activite FROM kofi_dossiers WHERE user_id=? AND formation_id=0 ORDER BY derniere_activite DESC, id DESC").all(user.id))
+      .map(d => ({ id: Number(d.id), nom: d.nom, derniere_activite: d.derniere_activite }));
+    const discussions = (await db.prepare("SELECT id, titre, dossier_id, derniere_activite FROM kofi_conversations WHERE user_id=? AND contexte='annuaire' AND (derniere_activite>=? OR dossier_id IS NOT NULL) ORDER BY derniere_activite DESC, id DESC LIMIT 300").all(user.id, limite))
+      .map(c => ({ id: Number(c.id), titre: c.titre || "Nouvelle discussion", dossier_id: c.dossier_id ? Number(c.dossier_id) : null, derniere_activite: c.derniere_activite }));
+    return { dossiers, discussions };
+  }
+  const dossierDe = async (user, id) => (await db.prepare("SELECT * FROM kofi_dossiers WHERE id=? AND user_id=? AND formation_id=0").get(Number(id), user.id)) || null;
+  const conversationDe = async (user, id) => (await db.prepare("SELECT * FROM kofi_conversations WHERE id=? AND user_id=? AND contexte='annuaire'").get(Number(id), user.id)) || null;
+  async function effacerDiscussions(ids) {
+    for (const id of ids) {
+      await db.prepare("DELETE FROM kofi_feedback WHERE message_id IN (SELECT id FROM kofi_messages WHERE conversation_id=?)").run(id);
+      await db.prepare("DELETE FROM kofi_messages WHERE conversation_id=?").run(id);
+      await db.prepare("DELETE FROM kofi_conversations WHERE id=?").run(id);
+    }
   }
 
   route("GET", "/api/kofi/annuaire/etat", async (req, res) => {
@@ -255,7 +277,71 @@ module.exports.register = function register(deps) {
       portefeuille: pf, recharge: { achetable: !["indisponible", "desactive", "mineur", "majorite", "pays"].includes(ctx.etat), texte: P.TEXTE_RECHARGE_NON_REMBOURSABLE, retractation: P.TEXTE_RECHARGE_RETRACTATION },
       max_message: r.annuaire_max_message_caracteres, retention_jours: r.retention_jours,
       conversation: bloque ? null : await derniereConversation(user, r),
+      ...(bloque ? { dossiers: [], discussions: [] } : await listeRangee(user, r)),
     });
+  });
+
+  /* ── Dossiers et discussions : ranger pour ne pas se perdre ─────────────────────────────────────── */
+  route("GET", "/api/kofi/annuaire/discussions", async (req, res) => {
+    const user = await exiger(req, res); if (!user) return;
+    const ctx = await contexte(user, req);
+    sendJSON(res, 200, await listeRangee(user, ctx.r));
+  });
+  route("GET", "/api/kofi/annuaire/conversations/:id", async (req, res, params) => {
+    const user = await exiger(req, res); if (!user) return;
+    const c = await conversationDe(user, params.id);
+    if (!c) return sendJSON(res, 404, { error: "Discussion introuvable." });
+    const ctx = await contexte(user, req);
+    sendJSON(res, 200, await avecMessages(c, limiteDe(ctx.r)));
+  });
+  route("POST", "/api/kofi/annuaire/dossiers", async (req, res, params, body) => {
+    const user = await exiger(req, res); if (!user) return;
+    const nom = court(body && body.nom, 60);
+    if (!nom) return sendJSON(res, 400, { error: "Donnez un nom au dossier (par exemple « Avocats »)." });
+    const lim = SEC.rateLimit(`kofi-annuaire-dossier:${user.id}`, 40, 3600000);
+    if (!lim.allowed) return sendJSON(res, 429, { error: "Trop de créations. Réessayez plus tard." });
+    const n = Number((await db.prepare("SELECT COUNT(*) AS n FROM kofi_dossiers WHERE user_id=? AND formation_id=0").get(user.id)).n) || 0;
+    if (n >= MAX_DOSSIERS) return sendJSON(res, 400, { error: `Vous avez atteint la limite de ${MAX_DOSSIERS} dossiers : supprimez-en un.` });
+    const x = await db.prepare("INSERT INTO kofi_dossiers (user_id, formation_id, nom) VALUES (?,?,?)").run(user.id, 0, nom);
+    sendJSON(res, 201, { id: Number(x.lastInsertRowid), nom });
+  });
+  route("PATCH", "/api/kofi/annuaire/dossiers/:id", async (req, res, params, body) => {
+    const user = await exiger(req, res); if (!user) return;
+    const d = await dossierDe(user, params.id);
+    if (!d) return sendJSON(res, 404, { error: "Dossier introuvable." });
+    const nom = court(body && body.nom, 60);
+    if (!nom) return sendJSON(res, 400, { error: "Donnez un nom au dossier." });
+    await db.prepare("UPDATE kofi_dossiers SET nom=? WHERE id=?").run(nom, d.id);
+    sendJSON(res, 200, { ok: true, nom });
+  });
+  /* Supprimer un dossier supprime les discussions qu'il contient (l'écran le demande clairement). */
+  route("DELETE", "/api/kofi/annuaire/dossiers/:id", async (req, res, params) => {
+    const user = await exiger(req, res); if (!user) return;
+    const d = await dossierDe(user, params.id);
+    if (!d) return sendJSON(res, 404, { error: "Dossier introuvable." });
+    const ids = (await db.prepare("SELECT id FROM kofi_conversations WHERE dossier_id=? AND user_id=? AND contexte='annuaire'").all(d.id, user.id)).map(c => Number(c.id));
+    await effacerDiscussions(ids);
+    await db.prepare("DELETE FROM kofi_dossiers WHERE id=?").run(d.id);
+    sendJSON(res, 200, { ok: true, discussions_supprimees: ids.length });
+  });
+  /* Renommer une discussion, ou la ranger dans un dossier (dossier_id = null : hors dossier). */
+  route("PATCH", "/api/kofi/annuaire/conversations/:id", async (req, res, params, body) => {
+    const user = await exiger(req, res); if (!user) return;
+    const c = await conversationDe(user, params.id);
+    if (!c) return sendJSON(res, 404, { error: "Discussion introuvable." });
+    if (body && body.titre !== undefined) {
+      const t = court(body.titre, 60); if (!t) return sendJSON(res, 400, { error: "Donnez un titre à la discussion." });
+      await db.prepare("UPDATE kofi_conversations SET titre=? WHERE id=?").run(t, c.id);
+    }
+    if (body && body.dossier_id !== undefined) {
+      if (body.dossier_id === null) await db.prepare("UPDATE kofi_conversations SET dossier_id=NULL WHERE id=?").run(c.id);
+      else {
+        const d = await dossierDe(user, body.dossier_id);
+        if (!d) return sendJSON(res, 404, { error: "Dossier introuvable." });
+        await db.prepare("UPDATE kofi_conversations SET dossier_id=? WHERE id=?").run(d.id, c.id);
+      }
+    }
+    sendJSON(res, 200, { ok: true });
   });
 
   route("POST", "/api/kofi/annuaire/messages", async (req, res, params, body) => {
@@ -278,9 +364,20 @@ module.exports.register = function register(deps) {
       conv = await db.prepare("SELECT * FROM kofi_conversations WHERE id=? AND user_id=? AND contexte='annuaire'").get(Number(body.conversation_id), user.id);
       if (!conv) return sendJSON(res, 404, { error: "Conversation introuvable." });
     }
+    /* Nouvelle discussion lancée depuis un dossier : elle y est rangée d'emblée. */
+    let dossierCible = null;
+    if (!conv && body && body.dossier_id) {
+      const d = await dossierDe(user, body.dossier_id);
+      if (!d) return sendJSON(res, 404, { error: "Dossier introuvable." });
+      dossierCible = Number(d.id);
+    }
+    if (!conv) {
+      const nb = Number((await db.prepare("SELECT COUNT(*) AS n FROM kofi_conversations WHERE user_id=? AND contexte='annuaire'").get(user.id)).n) || 0;
+      if (nb >= MAX_DISCUSSIONS) return sendJSON(res, 400, { error: `Vous avez atteint la limite de ${MAX_DISCUSSIONS} discussions : supprimez-en une pour en commencer une nouvelle.`, code: "trop_de_discussions" });
+    }
     const ouvrir = async () => {
       if (conv) { if (!conv.titre) await db.prepare("UPDATE kofi_conversations SET titre=? WHERE id=?").run(court(texte, 60), conv.id); return conv; }
-      const x = await db.prepare("INSERT INTO kofi_conversations (user_id, formation_id, contexte, langue, titre) VALUES (?,?,?,?,?)").run(user.id, 0, "annuaire", "fr", court(texte, 60));
+      const x = await db.prepare("INSERT INTO kofi_conversations (user_id, formation_id, contexte, langue, titre, dossier_id) VALUES (?,?,?,?,?,?)").run(user.id, 0, "annuaire", "fr", court(texte, 60), dossierCible);
       conv = { id: Number(x.lastInsertRowid) };
       return conv;
     };

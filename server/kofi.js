@@ -520,6 +520,7 @@ async function effacerCompte(db, userId) {
   await db.prepare("DELETE FROM kofi_feedback WHERE user_id=? OR message_id IN (SELECT m.id FROM kofi_messages m JOIN kofi_conversations c ON c.id=m.conversation_id WHERE c.user_id=?)").run(id, id);
   const m = await db.prepare("DELETE FROM kofi_messages WHERE conversation_id IN (SELECT id FROM kofi_conversations WHERE user_id=?)").run(id);
   const c = await db.prepare("DELETE FROM kofi_conversations WHERE user_id=?").run(id);
+  await db.prepare("DELETE FROM kofi_dossiers WHERE user_id=?").run(id); /* dossiers de discussions (assistant du formateur, conseiller de l'Annuaire) */
   await db.prepare("DELETE FROM kofi_admin_taches WHERE admin_id=?").run(id); /* tâches de l'assistant de l'administrateur */
   await db.prepare("DELETE FROM kofi_actions WHERE user_id=?").run(id); /* missions proposées par l'assistant du formateur (elles contiennent le texte collé) */
   await db.prepare("DELETE FROM kofi_majorite WHERE user_id=?").run(id);
