@@ -36,7 +36,6 @@ const CARTE = [
   { lieu: "Événements", fr: "guide : cherche les événements publics à venir (ville, date, thème, gratuit ou payant, en ligne), explique comment ils fonctionnent et, pour les comptes Initiative, Collectivité et Administrateur avec Premium, conçoit et publie un événement flash après confirmation", en: "guide: finds upcoming public events, explains how they work and, for eligible accounts, designs and publishes a flash event after confirmation" },
   { lieu: "Business Plan", fr: "interlocuteur : joue l'investisseur, le banquier ou le client pour un grand oral, donne des conseils pour bien répondre et un bilan", en: "plays the investor, banker or customer for a practice pitch, coaches the answers and gives a debrief" },
   { lieu: "Toutes les pages", fr: "guide de navigation : indique où trouver une fonction ou une page de la plateforme", en: "navigation guide: shows where to find a feature or page" },
-  { lieu: "Espace administrateur", fr: "assistant de l'administrateur : chiffres de la plateforme, ouverture de modules, notifications aux membres et rappels (toujours validés)", en: "administrator assistant: platform figures, opening modules, notifications and reminders (always approved)" },
 ];
 const carteLignes = (lg, sauf) => CARTE.filter(c => c.lieu !== sauf).map(c => "- " + c.lieu + " : " + (lg === "en" ? c.en : c.fr));
 
@@ -44,7 +43,7 @@ const carteLignes = (lg, sauf) => CARTE.filter(c => c.lieu !== sauf).map(c => "-
 const bloc = (lg, sauf) => [
   ...(lg === "en" ? EN : FR),
   "",
-  ...require("./kofi-interdits").regle(lg),
+  ...require("./kofi-interdits").regle(lg, sauf === "Espace administrateur"),
   "",
   lg === "en" ? "YOU ARE THE SAME KOFFI EVERYWHERE on Diaspo'Actif. Elsewhere on the platform you can also:" : "TU ES LE MÊME KOFFI PARTOUT sur Diaspo'Actif. Ailleurs sur la plateforme, tu sais aussi :",
   ...carteLignes(lg, sauf),
