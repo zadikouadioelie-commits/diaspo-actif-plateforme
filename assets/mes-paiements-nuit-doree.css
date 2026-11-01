@@ -1,0 +1,31 @@
+/* Design « Nuit dorée » — Mes moyens de paiement (mes-paiements.html) (2026-11-01).
+   S'ajoute à assets/theme-nuit-doree.css (fond, barre du haut). Même principe que Mes billets : les variables du site sont redéfinies dans la zone de contenu seulement.
+   Tout est préfixé html body.nd. Aucun changement de logique. Retour arrière : retirer les 2 liens et class="nd" sur <body>. */
+
+html body.nd main.container{--bg:rgba(255,255,255,.06);--card:rgba(255,255,255,.045);--text:#EDEAE0;--muted:#AEB8D0;--border:rgba(255,255,255,.13);color:var(--nd-texte)}
+html body.nd main.container h2{font-family:var(--nd-display)!important;font-weight:500!important;font-size:clamp(28px,3.2vw,40px)!important;letter-spacing:-.01em;color:#fff!important}
+html body.nd main.container .sub{color:var(--nd-doux)!important}
+
+/* cartes */
+html body.nd .mp-card{background:var(--nd-verre)!important;border:1px solid var(--nd-bord2)!important;border-radius:22px;color:var(--nd-texte);box-shadow:0 26px 54px -36px #000}
+html body.nd .mp-card h4{font-family:var(--nd-display);font-weight:500;font-size:18px;color:#fff}
+html body.nd .mp-carte-row{background:rgba(255,255,255,.05);border:1px solid var(--nd-bord2)!important;border-radius:16px}
+html body.nd .mp-carte-exp,html body.nd .mp-empty{color:var(--nd-doux)}
+html body.nd .mp-badge-defaut{background:rgba(143,224,176,.14);color:#9BE8B8}
+
+/* boutons */
+html body.nd .mp-btn-add{background:var(--nd-degore);color:#1a1202;border-radius:999px;box-shadow:0 12px 26px -14px rgba(227,192,110,.7)}
+html body.nd .mp-btn-add:hover{filter:brightness(1.07)}
+html body.nd .mp-btn-sm{border-radius:999px}
+html body.nd .mp-btn-sm.bleu{color:var(--nd-or);border-color:var(--nd-or)}
+html body.nd .mp-btn-sm.bleu:hover{background:rgba(227,192,110,.12)}
+html body.nd .mp-btn-sm.rouge{color:#FF9C9C;border-color:rgba(248,113,113,.55)}
+html body.nd .mp-btn-sm.rouge:hover{background:rgba(239,68,68,.14)}
+
+/* liens en ligne (« Voir la fiche », « Reçu ») : le bleu posé dans le HTML passe à l'or */
+html body.nd main.container a{color:var(--nd-or)!important}
+
+/* messages */
+html body.nd .mp-flash.ok{background:rgba(143,224,176,.12);border:1px solid rgba(143,224,176,.45);color:#9BE8B8}
+html body.nd .mp-flash.annule{background:rgba(227,192,110,.1);border:1px solid var(--nd-bord);color:#F3DC9B}
+html body.nd main.container :is(button,a):focus-visible{outline:3px solid var(--nd-or);outline-offset:2px}

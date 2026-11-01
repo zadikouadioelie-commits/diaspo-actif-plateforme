@@ -1,0 +1,49 @@
+/* Design « Nuit dorée » — Lettre de motivation (lettre-builder.html) (2026-11-01).
+   Page autonome (outil d'édition : en-tête, formulaire à gauche, aperçu de la lettre à droite). S'ajoute à assets/theme-nuit-doree.css.
+   La feuille A4 de l'aperçu et la zone de saisie du corps de la lettre restent BLANCHES (papier / surface d'écriture), comme pour le CV ; le reste passe en nuit + or.
+   Tout est préfixé html body.nd. Retour arrière : retirer le lien vers cette feuille et celui du thème, et class="nd" sur <body>. */
+
+html body.nd{background:var(--nd-nuit);color:var(--nd-texte);font-family:var(--nd-sans);color-scheme:dark}
+
+/* en-tête */
+html body.nd .lmb-header{background:rgba(10,16,36,.92);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border-bottom:1px solid var(--nd-bord2)}
+html body.nd .lmb-header h1{font-family:var(--nd-display);font-weight:500;font-size:1.3rem;color:#fff}
+html body.nd .lmb-header h1 span{color:var(--nd-or)}
+html body.nd .btn{border-radius:999px;font-weight:700}
+html body.nd .btn-primary{background:var(--nd-degore)!important;color:#1a1202!important;border:0!important}
+html body.nd .btn-primary:hover{filter:brightness(1.07)}
+html body.nd .btn-outline{background:rgba(255,255,255,.05)!important;border:1px solid var(--nd-bord)!important;color:#F3E3B5!important}
+html body.nd .btn-outline:hover{background:rgba(227,192,110,.16)}
+
+/* formulaire */
+html body.nd .lmb-form{background:var(--nd-verre);border-right:1px solid var(--nd-bord2)}
+html body.nd .lmb-form h2{font-family:var(--nd-display);font-weight:500;font-size:1.05rem;color:#fff;border-top:1px solid var(--nd-bord2)}
+html body.nd .lmb-form h2:first-child{border-top:none}
+html body.nd .lmb-form label{color:var(--nd-or)!important;letter-spacing:.05em}
+html body.nd .lmb-form :is(input,textarea,select):not(.rich-editor-toolbar select):not([type=color]):not([type=range]):not([type=file]){background:rgba(255,255,255,.07)!important;border:1px solid rgba(255,255,255,.2)!important;border-radius:12px!important;color:#fff!important;color-scheme:dark}
+html body.nd .lmb-form :is(input,textarea)::placeholder{color:#8F9BB8}
+html body.nd .lmb-form :is(input,textarea,select):focus{border-color:var(--nd-or);box-shadow:0 0 0 3px rgba(227,192,110,.18)}
+html body.nd .lmb-form select option{background:#0E1730;color:#fff}
+html body.nd .lmb-form input[type=color]{background:rgba(255,255,255,.07)!important;border:1px solid rgba(255,255,255,.2)!important;border-radius:10px!important;padding:3px!important}
+html body.nd .lmb-form input[type=file]{background:transparent!important;border:0!important;color:var(--nd-doux)!important;color-scheme:dark}
+html body.nd .lmb-form input[type=range]{accent-color:var(--nd-or);background:transparent!important;border:0!important;box-shadow:none!important}
+html body.nd .lmb-form > p,html body.nd .lmb-form #qr-url-lm{color:var(--nd-doux)!important}
+html body.nd .lmb-form > p b{color:var(--nd-texte)}
+
+/* modèles et thèmes */
+html body.nd .tmpl-card{background:rgba(255,255,255,.04);border:1px solid var(--nd-bord2);border-radius:14px}
+html body.nd .tmpl-card:hover{border-color:var(--nd-bord)}
+html body.nd .tmpl-card.active{border-color:var(--nd-or);box-shadow:0 0 0 2px rgba(227,192,110,.25)}
+html body.nd .tmpl-label{background:transparent;color:var(--nd-texte)}
+html body.nd .theme-swatch{border:2px solid var(--nd-bord2)}
+html body.nd .theme-swatch:hover{border-color:var(--nd-or)}
+html body.nd .qr-block{background:rgba(255,255,255,.05);border:1px solid var(--nd-bord2);border-radius:16px}
+html body.nd #qr-img-lm{background:#fff;border-radius:8px;padding:4px}
+
+/* aperçu : le fond passe en nuit, la feuille reste du papier */
+html body.nd .lmb-preview{background:linear-gradient(180deg,#0B1226,#060A14)}
+html body.nd .lettre-sheet{box-shadow:0 30px 70px -30px #000}
+html body.nd :is(.btn,button,a,input,select,textarea):focus-visible{outline:3px solid var(--nd-or);outline-offset:2px}
+
+/* impression : tout redevient clair */
+@media print{html body.nd{background:#fff!important}html body.nd .lmb-preview{background:#fff!important}html body.nd .lettre-sheet{box-shadow:none}}

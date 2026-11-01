@@ -125,8 +125,13 @@
 <link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
   <link rel="stylesheet" href="/assets/design-upgrade.v2.css">
   <link rel="stylesheet" href="/assets/theme-manager.css">
+  <!-- Design « Nuit dorée » (2026-11-01) : thème + feuilles de la page, zone nd-zone sur le contenu et les 2 fenêtres du Tuteur IA ; retour arrière : retirer ces lignes, nd-zone et class="nd" sur <body> -->
+  <link rel="stylesheet" href="/assets/theme-nuit-doree.css?v=8">
+  <link rel="stylesheet" href="/assets/pages-initiative-nuit-doree.css?v=1">
+  <link rel="stylesheet" href="/assets/tutoriels-nuit-doree.css?v=1">
+  <script src="/assets/dashboard-nuit-doree.js?v=4" defer></script>
 </head>
-<body>
+<body class="nd">
 
 <div id="app-topbar"></div>
 
@@ -142,7 +147,7 @@
 </div>
 
 <!-- ── Contenu ── -->
-<div class="tuto-main">
+<div class="tuto-main nd-zone">
   <div class="tuto-grid">
 
     <!-- ── Sidebar ── -->
@@ -262,7 +267,7 @@
 
 <!-- Modal D'A Tutor AI -->
 <div id="tutor-ai-modal" style="display:none;position:fixed;inset:0;z-index:99990;background:rgba(0,0,0,.65);align-items:flex-start;justify-content:center;padding:24px 16px;overflow-y:auto;">
-  <div style="background:#fff;border-radius:20px;max-width:680px;width:100%;margin:0 auto;overflow:hidden;">
+  <div class="tuto-nd-box nd-zone" style="background:#fff;border-radius:20px;max-width:680px;width:100%;margin:0 auto;overflow:hidden;">
     <!-- Header modal -->
     <div style="background:linear-gradient(135deg,#1e1e2e,#312e81);padding:20px 24px;display:flex;justify-content:space-between;align-items:center;">
       <div style="color:#fff;"><strong style="font-size:16px;">🧠 D'A Tutor AI — Créer un tutoriel</strong><br><span style="font-size:12px;opacity:.75;">Super Administrateur · Génération automatique</span></div>
@@ -328,7 +333,7 @@
 
 <!-- Modal lecture tutoriel IA -->
 <div id="ai-read-modal" style="display:none;position:fixed;inset:0;z-index:99991;background:rgba(0,0,0,.7);align-items:flex-start;justify-content:center;padding:24px 16px;overflow-y:auto;">
-  <div style="background:#fff;border-radius:20px;max-width:720px;width:100%;margin:0 auto;padding:32px;">
+  <div class="tuto-nd-box nd-zone" style="background:#fff;border-radius:20px;max-width:720px;width:100%;margin:0 auto;padding:32px;">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;">
       <div><strong id="ai-read-titre" style="font-size:20px;display:block;margin-bottom:4px;"></strong><span id="ai-read-meta" style="font-size:12px;color:var(--muted);"></span></div>
       <button onclick="document.getElementById('ai-read-modal').style.display='none'" style="background:var(--surface);border:1px solid var(--border);border-radius:50%;width:32px;height:32px;font-size:16px;cursor:pointer;flex-shrink:0;">✕</button>

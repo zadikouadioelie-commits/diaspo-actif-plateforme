@@ -1,0 +1,75 @@
+/* Design « Nuit dorée » — Centre des tutos (tutoriels.html) (2026-11-01).
+   S'ajoute à assets/theme-nuit-doree.css et assets/pages-initiative-nuit-doree.css (zone « nd-zone » = .tuto-main + les deux fenêtres du Tuteur IA) :
+   cette feuille règle l'en-tête, la recherche, la colonne de catégories, les cartes de tutoriels, les onglets et les fenêtres.
+   Les couleurs claires posées en ligne par le script de la page sont converties par assets/dashboard-nuit-doree.js. Tout est préfixé html body.nd.
+   Retour arrière : retirer les liens et le script, nd-zone et class="nd" sur <body>. */
+
+/* en-tête */
+html body.nd .tuto-hero{background:radial-gradient(640px 280px at 85% 0%,rgba(227,192,110,.2),transparent 66%),radial-gradient(520px 260px at 0% 100%,rgba(63,123,255,.16),transparent 70%),linear-gradient(160deg,#101a38 0%,#070c1a 100%);
+  border-bottom:1px solid var(--nd-bord2);color:var(--nd-texte)}
+html body.nd .tuto-hero h1{font-family:var(--nd-display);font-weight:500;letter-spacing:-.01em;color:#fff}
+html body.nd .tuto-hero p{color:var(--nd-doux)}
+html body.nd .tuto-back{background:rgba(255,255,255,.06);border:1px solid var(--nd-bord);color:#F3E3B5;border-radius:999px}
+html body.nd .tuto-back:hover{background:rgba(227,192,110,.16)}
+html body.nd .tuto-search{background:rgba(255,255,255,.08)!important;border:1px solid var(--nd-bord)!important;border-radius:999px!important;color:#fff!important;box-shadow:0 18px 40px -26px #000;color-scheme:dark}
+html body.nd .tuto-search::placeholder{color:#8F9BB8}
+html body.nd .tuto-search:focus{outline:none;border-color:var(--nd-or);box-shadow:0 0 0 3px rgba(227,192,110,.18)}
+
+/* colonne de catégories */
+html body.nd .tuto-sidebar-section{background:var(--nd-verre);border:1px solid var(--nd-bord2);border-radius:22px;box-shadow:0 26px 54px -36px #000}
+html body.nd .tuto-sidebar-title{background:rgba(255,255,255,.04);border-bottom:1px solid var(--nd-bord2);color:var(--nd-or);letter-spacing:.1em}
+html body.nd .tuto-cat-btn{color:var(--nd-texte);border-bottom:1px solid var(--nd-bord2)}
+html body.nd .tuto-cat-btn:last-child{border-bottom:0}
+html body.nd .tuto-cat-btn:hover,html body.nd .tuto-cat-btn.active{background:rgba(227,192,110,.12);color:var(--nd-or)}
+html body.nd .tuto-cat-btn .cat-count{background:rgba(255,255,255,.1);color:var(--nd-doux)}
+html body.nd .tuto-cat-btn.active .cat-count{background:rgba(227,192,110,.22);color:var(--nd-or)}
+
+/* titres, onglets, filtres */
+html body.nd .tuto-section-title{font-family:var(--nd-display);font-weight:500;font-size:22px;color:#fff}
+html body.nd .tuto-tabs{border-bottom:1px solid var(--nd-bord2)}
+html body.nd .tuto-tab{color:var(--nd-doux)}
+html body.nd .tuto-tab:hover{color:#fff}
+html body.nd .tuto-tab.active{color:var(--nd-or);border-bottom-color:var(--nd-or)}
+html body.nd .tuto-tag{background:rgba(255,255,255,.06);border:1px solid var(--nd-bord2);color:var(--nd-doux);border-radius:999px}
+html body.nd .tuto-tag:hover,html body.nd .tuto-tag.active{background:var(--nd-degore);border-color:transparent;color:#1a1202}
+
+/* cartes de tutoriels */
+html body.nd .tuto-card{background:var(--nd-verre)!important;border:1px solid var(--nd-bord2);border-radius:22px;box-shadow:0 26px 54px -36px #000}
+html body.nd .tuto-card:hover{transform:translateY(-3px);border-color:var(--nd-bord);box-shadow:0 30px 60px -34px #000}
+html body.nd .tuto-card-play-btn{background:var(--nd-degore);color:#1a1202}
+html body.nd .tuto-card-tag{background:rgba(227,192,110,.14);color:var(--nd-or);border:1px solid var(--nd-bord)}
+html body.nd .tuto-card-title{color:#fff}
+html body.nd .tuto-card-desc{color:var(--nd-doux)}
+html body.nd .tuto-card-footer{border-top:1px solid var(--nd-bord2)}
+html body.nd .tuto-card-meta{color:var(--nd-doux)}
+html body.nd .tuto-card-fav.active{color:var(--nd-or)}
+html body.nd .tuto-progress-bar,html body.nd .me-progress-bar-wrap{background:rgba(255,255,255,.12)}
+html body.nd .tuto-progress-fill{background:var(--nd-degore)}
+html body.nd .me-progress{background:rgba(255,255,255,.05);border:1px solid var(--nd-bord2)}
+html body.nd .me-progress-label{color:var(--nd-doux)}
+html body.nd .tuto-empty,html body.nd .me-not-logged{color:var(--nd-doux)}
+html body.nd .me-not-logged h3{color:#fff;font-family:var(--nd-display);font-weight:500}
+html body.nd .me-login-btn{background:var(--nd-degore);color:#1a1202;border-radius:999px}
+
+/* « Mon espace » : bandeau du rôle et boutons */
+html body.nd .me-hero[style*="312e81"]{background:radial-gradient(420px 220px at 100% 0%,rgba(227,192,110,.16),transparent 66%),linear-gradient(160deg,#17254d,#0B1226)!important;border:1px solid var(--nd-bord)}
+html body.nd .me-hero-text h2{font-family:var(--nd-display);font-weight:500}
+html body.nd .me-btn-primary,html body.nd .me-hero [style*="color:#312e81"]{background:var(--nd-degore)!important;color:#1a1202!important;border-radius:999px!important}
+html body.nd .me-btn-secondary{border-radius:999px}
+html body.nd .me-section-title{color:var(--nd-or);letter-spacing:.1em}
+
+/* fenêtres : Tuteur IA, lecture d'un tutoriel IA, lancement d'un tutoriel */
+html body.nd :is(#tutor-ai-modal,#ai-read-modal,#tuto-player-modal){background:rgba(3,6,14,.8)!important;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+html body.nd .tuto-nd-box.nd-zone,html body.nd #tuto-player-box{background:linear-gradient(160deg,#14234a 0%,#0B1226 62%)!important;border:1px solid rgba(227,192,110,.4);border-radius:26px!important;
+  box-shadow:0 40px 90px -30px #000;color:var(--nd-texte)}
+html body.nd #tuto-player-box{--text:#EDEAE0;--muted:#AEB8D0;--border:rgba(255,255,255,.13);--surface:rgba(255,255,255,.05)}
+html body.nd #tuto-player-box h3{font-family:var(--nd-display);font-weight:500;color:#fff}
+html body.nd #tuto-player-box p{color:var(--nd-doux)}
+html body.nd #tutor-ai-modal .tuto-nd-box.nd-zone > div:first-child{background:radial-gradient(420px 200px at 100% 0%,rgba(227,192,110,.18),transparent 66%),linear-gradient(135deg,#17254d,#0B1226)!important;border-bottom:1px solid var(--nd-bord2)}
+html body.nd .tuto-nd-box.nd-zone :is(input,select,textarea){background:rgba(255,255,255,.07)!important;border:1px solid rgba(255,255,255,.2)!important;border-radius:14px!important;color:#fff!important;color-scheme:dark}
+html body.nd .tuto-nd-box.nd-zone :is(input,textarea)::placeholder{color:#8F9BB8}
+html body.nd .tuto-nd-box.nd-zone :is(input,select,textarea):focus{outline:none;border-color:var(--nd-or)!important;box-shadow:0 0 0 3px rgba(227,192,110,.18)}
+html body.nd .tuto-nd-box.nd-zone :is(#ai-gen-btn,button[onclick*="sauvegarderTutoriel"]){background:var(--nd-degore)!important;color:#1a1202!important;border-radius:999px!important}
+html body.nd .tuto-player-start{background:var(--nd-degore)!important;color:#1a1202!important;border:0!important;border-radius:999px!important}
+html body.nd .tuto-player-close{background:rgba(255,255,255,.07)!important;color:var(--nd-texte)!important;border:1px solid var(--nd-bord2)!important;border-radius:999px!important}
+html body.nd :is(.tuto-card,.tuto-cat-btn,.tuto-tab,.tuto-tag,.tuto-card-fav):focus-visible{outline:3px solid var(--nd-or);outline-offset:2px}
