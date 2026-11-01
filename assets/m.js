@@ -177,9 +177,19 @@
      arrive très tôt : on la garde ici (window.__daInvite) pour assets/telecharger-app.js, chargé seulement au toucher ; sans invite
      (iPhone, navigateur qui ne la propose pas), il affiche le guide adapté. Le bouton disparaît une fois l'application installée. */
   window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); window.__daInvite = e; });
+  /* Doré scintillant (2026-10-30, demande explicite : « la véritable couleur, c'est doré scintillant ») : dégradé d'or qui glisse + éclat blanc qui balaie le bouton.
+     Même feuille que le bouton du menu de bureau (assets/app.js, classe .da-or) ; mouvement coupé si l'appareil demande moins d'animations. */
+  if (!document.getElementById('da-or-css')) {
+    const st = document.createElement('style'); st.id = 'da-or-css';
+    st.textContent = '.da-or{position:relative;overflow:hidden;background:linear-gradient(110deg,#A97A12 0%,#E8B923 22%,#FFF1A8 40%,#F2C94C 52%,#B8860B 78%,#E8B923 100%) !important;background-size:240% 100% !important;animation:da-or-glisse 4s ease-in-out infinite alternate;box-shadow:0 0 0 1px rgba(255,236,160,.55),0 4px 16px rgba(232,185,35,.45) !important;font-weight:800;}'
+      + '.da-or::after{content:"";position:absolute;top:0;bottom:0;left:-60%;width:40%;background:linear-gradient(100deg,transparent,rgba(255,250,220,.5),transparent);transform:skewX(-20deg);mix-blend-mode:soft-light;animation:da-or-eclat 2.8s ease-in-out infinite;pointer-events:none;}'
+      + '@keyframes da-or-glisse{0%{background-position:0% 50%}100%{background-position:100% 50%}}@keyframes da-or-eclat{0%{left:-60%}55%,100%{left:130%}}'
+      + '@media (prefers-reduced-motion:reduce){.da-or,.da-or::after{animation:none}}';
+    document.head.appendChild(st);
+  }
   window.addEventListener('appinstalled', () => { window.__daInvite = null; document.querySelectorAll('[data-da-install]').forEach(b => b.remove()); });
   const daInstallee = () => { try { return matchMedia('(display-mode: standalone)').matches || navigator.standalone === true; } catch (e) { return false; } };
-  const daBouton = () => daInstallee() ? '' : `<button type="button" class="btn block" data-da-install data-nd-skip style="margin:0 0 12px;background:linear-gradient(135deg,#F59E0B,#E2A929);color:#1A2332;border-color:transparent">${ic('down', 's')} Télécharger Diaspo’Actif</button>`;
+  const daBouton = () => daInstallee() ? '' : `<button type="button" class="btn block da-or" data-da-install data-nd-skip style="margin:0 0 12px;color:#1A2332;border-color:transparent">${ic('down', 's')} Télécharger Diaspo’Actif</button>`;
   let daPromesse = null;
   const daCharger = () => daPromesse || (daPromesse = window.DAInstall ? Promise.resolve() : new Promise((ok, ko) => { const sc = document.createElement('script'); sc.src = 'assets/telecharger-app.js?v=2'; sc.onload = ok; sc.onerror = () => { daPromesse = null; ko(new Error('chargement')); }; document.head.appendChild(sc); }));
   /* Préchargé peu après l'ouverture : le toucher n'attend plus le réseau (sinon, sur une connexion lente, rien ne s'affichait pendant plusieurs secondes). */

@@ -130,6 +130,16 @@
 .ann-section-head h2{font-size:22px;font-weight:800;margin:0;position:relative;padding-bottom:10px;}
 .ann-section-head h2::after{content:'';position:absolute;left:0;bottom:0;width:36px;height:3px;background:linear-gradient(135deg,#2563EB,#1d4ed8);border-radius:2px;}
 .ann-section-desc{font-size:13px;color:var(--muted);max-width:420px;line-height:1.55;}
+/* Démarcation publications / comptes (2026-10-28, demande explicite) — les bandes de publications du haut touchaient la grille des comptes sans rien
+   pour les distinguer. Un intitulé doré « Publications à la une » les ouvre ; un séparateur centré « Les comptes de l'annuaire » ouvre la grille.
+   Les deux disparaissent avec l'espace du haut quand il est vide (l'emplacement #ad-vitrine-section se masque lui-même : style="display:none"). */
+.ann-demarc{display:flex;align-items:center;gap:14px;font-size:12.5px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:#E3C06E;}
+.ann-demarc::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,rgba(227,192,110,.6),rgba(227,192,110,0));}
+.ann-demarc-pub{margin:0 0 14px;}
+.ann-demarc-comptes{margin:34px 0 4px;color:#F3DC9B;font-size:14px;}
+.ann-demarc-comptes::before{content:'';flex:1;height:1px;background:linear-gradient(270deg,rgba(227,192,110,.6),rgba(227,192,110,0));}
+.ann-demarc-comptes span{padding:7px 18px;border:1px solid rgba(227,192,110,.55);border-radius:999px;background:rgba(227,192,110,.08);}
+.ann-pubs-bloc:has(> #ad-vitrine-section[style*="none"]) .ann-demarc{display:none;}
 .ann-result-count{font-size:13px;color:var(--muted);margin-top:4px;}
 
 /* Cards grid */
@@ -428,11 +438,13 @@ html,html body{overflow-x:clip;}
     <p class="ann-section-desc">Explorez les actions inspirantes portées par des individus, des collectifs et des organisations qui œuvrent pour un changement positif.</p>
   </div>
 
-  <div style="width:100%;box-sizing:border-box;max-width:1200px;margin:0 auto 16px;padding:0 24px;">
+  <div class="ann-pubs-bloc" style="width:100%;box-sizing:border-box;max-width:1200px;margin:0 auto 16px;padding:0 24px;">
+    <div class="ann-demarc ann-demarc-pub"><span>📰 Publications à la une</span></div>
     <!-- Espace du haut (2026-10-24, demande explicite) : UNE publicité par heure (data-ad-fenetre = 3 600 000 ms), changée à l'heure pile en ne repeignant que
          cet emplacement, en bannière bien visible (data-ad-format). Sans publicité active : relais de publications du fil, comme avant. -->
     <!-- Puis (2026-10-24, nouvelle demande) : TROIS bandes de même taille, les unes au-dessus des autres (data-ad-count="3", data-ad-format="bandes"), remplacées chaque heure. -->
     <div id="ad-vitrine-section" data-ad-emplacement="vitrine_section" data-ad-fenetre="3600000" data-ad-count="3" data-ad-format="bandes" style="display:none;"></div>
+    <div class="ann-demarc ann-demarc-comptes"><span>👥 Les comptes de l'annuaire</span></div>
   </div>
 
   <section id="honneur-mur" style="display:none;" aria-label="Espace d'honneur"></section>
