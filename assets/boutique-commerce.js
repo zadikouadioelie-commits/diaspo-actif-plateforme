@@ -6,7 +6,7 @@
   var app = document.getElementById('bq-app');
   var toastEl = document.getElementById('bq-toast');
   var modalEl = document.getElementById('bq-modal');
-  var etat = { init: null, produits: [], catalogues: [], avis: null, agenda: [], moi: null, panier: 0, cat: null, q: '', favoris: [], slide: 0, minuteur: null };
+  var etat = { init: null, produits: [], catalogues: [], formationsBande: [], titreBande: '', avis: null, agenda: [], moi: null, panier: 0, cat: null, q: '', favoris: [], slide: 0, minuteur: null };
 
   /* ── utilitaires ── */
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -112,6 +112,7 @@
         return Promise.all([
           api('GET', '/initiatives/' + iid + '/produits').then(function (r) { etat.produits = r.produits || []; }).catch(function () {}),
           api('GET', '/initiatives/' + iid + '/catalogues').then(function (r) { etat.catalogues = (r.catalogues || []).filter(function (c) { return c.statut !== 'masque'; }); }).catch(function () {}),
+          api('GET', '/initiatives/' + iid + '/formations-boutique').then(function (r) { etat.formationsBande = r.formations || []; etat.titreBande = r.titre || ''; }).catch(function () {}),
           api('GET', '/initiatives/' + iid + '/avis').then(function (r) { etat.avis = r; }).catch(function () {}),
           api('GET', '/auth/me').then(function (r) { etat.moi = r.user || null; }).catch(function () {}),
           agenda(etat.init)
@@ -207,6 +208,21 @@
   function enTete(titre, lien, icone) {
     return '<div class="bq-sect-tete"><h2' + (icone ? ' class="avec-icone"' : '') + '>' + (icone ? ic(icone) : '') + esc(titre) + '</h2>' + (lien ? '<button type="button" class="bq-voir" data-act="' + lien[1] + '">' + esc(lien[0]) + ic('fleche') + '</button>' : '') + '</div>';
   }
+  /* Bande « Formations créées par <initiative> » : formations que le propriétaire a choisi de vendre ici (lues en direct côté serveur). */
+  function prixFormation(v, dev) {
+    try { return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: String(dev || 'EUR').toUpperCase() }).format(Number(v) || 0); }
+    catch (e) { return (Number(v) || 0).toFixed(2) + ' ' + (dev || '€'); }
+  }
+  function bandeFormations() {
+    return '<section class="bq-formations">' + enTete(etat.titreBande, null, 'livre') + '<div class="bq-fbande">' + etat.formationsBande.map(function (f) {
+      var promo = !f.gratuit && Number(f.prix_catalogue) > Number(f.prix_final);
+      return '<a class="bq-fcarte" href="formation-fiche.html?id=' + encodeURIComponent(f.id) + '">' +
+        '<div class="bq-fmedia">' + (f.image_url ? '<img src="' + esc(f.image_url) + '" alt="" loading="lazy" onerror="this.remove()">' : '<span aria-hidden="true">🎓</span>') +
+        '<span class="bq-fpuce">Formation</span>' + (f.gratuit ? '<span class="bq-fpuce bq-fgratuit">Gratuit</span>' : '') + '</div>' +
+        '<div class="bq-finfo"><h3>' + esc(f.titre) + '</h3>' + (f.auteur ? '<div class="bq-fauteur">par ' + esc(f.auteur) + '</div>' : '') +
+        '<div class="bq-fprix">' + (f.gratuit ? 'Gratuit' : (promo ? '<s>' + esc(prixFormation(f.prix_catalogue, f.devise)) + '</s>' : '') + esc(prixFormation(f.prix_final, f.devise))) + '</div></div></a>';
+    }).join('') + '</div></section>';
+  }
   function carteProduit(p, compact) {
     var ph = photos(p)[0], prix = nombreProduit(p), promo = p.prix_promo != null && Number(p.prix_promo) > 0 && prix && Number(p.prix_promo) < prix ? Number(p.prix_promo) : null;
     var cat = (p.categorie || '').trim(), or = /formation/i.test(cat);
@@ -293,6 +309,7 @@
     var h = carrousel();
     if (vedettes.length) h += '<section>' + enTete('Nos offres phares', ['Voir tout', 'tout']) + '<div class="bq-grille">' + vedettes.slice(0, 4).map(function (p) { return carteProduit(p); }).join('') + '</div></section>';
     else h += '<div class="bq-vide">Cette boutique n\'a pas encore de produit publié. Revenez bientôt !</div>';
+    if (etat.formationsBande.length) h += bandeFormations();
     if (etat.catalogues.length) h += '<section>' + enTete('Nos catalogues', null, 'livre') + '<div class="bq-catalogues">' + etat.catalogues.map(function (c) {
       return '<button type="button" class="bq-catalogue" data-cat="' + esc(c.categorie || '') + '"><span class="img"' + (c.image_url ? ' style="background-image:url(\'' + esc(c.image_url) + '\')"' : '') + '><span class="puce">' + ic(iconeCategorie(c.categorie || c.nom)) + '</span></span><span class="nom">' + esc(c.nom) + '</span></button>'; }).join('') + '</div></section>';
     if (recents.length) h += '<section>' + enTete('Produits récents', ['Voir tous les produits', 'tout']) + '<div class="bq-recents">' + recents.map(function (p) { return carteProduit(p, true); }).join('') + '</div></section>';

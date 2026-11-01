@@ -262,6 +262,9 @@ body.bq img{max-width:100%;display:block}
   .bq-hero-in{grid-template-columns:auto 1fr}
   .bq-hero-droite{display:none}
   .bq-nav a:nth-child(n+5){display:none}
+  .bq-top-in{gap:14px}
+  .bq-nav{gap:14px}
+  .bq-rech{min-width:150px}
   .bq-pied-in{grid-template-columns:1fr 1fr}
   .bq-membre{grid-template-columns:1fr;gap:16px}
   .bq-membre ul{border-left:0;padding-left:0}
@@ -378,3 +381,16 @@ body.bq img{max-width:100%;display:block}
 @media (max-width:1100px){.bq-membre{padding-left:28px}.bq-membre::before{display:none}.bq-membre li{white-space:normal}}
 .bq-membre::before{width:290px;background:linear-gradient(90deg,transparent 88%,#74102B),url(/assets/boutique-membres.jpg) left bottom/auto 100% no-repeat}
 .bq-membre{padding-left:300px}
+/* Bande « Formations créées par… » */
+.bq-fbande{display:flex;gap:16px;overflow-x:auto;scroll-snap-type:x proximity;padding:2px 2px 12px;scrollbar-width:thin}
+.bq-fcarte{flex:0 0 250px;scroll-snap-align:start;display:flex;flex-direction:column;background:var(--bq-carte);border:1px solid var(--bq-ligne);border-radius:14px;overflow:hidden;text-decoration:none;color:var(--bq-texte);box-shadow:var(--bq-ombre);transition:transform .15s}
+.bq-fcarte:hover{transform:translateY(-2px)}
+.bq-fmedia{position:relative;height:140px;background:linear-gradient(135deg,var(--bq-marine),var(--bq-marine2));display:flex;align-items:center;justify-content:center;font-size:36px;overflow:hidden}
+.bq-fmedia img{width:100%;height:100%;object-fit:cover}
+.bq-fpuce{position:absolute;left:10px;top:10px;background:var(--bq-marine);color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px}
+.bq-fgratuit{left:auto;right:10px;background:var(--bq-vert)}
+.bq-finfo{padding:12px 14px 14px;display:flex;flex-direction:column;gap:4px;flex:1}
+.bq-finfo h3{margin:0;font-size:15px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.bq-fauteur{font-size:12.5px;color:var(--bq-doux)}
+.bq-fprix{margin-top:auto;padding-top:6px;font-weight:800;color:var(--bq-bordeaux)}
+.bq-fprix s{font-weight:500;font-size:12.5px;color:var(--bq-doux);margin-right:6px}
