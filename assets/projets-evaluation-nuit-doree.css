@@ -1,0 +1,46 @@
+/* Design « Nuit dorée » — Évaluation de projet (projets-evaluation.html) (2026-11-01).
+   S'ajoute à assets/theme-nuit-doree.css et assets/pages-initiative-nuit-doree.css (zone « nd-zone » = .container) : cette feuille règle onglets, cartes, pastilles de statut et fenêtres (pe-modal)
+   propres à la page. Tout est préfixé html body.nd. Retour arrière : retirer le lien vers cette feuille avec ceux de la page. */
+
+html body.nd .nd-zone{--border:rgba(255,255,255,.12);--muted:#AEB8D0;--card:rgba(255,255,255,.045);--bg:rgba(255,255,255,.06)}
+html body.nd .pe-nav{border-bottom:1px solid var(--nd-bord2)}
+html body.nd .pe-tab{color:var(--nd-doux)}
+html body.nd .pe-tab:hover{color:#fff}
+html body.nd .pe-tab.active{color:var(--nd-or);border-bottom-color:var(--nd-or)}
+
+/* cartes et chiffres */
+html body.nd :is(.pe-card,.pe-stat-box){background:var(--nd-verre)!important;border:1px solid var(--nd-bord2);border-radius:20px;color:var(--nd-texte)}
+html body.nd .pe-card:hover{border-color:var(--nd-bord);box-shadow:0 26px 54px -34px #000}
+html body.nd .pe-stat-num{font-family:var(--nd-display);font-weight:500;background:var(--nd-degore);-webkit-background-clip:text;background-clip:text;color:transparent}
+html body.nd .pe-card-title{color:#fff}
+html body.nd :is(.pe-card-meta,.pe-stat-lbl){color:var(--nd-doux)}
+html body.nd .pe-act{background:rgba(255,255,255,.06);border-color:var(--nd-bord);color:#F3E3B5}
+html body.nd .pe-act:hover{background:rgba(227,192,110,.16);border-color:var(--nd-or)}
+html body.nd .pe-act-danger{color:#FF9C9C;border-color:rgba(248,113,113,.5)}
+html body.nd .pe-act-danger:hover{background:rgba(239,68,68,.14);border-color:#EF4444}
+
+/* statuts */
+html body.nd :is(.pe-pill-recu,.pe-pill-envoye){background:rgba(63,123,255,.16);color:#BFD2FF}
+html body.nd :is(.pe-pill-en_analyse,.pe-pill-documents_demandes){background:rgba(227,192,110,.16);color:#F3DC9B}
+html body.nd .pe-pill-entretien_propose{background:rgba(167,139,250,.16);color:#D8CCFF}
+html body.nd .pe-pill-accepte{background:rgba(143,224,176,.14);color:#9BE8B8}
+html body.nd .pe-pill-refuse{background:rgba(255,154,143,.14);color:#FFB3AA}
+html body.nd .pe-pill-amelioration_demandee{background:rgba(251,146,60,.16);color:#FDBA74}
+html body.nd .pe-pill-brouillon{background:rgba(255,255,255,.08);color:var(--nd-doux)}
+
+/* fenêtres */
+html body.nd .pe-modal-bg{background:rgba(3,6,14,.74);backdrop-filter:blur(5px)}
+html body.nd .pe-modal{background:linear-gradient(160deg,rgba(23,37,77,.97),rgba(10,16,36,.99));border:1px solid var(--nd-bord);box-shadow:0 40px 90px -30px #000;color:var(--nd-texte);
+  --border:rgba(255,255,255,.14);--muted:#AEB8D0;--card:rgba(255,255,255,.05);--bg:rgba(255,255,255,.07);--text:#E8ECF6}
+html body.nd .pe-modal :is(h2,h3){font-family:var(--nd-display);font-weight:500;color:#fff}
+html body.nd .pe-field label{color:var(--nd-or);letter-spacing:.05em}
+html body.nd .pe-field :is(input,select,textarea){background:rgba(255,255,255,.07)!important;border:1px solid rgba(255,255,255,.2)!important;color:#fff!important;color-scheme:dark}
+html body.nd .pe-field :is(input,textarea)::placeholder{color:#8F9BB8}
+html body.nd .pe-field :is(input,select,textarea):focus{outline:none;border-color:var(--nd-or)!important;box-shadow:0 0 0 3px rgba(227,192,110,.18)}
+html body.nd .pe-field select option{background:#0E1730;color:#fff}
+html body.nd .pe-star{color:rgba(255,255,255,.2)}
+html body.nd .pe-star.on{color:var(--nd-or)}
+html body.nd .pe-msg.mine{background:rgba(227,192,110,.18);color:#F3E3B5}
+html body.nd .pe-msg.theirs{background:rgba(255,255,255,.07)}
+html body.nd .pe-timeline-item::before{background:var(--nd-or)}
+html body.nd :is(.pe-doc-row,.pe-timeline){border-color:var(--nd-bord2)}

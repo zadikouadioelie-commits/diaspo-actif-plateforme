@@ -82,8 +82,13 @@
   .rec-resume-row .k{color:var(--muted);font-weight:600;flex:none;}
   .rec-resume-row .v{text-align:right;}
 </style>
+  <!-- Design « Nuit dorée » (2026-11-01) : recensement ; retour arrière : retirer ces lignes, nd-zone et class="nd" sur <body> -->
+  <link rel="stylesheet" href="/assets/theme-nuit-doree.css?v=8">
+  <link rel="stylesheet" href="/assets/pages-initiative-nuit-doree.css?v=1">
+  <link rel="stylesheet" href="/assets/recensement-nuit-doree.css?v=1">
+  <script src="/assets/dashboard-nuit-doree.js?v=4" defer></script>
 </head>
-<body>
+<body class="nd">
 <div class="page">
 
   <header class="topbar">
@@ -104,7 +109,7 @@
     </div>
   </header>
 
-  <main class="rec-wrap" id="rec-wrap">
+  <main class="rec-wrap nd-zone" id="rec-wrap">
     <div class="notice">Chargement…</div>
   </main>
 

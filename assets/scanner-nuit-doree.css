@@ -1,0 +1,36 @@
+/* Design « Nuit dorée » — Scanner de billets (scanner.html) (2026-11-01).
+   S'ajoute à assets/theme-nuit-doree.css. La page était déjà sombre et pilotée par des variables (--bg, --accent…) : on les redéfinit sur <body> (palette nuit + or à la place du violet),
+   les couleurs de résultat (vert accepté, rouge refusé) restent celles du contrôle d'entrée. Tout est préfixé html body.nd.
+   Retour arrière : retirer le lien vers cette feuille et celui du thème, et class="nd" sur <body>. */
+
+html body.nd{--bg:#060A14;--bg2:rgba(10,16,36,.92);--bg3:rgba(255,255,255,.08);--border:rgba(255,255,255,.14);--text:#E8ECF6;--sub:#AEB8D0;--accent:#E3C06E;
+  font-family:var(--nd-sans)}
+html body.nd .top-bar{background:rgba(10,16,36,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--nd-bord2)}
+html body.nd .top-title{font-family:var(--nd-display);font-weight:500;font-size:1.15rem;color:#fff}
+html body.nd #auth-gate h2{font-family:var(--nd-display);font-weight:500}
+html body.nd #auth-gate a{background:var(--nd-degore)!important;color:#1a1405!important;border-radius:999px!important}
+html body.nd .select-label{color:var(--nd-or);letter-spacing:.08em}
+html body.nd select{color-scheme:dark;border-radius:999px}
+html body.nd select option{background:#0E1730;color:#fff}
+html body.nd select:focus,html body.nd .manual-input:focus{border-color:var(--nd-or);box-shadow:0 0 0 3px rgba(227,192,110,.18)}
+html body.nd .manual-input{border-radius:999px;color-scheme:dark}
+html body.nd .manual-input::placeholder{color:#8F9BB8}
+
+/* caméra : le cadre de visée passe à l'or */
+html body.nd .cam-wrap{border:1px solid var(--nd-bord);box-shadow:0 26px 54px -34px #000}
+html body.nd .cam-btn{border-color:var(--nd-bord)}
+html body.nd .cam-btn:hover{background:rgba(227,192,110,.14)}
+html body.nd :is(.cam-btn.primary,.manual-btn){background:var(--nd-degore);border-color:transparent;color:#1a1405}
+html body.nd .cam-btn.danger{color:#fff}
+
+/* résultat du contrôle */
+html body.nd #result-overlay{background:rgba(3,6,14,.88);backdrop-filter:blur(5px)}
+html body.nd .result-card{background:linear-gradient(160deg,rgba(23,37,77,.97),rgba(10,16,36,.99));box-shadow:0 40px 90px -30px #000}
+html body.nd .result-label{font-family:var(--nd-display);font-weight:600}
+html body.nd .result-close{border-color:var(--nd-bord);border-radius:999px}
+
+/* chiffres et historique */
+html body.nd .stat-chip{border-color:var(--nd-bord2)}
+html body.nd .stat-chip strong{font-family:var(--nd-display);font-weight:500}
+html body.nd .hist-title{color:var(--nd-or);letter-spacing:.08em}
+html body.nd .hist-item{border-bottom-color:var(--nd-bord2)}

@@ -1,0 +1,38 @@
+/* Design « Nuit dorée » — Dossiers de candidatures (dossiers-candidatures.html) (2026-11-01).
+   Page autonome pilotée par des variables (--navy, --card, --ink…) : on les redéfinit sur <body> (palette nuit + or), puis on reprend les éléments qui posaient du marine plein
+   ou des pastels. La feuille de CV (aperçu d'un document) reste blanche, comme du papier. Tout est préfixé html body.nd.
+   Retour arrière : retirer le lien vers cette feuille et celui du thème, et class="nd" sur <body>. */
+
+html body.nd{--navy:#E3C06E;--navy2:#B9893A;--bg:#060A14;--card:rgba(255,255,255,.05);--ink:#E8ECF6;--muted:#AEB8D0;--line:rgba(255,255,255,.14);
+  font-family:var(--nd-sans);color-scheme:dark}
+html body.nd .top{background:rgba(10,16,36,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--nd-bord2);box-shadow:none}
+html body.nd .top a.marque{font-family:var(--nd-display);font-weight:500;letter-spacing:.02em}
+html body.nd :is(h1,h2){font-family:var(--nd-display);font-weight:500;color:#fff}
+html body.nd .retour{color:var(--nd-or)}
+
+/* boutons : l'or remplace le marine plein */
+html body.nd .btn{border-color:var(--nd-bord);color:var(--nd-texte);border-radius:999px}
+html body.nd .btn.prim{background:var(--nd-degore);border-color:transparent;color:#1a1405}
+html body.nd .btn.danger{color:#FF9C9C;border-color:rgba(248,113,113,.5)}
+html body.nd .filtres button[aria-pressed="true"],html body.nd .n[aria-pressed="true"]{background:var(--nd-degore);border-color:transparent;color:#1a1405}
+html body.nd .v[aria-pressed="true"]{color:#1a1405}
+
+/* cartes, indicateurs, candidats */
+html body.nd :is(.dos,.kpi,.cand,.com){border-color:var(--nd-bord2);border-radius:18px}
+html body.nd .dos:hover,html body.nd .cand:hover{border-color:var(--nd-bord);box-shadow:0 22px 44px -30px #000}
+html body.nd .kpi b,html body.nd .nt{font-family:var(--nd-display);font-weight:500;color:#fff}
+html body.nd .lbl{color:var(--nd-or);letter-spacing:.06em;text-transform:uppercase;font-size:.74rem}
+html body.nd .av{background:var(--nd-degore);color:#1a1405}
+html body.nd .tend{background:rgba(63,123,255,.16);color:#BFD2FF}
+html body.nd .tend.hausse{background:rgba(143,224,176,.14);color:#9BE8B8}
+html body.nd .tend.baisse{background:rgba(255,154,143,.14);color:#FFB3AA}
+html body.nd .erreur,html body.nd .com button{color:#FFB3AA}
+html body.nd .alerte{background:rgba(227,192,110,.1);border-color:var(--nd-bord);color:#F3DC9B}
+
+/* champs */
+html body.nd :is(textarea,select,input[type=text]){background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.2);color:#fff;color-scheme:dark}
+html body.nd :is(textarea,input[type=text])::placeholder{color:#8F9BB8}
+html body.nd :is(textarea,select,input[type=text]):focus{outline:none;border-color:var(--nd-or);box-shadow:0 0 0 3px rgba(227,192,110,.18)}
+html body.nd select option{background:#0E1730;color:#fff}
+html body.nd :focus-visible{outline-color:var(--nd-or)}
+html body.nd #toast{background:#0E1730;border:1px solid var(--nd-bord)}

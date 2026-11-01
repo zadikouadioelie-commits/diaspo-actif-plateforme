@@ -1,0 +1,48 @@
+/* Design « Nuit dorée » — Recensement (recensement.html) (2026-11-01).
+   S'ajoute à assets/theme-nuit-doree.css et assets/pages-initiative-nuit-doree.css (zone « nd-zone » = .rec-wrap) : cette feuille règle boutons, pastilles, étapes, interrupteurs et cartes propres à la page.
+   Tout est préfixé html body.nd. Retour arrière : retirer le lien vers cette feuille avec ceux de la page. */
+
+html body.nd .nd-zone{--border:rgba(255,255,255,.12);--muted:#AEB8D0;--card:rgba(255,255,255,.045);--bg:rgba(255,255,255,.06);--text:#E8ECF6}
+html body.nd .rec-hero h1{font-size:clamp(28px,3.2vw,40px)}
+html body.nd .rec-hero p{color:var(--nd-doux)}
+
+/* boutons : l'or remplace le bleu */
+html body.nd .rec-btn{border-radius:999px}
+html body.nd .rec-btn-primary{background:var(--nd-degore);color:#1a1405}
+html body.nd .rec-btn-primary:hover{filter:brightness(1.07)}
+html body.nd .rec-btn-outline{background:rgba(255,255,255,.06);border:1px solid var(--nd-bord)!important;color:#F3E3B5}
+html body.nd .rec-btn-outline:hover{background:rgba(227,192,110,.16)}
+html body.nd .rec-btn-danger{background:#E5484D;color:#fff}
+
+/* cartes */
+html body.nd .rec-card{background:var(--nd-verre)!important;border:1px solid var(--nd-bord2);border-radius:20px;color:var(--nd-texte)}
+html body.nd .rec-campagne-card:hover{border-color:var(--nd-bord);box-shadow:0 26px 54px -34px #000;transform:translateY(-3px)}
+html body.nd .rec-stat-tile{background:rgba(255,255,255,.06);border:1px solid var(--nd-bord2);border-radius:14px}
+html body.nd .rec-stat-tile .n{font-family:var(--nd-display);font-weight:500;color:#fff}
+html body.nd .rec-resume-row,html body.nd .rec-champ-row{border-bottom-color:var(--nd-bord2)}
+html body.nd .rec-type-card{border-color:var(--nd-bord2);border-radius:20px}
+html body.nd .rec-type-card:hover{border-color:var(--nd-or)}
+html body.nd .rec-type-card h3{color:#fff!important}
+
+/* pastilles de statut */
+html body.nd :is(.rec-badge-actif,.rec-badge-verifie){background:rgba(143,224,176,.14);color:#9BE8B8}
+html body.nd :is(.rec-badge-brouillon,.rec-badge-non_verifie,.rec-badge-termine){background:rgba(255,255,255,.08);color:var(--nd-doux)}
+html body.nd .rec-badge-suspendu{background:rgba(251,146,60,.16);color:#FDBA74}
+html body.nd .rec-badge-en_cours{background:rgba(63,123,255,.16);color:#BFD2FF}
+html body.nd .rec-badge-echec{background:rgba(255,154,143,.14);color:#FFB3AA}
+html body.nd .rec-msg-ok{background:rgba(143,224,176,.14);color:#9BE8B8}
+html body.nd .rec-msg-err{background:rgba(255,154,143,.14);color:#FFB3AA}
+
+/* étapes et interrupteurs */
+html body.nd .rec-step-dot.active{color:var(--nd-or);border-bottom-color:var(--nd-or)}
+html body.nd .rec-step-dot.done{color:#9BE8B8;border-bottom-color:#9BE8B8}
+html body.nd .rec-toggle-track{background:rgba(255,255,255,.18)}
+html body.nd .rec-toggle-track::before{background:#F6F3EA}
+html body.nd .rec-toggle input:checked + .rec-toggle-track{background:var(--nd-degore)}
+
+/* champs */
+html body.nd .rec-field label{color:var(--nd-or);letter-spacing:.06em}
+html body.nd .rec-field :is(input,select,textarea){background:rgba(255,255,255,.07)!important;border:1px solid rgba(255,255,255,.2)!important;color:#fff!important;color-scheme:dark}
+html body.nd .rec-field :is(input,textarea)::placeholder{color:#8F9BB8}
+html body.nd .rec-field :is(input,select,textarea):focus{outline:none;border-color:var(--nd-or)!important;box-shadow:0 0 0 3px rgba(227,192,110,.18)}
+html body.nd .rec-field select option{background:#0E1730;color:#fff}
