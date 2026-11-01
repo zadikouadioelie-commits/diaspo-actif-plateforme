@@ -17,7 +17,8 @@
    à cet endroit du code — sauf pour le rattrapage local ci-dessous (backfillDsIds),
    qui ne s'exécute jamais en production et embarque donc sa propre vérification. */
 const crypto = require('node:crypto');
-const DS_ID_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+/* Sans le chiffre 0 ni la lettre O (2026-11-01, demande explicite : « les gens sont un peu perdus » entre les deux). Les codes déjà émis ne changent pas. */
+const DS_ID_ALPHABET = 'ABCDEFGHIJKLMNPQRSTUVWXYZ123456789';
 function sharedGenerateDsId() {
   let out = '';
   for (let i = 0; i < 10; i++) out += DS_ID_ALPHABET[crypto.randomInt(DS_ID_ALPHABET.length)];
@@ -28,7 +29,8 @@ if (process.env.DATABASE_URL) {
   const pg = require('./db-pg');
   module.exports = pg;
   module.exports.backfillOfficialFollow = () => {};
-  module.exports.generateDaId = () => Math.random().toString(36).slice(2,10).toUpperCase();
+  /* DA-ID de production : 8 caractères, sans le chiffre 0 ni la lettre O (même règle que le DS-ID) ; les identifiants déjà attribués ne changent pas. */
+  module.exports.generateDaId = () => { let out = ''; for (let i = 0; i < 8; i++) out += DS_ID_ALPHABET[crypto.randomInt(DS_ID_ALPHABET.length)]; return out; };
   module.exports.generateDsId = sharedGenerateDsId;
   return;
 }

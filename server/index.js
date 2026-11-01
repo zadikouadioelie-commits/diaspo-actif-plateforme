@@ -1197,7 +1197,7 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
    Cahier des charges complet (2026-09-19). Tables créées par migrateParrainageInvitations()
    (fin de fichier). Code d'invitation sur le patron de sharedGenerateDsId()/generateDsIdUnique()
    (server/db.js:19-25,5497-5504) — alphabet A-Z0-9, vérification d'unicité en base. */
-const INVITATION_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+const INVITATION_ALPHABET = 'ABCDEFGHIJKLMNPQRSTUVWXYZ123456789'; // sans 0 ni O : aucune confusion à la lecture ou à la dictée (2026-11-01)
 function genererCodeInvitation() {
   let suffixe = '';
   for (let i = 0; i < 6; i++) suffixe += INVITATION_ALPHABET[crypto.randomInt(INVITATION_ALPHABET.length)];
@@ -46386,7 +46386,9 @@ app.post('/api/certifications', requireAuth, async (req, res) => {
   const uid = req.user.id;
   const { titre, organisme, formation_id, date_obtention, date_expiration } = req.body;
   if (!titre) return sendJSON(res, 400, { error: 'Titre requis' });
-  const code = 'CERT-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).substring(2,6).toUpperCase();
+  const _alpha = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // sans I/O/0/1 : code de vérification saisi à la main (2026-11-01)
+  const _tirage = n => Array.from({ length: n }, () => _alpha[crypto.randomInt(_alpha.length)]).join('');
+  const code = 'CERT-' + _tirage(6) + '-' + _tirage(4);
   const qr_data = JSON.stringify({ code, titre, organisme, uid, date: date_obtention || new Date().toISOString().slice(0,10) });
   const r = await db.prepare(`INSERT INTO user_certifications_obtenues (user_id, titre, organisme, formation_id, date_obtention, date_expiration, code_verification, qr_data)
     VALUES (?,?,?,?,?,?,?,?)`).run(uid, titre, organisme||null, formation_id||null, date_obtention||new Date().toISOString().slice(0,10), date_expiration||null, code, qr_data);

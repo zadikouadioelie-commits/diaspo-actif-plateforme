@@ -53,7 +53,7 @@
       .cf-row .t{font-weight:600;display:block}
       .cf-row .d{font-size:12.5px;color:var(--muted);display:block;line-height:1.3}
       .cf-row[disabled]{opacity:.6}
-      .cf-ds-code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:30px;font-weight:800;letter-spacing:.12em;text-align:center;padding:18px 10px;margin:10px 0 6px;border-radius:14px;background:var(--sky-l);color:var(--navy);user-select:all;-webkit-user-select:all;word-break:break-all}
+      .cf-ds-code{font-family:ui-monospace,"Cascadia Mono",Menlo,Consolas,"DejaVu Sans Mono",monospace;font-variant-numeric:slashed-zero;font-feature-settings:"zero" 1;font-size:30px;font-weight:800;letter-spacing:.12em;text-align:center;padding:18px 10px;margin:10px 0 6px;border-radius:14px;background:var(--sky-l);color:var(--navy);user-select:all;-webkit-user-select:all;word-break:break-all}
       .cf-pwd{position:relative}
       .cf-pwd .cf-in{padding-right:48px}
       .cf-pwd button{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:42px;height:42px;font-size:18px;line-height:1}
@@ -72,7 +72,7 @@
       .cf-lvl p{margin:0 0 8px;font-size:13.5px;color:var(--muted);line-height:1.45}
       .cf-lvl ul{margin:0;padding-left:20px}
       .cf-lvl li{margin:2px 0}
-      .cf-mono{font-family:ui-monospace,Consolas,monospace;font-size:20px;font-weight:800;letter-spacing:2px;text-align:center;background:var(--orange-l);border:1.5px solid var(--orange);border-radius:12px;padding:12px;margin:10px 0;word-break:break-all}
+      .cf-mono{font-family:ui-monospace,"Cascadia Mono",Consolas,"DejaVu Sans Mono",monospace;font-variant-numeric:slashed-zero;font-feature-settings:"zero" 1;font-size:20px;font-weight:800;letter-spacing:2px;text-align:center;background:var(--orange-l);border:1.5px solid var(--orange);border-radius:12px;padding:12px;margin:10px 0;word-break:break-all}
       .cf-sheet-t{margin:4px 0 8px;font-size:19px}
       .cf-sheet-p{margin:0 0 10px;line-height:1.5}
     `;

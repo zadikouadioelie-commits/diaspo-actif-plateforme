@@ -31,7 +31,7 @@
   .codes-card h4{margin:0 0 6px;font-size:14px;font-weight:800;}
   .codes-card .codes-sub{font-size:12px;color:var(--muted);margin:0 0 14px;}
   .ds-masked{font-size:20px;letter-spacing:4px;color:var(--muted);margin-bottom:12px;font-family:monospace;}
-  .ds-revealed{font-family:monospace;font-size:16px;font-weight:800;letter-spacing:3px;color:#1e293b;background:#f0fdf4;border:1.5px solid #22c55e;border-radius:8px;padding:8px 16px;margin-bottom:12px;word-break:break-all;}
+  .ds-revealed{font-family:"Cascadia Mono",Consolas,"DejaVu Sans Mono",Menlo,monospace;font-variant-numeric:slashed-zero;font-feature-settings:"zero" 1;font-size:16px;font-weight:800;letter-spacing:3px;color:#1e293b;background:#f0fdf4;border:1.5px solid #22c55e;border-radius:8px;padding:8px 16px;margin-bottom:12px;word-break:break-all;}
   .codes-btn-row{display:flex;gap:8px;flex-wrap:wrap;}
   .codes-btn{font-size:12px;padding:6px 14px;border-radius:7px;cursor:pointer;font-weight:700;border:1.5px solid;background:transparent;}
   .codes-btn.orange{color:#2563EB;border-color:#2563EB;}
@@ -564,7 +564,7 @@ function urlBase64ToUint8Array(base64String) {
           <div id="init-qr-confidentialite"></div>
           ${init.da_id ? `
           <div style="text-align:center;">
-            <div style="font-family:monospace;font-size:15px;font-weight:800;letter-spacing:2px;color:#2563EB;background:rgba(255,107,0,0.08);border:1.5px solid var(--orange);border-radius:8px;padding:6px 14px;margin-bottom:8px;">${init.da_id}</div>
+            <div style="font-family:'Cascadia Mono',Consolas,'DejaVu Sans Mono',Menlo,monospace;font-variant-numeric:slashed-zero;font-feature-settings:'zero' 1;font-size:15px;font-weight:800;letter-spacing:2px;color:#2563EB;background:rgba(255,107,0,0.08);border:1.5px solid var(--orange);border-radius:8px;padding:6px 14px;margin-bottom:8px;">${init.da_id}</div>
             <div style="display:flex;gap:8px;justify-content:center;">
               <button class="codes-btn orange" onclick="navigator.clipboard.writeText('${init.da_id}').then(()=>{if(typeof showToast==='function')showToast('✅ Identifiant copié !');})">📋 Copier</button>
               <button class="codes-btn green" onclick="navigator.share ? navigator.share({title:'Mon identifiant Diaspo\\'Actif',text:'Retrouvez-moi sur Diaspo\\'Actif avec l\\'identifiant ${init.da_id}',url:window.location.origin+'/initiative.html?id=${init.id}'}).catch(()=>{}) : navigator.clipboard.writeText('${init.da_id}').then(()=>{if(typeof showToast==='function')showToast('✅ Identifiant copié !');})">🔗 Partager</button>
