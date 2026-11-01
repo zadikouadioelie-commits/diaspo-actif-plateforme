@@ -5033,6 +5033,7 @@ db.exec(`
   );
 `);
 ;['type_reduction TEXT DEFAULT \'pourcentage\'','montant_fixe REAL','date_debut TEXT','date_fin TEXT','max_par_utilisateur INTEGER DEFAULT 1','type_code TEXT'].forEach(col => { try { db.exec(`ALTER TABLE formation_coupons ADD COLUMN ${col}`); } catch(_) {} }); /* type_code : codes générés en un clic (2026-10-31) */
+try { db.exec("ALTER TABLE formations ADD COLUMN en_boutique INTEGER DEFAULT 0"); } catch(_) {} /* « Vendre cette formation sur ma boutique » (2026-11-01) : désactivé par défaut */
 /* Fin de module (2026-10-31) : options « carte mentale » et « récapitulatif PDF » de la formation ; carte automatique rattachée à son module. */
 ;['carte_module INTEGER DEFAULT 0','recap_module INTEGER DEFAULT 0'].forEach(col => { try { db.exec(`ALTER TABLE formations ADD COLUMN ${col}`); } catch(_) {} });
 ;['module_id INTEGER'].forEach(col => { try { db.exec(`ALTER TABLE cartes_mentales ADD COLUMN ${col}`); } catch(_) {} });

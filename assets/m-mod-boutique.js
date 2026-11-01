@@ -53,6 +53,19 @@
 .bq-lbl{display:block;font-size:13px;font-weight:700;margin:12px 0 4px}
 .bq-err{color:var(--red);font-size:14px;margin:8px 2px 0}
 .bq-err:empty{display:none}
+.bq-fbande{margin:0 0 14px}
+.bq-ft{font-weight:800;font-size:16px;margin:0 2px 8px}
+.bq-frail{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x proximity;scroll-padding:0 14px;margin:0 -14px;padding:2px 14px 8px;scrollbar-width:none}
+.bq-frail::-webkit-scrollbar{display:none}
+.bq-fc{flex:0 0 200px;scroll-snap-align:start;display:flex;flex-direction:column;background:var(--card);border:1px solid var(--border);border-radius:16px;overflow:hidden;color:inherit;text-decoration:none}
+.bq-fm{flex:none;position:relative;width:100%;box-sizing:border-box;height:112px;background:linear-gradient(135deg,#0D2B4E,#2a5d9f);display:flex;align-items:center;justify-content:center;font-size:30px;overflow:hidden}
+.bq-fm img{width:100%;height:100%;object-fit:cover}
+.bq-fb{position:absolute;left:8px;top:8px;background:rgba(15,23,42,.82);color:#fff;font-size:11px;font-weight:700;padding:3px 8px;border-radius:20px}
+.bq-fg{position:absolute;right:8px;top:8px;background:#16a34a;color:#fff;font-size:11px;font-weight:800;padding:3px 8px;border-radius:20px}
+.bq-fi{padding:9px 10px 11px;display:flex;flex-direction:column;gap:2px;flex:1}
+.bq-fa{font-size:12px;color:var(--muted)}
+.bq-fp{margin-top:auto;padding-top:5px;font-weight:800;font-size:15px;color:var(--orange-d,#e8590c)}
+.bq-fp s{font-weight:500;font-size:12px;color:var(--muted);margin-right:5px}
 `;
     document.head.appendChild(st);
   }
@@ -90,10 +103,11 @@
         if (!v) { if (!alive()) return; return setPane('Boutique', `<div class="empty"><div class="ei">${ic('shop', 'l')}</div><b>Boutique introuvable</b>Cette boutique n’est pas visible pour le moment.<br><br><a class="btn sm" href="#/boutiques">Toutes les boutiques</a></div>`); }
         iid = v.id;
       }
-      const [ri, rp, rc] = await Promise.all([
+      const [ri, rp, rc, rf] = await Promise.all([
         api('/api/initiatives/' + encodeURIComponent(iid)),
         api('/api/initiatives/' + encodeURIComponent(iid) + '/produits'),
-        api('/api/initiatives/' + encodeURIComponent(iid) + '/catalogues').catch(() => ({}))
+        api('/api/initiatives/' + encodeURIComponent(iid) + '/catalogues').catch(() => ({})),
+        api('/api/initiatives/' + encodeURIComponent(iid) + '/formations-boutique').catch(() => ({}))
       ]);
       if (!alive()) return;
       const ini = ri.initiative || {};
@@ -103,6 +117,14 @@
       const lieu = [ini.ville, ini.pays].filter(Boolean).join(', ');
       const desc = strip(ini.boutique_description || ini.description || ini.slogan || '');
       const ST = { q: '', cat: '' };
+      /* Bande « Formations créées par <initiative> » (2026-11-01) : les formations que le propriétaire vend en boutique ; le clic mène à la fiche de la formation. */
+      const fmt = (v, dev) => { try { return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: (dev || 'EUR').toUpperCase() }).format(Number(v) || 0); } catch (e) { return (Number(v) || 0).toFixed(2) + ' ' + (dev || '€'); } };
+      const formations = (rf && rf.formations) || [];
+      const bande = formations.length ? `<div class="bq-fbande"><div class="bq-ft">🎓 ${esc(rf.titre)}</div><div class="bq-frail">${formations.map(f => {
+        const promo = !f.gratuit && Number(f.prix_catalogue) > Number(f.prix_final);
+        return `<a class="bq-fc" href="#/formations/${encodeURIComponent(f.id)}"><div class="bq-fm">${f.image_url ? `<img src="${A.attrUrl(f.image_url)}" alt="" loading="lazy" onerror="this.remove()">` : '🎓'}<span class="bq-fb">Formation</span>${f.gratuit ? '<span class="bq-fg">Gratuit</span>' : ''}</div>
+          <div class="bq-fi"><div class="bq-nm">${esc(f.titre)}</div>${f.auteur ? `<div class="bq-fa">par ${esc(f.auteur)}</div>` : ''}<div class="bq-fp">${f.gratuit ? 'Gratuit' : `${promo ? `<s>${esc(fmt(f.prix_catalogue, f.devise))}</s>` : ''}${esc(fmt(f.prix_final, f.devise))}`}</div></div></a>`;
+      }).join('')}</div></div>` : '';
       const carte = p => {
         const ph = photosDe(p)[0], ok = dispo(p);
         return `<a class="bq-p" href="#/produit/${encodeURIComponent(p.id)}"><div class="bq-ph">${ph ? `<img src="${A.attrUrl(ph)}" alt="" loading="lazy" onerror="this.remove()">` : ic('shop', 'l')}${ok ? '' : `<span class="bq-ind">${statutDe(p) === 'epuise' ? 'Épuisé' : 'Indisponible'}</span>`}</div>
@@ -112,6 +134,7 @@
           <div class="sp"><b style="font-size:18px;line-height:1.2;display:block">${esc(nom)}</b>${lieu ? `<div class="small muted">${ic('pin', 's')} ${esc(lieu)}</div>` : ''}<div class="small muted">${prods.length} article${prods.length > 1 ? 's' : ''}</div></div></div>
         ${desc ? `<div class="bq-desc">${esc(desc)}</div>` : ''}
         <div class="bq-acts">${ini.owner_user_id ? `<button class="btn out sm sp" data-write="${Number(ini.owner_user_id)}" type="button">${ic('chat', 's')} Contacter</button>` : ''}</div></div>
+        ${bande}
         ${prods.length ? `<div class="search" style="margin-bottom:10px">${ic('search', 's')}<input id="bq-q" type="search" placeholder="Rechercher un article…" aria-label="Rechercher un article"></div>` : ''}
         ${cats.length ? `<div class="chips" id="bq-cats"><button class="chip on" data-c="">Tous</button>${cats.map(c => `<button class="chip" data-c="${esc(c.id)}">${esc(c.nom)}</button>`).join('')}</div>` : ''}
         <div id="bq-list"></div>`);

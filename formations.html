@@ -1990,12 +1990,34 @@
           </div>
           ${(f.statut==='refusee'||f.statut==='modifications_demandees') && f.motif_refus ? `<p style="margin:8px 0 0;font-size:12.5px;color:#dc2626;">Motif : ${f.motif_refus}</p>` : ''}
           ${f.date_suppression_prevue ? `<div class="notice" style="margin-top:8px;font-size:12.5px;">🗑️ Suppression programmée le <strong>${f.date_suppression_prevue.slice(0,10)}</strong>. <button type="button" class="mf-annuler-suppr" data-id="${f.id}" style="border:none;background:none;color:#ff6b00;text-decoration:underline;cursor:pointer;">Annuler</button></div>` : ''}
+          <div style="margin-top:10px;padding:10px 12px;border:1px solid rgba(255,255,255,.14);border-radius:10px;">
+            <label class="fb-switch" style="font-size:13px;font-weight:700;${f.statut==='publiee' ? '' : 'opacity:.55;'}"><input type="checkbox" class="mf-boutique" data-id="${f.id}" ${Number(f.en_boutique)===1 ? 'checked' : ''} ${f.statut==='publiee' ? '' : 'disabled'}><span class="fb-switch-track"></span> 🛍️ Vendre cette formation sur ma boutique</label>
+            <div class="mf-boutique-note" style="font-size:12px;color:var(--muted);margin-top:4px;">${f.statut==='publiee' ? (Number(f.en_boutique)===1 ? 'Elle apparaît dans la bande « Formations créées par… » de votre boutique. Un clic y mène à sa fiche, avec le bouton d’achat.' : 'Désactivé : cette formation n’apparaît pas dans votre boutique. Activez pour l’y afficher.') : 'Disponible une fois la formation publiée.'}</div>
+          </div>
           <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
             <button class="btn btn-sm btn-outline mf-construire" data-id="${f.id}" data-titre="${f.titre.replace(/"/g,'&quot;')}" data-statut="${f.statut}">🛠️ Construire le contenu</button>
             <button class="btn btn-sm btn-outline mf-suivi" data-id="${f.id}" data-titre="${f.titre.replace(/"/g,'&quot;')}">📊 Suivi</button>
             <button class="btn btn-sm btn-outline mf-supprimer" data-id="${f.id}" data-titre="${f.titre.replace(/"/g,'&quot;')}" data-statut="${f.statut}" style="color:#dc2626;border-color:#fca5a5;">🗑️ Supprimer la formation</button>
           </div>
         </div>`).join('');
+      document.querySelectorAll('.mf-boutique').forEach(box=>{
+        box.addEventListener('change', async ()=>{
+          const note = box.closest('label').nextElementSibling;
+          const voulu = box.checked;
+          box.disabled = true;
+          try {
+            const r = await api('PUT', `/formations/${box.dataset.id}/boutique`, { actif: voulu });
+            const f = fbToutes.find(x => String(x.id) === String(box.dataset.id)); if(f) f.en_boutique = voulu ? 1 : 0;
+            if(note) note.textContent = voulu
+              ? (r.boutique_visible ? 'Elle apparaît dans la bande « Formations créées par… » de votre boutique. Un clic y mène à sa fiche, avec le bouton d’achat.' : 'Activé. Votre boutique n’est pas visible du public pour le moment : la bande s’affichera dès qu’elle le sera.')
+              : 'Désactivé : cette formation n’apparaît pas dans votre boutique. Activez pour l’y afficher.';
+            showMsg(voulu ? 'Formation ajoutée à votre boutique.' : 'Formation retirée de votre boutique.', 'success');
+          } catch(e){
+            box.checked = !voulu;
+            showMsg(e.message || 'Impossible de modifier la boutique.', 'danger');
+          } finally { box.disabled = false; }
+        });
+      });
       document.querySelectorAll('.mf-construire').forEach(btn=>{
         btn.addEventListener('click', ()=> openFormationBuilder(btn.dataset.id, btn.dataset.titre, btn.dataset.statut));
       });

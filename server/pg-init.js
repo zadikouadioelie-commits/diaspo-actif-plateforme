@@ -1009,6 +1009,7 @@ const COLONNES_MIGRATION = [
     ['formation_coupons', 'date_fin', 'TEXT'],
     ['formation_coupons', 'max_par_utilisateur', 'INTEGER DEFAULT 1'],
     ['formation_coupons', 'type_code', 'TEXT'], // codes générés en un clic : 'individuel' | 'collectif' (2026-10-31)
+    ['formations', 'en_boutique', 'INTEGER DEFAULT 0'], // « Vendre cette formation sur ma boutique » : bande de formations de la boutique (2026-11-01)
     ['formations', 'carte_module', 'INTEGER DEFAULT 0'], // fin de module : carte mentale automatique (2026-10-31)
     ['formations', 'recap_module', 'INTEGER DEFAULT 0'], // fin de module : récapitulatif PDF automatique (2026-10-31)
     ['cartes_mentales', 'module_id', 'INTEGER'], // carte automatique d'un module
