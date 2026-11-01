@@ -252,6 +252,10 @@ function reponseFausse({ systeme, messages }) {
 
 /* repondre({ modele, systeme, messages, maxSortie }) → { texte, entree, sortie, lecture_cache, refus, arret } — ou lève KofiIAErreur. */
 async function repondre({ modele, systeme, messages, maxSortie }) {
+  /* Aucun secret (mot de passe, code, jeton) ne part vers le fournisseur : règle du propriétaire, voir server/kofi-interdits.js. */
+  const { masquerSecrets } = require("./kofi-interdits");
+  systeme = masquerSecrets(systeme);
+  messages = (messages || []).map(m => ({ ...m, content: typeof m.content === "string" ? masquerSecrets(m.content) : m.content }));
   if (fausse()) return reponseFausse({ systeme, messages });
   if (!process.env.ANTHROPIC_API_KEY) throw new KofiIAErreur("non_configure", "Le service d'IA n'est pas configuré.");
   const nom = MODELES_AUTORISES.includes(modele) ? modele : MODELE_PAR_DEFAUT;

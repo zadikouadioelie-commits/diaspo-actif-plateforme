@@ -31,7 +31,7 @@ const CHAMPS_INFOS = { titre: ["Titre", 160, false], sous_titre: ["Sous-titre", 
 const NIVEAUX = ["Débutant", "Intermédiaire", "Avancé", "Tous niveaux"];
 
 /* ── Petits outils ───────────────────────────────────────────────────────────────────────────────── */
-const nettoyer = s => String(s == null ? "" : s).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "").replace(/\r\n/g, "\n").trim();
+const nettoyer = s => require("./kofi-interdits").masquerSecrets(String(s == null ? "" : s).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "").replace(/\r\n/g, "\n").trim());   /* mots de passe, codes et jetons masqués dès l'entrée (server/kofi-interdits.js) */
 const court = (s, max) => nettoyer(s).replace(/\s+/g, " ").slice(0, max);
 const entier = v => { const n = Math.floor(Number(v)); return Number.isFinite(n) ? n : NaN; };
 const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");

@@ -41,7 +41,7 @@ const SECTIONS = [
 const SECTION_IDS = new Set(SECTIONS.map(s => s[0]));
 const libelleSection = id => (SECTIONS.find(s => s[0] === id) || [id, id])[1];
 
-const nettoyer = s => String(s == null ? "" : s).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "").replace(/\r\n/g, "\n").trim();
+const nettoyer = s => require("./kofi-interdits").masquerSecrets(String(s == null ? "" : s).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "").replace(/\r\n/g, "\n").trim());   /* mots de passe, codes et jetons masqués dès l'entrée (server/kofi-interdits.js) */
 const court = (s, max) => nettoyer(s).replace(/\s+/g, " ").slice(0, max);
 const sqlDate = d => d.toISOString().slice(0, 19).replace("T", " ");
 const aDate = s => { if (!s) return null; const t = String(s).replace(" ", "T"); const d = new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(t) ? t : t + "Z"); return isNaN(d) ? null : d; };

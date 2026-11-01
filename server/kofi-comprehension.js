@@ -44,6 +44,8 @@ const carteLignes = (lg, sauf) => CARTE.filter(c => c.lieu !== sauf).map(c => "-
 const bloc = (lg, sauf) => [
   ...(lg === "en" ? EN : FR),
   "",
+  ...require("./kofi-interdits").regle(lg),
+  "",
   lg === "en" ? "YOU ARE THE SAME KOFFI EVERYWHERE on Diaspo'Actif. Elsewhere on the platform you can also:" : "TU ES LE MÊME KOFFI PARTOUT sur Diaspo'Actif. Ailleurs sur la plateforme, tu sais aussi :",
   ...carteLignes(lg, sauf),
   lg === "en" ? "If the request belongs to another place, say where to go (name the section) instead of pretending you can do it here, and never reveal anything that is not part of what you were given in this conversation." : "Si la demande relève d'un autre endroit, dis à la personne où aller (nomme la section) au lieu de prétendre pouvoir le faire ici, et ne révèle jamais rien qui ne fasse pas partie de ce qui t'a été donné dans cette conversation.",

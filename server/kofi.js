@@ -133,7 +133,7 @@ const BORNES = {
 
 const sqlDate = d => d.toISOString().slice(0, 19).replace("T", " ");
 const aDate = s => { if (!s) return null; const t = String(s).replace(" ", "T"); const d = new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(t) ? t : t + "Z"); return isNaN(d) ? null : d; };
-const nettoyer = s => String(s == null ? "" : s).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "").replace(/\r\n/g, "\n").trim();
+const nettoyer = s => require("./kofi-interdits").masquerSecrets(String(s == null ? "" : s).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "").replace(/\r\n/g, "\n").trim());   /* mots de passe, codes et jetons masqués dès l'entrée (server/kofi-interdits.js) */
 const entier = (v, min, max, defaut) => { const n = Math.floor(Number(v)); return Number.isFinite(n) ? Math.min(Math.max(n, min), max) : defaut; };
 const arrondi = (n, d) => { const p = Math.pow(10, d); return Math.round((Number(n) || 0) * p) / p; };
 

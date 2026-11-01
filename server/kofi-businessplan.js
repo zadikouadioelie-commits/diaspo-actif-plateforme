@@ -32,7 +32,7 @@ const RUBRIQUES = {
 const ORDRE = Object.keys(RUBRIQUES);
 const IGNORER = /(^|_)(e?mail|courriel|tel|telephone|phone|whatsapp|adresse|iban|rib|bic|password|token|site_web|linkedin|facebook|instagram|twitter|youtube|url|lien|logo|image|photo|media|document|fichier|siret|siren|rccm|ifu|naissance|responsable|contact|signature)(_|$)/i;
 
-const nettoyer = s => String(s == null ? "" : s).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "").replace(/\r\n/g, "\n").trim();
+const nettoyer = s => require("./kofi-interdits").masquerSecrets(String(s == null ? "" : s).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "").replace(/\r\n/g, "\n").trim());   /* mots de passe, codes et jetons masqués dès l'entrée (server/kofi-interdits.js) */
 const court = (s, max) => nettoyer(s).replace(/\s+/g, " ").slice(0, max);
 const parseJson = s => { try { return JSON.parse(s); } catch (_) { return null; } };
 const sqlDate = d => d.toISOString().slice(0, 19).replace("T", " ");
