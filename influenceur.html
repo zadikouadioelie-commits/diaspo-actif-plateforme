@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="/assets/logo.png">
+<title>Influenceur Diaspo'Actif</title>
+<meta name="description" content="Influenceur Diaspo'Actif (IDA) : podcasts vidéo, débats, interviews et récits inspirants pour la diaspora, en vidéos de 30 minutes à 1 heure.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Diaspo'Actif">
+<meta property="og:title" content="Influenceur Diaspo'Actif">
+<meta property="og:description" content="Podcasts vidéo, débats, interviews et récits inspirants pour la diaspora.">
+<meta property="og:image" content="https://diaspoactif.com/assets/og-image.png">
+<meta property="og:url" content="https://diaspoactif.com/influenceur.html">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="stylesheet" href="assets/styles.v2.css">
+<link rel="stylesheet" href="/assets/responsive.v2.css?v=2">
+<link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,500;0,6..96,600;1,6..96,500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/design-upgrade.v2.css">
+<link rel="stylesheet" href="/assets/theme-manager.css">
+<style>
+/* ═══ Influenceur Diaspo'Actif (IDA) — rubrique vidéo (2026-11-02, demande explicite, maquette fournie) ═══
+   Vidéos longues : de 30 minutes à 1 heure. Design « Nuit dorée » de la plateforme, composition de la maquette :
+   bannière, menu à gauche, lecteur + fiche au centre, « À suivre » à droite, vidéos en vedette, bandeau créateur.
+   Aucune vidéo n'est publiée pour l'instant : sans ?apercu=1 la page affiche des états vides honnêtes ;
+   avec ?apercu=1 elle montre la composition avec des contenus d'EXEMPLE signalés comme tels. */
+.ida { width:100%; max-width:1440px; margin:0 auto; padding:0 20px 48px; font-family:var(--nd-sans,'Manrope','Segoe UI',system-ui,sans-serif); color:var(--nd-texte,#E8ECF6); }
+.ida *, .ida *::before, .ida *::after { box-sizing:border-box; }
+.ida h1, .ida h2, .ida h3 { margin:0; font-weight:500; }
+/* Le thème global impose une police sans-serif aux titres : on garde les titres en Bodoni Moda comme le reste du site. */
+html body.nd .ida :is(h1,h2,h3) { font-family:var(--nd-display,'Bodoni Moda','Didot',Georgia,serif); font-weight:500; }
+
+/* Bannière */
+.ida-banner { position:relative; overflow:hidden; margin:0 -20px 22px; padding:30px 20px; display:flex; align-items:center; gap:22px; min-height:150px;
+  background:radial-gradient(900px 260px at 82% 40%, rgba(227,192,110,.20), transparent 70%), radial-gradient(700px 260px at 8% 0%, rgba(142,27,46,.38), transparent 70%), linear-gradient(120deg,#0B1226 0%,#1a0d1c 55%,#0B1226 100%);
+  border-bottom:1px solid var(--nd-bord,rgba(227,192,110,.24)); }
+.ida-banner-in { max-width:1400px; width:100%; margin:0 auto; display:flex; align-items:center; gap:22px; }
+.ida-mic { flex:0 0 auto; width:64px; height:64px; color:var(--nd-or,#E3C06E); }
+.ida-banner h1 { font-family:var(--nd-display,'Bodoni Moda',Georgia,serif); font-size:clamp(30px,4.4vw,52px); line-height:1.05; color:#fff; }
+.ida-banner h1 em { font-style:normal; color:var(--nd-or,#E3C06E); }
+.ida-banner p { margin:8px 0 0; font-size:clamp(13px,1.5vw,16px); color:var(--nd-doux,#A9B4CC); max-width:62ch; line-height:1.5; }
+.ida-chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+.ida-chip { display:inline-flex; align-items:center; gap:6px; padding:5px 12px; border-radius:999px; font-size:12px; font-weight:700; border:1px solid var(--nd-bord,rgba(227,192,110,.24)); color:var(--nd-or,#E3C06E); background:rgba(227,192,110,.08); }
+.ida-chip[hidden] { display:none; }
+.ida-chip.ex { color:#FFD7A3; border-color:rgba(255,170,80,.45); background:rgba(255,170,80,.10); }
+
+/* Composition */
+.ida-grid { display:grid; grid-template-columns:240px minmax(0,1fr) 330px; gap:18px; align-items:start; }
+.ida-card { background:var(--nd-verre,rgba(255,255,255,.045)); border:1px solid var(--nd-bord2,rgba(255,255,255,.09)); border-radius:18px; padding:16px; }
+.ida-side { position:sticky; top:12px; padding:12px; }
+.ida-menu { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:4px; }
+.ida-menu button { width:100%; display:flex; align-items:center; gap:10px; min-height:44px; padding:0 12px; border:0; border-radius:12px; background:transparent; color:var(--nd-doux,#A9B4CC); font:inherit; font-size:14px; font-weight:600; text-align:left; cursor:pointer; transition:background .25s, color .25s; }
+.ida-menu button:hover { background:rgba(255,255,255,.06); color:#fff; }
+.ida-menu button[aria-current="true"] { background:linear-gradient(135deg,#8E1B2E,#5E0F1E); color:#fff; }
+.ida-menu svg { width:20px; height:20px; flex:0 0 auto; }
+.ida-sep { height:1px; background:var(--nd-bord2,rgba(255,255,255,.09)); margin:12px 4px; }
+.ida-themes-t { display:flex; align-items:center; justify-content:space-between; padding:0 12px 6px; font-family:var(--nd-display,'Bodoni Moda',Georgia,serif); font-size:17px; color:var(--nd-or,#E3C06E); }
+.ida-theme { display:flex; align-items:center; gap:10px; min-height:36px; padding:0 12px; font-size:13px; color:var(--nd-doux,#A9B4CC); cursor:pointer; border-radius:10px; }
+.ida-theme:hover { background:rgba(255,255,255,.05); }
+.ida-theme input { width:16px; height:16px; accent-color:#E3C06E; flex:0 0 auto; }
+/* Le style global des <label> impose un gris foncé illisible sur fond nuit. */
+.ida .ida-theme, .ida .ida-auto { color:var(--nd-doux,#A9B4CC) !important; }
+
+/* Lecteur + fiche */
+.ida-main { display:flex; flex-direction:column; gap:18px; min-width:0; }
+.ida-player { display:grid; grid-template-columns:minmax(0,1.45fr) minmax(0,1fr); gap:20px; padding:14px; }
+.ida-screen { position:relative; aspect-ratio:16/9; border-radius:14px; overflow:hidden; background:#0B1226; display:flex; align-items:center; justify-content:center; }
+.ida-screen .bg { position:absolute; inset:0; }
+.ida-play { position:relative; width:72px; height:72px; border-radius:50%; border:0; cursor:pointer; background:rgba(255,255,255,.92); color:#8E1B2E; display:flex; align-items:center; justify-content:center; box-shadow:0 10px 30px -8px rgba(0,0,0,.7); transition:transform .25s; }
+.ida-play:hover { transform:scale(1.06); }
+.ida-play svg { width:30px; height:30px; margin-left:4px; }
+.ida-bar { position:absolute; left:0; right:0; bottom:0; padding:10px 14px; display:flex; align-items:center; gap:12px; font-size:12px; font-variant-numeric:tabular-nums; color:#fff; background:linear-gradient(transparent,rgba(0,0,0,.65)); }
+.ida-bar i { flex:1; height:3px; border-radius:2px; background:rgba(255,255,255,.3); }
+.ida-info { display:flex; flex-direction:column; gap:10px; min-width:0; }
+.ida-badge { align-self:flex-start; padding:4px 12px; border-radius:6px; font-size:12px; font-weight:800; color:#fff; background:linear-gradient(135deg,#8E1B2E,#5E0F1E); }
+.ida-info h2 { font-family:var(--nd-display,'Bodoni Moda',Georgia,serif); font-size:clamp(20px,2.2vw,28px); line-height:1.15; color:#fff; text-wrap:balance; }
+.ida-meta { font-size:13px; color:var(--nd-faible,#7C88A4); font-variant-numeric:tabular-nums; }
+.ida-chaine { display:flex; align-items:center; gap:10px; }
+.ida-avatar { width:38px; height:38px; border-radius:50%; flex:0 0 auto; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:14px; color:#1a1405; background:linear-gradient(135deg,#F3DC9B,#B9893A); }
+.ida-chaine b { display:block; font-size:14px; color:#fff; }
+.ida-chaine small { color:var(--nd-faible,#7C88A4); font-size:12px; }
+.ida-desc { margin:0; font-size:13.5px; line-height:1.55; color:var(--nd-doux,#A9B4CC); max-width:62ch; }
+.ida-btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:44px; padding:0 18px; border-radius:999px; border:1px solid var(--nd-bord,rgba(227,192,110,.24)); background:rgba(255,255,255,.05); color:#F3E3B5; font:inherit; font-size:13.5px; font-weight:700; cursor:pointer; transition:background .25s, transform .25s; }
+.ida-btn:hover { background:rgba(255,255,255,.10); }
+.ida-btn[aria-pressed="true"] { background:rgba(227,192,110,.16); border-color:var(--nd-or,#E3C06E); color:#fff; }
+.ida-btn.principal { border:0; color:#1a1405; background:var(--nd-degore,linear-gradient(135deg,#F3DC9B,#E3C06E 38%,#B9893A)); }
+.ida-btn svg { width:18px; height:18px; }
+.ida-actions { display:flex; flex-wrap:wrap; gap:10px; }
+.ida-btn:focus-visible, .ida-menu button:focus-visible, .ida-play:focus-visible, .ida-vignette:focus-visible, .ida-next:focus-visible { outline:2px solid #fff; outline-offset:2px; }
+
+/* Vignettes */
+.ida-th { position:relative; aspect-ratio:16/9; border-radius:12px; overflow:hidden; display:flex; align-items:center; justify-content:center; background:#0B1226; }
+.ida-th .bg { position:absolute; inset:0; }
+.ida-th svg { position:relative; width:34px; height:34px; opacity:.55; color:#fff; }
+.ida-dur { position:absolute; right:8px; bottom:8px; padding:2px 7px; border-radius:6px; font-size:12px; font-weight:700; font-variant-numeric:tabular-nums; color:#fff; background:rgba(0,0,0,.78); }
+.ida-sec-t { display:flex; align-items:center; justify-content:space-between; margin:0 0 12px; }
+.ida-sec-t h3 { font-family:var(--nd-display,'Bodoni Moda',Georgia,serif); font-size:22px; color:var(--nd-or,#E3C06E); }
+.ida-sec-t a, .ida-sec-t button { background:none; border:0; font:inherit; font-size:13px; font-weight:800; color:#F3E3B5; cursor:pointer; }
+.ida-vedette { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; }
+.ida-vignette { display:flex; flex-direction:column; align-items:stretch; justify-content:flex-start; gap:8px; width:100%; padding:0; border:0; background:none; font:inherit; color:inherit; text-align:left; cursor:pointer; }
+.ida-vignette .ida-th { width:100%; flex:0 0 auto; }
+.ida-vignette b { font-size:14px; line-height:1.3; color:#fff; font-weight:700; }
+.ida-vignette small { font-size:12px; color:var(--nd-faible,#7C88A4); font-variant-numeric:tabular-nums; }
+.ida-vignette:hover .ida-th { outline:2px solid var(--nd-or,#E3C06E); }
+
+/* À suivre */
+.ida-suivre { padding:14px; }
+.ida-suivre-h { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px; }
+.ida-suivre-h h3 { font-family:var(--nd-display,'Bodoni Moda',Georgia,serif); font-size:20px; color:var(--nd-or,#E3C06E); }
+.ida-auto { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--nd-doux,#A9B4CC); }
+.ida-switch { position:relative; width:42px; height:24px; border-radius:999px; border:0; cursor:pointer; background:rgba(255,255,255,.18); transition:background .25s; }
+.ida-switch::after { content:""; position:absolute; top:3px; left:3px; width:18px; height:18px; border-radius:50%; background:#fff; transition:transform .25s; }
+.ida-switch[aria-checked="true"] { background:#8E1B2E; }
+.ida-switch[aria-checked="true"]::after { transform:translateX(18px); }
+.ida-switch:focus-visible { outline:2px solid #fff; outline-offset:2px; }
+.ida-list { display:flex; flex-direction:column; gap:12px; }
+.ida-next { display:grid; grid-template-columns:128px minmax(0,1fr); gap:12px; padding:0; border:0; background:none; font:inherit; color:inherit; text-align:left; cursor:pointer; }
+.ida-next b { display:block; font-size:13.5px; line-height:1.3; color:#fff; font-weight:700; }
+.ida-next small { display:block; margin-top:4px; font-size:12px; color:var(--nd-faible,#7C88A4); line-height:1.4; }
+
+/* États vides */
+.ida-vide { padding:44px 24px; text-align:center; display:flex; flex-direction:column; align-items:center; gap:12px; }
+.ida-vide svg { width:56px; height:56px; color:var(--nd-or,#E3C06E); opacity:.85; }
+.ida-vide h2 { font-family:var(--nd-display,'Bodoni Moda',Georgia,serif); font-size:clamp(22px,2.6vw,30px); color:#fff; text-wrap:balance; }
+.ida-vide p { margin:0; max-width:52ch; font-size:14px; line-height:1.6; color:var(--nd-doux,#A9B4CC); }
+.ida-vide-mini { padding:18px 6px; font-size:13px; line-height:1.55; color:var(--nd-faible,#7C88A4); text-align:center; }
+
+/* Bandeau créateur */
+.ida-cta { margin-top:22px; display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:22px; padding:20px 26px; border-radius:20px; border:1px solid var(--nd-bord,rgba(227,192,110,.24)); background:linear-gradient(120deg,rgba(142,27,46,.40),rgba(11,18,38,.85) 60%); }
+.ida-cta > svg { width:54px; height:54px; color:var(--nd-or,#E3C06E); }
+.ida-cta h3 { font-family:var(--nd-display,'Bodoni Moda',Georgia,serif); font-size:clamp(22px,2.4vw,30px); line-height:1.1; color:#fff; }
+.ida-cta ul { list-style:none; margin:10px 0 0; padding:0; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px 24px; font-size:13.5px; color:var(--nd-doux,#A9B4CC); }
+.ida-cta li { display:flex; gap:8px; align-items:flex-start; }
+.ida-cta li::before { content:"✓"; color:var(--nd-or,#E3C06E); font-weight:800; }
+#ida-toast { position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(20px); opacity:0; pointer-events:none; z-index:9000; padding:12px 20px; border-radius:999px; font-size:14px; font-weight:700; color:#1a1405; background:var(--nd-degore,#E3C06E); transition:opacity .3s, transform .3s; max-width:calc(100vw - 32px); text-align:center; }
+#ida-toast.on { opacity:1; transform:translateX(-50%) translateY(0); }
+
+@media (max-width:1180px) {
+  .ida-grid { grid-template-columns:220px minmax(0,1fr); }
+  .ida-suivre-col { grid-column:1 / -1; }
+  .ida-list { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); }
+}
+@media (max-width:860px) {
+  .ida { padding:0 16px 40px; }
+  .ida-banner { margin:0 -16px 18px; padding:22px 16px; }
+  .ida-mic { width:44px; height:44px; }
+  .ida-grid { grid-template-columns:minmax(0,1fr); }
+  .ida-side { position:static; }
+  .ida-menu { flex-direction:row; overflow-x:auto; padding-bottom:4px; scrollbar-width:thin; }
+  .ida-menu li { flex:0 0 auto; }
+  .ida-menu button { width:auto; white-space:nowrap; }
+  .ida-themes { display:none; }
+  .ida-sep { display:none; }
+  .ida-player { grid-template-columns:minmax(0,1fr); }
+  .ida-vedette { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .ida-cta { grid-template-columns:minmax(0,1fr); text-align:left; }
+  .ida-cta ul { grid-template-columns:minmax(0,1fr); }
+}
+@media (prefers-reduced-motion:reduce) { .ida *, #ida-toast { transition:none !important; } }
+</style>
+</head>
+<body class="nd">
+<div class="page">
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Menu">&#9776;</button>
+      <div class="logo"><img loading="lazy" class="logo-img" src="assets/logo.png" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+      <nav class="nav">
+        <a href="index.html">Accueil</a>
+        <a href="annuaire.html">Annuaire</a>
+        <a href="vitrines.html">Boutiques</a>
+        <a href="fil-actualite.html">Fil d'actualité</a>
+        <a href="influenceur.html" class="active" title="Influenceur Diaspo'Actif">Influenceur IDA</a>
+        <a href="formations.html">Formations</a>
+        <a href="evenements.html">Autres événements</a>
+      </nav>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="ida" id="ida">
+    <section class="ida-banner" aria-labelledby="ida-titre">
+      <div class="ida-banner-in">
+        <svg class="ida-mic" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="22" y="6" width="20" height="34" rx="10"/><path d="M12 30a20 20 0 0 0 40 0M32 50v8M22 58h20"/></svg>
+        <div>
+          <h1 id="ida-titre">Influenceur <em>Diaspo'Actif</em></h1>
+          <p>Podcasts vidéo · Débats · Interviews · Récits inspirants · Idées et solutions pour la diaspora</p>
+          <div class="ida-chips">
+            <span class="ida-chip">IDA</span>
+            <span class="ida-chip">Vidéos de 30 min à 1 h</span>
+            <span class="ida-chip ex" id="ida-ex" hidden>Aperçu — contenus d'exemple</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="ida-grid">
+      <!-- Menu -->
+      <aside class="ida-card ida-side" aria-label="Menu Influenceur">
+        <ul class="ida-menu" id="ida-menu"></ul>
+        <div class="ida-themes" id="ida-themes">
+          <div class="ida-sep"></div>
+          <div class="ida-themes-t">Thématiques</div>
+          <div id="ida-themes-l"></div>
+        </div>
+      </aside>
+
+      <!-- Centre -->
+      <div class="ida-main">
+        <section class="ida-card ida-player" id="ida-player" aria-live="polite"></section>
+        <section id="ida-vedette-sec" aria-labelledby="ida-vedette-t">
+          <div class="ida-sec-t"><h3 id="ida-vedette-t">Vidéos en vedette</h3></div>
+          <div class="ida-vedette" id="ida-vedette"></div>
+        </section>
+      </div>
+
+      <!-- À suivre -->
+      <aside class="ida-card ida-suivre ida-suivre-col" aria-labelledby="ida-suivre-t">
+        <div class="ida-suivre-h">
+          <h3 id="ida-suivre-t">À suivre</h3>
+          <label class="ida-auto">Lecture automatique
+            <button type="button" class="ida-switch" id="ida-auto" role="switch" aria-checked="true" aria-label="Lecture automatique"></button>
+          </label>
+        </div>
+        <div class="ida-list" id="ida-suivre"></div>
+      </aside>
+    </div>
+
+    <!-- Bandeau créateur -->
+    <section class="ida-cta" aria-labelledby="ida-cta-t">
+      <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="16" width="36" height="32" rx="6"/><path d="M42 28l16-8v24l-16-8z"/><circle cx="24" cy="32" r="5"/></svg>
+      <div>
+        <h3 id="ida-cta-t">Devenez créateur sur Influenceur Diaspo'Actif</h3>
+        <ul>
+          <li>Publiez vos podcasts et émissions</li>
+          <li>Développez votre audience</li>
+          <li>Échangez avec votre communauté</li>
+          <li>Valorisez vos idées, projets et initiatives</li>
+        </ul>
+      </div>
+      <a class="ida-btn principal" href="inscription.html" id="ida-cta-btn">Commencer maintenant →</a>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span id="footer-text">Diaspo'Actif · Du Sud au Nord · 2026</span> ·
+    <a href="mentions-legales.html" class="footer-link">Mentions légales</a> · <a href="charte.html" class="footer-link">Charte</a> · <a href="politique-confidentialite.html" class="footer-link">Politique de confidentialité</a>
+  </footer>
+</div>
+<div id="ida-toast" role="status" aria-live="polite"></div>
+
+<script src="assets/data.js?v=7"></script>
+<script src="assets/geo.js?v=3"></script>
+<script src="assets/demo.js?v=2"></script>
+<script src="assets/app.js?v=15"></script>
+<script>
+/* ═══ Rubrique Influenceur Diaspo'Actif (IDA) ═══
+   VIDEOS : liste des vidéos publiées (30 min à 1 h). Vide tant que la publication n'est pas ouverte : la page affiche alors des
+   états vides, jamais de faux chiffres. ?apercu=1 charge APERCU, des exemples signalés « Aperçu », uniquement pour juger la composition. */
+(function () {
+  'use strict';
+  var APERCU_ON = /(?:^|[?&])apercu=1(?:&|$)/.test(location.search);
+  var VIDEOS = [];
+  var APERCU = [
+    { id: 1, titre: "Entreprendre en Afrique : opportunités, défis et clés de réussite", min: 52, vues: 14562, jours: 3, chaine: "Chaîne d'exemple", abonnes: 76400, theme: "Entrepreneuriat & Business", type: "Podcast Diaspo'Actif", desc: "Exemple de fiche : dans ce podcast, nous échangeons avec des entrepreneurs de la diaspora et du continent sur les secteurs porteurs, les obstacles à anticiper et les bonnes pratiques." },
+    { id: 2, titre: "Investir dans l'agroalimentaire en Afrique", min: 38, vues: 9300, jours: 5, chaine: "Chaîne d'exemple", abonnes: 76400, theme: "Entrepreneuriat & Business", type: "Interview", desc: "Exemple de fiche d'une interview." },
+    { id: 3, titre: "La puissance de la culture dans le développement", min: 47, vues: 12000, jours: 7, chaine: "Voix de la diaspora (exemple)", abonnes: 31200, theme: "Culture & Identité", type: "Débat", desc: "Exemple de fiche d'un débat." },
+    { id: 4, titre: "IA et opportunités pour la jeunesse africaine", min: 56, vues: 21000, jours: 14, chaine: "Tech Diaspora (exemple)", abonnes: 18900, theme: "Innovation & Technologie", type: "Podcast Diaspo'Actif", desc: "Exemple de fiche d'un podcast." },
+    { id: 5, titre: "Femmes de la diaspora : parcours et inspirations", min: 49, vues: 18000, jours: 21, chaine: "Chaîne d'exemple", abonnes: 76400, theme: "Leadership & Inspiration", type: "Récit inspirant", desc: "Exemple de fiche d'un récit." },
+    { id: 6, titre: "Énergies renouvelables : quelles solutions pour l'Afrique ?", min: 58, vues: 27000, jours: 30, chaine: "Impact Afrique (exemple)", abonnes: 9800, theme: "Développement & Impact", type: "Débat", desc: "Exemple de fiche d'un débat." },
+    { id: 7, titre: "Leadership et impact de la diaspora", min: 58, vues: 15000, jours: 4, chaine: "Chaîne d'exemple", abonnes: 76400, theme: "Leadership & Inspiration", type: "Interview", desc: "Exemple de fiche d'une interview." },
+    { id: 8, titre: "Réussir sa transition professionnelle en Europe", min: 45, vues: 11000, jours: 6, chaine: "Chaîne d'exemple", abonnes: 76400, theme: "Diaspora & Mobilité", type: "Podcast Diaspo'Actif", desc: "Exemple de fiche d'un podcast." },
+    { id: 9, titre: "Construire un projet à impact social", min: 52, vues: 8900, jours: 7, chaine: "Chaîne d'exemple", abonnes: 76400, theme: "Société & Citoyenneté", type: "Débat", desc: "Exemple de fiche d'un débat." },
+    { id: 10, titre: "Entre tradition et innovation : la mode africaine", min: 39, vues: 6400, jours: 7, chaine: "Chaîne d'exemple", abonnes: 76400, theme: "Culture & Identité", type: "Interview", desc: "Exemple de fiche d'une interview." }
+  ];
+  if (APERCU_ON) { VIDEOS = APERCU; document.getElementById('ida-ex').hidden = false; }
+
+  var THEMES = ["Entrepreneuriat & Business", "Développement & Impact", "Culture & Identité", "Innovation & Technologie", "Éducation & Formation", "Diaspora & Mobilité", "Leadership & Inspiration", "Société & Citoyenneté"];
+  var MENU = [
+    { k: 'accueil', t: "Accueil Influenceur", i: '<path d="M3 11l9-8 9 8M5 10v10h5v-6h4v6h5V10"/>' },
+    { k: 'abonnements', t: "Mes abonnements", i: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6M17 6h5M17 10h5M17 14h5"/>', connexion: true },
+    { k: 'populaires', t: "Vidéos populaires", i: '<path d="M12 3c1 4 5 5.5 5 10a5 5 0 0 1-10 0c0-2 1-3 2-4 0 2 1 3 2 3 1-3 0-6 1-9z"/>' },
+    { k: 'nouvelles', t: "Nouvelles vidéos", i: '<rect x="3" y="4" width="18" height="16" rx="3"/><path d="M10 9l5 3-5 3z"/>' },
+    { k: 'favoris', t: "Mes favoris", i: '<path d="M12 20s-8-5-8-11a4.5 4.5 0 0 1 8-2.5A4.5 4.5 0 0 1 20 9c0 6-8 11-8 11z"/>', connexion: true },
+    { k: 'plustard', t: "À regarder plus tard", i: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', connexion: true },
+    { k: 'playlists', t: "Mes playlists", i: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>', connexion: true }
+  ];
+  var etat = { vue: 'accueil', courant: null, themes: {}, like: {}, garde: {} };
+  var connecte = null;
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+  function nb(n) { return n >= 1000 ? (Math.round(n / 100) / 10).toLocaleString('fr-FR') + ' k' : String(n); }
+  function duree(m) { return m >= 60 ? '1:' + ('0' + (m - 60)).slice(-2) + ':00' : m + ':00'; }
+  function il(j) { return j < 7 ? 'il y a ' + j + ' jour' + (j > 1 ? 's' : '') : j < 30 ? 'il y a ' + Math.round(j / 7) + ' semaine' + (Math.round(j / 7) > 1 ? 's' : '') : 'il y a ' + Math.round(j / 30) + ' mois'; }
+  function toast(m) { var t = $('ida-toast'); t.textContent = m; t.classList.add('on'); clearTimeout(toast._t); toast._t = setTimeout(function () { t.classList.remove('on'); }, 3200); }
+  function teinte(s) { var h = 0; for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 360; return h; }
+  function fond(v) { var h = teinte(v.titre); return '<span class="bg" style="background:linear-gradient(135deg,hsl(' + h + ' 45% 22%),hsl(' + ((h + 40) % 360) + ' 55% 12%))"></span>'; }
+  var PLAY = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>';
+  function th(v) { return '<span class="ida-th">' + fond(v) + PLAY + '<span class="ida-dur">' + duree(v.min) + '</span></span>'; }
+
+  function visibles() {
+    var l = VIDEOS.slice(), actifs = Object.keys(etat.themes).filter(function (k) { return etat.themes[k]; });
+    if (actifs.length) l = l.filter(function (v) { return actifs.indexOf(v.theme) >= 0; });
+    if (etat.vue === 'populaires') l.sort(function (a, b) { return b.vues - a.vues; });
+    else if (etat.vue === 'nouvelles') l.sort(function (a, b) { return a.jours - b.jours; });
+    return l;
+  }
+
+  function dessinerMenu() {
+    $('ida-menu').innerHTML = MENU.map(function (m) {
+      return '<li><button type="button" data-k="' + m.k + '"' + (etat.vue === m.k ? ' aria-current="true"' : '') + '><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + m.i + '</svg>' + esc(m.t) + '</button></li>';
+    }).join('');
+  }
+  function dessinerThemes() {
+    $('ida-themes-l').innerHTML = THEMES.map(function (t, i) {
+      return '<label class="ida-theme"><input type="checkbox" data-t="' + i + '"' + (etat.themes[t] ? ' checked' : '') + '>' + esc(t) + '</label>';
+    }).join('');
+  }
+
+  function videoVide(titre, texte, lien) {
+    return '<div class="ida-vide" style="grid-column:1/-1"><svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="14" width="52" height="36" rx="8"/><path d="M27 24l13 8-13 8z"/></svg><h2>' + esc(titre) + '</h2><p>' + esc(texte) + '</p>' + (lien || '') + '</div>';
+  }
+
+  function dessiner() {
+    var vue = etat.vue, m = MENU.filter(function (x) { return x.k === vue; })[0];
+    var liste = visibles(), player = $('ida-player'), suivre = $('ida-suivre'), vedette = $('ida-vedette'), secV = $('ida-vedette-sec');
+    dessinerMenu();
+
+    // Vues réservées au compte : on ne simule rien.
+    if (m && m.connexion) {
+      secV.hidden = true; suivre.innerHTML = '<div class="ida-vide-mini">Rien à suivre pour l’instant.</div>';
+      player.style.display = 'block';
+      player.innerHTML = connecte
+        ? videoVide(m.t, "Cette fonction s'ouvrira avec les premières vidéos de la rubrique. Vous la retrouverez ici, avec vos choix enregistrés.")
+        : videoVide(m.t, "Connectez-vous pour retrouver ici vos abonnements, favoris, vidéos à regarder plus tard et playlists.", '<a class="ida-btn principal" href="login.html">Se connecter</a>');
+      return;
+    }
+    secV.hidden = false; player.style.display = '';
+
+    if (!VIDEOS.length) {
+      player.style.display = 'block';
+      player.innerHTML = videoVide("Les premières vidéos arrivent bientôt", "Influenceur Diaspo'Actif réunira des podcasts vidéo, débats, interviews et récits inspirants de 30 minutes à 1 heure, au service de la diaspora. Les créateurs pourront publier dès l'ouverture de la rubrique.", '<a class="ida-btn principal" href="inscription.html">Devenir créateur →</a>');
+      secV.hidden = true; suivre.innerHTML = '<div class="ida-vide-mini">Les vidéos à suivre apparaîtront ici dès les premières publications.</div>';
+      return;
+    }
+    if (!liste.length) {
+      player.style.display = 'block';
+      player.innerHTML = videoVide("Aucune vidéo pour ces thématiques", "Décochez une thématique pour retrouver toutes les vidéos.");
+      secV.hidden = true; suivre.innerHTML = ''; return;
+    }
+
+    var cur = liste.filter(function (v) { return v.id === etat.courant; })[0] || liste[0];
+    etat.courant = cur.id;
+    var aime = !!etat.like[cur.id], garde = !!etat.garde[cur.id];
+    player.innerHTML =
+      '<div class="ida-screen">' + fond(cur) + '<button type="button" class="ida-play" id="ida-lire" aria-label="Lire la vidéo">' + PLAY + '</button><div class="ida-bar" aria-hidden="true"><span>0:00 / ' + duree(cur.min) + '</span><i></i></div></div>' +
+      '<div class="ida-info"><span class="ida-badge">' + esc(cur.type) + '</span><h2>' + esc(cur.titre) + '</h2>' +
+      '<div class="ida-meta">' + nb(cur.vues) + ' vues · ' + il(cur.jours) + ' · ' + duree(cur.min) + '</div>' +
+      '<div class="ida-chaine"><span class="ida-avatar" aria-hidden="true">' + esc(cur.chaine.charAt(0)) + '</span><div><b>' + esc(cur.chaine) + '</b><small>' + nb(cur.abonnes) + ' abonnés</small></div><button type="button" class="ida-btn principal" id="ida-abo" style="margin-left:auto">S’abonner</button></div>' +
+      '<p class="ida-desc">' + esc(cur.desc) + '</p>' +
+      '<div class="ida-actions"><button type="button" class="ida-btn" id="ida-like" aria-pressed="' + aime + '">👍 ' + nb(cur.vues > 1000 ? Math.round(cur.vues / 8) + (aime ? 1 : 0) : 0) + '</button>' +
+      '<button type="button" class="ida-btn" id="ida-comm">💬 Commenter</button><button type="button" class="ida-btn" id="ida-part">↗ Partager</button>' +
+      '<button type="button" class="ida-btn" id="ida-gard" aria-pressed="' + garde + '">🔖 Enregistrer</button></div></div>';
+
+    vedette.innerHTML = liste.slice(0, 4).map(function (v) {
+      return '<button type="button" class="ida-vignette" data-v="' + v.id + '">' + th(v) + '<b>' + esc(v.titre) + '</b><small>' + nb(v.vues) + ' vues · ' + il(v.jours) + '</small></button>';
+    }).join('');
+    suivre.innerHTML = liste.filter(function (v) { return v.id !== cur.id; }).slice(0, 6).map(function (v) {
+      return '<button type="button" class="ida-next" data-v="' + v.id + '">' + th(v) + '<span><b>' + esc(v.titre) + '</b><small>' + esc(v.chaine) + '<br>' + nb(v.vues) + ' vues · ' + il(v.jours) + '</small></span></button>';
+    }).join('');
+  }
+
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest ? e.target.closest('button, [data-v]') : null; if (!b) return;
+    if (b.dataset.k) { etat.vue = b.dataset.k; dessiner(); return; }
+    if (b.dataset.v) { etat.courant = Number(b.dataset.v); dessiner(); var p = $('ida-player'); if (p && p.scrollIntoView) p.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); return; }
+    if (b.id === 'ida-lire') return toast("Le lecteur sera branché à l'ouverture de la rubrique : cet aperçu montre seulement la composition.");
+    if (b.id === 'ida-abo') return toast(connecte ? "Les abonnements s'ouvriront avec la rubrique." : 'Connectez-vous pour vous abonner à une chaîne.');
+    if (b.id === 'ida-like') { etat.like[etat.courant] = !etat.like[etat.courant]; return dessiner(); }
+    if (b.id === 'ida-gard') { etat.garde[etat.courant] = !etat.garde[etat.courant]; return dessiner(); }
+    if (b.id === 'ida-comm') return toast("Les commentaires s'ouvriront avec les premières vidéos.");
+    if (b.id === 'ida-part') {
+      var url = location.origin + '/influenceur.html';
+      if (navigator.share) { navigator.share({ title: "Influenceur Diaspo'Actif", url: url }).catch(function () {}); }
+      else if (navigator.clipboard) { navigator.clipboard.writeText(url).then(function () { toast('Lien copié'); }, function () { toast(url); }); }
+      else toast(url);
+    }
+  });
+  document.addEventListener('change', function (e) {
+    var c = e.target;
+    if (c && c.dataset && c.dataset.t !== undefined) { etat.themes[THEMES[Number(c.dataset.t)]] = c.checked; dessiner(); }
+  });
+  $('ida-auto').addEventListener('click', function () { this.setAttribute('aria-checked', this.getAttribute('aria-checked') === 'true' ? 'false' : 'true'); });
+
+  dessinerThemes(); dessiner();
+  fetch('/api/auth/me', { credentials: 'same-origin' }).then(function (r) { return r.json(); })
+    .then(function (d) { connecte = d && d.user ? d.user : null; if (MENU.some(function (x) { return x.k === etat.vue && x.connexion; })) dessiner(); }).catch(function () {});
+})();
+</script>
+<script src="assets/chatbot.js"></script>
+<script src="/assets/cookies-banner.js"></script>
+<link rel="stylesheet" href="/assets/theme-nuit-doree.css?v=8">
+</body>
+</html>

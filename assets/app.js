@@ -7774,6 +7774,9 @@ document.addEventListener('load', function (e) {
     { href: 'annuaire.html', label: 'Annuaire' },
     { href: 'vitrines.html', label: 'Boutiques' },
     { href: 'fil-actualite.html', label: "Fil d'actualité" },
+    /* Rubrique vidéo « Influenceur Diaspo'Actif » (IDA, 2026-11-02, demande explicite) : entre le Fil d'actualité et les
+       Formations. `apres` = se glisse juste derrière ce lien quand la page l'a, au lieu de finir en bout de barre. */
+    { href: 'influenceur.html', label: 'Influenceur IDA', titre: "Influenceur Diaspo'Actif", apres: 'fil-actualite.html', fixe: true },
     { href: 'formations.html', label: 'Formations' },
     { href: 'evenements.html', label: 'Autres événements' }
   ];
@@ -7793,8 +7796,13 @@ document.addEventListener('load', function (e) {
       a.href = it.href;
       a.textContent = it.label;
       a.setAttribute('data-nav-ajout', '1');
-      nav.appendChild(a);
-      ajoutes.push(a);
+      if (it.titre) a.title = it.titre;
+      var pivot = null;
+      if (it.apres) liens.forEach(function (l) { if (nomPage(l.getAttribute('href')) === it.apres) pivot = l; });
+      if (pivot && pivot.parentNode === nav) nav.insertBefore(a, pivot.nextSibling);
+      else nav.appendChild(a);
+      /* `fixe` : jamais retiré faute de place (la barre défile plutôt) — les autres accès ajoutés cèdent d'abord. */
+      if (!it.fixe) ajoutes.push(a);
     });
     if (!ajoutes.length) return;
     try { if (typeof applyTranslations === 'function') applyTranslations(); } catch (e) { /* libellés en français */ }
