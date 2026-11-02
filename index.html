@@ -192,6 +192,19 @@ body { overflow-x: clip; }
 /* --- Bande « À la une » : 1 Reel + 2 actualités à droite de la carte (2026-11-01) — assets/accueil-fil.js --- */
 .hp-hero-fil { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 12px; min-width: 0; z-index: 2; font-family: Manrope, system-ui, sans-serif; }
 .hp-hero-fil[hidden] { display: none; }
+/* --- Bouton « Créer une publication » (2026-11-02, demande explicite : « accessible, rapide et facile sur l'accueil ») ---
+   Deux déclencheurs, même action (hpCreerPublication) : le bouton flottant, toujours sous le pouce/la souris quelle que soit
+   la position de défilement, et le bouton en tête de la bande « À la une ». La publication s'ouvre dans la fenêtre du fil
+   (assets/posts.js, chargé à la demande) : rien à quitter, rien à apprendre. */
+/* right:88px = à gauche de la bulle de l'assistant (#assist-hub-fab, 52 px à 20 px du bord). position:fixed !important : assets/gsap-animations.js (effet d'ondulation) pose position:relative en ligne sur tous les <button>. */
+.hp-creer-flottant { position: fixed !important; right: 88px; bottom: 20px; z-index: 900; display: inline-flex; align-items: center; gap: 8px; border: 0; cursor: pointer; font: 800 15px Manrope, system-ui, sans-serif; color: #fff; background: linear-gradient(135deg, #F59E0B, #EA580C); padding: 14px 22px; border-radius: 999px; box-shadow: 0 6px 24px rgba(234,88,12,.45); transition: transform .2s, box-shadow .2s; }
+.hp-creer-flottant:hover, .hp-creer-flottant:focus-visible { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(234,88,12,.55); outline: 2px solid #fff; outline-offset: 2px; }
+.hp-creer-flottant[disabled] { opacity: .7; cursor: progress; }
+.hp-creer-flottant .hp-creer-plus { font-size: 20px; line-height: 1; }
+.hp-creer-tete { display: inline-flex; align-items: center; gap: 6px; border: 0; cursor: pointer; font: 800 12px Manrope, system-ui, sans-serif; color: #fff; background: linear-gradient(135deg, #F59E0B, #EA580C); padding: 7px 14px; border-radius: 999px; }
+.hp-creer-tete:hover, .hp-creer-tete:focus-visible { filter: brightness(1.08); outline: 2px solid #fff; outline-offset: 2px; }
+.hp-fil-tete-droite { display: inline-flex; align-items: center; gap: 12px; }
+@media (max-width: 640px) { .hp-creer-flottant { right: 78px; bottom: 16px; padding: 13px 18px; } }
 .hp-fil-tete { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .hp-fil-tete b { font-size: 12px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: #E3C06E; }
 .hp-fil-tete a { font-size: 12px; font-weight: 700; color: rgba(255,255,255,.72); text-decoration: none; }
@@ -1349,7 +1362,10 @@ body { overflow-x: clip; }
       <aside class="hp-hero-fil" id="hp-hero-fil" aria-label="À la une sur Diaspo’Actif">
         <div class="hp-fil-tete">
           <b>À la une</b>
-          <a href="fil-actualite-app.html">Tout voir →</a>
+          <span class="hp-fil-tete-droite">
+            <button type="button" class="hp-creer-tete" onclick="hpCreerPublication(this)">✏️ Créer une publication</button>
+            <a href="fil-actualite-app.html">Tout voir →</a>
+          </span>
         </div>
         <div class="hp-fil-liste" id="hp-fil-liste" aria-busy="true">
           <span class="hp-fil-carte" aria-hidden="true"></span>
@@ -2276,6 +2292,29 @@ async function hpOuvrirPost(postId) {
 }
 window.hpOuvrirPost = hpOuvrirPost;
 
+/* « Créer une publication » : connecté → la fenêtre de création du fil s'ouvre ici même ; visiteur → page de connexion qui le
+   ramène sur l'accueil. Le module du fil est chargé au premier clic (comme la visionneuse ci-dessus). */
+let _hpUtilisateurId = null;
+async function hpCreerPublication(btn) {
+  if (btn) btn.disabled = true;
+  try {
+    if (_hpUtilisateurId == null) {
+      const r = await fetch('/api/auth/me', { credentials: 'same-origin' });
+      const d = await r.json().catch(() => ({}));
+      if (!d || !d.user) { window.location.href = 'login.html?redirect=' + encodeURIComponent('/index.html'); return; }
+      _hpUtilisateurId = d.user.id;
+    }
+    await hpChargerPosts();
+    if (window.Posts._currentUserId == null) window.Posts.init(_hpUtilisateurId);
+    window.Posts.openModal();
+  } catch (e) {
+    window.location.href = 'fil-actualite-app.html';
+  } finally {
+    document.querySelectorAll('.hp-creer-flottant, .hp-creer-tete').forEach(b => { b.disabled = false; });
+  }
+}
+window.hpCreerPublication = hpCreerPublication;
+
 /* Galerie photos/vidéos d'une cartouche (assets/media-galerie.js) : réactions du post, défilement sur les autres médias, sans nouvelle page. */
 function hpOuvrirMedias(postId, i) {
   const p = (window.HP_POSTS || {})[postId];
@@ -2584,6 +2623,7 @@ async function hpReagir(postId, btn) {
     .catch(function(){ render(null); });
 })();
 </script>
+<button type="button" class="hp-creer-flottant" id="hp-creer-flottant" onclick="hpCreerPublication(this)" aria-label="Créer une publication"><span class="hp-creer-plus" aria-hidden="true">✏️</span> Créer une publication</button>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js" defer></script>
 <script src="assets/gsap-animations.js" defer></script>
