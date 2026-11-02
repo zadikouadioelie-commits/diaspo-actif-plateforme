@@ -2321,7 +2321,9 @@ function renderVisitorProfile() {
      toujours visibles à droite de la bannière (voir #theme-swatches dans le bloc BANNIÈRE),
      plus besoin d'un panneau à déplier pour les retrouver. */
   const domaineActiviteBtn = `<button class="pvz-btn" onclick="editDomaineActiviteInit()">🏷️ ${profil.domaine_principal ? 'Modifier mon domaine' : 'Renseigner mon domaine'}</button>`;
-  const ownerActionsRow = `<button class="pvz-btn primary" onclick="openEditIdentity()">✏️ Modifier mon profil</button>${domaineActiviteBtn}${gererAdhesionsBtn}${vitrineToggleBtn}${shareBtn}`;
+  /* 2026-11-02, demande explicite : le bouton « Créer une publication » aussi, bien visible, dans le profil public (en plus de celui de la carte Publications). Style sobre (même gabarit que les autres boutons de la rangée) : l'orange vif a été jugé trop voyant. */
+  const creerPubBtn = `<button class="pvz-btn" onclick="window.Posts?Posts.openModal():(location.href='fil-actualite.html')">✍️ Créer une publication</button>`;
+  const ownerActionsRow = `${creerPubBtn}<button class="pvz-btn primary" onclick="openEditIdentity()">✏️ Modifier mon profil</button>${domaineActiviteBtn}${gererAdhesionsBtn}${vitrineToggleBtn}${shareBtn}`;
 
   // Onglets + stats
   const seg = `<div class="pvz-segmented">
