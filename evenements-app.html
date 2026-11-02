@@ -1171,6 +1171,7 @@ function renderEvts() {
         <div class="evt-actions">
           <button class="btn btn-outline" style="font-size:12px" onclick="openDetail(${evt.id})">Voir</button>
           <button class="btn btn-outline" style="font-size:12px" onclick="partagerEvenement(${evt.id})">📤 Partager</button>
+          ${evtAProgramme(evt) ? `<button class="btn btn-outline" style="font-size:12px" onclick="voirProgramme(${evt.id})" title="Voir le programme de l'événement">📅 Programme</button>` : ''}
           ${agendaBouton(evt.id, 12)}
           ${!inscriptionsOuvertes(evt) ? evtBoutonTermine(evt, inscrit, 12) + evtBoutonCompteRendu(evt, peutGerer, 12) : evt.inscription_ouverte === 0
             ? `<span class="btn btn-outline" style="font-size:12px;cursor:default;opacity:.75;" title="Événement informatif, sans inscription">ℹ️ Informatif</span>`
@@ -1961,12 +1962,21 @@ function evtProgrammeExtras() {
   const err = progValider('e-prog-list'); if (err) throw new Error(err);
   return { programme: progLire('e-prog-list'), inscription_rapide_active: document.getElementById('e-insc-rapide').checked };
 }
-function programmeDetailHtml(evt) {
+/* Parse robuste de evt.programme_json (ou null si vide) — partagé par programmeDetailHtml() et
+   le bouton « 📅 Programme » de la carte liste (voirProgramme/evtAProgramme ci-dessous). */
+function evtProgrammeParse(evt) {
   let prog = evt.programme_json;
   if (typeof prog === 'string') { try { prog = JSON.parse(prog); } catch (e) { prog = null; } }
-  if (!Array.isArray(prog) || !prog.length) return '';
+  return Array.isArray(prog) && prog.length ? prog : null;
+}
+// Le programme a-t-il été rempli ? (2026-11-02, demande explicite : bouton « Programme » visible
+// uniquement quand il y a quelque chose à montrer — même test que programmeDetailHtml().)
+function evtAProgramme(evt) { return !!evtProgrammeParse(evt); }
+function programmeDetailHtml(evt) {
+  const prog = evtProgrammeParse(evt);
+  if (!prog) return '';
   const jour = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }) : '';
-  return `<div style="padding:0 20px 14px;"><div class="section-divider">📅 Programme</div>${prog.map((j, i) => `
+  return `<div id="evt-programme-${evt.id}" style="padding:0 20px 14px;"><div class="section-divider">📅 Programme</div>${prog.map((j, i) => `
     <div style="margin-top:${i ? 12 : 4}px;${i ? 'border-top:1px solid var(--border,#e5e7eb);padding-top:10px;' : ''}">
       <div style="font-weight:700;font-size:13px;">Journée ${i + 1}${j.date_debut ? ' — ' + esc(jour(j.date_debut)) : ''}${j.date_fin && j.date_fin !== j.date_debut ? ' au ' + esc(jour(j.date_fin)) : ''}</div>
       ${(j.etapes || []).map(e => `<div style="display:flex;justify-content:space-between;gap:12px;font-size:13px;margin-top:6px;"><span>${esc(e.titre || '')}</span><span style="color:var(--muted,#6b7280);white-space:nowrap;">${esc(e.heure_debut || '')}${e.heure_fin ? ' – ' + esc(e.heure_fin) : ''}</span></div>`).join('')}
@@ -2736,6 +2746,16 @@ window.ouvrirModaleProlongerInscriptions = async function(evtId) {
   bg.querySelector('#mpi-annuler-prolongation').addEventListener('click', () => envoyer(''));
 };
 
+/* Bouton « 📅 Programme » de la carte liste (2026-11-02, demande explicite : « si jamais le
+   programme a été rempli, permets un bouton programme ici qui permet de voir le programme
+   directement ») — ouvre la fiche détaillée (seule source fiable, le programme peut être long)
+   et défile aussitôt jusqu'à sa section, sans faire chercher l'utilisateur. */
+window.voirProgramme = async function(id) {
+  await openDetail(id);
+  setTimeout(() => {
+    document.getElementById('evt-programme-' + id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 60);
+};
 window.openDetail = async function(id) {
   document.getElementById('evt-detail-content').innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted);">⏳ Chargement…</div>';
   document.getElementById('modal-detail-bg').classList.add('open');
