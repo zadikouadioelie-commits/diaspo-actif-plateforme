@@ -58,6 +58,12 @@
 .pf-part>*{background:var(--bg);border-radius:12px;padding:10px;text-align:center;font-size:13px;font-weight:700;color:inherit;word-break:break-word}
 .pf-part img{width:100%;height:46px;object-fit:contain;margin-bottom:4px;display:block}
 .pf-note{margin:10px 0 0;font-size:12px;color:var(--muted)}
+.pf-det{margin-bottom:12px}
+.pf-det>summary{list-style:none;cursor:pointer;min-height:44px;display:flex;align-items:center;justify-content:space-between;background:var(--card);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow);padding:0 14px;font-weight:800;color:var(--navy)}
+.pf-det>summary::-webkit-details-marker{display:none}
+.pf-det>summary:after{content:'▾';color:var(--orange-d)}
+.pf-det[open]>summary:after{content:'▴'}
+.pf-det[open]>summary{margin-bottom:12px}
 `;
     document.head.appendChild(st);
   }
@@ -67,7 +73,8 @@
   const domLabel = k => { const d = (window.DOMAINES_ACTIVITE || []).find(z => z[0] === k); return d ? d[2] : (k ? String(k).replace(/_/g, ' ') : ''); };
   const item = x => typeof x === 'string' ? x : (x && (x.titre || x.nom || x.libelle || x.texte || x.label)) || '';
   const chips = (arr, cls) => arr.filter(Boolean).length ? `<div class="tags" style="margin:0">${arr.filter(Boolean).map(t => `<span class="badge ${cls || ''}">${esc(t)}</span>`).join('')}</div>` : '';
-  /* Reels du compte (2026-10-14) : section + montage après affichage ; invisible si le compte n'a aucun Reel (sauf sur son propre profil). */
+  /* Reels du compte (2026-10-14) : section + montage après affichage ; invisible si le compte n'a aucun Reel (sauf sur son propre profil).
+     2026-11-02 : seuls les profils de collectivité l'utilisent encore — pour le connecté, les Reels sont en bande tout en haut de l'onglet « Moi » ; sur le profil d'une autre personne, seulement ses publications. */
   const reelsSec = () => `<section class="pf-sec"><h3>Reels</h3><div id="rp-mount"></div></section>`;
   const reelsMonter = uid => {
     const m = document.getElementById('rp-mount'); if (!m || !window.ReelsProfil || !uid) return;
@@ -95,10 +102,31 @@
       return `<a class="pf-lk" href="${esc(attrUrl(h))}" target="_blank" rel="noopener">${ic('out', 's')}<span>${esc(REZO[k.toLowerCase()] || k)}</span></a>`;
     }).join('');
   }
-  const posts = l => l.length ? l.slice(0, 5).map(p => {
+  const posts = (l, tout) => l.length ? (tout ? l : l.slice(0, 5)).map(p => {
     const t = strip(md(p.titre || p.article_titre || '')); const c = strip(md(p.corps != null ? p.corps : (p.contenu || '')));
     return `<div class="pf-post"><div class="small muted">${esc(ago(p.created_at))}${p.categorie ? ' · ' + esc(p.categorie) : ''}</div>${t ? `<div style="font-weight:700">${esc(t)}</div>` : ''}<div class="pf-clamp">${linkify(c)}</div></div>`;
   }).join('') : '';
+
+  /* Publications d'une autre personne (2026-11-02) : seulement ce qu'elle a publié ou republié, avec « Voir plus » (même route que le site, GET /api/profil/:id/publications). */
+  function pubsMonter(uid, initial) {
+    const box = document.getElementById('pf-pubs'), plus = document.getElementById('pf-pubs-plus'); if (!box || !uid) return;
+    let items = initial.slice(), page = 0, pages = 1, total = null, charge = false;
+    const peindre = () => { box.innerHTML = posts(items, true); plus.hidden = !(page < pages || (page === 0 && (total == null || total > items.length) && items.length >= 5)); };
+    plus.onclick = async () => {
+      if (charge) return; charge = true; plus.disabled = true; plus.textContent = 'Chargement…';
+      try {
+        const r = await api('/api/profil/' + encodeURIComponent(uid) + '/publications?page=' + (page + 1));
+        const l = r.publications || []; total = r.total; pages = r.pages || 1;
+        if (page === 0) items = l; else { const vus = new Set(items.map(x => String(x.id))); items = items.concat(l.filter(x => !vus.has(String(x.id)))); }
+        page++;
+      } catch (e) { A.toast(e.message, true); }
+      charge = false; plus.disabled = false; plus.textContent = 'Voir plus de publications'; peindre();
+    };
+    peindre();
+  }
+  const pubsSec = l => l.length ? `<section class="pf-sec"><h3>Publications</h3><div id="pf-pubs"></div><button type="button" class="btn out block" id="pf-pubs-plus" style="margin-top:8px" hidden>Voir plus de publications</button></section>` : '';
+  /* Mon propre profil (onglet « Moi ») : le fil de l'accueil (Reels en haut, filtres, créer) prend la place des Publications ; le détail du profil se déplie. */
+  const detail = html => html ? `<details class="pf-det"><summary>Mon profil en détail</summary>${html}</details>` : '';
 
   /* En-tête commun */
   function hero(o) {
@@ -178,14 +206,15 @@
       sec('Contact et liens', liens),
       prodsL.length ? sec('Boutique', `<div class="prods" style="padding:0">${prodsL.map(p => { const ph = list(p.photos_json)[0]; return `<a class="p" href="#/produit/${encodeURIComponent(p.id)}" style="color:inherit;text-decoration:none"><div class="ph">${ph ? `<img src="${attrUrl(ph)}" alt="" loading="lazy" onerror="this.remove()">` : ic('shop')}</div><div class="pn ell">${esc(p.nom)}</div><div class="pp">${p.prix != null ? esc(p.prix) + ' ' + esc(!p.devise || p.devise === 'EUR' ? '€' : p.devise) : ''}</div></a>`; }).join('')}</div><a class="pf-more" href="#/boutique/${encodeURIComponent(r.id)}">Voir toute la boutique ›</a>`) : '',
       sec('Avis' + (avis.total ? ` (${avis.total})` : ''), avis.total ? `<div class="row" style="margin-bottom:6px"><b style="font-size:22px">${esc(Number(avis.moyenne || 0).toFixed(1))}</b><span class="pf-st">${stars(avis.moyenne)}</span></div>` + lstAvis.map(v => `<div class="pf-rev"><span class="pf-st">${stars(v.note || v.rating)}</span> <b class="small">${esc(v.auteur_nom || v.nom || '')}</b><div>${esc(strip(v.commentaire || v.texte || v.contenu || ''))}</div></div>`).join('') : ''),
-      reelsSec(),
-      sec('Publications', posts(pubs.publications || []))
     ].join('');
+    const moi = !!cibleTab && !!S.me && Number(S.me.id) === Number(r.owner_user_id);
+    const pubsL = pubs.publications || [];
     const badges = [r.type ? `<span class="badge g">${esc(r.type)}</span>` : '', verifiee ? `<span class="badge g">${ic('check', 's')} Vérifiée</span>` : ''].filter(Boolean);
     const h = hero({ rejoindre: true, adherer: ['Association', 'ONG'].includes(r.type) && r.adhesions_ouvertes !== false && r.adhesions_ouvertes !== 0, uid: r.owner_user_id, fid: r.id, kind: 'initiative', nom: r.nom, sous: r.sigle || '', photo: r.logo_url, banner: r.vitrine_banniere_url || r.banniere_url, badges, loc: [r.ville, r.pays].filter(Boolean).join(', '), orig: [r.origine1 || r.owner_origine1, r.origine2 || r.owner_origine2].filter(Boolean).join(' · '),
       stats: [[r.abonnes || 0, 'abonnés'], [r.vues || r.nb_vues || 0, 'vues'], [avis.total ? Number(avis.moyenne || 0).toFixed(1) + '★' : '—', 'avis']] });
-    rendre(r.nom, h + sections + `<a class="btn out block" style="margin:4px 0 8px" href="initiative.html?id=${encodeURIComponent(r.slug || r.id)}">${ic('out', 's')} Ouvrir la fiche complète sur le site</a>`);
-    reelsMonter(r.owner_user_id);
+    const lienIni = `<a class="btn out block" style="margin:4px 0 8px" href="initiative.html?id=${encodeURIComponent(r.slug || r.id)}">${ic('out', 's')} Ouvrir la fiche complète sur le site</a>`;
+    if (moi && A.viewFilMoi) { rendre(r.nom, h + '<div id="moi-fil"></div>' + detail(sections) + lienIni); A.viewFilMoi(); }
+    else { rendre(r.nom, h + sections + pubsSec(pubsL) + lienIni); pubsMonter(r.owner_user_id, pubsL); }
     /* Partager ce profil (2026-10-07) : lien public, lisible sans compte. */
     if (A.paneShare && !cibleTab) A.paneShare(location.origin + (r.owner_user_id ? '/profil.html?id=' + encodeURIComponent(r.owner_user_id) : '/initiative.html?id=' + encodeURIComponent(r.slug || r.id)) + '&r=' + A.jetonPartage(), r.nom);
   }
@@ -231,15 +260,16 @@
       sec('Score d’activité', sc && sc.score != null ? gauge(sc.score) + '<div class="pf-note">Calculé sur les publications, abonnés, relations et la complétude du profil.</div>' : ''),
       sec('Galerie', galerieHtml(gal)),
       sec('Initiatives suivies', suivies.map(i => `<a class="pf-eq" href="#/profil/i/${encodeURIComponent(i.slug || i.id)}"><span class="pf-eqav">${i.logo_url ? `<img src="${attrUrl(i.logo_url)}" alt="" onerror="this.remove()">` : esc(initials(i.nom))}</span><span><b>${esc(i.nom)}</b>${i.type ? `<span class="small muted" style="display:block">${esc(i.type)}</span>` : ''}</span></a>`).join('')),
-      reelsSec(),
-      sec('Publications', posts(Array.isArray(p.publications) ? p.publications : []))
     ].join('');
+    const moi = !!cibleTab && !!S.me && Number(S.me.id) === Number(p.id);
+    const pubsL = Array.isArray(p.publications) ? p.publications : [];
     const rolLabel = A.ROLE_LABEL[p.role] || '';
     const badges = [pro && rolLabel ? `<span class="badge g">${esc(rolLabel)}</span>` : `<span class="badge">Membre</span>`, p.identite_verifiee ? `<span class="badge g">${ic('check', 's')} Identité vérifiée</span>` : '', p.partenaire_officiel ? '<span class="badge o">Partenaire officiel</span>' : ''].filter(Boolean);
     const h = hero({ uid: p.id, fid: p.id, kind: p.role === 'collectivite' ? 'collectivite' : 'user', nom, sous: pro ? '' : (p.titre_pro || ''), photo: p.photo_url, banner: p.banner_url || p.vitrine_banniere_url, rond: !pro, badges,
       loc: [p.ville, p.pays].filter(Boolean).join(', '), orig: [p.origine1, p.origine2].filter(Boolean).join(' · '), stats: [[p.nbAbonnes || 0, 'abonnés'], [p.nbSuivis || 0, 'abonnements'], [(Array.isArray(p.publications) ? p.publications.length : 0), 'publications']] });
-    rendre(nom, h + sections + `<a class="btn out block" style="margin:4px 0 8px" href="profil.html?id=${encodeURIComponent(p.id)}">${ic('out', 's')} Ouvrir le profil complet sur le site</a>`);
-    reelsMonter(p.id);
+    const lien = `<a class="btn out block" style="margin:4px 0 8px" href="profil.html?id=${encodeURIComponent(p.id)}">${ic('out', 's')} Ouvrir le profil complet sur le site</a>`;
+    if (moi && A.viewFilMoi) { rendre(nom, h + '<div id="moi-fil"></div>' + detail(sections) + lien); A.viewFilMoi(); }
+    else { rendre(nom, h + sections + pubsSec(pubsL) + lien); pubsMonter(p.id, pubsL); }
     if (A.paneShare && !cibleTab) A.paneShare(location.origin + '/profil.html?id=' + encodeURIComponent(p.id) + '&r=' + A.jetonPartage(), nom);
   }
 

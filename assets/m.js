@@ -552,11 +552,12 @@
      Données : GET /api/fil/accueil?filtre=… (curseur « avant »). Les Reels sont en bande au-dessus (GET /api/fil/medias). */
   const FIL_MODES = [['tous', 'Tout'], ['mes', 'Mes actualités'], ['textes', 'Textes'], ['photos', 'Photos'], ['videos', 'Vidéos'], ['articles', 'Articles'], ['evenements', 'Événements'], ['suivis', 'Abonnements']];
   const FIL_FILTRE = { tous: 'tout', suivis: 'abonnements' };
-  async function filReels() {
-    const el = $('#fil-reels'); if (!el) return;
+  async function filReels(idEl) {
+    idEl = idEl || 'fil-reels';
+    const el = $('#' + idEl); if (!el) return;
     let items = [];
     try { items = (await api('/api/fil/medias?type=video&limit=12')).items || []; } catch (e) { }
-    if (!$('#fil-reels')) return;
+    if (!$('#' + idEl)) return;
     const carte = it => {
       const m = (it.medias && it.medias[0]) || {};
       const vignette = m.poster ? `<img src="${attrUrl(m.poster)}" alt="" loading="lazy" onerror="this.remove()">` : (m.url ? `<video src="${attrUrl(m.url)}#t=0.5" muted playsinline preload="metadata"></video>` : '');
@@ -568,8 +569,12 @@
     const t = $('#fr-tout', el); if (t) t.onclick = () => voir();
     const n = $('#fr-nouveau', el); if (n) n.onclick = () => ouvrirChoixCreation();
   }
-  function viewFil() {
-    const el = $('#home-feed');
+  /* moi = true : le fil est monté dans l'onglet « Moi » (profil public du connecté, 2026-11-02) ; la bande de Reels est alors posée tout en haut de l'onglet par viewMoi. */
+  function viewFil(moi) {
+    /* Deux hôtes possibles (écran Actualités / onglet Moi), un seul état : on repart de « Tout » quand on change d'hôte. */
+    if (S.filHote !== undefined && S.filHote !== !!moi) S.fil = { mode: 'tous', page: 1, pages: 1, suivant: null, posts: [], loaded: false };
+    S.filHote = !!moi; S.filMoi = !!moi;
+    const el = $(moi ? '#moi-fil' : '#home-feed'); if (!el) return;
     /* Bouton « Reels » (2026-10-13, demande explicite) : une petite caméra stylisée, qui apparaît toute seule dès qu'il existe au moins une vidéo
        publique ; il ouvre l'univers des petites vidéos de la plateforme (visionneur plein écran, mode Reels). */
     const reelsBtn = `<button type="button" class="chip reels" id="reels-open" aria-label="Reels, les petites vidéos">${(window.MediaViewer && MediaViewer.iconeReels) ? MediaViewer.iconeReels() : ''}<span>Reels</span></button>`;
@@ -579,8 +584,8 @@
        point d'entrée unique sur l'onglet Fil propose maintenant les deux, pour que ce soit
        découvrable sans avoir à d'abord ouvrir les Reels. Voir ouvrirChoixCreation() plus bas. */
     const creerBtn = `<button type="button" class="chip creer" id="fil-creer" aria-label="Créer une publication ou un Reel">✍️<span>Créer</span></button>`;
-    el.innerHTML = `<div id="fil-reels"></div><div class="chips" role="tablist">${creerBtn}${FIL_MODES.map(([k, l]) => `<button class="chip ${k === 'mes' ? 'mes' : ''} ${S.fil.mode === k ? 'on' : ''}" data-mode="${k}" role="tab" aria-selected="${S.fil.mode === k}">${l}</button>`).join('')}</div>${pubSlot('between_posts')}<div id="fil-list"></div><div id="fil-more"></div>`;
-    filReels();
+    el.innerHTML = `${moi ? '' : '<div id="fil-reels" class="fil-reels-box"></div>'}<div class="chips" role="tablist">${creerBtn}${FIL_MODES.map(([k, l]) => `<button class="chip ${k === 'mes' ? 'mes' : ''} ${S.fil.mode === k ? 'on' : ''}" data-mode="${k}" role="tab" aria-selected="${S.fil.mode === k}">${l}</button>`).join('')}</div>${pubSlot('between_posts')}<div id="${moi ? 'moi-list' : 'fil-list'}"></div><div id="${moi ? 'moi-more' : 'fil-more'}"></div>`;
+    if (!moi) filReels();
     const rb = $('#reels-open', el);
     if (rb) {
       rb.onclick = () => { if (window.MediaViewer && MediaViewer.openReels) MediaViewer.openReels(MV_OPTS); };
@@ -592,12 +597,13 @@
       if (c.dataset.mode === 'mes' && !(await needLogin('Connectez-vous pour voir vos actualités.'))) return;
       /* Un second appui sur le filtre actif revient à « Tout ». */
       const mode = (c.dataset.mode === S.fil.mode && c.dataset.mode !== 'tous') ? 'tous' : c.dataset.mode;
-      S.fil = { mode, page: 1, pages: 1, suivant: null, posts: [], loaded: false }; viewFil();
+      S.fil = { mode, page: 1, pages: 1, suivant: null, posts: [], loaded: false }; viewFil(moi);
     });
     if (!S.fil.loaded) loadFil(true); else paintFil();
   }
+  const filSel = () => S.filMoi ? ['#moi-list', '#moi-more'] : ['#fil-list', '#fil-more'];
   async function loadFil(first) {
-    const list = $('#fil-list');
+    const list = $(filSel()[0]);
     if (first && list) list.innerHTML = '<div class="sk skc"></div><div class="sk skc"></div>';
     try {
       const r = await api(`/api/fil/accueil?filtre=${FIL_FILTRE[S.fil.mode] || S.fil.mode}&limit=10${first || !S.fil.suivant ? '' : '&avant=' + S.fil.suivant}`);
@@ -606,7 +612,7 @@
       paintFil();
     } catch (e) {
       if (list) list.innerHTML = `<div class="empty"><b>Impossible de charger le fil</b>${esc(e.message)}<br><br><button class="btn sm" id="retry">Réessayer</button></div>`;
-      const b = $('#retry'); if (b) b.onclick = () => loadFil(true);
+      const b = $('#retry', list); if (b) b.onclick = () => loadFil(true);
     }
   }
   function postHtml(p) {
@@ -657,7 +663,7 @@
       </div></article>`;
   }
   function paintFil() {
-    const list = $('#fil-list'), more = $('#fil-more'); if (!list) return;
+    const list = $(filSel()[0]), more = $(filSel()[1]); if (!list) return;
     const cartesFil = S.fil.posts.filter(p => p.type !== 'compte_rendu' && !p.compte_rendu).map(p => actuVerte(postHtml(p))).filter(Boolean);
     const html = pubIntercaler(cartesFil, 0, { 3: 'fil_sidebar' }, 6, 'vue_publication_restreinte').join('');
     if (!cartesFil.length) {
@@ -666,7 +672,7 @@
     }
     list.innerHTML = html;
     more.innerHTML = S.fil.suivant ? `<button class="btn out block" id="fil-next">Voir plus de publications</button>` : '';
-    const n = $('#fil-next'); if (n) n.onclick = async () => { n.disabled = true; n.textContent = 'Chargement…'; await loadFil(false); };
+    const n = $('#fil-next', more), moiFil = S.filMoi; if (n) n.onclick = async () => { if (S.filHote !== moiFil) { viewFil(moiFil); return; } S.filMoi = moiFil; n.disabled = true; n.textContent = 'Chargement…'; await loadFil(false); };
     $$('[data-clamp]', list).forEach(c => { if (c.scrollHeight > c.clientHeight + 2) { const b = c.parentNode.querySelector('[data-more]'); if (b) b.hidden = false; } });
   }
   document.addEventListener('click', async e => {
@@ -2402,11 +2408,13 @@
     /* Le bouton « Moi » ouvre le PROFIL PUBLIC du compte (2026-10-08, demande explicite), tel que les autres le voient, dans l'habillage
        de l'appli (assets/m-mod-profil.js). Les modules, le changement de compte et la déconnexion restent à un toucher : « Mes outils ». */
     const m0 = S.me, nom0 = m0.nom_affichage || [m0.prenom, m0.nom].filter(Boolean).join(' ') || m0.email;
-    el.innerHTML = `<div class="moi-bar"><a class="btn block" href="#/outils">${ic('menu', 's')} Mes outils et modules</a>
+    const avecFil = m0.role !== 'collectivite' && !m0.relais_invite_fiche_id;
+    el.innerHTML = `${avecFil ? '<div id="moi-reels" class="fil-reels-box"></div>' : ''}<div class="moi-bar"><a class="btn block" href="#/outils">${ic('menu', 's')} Mes outils et modules</a>
       <div class="row" style="gap:8px;margin-top:8px"><button type="button" class="btn out sm" id="moi-part" style="flex:1">${ic('share', 's')} Partager mon profil</button><button type="button" class="btn out sm" id="moi-switch" style="flex:1">${ic('people', 's')} Changer de compte</button></div></div>
       <div id="moi-profil"><div class="sk" style="height:140px;margin-bottom:12px"></div><div class="sk skc"></div></div>`;
     $('#moi-switch').onclick = openSwitcher;
     $('#moi-part').onclick = () => partagerLien(location.origin + '/profil.html?id=' + encodeURIComponent(m0.id) + '&r=' + jetonPartage(), nom0);
+    if (avecFil) filReels('moi-reels');
     if (window.MMods && MMods.profilTab) MMods.profilTab($('#moi-profil'), m0);
     else $('#moi-profil').innerHTML = `<a class="btn out block" href="#/profil/${encodeURIComponent(m0.id)}">Voir mon profil public</a>`;
   }
@@ -2665,12 +2673,12 @@
     /* readyState vaut déjà « interactive » pendant l'exécution des scripts différés : on attend l'événement, avec un délai de secours si jamais il est déjà passé. */
     if (document.readyState !== 'complete') await Promise.race([new Promise(r => document.addEventListener('DOMContentLoaded', r, { once: true })), new Promise(r => setTimeout(r, 1500))]);
     await loadMe();
-    /* 2026-11-02 (demande explicite) : une personne déjà connectée qui revient sur l'appli arrive sur ses actualités (Reels en haut, filtres, créer, « Mes actualités »).
+    /* 2026-11-02 (demande explicite) : une personne déjà connectée qui revient sur l'appli arrive sur son profil public (onglet « Moi » : Reels en haut, puis fil filtrable avec créer et « Mes actualités »).
        Une seule fois par session, et seulement quand aucune destination précise n'est demandée (lien partagé, notification…). */
     try {
       if (S.me && (!location.hash || /^#\/?(accueil)?$/.test(location.hash)) && !sessionStorage.getItem('da_atterrissage_m')) {
         sessionStorage.setItem('da_atterrissage_m', '1');
-        if (!S.me.relais_invite_fiche_id) location.hash = '#/actualites';
+        if (!S.me.relais_invite_fiche_id) location.hash = '#/moi';
       }
     } catch (e) { }
     route(true);
@@ -2679,6 +2687,6 @@
     if ('serviceWorker' in navigator) { /* le site est « réseau uniquement » : rien à enregistrer */ }
   }
   window.MMods = window.MMods || {};
-  window.MApp = { S, refreshTab, api, esc, strip, md, linkify, richHtml, ic, ICONS, setPane, paneShare, partagerLien, jetonPartage, closePane, openSheet, toast, needLogin, openLogin, loginCard, mediaBlock, videoBlock, money, dateLong, parseDay, ago, hhmm, dayLabel, initials, attrUrl, safeUrl, premiumLocked, premiumSheet, loadPremium, afterAuthChange, ROLE_LABEL, paintBadges };
+  window.MApp = { S, viewFilMoi: () => viewFil(true), refreshTab, api, esc, strip, md, linkify, richHtml, ic, ICONS, setPane, paneShare, partagerLien, jetonPartage, closePane, openSheet, toast, needLogin, openLogin, loginCard, mediaBlock, videoBlock, money, dateLong, parseDay, ago, hhmm, dayLabel, initials, attrUrl, safeUrl, premiumLocked, premiumSheet, loadPremium, afterAuthChange, ROLE_LABEL, paintBadges };
   init();
 })();
