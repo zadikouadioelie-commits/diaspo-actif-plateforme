@@ -550,7 +550,7 @@
      ============================================================ */
   /* 2026-11-02 (demande explicite, même règle que le site) : toute la plateforme, filtrable ; « Mes actualités » = ce que j'ai publié ou republié.
      Données : GET /api/fil/accueil?filtre=… (curseur « avant »). Les Reels sont en bande au-dessus (GET /api/fil/medias). */
-  const FIL_MODES = [['tous', 'Tout'], ['mes', 'Mes actualités'], ['textes', 'Textes'], ['photos', 'Photos'], ['videos', 'Vidéos'], ['articles', 'Articles'], ['evenements', 'Événements'], ['suivis', 'Abonnements']];
+  const FIL_MODES = [['tous', 'Tout'], ['mes', 'Mes actualités'], ['textes', 'Textes'], ['photos', 'Photos'], ['articles', 'Articles'], ['evenements', 'Événements'], ['suivis', 'Abonnements']];
   const FIL_FILTRE = { tous: 'tout', suivis: 'abonnements' };
   async function filReels(idEl) {
     idEl = idEl || 'fil-reels';
@@ -975,7 +975,7 @@
       <div class="bd"><h3 class="tt">${esc(e.titre)}</h3>
         <div class="meta">${ic('clock', 's')}<span>${esc(dateLong(e.date_evt))}${e.heure_debut ? ' · ' + esc(String(e.heure_debut).slice(0, 5)) : ''}</span></div>
         <div class="meta">${ic('pin', 's')}<span class="ell">${esc([e.ville, e.pays].filter(Boolean).join(', ') || e.lieu || 'En ligne')}</span></div>
-        <div class="tags"><span class="badge ${paid ? 'o' : 'g'}">${part}</span>${e.est_termine ? '<span class="badge">Terminé</span>' : ''}${e.cr_statut === 'publie' ? `<span class="badge o">${ic('doc', 's')} Compte-rendu</span>` : ''}${inscrit ? `<span class="badge g">${ic('check', 's')} Inscrit</span>` : ''}</div></div></a>`;
+        <div class="tags"><span class="badge ${paid ? 'o' : 'g'}">${part}</span>${e.est_termine ? '<span class="badge">Terminé</span>' : ''}${e.cr_statut === 'publie' ? `<span class="badge o">${ic('doc', 's')} Compte-rendu</span>` : ''}${inscrit ? `<span class="badge g">${ic('check', 's')} Inscrit</span>` : ''}${e.nb_participants ? `<span class="badge">${e.nb_participants} inscrit${e.nb_participants > 1 ? 's' : ''}</span>` : ''}</div></div></a>`;
   }
 
   async function paneEvent(id) {
@@ -1023,7 +1023,7 @@
         <div class="meta">${ic('cal', 's')}<span>${esc(dateLong(e.date_evt))}${e.date_fin && e.date_fin !== e.date_evt ? ' → ' + esc(dateLong(e.date_fin)) : ''}</span></div>
         ${e.heure_debut ? `<div class="meta">${ic('clock', 's')}<span>${esc(String(e.heure_debut).slice(0, 5))}${e.heure_fin ? ' – ' + esc(String(e.heure_fin).slice(0, 5)) : ''}</span></div>` : ''}
         <div class="meta">${ic('pin', 's')}<span>${esc([e.lieu, e.ville, e.pays].filter(Boolean).join(', ') || 'En ligne')}</span></div>
-        <div class="tags"><span class="badge ${paid ? 'o' : 'g'}">${paid ? (ev.prix_min > 0 ? 'Dès ' + esc(ev.prix_min) + ' €' : 'Payant') : 'Gratuit'}</span>${e.type_evt ? `<span class="badge">${esc(e.type_evt)}</span>` : ''}${e.domaine ? `<span class="badge">${esc(e.domaine)}</span>` : ''}</div>
+        <div class="tags"><span class="badge ${paid ? 'o' : 'g'}">${paid ? (ev.prix_min > 0 ? 'Dès ' + esc(ev.prix_min) + ' €' : 'Payant') : 'Gratuit'}</span>${e.type_evt ? `<span class="badge">${esc(e.type_evt)}</span>` : ''}${e.domaine ? `<span class="badge">${esc(e.domaine)}</span>` : ''}${r.nb_participants ? `<span class="badge">${r.nb_participants} inscrit${r.nb_participants > 1 ? 's' : ''}</span>` : ''}</div>
         ${e.organisateur_nom || ev.organisateur_nom ? `<p class="small muted" style="margin:12px 0 0">Organisé par <b style="color:var(--text)" ${e.owner_user_id ? `data-prof="${esc(e.owner_user_id)}" role="link"` : ''}>${esc(ev.organisateur_nom || e.organisateur_nom)}</b></p>` : ''}</div></div>
       ${(e.visibilite || 'public') === 'public' ? `<div class="card"><div class="pad" style="text-align:center"><b>${ic('ticket', 's')} QR code de l’événement</b><p class="small muted" style="margin:4px 0 0">Scannez-le pour ouvrir l’événement, ou montrez-le pour le partager.</p><div class="qr" id="ev-qr" role="img" aria-label="QR code de l’événement"></div><div class="row" style="gap:8px"><button type="button" class="btn out sm sp" id="ev-qr-big">${ic('search', 's')} Agrandir</button><button type="button" class="btn out sm sp" id="ev-qr-share">${ic('share', 's')} Partager le lien</button></div></div></div>` : ''}
       ${desc ? `<div class="card"><div class="pad rich" style="white-space:pre-line">${esc(desc)}</div></div>` : ''}

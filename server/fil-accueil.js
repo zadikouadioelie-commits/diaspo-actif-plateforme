@@ -6,7 +6,7 @@
    GET /api/fil/accueil?filtre=…&categorie=…&avant=<id>&limit=<n>
      filtre : tout (défaut) · textes · photos · videos · articles · evenements · abonnements · mes
      Réponse : { posts: [...publications enrichies comme /api/fil...], suivant: <id>|null, filtre, conseil? }
-   Un ordre simple et prévisible : du plus récent au plus ancien (les Reels ont leur propre bande, au-dessus).
+   Un ordre simple et prévisible : du plus récent au plus ancien. Les Reels (publications avec vidéo) ont leur propre bande, au-dessus : ils ne reviennent pas dans ce fil, sauf dans « Mes actualités ».
    Pagination par curseur (« avant » = dernier id reçu) : le tri par type (photo / vidéo / texte) se fait sur le contenu des médias,
    donc on parcourt les publications par paquets jusqu'à en avoir assez — sans jamais sauter ni répéter une publication.
    Mêmes règles de publication que le fil général : ni archivée, ni brouillon, ni programmée ; comptes de démonstration exclus ;
@@ -79,7 +79,10 @@ function register({ route, db, sendJSON, getCurrentUser, enrichPost, filMediasDu
       for (const p of rows) {
         curseur = Number(p.id);
         let garder = true;
-        if (filtre === 'textes' || filtre === 'photos' || filtre === 'videos') {
+        /* Les Reels (publications avec une vidéo) ont leur bande, au-dessus : le fil du bas montre les AUTRES publications (demande du 2026-11-02).
+           Exceptions : « Mes actualités » (tout ce que j'ai publié) et le filtre « videos » (conservé côté API, plus proposé dans les écrans). */
+        if (filtre !== 'mes' && filtre !== 'videos') garder = !(await mediasDe(p)).some(x => x.kind === 'video');
+        if (garder && (filtre === 'textes' || filtre === 'photos' || filtre === 'videos')) {
           const m = await mediasDe(p);
           if (filtre === 'videos') garder = m.some(x => x.kind === 'video');
           else if (filtre === 'photos') garder = m.some(x => x.kind === 'photo');

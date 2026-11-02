@@ -15,8 +15,8 @@
 (function () {
   'use strict';
   if (window.ProfilAccueil) return;
-  var VERSION = '20261102g';
-  var FILTRES = [['tout', 'Tout'], ['textes', 'Textes'], ['photos', 'Photos'], ['videos', 'Vidéos'], ['articles', 'Articles'], ['evenements', 'Événements'], ['abonnements', 'Abonnements']];
+  var VERSION = '20261102h';
+  var FILTRES = [['tout', 'Tout'], ['textes', 'Textes'], ['photos', 'Photos'], ['articles', 'Articles'], ['evenements', 'Événements'], ['abonnements', 'Abonnements']];
   var CATEGORIES = ['Actualité', 'Projet', 'Investissement', 'Emploi', 'Formation', 'Événement', 'Succès', 'Témoignage', 'Appel à bénévoles', 'Culture', 'Diaspora', 'Innovation', 'Autre'];
   var CAM = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="2" y="6" width="13.5" height="12" rx="3.2" fill="currentColor"/><path d="M17.2 10.4l4.2-2.5a.7.7 0 0 1 1.05.6v7a.7.7 0 0 1-1.05.6l-4.2-2.5z" fill="currentColor"/></svg>';
   var PLUME = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 20l1.2-4.4L16.6 4.2a2 2 0 0 1 2.8 0l.4.4a2 2 0 0 1 0 2.8L8.4 18.8z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M14.5 6.3l3.2 3.2" stroke="currentColor" stroke-width="1.8"/></svg>';
@@ -143,6 +143,7 @@
   /* ============================================================
      1. Bande de Reels
      ============================================================ */
+  var rafraichirBande = null;
   function monterReels(el, o) {
     if (!el) return Promise.resolve(false);
     o = o || {}; css();
@@ -190,6 +191,7 @@
     function rafraichir() {
       return getJSON('/api/fil/medias?type=video&limit=14').catch(function () { return { items: [] }; }).then(function (r) { peindre((r && r.items) || []); return true; });
     }
+    rafraichirBande = rafraichir;
     return rafraichir();
   }
 
@@ -233,7 +235,7 @@
     el.querySelectorAll('[data-pa]').forEach(function (b) {
       b.onclick = function () {
         var a = b.dataset.pa;
-        if (a === 'reel') { creerReel(function () { if (etat.filtre === 'videos' || etat.filtre === 'mes') recharger(); }); return; }
+        if (a === 'reel') { creerReel(function () { if (etat.filtre === 'mes') recharger(); if (window.ProfilAccueil && window.ProfilAccueil.rafraichirReels) window.ProfilAccueil.rafraichirReels(); }); return; }
         if (window.Posts && window.Posts.openModal) window.Posts.openModal(a === 'texte' ? undefined : a);
         else location.href = 'fil-actualite.html';
       };
@@ -370,5 +372,5 @@
     return { rafraichir: recharger };
   }
 
-  window.ProfilAccueil = { monterReels: monterReels, monterFil: monterFil, version: VERSION };
+  window.ProfilAccueil = { monterReels: monterReels, monterFil: monterFil, rafraichirReels: function () { return rafraichirBande ? rafraichirBande() : Promise.resolve(false); }, version: VERSION };
 })();

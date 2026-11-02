@@ -59,7 +59,8 @@ test('fil de l\'accueil : filtres, Mes actualités, abonnements, pagination', as
     const r = await c(jarA, '/api/fil/accueil?filtre=tout&limit=20');
     assert.equal(r.status, 200, JSON.stringify(r.data));
     const ids = mien(r);
-    for (const id of [T1, PH, VI, AR, EV, T2, VA, RP, PRIVE_A]) assert.ok(ids.includes(id), `la publication ${id} est dans le fil`);
+    for (const id of [T1, PH, AR, EV, T2, RP, PRIVE_A]) assert.ok(ids.includes(id), `la publication ${id} est dans le fil`);
+    for (const id of [VI, VA]) assert.ok(!ids.includes(id), `le Reel ${id} a sa propre bande : il n'est pas dans le fil du bas`);
     for (const id of [BROUILLON, ARCHIVE, PROG, PRIVE_B, DEMO]) assert.ok(!ids.includes(id), `la publication ${id} n'est pas dans le fil`);
     assert.deepEqual(ids, [...ids].sort((x, y) => y - x), 'du plus récent au plus ancien');
   });
@@ -115,7 +116,7 @@ test('fil de l\'accueil : filtres, Mes actualités, abonnements, pagination', as
     }
     assert.equal(new Set(toutes).size, toutes.length, 'aucun doublon');
     const attendus = sql(d => d.prepare(
-      "SELECT id FROM fil_posts WHERE contenu LIKE ? AND COALESCE(statut,'publie')='publie' AND (COALESCE(visibilite,'public')='public' OR auteur_id=?) AND auteur_id<>? ORDER BY id DESC").all(marque + '%', idA, idD).map(r => r.id));
+      "SELECT id FROM fil_posts WHERE contenu LIKE ? AND COALESCE(statut,'publie')='publie' AND (COALESCE(visibilite,'public')='public' OR auteur_id=?) AND auteur_id<>? ORDER BY id DESC").all(marque + '%', idA, idD).map(r => r.id).filter(id => id !== VI && id !== VA)); // les Reels ont leur bande
     assert.deepEqual(toutes.filter(id => attendus.includes(id)), attendus, 'toutes les publications attendues, dans l\'ordre');
 
     const videos = []; avant = null;
