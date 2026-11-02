@@ -297,4 +297,32 @@ function register({ route, db, sendJSON, getCurrentUser, creerNotif, SEC, contac
   });
 }
 
-module.exports = { register, enrichir, purger, MARQUEUR, DUREE_LECTURE_MS, _chiffrer: chiffrer, _dechiffrer: dechiffrer };
+/* Envoi d'un message sécurisé par le SERVEUR (hors route HTTP) : utilisé par les accréditations pour remettre un code d'activation.
+   Même stockage que l'envoi normal (marqueur dans messages, texte chiffré dans messages_securises) : le destinataire l'ouvre avec son
+   DS-ID, lecture 2 minutes puis destruction. Crée la conversation si elle n'existe pas. En cas d'échec, aucun marqueur ne reste. */
+async function envoyerSysteme(db, { expediteurId, destinataireId, texte, creerNotif, nomCompteAffichage }) {
+  const exp = num(expediteurId), dest = num(destinataireId), contenu = String(texte || '').trim();
+  if (!exp || !dest || exp === dest) throw new Error('Expéditeur ou destinataire invalide.');
+  if (!contenu || contenu.length > MAX_CARACTERES) throw new Error('Texte du message sécurisé invalide.');
+  let conv = await db.prepare('SELECT id, user1_id, user2_id FROM conversations WHERE (user1_id=? AND user2_id=?) OR (user1_id=? AND user2_id=?)').get(exp, dest, dest, exp);
+  let convId = conv && conv.id;
+  if (!convId) convId = num((await db.prepare('INSERT INTO conversations (user1_id, user2_id) VALUES (?,?)').run(exp, dest)).lastInsertRowid);
+  else {
+    /* une conversation supprimée par le destinataire redevient visible */
+    if (num(conv.user1_id) === dest) await db.prepare('UPDATE conversations SET deleted_u1=0 WHERE id=?').run(convId);
+    else await db.prepare('UPDATE conversations SET deleted_u2=0 WHERE id=?').run(convId);
+  }
+  const id = num((await db.prepare('INSERT INTO messages (conversation_id, sender_id, contenu, type) VALUES (?, ?, ?, ?)').run(convId, exp, MARQUEUR, 'securise')).lastInsertRowid);
+  try {
+    const c = chiffrer(contenu, aad(id, dest));
+    await db.prepare('INSERT INTO messages_securises (message_id, conversation_id, expediteur_id, destinataire_id, iv, tag, chiffre, cree_le) VALUES (?,?,?,?,?,?,?,?)')
+      .run(id, num(convId), exp, dest, c.iv, c.tag, c.chiffre, maintenant());
+  } catch (e) {
+    await db.prepare('DELETE FROM messages WHERE id=?').run(id);
+    throw e;
+  }
+  try { if (creerNotif) await creerNotif(dest, 'message', 'Nouveau message sécurisé', `${nomCompteAffichage ? await nomCompteAffichage(exp) : 'Diaspo\'Actif'} vous a envoyé un message sécurisé`, { conversation_id: convId }); } catch (_) { /* facultatif */ }
+  return { message_id: id, conversation_id: convId };
+}
+
+module.exports = { register, enrichir, purger, envoyerSysteme, MARQUEUR, DUREE_LECTURE_MS, _chiffrer: chiffrer, _dechiffrer: dechiffrer };

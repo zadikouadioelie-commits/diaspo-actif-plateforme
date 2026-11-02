@@ -2911,6 +2911,7 @@ route("GET", "/api/auth/me", async (req, res) => {
     pub.tracker_disponible = _trackerModule ? await _trackerModule.disponible(user) : false;
     /* Rubrique « Influenceur Diaspo'Actif » en phase de test (2026-11-02) : visible du seul compte diaspo.actif@gmail.com (server/acces-reserve.js). */
     pub.influenceur_disponible = AccesReserve.ouvert(user);
+    try { pub.accred_simple = await AccredSimple.resume(user); } catch (e) { pub.accred_simple = null; }
     /* Ouverture de la page Premium après le profil rempli (voir ProfilObligatoire.abonnementDu) : jamais pour un compte déjà abonné en payant. */
     pub.ouverture_abonnement = false;
     try {
@@ -3362,6 +3363,8 @@ MultiConnexion.register({ route, db, sendJSON, getCurrentUser, creerNotif, SEC }
 const AccesReserve = require("./acces-reserve");
 const MessageSecurise = require("./message-securise");
 MessageSecurise.register({ route, db, sendJSON, getCurrentUser, creerNotif, SEC, contactBloque, peutEcrireDirectement, nomCompteAffichage });
+/* Accréditations simplifiées (2026-11-02) : module « Accréditations », réservé au compte officiel pendant les tests (server/acces-reserve.js). */
+const AccredSimple = require("./accreditation-simple").register({ route, db, sendJSON, getCurrentUser, SEC, creerNotif, nomCompteAffichage, getInitiativeOfficielleId, MessageSecurise });
 /* Fil de l'accueil du profil public (2026-11-02) : toutes les actualités de la plateforme, filtrables, + « Mes actualités » — server/fil-accueil.js. Enregistré ici, avant GET /api/fil/:id qui l'aurait pris pour un identifiant. */
 const FilAccueil = require("./fil-accueil");
 FilAccueil.register({ route, db, sendJSON, getCurrentUser, enrichPost, filMediasDuPost, dateParisISO, TutoPartage, verifierProgrammes: () => FilProgrammes.verifier() });

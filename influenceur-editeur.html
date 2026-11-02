@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="/assets/logo.png">
+<title>Espace Influenceur</title>
+<meta name="description" content="Centre de commandement de l'Influenceur Diaspo'Actif : publier et gérer vos vidéos.">
+<meta name="robots" content="noindex,nofollow">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,500;0,6..96,600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ═══ Module premium « Influenceur Diaspo'Actif » — espace éditeur (2026-11-02, demande explicite) ═══
+   Vert et verrouillé tant que l'accréditation « Influenceur » n'est pas active ; doré ensuite.
+   Réservé au compte Diaspo'Actif officiel pendant les tests (serveur : server/acces-reserve.js).
+   La publication de vidéos n'est pas encore ouverte : les zones concernées l'annoncent honnêtement. */
+:root {
+  --nuit:#060A14; --texte:#E8ECF6; --doux:#A9B4CC; --faible:#8793B0;
+  --or:#E3C06E; --vert:#3FCF8E; --rouge:#FF8E8E;
+  --verre:rgba(255,255,255,.045); --bord:rgba(255,255,255,.1); --bord-or:rgba(227,192,110,.34); --bord-vert:rgba(63,207,142,.34);
+  --display:"Bodoni Moda","Didot",Georgia,serif; --sans:"Manrope","Segoe UI",system-ui,sans-serif;
+}
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+[hidden] { display:none !important; }
+body { min-height:100vh; background:radial-gradient(ellipse at 50% -10%,#14234a 0%,var(--nuit) 62%) fixed; color:var(--texte); font-family:var(--sans); line-height:1.55; -webkit-font-smoothing:antialiased; }
+a { color:inherit; }
+.page { max-width:1040px; margin:0 auto; padding:22px 16px 64px; }
+.haut { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:26px; flex-wrap:wrap; }
+.retour { display:inline-flex; align-items:center; color:var(--doux); text-decoration:none; font-weight:600; font-size:14px; padding:8px 14px; border:1px solid var(--bord); border-radius:999px; background:var(--verre); }
+.retour:hover { color:#fff; }
+.marque { display:flex; align-items:center; gap:10px; font-family:var(--display); font-size:17px; font-weight:600; text-decoration:none; }
+.marque img { width:30px; height:30px; border-radius:50%; }
+.etiquette { display:inline-block; font-size:11px; letter-spacing:.22em; text-transform:uppercase; font-weight:800; color:var(--or); margin-bottom:10px; }
+.verrou .etiquette { color:var(--vert); }
+h1 { font-family:var(--display); font-weight:500; font-size:clamp(28px,5vw,40px); line-height:1.12; margin-bottom:12px; text-wrap:balance; }
+.chapo { color:var(--doux); font-size:15.5px; max-width:66ch; }
+.statut { display:inline-flex; align-items:center; gap:7px; font-size:12.5px; font-weight:700; padding:5px 12px; border-radius:999px; border:1px solid var(--bord-or); color:var(--or); background:rgba(227,192,110,.12); margin-bottom:14px; }
+.statut.alerte { color:var(--rouge); border-color:rgba(255,142,142,.4); background:rgba(255,142,142,.09); }
+.grille { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr)); gap:16px; margin-top:28px; }
+.carte { display:flex; flex-direction:column; gap:10px; padding:20px; border-radius:20px; background:var(--verre); border:1px solid var(--bord-or); box-shadow:0 24px 50px -32px #000; }
+.carte h2 { font-family:var(--display); font-weight:500; font-size:21px; line-height:1.2; }
+.carte p { color:var(--doux); font-size:14.5px; }
+.carte .bientot { align-self:flex-start; margin-top:auto; font-size:12px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--faible); border:1px dashed var(--bord); border-radius:999px; padding:4px 11px; }
+.verrou-boite { margin-top:30px; max-width:60ch; padding:26px; border-radius:22px; background:var(--verre); border:1px solid var(--bord-vert); }
+.verrou-boite h2 { font-family:var(--display); font-weight:500; font-size:24px; margin-bottom:8px; }
+.verrou-boite p { color:var(--doux); margin-bottom:18px; }
+.actions { display:flex; gap:10px; flex-wrap:wrap; }
+.btn { font:inherit; font-weight:800; font-size:14.5px; padding:12px 20px; border-radius:999px; border:0; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; justify-content:center; min-height:44px; }
+.btn.vert { background:linear-gradient(135deg,#7CF0BA,#3FCF8E 45%,#1E8F5E); color:#04180e; }
+.btn.dore { background:linear-gradient(135deg,#F3DC9B,#E3C06E 38%,#B9893A); color:#1a1202; }
+.btn.fantome { background:var(--verre); color:var(--texte); border:1px solid var(--bord); }
+.btn:focus-visible { outline:2px solid #fff; outline-offset:2px; }
+.fermee { text-align:center; padding:60px 16px; max-width:52ch; margin:40px auto; }
+.fermee h2 { font-family:var(--display); font-weight:500; font-size:26px; margin-bottom:10px; }
+.fermee p { color:var(--doux); }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="haut">
+    <a class="retour" href="dashboard-initiative.html">← Retour au tableau de bord</a>
+    <a class="marque" href="index.html"><img src="/assets/logo.png" alt="" width="30" height="30">Diaspo'Actif</a>
+  </div>
+
+  <!-- Accréditation active : centre de commandement -->
+  <main id="actif" hidden>
+    <span class="statut" id="statut-actif">✓ Accréditation active</span>
+    <span class="etiquette" style="display:block">Module Influenceur Diaspo'Actif</span>
+    <h1>Votre espace d'influenceur</h1>
+    <p class="chapo">Depuis cet espace, vous pilotez vos vidéos de 30 minutes à 1 heure publiées dans la rubrique Influenceur Diaspo'Actif.</p>
+    <section class="grille">
+      <article class="carte">
+        <h2>Voir la rubrique</h2>
+        <p>Découvrez la page publique où seront présentées vos vidéos.</p>
+        <div class="actions"><a class="btn dore" href="influenceur.html">Ouvrir la rubrique</a></div>
+      </article>
+      <article class="carte">
+        <h2>Publier une vidéo</h2>
+        <p>Titre, thème, description et lien de la vidéo : bientôt disponible dans cet espace.</p>
+        <span class="bientot">Bientôt</span>
+      </article>
+      <article class="carte">
+        <h2>Mes vidéos</h2>
+        <p>La liste de vos vidéos, leur état de publication et leurs statistiques apparaîtront ici.</p>
+        <span class="bientot">Bientôt</span>
+      </article>
+    </section>
+  </main>
+
+  <!-- Suspendue / retirée -->
+  <main id="retire" hidden>
+    <span class="statut alerte" id="statut-retire">Accréditation suspendue</span>
+    <h1>Accès à l'espace d'influenceur interrompu</h1>
+    <p class="chapo" id="texte-retire">Contactez Diaspo'Actif pour en savoir plus.</p>
+  </main>
+
+  <!-- Pas d'accréditation : module vert verrouillé -->
+  <main id="verrou" class="verrou" hidden>
+    <span class="etiquette">Module Influenceur Diaspo'Actif</span>
+    <h1>Réservé aux influenceurs accrédités</h1>
+    <p class="chapo">Publier des vidéos dans la rubrique Influenceur Diaspo'Actif demande une accréditation délivrée par Diaspo'Actif.</p>
+    <div class="verrou-boite">
+      <h2 id="verrou-titre">Demandez votre accréditation</h2>
+      <p id="verrou-texte">Faites votre demande en quelques lignes : l'équipe vous recontacte, puis vous envoie un code d'activation par message sécurisé.</p>
+      <div class="actions"><a class="btn vert" id="verrou-lien" href="accreditation.html">Demander l'accréditation</a></div>
+    </div>
+  </main>
+
+  <main id="ferme" class="fermee" hidden>
+    <h2>Rubrique en préparation</h2>
+    <p>Ce module n'est pas encore ouvert. Il le sera bientôt pour l'ensemble des comptes.</p>
+  </main>
+
+  <main id="connexion" class="fermee" hidden>
+    <h2>Connexion requise</h2>
+    <p>Connectez-vous pour accéder à cet espace.</p>
+    <p style="margin-top:18px"><a class="btn vert" href="login.html">Me connecter</a></p>
+  </main>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  function montrer(id) { ['actif', 'retire', 'verrou', 'ferme', 'connexion'].forEach(function (k) { $(k).hidden = k !== id; }); }
+  fetch('/api/accreditation-simple/etat', { credentials: 'same-origin' })
+    .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { d._status = r.status; return d; }); })
+    .then(function (d) {
+      if (d._status === 401) return montrer('connexion');
+      if (d._status === 403 || !d.types) return montrer('ferme');
+      var t = d.types.filter(function (x) { return x.type === 'influenceur_ida'; })[0] || { statut: 'aucune' };
+      switch (t.statut) {
+        case 'active': return montrer('actif');
+        case 'suspendue': case 'revoquee':
+          $('statut-retire').textContent = t.statut === 'suspendue' ? 'Accréditation suspendue' : 'Accréditation retirée';
+          $('texte-retire').textContent = (t.motif ? t.motif + ' — ' : '') + "Contactez Diaspo'Actif pour en savoir plus.";
+          return montrer('retire');
+        case 'demande_envoyee':
+          $('verrou-titre').textContent = 'Votre demande est envoyée';
+          $('verrou-texte').textContent = "Diaspo'Actif vous recontactera. Une fois le code reçu par message sécurisé, saisissez-le dans le module Accréditations.";
+          $('verrou-lien').textContent = 'Voir ma demande'; return montrer('verrou');
+        case 'code_a_saisir':
+          $('verrou-titre').textContent = "Saisissez votre code d'activation";
+          $('verrou-texte').textContent = 'Un code vous a été envoyé par message sécurisé. Saisissez-le dans le module Accréditations pour ouvrir cet espace.';
+          $('verrou-lien').textContent = 'Saisir mon code'; return montrer('verrou');
+        default: return montrer('verrou');
+      }
+    })
+    .catch(function () { montrer('ferme'); });
+})();
+</script>
+</body>
+</html>

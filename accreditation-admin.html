@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Accréditations — administration</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<style>
+/* Administration du module « Accréditations » (2026-11-02). Page autonome, réservée au rôle administrateur
+   (le serveur refuse tout autre compte). Le code d'activation n'est JAMAIS affiché ici : il part directement
+   par message sécurisé vers le compte choisi, et n'est conservé que sous forme hachée. */
+:root{
+  --fond:#0D1B2A; --carte:#14263A; --carte-2:#1B3149; --bord:rgba(255,255,255,.12);
+  --texte:#F1F5F9; --doux:#9FB1C5; --or:#E3C06E; --vert:#34D399; --alerte:#FBBF24; --rouge:#FCA5A5; --orange:#F26422;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+[hidden]{display:none !important}
+body{min-height:100vh;background:var(--fond);color:var(--texte);font-family:Inter,Arial,sans-serif;padding:24px 16px 60px}
+.wrap{max-width:1000px;margin:0 auto}
+a{color:var(--or)}
+h1{font-size:21px;font-weight:900;margin-bottom:4px}
+.sous{color:var(--doux);font-size:13px;margin-bottom:18px;line-height:1.5;max-width:75ch}
+.onglets{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
+.onglet{background:var(--carte);color:var(--doux);border:1px solid var(--bord);border-radius:999px;padding:8px 15px;font-size:13px;font-weight:700;cursor:pointer;min-height:40px}
+.onglet[aria-selected="true"]{background:var(--or);color:#1a1202;border-color:var(--or)}
+.outils{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.outils select,.outils input{background:var(--carte);color:var(--texte);border:1.5px solid var(--bord);border-radius:9px;padding:9px 11px;font-size:13px;min-height:40px}
+.outils input{flex:1;min-width:220px}
+.btn{background:var(--orange);color:#fff;border:none;border-radius:9px;padding:8px 13px;font-size:13px;font-weight:700;cursor:pointer;min-height:38px}
+.btn:hover{opacity:.9}.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.sec{background:rgba(255,255,255,.12)}.btn.ok{background:#16a34a}.btn.danger{background:#b91c1c}
+.btn:focus-visible,input:focus-visible,select:focus-visible,.onglet:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.liste{display:flex;flex-direction:column;gap:10px}
+.ligne{background:var(--carte);border:1px solid var(--bord);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:8px}
+.ligne-tete{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline}
+.nom{font-weight:800;font-size:15px}
+.meta{color:var(--doux);font-size:12.5px}
+.motif{background:var(--carte-2);border-radius:9px;padding:9px 11px;font-size:13.5px;line-height:1.5;white-space:pre-wrap;word-break:break-word}
+.coords{display:flex;gap:16px;flex-wrap:wrap;font-size:13px}
+.coords b{color:var(--doux);font-weight:600}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.pill{display:inline-block;font-size:11.5px;font-weight:800;padding:3px 10px;border-radius:999px;border:1px solid var(--bord)}
+.pill.active{color:var(--or);border-color:var(--or)}
+.pill.code_envoye{color:var(--vert);border-color:var(--vert)}
+.pill.suspendue{color:var(--alerte);border-color:var(--alerte)}
+.pill.revoquee{color:var(--rouge);border-color:var(--rouge)}
+.vide{color:var(--doux);padding:26px;text-align:center;border:1px dashed var(--bord);border-radius:12px;font-size:14px}
+.msg{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#0b1626;border:1px solid var(--bord);border-radius:10px;padding:11px 16px;font-size:14px;max-width:90vw;z-index:9}
+.msg.erreur{border-color:var(--rouge);color:var(--rouge)}
+.msg.ok{border-color:var(--vert);color:var(--vert)}
+.resultat{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;background:var(--carte);border:1px solid var(--bord);border-radius:10px;padding:10px 14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Accréditations</h1>
+  <p class="sous">Demandes des membres, attribution des accréditations et suivi. « Attribuer » envoie automatiquement un code d'activation par message sécurisé au compte choisi : ce code n'est jamais affiché ici, il ne fonctionne que sur ce compte, une seule fois, pendant 7 jours.</p>
+
+  <div id="refuse" class="vide" hidden>Cette page est réservée aux administrateurs. <a href="login.html">Se connecter</a></div>
+
+  <div id="app" hidden>
+    <div class="onglets" role="tablist">
+      <button class="onglet" role="tab" id="t-demandes" aria-selected="true" data-vue="demandes">Demandes</button>
+      <button class="onglet" role="tab" id="t-attrib" aria-selected="false" data-vue="attributions">Accréditations accordées</button>
+      <button class="onglet" role="tab" id="t-compte" aria-selected="false" data-vue="compte">Attribuer à un compte</button>
+    </div>
+
+    <section id="v-demandes">
+      <div class="outils">
+        <label for="f-statut" class="meta">Afficher</label>
+        <select id="f-statut"><option value="en_attente">En attente</option><option value="traitee">Traitées</option><option value="refusee">Refusées</option></select>
+      </div>
+      <div class="liste" id="l-demandes"></div>
+    </section>
+
+    <section id="v-attributions" hidden>
+      <div class="liste" id="l-attributions"></div>
+    </section>
+
+    <section id="v-compte" hidden>
+      <div class="outils">
+        <input type="search" id="q" placeholder="Nom, prénom ou e-mail du compte (2 lettres minimum)" aria-label="Rechercher un compte">
+        <select id="q-type" aria-label="Accréditation à attribuer"></select>
+      </div>
+      <div class="liste" id="l-comptes"></div>
+    </section>
+  </div>
+</div>
+<div class="msg" id="msg" role="status" hidden></div>
+
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var TYPES = [];
+  function el(tag, cls, txt) { var e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
+  function api(method, path, body) {
+    return fetch('/api' + path, { method: method, credentials: 'same-origin', headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined })
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { d._status = r.status; return d; }); });
+  }
+  var minuteur;
+  function dire(texte, genre) {
+    var m = $('msg'); m.textContent = texte; m.className = 'msg ' + (genre || ''); m.hidden = false;
+    clearTimeout(minuteur); minuteur = setTimeout(function () { m.hidden = true; }, 4500);
+  }
+  function dateFr(iso) { try { return new Date(iso).toLocaleString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }); } catch (e) { return ''; } }
+  function nomDe(r) { return ((r.user_prenom || '') + ' ' + (r.user_nom || r.nom || '')).trim() || r.compte_email || r.email || ('Compte n°' + r.user_id); }
+
+  /* Une action qui appelle l'API, puis rafraîchit la vue courante. */
+  function agir(chemin, corps, ok) {
+    return api('POST', '/admin/accreditation-simple/' + chemin, corps).then(function (d) {
+      if (d.ok) { dire(ok, 'ok'); rafraichir(); } else dire(d.error || 'Action impossible.', 'erreur');
+    }).catch(function () { dire('Connexion impossible, réessayez.', 'erreur'); });
+  }
+  function bouton(texte, cls, fn) { var b = el('button', 'btn ' + (cls || ''), texte); b.type = 'button'; b.addEventListener('click', function () { b.disabled = true; Promise.resolve(fn()).then(function () { b.disabled = false; }, function () { b.disabled = false; }); }); return b; }
+
+  /* ── Demandes ── */
+  function chargerDemandes() {
+    return api('GET', '/admin/accreditation-simple/demandes?statut=' + encodeURIComponent($('f-statut').value)).then(function (d) {
+      var l = $('l-demandes'); l.textContent = '';
+      if (!d.demandes || !d.demandes.length) { l.appendChild(el('p', 'vide', 'Aucune demande dans cette liste.')); return; }
+      d.demandes.forEach(function (r) {
+        var c = el('article', 'ligne'), t = el('div', 'ligne-tete');
+        t.appendChild(el('span', 'nom', r.emoji + ' ' + r.label + ' — ' + nomDe(r)));
+        t.appendChild(el('span', 'meta', dateFr(r.created_at)));
+        c.appendChild(t);
+        var co = el('div', 'coords');
+        var tel = el('span'); tel.appendChild(el('b', null, 'Téléphone : ')); tel.appendChild(document.createTextNode(r.telephone || '—'));
+        var ma = el('span'); ma.appendChild(el('b', null, 'E-mail : ')); ma.appendChild(document.createTextNode(r.email || '—'));
+        var cm = el('span'); cm.appendChild(el('b', null, 'Compte : ')); cm.appendChild(document.createTextNode((r.compte_email || '') + ' (' + (r.user_role || '') + ')'));
+        co.appendChild(tel); co.appendChild(ma); co.appendChild(cm); c.appendChild(co);
+        c.appendChild(el('div', 'motif', r.motif || ''));
+        if (r.statut === 'refusee' && r.motif_refus) c.appendChild(el('p', 'meta', 'Motif du refus : ' + r.motif_refus));
+        if (r.statut === 'en_attente') {
+          var a = el('div', 'actions');
+          a.appendChild(bouton('Attribuer', 'ok', function () {
+            if (!confirm('Envoyer un code d’activation « ' + r.label + ' » à ' + nomDe(r) + ' par message sécurisé ?')) return;
+            return agir('attribuer', { user_id: r.user_id, type: r.type }, 'Code envoyé par message sécurisé.');
+          }));
+          a.appendChild(bouton('Refuser', 'danger', function () {
+            var motif = prompt('Motif du refus (facultatif, visible par le membre) :'); if (motif === null) return;
+            return agir('refuser', { demande_id: r.id, motif: motif }, 'Demande refusée.');
+          }));
+          c.appendChild(a);
+        }
+        l.appendChild(c);
+      });
+    });
+  }
+
+  /* ── Accréditations accordées ── */
+  var LIBELLE_STATUT = { code_envoye: 'Code envoyé', active: 'Active', suspendue: 'Suspendue', revoquee: 'Retirée' };
+  function chargerAttributions() {
+    return api('GET', '/admin/accreditation-simple/attributions').then(function (d) {
+      var l = $('l-attributions'); l.textContent = '';
+      if (!d.attributions || !d.attributions.length) { l.appendChild(el('p', 'vide', "Aucune accréditation attribuée pour l'instant.")); return; }
+      d.attributions.forEach(function (r) {
+        var c = el('article', 'ligne'), t = el('div', 'ligne-tete');
+        t.appendChild(el('span', 'nom', r.emoji + ' ' + r.label + ' — ' + nomDe(r)));
+        t.appendChild(el('span', 'pill ' + r.statut, LIBELLE_STATUT[r.statut] || r.statut));
+        c.appendChild(t);
+        var info = 'Attribuée le ' + dateFr(r.attribue_le);
+        if (r.statut === 'active' && r.active_le) info = 'Active depuis le ' + dateFr(r.active_le);
+        if (r.statut === 'code_envoye' && r.code_expire_le) info += ' · code valable jusqu’au ' + dateFr(r.code_expire_le);
+        c.appendChild(el('p', 'meta', info + ' · ' + (r.compte_email || '')));
+        if (r.motif) c.appendChild(el('p', 'meta', 'Motif : ' + r.motif));
+        var a = el('div', 'actions');
+        var cible = { user_id: r.user_id, type: r.type };
+        if (r.statut === 'code_envoye') a.appendChild(bouton('Renvoyer un code', 'sec', function () {
+          if (!confirm('Renvoyer un nouveau code ? L’ancien sera annulé.')) return;
+          return agir('renvoyer', cible, 'Nouveau code envoyé (l’ancien est annulé).');
+        }));
+        if (r.statut === 'active') a.appendChild(bouton('Suspendre', 'sec', function () {
+          var motif = prompt('Motif de la suspension (facultatif, visible par le membre) :'); if (motif === null) return;
+          return agir('suspendre', { user_id: r.user_id, type: r.type, motif: motif }, 'Accréditation suspendue.');
+        }));
+        if (r.statut === 'suspendue') a.appendChild(bouton('Réactiver', 'ok', function () { return agir('reactiver', cible, 'Accréditation rétablie.'); }));
+        if (r.statut === 'revoquee') a.appendChild(bouton('Attribuer de nouveau', 'ok', function () {
+          if (!confirm('Envoyer un nouveau code d’activation ?')) return;
+          return agir('attribuer', cible, 'Code envoyé par message sécurisé.');
+        }));
+        if (r.statut !== 'revoquee') a.appendChild(bouton('Retirer', 'danger', function () {
+          var motif = prompt('Retirer définitivement cette accréditation ? Motif (facultatif, visible par le membre) :'); if (motif === null) return;
+          return agir('revoquer', { user_id: r.user_id, type: r.type, motif: motif }, 'Accréditation retirée.');
+        }));
+        c.appendChild(a); l.appendChild(c);
+      });
+    });
+  }
+
+  /* ── Attribution directe à un compte ── */
+  var tempoRecherche;
+  function chargerComptes() {
+    var q = $('q').value.trim(), l = $('l-comptes'); l.textContent = '';
+    if (q.length < 2) { l.appendChild(el('p', 'vide', 'Tapez au moins deux lettres pour trouver un compte.')); return Promise.resolve(); }
+    return api('GET', '/admin/accreditation-simple/comptes?q=' + encodeURIComponent(q)).then(function (d) {
+      l.textContent = '';
+      if (!d.comptes || !d.comptes.length) { l.appendChild(el('p', 'vide', 'Aucun compte trouvé.')); return; }
+      d.comptes.forEach(function (u) {
+        var r = el('div', 'resultat');
+        var g = el('div'); g.appendChild(el('div', 'nom', nomDe({ user_prenom: u.prenom, user_nom: u.nom, email: u.email, user_id: u.id })));
+        g.appendChild(el('div', 'meta', u.email + ' · ' + u.role));
+        r.appendChild(g);
+        r.appendChild(bouton('Attribuer', 'ok', function () {
+          var type = $('q-type').value, lib = ($('q-type').selectedOptions[0] || {}).textContent || type;
+          if (!confirm('Envoyer un code d’activation « ' + lib + ' » à ' + u.email + ' par message sécurisé ?')) return;
+          return agir('attribuer', { user_id: u.id, type: type }, 'Code envoyé par message sécurisé.');
+        }));
+        l.appendChild(r);
+      });
+    });
+  }
+  $('q').addEventListener('input', function () { clearTimeout(tempoRecherche); tempoRecherche = setTimeout(chargerComptes, 300); });
+
+  /* ── Onglets ── */
+  var VUE = 'demandes';
+  function rafraichir() { return VUE === 'demandes' ? chargerDemandes() : VUE === 'attributions' ? chargerAttributions() : chargerComptes(); }
+  function choisir(vue) {
+    VUE = vue;
+    document.querySelectorAll('.onglet').forEach(function (b) { b.setAttribute('aria-selected', String(b.dataset.vue === vue)); });
+    ['demandes', 'attributions', 'compte'].forEach(function (v) { $('v-' + v).hidden = v !== vue; });
+    rafraichir();
+  }
+  document.querySelectorAll('.onglet').forEach(function (b) { b.addEventListener('click', function () { choisir(b.dataset.vue); }); });
+  $('f-statut').addEventListener('change', chargerDemandes);
+
+  api('GET', '/admin/accreditation-simple/types').then(function (d) {
+    if (d._status !== 200) { $('refuse').hidden = false; return; }
+    TYPES = d.types || [];
+    $('q-type').textContent = '';
+    TYPES.forEach(function (t) { var o = el('option', null, t.emoji + ' ' + t.label); o.value = t.type; $('q-type').appendChild(o); });
+    $('app').hidden = false; choisir('demandes');
+  }).catch(function () { $('refuse').hidden = false; });
+})();
+</script>
+</body>
+</html>

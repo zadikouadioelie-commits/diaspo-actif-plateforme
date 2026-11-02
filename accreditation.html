@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="/assets/logo.png">
+<title>Accréditations</title>
+<meta name="description" content="Demandez une accréditation Diaspo'Actif (formateur, influenceur…) et activez-la avec le code reçu par message sécurisé.">
+<meta name="robots" content="noindex,nofollow">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,500;0,6..96,600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ═══ Module « Accréditations » (2026-11-02, demande explicite) ═══
+   Module VERT tant qu'aucune accréditation n'est accordée, DORÉ ensuite (comme les autres accréditations).
+   Réservé au compte Diaspo'Actif officiel pendant les tests (serveur : server/acces-reserve.js). */
+:root {
+  --nuit:#060A14; --nuit2:#0B1226; --texte:#E8ECF6; --doux:#A9B4CC; --faible:#8793B0;
+  --or:#E3C06E; --or2:#B9893A; --vert:#3FCF8E; --vert2:#1E8F5E; --rouge:#FF8E8E;
+  --verre:rgba(255,255,255,.045); --bord:rgba(255,255,255,.1); --bord-or:rgba(227,192,110,.34); --bord-vert:rgba(63,207,142,.34);
+  --display:"Bodoni Moda","Didot",Georgia,serif; --sans:"Manrope","Segoe UI",system-ui,sans-serif;
+}
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+[hidden] { display:none !important; }
+body { min-height:100vh; background:radial-gradient(ellipse at 50% -10%,#14234a 0%,var(--nuit) 62%) fixed; color:var(--texte); font-family:var(--sans); line-height:1.55; -webkit-font-smoothing:antialiased; }
+a { color:inherit; }
+.page { max-width:980px; margin:0 auto; padding:22px 16px 64px; }
+.haut { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:26px; flex-wrap:wrap; }
+.retour { display:inline-flex; align-items:center; gap:8px; color:var(--doux); text-decoration:none; font-weight:600; font-size:14px; padding:8px 14px; border:1px solid var(--bord); border-radius:999px; background:var(--verre); }
+.retour:hover { color:#fff; border-color:var(--bord-vert); }
+.marque { display:flex; align-items:center; gap:10px; font-family:var(--display); font-size:17px; font-weight:600; text-decoration:none; }
+.marque img { width:30px; height:30px; border-radius:50%; }
+.entete { margin-bottom:26px; max-width:68ch; }
+.etiquette { display:inline-block; font-size:11px; letter-spacing:.22em; text-transform:uppercase; font-weight:800; color:var(--vert); margin-bottom:10px; }
+h1 { font-family:var(--display); font-weight:500; font-size:clamp(28px,5vw,40px); line-height:1.12; margin-bottom:12px; text-wrap:balance; }
+.chapo { color:var(--doux); font-size:15.5px; }
+.grille { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr)); gap:16px; }
+.carte { position:relative; display:flex; flex-direction:column; gap:12px; padding:20px; border-radius:20px; background:var(--verre); border:1px solid var(--bord-vert); box-shadow:0 24px 50px -32px #000; }
+.carte.or { border-color:var(--bord-or); background:linear-gradient(180deg,rgba(227,192,110,.09),rgba(255,255,255,.03)); }
+.carte.grise { border-color:var(--bord); opacity:.92; }
+.carte-tete { display:flex; gap:14px; align-items:flex-start; }
+.pastille { flex:none; width:48px; height:48px; border-radius:14px; display:grid; place-items:center; font-size:24px; background:rgba(63,207,142,.14); border:1px solid var(--bord-vert); }
+.carte.or .pastille { background:rgba(227,192,110,.14); border-color:var(--bord-or); }
+.carte h2 { font-family:var(--display); font-weight:500; font-size:22px; line-height:1.2; }
+.carte p.desc { color:var(--doux); font-size:14.5px; }
+.statut { display:inline-flex; align-items:center; gap:7px; align-self:flex-start; font-size:12.5px; font-weight:700; padding:5px 12px; border-radius:999px; border:1px solid var(--bord-vert); color:var(--vert); background:rgba(63,207,142,.1); }
+.statut.or { color:var(--or); border-color:var(--bord-or); background:rgba(227,192,110,.12); }
+.statut.alerte { color:var(--rouge); border-color:rgba(255,142,142,.4); background:rgba(255,142,142,.09); }
+.statut.neutre { color:var(--doux); border-color:var(--bord); background:var(--verre); }
+.note { color:var(--doux); font-size:13.5px; }
+.actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:auto; padding-top:4px; }
+.btn { font:inherit; font-weight:800; font-size:14.5px; padding:12px 20px; border-radius:999px; border:0; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; justify-content:center; min-height:44px; transition:transform .2s, box-shadow .2s, opacity .2s; }
+.btn:hover { transform:translateY(-1px); }
+.btn:disabled { opacity:.55; cursor:not-allowed; transform:none; }
+.btn.vert { background:linear-gradient(135deg,#7CF0BA,#3FCF8E 45%,#1E8F5E); color:#04180e; box-shadow:0 10px 26px -12px rgba(63,207,142,.7); }
+.btn.dore { background:linear-gradient(135deg,#F3DC9B,#E3C06E 38%,#B9893A); color:#1a1202; box-shadow:0 10px 26px -12px rgba(227,192,110,.7); }
+.btn.fantome { background:var(--verre); color:var(--texte); border:1px solid var(--bord); }
+.btn:focus-visible, input:focus-visible, textarea:focus-visible { outline:2px solid #fff; outline-offset:2px; }
+.code-ligne { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+.code-ligne input { flex:1 1 180px; min-width:0; font:inherit; font-size:20px; font-weight:800; letter-spacing:.22em; text-align:center; text-transform:uppercase; color:#fff; background:rgba(255,255,255,.07); border:1.5px solid var(--bord-vert); border-radius:14px; padding:11px 14px; }
+.code-ligne input::placeholder { color:var(--faible); letter-spacing:.2em; }
+.retour-msg { font-size:13.5px; min-height:20px; }
+.retour-msg.erreur { color:var(--rouge); }
+.retour-msg.ok { color:var(--vert); }
+.fermee { text-align:center; padding:60px 16px; max-width:52ch; margin:40px auto; }
+.fermee h2 { font-family:var(--display); font-weight:500; font-size:26px; margin-bottom:10px; }
+.fermee p { color:var(--doux); }
+.regles { margin-top:30px; padding:18px 20px; border:1px solid var(--bord); border-radius:16px; background:var(--verre); color:var(--doux); font-size:13.5px; max-width:80ch; }
+.regles b { color:var(--texte); }
+/* Fenêtre de demande */
+dialog { margin:auto; width:min(94vw,520px); border:1px solid var(--bord-vert); border-radius:22px; background:#0d1630; color:var(--texte); padding:0; box-shadow:0 40px 90px -30px #000; }
+dialog::backdrop { background:rgba(3,6,14,.72); backdrop-filter:blur(3px); }
+.dlg { padding:24px; display:flex; flex-direction:column; gap:14px; }
+.dlg h3 { font-family:var(--display); font-weight:500; font-size:24px; }
+.dlg label { display:flex; flex-direction:column; gap:6px; font-size:13px; font-weight:700; color:var(--doux); }
+.dlg input, .dlg textarea { font:inherit; font-size:15px; font-weight:500; color:#fff; background:rgba(255,255,255,.07); border:1.5px solid var(--bord); border-radius:12px; padding:11px 13px; width:100%; }
+.dlg textarea { min-height:110px; resize:vertical; }
+.dlg input:focus, .dlg textarea:focus { border-color:var(--vert); }
+.dlg .aide { font-size:12.5px; color:var(--faible); font-weight:500; }
+@media (prefers-reduced-motion: reduce) { .btn { transition:none; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="haut">
+    <a class="retour" id="lien-retour" href="dashboard-initiative.html">← Retour au tableau de bord</a>
+    <a class="marque" href="index.html"><img src="/assets/logo.png" alt="" width="30" height="30">Diaspo'Actif</a>
+  </div>
+
+  <main id="contenu" hidden>
+    <header class="entete">
+      <span class="etiquette">Module Accréditations</span>
+      <h1>Obtenir une accréditation Diaspo'Actif</h1>
+      <p class="chapo">Certaines rubriques sont réservées aux personnes agréées par Diaspo'Actif. Choisissez l'accréditation qui vous intéresse et faites votre demande : l'équipe vous recontacte, puis vous envoie un code d'activation par message sécurisé.</p>
+    </header>
+    <section class="grille" id="grille" aria-live="polite"></section>
+    <aside class="regles">
+      <b>Comment ça marche ?</b> 1. Vous faites votre demande (téléphone, e-mail, motif). 2. Diaspo'Actif vous recontacte. 3. Vous recevez un code par <b>message sécurisé</b>, valable 7 jours, qui ne fonctionne que sur votre compte et une seule fois. 4. Vous le saisissez ici : l'accès s'ouvre et le module passe au doré. Diaspo'Actif peut suspendre ou retirer une accréditation à tout moment.
+    </aside>
+  </main>
+
+  <main id="ferme" class="fermee" hidden>
+    <h2>Rubrique en préparation</h2>
+    <p>Le module Accréditations n'est pas encore ouvert. Il le sera bientôt pour l'ensemble des comptes.</p>
+  </main>
+
+  <main id="connexion" class="fermee" hidden>
+    <h2>Connexion requise</h2>
+    <p>Connectez-vous pour demander une accréditation.</p>
+    <p style="margin-top:18px"><a class="btn vert" href="login.html">Me connecter</a></p>
+  </main>
+</div>
+
+<dialog id="dlg-demande">
+  <form class="dlg" id="form-demande" method="dialog" novalidate>
+    <h3 id="dlg-titre">Faire ma demande</h3>
+    <p class="aide">Les informations de votre compte sont jointes automatiquement. Diaspo'Actif vous recontacte pour la suite.</p>
+    <label>Téléphone
+      <input type="tel" id="d-tel" autocomplete="tel" inputmode="tel" required>
+    </label>
+    <label>Adresse e-mail
+      <input type="email" id="d-mail" autocomplete="email" required>
+    </label>
+    <label>Pourquoi cette accréditation ?
+      <textarea id="d-motif" maxlength="2000" required></textarea>
+      <span class="aide">Quelques lignes suffisent : votre activité, ce que vous voulez publier.</span>
+    </label>
+    <p class="retour-msg" id="d-msg" role="alert"></p>
+    <div class="actions">
+      <button class="btn vert" type="submit" id="d-envoyer">Envoyer ma demande</button>
+      <button class="btn fantome" type="button" id="d-annuler">Annuler</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var TYPE_COURANT = null, COMPTE = { email: '', telephone: '' };
+  /* Où ouvrir le module une fois l'accréditation active. */
+  var OUVERTURE = { influenceur_ida: 'influenceur-editeur.html', formateur: 'dashboard-initiative.html#formations-gestion' };
+
+  function el(tag, cls, txt) { var e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
+  function api(method, path, body) {
+    return fetch('/api' + path, { method: method, credentials: 'same-origin', headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined })
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { d._status = r.status; return d; }); });
+  }
+  function dateFr(iso) { try { return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' }); } catch (e) { return ''; } }
+
+  function carte(t) {
+    var s = t.statut, active = s === 'active';
+    var c = el('article', 'carte' + (active ? ' or' : (s === 'suspendue' || s === 'revoquee' ? ' grise' : '')));
+    var tete = el('div', 'carte-tete');
+    tete.appendChild(el('div', 'pastille', t.emoji));
+    var txt = el('div');
+    txt.appendChild(el('h2', null, t.label));
+    txt.appendChild(el('p', 'desc', t.description));
+    tete.appendChild(txt); c.appendChild(tete);
+
+    var act = el('div', 'actions'), msg = null;
+    if (active) {
+      c.appendChild(el('span', 'statut or', '✓ Accréditation active'));
+      var o = el('a', 'btn dore', 'Ouvrir le module'); o.href = OUVERTURE[t.type] || 'dashboard-initiative.html'; act.appendChild(o);
+    } else if (s === 'demande_envoyee') {
+      c.appendChild(el('span', 'statut neutre', '⏳ Demande envoyée'));
+      c.appendChild(el('p', 'note', "Diaspo'Actif a bien reçu votre demande et vous recontactera."));
+    } else if (s === 'demande_refusee') {
+      c.appendChild(el('span', 'statut alerte', 'Demande non retenue'));
+      if (t.motif) c.appendChild(el('p', 'note', t.motif));
+      var r = el('button', 'btn vert', 'Refaire une demande'); r.type = 'button'; r.addEventListener('click', function () { ouvrirDemande(t); }); act.appendChild(r);
+    } else if (s === 'code_a_saisir') {
+      c.appendChild(el('span', 'statut', '✉️ Code envoyé par message sécurisé'));
+      if (t.code_expire) {
+        c.appendChild(el('p', 'note', "Ce code a expiré. Demandez à Diaspo'Actif de vous en renvoyer un."));
+      } else {
+        c.appendChild(el('p', 'note', 'Ouvrez votre messagerie, lisez le message sécurisé (il ne reste lisible que 2 minutes), puis saisissez le code ici' + (t.expire_le ? ' avant le ' + dateFr(t.expire_le) : '') + '.'));
+        var ligne = el('div', 'code-ligne');
+        var inp = el('input'); inp.type = 'text'; inp.placeholder = 'XXXX-XXXX'; inp.maxLength = 9; inp.autocomplete = 'one-time-code'; inp.spellcheck = false; inp.setAttribute('aria-label', "Code d'activation");
+        inp.addEventListener('input', function () {
+          var v = inp.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
+          inp.value = v.length > 4 ? v.slice(0, 4) + '-' + v.slice(4) : v;
+        });
+        var b = el('button', 'btn vert', 'Activer'); b.type = 'button';
+        msg = el('p', 'retour-msg'); msg.setAttribute('role', 'alert');
+        var go = function () {
+          if (inp.value.replace('-', '').length !== 8) { msg.className = 'retour-msg erreur'; msg.textContent = 'Le code compte 8 caractères.'; return; }
+          b.disabled = true; msg.className = 'retour-msg'; msg.textContent = 'Vérification…';
+          api('POST', '/accreditation-simple/activer', { type: t.type, code: inp.value }).then(function (d) {
+            if (d.ok) { msg.className = 'retour-msg ok'; msg.textContent = 'Accréditation activée !'; setTimeout(charger, 700); }
+            else { b.disabled = false; msg.className = 'retour-msg erreur'; msg.textContent = d.error || 'Activation impossible.'; }
+          }).catch(function () { b.disabled = false; msg.className = 'retour-msg erreur'; msg.textContent = 'Connexion impossible, réessayez.'; });
+        };
+        b.addEventListener('click', go); inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); go(); } });
+        ligne.appendChild(inp); ligne.appendChild(b); c.appendChild(ligne); c.appendChild(msg);
+        var ms = el('a', 'btn fantome', 'Ouvrir ma messagerie'); ms.href = 'messagerie.html'; act.appendChild(ms);
+      }
+    } else if (s === 'suspendue') {
+      c.appendChild(el('span', 'statut alerte', 'Accréditation suspendue'));
+      c.appendChild(el('p', 'note', (t.motif ? t.motif + ' — ' : '') + "Contactez Diaspo'Actif pour la rétablir."));
+    } else if (s === 'revoquee') {
+      c.appendChild(el('span', 'statut alerte', 'Accréditation retirée'));
+      c.appendChild(el('p', 'note', (t.motif ? t.motif + ' — ' : '') + "Contactez Diaspo'Actif pour en savoir plus."));
+    } else {
+      c.appendChild(el('span', 'statut', 'Disponible sur demande'));
+      var d = el('button', 'btn vert', 'Faire ma demande'); d.type = 'button'; d.addEventListener('click', function () { ouvrirDemande(t); }); act.appendChild(d);
+    }
+    if (act.childNodes.length) c.appendChild(act);
+    return c;
+  }
+
+  function charger() {
+    return api('GET', '/accreditation-simple/etat').then(function (d) {
+      if (d._status === 401) { $('connexion').hidden = false; $('contenu').hidden = true; return; }
+      if (d._status === 403 || !d.types) { $('ferme').hidden = false; $('contenu').hidden = true; return; }
+      COMPTE = d.compte || COMPTE;
+      var g = $('grille'); g.textContent = '';
+      d.types.forEach(function (t) { g.appendChild(carte(t)); });
+      $('contenu').hidden = false; $('ferme').hidden = true; $('connexion').hidden = true;
+    }).catch(function () { $('ferme').hidden = false; $('contenu').hidden = true; });
+  }
+
+  function ouvrirDemande(t) {
+    TYPE_COURANT = t;
+    $('dlg-titre').textContent = 'Demande : ' + t.label;
+    $('d-tel').value = COMPTE.telephone || ''; $('d-mail').value = COMPTE.email || ''; $('d-motif').value = '';
+    $('d-msg').textContent = ''; $('d-msg').className = 'retour-msg'; $('d-envoyer').disabled = false;
+    $('dlg-demande').showModal(); $('d-tel').focus();
+  }
+  $('d-annuler').addEventListener('click', function () { $('dlg-demande').close(); });
+  $('form-demande').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var msg = $('d-msg');
+    if (!/^[0-9 +().\-]{6,25}$/.test($('d-tel').value.trim())) { msg.className = 'retour-msg erreur'; msg.textContent = 'Indiquez un numéro de téléphone valide.'; $('d-tel').focus(); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test($('d-mail').value.trim())) { msg.className = 'retour-msg erreur'; msg.textContent = 'Indiquez une adresse e-mail valide.'; $('d-mail').focus(); return; }
+    if ($('d-motif').value.trim().length < 10) { msg.className = 'retour-msg erreur'; msg.textContent = 'Expliquez en quelques mots le motif (10 caractères au moins).'; $('d-motif').focus(); return; }
+    $('d-envoyer').disabled = true; msg.className = 'retour-msg'; msg.textContent = 'Envoi…';
+    api('POST', '/accreditation-simple/demande', { type: TYPE_COURANT.type, telephone: $('d-tel').value.trim(), email: $('d-mail').value.trim(), motif: $('d-motif').value.trim() }).then(function (d) {
+      if (d.ok) { $('dlg-demande').close(); charger(); }
+      else { $('d-envoyer').disabled = false; msg.className = 'retour-msg erreur'; msg.textContent = d.error || 'Envoi impossible.'; }
+    }).catch(function () { $('d-envoyer').disabled = false; msg.className = 'retour-msg erreur'; msg.textContent = 'Connexion impossible, réessayez.'; });
+  });
+
+  charger();
+})();
+</script>
+</body>
+</html>

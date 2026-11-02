@@ -89,6 +89,9 @@
       <a href="#adhesions-init" data-section="adhesions-init" data-aide="cotisations_adhesions">🎫 Cotisations &amp; Adhésions</a>
       <a href="#votes-init" data-section="votes-init" data-aide="votes_securises">🗳️ Votes sécurisés</a>
       <a href="#tracker" data-section="tracker" id="lien-tracker">⚽ Maracana Tracker</a>
+      <!-- Modules « Accréditations » et « Influenceur Diaspo'Actif » (2026-11-02, demande explicite) : VERTS tant qu'aucune accréditation n'est accordée, DORÉS ensuite. Phase de test : visibles du seul compte officiel (drapeau accred_simple de /api/auth/me). -->
+      <a href="accreditation.html" id="lien-accred" class="accred-lien">🛡️ Accréditations</a>
+      <a href="influenceur-editeur.html" id="lien-ida-editeur" class="accred-lien">🎙️ Influenceur Diaspo'Actif</a>
       <a href="#billetterie-init" data-section="billetterie-init" data-aide="billetterie">🎟️ Billetterie <span class="pill" id="init-billets-badge" style="display:none;"></span></a>
       <a href="#messages-vitrine" data-section="messages-vitrine" data-aide="messages_vitrine">🛍️ Messages de la boutique <span class="pill" id="vitrine-msg-count" style="display:none;"></span></a>
       <a href="#offres-emploi" data-section="offres-emploi" data-aide="emplois_stages">💼 Emplois & Stages</a>
@@ -157,10 +160,24 @@
 <script src="assets/tracker-ui.js?v=20261017a"></script>
 <!-- Phase de test (2026-10-30) : le menu n'affiche le Maracana Tracker qu'au compte officiel Diaspo'Actif (serveur : drapeau tracker_disponible de /api/auth/me, accès refusé aux autres par /api/tracker/*). -->
 <style>#lien-tracker:not(.trk-ok){display:none !important;}</style>
+<style>
+.accred-lien{display:none !important;}
+.accred-lien.accred-ok{display:flex !important;}
+/* Vert tant que non accrédité, doré une fois l'accréditation active (comme les autres accréditations). */
+#sidebar a.accred-lien.accred-ok{color:#6FE3B0 !important;border-left:3px solid #3FCF8E;background:rgba(63,207,142,.08) !important;}
+#sidebar a.accred-lien.accred-ok.accred-or{color:#E3C06E !important;border-left-color:#E3C06E;background:rgba(227,192,110,.1) !important;}
+</style>
 <script>
   fetch('/api/auth/me', { credentials: 'same-origin' }).then(r => r.json()).then(d => {
     const dispo = !!(d && d.user && d.user.tracker_disponible);
     const lien = document.getElementById('lien-tracker'); if (lien && dispo) lien.classList.add('trk-ok');
+    /* Accréditations : liens verts, dorés si l'accréditation Influenceur est active. */
+    const acc = d && d.user && d.user.accred_simple;
+    if (acc) {
+      const l1 = document.getElementById('lien-accred'), l2 = document.getElementById('lien-ida-editeur');
+      if (l1) l1.classList.add('accred-ok');
+      if (l2) { l2.classList.add('accred-ok'); if ((acc.actives || []).indexOf('influenceur_ida') >= 0) l2.classList.add('accred-or'); }
+    }
     if (!dispo && location.hash === '#tracker') location.hash = '#cockpit';
   }).catch(() => {});
 </script>

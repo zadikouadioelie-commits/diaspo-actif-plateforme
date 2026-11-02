@@ -6849,6 +6849,44 @@ db.exec(`
 `);
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   ACCRÉDITATIONS SIMPLIFIÉES (2026-11-02, demande explicite) — voir server/accreditation-simple.js.
+   demandes : téléphone, e-mail, motif laissés par le membre. attributions : une ligne par (compte, accréditation), le code
+   d'activation n'y est conservé que haché et disparaît à l'activation.
+   statut attribution : code_envoye | active | suspendue | revoquee ; statut demande : en_attente | traitee | refusee. */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS accred_simple_demandes (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id      INTEGER NOT NULL,
+    type         TEXT NOT NULL,
+    telephone    TEXT,
+    email        TEXT,
+    motif        TEXT,
+    statut       TEXT NOT NULL DEFAULT 'en_attente',
+    motif_refus  TEXT,
+    created_at   TEXT,
+    traitee_at   TEXT,
+    traitee_par  INTEGER
+  );
+  CREATE INDEX IF NOT EXISTS idx_accred_simple_dem ON accred_simple_demandes(user_id, type, statut);
+  CREATE TABLE IF NOT EXISTS accred_simple_attributions (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id        INTEGER NOT NULL,
+    type           TEXT NOT NULL,
+    statut         TEXT NOT NULL DEFAULT 'code_envoye',
+    code_hash      TEXT,
+    code_expire_le TEXT,
+    essais         INTEGER DEFAULT 0,
+    verrou_jusqua  TEXT,
+    attribue_par   INTEGER,
+    attribue_le    TEXT,
+    active_le      TEXT,
+    motif          TEXT,
+    maj_le         TEXT,
+    UNIQUE(user_id, type)
+  );
+`);
+
+/* ═══════════════════════════════════════════════════════════════════════════
    CONFIRMATION D'UN NOUVEL APPAREIL (2026-10-05, étape 2 du chantier sécurité des connexions).
    Quand le bon mot de passe est saisi depuis un appareil inconnu alors que le compte est déjà ouvert
    (activité < 24 h) sur un autre, aucune session n'est ouverte : un « défi » est créé ici et la
