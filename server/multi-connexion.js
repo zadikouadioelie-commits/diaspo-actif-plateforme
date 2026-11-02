@@ -57,13 +57,18 @@ async function evaluer(db, userId, connexionId) {
   if (estDesactive() || !userId || !connexionId) return null;
   const u = await db.prepare('SELECT email, is_demo FROM users WHERE id=?').get(userId);
   if (!u || ConfirmationAppareil.estCompteDemo(u)) return null;
+  /* La session qui interroge doit elle-même être valable (ni révoquée ni expirée). Sinon getCurrentUser la traite
+     déjà comme anonyme : la bloquer ici ne ferait que casser les pages publiques, sans fenêtre « Est-ce vous ? »
+     possible (le titulaire n'est pas identifié) — impasse constatée sur mobile le 2026-11-02. */
+  if (!(await Connexions.verifier(db, connexionId))) return null;
   const actives = await connexionsActives(db, userId);
-  if (actives.length < 2) return null;
+  const autresActives = actives.filter(l => l.id !== connexionId);
+  if (autresActives.length < 1) return null;
   const etat = await lireEtat(db, userId);
   if (etat && etat.ok_jusqua && String(etat.ok_jusqua) > horodatage()) return null;
   return {
     code_existe: !!(etat && etat.code),
-    autres: actives.filter(l => l.id !== connexionId).map(l => ({ appareil: Connexions.etiquette(l), ville: l.ville || null, pays: l.pays || null, vue: l.last_seen_at || null })),
+    autres: autresActives.map(l => ({ appareil: Connexions.etiquette(l), ville: l.ville || null, pays: l.pays || null, vue: l.last_seen_at || null })),
   };
 }
 
