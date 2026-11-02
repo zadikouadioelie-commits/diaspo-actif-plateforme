@@ -15,7 +15,7 @@
 (function () {
   'use strict';
   if (window.ProfilAccueil) return;
-  var VERSION = '20261102i';
+  var VERSION = '20261102j';
   var FILTRES = [['tout', 'Tout'], ['textes', 'Textes'], ['photos', 'Photos'], ['videos', 'Vidéos'], ['articles', 'Articles'], ['evenements', 'Événements'], ['abonnements', 'Abonnements']];
   var CATEGORIES = ['Actualité', 'Projet', 'Investissement', 'Emploi', 'Formation', 'Événement', 'Succès', 'Témoignage', 'Appel à bénévoles', 'Culture', 'Diaspora', 'Innovation', 'Autre'];
   var CAM = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="2" y="6" width="13.5" height="12" rx="3.2" fill="currentColor"/><path d="M17.2 10.4l4.2-2.5a.7.7 0 0 1 1.05.6v7a.7.7 0 0 1-1.05.6l-4.2-2.5z" fill="currentColor"/></svg>';
@@ -94,9 +94,9 @@
       '.pa-evts{padding:14px 0 12px;border-radius:18px;background:rgba(227,192,110,.07);border:1px solid var(--pa-bord2);margin:2px 0}',
       '.pa-evts h3{margin:0;padding:0 16px 10px;font-size:15px;font-weight:800;color:#fff!important;display:flex;align-items:center;gap:8px}',
       '.pa-evts-rail{display:flex;gap:12px;overflow-x:auto;padding:2px 16px 6px;scrollbar-width:thin;scrollbar-color:rgba(227,192,110,.4) transparent}',
-      '.pa-evt{flex:0 0 232px;display:flex;flex-direction:column;border-radius:14px;overflow:hidden;border:1px solid var(--pa-bord2);background:rgba(11,18,38,.85);text-decoration:none;color:var(--pa-texte)!important;transition:transform .18s,border-color .18s}',
+      '.pa-evt{flex:0 0 232px;display:flex;flex-direction:column;align-items:stretch;border-radius:14px;overflow:hidden;border:1px solid var(--pa-bord2);background:rgba(11,18,38,.85);text-decoration:none;color:var(--pa-texte)!important;transition:transform .18s,border-color .18s}',
       '.pa-evt:hover{transform:translateY(-3px);border-color:var(--pa-or)}',
-      '.pa-evt-img{height:104px;background:linear-gradient(135deg,#1d2b55,#0B1226);position:relative}',
+      '.pa-evt-img{display:block;width:100%;flex:0 0 104px;height:104px;background:linear-gradient(135deg,#1d2b55,#0B1226);position:relative}',
       '.pa-evt-img img{width:100%;height:100%;object-fit:cover;display:block}',
       '.pa-evt-date{position:absolute;left:10px;bottom:-14px;background:linear-gradient(135deg,#F0D48C,#D9A94A);color:#1a1202!important;font-weight:800;font-size:12px;padding:5px 10px;border-radius:9px;white-space:nowrap}',
       '.pa-evt-corps{padding:20px 12px 12px;display:flex;flex-direction:column;gap:3px}',
