@@ -4497,7 +4497,9 @@ const CLE_BOUTIQUES_MAINTENANCE = 'boutiques_en_maintenance';
 async function boutiquesEnMaintenance() {
   try {
     const row = await db.prepare("SELECT valeur FROM parametres_plateforme WHERE cle=?").get(CLE_BOUTIQUES_MAINTENANCE);
-    return !!row && row.valeur === 'true';
+    /* Fermées par défaut (2026-11-02, demande explicite : le temps de la refonte, personne ne doit pouvoir
+       acheter) : tant que l'administrateur n'a pas rouvert explicitement (valeur « false »), c'est fermé. */
+    return !row || row.valeur !== 'false';
   } catch (e) { return false; }
 }
 async function definirBoutiquesMaintenance(actif, adminId) {
