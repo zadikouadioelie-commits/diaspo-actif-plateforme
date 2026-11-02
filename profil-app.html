@@ -3638,7 +3638,7 @@ async function renderVitrineVisitor(init) {
                 ${e.type_evt ? `<span style="font-size:11px;color:#8794A7;background:#fff;border:1px solid #E3DDD8;border-radius:99px;padding:2px 8px;">${esc(EVT_TYPE_LABEL[e.type_evt]||e.type_evt)}</span>` : ''}
                 ${e.domaine ? `<span style="font-size:11px;color:#8794A7;background:#fff;border:1px solid #E3DDD8;border-radius:99px;padding:2px 8px;">${esc(e.domaine)}</span>` : ''}
                 ${e.visibilite === 'boutique' ? `<span style="font-size:11px;color:#8B12D6;background:#F5EBFF;border:1px solid #BC13FE;border-radius:99px;padding:2px 8px;">🏬 Boutique uniquement</span>` : ''}
-                ${(e.nb_participants!=null && !e.masquer_inscrits) ? `<span style="font-size:11px;color:#8794A7;background:#fff;border:1px solid #E3DDD8;border-radius:99px;padding:2px 8px;">👥 ${e.nb_participants}${e.places_max?' / '+e.places_max:''}</span>` : ''}
+                ${e.nb_participants!=null ? `<span style="font-size:11px;color:#8794A7;background:#fff;border:1px solid #E3DDD8;border-radius:99px;padding:2px 8px;">👥 ${e.nb_participants}${e.places_max?' / '+e.places_max:''}</span>` : ''}
               </div>
               ${descApercu ? `<div style="font-size:12px;color:#6b7280;margin-top:6px;line-height:1.5;">${esc(descApercu)}</div>` : ''}
               ${(e.billetterie && EvtTemporel.statut(e) !== 'termine') ? `<div style="margin-top:8px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
@@ -7508,7 +7508,7 @@ async function loadEvenementsTab(containerId = 'ptab-evenements') {
             ${e.type_evt?`<span class="evt-tag">${esc(PVT_TYPE_EVT_LABEL[e.type_evt]||e.type_evt)}</span>`:''}
             ${e.domaine?`<span class="evt-tag">${esc(e.domaine)}</span>`:''}
             ${visiBadge}
-            ${(e.nb_participants!=null && !e.masquer_inscrits)?`<span class="evt-tag">👥 ${e.nb_participants} inscrit${e.nb_participants>1?'s':''}${e.places_max?' / '+e.places_max:''}</span>`:''}
+            ${e.nb_participants!=null?`<span class="evt-tag">👥 ${e.nb_participants} inscrit${e.nb_participants>1?'s':''}${e.places_max?' / '+e.places_max:''}</span>`:''}
           </div>
           ${descApercu ? `<p style="font-size:13px;color:var(--muted);margin:0;line-height:1.5;">${esc(descApercu)}</p>` : ''}
         </div>

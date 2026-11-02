@@ -1088,7 +1088,7 @@ function renderEvts() {
   list.innerHTML = evts.map(evt => {
     const icon  = DOMAINE_ICON[evt.domaine] || '📢';
     const inscrit = inscritSet.has(evt.id);
-    const plein   = evt.places_max && evt.nb_participants >= evt.places_max;
+    const plein   = evt.complet || (evt.places_max && evt.nb_participants >= evt.places_max);
     const pasEncoreOuvert = inscriptionsPasEncoreOuvertes(evt);
     const visiBadge = evt.visibilite === 'prive' ? '<span class="evt-tag" style="color:#e74c3c;">🔒 Privé</span>' :
                       evt.visibilite === 'abonnes' ? '<span class="evt-tag" style="color:#9b59b6;">⭐ Abonnés</span>' :
@@ -1165,7 +1165,8 @@ function renderEvts() {
           ${organisateurExterneHtml(evt)}
           ${visiBadge}
           ${brouillonBadge}
-          ${(evt.nb_participants && peutGerer) ? '<span>👥 '+evt.nb_participants+' inscrit'+(evt.nb_participants>1?'s':'')+(evt.places_max?' / '+evt.places_max:'')+'</span>' : ''}
+          ${evt.nb_participants ? '<span>👥 '+evt.nb_participants+' inscrit'+(evt.nb_participants>1?'s':'')+(evt.places_max?' / '+evt.places_max:'')+'</span>' : ''}
+          ${peutGerer ? masqueInscritsBouton(evt) : ''}
         </div>
         ${evt.description ? '<p style="font-size:13px;color:var(--muted);margin:0 0 10px;line-height:1.5">'+evtDescApercu(evt.description,120)+'</p>' : ''}
         <div class="evt-actions">
@@ -1520,6 +1521,27 @@ async function promouvoirEvenement(id, btn) {
     reset();
   }
 }
+/* Interrupteur « Masquer le nombre d'inscrits au public » directement sur la cartouche (2026-11-02, demande explicite) — visible du
+   seul organisateur / administrateur (peutGerer). Le serveur n'envoie plus le nombre au public quand il est masqué
+   (inscritsVisiblesPour, server/index.js) ; l'organisateur, lui, le voit toujours. */
+function masqueInscritsBouton(evt) {
+  const m = !!evt.masquer_inscrits;
+  return '<button type="button" class="evt-tag" data-masque="'+(m?1:0)+'" aria-pressed="'+m+'" onclick="basculerMasqueInscrits('+evt.id+',this)" '
+    + 'title="'+(m ? 'Le nombre d\'inscrits est caché au public — cliquer pour le réafficher' : 'Le nombre d\'inscrits est visible par le public — cliquer pour le masquer')+'" '
+    + 'style="cursor:pointer;border:1px solid '+(m?'#F26422':'#CBD5E1')+';background:'+(m?'#FFF1E8':'#fff')+';color:'+(m?'#B84C1A':'#0D2B4E')+';font-weight:700;">'
+    + (m ? '🙈 Masqué au public · Afficher' : '👁 Visible au public · Masquer') + '</button>';
+}
+async function basculerMasqueInscrits(id, btn) {
+  const masquer = btn.dataset.masque !== '1';
+  btn.disabled = true;
+  try {
+    await api('POST', '/evenements/'+id+'/masquer-inscrits', { masquer });
+    const e = allEvts.find(x => Number(x.id) === Number(id));
+    if (e) e.masquer_inscrits = masquer ? 1 : 0;
+    renderEvts();
+  } catch(er) { alert('Erreur : '+er.message); btn.disabled = false; }
+}
+
 async function supprimerEvenement(id, btn) {
   if (!confirm('Supprimer définitivement cet événement ?\n\nCette action est irréversible.')) return;
   btn.disabled = true;

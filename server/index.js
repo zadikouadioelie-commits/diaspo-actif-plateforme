@@ -24156,6 +24156,42 @@ route("GET", "/api/admin/honneur/premium-origines", async (req, res, params, bod
   sendJSON(res, 200, { totaux, mode_eligibilite: await honneur.modeEligibilite(), comptes: retenues.slice(0, 300).map(l => ({ ...l, nom: noms[l.user_id] })) });
 });
 
+/* Nombre d'inscrits (2026-11-02, bug constaté : une personne s'était inscrite à l'événement Diaspo'Actif et le compteur restait à 0).
+   Le compteur ne lisait QUE le formulaire simple (evenements_participants) : une inscription faite par la fiche d'inscription
+   (insc_inscriptions) ou par l'inscription rapide (evenements_inscriptions_rapides) n'était jamais comptée. On additionne
+   maintenant les trois voies, avec la même règle que les places prises d'une fiche (ni annulée, ni en liste d'attente, paiement qui compte). */
+async function nbInscritsEvenements(ids) {
+  const res = {};
+  ids.forEach(i => { res[i] = 0; });
+  if (!ids.length) return res;
+  const ph = ids.map(() => '?').join(',');
+  const ajoute = async (sql) => {
+    try { for (const l of await db.prepare(sql).all(...ids)) res[l.evenement_id] = (res[l.evenement_id] || 0) + (Number(l.n) || 0); }
+    catch (e) { console.error('[nbInscritsEvenements]', e.message); }
+  };
+  await ajoute(`SELECT evenement_id, COUNT(*) AS n FROM evenements_participants WHERE evenement_id IN (${ph}) GROUP BY evenement_id`);
+  await ajoute(`SELECT evenement_id, COUNT(*) AS n FROM evenements_inscriptions_rapides WHERE evenement_id IN (${ph}) GROUP BY evenement_id`);
+  await ajoute(`SELECT l.evenement_id AS evenement_id, COUNT(*) AS n FROM insc_inscriptions i JOIN insc_fiches_evenements l ON l.fiche_id=i.fiche_id
+    WHERE l.evenement_id IN (${ph}) AND i.statut NOT IN ('annule','liste_attente') AND i.statut_paiement IN (${INSC_PAIEMENTS_QUI_COMPTENT}) GROUP BY l.evenement_id`);
+  return res;
+}
+async function avecNbInscrits(rows) {
+  const nb = await nbInscritsEvenements(rows.map(r => r.id));
+  return rows.map(r => ({ ...r, nb_participants: nb[r.id] || 0 }));
+}
+/* Masquage du nombre d'inscrits (2026-11-02, demande explicite) : le propriétaire (et l'administrateur) le voient TOUJOURS ;
+   le public ne le reçoit pas du tout (null, jamais seulement caché à l'écran) quand l'organisateur l'a masqué.
+   est_gerant = le visiteur peut gérer l'événement (affiche l'interrupteur « Masquer au public » sur la cartouche). */
+function inscritsVisiblesPour(rows, me) {
+  return rows.map(r => {
+    const gerant = !!me && (Number(me.id) === Number(r.owner_user_id) || me.role === 'administrateur');
+    /* complet : le public doit toujours savoir qu'il n'y a plus de place, même sans voir le nombre d'inscrits. */
+    const complet = (r.places_max && r.nb_participants >= r.places_max) ? 1 : 0;
+    if (r.masquer_inscrits && !gerant) return { ...r, nb_participants: null, inscrits_masques: 1, est_gerant: 0, complet };
+    return { ...r, inscrits_masques: r.masquer_inscrits ? 1 : 0, est_gerant: gerant ? 1 : 0, complet };
+  });
+}
+
 route("GET", "/api/evenements/recommandes", async (req, res, params, body, query) => {
   const me = await getCurrentUser(req);
   let prefs = {};
@@ -24167,7 +24203,7 @@ route("GET", "/api/evenements/recommandes", async (req, res, params, body, query
 
   const hasPrefs = prefs && (prefs.ville || prefs.commune || prefs.departement || prefs.region || prefs.pays ||
     (Array.isArray(prefs.types) && prefs.types.length) || (Array.isArray(prefs.origines) && prefs.origines.length));
-  const withCounts = async (rows) => Promise.all(rows.map(async r => ({ ...r, nb_participants: (await db.prepare("SELECT COUNT(*) AS n FROM evenements_participants WHERE evenement_id=?").get(r.id))?.n || 0 })));
+  const withCounts = async (rows) => inscritsVisiblesPour(await avecNbInscrits(rows), me);
 
   if (!hasPrefs) {
     // Brouillon (2026-09-24, demande explicite : "l'événement en brouillon ne doit pas
@@ -24305,7 +24341,7 @@ route("GET", "/api/evenements", async (req, res, params, body, query) => {
   else if (query.gratuit === '0') rows = rows.filter(r => participationEffective(r) === 'payant');
   else if (query.gratuit === 'partiel') rows = rows.filter(r => participationEffective(r) === 'partiellement_payant');
   if (query.q) { const q = query.q.toLowerCase(); rows = rows.filter(r => (r.titre+r.lieu+r.description||"").toLowerCase().includes(q)); }
-  const withCounts = await Promise.all(rows.map(async r => ({ ...r, nb_participants: (await db.prepare("SELECT COUNT(*) AS n FROM evenements_participants WHERE evenement_id=?").get(r.id))?.n || 0 })));
+  const withCounts = inscritsVisiblesPour(await avecNbInscrits(rows), meListe);
   sendJSON(res, 200, { evenements: await protegerPdfListe(await enrichirAvecFicheMedia(withCounts), req, { alleger: true }) });
 });
 
@@ -26070,8 +26106,29 @@ route("GET", "/api/evenements/:id", async (req, res, params) => {
     "SELECT id, slug, titre, image_url, objectif_montant, montant_collecte, devise, statut_manuel, est_publiee, date_fin FROM cagnottes WHERE evenement_id=? AND est_publiee=1 AND visibilite='publique'"
   ).all(params.id)).map(cagnotteAvecStatut);
   if (row.owner_user_id) { row.organisateur_nom = (await nomCompteAffichage(row.owner_user_id)) || row.organisateur_nom; }
-  const [rowAvecFiche] = await protegerPdfListe(await enrichirAvecFicheMedia([row]), req);
-  sendJSON(res, 200, { evenement: rowAvecFiche, participants, nb_participants: participants.length, cagnottes: cagnottesLiees });
+  /* Nombre d'inscrits : toutes les voies d'inscription, masqué au public si l'organisateur l'a demandé (voir inscritsVisiblesPour).
+     La liste nominative des inscrits suit la même règle : un visiteur n'y voit que lui-même quand le nombre est masqué. */
+  const meInscrits = await getCurrentUser(req);
+  const [rowVisible] = inscritsVisiblesPour(await avecNbInscrits([row]), meInscrits);
+  const participantsVisibles = (rowVisible.est_gerant || !row.masquer_inscrits) ? participants : participants.filter(p => meInscrits && Number(p.id) === Number(meInscrits.id));
+  const [rowAvecFiche] = await protegerPdfListe(await enrichirAvecFicheMedia([rowVisible]), req);
+  sendJSON(res, 200, { evenement: rowAvecFiche, participants: participantsVisibles, nb_participants: rowVisible.nb_participants, cagnottes: cagnottesLiees });
+});
+
+/* POST /api/evenements/:id/masquer-inscrits — interrupteur directement sur la cartouche (2026-11-02, demande explicite) : l'organisateur
+   (ou l'administrateur) masque / réaffiche le nombre d'inscrits au public sans rouvrir le formulaire. Ne touche à AUCUN autre champ
+   (PUT /api/evenements/:id réécrit toute la ligne). Le propriétaire continue de voir le nombre dans tous les cas. */
+route("POST", "/api/evenements/:id/masquer-inscrits", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const evt = await db.prepare("SELECT id, owner_user_id FROM evenements WHERE id=?").get(params.id);
+  if (!evt) return sendJSON(res, 404, { error: "Événement introuvable." });
+  if (Number(evt.owner_user_id) !== Number(user.id) && user.role !== "administrateur") {
+    return sendJSON(res, 403, { error: "Vous ne pouvez modifier que vos propres événements." });
+  }
+  const masquer = body && (body.masquer === true || body.masquer === 1 || body.masquer === "1") ? 1 : 0;
+  await db.prepare("UPDATE evenements SET masquer_inscrits=? WHERE id=?").run(masquer, evt.id);
+  sendJSON(res, 200, { ok: true, masquer_inscrits: masquer });
 });
 
 /* DELETE /api/evenements/:id — suppression depuis la page publique elle-même (2026-09-07,

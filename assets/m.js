@@ -158,7 +158,8 @@
     home: '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/>',
     swap: '<path d="M7 7h12l-3-3M17 17H5l3 3"/>',
     dir: '<circle cx="9" cy="8" r="3.4"/><path d="M2.8 20a6.2 6.2 0 0 1 12.4 0"/><path d="M17 5h4M17 9h4M17 13h4"/>',
-    doc: '<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h7"/>'
+    doc: '<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h7"/>',
+    eye: '<path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.8"/>'
   };
   const ic = (n, cls) => `<svg class="i ${cls || ''}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n] || ''}</svg>`;
 
@@ -972,6 +973,27 @@
       </div>
     </div>`;
   }
+  /* Nombre d'inscrits (2026-11-02, demande explicite) : le serveur n'envoie le nombre au public que si l'organisateur ne l'a pas masqué ;
+     l'organisateur (est_gerant) le voit toujours, avec un interrupteur directement sur la cartouche pour le masquer / le réafficher au public. */
+  function evtInscritsBadge(e) {
+    return e.nb_participants ? `<span class="badge">${e.nb_participants} inscrit${e.nb_participants > 1 ? 's' : ''}</span>` : '';
+  }
+  function evtMasqueChip(e) {
+    if (!Number(e.est_gerant)) return '';
+    const m = Number(e.inscrits_masques) === 1;
+    return `<button type="button" class="badge ev-mask${m ? ' on' : ''}" data-mask-ev="${e.id}" data-masque="${m ? 1 : 0}" aria-pressed="${m}" title="${m ? 'Le nombre d’inscrits est caché au public — toucher pour le réafficher' : 'Le nombre d’inscrits est visible par le public — toucher pour le masquer'}">${ic('eye', 's')} ${m ? 'Masqué au public · Afficher' : 'Visible au public · Masquer'}</button>`;
+  }
+  async function basculerInscritsMasques(btn) {
+    const id = btn.dataset.maskEv, masquer = btn.dataset.masque !== '1';
+    btn.disabled = true;
+    try {
+      await api('/api/evenements/' + encodeURIComponent(id) + '/masquer-inscrits', { method: 'POST', body: { masquer } });
+      const it = (S.ev.items || []).find(x => String(x.id) === String(id));
+      if (it) it.inscrits_masques = masquer ? 1 : 0;
+      btn.outerHTML = evtMasqueChip({ id, est_gerant: 1, inscrits_masques: masquer ? 1 : 0 });
+      toast(masquer ? 'Le nombre d’inscrits est maintenant caché au public (vous le voyez toujours).' : 'Le nombre d’inscrits est de nouveau visible par le public.');
+    } catch (er) { btn.disabled = false; toast(er.message, true); }
+  }
   function evtCard(e) {
     if (Number(e.epingle_permanent) === 1) return evtPromo(e);
     const p = parseDay(e.date_evt); const cov = evtCover(e);
@@ -983,7 +1005,7 @@
       <div class="bd"><h3 class="tt">${esc(e.titre)}</h3>
         <div class="meta">${ic('clock', 's')}<span>${esc(dateLong(e.date_evt))}${e.heure_debut ? ' · ' + esc(String(e.heure_debut).slice(0, 5)) : ''}</span></div>
         <div class="meta">${ic('pin', 's')}<span class="ell">${esc([e.ville, e.pays].filter(Boolean).join(', ') || e.lieu || 'En ligne')}</span></div>
-        <div class="tags"><span class="badge ${paid ? 'o' : 'g'}">${part}</span>${e.est_termine ? '<span class="badge">Terminé</span>' : ''}${e.cr_statut === 'publie' ? `<span class="badge o">${ic('doc', 's')} Compte-rendu</span>` : ''}${inscrit ? `<span class="badge g">${ic('check', 's')} Inscrit</span>` : ''}${e.nb_participants ? `<span class="badge">${e.nb_participants} inscrit${e.nb_participants > 1 ? 's' : ''}</span>` : ''}</div></div></a>`;
+        <div class="tags"><span class="badge ${paid ? 'o' : 'g'}">${part}</span>${e.est_termine ? '<span class="badge">Terminé</span>' : ''}${e.cr_statut === 'publie' ? `<span class="badge o">${ic('doc', 's')} Compte-rendu</span>` : ''}${inscrit ? `<span class="badge g">${ic('check', 's')} Inscrit</span>` : ''}${evtInscritsBadge(e)}${evtMasqueChip(e)}</div></div></a>`;
   }
 
   async function paneEvent(id) {
@@ -1031,7 +1053,7 @@
         <div class="meta">${ic('cal', 's')}<span>${esc(dateLong(e.date_evt))}${e.date_fin && e.date_fin !== e.date_evt ? ' → ' + esc(dateLong(e.date_fin)) : ''}</span></div>
         ${e.heure_debut ? `<div class="meta">${ic('clock', 's')}<span>${esc(String(e.heure_debut).slice(0, 5))}${e.heure_fin ? ' – ' + esc(String(e.heure_fin).slice(0, 5)) : ''}</span></div>` : ''}
         <div class="meta">${ic('pin', 's')}<span>${esc([e.lieu, e.ville, e.pays].filter(Boolean).join(', ') || 'En ligne')}</span></div>
-        <div class="tags"><span class="badge ${paid ? 'o' : 'g'}">${paid ? (ev.prix_min > 0 ? 'Dès ' + esc(ev.prix_min) + ' €' : 'Payant') : 'Gratuit'}</span>${e.type_evt ? `<span class="badge">${esc(e.type_evt)}</span>` : ''}${e.domaine ? `<span class="badge">${esc(e.domaine)}</span>` : ''}${r.nb_participants ? `<span class="badge">${r.nb_participants} inscrit${r.nb_participants > 1 ? 's' : ''}</span>` : ''}</div>
+        <div class="tags"><span class="badge ${paid ? 'o' : 'g'}">${paid ? (ev.prix_min > 0 ? 'Dès ' + esc(ev.prix_min) + ' €' : 'Payant') : 'Gratuit'}</span>${e.type_evt ? `<span class="badge">${esc(e.type_evt)}</span>` : ''}${e.domaine ? `<span class="badge">${esc(e.domaine)}</span>` : ''}${evtInscritsBadge(e)}${evtMasqueChip(e)}</div>
         ${e.organisateur_nom || ev.organisateur_nom ? `<p class="small muted" style="margin:12px 0 0">Organisé par <b style="color:var(--text)" ${e.owner_user_id ? `data-prof="${esc(e.owner_user_id)}" role="link"` : ''}>${esc(ev.organisateur_nom || e.organisateur_nom)}</b></p>` : ''}</div></div>
       ${(e.visibilite || 'public') === 'public' ? `<div class="card"><div class="pad" style="text-align:center"><b>${ic('ticket', 's')} QR code de l’événement</b><p class="small muted" style="margin:4px 0 0">Scannez-le pour ouvrir l’événement, ou montrez-le pour le partager.</p><div class="qr" id="ev-qr" role="img" aria-label="QR code de l’événement"></div><div class="row" style="gap:8px"><button type="button" class="btn out sm sp" id="ev-qr-big">${ic('search', 's')} Agrandir</button><button type="button" class="btn out sm sp" id="ev-qr-share">${ic('share', 's')} Partager le lien</button></div></div></div>` : ''}
       ${desc ? `<div class="card"><div class="pad rich" style="white-space:pre-line">${esc(desc)}</div></div>` : ''}
@@ -1393,6 +1415,8 @@
     /* Partager un profil de l'annuaire ou un événement de la liste : le lien s'ouvre sans compte, un jeton rend chaque envoi unique (aperçu WhatsApp). */
     const shA = e.target.closest('[data-share-ann]');
     if (shA) { e.preventDefault(); const s = (S.annShare || {})[shA.dataset.shareAnn]; if (s) partagerLien(location.origin + s.path + (S.me ? '&via=' + S.me.id : '') + '&r=' + jetonPartage(), s.nm); return; }
+    const mkE = e.target.closest('[data-mask-ev]');
+    if (mkE) { e.preventDefault(); e.stopPropagation(); basculerInscritsMasques(mkE); return; }
     const shE = e.target.closest('[data-share-ev]');
     if (shE) { e.preventDefault(); e.stopPropagation(); if (shE.dataset.promo && S.me) api('/api/evenements/' + encodeURIComponent(shE.dataset.shareEv) + '/partage-promo', { method: 'POST', body: {} }).then(r => { if (r && r.points) toast('+3 points d’indice de fiabilité ✓'); }).catch(() => { /* le partage lui-même ne doit jamais dépendre du bonus */ }); partagerEvt(location.origin + '/evenements.html?evt=' + encodeURIComponent(shE.dataset.shareEv) + (S.me ? '&via=' + S.me.id : '') + '&r=' + jetonPartage(), shE.dataset.shareTitre || 'Événement Diaspo’Actif', shE.dataset.shareEv); return; }
     const af = e.target.closest('[data-aff-go]');

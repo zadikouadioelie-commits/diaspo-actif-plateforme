@@ -89,11 +89,3 @@ test('Boutons : site (Événements) et redirection téléphone', () => {
   assert.match(source('assets/m.js'), /href="#\/comptesrendus"/);
   assert.match(source('assets/m.js'), /a === 'comptesrendus'\) paneCRListe\(\)/);
 });
-
-test('Le nombre d\'inscrits n\'est plus affiché au public (cartes d\'événements, site et téléphone)', () => {
-  const m = source('assets/m.js');
-  assert.ok(!/nb_participants \? `<span class="badge">/.test(m), 'téléphone : plus de badge « N inscrits » sur la carte');
-  assert.ok(!/r\.nb_participants \?/.test(m), 'téléphone : plus de badge « N inscrits » sur la fiche');
-  assert.match(source('evenements-app.html'), /\(evt\.nb_participants && peutGerer\)/, 'site : visible seulement pour l\'organisateur et l\'administrateur');
-  assert.ok(!/nb_participants!=null/.test(source('profil-app.html')), 'profil public : plus de compteur d\'inscrits');
-});

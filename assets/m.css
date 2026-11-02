@@ -439,6 +439,11 @@ button.li{background:none;font:inherit;color:inherit}
 /* Partage depuis la liste des événements (2026-10-07) : bouton rond sur la couverture, au-dessus du lien de la carte. */
 .ev .ev-share{position:absolute;top:8px;right:8px;z-index:2;width:36px;height:36px;border-radius:50%;border:0;background:rgba(255,255,255,.94);color:var(--navy,#0D2B4E);display:grid;place-items:center;box-shadow:0 2px 8px rgba(0,0,0,.25);cursor:pointer;padding:0}
 .ev .ev-share svg{width:18px;height:18px}
+/* Interrupteur « Masquer le nombre d'inscrits au public » (2026-11-02) : visible du seul organisateur, directement sur la cartouche. */
+.ev-mask{border:1px solid #CBD5E1;background:#fff;color:var(--navy,#0D2B4E);font:inherit;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:5px;min-height:30px}
+.ev-mask svg{width:14px;height:14px}
+.ev-mask.on{background:#FFF1E8;border-color:#F26422;color:#B84C1A}
+.ev-mask:disabled{opacity:.6}
 
 /* ---------- Actualités : cartouche de compte-rendu (2026-10-08) ---------- */
 .crn{overflow:hidden;border:2px solid #1558C8;box-shadow:0 0 0 3px rgba(21,88,200,.16),0 8px 22px rgba(11,31,92,.18)}
