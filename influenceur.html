@@ -33,7 +33,8 @@ html body.nd .ida :is(h1,h2,h3) { font-family:var(--nd-display,'Bodoni Moda','Di
 
 /* Héros : image fournie par l'équipe (titre, micro, globe, caméra). Le texte reste présent pour les lecteurs d'écran ;
    sur téléphone, où l'image serait trop petite pour être lue, le titre et le sous-titre s'affichent en texte sous l'image. */
-.ida-banner { margin:0 -20px 14px; border-bottom:1px solid var(--nd-bord,rgba(227,192,110,.24)); background:#1b0420; }
+html:has(.ida) { overflow-x:clip; }
+.ida-banner { width:100vw; margin:0 0 14px calc(50% - 50vw); border-bottom:1px solid var(--nd-bord,rgba(227,192,110,.24)); background:#1b0420; }
 .ida-banner img { display:block; width:100%; height:auto; aspect-ratio:2172/216; }
 .ida-banner-txt { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
 .ida-banner-txt h1 { font-family:var(--nd-display,'Bodoni Moda',Georgia,serif); font-size:clamp(26px,7vw,34px); line-height:1.1; color:#fff; }
@@ -55,6 +56,7 @@ html body.nd .ida :is(h1,h2,h3) { font-family:var(--nd-display,'Bodoni Moda','Di
 /* Champs de recherche : le style global des champs impose fond blanc et texte clair → on force fond nuit, texte blanc, y compris pendant la saisie et l'autoremplissage. */
 html body.nd .ida .ida-champ input[type="search"], html body.nd .ida .ida-recherche select { background-color:#0B1226 !important; color:#fff !important; -webkit-text-fill-color:#fff !important; caret-color:#E3C06E; border:1px solid rgba(227,192,110,.35) !important; box-shadow:none !important; }
 html body.nd .ida .ida-champ input[type="search"]:focus, html body.nd .ida .ida-recherche select:focus { border-color:#E3C06E !important; }
+html body.nd .ida .ida-champ input[type="search"]::placeholder { color:#8E9AB6 !important; -webkit-text-fill-color:#8E9AB6 !important; opacity:1; font-weight:500; }
 html body.nd .ida .ida-champ input:-webkit-autofill { -webkit-box-shadow:0 0 0 40px #0B1226 inset !important; -webkit-text-fill-color:#fff !important; }
 html body.nd .ida .ida-champ input[type="search"]::-webkit-search-cancel-button { -webkit-appearance:none; appearance:none; width:16px; height:16px; cursor:pointer; background:no-repeat center/12px url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23E3C06E' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M5 5l14 14M19 5L5 19'/%3E%3C/svg%3E"); }
 .ida .ida-recherche select { padding:0 38px 0 16px; cursor:pointer; -webkit-appearance:none; appearance:none; background-image:linear-gradient(45deg,transparent 50%,#E3C06E 50%),linear-gradient(135deg,#E3C06E 50%,transparent 50%); background-position:calc(100% - 20px) 50%,calc(100% - 14px) 50%; background-size:6px 6px; background-repeat:no-repeat; }
@@ -90,6 +92,7 @@ html body.nd .ida .ida-champ input[type="search"]::-webkit-search-cancel-button 
 /* Lecteur + fiche */
 .ida-main { display:flex; flex-direction:column; gap:18px; min-width:0; }
 .ida-vedette-sec { flex:1 1 auto; display:flex; flex-direction:column; }
+.ida-vedette-sec[hidden] { display:none; }
 .ida-vedette-sec .ida-vedette { flex:1 1 auto; align-content:start; }
 .ida-player { display:grid; grid-template-columns:minmax(0,1.3fr) minmax(0,1fr); gap:20px; padding:14px; align-items:stretch; }
 .ida-left { display:flex; flex-direction:column; gap:14px; min-width:0; }
@@ -175,7 +178,6 @@ html body.nd .ida .ida-champ input[type="search"]::-webkit-search-cancel-button 
 }
 @media (max-width:860px) {
   .ida { padding:0 16px 40px; }
-  .ida-banner { margin:0 -16px 14px; }
   .ida-banner-txt { position:static; width:auto; height:auto; overflow:visible; clip:auto; white-space:normal; padding:14px 16px 4px; background:#1b0420; }
   .ida-grid { grid-template-columns:minmax(0,1fr); }
   .ida-recherche { grid-template-columns:minmax(0,1fr); }
@@ -372,10 +374,15 @@ html body.nd .ida .ida-champ input[type="search"]::-webkit-search-cancel-button 
     return '<div class="ida-vide" style="grid-column:1/-1"><svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="14" width="52" height="36" rx="8"/><path d="M27 24l13 8-13 8z"/></svg><h2>' + esc(titre) + '</h2><p>' + esc(texte) + '</p>' + (lien || '') + '</div>';
   }
 
+  function htmlVignette(v) { return '<button type="button" class="ida-vignette" data-v="' + v.id + '">' + th(v) + '<b>' + esc(v.titre) + '</b><small>' + nb(v.vues) + ' vues · ' + il(v.jours) + '</small></button>'; }
+  function htmlSuivant(v) { return '<button type="button" class="ida-next" data-v="' + v.id + '">' + th(v) + '<span><b>' + esc(v.titre) + '</b><small>' + esc(v.chaine) + '<br>' + nb(v.vues) + ' vues · ' + il(v.jours) + '</small></span></button>'; }
+
   function dessiner() {
     var vue = etat.vue, m = MENU.filter(function (x) { return x.k === vue; })[0];
     var liste = visibles(), player = $('ida-player'), suivre = $('ida-suivre'), vedette = $('ida-vedette'), secV = $('ida-vedette-sec');
     dessinerMenu();
+    $('ida-vedette-t').textContent = 'Vidéos en vedette';
+    $('ida-nb').hidden = true; $('ida-raz').hidden = true;
 
     // Vues réservées au compte : on ne simule rien.
     if (m && m.connexion) {
@@ -394,15 +401,18 @@ html body.nd .ida .ida-champ input[type="search"]::-webkit-search-cancel-button 
       secV.hidden = true; suivre.innerHTML = '<div class="ida-vide-mini">Les vidéos à suivre apparaîtront ici dès les premières publications.</div>';
       return;
     }
+    var filtre = !!(norm(etat.q) || etat.theme || Object.keys(etat.themes).some(function (k) { return etat.themes[k]; }));
+    $('ida-nb').hidden = !filtre; $('ida-nb').textContent = liste.length ? liste.length + ' vidéo' + (liste.length > 1 ? 's' : '') + ' trouvée' + (liste.length > 1 ? 's' : '') : 'Aucun résultat';
+    $('ida-raz').hidden = !filtre;
     if (!liste.length) {
+      // Aucun résultat : on le dit clairement, et on propose les autres vidéos pour que la page ne reste pas vide.
       player.style.display = 'block';
       player.innerHTML = videoVide("Aucune vidéo trouvée", "Aucune vidéo ne correspond à votre recherche. Essayez un autre mot ou retirez le filtre de thématique.", '<button type="button" class="ida-btn principal" id="ida-raz2">Effacer la recherche</button>');
-      secV.hidden = true; suivre.innerHTML = ''; return;
+      $('ida-vedette-t').textContent = 'À découvrir en attendant';
+      vedette.innerHTML = VIDEOS.slice(0, VIDEOS.length >= 8 ? 8 : 4).map(htmlVignette).join('');
+      suivre.innerHTML = VIDEOS.slice(0, 7).map(htmlSuivant).join('');
+      return;
     }
-
-    var filtre = !!(norm(etat.q) || etat.theme || Object.keys(etat.themes).some(function (k) { return etat.themes[k]; }));
-    $('ida-nb').hidden = !filtre; $('ida-nb').textContent = liste.length + ' vidéo' + (liste.length > 1 ? 's' : '') + ' trouvée' + (liste.length > 1 ? 's' : '');
-    $('ida-raz').hidden = !filtre;
     var cur = liste.filter(function (v) { return v.id === etat.courant; })[0] || liste[0];
     etat.courant = cur.id;
     var aime = !!etat.like[cur.id], garde = !!etat.garde[cur.id];
@@ -416,18 +426,14 @@ html body.nd .ida .ida-champ input[type="search"]::-webkit-search-cancel-button 
       '<div class="ida-chaine"><span class="ida-avatar" aria-hidden="true">' + esc(cur.chaine.charAt(0)) + '</span><div><b>' + esc(cur.chaine) + '</b><small>' + nb(cur.abonnes) + ' abonnés</small></div><button type="button" class="ida-btn principal" id="ida-abo" style="margin-left:auto">S’abonner</button></div>' +
       '<p class="ida-desc">' + esc(cur.desc) + '</p></div>';
 
-    vedette.innerHTML = liste.slice(0, liste.length >= 8 ? 8 : 4).map(function (v) {
-      return '<button type="button" class="ida-vignette" data-v="' + v.id + '">' + th(v) + '<b>' + esc(v.titre) + '</b><small>' + nb(v.vues) + ' vues · ' + il(v.jours) + '</small></button>';
-    }).join('');
-    suivre.innerHTML = liste.filter(function (v) { return v.id !== cur.id; }).slice(0, 7).map(function (v) {
-      return '<button type="button" class="ida-next" data-v="' + v.id + '">' + th(v) + '<span><b>' + esc(v.titre) + '</b><small>' + esc(v.chaine) + '<br>' + nb(v.vues) + ' vues · ' + il(v.jours) + '</small></span></button>';
-    }).join('');
+    vedette.innerHTML = liste.slice(0, liste.length >= 8 ? 8 : 4).map(htmlVignette).join('');
+    suivre.innerHTML = liste.filter(function (v) { return v.id !== cur.id; }).slice(0, 7).map(htmlSuivant).join('');
   }
 
   document.addEventListener('click', function (e) {
     var b = e.target.closest ? e.target.closest('button, [data-v]') : null; if (!b) return;
     if (b.dataset.k) { etat.vue = b.dataset.k; dessiner(); return; }
-    if (b.dataset.v) { etat.courant = Number(b.dataset.v); dessiner(); var p = $('ida-player'); if (p && p.scrollIntoView) p.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); return; }
+    if (b.dataset.v) { if (!visibles().some(function (v) { return v.id === Number(b.dataset.v); })) { etat.q = ''; etat.theme = ''; etat.themes = {}; $('ida-q').value = ''; dessinerThemes(); } etat.courant = Number(b.dataset.v); dessiner(); var p = $('ida-player'); if (p && p.scrollIntoView) p.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); return; }
     if (b.id === 'ida-raz' || b.id === 'ida-raz2') { etat.q = ''; etat.theme = ''; etat.themes = {}; $('ida-q').value = ''; dessinerThemes(); return dessiner(); }
     if (b.id === 'ida-lire') return toast("Le lecteur sera branché à l'ouverture de la rubrique : cet aperçu montre seulement la composition.");
     if (b.id === 'ida-abo') return toast(connecte ? "Les abonnements s'ouvriront avec la rubrique." : 'Connectez-vous pour vous abonner à une chaîne.');
