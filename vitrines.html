@@ -48,6 +48,11 @@
 .vit-hero-text h1{font-size:42px;font-weight:900;color:#fff;margin:0 0 8px;letter-spacing:-.5px;text-transform:uppercase;text-shadow:0 2px 10px rgba(0,0,0,.45);}
 .vit-hero-text p{color:rgba(255,255,255,.92);font-size:15px;margin:0;max-width:460px;line-height:1.5;text-shadow:0 1px 6px rgba(0,0,0,.45);}
 
+/* Bandeau image (2026-11-02) : pleine largeur, hauteur suivant le ratio de l'image (2000×225). */
+.vit-bandeau{background:#2B0A16;line-height:0;}
+.vit-bandeau-titre{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;}
+.vit-bandeau-defil{width:100%;}
+.vit-bandeau-img{display:block;width:100%;height:auto;}
 .vit-stat-band{background:#1B3A6B;padding:0;}
 .vit-stat-band-inner{max-width:1180px;margin:0 auto;padding:0 24px;display:flex;}
 .vit-stat-chip{display:flex;align-items:center;gap:12px;padding:16px 32px;font-size:14px;font-weight:600;color:rgba(255,255,255,.9);border-right:1px solid rgba(255,255,255,.15);}
@@ -161,6 +166,10 @@
      horizontalement, ne garde qu'une mince tranche centrale). "contain" préserve toute la
      composition, quitte à laisser une bande de fond uni de part et d'autre. */
   .vit-hero{height:190px;background-size:contain;background-repeat:no-repeat;}
+  /* Bandeau image : sur téléphone, l'image garde une largeur lisible et se fait défiler d'un doigt. */
+  .vit-bandeau-defil{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+  .vit-bandeau-defil::-webkit-scrollbar{display:none;}
+  .vit-bandeau-img{width:760px;max-width:none;}
   .vit-stat-band-inner{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
   .vit-stat-band-inner::-webkit-scrollbar{display:none;}
   .vit-stat-chip{padding:12px 16px;font-size:12.5px;flex:none;}
@@ -213,14 +222,14 @@
     <div id="hb-account-section"></div>
   </aside>
 
-  <!-- ===== HERO ===== -->
-  <div class="vit-hero nd-zone">
-    <div class="vit-hero-overlay"></div>
-    <div class="vit-hero-content">
-      <div class="vit-hero-text">
-        <h1>Boutique Diaspo'Actif</h1>
-        <p>Découvrez les entreprises, associations, projets et services créés par la diaspora sur Diaspo'Actif.</p>
-      </div>
+  <!-- ===== BANDEAU (2026-11-02, demande explicite : remplace l'ancien héros photo par l'image « Boutique Diaspo'Actif »).
+       Le titre et la phrase sont dans l'image ; le titre reste en HTML masqué pour les lecteurs d'écran et le référencement.
+       Retour arrière : remettre le bloc .vit-hero (assets/hero-boutiques.png). ===== -->
+  <div class="vit-bandeau">
+    <h1 class="vit-bandeau-titre">Boutique Diaspo'Actif — Le marché des talents, produits, services et projets de la diaspora</h1>
+    <div class="vit-bandeau-defil">
+      <img class="vit-bandeau-img" src="assets/hero-boutiques-diaspora.webp" width="2000" height="225"
+           alt="Boutique Diaspo'Actif : le marché des talents, produits, services et projets de la diaspora. Plus de 500 boutiques, 5 types de boutiques, diaspora et Afrique, achat sécurisé, livraison multi-colis.">
     </div>
   </div>
 
