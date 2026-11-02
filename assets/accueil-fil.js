@@ -11,7 +11,7 @@
    ============================================================ */
 (function () {
   'use strict';
-  var VERSION = '20261014a';
+  var VERSION = '20261102i';
   var liste = document.getElementById('hp-fil-liste');
   var zone = document.getElementById('hp-hero-fil');
   if (!liste || !zone) return;
@@ -142,7 +142,7 @@
   }
 
   Promise.all([
-    get('/api/fil/medias?type=video&limit=1').catch(function () { return null; }),
+    get('/api/fil/medias?type=video&reels=1&limit=1').catch(function () { return null; }),
     get('/api/fil?mode=organisations&limit=20').catch(function () { return null; })
   ]).then(function (r) {
     var reel = r[0] && r[0].items && r[0].items[0];

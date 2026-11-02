@@ -2,7 +2,8 @@
    tests/fil-accueil.test.js — Fil de l'accueil du profil public (2026-11-02)
    ===========================================================
    Un vrai serveur contre une COPIE isolée de la base. Vérifie :
-   • « Tout » : toute la plateforme, du plus récent au plus ancien ; ni brouillon, ni archivée, ni programmée, ni compte de démonstration ;
+   • « Tout » : toute la plateforme — officiel d'abord, autres publications (brassées chaque heure), puis celles du compte en dernier ; ni brouillon,
+     ni archivée, ni programmée, ni compte de démonstration ; les Reels (vidéo marquée reel) n'y sont pas, une vidéo ordinaire si ;
    • une publication non publique n'est visible que de son auteur ;
    • chaque filtre ne rend que son type : textes, photos, vidéos, articles, événements ;
    • « Mes actualités » : uniquement ce que le compte a publié ou republié (jamais les autres), connexion exigée ;
@@ -47,6 +48,9 @@ test('fil de l\'accueil : filtres, Mes actualités, abonnements, pagination', as
   const T2 = ajouter(idA, { contenu: 'texte A' });
   const VA = ajouter(idA, { contenu: 'video A', type: 'video', medias: JSON.stringify([{ type: 'video', url: '/uploads/b.mp4' }]) });
   const RP = ajouter(idA, { contenu: 'repost A', type: 'repost', pub_type: 'repost', original_post_id: PH });
+  const REEL = JSON.stringify([{ type: 'video', url: '/uploads/reel.mp4', reel: true, fin_lecture: 33 }]);
+  const RA = ajouter(idA, { contenu: 'reel A', type: 'video', medias: REEL });
+  const RB = ajouter(idB, { contenu: 'reel B', type: 'video', medias: REEL });
   const BROUILLON = ajouter(idB, { contenu: 'brouillon', statut: 'brouillon' });
   const ARCHIVE = ajouter(idB, { contenu: 'archive', statut: 'archive' });
   const PROG = ajouter(idB, { contenu: 'programme', statut: 'programme' });
@@ -55,25 +59,27 @@ test('fil de l\'accueil : filtres, Mes actualités, abonnements, pagination', as
   const DEMO = ajouter(idD, { contenu: 'demo' });
   const mien = (r) => r.data.posts.filter(p => String(p.contenu || '').includes(marque)).map(p => p.id);
 
-  await t.test('Tout : toute la plateforme, du plus récent au plus ancien, sans brouillon/archive/programmé/démo/privé d\'autrui', async () => {
+  await t.test('Tout : toute la plateforme (les miennes en dernier), sans Reels/brouillon/archive/programmé/démo/privé d\'autrui', async () => {
     const r = await c(jarA, '/api/fil/accueil?filtre=tout&limit=20');
     assert.equal(r.status, 200, JSON.stringify(r.data));
     const ids = mien(r);
-    for (const id of [T1, PH, AR, EV, T2, RP, PRIVE_A]) assert.ok(ids.includes(id), `la publication ${id} est dans le fil`);
-    for (const id of [VI, VA]) assert.ok(!ids.includes(id), `le Reel ${id} a sa propre bande : il n'est pas dans le fil du bas`);
+    for (const id of [T1, PH, VI, AR, EV, T2, VA, RP, PRIVE_A]) assert.ok(ids.includes(id), `la publication ${id} est dans le fil`);
+    for (const id of [RA, RB]) assert.ok(!ids.includes(id), `le Reel ${id} a sa propre bande : il n'est pas dans le fil du bas`);
     for (const id of [BROUILLON, ARCHIVE, PROG, PRIVE_B, DEMO]) assert.ok(!ids.includes(id), `la publication ${id} n'est pas dans le fil`);
-    assert.deepEqual(ids, [...ids].sort((x, y) => y - x), 'du plus récent au plus ancien');
+    const miennes = [T2, VA, RP, PRIVE_A], autres = [T1, PH, VI, AR, EV];
+    assert.ok(Math.max(...autres.map(id => ids.indexOf(id))) < Math.min(...miennes.map(id => ids.indexOf(id))), 'mes publications viennent à la suite de celles de la plateforme');
+    assert.deepEqual(miennes.map(id => ids.indexOf(id)).sort((x, y) => x - y).map(i => ids[i]), [PRIVE_A, RP, VA, T2], 'mes publications : de la plus récente à la plus ancienne');
   });
 
   await t.test('visiteur déconnecté : fil public, sans les publications non publiques', async () => {
-    const r = await c(null, '/api/fil/accueil');
+    const r = await c(null, '/api/fil/accueil?limit=20');
     assert.equal(r.status, 200);
     assert.ok(!mien(r).includes(PRIVE_A) && !mien(r).includes(PRIVE_B));
     assert.ok(mien(r).includes(T1));
   });
 
   await t.test('chaque filtre ne rend que son type', async () => {
-    const f = async (nom) => mien(await c(jarA, `/api/fil/accueil?filtre=${nom}&limit=20`));
+    const f = async (nom) => { const rr = await c(jarA, `/api/fil/accueil?filtre=${nom}&limit=20`); assert.equal(rr.status, 200, nom + ' : ' + JSON.stringify(rr.data)); return mien(rr); };
     assert.deepEqual((await f('videos')).sort(), [VI, VA].sort(), 'vidéos');
     assert.deepEqual((await f('photos')).sort(), [PH, RP].sort(), 'photos (y compris la photo d\'une republication)');
     assert.deepEqual(await f('articles'), [AR], 'articles');
@@ -86,7 +92,7 @@ test('fil de l\'accueil : filtres, Mes actualités, abonnements, pagination', as
   await t.test('Mes actualités : seulement ce que j\'ai publié ou republié', async () => {
     const r = await c(jarA, '/api/fil/accueil?filtre=mes&limit=20');
     assert.equal(r.status, 200);
-    assert.deepEqual(mien(r).sort(), [T2, VA, RP, PRIVE_A].sort());
+    assert.deepEqual(mien(r).sort(), [T2, VA, RP, PRIVE_A, RA].sort(), 'tout ce que j\'ai publié, Reels compris');
     assert.ok(r.data.posts.every(p => Number(p.auteur_id) === idA), 'aucune publication d\'un autre compte');
     assert.equal((await c(null, '/api/fil/accueil?filtre=mes')).status, 401, 'connexion exigée');
   });
@@ -115,9 +121,11 @@ test('fil de l\'accueil : filtres, Mes actualités, abonnements, pagination', as
       avant = r.data.suivant;
     }
     assert.equal(new Set(toutes).size, toutes.length, 'aucun doublon');
+    const complet = (await c(jarA, '/api/fil/accueil?filtre=tout&limit=20')).data.posts.map(p => p.id);
+    assert.deepEqual(toutes.slice(0, complet.length), complet, 'la même suite, page par page ou d\'un bloc');
     const attendus = sql(d => d.prepare(
-      "SELECT id FROM fil_posts WHERE contenu LIKE ? AND COALESCE(statut,'publie')='publie' AND (COALESCE(visibilite,'public')='public' OR auteur_id=?) AND auteur_id<>? ORDER BY id DESC").all(marque + '%', idA, idD).map(r => r.id).filter(id => id !== VI && id !== VA)); // les Reels ont leur bande
-    assert.deepEqual(toutes.filter(id => attendus.includes(id)), attendus, 'toutes les publications attendues, dans l\'ordre');
+      "SELECT id FROM fil_posts WHERE contenu LIKE ? AND COALESCE(statut,'publie')='publie' AND (COALESCE(visibilite,'public')='public' OR auteur_id=?) AND auteur_id<>? ORDER BY id DESC").all(marque + '%', idA, idD).map(r => r.id));
+    assert.deepEqual(toutes.filter(id => attendus.includes(id)).sort((x, y) => x - y), attendus.filter(id => id !== RA && id !== RB).sort((x, y) => x - y), 'toutes les publications attendues, sans doublon, sans Reels');
 
     const videos = []; avant = null;
     for (let i = 0; i < 20; i++) {
@@ -128,6 +136,36 @@ test('fil de l\'accueil : filtres, Mes actualités, abonnements, pagination', as
     }
     assert.ok(videos.includes(VI) && videos.includes(VA));
     assert.equal(new Set(videos).size, videos.length);
+  });
+
+  await t.test('le compte officiel passe en tête, puis la plateforme, puis mes publications', async () => {
+    sql(d => d.prepare('UPDATE users SET is_official=1 WHERE id=?').run(idB));
+    try {
+      const r = await c(jarA, '/api/fil/accueil?filtre=tout&limit=20');
+      const ids = mien(r);
+      assert.deepEqual(ids.slice(0, 5), [EV, AR, VI, PH, T1], 'les publications officielles d\'abord, de la plus récente à la plus ancienne');
+      assert.ok(ids.indexOf(T2) > ids.indexOf(T1), 'mes publications ensuite');
+    } finally { sql(d => d.prepare('UPDATE users SET is_official=0 WHERE id=?').run(idB)); }
+  });
+
+  await t.test('brassage horaire : l\'ordre change à chaque heure, reste stable dans l\'heure ; récentes fixes ; miennes en dernier', async () => {
+    const { ordonner, rang } = require('../server/fil-accueil');
+    const autres = Array.from({ length: 40 }, (_, i) => ({ id: 1000 - i, auteur_id: 7 }));
+    const miens = [{ id: 5, auteur_id: 9 }, { id: 3, auteur_id: 9 }];
+    const o = (heure) => ordonner({ autres, miens, officiels: new Set(), heure });
+    assert.deepEqual(o(100), o(100), 'stable pendant l\'heure');
+    assert.notDeepEqual(o(100), o(101), 'un autre ordre à l\'heure suivante');
+    assert.deepEqual(o(100).slice(0, 4), [1000, 999, 998, 997], 'les 4 plus récentes restent en tête');
+    assert.deepEqual(o(100).slice(-2), [5, 3], 'mes publications à la suite');
+    assert.equal(new Set(o(100)).size, 42, 'aucun doublon');
+    assert.equal(rang(12, 5), rang(12, 5));
+  });
+
+  await t.test('le curseur garde son heure : le défilement ne change pas d\'ordre quand l\'heure tourne', async () => {
+    const r = await c(jarA, '/api/fil/accueil?filtre=tout&limit=2&avant=123-0');
+    assert.equal(r.status, 200);
+    assert.ok(!r.data.suivant || /^123-\d+$/.test(r.data.suivant), 'le curseur renvoyé garde l\'heure du curseur reçu : ' + r.data.suivant);
+    assert.ok(r.data.posts.length <= 2);
   });
 
   await t.test('filtre inconnu : retombe sur « Tout » ; catégorie : filtre exact', async () => {

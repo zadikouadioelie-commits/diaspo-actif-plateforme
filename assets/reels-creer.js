@@ -14,7 +14,7 @@
 (function () {
   'use strict';
   if (window.ReelsCreer) return;
-  var VERSION = '20261014a';
+  var VERSION = '20261102i';
   var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); };
   var CAM = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="6" width="13.5" height="12" rx="3.2" fill="currentColor"/><path d="M17.2 10.4l4.2-2.5a.7.7 0 0 1 1.05.6v7a.7.7 0 0 1-1.05.6l-4.2-2.5z" fill="currentColor"/></svg>';
 
@@ -120,7 +120,7 @@
       corps.querySelector('[data-a="ferme"]').onclick = function () { fermer(); };
     }
     function ecranChoix(erreur) {
-      corps.innerHTML = '<p class="rc-p">Une petite vidéo de 3 à 90 secondes, idéalement verticale (comme un Reel). Elle sera visible par toute la communauté, dans les Reels et sur votre profil public.<small>Formats MP4 ou MOV.</small></p>'
+      corps.innerHTML = '<p class="rc-p">Une petite vidéo de <b>33 secondes au maximum</b>, idéalement verticale. Si elle est plus longue, elle est coupée automatiquement à 33 secondes (le début est gardé) — pour une vidéo plus longue, publiez-la comme une publication. Elle sera visible par toute la communauté, dans les Reels et sur votre profil public.<small>Formats MP4 ou MOV.</small></p>'
         + (erreur ? message(esc(erreur)) : '')
         + '<div class="rc-choix"><button type="button" class="rc-bout" data-a="filmer">' + CAM + ' Filmer maintenant</button>'
         + '<button type="button" class="rc-bout sec" data-a="choisir">Choisir une vidéo de mon appareil</button></div>'
@@ -144,7 +144,7 @@
     function ecranPrevisu(erreur) {
       var d = E.diag || {}, cadre = { vertical: 'Vertical', '4:5': '4:5', carre: 'Carré', horizontal: 'Horizontal' }[d.cadre] || '';
       corps.innerHTML = '<video class="rc-vid" src="' + esc(E.url) + '" controls playsinline muted preload="metadata"></video>'
-        + '<div class="rc-meta">' + (d.duree ? '<span class="rc-pastille">' + Math.round(d.duree) + ' s</span>' : '') + (cadre ? '<span class="rc-pastille">' + esc(cadre) + '</span>' : '')
+        + '<div class="rc-meta">' + (d.duree ? '<span class="rc-pastille">' + (d.coupe ? d.duree_reel + ' s gardées sur ' + Math.round(d.duree) + ' s' : Math.round(d.duree) + ' s') + '</span>' : '') + (cadre ? '<span class="rc-pastille">' + esc(cadre) + '</span>' : '')
         + '<span class="rc-pastille">' + (E.fichier.size / 1048576 < 10 ? (E.fichier.size / 1048576).toFixed(1) : Math.round(E.fichier.size / 1048576)) + ' Mo</span></div>'
         + (d.avertissements && d.avertissements.length ? d.avertissements.map(function (a) { return message(esc(a), 'rc-avis'); }).join('') : '')
         + (erreur ? message(esc(erreur)) : '')
@@ -152,6 +152,9 @@
         + '<textarea id="rc-leg" maxlength="300" placeholder="Dites en quelques mots de quoi parle votre Reel…"></textarea><span class="rc-cpt" id="rc-cpt">0/300</span>'
         + '<button type="button" class="rc-bout" data-a="publier">' + CAM + ' Publier le Reel</button>'
         + '<button type="button" class="rc-bout sec" data-a="changer">Changer de vidéo</button>';
+      /* Aperçu de ce qui sera gardé : la lecture s'arrête à la durée d'un Reel. */
+      var apercu = corps.querySelector('.rc-vid');
+      if (apercu && d.coupe && d.duree_reel) apercu.addEventListener('timeupdate', function () { if (apercu.currentTime >= d.duree_reel) { apercu.pause(); apercu.currentTime = 0; } });
       var leg = corps.querySelector('#rc-leg'), cpt = corps.querySelector('#rc-cpt');
       if (E.legende) { leg.value = E.legende; cpt.textContent = leg.value.length + '/300'; }
       leg.oninput = function () { E.legende = leg.value; cpt.textContent = leg.value.length + '/300'; };

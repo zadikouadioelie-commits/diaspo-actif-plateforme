@@ -8,7 +8,7 @@
    ============================================================ */
 (function () {
   'use strict';
-  var VERSION = '20261014a';
+  var VERSION = '20261102i';
   function css() {
     if (document.getElementById('reels-css')) return;
     var s = document.createElement('style'); s.id = 'reels-css';

@@ -235,7 +235,7 @@ function chargerVisionneur() {
   if (window.MediaViewer) return Promise.resolve();
   if (!_visionneurPromesse) _visionneurPromesse = new Promise(resolve => {
     const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = '/assets/media-viewer.css?v=20261014a'; document.head.appendChild(l);
-    const s = document.createElement('script'); s.src = '/assets/media-viewer.js?v=20261014a'; s.onload = () => resolve(); s.onerror = () => resolve(); document.head.appendChild(s);
+    const s = document.createElement('script'); s.src = '/assets/media-viewer.js?v=20261102i'; s.onload = () => resolve(); s.onerror = () => resolve(); document.head.appendChild(s);
   });
   return _visionneurPromesse;
 }
@@ -282,7 +282,7 @@ function renderMedias(post) {
     // (l'extraction de couleur dominante n'a pas de sens ici sans décoder une image de la
     // vidéo — le noir reste le repli attendu, déjà validé pour les photos sans fond choisi).
     vids.forEach(m => {
-      html += `<div class="post-media-video"><video controls preload="metadata" style="width:100%;height:auto;max-height:300px;border-radius:8px;object-fit:contain;background:#111;display:block;"><source src="${escHtml(m.url)}">Votre navigateur ne supporte pas la vidéo.</video></div>`;
+      html += `<div class="post-media-video"><video controls preload="metadata"${Number(m.fin_lecture) > 0 ? ' data-fin="' + Number(m.fin_lecture) + '"' : ''} style="width:100%;height:auto;max-height:300px;border-radius:8px;object-fit:contain;background:#111;display:block;"><source src="${escHtml(m.url)}">Votre navigateur ne supporte pas la vidéo.</video></div>`;
     });
   }
   if (auds.length) {
@@ -2139,3 +2139,12 @@ window.voirVitrineDepuisFil = function(initiativeId, sousType, ownerUserId) {
     if (v.controls) { v._survol = false; } else { arreter(v); }
   }, true);
 })();
+
+/* Reels coupés à 33 s (2026-11-02) : une vidéo marquée data-fin s'arrête à cette seconde, où qu'elle soit affichée (fil, profil, publication). */
+if (!window.__coupeReel) {
+  window.__coupeReel = true;
+  document.addEventListener('timeupdate', function (e) {
+    var v = e.target; if (!v || v.tagName !== 'VIDEO' || !v.dataset || !v.dataset.fin) return;
+    if (v.currentTime >= Number(v.dataset.fin)) { v.pause(); v.currentTime = 0; }
+  }, true);
+}

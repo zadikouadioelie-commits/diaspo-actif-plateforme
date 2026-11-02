@@ -14,7 +14,8 @@
 
    SPÉCIFICATION DES REELS DIASPO'ACTIF (inspirée des Reels Facebook : cadre vertical 9:16, 1080×1920, MP4/MOV H.264 + AAC, 30 i/s,
    courts ; Facebook accepte jusqu'à 4 Go) :
-     • durée   : 3 s minimum, 90 s maximum (idéal 15-45 s) ;
+     • durée   : 3 s minimum, 33 s MAXIMUM (décision du 2026-11-02) : une vidéo plus longue, jusqu'à 5 minutes, est coupée à 33 s (à la lecture ; le fichier
+                 d'origine reste chez Bunny) ; au-delà de 5 minutes elle est refusée — pour une longue vidéo, on publie une publication vidéo ordinaire ;
      • cadre   : vertical 9:16 recommandé (1080×1920) ; 4:5, carré 1:1 et horizontal 16:9 acceptés, affichés sans déformation ;
      • poids   : 1 Go maximum (un reel de 90 s en 1080p fait ~100 Mo) ; formats MP4 et MOV (iPhone) ;
      • définition minimale : 480 px sur le plus petit côté.
@@ -34,8 +35,9 @@ const SEC = require("./security");
 
 const SPEC = Object.freeze({
   duree_min: 3,
-  duree_max: 90,
-  duree_ideale: [15, 45],
+  duree_max: 300,          /* durée maximale du fichier ENVOYÉ (coupé ensuite à duree_reel) */
+  duree_reel: 33,          /* durée maximale d'un Reel : au-delà, coupe automatique */
+  duree_ideale: [15, 33],
   taille_max_mo: 1024,
   cote_min_px: 480,
   cadre_recommande: "9:16",
@@ -56,10 +58,10 @@ const cfg = () => ({
 });
 /* Vidéo courte d'un ÉVÉNEMENT (2026-10-28, demande explicite : « une vidéo courte, 2 minutes maximum ») : même hébergement et même envoi direct que les Reels,
    seule la durée change. Règles distinctes, jamais modifiables par le navigateur : c'est le serveur qui choisit quelle règle s'applique. */
-const SPEC_EVENEMENT = Object.freeze({ ...SPEC, duree_min: 1, duree_max: 120, duree_ideale: [30, 90], taille_max_mo: 600, cadre_recommande: "16:9", resolution_recommandee: "1280x720" });
+const SPEC_EVENEMENT = Object.freeze({ ...SPEC, duree_reel: null, duree_min: 1, duree_max: 120, duree_ideale: [30, 90], taille_max_mo: 600, cadre_recommande: "16:9", resolution_recommandee: "1280x720" });
 /* Vidéo de COURS d'une formation (Studio, 2026-10-30) : même hébergement et même envoi direct, mais des règles de cours — jusqu'à 1 h, cadre horizontal 16:9 recommandé,
    définition minimale plus souple. Règles choisies ICI (jamais par le navigateur). */
-const SPEC_FORMATION = Object.freeze({ ...SPEC, duree_min: 1, duree_max: 3600, duree_ideale: [120, 1200], taille_max_mo: 1024, cote_min_px: 360, cadre_recommande: "16:9", resolution_recommandee: "1920x1080", cadres_acceptes: ["16:9", "9:16", "4:5", "1:1"] });
+const SPEC_FORMATION = Object.freeze({ ...SPEC, duree_reel: null, duree_min: 1, duree_max: 3600, duree_ideale: [120, 1200], taille_max_mo: 1024, cote_min_px: 360, cadre_recommande: "16:9", resolution_recommandee: "1920x1080", cadres_acceptes: ["16:9", "9:16", "4:5", "1:1"] });
 const specDe = usage => (usage === "evenement" ? SPEC_EVENEMENT : usage === "formation" ? SPEC_FORMATION : SPEC);
 const actif = () => { const c = cfg(); return !!(c.lib && c.cle && c.hote); };
 

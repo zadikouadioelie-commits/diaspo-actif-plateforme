@@ -102,9 +102,18 @@
       return `<a class="pf-lk" href="${esc(attrUrl(h))}" target="_blank" rel="noopener">${ic('out', 's')}<span>${esc(REZO[k.toLowerCase()] || k)}</span></a>`;
     }).join('');
   }
+  /* Média d'une publication dans un profil (2026-11-02) : une vidéo ordinaire (ou un Reel) et les photos paraissent dans les publications du compte, comme dans le fil. */
+  const mediaPub = p => {
+    let l = []; try { l = JSON.parse(p.medias || '[]'); } catch (e) { l = []; } if (!Array.isArray(l)) l = [];
+    if (p.media_url) l.unshift({ type: p.media_type || '', url: p.media_url });
+    const v = l.find(x => x && x.url && (x.type === 'video' || /\.(mp4|webm|mov|m4v)(\?|#|$)/i.test(x.url)));
+    if (v) return `<div class="media" style="margin-top:6px"><video controls playsinline preload="metadata" ${v.poster ? `poster="${attrUrl(v.poster)}"` : ''} ${Number(v.fin_lecture) > 0 ? `data-fin="${Number(v.fin_lecture)}"` : ''} src="${attrUrl(v.url)}"></video></div>`;
+    const im = l.find(x => x && x.url && (x.type === 'image' || x.type === 'photo' || /\.(jpe?g|png|webp|gif|avif)(\?|#|$)/i.test(x.url)));
+    return im ? `<img src="${attrUrl(im.url)}" alt="" loading="lazy" style="display:block;width:100%;border-radius:10px;margin-top:6px" onerror="this.remove()">` : '';
+  };
   const posts = (l, tout) => l.length ? (tout ? l : l.slice(0, 5)).map(p => {
     const t = strip(md(p.titre || p.article_titre || '')); const c = strip(md(p.corps != null ? p.corps : (p.contenu || '')));
-    return `<div class="pf-post"><div class="small muted">${esc(ago(p.created_at))}${p.categorie ? ' · ' + esc(p.categorie) : ''}</div>${t ? `<div style="font-weight:700">${esc(t)}</div>` : ''}<div class="pf-clamp">${linkify(c)}</div></div>`;
+    return `<div class="pf-post"><div class="small muted">${esc(ago(p.created_at))}${p.categorie ? ' · ' + esc(p.categorie) : ''}</div>${t ? `<div style="font-weight:700">${esc(t)}</div>` : ''}<div class="pf-clamp">${linkify(c)}</div>${mediaPub(p)}</div>`;
   }).join('') : '';
 
   /* Publications d'une autre personne (2026-11-02) : seulement ce qu'elle a publié ou republié, avec « Voir plus » (même route que le site, GET /api/profil/:id/publications). */

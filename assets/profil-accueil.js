@@ -15,8 +15,8 @@
 (function () {
   'use strict';
   if (window.ProfilAccueil) return;
-  var VERSION = '20261102h';
-  var FILTRES = [['tout', 'Tout'], ['textes', 'Textes'], ['photos', 'Photos'], ['articles', 'Articles'], ['evenements', 'Événements'], ['abonnements', 'Abonnements']];
+  var VERSION = '20261102i';
+  var FILTRES = [['tout', 'Tout'], ['textes', 'Textes'], ['photos', 'Photos'], ['videos', 'Vidéos'], ['articles', 'Articles'], ['evenements', 'Événements'], ['abonnements', 'Abonnements']];
   var CATEGORIES = ['Actualité', 'Projet', 'Investissement', 'Emploi', 'Formation', 'Événement', 'Succès', 'Témoignage', 'Appel à bénévoles', 'Culture', 'Diaspora', 'Innovation', 'Autre'];
   var CAM = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="2" y="6" width="13.5" height="12" rx="3.2" fill="currentColor"/><path d="M17.2 10.4l4.2-2.5a.7.7 0 0 1 1.05.6v7a.7.7 0 0 1-1.05.6l-4.2-2.5z" fill="currentColor"/></svg>';
   var PLUME = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 20l1.2-4.4L16.6 4.2a2 2 0 0 1 2.8 0l.4.4a2 2 0 0 1 0 2.8L8.4 18.8z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M14.5 6.3l3.2 3.2" stroke="currentColor" stroke-width="1.8"/></svg>';
@@ -144,6 +144,13 @@
      1. Bande de Reels
      ============================================================ */
   var rafraichirBande = null;
+  /* Brassage horaire de la bande de Reels (2026-11-02, demande explicite : l'ordre change chaque heure) : les 2 plus récents restent en tête, le reste est tiré
+     par hachage (identifiant, heure) — le même rang que le serveur, jamais Math.random : stable pendant l'heure. */
+  function brasserReels(items) {
+    var h = Math.floor(Date.now() / 3600000);
+    function rang(id) { var x = (Math.imul(Number(id) | 0, 374761393) + Math.imul(h | 0, 668265263)) | 0; x = Math.imul(x ^ (x >>> 13), 1274126177); x ^= x >>> 16; return x >>> 0; }
+    return items.slice(0, 2).concat(items.slice(2).sort(function (a, b) { return rang(a.post_id) - rang(b.post_id); }));
+  }
   function monterReels(el, o) {
     if (!el) return Promise.resolve(false);
     o = o || {}; css();
@@ -189,7 +196,7 @@
       var bt = sec.querySelector('[data-pa="tout"]'); if (bt) bt.onclick = function () { ouvrirReels(); };
     }
     function rafraichir() {
-      return getJSON('/api/fil/medias?type=video&limit=14').catch(function () { return { items: [] }; }).then(function (r) { peindre((r && r.items) || []); return true; });
+      return getJSON('/api/fil/medias?type=video&reels=1&limit=30').catch(function () { return { items: [] }; }).then(function (r) { peindre(brasserReels((r && r.items) || []).slice(0, 14)); return true; });
     }
     rafraichirBande = rafraichir;
     return rafraichir();
@@ -331,7 +338,7 @@
       io.observe(sentinelle);
     }
     function url(avant) {
-      var q = 'filtre=' + encodeURIComponent(etat.filtre) + '&limit=10' + (etat.categorie ? '&categorie=' + encodeURIComponent(etat.categorie) : '') + (avant ? '&avant=' + avant : '');
+      var q = 'filtre=' + encodeURIComponent(etat.filtre) + '&limit=10' + (etat.categorie ? '&categorie=' + encodeURIComponent(etat.categorie) : '') + (avant ? '&avant=' + encodeURIComponent(avant) : '');
       return '/api/fil/accueil?' + q;
     }
     function libelleEtat() {

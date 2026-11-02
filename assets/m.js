@@ -264,10 +264,12 @@
     const u = attrUrl(url); if (!u) return '';
     return `<div class="media"><img class="bg" src="${u}" alt="" aria-hidden="true"><img class="fg" loading="lazy" src="${u}" alt="${esc((extra && extra.alt) || '')}" data-zoom="${u}">${extra && extra.more ? `<span class="more">+${extra.more}</span>` : ''}</div>`;
   }
-  function videoBlock(url, poster) {
+  /* fin : seconde où un Reel plus long à l'origine s'arrête (33 s) ; l'arrêt est géré par cet écouteur « timeupdate ». */
+  document.addEventListener('timeupdate', e => { const v = e.target; if (v && v.tagName === 'VIDEO' && v.dataset && v.dataset.fin && v.currentTime >= Number(v.dataset.fin)) { v.pause(); v.currentTime = 0; } }, true);
+  function videoBlock(url, poster, fin) {
     const u = attrUrl(url); if (!u) return '';
     const p = poster ? attrUrl(poster) : '';
-    return `<div class="media"><video controls playsinline preload="metadata" ${p ? `poster="${p}"` : ''} src="${u}"></video></div>`;
+    return `<div class="media"><video controls playsinline preload="metadata" ${p ? `poster="${p}"` : ''} ${Number(fin) > 0 ? `data-fin="${Number(fin)}"` : ''} src="${u}"></video></div>`;
   }
   const MV_OPTS = { onOpenPost: id => { location.hash = '#/post/' + id; }, onOpenProfile: id => { location.hash = '#/profil/' + id; } };
   function zoom(src) {
@@ -550,13 +552,19 @@
      ============================================================ */
   /* 2026-11-02 (demande explicite, même règle que le site) : toute la plateforme, filtrable ; « Mes actualités » = ce que j'ai publié ou republié.
      Données : GET /api/fil/accueil?filtre=… (curseur « avant »). Les Reels sont en bande au-dessus (GET /api/fil/medias). */
-  const FIL_MODES = [['tous', 'Tout'], ['mes', 'Mes actualités'], ['textes', 'Textes'], ['photos', 'Photos'], ['articles', 'Articles'], ['evenements', 'Événements'], ['suivis', 'Abonnements']];
+  const FIL_MODES = [['tous', 'Tout'], ['mes', 'Mes actualités'], ['textes', 'Textes'], ['photos', 'Photos'], ['videos', 'Vidéos'], ['articles', 'Articles'], ['evenements', 'Événements'], ['suivis', 'Abonnements']];
   const FIL_FILTRE = { tous: 'tout', suivis: 'abonnements' };
+  /* Brassage horaire de la bande de Reels (2026-11-02) : les 2 plus récents d'abord, le reste tiré par hachage (identifiant, heure) — même rang que le serveur. */
+  function brasserReels(items) {
+    const h = Math.floor(Date.now() / 3600000);
+    const rang = id => { let x = (Math.imul(Number(id) | 0, 374761393) + Math.imul(h | 0, 668265263)) | 0; x = Math.imul(x ^ (x >>> 13), 1274126177); x ^= x >>> 16; return x >>> 0; };
+    return items.slice(0, 2).concat(items.slice(2).sort((a, b) => rang(a.post_id) - rang(b.post_id)));
+  }
   async function filReels(idEl) {
     idEl = idEl || 'fil-reels';
     const el = $('#' + idEl); if (!el) return;
     let items = [];
-    try { items = (await api('/api/fil/medias?type=video&limit=12')).items || []; } catch (e) { }
+    try { items = brasserReels((await api('/api/fil/medias?type=video&reels=1&limit=30')).items || []).slice(0, 12); } catch (e) { }
     if (!$('#' + idEl)) return;
     const carte = it => {
       const m = (it.medias && it.medias[0]) || {};
@@ -633,7 +641,7 @@
     const imgs = items.filter(m => m.type === 'image' || (!m.type && /\.(jpe?g|png|gif|webp)/i.test(m.url || '')));
     const vid = items.find(m => m.type === 'video' || /\.(mp4|webm)/i.test(m.url || ''));
     let media = '';
-    if (vid) media = '<div class="mv-wrap">' + videoBlock(vid.url) + '<button type="button" class="mv-expand" data-mv-video aria-label="Voir en plein écran et parcourir les vidéos">⤢ Plein écran</button></div>';
+    if (vid) media = '<div class="mv-wrap">' + videoBlock(vid.url, null, vid.fin_lecture) + '<button type="button" class="mv-expand" data-mv-video aria-label="Voir en plein écran et parcourir les vidéos">⤢ Plein écran</button></div>';
     else if (imgs.length) media = mediaBlock(imgs[0].url, { more: imgs.length > 1 ? imgs.length - 1 : 0 });
     const promo = p.evenement_promo || null;
     const cr = src.compte_rendu || p.compte_rendu;
@@ -767,7 +775,7 @@
   function ouvrirCreerReel() {
     const lancer = () => window.ReelsCreer.ouvrir({ onPublie: () => refreshTab('accueil') });
     if (window.ReelsCreer) { lancer(); return; }
-    const sc = document.createElement('script'); sc.src = '/assets/reels-creer.js?v=20261014a'; sc.onload = lancer;
+    const sc = document.createElement('script'); sc.src = '/assets/reels-creer.js?v=20261102i'; sc.onload = lancer;
     sc.onerror = () => toast('Impossible d’ouvrir la création pour le moment.', true);
     document.head.appendChild(sc);
   }

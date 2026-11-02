@@ -15,7 +15,7 @@
 (function () {
   'use strict';
   if (window.ReelsProfil) return;
-  var VERSION = '20261014a';
+  var VERSION = '20261102i';
   var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); };
   var urlOk = function (u) { return typeof u === 'string' && /^(https?:\/\/|\/[^\/])/i.test(u); };
   var CAM = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="6" width="13.5" height="12" rx="3.2" fill="currentColor"/><path d="M17.2 10.4l4.2-2.5a.7.7 0 0 1 1.05.6v7a.7.7 0 0 1-1.05.6l-4.2-2.5z" fill="currentColor"/></svg>';
@@ -77,7 +77,7 @@
         });
       });
     }
-    return fetch('/api/fil/medias?type=video&limit=12&auteur_id=' + id, { credentials: 'same-origin' })
+    return fetch('/api/fil/medias?type=video&reels=1&limit=12&auteur_id=' + id, { credentials: 'same-origin' })
       .then(function (r) { return r.ok ? r.json() : { items: [] }; }).catch(function () { return { items: [] }; })
       .then(function (r) {
         var items = (r && r.items) || [];

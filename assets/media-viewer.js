@@ -79,7 +79,7 @@
     if (V) fermer(true);
     var v = V = { kind: 'video', reels: true, scope: (opts && opts.auteurId) ? 'auteur' : 'plateforme', auteurId: (opts && Number(opts.auteurId)) || null, items: [], idx: 0, mi: 0, opts: opts || {}, cur: { avant: null, apres: null }, fin: { avant: false, apres: true }, charge: { avant: false, apres: false }, histo: false, ver: 0, anim: 0, roue: 0 };
     construire();
-    return getJson('/api/fil/medias?type=video&limit=8' + (opts && opts.auteurId ? '&auteur_id=' + Number(opts.auteurId) : '') + (opts && opts.postId ? '&avant=' + (Number(opts.postId) + 1) : '')).then(function (r) {
+    return getJson('/api/fil/medias?type=video&reels=1&limit=8' + (opts && opts.auteurId ? '&auteur_id=' + Number(opts.auteurId) : '') + (opts && opts.postId ? '&avant=' + (Number(opts.postId) + 1) : '')).then(function (r) {
       if (V !== v) return false;
       var l = (r && r.items) || [];
       if (!l.length) { ecranVide(v); return false; }
@@ -106,7 +106,7 @@
       });
     };
     if (window.ReelsCreer) { lancer(); return; }
-    var sc = document.createElement('script'); sc.src = '/assets/reels-creer.js?v=20261014a'; sc.onload = lancer;
+    var sc = document.createElement('script'); sc.src = '/assets/reels-creer.js?v=20261102i'; sc.onload = lancer;
     sc.onerror = function () { toast('Impossible d’ouvrir la création pour le moment.'); };
     document.head.appendChild(sc);
   }
@@ -198,6 +198,7 @@
     v.charge[sens] = true; var ver = v.ver;
     var q = new URLSearchParams({ type: v.kind, limit: '8' }); q.set(sens, v.cur[sens]);
     if (v.scope === 'auteur' && v.auteurId) q.set('auteur_id', v.auteurId);
+    if (v.reels) q.set('reels', '1');   /* l'univers des Reels : seulement les vrais Reels */
     return getJson('/api/fil/medias?' + q.toString()).then(function (r) {
       if (V !== v || v.ver !== ver) return;
       var connus = {}; v.items.forEach(function (i) { connus[i.post_id] = 1; });
@@ -269,7 +270,9 @@
       st.innerHTML = '<video class="mv-media ' + anim + '" playsinline loop preload="auto"' + (m.poster ? ' poster="' + esc(m.poster) + '"' : '') + ' src="' + esc(m.url) + '"></video>'
         + '<div class="mv-play" aria-hidden="true">▶</div><button type="button" class="mv-mute" aria-label="Couper le son">🔊</button><div class="mv-prog"><i></i></div>';
       var vid = st.querySelector('video'), prog = st.querySelector('.mv-prog i'), play = st.querySelector('.mv-play');
-      vid.addEventListener('timeupdate', function () { if (vid.duration) prog.style.width = (vid.currentTime / vid.duration * 100) + '%'; });
+      /* Reel plus long que 33 s à l'origine : la lecture repart du début à la durée d'un Reel (fin_lecture). */
+      var finLecture = Number(m.fin_lecture) > 0 ? Number(m.fin_lecture) : 0;
+      vid.addEventListener('timeupdate', function () { if (finLecture && vid.currentTime >= finLecture) { vid.currentTime = 0; if (vid.paused) { var rp = vid.play(); if (rp && rp.catch) rp.catch(function () {}); } } var tot = finLecture || vid.duration; if (tot) prog.style.width = Math.min(100, vid.currentTime / tot * 100) + '%'; });
       vid.addEventListener('pause', function () { play.classList.add('on'); }); vid.addEventListener('play', function () { play.classList.remove('on'); });
       st.querySelector('.mv-mute').onclick = function (e) { e.stopPropagation(); vid.muted = !vid.muted; majMute(); };
       vid.muted = false; var p = vid.play();

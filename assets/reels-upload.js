@@ -54,11 +54,14 @@
     const m = await lireMetadonnees(file), avert = [];
     if (!m) return { ok: true, avertissements: ['Aperçu impossible sur cet appareil : la durée sera contrôlée après l’envoi.'], duree: null };
     const d = Math.round(m.duree * 10) / 10, cadre = cadreDe(m.largeur, m.hauteur);
-    if (d > spec.duree_max + 0.5) return { ok: false, erreur: `Vidéo trop longue : ${Math.round(d)} s (maximum ${spec.duree_max} s).`, duree: d };
+    if (d > spec.duree_max + 0.5) return { ok: false, erreur: spec.duree_reel ? `Vidéo trop longue pour un Reel (${Math.round(d)} s). Un Reel dure ${spec.duree_reel} secondes ; pour une vidéo plus longue, publiez-la comme une publication (bouton « Vidéo » de la fenêtre de publication).` : `Vidéo trop longue : ${Math.round(d)} s (maximum ${spec.duree_max} s).`, duree: d };
     if (d && d < spec.duree_min) return { ok: false, erreur: `Vidéo trop courte : ${d} s (minimum ${spec.duree_min} s).`, duree: d };
     if (Math.min(m.largeur, m.hauteur) < spec.cote_min_px) return { ok: false, erreur: `Définition trop faible (${m.largeur}×${m.hauteur}). Minimum ${spec.cote_min_px} px sur le plus petit côté.` };
     if (usage !== 'evenement' && cadre && cadre !== 'vertical') avert.push('Cadre ' + (cadre === 'horizontal' ? 'horizontal' : cadre === 'carre' ? 'carré' : '4:5') + ' : un cadre vertical 9:16 (1080×1920) remplit tout l’écran du téléphone.');
-    return { ok: true, avertissements: avert, duree: d, largeur: m.largeur, hauteur: m.hauteur, cadre };
+    /* Reel : 33 s au plus (2026-11-02). Au-delà, on prévient — la vidéo est coupée automatiquement, seul le début est gardé. */
+    const coupe = !!(spec.duree_reel && d > spec.duree_reel + 0.5);
+    if (coupe) avert.unshift(`Votre vidéo dure ${Math.round(d)} s : un Reel dure ${spec.duree_reel} secondes au maximum. Seules les ${spec.duree_reel} premières secondes seront gardées (coupe automatique). Pour la publier en entier, utilisez une publication vidéo.`);
+    return { ok: true, avertissements: avert, duree: d, largeur: m.largeur, hauteur: m.hauteur, cadre, coupe, duree_reel: spec.duree_reel || null };
   }
 
   const b64 = s => btoa(unescape(encodeURIComponent(String(s))));

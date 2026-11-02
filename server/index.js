@@ -14775,8 +14775,8 @@ route("POST", "/api/fil", async (req, res, params, body) => {
     catch (e) { return sendJSON(res, 502, SEC.safeError(e, "reels publier")); }
     if (!etatReel || etatReel.etat !== "pret") return sendJSON(res, 409, { error: etatReel && etatReel.erreur ? etatReel.erreur : "Votre vidéo n’est pas encore prête. Patientez quelques instants puis réessayez.", etat: etatReel && etatReel.etat });
     body.pub_type = "video"; body.visibilite = "public"; body.statut = "publie";
-    body.medias = [{ type: "video", url: etatReel.urls.mp4, poster: etatReel.urls.miniature, hls: etatReel.urls.hls, apercu: etatReel.urls.apercu, reel: true, guid: etatReel.guid, duree: etatReel.duree, largeur: etatReel.largeur, hauteur: etatReel.hauteur }];
-    body.media_url = null; body.video_duree = Math.round(etatReel.duree) || null;
+    body.medias = [{ type: "video", url: etatReel.urls.mp4, poster: etatReel.urls.miniature, hls: etatReel.urls.hls, apercu: etatReel.urls.apercu, reel: true, guid: etatReel.guid, duree: Math.min(etatReel.duree, R.SPEC.duree_reel), duree_source: etatReel.duree, fin_lecture: etatReel.duree > R.SPEC.duree_reel + 0.5 ? R.SPEC.duree_reel : null, largeur: etatReel.largeur, hauteur: etatReel.hauteur }];
+    body.media_url = null; body.video_duree = Math.round(Math.min(etatReel.duree, R.SPEC.duree_reel)) || null; /* 2026-11-02 : un Reel dure 33 s au plus ; une vidéo plus longue est coupée à la lecture (fin_lecture), le fichier d'origine reste chez Bunny */
     body.categorie = body.categorie || "Reels";
     body.contenu = String(body.contenu || "").trim().slice(0, 600) || "Nouveau Reel";
     reelVerifie = true;
@@ -15087,12 +15087,14 @@ function filMediasDuPost(p) {
   return l.map(m => (typeof m === 'string' ? { url: m } : m)).filter(m => m && typeof m.url === 'string' && /^(https?:\/\/|\/[^\/])/i.test(m.url))
     .map(m => {
       const kind = (m.type === 'video' || FIL_MEDIA_VIDEO_RE.test(m.url)) ? 'video' : ((m.type === 'image' || m.type === 'photo' || FIL_MEDIA_IMAGE_RE.test(m.url)) ? 'photo' : null);
-      return kind ? { kind, url: m.url, poster: (typeof m.poster === 'string' && /^(https?:\/\/|\/[^\/])/i.test(m.poster)) ? m.poster : (typeof m.thumbnail === 'string' && /^(https?:\/\/|\/[^\/])/i.test(m.thumbnail) ? m.thumbnail : null) } : null;
+      return kind ? { kind, url: m.url, poster: (typeof m.poster === 'string' && /^(https?:\/\/|\/[^\/])/i.test(m.poster)) ? m.poster : (typeof m.thumbnail === 'string' && /^(https?:\/\/|\/[^\/])/i.test(m.thumbnail) ? m.thumbnail : null), reel: m.reel === true, fin_lecture: (m.reel === true && Number(m.fin_lecture) > 0) ? Number(m.fin_lecture) : null } : null;
     }).filter(Boolean);
 }
 route("GET", "/api/fil/medias", async (req, res, params, body, query) => {
   const cu = await getCurrentUser(req);
   const kind = query.type === 'video' ? 'video' : 'photo';
+  /* reels=1 (2026-11-02) : seulement les vrais Reels (vidéo marquée « reel », 33 s maximum) ; sans ce paramètre, toutes les vidéos (balayage depuis une publication). */
+  const reelsSeul = query.reels === '1';
   const auteurId = Number(query.auteur_id) || null;
   const limite = Math.min(Math.max(Number(query.limit) || 10, 1), 30);
   const plusRecents = !!query.apres;
@@ -15111,7 +15113,7 @@ route("GET", "/api/fil/medias", async (req, res, params, body, query) => {
     if (!rows.length) { epuise = true; break; }
     for (const p of rows) {
       curseur = Number(p.id);
-      const medias = filMediasDuPost(p).filter(m => m.kind === kind);
+      const medias = filMediasDuPost(p).filter(m => m.kind === kind && (!reelsSeul || m.reel));
       if (!medias.length) continue;
       const likes = await db.prepare("SELECT COUNT(*) AS n FROM fil_reactions WHERE post_id=? AND type='like'").get(p.id);
       const comm = await db.prepare("SELECT COUNT(*) AS n FROM fil_commentaires WHERE post_id=?").get(p.id);
@@ -15134,7 +15136,7 @@ route("GET", "/api/fil/medias", async (req, res, params, body, query) => {
       const titre = plain(p.titre), corps = plain(p.corps != null ? p.corps : p.contenu);
       items.push({
         post_id: Number(p.id), auteur_id: Number(p.auteur_id), auteur_nom: await nomCompteAffichage(p.auteur_id), auteur_photo: photo,
-        kind, medias: medias.slice(0, 10).map(m => ({ kind: m.kind, url: m.url, poster: m.poster })),
+        kind, medias: medias.slice(0, 10).map(m => ({ kind: m.kind, url: m.url, poster: m.poster, reel: m.reel, fin_lecture: m.fin_lecture })),
         titre: titre.slice(0, 120), extrait: (titre && corps.startsWith(titre) ? corps.slice(titre.length).trim() : corps).slice(0, 180),
         nb_likes: likes ? Number(likes.n) : 0, nb_commentaires: comm ? Number(comm.n) : 0, a_aime: aime, created_at: p.created_at,
         reactions: reactionsParType, nb_reactions: nbReactions, mes_reactions: mesReactions,
