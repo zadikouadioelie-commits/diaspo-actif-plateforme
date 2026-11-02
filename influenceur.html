@@ -11,6 +11,7 @@
 <meta property="og:description" content="Podcasts vidéo, débats, interviews et récits inspirants pour la diaspora.">
 <meta property="og:image" content="https://diaspoactif.com/assets/og-image.png">
 <meta property="og:url" content="https://diaspoactif.com/influenceur.html">
+<meta name="robots" content="noindex">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="stylesheet" href="assets/styles.v2.css">
 <link rel="stylesheet" href="/assets/responsive.v2.css?v=2">
@@ -206,7 +207,6 @@ html body.nd .ida .ida-champ input[type="search"]::-webkit-search-cancel-button 
         <a href="annuaire.html">Annuaire</a>
         <a href="vitrines.html">Boutiques</a>
         <a href="fil-actualite.html">Fil d'actualité</a>
-        <a href="influenceur.html" class="active" title="Influenceur Diaspo'Actif">Influenceur IDA</a>
         <a href="formations.html">Formations</a>
         <a href="evenements.html">Autres événements</a>
       </nav>
@@ -217,7 +217,7 @@ html body.nd .ida .ida-champ input[type="search"]::-webkit-search-cancel-button 
     </div>
   </header>
 
-  <main class="ida" id="ida">
+  <main class="ida" id="ida" hidden>
     <section class="ida-banner" aria-labelledby="ida-titre">
       <img src="assets/influenceur-hero.jpg" width="2172" height="216" alt="Influenceur Diaspo'Actif : podcasts vidéo, débats, interviews, récits inspirants, idées et solutions pour la diaspora" fetchpriority="high">
       <div class="ida-banner-txt">
@@ -286,6 +286,16 @@ html body.nd .ida .ida-champ input[type="search"]::-webkit-search-cancel-button 
         </ul>
       </div>
       <a class="ida-btn principal" href="inscription.html" id="ida-cta-btn">Commencer maintenant →</a>
+    </section>
+  </main>
+
+  <!-- Phase de test (2026-11-02) : la rubrique n'est ouverte qu'au compte Diaspo'Actif officiel (drapeau influenceur_disponible de /api/auth/me). -->
+  <main class="ida" id="ida-ferme" hidden>
+    <section class="ida-card ida-vide" style="margin-top:40px">
+      <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="22" y="6" width="20" height="34" rx="10"/><path d="M12 30a20 20 0 0 0 40 0M32 50v8M22 58h20"/></svg>
+      <h2>Rubrique en préparation</h2>
+      <p>Influenceur Diaspo'Actif n'est pas encore ouverte. Elle arrivera bientôt.</p>
+      <a class="ida-btn principal" href="index.html">Retour à l'accueil</a>
     </section>
   </main>
 
@@ -458,7 +468,11 @@ html body.nd .ida .ida-champ input[type="search"]::-webkit-search-cancel-button 
 
   dessinerThemes(); dessiner();
   fetch('/api/auth/me', { credentials: 'same-origin' }).then(function (r) { return r.json(); })
-    .then(function (d) { connecte = d && d.user ? d.user : null; if (MENU.some(function (x) { return x.k === etat.vue && x.connexion; })) dessiner(); }).catch(function () {});
+    .then(function (d) {
+      connecte = d && d.user ? d.user : null;
+      var ok = !!(connecte && connecte.influenceur_disponible);
+      $('ida').hidden = !ok; $('ida-ferme').hidden = ok;
+      if (MENU.some(function (x) { return x.k === etat.vue && x.connexion; })) dessiner(); }).catch(function () { $('ida').hidden = true; $('ida-ferme').hidden = false; });
 })();
 </script>
 <script src="assets/chatbot.js"></script>

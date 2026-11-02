@@ -7774,9 +7774,6 @@ document.addEventListener('load', function (e) {
     { href: 'annuaire.html', label: 'Annuaire' },
     { href: 'vitrines.html', label: 'Boutiques' },
     { href: 'fil-actualite.html', label: "Fil d'actualité" },
-    /* Rubrique vidéo « Influenceur Diaspo'Actif » (IDA, 2026-11-02, demande explicite) : entre le Fil d'actualité et les
-       Formations. `apres` = se glisse juste derrière ce lien quand la page l'a, au lieu de finir en bout de barre. */
-    { href: 'influenceur.html', label: 'Influenceur IDA', titre: "Influenceur Diaspo'Actif", apres: 'fil-actualite.html', fixe: true },
     { href: 'formations.html', label: 'Formations' },
     { href: 'evenements.html', label: 'Autres événements' }
   ];
@@ -7826,4 +7823,28 @@ document.addEventListener('load', function (e) {
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', completer);
   else completer();
+
+  /* Rubrique vidéo « Influenceur Diaspo'Actif » (IDA, 2026-11-02, demande explicite) : entre le Fil d'actualité et les Formations.
+     Phase de test : le lien n'apparaît que pour le compte Diaspo'Actif officiel (drapeau `influenceur_disponible` de /api/auth/me,
+     voir server/acces-reserve.js). Pour tous les autres comptes et les visiteurs, rien n'est ajouté à la barre. */
+  function ajouterInfluenceur() {
+    if (typeof fetchCurrentUser !== 'function') return;
+    fetchCurrentUser().then(function (u) {
+      if (!u || !u.influenceur_disponible) return;
+      var nav = document.querySelector('.topbar .nav, header .nav');
+      if (!nav || nav.hasAttribute('data-nav-fixe')) return;
+      var liens = nav.querySelectorAll('a');
+      if (liens.length < 2) return;
+      var deja = false, pivot = null;
+      liens.forEach(function (l) { var p = nomPage(l.getAttribute('href')); if (p === 'influenceur.html') deja = true; if (p === 'fil-actualite.html') pivot = l; });
+      if (deja) return;
+      var a = document.createElement('a');
+      a.href = 'influenceur.html'; a.textContent = 'Influenceur IDA'; a.title = "Influenceur Diaspo'Actif";
+      a.setAttribute('data-nav-ajout', '1');
+      if (nomPage(location.pathname.split('/').pop()) === 'influenceur.html') a.className = 'active';
+      if (pivot && pivot.parentNode === nav) nav.insertBefore(a, pivot.nextSibling); else nav.appendChild(a);
+    }).catch(function () { /* sans compte connu : aucun lien */ });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ajouterInfluenceur);
+  else ajouterInfluenceur();
 })();

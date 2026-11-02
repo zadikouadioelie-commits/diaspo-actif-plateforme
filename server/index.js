@@ -2909,6 +2909,8 @@ route("GET", "/api/auth/me", async (req, res) => {
     try { pub.legal_a_accepter = await legal.aAccepter(user.id); } catch (e) { pub.legal_a_accepter = []; logError(e, "documents légaux à accepter", req); }
     /* Maracana Tracker en phase de test (2026-10-30) : le menu ne le propose qu'au compte officiel Diaspo'Actif. */
     pub.tracker_disponible = _trackerModule ? await _trackerModule.disponible(user) : false;
+    /* Rubrique « Influenceur Diaspo'Actif » en phase de test (2026-11-02) : visible du seul compte diaspo.actif@gmail.com (server/acces-reserve.js). */
+    pub.influenceur_disponible = AccesReserve.ouvert(user);
     /* Ouverture de la page Premium après le profil rempli (voir ProfilObligatoire.abonnementDu) : jamais pour un compte déjà abonné en payant. */
     pub.ouverture_abonnement = false;
     try {
@@ -3357,6 +3359,7 @@ FormationRelances.register({ route, db, sendJSON, getCurrentUser, SEC, exigerPre
 const MultiConnexion = require("./multi-connexion");
 MultiConnexion.register({ route, db, sendJSON, getCurrentUser, creerNotif, SEC });
 /* Message sécurisé : lisible 2 minutes après saisie du DS-ID du destinataire, puis détruit (server/message-securise.js). */
+const AccesReserve = require("./acces-reserve");
 const MessageSecurise = require("./message-securise");
 MessageSecurise.register({ route, db, sendJSON, getCurrentUser, creerNotif, SEC, contactBloque, peutEcrireDirectement, nomCompteAffichage });
 /* Fil de l'accueil du profil public (2026-11-02) : toutes les actualités de la plateforme, filtrables, + « Mes actualités » — server/fil-accueil.js. Enregistré ici, avant GET /api/fil/:id qui l'aurait pris pour un identifiant. */
