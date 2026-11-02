@@ -1571,7 +1571,7 @@ db.exec(`
     image_b64 TEXT,
     categorie TEXT DEFAULT 'Général',
     statut TEXT DEFAULT 'brouillon',        -- brouillon|publie|archive|ferme
-    commission_pct REAL DEFAULT 4.0,        -- % plateforme (2026-08-26 : 5% -> 3% ; 2026-11-01 : 3% -> 4% ; le DEFAULT ne
+    commission_pct REAL DEFAULT 2.0,        -- % plateforme (2026-08-26 : 5% -> 3% ; 2026-11-01 : 3% -> 4% ; 2026-11-02 : 4% -> 2% ; le DEFAULT ne
                                              -- sert que pour une base neuve, jamais rejoue sur une
                                              -- table existante -- voir la constante explicite
                                              -- PLATFORM_COMMISSION_PCT dans POST /api/events)
@@ -1748,7 +1748,7 @@ db.exec(`
     type TEXT NOT NULL,                       -- 'platform_fee' | 'organizer_credit'
     beneficiaire_id INTEGER,                  -- NULL = plateforme, sinon user.id initiative
     montant REAL NOT NULL,                    -- toujours positif
-    commission_rate REAL DEFAULT 0.04,
+    commission_rate REAL DEFAULT 0.02,
     prix_billet REAL NOT NULL,
     platform_fee REAL NOT NULL,               -- 5% du prix billet
     organizer_amount REAL NOT NULL,           -- 95% du prix billet
@@ -2173,8 +2173,10 @@ const MIGRATIONS = [
   ["evenement_comptes_rendus", "profils_json TEXT DEFAULT '[]'"],
   // Masquer le nombre d'inscrits sur la fiche publique (2026-09-08, demande explicite) —
   // les deux tables, comme prix_min/whatsapp_lien/origine plus haut.
-  ["events", "masquer_inscrits INTEGER DEFAULT 0"],
-  ["evenements", "masquer_inscrits INTEGER DEFAULT 0"],
+  // Masqué au public PAR DÉFAUT (2026-11-02, demande explicite) : plus aucun « N inscrits »
+  // public tant que l'organisateur ne l'a pas explicitement rendu visible.
+  ["events", "masquer_inscrits INTEGER DEFAULT 1"],
+  ["evenements", "masquer_inscrits INTEGER DEFAULT 1"],
   // Exclure un événement public de la page boutique de son organisateur, sans le rendre privé
   // (2026-10-01, demande explicite, voir POST /api/evenements et GET /api/evenements
   // &boutique=1 côté serveur) — déjà auto-réparé au runtime par ce dernier, ajouté ici aussi
@@ -6468,6 +6470,16 @@ db.exec(`
      la lisent — en local (SQLite) ces routes (annuaire, compteurs, audience publicitaire…) plantaient « no such column ». */
   if (!userCols3.includes('is_demo')) {
     db.exec('ALTER TABLE users ADD COLUMN is_demo INTEGER DEFAULT 0');
+  }
+  /* email_visible_annuaire (2026-11-01, demande explicite : "tous les adresses mail doivent être
+     masquées... avec un bouton qui permet de les démasquer selon les souhaits du propriétaire") —
+     0 = masqué par défaut pour tout compte existant ou nouveau (aucun rattrapage à faire, DEFAULT 0
+     couvre les deux cas). 1 = le titulaire a choisi de rendre son e-mail trouvable par recherche
+     exacte (voir /api/annuaire/recherche) et affiché. Ne concerne QUE l'e-mail privé du compte —
+     distinct du champ contact_email de certaines fiches (ex. campagnes Collectivité), qui est une
+     adresse publique saisie volontairement pour cette fiche-là et n'a jamais été masquée. */
+  if (!userCols3.includes('email_visible_annuaire')) {
+    db.exec('ALTER TABLE users ADD COLUMN email_visible_annuaire INTEGER DEFAULT 0');
   }
 }
 

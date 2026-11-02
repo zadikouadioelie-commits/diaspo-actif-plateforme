@@ -228,7 +228,7 @@ async function evaluerNouvelAppareil(req, user, ip, { viaDsId = false } = {}) {
       return { reponse: (res) => sendJSON(res, 429, { error: `Trop de tentatives de confirmation depuis cet appareil. Réessayez dans ${Math.ceil(v.reessayerDans / 60)} min.` }) };
     }
     if (v.requis) {
-      return { reponse: (res) => sendJSON(res, 403, { error: "Ce compte est déjà ouvert sur un autre appareil. Pour autoriser celui-ci, connectez-vous d'abord depuis la page de connexion (mot de passe puis Code de Sécurité), puis revenez ici." }) };
+      return { reponse: (res) => sendJSON(res, 403, { error: "Ce compte est déjà ouvert sur un autre appareil. Pour autoriser celui-ci, connectez-vous d'abord depuis la page de connexion (mot de passe puis Code ultra secret), puis revenez ici." }) };
     }
     if (v.defi) {
       SEC.logSecurity("login_appareil_a_confirmer", { ip, uid: Number(user.id) });
@@ -293,7 +293,7 @@ async function getCurrentUser(req) {
        sur le cookie sid — sinon la session SQL (30 jours) la ferait renaître. */
     if (payload?.uid && payload.jti && !connexionOk) return null;
     if (payload?.uid && connexionOk) {
-      const user = await db.prepare("SELECT id, nom, prenom, email, role, ville, pays, profil_json, photo_url, email_verifie, nb_connexions, pwa_prompt_dismiss, temoignage_statut, temoignage_derniere_demande, demo_vue, da_id, identite_verifiee, credential_version, premiere_publication_le, est_relais_diaspora, relais_invite_fiche_id, relais_invite_axe, relais_invite_expire_le, relais_invite_permissions_json FROM users WHERE id = ?").get(payload.uid);
+      const user = await db.prepare("SELECT id, nom, prenom, email, role, ville, pays, profil_json, photo_url, email_verifie, nb_connexions, pwa_prompt_dismiss, temoignage_statut, temoignage_derniere_demande, demo_vue, da_id, identite_verifiee, credential_version, premiere_publication_le, est_relais_diaspora, relais_invite_fiche_id, relais_invite_axe, relais_invite_expire_le, relais_invite_permissions_json, email_visible_annuaire FROM users WHERE id = ?").get(payload.uid);
       /* credential_version (2026-08-08, transfert de gestionnaire) : le token 'auth' est
          stateless (aucun état serveur, survit à un DELETE FROM sessions) — c'est le SEUL
          moyen de forcer son invalidation avant expiration naturelle. Un ancien gestionnaire
@@ -326,7 +326,7 @@ async function getCurrentUser(req) {
       Connexions.toucher(db, okReg);
     }
   } catch (e) { console.error('[connexions.verifier-sid]', e.message); }
-  const user = await db.prepare("SELECT id, nom, prenom, email, role, ville, pays, profil_json, photo_url, email_verifie, nb_connexions, pwa_prompt_dismiss, temoignage_statut, temoignage_derniere_demande, demo_vue, da_id, identite_verifiee, premiere_publication_le, est_relais_diaspora, relais_invite_fiche_id, relais_invite_axe, relais_invite_expire_le, relais_invite_permissions_json FROM users WHERE id = ?").get(session.userId);
+  const user = await db.prepare("SELECT id, nom, prenom, email, role, ville, pays, profil_json, photo_url, email_verifie, nb_connexions, pwa_prompt_dismiss, temoignage_statut, temoignage_derniere_demande, demo_vue, da_id, identite_verifiee, premiere_publication_le, est_relais_diaspora, relais_invite_fiche_id, relais_invite_axe, relais_invite_expire_le, relais_invite_permissions_json, email_visible_annuaire FROM users WHERE id = ?").get(session.userId);
   if (user && user.relais_invite_expire_le && new Date(user.relais_invite_expire_le) <= new Date()) {
     await purgerCompteRelaisInviteExpire(user.id);
     return null;
@@ -496,7 +496,8 @@ function publicUser(u) {
     nb_connexions: u.nb_connexions || 0, pwa_prompt_dismiss: !!u.pwa_prompt_dismiss, temoignage_statut: u.temoignage_statut || 'non_demande', temoignage_derniere_demande: u.temoignage_derniere_demande || null,
     demo_vue: u.demo_vue || 0, da_id: u.da_id || null, email_verifie: !!u.email_verifie, identite_verifiee: !!u.identite_verifiee,
     a_publie: !!u.premiere_publication_le,
-    est_relais_diaspora: !!u.est_relais_diaspora, relais_invite_fiche_id: u.relais_invite_fiche_id ? Number(u.relais_invite_fiche_id) : null };
+    est_relais_diaspora: !!u.est_relais_diaspora, relais_invite_fiche_id: u.relais_invite_fiche_id ? Number(u.relais_invite_fiche_id) : null,
+    email_visible_annuaire: !!u.email_visible_annuaire };
   // NOTE: ds_id est intentionnellement exclu — jamais exposé via cette fonction
 }
 
@@ -2137,6 +2138,20 @@ route("PATCH", "/api/auth/pwa-prompt-preference", async (req, res, params, body)
   sendJSON(res, 200, { ok: true, pwa_prompt_dismiss: dismiss });
 });
 
+/* PATCH /api/auth/email-visibilite — (2026-11-01, demande explicite) : l'adresse e-mail privée
+   du compte est masquée PAR DÉFAUT (email_visible_annuaire=0, voir server/db.js) et n'est donc
+   trouvable par personne via la recherche par e-mail de l'Annuaire (GET /api/annuaire/recherche).
+   Le titulaire seul décide de la rendre visible/trouvable, et peut revenir en arrière à tout
+   moment. Ne touche jamais au fonctionnement interne (connexion, réinitialisation de mot de
+   passe, e-mails automatiques) qui continue d'utiliser la vraie adresse quel que soit ce réglage. */
+route("PATCH", "/api/auth/email-visibilite", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const visible = !!(body && body.visible);
+  await db.prepare("UPDATE users SET email_visible_annuaire=? WHERE id=?").run(visible ? 1 : 0, user.id);
+  sendJSON(res, 200, { ok: true, email_visible_annuaire: visible });
+});
+
 /* ═══════════ Demandes de suppression définitive de compte (RGPD, workflow admin) ═══════════ */
 
 async function executerSuppressionCompte(userId, drId) {
@@ -2615,7 +2630,7 @@ route("POST", "/api/auth/confirmer-appareil", async (req, res, params, body) => 
   if (c.erreur) return sendJSON(res, c.code, { error: c.erreur });
   const d = c.defi;
   const dsId = body && body.ds_id, code = body && body.code, codeNotif = body && body.code_notif;
-  if (!dsId && !code && !codeNotif) return sendJSON(res, 400, { error: "Saisissez le code affiché sur votre appareil connecté, votre Code de Sécurité (DS-ID) ou le code reçu par e-mail." });
+  if (!dsId && !code && !codeNotif) return sendJSON(res, 400, { error: "Saisissez le code affiché sur votre appareil connecté, votre Code ultra secret ou le code reçu par e-mail." });
   const via = codeNotif ? "notification" : dsId ? "ds_id" : "email";
   const ok = codeNotif ? ConfirmationAppareil.codeNotifValide(d, codeNotif) : dsId ? await ConfirmationAppareil.dsIdValide(db, d.user_id, dsId) : ConfirmationAppareil.codeEmailValide(d, code);
   if (!ok) {
@@ -2625,7 +2640,7 @@ route("POST", "/api/auth/confirmer-appareil", async (req, res, params, body) => 
       try { await creerNotif(d.user_id, "connexion_suspecte", "Tentatives de connexion bloquées", `Plusieurs codes incorrects ont été saisis pour ouvrir votre compte depuis ${Connexions.etiquette(d)}${d.ville ? " (" + d.ville + ")" : ""}. La connexion a été bloquée.`, { lien: "parametres-compte.html" }); } catch (_) {}
       return sendJSON(res, 429, { error: "Trop d'essais : cette connexion est bloquée pendant 15 minutes.", bloque: true });
     }
-    return sendJSON(res, 401, { error: dsId && !codeNotif ? "Code de Sécurité incorrect." : "Code incorrect ou expiré.", essais_restants: r.restants });
+    return sendJSON(res, 401, { error: dsId && !codeNotif ? "Code ultra secret incorrect." : "Code incorrect ou expiré.", essais_restants: r.restants });
   }
   await ConfirmationAppareil.valider(db, d, via);
   SEC.logSecurity("confirmation_appareil_ok", { ip, uid: Number(d.user_id), via });
@@ -2641,14 +2656,14 @@ route("POST", "/api/auth/confirmer-appareil/envoyer-code", async (req, res, para
   if (c.erreur) return sendJSON(res, c.code, { error: c.erreur });
   const d = c.defi;
   const u = await db.prepare("SELECT email FROM users WHERE id=?").get(d.user_id);
-  if (!u || !u.email) return sendJSON(res, 400, { error: "Aucune adresse e-mail sur ce compte : utilisez votre Code de Sécurité (DS-ID)." });
+  if (!u || !u.email) return sendJSON(res, 400, { error: "Aucune adresse e-mail sur ce compte : utilisez votre Code ultra secret." });
   const prep = await ConfirmationAppareil.preparerCodeEmail(db, d);
   if (prep.erreur) return sendJSON(res, prep.code, { error: prep.erreur });
   const { emailCodeConfirmationAppareil } = require("./mailer");
   const envoi = await emailCodeConfirmationAppareil({ email: u.email, code: prep.code, appareil: Connexions.etiquette(d), lieu: [d.ville, d.pays].filter(Boolean).join(", ") });
   if (!envoi || !envoi.ok) {
     await logError(new Error(`Code de confirmation d'appareil non envoyé : ${JSON.stringify(envoi && (envoi.error || envoi.reason) || "raison inconnue")}`), "confirmation-appareil-email", req);
-    return sendJSON(res, 502, { error: "L'envoi du code par e-mail est momentanément impossible. Utilisez votre Code de Sécurité (DS-ID)." });
+    return sendJSON(res, 502, { error: "L'envoi du code par e-mail est momentanément impossible. Utilisez votre Code ultra secret." });
   }
   sendJSON(res, 200, { ok: true, email_masque: ConfirmationAppareil.masquerEmail(u.email) });
 });
@@ -2670,12 +2685,12 @@ route("POST", "/api/auth/connexions/principal", async (req, res, params, body) =
   let remplacer = false;
   if (etat[cat].occupe && etat[cat].appareil_id !== cx.appareil_id) {
     const dsId = body && body.ds_id;
-    if (!dsId) return sendJSON(res, 409, { error: `Votre ${cat === "mobile" ? "téléphone" : "ordinateur"} principal est déjà défini sur un autre appareil. Saisissez votre Code de Sécurité (DS-ID) pour le remplacer.`, ds_id_requis: true });
+    if (!dsId) return sendJSON(res, 409, { error: `Votre ${cat === "mobile" ? "téléphone" : "ordinateur"} principal est déjà défini sur un autre appareil. Saisissez votre Code ultra secret pour le remplacer.`, ds_id_requis: true });
     const lim = SEC.rateLimit(`principal:${user.id}`, 5, 15 * 60 * 1000);
     if (!lim.allowed) return sendJSON(res, 429, { error: `Trop de tentatives. Réessayez dans ${lim.retryAfter}s.` });
     if (!(await ConfirmationAppareil.dsIdValide(db, user.id, dsId))) {
       SEC.logSecurity("appareil_principal_dsid_incorrect", { uid: Number(user.id) });
-      return sendJSON(res, 401, { error: "Code de Sécurité incorrect." });
+      return sendJSON(res, 401, { error: "Code ultra secret incorrect." });
     }
     remplacer = true;
   }
@@ -4466,6 +4481,81 @@ route("PATCH", "/api/initiatives/:id/activer-module", async (req, res, params, b
   sendJSON(res, 200, { ok: true });
 });
 
+/* Maintenance générale des boutiques (2026-11-02, demande explicite : « à partir de maintenant,
+   mets toutes les boutiques en maintenance »). Un seul interrupteur dans parametres_plateforme
+   bloque toute NOUVELLE mise en visibilité et tout achat, sans jamais empêcher la création/
+   configuration d'une boutique — pattern direct-SQL déjà utilisé partout ailleurs sur cette
+   table (aucune fonction générique existante à réutiliser). */
+const CLE_BOUTIQUES_MAINTENANCE = 'boutiques_en_maintenance';
+/* "true"/"false" en texte, pas "1"/"0" : même convention que le reste de parametres_plateforme
+   (voir dashboard-administrateur.html, section ⚙️ Paramètres, qui lit/écrit cette même ligne de
+   façon générique — un admin peut aussi basculer ce réglage depuis là, mais sans le masquage
+   forcé ni les notifications que fait la route dédiée ci-dessous). */
+async function boutiquesEnMaintenance() {
+  try {
+    const row = await db.prepare("SELECT valeur FROM parametres_plateforme WHERE cle=?").get(CLE_BOUTIQUES_MAINTENANCE);
+    return !!row && row.valeur === 'true';
+  } catch (e) { return false; }
+}
+async function definirBoutiquesMaintenance(actif, adminId) {
+  const valeur = actif ? 'true' : 'false';
+  const existe = await db.prepare("SELECT cle FROM parametres_plateforme WHERE cle=?").get(CLE_BOUTIQUES_MAINTENANCE);
+  if (existe) await db.prepare("UPDATE parametres_plateforme SET valeur=?, updated_at=datetime('now'), updated_by=? WHERE cle=?").run(valeur, adminId || null, CLE_BOUTIQUES_MAINTENANCE);
+  else await db.prepare("INSERT INTO parametres_plateforme (cle, valeur, type, description, updated_by) VALUES (?,?,?,?,?)").run(
+    CLE_BOUTIQUES_MAINTENANCE, valeur, 'booleen', "Bloque la mise en visibilité et l'achat de toutes les boutiques pendant la réorganisation.", adminId || null
+  );
+}
+
+/* GET public — consulté par les pages boutique.html / boutique-video.html avant tout rendu. */
+route("GET", "/api/plateforme/boutiques-maintenance", async (req, res) => {
+  sendJSON(res, 200, {
+    en_maintenance: await boutiquesEnMaintenance(),
+    message: "Nous sommes en réorganisation de l'aspect des boutiques. Vous serez averti rapidement du stade d'avancement.",
+  });
+});
+
+/* GET admin — état courant + nombre de boutiques publiques, pour affichage dans le tableau de bord admin. */
+route("GET", "/api/admin/boutiques-maintenance", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: "Réservé à l'administration." });
+  const nbPubliques = await db.prepare("SELECT COUNT(*) AS n FROM initiatives WHERE vitrine_active=1").get();
+  sendJSON(res, 200, { en_maintenance: await boutiquesEnMaintenance(), boutiques_publiques: Number(nbPubliques && nbPubliques.n) || 0 });
+});
+
+/* POST admin — active la maintenance : bascule le drapeau, force toutes les boutiques publiques
+   en invisible (une seule fois, à l'activation — pas de rappel de qui était public, la réouverture
+   se fait volontairement par chaque propriétaire via le nouveau parcours de contrôle), et prévient
+   chaque propriétaire concerné avec le message exact demandé. */
+route("POST", "/api/admin/boutiques-maintenance/activer", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: "Réservé à l'administration." });
+  await definirBoutiquesMaintenance(true, user.id);
+  const publiques = await db.prepare("SELECT id, owner_user_id FROM initiatives WHERE vitrine_active=1").all();
+  await db.prepare("UPDATE initiatives SET vitrine_active=0 WHERE vitrine_active=1").run();
+  const proprietaires = [...new Set(publiques.map(i => Number(i.owner_user_id)).filter(Boolean))];
+  for (const ownerId of proprietaires) {
+    try {
+      await db.prepare(`INSERT INTO notifications (user_id, type, titre, contenu, data_json) VALUES (?,?,?,?,?)`).run(
+        ownerId, 'boutique_maintenance',
+        "Boutiques en réorganisation",
+        "Nous sommes en réorganisation de l'aspect des boutiques. Vous serez averti rapidement du stade d'avancement.",
+        JSON.stringify({})
+      );
+    } catch (e) { logError(e, "notification boutique maintenance", req); }
+  }
+  sendJSON(res, 200, { ok: true, boutiques_masquees: publiques.length, proprietaires_prevenus: proprietaires.length });
+});
+
+/* POST admin — désactive la maintenance. Ne réactive AUCUNE boutique automatiquement : chaque
+   propriétaire doit repasser par PUT /vitrine, qui applique désormais la règle "moyen
+   d'encaissement obligatoire si le pays est couvert". */
+route("POST", "/api/admin/boutiques-maintenance/desactiver", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: "Réservé à l'administration." });
+  await definirBoutiquesMaintenance(false, user.id);
+  sendJSON(res, 200, { ok: true });
+});
+
 route("PUT", "/api/initiatives/:id/vitrine", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
@@ -4473,11 +4563,34 @@ route("PUT", "/api/initiatives/:id/vitrine", async (req, res, params, body) => {
   if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
   if (Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
 
-  /* Rendre la vitrine visible au public est réservé aux comptes Premium (initiative_abonne).
-     La masquer reste toujours possible, y compris sans Premium. */
+  /* Rendre la vitrine visible au public est réservé aux comptes Premium (initiative_abonne),
+     bloqué pendant la réorganisation générale des boutiques (maintenance), et — pour un pays
+     couvert par un prestataire réel — conditionné au choix effectif d'un moyen d'encaissement
+     (décision explicite du 2026-11-02 : jamais de repli silencieux sur le portefeuille pour un
+     vendeur qui avait une vraie option). La masquer reste toujours possible, sans condition. */
   if (body.vitrine_active === true && init.vitrine_active !== 1) {
+    if (await boutiquesEnMaintenance()) {
+      return sendJSON(res, 423, {
+        error: "Les boutiques sont en cours de réorganisation. Vous pouvez continuer à préparer la vôtre, mais sa mise en ligne est temporairement bloquée — vous serez averti dès que ce sera rouvert.",
+        maintenance: true,
+      });
+    }
     const estPremium = await hasAccreditation(user.id, 'initiative_abonne');
     if (!estPremium) return sendJSON(res, 402, { error: "Rendre votre boutique visible au public est réservé aux comptes Premium.", accred_type: 'initiative_abonne' });
+
+    const PaysCouverture = require("./payments/pays-couverture");
+    const codePaysVendeur = String(init.pays_immatriculation || init.vitrine_pays || init.pays || '').trim().toUpperCase();
+    const providerRecommande = PaysCouverture.prestataireRecommande(codePaysVendeur);
+    if (providerRecommande === 'stripe') {
+      const connect = await db.prepare("SELECT charges_enabled FROM stripe_connect_accounts WHERE initiative_id=?").get(init.id);
+      if (!connect || !connect.charges_enabled) {
+        return sendJSON(res, 409, {
+          error: "Votre pays est couvert par Stripe : vous devez choisir un moyen d'encaissement avant de rendre votre boutique visible, sinon c'est Diaspo'Actif qui recevrait l'argent à votre place.",
+          moyen_encaissement_requis: true,
+          provider_recommande: providerRecommande,
+        });
+      }
+    }
   }
 
   const {
@@ -5616,6 +5729,7 @@ async function finaliserCommandeVitrinePayee(commandeId) {
 route("POST", "/api/produits/:id/commander", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (await boutiquesEnMaintenance()) return sendJSON(res, 423, { error: "Les achats en boutique sont temporairement suspendus pendant une réorganisation. Merci de réessayer un peu plus tard.", maintenance: true });
   const prod = await db.prepare("SELECT * FROM produits_vitrine WHERE id=?").get(params.id);
   if (!prod) return sendJSON(res, 404, { error: "Produit introuvable." });
   const init = await db.prepare("SELECT * FROM initiatives WHERE id=?").get(prod.initiative_id);
@@ -5895,6 +6009,7 @@ route("DELETE", "/api/panier", async (req, res) => {
 route("POST", "/api/panier/commander", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (await boutiquesEnMaintenance()) return sendJSON(res, 423, { error: "Les achats en boutique sont temporairement suspendus pendant une réorganisation. Merci de réessayer un peu plus tard.", maintenance: true });
 
   const items = await db.prepare(`
     SELECT pi.*, p.nom AS produit_nom, p.prix, p.devise, p.initiative_id, p.statut AS produit_statut,
@@ -8751,10 +8866,10 @@ route("GET", "/api/adhesion/verify/:id", async (req, res, params) => {
 async function verifyVoteDsId(userId, submittedCode) {
   const u = await db.prepare("SELECT ds_id FROM users WHERE id=?").get(userId);
   if (!u?.ds_id) {
-    return { ok: false, error: "Vous n'avez pas encore généré votre Code de Sécurité Diaspo'Actif (DS-ID). Rendez-vous dans Confidentialité pour le créer." };
+    return { ok: false, error: "Vous n'avez pas encore généré votre Code ultra secret. Rendez-vous dans Confidentialité pour le créer." };
   }
   if (String(submittedCode || "").trim().toUpperCase() !== u.ds_id.toUpperCase()) {
-    return { ok: false, error: "Code de Sécurité (DS-ID) invalide." };
+    return { ok: false, error: "Code ultra secret invalide." };
   }
   return { ok: true };
 }
@@ -9173,7 +9288,7 @@ route("POST", "/api/vote-scrutins/:id/electeurs/resoudre", async (req, res, para
     ajoutes++;
     const electeurUser = await db.prepare("SELECT email, nom, ds_id FROM users WHERE id=?").get(uid);
     creerNotif(uid, "vote_invitation", `Consultation : ${s.nom}`,
-      `Vous êtes invité à participer au vote « ${s.nom} » (${s.init_nom}). Votez avec votre Code de Sécurité Diaspo'Actif (DS-ID).`,
+      `Vous êtes invité à participer au vote « ${s.nom} » (${s.init_nom}). Votez avec votre Code ultra secret.`,
       { scrutin_id: Number(params.id) });
     await db.prepare("UPDATE vote_electeurs SET notif_envoyee_at=datetime('now') WHERE scrutin_id=? AND user_id=?").run(params.id, uid);
     if (electeurUser?.email) {
@@ -9184,7 +9299,7 @@ route("POST", "/api/vote-scrutins/:id/electeurs/resoudre", async (req, res, para
           subject: `Invitation au vote — ${s.nom}`,
           html: `${s.image_url && /^https:\/\//i.test(s.image_url) ? `<p><img src="${s.image_url}" alt="" style="max-width:100%;border-radius:10px;"></p>` : ''}<p>Bonjour ${electeurUser.nom || ""},</p><p>Vous êtes invité à participer au vote « ${s.nom} » organisé par ${s.init_nom}.</p>
                  <p>Ouverture : ${s.date_ouverture || "à définir"}<br>Clôture : ${s.date_fermeture || "à définir"}</p>
-                 <p>Pour voter, connectez-vous puis signez votre bulletin avec votre <strong>Code de Sécurité Diaspo'Actif (DS-ID)</strong>
+                 <p>Pour voter, connectez-vous puis signez votre bulletin avec votre <strong>Code ultra secret</strong>
                  ${electeurUser.ds_id ? '' : `(à générer dans <a href="${getOrigin(req)}/confidentialite.html">Confidentialité</a> si ce n'est pas déjà fait)`}.</p>`,
         });
       } catch (e) { /* email indisponible en local (RESEND_API_KEY absent) */ }
@@ -9975,6 +10090,15 @@ route("GET", "/api/annuaire/recherche", async (req, res, params, body, query) =>
   const termesOriginaux = qRaw ? ANNUAIRE_NORMALISE(qRaw).split(/\s+/).filter(w => w.length >= 2) : [];
   const termesEtendus = termesOriginaux.length ? annuaireExpandTermes(termesOriginaux) : [];
 
+  /* Recherche par e-mail (2026-11-01, demande explicite) : correspondance EXACTE uniquement,
+     jamais un LIKE/préfixe — un préfixe permettrait de deviner des adresses caractère par
+     caractère. Un compte n'est trouvé que s'il a explicitement choisi d'être visible
+     (email_visible_annuaire=1, voir PATCH /api/auth/email-visibilite) ; sinon il n'apparaît
+     jamais, quel que soit le rôle. Remplace entièrement la recherche par mots-clés quand la
+     saisie ressemble à une adresse e-mail. */
+  const estRechercheEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(qRaw);
+  const emailRecherche = estRechercheEmail ? qRaw.trim().toLowerCase() : null;
+
   const cu = await getCurrentUser(req);
   let meVillePays = { ville: null, pays: null };
   if (cu) { const r = await db.prepare("SELECT ville, pays FROM users WHERE id=?").get(cu.id); meVillePays = { ville: r?.ville || null, pays: r?.pays || null }; }
@@ -9982,8 +10106,10 @@ route("GET", "/api/annuaire/recherche", async (req, res, params, body, query) =>
   let initiatives = await db.prepare(/* L'origine du PROPRIÉTAIRE accompagne chaque initiative : beaucoup de structures n'ont
    pas d'origine propre en base alors que leur responsable a déclaré la sienne. Sans ce
    repli, la cartouche retombait sur la nationalité et affichait « France » pour une
-   initiative d'origine ivoirienne — un pays FAUX, ce qui est pire qu'une absence. */
-"SELECT i.*, u.origine1 AS owner_origine1, u.origine2 AS owner_origine2, u.invisible_annuaire_definitif AS owner_invisible_definitif, u.invisible_annuaire_jusqu_au AS owner_invisible_jusqu_au FROM initiatives i LEFT JOIN users u ON u.id=i.owner_user_id WHERE (u.is_demo IS NULL OR u.is_demo=FALSE) AND (u.email IS NULL OR u.email NOT LIKE '%@diaspoactif.invalid') ORDER BY i.created_at DESC").all();
+   initiative d'origine ivoirienne — un pays FAUX, ce qui est pire qu'une absence.
+   owner_email/owner_email_visible (2026-11-01) : uniquement pour la recherche par e-mail
+   ci-dessous — jamais exposés hors de ce cas précis, voir le filtre juste avant le push. */
+"SELECT i.*, u.origine1 AS owner_origine1, u.origine2 AS owner_origine2, u.invisible_annuaire_definitif AS owner_invisible_definitif, u.invisible_annuaire_jusqu_au AS owner_invisible_jusqu_au, u.email AS owner_email, u.email_visible_annuaire AS owner_email_visible FROM initiatives i LEFT JOIN users u ON u.id=i.owner_user_id WHERE (u.is_demo IS NULL OR u.is_demo=FALSE) AND (u.email IS NULL OR u.email NOT LIKE '%@diaspoactif.invalid') ORDER BY i.created_at DESC").all();
   /* Une Initiative est un profil d'organisation, mais son "compte" au sens administrateur est
      celui de son propriétaire (owner_user_id) — l'invisibilité s'applique donc via celle DU
      PROPRIÉTAIRE, pas d'un champ propre à la table initiatives. */
@@ -9997,7 +10123,7 @@ route("GET", "/api/annuaire/recherche", async (req, res, params, body, query) =>
   if (query.ville) { const v = query.ville.toLowerCase(); initiatives = initiatives.filter(r => (r.ville||'').toLowerCase().includes(v)); }
 
   let utilisateurs = (query.type && query.type !== 'Utilisateurs') ? [] : await db.prepare(
-    "SELECT id, nom, prenom, ville, pays, photo_url, banner_url, titre_pro, bio, competences, experiences, centres_interet, situation_pro, nationalite1, nationalite2, origine1, origine2, domaine_principal, sous_domaine_1, sous_domaine_2, invisible_annuaire_definitif, invisible_annuaire_jusqu_au FROM users WHERE role='utilisateur' AND compte_masque=0 AND nom != 'Compte supprimé' AND (is_demo IS NULL OR is_demo=FALSE) LIMIT 500"
+    "SELECT id, nom, prenom, ville, pays, photo_url, banner_url, titre_pro, bio, competences, experiences, centres_interet, situation_pro, nationalite1, nationalite2, origine1, origine2, domaine_principal, sous_domaine_1, sous_domaine_2, invisible_annuaire_definitif, invisible_annuaire_jusqu_au, email, email_visible_annuaire FROM users WHERE role='utilisateur' AND compte_masque=0 AND nom != 'Compte supprimé' AND (is_demo IS NULL OR is_demo=FALSE) LIMIT 500"
   ).all();
   if (query.pays) utilisateurs = utilisateurs.filter(r => r.pays === query.pays);
   if (query.ville) { const v = query.ville.toLowerCase(); utilisateurs = utilisateurs.filter(r => (r.ville||'').toLowerCase().includes(v)); }
@@ -10015,7 +10141,7 @@ route("GET", "/api/annuaire/recherche", async (req, res, params, body, query) =>
     `SELECT id, nom, nom_institution, type_organisme, ville, pays, photo_url, banner_url, bio, role,
        nom_responsable_etatique, prenom_responsable_etatique, fonction_responsable_etatique,
        origine1, origine2, pays_origine_institution, nationalite1, nationalite2, domaine_principal,
-       invisible_annuaire_definitif, invisible_annuaire_jusqu_au
+       invisible_annuaire_definitif, invisible_annuaire_jusqu_au, email, email_visible_annuaire
      FROM users WHERE role IN ('collectivite','administrateur','institutionnel','officiel') AND compte_masque=0 AND nom != 'Compte supprimé' AND (is_demo IS NULL OR is_demo=FALSE) LIMIT 500`
   ).all();
   organismes = organismes.filter(r => !annuaireEstInvisible(r));
@@ -10075,6 +10201,14 @@ route("GET", "/api/annuaire/recherche", async (req, res, params, body, query) =>
   let resultats = [];
 
   initiatives.forEach(ini => {
+    if (estRechercheEmail) {
+      const match = ini.owner_email_visible && (ini.owner_email || '').toLowerCase() === emailRecherche;
+      delete ini.owner_email_visible;
+      if (!match) { delete ini.owner_email; return; }
+      resultats.push({ type: 'initiative', score: 1000, geo: 0, data: ini }); // ini.owner_email conservé : propriétaire trouvé et consentant
+      return;
+    }
+    delete ini.owner_email; delete ini.owner_email_visible;
     const produits = produitsParInit[ini.id] || [];
     let score = 1; // visible par défaut hors recherche
     if (termesOriginaux.length) {
@@ -10096,6 +10230,14 @@ route("GET", "/api/annuaire/recherche", async (req, res, params, body, query) =>
   });
 
   utilisateurs.forEach(u => {
+    if (estRechercheEmail) {
+      const match = u.email_visible_annuaire && (u.email || '').toLowerCase() === emailRecherche;
+      delete u.email_visible_annuaire;
+      if (!match) { delete u.email; return; }
+      resultats.push({ type: 'utilisateur', score: 1000, geo: 0, data: u }); // u.email conservé : trouvé et consentant
+      return;
+    }
+    delete u.email; delete u.email_visible_annuaire;
     let score = 1;
     if (termesOriginaux.length) {
       score = annuaireScorerEntite([
@@ -10111,6 +10253,14 @@ route("GET", "/api/annuaire/recherche", async (req, res, params, body, query) =>
   });
 
   organismes.forEach(o => {
+    if (estRechercheEmail) {
+      const match = o.email_visible_annuaire && (o.email || '').toLowerCase() === emailRecherche;
+      delete o.email_visible_annuaire;
+      if (!match) { delete o.email; return; }
+      resultats.push({ type: 'organisme', score: 1000, geo: 0, data: o }); // o.email conservé : trouvé et consentant
+      return;
+    }
+    delete o.email; delete o.email_visible_annuaire;
     let score = 1;
     if (termesOriginaux.length) {
       score = annuaireScorerEntite([
@@ -12009,7 +12159,7 @@ route("POST", "/api/profil/ds-id/reveal", async (req, res, params, body) => {
     const secondesRestantes = Math.ceil((delaiMs - (Date.now() - derniere)) / 1000);
     const minutesRestantes = Math.ceil(secondesRestantes / 60);
     return sendJSON(res, 429, {
-      error: `Pour des raisons de sécurité, votre Code de Sécurité Diaspo'Actif ne pourra être consulté de nouveau qu'après ${Math.round(delaiMs / 60000)} minute${delaiMs > 60000 ? 's' : ''}.`,
+      error: `Pour des raisons de sécurité, votre Code ultra secret ne pourra être consulté de nouveau qu'après ${Math.round(delaiMs / 60000)} minute${delaiMs > 60000 ? 's' : ''}.`,
       minutes_restantes: minutesRestantes,
       secondes_restantes: secondesRestantes,
     });
@@ -12509,7 +12659,7 @@ route("POST", "/api/transfert-gestionnaire/:id/finaliser", async (req, res, para
       await sendEmail({ to: ancienManager.email, subject: "Changement de gestionnaire effectué",
         html: `<p>Le gestionnaire du compte Diaspo'Actif « ${(init.nom||'').replace(/</g,'&lt;')} » a été remplacé.</p><p>Votre ancien accès gestionnaire a été révoqué et votre ancien code confidentiel est désormais définitivement inutilisable.</p>` });
       await sendEmail({ to: pending.email, subject: "Vous êtes désormais gestionnaire sur Diaspo'Actif",
-        html: `<p>Bonjour ${(pending.prenom||'').replace(/</g,'&lt;')},</p><p>Votre identité a été vérifiée et votre accès gestionnaire du compte « ${(init.nom||'').replace(/</g,'&lt;')} » est maintenant actif.</p><p>Un nouveau code de sécurité (DS-ID) a été généré pour ce compte — connectez-vous puis consultez-le depuis Confidentialité &amp; Sécurité.</p><p><a href="${process.env.PUBLIC_ORIGIN || 'https://diaspoactif.com'}/login.html">Se connecter</a></p>` });
+        html: `<p>Bonjour ${(pending.prenom||'').replace(/</g,'&lt;')},</p><p>Votre identité a été vérifiée et votre accès gestionnaire du compte « ${(init.nom||'').replace(/</g,'&lt;')} » est maintenant actif.</p><p>Un nouveau Code ultra secret a été généré pour ce compte — connectez-vous puis consultez-le depuis Confidentialité &amp; Sécurité.</p><p><a href="${process.env.PUBLIC_ORIGIN || 'https://diaspoactif.com'}/login.html">Se connecter</a></p>` });
     } catch (e) { console.error('[transfert-gestionnaire] notifications finales', e.message); }
 
     sendJSON(res, 200, { ok: true, status: 'COMPLETED' });
@@ -13516,17 +13666,17 @@ route("POST", "/api/comptes-lies/lier", async (req, res, params, body) => {
 
   if (saisie.length < 6 || saisie.length > 10) {
     await journaliserEchec('format_invalide');
-    return sendJSON(res, 400, { error: "Le DS-ID doit comporter entre 6 et 10 caractères." });
+    return sendJSON(res, 400, { error: "Le Code ultra secret doit comporter entre 6 et 10 caractères." });
   }
 
   const cible = await db.prepare("SELECT * FROM users WHERE ds_id = ?").get(saisie);
   if (!cible) {
     await journaliserEchec('ds_id_introuvable');
-    return sendJSON(res, 404, { error: "Aucun compte ne correspond à ce DS-ID." });
+    return sendJSON(res, 404, { error: "Aucun compte ne correspond à ce Code ultra secret." });
   }
   if (cible.id === user.id) {
     await journaliserEchec('compte_actuel');
-    return sendJSON(res, 400, { error: "Ce DS-ID correspond au compte actuellement utilisé." });
+    return sendJSON(res, 400, { error: "Ce Code ultra secret correspond au compte actuellement utilisé." });
   }
   if (cible.suspendu_definitif || (cible.suspendu_jusqu_au && new Date(cible.suspendu_jusqu_au) > new Date())) {
     await journaliserEchec('compte_suspendu');
@@ -13552,7 +13702,7 @@ route("POST", "/api/comptes-lies/lier", async (req, res, params, body) => {
   await db.prepare("INSERT INTO comptes_lies_membres (groupe_id, user_id, ajoute_par_user_id) VALUES (?,?,?)").run(groupeId, cible.id, user.id);
 
   await db.prepare(`INSERT INTO ds_id_validations (user_id, action_type, action_ref, succes, ip, user_agent) VALUES (?,?,?,?,?,?)`).run(user.id, 'comptes_lies_liaison', 'succes', 1, ip, req.headers['user-agent'] || null);
-  await db.prepare(`INSERT INTO comptes_lies_journal (groupe_id, user_id, compte_concerne_id, action, details) VALUES (?,?,?,?,?)`).run(groupeId, user.id, cible.id, 'creation_liaison', `Compte ${cible.nom || cible.id} relié via DS-ID`);
+  await db.prepare(`INSERT INTO comptes_lies_journal (groupe_id, user_id, compte_concerne_id, action, details) VALUES (?,?,?,?,?)`).run(groupeId, user.id, cible.id, 'creation_liaison', `Compte ${cible.nom || cible.id} relié via Code ultra secret`);
 
   /* Réduction automatique « comptes liés » : on PRÉVIENT tous les comptes du groupe au moment de la liaison
      (demande explicite, 2026-10-31). Voir server/reduction-comptes-lies.js pour les règles (plafond 20 %). */
@@ -13894,7 +14044,7 @@ route("POST", "/api/mon-associe/connexion", async (req, res, params, body) => {
     SEC.logSecurity("associe_dsid_failed", { ip });
     dbLoginRecord(`associe_dsid_ip:${ip}`, false);
     dbLoginRecord(`associe_dsid_code:${dsIdHash}`, false);
-    return sendJSON(res, 401, { error: "Code de Sécurité invalide." });
+    return sendJSON(res, 401, { error: "Code ultra secret invalide." });
   }
   dbLoginRecord(`associe_dsid_ip:${ip}`, true);
   dbLoginRecord(`associe_dsid_code:${dsIdHash}`, true);
@@ -20816,7 +20966,7 @@ async function handleStripeWebhook(req, res) {
       /* Forfait de questions Koffi : crédité UNIQUEMENT ici, sur la confirmation signée de Stripe. Idempotent (Kofi.confirmerCommande ne traite qu'une commande « en_attente »). */
       const session = event.data.object;
       const conf = await Kofi.confirmerCommande(db, Number(session.metadata.diaspoactif_kofi_commande_id), (session.amount_total || 0) / 100);
-      if (conf) creerNotif(conf.commande.user_id, "formation", "Koffi : questions créditées ✅", `Votre forfait de ${conf.questions} questions est crédité (valable 12 mois, dans toutes vos formations).`, { formation_id: conf.commande.formation_id });
+      if (conf) creerNotif(conf.commande.user_id, "formation", "Koffi : crédit ajouté ✅", conf.credit_eur ? `Votre recharge est créditée : ${String(conf.credit_eur.toFixed(2)).replace(".", ",")} € d'utilisation Koffi (valable 12 mois, pour tout Koffi).` : `Votre forfait de ${conf.questions} questions est crédité (valable 12 mois, dans toutes vos formations).`, { formation_id: conf.commande.formation_id });
     } else if (event.type === "checkout.session.expired" && event.data.object.metadata?.diaspoactif_kofi_commande_id) {
       await Kofi.annulerCommande(db, Number(event.data.object.metadata.diaspoactif_kofi_commande_id), "expiree");
     } else if (event.type === "checkout.session.completed" && event.data.object.metadata?.diaspoactif_formation_commande_id) {
@@ -23122,7 +23272,7 @@ route("GET", "/api/comptes-rendus/publies", async (req, res, params, body, query
   sendJSON(res, 200, { comptes_rendus: cartes, suite });
 });
 
-route("GET", "/api/evenements/:id/compte-rendu", async (req, res, params) => {
+route("GET", "/api/evenements/:id/compte-rendu",async (req, res, params) => {
   const ctx = await crChargerEvenement(req, res, params.id); if (!ctx) return;
   const { user, evt, edit } = ctx;
   const cr = await db.prepare("SELECT * FROM evenement_comptes_rendus WHERE evenement_id=?").get(evt.id);
@@ -24591,7 +24741,10 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
       video1UrlVerifiee, null, video2_url||null, video2_titre||null,
       pdf_url||null, pdf_nom||null, pdf_acces||'public',
       langue||'francais', mode_participation||'presentiel', region||null, departement||null,
-      masquer_inscrits?1:0, whatsapp_lien||null, lieu_gps||null, public_concerne||null, masquer_boutique?1:0,
+      /* Masqué au public PAR DÉFAUT (2026-11-02, demande explicite) : un nouvel événement ne
+         montre jamais « N inscrits » tant que son organisateur n'a pas choisi de le rendre
+         visible via l'interrupteur de la cartouche — jamais l'inverse (visible par défaut). */
+      masquer_inscrits===false?0:1, whatsapp_lien||null, lieu_gps||null, public_concerne||null, masquer_boutique?1:0,
       organisateur_externe_nom||null, organisateur_externe_logo_url||null, programmeJson, inscription_rapide_active?1:0, lienInfo
     )).lastInsertRowid;
   // Notifier abonnés de l'initiative — jamais pour un brouillon, la publication n'est pas
@@ -24658,7 +24811,7 @@ route("PUT", "/api/evenements/:id", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   await ensureEvenementsFlashExtras();
-  const evt = await db.prepare("SELECT id, owner_user_id, statut, programme_json, inscription_rapide_active, lien_plus_info, video1_url, date_evt, date_fin FROM evenements WHERE id=?").get(params.id);
+  const evt = await db.prepare("SELECT id, owner_user_id, statut, programme_json, inscription_rapide_active, lien_plus_info, video1_url, date_evt, date_fin, masquer_inscrits FROM evenements WHERE id=?").get(params.id);
   if (!evt) return sendJSON(res, 404, { error: "Événement introuvable." });
   if (Number(evt.owner_user_id) !== Number(user.id) && user.role !== "administrateur") {
     return sendJSON(res, 403, { error: "Vous ne pouvez modifier que vos propres événements." });
@@ -24716,6 +24869,12 @@ route("PUT", "/api/evenements/:id", async (req, res, params, body) => {
   /* Lien « Plus d'informations » : même règle (`undefined` conserve l'existant, une valeur envoyée — même vide — s'applique). */
   const lienInfo = lien_plus_info === undefined ? evt.lien_plus_info : normaliserLienInfo(lien_plus_info);
   if (lienInfo === false) return sendJSON(res, 400, { error: "Le lien « Plus d'informations » n'est pas valide : indiquez une adresse complète, par exemple https://www.exemple.com/mon-evenement." });
+  /* Bug réel corrigé (2026-11-02) : cette route écrivait masquer_inscrits sans condition
+     (absent du corps → toujours 0/visible), donc toute modification de l'événement via la
+     modale d'édition (titre, photo, etc. — qui n'envoie jamais ce champ, propre à l'interrupteur
+     de la cartouche) effaçait silencieusement le masquage choisi par l'organisateur. Même garde
+     « undefined conserve l'existant » que programmeJson/inscriptionRapideActive/lienInfo ci-dessus. */
+  const masquerInscritsFinal = masquer_inscrits === undefined ? evt.masquer_inscrits : (masquer_inscrits ? 1 : 0);
   await db.prepare(`UPDATE evenements SET
     titre=?, date_evt=?, date_fin=?, heure_debut=?, heure_fin=?, type_evt=?, domaine=?, zone_diffusion=?, type_participation=?, ouverture_inscriptions=?, statut=?, pays=?, lieu=?, ville=?, lieu_gps=?,
     origine=?, description=?, places_max=?, masquer_inscrits=?, visibilite=?, lien_visio=?, whatsapp_lien=?,
@@ -24725,7 +24884,7 @@ route("PUT", "/api/evenements/:id", async (req, res, params, body) => {
       titre, date_evt, dateFinFinale, heure_debut || null, heure_fin || null, type_evt || "evenement", domaine || null, zone_diffusion || null,
       ['payant','partiellement_payant'].includes(type_participation) ? type_participation : 'gratuit', ouverture_inscriptions || null, statutFinal,
       pays || null, lieu || null, ville || null, lieu_gps || null, origine || null, descriptionSafe || null,
-      places_max || null, masquer_inscrits ? 1 : 0, visibilite || "public", lien_visio || null, whatsapp_lien || null,
+      places_max || null, masquerInscritsFinal, visibilite || "public", lien_visio || null, whatsapp_lien || null,
       coverImg, coverImg, galerie, programmeJson, inscriptionRapideActive, lienInfo, video1Url, evt.id
     );
   if (evt.video1_url && evt.video1_url !== video1Url) require("./reels-upload").supprimerVideoParUrl(evt.video1_url).catch(() => {});
@@ -37329,7 +37488,7 @@ ${jsonLd}
              programmed_at||null, timezone||'Europe/Paris', inscription_lien_externe||null, whatsapp_lien||null,
              rayon_publication||'international', langue||'francais', mode_participation||'presentiel',
              region||null, departement||null, communaute||null, origine1||null, origine2||null,
-             masquer_inscrits?1:0)).lastInsertRowid;
+             masquer_inscrits===false?0:1)).lastInsertRowid;
       // Fixer publie_at et envoyer notifications si publication immédiate
       if (finalStatut === 'publie') {
         await db.prepare(`UPDATE events SET publie_at=datetime('now') WHERE id=?`).run(eid);
@@ -38045,7 +38204,7 @@ ${jsonLd}
 
       // Liste participants consolidée
       const participants = [
-        ...inscrits.map(i=>({ nom:i.nom, da_id:i.da_id_utilise, type_compte:i.type_compte||'—', statut:i.statut, created_at:i.created_at, methode:'ID DA + DS-ID', ds_id_signe:i.ds_id_signe })),
+        ...inscrits.map(i=>({ nom:i.nom, da_id:i.da_id_utilise, type_compte:i.type_compte||'—', statut:i.statut, created_at:i.created_at, methode:'ID DA + Code ultra secret', ds_id_signe:i.ds_id_signe })),
         ...acheteurs.map(a=>({ nom:a.nom, da_id:a.da_id||'—', type_compte:a.role||'—', statut:a.statut==='valid'?'confirme':a.statut, created_at:a.created_at, methode:'Billet', ds_id_signe:0 }))
       ];
 
@@ -38104,7 +38263,7 @@ ${jsonLd}
       if (!insc) return sendJSON(res, 404, { error: 'Inscription introuvable ou déjà traitée.' });
       // Retrouver l'utilisateur par da_id
       const userRow = await db.prepare(`SELECT id,ds_id,password_hash,password_salt FROM users WHERE da_id=?`).get(insc.da_id_utilise);
-      if (!userRow || !userRow.ds_id) return sendJSON(res, 400, { error: 'Compte sans Code de Sécurité configuré.' });
+      if (!userRow || !userRow.ds_id) return sendJSON(res, 400, { error: 'Compte sans Code ultra secret configuré.' });
       const dsIdSaisi = ds_id_saisi.trim().toUpperCase();
       // Vérification constante-time
       const dsIdAttendu = userRow.ds_id;
@@ -38116,7 +38275,7 @@ ${jsonLd}
       await db.prepare(`INSERT INTO ds_id_validations (user_id,action_type,action_ref,action_id,da_id,succes,ip,user_agent) VALUES (?,?,?,?,?,?,?,?)`)
         .run(userRow.id, 'inscription_evenement', `event_${eid}`, eid, insc.da_id_utilise, succes ? 1 : 0, req.headers['x-forwarded-for']||'', req.headers['user-agent']||'');
       if (!succes) {
-        return sendJSON(res, 401, { error: 'Code de Sécurité incorrect. Veuillez vérifier et réessayer.' });
+        return sendJSON(res, 401, { error: 'Code ultra secret incorrect. Veuillez vérifier et réessayer.' });
       }
       // Vérifier places disponibles (re-check atomique)
       const ev = await db.prepare(`SELECT * FROM events WHERE id=?`).get(eid);

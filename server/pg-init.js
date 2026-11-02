@@ -494,9 +494,9 @@ const COLONNES_MIGRATION = [
     ['evenement_comptes_rendus', 'logo_url', 'TEXT'],
     ['evenement_comptes_rendus', 'partenaires_json', "TEXT DEFAULT '[]'"],
     ['evenement_comptes_rendus', 'profils_json', "TEXT DEFAULT '[]'"],
-    // Masquer le nombre d'inscrits sur la fiche publique (2026-09-08) — miroir exact de l'ALTER db.js.
-    ['events', 'masquer_inscrits', 'INTEGER DEFAULT 0'],
-    ['evenements', 'masquer_inscrits', 'INTEGER DEFAULT 0'],
+    // Masqué au public PAR DÉFAUT (2026-11-02) — miroir exact de l'ALTER db.js.
+    ['events', 'masquer_inscrits', 'INTEGER DEFAULT 1'],
+    ['evenements', 'masquer_inscrits', 'INTEGER DEFAULT 1'],
     // Exclure un événement public de la page boutique de son organisateur (2026-10-01, demande
     // explicite) — déjà auto-réparé au runtime par POST /api/evenements, ajouté ici aussi.
     ['evenements', 'masquer_boutique', 'INTEGER DEFAULT 0'],
