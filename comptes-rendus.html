@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<script src="/assets/m-redirect.js"></script>
+<link rel="icon" href="/assets/logo.png">
+<title>Diaspo'Actif — Comptes-rendus d'événements</title>
+<meta name="description" content="Tous les comptes-rendus des événements de la communauté Diaspo'Actif, au même endroit.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Diaspo'Actif">
+<meta property="og:title" content="Diaspo'Actif — Comptes-rendus d'événements">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="stylesheet" href="assets/styles.v2.css">
+<link rel="stylesheet" href="/assets/responsive.v2.css?v=2">
+<link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Source+Sans+3:wght@400;600;700;800&display=swap">
+<link rel="stylesheet" href="assets/compte-rendu.css?v=24">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#ff6b00">
+<style>
+/* Espace « Compte-rendu d'événement » (2026-11-02, demande explicite) : tous les comptes-rendus publiés, rangés au même endroit.
+   Même bleu « compte-rendu » que la cartouche du fil. */
+.crl{max-width:1100px;margin:0 auto;padding:20px 16px 80px;color:var(--text,#1f2937)}
+.crl h1{font-size:26px;line-height:1.25;margin:0 0 6px}
+.crl-note{font-size:13.5px;color:var(--muted,#5B6B82);margin:0}
+.crl-top{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:16px 0 8px}
+.crl-search{flex:1;min-width:240px;font:inherit;font-size:15px;border:1.5px solid var(--border,#DCE4F0);border-radius:12px;padding:11px 14px;background:#fff;color:inherit;box-sizing:border-box}
+.crl-search:focus-visible{outline:3px solid #F26422;outline-offset:2px}
+.crl-count{font-size:13px;color:var(--muted,#5B6B82);margin:0 2px 14px;min-height:18px}
+.crl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:18px}
+.crl-card{display:flex;flex-direction:column;background:#fff;border:1.5px solid #BBD2F7;border-radius:16px;overflow:hidden;box-shadow:0 2px 12px rgba(46,116,224,.12)}
+.crl-band{display:flex;align-items:center;gap:8px;padding:8px 14px;background:linear-gradient(135deg,#2E74E0,#0D2B4E);color:#fff;font-size:12px;letter-spacing:.06em}
+.crl-band small{opacity:.85;font-size:12px}
+.crl-img{display:block;width:100%;height:170px;object-fit:cover;background:#E8F0FD}
+.crl-body{display:flex;flex-direction:column;gap:6px;padding:14px 16px 16px;flex:1}
+.crl-t{margin:0;font-size:17px;line-height:1.3}
+.crl-t a{color:#0D2B4E;text-decoration:none}
+.crl-t a:hover{text-decoration:underline}
+.crl-meta{font-size:13px;color:var(--muted,#5B6B82)}
+.crl-ap{margin:4px 0 2px;font-size:14px;line-height:1.55;color:#374151}
+.crl-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto;padding-top:10px}
+.crl-more{display:block;margin:24px auto 0}
+.crl-empty{background:#fff;border:1.5px dashed #BBD2F7;border-radius:14px;padding:28px 18px;text-align:center;color:var(--muted,#5B6B82)}
+.crl [hidden]{display:none!important}
+@media (max-width:560px){.crl-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Menu">&#9776;</button>
+      <div class="logo"><img loading="lazy" class="logo-img" src="assets/logo.png" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+      <nav class="nav">
+        <a href="index.html">Accueil</a>
+        <a href="annuaire.html">Annuaire</a>
+        <a href="vitrines.html">Boutiques</a>
+        <a href="fil-actualite.html">Fil</a>
+        <a href="formations.html">Formations</a>
+        <a href="messagerie.html">Messages</a>
+      </nav>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+  <main class="crl" id="crl">
+    <h1>📄 Comptes-rendus d'événements</h1>
+    <p class="crl-note">Tous les comptes-rendus publiés par la communauté, du plus récent au plus ancien.</p>
+    <div class="crl-top">
+      <input type="search" id="crl-q" class="crl-search" placeholder="🔎 Rechercher par titre, événement ou ville…" aria-label="Rechercher un compte-rendu" autocomplete="off">
+      <a class="cr-btn out" href="evenements.html">← Événements</a>
+      <a class="cr-btn sec" id="crl-gerer" href="compte-rendu.html" hidden>✍️ Gérer mes comptes-rendus</a>
+    </div>
+    <p class="crl-count" id="crl-count" aria-live="polite"></p>
+    <div class="crl-grid" id="crl-grid"></div>
+    <button type="button" class="cr-btn sec crl-more" id="crl-more" hidden>Voir plus de comptes-rendus</button>
+  </main>
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/demo.js?v=2"></script>
+<script src="assets/app.js?v=13"></script>
+<script>
+const $ = (s, r = document) => r.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const PAS = 12;
+const ST = { q: '', decalage: 0, total: 0, suite: false, charge: false, jeton: 0 };
+
+function dateLongue(s) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s || ''));
+  if (!m) return '';
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return isNaN(d) ? '' : d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+function apercu(txt) {
+  const t = String(txt || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\*\*|__|`/g, '').replace(/\s+/g, ' ').trim();
+  if (t.length <= 260) return t;
+  const c = t.lastIndexOf(' ', 260);
+  return t.slice(0, c > 180 ? c : 260) + '…';
+}
+function carte(c) {
+  const lien = 'compte-rendu.html?evt=' + encodeURIComponent(c.evenement_id);
+  const meta = [dateLongue(c.date_evt), c.ville].filter(Boolean).map(esc).join(' · ');
+  const ap = apercu(c.resume);
+  return '<article class="crl-card">'
+    + '<div class="crl-band"><span aria-hidden="true">📄</span><b>COMPTE-RENDU</b><small>d’événement</small></div>'
+    + (c.image ? '<a href="' + lien + '" tabindex="-1" aria-hidden="true"><img class="crl-img" loading="lazy" src="' + esc(c.image) + '" alt="" onerror="this.parentNode.remove()"></a>' : '')
+    + '<div class="crl-body">'
+    + '<h2 class="crl-t"><a href="' + lien + '">' + esc(c.titre) + '</a></h2>'
+    + (c.evenement_titre && c.evenement_titre !== c.titre ? '<div class="crl-meta">Événement : ' + esc(c.evenement_titre) + '</div>' : '')
+    + (meta ? '<div class="crl-meta">📅 ' + meta + '</div>' : '')
+    + (c.organisateur ? '<div class="crl-meta">👤 Par <b>' + esc(c.organisateur) + '</b></div>' : '')
+    + (ap ? '<p class="crl-ap">' + esc(ap) + '</p>' : '')
+    + '<div class="crl-btns"><a class="cr-btn pri" href="' + lien + '">📄 Lire le compte-rendu</a><a class="cr-btn sec" href="' + lien + '&synthese=1">📋 Synthèse</a></div>'
+    + '</div></article>';
+}
+async function charger(debut) {
+  if (ST.charge) return;
+  ST.charge = true;
+  const jeton = ++ST.jeton;
+  const grille = $('#crl-grid'), plus = $('#crl-more'), cpt = $('#crl-count');
+  if (debut) { ST.decalage = 0; ST.total = 0; grille.innerHTML = ''; cpt.textContent = 'Chargement…'; plus.hidden = true; }
+  else { plus.disabled = true; plus.textContent = 'Chargement…'; }
+  try {
+    const r = await fetch('/api/comptes-rendus/publies?limit=' + PAS + '&offset=' + ST.decalage + (ST.q ? '&q=' + encodeURIComponent(ST.q) : ''), { credentials: 'same-origin' });
+    if (!r.ok) throw new Error();
+    const d = await r.json();
+    if (jeton !== ST.jeton) return;
+    const l = d.comptes_rendus || [];
+    grille.insertAdjacentHTML('beforeend', l.map(carte).join(''));
+    ST.decalage += l.length; ST.total += l.length; ST.suite = !!d.suite;
+    if (!ST.total) {
+      grille.innerHTML = '<div class="crl-empty" style="grid-column:1/-1">' + (ST.q ? 'Aucun compte-rendu ne correspond à « ' + esc(ST.q) + ' ».' : 'Aucun compte-rendu n’a encore été publié.') + '</div>';
+      cpt.textContent = '';
+    } else cpt.textContent = ST.total + ' compte' + (ST.total > 1 ? 's' : '') + '-rendu' + (ST.total > 1 ? 's' : '') + (ST.suite ? ' affichés' : '');
+    plus.hidden = !ST.suite;
+  } catch (e) {
+    if (jeton === ST.jeton) { cpt.textContent = ''; if (debut) grille.innerHTML = '<div class="crl-empty" style="grid-column:1/-1">Impossible de charger les comptes-rendus pour le moment. <button type="button" class="cr-btn sec" id="crl-retry">Réessayer</button></div>'; const b = $('#crl-retry'); if (b) b.onclick = () => charger(true); }
+  } finally { if (jeton === ST.jeton) { ST.charge = false; plus.disabled = false; plus.textContent = 'Voir plus de comptes-rendus'; } }
+}
+let minuterie = null;
+$('#crl-q').addEventListener('input', e => {
+  clearTimeout(minuterie);
+  minuterie = setTimeout(() => { ST.q = e.target.value.trim(); ST.charge = false; charger(true); }, 300);
+});
+$('#crl-more').addEventListener('click', () => charger(false));
+/* « Gérer mes comptes-rendus » : seulement pour un compte connecté (la page de gestion exige une connexion). */
+fetchCurrentUser().then(u => { if (u) $('#crl-gerer').hidden = false; }).catch(() => {});
+charger(true);
+</script>
+<script src="assets/chatbot.js"></script>
+<script src="/assets/cookies-banner.js"></script>
+<script src="/assets/theme-manager.js"></script>
+<script src="assets/back-button.js"></script>
+</body>
+</html>

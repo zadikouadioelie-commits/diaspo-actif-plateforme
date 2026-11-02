@@ -899,6 +899,7 @@
     /* Entrée « ⚡ Événement flash » + « ? » (comptes Initiative seulement) — fournie par le module Mes événements, vide sinon. */
     el.innerHTML = `${(window.MMods && window.MMods.flashCarte) ? window.MMods.flashCarte() : ''}<div class="ev-top"><div class="search">${ic('search', 's')}<input id="evq" type="search" placeholder="Rechercher un événement…" aria-label="Rechercher un événement" value="${esc(S.ev.q)}"></div><button type="button" id="ev-cloche" aria-label="Être informé des événements" title="Être informé des événements"></button></div>
       <a class="btn out block" href="#/calendrier" style="margin:10px 0 2px">${ic('cal', 's')} Calendrier — voir par mois et ajouter à mon agenda</a>
+      <a class="btn out block" href="#/comptesrendus" style="margin:6px 0 2px">${ic('doc', 's')} Compte-rendu d’événement — tous les comptes-rendus</a>
       <div class="chips">${[['avenir', 'À venir'], ['passes', 'Terminés'], ['gratuit', 'Gratuits'], ['mes', 'Mes inscriptions']].map(([k, l]) => `<button class="chip ${S.ev.filtre === k ? 'on' : ''}" data-f="${k}">${l}</button>`).join('')}</div>
       ${pubSlot('evenements_sidebar')}<div id="ev-bar"></div><div class="small muted" id="ev-count" style="margin:0 4px 10px"></div><div id="ev-list"></div>`;
     $$('.chip[data-f]', el).forEach(c => c.onclick = async () => {
@@ -1489,6 +1490,36 @@
         ${court ? `<p class="crn-ap">${esc(court)}</p><a class="crn-plus" href="${lien}">Voir plus ›</a>` : ''}
         <div class="crn-btns"><a class="cr-bleu" href="${lien}">📝<span>Lire le compte-rendu</span><i aria-hidden="true">→</i></a><a class="cr-synth" href="${lien}/synthese"><span aria-hidden="true">📋</span> Synthèse</a></div></div></article>`;
   }
+  /* Espace « Compte-rendu d'événement » (2026-11-02, demande explicite) : tous les comptes-rendus publiés, recherche + « Voir plus » par lots de 10. */
+  function paneCRListe() {
+    const PAS = 10, E = { q: '', decalage: 0, total: 0, jeton: 0 };
+    setPane('Comptes-rendus', `<div class="ev-top"><div class="search">${ic('search', 's')}<input id="crl-q" type="search" placeholder="Titre, événement ou ville…" aria-label="Rechercher un compte-rendu" autocomplete="off"></div></div>
+      <div class="small muted" id="crl-n" style="margin:8px 4px 10px"></div><div id="crl-l"></div><div id="crl-more"></div>`);
+    const charger = async debut => {
+      const l = $('#crl-l'), more = $('#crl-more'), n = $('#crl-n'); if (!l) return;
+      const jeton = ++E.jeton;
+      if (debut) { E.decalage = 0; E.total = 0; l.innerHTML = '<div class="sk skc"></div><div class="sk skc"></div>'; more.innerHTML = ''; n.textContent = ''; }
+      try {
+        const r = await api('/api/comptes-rendus/publies?limit=' + PAS + '&offset=' + E.decalage + (E.q ? '&q=' + encodeURIComponent(E.q) : ''));
+        if (jeton !== E.jeton || !$('#crl-l')) return;
+        const cartes = r.comptes_rendus || [];
+        if (debut) l.innerHTML = '';
+        l.insertAdjacentHTML('beforeend', cartes.map(crCarte).join(''));
+        E.decalage += cartes.length; E.total += cartes.length;
+        if (!E.total) l.innerHTML = `<div class="empty"><div class="ei">${ic('doc', 'l')}</div><b>${E.q ? 'Aucun résultat' : 'Aucun compte-rendu pour le moment'}</b>${E.q ? 'Essayez un autre mot.' : 'Les comptes-rendus publiés par les organisateurs apparaîtront ici.'}</div>`;
+        n.textContent = E.total ? `${E.total} compte${E.total > 1 ? 's' : ''}-rendu${E.total > 1 ? 's' : ''}${r.suite ? ' affichés' : ''}` : '';
+        more.innerHTML = r.suite ? '<button class="btn out block" id="crl-next">Voir plus de comptes-rendus</button>' : '';
+        const b = $('#crl-next'); if (b) b.onclick = () => { b.disabled = true; b.textContent = 'Chargement…'; charger(false); };
+      } catch (e) {
+        if (jeton !== E.jeton || !$('#crl-l')) return;
+        if (debut) l.innerHTML = `<div class="empty"><b>Impossible de charger les comptes-rendus</b>${esc(e.message || '')}<br><br><button class="btn sm" id="crl-retry">Réessayer</button></div>`;
+        const b = $('#crl-retry') || $('#crl-next'); if (b) { b.disabled = false; b.textContent = debut ? 'Réessayer' : 'Voir plus de comptes-rendus'; b.onclick = () => charger(debut); }
+      }
+    };
+    let t = null;
+    $('#crl-q').addEventListener('input', e => { clearTimeout(t); t = setTimeout(() => { E.q = e.target.value.trim(); charger(true); }, 300); });
+    charger(true);
+  }
   /* « Toutes les actualités » : tous les comptes-rendus publiés (même ceux sans publication dans le fil), puis le fil complet. */
   async function paneActus() {
     setPane('Actualités', `<div id="actu-crs"></div><div class="sec"><h2 class="sec-t"><span class="sic">${ic('fil')}</span><span>Publications</span></h2></div><div id="home-feed"></div>`);
@@ -1503,7 +1534,20 @@
      « Toutes les actualités », sans limite) — sinon le défilement infini ferait disparaître les sections situées plus bas (initiatives, boutiques…).
      Couleurs inchangées : compte-rendu = bleu scintillant, toute autre actualité = vert scintillant. */
   const ACTU_PAS = 5, ACTU_MAX = 20;
-  const ACTU = { liste: [], affiche: 0, page: 0, pages: 1, busy: false, obs: null };
+  const ACTU = { liste: [], affiche: 0, page: 0, pages: 1, busy: false, obs: null, crs: [] };
+  /* Range un lot de publications dans l'ordre reçu et y intercale, selon leur date, les comptes-rendus en attente (ACTU.crs, du plus récent au plus ancien) ;
+     au dernier lot, les comptes-rendus restants (plus anciens que tout) ferment la liste. */
+  function actusFusion(posts) {
+    const sortie = [];
+    /* Comme avant sur le premier lot : les publications sont rangées par date (l'API les brasse), les comptes-rendus s'y glissent à leur date. */
+    posts.slice().sort((a, b) => tsDe(b.created_at) - tsDe(a.created_at)).forEach(p => {
+      const ts = tsDe(p.created_at);
+      while (ACTU.crs.length && ACTU.crs[0].ts > ts) sortie.push(ACTU.crs.shift().x);
+      sortie.push({ h: actuVerte(postHtml(p)) });
+    });
+    if (ACTU.page >= ACTU.pages) while (ACTU.crs.length) sortie.push(ACTU.crs.shift().x);
+    return sortie;
+  }
   const tsDe = x => { const t = Date.parse(x); return isNaN(t) ? 0 : t; };
   async function actusPosts() {
     ACTU.page++;
@@ -1541,7 +1585,7 @@
       if (!force && ACTU.affiche >= ACTU_MAX) { actusFinal(); return 0; }
       if (ACTU.liste.length - ACTU.affiche < ACTU_PAS && ACTU.page < ACTU.pages) {
         const posts = await actusPosts();
-        ACTU.liste = ACTU.liste.concat(posts.map(p => ({ h: actuVerte(postHtml(p)) })));
+        ACTU.liste = ACTU.liste.concat(actusFusion(posts));
       }
       const n = actusAfficher(ACTU_PAS);
       actusFinal();
@@ -1550,13 +1594,12 @@
   }
   async function actusInit() {
     if (ACTU.obs) { ACTU.obs.disconnect(); ACTU.obs = null; }
-    Object.assign(ACTU, { liste: [], affiche: 0, page: 0, pages: 1, busy: false });
+    Object.assign(ACTU, { liste: [], affiche: 0, page: 0, pages: 1, busy: false, crs: [] });
     const [cr, posts] = await Promise.all([api('/api/comptes-rendus/publies?limit=30').catch(() => ({ comptes_rendus: [] })), actusPosts()]);
-    const crs = (cr.comptes_rendus || []).slice().sort((a, b) => tsDe(b.publie_le) - tsDe(a.publie_le));
-    /* Les 3 derniers comptes-rendus en tête (demande du 2026-10-08), puis le reste mêlé par date. */
-    const suite = crs.slice(3).map(c => ({ ts: tsDe(c.publie_le), h: crCarte(c) }))
-      .concat(posts.map(p => ({ ts: tsDe(p.created_at), h: actuVerte(postHtml(p)) }))).sort((a, b) => b.ts - a.ts);
-    ACTU.liste = crs.slice(0, 3).map(c => ({ h: crCarte(c) })).concat(suite);
+    /* Le compte-rendu n'est plus épinglé en tête (2026-11-02, demande explicite) : il garde sa cartouche bleue mais prend sa place par date, comme
+       toute autre actualité (2ᵉ s'il doit être 2ᵉ, 3ᵉ s'il doit être 3ᵉ). Les comptes-rendus attendent dans ACTU.crs et s'insèrent au fil des lots. */
+    ACTU.crs = (cr.comptes_rendus || []).map(c => ({ ts: tsDe(c.publie_le), x: { h: crCarte(c) } })).sort((a, b) => b.ts - a.ts);
+    ACTU.liste = actusFusion(posts);
     if (!ACTU.liste.length) return;
     homeBlock('home-actus', 'Actualités', '<div id="actu-liste"></div><div id="actu-fin" style="min-height:2px"></div>', '<a href="#/actualites" class="sec-more">Toutes les actualités ›</a>', 'Les derniers comptes-rendus et publications. Touchez une actualité pour parcourir les suivantes.');
     actusAfficher(ACTU_PAS);
@@ -2605,6 +2648,7 @@
     else if (a === 'outils') paneOutils();
     else if (a === 'cr') paneCR(b, c);
     else if (a === 'actualites') paneActus();
+    else if (a === 'comptesrendus') paneCRListe();
     else if (a === 'cagnottes') paneCagnottes(b);
     else if (a === 'videos') paneVideos();
     else if (a === 'video') paneVideo(b);

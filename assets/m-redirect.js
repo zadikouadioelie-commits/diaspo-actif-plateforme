@@ -19,7 +19,7 @@
     'parrainage.html': '#/parrainage', 'mon-abonnement.html': '#/abonnement', 'confidentialite.html': '#/confidentialite', 'centre-financier.html': '#/centrefinancier',
     'reseau.html': '#/reseaupro', 'business-plan.html': '#/businessplan', 'mon-associe.html': '#/associe',
     'videos-tutoriels.html': '#/videos', 'cagnottes.html': '#/cagnottes', 'agenda.html': '#/agenda',
-    'fil-actualite.html': '#/accueil', 'fil-actualite-app.html': '#/accueil', 'evenements.html': '#/evenements'
+    'fil-actualite.html': '#/accueil', 'fil-actualite-app.html': '#/accueil', 'evenements.html': '#/evenements', 'comptes-rendus.html': '#/comptesrendus'
   };
   /* Les tableaux de bord (dashboard-*.html) ne sont PAS redirigés : ils contiennent des outils qui n'existent pas encore dans l'appli. */
   /* Pages avec paramètre : initiative.html?id=X, profil.html?id=X, compte-rendu.html?evt=X, videos-tutoriels.html?v=X */

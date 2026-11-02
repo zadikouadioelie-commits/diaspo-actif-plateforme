@@ -23088,6 +23088,12 @@ async function crIdentifies(evenementId) {
    celle d'une publication de compte-rendu du fil (carteCompteRenduPost) ; aucun contenu qui ne soit déjà public via /api/evenements/:id/compte-rendu. */
 route("GET", "/api/comptes-rendus/publies", async (req, res, params, body, query) => {
   const limite = Math.min(Math.max(Number(query && query.limit) || 10, 1), 30);
+  /* Espace « Compte-rendu d'événement » (2026-11-02, demande explicite) : tous les comptes-rendus, par pages (?offset=) et avec recherche (?q=) sur le
+     titre, l'événement ou la ville. On lit limite+1 lignes pour savoir s'il y en a encore (« suite »), sans second comptage. */
+  const decalage = Math.max(Number(query && query.offset) || 0, 0);
+  const motCle = String((query && query.q) || '').trim().toLowerCase().slice(0, 80);
+  const rechSql = motCle ? ` AND (LOWER(COALESCE(c.titre,'')) LIKE ? OR LOWER(COALESCE(e.titre,'')) LIKE ? OR LOWER(COALESCE(e.ville,'')) LIKE ?)` : '';
+  const rechArgs = motCle ? [`%${motCle}%`, `%${motCle}%`, `%${motCle}%`] : [];
   /* ?owner=<user_id> (2026-10-09, demande explicite : "affiche les comptes rendus d'événements...
      sur le profil public") — même signature que GET /api/evenements?owner=, pour lister les
      comptes-rendus des événements d'UN compte précis plutôt que le fil global. Un visiteur voit
@@ -23100,17 +23106,18 @@ route("GET", "/api/comptes-rendus/publies", async (req, res, params, body, query
   const lignes = query.owner
     ? await db.prepare(`SELECT c.evenement_id AS id, COALESCE(c.published_at, c.updated_at) AS publie_le
         FROM evenement_comptes_rendus c JOIN evenements e ON e.id = c.evenement_id
-        WHERE c.statut='publie' AND e.owner_user_id=? ${visibiliteCr}
-        ORDER BY COALESCE(c.published_at, c.updated_at) DESC LIMIT ?`).all(Number(query.owner), limite)
+        WHERE c.statut='publie' AND e.owner_user_id=? ${visibiliteCr}${rechSql}
+        ORDER BY COALESCE(c.published_at, c.updated_at) DESC LIMIT ? OFFSET ?`).all(Number(query.owner), ...rechArgs, limite + 1, decalage)
     : await db.prepare(`SELECT c.evenement_id AS id, COALESCE(c.published_at, c.updated_at) AS publie_le
         FROM evenement_comptes_rendus c JOIN evenements e ON e.id = c.evenement_id
-        WHERE c.statut='publie' AND COALESCE(e.visibilite,'public')='public'
-        ORDER BY COALESCE(c.published_at, c.updated_at) DESC LIMIT ?`).all(limite);
+        WHERE c.statut='publie' AND COALESCE(e.visibilite,'public')='public'${rechSql}
+        ORDER BY COALESCE(c.published_at, c.updated_at) DESC LIMIT ? OFFSET ?`).all(...rechArgs, limite + 1, decalage);
+  const suite = lignes.length > limite;
   const cartes = [];
-  for (const l of lignes) {
+  for (const l of lignes.slice(0, limite)) {
     try { const c = await carteCompteRenduPost(l.id); if (c) cartes.push({ ...c, publie_le: l.publie_le }); } catch (_) { /* une carte en échec ne bloque pas les autres */ }
   }
-  sendJSON(res, 200, { comptes_rendus: cartes });
+  sendJSON(res, 200, { comptes_rendus: cartes, suite });
 });
 
 route("GET", "/api/evenements/:id/compte-rendu", async (req, res, params) => {
