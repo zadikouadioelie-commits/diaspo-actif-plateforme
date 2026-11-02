@@ -3344,6 +3344,9 @@ MultiConnexion.register({ route, db, sendJSON, getCurrentUser, creerNotif, SEC }
 /* Message sécurisé : lisible 2 minutes après saisie du DS-ID du destinataire, puis détruit (server/message-securise.js). */
 const MessageSecurise = require("./message-securise");
 MessageSecurise.register({ route, db, sendJSON, getCurrentUser, creerNotif, SEC, contactBloque, peutEcrireDirectement, nomCompteAffichage });
+/* Fil de l'accueil du profil public (2026-11-02) : toutes les actualités de la plateforme, filtrables, + « Mes actualités » — server/fil-accueil.js. Enregistré ici, avant GET /api/fil/:id qui l'aurait pris pour un identifiant. */
+const FilAccueil = require("./fil-accueil");
+FilAccueil.register({ route, db, sendJSON, getCurrentUser, enrichPost, filMediasDuPost, dateParisISO, TutoPartage, verifierProgrammes: () => FilProgrammes.verifier() });
 /* Documents PDF et Excel affichés DANS la page du cours (visionneuse, accès contrôlé, lecture par fenêtres) — server/formation-documents.js. checkFormationOwner est une déclaration de fonction (hissée). */
 const FormationDocuments = require("./formation-documents");
 FormationDocuments.register({ route, db, sendJSON, getCurrentUser, SEC, checkFormationOwner });

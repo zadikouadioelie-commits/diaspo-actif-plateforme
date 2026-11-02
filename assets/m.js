@@ -548,7 +548,26 @@
   /* ============================================================
      FIL
      ============================================================ */
-  const FIL_MODES = [['tous', 'Pour vous'], ['suivis', 'Mes abonnements'], ['populaires', 'Populaires'], ['organisations', 'Organisations']];
+  /* 2026-11-02 (demande explicite, même règle que le site) : toute la plateforme, filtrable ; « Mes actualités » = ce que j'ai publié ou republié.
+     Données : GET /api/fil/accueil?filtre=… (curseur « avant »). Les Reels sont en bande au-dessus (GET /api/fil/medias). */
+  const FIL_MODES = [['tous', 'Tout'], ['mes', 'Mes actualités'], ['textes', 'Textes'], ['photos', 'Photos'], ['videos', 'Vidéos'], ['articles', 'Articles'], ['evenements', 'Événements'], ['suivis', 'Abonnements']];
+  const FIL_FILTRE = { tous: 'tout', suivis: 'abonnements' };
+  async function filReels() {
+    const el = $('#fil-reels'); if (!el) return;
+    let items = [];
+    try { items = (await api('/api/fil/medias?type=video&limit=12')).items || []; } catch (e) { }
+    if (!$('#fil-reels')) return;
+    const carte = it => {
+      const m = (it.medias && it.medias[0]) || {};
+      const vignette = m.poster ? `<img src="${attrUrl(m.poster)}" alt="" loading="lazy" onerror="this.remove()">` : (m.url ? `<video src="${attrUrl(m.url)}#t=0.5" muted playsinline preload="metadata"></video>` : '');
+      return `<button type="button" class="fr-reel" data-reel="${esc(it.post_id)}" aria-label="Voir le Reel de ${esc(it.auteur_nom || 'la communauté')}">${vignette}<span class="fr-ombre"></span><span class="fr-nom">${esc(it.auteur_nom || '')}</span></button>`;
+    };
+    el.innerHTML = `<div class="fr-tete"><b>Reels</b><button type="button" class="fr-tout" id="fr-tout">Tout voir</button></div><div class="fr-rail">${items.length ? items.map(carte).join('') : `<button type="button" class="fr-reel fr-nouveau" id="fr-nouveau"><span>Soyez le premier à partager un Reel</span></button>`}</div>`;
+    const voir = id => { if (window.MediaViewer && MediaViewer.openReels) MediaViewer.openReels(Object.assign({}, MV_OPTS, id ? { postId: Number(id) } : {})); };
+    $$('.fr-reel[data-reel]', el).forEach(b => b.onclick = () => voir(b.dataset.reel));
+    const t = $('#fr-tout', el); if (t) t.onclick = () => voir();
+    const n = $('#fr-nouveau', el); if (n) n.onclick = () => ouvrirChoixCreation();
+  }
   function viewFil() {
     const el = $('#home-feed');
     /* Bouton « Reels » (2026-10-13, demande explicite) : une petite caméra stylisée, qui apparaît toute seule dès qu'il existe au moins une vidéo
@@ -560,7 +579,8 @@
        point d'entrée unique sur l'onglet Fil propose maintenant les deux, pour que ce soit
        découvrable sans avoir à d'abord ouvrir les Reels. Voir ouvrirChoixCreation() plus bas. */
     const creerBtn = `<button type="button" class="chip creer" id="fil-creer" aria-label="Créer une publication ou un Reel">✍️<span>Créer</span></button>`;
-    el.innerHTML = `<div class="chips" role="tablist">${creerBtn}${reelsBtn}${FIL_MODES.map(([k, l]) => `<button class="chip ${S.fil.mode === k ? 'on' : ''}" data-mode="${k}" role="tab" aria-selected="${S.fil.mode === k}">${l}</button>`).join('')}</div>${pubSlot('between_posts')}<div id="fil-list"></div><div id="fil-more"></div>`;
+    el.innerHTML = `<div id="fil-reels"></div><div class="chips" role="tablist">${creerBtn}${FIL_MODES.map(([k, l]) => `<button class="chip ${k === 'mes' ? 'mes' : ''} ${S.fil.mode === k ? 'on' : ''}" data-mode="${k}" role="tab" aria-selected="${S.fil.mode === k}">${l}</button>`).join('')}</div>${pubSlot('between_posts')}<div id="fil-list"></div><div id="fil-more"></div>`;
+    filReels();
     const rb = $('#reels-open', el);
     if (rb) {
       rb.onclick = () => { if (window.MediaViewer && MediaViewer.openReels) MediaViewer.openReels(MV_OPTS); };
@@ -569,7 +589,10 @@
     if (cb) cb.onclick = () => ouvrirChoixCreation();
     $$('.chip[data-mode]', el).forEach(c => c.onclick = async () => {
       if (c.dataset.mode === 'suivis' && !(await needLogin('Connectez-vous pour voir les publications de vos abonnements.'))) return;
-      S.fil = { mode: c.dataset.mode, page: 1, pages: 1, posts: [], loaded: false }; viewFil();
+      if (c.dataset.mode === 'mes' && !(await needLogin('Connectez-vous pour voir vos actualités.'))) return;
+      /* Un second appui sur le filtre actif revient à « Tout ». */
+      const mode = (c.dataset.mode === S.fil.mode && c.dataset.mode !== 'tous') ? 'tous' : c.dataset.mode;
+      S.fil = { mode, page: 1, pages: 1, suivant: null, posts: [], loaded: false }; viewFil();
     });
     if (!S.fil.loaded) loadFil(true); else paintFil();
   }
@@ -577,8 +600,9 @@
     const list = $('#fil-list');
     if (first && list) list.innerHTML = '<div class="sk skc"></div><div class="sk skc"></div>';
     try {
-      const r = await api(`/api/fil?mode=${S.fil.mode}&page=${S.fil.page}&limit=10`);
-      S.fil.posts = S.fil.posts.concat(r.posts || []); S.fil.pages = r.pages || 1; S.fil.loaded = true; S.fil.conseil = r.conseil;
+      const r = await api(`/api/fil/accueil?filtre=${FIL_FILTRE[S.fil.mode] || S.fil.mode}&limit=10${first || !S.fil.suivant ? '' : '&avant=' + S.fil.suivant}`);
+      const vus = new Set(S.fil.posts.map(p => p.id));
+      S.fil.posts = S.fil.posts.concat((r.posts || []).filter(p => !vus.has(p.id))); S.fil.suivant = r.suivant || null; S.fil.loaded = true; S.fil.conseil = r.conseil;
       paintFil();
     } catch (e) {
       if (list) list.innerHTML = `<div class="empty"><b>Impossible de charger le fil</b>${esc(e.message)}<br><br><button class="btn sm" id="retry">Réessayer</button></div>`;
@@ -637,12 +661,12 @@
     const cartesFil = S.fil.posts.filter(p => p.type !== 'compte_rendu' && !p.compte_rendu).map(p => actuVerte(postHtml(p))).filter(Boolean);
     const html = pubIntercaler(cartesFil, 0, { 3: 'fil_sidebar' }, 6, 'vue_publication_restreinte').join('');
     if (!cartesFil.length) {
-      list.innerHTML = `<div class="empty"><div class="ei">${ic('fil', 'l')}</div><b>${S.fil.mode === 'suivis' ? 'Rien à afficher pour l’instant' : 'Aucune publication'}</b>${esc(S.fil.conseil || 'Revenez bientôt : la communauté publie chaque jour.')}</div>`;
+      list.innerHTML = `<div class="empty"><div class="ei">${ic('fil', 'l')}</div><b>${S.fil.mode === 'suivis' ? 'Rien à afficher pour l’instant' : S.fil.mode === 'mes' ? 'Vous n’avez encore rien publié' : 'Aucune publication'}</b>${esc(S.fil.conseil || (S.fil.mode === 'mes' ? 'Touchez « Créer » pour partager une actualité, une photo ou une vidéo.' : 'Revenez bientôt : la communauté publie chaque jour.'))}</div>`;
       more.innerHTML = ''; return;
     }
     list.innerHTML = html;
-    more.innerHTML = S.fil.page < S.fil.pages ? `<button class="btn out block" id="fil-next">Voir plus de publications</button>` : '';
-    const n = $('#fil-next'); if (n) n.onclick = async () => { n.disabled = true; n.textContent = 'Chargement…'; S.fil.page++; await loadFil(false); };
+    more.innerHTML = S.fil.suivant ? `<button class="btn out block" id="fil-next">Voir plus de publications</button>` : '';
+    const n = $('#fil-next'); if (n) n.onclick = async () => { n.disabled = true; n.textContent = 'Chargement…'; await loadFil(false); };
     $$('[data-clamp]', list).forEach(c => { if (c.scrollHeight > c.clientHeight + 2) { const b = c.parentNode.querySelector('[data-more]'); if (b) b.hidden = false; } });
   }
   document.addEventListener('click', async e => {
@@ -2641,6 +2665,14 @@
     /* readyState vaut déjà « interactive » pendant l'exécution des scripts différés : on attend l'événement, avec un délai de secours si jamais il est déjà passé. */
     if (document.readyState !== 'complete') await Promise.race([new Promise(r => document.addEventListener('DOMContentLoaded', r, { once: true })), new Promise(r => setTimeout(r, 1500))]);
     await loadMe();
+    /* 2026-11-02 (demande explicite) : une personne déjà connectée qui revient sur l'appli arrive sur ses actualités (Reels en haut, filtres, créer, « Mes actualités »).
+       Une seule fois par session, et seulement quand aucune destination précise n'est demandée (lien partagé, notification…). */
+    try {
+      if (S.me && (!location.hash || /^#\/?(accueil)?$/.test(location.hash)) && !sessionStorage.getItem('da_atterrissage_m')) {
+        sessionStorage.setItem('da_atterrissage_m', '1');
+        if (!S.me.relais_invite_fiche_id) location.hash = '#/actualites';
+      }
+    } catch (e) { }
     route(true);
     setInterval(() => { if (!document.hidden) { refreshBadges(); verifierVersion(); } }, 45000); setTimeout(verifierVersion, 4000);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) { refreshBadges(); verifierVersion(); } });

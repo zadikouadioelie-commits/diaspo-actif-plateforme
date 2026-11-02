@@ -2622,7 +2622,23 @@ async function hpReagir(postId, btn) {
   }
   fetch('/api/auth/me', {credentials:'same-origin'})
     .then(function(r){ return r.json(); })
-    .then(function(d){ render(d && d.user ? d.user : null); })
+    .then(function(d){
+      var u = d && d.user ? d.user : null;
+      render(u);
+      /* 2026-11-02 (demande explicite) : une personne déjà connectée qui REVIENT sur le site arrive sur son profil public
+         (Reels + actualités). Seulement à l'arrivée sur le site (adresse tapée, favori, lien externe) : jamais quand elle
+         clique elle-même sur « Accueil » depuis une page du site, ni avec ?accueil=1, ni avec une ancre. Une seule fois par session. */
+      try {
+        if (!u || !/^(utilisateur|initiative|collectivite)$/.test(u.role) || u.relais_invite_fiche_id) return;
+        if (/[?&]accueil=1\b/.test(location.search) || location.hash) return;
+        if (sessionStorage.getItem('da_atterrissage')) return;
+        sessionStorage.setItem('da_atterrissage', '1');
+        var interne = document.referrer && document.referrer.indexOf(location.origin) === 0;
+        if (interne) return;
+        if (typeof loginLandingUrl === 'function') location.replace(loginLandingUrl(u));
+        else location.replace(u.role === 'collectivite' ? 'profil-collectivite.html?id=' + u.id : 'profil.html');
+      } catch (e) { /* en cas de doute : l'accueil s'affiche */ }
+    })
     .catch(function(){ render(null); });
 })();
 </script>

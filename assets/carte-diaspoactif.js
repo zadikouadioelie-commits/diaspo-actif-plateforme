@@ -308,6 +308,12 @@
           <div class="cda-actions" id="cda-actions"></div>
         </div>`;
 
+    /* 2026-11-02, demande explicite (profil « à la Facebook ») — page de profil seulement (3 colonnes) :
+       • SON profil : bande de Reels de la communauté AU-DESSUS du profil, puis au milieu les actualités de toute la plateforme (filtres, « Mes actualités », créer) — assets/profil-accueil.js ;
+         ses propres Reels n'ont donc plus de boîte à part.
+       • Profil d'UNE AUTRE personne : seulement ses actualités (publiées ou republiées par elle), qui se poursuivent par « Afficher plus » ; pas de bande de Reels.
+       Le tableau de bord (une colonne) garde l'ancienne présentation. */
+    const modeAccueil = troisCol && isOwner && !!window.ProfilAccueil;
     if (troisCol) {
       container.innerHTML = `
         <div class="cda-card cda-card-3col">${tete}
@@ -315,8 +321,7 @@
             <button type="button" class="cda-theme-btn" id="cda-banner-style">🎨 Thème de bandeaux</button>
           </div>` : '<div style="height:8px;"></div>'}
         </div>
-        ${hReels}
-        ${hPubs}
+        ${modeAccueil ? '<div id="cda-premier-post"></div><div id="cda-accueil-hub"></div>' : hPubs}
         ${hAvis}`;
       colG.innerHTML = hInfosCarte + hDomaine + hStatut + hComp;
       colD.innerHTML = hBio + hCi + hAffil;
@@ -424,7 +429,7 @@
     // profil.publications est déjà renvoyé par GET /api/profil/:id (utilisé ailleurs sur la
     // plateforme, voir profil-app.html) — pas de nouvelle route nécessaire pour l'affichage
     // initial ; window.CdaPublicationsRefresh() ne réinterroge que pour rafraîchir après un post.
-    if (window.ReelsProfil) {
+    if (window.ReelsProfil && !troisCol) {
       const rb = document.getElementById('cda-reels-box');
       if (rb) { rb.style.display = 'none'; ReelsProfil.monter(document.getElementById('cda-reels-mount'), { auteurId: profil.id, estMoi: isOwner }).then(v => { if (v) rb.style.display = ''; }); }
     }
@@ -446,16 +451,51 @@
       zone.querySelector('#cda-pp-later').addEventListener('click', () => { try { localStorage.setItem(cleMasque, '1'); } catch (e) { /* sans stockage, la proposition revient au prochain affichage */ } zone.innerHTML = ''; });
     }
     if (window.Posts) {
-      window.Posts.renderFeed(profil.publications || [], 'cda-publications-list');
+      const peindreListe = () => { if (document.getElementById('cda-publications-list')) window.Posts.renderFeed(profil.publications || [], 'cda-publications-list'); };
+      peindreListe();
       montrerPremierPost();
+      /* Profil d'une autre personne : « Afficher plus d'actualités » poursuit la liste de cette personne (page suivante de /profil/:id/publications). */
+      let pagePub = 1;
+      const bilanPlus = (pages) => {
+        const ancien = document.getElementById('cda-pubs-plus'); if (ancien) ancien.remove();
+        const liste = document.getElementById('cda-publications-list');
+        if (!liste || !troisCol || isOwner || pagePub >= (pages || 1)) return;
+        const b = document.createElement('button');
+        b.id = 'cda-pubs-plus'; b.type = 'button'; b.className = 'cda-theme-btn'; b.textContent = 'Afficher plus d’actualités';
+        b.style.cssText = 'display:block;width:100%;min-height:44px;margin-top:12px;justify-content:center;';
+        b.onclick = async () => {
+          b.disabled = true; b.textContent = 'Chargement…';
+          try {
+            const r = await window.api('GET', `/profil/${profil.id}/publications?page=${pagePub + 1}`);
+            pagePub = r.page || (pagePub + 1);
+            const vus = new Set((profil.publications || []).map(p => p.id));
+            profil.publications = (profil.publications || []).concat((r.publications || []).filter(p => !vus.has(p.id)));
+            peindreListe(); bilanPlus(r.pages);
+          } catch (e) { b.disabled = false; b.textContent = 'Réessayer'; }
+        };
+        liste.insertAdjacentElement('afterend', b);
+      };
+      /* La liste de départ (profil.publications) est plus courte qu'une page : on repart de la page 1 complète pour que « Afficher plus » ne saute aucune publication. */
+      if (troisCol && !isOwner) window.api('GET', `/profil/${profil.id}/publications?page=1`).then(r => { pagePub = r.page || 1; profil.publications = r.publications || profil.publications || []; peindreListe(); bilanPlus(r.pages); }).catch(() => { });
       window.CdaPublicationsRefresh = async () => {
         try {
           const r = await window.api('GET', `/profil/${profil.id}/publications`);
           profil.publications = r.publications || [];
-          window.Posts.renderFeed(profil.publications, 'cda-publications-list');
+          peindreListe();
           montrerPremierPost();
         } catch (e) { /* liste non rafraîchie, pas bloquant */ }
       };
+    }
+    if (modeAccueil) {
+      const moi = Object.assign({}, opts.cu || {}, { id: profil.id });
+      /* La bande de Reels occupe toute la largeur, AU-DESSUS des trois colonnes du profil (créée une seule fois, la carte se redessine à chaque modification). */
+      let mReels = document.getElementById('cda-accueil-reels');
+      if (!mReels) {
+        const grille = container.closest('.pp-3col');
+        if (grille && grille.parentElement) { mReels = document.createElement('div'); mReels.id = 'cda-accueil-reels'; grille.parentElement.insertBefore(mReels, grille); }
+      }
+      window.ProfilAccueil.monterReels(mReels, { moi });
+      window.ProfilAccueil.monterFil(document.getElementById('cda-accueil-hub'), { moi });
     }
 
     // Avis + droit de réponse (cahier des charges "Avis + droit de réponse") — même composant

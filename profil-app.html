@@ -2139,13 +2139,30 @@ function pvzFirstImage(p) {
    route que loadPublicationsTab (GET /profil/:id/publications), dont la forme est celle
    attendue par Posts.renderFeed/renderPostCard (auteur_profil, reactions par type, hashtags…),
    contrairement à l'objet `profil.publications` déjà en mémoire (trop allégé pour ce rendu). */
-async function pvzChargerPublications() {
+/* 2026-11-02 : sur le profil d'une autre personne, UNIQUEMENT ses actualités (publiées ou republiées par elle),
+   qui se poursuivent par « Afficher plus » au lieu d'être tronquées aux 8 premières. */
+let pvzPubsVues = [], pvzPubPage = 1;
+async function pvzChargerPublications(suite) {
   const feed = document.getElementById('pvz-pub-feed');
   if (!feed) return;
   if (window.Posts) {
     try {
-      const r = await api('GET', `/profil/${profil.id}/publications?page=1`);
-      Posts.renderFeed((r.publications || []).slice(0, 8), 'pvz-pub-feed', { currentUserId: CU?.id });
+      if (!suite) { pvzPubsVues = []; pvzPubPage = 0; }
+      const r = await api('GET', `/profil/${profil.id}/publications?page=${pvzPubPage + 1}`);
+      pvzPubPage = r.page || (pvzPubPage + 1);
+      const vus = new Set(pvzPubsVues.map(p => p.id));
+      pvzPubsVues = pvzPubsVues.concat((r.publications || []).filter(p => !vus.has(p.id)));
+      const reste = pvzPubPage < (r.pages || 1);
+      if (!pvzPubsVues.length) { feed.innerHTML = `<div class="pvz-empty" style="padding:8px 0;">Aucune publication pour le moment.</div>`; return; }
+      Posts.renderFeed(pvzPubsVues, 'pvz-pub-feed', { currentUserId: CU?.id });
+      const ancien = document.getElementById('pvz-pub-plus'); if (ancien) ancien.remove();
+      if (reste) {
+        const b = document.createElement('button');
+        b.id = 'pvz-pub-plus'; b.type = 'button'; b.className = 'pvz-btn'; b.style.cssText = 'width:100%;justify-content:center;margin-top:12px;min-height:44px;';
+        b.textContent = 'Afficher plus d’actualités';
+        b.onclick = () => { b.disabled = true; b.textContent = 'Chargement…'; pvzChargerPublications(true); };
+        feed.insertAdjacentElement('afterend', b);
+      }
       return;
     } catch (e) { /* repli ci-dessous */ }
   }
@@ -2439,16 +2456,18 @@ function renderVisitorProfile() {
       <div class="pvz-card-title">📄 Comptes-rendus d'événements</div>
       <div id="pvz-cr-feed"><div class="pvz-empty" style="padding:8px 0;">Chargement…</div></div>
     </section>` : '';
-  const centerCol = `<main class="pvz-main">
-    <section class="pvz-card" data-reels-section hidden style="display:none">
-      <div class="pvz-card-title">🎬 Reels</div>
-      <div id="pvz-reels-mount"></div>
-    </section>
-    <section class="pvz-card">
+  /* 2026-11-02, demande explicite (profil « à la Facebook ») :
+     • SON profil : les actualités de toute la plateforme (filtrables, « Mes actualités »), créer facilement ; les Reels sont en bande AU-DESSUS du profil
+       (assets/profil-accueil.js) — ses propres Reels ne figurent donc plus dans une carte à part.
+     • Profil d'UNE AUTRE personne : seulement ses actualités (publiées ou republiées par elle), sans bande de Reels.
+     Le contenu historique (carte « Publications ») reste le repli si le module ne se charge pas. */
+  const cartePublications = `<section class="pvz-card">
       <div class="pvz-card-title">🗞️ Publications ${pubs.length?`<a class="more" href="fil-actualite.html" style="text-decoration:none;">Voir tout</a>`:''}</div>
       ${isOwn ? `<button class="pvz-btn primary" style="width:100%;justify-content:center;margin-bottom:14px;" onclick="window.Posts&&Posts.openModal()">✍️ Créer une publication</button>` : ''}
       <div id="pvz-pub-feed"><div class="pvz-empty" style="padding:8px 0;">Chargement…</div></div>
-    </section>
+    </section>`;
+  const centerCol = `<main class="pvz-main">
+    ${isOwn ? `<div id="pa-hub-mount">${cartePublications}</div>` : cartePublications}
     ${evtComptesRendusCol}
     <div id="pvz-avis-mount"></div>
   </main>`;
@@ -2466,14 +2485,17 @@ function renderVisitorProfile() {
 
   const dpBlock = (!isPremium && profil._decouverte_premium) ? window.decouvertePremiumBlockHtml(profil._decouverte_premium.date_expiration, 'pvz-dp-block') : '';
 
-  root.innerHTML = hero + dpBlock + grid;
+  root.innerHTML = (isOwn && window.ProfilAccueil ? '<div id="pa-reels-top"></div>' : '') + hero + dpBlock + grid;
   /* Le profil est rendu APRÈS le chargement de la page : sans cet appel, l'emplacement du
      bouton de mise en relation resterait vide, le composant ne balayant le DOM qu'au démarrage. */
   window.initBoutonsRelation && window.initBoutonsRelation(root);
   if (window.Soutenir) Soutenir.hydrate(root);
-  pvzChargerPublications();
-  /* Reels du compte (2026-10-14) : leurs vidéos, et « Créer un Reel » sur son propre profil. */
-  if (window.ReelsProfil) ReelsProfil.monter(document.getElementById('pvz-reels-mount'), { auteurId: profil.id, estMoi: !!isOwn });
+  if (isOwn && window.ProfilAccueil && CU) {
+    ProfilAccueil.monterReels(document.getElementById('pa-reels-top'), { moi: CU });
+    ProfilAccueil.monterFil(document.getElementById('pa-hub-mount'), { moi: CU });
+  } else {
+    pvzChargerPublications();
+  }
   if (isOrgAccount) { loadEvenementsTab('pvz-evt-feed'); pvzChargerComptesRendus(); }
 
   // Avis + droit de réponse (cahier des charges "Avis + droit de réponse") — visible sur
@@ -9602,6 +9624,7 @@ init();
 <script src="assets/profile-qr.js"></script>
 <script src="assets/posts.js"></script>
 <script src="assets/reels-profil.js?v=20261014a"></script>
+<script src="assets/profil-accueil.js?v=20261102g"></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js" defer></script>
 <script src="assets/gsap-animations.js" defer></script>
@@ -9611,7 +9634,7 @@ init();
 <script src="assets/avis-section.js"></script>
 <script src="assets/banner-presets.js"></script>
 <script src="assets/domaines-activite.js"></script>
-<script src="assets/carte-diaspoactif.js?v=5"></script>
+<script src="assets/carte-diaspoactif.js?v=8"></script>
 <script src="/assets/image-cropper.js"></script>
 <script src="/assets/widget-board.js"></script>
   <script src="/assets/theme-manager.js"></script>
