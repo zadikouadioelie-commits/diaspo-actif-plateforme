@@ -833,6 +833,15 @@ body.pp-sans-bandeau .pvz-hero { margin-top:78px; }
 .pvz-card { background:#fff; border:1px solid rgba(18,32,56,.07); border-radius:16px; box-shadow:0 1px 2px rgba(18,32,56,.04); padding:18px 20px; }
 .pvz-card-title { font-size:14px; font-weight:700; color:#122A4D; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; }
 .pvz-card-title .more { font-size:12.5px; font-weight:600; color:var(--tp,#2F6BED); cursor:pointer; }
+/* Carte « Code d'identification » (2026-11-02) : distincte du QR code — l'ID DA est une suite de chiffres propre au compte, public, sans lien avec le code secret DS-ID. */
+.pvz-idcode { font-family:ui-monospace,'SFMono-Regular',Menlo,Consolas,monospace; font-size:22px; font-weight:800; letter-spacing:.12em; color:#122A4D; background:#F3F6FB; border:1px solid #DCE4F2; border-radius:12px; padding:12px 10px; text-align:center; word-break:break-all; font-variant-numeric:tabular-nums; user-select:all; }
+.pvz-idcode-note { margin:8px 0 12px; font-size:12px; line-height:1.45; color:#8794A7; }
+.pvz-idcode-btn { display:inline-flex; align-items:center; justify-content:center; gap:6px; min-height:40px; padding:0 16px; border-radius:10px; border:1.5px solid #DCE4F2; background:#fff; color:#122A4D; font:inherit; font-size:13px; font-weight:700; cursor:pointer; }
+.pvz-idcode-btn:hover { background:#122A4D; color:#fff; border-color:#122A4D; }
+.pvz-idcode-btn:focus-visible { outline:2px solid var(--tp,#2F6BED); outline-offset:2px; }
+html body.nd .pvz-idcode { color:var(--nd-or,#E3C06E); background:rgba(255,255,255,.06); border-color:var(--nd-bord,rgba(227,192,110,.24)); }
+html body.nd .pvz-idcode-btn { background:transparent; color:var(--nd-or,#E3C06E); border-color:var(--nd-bord,rgba(227,192,110,.24)); }
+html body.nd .pvz-idcode-btn:hover { background:var(--nd-or,#E3C06E); color:#0B1226; border-color:var(--nd-or,#E3C06E); }
 .pvz-empty { font-size:13px; color:#94a3b8; font-style:italic; }
 .pvz-interest-chip { padding:6px 11px; border-radius:8px; background-color:var(--tp-light,#EAF1FE); color:var(--tp,#2F6BED); font-size:12px; font-weight:500; }
 .pvz-link-row { display:flex; align-items:center; gap:10px; font-size:13px; color:#3B4658; }
@@ -2423,10 +2432,20 @@ function renderVisitorProfile() {
       ${interetsBody}
     </section>` : '';
 
+  /* Deux cartes distinctes (2026-11-02, demande explicite) : le code d'identification (ID DA, « DA- » + 8 chiffres,
+     propre à ce compte) d'un côté, le QR code de l'autre. Jamais le DS-ID ici : ce profil est public. */
+  const idDaPropre = String(profil.da_id || '').replace(/[^A-Za-z0-9-]/g, '');
+  const idCodeCard = idDaPropre ? `<section class="pvz-card" style="text-align:center;">
+      <h3 class="pvz-card-title" style="justify-content:center;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#8794A7;">🔢 Code d'identification</h3>
+      <div class="pvz-idcode" id="pvz-idcode" aria-label="Code d'identification propre à ce compte">${idDaPropre}</div>
+      <p class="pvz-idcode-note">Code d'identification propre à ce compte. Il peut être communiqué sans risque.</p>
+      <button type="button" class="pvz-idcode-btn" onclick="pvzCopierIdDa('${idDaPropre}')">📋 Copier le code</button>
+    </section>` : '';
   const leftCol = `<aside class="pvz-aside">
     ${reseauxCard}
+    ${idCodeCard}
     <section class="pvz-card" style="text-align:center;">
-      <h3 class="pvz-card-title" style="justify-content:center;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#8794A7;">📱 QR code profil</h3>
+      <h3 class="pvz-card-title" style="justify-content:center;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#8794A7;">📱 QR code</h3>
       <div id="pvz-qr" style="display:flex;justify-content:center;"></div>
     </section>
   </aside>`;
@@ -2518,13 +2537,20 @@ function renderVisitorProfile() {
   // QR code (composant partagé)
   const qrEl = document.getElementById('pvz-qr');
   if (qrEl && window.ProfileQR) {
-    ProfileQR.render(qrEl, { userId:profil.id, userName:nom, userRole:profil.role_label||profil.role||'Membre', size:140 });
+    ProfileQR.render(qrEl, { userId:profil.id, userName:nom, userRole:profil.role_label||profil.role||'Membre', size:140, compact:true });
   }
 
   // Bascule initiale selon le hash (#vitrine)
   if (isInit && (window.location.hash || '').startsWith('#vitrine')) {
     pvzSwitchTab('vitrine');
   }
+}
+
+/* Copie du code d'identification (ID DA) — même retour que le bouton de l'écran « Codes ». */
+function pvzCopierIdDa(id) {
+  const ok = () => { if (typeof showToast === 'function') showToast('✅ Code copié !'); };
+  try { navigator.clipboard.writeText(id).then(ok, () => { window.prompt('Copiez ce code :', id); }); }
+  catch (e) { window.prompt('Copiez ce code :', id); }
 }
 
 /* Bascule Profil/Vitrine côté visiteur */
