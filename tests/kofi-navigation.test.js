@@ -120,6 +120,16 @@ test('Koffi navigation — parcours complet', async (t) => {
     assert.match(dernierAppel().messages.pop().content, /<page_actuelle>inconnue<\/page_actuelle>/);
   });
 
+  await t.test('chiffres publics (2026-11-01) : le modèle reçoit des compteurs exacts, jamais de donnée de compte dedans', async () => {
+    await msg(jar.Autre, { texte: 'combien de boutiques y a-t-il ?' });
+    const appel = dernierAppel();
+    assert.match(appel.systeme, /<stats_publiques>/);
+    const nbBoutiquesAttendu = sql(`SELECT COUNT(*) n FROM initiatives i LEFT JOIN users u ON u.id=i.owner_user_id WHERE (u.is_demo IS NULL OR u.is_demo=FALSE) AND i.vitrine_active=1`)[0].n;
+    assert.match(appel.systeme, new RegExp(`boutiques actives : ${nbBoutiquesAttendu}\\b`));
+    assert.match(appel.systeme, /membres \(hors administration\) : \d+/);
+    assert.match(appel.systeme, /jamais citer ni estimer un autre chiffre/);
+  });
+
   await t.test('pages réservées : un compte ordinaire ne reçoit pas le scanner ; l\'administrateur oui', async () => {
     const a = await msg(jar.Autre, { texte: 'scanner les billets PAGE:scanner_billets,faq' });
     assert.deepEqual(a.data.message.destinations.map(d => d.cle), ['faq']);
