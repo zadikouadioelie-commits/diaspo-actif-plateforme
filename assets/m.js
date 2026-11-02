@@ -2056,7 +2056,7 @@
   }
   async function loadBoutiques() {
     const l = $('#bt-list'); l.innerHTML = '<div class="sk skc"></div><div class="sk skc"></div>';
-    try { const r = await api('/api/vitrines'); S.boutiques.items = r.vitrines || []; S.boutiques.loaded = true; paintBoutiques(); }
+    try { const r = await api('/api/vitrines'); S.boutiques.items = r.vitrines || []; S.boutiques.maintenance = !!r.en_maintenance; S.boutiques.loaded = true; paintBoutiques(); }
     catch (e) { l.innerHTML = `<div class="empty"><b>Impossible de charger les boutiques</b>${esc(e.message)}<br><br><button class="btn sm" id="retry">Réessayer</button></div>`; $('#retry').onclick = loadBoutiques; }
   }
   /* Aperçu des prix d'une boutique (2026-10-13) : « 12 articles · de 5 € à 60 € ». Pas de lien vers le profil ici : en Boutiques, on regarde la boutique ; le profil se consulte depuis l'Annuaire. */
@@ -2070,8 +2070,14 @@
     const fourchette = a.prix_min == null ? 'Prix sur demande' : (a.prix_min === a.prix_max ? prixBoutique(a.prix_min, a.devise) : 'de ' + prixBoutique(a.prix_min, a.devise) + ' à ' + prixBoutique(a.prix_max, a.devise));
     return `<div class="small" style="padding:0 14px 8px"><b>${a.nb_articles} article${a.nb_articles > 1 ? 's' : ''}</b> <span class="muted">· ${esc(fourchette)}</span></div>`;
   }
+  /* Maintenance générale des boutiques (2026-11-02, demande explicite) : l'affiche remplace recherche, filtres et liste. */
+  function afficherMaintenanceBoutiques(l) {
+    ['.search', '#bt-bar', '#bt-count'].forEach(sel => { const e = $(sel, $('#t-boutiques')); if (e) e.style.display = 'none'; });
+    l.innerHTML = '<img src="/assets/boutiques-maintenance-affiche.webp" width="1672" height="941" alt="Nos boutiques Diaspo&#39;Actif sont actuellement en maintenance. Revenez très vite ! Contact : contact@diaspoactique.com" style="display:block;width:100%;height:auto;border-radius:14px">';
+  }
   function paintBoutiques() {
     const l = $('#bt-list'); if (!l) return;
+    if (S.boutiques.maintenance) return afficherMaintenanceBoutiques(l);
     S.boutiques.f = S.boutiques.f || {}; drawBtBar();
     const q = S.boutiques.q.toLowerCase();
     const a = S.boutiques.items.filter(v => btMatch(v) && (!q || [v.boutique_nom, v.nom, v.domaine, v.ville, v.pays, v.slogan].join(' ').toLowerCase().includes(q)));

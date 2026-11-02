@@ -10669,6 +10669,10 @@ route("GET", "/api/initiatives", async (req, res, params, body, query) => {
    Distinct de /api/initiatives : ne montre que les vitrines réellement publiées et actives,
    avec note moyenne et tri dédié — /api/initiatives reste utilisé par l'Annuaire tel quel. */
 route("GET", "/api/vitrines", async (req, res, params, body, query) => {
+  /* Maintenance générale (2026-11-02, demande explicite : « fermer l'accès et la vision des boutiques,
+     même une boutique rendue publique ne sera pas visible ») : aucune boutique n'est listée tant que
+     l'interrupteur est actif ; vitrine_active n'est pas touché, la réouverture rend tout tel quel. */
+  if (await boutiquesEnMaintenance()) return sendJSON(res, 200, { vitrines: [], en_maintenance: true });
   let rows = await db.prepare(`
     SELECT i.*, u.origine1 AS owner_origine1, u.origine2 AS owner_origine2,
       av.note_moyenne, av.nb_avis

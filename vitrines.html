@@ -53,6 +53,12 @@
 .vit-bandeau-titre{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;}
 .vit-bandeau-defil{width:100%;}
 .vit-bandeau-img{display:block;width:100%;height:auto;}
+/* Maintenance des boutiques (2026-11-02, demande explicite) : l'affiche remplace stats, recherche, filtres, liste et appel à l'action. */
+.vit-maintenance{display:none;background:#060A14;padding:28px 16px 40px;line-height:0;}
+.vit-maintenance img{display:block;width:100%;max-width:1500px;height:auto;margin:0 auto;border-radius:14px;box-shadow:0 10px 40px rgba(0,0,0,.45);}
+html.vit-ferme .vit-maintenance{display:block;}
+html.vit-ferme .vit-masquable{display:none!important;}
+html.vit-attente .vit-masquable{visibility:hidden;}
 .vit-stat-band{background:#1B3A6B;padding:0;}
 .vit-stat-band-inner{max-width:1180px;margin:0 auto;padding:0 24px;display:flex;}
 .vit-stat-chip{display:flex;align-items:center;gap:12px;padding:16px 32px;font-size:14px;font-weight:600;color:rgba(255,255,255,.9);border-right:1px solid rgba(255,255,255,.15);}
@@ -233,8 +239,27 @@
     </div>
   </div>
 
+  <!-- ===== MAINTENANCE (2026-11-02, demande explicite : fermer l'accès et la vision des boutiques, même publiques,
+       et mettre l'affiche en grand à la place). Pilotée par l'interrupteur « Maintenance des boutiques » du tableau
+       de bord administrateur ; désactivé, la page redevient celle d'avant. ===== -->
+  <div class="vit-maintenance" id="vit-maintenance">
+    <img src="assets/boutiques-maintenance-affiche.webp" width="1672" height="941"
+         alt="Nos boutiques Diaspo'Actif sont actuellement en maintenance. Revenez très vite ! Nous vous tenons informés de la réouverture. Contact : contact@diaspoactique.com">
+  </div>
+  <script>
+  (function(){
+    var h = document.documentElement;
+    h.classList.add('vit-attente');
+    fetch('/api/plateforme/boutiques-maintenance', {credentials:'same-origin'})
+      .then(function(r){ return r.json(); })
+      .then(function(d){ if (d && d.en_maintenance) h.classList.add('vit-ferme'); })
+      .catch(function(){})
+      .then(function(){ h.classList.remove('vit-attente'); });
+  })();
+  </script>
+
   <!-- ===== STAT CHIPS ===== -->
-  <div class="vit-stat-band nd-zone">
+  <div class="vit-stat-band nd-zone vit-masquable">
     <div class="vit-stat-band-inner">
       <div class="vit-stat-chip"><div class="vit-stat-icon">🏪</div><span>Des boutiques à découvrir</span></div>
       <div class="vit-stat-chip"><div class="vit-stat-icon">🛍️</div><span>Des produits et services</span></div>
@@ -243,7 +268,7 @@
   </div>
 
   <!-- ===== RECHERCHE PAR MOT-CLÉ ===== -->
-  <div class="vit-filters nd-zone" style="padding-bottom:0;">
+  <div class="vit-filters nd-zone vit-masquable" style="padding-bottom:0;">
     <div class="vit-filters-inner" style="max-width:100%;">
       <div class="vit-filter-group" style="flex:1;min-width:260px;position:relative;">
         <label>🔍 Rechercher une boutique</label>
@@ -254,7 +279,7 @@
   </div>
 
   <!-- ===== FILTRES ===== -->
-  <div class="vit-filters nd-zone">
+  <div class="vit-filters nd-zone vit-masquable">
     <div class="vit-filters-inner">
 
       <div class="vit-filter-group">
@@ -329,7 +354,7 @@
   </div>
 
   <!-- ===== CATALOGUE ===== -->
-  <div class="vit-section-head nd-zone">
+  <div class="vit-section-head nd-zone vit-masquable">
     <div>
       <h2>Toutes les boutiques</h2>
       <div class="vit-result-count"><strong id="v-result-count">0</strong> boutique(s) trouvée(s)</div>
@@ -337,12 +362,12 @@
     <p class="vit-section-desc">Explorez les boutiques publiées par les comptes Initiative — entreprises, associations, coopératives et projets de la diaspora.</p>
   </div>
 
-  <div class="vit-grid nd-zone" id="vit-list">
+  <div class="vit-grid nd-zone vit-masquable" id="vit-list">
     <div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted);">Chargement…</div>
   </div>
 
   <!-- ===== CTA ===== -->
-  <div class="vit-cta nd-zone">
+  <div class="vit-cta nd-zone vit-masquable">
     <div class="vit-cta-inner">
       <div class="vit-cta-icon">🏪</div>
       <h3>Vous portez un projet ou une activité ?</h3>
