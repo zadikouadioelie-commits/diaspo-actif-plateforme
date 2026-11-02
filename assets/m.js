@@ -2073,7 +2073,18 @@
   /* Maintenance générale des boutiques (2026-11-02, demande explicite) : l'affiche remplace recherche, filtres et liste. */
   function afficherMaintenanceBoutiques(l) {
     ['.search', '#bt-bar', '#bt-count'].forEach(sel => { const e = $(sel, $('#t-boutiques')); if (e) e.style.display = 'none'; });
-    l.innerHTML = '<img src="/assets/boutiques-maintenance-affiche.webp" width="1672" height="941" alt="Nos boutiques Diaspo&#39;Actif sont actuellement en maintenance. Revenez très vite ! Contact : contact@diaspoactique.com" style="display:block;width:100%;height:auto;border-radius:14px">';
+    const dis = "font-family:'Bodoni Moda',Didot,Georgia,serif;font-weight:500";
+    l.innerHTML = `<div style="text-align:center;padding:36px 16px 44px;border-radius:16px;background:radial-gradient(ellipse 80% 50% at 50% 30%,rgba(63,123,255,.16),transparent 70%),linear-gradient(180deg,#0B1226,#060A14)">
+      <div style="width:76px;height:76px;margin:0 auto 22px;border-radius:50%;display:grid;place-items:center;border:1px solid rgba(227,192,110,.28);background:radial-gradient(circle at 50% 35%,rgba(227,192,110,.18),rgba(227,192,110,.03) 70%)"><svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="#E3C06E" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3.5 17.5a1.8 1.8 0 0 0 2.5 2.5l5.8-5.8a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4 2.6-2.6z"/></svg></div>
+      <div style="margin:0 0 14px;font-size:11.5px;font-weight:700;letter-spacing:.24em;text-transform:uppercase;color:#E3C06E">Boutiques Diaspo&#39;Actif</div>
+      <h1 style="margin:0;${dis};font-size:31px;line-height:1.14;color:#F4F6FC">Nos boutiques sont actuellement en <em style="font-style:italic;color:#E3C06E">maintenance</em></h1>
+      <div style="width:100px;height:1px;margin:26px auto;background:linear-gradient(90deg,transparent,#E3C06E,transparent)"></div>
+      <div style="${dis};font-size:23px;color:#E3C06E;margin:0 0 6px">Revenez très vite !</div>
+      <p style="margin:0;font-size:15px;line-height:1.6;color:#A9B4CC">Nous vous tenons informés de la réouverture.</p>
+      <p style="margin:28px 0 0;padding:16px;border:1px solid rgba(227,192,110,.28);border-radius:14px;background:rgba(255,255,255,.04);font-size:15px;line-height:1.6;color:#E8ECF6">Nous vous préparons le meilleur de ce que <b style="color:#E3C06E">l&#39;Afrique et la diaspora</b> peuvent offrir.</p>
+      <p style="margin:28px 0 10px;font-size:13px;color:#A9B4CC">Vous pouvez nous contacter à :</p>
+      <a href="mailto:contact@diaspoactif.com" style="display:inline-block;padding:13px 22px;border-radius:999px;background:linear-gradient(135deg,#F3DC9B,#E3C06E 40%,#B9893A);color:#1A1305!important;font-weight:700;font-size:15px;text-decoration:none">contact@diaspoactif.com</a>
+    </div>`;
   }
   function paintBoutiques() {
     const l = $('#bt-list'); if (!l) return;
