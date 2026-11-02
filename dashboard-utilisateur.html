@@ -411,11 +411,11 @@ function fmtDate(d){if(!d)return '';try{return new Date(d).toLocaleDateString('f
     window.location.href='profil.html?id='+me.id;
   });
 
-  // Nationalités (confidentielles — on affiche juste si renseignées)
+  // Nationalités (publiques : elles apparaissent sur le profil public — on affiche juste si renseignées)
   const natEl = document.getElementById('dv-nationalites');
   const nats = [me.profil?.nationalite1, me.profil?.nationalite2].filter(Boolean);
   natEl.innerHTML = nats.length
-    ? '<p style="margin:8px 0;">🔐 '+nats.length+' nationalité'+(nats.length>1?'s':'')+ ' déclarée'+(nats.length>1?'s':'')+' (confidentielle'+(nats.length>1?'s':'')+')</p>'
+    ? '<p style="margin:8px 0;">🌍 '+nats.length+' nationalité'+(nats.length>1?'s':'')+ ' déclarée'+(nats.length>1?'s':'')+' (visible'+(nats.length>1?'s':'')+' sur votre profil public)</p>'
     : '<p style="color:var(--muted);font-size:13px;margin:8px 0;">Aucune nationalité déclarée pour l\'instant.</p>';
 
   // Financements

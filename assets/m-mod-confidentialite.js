@@ -92,9 +92,9 @@
   const NIVEAUX = [['public', '🌍 Public'], ['membres', '👤 Membres'], ['relations', '🤝 Relations'], ['prive', '🔒 Privé']];
   /* assets/data.js, CONFIDENTIALITE_NIVEAUX (affiché sur confidentialite.html) */
   const NIVEAUX_DONNEES = [
-    { icone: '🌍', niveau: 'Public', desc: 'Visible par l’ensemble des membres de Diaspo’Actif, y compris les visiteurs non connectés à certains contenus.', champs: ['Nom et prénom (ou pseudonyme)', 'Photo', 'Ville (optionnel)', 'Profession', 'Compétences', 'Projets', 'Publications'] },
+    { icone: '🌍', niveau: 'Public', desc: 'Visible par l’ensemble des membres de Diaspo’Actif, y compris les visiteurs non connectés à certains contenus.', champs: ['Nom et prénom (ou pseudonyme)', 'Photo', 'Ville (optionnel)', 'Nationalité(s)', 'Profession', 'Compétences', 'Projets', 'Publications'] },
     { icone: '🔒', niveau: 'Réseau uniquement', desc: 'Visible uniquement par les membres de votre réseau (connexions acceptées, initiatives suivies, groupes communs).', champs: ['Téléphone', 'Email', 'Documents partagés', 'Certaines informations professionnelles'] },
-    { icone: '🔐', niveau: 'Confidentiel', desc: 'Accès réservé à Diaspo’Actif et aux institutions habilitées, dans un cadre strictement encadré.', champs: ['Nationalités', 'Pièces d’identité', 'Documents de vérification', 'Coordonnées administratives', 'Informations de paiement'] }
+    { icone: '🔐', niveau: 'Confidentiel', desc: 'Accès réservé à Diaspo’Actif et aux institutions habilitées, dans un cadre strictement encadré.', champs: ['Pièces d’identité', 'Documents de vérification', 'Coordonnées administratives', 'Informations de paiement'] }
   ];
   const ROLES_INSTITUTION = ['collectivite', 'institutionnel', 'officiel'];
 
@@ -650,7 +650,7 @@
     jeton++;
     setPane('Qui voit quoi ?', `<p class="muted" style="margin:2px 4px 12px;line-height:1.5">Dans Diaspo’Actif, les informations que vous partagez sont classées en trois niveaux de visibilité.</p>
       ${NIVEAUX_DONNEES.map(n => `<div class="cf-lvl"><h3><span aria-hidden="true">${n.icone}</span> ${esc(n.niveau)}</h3><p>${esc(n.desc)}</p><ul>${n.champs.map(c => `<li>${esc(c)}</li>`).join('')}</ul></div>`).join('')}
-      <div class="cf-alert g">Les données « Confidentiel » (nationalités, pièces d’identité, documents de vérification, coordonnées administratives, informations de paiement) ne sont accessibles qu’à Diaspo’Actif et aux institutions habilitées, dans un cadre strictement encadré.</div>
+      <div class="cf-alert g">Les données « Confidentiel » (pièces d’identité, documents de vérification, coordonnées administratives, informations de paiement) ne sont accessibles qu’à Diaspo’Actif et aux institutions habilitées, dans un cadre strictement encadré.</div>
       <a class="btn out block" href="#/confidentialite">Retour aux réglages</a>`);
   }
 

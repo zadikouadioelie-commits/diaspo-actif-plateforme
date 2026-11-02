@@ -434,7 +434,7 @@ const CONFIDENTIALITE_NIVEAUX = [
     icone: "🌍",
     classe: "conf-public",
     description: "Visible par l'ensemble des membres de Diaspo'Actif, y compris les visiteurs non connectés à certains contenus.",
-    champs: ["Nom et prénom (ou pseudonyme)", "Photo", "Ville (optionnel)", "Profession", "Compétences", "Projets", "Publications"]
+    champs: ["Nom et prénom (ou pseudonyme)", "Photo", "Ville (optionnel)", "Nationalité(s)", "Profession", "Compétences", "Projets", "Publications"]
   },
   {
     niveau: "Réseau uniquement",
@@ -448,7 +448,7 @@ const CONFIDENTIALITE_NIVEAUX = [
     icone: "🔐",
     classe: "conf-confidentiel",
     description: "Accès réservé à Diaspo'Actif et aux institutions habilitées, dans un cadre strictement encadré.",
-    champs: ["Nationalités", "Pièces d'identité", "Documents de vérification", "Coordonnées administratives", "Informations de paiement"]
+    champs: ["Pièces d'identité", "Documents de vérification", "Coordonnées administratives", "Informations de paiement"]
   }
 ];
 
