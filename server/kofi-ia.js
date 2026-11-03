@@ -211,7 +211,10 @@ function reponseFausseNavigation({ systeme, messages }) {
   else {
     const m = /PAGE:(\S+)/.exec(q);
     const dest = m ? m[1].split(",").filter(Boolean) : [];
-    texte = "```json\n" + JSON.stringify({ message: "Voici où aller.", destinations: dest }) + "\n```";
+    /* ADHJSON:{…} (une ligne) → le modèle « demande » d'ajouter cet adhérent (brouillon revalidé par le serveur). */
+    const adh = /ADHJSON:(\{.*\})/.exec(q);
+    let action; try { action = adh ? { type: "ajouter_adherent", adherent: JSON.parse(adh[1]) } : undefined; } catch (e) { action = undefined; }
+    texte = "```json\n" + JSON.stringify({ message: action ? "Je prépare l'ajout." : "Voici où aller.", destinations: dest, ...(action ? { action } : {}) }) + "\n```";
   }
   return { texte, entree, sortie: Math.ceil(texte.length / 4), lecture_cache: 0, refus: false, arret: "end_turn" };
 }
