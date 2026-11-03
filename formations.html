@@ -1752,7 +1752,12 @@
     try {
       /* Le serveur décide qui peut créer des formations : administration, partenaire, formateur invité par Diaspo'Actif ou Initiative Premium. */
       const st = await api('GET', '/formateur/statut');
-      if (st.peut_creer) { document.getElementById('sb-tab-espace-formateur').style.display = ''; return; }
+      if (st.peut_creer) {
+        document.getElementById('sb-tab-espace-formateur').style.display = '';
+        /* Lien direct (Koffi, tableau de bord) : formations.html#espace-formateur ouvre l'Espace Formateur. */
+        if (location.hash === '#espace-formateur') switchVolet('espace-formateur');
+        return;
+      }
       if (st.acces_requis) {
         /* Compte Initiative sans autorisation : la création de formations s'obtient sur demande (module Création de formation), plus par le seul Premium. */
         const ban = document.getElementById('devenir-formateur-banner');

@@ -42,7 +42,7 @@ const PAGES = [
   { cle: "mon_abonnement", icone: "👑", titre: "Mon abonnement", url: "mon-abonnement.html", tel: "#/abonnement", desc: "Voir l'état de votre abonnement Premium, sa date d'échéance, le renouveler ou le gérer." },
   { cle: "parrainage", icone: "🎁", titre: "Parrainage et invitations", url: "parrainage.html", tel: "#/parrainage", desc: "Inviter des proches à rejoindre Diaspo'Actif et suivre vos parrainages." },
   { cle: "formations", icone: "🎓", titre: "Formations en ligne", url: "formations.html", tel: "#/formations", desc: "Le catalogue des formations de Diaspo'Actif : s'inscrire, suivre une formation, retrouver ses certificats ; Koffi, le tuteur, répond aux questions dans chaque formation." },
-  { cle: "creer_formation", icone: "🧑‍🏫", titre: "Studio de création de formation", url: "formation-studio.html", desc: "Créer et publier une formation (modules, leçons, évaluations, certificat), avec l'aide de Koffi ; réservé aux comptes autorisés à créer des formations." },
+  { cle: "creer_formation", icone: "🧑‍🏫", titre: "Studio de création de formation", url: "formations.html#espace-formateur", page: "formation-studio.html", desc: "Créer et publier une formation (modules, leçons, évaluations, certificat), avec l'aide de Koffi : ouvre l'Espace Formateur, d'où l'on crée une formation puis où l'on ouvre le Studio sur une leçon ; réservé aux comptes autorisés à créer des formations." },
   { cle: "attestation", icone: "📜", titre: "Mon attestation", url: "attestation.html", desc: "Consulter votre attestation Diaspo'Actif." },
   { cle: "business_plan", icone: "📋", titre: "Business Plans", url: "business-plan.html", tel: "#/businessplan", desc: "Créer, écrire et améliorer votre business plan rubrique par rubrique ; dans l'éditeur, Koffi peut jouer l'investisseur, le banquier ou le client pour vous faire répéter." },
   { cle: "cv", icone: "📄", titre: "Créer mon CV", url: "cv-builder.html", tel: "#/cvlettres", desc: "Construire et télécharger son CV (modèles, médias, partage par lien ou code QR)." },
@@ -89,7 +89,7 @@ function pageActuelle(chemin) {
   const f = String(chemin || "").split(/[?#]/)[0].split("/").pop().toLowerCase();
   if (!/^[a-z0-9-]+\.html$/.test(f)) return null;
   const nom = f.replace(/-app\.html$/, ".html");
-  for (const p of PAGES) { const u = String(p.url).split("?")[0]; if (u === f || u === nom) return p; }
+  for (const p of PAGES) { const u = String(p.page || p.url).split(/[?#]/)[0]; if (u === f || u === nom) return p; }
   if (Object.values(ROLE_DASHBOARD).includes(f)) return parCle.get("tableau_de_bord");
   if (f === "profil.html" || f === "profil-app.html" || f === "profil-collectivite.html") return parCle.get("mon_profil");
   return null;

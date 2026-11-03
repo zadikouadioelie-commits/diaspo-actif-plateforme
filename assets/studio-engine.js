@@ -1007,7 +1007,7 @@
   }
 
   async function demarrer() {
-    if (!FID || !LID) { document.body.innerHTML = '<p style="padding:30px;color:#fff">Module introuvable : ouvrez le studio depuis une leçon de votre formation.</p>'; return; }
+    if (!FID || !LID) { document.body.innerHTML = '<div style="padding:30px;color:#fff;font:16px/1.5 sans-serif"><p style="margin:0 0 16px">Le Studio s’ouvre depuis une leçon de votre formation : choisissez d’abord la formation et la leçon dans votre Espace Formateur.</p><a href="formations.html#espace-formateur" style="display:inline-block;background:#F26422;color:#fff;font-weight:700;text-decoration:none;padding:10px 18px;border-radius:10px">Ouvrir mon Espace Formateur</a></div>'; return; }
     renderOutils(); brancher();
     let d;
     try { d = await api('GET', API); }
