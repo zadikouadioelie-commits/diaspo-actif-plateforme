@@ -144,6 +144,7 @@ const Connexions = require("./connexions");
 const ConfirmationAppareil = require("./confirmation-appareil");
 const ProfilObligatoire = require("./profil-obligatoire");
 const RelancePublication = require("./relance-publication");
+const RelanceMessages = require("./relance-messages");
 /* Étape 3 : l'échéance réelle d'une session enregistrée est dans le registre (30 jours glissants pour un
    appareil principal, 3 jours pour un autre) — le jeton et le cookie doivent donc pouvoir vivre au moins
    aussi longtemps, d'où cette durée longue pour toute session portée par un jti. Sans jti (ancien
@@ -34178,6 +34179,41 @@ async function handleRequest(req, res) {
       sendJSON(res, 500, { error: 'Relances failed', detail: e.message });
     }
     return;
+  }
+
+  /* ── Relance par e-mail d'un message resté NON LU depuis 3 jours (2026-11-04, Vercel Cron quotidien) ──
+     Règles complètes dans server/relance-messages.js. Sans MESSAGES_RELANCES_EMAIL=1, l'exécution est « à blanc » :
+     elle compte les personnes concernées sans rien envoyer ni consigner (réponse JSON : a_blanc: true). */
+  if (pathname === '/api/cron/messages-relances') {
+    const cronSecret = process.env.CRON_SECRET;
+    const authHeader = req.headers['authorization'] || '';
+    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+      return sendJSON(res, 401, { error: "Non autorisé." });
+    }
+    try {
+      const ORIGIN_PUBLIC = process.env.PUBLIC_ORIGIN || 'https://diaspo-actif-plateforme.vercel.app';
+      const { sendEmail } = require("./mailer");
+      const bilan = await RelanceMessages.relancerMessagesNonLus({ db, sendEmail, signAuthToken, nomAffichage: nomCompteAffichage, origine: ORIGIN_PUBLIC });
+      sendJSON(res, 200, { ok: true, ...bilan });
+    } catch (e) {
+      console.error('[messages-relances]', e.stack || e.message);
+      sendJSON(res, 500, { error: 'Relances messages failed', detail: e.message });
+    }
+    return;
+  }
+
+  /* Lien de l'e-mail de relance des messages : sans connexion, signé, valable plus d'un an. Coupe « E-mails non
+     essentiels » du compte (le même réglage que dans Confidentialité / Paramètres) — les e-mails de sécurité restent envoyés. */
+  if (pathname === '/api/relances-messages/stop') {
+    const lim = SEC.rateLimit(`relance-msg-stop:${SEC.clientIp(req)}`, 30, 600000);
+    const echap = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const page = (titre, txt) => { res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" }); res.end(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${echap(titre)}</title><body style="font-family:Arial,sans-serif;background:#0B1226;color:#E8ECF6;display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0;"><div style="max-width:440px;padding:28px;text-align:center;"><h1 style="font-size:20px;color:#E3C06E;">${echap(titre)}</h1><p style="line-height:1.6;">${echap(txt)}</p><p><a href="/messagerie.html" style="color:#E3C06E;">Aller à ma messagerie</a></p></div></body>`); };
+    if (!lim.allowed) return page("Trop de demandes", "Réessayez dans quelques minutes.");
+    const p = verifyAuthToken(String(new URL(req.url, 'http://x').searchParams.get('t') || ''));
+    if (!p || p.k !== 'messages_mail_off' || !p.u) return page("Lien invalide", "Ce lien n'est pas valable ou a expiré. Vous pouvez aussi couper ces e-mails dans les réglages de votre compte (« E-mails non essentiels »).");
+    const r = await db.prepare("UPDATE users SET notif_emails_non_essentiels=0 WHERE id=?").run(Number(p.u));
+    if (!r || !Number(r.changes)) return page("Compte introuvable", "Votre compte n'a pas été retrouvé.");
+    return page("C'est noté", "Vous ne recevrez plus d'e-mails de rappel pour vos messages non lus. Vous pouvez rétablir ce réglage à tout moment dans les réglages de votre compte (« E-mails non essentiels »).");
   }
 
   /* ── Finalisation des suppressions de compte après le délai de grâce de 5 jours (Vercel Cron, quotidien) ──

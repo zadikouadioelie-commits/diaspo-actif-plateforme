@@ -6718,6 +6718,23 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_publication_relances_user ON publication_relances(user_id, created_at);
 
+  /* Relance par e-mail d'un message resté sans lecture depuis 3 jours (2026-11-04, demande explicite :
+     « les gens n'ont pas encore le réflexe d'aller sur Diaspo'Actif regarder leurs messages »).
+     Une ligne par (personne, conversation) et par envoi : message_id = le plus récent message non lu
+     couvert par l'e-mail — verrou « jamais deux fois pour le même message ». statut : 'envoye' | 'ignore'
+     (e-mails non essentiels coupés, ou pas d'adresse). Sans clé étrangère : ne bloque jamais une suppression
+     de compte. Voir server/relance-messages.js. */
+  CREATE TABLE IF NOT EXISTS messages_relances_email (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id         INTEGER NOT NULL,
+    conversation_id INTEGER NOT NULL,
+    message_id      INTEGER NOT NULL,
+    statut          TEXT NOT NULL DEFAULT 'envoye',
+    created_at      TEXT DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_msg_relances_email_conv ON messages_relances_email(user_id, conversation_id, message_id);
+  CREATE INDEX IF NOT EXISTS idx_msg_relances_email_date ON messages_relances_email(user_id, created_at);
+
   /* Partage de l'événement "3 mois de Premium offerts" (2026-10-09, demande explicite : "Partager
      cet événement va permettre de gagner 3 points de score de fiabilité. Ça ne se cumule pas.") —
      UNIQUE sur user_id, écrite en INSERT OR IGNORE : le bonus +3 (server/index.js,
