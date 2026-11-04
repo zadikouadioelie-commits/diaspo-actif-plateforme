@@ -143,6 +143,28 @@ async function verifier(db, id) {
   return c;
 }
 
+/* Pourquoi une session s'est-elle terminée ? (message affiché à la reconnexion, 2026-11-04)
+   Ne renvoie rien si la connexion est introuvable ou toujours valide : on n'invente jamais de motif. */
+async function raisonFin(db, id) {
+  if (!ID_RE.test(String(id || ''))) return null;
+  const c = await db.prepare('SELECT revoque_at, revoque_motif, expire_at, principal FROM connexions WHERE id=?').get(id);
+  if (!c) return null;
+  if (c.revoque_at) {
+    const m = String(c.revoque_motif || '');
+    if (m === 'multi_connexion_refusee' || m === 'code_multi_modifie') return { code: 'autre_appareil', message: "Vous avez été déconnecté : cette session a été fermée depuis un autre appareil (réponse « Non » à la question de connexion multiple, ou changement du code)." };
+    if (m === 'mot_de_passe_change' || m === 'mot_de_passe_reinitialise') return { code: 'mot_de_passe', message: "Vous avez été déconnecté : le mot de passe de ce compte a été modifié." };
+    if (m === 'deconnexion_manuelle' || m === 'deconnexion_des_autres' || m === 'deconnexion_groupe') return { code: 'autre_appareil', message: "Vous avez été déconnecté : cette session a été fermée depuis un autre appareil." };
+    if (m === 'remplacee') return { code: 'remplacee', message: "Vous avez été déconnecté : une nouvelle connexion sur ce même appareil a remplacé cette session." };
+    return { code: 'securite', message: "Vous avez été déconnecté : votre session a été fermée par mesure de sécurité." };
+  }
+  if (c.expire_at && String(c.expire_at) < horodatage()) {
+    return Number(c.principal) === 1
+      ? { code: 'expiree', message: "Vous avez été déconnecté : votre session de 30 jours d'inactivité a expiré." }
+      : { code: 'expiree', message: "Vous avez été déconnecté : votre session de 3 jours a expiré (appareil non principal). Reconnectez-vous pour continuer." };
+  }
+  return null;
+}
+
 const dernierToucher = new Map();
 async function toucher(db, cx) {
   const id = cx.id;
@@ -259,4 +281,4 @@ function cookieAppareilTexte(appareilId, sf) {
   return `${COOKIE_APPAREIL}=${appareilId}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${DUREE_COOKIE_APPAREIL_S}${sf || ''}`;
 }
 
-module.exports = { categorieDe, etatPrincipaux, designerPrincipal, retirerPrincipal, _viderThrottle, COOKIE_APPAREIL, analyserAppareil, etiquette, horodatage, lireAppareilId, nouvelAppareilId, cookieAppareilTexte, ouvrir, verifier, toucher, lister, compter, revoquer, revoquerAutres };
+module.exports = { raisonFin, categorieDe, etatPrincipaux, designerPrincipal, retirerPrincipal, _viderThrottle, COOKIE_APPAREIL, analyserAppareil, etiquette, horodatage, lireAppareilId, nouvelAppareilId, cookieAppareilTexte, ouvrir, verifier, toucher, lister, compter, revoquer, revoquerAutres };

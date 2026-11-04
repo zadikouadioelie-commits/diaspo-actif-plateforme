@@ -2870,6 +2870,17 @@ route("POST", "/api/relances-profil/:id/fermer", async (req, res, params) => {
 
 route("GET", "/api/auth/me", async (req, res) => {
   const user = await getCurrentUser(req);
+  /* Session terminée : on dit POURQUOI (expirée, fermée depuis un autre appareil…) une seule fois,
+     puis on efface le cookie périmé pour que le message ne se répète pas. */
+  if (!user) {
+    try {
+      const payload = verifyAuthToken(parseCookies(req).auth);
+      if (payload?.uid && payload.jti) {
+        const raison = await Connexions.raisonFin(db, payload.jti);
+        if (raison) return sendJSON(res, 200, { user: null, session_terminee: raison }, { "Set-Cookie": ["sid=; HttpOnly; Path=/; Max-Age=0", "auth=; HttpOnly; Path=/; Max-Age=0"] });
+      }
+    } catch (e) { console.error('[auth/me raisonFin]', e.message); }
+  }
   const pub = publicUser(user);
   if (pub) { try { pub.nom_affichage = await nomCompteAffichage(user.id); } catch (e) { pub.nom_affichage = null; } }
 

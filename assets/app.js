@@ -75,6 +75,37 @@ let CURRENT_USER = null;
    requêtes /api/auth/me identiques en quelques millisecondes sur une seule page
    (constaté lors du balayage plateforme du 2026-09-18). Une fois la requête en
    cours terminée, l'appel suivant repart bien sur le réseau (pas de cache figé). */
+/* Déconnexion forcée : explique pourquoi (session expirée, fermée depuis un autre appareil…).
+   Le serveur ne renvoie la raison qu'une fois (il efface le cookie périmé) ; la bannière reste jusqu'à fermeture. */
+function afficherSessionTerminee(raison) {
+  try {
+    if (!raison || !raison.message || document.getElementById("da-session-terminee")) return;
+    const surLogin = /\/(login|connexion|inscription)(\.html)?$/.test(location.pathname);
+    const b = document.createElement("div");
+    b.id = "da-session-terminee";
+    b.setAttribute("role", "alert");
+    b.style.cssText = "position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:100000;width:min(560px,calc(100vw - 24px));box-sizing:border-box;display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding:14px 16px;border-radius:14px;border:1px solid rgba(227,192,110,.45);background:#0B1226;color:#E8ECF6;font:500 14px/1.5 Manrope,'Segoe UI',system-ui,sans-serif;box-shadow:0 14px 40px rgba(0,0,0,.45)";
+    const t = document.createElement("span");
+    t.style.cssText = "flex:1 1 240px";
+    t.textContent = raison.message;
+    b.appendChild(t);
+    if (!surLogin) {
+      const a = document.createElement("a");
+      a.href = "login.html?redirect=" + encodeURIComponent(location.pathname.replace(/^\//, "") + location.search);
+      a.textContent = "Me reconnecter";
+      a.style.cssText = "padding:9px 16px;border-radius:999px;background:linear-gradient(135deg,#F3DC9B,#E3C06E 40%,#B9893A);color:#1A1305;font-weight:700;text-decoration:none";
+      b.appendChild(a);
+    }
+    const x = document.createElement("button");
+    x.type = "button";
+    x.setAttribute("aria-label", "Fermer");
+    x.textContent = "×";
+    x.style.cssText = "background:none;border:0;color:#A9B4CC;font-size:22px;line-height:1;cursor:pointer;padding:2px 6px";
+    x.onclick = () => b.remove();
+    b.appendChild(x);
+    (document.body || document.documentElement).appendChild(b);
+  } catch (e) { /* message informatif : jamais bloquant */ }
+}
 let _fetchCurrentUserPromise = null;
 async function fetchCurrentUser() {
   if (_fetchCurrentUserPromise) return _fetchCurrentUserPromise;
@@ -82,6 +113,7 @@ async function fetchCurrentUser() {
     try {
       const r = await api("GET", "/auth/me");
       CURRENT_USER = r.user;
+      if (!r.user && r.session_terminee) afficherSessionTerminee(r.session_terminee);
       return r.user;
     } catch (e) {
       CURRENT_USER = null;
