@@ -219,8 +219,8 @@ async function evaluerNouvelAppareil(req, user, ip, { viaDsId = false } = {}) {
   try {
     const v = await ConfirmationAppareil.evaluer(db, {
       req, user, ip, creerDefi: !viaDsId,
-      notifier: (d) => creerNotif(user.id, "connexion_suspecte", `Code de connexion : ${ConfirmationAppareil.codeNotif(d.id)}`,
-        `Une connexion est en cours depuis ${Connexions.etiquette(d)}${d.ville ? " (" + d.ville + ")" : ""}. Si c'est vous, saisissez le code ${ConfirmationAppareil.codeNotif(d.id)} sur cet appareil (valable 10 minutes). Si ce n'est pas vous, ne le communiquez à personne et bloquez la connexion depuis le bandeau « Mes connexions ».`,
+      notifier: (d) => creerNotif(user.id, "connexion_suspecte", "Nouvelle connexion en attente",
+        `Une connexion est en cours depuis ${Connexions.etiquette(d)}${d.ville ? " (" + d.ville + ")" : ""}. Si c'est vous, saisissez votre code multi-connexion (4 chiffres) sur cet appareil. Si ce n'est pas vous, ne le communiquez à personne et bloquez la connexion depuis le bandeau « Mes connexions ».`,
         { lien: "parametres-compte.html" }),
     });
     if (v.bloque) {
@@ -232,8 +232,9 @@ async function evaluerNouvelAppareil(req, user, ip, { viaDsId = false } = {}) {
     }
     if (v.defi) {
       SEC.logSecurity("login_appareil_a_confirmer", { ip, uid: Number(user.id) });
+      const aCode = await ConfirmationAppareil.aCodeMulti(db, user.id);   // sans code multi-connexion défini, la fenêtre part du DS-ID
       return { reponse: (res) => sendJSON(res, 200,
-        { confirmation_requise: true, defi: v.defi.id, methodes: ["ds_id", "email"], email_masque: ConfirmationAppareil.masquerEmail(user.email), expire_dans: 600, deja_ouvert_sur: v.autres || [] },
+        { confirmation_requise: true, defi: v.defi.id, methodes: ["code_multi", "ds_id", "email"], code_multi: aCode, email_masque: ConfirmationAppareil.masquerEmail(user.email), expire_dans: 600, deja_ouvert_sur: v.autres || [] },
         { "Set-Cookie": [Connexions.cookieAppareilTexte(v.appareilId, cookieSecureFlag(req))] }) };
     }
   } catch (e) { console.error("[confirmation-appareil.evaluer]", e.message); }
@@ -2629,18 +2630,19 @@ route("POST", "/api/auth/confirmer-appareil", async (req, res, params, body) => 
   const c = await ConfirmationAppareil.charger(db, req, body && body.defi);
   if (c.erreur) return sendJSON(res, c.code, { error: c.erreur });
   const d = c.defi;
-  const dsId = body && body.ds_id, code = body && body.code, codeNotif = body && body.code_notif;
-  if (!dsId && !code && !codeNotif) return sendJSON(res, 400, { error: "Saisissez le code affiché sur votre appareil connecté, votre Code ultra secret ou le code reçu par e-mail." });
-  const via = codeNotif ? "notification" : dsId ? "ds_id" : "email";
-  const ok = codeNotif ? ConfirmationAppareil.codeNotifValide(d, codeNotif) : dsId ? await ConfirmationAppareil.dsIdValide(db, d.user_id, dsId) : ConfirmationAppareil.codeEmailValide(d, code);
+  /* code_notif : ancien nom du champ, accepté pour une page de connexion restée ouverte avant la mise à jour */
+  const dsId = body && body.ds_id, code = body && body.code, codeMulti = body && (body.code_multi || body.code_notif);
+  if (!dsId && !code && !codeMulti) return sendJSON(res, 400, { error: "Saisissez votre code multi-connexion (4 chiffres), votre Code ultra secret ou le code reçu par e-mail." });
+  const via = codeMulti ? "code_multi" : dsId ? "ds_id" : "email";
+  const ok = codeMulti ? await ConfirmationAppareil.codeMultiValide(db, d.user_id, codeMulti) : dsId ? await ConfirmationAppareil.dsIdValide(db, d.user_id, dsId) : ConfirmationAppareil.codeEmailValide(d, code);
   if (!ok) {
-    const r = await ConfirmationAppareil.compterEchec(db, d, codeNotif ? ConfirmationAppareil.MAX_ESSAIS_CODE_NOTIF : undefined);
+    const r = await ConfirmationAppareil.compterEchec(db, d, codeMulti ? ConfirmationAppareil.MAX_ESSAIS_CODE_MULTI : undefined);
     SEC.logSecurity("confirmation_appareil_echec", { ip, uid: Number(d.user_id), restants: r.restants });
     if (r.bloque) {
       try { await creerNotif(d.user_id, "connexion_suspecte", "Tentatives de connexion bloquées", `Plusieurs codes incorrects ont été saisis pour ouvrir votre compte depuis ${Connexions.etiquette(d)}${d.ville ? " (" + d.ville + ")" : ""}. La connexion a été bloquée.`, { lien: "parametres-compte.html" }); } catch (_) {}
       return sendJSON(res, 429, { error: "Trop d'essais : cette connexion est bloquée pendant 15 minutes.", bloque: true });
     }
-    return sendJSON(res, 401, { error: dsId && !codeNotif ? "Code ultra secret incorrect." : "Code incorrect ou expiré.", essais_restants: r.restants });
+    return sendJSON(res, 401, { error: dsId && !codeMulti ? "Code ultra secret incorrect." : "Code incorrect ou expiré.", essais_restants: r.restants });
   }
   await ConfirmationAppareil.valider(db, d, via);
   SEC.logSecurity("confirmation_appareil_ok", { ip, uid: Number(d.user_id), via });

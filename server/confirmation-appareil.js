@@ -3,7 +3,7 @@
    confirmations_appareil / appareils_reconnus dans db.js).
 
    Règle : bon mot de passe + appareil inconnu + compte déjà ouvert ailleurs (activité < 24 h)
-   => pas de session, un « défi » à résoudre par DS-ID (compte ou compte lié) ou code e-mail.
+   => pas de session, un « défi » à résoudre par code multi-connexion (4 chiffres), DS-ID (compte ou compte lié) ou code e-mail.
    Un appareil confirmé est reconnu 30 jours. Comptes de démonstration exemptés (partagés par
    conception). Interrupteur d'urgence : variable d'environnement DESACTIVER_CONFIRMATION_APPAREIL=1.
    Toutes les fonctions reçoivent `db` (module async partagé SQLite/Postgres).
@@ -20,7 +20,7 @@ const DUREE_RECONNU_MS = 30 * 24 * 3600 * 1000;
 const MAX_ESSAIS = 5;
 const MAX_ENVOIS_EMAIL = 3;
 const MAX_DEFIS_PAR_HEURE = 6;
-const MAX_ESSAIS_CODE_NOTIF = 3;
+const MAX_ESSAIS_CODE_MULTI = 3;
 const DEFI_RE = /^[a-f0-9]{32}$/;
 
 const estDesactive = () => process.env.DESACTIVER_CONFIRMATION_APPAREIL === '1';
@@ -62,7 +62,7 @@ async function evaluer(db, { req, user, ip, notifier, creerDefi = true }) {
   const nouveauCookie = !appareilId;
   if (!appareilId) appareilId = Connexions.nouvelAppareilId();
 
-  /* Plafond de demandes par compte : le code affiché sur l'appareil connecté n'a que 3 chiffres ; des essais répétés depuis de
+  /* Plafond de demandes par compte : le code multi-connexion n'a que 4 chiffres ; des essais répétés depuis de
      nouveaux navigateurs ne doivent pas pouvoir le deviner. Au-delà de 6 demandes en 1 h : plus de nouvelle demande pendant 15 min. */
   const recentes = await db.prepare('SELECT COUNT(*) AS n FROM confirmations_appareil WHERE user_id=? AND created_at > ?').get(user.id, horodatage(-3600 * 1000));
   if (Number(recentes && recentes.n || 0) >= MAX_DEFIS_PAR_HEURE) return { bloque: true, reessayerDans: 15 * 60 };
@@ -121,16 +121,19 @@ async function compterEchec(db, d, max = MAX_ESSAIS) {
   return { restants: max - essais, bloque: false };
 }
 
-/* Code à 3 chiffres affiché dans les NOTIFICATIONS du compte, sur l'appareil déjà connecté (2026-10-07, demande du titulaire).
-   Dérivé (HMAC) de l'identifiant de la demande et d'un secret serveur : rien à stocker ; il vit aussi longtemps que la demande
-   (10 min) et ne vaut que pour CETTE demande. 3 essais maximum, puis la demande est bloquée. */
-function codeNotif(defiId) {
-  const h = crypto.createHmac('sha256', process.env.AUTH_SECRET || 'diaspo-actif-2026-secret').update('code-notif:' + defiId).digest();
-  return String(h.readUInt32BE(0) % 1000).padStart(3, '0');
+/* Preuve par défaut d'un nouvel appareil : le code multi-connexion à 4 chiffres, celui que le titulaire a déjà choisi dans
+   « Paramètres du compte » (table multi_connexion, voir server/multi-connexion.js). 2026-11-04, demande du titulaire : un code de moins à
+   retenir — il remplace le code à 3 chiffres qu'on affichait dans les notifications de l'appareil connecté. Sans code défini, la personne
+   passe par le DS-ID ou l'e-mail. 3 essais maximum par demande, puis la demande est bloquée. */
+async function codeMultiDuCompte(db, userId) {
+  const r = await db.prepare('SELECT code FROM multi_connexion WHERE user_id=?').get(userId);
+  return r && /^\d{4}$/.test(String(r.code || '')) ? String(r.code) : null;
 }
-function codeNotifValide(d, saisie) {
-  if (!/^\d{3}$/.test(String(saisie || '').trim())) return false;
-  return egalSur(codeNotif(d.id), String(saisie).trim());
+async function aCodeMulti(db, userId) { return !!(await codeMultiDuCompte(db, userId)); }
+async function codeMultiValide(db, userId, saisie) {
+  if (!/^\d{4}$/.test(String(saisie || '').trim())) return false;
+  const code = await codeMultiDuCompte(db, userId);
+  return !!code && egalSur(code, String(saisie).trim());
 }
 
 /* Le DS-ID saisi est-il celui du compte du défi, ou d'un compte du même groupe de liaison ? */
@@ -203,5 +206,5 @@ function masquerEmail(email) {
 
 module.exports = {
   MAX_ESSAIS, estDesactive, estCompteDemo, estReconnu, evaluer, charger, compterEchec, dsIdValide,
-  preparerCodeEmail, codeEmailValide, codeNotif, codeNotifValide, MAX_ESSAIS_CODE_NOTIF, valider, enAttente, incidents30j, refuser, masquerEmail,
+  preparerCodeEmail, codeEmailValide, aCodeMulti, codeMultiValide, MAX_ESSAIS_CODE_MULTI, valider, enAttente, incidents30j, refuser, masquerEmail,
 };
