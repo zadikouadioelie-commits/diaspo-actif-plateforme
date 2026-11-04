@@ -1335,8 +1335,25 @@
       catch (er) { go.disabled = false; go.textContent = 'Envoyer l’invitation'; if (er.status === 403 && er.data && er.data.manquants) { close(); affProfilIncomplet(er); } else toast(er.message, true); }
     };
   }
+  /* Collectivités « bientôt intégrées » (2026-11-04, demande explicite) : même message et même style que la maintenance des boutiques, à la place d'une liste trompeuse. */
+  function annCollectivitesBientot(l) {
+    const dis = "font-family:'Bodoni Moda',Didot,Georgia,serif;font-weight:500";
+    const bouton = (t, txt) => `<button type="button" data-coll-t="${t}" style="padding:11px 18px;margin:4px;border-radius:999px;border:1px solid rgba(227,192,110,.5);background:rgba(255,255,255,.04);color:#F3DC9B;font-weight:700;font-size:14px;cursor:pointer">${txt}</button>`;
+    l.innerHTML = `<div style="text-align:center;padding:36px 16px 44px;border-radius:16px;background:radial-gradient(ellipse 80% 50% at 50% 30%,rgba(63,123,255,.16),transparent 70%),linear-gradient(180deg,#0B1226,#060A14)">
+      <div style="width:76px;height:76px;margin:0 auto 22px;border-radius:50%;display:grid;place-items:center;border:1px solid rgba(227,192,110,.28);background:radial-gradient(circle at 50% 35%,rgba(227,192,110,.18),rgba(227,192,110,.03) 70%)" aria-hidden="true"><svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="#E3C06E" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V10m14 11V10M9 21V10m6 11V10M2 10l10-6 10 6z"/></svg></div>
+      <div style="margin:0 0 14px;font-size:11.5px;font-weight:700;letter-spacing:.24em;text-transform:uppercase;color:#E3C06E">Collectivités Diaspo&#39;Actif</div>
+      <h1 style="margin:0;${dis};font-size:29px;line-height:1.14;color:#F4F6FC">Les collectivités seront bientôt <em style="font-style:italic;color:#E3C06E">intégrées</em></h1>
+      <div style="width:100px;height:1px;margin:26px auto;background:linear-gradient(90deg,transparent,#E3C06E,transparent)"></div>
+      <div style="${dis};font-size:23px;color:#E3C06E;margin:0 0 6px">Merci de votre patience !</div>
+      <p style="margin:0;font-size:15px;line-height:1.6;color:#A9B4CC">Pour le moment, nous recensons les <b style="color:#E8ECF6">initiatives</b> et les <b style="color:#E8ECF6">utilisateurs</b>.</p>
+      <p style="margin:26px 0 0;padding:16px;border:1px solid rgba(227,192,110,.28);border-radius:14px;background:rgba(255,255,255,.04);font-size:15px;line-height:1.6;color:#E8ECF6">Merci aux initiatives et aux membres qui rejoignent Diaspo&#39;Actif : grâce à vous, l&#39;annuaire de <b style="color:#E3C06E">l&#39;Afrique et de la diaspora</b> grandit chaque jour.</p>
+      <div style="margin-top:24px">${bouton('Initiative', '🌱 Voir les initiatives')}${bouton('Utilisateurs', '👥 Voir les utilisateurs')}</div>
+    </div>`;
+    $$('[data-coll-t]', l).forEach(b => b.onclick = () => { S.ann.type = b.dataset.collT; S.ann.loaded = false; viewAnnuaire(); });
+  }
   function paintAnnuaire() {
     const l = $('#ann-list'); if (!l) return;
+    if (/^Collectivité/.test(S.ann.type || '')) { $('#ann-count').textContent = ''; $('#ann-more').innerHTML = ''; annCollectivitesBientot(l); return; }
     const a = S.ann.items.filter(annMatch);
     $('#ann-count').textContent = a.length ? `${a.length} résultat${a.length > 1 ? 's' : ''}` : '';
     if (!a.length) { l.innerHTML = `<div class="empty"><div class="ei">${ic('dir', 'l')}</div><b>Aucun résultat</b>Essayez un autre mot-clé ou retirez un filtre.</div>`; $('#ann-more').innerHTML = ''; return; }

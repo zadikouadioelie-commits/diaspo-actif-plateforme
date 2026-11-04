@@ -3281,7 +3281,28 @@ async function initAnnuaire(){
   let filtered_count = ALL.length;
 
   /* ── Recherche par mots-clés (serveur, pertinence + tolérance fautes/synonymes) ── */
+  /* Collectivités « bientôt intégrées » (2026-11-04, demande explicite) : tant qu'elles ne sont pas recensées, chercher une collectivité affiche ce message (même style que la
+     maintenance des boutiques) à la place d'une liste trompeuse. Retour arrière : retirer l'appel au début de applyRechercheMotCle(). */
+  function afficherCollectivitesBientot() {
+    const dis = "font-family:'Bodoni Moda',Didot,Georgia,serif;font-weight:500";
+    const bouton = (id, txt) => `<button type="button" id="${id}" style="padding:11px 20px;margin:4px;border-radius:999px;border:1px solid rgba(227,192,110,.5);background:rgba(255,255,255,.04);color:#F3DC9B;font:700 14px 'Manrope',system-ui,sans-serif;cursor:pointer">${txt}</button>`;
+    list.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:44px 18px 52px;border-radius:16px;background:radial-gradient(ellipse 80% 50% at 50% 30%,rgba(63,123,255,.16),transparent 70%),linear-gradient(180deg,#0B1226,#060A14)">
+      <div style="width:76px;height:76px;margin:0 auto 22px;border-radius:50%;display:grid;place-items:center;border:1px solid rgba(227,192,110,.28);background:radial-gradient(circle at 50% 35%,rgba(227,192,110,.18),rgba(227,192,110,.03) 70%)" aria-hidden="true"><svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="#E3C06E" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V10m14 11V10M9 21V10m6 11V10M2 10l10-6 10 6z"/></svg></div>
+      <div style="margin:0 0 14px;font-size:11.5px;font-weight:700;letter-spacing:.24em;text-transform:uppercase;color:#E3C06E">Collectivités Diaspo&#39;Actif</div>
+      <h2 style="margin:0 auto;max-width:640px;${dis};font-size:clamp(26px,4.4vw,38px);line-height:1.14;color:#F4F6FC">Les collectivités seront bientôt <em style="font-style:italic;color:#E3C06E">intégrées</em></h2>
+      <div style="width:100px;height:1px;margin:26px auto;background:linear-gradient(90deg,transparent,#E3C06E,transparent)"></div>
+      <div style="${dis};font-size:clamp(20px,3vw,26px);color:#E3C06E;margin:0 0 6px">Merci de votre patience !</div>
+      <p style="margin:0 auto;max-width:520px;font-size:15.5px;line-height:1.6;color:#A9B4CC">Pour le moment, nous recensons les <b style="color:#E8ECF6">initiatives</b> et les <b style="color:#E8ECF6">utilisateurs</b>.</p>
+      <p style="margin:28px auto 0;max-width:560px;padding:16px 20px;border:1px solid rgba(227,192,110,.28);border-radius:14px;background:rgba(255,255,255,.04);font-size:15.5px;line-height:1.6;color:#E8ECF6">Merci aux initiatives et aux membres qui rejoignent Diaspo&#39;Actif : grâce à vous, l&#39;annuaire de <b style="color:#E3C06E">l&#39;Afrique et de la diaspora</b> grandit chaque jour.</p>
+      <div style="margin-top:26px">${bouton("coll-bientot-init", "🌱 Voir les initiatives")}${bouton("coll-bientot-util", "👥 Voir les utilisateurs")}</div>
+    </div>`;
+    const choisir = (type) => { state.typeOrg = type; if (typeEl) typeEl.value = type; syncQuickButtons(); apply(); };
+    document.getElementById("coll-bientot-init").onclick = () => choisir("Initiative");
+    document.getElementById("coll-bientot-util").onclick = () => choisir("Utilisateurs");
+    const compte = document.getElementById("result-count"); if (compte) compte.textContent = "0";
+  }
   async function applyRechercheMotCle() {
+    if (/^Collectivité/.test(state.typeOrg || "")) { afficherCollectivitesBientot(); return; }
     const params = new URLSearchParams({ q: state.motCle || "" });
     if (state.typeOrg) params.set("type", state.typeOrg);
     if (state.domaineActivite) params.set("domaine_activite", state.domaineActivite);
