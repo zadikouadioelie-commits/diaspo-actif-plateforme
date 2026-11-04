@@ -10132,7 +10132,7 @@ route("GET", "/api/annuaire/recherche", async (req, res, params, body, query) =>
    initiative d'origine ivoirienne — un pays FAUX, ce qui est pire qu'une absence.
    owner_email/owner_email_visible (2026-11-01) : uniquement pour la recherche par e-mail
    ci-dessous — jamais exposés hors de ce cas précis, voir le filtre juste avant le push. */
-"SELECT i.*, u.origine1 AS owner_origine1, u.origine2 AS owner_origine2, u.invisible_annuaire_definitif AS owner_invisible_definitif, u.invisible_annuaire_jusqu_au AS owner_invisible_jusqu_au, u.email AS owner_email, u.email_visible_annuaire AS owner_email_visible FROM initiatives i LEFT JOIN users u ON u.id=i.owner_user_id WHERE (u.is_demo IS NULL OR u.is_demo=FALSE) AND (u.email IS NULL OR u.email NOT LIKE '%@diaspoactif.invalid') ORDER BY i.created_at DESC").all();
+"SELECT i.*, u.origine1 AS owner_origine1, u.origine2 AS owner_origine2, u.invisible_annuaire_definitif AS owner_invisible_definitif, u.invisible_annuaire_jusqu_au AS owner_invisible_jusqu_au, u.email AS owner_email, u.email_visible_annuaire AS owner_email_visible, u.nom AS owner_nom, u.prenom AS owner_prenom FROM initiatives i LEFT JOIN users u ON u.id=i.owner_user_id WHERE (u.is_demo IS NULL OR u.is_demo=FALSE) AND (u.email IS NULL OR u.email NOT LIKE '%@diaspoactif.invalid') ORDER BY i.created_at DESC").all();
   /* Une Initiative est un profil d'organisation, mais son "compte" au sens administrateur est
      celui de son propriétaire (owner_user_id) — l'invisibilité s'applique donc via celle DU
      PROPRIÉTAIRE, pas d'un champ propre à la table initiatives. */
@@ -10145,8 +10145,14 @@ route("GET", "/api/annuaire/recherche", async (req, res, params, body, query) =>
   if (query.type && query.type !== 'Initiative') initiatives = initiatives.filter(r => STRUCTURES_INITIATIVE.typeIdentique(r.type, query.type)); /* « Cooperative » = « Coopérative » */
   if (query.ville) { const v = query.ville.toLowerCase(); initiatives = initiatives.filter(r => (r.ville||'').toLowerCase().includes(v)); }
 
+  /* Plafond de lecture (2026-11-04) : « LIMIT 500 » sans tri coupait les comptes les plus récents dès
+     que la plateforme dépassait 500 membres — une personne inscrite récemment restait introuvable,
+     même par son nom complet. Une RECHERCHE (mot-clé, nom, prénom, e-mail) lit désormais tous les
+     comptes ; seule la vue par défaut, sans saisie, garde son plafond d'affichage. */
+  const rechercheActive = !!(termesOriginaux.length || estRechercheEmail || query.nom || query.prenom);
+  const plafondFiches = rechercheActive ? 50000 : 500;
   let utilisateurs = (query.type && query.type !== 'Utilisateurs') ? [] : await db.prepare(
-    "SELECT id, nom, prenom, ville, pays, photo_url, banner_url, titre_pro, bio, competences, experiences, centres_interet, situation_pro, nationalite1, nationalite2, origine1, origine2, domaine_principal, sous_domaine_1, sous_domaine_2, invisible_annuaire_definitif, invisible_annuaire_jusqu_au, email, email_visible_annuaire FROM users WHERE role='utilisateur' AND compte_masque=0 AND nom != 'Compte supprimé' AND (is_demo IS NULL OR is_demo=FALSE) LIMIT 500"
+    `SELECT id, nom, prenom, ville, pays, photo_url, banner_url, titre_pro, bio, competences, experiences, centres_interet, situation_pro, nationalite1, nationalite2, origine1, origine2, domaine_principal, sous_domaine_1, sous_domaine_2, invisible_annuaire_definitif, invisible_annuaire_jusqu_au, email, email_visible_annuaire FROM users WHERE role='utilisateur' AND compte_masque=0 AND nom != 'Compte supprimé' AND (is_demo IS NULL OR is_demo=FALSE) ORDER BY id DESC LIMIT ${plafondFiches}`
   ).all();
   if (query.pays) utilisateurs = utilisateurs.filter(r => r.pays === query.pays);
   if (query.ville) { const v = query.ville.toLowerCase(); utilisateurs = utilisateurs.filter(r => (r.ville||'').toLowerCase().includes(v)); }
@@ -10165,10 +10171,33 @@ route("GET", "/api/annuaire/recherche", async (req, res, params, body, query) =>
        nom_responsable_etatique, prenom_responsable_etatique, fonction_responsable_etatique,
        origine1, origine2, pays_origine_institution, nationalite1, nationalite2, domaine_principal,
        invisible_annuaire_definitif, invisible_annuaire_jusqu_au, email, email_visible_annuaire
-     FROM users WHERE role IN ('collectivite','administrateur','institutionnel','officiel') AND compte_masque=0 AND nom != 'Compte supprimé' AND (is_demo IS NULL OR is_demo=FALSE) LIMIT 500`
+     FROM users WHERE role IN ('collectivite','administrateur','institutionnel','officiel') AND compte_masque=0 AND nom != 'Compte supprimé' AND (is_demo IS NULL OR is_demo=FALSE) ORDER BY id DESC LIMIT ${plafondFiches}`
   ).all();
   organismes = organismes.filter(r => !annuaireEstInvisible(r));
   organismes.forEach(r => { delete r.invisible_annuaire_definitif; delete r.invisible_annuaire_jusqu_au; });
+
+  /* Champs « Nom » et « Prénom » de l'Annuaire : jusqu'ici le client ne les envoyait jamais ici
+     (seule la liste « Utilisateurs » les filtrait, en local, sur les 200 premiers comptes par
+     ordre alphabétique) — taper un nom avec « Tous les types » ne changeait rien. Le nom se lit
+     sur le nom COMPLET (« Aminata Koné » trouve prénom Aminata + nom Koné), accents et casse
+     ignorés, chaque mot saisi devant figurer quelque part dans le nom de la fiche ou de son
+     responsable. */
+  const motsNom = query.nom ? ANNUAIRE_NORMALISE(query.nom).split(/[\s'’-]+/).filter(Boolean) : [];
+  const nomCorrespond = (...valeurs) => {
+    if (!motsNom.length) return true;
+    const texte = ANNUAIRE_NORMALISE(valeurs.filter(Boolean).join(' '));
+    return motsNom.every(m => texte.includes(m));
+  };
+  const prenomRecherche = query.prenom ? ANNUAIRE_NORMALISE(query.prenom).trim() : '';
+  if (motsNom.length) {
+    initiatives = initiatives.filter(r => nomCorrespond(r.nom, r.sigle, r.owner_prenom, r.owner_nom));
+    utilisateurs = utilisateurs.filter(r => nomCorrespond(r.prenom, r.nom));
+    organismes = organismes.filter(r => nomCorrespond(r.nom_institution, r.nom, r.prenom_responsable_etatique, r.nom_responsable_etatique));
+  }
+  if (prenomRecherche) {
+    utilisateurs = utilisateurs.filter(r => ANNUAIRE_NORMALISE(r.prenom || '').includes(prenomRecherche));
+    initiatives = []; organismes = [];
+  }
   if (query.pays) organismes = organismes.filter(r => r.pays === query.pays);
   if (query.ville) { const v = query.ville.toLowerCase(); organismes = organismes.filter(r => (r.ville||'').toLowerCase().includes(v)); }
 
@@ -10224,6 +10253,11 @@ route("GET", "/api/annuaire/recherche", async (req, res, params, body, query) =>
   let resultats = [];
 
   initiatives.forEach(ini => {
+    /* Nom du responsable : une initiative se retrouve aussi par le nom de la personne qui la porte
+       (2026-11-04) — « Aminata Koné » restait introuvable car seul le nom de la structure comptait.
+       Servi uniquement au calcul de pertinence, jamais renvoyé au navigateur. */
+    const responsableNoms = [ini.owner_prenom, ini.owner_nom];
+    delete ini.owner_prenom; delete ini.owner_nom;
     if (estRechercheEmail) {
       const match = ini.owner_email_visible && (ini.owner_email || '').toLowerCase() === emailRecherche;
       delete ini.owner_email_visible;
@@ -10237,6 +10271,7 @@ route("GET", "/api/annuaire/recherche", async (req, res, params, body, query) =>
     if (termesOriginaux.length) {
       score = annuaireScorerEntite([
         [[ini.nom, ini.sigle], 1000],
+        [responsableNoms, 900],
         /* domaines_secondaires_json ajouté le 2026-08-30 (demande explicite : "vérifier les
            descriptions d'activités déclarées") — jusqu'ici seul le domaine PRINCIPAL comptait,
            une initiative avec domaine principal "Agriculture" et domaine secondaire "Formation"
@@ -10355,13 +10390,15 @@ route("GET", "/api/annuaire/suggestions", async (req, res, params, body, query) 
      une fois validée. Mêmes filtres de visibilité (masqué/démo/supprimé/invisible) que
      partout ailleurs dans l'annuaire. */
   const nomsInitiatives = await db.prepare(
-    `SELECT i.nom, i.sigle, u.invisible_annuaire_definitif, u.invisible_annuaire_jusqu_au
+    `SELECT i.nom, i.sigle, u.nom AS owner_nom, u.prenom AS owner_prenom, u.invisible_annuaire_definitif, u.invisible_annuaire_jusqu_au
      FROM initiatives i LEFT JOIN users u ON u.id=i.owner_user_id
      WHERE (u.id IS NULL OR ((u.is_demo IS NULL OR u.is_demo=FALSE) AND u.compte_masque=0 AND u.nom != 'Compte supprimé'))`
   ).all();
   nomsInitiatives.filter(r => !annuaireEstInvisible(r)).forEach(r => {
     if (r.nom && ANNUAIRE_NORMALISE(r.nom).startsWith(qRaw)) suggestions.add(r.nom);
     if (r.sigle && ANNUAIRE_NORMALISE(r.sigle).startsWith(qRaw)) suggestions.add(r.sigle);
+    const responsable = [r.owner_prenom, r.owner_nom].filter(Boolean).join(' ');
+    if (responsable && ANNUAIRE_NORMALISE(responsable).startsWith(qRaw)) suggestions.add(responsable);
   });
   const nomsOrganismes = await db.prepare(
     `SELECT nom, nom_institution, invisible_annuaire_definitif, invisible_annuaire_jusqu_au FROM users
@@ -10387,7 +10424,7 @@ route("GET", "/api/annuaire/suggestions", async (req, res, params, body, query) 
 /* GET /api/annuaire/utilisateurs — liste publique des comptes Utilisateur (annuaire), filtrable par nom/prénom/ville */
 route("GET", "/api/annuaire/utilisateurs", async (req, res, params, body, query) => {
   let rows = await db.prepare(
-    "SELECT id, nom, prenom, ville, pays, photo_url, banner_url, titre_pro, nationalite1, nationalite2, origine1, origine2, domaine_principal, sous_domaine_1, sous_domaine_2, invisible_annuaire_definitif, invisible_annuaire_jusqu_au FROM users WHERE role='utilisateur' AND compte_masque=0 AND nom != 'Compte supprimé' AND (is_demo IS NULL OR is_demo=FALSE) ORDER BY nom ASC LIMIT 200"
+    "SELECT id, nom, prenom, ville, pays, photo_url, banner_url, titre_pro, nationalite1, nationalite2, origine1, origine2, domaine_principal, sous_domaine_1, sous_domaine_2, invisible_annuaire_definitif, invisible_annuaire_jusqu_au FROM users WHERE role='utilisateur' AND compte_masque=0 AND nom != 'Compte supprimé' AND (is_demo IS NULL OR is_demo=FALSE) ORDER BY nom ASC LIMIT 2000"
   ).all();
   rows = rows.filter(r => !annuaireEstInvisible(r));
   rows.forEach(r => { delete r.invisible_annuaire_definitif; delete r.invisible_annuaire_jusqu_au; });

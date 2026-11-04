@@ -3348,6 +3348,9 @@ async function initAnnuaire(){
        strictement rien à la requête envoyée, et la vue par défaut (tout, non filtré)
        s'affichait quel que soit le choix. */
     if (state.paysOrig) params.set("origine", state.paysOrig);
+    /* Nom / Prénom : jamais transmis jusqu'ici — taper un nom avec « Tous les types » ne filtrait rien. */
+    if (state.nom) params.set("nom", state.nom);
+    if (state.prenom) params.set("prenom", state.prenom);
     let r;
     try { r = await api("GET", "/annuaire/recherche?" + params); }
     catch (e) {
@@ -3405,7 +3408,9 @@ async function initAnnuaire(){
 
     // Recherche serveur (mots-clés OU vue par défaut) — inclut Initiatives + Utilisateurs +
     // Collectivités/Diaspo'Actif dès l'arrivée sur la page, même sans recherche.
-    if (state.motCle || state.typeOrg !== "Utilisateurs") { await applyRechercheMotCle(); return; }
+    /* Un nom ou un prénom saisi passe aussi par le serveur : la liste « Utilisateurs » mise en cache
+       ne contient que les premiers comptes par ordre alphabétique, un membre plus loin y restait introuvable. */
+    if (state.motCle || state.nom || state.prenom || state.typeOrg !== "Utilisateurs") { await applyRechercheMotCle(); return; }
 
     if (state.typeOrg === "Utilisateurs") {
       let enPanne = false;
