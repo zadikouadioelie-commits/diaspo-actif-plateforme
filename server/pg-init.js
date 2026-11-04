@@ -901,6 +901,8 @@ const COLONNES_MIGRATION = [
     ['sondages', 'une_reponse_par_compte', "INTEGER DEFAULT 1"],
     ['sondages', 'modification_autorisee', "INTEGER DEFAULT 0"],
     ['sondages', 'fil_post_id', "INTEGER"],
+    ['sondages', 'champs_repondant_json', "TEXT DEFAULT '[]'"],
+    ['sondages', 'periodes_json', "TEXT DEFAULT '[]'"],
     ['sondage_questions', 'description', "TEXT"],
     ['sondage_questions', 'min_label', "TEXT"],
     ['sondage_questions', 'max_label', "TEXT"],

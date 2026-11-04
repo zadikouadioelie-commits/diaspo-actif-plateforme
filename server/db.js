@@ -2464,6 +2464,9 @@ const MIGRATIONS = [
   ["sondages", "une_reponse_par_compte INTEGER DEFAULT 1"],
   ["sondages", "modification_autorisee INTEGER DEFAULT 0"],
   ["sondages", "fil_post_id INTEGER"],
+  // Sondages (2026-11-04) : informations demandées aux répondants + historique des périodes de publication (30 jours max chacune)
+  ["sondages", "champs_repondant_json TEXT DEFAULT '[]'"],
+  ["sondages", "periodes_json TEXT DEFAULT '[]'"],
   // ── Questions sondage enrichies ──
   ["sondage_questions", "description TEXT"],
   ["sondage_questions", "min_label TEXT"],

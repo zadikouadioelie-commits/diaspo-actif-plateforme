@@ -30835,65 +30835,61 @@ route("PATCH", "/api/admin/accreditations/:userId/:type/reactiver", async (req, 
   sendJSON(res, 200, { ok: true });
 });
 
+/* ──── SONDAGES — durée, republication, informations demandées aux répondants (2026-11-04, demande explicite) ────
+   Un sondage reste actif 30 jours AU MAXIMUM (jour de début et jour de fin compris), pour TOUS ses lieux de diffusion à la fois.
+   À l'échéance il passe à « cloture » mais reste visible (mention « Fin de ce sondage », réponses impossibles) ;
+   seule une republication (POST /api/sondages/:id/republier) le réactive. */
+const SONDAGE_DUREE_MAX_JOURS = 30;
+function sondageJourIso(d) { return d.toISOString().slice(0, 10); }
+function sondageAjouterJours(jourIso, n) { const d = new Date(jourIso + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return sondageJourIso(d); }
+function sondageDureeJours(debutIso, finIso) { return Math.round((new Date(finIso + "T00:00:00Z") - new Date(debutIso + "T00:00:00Z")) / 86400000) + 1; }
+/* date_cloture est un jour (AAAA-MM-JJ) : le sondage reste ouvert tout ce jour-là, puis passe à « cloture ». */
+async function sondageAutoCloture() {
+  await db.prepare(`UPDATE sondages SET statut='cloture' WHERE statut='ouvert' AND date_cloture IS NOT NULL AND date_cloture < date('now')`).run();
+}
+const SONDAGE_CHAMPS_TYPES = ["texte_court", "texte_long", "email", "telephone", "nombre", "date", "url", "choix_unique"];
+const SONDAGE_CHAMPS_CATEGORIES = ["Identité", "Contact", "Profession", "Diaspora", "Événement", "Personnalisé"];
+/* Par défaut (sondage non anonyme) : nom, prénom et e-mail sont OBLIGATOIRES ; le créateur peut les rendre facultatifs ou en retirer. */
+const SONDAGE_CHAMPS_DEFAUT = [
+  { cle: "nom", libelle: "Nom", categorie: "Identité", type_champ: "texte_court", obligatoire: true },
+  { cle: "prenom", libelle: "Prénom", categorie: "Identité", type_champ: "texte_court", obligatoire: true },
+  { cle: "email", libelle: "Adresse e-mail", categorie: "Contact", type_champ: "email", obligatoire: true },
+];
+/* Normalise la liste envoyée par le créateur ; renvoie null si ce n'est pas une liste (=> valeurs par défaut). */
+function sondageChampsRepondant(brut) {
+  if (!Array.isArray(brut)) return null;
+  const vus = new Set();
+  const sortie = [];
+  for (const c of brut.slice(0, 25)) {
+    const libelle = String(c && c.libelle || "").trim().slice(0, 120);
+    if (!libelle) continue;
+    let type = SONDAGE_CHAMPS_TYPES.includes(c.type_champ) ? c.type_champ : "texte_court";
+    let options = [];
+    if (type === "choix_unique") {
+      options = (Array.isArray(c.options) ? c.options : []).map(o => String(o || "").trim().slice(0, 80)).filter(Boolean).slice(0, 12);
+      if (options.length < 2) { type = "texte_court"; options = []; }
+    }
+    let cle = String(c.cle || libelle).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 40) || "champ";
+    const base = cle;
+    for (let i = 2; vus.has(cle); i++) cle = base + "_" + i;
+    vus.add(cle);
+    const champ = {
+      cle, libelle,
+      categorie: SONDAGE_CHAMPS_CATEGORIES.includes(c.categorie) ? c.categorie : "Personnalisé",
+      type_champ: type,
+      obligatoire: !!c.obligatoire,
+    };
+    if (options.length) champ.options = options;
+    sortie.push(champ);
+  }
+  return sortie;
+}
+
 /* ──── MODULE MOBILISATION ACTIVE — Sondages & Consultations ──── */
 
-/* GET /api/sondages */
-route("GET", "/api/sondages", async (req, res, params, body, query) => {
-  let rows = await db.prepare(`
-    SELECT s.*, u.nom AS createur_nom, u.role AS createur_role
-    FROM sondages s JOIN users u ON u.id=s.createur_id
-    WHERE s.statut IN ('ouvert','cloture')
-    ORDER BY s.created_at DESC
-  `).all();
-  if (query.type) rows = rows.filter(r => r.type === query.type);
-  if (query.statut) rows = rows.filter(r => r.statut === query.statut);
-  if (query.q) { const q = query.q.toLowerCase(); rows = rows.filter(r => (r.titre+r.description||"").toLowerCase().includes(q)); }
-  rows = rows.map(r => ({ ...r, cible_roles: safeParse(r.cible_roles), cible_pays: safeParse(r.cible_pays) }));
-  sendJSON(res, 200, { sondages: rows });
-});
-
-/* POST /api/sondages */
-route("POST", "/api/sondages", async (req, res, params, body) => {
-  const user = await getCurrentUser(req);
-  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  if (!(await hasAccred(user.id, "mobilisation_active"))) return sendJSON(res, 403, { error: "Accréditation « Mobilisation Active » requise." });
-  const { titre, description, type, sous_type, anonyme, cible_roles, cible_pays, date_cloture, questions } = body;
-  if (!titre) return sendJSON(res, 400, { error: "Titre requis." });
-  if (!questions || !questions.length) return sendJSON(res, 400, { error: "Au moins une question requise." });
-  /* Parenthèses + await : sans elles, .lastInsertRowid est lu sur la promesse et vaut
-     undefined — le sondage était créé mais ses questions rattachées à un identifiant vide,
-     donc introuvables. Et la réponse partait avant leur enregistrement. */
-  const id = (await db.prepare(`INSERT INTO sondages (createur_id,titre,description,type,sous_type,statut,anonyme,cible_roles,cible_pays,date_cloture)
-    VALUES (?,?,?,?,?,'ouvert',?,?,?,?)`).run(
-    user.id, titre, description||null, type||"sondage", sous_type||null, anonyme?1:0,
-    JSON.stringify(Array.isArray(cible_roles)?cible_roles:[]),
-    JSON.stringify(Array.isArray(cible_pays)?cible_pays:[]),
-    date_cloture||null
-  )).lastInsertRowid;
-  for (const [i, q] of questions.entries()) {
-    await db.prepare("INSERT INTO sondage_questions (sondage_id,texte,type,options_json,obligatoire,ordre) VALUES (?,?,?,?,?,?)").run(
-      id, q.texte, q.type||"choix_unique",
-      JSON.stringify(Array.isArray(q.options)?q.options:[]),
-      q.obligatoire!==false?1:0, i
-    );
-  }
-  sendJSON(res, 201, { id });
-});
-
-/* GET /api/sondages/:id */
-route("GET", "/api/sondages/:id", async (req, res, params) => {
-  const s = await db.prepare("SELECT s.*,u.nom AS createur_nom,u.role AS createur_role FROM sondages s JOIN users u ON u.id=s.createur_id WHERE s.id=?").get(params.id);
-  if (!s) return sendJSON(res, 404, { error: "Sondage introuvable." });
-  const questions = await db.prepare("SELECT * FROM sondage_questions WHERE sondage_id=? ORDER BY ordre ASC").all(params.id);
-  const me = await getCurrentUser(req);
-  const dejaRepondu = me ? !!await db.prepare("SELECT 1 FROM sondage_reponses WHERE sondage_id=? AND user_id=?").get(params.id, me.id) : false;
-  sendJSON(res, 200, {
-    sondage: { ...s, cible_roles: safeParse(s.cible_roles), cible_pays: safeParse(s.cible_pays) },
-    questions: questions.map(q => ({ ...q, options: safeParse(q.options_json) })),
-    dejaRepondu
-  });
-});
-
+/* Liste, création, détail et résultats des sondages : servis par le module enrichi de handleRequest (« SONDAGES — MODULE ENRICHI »).
+   (2026-11-04) Les anciennes routes qui les masquaient exigeaient l'accréditation « Mobilisation Active » et ne gardaient ni catégorie,
+   ni brouillon, ni durée : un compte Initiative ne pouvait donc pas créer de sondage depuis la page Sondages. */
 /* POST /api/sondages/:id/repondre */
 route("POST", "/api/sondages/:id/repondre", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
@@ -30916,39 +30912,6 @@ route("POST", "/api/sondages/:id/repondre", async (req, res, params, body) => {
   await db.prepare("UPDATE sondages SET nb_reponses=nb_reponses+1 WHERE id=?").run(params.id);
   creerNotif(s.createur_id, "mention", "Nouvelle réponse à votre sondage", `${await nomCompteAffichage(user.id)} a répondu à « ${s.titre} »`, { sondage_id: Number(params.id) });
   sendJSON(res, 201, { ok: true });
-});
-
-/* GET /api/sondages/:id/resultats — créateur uniquement */
-route("GET", "/api/sondages/:id/resultats", async (req, res, params) => {
-  const user = await getCurrentUser(req);
-  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  const s = await db.prepare("SELECT * FROM sondages WHERE id=?").get(params.id);
-  if (!s) return sendJSON(res, 404, { error: "Sondage introuvable." });
-  if (s.createur_id !== user.id && user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé au créateur." });
-  const questions = await db.prepare("SELECT * FROM sondage_questions WHERE sondage_id=? ORDER BY ordre").all(params.id);
-  const resultats = await Promise.all(questions.map(async q => {
-    const reps = await db.prepare("SELECT reponse, COUNT(*) AS n FROM sondage_reponses WHERE question_id=? GROUP BY reponse").all(q.id);
-    return { question: q.texte, type: q.type, options: safeParse(q.options_json), reponses: reps };
-  }));
-  // Stats géographiques des répondants
-  const repartition_pays = await db.prepare(
-    "SELECT u.pays, COUNT(DISTINCT sr.user_id) AS n FROM sondage_reponses sr JOIN users u ON u.id=sr.user_id WHERE sr.sondage_id=? AND u.pays IS NOT NULL GROUP BY u.pays ORDER BY n DESC LIMIT 10"
-  ).all(params.id);
-  const nb_repondants = (await db.prepare("SELECT COUNT(DISTINCT user_id) AS n FROM sondage_reponses WHERE sondage_id=?").get(params.id))?.n;
-  let taux_participation = 0;
-  if (s.cible_roles) {
-    const cibles = safeParse(s.cible_roles);
-    let total = 0;
-    if (Array.isArray(cibles) && cibles.length) {
-      const _t = await db.prepare("SELECT COUNT(*) AS n FROM users WHERE role IN (" + cibles.map(()=>"?").join(",") + ")").get(...cibles);
-      total = _t?.n || 0;
-    } else {
-      const _t = await db.prepare("SELECT COUNT(*) AS n FROM users").get();
-      total = _t?.n || 0;
-    }
-    taux_participation = total > 0 ? Math.round((nb_repondants / total) * 100) : 0;
-  }
-  sendJSON(res, 200, { sondage: s, resultats, nb_reponses: s.nb_reponses, nb_repondants, taux_participation, repartition_pays });
 });
 
 /* PATCH /api/sondages/:id/cloturer */
@@ -39525,6 +39488,8 @@ ${jsonLd}
 
     /* ── GET /api/sondages ── */
     if (req.method === 'GET' && (pathname === '/api/sondages' || pathname.startsWith('/api/sondages?'))) {
+      await sondageAutoCloture();
+      const q = parsed.query || {};
       const mine = q.mine === '1';
       const me = await getCurrentUser(req);
       let sql = `SELECT s.*, u.nom AS createur_nom, u.photo_url AS createur_photo, u.da_id AS createur_da_id,
@@ -39535,31 +39500,36 @@ ${jsonLd}
         if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
         sql += ' AND s.createur_id=?'; args.push(me.id);
       } else {
-        sql += " AND s.statut='ouvert'";
+        /* Un sondage terminé reste visible (« Fin de ce sondage ») : il nourrit le contenu de la plateforme. */
+        sql += " AND s.statut IN ('ouvert','cloture')";
       }
       if (q.categorie) { sql += ' AND s.categorie=?'; args.push(q.categorie); }
       if (q.q) { sql += ' AND (s.titre LIKE ? OR s.description LIKE ?)'; args.push('%'+q.q+'%','%'+q.q+'%'); }
-      sql += ' ORDER BY s.created_at DESC LIMIT 50';
+      sql += " ORDER BY CASE WHEN s.statut='ouvert' THEN 0 ELSE 1 END, s.created_at DESC LIMIT 50";
       const sondages_list = await db.prepare(sql).all(...args);
-      // Auto-clôturer les sondages expirés
-      await db.prepare(`UPDATE sondages SET statut='cloture' WHERE statut='ouvert' AND date_cloture IS NOT NULL AND date_cloture < datetime('now')`).run();
+
       return sendJSON(res, 200, { sondages: sondages_list });
     }
 
     /* ── POST /api/sondages ── */
     if (req.method === 'POST' && pathname === '/api/sondages') {
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
-      if (!['initiative','collectivite','administrateur'].includes(me.role)) return sendJSON(res, 403, { error: 'Réservé aux Initiatives et Comptes Étatiques.' });
+      if (!['initiative','collectivite','administrateur'].includes(me.role) && !(await hasAccred(me.id, 'mobilisation_active'))) return sendJSON(res, 403, { error: 'Réservé aux Initiatives et Comptes Étatiques.' });
       const { titre, description, objectif, categorie, type = 'sondage', ville, pays, region, departement, rayon_publication, date_debut, date_cloture, anonyme, confidentialite, resultats_visibles, une_reponse_par_compte, modification_autorisee, cible_roles, photos_json, pdf_b64, pdf_nom, video_url, questions = [], statut = 'brouillon' } = body;
       if (!titre) return sendJSON(res, 400, { error: 'Titre requis.' });
       if (pdf_b64 && SEC.isDangerousFile(Buffer.from(String(pdf_b64).split(',').pop(), 'base64'))) return sendJSON(res, 400, { error: 'Fichier PDF invalide.' });
-      if (date_cloture && date_debut) {
-        const diffDays = (new Date(date_cloture) - new Date(date_debut)) / 86400000;
-        if (diffDays > 30) return sendJSON(res, 400, { error: 'Durée maximale : 30 jours.' });
-      }
-      const r = await db.prepare(`INSERT INTO sondages(createur_id,titre,description,objectif,categorie,type,ville,pays,region,departement,rayon_publication,date_debut,date_cloture,anonyme,confidentialite,resultats_visibles,une_reponse_par_compte,modification_autorisee,cible_roles,photos_json,pdf_b64,pdf_nom,video_url,statut)
-        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-        .run(me.id,titre,description,objectif,categorie||'autre',type,ville,pays,region,departement,rayon_publication||'national',date_debut,date_cloture,anonyme?1:0,confidentialite||'anonyme',resultats_visibles||'apres_cloture',une_reponse_par_compte?1:1,modification_autorisee?1:0,JSON.stringify(cible_roles||[]),JSON.stringify(photos_json||[]),pdf_b64||null,pdf_nom||null,video_url||null,statut);
+      if (!['brouillon', 'ouvert'].includes(statut)) return sendJSON(res, 400, { error: 'Statut invalide.' });
+      if (!Array.isArray(questions) || !questions.length || questions.some(q2 => !q2 || !String(q2.texte || '').trim())) return sendJSON(res, 400, { error: 'Au moins une question, chacune avec un texte.' });
+      const jourOk = (v) => /^\d{4}-\d{2}-\d{2}/.test(String(v || ''));
+      const debutSond = (statut === 'ouvert' || !jourOk(date_debut)) ? sondageJourIso(new Date()) : String(date_debut).slice(0, 10);
+      const finSond = jourOk(date_cloture) ? String(date_cloture).slice(0, 10) : sondageAjouterJours(debutSond, SONDAGE_DUREE_MAX_JOURS - 1);
+      if (finSond < debutSond) return sendJSON(res, 400, { error: 'La date de fin doit être postérieure à la date de début.' });
+      if (sondageDureeJours(debutSond, finSond) > SONDAGE_DUREE_MAX_JOURS) return sendJSON(res, 400, { error: 'Durée maximale : 30 jours.' });
+      const champsRep = anonyme ? [] : (sondageChampsRepondant(body.champs_repondant) || SONDAGE_CHAMPS_DEFAUT);
+      const periodeInitiale = { numero: 1, debut: debutSond, fin: finSond, duree_jours: sondageDureeJours(debutSond, finSond) };
+      const r = await db.prepare(`INSERT INTO sondages(createur_id,titre,description,objectif,categorie,type,ville,pays,region,departement,rayon_publication,date_debut,date_cloture,anonyme,confidentialite,resultats_visibles,une_reponse_par_compte,modification_autorisee,cible_roles,photos_json,pdf_b64,pdf_nom,video_url,statut,champs_repondant_json,periodes_json)
+        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+        .run(...[me.id,titre,description,objectif,categorie||'autre',type,ville,pays,region,departement,rayon_publication||'national',debutSond,finSond,anonyme?1:0,confidentialite||'anonyme',resultats_visibles||'apres_cloture',une_reponse_par_compte?1:1,modification_autorisee?1:0,JSON.stringify(cible_roles||[]),JSON.stringify(photos_json||[]),pdf_b64||null,pdf_nom||null,video_url||null,statut,JSON.stringify(champsRep),JSON.stringify(statut === 'ouvert' ? [periodeInitiale] : [])].map(v => v === undefined ? null : v));
       const sid = Number(r.lastInsertRowid);
       // Insérer les questions
       for (let i = 0; i < questions.length; i++) {
@@ -39567,20 +39537,15 @@ ${jsonLd}
         await db.prepare(`INSERT INTO sondage_questions(sondage_id,texte,type,options_json,obligatoire,ordre,description,min_label,max_label,min_val,max_val) VALUES(?,?,?,?,?,?,?,?,?,?,?)`)
           .run(sid,q2.texte,q2.type||'choix_unique',JSON.stringify(q2.options||[]),q2.obligatoire?1:1,i,q2.description||null,q2.min_label||null,q2.max_label||null,q2.min_val||1,q2.max_val||5);
       }
-      // Publication dans le fil si statut=ouvert
-      if (statut === 'ouvert') {
-        if (await db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='fil_posts'`).get()) {
-          const fp = await db.prepare(`INSERT INTO fil_posts(user_id,contenu,pub_type,original_post_id) VALUES(?,?,?,?)`)
-            .run(me.id,`📊 Sondage — ${titre}`,'sondage',sid);
-          await (await db.prepare(`UPDATE sondages SET fil_post_id=? WHERE id=?`).run(Number(fp).lastInsertRowid), sid);
-        }
-      }
+      /* La publication dans le fil d'actualité (et les autres lieux) se règle dans « Diffusion » (étape suivante) : l'ancien envoi automatique
+         visait une colonne inexistante (fil_posts.user_id) et ne fonctionnait pas. */
       return sendJSON(res, 201, { id: sid });
     }
 
     /* ── GET /api/sondages/:id ── */
     if (req.method === 'GET' && /^\/api\/sondages\/\d+$/.test(pathname)) {
       const sid = parseInt(pathname.split('/')[3]);
+      await sondageAutoCloture();
       const sondage = await db.prepare(`SELECT s.*, u.nom AS createur_nom, u.photo_url AS createur_photo, u.da_id AS createur_da_id
         FROM sondages s LEFT JOIN users u ON u.id=s.createur_id WHERE s.id=?`).get(sid);
       if (!sondage) return sendJSON(res, 404, { error: 'Sondage introuvable.' });
@@ -39604,9 +39569,21 @@ ${jsonLd}
       const s = await db.prepare(`SELECT * FROM sondages WHERE id=?`).get(sid);
       if (!s || (s.createur_id !== me.id && me.role !== 'administrateur')) return sendJSON(res, 403, { error: 'Accès refusé.' });
       const { titre, description, objectif, categorie, date_cloture, statut, rayon_publication, confidentialite, resultats_visibles, photos_json, pdf_b64, pdf_nom, video_url } = body;
+      if (statut === 'ouvert' && s.statut !== 'ouvert') return sendJSON(res, 400, { error: 'Pour publier un brouillon ou réactiver un sondage terminé, utilisez « Republier ».' });
+      let dateClotureOk = null;
+      if (date_cloture) {
+        if (!/^\d{4}-\d{2}-\d{2}/.test(String(date_cloture))) return sendJSON(res, 400, { error: 'Date de fin invalide.' });
+        dateClotureOk = String(date_cloture).slice(0, 10);
+        let periodesPut = []; try { periodesPut = JSON.parse(s.periodes_json || '[]'); } catch (_) {}
+        const debutPeriode = (periodesPut[periodesPut.length - 1] && periodesPut[periodesPut.length - 1].debut) || (s.date_debut ? String(s.date_debut).slice(0, 10) : null) || String(s.created_at || '').slice(0, 10);
+        if (debutPeriode) {
+          if (dateClotureOk < debutPeriode) return sendJSON(res, 400, { error: 'La date de fin doit être postérieure à la date de début.' });
+          if (sondageDureeJours(debutPeriode, dateClotureOk) > SONDAGE_DUREE_MAX_JOURS) return sendJSON(res, 400, { error: 'Durée maximale : 30 jours.' });
+        }
+      }
       if (pdf_b64 && SEC.isDangerousFile(Buffer.from(String(pdf_b64).split(',').pop(), 'base64'))) return sendJSON(res, 400, { error: 'Fichier PDF invalide.' });
       await db.prepare(`UPDATE sondages SET titre=COALESCE(?,titre),description=COALESCE(?,description),objectif=COALESCE(?,objectif),categorie=COALESCE(?,categorie),date_cloture=COALESCE(?,date_cloture),statut=COALESCE(?,statut),rayon_publication=COALESCE(?,rayon_publication),confidentialite=COALESCE(?,confidentialite),resultats_visibles=COALESCE(?,resultats_visibles),photos_json=COALESCE(?,photos_json),pdf_b64=COALESCE(?,pdf_b64),pdf_nom=COALESCE(?,pdf_nom),video_url=COALESCE(?,video_url) WHERE id=?`)
-        .run(titre,description,objectif,categorie,date_cloture,statut,rayon_publication,confidentialite,resultats_visibles,photos_json?JSON.stringify(photos_json):null,pdf_b64,pdf_nom,video_url,sid);
+        .run(...[titre,description,objectif,categorie,dateClotureOk,statut,rayon_publication,confidentialite,resultats_visibles,photos_json?JSON.stringify(photos_json):null,pdf_b64,pdf_nom,video_url,sid].map(v => v === undefined ? null : v));
       return sendJSON(res, 200, { message: 'Sondage mis à jour.' });
     }
 
@@ -39620,6 +39597,28 @@ ${jsonLd}
       return sendJSON(res, 200, { message: 'Sondage archivé.' });
     }
 
+    /* ── POST /api/sondages/:id/republier ── nouvelle période de publication (30 jours maximum), même sondage ── */
+    if (req.method === 'POST' && /^\/api\/sondages\/\d+\/republier$/.test(pathname)) {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const sid = parseInt(pathname.split('/')[3]);
+      await sondageAutoCloture();
+      const s = await db.prepare(`SELECT * FROM sondages WHERE id=?`).get(sid);
+      if (!s || (s.createur_id !== me.id && me.role !== 'administrateur')) return sendJSON(res, 403, { error: 'Accès refusé.' });
+      if (s.statut === 'archive') return sendJSON(res, 400, { error: 'Ce sondage est archivé.' });
+      if (s.statut === 'ouvert') return sendJSON(res, 400, { error: 'Ce sondage est déjà en cours.' });
+      let duree = body && body.duree_jours !== undefined && body.duree_jours !== '' ? parseInt(body.duree_jours, 10) : SONDAGE_DUREE_MAX_JOURS;
+      if (!Number.isInteger(duree) || duree < 1) return sendJSON(res, 400, { error: 'Durée invalide.' });
+      if (duree > SONDAGE_DUREE_MAX_JOURS) return sendJSON(res, 400, { error: 'Durée maximale : 30 jours.' });
+      const debut = sondageJourIso(new Date());
+      const fin = sondageAjouterJours(debut, duree - 1);
+      let periodes = []; try { periodes = JSON.parse(s.periodes_json || '[]'); } catch (_) {}
+      const periode = { numero: periodes.length + 1, debut, fin, duree_jours: duree };
+      periodes.push(periode);
+      await db.prepare(`UPDATE sondages SET statut='ouvert', date_debut=?, date_cloture=?, periodes_json=?, nb_republications=COALESCE(nb_republications,0)+? WHERE id=?`)
+        .run(debut, fin, JSON.stringify(periodes.slice(-50)), periodes.length > 1 ? 1 : 0, sid);
+      return sendJSON(res, 200, { message: periodes.length > 1 ? 'Sondage republié.' : 'Sondage publié.', periode });
+    }
+
     /* ── POST /api/sondages/:id/view ── */
     if (req.method === 'POST' && /^\/api\/sondages\/\d+\/view$/.test(pathname)) {
       const sid = parseInt(pathname.split('/')[3]);
@@ -39631,8 +39630,20 @@ ${jsonLd}
     if (req.method === 'POST' && /^\/api\/sondages\/\d+\/participer$/.test(pathname)) {
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const sid = parseInt(pathname.split('/')[3]);
+      await sondageAutoCloture();
       const s = await db.prepare(`SELECT * FROM sondages WHERE id=?`).get(sid);
-      if (!s || s.statut !== 'ouvert') return sendJSON(res, 400, { error: 'Ce sondage est fermé.' });
+      if (!s || s.statut !== 'ouvert') return sendJSON(res, 400, { error: 'Fin de ce sondage : il n\'accepte plus de réponses.' });
+      const { reponses = [] } = body;
+      const questionsP = await db.prepare(`SELECT id, texte, obligatoire FROM sondage_questions WHERE sondage_id=?`).all(sid);
+      const valides = new Map();
+      for (const rep of (Array.isArray(reponses) ? reponses : [])) {
+        if (!rep || rep.valeur === undefined || rep.valeur === null || rep.valeur === '' || (Array.isArray(rep.valeur) && !rep.valeur.length)) continue;
+        if (!questionsP.some(qq => qq.id === Number(rep.question_id))) continue;
+        valides.set(Number(rep.question_id), rep.valeur);
+      }
+      for (const qq of questionsP) {
+        if (qq.obligatoire && !valides.has(qq.id)) return sendJSON(res, 400, { error: `Question obligatoire sans réponse : « ${qq.texte} »` });
+      }
       if (s.une_reponse_par_compte) {
         const already = await db.prepare(`SELECT id FROM sondage_reponses WHERE sondage_id=? AND user_id=? LIMIT 1`).get(sid, me.id);
         if (already && !s.modification_autorisee) return sendJSON(res, 400, { error: 'Vous avez déjà répondu à ce sondage.' });
@@ -39640,10 +39651,9 @@ ${jsonLd}
           await db.prepare(`DELETE FROM sondage_reponses WHERE sondage_id=? AND user_id=?`).run(sid, me.id);
         }
       }
-      const { reponses = [] } = body;
-      for (const rep of reponses) {
+      for (const [qid, valeur] of valides) {
         await db.prepare(`INSERT INTO sondage_reponses(sondage_id,question_id,user_id,reponse) VALUES(?,?,?,?)`)
-          .run(sid, rep.question_id, s.anonyme ? null : me.id, JSON.stringify(rep.valeur));
+          .run(sid, qid, s.anonyme ? null : me.id, JSON.stringify(valeur));
       }
       await db.prepare(`UPDATE sondages SET nb_reponses=nb_reponses+1 WHERE id=?`).run(sid);
       return sendJSON(res, 201, { message: 'Réponse enregistrée.' });

@@ -34,6 +34,9 @@
 .interact-bar{display:flex;gap:8px;flex-wrap:wrap;padding-top:12px;border-top:1px solid var(--border);margin-top:12px;}
 .ibtn{display:flex;align-items:center;gap:4px;padding:5px 10px;border:1px solid var(--border);border-radius:20px;background:#fff;cursor:pointer;font-size:12px;font-weight:700;transition:all .15s;color:#374151;}
 .ibtn:hover,.ibtn.active{border-color:#2563EB;color:#2563EB;background:#fff7f0;}
+/* Fenêtres en surimpression (2026-11-04) : la page n'avait aucun style pour .modal-bg / .modal, les fenêtres s'affichaient en bas de page. */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:200;align-items:center;justify-content:center;padding:20px;}
+.modal-bg .modal{background:#fff;color:#102a43;border-radius:16px;padding:22px;width:100%;box-sizing:border-box;box-shadow:0 20px 60px rgba(0,0,0,.3);}
 </style>
 <link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
   <link rel="stylesheet" href="/assets/design-upgrade.v2.css">
@@ -146,8 +149,26 @@
             <option value="ville">Ville</option>
           </select>
         </div>
-        <div class="form-row"><label>Date de début</label><input type="date" id="cs-debut"></div>
-        <div class="form-row"><label>Date de clôture (max 30 jours)</label><input type="date" id="cs-cloture"></div>
+        <div class="form-row"><label>Date de début</label><input type="date" id="cs-debut" onchange="majFinSond()"></div>
+        <div class="form-row"><label>Date de fin (30 jours maximum)</label><input type="date" id="cs-cloture"></div>
+      </div>
+      <div style="font-size:12px;line-height:1.5;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:10px 12px;color:#1e3a8a;">ℹ️ Un sondage reste actif <strong>30 jours au maximum</strong>, pour tous les endroits où il est affiché (à la fois). Une fois terminé, il reste visible avec la mention « Fin de ce sondage » mais n'accepte plus de réponses. Vous pourrez le <strong>republier</strong> depuis « Mes sondages ».</div>
+    </div>
+    <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px;border-top:1px solid var(--border);padding-top:12px;">Informations demandées aux répondants</div>
+    <div style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:10px;">Elles servent à identifier et à recontacter les personnes qui répondent sans compte Diaspo'Actif. Elles ne sont pas redemandées aux personnes connectées.</div>
+    <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:10px;">
+      <input type="checkbox" id="cs-anonyme" style="accent-color:#2563EB;" onchange="majChampsSond()"> Sondage anonyme — aucune information personnelle n'est demandée
+    </label>
+    <div id="cs-champs-bloc" style="margin-bottom:16px;">
+      <div id="cs-champs-liste"></div>
+      <div style="font-size:12px;font-weight:700;margin:10px 0 6px;">Ajouter une information</div>
+      <div id="cs-champs-catalogue"></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">
+        <input type="text" id="cs-champ-perso" maxlength="120" placeholder="Créer un champ personnalisé (ex : Quartier)" style="flex:1;min-width:180px;height:34px;padding:0 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;">
+        <select id="cs-champ-perso-type" aria-label="Type du champ personnalisé" style="height:34px;border:1px solid var(--border);border-radius:8px;font-size:12px;background:#fff;">
+          <option value="texte_court">Texte court</option><option value="texte_long">Texte long</option><option value="nombre">Nombre</option><option value="date">Date</option><option value="telephone">Téléphone</option><option value="url">Lien</option>
+        </select>
+        <button type="button" class="btn btn-sm btn-outline" onclick="ajouterChampPersoSond()">+ Créer</button>
       </div>
     </div>
     <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px;border-top:1px solid var(--border);padding-top:12px;">Confidentialité</div>
@@ -184,6 +205,19 @@
   </div>
 </div>
 
+<!-- MODAL REPUBLIER -->
+<div class="modal-bg" id="modal-republier-bg" onclick="if(event.target===this)closeMod('modal-republier-bg')">
+  <div class="modal" style="max-width:420px;">
+    <h3 style="margin:0 0 8px;" id="rep-titre">🔁 Republier le sondage</h3>
+    <p style="font-size:13px;color:var(--muted);margin:0 0 12px;line-height:1.5;">Le sondage redevient actif partout où il est affiché, pour la durée choisie (30 jours maximum). Les réponses déjà reçues sont conservées.</p>
+    <div class="form-row"><label for="rep-duree">Durée (en jours, de 1 à 30)</label><input type="number" id="rep-duree" min="1" max="30" value="30"></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px;">
+      <button class="btn btn-outline" onclick="closeMod('modal-republier-bg')">Annuler</button>
+      <button class="btn btn-orange" id="rep-btn" onclick="confirmerRepublier()">Republier</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL STATS -->
 <div class="modal-bg" id="modal-stats-sond-bg" onclick="if(event.target===this)closeMod('modal-stats-sond-bg')">
   <div class="modal" id="modal-stats-sond-content" style="max-width:640px;max-height:90vh;overflow-y:auto;"></div>
@@ -192,6 +226,7 @@
 <script src="assets/data.js"></script>
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js?v=13"></script>
+<script src="assets/ds.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js" defer></script>
 <script src="assets/gsap-animations.js" defer></script>
@@ -204,7 +239,16 @@ let QS_IDX = 0;
 
 function closeMod(id){ document.getElementById(id).style.display='none'; }
 function fmtDate(s){ if(!s)return '—'; return new Date(s).toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'}); }
-function daysLeft(d){ if(!d)return null; return Math.ceil((new Date(d)-new Date())/86400000); }
+function daysLeft(d){ if(!d)return null; return Math.ceil((new Date(String(d).slice(0,10)+'T23:59:59')-new Date())/86400000); }
+const STATUT_LABELS={ouvert:'En cours',cloture:'Fin de ce sondage',brouillon:'Brouillon',archive:'Archivé'};
+function lirePeriodes(s){ try{ return JSON.parse(s.periodes_json||'[]'); }catch(_){ return []; } }
+function lireChamps(s){ try{ return JSON.parse(s.champs_repondant_json||'[]'); }catch(_){ return []; } }
+function descPeriodes(s){
+  const ps=lirePeriodes(s); const nb=lireChamps(s).length;
+  const info=s.anonyme?'Anonyme : aucune information personnelle demandée':(nb+' information(s) demandée(s) aux répondants sans compte');
+  const lignes=ps.length?ps.map(p=>'Période '+p.numero+' : '+fmtDate(p.debut)+' → '+fmtDate(p.fin)).join(' · '):'Pas encore publié';
+  return `<div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5;">${escH(lignes)}<br>${escH(info)}</div>`;
+}
 
 const CAT_LABELS = {consultation_citoyenne:'Consultation citoyenne',projet:'Projet',emploi:'Emploi',formation:'Formation',culture:'Culture',tourisme:'Tourisme',investissement:'Investissement',sante:'Santé',numerique:'Numérique',education:'Éducation',environnement:'Environnement',autre:'Sondage'};
 
@@ -248,7 +292,7 @@ function renderSonds(sonds){
     return `<div class="sond-card" onclick="openSond(${s.id})">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;gap:8px;">
         <span class="cat-badge">📊 ${escH(CAT_LABELS[s.categorie]||s.categorie||'Sondage')}</span>
-        ${jours!==null?`<span style="font-size:11px;font-weight:700;color:${jours<=3&&jours>0?'#ef4444':jours<=0?'#6b7280':'var(--muted)'};">${jours>0?jours+' j restants':'Clôturé'}</span>`:''}
+        ${s.statut!=='ouvert'?`<span style="font-size:11px;font-weight:700;color:#6b7280;">Fin de ce sondage</span>`:(jours!==null?`<span style="font-size:11px;font-weight:700;color:${jours<=3?'#ef4444':'var(--muted)'};">${jours>1?jours+' j restants':'Dernier jour'}</span>`:'')}
       </div>
       <h3 style="margin:0 0 6px;font-size:15px;line-height:1.3;">${escH(s.titre)}</h3>
       ${s.description?`<p style="font-size:12px;color:#555;margin:0 0 10px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${escH(s.description)}</p>`:''}
@@ -260,7 +304,7 @@ function renderSonds(sonds){
         <button class="ibtn" onclick="toggleRxnSond(${s.id},this)">❤️ ${s.nb_reactions||0}</button>
         <button class="ibtn" onclick="toggleFavSond(${s.id},this)">⭐</button>
         <button class="ibtn" onclick="openSond(${s.id})">💬 ${s.nb_commentaires||0}</button>
-        <button class="ibtn" style="border-color:#2563EB;color:#2563EB;" onclick="openSond(${s.id})">📋 Participer</button>
+        ${s.statut==='ouvert'?`<button class="ibtn" style="border-color:#2563EB;color:#2563EB;" onclick="openSond(${s.id})">📋 Participer</button>`:`<button class="ibtn" style="border-color:#9ca3af;color:#6b7280;cursor:default;" disabled>⏹️ Fin de ce sondage</button>`}
       </div>
     </div>`;
   }).join('');
@@ -291,7 +335,8 @@ async function openSond(sid){
       <div style="display:flex;gap:14px;font-size:13px;color:var(--muted);margin-bottom:16px;flex-wrap:wrap;">
         <span>👥 ${s.nb_reponses||0}</span><span>👁️ ${s.nb_vues||0}</span><span>❤️ ${s.nb_reactions||0}</span>
       </div>
-      ${ferme?'<div style="padding:12px;background:#fef3c7;border-radius:10px;margin-bottom:16px;text-align:center;font-size:13px;">⏰ Ce sondage est clôturé.</div>':''}
+      ${s.statut==='cloture'?`<div style="padding:12px;background:#fef3c7;border-radius:10px;margin-bottom:16px;text-align:center;font-size:13px;">⏹️ <strong>Fin de ce sondage</strong> — il n'accepte plus de réponses.${estCreateur?' Republiez-le pour le réactiver.':''}</div>`:''}
+      ${s.statut==='brouillon'?`<div style="padding:12px;background:#f3f4f6;border-radius:10px;margin-bottom:16px;text-align:center;font-size:13px;">📝 Brouillon : ce sondage n'est pas encore publié.</div>`:''}
       ${dejaRepondu&&!ferme?'<div style="padding:12px;background:#d1fae5;border-radius:10px;margin-bottom:16px;text-align:center;font-size:13px;font-weight:700;color:#065f46;">✅ Vous avez déjà répondu.</div>':''}
       ${peutParticiper?`<div id="sond-form-${sid}">${qs.map((q2,i)=>renderQ(q2,i)).join('')}<button class="btn btn-orange" style="width:100%;margin-top:12px;" onclick="submitSond(${sid},[${qs.map(q2=>q2.id).join(',')}])">✅ Soumettre</button></div>`:''}
       ${(ferme||dejaRepondu)?`<button class="btn btn-sm btn-outline" onclick="loadResMini(${sid})">📊 Voir les résultats</button><div id="res-mini-${sid}"></div>`:''}
@@ -302,6 +347,8 @@ async function openSond(sid){
         <button class="ibtn" onclick="navigator.clipboard.writeText(location.origin+'/sondages.html?id=${sid}');DA.toast('Lien copié !',{type:'success'})">📤 Copier</button>
         ${estCreateur?`<button class="btn btn-sm" style="border-color:#2563EB;color:#2563EB;" onclick="closeMod('modal-sond-bg');openStatsSond(${sid})">📊 Stats</button>`:''}
         ${estCreateur&&!ferme?`<button class="btn btn-sm" style="border-color:#ef4444;color:#ef4444;" onclick="cloturerSond(${sid})">🔒 Clôturer</button>`:''}
+        ${estCreateur&&s.statut==='cloture'?`<button class="btn btn-sm" style="border-color:#2563EB;color:#2563EB;" onclick="ouvrirRepublier(${sid})">🔁 Republier</button>`:''}
+        ${estCreateur&&s.statut==='brouillon'?`<button class="btn btn-sm" style="border-color:#2563EB;color:#2563EB;" onclick="ouvrirRepublier(${sid},true)">🚀 Publier</button>`:''}
         ${estCreateur?`<button class="btn btn-sm" onclick="window.location.href='/api/sondages/${sid}/export'">⬇️ CSV</button>`:''}
       </div>
       <div style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px;">
@@ -406,9 +453,10 @@ async function loadMesSonds(){
           <div>
             <span class="cat-badge">📊 ${escH(CAT_LABELS[s.categorie]||'Sondage')}</span>
             <strong style="font-size:15px;display:block;margin-top:4px;">${escH(s.titre)}</strong>
-            <div style="font-size:12px;color:var(--muted);">Clôture ${fmtDate(s.date_cloture)} · ${s.nb_reponses||0} réponses</div>
+            <div style="font-size:12px;color:var(--muted);">${s.statut==='ouvert'?'Fin le ':'Terminé le '}${fmtDate(s.date_cloture)} · ${s.nb_reponses||0} réponses</div>
+            ${descPeriodes(s)}
           </div>
-          <span style="padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;background:${s.statut==='ouvert'?'#d1fae5':'#f3f4f6'};color:${s.statut==='ouvert'?'#065f46':'#6b7280'};">${s.statut}</span>
+          <span style="padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;background:${s.statut==='ouvert'?'#d1fae5':'#f3f4f6'};color:${s.statut==='ouvert'?'#065f46':'#6b7280'};">${STATUT_LABELS[s.statut]||s.statut}</span>
         </div>
         <div style="display:flex;gap:10px;font-size:12px;color:var(--muted);margin-bottom:10px;">
           <span>👁️ ${s.nb_vues||0}</span><span>❤️ ${s.nb_reactions||0}</span><span>💬 ${s.nb_commentaires||0}</span><span>👥 ${s.nb_reponses||0}</span>
@@ -417,6 +465,8 @@ async function loadMesSonds(){
           <button class="btn btn-sm btn-outline" onclick="openSond(${s.id})">👁️ Voir</button>
           <button class="btn btn-sm btn-outline" onclick="openStatsSond(${s.id})">📊 Stats</button>
           ${s.statut==='ouvert'?`<button class="btn btn-sm" style="border-color:#ef4444;color:#ef4444;" onclick="cloturerSond(${s.id})">🔒 Clôturer</button>`:''}
+          ${s.statut==='cloture'?`<button class="btn btn-sm" style="border-color:#2563EB;color:#2563EB;" onclick="ouvrirRepublier(${s.id})">🔁 Republier</button>`:''}
+          ${s.statut==='brouillon'?`<button class="btn btn-sm" style="border-color:#2563EB;color:#2563EB;" onclick="ouvrirRepublier(${s.id},true)">🚀 Publier</button>`:''}
           <button class="btn btn-sm" onclick="window.location.href='/api/sondages/${s.id}/export'">⬇️ CSV</button>
           <button class="btn btn-sm" style="border-color:#6b7280;color:#6b7280;" onclick="archiverSond(${s.id})">🗄️ Archiver</button>
         </div>
@@ -434,10 +484,53 @@ function openCreateSond(){
   document.getElementById('cs-conf').value='anonyme';
   document.getElementById('cs-res-vis').value='apres_cloture';
   document.getElementById('cs-debut').value=new Date().toISOString().slice(0,10);
-  document.getElementById('cs-cloture').value=new Date(Date.now()+30*86400000).toISOString().slice(0,10);
+  document.getElementById('cs-cloture').value=new Date(Date.now()+29*86400000).toISOString().slice(0,10);
+  majFinSond();
+  CS_CHAMPS=CS_DEFAUT.map(c=>({...c}));
+  document.getElementById('cs-anonyme').checked=false;
+  document.getElementById('cs-champ-perso').value='';
+  majChampsSond();
   document.getElementById('cs-publier').checked=false;
   addQuestion();
   document.getElementById('modal-create-sond-bg').style.display='flex';
+}
+
+/* ── Informations demandées aux répondants (même principe que la fiche d'inscription) ── */
+const CS_CATALOGUE={
+  'Identité':[{libelle:'Genre',type_champ:'choix_unique',options:['Homme','Femme']},{libelle:'Date de naissance',type_champ:'date'},{libelle:'Nationalité',type_champ:'texte_court'}],
+  'Contact':[{libelle:'Téléphone',type_champ:'telephone'},{libelle:'Numéro WhatsApp',type_champ:'telephone'},{libelle:'Adresse postale',type_champ:'texte_court'}],
+  'Profession':[{libelle:'Fonction / Poste',type_champ:'texte_court'},{libelle:"Secteur d'activité",type_champ:'texte_court'},{libelle:'Entreprise / Organisation',type_champ:'texte_court'},{libelle:'Statut professionnel',type_champ:'choix_unique',options:['Salarié','Indépendant','Étudiant','Sans emploi','Retraité']}],
+  'Diaspora':[{libelle:'Ville de résidence',type_champ:'texte_court'},{libelle:'Pays de résidence',type_champ:'texte_court'},{libelle:"Pays d'origine",type_champ:'texte_court'},{libelle:"Communauté / région d'origine",type_champ:'texte_court'},{libelle:"Année d'arrivée dans le pays de résidence",type_champ:'nombre'}]
+};
+const CS_DEFAUT=[{cle:'nom',libelle:'Nom',categorie:'Identité',type_champ:'texte_court',obligatoire:true},{cle:'prenom',libelle:'Prénom',categorie:'Identité',type_champ:'texte_court',obligatoire:true},{cle:'email',libelle:'Adresse e-mail',categorie:'Contact',type_champ:'email',obligatoire:true}];
+const CS_TYPE_LABELS={texte_court:'Texte court',texte_long:'Texte long',email:'E-mail',telephone:'Téléphone',nombre:'Nombre',date:'Date',url:'Lien',choix_unique:'Choix'};
+let CS_CHAMPS=[];
+function csCle(l){ return l.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'').slice(0,40)||'champ'; }
+function majChampsSond(){
+  const anon=document.getElementById('cs-anonyme').checked;
+  document.getElementById('cs-champs-bloc').style.display=anon?'none':'';
+  if(anon) return;
+  document.getElementById('cs-champs-liste').innerHTML=CS_CHAMPS.length?CS_CHAMPS.map((c,i)=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;background:#fff;font-size:13px;"><span style="flex:1;">${escH(c.libelle)} <span style="font-size:11px;color:var(--muted);">· ${escH(CS_TYPE_LABELS[c.type_champ]||c.type_champ)}</span></span><label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;"><input type="checkbox" ${c.obligatoire?'checked':''} onchange="CS_CHAMPS[${i}].obligatoire=this.checked"> Obligatoire</label><button type="button" onclick="retirerChampSond(${i})" aria-label="Retirer ${escH(c.libelle)}" style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:16px;">×</button></div>`).join(''):'<div style="font-size:12px;color:var(--muted);">Aucune information demandée : les répondants sans compte répondront sans s\'identifier.</div>';
+  const deja=new Set(CS_CHAMPS.map(c=>c.libelle.toLowerCase()));
+  document.getElementById('cs-champs-catalogue').innerHTML=Object.entries(CS_CATALOGUE).map(([cat,items])=>`<div style="margin-bottom:6px;"><span style="font-size:11px;font-weight:700;color:var(--muted);margin-right:6px;">${escH(cat)}</span>${items.map((it,k)=>`<button type="button" class="ibtn" style="display:inline-flex;margin:2px 4px 2px 0;" ${deja.has(it.libelle.toLowerCase())?'disabled':''} onclick="ajouterChampSond('${cat}',${k})">+ ${escH(it.libelle)}</button>`).join('')}</div>`).join('');
+}
+function ajouterChampSond(cat,k){
+  const it=(CS_CATALOGUE[cat]||[])[k]; if(!it||CS_CHAMPS.length>=25)return;
+  CS_CHAMPS.push({cle:csCle(it.libelle),libelle:it.libelle,categorie:cat,type_champ:it.type_champ,options:it.options,obligatoire:false});
+  majChampsSond();
+}
+function ajouterChampPersoSond(){
+  const inp=document.getElementById('cs-champ-perso'); const l=inp.value.trim(); if(!l)return;
+  if(CS_CHAMPS.length>=25){DA.toast('25 informations au maximum.',{type:'warning'});return;}
+  if(CS_CHAMPS.some(c=>c.libelle.toLowerCase()===l.toLowerCase())){DA.toast('Cette information est déjà dans la liste.',{type:'warning'});return;}
+  CS_CHAMPS.push({cle:csCle(l),libelle:l,categorie:'Personnalisé',type_champ:document.getElementById('cs-champ-perso-type').value,obligatoire:false});
+  inp.value=''; majChampsSond();
+}
+function retirerChampSond(i){ CS_CHAMPS.splice(i,1); majChampsSond(); }
+function majFinSond(){
+  const d=document.getElementById('cs-debut').value; const f=document.getElementById('cs-cloture'); if(!d)return;
+  const max=new Date(new Date(d+'T00:00:00Z').getTime()+29*86400000).toISOString().slice(0,10);
+  f.min=d; f.max=max; if(f.value&&f.value>max) f.value=max;
 }
 
 function addQuestion(){
@@ -493,12 +586,12 @@ async function saveSond(){
   if(!titre){DA.toast('Titre requis.',{type:'warning'});return;}
   const debut=document.getElementById('cs-debut').value;
   const cloture=document.getElementById('cs-cloture').value;
-  if(debut&&cloture&&(new Date(cloture)-new Date(debut))/86400000>30){DA.toast('Max 30 jours.',{type:'warning'});return;}
+  if(debut&&cloture&&(new Date(cloture)-new Date(debut))/86400000>29){DA.toast('Un sondage dure 30 jours au maximum.',{type:'warning'});return;}
   const questions=QS_BUILDER.map(q=>({texte:q.texte,type:q.type,options:q.options.filter(Boolean),obligatoire:true})).filter(q=>q.texte.trim());
   if(!questions.length){DA.toast('Ajoutez au moins une question.',{type:'warning'});return;}
   const btn=document.getElementById('btn-save-sond');btn.disabled=true;btn.textContent='…';
   try{
-    await api('POST','/sondages',{titre,description:document.getElementById('cs-desc').value||null,categorie:document.getElementById('cs-cat').value,rayon_publication:document.getElementById('cs-rayon').value,date_debut:debut||null,date_cloture:cloture||null,confidentialite:document.getElementById('cs-conf').value,resultats_visibles:document.getElementById('cs-res-vis').value,statut:document.getElementById('cs-publier').checked?'ouvert':'brouillon',questions});
+    await api('POST','/sondages',{titre,description:document.getElementById('cs-desc').value||null,categorie:document.getElementById('cs-cat').value,rayon_publication:document.getElementById('cs-rayon').value,date_debut:debut||null,date_cloture:cloture||null,confidentialite:document.getElementById('cs-conf').value,anonyme:document.getElementById('cs-anonyme').checked,champs_repondant:document.getElementById('cs-anonyme').checked?[]:CS_CHAMPS,resultats_visibles:document.getElementById('cs-res-vis').value,statut:document.getElementById('cs-publier').checked?'ouvert':'brouillon',questions});
     DA.toast('Sondage créé !',{type:'success'});closeMod('modal-create-sond-bg');loadSonds();
     if(ME_SOND&&['initiative','collectivite','administrateur'].includes(ME_SOND.role)) loadMesSonds();
   }catch(e){DA.toast(e.message,{type:'danger'});}
@@ -512,6 +605,27 @@ async function cloturerSond(sid){
 async function archiverSond(sid){
   if(!confirm('Archiver ce sondage ?'))return;
   try{await api('DELETE','/sondages/'+sid);DA.toast('Archivé.',{type:'success'});loadMesSonds();}catch(e){DA.toast(e.message,{type:'danger'});}
+}
+
+let REP_SID=null;
+function ouvrirRepublier(sid,brouillon){
+  REP_SID=sid;
+  document.getElementById('rep-titre').textContent=brouillon?'🚀 Publier le sondage':'🔁 Republier le sondage';
+  document.getElementById('rep-btn').textContent=brouillon?'Publier':'Republier';
+  document.getElementById('rep-duree').value=30;
+  closeMod('modal-sond-bg');
+  document.getElementById('modal-republier-bg').style.display='flex';
+}
+async function confirmerRepublier(){
+  const duree=parseInt(document.getElementById('rep-duree').value,10);
+  if(!(duree>=1&&duree<=30)){DA.toast('Durée : de 1 à 30 jours.',{type:'warning'});return;}
+  const btn=document.getElementById('rep-btn');btn.disabled=true;
+  try{
+    const r=await api('POST','/sondages/'+REP_SID+'/republier',{duree_jours:duree});
+    DA.toast(r.message||'Sondage republié.',{type:'success'});
+    closeMod('modal-republier-bg');loadSonds();loadMesSonds();
+  }catch(e){DA.toast(e.message,{type:'danger'});}
+  finally{btn.disabled=false;}
 }
 
 async function openStatsSond(sid){
