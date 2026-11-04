@@ -61,6 +61,8 @@
         <a href="annuaire.html">Annuaire</a>
         <a href="vitrines.html">Boutiques</a>
         <a href="fil-actualite.html">Fil d'actualité</a>
+        <a href="formations.html">Formations</a>
+        <a href="sondages.html">Sondages</a>
       </nav>
       <div class="topbar-right">
         <select class="lang-select" id="lang-select"></select>
@@ -215,10 +217,15 @@ function cfRenderRevenus(el) {
 /* ── Onglet 2 : Comptes de réception ── */
 function cfRenderComptes(el) {
   const d = CF_DATA;
-  const autresProviders = [
-    { nom: 'PayPal', icon: '💳' },
-  ];
+  const pp = d.paypal_connect;
+  const reco = d.pays_recommandation;
+  const recoTexte = reco && reco.code_pays
+    ? (reco.provider === 'stripe'
+        ? `Pour votre pays (${cfEsc(reco.code_pays)}), Stripe est recommandé — c'est celui qui vous permettra de recevoir l'argent le plus directement.`
+        : `Stripe n'est pas encore disponible pour votre pays (${cfEsc(reco.code_pays)}) — vérifiez si PayPal couvre votre situation, en attendant d'autres prestataires.`)
+    : '';
   el.innerHTML = `
+    ${recoTexte ? `<div class="cf-card" style="background:#eff6ff;border-color:#bfdbfe;"><p style="margin:0;font-size:13px;">💡 ${recoTexte}</p></div>` : ''}
     <div class="cf-card">
       <h3 style="margin-top:0;">💼 Stripe Connect</h3>
       ${d.connect ? `
@@ -235,13 +242,27 @@ function cfRenderComptes(el) {
       `}
     </div>
     <div class="cf-card">
-      <h3 style="margin-top:0;">Autres prestataires</h3>
-      <p style="font-size:12.5px;color:var(--muted);margin-top:-6px;">Non connectés pour l'instant — l'architecture est prête à les accueillir dès que les intégrations officielles seront disponibles.</p>
-      ${autresProviders.map(p => `
+      <h3 style="margin-top:0;">💳 PayPal</h3>
+      ${!pp ? `
+        <div class="cf-empty">Vous devez posséder une Initiative pour connecter un compte de réception.</div>
+      ` : !pp.disponible ? `
         <div class="cf-provider-row" style="opacity:.6;">
-          <div>${p.icon} ${cfEsc(p.nom)}</div>
+          <div>💳 PayPal</div>
           <span class="cf-badge pending">Bientôt disponible</span>
-        </div>`).join('')}
+        </div>
+      ` : `
+        <div class="cf-provider-row">
+          <div>
+            <div style="font-size:12px;color:var(--muted);margin-top:2px;">Statut : <span class="cf-badge ${pp.statut}">${cfEsc(pp.statut)}</span>
+              ${pp.payments_receivable ? ' · ✅ Prêt à encaisser' : ' · ⏳ Onboarding à terminer'}</div>
+          </div>
+          <button class="btn-primary btn-sm" onclick="cfPaypalOnboard(${pp.initiative_id})">${pp.connecte ? 'Gérer / Compléter' : 'Connecter PayPal'}</button>
+        </div>
+      `}
+    </div>
+    <div class="cf-card">
+      <h3 style="margin-top:0;">Autres prestataires</h3>
+      <p style="font-size:12.5px;color:var(--muted);margin-top:-6px;">Non connectés pour l'instant — l'architecture est prête à les accueillir dès que les intégrations officielles seront disponibles (mobile money, etc.).</p>
     </div>
   `;
 }
@@ -251,6 +272,26 @@ async function cfConnectOnboard(initiativeId) {
     if (r.url) window.location.href = r.url;
   } catch(e) { cfToast(e.message || 'Erreur Stripe Connect', 'error'); }
 }
+async function cfPaypalOnboard(initiativeId) {
+  try {
+    const r = await api('POST', `/initiatives/${initiativeId}/paypal/onboard`);
+    if (r.url) window.location.href = r.url;
+  } catch(e) { cfToast(e.message || 'Erreur PayPal', 'error'); }
+}
+/* Retour depuis l'onboarding PayPal : PayPal ajoute lui-même merchantIdInPayPal à l'URL — jamais
+   fait confiance au navigateur seul, le serveur revérifie ce statut auprès de PayPal avant de
+   l'enregistrer (voir POST /initiatives/:id/paypal/confirmer). */
+(function cfTraiterRetourPaypal() {
+  const q = new URLSearchParams(location.search);
+  if (q.get('paypal_retour') !== '1') return;
+  const initiativeId = q.get('initiative_id');
+  const merchantId = q.get('merchantIdInPayPal');
+  history.replaceState(null, '', location.pathname);
+  if (!initiativeId || !merchantId) return;
+  api('POST', `/initiatives/${initiativeId}/paypal/confirmer`, { merchant_id_paypal: merchantId })
+    .then(() => cfToast('Compte PayPal connecté.'))
+    .catch(e => cfToast(e.message || 'Erreur de confirmation PayPal', 'error'));
+})();
 
 /* ── Onglet 3 : Retrait ── */
 function cfRenderRetrait(el) {

@@ -62,8 +62,10 @@
         <a href="annuaire.html">Annuaire</a>
         <a href="vitrines.html">Boutiques</a>
         <a href="fil-actualite.html">Fil d'actualité</a>
+        <a href="formations.html">Formations</a>
         <a href="actualites.html" style="display:none;">Projets diasporas</a>
         <a href="evenements.html">Autres événements</a>
+        <a href="sondages.html">Sondages</a>
       </nav>
       <div class="topbar-right">
         
@@ -78,6 +80,7 @@
     <div id="code-secret-zone"></div>
     <div id="ds-histo-zone"></div>
     <div id="mes-infos-zone"></div>
+    <div id="email-visibilite-zone"></div>
     <div id="origine-institution-zone"></div>
     <div id="identite-verif-zone"></div>
     <div id="identite-publique-zone"></div>
@@ -350,6 +353,61 @@
       } catch(e) {
         alert(e.message || 'Erreur.');
         btn.disabled = false; btn.textContent = '🔔 Réactiver la proposition';
+      }
+    };
+  }
+  render();
+})();
+
+/* ── Visibilité de l'adresse e-mail dans l'Annuaire (2026-11-01, demande explicite) ──
+   Masquée par défaut pour tout compte (email_visible_annuaire=0, server/db.js) : personne ne
+   peut la trouver via la recherche par e-mail de l'Annuaire (GET /api/annuaire/recherche) tant
+   que ce réglage reste désactivé. Ne touche JAMAIS au fonctionnement interne de la plateforme
+   (connexion, réinitialisation de mot de passe, e-mails automatiques), qui continue d'utiliser
+   la vraie adresse quel que soit ce réglage — seule la trouvabilité par les autres change. */
+(async function initEmailVisibiliteZone(){
+  const zone = document.getElementById('email-visibilite-zone');
+  if (!zone) return;
+  let user;
+  try {
+    const me = await api('GET', '/auth/me');
+    if (!me.user) return;
+    user = me.user;
+  } catch(e) { return; }
+
+  // Même algorithme que ConfirmationAppareil.masquerEmail (server/confirmation-appareil.js) —
+  // reproduit ici côté client pour un simple affichage, jamais pour une vérification de sécurité.
+  function masquerEmail(email) {
+    const [nom, domaine] = String(email || '').split('@');
+    if (!domaine) return '';
+    return (nom.length <= 2 ? nom[0] + '*' : nom.slice(0, 2) + '***') + '@' + domaine;
+  }
+
+  function render() {
+    const visible = !!user.email_visible_annuaire;
+    zone.innerHTML = `
+      <div class="codes-card cf-cadre">
+        <h4>✉️ Visibilité de mon adresse e-mail</h4>
+        <p class="codes-sub">Par défaut, votre adresse e-mail (<strong>${masquerEmail(user.email)}</strong>) est masquée : personne ne peut vous trouver avec, dans la recherche de l'Annuaire. Rendez-la visible pour permettre à un tiers qui connaît déjà cette adresse de vous retrouver et de vous contacter (invitation, affiliation…). Cela ne change rien à la connexion ni aux e-mails automatiques de la plateforme.</p>
+        <div class="codes-btn-row">
+          <button class="codes-btn ${visible ? 'orange' : 'green'}" id="email-visibilite-btn">
+            ${visible ? '🙈 Masquer mon adresse e-mail' : '👁 Rendre mon adresse e-mail visible et trouvable'}
+          </button>
+        </div>
+        <p style="font-size:12px;color:var(--muted);margin:8px 0 0;">${visible ? '✅ Actuellement visible et trouvable par recherche e-mail.' : '🔒 Actuellement masquée — introuvable par recherche e-mail.'}</p>
+      </div>
+    `;
+    const btn = document.getElementById('email-visibilite-btn');
+    if (btn) btn.onclick = async () => {
+      btn.disabled = true;
+      try {
+        const r = await api('PATCH', '/auth/email-visibilite', { visible: !visible });
+        user.email_visible_annuaire = r.email_visible_annuaire;
+        if (window.CURRENT_USER) window.CURRENT_USER.email_visible_annuaire = r.email_visible_annuaire;
+        render();
+      } catch(e) {
+        alert(e.message || 'Erreur.');
+        btn.disabled = false;
       }
     };
   }
