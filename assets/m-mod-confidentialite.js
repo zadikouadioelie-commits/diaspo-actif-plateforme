@@ -186,7 +186,7 @@
       }, 1000);
     };
     const formulaire = () => {
-      zone().innerHTML = `${entete}<p class="cf-sheet-p">Votre DS-ID est votre signature numérique personnelle : permanente, non modifiable, jamais visible par un administrateur. Elle sert à signer des partenariats et des <b>votes sécurisés</b>, et à autoriser un nouvel appareil.</p>
+      zone().innerHTML = `${entete}<p class="cf-sheet-p">Votre DS-ID est votre signature numérique personnelle : permanente, non modifiable, jamais visible par un administrateur. Elle sert à signer des partenariats et des <b>votes sécurisés</b>.</p>
         <label class="cf-lbl" for="ds-pwd">Votre mot de passe</label>
         <div class="cf-pwd"><input class="cf-in" id="ds-pwd" type="password" autocomplete="current-password" placeholder="Mot de passe"><button type="button" id="ds-oeil" aria-label="Afficher le mot de passe">👁</button></div>
         <p class="cf-hint">Le code s’affiche 45 secondes ; nouvelle consultation possible après 1 minute, puis 5 minutes.</p>

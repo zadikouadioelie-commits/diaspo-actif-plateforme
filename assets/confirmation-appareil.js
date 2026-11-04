@@ -1,11 +1,12 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   Confirmation d'un nouvel appareil à la connexion (2026-10-05, étape 2 du chantier sécurité).
-   Utilisation : remplacer  api("POST", "/auth/login", { email, password })
-                par         loginAvecConfirmation(email, password)
-   Si le serveur répond « confirmation_requise » (compte déjà ouvert ailleurs, appareil inconnu), une
-   fenêtre demande le Code de Sécurité (DS-ID) du compte — ou d'un compte lié — ou, à défaut, un code
-   à 6 chiffres envoyé par e-mail. Une fois l'appareil autorisé, la connexion est rejouée
-   automatiquement. Rejette avec une Error si la personne annule.
+   Connexion sans mot de passe : code provisoire à 4 chiffres envoyé par e-mail (2026-11-04).
+
+   Historique : le 2026-10-05 une fenêtre « Confirmez que c'est bien vous » (DS-ID, code multi-connexion, code e-mail) pouvait s'intercaler après
+   un bon mot de passe. Le titulaire du site a tranché : le mot de passe suffit. Cette fenêtre n'existe plus.
+     • loginAvecConfirmation(email, mot de passe) : connexion par mot de passe (nom conservé pour les pages qui l'appellent déjà).
+     • connexionParCodeEmail(emailInitial) : pour qui n'a pas son mot de passe — la personne saisit l'adresse e-mail DU COMPTE voulu (compte lié
+       compris : chaque compte a sa propre adresse), reçoit un code à 4 chiffres (10 minutes, 3 essais) et est connectée à ce compte-là.
+       Renvoie la réponse de connexion ({ user }) ; rejette avec une Error portant `annule = true` si la personne ferme la fenêtre.
    ═══════════════════════════════════════════════════════════════════════════ */
 (function () {
   const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -23,20 +24,20 @@
 .ca-box input{width:100%;box-sizing:border-box;padding:12px;font-size:16px;border:1.5px solid #d1d5db;border-radius:10px;letter-spacing:.06em;color:#111;background:#fff;}
 .ca-box input:focus{outline:none;border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.15);}
 .ca-err{color:#b91c1c;font-size:12.5px;font-weight:600;min-height:1.2em;margin:8px 0 0;}
-.ca-ok{color:#15803d;font-size:12.5px;font-weight:600;margin:8px 0 0;}
+.ca-ok{color:#15803d;font-size:12.5px;font-weight:600;margin:0 0 12px;line-height:1.45;}
 .ca-actions{display:flex;gap:10px;margin-top:16px;}
 .ca-btn{flex:1;border:none;border-radius:10px;padding:12px;font-weight:800;font-size:14px;cursor:pointer;}
 .ca-btn.principal{background:#2563eb;color:#fff;}
 .ca-btn.principal:disabled{opacity:.6;cursor:default;}
 .ca-btn.secondaire{background:#f3f4f6;color:#374151;}
-.ca-lien{background:none;border:none;color:#2563eb;font-size:12.5px;font-weight:700;cursor:pointer;padding:0;margin-top:12px;text-decoration:underline;text-align:left;}
+.ca-lien{background:none;border:none;color:#2563eb;font-size:12.5px;font-weight:700;cursor:pointer;padding:0;margin-top:12px;text-decoration:underline;text-align:left;display:block;}
 .ca-lien:disabled{color:#9ca3af;cursor:default;text-decoration:none;}
 .ca-aide{font-size:12px;color:#6b7280;background:#f9fafb;border-radius:8px;padding:10px;margin-top:12px;line-height:1.5;}
 `;
     document.head.appendChild(st);
   }
 
-  function demanderConfirmation(rep) {
+  function connexionParCodeEmail(emailInitial) {
     styles();
     return new Promise((resolve, reject) => {
       const ov = document.createElement('div');
@@ -44,103 +45,81 @@
       ov.setAttribute('role', 'dialog');
       ov.setAttribute('aria-modal', 'true');
       ov.setAttribute('aria-labelledby', 'ca-titre');
-      const ouvert = (rep.deja_ouvert_sur || []).map(a => esc(a.libelle) + (a.il_y_a_min != null ? ' (actif ' + (a.il_y_a_min < 2 ? 'à l\'instant' : a.il_y_a_min < 90 ? 'il y a ' + a.il_y_a_min + ' min' : a.il_y_a_min < 2880 ? 'il y a ' + Math.round(a.il_y_a_min / 60) + ' h' : 'il y a plus de 2 jours') + ')' : '')).join(' · ');
       ov.innerHTML = `<div class="ca-box">
-        <h3 id="ca-titre">🔐 Confirmez que c'est bien vous</h3>
-        <p>Ce compte est déjà utilisé sur un autre appareil du même type (téléphone ou ordinateur). Pour votre sécurité, prouvez que vous en êtes le titulaire : une seule fois, cet appareil sera ensuite reconnu pendant 30 jours.</p>
-        ${ouvert ? `<p><strong>Déjà connecté sur :</strong> ${ouvert}</p>` : ''}
-        <div id="ca-mode-notif">
-          <label for="ca-cn">Votre code multi-connexion (4 chiffres)</label>
-          <input id="ca-cn" type="text" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="0000" style="font-size:22px;">
-          <div class="ca-aide">C'est le code à 4 chiffres que vous avez choisi dans <strong>Paramètres du compte</strong> (« Code multi-connexion »). Vous avez 3 essais.</div>
-          <button type="button" class="ca-lien" id="ca-n-dsid">Utiliser mon DS-ID à la place</button>
-          <button type="button" class="ca-lien" id="ca-n-email" style="display:block;">Recevoir un code par e-mail</button>
+        <h3 id="ca-titre">Se connecter avec un code reçu par e-mail</h3>
+        <div id="ca-etape1">
+          <p>Vous n'avez pas votre mot de passe ? Saisissez l'adresse e-mail de votre compte : nous y envoyons un code provisoire à 4 chiffres qui vous connecte, sans mot de passe.</p>
+          <label for="ca-email">Adresse e-mail du compte</label>
+          <input id="ca-email" type="email" autocomplete="username" autocapitalize="off" spellcheck="false" placeholder="vous@exemple.com" value="${esc(emailInitial || '')}">
+          <div class="ca-aide">Vos comptes sont liés (par exemple Initiative et Utilisateur) ? Saisissez l'adresse du compte auquel vous voulez accéder : le code vous ouvre celui-là.</div>
         </div>
-        <div id="ca-mode-dsid" style="display:none;">
-          <label for="ca-dsid">Votre Code de Sécurité (DS-ID)</label>
-          <input id="ca-dsid" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="DS-ID de ce compte ou d'un compte lié">
-          <div class="ca-aide">Vous le trouvez dans votre profil, section <strong>Confidentialité</strong>, sur l'appareil déjà connecté. Vous pouvez aussi saisir celui d'un de vos comptes liés.</div>
-          <button type="button" class="ca-lien" id="ca-vers-email">Je n'ai pas mon DS-ID : m'envoyer un code par e-mail</button>
-          <button type="button" class="ca-lien" id="ca-d-notif" style="display:block;">Utiliser mon code multi-connexion (4 chiffres)</button>
-        </div>
-        <div id="ca-mode-email" style="display:none;">
-          <label for="ca-code">Code à 6 chiffres reçu par e-mail</label>
-          <input id="ca-code" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="000000">
-          <div class="ca-ok" id="ca-email-info"></div>
+        <div id="ca-etape2" style="display:none;">
+          <div class="ca-ok" id="ca-info"></div>
+          <label for="ca-code">Code à 4 chiffres</label>
+          <input id="ca-code" type="text" inputmode="numeric" maxlength="4" autocomplete="one-time-code" placeholder="0000" style="font-size:22px;">
           <button type="button" class="ca-lien" id="ca-renvoyer">Renvoyer le code</button>
-          <button type="button" class="ca-lien" id="ca-vers-dsid" style="display:block;">Utiliser mon DS-ID à la place</button>
-          <button type="button" class="ca-lien" id="ca-e-notif" style="display:block;">Utiliser mon code multi-connexion (4 chiffres)</button>
+          <button type="button" class="ca-lien" id="ca-autre">Changer d'adresse e-mail</button>
         </div>
         <div class="ca-err" id="ca-err" role="alert" aria-live="assertive"></div>
         <div class="ca-actions">
           <button type="button" class="ca-btn secondaire" id="ca-annuler">Annuler</button>
-          <button type="button" class="ca-btn principal" id="ca-valider">Confirmer</button>
+          <button type="button" class="ca-btn principal" id="ca-valider">Envoyer le code</button>
         </div>
       </div>`;
       document.body.appendChild(ov);
       const $ = (id) => ov.querySelector('#' + id);
-      /* Sans code multi-connexion défini sur le compte : on part directement du DS-ID. */
-      let mode = rep.code_multi === false ? 'dsid' : 'multi';
-      const CHAMP = { multi: 'ca-cn', dsid: 'ca-dsid', email: 'ca-code' };
+      let etape = 1, email = '';
       const err = (m) => { $('ca-err').textContent = m || ''; };
       const fermer = () => ov.remove();
-      const basculer = (m) => {
-        mode = m; err('');
-        $('ca-mode-notif').style.display = m === 'multi' ? '' : 'none';
-        $('ca-mode-dsid').style.display = m === 'dsid' ? '' : 'none';
-        $('ca-mode-email').style.display = m === 'email' ? '' : 'none';
-        $(CHAMP[m]).focus();
+      const montrer = (n) => {
+        etape = n; err('');
+        $('ca-etape1').style.display = n === 1 ? '' : 'none';
+        $('ca-etape2').style.display = n === 2 ? '' : 'none';
+        const b = $('ca-valider'); b.disabled = false; b.textContent = n === 1 ? 'Envoyer le code' : 'Me connecter';
+        $(n === 1 ? 'ca-email' : 'ca-code').focus();
       };
 
       async function envoyerCode() {
         err('');
-        const b1 = $('ca-vers-email'), b2 = $('ca-renvoyer');
-        b1.disabled = true; b2.disabled = true;
+        email = $('ca-email').value.trim().toLowerCase();
+        if (!email) { err("Saisissez l'adresse e-mail de votre compte."); return; }
+        const b = $('ca-valider'), re = $('ca-renvoyer'); b.disabled = true; re.disabled = true; b.textContent = 'Envoi…';
         try {
-          const r = await api('POST', '/auth/confirmer-appareil/envoyer-code', { defi: rep.defi });
-          basculer('email');
-          $('ca-email-info').textContent = 'Un code vient d\'être envoyé à ' + (r.email_masque || rep.email_masque || 'votre adresse e-mail') + ' (valable 10 minutes).';
-        } catch (e) { err(e.message || 'Envoi impossible.'); }
-        finally { b1.disabled = false; setTimeout(() => { b2.disabled = false; }, 20000); }
+          const r = await api('POST', '/auth/code-email/demander', { email });
+          montrer(2);
+          $('ca-info').textContent = (r.message || "Un code à 4 chiffres vient d'être envoyé (valable 10 minutes).") + ' Adresse : ' + email;
+          setTimeout(() => { re.disabled = false; }, 30000);
+        } catch (e) {
+          err(e.message || 'Envoi impossible.');
+          b.disabled = false; b.textContent = 'Envoyer le code'; re.disabled = false;
+        }
       }
 
-      $('ca-vers-email').addEventListener('click', envoyerCode);
-      $('ca-n-email').addEventListener('click', envoyerCode);
-      $('ca-n-dsid').addEventListener('click', () => basculer('dsid'));
-      $('ca-d-notif').addEventListener('click', () => basculer('multi'));
-      $('ca-e-notif').addEventListener('click', () => basculer('multi'));
       $('ca-renvoyer').addEventListener('click', envoyerCode);
-      $('ca-vers-dsid').addEventListener('click', () => basculer('dsid'));
-      $('ca-annuler').addEventListener('click', () => { fermer(); reject(new Error('Connexion annulée.')); });
+      $('ca-autre').addEventListener('click', () => montrer(1));
+      $('ca-annuler').addEventListener('click', () => { fermer(); const e = new Error('Connexion annulée.'); e.annule = true; reject(e); });
       ov.addEventListener('keydown', (e) => { if (e.key === 'Enter') $('ca-valider').click(); });
 
       $('ca-valider').addEventListener('click', async () => {
+        if (etape === 1) { await envoyerCode(); return; }
         err('');
-        const saisie = $(CHAMP[mode]).value.trim();
-        if (!saisie) { err(mode === 'multi' ? 'Saisissez votre code multi-connexion à 4 chiffres.' : mode === 'dsid' ? 'Saisissez votre Code de Sécurité.' : 'Saisissez le code reçu par e-mail.'); return; }
+        const code = $('ca-code').value.trim();
+        if (!/^\d{4}$/.test(code)) { err('Saisissez le code à 4 chiffres reçu par e-mail.'); return; }
         const btn = $('ca-valider'); btn.disabled = true; btn.textContent = 'Vérification…';
         try {
-          await api('POST', '/auth/confirmer-appareil', mode === 'multi' ? { defi: rep.defi, code_multi: saisie } : mode === 'dsid' ? { defi: rep.defi, ds_id: saisie } : { defi: rep.defi, code: saisie });
-          fermer(); resolve();
+          const r = await api('POST', '/auth/code-email/verifier', { email, code });
+          fermer(); resolve(r);
         } catch (e) {
           const d = e.data || {};
           err(e.message + (typeof d.essais_restants === 'number' ? ` (${d.essais_restants} essai${d.essais_restants > 1 ? 's' : ''} restant${d.essais_restants > 1 ? 's' : ''})` : ''));
-          if (d.bloque || e.status === 429 || e.status === 403 || e.status === 410) { btn.disabled = true; btn.textContent = 'Bloqué'; return; }
-          btn.disabled = false; btn.textContent = 'Confirmer';
+          if (d.bloque || e.status === 429 || e.status === 403) { btn.disabled = true; btn.textContent = 'Demandez un nouveau code'; $('ca-renvoyer').disabled = false; return; }
+          btn.disabled = false; btn.textContent = 'Me connecter';
         }
       });
-      if (rep.code_multi === false) { $('ca-d-notif').style.display = 'none'; $('ca-e-notif').style.display = 'none'; }
-      basculer(mode);
+      montrer(1);
     });
   }
 
-  window.loginAvecConfirmation = async function (email, password) {
-    let r = await api('POST', '/auth/login', { email, password });
-    if (r && r.confirmation_requise) {
-      await demanderConfirmation(r);
-      // L'appareil est désormais reconnu : on rejoue la connexion normale (session, cookies, droits…).
-      r = await api('POST', '/auth/login', { email, password });
-    }
-    return r;
-  };
+  window.connexionParCodeEmail = connexionParCodeEmail;
+  window.loginAvecConfirmation = function (email, password) { return api('POST', '/auth/login', { email, password }); };
 })();

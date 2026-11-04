@@ -1,30 +1,43 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   Confirmation d'un nouvel appareil (2026-10-05, étape 2 — voir le commentaire des tables
-   confirmations_appareil / appareils_reconnus dans db.js).
+   Appareils reconnus + connexion par code provisoire (e-mail).
 
-   Règle : bon mot de passe + appareil inconnu + compte déjà ouvert ailleurs (activité < 24 h)
-   => pas de session, un « défi » à résoudre par code multi-connexion (4 chiffres), DS-ID (compte ou compte lié) ou code e-mail.
-   Un appareil confirmé est reconnu 30 jours. Comptes de démonstration exemptés (partagés par
-   conception). Interrupteur d'urgence : variable d'environnement DESACTIVER_CONFIRMATION_APPAREIL=1.
-   Toutes les fonctions reçoivent `db` (module async partagé SQLite/Postgres).
+   Historique : le 2026-10-05 une connexion avec le bon mot de passe pouvait être arrêtée par une fenêtre « Confirmez que c'est bien vous »
+   (code à 3 chiffres, puis code multi-connexion, DS-ID, code e-mail). Le 2026-11-04 le titulaire du site a tranché : trop de codes. Désormais :
+     • le mot de passe suffit, sur n'importe quel appareil — aucun code, aucun DS-ID n'est demandé ;
+     • la personne qui n'a pas son mot de passe reçoit, à l'adresse e-mail DU COMPTE qu'elle a saisie, un code provisoire à 4 chiffres
+       (10 minutes, 3 essais) qui l'y connecte. Deux comptes liés (Initiative + Utilisateur) ont chacun leur adresse : le code ouvre
+       le compte dont l'adresse a été saisie, et le sélecteur de comptes liés permet ensuite de basculer.
+   Les « défis » sont rangés dans la table confirmations_appareil (statuts code_connexion / code_utilise / code_bloque / code_remplace /
+   code_expire : jamais confondus avec les anciennes demandes d'appareil). Un appareil qui a servi à se connecter est « reconnu » 30 jours
+   (appareils_reconnus) : c'est ce que vérifie encore l'entrée par DS-ID seul (« Mon Associé »), qui n'a pas de mot de passe.
+   Comptes de démonstration, administrateurs et administrateurs junior sont exclus du code par e-mail (un e-mail piraté ne doit pas
+   suffire à ouvrir un compte à privilèges). Interrupteurs d'urgence : DESACTIVER_CONFIRMATION_APPAREIL=1 (appareils reconnus) et
+   DESACTIVER_CODE_EMAIL_CONNEXION=1 (code par e-mail). Toutes les fonctions reçoivent `db` (module async partagé SQLite/Postgres).
    ═══════════════════════════════════════════════════════════════════════════ */
 const crypto = require('node:crypto');
 const Connexions = require('./connexions');
 const { horodatage } = Connexions;
 
 const ACTIVITE_RECENTE_MS = 24 * 3600 * 1000;
-const DUREE_DEFI_MS = 10 * 60 * 1000;
-const DUREE_CODE_EMAIL_MS = 10 * 60 * 1000;
-const VERROU_MS = 15 * 60 * 1000;
 const DUREE_RECONNU_MS = 30 * 24 * 3600 * 1000;
-const MAX_ESSAIS = 5;
-const MAX_ENVOIS_EMAIL = 3;
-const MAX_DEFIS_PAR_HEURE = 6;
-const MAX_ESSAIS_CODE_MULTI = 3;
-const DEFI_RE = /^[a-f0-9]{32}$/;
+const DUREE_CODE_MS = 10 * 60 * 1000;
+const MAX_ESSAIS_CODE = 3;                  // essais par code (4 chiffres : on ne laisse pas deviner)
+const MAX_CODES_PAR_HEURE = 5;              // codes envoyés par compte et par heure
+const MAX_CODES_BLOQUES_PAR_JOUR = 3;       // au-delà : plus aucun code pendant 24 h (et le titulaire est prévenu)
+const ROLES_SANS_CODE_EMAIL = ['administrateur', 'administrateur_junior'];
+const STATUTS_CODE = ['code_connexion', 'code_utilise', 'code_bloque', 'code_remplace', 'code_expire'];
 
 const estDesactive = () => process.env.DESACTIVER_CONFIRMATION_APPAREIL === '1';
+const codeEmailDesactive = () => process.env.DESACTIVER_CODE_EMAIL_CONNEXION === '1';
 const estCompteDemo = (u) => Number(u.is_demo) === 1 || u.is_demo === true || /@(diaspoactif\.demo|demo\.fr)$/i.test(String(u.email || ''));
+
+/* Ce compte peut-il se connecter par code envoyé à son e-mail ? */
+function codeEmailAutorise(u) {
+  if (!u || codeEmailDesactive()) return false;
+  if (estCompteDemo(u) || ROLES_SANS_CODE_EMAIL.includes(u.role)) return false;
+  if (u.relais_invite_expire_le || u.relais_invite_fiche_id) return false;   // accès invité temporaire : identifiants remis par un producteur, pas d'e-mail propre
+  return true;
+}
 
 async function estReconnu(db, userId, appareilId) {
   if (!appareilId) return false;
@@ -34,109 +47,33 @@ async function estReconnu(db, userId, appareilId) {
 }
 
 async function reconnaitre(db, userId, appareilId, via) {
+  if (!appareilId) return;
   await db.prepare('DELETE FROM appareils_reconnus WHERE user_id=? AND appareil_id=?').run(userId, appareilId);
   await db.prepare('INSERT INTO appareils_reconnus (user_id, appareil_id, via, confirme_at, expire_at) VALUES (?,?,?,?,?)')
     .run(userId, appareilId, via, horodatage(), horodatage(DUREE_RECONNU_MS));
   try { await db.prepare('DELETE FROM appareils_reconnus WHERE expire_at < ?').run(horodatage(-24 * 3600 * 1000)); } catch (_) {}
 }
 
-/* Faut-il un défi pour cette connexion ? Renvoie :
-   { ok:true }                                  -> on peut ouvrir la session normalement
-   { bloque:true, reessayerDans }               -> trop de tentatives récentes depuis cet appareil
-   { defi, appareilId, nouveauCookie }          -> défi à résoudre (créé ou repris) */
-async function evaluer(db, { req, user, ip, notifier, creerDefi = true }) {
+/* Entrée par DS-ID seul (sans mot de passe) : cet appareil est-il déjà connu ? Renvoie :
+   { ok:true }      -> on peut ouvrir la session
+   { requis:true }  -> le compte est déjà ouvert ailleurs (même catégorie d'appareil) et celui-ci n'a jamais servi à se connecter :
+                       il faut d'abord se connecter depuis la page de connexion (mot de passe, ou code reçu par e-mail). */
+async function evaluer(db, { req, user, ip }) {
   if (estDesactive() || estCompteDemo(user)) return { ok: true };
-  let appareilId = Connexions.lireAppareilId(req);
+  const appareilId = Connexions.lireAppareilId(req);
   if (appareilId && await estReconnu(db, user.id, appareilId)) return { ok: true };
 
-  const lignes = await db.prepare('SELECT appareil_id, last_seen_at, expire_at, type_appareil, navigateur, os FROM connexions WHERE user_id=? AND revoque_at IS NULL').all(user.id);
+  const lignes = await db.prepare('SELECT appareil_id, last_seen_at, expire_at, type_appareil FROM connexions WHERE user_id=? AND revoque_at IS NULL').all(user.id);
   const maintenant = horodatage(), limite = horodatage(-ACTIVITE_RECENTE_MS);
   const maCategorie = Connexions.categorieDe(Connexions.analyserAppareil(req, ip).type);
   /* Un ordinateur et un téléphone peuvent être connectés ensemble au même compte : seul un autre appareil de la MÊME catégorie compte. */
   const autresActives = lignes.filter(l => l.appareil_id !== appareilId
     && Connexions.categorieDe(l.type_appareil) === maCategorie
     && (!l.expire_at || String(l.expire_at) >= maintenant) && String(l.last_seen_at || '') >= limite);
-  if (!autresActives.length) return { ok: true };
-  if (!creerDefi) return { requis: true };   // entrée sans mot de passe (DS-ID seul) : on n'ouvre pas de défi, on renvoie vers la page de connexion
-
-  const nouveauCookie = !appareilId;
-  if (!appareilId) appareilId = Connexions.nouvelAppareilId();
-
-  /* Plafond de demandes par compte : le code multi-connexion n'a que 4 chiffres ; des essais répétés depuis de
-     nouveaux navigateurs ne doivent pas pouvoir le deviner. Au-delà de 6 demandes en 1 h : plus de nouvelle demande pendant 15 min. */
-  const recentes = await db.prepare('SELECT COUNT(*) AS n FROM confirmations_appareil WHERE user_id=? AND created_at > ?').get(user.id, horodatage(-3600 * 1000));
-  if (Number(recentes && recentes.n || 0) >= MAX_DEFIS_PAR_HEURE) return { bloque: true, reessayerDans: 15 * 60 };
-
-  const verrou = await db.prepare("SELECT resolu_at FROM confirmations_appareil WHERE user_id=? AND appareil_id=? AND statut IN ('refusee','bloquee') AND resolu_at > ? ORDER BY resolu_at DESC LIMIT 1")
-    .get(user.id, appareilId, horodatage(-VERROU_MS));
-  if (verrou) {
-    const fin = new Date(String(verrou.resolu_at).replace(' ', 'T') + 'Z').getTime() + VERROU_MS;
-    return { bloque: true, reessayerDans: Math.max(60, Math.ceil((fin - Date.now()) / 1000)) };
-  }
-
-  let defi = await db.prepare("SELECT * FROM confirmations_appareil WHERE user_id=? AND appareil_id=? AND statut='en_attente' AND expire_at > ? ORDER BY created_at DESC LIMIT 1")
-    .get(user.id, appareilId, maintenant);
-  if (!defi) {
-    const a = Connexions.analyserAppareil(req, ip);
-    const id = crypto.randomBytes(16).toString('hex');
-    await db.prepare(`INSERT INTO confirmations_appareil
-      (id, user_id, appareil_id, type_appareil, navigateur, os, ville, pays, ip_masquee, statut, essais, envois_email, created_at, expire_at)
-      VALUES (?,?,?,?,?,?,?,?,?, 'en_attente', 0, 0, ?, ?)`)
-      .run(id, user.id, appareilId, a.type, a.navigateur, a.os, a.ville, a.pays, a.ipMasquee, horodatage(), horodatage(DUREE_DEFI_MS));
-    defi = await db.prepare('SELECT * FROM confirmations_appareil WHERE id=?').get(id);
-    if (notifier) { try { await notifier(defi); } catch (_) { /* l'alerte est best-effort */ } }
-  }
-  /* Où le compte est-il déjà ouvert ? Affiché dans la fenêtre de confirmation pour que la personne comprenne de quel appareil on parle
-     (type, système, navigateur, ancienneté — jamais la ville ni l'adresse IP). */
-  const autres = autresActives.map(l => {
-    const t = new Date(String(l.last_seen_at || '').replace(' ', 'T') + 'Z').getTime();
-    return { libelle: Connexions.etiquette(l), il_y_a_min: isNaN(t) ? null : Math.max(0, Math.round((Date.now() - t) / 60000)) };
-  });
-  return { defi, appareilId, nouveauCookie, autres };
+  return autresActives.length ? { requis: true } : { ok: true };
 }
 
-/* Charge un défi en vérifiant qu'il est actionnable depuis CE navigateur. */
-async function charger(db, req, defiId) {
-  if (!DEFI_RE.test(String(defiId || ''))) return { erreur: 'Demande de confirmation invalide.', code: 400 };
-  const d = await db.prepare('SELECT * FROM confirmations_appareil WHERE id=?').get(defiId);
-  if (!d) return { erreur: 'Demande de confirmation introuvable.', code: 404 };
-  if (Connexions.lireAppareilId(req) !== d.appareil_id) return { erreur: 'Cette demande a été ouverte depuis un autre navigateur.', code: 403 };
-  if (d.statut === 'refusee') return { erreur: 'Cette connexion a été refusée par le titulaire du compte.', code: 403 };
-  if (d.statut === 'bloquee') return { erreur: 'Trop d\'essais. Réessayez dans 15 minutes.', code: 429 };
-  if (d.statut !== 'en_attente') return { erreur: 'Cette demande a déjà été traitée.', code: 409 };
-  if (String(d.expire_at) <= horodatage()) {
-    await db.prepare("UPDATE confirmations_appareil SET statut='expiree', resolu_at=? WHERE id=?").run(horodatage(), d.id);
-    return { erreur: 'La demande a expiré : reconnectez-vous.', code: 410 };
-  }
-  return { defi: d };
-}
-
-async function compterEchec(db, d, max = MAX_ESSAIS) {
-  const essais = Number(d.essais || 0) + 1;
-  if (essais >= max) {
-    await db.prepare("UPDATE confirmations_appareil SET essais=?, statut='bloquee', resolu_at=? WHERE id=?").run(essais, horodatage(), d.id);
-    return { restants: 0, bloque: true };
-  }
-  await db.prepare('UPDATE confirmations_appareil SET essais=? WHERE id=?').run(essais, d.id);
-  return { restants: max - essais, bloque: false };
-}
-
-/* Preuve par défaut d'un nouvel appareil : le code multi-connexion à 4 chiffres, celui que le titulaire a déjà choisi dans
-   « Paramètres du compte » (table multi_connexion, voir server/multi-connexion.js). 2026-11-04, demande du titulaire : un code de moins à
-   retenir — il remplace le code à 3 chiffres qu'on affichait dans les notifications de l'appareil connecté. Sans code défini, la personne
-   passe par le DS-ID ou l'e-mail. 3 essais maximum par demande, puis la demande est bloquée. */
-async function codeMultiDuCompte(db, userId) {
-  const r = await db.prepare('SELECT code FROM multi_connexion WHERE user_id=?').get(userId);
-  return r && /^\d{4}$/.test(String(r.code || '')) ? String(r.code) : null;
-}
-async function aCodeMulti(db, userId) { return !!(await codeMultiDuCompte(db, userId)); }
-async function codeMultiValide(db, userId, saisie) {
-  if (!/^\d{4}$/.test(String(saisie || '').trim())) return false;
-  const code = await codeMultiDuCompte(db, userId);
-  return !!code && egalSur(code, String(saisie).trim());
-}
-
-/* Le DS-ID saisi est-il celui du compte du défi, ou d'un compte du même groupe de liaison ? */
+/* Le DS-ID saisi est-il celui du compte, ou d'un compte du même groupe de liaison ? (changement d'appareil principal) */
 async function dsIdValide(db, userId, saisie) {
   const valeur = String(saisie || '').trim().toUpperCase();
   if (valeur.length < 6 || valeur.length > 30) return false;
@@ -156,27 +93,75 @@ function egalSur(a, b) {
   return x.length === y.length && crypto.timingSafeEqual(x, y);
 }
 
-/* Génère et mémorise un code à 6 chiffres pour ce défi ; renvoie le code en clair (à envoyer par e-mail). */
-async function preparerCodeEmail(db, d) {
-  if (Number(d.envois_email || 0) >= MAX_ENVOIS_EMAIL) return { erreur: 'Nombre maximal de codes envoyés pour cette demande.', code: 429 };
-  const code = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
-  await db.prepare('UPDATE confirmations_appareil SET code_email_hash=?, code_email_expire=?, envois_email=? WHERE id=?')
-    .run(hacherCode(d.id, code), horodatage(DUREE_CODE_EMAIL_MS), Number(d.envois_email || 0) + 1, d.id);
-  return { code };
+/* ── Code provisoire envoyé par e-mail ─────────────────────────────────────────────────────────
+   Étape 1 : prépare un code pour CE navigateur (cookie da_dev, créé s'il n'existe pas). Renvoie :
+     { code, appareilId, nouveauCookie, appareil, lieu }  -> à envoyer par e-mail
+     { limite:true }                                      -> déjà 5 codes cette heure pour ce compte
+     { verrouille:true }                                  -> 3 codes bloqués en 24 h : plus de code avant demain
+   Le code n'est valable que depuis le navigateur qui l'a demandé : qui lit l'e-mail sur un autre appareil ne peut pas s'en servir
+   sans avoir aussi demandé le code depuis celui-là. */
+async function demanderCodeConnexion(db, { req, user, ip }) {
+  let appareilId = Connexions.lireAppareilId(req);
+  const nouveauCookie = !appareilId;
+  if (!appareilId) appareilId = Connexions.nouvelAppareilId();
+
+  const bloques = await db.prepare("SELECT COUNT(*) AS n FROM confirmations_appareil WHERE user_id=? AND statut='code_bloque' AND resolu_at > ?")
+    .get(user.id, horodatage(-24 * 3600 * 1000));
+  if (Number(bloques && bloques.n || 0) >= MAX_CODES_BLOQUES_PAR_JOUR) return { verrouille: true };
+  const recents = await db.prepare(`SELECT COUNT(*) AS n FROM confirmations_appareil WHERE user_id=? AND created_at > ? AND statut IN (${STATUTS_CODE.map(() => '?').join(',')})`)
+    .get(user.id, horodatage(-3600 * 1000), ...STATUTS_CODE);
+  if (Number(recents && recents.n || 0) >= MAX_CODES_PAR_HEURE) return { limite: true };
+
+  /* Un seul code valable à la fois pour ce navigateur : le précédent est annulé. */
+  await db.prepare("UPDATE confirmations_appareil SET statut='code_remplace', resolu_at=? WHERE user_id=? AND appareil_id=? AND statut='code_connexion'")
+    .run(horodatage(), user.id, appareilId);
+
+  const a = Connexions.analyserAppareil(req, ip);
+  const id = crypto.randomBytes(16).toString('hex');
+  const code = String(crypto.randomInt(0, 10000)).padStart(4, '0');
+  await db.prepare(`INSERT INTO confirmations_appareil
+    (id, user_id, appareil_id, type_appareil, navigateur, os, ville, pays, ip_masquee, statut, essais, envois_email, code_email_hash, code_email_expire, created_at, expire_at)
+    VALUES (?,?,?,?,?,?,?,?,?, 'code_connexion', 0, 1, ?, ?, ?, ?)`)
+    .run(id, user.id, appareilId, a.type, a.navigateur, a.os, a.ville, a.pays, a.ipMasquee, hacherCode(id, code), horodatage(DUREE_CODE_MS), horodatage(), horodatage(DUREE_CODE_MS));
+  return {
+    code, appareilId, nouveauCookie,
+    appareil: Connexions.etiquette({ type_appareil: a.type, navigateur: a.navigateur, os: a.os }),
+    lieu: [a.ville, a.pays].filter(Boolean).join(', '),
+  };
 }
 
-function codeEmailValide(d, saisie) {
-  if (!d.code_email_hash || !d.code_email_expire || String(d.code_email_expire) < horodatage()) return false;
-  if (!/^\d{6}$/.test(String(saisie || '').trim())) return false;
-  return egalSur(d.code_email_hash, hacherCode(d.id, saisie));
+/* Étape 2 : le code saisi est-il le bon ? Le compteur d'essais est incrémenté EN BASE avant toute comparaison (UPDATE atomique) : des
+   requêtes lancées en parallèle ne peuvent donc pas multiplier les essais. Renvoie { ok:true } | { ok:false, restants } | { ok:false, bloque:true }
+   | { ok:false } (aucun code en cours pour ce navigateur, ou code expiré). */
+async function verifierCodeConnexion(db, { req, user, saisie }) {
+  const appareilId = Connexions.lireAppareilId(req);
+  if (!appareilId) return { ok: false };
+  const d = await db.prepare("SELECT * FROM confirmations_appareil WHERE user_id=? AND appareil_id=? AND statut='code_connexion' ORDER BY created_at DESC LIMIT 1")
+    .get(user.id, appareilId);
+  if (!d) return { ok: false };
+  if (String(d.code_email_expire || d.expire_at) <= horodatage()) {
+    await db.prepare("UPDATE confirmations_appareil SET statut='code_expire', resolu_at=? WHERE id=? AND statut='code_connexion'").run(horodatage(), d.id);
+    return { ok: false };
+  }
+  await db.prepare("UPDATE confirmations_appareil SET essais=COALESCE(essais,0)+1 WHERE id=? AND statut='code_connexion'").run(d.id);
+  const apres = await db.prepare('SELECT essais, statut FROM confirmations_appareil WHERE id=?').get(d.id);
+  const essais = Number(apres && apres.essais || 0);
+  if (!apres || apres.statut !== 'code_connexion' || essais > MAX_ESSAIS_CODE) return { ok: false, bloque: true };
+
+  const bon = /^\d{4}$/.test(String(saisie || '').trim()) && egalSur(d.code_email_hash, hacherCode(d.id, saisie));
+  if (bon) {
+    await db.prepare("UPDATE confirmations_appareil SET statut='code_utilise', resolu_at=? WHERE id=? AND statut='code_connexion'").run(horodatage(), d.id);
+    return { ok: true };
+  }
+  if (essais >= MAX_ESSAIS_CODE) {
+    await db.prepare("UPDATE confirmations_appareil SET statut='code_bloque', resolu_at=? WHERE id=? AND statut='code_connexion'").run(horodatage(), d.id);
+    return { ok: false, bloque: true, restants: 0 };
+  }
+  return { ok: false, restants: MAX_ESSAIS_CODE - essais };
 }
 
-async function valider(db, d, via) {
-  await db.prepare("UPDATE confirmations_appareil SET statut='confirmee', resolu_at=? WHERE id=?").run(horodatage(), d.id);
-  await reconnaitre(db, d.user_id, d.appareil_id, via);
-}
-
-/* Vue « sur l'appareil déjà connecté » : demandes en attente + incidents des 30 derniers jours. */
+/* Vue « Mes connexions » : demandes d'appareil encore en attente (héritage : plus créées depuis le 2026-11-04) + incidents des 30 derniers jours
+   (connexions refusées, ou codes e-mail bloqués après trois essais ratés). */
 async function enAttente(db, userId) {
   const lignes = await db.prepare("SELECT * FROM confirmations_appareil WHERE user_id=? AND statut='en_attente' AND expire_at > ? ORDER BY created_at DESC").all(userId, horodatage());
   return lignes.map(d => ({
@@ -185,12 +170,12 @@ async function enAttente(db, userId) {
   }));
 }
 async function incidents30j(db, userId) {
-  const r = await db.prepare("SELECT COUNT(*) AS n FROM confirmations_appareil WHERE user_id=? AND statut IN ('refusee','bloquee') AND resolu_at > ?")
+  const r = await db.prepare("SELECT COUNT(*) AS n FROM confirmations_appareil WHERE user_id=? AND statut IN ('refusee','bloquee','code_bloque') AND resolu_at > ?")
     .get(userId, horodatage(-30 * 24 * 3600 * 1000));
   return Number(r && r.n || 0);
 }
 
-/* Le titulaire déclare « ce n'est pas moi » depuis un appareil déjà connecté. */
+/* Le titulaire déclare « ce n'est pas moi » sur une demande d'appareil encore en attente (héritage). */
 async function refuser(db, userId, defiId) {
   const d = await db.prepare("SELECT * FROM confirmations_appareil WHERE id=? AND user_id=? AND statut='en_attente'").get(defiId, userId);
   if (!d) return false;
@@ -198,13 +183,8 @@ async function refuser(db, userId, defiId) {
   return true;
 }
 
-function masquerEmail(email) {
-  const [nom, domaine] = String(email || '').split('@');
-  if (!domaine) return '';
-  return (nom.length <= 2 ? nom[0] + '*' : nom.slice(0, 2) + '***') + '@' + domaine;
-}
-
 module.exports = {
-  MAX_ESSAIS, estDesactive, estCompteDemo, estReconnu, evaluer, charger, compterEchec, dsIdValide,
-  preparerCodeEmail, codeEmailValide, aCodeMulti, codeMultiValide, MAX_ESSAIS_CODE_MULTI, valider, enAttente, incidents30j, refuser, masquerEmail,
+  MAX_ESSAIS_CODE, MAX_CODES_PAR_HEURE, MAX_CODES_BLOQUES_PAR_JOUR, DUREE_CODE_MS,
+  estDesactive, codeEmailDesactive, estCompteDemo, codeEmailAutorise, estReconnu, reconnaitre, evaluer, dsIdValide,
+  demanderCodeConnexion, verifierCodeConnexion, enAttente, incidents30j, refuser,
 };

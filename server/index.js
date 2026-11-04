@@ -213,30 +213,15 @@ async function ouvrirConnexion(req, userId, sidToken) {
   catch (e) { console.error('[connexions.ouvrir]', e.message); return null; }
 }
 
-/* Étape 2 du chantier sécurité des connexions : faut-il confirmer cet appareil avant d'ouvrir la session ?
-   Renvoie { reponse(res) } si la connexion doit s'arrêter ici (défi, blocage…), {} sinon. En cas d'erreur
-   interne on laisse passer (et on journalise) : une panne de ce garde-fou ne doit pas couper tout le site. */
-async function evaluerNouvelAppareil(req, user, ip, { viaDsId = false } = {}) {
+/* Entrée par DS-ID seul (« Mon Associé », sans mot de passe) : si le compte est déjà ouvert ailleurs (même catégorie d'appareil) et que cet
+   appareil n'a jamais servi à se connecter, on n'ouvre rien — il faut d'abord se connecter depuis la page de connexion (mot de passe, ou code
+   reçu par e-mail), ce qui rend l'appareil « reconnu » 30 jours. Renvoie { reponse(res) } si l'entrée doit s'arrêter ici, {} sinon. En cas
+   d'erreur interne on laisse passer (et on journalise) : une panne de ce garde-fou ne doit pas couper tout le site. */
+async function evaluerNouvelAppareil(req, user, ip) {
   try {
-    const v = await ConfirmationAppareil.evaluer(db, {
-      req, user, ip, creerDefi: !viaDsId,
-      notifier: (d) => creerNotif(user.id, "connexion_suspecte", "Nouvelle connexion en attente",
-        `Une connexion est en cours depuis ${Connexions.etiquette(d)}${d.ville ? " (" + d.ville + ")" : ""}. Si c'est vous, saisissez votre code multi-connexion (4 chiffres) sur cet appareil. Si ce n'est pas vous, ne le communiquez à personne et bloquez la connexion depuis le bandeau « Mes connexions ».`,
-        { lien: "parametres-compte.html" }),
-    });
-    if (v.bloque) {
-      SEC.logSecurity("login_appareil_verrouille", { ip, uid: Number(user.id) });
-      return { reponse: (res) => sendJSON(res, 429, { error: `Trop de tentatives de confirmation depuis cet appareil. Réessayez dans ${Math.ceil(v.reessayerDans / 60)} min.` }) };
-    }
+    const v = await ConfirmationAppareil.evaluer(db, { req, user, ip });
     if (v.requis) {
-      return { reponse: (res) => sendJSON(res, 403, { error: "Ce compte est déjà ouvert sur un autre appareil. Pour autoriser celui-ci, connectez-vous d'abord depuis la page de connexion (mot de passe puis Code ultra secret), puis revenez ici." }) };
-    }
-    if (v.defi) {
-      SEC.logSecurity("login_appareil_a_confirmer", { ip, uid: Number(user.id) });
-      const aCode = await ConfirmationAppareil.aCodeMulti(db, user.id);   // sans code multi-connexion défini, la fenêtre part du DS-ID
-      return { reponse: (res) => sendJSON(res, 200,
-        { confirmation_requise: true, defi: v.defi.id, methodes: ["code_multi", "ds_id", "email"], code_multi: aCode, email_masque: ConfirmationAppareil.masquerEmail(user.email), expire_dans: 600, deja_ouvert_sur: v.autres || [] },
-        { "Set-Cookie": [Connexions.cookieAppareilTexte(v.appareilId, cookieSecureFlag(req))] }) };
+      return { reponse: (res) => sendJSON(res, 403, { error: "Ce compte est déjà ouvert sur un autre appareil. Pour autoriser celui-ci, connectez-vous d'abord depuis la page de connexion avec votre mot de passe (ou un code reçu par e-mail), puis revenez ici." }) };
     }
   } catch (e) { console.error("[confirmation-appareil.evaluer]", e.message); }
   return {};
@@ -1821,6 +1806,54 @@ async function dbLoginRecord(cle, reussite) {
   } catch (_) {}
 }
 
+/* Fin d'une connexion réussie (mot de passe, ou code provisoire reçu par e-mail) : compteur, session, jeton, registre des connexions, cookies.
+   `email` = adresse du compte en minuscules ; `via` = "mot_de_passe" | "code_email". Renvoie la réponse JSON déjà envoyée. */
+async function finaliserConnexion(req, res, user, email, ip, via) {
+  await db.prepare("UPDATE users SET nb_connexions = COALESCE(nb_connexions,0) + 1 WHERE id=?").run(user.id);
+  const fresh = await db.prepare("SELECT * FROM users WHERE id=?").get(user.id);
+  const token = createSession(user.id);
+  const cx = await ouvrirConnexion(req, user.id, token);
+  /* L'appareil qui vient de servir à se connecter est « reconnu » 30 jours : c'est ce que vérifie l'entrée par DS-ID seul. */
+  if (cx && !ConfirmationAppareil.estCompteDemo(user)) { try { await ConfirmationAppareil.reconnaitre(db, user.id, cx.appareilId, via); } catch (e) { console.error('[appareil-reconnu]', e.message); } }
+  const authTok = signAuthToken({ uid: user.id, role: user.role, cv: fresh.credential_version, ...(cx ? { jti: cx.id } : {}), exp: Math.floor(Date.now()/1000) + dureeJeton(cx) });
+  if (user.role === 'administrateur_junior') {
+    /* Fige les droits actuels pour toute la session à venir — voir le commentaire sur
+       actualiserSnapshotPermissions() : c'est ce qui garantit qu'une révocation faite par
+       l'administrateur principal pendant que ce junior est déjà connecté n'a d'effet qu'à
+       SA PROCHAINE connexion, jamais en coupant l'accès en cours de session. */
+    await AdminJunior.actualiserSnapshotPermissions(db, user.id);
+    await AdminJunior.journaliserJunior(db, { juniorUserId: user.id, acteurId: user.id, acteurNom: fresh.nom, action: 'connexion_reussie' });
+  }
+  SEC.logSecurity("login_success", { ip, email, uid: Number(user.id), role: user.role, via });
+
+  /* Proposition de fusion à la CONNEXION (module "Invitation externe", règle #5 du cahier des
+     charges) — pas seulement à l'inscription : une personne ayant DÉJÀ un compte peut très bien
+     avoir contribué en tant qu'invité sans se connecter (le paiement invité reste toujours
+     possible, y compris pour un e-mail qui a un compte). Best-effort, jamais bloquant. Dédoublonné
+     par un LIKE sur data_json : sans ça, la même proposition réapparaîtrait à CHAQUE connexion
+     tant que la contribution n'est pas rattachée (contrairement à l'inscription, qui n'arrive
+     qu'une fois). */
+  try {
+    const contribsExternes = await db.prepare(`
+      SELECT co.id, co.cagnotte_id, c.titre AS cagnotte_titre FROM cagnotte_contributions co
+      JOIN cagnottes c ON c.id = co.cagnotte_id
+      WHERE co.user_id IS NULL AND co.statut='paye' AND LOWER(co.email) = ?
+    `).all(email);
+    for (const f of contribsExternes) {
+      const dejaPropose = await db.prepare(
+        `SELECT id FROM notifications WHERE user_id=? AND type='cagnotte_fusion_proposee' AND data_json LIKE ?`
+      ).get(user.id, `%"contribution_id":${f.id}%`);
+      if (!dejaPropose) {
+        creerNotif(user.id, "cagnotte_fusion_proposee", "Contribution trouvée 🔗",
+          `Une contribution existe déjà pour votre adresse e-mail sur la cagnotte « ${f.cagnotte_titre} ». Voulez-vous la rattacher à votre compte ?`,
+          { contribution_id: f.id, cagnotte_id: f.cagnotte_id, cagnotte_titre: f.cagnotte_titre });
+      }
+    }
+  } catch (e) { console.error('[fusion-cagnotte-login]', e.message); }
+
+  { const sf = cookieSecureFlag(req); sendJSON(res, 200, { user: publicUser(fresh) }, { "Set-Cookie": [`sid=${token}; HttpOnly; Path=/; SameSite=Lax${sf}`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${dureeJeton(cx)}${sf}`, ...(cx ? [cx.cookieAppareil(sf)] : [])] }); }
+}
+
 route("POST", "/api/auth/login", async (req, res, params, body) => {
   const ip = SEC.clientIp(req);
   const email = SEC.normalizeEmail(body.email);
@@ -1903,54 +1936,9 @@ route("POST", "/api/auth/login", async (req, res, params, body) => {
     });
   }
 
-  /* Confirmation d'un nouvel appareil (2026-10-05, demande explicite) : bon mot de passe, mais le
-     compte est déjà ouvert ailleurs (activité < 24 h) et cet appareil n'est pas reconnu => aucune
-     session n'est ouverte, la personne doit prouver qu'elle est bien le titulaire (DS-ID, ou code
-     par e-mail). Voir server/confirmation-appareil.js. Le client rejoue ensuite la connexion. */
-  const verdict = await evaluerNouvelAppareil(req, user, ip);
-  if (verdict.reponse) return verdict.reponse(res);
-
-  await db.prepare("UPDATE users SET nb_connexions = COALESCE(nb_connexions,0) + 1 WHERE id=?").run(user.id);
-  const fresh = await db.prepare("SELECT * FROM users WHERE id=?").get(user.id);
-  const token = createSession(user.id);
-  const cx = await ouvrirConnexion(req, user.id, token);
-  const authTok = signAuthToken({ uid: user.id, role: user.role, cv: fresh.credential_version, ...(cx ? { jti: cx.id } : {}), exp: Math.floor(Date.now()/1000) + dureeJeton(cx) });
-  if (user.role === 'administrateur_junior') {
-    /* Fige les droits actuels pour toute la session à venir — voir le commentaire sur
-       actualiserSnapshotPermissions() : c'est ce qui garantit qu'une révocation faite par
-       l'administrateur principal pendant que ce junior est déjà connecté n'a d'effet qu'à
-       SA PROCHAINE connexion, jamais en coupant l'accès en cours de session. */
-    await AdminJunior.actualiserSnapshotPermissions(db, user.id);
-    await AdminJunior.journaliserJunior(db, { juniorUserId: user.id, acteurId: user.id, acteurNom: fresh.nom, action: 'connexion_reussie' });
-  }
-  SEC.logSecurity("login_success", { ip, email, uid: Number(user.id), role: user.role });
-
-  /* Proposition de fusion à la CONNEXION (module "Invitation externe", règle #5 du cahier des
-     charges) — pas seulement à l'inscription : une personne ayant DÉJÀ un compte peut très bien
-     avoir contribué en tant qu'invité sans se connecter (le paiement invité reste toujours
-     possible, y compris pour un e-mail qui a un compte). Best-effort, jamais bloquant. Dédoublonné
-     par un LIKE sur data_json : sans ça, la même proposition réapparaîtrait à CHAQUE connexion
-     tant que la contribution n'est pas rattachée (contrairement à l'inscription, qui n'arrive
-     qu'une fois). */
-  try {
-    const contribsExternes = await db.prepare(`
-      SELECT co.id, co.cagnotte_id, c.titre AS cagnotte_titre FROM cagnotte_contributions co
-      JOIN cagnottes c ON c.id = co.cagnotte_id
-      WHERE co.user_id IS NULL AND co.statut='paye' AND LOWER(co.email) = ?
-    `).all(email);
-    for (const f of contribsExternes) {
-      const dejaPropose = await db.prepare(
-        `SELECT id FROM notifications WHERE user_id=? AND type='cagnotte_fusion_proposee' AND data_json LIKE ?`
-      ).get(user.id, `%"contribution_id":${f.id}%`);
-      if (!dejaPropose) {
-        creerNotif(user.id, "cagnotte_fusion_proposee", "Contribution trouvée 🔗",
-          `Une contribution existe déjà pour votre adresse e-mail sur la cagnotte « ${f.cagnotte_titre} ». Voulez-vous la rattacher à votre compte ?`,
-          { contribution_id: f.id, cagnotte_id: f.cagnotte_id, cagnotte_titre: f.cagnotte_titre });
-      }
-    }
-  } catch (e) { console.error('[fusion-cagnotte-login]', e.message); }
-
-  { const sf = cookieSecureFlag(req); sendJSON(res, 200, { user: publicUser(fresh) }, { "Set-Cookie": [`sid=${token}; HttpOnly; Path=/; SameSite=Lax${sf}`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${dureeJeton(cx)}${sf}`, ...(cx ? [cx.cookieAppareil(sf)] : [])] }); }
+  /* Le mot de passe suffit (2026-11-04, demande du titulaire) : plus de fenêtre « Confirmez que c'est bien vous », ni code multi-connexion,
+     ni DS-ID, quel que soit l'appareil. Qui n'a pas son mot de passe passe par le code provisoire envoyé à son e-mail (voir plus bas). */
+  return finaliserConnexion(req, res, user, email, ip, "mot_de_passe");
 });
 
 /* POST /api/auth/forgot-password — demande de réinitialisation */
@@ -2621,54 +2609,67 @@ route("GET", "/api/auth/connexions", async (req, res) => {
     cookiesSortie.length ? { "Set-Cookie": cookiesSortie } : undefined);
 });
 
-/* ── Confirmation d'un nouvel appareil (étape 2) ───────────────────────────────────────────────
-   Appelées depuis la page de connexion, SANS session (le mot de passe vient d'être validé et un
-   défi a été créé). Le défi n'est actionnable que depuis le navigateur qui l'a reçu (cookie da_dev). */
-route("POST", "/api/auth/confirmer-appareil", async (req, res, params, body) => {
+/* ── Connexion par code provisoire envoyé par e-mail (2026-11-04) ────────────────────────────────
+   Pour qui n'a pas (ou plus) son mot de passe : on saisit l'adresse e-mail DU COMPTE auquel on veut entrer, on reçoit un code à 4 chiffres
+   (10 minutes, 3 essais) qui ouvre ce compte-là. Comptes liés : chacun a sa propre adresse (ex. xxx@bat.com pour l'Initiative, aaa@mail.com
+   pour l'Utilisateur) — l'adresse saisie désigne le compte ouvert, le sélecteur de comptes liés permet ensuite de basculer.
+   Réponses identiques que le compte existe ou non (aucune énumération). Sans session : appelées depuis la page de connexion. */
+const REPONSE_CODE_ENVOYE = { ok: true, message: "Si un compte correspond à cette adresse, un code à 4 chiffres vient d'y être envoyé (valable 10 minutes)." };
+route("POST", "/api/auth/code-email/demander", async (req, res, params, body) => {
   const ip = SEC.clientIp(req);
-  const lim = SEC.rateLimit(`confirm:ip:${ip}`, 30, 15 * 60 * 1000);
-  if (!lim.allowed) return sendJSON(res, 429, { error: `Trop de tentatives. Réessayez dans ${lim.retryAfter}s.` });
-  const c = await ConfirmationAppareil.charger(db, req, body && body.defi);
-  if (c.erreur) return sendJSON(res, c.code, { error: c.erreur });
-  const d = c.defi;
-  /* code_notif : ancien nom du champ, accepté pour une page de connexion restée ouverte avant la mise à jour */
-  const dsId = body && body.ds_id, code = body && body.code, codeMulti = body && (body.code_multi || body.code_notif);
-  if (!dsId && !code && !codeMulti) return sendJSON(res, 400, { error: "Saisissez votre code multi-connexion (4 chiffres), votre Code ultra secret ou le code reçu par e-mail." });
-  const via = codeMulti ? "code_multi" : dsId ? "ds_id" : "email";
-  const ok = codeMulti ? await ConfirmationAppareil.codeMultiValide(db, d.user_id, codeMulti) : dsId ? await ConfirmationAppareil.dsIdValide(db, d.user_id, dsId) : ConfirmationAppareil.codeEmailValide(d, code);
-  if (!ok) {
-    const r = await ConfirmationAppareil.compterEchec(db, d, codeMulti ? ConfirmationAppareil.MAX_ESSAIS_CODE_MULTI : undefined);
-    SEC.logSecurity("confirmation_appareil_echec", { ip, uid: Number(d.user_id), restants: r.restants });
-    if (r.bloque) {
-      try { await creerNotif(d.user_id, "connexion_suspecte", "Tentatives de connexion bloquées", `Plusieurs codes incorrects ont été saisis pour ouvrir votre compte depuis ${Connexions.etiquette(d)}${d.ville ? " (" + d.ville + ")" : ""}. La connexion a été bloquée.`, { lien: "parametres-compte.html" }); } catch (_) {}
-      return sendJSON(res, 429, { error: "Trop d'essais : cette connexion est bloquée pendant 15 minutes.", bloque: true });
-    }
-    return sendJSON(res, 401, { error: dsId && !codeMulti ? "Code ultra secret incorrect." : "Code incorrect ou expiré.", essais_restants: r.restants });
+  const lim = SEC.rateLimit(`code-email:ip:${ip}`, 10, 15 * 60 * 1000);
+  if (!lim.allowed) return sendJSON(res, 429, { error: `Trop de demandes. Réessayez dans ${lim.retryAfter}s.` });
+  const email = SEC.normalizeEmail(body && body.email);
+  if (!email || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return sendJSON(res, 400, { error: "Saisissez l'adresse e-mail de votre compte." });
+  const limMail = SEC.rateLimit(`code-email:mail:${email}`, 5, 60 * 60 * 1000);
+  if (!limMail.allowed) return sendJSON(res, 429, { error: `Trop de demandes pour cette adresse. Réessayez dans ${Math.ceil(limMail.retryAfter / 60)} min.` });
+  if (ConfirmationAppareil.codeEmailDesactive()) return sendJSON(res, 503, { error: "La connexion par code est momentanément indisponible. Utilisez votre mot de passe." });
+
+  const user = await db.prepare("SELECT * FROM users WHERE LOWER(email) = ?").get(email);
+  if (!user || !ConfirmationAppareil.codeEmailAutorise(user)) { SEC.logSecurity("code_email_demande_ignoree", { ip, email }); return sendJSON(res, 200, REPONSE_CODE_ENVOYE); }
+  const prep = await ConfirmationAppareil.demanderCodeConnexion(db, { req, user, ip });
+  if (prep.verrouille || prep.limite) {
+    SEC.logSecurity(prep.verrouille ? "code_email_verrouille" : "code_email_limite", { ip, uid: Number(user.id) });
+    return sendJSON(res, 200, REPONSE_CODE_ENVOYE);
   }
-  await ConfirmationAppareil.valider(db, d, via);
-  SEC.logSecurity("confirmation_appareil_ok", { ip, uid: Number(d.user_id), via });
-  try { await creerNotif(d.user_id, "appareil_confirme", "Nouvel appareil autorisé", `${Connexions.etiquette(d)}${d.ville ? " (" + d.ville + ")" : ""} a été autorisé à ouvrir votre compte. Ce n'est pas vous ? Déconnectez-le depuis « Mes connexions » et changez votre mot de passe.`, { lien: "parametres-compte.html" }); } catch (_) {}
-  sendJSON(res, 200, { ok: true });
+  const { emailCodeConnexion } = require("./mailer");
+  const envoi = await emailCodeConnexion({ email: user.email, code: prep.code, appareil: prep.appareil, lieu: prep.lieu });
+  if (!envoi || !envoi.ok) {
+    await logError(new Error(`Code de connexion non envoyé : ${JSON.stringify(envoi && (envoi.error || envoi.reason) || "raison inconnue")}`), "code-email-connexion", req);
+    return sendJSON(res, 502, { error: "L'envoi du code par e-mail est momentanément impossible. Réessayez dans un instant, ou utilisez « Mot de passe oublié ? »." });
+  }
+  SEC.logSecurity("code_email_envoye", { ip, uid: Number(user.id) });
+  sendJSON(res, 200, REPONSE_CODE_ENVOYE, prep.nouveauCookie ? { "Set-Cookie": [Connexions.cookieAppareilTexte(prep.appareilId, cookieSecureFlag(req))] } : {});
 });
 
-route("POST", "/api/auth/confirmer-appareil/envoyer-code", async (req, res, params, body) => {
+route("POST", "/api/auth/code-email/verifier", async (req, res, params, body) => {
   const ip = SEC.clientIp(req);
-  const lim = SEC.rateLimit(`confirm-mail:ip:${ip}`, 10, 15 * 60 * 1000);
-  if (!lim.allowed) return sendJSON(res, 429, { error: `Trop de demandes. Réessayez dans ${lim.retryAfter}s.` });
-  const c = await ConfirmationAppareil.charger(db, req, body && body.defi);
-  if (c.erreur) return sendJSON(res, c.code, { error: c.erreur });
-  const d = c.defi;
-  const u = await db.prepare("SELECT email FROM users WHERE id=?").get(d.user_id);
-  if (!u || !u.email) return sendJSON(res, 400, { error: "Aucune adresse e-mail sur ce compte : utilisez votre Code ultra secret." });
-  const prep = await ConfirmationAppareil.preparerCodeEmail(db, d);
-  if (prep.erreur) return sendJSON(res, prep.code, { error: prep.erreur });
-  const { emailCodeConfirmationAppareil } = require("./mailer");
-  const envoi = await emailCodeConfirmationAppareil({ email: u.email, code: prep.code, appareil: Connexions.etiquette(d), lieu: [d.ville, d.pays].filter(Boolean).join(", ") });
-  if (!envoi || !envoi.ok) {
-    await logError(new Error(`Code de confirmation d'appareil non envoyé : ${JSON.stringify(envoi && (envoi.error || envoi.reason) || "raison inconnue")}`), "confirmation-appareil-email", req);
-    return sendJSON(res, 502, { error: "L'envoi du code par e-mail est momentanément impossible. Utilisez votre Code ultra secret." });
+  const lim = SEC.rateLimit(`code-email-verif:ip:${ip}`, 30, 15 * 60 * 1000);
+  if (!lim.allowed) return sendJSON(res, 429, { error: `Trop de tentatives. Réessayez dans ${lim.retryAfter}s.` });
+  const email = SEC.normalizeEmail(body && body.email), saisie = String(body && body.code || "").trim();
+  if (!email || !saisie) return sendJSON(res, 400, { error: "Saisissez l'adresse e-mail du compte et le code reçu." });
+  const limMail = SEC.rateLimit(`code-email-verif:mail:${email}`, 20, 60 * 60 * 1000);
+  if (!limMail.allowed) return sendJSON(res, 429, { error: "Trop de tentatives pour cette adresse. Réessayez plus tard." });
+  const user = await db.prepare("SELECT * FROM users WHERE LOWER(email) = ?").get(email);
+  const echec = (r) => {
+    if (r && r.bloque) return sendJSON(res, 429, { error: "Trop d'essais : ce code est annulé. Demandez-en un nouveau.", bloque: true });
+    return sendJSON(res, 401, { error: "Code incorrect ou expiré.", ...(r && typeof r.restants === "number" ? { essais_restants: r.restants } : {}) });
+  };
+  if (!user || !ConfirmationAppareil.codeEmailAutorise(user)) return echec(null);
+  const r = await ConfirmationAppareil.verifierCodeConnexion(db, { req, user, saisie });
+  if (!r.ok) {
+    SEC.logSecurity("code_email_echec", { ip, uid: Number(user.id), restants: r.restants });
+    if (r.bloque && r.restants === 0) {
+      try { await creerNotif(user.id, "connexion_suspecte", "Code de connexion annulé", "Trois codes incorrects ont été saisis pour ouvrir votre compte avec un code reçu par e-mail : ce code est annulé. Si ce n'était pas vous, changez votre mot de passe.", { lien: "parametres-compte.html" }); } catch (_) {}
+    }
+    return echec(r);
   }
-  sendJSON(res, 200, { ok: true, email_masque: ConfirmationAppareil.masquerEmail(u.email) });
+  /* Code juste : la personne a prouvé qu'elle lit l'e-mail du compte. Mêmes refus qu'une connexion par mot de passe pour un compte suspendu. */
+  if (user.suspendu_definitif) return sendJSON(res, 403, { error: "Ce compte a été suspendu définitivement suite à une décision administrative." });
+  if (user.suspendu_jusqu_au && new Date(user.suspendu_jusqu_au) > new Date()) {
+    return sendJSON(res, 403, { error: `Ce compte est suspendu jusqu'au ${new Date(user.suspendu_jusqu_au).toLocaleDateString("fr-FR")} suite à une décision administrative.` });
+  }
+  return finaliserConnexion(req, res, user, email, ip, "code_email");
 });
 
 /* ── Appareils principaux (étape 3) ──────────────────────────────────────────────────────────────
@@ -14093,7 +14094,7 @@ route("POST", "/api/mon-associe/connexion", async (req, res, params, body) => {
   /* Connexion par DS-ID seul (pas de mot de passe) : si le compte est déjà ouvert ailleurs et que cet
      appareil n'est pas reconnu, on n'ouvre rien — l'appareil se confirme d'abord depuis la page de
      connexion (mot de passe + DS-ID), après quoi cette entrée fonctionne normalement (2026-10-05). */
-  const verdict = await evaluerNouvelAppareil(req, user, ip, { viaDsId: true });
+  const verdict = await evaluerNouvelAppareil(req, user, ip);
   if (verdict.reponse) return verdict.reponse(res);
 
   await db.prepare("UPDATE users SET nb_connexions = COALESCE(nb_connexions,0) + 1 WHERE id=?").run(user.id);

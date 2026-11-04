@@ -1048,11 +1048,11 @@ function emailCompteRenduDiffusion({ to, prenom, objet, evenementTitre, auteurNo
   });
 }
 
-/* Code de confirmation d'un nouvel appareil (2026-10-05) — secours du DS-ID. Valable 10 minutes. */
-function emailCodeConfirmationAppareil({ email, code, appareil, lieu }) {
+/* Code provisoire de connexion (2026-11-04) : pour qui n'a pas son mot de passe, 4 chiffres envoyés à l'adresse du compte. Valable 10 minutes, 3 essais. */
+function emailCodeConnexion({ email, code, appareil, lieu }) {
   return sendEmail({
     to: email,
-    subject: `Votre code de confirmation : ${code} — Diaspo'Actif`,
+    subject: `Votre code de connexion : ${code} — Diaspo'Actif`,
     html: `
 <!DOCTYPE html>
 <html lang="fr">
@@ -1063,16 +1063,16 @@ function emailCodeConfirmationAppareil({ email, code, appareil, lieu }) {
       <div style="font-size:28px;font-weight:900;color:#fff;letter-spacing:-.02em;">DIASPO'ACTIF</div>
     </div>
     <div style="padding:36px 32px;">
-      <h1 style="margin:0 0 12px;font-size:22px;font-weight:900;color:#0D1B2A;">Confirmez que c'est bien vous</h1>
+      <h1 style="margin:0 0 12px;font-size:22px;font-weight:900;color:#0D1B2A;">Votre code de connexion</h1>
       <p style="color:#475569;line-height:1.7;margin:0 0 20px;">
-        Une connexion à votre compte est en cours depuis <strong>${appareil || 'un nouvel appareil'}</strong>${lieu ? ' (' + lieu + ')' : ''}, alors que votre compte est déjà ouvert sur un autre appareil.<br>
-        Saisissez ce code pour l'autoriser — il est valable <strong>10 minutes</strong> :
+        Vous avez demandé à ouvrir votre compte sans mot de passe, depuis <strong>${appareil || 'un appareil'}</strong>${lieu ? ' (' + lieu + ')' : ''}.<br>
+        Saisissez ce code pour vous connecter — il est valable <strong>10 minutes</strong> :
       </p>
       <div style="text-align:center;margin:28px 0;">
         <div style="display:inline-block;background:#F0F4FF;border:2px dashed #2563EB;border-radius:12px;padding:14px 32px;font-size:34px;font-weight:900;letter-spacing:.35em;color:#0D1B2A;">${code}</div>
       </div>
       <p style="color:#94A3B8;font-size:12px;text-align:center;margin:0;">
-        Ce n'est pas vous ? Ne communiquez ce code à personne, et changez votre mot de passe dès maintenant.
+        Vous n'avez rien demandé ? Ignorez ce message et ne communiquez ce code à personne. Par prudence, vous pouvez aussi changer votre mot de passe.
       </p>
     </div>
     <div style="background:#F8FAFF;padding:16px 32px;text-align:center;border-top:1px solid #E8EFFE;">
@@ -1152,7 +1152,7 @@ function emailAdresseModifiee({ email, nouvelle }) {
   });
 }
 
-module.exports = { emailAdresseModifiee, emailNomModifie, emailCodeConfirmationAppareil, emailCompteRenduRelance, emailCompteRenduDiffusion, sendEmail, emailBienvenue, emailVerification, emailResetPassword, emailAccreditation, emailDeletionConfirmee, emailSuppressionProgrammee, emailCompteRestaure, emailConfirmationBillets, emailInvitationCagnotte, emailConfirmationParticipationCagnotte, emailAccesCagnottePrivee, emailDemandeDevisRecue, emailDemandeDevisReponse, emailConfirmationInscription, emailCommunicationInscription };
+module.exports = { emailAdresseModifiee, emailNomModifie, emailCodeConnexion, emailCompteRenduRelance, emailCompteRenduDiffusion, sendEmail, emailBienvenue, emailVerification, emailResetPassword, emailAccreditation, emailDeletionConfirmee, emailSuppressionProgrammee, emailCompteRestaure, emailConfirmationBillets, emailInvitationCagnotte, emailConfirmationParticipationCagnotte, emailAccesCagnottePrivee, emailDemandeDevisRecue, emailDemandeDevisReponse, emailConfirmationInscription, emailCommunicationInscription };
 
 /* Partage d'un tuto vidéo par e-mail (2026-10-13, demande explicite : l'e-mail doit montrer le titre du tuto, l'affiche — la même que sur la
    cartouche de l'accueil — et la durée). Carte en table HTML + styles inline (rendu identique Gmail/Outlook) ; l'affiche et le bouton

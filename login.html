@@ -201,6 +201,7 @@ footer.footer a { color: rgba(255,255,255,.5) !important; }
         <label for="password">Mot de passe</label>
         <input type="password" id="password" required autocomplete="current-password">
         <div style="text-align:right;margin-top:6px;"><a href="mot-de-passe-oublie.html" style="font-size:12px;color:#2563EB;font-weight:600;text-decoration:none;">Mot de passe oublié ?</a></div>
+        <div style="text-align:right;margin-top:4px;"><button type="button" id="code-email-btn" style="background:none;border:none;padding:0;font:inherit;font-size:12px;color:#2563EB;font-weight:600;cursor:pointer;">Pas de mot de passe sous la main ? Recevoir un code par e-mail</button></div>
         <button type="submit" class="btn btn-orange btn-block" style="margin-top:14px;">Se connecter</button>
         <div class="auth-error" id="login-error"></div>
       </form>
@@ -240,7 +241,7 @@ footer.footer a { color: rgba(255,255,255,.5) !important; }
 <script src="assets/data.js"></script>
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js?v=13"></script>
-<script src="assets/confirmation-appareil.js?v=4"></script>
+<script src="assets/confirmation-appareil.js?v=5"></script>
 <script>
   /* Préremplissage depuis un lien externe (ex. e-mail de confirmation de participation à une
      cagnotte proposant de se connecter) — jamais de mot de passe, juste l'e-mail, un simple
@@ -287,6 +288,28 @@ footer.footer a { color: rgba(255,255,255,.5) !important; }
     window.location.href = "login-administrateur-junior.html";
   });
 
+  /* Retour à la page d'origine (ex: vidéo Vidéos Tuto) si ?redirect=... est présent et
+     reste un chemin relatif du site — jamais une URL absolue/externe (anti-open-redirect). */
+  function allerApresConnexion(r) {
+    const redirect = new URLSearchParams(location.search).get("redirect");
+    const redirectSur = (redirect && !redirect.includes("://") && !redirect.startsWith("//")) ? redirect : null;
+    window.location.href = redirectSur || loginLandingUrl(r.user);
+  }
+
+  /* Sans mot de passe : code provisoire à 4 chiffres envoyé à l'adresse e-mail du compte (assets/confirmation-appareil.js). */
+  document.getElementById("code-email-btn").addEventListener("click", async () => {
+    const errBox = document.getElementById("login-error");
+    errBox.style.display = "none";
+    try {
+      const r = await connexionParCodeEmail(document.getElementById("email").value.trim());
+      allerApresConnexion(r);
+    } catch (err) {
+      if (err && err.annule) return;
+      errBox.textContent = (err && err.message) || "Connexion impossible.";
+      errBox.style.display = "block";
+    }
+  });
+
   document.getElementById("login-form").addEventListener("submit", async (e)=>{
     e.preventDefault();
     const email = document.getElementById("email").value.trim();
@@ -295,11 +318,7 @@ footer.footer a { color: rgba(255,255,255,.5) !important; }
     errBox.style.display = "none";
     try {
       const r = await loginAvecConfirmation(email, password);
-      /* Retour à la page d'origine (ex: vidéo Vidéos Tuto) si ?redirect=... est présent et
-         reste un chemin relatif du site — jamais une URL absolue/externe (anti-open-redirect). */
-      const redirect = new URLSearchParams(location.search).get("redirect");
-      const redirectSur = (redirect && !redirect.includes("://") && !redirect.startsWith("//")) ? redirect : null;
-      window.location.href = redirectSur || loginLandingUrl(r.user);
+      allerApresConnexion(r);
     } catch (err) {
       errBox.textContent = err.message || "Connexion impossible.";
       errBox.style.display = "block";
