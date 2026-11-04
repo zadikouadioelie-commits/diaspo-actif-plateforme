@@ -124,7 +124,11 @@ function reponseFausseAnnuaire({ systeme, messages }) {
   if (/JSONFAUX/.test(q)) texte = "Voici ma réponse sans structure.";
   else if (/VAGUEFAUX/.test(q)) texte = JSON.stringify({ action: "question", message: "Quel domaine ou quel type de compétence recherchez-vous ?" });
   else if (/EXPLIQUEFAUX/.test(q)) texte = JSON.stringify({ action: "repondre", message: "Je ne propose que les comptes Premium qui ont une photo et un descriptif." });
-  else if (/TOUSFAUX/.test(q)) {
+  else if (/NOMFAUX:/.test(q)) {
+    /* recherche par nom : NOMFAUX:prenom_nom (les tirets bas deviennent des espaces) */
+    const nom = ((/NOMFAUX:(\S+)/.exec(q) || [])[1] || "").replace(/_/g, " ");
+    texte = JSON.stringify({ action: "chercher", message: "Je cherche ce nom.", criteres: { concepts: [["papeterie"]], ville: "", pays: "", type: "", nom, liste: false, suite: false } });
+  } else if (/TOUSFAUX/.test(q)) {
     /* « montre-moi les comptes » : aucun thème — le modèle renvoie des critères vides (type facultatif : TYPE:xxx), et SUITE:oui pour « la suite ». */
     const prise = re => (re.exec(q) || [])[1] || "";
     texte = "```json\n" + JSON.stringify({ action: "chercher", message: "Je vous montre les comptes de l'Annuaire.", criteres: { concepts: [], ville: prise(/VILLE:(\S+)/), pays: "", type: prise(/TYPE:(\S+)/), liste: true, suite: /SUITE:oui/.test(q) } }) + "\n```";

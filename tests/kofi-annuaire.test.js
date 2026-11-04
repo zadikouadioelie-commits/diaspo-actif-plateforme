@@ -61,6 +61,14 @@ test('Koffi annuaire — critères, sortie du modèle, pourcentage (fonctions pu
   assert.equal(A.noter(p, crit({ ville: 'Dakar', pays: 'Sénégal' })).pct, 70, 'autre pays : le lieu ne rapporte rien');
   const n = A.noter(p, crit({ ville: 'Lyon' })); assert.ok(n.raisons.some(r => /comptabilité/.test(r)) && n.raisons.some(r => /Lyon/.test(r)), JSON.stringify(n.raisons));
   assert.ok(A.noter(p, { concepts: [], ville: 'Lyon', pays: '', type: '' }).pct >= 99, 'recherche par lieu seul');
+  /* Recherche par nom : au moins 3 lettres, mots entiers, une faute de frappe tolérée (mots de 5 lettres ou plus), jamais une initiale seule. */
+  assert.equal(A.validerCriteres({ nom: 'A' }).nom, undefined, 'une initiale ne suffit pas'); assert.equal(A.validerCriteres({ nom: '  Thomas  Hervet ' }).nom, 'Thomas Hervet');
+  assert.equal(A.correspondanceNom('hervet thomas', 'Thomas Hervet'), 99, 'ordre indifférent');
+  assert.equal(A.correspondanceNom('Hervé Thomas', 'Thomas Herve'), 99, 'accents ignorés');
+  assert.equal(A.correspondanceNom('hervet thomas', 'Thomas Herve'), 85, 'une faute de frappe');
+  assert.equal(A.correspondanceNom('thom', 'Thomas Hervet'), 0, 'mot incomplet court : non'); assert.equal(A.correspondanceNom('Thomas Durand', 'Thomas Hervet'), 0);
+  assert.equal(A.correspondanceNom('ab', 'Ab Cd'), 0, 'moins de 3 lettres au total : jamais');
+  assert.equal(A.noter({ kind: 'personne', affiche: 'Thomas Hervet' }, { concepts: [['papeterie']], ville: 'Lyon', pays: '', type: '', nom: 'Thomas Hervet' }).pct, 99, 'avec un nom, les autres critères sont ignorés');
   /* Le prompt système ne contient aucun profil et interdit de citer un nom. */
   const s = A.systemePour(); assert.match(s, /ASSISTANT_ANNUAIRE/); assert.match(s, /AUCUN profil/); assert.match(s, /DONNÉES/);
 });
@@ -277,15 +285,18 @@ test('Koffi annuaire — parcours complet', async (t) => {
   });
 
   await t.test('comprendre sans mot précis : « tous les comptes » sans thème → liste sans pourcentage ; « la suite » ne répète rien ; « ma ville » ; question d\'explication', async () => {
+    /* Le test « Premium perdu » a expiré l'abonnement du responsable de l'initiative : on le rétablit (et on vide le cache Premium de 60 s) pour retrouver l'initiative dans le parcours. */
+    sql("UPDATE user_accreditations SET statut='active', date_expiration=datetime('now','+30 day') WHERE user_id=?", uid('Ini'));
+    await call(jar.Lr, 'PUT', '/api/kofi/annuaire/visibilite', { non_propose: false });
     /* Aucun thème : la demande « fais-moi la liste de tous les comptes que tu peux lister » ne doit plus être « incomprise ». */
-    const t0 = await dire(jar.Lr, 'Fais-moi la liste de tous les comptes que tu peux lister TOUSFAUX');
+    const t0 =await dire(jar.Lr, 'Fais-moi la liste de tous les comptes que tu peux lister TOUSFAUX');
     assert.equal(t0.status, 200, JSON.stringify(t0.data));
     const m = t0.data.message, props = m.propositions;
     assert.equal(m.liste, true); assert.ok(props.length >= 8, 'plusieurs comptes : ' + props.length);
     assert.doesNotMatch(m.contenu, /pas bien compris/); assert.match(m.contenu, /Voici \d+ comptes? de l'Annuaire/);
     assert.ok(props.every(p => p.pourcentage === null), 'pas de pourcentage quand aucun critère');
     for (const exclu of ['P4', 'P5', 'P6', 'P7', 'P8', 'P9', 'P10', 'L7', 'Lr']) assert.ok(!props.some(p => p.type === 'personne' && p.id === uid(exclu)), exclu + ' ne doit jamais être listé');
-    assert.ok(props.some(p => p.id === uid('P1')) && props.some(p => p.type === 'initiative'), 'personnes et initiatives');
+    assert.ok(props.some(p => p.id === uid('P1')) && props.some(p => p.type === 'initiative'), 'personnes et initiatives : ' + JSON.stringify(props.map(p => p.type + ':' + p.nom)));
     assert.ok(!/telephone|password|date_naissance|email/i.test(JSON.stringify(props)), 'aucun champ privé');
     /* Un type seulement (« les associations ») : parcours restreint ; « la suite » dans la même discussion ne remontre jamais le même compte. */
     const ini = await dire(jar.Lr, 'Montre-moi les associations TOUSFAUX TYPE:initiative');
@@ -302,6 +313,30 @@ test('Koffi annuaire — parcours complet', async (t) => {
     /* Une question d'explication reçoit une réponse, pas une recherche. */
     const ex = await dire(jar.Lr, 'Pourquoi certains comptes ne sont pas proposés ? EXPLIQUEFAUX');
     assert.deepEqual(ex.data.message.propositions, []); assert.match(ex.data.message.contenu, /Premium/);
+  });
+
+  await t.test('recherche par NOM : retrouve la personne parmi les comptes proposables, à une faute de frappe près ; jamais un compte exclu ; honnête quand rien', async () => {
+    /* Cas réel : « hervet thomas » recevait « je ne peux pas rechercher par nom ». */
+    const jz = H.cookieJar(); await H.creerApprenant(env, jz, rnd, 'Nm');
+    sql("UPDATE users SET created_at=datetime('now','-2 year') WHERE id=?", uid('Nm')); sql('DELETE FROM user_accreditations WHERE user_id=?', uid('Nm')); H.ordinariser(env, rnd, 'Nm');
+    const ex = await dire(jz, 'NOMFAUX:Aminata_P1');
+    assert.equal(ex.status, 200, JSON.stringify(ex.data));
+    const props = ex.data.message.propositions;
+    assert.deepEqual(props.map(p => p.id), [uid('P1')], 'uniquement P1 (prénom + nom) : P2, P3… portent le même prénom mais pas le même nom ; le thème « papeterie » du faux modèle est ignoré');
+    assert.equal(props[0].pourcentage, 99); assert.match(props[0].raisons[0], /Nom : correspond/); assert.equal(ex.data.message.liste, false);
+    assert.match(ex.data.message.contenu, /compte dont le nom correspond/);
+    const flou = await dire(jz, 'NOMFAUX:Aminatta_P1');
+    assert.deepEqual(flou.data.message.propositions.map(p => p.id), [uid('P1')], 'une lettre de trop : retrouvé'); assert.equal(flou.data.message.propositions[0].pourcentage, 85);
+    /* Comptes non proposables : jamais trouvés par leur nom, et la réponse reste la même que pour un nom inconnu (on ne révèle pas leur existence). */
+    for (const n of ['P4', 'P5', 'P6', 'P7', 'P8', 'P9', 'P10']) {
+      const r = await dire(jz, 'NOMFAUX:Aminata_' + n);
+      assert.deepEqual(r.data.message.propositions, [], n + ' ne doit pas être trouvé par son nom');
+    }
+    const inconnu = await dire(jz, 'NOMFAUX:Zebulon_Quarante');
+    assert.deepEqual(inconnu.data.message.propositions, []); assert.match(inconnu.data.message.contenu, /Je ne trouve personne de ce nom/); assert.match(inconnu.data.message.contenu, /recherche manuelle de l'Annuaire cherche par nom/);
+    /* Les noms de comptes ne sont pas transmis au modèle : seul le nom tapé par la personne l'est. */
+    assert.ok(!fs.readFileSync(journalIA, 'utf8').includes('Présentation de P1'), 'aucune donnée de profil dans les requêtes au modèle');
+    assert.match(A.systemePour(), /Ne refuse JAMAIS une recherche par nom/);
   });
 
   await t.test('suppression : le demandeur efface sa conversation ; un autre compte ne peut pas', async () => {

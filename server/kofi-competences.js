@@ -133,6 +133,7 @@ function reponseAnnuaire(r) {
     "• Parcourir les profils publics de l'Annuaire et vous en proposer au moins trois, avec un pourcentage de correspondance et la raison en une phrase. Le pourcentage est calculé par la plateforme d'après vos critères, il n'est pas inventé.",
     "• Établir une LISTE (jusqu'à 30 profils) quand vous la demandez, avec vos propres mots : « fais-moi la liste des… », « montre-moi tous les comptes que tu peux lister », « et la suite ? ». Sans thème précis, je montre les profils les plus complets ; avec un thème, je les classe par pourcentage de correspondance. Elle ne contient que les comptes proposables ; un nombre limité de listes est possible chaque jour.",
     "• Comprendre le sens de votre demande sans formule précise, et tenir compte de la conversation : « plutôt à Lyon », « seulement les associations », « ma ville » (lue dans votre profil par la plateforme, pas par moi).",
+    "• Retrouver une personne ou une structure PAR SON NOM (« Thomas Hervet »), parmi les comptes que je peux proposer.",
     "• Vous mener en un clic sur le profil public de la personne qui vous intéresse.",
     "• Vous dire honnêtement quand je ne trouve pas trois bons profils, plutôt que d'en inventer.",
     "",
