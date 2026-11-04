@@ -161,6 +161,20 @@ function reponseEvenements(r) {
   ].join("\n");
 }
 
+function reponseInscriptions(r) {
+  return [
+    "Je suis votre guide des fiches d'inscription. Voici tout ce que je sais faire :",
+    "• Vous expliquer à quoi sert chaque partie du module : les types d'inscription (gratuit ou payant, places, liste d'attente), le formulaire et ses questions, la validation, l'aperçu public, la communication aux inscrits, le contrôle par QR code, les présences, les finances.",
+    "• Vous dire à quoi sert une partie de la fiche (types d'inscription, liste d'attente, validation, QR…), comment ajouter une question personnalisée (par exemple pour demander le nom d'un accompagnant), ce qui est déjà demandé d'office à chaque inscrit (nom, prénom, e-mail, téléphone) et les questions toutes prêtes de la banque de champs.",
+    "• Pour les comptes Initiative, Collectivité et Administrateur : PRÉPARER une fiche avec vous. Je vous pose les questions qui manquent (nom, dates, types d'inscription, questions du formulaire), je vous montre un aperçu, et je ne crée la fiche que quand vous confirmez (bouton « Créer la fiche » ou « oui »). Elle est créée en BROUILLON : rien n'est publié.",
+    "• Vous dire honnêtement quand je ne connais pas une réponse, plutôt que d'inventer.",
+    "",
+    "Ce que je ne fais pas : publier une fiche, la lier à un événement, la partager, voir ou modifier vos fiches existantes, voir vos inscrits ou vos paiements, ni envoyer de message. Pour tout cela, je vous indique l'onglet et les étapes (le bouton « 🎥 Tutoriel » en haut d'une fiche fait aussi visiter les onglets).",
+    "",
+    phraseCredit("fr", r),
+  ].join("\n");
+}
+
 function reponseBusinessPlan(r) {
   return [
     "Je peux jouer un interlocuteur pour tester la solidité de votre business plan. Voici comment cela se passe :",
@@ -211,6 +225,7 @@ module.exports = {
   reponseCreateur: r => reponseCreateur(r) + ailleurs("fr", LIEU_FORMATION),
   reponseAnnuaire: r => reponseAnnuaire(r) + ailleurs("fr", "Annuaire"),
   reponseEvenements: r => reponseEvenements(r) + ailleurs("fr", "Événements"),
+  reponseInscriptions: r => reponseInscriptions(r) + ailleurs("fr", "Fiches d'inscription"),
   reponseBusinessPlan: r => reponseBusinessPlan(r) + ailleurs("fr", "Business Plan"),
   reponseAdmin: () => reponseAdmin() + ailleurs("fr", "Espace administrateur"),
   phraseCredit, normaliser,

@@ -3,6 +3,7 @@
    - Conseiller de l'Annuaire : le bouton Koffi (assets/koffi-annuaire.js, même fenêtre que sur le site) apparaît sur l'onglet « Annuaire »
      pour une personne connectée, et disparaît dès qu'on le quitte. Toutes les règles sont décidées par le serveur.
    - Guide des événements : même principe sur l'onglet « Événements » (assets/koffi-evenements.js) ; les cartes ouvrent la fiche dans l'appli (#/evenement/ID).
+   - Guide des fiches d'inscription : même principe sur le module « Formulaires » (#/inscriptions…, assets/koffi-inscriptions.js) ; « Ouvrir la fiche » mène à #/inscriptions/ID.
    - Guide de navigation (assets/koffi-navigation.js) : bouton rond Koffi (son visage) en bas à gauche de tous les écrans, gratuit ; les cartes ouvrent l'écran de l'appli (#/…) ou la page du site.
    - Retour de Stripe après une recharge du crédit (m.html?kofi=succes|annule) : le crédit arrive par le webhook, on attend de le voir puis on prévient.
    Le tuteur des formations est monté par m-mod-formations.js ; le crédit (pastille, recharge) vient de assets/koffi-credit.js.
@@ -19,6 +20,7 @@
   }
   const chargerAnnuaire = () => charger('/assets/koffi-annuaire.js?v=5', () => !!window.KoffiAnnuaire);
   const chargerEvenements = () => charger('/assets/koffi-evenements.js?v=4', () => !!window.KoffiEvenements);
+  const chargerInscriptions = () => charger('/assets/koffi-inscriptions.js?v=1', () => !!window.KoffiInscriptions);
 
   /* Tous les boutons Koffi du téléphone se déplacent au doigt ; une seule position mémorisée pour qu'il reste où on l'a posé d'un écran à l'autre. */
   const CLE_POS = 'da_koffi_pos_tel';
@@ -63,12 +65,31 @@
   setInterval(majEvenements, 1500);
   majEvenements();
 
+  /* ── Guide des fiches d'inscription : monté sur le module « Formulaires » (#/inscriptions, #/inscriptions/ID…) seulement ── */
+  let enCoursIns = false;
+  const surInscriptions = () => /^#\/inscriptions(\/|$)/.test(location.hash);
+  async function majInscriptions() {
+    if (enCoursIns) return;
+    const K = window.KoffiInscriptions;
+    if (!surInscriptions() || !S.me) { if (K && K.estMonte()) K.demonter(); return; }
+    if (K && K.estMonte()) return;
+    enCoursIns = true;
+    try {
+      await chargerInscriptions();
+      if (window.KoffiInscriptions && surInscriptions() && S.me && !window.KoffiInscriptions.estMonte()) { await window.KoffiInscriptions.monter({ telephone: true }); const r = document.querySelector('.ki-root'); if (r) deplacable(r, r.querySelector('.ki-btn')); }
+      if (window.KoffiInscriptions && !surInscriptions() && window.KoffiInscriptions.estMonte()) window.KoffiInscriptions.demonter();
+    } finally { enCoursIns = false; }
+  }
+  window.addEventListener('hashchange', majInscriptions);
+  setInterval(majInscriptions, 1500);
+  majInscriptions();
+
   /* ── Guide de navigation : bouton rond Koffi (son visage) en bas à gauche de TOUS les écrans pour une personne connectée (à droite : les boutons Koffi de l'Annuaire et des Événements).
      Le script de la fenêtre n'est chargé qu'au premier appui : aucun appel au serveur ni à l'IA tant que la personne ne l'ouvre pas. ── */
   function majNavigation() {
     const present = document.getElementById('kn-tel-btn');
     /* Sur l'Annuaire et les Événements, le Koffi de l'écran est déjà là : un seul bouton Koffi à la fois. */
-    const koffiDeLEcran = surAnnuaire() || surEvenements();
+    const koffiDeLEcran = surAnnuaire() || surEvenements() || surInscriptions();
     if (!S.me || koffiDeLEcran) { if (present) present.remove(); return; }
     if (present) return;
     if (!document.getElementById('kn-tel-style')) {

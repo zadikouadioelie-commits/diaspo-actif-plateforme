@@ -197,6 +197,28 @@ function reponseFausseEvenements({ systeme, messages }) {
   return { texte, entree, sortie: Math.ceil(texte.length / 4), lecture_cache: 0, refus: false, arret: "end_turn" };
 }
 
+/* Guide des fiches d'inscription (système marqué ASSISTANT_INSCRIPTIONS) : JSON déterministe d'après des marqueurs de la demande —
+   FICHEJSON:{…} (une ligne) → action « fiche » avec ce brouillon ; OUIFICHE → « fiche » avec confirme:true (brouillon précédent repris tel quel) ; ABANDON → « abandonner » ;
+   sinon une réponse simple. PANNEFAUSSE, LIMITEFAUSSE, REFUSFAUX, JSONFAUX comme les autres. */
+function reponseFausseInscriptions({ systeme, messages }) {
+  if (process.env.KOFI_FAUX_LOG) { try { fs.appendFileSync(process.env.KOFI_FAUX_LOG, JSON.stringify({ systeme, messages }) + "\n"); } catch (e) { /* sans importance */ } }
+  const dernier = String((messages[messages.length - 1] || {}).content || "");
+  const q = (dernier.split("<demande>")[1] || dernier).split("</demande>")[0];
+  const entree = Math.ceil((String(systeme).length + messages.reduce((a, m) => a + String(m.content).length, 0)) / 4);
+  if (/PANNEFAUSSE/.test(q)) throw new KofiIAErreur("indisponible", "Panne simulée.");
+  if (/LIMITEFAUSSE/.test(q)) throw new KofiIAErreur("limite", "Limite simulée.");
+  if (/REFUSFAUX/.test(q)) return { texte: "", entree, sortie: 5, lecture_cache: 0, refus: true, arret: "refusal" };
+  let texte;
+  const fj = /FICHEJSON:(\{.*\})/.exec(q);
+  const prec = ((/<brouillon_precedent>([\s\S]*?)<\/brouillon_precedent>/.exec(dernier) || [])[1]) || "";
+  if (/JSONFAUX/.test(q)) texte = "Voici ma réponse sans structure.";
+  else if (fj) { let b = {}; try { b = JSON.parse(fj[1]); } catch (e) { b = {}; } texte = JSON.stringify({ action: "fiche", message: "Je prépare la fiche.", brouillon: b, confirme: false }); }
+  else if (/OUIFICHE/.test(q)) { let b = {}; try { b = JSON.parse(prec); } catch (e) { b = {}; } texte = JSON.stringify({ action: "fiche", message: "C'est noté.", brouillon: b, confirme: true }); }
+  else if (/ABANDON/.test(q)) texte = JSON.stringify({ action: "abandonner", message: "" });
+  else texte = JSON.stringify({ action: "repondre", message: "Voici une explication sur la fiche." });
+  return { texte, entree, sortie: Math.ceil(texte.length / 4), lecture_cache: 0, refus: false, arret: "end_turn" };
+}
+
 /* Guide de navigation (système marqué ASSISTANT_NAVIGATION) : JSON déterministe — PAGE:cle1,cle2 dans la demande → ces destinations ; sinon aucune. */
 function reponseFausseNavigation({ systeme, messages }) {
   if (process.env.KOFI_FAUX_LOG) { try { fs.appendFileSync(process.env.KOFI_FAUX_LOG, JSON.stringify({ systeme, messages }) + "\n"); } catch (e) { /* sans importance */ } }
@@ -248,6 +270,7 @@ function reponseFausse({ systeme, messages }) {
   if (/ASSISTANT_ADMIN/.test(String(systeme))) return reponseFausseAdmin({ systeme, messages });
   if (/ASSISTANT_EVENEMENTS/.test(String(systeme))) return reponseFausseEvenements({ systeme, messages });
   if (/ASSISTANT_BUSINESSPLAN/.test(String(systeme))) return reponseFausseBusinessPlan({ systeme, messages });
+  if (/ASSISTANT_INSCRIPTIONS/.test(String(systeme))) return reponseFausseInscriptions({ systeme, messages });
   if (/ASSISTANT_NAVIGATION/.test(String(systeme))) return reponseFausseNavigation({ systeme, messages });
   if (/ASSISTANT_FORMATEUR/.test(String(systeme))) return reponseFausseCreateur({ systeme, messages });
   if (/ASSISTANT_CORRECTION/.test(String(systeme))) return reponseFausseCorrection({ systeme, messages });

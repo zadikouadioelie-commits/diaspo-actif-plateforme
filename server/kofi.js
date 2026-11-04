@@ -107,6 +107,10 @@ const DEFAUTS = {
   navigation_max_sortie_tokens: 500,
   plafond_jour_navigation: 40,       /* anti-abus : questions de navigation par compte et par 24 h */
   plafond_jour_evenements: 60,     /* anti-abus : messages par 24 h au guide des événements */
+  /* Guide des fiches d'inscription (2026-11-04) : server/kofi-inscriptions.js */
+  inscriptions_max_message_caracteres: 800,
+  inscriptions_max_sortie_tokens: 800,
+  plafond_jour_inscriptions: 60,   /* anti-abus : messages par 24 h au guide des fiches d'inscription */
   annuaire_nb_candidats: 25,       /* profils examinés par Koffi à chaque recherche */
   plafond_jour_annuaire: 60,       /* anti-abus : messages par 24 h */
   plafond_jour_liste_annuaire: 10, /* listes de comptes (« fais-moi la liste de… ») par compte et par 24 h : anti-moissonnage */
@@ -129,6 +133,7 @@ const BORNES = {
   recharge_min_eur: [0.5, 1000], recharge_ratio: [1, 100], coefficient_cout: [0.1, 100], alerte_solde_pct: [1, 100],
   annuaire_max_message_caracteres: [50, 3000], annuaire_max_sortie_tokens: [200, 4000], evenements_max_message_caracteres: [50, 3000], evenements_max_sortie_tokens: [200, 4000], plafond_jour_evenements: [1, 10000], bp_max_message_caracteres: [100, 4000], bp_max_sortie_tokens: [300, 4000], bp_max_plan_caracteres: [2000, 20000], bp_nb_questions: [3, 15], plafond_jour_businessplan: [1, 10000], navigation_max_message_caracteres: [50, 2000], navigation_max_sortie_tokens: [200, 2000], plafond_jour_navigation: [1, 10000], annuaire_nb_candidats: [5, 60], plafond_jour_annuaire: [1, 10000], plafond_jour_liste_annuaire: [1, 200],
   admin_max_message_caracteres: [100, 10000], admin_max_sortie_tokens: [300, 4000], plafond_jour_admin: [1, 10000],
+  inscriptions_max_message_caracteres: [50, 3000], inscriptions_max_sortie_tokens: [200, 4000], plafond_jour_inscriptions: [1, 10000],
 };
 
 const sqlDate = d => d.toISOString().slice(0, 19).replace("T", " ");
@@ -559,6 +564,8 @@ module.exports.register = function register(deps) {
   require("./kofi-admin").register(deps);
   /* Guide des événements (2026-11-01) : server/kofi-evenements.js. */
   require("./kofi-evenements").register(deps);
+  /* Guide des fiches d'inscription (2026-11-04) : server/kofi-inscriptions.js. */
+  require("./kofi-inscriptions").register(deps);
   /* Koffi joue l'investisseur / le banquier / le client dans le Business Plan (2026-11-01) : server/kofi-businessplan.js. */
   require("./kofi-businessplan").register(deps);
   /* Guide de navigation dans toutes les pages (2026-11-01), gratuit : server/kofi-navigation.js. */
@@ -690,6 +697,7 @@ module.exports.register = function register(deps) {
       if (page === "telephone") retour = `${origine}/m.html?kofi=`;
       else if (page === "annuaire") retour = `${origine}/annuaire.html?kofi=`;
       else if (page === "evenements") retour = `${origine}/evenements.html?kofi=`;
+      else if (page === "inscriptions") retour = `${origine}/inscriptions-admin.html?kofi=`;
       else if (page === "businessplan" && Number.isInteger(Number(body && body.plan_id)) && Number(body.plan_id) > 0) retour = `${origine}/business-plan-edit.html?id=${Number(body.plan_id)}&kofi=`;
       else if (page === "createur") retour = `${origine}/formations.html?kofi=`;
       else retour = formationId ? `${origine}/suivre-formation.html?id=${encodeURIComponent(formationId)}&kofi=` : `${origine}/formations.html?kofi=`;
