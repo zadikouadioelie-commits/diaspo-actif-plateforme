@@ -948,13 +948,13 @@ function iaOuvrirSondage() {
   overlay.innerHTML = `
     <div style="background:#fff;border-radius:16px;max-width:640px;width:100%;max-height:88vh;overflow-y:auto;padding:24px;box-sizing:border-box;">
       <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:4px; gap:10px;">
-        <h3 style="margin:0; font-size:17px; color:#6B0FA3;">📊 Sondage</h3>
+        <h3 style="margin:0; font-size:17px; color:#6B0FA3;">📊 Sondage privé</h3>
         <button type="button" id="is-fermer" style="background:none; border:none; font-size:20px; cursor:pointer; color:oklch(0.55 0.006 30); flex-shrink:0;">✕</button>
       </div>
       <p style="font-size:12.5px; color:oklch(0.55 0.006 30); margin:0 0 16px;">Posez une ou plusieurs questions aux participants — chacune avec Oui/Non, une réponse libre, ou une liste de réponses que vous programmez vous-même. Image facultative par question.</p>
       <div id="is-questions-list" style="display:flex; flex-direction:column; gap:12px;"></div>
       <button type="button" id="is-ajouter" style="width:100%; margin-top:12px; background:none; border:1.5px dashed oklch(0.8 0.006 30); color:oklch(0.5 0.006 30); font-size:13px; font-weight:600; padding:11px; border-radius:10px; cursor:pointer;">+ Ajouter une autre question</button>
-      <button type="button" id="is-enregistrer" style="width:100%; margin-top:18px; background:#8B12D6; border:none; color:#fff; font-size:13.5px; font-weight:700; padding:12px; border-radius:10px; cursor:pointer;">Enregistrer le sondage</button>
+      <button type="button" id="is-enregistrer" style="width:100%; margin-top:18px; background:#8B12D6; border:none; color:#fff; font-size:13.5px; font-weight:700; padding:12px; border-radius:10px; cursor:pointer;">Enregistrer le sondage privé</button>
     </div>`;
   document.body.appendChild(overlay);
 
@@ -1046,7 +1046,7 @@ function iaOuvrirSondage() {
           libelle: q.libelle, type_champ: q.type_champ, obligatoire: false, image_url: q.image_url, options: q.options,
         });
       }
-      ia_toast(`${questions.length} question(s) de sondage ajoutée(s).`, true);
+      ia_toast(`${questions.length} question(s) de sondage privé ajoutée(s).`, true);
       overlay.remove();
       await iaChargerFiche(state.selectedFicheId);
       render();
@@ -2259,7 +2259,7 @@ function renderFields() {
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
           ${cats}
           <button style="background:#fff; border:1.5px solid #BC13FE; color:#8B12D6; font-size:12.5px; font-weight:700; padding:6px 13px; border-radius:8px; cursor:pointer; box-shadow:0 0 6px rgba(188,19,254,.35);" data-action="ouvrirOptionsPayantes">💰 Option payante</button>
-          <button style="background:#fff; border:1.5px solid #BC13FE; color:#8B12D6; font-size:12.5px; font-weight:700; padding:6px 13px; border-radius:8px; cursor:pointer; box-shadow:0 0 6px rgba(188,19,254,.35);" data-action="ouvrirSondage">📊 Sondage</button>
+          <button style="background:#fff; border:1.5px solid #BC13FE; color:#8B12D6; font-size:12.5px; font-weight:700; padding:6px 13px; border-radius:8px; cursor:pointer; box-shadow:0 0 6px rgba(188,19,254,.35);" data-action="ouvrirSondage">📊 Sondage privé</button>
           <!-- "💼 Candidature" (2026-09-27, demande explicite) — bouton seul pour l'instant,
                le contenu de la modale qu'il ouvrira est en cours de préparation par
                l'utilisateur ; data-action enregistré dans actions ci-dessous, ne fait
