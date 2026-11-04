@@ -994,6 +994,23 @@
       toast(masquer ? 'Le nombre d’inscrits est maintenant caché au public (vous le voyez toujours).' : 'Le nombre d’inscrits est de nouveau visible par le public.');
     } catch (er) { btn.disabled = false; toast(er.message, true); }
   }
+  /* Organisateur relayé (2026-11-04, demande explicite : "l'onglet organisateur... une image
+     plus un nom... visible... même avant de cliquer sur la cartouche... directement sur la
+     cartouche") — même garde que organisateurExterneChip/Bandeau côté site (evenements-app.html) :
+     réservé aux événements flash (inscription_ouverte===0), facultatif. */
+  function evtOrganisateurInitiale(e) { return esc((e.organisateur_externe_nom || '?').trim().charAt(0).toUpperCase() || '?'); }
+  function evtOrganisateurChip(e) {
+    if (Number(e.inscription_ouverte) !== 0 || !e.organisateur_externe_nom) return '';
+    const av = e.organisateur_externe_logo_url ? `<img src="${esc(e.organisateur_externe_logo_url)}" alt="">` : `<span class="ini">${evtOrganisateurInitiale(e)}</span>`;
+    return `<div class="org-chip">${av}<span>${esc(e.organisateur_externe_nom)}</span></div>`;
+  }
+  function evtOrganisateurBandeau(e) {
+    if (Number(e.inscription_ouverte) !== 0 || !e.organisateur_externe_nom) return '';
+    const av = e.organisateur_externe_logo_url
+      ? `<img src="${esc(e.organisateur_externe_logo_url)}" alt="" style="width:32px;height:32px;border-radius:50%;object-fit:cover;flex-shrink:0">`
+      : `<span style="width:32px;height:32px;border-radius:50%;background:var(--navy);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0">${evtOrganisateurInitiale(e)}</span>`;
+    return `<div class="card" style="margin:0 0 10px"><div class="pad" style="display:flex;align-items:center;gap:10px;padding:10px 12px">${av}<div style="font-size:12.5px;line-height:1.35"><span class="muted">Événement relayé pour le compte de</span><br><strong style="font-size:13.5px">${esc(e.organisateur_externe_nom)}</strong></div></div></div>`;
+  }
   function evtCard(e) {
     if (Number(e.epingle_permanent) === 1) return evtPromo(e);
     const p = parseDay(e.date_evt); const cov = evtCover(e);
@@ -1001,7 +1018,7 @@
     const part = e.type_participation === 'partiellement_payant' ? 'Partiellement payant' : paid ? 'Payant' : 'Gratuit';
     const inscrit = S.myInsc.has(Number(e.id));
     return `<a class="card ev${e.est_termine ? ' ev-fini' : ''}" href="#/evenement/${e.id}" style="display:block">
-      <div class="cov">${(e.visibilite || 'public') === 'public' ? `<button type="button" class="ev-share" data-share-ev="${e.id}" data-share-titre="${esc(e.titre)}" aria-label="Partager cet événement">${ic('share', 's')}</button>` : ''}${p ? `<div class="dt"><b>${p.d}</b><span>${MOIS[p.m - 1]}</span></div>` : ''}${cov ? mediaBlock(cov, { alt: e.titre }) : `<div class="media" style="min-height:78px;background:linear-gradient(135deg,var(--navy),var(--navy2))"></div>`}</div>
+      <div class="cov">${(e.visibilite || 'public') === 'public' ? `<button type="button" class="ev-share" data-share-ev="${e.id}" data-share-titre="${esc(e.titre)}" aria-label="Partager cet événement">${ic('share', 's')}</button>` : ''}${p ? `<div class="dt"><b>${p.d}</b><span>${MOIS[p.m - 1]}</span></div>` : ''}${cov ? mediaBlock(cov, { alt: e.titre }) : `<div class="media" style="min-height:78px;background:linear-gradient(135deg,var(--navy),var(--navy2))"></div>`}${evtOrganisateurChip(e)}</div>
       <div class="bd"><h3 class="tt">${esc(e.titre)}</h3>
         <div class="meta">${ic('clock', 's')}<span>${esc(dateLong(e.date_evt))}${e.heure_debut ? ' · ' + esc(String(e.heure_debut).slice(0, 5)) : ''}</span></div>
         <div class="meta">${ic('pin', 's')}<span class="ell">${esc([e.ville, e.pays].filter(Boolean).join(', ') || e.lieu || 'En ligne')}</span></div>
@@ -1055,6 +1072,7 @@
         <div class="meta">${ic('pin', 's')}<span>${esc([e.lieu, e.ville, e.pays].filter(Boolean).join(', ') || 'En ligne')}</span></div>
         <div class="tags"><span class="badge ${paid ? 'o' : 'g'}">${paid ? (ev.prix_min > 0 ? 'Dès ' + esc(ev.prix_min) + ' €' : 'Payant') : 'Gratuit'}</span>${e.type_evt ? `<span class="badge">${esc(e.type_evt)}</span>` : ''}${e.domaine ? `<span class="badge">${esc(e.domaine)}</span>` : ''}${evtInscritsBadge(e)}${evtMasqueChip(e)}</div>
         ${e.organisateur_nom || ev.organisateur_nom ? `<p class="small muted" style="margin:12px 0 0">Organisé par <b style="color:var(--text)" ${e.owner_user_id ? `data-prof="${esc(e.owner_user_id)}" role="link"` : ''}>${esc(ev.organisateur_nom || e.organisateur_nom)}</b></p>` : ''}</div></div>
+      ${evtOrganisateurBandeau(e)}
       ${(e.visibilite || 'public') === 'public' ? `<div class="card"><div class="pad" style="text-align:center"><b>${ic('ticket', 's')} QR code de l’événement</b><p class="small muted" style="margin:4px 0 0">Scannez-le pour ouvrir l’événement, ou montrez-le pour le partager.</p><div class="qr" id="ev-qr" role="img" aria-label="QR code de l’événement"></div><div class="row" style="gap:8px"><button type="button" class="btn out sm sp" id="ev-qr-big">${ic('search', 's')} Agrandir</button><button type="button" class="btn out sm sp" id="ev-qr-share">${ic('share', 's')} Partager le lien</button></div></div></div>` : ''}
       ${desc ? `<div class="card"><div class="pad rich" style="white-space:pre-line">${esc(desc)}</div></div>` : ''}
       ${programmeHtml}

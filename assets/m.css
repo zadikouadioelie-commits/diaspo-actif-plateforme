@@ -124,6 +124,12 @@ svg.i.l{width:28px;height:28px}
 .ev .dt{position:absolute;left:12px;top:12px;z-index:3;background:#fff;border-radius:12px;padding:6px 10px;text-align:center;box-shadow:var(--shadow);line-height:1.1}
 .ev .dt b{display:block;font-size:20px;color:var(--navy)}
 .ev .dt span{font-size:11px;font-weight:700;color:var(--orange-d);text-transform:uppercase}
+/* Organisateur relayé, bien visible sur la cartouche (2026-11-04, demande explicite) — bas de
+   l'image : les deux coins du haut sont déjà pris (date à gauche, partager à droite). */
+.ev .org-chip{position:absolute;left:0;right:0;bottom:0;z-index:2;display:flex;align-items:center;gap:6px;background:rgba(13,27,42,.78);color:#fff;padding:6px 10px;font-size:12px;font-weight:700}
+.ev .org-chip img{width:22px;height:22px;border-radius:50%;object-fit:cover;flex-shrink:0;background:#fff}
+.ev .org-chip .ini{width:22px;height:22px;border-radius:50%;background:#fff;color:var(--navy);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0}
+.ev .org-chip span:not(.ini){overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ev .bd{padding:12px 14px 14px}
 .ev .tt{font-size:17px;font-weight:700;margin:0 0 6px;line-height:1.25}
 .meta{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:13.5px;margin:3px 0}

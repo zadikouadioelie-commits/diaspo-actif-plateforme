@@ -113,7 +113,7 @@
 .mev-gerr{background:var(--red-l);color:var(--red);border-radius:12px;padding:10px 14px;font-weight:600;font-size:14px;margin-bottom:12px}
 .mev-gerr:empty{display:none}
 .mev-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.mev-opt{display:flex;gap:12px;align-items:flex-start;border:1.5px solid var(--border);background:#fff;border-radius:14px;padding:12px;margin-bottom:8px;cursor:pointer}
+.mev-opt{display:flex;gap:12px;align-items:flex-start;border:1.5px solid var(--border);background:var(--card,#fff);border-radius:14px;padding:12px;margin-bottom:8px;cursor:pointer}
 .mev-opt.on{border-color:var(--navy2);background:var(--sky-l)}
 .mev-opt input{margin:3px 0 0;width:20px;height:20px;flex:none;accent-color:var(--navy2)}
 .mev-opt b{display:block;font-size:15px}
@@ -696,6 +696,26 @@
         ${opt('mev-part', 'partiellement_payant', 'Partiellement payant', 'Certaines places ou formules sont payantes.', false)}
         ${opt('mev-part', 'payant', 'Payant', 'Participation payante.', false)}
         <p class="mev-hint" id="mev-part-hint" hidden>Les tarifs se définissent dans la fiche d’inscription, sur ordinateur : ici, vous indiquez seulement la catégorie affichée.</p></div>
+      <!-- Type de participation — événement flash (2026-11-04, demande explicite : "ajoute la
+           possibilité de notifier événements payants ou gratuits") : jusqu'ici masqué pour un
+           flash (#mev-b-part ci-dessus caché par majMode()), donc toujours "Gratuit" par défaut
+           côté serveur sans aucun moyen de le changer. Volontairement 2 états seulement, pas
+           "Partiellement payant" (pas de fiche de tarifs à la déclaration d'un flash). -->
+      <div id="mev-part-flash-wrap" hidden><div class="h2">TYPE DE PARTICIPATION</div>
+        ${opt('mev-part-flash', 'gratuit', 'Gratuit', 'Aucune participation financière.', true)}
+        ${opt('mev-part-flash', 'payant', 'Payant', 'Participation payante.', false)}</div>
+      <!-- Organisateur relayé — événement flash (2026-11-04, demande explicite : "ajoute un
+           onglet organisateur... au cas où celui qui déclare l'événement flash n'est pas
+           l'organisateur... une image plus un nom... visible directement sur la cartouche, même
+           avant de cliquer") — mêmes deux champs que sur ordinateur
+           (organisateur_externe_nom/logo_url), facultatifs. -->
+      <div id="mev-org-wrap" hidden><div class="h2">ORGANISATEUR <span style="font-weight:400">(si ce n’est pas vous)</span></div>
+        <p class="mev-hint">Visible directement sur la cartouche (photo + nom), avant même d’ouvrir l’événement.</p>
+        <label class="mev-l" for="mev-org-nom">Nom de l’organisateur</label>
+        <input type="text" id="mev-org-nom" placeholder="Ex. : Association Les Tisserands">
+        <label class="mev-l" for="mev-org-photo" style="margin-top:10px">Photo / logo de l’organisateur</label>
+        <div class="mev-photo"><img id="mev-org-img" alt="" hidden><div class="sp"><input type="file" id="mev-org-photo" accept="image/jpeg,image/png,image/webp" aria-label="Choisir une photo de l’organisateur"><button type="button" class="btn out sm" id="mev-org-del" hidden style="margin-top:8px">Retirer la photo</button></div></div>
+        <div class="mev-err" id="mev-e-org-photo" role="alert"></div></div>
       <div class="h2">VISIBILITÉ</div>
         ${opt('mev-vis', 'both', 'Boutique et Événements', 'Visible dans le calendrier public et sur votre page boutique.', true)}
         ${opt('mev-vis', 'public', 'Événements uniquement', 'Visible dans le calendrier public, pas sur votre boutique.', false)}
@@ -736,8 +756,9 @@
          l'ouverture du formulaire — le radio de type n'existe plus, flash vaut toujours faux
          ici, donc on ne doit JAMAIS les masquer via ce chemin en édition. */
       if (!edition) {
-        const pw = $('#mev-prog-wrap'), iw = $('#mev-ir-wrap'), lw = $('#mev-info-wrap');
+        const pw = $('#mev-prog-wrap'), iw = $('#mev-ir-wrap'), lw = $('#mev-info-wrap'), pfw = $('#mev-part-flash-wrap'), ow = $('#mev-org-wrap');
         if (pw) pw.hidden = !flash; if (iw) iw.hidden = !flash; if (lw) lw.hidden = !flash;
+        if (pfw) pfw.hidden = !flash; if (ow) ow.hidden = !flash;
       }
       compteur();
     }
@@ -790,6 +811,22 @@
       } catch (er) { photo = null; ph.value = ''; err.textContent = er.message; }
     };
     const pd = $('#mev-ph-del'); if (pd) pd.onclick = () => { photo = null; ph.value = ''; $('#mev-ph-img').hidden = true; pd.hidden = true; };
+
+    // Photo/logo de l'organisateur — même traitement que la photo de couverture ci-dessus (réduction, aperçu, retrait), un fichier distinct.
+    let orgPhoto = null;
+    const op = $('#mev-org-photo');
+    if (op) op.onchange = async () => {
+      const f = op.files[0]; const err = $('#mev-e-org-photo'); err.textContent = '';
+      if (!f) return;
+      if (!/^image\/(jpeg|png|webp)$/.test(f.type)) { err.textContent = 'Format non pris en charge : choisissez une photo JPEG, PNG ou WebP.'; op.value = ''; return; }
+      if (f.size > 20 * 1024 * 1024) { err.textContent = 'Cette photo est trop lourde (20 Mo maximum).'; op.value = ''; return; }
+      try {
+        orgPhoto = await reduirePhoto(f);
+        if (orgPhoto.size > 5 * 1024 * 1024) { orgPhoto = null; op.value = ''; err.textContent = 'Cette photo reste trop lourde après réduction (5 Mo maximum).'; return; }
+        const im = $('#mev-org-img'); im.src = URL.createObjectURL(orgPhoto); im.hidden = false; $('#mev-org-del').hidden = false;
+      } catch (er) { orgPhoto = null; op.value = ''; err.textContent = er.message; }
+    };
+    const od = $('#mev-org-del'); if (od) od.onclick = () => { orgPhoto = null; op.value = ''; $('#mev-org-img').hidden = true; od.hidden = true; };
 
     // Modèle standard de fiche d'inscription : proposé (et décochable) comme sur le site, jamais appliqué en silence.
     let modeleNom = null;
@@ -862,6 +899,8 @@
           body.inscription_ouverte = false; body.appliquer_fiche_standard = false;
           body.programme = programme; body.lien_plus_info = champ('mev-info') || null;
           const irCk2 = $('#mev-ir-ck'); if (irCk2) body.inscription_rapide_active = irCk2.checked;
+          body.type_participation = $('input[name="mev-part-flash"]:checked', form)?.value || 'gratuit';
+          body.organisateur_externe_nom = champ('mev-org-nom') || null;
         }
         else {
           body.inscription_ouverte = true;
@@ -874,6 +913,7 @@
       bloquer(true, btn, statut === 'ouvert' && !edition ? 'Publication…' : 'Enregistrement…');
       try {
         if (!edition && photo) body.image_couverture = await envoyerPhoto(photo);
+        if (!edition && orgPhoto) body.organisateur_externe_logo_url = await envoyerPhoto(orgPhoto);
         if (edition) { await api('/api/evenements/' + Number(e.id), { method: 'PUT', body }); toast('Modifications enregistrées ✓'); if (history.length > 1) history.back(); else location.replace('#/mesevenements/' + Number(e.id)); }
         else {
           const r = await api('/api/evenements', { method: 'POST', body });

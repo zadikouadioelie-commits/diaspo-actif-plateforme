@@ -357,6 +357,18 @@
 @media (prefers-reduced-motion: reduce){
   .evt-card-flash, .flash-shimmer::after, .flash-cachet{animation:none;}
 }
+/* ═══ Organisateur relayé — incrustation sur la carte (2026-11-04, demande explicite) ═══
+   Coin haut-gauche de l'image : le haut-droit est réservé aux cachets Trophée/Flash, le bas à
+   la bande Promo J-7 (.promo-band, assets/evenement-promo.css) — aucune collision possible. */
+.organisateur-chip{
+  position:absolute; top:8px; left:8px; z-index:2; max-width:calc(100% - 64px);
+  display:flex; align-items:center; gap:6px;
+  background:rgba(13,27,42,.78); color:#fff; border-radius:999px;
+  padding:4px 10px 4px 4px; font-size:11.5px; font-weight:700;
+}
+.organisateur-chip img{width:22px;height:22px;border-radius:50%;object-fit:cover;flex-shrink:0;background:#fff;}
+.organisateur-chip .ini{width:22px;height:22px;border-radius:50%;background:#fff;color:#0D2B4E;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0;}
+.organisateur-chip span:not(.ini){overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 
 /* ═══ Événement épinglé "3 mois de Premium offerts" (2026-10-09, demande explicite) ═══
    Chargé et affiché indépendamment des onglets En cours/À venir/Terminés et des filtres —
@@ -426,6 +438,7 @@
   <a href="annuaire.html">🔍 Annuaire</a>
   <a href="vitrines.html">🏪 Boutiques</a>
   <a href="fil-actualite.html">📰 Fil d'actualité</a>
+  <a href="formations.html">🎓 Formations</a>
   <a href="actualites.html">Projets diasporas</a>
   <a href="evenements.html">📅 Événements</a>
   <a href="site-vitrine.html">🌐 Site Diaspo'Actif</a>
@@ -806,17 +819,44 @@
           <div id="fl-prog-list"></div>
           <button type="button" class="btn btn-outline" style="font-size:12.5px;margin-top:6px;" onclick="progAjouterJour('fl-prog-list')">+ Ajouter une journée</button></div>
         <div style="grid-column:1/-1;"><label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer;"><input type="checkbox" id="fl-insc-rapide" style="width:auto;margin-top:3px;flex-shrink:0;"><span><strong>Inscription rapide (facultative)</strong><br><span style="font-weight:400;font-size:.78rem;color:var(--muted,#6b7280);">Les personnes confirment leur venue (nom, prénom, e-mail). Un compte Diaspo'Actif l'ajoute aussi à son agenda ; vous voyez la liste pour anticiper le nombre de personnes.</span></span></label></div>
+        <!-- Type de participation (2026-11-04, demande explicite : "ajoute la possibilité de
+             notifier événements payants ou gratuits") — l'événement flash n'avait jusqu'ici aucun
+             moyen de se déclarer payant : POST /api/evenements retombait toujours sur son défaut
+             "gratuit" puisque ce champ n'était jamais envoyé. Volontairement 2 états seulement ici
+             (pas de "Partiellement payant" : un flash n'a pas de fiche de tarifs au moment de sa
+             déclaration — "Payant" reste modifiable/précisable ensuite via "Lier une fiche"). -->
+        <div style="grid-column:1/-1;margin-bottom:4px;">
+          <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:6px;">Type de participation</label>
+          <div style="display:flex;gap:8px;">
+            <label style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;padding:10px 10px;border:1.5px solid #16a34a;border-radius:8px;background:#F0FDF4;font-weight:600;font-size:12.5px;">
+              <input type="radio" name="fl-gratuit-payant" id="fl-radio-gratuit" value="gratuit" checked style="accent-color:#16a34a;width:16px;height:16px;">
+              🟢 Gratuit
+            </label>
+            <label style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;padding:10px 10px;border:1.5px solid var(--border);border-radius:8px;font-weight:600;font-size:12.5px;">
+              <input type="radio" name="fl-gratuit-payant" id="fl-radio-payant" value="payant" style="accent-color:#DC2626;width:16px;height:16px;">
+              🔴 Payant
+            </label>
+          </div>
+        </div>
         <!-- Organisateur relayé (2026-10-12, demande explicite) : "permettre à des personnes de
              signaler des événements qui ne sont pas les leurs... faire relais d'informations" —
              distinct du compte Diaspo'Actif qui publie (toujours affiché par ailleurs). Facultatif :
-             un compte qui publie son propre événement n'a rien à y mettre. -->
-        <div><label>Organisateur <span style="font-weight:400;color:var(--muted,#6b7280);">(si ce n'est pas vous)</span></label><input type="text" id="fl-organisateur" placeholder="Ex : Association Les Tisserands"></div>
-        <div>
-          <label>Logo de l'organisateur</label>
-          <div style="display:flex;align-items:center;gap:8px;">
-            <img id="fl-logo-preview" style="display:none;width:34px;height:34px;border-radius:50%;object-fit:cover;flex-shrink:0;">
-            <input type="file" id="fl-logo" accept="image/*" style="flex:1;min-width:0;">
+             un compte qui publie son propre événement n'a rien à y mettre. Isolé dans sa propre
+             section (2026-11-04, demande explicite : "ajoute un onglet organisateur") pour que ce
+             choix se distingue clairement du reste du formulaire. -->
+        <div style="grid-column:1/-1;border:1.5px solid var(--border,#ddd);border-radius:10px;padding:14px;margin-bottom:4px;">
+          <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:10px;">👤 Organisateur</div>
+          <div class="grid-2">
+            <div><label>Nom de l'organisateur <span style="font-weight:400;color:var(--muted,#6b7280);">(si ce n'est pas vous)</span></label><input type="text" id="fl-organisateur" placeholder="Ex : Association Les Tisserands"></div>
+            <div>
+              <label>Photo / logo de l'organisateur</label>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <img id="fl-logo-preview" style="display:none;width:34px;height:34px;border-radius:50%;object-fit:cover;flex-shrink:0;">
+                <input type="file" id="fl-logo" accept="image/*" style="flex:1;min-width:0;">
+              </div>
+            </div>
           </div>
+          <p style="margin:10px 0 0;font-size:11.5px;color:var(--muted,#6b7280);">Visible directement sur la cartouche (photo + nom), avant même d'ouvrir l'événement.</p>
         </div>
         <div style="grid-column:1/-1;">
           <label>Description <span style="color:#2563EB">*</span> <span id="fl-compteur" style="font-weight:400;color:var(--muted,#6b7280);">0/500</span></label>
@@ -1147,7 +1187,7 @@ function renderEvts() {
     return `<div class="evt-card${estTrophee ? ' evt-card-trophee' : ''}${estFlash ? ' evt-card-flash' : ''}${evt.est_termine ? ' evt-card-termine' : ''}${evt.promo_active ? ' evt-card-promo' : ''}" data-evt-id="${evt.id}">
       ${peutGerer ? `<button class="evt-delete-float" onclick="supprimerEvenement(${evt.id},this)" title="Supprimer cet événement">🗑</button>` : ''}
       ${evt.whatsapp_lien ? `<a href="${esc(evt.whatsapp_lien)}" target="_blank" rel="noopener" title="Rejoindre la chaîne WhatsApp de l'événement" class="evt-whatsapp-float"><svg width="24" height="24" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="16" fill="#25D366"/><path fill="#fff" d="M23.47 8.52A10.6 10.6 0 0 0 16.02 5.4c-5.86 0-10.62 4.76-10.62 10.62 0 1.87.49 3.7 1.42 5.31L5.3 26.6l5.4-1.42a10.6 10.6 0 0 0 5.31 1.35h.01c5.86 0 10.62-4.76 10.62-10.62 0-2.84-1.1-5.5-3.17-7.39Zm-7.45 16.34h-.01a8.8 8.8 0 0 1-4.5-1.23l-.32-.19-3.35.88.89-3.26-.21-.34a8.79 8.79 0 0 1-1.35-4.7c0-4.86 3.96-8.82 8.83-8.82 2.36 0 4.57.92 6.24 2.6a8.75 8.75 0 0 1 2.58 6.23c0 4.86-3.96 8.83-8.8 8.83Zm4.83-6.61c-.26-.13-1.57-.78-1.82-.86-.24-.09-.42-.13-.6.13-.18.26-.68.86-.84 1.04-.15.18-.31.2-.57.07-.26-.13-1.1-.4-2.1-1.29-.78-.69-1.3-1.55-1.46-1.81-.15-.26-.02-.4.11-.53.12-.12.26-.31.39-.47.13-.15.17-.26.26-.44.09-.18.04-.33-.02-.46-.07-.13-.6-1.44-.82-1.98-.22-.51-.44-.44-.6-.45h-.51c-.18 0-.46.07-.7.33-.24.26-.92.9-.92 2.19s.94 2.54 1.08 2.72c.13.18 1.85 2.83 4.49 3.97.63.27 1.12.43 1.5.55.63.2 1.2.17 1.66.1.5-.08 1.57-.64 1.79-1.26.22-.62.22-1.15.16-1.26-.07-.12-.24-.19-.5-.32Z"/></svg></a>` : ''}
-      <div class="evt-img${estTrophee ? ' trophee-shimmer' : estFlash ? ' flash-shimmer' : ''}">${cover ? `<img src="${esc(cover)}" alt="${esc(evt.titre)}" loading="lazy" onerror="this.parentNode.innerHTML='${icon}'">` : icon}${cachetHtml}${promoBand}</div>
+      <div class="evt-img${estTrophee ? ' trophee-shimmer' : estFlash ? ' flash-shimmer' : ''}">${cover ? `<img src="${esc(cover)}" alt="${esc(evt.titre)}" loading="lazy" onerror="this.parentNode.innerHTML='${icon}'">` : icon}${cachetHtml}${promoBand}${organisateurExterneChip(evt)}</div>
       <div class="evt-body">
         <div class="evt-date">${fmtDate(evt.date_evt)}${evt.heure_debut?' · '+evt.heure_debut:''}${EvtTemporel.badge(evt)}</div>
         <div class="evt-title">${esc(evt.titre)}</div>
@@ -1162,7 +1202,6 @@ function renderEvts() {
           ${evt.domaine ? '<span class="evt-tag">'+esc(evt.domaine)+'</span>' : ''}
           ${badgeParticipation(evt)}
           ${badgeFlash(evt)}
-          ${organisateurExterneHtml(evt)}
           ${visiBadge}
           ${brouillonBadge}
           ${evt.nb_participants ? '<span>👥 '+evt.nb_participants+' inscrit'+(evt.nb_participants>1?'s':'')+(evt.places_max?' / '+evt.places_max:'')+'</span>' : ''}
@@ -1299,11 +1338,28 @@ function badgeFlash(evt) {
    quelqu'un d'autre que l'organisateur réel affiche le nom + logo de celui-ci sur la cartouche,
    distinct du compte Diaspo'Actif qui publie (déjà affiché ailleurs sur la fiche). Réservé aux
    événements flash (même garde que badgeFlash) et seulement si réellement renseigné. */
-function organisateurExterneHtml(evt) {
+/* Organisateur relayé bien visible (2026-11-04, demande explicite : "les informations de
+   l'organisateur doivent être visibles par toute personne qui clique sur la cartouche et même
+   avant de cliquer... photo et nom directement sur la cartouche") — deux rendus à partir des
+   mêmes deux champs (organisateur_externe_nom/logo_url) : une incrustation sur l'image de la
+   carte liste (avant clic), un bandeau en tête de la fiche détaillée (après clic). Initiale en
+   repli quand aucun logo n'a été fourni, jamais une image cassée. */
+function organisateurExterneInitiale(evt) {
+  return esc((evt.organisateur_externe_nom || '?').trim().charAt(0).toUpperCase() || '?');
+}
+function organisateurExterneChip(evt) {
   if (evt.inscription_ouverte !== 0 || !evt.organisateur_externe_nom) return '';
-  const logo = evt.organisateur_externe_logo_url
-    ? `<img src="${esc(evt.organisateur_externe_logo_url)}" alt="" style="width:16px;height:16px;border-radius:50%;object-fit:cover;vertical-align:-3px;margin-right:4px;">` : '';
-  return `<span class="evt-tag" title="Événement relayé pour le compte de cet organisateur">${logo}${esc(evt.organisateur_externe_nom)}</span>`;
+  const avatar = evt.organisateur_externe_logo_url
+    ? `<img src="${esc(evt.organisateur_externe_logo_url)}" alt="">`
+    : `<span class="ini">${organisateurExterneInitiale(evt)}</span>`;
+  return `<div class="organisateur-chip" title="Organisé par ${esc(evt.organisateur_externe_nom)}">${avatar}<span>${esc(evt.organisateur_externe_nom)}</span></div>`;
+}
+function organisateurExterneBandeau(evt) {
+  if (evt.inscription_ouverte !== 0 || !evt.organisateur_externe_nom) return '';
+  const avatar = evt.organisateur_externe_logo_url
+    ? `<img src="${esc(evt.organisateur_externe_logo_url)}" alt="" style="width:30px;height:30px;border-radius:50%;object-fit:cover;flex-shrink:0;">`
+    : `<span style="width:30px;height:30px;border-radius:50%;background:#0D2B4E;color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0;">${organisateurExterneInitiale(evt)}</span>`;
+  return `<div style="display:flex;align-items:center;gap:9px;margin:2px 0 12px;padding:8px 11px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;">${avatar}<div style="font-size:12.5px;line-height:1.35;"><span style="color:var(--muted);">Événement relayé pour le compte de</span><br><strong style="font-size:13.5px;">${esc(evt.organisateur_externe_nom)}</strong></div></div>`;
 }
 
 // Ouverture programmée des inscriptions (2026-09-25, demande explicite) — partagé entre la vue
@@ -2062,6 +2118,7 @@ function flashOuvrir() {
   document.getElementById('fl-lien-info').value = '';
   progSet('fl-prog-list', []);
   document.getElementById('fl-insc-rapide').checked = false;
+  document.getElementById('fl-radio-gratuit').checked = true;
   document.getElementById('fl-organisateur').value = '';
   document.getElementById('fl-texte').value = '';
   document.getElementById('fl-compteur').textContent = '0/500';
@@ -2126,6 +2183,7 @@ function flashLireChamps() {
     public_concerne: document.getElementById('fl-public').value.trim() || null,
     lien_plus_info: document.getElementById('fl-lien-info').value.trim() || null,
     organisateur_externe_nom: document.getElementById('fl-organisateur').value.trim() || null,
+    type_participation: document.querySelector('input[name="fl-gratuit-payant"]:checked')?.value || 'gratuit',
     programme: progLire('fl-prog-list'),
     insc_rapide: document.getElementById('fl-insc-rapide').checked,
     description: document.getElementById('fl-texte').value.trim(),
@@ -2157,6 +2215,7 @@ function flashVoirRecap() {
     ${c.origine ? `<div><strong>Origine :</strong> ${esc(c.origine)}</div>` : ''}
     ${c.public_concerne ? `<div><strong>Public concerné :</strong> ${esc(c.public_concerne)}</div>` : ''}
     ${c.lien_plus_info ? `<div><strong>Lien d'information :</strong> ${esc(c.lien_plus_info)}</div>` : ''}
+    <div><strong>Type de participation :</strong> ${c.type_participation === 'payant' ? '🔴 Payant' : '🟢 Gratuit'}</div>
     ${c.organisateur_externe_nom ? `<div style="display:flex;align-items:center;gap:6px;">${flashLogo ? `<img src="${flashLogo}" style="width:22px;height:22px;border-radius:50%;object-fit:cover;">` : ''}<strong>Organisateur :</strong> ${esc(c.organisateur_externe_nom)}</div>` : ''}
     <div style="margin-top:8px;"><strong>Description :</strong><br>${esc(c.description)}</div>
     <div style="margin-top:8px;color:#8B12D6;font-weight:600;">${visMsg}</div>
@@ -2191,6 +2250,7 @@ async function flashPublier() {
       galerie_photos: flashPhoto2 ? [flashPhoto2] : [],
       organisateur_externe_nom: c.organisateur_externe_nom,
       organisateur_externe_logo_url: flashLogo || null,
+      type_participation: c.type_participation,
       lien_plus_info: c.lien_plus_info,
       programme: c.programme,
       inscription_rapide_active: c.insc_rapide,
@@ -2988,6 +3048,7 @@ function renderEventDetail(evt, isPreview) {
         </div>
         ${!isPreview ? `<button onclick="document.getElementById('modal-detail-bg').classList.remove('open')" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);flex-shrink:0;">×</button>` : ''}
       </div>
+      ${organisateurExterneBandeau(evt)}
       <div class="evt-detail-meta">
         ${evt.date_evt ? `<span>📅 ${fmtDate(evt.date_evt)}${evt.heure_debut ? ' · '+evt.heure_debut : ''}</span>` : ''}
         ${evt.lieu ? `<span>📍 ${esc(evt.lieu)}</span>` : ''}
@@ -2998,7 +3059,6 @@ function renderEventDetail(evt, isPreview) {
         ${evt.origine ? `<span class="evt-tag">🎯 ${[evt.origine,evt.origine2].filter(Boolean).map(esc).join(' · ')}</span>` : ''}
         ${badgeParticipation(evt)}
         ${badgeFlash(evt)}
-        ${organisateurExterneHtml(evt)}
       </div>
       ${evt.lieu ? `<div style="display:flex;align-items:flex-start;gap:9px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:10px 12px;margin-bottom:12px;">
         <span style="font-size:16px;flex-shrink:0;line-height:1.3;">📍</span>
