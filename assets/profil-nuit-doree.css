@@ -13,9 +13,14 @@ html body.nd :is(.cda-card,.pvz-card,.pvz-hero,.init-section,.side-card,.pc-card
 html body.nd :is(.cda-card,.pvz-hero){background:linear-gradient(160deg,rgba(23,37,77,.85),rgba(10,16,36,.9))!important;border-color:var(--nd-bord)!important}
 /* petites cartouches */
 html body.nd :is(.cda-statut-chip,.cda-tag,.pvz-chip,.pvz-btn,.pvz-segmented,.pvz-avatar,.pvz-verified,.pvz-link-ico,.psug-av,.psug-follow,.pqr-url,
-  .ts-badge-trust,.ts-badge-verified,.equipe-avatar,.init-card-header,.init-profile-logo,.side-tag,.strip-icon,.tag,.type-badge,
+  .ts-badge-trust,.ts-badge-verified,.equipe-avatar,.init-profile-logo,.side-tag,.strip-icon,.tag,.type-badge,
   .evt-badge-statut,.evt-tag,.pc-doc-icon,.pc-evt-date,.pc-ia-suggestion,.pc-stat-icon,.banner-btn,.posts-btn-secondary,.posts-media-btn,.pp-join-btn,.pqr-btn){
   background:var(--nd-verre)!important;background-image:none!important;border:1px solid var(--nd-bord)!important;color:var(--nd-texte)!important}
+/* .init-card-header est épinglé (position:sticky) au-dessus du fil qui défile dans la colonne
+   centrale (voir initiative.html) : le fond "verre" quasi transparent (4,5 %) des petites
+   cartouches ci-dessus le laissait voir par transparence, texte du fil et bandeau superposés,
+   illisibles (signalé 2026-11-04). Fond presque opaque + flou, comme .topbar qui a le même rôle. */
+html body.nd .init-card-header{background:rgba(8,13,30,.94)!important;background-image:none!important;border:1px solid var(--nd-bord2)!important;backdrop-filter:blur(16px) saturate(140%);color:var(--nd-texte)!important}
 html body.nd :is(.cda-statut-chip,.cda-tag,.pvz-chip,.side-tag,.tag,.type-badge,.evt-tag){border-radius:999px}
 html body.nd .cda-statut-chip[style*="background"]{background-image:none}   /* le statut actif garde sa couleur posée en ligne */
 /* Le statut professionnel CHOISI doit se voir : la règle des petites cartouches ci-dessus (!important) écrasait la couleur posée en ligne, tous les statuts paraissaient donc non renseignés (2026-10-12) */
