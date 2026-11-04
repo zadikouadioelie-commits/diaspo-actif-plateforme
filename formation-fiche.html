@@ -45,6 +45,10 @@
 @media(max-width:860px){.ff-grid{grid-template-columns:1fr;}}
 .ff-card{background:#14213f;border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:16px 18px;margin-bottom:16px;}
 .ff-card h2{margin:0 0 10px;font-size:16px;color:#e6b84a;}
+/* Titres des cartes bien distincts du texte (2026-11-04) : or, police d'affichage, filet doré dessous. Le thème Nuit dorée force les h2 en blanc : on reprend la main ici. */
+html body.nd .ff-card.ff-card > h2{font-family:var(--nd-display,Georgia,serif)!important;font-weight:600!important;font-size:22px;line-height:1.25;letter-spacing:.005em;color:#f4d98a!important;margin:0 0 14px;padding:0 0 10px;border-bottom:1px solid rgba(230,184,74,.38);display:flex;align-items:center;gap:10px;}
+html body.nd .ff-card.ff-card > h2::before{content:"";flex:none;width:9px;height:9px;transform:rotate(45deg);background:linear-gradient(135deg,#f4d98a,#e6b84a);border-radius:1px;}
+html body.nd .ff-card h3{font-family:var(--nd-display,Georgia,serif)!important;font-weight:600!important;font-size:18px;color:#f4d98a!important;margin:18px 0 8px;}
 .ff-card p,.ff-card li,.ff-card div{color:#e6ecfa;}
 .ff-card ul{margin:0;padding-left:20px;}
 .ff-video{position:relative;padding-top:56.25%;border-radius:12px;overflow:hidden;background:#000;}
@@ -52,7 +56,7 @@
 .ff-mod{display:flex;gap:10px;align-items:flex-start;justify-content:space-between;padding:12px 0;border-top:1px solid rgba(255,255,255,.08);flex-wrap:wrap;}
 .ff-mod:first-of-type{border-top:0;}
 .ff-mod-t{flex:1;min-width:200px;}
-.ff-mod-t strong{color:#fff;}
+.ff-mod-t strong{color:#fff;font-size:15.5px;font-weight:800;}
 .ff-mod-s{font-size:12.5px;color:#9fb0d4;margin-top:2px;}
 .ff-mod-acces{font-size:12px;font-weight:800;padding:3px 10px;border-radius:99px;background:rgba(34,197,94,.15);color:#86efac;border:1px solid rgba(34,197,94,.4);white-space:nowrap;}
 .ff-offre{min-width:0;}
