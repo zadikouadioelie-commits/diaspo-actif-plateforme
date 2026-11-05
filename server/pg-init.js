@@ -1275,6 +1275,9 @@ const COLONNES_MIGRATION = [
     ['adhesion_formules', 'est_officielle', 'INTEGER DEFAULT 0'],
     ['adhesion_formules', 'est_gratuite_auto', 'INTEGER DEFAULT 0'],
     ['adhesion_membres', 'reponses_json', "TEXT DEFAULT '{}'"],
+    // Dossier des adhérents (2026-11-05) : date de naissance + statut de la carte de membre (miroir de db.js)
+    ['adhesion_membres', 'date_naissance', 'TEXT'],
+    ['adhesion_membres', 'statut_carte', "TEXT DEFAULT 'non_creee'"],
     // Module Adhésions — incrément 6 (2026-08-07) : sync avec le module Affiliations (miroir des ALTER db.js)
     ['initiative_membres', 'formule_id', 'INTEGER'],
     ['initiative_membres', 'mode_adhesion', 'TEXT'],

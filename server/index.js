@@ -6272,6 +6272,21 @@ function calculerDateExpirationAdhesion(formule, months) {
 function calculerDateExpirationFiche(dateAdhesion, p) {
   const depart = dateAdhesion ? new Date(dateAdhesion) : new Date();
   if (p?.mode_validite === 'collectif' && p.periode_collective_fin) {
+    /* Calendrier fixe (année scolaire, année civile…) : l'échéance est la fin de la période QUI CONTIENT
+       la date d'adhésion. Pour une adhésion antérieure à la période en cours (liste de membres déjà
+       inscrits), la période est reculée d'autant d'années entières que nécessaire : un membre entré en
+       octobre 2025 dans un calendrier 01/09→31/08 expire le 31/08/2026, pas le 31/08/2027. */
+    let fin = new Date(`${String(p.periode_collective_fin).slice(0, 10)}T23:59:59`);
+    if (dateAdhesion && !isNaN(fin)) {
+      let garde = 0;
+      while (garde++ < 60) {
+        const precedente = new Date(fin); precedente.setFullYear(precedente.getFullYear() - 1);
+        const debutPeriode = new Date(precedente); debutPeriode.setDate(debutPeriode.getDate() + 1); debutPeriode.setHours(0, 0, 0, 0);
+        if (depart < debutPeriode) fin = precedente; else break;
+      }
+      const j = d => String(d).padStart(2, '0');
+      return `${fin.getFullYear()}-${j(fin.getMonth() + 1)}-${j(fin.getDate())} 23:59:59`;
+    }
     return `${p.periode_collective_fin} 23:59:59`.slice(0, 19);
   }
   if (p?.duree_illimitee) return null;
@@ -7465,6 +7480,7 @@ async function chargerEtFiltrerAdhesionMembres(initiativeId, query) {
   rows = rows.map(m => ({ ...m, statut: computeAdhesionStatut(m), badges_json: JSON.parse(m.badges_json || '[]') }));
   const statutFiltre = query?.statut;
   const formuleFiltre = query?.formule_id;
+  if (query?.statut_carte) rows = rows.filter(m => (m.statut_carte || 'non_creee') === query.statut_carte);
   if (statutFiltre) rows = rows.filter(m => m.statut === statutFiltre);
   if (formuleFiltre) rows = rows.filter(m => Number(m.formule_id) === Number(formuleFiltre));
   /* Filtres combinables supplémentaires (cahier des charges 2026-08-04, points 9-10) : origine
@@ -7481,6 +7497,7 @@ async function chargerEtFiltrerAdhesionMembres(initiativeId, query) {
     rows = rows.filter(m =>
       (m.nom || '').toLowerCase().includes(q) || (m.prenom || '').toLowerCase().includes(q) ||
       (m.email || '').toLowerCase().includes(q) || (m.telephone || '').toLowerCase().includes(q) ||
+      (m.ville || '').toLowerCase().includes(q) ||
       `adh-${initiativeId}-${m.id}`.toLowerCase().includes(q));
   }
   return rows;
@@ -7548,6 +7565,11 @@ route("POST", "/api/initiatives/:id/adhesion-membres", async (req, res, params, 
     date_adhesion, mode_validite, duree_valeur, duree_unite, duree_illimitee,
     periode_collective_debut, periode_collective_fin, relances_jours, relances_canal } = body;
   if (!nom?.trim()) return sendJSON(res, 400, { error: "Nom requis." });
+  /* Dossier des adhérents (2026-11-05) : date de naissance et statut de la carte de membre. */
+  const naissanceVal = adhImportNormaliserDate(body.date_naissance, { naissance: true });
+  if (naissanceVal === null) return sendJSON(res, 400, { error: "Date de naissance illisible (format JJ/MM/AAAA)." });
+  const carteVal = adhNormaliserStatutCarte(body.statut_carte);
+  if (carteVal === null) return sendJSON(res, 400, { error: "Statut de carte invalide (non créée, créée ou livrée)." });
   const formule = await db.prepare("SELECT * FROM adhesion_formules WHERE id=? AND initiative_id=?").get(formule_id, params.id);
   if (!formule) return sendJSON(res, 400, { error: "Formule invalide." });
   /* Rattachement à un compte Diaspo'Actif existant (cahier des charges 2026-08-04, point 8) —
@@ -7568,11 +7590,14 @@ route("POST", "/api/initiatives/:id/adhesion-membres", async (req, res, params, 
      posteriori) — son statut passe directement à 'a_jour' plutôt que de rester en attente. */
   let dateAdhesionVal = null, dateExpirationVal = null, statutInitial = 'en_attente';
   if (date_adhesion) {
-    const d = new Date(date_adhesion);
+    /* Une date « AAAA-MM-JJ » est fixée à midi : à minuit, le fuseau horaire du serveur faisait reculer
+       l'échéance d'un jour (adhésion du 10/02 → échéance au 09/02 de l'année suivante au lieu du 10/02). */
+    const d = new Date(/^\d{4}-\d{2}-\d{2}$/.test(String(date_adhesion)) ? `${date_adhesion}T12:00:00Z` : date_adhesion);
     if (!isNaN(d)) {
       dateAdhesionVal = d.toISOString().slice(0, 19).replace('T', ' ');
       dateExpirationVal = calculerDateExpirationFiche(dateAdhesionVal, {
         mode_validite: mode_validite === 'collectif' ? 'collectif' : 'individuel',
+        periode_collective_debut: periode_collective_debut || null,
         periode_collective_fin: periode_collective_fin || null,
         duree_illimitee: !!duree_illimitee,
         duree_valeur: duree_valeur ? Number(duree_valeur) : null,
@@ -7590,11 +7615,11 @@ route("POST", "/api/initiatives/:id/adhesion-membres", async (req, res, params, 
     if (sanitized) { relancesJoursVal = JSON.stringify(sanitized.jours); relancesCanalVal = sanitized.canal; }
   }
   const id = (await db.prepare(`
-    INSERT INTO adhesion_membres (formule_id, initiative_id, linked_user_id, nom, prenom, email, telephone, adresse, pays, ville, observations, statut, date_adhesion, date_expiration, relances_jours_json, relances_canal)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    INSERT INTO adhesion_membres (formule_id, initiative_id, linked_user_id, nom, prenom, email, telephone, adresse, pays, ville, observations, statut, date_adhesion, date_expiration, relances_jours_json, relances_canal, date_naissance, statut_carte)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
   `).run(formule_id, params.id, linkedId, nom.trim(), prenom || null, email || null, telephone || null,
     adresse || null, pays || null, ville || null, observations || null, statutInitial,
-    dateAdhesionVal, dateExpirationVal, relancesJoursVal, relancesCanalVal)).lastInsertRowid;
+    dateAdhesionVal, dateExpirationVal, relancesJoursVal, relancesCanalVal, naissanceVal || null, carteVal)).lastInsertRowid;
   journaliserAdhesion(params.id, id, 'creation', user, `Fiche créée manuellement par l'association — « ${formule.nom} ».`);
   /* Norme des prochains ajouts manuels (2026-10-09, demande explicite) : posée une seule fois,
      la première fois qu'un ajout manuel précise ces réglages — jamais réécrite ensuite, même si
@@ -7623,17 +7648,37 @@ route("POST", "/api/initiatives/:id/adhesion-membres", async (req, res, params, 
 const ADH_IMPORT_MAX = 500;
 const ADH_IMPORT_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
-/* Date de fichier → 'AAAA-MM-JJ' ('' si vide, null si illisible). Accepte AAAA-MM-JJ, JJ/MM/AAAA, JJ-MM-AAAA, JJ.MM.AAAA (année sur 2 chiffres = 20AA). */
-function adhImportNormaliserDate(v) {
+/* Statut de la carte de membre physique : non_creee | creee | livree. Accepte les libellés usuels
+   d'un fichier (« carte créée », « livrée », « non créée », « pas encore », « remise »…). '' → valeur par défaut
+   « non_creee » ; null → libellé non reconnu. */
+const ADH_STATUTS_CARTE = ['non_creee', 'creee', 'livree'];
+function adhNormaliserStatutCarte(v) {
+  const s = String(v == null ? '' : v).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+  if (!s) return 'non_creee';
+  if (ADH_STATUTS_CARTE.includes(s)) return s;
+  if (/(non|pas|aucune?)\s*(encore\s*)?(cree|concu|faite|fabriq|imprim|realis)|a\s*creer|a\s*faire|en\s*attente|^non$|^no$/.test(s)) return 'non_creee';
+  if (/(non|pas)\s*(encore\s*)?(livr|remis|envoy|expedi)/.test(s)) return 'creee';
+  if (/livr|remis|envoy|expedi|recu|distribu/.test(s)) return 'livree';
+  if (/cre|concu|fait|fabriq|imprim|realis|pret|oui|^ok$/.test(s)) return 'creee';
+  return null;
+}
+
+/* Date de fichier → 'AAAA-MM-JJ' ('' si vide, null si illisible). Accepte AAAA-MM-JJ, JJ/MM/AAAA, JJ-MM-AAAA, JJ.MM.AAAA (année sur 2 chiffres = 20AA ;
+   pour une date de naissance, 2 chiffres = 19AA sauf si cela donne une date future). */
+function adhImportNormaliserDate(v, opts) {
   const s = String(v == null ? '' : v).trim();
   if (!s) return '';
   let a, m, j, r;
   if ((r = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/))) { a = +r[1]; m = +r[2]; j = +r[3]; }
-  else if ((r = s.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4}|\d{2})/))) { j = +r[1]; m = +r[2]; a = +r[3]; if (a < 100) a += 2000; }
+  else if ((r = s.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4}|\d{2})/))) {
+    j = +r[1]; m = +r[2]; a = +r[3];
+    if (a < 100) { a += 2000; if (opts?.naissance && a > new Date().getFullYear()) a -= 100; }
+  }
   else return null;
   const d = new Date(Date.UTC(a, m - 1, j));
   if (d.getUTCFullYear() !== a || d.getUTCMonth() !== m - 1 || d.getUTCDate() !== j) return null;
-  if (a < 1950 || d > new Date(Date.now() + 366 * 86400000)) return null;
+  if (opts?.naissance) { if (a < 1900 || d > new Date()) return null; }
+  else if (a < 1950 || d > new Date(Date.now() + 366 * 86400000)) return null;
   return `${String(a).padStart(4, '0')}-${String(m).padStart(2, '0')}-${String(j).padStart(2, '0')}`;
 }
 
@@ -7706,12 +7751,18 @@ route("POST", "/api/initiatives/:id/adhesion-import", async (req, res, params, b
   const res_ = lignes.map((l, i) => {
     const r = { ligne: Number(l?.ligne) || i + 1, nom: net(l?.nom, 120), prenom: net(l?.prenom, 120), email: net(l?.email, 200).toLowerCase(),
       telephone: net(l?.telephone, 40), adresse: net(l?.adresse, 300), pays: net(l?.pays, 100), ville: net(l?.ville, 100), observations: net(l?.observations, 500),
-      statut: 'ok', motif: '', date: '' };
+      statut: 'ok', motif: '', date: '', naissance: '', carte: 'non_creee' };
     if (!r.nom) { r.statut = 'erreur'; r.motif = 'Nom manquant'; return r; }
     if (r.email && !ADH_IMPORT_EMAIL_RE.test(r.email)) { r.statut = 'erreur'; r.motif = 'E-mail invalide'; return r; }
     const d = adhImportNormaliserDate(l?.date_adhesion);
     if (d === null) { r.statut = 'erreur'; r.motif = "Date d'adhésion illisible"; return r; }
     r.date = d;
+    const nais = adhImportNormaliserDate(l?.date_naissance, { naissance: true });
+    if (nais === null) { r.statut = 'erreur'; r.motif = 'Date de naissance illisible'; return r; }
+    r.naissance = nais;
+    const carte = adhNormaliserStatutCarte(l?.statut_carte);
+    if (carte === null) { r.statut = 'erreur'; r.motif = 'Statut de carte non reconnu (créée, livrée, non créée)'; return r; }
+    r.carte = carte;
     r.cle = r.email || `${r.nom.toLowerCase()}|${r.prenom.toLowerCase()}`;
     if (vus.has(r.cle)) { r.statut = 'doublon_fichier'; r.motif = 'Déjà présent plus haut dans le fichier'; return r; }
     vus.add(r.cle);
@@ -7742,6 +7793,7 @@ route("POST", "/api/initiatives/:id/adhesion-import", async (req, res, params, b
       r.date_effective = `${d} 12:00:00`; // midi : évite qu'un décalage de fuseau fasse reculer l'échéance d'un jour
       r.date_expiration = calculerDateExpirationFiche(r.date_effective, {
         mode_validite: formule.mode_validite === 'collectif' ? 'collectif' : 'individuel',
+        periode_collective_debut: formule.periode_collective_debut || null,
         periode_collective_fin: formule.periode_collective_fin || null,
         duree_illimitee: !!Number(formule.duree_illimitee),
         duree_valeur: formule.duree_valeur ? Number(formule.duree_valeur) : null,
@@ -7758,10 +7810,11 @@ route("POST", "/api/initiatives/:id/adhesion-import", async (req, res, params, b
       await Promise.all(aImporter.slice(i, i + 10).map(async r => {
         try {
           const id = (await db.prepare(`
-            INSERT INTO adhesion_membres (formule_id, initiative_id, linked_user_id, nom, prenom, email, telephone, adresse, pays, ville, observations, statut, date_adhesion, date_expiration)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            INSERT INTO adhesion_membres (formule_id, initiative_id, linked_user_id, nom, prenom, email, telephone, adresse, pays, ville, observations, statut, date_adhesion, date_expiration, date_naissance, statut_carte)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
           `).run(formule.id, params.id, r.linked_user_id || null, r.nom, r.prenom || null, r.email || null, r.telephone || null,
-            r.adresse || null, r.pays || null, r.ville || null, r.observations || null, r.statut_prevu, r.date_effective, r.date_expiration)).lastInsertRowid;
+            r.adresse || null, r.pays || null, r.ville || null, r.observations || null, r.statut_prevu, r.date_effective, r.date_expiration,
+            r.naissance || null, r.carte)).lastInsertRowid;
           r.membre_id = id;
           await journaliserAdhesion(params.id, id, 'creation', user, `Fiche créée par import de liste — « ${formule.nom} ».`);
         } catch (e) { r.statut = 'erreur'; r.motif = "Enregistrement impossible"; console.error('[adhesion-import]', e.message); }
@@ -7776,7 +7829,7 @@ route("POST", "/api/initiatives/:id/adhesion-import", async (req, res, params, b
     total: res_.length, a_importer: simuler ? aImporter.length : res_.filter(r => r.membre_id).length,
     rattaches: res_.filter(r => r.linked_user_id && (simuler || r.membre_id)).length,
     deja_membres: compte('deja_membre'), doublons: compte('doublon_fichier'), erreurs: compte('erreur'),
-    lignes: res_.map(r => ({ ligne: r.ligne, statut: r.statut, motif: r.motif, nom: r.nom, prenom: r.prenom, email: r.email, statut_prevu: r.statut_prevu || null, expiration: r.date_expiration ? r.date_expiration.slice(0, 10) : null })),
+    lignes: res_.map(r => ({ ligne: r.ligne, statut: r.statut, motif: r.motif, nom: r.nom, prenom: r.prenom, email: r.email, carte: r.carte, statut_prevu: r.statut_prevu || null, expiration: r.date_expiration ? r.date_expiration.slice(0, 10) : null })),
   });
 });
 
@@ -7802,6 +7855,19 @@ route("PUT", "/api/adhesion-membres/:id", async (req, res, params, body) => {
   if (Number(m.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
   if (!(await exigerPremium(user, res, "adhesions"))) return;
   const { nom, prenom, email, telephone, adresse, pays, ville, observations, statut, formule_id } = body;
+  /* Dossier des adhérents (2026-11-05) : absent du corps = inchangé ; '' = effacé (date de naissance). */
+  let naissanceMaj = m.date_naissance || null;
+  if (body.date_naissance !== undefined) {
+    const n = adhImportNormaliserDate(body.date_naissance, { naissance: true });
+    if (n === null) return sendJSON(res, 400, { error: "Date de naissance illisible (format JJ/MM/AAAA)." });
+    naissanceMaj = n || null;
+  }
+  let carteMaj = m.statut_carte || 'non_creee';
+  if (body.statut_carte !== undefined) {
+    const c = adhNormaliserStatutCarte(body.statut_carte);
+    if (c === null) return sendJSON(res, 400, { error: "Statut de carte invalide (non créée, créée ou livrée)." });
+    carteMaj = c;
+  }
   /* Changement de catégorie (tâche #70) : la nouvelle formule doit appartenir à la même
      initiative — sinon on ignore silencieusement plutôt que de rattacher un adhérent à
      la formule d'une autre association. */
@@ -7811,11 +7877,15 @@ route("PUT", "/api/adhesion-membres/:id", async (req, res, params, body) => {
   }
   await db.prepare(`UPDATE adhesion_membres SET
       nom=COALESCE(?,nom), prenom=?, email=?, telephone=?, adresse=?, pays=?, ville=?, observations=?,
-      statut=COALESCE(?,statut), formule_id=COALESCE(?,formule_id), updated_at=datetime('now')
+      statut=COALESCE(?,statut), formule_id=COALESCE(?,formule_id), date_naissance=?, statut_carte=?, updated_at=datetime('now')
     WHERE id=?`)
     .run(nom || null, prenom ?? m.prenom, email ?? m.email, telephone ?? m.telephone,
       adresse ?? m.adresse, pays ?? m.pays, ville ?? m.ville, observations ?? m.observations,
-      statut || null, nouvelleFormule?.id || null, params.id);
+      statut || null, nouvelleFormule?.id || null, naissanceMaj, carteMaj, params.id);
+  if (carteMaj !== (m.statut_carte || 'non_creee')) {
+    const LIB = { non_creee: 'carte non créée', creee: 'carte créée', livree: 'carte livrée' };
+    journaliserAdhesion(m.initiative_id, m.id, 'modification', user, `Carte de membre : ${LIB[m.statut_carte || 'non_creee']} → ${LIB[carteMaj]}.`);
+  }
   if (statut && statut !== m.statut) {
     const action = statut === 'suspendu' ? 'suspension' : statut === 'radie' ? 'radiation' : 'modification';
     journaliserAdhesion(m.initiative_id, m.id, action, user, `Statut changé : ${m.statut} → ${statut}.`);
@@ -8102,11 +8172,14 @@ route("GET", "/api/initiatives/:id/adhesion-export", async (req, res, params, bo
     SELECT m.*, f.nom AS formule_nom FROM adhesion_membres m JOIN adhesion_formules f ON f.id=m.formule_id
     WHERE m.initiative_id=? ORDER BY m.nom
   `).all(params.id);
-  const entetes = ['Nom','Prénom','Email','Téléphone','Formule','Statut','Date adhésion','Date expiration','Montant payé','Mode paiement','N° reçu'];
-  const STATUT_LABELS = { a_jour: 'À jour', non_a_jour: 'Non à jour', en_attente: 'En attente', suspendu: 'Suspendu' };
-  const lignes = rows.map(m => [m.nom, m.prenom || '', m.email || '', m.telephone || '', m.formule_nom,
+  const entetes = ['Nom','Prénom','Date de naissance','Ville','Adresse postale','Email','Téléphone','Statut de la carte','Formule','Statut','Date adhésion','Date expiration','Montant payé','Mode paiement','N° reçu'];
+  const STATUT_LABELS = { a_jour: 'À jour', non_a_jour: 'Non à jour', en_attente: 'En attente', suspendu: 'Suspendu', radie: 'Radié' };
+  const CARTE_LABELS = { non_creee: 'Carte non créée', creee: 'Carte créée', livree: 'Carte livrée' };
+  const fr = d => d ? String(d).slice(0,10).split('-').reverse().join('/') : '';
+  const lignes = rows.map(m => [m.nom, m.prenom || '', fr(m.date_naissance), m.ville || '', m.adresse || '', m.email || '', m.telephone || '',
+    CARTE_LABELS[m.statut_carte || 'non_creee'] || '', m.formule_nom,
     STATUT_LABELS[computeAdhesionStatut(m)] || computeAdhesionStatut(m),
-    m.date_adhesion ? m.date_adhesion.slice(0,10) : '', m.date_expiration ? m.date_expiration.slice(0,10) : '',
+    fr(m.date_adhesion), fr(m.date_expiration),
     m.montant_paye ?? '', m.mode_paiement || '', m.numero_recu || '']);
 
   const format = ['excel', 'pdf'].includes(query?.format) ? query.format : 'csv';
@@ -34092,7 +34165,9 @@ async function handleRequest(req, res) {
         const { texte: texteRelance, html: htmlRelance } = composerRelanceAdhesion({ message, prenom: m.prenom, lienRenouvellement, autresLiens: liensParInit[m.initiative_id], modeleContientLien: !!(m.modele_relance && /\{lien\}/.test(m.modele_relance)) });
         /* Canal choisi pour la formule : notification Diaspo'Actif (réservée aux adhérents ayant un compte), e-mail, ou les deux. Le journal
            adhesion_relances garde une ligne par canal réellement utilisé — c'est aussi lui qui évite le doublon d'un même rappel. */
-        const veutNotif = canalRappel !== 'email', veutMail = canalRappel !== 'notification';
+        /* Règle du 2026-11-05 (demande explicite) : le rappel part TOUJOURS par e-mail ; un adhérent qui a un compte
+           Diaspo'Actif reçoit EN PLUS la notification (sauf si l'association a explicitement choisi « e-mail seul »). */
+        const veutNotif = canalRappel !== 'email', veutMail = true;
         let envoye = false;
         if (veutNotif && m.linked_user_id) {
           await db.prepare(`INSERT INTO adhesion_relances (membre_id, niveau, canal, message) VALUES (?,?,?,?)`)

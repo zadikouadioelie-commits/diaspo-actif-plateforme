@@ -2560,6 +2560,10 @@ const MIGRATIONS = [
   // sur l'ordre des migrations) ; déplacé ici pour repasser par appliquerMigrations(), déjà
   // appelée une seconde fois après la création de cette table (voir plus bas).
   ["adhesion_membres", "reponses_json TEXT DEFAULT '{}'"],
+  // Dossier des adhérents (2026-11-05, demande explicite) : date de naissance + statut de la carte
+  // de membre physique (non_creee | creee | livree). Miroir dans pg-init.js (COLONNES_MIGRATION).
+  ["adhesion_membres", "date_naissance TEXT"],
+  ["adhesion_membres", "statut_carte TEXT DEFAULT 'non_creee'"],
   // Module Paramètres du compte — taxonomie "domaine d'activité" unifiée (2026-09-04) :
   // un domaine (liste fermée avec icône, assets/domaines-activite.js) + jusqu'à 2 sous-domaines
   // en texte libre, partagée entre comptes individuels (users) et initiatives, remplaçant à
@@ -10028,11 +10032,22 @@ db.exec(`
       reponses_json       TEXT DEFAULT '{}',
       created_at          TEXT DEFAULT (datetime('now')),
       updated_at          TEXT DEFAULT (datetime('now')),
+      relances_jours_json TEXT,
+      relances_canal      TEXT,
+      date_naissance      TEXT,
+      statut_carte        TEXT DEFAULT 'non_creee',
       FOREIGN KEY(formule_id) REFERENCES adhesion_formules(id) ON DELETE CASCADE,
       FOREIGN KEY(initiative_id) REFERENCES initiatives(id) ON DELETE CASCADE,
       FOREIGN KEY(linked_user_id) REFERENCES users(id) ON DELETE SET NULL
     );
-    INSERT INTO adhesion_membres_new SELECT id,formule_id,initiative_id,linked_user_id,nom,prenom,email,telephone,photo_url,adresse,pays,ville,observations,statut,date_adhesion,date_expiration,montant_paye,mode_paiement,numero_recu,stripe_customer_id,stripe_subscription_id,badges_json,reponses_json,created_at,updated_at FROM adhesion_membres;
+  `);
+  /* Copie de TOUTES les colonnes communes (l'ancienne liste figée faisait perdre, sur une base neuve,
+     relances_jours_json / relances_canal ajoutées plus haut par ALTER, puis les nouvelles colonnes). */
+  const ancCols = db.prepare('PRAGMA table_info(adhesion_membres)').all().map(c => c.name);
+  const nvCols = db.prepare('PRAGMA table_info(adhesion_membres_new)').all().map(c => c.name);
+  const communes = nvCols.filter(c => ancCols.includes(c)).join(',');
+  db.exec(`
+    INSERT INTO adhesion_membres_new (${communes}) SELECT ${communes} FROM adhesion_membres;
     DROP TABLE adhesion_membres;
     ALTER TABLE adhesion_membres_new RENAME TO adhesion_membres;
   `);

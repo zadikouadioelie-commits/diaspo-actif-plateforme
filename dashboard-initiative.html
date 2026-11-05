@@ -1789,7 +1789,7 @@ async function initRelaisDiasporaWidget(me, api) {
         <h3 style="margin:0 0 14px;">➕ Ajouter un adhérent</h3>
         <button type="button" class="btn btn-sm btn-outline" style="width:100%;margin:-4px 0 14px;" onclick="document.getElementById('modal-adh-membre').style.display='none';adhImpOuvrir()">📥 Importer toute une liste (Excel, CSV, Google Sheets)</button>
         <label style="font-size:12px;font-weight:700;">Formule</label>
-        <select id="adh-m-formule" class="input" style="margin:4px 0 10px;width:100%;"></select>
+        <select id="adh-m-formule" class="input" style="margin:4px 0 10px;width:100%;" onchange="adhMAppliquerFormule()"></select>
 
         <label style="font-size:12px;font-weight:700;">🔎 Rattacher à un compte Diaspo'Actif existant <span style="font-weight:400;color:var(--muted);">(facultatif)</span></label>
         <input type="text" id="adh-m-recherche-user" class="input" placeholder="Rechercher par nom, prénom ou ville…" style="margin:4px 0 6px;width:100%;" oninput="adhRechercherUser(this.value)">
@@ -1803,10 +1803,13 @@ async function initRelaisDiasporaWidget(me, api) {
         <input type="text" id="adh-m-nom" class="input" style="margin:4px 0 10px;width:100%;">
         <label style="font-size:12px;font-weight:700;">Prénom</label>
         <input type="text" id="adh-m-prenom" class="input" style="margin:4px 0 10px;width:100%;">
+        <label style="font-size:12px;font-weight:700;">Date de naissance <span style="font-weight:400;color:var(--muted);">(facultatif)</span></label>
+        <input type="date" id="adh-m-naissance" class="input" max="" style="margin:4px 0 10px;width:100%;">
 
         <label style="font-size:12px;font-weight:700;">Date d'adhésion <span style="font-weight:400;color:var(--muted);">(facultatif)</span></label>
         <p style="font-size:11px;color:var(--muted);margin:2px 0 6px;">Laissez vide pour une fiche en attente de paiement, comme avant. Renseignez-la pour enregistrer une adhésion déjà effective (ex. antidater quelqu'un qui a adhéré avant aujourd'hui) — la fiche passe alors directement « à jour ».</p>
-        <input type="date" id="adh-m-date-adhesion" class="input" style="margin:4px 0 10px;width:100%;">
+        <input type="date" id="adh-m-date-adhesion" class="input" style="margin:4px 0 6px;width:100%;" onchange="adhMMajCalendrier()">
+        <div id="adh-m-calendrier-info" style="font-size:12px;line-height:1.45;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:8px 10px;margin:0 0 10px;"></div>
 
         <details id="adh-m-duree-details" style="margin:4px 0 14px;border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;">
           <summary style="cursor:pointer;font-size:12px;font-weight:700;">⏳ Durée de validité — propre à cette fiche</summary>
@@ -1861,6 +1864,10 @@ async function initRelaisDiasporaWidget(me, api) {
           <div style="flex:1;"><label style="font-size:12px;font-weight:700;">Ville</label>
             <input type="text" id="adh-m-ville" class="input" style="margin:4px 0 10px;width:100%;"></div>
         </div>
+        <label style="font-size:12px;font-weight:700;">Carte de membre</label>
+        <select id="adh-m-carte" class="input" style="margin:4px 0 10px;width:100%;">
+          <option value="non_creee">Carte non créée</option><option value="creee">Carte créée</option><option value="livree">Carte livrée</option>
+        </select>
         <label style="font-size:12px;font-weight:700;">Observations</label>
         <textarea id="adh-m-observations" class="input" style="margin:4px 0 14px;width:100%;min-height:60px;"></textarea>
         <div style="display:flex;gap:8px;justify-content:flex-end;">
@@ -7858,6 +7865,7 @@ function adhMToggleModeValidite() {
   const collectif = document.getElementById('adh-m-mode-validite').value === 'collectif';
   document.getElementById('adh-m-duree-glissante').style.display = collectif ? 'none' : 'flex';
   document.getElementById('adh-m-periode-collective').style.display = collectif ? 'block' : 'none';
+  if (typeof adhMMajCalendrier === 'function') adhMMajCalendrier();
 }
 
 function adhRenderChampsStandard(config){
@@ -8613,15 +8621,22 @@ function adhRenderMembresLignes(liste){
   return liste.map(m => {
     const formule = ADH_FORMULES.find(f=>f.id===m.formule_id);
     let badges = []; try{ badges = JSON.parse(m.badges_json||'[]'); }catch(e){}
+    const carte = m.statut_carte || 'non_creee';
     return `<tr style="border-bottom:1px solid var(--border);">
-      <td style="padding:8px;">${escH(m.prenom||'')} ${escH(m.nom)}</td>
-      <td style="padding:8px;">${m.linked_user_id ? '<span style="color:#16a34a;font-weight:700;white-space:nowrap;">🟢 Diaspo\'Actif</span>' : '<span style="color:var(--muted);white-space:nowrap;">⚪ Externe</span>'}</td>
-      <td style="padding:8px;">${escH(formule?.nom||'')}</td>
+      <td style="padding:8px;"><b>${escH(m.prenom||'')} ${escH(m.nom)}</b>
+        <div style="font-size:11px;color:var(--muted);white-space:nowrap;">${m.linked_user_id ? '<span style="color:#16a34a;font-weight:700;">🟢 Diaspo\'Actif</span>' : '⚪ Externe'} · ${escH(formule?.nom||'')}</div></td>
+      <td style="padding:8px;white-space:nowrap;">${m.date_naissance ? adhFr(m.date_naissance) : '—'}</td>
+      <td style="padding:8px;">${escH(m.ville||'—')}${m.adresse ? `<div style="font-size:11px;color:var(--muted);max-width:200px;">${escH(m.adresse)}</div>` : ''}</td>
+      <td style="padding:8px;font-size:12px;">${m.email ? escH(m.email) : '<span style="color:var(--muted);">—</span>'}${m.telephone ? `<div style="color:var(--muted);white-space:nowrap;">${escH(m.telephone)}</div>` : ''}</td>
+      <td style="padding:8px;white-space:nowrap;">${m.date_adhesion ? adhFr(m.date_adhesion) : '—'}</td>
+      <td style="padding:8px;white-space:nowrap;">${m.date_expiration ? new Date(m.date_expiration).toLocaleDateString('fr-FR') : '—'}</td>
       <td style="padding:8px;">${ADH_STATUT_LABELS[m.statut]||m.statut}</td>
-      <td style="padding:8px;">${m.date_expiration ? new Date(m.date_expiration).toLocaleDateString('fr-FR') : '—'}</td>
+      <td style="padding:8px;"><select class="input" style="font-size:12px;padding:4px 6px;min-width:120px;${carte==='livree'?'color:#16a34a;font-weight:700;':carte==='creee'?'color:#2563eb;font-weight:700;':'color:var(--muted);'}" onchange="adhChangerCarte(${m.id}, this)" aria-label="Statut de la carte de membre">
+        <option value="non_creee" ${carte==='non_creee'?'selected':''}>Non créée</option><option value="creee" ${carte==='creee'?'selected':''}>Créée</option><option value="livree" ${carte==='livree'?'selected':''}>Livrée</option></select></td>
       <td style="padding:8px;">${m.montant_paye ? m.montant_paye+' '+(formule?.devise||'EUR') : '—'}</td>
       <td style="padding:8px;font-size:11px;">${badges.join(', ')||'—'}</td>
       <td style="padding:8px;white-space:nowrap;">
+        <button class="btn btn-sm btn-outline" onclick="adhOuvrirEditionMembre(${m.id})" title="Modifier la fiche (naissance, adresse, carte…)">✏️ Modifier</button>
         ${m.linked_user_id?`<a class="btn btn-sm btn-outline" href="profil.html?id=${m.linked_user_id}" target="_blank">👁 Accéder au profil</a>`:''}
         ${!m.linked_user_id && m.email?`<button class="btn btn-sm btn-outline" onclick="adhInviterMembre(${m.id},this)" title="Envoie un e-mail invitant ce membre à créer son compte Diaspo'Actif — sa fiche lui sera automatiquement proposée au rattachement.">✉️ Inviter</button>`:''}
         ${(m.statut==='en_attente' && formule && (formule.est_gratuite_auto || (formule.montant_type==='fixe' && !(Number(formule.montant_fixe)>0)))) ? `<button class="btn btn-sm" style="background:#16a34a;color:#fff;border:none;" onclick="adhAccepterMembre(${m.id},this)" title="Accepter cette demande d'adhésion">✅ Accepter</button> <button class="btn btn-sm btn-outline" style="color:#b45309;border-color:#b45309;" onclick="adhRefuserMembre(${m.id},this)" title="Refuser cette demande d'adhésion">❌ Refuser</button>` : ''}
@@ -8714,6 +8729,7 @@ async function adhAppliquerFiltresServeur(){
   const initId = window.__vitrineInitId;
   ADH_FILTRES = {
     statut: document.getElementById('adh-filtre-statut')?.value || '',
+    statut_carte: document.getElementById('adh-filtre-carte')?.value || '',
     formule_id: document.getElementById('adh-filtre-formule')?.value || '',
     origine: document.getElementById('adh-filtre-origine')?.value || '',
     paiement: document.getElementById('adh-filtre-paiement')?.value || '',
@@ -8722,11 +8738,68 @@ async function adhAppliquerFiltresServeur(){
   try{
     const r = await api('GET', `/initiatives/${initId}/adhesion-membres${qs?'?'+qs:''}`);
     ADH_MEMBRES = r.membres || [];
+    adhMajResumeCartes();
     const recherche = document.getElementById('adh-registre-recherche')?.value || '';
     adhFiltrerRegistre(recherche);
     const compteur = document.getElementById('adh-emailing-count');
     if (compteur) compteur.textContent = ADH_MEMBRES.filter(m=>m.email).length;
   }catch(e){ showToast('Erreur filtre : '+e.message, 'danger'); }
+}
+
+function adhMajResumeCartes(){
+  const el = document.getElementById('adh-resume-cartes'); if (!el) return;
+  const n = k => ADH_MEMBRES.filter(m => (m.statut_carte || 'non_creee') === k).length;
+  el.innerHTML = `<b>${ADH_MEMBRES.length}</b> adhérent${ADH_MEMBRES.length>1?'s':''} — cartes : <span style="color:var(--muted);">${n('non_creee')} non créée${n('non_creee')>1?'s':''}</span> · <span style="color:#2563eb;">${n('creee')} créée${n('creee')>1?'s':''}</span> · <span style="color:#16a34a;">${n('livree')} livrée${n('livree')>1?'s':''}</span>`;
+}
+async function adhChangerCarte(id, sel){
+  const m = ADH_MEMBRES.find(x => Number(x.id) === Number(id)); const ancien = m?.statut_carte || 'non_creee';
+  sel.disabled = true;
+  try{
+    await api('PUT', `/adhesion-membres/${id}`, { statut_carte: sel.value });
+    if (m) m.statut_carte = sel.value;
+    sel.style.color = sel.value==='livree' ? '#16a34a' : sel.value==='creee' ? '#2563eb' : 'var(--muted)';
+    sel.style.fontWeight = sel.value==='non_creee' ? '400' : '700';
+    adhMajResumeCartes();
+    showToast('Carte mise à jour ✅');
+  }catch(e){ sel.value = ancien; showToast('Erreur : '+e.message, 'danger'); }
+  sel.disabled = false;
+}
+function adhOuvrirEditionMembre(id){
+  const m = ADH_MEMBRES.find(x => Number(x.id) === Number(id)); if (!m) return;
+  document.getElementById('modal-adh-edition')?.remove();
+  const w = document.createElement('div');
+  w.id = 'modal-adh-edition'; w.className = 'modal-back';
+  w.style.cssText = 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:600;align-items:flex-start;justify-content:center;overflow-y:auto;padding:30px 12px;';
+  const champ = (cid, lib, val, type='text') => `<label style="font-size:12px;font-weight:700;">${lib}</label><input type="${type}" id="adh-e-${cid}" class="input" value="${escH(val||'')}" style="margin:4px 0 10px;width:100%;">`;
+  w.innerHTML = `<div class="card" style="max-width:480px;width:100%;padding:20px;">
+    <h3 style="margin:0 0 14px;">✏️ Fiche de ${escH((m.prenom||'')+' '+m.nom)}</h3>
+    <div style="display:flex;gap:10px;"><div style="flex:1;">${champ('nom','Nom',m.nom)}</div><div style="flex:1;">${champ('prenom','Prénom',m.prenom)}</div></div>
+    ${champ('naissance','Date de naissance',m.date_naissance ? String(m.date_naissance).slice(0,10) : '','date')}
+    ${champ('email','E-mail',m.email,'email')}
+    ${champ('telephone','Téléphone',m.telephone)}
+    ${champ('adresse','Adresse postale',m.adresse)}
+    <div style="display:flex;gap:10px;"><div style="flex:1;">${champ('ville','Ville',m.ville)}</div><div style="flex:1;">${champ('pays','Pays',m.pays)}</div></div>
+    <label style="font-size:12px;font-weight:700;">Carte de membre</label>
+    <select id="adh-e-carte" class="input" style="margin:4px 0 14px;width:100%;">
+      <option value="non_creee" ${(m.statut_carte||'non_creee')==='non_creee'?'selected':''}>Carte non créée</option><option value="creee" ${m.statut_carte==='creee'?'selected':''}>Carte créée</option><option value="livree" ${m.statut_carte==='livree'?'selected':''}>Carte livrée</option>
+    </select>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button class="btn btn-outline" onclick="document.getElementById('modal-adh-edition').remove()">Annuler</button>
+      <button class="btn btn-orange" onclick="adhEnregistrerEditionMembre(${m.id})">Enregistrer</button>
+    </div></div>`;
+  document.body.appendChild(w);
+  document.getElementById('adh-e-naissance').max = new Date().toISOString().slice(0,10);
+}
+async function adhEnregistrerEditionMembre(id){
+  const v = k => document.getElementById('adh-e-'+k).value.trim();
+  if(!v('nom')){ showToast('Nom requis.', 'warning'); return; }
+  try{
+    await api('PUT', `/adhesion-membres/${id}`, { nom: v('nom'), prenom: v('prenom') || null, email: v('email') || null, telephone: v('telephone') || null,
+      adresse: v('adresse') || null, ville: v('ville') || null, pays: v('pays') || null, date_naissance: v('naissance'), statut_carte: document.getElementById('adh-e-carte').value });
+    document.getElementById('modal-adh-edition')?.remove();
+    await adhAppliquerFiltresServeur();
+    showToast('Fiche mise à jour ✅');
+  }catch(e){ showToast('Erreur : '+e.message, 'danger'); }
 }
 
 function adhFiltrerRegistre(terme){
@@ -8735,9 +8808,9 @@ function adhFiltrerRegistre(terme){
   const q = (terme||'').trim().toLowerCase();
   const filtres = !q ? ADH_MEMBRES : ADH_MEMBRES.filter(m =>
     (m.nom||'').toLowerCase().includes(q) || (m.prenom||'').toLowerCase().includes(q) ||
-    (m.email||'').toLowerCase().includes(q) || (m.telephone||'').toLowerCase().includes(q) ||
+    (m.email||'').toLowerCase().includes(q) || (m.telephone||'').toLowerCase().includes(q) || (m.ville||'').toLowerCase().includes(q) ||
     `adh-${window.__vitrineInitId}-${m.id}`.toLowerCase().includes(q));
-  tbody.innerHTML = adhRenderMembresLignes(filtres) || `<tr><td colspan="8" style="padding:16px;text-align:center;color:var(--muted);">Aucun résultat.</td></tr>`;
+  tbody.innerHTML = adhRenderMembresLignes(filtres) || `<tr><td colspan="11" style="padding:16px;text-align:center;color:var(--muted);">Aucun résultat.</td></tr>`;
 }
 
 async function adhRenderRegistre(){
@@ -8771,6 +8844,9 @@ async function adhRenderRegistre(){
           <option value="">Tous les statuts</option>
           ${Object.entries(ADH_STATUT_LABELS).map(([k,l])=>`<option value="${k}">${l}</option>`).join('')}
         </select>
+        <select id="adh-filtre-carte" class="input" style="width:auto;font-size:12.5px;" onchange="adhAppliquerFiltresServeur()">
+          <option value="">Toutes les cartes</option><option value="non_creee">Carte non créée</option><option value="creee">Carte créée</option><option value="livree">Carte livrée</option>
+        </select>
         <select id="adh-filtre-formule" class="input" style="width:auto;font-size:12.5px;" onchange="adhAppliquerFiltresServeur()">
           <option value="">Toutes les formules</option>
           ${ADH_FORMULES.map(f=>`<option value="${f.id}">${escH(f.nom)}</option>`).join('')}
@@ -8783,17 +8859,20 @@ async function adhRenderRegistre(){
         </select>
         <button class="btn btn-sm btn-orange" onclick="adhOuvrirEmailing()">✉️ Emailing (<span id="adh-emailing-count">${ADH_MEMBRES.filter(m=>m.email).length}</span>)</button>
       </div>
+      <div id="adh-resume-cartes" style="font-size:12.5px;margin:0 0 10px;"></div>
       <div style="overflow-x:auto;">
       <table style="width:100%;border-collapse:collapse;font-size:13px;">
         <thead><tr style="text-align:left;border-bottom:2px solid var(--border);">
-          <th style="padding:8px;">Nom</th><th style="padding:8px;">Origine</th><th style="padding:8px;">Formule</th><th style="padding:8px;">Statut</th>
-          <th style="padding:8px;">Expiration</th><th style="padding:8px;">Montant</th><th style="padding:8px;">Badges</th><th style="padding:8px;"></th>
+          <th style="padding:8px;">Nom</th><th style="padding:8px;">Naissance</th><th style="padding:8px;">Ville / adresse</th><th style="padding:8px;">E-mail / téléphone</th>
+          <th style="padding:8px;">Adhésion</th><th style="padding:8px;">Échéance</th><th style="padding:8px;">Statut</th><th style="padding:8px;">Carte</th>
+          <th style="padding:8px;">Montant</th><th style="padding:8px;">Badges</th><th style="padding:8px;"></th>
         </tr></thead>
         <tbody id="adh-registre-tbody">
         ${adhRenderMembresLignes(ADH_MEMBRES)}
         </tbody>
       </table>
       </div>`;
+    adhMajResumeCartes();
   }catch(e){ el.innerHTML = `<div class="notice">Erreur : ${e.message}</div>`; }
 }
 
@@ -8802,7 +8881,8 @@ async function adhRenderRegistre(){
    le serveur (doublons, e-mails invalides, comptes Diaspo'Actif reconnus) → 4 compte rendu. */
 const ADH_IMP_CHAMPS = [
   ['nom','Nom'], ['prenom','Prénom'], ['nom_complet','Nom complet (à séparer)'], ['email','E-mail'], ['telephone','Téléphone'],
-  ['adresse','Adresse'], ['pays','Pays'], ['ville','Ville'], ['date_adhesion',"Date d'adhésion"], ['observations','Observations']
+  ['date_naissance','Date de naissance'], ['adresse','Adresse postale'], ['pays','Pays'], ['ville','Ville'], ['date_adhesion',"Date d'adhésion"],
+  ['statut_carte','Statut de la carte'], ['observations','Observations']
 ];
 const ADH_IMP_SYNONYMES = {
   nom: ['nom','nomdefamille','lastname','surname','familyname','nomfamille'],
@@ -8810,6 +8890,8 @@ const ADH_IMP_SYNONYMES = {
   nom_complet: ['nomcomplet','nometprenom','nomprenom','prenomnom','name','nomcompletdumembre','adherent','membre'],
   email: ['email','mail','courriel','adressemail','adresseemail','emailadresse','adresseelectronique','adressemel','mel'],
   telephone: ['telephone','tel','phone','mobile','portable','gsm','whatsapp','numerodetelephone','numerotelephone'],
+  date_naissance: ['datenaissance','datedenaissance','naissance','nele','nee','neele','dob','birthdate','dateofbirth','anniversaire','ne'],
+  statut_carte: ['statutcarte','statutdelacarte','statutdelacartedemembre','carte','cartemembre','cartedemembre','etatcarte','etatdelacarte','statutcartedemembre'],
   adresse: ['adresse','address','rue','adressepostale'],
   pays: ['pays','country','paysderesidence'],
   ville: ['ville','city','commune','villederesidence'],
@@ -8945,7 +9027,8 @@ function adhImpConstruireLignes(){
   return ADH_IMP.rows.slice(debut).map((r,i) => {
     const v = c => (M[c] !== undefined && M[c] !== '' ? (r[M[c]]||'') : '');
     const l = { ligne: debut + i + 1, nom: v('nom'), prenom: v('prenom'), email: v('email'), telephone: v('telephone'),
-      adresse: v('adresse'), pays: v('pays'), ville: v('ville'), date_adhesion: v('date_adhesion'), observations: v('observations') };
+      adresse: v('adresse'), pays: v('pays'), ville: v('ville'), date_adhesion: v('date_adhesion'), observations: v('observations'),
+      date_naissance: v('date_naissance'), statut_carte: v('statut_carte') };
     if(!l.nom && M.nom_complet !== undefined && M.nom_complet !== ''){ Object.assign(l, adhImpSeparerNom(r[M.nom_complet])); }
     return l;
   });
@@ -9061,9 +9144,56 @@ function adhImpRendre(){
 }
 
 let ADH_M_USER_SELECTIONNE = null;
+let ADH_M_PERIODE_DEBUT = null, ADH_M_ILLIMITEE = false;
+function adhFr(d){ return d ? String(d).slice(0,10).split('-').reverse().join('/') : ''; }
+/* Reprend le réglage de la formule choisie : année glissante (durée à partir de la date d'adhésion) ou calendrier fixe. */
+function adhMAppliquerFormule(){
+  const f = ADH_FORMULES.find(x => String(x.id) === String(document.getElementById('adh-m-formule').value));
+  ADH_M_PERIODE_DEBUT = null; ADH_M_ILLIMITEE = false;
+  if (f) {
+    const fixe = f.mode_validite === 'collectif' && f.periode_collective_fin;
+    if (fixe) {
+      document.getElementById('adh-m-mode-validite').value = 'collectif';
+      document.getElementById('adh-m-periode-fin').value = String(f.periode_collective_fin).slice(0,10);
+      ADH_M_PERIODE_DEBUT = f.periode_collective_debut ? String(f.periode_collective_debut).slice(0,10) : null;
+    } else if (Number(f.duree_illimitee)) {
+      document.getElementById('adh-m-mode-validite').value = 'individuel'; ADH_M_ILLIMITEE = true;
+    } else if (f.duree_valeur) {
+      document.getElementById('adh-m-mode-validite').value = 'individuel';
+      document.getElementById('adh-m-duree-valeur').value = f.duree_valeur;
+      document.getElementById('adh-m-duree-unite').value = f.duree_unite || 'mois';
+    }
+  }
+  adhMToggleModeValidite();
+  adhMMajCalendrier();
+}
+/* Explique en clair l'échéance et le rappel qui en découlent. */
+function adhMMajCalendrier(){
+  const el = document.getElementById('adh-m-calendrier-info'); if (!el) return;
+  const mode = document.getElementById('adh-m-mode-validite').value;
+  const date = document.getElementById('adh-m-date-adhesion').value;
+  let echeance = null, txt;
+  if (ADH_M_ILLIMITEE) { el.innerHTML = '📅 Adhésion <b>sans échéance</b> : aucun rappel de renouvellement.'; return; }
+  if (mode === 'collectif') {
+    const fin = document.getElementById('adh-m-periode-fin').value;
+    if (fin) {
+      let f = new Date(fin + 'T12:00:00');
+      if (date) { const a = new Date(date + 'T12:00:00'); let g = 0; while (g++ < 60) { const prec = new Date(f); prec.setFullYear(prec.getFullYear() - 1); prec.setDate(prec.getDate() + 1); if (a < prec) f.setFullYear(f.getFullYear() - 1); else break; } }
+      echeance = f.toISOString().slice(0,10);
+    }
+    txt = `📅 <b>Calendrier fixe</b>${ADH_M_PERIODE_DEBUT ? ' (du '+adhFr(ADH_M_PERIODE_DEBUT)+' au '+adhFr(document.getElementById('adh-m-periode-fin').value)+')' : ''} — même échéance pour tous` + (echeance ? ` : <b>${adhFr(echeance)}</b>.` : '.');
+  } else {
+    const v = Number(document.getElementById('adh-m-duree-valeur').value) || 0, u = document.getElementById('adh-m-duree-unite').value;
+    if (date && v) { const d = new Date(date + 'T12:00:00'); if (u==='jours') d.setDate(d.getDate()+v); else if (u==='semaines') d.setDate(d.getDate()+7*v); else if (u==='annees') d.setFullYear(d.getFullYear()+v); else d.setMonth(d.getMonth()+v); echeance = d.toISOString().slice(0,10); }
+    txt = `📅 <b>Année glissante</b> (${v||'?'} ${u}) : l'échéance tombe à la même date, ${v>=12&&u==='mois'||u==='annees' ? "l'année suivante" : 'après la durée choisie'}` + (echeance ? ` — <b>${adhFr(echeance)}</b>.` : ' — indiquez la date d\'adhésion pour la calculer.');
+  }
+  el.innerHTML = txt + (echeance ? '<br>✉️ Les rappels prévus partent par <b>e-mail</b> dans tous les cas, et par <b>notification</b> si la personne a un compte Diaspo\'Actif.' : '');
+}
 async function adhOuvrirAjoutMembre(){
   document.getElementById('adh-m-formule').innerHTML = ADH_FORMULES.map(f=>`<option value="${f.id}">${escH(f.nom)}</option>`).join('');
-  ['adh-m-nom','adh-m-prenom','adh-m-email','adh-m-telephone','adh-m-adresse','adh-m-pays','adh-m-ville','adh-m-observations','adh-m-recherche-user','adh-m-date-adhesion'].forEach(id=>document.getElementById(id).value='');
+  ['adh-m-nom','adh-m-prenom','adh-m-email','adh-m-telephone','adh-m-adresse','adh-m-pays','adh-m-ville','adh-m-observations','adh-m-recherche-user','adh-m-date-adhesion','adh-m-naissance'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('adh-m-carte').value = 'non_creee';
+  document.getElementById('adh-m-naissance').max = new Date().toISOString().slice(0,10);
   document.getElementById('adh-m-user-resultats').innerHTML = '';
   adhDeselectionnerUser();
   /* Norme des ajouts manuels (2026-10-09, demande explicite) : pré-remplit durée + relances
@@ -9076,6 +9206,9 @@ async function adhOuvrirAjoutMembre(){
   document.getElementById('adh-m-duree-unite').value = norme?.duree_unite || 'mois';
   document.getElementById('adh-m-periode-fin').value = norme?.periode_collective_fin || '';
   adhMToggleModeValidite();
+  /* Le calendrier de la FORMULE choisie prime (2026-11-05, demande explicite : la date d'adhésion suit le calendrier
+     des adhésions de l'initiative — année glissante ou calendrier fixe) ; la norme du premier ajout ne sert que de repli. */
+  adhMAppliquerFormule();
   ADH_M_RELANCES = (norme?.relances_jours && norme.relances_jours.length)
     ? { jours: norme.relances_jours.map(Number).sort((a,b)=>b-a), canal: norme.relances_canal || 'les_deux' }
     : { jours: ADH_RELANCES_DEFAUT.slice(), canal: 'les_deux' };
@@ -9135,7 +9268,11 @@ async function adhEnregistrerMembre(){
       mode_validite: modeValidite,
       duree_valeur: Number(document.getElementById('adh-m-duree-valeur').value) || null,
       duree_unite: document.getElementById('adh-m-duree-unite').value,
+      periode_collective_debut: modeValidite === 'collectif' ? ADH_M_PERIODE_DEBUT : null,
       periode_collective_fin: modeValidite === 'collectif' ? document.getElementById('adh-m-periode-fin').value : null,
+      duree_illimitee: modeValidite !== 'collectif' && ADH_M_ILLIMITEE,
+      date_naissance: document.getElementById('adh-m-naissance').value || null,
+      statut_carte: document.getElementById('adh-m-carte').value,
       relances_jours: ADH_M_RELANCES.jours,
       relances_canal: ADH_M_RELANCES.canal,
     });
