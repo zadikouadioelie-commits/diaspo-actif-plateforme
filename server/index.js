@@ -33924,8 +33924,8 @@ async function autoGererRecrutement() {
         AND promotion_fin BETWEEN datetime(?,'+0 days') AND datetime(?,'+7 days')`).all(now, now);
     for (const c of aNotifPromo7) {
       try {
-        await db.prepare(`INSERT INTO notifications(user_id,type,contenu,lien,created_at) VALUES(?,?,?,?,datetime('now'))`)
-          .run(c.recruteur_id,'systeme',`📣 La promotion de votre campagne "${c.nom}" se termine dans 7 jours.`,`/recrutement.html`);
+        await db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`)
+          .run(c.recruteur_id,'systeme','Promotion bientôt terminée',`📣 La promotion de votre campagne "${c.nom}" se termine dans 7 jours.`,JSON.stringify({lien:'/recrutement.html'}));
         await db.prepare(`UPDATE recrutement_campagnes SET notif_promo_7j=1 WHERE id=?`).run(c.id);
       } catch(_){}
     }
@@ -33934,8 +33934,8 @@ async function autoGererRecrutement() {
       WHERE statut='active' AND notif_promo_fin=0 AND promotion_fin IS NOT NULL AND promotion_fin < ?`).all(now);
     for (const c of aNotifPromoFin) {
       try {
-        await db.prepare(`INSERT INTO notifications(user_id,type,contenu,lien,created_at) VALUES(?,?,?,?,datetime('now'))`)
-          .run(c.recruteur_id,'systeme',`📣 La période de promotion de "${c.nom}" est terminée. La campagne reste accessible jusqu'à expiration.`,`/recrutement.html`);
+        await db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`)
+          .run(c.recruteur_id,'systeme','Fin de promotion',`📣 La période de promotion de "${c.nom}" est terminée. La campagne reste accessible jusqu'à expiration.`,JSON.stringify({lien:'/recrutement.html'}));
         await db.prepare(`UPDATE recrutement_campagnes SET notif_promo_fin=1 WHERE id=?`).run(c.id);
       } catch(_){}
     }
@@ -33945,8 +33945,8 @@ async function autoGererRecrutement() {
         AND expire_at BETWEEN datetime(?,'+0 days') AND datetime(?,'+7 days')`).all(now, now);
     for (const c of aNotifExpir7) {
       try {
-        await db.prepare(`INSERT INTO notifications(user_id,type,contenu,lien,created_at) VALUES(?,?,?,?,datetime('now'))`)
-          .run(c.recruteur_id,'systeme',`⚠️ Votre campagne "${c.nom}" expire dans 7 jours et sera automatiquement clôturée.`,`/recrutement.html`);
+        await db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`)
+          .run(c.recruteur_id,'systeme','Offre bientôt expirée',`⚠️ Votre campagne "${c.nom}" expire dans 7 jours et sera automatiquement clôturée.`,JSON.stringify({lien:'/recrutement.html'}));
         await db.prepare(`UPDATE recrutement_campagnes SET notif_expir_7j=1 WHERE id=?`).run(c.id);
       } catch(_){}
     }
@@ -33955,14 +33955,35 @@ async function autoGererRecrutement() {
       WHERE statut='expiree' AND notif_cloture=0`).all();
     for (const c of aClotures) {
       try {
-        await db.prepare(`INSERT INTO notifications(user_id,type,contenu,lien,created_at) VALUES(?,?,?,?,datetime('now'))`)
-          .run(c.recruteur_id,'systeme',`🔒 Votre campagne "${c.nom}" a été clôturée automatiquement. Les statistiques restent accessibles.`,`/recrutement.html`);
+        await db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`)
+          .run(c.recruteur_id,'systeme','Offre clôturée',`🔒 Votre campagne "${c.nom}" a été clôturée automatiquement. Les statistiques restent accessibles.`,JSON.stringify({lien:'/recrutement.html'}));
         // Archiver les candidatures
         await db.prepare(`UPDATE recrutement_candidatures SET statut='archivee' WHERE campagne_id=? AND statut='en_attente'`).run(c.id);
         await db.prepare(`UPDATE recrutement_campagnes SET notif_cloture=1 WHERE id=?`).run(c.id);
       } catch(_){}
     }
   } catch(_){}
+}
+
+/* ── Alertes emploi recrutement (2026-11-05) : une offre publiée déclenche une notification
+   pour chaque alerte dont les critères correspondent (champ non renseigné = joker). Appelé
+   depuis la publication d'une campagne (création directe ou passage brouillon → active) ;
+   aucun cron. Distinct de offres_alertes (système séparé /api/offres de emplois-stages.html). */
+async function declencherAlertesRecrutement(c) {
+  if (!c) return;
+  const alertes = await db.prepare(`SELECT * FROM recrutement_alertes
+    WHERE (type_recrutement IS NULL OR type_recrutement=?)
+      AND (secteur_activite IS NULL OR secteur_activite=?)
+      AND (pays IS NULL OR pays=?)
+      AND (ville IS NULL OR ville=?)`)
+    .all(c.type_recrutement||'', c.secteur_activite||'', c.pays||'', c.ville||'');
+  for (const a of alertes) {
+    if (Number(a.user_id) === Number(c.recruteur_id)) continue;
+    try {
+      await db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`)
+        .run(a.user_id,'recrutement_alerte','Nouvelle offre correspondant à votre alerte',`🔔 "${c.nom}"`,JSON.stringify({lien:`/recrutement.html?id=${c.id}`}));
+    } catch(_){}
+  }
 }
 
 /* ══ Auto-publication des événements programmés (lazy) ══ */
@@ -39193,6 +39214,7 @@ ${jsonLd}
       const q = Object.fromEntries(new URL('http://x'+req.url).searchParams);
       let sql = `SELECT c.*, u.nom AS recruteur_nom, u.da_id AS recruteur_da_id, u.photo_url AS recruteur_photo,
         (SELECT COUNT(*) FROM recrutement_candidatures r WHERE r.campagne_id=c.id) AS nb_candidatures,
+        (SELECT COUNT(*) FROM recrutement_candidatures r WHERE r.campagne_id=c.id AND r.statut='acceptee') AS nb_recrutements,
         CASE WHEN c.promotion_fin > datetime('now') THEN 1 ELSE 0 END AS en_promotion
         FROM recrutement_campagnes c LEFT JOIN users u ON u.id=c.recruteur_id WHERE 1=1`;
       const args = [];
@@ -39231,7 +39253,7 @@ ${jsonLd}
       const utilisees = await db.prepare(`SELECT COUNT(*) n FROM recrutement_campagnes WHERE recruteur_id=? AND strftime('%Y',created_at)=?`).get(me.id, String(annee))?.n || 0;
       if (utilisees >= 2 && me.role !== 'administrateur')
         return sendJSON(res, 403, { error: 'Quota annuel atteint (2 campagnes par an maximum).' });
-      const { nom, description, titre_poste, type_recrutement, organisme, secteur_activite, pays, region, departement, ville, adresse, teletravail, rayon_publication, image_b64, statut: statutInit, niveau_etudes, experience_annees, competences, langues, certifications, qualites, date_debut, duree_mission, remuneration, devise, nb_postes, photos_json, pdf_b64, pdf_nom, date_limite_candidature } = body;
+      const { nom, description, titre_poste, type_recrutement, type_contrat, organisme, secteur_activite, pays, region, departement, ville, adresse, teletravail, rayon_publication, image_b64, statut: statutInit, niveau_etudes, experience_annees, competences, langues, certifications, qualites, date_debut, duree_mission, remuneration, devise, nb_postes, photos_json, pdf_b64, pdf_nom, date_limite_candidature } = body;
       if (!nom) return sendJSON(res, 400, { error: 'Nom de campagne requis.' });
       if (pdf_b64 && SEC.isDangerousFile(Buffer.from(String(pdf_b64).split(',').pop(), 'base64'))) return sendJSON(res, 400, { error: 'Fichier PDF invalide.' });
       if (image_b64 && !SEC.isSafeRasterImage(Buffer.from(String(image_b64).split(',').pop(), 'base64'))) return sendJSON(res, 400, { error: 'Image invalide.' });
@@ -39241,15 +39263,19 @@ ${jsonLd}
       const promotion_fin = publie_at ? new Date(new Date(publie_at).getTime() + 30*86400000).toISOString() : null;
       const expire_at = publie_at ? new Date(new Date(publie_at).getTime() + 60*86400000).toISOString() : null;
       const r = await db.prepare(`INSERT INTO recrutement_campagnes
-        (recruteur_id,nom,description,titre_poste,type_recrutement,organisme,secteur_activite,pays,region,departement,ville,adresse,teletravail,rayon_publication,image_b64,statut,publie_at,promotion_fin,expire_at,niveau_etudes,experience_annees,competences,langues,certifications,qualites,date_debut,duree_mission,remuneration,devise,nb_postes,photos_json,pdf_b64,pdf_nom,date_limite_candidature,created_at,updated_at)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'),datetime('now'))`)
-        .run(me.id,nom,description ? SEC.sanitizeRichHtml(description) : null,titre_poste||null,type_recrutement||'emploi',organisme||null,secteur_activite||null,pays||null,region||null,departement||null,ville||null,adresse||null,teletravail||'non',rayon_publication||'national',image_b64||null,finalStatut,publie_at,promotion_fin,expire_at,niveau_etudes||null,experience_annees||null,JSON.stringify(competences||[]),JSON.stringify(langues||[]),JSON.stringify(certifications||[]),JSON.stringify(qualites||[]),date_debut||null,duree_mission||null,remuneration||null,devise||'EUR',nb_postes||1,JSON.stringify(photos_json||[]),pdf_b64||null,pdf_nom||null,date_limite_candidature||null);
+        (recruteur_id,nom,description,titre_poste,type_recrutement,type_contrat,organisme,secteur_activite,pays,region,departement,ville,adresse,teletravail,rayon_publication,image_b64,statut,publie_at,promotion_fin,expire_at,niveau_etudes,experience_annees,competences,langues,certifications,qualites,date_debut,duree_mission,remuneration,devise,nb_postes,photos_json,pdf_b64,pdf_nom,date_limite_candidature,created_at,updated_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'),datetime('now'))`)
+        .run(me.id,nom,description ? SEC.sanitizeRichHtml(description) : null,titre_poste||null,type_recrutement||'emploi',type_contrat||null,organisme||null,secteur_activite||null,pays||null,region||null,departement||null,ville||null,adresse||null,teletravail||'non',rayon_publication||'national',image_b64||null,finalStatut,publie_at,promotion_fin,expire_at,niveau_etudes||null,experience_annees||null,JSON.stringify(competences||[]),JSON.stringify(langues||[]),JSON.stringify(certifications||[]),JSON.stringify(qualites||[]),date_debut||null,duree_mission||null,remuneration||null,devise||'EUR',nb_postes||1,JSON.stringify(photos_json||[]),pdf_b64||null,pdf_nom||null,date_limite_candidature||null);
       const cid = Number(r.lastInsertRowid);
       // Publication dans le fil si active
       if (finalStatut === 'active' && await db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='fil_posts'`).get()) {
-        const fp = await db.prepare(`INSERT INTO fil_posts(user_id,contenu,pub_type,original_post_id) VALUES(?,?,?,?)`)
+        const fp = await db.prepare(`INSERT INTO fil_posts(auteur_id,contenu,pub_type,original_post_id) VALUES(?,?,?,?)`)
           .run(me.id,`📢 Recrutement — ${nom}`,'recrutement',cid);
-        await (await db.prepare(`UPDATE recrutement_campagnes SET fil_post_id=? WHERE id=?`).run(Number(fp).lastInsertRowid), cid);
+        await db.prepare(`UPDATE recrutement_campagnes SET fil_post_id=? WHERE id=?`).run(Number(fp.lastInsertRowid), cid);
+      }
+      if (finalStatut === 'active') {
+        const cPourAlertes = await db.prepare(`SELECT * FROM recrutement_campagnes WHERE id=?`).get(cid);
+        await declencherAlertesRecrutement(cPourAlertes).catch(()=>{});
       }
       return sendJSON(res, 201, { ok: true, id: cid });
     }
@@ -39277,41 +39303,52 @@ ${jsonLd}
       const c = await db.prepare(`SELECT * FROM recrutement_campagnes WHERE id=?`).get(cid);
       if (!c) return sendJSON(res, 404, { error: 'Introuvable.' });
       if (c.recruteur_id !== me.id && me.role !== 'administrateur') return sendJSON(res, 403, { error: 'Accès refusé.' });
-      const { nom, description, titre_poste, type_recrutement, organisme, secteur_activite, pays, region, departement, ville, adresse, teletravail, rayon_publication, image_b64, statut, niveau_etudes, experience_annees, competences, langues, certifications, qualites, date_debut, duree_mission, remuneration, devise, nb_postes, photos_json, pdf_b64, pdf_nom, date_limite_candidature } = body;
+      const { nom, description, titre_poste, type_recrutement, type_contrat, organisme, secteur_activite, pays, region, departement, ville, adresse, teletravail, rayon_publication, image_b64, statut, niveau_etudes, experience_annees, competences, langues, certifications, qualites, date_debut, duree_mission, remuneration, devise, nb_postes, photos_json, pdf_b64, pdf_nom, date_limite_candidature } = body;
       if (pdf_b64 && SEC.isDangerousFile(Buffer.from(String(pdf_b64).split(',').pop(), 'base64'))) return sendJSON(res, 400, { error: 'Fichier PDF invalide.' });
       if (image_b64 && !SEC.isSafeRasterImage(Buffer.from(String(image_b64).split(',').pop(), 'base64'))) return sendJSON(res, 400, { error: 'Image invalide.' });
       // Calculer dates si passage à active
       let publie_at = c.publie_at, promotion_fin = c.promotion_fin, expire_at = c.expire_at;
-      if (statut === 'active' && c.statut === 'brouillon') {
+      const passeEnActif = statut === 'active' && c.statut === 'brouillon';
+      if (passeEnActif) {
         publie_at = new Date().toISOString();
         promotion_fin = new Date(new Date(publie_at).getTime() + 30*86400000).toISOString();
         expire_at = new Date(new Date(publie_at).getTime() + 60*86400000).toISOString();
         // Publier dans le fil
         if (await db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='fil_posts'`).get()) {
-          const fp = await db.prepare(`INSERT INTO fil_posts(user_id,contenu,pub_type,original_post_id) VALUES(?,?,?,?)`)
+          const fp = await db.prepare(`INSERT INTO fil_posts(auteur_id,contenu,pub_type,original_post_id) VALUES(?,?,?,?)`)
             .run(me.id,`📢 Recrutement — ${nom||c.nom}`,'recrutement',cid);
-          await (await db.prepare(`UPDATE recrutement_campagnes SET fil_post_id=? WHERE id=?`).run(Number(fp).lastInsertRowid), cid);
+          await db.prepare(`UPDATE recrutement_campagnes SET fil_post_id=? WHERE id=?`).run(Number(fp.lastInsertRowid), cid);
         }
       }
       await db.prepare(`UPDATE recrutement_campagnes SET
         nom=COALESCE(?,nom), description=COALESCE(?,description), titre_poste=COALESCE(?,titre_poste),
-        type_recrutement=COALESCE(?,type_recrutement), organisme=COALESCE(?,organisme),
+        type_recrutement=COALESCE(?,type_recrutement), type_contrat=COALESCE(?,type_contrat), organisme=COALESCE(?,organisme),
         secteur_activite=COALESCE(?,secteur_activite), pays=COALESCE(?,pays), region=COALESCE(?,region),
         departement=COALESCE(?,departement), ville=COALESCE(?,ville), adresse=COALESCE(?,adresse),
         teletravail=COALESCE(?,teletravail), rayon_publication=COALESCE(?,rayon_publication),
         image_b64=COALESCE(?,image_b64), statut=COALESCE(?,statut),
         niveau_etudes=COALESCE(?,niveau_etudes), experience_annees=COALESCE(?,experience_annees),
+        competences=COALESCE(?,competences), langues=COALESCE(?,langues), certifications=COALESCE(?,certifications), qualites=COALESCE(?,qualites),
         date_debut=COALESCE(?,date_debut), duree_mission=COALESCE(?,duree_mission),
         remuneration=COALESCE(?,remuneration), devise=COALESCE(?,devise), nb_postes=COALESCE(?,nb_postes),
+        photos_json=COALESCE(?,photos_json), pdf_b64=COALESCE(?,pdf_b64),
         pdf_nom=COALESCE(?,pdf_nom), date_limite_candidature=COALESCE(?,date_limite_candidature),
         publie_at=?, promotion_fin=?, expire_at=?, updated_at=datetime('now')
         WHERE id=?`)
-        .run(nom||null,description ? SEC.sanitizeRichHtml(description) : null,titre_poste||null,type_recrutement||null,organisme||null,
+        .run(nom||null,description ? SEC.sanitizeRichHtml(description) : null,titre_poste||null,type_recrutement||null,type_contrat||null,organisme||null,
              secteur_activite||null,pays||null,region||null,departement||null,ville||null,adresse||null,
              teletravail||null,rayon_publication||null,image_b64||null,statut||null,
-             niveau_etudes||null,experience_annees||null,date_debut||null,duree_mission||null,
-             remuneration||null,devise||null,nb_postes||null,pdf_nom||null,date_limite_candidature||null,
+             niveau_etudes||null,experience_annees||null,
+             competences?JSON.stringify(competences):null,langues?JSON.stringify(langues):null,certifications?JSON.stringify(certifications):null,qualites?JSON.stringify(qualites):null,
+             date_debut||null,duree_mission||null,
+             remuneration||null,devise||null,nb_postes||null,
+             photos_json?JSON.stringify(photos_json):null,pdf_b64||null,
+             pdf_nom||null,date_limite_candidature||null,
              publie_at,promotion_fin,expire_at,cid);
+      if (passeEnActif) {
+        const cPourAlertes = await db.prepare(`SELECT * FROM recrutement_campagnes WHERE id=?`).get(cid);
+        await declencherAlertesRecrutement(cPourAlertes).catch(()=>{});
+      }
       return sendJSON(res, 200, { ok: true });
     }
 
@@ -39341,8 +39378,8 @@ ${jsonLd}
           VALUES(?,?,?,?,datetime('now'),datetime('now'))`).run(cid, me.id, message||null, cv_b64||null);
         // Notifier le recruteur
         try {
-          await db.prepare(`INSERT INTO notifications(user_id,type,contenu,lien,created_at) VALUES(?,?,?,?,datetime('now'))`)
-            .run(c.recruteur_id,'recrutement',`👤 Nouvelle candidature pour "${c.nom}" de ${me.nom||me.da_id}`,`/recrutement.html`);
+          await db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`)
+            .run(c.recruteur_id,'recrutement','Nouvelle candidature reçue',`👤 Nouvelle candidature pour "${c.nom}" de ${me.nom||me.da_id}`,JSON.stringify({lien:'/recrutement.html'}));
         } catch(_){}
         return sendJSON(res, 201, { ok: true });
       } catch(e) {
@@ -39483,7 +39520,7 @@ ${jsonLd}
       const { commentaire = '' } = body;
       // Créer une publication dans le fil
       if (await db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='fil_posts'`).get()) {
-        await db.prepare(`INSERT INTO fil_posts(user_id, contenu, pub_type, original_post_id, repost_commentaire) VALUES(?,?,?,?,?)`)
+        await db.prepare(`INSERT INTO fil_posts(auteur_id, contenu, pub_type, original_post_id, repost_commentaire) VALUES(?,?,?,?,?)`)
           .run(me.id, `📢 Recrutement — ${c.nom}`, 'recrutement_repost', cid, commentaire);
       }
       const nb = (c.nb_republications || 0) + 1;
@@ -39507,6 +39544,59 @@ ${jsonLd}
 
     /* ── GET /api/recrutement/:id/stats enrichi ── */
     /* (déjà géré plus haut) */
+
+    /* ══════════════════════════════════════════════════════════════
+       RECRUTEMENT — MES CANDIDATURES / MES FAVORIS / ALERTES EMPLOI
+       (2026-11-05, demande explicite : onglet Recrutement complet)
+       ══════════════════════════════════════════════════════════════ */
+
+    /* ── GET /api/recrutement/mes-candidatures — mes candidatures (candidat) ── */
+    if (req.method === 'GET' && pathname === '/api/recrutement/mes-candidatures') {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const candidatures = await db.prepare(`SELECT rc.id, rc.campagne_id, rc.message, rc.statut, rc.created_at, rc.updated_at,
+        c.nom, c.organisme, c.type_recrutement, c.pays, c.ville, c.statut AS campagne_statut
+        FROM recrutement_candidatures rc JOIN recrutement_campagnes c ON c.id=rc.campagne_id
+        WHERE rc.candidat_id=? ORDER BY rc.created_at DESC`).all(me.id);
+      return sendJSON(res, 200, { candidatures });
+    }
+
+    /* ── GET /api/recrutement/mes-favoris — offres favorites (liste complète, même format que la liste publique) ── */
+    if (req.method === 'GET' && pathname === '/api/recrutement/mes-favoris') {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const campagnes = await db.prepare(`SELECT c.*, u.nom AS recruteur_nom, u.da_id AS recruteur_da_id, u.photo_url AS recruteur_photo,
+        (SELECT COUNT(*) FROM recrutement_candidatures r WHERE r.campagne_id=c.id) AS nb_candidatures,
+        (SELECT COUNT(*) FROM recrutement_candidatures r WHERE r.campagne_id=c.id AND r.statut='acceptee') AS nb_recrutements,
+        CASE WHEN c.promotion_fin > datetime('now') THEN 1 ELSE 0 END AS en_promotion
+        FROM recrutement_favoris f JOIN recrutement_campagnes c ON c.id=f.campagne_id LEFT JOIN users u ON u.id=c.recruteur_id
+        WHERE f.user_id=? ORDER BY f.created_at DESC`).all(me.id);
+      return sendJSON(res, 200, { campagnes });
+    }
+
+    /* ── GET /api/recrutement/alertes/mes — mes alertes emploi ── */
+    if (req.method === 'GET' && pathname === '/api/recrutement/alertes/mes') {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const alertes = await db.prepare(`SELECT * FROM recrutement_alertes WHERE user_id=? ORDER BY created_at DESC`).all(me.id);
+      return sendJSON(res, 200, { alertes });
+    }
+
+    /* ── POST /api/recrutement/alertes — créer une alerte emploi ── */
+    if (req.method === 'POST' && pathname === '/api/recrutement/alertes') {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const n = (await db.prepare(`SELECT COUNT(*) n FROM recrutement_alertes WHERE user_id=?`).get(me.id))?.n || 0;
+      if (n >= 10) return sendJSON(res, 400, { error: 'Limite de 10 alertes atteinte. Supprimez-en une avant d\'en créer une nouvelle.' });
+      const { type_recrutement, secteur_activite, pays, ville } = body;
+      const r = await db.prepare(`INSERT INTO recrutement_alertes(user_id,type_recrutement,secteur_activite,pays,ville) VALUES(?,?,?,?,?)`)
+        .run(me.id, type_recrutement||null, secteur_activite||null, pays||null, ville||null);
+      return sendJSON(res, 201, { id: Number(r.lastInsertRowid) });
+    }
+
+    /* ── DELETE /api/recrutement/alertes/:id — supprimer une alerte ── */
+    if (req.method === 'DELETE' && /^\/api\/recrutement\/alertes\/\d+$/.test(pathname)) {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const aid = parseInt(pathname.split('/').pop());
+      await db.prepare(`DELETE FROM recrutement_alertes WHERE id=? AND user_id=?`).run(aid, me.id);
+      return sendJSON(res, 200, { ok: true });
+    }
 
     /* ── POST /api/vitrine-site/rapports/demande-acces — site institutionnel public ── */
     if (req.method === 'POST' && pathname === '/api/vitrine-site/rapports/demande-acces') {

@@ -2437,6 +2437,7 @@ const MIGRATIONS = [
   ["recrutement_campagnes", "nb_favoris INTEGER DEFAULT 0"],
   ["recrutement_campagnes", "nb_republications INTEGER DEFAULT 0"],
   ["recrutement_campagnes", "fil_post_id INTEGER"],
+  ["recrutement_campagnes", "type_contrat TEXT"],
   // ── Recrutement candidatures enrichies ──
   ["recrutement_candidatures", "cv_snapshot TEXT"],
   ["recrutement_candidatures", "lettre_snapshot TEXT"],
@@ -6172,6 +6173,21 @@ db.exec(`
     created_at TEXT DEFAULT (datetime('now')),
     UNIQUE(campagne_id, user_id),
     FOREIGN KEY(campagne_id) REFERENCES recrutement_campagnes(id) ON DELETE CASCADE,
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
+  /* ── Alertes emploi (recrutement_campagnes) — 2026-11-05, demande explicite ──
+     Un compte enregistre des critères (type + domaine + pays + ville) ; quand une offre
+     correspondante est publiée, une notification est envoyée (déclenchée à la publication,
+     pas de cron). Distinct de offres_alertes (système séparé /api/offres de emplois-stages.html). */
+  CREATE TABLE IF NOT EXISTS recrutement_alertes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    type_recrutement TEXT,
+    secteur_activite TEXT,
+    pays TEXT,
+    ville TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY(user_id) REFERENCES users(id)
   );
 

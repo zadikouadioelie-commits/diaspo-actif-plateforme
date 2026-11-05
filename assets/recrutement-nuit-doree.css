@@ -1,0 +1,95 @@
+/* ============================================================
+   Recrutement (recrutement.html) — design « Nuit dorée » (2026-11-05, demande explicite).
+   Complète theme-nuit-doree.css (fond, barre du haut, boutons). Tout est préfixé html body.nd.
+   Modèle : assets/emplois-stages-nuit-doree.css. Aucun changement de logique.
+   Retour arrière : retirer les 2 <link> et class="nd" sur <body> de recrutement.html.
+   ============================================================ */
+
+/* Variables du site redéfinies dans la page (barre du haut intacte, elle n'utilise pas ces variables en nuit) */
+html body.nd :is(.recr-typewrap,.recr-search-bar,.recr-layout,.recr-form-section){
+  --bg:rgba(255,255,255,.06); --card:rgba(255,255,255,.045); --text:#EDEAE0; --muted:#AEB8D0; --border:rgba(255,255,255,.13);
+  --navy:#FFFFFF; --orange:#E3C06E; --orange-light:rgba(227,192,110,.14); --green:#8FE0B0; --navy-light:#14234a;
+}
+
+/* ── Héros ── */
+html body.nd .recr-hero{background:radial-gradient(520px 320px at 85% 0%,rgba(227,192,110,.16),transparent 70%),linear-gradient(180deg,#0B1226 0%,#060A14 100%);border-bottom:1px solid var(--nd-bord2)}
+html body.nd .recr-hero-icon{background:var(--nd-verre2);border:1px solid var(--nd-bord2)}
+html body.nd .recr-hero-left h1{font-family:var(--nd-display)!important;font-weight:500!important;font-size:clamp(28px,3.4vw,42px)!important;letter-spacing:-.01em;color:#fff}
+html body.nd .recr-hero-left h1 span{color:var(--nd-or)}
+html body.nd .recr-hero-sub{color:var(--nd-doux)}
+html body.nd .recr-hero-points{color:var(--nd-texte)}
+html body.nd .recr-hero-illu{background:var(--nd-verre);border:1px solid var(--nd-bord);border-radius:26px;box-shadow:0 30px 60px -36px #000}
+html body.nd .recr-illu-card{background:var(--nd-verre2);border:1px solid var(--nd-bord2);border-radius:16px}
+html body.nd .recr-illu-card .txt small{color:var(--nd-doux)}
+
+/* ── Barre de type (5 boutons) ── */
+html body.nd .recr-typewrap{background:transparent;border-bottom:1px solid var(--nd-bord2)}
+html body.nd .recr-type-opt{background:var(--nd-verre)!important;border:1px solid var(--nd-bord2)!important;border-radius:16px!important}
+html body.nd .recr-type-opt:hover{border-color:var(--nd-bord)!important;transform:translateY(-2px)}
+html body.nd .recr-type-opt.sel{border-color:var(--nd-or)!important;background:rgba(227,192,110,.14)!important}
+html body.nd .recr-type-opt .lb{color:#fff}
+html body.nd .recr-type-opt .sub{color:var(--nd-doux)}
+
+/* ── Barre de recherche ── */
+html body.nd .recr-search-bar{background:rgba(8,13,30,.82);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border-bottom:1px solid var(--nd-bord2);box-shadow:0 10px 30px -18px #000}
+html body.nd .recr-search-inner input[type="text"]{background:rgba(255,255,255,.06)!important;border:1px solid var(--nd-bord2)!important;color:#fff!important;border-radius:999px;color-scheme:dark}
+html body.nd .recr-search-inner select{background:rgba(255,255,255,.06)!important;border:1px solid var(--nd-bord2)!important;color:#fff!important;border-radius:999px;color-scheme:dark}
+html body.nd .btn-recr-search{background:var(--nd-degore)!important;color:#1a1202!important;font-weight:800;border-radius:999px;box-shadow:0 12px 26px -14px rgba(227,192,110,.7)}
+
+/* ── Colonnes : filtres, résultats, espace recrutement ── */
+html body.nd :is(.recr-filters,.recr-side-box){background:var(--nd-verre)!important;border:1px solid var(--nd-bord2)!important;border-radius:22px!important;box-shadow:0 26px 54px -36px #000;color:var(--nd-texte)}
+html body.nd :is(.recr-filters-head h3,.recr-side-box h4){font-family:var(--nd-display);font-weight:500;font-size:16px;color:#fff}
+html body.nd .btn-recr-reset{color:var(--nd-or)!important}
+html body.nd .recr-fgroup label{color:var(--nd-doux);letter-spacing:.08em}
+html body.nd .recr-fgroup.chk label{color:var(--nd-texte);letter-spacing:0}
+html body.nd :is(.recr-fgroup select,.recr-fgroup input[type=text],.recr-fgroup input:not([type])){background:rgba(255,255,255,.06)!important;border:1px solid var(--nd-bord2)!important;border-radius:12px!important;color:#fff!important;min-height:38px;color-scheme:dark}
+html body.nd .recr-fgroup select option{background:#0f1a38;color:#fff}
+html body.nd :is(.recr-fgroup,.recr-search-inner) :is(input,select):focus{outline:none;border-color:var(--nd-or)!important;box-shadow:0 0 0 3px rgba(227,192,110,.18)}
+html body.nd .recr-fgroup input[type=checkbox]{accent-color:var(--nd-or)}
+html body.nd .recr-type-check{color:var(--nd-texte)}
+html body.nd .recr-type-check input[type=checkbox]{accent-color:var(--nd-or)}
+html body.nd .recr-type-check span.n{color:var(--nd-doux)}
+html body.nd .btn-recr-apply{background:var(--nd-degore)!important;color:#1a1202!important;font-weight:800;box-shadow:0 10px 22px -12px rgba(227,192,110,.7)}
+
+/* ── Onglets, en-tête de résultats, pagination ── */
+html body.nd .recr-tabs{border-bottom-color:var(--nd-bord2)}
+html body.nd .recr-tab{color:var(--nd-doux)}
+html body.nd .recr-tab.active{color:var(--nd-or);border-bottom-color:var(--nd-or)}
+html body.nd .recr-results-head>span{color:var(--nd-doux)}
+html body.nd .recr-results-actions select{background:rgba(255,255,255,.06)!important;border:1px solid var(--nd-bord2)!important;color:#fff!important;color-scheme:dark}
+html body.nd .recr-view-toggle{border-color:var(--nd-bord2)!important}
+html body.nd .recr-view-toggle button{background:transparent!important;color:var(--nd-doux)}
+html body.nd .recr-view-toggle button.active{background:var(--nd-degore)!important;color:#1a1202!important}
+html body.nd .recr-page-btn{background:var(--nd-verre)!important;border-color:var(--nd-bord2)!important;color:var(--nd-texte)!important}
+html body.nd .recr-page-btn.active{background:var(--nd-degore)!important;color:#1a1202!important;border-color:transparent!important;font-weight:800}
+html body.nd .recr-empty{color:var(--nd-doux)}
+
+/* ── Cartes d'offres ── */
+html body.nd .camp-card{background:var(--nd-verre)!important;border:1px solid var(--nd-bord2)!important;border-radius:18px!important;box-shadow:0 20px 44px -30px #000;color:var(--nd-texte)}
+html body.nd .camp-card:hover{transform:translateY(-3px);border-color:var(--nd-bord)!important;box-shadow:0 26px 54px -32px #000}
+html body.nd .camp-card h3{color:#fff}
+html body.nd .recr-mini-tag{background:var(--nd-verre2)!important;color:var(--nd-texte)!important;border:1px solid var(--nd-bord2)}
+html body.nd .ibtn{background:transparent!important;border-color:var(--nd-bord2)!important;color:var(--nd-doux)!important}
+html body.nd .ibtn:hover,html body.nd .ibtn.active{border-color:var(--nd-or)!important;color:var(--nd-or)!important;background:rgba(227,192,110,.1)!important}
+html body.nd .interact-bar{border-top-color:var(--nd-bord2)}
+
+/* ── Mon espace recrutement ── */
+html body.nd .recr-side-sub{color:var(--nd-doux)}
+html body.nd .recr-side-item{border-bottom-color:var(--nd-bord2);color:var(--nd-texte)}
+html body.nd .recr-side-item b{color:var(--nd-or)}
+html body.nd .btn-recr-publish{background:var(--nd-degore)!important;color:#1a1202!important;box-shadow:0 10px 24px -12px rgba(227,192,110,.7)}
+html body.nd .btn-recr-outline{border-color:var(--nd-bord2)!important;color:var(--nd-doux)!important}
+html body.nd .btn-recr-outline:hover{border-color:var(--nd-or)!important;color:var(--nd-or)!important}
+html body.nd .recr-alert-item{background:var(--nd-verre2);color:var(--nd-texte)}
+html body.nd .recr-alert-item button{color:var(--nd-doux)}
+html body.nd .recr-kpi{background:var(--nd-verre2)!important}
+html body.nd .recr-kpi .n{color:var(--nd-or)}
+html body.nd .recr-kpi .l{color:var(--nd-doux)}
+html body.nd .recr-side-link{color:var(--nd-or)}
+
+/* ── Défilement doré des colonnes à défilement propre ── */
+html body.nd :is(.recr-filters,.recr-side){scrollbar-width:thin;scrollbar-color:rgba(227,192,110,.55) transparent}
+html body.nd :is(.recr-filters,.recr-side)::-webkit-scrollbar{width:8px}
+html body.nd :is(.recr-filters,.recr-side)::-webkit-scrollbar-thumb{background:linear-gradient(180deg,#F0D68C,#B9893A);border-radius:999px}
+
+html body.nd :is(.btn-recr-search,.btn-recr-apply,.btn-recr-publish,.recr-view-toggle button,.recr-page-btn,.recr-type-opt,.camp-card):focus-visible{outline:3px solid var(--nd-or);outline-offset:2px}

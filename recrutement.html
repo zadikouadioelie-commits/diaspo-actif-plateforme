@@ -18,47 +18,152 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="stylesheet" href="assets/styles.v2.css">
 <link rel="stylesheet" href="/assets/responsive.v2.css?v=2">
+<!-- Design « Nuit dorée » (2026-11-05, demande explicite) : même recette que emplois-stages.html.
+     Retour arrière : retirer ces 2 liens et class="nd" sur <body>. -->
+<link rel="stylesheet" href="/assets/theme-nuit-doree.css?v=8">
+<link rel="stylesheet" href="/assets/recrutement-nuit-doree.css?v=1">
+<meta name="theme-color" content="#0D2B4E">
 <style>
-.recr-nav{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:24px;overflow-x:auto;}
-.recr-tab{padding:12px 20px;font-size:13px;font-weight:700;cursor:pointer;border:none;background:none;border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap;color:var(--muted);transition:all .15s;}
-.recr-tab.active{color:#2563EB;border-bottom-color:#2563EB;}
+/* ═══ Bandeau ═══ */
+.recr-hero{background:linear-gradient(135deg,#0D2B4E 0%,#1E4F8A 100%);color:#fff;padding:48px 24px;}
+.recr-hero-inner{max-width:1320px;margin:0 auto;display:grid;grid-template-columns:1.15fr .85fr;gap:36px;align-items:center;}
+@media (max-width:860px){ .recr-hero-inner{grid-template-columns:1fr;} }
+.recr-hero-left{display:flex;align-items:flex-start;gap:16px;}
+.recr-hero-icon{flex-shrink:0;width:56px;height:56px;border-radius:16px;background:rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;font-size:28px;}
+.recr-hero-left h1{font-size:1.9rem;font-weight:900;margin:0 0 10px;line-height:1.2;}
+.recr-hero-left h1 span{color:#F3DC9B;}
+.recr-hero-sub{margin:0 0 16px;font-size:13.5px;color:rgba(255,255,255,.82);max-width:520px;}
+.recr-hero-points{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;font-size:13px;font-weight:700;}
+.recr-hero-illu{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);border-radius:18px;padding:22px;min-height:190px;}
+.recr-illu-cards{display:flex;flex-direction:column;gap:10px;}
+.recr-illu-card{background:rgba(255,255,255,.1);border-radius:12px;padding:10px 14px;font-size:12px;display:flex;align-items:center;gap:12px;}
+.recr-illu-card .av{font-size:24px;line-height:1;flex-shrink:0;}
+.recr-illu-card .txt{flex:1;min-width:0;display:flex;flex-direction:column;}
+.recr-illu-card .txt b{font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.recr-illu-card .txt small{color:rgba(255,255,255,.65);font-weight:600;}
+
+/* ═══ Barre de type (5 boutons) ═══ */
+.recr-typewrap{background:#fff;border-bottom:1px solid var(--border);padding:18px 24px;}
+.recr-type-grid{max-width:1320px;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr);gap:10px;}
+@media (max-width:860px){ .recr-type-grid{grid-template-columns:repeat(3,1fr);} }
+@media (max-width:560px){ .recr-type-grid{grid-template-columns:repeat(2,1fr);} }
+.recr-type-opt{cursor:pointer;border:2px solid var(--border);border-radius:14px;padding:14px 10px;text-align:center;transition:all .15s;background:#fff;}
+.recr-type-opt:hover{border-color:var(--orange);transform:translateY(-1px);}
+.recr-type-opt.sel{border-color:var(--orange);background:var(--orange-light,#fff3ea);}
+.recr-type-opt .ic{font-size:22px;margin-bottom:4px;}
+.recr-type-opt .lb{font-size:12.5px;font-weight:800;color:var(--navy);}
+.recr-type-opt .sub{font-size:10.5px;color:var(--muted);margin-top:1px;}
+
+/* ═══ Barre de recherche ═══ */
+.recr-search-bar{background:#fff;border-bottom:1px solid var(--border);padding:14px 0;position:sticky;top:0;z-index:40;box-shadow:0 2px 8px rgba(0,0,0,.06);}
+.recr-search-inner{max-width:1320px;margin:0 auto;padding:0 24px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+.recr-search-inner input[type="text"],.recr-search-inner input:not([type]){flex:1;min-width:220px;padding:10px 16px;border:1px solid var(--border);border-radius:30px;font-size:.88rem;}
+.recr-search-inner select{padding:10px 14px;border:1px solid var(--border);border-radius:30px;font-size:.84rem;background:#fff;min-width:140px;}
+.btn-recr-search{background:var(--navy);color:#fff;border:none;padding:10px 22px;border-radius:30px;font-size:.85rem;font-weight:700;cursor:pointer;}
+
+/* ═══ Layout 3 colonnes ═══ */
+.recr-layout{max-width:1320px;margin:0 auto;padding:22px 24px 60px;display:grid;grid-template-columns:250px 1fr 270px;gap:22px;align-items:start;}
+@media (max-width:1150px){ .recr-layout{grid-template-columns:230px 1fr;} .recr-side{display:none;} }
+@media (max-width:860px){ .recr-layout{grid-template-columns:1fr;} .recr-filters{position:static;max-height:none;} }
+
+.recr-filters{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px;position:sticky;top:80px;max-height:calc(100vh - 100px);overflow-y:auto;}
+.recr-filters-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
+.recr-filters-head h3{font-size:14px;margin:0;color:var(--navy);}
+.btn-recr-reset{background:none;border:none;color:var(--orange);font-size:11.5px;font-weight:700;cursor:pointer;}
+.recr-fgroup{margin-bottom:16px;}
+.recr-fgroup label{display:block;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;}
+.recr-fgroup select,.recr-fgroup input[type="text"],.recr-fgroup input:not([type]){width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:12.5px;box-sizing:border-box;}
+.recr-fgroup.chk{display:flex;align-items:center;gap:8px;}
+.recr-fgroup.chk label{margin:0;text-transform:none;font-weight:600;font-size:12.5px;color:var(--navy);}
+.recr-type-checks{display:flex;flex-direction:column;gap:7px;}
+.recr-type-check{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;color:var(--navy);cursor:pointer;}
+.recr-type-check span.n{margin-left:auto;color:var(--muted);font-weight:700;font-size:11px;}
+.btn-recr-apply{width:100%;background:var(--orange);color:#fff;border:none;border-radius:30px;padding:9px;font-size:12.5px;font-weight:700;cursor:pointer;margin-top:4px;}
+
+.recr-results{min-width:0;}
+.recr-tabs{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:18px;overflow-x:auto;}
+.recr-tab{padding:11px 18px;font-size:13px;font-weight:700;cursor:pointer;border:none;background:none;border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap;color:var(--muted);transition:all .15s;}
+.recr-tab.active{color:var(--orange);border-bottom-color:var(--orange);}
 .recr-section{display:none;}.recr-section.active{display:block;}
-/* Cartes campagne */
-.camp-card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:20px;transition:box-shadow .2s;cursor:pointer;}
-.camp-card:hover{box-shadow:0 4px 20px rgba(0,0,0,.08);}
-.camp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;}
+
+.recr-results-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px;}
+.recr-results-head>span{font-size:13px;color:var(--muted);font-weight:600;}
+.recr-results-actions{display:flex;gap:8px;align-items:center;}
+.recr-results-actions select{padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;background:#fff;}
+.recr-view-toggle{display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+.recr-view-toggle button{border:none;background:#fff;padding:6px 10px;cursor:pointer;font-size:13px;color:var(--muted);}
+.recr-view-toggle button.active{background:var(--navy);color:#fff;}
+
+.camp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:16px;}
+.camp-grid.list-view{grid-template-columns:1fr;}
+.camp-grid.list-view .camp-card{display:flex;gap:14px;align-items:flex-start;}
+.camp-grid.list-view .camp-card>.cc-body{flex:1;min-width:0;}
+.camp-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px;box-shadow:var(--shadow);transition:box-shadow .2s,transform .12s;cursor:pointer;}
+.camp-card:hover{box-shadow:0 6px 24px rgba(13,43,78,.14);transform:translateY(-2px);}
 .camp-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;}
 .badge-promo{background:#fff7ed;border:1px solid #fed7aa;color:#c2410c;}
 .badge-actif{background:#f0fdf4;border:1px solid #bbf7d0;color:#166534;}
 .badge-expire{background:#f3f4f6;border:1px solid #d1d5db;color:#6b7280;}
 .badge-brouillon{background:#fef9c3;border:1px solid #fde047;color:#713f12;}
-/* Types */
 .type-tag{padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700;}
 .t-emploi{background:#dbeafe;color:#1e40af;}
 .t-benevolat{background:#dcfce7;color:#166534;}
 .t-stage{background:#fce7f3;color:#9d174d;}
 .t-mission{background:#ede9fe;color:#6d28d9;}
 .t-appel{background:#ffedd5;color:#9a3412;}
-/* Quota */
+.recr-mini-tag{font-size:10px;font-weight:700;background:var(--bg);color:var(--navy);border-radius:20px;padding:2px 9px;}
 .quota-bar{height:8px;border-radius:4px;background:#f3f4f6;overflow:hidden;margin-top:6px;}
-.quota-fill{height:100%;border-radius:4px;background:linear-gradient(135deg,#2563EB,#1d4ed8);transition:width .4s;}
-/* Interactions bar */
+.quota-fill{height:100%;border-radius:4px;background:linear-gradient(135deg,var(--navy),#1d4ed8);transition:width .4s;}
 .interact-bar{display:flex;gap:6px;flex-wrap:wrap;padding-top:10px;border-top:1px solid var(--border);margin-top:10px;}
 .ibtn{display:flex;align-items:center;gap:3px;padding:4px 9px;border:1px solid var(--border);border-radius:20px;background:#fff;cursor:pointer;font-size:11px;font-weight:700;transition:all .15s;color:#374151;}
-.ibtn:hover,.ibtn.active{border-color:#2563EB;color:#2563EB;background:#fff7f0;}
-/* Rayon grid */
+.ibtn:hover,.ibtn.active{border-color:var(--orange);color:var(--orange);background:#fff7f0;}
 .rayon-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
 .rayon-opt{cursor:pointer;border:2px solid var(--border);border-radius:10px;padding:10px 6px;text-align:center;transition:all .15s;background:#fff;}
-.rayon-opt.sel{border-color:#2563EB;background:#fff7f0;}
-/* Candidatures */
+.rayon-opt.sel{border-color:var(--orange);background:#fff7f0;}
 .cand-row{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);}
 .stat-kpi{background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center;}
+.recr-pagination{display:flex;justify-content:center;gap:6px;margin-top:26px;flex-wrap:wrap;}
+.recr-page-btn{border:1px solid var(--border);background:#fff;border-radius:8px;padding:7px 12px;font-size:12.5px;font-weight:700;cursor:pointer;color:var(--navy);}
+.recr-page-btn.active{background:var(--navy);color:#fff;border-color:var(--navy);}
+.recr-page-btn:disabled{opacity:.4;cursor:default;}
+
+.recr-side{display:flex;flex-direction:column;gap:16px;position:sticky;top:80px;}
+.recr-side-box{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;}
+.recr-side-box h4{font-size:13px;margin:0 0 10px;color:var(--navy);display:flex;align-items:center;gap:6px;}
+.recr-side-sub{font-size:11px;color:var(--muted);margin:0 0 10px;}
+.recr-side-item{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);font-size:12.5px;cursor:pointer;color:var(--navy);}
+.recr-side-item:last-child{border-bottom:none;}
+.recr-side-item b{font-size:15px;color:var(--orange);}
+.btn-recr-publish{width:100%;background:var(--orange);color:#fff;border:none;border-radius:30px;padding:12px;font-size:13.5px;font-weight:800;cursor:pointer;box-shadow:0 6px 18px -8px rgba(184,76,26,.6);}
+.btn-recr-outline{width:100%;background:none;border:1px solid var(--border);border-radius:30px;padding:8px;font-size:11.5px;font-weight:700;color:var(--navy);cursor:pointer;margin-top:4px;}
+.recr-alert-item{background:var(--bg);border-radius:8px;padding:7px 10px;font-size:11px;color:var(--navy);display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:6px;}
+.recr-alert-item button{background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;}
+.recr-kpi-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:10px;}
+.recr-kpi{background:var(--bg);border-radius:10px;padding:10px;text-align:center;}
+.recr-kpi .n{font-size:17px;font-weight:800;color:var(--navy);}
+.recr-kpi .l{font-size:9.5px;color:var(--muted);font-weight:700;margin-top:1px;}
+.recr-side-link{font-size:11.5px;color:var(--orange);font-weight:700;text-decoration:none;}
+.recr-empty{text-align:center;padding:50px 20px;color:var(--muted);}
+.recr-empty .ic{font-size:40px;margin-bottom:8px;}
+.recr-form-section{margin:18px 0 10px;font-size:13px;font-weight:700;color:#555;border-top:1px solid var(--border);padding-top:14px;}
+.recr-form-section:first-child{border-top:none;margin-top:0;padding-top:0;}
+.recr-chip-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+.recr-chip{background:var(--bg);color:var(--navy);border-radius:20px;padding:4px 11px;font-size:11.5px;font-weight:600;}
+.recr-photo-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;}
+.recr-photo-thumb{position:relative;width:70px;height:70px;border-radius:10px;overflow:hidden;border:1px solid var(--border);}
+.recr-photo-thumb img{width:100%;height:100%;object-fit:cover;}
+.recr-photo-thumb button{position:absolute;top:2px;right:2px;background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:11px;cursor:pointer;line-height:1;}
+.recr-cand-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px;}
+
+/* ═══ Modales (pas de règle globale sur le site : chaque page définit .modal-bg/.modal) ═══ */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:none;align-items:center;justify-content:center;padding:20px;}
+.modal{background:#fff;border-radius:16px;padding:26px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.25);}
 </style>
 <link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
   <link rel="stylesheet" href="/assets/design-upgrade.v2.css">
   <link rel="stylesheet" href="/assets/theme-manager.css">
 </head>
-<body>
+<body class="nd">
 <div class="page" id="app">
 
   <header class="topbar">
@@ -71,7 +176,7 @@
         <a href="vitrines.html">Boutiques</a>
         <a href="fil-actualite.html">Fil</a>
         <a href="evenements.html">Autres événements</a>
-        <a href="recrutement.html" style="color:#2563EB;font-weight:700;">Recrutement</a>
+        <a href="recrutement.html" class="active" style="color:#2563EB;font-weight:700;">Recrutement</a>
         <a href="billetterie.html">Billetterie</a>
         <a href="sondages.html">Sondages</a>
       </nav>
@@ -82,86 +187,209 @@
     </div>
   </header>
 
-  <main class="container" style="padding-top:24px;padding-bottom:60px;">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;flex-wrap:wrap;gap:12px;">
-      <div>
-        <h1 style="margin:0 0 4px;font-size:26px;">💼 Recrutement</h1>
-        <p style="margin:0;color:var(--muted);font-size:14px;">Offres d'emploi, bénévolat, stages, missions et appels à candidatures de la diaspora</p>
-      </div>
-      <button class="btn btn-orange" id="btn-creer-camp" style="display:none;" onclick="openCreateCamp()">＋ Créer une campagne</button>
-    </div>
-
-    <!-- Tabs -->
-    <div class="recr-nav">
-      <button class="recr-tab active" onclick="switchRecr('offres')">🔍 Offres</button>
-      <button class="recr-tab" onclick="switchRecr('mes-campagnes')" id="tab-mes-camp" style="display:none;">📋 Mes campagnes</button>
-    </div>
-
-    <!-- SECTION : Offres publiques -->
-    <div class="recr-section active" id="sec-offres">
-      <!-- Filtres -->
-      <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:20px;">
-        <input type="text" id="f-q" placeholder="🔍 Rechercher…" style="flex:1;min-width:180px;height:38px;padding:0 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;" oninput="filterCamps()">
-        <select id="f-type" onchange="filterCamps()" style="height:38px;padding:0 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:#fff;">
-          <option value="">Tous les types</option>
-          <option value="emploi">💼 Emploi</option>
-          <option value="benevolat">🤝 Bénévolat</option>
-          <option value="stage">🎓 Stage</option>
-          <option value="mission">🎯 Mission</option>
-          <option value="appel_candidature">📣 Appel à candidatures</option>
-        </select>
-        <select id="f-pays" onchange="filterCamps()" style="height:38px;padding:0 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:#fff;">
-          <option value="">Tous les pays</option>
-        </select>
-      </div>
-      <div id="camps-grid" class="camp-grid">
-        <div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted);">Chargement…</div>
-      </div>
-    </div>
-
-    <!-- SECTION : Mes campagnes (recruteur) -->
-    <div class="recr-section" id="sec-mes-campagnes">
-      <!-- Quota -->
-      <div id="quota-banner" style="display:none;background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:20px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-          <strong style="font-size:14px;">📊 Quota annuel de campagnes</strong>
-          <span id="quota-label" style="font-size:13px;font-weight:700;"></span>
+  <!-- ══ BANDEAU ══ -->
+  <section class="recr-hero">
+    <div class="recr-hero-inner">
+      <div class="recr-hero-left">
+        <div class="recr-hero-icon">💼</div>
+        <div>
+          <h1>Recrutement <span>Diaspo'Actif</span></h1>
+          <p class="recr-hero-sub">Offres d'emploi, de bénévolat, de stages, de missions et d'appels à candidatures de la diaspora et pour l'Afrique.</p>
+          <ul class="recr-hero-points">
+            <li>✅ Trouvez des opportunités</li>
+            <li>✅ Recrutez des talents</li>
+            <li>✅ Contribuez à des projets à impact</li>
+          </ul>
         </div>
-        <div class="quota-bar"><div class="quota-fill" id="quota-fill" style="width:0%"></div></div>
-        <div id="quota-msg" style="font-size:12px;color:var(--muted);margin-top:6px;"></div>
       </div>
-      <div id="mes-camps-list">
-        <div style="text-align:center;padding:30px;color:var(--muted);">Chargement…</div>
+      <div class="recr-hero-illu">
+        <div class="recr-illu-cards" id="recr-illu-cards">
+          <div class="recr-illu-card"><div class="av">💼</div><div class="txt"><b>Chargé(e) de communication</b><small>Abidjan, Côte d'Ivoire</small></div></div>
+          <div class="recr-illu-card"><div class="av">🤝</div><div class="txt"><b>Bénévoles — Campagne Éducation</b><small>Dakar, Sénégal</small></div></div>
+          <div class="recr-illu-card"><div class="av">🎓</div><div class="txt"><b>Stage — Développeur(se) Web</b><small>Toulouse, France</small></div></div>
+        </div>
       </div>
     </div>
-  </main>
+  </section>
+
+  <!-- ══ BARRE DE TYPE ══ -->
+  <section class="recr-typewrap">
+    <div class="recr-type-grid" id="recr-type-grid">
+      <div class="recr-type-opt" data-type="emploi" onclick="quickType('emploi')">
+        <div class="ic">💼</div><div class="lb">Emploi</div><div class="sub">CDI, CDD, Freelance…</div>
+      </div>
+      <div class="recr-type-opt" data-type="benevolat" onclick="quickType('benevolat')">
+        <div class="ic">🤝</div><div class="lb">Bénévolat</div><div class="sub">Engagement citoyen</div>
+      </div>
+      <div class="recr-type-opt" data-type="stage" onclick="quickType('stage')">
+        <div class="ic">🎓</div><div class="lb">Stage</div><div class="sub">Formation &amp; expérience</div>
+      </div>
+      <div class="recr-type-opt" data-type="mission" onclick="quickType('mission')">
+        <div class="ic">🎯</div><div class="lb">Mission</div><div class="sub">Prestations &amp; expertises</div>
+      </div>
+      <div class="recr-type-opt" data-type="appel_candidature" onclick="quickType('appel_candidature')">
+        <div class="ic">📣</div><div class="lb">Appel à candidatures</div><div class="sub">Projets, programmes…</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ BARRE DE RECHERCHE ══ -->
+  <section class="recr-search-bar">
+    <div class="recr-search-inner">
+      <input type="text" id="f-q" placeholder="🔍 Rechercher une offre (ex : développeur, communication, gestion de projet…)" oninput="applyFilters()">
+      <select id="f-pays-top" onchange="document.getElementById('f-pays').value=this.value;applyFilters();"><option value="">Tous les pays</option></select>
+      <select id="f-domaine-top" onchange="document.getElementById('f-domaine').value=this.value;applyFilters();"><option value="">Tous les domaines</option></select>
+      <button class="btn-recr-search" onclick="applyFilters()">🔍 Rechercher</button>
+    </div>
+  </section>
+
+  <div class="recr-layout">
+    <!-- ══ FILTRES ══ -->
+    <aside class="recr-filters">
+      <div class="recr-filters-head">
+        <h3>🔎 Filtres de recherche</h3>
+        <button class="btn-recr-reset" onclick="resetFilters()">↻ Réinitialiser</button>
+      </div>
+      <div class="recr-fgroup">
+        <label>Type d'opportunité</label>
+        <div class="recr-type-checks" id="f-type-checks"></div>
+      </div>
+      <div class="recr-fgroup">
+        <label>Domaine d'activité</label>
+        <select id="f-domaine" onchange="document.getElementById('f-domaine-top').value=this.value;applyFilters();"><option value="">Tous les domaines</option></select>
+      </div>
+      <div class="recr-fgroup">
+        <label>Pays</label>
+        <select id="f-pays" onchange="document.getElementById('f-pays-top').value=this.value;applyFilters();"><option value="">Tous les pays</option></select>
+      </div>
+      <div class="recr-fgroup">
+        <label>Ville</label>
+        <input type="text" id="f-ville" placeholder="Ex : Abidjan, Dakar, Paris…" oninput="applyFilters()">
+      </div>
+      <div class="recr-fgroup">
+        <label>Type de contrat</label>
+        <select id="f-contrat" onchange="applyFilters()">
+          <option value="">Tous les contrats</option>
+          <option value="CDI">CDI</option>
+          <option value="CDD">CDD</option>
+          <option value="Freelance">Freelance</option>
+          <option value="Alternance">Alternance</option>
+          <option value="Intérim">Intérim</option>
+          <option value="Autre">Autre</option>
+        </select>
+      </div>
+      <div class="recr-fgroup chk">
+        <input type="checkbox" id="f-teletravail" onchange="applyFilters()"><label for="f-teletravail">Télétravail possible</label>
+      </div>
+      <div class="recr-fgroup chk">
+        <input type="checkbox" id="f-remuneration" onchange="applyFilters()"><label for="f-remuneration">Rémunération indiquée</label>
+      </div>
+      <button class="btn-recr-apply" onclick="applyFilters()">⚙️ Appliquer les filtres</button>
+    </aside>
+
+    <!-- ══ RÉSULTATS ══ -->
+    <main class="recr-results">
+      <div class="recr-tabs">
+        <button class="recr-tab active" onclick="switchRecr('offres')">Offres (<span id="tab-count-offres">0</span>)</button>
+        <button class="recr-tab" id="tab-mes-camp" style="display:none;" onclick="switchRecr('mes-campagnes')">Mes campagnes</button>
+        <button class="recr-tab" id="tab-mes-cand" style="display:none;" onclick="switchRecr('mes-candidatures')">Mes candidatures</button>
+        <button class="recr-tab" id="tab-mes-fav" style="display:none;" onclick="switchRecr('mes-favoris')">Offres favorites</button>
+      </div>
+
+      <!-- SECTION : Offres publiques -->
+      <div class="recr-section active" id="sec-offres">
+        <div class="recr-results-head">
+          <span id="recr-count-txt">Chargement…</span>
+          <div class="recr-results-actions">
+            <select id="f-sort" onchange="applyFilters()">
+              <option value="recent">Plus récentes</option>
+              <option value="vues">Plus vues</option>
+              <option value="cands">Plus de candidatures</option>
+              <option value="expire">Expire bientôt</option>
+            </select>
+            <div class="recr-view-toggle">
+              <button id="btn-view-grid" class="active" onclick="setView('grid')" title="Grille">▦</button>
+              <button id="btn-view-list" onclick="setView('list')" title="Liste">☰</button>
+            </div>
+          </div>
+        </div>
+        <div id="camps-grid" class="camp-grid">
+          <div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted);">Chargement…</div>
+        </div>
+        <div class="recr-pagination" id="recr-pagination"></div>
+      </div>
+
+      <!-- SECTION : Mes campagnes (recruteur) -->
+      <div class="recr-section" id="sec-mes-campagnes">
+        <div id="quota-banner" style="display:none;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:20px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <strong style="font-size:14px;">📊 Quota annuel de campagnes</strong>
+            <span id="quota-label" style="font-size:13px;font-weight:700;"></span>
+          </div>
+          <div class="quota-bar"><div class="quota-fill" id="quota-fill" style="width:0%"></div></div>
+          <div id="quota-msg" style="font-size:12px;color:var(--muted);margin-top:6px;"></div>
+        </div>
+        <div id="mes-camps-list">
+          <div style="text-align:center;padding:30px;color:var(--muted);">Chargement…</div>
+        </div>
+      </div>
+
+      <!-- SECTION : Mes candidatures (candidat) -->
+      <div class="recr-section" id="sec-mes-candidatures">
+        <div id="mes-cands-list"><div style="text-align:center;padding:30px;color:var(--muted);">Chargement…</div></div>
+      </div>
+
+      <!-- SECTION : Offres favorites -->
+      <div class="recr-section" id="sec-mes-favoris">
+        <div id="mes-favoris-grid" class="camp-grid"><div style="grid-column:1/-1;text-align:center;padding:30px;color:var(--muted);">Chargement…</div></div>
+      </div>
+    </main>
+
+    <!-- ══ MON ESPACE RECRUTEMENT ══ -->
+    <aside class="recr-side">
+      <div class="recr-side-box">
+        <h4>👤 Mon espace recrutement</h4>
+        <div id="recr-espace-items"><div class="recr-side-item" style="cursor:default;color:var(--muted);">Connectez-vous pour accéder à votre espace.</div></div>
+      </div>
+      <button class="btn-recr-publish" id="btn-creer-camp" style="display:none;" onclick="openCreateCamp()">＋ Publier une offre</button>
+      <div class="recr-side-box" id="recr-alert-box" style="display:none;">
+        <h4>🔔 Créer une alerte emploi</h4>
+        <p class="recr-side-sub">Recevez une notification quand une offre correspond à vos critères.</p>
+        <div id="recr-alertes-list"></div>
+        <button class="btn-recr-outline" onclick="openAlerteModal()">＋ Nouvelle alerte</button>
+      </div>
+      <div class="recr-side-box" id="recr-kpi-box" style="display:none;">
+        <h4>📊 Statistiques (mes campagnes)</h4>
+        <div class="recr-kpi-grid" id="recr-kpi-grid"></div>
+        <a href="dashboard-initiative.html" class="recr-side-link">Voir le tableau de bord complet →</a>
+      </div>
+    </aside>
+  </div>
 </div>
 
 <!-- ══ MODAL DÉTAIL CAMPAGNE ══ -->
 <div class="modal-bg" id="modal-camp-bg" onclick="if(event.target===this)closeMod('modal-camp-bg')">
-  <div class="modal" id="modal-camp-content" style="max-width:680px;max-height:90vh;overflow-y:auto;"></div>
+  <div class="modal" id="modal-camp-content" style="max-width:700px;max-height:90vh;overflow-y:auto;"></div>
 </div>
 
 <!-- ══ MODAL CRÉER / ÉDITER CAMPAGNE ══ -->
 <div class="modal-bg" id="modal-create-camp-bg" onclick="if(event.target===this)closeMod('modal-create-camp-bg')">
-  <div class="modal" style="max-width:620px;max-height:90vh;overflow-y:auto;">
+  <div class="modal" style="max-width:660px;max-height:90vh;overflow-y:auto;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
-      <h3 style="margin:0;" id="create-camp-title">＋ Créer une campagne</h3>
+      <h3 style="margin:0;" id="create-camp-title">＋ Publier une offre</h3>
       <button onclick="closeMod('modal-create-camp-bg')" style="background:none;border:none;font-size:22px;cursor:pointer;">×</button>
     </div>
     <div id="create-camp-form">
+
+      <div class="recr-form-section">📋 Informations générales</div>
       <div class="form-row">
-        <label>Nom de la campagne *</label>
+        <label>Nom de l'offre *</label>
         <input type="text" id="camp-nom" placeholder="Ex : Responsable communication bénévole">
-      </div>
-      <div class="form-row">
-        <label>Description détaillée</label>
-        <textarea id="camp-desc" rows="5" placeholder="Missions, profil recherché, conditions…" style="resize:vertical;"></textarea>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
         <div class="form-row">
           <label>Type de recrutement</label>
-          <select id="camp-type">
+          <select id="camp-type" onchange="campToggleTypeFields()">
             <option value="emploi">💼 Emploi</option>
             <option value="benevolat">🤝 Bénévolat</option>
             <option value="stage">🎓 Stage</option>
@@ -170,65 +398,116 @@
           </select>
         </div>
         <div class="form-row">
+          <label>Intitulé du poste</label>
+          <input type="text" id="camp-titre-poste" placeholder="Ex : Développeur Web Junior">
+        </div>
+        <div class="form-row">
           <label>Organisme recruteur</label>
           <input type="text" id="camp-organisme" placeholder="Nom de l'organisation">
         </div>
         <div class="form-row">
-          <label>Pays</label>
-          <input type="text" id="camp-pays" placeholder="France">
-        </div>
-        <div class="form-row">
-          <label>Ville</label>
-          <input type="text" id="camp-ville" placeholder="Paris">
+          <label>Domaine d'activité</label>
+          <input type="text" id="camp-secteur" placeholder="Ex : Communication, Informatique…">
         </div>
       </div>
-      <div class="form-row" style="grid-column:1/-1;">
-        <label>Adresse (facultatif)</label>
-        <input type="text" id="camp-adresse" placeholder="Ex : 12 rue des Lilas, 75020 Paris">
+      <div class="form-row">
+        <label>Description détaillée</label>
+        <textarea id="camp-desc" rows="5" placeholder="Missions, profil recherché, conditions…" style="resize:vertical;"></textarea>
       </div>
 
+      <div class="recr-form-section">📍 Lieu</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+        <div class="form-row"><label>Pays</label><input type="text" id="camp-pays" placeholder="France"></div>
+        <div class="form-row"><label>Ville</label><input type="text" id="camp-ville" placeholder="Paris"></div>
+        <div class="form-row"><label>Région</label><input type="text" id="camp-region" placeholder="Facultatif"></div>
+        <div class="form-row"><label>Département</label><input type="text" id="camp-departement" placeholder="Facultatif"></div>
+      </div>
+      <div class="form-row"><label>Adresse (facultatif)</label><input type="text" id="camp-adresse" placeholder="Ex : 12 rue des Lilas, 75020 Paris"></div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;cursor:pointer;margin:6px 0 0;">
+        <input type="checkbox" id="camp-teletravail" style="accent-color:var(--orange);"> Télétravail possible
+      </label>
+
       <!-- Rayon de publication -->
-      <div style="margin:18px 0 10px;font-size:13px;font-weight:700;color:#555;border-top:1px solid var(--border);padding-top:14px;">📡 Rayon de publication</div>
+      <div style="margin:18px 0 10px;font-size:13px;font-weight:700;color:#555;">📡 Rayon de publication</div>
       <div class="rayon-grid" id="camp-rayon-grid">
         <div class="rayon-opt" onclick="campSelectRayon('ville')">
           <input type="radio" name="camp-rayon" value="ville" style="display:none;">
           <div style="font-size:20px;">🏙️</div><div style="font-size:12px;font-weight:700;">Ville</div>
-          <div style="font-size:10px;color:var(--muted);">Ma ville uniquement</div>
         </div>
         <div class="rayon-opt" onclick="campSelectRayon('commune')">
           <input type="radio" name="camp-rayon" value="commune" style="display:none;">
           <div style="font-size:20px;">🏘️</div><div style="font-size:12px;font-weight:700;">Commune</div>
-          <div style="font-size:10px;color:var(--muted);">Commune d'organisation</div>
         </div>
         <div class="rayon-opt" onclick="campSelectRayon('departement')">
           <input type="radio" name="camp-rayon" value="departement" style="display:none;">
           <div style="font-size:20px;">🗺️</div><div style="font-size:12px;font-weight:700;">Département</div>
-          <div style="font-size:10px;color:var(--muted);">Tout le département</div>
         </div>
         <div class="rayon-opt" onclick="campSelectRayon('region')">
           <input type="radio" name="camp-rayon" value="region" style="display:none;">
           <div style="font-size:20px;">🌐</div><div style="font-size:12px;font-weight:700;">Région</div>
-          <div style="font-size:10px;color:var(--muted);">Toute la région</div>
         </div>
         <div class="rayon-opt" onclick="campSelectRayon('national')">
           <input type="radio" name="camp-rayon" value="national" style="display:none;">
-          <div style="font-size:20px;">🇫🇷</div><div style="font-size:12px;font-weight:700;">National</div>
-          <div style="font-size:10px;color:var(--muted);">Tout le pays</div>
+          <div style="font-size:20px;">🏳️</div><div style="font-size:12px;font-weight:700;">National</div>
         </div>
         <div class="rayon-opt sel" onclick="campSelectRayon('international')">
           <input type="radio" name="camp-rayon" value="international" checked style="display:none;">
           <div style="font-size:20px;">🌍</div><div style="font-size:12px;font-weight:700;">International</div>
-          <div style="font-size:10px;color:var(--muted);">Diffusion mondiale</div>
         </div>
       </div>
 
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:20px;flex-wrap:wrap;gap:10px;">
+      <div class="recr-form-section">📝 Conditions</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;" id="camp-conditions-grid">
+        <div class="form-row" id="camp-contrat-row">
+          <label>Type de contrat</label>
+          <select id="camp-contrat">
+            <option value="">—</option>
+            <option value="CDI">CDI</option>
+            <option value="CDD">CDD</option>
+            <option value="Freelance">Freelance</option>
+            <option value="Alternance">Alternance</option>
+            <option value="Intérim">Intérim</option>
+            <option value="Autre">Autre</option>
+          </select>
+        </div>
+        <div class="form-row"><label>Niveau d'études</label><input type="text" id="camp-niveau" placeholder="Ex : Bac+3, Bac+5…"></div>
+        <div class="form-row"><label>Expérience requise</label><input type="text" id="camp-exp" placeholder="Ex : 2 à 5 ans"></div>
+        <div class="form-row"><label>Nombre de postes</label><input type="number" id="camp-nb-postes" min="1" value="1"></div>
+        <div class="form-row"><label>Date de début souhaitée</label><input type="date" id="camp-date-debut"></div>
+        <div class="form-row" id="camp-duree-row"><label>Durée de la mission/stage</label><input type="text" id="camp-duree" placeholder="Ex : 6 mois"></div>
+        <div class="form-row"><label>Rémunération</label><input type="text" id="camp-remuneration" placeholder="Ex : 1800 à 2200 / mois"></div>
+        <div class="form-row"><label>Devise</label>
+          <select id="camp-devise"><option value="EUR">EUR</option><option value="XOF">XOF</option><option value="XAF">XAF</option><option value="USD">USD</option><option value="MAD">MAD</option><option value="Autre">Autre</option></select>
+        </div>
+        <div class="form-row" style="grid-column:1/-1;"><label>Date limite de candidature</label><input type="date" id="camp-date-limite"></div>
+      </div>
+
+      <div class="recr-form-section">🎯 Profil recherché</div>
+      <div class="form-row"><label>Compétences (séparées par des virgules)</label><input type="text" id="camp-competences" placeholder="Ex : Excel, Communication, Gestion de projet"></div>
+      <div class="form-row"><label>Langues (séparées par des virgules)</label><input type="text" id="camp-langues" placeholder="Ex : Français, Anglais"></div>
+      <div class="form-row"><label>Certifications (séparées par des virgules)</label><input type="text" id="camp-certifications" placeholder="Facultatif"></div>
+      <div class="form-row"><label>Qualités recherchées (séparées par des virgules)</label><input type="text" id="camp-qualites" placeholder="Ex : Rigueur, Autonomie"></div>
+
+      <div class="recr-form-section">📎 Documents</div>
+      <div class="form-row">
+        <label>Photo(s) de l'offre</label>
+        <div class="recr-photo-row" id="camp-photos-row"></div>
+        <button type="button" class="btn btn-outline btn-sm" style="margin-top:8px;" onclick="campAjouterPhoto()">＋ Ajouter une photo</button>
+      </div>
+      <div class="form-row">
+        <label>Fiche de poste (PDF, 5 Mo max)</label>
+        <input type="file" id="camp-pdf-input" accept="application/pdf" style="display:none;" onchange="campStagerPdf()">
+        <div id="camp-pdf-status" style="font-size:12px;color:var(--muted);"></div>
+        <button type="button" class="btn btn-outline btn-sm" style="margin-top:8px;" onclick="document.getElementById('camp-pdf-input').click()">📎 Choisir un fichier</button>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:20px;flex-wrap:wrap;gap:10px;border-top:1px solid var(--border);padding-top:16px;">
         <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;cursor:pointer;">
-          <input type="checkbox" id="camp-publier" style="accent-color:#2563EB;"> Publier immédiatement
+          <input type="checkbox" id="camp-publier" style="accent-color:var(--orange);"> Publier immédiatement
         </label>
         <div style="display:flex;gap:10px;">
           <button class="btn btn-outline" onclick="closeMod('modal-create-camp-bg')">Annuler</button>
-          <button class="btn btn-orange" id="btn-save-camp" onclick="saveCamp()">Créer la campagne</button>
+          <button class="btn btn-orange" id="btn-save-camp" onclick="saveCamp()">Publier l'offre</button>
         </div>
       </div>
     </div>
@@ -243,6 +522,35 @@
 <!-- ══ MODAL STATS CAMPAGNE ══ -->
 <div class="modal-bg" id="modal-stats-camp-bg" onclick="if(event.target===this)closeMod('modal-stats-camp-bg')">
   <div class="modal" id="modal-stats-camp-content" style="max-width:680px;max-height:90vh;overflow-y:auto;"></div>
+</div>
+
+<!-- ══ MODAL CRÉER UNE ALERTE EMPLOI ══ -->
+<div class="modal-bg" id="modal-alerte-bg" onclick="if(event.target===this)closeMod('modal-alerte-bg')">
+  <div class="modal" style="max-width:420px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <h3 style="margin:0;">🔔 Nouvelle alerte emploi</h3>
+      <button onclick="closeMod('modal-alerte-bg')" style="background:none;border:none;font-size:22px;cursor:pointer;">×</button>
+    </div>
+    <p style="font-size:12.5px;color:var(--muted);margin:0 0 14px;">Laissez un champ vide pour qu'il ne soit pas pris en compte dans le critère.</p>
+    <div class="form-row">
+      <label>Type d'opportunité</label>
+      <select id="alerte-type">
+        <option value="">Tous les types</option>
+        <option value="emploi">💼 Emploi</option>
+        <option value="benevolat">🤝 Bénévolat</option>
+        <option value="stage">🎓 Stage</option>
+        <option value="mission">🎯 Mission</option>
+        <option value="appel_candidature">📣 Appel à candidatures</option>
+      </select>
+    </div>
+    <div class="form-row"><label>Domaine d'activité</label><input type="text" id="alerte-domaine" placeholder="Ex : Informatique"></div>
+    <div class="form-row"><label>Pays</label><input type="text" id="alerte-pays" placeholder="Ex : France"></div>
+    <div class="form-row"><label>Ville</label><input type="text" id="alerte-ville" placeholder="Ex : Paris"></div>
+    <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px;">
+      <button class="btn btn-outline" onclick="closeMod('modal-alerte-bg')">Annuler</button>
+      <button class="btn btn-orange" onclick="saveAlerte()">Créer l'alerte</button>
+    </div>
+  </div>
 </div>
 
 <script src="assets/data.js"></script>
@@ -262,6 +570,15 @@ let ALL_CAMPS = [];
 let ME_RECR = null;
 let QUOTA = null;
 let EDIT_CAMP_ID = null;
+let MES_CANDS = null;
+let MES_FAVORIS = null;
+let MES_ALERTES = null;
+let CUR_TAB = 'offres';
+let CUR_VIEW = 'grid';
+let CUR_PAGE = 1;
+const PAGE_SIZE = 12;
+let CAMP_PHOTOS = [];
+let CAMP_PDF = null; // { b64, nom }
 
 /* Utilitaires */
 function closeMod(id) { document.getElementById(id).style.display='none'; }
@@ -271,30 +588,40 @@ function fmtDate(s) {
 }
 const TYPE_LABELS = {emploi:'💼 Emploi',benevolat:'🤝 Bénévolat',stage:'🎓 Stage',mission:'🎯 Mission',appel_candidature:'📣 Appel à candidatures'};
 const TYPE_CLASS = {emploi:'t-emploi',benevolat:'t-benevolat',stage:'t-stage',mission:'t-mission',appel_candidature:'t-appel'};
-const RAYON_LABELS = {ville:'🏙️ Ville',commune:'🏘️ Commune',departement:'🗺️ Département',region:'🌐 Région',national:'🇫🇷 National',international:'🌍 International'};
+const RAYON_LABELS = {ville:'🏙️ Ville',commune:'🏘️ Commune',departement:'🗺️ Département',region:'🌐 Région',national:'🏳️ National',international:'🌍 International'};
+const jsonArr = s => { try { const v = JSON.parse(s||'[]'); return Array.isArray(v) ? v : []; } catch(_) { return []; } };
 
 /* Init */
 document.addEventListener('DOMContentLoaded', async () => {
-  // Détecter le user connecté
   try { ME_RECR = await fetchCurrentUser(); } catch(_) {}
   initUIPerRole();
   loadCamps();
 });
 
 function initUIPerRole() {
-  if (ME_RECR && ['initiative','collectivite','administrateur'].includes(ME_RECR.role)) {
+  if (!ME_RECR) return;
+  if (['initiative','collectivite','administrateur'].includes(ME_RECR.role)) {
     document.getElementById('btn-creer-camp').style.display = '';
     document.getElementById('tab-mes-camp').style.display = '';
+    document.getElementById('recr-kpi-box').style.display = '';
   }
+  document.getElementById('tab-mes-cand').style.display = '';
+  document.getElementById('tab-mes-fav').style.display = '';
+  document.getElementById('recr-alert-box').style.display = '';
+  renderEspaceRecrutement();
+  loadMesAlertes();
 }
 
 /* ── Tabs ── */
 function switchRecr(name) {
+  CUR_TAB = name; CUR_PAGE = 1;
   document.querySelectorAll('.recr-section').forEach(s=>s.classList.remove('active'));
   document.querySelectorAll('.recr-tab').forEach(t=>t.classList.remove('active'));
   document.getElementById('sec-'+name)?.classList.add('active');
-  document.querySelector(`.recr-tab[onclick*="${name}"]`)?.classList.add('active');
+  event?.currentTarget?.classList.add('active');
   if (name === 'mes-campagnes') loadMesCamps();
+  if (name === 'mes-candidatures') loadMesCandidatures();
+  if (name === 'mes-favoris') loadMesFavoris();
 }
 
 /* ── Chargement offres publiques ── */
@@ -303,40 +630,149 @@ async function loadCamps() {
     const r = await api('GET', '/recrutement');
     ALL_CAMPS = r.campagnes || [];
     QUOTA = r.quota;
-    // Pays pour le filtre
     const pays = [...new Set(ALL_CAMPS.map(c=>c.pays).filter(Boolean))].sort();
-    const sel = document.getElementById('f-pays');
-    pays.forEach(p => { const o=document.createElement('option'); o.value=p; o.textContent=p; sel.appendChild(o); });
-    renderCamps(ALL_CAMPS);
+    const domaines = [...new Set(ALL_CAMPS.map(c=>c.secteur_activite).filter(Boolean))].sort();
+    ['f-pays','f-pays-top'].forEach(id => {
+      const sel = document.getElementById(id);
+      pays.forEach(p => { const o=document.createElement('option'); o.value=p; o.textContent=p; sel.appendChild(o); });
+    });
+    ['f-domaine','f-domaine-top'].forEach(id => {
+      const sel = document.getElementById(id);
+      domaines.forEach(d => { const o=document.createElement('option'); o.value=d; o.textContent=d; sel.appendChild(o); });
+    });
+    renderTypeUI();
+    renderIlluCards();
+    applyFilters();
+    if (ME_RECR) renderEspaceRecrutement();
   } catch(e) { document.getElementById('camps-grid').innerHTML=`<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted);">Erreur de chargement.</div>`; }
 }
 
-function filterCamps() {
+function renderIlluCards() {
+  if (!ALL_CAMPS.length) return;
+  const el = document.getElementById('recr-illu-cards');
+  const avs = {emploi:'💼',benevolat:'🤝',stage:'🎓',mission:'🎯',appel_candidature:'📣'};
+  el.innerHTML = ALL_CAMPS.slice(0,3).map(c => `
+    <div class="recr-illu-card"><div class="av">${avs[c.type_recrutement]||'💼'}</div><div class="txt"><b>${escH(c.titre_poste||c.nom)}</b><small>${escH([c.ville,c.pays].filter(Boolean).join(', ')||'International')}</small></div></div>
+  `).join('');
+}
+
+/* ── Barre de type (5 boutons) + checkboxes filtres ── */
+function renderTypeUI() {
+  const counts = {emploi:0,benevolat:0,stage:0,mission:0,appel_candidature:0};
+  ALL_CAMPS.forEach(c => { if (counts[c.type_recrutement] !== undefined) counts[c.type_recrutement]++; });
+  document.querySelectorAll('#recr-type-grid .recr-type-opt').forEach(el => {
+    const t = el.dataset.type;
+    const sub = el.querySelector('.sub');
+    if (t && counts[t] !== undefined) sub.textContent = counts[t] + (counts[t] > 1 ? ' offres' : ' offre');
+  });
+  const checksEl = document.getElementById('f-type-checks');
+  checksEl.innerHTML = Object.keys(TYPE_LABELS).map(t => `
+    <label class="recr-type-check"><input type="checkbox" class="f-type-chk" value="${t}" onchange="applyFilters()"> ${TYPE_LABELS[t]} <span class="n">(${counts[t]})</span></label>
+  `).join('');
+}
+
+function quickType(t) {
+  document.querySelectorAll('#recr-type-grid .recr-type-opt').forEach(el => el.classList.toggle('sel', el.dataset.type === t && !el.classList.contains('sel')));
+  // Bascule simple : un seul type actif à la fois via les boutons du haut
+  const opt = [...document.querySelectorAll('#recr-type-grid .recr-type-opt')].find(el => el.dataset.type === t);
+  const wasSel = opt.classList.contains('sel');
+  document.querySelectorAll('#recr-type-grid .recr-type-opt').forEach(el => el.classList.remove('sel'));
+  document.querySelectorAll('.f-type-chk').forEach(chk => chk.checked = false);
+  if (!wasSel) {
+    opt.classList.add('sel');
+    const chk = document.querySelector(`.f-type-chk[value="${t}"]`);
+    if (chk) chk.checked = true;
+  }
+  applyFilters();
+}
+
+/* ── Filtres + tri + pagination (client-side) ── */
+function getFilteredCamps() {
   const q = document.getElementById('f-q').value.toLowerCase();
-  const type = document.getElementById('f-type').value;
+  const types = [...document.querySelectorAll('.f-type-chk:checked')].map(c=>c.value);
+  const domaine = document.getElementById('f-domaine').value;
   const pays = document.getElementById('f-pays').value;
-  renderCamps(ALL_CAMPS.filter(c =>
-    (!q || c.nom.toLowerCase().includes(q) || (c.description||'').toLowerCase().includes(q) || (c.organisme||'').toLowerCase().includes(q)) &&
-    (!type || c.type_recrutement === type) &&
-    (!pays || c.pays === pays)
-  ));
+  const ville = document.getElementById('f-ville').value.toLowerCase();
+  const contrat = document.getElementById('f-contrat').value;
+  const teletravail = document.getElementById('f-teletravail').checked;
+  const remuneration = document.getElementById('f-remuneration').checked;
+  let arr = ALL_CAMPS.filter(c =>
+    (!q || c.nom.toLowerCase().includes(q) || (c.description||'').toLowerCase().includes(q) || (c.organisme||'').toLowerCase().includes(q) || (c.titre_poste||'').toLowerCase().includes(q)) &&
+    (!types.length || types.includes(c.type_recrutement)) &&
+    (!domaine || c.secteur_activite === domaine) &&
+    (!pays || c.pays === pays) &&
+    (!ville || (c.ville||'').toLowerCase().includes(ville)) &&
+    (!contrat || c.type_contrat === contrat) &&
+    (!teletravail || c.teletravail === 'oui') &&
+    (!remuneration || !!(c.remuneration && String(c.remuneration).trim()))
+  );
+  const sort = document.getElementById('f-sort').value;
+  if (sort === 'vues') arr = arr.slice().sort((a,b)=>(b.vues_total||0)-(a.vues_total||0));
+  else if (sort === 'cands') arr = arr.slice().sort((a,b)=>(b.nb_candidatures||0)-(a.nb_candidatures||0));
+  else if (sort === 'expire') arr = arr.slice().sort((a,b)=>new Date(a.expire_at||'9999')-new Date(b.expire_at||'9999'));
+  else arr = arr.slice().sort((a,b)=>new Date(b.publie_at||b.created_at||0)-new Date(a.publie_at||a.created_at||0));
+  return arr;
+}
+
+function applyFilters() {
+  CUR_PAGE = 1;
+  renderCamps(getFilteredCamps());
+}
+function filterCamps() { applyFilters(); } // compat
+
+function resetFilters() {
+  document.getElementById('f-q').value = '';
+  document.getElementById('f-domaine').value = ''; document.getElementById('f-domaine-top').value = '';
+  document.getElementById('f-pays').value = ''; document.getElementById('f-pays-top').value = '';
+  document.getElementById('f-ville').value = '';
+  document.getElementById('f-contrat').value = '';
+  document.getElementById('f-teletravail').checked = false;
+  document.getElementById('f-remuneration').checked = false;
+  document.querySelectorAll('.f-type-chk').forEach(c=>c.checked=false);
+  document.querySelectorAll('#recr-type-grid .recr-type-opt').forEach(el=>el.classList.remove('sel'));
+  document.getElementById('f-sort').value = 'recent';
+  applyFilters();
+}
+
+function setView(mode) {
+  CUR_VIEW = mode;
+  document.getElementById('btn-view-grid').classList.toggle('active', mode==='grid');
+  document.getElementById('btn-view-list').classList.toggle('active', mode==='list');
+  document.getElementById('camps-grid').classList.toggle('list-view', mode==='list');
+  renderCamps(getFilteredCamps());
 }
 
 function renderCamps(camps) {
+  document.getElementById('tab-count-offres').textContent = camps.length;
+  document.getElementById('recr-count-txt').textContent = camps.length + (camps.length > 1 ? ' offres trouvées' : ' offre trouvée');
   const grid = document.getElementById('camps-grid');
-  if (!camps.length) { grid.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted);">Aucune offre disponible.</div>'; return; }
-  grid.innerHTML = camps.map(c => `
+  if (!camps.length) { grid.innerHTML='<div class="recr-empty" style="grid-column:1/-1;"><div class="ic">🔍</div>Aucune offre ne correspond à ces critères.</div>'; document.getElementById('recr-pagination').innerHTML=''; return; }
+  const totalPages = Math.max(1, Math.ceil(camps.length / PAGE_SIZE));
+  if (CUR_PAGE > totalPages) CUR_PAGE = totalPages;
+  const page = camps.slice((CUR_PAGE-1)*PAGE_SIZE, CUR_PAGE*PAGE_SIZE);
+  grid.innerHTML = page.map(campCardHtml).join('');
+  renderPagination(totalPages);
+}
+
+function campCardHtml(c) {
+  const tags = [];
+  if (c.type_contrat) tags.push(`<span class="recr-mini-tag">${escH(c.type_contrat)}</span>`);
+  if (c.teletravail === 'oui') tags.push(`<span class="recr-mini-tag">🏠 Télétravail</span>`);
+  if (c.remuneration) tags.push(`<span class="recr-mini-tag">💰 ${escH(c.remuneration)}</span>`);
+  return `
     <div class="camp-card" onclick="openCamp(${c.id})">
+      <div class="cc-body">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;gap:8px;">
         <span class="type-tag ${TYPE_CLASS[c.type_recrutement]||'t-emploi'}">${TYPE_LABELS[c.type_recrutement]||c.type_recrutement}</span>
         ${c.en_promotion ? `<span class="camp-badge badge-promo">⚡ En vedette</span>` : `<span class="camp-badge badge-actif">✅ Active</span>`}
       </div>
-      <h3 style="margin:0 0 4px;font-size:15px;line-height:1.3;">${escH(c.nom)}</h3>
+      <h3 style="margin:0 0 4px;font-size:15px;line-height:1.3;">${escH(c.titre_poste||c.nom)}</h3>
       <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">
         ${c.organisme?`🏛️ ${escH(c.organisme)} · `:''}
         ${c.ville?`📍 ${escH(c.ville)}${c.pays?', '+escH(c.pays):''}`:c.pays?`📍 ${escH(c.pays)}`:''}
       </div>
       ${c.description ? `<p style="font-size:12px;color:#555;margin:0 0 10px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${escH(stripRichTags(c.description))}</p>` : ''}
+      ${tags.length ? `<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;">${tags.join('')}</div>` : ''}
       <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--muted);">
         <span>${RAYON_LABELS[c.rayon_publication]||''}</span>
         <span>👁️ ${c.vues_total||0} vues · 👤 ${c.nb_candidatures||0} candidatures</span>
@@ -349,9 +785,131 @@ function renderCamps(camps) {
         <button class="ibtn" onclick="openCamp(${c.id})">💬 ${c.nb_commentaires||0}</button>
         <button class="ibtn" onclick="favCamp(${c.id},this)">⭐</button>
         <button class="ibtn" onclick="partagerCamp(${c.id})">📤</button>
-        <button class="ibtn" style="border-color:#2563EB;color:#2563EB;" onclick="openCamp(${c.id})">📩 Postuler</button>
+        <button class="ibtn" style="border-color:var(--navy);color:var(--navy);" onclick="openCamp(${c.id})">📩 Postuler</button>
       </div>
-    </div>`).join('');
+      </div>
+    </div>`;
+}
+
+function renderPagination(totalPages) {
+  const el = document.getElementById('recr-pagination');
+  if (totalPages <= 1) { el.innerHTML = ''; return; }
+  let html = `<button class="recr-page-btn" ${CUR_PAGE===1?'disabled':''} onclick="goToPage(${CUR_PAGE-1})">← Précédent</button>`;
+  const start = Math.max(1, CUR_PAGE-2), end = Math.min(totalPages, CUR_PAGE+2);
+  if (start > 1) html += `<button class="recr-page-btn" onclick="goToPage(1)">1</button>` + (start>2?'<span style="padding:7px 4px;color:var(--muted);">…</span>':'');
+  for (let i=start;i<=end;i++) html += `<button class="recr-page-btn ${i===CUR_PAGE?'active':''}" onclick="goToPage(${i})">${i}</button>`;
+  if (end < totalPages) html += (end<totalPages-1?'<span style="padding:7px 4px;color:var(--muted);">…</span>':'') + `<button class="recr-page-btn" onclick="goToPage(${totalPages})">${totalPages}</button>`;
+  html += `<button class="recr-page-btn" ${CUR_PAGE===totalPages?'disabled':''} onclick="goToPage(${CUR_PAGE+1})">Suivant →</button>`;
+  el.innerHTML = html;
+}
+function goToPage(n) { CUR_PAGE = n; renderCamps(getFilteredCamps()); window.scrollTo({top:document.querySelector('.recr-results').offsetTop-90,behavior:'smooth'}); }
+
+/* ── Mon espace recrutement (sidebar) ── */
+function renderEspaceRecrutement() {
+  const el = document.getElementById('recr-espace-items');
+  if (!ME_RECR) { el.innerHTML = '<div class="recr-side-item" style="cursor:default;color:var(--muted);">Connectez-vous pour accéder à votre espace.</div>'; return; }
+  const estRecruteur = ['initiative','collectivite','administrateur'].includes(ME_RECR.role);
+  let items = [];
+  if (estRecruteur) {
+    const mines = ALL_CAMPS.filter(c => c.recruteur_id === ME_RECR.id);
+    items.push({ label:'Mes offres publiées', n: mines.filter(c=>c.statut==='active').length, tab:'mes-campagnes' });
+    items.push({ label:'Mes campagnes', n: mines.length, tab:'mes-campagnes' });
+    items.push({ label:'Candidatures reçues', n: mines.reduce((s,c)=>s+(c.nb_candidatures||0),0), tab:'mes-campagnes' });
+  }
+  items.push({ label:'Mes candidatures', n: MES_CANDS ? MES_CANDS.length : '…', tab:'mes-candidatures' });
+  items.push({ label:'Offres favorites', n: MES_FAVORIS ? MES_FAVORIS.length : '…', tab:'mes-favoris' });
+  el.innerHTML = items.map(it => `<div class="recr-side-item" onclick="switchRecr('${it.tab}');document.querySelector('[onclick*=\\'${it.tab}\\']')?.scrollIntoView({block:'nearest'});"><span>${escH(it.label)}</span><b>${it.n}</b></div>`).join('')
+    + `<div class="recr-side-item" onclick="window.location.href='espace-candidat.html'"><span>🗂️ Gérer mon profil candidat</span><span>→</span></div>`;
+  if (estRecruteur) renderKpiRecruteur();
+}
+
+function renderKpiRecruteur() {
+  const mines = ALL_CAMPS.filter(c => c.recruteur_id === ME_RECR.id);
+  const kpis = [
+    [mines.filter(c=>c.statut==='active').length, 'Offres actives'],
+    [mines.reduce((s,c)=>s+(c.vues_total||0),0), 'Vues'],
+    [mines.reduce((s,c)=>s+(c.nb_candidatures||0),0), 'Candidatures'],
+    [mines.reduce((s,c)=>s+(c.nb_recrutements||0),0), 'Recrutements'],
+  ];
+  document.getElementById('recr-kpi-grid').innerHTML = kpis.map(([n,l])=>`<div class="recr-kpi"><div class="n">${n}</div><div class="l">${l}</div></div>`).join('');
+}
+
+/* ── Mes candidatures (candidat) ── */
+async function loadMesCandidatures() {
+  if (!ME_RECR) return;
+  const el = document.getElementById('mes-cands-list');
+  try {
+    const r = await api('GET', '/recrutement/mes-candidatures');
+    MES_CANDS = r.candidatures || [];
+    renderEspaceRecrutement();
+    if (!MES_CANDS.length) { el.innerHTML = '<div class="notice">Vous n\'avez encore postulé à aucune offre.</div>'; return; }
+    const statutLabel = {en_attente:'🟡 En attente',vue:'🔵 Vue',acceptee:'🟢 Acceptée',refusee:'🔴 Refusée',archivee:'⚫ Archivée'};
+    el.innerHTML = MES_CANDS.map(c => `
+      <div class="recr-cand-card">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;">
+          <div>
+            <span class="type-tag ${TYPE_CLASS[c.type_recrutement]||'t-emploi'}" style="margin-bottom:4px;display:inline-block;">${TYPE_LABELS[c.type_recrutement]||c.type_recrutement}</span>
+            <strong style="font-size:14px;display:block;cursor:pointer;" onclick="openCamp(${c.campagne_id})">${escH(c.nom)}</strong>
+            <div style="font-size:12px;color:var(--muted);margin-top:2px;">${c.organisme?escH(c.organisme)+' · ':''}${[c.ville,c.pays].filter(Boolean).map(escH).join(', ')}</div>
+          </div>
+          <span class="camp-badge ${c.statut==='acceptee'?'badge-actif':c.statut==='refusee'?'badge-expire':'badge-brouillon'}">${statutLabel[c.statut]||c.statut}</span>
+        </div>
+        ${c.message?`<div style="font-size:12px;margin-top:8px;color:#555;font-style:italic;">« ${escH(c.message)} »</div>`:''}
+        <div style="font-size:11px;color:var(--muted);margin-top:6px;">Postulé le ${fmtDate(c.created_at)}${c.campagne_statut!=='active'?' · Offre clôturée':''}</div>
+      </div>`).join('');
+  } catch(e) { el.innerHTML = `<div style="padding:20px;color:#ef4444;">Erreur : ${escH(e.message)}</div>`; }
+}
+
+/* ── Offres favorites ── */
+async function loadMesFavoris() {
+  if (!ME_RECR) return;
+  const el = document.getElementById('mes-favoris-grid');
+  try {
+    const r = await api('GET', '/recrutement/mes-favoris');
+    MES_FAVORIS = r.campagnes || [];
+    renderEspaceRecrutement();
+    if (!MES_FAVORIS.length) { el.innerHTML = '<div class="recr-empty" style="grid-column:1/-1;"><div class="ic">⭐</div>Aucune offre en favoris pour le moment.</div>'; return; }
+    el.innerHTML = MES_FAVORIS.map(campCardHtml).join('');
+  } catch(e) { el.innerHTML = `<div style="padding:20px;color:#ef4444;">Erreur : ${escH(e.message)}</div>`; }
+}
+
+/* ── Alertes emploi ── */
+async function loadMesAlertes() {
+  if (!ME_RECR) return;
+  try {
+    const r = await api('GET', '/recrutement/alertes/mes');
+    MES_ALERTES = r.alertes || [];
+    renderAlertes();
+  } catch(_) {}
+}
+function renderAlertes() {
+  const el = document.getElementById('recr-alertes-list');
+  if (!MES_ALERTES || !MES_ALERTES.length) { el.innerHTML = '<div style="font-size:11.5px;color:var(--muted);text-align:center;padding:6px 0;">Aucune alerte active.</div>'; return; }
+  el.innerHTML = MES_ALERTES.map(a => {
+    const crit = [TYPE_LABELS[a.type_recrutement]||null, a.secteur_activite, a.pays, a.ville].filter(Boolean).join(' · ') || 'Toutes les offres';
+    return `<div class="recr-alert-item"><span>${escH(crit)}</span><button onclick="deleteAlerte(${a.id})" title="Supprimer">✕</button></div>`;
+  }).join('');
+}
+function openAlerteModal() {
+  if (!ME_RECR) { DA.toast('Connexion requise.', {type:'warning'}); return; }
+  ['alerte-type','alerte-domaine','alerte-pays','alerte-ville'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('modal-alerte-bg').style.display = 'flex';
+}
+async function saveAlerte() {
+  try {
+    await api('POST', '/recrutement/alertes', {
+      type_recrutement: document.getElementById('alerte-type').value || null,
+      secteur_activite: document.getElementById('alerte-domaine').value.trim() || null,
+      pays: document.getElementById('alerte-pays').value.trim() || null,
+      ville: document.getElementById('alerte-ville').value.trim() || null,
+    });
+    DA.toast('Alerte créée !', {type:'success'});
+    closeMod('modal-alerte-bg');
+    loadMesAlertes();
+  } catch(e) { DA.toast('Erreur : '+e.message, {type:'danger'}); }
+}
+async function deleteAlerte(id) {
+  try { await api('DELETE', '/recrutement/alertes/'+id); loadMesAlertes(); } catch(e) { DA.toast(e.message, {type:'danger'}); }
 }
 
 /* ── Détail campagne ── */
@@ -364,24 +922,46 @@ async function openCamp(cid) {
     const r = await api('GET', '/recrutement/'+cid);
     const c = r.campagne; const maCand = r.ma_candidature;
     const estRecruteur = ME_RECR && (ME_RECR.id === c.recruteur_id || ME_RECR.role === 'administrateur');
+    const competences = jsonArr(c.competences), langues = jsonArr(c.langues), certifications = jsonArr(c.certifications), qualites = jsonArr(c.qualites), photos = jsonArr(c.photos_json);
+    const chips = (arr) => arr.length ? `<div class="recr-chip-list">${arr.map(x=>`<span class="recr-chip">${escH(x)}</span>`).join('')}</div>` : '';
     el.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
         <div>
           <span class="type-tag ${TYPE_CLASS[c.type_recrutement]||'t-emploi'}" style="margin-bottom:6px;display:inline-block;">${TYPE_LABELS[c.type_recrutement]||c.type_recrutement}</span>
-          <h2 style="margin:0;font-size:20px;line-height:1.3;">${escH(c.nom)}</h2>
+          <h2 style="margin:0;font-size:20px;line-height:1.3;">${escH(c.titre_poste||c.nom)}</h2>
+          ${c.titre_poste && c.titre_poste !== c.nom ? `<div style="font-size:12px;color:var(--muted);margin-top:2px;">${escH(c.nom)}</div>` : ''}
         </div>
         <button onclick="closeMod('modal-camp-bg')" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">×</button>
       </div>
+      ${photos.length ? `<div style="display:flex;gap:8px;overflow-x:auto;margin-bottom:14px;">${photos.map(p=>`<img src="${escH(p)}" style="width:140px;height:100px;object-fit:cover;border-radius:10px;flex-shrink:0;">`).join('')}</div>` : ''}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;font-size:13px;">
         ${c.organisme?`<div>🏛️ <strong>Organisme</strong><br>${escH(c.organisme)}</div>`:''}
         ${c.ville||c.pays?`<div>📍 <strong>Lieu</strong><br>${[c.ville,c.pays].filter(Boolean).map(escH).join(', ')}</div>`:''}
         <div>📡 <strong>Rayon</strong><br>${RAYON_LABELS[c.rayon_publication]||c.rayon_publication}</div>
         <div>⏳ <strong>Expire le</strong><br>${fmtDate(c.expire_at)}</div>
+        ${c.type_contrat?`<div>📄 <strong>Contrat</strong><br>${escH(c.type_contrat)}</div>`:''}
+        ${c.teletravail==='oui'?`<div>🏠 <strong>Télétravail</strong><br>Possible</div>`:''}
+        ${c.niveau_etudes?`<div>🎓 <strong>Niveau d'études</strong><br>${escH(c.niveau_etudes)}</div>`:''}
+        ${c.experience_annees?`<div>💼 <strong>Expérience</strong><br>${escH(c.experience_annees)}</div>`:''}
+        ${c.remuneration?`<div>💰 <strong>Rémunération</strong><br>${escH(c.remuneration)} ${escH(c.devise||'')}</div>`:''}
+        ${c.nb_postes>1?`<div>👥 <strong>Postes à pourvoir</strong><br>${c.nb_postes}</div>`:''}
+        ${c.date_debut?`<div>📅 <strong>Début souhaité</strong><br>${fmtDate(c.date_debut)}</div>`:''}
+        ${c.duree_mission?`<div>⏱️ <strong>Durée</strong><br>${escH(c.duree_mission)}</div>`:''}
+        ${c.date_limite_candidature?`<div>⌛ <strong>Date limite</strong><br>${fmtDate(c.date_limite_candidature)}</div>`:''}
         ${c.en_promotion?`<div style="grid-column:1/-1;">⚡ <strong>En promotion jusqu'au</strong> ${fmtDate(c.promotion_fin)}</div>`:''}
       </div>
-      ${c.description?`<div class="rich-content" style="background:#f8fafc;border-radius:10px;padding:16px;margin-bottom:16px;font-size:13px;">${renderRichText(c.description)}</div>`:''}
+      ${c.description?`<div class="rich-content" style="background:var(--bg);border-radius:10px;padding:16px;margin-bottom:16px;font-size:13px;">${renderRichText(c.description)}</div>`:''}
+      ${competences.length||langues.length||certifications.length||qualites.length ? `
+        <div style="margin-bottom:16px;">
+          <strong style="font-size:13px;">🎯 Profil recherché</strong>
+          ${competences.length?`<div style="font-size:11.5px;color:var(--muted);margin-top:8px;">Compétences</div>${chips(competences)}`:''}
+          ${langues.length?`<div style="font-size:11.5px;color:var(--muted);margin-top:8px;">Langues</div>${chips(langues)}`:''}
+          ${certifications.length?`<div style="font-size:11.5px;color:var(--muted);margin-top:8px;">Certifications</div>${chips(certifications)}`:''}
+          ${qualites.length?`<div style="font-size:11.5px;color:var(--muted);margin-top:8px;">Qualités</div>${chips(qualites)}`:''}
+        </div>` : ''}
+      ${c.pdf_b64?`<div style="margin-bottom:16px;"><a href="${c.pdf_b64}" download="${escH(c.pdf_nom||'fiche-de-poste.pdf')}" class="btn btn-outline btn-sm">📎 Télécharger la fiche de poste</a></div>`:''}
       <!-- Recruteur -->
-      <div style="display:flex;align-items:center;gap:10px;padding:12px;background:#f8fafc;border-radius:10px;margin-bottom:16px;">
+      <div style="display:flex;align-items:center;gap:10px;padding:12px;background:var(--bg);border-radius:10px;margin-bottom:16px;">
         ${c.recruteur_photo?`<img src="${escH(c.recruteur_photo)}" style="width:38px;height:38px;border-radius:50%;object-fit:cover;">`:`<div style="width:38px;height:38px;border-radius:50%;background:#e2e8f0;display:flex;align-items:center;justify-content:center;">🏛️</div>`}
         <div>
           <div style="font-size:13px;font-weight:700;">${escH(c.recruteur_nom||'—')}</div>
@@ -390,12 +970,12 @@ async function openCamp(cid) {
       </div>
       <!-- Stats rapides -->
       <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;">
-        <div style="flex:1;min-width:80px;background:#f8fafc;border-radius:8px;padding:10px;text-align:center;">
-          <div style="font-size:20px;font-weight:800;color:#2563EB;">${c.vues_total||0}</div>
+        <div style="flex:1;min-width:80px;background:var(--bg);border-radius:8px;padding:10px;text-align:center;">
+          <div style="font-size:20px;font-weight:800;color:var(--navy);">${c.vues_total||0}</div>
           <div style="font-size:11px;color:var(--muted);">Vues</div>
         </div>
-        <div style="flex:1;min-width:80px;background:#f8fafc;border-radius:8px;padding:10px;text-align:center;">
-          <div style="font-size:20px;font-weight:800;color:#2563EB;">${c.nb_candidatures||0}</div>
+        <div style="flex:1;min-width:80px;background:var(--bg);border-radius:8px;padding:10px;text-align:center;">
+          <div style="font-size:20px;font-weight:800;color:var(--navy);">${c.nb_candidatures||0}</div>
           <div style="font-size:11px;color:var(--muted);">Candidatures</div>
         </div>
       </div>
@@ -404,6 +984,7 @@ async function openCamp(cid) {
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <button class="btn btn-outline" onclick="openCandidatures(${c.id})">👥 Voir les candidatures</button>
           <button class="btn btn-outline" onclick="openStatsCamp(${c.id})">📊 Statistiques</button>
+          <button class="btn btn-sm" style="border-color:var(--navy);color:var(--navy);" onclick="editCamp(${c.id})">✏️ Modifier</button>
           <button class="btn btn-sm" style="border-color:#ef4444;color:#ef4444;" onclick="archiveCamp(${c.id})">🗄️ Archiver</button>
         </div>` : maCand ? `
         <div style="padding:12px;background:#d1fae5;border-radius:10px;text-align:center;font-size:13px;font-weight:700;color:#065f46;">
@@ -415,7 +996,7 @@ async function openCamp(cid) {
           <button class="btn btn-orange" style="width:100%;margin-top:10px;" onclick="postuler(${c.id})">✉️ Envoyer ma candidature</button>
         </div>` : `
         <div style="padding:12px;background:#fef3c7;border-radius:10px;text-align:center;font-size:13px;">
-          🔑 <a href="login.html" style="color:#2563EB;font-weight:700;">Connectez-vous</a> pour postuler à cette offre.
+          🔑 <a href="login.html" style="color:var(--navy);font-weight:700;">Connectez-vous</a> pour postuler à cette offre.
         </div>`}
       <!-- Interactions modal -->
       <div class="interact-bar" style="margin-top:16px;">
@@ -443,6 +1024,7 @@ async function postuler(cid) {
     await api('POST', '/recrutement/'+cid+'/candidature', { message });
     DA.toast('✅ Candidature envoyée !', {type:'success'});
     closeMod('modal-camp-bg');
+    MES_CANDS = null;
   } catch(e) { DA.toast('Erreur : '+e.message, {type:'danger'}); }
 }
 
@@ -453,7 +1035,13 @@ async function rxnCamp(cid,btn){
 }
 async function favCamp(cid,btn){
   if(!ME_RECR){DA.toast('Connexion requise.',{type:'warning'});return;}
-  try{const r=await api('POST','/recrutement/'+cid+'/favori');btn.textContent='⭐ '+(r.est_favori?'Sauvegardé':'Favoris');btn.classList.toggle('active',r.est_favori);}catch(_){}
+  try{
+    const r=await api('POST','/recrutement/'+cid+'/favori');
+    btn.textContent='⭐ '+(r.est_favori?'Sauvegardé':'Favoris');
+    btn.classList.toggle('active',r.est_favori);
+    MES_FAVORIS = null;
+    if (CUR_TAB === 'mes-favoris') loadMesFavoris();
+  }catch(_){}
 }
 async function republierCamp(cid){
   if(!ME_RECR){DA.toast('Connexion requise.',{type:'warning'});return;}
@@ -465,7 +1053,7 @@ async function loadComsCamp(cid){
   try{
     const r=await api('GET','/recrutement/'+cid+'/commentaires');
     const coms=r.commentaires||[];
-    el.innerHTML=coms.length?coms.map(c=>`<div style="display:flex;gap:8px;margin-bottom:8px;">${c.photo_url?`<img src="${escH(c.photo_url)}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;">`:'<div style="width:28px;height:28px;border-radius:50%;background:#e2e8f0;text-align:center;line-height:28px;font-size:12px;">👤</div>'}<div style="flex:1;background:#f8fafc;border-radius:10px;padding:8px 10px;"><div style="font-size:12px;font-weight:700;">${escH(c.prenom||'')} ${escH(c.nom||'')}</div><div style="font-size:13px;">${escH(c.contenu)}</div></div></div>`).join(''):'<div style="color:var(--muted);font-size:12px;">Aucun commentaire.</div>';
+    el.innerHTML=coms.length?coms.map(c=>`<div style="display:flex;gap:8px;margin-bottom:8px;">${c.photo_url?`<img src="${escH(c.photo_url)}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;">`:'<div style="width:28px;height:28px;border-radius:50%;background:#e2e8f0;text-align:center;line-height:28px;font-size:12px;">👤</div>'}<div style="flex:1;background:var(--bg);border-radius:10px;padding:8px 10px;"><div style="font-size:12px;font-weight:700;">${escH(c.prenom||'')} ${escH(c.nom||'')}</div><div style="font-size:13px;">${escH(c.contenu)}</div></div></div>`).join(''):'<div style="color:var(--muted);font-size:12px;">Aucun commentaire.</div>';
   }catch(_){}
 }
 async function postComCamp(cid){
@@ -481,7 +1069,6 @@ async function loadMesCamps() {
     const r = await api('GET', '/recrutement?mine=1');
     const camps = r.campagnes || [];
     QUOTA = r.quota;
-    // Afficher quota
     if (QUOTA) {
       const banner = document.getElementById('quota-banner');
       banner.style.display = '';
@@ -492,18 +1079,11 @@ async function loadMesCamps() {
       document.getElementById('quota-msg').textContent = QUOTA.utilisees >= QUOTA.max
         ? `⛔ Quota atteint pour ${QUOTA.annee}. Vous pourrez créer de nouvelles campagnes à partir du 1er janvier ${QUOTA.annee+1}.`
         : `Vous pouvez encore créer ${QUOTA.max - QUOTA.utilisees} campagne(s) en ${QUOTA.annee}.`;
-      // Désactiver le bouton si quota atteint
       const btnCreer = document.getElementById('btn-creer-camp');
       if (QUOTA.utilisees >= QUOTA.max && ME_RECR?.role !== 'administrateur') {
-        btnCreer.disabled = true;
-        btnCreer.title = 'Quota annuel atteint';
-        btnCreer.style.opacity = '0.5';
-        btnCreer.style.cursor = 'not-allowed';
+        btnCreer.disabled = true; btnCreer.title = 'Quota annuel atteint'; btnCreer.style.opacity = '0.5'; btnCreer.style.cursor = 'not-allowed';
       } else {
-        btnCreer.disabled = false;
-        btnCreer.title = '';
-        btnCreer.style.opacity = '';
-        btnCreer.style.cursor = '';
+        btnCreer.disabled = false; btnCreer.title = ''; btnCreer.style.opacity = ''; btnCreer.style.cursor = '';
       }
     }
     const el = document.getElementById('mes-camps-list');
@@ -519,7 +1099,7 @@ async function loadMesCamps() {
         <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:8px;">
           <div>
             <span class="type-tag ${TYPE_CLASS[c.type_recrutement]||'t-emploi'}" style="margin-bottom:4px;display:inline-block;">${TYPE_LABELS[c.type_recrutement]||c.type_recrutement}</span>
-            <strong style="font-size:15px;display:block;">${escH(c.nom)}</strong>
+            <strong style="font-size:15px;display:block;">${escH(c.titre_poste||c.nom)}</strong>
             <div style="font-size:12px;color:var(--muted);margin-top:2px;">
               ${c.organisme?escH(c.organisme)+' · ':''}${[c.ville,c.pays].filter(Boolean).map(escH).join(', ')}
             </div>
@@ -532,6 +1112,7 @@ async function loadMesCamps() {
         <div style="display:flex;gap:16px;font-size:12px;color:var(--muted);flex-wrap:wrap;margin-bottom:10px;">
           <span>👁️ ${c.vues_total||0} vues</span>
           <span>👤 ${c.nb_candidatures||0} candidatures</span>
+          <span>✅ ${c.nb_recrutements||0} recrutements</span>
           <span>📡 ${RAYON_LABELS[c.rayon_publication]||''}</span>
           ${c.expire_at?`<span>⏳ Expire le ${fmtDate(c.expire_at)}</span>`:''}
           ${c.promotion_fin?`<span>⚡ Promo jusqu'au ${fmtDate(c.promotion_fin)}</span>`:''}
@@ -540,7 +1121,7 @@ async function loadMesCamps() {
           ${c.statut==='brouillon'?`<button class="btn btn-sm btn-orange" onclick="publierCamp(${c.id})">🟢 Publier</button>`:''}
           <button class="btn btn-sm btn-outline" onclick="openCandidatures(${c.id})">👥 Candidatures</button>
           <button class="btn btn-sm btn-outline" onclick="openStatsCamp(${c.id})">📊 Stats</button>
-          <button class="btn btn-sm" style="border-color:#2563EB;color:#2563EB;" onclick="editCamp(${c.id})">✏️ Modifier</button>
+          <button class="btn btn-sm" style="border-color:var(--navy);color:var(--navy);" onclick="editCamp(${c.id})">✏️ Modifier</button>
           ${c.statut!=='archivee'?`<button class="btn btn-sm" style="border-color:#ef4444;color:#ef4444;" onclick="archiveCamp(${c.id})">🗄️ Archiver</button>`:''}
         </div>
       </div>`).join('');
@@ -548,17 +1129,54 @@ async function loadMesCamps() {
 }
 
 /* ── Créer / éditer campagne ── */
+function campToggleTypeFields() {
+  const t = document.getElementById('camp-type').value;
+  document.getElementById('camp-contrat-row').style.display = t === 'emploi' ? '' : 'none';
+  document.getElementById('camp-duree-row').style.display = (t === 'stage' || t === 'mission') ? '' : 'none';
+}
+
+function renderCampPhotos() {
+  document.getElementById('camp-photos-row').innerHTML = CAMP_PHOTOS.map((url,i) => `
+    <div class="recr-photo-thumb"><img src="${escH(url)}"><button type="button" onclick="campSupprimerPhoto(${i})">×</button></div>
+  `).join('');
+}
+async function campAjouterPhoto() {
+  if (CAMP_PHOTOS.length >= 5) { DA.toast('5 photos maximum.', {type:'warning'}); return; }
+  try {
+    const url = await pickAndUpload('post', { maxW:1200, maxH:1200, maxMo:4 });
+    if (url) { CAMP_PHOTOS.push(url); renderCampPhotos(); }
+  } catch(e) { DA.toast('Erreur upload : '+e.message, {type:'danger'}); }
+}
+function campSupprimerPhoto(i) { CAMP_PHOTOS.splice(i,1); renderCampPhotos(); }
+
+function campStagerPdf() {
+  const file = document.getElementById('camp-pdf-input').files[0];
+  if (!file) return;
+  if (file.size > 5*1024*1024) { DA.toast('Fichier trop volumineux (5 Mo max).', {type:'warning'}); return; }
+  const reader = new FileReader();
+  reader.onload = () => { CAMP_PDF = { b64: reader.result, nom: file.name }; document.getElementById('camp-pdf-status').textContent = '📄 ' + file.name + ' — sera enregistré avec l\'offre.'; };
+  reader.readAsDataURL(file);
+}
+
 function openCreateCamp() {
   EDIT_CAMP_ID = null;
-  document.getElementById('create-camp-title').textContent = '＋ Créer une campagne';
-  document.getElementById('btn-save-camp').textContent = 'Créer la campagne';
-  ['camp-nom','camp-desc','camp-organisme','camp-pays','camp-ville','camp-adresse'].forEach(id=>{
-    const el=document.getElementById(id); if(el) el.value='';
-  });
+  CAMP_PHOTOS = []; CAMP_PDF = null;
+  document.getElementById('create-camp-title').textContent = '＋ Publier une offre';
+  document.getElementById('btn-save-camp').textContent = 'Publier l\'offre';
+  ['camp-nom','camp-desc','camp-titre-poste','camp-organisme','camp-secteur','camp-pays','camp-ville','camp-region','camp-departement','camp-adresse',
+   'camp-niveau','camp-exp','camp-date-debut','camp-duree','camp-remuneration','camp-date-limite','camp-competences','camp-langues','camp-certifications','camp-qualites']
+   .forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
   if (window.RichEditor) RichEditor.attach('camp-desc', { placeholder: 'Missions, profil recherché, conditions…' })?.setHTML('');
   document.getElementById('camp-type').value = 'emploi';
+  document.getElementById('camp-contrat').value = '';
+  document.getElementById('camp-devise').value = 'EUR';
+  document.getElementById('camp-nb-postes').value = 1;
+  document.getElementById('camp-teletravail').checked = false;
   document.getElementById('camp-publier').checked = false;
+  document.getElementById('camp-pdf-status').textContent = '';
   campSelectRayon('international');
+  campToggleTypeFields();
+  renderCampPhotos();
   document.getElementById('modal-create-camp-bg').style.display = 'flex';
 }
 
@@ -572,33 +1190,54 @@ function campSelectRayon(val) {
 
 async function saveCamp() {
   const nom = document.getElementById('camp-nom').value.trim();
-  if (!nom) { DA.toast('Nom de campagne requis.', {type:'warning'}); return; }
+  if (!nom) { DA.toast('Nom de l\'offre requis.', {type:'warning'}); return; }
+  const csv = id => document.getElementById(id).value.split(',').map(s=>s.trim()).filter(Boolean);
   const data = {
     nom,
     description: document.getElementById('camp-desc').value||null,
+    titre_poste: document.getElementById('camp-titre-poste').value||null,
     type_recrutement: document.getElementById('camp-type').value,
+    type_contrat: document.getElementById('camp-type').value==='emploi' ? (document.getElementById('camp-contrat').value||null) : null,
     organisme: document.getElementById('camp-organisme').value||null,
+    secteur_activite: document.getElementById('camp-secteur').value||null,
     pays: document.getElementById('camp-pays').value||null,
     ville: document.getElementById('camp-ville').value||null,
+    region: document.getElementById('camp-region').value||null,
+    departement: document.getElementById('camp-departement').value||null,
     adresse: document.getElementById('camp-adresse').value||null,
+    teletravail: document.getElementById('camp-teletravail').checked ? 'oui' : 'non',
     rayon_publication: document.querySelector('#camp-rayon-grid input[name="camp-rayon"]:checked')?.value||'international',
+    niveau_etudes: document.getElementById('camp-niveau').value||null,
+    experience_annees: document.getElementById('camp-exp').value||null,
+    nb_postes: parseInt(document.getElementById('camp-nb-postes').value)||1,
+    date_debut: document.getElementById('camp-date-debut').value||null,
+    duree_mission: document.getElementById('camp-duree').value||null,
+    remuneration: document.getElementById('camp-remuneration').value||null,
+    devise: document.getElementById('camp-devise').value||'EUR',
+    date_limite_candidature: document.getElementById('camp-date-limite').value||null,
+    competences: csv('camp-competences'),
+    langues: csv('camp-langues'),
+    certifications: csv('camp-certifications'),
+    qualites: csv('camp-qualites'),
+    photos_json: CAMP_PHOTOS,
     statut: document.getElementById('camp-publier').checked ? 'active' : 'brouillon'
   };
+  if (CAMP_PDF) { data.pdf_b64 = CAMP_PDF.b64; data.pdf_nom = CAMP_PDF.nom; }
   const btn = document.getElementById('btn-save-camp');
   btn.disabled = true; btn.textContent = '⏳…';
   try {
     if (EDIT_CAMP_ID) {
       await api('PUT', '/recrutement/'+EDIT_CAMP_ID, data);
-      DA.toast('Campagne mise à jour !', {type:'success'});
+      DA.toast('Offre mise à jour !', {type:'success'});
     } else {
       await api('POST', '/recrutement', data);
-      DA.toast('Campagne créée !', {type:'success'});
+      DA.toast('Offre publiée !', {type:'success'});
     }
     closeMod('modal-create-camp-bg');
     loadMesCamps();
     loadCamps();
   } catch(e) { DA.toast('Erreur : '+e.message, {type:'danger'}); }
-  finally { btn.disabled=false; btn.textContent= EDIT_CAMP_ID ? 'Enregistrer' : 'Créer la campagne'; }
+  finally { btn.disabled=false; btn.textContent= EDIT_CAMP_ID ? 'Enregistrer' : 'Publier l\'offre'; }
 }
 
 async function editCamp(cid) {
@@ -606,18 +1245,40 @@ async function editCamp(cid) {
     const r = await api('GET', '/recrutement/'+cid);
     const c = r.campagne;
     EDIT_CAMP_ID = cid;
-    document.getElementById('create-camp-title').textContent = '✏️ Modifier la campagne';
+    CAMP_PHOTOS = jsonArr(c.photos_json); CAMP_PDF = null;
+    document.getElementById('create-camp-title').textContent = '✏️ Modifier l\'offre';
     document.getElementById('btn-save-camp').textContent = 'Enregistrer';
     document.getElementById('camp-nom').value = c.nom||'';
     document.getElementById('camp-desc').value = c.description||'';
     if (window.RichEditor) RichEditor.attach('camp-desc', { placeholder: 'Missions, profil recherché, conditions…' })?.setHTML(c.description||'');
+    document.getElementById('camp-titre-poste').value = c.titre_poste||'';
     document.getElementById('camp-type').value = c.type_recrutement||'emploi';
     document.getElementById('camp-organisme').value = c.organisme||'';
+    document.getElementById('camp-secteur').value = c.secteur_activite||'';
     document.getElementById('camp-pays').value = c.pays||'';
     document.getElementById('camp-ville').value = c.ville||'';
+    document.getElementById('camp-region').value = c.region||'';
+    document.getElementById('camp-departement').value = c.departement||'';
     document.getElementById('camp-adresse').value = c.adresse||'';
+    document.getElementById('camp-teletravail').checked = c.teletravail==='oui';
+    document.getElementById('camp-contrat').value = c.type_contrat||'';
+    document.getElementById('camp-niveau').value = c.niveau_etudes||'';
+    document.getElementById('camp-exp').value = c.experience_annees||'';
+    document.getElementById('camp-nb-postes').value = c.nb_postes||1;
+    document.getElementById('camp-date-debut').value = (c.date_debut||'').slice(0,10);
+    document.getElementById('camp-duree').value = c.duree_mission||'';
+    document.getElementById('camp-remuneration').value = c.remuneration||'';
+    document.getElementById('camp-devise').value = c.devise||'EUR';
+    document.getElementById('camp-date-limite').value = (c.date_limite_candidature||'').slice(0,10);
+    document.getElementById('camp-competences').value = jsonArr(c.competences).join(', ');
+    document.getElementById('camp-langues').value = jsonArr(c.langues).join(', ');
+    document.getElementById('camp-certifications').value = jsonArr(c.certifications).join(', ');
+    document.getElementById('camp-qualites').value = jsonArr(c.qualites).join(', ');
+    document.getElementById('camp-pdf-status').textContent = c.pdf_nom ? '📄 '+c.pdf_nom+' déjà enregistré — choisissez un fichier pour le remplacer.' : '';
     campSelectRayon(c.rayon_publication||'international');
     document.getElementById('camp-publier').checked = c.statut === 'active';
+    campToggleTypeFields();
+    renderCampPhotos();
     document.getElementById('modal-create-camp-bg').style.display = 'flex';
   } catch(e) { DA.toast('Erreur : '+e.message, {type:'danger'}); }
 }
@@ -625,16 +1286,16 @@ async function editCamp(cid) {
 async function publierCamp(cid) {
   try {
     await api('PUT', '/recrutement/'+cid, {statut:'active'});
-    DA.toast('Campagne publiée ! ⚡ 30 jours de promotion démarrés.', {type:'success'});
+    DA.toast('Offre publiée ! ⚡ 30 jours de promotion démarrés.', {type:'success'});
     loadMesCamps();
   } catch(e) { DA.toast('Erreur : '+e.message, {type:'danger'}); }
 }
 
 async function archiveCamp(cid) {
-  if (!confirm('Archiver cette campagne ? Elle ne sera plus visible et les candidatures seront clôturées.')) return;
+  if (!confirm('Archiver cette offre ? Elle ne sera plus visible et les candidatures seront clôturées.')) return;
   try {
     await api('DELETE', '/recrutement/'+cid);
-    DA.toast('Campagne archivée.', {type:'success'});
+    DA.toast('Offre archivée.', {type:'success'});
     closeMod('modal-camp-bg');
     loadMesCamps();
     loadCamps();
@@ -721,7 +1382,7 @@ async function openStatsCamp(cid) {
           ['👤','Candidatures',nb_candidatures],
           ['🔄','Taux conversion',taux_conversion+'%'],
           ['📤','Partages',c.nb_partages||0],
-        ].map(([ic,lb,v])=>`<div class="stat-kpi"><div style="font-size:18px;">${ic}</div><div style="font-size:24px;font-weight:800;color:#2563EB;">${v}</div><div style="font-size:10px;color:var(--muted);">${lb}</div></div>`).join('')}
+        ].map(([ic,lb,v])=>`<div class="stat-kpi"><div style="font-size:18px;">${ic}</div><div style="font-size:24px;font-weight:800;color:var(--navy);">${v}</div><div style="font-size:10px;color:var(--muted);">${lb}</div></div>`).join('')}
       </div>
       ${par_type.length?`<div style="margin-bottom:16px;">
         <strong style="font-size:13px;">Types de candidats</strong>
@@ -758,10 +1419,3 @@ async function openStatsCamp(cid) {
 <script src="assets/back-button.js"></script>
 </body>
 </html>
-
-
-
-
-
-
-
