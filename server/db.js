@@ -8546,6 +8546,22 @@ db.exec(`
     FOREIGN KEY(initiative_id) REFERENCES initiatives(id)
   );
 
+  -- Comptes vendeurs PayPal (Partner Referrals), même rôle que stripe_connect_accounts ci-dessus
+  -- (2026-11-02) : scaffolding posé en attendant l'agrément Partenaire PayPal de Diaspo'Actif —
+  -- voir server/paypal-partner.js, inerte tant que PAYPAL_PARTNER_ID n'est pas configuré.
+  CREATE TABLE IF NOT EXISTS paypal_connect_accounts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    initiative_id INTEGER NOT NULL UNIQUE,
+    merchant_id_paypal TEXT,
+    tracking_id TEXT,
+    payments_receivable INTEGER DEFAULT 0,
+    email_confirmed INTEGER DEFAULT 0,
+    statut TEXT DEFAULT 'pending' CHECK(statut IN ('pending','active','restricted')),
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id)
+  );
+
   -- Journal d'audit des vérifications d'identité (aucun document stocké — uniquement le statut/dates)
   CREATE TABLE IF NOT EXISTS identity_verifications_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

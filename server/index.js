@@ -10234,6 +10234,22 @@ route("GET", "/api/annuaire/recherche", async (req, res, params, body, query) =>
     organismes   = organismes.filter(r => correspond(r.origine1, r.origine2, r.pays_origine_institution, r.nationalite1, r.nationalite2));
   }
 
+  /* Filtres « Nom » et « Prénom » (2026-11-05) : sous-chaîne sans accents ni casse, comme la recherche
+     par mot-clé. Le nom couvre la personne ET la structure (nom, sigle, nom d'institution) ; le prénom
+     ne concerne que les personnes (il écarte donc initiatives et organismes). */
+  if (query.nom) {
+    const cible = ANNUAIRE_NORMALISE(String(query.nom).trim());
+    const contient = (...vals) => vals.some(v => v && ANNUAIRE_NORMALISE(String(v)).includes(cible));
+    initiatives = initiatives.filter(r => contient(r.nom, r.sigle));
+    utilisateurs = utilisateurs.filter(r => contient(r.nom, r.prenom, `${r.prenom || ''} ${r.nom || ''}`));
+    organismes = organismes.filter(r => contient(r.nom, r.nom_institution, r.nom_responsable_etatique, r.prenom_responsable_etatique));
+  }
+  if (query.prenom) {
+    const cible = ANNUAIRE_NORMALISE(String(query.prenom).trim());
+    utilisateurs = utilisateurs.filter(r => r.prenom && ANNUAIRE_NORMALISE(String(r.prenom)).includes(cible));
+    initiatives = []; organismes = [];
+  }
+
   // Produits vitrine (élargit "produits proposés") — rattachés par initiative_id
   const initIds = initiatives.map(i => i.id);
   let produitsParInit = {};
@@ -22051,6 +22067,88 @@ route("GET", "/api/initiatives/:id/connect/status", async (req, res, params) => 
     organisation_verifiee: !!init.organisation_verifiee,
     organisation_verifiee_le: init.organisation_verifiee_le || null,
     organisation_expire_le: init.organisation_expire_le || null,
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════
+   PAYPAL PARTNER — comptes vendeurs marketplace (initiatives), même rôle que Stripe Connect
+   ci-dessus. Scaffolding posé le 2026-11-02 en attendant l'agrément Partenaire PayPal de
+   Diaspo'Actif (démarche de l'utilisateur) — toutes ces routes répondent 503 tant que
+   PAYPAL_PARTNER_ID n'est pas configuré (server/paypal-partner.js, paypalPartnerEnabled).
+   ═══════════════════════════════════════════════════════════════ */
+
+/* POST /api/initiatives/:id/paypal/onboard — owner only, crée/poursuit l'onboarding PayPal Partner */
+route("POST", "/api/initiatives/:id/paypal/onboard", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT id, nom, owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
+  if (Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire de cette initiative." });
+
+  const PaypalPartner = require("./paypal-partner");
+  if (!PaypalPartner.paypalPartnerEnabled) return sendJSON(res, 503, { error: "La connexion PayPal n'est pas encore disponible sur Diaspo'Actif. Elle ouvrira dès que le programme Partenaire PayPal sera actif." });
+
+  try {
+    const origin = getOrigin(req);
+    const { actionUrl } = await PaypalPartner.creerReferral({
+      trackingId: init.id,
+      returnUrl: `${origin}/centre-financier.html?paypal_retour=1&initiative_id=${init.id}`,
+    });
+    const existe = await db.prepare("SELECT id FROM paypal_connect_accounts WHERE initiative_id=?").get(init.id);
+    if (existe) await db.prepare("UPDATE paypal_connect_accounts SET tracking_id=?, updated_at=datetime('now') WHERE initiative_id=?").run(String(init.id), init.id);
+    else await db.prepare("INSERT INTO paypal_connect_accounts (initiative_id, tracking_id) VALUES (?,?)").run(init.id, String(init.id));
+    sendJSON(res, 200, { url: actionUrl });
+  } catch (e) {
+    sendJSON(res, 500, SEC.safeError(e, "paypal-onboard"));
+  }
+});
+
+/* POST /api/initiatives/:id/paypal/confirmer — owner only, appelé au retour depuis PayPal avec le
+   merchantIdInPayPal que PayPal ajoute lui-même à return_url : vérifie et enregistre le vrai
+   statut (jamais de confiance aveugle dans ce que le navigateur rapporte). */
+route("POST", "/api/initiatives/:id/paypal/confirmer", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
+  if (Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire de cette initiative." });
+
+  const merchantIdInPayPal = String(body.merchant_id_paypal || "").trim();
+  if (!merchantIdInPayPal) return sendJSON(res, 400, { error: "Identifiant marchand PayPal manquant." });
+
+  const PaypalPartner = require("./paypal-partner");
+  if (!PaypalPartner.paypalPartnerEnabled) return sendJSON(res, 503, { error: "Onboarding PayPal indisponible." });
+
+  try {
+    const statut = await PaypalPartner.statutMarchand(merchantIdInPayPal);
+    const nouveauStatut = statut.paymentsReceivable ? "active" : "pending";
+    await db.prepare(`
+      UPDATE paypal_connect_accounts
+      SET merchant_id_paypal=?, payments_receivable=?, email_confirmed=?, statut=?, updated_at=datetime('now')
+      WHERE initiative_id=?
+    `).run(statut.merchantId, statut.paymentsReceivable ? 1 : 0, statut.emailConfirmed ? 1 : 0, nouveauStatut, params.id);
+    sendJSON(res, 200, { ok: true, statut: nouveauStatut, payments_receivable: statut.paymentsReceivable, email_confirmed: statut.emailConfirmed });
+  } catch (e) {
+    sendJSON(res, 500, SEC.safeError(e, "paypal-confirmer"));
+  }
+});
+
+/* GET /api/initiatives/:id/paypal/status — owner only, statut du compte PayPal Partner */
+route("GET", "/api/initiatives/:id/paypal/status", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
+  if (Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire de cette initiative." });
+
+  const PaypalPartner = require("./paypal-partner");
+  const account = await db.prepare("SELECT statut, payments_receivable, email_confirmed FROM paypal_connect_accounts WHERE initiative_id=?").get(params.id);
+  sendJSON(res, 200, {
+    disponible: PaypalPartner.paypalPartnerEnabled,
+    connecte: !!(account && account.merchant_id_paypal),
+    statut: account?.statut || "non_demarre",
+    payments_receivable: !!account?.payments_receivable,
+    email_confirmed: !!account?.email_confirmed,
   });
 });
 
@@ -38622,11 +38720,24 @@ ${jsonLd}
       const historique = [...histBillets, ...histLedger].sort((a,b) => new Date(b.date) - new Date(a.date)).slice(0, 80);
 
       // Compte de réception : Stripe Connect via l'initiative possédée (architecture actuelle : pas de Connect au niveau utilisateur individuel)
-      const initiative = await db.prepare(`SELECT id, nom FROM initiatives WHERE owner_user_id=?`).get(me.id);
-      let connect = null;
+      const initiative = await db.prepare(`SELECT id, nom, pays_immatriculation, vitrine_pays, pays FROM initiatives WHERE owner_user_id=?`).get(me.id);
+      let connect = null, paypalConnect = null, paysRecommandation = null;
       if (initiative) {
         const acc = await db.prepare(`SELECT statut, charges_enabled, payouts_enabled, details_submitted FROM stripe_connect_accounts WHERE initiative_id=?`).get(initiative.id);
         connect = { initiative_id: initiative.id, initiative_nom: initiative.nom, connecte: !!acc, statut: acc?.statut || 'non_demarre', payouts_enabled: !!acc?.payouts_enabled };
+
+        const accPaypal = await db.prepare(`SELECT statut, merchant_id_paypal, payments_receivable FROM paypal_connect_accounts WHERE initiative_id=?`).get(initiative.id);
+        const PaypalPartner = require("./paypal-partner");
+        paypalConnect = {
+          initiative_id: initiative.id, disponible: PaypalPartner.paypalPartnerEnabled,
+          connecte: !!(accPaypal && accPaypal.merchant_id_paypal), statut: accPaypal?.statut || 'non_demarre',
+          payments_receivable: !!accPaypal?.payments_receivable,
+        };
+
+        // Prestataire recommandé selon le pays déclaré de l'initiative (2026-11-02, demande explicite).
+        const PaysCouverture = require("./payments/pays-couverture");
+        const codePaysInit = String(initiative.pays_immatriculation || initiative.vitrine_pays || initiative.pays || '').trim().toUpperCase();
+        paysRecommandation = { code_pays: codePaysInit || null, provider: PaysCouverture.prestataireRecommande(codePaysInit) };
       }
 
       const settings = await db.prepare(`SELECT * FROM wallet_settings WHERE user_id=?`).get(me.id);
@@ -38637,7 +38748,7 @@ ${jsonLd}
         solde_disponible: soldeDisponible, solde_en_reserve: soldeEnReserve, reserve_jours: RESERVE_JOURS,
         reserve_dernier_paiement_le: reserveDernierPaiementLe, reserve_retirable_le: reserveRetirableLe,
         revenus: { aujourdhui, semaine, mois, annee, cumule },
-        historique, connect,
+        historique, connect, paypal_connect: paypalConnect, pays_recommandation: paysRecommandation,
         settings: settings || { devise_preferee: 'EUR', frequence_auto: 'manuel', seuil_auto: 0, notifications: 1 },
         retraits,
       });
@@ -39766,13 +39877,17 @@ ${jsonLd}
       return sendJSON(res, 200, {});
     }
 
-    /* ── POST /api/sondages/:id/participer ── */
+    /* ── POST /api/sondages/:id/participer ── compte connecté OU visiteur sans compte (2026-11-05) ── */
     if (req.method === 'POST' && /^\/api\/sondages\/\d+\/participer$/.test(pathname)) {
-      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req);
       const sid = parseInt(pathname.split('/')[3]);
       await sondageAutoCloture();
       const s = await db.prepare(`SELECT * FROM sondages WHERE id=?`).get(sid);
       if (!s || s.statut !== 'ouvert') return sendJSON(res, 400, { error: 'Fin de ce sondage : il n\'accepte plus de réponses.' });
+      if (!me) {
+        const limInvite = SEC.rateLimit(`sondage:rep:${SEC.clientIp(req)}`, 20, 3600000);
+        if (!limInvite.allowed) return sendJSON(res, 429, { error: 'Trop de réponses depuis cette connexion. Réessayez plus tard.' }, { 'Retry-After': String(limInvite.retryAfter) });
+      }
       const { reponses = [] } = body;
       const questionsP = await db.prepare(`SELECT id, texte, obligatoire FROM sondage_questions WHERE sondage_id=?`).all(sid);
       const valides = new Map();
@@ -39935,7 +40050,7 @@ ${jsonLd}
       return sendJSON(res, 200, { action, nb_favoris: nb, est_favori: action === 'added' });
     }
 
-    /* ── GET /api/sondages/:id/export ── */
+    /* ── GET /api/sondages/:id/export ── comptes ET personnes sans compte ; l'identité n'est jamais exportée pour un sondage anonyme ── */
     if (req.method === 'GET' && /^\/api\/sondages\/\d+\/export$/.test(pathname)) {
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const sid = parseInt(pathname.split('/')[3]);

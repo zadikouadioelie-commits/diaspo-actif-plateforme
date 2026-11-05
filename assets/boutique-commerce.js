@@ -457,6 +457,9 @@
   });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !modalEl.hidden) fermer(); });
 
-  charger().then(function () { chargeFavoris(); dessiner(); })
-    .catch(function (e) { app.innerHTML = '<p class="bq-chargement">' + esc(e.message || 'Boutique introuvable.') + ' <a href="vitrines.html" style="color:var(--bq-bordeaux);font-weight:700">Voir toutes les boutiques</a></p>'; });
+  (window.DA_verifierMaintenanceBoutique ? window.DA_verifierMaintenanceBoutique(app) : Promise.resolve(false)).then(function (bloque) {
+    if (bloque) return;
+    charger().then(function () { chargeFavoris(); dessiner(); })
+      .catch(function (e) { app.innerHTML = '<p class="bq-chargement">' + esc(e.message || 'Boutique introuvable.') + ' <a href="vitrines.html" style="color:var(--bq-bordeaux);font-weight:700">Voir toutes les boutiques</a></p>'; });
+  });
 })();

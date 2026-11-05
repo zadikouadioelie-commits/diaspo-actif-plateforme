@@ -328,13 +328,16 @@
   });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !modalEl.hidden) fermerLecteur(); });
 
-  charger().then(function () {
-    chargeFavoris();
-    etat.plafond = plafondPrix(); etat.prixMax = etat.plafond;
-    /* petit écran : les filtres sont repliés pour que les vidéos apparaissent tout de suite */
-    if (window.innerWidth <= 1060) etat.fermes = { cat: true, type: true, prix: true };
-    dessiner();
-  }).catch(function (e) {
-    app.innerHTML = '<p class="bv-chargement">' + esc(e && e.message ? e.message : 'Boutique introuvable.') + ' <a href="vitrines.html" style="text-decoration:underline">Voir toutes les boutiques</a></p>';
+  (window.DA_verifierMaintenanceBoutique ? window.DA_verifierMaintenanceBoutique(app) : Promise.resolve(false)).then(function (bloque) {
+    if (bloque) return;
+    charger().then(function () {
+      chargeFavoris();
+      etat.plafond = plafondPrix(); etat.prixMax = etat.plafond;
+      /* petit écran : les filtres sont repliés pour que les vidéos apparaissent tout de suite */
+      if (window.innerWidth <= 1060) etat.fermes = { cat: true, type: true, prix: true };
+      dessiner();
+    }).catch(function (e) {
+      app.innerHTML = '<p class="bv-chargement">' + esc(e && e.message ? e.message : 'Boutique introuvable.') + ' <a href="vitrines.html" style="text-decoration:underline">Voir toutes les boutiques</a></p>';
+    });
   });
 })();

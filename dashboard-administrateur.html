@@ -3058,6 +3058,22 @@
           </div>
           <button class="btn btn-orange" onclick="saveParametres()">💾 Enregistrer</button>
         </div>
+
+        <!-- Maintenance des boutiques (2026-11-02, demande explicite) -->
+        <div class="card" id="bqm-carte" style="margin-bottom:18px;">
+          <h3 style="margin:0 0 4px;font-size:15px;">🏬 Boutiques — Maintenance</h3>
+          <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">
+            Pendant la réorganisation : toutes les boutiques publiques passent invisibles, aucune nouvelle
+            boutique ne peut être rendue publique, et aucun achat n'est possible. Créer/configurer une boutique
+            reste toujours permis.
+          </p>
+          <div id="bqm-etat" style="font-size:13px;margin-bottom:12px;">Chargement…</div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button class="btn btn-orange btn-sm" id="bqm-btn-activer" onclick="bqmActiver()" style="display:none;">🔒 Activer la maintenance</button>
+            <button class="btn btn-sm" id="bqm-btn-desactiver" onclick="bqmDesactiver()" style="display:none;">🔓 Désactiver la maintenance</button>
+          </div>
+        </div>
+
         <div id="params-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;"></div>
       </section>
 
@@ -9900,7 +9916,7 @@ async function submitAccordDirect(){
     'diaspoactif-deals': () => loadDaDeals(),
     'partenaires-admin': () => loadPartenairesAdmin(),
     'temoignages-admin':   () => loadTemoignagesAdmin(),
-    parametres:  () => loadParametres(),
+    parametres:  () => { loadParametres(); bqmCharger(); },
     membres:     () => loadAdminMembres(),
     'reseau-pro': () => loadReseauPro(),
     initiatives: () => loadAdminInitiatives(),
@@ -12108,13 +12124,45 @@ async function submitAccordDirect(){
     catch(e) { alert('Erreur : ' + (e.message||'')); }
   };
 
+  // ══ BOUTIQUES — MAINTENANCE ════════════════════════════════
+  async function bqmCharger() {
+    const el = document.getElementById('bqm-etat');
+    const btnOn = document.getElementById('bqm-btn-activer'), btnOff = document.getElementById('bqm-btn-desactiver');
+    if (!el) return;
+    try {
+      const r = await api('GET', '/admin/boutiques-maintenance');
+      if (r.en_maintenance) {
+        el.innerHTML = '<strong style="color:#ef4444;">🔒 Maintenance active</strong> — les boutiques sont invisibles et aucun achat n\'est possible.';
+        btnOn.style.display = 'none'; btnOff.style.display = '';
+      } else {
+        el.innerHTML = '<strong style="color:#10b981;">🔓 Maintenance inactive</strong> — ' + (r.boutiques_publiques||0) + ' boutique(s) actuellement publique(s).';
+        btnOn.style.display = ''; btnOff.style.display = 'none';
+      }
+    } catch (e) { el.textContent = 'Erreur de chargement.'; }
+  }
+  window.bqmActiver = async function () {
+    if (!confirm("Activer la maintenance ? Toutes les boutiques actuellement publiques vont devenir invisibles immédiatement, et leurs propriétaires seront prévenus. Personne ne pourra plus acheter ni rendre sa boutique publique tant que vous n'aurez pas désactivé la maintenance.")) return;
+    try {
+      const r = await api('POST', '/admin/boutiques-maintenance/activer');
+      alert('✅ Maintenance activée. ' + (r.boutiques_masquees||0) + ' boutique(s) masquée(s), ' + (r.proprietaires_prevenus||0) + ' propriétaire(s) prévenu(s).');
+      bqmCharger();
+    } catch (e) { alert('Erreur : ' + (e.message||'')); }
+  };
+  window.bqmDesactiver = async function () {
+    if (!confirm("Désactiver la maintenance ? Chaque propriétaire devra lui-même repasser sa boutique en public (rien ne se réactive automatiquement).")) return;
+    try { await api('POST', '/admin/boutiques-maintenance/desactiver'); alert('✅ Maintenance désactivée.'); bqmCharger(); }
+    catch (e) { alert('Erreur : ' + (e.message||'')); }
+  };
+
   // ══ PARAMÈTRES ═════════════════════════════════════════════
   async function loadParametres() {
     const r = await api("GET", "/admin/parametres").catch(() => ({}));
     const params = r.parametres || {};
     const grid = document.getElementById("params-grid");
     if (!grid) return;
-    grid.innerHTML = Object.entries(params).map(([cle, p]) => `
+    /* boutiques_en_maintenance a sa propre carte dédiée ci-dessus (masquage forcé + notifications) :
+       pas de doublon ici, pour éviter deux contrôles différents sur le même réglage. */
+    grid.innerHTML = Object.entries(params).filter(([cle]) => cle !== 'boutiques_en_maintenance').map(([cle, p]) => `
       <div class="card" style="padding:16px;">
         <div style="font-weight:700;font-size:13px;margin-bottom:4px;">${cle.replace(/_/g," ").replace(/^\w/, c => c.toUpperCase())}</div>
         ${p.description ? `<div style="font-size:12px;color:var(--muted);margin-bottom:10px;">${p.description}</div>` : ""}
@@ -14023,7 +14071,7 @@ async function loadAdminBilletterie() {
       <div class="card" style="padding:14px;text-align:center;"><div style="font-size:26px;font-weight:800;color:#10b981;">${s.publies||0}</div><div style="font-size:12px;color:var(--muted);">Publiés</div></div>
       <div class="card" style="padding:14px;text-align:center;"><div style="font-size:26px;font-weight:800;">${s.total_tickets||0}</div><div style="font-size:12px;color:var(--muted);">Billets vendus</div></div>
       <div class="card" style="padding:14px;text-align:center;"><div style="font-size:26px;font-weight:800;color:#2563EB;">${(s.revenu_total||0).toFixed(2)} €</div><div style="font-size:12px;color:var(--muted);">Revenus bruts</div></div>
-      <div class="card" style="padding:14px;text-align:center;"><div style="font-size:26px;font-weight:800;color:#8b5cf6;">${(s.commission_total||0).toFixed(2)} €</div><div style="font-size:12px;color:var(--muted);">Commission DA (4%)</div></div>`;
+      <div class="card" style="padding:14px;text-align:center;"><div style="font-size:26px;font-weight:800;color:#8b5cf6;">${(s.commission_total||0).toFixed(2)} €</div><div style="font-size:12px;color:var(--muted);">Commission DA (2%)</div></div>`;
     /* Par pays */
     const pays = s.par_pays||[];
     document.getElementById('admin-billet-pays').innerHTML = pays.length

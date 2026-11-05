@@ -2805,6 +2805,7 @@ function renderInitiativeCard(it){
       </div>
       ${origs ? `<div class="ann-card-origs">${daDrapeauListe(origs) || '🌍'} <strong>Origines :</strong> ${origs}</div>` : ''}
       <div class="ann-card-nats">🏛 <strong>Nationalités :</strong> ${nats}</div>
+      ${it.owner_email ? `<div class="ann-card-origs" style="color:#0D2B4E;font-weight:700;">✉️ ${it.owner_email}</div>` : ''}
       ${domaineLigne ? `<div class="ann-card-origs">🎯 <strong>Domaine d'activité :</strong> ${domaineLigne}</div>` : ''}
       ${sousDomaineLigne ? `<div class="ann-card-origs">${sousDomaineLigne}</div>` : ''}
       ${responsableNom ? `<div class="ann-card-responsable">👤 Responsable : ${responsableNom}${it.fonction_responsable ? ` — ${it.fonction_responsable}` : ''}</div>` : ''}
@@ -3187,6 +3188,7 @@ function renderPersonCard(u) {
       <div class="ann-card-meta-row" style="justify-content:center;"><span class="ann-card-loc">📍 ${loc}</span></div>
       ${origs ? `<div class="ann-card-origs">${daDrapeauListe(origs) || '🌍'} <strong>Origines :</strong> ${origs}</div>` : ''}
       <div class="ann-card-nats">🏛 <strong>Nationalités :</strong> ${nats}</div>
+      ${u.email ? `<div class="ann-card-origs" style="color:#0D2B4E;font-weight:700;">✉️ ${u.email}</div>` : ''}
       ${domaineLigneUser ? `<div class="ann-card-origs">🎯 <strong>Domaine d'activité :</strong> ${domaineLigneUser}</div>` : ''}
       ${sousDomaineLigneUser ? `<div class="ann-card-origs">${sousDomaineLigneUser}</div>` : ''}
       ${u.titre_pro ? `<div class="ann-card-desc">${stripRichTags(u.titre_pro)}</div>` : ''}
@@ -3261,6 +3263,7 @@ async function initAnnuaire(){
         ${annAvisBadgeHtml(o)}
         <div class="ann-card-meta-row" style="justify-content:center;"><span class="ann-card-loc">📍 ${loc}</span></div>
         ${daOrigineDeclaree(o) ? `<div class="ann-card-origs">${daDrapeauListe(daOrigineDeclaree(o)) || '🌍'} <strong>Origine :</strong> ${daOrigineDeclaree(o)}</div>` : ''}
+        ${o.email ? `<div class="ann-card-origs" style="color:#0D2B4E;font-weight:700;">✉️ ${o.email}</div>` : ''}
         ${responsableNom ? `<div class="ann-card-responsable">👤 Responsable : ${responsableNom}${o.fonction_responsable_etatique ? ` — ${o.fonction_responsable_etatique}` : ''}</div>` : ''}
         ${o.bio ? `<div class="ann-card-desc">${stripRichTags(o.bio)}</div>` : ''}
         <div class="ann-card-foot" onclick="event.stopPropagation()">
@@ -3343,6 +3346,12 @@ async function initAnnuaire(){
     if (state.familleFin) params.set("famille_fin", state.familleFin);
     if (state.typeFin) params.set("type_fin", state.typeFin);
     if (state.ville) params.set("ville", state.ville);
+    /* Nom / prénom (2026-11-05, signalé : « une recherche qui n'a pas abouti ni par nom ni par prénom ») :
+       ces deux champs n'étaient lus que par la branche locale « Utilisateurs sans mot-clé » ; dans tous
+       les autres cas (type « Tous les types » par défaut), la requête serveur partait sans eux et la
+       liste complète revenait, non filtrée. */
+    if (state.nom) params.set("nom", state.nom);
+    if (state.prenom) params.set("prenom", state.prenom);
     if (state.paysRes) params.set("pays", state.paysRes);
     /* state.paysOrig n'était jamais transmis : choisir un pays d'origine ne changeait
        strictement rien à la requête envoyée, et la vue par défaut (tout, non filtré)
