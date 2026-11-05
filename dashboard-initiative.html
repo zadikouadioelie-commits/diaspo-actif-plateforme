@@ -1342,6 +1342,9 @@ async function initRelaisDiasporaWidget(me, api) {
           <button type="button" id="aff-envoyer-btn" class="btn btn-orange btn-sm" style="display:none;margin-top:10px;" onclick="affOuvrirInviteMultiple()">Envoyer l'affiliation</button>
         </div>
 
+        <!-- Nouvel affichage (2026-11-06, maquette « Gestion des adhérents ») : membres affiliés, invitations, demandes, refus et historique dans la page gestion-adherents.html, intégrée ici. Les anciennes listes ci-dessous restent dans la page (masquées) pour que les actions existantes continuent de fonctionner. -->
+        <iframe id="aff-iframe" title="Gestion des adhérents" style="width:100%;border:0;display:block;min-height:620px;background:transparent;border-radius:12px;"></iframe>
+        <div id="aff-ancien" style="display:none;">
         <!-- Demandes reçues des comptes eux-mêmes (2026-09-09, bouton "Demander une affiliation"
              sur les cartouches Annuaire) — sens inverse des invitations ci-dessous : ici c'est le
              compte qui sollicite l'initiative, le responsable doit accepter ou décliner. Placée en
@@ -1366,6 +1369,7 @@ async function initRelaisDiasporaWidget(me, api) {
         <div class="card">
           <h3 style="margin:0 0 12px;">🚫 Invitations refusées</h3>
           <div id="affiliation-list-refuse"></div>
+        </div>
         </div>
       </div>
     </div>
@@ -8026,6 +8030,10 @@ async function adhRenderJournal(membreId){
   } catch(e){ el.innerHTML = `<div class="notice">Erreur : ${e.message}</div>`; }
 }
 
+window.addEventListener('message', function(e){
+  if (e.origin !== location.origin || !e.data || typeof e.data.gdaHauteur !== 'number') return;
+  var f = document.getElementById('aff-iframe'); if (f) f.style.height = Math.max(620, Math.min(e.data.gdaHauteur + 4, 6000)) + 'px';
+});
 function adhSwitchTab(tab){
   ADH_TAB = tab;
   ['formules','registre','affiliation','stats','campagnes','journal'].forEach(t => {
@@ -10743,6 +10751,8 @@ function affCartoucheHtml(m) {
       </div>`;
 }
 async function renderAffiliation() {
+  { const f = document.getElementById('aff-iframe');
+    if (f) { const u = 'gestion-adherents.html?embed=1'; if (!f.getAttribute('src')) f.setAttribute('src', u); else { try { f.contentWindow.location.reload(); } catch(e) { f.setAttribute('src', u); } } } }
   const zones = {
     demandes:   document.getElementById('affiliation-list-demandes'),
     en_attente: document.getElementById('affiliation-list-attente'),

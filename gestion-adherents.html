@@ -127,9 +127,24 @@
   .gda-grille2{grid-template-columns:1fr}
   .gda-onglet{padding:9px 11px;font-size:13px}
 }
+.gda-embed .topbar,.gda-embed .sidebar,.gda-embed #sidebar-toggle,.gda-embed .po-bandeau{display:none!important}
+.gda-embed #origine-banner,.gda-embed #email-verif-banner,.gda-embed #da-cookie-banner,.gda-embed .mobile-bottom-nav,.gda-embed #assist-hub-fab,.gda-embed #assist-hub-menu,.gda-embed #st-fab,.gda-embed #kn-fab{display:none!important}
+.gda-embed .page{min-height:0!important;height:auto!important}
+.gda-embed body{padding-top:0!important;min-height:0!important}
+.gda-embed .gda{padding-top:0;min-height:0!important;height:auto!important}
 </style>
 </head>
 <body>
+<script>
+/* Mode intégré (?embed=1) : la page s'affiche dans le tableau de bord, sans barre du site ; liens vers la fenêtre parente ; hauteur transmise au parent. */
+(function(){ try {
+  if (new URLSearchParams(location.search).get('embed') !== '1') return;
+  document.documentElement.classList.add('gda-embed');
+  var b = document.createElement('base'); b.target = '_top'; document.head.appendChild(b);
+  var envoyer = function(){ try { parent.postMessage({ gdaHauteur: Math.ceil(document.querySelector('.page').getBoundingClientRect().height) + 8 }, location.origin); } catch(e){} };
+  window.addEventListener('load', function(){ envoyer(); if (window.ResizeObserver) new ResizeObserver(envoyer).observe(document.body); else setInterval(envoyer, 800); });
+} catch(e){} })();
+</script>
 <div class="page">
   <header class="topbar">
     <div class="topbar-inner">
