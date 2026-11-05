@@ -1247,3 +1247,66 @@ function emailPartageEvenement({ email, auteurNom, titre, organisateur, quand, o
   });
 }
 module.exports.emailPartageEvenement = emailPartageEvenement;
+
+/* Sondages (2026-11-05) — invitation personnelle (lien à usage unique) et remerciement après réponse.
+   Mêmes habillage et logique que les autres e-mails : sendEmail() n'échoue jamais par exception. */
+function _sondageMailCadre(titreH1, corps) {
+  return `
+<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#FFF7ED;font-family:Inter,Arial,sans-serif;">
+  <div style="max-width:560px;margin:40px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 8px 32px rgba(242,100,34,.12);">
+    <div style="background:linear-gradient(135deg,#0D1B2A,#1B3A6B);padding:26px 32px;text-align:center;">
+      <div style="font-size:26px;font-weight:900;color:#fff;letter-spacing:-.02em;">DIASPO'ACTIF</div>
+      <div style="color:rgba(255,255,255,.6);font-size:13px;margin-top:4px;">Du Sud au Nord</div>
+    </div>
+    <div style="padding:30px 32px 34px;">
+      <h1 style="margin:0 0 18px;font-size:19px;font-weight:900;color:#0D1B2A;line-height:1.35;">${titreH1}</h1>
+      ${corps}
+    </div>
+    <div style="background:#F8FAFF;padding:16px 32px;text-align:center;border-top:1px solid #E8EFFE;">
+      <p style="margin:0;font-size:11px;color:#94A3B8;">Diaspo'Actif · contact@diaspoactif.com</p>
+    </div>
+  </div>
+</body>
+</html>`;
+}
+function _sondageMailBouton(href, texte) {
+  return `<div style="text-align:center;margin:26px 0 6px;"><a href="${href}" style="display:inline-block;background:linear-gradient(135deg,#F26422,#c2410c);color:#fff;text-decoration:none;font-weight:800;font-size:15px;padding:14px 32px;border-radius:12px;">${texte}</a></div>`;
+}
+function emailInvitationSondage({ email, auteurNom, titre, description, finTxt, lien, message }) {
+  const e = v => String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const desc = String(description || "").trim().slice(0, 240);
+  const mot = String(message || "").trim().slice(0, 500);
+  const corps = `
+      ${mot ? `<p style="margin:0 0 16px;font-size:14px;color:#334155;line-height:1.6;white-space:pre-line;">${e(mot)}</p>` : ""}
+      <div style="border:1px solid #E2E8F0;border-radius:12px;padding:16px 18px;">
+        <div style="font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#C9460B;margin-bottom:6px;">Sondage</div>
+        <div style="font-size:18px;font-weight:900;color:#0D1B2A;line-height:1.3;">${e(titre)}</div>
+        ${desc ? `<div style="margin-top:10px;font-size:14px;color:#475569;line-height:1.6;">${e(desc)}</div>` : ""}
+        ${finTxt ? `<div style="margin-top:10px;font-size:13px;font-weight:700;color:#475569;">⏳ Réponses possibles jusqu'au ${e(finTxt)}</div>` : ""}
+      </div>
+      ${_sondageMailBouton(e(lien), "Répondre au sondage")}
+      <p style="color:#94A3B8;font-size:12px;text-align:center;margin:16px 0 0;">Ce lien est personnel et ne peut servir qu'une seule fois. Aucun compte n'est nécessaire. Si vous ne connaissez pas ${e(auteurNom)}, vous pouvez ignorer cet e-mail.</p>`;
+  return sendEmail({
+    to: email,
+    subject: `${auteurNom} vous invite à répondre à un sondage — Diaspo'Actif`,
+    html: _sondageMailCadre(`📊 ${e(auteurNom)} vous invite à répondre à un sondage`, corps)
+  });
+}
+function emailRemerciementSondage({ email, prenom, titre, lienInscription }) {
+  const e = v => String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const corps = `
+      <p style="margin:0 0 14px;font-size:15px;color:#334155;line-height:1.7;">Bonjour${prenom ? " " + e(prenom) : ""}, merci d'avoir répondu au sondage <strong>« ${e(titre)} »</strong>. Votre avis compte.</p>
+      <p style="margin:0 0 6px;font-size:14px;color:#475569;line-height:1.7;">Diaspo'Actif relie les initiatives de la diaspora du Sud au Nord. Créer un compte est gratuit : il vous permet de retrouver les initiatives près de chez vous, de suivre leurs événements et de répondre plus vite aux prochains sondages.</p>
+      ${_sondageMailBouton(e(lienInscription), "Créer mon compte gratuitement")}
+      <p style="color:#94A3B8;font-size:12px;text-align:center;margin:16px 0 0;">Vous n'êtes pas obligé(e) de créer un compte. Vous recevez ce message parce que vous avez indiqué votre adresse e-mail en répondant à ce sondage.</p>`;
+  return sendEmail({
+    to: email,
+    subject: `Merci pour votre réponse — Diaspo'Actif`,
+    html: _sondageMailCadre("🙏 Merci pour votre réponse", corps)
+  });
+}
+module.exports.emailInvitationSondage = emailInvitationSondage;
+module.exports.emailRemerciementSondage = emailRemerciementSondage;

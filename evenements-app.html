@@ -2858,6 +2858,8 @@ window.openDetail = async function(id) {
     initCarousel('detail-carousel');
     evtChargerZoneCr(evt);
     inscRapideChargerListe(evt);
+    /* « Sondage en cours » (2026-11-05) : sondages que l'organisateur a liés à cet événement ; réponse facultative, sans compte, hors parcours d'inscription. */
+    if (window.SondagesEnCours) SondagesEnCours.rendre({ evenement: evt.id, apres: document.getElementById('evt-cta-row-' + evt.id) });
     /* Bouton "Faire un don" partagé (2026-09-28, demande explicite) — distinct du bloc
        "Cagnottes liées" ci-dessus (campagnes explicitement associées à CET événement) : ici,
        le don mis en avant "partout" par le compte organisateur, quelle que soit sa nature. */
@@ -3473,6 +3475,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') fermerListeB
 <script src="assets/chatbot.js"></script>
 <script src="/assets/cookies-banner.js"></script>
 <script src="/assets/don-banner.js"></script>
+<script src="/assets/sondages-en-cours.js"></script>
 <script src="/assets/upload-media.js"></script>
 <!-- Recadrage des photos (2026-10-12, demande explicite : "permet de pouvoir ajuster l'image")
      — même recadreur déjà utilisé pour les bannières/logos de profil (assets/app.js). -->

@@ -2467,6 +2467,9 @@ const MIGRATIONS = [
   // Sondages (2026-11-04) : informations demandées aux répondants + historique des périodes de publication (30 jours max chacune)
   ["sondages", "champs_repondant_json TEXT DEFAULT '[]'"],
   ["sondages", "periodes_json TEXT DEFAULT '[]'"],
+  // Sondages (2026-11-05) : lieux de diffusion choisis par le créateur ({fil, profil}) + réponses de personnes sans compte
+  ["sondages", "diffusion_json TEXT DEFAULT '{}'"],
+  ["sondage_reponses", "repondant_id INTEGER"],
   // ── Questions sondage enrichies ──
   ["sondage_questions", "description TEXT"],
   ["sondage_questions", "min_label TEXT"],
@@ -2834,7 +2837,7 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     sondage_id INTEGER NOT NULL,
     texte TEXT NOT NULL,
-    type TEXT NOT NULL DEFAULT 'choix_unique' CHECK(type IN ('choix_unique','choix_multiple','texte_libre','echelle','classement')),
+    type TEXT NOT NULL DEFAULT 'choix_unique',
     options_json TEXT DEFAULT '[]',
     obligatoire INTEGER DEFAULT 1,
     ordre INTEGER DEFAULT 0,
@@ -6242,7 +6245,81 @@ db.exec(`
     FOREIGN KEY(sondage_id) REFERENCES sondages(id) ON DELETE CASCADE,
     FOREIGN KEY(user_id) REFERENCES users(id)
   );
+
+  /* Sondages (2026-11-05) — une ligne par PERSONNE ayant répondu : compte connecté (user_id) ou invité sans compte (identité saisie).
+     Les réponses (sondage_reponses.repondant_id) pointent ici ; seul le créateur du sondage voit l'identité. */
+  CREATE TABLE IF NOT EXISTS sondage_repondants (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sondage_id INTEGER NOT NULL,
+    user_id INTEGER,
+    nom TEXT,
+    prenom TEXT,
+    email TEXT,
+    telephone TEXT,
+    donnees_json TEXT DEFAULT '{}',
+    consentement_recontact INTEGER DEFAULT 0,
+    cle_appareil TEXT,
+    invitation_id INTEGER,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(sondage_id) REFERENCES sondages(id) ON DELETE CASCADE
+  );
+  CREATE INDEX IF NOT EXISTS idx_sondage_repondants_sondage ON sondage_repondants(sondage_id);
+
+  /* Lien personnel à usage unique envoyé par e-mail (anti-doublon) : le jeton ne sert qu'une fois. */
+  CREATE TABLE IF NOT EXISTS sondage_invitations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sondage_id INTEGER NOT NULL,
+    email TEXT NOT NULL,
+    token TEXT NOT NULL UNIQUE,
+    envoye_le TEXT DEFAULT (datetime('now')),
+    utilise_le TEXT,
+    FOREIGN KEY(sondage_id) REFERENCES sondages(id) ON DELETE CASCADE
+  );
+  CREATE INDEX IF NOT EXISTS idx_sondage_invitations_sondage ON sondage_invitations(sondage_id);
+
+  /* Un sondage peut être rattaché à PLUSIEURS événements du créateur : « Sondage en cours » sur la page de chacun (jamais dans le parcours d'inscription). */
+  CREATE TABLE IF NOT EXISTS sondage_evenements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sondage_id INTEGER NOT NULL,
+    evenement_id INTEGER NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(sondage_id, evenement_id),
+    FOREIGN KEY(sondage_id) REFERENCES sondages(id) ON DELETE CASCADE
+  );
 `);
+
+/* Sondages (2026-11-05) : la table sondage_questions avait été créée avec CHECK(type IN ('choix_unique','choix_multiple','texte_libre','echelle','classement')),
+   alors que la page Sondages propose oui_non, texte_court, texte_long, echelle_5, echelle_10, etoiles, nombre, date… : toute question d'un de ces types faisait
+   échouer la création du sondage. On reconstruit la table SANS cette contrainte (SQLite ; sur Postgres, voir checkFixes dans pg-init.js). Les lignes sont conservées. */
+;(function migrateSondageQuestionsSansCheckType() {
+  const t = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='sondage_questions'").get();
+  if (!t || !t.sql || !/CHECK\s*\(\s*type\s+IN/i.test(t.sql)) return;
+  const anciennes = db.prepare("PRAGMA table_info(sondage_questions)").all().map(c => c.name);
+  const voulues = ["id","sondage_id","texte","type","options_json","obligatoire","ordre","description","min_label","max_label","min_val","max_val"];
+  const communes = voulues.filter(c => anciennes.includes(c)).join(",");
+  db.exec("PRAGMA foreign_keys=OFF;");
+  try {
+    db.exec(`DROP TABLE IF EXISTS sondage_questions_new;
+      CREATE TABLE sondage_questions_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        sondage_id INTEGER NOT NULL,
+        texte TEXT NOT NULL,
+        type TEXT NOT NULL DEFAULT 'choix_unique',
+        options_json TEXT DEFAULT '[]',
+        obligatoire INTEGER DEFAULT 1,
+        ordre INTEGER DEFAULT 0,
+        description TEXT,
+        min_label TEXT,
+        max_label TEXT,
+        min_val INTEGER DEFAULT 1,
+        max_val INTEGER DEFAULT 5,
+        FOREIGN KEY(sondage_id) REFERENCES sondages(id) ON DELETE CASCADE
+      );
+      INSERT INTO sondage_questions_new(${communes}) SELECT ${communes} FROM sondage_questions;
+      DROP TABLE sondage_questions;
+      ALTER TABLE sondage_questions_new RENAME TO sondage_questions;`);
+  } finally { db.exec("PRAGMA foreign_keys=ON;"); }
+})();
 
 /* =====================================================================
    IDENTIFIANT UNIQUE DIASPO'ACTIF (DA-XXXXXXXX)

@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<script src="/assets/m-redirect.js"></script>
+<meta charset="UTF-8">
+<link rel="icon" href="/assets/logo.png">
+<title>Diaspo'Actif — Répondre à un sondage</title>
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Diaspo'Actif">
+<meta property="og:title" content="Diaspo'Actif — Répondre à un sondage">
+<meta property="og:description" content="Donnez votre avis en quelques minutes, sans créer de compte.">
+<meta property="og:image" content="https://diaspoactif.com/assets/og-image.png">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="stylesheet" href="assets/styles.v2.css">
+<link rel="stylesheet" href="/assets/responsive.v2.css?v=2">
+<style>
+/* Page publique de réponse à un sondage (2026-11-05) — utilisable sans compte, lisible sur téléphone. */
+.sr-wrap{max-width:720px;margin:0 auto;}
+.sr-card{background:#fff;border:1px solid var(--border);border-radius:16px;padding:22px;margin-bottom:16px;}
+.sr-badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;background:#eff6ff;color:#1d4ed8;}
+.sr-meta{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px;color:var(--muted);margin-top:8px;}
+.sr-etat{border-radius:12px;padding:14px 16px;font-size:14px;line-height:1.5;margin-bottom:16px;}
+.sr-etat.fin{background:#f3f4f6;color:#374151;}
+.sr-etat.ok{background:#d1fae5;color:#065f46;font-weight:700;}
+.sr-etat.info{background:#eff6ff;color:#1e3a8a;}
+.sr-titre-bloc{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:0 0 4px;}
+.sr-aide{font-size:12.5px;color:var(--muted);line-height:1.5;margin:0 0 14px;}
+.sr-champ{margin-bottom:12px;}
+.sr-champ label.sr-lib{display:block;font-size:13px;font-weight:700;margin-bottom:4px;}
+.sr-champ input,.sr-champ textarea,.sr-champ select{width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:8px;font-size:15px;padding:10px 12px;background:#fff;font-family:inherit;}
+.sr-champ textarea{resize:vertical;}
+.sr-q{background:#f8fafc;border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px;}
+.sr-q .sr-q-t{font-size:15px;font-weight:700;margin-bottom:4px;line-height:1.4;}
+.sr-q .sr-q-d{font-size:12.5px;color:var(--muted);margin-bottom:8px;}
+.sr-opt{display:flex;align-items:center;gap:10px;padding:9px 4px;font-size:15px;cursor:pointer;min-height:44px;}
+.sr-opt input{width:20px;height:20px;accent-color:#2563EB;flex-shrink:0;}
+.sr-echelle{display:flex;flex-wrap:wrap;gap:8px;}
+.sr-echelle label{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:44px;min-height:44px;justify-content:center;border:1px solid var(--border);border-radius:10px;background:#fff;cursor:pointer;font-size:14px;font-weight:700;}
+.sr-echelle input{accent-color:#2563EB;}
+.sr-echelle-lib{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:6px;}
+.sr-erreur{background:#fef2f2;color:#991b1b;border:1px solid #fecaca;border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:12px;display:none;}
+.sr-consent{display:flex;gap:10px;align-items:flex-start;font-size:13px;line-height:1.5;margin-top:6px;}
+.sr-consent input{width:20px;height:20px;margin-top:1px;accent-color:#2563EB;flex-shrink:0;}
+.sr-merci{text-align:center;padding:10px 0 4px;}
+.sr-merci h2{margin:0 0 8px;font-size:22px;}
+.sr-compte{margin-top:18px;text-align:left;background:#fff7ed;border:1px solid #fed7aa;border-radius:14px;padding:16px;}
+.sr-compte strong{display:block;margin-bottom:4px;}
+button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:3px solid #2563EB;outline-offset:2px;}
+@media (max-width:600px){.sr-card{padding:16px;border-radius:14px;}}
+</style>
+<link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
+<link rel="stylesheet" href="/assets/design-upgrade.v2.css">
+<link rel="stylesheet" href="/assets/theme-manager.css">
+</head>
+<body>
+<div class="page" id="app">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Menu">&#9776;</button>
+      <div class="logo"><a href="index.html" style="text-decoration:none;color:inherit;display:flex;align-items:center;gap:8px;"><img loading="lazy" class="logo-img" src="assets/logo.png" alt=""> DIASPO'ACTIF</a></div>
+      <nav class="nav">
+        <a href="index.html">Accueil</a>
+        <a href="fil-actualite.html">Fil</a>
+        <a href="sondages.html" style="color:#2563EB;font-weight:700;">Sondages</a>
+        <a href="evenements.html">Autres événements</a>
+      </nav>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container" style="padding-top:24px;padding-bottom:60px;">
+    <div class="sr-wrap" id="sr-racine" aria-live="polite">
+      <div class="sr-card" style="text-align:center;color:var(--muted);">Chargement du sondage…</div>
+    </div>
+  </main>
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/demo.js?v=2"></script>
+<script src="assets/app.js?v=13"></script>
+<script src="assets/ds.js"></script>
+<script>
+(function () {
+  var params = new URLSearchParams(location.search);
+  var SID = parseInt(params.get('id'), 10) || 0;
+  var INV = (params.get('inv') || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 80);
+  var racine = document.getElementById('sr-racine');
+  var ME = null, SONDAGE = null, QUESTIONS = [], CHAMPS = [];
+  var CAT = {consultation_citoyenne:'Consultation citoyenne',projet:'Projet',emploi:'Emploi',formation:'Formation',culture:'Culture',tourisme:'Tourisme',investissement:'Investissement',sante:'Santé',numerique:'Numérique',education:'Éducation',environnement:'Environnement',autre:'Sondage'};
+
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function fmtJour(s) { if (!s) return ''; var d = new Date(String(s).slice(0, 10) + 'T12:00:00'); return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }); }
+  function joursRestants(s) { if (!s) return null; return Math.ceil((new Date(String(s).slice(0, 10) + 'T23:59:59') - new Date()) / 86400000); }
+
+  /* Clé de l'appareil : sert uniquement à éviter qu'une même personne réponde deux fois depuis le même navigateur. */
+  function cleAppareil() {
+    try {
+      var k = localStorage.getItem('da_sond_cle');
+      if (!k) { k = (self.crypto && crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2)).replace(/[^A-Za-z0-9-]/g, ''); localStorage.setItem('da_sond_cle', k); }
+      return k;
+    } catch (e) { return ''; }
+  }
+  function dejaRepondu() { try { return localStorage.getItem('da_sond_ok_' + SID) === '1'; } catch (e) { return false; } }
+  function noterRepondu() { try { localStorage.setItem('da_sond_ok_' + SID, '1'); } catch (e) {} }
+
+  function ecran(html) { racine.innerHTML = html; }
+  function introuvable(msg) {
+    ecran('<div class="sr-card" style="text-align:center;"><h1 style="font-size:22px;margin:0 0 8px;">Sondage introuvable</h1><p class="sr-aide">' + esc(msg || 'Ce lien ne correspond à aucun sondage en ligne.') + '</p><a class="btn btn-orange" href="sondages.html">Voir les sondages ouverts</a></div>');
+  }
+
+  async function init() {
+    if (!SID) return introuvable();
+    try { var rm = await api('GET', '/auth/me'); ME = rm && rm.user; } catch (e) {}
+    var r;
+    try { r = await api('GET', '/sondages/' + SID + '?cle=' + encodeURIComponent(cleAppareil()) + (INV ? '&inv=' + encodeURIComponent(INV) : '')); }
+    catch (e) { return introuvable(); }
+    SONDAGE = r.sondage; QUESTIONS = r.questions || [];
+    window.__invEmail = (r.invitation && !r.invitation.utilise) ? r.invitation.email : '';
+    try { CHAMPS = JSON.parse(SONDAGE.champs_repondant_json || '[]'); } catch (e) { CHAMPS = []; }
+    document.title = 'Diaspo\'Actif — ' + SONDAGE.titre;
+    afficher(r);
+    api('POST', '/sondages/' + SID + '/view').catch(function () {});
+  }
+
+  function entete() {
+    var s = SONDAGE, j = joursRestants(s.date_cloture);
+    var fin = s.statut === 'ouvert' && j !== null ? (j > 1 ? j + ' jours restants' : 'Dernier jour') : '';
+    return '<div class="sr-card">' +
+      '<span class="sr-badge">📊 ' + esc(CAT[s.categorie] || 'Sondage') + '</span>' +
+      '<h1 style="margin:10px 0 0;font-size:24px;line-height:1.25;">' + esc(s.titre) + '</h1>' +
+      '<div class="sr-meta"><span>Par ' + esc(s.createur_nom || 'Diaspo\'Actif') + '</span>' +
+      (s.statut === 'ouvert' && s.date_cloture ? '<span>⏳ Jusqu\'au ' + esc(fmtJour(s.date_cloture)) + (fin ? ' · ' + fin : '') + '</span>' : '') +
+      '<span>👥 ' + (s.nb_reponses || 0) + ' réponse(s)</span></div>' +
+      (s.description ? '<p style="margin:14px 0 0;font-size:15px;line-height:1.6;">' + esc(s.description) + '</p>' : '') +
+      '</div>';
+  }
+
+  function afficher(r) {
+    var s = SONDAGE, h = entete();
+    if (s.statut !== 'ouvert') {
+      ecran(h + '<div class="sr-etat fin">⏹️ <strong>Fin de ce sondage</strong> — il n\'accepte plus de réponses. Merci à toutes les personnes qui ont participé.</div>' +
+        '<div style="text-align:center;"><a class="btn btn-outline" href="sondages.html">Voir les sondages ouverts</a></div>');
+      return;
+    }
+    if (r.ma_participation || dejaRepondu()) {
+      ecran(h + '<div class="sr-etat ok">✅ ' + (r.invitation && r.invitation.utilise ? 'Ce lien personnel a déjà servi : votre réponse est bien enregistrée.' : 'Vous avez déjà répondu à ce sondage. Merci !') + '</div>' +
+        '<div style="text-align:center;"><a class="btn btn-outline" href="sondages.html">Voir les autres sondages</a></div>');
+      return;
+    }
+    var bloc = '';
+    if (ME) {
+      bloc = '<div class="sr-etat info">Vous répondez avec votre compte Diaspo\'Actif' + (s.anonyme ? ' — ce sondage est anonyme : votre identité ne sera pas enregistrée avec vos réponses.' : '. Aucune autre information n\'est demandée.') + '</div>';
+    } else if (s.anonyme) {
+      bloc = '<div class="sr-etat info">🔒 Sondage anonyme : aucune information personnelle n\'est demandée. Aucun compte n\'est nécessaire.</div>';
+    } else if (CHAMPS.length) {
+      bloc = '<div class="sr-card"><p class="sr-titre-bloc">Vos informations</p><p class="sr-aide">Aucun compte n\'est nécessaire. Ces informations sont vues uniquement par l\'organisateur du sondage. Les champs marqués d\'une étoile sont obligatoires.</p>' +
+        CHAMPS.map(champHtml).join('') +
+        '<label class="sr-consent"><input type="checkbox" id="sr-consent"> <span>J\'accepte d\'être recontacté(e) par l\'organisateur au sujet de ce sondage et de ses suites.</span></label></div>';
+    }
+    ecran(h + '<form id="sr-form" novalidate>' + bloc +
+      '<div class="sr-card"><p class="sr-titre-bloc">Les questions</p><p class="sr-aide">Les questions marquées d\'une étoile sont obligatoires.</p>' + QUESTIONS.map(questionHtml).join('') + '</div>' +
+      '<div class="sr-erreur" id="sr-erreur" role="alert"></div>' +
+      '<button type="submit" class="btn btn-orange" id="sr-envoyer" style="width:100%;min-height:48px;font-size:16px;">Envoyer mes réponses</button>' +
+      '</form>');
+    document.getElementById('sr-form').addEventListener('submit', envoyer);
+  }
+
+  function champHtml(c) {
+    var id = 'sr-ch-' + c.cle, req = c.obligatoire ? ' <span style="color:#dc2626;" aria-hidden="true">*</span>' : '';
+    var pre = (c.cle === 'email' && window.__invEmail) ? esc(window.__invEmail) : '';
+    var champ;
+    if (c.type_champ === 'texte_long') champ = '<textarea id="' + id + '" rows="3" maxlength="1000"></textarea>';
+    else if (c.type_champ === 'choix_unique') champ = '<select id="' + id + '"><option value="">— Choisir —</option>' + (c.options || []).map(function (o) { return '<option>' + esc(o) + '</option>'; }).join('') + '</select>';
+    else {
+      var t = { email: 'email', telephone: 'tel', nombre: 'number', date: 'date', url: 'url' }[c.type_champ] || 'text';
+      var ac = { email: 'email', telephone: 'tel' }[c.type_champ] || (c.cle === 'nom' ? 'family-name' : c.cle === 'prenom' ? 'given-name' : 'off');
+      champ = '<input id="' + id + '" type="' + t + '" autocomplete="' + ac + '" maxlength="300" value="' + pre + '">';
+    }
+    return '<div class="sr-champ"><label class="sr-lib" for="' + id + '">' + esc(c.libelle) + req + '</label>' + champ + '</div>';
+  }
+
+  function questionHtml(q, i) {
+    var opts = []; try { opts = JSON.parse(q.options_json || '[]'); } catch (e) {}
+    var req = q.obligatoire ? ' <span style="color:#dc2626;" aria-hidden="true">*</span>' : '';
+    var corps = '', n = 'q_' + q.id;
+    if (q.type === 'oui_non') {
+      corps = ['oui', 'non'].map(function (v) { return '<label class="sr-opt"><input type="radio" name="' + n + '" value="' + v + '"> ' + (v === 'oui' ? 'Oui' : 'Non') + '</label>'; }).join('');
+    } else if (q.type === 'choix_unique') {
+      corps = opts.map(function (o) { return '<label class="sr-opt"><input type="radio" name="' + n + '" value="' + esc(o) + '"> ' + esc(o) + '</label>'; }).join('');
+    } else if (q.type === 'choix_multiple') {
+      corps = opts.map(function (o) { return '<label class="sr-opt"><input type="checkbox" name="' + n + '" value="' + esc(o) + '"> ' + esc(o) + '</label>'; }).join('');
+    } else if (['echelle_5', 'echelle_10', 'etoiles'].indexOf(q.type) >= 0) {
+      var max = q.type === 'echelle_10' ? 10 : 5, b = '';
+      for (var v = 1; v <= max; v++) b += '<label><input type="radio" name="' + n + '" value="' + v + '">' + v + '</label>';
+      corps = '<div class="sr-echelle">' + b + '</div>' + ((q.min_label || q.max_label) ? '<div class="sr-echelle-lib"><span>' + esc(q.min_label || '') + '</span><span>' + esc(q.max_label || '') + '</span></div>' : '');
+    } else if (q.type === 'texte_long' || q.type === 'texte_libre') {
+      corps = '<div class="sr-champ" style="margin:0;"><textarea name="' + n + '" rows="4" maxlength="2000" aria-label="' + esc(q.texte) + '"></textarea></div>';
+    } else {
+      var t = q.type === 'date' ? 'date' : q.type === 'nombre' ? 'number' : 'text';
+      corps = '<div class="sr-champ" style="margin:0;"><input type="' + t + '" name="' + n + '" maxlength="500" aria-label="' + esc(q.texte) + '"></div>';
+    }
+    return '<fieldset class="sr-q" style="margin-left:0;margin-right:0;"><legend class="sr-q-t" style="padding:0 4px;">' + (i + 1) + '. ' + esc(q.texte) + req + '</legend>' +
+      (q.description ? '<div class="sr-q-d">' + esc(q.description) + '</div>' : '') + corps + '</fieldset>';
+  }
+
+  function lireReponses() {
+    var out = [];
+    QUESTIONS.forEach(function (q) {
+      var n = 'q_' + q.id, val = null;
+      var coches = [].slice.call(document.querySelectorAll('input[name="' + n + '"]:checked'));
+      if (q.type === 'choix_multiple') { if (coches.length) val = coches.map(function (c) { return c.value; }); }
+      else if (coches.length) val = coches[0].value;
+      else { var el = document.querySelector('[name="' + n + '"]:not([type=radio]):not([type=checkbox])'); if (el && el.value.trim()) val = el.value.trim(); }
+      if (val !== null) out.push({ question_id: q.id, valeur: val });
+    });
+    return out;
+  }
+  function lireChamps() {
+    var o = {};
+    CHAMPS.forEach(function (c) { var el = document.getElementById('sr-ch-' + c.cle); if (el && String(el.value).trim()) o[c.cle] = String(el.value).trim(); });
+    return o;
+  }
+  function erreur(msg) { var e = document.getElementById('sr-erreur'); e.textContent = msg; e.style.display = 'block'; e.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+
+  async function envoyer(ev) {
+    ev.preventDefault();
+    document.getElementById('sr-erreur').style.display = 'none';
+    var reponses = lireReponses(), champs = {}, consent = false;
+    if (!ME && !SONDAGE.anonyme) {
+      champs = lireChamps();
+      for (var i = 0; i < CHAMPS.length; i++) if (CHAMPS[i].obligatoire && !champs[CHAMPS[i].cle] && !(CHAMPS[i].cle === 'email' && window.__invEmail)) return erreur('Merci de renseigner : ' + CHAMPS[i].libelle + '.');
+      var cb = document.getElementById('sr-consent'); consent = !!(cb && cb.checked);
+    }
+    for (var k = 0; k < QUESTIONS.length; k++) if (QUESTIONS[k].obligatoire && !reponses.some(function (r) { return r.question_id === QUESTIONS[k].id; })) return erreur('Merci de répondre à la question ' + (k + 1) + '.');
+    var btn = document.getElementById('sr-envoyer'); btn.disabled = true; btn.textContent = 'Envoi en cours…';
+    try {
+      var r = await api('POST', '/sondages/' + SID + '/participer', { reponses: reponses, cle: cleAppareil(), invitation: INV || undefined, repondant: { champs: champs, consentement: consent } });
+      noterRepondu();
+      merci(r.remerciement || {});
+    } catch (e) {
+      btn.disabled = false; btn.textContent = 'Envoyer mes réponses';
+      erreur(e && e.message ? e.message : 'L\'envoi a échoué. Réessayez dans un instant.');
+    }
+  }
+
+  function merci(rm) {
+    var compte = rm.proposer_compte
+      ? '<div class="sr-compte"><strong>Créez votre compte Diaspo\'Actif — c\'est gratuit</strong><p class="sr-aide" style="margin:0 0 12px;">Retrouvez les initiatives de la diaspora près de chez vous, suivez leurs événements et répondez plus vite aux prochains sondages. Vous n\'y êtes pas obligé(e).</p><a class="btn btn-orange" href="inscription.html">Créer mon compte</a></div>'
+      : '';
+    var mail = rm.email ? (rm.email_envoye ? '<p class="sr-aide">Un e-mail de remerciement vient d\'être envoyé à <strong>' + esc(rm.email) + '</strong>.</p>' : '') : '';
+    window.scrollTo({ top: 0 });
+    SONDAGE.nb_reponses = (SONDAGE.nb_reponses || 0) + 1;
+    ecran(entete() + '<div class="sr-card sr-merci"><div style="font-size:40px;" aria-hidden="true">🙏</div><h2>Merci pour votre réponse !</h2><p style="margin:0 0 6px;font-size:15px;line-height:1.6;">Votre avis a bien été enregistré.</p>' + mail + compte +
+      '<div style="margin-top:18px;"><a class="btn btn-outline" href="sondages.html">Voir les autres sondages</a></div></div>');
+  }
+
+  document.addEventListener('DOMContentLoaded', function () { setTimeout(init, 300); });
+})();
+</script>
+</body>
+</html>

@@ -218,6 +218,11 @@
   </div>
 </div>
 
+<!-- MODAL DIFFUSION (2026-11-05) -->
+<div class="modal-bg" id="modal-diffusion-bg" onclick="if(event.target===this)closeMod('modal-diffusion-bg')">
+  <div class="modal" id="modal-diffusion-content" style="max-width:640px;max-height:90vh;overflow-y:auto;"></div>
+</div>
+
 <!-- MODAL STATS -->
 <div class="modal-bg" id="modal-stats-sond-bg" onclick="if(event.target===this)closeMod('modal-stats-sond-bg')">
   <div class="modal" id="modal-stats-sond-content" style="max-width:640px;max-height:90vh;overflow-y:auto;"></div>
@@ -253,6 +258,9 @@ function descPeriodes(s){
 const CAT_LABELS = {consultation_citoyenne:'Consultation citoyenne',projet:'Projet',emploi:'Emploi',formation:'Formation',culture:'Culture',tourisme:'Tourisme',investissement:'Investissement',sante:'Santé',numerique:'Numérique',education:'Éducation',environnement:'Environnement',autre:'Sondage'};
 
 document.addEventListener('DOMContentLoaded', async()=>{
+  /* Anciens liens « sondages.html?id=N » : la réponse se fait désormais sur la page publique sondage.html (sans compte). */
+  const idLien=parseInt(new URLSearchParams(location.search).get('id'),10);
+  if(idLien){ location.replace('sondage.html?id='+idLien); return; }
   await new Promise(r=>setTimeout(r,400));
   try{ const r=await api('GET','/auth/me'); ME_SOND=r.user; }catch(_){}
   if(ME_SOND && ['initiative','collectivite','administrateur'].includes(ME_SOND.role)){
@@ -340,11 +348,12 @@ async function openSond(sid){
       ${dejaRepondu&&!ferme?'<div style="padding:12px;background:#d1fae5;border-radius:10px;margin-bottom:16px;text-align:center;font-size:13px;font-weight:700;color:#065f46;">✅ Vous avez déjà répondu.</div>':''}
       ${peutParticiper?`<div id="sond-form-${sid}">${qs.map((q2,i)=>renderQ(q2,i)).join('')}<button class="btn btn-orange" style="width:100%;margin-top:12px;" onclick="submitSond(${sid},[${qs.map(q2=>q2.id).join(',')}])">✅ Soumettre</button></div>`:''}
       ${(ferme||dejaRepondu)?`<button class="btn btn-sm btn-outline" onclick="loadResMini(${sid})">📊 Voir les résultats</button><div id="res-mini-${sid}"></div>`:''}
-      ${!ME_SOND&&!ferme?'<div style="padding:12px;background:#fef3c7;border-radius:10px;text-align:center;font-size:13px;">🔑 <a href="login.html" style="color:#2563EB;font-weight:700;">Connectez-vous</a> pour participer.</div>':''}
+      ${!ME_SOND&&!ferme?`<div style="padding:14px;background:#eff6ff;border-radius:10px;text-align:center;font-size:13px;line-height:1.6;"><a class="btn btn-orange" href="sondage.html?id=${sid}">Répondre sans compte</a><div style="margin-top:8px;">ou <a href="login.html" style="color:#2563EB;font-weight:700;">connectez-vous</a></div></div>`:''}
       <div class="interact-bar" style="margin-top:16px;">
         <button class="ibtn ${s.ma_reaction?'active':''}" onclick="toggleRxnSond(${sid},this)">❤️ ${s.nb_reactions||0}</button>
         <button class="ibtn ${s.est_favori?'active':''}" onclick="toggleFavSond(${sid},this)">⭐ ${s.est_favori?'Sauvegardé':'Favoris'}</button>
-        <button class="ibtn" onclick="navigator.clipboard.writeText(location.origin+'/sondages.html?id=${sid}');DA.toast('Lien copié !',{type:'success'})">📤 Copier</button>
+        <button class="ibtn" onclick="navigator.clipboard.writeText(location.origin+'/sondage.html?id=${sid}');DA.toast('Lien copié !',{type:'success'})">📤 Copier</button>
+        ${estCreateur?`<button class="btn btn-sm" style="border-color:#2563EB;color:#2563EB;" onclick="closeMod('modal-sond-bg');ouvrirDiffusion(${sid})">📣 Diffusion</button>`:''}
         ${estCreateur?`<button class="btn btn-sm" style="border-color:#2563EB;color:#2563EB;" onclick="closeMod('modal-sond-bg');openStatsSond(${sid})">📊 Stats</button>`:''}
         ${estCreateur&&!ferme?`<button class="btn btn-sm" style="border-color:#ef4444;color:#ef4444;" onclick="cloturerSond(${sid})">🔒 Clôturer</button>`:''}
         ${estCreateur&&s.statut==='cloture'?`<button class="btn btn-sm" style="border-color:#2563EB;color:#2563EB;" onclick="ouvrirRepublier(${sid})">🔁 Republier</button>`:''}
@@ -439,6 +448,89 @@ async function postComSond(sid){
   catch(e){DA.toast(e.message,{type:'danger'});}
 }
 
+/* ── Diffusion : lieux d'affichage, événements liés, partage, invitations, personnes ayant répondu (2026-11-05) ── */
+let DIFF_SID=0;
+async function ouvrirDiffusion(sid){
+  DIFF_SID=sid;
+  const el=document.getElementById('modal-diffusion-content');
+  el.innerHTML='<div style="padding:40px;text-align:center;color:var(--muted);">Chargement…</div>';
+  document.getElementById('modal-diffusion-bg').style.display='flex';
+  try{
+    const d=await api('GET','/sondages/'+sid+'/diffusion');
+    const s=d.sondage, ouvert=s.statut==='ouvert';
+    const evts=d.mes_evenements||[], lies=new Set((d.evenement_ids||[]).map(Number));
+    el.innerHTML=`
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:12px;">
+        <div><h3 style="margin:0 0 4px;">📣 Diffusion</h3><div style="font-size:13px;color:var(--muted);">${escH(s.titre)}</div></div>
+        <button onclick="closeMod('modal-diffusion-bg')" aria-label="Fermer" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">×</button>
+      </div>
+      <div style="font-size:12px;line-height:1.5;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:10px 12px;color:#1e3a8a;margin-bottom:14px;">
+        ${ouvert?`⏳ Sondage <strong>en cours</strong> jusqu'au ${fmtDate(s.date_cloture)}.`:`Ce sondage n'est pas en cours (${escH(STATUT_LABELS[s.statut]||s.statut)}). Vos choix s'appliqueront dès sa publication.`}
+        La durée (30 jours maximum) est <strong>la même partout</strong> où il est affiché.</div>
+
+      <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px;">Où l'afficher</div>
+      <label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;margin-bottom:8px;cursor:pointer;"><input type="checkbox" id="df-fil" ${d.diffusion.fil?'checked':''} style="margin-top:2px;accent-color:#2563EB;"> <span><strong>Fil d'actualité</strong> — une publication annonce le sondage avec son lien${d.sondage.fil_post_id?' (déjà publiée)':''}.</span></label>
+      <label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;margin-bottom:14px;cursor:pointer;"><input type="checkbox" id="df-profil" ${d.diffusion.profil?'checked':''} style="margin-top:2px;accent-color:#2563EB;"> <span><strong>Mon profil public</strong> — un encart « Sondage en cours » s'affiche sur votre page.</span></label>
+
+      <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:6px;">Événements concernés</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:8px;">Sur la page de chaque événement coché, un bloc « Sondage en cours » permet de répondre si on le souhaite. Il n'apparaît jamais dans le parcours d'inscription.</div>
+      <div style="max-height:170px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;padding:6px 10px;margin-bottom:12px;">
+        ${evts.length?evts.map(e=>`<label style="display:flex;gap:8px;align-items:center;font-size:13px;padding:6px 0;cursor:pointer;"><input type="checkbox" class="df-evt" value="${e.id}" ${lies.has(Number(e.id))?'checked':''} style="accent-color:#2563EB;"> <span>${escH(e.titre)}${e.date_evt?` <span style="color:var(--muted);font-size:12px;">· ${fmtDate(e.date_evt)}</span>`:''}</span></label>`).join(''):'<div style="font-size:13px;color:var(--muted);padding:8px 0;">Vous n\'avez pas encore d\'événement publié.</div>'}
+      </div>
+      <button class="btn btn-orange" id="df-save" onclick="sauverDiffusion()" style="width:100%;margin-bottom:18px;">Enregistrer la diffusion</button>
+
+      <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px;border-top:1px solid var(--border);padding-top:14px;">Partager le lien</div>
+      <div style="display:flex;gap:6px;margin-bottom:8px;"><input type="text" readonly id="df-lien" value="${escH(d.lien)}" style="flex:1;min-width:0;height:36px;padding:0 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;background:#f8fafc;" onclick="this.select()"><button class="btn btn-sm btn-outline" onclick="navigator.clipboard.writeText(document.getElementById('df-lien').value);DA.toast('Lien copié !',{type:'success'})">📤 Copier</button></div>
+      <a class="btn btn-sm" style="border-color:#16a34a;color:#15803d;text-decoration:none;display:inline-block;margin-bottom:16px;" href="${escH(d.lien_whatsapp)}" target="_blank" rel="noopener">💬 Partager sur WhatsApp</a>
+
+      <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:6px;">Inviter par e-mail</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:8px;">Chaque personne reçoit un <strong>lien personnel à usage unique</strong> (une seule réponse par lien, sans compte). ${d.invitations.total?`Déjà envoyées : ${d.invitations.total} · utilisées : ${d.invitations.utilisees}.`:''}</div>
+      <textarea id="df-emails" rows="3" placeholder="Une adresse par ligne, ou séparées par des virgules (50 maximum)" ${ouvert?'':'disabled'} style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;resize:vertical;font-family:inherit;"></textarea>
+      <textarea id="df-message" rows="2" maxlength="500" placeholder="Petit mot d'accompagnement (facultatif)" ${ouvert?'':'disabled'} style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;resize:vertical;font-family:inherit;margin-top:6px;"></textarea>
+      <button class="btn btn-sm btn-outline" id="df-inv" onclick="envoyerInvitationsSond()" ${ouvert?'':'disabled'} style="margin-top:8px;">✉️ Envoyer les invitations</button>
+      ${ouvert?'':'<div style="font-size:12px;color:var(--muted);margin-top:6px;">Publiez le sondage pour pouvoir envoyer des invitations.</div>'}
+
+      <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin:18px 0 8px;border-top:1px solid var(--border);padding-top:14px;">Personnes ayant répondu</div>
+      <div id="df-repondants"><button class="btn btn-sm btn-outline" onclick="chargerRepondants()">👥 Voir la liste</button></div>`;
+  }catch(e){ el.innerHTML=`<div style="padding:20px;color:#ef4444;">Erreur : ${escH(e.message)}</div>`; }
+}
+async function sauverDiffusion(){
+  const btn=document.getElementById('df-save'); btn.disabled=true;
+  try{
+    const evenement_ids=[...document.querySelectorAll('.df-evt:checked')].map(c=>Number(c.value));
+    await api('PUT','/sondages/'+DIFF_SID+'/diffusion',{fil:document.getElementById('df-fil').checked,profil:document.getElementById('df-profil').checked,evenement_ids});
+    DA.toast('Diffusion enregistrée.',{type:'success'});
+    ouvrirDiffusion(DIFF_SID);
+  }catch(e){ DA.toast(e.message,{type:'danger'}); btn.disabled=false; }
+}
+async function envoyerInvitationsSond(){
+  const emails=document.getElementById('df-emails').value.trim();
+  if(!emails){ DA.toast('Indiquez au moins une adresse e-mail.',{type:'warning'}); return; }
+  const btn=document.getElementById('df-inv'); btn.disabled=true;
+  try{
+    const r=await api('POST','/sondages/'+DIFF_SID+'/invitations',{emails,message:document.getElementById('df-message').value.trim()});
+    const det=[r.deja_invites?r.deja_invites+' déjà invitée(s)':'',r.deja_repondu?r.deja_repondu+' ont déjà répondu':'',r.invalides?r.invalides+' adresse(s) invalide(s)':'',r.echecs?r.echecs+' non envoyée(s)':''].filter(Boolean).join(' · ');
+    DA.toast((r.message||'Terminé.')+(det?' ('+det+')':''),{type:r.echecs&&!r.envoyes?'warning':'success'});
+    ouvrirDiffusion(DIFF_SID);
+  }catch(e){ DA.toast(e.message,{type:'danger'}); btn.disabled=false; }
+}
+async function chargerRepondants(){
+  const box=document.getElementById('df-repondants'); box.innerHTML='<div style="font-size:13px;color:var(--muted);">Chargement…</div>';
+  try{
+    const r=await api('GET','/sondages/'+DIFF_SID+'/repondants');
+    if(r.anonyme){ box.innerHTML=`<div style="font-size:13px;color:var(--muted);">Sondage anonyme : ${r.total} réponse(s), aucune identité enregistrée.</div>`; return; }
+    if(!r.repondants.length){ box.innerHTML='<div style="font-size:13px;color:var(--muted);">Aucune réponse pour le moment.</div>'; return; }
+    box.innerHTML=`<div style="font-size:12px;color:var(--muted);margin-bottom:6px;">${r.total} personne(s). Les coordonnées ne sont jamais visibles par les autres comptes.</div>
+      <div style="max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;">${r.repondants.map(p=>`
+      <div style="padding:8px 12px;border-bottom:1px solid var(--border);font-size:13px;">
+        <strong>${escH(((p.prenom||'')+' '+(p.nom||'')).trim()||'—')}</strong>
+        <span style="font-size:11px;font-weight:700;padding:1px 8px;border-radius:10px;margin-left:6px;background:${p.type==='compte'?'#d1fae5':'#f3f4f6'};color:${p.type==='compte'?'#065f46':'#374151'};">${p.type==='compte'?'Compte':'Sans compte'}</span>
+        ${p.email?`<div style="color:var(--muted);font-size:12px;">${escH(p.email)}${p.telephone?' · '+escH(p.telephone):''}${p.recontact?' · ✅ accepte d\'être recontacté(e)':''}</div>`:''}
+      </div>`).join('')}</div>
+      <button class="btn btn-sm btn-outline" style="margin-top:8px;" onclick="window.location.href='/api/sondages/${DIFF_SID}/export'">⬇️ Exporter en CSV</button>`;
+  }catch(e){ box.innerHTML=`<div style="color:#ef4444;font-size:13px;">${escH(e.message)}</div>`; }
+}
+
 /* ── Mes sondages ── */
 async function loadMesSonds(){
   if(!ME_SOND)return;
@@ -464,6 +556,7 @@ async function loadMesSonds(){
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <button class="btn btn-sm btn-outline" onclick="openSond(${s.id})">👁️ Voir</button>
           <button class="btn btn-sm btn-outline" onclick="openStatsSond(${s.id})">📊 Stats</button>
+          <button class="btn btn-sm" style="border-color:#2563EB;color:#2563EB;" onclick="ouvrirDiffusion(${s.id})">📣 Diffusion</button>
           ${s.statut==='ouvert'?`<button class="btn btn-sm" style="border-color:#ef4444;color:#ef4444;" onclick="cloturerSond(${s.id})">🔒 Clôturer</button>`:''}
           ${s.statut==='cloture'?`<button class="btn btn-sm" style="border-color:#2563EB;color:#2563EB;" onclick="ouvrirRepublier(${s.id})">🔁 Republier</button>`:''}
           ${s.statut==='brouillon'?`<button class="btn btn-sm" style="border-color:#2563EB;color:#2563EB;" onclick="ouvrirRepublier(${s.id},true)">🚀 Publier</button>`:''}

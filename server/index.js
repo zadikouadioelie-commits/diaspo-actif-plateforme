@@ -30937,6 +30937,29 @@ function sondageChampsRepondant(brut) {
   return sortie;
 }
 
+/* ──── SONDAGES — diffusion, événements, réponses sans compte (2026-11-05, demande explicite « étapes B et C ») ──── */
+function sondageUrlPublique(id, inv) { return `${process.env.PUBLIC_BASE_URL || "https://diaspoactif.com"}/sondage.html?id=${id}${inv ? "&inv=" + inv : ""}`; }
+function sondageEmailValide(e) { return /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]{2,}$/.test(String(e || "").trim()) && String(e).length <= 190; }
+/* Lieux de diffusion choisis (fil, profil public) ; les événements sont dans sondage_evenements. */
+function sondageDiffusionLue(s) {
+  try { const d = JSON.parse((s && s.diffusion_json) || "{}"); return { fil: !!d.fil, profil: !!d.profil }; } catch (_) { return { fil: false, profil: false }; }
+}
+function sondageFinTexte(s) { const j = String(s.date_cloture || "").slice(0, 10); return /^\d{4}-\d{2}-\d{2}$/.test(j) ? j.split("-").reverse().join("/") : ""; }
+/* Annonce dans le fil d'actualité, au nom du créateur. Un seul envoi par période de publication (fil_post_id mis à jour). */
+async function sondagePublierSurFil(s, user) {
+  try {
+    const nom = (await nomCompteAffichage(user.id)) || "Diaspo'Actif";
+    const desc = String(s.description || "").trim().slice(0, 220);
+    const fin = sondageFinTexte(s);
+    const contenu = `📊 Sondage en cours : « ${s.titre} »\n\n${desc ? desc + "\n\n" : ""}${fin ? "⏳ Réponses possibles jusqu'au " + fin + "\n" : ""}👉 Répondre (sans compte, en 2 minutes) : ${sondageUrlPublique(s.id)}`;
+    const r = await db.prepare(`INSERT INTO fil_posts (auteur_id, auteur_nom, type, pub_type, categorie, contenu, visibilite, medias, hashtags, statut)
+      VALUES (?, ?, 'texte', 'texte', 'Sondage', ?, 'public', '[]', '[]', 'publie')`).run(user.id, nom, contenu);
+    const postId = Number(r.lastInsertRowid);
+    await db.prepare("UPDATE sondages SET fil_post_id=? WHERE id=?").run(postId, s.id);
+    return postId;
+  } catch (e) { console.error("[sondagePublierSurFil]", e.message); return null; }
+}
+
 /* ──── MODULE MOBILISATION ACTIVE — Sondages & Consultations ──── */
 
 /* Liste, création, détail et résultats des sondages : servis par le module enrichi de handleRequest (« SONDAGES — MODULE ENRICHI »).
@@ -39636,17 +39659,34 @@ ${jsonLd}
       const sondage = await db.prepare(`SELECT s.*, u.nom AS createur_nom, u.photo_url AS createur_photo, u.da_id AS createur_da_id
         FROM sondages s LEFT JOIN users u ON u.id=s.createur_id WHERE s.id=?`).get(sid);
       if (!sondage) return sendJSON(res, 404, { error: 'Sondage introuvable.' });
-      const questions = await db.prepare(`SELECT * FROM sondage_questions WHERE sondage_id=? ORDER BY ordre`).all(sid);
       const me = await getCurrentUser(req);
+      /* Page publique (réponse sans compte) : un brouillon ou un sondage archivé n'est visible que de son créateur et de l'administrateur. */
+      const estCreateurDetail = !!me && (me.id === sondage.createur_id || me.role === 'administrateur');
+      if (['brouillon', 'archive'].includes(sondage.statut) && !estCreateurDetail) return sendJSON(res, 404, { error: 'Sondage introuvable.' });
+      const questions = await db.prepare(`SELECT * FROM sondage_questions WHERE sondage_id=? ORDER BY ordre`).all(sid);
       let ma_participation = null;
       if (me) {
-        ma_participation = await db.prepare(`SELECT * FROM sondage_reponses WHERE sondage_id=? AND user_id=? LIMIT 1`).get(sid, me.id);
+        ma_participation = await db.prepare(`SELECT * FROM sondage_reponses WHERE sondage_id=? AND user_id=? LIMIT 1`).get(sid, me.id)
+          || await db.prepare(`SELECT id FROM sondage_repondants WHERE sondage_id=? AND user_id=? LIMIT 1`).get(sid, me.id)
+          || null;
         const fav = await db.prepare(`SELECT id FROM sondage_favoris WHERE sondage_id=? AND user_id=?`).get(sid, me.id);
         sondage.est_favori = !!fav;
         const rxn = await db.prepare(`SELECT type FROM sondage_reactions WHERE sondage_id=? AND user_id=?`).get(sid, me.id);
         sondage.ma_reaction = rxn?.type || null;
       }
-      return sendJSON(res, 200, { sondage, questions, ma_participation });
+      /* Visiteur sans compte : déjà répondu depuis cet appareil (clé gardée par le navigateur) ou lien personnel déjà utilisé. */
+      const qDetail = parsed.query || {};
+      let invitation = null;
+      if (qDetail.inv) {
+        const inv = await db.prepare(`SELECT email, utilise_le FROM sondage_invitations WHERE sondage_id=? AND token=?`).get(sid, String(qDetail.inv).slice(0, 80));
+        if (inv) invitation = { email: inv.email, utilise: !!inv.utilise_le };
+      }
+      if (!ma_participation && qDetail.cle) {
+        const cleOk = String(qDetail.cle).slice(0, 80);
+        ma_participation = await db.prepare(`SELECT id FROM sondage_repondants WHERE sondage_id=? AND cle_appareil=? LIMIT 1`).get(sid, cleOk) || null;
+      }
+      if (!ma_participation && invitation && invitation.utilise) ma_participation = { invitation: true };
+      return sendJSON(res, 200, { sondage, questions, ma_participation, invitation });
     }
 
     /* ── PUT /api/sondages/:id ── */
@@ -39703,6 +39743,8 @@ ${jsonLd}
       periodes.push(periode);
       await db.prepare(`UPDATE sondages SET statut='ouvert', date_debut=?, date_cloture=?, periodes_json=?, nb_republications=COALESCE(nb_republications,0)+? WHERE id=?`)
         .run(debut, fin, JSON.stringify(periodes.slice(-50)), periodes.length > 1 ? 1 : 0, sid);
+      /* Diffusion choisie « Fil d'actualité » : nouvelle annonce à chaque nouvelle période de publication. */
+      if (sondageDiffusionLue(s).fil) await sondagePublierSurFil({ ...s, date_cloture: fin }, { id: s.createur_id });
       return sendJSON(res, 200, { message: periodes.length > 1 ? 'Sondage republié.' : 'Sondage publié.', periode });
     }
 
@@ -39731,21 +39773,73 @@ ${jsonLd}
       for (const qq of questionsP) {
         if (qq.obligatoire && !valides.has(qq.id)) return sendJSON(res, 400, { error: `Question obligatoire sans réponse : « ${qq.texte} »` });
       }
-      if (s.une_reponse_par_compte) {
-        const already = await db.prepare(`SELECT id FROM sondage_reponses WHERE sondage_id=? AND user_id=? LIMIT 1`).get(sid, me.id);
-        if (already && !s.modification_autorisee) return sendJSON(res, 400, { error: 'Vous avez déjà répondu à ce sondage.' });
-        if (already) {
-          await db.prepare(`DELETE FROM sondage_reponses WHERE sondage_id=? AND user_id=?`).run(sid, me.id);
+      const cleAppareil = body.cle ? String(body.cle).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64) : null;
+      let ident = { nom: null, prenom: null, email: null, telephone: null, donnees: {}, consentement: 0 };
+      let invitationRow = null;
+      if (me) {
+        /* Compte connecté : jamais d'identité redemandée ; une seule réponse par compte (sauf modification autorisée). */
+        if (s.une_reponse_par_compte) {
+          const dejaCompte = await db.prepare(`SELECT id FROM sondage_reponses WHERE sondage_id=? AND user_id=? LIMIT 1`).get(sid, me.id)
+            || await db.prepare(`SELECT id FROM sondage_repondants WHERE sondage_id=? AND user_id=? LIMIT 1`).get(sid, me.id);
+          if (dejaCompte && !s.modification_autorisee) return sendJSON(res, 400, { error: 'Vous avez déjà répondu à ce sondage.' });
+          if (dejaCompte) {
+            await db.prepare(`DELETE FROM sondage_reponses WHERE sondage_id=? AND user_id=?`).run(sid, me.id);
+            await db.prepare(`DELETE FROM sondage_repondants WHERE sondage_id=? AND user_id=?`).run(sid, me.id);
+          }
+        }
+      } else {
+        /* Visiteur sans compte : lien personnel à usage unique, identité demandée selon les choix du créateur, anti-doublon (lien, e-mail, appareil). */
+        if (body.invitation) {
+          invitationRow = await db.prepare(`SELECT * FROM sondage_invitations WHERE sondage_id=? AND token=?`).get(sid, String(body.invitation).slice(0, 80));
+          if (!invitationRow) return sendJSON(res, 400, { error: 'Ce lien personnel n\'est pas valide.' });
+          if (invitationRow.utilise_le) return sendJSON(res, 409, { error: 'Ce lien personnel a déjà servi : une seule réponse par lien.' });
+        }
+        if (cleAppareil && await db.prepare(`SELECT id FROM sondage_repondants WHERE sondage_id=? AND cle_appareil=? LIMIT 1`).get(sid, cleAppareil)) {
+          return sendJSON(res, 409, { error: 'Une réponse a déjà été envoyée depuis cet appareil.' });
+        }
+        if (!s.anonyme) {
+          let champs = []; try { champs = JSON.parse(s.champs_repondant_json || '[]'); } catch (_) {}
+          const saisie = (body.repondant && typeof body.repondant === 'object') ? (body.repondant.champs || {}) : {};
+          for (const ch of champs) {
+            let v = saisie[ch.cle];
+            if (Array.isArray(v)) v = v.join(', ');
+            v = String(v == null ? '' : v).trim().slice(0, ch.type_champ === 'texte_long' ? 1000 : 300);
+            if (ch.cle === 'email' && !v && invitationRow) v = invitationRow.email;
+            if (!v) { if (ch.obligatoire) return sendJSON(res, 400, { error: `Information obligatoire manquante : « ${ch.libelle} »` }); continue; }
+            if (ch.type_champ === 'email' && !sondageEmailValide(v)) return sendJSON(res, 400, { error: `Adresse e-mail invalide : « ${ch.libelle} »` });
+            if (ch.type_champ === 'choix_unique' && Array.isArray(ch.options) && !ch.options.includes(v)) return sendJSON(res, 400, { error: `Choix invalide : « ${ch.libelle} »` });
+            if (['nom', 'prenom', 'email', 'telephone'].includes(ch.cle)) ident[ch.cle] = v; else ident.donnees[ch.cle] = v;
+          }
+          if (ident.email) {
+            ident.email = ident.email.toLowerCase();
+            if (await db.prepare(`SELECT id FROM sondage_repondants WHERE sondage_id=? AND LOWER(email)=? LIMIT 1`).get(sid, ident.email)) {
+              return sendJSON(res, 409, { error: 'Une réponse a déjà été envoyée avec cette adresse e-mail.' });
+            }
+          }
+          ident.consentement = body.repondant && body.repondant.consentement ? 1 : 0;
         }
       }
+      const rep = await db.prepare(`INSERT INTO sondage_repondants(sondage_id,user_id,nom,prenom,email,telephone,donnees_json,consentement_recontact,cle_appareil,invitation_id) VALUES(?,?,?,?,?,?,?,?,?,?)`)
+        .run(...[sid, (me && !s.anonyme) ? me.id : null, ident.nom, ident.prenom, ident.email, ident.telephone, JSON.stringify(ident.donnees), ident.consentement, cleAppareil, invitationRow ? invitationRow.id : null].map(v => v === undefined ? null : v));
+      const repondantId = Number(rep.lastInsertRowid);
       for (const [qid, valeur] of valides) {
-        await db.prepare(`INSERT INTO sondage_reponses(sondage_id,question_id,user_id,reponse) VALUES(?,?,?,?)`)
-          .run(sid, qid, s.anonyme ? null : me.id, JSON.stringify(valeur));
+        await db.prepare(`INSERT INTO sondage_reponses(sondage_id,question_id,user_id,reponse,repondant_id) VALUES(?,?,?,?,?)`)
+          .run(sid, qid, (me && !s.anonyme) ? me.id : null, JSON.stringify(valeur), repondantId);
       }
+      if (invitationRow) await db.prepare(`UPDATE sondage_invitations SET utilise_le=datetime('now') WHERE id=?`).run(invitationRow.id);
       await db.prepare(`UPDATE sondages SET nb_reponses=nb_reponses+1 WHERE id=?`).run(sid);
-      return sendJSON(res, 201, { message: 'Réponse enregistrée.' });
+      /* Remerciement automatique : à l'écran (toujours) et par e-mail si l'adresse a été donnée, avec la proposition de créer un compte. */
+      const remerciement = { message: 'Merci pour votre réponse !', proposer_compte: !me, email: null, email_envoye: false };
+      if (!me && ident.email) {
+        remerciement.email = ident.email;
+        try {
+          const { emailRemerciementSondage } = require('./mailer');
+          const rm = await emailRemerciementSondage({ email: ident.email, prenom: ident.prenom, titre: s.titre, lienInscription: `${process.env.PUBLIC_BASE_URL || 'https://diaspoactif.com'}/inscription.html` });
+          remerciement.email_envoye = !!(rm && rm.ok);
+        } catch (e) { console.error('[sondage remerciement]', e.message); }
+      }
+      return sendJSON(res, 201, { message: 'Réponse enregistrée.', remerciement });
     }
-
     /* ── GET /api/sondages/:id/resultats ── */
     if (req.method === 'GET' && /^\/api\/sondages\/\d+\/resultats$/.test(pathname)) {
       const sid = parseInt(pathname.split('/')[3]);
@@ -39774,7 +39868,9 @@ ${jsonLd}
       const par_pays = await db.prepare(`SELECT u.pays, COUNT(DISTINCT r.user_id) n FROM sondage_reponses r LEFT JOIN users u ON u.id=r.user_id WHERE r.sondage_id=? AND u.pays IS NOT NULL GROUP BY u.pays ORDER BY n DESC LIMIT 10`).all(sid);
       const par_type = await db.prepare(`SELECT u.role AS type_compte, COUNT(DISTINCT r.user_id) n FROM sondage_reponses r LEFT JOIN users u ON u.id=r.user_id WHERE r.sondage_id=? GROUP BY u.role`).all(sid);
       const evolution = await db.prepare(`SELECT DATE(r.created_at) AS jour, COUNT(*) n FROM sondage_reponses r WHERE r.sondage_id=? GROUP BY jour ORDER BY jour`).all(sid);
-      return sendJSON(res, 200, { sondage: s, taux_participation: taux, par_pays, par_type, evolution });
+      const nb_repondants = (await db.prepare(`SELECT COUNT(*) n FROM sondage_repondants WHERE sondage_id=?`).get(sid))?.n || 0;
+      const nb_invites = (await db.prepare(`SELECT COUNT(*) n FROM sondage_repondants WHERE sondage_id=? AND user_id IS NULL AND (nom IS NOT NULL OR prenom IS NOT NULL OR email IS NOT NULL OR telephone IS NOT NULL)`).get(sid))?.n || 0;
+      return sendJSON(res, 200, { sondage: s, taux_participation: taux, par_pays, par_type, evolution, nb_repondants, nb_invites });
     }
 
     /* ── POST /api/sondages/:id/reaction ── */
@@ -39836,20 +39932,147 @@ ${jsonLd}
       if (!s || (s.createur_id !== me.id && me.role !== 'administrateur')) return sendJSON(res, 403, { error: 'Accès refusé.' });
       const questions = await db.prepare(`SELECT * FROM sondage_questions WHERE sondage_id=? ORDER BY ordre`).all(sid);
       const reponses = await db.prepare(`SELECT r.*, u.nom, u.prenom, u.pays FROM sondage_reponses r LEFT JOIN users u ON u.id=r.user_id WHERE r.sondage_id=? ORDER BY r.created_at`).all(sid);
-      const headers = ['Date','Nom','Prénom','Pays',...questions.map(q2=>q2.texte)];
+      const repondants = await db.prepare(`SELECT * FROM sondage_repondants WHERE sondage_id=?`).all(sid);
+      const parRepondant = new Map(repondants.map(r2 => [r2.id, r2]));
+      let champs = []; try { champs = JSON.parse(s.champs_repondant_json || '[]'); } catch (_) {}
+      const champsExtra = champs.filter(c => !['nom', 'prenom', 'email', 'telephone'].includes(c.cle));
+      /* Neutralise les formules de tableur (=, +, -, @) dans les valeurs saisies par des tiers. */
+      const sur = (v) => { const t = String(v == null ? '' : v); return /^[=+\-@\t\r]/.test(t) ? "'" + t : t; };
+      const headers = ['Date', 'Type', 'Nom', 'Prénom', 'Pays', 'E-mail', 'Téléphone', ...champsExtra.map(c => c.libelle), 'Accepte d\'être recontacté(e)', ...questions.map(q2 => q2.texte)];
       const rows = {};
       for (const rep of reponses) {
-        const key = (rep.user_id||'anon')+'_'+rep.created_at.slice(0,16);
-        if (!rows[key]) rows[key] = { date: rep.created_at.slice(0,10), nom: rep.nom||'—', prenom: rep.prenom||'—', pays: rep.pays||'—', reponses: {} };
+        const key = rep.repondant_id ? 'r' + rep.repondant_id : (rep.user_id || 'anon') + '_' + String(rep.created_at).slice(0, 16);
+        if (!rows[key]) {
+          const rp = rep.repondant_id ? parRepondant.get(rep.repondant_id) : null;
+          let extra = {}; try { extra = JSON.parse((rp && rp.donnees_json) || '{}'); } catch (_) {}
+          const estInvite = rp && !rp.user_id && (rp.nom || rp.prenom || rp.email || rp.telephone);
+          rows[key] = {
+            date: String(rep.created_at).slice(0, 10),
+            type: s.anonyme ? 'Anonyme' : (rep.user_id ? 'Compte' : (estInvite ? 'Sans compte' : 'Anonyme')),
+            nom: estInvite ? (rp.nom || '—') : (rep.nom || '—'), prenom: estInvite ? (rp.prenom || '—') : (rep.prenom || '—'), pays: rep.pays || '—',
+            email: estInvite ? (rp.email || '') : '', telephone: estInvite ? (rp.telephone || '') : '', extra: estInvite ? extra : {},
+            recontact: estInvite ? (rp.consentement_recontact ? 'Oui' : 'Non') : '',
+            reponses: {}
+          };
+        }
         rows[key].reponses[rep.question_id] = rep.reponse;
       }
-      let csv = headers.map(h=>`"${h}"`).join(',') + '\n';
+      let csv = headers.map(h => `"${String(h).replace(/"/g, '""')}"`).join(',') + '\n';
       for (const row of Object.values(rows)) {
-        const line = [row.date,row.nom,row.prenom,row.pays,...questions.map(q2=>JSON.parse(row.reponses[q2.id]||'""'))];
-        csv += line.map(v=>`"${String(v||'').replace(/"/g,'""')}"`).join(',') + '\n';
+        const line = [row.date, row.type, row.nom, row.prenom, row.pays, row.email, row.telephone, ...champsExtra.map(c => row.extra[c.cle] || ''), row.recontact, ...questions.map(q2 => { let v = ''; try { v = JSON.parse(row.reponses[q2.id] || '""'); } catch (_) { v = row.reponses[q2.id] || ''; } return Array.isArray(v) ? v.join(' | ') : v; })];
+        csv += line.map(v => `"${sur(v).replace(/"/g, '""')}"`).join(',') + '\n';
       }
       res.writeHead(200, { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="sondage-${sid}.csv"` });
       return res.end('﻿' + csv);
+    }
+
+    /* ── GET /api/sondages/:id/repondants ── liste des personnes ayant répondu (créateur et administrateur seulement) ── */
+    if (req.method === 'GET' && /^\/api\/sondages\/\d+\/repondants$/.test(pathname)) {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const sid = parseInt(pathname.split('/')[3]);
+      const s = await db.prepare(`SELECT * FROM sondages WHERE id=?`).get(sid);
+      if (!s || (s.createur_id !== me.id && me.role !== 'administrateur')) return sendJSON(res, 403, { error: 'Accès refusé.' });
+      const total = (await db.prepare(`SELECT COUNT(*) n FROM sondage_repondants WHERE sondage_id=?`).get(sid))?.n || 0;
+      if (s.anonyme) return sendJSON(res, 200, { anonyme: true, total, repondants: [] });
+      const lignes = await db.prepare(`SELECT r.id, r.user_id, r.nom, r.prenom, r.email, r.telephone, r.donnees_json, r.consentement_recontact, r.created_at, u.nom AS u_nom, u.prenom AS u_prenom
+        FROM sondage_repondants r LEFT JOIN users u ON u.id=r.user_id WHERE r.sondage_id=? ORDER BY r.created_at DESC LIMIT 500`).all(sid);
+      return sendJSON(res, 200, { anonyme: false, total, repondants: lignes.map(l => ({
+        id: l.id, type: l.user_id ? 'compte' : 'invite', date: l.created_at,
+        nom: l.user_id ? (l.u_nom || '') : (l.nom || ''), prenom: l.user_id ? (l.u_prenom || '') : (l.prenom || ''),
+        email: l.user_id ? '' : (l.email || ''), telephone: l.user_id ? '' : (l.telephone || ''),
+        recontact: !l.user_id && !!l.consentement_recontact
+      })) });
+    }
+
+    /* ── GET /api/sondages/:id/diffusion ── réglages de diffusion, événements liés, invitations (créateur) ── */
+    if (req.method === 'GET' && /^\/api\/sondages\/\d+\/diffusion$/.test(pathname)) {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const sid = parseInt(pathname.split('/')[3]);
+      await sondageAutoCloture();
+      const s = await db.prepare(`SELECT * FROM sondages WHERE id=?`).get(sid);
+      if (!s || (s.createur_id !== me.id && me.role !== 'administrateur')) return sendJSON(res, 403, { error: 'Accès refusé.' });
+      const lies = (await db.prepare(`SELECT evenement_id FROM sondage_evenements WHERE sondage_id=?`).all(sid)).map(r => Number(r.evenement_id));
+      const mesEvts = await db.prepare(`SELECT id, titre, date_evt, statut FROM evenements WHERE owner_user_id=? AND COALESCE(statut,'') <> 'brouillon' ORDER BY id DESC LIMIT 100`).all(s.createur_id);
+      const nbInv = (await db.prepare(`SELECT COUNT(*) n, COALESCE(SUM(CASE WHEN utilise_le IS NOT NULL THEN 1 ELSE 0 END),0) u FROM sondage_invitations WHERE sondage_id=?`).get(sid)) || { n: 0, u: 0 };
+      const lien = sondageUrlPublique(sid);
+      return sendJSON(res, 200, {
+        sondage: { id: s.id, titre: s.titre, statut: s.statut, date_cloture: s.date_cloture, fil_post_id: s.fil_post_id },
+        diffusion: sondageDiffusionLue(s), evenement_ids: lies, mes_evenements: mesEvts,
+        invitations: { total: Number(nbInv.n) || 0, utilisees: Number(nbInv.u) || 0 },
+        lien, lien_whatsapp: 'https://wa.me/?text=' + encodeURIComponent(`📊 Sondage : « ${s.titre} » — ${lien}`)
+      });
+    }
+
+    /* ── PUT /api/sondages/:id/diffusion ── choix des lieux (fil, profil public) et des événements (créateur) ── */
+    if (req.method === 'PUT' && /^\/api\/sondages\/\d+\/diffusion$/.test(pathname)) {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const sid = parseInt(pathname.split('/')[3]);
+      const s = await db.prepare(`SELECT * FROM sondages WHERE id=?`).get(sid);
+      if (!s || (s.createur_id !== me.id && me.role !== 'administrateur')) return sendJSON(res, 403, { error: 'Accès refusé.' });
+      const avant = sondageDiffusionLue(s);
+      const apres = { fil: body.fil === undefined ? avant.fil : !!body.fil, profil: body.profil === undefined ? avant.profil : !!body.profil };
+      await db.prepare(`UPDATE sondages SET diffusion_json=? WHERE id=?`).run(JSON.stringify(apres), sid);
+      if (Array.isArray(body.evenement_ids)) {
+        const ids = [...new Set(body.evenement_ids.map(Number).filter(n => Number.isInteger(n) && n > 0))].slice(0, 50);
+        const permis = new Set((await db.prepare(`SELECT id FROM evenements WHERE owner_user_id=?`).all(s.createur_id)).map(r => Number(r.id)));
+        if (ids.some(i => !permis.has(i))) return sendJSON(res, 400, { error: 'Vous ne pouvez lier un sondage qu\'à vos propres événements.' });
+        await db.prepare(`DELETE FROM sondage_evenements WHERE sondage_id=?`).run(sid);
+        for (const i of ids) await db.prepare(`INSERT INTO sondage_evenements(sondage_id,evenement_id) VALUES(?,?)`).run(sid, i);
+      }
+      let fil_post_id = s.fil_post_id || null;
+      /* Annonce dans le fil : tout de suite si le sondage est en cours et si le lieu vient d'être activé ; sinon à la publication. */
+      if (apres.fil && !avant.fil && s.statut === 'ouvert') fil_post_id = await sondagePublierSurFil(s, { id: s.createur_id });
+      return sendJSON(res, 200, { message: 'Diffusion enregistrée.', diffusion: apres, fil_post_id });
+    }
+
+    /* ── POST /api/sondages/:id/invitations ── e-mails avec lien personnel à usage unique (créateur) ── */
+    if (req.method === 'POST' && /^\/api\/sondages\/\d+\/invitations$/.test(pathname)) {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const sid = parseInt(pathname.split('/')[3]);
+      await sondageAutoCloture();
+      const s = await db.prepare(`SELECT * FROM sondages WHERE id=?`).get(sid);
+      if (!s || (s.createur_id !== me.id && me.role !== 'administrateur')) return sendJSON(res, 403, { error: 'Accès refusé.' });
+      if (s.statut !== 'ouvert') return sendJSON(res, 400, { error: 'Publiez le sondage avant d\'envoyer des invitations.' });
+      const brut = Array.isArray(body.emails) ? body.emails.join('\n') : String(body.emails || '');
+      const adresses = [...new Set(brut.split(/[\s,;]+/).map(x => x.trim().toLowerCase()).filter(Boolean))];
+      if (!adresses.length) return sendJSON(res, 400, { error: 'Indiquez au moins une adresse e-mail.' });
+      if (adresses.length > 50) return sendJSON(res, 400, { error: '50 adresses au maximum par envoi.' });
+      const lim = SEC.rateLimit(`sondage:inv:${me.id}`, 200, 24 * 3600000);
+      if (!lim.allowed) return sendJSON(res, 429, { error: 'Limite quotidienne d\'invitations atteinte. Réessayez demain.' });
+      const { emailInvitationSondage } = require('./mailer');
+      const nomCreateur = (await nomCompteAffichage(s.createur_id)) || 'Diaspo\'Actif';
+      const crypto = require('crypto');
+      const bilan = { envoyes: 0, deja_invites: 0, deja_repondu: 0, invalides: 0, echecs: 0 };
+      for (const adr of adresses) {
+        if (!sondageEmailValide(adr)) { bilan.invalides++; continue; }
+        if (await db.prepare(`SELECT id FROM sondage_invitations WHERE sondage_id=? AND email=?`).get(sid, adr)) { bilan.deja_invites++; continue; }
+        if (await db.prepare(`SELECT id FROM sondage_repondants WHERE sondage_id=? AND LOWER(email)=?`).get(sid, adr)) { bilan.deja_repondu++; continue; }
+        const token = crypto.randomBytes(18).toString('hex');
+        await db.prepare(`INSERT INTO sondage_invitations(sondage_id,email,token) VALUES(?,?,?)`).run(sid, adr, token);
+        const rm = await emailInvitationSondage({ email: adr, auteurNom: nomCreateur, titre: s.titre, description: s.description, finTxt: sondageFinTexte(s), lien: sondageUrlPublique(sid, token), message: body.message });
+        if (rm && rm.ok) bilan.envoyes++;
+        else {
+          bilan.echecs++;
+          /* Envoi refusé par le service d'e-mail : on libère l'adresse pour que le créateur puisse réessayer (sauf en local, sans clé d'envoi, où le lien reste utilisable). */
+          if (!rm || rm.reason !== 'no_key') await db.prepare(`DELETE FROM sondage_invitations WHERE sondage_id=? AND token=?`).run(sid, token);
+        }
+      }
+      return sendJSON(res, 200, { message: bilan.envoyes ? `${bilan.envoyes} invitation(s) envoyée(s).` : 'Aucune invitation envoyée.', ...bilan });
+    }
+
+    /* ── GET /api/sondages-en-cours?evenement=ID | ?profil=USER_ID ── sondages ouverts à afficher sur une page d'événement ou un profil public ── */
+    if (req.method === 'GET' && pathname === '/api/sondages-en-cours') {
+      await sondageAutoCloture();
+      const q = parsed.query || {};
+      const cols = `s.id, s.titre, s.description, s.date_cloture, s.nb_reponses, s.createur_id`;
+      let lignes = [];
+      if (q.evenement) {
+        lignes = await db.prepare(`SELECT ${cols} FROM sondage_evenements se JOIN sondages s ON s.id=se.sondage_id
+          WHERE se.evenement_id=? AND s.statut='ouvert' ORDER BY s.created_at DESC LIMIT 5`).all(parseInt(q.evenement, 10) || 0);
+      } else if (q.profil) {
+        lignes = await db.prepare(`SELECT ${cols} FROM sondages s WHERE s.createur_id=? AND s.statut='ouvert' AND s.diffusion_json LIKE '%"profil":true%' ORDER BY s.created_at DESC LIMIT 5`).all(parseInt(q.profil, 10) || 0);
+      } else return sendJSON(res, 400, { error: 'Paramètre evenement ou profil requis.' });
+      return sendJSON(res, 200, { sondages: lignes.map(l => ({ id: l.id, titre: l.titre, description: String(l.description || '').slice(0, 200), date_cloture: l.date_cloture, nb_reponses: l.nb_reponses || 0, lien: `sondage.html?id=${l.id}` })) });
     }
 
     /* ── GET /api/admin/events — TOUS les événements de la plateforme, quel que soit leur type

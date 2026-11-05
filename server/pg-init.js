@@ -903,6 +903,8 @@ const COLONNES_MIGRATION = [
     ['sondages', 'fil_post_id', "INTEGER"],
     ['sondages', 'champs_repondant_json', "TEXT DEFAULT '[]'"],
     ['sondages', 'periodes_json', "TEXT DEFAULT '[]'"],
+    ['sondages', 'diffusion_json', "TEXT DEFAULT '{}'"],
+    ['sondage_reponses', 'repondant_id', "INTEGER"],
     ['sondage_questions', 'description', "TEXT"],
     ['sondage_questions', 'min_label', "TEXT"],
     ['sondage_questions', 'max_label', "TEXT"],
@@ -1673,6 +1675,9 @@ async function migratePg(pool) {
        la table avait déjà été créée en production avec seulement 'photo'/'pdf'. */
     { table: 'insc_fiches_medias', constraint: 'insc_fiches_medias_type_check',
       addBack: "CHECK (type IN ('photo','pdf','video'))" },
+    /* Sondages (2026-11-05) : la page propose oui_non, texte_long, echelle_5, etoiles… mais la contrainte d'origine n'acceptait que 5 types
+       ('choix_unique','choix_multiple','texte_libre','echelle','classement') -> création impossible. On la retire (aucune remise). */
+    { table: 'sondage_questions', constraint: 'sondage_questions_type_check', addBack: null },
   ];
   for (const { table, constraint, addBack } of checkFixes) {
     try { await pool.query(`ALTER TABLE ${table} DROP CONSTRAINT IF EXISTS ${constraint}`); } catch (e) {

@@ -1189,6 +1189,7 @@ html body.nd .pvz-idcode-btn:hover { background:var(--nd-or,#E3C06E); color:#0B1
 <script src="assets/recherche-contacts.js"></script>
 <script src="assets/signalement.js"></script>
 <script src="/assets/don-banner.js"></script>
+<script src="/assets/sondages-en-cours.js"></script>
 <script src="/assets/soutenir.js"></script>
 <script>
 /* ===================================================
@@ -2028,6 +2029,8 @@ function render() {
     return;
   }
   renderVisitorProfile();
+  /* « Sondage en cours » (2026-11-05) : sondages que ce compte a choisi d'afficher sur son profil public. */
+  if (window.SondagesEnCours) { const _heroSond = document.querySelector('#pvz-visitor .pvz-hero'); if (_heroSond) SondagesEnCours.rendre({ profil: profil.id, apres: _heroSond }); }
 
   // Retour depuis Stripe Identity (?identity=retour) : faire défiler jusqu'au bloc Confidentialité et rafraîchir le statut
   if (isOwn && new URLSearchParams(location.search).get('identity') === 'retour') {
