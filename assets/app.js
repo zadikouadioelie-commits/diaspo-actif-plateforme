@@ -2821,6 +2821,7 @@ function renderInitiativeCard(it){
         ${(!isOwnInit && typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? `<button type="button" class="ann-card-btn" data-abonne="0" onclick="event.stopPropagation(); daToggleSuivre('initiative', ${it.id}, this)">🔔 S'abonner</button>` : ''}
         ${(!isOwnInit && it.owner_user_id && typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? `<span data-relation-user="${it.owner_user_id}" data-relation-classe="ann-card-btn"></span>` : ''}
         ${(!isOwnInit && typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? `<span data-affiliation-initiative="${it.id}" data-affiliation-classe="ann-card-btn ann-card-btn-affilier"></span>` : ''}
+        ${(!isOwnInit && it.owner_user_id && typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.role === 'initiative') ? `<span data-affiliation-user="${it.owner_user_id}" data-affiliation-nom="${(responsableNom || ('le responsable de ' + (it.nom || ''))).replace(/"/g,'&quot;')}" data-affiliation-libelle="🔗 Affilier ce compte" data-affiliation-sanspuces="1" data-affiliation-classe="ann-card-btn ann-card-btn-affilier"></span>` : ''}
         ${it.owner_user_id ? `<button type="button" class="ann-card-btn" onclick="event.stopPropagation(); openAnnuaireEvents(${it.owner_user_id}, ${JSON.stringify(it.nom||'').replace(/"/g,'&quot;')})">📅 Événements</button>` : ''}
         ${['Association','ONG'].includes(it.type) && it.adhesions_ouvertes !== false ? (
           isOwnInit
@@ -3084,8 +3085,8 @@ function ouvrirAffiliationUtilisateur(userId, btn) {
   overlay.id = 'aff-user-modal-overlay';
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(13,43,78,.55);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px;';
   overlay.innerHTML = `
-    <div class="card" style="width:100%;max-width:420px;background:#fff;border-radius:12px;padding:20px;">
-      <h3 style="margin:0 0 6px;">🔗 Affilier ${nom}</h3>
+    <div class="card" style="width:100%;max-width:420px;background:#fff;color:#0D2B4E;border-radius:12px;padding:20px;">
+      <h3 style="margin:0 0 6px;color:#0D2B4E;">🔗 Affilier ${nom}</h3>
       <p style="color:var(--muted);font-size:12.5px;margin:0 0 14px;">Invitez ce compte à rejoindre officiellement votre initiative en tant que membre affilié.</p>
       <label style="font-size:12.5px;font-weight:700;color:var(--muted);display:block;margin-bottom:4px;">Poste / fonction (optionnel)</label>
       <select id="aff-user-poste" onchange="document.getElementById('aff-user-poste-autre').style.display=this.value==='__autre'?'':'none';" style="width:100%;box-sizing:border-box;padding:9px;border:1px solid var(--border);border-radius:8px;font-size:13.5px;margin-bottom:10px;">
@@ -3101,7 +3102,7 @@ function ouvrirAffiliationUtilisateur(userId, btn) {
       <textarea id="aff-user-message" rows="3" style="width:100%;box-sizing:border-box;padding:9px;border:1px solid var(--border);border-radius:8px;font-size:13.5px;resize:vertical;"></textarea>
       <div id="aff-user-error" style="display:none;color:#EF4444;font-size:12.5px;margin-top:8px;"></div>
       <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
-        <button class="btn btn-outline btn-sm" onclick="document.getElementById('aff-user-modal-overlay').remove()">Annuler</button>
+        <button class="btn btn-outline btn-sm" style="color:#0D2B4E !important;border-color:#94A3B8 !important;" onclick="document.getElementById('aff-user-modal-overlay').remove()">Annuler</button>
         <button class="btn btn-orange btn-sm" id="aff-user-send" onclick="envoyerAffiliationUtilisateur(${userId})">Envoyer l'invitation</button>
       </div>
     </div>`;
@@ -7766,15 +7767,21 @@ window.initBoutonsAffiliation = async function (racine) {
       const classe = el.getAttribute('data-affiliation-classe') || 'ann-card-btn';
       const nomAttr = el.getAttribute('data-affiliation-nom') || '';
       const st = statuts[userId] || {};
-      const puces = (st.affiliations || []).map(affiliationPuceDoreeHtml).join('');
-      const bouton = `<button type="button" class="${classe}" data-affilier-nom="${nomAttr}" onclick="event.stopPropagation(); ouvrirAffiliationUtilisateur(${userId}, this)">🔗 Affiliation</button>`;
+      /* Cartouche « Initiative » vue par un compte Initiative (2026-11-05, demande explicite) : même
+         bouton que sur une carte « Utilisateur », appliqué au RESPONSABLE de l'initiative affichée.
+         Libellé distinct (le bouton « Affiliation » voisin, lui, demande à rejoindre cette initiative),
+         et pas de puces dorées — elles décrivent la personne, pas la structure de la carte. */
+      const sansPuces = el.getAttribute('data-affiliation-sanspuces') === '1';
+      const libelle = el.getAttribute('data-affiliation-libelle') || '🔗 Affiliation';
+      const puces = sansPuces ? '' : (st.affiliations || []).map(affiliationPuceDoreeHtml).join('');
+      const bouton = `<button type="button" class="${classe}" data-affilier-nom="${nomAttr}" onclick="event.stopPropagation(); ouvrirAffiliationUtilisateur(${userId}, this)">${libelle}</button>`;
       // Demande explicite (2026-10-08) : le bouton "Affiliation" (vert) reste disponible pour en
       // proposer une AUTRE même quand une ou plusieurs affiliations existent déjà — celles-ci
       // s'affichent à part, en puces dorées, pas en remplacement du bouton. Seul un statut
       // 'en_attente'/'refuse' le transforme en badge d'état (relancer serait de toute façon
       // rejeté par le serveur, UNIQUE sur initiative_membres) ; 'accepte' n'a plus de badge
       // dédié ici — déjà représenté par la puce dorée correspondante.
-      const monStatutPourBouton = st.mon_statut && st.mon_statut.statut !== 'accepte' ? st.mon_statut : null;
+      const monStatutPourBouton = st.mon_statut && (sansPuces || st.mon_statut.statut !== 'accepte') ? st.mon_statut : null;
       el.style.display = 'inline-flex'; el.style.flexWrap = 'wrap'; el.style.gap = '6px';
       el.innerHTML = puces + affiliationStatutHtml(classe, monStatutPourBouton, bouton);
     });

@@ -14872,6 +14872,8 @@ route("POST", "/api/annuaire/inviter-affiliation/:userId", async (req, res, para
   if (!init) return sendJSON(res, 404, { error: "Aucune initiative associée à ce compte." });
   const evInviterAnnuaire = await evaluerProfilPourAffiliation('initiative', init.id);
   if (evInviterAnnuaire && evInviterAnnuaire.pct < Completude.SEUIL_PCT) return sendJSON(res, 403, erreurProfilIncomplet(evInviterAnnuaire, MSG_PROFIL_INCOMPLET_ENVOYER));
+  /* Depuis 2026-11-05 la carte d'une Initiative offre aussi ce bouton (sur son responsable) : aucune garde n'empêchait jusque-là de s'inviter soi-même par appel direct. */
+  if (Number(params.userId) === Number(user.id)) return sendJSON(res, 400, { error: "Vous ne pouvez pas affilier votre propre compte." });
   const target = await db.prepare("SELECT id, nom, prenom FROM users WHERE id = ?").get(params.userId);
   if (!target) return sendJSON(res, 404, { error: "Utilisateur introuvable." });
   const { fonction, message } = body;

@@ -1284,6 +1284,7 @@
       ${it.k === 'i' && Number(x.vitrine_active) === 1 ? `<div class="ann-act2"><a class="btn sm block" href="#/boutique/${encodeURIComponent(x.id)}">${ic('shop', 's')} Voir la boutique</a></div>` : ''}
       <div class="ann-act2"><a class="btn sm out" href="${href}">${ic('user', 's')} Profil public</a><button type="button" class="btn sm out" data-share-ann="${esc(key)}" aria-label="Partager ce profil">${ic('share', 's')} Partager</button>${peutAdherer ? `<button type="button" class="btn sm navy" data-adh="${x.id}" data-nom="${esc(nm)}">${ic('people', 's')} Adhérer</button>` : ''}</div>
       ${peutAffilier(it, x, uid) ? `<div class="ann-act2" data-aff-zone="${it.k === 'i' ? 'i' : 'u'}:${it.k === 'i' ? x.id : x.id}" data-nom="${esc(nm)}"></div>` : ''}
+      ${peutAffilierResponsable(it, x, uid) ? `<div class="ann-act2" data-aff-zone="u:${esc(uid)}" data-aff-resp="1" data-nom="${esc([x.prenom_responsable, x.nom_responsable].filter(Boolean).join(' ') || ('le responsable de ' + nm))}"></div>` : ''}
       <div class="ann-act3">${uid ? `<button type="button" class="btn sm" data-sup="${uid}" hidden>${ic('heart', 's')} Soutenir</button><button type="button" class="btn sm out" data-write="${uid}">${ic('chat', 's')} Contacter</button>` : ''}<button type="button" class="btn sm out" data-follow="${fid}" data-kind="${kind}" data-on="0">${ic('bell', 's')} S’abonner</button></div></article>`;
   }
   /* « Liaison » = bouton Affiliation des cartouches du site : un compte demande à rejoindre une initiative, ou une initiative invite un membre. */
@@ -1293,8 +1294,12 @@
     if (it.k === 'u') return S.me.role === 'initiative' && Number(S.me.id) !== Number(x.id);
     return false;
   }
+  /* Cartouche « Initiative » vue par un compte Initiative (2026-11-05, demande explicite) : même bouton qu'une carte « Utilisateur », appliqué au RESPONSABLE de l'initiative affichée. Le bouton « Affiliation » voisin, lui, demande à rejoindre cette initiative. */
+  function peutAffilierResponsable(it, x, uid) {
+    return !!(S.me && it.k === 'i' && uid && S.me.role === 'initiative' && Number(S.me.id) !== Number(uid));
+  }
   const affEtat = (txt, cls) => `<span class="btn sm out aff-etat ${cls || ''}" style="flex:1;cursor:default">${txt}</span>`;
-  const affBtn = (kind, id, nom) => `<button type="button" class="btn sm out" data-aff-go="${kind}:${esc(id)}" data-nom="${esc(nom)}" style="flex:1">${ic('people', 's')} Affiliation</button>`;
+  const affBtn = (kind, id, nom, libelle) => `<button type="button" class="btn sm out" data-aff-go="${kind}:${esc(id)}" data-nom="${esc(nom)}" style="flex:1">${ic('people', 's')} ${libelle || 'Affiliation'}</button>`;
   const affStatutHtml = (st, bouton) => {
     if (!st) return bouton;
     if (st.statut === 'accepte') return affEtat('✅ Affilié', 'sub');
@@ -1316,8 +1321,10 @@
       let st = {}; try { st = (await api('/api/affiliation-statut-lot?user_ids=' + ids('u').slice(0, 100).join(','))).statuts || {}; } catch (e) { /* le clic vérifiera */ }
       uZ.forEach(z => {
         const id = z.dataset.affZone.split(':')[1], s1 = st[id] || {}, ms = s1.mon_statut && s1.mon_statut.statut !== 'accepte' ? s1.mon_statut : null;
-        const aff = (s1.affiliations || []).map(a => `<span class="badge o" style="align-self:center" title="${esc(a.fonction || '')}">🏅 ${esc(a.nom)}</span>`).join('');
-        z.style.flexWrap = 'wrap'; z.innerHTML = aff + affStatutHtml(ms, affBtn('u', id, z.dataset.nom));
+        const resp = z.dataset.affResp === '1';   // responsable d'une initiative : ni puces, et « Affilié » reste visible (pas de puce pour le dire)
+        const aff = resp ? '' : (s1.affiliations || []).map(a => `<span class="badge o" style="align-self:center" title="${esc(a.fonction || '')}">🏅 ${esc(a.nom)}</span>`).join('');
+        const msr = resp ? (s1.mon_statut || null) : ms;
+        z.style.flexWrap = 'wrap'; z.innerHTML = aff + affStatutHtml(msr, affBtn('u', id, z.dataset.nom, resp ? 'Affilier ce compte' : ''));
       });
     }
   }
