@@ -1884,7 +1884,9 @@ function majBoutonsPublication() {
   const notice = document.getElementById('modele-standard-notice'), modele = document.getElementById('e-appliquer-modele');
   const dejaPublie = !!(evtEdite && evtEdite.statut && evtEdite.statut !== 'brouillon');
   const ficheOk = !!(ficheChoisie || (evtEdite && evtEdite.fiche_id) || (notice && notice.style.display !== 'none' && modele && modele.checked));
-  const peutPublier = dejaPublie || ficheOk;
+  /* Un événement flash (inscription_ouverte = 0, repris en brouillon) n'a JAMAIS besoin de fiche d'inscription : c'est son principe (2026-11-05, demande explicite). */
+  const estFlashRepris = !!(evtEdite && Number(evtEdite.inscription_ouverte) === 0) || !!orgEditFlash;
+  const peutPublier = dejaPublie || ficheOk || estFlashRepris;
   document.getElementById('btn-save').style.display = peutPublier ? '' : 'none';
   document.getElementById('btn-creer-fiche').style.display = peutPublier ? 'none' : '';
 }
