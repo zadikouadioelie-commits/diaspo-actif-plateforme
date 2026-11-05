@@ -3316,6 +3316,44 @@ async function initAnnuaire(){
 
   let filtered_count = ALL.length;
 
+  /* ── Pagination (2026-11-05, demande explicite) : 10 comptes par page ; sans recherche comme avec. Les publications à la une sont SOUS la liste.
+     Retour à la page 1 dès que la recherche ou un filtre change (signature de l'état) ; changer de page ne rappelle pas le serveur. ── */
+  const ANN_PAR_PAGE = 10;
+  let annPage = 1, annSignature = "", annRepeindre = () => {};
+  function annPageCourante(total) {
+    const sig = JSON.stringify(state);
+    if (sig !== annSignature) { annSignature = sig; annPage = 1; }
+    const pages = Math.max(1, Math.ceil(total / ANN_PAR_PAGE));
+    if (annPage > pages) annPage = pages;
+    return annPage;
+  }
+  function annPeindrePager(total) {
+    const nav = document.getElementById("ann-pager"); if (!nav) return;
+    const pages = Math.ceil(total / ANN_PAR_PAGE);
+    if (pages <= 1) { nav.hidden = true; nav.innerHTML = ""; return; }
+    const num = new Set([1, pages, annPage - 1, annPage, annPage + 1]);
+    if (annPage <= 3) { for (let i = 2; i <= Math.min(5, pages); i++) num.add(i); }
+    if (annPage >= pages - 2) { for (let i = Math.max(1, pages - 4); i < pages; i++) num.add(i); }
+    const liste = [...num].filter(n => n >= 1 && n <= pages).sort((a, b) => a - b);
+    let html = `<button type="button" class="ann-pg" data-pg="${annPage - 1}" ${annPage === 1 ? "disabled" : ""} aria-label="Page précédente">‹ Précédent</button>`;
+    let prec = 0;
+    liste.forEach(n => {
+      if (prec && n - prec > 1) html += `<span class="ann-pg-gap" aria-hidden="true">…</span>`;
+      html += `<button type="button" class="ann-pg${n === annPage ? " on" : ""}" data-pg="${n}" ${n === annPage ? 'aria-current="page"' : ""} aria-label="Page ${n}">${n}</button>`;
+      prec = n;
+    });
+    html += `<button type="button" class="ann-pg" data-pg="${annPage + 1}" ${annPage === pages ? "disabled" : ""} aria-label="Page suivante">Suivant ›</button>`;
+    html += `<div class="ann-pager-info">Page ${annPage} sur ${pages} · ${total} résultat${total > 1 ? "s" : ""}</div>`;
+    nav.innerHTML = html; nav.hidden = false;
+    nav.querySelectorAll("[data-pg]").forEach(b => b.onclick = () => {
+      if (b.disabled) return;
+      annPage = Number(b.dataset.pg);
+      annRepeindre();
+      const tete = document.querySelector(".ann-section-head");
+      if (tete) window.scrollTo({ top: tete.getBoundingClientRect().top + window.scrollY - 90, behavior: "smooth" });
+    });
+  }
+
   /* ── Recherche par mots-clés (serveur, pertinence + tolérance fautes/synonymes) ── */
   /* Collectivités « bientôt intégrées » (2026-11-04, demande explicite) : tant qu'elles ne sont pas recensées, chercher une collectivité affiche ce message (même style que la
      maintenance des boutiques) à la place d'une liste trompeuse. Retour arrière : retirer l'appel au début de applyRechercheMotCle(). */
@@ -3336,6 +3374,7 @@ async function initAnnuaire(){
     document.getElementById("coll-bientot-init").onclick = () => choisir("Initiative");
     document.getElementById("coll-bientot-util").onclick = () => choisir("Utilisateurs");
     const compte = document.getElementById("result-count"); if (compte) compte.textContent = "0";
+    annPeindrePager(0);
   }
   async function applyRechercheMotCle() {
     if (/^Collectivité/.test(state.typeOrg || "")) { afficherCollectivitesBientot(); return; }
@@ -3376,22 +3415,30 @@ async function initAnnuaire(){
         </div>`;
       const resultCountElErr = document.getElementById("result-count");
       if (resultCountElErr) resultCountElErr.textContent = "0";
+      annPeindrePager(0);
       return;
     }
+    annRepeindre = () => peindreResultats(r);
+    peindreResultats(r);
+  }
+  /* Rendu d'une page de résultats serveur (2026-11-05, demande explicite : 10 comptes par page). Sans nouvel appel réseau quand on change de page. */
+  function peindreResultats(r) {
     const entites = [
-      ...(r.initiatives || []).map(it => ({ rang: it._rang ?? 0, html: renderInitiativeCard(it) })),
+      ...(r.initiatives || []).map(it => ({ rang: it._rang ?? 0, html: renderInitiativeCard(it), init: it })),
       ...(r.utilisateurs || []).map(u => ({ rang: u._rang ?? 0, html: renderPersonCard(u) })),
       ...(r.organismes || []).map(o => ({ rang: o._rang ?? 0, html: renderOrganismeCard(o) })),
     ].sort((a, b) => a.rang - b.rang);
-    const cartes = entites.map(e => e.html);
     filtered_count = r.total || 0;
     const resultCountEl = document.getElementById("result-count");
     if (resultCountEl) resultCountEl.textContent = filtered_count;
-    list.innerHTML = cartes.length ? cartes.join("") : `<div class="empty" style="grid-column:1/-1;padding:40px;text-align:center;color:var(--muted);">
+    const page = annPageCourante(entites.length);
+    const visibles = entites.slice((page - 1) * ANN_PAR_PAGE, page * ANN_PAR_PAGE);
+    list.innerHTML = visibles.length ? visibles.map(e => e.html).join("") : `<div class="empty" style="grid-column:1/-1;padding:40px;text-align:center;color:var(--muted);">
         <div style="font-size:2rem;margin-bottom:12px;">🔍</div>
         <p style="font-weight:700;margin-bottom:6px;">Aucun résultat pour « ${state.motCle} »</p>
         <p style="font-size:.88rem;">Essayez un autre mot-clé ou <button onclick="annResetFilters()" style="background:none;border:none;color:var(--orange);cursor:pointer;font-weight:700;text-decoration:underline;">réinitialisez la recherche</button>.</p>
       </div>`;
+    annPeindrePager(entites.length);
     renderChips();
     if (typeof initBoutonsRelation === 'function') initBoutonsRelation(list);
     if (typeof initBoutonsAffiliation === 'function') initBoutonsAffiliation(list);
@@ -3402,7 +3449,7 @@ async function initAnnuaire(){
        render() par carte en boucle a réellement saturé le rate-limit (429) dès 30-50 résultats. */
     if (window.DonBanner) {
       const mapping = {};
-      (r.initiatives || []).forEach(it => { if (it.owner_user_id) mapping[it.owner_user_id] = document.getElementById('ann-donban-' + it.id); });
+      visibles.forEach(e => { const it = e.init; if (it && it.owner_user_id) mapping[it.owner_user_id] = document.getElementById('ann-donban-' + it.id); });
       DonBanner.renderLot(mapping);
     }
     /* Bouton « Soutenir » (2026-10-07) : masqué sur chaque carte, révélé seulement pour les
@@ -3463,16 +3510,23 @@ async function initAnnuaire(){
       filtered_count = filtered.length;
       const resultCountEl2 = document.getElementById("result-count");
       if (resultCountEl2) resultCountEl2.textContent = filtered.length;
-      list.innerHTML = filtered.length
-        ? filtered.map(renderPersonCard).join("")
-        : `<div class="empty" style="grid-column:1/-1;padding:40px;text-align:center;color:var(--muted);">
+      const peindreUtilisateurs = () => {
+        const page = annPageCourante(filtered.length);
+        const visibles = filtered.slice((page - 1) * ANN_PAR_PAGE, page * ANN_PAR_PAGE);
+        list.innerHTML = visibles.length
+          ? visibles.map(renderPersonCard).join("")
+          : `<div class="empty" style="grid-column:1/-1;padding:40px;text-align:center;color:var(--muted);">
             <div style="font-size:2rem;margin-bottom:12px;">🔍</div>
             <p style="font-weight:700;margin-bottom:6px;">Aucun utilisateur trouvé</p>
             <p style="font-size:.88rem;">Essayez avec d'autres filtres ou <button onclick="annResetFilters()" style="background:none;border:none;color:var(--orange);cursor:pointer;font-weight:700;text-decoration:underline;">réinitialisez la recherche</button>.</p>
           </div>`;
-      renderChips();
-      if (typeof initBoutonsRelation === 'function') initBoutonsRelation(list);
-      if (typeof initBoutonsAffiliation === 'function') initBoutonsAffiliation(list);
+        annPeindrePager(filtered.length);
+        renderChips();
+        if (typeof initBoutonsRelation === 'function') initBoutonsRelation(list);
+        if (typeof initBoutonsAffiliation === 'function') initBoutonsAffiliation(list);
+      };
+      annRepeindre = peindreUtilisateurs;
+      peindreUtilisateurs();
       return;
     }
 

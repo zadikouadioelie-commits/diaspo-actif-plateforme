@@ -285,7 +285,7 @@
     fil: { mode: 'tous', page: 1, pages: 1, posts: [], loaded: false },
     ev: { items: [], filtre: 'avenir', q: '', loaded: false },
     boutiques: { items: [], q: '', loaded: false, open: {} },
-    ann: { type: '', q: '', pays: '', ville: '', domaine: '', origine: '', items: [], shown: 30, loaded: false, opts: null, open: {} },
+    ann: { type: '', q: '', pays: '', ville: '', domaine: '', origine: '', items: [], page: 1, sig: '', loaded: false, opts: null, open: {} },
     myInsc: new Set(), pane: null, chatTimer: null, convNames: {}
   };
   const TABS = ['accueil', 'evenements', 'annuaire', 'messages', 'boutiques', 'moi'];
@@ -1187,7 +1187,7 @@
     el.innerHTML = `<div class="search">${ic('search', 's')}<input id="aq" type="search" placeholder="Nom, métier, ville, mot-clé…" aria-label="Rechercher dans l’annuaire" value="${esc(S.ann.q)}"></div>
       <div class="chips">${ANN_TYPES.map(([k, l]) => `<button class="chip ${S.ann.type === k ? 'on' : ''}" data-t="${esc(k)}">${l}</button>`).join('')}</div>
       <div class="ann-bar"><button class="btn out sm" id="ann-fl">${ic('search', 's')} Filtres${annNbFiltres() ? ' (' + annNbFiltres() + ')' : ''}</button><div class="chips" id="ann-pills">${annPills()}</div></div>
-      <div class="small muted" id="ann-count" style="margin:0 4px 10px"></div>${pubSlot('annuaire_sidebar')}<div id="ann-list"></div><div id="ann-more"></div>`;
+      <div class="small muted" id="ann-count" style="margin:0 4px 10px"></div><div id="ann-list"></div><div id="ann-more"></div>${pubSlot('annuaire_sidebar')}`;
     $$('.chip[data-t]', el).forEach(c => c.onclick = () => { S.ann.type = c.dataset.t; S.ann.loaded = false; viewAnnuaire(); });
     $$('[data-clear]', el).forEach(c => c.onclick = () => { S.ann[c.dataset.clear] = ''; if (c.dataset.clear === 'type') S.ann.loaded = false; viewAnnuaire(); });
     $('#ann-fl').onclick = openAnnFilters;
@@ -1214,7 +1214,7 @@
   }
   async function loadAnnuaire() {
     const l = $('#ann-list'); if (!l) return; l.innerHTML = '<div class="sk skc" style="height:96px"></div><div class="sk skc" style="height:96px"></div><div class="sk skc" style="height:96px"></div>';
-    try { S.ann.items = await annFetch(S.ann.q, S.ann.type); S.ann.shown = 30; S.ann.loaded = true; paintAnnuaire(); }
+    try { S.ann.items = await annFetch(S.ann.q, S.ann.type); S.ann.loaded = true; paintAnnuaire(); }
     catch (e) { l.innerHTML = `<div class="empty"><b>Annuaire indisponible</b>${esc(e.message)}<br><br><button class="btn sm" id="retry">Réessayer</button></div>`; $('#retry').onclick = loadAnnuaire; }
   }
   async function openAnnFilters() {
@@ -1378,9 +1378,23 @@
     const a = S.ann.items.filter(annMatch);
     $('#ann-count').textContent = a.length ? `${a.length} résultat${a.length > 1 ? 's' : ''}` : '';
     if (!a.length) { l.innerHTML = `<div class="empty"><div class="ei">${ic('dir', 'l')}</div><b>Aucun résultat</b>Essayez un autre mot-clé ou retirez un filtre.</div>`; $('#ann-more').innerHTML = ''; return; }
-    l.innerHTML = a.slice(0, S.ann.shown).map(annCard).join('');
-    $('#ann-more').innerHTML = a.length > S.ann.shown ? `<button class="btn out block" id="ann-next">Voir plus de résultats (${a.length - S.ann.shown})</button>` : '';
-    const n = $('#ann-next'); if (n) n.onclick = () => { S.ann.shown += 30; paintAnnuaire(); };
+    /* Pagination (2026-11-05, demande explicite) : 10 comptes par page ; retour à la page 1 dès que la recherche ou un filtre change ; les publicités passent SOUS la liste. */
+    const A = S.ann, PAR = 10, pages = Math.ceil(a.length / PAR);
+    const sig = [A.type, A.q, A.pays, A.ville, A.domaine, A.origine, A.forme, A.taille, A.famille, A.typeFin].join('|');
+    if (sig !== A.sig) { A.sig = sig; A.page = 1; }
+    if (A.page > pages) A.page = pages;
+    l.innerHTML = a.slice((A.page - 1) * PAR, A.page * PAR).map(annCard).join('');
+    if (pages > 1) {
+      const nums = new Set([1, pages, A.page - 1, A.page, A.page + 1]);
+      if (A.page <= 3) for (let i = 2; i <= Math.min(5, pages); i++) nums.add(i);
+      if (A.page >= pages - 2) for (let i = Math.max(1, pages - 4); i < pages; i++) nums.add(i);
+      const liste = [...nums].filter(n => n >= 1 && n <= pages).sort((x, y) => x - y);
+      let h = `<button type="button" class="chip" style="min-width:36px;padding:0 6px;justify-content:center" data-pg="${A.page - 1}" ${A.page === 1 ? 'disabled' : ''} aria-label="Page précédente">‹</button>`, prec = 0;
+      liste.forEach(n => { if (prec && n - prec > 1) h += '<span class="muted" aria-hidden="true">…</span>'; h += `<button type="button" class="chip ${n === A.page ? 'on' : ''}" style="min-width:36px;padding:0 6px;justify-content:center" data-pg="${n}" ${n === A.page ? 'aria-current="page"' : ''} aria-label="Page ${n}">${n}</button>`; prec = n; });
+      h += `<button type="button" class="chip" style="min-width:36px;padding:0 6px;justify-content:center" data-pg="${A.page + 1}" ${A.page === pages ? 'disabled' : ''} aria-label="Page suivante">›</button>`;
+      $('#ann-more').innerHTML = `<div class="chips" style="justify-content:center;flex-wrap:wrap;align-items:center;gap:5px;margin:14px 0 6px">${h}</div><div class="small muted" style="text-align:center;margin-bottom:12px">Page ${A.page} sur ${pages}</div>`;
+      $$('[data-pg]', $('#ann-more')).forEach(b => b.onclick = () => { if (b.disabled) return; A.page = Number(b.dataset.pg); paintAnnuaire(); const c = $('#ann-count'); if (c) c.scrollIntoView({ block: 'start' }); });
+    } else $('#ann-more').innerHTML = '';
     /* « Voir plus » n'apparaît que si la description dépasse 3 lignes. */
     $$('[data-desc]', l).forEach(d => { const b = d.parentNode.querySelector('[data-more]'); if (b && (d.classList.contains('open') || d.scrollHeight > d.clientHeight + 2)) b.hidden = false; });
     hydraterAdhesionsM(l); hydraterAffiliationsM(l); hydraterSoutienM(l);

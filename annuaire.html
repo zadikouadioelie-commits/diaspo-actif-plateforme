@@ -140,6 +140,15 @@
 .ann-demarc-comptes::before{content:'';flex:1;height:1px;background:linear-gradient(270deg,rgba(227,192,110,.6),rgba(227,192,110,0));}
 .ann-demarc-comptes span{padding:7px 18px;border:1px solid rgba(227,192,110,.55);border-radius:999px;background:rgba(227,192,110,.08);}
 .ann-pubs-bloc:has(> #ad-vitrine-section[style*="none"]) .ann-demarc{display:none;}
+/* Pagination des comptes (2026-11-05) : 10 par page ; les publications à la une sont désormais SOUS la liste. */
+.ann-pager{max-width:1180px;margin:26px auto 0;padding:0 24px;display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:8px;box-sizing:border-box;}
+.ann-pager[hidden]{display:none;}
+.ann-pg{min-width:42px;height:42px;padding:0 14px;border-radius:10px;border:1px solid rgba(227,192,110,.35);background:rgba(255,255,255,.04);color:#F3DC9B;font:700 14px 'Manrope',system-ui,sans-serif;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:background .15s,border-color .15s;}
+.ann-pg:hover:not([disabled]):not(.on){border-color:#E3C06E;background:rgba(227,192,110,.12);}
+.ann-pg.on{background:linear-gradient(135deg,#F3DC9B,#C9A24A);color:#241B05;border-color:#E3C06E;cursor:default;}
+.ann-pg[disabled]{opacity:.38;cursor:default;}
+.ann-pg-gap{color:#8E98B3;padding:0 2px;}
+.ann-pager-info{flex-basis:100%;text-align:center;font-size:12.5px;color:var(--muted);margin-top:2px;}
 .ann-result-count{font-size:13px;color:var(--muted);margin-top:4px;}
 
 /* Cards grid */
@@ -442,15 +451,6 @@ html,html body{overflow-x:clip;}
     <p class="ann-section-desc">Explorez les actions inspirantes portées par des individus, des collectifs et des organisations qui œuvrent pour un changement positif.</p>
   </div>
 
-  <div class="ann-pubs-bloc" style="width:100%;box-sizing:border-box;max-width:1200px;margin:0 auto 16px;padding:0 24px;">
-    <div class="ann-demarc ann-demarc-pub"><span>📰 Publications à la une</span></div>
-    <!-- Espace du haut (2026-10-24, demande explicite) : UNE publicité par heure (data-ad-fenetre = 3 600 000 ms), changée à l'heure pile en ne repeignant que
-         cet emplacement, en bannière bien visible (data-ad-format). Sans publicité active : relais de publications du fil, comme avant. -->
-    <!-- Puis (2026-10-24, nouvelle demande) : TROIS bandes de même taille, les unes au-dessus des autres (data-ad-count="3", data-ad-format="bandes"), remplacées chaque heure. -->
-    <div id="ad-vitrine-section" data-ad-emplacement="vitrine_section" data-ad-fenetre="3600000" data-ad-count="3" data-ad-format="bandes" style="display:none;"></div>
-    <div class="ann-demarc ann-demarc-comptes"><span>👥 Les comptes de l'annuaire</span></div>
-  </div>
-
   <section id="honneur-mur" style="display:none;" aria-label="Espace d'honneur"></section>
   <div id="ann-page-row">
   <div class="ann-grid" id="init-list">
@@ -467,6 +467,17 @@ html,html body{overflow-x:clip;}
     <div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:2px;">📢 Espace publicitaire</div>
     <div id="ad-annuaire-sidebar" data-ad-emplacement="annuaire_sidebar" data-ad-count="2" data-ad-count-large="4" data-ad-large-min="1700" data-ad-rotate="60000" style="margin-top:10px;"></div>
   </aside>
+  </div>
+
+  <!-- Pagination (2026-11-05, demande explicite) : 10 comptes par page ; les publications passent SOUS la liste. -->
+  <nav class="ann-pager" id="ann-pager" aria-label="Pages de résultats" hidden></nav>
+
+  <div class="ann-pubs-bloc" style="width:100%;box-sizing:border-box;max-width:1200px;margin:34px auto 16px;padding:0 24px;">
+    <div class="ann-demarc ann-demarc-pub"><span>📰 Publications à la une</span></div>
+    <!-- Espace du haut (2026-10-24, demande explicite) : UNE publicité par heure (data-ad-fenetre = 3 600 000 ms), changée à l'heure pile en ne repeignant que
+         cet emplacement, en bannière bien visible (data-ad-format). Sans publicité active : relais de publications du fil, comme avant. -->
+    <!-- Puis (2026-10-24, nouvelle demande) : TROIS bandes de même taille, les unes au-dessus des autres (data-ad-count="3", data-ad-format="bandes"), remplacées chaque heure. -->
+    <div id="ad-vitrine-section" data-ad-emplacement="vitrine_section" data-ad-fenetre="3600000" data-ad-count="3" data-ad-format="bandes" style="display:none;"></div>
   </div>
 
   <!-- ===== CTA ===== -->
@@ -491,7 +502,7 @@ html,html body{overflow-x:clip;}
 <script src="assets/data.js?v=7"></script>
 <script src="assets/geo.js?v=3"></script>
 <script src="assets/demo.js?v=2"></script>
-<script src="assets/app.js?v=17"></script>
+<script src="assets/app.js?v=18"></script>
 <script src="assets/upload-media.js"></script>
 <script src="assets/image-cropper.js"></script>
 <script src="/assets/don-banner.js"></script>
