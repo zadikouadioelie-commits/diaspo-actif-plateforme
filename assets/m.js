@@ -898,7 +898,7 @@
   function viewEvents() {
     const el = $('#t-evenements');
     /* Entrée « ⚡ Événement flash » + « ? » (comptes Initiative seulement) — fournie par le module Mes événements, vide sinon. */
-    el.innerHTML = `${(window.MMods && window.MMods.flashCarte) ? window.MMods.flashCarte() : ''}<div class="ev-top"><div class="search">${ic('search', 's')}<input id="evq" type="search" placeholder="Rechercher un événement…" aria-label="Rechercher un événement" value="${esc(S.ev.q)}"></div><button type="button" id="ev-cloche" aria-label="Être informé des événements" title="Être informé des événements"></button></div>
+    el.innerHTML = `${(window.MMods && window.MMods.flashCarte) ? window.MMods.flashCarte() : ''}<div id="ev-brouillon-slot"></div><div class="ev-top"><div class="search">${ic('search', 's')}<input id="evq" type="search" placeholder="Rechercher un événement…" aria-label="Rechercher un événement" value="${esc(S.ev.q)}"></div><button type="button" id="ev-cloche" aria-label="Être informé des événements" title="Être informé des événements"></button></div>
       <a class="btn out block" href="#/calendrier" style="margin:10px 0 2px">${ic('cal', 's')} Calendrier — voir par mois et ajouter à mon agenda</a>
       <a class="btn out block" href="#/comptesrendus" style="margin:6px 0 2px">${ic('doc', 's')} Compte-rendu d’événement — tous les comptes-rendus</a>
       <div class="chips">${[['avenir', 'À venir'], ['passes', 'Terminés'], ['gratuit', 'Gratuits'], ['mes', 'Mes inscriptions']].map(([k, l]) => `<button class="chip ${S.ev.filtre === k ? 'on' : ''}" data-f="${k}">${l}</button>`).join('')}</div>
@@ -909,6 +909,8 @@
     });
     /* Cloche des événements (2026-10-13) : choisir les événements pour lesquels on veut être notifié. Module chargé à la demande. */
     poserClocheEvenements($('#ev-cloche', el));
+    /* Bouton « Brouillon » (comptes organisateurs ayant un brouillon) — fourni par le module Mes événements. */
+    if (window.MMods && window.MMods.brouillonBouton) window.MMods.brouillonBouton($('#ev-brouillon-slot', el));
     let t; $('#evq').oninput = e => { clearTimeout(t); t = setTimeout(() => { S.ev.q = e.target.value.trim(); paintEvents(); }, 200); };
     if (!S.ev.loaded) loadEvents(); else paintEvents();
   }

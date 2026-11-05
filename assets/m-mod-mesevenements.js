@@ -81,6 +81,23 @@
   }
   window.MMods.flashCarte = flashCarte;
 
+  /* Bouton « Brouillon » de l'onglet Événements (2026-11-05, demande explicite : « il n'y a toujours pas le brouillon ») : même idée que sur le site, où « Brouillon » se tient à côté
+     de « Créer un événement ». Réservé aux comptes qui créent des événements, visible seulement s'ils ont au moins un brouillon à eux. Un seul brouillon : on ouvre directement sa
+     fiche (Publier / Modifier) ; plusieurs : la liste « Mes événements », ouverte sur l'onglet Brouillons. */
+  async function brouillonBouton(slot) {
+    if (!slot || !S.me || !ROLES_CREATION.includes(S.me.role)) return;
+    let brouillons;
+    try {
+      const r = await api('/api/evenements?owner=' + encodeURIComponent(S.me.id));
+      brouillons = (r.evenements || []).filter(e => e.statut === 'brouillon' && Number(e.owner_user_id) === Number(S.me.id));
+    } catch (_) { return; }
+    if (!brouillons.length || !slot.isConnected) return;
+    const href = brouillons.length === 1 ? '#/mesevenements/' + Number(brouillons[0].id) : '#/mesevenements';
+    slot.innerHTML = `<a class="btn out block" id="ev-brouillon" href="${href}" style="margin:0 0 12px" aria-label="${brouillons.length > 1 ? 'Mes ' + brouillons.length + ' brouillons d’événements' : 'Mon brouillon d’événement'}">${ic('file', 's')} Brouillon${brouillons.length > 1 ? ' (' + brouillons.length + ')' : ''}</a>`;
+    if (brouillons.length > 1) $('#ev-brouillon', slot).addEventListener('click', () => { ST.versBrouillons = true; });
+  }
+  window.MMods.brouillonBouton = brouillonBouton;
+
   /* ---------- styles (injectés une seule fois) ---------- */
   function css() {
     if ($('#m-mod-mesevenements-css')) return;
@@ -269,7 +286,8 @@
     ST.items = (r.evenements || []).filter(e => Number(e.owner_user_id) === Number(S.me.id));
     const g = groupes();
     // Premier affichage : on ouvre directement l'onglet qui contient quelque chose.
-    ST.tab = g.avenir.length ? 'avenir' : g.brouillons.length ? 'brouillons' : g.termines.length ? 'termines' : 'avenir';
+    ST.tab = ST.versBrouillons && g.brouillons.length ? 'brouillons' : g.avenir.length ? 'avenir' : g.brouillons.length ? 'brouillons' : g.termines.length ? 'termines' : 'avenir';
+    ST.versBrouillons = false;
     ST.q = ''; ST.shown = 30;
     setPane(NOM, `${flashCarte()}<div id="mev-top"></div><div id="mev-list"></div>
       <div class="mev-note" style="margin-top:6px"><b>Inscriptions et billets</b>Recevez les inscriptions à vos événements avec une fiche d’inscription : billets, questions, QR codes.<br><a href="#/inscriptions" style="text-decoration:underline;font-weight:700">Mes fiches d’inscription</a></div>`,
