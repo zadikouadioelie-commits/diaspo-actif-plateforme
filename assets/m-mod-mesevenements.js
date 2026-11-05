@@ -273,8 +273,23 @@
     ST.q = ''; ST.shown = 30;
     setPane(NOM, `${flashCarte()}<div id="mev-top"></div><div id="mev-list"></div>
       <div class="mev-note" style="margin-top:6px"><b>Inscriptions et billets</b>Recevez les inscriptions à vos événements avec une fiche d’inscription : billets, questions, QR codes.<br><a href="#/inscriptions" style="text-decoration:underline;font-weight:700">Mes fiches d’inscription</a></div>`,
-    `<a class="btn block" href="#/mesevenements/nouveau">${ic('plus', 's')} Créer un événement</a>`);
+    piedListe(g.brouillons.length));
+    $('#mev-brouillon') && ($('#mev-brouillon').onclick = () => reprendreBrouillon());
     paintListe();
+  }
+  /* Pied d'écran de la liste (2026-11-05, demande explicite : « fais apparaître le bouton Brouillon sur téléphone », comme sur le site) :
+     « Brouillon (n) » à côté de « Créer un événement », visible seulement s'il existe au moins un brouillon à soi. */
+  function piedListe(nbBrouillons) {
+    const creer = `<a class="btn" style="flex:1;min-width:0;white-space:nowrap" href="#/mesevenements/nouveau">${ic('plus', 's')} Créer un événement</a>`;
+    if (!nbBrouillons) return `<a class="btn block" href="#/mesevenements/nouveau">${ic('plus', 's')} Créer un événement</a>`;
+    return `<div style="display:flex;gap:10px;width:100%"><button type="button" class="btn out" id="mev-brouillon" style="flex:none;padding:0 16px;white-space:nowrap" aria-label="${nbBrouillons > 1 ? 'Mes ' + nbBrouillons + ' brouillons' : 'Mon brouillon'}">${ic('file', 's')} Brouillon${nbBrouillons > 1 ? ' (' + nbBrouillons + ')' : ''}</button>${creer}</div>`;
+  }
+  /* Un seul brouillon : on l'ouvre directement (fiche de pilotage : Publier / Modifier). Plusieurs : l'onglet « Brouillons » de la liste. */
+  function reprendreBrouillon() {
+    const br = groupes().brouillons;
+    if (br.length === 1) { location.hash = '#/mesevenements/' + Number(br[0].id); return; }
+    ST.tab = 'brouillons'; ST.shown = 30; paintListe();
+    const top = $('#mev-top'); if (top && top.scrollIntoView) top.scrollIntoView({ block: 'start' });
   }
   function groupes() {
     const av = [], te = [], br = [];
