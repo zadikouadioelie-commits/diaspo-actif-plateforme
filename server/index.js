@@ -24842,7 +24842,8 @@ route("PUT", "/api/evenements/:id", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   await ensureEvenementsFlashExtras();
-  const evt = await db.prepare("SELECT id, owner_user_id, statut, programme_json, inscription_rapide_active, lien_plus_info, video1_url, date_evt, date_fin, masquer_inscrits FROM evenements WHERE id=?").get(params.id);
+  await ensureEvenementsOrganisateurExterneCol();
+  const evt = await db.prepare("SELECT id, owner_user_id, statut, programme_json, inscription_rapide_active, lien_plus_info, video1_url, date_evt, date_fin, masquer_inscrits, organisateur_externe_nom, organisateur_externe_logo_url FROM evenements WHERE id=?").get(params.id);
   if (!evt) return sendJSON(res, 404, { error: "Événement introuvable." });
   if (Number(evt.owner_user_id) !== Number(user.id) && user.role !== "administrateur") {
     return sendJSON(res, 403, { error: "Vous ne pouvez modifier que vos propres événements." });
@@ -24906,17 +24907,28 @@ route("PUT", "/api/evenements/:id", async (req, res, params, body) => {
      de la cartouche) effaçait silencieusement le masquage choisi par l'organisateur. Même garde
      « undefined conserve l'existant » que programmeJson/inscriptionRapideActive/lienInfo ci-dessus. */
   const masquerInscritsFinal = masquer_inscrits === undefined ? evt.masquer_inscrits : (masquer_inscrits ? 1 : 0);
+  /* Organisateur relayé (2026-11-05, demande explicite : un brouillon d'événement flash ne proposait ni le nom ni la photo de l'organisateur) : cette route ne lisait
+     pas ces deux champs, donc reprendre ou modifier un événement flash ne permettait ni de les renseigner ni de les corriger. Même garde que le programme et le lien :
+     `undefined` conserve l'existant, une valeur envoyée (même vide) s'applique. La photo reçue en base64 part sur le CDN, comme la couverture. */
+  let orgNom = evt.organisateur_externe_nom || null, orgLogo = evt.organisateur_externe_logo_url || null;
+  if (body.organisateur_externe_nom !== undefined) orgNom = String(body.organisateur_externe_nom || "").trim().slice(0, 120) || null;
+  if (body.organisateur_externe_logo_url !== undefined) {
+    const lg = body.organisateur_externe_logo_url;
+    orgLogo = lg ? await require("./images-cdn").imageVersCdn(String(lg), user.id) : null;
+    if (orgLogo && !/^(https?:\/\/|\/|data:image\/)/i.test(orgLogo)) orgLogo = null;
+  }
   await db.prepare(`UPDATE evenements SET
     titre=?, date_evt=?, date_fin=?, heure_debut=?, heure_fin=?, type_evt=?, domaine=?, zone_diffusion=?, type_participation=?, ouverture_inscriptions=?, statut=?, pays=?, lieu=?, ville=?, lieu_gps=?,
     origine=?, description=?, places_max=?, masquer_inscrits=?, visibilite=?, lien_visio=?, whatsapp_lien=?,
-    image_couverture=?, image_url=?, galerie_photos=?, programme_json=?, inscription_rapide_active=?, lien_plus_info=?, video1_url=?
+    image_couverture=?, image_url=?, galerie_photos=?, programme_json=?, inscription_rapide_active=?, lien_plus_info=?, video1_url=?,
+    organisateur_externe_nom=?, organisateur_externe_logo_url=?
     WHERE id=?`)
     .run(
       titre, date_evt, dateFinFinale, heure_debut || null, heure_fin || null, type_evt || "evenement", domaine || null, zone_diffusion || null,
       ['payant','partiellement_payant'].includes(type_participation) ? type_participation : 'gratuit', ouverture_inscriptions || null, statutFinal,
       pays || null, lieu || null, ville || null, lieu_gps || null, origine || null, descriptionSafe || null,
       places_max || null, masquerInscritsFinal, visibilite || "public", lien_visio || null, whatsapp_lien || null,
-      coverImg, coverImg, galerie, programmeJson, inscriptionRapideActive, lienInfo, video1Url, evt.id
+      coverImg, coverImg, galerie, programmeJson, inscriptionRapideActive, lienInfo, video1Url, orgNom, orgLogo, evt.id
     );
   if (evt.video1_url && evt.video1_url !== video1Url) require("./reels-upload").supprimerVideoParUrl(evt.video1_url).catch(() => {});
   if (evt.statut === 'brouillon' && statutFinal === 'ouvert') alertesEvenementDeclencher(evt.id);

@@ -619,6 +619,23 @@
       <button type="button" class="btn btn-outline" style="font-size:12.5px;margin-top:6px;" onclick="progAjouterJour('e-prog-list')">+ Ajouter une journée</button>
       <label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer;margin-top:12px;"><input type="checkbox" id="e-insc-rapide" style="width:auto;margin-top:3px;flex-shrink:0;"><span><strong>Inscription rapide (facultative)</strong><br><span style="font-weight:400;font-size:.78rem;color:var(--muted,#6b7280);">Les personnes confirment leur venue ; un compte Diaspo'Actif l'ajoute à son agenda.</span></span></label>
     </div>
+    <!-- Organisateur relayé en reprise/modification d'un événement flash (2026-11-05, demande explicite : « cette carte n'apparaît pas sur le brouillon ») : même carte que dans la
+         fenêtre de création d'un flash, affichée par ouvrirModification() pour un événement flash uniquement. -->
+    <div id="e-org-extras" style="display:none;border:1.5px solid var(--border,#ddd);border-radius:10px;padding:14px;margin-bottom:10px;">
+      <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:10px;">👤 Organisateur</div>
+      <div class="grid-2">
+        <div><label>Nom de l'organisateur <span style="font-weight:400;color:var(--muted,#6b7280);">(si ce n'est pas vous)</span></label><input type="text" id="e-organisateur" maxlength="120" placeholder="Ex : Association Les Tisserands"></div>
+        <div>
+          <label>Photo / logo de l'organisateur</label>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <img id="e-logo-org-preview" alt="" style="display:none;width:34px;height:34px;border-radius:50%;object-fit:cover;flex-shrink:0;">
+            <input type="file" id="e-logo-org" accept="image/*" style="flex:1;min-width:0;">
+            <button type="button" class="btn btn-outline" id="e-logo-org-retirer" style="display:none;font-size:11.5px;padding:4px 10px;" onclick="orgEditRetirerLogo()">Retirer</button>
+          </div>
+        </div>
+      </div>
+      <p style="margin:10px 0 0;font-size:11.5px;color:var(--muted,#6b7280);">Visible directement sur la cartouche (photo + nom), avant même d'ouvrir l'événement.</p>
+    </div>
     <div style="margin-bottom:10px;"><label>💬 Lien WhatsApp (groupe ou chaîne de l'événement)</label><input type="url" id="e-whatsapp" placeholder="https://chat.whatsapp.com/… ou https://whatsapp.com/channel/…"></div>
 
     <!-- Type de participation — Gratuit/Partiellement payant/Payant (2026-09-22, demande
@@ -1705,6 +1722,7 @@ function resetModaleEvenement() {
   document.getElementById('e-radio-gratuit').checked = true;
   majToggleParticipation();
   document.getElementById('e-flash-extras').style.display = 'none';
+  orgEditReset();
   progSet('e-prog-list', []);
   document.getElementById('e-insc-rapide').checked = false;
   document.getElementById('e-heure').value = '09:00';
@@ -1782,6 +1800,7 @@ function ouvrirModaleEdition(id) {
   /* Programme + inscription rapide : propres à l'événement flash (détecté comme partout ailleurs : inscription_ouverte === 0). */
   const flashEdition = Number(evt.inscription_ouverte) === 0;
   document.getElementById('e-flash-extras').style.display = flashEdition ? '' : 'none';
+  orgEditOuvrir(evt, flashEdition);
   let progEdition = [];
   try { progEdition = typeof evt.programme_json === 'string' ? JSON.parse(evt.programme_json || '[]') : (evt.programme_json || []); } catch (e) { progEdition = []; }
   progSet('e-prog-list', progEdition);
@@ -1844,8 +1863,11 @@ function majToggleParticipation() {
     lbl.style.borderColor = actif ? s.couleur : 'var(--border)';
     lbl.style.background  = actif ? s.fond : 'transparent';
   });
-  document.getElementById('e-payant-notice').style.display = (valeur !== 'gratuit') ? '' : 'none';
-  document.getElementById('e-gratuit-notice').style.display = (valeur === 'gratuit') ? '' : 'none';
+  /* Événement flash en modification : deux états seulement (Gratuit / Payant), sans les rappels sur la fiche d'inscription — comme dans la fenêtre de création d'un flash. */
+  /* !important en ligne : evenement-flash-nuit-doree.css impose display:block !important à tout label sans display:flex littéral dans son style. */
+  document.getElementById('e-partiel-lbl').style.setProperty('display', orgEditFlash ? 'none' : 'flex', 'important');
+  document.getElementById('e-payant-notice').style.display = (valeur !== 'gratuit' && !orgEditFlash) ? '' : 'none';
+  document.getElementById('e-gratuit-notice').style.display = (valeur === 'gratuit' && !orgEditFlash) ? '' : 'none';
 }
 document.querySelectorAll('input[name="e-gratuit-payant"]').forEach(r => r.addEventListener('change', majToggleParticipation));
 
@@ -2034,12 +2056,57 @@ function progValider(id) {
   }
   return '';
 }
+/* ─── Organisateur relayé d'un événement flash en reprise / modification (2026-11-05) ───
+   orgEditLogo : undefined = photo inchangée · null = retirée · « data:image… » = nouvelle photo. (var : lu par majToggleParticipation avant la fin du chargement du script.) */
+var orgEditLogo, orgEditFlash = false;
+function orgEditReset() {
+  orgEditLogo = undefined; orgEditFlash = false;
+  const z = document.getElementById('e-org-extras'); if (z) z.style.display = 'none';
+  const n = document.getElementById('e-organisateur'); if (n) n.value = '';
+  const f = document.getElementById('e-logo-org'); if (f) f.value = '';
+  const p = document.getElementById('e-logo-org-preview'); if (p) { p.removeAttribute('src'); p.style.display = 'none'; }
+  const r = document.getElementById('e-logo-org-retirer'); if (r) r.style.display = 'none';
+}
+function orgEditOuvrir(evt, flash) {
+  orgEditReset();
+  orgEditFlash = !!flash;
+  if (!flash) return;
+  document.getElementById('e-org-extras').style.display = '';
+  document.getElementById('e-organisateur').value = evt.organisateur_externe_nom || '';
+  if (evt.organisateur_externe_logo_url) {
+    const p = document.getElementById('e-logo-org-preview');
+    p.src = evt.organisateur_externe_logo_url; p.style.display = '';
+    document.getElementById('e-logo-org-retirer').style.display = '';
+  }
+}
+function orgEditRetirerLogo() {
+  orgEditLogo = null;
+  document.getElementById('e-logo-org').value = '';
+  const p = document.getElementById('e-logo-org-preview'); p.removeAttribute('src'); p.style.display = 'none';
+  document.getElementById('e-logo-org-retirer').style.display = 'none';
+}
+document.getElementById('e-logo-org').addEventListener('change', async function () {
+  const file = this.files[0]; if (!file) return;
+  if (file.size > 10*1024*1024) { alert('Image trop lourde (max 10 Mo).'); this.value = ''; return; }
+  const recadree = await flashRecadrer(file, { shape: 'circle', aspect: 1, outW: 200, outH: 200 });
+  if (!recadree) { this.value = ''; return; }
+  orgEditLogo = await compressImage(recadree, 200, 200, 0.85);
+  const p = document.getElementById('e-logo-org-preview'); p.src = orgEditLogo; p.style.display = '';
+  document.getElementById('e-logo-org-retirer').style.display = '';
+});
+/* Champs organisateur à joindre à l'enregistrement d'un événement flash en modification ({} pour un autre événement). */
+function orgEditLire() {
+  if (!orgEditFlash) return {};
+  const o = { organisateur_externe_nom: document.getElementById('e-organisateur').value.trim() || null };
+  if (orgEditLogo !== undefined) o.organisateur_externe_logo_url = orgEditLogo;
+  return o;
+}
 /* Champs programme + inscription rapide à joindre à l'enregistrement d'un événement flash en modification ({} pour un autre événement). */
 function evtProgrammeExtras() {
   const zone = document.getElementById('e-flash-extras');
   if (!zone || zone.style.display === 'none') return {};
   const err = progValider('e-prog-list'); if (err) throw new Error(err);
-  return { programme: progLire('e-prog-list'), inscription_rapide_active: document.getElementById('e-insc-rapide').checked };
+  return { programme: progLire('e-prog-list'), inscription_rapide_active: document.getElementById('e-insc-rapide').checked, ...orgEditLire() };
 }
 /* Parse robuste de evt.programme_json (ou null si vide) — partagé par programmeDetailHtml() et
    le bouton « 📅 Programme » de la carte liste (voirProgramme/evtAProgramme ci-dessous). */

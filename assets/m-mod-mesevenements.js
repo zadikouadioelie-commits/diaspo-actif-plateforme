@@ -661,6 +661,18 @@
     let programme = [];
     try { programme = v.programme_json ? JSON.parse(v.programme_json) : []; } catch (_) { programme = []; }
     if (!Array.isArray(programme)) programme = [];
+    /* Événement flash repris en modification (2026-11-05, demande explicite : « cette carte n'apparaît pas sur le brouillon ») : type de participation (deux états) + organisateur,
+       préremplis avec ce qui est déjà enregistré. Mêmes identifiants que dans le formulaire de création (qui n'est jamais rendu en même temps). */
+    const blocsFlashEdition = (edition && mostraProgramme) ? `<div id="mev-part-flash-wrap"><div class="h2">TYPE DE PARTICIPATION</div>
+        ${opt('mev-part-flash', 'gratuit', 'Gratuit', 'Aucune participation financière.', v.type_participation !== 'payant')}
+        ${opt('mev-part-flash', 'payant', 'Payant', 'Participation payante.', v.type_participation === 'payant')}</div>
+      <div id="mev-org-wrap"><div class="h2">ORGANISATEUR <span style="font-weight:400">(si ce n’est pas vous)</span></div>
+        <p class="mev-hint">Visible directement sur la cartouche (photo + nom), avant même d’ouvrir l’événement.</p>
+        <label class="mev-l" for="mev-org-nom">Nom de l’organisateur</label>
+        <input type="text" id="mev-org-nom" maxlength="120" value="${esc(v.organisateur_externe_nom || '')}" placeholder="Ex. : Association Les Tisserands">
+        <label class="mev-l" for="mev-org-photo" style="margin-top:10px">Photo / logo de l’organisateur</label>
+        <div class="mev-photo"><img id="mev-org-img" alt="" ${v.organisateur_externe_logo_url ? 'src="' + esc(v.organisateur_externe_logo_url) + '"' : 'hidden'}><div class="sp"><input type="file" id="mev-org-photo" accept="image/jpeg,image/png,image/webp" aria-label="Choisir une photo de l’organisateur"><button type="button" class="btn out sm" id="mev-org-del" ${v.organisateur_externe_logo_url ? '' : 'hidden'} style="margin-top:8px">Retirer la photo</button></div></div>
+        <div class="mev-err" id="mev-e-org-photo" role="alert"></div></div>` : '';
 
     const html = `<form id="mev-form" class="mev-f" novalidate autocomplete="off">
       <div class="mev-gerr" id="mev-gerr" role="alert"></div>
@@ -705,7 +717,7 @@
       <div id="mev-ir-wrap" ${mostraProgramme ? '' : 'hidden'}>
         <label class="mev-opt ${v.inscription_rapide_active ? 'on' : ''}" style="margin-top:14px" id="mev-ir-opt"><input type="checkbox" id="mev-ir-ck" ${v.inscription_rapide_active ? 'checked' : ''}><span><b>Inscription rapide (facultative)</b><small>Nom, prénom, e-mail (téléphone et ville facultatifs) pour confirmer sa venue — ajoutée automatiquement à l’agenda des personnes connectées ; une simple estimation du nombre de personnes pour les autres.</small></span></label>
       </div>
-      ${edition ? `<div class="mev-note" style="margin-top:14px"><b>Visibilité : ${esc(visLabel(v))}</b>Elle se règle à la création ; pour la changer, ouvrez l’événement sur ordinateur.</div>` : `
+      ${edition ? `${blocsFlashEdition}<div class="mev-note" style="margin-top:14px"><b>Visibilité : ${esc(visLabel(v))}</b>Elle se règle à la création ; pour la changer, ouvrez l’événement sur ordinateur.</div>` : `
       <div id="mev-b-part"><div class="h2">PARTICIPATION</div>
         ${opt('mev-part', 'gratuit', 'Gratuit', 'Aucune participation financière.', true)}
         ${opt('mev-part', 'partiellement_payant', 'Partiellement payant', 'Certaines places ou formules sont payantes.', false)}
@@ -828,7 +840,7 @@
     const pd = $('#mev-ph-del'); if (pd) pd.onclick = () => { photo = null; ph.value = ''; $('#mev-ph-img').hidden = true; pd.hidden = true; };
 
     // Photo/logo de l'organisateur — même traitement que la photo de couverture ci-dessus (réduction, aperçu, retrait), un fichier distinct.
-    let orgPhoto = null;
+    let orgPhoto = null, orgRetiree = false;
     const op = $('#mev-org-photo');
     if (op) op.onchange = async () => {
       const f = op.files[0]; const err = $('#mev-e-org-photo'); err.textContent = '';
@@ -838,10 +850,10 @@
       try {
         orgPhoto = await reduirePhoto(f);
         if (orgPhoto.size > 5 * 1024 * 1024) { orgPhoto = null; op.value = ''; err.textContent = 'Cette photo reste trop lourde après réduction (5 Mo maximum).'; return; }
-        const im = $('#mev-org-img'); im.src = URL.createObjectURL(orgPhoto); im.hidden = false; $('#mev-org-del').hidden = false;
+        orgRetiree = false; const im = $('#mev-org-img'); im.src = URL.createObjectURL(orgPhoto); im.hidden = false; $('#mev-org-del').hidden = false;
       } catch (er) { orgPhoto = null; op.value = ''; err.textContent = er.message; }
     };
-    const od = $('#mev-org-del'); if (od) od.onclick = () => { orgPhoto = null; op.value = ''; $('#mev-org-img').hidden = true; od.hidden = true; };
+    const od = $('#mev-org-del'); if (od) od.onclick = () => { orgPhoto = null; orgRetiree = true; op.value = ''; $('#mev-org-img').hidden = true; od.hidden = true; };
 
     // Modèle standard de fiche d'inscription : proposé (et décochable) comme sur le site, jamais appliqué en silence.
     let modeleNom = null;
@@ -898,6 +910,10 @@
         if (mostraProgramme) {
           body.programme = programme; body.lien_plus_info = champ('mev-info') || null;
           const irCk2 = $('#mev-ir-ck'); if (irCk2) body.inscription_rapide_active = irCk2.checked;
+          // Événement flash repris en modification : type de participation + organisateur (nom ; la photo est ajoutée plus bas, ou retirée).
+          body.type_participation = $('input[name="mev-part-flash"]:checked', form)?.value || 'gratuit';
+          body.organisateur_externe_nom = champ('mev-org-nom') || null;
+          if (orgRetiree && !orgPhoto) body.organisateur_externe_logo_url = null;
         }
       } else {
         const vis = $('input[name="mev-vis"]:checked', form).value;
@@ -928,7 +944,7 @@
       bloquer(true, btn, statut === 'ouvert' && !edition ? 'Publication…' : 'Enregistrement…');
       try {
         if (!edition && photo) body.image_couverture = await envoyerPhoto(photo);
-        if (!edition && orgPhoto) body.organisateur_externe_logo_url = await envoyerPhoto(orgPhoto);
+        if (orgPhoto) body.organisateur_externe_logo_url = await envoyerPhoto(orgPhoto);
         if (edition) { await api('/api/evenements/' + Number(e.id), { method: 'PUT', body }); toast('Modifications enregistrées ✓'); if (history.length > 1) history.back(); else location.replace('#/mesevenements/' + Number(e.id)); }
         else {
           const r = await api('/api/evenements', { method: 'POST', body });
