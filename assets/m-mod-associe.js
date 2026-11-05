@@ -12,7 +12,7 @@
    Règles d'accès (appliquées par le serveur, reprises ici pour expliquer) :
    - tout le monde peut CONSULTER les annonces, même sans compte ;
    - Utilisateur : lecture seule (consulter, favoris) — ni candidature ni publication ;
-   - Initiative / Collectivité : publier et candidater seulement si Premium actif.
+   - tous les autres comptes (Initiative, Collectivité…) : publier et candidater, sans Premium ni connexion séparée (règle du 2026-11-05).
    ============================================================ */
 (function () {
   'use strict';
@@ -110,16 +110,16 @@ textarea.mma-in{resize:vertical;line-height:1.4;min-height:110px}
     $$('#pane-body [data-go]').forEach(b => b.onclick = () => { location.replace('#/associe' + (b.dataset.go ? '/' + b.dataset.go : '')); });
   }
 
-  /* Droits de publication / candidature, demandés au serveur à chaque action (jamais mémorisés : le Premium peut expirer). */
+  /* Droits de publication / candidature, demandés au serveur à chaque action (jamais mémorisés). */
   async function getAccess() {
     try { return await api('/api/mon-associe/mon-acces'); }
     catch (e) { toast(e.message, true); return null; }
   }
-  /* Explication pour un compte Utilisateur (lecture seule par conception, pas faute de Premium) */
+  /* Explication pour un compte Utilisateur (lecture seule par conception) */
   function infoLectureSeule(action) {
     const close = A.openSheet(`<div style="text-align:center;padding:6px 4px 10px"><div class="ei" style="width:64px;height:64px;border-radius:50%;background:var(--sky-l);color:var(--navy2);display:flex;align-items:center;justify-content:center;margin:4px auto 10px">${ic('lock', 'l')}</div>
-      <h2 style="margin:0 0 6px;font-size:19px">${esc(action)} : comptes Initiative Premium</h2>
-      <p class="muted" style="margin:0 0 14px">Votre compte Utilisateur permet de consulter toutes les annonces et de les mettre en favoris. Publier une annonce ou candidater est réservé aux comptes Initiative et Collectivité Premium.</p>
+      <h2 style="margin:0 0 6px;font-size:19px">${esc(action)} : réservé aux autres comptes</h2>
+      <p class="muted" style="margin:0 0 14px">Votre compte Utilisateur permet de consulter toutes les annonces et de les mettre en favoris. Publier une annonce ou candidater est ouvert aux autres types de compte (Initiative, Collectivité…).</p>
       <button class="btn block" id="ma-ok">J’ai compris</button></div>`);
     $('#ma-ok').onclick = close;
   }
@@ -127,8 +127,7 @@ textarea.mma-in{resize:vertical;line-height:1.4;min-height:110px}
   async function checkAccess(actionLabel, moduleLabel) {
     const acc = await getAccess(); if (!acc) return false;
     if (acc.peut_publier) return true;
-    if (acc.lecture_seule || (S.me && S.me.role === 'utilisateur')) infoLectureSeule(actionLabel);
-    else A.premiumSheet(moduleLabel);
+    infoLectureSeule(actionLabel);
     return false;
   }
 
@@ -329,7 +328,6 @@ textarea.mma-in{resize:vertical;line-height:1.4;min-height:110px}
         close(); toast('Candidature envoyée ✓');
         ST.loaded = false; if (S.pane && S.pane.k === 'associe') viewDetail(id);
       } catch (e) {
-        if (e.data && e.data.premium_requis) { close(); A.premiumSheet('Mon Associé — candidater'); return; }
         err.textContent = e.message; btn.disabled = false; btn.textContent = 'Envoyer ma candidature';
       }
     };
@@ -350,7 +348,6 @@ textarea.mma-in{resize:vertical;line-height:1.4;min-height:110px}
         <div class="tags" style="margin:0 0 6px"><span class="badge ${clos ? '' : 'g'}">${clos ? 'Clôturée' : 'En ligne'}</span><span class="badge">${esc(lab(TYPES, a.type_recherche))}</span></div>
         <h3 style="margin:0 0 6px;font-size:17px;line-height:1.25;word-break:break-word">${esc(a.titre)}</h3>
         <div class="row small"><span class="muted">${nb} candidature${nb > 1 ? 's' : ''}</span>${nn ? `<span class="mma-dot">${nn} nouvelle${nn > 1 ? 's' : ''}</span>` : ''}<span class="sp"></span><span class="muted">${esc(since(a.created_at))}</span></div>
-        ${a.masquee_non_premium && !clos ? `<div class="mma-warn">${ic('lock', 's')} Cette annonce est masquée aux autres membres tant que votre Premium n’est pas actif. Elle réapparaîtra dès son renouvellement.</div>` : ''}</a>
       <div class="mma-acts" style="margin:0;padding:0 14px 14px"><a class="btn sm out" href="#/associe/a/${Number(a.id)}">Voir l’annonce</a><span style="display:flex;gap:8px">${clos ? '' : `<button class="btn sm out sp" data-clo="${Number(a.id)}">Clôturer</button>`}<button class="btn sm out sp" data-del="${Number(a.id)}" style="color:var(--red)">Supprimer</button></span></div></article>`;
   }
 
@@ -394,9 +391,8 @@ textarea.mma-in{resize:vertical;line-height:1.4;min-height:110px}
     const acc = await getAccess();
     if (!alive()) return;
     if (!acc || !acc.peut_publier) {
-      const ro = acc && (acc.lecture_seule || S.me.role === 'utilisateur');
-      setPane('Publier une annonce', `<div class="empty"><div class="ei">${ic('lock', 'l')}</div><b>Publication réservée</b>${acc ? (ro ? 'La publication d’annonces est réservée aux comptes Initiative et Collectivité Premium. Votre compte Utilisateur peut consulter les annonces.' : 'La publication d’annonces fait partie de l’offre Premium.') : 'Impossible de vérifier vos droits pour le moment.'}<br><br><a class="btn" href="#/associe/mes">Retour à mes annonces</a></div>`);
-      if (acc && !ro) A.premiumSheet('Mon Associé — publier une annonce');
+      const ro = true;
+      setPane('Publier une annonce', `<div class="empty"><div class="ei">${ic('lock', 'l')}</div><b>Publication réservée</b>${acc ? (ro ? 'La publication d’annonces est ouverte aux autres types de compte (Initiative, Collectivité…). Votre compte Utilisateur peut consulter les annonces.' : '') : 'Impossible de vérifier vos droits pour le moment.'}<br><br><a class="btn" href="#/associe/mes">Retour à mes annonces</a></div>`);
       return;
     }
     let validite = 30;
@@ -447,8 +443,7 @@ textarea.mma-in{resize:vertical;line-height:1.4;min-height:110px}
         toast('Annonce publiée ✓'); ST.loaded = false;
         location.replace('#/associe/mes');
       } catch (e) {
-        if (e.data && e.data.premium_requis) { A.premiumSheet('Mon Associé — publier une annonce'); }
-        else $('#e-form').textContent = e.message;
+        $('#e-form').textContent = e.message;
         btn.disabled = false; btn.textContent = 'Publier l’annonce';
       }
     };

@@ -14145,45 +14145,25 @@ route("POST", "/api/mon-associe/connexion", async (req, res, params, body) => {
 });
 
 /* ══ Mon Associé — garde d'accès à la publication ══
-   Consultation des annonces (GET) toujours libre, y compris en mode visiteur (SAS).
-   L'ancien système d'accréditation admin ('mon_associe', sur demande) est remplacé par un
-   contrôle automatique : Utilisateur = toujours lecture seule ; Initiative/Collectivité =
-   publication autorisée uniquement si le compte est Premium actif. PREMIUM_TYPE_PAR_ROLE
-   (déclaré plus bas dans ce fichier, déjà initialisé à l'exécution de toute requête) n'a
-   aucune entrée 'collectivite' aujourd'hui — aucune offre Premium Collectivité n'existe
-   encore (chantier séparé, D6 du plan Codes Adhésion D'A) — donc estPremiumActifAssocie()
-   renvoie false pour ce rôle sans qu'aucun rôle ne soit jamais codé en dur ici : le jour où
-   l'offre existera, ce contrôle fonctionnera automatiquement, sans modification. */
-async function estPremiumActifAssocie(user) {
-  const type = PREMIUM_TYPE_PAR_ROLE[user.role];
-  if (!type) return false;
-  return hasAccreditation(user.id, type);
-}
+   Consultation des annonces (GET) toujours libre, y compris en mode visiteur.
+   Règle du titulaire (2026-11-05, remplace la règle « Premium requis ») : TOUS les comptes
+   sauf les comptes Utilisateur peuvent publier leurs recherches de collaborateurs et
+   candidater, sans Premium et sans connexion séparée par code de sécurité — être connecté à
+   son compte suffit. Le compte Utilisateur reste en lecture seule (consulter, mettre en
+   favoris). */
 async function exigerAccesPublicationAssocie(user, res) {
-  if (user.role === 'administrateur') return true;
-  if (user.role === 'utilisateur') {
-    sendJSON(res, 403, {
-      error: "La publication d'annonces et les candidatures sur Mon Associé sont réservées aux comptes Initiative et Collectivité Premium. Votre compte Utilisateur conserve un accès en lecture illimité.",
-    });
-    return false;
-  }
-  if (!(await estPremiumActifAssocie(user))) {
-    sendJSON(res, 403, {
-      error: "Cette fonctionnalité fait partie de l'offre Premium. Passez Premium pour publier des annonces et candidater sur Mon Associé.",
-      premium_requis: true,
-    });
-    return false;
-  }
-  return true;
+  if (user.role !== 'utilisateur') return true;
+  sendJSON(res, 403, {
+    error: "La publication d'annonces et les candidatures sur Mon Associé ne sont pas ouvertes aux comptes Utilisateur. Votre compte conserve un accès en lecture illimité.",
+  });
+  return false;
 }
 
 route("GET", "/api/mon-associe/mon-acces", async (req, res) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  if (user.role === 'administrateur') return sendJSON(res, 200, { peut_publier: true });
   if (user.role === 'utilisateur') return sendJSON(res, 200, { peut_publier: false, lecture_seule: true });
-  const premium = await estPremiumActifAssocie(user);
-  sendJSON(res, 200, { peut_publier: premium, premium_requis: !premium });
+  sendJSON(res, 200, { peut_publier: true });
 });
 
 /* ══ Mon Associé — Annonces ══ */
@@ -14204,21 +14184,8 @@ route("GET", "/api/mon-associe/annonces", async (req, res, params, body, query) 
     WHERE ${conditions.join(' AND ')}
     ORDER BY a.created_at DESC LIMIT 150
   `).all(...args);
-  /* Masquage live (pas de cron, jamais de flag figé) : une annonce Initiative/Collectivité
-     reste invisible pour les autres tant que son auteur n'est pas Premium en ce moment même
-     — dès qu'il redevient Premium, elle réapparaît automatiquement, sans purge ni tâche de
-     fond. Les annonces d'un auteur Utilisateur (ancien système, non re-gatées Premium) restent
-     visibles sans changement. */
-  const premiumCache = new Map();
-  const visibles = [];
-  for (const r of rows) {
-    if (r.auteur_role !== 'initiative' && r.auteur_role !== 'collectivite') { visibles.push(r); continue; }
-    if (!premiumCache.has(r.auteur_id)) {
-      premiumCache.set(r.auteur_id, await estPremiumActifAssocie({ id: r.auteur_id, role: r.auteur_role }));
-    }
-    if (premiumCache.get(r.auteur_id)) visibles.push(r);
-    if (visibles.length >= 100) break;
-  }
+  /* Plus de masquage selon le Premium de l'auteur (règle du 2026-11-05) : toute annonce active est visible. */
+  const visibles = rows.slice(0, 100);
   const nomsAuteurs = new Map();
   for (const r of visibles) {
     if (!nomsAuteurs.has(r.auteur_id)) nomsAuteurs.set(r.auteur_id, await nomCompteAffichage(r.auteur_id));
@@ -14233,7 +14200,7 @@ route("GET", "/api/mon-associe/annonces", async (req, res, params, body, query) 
 route("GET", "/api/mon-associe/mes-annonces", async (req, res) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  const visible = user.role === 'administrateur' || user.role === 'utilisateur' ? true : await estPremiumActifAssocie(user);
+  const visible = true;
   const rows = await db.prepare(`
     SELECT a.*,
            (SELECT COUNT(*) FROM associe_candidatures c WHERE c.annonce_id=a.id) AS nb_candidatures,
