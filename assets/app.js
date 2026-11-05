@@ -3535,11 +3535,13 @@ async function initAnnuaire(){
   const typeEl = document.getElementById("f-type-org");
   const btnQuickInit = document.getElementById("btn-quick-initiatives");
   const btnQuickColl = document.getElementById("btn-quick-collectivites");
-  /* Reflète l'état courant sur les deux raccourcis, quel que soit le chemin qui a changé
+  const btnQuickUtil = document.getElementById("btn-quick-utilisateurs");
+  /* Reflète l'état courant sur les trois raccourcis, quel que soit le chemin qui a changé
      state.typeOrg (menu déroulant, raccourci lui-même, réinitialisation, retrait de chip). */
   function syncQuickButtons() {
     if (btnQuickInit) btnQuickInit.classList.toggle("active", state.typeOrg === "Initiative");
     if (btnQuickColl) btnQuickColl.classList.toggle("active", state.typeOrg === "Collectivité");
+    if (btnQuickUtil) btnQuickUtil.classList.toggle("active", state.typeOrg === "Utilisateurs");
   }
   if (typeEl) typeEl.addEventListener("change", () => { state.typeOrg = typeEl.value; syncQuickButtons(); apply(); });
 
@@ -3612,6 +3614,12 @@ async function initAnnuaire(){
   });
   if (btnQuickColl) btnQuickColl.addEventListener("click", () => {
     state.typeOrg = state.typeOrg === "Collectivité" ? "" : "Collectivité";
+    if (typeEl) typeEl.value = state.typeOrg;
+    syncQuickButtons();
+    apply();
+  });
+  if (btnQuickUtil) btnQuickUtil.addEventListener("click", () => {
+    state.typeOrg = state.typeOrg === "Utilisateurs" ? "" : "Utilisateurs";
     if (typeEl) typeEl.value = state.typeOrg;
     syncQuickButtons();
     apply();
