@@ -137,6 +137,13 @@
   /* Mon propre profil (onglet « Moi ») : le fil de l'accueil (Reels en haut, filtres, créer) prend la place des Publications ; le détail du profil se déplie. */
   const detail = html => html ? `<details class="pf-det"><summary>Mon profil en détail</summary>${html}</details>` : '';
 
+  /* Bloc « Sondage en cours » sous l'en-tête d'un profil public vu par un autre compte (2026-11-05) : sondages que le créateur a choisi d'y afficher. */
+  function sondagesMonter(uid) {
+    if (!uid || cibleTab || !window.MMods || !window.MMods.sondagesEnCours) return;
+    const corps = document.getElementById('pane-body'), tete = corps && corps.firstElementChild;
+    if (tete) window.MMods.sondagesEnCours({ profil: uid, apres: tete });
+  }
+
   /* En-tête commun */
   function hero(o) {
     const own = S.me && o.uid && Number(S.me.id) === Number(o.uid);
@@ -223,7 +230,7 @@
       stats: [[r.abonnes || 0, 'abonnés'], [r.vues || r.nb_vues || 0, 'vues'], [avis.total ? Number(avis.moyenne || 0).toFixed(1) + '★' : '—', 'avis']] });
     const lienIni = `<a class="btn out block" style="margin:4px 0 8px" href="initiative.html?id=${encodeURIComponent(r.slug || r.id)}">${ic('out', 's')} Ouvrir la fiche complète sur le site</a>`;
     if (moi && A.viewFilMoi) { rendre(r.nom, h + '<div id="moi-fil"></div>' + detail(sections) + lienIni); A.viewFilMoi(); }
-    else { rendre(r.nom, h + sections + pubsSec(pubsL) + lienIni); pubsMonter(r.owner_user_id, pubsL); }
+    else { rendre(r.nom, h + sections + pubsSec(pubsL) + lienIni); pubsMonter(r.owner_user_id, pubsL); sondagesMonter(r.owner_user_id); }
     /* Partager ce profil (2026-10-07) : lien public, lisible sans compte. */
     if (A.paneShare && !cibleTab) A.paneShare(location.origin + (r.owner_user_id ? '/profil.html?id=' + encodeURIComponent(r.owner_user_id) : '/initiative.html?id=' + encodeURIComponent(r.slug || r.id)) + '&r=' + A.jetonPartage(), r.nom);
   }
@@ -278,7 +285,7 @@
       loc: [p.ville, p.pays].filter(Boolean).join(', '), orig: [p.origine1, p.origine2].filter(Boolean).join(' · '), stats: [[p.nbAbonnes || 0, 'abonnés'], [p.nbSuivis || 0, 'abonnements'], [(Array.isArray(p.publications) ? p.publications.length : 0), 'publications']] });
     const lien = `<a class="btn out block" style="margin:4px 0 8px" href="profil.html?id=${encodeURIComponent(p.id)}">${ic('out', 's')} Ouvrir le profil complet sur le site</a>`;
     if (moi && A.viewFilMoi) { rendre(nom, h + '<div id="moi-fil"></div>' + detail(sections) + lien); A.viewFilMoi(); }
-    else { rendre(nom, h + sections + pubsSec(pubsL) + lien); pubsMonter(p.id, pubsL); }
+    else { rendre(nom, h + sections + pubsSec(pubsL) + lien); pubsMonter(p.id, pubsL); sondagesMonter(p.id); }
     if (A.paneShare && !cibleTab) A.paneShare(location.origin + '/profil.html?id=' + encodeURIComponent(p.id) + '&r=' + A.jetonPartage(), nom);
   }
 

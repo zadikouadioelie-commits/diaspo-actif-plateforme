@@ -1073,6 +1073,8 @@
       ${e.lien_visio ? `<a class="btn out block" style="margin-bottom:12px" href="${attrUrl(e.lien_visio)}" target="_blank" rel="noopener">Rejoindre en visio ${ic('out', 's')}</a>` : ''}
       <button class="btn out block" id="ev-agenda" type="button" style="margin-bottom:12px">${ic('cal', 's')} Ajouter à mon agenda</button>`;
     setPane(e.titre, html, cta);
+    /* Bloc « Sondage en cours » (2026-11-05) : sondages liés à cet événement par son organisateur ; facultatif, sans compte, jamais dans le parcours d'inscription. */
+    if (window.MMods && window.MMods.sondagesEnCours) window.MMods.sondagesEnCours({ evenement: e.id, apres: $('#ev-agenda') });
     /* « Ajouter à mon agenda » (2026-10-13) : copie l'événement dans l'agenda personnel ; déjà ajouté → ouvre l'agenda. */
     const ag = $('#ev-agenda');
     if (ag) {

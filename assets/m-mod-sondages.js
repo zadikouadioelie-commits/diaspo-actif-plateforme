@@ -4,6 +4,9 @@
            #/sondages/voir/ID        détail : participer, résultats, réactions, commentaires
            #/sondages/mes            mes sondages (comptes Initiative, Collectivité, Administrateur)
            #/sondages/nouveau        création (mêmes comptes)
+   Diffusion (2026-11-05) : fil, profil public, événements liés, lien / WhatsApp, invitations par e-mail, personnes ayant répondu
+   (fenêtre « 📣 Diffusion » d'un sondage) ; bloc « Sondage en cours » sur la fiche d'un événement et sur un profil public
+   (window.MMods.sondagesEnCours) ; réponse sans compte via sondage.html.
    Mêmes routes d'API et mêmes règles que sondages.html (site) : un sondage dure 30 jours
    maximum par période de publication ; une fois terminé il reste visible (« Fin de ce
    sondage ») mais n'accepte plus de réponses, jusqu'à une republication.
@@ -62,7 +65,7 @@
 .mso-err:empty{display:none}
 .mso-gerr{background:var(--red-l);color:var(--red);border-radius:12px;padding:10px 14px;font-weight:600;font-size:14px;margin-bottom:12px}
 .mso-gerr:empty{display:none}
-.mso-opt{display:flex;gap:12px;align-items:flex-start;border:1.5px solid var(--border);background:#fff;border-radius:14px;padding:12px;margin-bottom:8px;cursor:pointer}
+.mso-opt{display:flex;gap:12px;align-items:flex-start;border:1.5px solid var(--border);background:transparent;border-radius:14px;padding:12px;margin-bottom:8px;cursor:pointer}
 .mso-opt.on{border-color:var(--navy2);background:var(--sky-l)}
 .mso-opt input{margin:3px 0 0;width:20px;height:20px;flex:none;accent-color:var(--navy2)}
 .mso-opt b{display:block;font-size:15px}
@@ -72,6 +75,16 @@
 .mso-stat{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px;text-align:center}
 .mso-stat b{display:block;font-size:18px;color:var(--navy2)}
 .mso-stat span{font-size:11px;color:var(--muted)}
+.mso-so{margin:0 0 12px;border:1px solid var(--border);background:var(--sky-l,#eff6ff);border-radius:14px;padding:12px 14px}
+.mso-so .t{font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--navy2);margin-bottom:6px}
+.mso-so .it{display:flex;flex-direction:column;gap:8px;padding:6px 0}
+.mso-so .it+.it{border-top:1px solid var(--border)}
+.mso-dl{font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin:18px 2px 8px}
+.mso-evts{max-height:190px;overflow-y:auto;border:1px solid var(--border);border-radius:12px;padding:4px 10px;margin-bottom:12px}
+.mso-evts label{display:flex;gap:10px;align-items:center;padding:9px 0;font-size:14px;cursor:pointer}
+.mso-evts input{width:20px;height:20px;flex:none;accent-color:var(--navy2)}
+.mso-rep{padding:9px 12px;border-bottom:1px solid var(--border);font-size:13.5px}
+.mso-rep:last-child{border-bottom:0}
 `;
     document.head.appendChild(s);
   }
@@ -218,7 +231,7 @@
       ${dejaRepondu && !ferme ? `<div class="mso-hint" style="background:var(--green-l,#d1fae5);color:var(--green-d,#065f46);border-radius:12px;padding:10px 12px;font-weight:700">✅ Vous avez déjà répondu.</div>` : ''}
       ${peutParticiper ? `<form id="mso-form">${qs.map((q, i) => renderQ(q, i)).join('')}<button type="button" class="btn block" id="mso-submit" style="margin-top:4px">✅ Soumettre</button></form>` : ''}
       ${(ferme || dejaRepondu) ? `<button type="button" class="btn out block" id="mso-res-btn" style="margin-top:4px">📊 Voir les résultats</button><div id="mso-res"></div>` : ''}
-      ${!S.me && !ferme ? `<div class="mso-hint" style="background:var(--sky-l);border-radius:12px;padding:10px 12px">🔑 <a href="#" id="mso-login" style="font-weight:700">Connectez-vous</a> pour participer.</div>` : ''}
+      ${!S.me && !ferme ? `<div class="mso-hint" style="background:var(--sky-l);border-radius:12px;padding:10px 12px">🔑 <a href="#" id="mso-login" style="font-weight:700">Connectez-vous</a> pour participer, ou répondez sans compte.</div><a class="btn block" href="sondage.html?id=${Number(id)}" style="margin-top:8px">✍️ Répondre sans compte</a>` : ''}
       <div class="row" style="gap:8px;margin-top:14px;flex-wrap:wrap">
         <button type="button" class="btn out sm" id="mso-rxn">❤️ ${s.nb_reactions || 0}</button>
         <button type="button" class="btn out sm" id="mso-fav">⭐ ${s.est_favori ? 'Sauvegardé' : 'Favoris'}</button>
@@ -226,6 +239,7 @@
       </div>
       ${estCreateur ? `<div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap">
         <button type="button" class="btn out sm" id="mso-stats-btn">📊 Statistiques</button>
+        <button type="button" class="btn out sm" id="mso-diff">📣 Diffusion</button>
         ${!ferme ? `<button type="button" class="btn out sm" id="mso-cloturer">🔒 Clôturer</button>` : ''}
         ${s.statut === 'cloture' ? `<button type="button" class="btn out sm" id="mso-republier">🔁 Republier</button>` : ''}
         ${s.statut === 'brouillon' ? `<button type="button" class="btn sm" id="mso-publier">🚀 Publier</button>` : ''}
@@ -244,7 +258,7 @@
       if (!(await needLoginSond())) return;
       try { const rr = await api('/api/sondages/' + id + '/favori', { method: 'POST' }); fav.textContent = '⭐ ' + (rr.est_favori ? 'Sauvegardé' : 'Favoris'); } catch (e) { }
     };
-    const sh = $('#mso-share'); if (sh) sh.onclick = () => partager(location.origin + '/sondages.html?id=' + id, s.titre);
+    const sh = $('#mso-share'); if (sh) sh.onclick = () => partager(location.origin + '/sondage.html?id=' + id, s.titre);
     const lg = $('#mso-login'); if (lg) lg.onclick = ev => { ev.preventDefault(); A.openLogin(); };
     const sub = $('#mso-submit'); if (sub) sub.onclick = () => soumettre(t, id, qs);
     const rb = $('#mso-res-btn'); if (rb) rb.onclick = () => chargerResultats(id);
@@ -253,6 +267,7 @@
 
     if (estCreateur) {
       const sb = $('#mso-stats-btn'); if (sb) sb.onclick = () => chargerStats(id);
+      const df = $('#mso-diff'); if (df) df.onclick = () => diffusion(id);
       const cl = $('#mso-cloturer'); if (cl) cl.onclick = () => cloturer(t, id);
       const rp = $('#mso-republier'); if (rp) rp.onclick = () => republier(t, id, false);
       const pb = $('#mso-publier'); if (pb) pb.onclick = () => republier(t, id, true);
@@ -311,6 +326,7 @@
       el.innerHTML = `<div class="mso-stats" style="grid-template-columns:repeat(2,1fr)">
         <div class="mso-stat"><b>${s.nb_vues || 0}</b><span>Vues</span></div><div class="mso-stat"><b>${s.nb_reponses || 0}</b><span>Répondants</span></div>
         <div class="mso-stat"><b>${r.taux_participation}%</b><span>Taux</span></div><div class="mso-stat"><b>${s.nb_commentaires || 0}</b><span>Commentaires</span></div>
+        ${r.nb_invites != null ? `<div class="mso-stat" style="grid-column:1/-1"><b>${r.nb_invites}</b><span>réponses sans compte</span></div>` : ''}
       </div>
       ${r.par_pays && r.par_pays.length ? `<div class="h2">PAR PAYS</div>${r.par_pays.map(p => `<div class="row small"><span>${esc(p.pays || '—')}</span><span style="font-weight:700">${p.n}</span></div>`).join('')}` : ''}
       ${r.par_type && r.par_type.length ? `<div class="h2">PAR TYPE DE COMPTE</div>${r.par_type.map(x => `<div class="row small"><span>${esc(x.type_compte || '—')}</span><span style="font-weight:700">${x.n}</span></div>`).join('')}` : ''}`;
@@ -341,6 +357,100 @@
     if (!(n >= 1 && n <= DUREE_MAX)) { toast('Durée : de 1 à 30 jours.', true); return; }
     try { const r = await api('/api/sondages/' + id + '/republier', { method: 'POST', body: { duree_jours: n } }); toast(r.message || 'Sondage republié.'); detail(++rendu, id); }
     catch (e) { toast((e && e.message) || 'Erreur.', true); }
+  }
+
+  /* ============================================================
+     BLOC « SONDAGE EN COURS » — fiche d'un événement, profil public (jamais dans le parcours d'inscription).
+     Participation facultative et sans compte : simple lien vers sondage.html.
+     ============================================================ */
+  window.MMods.sondagesEnCours = async function (opts) {
+    opts = opts || {};
+    const q = opts.evenement ? 'evenement=' + encodeURIComponent(opts.evenement) : opts.profil ? 'profil=' + encodeURIComponent(opts.profil) : '';
+    const apres = opts.apres;
+    if (!q || !apres || !apres.parentNode) return null;
+    let liste;
+    try { liste = (await api('/api/sondages-en-cours?' + q)).sondages || []; } catch (e) { return null; }
+    if (!liste.length || !apres.parentNode) return null;
+    css();
+    const cle = opts.evenement ? 'e' + opts.evenement : 'p' + opts.profil;
+    const ancien = apres.parentNode.querySelector('[data-so="' + cle + '"]'); if (ancien) ancien.remove();
+    const bloc = document.createElement('section');
+    bloc.className = 'mso-so'; bloc.setAttribute('data-so', cle); bloc.setAttribute('aria-label', 'Sondage en cours');
+    bloc.innerHTML = '<div class="t">📊 Sondage en cours</div>' + liste.map(s => '<div class="it"><div><div style="font-weight:700;font-size:15px;line-height:1.35;word-break:break-word">' + esc(s.titre) + '</div>' +
+      '<div class="small muted" style="margin-top:2px">Facultatif, sans compte' + (s.date_cloture ? ' · jusqu’au ' + esc(fmtDate(s.date_cloture)) : '') + '</div></div>' +
+      '<a class="btn sm block" href="sondage.html?id=' + Number(s.id) + '">Répondre au sondage</a></div>').join('');
+    apres.parentNode.insertBefore(bloc, apres.nextSibling);
+    return bloc;
+  };
+
+  /* ============================================================
+     DIFFUSION (créateur) — lieux d'affichage, événements liés, partage, invitations, personnes ayant répondu
+     ============================================================ */
+  async function diffusion(id) {
+    const close = A.openSheet('<div class="sk skc" style="height:120px"></div>');
+    const corps = () => $('#sheet .sb');
+    let d;
+    try { d = await api('/api/sondages/' + id + '/diffusion'); }
+    catch (e) { const sb = corps(); if (sb) sb.innerHTML = '<div class="empty"><b>Diffusion indisponible</b>' + esc((e && e.message) || 'Erreur.') + '<br><br><button class="btn sm" id="msd-x">Fermer</button></div>'; const x = $('#msd-x'); if (x) x.onclick = close; return; }
+    const s = d.sondage, ouvert = s.statut === 'ouvert';
+    const evts = d.mes_evenements || [], lies = new Set((d.evenement_ids || []).map(Number));
+    const sb = corps(); if (!sb) return;
+    sb.className = 'sb mso-f';
+    sb.innerHTML = `<div class="row" style="align-items:flex-start;gap:8px"><div class="sp"><h3 style="margin:0 0 2px;font-size:18px">📣 Diffusion</h3><div class="small muted" style="word-break:break-word">${esc(s.titre)}</div></div><button type="button" class="ibtn" id="msd-close" aria-label="Fermer">${ic('close')}</button></div>
+      <p class="mso-hint" style="background:var(--sky-l);border-radius:12px;padding:10px 12px">${ouvert ? '⏳ Sondage <b>en cours</b> jusqu’au ' + esc(fmtDate(s.date_cloture)) + '.' : 'Ce sondage n’est pas en cours (' + esc(STATUT_LABELS[s.statut] || s.statut) + '). Vos choix s’appliqueront dès sa publication.'} La durée (30 jours maximum) est <b>la même partout</b> où il est affiché.</p>
+      <div class="mso-dl" style="margin-top:6px">Où l’afficher</div>
+      <label class="mso-opt" id="msd-fil-o"><input type="checkbox" id="msd-fil" ${d.diffusion.fil ? 'checked' : ''}><span><b>Fil d’actualité</b><small>Une publication annonce le sondage avec son lien${s.fil_post_id ? ' (déjà publiée)' : ''}.</small></span></label>
+      <label class="mso-opt" id="msd-profil-o"><input type="checkbox" id="msd-profil" ${d.diffusion.profil ? 'checked' : ''}><span><b>Mon profil public</b><small>Un encart « Sondage en cours » s’affiche sur votre page.</small></span></label>
+      <div class="mso-dl">Événements concernés</div>
+      <p class="mso-hint" style="margin-top:0">Sur la fiche de chaque événement coché, un bloc « Sondage en cours » permet de répondre si on le souhaite. Il n’apparaît jamais dans le parcours d’inscription.</p>
+      <div class="mso-evts">${evts.length ? evts.map(e => '<label><input type="checkbox" class="msd-evt" value="' + Number(e.id) + '" ' + (lies.has(Number(e.id)) ? 'checked' : '') + '><span>' + esc(e.titre) + (e.date_evt ? ' <span class="small muted">· ' + esc(fmtDate(e.date_evt)) + '</span>' : '') + '</span></label>').join('') : '<div class="small muted" style="padding:10px 0">Vous n’avez pas encore d’événement publié.</div>'}</div>
+      <button type="button" class="btn block" id="msd-save">Enregistrer la diffusion</button>
+      <div class="mso-dl">Partager le lien</div>
+      <input type="text" readonly id="msd-lien" value="${esc(d.lien)}" aria-label="Lien du sondage">
+      <div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap"><button type="button" class="btn out sm" id="msd-copy">${ic('share', 's')} Copier / partager</button><a class="btn out sm" id="msd-wa" href="${A.attrUrl(d.lien_whatsapp)}" target="_blank" rel="noopener">💬 WhatsApp</a></div>
+      <div class="mso-dl">Inviter par e-mail</div>
+      <p class="mso-hint" style="margin-top:0">Chaque personne reçoit un <b>lien personnel à usage unique</b> (une seule réponse par lien, sans compte).${d.invitations.total ? ' Déjà envoyées : ' + d.invitations.total + ' · utilisées : ' + d.invitations.utilisees + '.' : ''}</p>
+      <textarea id="msd-emails" rows="3" placeholder="Une adresse par ligne, ou séparées par des virgules (50 maximum)" ${ouvert ? '' : 'disabled'}></textarea>
+      <textarea id="msd-message" rows="2" maxlength="500" placeholder="Petit mot d’accompagnement (facultatif)" ${ouvert ? '' : 'disabled'} style="margin-top:8px"></textarea>
+      <button type="button" class="btn out block" id="msd-inv" ${ouvert ? '' : 'disabled'} style="margin-top:8px">✉️ Envoyer les invitations</button>
+      ${ouvert ? '' : '<p class="mso-hint">Publiez le sondage pour pouvoir envoyer des invitations.</p>'}
+      <div class="mso-dl">Personnes ayant répondu</div>
+      <div id="msd-rep"><button type="button" class="btn out sm" id="msd-rep-btn">👥 Voir la liste</button></div>`;
+    const cb = (a, b) => { const x = $(a, sb), y = $(b, sb); if (x && y) { const sync = () => y.classList.toggle('on', x.checked); x.addEventListener('change', sync); sync(); } };
+    cb('#msd-fil', '#msd-fil-o'); cb('#msd-profil', '#msd-profil-o');
+    $('#msd-close', sb).onclick = close;
+    $('#msd-save', sb).onclick = async ev => {
+      const btn = ev.currentTarget; btn.disabled = true;
+      try {
+        await api('/api/sondages/' + id + '/diffusion', { method: 'PUT', body: { fil: $('#msd-fil', sb).checked, profil: $('#msd-profil', sb).checked, evenement_ids: $$('.msd-evt:checked', sb).map(c => Number(c.value)) } });
+        toast('Diffusion enregistrée ✓'); diffusion(id);
+      } catch (e) { toast((e && e.message) || 'Enregistrement impossible.', true); btn.disabled = false; }
+    };
+    $('#msd-lien', sb).onclick = ev => ev.currentTarget.select();
+    $('#msd-copy', sb).onclick = () => partager($('#msd-lien', sb).value, s.titre);
+    $('#msd-inv', sb).onclick = async ev => {
+      const emails = $('#msd-emails', sb).value.trim();
+      if (!emails) { toast('Indiquez au moins une adresse e-mail.', true); return; }
+      const btn = ev.currentTarget; btn.disabled = true;
+      try {
+        const r = await api('/api/sondages/' + id + '/invitations', { method: 'POST', body: { emails, message: $('#msd-message', sb).value.trim() } });
+        const det = [r.deja_invites ? r.deja_invites + ' déjà invitée(s)' : '', r.deja_repondu ? r.deja_repondu + ' ont déjà répondu' : '', r.invalides ? r.invalides + ' adresse(s) invalide(s)' : '', r.echecs ? r.echecs + ' non envoyée(s)' : ''].filter(Boolean).join(' · ');
+        toast((r.message || 'Terminé.') + (det ? ' (' + det + ')' : ''), !!(r.echecs && !r.envoyes)); diffusion(id);
+      } catch (e) { toast((e && e.message) || 'Envoi impossible.', true); btn.disabled = false; }
+    };
+    $('#msd-rep-btn', sb).onclick = async () => {
+      const box = $('#msd-rep', sb); box.innerHTML = '<p class="small muted">Chargement…</p>';
+      try {
+        const r = await api('/api/sondages/' + id + '/repondants');
+        if (r.anonyme) { box.innerHTML = '<p class="small muted">Sondage anonyme : ' + r.total + ' réponse(s), aucune identité enregistrée.</p>'; return; }
+        if (!(r.repondants || []).length) { box.innerHTML = '<p class="small muted">Aucune réponse pour le moment.</p>'; return; }
+        box.innerHTML = '<p class="small muted" style="margin:0 0 6px">' + r.total + ' personne(s). Les coordonnées ne sont jamais visibles par les autres comptes.</p><div style="border:1px solid var(--border);border-radius:12px;max-height:240px;overflow-y:auto">' +
+          r.repondants.map(p => '<div class="mso-rep"><b>' + esc(((p.prenom || '') + ' ' + (p.nom || '')).trim() || '—') + '</b> <span class="badge ' + (p.type === 'compte' ? 'g' : '') + '">' + (p.type === 'compte' ? 'Compte' : 'Sans compte') + '</span>' +
+            (p.email ? '<div class="small muted">' + esc(p.email) + (p.telephone ? ' · ' + esc(p.telephone) : '') + (p.recontact ? ' · ✅ accepte d’être recontacté(e)' : '') + '</div>' : '') + '</div>').join('') +
+          '</div><button type="button" class="btn out sm" id="msd-csv" style="margin-top:8px">⬇️ Exporter en CSV</button>';
+        const c = $('#msd-csv', sb); if (c) c.onclick = () => { window.location.href = '/api/sondages/' + id + '/export'; };
+      } catch (e) { box.innerHTML = '<p class="small" style="color:var(--red)">' + esc((e && e.message) || 'Liste indisponible.') + '</p>'; }
+    };
   }
 
   /* ============================================================
