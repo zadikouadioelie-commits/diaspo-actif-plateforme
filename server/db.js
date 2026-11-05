@@ -6278,6 +6278,13 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_sondage_invitations_sondage ON sondage_invitations(sondage_id);
 
   /* Un sondage peut être rattaché à PLUSIEURS événements du créateur : « Sondage en cours » sur la page de chacun (jamais dans le parcours d'inscription). */
+  /* Alerte « Être informé des prochains sondages » (2026-11-05) : un compte inscrit reçoit une notification à chaque nouveau sondage publié. */
+  CREATE TABLE IF NOT EXISTS sondage_alertes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL UNIQUE,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
   CREATE TABLE IF NOT EXISTS sondage_evenements (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     sondage_id INTEGER NOT NULL,

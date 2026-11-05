@@ -41,8 +41,13 @@
 <link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
   <link rel="stylesheet" href="/assets/design-upgrade.v2.css">
   <link rel="stylesheet" href="/assets/theme-manager.css">
+  <!-- Nuit dorée (2026-11-05, « à chaque nouvelle création, la nouvelle DA ») : polices + thème + feuille de la page ; retour arrière = retirer ces 4 lignes et class="nd" -->
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,500;0,6..96,600;1,6..96,500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/theme-nuit-doree.css?v=8">
+  <link rel="stylesheet" href="/assets/sondages-nuit-doree.css?v=5">
 </head>
-<body>
+<body class="nd">
 <div class="page" id="app">
   <header class="topbar">
     <div class="topbar-inner">
@@ -62,46 +67,74 @@
     </div>
   </header>
 
-  <main class="container" style="padding-top:24px;padding-bottom:60px;">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;flex-wrap:wrap;gap:12px;">
-      <div>
-        <h1 style="margin:0 0 4px;font-size:26px;">📊 Sondages &amp; Consultations</h1>
-        <p style="margin:0;color:var(--muted);font-size:14px;">Participez aux sondages de la diaspora et publiez vos propres consultations</p>
+  <main class="sd-main" id="sd-main">
+    <section class="sd-hero" aria-labelledby="sd-h1">
+      <div class="sd-hero-texte">
+        <span class="sd-hero-ico" aria-hidden="true">
+          <svg viewBox="0 0 64 64" width="44" height="44"><defs><linearGradient id="sdg1" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#B9893A"/><stop offset="1" stop-color="#F3DC9B"/></linearGradient></defs><rect x="9" y="38" width="12" height="17" rx="3" fill="url(#sdg1)"/><rect x="26" y="26" width="12" height="29" rx="3" fill="url(#sdg1)"/><rect x="43" y="11" width="12" height="44" rx="3" fill="#fff"/></svg>
+        </span>
+        <div class="sd-hero-titre">
+          <h1 id="sd-h1">Sondages &amp; <em>Consultations</em></h1>
+          <p>Participez aux sondages de la diaspora et publiez vos propres consultations</p>
+        </div>
       </div>
-      <button class="btn btn-orange" id="btn-creer-sond" style="display:none;" onclick="openCreateSond()">+ Créer un sondage</button>
+      <img class="sd-hero-img" src="assets/sondages-hero.webp" width="875" height="202" alt="" decoding="async">
+    </section>
+
+    <ul class="sd-piliers">
+      <li><svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="14" r="6"/><path d="M12 38c0-7 5-12 12-12s12 5 12 12"/><circle cx="10" cy="22" r="4"/><circle cx="38" cy="22" r="4"/><path d="M3 36c0-4 3-7 7-7M45 36c0-4-3-7-7-7"/></svg><span><strong>Donnez</strong> votre avis</span></li>
+      <li><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M8 20l22-9v26L8 28z"/><path d="M8 20v8M30 14l6-3M30 24h8M30 34l6 3M13 28l3 9h5l-2-8"/></svg><span><strong>Participez</strong> aux décisions</span></li>
+      <li><svg viewBox="0 0 48 48" aria-hidden="true"><rect x="6" y="28" width="9" height="14" rx="2"/><rect x="19" y="18" width="9" height="24" rx="2"/><rect x="32" y="7" width="9" height="35" rx="2"/></svg><span><strong>Partagez</strong> vos opinions</span></li>
+      <li><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 5a13 13 0 0 0-7 24c1 1 2 3 2 5h10c0-2 1-4 2-5A13 13 0 0 0 24 5z"/><path d="M19 38h10M20 43h8"/></svg><span><strong>Contribuez</strong> à des solutions concrètes pour la diaspora</span></li>
+    </ul>
+
+    <div class="sd-barre">
+      <div class="sd-onglets" role="tablist" aria-label="Catégories de sondages">
+        <button type="button" class="sond-tab active" role="tab" aria-selected="true" data-onglet="cours" onclick="switchSond('cours')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V13M10 20V6M16 20v-9M22 20H2"/></svg>Sondages en cours</button>
+        <button type="button" class="sond-tab" role="tab" aria-selected="false" data-onglet="termines" onclick="switchSond('termines')"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M8 12.5l3 3 5-6"/></svg>Sondages terminés</button>
+        <button type="button" class="sond-tab" role="tab" aria-selected="false" data-onglet="participations" onclick="switchSond('participations')"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>Mes participations</button>
+        <button type="button" class="sond-tab" id="tab-mes-sond" role="tab" aria-selected="false" data-onglet="mes" onclick="switchSond('mes')"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2.5"/><path d="M9 4V3h6v1M9 11h6M9 15h6"/></svg>Mes sondages</button>
+      </div>
+      <button type="button" class="sd-creer" id="btn-creer-sond" onclick="demanderCreation()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Créer un sondage</button>
     </div>
 
-    <div class="sond-nav">
-      <button class="sond-tab active" onclick="switchSond('offres')">🔍 Sondages ouverts</button>
-      <button class="sond-tab" onclick="switchSond('mes-sondages')" id="tab-mes-sond" style="display:none;">📋 Mes sondages</button>
-    </div>
-
-    <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:20px;">
-      <input type="text" id="sf-q" placeholder="🔍 Rechercher…" style="flex:1;min-width:160px;height:38px;padding:0 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;" oninput="filterSonds()">
-      <select id="sf-cat" onchange="filterSonds()" style="height:38px;padding:0 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:#fff;">
-        <option value="">Toutes catégories</option>
-        <option value="consultation_citoyenne">Consultation citoyenne</option>
-        <option value="projet">Projet</option>
-        <option value="emploi">Emploi</option>
-        <option value="formation">Formation</option>
-        <option value="culture">Culture</option>
-        <option value="investissement">Investissement</option>
-        <option value="sante">Santé</option>
-        <option value="numerique">Numérique</option>
-        <option value="education">Éducation</option>
-        <option value="environnement">Environnement</option>
-        <option value="autre">Autre</option>
-      </select>
+    <div class="sd-filtres" id="sd-filtres">
+      <label class="sd-champ sd-recherche"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input type="search" id="sf-q" placeholder="Rechercher un sondage (titre, mot-clé…)" aria-label="Rechercher un sondage" oninput="filterSonds()"></label>
+      <label class="sd-champ"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"/></svg>
+        <select id="sf-cat" aria-label="Catégorie" onchange="filterSonds()">
+          <option value="">Toutes catégories</option>
+          <option value="consultation_citoyenne">Consultation citoyenne</option>
+          <option value="projet">Projet</option>
+          <option value="emploi">Emploi</option>
+          <option value="formation">Formation</option>
+          <option value="culture">Culture</option>
+          <option value="tourisme">Tourisme</option>
+          <option value="investissement">Investissement</option>
+          <option value="sante">Santé</option>
+          <option value="numerique">Numérique</option>
+          <option value="education">Éducation</option>
+          <option value="environnement">Environnement</option>
+          <option value="autre">Autre</option>
+        </select></label>
+      <label class="sd-champ"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-6.2 7-11.5a7 7 0 0 0-14 0C5 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>
+        <select id="sf-pays" aria-label="Pays" onchange="filterSonds()"><option value="">Tous les pays</option></select></label>
+      <label class="sd-champ"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h10M4 16h6M17 5v14M14 16l3 3 3-3"/></svg>
+        <select id="sf-tri" aria-label="Trier" onchange="filterSonds()">
+          <option value="recents">Trier : Plus récents</option>
+          <option value="fin">Trier : Se terminent bientôt</option>
+          <option value="participants">Trier : Plus de participants</option>
+          <option value="populaires">Trier : Plus populaires</option>
+        </select></label>
     </div>
 
     <div class="sond-section active" id="sec-offres">
-      <div id="sonds-grid" class="sond-grid">
-        <div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted);">Chargement…</div>
+      <div id="sonds-grid" class="sond-grid" aria-live="polite">
+        <div class="sd-chargement">Chargement…</div>
       </div>
     </div>
 
     <div class="sond-section" id="sec-mes-sondages">
-      <div id="mes-sonds-list"><div style="text-align:center;padding:30px;color:var(--muted);">Chargement…</div></div>
+      <div id="mes-sonds-list"><div class="sd-chargement">Chargement…</div></div>
     </div>
   </main>
 </div>
@@ -257,64 +290,165 @@ function descPeriodes(s){
 
 const CAT_LABELS = {consultation_citoyenne:'Consultation citoyenne',projet:'Projet',emploi:'Emploi',formation:'Formation',culture:'Culture',tourisme:'Tourisme',investissement:'Investissement',sante:'Santé',numerique:'Numérique',education:'Éducation',environnement:'Environnement',autre:'Sondage'};
 
+/* ── Page Sondages « Nuit dorée » (2026-11-05) : onglets, filtres, alerte « Être informé », états vides ── */
+let ONGLET='cours';
+let ALERTE_ACTIVE=false;
+const ROLES_CREATION=['initiative','collectivite','administrateur'];
+const SD_ICO_CLOSE='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+const SD_BELL='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 17V11a6 6 0 0 1 12 0v6l1.5 2h-15z"/><path d="M10 21h4"/></svg>';
+/* Même illustration que la maquette (presse-papier + coche), en bleu nuit et or. */
+const SD_ILLU=`<svg viewBox="0 0 230 250" class="sd-illu" aria-hidden="true" focusable="false">
+  <defs>
+    <linearGradient id="ill-bleu" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1B3A82"/><stop offset="1" stop-color="#0A1A44"/></linearGradient>
+    <linearGradient id="ill-or" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F3DC9B"/><stop offset=".45" stop-color="#E3C06E"/><stop offset="1" stop-color="#B9893A"/></linearGradient>
+    <radialGradient id="ill-halo" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#E3C06E" stop-opacity=".28"/><stop offset="1" stop-color="#E3C06E" stop-opacity="0"/></radialGradient>
+  </defs>
+  <ellipse cx="115" cy="150" rx="112" ry="92" fill="url(#ill-halo)"/>
+  <g transform="rotate(-7 105 130)">
+    <rect x="42" y="42" width="128" height="178" rx="18" fill="url(#ill-bleu)" stroke="url(#ill-or)" stroke-width="4"/>
+    <rect x="54" y="58" width="104" height="150" rx="10" fill="#0B1226" stroke="rgba(227,192,110,.35)" stroke-width="1.5"/>
+    <rect x="78" y="26" width="56" height="30" rx="10" fill="#14234a" stroke="url(#ill-or)" stroke-width="3.5"/>
+    <circle cx="106" cy="40" r="6" fill="none" stroke="url(#ill-or)" stroke-width="3"/>
+    <g stroke="url(#ill-or)" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="66" y="78" width="20" height="20" rx="5"/><path d="M71 88l4 4 7-8"/>
+      <rect x="66" y="116" width="20" height="20" rx="5"/><path d="M71 126l4 4 7-8"/>
+      <rect x="66" y="154" width="20" height="20" rx="5"/><path d="M71 164l4 4 7-8"/>
+    </g>
+    <g stroke="#9FB2DC" stroke-width="4" stroke-linecap="round"><path d="M97 84h46M97 94h30M97 122h46M97 132h30M97 160h46M97 170h30"/></g>
+  </g>
+  <circle cx="168" cy="186" r="32" fill="url(#ill-or)" stroke="#0B1226" stroke-width="5"/>
+  <path d="M153 187l11 11 18-22" fill="none" stroke="#0B1226" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <g stroke="url(#ill-or)" stroke-width="5" stroke-linecap="round"><path d="M176 26l8 14M192 52l16 4M196 76l14 10M20 112l10 10M10 138l12 4"/></g>
+</svg>`;
+
 document.addEventListener('DOMContentLoaded', async()=>{
   /* Anciens liens « sondages.html?id=N » : la réponse se fait désormais sur la page publique sondage.html (sans compte). */
   const idLien=parseInt(new URLSearchParams(location.search).get('id'),10);
   if(idLien){ location.replace('sondage.html?id='+idLien); return; }
   await new Promise(r=>setTimeout(r,400));
   try{ const r=await api('GET','/auth/me'); ME_SOND=r.user; }catch(_){}
-  if(ME_SOND && ['initiative','collectivite','administrateur'].includes(ME_SOND.role)){
-    document.getElementById('btn-creer-sond').style.display='';
-    document.getElementById('tab-mes-sond').style.display='';
-  }
-  loadSonds();
+  if(ME_SOND){ api('GET','/sondages/alerte').then(r=>{ ALERTE_ACTIVE=!!r.actif; majBoutonsAlerte(); }).catch(()=>{}); }
+  const h=(location.hash||'').replace('#','');
+  if(['termines','participations','mes'].includes(h)) ONGLET=h;
+  await loadSonds();
+  if(ONGLET!=='cours') switchSond(ONGLET);
 });
 
 function switchSond(name){
-  document.querySelectorAll('.sond-section').forEach(s=>s.classList.remove('active'));
-  document.querySelectorAll('.sond-tab').forEach(t=>t.classList.remove('active'));
-  document.getElementById('sec-'+name)?.classList.add('active');
-  document.querySelectorAll('.sond-tab').forEach(t=>{ if(t.getAttribute('onclick')?.includes(name)) t.classList.add('active'); });
-  if(name==='mes-sondages') loadMesSonds();
+  ONGLET=name;
+  document.querySelectorAll('.sond-tab').forEach(t=>{
+    const on=t.dataset.onglet===name; t.classList.toggle('active',on); t.setAttribute('aria-selected',on?'true':'false');
+  });
+  const mes=name==='mes';
+  document.getElementById('sec-offres').classList.toggle('active',!mes);
+  document.getElementById('sec-mes-sondages').classList.toggle('active',mes);
+  document.getElementById('sd-filtres').style.display=mes?'none':'';
+  if(mes) loadMesSonds(); else renderSonds();
+}
+
+/* « Créer un sondage » : connexion requise, puis réservé aux Initiatives, collectivités et administrateurs. */
+function demanderCreation(){
+  if(!ME_SOND){ DA.toast('Connectez-vous pour créer un sondage.',{type:'warning'}); setTimeout(()=>{ location.href='login.html'; },900); return; }
+  if(!ROLES_CREATION.includes(ME_SOND.role)){ DA.toast('La création de sondages est réservée aux Initiatives et aux comptes étatiques.',{type:'warning'}); return; }
+  openCreateSond();
 }
 
 async function loadSonds(){
   try{
     const r=await api('GET','/sondages');
     ALL_SONDS=r.sondages||[];
-    renderSonds(ALL_SONDS);
-  }catch(e){ document.getElementById('sonds-grid').innerHTML='<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted);">Erreur de chargement.</div>'; }
+    remplirPays();
+    renderSonds();
+  }catch(e){ document.getElementById('sonds-grid').innerHTML=etatVide({titre:'Chargement impossible.',texte:'Vérifiez votre connexion puis réessayez.',bouton:'<button type="button" class="sd-btn-or" onclick="loadSonds()">Réessayer</button>'}); }
 }
 
-function filterSonds(){
-  const q=document.getElementById('sf-q').value.toLowerCase();
-  const cat=document.getElementById('sf-cat').value;
-  renderSonds(ALL_SONDS.filter(s=>(!q||s.titre.toLowerCase().includes(q)||(s.description||'').toLowerCase().includes(q))&&(!cat||s.categorie===cat)));
+function remplirPays(){
+  const sel=document.getElementById('sf-pays'); const cur=sel.value;
+  const pays=[...new Set(ALL_SONDS.map(s=>String(s.pays_aff||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'fr'));
+  sel.innerHTML='<option value="">Tous les pays</option>'+pays.map(p=>`<option value="${escH(p)}">${escH(p)}</option>`).join('');
+  if(pays.includes(cur)) sel.value=cur;
 }
 
-function renderSonds(sonds){
+function filterSonds(){ renderSonds(); }
+function reinitialiserFiltres(){
+  document.getElementById('sf-q').value=''; document.getElementById('sf-cat').value=''; document.getElementById('sf-pays').value=''; document.getElementById('sf-tri').value='recents';
+  renderSonds();
+}
+
+function etatVide({titre,texte,bouton}){
+  return `<div class="sd-vide">
+    <div class="sd-vide-illu">${SD_ILLU}</div>
+    <div class="sd-vide-texte"><h2>${titre}</h2><p>${texte||''}</p>${bouton||''}</div>
+  </div>`;
+}
+function boutonAlerte(){
+  return `<button type="button" class="sd-btn-or sd-alerte" onclick="alerteClic()">${SD_BELL}<span>Être informé des prochains sondages</span></button>`;
+}
+function majBoutonsAlerte(){
+  document.querySelectorAll('.sd-alerte').forEach(b=>{
+    b.classList.toggle('actif',ALERTE_ACTIVE);
+    b.querySelector('span').textContent=ALERTE_ACTIVE?'Alerte activée — me désabonner':'Être informé des prochains sondages';
+  });
+}
+async function alerteClic(){
+  if(!ME_SOND){ DA.toast('Connectez-vous pour être informé des prochains sondages.',{type:'warning'}); setTimeout(()=>{ location.href='login.html'; },900); return; }
+  try{
+    const r=await api('POST','/sondages/alerte',{actif:!ALERTE_ACTIVE});
+    ALERTE_ACTIVE=!!r.actif; majBoutonsAlerte();
+    DA.toast(ALERTE_ACTIVE?'Alerte activée : vous serez notifié à chaque nouveau sondage.':'Alerte désactivée.',{type:'success'});
+  }catch(e){ DA.toast(e.message,{type:'danger'}); }
+}
+
+function renderSonds(){
   const grid=document.getElementById('sonds-grid');
-  if(!sonds.length){grid.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted);">Aucun sondage disponible.</div>';return;}
-  grid.innerHTML=sonds.map(s=>{
+  const q=document.getElementById('sf-q').value.trim().toLowerCase();
+  const cat=document.getElementById('sf-cat').value;
+  const pays=document.getElementById('sf-pays').value;
+  const tri=document.getElementById('sf-tri').value;
+  let base=ALL_SONDS;
+  if(ONGLET==='cours') base=base.filter(s=>s.statut==='ouvert');
+  else if(ONGLET==='termines') base=base.filter(s=>s.statut==='cloture');
+  else if(ONGLET==='participations') base=base.filter(s=>Number(s.ai_repondu)===1);
+
+  if(ONGLET==='participations' && !ME_SOND){
+    grid.innerHTML=etatVide({titre:'Connectez-vous pour voir vos participations.',texte:'Retrouvez ici tous les sondages auxquels vous avez répondu.',bouton:'<a class="sd-btn-or" href="login.html">Se connecter</a>'}); return;
+  }
+  const liste=base.filter(s=>(!q||String(s.titre||'').toLowerCase().includes(q)||String(s.description||'').toLowerCase().includes(q))&&(!cat||s.categorie===cat)&&(!pays||s.pays_aff===pays));
+  const num=(v)=>Number(v)||0;
+  const t=(s)=>String(s.created_at||'');
+  if(tri==='fin') liste.sort((a,b)=>String(a.date_cloture||'9999').localeCompare(String(b.date_cloture||'9999')));
+  else if(tri==='participants') liste.sort((a,b)=>num(b.nb_reponses)-num(a.nb_reponses));
+  else if(tri==='populaires') liste.sort((a,b)=>(num(b.nb_vues)+3*num(b.nb_reactions))-(num(a.nb_vues)+3*num(a.nb_reactions)));
+  else liste.sort((a,b)=>t(b).localeCompare(t(a)));
+
+  if(!liste.length){
+    const filtre=!!(q||cat||pays);
+    if(filtre){ grid.innerHTML=etatVide({titre:'Aucun sondage ne correspond à votre recherche.',texte:'Essayez d\'autres mots-clés ou retirez un filtre.',bouton:'<button type="button" class="sd-btn-or" onclick="reinitialiserFiltres()">Réinitialiser les filtres</button>'}); return; }
+    if(ONGLET==='termines') grid.innerHTML=etatVide({titre:'Aucun sondage terminé pour le moment.',texte:'Les sondages clôturés restent consultables ici, avec leurs résultats.'});
+    else if(ONGLET==='participations') grid.innerHTML=etatVide({titre:'Vous n\'avez pas encore participé.',texte:'Répondez à un sondage en cours : il apparaîtra ici.',bouton:'<button type="button" class="sd-btn-or" onclick="switchSond(\'cours\')">Voir les sondages en cours</button>'});
+    else grid.innerHTML=etatVide({titre:'Aucun sondage disponible pour le moment.',texte:'Soyez parmi les premiers à participer dès la publication de nouveaux sondages.',bouton:boutonAlerte()});
+    majBoutonsAlerte(); return;
+  }
+  grid.innerHTML=liste.map(s=>{
     const jours=daysLeft(s.date_cloture);
-    return `<div class="sond-card" onclick="openSond(${s.id})">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;gap:8px;">
-        <span class="cat-badge">📊 ${escH(CAT_LABELS[s.categorie]||s.categorie||'Sondage')}</span>
-        ${s.statut!=='ouvert'?`<span style="font-size:11px;font-weight:700;color:#6b7280;">Fin de ce sondage</span>`:(jours!==null?`<span style="font-size:11px;font-weight:700;color:${jours<=3?'#ef4444':'var(--muted)'};">${jours>1?jours+' j restants':'Dernier jour'}</span>`:'')}
+    const ouvert=s.statut==='ouvert', repondu=Number(s.ai_repondu)===1;
+    return `<article class="sond-card" tabindex="0" onclick="openSond(${s.id})" onkeydown="if(event.key==='Enter'&&event.target===this)openSond(${s.id})">
+      <div class="sc-tete">
+        <span class="cat-badge">${escH(CAT_LABELS[s.categorie]||s.categorie||'Sondage')}</span>
+        ${!ouvert?`<span class="sc-delai fin">Fin de ce sondage</span>`:(jours!==null?`<span class="sc-delai ${jours<=3?'urgent':''}">${jours>1?jours+' j restants':'Dernier jour'}</span>`:'')}
       </div>
-      <h3 style="margin:0 0 6px;font-size:15px;line-height:1.3;">${escH(s.titre)}</h3>
-      ${s.description?`<p style="font-size:12px;color:#555;margin:0 0 10px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${escH(s.description)}</p>`:''}
-      <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">🏛️ ${escH(s.createur_nom||'—')} · ${s.nb_questions||0} question(s)</div>
-      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);">
-        <span>👥 ${s.nb_reponses||0} participants</span><span>👁️ ${s.nb_vues||0} · ❤️ ${s.nb_reactions||0}</span>
-      </div>
+      <h3>${escH(s.titre)}</h3>
+      ${s.description?`<p class="sc-desc">${escH(s.description)}</p>`:''}
+      <div class="sc-meta">${escH(s.createur_nom||'—')} · ${s.nb_questions||0} question(s)${s.pays_aff?' · '+escH(s.pays_aff):''}</div>
+      <div class="sc-chiffres"><span>${s.nb_reponses||0} participants</span><span>${s.nb_vues||0} vues · ${s.nb_reactions||0} ❤</span></div>
+      ${repondu?'<div class="sc-repondu">✓ Vous avez répondu</div>':''}
       <div class="interact-bar" onclick="event.stopPropagation()">
-        <button class="ibtn" onclick="toggleRxnSond(${s.id},this)">❤️ ${s.nb_reactions||0}</button>
-        <button class="ibtn" onclick="toggleFavSond(${s.id},this)">⭐</button>
-        <button class="ibtn" onclick="openSond(${s.id})">💬 ${s.nb_commentaires||0}</button>
-        ${s.statut==='ouvert'?`<button class="ibtn" style="border-color:#2563EB;color:#2563EB;" onclick="openSond(${s.id})">📋 Participer</button>`:`<button class="ibtn" style="border-color:#9ca3af;color:#6b7280;cursor:default;" disabled>⏹️ Fin de ce sondage</button>`}
+        <button type="button" class="ibtn" aria-label="J'aime" onclick="toggleRxnSond(${s.id},this)">❤ ${s.nb_reactions||0}</button>
+        <button type="button" class="ibtn" aria-label="Ajouter aux favoris" onclick="toggleFavSond(${s.id},this)">⭐</button>
+        <button type="button" class="ibtn" aria-label="Commentaires" onclick="openSond(${s.id})">💬 ${s.nb_commentaires||0}</button>
+        ${ouvert&&!repondu?`<button type="button" class="ibtn principal" onclick="openSond(${s.id})">Participer</button>`:`<button type="button" class="ibtn principal" onclick="openSond(${s.id})">${ouvert?'Voir':'Résultats'}</button>`}
       </div>
-    </div>`;
+    </article>`;
   }).join('');
 }
 
@@ -533,8 +667,9 @@ async function chargerRepondants(){
 
 /* ── Mes sondages ── */
 async function loadMesSonds(){
-  if(!ME_SOND)return;
   const el=document.getElementById('mes-sonds-list');
+  if(!ME_SOND){ el.innerHTML=etatVide({titre:'Connectez-vous pour voir vos sondages.',texte:'Les Initiatives et comptes étatiques retrouvent ici les sondages qu\'ils ont créés.',bouton:'<a class="sd-btn-or" href="login.html">Se connecter</a>'}); return; }
+  if(!ROLES_CREATION.includes(ME_SOND.role)){ el.innerHTML=etatVide({titre:'Cet espace est réservé aux créateurs de sondages.',texte:'Les Initiatives et les comptes étatiques peuvent publier leurs propres consultations. Vous pouvez en revanche répondre à tous les sondages en cours.',bouton:'<button type="button" class="sd-btn-or" onclick="switchSond(\'cours\')">Voir les sondages en cours</button>'}); return; }
   try{
     const r=await api('GET','/sondages?mine=1');
     const sonds=r.sondages||[];

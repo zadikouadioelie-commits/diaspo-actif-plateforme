@@ -30946,6 +30946,20 @@ function sondageDiffusionLue(s) {
 }
 function sondageFinTexte(s) { const j = String(s.date_cloture || "").slice(0, 10); return /^\d{4}-\d{2}-\d{2}$/.test(j) ? j.split("-").reverse().join("/") : ""; }
 /* Annonce dans le fil d'actualité, au nom du créateur. Un seul envoi par période de publication (fil_post_id mis à jour). */
+/* Alerte « Être informé des prochains sondages » : une notification par abonné (jamais au créateur), au plus une par sondage et par période de publication. */
+async function sondageNotifierAlertes(sondageId, titre, createurId) {
+  try {
+    const abonnes = await db.prepare("SELECT user_id FROM sondage_alertes WHERE user_id <> ?").all(Number(createurId) || 0);
+    for (const a of abonnes) {
+      await db.prepare("INSERT INTO notifications (user_id, type, titre, contenu, data_json) VALUES (?,?,?,?,?)").run(
+        a.user_id, 'sondage_nouveau', 'Nouveau sondage publié',
+        `« ${String(titre || '').slice(0, 140)} » vient d'être publié. Votre avis compte : répondez en quelques minutes.`,
+        JSON.stringify({ sondage_id: sondageId, lien: '/sondage.html?id=' + sondageId })
+      );
+    }
+  } catch (e) { console.error('[sondageNotifierAlertes]', e.message); }
+}
+
 async function sondagePublierSurFil(s, user) {
   try {
     const nom = (await nomCompteAffichage(user.id)) || "Diaspo'Actif";
@@ -39596,14 +39610,30 @@ ${jsonLd}
        SONDAGES — MODULE ENRICHI
        ══════════════════════════════════════════════════════════════ */
 
+    /* ── GET/POST /api/sondages/alerte ── « Être informé des prochains sondages » (compte connecté) ── */
+    if (pathname === '/api/sondages/alerte' && (req.method === 'GET' || req.method === 'POST')) {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connectez-vous pour être informé des prochains sondages.' });
+      if (req.method === 'POST') {
+        const actif = !(body && (body.actif === false || body.actif === 0 || body.actif === '0'));
+        if (actif) await db.prepare("INSERT INTO sondage_alertes (user_id) VALUES (?) ON CONFLICT(user_id) DO NOTHING").run(me.id);
+        else await db.prepare("DELETE FROM sondage_alertes WHERE user_id=?").run(me.id);
+      }
+      const ligne = await db.prepare("SELECT id FROM sondage_alertes WHERE user_id=?").get(me.id);
+      return sendJSON(res, 200, { actif: !!ligne });
+    }
+
     /* ── GET /api/sondages ── */
     if (req.method === 'GET' && (pathname === '/api/sondages' || pathname.startsWith('/api/sondages?'))) {
       await sondageAutoCloture();
       const q = parsed.query || {};
       const mine = q.mine === '1';
       const me = await getCurrentUser(req);
+      const meIdListe = me ? Number(me.id) : 0;
       let sql = `SELECT s.*, u.nom AS createur_nom, u.photo_url AS createur_photo, u.da_id AS createur_da_id,
-        (SELECT COUNT(*) FROM sondage_questions sq WHERE sq.sondage_id=s.id) AS nb_questions
+        COALESCE(NULLIF(s.pays,''), u.pays) AS pays_aff,
+        (SELECT COUNT(*) FROM sondage_questions sq WHERE sq.sondage_id=s.id) AS nb_questions,
+        (CASE WHEN ${meIdListe} > 0 AND (EXISTS(SELECT 1 FROM sondage_reponses sr WHERE sr.sondage_id=s.id AND sr.user_id=${meIdListe})
+          OR EXISTS(SELECT 1 FROM sondage_repondants rp WHERE rp.sondage_id=s.id AND rp.user_id=${meIdListe})) THEN 1 ELSE 0 END) AS ai_repondu
         FROM sondages s LEFT JOIN users u ON u.id=s.createur_id WHERE 1=1`;
       const args = [];
       if (mine) {
@@ -39615,7 +39645,7 @@ ${jsonLd}
       }
       if (q.categorie) { sql += ' AND s.categorie=?'; args.push(q.categorie); }
       if (q.q) { sql += ' AND (s.titre LIKE ? OR s.description LIKE ?)'; args.push('%'+q.q+'%','%'+q.q+'%'); }
-      sql += " ORDER BY CASE WHEN s.statut='ouvert' THEN 0 ELSE 1 END, s.created_at DESC LIMIT 50";
+      sql += " ORDER BY CASE WHEN s.statut='ouvert' THEN 0 ELSE 1 END, s.created_at DESC LIMIT 200";
       const sondages_list = await db.prepare(sql).all(...args);
 
       return sendJSON(res, 200, { sondages: sondages_list });
@@ -39649,6 +39679,7 @@ ${jsonLd}
       }
       /* La publication dans le fil d'actualité (et les autres lieux) se règle dans « Diffusion » (étape suivante) : l'ancien envoi automatique
          visait une colonne inexistante (fil_posts.user_id) et ne fonctionnait pas. */
+      if (statut === 'ouvert') await sondageNotifierAlertes(sid, titre, me.id);
       return sendJSON(res, 201, { id: sid });
     }
 
@@ -39745,6 +39776,7 @@ ${jsonLd}
         .run(debut, fin, JSON.stringify(periodes.slice(-50)), periodes.length > 1 ? 1 : 0, sid);
       /* Diffusion choisie « Fil d'actualité » : nouvelle annonce à chaque nouvelle période de publication. */
       if (sondageDiffusionLue(s).fil) await sondagePublierSurFil({ ...s, date_cloture: fin }, { id: s.createur_id });
+      await sondageNotifierAlertes(sid, s.titre, s.createur_id);
       return sendJSON(res, 200, { message: periodes.length > 1 ? 'Sondage republié.' : 'Sondage publié.', periode });
     }
 
