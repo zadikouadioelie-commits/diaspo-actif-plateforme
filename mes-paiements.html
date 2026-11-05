@@ -88,6 +88,11 @@
       <p class="mp-sub">Vos adhésions aux associations et initiatives de Diaspo'Actif, avec l'historique de vos paiements et les reçus téléchargeables.</p>
       <div id="mp-adhesions-liste"><p class="mp-empty">Chargement…</p></div>
     </div>
+    <div class="mp-card" style="margin-top:20px;" id="mp-fiches-card" hidden>
+      <h4>🪪 Mes informations d'adhérent</h4>
+      <p class="mp-sub">Les informations que chaque association détient sur vous (jamais publiques), l'état de votre carte de membre, et un moyen de demander une correction.</p>
+      <div id="mp-fiches-liste"><p class="mp-empty">Chargement…</p></div>
+    </div>
   </main>
 
   <footer class="footer"><span id="footer-text">Diaspo'Actif · Du Sud au Nord · 2026</span></footer>
@@ -209,6 +214,39 @@
   }
   function escHtmlMP(s){ const d = document.createElement('div'); d.textContent = s||''; return d.innerHTML; }
   chargerMesAdhesions();
+
+  /* Mes informations d'adhérent (2026-11-05) : consultation de ma fiche + demande de rectification. */
+  const CARTE_MP = { not_edited: 'Non éditée', edited: 'Éditée', delivered: 'Livrée' };
+  const fmtMP = d => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(d||'')); return m ? `${m[3]}/${m[2]}/${m[1]}` : ''; };
+  async function chargerMesFiches() {
+    let fiches = [];
+    try { fiches = (await api('GET', '/mes-fiches-adherent')).fiches || []; } catch(e) { return; }
+    if (!fiches.length) return;
+    document.getElementById('mp-fiches-card').hidden = false;
+    document.getElementById('mp-fiches-liste').innerHTML = fiches.map(f => {
+      const l = (k, v) => v ? `<div style="display:flex;gap:8px;font-size:13px;"><span style="color:var(--muted,#888);min-width:130px;">${k}</span><span>${escHtmlMP(v)}</span></div>` : '';
+      return `<div class="mp-carte-row" style="flex-direction:column;align-items:stretch;gap:6px;">
+        <strong>${escHtmlMP(f.initiative)}</strong>
+        ${l("N° d'adhérent", f.numero)}${l('Nom', ((f.prenom||'')+' '+(f.nom||'')).trim())}${l('Fonction', f.fonction)}${l('Année de naissance', f.annee_naissance)}${l('E-mail', f.email)}${l('Téléphone', f.telephone)}${l('Adresse', f.adresse)}${l('Ville', f.ville)}
+        ${l("Date d'adhésion", fmtMP(f.date_adhesion))}${l("Valable jusqu'au", fmtMP(f.date_expiration))}${l('Carte de membre', CARTE_MP[f.card_status] || '')}${f.card_delivered_at ? l('Carte remise le', fmtMP(f.card_delivered_at)) : ''}
+        <div style="margin-top:6px;">${f.rectifications_ouvertes ? `<span style="font-size:12.5px;color:#b45309;">🟠 ${f.rectifications_ouvertes} demande${f.rectifications_ouvertes>1?'s':''} de correction en cours de traitement</span>` : `<button class="mp-btn-sm bleu" onclick="window._mpRectifier(${f.id})">✏️ Demander une correction</button>`}</div>
+        <div id="mp-rect-${f.id}"></div></div>`;
+    }).join('');
+  }
+  window._mpRectifier = function(id) {
+    const z = document.getElementById('mp-rect-' + id);
+    z.innerHTML = `<label for="mp-rect-t-${id}" style="font-size:12px;font-weight:700;">Que faut-il corriger ?</label>
+      <textarea id="mp-rect-t-${id}" rows="3" maxlength="1000" style="width:100%;margin:4px 0;font:inherit;padding:8px;border:1.5px solid var(--border);border-radius:8px;background:var(--card);color:inherit;"></textarea>
+      <div id="mp-rect-e-${id}" style="font-size:12px;color:#dc2626;min-height:16px;"></div>
+      <button class="mp-btn-sm bleu" onclick="window._mpEnvoyerRect(${id})">Envoyer</button> <button class="mp-btn-sm" style="color:var(--muted);border-color:var(--border);" onclick="document.getElementById('mp-rect-${id}').innerHTML=''">Annuler</button>`;
+    document.getElementById('mp-rect-t-' + id).focus();
+  };
+  window._mpEnvoyerRect = async function(id) {
+    const t = document.getElementById('mp-rect-t-' + id).value.trim();
+    try { await api('POST', `/adhesion-membres/${id}/rectification`, { message: t }); await chargerMesFiches(); }
+    catch(e) { document.getElementById('mp-rect-e-' + id).textContent = e.message || 'Envoi impossible.'; }
+  };
+  chargerMesFiches();
 
   chargerMoyens();
 })();

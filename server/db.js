@@ -2561,9 +2561,14 @@ const MIGRATIONS = [
   // appelée une seconde fois après la création de cette table (voir plus bas).
   ["adhesion_membres", "reponses_json TEXT DEFAULT '{}'"],
   // Dossier des adhérents (2026-11-05, demande explicite) : date de naissance + statut de la carte
-  // de membre physique (non_creee | creee | livree). Miroir dans pg-init.js (COLONNES_MIGRATION).
+  // de membre physique (not_edited | edited | delivered). Miroir dans pg-init.js (COLONNES_MIGRATION).
   ["adhesion_membres", "date_naissance TEXT"],
-  ["adhesion_membres", "statut_carte TEXT DEFAULT 'non_creee'"],
+  ["adhesion_membres", "card_status TEXT DEFAULT 'not_edited'"],
+  ["adhesion_membres", "card_edited_at TEXT"],
+  ["adhesion_membres", "card_delivered_at TEXT"],
+  ["adhesion_membres", "card_updated_by INTEGER"],
+  ["adhesion_membres", "numero_adherent TEXT"],
+  ["adhesion_membres", "fonction TEXT"],
   // Module Paramètres du compte — taxonomie "domaine d'activité" unifiée (2026-09-04) :
   // un domaine (liste fermée avec icône, assets/domaines-activite.js) + jusqu'à 2 sous-domaines
   // en texte libre, partagée entre comptes individuels (users) et initiatives, remplaçant à
@@ -3415,6 +3420,19 @@ function appliquerMigrations() {
   }
 }
 appliquerMigrations();
+
+/* Statut de la carte : l'ancien champ `statut_carte` (non_creee / creee / livree, commit 38bb2fb) est remplacé par
+   `card_status` (not_edited / edited / delivered) + historique. Recopie UNIQUE des valeurs déjà saisies, puis remise
+   de l'ancien champ à « non_creee » pour qu'elle ne se rejoue jamais (une carte remise volontairement à « non éditée »
+   ne doit pas être ressuscitée au redémarrage suivant). Sans effet si l'ancienne colonne n'existe pas. */
+(function recopierStatutCarte() {
+  try {
+    const cols = db.prepare("PRAGMA table_info(adhesion_membres)").all().map(r => r.name);
+    if (!cols.includes('statut_carte') || !cols.includes('card_status')) return;
+    db.exec(`UPDATE adhesion_membres SET card_status = CASE statut_carte WHEN 'creee' THEN 'edited' ELSE 'delivered' END, statut_carte = 'non_creee'
+             WHERE statut_carte IN ('creee','livree') AND (card_status IS NULL OR card_status = 'not_edited')`);
+  } catch (e) { /* table absente au tout premier démarrage : rien à recopier */ }
+})();
 
 /* =====================================================================
    TRUST SCORE · RÉACTIVITÉ · ABSENCE · SIGNALEMENTS
@@ -7770,6 +7788,35 @@ db.exec(`
       FOREIGN KEY(linked_user_id) REFERENCES users(id) ON DELETE SET NULL
     );
 
+    /* Historique des changements de statut de la carte de membre (2026-11-05, cahier des charges « Gestion des adhérents »). */
+    CREATE TABLE IF NOT EXISTS adhesion_cartes_historique (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      membre_id       INTEGER NOT NULL,
+      initiative_id   INTEGER NOT NULL,
+      ancien_statut   TEXT,
+      nouveau_statut  TEXT NOT NULL,
+      motif           TEXT,
+      acteur_id       INTEGER,
+      acteur_nom      TEXT,
+      created_at      TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY(membre_id) REFERENCES adhesion_membres(id) ON DELETE CASCADE
+    );
+
+    /* Demandes de rectification envoyées par un adhérent sur ses propres informations. */
+    CREATE TABLE IF NOT EXISTS adhesion_rectifications (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      membre_id       INTEGER NOT NULL,
+      initiative_id   INTEGER NOT NULL,
+      user_id         INTEGER,
+      message         TEXT NOT NULL,
+      statut          TEXT NOT NULL DEFAULT 'ouverte',
+      reponse         TEXT,
+      traite_par      INTEGER,
+      traite_at       TEXT,
+      created_at      TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY(membre_id) REFERENCES adhesion_membres(id) ON DELETE CASCADE
+    );
+
     CREATE TABLE IF NOT EXISTS adhesion_paiements (
       id                  INTEGER PRIMARY KEY AUTOINCREMENT,
       membre_id           INTEGER NOT NULL,
@@ -10035,7 +10082,12 @@ db.exec(`
       relances_jours_json TEXT,
       relances_canal      TEXT,
       date_naissance      TEXT,
-      statut_carte        TEXT DEFAULT 'non_creee',
+      card_status        TEXT DEFAULT 'not_edited',
+      card_edited_at      TEXT,
+      card_delivered_at   TEXT,
+      card_updated_by     INTEGER,
+      numero_adherent     TEXT,
+      fonction            TEXT,
       FOREIGN KEY(formule_id) REFERENCES adhesion_formules(id) ON DELETE CASCADE,
       FOREIGN KEY(initiative_id) REFERENCES initiatives(id) ON DELETE CASCADE,
       FOREIGN KEY(linked_user_id) REFERENCES users(id) ON DELETE SET NULL

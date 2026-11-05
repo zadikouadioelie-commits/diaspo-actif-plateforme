@@ -1277,7 +1277,12 @@ const COLONNES_MIGRATION = [
     ['adhesion_membres', 'reponses_json', "TEXT DEFAULT '{}'"],
     // Dossier des adhérents (2026-11-05) : date de naissance + statut de la carte de membre (miroir de db.js)
     ['adhesion_membres', 'date_naissance', 'TEXT'],
-    ['adhesion_membres', 'statut_carte', "TEXT DEFAULT 'non_creee'"],
+    ['adhesion_membres', 'card_status', "TEXT DEFAULT 'not_edited'"],
+    ['adhesion_membres', 'card_edited_at', 'TEXT'],
+    ['adhesion_membres', 'card_delivered_at', 'TEXT'],
+    ['adhesion_membres', 'card_updated_by', 'INTEGER'],
+    ['adhesion_membres', 'numero_adherent', 'TEXT'],
+    ['adhesion_membres', 'fonction', 'TEXT'],
     // Module Adhésions — incrément 6 (2026-08-07) : sync avec le module Affiliations (miroir des ALTER db.js)
     ['initiative_membres', 'formule_id', 'INTEGER'],
     ['initiative_membres', 'mode_adhesion', 'TEXT'],
@@ -1388,6 +1393,13 @@ async function migratePg(pool) {
       console.error(`[pg-init migration] ${table}.${col}:`, e.message);
     }
   }
+
+  /* ── Statut de la carte : recopie unique statut_carte → card_status (voir server/db.js, recopierStatutCarte) ──
+     Sans effet (erreur ignorée) si l'ancienne colonne n'a jamais existé sur cette base. */
+  try {
+    await pool.query(`UPDATE adhesion_membres SET card_status = CASE statut_carte WHEN 'creee' THEN 'edited' ELSE 'delivered' END, statut_carte = 'non_creee'
+                      WHERE statut_carte IN ('creee','livree') AND (card_status IS NULL OR card_status = 'not_edited')`);
+  } catch (e) { /* colonne statut_carte absente : rien à recopier */ }
 
   /* ── Nettoyage demandes_contact (2026-08-29) ──
      Bug de parsing dans colonnesDeclareesParTable() (voir le commentaire sur le CREATE TABLE

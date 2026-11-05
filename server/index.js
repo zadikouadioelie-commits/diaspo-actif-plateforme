@@ -7475,12 +7475,47 @@ function computeAdhesionStatut(m) {
 /* Filtres combinables du registre des membres — factorisé (incrément 3, 2026-08-07) pour
    être réutilisé tel quel par la route d'emailing en masse, qui doit cibler exactement les
    mêmes destinataires que ce que l'association voit affiché à l'écran. */
+/* Numéro d'adhérent : celui saisi/importé (ex. « A1 »), sinon un numéro stable dérivé de l'identifiant de la fiche. */
+function adhNumeroAffiche(m) { return m.numero_adherent || `ADH-${String(m.id).padStart(5, '0')}`; }
+/* Statut de paiement de la cotisation, déduit des données déjà enregistrées (jamais saisi en double). */
+function adhStatutPaiement(m) {
+  if (m.mode_paiement === 'offert') return 'offert';
+  if (Number(m.montant_paye) > 0 || (m.mode_paiement && m.mode_paiement !== 'offert')) return 'paye';
+  return 'a_verifier';
+}
+/* Complète chaque fiche avec ce que le compte Diaspo'Actif lié contient déjà (photo, ville, poste dans l'initiative) —
+   réutilisé et non dupliqué — et avec les champs calculés (numéro, identifiant de carte, année de cotisation…). */
+async function adhEnrichirMembres(initiativeId, rows) {
+  const ids = [...new Set(rows.filter(m => m.linked_user_id).map(m => Number(m.linked_user_id)))];
+  const users = new Map(), fonctions = new Map();
+  for (let i = 0; i < ids.length; i += 200) {
+    const lot = ids.slice(i, i + 200), ph = lot.map(() => '?').join(',');
+    (await db.prepare(`SELECT id, photo_url, ville, pays FROM users WHERE id IN (${ph})`).all(...lot)).forEach(u => users.set(Number(u.id), u));
+    (await db.prepare(`SELECT user_id, fonction FROM initiative_membres WHERE initiative_id=? AND statut='accepte' AND user_id IN (${ph})`).all(initiativeId, ...lot)).forEach(f => fonctions.set(Number(f.user_id), f.fonction));
+  }
+  return rows.map(m => {
+    const u = m.linked_user_id ? users.get(Number(m.linked_user_id)) : null;
+    const numero = adhNumeroAffiche(m);
+    const dateRef = m.date_adhesion || m.created_at || '';
+    return { ...m,
+      numero_affiche: numero, card_id: `CARTE-${numero}`, card_status: m.card_status || 'not_edited',
+      photo: m.photo_url || u?.photo_url || null,
+      ville: m.ville || u?.ville || null, pays: m.pays || u?.pays || null,
+      fonction: m.fonction || (m.linked_user_id ? fonctions.get(Number(m.linked_user_id)) : null) || null,
+      annee_naissance: m.date_naissance ? String(m.date_naissance).slice(0, 4) : null,
+      annee_cotisation: m.date_expiration && m.date_adhesion && new Date(m.date_expiration).getFullYear() !== new Date(m.date_adhesion).getFullYear()
+        ? `${String(m.date_adhesion).slice(0, 4)}-${String(m.date_expiration).slice(0, 4)}` : String(dateRef).slice(0, 4),
+      statut_paiement: adhStatutPaiement(m) };
+  });
+}
+
 async function chargerEtFiltrerAdhesionMembres(initiativeId, query) {
   let rows = await db.prepare(`SELECT * FROM adhesion_membres WHERE initiative_id=? ORDER BY created_at DESC`).all(initiativeId);
   rows = rows.map(m => ({ ...m, statut: computeAdhesionStatut(m), badges_json: JSON.parse(m.badges_json || '[]') }));
+  rows = await adhEnrichirMembres(initiativeId, rows);
   const statutFiltre = query?.statut;
   const formuleFiltre = query?.formule_id;
-  if (query?.statut_carte) rows = rows.filter(m => (m.statut_carte || 'non_creee') === query.statut_carte);
+  if (query?.card_status) rows = rows.filter(m => (m.card_status || 'not_edited') === query.card_status);
   if (statutFiltre) rows = rows.filter(m => m.statut === statutFiltre);
   if (formuleFiltre) rows = rows.filter(m => Number(m.formule_id) === Number(formuleFiltre));
   /* Filtres combinables supplémentaires (cahier des charges 2026-08-04, points 9-10) : origine
@@ -7497,7 +7532,8 @@ async function chargerEtFiltrerAdhesionMembres(initiativeId, query) {
     rows = rows.filter(m =>
       (m.nom || '').toLowerCase().includes(q) || (m.prenom || '').toLowerCase().includes(q) ||
       (m.email || '').toLowerCase().includes(q) || (m.telephone || '').toLowerCase().includes(q) ||
-      (m.ville || '').toLowerCase().includes(q) ||
+      (m.ville || '').toLowerCase().includes(q) || (m.numero_affiche || '').toLowerCase().includes(q) ||
+      `${m.prenom || ''} ${m.nom || ''}`.toLowerCase().includes(q) ||
       `adh-${initiativeId}-${m.id}`.toLowerCase().includes(q));
   }
   return rows;
@@ -7568,8 +7604,12 @@ route("POST", "/api/initiatives/:id/adhesion-membres", async (req, res, params, 
   /* Dossier des adhérents (2026-11-05) : date de naissance et statut de la carte de membre. */
   const naissanceVal = adhImportNormaliserDate(body.date_naissance, { naissance: true });
   if (naissanceVal === null) return sendJSON(res, 400, { error: "Date de naissance illisible (format JJ/MM/AAAA)." });
-  const carteVal = adhNormaliserStatutCarte(body.statut_carte);
-  if (carteVal === null) return sendJSON(res, 400, { error: "Statut de carte invalide (non créée, créée ou livrée)." });
+  const carteVal = adhNormaliserStatutCarte(body.card_status);
+  if (carteVal === null) return sendJSON(res, 400, { error: "Statut de carte invalide (non éditée, éditée ou livrée)." });
+  const numeroVal = String(body.numero_adherent || '').trim().slice(0, 40) || null;
+  if (numeroVal && await db.prepare("SELECT id FROM adhesion_membres WHERE initiative_id=? AND LOWER(numero_adherent)=LOWER(?)").get(params.id, numeroVal))
+    return sendJSON(res, 400, { error: `Le numéro d'adhérent « ${numeroVal} » est déjà utilisé.` });
+  const fonctionVal = String(body.fonction || '').trim().slice(0, 120) || null;
   const formule = await db.prepare("SELECT * FROM adhesion_formules WHERE id=? AND initiative_id=?").get(formule_id, params.id);
   if (!formule) return sendJSON(res, 400, { error: "Formule invalide." });
   /* Rattachement à un compte Diaspo'Actif existant (cahier des charges 2026-08-04, point 8) —
@@ -7615,11 +7655,12 @@ route("POST", "/api/initiatives/:id/adhesion-membres", async (req, res, params, 
     if (sanitized) { relancesJoursVal = JSON.stringify(sanitized.jours); relancesCanalVal = sanitized.canal; }
   }
   const id = (await db.prepare(`
-    INSERT INTO adhesion_membres (formule_id, initiative_id, linked_user_id, nom, prenom, email, telephone, adresse, pays, ville, observations, statut, date_adhesion, date_expiration, relances_jours_json, relances_canal, date_naissance, statut_carte)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    INSERT INTO adhesion_membres (formule_id, initiative_id, linked_user_id, nom, prenom, email, telephone, adresse, pays, ville, observations, statut, date_adhesion, date_expiration, relances_jours_json, relances_canal, date_naissance, card_status, numero_adherent, fonction)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
   `).run(formule_id, params.id, linkedId, nom.trim(), prenom || null, email || null, telephone || null,
     adresse || null, pays || null, ville || null, observations || null, statutInitial,
-    dateAdhesionVal, dateExpirationVal, relancesJoursVal, relancesCanalVal, naissanceVal || null, carteVal)).lastInsertRowid;
+    dateAdhesionVal, dateExpirationVal, relancesJoursVal, relancesCanalVal, naissanceVal || null, carteVal, numeroVal, fonctionVal)).lastInsertRowid;
+  await adhHistoriqueCarteInitial(params.id, id, carteVal, user, 'Fiche créée à la main');
   journaliserAdhesion(params.id, id, 'creation', user, `Fiche créée manuellement par l'association — « ${formule.nom} ».`);
   /* Norme des prochains ajouts manuels (2026-10-09, demande explicite) : posée une seule fois,
      la première fois qu'un ajout manuel précise ces réglages — jamais réécrite ensuite, même si
@@ -7648,18 +7689,137 @@ route("POST", "/api/initiatives/:id/adhesion-membres", async (req, res, params, 
 const ADH_IMPORT_MAX = 500;
 const ADH_IMPORT_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
-/* Statut de la carte de membre physique : non_creee | creee | livree. Accepte les libellés usuels
+/* Mode de règlement d'un fichier → valeur stockée. '' si absent ou inconnu (jamais inventé). */
+function adhNormaliserModePaiement(v) {
+  const s = String(v == null ? '' : v).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z]/g, '');
+  if (!s) return '';
+  if (/helloasso/.test(s)) return 'helloasso';
+  if (/espece|cash|liquide/.test(s)) return 'especes';
+  if (/offert|gratuit|invite/.test(s)) return 'offert';
+  if (/cheque/.test(s)) return 'cheque';
+  if (/virement/.test(s)) return 'virement';
+  if (/paypal/.test(s)) return 'paypal';
+  if (/carte|cb|stripe/.test(s)) return 'carte';
+  return '';
+}
+/* Téléphone d'un fichier : séparateurs unifiés (« 09,95,46,42,92 » → « 09 95 46 42 92 »), « .0 » d'un nombre Excel retiré. */
+function adhNormaliserTelephone(v) {
+  let t = String(v == null ? '' : v).trim().replace(/\.0+$/, '');
+  if (!t) return '';
+  if (/^[\d\s.,;\-]+$/.test(t)) { const c = t.replace(/\D/g, ''); if (c.length === 10) return c.replace(/(\d\d)(?=\d)/g, '$1 ').trim(); return c; }
+  return t;
+}
+const ADH_ORDRE_CARTE = { not_edited: 0, edited: 1, delivered: 2 };
+const ADH_LIB_CARTE = { not_edited: 'Non éditée', edited: 'Éditée', delivered: 'Livrée' };
+async function adhHistoriqueCarteInitial(initiativeId, membreId, statut, acteur, motif) {
+  try {
+    await db.prepare(`INSERT INTO adhesion_cartes_historique (membre_id, initiative_id, ancien_statut, nouveau_statut, motif, acteur_id, acteur_nom) VALUES (?,?,?,?,?,?,?)`)
+      .run(membreId, initiativeId, null, statut, motif || null, acteur?.id || null, acteur ? `${acteur.prenom || ''} ${acteur.nom || ''}`.trim() : null);
+  } catch (e) { console.error('[adhesion-carte-historique]', e.message); }
+}
+/* Droit d'agir sur une fiche : propriétaire de l'initiative ou administrateur. */
+async function adhFicheAutorisee(req, res, membreId) {
+  const user = await getCurrentUser(req);
+  if (!user) { sendJSON(res, 401, { error: "Connexion requise." }); return null; }
+  const m = await db.prepare(`SELECT m.*, i.owner_user_id, i.nom AS init_nom FROM adhesion_membres m JOIN initiatives i ON i.id=m.initiative_id WHERE m.id=?`).get(membreId);
+  if (!m) { sendJSON(res, 404, { error: "Membre introuvable." }); return null; }
+  if (user.role !== 'administrateur' && Number(m.owner_user_id) !== Number(user.id)) { sendJSON(res, 403, { error: "Réservé au responsable de l'initiative." }); return null; }
+  return { user, m };
+}
+
+/* Changement de statut de la carte (trois valeurs : not_edited | edited | delivered).
+   « Livrée » exige une confirmation explicite ; revenir à un statut antérieur exige un motif ; tout est historisé. */
+route("POST", "/api/adhesion-membres/:id/carte", async (req, res, params, body) => {
+  const a = await adhFicheAutorisee(req, res, params.id); if (!a) return;
+  const { user, m } = a;
+  if (!(await exigerPremium(user, res, "adhesions"))) return;
+  const nouveau = String(body?.card_status || '');
+  if (!(nouveau in ADH_ORDRE_CARTE)) return sendJSON(res, 400, { error: "Statut de carte invalide (not_edited, edited ou delivered)." });
+  const ancien = m.card_status || 'not_edited';
+  if (nouveau === ancien) return sendJSON(res, 200, { ok: true, inchange: true, card_status: ancien });
+  const recul = ADH_ORDRE_CARTE[nouveau] < ADH_ORDRE_CARTE[ancien];
+  const motif = String(body?.motif || '').trim().slice(0, 300);
+  if (recul && motif.length < 3) return sendJSON(res, 400, { error: "Un motif est obligatoire pour revenir à un statut antérieur.", motif_requis: true });
+  if (nouveau === 'delivered' && body?.confirme !== true) return sendJSON(res, 400, { error: "Confirmez la remise de la carte à l'adhérent.", confirmation_requise: true });
+  const maintenant = new Date().toISOString().slice(0, 19).replace('T', ' ');
+  let edite = m.card_edited_at || null, livre = m.card_delivered_at || null;
+  if (nouveau === 'not_edited') { edite = null; livre = null; }
+  else if (nouveau === 'edited') { edite = edite || maintenant; livre = null; }
+  else { edite = edite || maintenant; livre = maintenant; }
+  await db.prepare(`UPDATE adhesion_membres SET card_status=?, card_edited_at=?, card_delivered_at=?, card_updated_by=?, updated_at=datetime('now') WHERE id=?`)
+    .run(nouveau, edite, livre, user.id, m.id);
+  await db.prepare(`INSERT INTO adhesion_cartes_historique (membre_id, initiative_id, ancien_statut, nouveau_statut, motif, acteur_id, acteur_nom) VALUES (?,?,?,?,?,?,?)`)
+    .run(m.id, m.initiative_id, ancien, nouveau, motif || null, user.id, `${user.prenom || ''} ${user.nom || ''}`.trim());
+  journaliserAdhesion(m.initiative_id, m.id, 'modification', user, `Carte de membre : ${ADH_LIB_CARTE[ancien]} → ${ADH_LIB_CARTE[nouveau]}${motif ? ` (motif : ${motif})` : ''}.`);
+  sendJSON(res, 200, { ok: true, card_status: nouveau, card_edited_at: edite, card_delivered_at: livre, card_updated_by: `${user.prenom || ''} ${user.nom || ''}`.trim() });
+});
+
+/* Fiche détaillée : identité complète, carte (dates, responsable), historique de carte, journal, demandes de rectification. */
+route("GET", "/api/adhesion-membres/:id/fiche", async (req, res, params) => {
+  const a = await adhFicheAutorisee(req, res, params.id); if (!a) return;
+  const { m } = a;
+  const [fiche] = await adhEnrichirMembres(m.initiative_id, [{ ...m, statut: computeAdhesionStatut(m) }]);
+  const formule = await db.prepare("SELECT nom, devise FROM adhesion_formules WHERE id=?").get(m.formule_id);
+  let responsable = null;
+  if (m.card_updated_by) { const u = await db.prepare("SELECT prenom, nom FROM users WHERE id=?").get(m.card_updated_by); responsable = u ? `${u.prenom || ''} ${u.nom || ''}`.trim() : null; }
+  const cartes = await db.prepare("SELECT ancien_statut, nouveau_statut, motif, acteur_nom, created_at FROM adhesion_cartes_historique WHERE membre_id=? ORDER BY id DESC").all(m.id);
+  const journal = await db.prepare("SELECT action, details, acteur_nom, created_at FROM adhesion_audit_log WHERE membre_id=? ORDER BY id DESC LIMIT 100").all(m.id);
+  const rectifications = await db.prepare("SELECT id, message, statut, reponse, created_at, traite_at FROM adhesion_rectifications WHERE membre_id=? ORDER BY id DESC").all(m.id);
+  delete fiche.owner_user_id; delete fiche.init_nom;
+  sendJSON(res, 200, { fiche, formule, responsable_carte: responsable, historique_carte: cartes, journal, rectifications });
+});
+
+/* L'adhérent consulte ses propres informations (compte lié à une fiche). */
+route("GET", "/api/mes-fiches-adherent", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const rows = await db.prepare(`SELECT m.*, i.nom AS init_nom FROM adhesion_membres m JOIN initiatives i ON i.id=m.initiative_id WHERE m.linked_user_id=? ORDER BY m.created_at DESC`).all(user.id);
+  const sortie = [];
+  for (const m of rows) {
+    const [f] = await adhEnrichirMembres(m.initiative_id, [{ ...m, statut: computeAdhesionStatut(m) }]);
+    const ouvertes = await db.prepare("SELECT COUNT(*) AS n FROM adhesion_rectifications WHERE membre_id=? AND statut='ouverte'").get(m.id);
+    sortie.push({ id: f.id, initiative_id: f.initiative_id, initiative: m.init_nom, nom: f.nom, prenom: f.prenom, email: f.email, telephone: f.telephone, adresse: f.adresse,
+      ville: f.ville, pays: f.pays, annee_naissance: f.annee_naissance, numero: f.numero_affiche, fonction: f.fonction, statut: f.statut, date_adhesion: f.date_adhesion,
+      date_expiration: f.date_expiration, annee_cotisation: f.annee_cotisation, statut_paiement: f.statut_paiement, card_status: f.card_status,
+      card_edited_at: f.card_edited_at, card_delivered_at: f.card_delivered_at, rectifications_ouvertes: Number(ouvertes?.n || 0) });
+  }
+  sendJSON(res, 200, { fiches: sortie });
+});
+route("POST", "/api/adhesion-membres/:id/rectification", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const m = await db.prepare(`SELECT m.*, i.owner_user_id, i.nom AS init_nom FROM adhesion_membres m JOIN initiatives i ON i.id=m.initiative_id WHERE m.id=?`).get(params.id);
+  if (!m || Number(m.linked_user_id) !== Number(user.id)) return sendJSON(res, 404, { error: "Fiche introuvable." });
+  const message = String(body?.message || '').trim().slice(0, 1000);
+  if (message.length < 5) return sendJSON(res, 400, { error: "Décrivez en quelques mots ce qu'il faut corriger." });
+  await db.prepare(`INSERT INTO adhesion_rectifications (membre_id, initiative_id, user_id, message) VALUES (?,?,?,?)`).run(m.id, m.initiative_id, user.id, message);
+  journaliserAdhesion(m.initiative_id, m.id, 'modification', user, "Demande de rectification envoyée par l'adhérent.");
+  try { creerNotif(m.owner_user_id, "adhesion_rectification", "Demande de rectification", `${user.prenom || ''} ${user.nom || ''} demande la correction de ses informations d'adhérent (${m.init_nom}).`.trim(), { membre_id: m.id }); } catch (e) {}
+  sendJSON(res, 201, { ok: true });
+});
+route("POST", "/api/adhesion-rectifications/:id/traiter", async (req, res, params, body) => {
+  const r = await db.prepare("SELECT * FROM adhesion_rectifications WHERE id=?").get(params.id);
+  if (!r) return sendJSON(res, 404, { error: "Demande introuvable." });
+  const a = await adhFicheAutorisee(req, res, r.membre_id); if (!a) return;
+  await db.prepare("UPDATE adhesion_rectifications SET statut='traitee', reponse=?, traite_par=?, traite_at=datetime('now') WHERE id=?")
+    .run(String(body?.reponse || '').trim().slice(0, 500) || null, a.user.id, r.id);
+  journaliserAdhesion(a.m.initiative_id, a.m.id, 'modification', a.user, "Demande de rectification marquée comme traitée.");
+  if (r.user_id) { try { creerNotif(r.user_id, "adhesion_rectification", "Demande de rectification traitée", `Votre demande de rectification (${a.m.init_nom}) a été traitée.`, { membre_id: a.m.id }); } catch (e) {} }
+  sendJSON(res, 200, { ok: true });
+});
+
+/* Statut de la carte de membre physique : not_edited | edited | delivered. Accepte les libellés usuels
    d'un fichier (« carte créée », « livrée », « non créée », « pas encore », « remise »…). '' → valeur par défaut
-   « non_creee » ; null → libellé non reconnu. */
-const ADH_STATUTS_CARTE = ['non_creee', 'creee', 'livree'];
+   « not_edited » ; null → libellé non reconnu. */
+const ADH_STATUTS_CARTE = ['not_edited', 'edited', 'delivered'];
 function adhNormaliserStatutCarte(v) {
   const s = String(v == null ? '' : v).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
-  if (!s) return 'non_creee';
+  if (!s) return 'not_edited';
   if (ADH_STATUTS_CARTE.includes(s)) return s;
-  if (/(non|pas|aucune?)\s*(encore\s*)?(cree|concu|faite|fabriq|imprim|realis)|a\s*creer|a\s*faire|en\s*attente|^non$|^no$/.test(s)) return 'non_creee';
-  if (/(non|pas)\s*(encore\s*)?(livr|remis|envoy|expedi)/.test(s)) return 'creee';
-  if (/livr|remis|envoy|expedi|recu|distribu/.test(s)) return 'livree';
-  if (/cre|concu|fait|fabriq|imprim|realis|pret|oui|^ok$/.test(s)) return 'creee';
+  if (/(non|pas|aucune?)\s*(encore\s*)?(cree|edit|concu|faite|fabriq|imprim|realis)|a\s*creer|a\s*faire|en\s*attente|^non$|^no$/.test(s)) return 'not_edited';
+  if (/(non|pas)\s*(encore\s*)?(livr|remis|envoy|expedi)/.test(s)) return 'edited';
+  if (/livr|remis|envoy|expedi|recu|distribu/.test(s)) return 'delivered';
+  if (/cre|edit|concu|fait|fabriq|imprim|realis|pret|oui|^ok$/.test(s)) return 'edited';
   return null;
 }
 
@@ -7751,7 +7911,14 @@ route("POST", "/api/initiatives/:id/adhesion-import", async (req, res, params, b
   const res_ = lignes.map((l, i) => {
     const r = { ligne: Number(l?.ligne) || i + 1, nom: net(l?.nom, 120), prenom: net(l?.prenom, 120), email: net(l?.email, 200).toLowerCase(),
       telephone: net(l?.telephone, 40), adresse: net(l?.adresse, 300), pays: net(l?.pays, 100), ville: net(l?.ville, 100), observations: net(l?.observations, 500),
-      statut: 'ok', motif: '', date: '', naissance: '', carte: 'non_creee' };
+      statut: 'ok', motif: '', date: '', naissance: '', carte: 'not_edited',
+      numero: net(l?.numero_adherent, 40), fonction: net(l?.fonction, 120), mode_paiement: adhNormaliserModePaiement(l?.mode_paiement) };
+    r.telephone = adhNormaliserTelephone(r.telephone);
+    /* Ville et pays déduits d'une adresse française (« … 31830 Plaisance du touch ») quand ils ne sont pas fournis. */
+    if (r.adresse && (!r.ville || !r.pays)) {
+      const cp = r.adresse.match(/\b(\d{5})\s+([^\d,;]+?)\s*$/);
+      if (cp) { if (!r.ville) r.ville = cp[2].trim(); if (!r.pays) r.pays = 'France'; }
+    }
     if (!r.nom) { r.statut = 'erreur'; r.motif = 'Nom manquant'; return r; }
     if (r.email && !ADH_IMPORT_EMAIL_RE.test(r.email)) { r.statut = 'erreur'; r.motif = 'E-mail invalide'; return r; }
     const d = adhImportNormaliserDate(l?.date_adhesion);
@@ -7760,9 +7927,13 @@ route("POST", "/api/initiatives/:id/adhesion-import", async (req, res, params, b
     const nais = adhImportNormaliserDate(l?.date_naissance, { naissance: true });
     if (nais === null) { r.statut = 'erreur'; r.motif = 'Date de naissance illisible'; return r; }
     r.naissance = nais;
-    const carte = adhNormaliserStatutCarte(l?.statut_carte);
+    const carte = adhNormaliserStatutCarte(l?.card_status);
     if (carte === null) { r.statut = 'erreur'; r.motif = 'Statut de carte non reconnu (créée, livrée, non créée)'; return r; }
     r.carte = carte;
+    if (r.numero) {
+      if (vus.has('n:' + r.numero.toLowerCase())) { r.statut = 'doublon_fichier'; r.motif = `Numéro d'adhérent « ${r.numero} » déjà présent plus haut`; return r; }
+      vus.add('n:' + r.numero.toLowerCase());
+    }
     r.cle = r.email || `${r.nom.toLowerCase()}|${r.prenom.toLowerCase()}`;
     if (vus.has(r.cle)) { r.statut = 'doublon_fichier'; r.motif = 'Déjà présent plus haut dans le fichier'; return r; }
     vus.add(r.cle);
@@ -7777,12 +7948,14 @@ route("POST", "/api/initiatives/:id/adhesion-import", async (req, res, params, b
     const rows = await db.prepare(`SELECT u.id, LOWER(u.email) AS e FROM users u WHERE LOWER(u.email) IN (${lot.map(() => '?').join(',')}) AND ${ADS_COMPTES_REELS}`).all(...lot);
     rows.forEach(c => comptes.set(c.e, Number(c.id)));
   }
+  const numerosPris = new Set((await db.prepare("SELECT LOWER(numero_adherent) AS n FROM adhesion_membres WHERE initiative_id=? AND numero_adherent IS NOT NULL").all(params.id)).map(x => x.n));
   const existants = await db.prepare("SELECT formule_id, linked_user_id, LOWER(email) AS email, LOWER(nom) AS nom, LOWER(COALESCE(prenom,'')) AS prenom FROM adhesion_membres WHERE initiative_id=?").all(params.id);
   const comptesDeja = new Set(existants.filter(m => m.linked_user_id).map(m => Number(m.linked_user_id)));
   const cleDeja = new Set(existants.filter(m => Number(m.formule_id) === Number(formule.id)).map(m => m.email || `${m.nom}|${m.prenom}`));
   const aujourdhui = new Date().toISOString().slice(0, 10);
   res_.forEach(r => {
     if (r.statut !== 'ok') return;
+    if (r.numero && numerosPris.has(r.numero.toLowerCase())) { r.statut = 'deja_membre'; r.motif = `Numéro d'adhérent « ${r.numero} » déjà utilisé`; return; }
     const cpt = r.email ? comptes.get(r.email) : null;
     if (cpt) {
       if (comptesDeja.has(cpt)) { r.statut = 'deja_membre'; r.motif = "Ce compte Diaspo'Actif a déjà une fiche adhérent"; return; }
@@ -7810,11 +7983,12 @@ route("POST", "/api/initiatives/:id/adhesion-import", async (req, res, params, b
       await Promise.all(aImporter.slice(i, i + 10).map(async r => {
         try {
           const id = (await db.prepare(`
-            INSERT INTO adhesion_membres (formule_id, initiative_id, linked_user_id, nom, prenom, email, telephone, adresse, pays, ville, observations, statut, date_adhesion, date_expiration, date_naissance, statut_carte)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            INSERT INTO adhesion_membres (formule_id, initiative_id, linked_user_id, nom, prenom, email, telephone, adresse, pays, ville, observations, statut, date_adhesion, date_expiration, date_naissance, card_status, numero_adherent, fonction, mode_paiement)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
           `).run(formule.id, params.id, r.linked_user_id || null, r.nom, r.prenom || null, r.email || null, r.telephone || null,
             r.adresse || null, r.pays || null, r.ville || null, r.observations || null, r.statut_prevu, r.date_effective, r.date_expiration,
-            r.naissance || null, r.carte)).lastInsertRowid;
+            r.naissance || null, r.carte, r.numero || null, r.fonction || null, r.mode_paiement || null)).lastInsertRowid;
+          await adhHistoriqueCarteInitial(params.id, id, r.carte, user, 'Import de liste');
           r.membre_id = id;
           await journaliserAdhesion(params.id, id, 'creation', user, `Fiche créée par import de liste — « ${formule.nom} ».`);
         } catch (e) { r.statut = 'erreur'; r.motif = "Enregistrement impossible"; console.error('[adhesion-import]', e.message); }
@@ -7829,7 +8003,7 @@ route("POST", "/api/initiatives/:id/adhesion-import", async (req, res, params, b
     total: res_.length, a_importer: simuler ? aImporter.length : res_.filter(r => r.membre_id).length,
     rattaches: res_.filter(r => r.linked_user_id && (simuler || r.membre_id)).length,
     deja_membres: compte('deja_membre'), doublons: compte('doublon_fichier'), erreurs: compte('erreur'),
-    lignes: res_.map(r => ({ ligne: r.ligne, statut: r.statut, motif: r.motif, nom: r.nom, prenom: r.prenom, email: r.email, carte: r.carte, statut_prevu: r.statut_prevu || null, expiration: r.date_expiration ? r.date_expiration.slice(0, 10) : null })),
+    lignes: res_.map(r => ({ ligne: r.ligne, statut: r.statut, motif: r.motif, nom: r.nom, prenom: r.prenom, email: r.email, numero: r.numero, ville: r.ville, carte: r.carte, statut_prevu: r.statut_prevu || null, expiration: r.date_expiration ? r.date_expiration.slice(0, 10) : null })),
   });
 });
 
@@ -7862,12 +8036,16 @@ route("PUT", "/api/adhesion-membres/:id", async (req, res, params, body) => {
     if (n === null) return sendJSON(res, 400, { error: "Date de naissance illisible (format JJ/MM/AAAA)." });
     naissanceMaj = n || null;
   }
-  let carteMaj = m.statut_carte || 'non_creee';
-  if (body.statut_carte !== undefined) {
-    const c = adhNormaliserStatutCarte(body.statut_carte);
-    if (c === null) return sendJSON(res, 400, { error: "Statut de carte invalide (non créée, créée ou livrée)." });
-    carteMaj = c;
+  /* Le statut de la carte ne se change QUE par POST /api/adhesion-membres/:id/carte (confirmation, motif, historique). */
+  let numeroMaj = m.numero_adherent || null;
+  if (body.numero_adherent !== undefined) {
+    numeroMaj = String(body.numero_adherent || '').trim().slice(0, 40) || null;
+    if (numeroMaj) {
+      const doublon = await db.prepare("SELECT id FROM adhesion_membres WHERE initiative_id=? AND LOWER(numero_adherent)=LOWER(?) AND id<>?").get(m.initiative_id, numeroMaj, m.id);
+      if (doublon) return sendJSON(res, 400, { error: `Le numéro d'adhérent « ${numeroMaj} » est déjà utilisé.` });
+    }
   }
+  const fonctionMaj = body.fonction !== undefined ? (String(body.fonction || '').trim().slice(0, 120) || null) : (m.fonction || null);
   /* Changement de catégorie (tâche #70) : la nouvelle formule doit appartenir à la même
      initiative — sinon on ignore silencieusement plutôt que de rattacher un adhérent à
      la formule d'une autre association. */
@@ -7877,14 +8055,19 @@ route("PUT", "/api/adhesion-membres/:id", async (req, res, params, body) => {
   }
   await db.prepare(`UPDATE adhesion_membres SET
       nom=COALESCE(?,nom), prenom=?, email=?, telephone=?, adresse=?, pays=?, ville=?, observations=?,
-      statut=COALESCE(?,statut), formule_id=COALESCE(?,formule_id), date_naissance=?, statut_carte=?, updated_at=datetime('now')
+      statut=COALESCE(?,statut), formule_id=COALESCE(?,formule_id), date_naissance=?, numero_adherent=?, fonction=?, updated_at=datetime('now')
     WHERE id=?`)
     .run(nom || null, prenom ?? m.prenom, email ?? m.email, telephone ?? m.telephone,
       adresse ?? m.adresse, pays ?? m.pays, ville ?? m.ville, observations ?? m.observations,
-      statut || null, nouvelleFormule?.id || null, naissanceMaj, carteMaj, params.id);
-  if (carteMaj !== (m.statut_carte || 'non_creee')) {
-    const LIB = { non_creee: 'carte non créée', creee: 'carte créée', livree: 'carte livrée' };
-    journaliserAdhesion(m.initiative_id, m.id, 'modification', user, `Carte de membre : ${LIB[m.statut_carte || 'non_creee']} → ${LIB[carteMaj]}.`);
+      statut || null, nouvelleFormule?.id || null, naissanceMaj, numeroMaj, fonctionMaj, params.id);
+  /* Journal des modifications sensibles (coordonnées, naissance) : les NOMS des champs changés, jamais leurs valeurs. */
+  {
+    const compare = { nom: nom || m.nom, prénom: prenom ?? m.prenom, 'e-mail': email ?? m.email, téléphone: telephone ?? m.telephone, adresse: adresse ?? m.adresse,
+      ville: ville ?? m.ville, pays: pays ?? m.pays, 'date de naissance': naissanceMaj, "numéro d'adhérent": numeroMaj, fonction: fonctionMaj };
+    const avant = { nom: m.nom, prénom: m.prenom, 'e-mail': m.email, téléphone: m.telephone, adresse: m.adresse, ville: m.ville, pays: m.pays,
+      'date de naissance': m.date_naissance, "numéro d'adhérent": m.numero_adherent, fonction: m.fonction };
+    const changes = Object.keys(compare).filter(k => String(compare[k] || '') !== String(avant[k] || ''));
+    if (changes.length) journaliserAdhesion(m.initiative_id, m.id, 'modification', user, `Informations modifiées : ${changes.join(', ')}.`);
   }
   if (statut && statut !== m.statut) {
     const action = statut === 'suspendu' ? 'suspension' : statut === 'radie' ? 'radiation' : 'modification';
@@ -8172,12 +8355,12 @@ route("GET", "/api/initiatives/:id/adhesion-export", async (req, res, params, bo
     SELECT m.*, f.nom AS formule_nom FROM adhesion_membres m JOIN adhesion_formules f ON f.id=m.formule_id
     WHERE m.initiative_id=? ORDER BY m.nom
   `).all(params.id);
-  const entetes = ['Nom','Prénom','Date de naissance','Ville','Adresse postale','Email','Téléphone','Statut de la carte','Formule','Statut','Date adhésion','Date expiration','Montant payé','Mode paiement','N° reçu'];
+  const entetes = ['N° adhérent','Nom','Prénom','Fonction','Date de naissance','Ville','Adresse postale','Email','Téléphone','Statut de la carte','Formule','Statut','Date adhésion','Date expiration','Montant payé','Mode paiement','N° reçu'];
   const STATUT_LABELS = { a_jour: 'À jour', non_a_jour: 'Non à jour', en_attente: 'En attente', suspendu: 'Suspendu', radie: 'Radié' };
-  const CARTE_LABELS = { non_creee: 'Carte non créée', creee: 'Carte créée', livree: 'Carte livrée' };
+  const CARTE_LABELS = { not_edited: 'Non éditée', edited: 'Éditée', delivered: 'Livrée' };
   const fr = d => d ? String(d).slice(0,10).split('-').reverse().join('/') : '';
-  const lignes = rows.map(m => [m.nom, m.prenom || '', fr(m.date_naissance), m.ville || '', m.adresse || '', m.email || '', m.telephone || '',
-    CARTE_LABELS[m.statut_carte || 'non_creee'] || '', m.formule_nom,
+  const lignes = rows.map(m => [m.numero_adherent || `ADH-${String(m.id).padStart(5, '0')}`, m.nom, m.prenom || '', m.fonction || '', fr(m.date_naissance), m.ville || '', m.adresse || '', m.email || '', m.telephone || '',
+    CARTE_LABELS[m.card_status || 'not_edited'] || '', m.formule_nom,
     STATUT_LABELS[computeAdhesionStatut(m)] || computeAdhesionStatut(m),
     fr(m.date_adhesion), fr(m.date_expiration),
     m.montant_paye ?? '', m.mode_paiement || '', m.numero_recu || '']);

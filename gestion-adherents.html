@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="/assets/logo.png">
+<title>Diaspo'Actif — Gestion des adhérents</title>
+<meta name="description" content="Registre des adhérents, affiliations, cotisations et cartes de membre de votre initiative.">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="stylesheet" href="assets/styles.v2.css">
+<link rel="stylesheet" href="/assets/responsive.v2.css?v=2">
+<link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#060b1d">
+<style>
+/* Gestion des adhérents (2026-11-05, maquette fournie par l'utilisateur) — thème sombre bleu nuit + or, bandeau conservé tel quel. */
+.gda{--fond:#060b1d;--pan:#0d1530;--pan2:#111b3d;--bord:rgba(255,255,255,.09);--txt:#e8ecf6;--doux:#9aa7c4;--or:#f5b301;--or2:#e3c06e;--vert:#22c55e;--bleu:#3b82f6;--orange:#f97316;--rouge:#ef4444;
+  background:radial-gradient(1200px 500px at 70% -10%,#12204a 0,transparent 60%),var(--fond);color:var(--txt);font-family:"Source Sans 3",system-ui,sans-serif;min-height:100vh;padding-bottom:60px}
+.gda *{box-sizing:border-box}
+.gda a{color:inherit}
+.gda-wrap{max-width:1800px;margin:0 auto;padding:0 18px}
+.gda-bandeau{display:block;width:100%;height:auto;min-height:70px;object-fit:cover;object-position:left center}
+.gda-onglets{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:16px 0}
+.gda-onglet{display:inline-flex;align-items:center;gap:8px;background:var(--pan);border:1px solid var(--bord);color:var(--txt);border-radius:12px;padding:11px 16px;font:inherit;font-weight:700;font-size:14.5px;cursor:pointer;position:relative}
+.gda-onglet:hover{border-color:var(--or2)}
+.gda-onglet[aria-selected="true"]{background:linear-gradient(135deg,#3a2a05,#1c1503);border-color:var(--or);color:var(--or2);box-shadow:0 0 0 1px var(--or) inset}
+.gda-onglet .pt{background:var(--orange);color:#fff;border-radius:99px;font-size:11px;min-width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;padding:0 5px}
+.gda-btn{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--bord);background:var(--pan);color:var(--txt);border-radius:10px;padding:9px 14px;font:inherit;font-weight:700;font-size:13.5px;cursor:pointer;text-decoration:none}
+.gda-btn:hover{border-color:var(--or2)}
+.gda-btn.or{background:linear-gradient(135deg,#ffcb2e,#f5a300);color:#1a1202;border-color:#f5b301}
+.gda-btn.sm{padding:6px 10px;font-size:12.5px}
+.gda-btn.danger{color:#fca5a5;border-color:rgba(239,68,68,.45)}
+.gda-btn:disabled{opacity:.5;cursor:not-allowed}
+.gda-btn:focus-visible,.gda-onglet:focus-visible,.gda input:focus-visible,.gda select:focus-visible,.gda textarea:focus-visible{outline:3px solid var(--or);outline-offset:2px}
+.gda-kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;margin-bottom:16px}
+.gda-kpi{background:var(--pan);border:1px solid var(--bord);border-radius:14px;padding:14px 16px;display:flex;align-items:center;gap:12px}
+.gda-kpi .ic{font-size:26px;line-height:1}
+.gda-kpi b{display:block;font-size:26px;line-height:1.1}
+.gda-kpi span{font-size:12.5px;color:var(--doux)}
+.gda-main{display:grid;grid-template-columns:270px minmax(0,1fr);gap:16px;align-items:start}
+.gda-main.avec-fiche{grid-template-columns:250px minmax(0,1fr) 360px}
+@media (max-width:1500px){.gda-main{grid-template-columns:230px minmax(0,1fr)}.gda-main.avec-fiche{grid-template-columns:220px minmax(0,1fr) 340px}}
+.gda-pan{background:var(--pan);border:1px solid var(--bord);border-radius:14px;padding:16px}
+.gda-pan h2{font-size:17px;margin:0 0 12px}
+.gda-filtres label{display:block;font-size:12.5px;font-weight:700;margin:12px 0 4px;color:var(--doux)}
+.gda input[type=text],.gda input[type=search],.gda input[type=email],.gda input[type=tel],.gda input[type=date],.gda input[type=number],.gda select,.gda textarea{width:100%;background:#0a1128;color:var(--txt);border:1px solid var(--bord);border-radius:10px;padding:9px 11px;font:inherit;font-size:14px}
+.gda select option{background:#0a1128}
+.gda-liste-tete{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:space-between;margin-bottom:10px}
+.gda-liste-tete h2{margin:0}
+.gda-tab-wrap{overflow-x:auto}
+.gda table{width:100%;border-collapse:collapse;font-size:14px}
+.gda th{text-align:left;font-size:12.5px;color:var(--doux);font-weight:700;padding:10px 8px;border-bottom:1px solid var(--bord);white-space:nowrap}
+.gda td{padding:9px 8px;border-bottom:1px solid var(--bord);vertical-align:middle}
+.gda tbody tr{cursor:pointer}
+.gda tbody tr:hover{background:rgba(255,255,255,.035)}
+.gda tbody tr.actif{background:rgba(245,179,1,.09);outline:1px solid rgba(245,179,1,.4)}
+.gda-nom{display:flex;align-items:center;gap:10px;min-width:170px}
+.gda-nom b{display:block}
+.gda-nom small{color:var(--doux);font-size:12px}
+.gda-av{width:38px;height:38px;border-radius:50%;object-fit:cover;background:#1b2a5c;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;flex:none;border:2px solid rgba(255,255,255,.12)}
+.gda-av.lg{width:78px;height:78px;font-size:26px}
+.pill{display:inline-flex;align-items:center;gap:5px;border-radius:99px;padding:4px 11px;font-size:12.5px;font-weight:800;white-space:nowrap}
+.pill.delivered{background:rgba(34,197,94,.18);color:#4ade80;border:1px solid rgba(34,197,94,.5)}
+.pill.edited{background:rgba(59,130,246,.2);color:#93c5fd;border:1px solid rgba(59,130,246,.55)}
+.pill.not_edited{background:rgba(249,115,22,.18);color:#fdba74;border:1px solid rgba(249,115,22,.55)}
+.pill.neutre{background:rgba(255,255,255,.07);color:var(--doux);border:1px solid var(--bord)}
+.pill.ok{background:rgba(34,197,94,.15);color:#4ade80;border:1px solid rgba(34,197,94,.4)}
+.pill.ko{background:rgba(239,68,68,.15);color:#fca5a5;border:1px solid rgba(239,68,68,.4)}
+.gda-act{display:flex;gap:4px}
+.gda-ico{background:transparent;border:1px solid transparent;color:var(--txt);border-radius:8px;width:32px;height:32px;cursor:pointer;font-size:15px}
+.gda-ico:hover{border-color:var(--or2)}
+.gda-pied{display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:space-between;margin-top:14px;font-size:13.5px}
+.gda-pages{display:flex;gap:6px;flex-wrap:wrap}
+.gda-pages button{min-width:36px;height:34px;border-radius:9px;border:1px solid var(--bord);background:var(--pan2);color:var(--txt);font:inherit;font-weight:700;cursor:pointer;padding:0 10px}
+.gda-pages button[aria-current="page"]{background:var(--bleu);border-color:var(--bleu)}
+.gda-pages button:disabled{opacity:.45;cursor:not-allowed}
+.gda-fiche{position:sticky;top:78px;max-height:calc(100vh - 96px);overflow:auto}
+.gda-fiche-tete{display:flex;gap:14px;align-items:center;margin-bottom:12px;position:relative}
+.gda-fiche-tete h3{margin:0 0 6px;font-size:20px}
+.gda-fermer{position:absolute;right:-4px;top:-6px;background:none;border:0;color:var(--doux);font-size:22px;cursor:pointer}
+.gda-sous{display:flex;gap:2px;border-bottom:1px solid var(--bord);margin-bottom:12px;flex-wrap:wrap}
+.gda-sous button{background:none;border:0;color:var(--doux);font:inherit;font-weight:700;font-size:13.5px;padding:9px 10px;cursor:pointer;border-bottom:3px solid transparent}
+.gda-sous button[aria-selected="true"]{color:var(--txt);border-bottom-color:var(--bleu)}
+.gda-dl{display:grid;grid-template-columns:auto 1fr;gap:7px 12px;font-size:14px;margin:0}
+.gda-dl dt{color:var(--doux)}
+.gda-dl dd{margin:0;word-break:break-word}
+.gda-carte-bloc{border:1px solid var(--bord);border-radius:12px;padding:12px;margin-top:14px;background:rgba(255,255,255,.03)}
+.gda-radios{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0 12px}
+.gda-radio{display:flex;align-items:center;justify-content:center;gap:7px;border:1.5px solid var(--bord);border-radius:99px;padding:9px 6px;background:transparent;color:var(--txt);font:inherit;font-weight:700;font-size:13.5px;cursor:pointer}
+.gda-radio .pt{width:15px;height:15px;border-radius:50%;border:2px solid currentColor;display:inline-block;position:relative;flex:none}
+.gda-radio[aria-checked="true"] .pt::after{content:"";position:absolute;inset:2px;border-radius:50%;background:currentColor}
+.gda-radio[data-s="not_edited"]{color:#fdba74}.gda-radio[data-s="edited"]{color:#93c5fd}.gda-radio[data-s="delivered"]{color:#4ade80}
+.gda-radio[aria-checked="true"]{background:rgba(255,255,255,.08);border-width:2px}
+.gda-radio[data-s="delivered"][aria-checked="true"]{border-color:#22c55e}.gda-radio[data-s="edited"][aria-checked="true"]{border-color:#3b82f6}.gda-radio[data-s="not_edited"][aria-checked="true"]{border-color:#f97316}
+.gda-radio.flash{animation:gdaFlash .9s}
+@keyframes gdaFlash{0%{box-shadow:0 0 0 0 rgba(245,179,1,.9)}100%{box-shadow:0 0 0 14px rgba(245,179,1,0)}}
+@media (prefers-reduced-motion:reduce){.gda-radio.flash{animation:none}}
+.gda-hist{list-style:none;margin:0;padding:0;display:grid;gap:8px;font-size:13.5px}
+.gda-hist li{border-left:3px solid var(--bord);padding:2px 0 2px 10px}
+.gda-hist small{color:var(--doux);display:block}
+.gda-vide{padding:30px 10px;text-align:center;color:var(--doux)}
+.gda-cartouche{display:flex;align-items:center;gap:12px;border:1px solid var(--bord);border-radius:12px;padding:12px 14px;flex-wrap:wrap;margin-bottom:10px;background:var(--pan)}
+.gda-cartouche .inf{flex:1;min-width:160px}
+.gda-toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#14532d;color:#dcfce7;border:1px solid #22c55e;border-radius:12px;padding:11px 18px;font-weight:700;z-index:1200;box-shadow:0 10px 30px rgba(0,0,0,.5)}
+.gda-toast.err{background:#7f1d1d;color:#fee2e2;border-color:#ef4444}
+.gda-modal{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:1100;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:30px 12px}
+.gda-modal .boite{background:var(--pan);color:var(--txt);border:1px solid var(--bord);border-radius:16px;max-width:560px;width:100%;padding:20px}
+.gda-modal h3{margin:0 0 12px}
+.gda-modal label{display:block;font-size:12.5px;font-weight:700;color:var(--doux);margin:10px 0 4px}
+.gda-grille2{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+.gda-colmenu{position:absolute;right:0;top:calc(100% + 6px);background:var(--pan2);border:1px solid var(--bord);border-radius:12px;padding:10px 14px;z-index:30;min-width:200px;box-shadow:0 14px 34px rgba(0,0,0,.5)}
+.gda-colmenu label{display:flex;gap:8px;align-items:center;padding:4px 0;font-size:13.5px;cursor:pointer}
+.gda [hidden]{display:none!important}
+@media (max-width:1100px){.gda-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.gda-main,.gda-main.avec-fiche{grid-template-columns:230px minmax(0,1fr)}
+  .gda-fiche{position:fixed;inset:auto 0 0 0;max-height:82vh;z-index:900;border-radius:18px 18px 0 0;box-shadow:0 -20px 50px rgba(0,0,0,.6)}}
+@media (max-width:900px){.gda-main,.gda-main.avec-fiche{grid-template-columns:1fr}.gda-filtres-pan summary{cursor:pointer;font-weight:800}}
+/* Téléphone : chaque ligne devient une carte lisible, sans défilement horizontal */
+@media (max-width:760px){
+  .gda-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.gda-kpi b{font-size:22px}
+  .gda table,.gda thead,.gda tbody,.gda tr,.gda td{display:block;width:100%}
+  .gda thead{display:none}
+  .gda tbody tr{border:1px solid var(--bord);border-radius:12px;margin-bottom:10px;padding:8px 10px;background:var(--pan2)}
+  .gda td{border:0;padding:4px 0;display:flex;justify-content:space-between;gap:10px;align-items:center}
+  .gda td[data-l]::before{content:attr(data-l);color:var(--doux);font-size:12px;flex:none}
+  .gda td.cases{display:none}
+  .gda-grille2{grid-template-columns:1fr}
+  .gda-onglet{padding:9px 11px;font-size:13px}
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Menu">&#9776;</button>
+      <div class="logo"><img loading="lazy" class="logo-img" src="assets/logo.png" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+      <nav class="nav">
+        <a href="index.html">Accueil</a>
+        <a href="annuaire.html">Annuaire</a>
+        <a href="vitrines.html">Boutiques</a>
+        <a href="fil-actualite.html">Fil</a>
+        <a href="formations.html">Formations</a>
+        <a href="messagerie.html">Messages</a>
+        <a href="dashboard-initiative.html">Mon espace</a>
+      </nav>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="gda" id="gda">
+    <img class="gda-bandeau" src="assets/bandeau-gestion-adherents.webp" width="1672" height="137" alt="Gestion des adhérents — membres, affiliations, cotisations et cartes de membre">
+    <div class="gda-wrap">
+      <div class="gda-onglets" role="tablist" aria-label="Rubriques">
+        <button class="gda-onglet" role="tab" data-onglet="membres" aria-selected="true">👥 Membres affiliés</button>
+        <button class="gda-onglet" role="tab" data-onglet="attente" aria-selected="false">✉️ Invitations en attente <span class="pt" id="pt-attente" hidden></span></button>
+        <button class="gda-onglet" role="tab" data-onglet="demandes" aria-selected="false">📥 Affiliations demandées <span class="pt" id="pt-demandes" hidden></span></button>
+        <button class="gda-onglet" role="tab" data-onglet="refusees" aria-selected="false">🚫 Invitations refusées</button>
+        <button class="gda-onglet" role="tab" data-onglet="historique" aria-selected="false">📊 Historique &amp; rapports</button>
+        <span style="flex:1"></span>
+        <a class="gda-btn" id="gda-import" href="dashboard-initiative.html?import=adherents#adhesions-init" title="Importer une liste Excel, CSV ou Google Sheets">📥 Importer une liste</a>
+        <button class="gda-btn or" id="gda-ajouter">＋ Ajouter un adhérent</button>
+      </div>
+
+      <div class="gda-kpis" id="gda-kpis" aria-live="polite"></div>
+
+      <div id="gda-zone">
+        <div class="gda-vide">Chargement…</div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/demo.js?v=2"></script>
+<script src="assets/app.js?v=13"></script>
+<script>
+/* ============ Utilitaires ============ */
+const $ = (s, r = document) => r.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fr = d => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(d || '')); return m ? `${m[3]}/${m[2]}/${m[1]}` : ''; };
+const frLong = d => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(d || '')); if (!m) return ''; return new Date(+m[1], +m[2] - 1, +m[3]).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }); };
+const frHeure = d => { if (!d) return ''; const t = new Date(String(d).replace(' ', 'T') + 'Z'); return isNaN(t) ? fr(d) : t.toLocaleString('fr-FR', { timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }); };
+const initiales = m => ((m.prenom || '')[0] || (m.nom || '')[0] || '?').toUpperCase();
+const CARTE = { not_edited: 'Non éditée', edited: 'Éditée', delivered: 'Livrée' };
+const CARTE_ICO = { not_edited: '🪪', edited: '💳', delivered: '✅' };
+const STATUT = { a_jour: ['À jour', 'ok'], non_a_jour: ['Non à jour', 'ko'], en_attente: ['En attente', 'neutre'], suspendu: ['Suspendu', 'ko'], radie: ['Radié', 'ko'], affilie: ['Affilié (sans fiche)', 'neutre'] };
+const PAIEMENT = { paye: 'Payée', offert: 'Offerte', a_verifier: 'À vérifier' };
+const MODES = { helloasso: 'HelloAsso', especes: 'Espèces', offert: 'Offert', cheque: 'Chèque', virement: 'Virement', paypal: 'PayPal', carte: 'Carte bancaire' };
+const ORDRE_CARTE = { not_edited: 0, edited: 1, delivered: 2 };
+const lireLS = (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } };
+const ecrireLS = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+
+const COLS = [
+  ['numero', 'N° adhérent', true], ['nom', 'Nom et prénom', true], ['fonction', 'Fonction', false], ['adhesion', "Date d'adhésion", true],
+  ['naissance', 'Année de naissance', true], ['email', 'E-mail', false], ['tel', 'Téléphone', true], ['ville', 'Ville', false],
+  ['statut', 'Statut du membre', false], ['carte', 'Statut carte', true]
+];
+const ST = { init: null, formules: [], fiches: [], affilies: [], lignes: [], filtrees: [], page: 1, parPage: 10, sel: new Set(), cols: lireLS('gda_cols', null) || Object.fromEntries(COLS.map(c => [c[0], c[2]])),
+  filtres: { q: '', statut: '', carte: '', fonction: '', annee: '', pays: '', tri: 'adhesion_desc' }, detail: null, sousOnglet: 'infos', onglet: 'membres' };
+
+function toast(msg, erreur) {
+  $('.gda-toast')?.remove();
+  const t = document.createElement('div'); t.className = 'gda-toast' + (erreur ? ' err' : ''); t.setAttribute('role', 'status'); t.textContent = msg;
+  document.body.appendChild(t); setTimeout(() => t.remove(), erreur ? 5000 : 2600);
+}
+/* Boîte de dialogue maison (confirmation, motif obligatoire) : renvoie une promesse { ok, motif }. */
+function dialogue({ titre, texte, motif, ok = 'Confirmer', danger }) {
+  return new Promise(res => {
+    const w = document.createElement('div'); w.className = 'gda-modal'; w.setAttribute('role', 'dialog'); w.setAttribute('aria-modal', 'true');
+    w.innerHTML = `<div class="boite"><h3>${esc(titre)}</h3><p style="margin:0 0 6px;line-height:1.5">${esc(texte)}</p>
+      ${motif ? '<label for="gda-d-motif">Motif (obligatoire)</label><textarea id="gda-d-motif" rows="3" maxlength="300"></textarea><div id="gda-d-err" style="color:#fca5a5;font-size:13px;min-height:18px"></div>' : ''}
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button class="gda-btn" data-n>Annuler</button><button class="gda-btn ${danger ? 'danger' : 'or'}" data-o>${esc(ok)}</button></div></div>`;
+    document.body.appendChild(w);
+    const fin = v => { w.remove(); res(v); };
+    w.querySelector('[data-n]').onclick = () => fin({ ok: false });
+    w.addEventListener('keydown', e => { if (e.key === 'Escape') fin({ ok: false }); });
+    w.querySelector('[data-o]').onclick = () => {
+      const m = motif ? w.querySelector('#gda-d-motif').value.trim() : '';
+      if (motif && m.length < 3) { w.querySelector('#gda-d-err').textContent = 'Indiquez un motif (3 caractères minimum).'; return; }
+      fin({ ok: true, motif: m });
+    };
+    (w.querySelector('textarea') || w.querySelector('[data-o]')).focus();
+  });
+}
+function modale(html, fermeture) {
+  const w = document.createElement('div'); w.className = 'gda-modal'; w.setAttribute('role', 'dialog'); w.setAttribute('aria-modal', 'true');
+  w.innerHTML = `<div class="boite">${html}</div>`; document.body.appendChild(w);
+  const f = () => { w.remove(); fermeture && fermeture(); };
+  w.addEventListener('mousedown', e => { if (e.target === w) f(); });
+  w.addEventListener('keydown', e => { if (e.key === 'Escape') f(); });
+  w.fermer = f; return w;
+}
+
+/* ============ Chargement ============ */
+async function charger() {
+  const zone = $('#gda-zone');
+  const u = await fetchCurrentUser().catch(() => null);
+  if (!u) { location.href = 'login.html?redirect=' + encodeURIComponent('gestion-adherents.html'); return; }
+  let d; try { d = await api('GET', '/dashboard/initiative'); } catch (e) { zone.innerHTML = '<div class="gda-vide">Cette page est réservée aux comptes Initiative.</div>'; return; }
+  ST.init = d.initiative;
+  if (!ST.init) { zone.innerHTML = '<div class="gda-vide">Créez votre initiative pour gérer vos adhérents.</div>'; return; }
+  await recharger();
+  rendreOnglet();
+}
+async function recharger() {
+  const id = ST.init.id;
+  const [rm, rf, ra] = await Promise.all([
+    api('GET', `/initiatives/${id}/adhesion-membres`).catch(e => ({ membres: [], erreur: e })),
+    api('GET', `/initiatives/${id}/adhesion-formules/gestion`).catch(() => ({ formules: [] })),
+    api('GET', `/initiatives/${id}/membres`).catch(() => ({ membres: [] }))
+  ]);
+  if (rm.erreur && rm.erreur.status === 402) { $('#gda-zone').innerHTML = `<div class="gda-vide">${esc(rm.erreur.message || "Votre abonnement Premium est arrivé à expiration.")}</div>`; throw rm.erreur; }
+  ST.fiches = rm.membres || []; ST.formules = rf.formules || []; ST.affilies = ra.membres || [];
+  /* Comptes affiliés (acceptés) qui n'ont pas encore de fiche : affichés tels quels, la fiche se crée en un clic. */
+  const lies = new Set(ST.fiches.filter(f => f.linked_user_id).map(f => Number(f.linked_user_id)));
+  const virtuels = ST.affilies.filter(a => a.statut === 'accepte' && !lies.has(Number(a.user_id))).map(a => ({
+    virtuel: true, id: 'u' + a.user_id, user_id: a.user_id, nom: a.nom, prenom: a.prenom, email: a.email, photo: a.avatar_url, fonction: a.fonction,
+    statut: 'affilie', numero_affiche: '—', date_adhesion: a.created_at, card_status: null }));
+  ST.lignes = [...ST.fiches.map(f => ({ ...f, virtuel: false })), ...virtuels];
+  const nb = (st, org) => ST.affilies.filter(a => a.statut === st && (org === undefined || (org ? a.origine === 'demande' : a.origine !== 'demande'))).length;
+  const pa = nb('en_attente', false), pd = nb('en_attente', true);
+  $('#pt-attente').hidden = !pa; $('#pt-attente').textContent = pa; $('#pt-demandes').hidden = !pd; $('#pt-demandes').textContent = pd;
+  rendreKpis(); appliquerFiltres(false);
+}
+function rendreKpis() {
+  const L = ST.lignes, F = L.filter(m => !m.virtuel);
+  const actifs = L.filter(m => m.statut === 'a_jour' || m.statut === 'affilie').length;
+  const k = [['👥', L.length, 'Adhérents totaux'], ['🟢', actifs, 'Membres actifs'], ['⚪', L.length - actifs, 'Membres inactifs'],
+    ['💳', F.filter(m => m.card_status === 'edited').length, 'Cartes éditées'], ['⏳', F.filter(m => (m.card_status || 'not_edited') === 'not_edited').length, 'Cartes en attente'], ['✅', F.filter(m => m.card_status === 'delivered').length, 'Cartes livrées']];
+  $('#gda-kpis').innerHTML = k.map(x => `<div class="gda-kpi"><span class="ic" aria-hidden="true">${x[0]}</span><div><b>${x[1]}</b><span>${x[2]}</span></div></div>`).join('');
+}
+
+/* ============ Filtres, tri, pagination ============ */
+function appliquerFiltres(rendre = true) {
+  const f = ST.filtres, q = f.q.trim().toLowerCase();
+  let l = ST.lignes.filter(m => {
+    if (q && !`${m.prenom || ''} ${m.nom || ''} ${m.nom || ''} ${m.email || ''} ${m.numero_affiche || ''} ${m.ville || ''} ${m.telephone || ''}`.toLowerCase().includes(q)) return false;
+    if (f.statut && m.statut !== f.statut) return false;
+    if (f.carte && (m.card_status || (m.virtuel ? '' : 'not_edited')) !== f.carte) return false;
+    if (f.fonction && (m.fonction || '') !== f.fonction) return false;
+    if (f.annee && String(m.date_adhesion || '').slice(0, 4) !== f.annee) return false;
+    if (f.pays && (m.pays || '') !== f.pays) return false;
+    return true;
+  });
+  const cmpNom = (a, b) => `${a.nom || ''} ${a.prenom || ''}`.localeCompare(`${b.nom || ''} ${b.prenom || ''}`, 'fr', { sensitivity: 'base' });
+  const cmpDate = (a, b) => String(a.date_adhesion || '').localeCompare(String(b.date_adhesion || ''));
+  const tris = { adhesion_desc: (a, b) => cmpDate(b, a), adhesion_asc: cmpDate, nom_asc: cmpNom, nom_desc: (a, b) => cmpNom(b, a),
+    numero: (a, b) => String(a.numero_affiche).localeCompare(String(b.numero_affiche), 'fr', { numeric: true }) };
+  l.sort(tris[f.tri] || tris.adhesion_desc);
+  ST.filtrees = l; ST.page = 1;
+  if (rendre) rendreListe();
+}
+function optionsDistinctes(cle, fn) { return [...new Set(ST.lignes.map(fn || (m => m[cle])).filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b), 'fr')); }
+
+/* ============ Onglets ============ */
+function rendreOnglet() {
+  document.querySelectorAll('.gda-onglet').forEach(b => b.setAttribute('aria-selected', String(b.dataset.onglet === ST.onglet)));
+  if (ST.onglet === 'membres') return rendreMembres();
+  if (ST.onglet === 'historique') return rendreHistorique();
+  rendreAffiliations(ST.onglet);
+}
+document.querySelector('.gda-onglets').addEventListener('click', e => {
+  const b = e.target.closest('[data-onglet]'); if (!b) return;
+  ST.onglet = b.dataset.onglet; ST.detail = null; rendreOnglet();
+});
+
+function rendreMembres() {
+  const fonctions = optionsDistinctes('fonction'), annees = optionsDistinctes(null, m => String(m.date_adhesion || '').slice(0, 4)).reverse(), pays = optionsDistinctes('pays');
+  const f = ST.filtres, opt = (v, cur, lib) => `<option value="${esc(v)}" ${String(cur) === String(v) ? 'selected' : ''}>${esc(lib ?? v)}</option>`;
+  $('#gda-zone').innerHTML = `
+  <div class="gda-main ${ST.detail ? 'avec-fiche' : ''}" id="gda-main">
+    <aside class="gda-pan gda-filtres-pan"><details open><summary style="font-weight:800;font-size:17px;list-style:none">🔎 Filtres de recherche</summary>
+      <div class="gda-filtres">
+        <label for="f-q">Rechercher</label><input type="search" id="f-q" placeholder="Nom, prénom, e-mail, n°…" value="${esc(f.q)}" autocomplete="off">
+        <label for="f-statut">Statut du membre</label><select id="f-statut"><option value="">Tous les statuts</option>${Object.entries(STATUT).map(([k, v]) => opt(k, f.statut, v[0])).join('')}</select>
+        <label for="f-carte">Statut de la carte</label><select id="f-carte"><option value="">Tous les statuts</option>${Object.entries(CARTE).map(([k, v]) => opt(k, f.carte, v)).join('')}</select>
+        <label for="f-fonction">Fonction / poste</label><select id="f-fonction"><option value="">Tous les postes</option>${fonctions.map(x => opt(x, f.fonction)).join('')}</select>
+        <label for="f-annee">Année d'adhésion</label><select id="f-annee"><option value="">Toutes les années</option>${annees.map(x => opt(x, f.annee)).join('')}</select>
+        <label for="f-pays">Pays</label><select id="f-pays"><option value="">Tous les pays</option>${pays.map(x => opt(x, f.pays)).join('')}</select>
+        <label for="f-tri">Trier par</label><select id="f-tri">${[['adhesion_desc', "Date d'adhésion (récent d'abord)"], ['adhesion_asc', "Date d'adhésion (ancien d'abord)"], ['nom_asc', 'Nom A → Z'], ['nom_desc', 'Nom Z → A'], ['numero', "N° d'adhérent"]].map(x => opt(x[0], f.tri, x[1])).join('')}</select>
+        <div style="display:grid;gap:8px;margin-top:16px"><button class="gda-btn or" id="f-appliquer" style="justify-content:center">Appliquer les filtres</button><button class="gda-btn" id="f-reset" style="justify-content:center">↻ Réinitialiser</button></div>
+      </div></details>
+    </aside>
+    <section class="gda-pan" aria-label="Liste des adhérents">
+      <div class="gda-liste-tete"><h2 id="gda-titre-liste"></h2>
+        <div style="display:flex;gap:8px;position:relative"><button class="gda-btn sm" id="gda-export">⬇ Exporter</button><button class="gda-btn sm" id="gda-colbtn" aria-haspopup="true" aria-expanded="false">⚙ Colonnes ▾</button>
+          <div class="gda-colmenu" id="gda-colmenu" hidden>${COLS.map(c => `<label><input type="checkbox" data-col="${c[0]}" ${ST.cols[c[0]] ? 'checked' : ''}> ${esc(c[1])}</label>`).join('')}</div></div></div>
+      <div class="gda-tab-wrap" id="gda-tableau"></div>
+      <div class="gda-pied" id="gda-pied"></div>
+    </section>
+    <aside class="gda-pan gda-fiche" id="gda-fiche" ${ST.detail ? '' : 'hidden'} aria-label="Fiche de l'adhérent"></aside>
+  </div>`;
+  const bind = (id, ev, fn) => $(id).addEventListener(ev, fn);
+  const lire = () => { ST.filtres = { q: $('#f-q').value, statut: $('#f-statut').value, carte: $('#f-carte').value, fonction: $('#f-fonction').value, annee: $('#f-annee').value, pays: $('#f-pays').value, tri: $('#f-tri').value }; appliquerFiltres(); };
+  let t; bind('#f-q', 'input', () => { clearTimeout(t); t = setTimeout(lire, 200); });
+  ['#f-statut', '#f-carte', '#f-fonction', '#f-annee', '#f-pays', '#f-tri'].forEach(s => bind(s, 'change', lire));
+  bind('#f-appliquer', 'click', lire);
+  bind('#f-reset', 'click', () => { ST.filtres = { q: '', statut: '', carte: '', fonction: '', annee: '', pays: '', tri: 'adhesion_desc' }; appliquerFiltres(false); rendreMembres(); });
+  bind('#gda-export', 'click', exporterCsv);
+  bind('#gda-colbtn', 'click', e => { const m = $('#gda-colmenu'); m.hidden = !m.hidden; e.currentTarget.setAttribute('aria-expanded', String(!m.hidden)); });
+  $('#gda-colmenu').addEventListener('change', e => { const c = e.target.dataset.col; if (!c) return; ST.cols[c] = e.target.checked; ecrireLS('gda_cols', ST.cols); rendreListe(); });
+  rendreListe(); if (ST.detail) rendreFiche();
+}
+
+function celluleCol(m, c) {
+  switch (c) {
+    case 'numero': return esc(m.numero_affiche);
+    case 'nom': return `<div class="gda-nom">${avatar(m)}<div><b>${esc(m.prenom || '')} ${esc(m.nom || '')}</b><small>${esc(m.fonction || '')}${m.virtuel ? ' · sans fiche' : ''}</small></div></div>`;
+    case 'fonction': return esc(m.fonction || '—');
+    case 'adhesion': return m.date_adhesion ? esc(fr(m.date_adhesion)) : '—';
+    case 'naissance': return m.annee_naissance ? esc(m.annee_naissance) : '—';
+    case 'email': return m.email ? esc(m.email) : '—';
+    case 'tel': return m.telephone ? esc(m.telephone) : '—';
+    case 'ville': return esc(m.ville || '—');
+    case 'statut': { const s = STATUT[m.statut] || [m.statut, 'neutre']; return `<span class="pill ${s[1]}">${esc(s[0])}</span>`; }
+    case 'carte': return m.card_status ? `<span class="pill ${m.card_status}">${CARTE_ICO[m.card_status]} ${CARTE[m.card_status]}</span>` : '<span class="pill neutre">—</span>';
+  }
+  return '';
+}
+function avatar(m, grand) {
+  const cl = 'gda-av' + (grand ? ' lg' : '');
+  return m.photo ? `<img class="${cl}" src="${esc(m.photo)}" alt="" loading="lazy" onerror="this.outerHTML='<div class=&quot;${cl}&quot;>${esc(initiales(m))}</div>'">` : `<div class="${cl}" aria-hidden="true">${esc(initiales(m))}</div>`;
+}
+function rendreListe() {
+  const cols = COLS.filter(c => ST.cols[c[0]]);
+  const n = ST.filtrees.length, pages = Math.max(1, Math.ceil(n / ST.parPage));
+  ST.page = Math.min(ST.page, pages);
+  const debut = (ST.page - 1) * ST.parPage, vue = ST.filtrees.slice(debut, debut + ST.parPage);
+  $('#gda-titre-liste').textContent = `Liste des adhérents (${n})`;
+  const tousCoches = vue.length && vue.every(m => ST.sel.has(String(m.id)));
+  $('#gda-tableau').innerHTML = n ? `<table><thead><tr><th class="cases"><input type="checkbox" id="gda-tout" aria-label="Tout sélectionner" ${tousCoches ? 'checked' : ''}></th>${cols.map(c => `<th>${esc(c[1])}</th>`).join('')}<th>Actions</th></tr></thead>
+    <tbody>${vue.map(m => `<tr data-id="${esc(m.id)}" class="${ST.detail && String(ST.detail) === String(m.id) ? 'actif' : ''}"><td class="cases"><input type="checkbox" data-sel="${esc(m.id)}" aria-label="Sélectionner ${esc((m.prenom || '') + ' ' + (m.nom || ''))}" ${ST.sel.has(String(m.id)) ? 'checked' : ''}></td>
+      ${cols.map(c => `<td data-l="${esc(c[1])}">${celluleCol(m, c[0])}</td>`).join('')}
+      <td class="gda-act"><button class="gda-ico" data-act="voir" title="Voir la fiche" aria-label="Voir la fiche">👁</button>${m.virtuel ? '' : '<button class="gda-ico" data-act="modifier" title="Modifier" aria-label="Modifier">✏️</button>'}</td></tr>`).join('')}</tbody></table>`
+    : '<div class="gda-vide">Aucun adhérent ne correspond à ces critères.</div>';
+  const pp = [10, 25, 50, 100];
+  const nums = []; for (let p = 1; p <= pages; p++) if (p === 1 || p === pages || Math.abs(p - ST.page) <= 1) nums.push(p); else if (nums[nums.length - 1] !== '…') nums.push('…');
+  $('#gda-pied').innerHTML = `<div>Afficher <select id="gda-pp" style="width:auto;display:inline-block">${pp.map(x => `<option ${x === ST.parPage ? 'selected' : ''}>${x}</option>`).join('')}</select> par page ${ST.sel.size ? `· <b>${ST.sel.size}</b> sélectionné${ST.sel.size > 1 ? 's' : ''}` : ''}</div>
+    <div class="gda-pages"><button data-p="${ST.page - 1}" ${ST.page <= 1 ? 'disabled' : ''}>‹ Précédent</button>${nums.map(p => p === '…' ? '<span style="align-self:center">…</span>' : `<button data-p="${p}" ${p === ST.page ? 'aria-current="page"' : ''}>${p}</button>`).join('')}<button data-p="${ST.page + 1}" ${ST.page >= pages ? 'disabled' : ''}>Suivant ›</button></div>`;
+}
+document.addEventListener('click', e => {
+  const z = e.target.closest('#gda-pied [data-p]'); if (z && !z.disabled) { ST.page = +z.dataset.p; rendreListe(); return; }
+  if (!e.target.closest('#gda-colmenu') && !e.target.closest('#gda-colbtn')) { const m = $('#gda-colmenu'); if (m) m.hidden = true; }
+});
+document.addEventListener('change', e => {
+  if (e.target.id === 'gda-pp') { ST.parPage = +e.target.value; ST.page = 1; rendreListe(); }
+  if (e.target.id === 'gda-tout') { const debut = (ST.page - 1) * ST.parPage; ST.filtrees.slice(debut, debut + ST.parPage).forEach(m => e.target.checked ? ST.sel.add(String(m.id)) : ST.sel.delete(String(m.id))); rendreListe(); }
+  if (e.target.dataset && e.target.dataset.sel !== undefined) { e.target.checked ? ST.sel.add(e.target.dataset.sel) : ST.sel.delete(e.target.dataset.sel); rendreListe(); }
+});
+document.addEventListener('click', e => {
+  const tr = e.target.closest('#gda-tableau tbody tr'); if (!tr || e.target.closest('input')) return;
+  const id = tr.dataset.id; const act = e.target.closest('[data-act]')?.dataset.act;
+  ouvrirFiche(id); if (act === 'modifier') ouvrirEdition(id);
+});
+
+/* ============ Fiche détaillée (panneau de droite) ============ */
+const ligne = id => ST.lignes.find(m => String(m.id) === String(id));
+async function ouvrirFiche(id, sous) {
+  ST.detail = String(id); ST.sousOnglet = sous || 'infos'; ST.complet = null;
+  $('#gda-main')?.classList.add('avec-fiche'); $('#gda-fiche').hidden = false; rendreListe(); rendreFiche();
+  const m = ligne(id);
+  if (m && !m.virtuel) { try { ST.complet = await api('GET', `/adhesion-membres/${m.id}/fiche`); if (String(ST.detail) === String(id)) rendreFiche(); } catch (e) { toast(e.message || 'Fiche indisponible.', true); } }
+}
+function rendreFiche() {
+  const m = ligne(ST.detail), el = $('#gda-fiche'); if (!m || !el) return;
+  const c = ST.complet && String(ST.complet.fiche.id) === String(m.id) ? ST.complet : null, f = c ? c.fiche : m;
+  const s = STATUT[m.statut] || [m.statut, 'neutre'];
+  const sous = [['infos', 'Informations'], ['carte', 'Carte de membre'], ['cotis', 'Cotisation'], ['hist', 'Historique']].filter(x => !m.virtuel || x[0] === 'infos');
+  const ligneDl = (k, v) => v ? `<dt>${k}</dt><dd>${v}</dd>` : '';
+  let corps = '';
+  if (ST.sousOnglet === 'infos' || m.virtuel) {
+    corps = `<dl class="gda-dl">${ligneDl('Nom', esc(f.nom))}${ligneDl('Prénom', esc(f.prenom))}${ligneDl('Fonction', esc(f.fonction))}${ligneDl('Année de naissance', f.annee_naissance ? `${esc(f.annee_naissance)}${f.annee_naissance ? ` (${new Date().getFullYear() - Number(f.annee_naissance)} ans)` : ''}` : '')}
+      ${ligneDl("Date d'adhésion", f.date_adhesion ? esc(frLong(f.date_adhesion)) : '')}${ligneDl('E-mail', f.email ? `<a href="mailto:${esc(f.email)}" style="color:#93c5fd">${esc(f.email)}</a>` : '')}
+      ${ligneDl('Téléphone', esc(f.telephone))}${ligneDl('Adresse postale', esc(f.adresse))}${ligneDl('Ville', esc(f.ville))}${ligneDl('Pays', esc(f.pays))}
+      ${ligneDl('Compte Diaspo\'Actif', f.linked_user_id ? `🟢 Lié · <a href="profil.html?id=${f.linked_user_id}" target="_blank" rel="noopener" style="color:#93c5fd">voir le profil</a>` : m.virtuel ? `🟢 <a href="profil.html?id=${m.user_id}" target="_blank" rel="noopener" style="color:#93c5fd">voir le profil</a>` : '⚪ Externe (sans compte)')}
+      ${ligneDl('Observations', esc(f.observations))}</dl>
+      ${m.virtuel ? `<div style="margin-top:14px;display:grid;gap:8px"><p style="margin:0;font-size:13px;color:var(--doux)">Ce compte est affilié à votre initiative mais n'a pas encore de fiche adhérent (n°, carte, cotisation).</p><button class="gda-btn or" data-fiche-act="creer">＋ Créer sa fiche adhérent</button></div>` : ''}`;
+  } else if (ST.sousOnglet === 'carte') {
+    const cs = m.card_status || 'not_edited';
+    corps = `<div class="gda-carte-bloc" style="margin-top:0"><b>🪪 Statut de la carte de membre</b>
+      <div class="gda-radios" role="radiogroup" aria-label="Statut de la carte">${Object.entries(CARTE).map(([k, l]) => `<button type="button" class="gda-radio" role="radio" aria-checked="${k === cs}" data-s="${k}"><span class="pt"></span>${l}</button>`).join('')}</div>
+      <dl class="gda-dl">${ligneDl('N° de carte', esc(f.card_id || `CARTE-${m.numero_affiche}`))}${ligneDl("Date d'édition", f.card_edited_at ? esc(frHeure(f.card_edited_at)) : '—')}${ligneDl('Date de remise', f.card_delivered_at ? esc(frHeure(f.card_delivered_at)) : '—')}${ligneDl('Dernière modification par', c && c.responsable_carte ? esc(c.responsable_carte) : '—')}</dl></div>
+      <h4 style="margin:16px 0 8px">Historique de la carte</h4>${c ? (c.historique_carte.length ? `<ul class="gda-hist">${c.historique_carte.map(h => `<li><b>${h.ancien_statut ? `${CARTE[h.ancien_statut]} → ` : ''}${CARTE[h.nouveau_statut] || esc(h.nouveau_statut)}</b>${h.motif ? ` — ${esc(h.motif)}` : ''}<small>${esc(frHeure(h.created_at))}${h.acteur_nom ? ' · ' + esc(h.acteur_nom) : ''}</small></li>`).join('')}</ul>` : '<div class="gda-vide" style="padding:8px">Aucun changement enregistré.</div>') : '<div class="gda-vide" style="padding:8px">Chargement…</div>'}`;
+  } else if (ST.sousOnglet === 'cotis') {
+    corps = `<dl class="gda-dl">${ligneDl('Formule', esc(c?.formule?.nom || (ST.formules.find(x => Number(x.id) === Number(m.formule_id)) || {}).nom))}${ligneDl('Année de cotisation', esc(f.annee_cotisation))}
+      ${ligneDl("Date d'adhésion", f.date_adhesion ? esc(frLong(f.date_adhesion)) : '—')}${ligneDl('Échéance', f.date_expiration ? esc(frLong(f.date_expiration)) : '—')}
+      ${ligneDl('Statut du membre', `<span class="pill ${s[1]}">${esc(s[0])}</span>`)}${ligneDl('Paiement de la cotisation', `<span class="pill ${f.statut_paiement === 'a_verifier' ? 'neutre' : 'ok'}">${esc(PAIEMENT[f.statut_paiement] || '—')}</span>`)}
+      ${ligneDl('Montant payé', f.montant_paye ? esc(f.montant_paye + ' ' + (c?.formule?.devise || 'EUR')) : '')}${ligneDl('Mode de règlement', esc(MODES[f.mode_paiement] || f.mode_paiement))}${ligneDl('N° de reçu', esc(f.numero_recu))}</dl>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px"><button class="gda-btn or sm" data-fiche-act="cotiser">💰 Enregistrer une cotisation</button>
+      ${m.statut === 'suspendu' ? '<button class="gda-btn sm" data-fiche-act="reactiver">▶️ Réactiver</button>' : m.statut !== 'radie' ? '<button class="gda-btn sm" data-fiche-act="suspendre">⛔ Désactiver (suspendre)</button>' : ''}
+      ${m.statut !== 'radie' ? '<button class="gda-btn sm danger" data-fiche-act="radier">🚫 Radier</button>' : ''}
+      ${!f.linked_user_id && f.email ? '<button class="gda-btn sm" data-fiche-act="inviter">✉️ Inviter à créer son compte</button>' : ''}</div>`;
+  } else {
+    const rect = c?.rectifications || [], j = c?.journal || [];
+    corps = `${rect.length ? `<h4 style="margin:0 0 8px">Demandes de rectification</h4><ul class="gda-hist" style="margin-bottom:14px">${rect.map(r => `<li><b>${r.statut === 'ouverte' ? '🟠 Ouverte' : '✅ Traitée'}</b> — ${esc(r.message)}<small>${esc(frHeure(r.created_at))}${r.reponse ? ' · Réponse : ' + esc(r.reponse) : ''}</small>${r.statut === 'ouverte' ? `<button class="gda-btn sm" data-rect="${r.id}" style="margin-top:6px">Marquer comme traitée</button>` : ''}</li>`).join('')}</ul>` : ''}
+      <h4 style="margin:0 0 8px">Journal des modifications</h4>${c ? (j.length ? `<ul class="gda-hist">${j.map(x => `<li>${esc(x.details || x.action)}<small>${esc(frHeure(x.created_at))}${x.acteur_nom ? ' · ' + esc(x.acteur_nom) : ''}</small></li>`).join('')}</ul>` : '<div class="gda-vide" style="padding:8px">Aucune entrée.</div>') : '<div class="gda-vide" style="padding:8px">Chargement…</div>'}`;
+  }
+  el.innerHTML = `<div class="gda-fiche-tete">${avatar(m, true)}<div><h3>${esc(m.nom)} ${esc(m.prenom || '')}</h3><span class="pill ${s[1]}">${esc(s[0])}</span> <span class="pill neutre">${esc(m.numero_affiche)}</span></div><button class="gda-fermer" id="gda-fermer" aria-label="Fermer la fiche">×</button></div>
+    ${sous.length > 1 ? `<div class="gda-sous" role="tablist">${sous.map(x => `<button role="tab" data-sous="${x[0]}" aria-selected="${x[0] === ST.sousOnglet}">${x[1]}</button>`).join('')}</div>` : ''}
+    ${corps}
+    ${m.virtuel ? '' : `<div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap"><button class="gda-btn" data-fiche-act="modifier" style="flex:1;justify-content:center">✏️ Modifier</button><button class="gda-btn or" data-fiche-act="voircarte" style="flex:1;justify-content:center">💳 Voir la carte</button></div>`}`;
+}
+document.addEventListener('click', async e => {
+  const el = e.target.closest('#gda-fiche'); if (!el) return;
+  const m = ligne(ST.detail); if (!m) return;
+  if (e.target.closest('#gda-fermer')) { ST.detail = null; $('#gda-main').classList.remove('avec-fiche'); el.hidden = true; rendreListe(); return; }
+  const sous = e.target.closest('[data-sous]'); if (sous) { ST.sousOnglet = sous.dataset.sous; rendreFiche(); return; }
+  const rad = e.target.closest('.gda-radio'); if (rad) { changerCarte(m, rad.dataset.s, rad); return; }
+  const rect = e.target.closest('[data-rect]');
+  if (rect) { const r = await dialogue({ titre: 'Demande traitée', texte: "La demande de rectification sera marquée comme traitée et l'adhérent en sera informé.", ok: 'Marquer traitée' }); if (!r.ok) return;
+    try { await api('POST', `/adhesion-rectifications/${rect.dataset.rect}/traiter`, {}); toast('Demande traitée ✅'); await rafraichirFiche(m); } catch (err) { toast(err.message, true); } return; }
+  const act = e.target.closest('[data-fiche-act]')?.dataset.ficheAct; if (!act) return;
+  if (act === 'modifier') return ouvrirEdition(m.id);
+  if (act === 'creer') return ouvrirAjout({ nom: m.nom, prenom: m.prenom, email: m.email, fonction: m.fonction, linked_user_id: m.user_id });
+  if (act === 'voircarte') return voirCarte(m);
+  if (act === 'cotiser') return ouvrirCotisation(m);
+  if (act === 'inviter') { try { await api('POST', `/adhesion-membres/${m.id}/inviter`); toast('Invitation envoyée ✅'); } catch (err) { toast(err.message, true); } return; }
+  if (['suspendre', 'reactiver', 'radier'].includes(act)) {
+    const cible = act === 'reactiver' ? 'a_jour' : act === 'suspendre' ? 'suspendu' : 'radie';
+    const r = await dialogue({ titre: act === 'radier' ? 'Radier cet adhérent ?' : act === 'suspendre' ? "Désactiver l'affiliation ?" : 'Réactiver ?', texte: act === 'radier' ? "La radiation est une fin définitive depuis cet écran." : act === 'suspendre' ? "L'adhérent sera suspendu (réversible)." : "L'adhérent redevient actif.", ok: 'Confirmer', danger: act === 'radier' });
+    if (!r.ok) return;
+    try { await api('PUT', `/adhesion-membres/${m.id}`, { statut: cible }); toast('Statut mis à jour ✅'); await recharger(); ST.complet = null; ouvrirFiche(m.id, 'cotis'); } catch (err) { toast(err.message, true); }
+  }
+});
+async function rafraichirFiche(m) { ST.complet = await api('GET', `/adhesion-membres/${m.id}/fiche`); rendreFiche(); }
+
+/* Statut de la carte : un seul actif, confirmation pour « Livrée », motif obligatoire pour un retour en arrière. */
+async function changerCarte(m, nouveau, bouton) {
+  const ancien = m.card_status || 'not_edited'; if (nouveau === ancien) return;
+  const recul = ORDRE_CARTE[nouveau] < ORDRE_CARTE[ancien];
+  const corps = { card_status: nouveau };
+  if (nouveau === 'delivered') { const r = await dialogue({ titre: 'Confirmer la remise de la carte', texte: `Confirmez-vous que la carte de ${m.prenom || ''} ${m.nom} a bien été remise à l'adhérent ?`, ok: 'Oui, carte livrée', motif: recul }); if (!r.ok) return; corps.confirme = true; if (r.motif) corps.motif = r.motif; }
+  else if (recul) { const r = await dialogue({ titre: 'Revenir à un statut antérieur', texte: `La carte passera de « ${CARTE[ancien]} » à « ${CARTE[nouveau]} ». Précisez pourquoi.`, ok: 'Enregistrer', motif: true }); if (!r.ok) return; corps.motif = r.motif; }
+  try {
+    const r = await api('POST', `/adhesion-membres/${m.id}/carte`, corps);
+    m.card_status = r.card_status; m.card_edited_at = r.card_edited_at; m.card_delivered_at = r.card_delivered_at;
+    toast(`Carte de ${m.prenom || m.nom} : « ${CARTE[r.card_status]} » enregistré ✅`);
+    ST.complet = await api('GET', `/adhesion-membres/${m.id}/fiche`); rendreKpis(); rendreListe(); rendreFiche();
+    const b = $(`.gda-radio[data-s="${r.card_status}"]`); if (b) b.classList.add('flash');
+  } catch (e) { toast(e.message || 'Changement impossible.', true); rendreFiche(); }
+}
+
+function voirCarte(m) {
+  const f = ST.complet?.fiche || m, ini = ST.init;
+  const w = modale(`<div style="background:linear-gradient(135deg,#0d2b4e,#1a4a8a);border-radius:16px;padding:22px;color:#fff;border:2px solid #f5b301;max-width:420px;margin:0 auto">
+      <div style="font-size:12px;letter-spacing:.12em;opacity:.8">CARTE DE MEMBRE</div><div style="font-size:20px;font-weight:800;margin:4px 0 14px">${esc(ini.nom)}</div>
+      <div style="font-size:22px;font-weight:800">${esc(m.prenom || '')} ${esc(m.nom)}</div><div style="opacity:.85;margin-top:2px">${esc(m.fonction || 'Membre')}</div>
+      <div style="display:flex;justify-content:space-between;margin-top:18px;font-size:13px"><div><div style="opacity:.7">N° adhérent</div><b>${esc(m.numero_affiche)}</b></div><div><div style="opacity:.7">Adhésion</div><b>${esc(fr(f.date_adhesion) || '—')}</b></div><div><div style="opacity:.7">Valable jusqu'au</div><b>${esc(fr(f.date_expiration) || '—')}</b></div></div>
+      <div style="margin-top:14px;font-size:12px;opacity:.85">N° ${esc(f.card_id || '')} · ${CARTE[m.card_status || 'not_edited']}</div></div>
+    <div style="text-align:center;margin-top:14px"><button class="gda-btn" data-x>Fermer</button></div>`);
+  w.querySelector('[data-x]').onclick = () => w.fermer();
+}
+
+/* ============ Édition ============ */
+function champ(id, lib, val, type = 'text', extra = '') { return `<label for="${id}">${lib}</label><input type="${type}" id="${id}" value="${esc(val ?? '')}" ${extra}>`; }
+function ouvrirEdition(id) {
+  const m = ligne(id); if (!m || m.virtuel) return;
+  const f = ST.complet && String(ST.complet.fiche.id) === String(id) ? ST.complet.fiche : m;
+  const w = modale(`<h3>✏️ Modifier la fiche</h3><p style="margin:0 0 4px;font-size:13px;color:var(--doux)">Les informations personnelles ne sont jamais publiques ; chaque modification est consignée dans le journal.</p>
+    <div class="gda-grille2"><div>${champ('e-nom', 'Nom', f.nom)}</div><div>${champ('e-prenom', 'Prénom', f.prenom)}</div></div>
+    <div class="gda-grille2"><div>${champ('e-numero', "N° d'adhérent", f.numero_adherent || '', 'text', `placeholder="${esc(m.numero_affiche)}"`)}</div><div>${champ('e-fonction', 'Fonction / poste', f.fonction)}</div></div>
+    ${champ('e-naissance', 'Date de naissance (seule l\'année est affichée dans la liste)', f.date_naissance ? String(f.date_naissance).slice(0, 10) : '', 'date', `max="${new Date().toISOString().slice(0, 10)}"`)}
+    ${champ('e-email', 'E-mail', f.email, 'email')}${champ('e-tel', 'Téléphone (avec indicatif, ex. +33 6 12 34 56 78)', f.telephone, 'tel')}${champ('e-adresse', 'Adresse postale', f.adresse)}
+    <div class="gda-grille2"><div>${champ('e-ville', 'Ville', f.ville)}</div><div>${champ('e-pays', 'Pays', f.pays)}</div></div>
+    <label for="e-obs">Observations</label><textarea id="e-obs" rows="2">${esc(f.observations || '')}</textarea><div id="e-err" style="color:#fca5a5;font-size:13px;min-height:18px;margin-top:6px"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px"><button class="gda-btn" data-x>Annuler</button><button class="gda-btn or" data-ok>Enregistrer</button></div>`);
+  w.querySelector('[data-x]').onclick = () => w.fermer();
+  w.querySelector('[data-ok]').onclick = async () => {
+    const v = k => w.querySelector('#' + k).value.trim();
+    if (!v('e-nom')) { w.querySelector('#e-err').textContent = 'Le nom est obligatoire.'; return; }
+    const corps = { nom: v('e-nom'), prenom: v('e-prenom') || null, numero_adherent: v('e-numero'), fonction: v('e-fonction'), date_naissance: v('e-naissance'), email: v('e-email') || null,
+      telephone: v('e-tel') || null, adresse: v('e-adresse') || null, ville: v('e-ville') || null, pays: v('e-pays') || null, observations: v('e-obs') || null };
+    try {
+      await api('PUT', `/adhesion-membres/${m.id}`, corps);
+      /* Poste d'un compte affilié : on garde aussi la rubrique d'affiliation à jour (rôles existants conservés). */
+      if (m.linked_user_id && corps.fonction !== (m.fonction || '') && ST.affilies.some(a => Number(a.user_id) === Number(m.linked_user_id) && a.statut === 'accepte')) {
+        try { await api('PUT', `/initiatives/${ST.init.id}/membres/${m.linked_user_id}`, { fonction: corps.fonction }); } catch (e) {}
+      }
+      w.fermer(); toast('Fiche mise à jour ✅'); await recharger(); ST.complet = null; if (ST.onglet === 'membres') { rendreMembres(); ouvrirFiche(m.id, ST.sousOnglet); }
+    } catch (e) { w.querySelector('#e-err').textContent = e.message || 'Enregistrement impossible.'; }
+  };
+}
+
+/* ============ Ajout ============ */
+function ouvrirAjout(pre = {}) {
+  if (!ST.formules.length) { toast("Créez d'abord une formule d'adhésion (Cotisations & adhésions).", true); return; }
+  const oui = ST.formules.find(f => Number(f.est_officielle)) || ST.formules[0];
+  const w = modale(`<h3>＋ Ajouter un adhérent</h3>
+    <label for="a-formule">Formule d'adhésion</label><select id="a-formule">${ST.formules.map(f => `<option value="${f.id}" ${f.id === oui.id ? 'selected' : ''}>${esc(f.nom)}</option>`).join('')}</select>
+    <div id="a-cal" style="font-size:12.5px;color:var(--doux);margin:6px 0 0;line-height:1.45"></div>
+    <div class="gda-grille2"><div>${champ('a-nom', 'Nom *', pre.nom)}</div><div>${champ('a-prenom', 'Prénom', pre.prenom)}</div></div>
+    <div class="gda-grille2"><div>${champ('a-numero', "N° d'adhérent (facultatif)", '', 'text', 'placeholder="Généré si vide"')}</div><div>${champ('a-fonction', 'Fonction / poste', pre.fonction)}</div></div>
+    <div class="gda-grille2"><div>${champ('a-naissance', 'Date de naissance', '', 'date', `max="${new Date().toISOString().slice(0, 10)}"`)}</div><div>${champ('a-adhesion', "Date d'adhésion", new Date().toISOString().slice(0, 10), 'date')}</div></div>
+    ${champ('a-email', 'E-mail', pre.email, 'email')}${champ('a-tel', 'Téléphone (avec indicatif, ex. +33 6 12 34 56 78)', '', 'tel')}${champ('a-adresse', 'Adresse postale', '')}
+    <div class="gda-grille2"><div>${champ('a-ville', 'Ville', '')}</div><div>${champ('a-pays', 'Pays', '')}</div></div>
+    <label for="a-carte">Carte de membre</label><select id="a-carte"><option value="not_edited">Non éditée</option><option value="edited">Éditée</option><option value="delivered">Livrée</option></select>
+    <div id="a-err" style="color:#fca5a5;font-size:13px;min-height:18px;margin-top:6px"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px"><button class="gda-btn" data-x>Annuler</button><button class="gda-btn or" data-ok>Ajouter</button></div>`);
+  const formule = () => ST.formules.find(f => String(f.id) === w.querySelector('#a-formule').value);
+  const maj = () => { const f = formule(); w.querySelector('#a-cal').textContent = Number(f.duree_illimitee) ? 'Adhésion sans échéance.' : f.mode_validite === 'collectif' && f.periode_collective_fin ? `📅 Calendrier fixe (échéance ${fr(f.periode_collective_fin)}) : l'échéance suit la période qui contient la date d'adhésion.` : `📅 Année glissante : échéance = date d'adhésion + ${f.duree_valeur || '?'} ${f.duree_unite || 'mois'} ; rappel prévu à la même date l'année suivante. Rappels par e-mail dans tous les cas, plus notification si l'adhérent a un compte.`; };
+  w.querySelector('#a-formule').onchange = maj; maj();
+  w.querySelector('[data-x]').onclick = () => w.fermer();
+  w.querySelector('[data-ok]').onclick = async () => {
+    const v = k => w.querySelector('#' + k).value.trim(); const f = formule();
+    if (!v('a-nom')) { w.querySelector('#a-err').textContent = 'Le nom est obligatoire.'; return; }
+    const corps = { formule_id: f.id, linked_user_id: pre.linked_user_id || null, nom: v('a-nom'), prenom: v('a-prenom') || null, numero_adherent: v('a-numero'), fonction: v('a-fonction'),
+      date_naissance: v('a-naissance') || null, date_adhesion: v('a-adhesion') || null, email: v('a-email') || null, telephone: v('a-tel') || null, adresse: v('a-adresse') || null,
+      ville: v('a-ville') || null, pays: v('a-pays') || null, card_status: v('a-carte'),
+      mode_validite: f.mode_validite === 'collectif' ? 'collectif' : 'individuel', duree_valeur: f.duree_valeur || null, duree_unite: f.duree_unite || 'mois', duree_illimitee: !!Number(f.duree_illimitee),
+      periode_collective_debut: f.periode_collective_debut || null, periode_collective_fin: f.periode_collective_fin || null };
+    try { const r = await api('POST', `/initiatives/${ST.init.id}/adhesion-membres`, corps); w.fermer(); toast('Adhérent ajouté ✅'); await recharger(); ST.onglet = 'membres'; rendreOnglet(); ouvrirFiche(r.id); }
+    catch (e) { w.querySelector('#a-err').textContent = e.message || 'Ajout impossible.'; }
+  };
+}
+$('#gda-ajouter').addEventListener('click', () => ouvrirAjout());
+
+/* ============ Cotisation ============ */
+function ouvrirCotisation(m) {
+  const w = modale(`<h3>💰 Enregistrer une cotisation</h3><label for="c-montant">Montant reçu (€)</label><input type="number" id="c-montant" min="0" step="0.01">
+    <label for="c-mode">Mode de règlement</label><select id="c-mode">${['helloasso', 'especes', 'cheque', 'virement', 'carte', 'paypal'].map(k => `<option value="${k}">${MODES[k]}</option>`).join('')}</select>
+    <div id="c-err" style="color:#fca5a5;font-size:13px;min-height:18px;margin-top:6px"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end"><button class="gda-btn" data-x>Annuler</button><button class="gda-btn or" data-ok>Enregistrer</button></div>`);
+  w.querySelector('[data-x]').onclick = () => w.fermer();
+  w.querySelector('[data-ok]').onclick = async () => {
+    const montant = Number(w.querySelector('#c-montant').value);
+    if (!(montant > 0)) { w.querySelector('#c-err').textContent = 'Indiquez un montant supérieur à 0.'; return; }
+    try { await api('POST', `/adhesion-membres/${m.id}/marquer-paye`, { montant, mode_paiement: w.querySelector('#c-mode').value }); w.fermer(); toast('Cotisation enregistrée ✅'); await recharger(); ST.complet = null; ouvrirFiche(m.id, 'cotis'); }
+    catch (e) { w.querySelector('#c-err').textContent = e.message || 'Enregistrement impossible.'; }
+  };
+}
+
+/* ============ Export (informations autorisées, liste filtrée ou sélection) ============ */
+function exporterCsv() {
+  const base = ST.sel.size ? ST.lignes.filter(m => ST.sel.has(String(m.id))) : ST.filtrees;
+  const ent = ["N° adhérent", 'Nom', 'Prénom', 'Fonction', "Date d'adhésion", 'Année de naissance', 'E-mail', 'Téléphone', 'Adresse postale', 'Ville', 'Pays', 'Statut du membre', 'Statut de la carte', 'Année de cotisation'];
+  const l = base.map(m => [m.numero_affiche, m.nom, m.prenom, m.fonction, fr(m.date_adhesion), m.annee_naissance, m.email, m.telephone, m.adresse, m.ville, m.pays, (STATUT[m.statut] || [m.statut])[0], m.card_status ? CARTE[m.card_status] : '', m.annee_cotisation]);
+  const csv = [ent, ...l].map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(';')).join('\r\n');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })); a.download = 'adherents.csv'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  toast(`${l.length} adhérent${l.length > 1 ? 's' : ''} exporté${l.length > 1 ? 's' : ''} ✅`);
+}
+
+/* ============ Invitations / demandes / refus (rubrique d'affiliation existante, rôles et routes conservés) ============ */
+function rendreAffiliations(onglet) {
+  const cfg = { attente: ['en_attente', false, "Aucune invitation en attente."], demandes: ['en_attente', true, 'Aucune demande en attente.'], refusees: ['refuse', undefined, 'Aucune invitation refusée.'] }[onglet];
+  const l = ST.affilies.filter(a => a.statut === cfg[0] && (cfg[1] === undefined || (cfg[1] ? a.origine === 'demande' : a.origine !== 'demande')));
+  $('#gda-zone').innerHTML = `<div class="gda-pan">${l.length ? l.map(a => `<div class="gda-cartouche">${avatar({ nom: a.nom, prenom: a.prenom, photo: a.avatar_url })}<div class="inf"><b>${esc(a.prenom || '')} ${esc(a.nom || '')}</b><div style="font-size:12.5px;color:var(--doux)">${esc(a.email || '')}</div></div>
+      <div style="min-width:120px;font-weight:700">${esc(a.fonction || '—')}</div>
+      ${a.statut === 'en_attente' && a.origine === 'demande' ? `<button class="gda-btn or sm" data-aff="accepter" data-u="${a.user_id}">Accepter</button><button class="gda-btn sm danger" data-aff="refuser" data-u="${a.user_id}" data-n="${esc((a.prenom || '') + ' ' + (a.nom || ''))}">Décliner</button>`
+        : a.statut === 'en_attente' ? `<button class="gda-btn sm danger" data-aff="annuler" data-u="${a.user_id}" data-n="${esc((a.prenom || '') + ' ' + (a.nom || ''))}">Annuler l'invitation</button>` : '<span class="pill ko">🚫 Refusée</span>'}</div>`).join('') : `<div class="gda-vide">${cfg[2]}</div>`}
+    <p style="margin:14px 0 0;font-size:13px;color:var(--doux)">Pour inviter un compte ou modifier un poste, utilisez aussi <a href="dashboard-initiative.html#affiliation" style="color:#93c5fd">la rubrique « Membres affiliés »</a> de votre espace.</p></div>`;
+}
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-aff]'); if (!b) return;
+  const id = ST.init.id, u = b.dataset.u, n = b.dataset.n || 'ce compte';
+  try {
+    if (b.dataset.aff === 'accepter') await api('PUT', `/initiatives/${id}/membres/${u}`, { statut: 'accepte' });
+    else if (b.dataset.aff === 'refuser') { if (!(await dialogue({ titre: 'Décliner la demande', texte: `Décliner la demande d'affiliation de ${n} ?`, danger: true })).ok) return; await api('PUT', `/initiatives/${id}/membres/${u}`, { statut: 'refuse' }); }
+    else { if (!(await dialogue({ titre: "Annuler l'invitation", texte: `Annuler l'invitation envoyée à ${n} ?`, danger: true })).ok) return; await api('DELETE', `/initiatives/${id}/membres/${u}`); }
+    toast('Fait ✅'); await recharger(); rendreAffiliations(ST.onglet);
+  } catch (err) { toast(err.message || 'Action impossible.', true); }
+});
+
+/* ============ Historique & rapports ============ */
+async function rendreHistorique() {
+  const z = $('#gda-zone'); z.innerHTML = '<div class="gda-vide">Chargement…</div>';
+  let ent = []; try { ent = (await api('GET', `/initiatives/${ST.init.id}/adhesion-audit-log`)).entrees || []; } catch (e) {}
+  const F = ST.lignes.filter(m => !m.virtuel), parAnnee = {}; F.forEach(m => { const a = String(m.date_adhesion || m.created_at || '').slice(0, 4) || '—'; parAnnee[a] = (parAnnee[a] || 0) + 1; });
+  const parStatut = {}; F.forEach(m => { parStatut[m.statut] = (parStatut[m.statut] || 0) + 1; });
+  const cp = F.filter(m => m.statut_paiement === 'a_verifier').length;
+  z.innerHTML = `<div class="gda-main" style="grid-template-columns:minmax(0,1fr) minmax(0,1.4fr)"><section class="gda-pan"><h2>Rapport</h2>
+      <dl class="gda-dl"><dt>Fiches adhérents</dt><dd><b>${F.length}</b></dd><dt>Adhésions par année</dt><dd>${Object.entries(parAnnee).sort().map(([a, n]) => `${esc(a)} : <b>${n}</b>`).join(' · ') || '—'}</dd>
+      <dt>Par statut</dt><dd>${Object.entries(parStatut).map(([s, n]) => `${esc((STATUT[s] || [s])[0])} : <b>${n}</b>`).join(' · ') || '—'}</dd>
+      <dt>Cartes</dt><dd>${['not_edited', 'edited', 'delivered'].map(k => `${CARTE[k]} : <b>${F.filter(m => (m.card_status || 'not_edited') === k).length}</b>`).join(' · ')}</dd>
+      <dt>Cotisation à vérifier</dt><dd><b>${cp}</b> fiche${cp > 1 ? 's' : ''} sans règlement enregistré</dd></dl>
+      <div style="margin-top:14px"><button class="gda-btn" id="gda-rap-export">⬇ Exporter toute la liste</button></div></section>
+    <section class="gda-pan"><h2>Journal des modifications</h2>${ent.length ? `<ul class="gda-hist">${ent.slice(0, 80).map(x => `<li>${esc(x.details || x.action)}<small>${esc(frHeure(x.created_at))}${x.acteur_nom ? ' · ' + esc(x.acteur_nom) : ''}</small></li>`).join('')}</ul>` : '<div class="gda-vide">Aucune entrée.</div>'}</section></div>`;
+  $('#gda-rap-export').onclick = () => { ST.sel.clear(); ST.filtrees = ST.lignes.slice(); exporterCsv(); appliquerFiltres(false); };
+}
+
+charger().catch(() => {});
+</script>
+<script src="assets/chatbot.js"></script>
+<script src="/assets/cookies-banner.js"></script>
+</body>
+</html>
