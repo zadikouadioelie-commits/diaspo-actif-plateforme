@@ -44,7 +44,7 @@
 .gda-pan{background:var(--pan);border:1px solid var(--bord);border-radius:14px;padding:16px}
 .gda-pan h2{font-size:17px;margin:0 0 12px}
 .gda-filtres label{display:block;font-size:12.5px;font-weight:700;margin:12px 0 4px;color:var(--doux)}
-.gda input[type=text],.gda input[type=search],.gda input[type=email],.gda input[type=tel],.gda input[type=date],.gda input[type=number],.gda select,.gda textarea{width:100%;background:#0a1128;color:var(--txt);border:1px solid var(--bord);border-radius:10px;padding:9px 11px;font:inherit;font-size:14px}
+.gda input[type=text],.gda input[type=search],.gda input[type=email],.gda input[type=tel],.gda input[type=date],.gda input[type=number],.gda select,.gda textarea{width:100%;background:#0a1128!important;color:var(--txt)!important;border:1px solid var(--bord);border-radius:10px;padding:9px 11px;font:inherit;font-size:14px}
 .gda select option{background:#0a1128}
 .gda-liste-tete{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:space-between;margin-bottom:10px}
 .gda-liste-tete h2{margin:0}
@@ -113,9 +113,11 @@
 .gda-cartouche .inf{flex:1;min-width:160px}
 .gda-toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#14532d;color:#dcfce7;border:1px solid #22c55e;border-radius:12px;padding:11px 18px;font-weight:700;z-index:1200;box-shadow:0 10px 30px rgba(0,0,0,.5)}
 .gda-toast.err{background:#7f1d1d;color:#fee2e2;border-color:#ef4444}
-.gda-modal{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:1100;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:30px 12px}
-.gda-modal .boite{background:var(--pan);color:var(--txt);border:1px solid var(--bord);border-radius:16px;max-width:560px;width:100%;padding:20px}
-.gda-modal h3{margin:0 0 12px}
+.gda-modal{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:100000;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:30px 12px}
+.gda-modal .boite{background:var(--pan);color:var(--txt);border:2px solid rgba(245,179,1,.6);border-radius:16px;max-width:560px;width:100%;padding:22px 24px;box-shadow:0 24px 70px rgba(0,0,0,.75),0 0 0 6px rgba(245,179,1,.08)}
+.gda-modal h3{margin:0 0 12px;padding-bottom:12px;border-bottom:1px solid var(--bord);font-size:19px}
+.gda-modal .boite>div[style*="justify-content:flex-end"]{border-top:1px solid var(--bord);padding-top:16px;margin-top:18px!important}
+.gda-modal input[type=text],.gda-modal input[type=search],.gda-modal input[type=email],.gda-modal input[type=tel],.gda-modal input[type=date],.gda-modal input[type=number],.gda-modal select,.gda-modal textarea{border-color:rgba(255,255,255,.18)}
 .gda-modal label{display:block;font-size:12.5px;font-weight:700;color:var(--doux);margin:10px 0 4px}
 .gda-grille2{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
 .gda-colmenu{position:absolute;right:0;top:calc(100% + 6px);background:var(--pan2);border:1px solid var(--bord);border-radius:12px;padding:10px 14px;z-index:30;min-width:200px;box-shadow:0 14px 34px rgba(0,0,0,.5)}
