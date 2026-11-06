@@ -2547,7 +2547,7 @@
       const l = lvl(x); if (!l) return '';
       if (x.tracker && !m.tracker_disponible) return ''; /* Maracana Tracker : phase de test, réservé au compte officiel */
       const locked = premiumLocked(l) && !(x.formateur && S.formateurInvite), d = typeof x.d === 'object' ? (x.d[role] || x.d.utilisateur) : x.d;
-      const tag = l === 2 ? `<span class="prem">${locked ? '🔒' : '👑'} Premium</span>` : (l === 3 && S.premium && S.premium.concerne && !S.premium.actif ? '<span class="prem">👑 publier</span>' : '');
+      const tag = l === 2 ? `<span class="prem">Premium${locked ? ' · verrouillé' : ''}</span>` : (l === 3 && S.premium && S.premium.concerne && !S.premium.actif ? '<span class="prem">Premium · publier</span>' : '');
       const inner = `<span class="ic">${ic(locked ? 'lock' : x.i)}</span><span class="sp"><span class="t">${esc(x.t)}</span> ${tag}<br><span class="d">${esc(d)}</span></span><span class="ch">${ic('chev', 's')}</span>`;
       if (locked) return `<a class="li gold locked" href="#" data-lock="1" data-name="${esc(x.t)}">${inner}</a>`;
       return `<a class="li${l === 2 ? ' gold' : ''}" href="${esc(x.h)}" ${x.act ? `data-act="${x.act}"` : ''}>${inner}</a>`;
@@ -2566,7 +2566,7 @@
       <div class="h2" style="margin-top:12px">MENU DES MODULES</div>${partageBouton()}${daBouton()}
       <div class="lst"><a class="li" href="#/accueil"><span class="ic">${ic('home')}</span><span class="sp"><span class="t">Accueil</span><br><span class="d">Tutoriels vidéo, actualités, initiatives</span></span><span class="ch">${ic('chev', 's')}</span></a></div>
       ${modsAdmin ? `<div class="h2">🛡 ADMINISTRATION</div><div class="lst">${modsAdmin}</div>` : ''}
-      ${modsPrem ? `<div class="h2">⭐ MODULES PREMIUM</div><div class="lst">${modsPrem}</div>` : ''}
+      ${modsPrem ? `<div class="h2">MODULES PREMIUM</div><div class="lst">${modsPrem}</div>` : ''}
       <div class="h2">OUTILS</div><div class="lst">${mods}</div>
       <div class="h2">MON COMPTE</div><div class="lst">${compte}<a class="li" href="#/moi"><span class="ic">${ic('user')}</span><span class="sp"><span class="t">Mon espace</span><br><span class="d">Profil, tout le menu et les outils sur ordinateur</span></span><span class="ch">${ic('chev', 's')}</span></a></div>
       <button class="btn out block" id="menu-switch" style="margin-top:14px">${ic('people', 's')} Changer de compte</button>
@@ -2611,7 +2611,7 @@
       <button class="btn out block" id="me-switch" style="margin:10px 0 0">${ic('people', 's')} Changer de compte</button>
       <div class="mdark"><div class="h2" style="margin-top:0">MENU DES MODULES</div>${partageBouton()}${daBouton()}
         ${modsAdmin ? `<div class="h2">🛡 ADMINISTRATION</div><div class="lst">${modsAdmin}</div>` : ''}
-        ${modsPrem ? `<div class="h2">⭐ MODULES PREMIUM</div><div class="lst">${modsPrem}</div>` : ''}
+        ${modsPrem ? `<div class="h2">MODULES PREMIUM</div><div class="lst">${modsPrem}</div>` : ''}
         <div class="h2">OUTILS</div><div class="lst">${mods}</div>
         <div class="h2">MON COMPTE</div><div class="lst">${compte}</div></div>
       ${role ? '' : '<p class="small muted" style="margin:12px 4px 0">Ce type de compte retrouve ses outils complets sur le site : <a href="dashboard-' + esc(m.role === 'administrateur' ? 'administrateur' : 'collectivite') + '.html" style="text-decoration:underline">ouvrir mon tableau de bord</a>.</p>'}

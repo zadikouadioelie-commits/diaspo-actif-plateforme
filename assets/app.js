@@ -6736,6 +6736,14 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       if (menuIci && window.daRechercheMenu) window.daRechercheMenu(menuIci);
       // Boutons « Partager » et « Télécharger Diaspo'Actif » du vrai tiroir, eux aussi fabriqués par app.js.
       if (menuIci && window.daPartageMenu) window.daPartageMenu(menuIci);
+      // Mise en cartes du menu (2026-11-06, maquette fournie) : icônes SVG, descriptions, onglets Standard / Premium / Tous.
+      const cartes = () => { if (menuIci && window.menuModulesCartes) window.menuModulesCartes(menuIci); };
+      if (window.menuModulesCartes) cartes();
+      else if (!document.getElementById("mmc-js")) {
+        const s = document.createElement("script");
+        s.id = "mmc-js"; s.src = "assets/menu-modules-cartes.js?v=1"; s.onload = cartes;
+        document.head.appendChild(s);
+      }
     }
     function fermerMenuIci(viaNavigation) {
       if (!menuIci) return;
@@ -7060,8 +7068,10 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       // retrouvait collé au nom du module dans les résultats de recherche ("Paramètres
       // Boutique?"). Un <a> de sidebar ne porte jamais d'autre bouton que ce type de
       // contrôle auxiliaire, jamais une partie du libellé lui-même.
+      /* Menu en cartes (assets/menu-modules-cartes.js) : le titre est dans un <span class="mmc-titre"> — le retrait des <span> ci-dessous le viderait. */
+      const titreCarte = a.querySelector(".mmc-titre");
       clone.querySelectorAll("span, button").forEach(s => s.remove());
-      const label = (clone.textContent || "").trim();
+      const label = titreCarte ? titreCarte.textContent.trim() : (clone.textContent || "").trim();
       return { el: a, label, norm: sbNormalize(label) };
     }).filter(it => it.label);
     if (!items.length) return;
@@ -7070,7 +7080,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     wrap.className = "sb-search-wrap";
     wrap.style.cssText = "position:relative;padding:0 0 14px;";
     wrap.innerHTML = `
-      <input type="text" id="sb-search-input" placeholder="🔍 Rechercher un module…" autocomplete="off"
+      <input type="text" id="sb-search-input" placeholder="Rechercher un module..." autocomplete="off"
         style="width:100%;box-sizing:border-box;padding:11px 13px;border-radius:10px;border:none;background:#fff;color:#0D2B4E;font-size:14px;font-weight:600;outline:none;">
       <div class="sb-search-results" style="display:none;position:absolute;left:0;right:0;top:calc(100% - 10px);background:#fff;border-radius:10px;box-shadow:0 14px 30px rgba(0,0,0,.35);z-index:60;max-height:320px;overflow-y:auto;"></div>
     `;
@@ -7102,7 +7112,9 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     input.addEventListener("input", () => {
       const q = sbNormalize(input.value);
       if (!q) { results.style.display = "none"; results.innerHTML = ""; return; }
-      const matches = items.map(it => ({ ...it, score: sbScore(it.norm, q) }))
+      /* Libellé relu à la frappe : le menu en cartes (assets/menu-modules-cartes.js) retire les émojis des libellés APRÈS la fabrication de cette liste. */
+      const libelleActuel = a => { const t = a.querySelector(".mmc-titre"); return t ? t.textContent.trim() : null; };
+      const matches = items.map(it => { const l = libelleActuel(it.el); return l ? { ...it, label: l, score: sbScore(sbNormalize(l), q) } : { ...it, score: sbScore(it.norm, q) }; })
         .filter(it => it.score > 0)
         .sort((a, b) => b.score - a.score)
         .slice(0, 8);

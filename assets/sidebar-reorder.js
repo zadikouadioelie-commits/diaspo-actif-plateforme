@@ -165,7 +165,7 @@
     mode = on;
     sidebar.classList.toggle('sb-reorder-mode', on);
     sidebar.querySelectorAll('.sb-drag-handle').forEach(h => h.style.display = on ? 'inline-flex' : 'none');
-    if (btn) btn.textContent = on ? '✓ Terminé' : '↕️ Réorganiser les modules';
+    if (btn) btn.textContent = on ? 'Terminé' : 'Réorganiser les modules';
   }
 
   function injectStyle() {
@@ -187,7 +187,7 @@
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'sb-reorder-toggle';
-    btn.textContent = '↕️ Réorganiser les modules';
+    btn.textContent = 'Réorganiser les modules';
     btn.style.cssText = 'display:block;width:calc(100% - 24px);margin:6px 12px 4px;padding:7px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);color:rgba(255,255,255,.85);font-size:11.5px;font-weight:700;cursor:pointer;text-align:left;';
     btn.addEventListener('click', () => setMode(sidebar, !mode, btn));
     const brand = sidebar.querySelector('.brand');

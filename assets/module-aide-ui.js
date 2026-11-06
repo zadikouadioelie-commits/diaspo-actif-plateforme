@@ -50,7 +50,7 @@
     ov.id = 'module-aide-modal';
     ov.style.cssText = 'position:fixed;inset:0;background:rgba(13,27,42,.6);z-index:10000;display:flex;align-items:center;justify-content:center;padding:16px;';
     ov.innerHTML = `<div style="background:#fff;border-radius:16px;max-width:420px;width:100%;padding:24px;">
-      <h3 style="margin:0 0 12px;font-size:16px;color:#0D1B2A;">${entree.titre}</h3>
+      <h3 style="margin:0 0 12px;font-size:16px;color:#0D1B2A;">${entree.titre.replace(/^[\s\p{Extended_Pictographic}‍️]+/u, '')}</h3>
       <p style="margin:0;font-size:13.5px;color:#374151;line-height:1.6;">${entree.texte}</p>
       <div style="text-align:right;margin-top:18px;">
         <button type="button" onclick="document.getElementById('module-aide-modal').remove()" style="padding:8px 18px;border-radius:8px;border:none;background:#16A34A;color:#fff;font-weight:700;font-size:13px;cursor:pointer;">Compris</button>
