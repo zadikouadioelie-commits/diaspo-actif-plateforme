@@ -31,6 +31,7 @@
   <link rel="stylesheet" href="/assets/expansion-nuit-doree.css?v=1">
   <!-- Design « Nuit dorée » (2026-10-12) : Cotisations & Adhésions et ses fenêtres ; retour arrière : retirer cette ligne -->
   <link rel="stylesheet" href="/assets/adhesions-nuit-doree.css?v=6">
+  <link rel="stylesheet" href="/assets/adhesions-cockpit.css?v=1">
   <!-- Design « Nuit dorée » (2026-10-13) : tableau de bord Initiative (cockpit, Paramètres Boutique, rubriques) ; retour arrière : retirer ces 2 lignes, le script dashboard-nuit-doree.js et class="nd" sur <body> -->
   <link rel="stylesheet" href="/assets/theme-nuit-doree.css?v=7">
   <link rel="stylesheet" href="/assets/dashboard-nuit-doree.css?v=5">
@@ -1266,18 +1267,41 @@ async function initRelaisDiasporaWidget(me, api) {
 
     <!-- ══ SECTION 🎫 COTISATIONS & ADHÉSIONS ══ -->
     <div style="display:none;" id="adhesions-init">
-      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px;">
-        <div>
-          <h2 style="margin:0;">🎫 Cotisations &amp; Adhésions</h2><p id="adh-compteur-adherents" style="display:none;font-size:13px;font-weight:700;margin:6px 0 0;color:var(--text);"></p>
-          <p style="font-size:13px;color:var(--muted);margin:4px 0 0;">Créez des formules d'adhésion et encaissez réellement vos cotisations.</p>
-          <p style="font-size:11.5px;color:var(--muted);margin:6px 0 0;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:6px 10px;display:inline-block;">ℹ️ Diaspo'Actif fournit un reçu de paiement pour chaque adhésion, mais ne délivre pas de reçu fiscal officiel (Cerfa). Si votre organisation est éligible à en émettre pour des dons, cela reste de votre responsabilité de les délivrer vous-même.</p>
+      <!-- En-tête « Cotisations & Adhésions » (2026-11-06, maquette fournie) : bandeau, 4 cartes chiffrées (données réelles), actions. Styles : assets/adhesions-cockpit.css -->
+      <div class="adc-hero">
+        <div class="adc-hero-texte">
+          <svg class="adc-hero-ico" viewBox="0 0 64 64" aria-hidden="true"><g fill="#f5b301"><circle cx="32" cy="20" r="9"/><path d="M14 52c0-10 8-17 18-17s18 7 18 17v3H14z"/><circle cx="14" cy="26" r="6.5" opacity=".85"/><path d="M2 49c0-7 5-12 12-12 2 0 4 .4 5.600 1.200C16 41 14 46 14 52v3H2z" opacity=".85"/><circle cx="50" cy="26" r="6.500" opacity=".85"/><path d="M62 49c0-7-5-12-12-12-2 0-4 .4-5.600 1.200C48 41 50 46 50 52v3h12z" opacity=".85"/></g></svg>
+          <div>
+            <h2>Cotisations &amp; Adhésions</h2>
+            <p class="adc-sous">Gérez les adhésions, les cotisations et les membres de votre initiative.</p>
+            <p id="adh-compteur-adherents" class="adc-compteur" style="display:none;"></p>
+          </div>
         </div>
-        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-          <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;cursor:pointer;background:var(--bg);border:1px solid var(--border);border-radius:99px;padding:6px 14px;" title="Quand fermées, le bouton « Adhérer » disparaît partout (Annuaire, Boutiques, profil public) et aucune nouvelle adhésion n'est possible. Les membres déjà inscrits peuvent toujours renouveler.">
-            <input type="checkbox" id="adh-toggle-ouvertes" checked onchange="adhToggleOuvertes(this.checked)"> Adhésions ouvertes
-          </label>
-          <button class="btn" style="background:#7C3AED;color:#fff;" onclick="adhOuvrirCreationFormule(true)" title="Crée directement la formule ciblée par le bouton public « Adhérer à l'initiative » (annuaire, boutiques, profil) — même formulaire que ci-contre (durée, coût, informations demandées…), marquée Officielle dès l'enregistrement.">⭐ Créer l'adhésion officielle</button>
-          <button class="btn btn-orange" onclick="adhOuvrirCreationFormule()">➕ Créer une formule d'adhésion</button>
+      </div>
+      <details class="adc-note"><summary>ℹ️ Reçus de paiement et reçus fiscaux</summary>
+        <p>Diaspo'Actif fournit un reçu de paiement pour chaque adhésion, mais ne délivre pas de reçu fiscal officiel (Cerfa). Si votre organisation est éligible à en émettre pour des dons, cela reste de votre responsabilité de les délivrer vous-même.</p></details>
+
+      <div class="adc-kpis" id="adc-kpis" aria-live="polite">
+        <div class="adc-kpi"><div class="adc-kpi-ico adc-or" aria-hidden="true">👥</div><div><b>—</b><span>Adhérents totaux</span></div></div>
+        <div class="adc-kpi"><div class="adc-kpi-ico adc-violet" aria-hidden="true">🆕</div><div><b>—</b><span>Nouvelles adhésions</span></div></div>
+        <div class="adc-kpi"><div class="adc-kpi-ico adc-bleu" aria-hidden="true">📅</div><div><b>—</b><span>Adhésions actives</span></div></div>
+        <div class="adc-kpi"><div class="adc-kpi-ico adc-or" aria-hidden="true">🪙</div><div><b>—</b><span>Cotisations</span></div></div>
+      </div>
+
+      <div class="adc-actions">
+        <label class="adc-toggle" title="Quand fermées, le bouton « Adhérer » disparaît partout (Annuaire, Boutiques, profil public) et aucune nouvelle adhésion n'est possible. Les membres déjà inscrits peuvent toujours renouveler.">
+          <span class="adc-toggle-ico" aria-hidden="true">👥</span><span class="adc-toggle-lib">Adhésions ouvertes</span>
+          <input type="checkbox" id="adh-toggle-ouvertes" class="adc-sr" checked onchange="adhToggleOuvertes(this.checked)"><span class="adc-sw" aria-hidden="true"></span>
+        </label>
+        <button class="adc-btn adc-btn-violet" onclick="adhOuvrirCreationFormule(true)" title="Crée directement la formule ciblée par le bouton public « Adhérer à l'initiative » (annuaire, boutiques, profil) — même formulaire que ci-contre (durée, coût, informations demandées…), marquée Officielle dès l'enregistrement.">📄 Créer l'adhésion officielle</button>
+        <button class="adc-btn adc-btn-or" onclick="adhOuvrirCreationFormule()">＋ Créer un formulaire d'adhésion</button>
+        <div class="adc-export">
+          <button class="adc-btn" id="adc-export-btn" aria-haspopup="menu" aria-expanded="false" onclick="adhMenuExport()">⬇ Exporter</button>
+          <div class="adc-export-menu" id="adc-export-menu" role="menu" hidden>
+            <button role="menuitem" onclick="adhExporter('csv')">⬇️ CSV</button>
+            <button role="menuitem" onclick="adhExporter('excel')">📊 Excel</button>
+            <button role="menuitem" onclick="adhExporter('pdf')" title="Ouvre un aperçu imprimable — utilisez « Enregistrer en PDF » dans la boîte de dialogue d'impression du navigateur.">📄 PDF</button>
+          </div>
         </div>
       </div>
 
@@ -1301,11 +1325,11 @@ async function initRelaisDiasporaWidget(me, api) {
         </div>
       </div>
 
-      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
-        <button class="btn btn-sm" id="adh-tab-formules" onclick="adhSwitchTab('formules')">Formules</button>
-        <button class="btn btn-sm btn-outline" id="adh-tab-registre" onclick="adhSwitchTab('registre')">Registre des membres</button>
-        <button class="btn btn-sm btn-outline" id="adh-tab-affiliation" onclick="adhSwitchTab('affiliation')">🔗 Membres affiliés</button>
-        <button class="btn btn-sm btn-outline" id="adh-tab-stats" onclick="adhSwitchTab('stats')">Tableau de bord</button>
+      <div class="adc-onglets" role="tablist" aria-label="Cotisations et adhésions">
+        <button class="adc-onglet actif" role="tab" id="adh-tab-formules" onclick="adhSwitchTab('formules')">▦ Formules</button>
+        <button class="adc-onglet" role="tab" id="adh-tab-registre" onclick="adhSwitchTab('registre')">👤 Registre des membres</button>
+        <button class="adc-onglet" role="tab" id="adh-tab-affiliation" onclick="adhSwitchTab('affiliation')">🔗 Membres affiliés</button>
+        <button class="adc-onglet" role="tab" id="adh-tab-stats" onclick="adhSwitchTab('stats')">📊 Tableau de bord</button>
       </div>
       <div id="adhesions-init-content"><div style="text-align:center;padding:30px;color:var(--muted);">Chargement…</div></div>
       <!-- Membres affiliés (2026-10-08, demande explicite : « mets-le directement dans cotisation et adhésion ») — ancien module « Affiliation », désormais un onglet de cette section. -->
@@ -8039,7 +8063,7 @@ function adhSwitchTab(tab){
   ADH_TAB = tab;
   ['formules','registre','affiliation','stats','campagnes','journal'].forEach(t => {
     const btn = document.getElementById('adh-tab-'+t);
-    if (btn) btn.className = t === tab ? 'btn btn-sm' : 'btn btn-sm btn-outline';
+    if (btn) { btn.className = t === tab ? 'adc-onglet actif' : 'adc-onglet'; btn.setAttribute('aria-selected', String(t === tab)); }
   });
   /* Onglet « Membres affiliés » : panneau propre (ancien module Affiliation) au lieu du conteneur commun des autres onglets. */
   { const c = document.getElementById('adhesions-init-content'), p = document.getElementById('adh-affiliation');
@@ -8062,14 +8086,20 @@ async function adhRenderFormules(){
     ADH_FORMULES = r.formules || [];
     /* Cartouche « Adhésion gratuite automatique » (2026-10-09) — état lu à part : une erreur ici ne masque jamais les formules. */
     try { ADH_GRATUITE = await api('GET', `/initiatives/${initId}/adhesion-gratuite-auto`); } catch(e) { ADH_GRATUITE = null; }
-    const cartoucheGratuite = adhCartoucheGratuiteHtml();
-    if(!ADH_FORMULES.length){
-      el.innerHTML = cartoucheGratuite + '<div style="text-align:center;padding:40px;color:var(--muted);">Aucune formule pour le moment. Cliquez sur « Créer une formule d\'adhésion » pour commencer.</div>';
-      return;
-    }
-    el.innerHTML = cartoucheGratuite + `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;">
-      ${ADH_FORMULES.map(f => `
-        <div class="card" style="padding:0;overflow:hidden;border-left:4px solid ${f.couleur};${f.actif?'':'opacity:.5;'}">
+    /* Nouvelle présentation (2026-11-06, maquette fournie) : liste des formules | aperçu de la carte | dernières adhésions. */
+    try { ADH_DERNIERES = (await api('GET', `/initiatives/${initId}/adhesion-membres`)).membres || []; } catch(e) { ADH_DERNIERES = []; }
+    try { const ri = await api('GET', `/initiatives/${initId}`); ADH_INIT = ri.initiative || ri; } catch(e) { ADH_INIT = null; }
+    if (!ADH_FORMULES.some(f => Number(f.id) === Number(ADH_SEL))) ADH_SEL = (ADH_FORMULES.find(f => f.est_officielle && f.actif) || ADH_FORMULES.find(f => f.actif) || ADH_FORMULES[0] || {}).id || null;
+    el.innerHTML = adhHtmlCockpitFormules();
+    adhMajCartePreview();
+    adhChargerKpis();
+  }catch(e){ el.innerHTML = `<div class="notice">Erreur : ${e.message}</div>`; }
+}
+
+/* Détail de la formule sélectionnée : média, pastilles (officielle, durée, places) et toutes les actions d'origine. */
+function adhHtmlDetailFormule(f){
+  return `
+        <div class="card adc-detail-card" style="padding:0;overflow:hidden;border-left:4px solid ${f.couleur};${f.actif?'':'opacity:.6;'}">
           ${f.media_type==='photo' && f.media_url ? `<img src="${escH(f.media_url)}" style="width:100%;aspect-ratio:16/9;object-fit:cover;display:block;">` :
             f.media_type==='video' && f.media_url ? `<div style="position:relative;width:100%;aspect-ratio:16/9;background:#000;">
               <video src="${escH(f.media_url)}" style="width:100%;height:100%;object-fit:cover;display:block;" muted></video>
@@ -8102,10 +8132,121 @@ async function adhRenderFormules(){
             <button class="btn btn-sm btn-outline" style="color:#ef4444;border-color:#ef4444;" onclick="adhSupprimerFormule(${f.id},'${escH(f.nom).replace(/'/g,"\\'")}')">🗑️</button>`}
           </div>
           </div>
-        </div>`).join('')}
-    </div>`;
-  }catch(e){ el.innerHTML = `<div class="notice">Erreur : ${e.message}</div>`; }
+        </div>`;
 }
+
+let ADH_SEL = null, ADH_INIT = null, ADH_DERNIERES = [];
+const adhDevise = d => (!d || d === 'EUR') ? '€' : d;
+/* Prix affiché dans la liste : « 50 €/an » quand la formule dure un an, sinon le montant seul (la durée figure dans le détail). */
+function adhPrixListe(f){
+  const dev = adhDevise(f.devise);
+  if (f.montant_type === 'libre') return 'Libre';
+  if (f.montant_type !== 'fixe') return `Min. ${f.montant_min} ${dev}`;
+  if (!(Number(f.montant_fixe) > 0)) return 'Gratuit';
+  const annuel = f.mode_validite === 'collectif' || (!f.duree_illimitee && ((f.duree_unite === 'annees' && Number(f.duree_valeur) === 1) || (f.duree_unite === 'mois' && Number(f.duree_valeur) === 12)));
+  return `${f.montant_fixe} ${dev}${annuel ? '/an' : ''}`;
+}
+function adhInitiales(nom, prenom){ return ((prenom||'').trim()[0] || '') + ((nom||'').trim()[0] || '') || '?'; }
+
+function adhHtmlCockpitFormules(){
+  const F = ADH_FORMULES, sel = F.find(f => Number(f.id) === Number(ADH_SEL)) || null;
+  const liste = F.length ? F.map(f => `
+      <button type="button" class="adc-formule${sel && f.id === sel.id ? ' actif' : ''}${f.actif ? '' : ' inactive'}" onclick="adhSelectFormule(${f.id})" aria-pressed="${!!(sel && f.id === sel.id)}">
+        <span class="adc-formule-ico" style="--c:${escH(f.couleur || '#f5b301')}" aria-hidden="true">${escH(f.icone || '🎫')}</span>
+        <span class="adc-formule-txt"><b>${escH(f.nom)}</b><small>${f.est_officielle ? '⭐ Adhésion officielle' : f.description ? escH(String(f.description).replace(/\*\*/g, '').slice(0, 70)) : escH(ADH_TYPE_LABELS[f.type_contribution] || '')}${f.actif ? '' : ' · désactivée'}</small></span>
+        <span class="adc-formule-prix">${escH(adhPrixListe(f))}</span>
+      </button>`).join('')
+    : '<div class="adc-vide">Aucune formule pour le moment. Cliquez sur « Créer un formulaire d\'adhésion » pour commencer.</div>';
+  const dern = [...ADH_DERNIERES].sort((a, b) => String(b.date_adhesion || b.created_at || '').localeCompare(String(a.date_adhesion || a.created_at || ''))).slice(0, 4);
+  const PILL = { a_jour: ['Validée', 'ok'], en_attente: ['En attente', 'att'], non_a_jour: ['À renouveler', 'att'], suspendu: ['Suspendu', 'ko'], radie: ['Radié', 'ko'] };
+  const dernieres = dern.length ? dern.map(m => { const p = PILL[m.statut] || [m.statut, 'att'], d = m.date_adhesion || m.created_at;
+    return `<div class="adc-dern">
+      ${m.photo ? `<img class="adc-av" src="${escH(m.photo)}" alt="" loading="lazy" onerror="this.outerHTML='<span class=&quot;adc-av&quot;>${escH(adhInitiales(m.nom, m.prenom))}</span>'">` : `<span class="adc-av" aria-hidden="true">${escH(adhInitiales(m.nom, m.prenom))}</span>`}
+      <span class="adc-dern-txt"><b>${escH(m.prenom || '')} ${escH(m.nom || '')}</b><small>${d ? new Date(String(d).replace(' ', 'T')).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }) : ''}</small></span>
+      <span class="adc-pill ${p[1]}">${escH(p[0])}</span></div>`; }).join('')
+    : '<div class="adc-vide">Aucune adhésion pour le moment.</div>';
+  return `<div class="adc-grille">
+    <section class="adc-pan" aria-label="Formules d'adhésion"><h3><span aria-hidden="true">👥</span> Formules d'adhésion</h3><div class="adc-formules">${liste}</div></section>
+    <div class="adc-centre"><div id="adc-carte" class="adc-carte-zone"></div>${adhCartoucheGratuiteHtml()}</div>
+    <section class="adc-pan" aria-label="Dernières adhésions"><div class="adc-pan-tete"><h3><span aria-hidden="true">👥</span> Dernières adhésions</h3><button type="button" class="adc-lien" onclick="adhSwitchTab('affiliation')">Voir tout →</button></div>${dernieres}</section>
+  </div>
+  ${sel ? `<section class="adc-pan adc-detail" aria-label="Formule sélectionnée"><h3>Formule sélectionnée : ${escH(sel.nom)}</h3>${adhHtmlDetailFormule(sel)}</section>` : ''}`;
+}
+function adhSelectFormule(id){
+  ADH_SEL = Number(id);
+  const el = document.getElementById('adhesions-init-content'); if (!el) return;
+  el.innerHTML = adhHtmlCockpitFormules();
+  adhMajCartePreview();
+}
+
+/* Aperçu de la carte d'adhérent de la formule sélectionnée : le prototype téléversé par l'association s'il existe, sinon une carte composée
+   (nom de l'initiative, titulaire = compte connecté, validité calculée d'après la durée de la formule, QR vers la page publique). */
+async function adhMajCartePreview(){
+  const zone = document.getElementById('adc-carte'); if (!zone) return;
+  const f = ADH_FORMULES.find(x => Number(x.id) === Number(ADH_SEL));
+  if (!f) { zone.innerHTML = ''; return; }
+  let moi = null; try { moi = await fetchCurrentUser(); } catch (e) {}
+  const prenom = (moi && moi.prenom) || 'Prénom', nom = (moi && moi.nom) || 'Nom';
+  let proto = null; try { proto = f.carte_proto_json ? JSON.parse(f.carte_proto_json) : null; } catch (e) {}
+  if (proto && (proto.recto || proto.verso) && window.CarteProto) {
+    zone.innerHTML = `<div class="adc-carte-proto">${CarteProto.html(proto, prenom, nom)}</div>`;
+    try { CarteProto.ajusterChamps(zone); } catch (e) {}
+    return;
+  }
+  let valide = '—';
+  if (f.duree_illimitee) valide = 'Illimitée';
+  else if (f.mode_validite === 'collectif' && f.periode_collective_fin) valide = new Date(f.periode_collective_fin).toLocaleDateString('fr-FR');
+  else if (f.duree_valeur) { const d = new Date(); const n = Number(f.duree_valeur); if (f.duree_unite === 'jours') d.setDate(d.getDate() + n); else if (f.duree_unite === 'semaines') d.setDate(d.getDate() + 7 * n); else if (f.duree_unite === 'annees') d.setFullYear(d.getFullYear() + n); else d.setMonth(d.getMonth() + n); valide = d.toLocaleDateString('fr-FR'); }
+  const nomInit = (ADH_INIT && ADH_INIT.nom) || 'Mon initiative', logo = ADH_INIT && ADH_INIT.logo_url;
+  zone.innerHTML = `<div class="adc-carte" role="img" aria-label="Aperçu de la carte d'adhérent de ${escH(nomInit)}">
+      <div class="adc-carte-tete">${logo ? `<img src="${escH(logo)}" alt="" class="adc-carte-logo">` : '<span class="adc-carte-logo adc-carte-logo-vide" aria-hidden="true">🏢</span>'}<div><b>${escH(nomInit)}</b><small>${escH(f.nom)}</small></div><span class="adc-carte-type">CARTE<br>D'ADHÉRENT</span></div>
+      <div class="adc-carte-corps">
+        <div class="adc-carte-champs">
+          <div><small>PRÉNOM</small><b>${escH(prenom)}</b></div><div><small>NOM</small><b>${escH(nom)}</b></div>
+          <div><small>N° ADHÉRENT</small><b>Attribué à l'adhésion</b></div><div><small>VALIDITÉ</small><b>${escH(valide)}</b></div>
+        </div>
+        <div class="adc-qr" id="adc-qr" aria-hidden="true"></div>
+      </div>
+      <div class="adc-carte-legende">Aperçu — la carte de chaque adhérent est composée à son nom.</div></div>`;
+  adhQrCarte();
+}
+function adhQrCarte(){
+  const cible = document.getElementById('adc-qr'); if (!cible || !window.__vitrineInitId) return;
+  const dessiner = () => { try { cible.innerHTML = ''; new QRCode(cible, { text: `${location.origin}/initiative.html?id=${window.__vitrineInitId}`, width: 84, height: 84, correctLevel: QRCode.CorrectLevel.M }); } catch (e) {} };
+  if (window.QRCode) return dessiner();
+  const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js'; s.onload = dessiner; document.head.appendChild(s);
+}
+
+/* Cartes chiffrées de l'en-tête (données réelles, aucune tendance sans base de comparaison). */
+async function adhChargerKpis(){
+  const el = document.getElementById('adc-kpis'), initId = window.__vitrineInitId; if (!el || !initId) return;
+  try {
+    const r = await api('GET', `/initiatives/${initId}/adhesion-stats`);
+    const n = v => Number(v || 0).toLocaleString('fr-FR');
+    const delta = pct => (pct === null || !isFinite(pct) || Math.round(pct) === 0) ? '' : `<span class="adc-delta${pct < 0 ? ' neg' : ''}" title="Sur les 30 derniers jours">${pct < 0 ? '↓' : '↑'} ${pct > 0 ? '+' : ''}${Math.round(pct)} %</span>`;
+    const dTotal = r.adherents_avant_30j > 0 ? (r.nouveaux_30j / r.adherents_avant_30j) * 100 : null;
+    const dNouv = r.nouveaux_30j_precedents > 0 ? ((r.nouveaux_30j - r.nouveaux_30j_precedents) / r.nouveaux_30j_precedents) * 100 : null;
+    const cartes = [
+      ['adc-or', '👥', n(r.adherents), 'Adhérents totaux', delta(dTotal)],
+      ['adc-violet', '🆕', n(r.nouveaux_30j), 'Nouvelles adhésions (30 j)', delta(dNouv)],
+      ['adc-bleu', '📅', n(r.a_jour), 'Adhésions actives', ''],
+      ['adc-or', '🪙', `${n(r.cotisations_annee)} €`, `Cotisations (${r.annee})`, '']
+    ];
+    el.innerHTML = cartes.map(c => `<div class="adc-kpi"><div class="adc-kpi-ico ${c[0]}" aria-hidden="true">${c[1]}</div><div><b>${c[2]}</b><span>${c[3]}</span></div>${c[4]}</div>`).join('');
+  } catch (e) { /* les cartes gardent leurs tirets : aucune valeur inventée */ }
+}
+
+/* Menu « Exporter » : les trois exports du registre (CSV, Excel, PDF imprimable). */
+function adhMenuExport(){
+  const m = document.getElementById('adc-export-menu'), b = document.getElementById('adc-export-btn'); if (!m) return;
+  m.hidden = !m.hidden; b.setAttribute('aria-expanded', String(!m.hidden));
+}
+function adhExporter(format){
+  const initId = window.__vitrineInitId; if (!initId) return;
+  window.open(`/api/initiatives/${initId}/adhesion-export${format === 'csv' ? '' : '?format=' + format}`, '_blank');
+  adhMenuExport();
+}
+document.addEventListener('click', e => { const m = document.getElementById('adc-export-menu'); if (m && !m.hidden && !e.target.closest('.adc-export')) { m.hidden = true; document.getElementById('adc-export-btn')?.setAttribute('aria-expanded', 'false'); } });
 
 function adhToggleMontantChamps(){
   const type = document.getElementById('adh-f-montant-type').value;
@@ -8564,26 +8705,22 @@ function adhCartoucheGratuiteHtml(){
   if (!g || !g.type_ok) return '';
   const actif = !!g.actif;
   const bloque = !actif && g.autres_formules_actives > 0;
-  const note = (txt, couleur) => `<p style="font-size:12.5px;color:${couleur};margin:8px 0 0;line-height:1.5;">${txt}</p>`;
-  return `<div id="adh-gratuite-carte" style="border:1.5px solid #86efac;background:linear-gradient(135deg,#f0fdf4,#ecfdf5);border-radius:14px;padding:16px 18px;margin-bottom:16px;">
-    <div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;">
-      <div style="font-size:28px;line-height:1;" aria-hidden="true">🆓</div>
-      <div style="flex:1;min-width:240px;">
-        <div style="font-weight:800;font-size:15px;color:#14532d;">Adhésion gratuite automatique</div>
-        <p style="font-size:13px;color:#166534;margin:4px 0 0;line-height:1.5;">Si l'adhésion à votre initiative est gratuite, activez ce bouton : une adhésion gratuite de 12 mois sera proposée à toute personne qui souhaite adhérer à votre association, <b>avec ou sans compte Diaspo'Actif</b> (nom, prénom et e-mail suffisent). Vous acceptez ou refusez chaque demande depuis le registre des membres.</p>
-        ${actif ? note("✅ Activée — c'est elle que propose le bouton « Adhérer à l'initiative ». Vous pouvez modifier la durée, les champs obligatoires et les documents demandés.", '#166534') : ''}
-        ${bloque ? note("Vous avez déjà des formules d'adhésion actives : le bouton « Adhérer à l'initiative » propose votre adhésion officielle. L'adhésion gratuite automatique est réservée aux associations qui n'ont pas encore de formule.", '#92400e') : ''}
-        ${(!actif && g.formule_id && !bloque) ? note("Désactivée — ses adhérents actuels gardent leur fiche et leurs rappels. Vous pouvez créer de vraies formules d'adhésion ci-dessous.", '#475569') : ''}
-        ${g.adhesions_fermees ? note("🔒 Vos adhésions sont actuellement fermées : personne ne peut adhérer tant qu'elles le restent (réglage « Adhésions ouvertes » ci-dessus).", '#b45309') : ''}
-      </div>
-      <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;">
-        <label style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:13.5px;cursor:${bloque ? 'not-allowed' : 'pointer'};min-height:44px;">
-          <input type="checkbox" ${actif ? 'checked' : ''} ${bloque ? 'disabled' : ''} onchange="adhToggleGratuiteAuto(this)" style="width:20px;height:20px;accent-color:#16a34a;" aria-label="Adhésion gratuite automatique">
-          ${actif ? 'Activée' : 'Désactivée'}
-        </label>
-        ${actif && g.formule_id ? `<button type="button" class="btn btn-sm btn-outline" onclick="adhOuvrirEditionFormule(${g.formule_id})">⚙️ Personnaliser (durée, champs, documents)</button>` : ''}
-      </div>
+  const note = (txt, cls) => `<p class="adc-gratuite-note ${cls}">${txt}</p>`;
+  return `<div id="adh-gratuite-carte" class="adc-gratuite">
+    <span class="adc-gratuite-ico" aria-hidden="true">i</span>
+    <div class="adc-gratuite-txt">
+      <b>Adhésion gratuite automatique</b>
+      <p>Si l'adhésion à votre initiative est gratuite, activez ce bouton : une adhésion gratuite de 12 mois sera proposée à toute personne qui souhaite adhérer à votre initiative, <b>avec ou sans compte Diaspo'Actif</b> (nom, prénom et e-mail suffisent). Vous acceptez ou refusez chaque demande depuis le registre des membres.</p>
+      ${actif ? note("✅ Activée — c'est elle que propose le bouton « Adhérer à l'initiative ». Vous pouvez modifier la durée, les champs obligatoires et les documents demandés.", 'ok') : ''}
+      ${bloque ? note("Vous avez déjà des formules d'adhésion actives : le bouton « Adhérer à l'initiative » propose votre adhésion officielle. L'adhésion gratuite automatique est réservée aux associations qui n'ont pas encore de formule.", 'att') : ''}
+      ${(!actif && g.formule_id && !bloque) ? note("Désactivée — ses adhérents actuels gardent leur fiche et leurs rappels. Vous pouvez créer de vraies formules d'adhésion.", '') : ''}
+      ${g.adhesions_fermees ? note("🔒 Vos adhésions sont actuellement fermées : personne ne peut adhérer tant qu'elles le restent (réglage « Adhésions ouvertes » ci-dessus).", 'att') : ''}
+      ${actif && g.formule_id ? `<button type="button" class="adc-btn adc-btn-sm" onclick="adhOuvrirEditionFormule(${g.formule_id})">⚙️ Personnaliser (durée, champs, documents)</button>` : ''}
     </div>
+    <label class="adc-sw-lib${bloque ? ' bloque' : ''}">
+      <input type="checkbox" class="adc-sr" ${actif ? 'checked' : ''} ${bloque ? 'disabled' : ''} onchange="adhToggleGratuiteAuto(this)" aria-label="Adhésion gratuite automatique : ${actif ? 'activée' : 'désactivée'}">
+      <span class="adc-sw" aria-hidden="true"></span><span class="adc-sw-txt">${actif ? 'Activée' : 'Désactivée'}</span>
+    </label>
   </div>`;
 }
 async function adhToggleGratuiteAuto(cb){

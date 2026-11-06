@@ -8302,10 +8302,21 @@ route("GET", "/api/initiatives/:id/adhesion-stats", async (req, res, params) => 
   `).get(params.id);
   const totalAnneePrec = rows.filter(m => m.date_adhesion && new Date(m.date_adhesion) < new Date(Date.now() - 365*86400000)).length;
   const tauxRenouvellement = totalAnneePrec > 0 ? Math.round((aJour / totalAnneePrec) * 100) : (rows.length ? 100 : 0);
+  /* Cartes de l'en-tête « Cotisations & Adhésions » (2026-11-06) : nouvelles adhésions des 30 derniers jours,
+     comparées aux 30 jours précédents, et cotisations encaissées sur l'année civile en cours. Aucune tendance
+     n'est inventée : le client n'affiche un pourcentage que s'il existe une base de comparaison. */
+  const iso = jours => new Date(Date.now() - jours * 86400000).toISOString().slice(0, 19).replace('T', ' ');
+  const d30 = iso(30), d60 = iso(60);
+  const nouveaux30 = rows.filter(m => m.date_adhesion && String(m.date_adhesion) >= d30).length;
+  const nouveauxPrec = rows.filter(m => m.date_adhesion && String(m.date_adhesion) >= d60 && String(m.date_adhesion) < d30).length;
+  const annee = String(new Date().getFullYear());
+  const anneeCourante = await db.prepare(`SELECT COALESCE(SUM(montant),0) AS total FROM adhesion_paiements WHERE initiative_id=? AND statut='paye' AND substr(date_paiement,1,4)=?`).get(params.id, annee);
   sendJSON(res, 200, {
     adherents: rows.length, a_jour: aJour, en_retard: enRetard,
     montant_collecte: paiements.total, paiements_attendus: enAttentePaiements.total,
     taux_renouvellement: tauxRenouvellement,
+    nouveaux_30j: nouveaux30, nouveaux_30j_precedents: nouveauxPrec, adherents_avant_30j: rows.length - nouveaux30,
+    cotisations_annee: anneeCourante.total, annee: Number(annee),
   });
 });
 

@@ -1,0 +1,133 @@
+/* Cotisations & Adhésions — en-tête, cartes chiffrées, onglets et onglet « Formules » (2026-11-06, maquette fournie par l'utilisateur).
+   Complète assets/adhesions-nuit-doree.css (qui reste le thème de la section) : tout est limité à #adhesions-init.
+   Retour arrière : retirer le lien de cette feuille ET restaurer l'ancien en-tête / l'ancienne grille de formules (voir git). */
+#adhesions-init{--adc-pan:rgba(13,21,48,.82);--adc-bord:rgba(255,255,255,.1);--adc-or:#f5b301;--adc-doux:#aeb8d0;--adc-texte:#e8ecf6}
+#adhesions-init .adc-sr{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+#adhesions-init [hidden]{display:none!important}
+
+/* ── bandeau ── */
+#adhesions-init .adc-hero{position:relative;overflow:hidden;border:1px solid var(--adc-bord);border-radius:18px;min-height:104px;padding:18px 26px;margin-bottom:14px;display:flex;align-items:center;
+  background:linear-gradient(90deg,#0a1128 0%,#0a1128 38%,rgba(10,17,40,.0) 72%),url("/assets/bandeau-cotisations-adhesions.webp") right center/auto 100% no-repeat,#0a1128}
+#adhesions-init .adc-hero-texte{display:flex;align-items:center;gap:18px;position:relative;z-index:1}
+#adhesions-init .adc-hero-ico{width:58px;height:58px;flex:none}
+#adhesions-init .adc-hero h2{margin:0!important;font-family:'Manrope','Segoe UI',system-ui,sans-serif!important;font-weight:800!important;font-size:clamp(26px,3vw,36px)!important;letter-spacing:-.01em;color:#fff!important;border:0!important}
+#adhesions-init .adc-sous{margin:4px 0 0!important;font-size:15px;color:var(--adc-doux)!important}
+#adhesions-init .adc-compteur{margin:8px 0 0!important;font-size:13px;font-weight:700;color:#fff!important}
+#adhesions-init .adc-note{margin:0 0 14px;font-size:13px;color:var(--adc-doux)}
+#adhesions-init .adc-note summary{cursor:pointer;display:inline-block;padding:5px 12px;border:1px solid var(--adc-bord);border-radius:99px;background:rgba(255,255,255,.04)}
+#adhesions-init .adc-note p{margin:8px 0 0!important;max-width:820px;line-height:1.5;font-size:12.5px}
+
+/* ── cartes chiffrées ── */
+#adhesions-init .adc-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:16px}
+#adhesions-init .adc-kpi{position:relative;display:flex;align-items:center;gap:14px;padding:16px 18px 16px 24px;border-radius:16px;background:var(--adc-pan);border:1px solid var(--adc-bord);min-height:92px}
+#adhesions-init .adc-kpi::before{content:"";position:absolute;left:0;top:14px;bottom:14px;width:4px;border-radius:0 4px 4px 0;background:var(--adc-or)}
+#adhesions-init .adc-kpi:has(.adc-violet)::before{background:#8b5cf6}
+#adhesions-init .adc-kpi:has(.adc-bleu)::before{background:#60a5fa}
+#adhesions-init .adc-kpi-ico{width:48px;height:48px;flex:none;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:23px;background:rgba(245,179,1,.16)}
+#adhesions-init .adc-kpi-ico.adc-violet{background:rgba(139,92,246,.22)}
+#adhesions-init .adc-kpi-ico.adc-bleu{background:rgba(96,165,250,.2)}
+#adhesions-init .adc-kpi b{display:block;font-size:32px;line-height:1.05;font-weight:800;color:#fff}
+#adhesions-init .adc-kpi span{display:block;font-size:14.5px;color:var(--adc-texte);margin-top:2px}
+#adhesions-init .adc-delta{position:absolute;top:12px;right:14px;font-size:12.5px;font-weight:800;color:#4ade80;background:rgba(34,197,94,.16);border-radius:99px;padding:3px 9px}
+#adhesions-init .adc-delta.neg{color:#fca5a5;background:rgba(239,68,68,.16)}
+
+/* ── actions ── */
+#adhesions-init .adc-actions{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:18px}
+#adhesions-init .adc-toggle{display:flex;align-items:center;gap:12px;padding:11px 18px;border-radius:16px;background:var(--adc-pan)!important;border:1px solid rgba(245,179,1,.55)!important;cursor:pointer;color:#fff!important;font-weight:800;font-size:15px}
+#adhesions-init .adc-toggle-ico{font-size:20px}
+#adhesions-init .adc-sw{position:relative;display:inline-block;width:48px;height:27px;border-radius:99px;background:#475569;flex:none;transition:background .2s}
+#adhesions-init .adc-sw::after{content:"";position:absolute;top:3px;left:3px;width:21px;height:21px;border-radius:50%;background:#fff;transition:transform .2s}
+#adhesions-init .adc-sr:checked + .adc-sw{background:#22c55e}
+#adhesions-init .adc-sr:checked + .adc-sw::after{transform:translateX(21px)}
+#adhesions-init .adc-sr:focus-visible + .adc-sw{outline:3px solid var(--adc-or);outline-offset:2px}
+#adhesions-init .adc-sr:disabled + .adc-sw{opacity:.45}
+#adhesions-init .adc-btn{display:inline-flex;align-items:center;gap:9px;padding:13px 22px;border-radius:16px;border:1px solid rgba(255,255,255,.2);background:var(--adc-pan);color:#fff;font:inherit;font-weight:800;font-size:15px;cursor:pointer;min-height:48px}
+#adhesions-init .adc-btn:hover{border-color:var(--adc-or)}
+#adhesions-init .adc-btn:focus-visible,#adhesions-init .adc-onglet:focus-visible,#adhesions-init .adc-formule:focus-visible{outline:3px solid var(--adc-or);outline-offset:2px}
+#adhesions-init .adc-btn-violet{background:linear-gradient(135deg,#7c3aed,#4f46e5);border-color:#8b5cf6}
+#adhesions-init .adc-btn-or{background:linear-gradient(135deg,#ffcb2e,#f5a300);color:#1a1202;border-color:#f5b301;box-shadow:0 10px 26px -14px rgba(245,179,1,.9)}
+#adhesions-init .adc-btn-sm{min-height:0;padding:7px 13px;font-size:13px;border-radius:11px;margin-top:10px}
+#adhesions-init .adc-export{position:relative}
+#adhesions-init .adc-export-menu{position:absolute;right:0;top:calc(100% + 6px);z-index:60;min-width:170px;background:#0d1530;border:2px solid rgba(245,179,1,.55);border-radius:14px;padding:8px;box-shadow:0 18px 50px rgba(0,0,0,.65)}
+#adhesions-init .adc-export-menu button{display:block;width:100%;text-align:left;background:none;border:1px solid transparent;color:#fff;font:inherit;font-weight:700;padding:9px 12px;border-radius:9px;cursor:pointer}
+#adhesions-init .adc-export-menu button:hover,#adhesions-init .adc-export-menu button:focus-visible{border-color:var(--adc-or);background:rgba(255,255,255,.05);outline:none}
+
+/* ── onglets ── */
+#adhesions-init .adc-onglets{display:flex;flex-wrap:wrap;gap:8px;border-bottom:1px solid var(--adc-bord);margin-bottom:18px}
+#adhesions-init .adc-onglet{padding:13px 24px;border-radius:14px 14px 0 0;border:1px solid var(--adc-bord);border-bottom:0;background:rgba(13,21,48,.65);color:#dbe3f5;font:inherit;font-weight:700;font-size:15.5px;cursor:pointer}
+#adhesions-init .adc-onglet:hover{color:#fff;border-color:rgba(245,179,1,.5)}
+#adhesions-init .adc-onglet.actif{background:linear-gradient(135deg,#ffcb2e,#f5a300);color:#1a1202;border-color:#f5b301}
+
+/* ── onglet Formules : liste | carte | dernières adhésions ── */
+#adhesions-init .adc-grille{display:grid;grid-template-columns:minmax(290px,1fr) minmax(340px,1.3fr) minmax(280px,1fr);gap:16px;align-items:start}
+#adhesions-init .adc-pan{background:var(--adc-pan);border:1px solid var(--adc-bord);border-radius:18px;padding:18px}
+#adhesions-init .adc-pan h3{display:flex;align-items:center;gap:9px;margin:0 0 14px!important;font-family:'Manrope','Segoe UI',system-ui,sans-serif!important;font-weight:800!important;font-size:20px!important;color:#fff!important;border:0!important;padding:0!important}
+#adhesions-init .adc-pan-tete{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px}
+#adhesions-init .adc-pan-tete h3{margin-bottom:8px!important}
+#adhesions-init .adc-lien{background:none;border:0;color:#93c5fd;font:inherit;font-weight:700;cursor:pointer;white-space:nowrap}
+#adhesions-init .adc-lien:hover{text-decoration:underline}
+#adhesions-init .adc-vide{padding:22px 8px;text-align:center;color:var(--adc-doux);font-size:14px}
+
+#adhesions-init .adc-formule{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;width:100%;padding:14px;margin:0 0 10px;border:1px solid var(--adc-bord);border-radius:15px;background:rgba(255,255,255,.04);color:#fff;text-align:left;font:inherit;cursor:pointer}
+#adhesions-init .adc-formule:hover{border-color:rgba(245,179,1,.6)}
+#adhesions-init .adc-formule.inactive{opacity:.6}
+#adhesions-init .adc-formule-ico{width:42px;height:42px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:21px;background:color-mix(in srgb,var(--c) 30%,transparent)}
+#adhesions-init .adc-formule-txt b{display:block;font-size:16.5px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#adhesions-init .adc-formule-txt small{display:block;font-size:12.5px;color:var(--adc-doux);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#adhesions-init .adc-formule-prix{font-weight:800;font-size:17px;white-space:nowrap}
+#adhesions-init .adc-formule.actif{background:linear-gradient(135deg,#ffcb2e,#f5a300);border-color:#f5b301;color:#1a1202}
+#adhesions-init .adc-formule.actif .adc-formule-txt small{color:rgba(26,18,2,.78)}
+#adhesions-init .adc-formule.actif .adc-formule-ico{background:rgba(26,18,2,.16)}
+
+#adhesions-init .adc-centre{display:grid;gap:16px;min-width:0}
+#adhesions-init .adc-carte{position:relative;overflow:hidden;border-radius:20px;padding:20px 24px 24px;background:linear-gradient(135deg,#0a1836,#112250 62%,#0a1632);border:2px solid #b9893a;box-shadow:0 18px 40px -20px rgba(0,0,0,.8)}
+#adhesions-init .adc-carte::after{content:"";position:absolute;left:0;right:0;bottom:0;height:7px;background:linear-gradient(90deg,#b9893a,#f5d97a,#b9893a)}
+#adhesions-init .adc-carte-tete{display:flex;align-items:center;gap:14px}
+#adhesions-init .adc-carte-logo{width:54px;height:54px;border-radius:14px;object-fit:cover;flex:none;background:rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;font-size:26px}
+#adhesions-init .adc-carte-tete b{display:block;font-size:21px;font-weight:800;color:#fff;line-height:1.15}
+#adhesions-init .adc-carte-tete small{display:block;font-size:12.5px;color:var(--adc-doux)}
+#adhesions-init .adc-carte-type{margin-left:auto;text-align:right;font-size:13.5px;font-weight:800;letter-spacing:.06em;color:var(--adc-or);line-height:1.25}
+#adhesions-init .adc-carte-corps{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin-top:18px}
+#adhesions-init .adc-carte-champs{display:grid;grid-template-columns:1fr 1fr;gap:14px 22px;flex:1;min-width:0}
+#adhesions-init .adc-carte-champs div{border-bottom:1px solid rgba(255,255,255,.16);padding-bottom:5px;min-width:0}
+#adhesions-init .adc-carte-champs small{display:block;font-size:10.5px;letter-spacing:.1em;color:var(--adc-doux)}
+#adhesions-init .adc-carte-champs b{display:block;font-size:17px;font-weight:800;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#adhesions-init .adc-qr{width:98px;height:98px;flex:none;background:#fff;border-radius:10px;padding:7px;display:flex;align-items:center;justify-content:center}
+#adhesions-init .adc-qr img,#adhesions-init .adc-qr canvas{max-width:100%;height:auto}
+#adhesions-init .adc-carte-legende{margin-top:14px;font-size:11.5px;color:var(--adc-doux)}
+#adhesions-init .adc-carte-proto{background:var(--adc-pan);border:1px solid var(--adc-bord);border-radius:18px;padding:14px;overflow:hidden}
+
+#adhesions-init .adc-gratuite{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;align-items:start;padding:16px 18px;border-radius:18px;background:var(--adc-pan);border:1px solid rgba(34,197,94,.5)}
+#adhesions-init .adc-gratuite-ico{width:26px;height:26px;border-radius:50%;background:#22c55e;color:#04210f;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:15px;font-style:italic}
+#adhesions-init .adc-gratuite-txt b{display:block;font-size:17px;color:#4ade80}
+#adhesions-init .adc-gratuite-txt p{margin:6px 0 0!important;font-size:13.5px;line-height:1.5;color:var(--adc-doux)!important}
+#adhesions-init .adc-gratuite-txt p b{display:inline;font-size:inherit;color:#fff}
+#adhesions-init .adc-gratuite-txt .adc-gratuite-note{font-size:12.5px}
+#adhesions-init .adc-gratuite-txt .adc-gratuite-note.ok{color:#86efac!important}
+#adhesions-init .adc-gratuite-txt .adc-gratuite-note.att{color:#fcd34d!important}
+#adhesions-init .adc-sw-lib{display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer}
+#adhesions-init .adc-sw-lib.bloque{cursor:not-allowed}
+#adhesions-init .adc-sw-txt{font-size:12.5px;font-weight:800;color:#fff}
+
+#adhesions-init .adc-dern{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;padding:13px 0;border-bottom:1px solid rgba(255,255,255,.08)}
+#adhesions-init .adc-dern:last-child{border-bottom:0}
+#adhesions-init .adc-av{width:48px;height:48px;border-radius:50%;object-fit:cover;background:#1b2a5c;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;border:2px solid rgba(255,255,255,.14);flex:none}
+#adhesions-init .adc-dern-txt b{display:block;color:#fff;font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#adhesions-init .adc-dern-txt small{display:block;color:var(--adc-doux);font-size:13px}
+#adhesions-init .adc-pill{display:inline-flex;align-items:center;padding:5px 13px;border-radius:99px;font-size:13px;font-weight:800;white-space:nowrap}
+#adhesions-init .adc-pill.ok{background:rgba(34,197,94,.16);color:#4ade80;border:1px solid rgba(34,197,94,.5)}
+#adhesions-init .adc-pill.att{background:rgba(249,115,22,.16);color:#fdba74;border:1px solid rgba(249,115,22,.5)}
+#adhesions-init .adc-pill.ko{background:rgba(239,68,68,.16);color:#fca5a5;border:1px solid rgba(239,68,68,.45)}
+
+#adhesions-init .adc-detail{margin-top:18px}
+#adhesions-init .adc-detail .adc-detail-card{background:rgba(255,255,255,.03)}
+
+@media (max-width:1280px){#adhesions-init .adc-grille{grid-template-columns:minmax(270px,1fr) minmax(320px,1.2fr)}#adhesions-init .adc-grille>.adc-pan:last-child{grid-column:1 / -1}}
+@media (max-width:1000px){#adhesions-init .adc-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:820px){#adhesions-init .adc-grille{grid-template-columns:minmax(0,1fr)}
+  #adhesions-init .adc-hero{background:linear-gradient(90deg,#0a1128 0%,#0a1128 60%,rgba(10,17,40,.7) 100%),url("/assets/bandeau-cotisations-adhesions.webp") right center/auto 100% no-repeat,#0a1128;padding:16px}
+  #adhesions-init .adc-onglet{padding:11px 16px;font-size:14px}}
+@media (max-width:540px){#adhesions-init .adc-kpis{grid-template-columns:minmax(0,1fr)}
+  #adhesions-init .adc-gratuite{grid-template-columns:auto minmax(0,1fr)}#adhesions-init .adc-gratuite .adc-sw-lib{grid-column:1 / -1;flex-direction:row;justify-content:flex-start}
+  #adhesions-init .adc-carte-corps{flex-direction:column;align-items:flex-start}#adhesions-init .adc-btn{width:100%;justify-content:center}}
+@media (prefers-reduced-motion:reduce){#adhesions-init .adc-sw,#adhesions-init .adc-sw::after{transition:none}}
