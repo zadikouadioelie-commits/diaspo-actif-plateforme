@@ -35,7 +35,9 @@
     .pv-header { padding-left: 20px !important; padding-right: 20px !important}
     .pv-header > a span { display: none}
     .pv-wrap { padding-left: 20px !important; padding-right: 20px !important}
-    .pv-grid-2, .pv-grid-4, .pv-grid-5 { grid-template-columns: 1fr !important}
+    .pv-grid-2, .pv-grid-3, .pv-grid-4, .pv-grid-5 { grid-template-columns: 1fr !important}
+    .pv-grid-3 img { height: 220px !important; border-right: none !important; border-bottom: 1.5px solid #031922}
+    .pv-af-photo { min-height: 360px !important; border-right: none !important}
     .pv-footer-grid { grid-template-columns: 1fr !important; gap: 30px !important}
     .pv-heading-92 { font-size: 40px !important}
     .pv-heading-62 { font-size: 34px !important}
@@ -45,6 +47,13 @@
     .pv-heading-34 { font-size: 24px !important}
     .pv-heading-32 { font-size: 23px !important}
   }
+  /* Lien « Accéder au compte rendu » (acte fondateur) — même langage que le site : aplat jaune, trait 1,5 px, ombre portée dure. */
+  .pv-cr-lien { display: inline-flex; align-items: center; gap: 12px; margin-top: 8px; font-size: 13px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: #031922; background: #FFB300; padding: 15px 22px; border: 1.5px solid #031922; box-shadow: 4px 4px 0 #031922; transition: transform .18s ease, box-shadow .18s ease}
+  .pv-cr-lien:hover, .pv-cr-lien:focus-visible { transform: translate(-2px, -2px); box-shadow: 6px 6px 0 #031922}
+  .pv-cr-lien:focus-visible { outline: 2px solid #C4420C; outline-offset: 3px}
+  .pv-cr-lien .pv-cr-fleche { transition: transform .18s ease}
+  .pv-cr-lien:hover .pv-cr-fleche { transform: translateX(4px)}
+  @media (prefers-reduced-motion: reduce) { .pv-cr-lien, .pv-cr-lien .pv-cr-fleche { transition: none}}
 </style>
   <link rel="stylesheet" href="/assets/responsive.v2.css?v=2">
 <link rel="stylesheet" href="/assets/vitrine-brand.css?v=1">
@@ -99,13 +108,44 @@
     </div>
   </div>
 
-  <!-- ACTION 1 — FORUM -->
+  <!-- ACTION 1 — ACTE FONDATEUR (résumé tiré du compte rendu publié sur la plateforme : événement n° 6) -->
+  <div style="border-bottom: 1.5px solid #031922">
+    <div class="pv-grid-2" style="max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr">
+      <img class="pv-af-photo" src="https://diaspoactif-media.b-cdn.net/posts/11595-1791513627096.jpeg" alt="Poignée de main devant le kakemono de l'Acte fondateur de Diaspo'Actif" style="min-height: 470px; border-right: 1.5px solid #031922; display: block; width: 100%; height: 100%; object-fit:cover; object-position: center 30%">
+      <div style="padding: 54px">
+        <div style="display: flex; align-items: baseline; gap: 16px; margin-bottom: 20px">
+          <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 40px; color: #C4420C; line-height: 1">01</span>
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: .12em; color: #587371">ACTE FONDATEUR · TOULOUSE · 3 OCTOBRE 2026</span>
+        </div>
+        <h2 class="pv-heading-34" style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 34px; line-height: 1.08; letter-spacing: -.02em; margin: 0 0 20px">L'acte fondateur de Diaspo'Actif</h2>
+        <div style="display: flex; flex-direction: column; gap: 14px; font-size: 15px; line-height: 1.62; color: #3B5059">
+          <p style="margin: 0">Première édition de notre acte fondateur : il a réuni, autour de Diaspo'Actif, des responsables associatifs des diasporas tchadienne et ivoirienne, des professionnels de l'accompagnement, de la santé, de l'emploi et de la banque, des exposants et des représentants d'institutions, avec pour partenaires COSIM Occitanie-Pyrénées et AKOMCA.</p>
+          <p style="margin: 0">Le moment clé : la présentation de Diaspo'Actif, plateforme internationale des diasporas, par son président, Ondet Zadi, et la transmission de la vision. Elles ont été suivies de questions-réponses très instructives et d'un appel à travailler ensemble à un écosystème propice à la création de valeur pour les pays d'origine et d'accueil des diasporas.</p>
+          <p style="margin: 0">La journée a aussi compté des discours d'ouverture, une table ronde sur la diaspora et le besoin de collaboration, deux masterclass sur l'épargne et le surendettement (1 h 30 d'échanges interactifs et de formations), une présentation de Cofina Bank, la découverte de Moov To Learn et des stands d'initiatives de la plateforme.</p>
+        </div>
+        <div style="margin-top: 22px">
+          <a class="pv-cr-lien" href="compte-rendu.html?evt=6">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h6"/></svg>
+            Accéder au compte rendu
+            <svg class="pv-cr-fleche" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </a>
+        </div>
+      </div>
+    </div>
+    <div class="pv-grid-3" style="max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1.5px solid #031922">
+      <img src="https://diaspoactif-media.b-cdn.net/evenements/11595-1788805800985.jpg" alt="Affiche de l'Acte fondateur : se rencontrer, construire cet écosystème" loading="lazy" style="height: 250px; border-right: 1.5px solid #031922; display: block; width: 100%; object-fit:cover">
+      <img src="https://diaspoactif-media.b-cdn.net/posts/11595-1791513643388.png" alt="Table ronde sur la diaspora et le besoin de collaboration" loading="lazy" style="height: 250px; border-right: 1.5px solid #031922; display: block; width: 100%; object-fit:cover">
+      <img src="https://diaspoactif-media.b-cdn.net/posts/11595-1791513648097.png" alt="Le public de l'Acte fondateur" loading="lazy" style="height: 250px; display: block; width: 100%; object-fit:cover">
+    </div>
+  </div>
+
+  <!-- ACTION 2 — FORUM -->
   <div style="border-bottom: 1.5px solid #031922">
     <div class="pv-grid-2" style="max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr">
       <img src="assets/vitrine/photos/capture-d-cran-2026-07-02-150508-high-bc0909.png" alt="" style="min-height: 470px; border-right: 1.5px solid #031922; display: block; width: 100%; height: 100%; object-fit:cover">
       <div style="padding: 54px">
         <div style="display: flex; align-items: baseline; gap: 16px; margin-bottom: 20px">
-          <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 40px; color: #C4420C; line-height: 1">01</span>
+          <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 40px; color: #C4420C; line-height: 1">02</span>
           <span style="font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: .12em; color: #587371">FORUM · CÔTE D'IVOIRE ↔ FRANCE</span>
         </div>
         <h2 class="pv-heading-34" style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 34px; line-height: 1.08; letter-spacing: -.02em; margin: 0 0 20px">Organisation du Forum Économique AKOMCA</h2>
@@ -118,12 +158,12 @@
     </div>
   </div>
 
-  <!-- ACTION 2 — ANADER (image right) -->
+  <!-- ACTION 3 — ANADER (image right) -->
   <div style="border-bottom: 1.5px solid #031922">
     <div class="pv-grid-2" style="max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr">
       <div style="padding: 54px; border-right: 1.5px solid #031922">
         <div style="display: flex; align-items: baseline; gap: 16px; margin-bottom: 20px">
-          <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 40px; color: #C4420C; line-height: 1">02</span>
+          <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 40px; color: #C4420C; line-height: 1">03</span>
           <span style="font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: .12em; color: #587371">AGRICULTURE · PARTENAIRE ANADER</span>
         </div>
         <h2 class="pv-heading-34" style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 34px; line-height: 1.08; letter-spacing: -.02em; margin: 0 0 20px">Rencontre avec notre partenaire ANADER</h2>
@@ -136,13 +176,13 @@
     </div>
   </div>
 
-  <!-- ACTION 3 — TERRAIN -->
+  <!-- ACTION 4 — TERRAIN -->
   <div style="border-bottom: 1.5px solid #031922">
     <div class="pv-grid-2" style="max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr">
       <img src="assets/vitrine/photos/yobo-ci-high-330418.png" alt="" style="min-height: 470px; border-right: 1.5px solid #031922; display: block; width: 100%; height: 100%; object-fit:cover">
       <div style="padding: 54px">
         <div style="display: flex; align-items: baseline; gap: 16px; margin-bottom: 20px">
-          <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 40px; color: #C4420C; line-height: 1">03</span>
+          <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 40px; color: #C4420C; line-height: 1">04</span>
           <span style="font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: .12em; color: #587371">PROGRAMME AGRICOLE · TERRAIN</span>
         </div>
         <h2 class="pv-heading-34" style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 34px; line-height: 1.08; letter-spacing: -.02em; margin: 0 0 20px">Rencontre entrepreneurs sur le terrain</h2>
