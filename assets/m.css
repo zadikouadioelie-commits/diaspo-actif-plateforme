@@ -552,6 +552,15 @@ button.li{background:none;font:inherit;color:inherit}
 .ev-promo .ep-texte{margin:0 0 14px;font-size:14px;line-height:1.5;color:#C7D4E8;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .ev-promo .ep-periode{display:inline-flex;align-items:center;gap:8px;padding:7px 13px;border-radius:999px;border:1px solid rgba(227,192,110,.4);background:rgba(255,255,255,.06);font-size:13px;font-weight:700;color:#F3E3B5}
 .ev-promo .ep-periode svg,.ev-promo .ep-part svg{width:17px;height:17px;flex:none}
+.ev-promo .ep-cd{margin-top:16px;padding:14px 12px 12px;border-radius:18px;text-align:center;border:1px solid rgba(227,192,110,.4);background:rgba(255,255,255,.05)}
+.ev-promo .ep-cd[hidden]{display:none}
+.ev-promo .ep-cd-titre{font-size:12.5px;font-weight:800;letter-spacing:.04em;color:#E3C06E;margin-bottom:10px}
+.ev-promo .ep-cd-g{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.ev-promo .ep-cd-t{padding:9px 2px 7px;border-radius:12px;background:rgba(6,12,28,.7);border:1px solid rgba(227,192,110,.28)}
+.ev-promo .ep-cd-t b{display:block;font-family:"Bodoni Moda","Didot",Georgia,serif;font-weight:500;font-size:26px;line-height:1.05;color:#E3C06E;font-variant-numeric:tabular-nums}
+.ev-promo .ep-cd-t span{display:block;margin-top:3px;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#C7D4E8}
+.ev-promo .ep-cd-date{margin-top:10px;font-size:12px;color:#C7D4E8}
+.ev-promo .ep-cd-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 .ev-promo .ep-cta{display:flex;flex-direction:column;gap:10px;margin-top:18px}
 .ev-promo .ep-voir,.ev-promo .ep-part{display:flex;align-items:center;justify-content:center;gap:8px;min-height:50px;padding:0 18px;border-radius:999px;font:inherit;font-size:15px;font-weight:800;text-decoration:none;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .ev-promo .ep-voir{border:0;background:linear-gradient(135deg,#F3DC9A,#B9893A);color:#1a1202;box-shadow:0 12px 24px -12px rgba(227,192,110,.7)}

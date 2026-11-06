@@ -376,6 +376,19 @@
    première chose qu'on voit" : rendu une seule fois dans #evt-epingle, jamais soumis au tri/
    filtrage de renderEvts(). Même palette que la cartouche d'accueil (index.html). */
 .evt-epingle{position:relative;overflow:hidden;border-radius:18px;padding:24px;margin-bottom:18px;background:radial-gradient(800px 300px at 80% 10%,#1B3A6B 0%,#0D2B4E 46%,#081A33 100%);border:1.5px solid rgba(245,208,97,.3);box-shadow:0 16px 36px -14px rgba(8,26,51,.5)}
+.evt-epingle{display:flex;flex-wrap:wrap;align-items:center;gap:20px 32px}
+.evt-epingle-main{flex:1 1 420px;min-width:0}
+/* Compte à rebours (2026-11-06) : à droite de la bannière, passe sous le texte quand la place manque. */
+.evt-cd{flex:0 0 auto;text-align:center;padding:16px 18px;border-radius:18px;background:rgba(255,255,255,.05);border:1px solid rgba(245,208,97,.35);max-width:100%}
+.evt-cd[hidden]{display:none}
+.evt-cd-titre{font-weight:800;font-size:13px;letter-spacing:.03em;color:#F5D061;margin-bottom:10px}
+.evt-cd-grille{display:flex;gap:8px;justify-content:center}
+.evt-cd-t{min-width:62px;padding:9px 6px 7px;border-radius:12px;background:rgba(6,12,28,.7);border:1px solid rgba(245,208,97,.25)}
+.evt-cd-t b{display:block;font-size:28px;line-height:1.05;font-weight:800;color:#fff;font-variant-numeric:tabular-nums}
+.evt-cd-t span{display:block;margin-top:3px;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#C7D4E8}
+.evt-cd-date{margin-top:10px;font-size:12px;color:#C7D4E8}
+.evt-cd-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+@media (max-width:520px){.evt-cd{width:100%;padding:14px 10px}.evt-cd-grille{gap:6px}.evt-cd-t{flex:1;min-width:0}.evt-cd-t b{font-size:24px}}
 .evt-epingle-badge{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#F5D061,#C9971C);color:#3A2600;font-weight:800;font-size:11px;letter-spacing:.04em;padding:5px 12px;border-radius:999px;margin-bottom:10px}
 .evt-epingle h3{margin:0 0 8px;font-size:21px;color:#fff;font-weight:800}
 .evt-epingle p{margin:0 0 12px;font-size:13.5px;line-height:1.55;color:#C7D4E8;max-width:640px}
@@ -407,7 +420,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,500;0,6..96,600;1,6..96,500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <!-- Design « Nuit dorée » (2026-10-12) : surcharges chargées en dernier, tout est préfixé html body.nd ; retour arrière : retirer ces 2 lignes et class="nd" sur <body> -->
   <link rel="stylesheet" href="/assets/theme-nuit-doree.css?v=8">
-  <link rel="stylesheet" href="/assets/evenements-nuit-doree.css?v=8">
+  <link rel="stylesheet" href="/assets/evenements-nuit-doree.css?v=9">
 </head>
 <body class="nd">
 <div class="page">
@@ -1079,18 +1092,59 @@ async function chargerEvenementEpingle() {
     const debut = evt.date_evt ? new Date(evt.date_evt + 'T12:00:00Z').toLocaleDateString('fr-FR', { day:'numeric', month:'long', year:'numeric', timeZone:'Europe/Paris' }) : '';
     const fin = evt.date_fin ? new Date(evt.date_fin + 'T12:00:00Z').toLocaleDateString('fr-FR', { day:'numeric', month:'long', year:'numeric', timeZone:'Europe/Paris' }) : '';
     zone.innerHTML = `<div class="evt-epingle">
-      <span class="evt-epingle-badge">⭐ Événement spécial Diaspo'Actif</span>
-      <h3>${esc(evt.titre)}</h3>
-      <p>${evtDescApercu(evt.description, 280)}</p>
-      <div>
-        <span class="evt-epingle-meta">📅 Du ${debut} au ${fin}</span>
+      <div class="evt-epingle-main">
+        <span class="evt-epingle-badge">⭐ Événement spécial Diaspo'Actif</span>
+        <h3>${esc(evt.titre)}</h3>
+        <p>${evtDescApercu(evt.description, 280)}</p>
+        <div>
+          <span class="evt-epingle-meta">📅 Du ${debut} au ${fin}</span>
+        </div>
+        <div class="evt-epingle-ctas">
+          <a class="evt-epingle-cta-primary" href="javascript:void(0)" onclick="openDetail(${evt.id})">👁 Voir l'événement</a>
+          <button type="button" class="evt-epingle-cta-secondary" onclick="partagerEvenement(${evt.id})">📤 Partager — gagnez 3 points de fiabilité</button>
+        </div>
       </div>
-      <div class="evt-epingle-ctas">
-        <a class="evt-epingle-cta-primary" href="javascript:void(0)" onclick="openDetail(${evt.id})">👁 Voir l'événement</a>
-        <button type="button" class="evt-epingle-cta-secondary" onclick="partagerEvenement(${evt.id})">📤 Partager — gagnez 3 points de fiabilité</button>
-      </div>
+      <div class="evt-cd" id="evt-cd" role="timer" hidden></div>
     </div>`;
+    demarrerCompteARebours();
   } catch (e) { zone.innerHTML = ''; }
+}
+
+/* Compte à rebours jusqu'à la fin de la gratuité Premium (2026-11-06, demande explicite).
+   L'échéance vient du serveur (GET /api/premium/fin-gratuite = PREMIUM_FIN_GRATUITE_COMMUNE) : on ne recopie jamais la date
+   ici. Si la route échoue, le bloc reste simplement caché (la bannière reste intacte). Le minuteur s'arrête tout seul
+   quand le bloc quitte la page (bannière re-rendue) ou quand l'échéance est passée. */
+let _cdTimer = null;
+async function demarrerCompteARebours() {
+  if (_cdTimer) { clearInterval(_cdTimer); _cdTimer = null; }
+  const el = document.getElementById('evt-cd');
+  if (!el) return;
+  let fin;
+  try { const r = await api('GET', '/premium/fin-gratuite'); fin = new Date(r.fin).getTime(); } catch (e) { return; }
+  if (!isFinite(fin)) return;
+  const dateTxt = new Date(fin).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Paris' });
+  const tuile = (cle, lib) => `<div class="evt-cd-t"><b data-cd="${cle}">00</b><span>${lib}</span></div>`;
+  el.innerHTML = `<div class="evt-cd-titre">⏳ Fin de la gratuité Premium</div>
+    <div class="evt-cd-grille" aria-hidden="true">${tuile('j', 'jours')}${tuile('h', 'heures')}${tuile('m', 'minutes')}${tuile('s', 'secondes')}</div>
+    <div class="evt-cd-date">Échéance : ${dateTxt}</div>
+    <span class="evt-cd-sr" data-cd="sr"></span>`;
+  el.hidden = false;
+  const p2 = n => String(n).padStart(2, '0');
+  function tic() {
+    if (!document.body.contains(el)) { clearInterval(_cdTimer); _cdTimer = null; return; }
+    let reste = Math.max(0, Math.floor((fin - Date.now()) / 1000));
+    const j = Math.floor(reste / 86400), h = Math.floor(reste % 86400 / 3600), m = Math.floor(reste % 3600 / 60), s = reste % 60;
+    const set = (k, v) => { const n = el.querySelector(`[data-cd="${k}"]`); if (n && n.textContent !== v) n.textContent = v; };
+    set('j', String(j).length < 2 ? p2(j) : String(j)); set('h', p2(h)); set('m', p2(m)); set('s', p2(s));
+    /* Texte lu par les lecteurs d'écran : mis à jour une fois par minute seulement (pas de bavardage chaque seconde). */
+    if (s === 0 || !el.dataset.sr) { el.dataset.sr = '1'; set('sr', `Fin de la gratuité Premium dans ${j} jours, ${h} heures et ${m} minutes.`); }
+    if (reste <= 0) {
+      clearInterval(_cdTimer); _cdTimer = null;
+      el.innerHTML = `<div class="evt-cd-titre">⏳ La gratuité Premium est terminée</div><div class="evt-cd-date">Échéance : ${dateTxt}</div>`;
+    }
+  }
+  tic();
+  _cdTimer = setInterval(tic, 1000);
 }
 
 /* Aperçu court de la description sur la carte de liste (2026-09-25, éditeur de texte enrichi) —

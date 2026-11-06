@@ -949,7 +949,39 @@
   /* Cartouche de l'événement épinglé « 3 mois de Premium offerts » (2026-10-13, demande explicite : « inspire-toi du rendu sur l'ordinateur,
      là je le trouve très banal »). Même langage que la cartouche .evt-epingle du site : nuit, halo doré, badge or, titre en Bodoni, boutons
      en pilule. Bodoni n'est chargé qu'à la première apparition de la cartouche (le reste de l'application reste en police système). */
+  /* Compte à rebours de la cartouche (2026-11-06, demande explicite) : jusqu'à la fin de la gratuité Premium. L'échéance vient du serveur
+     (GET /api/premium/fin-gratuite), jamais recopiée ici ; si la route échoue, le bloc reste caché. Un seul minuteur pour toutes les
+     cartouches présentes dans la page : il (re)remplit les blocs .ep-cd à chaque seconde, donc un nouveau rendu de la liste suffit,
+     et il s'arrête tout seul quand plus aucun bloc n'est affiché. */
+  let epFin = null, epFinEssai = false, epTimer = null;
+  function epCdDemarrer() {
+    if (!epFinEssai) { epFinEssai = true; api('/api/premium/fin-gratuite').then(r => { const t = new Date(r.fin).getTime(); if (isFinite(t)) { epFin = t; epCdTic(); } }).catch(() => { epFinEssai = false; }); }
+    if (!epTimer) epTimer = setInterval(epCdTic, 1000);
+  }
+  function epCdTic() {
+    const blocs = document.querySelectorAll('.ep-cd');
+    if (!blocs.length) { clearInterval(epTimer); epTimer = null; return; }
+    if (epFin == null) return;
+    const reste = Math.max(0, Math.floor((epFin - Date.now()) / 1000));
+    const j = Math.floor(reste / 86400), h = Math.floor(reste % 86400 / 3600), m = Math.floor(reste % 3600 / 60), s = reste % 60;
+    const p2 = n => String(n).padStart(2, '0');
+    const dateTxt = new Date(epFin).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Paris' });
+    blocs.forEach(el => {
+      if (!reste) { if (el.dataset.fini !== '1') { el.dataset.fini = '1'; el.hidden = false; el.innerHTML = `<div class="ep-cd-titre">La gratuité Premium est terminée</div><div class="ep-cd-date">Échéance : ${dateTxt}</div>`; } return; }
+      if (!el.firstChild || el.dataset.fini === '1') {
+        el.dataset.fini = '';
+        const t = (k, l) => `<div class="ep-cd-t"><b data-k="${k}">00</b><span>${l}</span></div>`;
+        el.innerHTML = `<div class="ep-cd-titre">Fin de la gratuité Premium dans</div><div class="ep-cd-g" aria-hidden="true">${t('j', 'jours')}${t('h', 'h')}${t('m', 'min')}${t('s', 's')}</div><div class="ep-cd-date">Échéance : ${dateTxt}</div><span class="ep-cd-sr"></span>`;
+        el.hidden = false;
+      }
+      const set = (k, v) => { const n = el.querySelector(`[data-k="${k}"]`); if (n && n.textContent !== v) n.textContent = v; };
+      set('j', j < 10 ? p2(j) : String(j)); set('h', p2(h)); set('m', p2(m)); set('s', p2(s));
+      const sr = el.querySelector('.ep-cd-sr');
+      if (sr && (s === 0 || !sr.textContent)) sr.textContent = `Fin de la gratuité Premium dans ${j} jours, ${h} heures et ${m} minutes.`;
+    });
+  }
   function evtPromo(e) {
+    epCdDemarrer();
     if (!document.getElementById('ep-font')) { const l = document.createElement('link'); l.id = 'ep-font'; l.rel = 'stylesheet'; l.href = 'https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,500&display=swap'; document.head.appendChild(l); }
     const court = s => { const p = parseDay(s); return p ? `${p.d} ${MOIS[p.m - 1]}` : ''; };
     const dFin = parseDay(e.date_fin);
@@ -961,6 +993,7 @@
       <h3 class="ep-titre">${esc(e.titre)}</h3>
       ${resume ? `<p class="ep-texte">${esc(resume)}${String(e.description || '').length > 170 ? '…' : ''}</p>` : ''}
       ${periode ? `<span class="ep-periode">${ic('cal', 's')}${esc(periode)}</span>` : ''}
+      <div class="ep-cd" role="timer" hidden></div>
       <div class="ep-cta">
         <a class="ep-voir" href="#/evenement/${e.id}">Voir l’événement</a>
         <button type="button" class="ep-part" data-share-ev="${e.id}" data-share-titre="${esc(e.titre)}" data-promo="1">${ic('share', 's')}Partager · gagnez 3 points</button>

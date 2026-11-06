@@ -18049,6 +18049,13 @@ route("POST", "/api/admin/test-email", async (req, res, params, body) => {
   }
 });
 
+/* GET /api/premium/fin-gratuite — échéance COMMUNE de la gratuité Premium (2026-11-06), publique : elle alimente le
+   compte à rebours de la bannière « 3 mois de Premium offerts ». Lit la constante unique PREMIUM_FIN_GRATUITE_COMMUNE
+   (modifiable par variable d'environnement) : le compte à rebours suit donc toujours la vraie règle, jamais une date recopiée. */
+route("GET", "/api/premium/fin-gratuite", async (req, res) => {
+  sendJSON(res, 200, { fin: PREMIUM_FIN_GRATUITE_COMMUNE.toISOString() });
+});
+
 /* GET /api/premium/statut — état de l'abonnement du compte connecté. */
 route("GET", "/api/premium/statut", async (req, res) => {
   const user = await getCurrentUser(req);

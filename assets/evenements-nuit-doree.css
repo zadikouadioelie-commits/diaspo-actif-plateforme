@@ -84,6 +84,10 @@ html body.nd .evt-epingle{border:1px solid var(--nd-bord);border-radius:26px;bac
 html body.nd .evt-epingle h3{font-family:var(--nd-display)!important;font-weight:500;font-size:26px}
 html body.nd .evt-epingle-badge{background:var(--nd-degore);color:#1a1202}
 html body.nd .evt-epingle-cta-primary{background:var(--nd-degore)!important;color:#1a1202!important;border-radius:999px!important;font-weight:800}
+html body.nd .evt-cd{border:1px solid var(--nd-bord);border-radius:22px;background:rgba(255,255,255,.04)}
+html body.nd .evt-cd-titre{color:var(--nd-or)}
+html body.nd .evt-cd-t{border-radius:14px;border:1px solid var(--nd-bord)}
+html body.nd .evt-cd-t b{font-family:var(--nd-display)!important;font-weight:500;color:var(--nd-or)}
 html body.nd .evt-epingle-cta-secondary{border-radius:999px!important;color:var(--nd-or)!important}
 
 /* ═══ fenêtres : calendrier Diaspora, détail, création, aperçu ═══ */
