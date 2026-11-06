@@ -73,6 +73,16 @@
 .gda-relier.trouve{background:rgba(34,197,94,.18);border-color:rgba(34,197,94,.7);color:#86efac}
 .gda-relier.trouve:hover{background:rgba(34,197,94,.3)}
 .gda-ico.gda-relie{border-color:rgba(34,197,94,.55);background:rgba(34,197,94,.14)}
+.gda-pillbtn{font:inherit;font-weight:800;font-size:12.5px;cursor:pointer}
+.gda-pillbtn:hover{filter:brightness(1.25);box-shadow:0 0 0 2px rgba(245,179,1,.35)}
+.gda-menu-carte{position:fixed;z-index:99000;width:260px;max-width:calc(100vw - 16px);background:var(--pan);border:2px solid rgba(245,179,1,.6);border-radius:14px;padding:10px;box-shadow:0 18px 50px rgba(0,0,0,.7)}
+.gda-mc-titre{font-weight:800;font-size:13px;color:var(--doux);padding:2px 6px 8px;border-bottom:1px solid var(--bord);margin-bottom:6px}
+.gda-menu-carte button{display:flex;width:100%;justify-content:space-between;align-items:center;gap:10px;background:transparent;border:1px solid transparent;color:var(--txt);border-radius:9px;padding:9px 10px;font:inherit;font-weight:700;font-size:14px;cursor:pointer;text-align:left}
+.gda-menu-carte button:hover:not(:disabled),.gda-menu-carte button:focus-visible{border-color:var(--or2);background:rgba(255,255,255,.05);outline:none}
+.gda-menu-carte button:disabled{opacity:.55;cursor:default}
+.gda-menu-carte button small{color:var(--doux);font-weight:600}
+.gda-menu-carte button.not_edited{color:#fdba74}.gda-menu-carte button.edited{color:#93c5fd}.gda-menu-carte button.delivered{color:#4ade80}
+.gda-mc-aide{font-size:11.5px;color:var(--doux);padding:8px 6px 2px;border-top:1px solid var(--bord);margin-top:6px;line-height:1.4}
 .gda-lien{background:none;border:0;padding:0;color:#93c5fd;font:inherit;text-decoration:underline;cursor:pointer}
 .gda-res{display:flex;align-items:center;gap:12px;border:1px solid var(--bord);border-radius:12px;padding:10px 12px;margin-top:8px;background:var(--pan2)}
 .gda-res .inf{flex:1;min-width:0;font-size:13px;color:var(--doux)}
@@ -390,7 +400,9 @@ function celluleCol(m, c) {
     case 'tel': return m.telephone ? esc(m.telephone) : '—';
     case 'ville': return esc(m.ville || '—');
     case 'statut': { const s = STATUT[m.statut] || [m.statut, 'neutre']; return `<span class="pill ${s[1]}">${esc(s[0])}</span>`; }
-    case 'carte': return m.card_status ? `<span class="pill ${m.card_status}">${CARTE_ICO[m.card_status]} ${CARTE[m.card_status]}</span>` : '<span class="pill neutre">—</span>';
+    case 'carte': return m.card_status && !m.virtuel
+      ? `<button type="button" class="pill ${m.card_status} gda-pillbtn" data-act="carte" aria-haspopup="menu" title="Cliquer pour faire évoluer le statut de la carte" aria-label="Statut de la carte : ${CARTE[m.card_status]}. Changer le statut">${CARTE_ICO[m.card_status]} ${CARTE[m.card_status]} <span aria-hidden="true">▾</span></button>`
+      : '<span class="pill neutre">—</span>';
   }
   return '';
 }
@@ -427,6 +439,7 @@ document.addEventListener('change', e => {
 document.addEventListener('click', e => {
   const tr = e.target.closest('#gda-tableau tbody tr'); if (!tr || e.target.closest('input')) return;
   const id = tr.dataset.id; const act = e.target.closest('[data-act]')?.dataset.act;
+  if (act === 'carte') { ouvrirMenuCarte(ligne(id), e.target.closest('[data-act]')); return; }
   ouvrirFiche(id); if (act === 'modifier') ouvrirEdition(id); if (act === 'relier') ouvrirRelier(id);
 });
 
@@ -517,6 +530,33 @@ async function changerCarte(m, nouveau, bouton) {
     const b = $(`.gda-radio[data-s="${r.card_status}"]`); if (b) b.classList.add('flash');
   } catch (e) { toast(e.message || 'Changement impossible.', true); rendreFiche(); }
 }
+
+/* Menu rapide du statut de carte, depuis la liste : mêmes règles que dans la fiche (confirmation pour « Livrée »,
+   motif obligatoire pour un retour en arrière), via changerCarte(). */
+function fermerMenuCarte() { document.querySelector('.gda-menu-carte')?.remove(); }
+function ouvrirMenuCarte(m, bouton) {
+  const deja = document.querySelector('.gda-menu-carte'); const memeMembre = deja && deja.dataset.id === String(m?.id);
+  fermerMenuCarte(); if (!m || m.virtuel || memeMembre) return;
+  const cs = m.card_status || 'not_edited';
+  const menu = document.createElement('div'); menu.className = 'gda-menu-carte'; menu.dataset.id = String(m.id); menu.setAttribute('role', 'menu');
+  menu.setAttribute('aria-label', `Statut de la carte de ${m.prenom || ''} ${m.nom}`);
+  menu.innerHTML = `<div class="gda-mc-titre">Carte de ${esc(m.prenom || '')} ${esc(m.nom)}</div>`
+    + Object.entries(CARTE).map(([k, l]) => `<button type="button" role="menuitemradio" aria-checked="${k === cs}" data-s="${k}" class="${k}" ${k === cs ? 'disabled' : ''}><span>${CARTE_ICO[k]} ${l}</span>${k === cs ? '<small>actuel</small>' : ORDRE_CARTE[k] < ORDRE_CARTE[cs] ? '<small>retour</small>' : ''}</button>`).join('')
+    + '<div class="gda-mc-aide">« Livrée » demande une confirmation ; revenir en arrière demande un motif.</div>';
+  (document.getElementById('gda') || document.body).appendChild(menu);
+  const r = bouton.getBoundingClientRect(), h = menu.offsetHeight, w = menu.offsetWidth;
+  menu.style.left = Math.max(8, Math.min(r.left, innerWidth - w - 8)) + 'px';
+  menu.style.top = (r.bottom + 6 + h > innerHeight - 8 ? Math.max(8, r.top - h - 6) : r.bottom + 6) + 'px';
+  menu.addEventListener('click', async e => {
+    const b = e.target.closest('[data-s]'); if (!b || b.disabled) return;
+    fermerMenuCarte(); await changerCarte(m, b.dataset.s, b);
+  });
+  menu.addEventListener('keydown', e => { if (e.key === 'Escape') { fermerMenuCarte(); bouton.focus(); } });
+  (menu.querySelector('button:not([disabled])') || menu).focus();
+}
+document.addEventListener('click', e => { if (!e.target.closest('.gda-menu-carte') && !e.target.closest('[data-act="carte"]')) fermerMenuCarte(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') fermerMenuCarte(); });
+window.addEventListener('scroll', fermerMenuCarte, true); window.addEventListener('resize', fermerMenuCarte);
 
 function voirCarte(m) {
   const f = ST.complet?.fiche || m, ini = ST.init;
