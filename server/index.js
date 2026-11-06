@@ -7490,8 +7490,22 @@ async function adhEnrichirMembres(initiativeId, rows) {
   const users = new Map(), fonctions = new Map();
   for (let i = 0; i < ids.length; i += 200) {
     const lot = ids.slice(i, i + 200), ph = lot.map(() => '?').join(',');
-    (await db.prepare(`SELECT id, photo_url, ville, pays FROM users WHERE id IN (${ph})`).all(...lot)).forEach(u => users.set(Number(u.id), u));
+    (await db.prepare(`SELECT id, photo_url, ville, pays, nom, prenom, role FROM users WHERE id IN (${ph})`).all(...lot)).forEach(u => users.set(Number(u.id), u));
     (await db.prepare(`SELECT user_id, fonction FROM initiative_membres WHERE initiative_id=? AND statut='accepte' AND user_id IN (${ph})`).all(initiativeId, ...lot)).forEach(f => fonctions.set(Number(f.user_id), f.fonction));
+  }
+  /* Proposition automatique de rattachement : pour une fiche sans compte, le compte Diaspo'Actif qui porte
+     exactement la même adresse e-mail (jamais appliqué seul : l'association confirme d'un clic). */
+  const propositions = new Map();
+  const nonLies = [...new Set(rows.filter(m => !m.linked_user_id && m.email).map(m => String(m.email).trim().toLowerCase()))];
+  if (nonLies.length) {
+    const dejaLies = new Set((await db.prepare("SELECT linked_user_id FROM adhesion_membres WHERE initiative_id=? AND linked_user_id IS NOT NULL").all(initiativeId)).map(r => Number(r.linked_user_id)));
+    for (let i = 0; i < nonLies.length; i += 200) {
+      const lot = nonLies.slice(i, i + 200), ph = lot.map(() => '?').join(',');
+      (await db.prepare(`SELECT u.id, u.nom, u.prenom, u.role, u.photo_url, LOWER(u.email) AS e, i_s.nom AS init_nom FROM users u LEFT JOIN initiatives i_s ON i_s.owner_user_id=u.id
+        WHERE LOWER(u.email) IN (${ph}) AND u.role != 'administrateur' AND u.compte_masque=0 AND u.nom != 'Compte supprimé' AND (u.is_demo IS NULL OR u.is_demo=FALSE)`).all(...lot))
+        .filter(u => !dejaLies.has(Number(u.id)))
+        .forEach(u => propositions.set(u.e, { id: u.id, nom: u.role === 'utilisateur' ? `${u.prenom || ''} ${u.nom || ''}`.trim() : (u.init_nom || u.nom), photo: u.photo_url || null }));
+    }
   }
   return rows.map(m => {
     const u = m.linked_user_id ? users.get(Number(m.linked_user_id)) : null;
@@ -7499,7 +7513,9 @@ async function adhEnrichirMembres(initiativeId, rows) {
     const dateRef = m.date_adhesion || m.created_at || '';
     return { ...m,
       numero_affiche: numero, card_id: `CARTE-${numero}`, card_status: m.card_status || 'not_edited',
-      photo: m.photo_url || u?.photo_url || null,
+      photo: u?.photo_url || m.photo_url || null,
+      compte_nom: u ? (u.role === 'utilisateur' ? `${u.prenom || ''} ${u.nom || ''}`.trim() : u.nom) : null,
+      compte_propose: !m.linked_user_id && m.email ? (propositions.get(String(m.email).trim().toLowerCase()) || null) : null,
       ville: m.ville || u?.ville || null, pays: m.pays || u?.pays || null,
       fonction: m.fonction || (m.linked_user_id ? fonctions.get(Number(m.linked_user_id)) : null) || null,
       annee_naissance: m.date_naissance ? String(m.date_naissance).slice(0, 4) : null,
@@ -7752,6 +7768,65 @@ route("POST", "/api/adhesion-membres/:id/carte", async (req, res, params, body) 
     .run(m.id, m.initiative_id, ancien, nouveau, motif || null, user.id, `${user.prenom || ''} ${user.nom || ''}`.trim());
   journaliserAdhesion(m.initiative_id, m.id, 'modification', user, `Carte de membre : ${ADH_LIB_CARTE[ancien]} → ${ADH_LIB_CARTE[nouveau]}${motif ? ` (motif : ${motif})` : ''}.`);
   sendJSON(res, 200, { ok: true, card_status: nouveau, card_edited_at: edite, card_delivered_at: livre, card_updated_by: `${user.prenom || ''} ${user.nom || ''}`.trim() });
+});
+
+/* ── Relier une fiche adhérent à un compte Diaspo'Actif (2026-11-06) ──
+   L'association choisit à la main le compte qui correspond à la personne : la fiche reprend alors
+   la photo, la ville et le pays du profil (cf. adhEnrichirMembres) et l'adhérent retrouve sa fiche
+   dans son espace. Seules des données déjà publiques du profil sont reprises — jamais l'e-mail ni
+   le téléphone du compte. L'e-mail renvoyé par la recherche est masqué. */
+function adhMasquerEmail(e) {
+  const [l, d] = String(e || '').split('@'); if (!d) return '';
+  const [dom, ...ext] = d.split('.');
+  return `${l.slice(0, 1)}***@${dom.slice(0, 1)}***${ext.length ? '.' + ext.join('.') : ''}`;
+}
+route("GET", "/api/adhesion-membres/:id/comptes-candidats", async (req, res, params, body, query) => {
+  const a = await adhFicheAutorisee(req, res, params.id); if (!a) return;
+  const { user, m } = a;
+  if (!(await exigerPremium(user, res, "adhesions"))) return;
+  const q = String(query?.q || '').trim().toLowerCase().slice(0, 80);
+  if (q.length < 2) return sendJSON(res, 200, { comptes: [] });
+  const like = `%${q}%`;
+  const rows = await db.prepare(`
+    SELECT u.id, u.nom, u.prenom, u.email, u.role, u.ville, u.pays, u.photo_url, i_s.nom AS init_nom
+    FROM users u LEFT JOIN initiatives i_s ON i_s.owner_user_id = u.id
+    WHERE u.role != 'administrateur' AND u.compte_masque=0 AND u.nom != 'Compte supprimé' AND (u.is_demo IS NULL OR u.is_demo=FALSE)
+      AND (LOWER(u.nom) LIKE ? OR LOWER(u.prenom) LIKE ? OR LOWER(u.email) LIKE ? OR LOWER(COALESCE(i_s.nom,'')) LIKE ? OR CAST(u.id AS TEXT) = ?)
+    ORDER BY u.nom ASC LIMIT 12`).all(like, like, like, like, q);
+  const deja = new Set((await db.prepare("SELECT linked_user_id FROM adhesion_membres WHERE initiative_id=? AND linked_user_id IS NOT NULL AND id<>?").all(m.initiative_id, m.id)).map(r => Number(r.linked_user_id)));
+  const emailFiche = String(m.email || '').trim().toLowerCase();
+  sendJSON(res, 200, { comptes: rows.map(u => ({
+    id: u.id, role: u.role,
+    nom: u.role === 'utilisateur' ? u.nom : (u.init_nom || u.nom), prenom: u.role === 'utilisateur' ? u.prenom : null,
+    email_masque: adhMasquerEmail(u.email), ville: u.ville || null, pays: u.pays || null, photo: u.photo_url || null,
+    meme_email: !!emailFiche && String(u.email || '').toLowerCase() === emailFiche,
+    deja_relie: deja.has(Number(u.id)) })) });
+});
+
+route("POST", "/api/adhesion-membres/:id/relier", async (req, res, params, body) => {
+  const a = await adhFicheAutorisee(req, res, params.id); if (!a) return;
+  const { user, m } = a;
+  if (!(await exigerPremium(user, res, "adhesions"))) return;
+  if (m.linked_user_id) return sendJSON(res, 400, { error: "Cette fiche est déjà reliée à un compte. Déliez-la d'abord pour en choisir un autre." });
+  const cible = await db.prepare("SELECT id, nom, prenom, role FROM users WHERE id=? AND role != 'administrateur' AND compte_masque=0 AND nom != 'Compte supprimé' AND (is_demo IS NULL OR is_demo=FALSE)").get(Number(body?.user_id) || 0);
+  if (!cible) return sendJSON(res, 400, { error: "Compte Diaspo'Actif introuvable." });
+  const autre = await db.prepare("SELECT id FROM adhesion_membres WHERE initiative_id=? AND linked_user_id=? AND id<>?").get(m.initiative_id, cible.id, m.id);
+  if (autre) return sendJSON(res, 400, { error: "Ce compte est déjà relié à une autre fiche adhérent de votre initiative." });
+  await db.prepare("UPDATE adhesion_membres SET linked_user_id=?, updated_at=datetime('now') WHERE id=?").run(cible.id, m.id);
+  journaliserAdhesion(m.initiative_id, m.id, 'modification', user, `Fiche reliée au compte Diaspo'Actif n° ${cible.id}.`);
+  creerNotif(cible.id, "adhesion_fiche_reliee", "Votre fiche d'adhérent est reliée à votre compte",
+    `« ${m.init_nom} » a relié votre fiche d'adhérent à votre compte Diaspo'Actif. Vous la retrouvez dans « Mes paiements ».`, { membre_id: m.id });
+  sendJSON(res, 200, { ok: true, linked_user_id: cible.id });
+});
+
+route("POST", "/api/adhesion-membres/:id/delier", async (req, res, params) => {
+  const a = await adhFicheAutorisee(req, res, params.id); if (!a) return;
+  const { user, m } = a;
+  if (!(await exigerPremium(user, res, "adhesions"))) return;
+  if (!m.linked_user_id) return sendJSON(res, 400, { error: "Cette fiche n'est reliée à aucun compte." });
+  await db.prepare("UPDATE adhesion_membres SET linked_user_id=NULL, updated_at=datetime('now') WHERE id=?").run(m.id);
+  journaliserAdhesion(m.initiative_id, m.id, 'modification', user, `Fiche déliée du compte Diaspo'Actif n° ${m.linked_user_id}.`);
+  sendJSON(res, 200, { ok: true });
 });
 
 /* Fiche détaillée : identité complète, carte (dates, responsable), historique de carte, journal, demandes de rectification. */

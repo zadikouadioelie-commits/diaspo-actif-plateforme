@@ -8031,6 +8031,7 @@ async function adhRenderJournal(membreId){
 }
 
 window.addEventListener('message', function(e){
+  if (e.origin === location.origin && e.data && e.data.gdaModale) { var fm = document.getElementById('aff-iframe'); if (fm) fm.scrollIntoView({ block: 'start', behavior: 'smooth' }); return; }
   if (e.origin !== location.origin || !e.data || typeof e.data.gdaHauteur !== 'number') return;
   var f = document.getElementById('aff-iframe'); if (f) f.style.height = Math.max(620, Math.min(e.data.gdaHauteur + 4, 6000)) + 'px';
 });

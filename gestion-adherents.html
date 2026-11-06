@@ -67,7 +67,16 @@
 .pill.neutre{background:rgba(255,255,255,.07);color:var(--doux);border:1px solid var(--bord)}
 .pill.ok{background:rgba(34,197,94,.15);color:#4ade80;border:1px solid rgba(34,197,94,.4)}
 .pill.ko{background:rgba(239,68,68,.15);color:#fca5a5;border:1px solid rgba(239,68,68,.4)}
-.gda-act{display:flex;gap:4px}
+.gda-act{display:flex;gap:4px;align-items:center}
+.gda-relier{background:rgba(245,179,1,.12);border:1px solid rgba(245,179,1,.55);color:#fcd34d;border-radius:8px;height:32px;padding:0 10px;font:inherit;font-weight:800;font-size:13px;cursor:pointer;white-space:nowrap}
+.gda-relier:hover{background:rgba(245,179,1,.25)}
+.gda-relier.trouve{background:rgba(34,197,94,.18);border-color:rgba(34,197,94,.7);color:#86efac}
+.gda-relier.trouve:hover{background:rgba(34,197,94,.3)}
+.gda-ico.gda-relie{border-color:rgba(34,197,94,.55);background:rgba(34,197,94,.14)}
+.gda-lien{background:none;border:0;padding:0;color:#93c5fd;font:inherit;text-decoration:underline;cursor:pointer}
+.gda-res{display:flex;align-items:center;gap:12px;border:1px solid var(--bord);border-radius:12px;padding:10px 12px;margin-top:8px;background:var(--pan2)}
+.gda-res .inf{flex:1;min-width:0;font-size:13px;color:var(--doux)}
+.gda-res .inf b{display:block;color:var(--txt);font-size:14.5px}
 .gda-ico{background:transparent;border:1px solid transparent;color:var(--txt);border-radius:8px;width:32px;height:32px;cursor:pointer;font-size:15px}
 .gda-ico:hover{border-color:var(--or2)}
 .gda-pied{display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:space-between;margin-top:14px;font-size:13.5px}
@@ -222,6 +231,13 @@ function toast(msg, erreur) {
   const t = document.createElement('div'); t.className = 'gda-toast' + (erreur ? ' err' : ''); t.setAttribute('role', 'status'); t.textContent = msg;
   document.body.appendChild(t); setTimeout(() => t.remove(), erreur ? 5000 : 2600);
 }
+/* Les fenêtres vivent DANS #gda : c'est là que sont définies les couleurs (--pan…) et le style des champs ;
+   posées sur <body>, elles apparaissaient sans fond ni mise en forme. Intégrée au tableau de bord, la page
+   demande au parent de faire défiler jusqu'à elle pour que la fenêtre soit visible. */
+function poserModale(w) {
+  (document.getElementById('gda') || document.body).appendChild(w);
+  if (/[?&]embed=1/.test(location.search)) { try { parent.postMessage({ gdaModale: true }, location.origin); } catch (e) {} }
+}
 /* Boîte de dialogue maison (confirmation, motif obligatoire) : renvoie une promesse { ok, motif }. */
 function dialogue({ titre, texte, motif, ok = 'Confirmer', danger }) {
   return new Promise(res => {
@@ -229,7 +245,7 @@ function dialogue({ titre, texte, motif, ok = 'Confirmer', danger }) {
     w.innerHTML = `<div class="boite"><h3>${esc(titre)}</h3><p style="margin:0 0 6px;line-height:1.5">${esc(texte)}</p>
       ${motif ? '<label for="gda-d-motif">Motif (obligatoire)</label><textarea id="gda-d-motif" rows="3" maxlength="300"></textarea><div id="gda-d-err" style="color:#fca5a5;font-size:13px;min-height:18px"></div>' : ''}
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button class="gda-btn" data-n>Annuler</button><button class="gda-btn ${danger ? 'danger' : 'or'}" data-o>${esc(ok)}</button></div></div>`;
-    document.body.appendChild(w);
+    poserModale(w);
     const fin = v => { w.remove(); res(v); };
     w.querySelector('[data-n]').onclick = () => fin({ ok: false });
     w.addEventListener('keydown', e => { if (e.key === 'Escape') fin({ ok: false }); });
@@ -243,7 +259,7 @@ function dialogue({ titre, texte, motif, ok = 'Confirmer', danger }) {
 }
 function modale(html, fermeture) {
   const w = document.createElement('div'); w.className = 'gda-modal'; w.setAttribute('role', 'dialog'); w.setAttribute('aria-modal', 'true');
-  w.innerHTML = `<div class="boite">${html}</div>`; document.body.appendChild(w);
+  w.innerHTML = `<div class="boite">${html}</div>`; poserModale(w);
   const f = () => { w.remove(); fermeture && fermeture(); };
   w.addEventListener('mousedown', e => { if (e.target === w) f(); });
   w.addEventListener('keydown', e => { if (e.key === 'Escape') f(); });
@@ -390,7 +406,7 @@ function rendreListe() {
   $('#gda-tableau').innerHTML = n ? `<table><thead><tr><th class="cases"><input type="checkbox" id="gda-tout" aria-label="Tout sélectionner" ${tousCoches ? 'checked' : ''}></th>${cols.map(c => `<th>${esc(c[1])}</th>`).join('')}<th>Actions</th></tr></thead>
     <tbody>${vue.map(m => `<tr data-id="${esc(m.id)}" class="${ST.detail && String(ST.detail) === String(m.id) ? 'actif' : ''}"><td class="cases"><input type="checkbox" data-sel="${esc(m.id)}" aria-label="Sélectionner ${esc((m.prenom || '') + ' ' + (m.nom || ''))}" ${ST.sel.has(String(m.id)) ? 'checked' : ''}></td>
       ${cols.map(c => `<td data-l="${esc(c[1])}">${celluleCol(m, c[0])}</td>`).join('')}
-      <td class="gda-act"><button class="gda-ico" data-act="voir" title="Voir la fiche" aria-label="Voir la fiche">👁</button>${m.virtuel ? '' : '<button class="gda-ico" data-act="modifier" title="Modifier" aria-label="Modifier">✏️</button>'}</td></tr>`).join('')}</tbody></table>`
+      <td class="gda-act"><button class="gda-ico" data-act="voir" title="Voir la fiche" aria-label="Voir la fiche">👁</button>${m.virtuel ? '' : '<button class="gda-ico" data-act="modifier" title="Modifier" aria-label="Modifier">✏️</button>'}${m.virtuel ? '' : m.linked_user_id ? `<button class="gda-ico gda-relie" data-act="relier" title="Compte relié : ${esc(m.compte_nom || '')} — cliquer pour gérer" aria-label="Compte relié, gérer le lien">🔗</button>` : m.compte_propose ? `<button class="gda-relier trouve" data-act="relier" title="Compte trouvé avec cet e-mail : ${esc(m.compte_propose.nom)}" aria-label="Relier au compte trouvé : ${esc(m.compte_propose.nom)}">✨ Relier</button>` : '<button class="gda-relier" data-act="relier" title="Relier à un compte Diaspo\'Actif" aria-label="Relier à un compte Diaspo\'Actif">🔗 Relier</button>'}</td></tr>`).join('')}</tbody></table>`
     : '<div class="gda-vide">Aucun adhérent ne correspond à ces critères.</div>';
   const pp = [10, 25, 50, 100];
   const nums = []; for (let p = 1; p <= pages; p++) if (p === 1 || p === pages || Math.abs(p - ST.page) <= 1) nums.push(p); else if (nums[nums.length - 1] !== '…') nums.push('…');
@@ -409,7 +425,7 @@ document.addEventListener('change', e => {
 document.addEventListener('click', e => {
   const tr = e.target.closest('#gda-tableau tbody tr'); if (!tr || e.target.closest('input')) return;
   const id = tr.dataset.id; const act = e.target.closest('[data-act]')?.dataset.act;
-  ouvrirFiche(id); if (act === 'modifier') ouvrirEdition(id);
+  ouvrirFiche(id); if (act === 'modifier') ouvrirEdition(id); if (act === 'relier') ouvrirRelier(id);
 });
 
 /* ============ Fiche détaillée (panneau de droite) ============ */
@@ -431,7 +447,7 @@ function rendreFiche() {
     corps = `<dl class="gda-dl">${ligneDl('Nom', esc(f.nom))}${ligneDl('Prénom', esc(f.prenom))}${ligneDl('Fonction', esc(f.fonction))}${ligneDl('Année de naissance', f.annee_naissance ? `${esc(f.annee_naissance)}${f.annee_naissance ? ` (${new Date().getFullYear() - Number(f.annee_naissance)} ans)` : ''}` : '')}
       ${ligneDl("Date d'adhésion", f.date_adhesion ? esc(frLong(f.date_adhesion)) : '')}${ligneDl('E-mail', f.email ? `<a href="mailto:${esc(f.email)}" style="color:#93c5fd">${esc(f.email)}</a>` : '')}
       ${ligneDl('Téléphone', esc(f.telephone))}${ligneDl('Adresse postale', esc(f.adresse))}${ligneDl('Ville', esc(f.ville))}${ligneDl('Pays', esc(f.pays))}
-      ${ligneDl('Compte Diaspo\'Actif', f.linked_user_id ? `🟢 Lié · <a href="profil.html?id=${f.linked_user_id}" target="_blank" rel="noopener" style="color:#93c5fd">voir le profil</a>` : m.virtuel ? `🟢 <a href="profil.html?id=${m.user_id}" target="_blank" rel="noopener" style="color:#93c5fd">voir le profil</a>` : '⚪ Externe (sans compte)')}
+      ${ligneDl('Compte Diaspo\'Actif', f.linked_user_id ? `🟢 Relié${m.compte_nom ? ' à ' + esc(m.compte_nom) : ''} · <a href="profil.html?id=${f.linked_user_id}" target="_blank" rel="noopener" style="color:#93c5fd">voir le profil</a> · <button class="gda-lien" data-fiche-act="relier">gérer</button>` : m.virtuel ? `🟢 <a href="profil.html?id=${m.user_id}" target="_blank" rel="noopener" style="color:#93c5fd">voir le profil</a>` : m.compte_propose ? `🟡 Compte trouvé avec cet e-mail : <b>${esc(m.compte_propose.nom)}</b> · <button class="gda-relier trouve" data-fiche-act="relier">✨ Relier</button>` : '⚪ Externe (sans compte) · <button class="gda-relier" data-fiche-act="relier">🔗 Relier à un compte</button>')}
       ${ligneDl('Observations', esc(f.observations))}</dl>
       ${m.virtuel ? `<div style="margin-top:14px;display:grid;gap:8px"><p style="margin:0;font-size:13px;color:var(--doux)">Ce compte est affilié à votre initiative mais n'a pas encore de fiche adhérent (n°, carte, cotisation).</p><button class="gda-btn or" data-fiche-act="creer">＋ Créer sa fiche adhérent</button></div>` : ''}`;
   } else if (ST.sousOnglet === 'carte') {
@@ -470,6 +486,7 @@ document.addEventListener('click', async e => {
     try { await api('POST', `/adhesion-rectifications/${rect.dataset.rect}/traiter`, {}); toast('Demande traitée ✅'); await rafraichirFiche(m); } catch (err) { toast(err.message, true); } return; }
   const act = e.target.closest('[data-fiche-act]')?.dataset.ficheAct; if (!act) return;
   if (act === 'modifier') return ouvrirEdition(m.id);
+  if (act === 'relier') return ouvrirRelier(m.id);
   if (act === 'creer') return ouvrirAjout({ nom: m.nom, prenom: m.prenom, email: m.email, fonction: m.fonction, linked_user_id: m.user_id });
   if (act === 'voircarte') return voirCarte(m);
   if (act === 'cotiser') return ouvrirCotisation(m);
@@ -508,6 +525,65 @@ function voirCarte(m) {
       <div style="margin-top:14px;font-size:12px;opacity:.85">N° ${esc(f.card_id || '')} · ${CARTE[m.card_status || 'not_edited']}</div></div>
     <div style="text-align:center;margin-top:14px"><button class="gda-btn" data-x>Fermer</button></div>`);
   w.querySelector('[data-x]').onclick = () => w.fermer();
+}
+
+/* ============ Relier une fiche à un compte Diaspo'Actif ============ */
+async function apresLien(id) {
+  await recharger(); ST.complet = null;
+  if (ST.onglet === 'membres') { rendreMembres(); ouvrirFiche(id, ST.sousOnglet); }
+}
+function ouvrirRelier(id) {
+  const m = ligne(id); if (!m || m.virtuel) return;
+  const nomFiche = `${m.prenom || ''} ${m.nom || ''}`.trim();
+  if (m.linked_user_id) {
+    const w = modale(`<h3>🔗 Compte Diaspo'Actif relié</h3>
+      <p style="margin:0 0 4px;font-size:13px;color:var(--doux)">La fiche de ${esc(nomFiche)} reprend la photo, la ville et le pays de ce profil.</p>
+      <div class="gda-res">${avatar({ nom: m.compte_nom || m.nom, photo: m.photo })}<div class="inf"><b>${esc(m.compte_nom || 'Compte n° ' + m.linked_user_id)}</b>Compte n° ${esc(m.linked_user_id)}</div>
+        <a class="gda-btn sm" href="profil.html?id=${esc(m.linked_user_id)}" target="_blank" rel="noopener">Voir le profil</a></div>
+      <div id="r-err" style="color:#fca5a5;font-size:13px;min-height:18px;margin-top:8px"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px"><button class="gda-btn" data-x>Fermer</button><button class="gda-btn danger" data-delier>Délier ce compte</button></div>`);
+    w.querySelector('[data-x]').onclick = () => w.fermer();
+    w.querySelector('[data-delier]').onclick = async () => {
+      const r = await dialogue({ titre: 'Délier ce compte ?', texte: `La fiche de ${nomFiche} ne sera plus reliée au compte « ${m.compte_nom || m.linked_user_id} » : la photo du profil ne sera plus affichée et la personne ne la verra plus dans son espace. La fiche elle-même est conservée.`, ok: 'Délier', danger: true });
+      if (!r.ok) return;
+      try { await api('POST', `/adhesion-membres/${m.id}/delier`, {}); w.fermer(); toast('Compte délié ✅'); await apresLien(m.id); }
+      catch (e) { w.querySelector('#r-err').textContent = e.message || 'Impossible de délier.'; }
+    };
+    return;
+  }
+  const w = modale(`<h3>🔗 Relier à un compte Diaspo'Actif</h3>
+    <p style="margin:0 0 4px;font-size:13px;color:var(--doux)">Cherchez le compte de <b>${esc(nomFiche)}</b> (nom, prénom ou e-mail). Une fois relié, sa photo de profil, sa ville et son pays sont repris, et la personne retrouve sa fiche dans son espace.</p>
+    ${m.compte_propose ? `<div style="margin-top:12px;font-size:13px;font-weight:800;color:#86efac">✨ Compte trouvé automatiquement avec l'e-mail ${esc(m.email)}</div>
+      <div class="gda-res" style="border-color:rgba(34,197,94,.6)">${avatar({ nom: m.compte_propose.nom, photo: m.compte_propose.photo })}<div class="inf"><b>${esc(m.compte_propose.nom)}</b>Compte n° ${esc(m.compte_propose.id)} · même e-mail que la fiche</div>
+        <a class="gda-btn sm" href="profil.html?id=${esc(m.compte_propose.id)}" target="_blank" rel="noopener">Profil</a><button class="gda-btn or sm" data-choisir="${esc(m.compte_propose.id)}">Relier</button></div>` : m.email ? `<p style="margin:10px 0 0;font-size:13px;color:var(--doux)">Aucun compte Diaspo'Actif ne porte l'e-mail ${esc(m.email)}. Cherchez-le par son nom :</p>` : ''}
+    <label for="r-q">${m.compte_propose ? 'Ou chercher un autre compte' : 'Rechercher un compte'}</label><input type="search" id="r-q" placeholder="Au moins 2 lettres" value="${m.compte_propose ? '' : esc(nomFiche)}" autocomplete="off">
+    <div id="r-liste" aria-live="polite"></div>
+    <div id="r-err" style="color:#fca5a5;font-size:13px;min-height:18px;margin-top:8px"></div>
+    <div style="display:flex;justify-content:flex-end;margin-top:8px"><button class="gda-btn" data-x>Annuler</button></div>`);
+  w.querySelector('[data-x]').onclick = () => w.fermer();
+  const liste = w.querySelector('#r-liste'), champRech = w.querySelector('#r-q'); let t, seq = 0;
+  async function chercher() {
+    const q = champRech.value.trim(), mon = ++seq;
+    if (q.length < 2) { liste.innerHTML = ''; return; }
+    liste.innerHTML = '<div class="gda-vide" style="padding:14px">Recherche…</div>';
+    try {
+      const r = await api('GET', `/adhesion-membres/${m.id}/comptes-candidats?q=${encodeURIComponent(q)}`);
+      if (mon !== seq) return;
+      liste.innerHTML = r.comptes.length ? r.comptes.map(c => `<div class="gda-res">${avatar({ nom: c.nom, prenom: c.prenom, photo: c.photo })}
+        <div class="inf"><b>${esc(c.prenom || '')} ${esc(c.nom || '')}</b>${esc([c.ville, c.pays].filter(Boolean).join(', ') || 'Lieu non renseigné')} · ${esc(c.email_masque)}
+          ${c.meme_email ? '<br><span class="pill ok" style="margin-top:4px">✔ Même e-mail que la fiche</span>' : ''}${c.role !== 'utilisateur' ? `<br><span class="pill neutre" style="margin-top:4px">Compte ${esc(c.role)}</span>` : ''}</div>
+        ${c.deja_relie ? '<span class="pill neutre">Déjà relié à une autre fiche</span>' : `<a class="gda-btn sm" href="profil.html?id=${esc(c.id)}" target="_blank" rel="noopener">Profil</a><button class="gda-btn or sm" data-choisir="${esc(c.id)}">Relier</button>`}</div>`).join('')
+        : '<div class="gda-vide" style="padding:14px">Aucun compte ne correspond.</div>';
+    } catch (e) { liste.innerHTML = ''; w.querySelector('#r-err').textContent = e.message || 'Recherche impossible.'; }
+  }
+  champRech.addEventListener('input', () => { clearTimeout(t); t = setTimeout(chercher, 250); });
+  w.addEventListener('click', async e => {
+    const b = e.target.closest('[data-choisir]'); if (!b) return;
+    b.disabled = true;
+    try { await api('POST', `/adhesion-membres/${m.id}/relier`, { user_id: Number(b.dataset.choisir) }); w.fermer(); toast('Compte relié ✅'); await apresLien(m.id); }
+    catch (err) { b.disabled = false; w.querySelector('#r-err').textContent = err.message || 'Impossible de relier.'; }
+  });
+  champRech.focus(); chercher();
 }
 
 /* ============ Édition ============ */
