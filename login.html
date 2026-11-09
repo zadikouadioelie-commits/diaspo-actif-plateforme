@@ -166,8 +166,14 @@ footer.footer a { color: rgba(255,255,255,.5) !important; }
 <link rel="apple-touch-icon" href="assets/logo.png">
   <link rel="stylesheet" href="/assets/design-upgrade.v2.css">
   <link rel="stylesheet" href="/assets/theme-manager.css">
+  <link rel="stylesheet" href="/assets/annuaire-cards.css?v=2">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,500;0,6..96,600;1,6..96,500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/theme-nuit-doree.css?v=8">
+  <link rel="stylesheet" href="/assets/connexion-nuit-doree.css?v=1">
 </head>
-<body>
+<body class="nd">
 <div class="page">
 
   <header class="topbar">
@@ -191,7 +197,17 @@ footer.footer a { color: rgba(255,255,255,.5) !important; }
     </div>
   </header>
 
-  <main class="container">
+  <main class="container conn-layout">
+
+    <!-- Colonne de gauche : 2 événements (à venir, sinon passés) + 2 comptes à découvrir -->
+    <section class="conn-col" id="conn-gauche" aria-label="Événements et comptes à découvrir">
+      <h2 class="conn-col-titre" id="conn-evts-titre">À l'affiche</h2>
+      <div class="conn-grille2" id="conn-evts"><div class="conn-squelette"></div><div class="conn-squelette"></div></div>
+      <h2 class="conn-col-titre second">Comptes à découvrir</h2>
+      <div class="conn-grille2 conn-comptes" id="conn-comptes"><div class="conn-squelette"></div><div class="conn-squelette"></div></div>
+    </section>
+
+    <div class="conn-centre">
     <div class="card auth-form-card">
       <button type="button" id="admin-junior-lock" aria-label="Connexion administrateur junior">🔒</button>
       <h2 style="margin-top:0;">Connexion à Diaspo'Actif</h2>
@@ -208,7 +224,7 @@ footer.footer a { color: rgba(255,255,255,.5) !important; }
         <div class="auth-error" id="login-error"></div>
       </form>
 
-      <p style="margin-top:18px;font-size:13px;color:var(--muted);">Pas encore de compte ? <a href="inscription.html" style="color:#2563EB;font-weight:700;">Créer un compte</a></p>
+      <p class="conn-sans-compte">Pas encore de compte ? <a href="inscription.html">Créer un compte</a></p>
 
       <!-- Bloc réservé aux administrateurs connectés (masqué au public). Révélé par JS si role='administrateur'. -->
       <div class="notice" id="demo-accounts-block" style="margin-top:18px;display:none;">
@@ -235,6 +251,13 @@ footer.footer a { color: rgba(255,255,255,.5) !important; }
         </table>
       </div>
     </div>
+    </div>
+
+    <!-- Colonne de droite : les 2 dernières actualités du fil -->
+    <section class="conn-col" id="conn-droite" aria-label="Dernières actualités">
+      <h2 class="conn-col-titre">Dernières actualités</h2>
+      <div class="conn-col" id="conn-actus"><div class="conn-squelette"></div><div class="conn-squelette"></div></div>
+    </section>
   </main>
 
   <footer class="footer"><span id="footer-text">Diaspo'Actif · Du Sud au Nord · 2026</span> · <a href="mentions-legales.html" class="footer-link">Mentions légales</a> · <a href="charte.html" class="footer-link">Charte</a> · <a href="politique-confidentialite.html" class="footer-link">Politique de confidentialité</a></footer>
@@ -284,6 +307,59 @@ footer.footer a { color: rgba(255,255,255,.5) !important; }
       const hint = document.getElementById("demo-hint");
       if (hint) hint.textContent = "(" + raison + ")";
     }
+  })();
+
+  /* ── Colonnes d'accueil : 2 événements + 2 comptes à gauche, 2 actualités à droite ──
+     Données : /api/vitrine-connexion (événements à venir, sinon passés ; 2 dernières publications)
+     et /api/talents-diaspora (mêmes cartouches que l'annuaire). Une panne d'une colonne ne bloque jamais la connexion. */
+  (() => {
+    const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    const MOIS = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
+    const partiesDate = iso => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || ""); return m ? { j: String(Number(m[3])), m: MOIS[Number(m[2]) - 1] || "", a: m[1] } : null; };
+    const vide = (id, texte) => { const z = document.getElementById(id); if (z) z.innerHTML = '<div class="conn-vide">' + esc(texte) + '</div>'; };
+
+    function carteEvenement(e) {
+      const d = partiesDate(e.date_evt), f = partiesDate(e.date_fin);
+      const lieu = [e.lieu, e.ville, e.pays].filter(Boolean).join(" · ");
+      const quand = [d ? d.j + (f && e.date_fin !== e.date_evt ? " – " + f.j + " " + f.m : " " + d.m) + " " + d.a : "", e.heure_debut ? "à " + e.heure_debut : ""].filter(Boolean).join(" ");
+      return '<a class="conn-evt" href="evenements.html?evt=' + encodeURIComponent(e.id) + '">'
+        + '<div class="conn-evt-img">' + (e.image ? '<img loading="lazy" alt="" src="' + esc(e.image) + '" onerror="this.remove()">' : '')
+        + (d ? '<div class="conn-evt-date"><b>' + esc(d.j) + '</b><span>' + esc(d.m) + '</span></div>' : '')
+        + '<span class="conn-evt-puce' + (e.passe ? ' passe' : '') + '">' + (e.passe ? 'Terminé' : 'À venir') + '</span></div>'
+        + '<div class="conn-evt-corps"><h3 class="conn-evt-titre">' + esc(e.titre) + '</h3>'
+        + '<div class="conn-evt-meta">' + esc(quand) + (lieu ? '<br>' + esc(lieu) : '') + '</div>'
+        + '<span class="conn-evt-lien">' + (e.passe ? 'Revoir l\'événement' : 'Voir l\'événement') + ' →</span></div></a>';
+    }
+
+    function carteActualite(a) {
+      let quand = "";
+      try { quand = new Date(String(a.created_at).replace(" ", "T") + "Z").toLocaleDateString("fr-FR", { day: "numeric", month: "long", timeZone: "Europe/Paris" }); } catch (_) {}
+      return '<a class="conn-actu" href="fil-actualite.html?post=' + encodeURIComponent(a.id) + '">'
+        + (a.image ? '<div class="conn-actu-img"><img loading="lazy" alt="" src="' + esc(a.image) + '" onerror="this.parentNode.remove()"></div>' : '')
+        + '<div class="conn-actu-corps"><div class="conn-actu-auteur"><b>' + esc(a.auteur) + '</b>' + (quand ? '<i>·</i><span>' + esc(quand) + '</span>' : '') + '</div>'
+        + '<h3 class="conn-actu-titre">' + esc(a.titre) + '</h3>'
+        + (a.extrait ? '<p class="conn-actu-extrait">' + esc(a.extrait) + '</p>' : '')
+        + '<span class="conn-actu-lien">Lire l\'actualité →</span></div></a>';
+    }
+
+    fetch("/api/vitrine-connexion").then(r => r.ok ? r.json() : Promise.reject()).then(d => {
+      const evts = d.evenements || [], actus = d.actualites || [];
+      const zE = document.getElementById("conn-evts"), zA = document.getElementById("conn-actus");
+      if (zE) zE.innerHTML = evts.length ? evts.map(carteEvenement).join("") : '<div class="conn-vide">Aucun événement pour le moment.</div>';
+      /* Si aucun événement à venir, on le dit : les cartouches présentées sont des événements passés. */
+      const titre = document.getElementById("conn-evts-titre");
+      if (titre) titre.textContent = evts.length && evts.every(e => e.passe) ? "Événements récents" : "À l'affiche";
+      if (zA) zA.innerHTML = actus.length ? actus.map(carteActualite).join("") : '<div class="conn-vide">Aucune actualité pour le moment.</div>';
+    }).catch(() => { vide("conn-evts", "Événements indisponibles pour le moment."); vide("conn-actus", "Actualités indisponibles pour le moment."); });
+
+    fetch("/api/talents-diaspora").then(r => r.ok ? r.json() : Promise.reject()).then(({ talents }) => {
+      const zone = document.getElementById("conn-comptes");
+      const deux = (talents || []).slice(0, 2);   // l'API entrelace initiative / membre : on garde un de chaque quand c'est possible
+      if (!zone || !deux.length) return vide("conn-comptes", "Aucun compte à présenter pour le moment.");
+      zone.innerHTML = deux.map(t => t.type === "initiative" ? renderInitiativeCard(t.data) : window.annRenderPersonCard(t.data)).join("");
+      if (typeof initBoutonsRelation === "function") initBoutonsRelation(zone);
+      if (window.Soutenir && window.Soutenir.hydrate) window.Soutenir.hydrate(zone);
+    }).catch(() => vide("conn-comptes", "Comptes indisponibles pour le moment."));
   })();
 
   document.getElementById("admin-junior-lock")?.addEventListener("click", () => {

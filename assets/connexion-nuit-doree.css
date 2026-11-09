@@ -1,0 +1,176 @@
+/* Page « Connexion » (login.html) en Nuit dorée — 3 colonnes :
+   gauche  = 2 événements + 2 comptes à découvrir (cartouches de l'annuaire),
+   centre  = carte de connexion,
+   droite  = les 2 dernières actualités.
+   Tout est préfixé html body.nd : aucune autre page n'est touchée. */
+
+/* ── Mise en page ─────────────────────────────────────────── */
+html body.nd .page{background:transparent!important}
+html body.nd main.container.conn-layout{
+  max-width:1560px;margin:0 auto;padding:44px 28px 72px;
+  display:grid;grid-template-columns:minmax(0,1.95fr) minmax(380px,430px) minmax(0,1fr);
+  gap:34px;align-items:start;
+}
+html body.nd .conn-centre{min-width:0;position:sticky;top:88px}
+html body.nd .conn-col{min-width:0;display:flex;flex-direction:column;gap:18px}
+html body.nd .conn-col-titre{
+  display:flex;align-items:center;gap:10px;margin:0 0 2px;
+  font:700 11px/1 var(--nd-sans);letter-spacing:.24em;text-transform:uppercase;color:var(--nd-or);
+}
+html body.nd .conn-col-titre::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,var(--nd-bord),transparent)}
+html body.nd .conn-col-titre.second{margin-top:12px}
+/* Colonne de gauche : 2 cartouches côte à côte en haut (événements), 2 en dessous (comptes) */
+html body.nd .conn-grille2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;align-items:stretch}
+
+/* ── Carte de connexion ───────────────────────────────────── */
+html body.nd .auth-form-card{
+  background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.035))!important;
+  border:1px solid var(--nd-bord)!important;border-radius:28px!important;
+  padding:38px 34px 32px!important;
+  box-shadow:0 40px 90px -40px #000,0 0 80px -30px rgba(227,192,110,.28)!important;
+  backdrop-filter:blur(14px);color:var(--nd-texte);margin:0!important;width:100%;box-sizing:border-box;
+}
+html body.nd .auth-form-card h2{
+  font-family:var(--nd-display)!important;font-weight:500!important;font-size:30px!important;
+  line-height:1.12;color:#fff!important;letter-spacing:-.005em;margin:0 0 8px!important;
+}
+html body.nd .auth-form-card .sub{color:var(--nd-doux)!important;font-size:14px!important;line-height:1.55;margin-bottom:6px!important}
+html body.nd .auth-form-card label,
+html body.nd .auth-form-card label:not(.da-pill){
+  color:var(--nd-doux)!important;font-size:11px!important;font-weight:700!important;
+  letter-spacing:.14em;text-transform:uppercase;margin:18px 0 7px!important;display:block;
+}
+html body.nd .auth-form-card input[type="email"],
+html body.nd .auth-form-card input[type="password"],
+html body.nd .auth-form-card input[type="text"]{
+  background:rgba(255,255,255,.07)!important;border:1px solid var(--nd-bord2)!important;color:#fff!important;
+  border-radius:14px!important;height:50px;padding:0 16px;font-size:15px;color-scheme:dark;
+  transition:border-color .3s,box-shadow .3s,background .3s;
+}
+html body.nd .auth-form-card input::placeholder{color:var(--nd-faible)}
+html body.nd .auth-form-card input:focus{
+  outline:none;border-color:var(--nd-or)!important;background:rgba(255,255,255,.1)!important;
+  box-shadow:0 0 0 3px rgba(227,192,110,.18)!important;
+}
+html body.nd .auth-form-card input:-webkit-autofill{
+  -webkit-text-fill-color:#fff;box-shadow:0 0 0 40px #141d38 inset!important;caret-color:#fff;
+}
+html body.nd .auth-form-card .btn-orange{
+  height:52px;font-size:15px;font-weight:800;border-radius:999px!important;
+  background:var(--nd-degore)!important;color:#1a1202!important;border:0!important;letter-spacing:.02em;
+  box-shadow:0 14px 34px -14px rgba(227,192,110,.7)!important;
+}
+html body.nd .auth-form-card .btn-orange:hover{transform:translateY(-2px)!important;box-shadow:0 20px 40px -14px rgba(227,192,110,.85)!important}
+html body.nd .auth-form-card a{color:var(--nd-or)!important;font-weight:600}
+html body.nd .auth-form-card a:hover{text-decoration:underline}
+html body.nd #code-email-btn{color:var(--nd-or)!important}
+html body.nd .conn-sans-compte{margin-top:20px;padding-top:18px;border-top:1px solid var(--nd-bord2);font-size:13px;color:var(--nd-doux)!important;text-align:center}
+html body.nd .conn-sans-compte a{font-weight:700}
+html body.nd .auth-error{
+  background:rgba(239,68,68,.12)!important;border:1px solid rgba(248,113,113,.4)!important;color:#fecaca!important;
+  border-radius:14px!important;padding:12px 16px!important;font-size:13px!important;font-weight:600!important;margin-top:14px!important;
+}
+html body.nd #admin-junior-lock{color:var(--nd-or);opacity:.28}
+html body.nd #admin-junior-lock:hover{opacity:.8}
+
+/* Comptes de démonstration (réservé aux administrateurs / lien secret) */
+html body.nd .notice{background:rgba(255,255,255,.05)!important;border:1px solid var(--nd-bord2)!important;border-radius:16px!important}
+html body.nd .notice strong{color:#fff!important}
+html body.nd .notice td{color:var(--nd-doux)!important;border-color:var(--nd-bord2)!important}
+html body.nd .notice td:first-child{color:#fff!important}
+html body.nd .notice td[style*="2563EB" i]{color:var(--nd-or)!important}
+html body.nd .notice tr{border-color:var(--nd-bord2)!important}
+html body.nd .notice button{background:var(--nd-verre2)!important;border:1px solid var(--nd-bord)!important;color:var(--nd-texte)!important}
+html body.nd #demo-hint{color:var(--nd-faible)!important}
+
+html body.nd footer.footer{background:transparent!important;color:var(--nd-faible)!important;border-top:1px solid var(--nd-bord2)!important}
+html body.nd footer.footer a{color:var(--nd-doux)!important}
+
+/* ── Cartouche événement ──────────────────────────────────── */
+html body.nd .conn-evt{
+  display:flex;flex-direction:column;align-items:stretch;overflow:hidden;text-decoration:none;color:inherit;
+  background:var(--nd-verre);border:1px solid var(--nd-bord2);border-radius:22px;
+  box-shadow:0 26px 54px -34px #000;
+  transition:transform .6s var(--nd-ease),border-color .6s var(--nd-ease);
+}
+html body.nd .conn-evt:hover{transform:translateY(-4px);border-color:var(--nd-bord)}
+html body.nd .conn-evt-img{position:relative;height:150px;overflow:hidden;background:
+  radial-gradient(circle at 25% 20%,rgba(63,123,255,.35),transparent 60%),
+  radial-gradient(circle at 80% 90%,rgba(227,192,110,.25),transparent 55%),var(--nd-nuit2)}
+html body.nd .conn-evt-img img{width:100%;height:100%;object-fit:cover;display:block;filter:saturate(.92) brightness(.92);transition:transform .8s var(--nd-ease)}
+html body.nd .conn-evt:hover .conn-evt-img img{transform:scale(1.04)}
+html body.nd .conn-evt-date{
+  position:absolute;left:14px;bottom:-1px;z-index:2;min-width:58px;padding:7px 10px 6px;text-align:center;
+  background:#0B1226;border:1px solid var(--nd-bord);border-bottom:0;border-radius:14px 14px 0 0;
+}
+html body.nd .conn-evt-date b{display:block;font:500 25px/1 var(--nd-display);color:#fff}
+html body.nd .conn-evt-date span{display:block;margin-top:3px;font:700 10px/1 var(--nd-sans);letter-spacing:.18em;text-transform:uppercase;color:var(--nd-or)}
+html body.nd .conn-evt-puce{
+  position:absolute;right:12px;top:12px;z-index:2;padding:5px 11px;border-radius:999px;
+  font:700 10px/1 var(--nd-sans);letter-spacing:.14em;text-transform:uppercase;
+  background:rgba(8,13,30,.78);border:1px solid var(--nd-bord);color:var(--nd-or);backdrop-filter:blur(8px);
+}
+html body.nd .conn-evt-puce.passe{color:var(--nd-doux);border-color:var(--nd-bord2)}
+html body.nd .conn-evt-corps{padding:16px 18px 18px;display:flex;flex-direction:column;gap:7px}
+html body.nd .conn-evt-titre{font:500 20px/1.2 var(--nd-display);color:#fff;margin:0;text-wrap:balance}
+html body.nd .conn-evt-meta{font-size:12.5px;line-height:1.5;color:var(--nd-doux)}
+html body.nd .conn-evt-lien{margin-top:4px;font:700 12px/1 var(--nd-sans);color:var(--nd-or);letter-spacing:.04em}
+
+/* ── Cartouche actualité ──────────────────────────────────── */
+html body.nd .conn-actu{
+  display:flex;flex-direction:column;align-items:stretch;overflow:hidden;text-decoration:none;color:inherit;
+  background:var(--nd-verre);border:1px solid var(--nd-bord2);border-radius:22px;
+  box-shadow:0 26px 54px -34px #000;
+  transition:transform .6s var(--nd-ease),border-color .6s var(--nd-ease);
+}
+html body.nd .conn-actu:hover{transform:translateY(-4px);border-color:var(--nd-bord)}
+html body.nd .conn-actu-img{height:190px;overflow:hidden;background:
+  radial-gradient(circle at 70% 20%,rgba(227,192,110,.28),transparent 55%),
+  radial-gradient(circle at 15% 85%,rgba(63,123,255,.35),transparent 60%),var(--nd-nuit2)}
+html body.nd .conn-actu-img img{width:100%;height:100%;object-fit:cover;display:block;filter:saturate(.92) brightness(.92);transition:transform .8s var(--nd-ease)}
+html body.nd .conn-actu:hover .conn-actu-img img{transform:scale(1.04)}
+html body.nd .conn-actu-corps{padding:18px 20px 20px;display:flex;flex-direction:column;gap:9px}
+html body.nd .conn-actu-auteur{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--nd-doux)}
+html body.nd .conn-actu-auteur b{color:#fff;font-weight:700}
+html body.nd .conn-actu-auteur i{font-style:normal;color:var(--nd-faible)}
+html body.nd .conn-actu-titre{font:500 21px/1.22 var(--nd-display);color:#fff;margin:0;text-wrap:balance}
+html body.nd .conn-actu-extrait{font-size:13.5px;line-height:1.6;color:var(--nd-doux);margin:0;
+  display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+html body.nd .conn-actu-lien{margin-top:2px;font:700 12px/1 var(--nd-sans);color:var(--nd-or);letter-spacing:.04em}
+
+/* ── Cartouches de l'annuaire (comptes à découvrir) ───────── */
+html body.nd .conn-comptes .ann-card{background:var(--nd-verre)!important;border:1px solid var(--nd-bord2)!important;border-radius:22px!important;box-shadow:0 26px 54px -34px #000;color:var(--nd-texte)}
+html body.nd .conn-comptes .ann-card:hover{transform:translateY(-4px);border-color:var(--nd-bord)!important}
+html body.nd .conn-comptes .ann-card *{color:inherit}
+html body.nd .conn-comptes .ann-card-title,html body.nd .conn-comptes .ann-card-responsable{color:#fff!important;font-family:var(--nd-display)!important;font-weight:500}
+html body.nd .conn-comptes .ann-card-loc,html body.nd .conn-comptes .ann-card-desc,html body.nd .conn-comptes .ann-card-nats,
+html body.nd .conn-comptes .ann-card-origs,html body.nd .conn-comptes .ann-card-meta-row{color:var(--nd-doux)!important}
+html body.nd .conn-comptes .ann-cat-badge,html body.nd .conn-comptes .ann-type-badge,html body.nd .conn-comptes .ann-ray-badge,html body.nd .conn-comptes .ann-ray-locale{
+  background:rgba(227,192,110,.14)!important;border:1px solid var(--nd-bord)!important;color:var(--nd-or)!important;border-radius:999px}
+html body.nd .conn-comptes .ann-card-foot{border-top:1px solid var(--nd-bord2)!important;background:transparent!important}
+html body.nd .conn-comptes .ann-card-btn{background:var(--nd-verre2)!important;border:1px solid var(--nd-bord)!important;color:var(--nd-texte)!important;border-radius:999px!important}
+html body.nd .conn-comptes .ann-card-btn-primary,html body.nd .conn-comptes .ann-card-btn-adherer{background:var(--nd-degore)!important;color:#1a1202!important;font-weight:700;border:0!important}
+html body.nd .conn-comptes .ann-card-initiales{background:var(--nd-degore)!important;color:#1a1202!important;font-family:var(--nd-display)}
+html body.nd .conn-comptes .ann-card-banner,html body.nd .conn-comptes .ann-card-photo{filter:saturate(.9) brightness(.95)}
+html body.nd .conn-comptes .ann-card-avatar-wrap img{border-color:#0B1226}
+
+/* États vides / chargement */
+html body.nd .conn-grille2>.conn-vide{grid-column:1/-1}
+html body.nd .conn-vide{padding:22px;border:1px dashed var(--nd-bord2);border-radius:18px;color:var(--nd-faible);font-size:13px;text-align:center}
+html body.nd .conn-squelette{height:200px;border-radius:22px;background:linear-gradient(100deg,rgba(255,255,255,.04) 30%,rgba(255,255,255,.09) 50%,rgba(255,255,255,.04) 70%);background-size:200% 100%;animation:conn-sk 1.6s linear infinite}
+@keyframes conn-sk{to{background-position:-200% 0}}
+@media (prefers-reduced-motion:reduce){html body.nd .conn-squelette{animation:none}html body.nd .conn-evt,html body.nd .conn-actu{transition:none}}
+
+/* ── Adaptation ───────────────────────────────────────────── */
+@media (max-width:1180px){
+  html body.nd main.container.conn-layout{grid-template-columns:minmax(0,520px);justify-content:center;padding:32px 20px 56px}
+  html body.nd .conn-centre{position:static;order:-1}
+  html body.nd .conn-col{order:2}
+}
+@media (max-width:620px){
+  html body.nd .conn-grille2{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:480px){
+  html body.nd .auth-form-card{padding:30px 22px 26px!important;border-radius:22px!important}
+  html body.nd .auth-form-card h2{font-size:26px!important}
+}

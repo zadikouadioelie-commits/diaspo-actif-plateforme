@@ -10919,6 +10919,72 @@ route("GET", "/api/talents-diaspora", async (req, res) => {
   }
 });
 
+/* GET /api/vitrine-connexion — colonnes d'accueil de la page de connexion (login.html), publiques :
+   - evenements : 2 événements — les prochains d'abord ; s'il y en a moins de 2 à venir, complétés par les
+     plus récents déjà passés (passe:true), jamais plus de 2 au total ;
+   - actualites : les 2 dernières publications publiques du fil (hors brouillon/archive/programmée, hors comptes démo).
+   Volontairement léger (aucun enrichissement : ni réactions, ni commentaires) : la page est vue avant toute connexion.
+   Les « comptes à découvrir » viennent de /api/talents-diaspora (mêmes cartouches que l'annuaire). */
+route("GET", "/api/vitrine-connexion", async (req, res) => {
+  try {
+    const aujourdhui = dateParisISO();
+    const evts = await db.prepare(
+      `SELECT e.id, e.titre, e.date_evt, e.date_fin, e.heure_debut, e.lieu, e.ville, e.pays, e.type_evt, e.image_url, e.image_couverture, e.owner_user_id
+       FROM evenements e LEFT JOIN users u ON u.id=e.owner_user_id
+       WHERE COALESCE(e.statut,'publie') NOT IN ('brouillon','programme','annule')
+         AND COALESCE(e.visibilite,'') != 'boutique'
+         AND e.date_evt IS NOT NULL AND e.date_evt != ''
+         AND (u.id IS NULL OR u.is_demo IS NULL OR u.is_demo=FALSE)
+       ORDER BY e.date_evt ASC, e.heure_debut ASC LIMIT 400`
+    ).all();
+    const fin = e => String(e.date_fin || e.date_evt).slice(0, 10);
+    const avenir = evts.filter(e => fin(e) >= aujourdhui);
+    const passes = evts.filter(e => fin(e) < aujourdhui).reverse();
+    const choisis = avenir.slice(0, 2).map(e => ({ ...e, passe: false }));
+    if (choisis.length < 2) passes.slice(0, 2 - choisis.length).forEach(e => choisis.push({ ...e, passe: true }));
+    const evenements = choisis.map(e => ({
+      id: e.id, titre: e.titre, date_evt: e.date_evt, date_fin: e.date_fin, heure_debut: e.heure_debut,
+      lieu: e.lieu, ville: e.ville, pays: e.pays, type_evt: e.type_evt, passe: e.passe,
+      image: e.image_couverture || e.image_url || null,
+    }));
+
+    const lignes = await db.prepare(
+      `SELECT p.id, p.titre, p.corps, p.contenu, p.media_url, p.media_type, p.medias, p.created_at, p.auteur_id, p.auteur_nom
+       FROM fil_posts p JOIN users u ON u.id=p.auteur_id
+       WHERE (u.is_demo IS NULL OR u.is_demo=FALSE)
+         AND (p.pub_type IS NULL OR p.pub_type != 'repost') AND (p.type IS NULL OR p.type != 'repost')
+         AND COALESCE(p.statut,'publie') NOT IN ('archive','brouillon','programme')
+         AND COALESCE(p.visibilite,'public')='public'
+         AND (p.promo_evenement_id IS NULL OR EXISTS (SELECT 1 FROM evenements pe WHERE pe.id=p.promo_evenement_id AND COALESCE(NULLIF(pe.date_fin,''), pe.date_evt) >= '${aujourdhui}'))${TutoPartage.tutoClause}
+       ORDER BY p.created_at DESC LIMIT 2`
+    ).all();
+    const actualites = await Promise.all(lignes.map(async p => {
+      const complet = titrePostComplet(p);
+      let image = null;
+      try {
+        const m = typeof p.medias === "string" ? JSON.parse(p.medias || "[]") : (p.medias || []);
+        const premiere = Array.isArray(m) ? m.find(x => x && (x.type === "image" || x.type === "photo") && (x.url || x.src)) : null;
+        if (premiere) image = premiere.url || premiere.src;
+      } catch (_) {}
+      if (!image && p.media_url && (!p.media_type || /image|photo/i.test(p.media_type))) image = p.media_url;
+      const titreTexte = texteDuTitre(complet.titre) || "Publication";
+      let extrait = String(htmlEnTexte(complet.corps || "")).replace(/\s+/g, " ").trim();
+      /* Pas de redite : si le texte ne fait que répéter le titre, on ne l'affiche pas deux fois. */
+      if (extrait === titreTexte || titreTexte.startsWith(extrait)) extrait = "";
+      return {
+        id: p.id,
+        titre: titreTexte,
+        extrait: extrait.length > 150 ? extrait.slice(0, 147).trimEnd() + "…" : extrait,
+        image, created_at: p.created_at,
+        auteur: (await nomCompteAffichage(p.auteur_id)) || p.auteur_nom || "Diaspo'Actif",
+      };
+    }));
+    sendJSON(res, 200, { evenements, actualites });
+  } catch (e) {
+    sendJSON(res, 500, SEC.safeError(e, "vitrine-connexion"));
+  }
+});
+
 /* GET /api/annuaire/apercu-invitation — aperçu public (page /join/CODE) : 2 initiatives +
    1 compte Utilisateur, tirés au hasard À CHAQUE APPEL (contrairement à /api/talents-diaspora,
    dont le tirage est volontairement stable 2h pour l'accueil) — ici chaque chargement de la
