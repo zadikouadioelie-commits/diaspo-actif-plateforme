@@ -40196,6 +40196,13 @@ ${jsonLd}
       return sendJSON(res, 200, { actif: !!ligne });
     }
 
+    /* ── GET /api/sondages/mes-evenements ── événements du compte, à proposer dans le formulaire de création (lien facultatif sondage ↔ événement) ── */
+    if (req.method === 'GET' && pathname === '/api/sondages/mes-evenements') {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const evts = await db.prepare(`SELECT id, titre, date_evt, statut FROM evenements WHERE owner_user_id=? AND COALESCE(statut,'') <> 'brouillon' ORDER BY id DESC LIMIT 100`).all(me.id);
+      return sendJSON(res, 200, { evenements: evts });
+    }
+
     /* ── GET /api/sondages ── */
     if (req.method === 'GET' && (pathname === '/api/sondages' || pathname.startsWith('/api/sondages?'))) {
       await sondageAutoCloture();
@@ -40234,6 +40241,12 @@ ${jsonLd}
       if (pdf_b64 && SEC.isDangerousFile(Buffer.from(String(pdf_b64).split(',').pop(), 'base64'))) return sendJSON(res, 400, { error: 'Fichier PDF invalide.' });
       if (!['brouillon', 'ouvert'].includes(statut)) return sendJSON(res, 400, { error: 'Statut invalide.' });
       if (!Array.isArray(questions) || !questions.length || questions.some(q2 => !q2 || !String(q2.texte || '').trim())) return sendJSON(res, 400, { error: 'Au moins une question, chacune avec un texte.' });
+      /* Événements liés (facultatif) : uniquement les événements du créateur. Le sondage reste indépendant de l'inscription. */
+      const evtIdsLies = Array.isArray(body.evenement_ids) ? [...new Set(body.evenement_ids.map(Number).filter(n => Number.isInteger(n) && n > 0))].slice(0, 50) : [];
+      if (evtIdsLies.length) {
+        const permisEvt = new Set((await db.prepare(`SELECT id FROM evenements WHERE owner_user_id=?`).all(me.id)).map(r0 => Number(r0.id)));
+        if (evtIdsLies.some(i => !permisEvt.has(i))) return sendJSON(res, 400, { error: 'Vous ne pouvez lier un sondage qu’à vos propres événements.' });
+      }
       const jourOk = (v) => /^\d{4}-\d{2}-\d{2}/.test(String(v || ''));
       const debutSond = (statut === 'ouvert' || !jourOk(date_debut)) ? sondageJourIso(new Date()) : String(date_debut).slice(0, 10);
       const finSond = jourOk(date_cloture) ? String(date_cloture).slice(0, 10) : sondageAjouterJours(debutSond, SONDAGE_DUREE_MAX_JOURS - 1);
@@ -40251,6 +40264,7 @@ ${jsonLd}
         await db.prepare(`INSERT INTO sondage_questions(sondage_id,texte,type,options_json,obligatoire,ordre,description,min_label,max_label,min_val,max_val) VALUES(?,?,?,?,?,?,?,?,?,?,?)`)
           .run(sid,q2.texte,q2.type||'choix_unique',JSON.stringify(q2.options||[]),q2.obligatoire?1:1,i,q2.description||null,q2.min_label||null,q2.max_label||null,q2.min_val||1,q2.max_val||5);
       }
+      for (const i of evtIdsLies) await db.prepare(`INSERT INTO sondage_evenements(sondage_id,evenement_id) VALUES(?,?)`).run(sid, i);
       /* La publication dans le fil d'actualité (et les autres lieux) se règle dans « Diffusion » (étape suivante) : l'ancien envoi automatique
          visait une colonne inexistante (fil_posts.user_id) et ne fonctionnait pas. */
       if (statut === 'ouvert') await sondageNotifierAlertes(sid, titre, me.id);

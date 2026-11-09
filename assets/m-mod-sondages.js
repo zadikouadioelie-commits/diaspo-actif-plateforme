@@ -516,6 +516,9 @@
       <select id="mso-conf">${CONFS.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select>
       <label class="mso-l" for="mso-vis">Résultats visibles</label>
       <select id="mso-vis">${VISIBS.map(([v, l]) => `<option value="${v}" ${v === 'apres_cloture' ? 'selected' : ''}>${l}</option>`).join('')}</select>
+      <div class="mso-dl" style="margin-top:16px">Lier à un événement <small>(facultatif)</small></div>
+      <p class="mso-hint" style="margin-top:0">Sur la fiche de l’événement, un bloc « Sondage en cours » permet d’y répondre <b>sans s’inscrire</b> à l’événement. Il ne fait jamais partie de l’inscription.</p>
+      <div class="mso-evts" id="mso-evts"><span class="small muted">Chargement…</span></div>
       <div class="h2" style="margin-top:16px">QUESTIONS</div>
       <div id="mso-qbuilder"></div>
       <button type="button" class="btn out block" id="mso-addq" style="margin:4px 0 14px">+ Ajouter une question</button>
@@ -527,6 +530,10 @@
     $$('.mso-opt input', $('#mso-form2')).forEach(cb => cb.addEventListener('change', () => cb.closest('.mso-opt').classList.toggle('on', cb.checked)));
     $('#mso-addq').onclick = () => { QIDX++; qCard(QIDX); };
     qCard(++QIDX);
+    api('/api/sondages/mes-evenements').then(d => {
+      const evts = (d && d.evenements) || [], z = $('#mso-evts'); if (!z) return;
+      z.innerHTML = evts.length ? evts.map(e => '<label><input type="checkbox" class="mso-evt" value="' + Number(e.id) + '"><span>' + esc(e.titre) + (e.date_evt ? ' <span class="small muted">· ' + esc(fmtDate(e.date_evt)) + '</span>' : '') + '</span></label>').join('') : '<span class="small muted">Vous n’avez pas encore d’événement publié.</span>';
+    }).catch(() => { const z = $('#mso-evts'); if (z) z.innerHTML = '<span class="small muted">Liste des événements indisponible.</span>'; });
 
     const val = id => { const x = $('#mso-' + id); return x ? x.value.trim() : ''; };
     const bad = (id, msg) => { const x = $('#mso-' + id), m = $('#mso-e-' + id); if (x) x.setAttribute('aria-invalid', 'true'); if (m) m.textContent = msg; return x; };
@@ -547,7 +554,7 @@
             titre: val('titre'), description: val('desc') || null, categorie: $('#mso-cat2').value,
             rayon_publication: $('#mso-rayon').value, date_debut: d1 || null, date_cloture: d2 || null,
             confidentialite: $('#mso-conf').value, anonyme: $('#mso-anon').checked,
-            resultats_visibles: $('#mso-vis').value, statut: $('#mso-publier-ck').checked ? 'ouvert' : 'brouillon', questions
+            resultats_visibles: $('#mso-vis').value, statut: $('#mso-publier-ck').checked ? 'ouvert' : 'brouillon', evenement_ids: $$('.mso-evt:checked').map(c => Number(c.value)), questions
           }
         });
         toast('Sondage créé ✓');
