@@ -1733,43 +1733,19 @@ function basculerRubrique(nom){
   const conv = document.getElementById('conv-list');
   const dem  = document.getElementById('panneau-demandes');
   const con  = document.getElementById('panneau-contacts');
+  const hors = document.getElementById('panneau-hors');
   const tabs = document.querySelector('.msg-tabs');
   const rech = document.querySelector('.msg-search');
   conv.style.display = nom === 'conversations' ? '' : 'none';
   dem.style.display  = nom === 'demandes'      ? '' : 'none';
   con.style.display  = nom === 'contacts'      ? '' : 'none';
+  if (hors) hors.style.display = nom === 'hors' ? '' : 'none';
   /* Onglets et recherche ne concernent que les conversations : les laisser visibles
      ailleurs laisserait croire qu'ils filtrent la rubrique affichée. */
   if (tabs) tabs.style.display = nom === 'conversations' ? '' : 'none';
   if (rech) rech.style.display = nom === 'conversations' ? '' : 'none';
   if (nom === 'demandes') chargerDemandesContact();
   if (nom === 'contacts') chargerContacts();
-}
-
-document.querySelectorAll('.msg-rubrique').forEach(b => {
-  b.addEventListener('click', () => basculerRubrique(b.dataset.rubrique));
-});
-
-/* Compteur alimenté dès l'ouverture, sans attendre que l'utilisateur visite la rubrique. */
-(async function badgeInitial(){
-  try {
-    const r = await api('GET','/demandes-contact?direction=recues&statut=en_attente');
-    majBadgeDemandes((r.demandes || []).length);
-  } catch(e) {}
-})();
-  const hors = document.getElementById('panneau-hors');
-
-/* ---- Filtres ---- */
-document.querySelectorAll(".msg-tab[data-filtre]").forEach(tab=>{
-  tab.addEventListener("click",()=>{
-    document.querySelectorAll(".msg-tab[data-filtre]").forEach(t=>t.classList.remove("active"));
-  if (hors) hors.style.display = nom === 'hors' ? '' : 'none';
-    tab.classList.add("active");
-    filtre=tab.dataset.filtre;
-    loadConvList();
-  });
-});
-/* ---- Onglets Classiques / Automatiques (compte officiel) ---- */
   if (nom === 'hors') chargerHors();
 }
 
@@ -1810,7 +1786,7 @@ async function chargerHors(){
   } catch (e) {
     zone.innerHTML = `<div style="padding:20px;color:#000;font-size:13px;text-align:center;">Impossible de charger ces messages pour le moment.</div>`;
   }
-document.querySelectorAll(".msg-tab[data-onglet]").forEach(tab=>{
+}
 window.mhLu = async function(id, lu){
   try { await api('POST', `/messages-hors-diaspo/${id}/lu`, { lu: !!lu }); } catch(e) {}
 };
@@ -1819,6 +1795,39 @@ window.mhSupprimer = async function(id){
   try { await api('DELETE', `/messages-hors-diaspo/${id}`); } catch(e) { alert(e.message || 'Suppression impossible.'); return; }
   chargerHors();
 };
+
+document.querySelectorAll('.msg-rubrique').forEach(b => {
+  b.addEventListener('click', () => basculerRubrique(b.dataset.rubrique));
+});
+
+/* Compteur alimenté dès l'ouverture, sans attendre que l'utilisateur visite la rubrique. */
+(async function badgeInitial(){
+  try {
+    const r = await api('GET','/demandes-contact?direction=recues&statut=en_attente');
+    majBadgeDemandes((r.demandes || []).length);
+  } catch(e) {}
+})();
+
+/* Compteur « Hors Diaspo'Actif » dès l'ouverture ; arrivée depuis la notification (?rubrique=hors) → rubrique ouverte directement. */
+(async function badgeHors(){
+  try {
+    const r = await api('GET','/messages-hors-diaspo');
+    majBadgeHors(r.non_lus || 0);
+  } catch(e) {}
+  if (new URLSearchParams(location.search).get('rubrique') === 'hors') basculerRubrique('hors');
+})();
+
+/* ---- Filtres ---- */
+document.querySelectorAll(".msg-tab[data-filtre]").forEach(tab=>{
+  tab.addEventListener("click",()=>{
+    document.querySelectorAll(".msg-tab[data-filtre]").forEach(t=>t.classList.remove("active"));
+    tab.classList.add("active");
+    filtre=tab.dataset.filtre;
+    loadConvList();
+  });
+});
+/* ---- Onglets Classiques / Automatiques (compte officiel) ---- */
+document.querySelectorAll(".msg-tab[data-onglet]").forEach(tab=>{
   tab.addEventListener("click",()=>{
     document.querySelectorAll(".msg-tab[data-onglet]").forEach(t=>t.classList.remove("active"));
     tab.classList.add("active");
@@ -1832,15 +1841,6 @@ let listSearchTimer=null;
 document.getElementById("conv-search").addEventListener("input",function(){
   clearTimeout(listSearchTimer);
   const q=this.value.trim();
-/* Compteur « Hors Diaspo'Actif » dès l'ouverture ; arrivée depuis la notification (?rubrique=hors) → rubrique ouverte directement. */
-(async function badgeHors(){
-  try {
-    const r = await api('GET','/messages-hors-diaspo');
-    majBadgeHors(r.non_lus || 0);
-  } catch(e) {}
-  if (new URLSearchParams(location.search).get('rubrique') === 'hors') basculerRubrique('hors');
-})();
-
   listSearchTimer=setTimeout(()=>loadConvList(q||undefined),250);
 });
 
