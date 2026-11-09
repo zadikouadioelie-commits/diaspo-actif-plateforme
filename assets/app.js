@@ -7802,6 +7802,22 @@ async function statutsParTranches(chemin, param, ids) {
 }
 window.statutsParTranches = statutsParTranches;
 
+/* Contact pour les personnes SANS compte (2026-11-09, demande explicite) : le module de la fenêtre n'est chargé qu'au premier clic. */
+function escAttrContact(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+window.ouvrirContactExterne = function (userId, nom) {
+  const go = () => window.ContactExterne && window.ContactExterne.ouvrir(userId, nom);
+  if (window.ContactExterne) return go();
+  const sc = document.createElement('script');
+  sc.src = '/assets/contact-externe.js';
+  sc.onload = go;
+  sc.onerror = () => { window.location.href = 'login.html?redirect=' + encodeURIComponent(location.pathname + location.search); };
+  document.head.appendChild(sc);
+};
+function contactExterneBoutonHtml(userId, classe, nom) {
+  const n = escAttrContact(nom);
+  return `<button type="button" class="${escAttrContact(classe)}" data-contact-externe="${Number(userId)}" onclick="event.stopPropagation(); ouvrirContactExterne(${Number(userId)}, this.getAttribute('data-nom'))" data-nom="${n}">✉️ Contact</button>`;
+}
+
 window.initBoutonsRelation = async function (racine) {
   const cibles = [...(racine || document).querySelectorAll('[data-relation-user]:not([data-relation-prete])')];
   if (!cibles.length) return;
@@ -7822,22 +7838,6 @@ window.initBoutonsRelation = async function (racine) {
   const ids = [...new Set(aTraiter.map(el => el.getAttribute('data-relation-user')))];
   let statuts = {};
   try {
-/* Contact pour les personnes SANS compte (2026-11-09, demande explicite) : le module de la fenêtre n'est chargé qu'au premier clic. */
-function escAttrContact(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
-window.ouvrirContactExterne = function (userId, nom) {
-  const go = () => window.ContactExterne && window.ContactExterne.ouvrir(userId, nom);
-  if (window.ContactExterne) return go();
-  const sc = document.createElement('script');
-  sc.src = '/assets/contact-externe.js';
-  sc.onload = go;
-  sc.onerror = () => { window.location.href = 'login.html?redirect=' + encodeURIComponent(location.pathname + location.search); };
-  document.head.appendChild(sc);
-};
-function contactExterneBoutonHtml(userId, classe, nom) {
-  const n = escAttrContact(nom);
-  return `<button type="button" class="${escAttrContact(classe)}" data-contact-externe="${Number(userId)}" onclick="event.stopPropagation(); ouvrirContactExterne(${Number(userId)}, this.getAttribute('data-nom'))" data-nom="${n}">✉️ Contact</button>`;
-}
-
     statuts = await statutsParTranches('/relation-statut-lot', 'user_ids', ids);
   } catch (e) {
     /* Non connecté : un bouton « Contact » (formulaire sans compte, assets/contact-externe.js) au lieu d'un repère vide — 2026-11-09, demande explicite. */
