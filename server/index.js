@@ -31410,8 +31410,21 @@ function sondageChampsRepondant(brut) {
 function sondageUrlPublique(id, inv) { return `${process.env.PUBLIC_BASE_URL || "https://diaspoactif.com"}/sondage.html?id=${id}${inv ? "&inv=" + inv : ""}`; }
 function sondageEmailValide(e) { return /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]{2,}$/.test(String(e || "").trim()) && String(e).length <= 190; }
 /* Lieux de diffusion choisis (fil, profil public) ; les événements sont dans sondage_evenements. */
+/* 2026-11-09 : lieux = fil, profil public, onglet Sondages, boutique (+ événements). Rien n'est affiché d'office pour un NOUVEAU sondage ;
+   un sondage créé avant cette règle n'a pas la clé « onglet » : il reste dans l'onglet Sondages comme avant. */
 function sondageDiffusionLue(s) {
-  try { const d = JSON.parse((s && s.diffusion_json) || "{}"); return { fil: !!d.fil, profil: !!d.profil }; } catch (_) { return { fil: false, profil: false }; }
+  try { const d = JSON.parse((s && s.diffusion_json) || "{}"); return { fil: !!d.fil, profil: !!d.profil, onglet: d.onglet === undefined ? true : !!d.onglet, boutique: !!d.boutique }; } catch (_) { return { fil: false, profil: false, onglet: true, boutique: false }; }
+}
+/* Nombre de lieux d'affichage choisis (les 4 lieux + les événements liés). 0 = le sondage ne peut être que brouillon. */
+async function sondageNbLieux(s, diffusion, nbEvenements) {
+  const d = diffusion || sondageDiffusionLue(s);
+  const ev = nbEvenements !== undefined ? nbEvenements : Number(((await db.prepare("SELECT COUNT(*) n FROM sondage_evenements WHERE sondage_id=?").get(s.id)) || {}).n) || 0;
+  return (d.fil ? 1 : 0) + (d.profil ? 1 : 0) + (d.onglet ? 1 : 0) + (d.boutique ? 1 : 0) + (ev > 0 ? 1 : 0);
+}
+/* Lieux reçus du client (objet {fil, profil, onglet, boutique}) : tout ce qui n'est pas explicitement vrai est faux. */
+function sondageDiffusionSaisie(b) {
+  const x = (b && typeof b === "object") ? b : {};
+  return { fil: x.fil === true || x.fil === 1, profil: x.profil === true || x.profil === 1, onglet: x.onglet === true || x.onglet === 1, boutique: x.boutique === true || x.boutique === 1 };
 }
 function sondageFinTexte(s) { const j = String(s.date_cloture || "").slice(0, 10); return /^\d{4}-\d{2}-\d{2}$/.test(j) ? j.split("-").reverse().join("/") : ""; }
 /* Annonce dans le fil d'actualité, au nom du créateur. Un seul envoi par période de publication (fil_post_id mis à jour). */
@@ -40213,6 +40226,7 @@ ${jsonLd}
       let sql = `SELECT s.*, u.nom AS createur_nom, u.photo_url AS createur_photo, u.da_id AS createur_da_id,
         COALESCE(NULLIF(s.pays,''), u.pays) AS pays_aff,
         (SELECT COUNT(*) FROM sondage_questions sq WHERE sq.sondage_id=s.id) AS nb_questions,
+        (SELECT COUNT(*) FROM sondage_evenements se WHERE se.sondage_id=s.id) AS nb_evts_lies,
         (CASE WHEN ${meIdListe} > 0 AND (EXISTS(SELECT 1 FROM sondage_reponses sr WHERE sr.sondage_id=s.id AND sr.user_id=${meIdListe})
           OR EXISTS(SELECT 1 FROM sondage_repondants rp WHERE rp.sondage_id=s.id AND rp.user_id=${meIdListe})) THEN 1 ELSE 0 END) AS ai_repondu
         FROM sondages s LEFT JOIN users u ON u.id=s.createur_id WHERE 1=1`;
@@ -40223,6 +40237,8 @@ ${jsonLd}
       } else {
         /* Un sondage terminé reste visible (« Fin de ce sondage ») : il nourrit le contenu de la plateforme. */
         sql += " AND s.statut IN ('ouvert','cloture')";
+        /* Onglet Sondages : seulement les sondages dont le créateur a coché ce lieu (les sondages d'avant cette règle n'ont pas la clé : ils y restent). */
+        sql += " AND (s.diffusion_json IS NULL OR s.diffusion_json NOT LIKE '%\"onglet\":false%')";
       }
       if (q.categorie) { sql += ' AND s.categorie=?'; args.push(q.categorie); }
       if (q.q) { sql += ' AND (s.titre LIKE ? OR s.description LIKE ?)'; args.push('%'+q.q+'%','%'+q.q+'%'); }
@@ -40236,7 +40252,8 @@ ${jsonLd}
     if (req.method === 'POST' && pathname === '/api/sondages') {
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       if (!['initiative','collectivite','administrateur'].includes(me.role) && !(await hasAccred(me.id, 'mobilisation_active'))) return sendJSON(res, 403, { error: 'Réservé aux Initiatives et Comptes Étatiques.' });
-      const { titre, description, objectif, categorie, type = 'sondage', ville, pays, region, departement, rayon_publication, date_debut, date_cloture, anonyme, confidentialite, resultats_visibles, une_reponse_par_compte, modification_autorisee, cible_roles, photos_json, pdf_b64, pdf_nom, video_url, questions = [], statut = 'brouillon' } = body;
+      const { titre, description, objectif, categorie, type = 'sondage', ville, pays, region, departement, rayon_publication, date_debut, date_cloture, anonyme, confidentialite, resultats_visibles, une_reponse_par_compte, modification_autorisee, cible_roles, photos_json, pdf_b64, pdf_nom, video_url, questions = [], statut: statutDemande = 'brouillon' } = body;
+      let statut = statutDemande;
       if (!titre) return sendJSON(res, 400, { error: 'Titre requis.' });
       if (pdf_b64 && SEC.isDangerousFile(Buffer.from(String(pdf_b64).split(',').pop(), 'base64'))) return sendJSON(res, 400, { error: 'Fichier PDF invalide.' });
       if (!['brouillon', 'ouvert'].includes(statut)) return sendJSON(res, 400, { error: 'Statut invalide.' });
@@ -40247,6 +40264,11 @@ ${jsonLd}
         const permisEvt = new Set((await db.prepare(`SELECT id FROM evenements WHERE owner_user_id=?`).all(me.id)).map(r0 => Number(r0.id)));
         if (evtIdsLies.some(i => !permisEvt.has(i))) return sendJSON(res, 400, { error: 'Vous ne pouvez lier un sondage qu’à vos propres événements.' });
       }
+      /* Lieux d'affichage (2026-11-09) : rien n'est affiché d'office. Sans aucun lieu coché, le sondage reste un brouillon (visible de son seul créateur). */
+      const diffSaisie = sondageDiffusionSaisie(body.diffusion);
+      const nbLieuxNouveau = (diffSaisie.fil ? 1 : 0) + (diffSaisie.profil ? 1 : 0) + (diffSaisie.onglet ? 1 : 0) + (diffSaisie.boutique ? 1 : 0) + (evtIdsLies.length ? 1 : 0);
+      let messageStatut = null;
+      if (statut === 'ouvert' && nbLieuxNouveau === 0) { statut = 'brouillon'; messageStatut = 'Aucun lieu d’affichage choisi : le sondage est enregistré en brouillon. Choisissez au moins un lieu pour le publier.'; }
       const jourOk = (v) => /^\d{4}-\d{2}-\d{2}/.test(String(v || ''));
       const debutSond = (statut === 'ouvert' || !jourOk(date_debut)) ? sondageJourIso(new Date()) : String(date_debut).slice(0, 10);
       const finSond = jourOk(date_cloture) ? String(date_cloture).slice(0, 10) : sondageAjouterJours(debutSond, SONDAGE_DUREE_MAX_JOURS - 1);
@@ -40267,8 +40289,12 @@ ${jsonLd}
       for (const i of evtIdsLies) await db.prepare(`INSERT INTO sondage_evenements(sondage_id,evenement_id) VALUES(?,?)`).run(sid, i);
       /* La publication dans le fil d'actualité (et les autres lieux) se règle dans « Diffusion » (étape suivante) : l'ancien envoi automatique
          visait une colonne inexistante (fil_posts.user_id) et ne fonctionnait pas. */
-      if (statut === 'ouvert') await sondageNotifierAlertes(sid, titre, me.id);
-      return sendJSON(res, 201, { id: sid });
+      await db.prepare(`UPDATE sondages SET diffusion_json=? WHERE id=?`).run(JSON.stringify(diffSaisie), sid);
+      if (statut === 'ouvert') {
+        if (diffSaisie.fil) await sondagePublierSurFil({ id: sid, titre, description, date_cloture: finSond }, { id: me.id });
+        await sondageNotifierAlertes(sid, titre, me.id);
+      }
+      return sendJSON(res, 201, { id: sid, statut, ...(messageStatut ? { message: messageStatut } : {}) });
     }
 
     /* ── GET /api/sondages/:id ── */
@@ -40352,6 +40378,7 @@ ${jsonLd}
       if (!s || (s.createur_id !== me.id && me.role !== 'administrateur')) return sendJSON(res, 403, { error: 'Accès refusé.' });
       if (s.statut === 'archive') return sendJSON(res, 400, { error: 'Ce sondage est archivé.' });
       if (s.statut === 'ouvert') return sendJSON(res, 400, { error: 'Ce sondage est déjà en cours.' });
+      if ((await sondageNbLieux(s)) === 0) return sendJSON(res, 400, { error: 'Choisissez au moins un lieu d’affichage (événement, onglet Sondages, fil d’actualité, profil public ou boutique) pour publier ce sondage.', code: 'aucun_lieu' });
       let duree = body && body.duree_jours !== undefined && body.duree_jours !== '' ? parseInt(body.duree_jours, 10) : SONDAGE_DUREE_MAX_JOURS;
       if (!Number.isInteger(duree) || duree < 1) return sendJSON(res, 400, { error: 'Durée invalide.' });
       if (duree > SONDAGE_DUREE_MAX_JOURS) return sendJSON(res, 400, { error: 'Durée maximale : 30 jours.' });
@@ -40634,12 +40661,21 @@ ${jsonLd}
       const s = await db.prepare(`SELECT * FROM sondages WHERE id=?`).get(sid);
       if (!s || (s.createur_id !== me.id && me.role !== 'administrateur')) return sendJSON(res, 403, { error: 'Accès refusé.' });
       const avant = sondageDiffusionLue(s);
-      const apres = { fil: body.fil === undefined ? avant.fil : !!body.fil, profil: body.profil === undefined ? avant.profil : !!body.profil };
-      await db.prepare(`UPDATE sondages SET diffusion_json=? WHERE id=?`).run(JSON.stringify(apres), sid);
+      const apres = {
+        fil: body.fil === undefined ? avant.fil : !!body.fil, profil: body.profil === undefined ? avant.profil : !!body.profil,
+        onglet: body.onglet === undefined ? avant.onglet : !!body.onglet, boutique: body.boutique === undefined ? avant.boutique : !!body.boutique
+      };
+      let idsEvt = null;
       if (Array.isArray(body.evenement_ids)) {
-        const ids = [...new Set(body.evenement_ids.map(Number).filter(n => Number.isInteger(n) && n > 0))].slice(0, 50);
+        idsEvt = [...new Set(body.evenement_ids.map(Number).filter(n => Number.isInteger(n) && n > 0))].slice(0, 50);
         const permis = new Set((await db.prepare(`SELECT id FROM evenements WHERE owner_user_id=?`).all(s.createur_id)).map(r => Number(r.id)));
-        if (ids.some(i => !permis.has(i))) return sendJSON(res, 400, { error: 'Vous ne pouvez lier un sondage qu\'à vos propres événements.' });
+        if (idsEvt.some(i => !permis.has(i))) return sendJSON(res, 400, { error: 'Vous ne pouvez lier un sondage qu’à vos propres événements.' });
+      }
+      /* Un sondage en cours doit rester affiché quelque part ; un brouillon peut n'avoir encore aucun lieu. */
+      if (s.statut === 'ouvert' && (await sondageNbLieux(s, apres, idsEvt ? idsEvt.length : undefined)) === 0) return sendJSON(res, 400, { error: 'Un sondage en cours doit avoir au moins un lieu d’affichage.' });
+      await db.prepare(`UPDATE sondages SET diffusion_json=? WHERE id=?`).run(JSON.stringify(apres), sid);
+      if (idsEvt) {
+        const ids = idsEvt;
         await db.prepare(`DELETE FROM sondage_evenements WHERE sondage_id=?`).run(sid);
         for (const i of ids) await db.prepare(`INSERT INTO sondage_evenements(sondage_id,evenement_id) VALUES(?,?)`).run(sid, i);
       }
@@ -40695,7 +40731,9 @@ ${jsonLd}
           WHERE se.evenement_id=? AND s.statut='ouvert' ORDER BY s.created_at DESC LIMIT 5`).all(parseInt(q.evenement, 10) || 0);
       } else if (q.profil) {
         lignes = await db.prepare(`SELECT ${cols} FROM sondages s WHERE s.createur_id=? AND s.statut='ouvert' AND s.diffusion_json LIKE '%"profil":true%' ORDER BY s.created_at DESC LIMIT 5`).all(parseInt(q.profil, 10) || 0);
-      } else return sendJSON(res, 400, { error: 'Paramètre evenement ou profil requis.' });
+      } else if (q.boutique) {
+        lignes = await db.prepare(`SELECT ${cols} FROM sondages s WHERE s.createur_id=? AND s.statut='ouvert' AND s.diffusion_json LIKE '%"boutique":true%' ORDER BY s.created_at DESC LIMIT 5`).all(parseInt(q.boutique, 10) || 0);
+      } else return sendJSON(res, 400, { error: 'Paramètre evenement, profil ou boutique requis.' });
       return sendJSON(res, 200, { sondages: lignes.map(l => ({ id: l.id, titre: l.titre, description: String(l.description || '').slice(0, 200), date_cloture: l.date_cloture, nb_reponses: l.nb_reponses || 0, lien: `sondage.html?id=${l.id}` })) });
     }
 

@@ -236,6 +236,9 @@
     app.innerHTML = entete() + hero() + barreCategories() + '<main class="bv-corps">' + blocFiltres() + '<section id="bv-zone">' + zoneListe() + '</section></main>' + pied();
     document.title = 'Boutique Vidéo ' + nom() + ' — Diaspo\'Actif';
     lier();
+    /* Encart « Sondage en cours » : sondages que le propriétaire a choisi d'afficher sur sa boutique (2026-11-09). */
+    var m = app.querySelector('.bv-corps');
+    if (window.SondagesEnCours && etat.init && etat.init.owner_user_id && m && m.previousElementSibling) SondagesEnCours.rendre({ boutique: etat.init.owner_user_id, apres: m.previousElementSibling });
   }
   /* Rafraîchit seulement la zone de droite (et les cases à gauche) : garde le focus de la recherche et du curseur de prix. */
   function rafraichir(avecFiltres) {

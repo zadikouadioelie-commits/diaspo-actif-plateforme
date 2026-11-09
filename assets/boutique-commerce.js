@@ -357,6 +357,11 @@
       '<a class="bq-bouton" href="initiative.html?id=' + i.id + '#contact">' + ic('bulle') + 'Écrire à la boutique</a></div></div></footer>';
   }
 
+  /* Encart « Sondage en cours » : sondages que le propriétaire a choisi d'afficher sur sa boutique (2026-11-09). */
+  function sondageBoutique() {
+    var m = app.querySelector('.bq-corps');
+    if (window.SondagesEnCours && etat.init && etat.init.owner_user_id && m && m.previousElementSibling) SondagesEnCours.rendre({ boutique: etat.init.owner_user_id, apres: m.previousElementSibling });
+  }
   /* ── affichage ── */
   function dessiner() {
     var accueil = etat.cat === null && !etat.q;
@@ -365,6 +370,7 @@
       '<main class="bq-corps">' + lateral() + '<div class="bq-principal" id="bq-principal">' + (accueil ? vueAccueil() : vueListe()) + '</div></main>' + assurance() + pied();
     var f = document.getElementById('bq-q'); if (f) f.value = etat.q;
     demarreCarrousel();
+    sondageBoutique();
   }
   function demarreCarrousel() {
     clearInterval(etat.minuteur);

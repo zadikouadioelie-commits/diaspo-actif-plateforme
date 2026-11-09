@@ -435,6 +435,9 @@
     document.title = nom() + ' — Boutique Portfolio Diaspo\'Actif';
     app.innerHTML = entete() + hero() + onglets() + '<main class="pf-corps">' + lateral() + '<div class="pf-principal" id="pf-principal">' + panneau() + '</div></main>' + pied();
     demarreCarrousel();
+    /* Encart « Sondage en cours » : sondages que le propriétaire a choisi d'afficher sur sa boutique (2026-11-09). */
+    var m = app.querySelector('.pf-corps');
+    if (window.SondagesEnCours && etat.init && etat.init.owner_user_id && m && m.previousElementSibling) SondagesEnCours.rendre({ boutique: etat.init.owner_user_id, apres: m.previousElementSibling });
   }
   function rafraichirPanneau(faireDefiler) {
     var p = document.getElementById('pf-principal'); if (!p) return dessiner();

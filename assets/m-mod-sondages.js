@@ -167,6 +167,18 @@
   /* ============================================================
      MES SONDAGES
      ============================================================ */
+  /* Lieux d'affichage d'un sondage (2026-11-09) : un sondage sans aucun lieu ne peut être qu'un brouillon. */
+  let MES_F = 'tous';
+  function lieuxDe(s) {
+    let d = {}; try { d = JSON.parse(s.diffusion_json || '{}'); } catch (e) { /* illisible : aucun lieu */ }
+    const l = [];
+    if (d.onglet === undefined || d.onglet) l.push('Onglet Sondages');
+    if (d.fil) l.push('Fil d’actualité');
+    if (d.profil) l.push('Profil public');
+    if (d.boutique) l.push('Boutique');
+    const n = Number(s.nb_evts_lies) || 0; if (n) l.push(n + ' événement' + (n > 1 ? 's' : ''));
+    return l;
+  }
   async function mesSondages(t) {
     if (!gate('Mes sondages')) return;
     setPane('Mes sondages', SK, `<a class="btn block" href="#/sondages/nouveau">${ic('plus', 's')} Créer un sondage</a>`);
@@ -174,13 +186,18 @@
     try { rows = (await api('/api/sondages?mine=1')).sondages || []; }
     catch (e) { return showError(t, 'Mes sondages', e, 'Impossible de charger vos sondages', () => mesSondages(++rendu)); }
     if (!vivant(t)) return;
-    const html = rows.length ? rows.map(s => {
+    const nbBr = rows.filter(s => s.statut === 'brouillon').length;
+    if (MES_F === 'brouillons' && !nbBr) MES_F = 'tous';
+    const barre = nbBr ? `<div class="chips" id="mso-mesf" style="margin-bottom:10px"><button type="button" class="chip ${MES_F === 'tous' ? 'on' : ''}" data-f="tous">Tous</button><button type="button" class="chip ${MES_F === 'brouillons' ? 'on' : ''}" data-f="brouillons">📝 Brouillons (${nbBr})</button></div>` : '';
+    if (MES_F === 'brouillons') rows = rows.filter(s => s.statut === 'brouillon');
+    const html = barre + (MES_F === 'brouillons' ? '<p class="mso-hint" style="margin:0 0 10px">Ces sondages ne sont affichés nulle part : vous seul(e) les voyez. Ouvrez-en un, choisissez les lieux (« Diffusion »), puis publiez-le.</p>' : '') + (rows.length ? rows.map(s => {
       const st = STATUT_LABELS[s.statut] || s.statut;
       return `<a class="card mso-card" href="#/sondages/voir/${Number(s.id)}"><div class="pad">
-        <div class="row" style="align-items:flex-start"><div class="sp"><span class="mso-cat">${esc(CAT_LABELS[s.categorie] || 'Sondage')}</span><div style="font-weight:700;font-size:15px;margin-top:4px;word-break:break-word">${esc(s.titre)}</div><div class="small muted">${s.statut === 'ouvert' ? 'Fin le ' : 'Terminé le '}${fmtDate(s.date_cloture)} · ${s.nb_reponses || 0} réponse${s.nb_reponses > 1 ? 's' : ''}</div></div><span class="badge ${s.statut === 'ouvert' ? 'g' : ''}">${esc(st)}</span></div>
+        <div class="row" style="align-items:flex-start"><div class="sp"><span class="mso-cat">${esc(CAT_LABELS[s.categorie] || 'Sondage')}</span><div style="font-weight:700;font-size:15px;margin-top:4px;word-break:break-word">${esc(s.titre)}</div><div class="small muted">${s.statut === 'ouvert' ? 'Fin le ' : 'Terminé le '}${fmtDate(s.date_cloture)} · ${s.nb_reponses || 0} réponse${s.nb_reponses > 1 ? 's' : ''}</div>${s.statut === 'brouillon' ? `<div class="small muted">${lieuxDe(s).length ? 'Lieux choisis : ' + esc(lieuxDe(s).join(' · ')) : 'Aucun lieu choisi pour l’instant'}</div>` : ''}</div><span class="badge ${s.statut === 'ouvert' ? 'g' : ''}">${esc(st)}</span></div>
       </div></a>`;
-    }).join('') : `<div class="empty"><div class="ei">${ic('doc', 'l')}</div><b>Vous n’avez pas encore créé de sondage</b>Créez-en un pour consulter votre communauté.</div>`;
+    }).join('') : `<div class="empty"><div class="ei">${ic('doc', 'l')}</div><b>Vous n’avez pas encore créé de sondage</b>Créez-en un pour consulter votre communauté.</div>`);
     paint(t, 'Mes sondages', html, `<a class="btn block" href="#/sondages/nouveau">${ic('plus', 's')} Créer un sondage</a>`);
+    $$('#mso-mesf .chip').forEach(b => { b.onclick = () => { MES_F = b.dataset.f; mesSondages(++rendu); }; });
   }
 
   /* ============================================================
@@ -365,14 +382,14 @@
      ============================================================ */
   window.MMods.sondagesEnCours = async function (opts) {
     opts = opts || {};
-    const q = opts.evenement ? 'evenement=' + encodeURIComponent(opts.evenement) : opts.profil ? 'profil=' + encodeURIComponent(opts.profil) : '';
+    const q = opts.evenement ? 'evenement=' + encodeURIComponent(opts.evenement) : opts.profil ? 'profil=' + encodeURIComponent(opts.profil) : opts.boutique ? 'boutique=' + encodeURIComponent(opts.boutique) : '';
     const apres = opts.apres;
     if (!q || !apres || !apres.parentNode) return null;
     let liste;
     try { liste = (await api('/api/sondages-en-cours?' + q)).sondages || []; } catch (e) { return null; }
     if (!liste.length || !apres.parentNode) return null;
     css();
-    const cle = opts.evenement ? 'e' + opts.evenement : 'p' + opts.profil;
+    const cle = opts.evenement ? 'e' + opts.evenement : opts.boutique ? 'b' + opts.boutique : 'p' + opts.profil;
     const ancien = apres.parentNode.querySelector('[data-so="' + cle + '"]'); if (ancien) ancien.remove();
     const bloc = document.createElement('section');
     bloc.className = 'mso-so'; bloc.setAttribute('data-so', cle); bloc.setAttribute('aria-label', 'Sondage en cours');
@@ -400,6 +417,8 @@
       <p class="mso-hint" style="background:var(--sky-l);border-radius:12px;padding:10px 12px">${ouvert ? '⏳ Sondage <b>en cours</b> jusqu’au ' + esc(fmtDate(s.date_cloture)) + '.' : 'Ce sondage n’est pas en cours (' + esc(STATUT_LABELS[s.statut] || s.statut) + '). Vos choix s’appliqueront dès sa publication.'} La durée (30 jours maximum) est <b>la même partout</b> où il est affiché.</p>
       <div class="mso-dl" style="margin-top:6px">Où l’afficher</div>
       <label class="mso-opt" id="msd-fil-o"><input type="checkbox" id="msd-fil" ${d.diffusion.fil ? 'checked' : ''}><span><b>Fil d’actualité</b><small>Une publication annonce le sondage avec son lien${s.fil_post_id ? ' (déjà publiée)' : ''}.</small></span></label>
+      <label class="mso-opt" id="msd-onglet-o"><input type="checkbox" id="msd-onglet" ${d.diffusion.onglet ? 'checked' : ''}><span><b>Onglet Sondages</b><small>Le sondage figure dans la page publique des sondages.</small></span></label>
+      <label class="mso-opt" id="msd-boutique-o"><input type="checkbox" id="msd-boutique" ${d.diffusion.boutique ? 'checked' : ''}><span><b>Ma boutique</b><small>Un encart « Sondage en cours » s’affiche sur votre vitrine.</small></span></label>
       <label class="mso-opt" id="msd-profil-o"><input type="checkbox" id="msd-profil" ${d.diffusion.profil ? 'checked' : ''}><span><b>Mon profil public</b><small>Un encart « Sondage en cours » s’affiche sur votre page.</small></span></label>
       <div class="mso-dl">Événements concernés</div>
       <p class="mso-hint" style="margin-top:0">Sur la fiche de chaque événement coché, un bloc « Sondage en cours » permet de répondre si on le souhaite. Il n’apparaît jamais dans le parcours d’inscription.</p>
@@ -417,12 +436,12 @@
       <div class="mso-dl">Personnes ayant répondu</div>
       <div id="msd-rep"><button type="button" class="btn out sm" id="msd-rep-btn">👥 Voir la liste</button></div>`;
     const cb = (a, b) => { const x = $(a, sb), y = $(b, sb); if (x && y) { const sync = () => y.classList.toggle('on', x.checked); x.addEventListener('change', sync); sync(); } };
-    cb('#msd-fil', '#msd-fil-o'); cb('#msd-profil', '#msd-profil-o');
+    cb('#msd-fil', '#msd-fil-o'); cb('#msd-profil', '#msd-profil-o'); cb('#msd-onglet', '#msd-onglet-o'); cb('#msd-boutique', '#msd-boutique-o');
     $('#msd-close', sb).onclick = close;
     $('#msd-save', sb).onclick = async ev => {
       const btn = ev.currentTarget; btn.disabled = true;
       try {
-        await api('/api/sondages/' + id + '/diffusion', { method: 'PUT', body: { fil: $('#msd-fil', sb).checked, profil: $('#msd-profil', sb).checked, evenement_ids: $$('.msd-evt:checked', sb).map(c => Number(c.value)) } });
+        await api('/api/sondages/' + id + '/diffusion', { method: 'PUT', body: { fil: $('#msd-fil', sb).checked, profil: $('#msd-profil', sb).checked, onglet: $('#msd-onglet', sb).checked, boutique: $('#msd-boutique', sb).checked, evenement_ids: $$('.msd-evt:checked', sb).map(c => Number(c.value)) } });
         toast('Diffusion enregistrée ✓'); diffusion(id);
       } catch (e) { toast((e && e.message) || 'Enregistrement impossible.', true); btn.disabled = false; }
     };
@@ -516,13 +535,19 @@
       <select id="mso-conf">${CONFS.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select>
       <label class="mso-l" for="mso-vis">Résultats visibles</label>
       <select id="mso-vis">${VISIBS.map(([v, l]) => `<option value="${v}" ${v === 'apres_cloture' ? 'selected' : ''}>${l}</option>`).join('')}</select>
-      <div class="mso-dl" style="margin-top:16px">Lier à un événement <small>(facultatif)</small></div>
+      <div class="mso-dl" style="margin-top:16px">Où afficher ce sondage</div>
+      <p class="mso-hint" style="margin-top:0">Plusieurs choix possibles. <b>Rien n’est coché d’office</b> : sans aucun lieu, le sondage reste un brouillon que vous seul(e) voyez.</p>
+      <label class="mso-opt"><input type="checkbox" id="mso-lieu-onglet"><span><b>Onglet Sondages</b><small>La page publique des sondages.</small></span></label>
+      <label class="mso-opt"><input type="checkbox" id="mso-lieu-fil"><span><b>Fil d’actualité</b><small>Une publication annonce le sondage.</small></span></label>
+      <label class="mso-opt"><input type="checkbox" id="mso-lieu-profil"><span><b>Profil public</b><small>Un encart « Sondage en cours » sur votre page.</small></span></label>
+      <label class="mso-opt"><input type="checkbox" id="mso-lieu-boutique"><span><b>Boutique</b><small>Un encart « Sondage en cours » sur votre vitrine.</small></span></label>
+      <div class="mso-dl">Événements</div>
       <p class="mso-hint" style="margin-top:0">Sur la fiche de l’événement, un bloc « Sondage en cours » permet d’y répondre <b>sans s’inscrire</b> à l’événement. Il ne fait jamais partie de l’inscription.</p>
       <div class="mso-evts" id="mso-evts"><span class="small muted">Chargement…</span></div>
       <div class="h2" style="margin-top:16px">QUESTIONS</div>
       <div id="mso-qbuilder"></div>
       <button type="button" class="btn out block" id="mso-addq" style="margin:4px 0 14px">+ Ajouter une question</button>
-      <label class="mso-opt" id="mso-pub-opt"><input type="checkbox" id="mso-publier-ck"><span><b>Publier immédiatement</b><small>Sinon, le sondage est enregistré comme brouillon.</small></span></label>
+      <label class="mso-opt" id="mso-pub-opt"><input type="checkbox" id="mso-publier-ck"><span><b>Publier immédiatement</b><small>Si au moins un lieu est coché. Sinon, le sondage est enregistré comme brouillon.</small></span></label>
     </form>`;
     setPane('Nouveau sondage', html, `<button class="btn block" id="mso-save">Créer le sondage</button>`);
 
@@ -551,13 +576,14 @@
       try {
         const r = await api('/api/sondages', {
           method: 'POST', body: {
+            diffusion: { onglet: $('#mso-lieu-onglet').checked, fil: $('#mso-lieu-fil').checked, profil: $('#mso-lieu-profil').checked, boutique: $('#mso-lieu-boutique').checked },
             titre: val('titre'), description: val('desc') || null, categorie: $('#mso-cat2').value,
             rayon_publication: $('#mso-rayon').value, date_debut: d1 || null, date_cloture: d2 || null,
             confidentialite: $('#mso-conf').value, anonyme: $('#mso-anon').checked,
             resultats_visibles: $('#mso-vis').value, statut: $('#mso-publier-ck').checked ? 'ouvert' : 'brouillon', evenement_ids: $$('.mso-evt:checked').map(c => Number(c.value)), questions
           }
         });
-        toast('Sondage créé ✓');
+        toast(r && r.message ? r.message : (r && r.statut === 'ouvert' ? 'Sondage publié ✓' : 'Brouillon enregistré ✓'), !!(r && r.message));
         location.replace('#/sondages/voir/' + Number(r.id));
       } catch (e) {
         btn.disabled = false; btn.textContent = txt;

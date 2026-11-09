@@ -1,7 +1,7 @@
 /* ============================================================
    Diaspo'Actif — Bloc « Sondage en cours » (2026-11-05)
    Affiché sur la page publique d'un événement (sondages liés à cet événement) et sur le profil public d'un compte
-   (sondages que le créateur a choisi d'y afficher). Participation FACULTATIVE, sans compte : un simple lien vers sondage.html.
+   (sondages que le créateur a choisi d'y afficher), et sur sa boutique ({ boutique: USER_ID }, ajouté le 2026-11-09). Participation FACULTATIVE, sans compte : un simple lien vers sondage.html.
    Jamais utilisé dans le parcours d'inscription à un événement.
    Usage : SondagesEnCours.rendre({ evenement: 12, apres: element })  ou  SondagesEnCours.rendre({ profil: 34, apres: element })
    ============================================================ */
@@ -12,19 +12,24 @@
     var d = new Date(String(s || '').slice(0, 10) + 'T12:00:00');
     return isNaN(d) ? '' : d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
   }
+  var CACHE = {};
   async function rendre(opts) {
     opts = opts || {};
-    var q = opts.evenement ? 'evenement=' + encodeURIComponent(opts.evenement) : opts.profil ? 'profil=' + encodeURIComponent(opts.profil) : '';
+    var q = opts.evenement ? 'evenement=' + encodeURIComponent(opts.evenement) : opts.profil ? 'profil=' + encodeURIComponent(opts.profil) : opts.boutique ? 'boutique=' + encodeURIComponent(opts.boutique) : '';
     if (!q || !opts.apres || !opts.apres.parentNode) return null;
     var liste;
-    try {
-      var r = await fetch('/api/sondages-en-cours?' + q, { credentials: 'same-origin' });
-      if (!r.ok) return null;
-      liste = (await r.json()).sondages || [];
-    } catch (e) { return null; }
+    /* Page qui se redessine (filtres d'une boutique…) : une seule requête par emplacement. */
+    if (CACHE[q]) liste = CACHE[q];
+    else {
+      try {
+        var r = await fetch('/api/sondages-en-cours?' + q, { credentials: 'same-origin' });
+        if (!r.ok) return null;
+        liste = CACHE[q] = (await r.json()).sondages || [];
+      } catch (e) { return null; }
+    }
     if (!liste.length) return null;
     /* Un seul bloc par emplacement, même si la fiche est rouverte. */
-    var cle = 'sec-' + (opts.evenement ? 'e' + opts.evenement : 'p' + opts.profil);
+    var cle = 'sec-' + (opts.evenement ? 'e' + opts.evenement : opts.boutique ? 'b' + opts.boutique : 'p' + opts.profil);
     var ancien = opts.apres.parentNode.querySelector('[data-sec="' + cle + '"]');
     if (ancien) ancien.remove();
     var bloc = document.createElement('section');

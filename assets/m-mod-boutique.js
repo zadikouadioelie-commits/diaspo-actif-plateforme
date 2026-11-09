@@ -145,6 +145,11 @@
           : `<div class="empty"><div class="ei">${ic('shop', 'l')}</div><b>${prods.length ? 'Aucun article' : 'Cette boutique n’a pas encore d’article'}</b>${prods.length ? 'Modifiez votre recherche ou le catalogue.' : ''}</div>`;
       };
       paint();
+      /* Encart « Sondage en cours » : sondages que le propriétaire a choisi d'afficher sur sa boutique (2026-11-09). */
+      try {
+        const tete = $('.bq-head') && $('.bq-head').closest('.card');
+        if (tete && ini.owner_user_id && window.MMods && window.MMods.sondagesEnCours) window.MMods.sondagesEnCours({ boutique: ini.owner_user_id, apres: tete });
+      } catch (e) { /* l'encart est facultatif */ }
       const q = $('#bq-q'); if (q) { let t; q.oninput = e => { clearTimeout(t); t = setTimeout(() => { ST.q = e.target.value.trim(); paint(); }, 200); }; }
       $$('#bq-cats .chip').forEach(b => { b.onclick = () => { ST.cat = b.dataset.c; $$('#bq-cats .chip').forEach(x => x.classList.toggle('on', x === b)); paint(); }; });
       if (A.paneShare) A.paneShare(location.origin + '/profil.html?id=' + encodeURIComponent(ini.owner_user_id) + '&vitrine=1&r=' + A.jetonPartage(), nom);

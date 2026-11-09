@@ -95,6 +95,7 @@
         <button type="button" class="sond-tab" role="tab" aria-selected="false" data-onglet="participations" onclick="switchSond('participations')"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>Mes participations</button>
         <button type="button" class="sond-tab" id="tab-mes-sond" role="tab" aria-selected="false" data-onglet="mes" onclick="switchSond('mes')"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2.5"/><path d="M9 4V3h6v1M9 11h6M9 15h6"/></svg>Mes sondages</button>
       </div>
+      <button type="button" id="btn-brouillons" onclick="ouvrirBrouillons()" style="display:none;align-items:center;gap:8px;padding:12px 18px;border-radius:999px;border:1px solid rgba(227,192,110,.65);background:transparent;color:#e3c06e;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;">📝 Brouillons <span id="nb-brouillons">(0)</span></button>
       <button type="button" class="sd-creer" id="btn-creer-sond" onclick="demanderCreation()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Créer un sondage</button>
     </div>
 
@@ -223,15 +224,21 @@
         </select>
       </div>
     </div>
-    <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:6px;border-top:1px solid var(--border);padding-top:12px;">Lier à un événement <span style="text-transform:none;font-weight:600;">(facultatif)</span></div>
-    <div style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:8px;">Sur la page de l'événement, un bloc « Sondage en cours » permet d'y répondre <strong>sans s'inscrire</strong> à l'événement. Il ne fait jamais partie de l'inscription.</div>
+    <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:6px;border-top:1px solid var(--border);padding-top:12px;">Où afficher ce sondage</div>
+    <div style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:8px;">Plusieurs choix possibles. <strong>Rien n'est coché d'office</strong> : sans aucun lieu, le sondage reste un brouillon que vous seul(e) voyez.</div>
+    <label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;margin-bottom:6px;cursor:pointer;"><input type="checkbox" id="cs-lieu-onglet" style="margin-top:2px;accent-color:#2563EB;"> <span><strong>Onglet Sondages</strong> — la page publique des sondages.</span></label>
+    <label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;margin-bottom:6px;cursor:pointer;"><input type="checkbox" id="cs-lieu-fil" style="margin-top:2px;accent-color:#2563EB;"> <span><strong>Fil d'actualité</strong> — une publication annonce le sondage.</span></label>
+    <label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;margin-bottom:6px;cursor:pointer;"><input type="checkbox" id="cs-lieu-profil" style="margin-top:2px;accent-color:#2563EB;"> <span><strong>Profil public</strong> — un encart « Sondage en cours » sur votre page.</span></label>
+    <label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;margin-bottom:10px;cursor:pointer;"><input type="checkbox" id="cs-lieu-boutique" style="margin-top:2px;accent-color:#2563EB;"> <span><strong>Boutique</strong> — un encart « Sondage en cours » sur votre vitrine.</span></label>
+    <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:4px;">Événements</div>
+    <div style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:8px;">Sur la page de chaque événement coché, un bloc « Sondage en cours » permet d'y répondre <strong>sans s'inscrire</strong> à l'événement. Il ne fait jamais partie de l'inscription.</div>
     <div id="cs-evts" style="max-height:150px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;padding:6px 10px;margin-bottom:16px;"></div>
     <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px;border-top:1px solid var(--border);padding-top:12px;">Questions</div>
     <div id="qs-builder"></div>
     <button class="btn btn-sm btn-outline" onclick="addQuestion()" style="margin-bottom:16px;">+ Ajouter une question</button>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;flex-wrap:wrap;gap:10px;">
       <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;cursor:pointer;">
-        <input type="checkbox" id="cs-publier" style="accent-color:#2563EB;"> Publier immédiatement
+        <input type="checkbox" id="cs-publier" style="accent-color:#2563EB;"> Publier immédiatement <span style="font-weight:500;font-size:12px;color:var(--muted);">(si au moins un lieu est coché)</span>
       </label>
       <div style="display:flex;gap:8px;">
         <button class="btn btn-outline" onclick="closeMod('modal-create-sond-bg')">Annuler</button>
@@ -251,6 +258,18 @@
       <button class="btn btn-outline" onclick="closeMod('modal-republier-bg')">Annuler</button>
       <button class="btn btn-orange" id="rep-btn" onclick="confirmerRepublier()">Republier</button>
     </div>
+  </div>
+</div>
+
+<!-- MODAL BROUILLONS (2026-11-09) : sondages sans lieu d'affichage ou non publiés, visibles de leur seul créateur -->
+<div class="modal-bg" id="modal-brouillons-bg" onclick="if(event.target===this)closeMod('modal-brouillons-bg')">
+  <div class="modal" style="max-width:600px;max-height:90vh;overflow-y:auto;" role="dialog" aria-modal="true" aria-labelledby="brouillons-titre">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px;">
+      <h3 style="margin:0;" id="brouillons-titre">📝 Mes brouillons</h3>
+      <button onclick="closeMod('modal-brouillons-bg')" aria-label="Fermer" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">×</button>
+    </div>
+    <p style="font-size:12px;color:var(--muted);line-height:1.5;margin:0 0 12px;">Ces sondages ne sont affichés nulle part et <strong>vous seul(e) les voyez</strong>. Choisissez où les afficher, puis publiez-les.</p>
+    <div id="brouillons-liste"></div>
   </div>
 </div>
 
@@ -331,6 +350,7 @@ document.addEventListener('DOMContentLoaded', async()=>{
   await new Promise(r=>setTimeout(r,400));
   try{ const r=await api('GET','/auth/me'); ME_SOND=r.user; }catch(_){}
   if(ME_SOND){ api('GET','/sondages/alerte').then(r=>{ ALERTE_ACTIVE=!!r.actif; majBoutonsAlerte(); }).catch(()=>{}); }
+  majBrouillons();
   const h=(location.hash||'').replace('#','');
   if(['termines','participations','mes'].includes(h)) ONGLET=h;
   await loadSonds();
@@ -607,7 +627,9 @@ async function ouvrirDiffusion(sid){
 
       <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px;">Où l'afficher</div>
       <label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;margin-bottom:8px;cursor:pointer;"><input type="checkbox" id="df-fil" ${d.diffusion.fil?'checked':''} style="margin-top:2px;accent-color:#2563EB;"> <span><strong>Fil d'actualité</strong> — une publication annonce le sondage avec son lien${d.sondage.fil_post_id?' (déjà publiée)':''}.</span></label>
-      <label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;margin-bottom:14px;cursor:pointer;"><input type="checkbox" id="df-profil" ${d.diffusion.profil?'checked':''} style="margin-top:2px;accent-color:#2563EB;"> <span><strong>Mon profil public</strong> — un encart « Sondage en cours » s'affiche sur votre page.</span></label>
+      <label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;margin-bottom:8px;cursor:pointer;"><input type="checkbox" id="df-profil" ${d.diffusion.profil?'checked':''} style="margin-top:2px;accent-color:#2563EB;"> <span><strong>Mon profil public</strong> — un encart « Sondage en cours » s'affiche sur votre page.</span></label>
+      <label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;margin-bottom:8px;cursor:pointer;"><input type="checkbox" id="df-onglet" ${d.diffusion.onglet?'checked':''} style="margin-top:2px;accent-color:#2563EB;"> <span><strong>Onglet Sondages</strong> — le sondage figure dans la page publique des sondages.</span></label>
+      <label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;margin-bottom:14px;cursor:pointer;"><input type="checkbox" id="df-boutique" ${d.diffusion.boutique?'checked':''} style="margin-top:2px;accent-color:#2563EB;"> <span><strong>Ma boutique</strong> — un encart « Sondage en cours » s'affiche sur votre vitrine.</span></label>
 
       <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:6px;">Événements concernés</div>
       <div style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:8px;">Sur la page de chaque événement coché, un bloc « Sondage en cours » permet de répondre si on le souhaite. Il n'apparaît jamais dans le parcours d'inscription.</div>
@@ -635,9 +657,9 @@ async function sauverDiffusion(){
   const btn=document.getElementById('df-save'); btn.disabled=true;
   try{
     const evenement_ids=[...document.querySelectorAll('.df-evt:checked')].map(c=>Number(c.value));
-    await api('PUT','/sondages/'+DIFF_SID+'/diffusion',{fil:document.getElementById('df-fil').checked,profil:document.getElementById('df-profil').checked,evenement_ids});
+    await api('PUT','/sondages/'+DIFF_SID+'/diffusion',{fil:document.getElementById('df-fil').checked,profil:document.getElementById('df-profil').checked,onglet:document.getElementById('df-onglet').checked,boutique:document.getElementById('df-boutique').checked,evenement_ids});
     DA.toast('Diffusion enregistrée.',{type:'success'});
-    ouvrirDiffusion(DIFF_SID);
+    ouvrirDiffusion(DIFF_SID); loadSonds(); majBrouillons();
   }catch(e){ DA.toast(e.message,{type:'danger'}); btn.disabled=false; }
 }
 async function envoyerInvitationsSond(){
@@ -722,6 +744,7 @@ function openCreateSond(){
   document.getElementById('cs-champ-perso').value='';
   majChampsSond();
   chargerEvtsSond();
+  ['onglet','fil','profil','boutique'].forEach(k=>{ const c=document.getElementById('cs-lieu-'+k); if(c) c.checked=false; });
   document.getElementById('cs-publier').checked=false;
   addQuestion();
   document.getElementById('modal-create-sond-bg').style.display='flex';
@@ -834,8 +857,8 @@ async function saveSond(){
   if(!questions.length){DA.toast('Ajoutez au moins une question.',{type:'warning'});return;}
   const btn=document.getElementById('btn-save-sond');btn.disabled=true;btn.textContent='…';
   try{
-    await api('POST','/sondages',{titre,description:document.getElementById('cs-desc').value||null,categorie:document.getElementById('cs-cat').value,rayon_publication:document.getElementById('cs-rayon').value,date_debut:debut||null,date_cloture:cloture||null,confidentialite:document.getElementById('cs-conf').value,anonyme:document.getElementById('cs-anonyme').checked,champs_repondant:document.getElementById('cs-anonyme').checked?[]:CS_CHAMPS,resultats_visibles:document.getElementById('cs-res-vis').value,statut:document.getElementById('cs-publier').checked?'ouvert':'brouillon',evenement_ids:[...document.querySelectorAll('.cs-evt:checked')].map(c=>Number(c.value)),questions});
-    DA.toast('Sondage créé !',{type:'success'});closeMod('modal-create-sond-bg');loadSonds();
+    const rCree=await api('POST','/sondages',{diffusion:{onglet:document.getElementById('cs-lieu-onglet').checked,fil:document.getElementById('cs-lieu-fil').checked,profil:document.getElementById('cs-lieu-profil').checked,boutique:document.getElementById('cs-lieu-boutique').checked},titre,description:document.getElementById('cs-desc').value||null,categorie:document.getElementById('cs-cat').value,rayon_publication:document.getElementById('cs-rayon').value,date_debut:debut||null,date_cloture:cloture||null,confidentialite:document.getElementById('cs-conf').value,anonyme:document.getElementById('cs-anonyme').checked,champs_repondant:document.getElementById('cs-anonyme').checked?[]:CS_CHAMPS,resultats_visibles:document.getElementById('cs-res-vis').value,statut:document.getElementById('cs-publier').checked?'ouvert':'brouillon',evenement_ids:[...document.querySelectorAll('.cs-evt:checked')].map(c=>Number(c.value)),questions});
+    DA.toast(rCree&&rCree.message?rCree.message:(rCree&&rCree.statut==='ouvert'?'Sondage publié !':'Sondage enregistré en brouillon.'),{type:rCree&&rCree.message?'warning':'success'});closeMod('modal-create-sond-bg');loadSonds();majBrouillons();
     if(ME_SOND&&['initiative','collectivite','administrateur'].includes(ME_SOND.role)) loadMesSonds();
   }catch(e){DA.toast(e.message,{type:'danger'});}
   finally{btn.disabled=false;btn.textContent='Créer le sondage';}
@@ -847,7 +870,54 @@ async function cloturerSond(sid){
 }
 async function archiverSond(sid){
   if(!confirm('Archiver ce sondage ?'))return;
-  try{await api('DELETE','/sondages/'+sid);DA.toast('Archivé.',{type:'success'});loadMesSonds();}catch(e){DA.toast(e.message,{type:'danger'});}
+  try{await api('DELETE','/sondages/'+sid);DA.toast('Archivé.',{type:'success'});loadMesSonds();majBrouillons();}catch(e){DA.toast(e.message,{type:'danger'});}
+}
+
+/* ── Brouillons (2026-11-09) : sondages enregistrés sans lieu d'affichage ou pas encore publiés — visibles de leur seul créateur ── */
+let BROUILLONS=[];
+function lieuxDe(s){
+  let d={}; try{ d=JSON.parse(s.diffusion_json||'{}'); }catch(_){}
+  const l=[];
+  if(d.onglet===undefined||d.onglet) l.push('Onglet Sondages');
+  if(d.fil) l.push('Fil d\'actualité');
+  if(d.profil) l.push('Profil public');
+  if(d.boutique) l.push('Boutique');
+  const n=Number(s.nb_evts_lies)||0; if(n) l.push(n+' événement'+(n>1?'s':''));
+  return l;
+}
+async function majBrouillons(){
+  const b=document.getElementById('btn-brouillons'); if(!b) return;
+  if(!ME_SOND||!ROLES_CREATION.includes(ME_SOND.role)){ b.style.display='none'; return; }
+  try{ const r=await api('GET','/sondages?mine=1'); BROUILLONS=(r.sondages||[]).filter(s=>s.statut==='brouillon'); }catch(_){ BROUILLONS=[]; }
+  document.getElementById('nb-brouillons').textContent='('+BROUILLONS.length+')';
+  b.style.display='inline-flex';
+}
+async function ouvrirBrouillons(){
+  const el=document.getElementById('brouillons-liste');
+  el.innerHTML='<div style="padding:24px;text-align:center;color:var(--muted);">Chargement…</div>';
+  document.getElementById('modal-brouillons-bg').style.display='flex';
+  await majBrouillons();
+  if(!BROUILLONS.length){ el.innerHTML='<div class="notice">Vous n\'avez aucun brouillon.</div>'; return; }
+  el.innerHTML=BROUILLONS.map(s=>{
+    const l=lieuxDe(s);
+    return `<div style="border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:10px;">
+      <strong style="font-size:14px;display:block;">${escH(s.titre)}</strong>
+      <div style="font-size:12px;color:var(--muted);margin:3px 0 8px;">${l.length?'Lieux choisis : '+escH(l.join(' · ')):'Aucun lieu choisi pour l\'instant'}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-sm" style="border-color:#2563EB;color:#2563EB;" onclick="closeMod('modal-brouillons-bg');ouvrirDiffusion(${s.id})">📣 Choisir les lieux</button>
+        <button class="btn btn-sm btn-outline" onclick="publierBrouillon(${s.id})">🚀 Publier</button>
+        <button class="btn btn-sm" style="border-color:#ef4444;color:#ef4444;" onclick="supprimerBrouillon(${s.id})">🗑️ Supprimer</button>
+      </div></div>`;
+  }).join('');
+}
+function publierBrouillon(sid){
+  const s=BROUILLONS.find(x=>x.id===sid);
+  if(s&&!lieuxDe(s).length){ DA.toast('Choisissez d\'abord au moins un lieu d\'affichage.',{type:'warning'}); closeMod('modal-brouillons-bg'); ouvrirDiffusion(sid); return; }
+  closeMod('modal-brouillons-bg'); ouvrirRepublier(sid,true);
+}
+async function supprimerBrouillon(sid){
+  if(!confirm('Supprimer ce brouillon ? Il sera archivé et ne sera plus affiché.'))return;
+  try{ await api('DELETE','/sondages/'+sid); DA.toast('Brouillon supprimé.',{type:'success'}); await ouvrirBrouillons(); loadMesSonds(); }catch(e){ DA.toast(e.message,{type:'danger'}); }
 }
 
 let REP_SID=null;
@@ -866,7 +936,7 @@ async function confirmerRepublier(){
   try{
     const r=await api('POST','/sondages/'+REP_SID+'/republier',{duree_jours:duree});
     DA.toast(r.message||'Sondage republié.',{type:'success'});
-    closeMod('modal-republier-bg');loadSonds();loadMesSonds();
+    closeMod('modal-republier-bg');loadSonds();loadMesSonds();majBrouillons();
   }catch(e){DA.toast(e.message,{type:'danger'});}
   finally{btn.disabled=false;}
 }
