@@ -99,6 +99,7 @@ html body.nd .send,html body.nd .unr{background:var(--nd-degore);color:#1a1202}
 html body.nd .badge{background:rgba(127,166,224,.16);color:#A9C4FF}
 html body.nd .badge.g{background:var(--green-l);color:var(--green)}
 html body.nd .badge.o{background:var(--orange-l);color:var(--nd-or)}
+html body.nd .badge.contact{background:#0A0F1C;color:#F0D68C;border:1px solid rgba(227,192,110,.65)}
 html body.nd .badge.r{background:var(--red-l);color:var(--red)}
 html body.nd .prem{color:#1a1202}
 

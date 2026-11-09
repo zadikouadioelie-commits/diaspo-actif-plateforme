@@ -1580,6 +1580,24 @@ function dcCarte(d, traitee){
     </div>`;
 }
 
+/* Carte d'une demande que J'AI envoyée et qui attend encore une réponse : la personne contactée, la date, et le même repère « Prise de
+   contact en cours » que sur sa cartouche de l'annuaire. Aucune action possible (le serveur refuse de toute façon une seconde demande). */
+function dcCarteEnvoyee(d){
+  const nom = escH([d.autre_prenom, d.autre_nom].filter(Boolean).join(' ') || d.autre_nom || 'Compte');
+  return `
+    <div class="dc-carte" id="dce-${d.id}">
+      <div class="dc-tete">
+        ${dcAvatar(d)}
+        <div style="flex:1;min-width:0;">
+          <a class="dc-nom" href="profil.html?id=${d.autre_id}">${nom}</a>
+          <span class="dc-role">${escH(ROLE_LIBELLE[d.autre_role] || d.autre_role || '')}</span>
+          <div class="dc-date">Demande envoyée le ${fmtDateDC(d.created_at)}</div>
+          <div style="margin-top:6px;"><span class="dc-statut" style="display:inline-block;color:#F0D68C;background:#0A0F1C;border:1px solid rgba(227,192,110,.65);">⏳ Prise de contact en cours</span></div>
+        </div>
+      </div>
+    </div>`;
+}
+
 /* Présentation et activité publique du demandeur : décider suppose de savoir qui écrit,
    sans avoir à quitter la page. */
 function dcPresentation(d){
@@ -1604,16 +1622,22 @@ async function chargerDemandesContact(){
   if (!zone) return;
   zone.innerHTML = `<div style="padding:20px;color:var(--muted);font-size:13px;text-align:center;">Chargement…</div>`;
   try {
-    const [att, trt] = await Promise.all([
+    const [att, trt, env] = await Promise.all([
       api('GET','/demandes-contact?direction=recues&statut=en_attente'),
       api('GET','/demandes-contact?direction=recues&statut=traitees'),
+      /* Demandes ENVOYÉES et encore sans réponse (2026-11-09, demande explicite) : le demandeur voit ici qu'il a déjà fait la démarche. */
+      api('GET','/demandes-contact?direction=envoyees&statut=en_attente').catch(() => ({ demandes: [] })),
     ]);
-    const enAttente = att.demandes || [], traitees = trt.demandes || [];
+    const enAttente = att.demandes || [], traitees = trt.demandes || [], envoyees = env.demandes || [];
     majBadgeDemandes(enAttente.length);
     zone.innerHTML =
       (enAttente.length
         ? enAttente.map(d => dcCarte(d, false)).join('')
         : `<div style="padding:26px 20px;color:var(--muted);font-size:13px;text-align:center;">Aucune demande en attente.</div>`)
+      + (envoyees.length
+        ? `<div style="padding:12px 14px 6px;font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;">Mes demandes envoyées (${envoyees.length})</div>`
+          + envoyees.map(dcCarteEnvoyee).join('')
+        : '')
       + (traitees.length
         ? `<div style="padding:12px 14px 6px;font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;">Demandes traitées</div>`
           + traitees.map(d => dcCarte(d, true)).join('')

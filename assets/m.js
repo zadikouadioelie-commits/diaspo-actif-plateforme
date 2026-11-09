@@ -1430,7 +1430,29 @@
     } else $('#ann-more').innerHTML = '';
     /* « Voir plus » n'apparaît que si la description dépasse 3 lignes. */
     $$('[data-desc]', l).forEach(d => { const b = d.parentNode.querySelector('[data-more]'); if (b && (d.classList.contains('open') || d.scrollHeight > d.clientHeight + 2)) b.hidden = false; });
-    hydraterAdhesionsM(l); hydraterAffiliationsM(l); hydraterSoutienM(l);
+    hydraterAdhesionsM(l); hydraterAffiliationsM(l); hydraterSoutienM(l); hydraterContactsM(l);
+  }
+  /* « Prise de contact en cours » (2026-11-09, demande explicite) : même repère que sur les cartouches du site. Quand le membre a déjà envoyé une
+     demande « Établir contact » restée sans réponse, la cartouche porte une pastille dorée et « Contacter » devient « Demande en attente »
+     (inutile de recliquer : le serveur refuserait une seconde demande). La décision vient du serveur (GET /api/relation-statut-lot, tranches de 100). */
+  function marquerContactEnCoursM(btn) {
+    const carte = btn && btn.closest ? btn.closest('.card.ann') : null; if (!carte) return;
+    const tags = carte.querySelector('.ann-top .tags');
+    if (tags && !tags.querySelector('.badge.contact')) tags.insertAdjacentHTML('beforeend', '<span class="badge contact" title="Votre demande de contact attend sa réponse">⏳ Prise de contact en cours</span>');
+    btn.disabled = true; btn.innerHTML = `${ic('clock', 's')} Demande en attente`;
+  }
+  async function hydraterContactsM(racine) {
+    if (!S.me) return;
+    const bs = [...(racine || document).querySelectorAll('.card.ann [data-write]:not([data-contact-verifie])')];
+    if (!bs.length) return;
+    bs.forEach(b => b.setAttribute('data-contact-verifie', '1'));
+    const ids = [...new Set(bs.map(b => b.dataset.write).filter(id => Number(id) !== Number(S.me.id)))];
+    const statuts = {};
+    for (let i = 0; i < ids.length; i += 100) {
+      try { Object.assign(statuts, (await api('/api/relation-statut-lot?user_ids=' + ids.slice(i, i + 100).join(','))).statuts || {}); }
+      catch (e) { if (i === 0) return; /* le clic vérifiera */ }
+    }
+    bs.forEach(b => { const st = statuts[b.dataset.write]; if (st && st.action === 'en_attente' && b.isConnected) marquerContactEnCoursM(b); });
   }
   /* « Soutenir » (2026-10-13, demande explicite) : réservé aux associations et aux ONG ; une entreprise ne l'a que si elle a créé une cagnotte
      ouverte. Même règle que le site : c'est le serveur qui décide (GET /api/soutenir-lot, une requête pour toute la page) ; le bouton reste
@@ -1555,7 +1577,7 @@
     $('#dc-x').onclick = close;
     $('#dc-go').onclick = async () => {
       const go = $('#dc-go'); go.disabled = true; go.textContent = 'Envoi…';
-      try { await api('/api/demandes-contact', { method: 'POST', body: { destinataire_id: Number(d.destinataire_id) } }); close(); toast('Demande de contact envoyée ✓'); if (btn) { btn.innerHTML = `${ic('clock', 's')} Demande envoyée`; btn.disabled = true; } }
+      try { await api('/api/demandes-contact', { method: 'POST', body: { destinataire_id: Number(d.destinataire_id) } }); close(); toast('Demande de contact envoyée ✓'); if (btn) { btn.innerHTML = `${ic('clock', 's')} Demande envoyée`; btn.disabled = true; marquerContactEnCoursM(btn); } }
       catch (er) {
         if (er.status === 409 && er.data && er.data.code === 'deja_en_attente') { close(); toast('Votre demande est déjà en attente de réponse.'); }
         else if (er.status === 409 && er.data && er.data.code === 'deja_contacts') { close(); toast('Vous êtes déjà en contact : ouvrez la discussion.'); if (btn) btn.click(); }
@@ -2005,6 +2027,14 @@
       el.innerHTML = (r.formation && r.formation.actif && !S.msgArch ? '<div class="chips" role="tablist"><button class="chip ' + (!S.msgFormation ? 'on' : '') + '" data-msg-fq="0" role="tab">💬 Messages</button><button class="chip ' + (S.msgFormation ? 'on' : '') + '" data-msg-fq="1" role="tab">🎓 Messages de formation' + (r.formation.a_traiter ? ' <span class="n">' + r.formation.a_traiter + '</span>' : '') + '</button></div>' : '') + (S.msgFormation ? '' : filtres + (S.msgArch ? '' : barre)) + (c.length ? `<div class="lst">${c.map(x => `<div class="convw"><a class="conv ${x.non_lus > 0 ? 'unread' : ''}" href="#/conv/${x.id}"><div class="av">${x.avec_photo ? `<img src="${attrUrl(x.avec_photo)}" alt="" onerror="this.remove()">` : esc(initials(x.avec_nom))}</div>
         <div class="sp"><div class="row"><span class="nm ell sp">${esc(x.avec_nom)}</span><span class="tm">${esc(ago(x.derniere_date))}</span></div><div class="pv ell">${esc(x.derniere_type && x.derniere_type !== 'text' ? '📎 Pièce jointe' : strip(x.derniere || x.sujet || 'Nouvelle conversation'))}</div></div>${x.non_lus > 0 ? `<span class="unr">${x.non_lus}</span>` : ''}</a><button type="button" class="conv-more" data-cmore="${x.id}" aria-label="Actions sur cette conversation">${ic('more')}</button></div>`).join('')}</div>`
         : `<div class="empty"><div class="ei">${ic('chat', 'l')}</div><b>${S.msgArch ? 'Aucune conversation archivée' : mode === 'automatique' ? 'Aucun message automatique' : 'Aucune conversation'}</b>${mode === 'automatique' ? 'Les messages de bienvenue sans réponse apparaissent ici.' : 'Contactez une boutique ou un membre depuis son profil pour démarrer un échange.'}</div>`);
+      /* Demandes de contact ENVOYÉES et sans réponse (2026-11-09, demande explicite) : le demandeur voit dans ses messages qu'il a déjà fait la démarche. */
+      if (!S.msgArch && !S.msgFormation && !(onglets && mode === 'automatique')) {
+        api('/api/demandes-contact?direction=envoyees&statut=en_attente').then(rd => {
+          const env = (rd && rd.demandes) || []; const ancre = el.querySelector('.lst, .empty');
+          if (!env.length || !ancre || !el.isConnected || el.querySelector('#msg-env')) return;
+          ancre.insertAdjacentHTML('beforebegin', `<div id="msg-env"><div class="h2" style="margin-top:6px">DEMANDES DE CONTACT ENVOYÉES (${env.length})</div><div class="lst">${env.map(d => { const nm = [d.autre_prenom, d.autre_nom].filter(Boolean).join(' ') || 'Compte'; return `<a class="li" href="#/profil/${encodeURIComponent(d.autre_id)}"><div class="av">${d.autre_photo ? `<img src="${attrUrl(d.autre_photo)}" alt="" onerror="this.remove()">` : esc(initials(nm))}</div><span class="sp"><span class="t">${esc(nm)}</span><br><span class="d">⏳ Prise de contact en cours · envoyée ${esc(ago(d.created_at))}</span></span></a>`; }).join('')}</div></div>`);
+        }).catch(() => { /* facultatif : la liste des conversations reste intacte */ });
+      }
       /* Messages de formation (2026-10-30) : questions privées des élèves aux formateurs — mêmes règles que messagerie.html. */
       el.querySelectorAll('[data-msg-fq]').forEach(b => { b.onclick = () => { S.msgFormation = b.dataset.msgFq === '1'; S.msgArch = false; viewMessages(); }; });
       el.querySelectorAll('a.conv').forEach(a => { const x = tout.find(y => String(y.id) === String(a.getAttribute('href').split('/').pop())); const nm = a.querySelector('.nm'); if (x && Number(x.formation_ouvertes) > 0 && nm) nm.insertAdjacentHTML('afterend', '<span class="badge o" style="margin-left:6px;flex:none">🎓 À traiter</span>'); });

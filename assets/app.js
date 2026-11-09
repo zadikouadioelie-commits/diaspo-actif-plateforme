@@ -7729,7 +7729,7 @@ window.etablirContact = async function (userId, messagePredefini, bouton) {
   if (bouton) { bouton.disabled = true; bouton.innerHTML = '⏳ Envoi…'; }
   try {
     await api('POST', '/demandes-contact', { destinataire_id: Number(userId) });
-    if (bouton) { bouton.innerHTML = '⏳ Demande en attente'; bouton.disabled = true; }
+    if (bouton) { bouton.innerHTML = '⏳ Demande en attente'; bouton.disabled = true; marquerPriseContact(bouton, true); }
     else alert('Demande envoyée.');
   } catch (e) {
     if (bouton) { bouton.innerHTML = ancien; bouton.disabled = false; }
@@ -7739,7 +7739,27 @@ window.etablirContact = async function (userId, messagePredefini, bouton) {
 
 /* Rend un bouton de relation à partir du statut déjà connu (factorisé, 2026-09-29) — utilisé
    par le lot ci-dessous, même logique d'affichage qu'avant, juste séparée de l'appel réseau. */
+/* Badge « Prise de contact en cours » (2026-11-09, demande explicite) : sur la cartouche d'un profil auquel le membre connecté a déjà
+   envoyé une demande « Établir contact » restée sans réponse, un repère doré posé juste SOUS LE NOM. (Un repère dans l'angle de la couverture
+   était masqué par le cercle de la photo sur les cartouches Utilisateur et Collectivité : constaté en test, elementFromPoint renvoyait l'avatar.)
+   Il suit exactement l'état renvoyé par le serveur : dès que la demande est acceptée, refusée ou bloquée, il disparaît.
+   Utilisé par les trois cartouches (Utilisateur, Initiative, Collectivité). */
+function marquerPriseContact(el, actif) {
+  const carte = el && el.closest ? el.closest('.ann-card') : null;
+  if (!carte) return;
+  const existant = carte.querySelector('.ann-contact-badge');
+  if (!actif) { if (existant) existant.remove(); return; }
+  if (existant) return;
+  const titre = carte.querySelector('.ann-card-title');
+  if (!titre) return;
+  const b = document.createElement('span');
+  b.className = 'ann-contact-badge';
+  b.title = 'Vous avez déjà envoyé une demande de contact à ce profil : elle attend sa réponse.';
+  b.textContent = '⏳ Prise de contact en cours';
+  titre.insertAdjacentElement('afterend', b);
+}
 function appliquerStatutRelation(el, userId, classe, st) {
+  marquerPriseContact(el, st.action === 'en_attente');
   if (st.action === 'message') {
     el.innerHTML = `<a href="messagerie.html?with=${userId}" class="${classe}">✉️ Message</a>`;
   } else if (st.action === 'en_attente') {
