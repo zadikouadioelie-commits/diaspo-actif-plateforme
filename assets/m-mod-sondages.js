@@ -41,7 +41,7 @@
     s.textContent = `
 .mso-cat{display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;background:var(--border);color:var(--text)}
 .mso-tabs{display:flex;gap:0;border-bottom:1.5px solid var(--border);margin-bottom:12px}
-.mso-tab{flex:1;padding:10px 4px;font-size:13px;font-weight:700;text-align:center;background:none;border:none;border-bottom:3px solid transparent;color:var(--muted);cursor:pointer}
+.mso-tab{display:block;text-decoration:none;flex:1;padding:10px 4px;font-size:13px;font-weight:700;text-align:center;background:none;border:none;border-bottom:3px solid transparent;color:var(--muted);cursor:pointer}
 .mso-tab.on{color:var(--navy2);border-bottom-color:var(--navy2)}
 .mso-card{display:block;color:inherit}
 .mso-card .pad{padding:14px}
@@ -93,6 +93,8 @@
   let rendu = 0;
   const vivant = t => t === rendu && /^#\/sondages/.test(location.hash);
   const paint = (t, titre, html, foot) => { if (vivant(t)) setPane(titre, html, foot); };
+  /* Deux onglets toujours visibles pour un compte connecté : les sondages en cours sur Diaspo'Actif, et les siens (2026-11-09, demande explicite). */
+  const onglets = actif => S.me ? `<div class="mso-tabs" role="tablist"><a class="mso-tab${actif === 'cours' ? ' on' : ''}" role="tab" href="#/sondages">En cours</a><a class="mso-tab${actif === 'mes' ? ' on' : ''}" role="tab" href="#/sondages/mes">Mes sondages</a></div>` : '';
   const pl = (n, un, plus) => n + ' ' + (n > 1 ? plus : un);
   function fmtDate(s) { const p = A.parseDay(s); if (!p) return '—'; return p.d + ' ' + ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'][p.m - 1] + ' ' + p.y; }
   function joursRestants(d) { if (!d) return null; return Math.ceil((new Date(String(d).slice(0, 10) + 'T23:59:59') - new Date()) / 86400000); }
@@ -115,7 +117,7 @@
       return false;
     }
     if (!(await peutCreerSondage())) {
-      setPane(titre, `<div class="empty"><div class="ei">${ic('lock', 'l')}</div><b>Réservé aux comptes organisateurs</b>La création de sondages est proposée aux comptes Initiative, Premium, Collectivité et Administrateur. Vous êtes connecté avec un autre type de compte.<br><br><a class="btn" href="#/sondages">Voir les sondages ouverts</a></div>`);
+      setPane(titre, `${onglets('mes')}<div class="empty"><div class="ei">${ic('lock', 'l')}</div><b>Créer des sondages : module Premium</b>Vous pouvez répondre à tous les sondages en cours. Créer et gérer vos propres sondages est proposé aux comptes Premium (période gratuite comprise), Initiative, Collectivité et Administrateur.<br><br><a class="btn" href="#/abonnement">Voir mon abonnement Premium</a><br><br><a class="btn out" href="#/sondages">Voir les sondages en cours</a></div>`);
       return false;
     }
     return true;
@@ -160,12 +162,11 @@
   }
   async function liste(t) {
     const peutCreer = await peutCreerSondage();
-    setPane(NOM, `<div class="search">${ic('search', 's')}<input id="mso-q" type="search" placeholder="Rechercher un sondage…" aria-label="Rechercher un sondage"></div>
+    setPane(NOM, `${onglets('cours')}<div class="search">${ic('search', 's')}<input id="mso-q" type="search" placeholder="Rechercher un sondage…" aria-label="Rechercher un sondage"></div>
       <select id="mso-cat" aria-label="Filtrer par catégorie" style="width:100%;box-sizing:border-box;min-height:44px;padding:0 10px;border:1px solid var(--border);border-radius:10px;background:#fff;font-size:15px;margin:8px 0 12px">
         <option value="">Toutes catégories</option>${CATEGORIES.map(c => `<option value="${c}">${esc(CAT_LABELS[c])}</option>`).join('')}
       </select>
-      ${peutCreer ? `<a class="btn out block" href="#/sondages/mes" style="margin-bottom:12px">${ic('doc', 's')} Mes sondages</a>` : ''}
-      <div id="mso-grid">${SK}</div>`, peutCreer ? `<a class="btn block" href="#/sondages/nouveau">${ic('plus', 's')} Créer un sondage</a>` : '');
+      <div id="mso-grid">${SK}</div>`, S.me ? `<a class="btn block" href="#/sondages/nouveau">${ic('plus', 's')} Créer un sondage${peutCreer ? '' : ' · Premium'}</a>` : '');
     const qi = $('#mso-q'), ci = $('#mso-cat');
     if (qi) qi.oninput = () => { ST.q = qi.value.trim(); renderListe(); };
     if (ci) ci.onchange = () => { ST.cat = ci.value; renderListe(); };
@@ -201,7 +202,7 @@
     if (MES_F === 'brouillons' && !nbBr) MES_F = 'tous';
     const barre = nbBr ? `<div class="chips" id="mso-mesf" style="margin-bottom:10px"><button type="button" class="chip ${MES_F === 'tous' ? 'on' : ''}" data-f="tous">Tous</button><button type="button" class="chip ${MES_F === 'brouillons' ? 'on' : ''}" data-f="brouillons">📝 Brouillons (${nbBr})</button></div>` : '';
     if (MES_F === 'brouillons') rows = rows.filter(s => s.statut === 'brouillon');
-    const html = barre + (MES_F === 'brouillons' ? '<p class="mso-hint" style="margin:0 0 10px">Ces sondages ne sont affichés nulle part : vous seul(e) les voyez. Ouvrez-en un, choisissez les lieux (« Diffusion »), puis publiez-le.</p>' : '') + (rows.length ? rows.map(s => {
+    const html = onglets('mes') + barre + (MES_F === 'brouillons' ? '<p class="mso-hint" style="margin:0 0 10px">Ces sondages ne sont affichés nulle part : vous seul(e) les voyez. Ouvrez-en un, choisissez les lieux (« Diffusion »), puis publiez-le.</p>' : '') + (rows.length ? rows.map(s => {
       const st = STATUT_LABELS[s.statut] || s.statut;
       return `<a class="card mso-card" href="#/sondages/voir/${Number(s.id)}"><div class="pad">
         <div class="row" style="align-items:flex-start"><div class="sp"><span class="mso-cat">${esc(CAT_LABELS[s.categorie] || 'Sondage')}</span><div style="font-weight:700;font-size:15px;margin-top:4px;word-break:break-word">${esc(s.titre)}</div><div class="small muted">${s.statut === 'ouvert' ? 'Fin le ' : 'Terminé le '}${fmtDate(s.date_cloture)} · ${s.nb_reponses || 0} réponse${s.nb_reponses > 1 ? 's' : ''}</div>${s.statut === 'brouillon' ? `<div class="small muted">${lieuxDe(s).length ? 'Lieux choisis : ' + esc(lieuxDe(s).join(' · ')) : 'Aucun lieu choisi pour l’instant'}</div>` : ''}</div><span class="badge ${s.statut === 'ouvert' ? 'g' : ''}">${esc(st)}</span></div>

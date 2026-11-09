@@ -2504,10 +2504,10 @@
 
   /* ============================================================
      MOI — menu des modules selon le type de compte et le Premium
-     r[rôle] : 0 absent · 1 libre · 2 Premium (verrouillé si expiré) · 3 libre, une partie est Premium
+     r[rôle] : 0 absent · 1 libre · 2 Premium (verrouillé si expiré) · 3 libre, une partie est Premium · 4 rangé parmi les modules Premium (doré) mais jamais verrouillé (ex. Sondages : répondre ouvert à tous, créer = Premium)
      ============================================================ */
   const MODS = [
-    { t: 'Sondages', i: 'doc', h: '#/sondages', d: 'Participer aux sondages de la diaspora, ou en créer un', r: { utilisateur: 1, initiative: 1, collectivite: 1, administrateur: 1 } },
+    { t: 'Sondages', i: 'doc', h: '#/sondages', d: 'Sondages en cours, vos propres sondages, en créer un', r: { utilisateur: 4, initiative: 4, collectivite: 1, administrateur: 1 } },
     { t: 'Mes événements', i: 'cal', h: '#/mesevenements', d: 'Créer et gérer vos événements', r: { initiative: 2, collectivite: 1, administrateur: 1 } },
     { t: 'Fiches d’inscription', i: 'ticket', h: '#/inscriptions', d: 'Inscriptions à vos événements, billets, QR codes', r: { initiative: 2, collectivite: 1, administrateur: 1 } },
     { t: 'Cotisations et adhésions', i: 'people', h: '#/cotisations', d: 'Formules, adhérents, paiements', r: { initiative: 2 } },
@@ -2577,15 +2577,15 @@
       const l = lvl(x); if (!l) return '';
       if (x.tracker && !m.tracker_disponible) return ''; /* Maracana Tracker : phase de test, réservé au compte officiel */
       const locked = premiumLocked(l) && !(x.formateur && S.formateurInvite), d = typeof x.d === 'object' ? (x.d[role] || x.d.utilisateur) : x.d;
-      const tag = l === 2 ? `<span class="prem">Premium${locked ? ' · verrouillé' : ''}</span>` : (l === 3 && S.premium && S.premium.concerne && !S.premium.actif ? '<span class="prem">Premium · publier</span>' : '');
+      const tag = (l === 2 || l === 4) ? `<span class="prem">Premium${locked ? ' · verrouillé' : ''}</span>` : (l === 3 && S.premium && S.premium.concerne && !S.premium.actif ? '<span class="prem">Premium · publier</span>' : '');
       const inner = `<span class="ic">${ic(locked ? 'lock' : x.i)}</span><span class="sp"><span class="t">${esc(x.t)}</span> ${tag}<br><span class="d">${esc(d)}</span></span><span class="ch">${ic('chev', 's')}</span>`;
       if (locked) return `<a class="li gold locked" href="#" data-lock="1" data-name="${esc(x.t)}">${inner}</a>`;
-      return `<a class="li${l === 2 ? ' gold' : ''}" href="${esc(x.h)}" ${x.act ? `data-act="${x.act}"` : ''}>${inner}</a>`;
+      return `<a class="li${(l === 2 || l === 4) ? ' gold' : ''}" href="${esc(x.h)}" ${x.act ? `data-act="${x.act}"` : ''}>${inner}</a>`;
     };
     /* Comme le menu du site : les modules Premium (dorés) d'abord, puis les autres (blancs). */
     /* Compte administrateur (2026-10-10, demande explicite) : les modules d'administration, définis par assets/m-mod-admin.js. */
     const admin = m.role === 'administrateur' && window.MAdminModules ? window.MAdminModules.map(x => `<a class="li" href="${esc(x.h)}"><span class="ic">${ic(x.i)}</span><span class="sp"><span class="t">${esc(x.t)}</span><br><span class="d">${esc(x.d)}</span></span><span class="ch">${ic('chev', 's')}</span></a>`).join('') : '';
-    return { role, admin, premium: MODS.filter(x => lvl(x) === 2).map(li).join(''), mods: MODS.filter(x => lvl(x) !== 2).map(li).join(''), compte: MODS_COMPTE.map(li).join('') };
+    return { role, admin, premium: MODS.filter(x => lvl(x) === 2 || lvl(x) === 4).map(li).join(''), mods: MODS.filter(x => lvl(x) !== 2 && lvl(x) !== 4).map(li).join(''), compte: MODS_COMPTE.map(li).join('') };
   }
   function openMenu() {
     if (!S.me) { openLogin(); return; }
