@@ -98,6 +98,7 @@
       <a href="#verifications-organisation" data-section="verifications-organisation" style="display:flex;justify-content:space-between;align-items:center;">🏢 Vérifications d'organisation <span id="vo-pending-badge" style="display:none;background:#f59e0b;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;min-width:18px;text-align:center;"></span></a>
       <a href="#demandes-formateur" data-section="demandes-formateur" style="display:flex;justify-content:space-between;align-items:center;">🎓 Demandes de compte formateur <span id="df-pending-badge" style="display:none;background:#f59e0b;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;min-width:18px;text-align:center;"></span></a>
       <a href="#demandes-passage" data-section="demandes-passage" style="display:flex;justify-content:space-between;align-items:center;">🚀 Passage « Existante » <span id="dp-pending-badge" style="display:none;background:#f59e0b;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;min-width:18px;text-align:center;"></span></a>
+      <a href="#ida-demandes" data-section="ida-demandes" style="display:flex;justify-content:space-between;align-items:center;">🎙️ Influenceur DA — Créateurs <span id="ida-pending-badge" style="display:none;background:#f59e0b;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;min-width:18px;text-align:center;"></span></a>
       <a href="#rencontres" data-section="rencontres" style="display:flex;justify-content:space-between;align-items:center;">🤝 Rencontres D'A <span id="rdv-badge" style="display:none;background:#f59e0b;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;min-width:18px;text-align:center;"></span></a>
       <a href="#parrainage-admin" data-section="parrainage-admin">🔗 Parrainage &amp; Invitations</a>
       <a href="#liens-adherents" data-section="liens-adherents">🎫 Liens Adhérents</a>
@@ -3489,6 +3490,19 @@
           <button class="btn btn-sm btn-outline" id="df-filtre-refusee" onclick="loadDemandesFormateur('refusee')">❌ Refusées</button>
         </div>
         <div id="df-list"><p class="notice">Chargement…</p></div>
+      </section>
+
+      <section id="section-ida-demandes" style="display:none;">
+        <div style="margin-bottom:20px;">
+          <h2 style="margin:0;">🎙️ Influenceur DA — Demandes créateur</h2>
+          <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Demandes des comptes Initiative et Utilisateur (Premium) pour devenir créateur sur Influenceur Diaspo'Actif.</p>
+        </div>
+        <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;">
+          <button class="btn btn-sm btn-orange" id="ida-filtre-en_attente" onclick="loadIdaDemandes('en_attente')">⏳ En attente</button>
+          <button class="btn btn-sm btn-outline" id="ida-filtre-autorisee" onclick="loadIdaDemandes('autorisee')">✅ Autorisées</button>
+          <button class="btn btn-sm btn-outline" id="ida-filtre-declinee" onclick="loadIdaDemandes('declinee')">❌ Déclinées</button>
+        </div>
+        <div id="ida-list"><p class="notice">Chargement…</p></div>
       </section>
 
       <section id="section-demandes-passage" style="display:none;">
@@ -9729,6 +9743,66 @@ async function dfDecider(id, action, btn) {
   loadDemandesFormateur();
 }
 
+/* ── Influenceur DA — demandes créateur (2026-11-09) ── */
+let _idaFiltre = 'en_attente';
+function idaMajBadge(n) {
+  const b = document.getElementById('ida-pending-badge');
+  if (!b) return;
+  if (n > 0) { b.textContent = n; b.style.display = 'inline-block'; } else b.style.display = 'none';
+}
+async function idaDfCharger() {
+  try { const r = await api('GET', '/admin/ida-demandes?statut=en_attente'); idaMajBadge(r.nb_en_attente || 0); } catch (_) {}
+}
+async function loadIdaDemandes(statut) {
+  if (statut) _idaFiltre = statut;
+  const el = document.getElementById('ida-list');
+  if (!el) return;
+  el.innerHTML = '<p class="notice">Chargement…</p>';
+  ['en_attente', 'autorisee', 'declinee'].forEach(v => {
+    const b = document.getElementById('ida-filtre-' + v);
+    if (b) { b.classList.toggle('btn-orange', v === _idaFiltre); b.classList.toggle('btn-outline', v !== _idaFiltre); }
+  });
+  try {
+    const r = await api('GET', '/admin/ida-demandes?statut=' + _idaFiltre);
+    idaMajBadge(r.nb_en_attente || 0);
+    const demandes = r.demandes || [];
+    if (!demandes.length) { el.innerHTML = '<p class="notice">Aucune demande dans cette catégorie.</p>'; return; }
+    el.innerHTML = demandes.map(d => {
+      const liens = (d.liens || []).map(l => `<a href="${esc(l)}" target="_blank" rel="noopener" style="display:block;word-break:break-all;">${esc(l)}</a>`).join('') || '<span style="color:var(--muted);">—</span>';
+      return `
+      <div class="card" style="margin-bottom:12px;padding:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
+          <div>
+            <div style="font-weight:700;">${esc(d.nom)}</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:2px;">${esc(d.email || '')} · compte n°${d.user_id} · ${esc(d.role)} · demande du ${new Date(String(d.cree_le).replace(' ', 'T')).toLocaleDateString('fr-FR')}${d.decide_le ? ' · réponse du ' + new Date(String(d.decide_le).replace(' ', 'T')).toLocaleDateString('fr-FR') : ''}</div>
+          </div>
+          ${d.statut !== 'en_attente' ? `<span style="font-size:12px;font-weight:700;color:${d.statut === 'autorisee' ? '#16a34a' : '#dc2626'};">${d.statut === 'autorisee' ? 'Autorisée' : 'Déclinée'}</span>` : ''}
+        </div>
+        <div class="grid grid-2" style="gap:12px;margin-bottom:10px;">
+          <div><label class="form-label">Thèmes</label><div style="font-size:13px;">${(d.themes || []).map(esc).join(' · ') || '—'}</div></div>
+          <div><label class="form-label">Objectif</label><div style="font-size:13px;white-space:pre-wrap;">${esc(d.objectif || '—')}</div></div>
+          <div><label class="form-label">Autres réseaux de diffusion</label><div style="font-size:13px;">${d.autres_reseaux ? liens : 'Non'}</div></div>
+          <div><label class="form-label">Métier en lien avec le journalisme</label><div style="font-size:13px;">${d.metier_journalisme ? esc(d.metier_precision || '—') : 'Non'}</div></div>
+        </div>
+        ${d.commentaire_admin ? `<div style="font-size:13px;color:var(--muted);margin-bottom:10px;"><b>Commentaire envoyé :</b> ${esc(d.commentaire_admin)}</div>` : ''}
+        ${d.statut === 'en_attente' ? `
+        <input type="text" id="ida-com-${d.id}" class="input-field" style="width:100%;margin-bottom:8px;" placeholder="Commentaire (facultatif, envoyé au demandeur)">
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-sm btn-orange" onclick="idaDecider(${d.id}, 'autoriser', this)">✅ Autoriser</button>
+          <button class="btn btn-sm btn-outline" style="color:#dc2626;" onclick="idaDecider(${d.id}, 'decliner', this)">❌ Décliner</button>
+        </div>` : ''}
+      </div>`;
+    }).join('');
+  } catch (e) { el.innerHTML = '<p class="notice" style="color:red;">Erreur : ' + esc(e.message || 'chargement impossible') + '</p>'; }
+}
+async function idaDecider(id, action, btn) {
+  if (btn) btn.disabled = true;
+  const com = document.getElementById('ida-com-' + id);
+  try { await api('POST', '/admin/ida-demandes/' + id + '/' + action, { commentaire: com ? com.value.trim() : '' }); }
+  catch (e) { alert(e.message || 'Erreur.'); }
+  loadIdaDemandes();
+}
+
 async function loadDemandesPassage(statut){
   if (statut) _dpAdminFiltre = statut;
   const el = document.getElementById('dp-admin-list');
@@ -9944,6 +10018,7 @@ async function submitAccordDirect(){
     'verifications-organisation': () => loadVerificationsOrganisation(),
     'demandes-passage': () => loadDemandesPassage(),
     'demandes-formateur': () => loadDemandesFormateur(),
+    'ida-demandes': () => loadIdaDemandes(),
     'administrateurs-junior': () => loadAdminsJunior(),
     'support-pilote': () => loadSupportPilote(),
     'partenariat-admin': () => loadPartenariatAdmin(),
@@ -9960,6 +10035,7 @@ async function submitAccordDirect(){
   }));
 
   dfCharger();
+  idaDfCharger();
 
   // Ouvrir directement une section si l'URL arrive avec un hash (ex: bouton flottant admin)
   if (location.hash) {

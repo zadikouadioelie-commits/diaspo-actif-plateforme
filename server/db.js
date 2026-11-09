@@ -6352,6 +6352,28 @@ db.exec(`
   );
 `);
 
+/* Influenceur Diaspo'Actif (IDA) — demande d'accès créateur (2026-11-09, demande explicite).
+   Réservé aux comptes Initiative et Utilisateur, Premium actif (voir server/ida-demandes-createur.js).
+   themes_json : sous-ensemble de la liste THEMES figée dans influenceur.html (à garder synchronisée).
+   liens_json : liens vers d'autres réseaux de diffusion, seulement si autres_reseaux=1. */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS ida_demandes_createur (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    themes_json TEXT DEFAULT '[]',
+    objectif TEXT,
+    autres_reseaux INTEGER DEFAULT 0,
+    liens_json TEXT DEFAULT '[]',
+    metier_journalisme INTEGER DEFAULT 0,
+    metier_precision TEXT,
+    statut TEXT DEFAULT 'en_attente',
+    commentaire_admin TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    decide_le TEXT,
+    decide_par INTEGER
+  );
+`);
+
 /* Sondages (2026-11-05) : la table sondage_questions avait été créée avec CHECK(type IN ('choix_unique','choix_multiple','texte_libre','echelle','classement')),
    alors que la page Sondages propose oui_non, texte_court, texte_long, echelle_5, echelle_10, etoiles, nombre, date… : toute question d'un de ces types faisait
    échouer la création du sondage. On reconstruit la table SANS cette contrainte (SQLite ; sur Postgres, voir checkFixes dans pg-init.js). Les lignes sont conservées. */

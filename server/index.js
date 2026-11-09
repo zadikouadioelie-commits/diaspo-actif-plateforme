@@ -3360,6 +3360,9 @@ FormationAcces.register({ route, db, sendJSON, getCurrentUser, SEC, checkFormati
 /* Formation Diaspora : demande d'accès à l'espace formateur (Initiative → administration, accepter/refuser sans motif) — server/formation-demandes-formateur.js. */
 const FormationDemandesFormateur = require("./formation-demandes-formateur");
 FormationDemandesFormateur.register({ route, db, sendJSON, getCurrentUser, creerNotif, nomCompteAffichage, hasAccreditation });
+/* Influenceur Diaspo'Actif (IDA) : demande d'accès créateur (Initiative/Utilisateur Premium → administration, autoriser/décliner avec ou sans commentaire) — server/ida-demandes-createur.js. */
+const IdaDemandesCreateur = require("./ida-demandes-createur");
+IdaDemandesCreateur.register({ route, db, sendJSON, getCurrentUser, creerNotif, nomCompteAffichage, exigerPremium, getPremiumStatut });
 /* Formation Diaspora, lot A : droits d'accès par formation ou par module, commandes, expiration — server/formation-droits.js. getOrigin est une déclaration de fonction (hissée). */
 const FormationDroits = require("./formation-droits");
 FormationDroits.register({ route, db, sendJSON, getCurrentUser, SEC, checkFormationOwner, creerNotif, getOrigin, ParcoursFormation });
@@ -16915,12 +16918,12 @@ route("GET", "/api/demandes-contact", async (req, res, params, body, query) => {
   sendJSON(res, 200, { demandes, en_attente });
 });
 
-/* POST /api/demandes-contact/:id/repondre — accepter, refuser ou bloquer */
-route("POST", "/api/demandes-contact/:id/repondre", async (req, res, params, body) => {
-  const user = await getCurrentUser(req);
 /* Contact pour les personnes SANS compte (2026-11-09, demande explicite) : formulaire public → notification + rubrique « Hors Diaspo'Actif » de la messagerie — server/contact-externe.js. */
 require("./contact-externe").register({ route, db, sendJSON, getCurrentUser, creerNotif, SEC });
 
+/* POST /api/demandes-contact/:id/repondre — accepter, refuser ou bloquer */
+route("POST", "/api/demandes-contact/:id/repondre", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const demande = await db.prepare("SELECT * FROM demandes_contact WHERE id=?").get(params.id);
   if (!demande || Number(demande.destinataire_id) !== Number(user.id)) {

@@ -172,6 +172,28 @@ html body.nd .ida .ida-champ input[type="search"]::-webkit-search-cancel-button 
 #ida-toast { position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(20px); opacity:0; pointer-events:none; z-index:9000; padding:12px 20px; border-radius:999px; font-size:14px; font-weight:700; color:#1a1405; background:var(--nd-degore,#E3C06E); transition:opacity .3s, transform .3s; max-width:calc(100vw - 32px); text-align:center; }
 #ida-toast.on { opacity:1; transform:translateX(-50%) translateY(0); }
 
+/* Fiche de demande « Devenir créateur » (2026-11-09, demande explicite) */
+.ida-modal-bg { position:fixed; inset:0; z-index:500; display:flex; align-items:center; justify-content:center; padding:20px; background:rgba(5,8,18,.72); }
+.ida-modal-bg[hidden] { display:none; }
+.ida-modal { width:100%; max-width:560px; max-height:88vh; overflow-y:auto; }
+.ida-field { margin-bottom:16px; }
+.ida-field > label.ida-l { display:block; font-weight:700; font-size:13px; margin-bottom:7px; color:#D3DAEA; }
+.ida-field small { display:block; font-weight:400; color:var(--nd-faible,#7C88A4); margin-top:4px; }
+.ida .ida-field textarea, .ida .ida-field input[type="text"], .ida .ida-field input[type="url"] { width:100%; box-sizing:border-box; min-height:44px; padding:10px 12px; border-radius:10px; border:1px solid var(--nd-bord2,rgba(255,255,255,.14)); background-color:#0B1226 !important; color:#fff !important; font:inherit; font-size:14px; }
+.ida .ida-field textarea { min-height:90px; resize:vertical; }
+.ida-themes-pick { display:flex; flex-wrap:wrap; gap:8px; }
+.ida-theme-chip { display:inline-flex; align-items:center; gap:7px; padding:7px 13px; border-radius:999px; border:1px solid var(--nd-bord2,rgba(255,255,255,.14)); cursor:pointer; font-size:12.5px; font-weight:600; color:#D3DAEA; }
+.ida-theme-chip input { margin:0; accent-color:var(--nd-or,#E3C06E); }
+.ida-theme-chip:has(input:checked) { border-color:var(--nd-or,#E3C06E); color:var(--nd-or,#E3C06E); background:rgba(227,192,110,.1); }
+.ida-oui-non { display:flex; gap:18px; margin-bottom:4px; }
+.ida-oui-non label { display:flex; align-items:center; gap:7px; font-size:13.5px; font-weight:600; color:#D3DAEA; cursor:pointer; }
+.ida-oui-non input { accent-color:var(--nd-or,#E3C06E); }
+.ida-lien-row { display:flex; gap:8px; margin-bottom:8px; }
+.ida-lien-row input { flex:1 1 auto; }
+.ida-lien-row button { flex:0 0 auto; }
+.ida-err-msg { color:#FCA5A5; font-size:13px; margin-top:10px; }
+.ida-dc-statut { padding:14px 16px; border-radius:12px; background:rgba(255,255,255,.05); border:1px solid var(--nd-bord2,rgba(255,255,255,.1)); font-size:13.5px; line-height:1.55; color:var(--nd-doux,#A9B4CC); margin-bottom:14px; }
+
 @media (max-width:1180px) {
   .ida-grid { grid-template-columns:220px minmax(0,1fr); }
   .ida-suivre-col { grid-column:1 / -1; }
@@ -286,9 +308,20 @@ html body.nd .ida .ida-champ input[type="search"]::-webkit-search-cancel-button 
           <li>Valorisez vos idées, projets et initiatives</li>
         </ul>
       </div>
-      <a class="ida-btn principal" href="inscription.html" id="ida-cta-btn">Commencer maintenant →</a>
+      <a class="ida-btn principal" href="#" id="ida-cta-btn">Commencer maintenant →</a>
     </section>
   </main>
+
+  <!-- Fiche de demande « Devenir créateur » -->
+  <div class="ida-modal-bg" id="ida-dc-bg" hidden>
+    <div class="ida-card ida-modal" id="ida-dc-modal" role="dialog" aria-modal="true" aria-labelledby="ida-dc-t">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:16px;">
+        <h3 id="ida-dc-t" style="margin:0;font-size:20px;">Devenir créateur sur Influenceur Diaspo'Actif</h3>
+        <button type="button" class="ida-btn" id="ida-dc-close" aria-label="Fermer">✕</button>
+      </div>
+      <div id="ida-dc-corps"><p class="ida-desc">Chargement…</p></div>
+    </div>
+  </div>
 
   <!-- Phase de test (2026-11-02) : la rubrique n'est ouverte qu'au compte Diaspo'Actif officiel (drapeau influenceur_disponible de /api/auth/me). -->
   <main class="ida" id="ida-ferme" hidden>
@@ -408,7 +441,7 @@ html body.nd .ida .ida-champ input[type="search"]::-webkit-search-cancel-button 
 
     if (!VIDEOS.length) {
       player.style.display = 'block';
-      player.innerHTML = videoVide("Les premières vidéos arrivent bientôt", "Influenceur Diaspo'Actif réunira des podcasts vidéo, débats, interviews et récits inspirants de 30 minutes à 1 heure, au service de la diaspora. Les créateurs pourront publier dès l'ouverture de la rubrique.", '<a class="ida-btn principal" href="inscription.html">Devenir créateur →</a>');
+      player.innerHTML = videoVide("Les premières vidéos arrivent bientôt", "Influenceur Diaspo'Actif réunira des podcasts vidéo, débats, interviews et récits inspirants de 30 minutes à 1 heure, au service de la diaspora. Les créateurs pourront publier dès l'ouverture de la rubrique.", '<button type="button" class="ida-btn principal" id="ida-cta-btn2">Devenir créateur →</button>');
       secV.hidden = true; suivre.innerHTML = '<div class="ida-vide-mini">Les vidéos à suivre apparaîtront ici dès les premières publications.</div>';
       return;
     }
@@ -466,6 +499,100 @@ html body.nd .ida .ida-champ input[type="search"]::-webkit-search-cancel-button 
   $('ida-q').addEventListener('input', function () { etat.q = this.value; dessiner(); });
   $('ida-th').addEventListener('change', function () { etat.theme = this.value; dessiner(); });
   $('ida-auto').addEventListener('click', function () { this.setAttribute('aria-checked', this.getAttribute('aria-checked') === 'true' ? 'false' : 'true'); });
+
+  /* ═══ Fiche de demande « Devenir créateur » (2026-11-09, demande explicite) ═══
+     Réservée aux comptes Initiative/Utilisateur Premium actif (voir server/ida-demandes-createur.js) ;
+     la demande part vers l'administration (module dédié dashboard-administrateur.html#ida-demandes). */
+  var DC_LIENS_MAX = 5;
+  function dcOuvrir() { $('ida-dc-bg').hidden = false; dcCharger(); }
+  function dcFermer() { $('ida-dc-bg').hidden = true; }
+  function dcEtatConnexion() { return '<div class="ida-dc-statut">Connectez-vous pour demander à devenir créateur.</div><a class="ida-btn principal" href="login.html">Se connecter</a>'; }
+  function dcEtatRole() { return '<div class="ida-dc-statut">Devenir créateur sur Influenceur Diaspo\'Actif est réservé aux comptes Initiative et Utilisateur.</div>'; }
+  function dcEtatPremium() { return '<div class="ida-dc-statut">Cette fonctionnalité est réservée aux abonnés Premium.</div><a class="ida-btn principal" href="mon-abonnement.html">Voir mon abonnement</a>'; }
+  function dcEtatDecision(d) {
+    var txt = d.statut === 'en_attente' ? "Votre demande a bien été envoyée et est en attente de réponse de l'administration."
+      : d.statut === 'autorisee' ? "Votre demande a été autorisée ✓ Vous pourrez publier dès l'ouverture de la rubrique."
+      : "Votre demande n'a pas été retenue.";
+    var html = '<div class="ida-dc-statut">' + esc(txt) + (d.commentaire_admin ? '<br><br><b>Commentaire : </b>' + esc(d.commentaire_admin) : '') + '</div>';
+    if (d.statut === 'en_attente') html += '<button type="button" class="ida-btn" id="dc-modifier">Modifier ma demande</button>';
+    if (d.statut === 'declinee') html += '<button type="button" class="ida-btn principal" id="dc-nouvelle">Déposer une nouvelle demande</button>';
+    return html;
+  }
+  function dcListeLiens(liens) { var l = $('dc-liens-list'); l.innerHTML = ''; (liens.length ? liens : ['']).forEach(dcAjouterLien); }
+  function dcAjouterLien(valeur) {
+    var list = $('dc-liens-list'); if (list.children.length >= DC_LIENS_MAX) return;
+    var row = document.createElement('div'); row.className = 'ida-lien-row';
+    row.innerHTML = '<input type="url" placeholder="https://…" value="' + esc(valeur || '') + '"><button type="button" class="ida-btn" aria-label="Retirer ce lien">✕</button>';
+    row.querySelector('button').addEventListener('click', function () { row.remove(); });
+    list.appendChild(row);
+  }
+  function dcFormulaire(prefill) {
+    prefill = prefill || {};
+    var themesSel = {}; (prefill.themes || []).forEach(function (t) { themesSel[t] = true; });
+    var html = '<form id="dc-form" novalidate>' +
+      '<div class="ida-field"><label class="ida-l">Thèmes que vous souhaitez aborder<small>Choisissez-en un ou plusieurs, parmi les thématiques existantes.</small></label>' +
+      '<div class="ida-themes-pick">' + THEMES.map(function (t, i) { return '<label class="ida-theme-chip"><input type="checkbox" data-dc-theme="' + i + '"' + (themesSel[t] ? ' checked' : '') + '><span>' + esc(t) + '</span></label>'; }).join('') + '</div></div>' +
+      '<div class="ida-field"><label class="ida-l" for="dc-objectif">Objectif</label><textarea id="dc-objectif" placeholder="Ce que vous souhaitez apporter à la communauté…">' + esc(prefill.objectif || '') + '</textarea></div>' +
+      '<div class="ida-field"><label class="ida-l">Avez-vous d\'autres réseaux de diffusion ?</label>' +
+      '<div class="ida-oui-non"><label><input type="radio" name="dc-reseaux" value="oui"' + (prefill.autres_reseaux ? ' checked' : '') + '> Oui</label><label><input type="radio" name="dc-reseaux" value="non"' + (!prefill.autres_reseaux ? ' checked' : '') + '> Non</label></div>' +
+      '<div id="dc-liens-bloc"' + (prefill.autres_reseaux ? '' : ' hidden') + '><div id="dc-liens-list"></div><button type="button" class="ida-btn" id="dc-lien-add">+ Ajouter un lien</button></div></div>' +
+      '<div class="ida-field"><label class="ida-l">Avez-vous un métier en lien avec le journalisme ?</label>' +
+      '<div class="ida-oui-non"><label><input type="radio" name="dc-journalisme" value="oui"' + (prefill.metier_journalisme ? ' checked' : '') + '> Oui</label><label><input type="radio" name="dc-journalisme" value="non"' + (!prefill.metier_journalisme ? ' checked' : '') + '> Non</label></div>' +
+      '<div id="dc-metier-bloc"' + (prefill.metier_journalisme ? '' : ' hidden') + '><input type="text" id="dc-metier" placeholder="Précisez votre métier" value="' + esc(prefill.metier_precision || '') + '"></div></div>' +
+      '<div class="ida-err-msg" id="dc-err"></div>' +
+      '<button type="button" class="ida-btn principal" id="dc-envoyer" style="width:100%;margin-top:4px;">Envoyer ma demande</button>' +
+      '</form>';
+    $('ida-dc-corps').innerHTML = html;
+    dcListeLiens(prefill.liens || []);
+    Array.prototype.forEach.call(document.getElementsByName('dc-reseaux'), function (b) { b.addEventListener('change', function () { $('dc-liens-bloc').hidden = document.querySelector('input[name="dc-reseaux"]:checked').value !== 'oui'; }); });
+    Array.prototype.forEach.call(document.getElementsByName('dc-journalisme'), function (b) { b.addEventListener('change', function () { $('dc-metier-bloc').hidden = document.querySelector('input[name="dc-journalisme"]:checked').value !== 'oui'; }); });
+    $('dc-lien-add').addEventListener('click', function () { dcAjouterLien(''); });
+    $('dc-envoyer').addEventListener('click', dcEnvoyer);
+  }
+  function dcEnvoyer() {
+    var themes = [];
+    document.querySelectorAll('[data-dc-theme]').forEach(function (c) { if (c.checked) themes.push(THEMES[Number(c.dataset.dcTheme)]); });
+    var objectif = $('dc-objectif').value.trim();
+    var autresReseaux = document.querySelector('input[name="dc-reseaux"]:checked').value === 'oui';
+    var liens = autresReseaux ? Array.prototype.map.call(document.querySelectorAll('#dc-liens-list input'), function (i) { return i.value.trim(); }).filter(Boolean) : [];
+    var metierJournalisme = document.querySelector('input[name="dc-journalisme"]:checked').value === 'oui';
+    var metierPrecision = metierJournalisme ? $('dc-metier').value.trim() : '';
+    var err = $('dc-err'); err.textContent = '';
+    if (!themes.length) { err.textContent = 'Choisissez au moins un thème.'; return; }
+    if (!objectif) { err.textContent = "L'objectif est requis."; return; }
+    if (autresReseaux && !liens.length) { err.textContent = 'Ajoutez au moins un lien, ou répondez Non.'; return; }
+    if (metierJournalisme && !metierPrecision) { err.textContent = 'Précisez votre métier.'; return; }
+    var btn = $('dc-envoyer'); btn.disabled = true; btn.textContent = 'Envoi…';
+    fetch('/api/ida/demande', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ themes: themes, objectif: objectif, autres_reseaux: autresReseaux, liens: liens, metier_journalisme: metierJournalisme, metier_precision: metierPrecision }) })
+      .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || 'Erreur.'); return j; }); })
+      .then(function () { toast('Demande envoyée ✓'); dcCharger(); })
+      .catch(function (e) { btn.disabled = false; btn.textContent = 'Envoyer ma demande'; err.textContent = e.message || "Erreur lors de l'envoi."; });
+  }
+  function dcCharger() {
+    $('ida-dc-corps').innerHTML = '<p class="ida-desc">Chargement…</p>';
+    if (!connecte) { $('ida-dc-corps').innerHTML = dcEtatConnexion(); return; }
+    if (['initiative', 'utilisateur'].indexOf(connecte.role) < 0) { $('ida-dc-corps').innerHTML = dcEtatRole(); return; }
+    fetch('/api/ida/demande', { credentials: 'same-origin' }).then(function (x) { return x.json(); })
+      .then(function (r) {
+        if (!r.premium_actif) { $('ida-dc-corps').innerHTML = dcEtatPremium(); return; }
+        if (r.demande) {
+          $('ida-dc-corps').innerHTML = dcEtatDecision(r.demande);
+          var m = $('dc-modifier'); if (m) m.addEventListener('click', function () { dcFormulaire(r.demande); });
+          var n = $('dc-nouvelle'); if (n) n.addEventListener('click', function () { dcFormulaire(null); });
+          return;
+        }
+        dcFormulaire(null);
+      })
+      .catch(function () { $('ida-dc-corps').innerHTML = '<div class="ida-err-msg">Impossible de charger votre demande pour le moment.</div>'; });
+  }
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest ? e.target.closest('#ida-cta-btn, #ida-cta-btn2, #ida-dc-close, #ida-dc-bg') : null;
+    if (!t) return;
+    if (t.id === 'ida-dc-bg' && e.target !== t) return;
+    if (t.id === 'ida-cta-btn' || t.id === 'ida-cta-btn2') { e.preventDefault(); dcOuvrir(); return; }
+    dcFermer();
+  });
 
   dessinerThemes(); dessiner();
   fetch('/api/auth/me', { credentials: 'same-origin' }).then(function (r) { return r.json(); })
