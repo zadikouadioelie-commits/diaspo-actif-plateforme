@@ -192,18 +192,20 @@
       .rich-editor-toolbar button:hover{background:#E2E8F0;}
       .rich-editor-toolbar button.active{background:#0D2B4E;color:#fff;}
       .rich-editor-toolbar .rich-editor-sep{width:1px;background:var(--border,#D6DEE8);margin:4px 3px;}
-      .rich-editor-area{min-height:140px;max-height:420px;overflow-y:auto;padding:12px 14px;font-size:14px;line-height:1.65;color:#102A43;outline:none;}
+      .rich-editor-area{min-height:140px;max-height:420px;overflow-y:auto;padding:12px 14px;font-size:14px;line-height:1.65;color:#000;outline:none;}
       .rich-editor-area p{margin:0 0 12px;}
       .rich-editor-area p:last-child{margin-bottom:0;}
-      .rich-editor-area h2{font-size:19px;font-weight:800;margin:16px 0 8px;}
+      .rich-editor-area h2{font-size:38px;font-weight:800;margin:16px 0 8px;}
       .rich-editor-area h2:first-child{margin-top:0;}
-      .rich-editor-area h3{font-size:16px;font-weight:700;margin:14px 0 6px;}
+      .rich-editor-area h3{font-size:32px;font-weight:800;margin:14px 0 6px;}
       .rich-editor-area h3:first-child{margin-top:0;}
       .rich-editor-area blockquote{margin:10px 0;padding:8px 14px;border-left:3px solid var(--orange,#B84C1A);background:#FFF8F3;color:#4A3B2E;font-style:italic;}
       .rich-editor-area ul,.rich-editor-area ol{margin:0 0 12px;padding-left:22px;}
       .rich-editor-area a{color:var(--orange,#B84C1A);text-decoration:underline;}
       .rich-editor-area:empty::before{content:attr(data-placeholder);color:#9AA5B1;}
-      .rich-editor-area.rich-editor-area-compact{min-height:44px;max-height:none;overflow:visible;font-size:17px;line-height:1.4;padding:10px 14px;}
+      .rich-editor-area.rich-editor-area-compact{min-height:44px;max-height:none;overflow:visible;font-size:34px;font-weight:800;line-height:1.25;padding:10px 14px;}
+      /* 2026-11-09 (demande explicite : « tout ce que j'écris en noir, les titres en gras et deux fois plus grands, partout ») : texte saisi NOIR sur le fond blanc de l'éditeur, même quand le thème de la page (Nuit dorée) le faisait hériter d'une couleur claire — blanc sur blanc. Seuls les thèmes qui rendent le champ sombre (fil : .posts-modal-box, fond translucide) gardent leur texte clair, par une règle plus spécifique. Les couleurs choisies par l'auteur (balises <font>/<span>) restent prioritaires : la règle ne vise que le champ lui-même. */
+      .rich-editor-wrap .rich-editor-area{color:#000!important;}
       .rich-editor-toolbar{align-items:center;}
       .rich-editor-toolbar select{border:1px solid var(--border,#D6DEE8);border-radius:6px;font-size:12px;padding:0 3px;background:#fff!important;color:#102A43!important;height:28px;min-height:28px;max-width:112px;font-family:inherit;cursor:pointer;}
       .rich-editor-toolbar select.re-taille{max-width:58px;}
