@@ -2109,9 +2109,44 @@ async function applyAuthState() {
        « 📱 Aperçu » (l'outil multi-appareils a ensuite été supprimé du site), l'icône orange
        « Découvrir une publication » (fil-actualite.html?decouvrir=1, toujours géré par fil-actualite-app.html) et le
        bouton « Rafraîchir la page ». Le sélecteur de langue est masqué dans le bandeau par styles.v2.css. */
+    /* Bouton « Créer une publication » dans le grand bandeau (2026-11-09, demande explicite : « un bouton bien visible et facilement
+       identifiable qui crée une publication ») : doré plein comme « Menu des modules », texte noir, sur toutes les pages à bandeau,
+       pour tout compte connecté. Même action que sur l'accueil : la fenêtre de création du fil s'ouvre ICI, sans quitter la page
+       (module assets/posts.js chargé au premier clic si la page ne l'a pas déjà). Masqué sous 900 px (le téléphone a sa propre création). */
+    if (!document.getElementById('tb-creer-pub-css')) {
+      const st = document.createElement('style');
+      st.id = 'tb-creer-pub-css';
+      st.textContent = '.tb-creer-pub{display:inline-flex;align-items:center;gap:7px;flex:0 0 auto;white-space:nowrap;cursor:pointer;font:800 13px Manrope,system-ui,sans-serif;color:#000;background:linear-gradient(135deg,#F6D879,#D9A82E);border:1px solid rgba(255,243,191,.7);border-radius:999px;padding:9px 16px;box-shadow:0 2px 10px rgba(0,0,0,.28)}'
+        + '.tb-creer-pub:hover{filter:brightness(1.07)}.tb-creer-pub:focus-visible{outline:2px solid #fff;outline-offset:2px}.tb-creer-pub[disabled]{opacity:.7;cursor:progress}'
+        + '.tb-creer-pub .tb-cp-court{display:none}'
+        + '@media (max-width:1500px){.tb-creer-pub .tb-cp-long{display:none}.tb-creer-pub .tb-cp-court{display:inline}}'
+        + '@media (max-width:900px){.tb-creer-pub{display:none!important}}';
+      document.head.appendChild(st);
+    }
+    window.topbarCreerPublication = async function (btn) {
+      if (btn) btn.disabled = true;
+      try {
+        if (!window.Posts) {
+          await new Promise((ok, ko) => {
+            const sc = document.createElement('script');
+            sc.src = '/assets/posts.js';
+            sc.onload = ok; sc.onerror = () => ko(new Error('chargement'));
+            document.head.appendChild(sc);
+          });
+        }
+        if (window.Posts._currentUserId == null) window.Posts.init(user.id);
+        window.Posts.openModal();
+      } catch (e) {
+        window.location.href = 'fil-actualite.html';
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    };
+    const creerPubBtnHtml = `<button type="button" class="tb-creer-pub" id="tb-creer-pub" onclick="topbarCreerPublication(this)" aria-label="Créer une publication" title="Créer une publication"><span aria-hidden="true">✍️</span><span class="tb-cp-long">Créer une publication</span><span class="tb-cp-court">Publier</span></button>`;
     el.innerHTML = `
       ${demoBtnHtml}
       ${premiumBtnHtml}
+      ${creerPubBtnHtml}
       <a href="messagerie.html" class="topbar-icon-btn" title="Messagerie">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:middle;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
         <span id="msg-topbar-badge" style="display:none;position:absolute;top:-6px;right:-8px;background:var(--orange);color:#fff;border-radius:50%;width:16px;height:16px;font-size:10px;font-weight:700;align-items:center;justify-content:center;"></span>
