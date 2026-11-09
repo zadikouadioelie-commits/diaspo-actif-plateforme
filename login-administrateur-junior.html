@@ -43,8 +43,13 @@ footer.footer { background: transparent !important; color: rgba(255,255,255,.35)
 <link rel="apple-touch-icon" href="assets/logo.png">
   <link rel="stylesheet" href="/assets/design-upgrade.v2.css">
   <link rel="stylesheet" href="/assets/theme-manager.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,500;0,6..96,600;1,6..96,500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/theme-nuit-doree.css?v=8">
+  <link rel="stylesheet" href="/assets/connexion-nuit-doree.css?v=2">
 </head>
-<body>
+<body class="nd">
 <div class="page">
 
   <header class="topbar">
@@ -55,7 +60,7 @@ footer.footer { background: transparent !important; color: rgba(255,255,255,.35)
     </div>
   </header>
 
-  <main class="container">
+  <main class="container conn-simple">
     <div class="card auth-form-card">
       <h2 style="margin-top:0;">🔒 Connexion Administrateur Junior</h2>
       <p class="sub" style="margin-bottom:0;">Identifiant et mot de passe fournis par l'administrateur principal.</p>
@@ -69,7 +74,7 @@ footer.footer { background: transparent !important; color: rgba(255,255,255,.35)
         <div class="auth-error" id="login-error"></div>
       </form>
 
-      <p style="margin-top:18px;font-size:12px;color:var(--muted);">Ces identifiants sont générés et renouvelés automatiquement par l'administrateur principal — ils ne peuvent pas être choisis ni modifiés. En cas de perte, contactez l'administrateur principal pour un rafraîchissement.</p>
+      <p class="conn-sans-compte" style="font-size:12px;line-height:1.6;">Ces identifiants sont générés et renouvelés automatiquement par l'administrateur principal — ils ne peuvent pas être choisis ni modifiés. En cas de perte, contactez l'administrateur principal pour un rafraîchissement.</p>
     </div>
   </main>
 
