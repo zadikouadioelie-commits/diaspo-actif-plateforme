@@ -1,0 +1,183 @@
+/* ============================================================
+   Création de compte (inscription.html) — design « Nuit dorée » (2026-11-09, « nouvelle D'A »).
+   Règle du titulaire : la nouvelle DA partout, jamais l'ancien design.
+   Complète theme-nuit-doree.css (fond, barre du haut, boutons, pied de page). Tout est préfixé html body.nd.
+   La page pose beaucoup de couleurs claires en ligne (encadrés bleus, ambre, vert) : elles sont ré-habillées par sélecteurs
+   d'attribut, en gardant le SENS des teintes (bleu = information, ambre = attention, vert = validé, rouge = erreur).
+   Aucun changement de logique. Retour arrière : retirer les 4 liens du <head> et class="nd" sur <body> de inscription.html.
+   ============================================================ */
+
+/* Variables du site redéfinies pour la colonne centrale et les colonnes latérales */
+html body.nd :is(.insc-wrap,.insc-side-col){
+  --bg:rgba(255,255,255,.06); --card:rgba(255,255,255,.045); --surface:rgba(255,255,255,.045); --text:#E8ECF6; --muted:#A9B4CC; --border:rgba(255,255,255,.14);
+  --navy:#FFFFFF; --orange:#E3C06E; --orange-light:rgba(227,192,110,.14);
+}
+html body.nd .insc-wrap{color:var(--nd-texte)}
+
+/* ── Titre de la page ── */
+html body.nd .insc-wrap>div:first-child>h2{margin:0 0 8px;font-family:var(--nd-display)!important;font-weight:600!important;font-size:clamp(30px,3.6vw,46px);line-height:1.1;letter-spacing:-.01em;color:#fff}
+html body.nd .insc-wrap>div:first-child>p{color:var(--nd-doux)!important;font-size:15px!important}
+
+/* ── Cartouche du film « Comment ça marche » ── */
+html body.nd .film-cartouche{background:radial-gradient(420px 220px at 100% 0%,rgba(227,192,110,.12),transparent 66%),var(--nd-verre);border:1px solid var(--nd-bord);border-radius:24px;box-shadow:0 30px 60px -38px #000;text-align:left}
+html body.nd .film-affiche{background:#0B1226}
+html body.nd .film-play{background:var(--nd-degore);color:#1a1202;box-shadow:0 14px 30px -12px rgba(227,192,110,.8)}
+html body.nd .film-affiche:focus-visible{outline-color:var(--nd-or)}
+html body.nd .film-duree{background:rgba(6,10,20,.82);border:1px solid var(--nd-bord2)}
+html body.nd .film-etiquette{color:var(--nd-or)}
+html body.nd .film-titre{font-family:var(--nd-display);font-weight:500;font-size:22px;color:#fff}
+html body.nd .film-sous{color:var(--nd-doux)}
+html body.nd .film-btn-principal{background:var(--nd-degore);color:#1a1202;box-shadow:0 12px 26px -14px rgba(227,192,110,.8)}
+html body.nd .film-btn-principal span{color:#1a1202}
+html body.nd .film-btn-secondaire{background:var(--nd-verre);color:var(--nd-texte);border:1px solid var(--nd-bord)}
+html body.nd .film-btn-secondaire:hover{border-color:var(--nd-or);color:#fff}
+
+/* ── Les trois étapes ── */
+html body.nd .insc-step-dot .dot{background:var(--nd-verre2);border:1px solid var(--nd-bord2);color:var(--nd-doux)}
+html body.nd .insc-step-dot .dot.active{background:var(--nd-degore);border-color:transparent;color:#1a1202;box-shadow:0 10px 24px -12px rgba(227,192,110,.85)}
+html body.nd .insc-step-dot .dot.done{background:rgba(143,224,176,.16);border-color:rgba(143,224,176,.5);color:#8FE0B0}
+html body.nd .insc-step-dot span{color:var(--nd-doux)}
+html body.nd .insc-step-line{background:var(--nd-bord2)}
+
+/* ── Cartes (cadres des étapes) ── */
+html body.nd .insc-wrap .card{background:var(--nd-verre)!important;border:1px solid var(--nd-bord2)!important;border-radius:24px;color:var(--nd-texte);box-shadow:0 30px 60px -40px #000}
+html body.nd .insc-wrap .card :is(h3,h4){font-family:var(--nd-display);font-weight:500;color:#fff}
+html body.nd .insc-wrap .card strong{color:#fff}
+html body.nd .insc-wrap .card .form-section h4{font-family:var(--nd-sans);font-weight:800}
+html body.nd .insc-wrap .btn:not(.btn-orange):not(.btn-brouillon){background:var(--nd-verre)!important;border:1px solid var(--nd-bord)!important;color:var(--nd-texte)!important;border-radius:999px}
+html body.nd .insc-wrap .btn:not(.btn-orange):not(.btn-brouillon):hover{border-color:var(--nd-or)!important;color:var(--nd-or)!important}
+html body.nd .insc-wrap .btn-orange{background:var(--nd-degore)!important;color:#1a1202!important;font-weight:800;border-radius:999px;border:0!important;box-shadow:0 14px 30px -14px rgba(227,192,110,.75)}
+html body.nd .insc-wrap .btn-orange:hover{filter:brightness(1.06)}
+html body.nd .insc-wrap .btn-orange:disabled{opacity:.55;filter:none}
+
+/* ── Choix du type de compte ── */
+html body.nd .type-card{background:var(--nd-verre);border:1.5px solid var(--nd-bord2);border-radius:20px;color:var(--nd-texte);transition:border-color .3s,transform .3s,box-shadow .3s,background .3s}
+html body.nd .type-card:hover{border-color:var(--nd-or);transform:translateY(-3px);box-shadow:0 22px 44px -26px rgba(227,192,110,.55)}
+html body.nd .type-card.selected{border-color:var(--nd-or);background:rgba(227,192,110,.12);box-shadow:0 0 0 3px rgba(227,192,110,.2)}
+html body.nd .type-card h3{font-size:19px}
+html body.nd .type-card p{color:var(--nd-doux)}
+html body.nd .type-card .badge{background:var(--nd-verre2);border:1px solid var(--nd-bord2);color:var(--nd-texte)}
+html body.nd .type-card.selected .badge{background:var(--nd-degore);border-color:transparent;color:#1a1202;font-weight:800}
+html body.nd .gt-launch-btn{background:rgba(227,192,110,.12)!important;border:1px solid var(--nd-bord)!important;color:var(--nd-or)!important;border-radius:999px;font-weight:800}
+html body.nd .gt-launch-btn:hover{background:var(--nd-degore)!important;color:#1a1202!important;border-color:transparent!important}
+
+/* ── Rubriques d'un formulaire ── */
+html body.nd .form-section h4{color:var(--nd-or)!important;font-size:12.5px;letter-spacing:.16em;border-bottom:1px solid var(--nd-bord)}
+html body.nd .insc-wrap label:not(.da-pill){color:var(--nd-texte)!important}
+html body.nd .insc-pane .grid-2>div>label,html body.nd .insc-pane .grid-3>div>label,html body.nd .insc-pane .rg-4>div>label{color:var(--nd-texte)}
+html body.nd .insc-wrap :is(.hint,.form-hint){color:var(--nd-faible)!important}
+
+/* ── Champs ── */
+html body.nd .insc-wrap :is(input:not([type=checkbox],[type=radio],[type=file],[type=color],[type=range]),select,textarea){background:rgba(255,255,255,.07)!important;border:1px solid var(--nd-bord2)!important;color:#fff!important;border-radius:12px;color-scheme:dark;box-shadow:none}
+html body.nd .insc-wrap :is(input,select,textarea):focus{outline:0;border-color:var(--nd-or)!important;box-shadow:0 0 0 3px rgba(227,192,110,.18)!important}
+html body.nd .insc-wrap :is(input,textarea)::placeholder{color:var(--nd-faible)}
+html body.nd .insc-wrap select option{background:#0f1a38;color:#fff}
+html body.nd .insc-wrap :is(input,select,textarea):disabled{opacity:.55}
+html body.nd .insc-pane input[type=date]{color:#fff;display:block;width:100%;max-width:100%;box-sizing:border-box;min-height:46px;padding:10px 14px}
+html body.nd .insc-pane label:has(+input[type=date]){display:block;margin-bottom:5px}
+html body.nd .insc-wrap input[type=file]{background:rgba(255,255,255,.05)!important;border:1px dashed var(--nd-bord)!important;border-radius:12px;color:var(--nd-doux);padding:8px}
+html body.nd .insc-wrap input[type=file]::file-selector-button{background:var(--nd-verre2);border:1px solid var(--nd-bord);color:var(--nd-texte);border-radius:999px;padding:6px 14px;margin-right:10px;font-weight:700;cursor:pointer}
+html body.nd .insc-wrap :is(input[type=checkbox],input[type=radio]){accent-color:var(--nd-or)}
+html body.nd.nd .insc-wrap :is(input,select,textarea).di-champ-manquant{border-color:#FF9B9B!important;box-shadow:0 0 0 1px #FF9B9B!important}
+html body.nd .champ-aide{color:var(--nd-doux)}
+html body.nd .champ-aide.ok{color:#8FE0B0}
+html body.nd .champ-aide.err{color:#FF9B9B}
+html body.nd .pwd-strength{background:rgba(255,255,255,.12)}
+html body.nd .pwd-hint{color:var(--nd-faible)}
+
+/* ── Éditeur de texte (« Présentation ») : barre en verre, zone de saisie en papier clair, encre noire ── */
+html body.nd .insc-wrap .rich-editor-wrap{background:rgba(255,255,255,.03);border:1px solid var(--nd-bord2);border-radius:14px;overflow:hidden}
+html body.nd .insc-wrap .rich-editor-toolbar{background:rgba(255,255,255,.06);border-bottom:1px solid var(--nd-bord2)}
+html body.nd .insc-wrap .rich-editor-toolbar button{color:var(--nd-texte)}
+html body.nd .insc-wrap .rich-editor-area{border:0!important;border-radius:0!important}
+
+/* ── Pastilles à choix (centres d'intérêt, situation, domaines) ── */
+html body.nd .insc-wrap :is(.interests-grid,.radio-grid) label{background:var(--nd-verre);border:1.5px solid var(--nd-bord2);color:var(--nd-doux)!important}
+html body.nd .insc-wrap :is(.interests-grid,.radio-grid) label:hover{border-color:var(--nd-or);color:#fff!important}
+html body.nd .insc-wrap :is(.interests-grid,.radio-grid) label.pill-on,html body.nd .insc-wrap label.pill-on{background:rgba(227,192,110,.2)!important;border-color:var(--nd-or)!important;color:#fff!important;box-shadow:0 6px 16px -10px rgba(227,192,110,.8)}
+
+/* ── Statut de l'initiative (deux grandes cartes) ── */
+html body.nd .statut-card{background:var(--nd-verre);border:1.5px solid var(--nd-bord2);border-radius:18px;color:var(--nd-texte)!important}
+html body.nd .statut-card:hover{border-color:var(--nd-or)}
+html body.nd .statut-card .sc-desc{color:var(--nd-doux)}
+html body.nd .statut-card .sc-body strong{color:#fff}
+html body.nd .statut-card.pill-on{background:rgba(227,192,110,.14)!important;border-color:var(--nd-or)!important;box-shadow:0 0 0 3px rgba(227,192,110,.2)}
+html body.nd .statut-card.pill-on .sc-body strong{color:var(--nd-or)}
+html body.nd .statut-card .sc-btn{background:transparent;border:1.5px solid var(--nd-bord);color:var(--nd-or);border-radius:999px}
+html body.nd .statut-card.pill-on .sc-btn{background:var(--nd-degore);border-color:transparent;color:#1a1202}
+html body.nd .statut-card.locked{background:var(--nd-verre)}
+
+/* ── Encadrés d'information : bleu = information, ambre = attention, vert = validé, rouge = erreur ── */
+html body.nd .insc-wrap :is(.nat-notice,.validation-notice),
+html body.nd .insc-wrap [style*="background:#eff6ff" i],html body.nd .insc-wrap [style*="background:#F0F9FF" i]{background:rgba(63,123,255,.13)!important;border:1px solid rgba(127,166,224,.4)!important;color:#CFE0FF!important}
+html body.nd .insc-wrap :is(.nat-notice,.validation-notice) :is(strong,b){color:#fff!important}
+html body.nd .insc-wrap :is(.nat-notice,.validation-notice) a{color:var(--nd-or)!important}
+html body.nd .insc-wrap .insc-brouillon{background:rgba(63,123,255,.13)!important;border:1px solid rgba(127,166,224,.4)!important;color:#CFE0FF!important}
+/* Bandeaux dont la page change le style en JavaScript : le navigateur réécrit alors l'attribut style (couleurs en rgb), les sélecteurs d'attribut ne les reconnaissent plus → classes / identifiants */
+html body.nd .insc-wrap :is(#i-statut-creation-banner,[style*="background:#fffbeb" i]){background:rgba(245,197,107,.13)!important;border:1px solid rgba(245,197,107,.4)!important;color:#F5D9A0!important}
+html body.nd .insc-wrap [style*="background:#FFF7ED" i]{background:rgba(245,197,107,.1)!important;border:1.5px solid rgba(245,197,107,.5)!important}
+html body.nd .insc-wrap [style*="background:#FFF7ED" i] :is(strong,p,span){color:#F2E3BE!important}
+html body.nd .insc-wrap [style*="background:#FFF7ED" i]>strong:first-child{color:var(--ip-ambre,#F5C56B)!important}
+html body.nd .auth-error{background:rgba(255,120,120,.12)!important;border:1px solid rgba(255,155,155,.45)!important;color:#FFB4B4!important}
+
+/* Case « J'ai lu la charte » : ambre tant que non cochée, verte une fois cochée (classe .ok posée par la page) */
+html body.nd .insc-wrap :is(#u-charte-box,#i-charte-box){background:rgba(245,197,107,.1)!important;border:2px solid rgba(245,197,107,.5)!important;color:var(--nd-texte)}
+html body.nd .insc-wrap :is(#u-charte-box,#i-charte-box).ok{background:rgba(143,224,176,.12)!important;border-color:rgba(143,224,176,.6)!important}
+html body.nd .insc-wrap :is(#u-charte-confirm,#i-charte-confirm){border-top-color:rgba(143,224,176,.35)!important;color:#8FE0B0!important}
+html body.nd input[type="checkbox"].charte-check{background:rgba(255,255,255,.08)!important;border-color:var(--nd-or)!important}
+html body.nd input[type="checkbox"].charte-check:checked::after{background:#2F9E5B;border-color:#2F9E5B}
+
+/* ── Couleurs de texte posées en ligne (versions nuit) ── */
+html body.nd .insc-wrap [style*="color:#2563EB" i]{color:var(--nd-or)!important}
+html body.nd .insc-wrap :is([style*="color:#64748B" i],[style*="color:#475569" i]){color:var(--nd-doux)!important}
+html body.nd .insc-wrap [style*="color:#B45309" i]{color:#F5C56B!important}
+html body.nd .insc-wrap :is([style*="color:#1E3A8A" i],[style*="color:#0369A1" i]){color:#CFE0FF!important}
+html body.nd .insc-wrap :is([style*="color:#15803d" i]){color:#8FE0B0!important}
+html body.nd .insc-wrap :is([style*="color:#dc2626" i]){color:#FF9B9B!important}
+html body.nd .insc-wrap :is([style*="color:#78350F" i],[style*="color:#92400e" i],[style*="color:#C2410C" i]){color:#F2E3BE!important}
+html body.nd .insc-wrap :is(.nat-notice,.validation-notice) [style*="color:#2563EB" i]{color:var(--nd-or)!important}
+html body.nd .insc-wrap a[style*="color:#2563EB" i]{text-decoration-color:rgba(227,192,110,.5)}
+
+/* ── Boutons « brouillon », « tout sélectionner », « retirer un territoire » ── */
+html body.nd .insc-wrap :is(.btn-brouillon,[data-brouillon-restore],[data-brouillon-discard],#i-public-toutcocher){background:var(--nd-verre)!important;border:1px solid var(--nd-bord)!important;color:var(--nd-texte)!important;border-radius:999px!important}
+html body.nd .insc-wrap :is(.btn-brouillon,[data-brouillon-restore],[data-brouillon-discard],#i-public-toutcocher):hover{border-color:var(--nd-or)!important;color:var(--nd-or)!important}
+html body.nd .insc-wrap [style*="background:#fee2e2" i]{background:rgba(255,120,120,.14)!important;color:#FF9B9B!important}
+
+/* ── Aperçu en direct de la fiche (logo + bannière) ── */
+html body.nd .apercu-profil{background:var(--nd-verre);border:1px solid var(--nd-bord2);border-radius:18px;box-shadow:0 20px 40px -30px #000}
+html body.nd .ap-logo{border-color:#0B1226;background-color:#1a2750;color:#B7C2DD;box-shadow:0 2px 10px rgba(0,0,0,.5)}
+html body.nd .ap-nom{color:#fff}
+html body.nd .ap-aide{color:var(--nd-faible)}
+html body.nd .ap-info{color:var(--nd-doux)}
+html body.nd .ap-info.err{color:#FF9B9B}
+html body.nd .ap-info button{background:var(--nd-verre);border-color:var(--nd-bord2);color:var(--nd-texte)}
+html body.nd .ap-info button:hover{border-color:#FF9B9B;color:#FF9B9B}
+
+/* ── Compte étatique : barre de progression en 4 onglets ── */
+html body.nd #ce-progress{background:var(--nd-verre);border-color:var(--nd-bord2)!important}
+html body.nd .ce-tab{background:transparent!important;color:var(--nd-doux)!important;border-right-color:var(--nd-bord2)!important}
+html body.nd .ce-tab.fait{background:rgba(143,224,176,.12)!important;color:#8FE0B0!important}
+html body.nd .ce-tab.on{background:var(--nd-degore)!important;color:#1a1202!important}
+
+/* ── Écran de réussite ── */
+html body.nd .success-box h3{font-family:var(--nd-display);font-weight:500;font-size:26px;color:#fff}
+html body.nd .success-box p{color:var(--nd-doux)}
+html body.nd #success-identity-box{border-top-color:var(--nd-bord2)!important}
+
+/* ── Colonnes latérales : comptes à découvrir et prochains événements ── */
+html body.nd .insc-events-widget{background:var(--nd-verre);border:1px solid var(--nd-bord2);border-radius:20px;box-shadow:0 24px 50px -36px #000}
+html body.nd :is(.insc-events-widget,.insc-talents) h4{color:var(--nd-or);font-size:11.5px;font-weight:800;letter-spacing:.14em}
+html body.nd .evt-card{background:rgba(255,255,255,.04);border:1px solid var(--nd-bord2);border-radius:14px;color:var(--nd-texte)}
+html body.nd .evt-card :is(strong,a,.evt-titre){color:#fff}
+html body.nd .evt-date{color:var(--nd-or)}
+
+/* ── Téléphones et tablettes ── */
+@media (max-width:560px){
+  html body.nd .insc-wrap{padding:0 12px 56px}
+  html body.nd .insc-wrap .card{border-radius:20px}
+  html body.nd .film-cartouche{border-radius:20px}
+}
+@media (prefers-reduced-motion:reduce){
+  html body.nd :is(.type-card,.statut-card,.film-btn){transition:none}
+  html body.nd .type-card:hover{transform:none}
+}

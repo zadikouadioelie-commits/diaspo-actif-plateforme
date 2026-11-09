@@ -191,8 +191,13 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
   <link rel="stylesheet" href="/assets/theme-manager.css">
   <link rel="stylesheet" href="/assets/guided-tour.css">
   <link rel="stylesheet" href="/assets/annuaire-cards.css">
+  <!-- Nuit dorée (2026-11-09, « nouvelle D'A ») : polices + thème + feuille de la page ; retour arrière = retirer ces 4 lignes et class="nd" -->
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,500;0,6..96,600;1,6..96,500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/theme-nuit-doree.css?v=8">
+  <link rel="stylesheet" href="/assets/inscription-nuit-doree.css?v=1">
 </head>
-<body>
+<body class="nd">
 <div class="page">
 <!-- Honeypot anti-bot : champ invisible aux humains, souvent rempli par les robots -->
 <input type="text" id="site_perso" name="site_perso" autocomplete="off" tabindex="-1"
@@ -292,7 +297,7 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
         <div style="flex:1;"><strong>Compte Utilisateur</strong><br><span style="font-size:12px;color:var(--muted)">Personne physique</span></div>
         <button type="button" class="btn-brouillon" data-brouillon-save="u" style="border:1.5px solid #94A3B8;color:#475569;background:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">💾 Mettre en brouillon</button>
       </div>
-      <div id="u-brouillon-banner" style="display:none;margin-bottom:16px;background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a;border-radius:8px;padding:10px 14px;font-size:12.5px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+      <div id="u-brouillon-banner" class="insc-brouillon" style="display:none;margin-bottom:16px;background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a;border-radius:8px;padding:10px 14px;font-size:12.5px;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
         <span id="u-brouillon-banner-txt"></span>
         <span style="display:flex;gap:8px;">
           <button type="button" data-brouillon-restore="u" style="border:1px solid #2563EB;color:#2563EB;background:none;border-radius:6px;padding:3px 10px;font-size:11.5px;font-weight:700;cursor:pointer;">Restaurer</button>
@@ -466,7 +471,7 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
       </div>
       <div id="u-charte-box" onclick="if(event.target.closest('a'))return; var cb=document.getElementById('u-charte'); if(event.target!==cb){event.preventDefault(); cb.checked=!cb.checked; cb.dispatchEvent(new Event('change',{bubbles:true}));}" style="margin-top:18px;background:#fff8f2;border:2px solid #fed7aa;border-radius:10px;padding:14px 16px;transition:background .15s,border-color .15s;cursor:pointer;">
         <label style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;font-size:13.5px;line-height:1.5;padding:4px;margin:-4px;">
-          <input type="checkbox" id="u-charte" onclick="event.stopPropagation();" onchange="document.getElementById('u-charte-box').style.background=this.checked?'#f0fdf4':'#fff8f2';document.getElementById('u-charte-box').style.borderColor=this.checked?'#16a34a':'#fed7aa';document.getElementById('u-charte-confirm').style.display=this.checked?'flex':'none';" class="charte-check">
+          <input type="checkbox" id="u-charte" onclick="event.stopPropagation();" onchange="document.getElementById('u-charte-box').classList.toggle('ok',this.checked);document.getElementById('u-charte-box').style.background=this.checked?'#f0fdf4':'#fff8f2';document.getElementById('u-charte-box').style.borderColor=this.checked?'#16a34a':'#fed7aa';document.getElementById('u-charte-confirm').style.display=this.checked?'flex':'none';" class="charte-check">
           <span>J'ai lu et j'accepte la <a href="charte.html" target="_blank" style="color:#2563EB;font-weight:600;text-decoration:underline;">Charte Institutionnelle de Diaspo'Actif</a> ainsi que les <a href="cgu.html" target="_blank" style="color:#2563EB;font-weight:600;text-decoration:underline;">Conditions Générales d'Utilisation</a> et la <a href="politique-confidentialite.html" target="_blank" style="color:#2563EB;font-weight:600;text-decoration:underline;">Politique de confidentialité</a>. Cet engagement est obligatoire pour créer un compte.</span>
         </label>
         <div id="u-charte-confirm" style="display:none;align-items:center;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid #bbf7d0;color:#15803d;font-weight:700;font-size:12.5px;">✓ Lecture confirmée — vous pouvez créer votre compte.</div>
@@ -483,7 +488,7 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
         <div style="flex:1;"><strong>Compte Initiative</strong><br><span style="font-size:12px;color:var(--muted)">Association, ONG, entreprise, startup…</span></div>
         <button type="button" class="btn-brouillon" data-brouillon-save="i" style="border:1.5px solid #94A3B8;color:#475569;background:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">💾 Mettre en brouillon</button>
       </div>
-      <div id="i-brouillon-banner" style="display:none;margin-bottom:16px;background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a;border-radius:8px;padding:10px 14px;font-size:12.5px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+      <div id="i-brouillon-banner" class="insc-brouillon" style="display:none;margin-bottom:16px;background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a;border-radius:8px;padding:10px 14px;font-size:12.5px;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
         <span id="i-brouillon-banner-txt"></span>
         <span style="display:flex;gap:8px;">
           <button type="button" data-brouillon-restore="i" style="border:1px solid #2563EB;color:#2563EB;background:none;border-radius:6px;padding:3px 10px;font-size:11.5px;font-weight:700;cursor:pointer;">Restaurer</button>
@@ -798,7 +803,7 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
       <div class="notice" style="margin-top:16px">&#9888; La création de compte est gratuite.</div>
       <div id="i-charte-box" onclick="if(event.target.closest('a'))return; var cb=document.getElementById('i-charte'); if(event.target!==cb){event.preventDefault(); cb.checked=!cb.checked; cb.dispatchEvent(new Event('change',{bubbles:true}));}" style="margin-top:18px;background:#fff8f2;border:2px solid #fed7aa;border-radius:10px;padding:14px 16px;transition:background .15s,border-color .15s;cursor:pointer;">
         <label style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;font-size:13.5px;line-height:1.5;padding:4px;margin:-4px;">
-          <input type="checkbox" id="i-charte" onclick="event.stopPropagation();" onchange="document.getElementById('i-charte-box').style.background=this.checked?'#f0fdf4':'#fff8f2';document.getElementById('i-charte-box').style.borderColor=this.checked?'#16a34a':'#fed7aa';document.getElementById('i-charte-confirm').style.display=this.checked?'flex':'none';" class="charte-check">
+          <input type="checkbox" id="i-charte" onclick="event.stopPropagation();" onchange="document.getElementById('i-charte-box').classList.toggle('ok',this.checked);document.getElementById('i-charte-box').style.background=this.checked?'#f0fdf4':'#fff8f2';document.getElementById('i-charte-box').style.borderColor=this.checked?'#16a34a':'#fed7aa';document.getElementById('i-charte-confirm').style.display=this.checked?'flex':'none';" class="charte-check">
           <span>J'ai lu et j'accepte la <a href="charte.html" target="_blank" style="color:#2563EB;font-weight:600;text-decoration:underline;">Charte Institutionnelle de Diaspo'Actif</a> ainsi que les <a href="cgu.html" target="_blank" style="color:#2563EB;font-weight:600;text-decoration:underline;">Conditions Générales d'Utilisation</a> et la <a href="politique-confidentialite.html" target="_blank" style="color:#2563EB;font-weight:600;text-decoration:underline;">Politique de confidentialité</a>. Cet engagement est obligatoire pour créer un compte.</span>
         </label>
         <div id="i-charte-confirm" style="display:none;align-items:center;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid #bbf7d0;color:#15803d;font-weight:700;font-size:12.5px;">✓ Lecture confirmée — vous pouvez créer votre compte.</div>
@@ -824,7 +829,7 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
           <div style="flex:1;"><strong>🏛 Compte Étatique</strong> — Section 1/4<br><span style="font-size:12px;color:var(--muted);">Informations sur l'institution</span></div>
           <button type="button" class="btn-brouillon" data-brouillon-save="ce" style="border:1.5px solid #94A3B8;color:#475569;background:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">💾 Mettre en brouillon</button>
         </div>
-        <div id="ce-brouillon-banner" style="display:none;margin-bottom:16px;background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a;border-radius:8px;padding:10px 14px;font-size:12.5px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+        <div id="ce-brouillon-banner" class="insc-brouillon" style="display:none;margin-bottom:16px;background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a;border-radius:8px;padding:10px 14px;font-size:12.5px;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
           <span id="ce-brouillon-banner-txt"></span>
           <span style="display:flex;gap:8px;">
             <button type="button" data-brouillon-restore="ce" style="border:1px solid #2563EB;color:#2563EB;background:none;border-radius:6px;padding:3px 10px;font-size:11.5px;font-weight:700;cursor:pointer;">Restaurer</button>
@@ -1963,6 +1968,9 @@ function collecterTerritoires(){
       const t = parseInt(tab.dataset.tab);
       tab.style.background = t===n ? 'var(--orange)' : t<n ? '#F0FDF4' : '#F9FAFB';
       tab.style.color = t===n ? '#fff' : t<n ? '#15803D' : 'var(--muted)';
+      // Classes lues par assets/inscription-nuit-doree.css (les couleurs ci-dessus restent celles de l'ancien design)
+      tab.classList.toggle('on', t===n);
+      tab.classList.toggle('fait', t<n);
     });
   }
 
