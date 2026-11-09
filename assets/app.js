@@ -3316,9 +3316,10 @@ async function initAnnuaire(){
 
   let filtered_count = ALL.length;
 
-  /* ── Pagination (2026-11-05, demande explicite) : 10 comptes par page ; sans recherche comme avec. Les publications à la une sont SOUS la liste.
+  /* ── Pagination (2026-11-05, demande explicite) : 12 comptes par page (10 jusqu'au 2026-11-09) ; sans recherche comme avec. Les publications à la une sont SOUS la liste.
      Retour à la page 1 dès que la recherche ou un filtre change (signature de l'état) ; changer de page ne rappelle pas le serveur. ── */
-  const ANN_PAR_PAGE = 10;
+  /* 12 comptes par page depuis le 2026-11-09 (demande explicite : « deux comptes supplémentaires pour avoir des pages remplies, pas à moitié ») : 12 = 3 rangées pleines de 4 (grand écran), 4 de 3 (portable) ou 6 de 2 — plus de dernière rangée à moitié vide qu'avec 10. */
+  const ANN_PAR_PAGE = 12;
   let annPage = 1, annSignature = "", annRepeindre = () => {};
   function annPageCourante(total) {
     const sig = JSON.stringify(state);
