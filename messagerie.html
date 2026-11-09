@@ -48,7 +48,22 @@
 /* ===== Rubriques du module Messages =====
    Conversations / Établir contact / Contacts. Distinctes des onglets ci-dessus, qui ne
    filtrent que la liste des conversations : ici on change de contenu, pas de filtre. */
-.msg-rubriques{display:flex;gap:4px;padding:10px 12px 0;}
+.msg-rubriques{display:flex;flex-wrap:wrap;gap:4px;padding:10px 12px 0;}
+/* Rubrique « Hors Diaspo'Actif » (2026-11-09) : sur sa propre ligne, le libellé est long. */
+.msg-rubrique[data-rubrique="hors"]{flex:1 1 100%;}
+/* Cartes des messages reçus de personnes sans compte : fond clair, texte NOIR. */
+.mh-carte{padding:14px;border-bottom:1px solid var(--border);background:#fff;color:#000;}
+.mh-carte.nouveau{background:#FFF8E1;}
+.mh-tete{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap;}
+.mh-nom{font-size:15px;font-weight:800;color:#000;}
+.mh-date{font-size:12px;color:#334155;font-weight:600;}
+.mh-pill{display:inline-block;margin-left:6px;padding:1px 8px;border-radius:99px;background:#D9A82E;color:#000;font-size:11px;font-weight:800;}
+.mh-motif{margin:8px 0;font-size:14px;line-height:1.5;color:#000;white-space:pre-wrap;word-break:break-word;}
+.mh-coord{font-size:13.5px;font-weight:700;color:#000;display:flex;flex-direction:column;gap:3px;margin-bottom:10px;}
+.mh-coord a{color:#000;text-decoration:underline;}
+.mh-actions{display:flex;gap:6px;flex-wrap:wrap;}
+.mh-btn{border:1px solid #C9971C;background:#fff;color:#000;border-radius:9px;padding:7px 11px;font:700 12.5px inherit;font-family:inherit;cursor:pointer;text-decoration:none;}
+.mh-btn.or{background:linear-gradient(135deg,#F6D879,#D9A82E);}
 .msg-rubrique{
   flex:1;padding:8px 6px;border:none;background:none;cursor:pointer;border-radius:9px;
   font-size:12px;font-weight:700;color:var(--muted);font-family:inherit;
@@ -297,6 +312,8 @@
         <button class="msg-rubrique active" data-rubrique="conversations">💬 Conversations</button>
         <button class="msg-rubrique" data-rubrique="demandes">🤝 Établir contact <span class="rub-badge" id="rub-demandes-count"></span></button>
         <button class="msg-rubrique" data-rubrique="contacts">👥 Contacts</button>
+        <!-- Messages de personnes SANS compte Diaspo'Actif, écrits depuis le bouton « Contact » de l'annuaire (2026-11-09) — voir server/contact-externe.js -->
+        <button class="msg-rubrique" data-rubrique="hors">📨 Hors Diaspo'Actif <span class="rub-badge" id="rub-hors-count"></span></button>
       </div>
 
       <div class="msg-search">
@@ -339,6 +356,8 @@
       <div class="msg-conv-list" id="panneau-demandes" style="display:none;"></div>
       <!-- Rubrique « Contacts » : comptes avec qui le lien est établi. -->
       <div class="msg-conv-list" id="panneau-contacts" style="display:none;"></div>
+      <!-- Rubrique « Hors Diaspo'Actif » : messages reçus de personnes sans compte (répondre par e-mail ou téléphone, hors plateforme). -->
+      <div class="msg-conv-list" id="panneau-hors" style="display:none;"></div>
     </div>
 
     <!-- PANNEAU DROIT : conversation active -->
@@ -1714,18 +1733,68 @@ document.querySelectorAll('.msg-rubrique').forEach(b => {
     majBadgeDemandes((r.demandes || []).length);
   } catch(e) {}
 })();
+  const hors = document.getElementById('panneau-hors');
 
 /* ---- Filtres ---- */
 document.querySelectorAll(".msg-tab[data-filtre]").forEach(tab=>{
   tab.addEventListener("click",()=>{
     document.querySelectorAll(".msg-tab[data-filtre]").forEach(t=>t.classList.remove("active"));
+  if (hors) hors.style.display = nom === 'hors' ? '' : 'none';
     tab.classList.add("active");
     filtre=tab.dataset.filtre;
     loadConvList();
   });
 });
 /* ---- Onglets Classiques / Automatiques (compte officiel) ---- */
+  if (nom === 'hors') chargerHors();
+}
+
+/* ---- Rubrique « Hors Diaspo'Actif » (2026-11-09, demande explicite) : messages de personnes sans compte ---- */
+function majBadgeHors(n){
+  const b = document.getElementById('rub-hors-count');
+  if (!b) return;
+  b.textContent = n;
+  b.classList.toggle('on', n > 0);
+}
+async function chargerHors(){
+  const zone = document.getElementById('panneau-hors');
+  if (!zone) return;
+  zone.innerHTML = `<div style="padding:20px;color:#000;font-size:13px;text-align:center;">Chargement…</div>`;
+  try {
+    const r = await api('GET','/messages-hors-diaspo');
+    const liste = r.messages || [];
+    majBadgeHors(r.non_lus || 0);
+    if (!liste.length) {
+      zone.innerHTML = `<div style="padding:24px 16px;color:#000;font-size:13.5px;text-align:center;line-height:1.5;"><div style="font-size:30px;">📨</div><b>Aucun message pour le moment.</b><br>Ici arrivent les messages des personnes qui n'ont pas de compte Diaspo'Actif et vous écrivent depuis l'annuaire.</div>`;
+      return;
+    }
+    zone.innerHTML = liste.map(m => {
+      const nomComplet = escH((m.prenom || '') + ' ' + (m.nom || ''));
+      const sujet = encodeURIComponent("Votre message sur Diaspo'Actif");
+      const tel = m.telephone ? `<span>📞 <a href="tel:${escH(String(m.telephone).replace(/[^0-9+]/g,''))}">${escH(m.telephone)}</a></span>` : '';
+      return `<div class="mh-carte${m.lu ? '' : ' nouveau'}" id="mh-${m.id}">
+        <div class="mh-tete"><span class="mh-nom">${nomComplet}${m.lu ? '' : '<span class="mh-pill">Nouveau</span>'}</span><span class="mh-date">${escH(fmtDateDC(m.created_at))}</span></div>
+        <div class="mh-motif">${escH(m.motif)}</div>
+        <div class="mh-coord"><span>✉️ <a href="mailto:${escH(m.email)}">${escH(m.email)}</a></span>${tel}</div>
+        <div class="mh-actions">
+          <a class="mh-btn or" href="mailto:${escH(m.email)}?subject=${sujet}" onclick="mhLu(${m.id}, true)">✉️ Répondre par e-mail</a>
+          <button type="button" class="mh-btn" onclick="mhLu(${m.id}, ${m.lu ? 'false' : 'true'}).then(chargerHors)">${m.lu ? '↺ Marquer non lu' : '✓ Marquer comme lu'}</button>
+          <button type="button" class="mh-btn" onclick="mhSupprimer(${m.id})">🗑 Supprimer</button>
+        </div>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    zone.innerHTML = `<div style="padding:20px;color:#000;font-size:13px;text-align:center;">Impossible de charger ces messages pour le moment.</div>`;
+  }
 document.querySelectorAll(".msg-tab[data-onglet]").forEach(tab=>{
+window.mhLu = async function(id, lu){
+  try { await api('POST', `/messages-hors-diaspo/${id}/lu`, { lu: !!lu }); } catch(e) {}
+};
+window.mhSupprimer = async function(id){
+  if (!confirm("Supprimer ce message ?\n\nLes coordonnées de cette personne seront effacées définitivement.")) return;
+  try { await api('DELETE', `/messages-hors-diaspo/${id}`); } catch(e) { alert(e.message || 'Suppression impossible.'); return; }
+  chargerHors();
+};
   tab.addEventListener("click",()=>{
     document.querySelectorAll(".msg-tab[data-onglet]").forEach(t=>t.classList.remove("active"));
     tab.classList.add("active");
@@ -1739,6 +1808,15 @@ let listSearchTimer=null;
 document.getElementById("conv-search").addEventListener("input",function(){
   clearTimeout(listSearchTimer);
   const q=this.value.trim();
+/* Compteur « Hors Diaspo'Actif » dès l'ouverture ; arrivée depuis la notification (?rubrique=hors) → rubrique ouverte directement. */
+(async function badgeHors(){
+  try {
+    const r = await api('GET','/messages-hors-diaspo');
+    majBadgeHors(r.non_lus || 0);
+  } catch(e) {}
+  if (new URLSearchParams(location.search).get('rubrique') === 'hors') basculerRubrique('hors');
+})();
+
   listSearchTimer=setTimeout(()=>loadConvList(q||undefined),250);
 });
 

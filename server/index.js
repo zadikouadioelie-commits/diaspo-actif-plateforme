@@ -16918,6 +16918,9 @@ route("GET", "/api/demandes-contact", async (req, res, params, body, query) => {
 /* POST /api/demandes-contact/:id/repondre — accepter, refuser ou bloquer */
 route("POST", "/api/demandes-contact/:id/repondre", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
+/* Contact pour les personnes SANS compte (2026-11-09, demande explicite) : formulaire public → notification + rubrique « Hors Diaspo'Actif » de la messagerie — server/contact-externe.js. */
+require("./contact-externe").register({ route, db, sendJSON, getCurrentUser, creerNotif, SEC });
+
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const demande = await db.prepare("SELECT * FROM demandes_contact WHERE id=?").get(params.id);
   if (!demande || Number(demande.destinataire_id) !== Number(user.id)) {

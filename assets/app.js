@@ -600,6 +600,7 @@ const NOTIF_ICONS = {
   pub_commentaire: "💬",
   pub_like: "❤️",
   demande_contact: "📩",
+  message_externe: "📨",
   demande_contact_acceptee: "🤝",
   demande_contact_refusee: "🚫",
   affiliation_initiative: "🔗",
@@ -2854,7 +2855,7 @@ function renderInitiativeCard(it){
         <button type="button" class="ann-card-btn" onclick="event.stopPropagation(); openShareUrlModal(location.origin + '/' + '${profilHref}', ${JSON.stringify(it.nom || '').replace(/"/g,'&quot;')})">↗ Partager</button>
         ${vitrineBtn}
         ${(!isOwnInit && typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? `<button type="button" class="ann-card-btn" data-abonne="0" onclick="event.stopPropagation(); daToggleSuivre('initiative', ${it.id}, this)">🔔 S'abonner</button>` : ''}
-        ${(!isOwnInit && it.owner_user_id && typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? `<span data-relation-user="${it.owner_user_id}" data-relation-classe="ann-card-btn"></span>` : ''}
+        ${(!isOwnInit && it.owner_user_id) ? `<span data-relation-user="${it.owner_user_id}" data-relation-nom="${escAttrContact(it.nom)}" data-relation-classe="ann-card-btn"></span>` : ''}
         ${(!isOwnInit && typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? `<span data-affiliation-initiative="${it.id}" data-affiliation-classe="ann-card-btn ann-card-btn-affilier"></span>` : ''}
         ${(!isOwnInit && it.owner_user_id && typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.role === 'initiative') ? `<span data-affiliation-user="${it.owner_user_id}" data-affiliation-nom="${(responsableNom || ('le responsable de ' + (it.nom || ''))).replace(/"/g,'&quot;')}" data-affiliation-libelle="🔗 Affilier ce compte" data-affiliation-sanspuces="1" data-affiliation-classe="ann-card-btn ann-card-btn-affilier"></span>` : ''}
         ${it.owner_user_id ? `<button type="button" class="ann-card-btn" onclick="event.stopPropagation(); openAnnuaireEvents(${it.owner_user_id}, ${JSON.stringify(it.nom||'').replace(/"/g,'&quot;')})">📅 Événements</button>` : ''}
@@ -3232,7 +3233,7 @@ function renderPersonCard(u) {
         <a href="${profilHref}" class="ann-card-btn ann-card-btn-primary" onclick="event.stopPropagation()">👁 Voir le profil</a>
         <a href="${profilHref}#avis" class="ann-card-btn" onclick="event.stopPropagation()">⭐ Avis</a>
         <button type="button" class="ann-card-btn" title="Envoyer ce profil à quelqu'un : le lien s'ouvre sans compte" onclick="event.stopPropagation(); openShareUrlModal(location.origin + '/' + '${profilHref}', ${JSON.stringify(nom || '').replace(/"/g,'&quot;')})">↗ Partager</button>
-        ${!isOwn && typeof CURRENT_USER !== 'undefined' && CURRENT_USER ? `<span data-relation-user="${u.id}" data-relation-classe="ann-card-btn"></span>` : ''}
+        ${!isOwn ? `<span data-relation-user="${u.id}" data-relation-nom="${escAttrContact(nom)}" data-relation-classe="ann-card-btn"></span>` : ''}
         ${!isOwn && typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.role === 'initiative' ? `<span data-affiliation-user="${u.id}" data-affiliation-nom="${nom.replace(/"/g,'&quot;')}" data-affiliation-classe="ann-card-btn ann-card-btn-affilier"></span>` : ''}
         ${relanceProfilBoutonHtml(u.id, isOwn, relanceProfilIncomplet(u, 'utilisateur'))}
         ${adminAnnuaireBoutonsHtml(u.id, isOwn)}
@@ -3307,7 +3308,7 @@ async function initAnnuaire(){
           <a href="${profilHref}#avis" class="ann-card-btn" onclick="event.stopPropagation()">⭐ Avis</a>
           <button type="button" class="ann-card-btn" title="Envoyer ce profil à quelqu'un : le lien s'ouvre sans compte" onclick="event.stopPropagation(); openShareUrlModal(location.origin + '/' + '${profilHref}', ${JSON.stringify(nomAffiche || '').replace(/"/g,'&quot;')})">↗ Partager</button>
           ${abonnerBtn}
-          ${!isOwn && typeof CURRENT_USER !== 'undefined' && CURRENT_USER ? `<span data-relation-user="${o.id}" data-relation-classe="ann-card-btn"></span>` : ''}
+          ${!isOwn ? `<span data-relation-user="${o.id}" data-relation-nom="${escAttrContact(nomAffiche)}" data-relation-classe="ann-card-btn"></span>` : ''}
           ${relanceProfilBoutonHtml(o.id, isOwn, relanceProfilIncomplet(o, 'organisme'))}
           ${adminAnnuaireBoutonsHtml(o.id, isOwn)}
         </div>
@@ -7801,9 +7802,29 @@ window.initBoutonsRelation = async function (racine) {
   const ids = [...new Set(aTraiter.map(el => el.getAttribute('data-relation-user')))];
   let statuts = {};
   try {
+/* Contact pour les personnes SANS compte (2026-11-09, demande explicite) : le module de la fenêtre n'est chargé qu'au premier clic. */
+function escAttrContact(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+window.ouvrirContactExterne = function (userId, nom) {
+  const go = () => window.ContactExterne && window.ContactExterne.ouvrir(userId, nom);
+  if (window.ContactExterne) return go();
+  const sc = document.createElement('script');
+  sc.src = '/assets/contact-externe.js';
+  sc.onload = go;
+  sc.onerror = () => { window.location.href = 'login.html?redirect=' + encodeURIComponent(location.pathname + location.search); };
+  document.head.appendChild(sc);
+};
+function contactExterneBoutonHtml(userId, classe, nom) {
+  const n = escAttrContact(nom);
+  return `<button type="button" class="${escAttrContact(classe)}" data-contact-externe="${Number(userId)}" onclick="event.stopPropagation(); ouvrirContactExterne(${Number(userId)}, this.getAttribute('data-nom'))" data-nom="${n}">✉️ Contact</button>`;
+}
+
     statuts = await statutsParTranches('/relation-statut-lot', 'user_ids', ids);
   } catch (e) {
-    aTraiter.forEach(el => el.innerHTML = '');   // non connecté : on n'affiche rien
+    /* Non connecté : un bouton « Contact » (formulaire sans compte, assets/contact-externe.js) au lieu d'un repère vide — 2026-11-09, demande explicite. */
+    const connecte = typeof CURRENT_USER !== 'undefined' && CURRENT_USER;
+    aTraiter.forEach(el => {
+      el.innerHTML = connecte ? '' : contactExterneBoutonHtml(el.getAttribute('data-relation-user'), el.getAttribute('data-relation-classe') || 'pvz-btn', el.getAttribute('data-relation-nom') || '');
+    });
     return;
   }
   aTraiter.forEach(el => {

@@ -418,7 +418,7 @@
       // Boutons Demande / Message — widget partagé du site, uniquement pour un visiteur
       const zone = q('#cda-actions');
       if (zone && profil.id) {
-        zone.innerHTML = `<span data-relation-user="${profil.id}" data-relation-origine="carte_diaspoactif" data-relation-classe="cda-btn"></span>`;
+        zone.innerHTML = `<span data-relation-user="${profil.id}" data-relation-nom="${esc([profil.prenom, profil.nom].filter(Boolean).join(' '))}" data-relation-origine="carte_diaspoactif" data-relation-classe="cda-btn"></span>`;
         if (window.initBoutonsRelation) window.initBoutonsRelation();
       }
     }

@@ -3246,6 +3246,23 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_dc_destinataire ON demandes_contact(destinataire_id, statut);
   CREATE INDEX IF NOT EXISTS idx_dc_demandeur ON demandes_contact(demandeur_id, statut);
 
+  /* Messages « hors Diaspo'Actif » (2026-11-09, demande explicite) : une personne SANS compte écrit à un membre de l'annuaire
+     (nom, prénom, motif ≤ 300 caractères, e-mail obligatoire, téléphone facultatif). Voir server/contact-externe.js.
+     Les coordonnées d'un tiers ne sont gardées que le temps utile : le destinataire peut supprimer le message pour de bon. */
+  CREATE TABLE IF NOT EXISTS messages_hors_diaspo (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    destinataire_id INTEGER NOT NULL,
+    nom TEXT NOT NULL,
+    prenom TEXT NOT NULL,
+    motif TEXT NOT NULL,
+    email TEXT NOT NULL,
+    telephone TEXT,
+    lu INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(destinataire_id) REFERENCES users(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_mhd_destinataire ON messages_hors_diaspo(destinataire_id, lu);
+
   /* ===== HISTORIQUE DES MODIFICATIONS DE CONTACT =====
      Trace des changements de coordonnées et de leur visibilité : qui a modifié quoi, quand.
 

@@ -1445,7 +1445,7 @@ async function renderEnrichedColumns() {
         <h4>🚀 Entrer en relation</h4>
         ${`
           <!-- Contact direct pour tous depuis le 2026-07-25 : plus aucune demande préalable. -->
-          <span data-relation-user="${profil.id}" data-relation-origine="profil" data-relation-classe="pp-join-btn"></span>
+          <span data-relation-user="${profil.id}" data-relation-nom="${esc(profil.nom || '')}" data-relation-origine="profil" data-relation-classe="pp-join-btn"></span>
           <button class="pp-join-btn" onclick="ppContact('Proposition de collaboration')">🤝 Proposer une collaboration</button>
         `}
       </div>` : ''}
@@ -2338,7 +2338,7 @@ function renderVisitorProfile() {
      profil. */
   const soutenirBtn = (!isOwn && isInit && window.Soutenir)
     ? Soutenir.buttonHtml(profil.id, { cls: 'pvz-btn', nom: profil.nom || '' }) : '';
-  const msgBtn = `<span data-relation-user="${profil.id}" data-relation-origine="profil" data-relation-classe="pvz-btn"></span>`;
+  const msgBtn = `<span data-relation-user="${profil.id}" data-relation-nom="${esc(profil.nom || '')}" data-relation-origine="profil" data-relation-classe="pvz-btn"></span>`;
   const shareBtn = `<button class="pvz-btn" onclick="pvzShare()">↗ Partager</button>`;
   const reportBtn = CU ? `<button class="pvz-btn" style="color:#dc2626;" onclick="ouvrirSignalementModal(${profil.id},'${esc(profil.nom || '').replace(/'/g,"\\'")}')" title="Signaler ce compte">🚩 Signaler</button>` : '';
   const vitrineToggleBtn = (isOwn && isInit) ? `<button class="pvz-btn" id="pvz-vitrine-toggle-btn" onclick="pvzQuickToggleVitrine()" disabled>⏳ Boutique…</button>` : '';

@@ -438,7 +438,7 @@ const THEME_VITRINE_LABELS = { bordeaux:'Bordeaux', ocean:'Ocean', emeraude:'Eme
                si l'échange est ouvert, « Demande de liaison » avec son message imposé sinon.
                Auparavant « Écrire » menait toujours à la messagerie, où l'utilisateur se
                heurtait à la règle après coup. Voir initBoutonsRelation (assets/app.js). */
-            ? `<span data-relation-user="${init.owner_user_id}" data-relation-origine="profil" data-relation-classe="btn btn-outline"></span>`
+            ? `<span data-relation-user="${init.owner_user_id}" data-relation-nom="${(init.nom || '').replace(/"/g, '&quot;')}" data-relation-origine="profil" data-relation-classe="btn btn-outline"></span>`
             : `<a href="messagerie.html?init=${init.id}" class="btn btn-outline">✏️ Écrire</a>`}
           ${(!isOwner && me && init.owner_user_id) ? `<button type="button" class="btn btn-outline" style="color:#dc2626;" onclick="ouvrirSignalementModal(${init.owner_user_id},'${(init.nom || '').replace(/'/g, "\\'").replace(/</g, '')}')" title="Signaler ce compte">🚩 Signaler</button>` : ''}
         </div>
@@ -958,7 +958,7 @@ const THEME_VITRINE_LABELS = { bordeaux:'Bordeaux', ocean:'Ocean', emeraude:'Eme
             <button class="rejoindre-btn" id="btn-devenir-partenaire" onclick="rejoindreInitiative('partenaire', this)">🤝 Devenir partenaire</button>
           ` : ''}
           ${init.owner_user_id
-            ? `<span data-relation-user="${init.owner_user_id}" data-relation-origine="profil" data-relation-classe="rejoindre-btn"></span>`
+            ? `<span data-relation-user="${init.owner_user_id}" data-relation-nom="${(init.nom || '').replace(/"/g, '&quot;')}" data-relation-origine="profil" data-relation-classe="rejoindre-btn"></span>`
             : `<a class="rejoindre-btn" href="messagerie.html?init=${init.id}">✉️ Contacter</a>`}
         `}
       </div>
