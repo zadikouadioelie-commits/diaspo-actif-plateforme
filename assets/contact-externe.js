@@ -176,5 +176,8 @@
       .catch(function () { etapeChoix(); });
   }
 
-  window.ContactExterne = { ouvrir: ouvrir, fermer: fermer };
+  /* Accès direct au formulaire (version téléphone : le choix « me connecter » y est déjà posé par l'appli). */
+  function formulaire(userId, nom) { courant = { userId: userId, nom: nom ? String(nom) : "" }; etapeFormulaire(); }
+
+  window.ContactExterne = { ouvrir: ouvrir, fermer: fermer, formulaire: formulaire };
 })();

@@ -1561,12 +1561,40 @@
     const pf = e.target.closest('[data-prof]'); if (pf && !e.target.closest('a,button')) { location.hash = '#/profil/' + pf.dataset.prof; return; }
     const w = e.target.closest('[data-write]'); if (!w) return;
     if (w.tagName === 'A') e.preventDefault();
-    if (!(await needLogin('Connectez-vous pour écrire à ce compte.'))) return;
+    if (!S.me && !(await contactVisiteur(w))) return; /* visiteur sans compte : choix « me connecter » / « écrire un message » */
     w.disabled = true;
     try { const r = await api('/api/conversations', { method: 'POST', body: { user_id: Number(w.dataset.write) } }); location.hash = '#/conv/' + r.conversation_id; }
     catch (er) { if (er.status === 403 && er.data && er.data.code === 'contact_requis') demandeContact(er.data, w); else toast(er.message, true); }
     w.disabled = false;
   });
+  /* Visiteur déconnecté qui touche « Contacter » (2026-11-09, demande explicite) : même choix que sur le site — se connecter, ou laisser un message
+     (formulaire assets/contact-externe.js, POST /api/contact-externe) pour une personne qui n'a pas de compte. Résout true si la connexion réussit
+     (le clic reprend alors son cours), false sinon. */
+  function chargerContactExterne() {
+    return new Promise((ok, ko) => {
+      if (window.ContactExterne) return ok();
+      const s = document.createElement('script'); s.src = 'assets/contact-externe.js?v=20261109b';
+      s.onload = () => ok(); s.onerror = () => ko(new Error('Formulaire indisponible')); document.head.appendChild(s);
+    });
+  }
+  function contactVisiteur(btn) {
+    return new Promise(resolve => {
+      const uid = Number(btn.dataset.write);
+      const carte = btn.closest ? btn.closest('.card, article') : null, elNom = carte ? carte.querySelector('.nm') : null;
+      const nom = ((S.annNames && S.annNames[uid]) || (elNom && elNom.textContent.trim()) || '').trim();
+      const close = openSheet(`<h2 style="margin:2px 0 6px;font-size:19px">Contacter ${esc(nom || 'cette personne')}</h2>
+        <p style="margin:0 0 12px">Connectez-vous si vous avez un compte Diaspo’Actif. Sinon, laissez-lui un message : elle vous répondra directement par e-mail ou par téléphone.</p>
+        <button type="button" class="btn block" id="cv-login">${ic('user', 's')} J’ai un compte : me connecter</button>
+        <button type="button" class="btn out block" id="cv-msg" style="margin-top:10px">${ic('chat', 's')} Pas de compte : écrire un message</button>
+        <button type="button" class="btn out block" id="cv-x" style="margin-top:10px">Plus tard</button>`);
+      $('#cv-x').onclick = () => { close(); resolve(false); };
+      $('#cv-login').onclick = async () => { close(); resolve(!!(await needLogin('Connectez-vous pour écrire à ce compte.'))); };
+      $('#cv-msg').onclick = async () => {
+        close(); resolve(false);
+        try { await chargerContactExterne(); window.ContactExterne.formulaire(uid, nom); } catch (e) { toast(e.message, true); }
+      };
+    });
+  }
   /* Le site n'autorise une conversation qu'entre comptes en contact : on propose d'envoyer la demande de contact, puis la discussion s'ouvre dès qu'elle est acceptée. */
   function demandeContact(d, btn) {
     const nom = (S.annNames && S.annNames[d.destinataire_id]) || d.destinataire_nom || 'ce compte';
