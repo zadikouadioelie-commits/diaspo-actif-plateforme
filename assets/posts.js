@@ -54,6 +54,69 @@ function titrePostHtml(post) {
   const t = titreSur(post.titre).trim();
   return t ? `<h3 class="post-titre">${t}</h3>` : '';
 }
+/* Texte enrichi des publications (2026-11-09) : le serveur a déjà nettoyé le HTML (corps_html) ; on le filtre une seconde fois ici avant
+   injection (liste de balises et de styles fermée), puis les #hashtags et les mentions @[Nom](u:5) y deviennent des liens, dans le texte seulement. */
+const CORPS_BALISES = { P:1, BR:1, STRONG:1, B:1, EM:1, I:1, U:1, S:1, STRIKE:1, SUB:1, SUP:1, SPAN:1, UL:1, OL:1, LI:1, H2:1, H3:1, H4:1, BLOCKQUOTE:1, A:1 };
+const CORPS_STYLES = { 'color':1, 'background-color':1, 'text-align':1, 'font-family':1, 'font-size':1, 'line-height':1 };
+function styleSur(st) {
+  return String(st || '').split(';').map(d => d.trim()).filter(d => {
+    const i = d.indexOf(':'); if (i < 1) return false;
+    const prop = d.slice(0, i).trim().toLowerCase(), val = d.slice(i + 1).trim();
+    return CORPS_STYLES[prop] && /^[#\w\s,.()%'"-]+$/.test(val) && !/url\s*\(|expression|javascript/i.test(val);
+  }).join(';');
+}
+function rendreCorpsHtml(html) {
+  if (!html) return '';
+  const doc = new DOMParser().parseFromString('<div>' + String(html) + '</div>', 'text/html');
+  const racine = doc.body.firstChild;
+  (function nettoyer(n) {
+    Array.from(n.childNodes).forEach(c => {
+      if (c.nodeType === 3) return;
+      if (c.nodeType !== 1) { c.remove(); return; }
+      if (/^(SCRIPT|STYLE|IFRAME|OBJECT|EMBED|LINK|META)$/.test(c.tagName)) { c.remove(); return; }
+      if (!CORPS_BALISES[c.tagName]) { nettoyer(c); while (c.firstChild) n.insertBefore(c.firstChild, c); c.remove(); return; }
+      Array.from(c.attributes).forEach(a => {
+        if (a.name === 'style') { const st = styleSur(a.value); if (st) c.setAttribute('style', st); else c.removeAttribute('style'); }
+        else if (!(c.tagName === 'A' && a.name === 'href')) c.removeAttribute(a.name);
+      });
+      if (c.tagName === 'A') {
+        const h = c.getAttribute('href') || '';
+        if (!/^(https?:|mailto:)/i.test(h)) c.removeAttribute('href'); else { c.setAttribute('target', '_blank'); c.setAttribute('rel', 'noopener noreferrer'); }
+      }
+      nettoyer(c);
+    });
+  })(racine);
+  /* #hashtags et mentions : seulement dans les passages de texte (jamais dans un lien existant). */
+  const textes = [];
+  (function chercher(n, dansLien) {
+    n.childNodes.forEach(c => {
+      if (c.nodeType === 3) { if (!dansLien) textes.push(c); }
+      else if (c.nodeType === 1) chercher(c, dansLien || c.tagName === 'A');
+    });
+  })(racine, false);
+  textes.forEach(t => {
+    const brut = t.nodeValue;
+    if (!/[#@*]/.test(brut)) return;
+    let h = escHtml(brut).replace(/#([\wÀ-ÿ]+)/g, '<a href="fil-actualite.html?hashtag=$1" class="post-hashtag">#$1</a>');
+    h = h.replace(/[@*]\[([^\]]+)\]\(([uic]):(\d+)\)/g, (m, nom, type, id) => `<a href="${MENTION_LINK[type] || MENTION_LINK.u}${id}" class="post-mention">@${nom}</a>`);
+    if (h === escHtml(brut)) return;
+    const tpl = document.createElement('template'); tpl.innerHTML = h;
+    t.replaceWith(tpl.content);
+  });
+  return racine.innerHTML;
+}
+/* Texte simple d'un HTML d'éditeur (retours à la ligne entre blocs) — sert au compteur et à la vérification « rien d'écrit ». */
+function htmlEnTexteBrut(html) {
+  const d = new DOMParser().parseFromString(String(html || '').replace(/<br\s*\/?>/gi, '\n').replace(/<\/(p|h[1-6]|li|blockquote)>/gi, '\n'), 'text/html');
+  return (d.body.textContent || '').replace(/\n{3,}/g, '\n\n').trim();
+}
+/* Texte simple (publication ancienne, brouillon) -> HTML pour l'éditeur : un paragraphe par ligne. */
+function texteVersHtmlEditeur(txt) {
+  const t = String(txt || '').replace(/\r/g, '');
+  if (!t.trim()) return '';
+  return t.split('\n').map(l => '<p>' + (escHtml(l) || '<br>') + '</p>').join('');
+}
+
 /* L'éditeur de texte enrichi n'est pas chargé sur toutes les pages qui utilisent ce module :
    chargement à la demande, une seule fois. */
 let _richEditorPromesse = null;
@@ -146,9 +209,25 @@ function attachMentionPicker(el) {
 
   function closeBox() { if (box) { box.remove(); box = null; } items = []; activeIdx = -1; triggerPos = -1; }
 
+  /* Zone modifiable (éditeur de texte enrichi) : le curseur vit dans un passage de texte, pas dans une valeur de champ. */
+  const riche = !!el.isContentEditable;
+  let trigNode = null;
   function insertMention(u) {
     const type = u.role === 'initiative' ? 'i' : u.role === 'collectivite' ? 'c' : 'u';
     const label = u.role === 'utilisateur' ? [u.prenom, u.nom].filter(Boolean).join(' ') : u.nom;
+    if (riche) {
+      const node = trigNode;
+      if (!node || !node.parentNode) { closeBox(); return; }
+      const sel = window.getSelection();
+      const fin = (sel && sel.anchorNode === node) ? sel.anchorOffset : node.nodeValue.length;
+      const ins = `@[${label}](${type}:${u.id}) `;
+      node.nodeValue = node.nodeValue.slice(0, triggerPos) + ins + node.nodeValue.slice(fin);
+      const r = document.createRange(); r.setStart(node, triggerPos + ins.length); r.collapse(true);
+      sel.removeAllRanges(); sel.addRange(r);
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      closeBox();
+      return;
+    }
     const val = el.value;
     const before = val.slice(0, triggerPos);
     const after = val.slice(el.selectionStart);
@@ -186,6 +265,15 @@ function attachMentionPicker(el) {
   }
 
   el.addEventListener('input', () => {
+    if (riche) {
+      const sel = window.getSelection();
+      const nd = sel && sel.anchorNode;
+      if (!nd || nd.nodeType !== 3 || !el.contains(nd)) { closeBox(); return; }
+      const pos = sel.anchorOffset, val = nd.nodeValue.slice(0, pos);
+      const m = val.match(/(?:^|\s)([@*])([\wÀ-ÿ' -]{0,30})$/);
+      if (m) { trigNode = nd; triggerPos = pos - m[2].length - 1; updateBox(m[2]); } else closeBox();
+      return;
+    }
     const pos = el.selectionStart;
     const val = el.value.slice(0, pos);
     const m = val.match(/(?:^|\s)([@*])([\wÀ-ÿ' -]{0,30})$/);
@@ -333,7 +421,7 @@ function renderPanneauTexte(post) {
   const pieces = renderMedias(post);
   return `<div class="pd-texte" style="background:linear-gradient(135deg,${c},${c}bb)"><div class="pd-texte-inner">
     ${titre ? `<h3 class="pd-texte-titre">${titre}</h3>` : ''}
-    ${texte ? `<div class="pd-texte-corps">${processContent(texte)}</div>` : ''}
+    ${texte ? `<div class="pd-texte-corps">${(!estArticle && post.corps_html) ? `<div class="post-riche">${rendreCorpsHtml(post.corps_html)}</div>` : processContent(texte)}</div>` : ''}
     ${pieces}
   </div></div>`;
 }
@@ -591,9 +679,11 @@ function renderPostCard(post, options = {}) {
      contenu). Affiché au-dessus du média ; champ à part du texte, jamais retiré ni modifié par lui. */
   const titreHtml = titrePostHtml(post);
   const texteBrut = estArticle ? (post.article_contenu || '') : (post.corps != null ? post.corps : (post.contenu || ''));
-  const contenuHTML = processContent(texteBrut);
-  const texteTronque = tronquerTexteBrut(texteBrut, POST_TRUNC_LEN);
-  const contenuApercuHTML = texteTronque ? processContent(texteTronque) + '…' : '';
+  /* Texte enrichi (corps_html) : affiché avec sa mise en forme ; « Voir plus » replie la hauteur au lieu de couper le HTML. */
+  const corpsRiche = (!estArticle && post.corps_html) ? rendreCorpsHtml(post.corps_html) : '';
+  const contenuHTML = corpsRiche ? `<div class="post-riche">${corpsRiche}</div>` : processContent(texteBrut);
+  const texteTronque = tronquerTexteBrut(texteBrut, POST_TRUNC_LEN) || (corpsRiche && String(post.corps_html).length > 700 ? ' ' : null);
+  const contenuApercuHTML = texteTronque ? (corpsRiche ? `<div class="post-riche post-riche-replie">${corpsRiche}</div>` : processContent(texteTronque) + '…') : '';
 
   const repostBanner = (post.pub_type === 'repost' || post.type === 'repost') && post.original_post
     ? `<div class="post-repost-banner">
@@ -743,6 +833,7 @@ function buildCreateModal() {
     <!-- Zone de texte -->
     <div class="posts-field">
       <textarea id="post-contenu" class="posts-textarea" placeholder="Partagez une actualité, un projet, une opportunité… Utilisez #hashtag et @ ou * pour identifier un compte" rows="5" oninput="Posts.updateCounter()"></textarea>
+      <div class="posts-aide-corps">Utilisez #hashtag, et @ ou * pour identifier un compte.</div>
       <div class="posts-counter"><span id="post-counter">0</span> caractères</div>
     </div>
 
@@ -935,6 +1026,15 @@ function injectStyles() {
 .post-body{padding:4px 16px 12px;font-size:.95rem;line-height:1.6;color:#1f2937;white-space:pre-wrap;word-break:break-word;}
 .post-voir-plus{display:inline-block;margin-top:4px;background:none;border:none;padding:0;color:#ff6b00;font-weight:700;font-size:.9rem;cursor:pointer;}
 .post-voir-plus:hover{text-decoration:underline;}
+.post-riche{line-height:1.55;word-break:break-word;}
+.post-riche p{margin:0 0 .6em;}
+.post-riche h2,.post-riche h3,.post-riche h4{margin:.5em 0 .3em;line-height:1.25;}
+.post-riche h2{font-size:1.25em;}.post-riche h3{font-size:1.12em;}.post-riche h4{font-size:1em;}
+.post-riche ul,.post-riche ol{margin:.2em 0 .7em;padding-left:1.4em;}
+.post-riche blockquote{margin:.4em 0 .7em;padding:.2em 0 .2em .9em;border-left:3px solid #c9971c;opacity:.92;}
+.post-riche a{color:#c9971c;}
+.posts-aide-corps{font-size:12px;color:var(--muted,#6b7280);margin:6px 2px 0;}
+.post-riche-replie{max-height:9.5em;overflow:hidden;-webkit-mask-image:linear-gradient(#000 70%,transparent);mask-image:linear-gradient(#000 70%,transparent);}
 .post-article-titre{font-size:1.1rem;font-weight:700;color:#111;margin-bottom:8px;}
 .post-titre{margin:0;padding:4px 16px 10px;font-size:1.2rem;line-height:1.35;font-weight:400;color:#0f172a;word-break:break-word;}
 .post-titre strong,.post-titre b{font-weight:800;}
@@ -1218,7 +1318,6 @@ const Posts = {
     this._editingId = null;
 
     // Réinitialiser
-    document.getElementById('post-contenu').value = '';
     document.getElementById('post-categorie').value = '';
     document.getElementById('post-visibilite').value = 'public';
     document.getElementById('post-pays').value = '';
@@ -1226,12 +1325,10 @@ const Posts = {
     document.getElementById('post-edit-id').value = '';
     document.getElementById('posts-schedule-panel').style.display = 'none';
     document.getElementById('post-medias-list').innerHTML = '';
-    this.updateCounter();
-    attachMentionPicker(document.getElementById('post-contenu'));
+    this._preparerCorps(draftPost ? (draftPost.corps_html || texteVersHtmlEditeur(draftPost.corps != null ? draftPost.corps : draftPost.contenu)) : '', draftPost ? ((draftPost.corps != null ? draftPost.corps : draftPost.contenu) || '') : '');
     this._preparerTitre(draftPost ? (draftPost.titre || '') : '');
 
     if (draftPost) {
-      document.getElementById('post-contenu').value = (draftPost.corps != null ? draftPost.corps : draftPost.contenu) || '';
       document.getElementById('post-categorie').value = draftPost.categorie || '';
       document.getElementById('post-visibilite').value = draftPost.visibilite || 'public';
       document.getElementById('post-pays').value = draftPost.localisation_pays || '';
@@ -1256,6 +1353,30 @@ const Posts = {
     else ta.value = String(valeur || '').replace(/<[^>]+>/g, '');
   },
 
+  /* Zone de texte du composeur : éditeur de texte enrichi complet (police, taille, couleur, surlignage, titres, listes, alignements, lien…) ;
+     sans l'éditeur, retombe sur le champ texte simple. Les @/* (comptes) et #hashtags restent reconnus. */
+  async _preparerCorps(html, texteSimple) {
+    const ta = document.getElementById('post-contenu');
+    if (!ta) return;
+    ta.value = '';
+    const ok = await ensureRichEditor();
+    if (ok && !ta._richEditorInstance) {
+      const ed = window.RichEditor.attach(ta, { avance: true, placeholder: 'Partagez une actualité, un projet, une opportunité… Utilisez #hashtag et @ ou * pour identifier un compte' });
+      if (ed && ed.area) attachMentionPicker(ed.area);
+    }
+    const ed = ta._richEditorInstance;
+    if (ed) ed.setHTML(html || '');
+    else { ta.value = texteSimple || ''; attachMentionPicker(ta); }
+    this.updateCounter();
+  },
+  /* Contenu saisi : html (vide si rien d'écrit) et texte simple correspondant. */
+  _lireCorps() {
+    const ta = document.getElementById('post-contenu');
+    const ed = ta && ta._richEditorInstance;
+    if (ed) { const html = ed.isEmpty() ? '' : ed.getHTML(); return { html, texte: htmlEnTexteBrut(html) }; }
+    return { html: '', texte: (ta && ta.value || '').trim() };
+  },
+
   closeModal() {
     const modal = document.getElementById('posts-create-modal');
     if (modal) modal.style.display = 'none';
@@ -1263,7 +1384,7 @@ const Posts = {
   },
 
   updateCounter() {
-    const v = document.getElementById('post-contenu')?.value || '';
+    const v = this._lireCorps().texte;
     const el = document.getElementById('post-counter');
     if (el) el.textContent = v.length;
   },
@@ -1384,10 +1505,10 @@ const Posts = {
 
   /* ── Brouillon ── */
   async saveDraft() {
-    const contenu = document.getElementById('post-contenu')?.value?.trim() || '';
+    const { html: contenuHtml, texte: contenu } = this._lireCorps();
     const editId = document.getElementById('post-edit-id')?.value;
     const payload = {
-      contenu, statut: 'brouillon', titre: document.getElementById('post-titre')?.value || '',
+      contenu, contenu_html: contenuHtml, statut: 'brouillon', titre: document.getElementById('post-titre')?.value || '',
       categorie: document.getElementById('post-categorie')?.value || '',
       visibilite: document.getElementById('post-visibilite')?.value || 'public',
       localisation_pays: document.getElementById('post-pays')?.value || '',
@@ -1405,7 +1526,7 @@ const Posts = {
 
   /* ── Publier ── */
   async submitPost(mode) {
-    const contenu = document.getElementById('post-contenu')?.value?.trim() || '';
+    const { html: contenuHtml, texte: contenu } = this._lireCorps();
     const editId = document.getElementById('post-edit-id')?.value;
     const programmedAt = mode === 'programme' ? document.getElementById('post-programmed-at')?.value : null;
 
@@ -1422,7 +1543,7 @@ const Posts = {
     }
 
     const payload = {
-      contenu,
+      contenu, contenu_html: contenuHtml,
       titre: document.getElementById('post-titre')?.value || '',
       statut: programmedAt ? 'programme' : 'publie',
       categorie: document.getElementById('post-categorie')?.value || 'Publication',
@@ -1797,7 +1918,7 @@ const Posts = {
       ? titrePostHtml(post) + renderCompteRenduBloc(post).replace(/<div class="cr-cover">[\s\S]*?<\/div>\s*(?=<div class="cr-resume)/, '')
       : promoEvt
       ? `<h3 class="post-titre">${escHtml(promoEvt.titre)}</h3><a href="evenements.html?evt=${promoEvt.id}" style="color:var(--orange,#ff6b00);font-weight:700;">Voir l'événement →</a>`
-      : titrePostHtml(post) + processContent(texteBrut) + renderTutoCta(post);
+      : titrePostHtml(post) + ((!estArticle && post.corps_html) ? `<div class="post-riche">${rendreCorpsHtml(post.corps_html)}</div>` : processContent(texteBrut)) + renderTutoCta(post);
 
     document.getElementById('pd-actions').innerHTML = `
       <div class="post-reactions-wrap">

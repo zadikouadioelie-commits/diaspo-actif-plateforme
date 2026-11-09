@@ -653,6 +653,8 @@ const COLONNES_MIGRATION = [
     ['fil_posts', 'titre_auto', 'INTEGER DEFAULT 0'],
     // Texte seul de la publication (sans le titre) — contenu reste la version complète
     ['fil_posts', 'corps', 'TEXT'],
+    // Texte enrichi (HTML nettoyé) ; corps/contenu restent le texte simple
+    ['fil_posts', 'corps_html', 'TEXT'],
     // ─── Rattrapage massif : colonnes présentes dans db.js (SQLite) mais jamais migrées vers Postgres ───
     // Découvert le 2026-07-07 en investiguant une panne FUNCTION_INVOCATION_FAILED sur GET /api/events
     // (colonne events.publie_at absente en production). Ce tableau ne couvrait qu'une fraction des

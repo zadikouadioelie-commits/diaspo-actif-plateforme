@@ -495,6 +495,7 @@
       setHTML: html => { area.innerHTML = html || (opts.compact ? '' : '<p><br></p>'); if (window.rendreTexteLisible) window.rendreTexteLisible(area); sync(); },
       isEmpty: () => !area.textContent.trim(),
       focus: () => area.focus(),
+      area,   // zone modifiable (sélecteur de mentions des publications)
     };
     textarea._richEditorInstance = instance;
     return instance;

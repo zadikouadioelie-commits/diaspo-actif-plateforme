@@ -6019,6 +6019,8 @@ const postsAlters = [
   "ALTER TABLE fil_posts ADD COLUMN titre TEXT",
   "ALTER TABLE fil_posts ADD COLUMN titre_auto INTEGER DEFAULT 0",
   "ALTER TABLE fil_posts ADD COLUMN corps TEXT",
+  /* Texte enrichi de la publication (HTML nettoyé par le serveur) ; corps/contenu restent le texte simple. */
+  "ALTER TABLE fil_posts ADD COLUMN corps_html TEXT",
 ];
 for (const sql of postsAlters) { try { db.prepare(sql).run(); } catch(e) { /* colonne déjà existante */ } }
 

@@ -15324,7 +15324,10 @@ route("POST", "/api/fil", async (req, res, params, body) => {
   }
 
   const pub_type = body.pub_type || "texte";
-  const contenu  = (body.contenu || "").trim();
+  /* Texte enrichi : le HTML est nettoyé ici (jamais confiance au client) et le texte simple en est déduit. */
+  const contenuHtmlSaisi = typeof body.contenu_html === "string" ? SEC.sanitizeRichHtml(body.contenu_html).slice(0, 60000) : "";
+  const contenuHtml = texteDuTitre(contenuHtmlSaisi) ? contenuHtmlSaisi : "";
+  const contenu  = contenuHtml ? htmlEnTexte(contenuHtml).slice(0, 20000) : (body.contenu || "").trim();
   const article_titre   = (body.article_titre || "").trim();
   const article_contenu = (body.article_contenu || "").trim();
   const statut   = body.statut || "publie"; // publie | brouillon | archive | programme
@@ -15388,8 +15391,17 @@ route("POST", "/api/fil", async (req, res, params, body) => {
   // Titre saisi (mise en forme en ligne autorisée) ou, à défaut, généré depuis le contenu.
   {
     const saisi = SEC.sanitizeInlineHtml(typeof body.titre === "string" ? body.titre : "").slice(0, 800);
-    if (texteDuTitre(saisi)) await ecrireTitreEtCorps(id, saisi, 0, contenu, composerContenu(saisi, contenu, 0));
-    else await genererEtAppliquerTitre({ id, contenu: contenu || article_titre, article_titre, pub_type, categorie: body.categorie });
+    if (texteDuTitre(saisi)) {
+      await ecrireTitreEtCorps(id, saisi, 0, contenu, composerContenu(saisi, contenu, 0));
+      if (contenuHtml) { try { await db.prepare("UPDATE fil_posts SET corps_html=? WHERE id=?").run(contenuHtml, id); } catch (e) { /* colonne pas encore migrée : le texte simple s'affiche */ } }
+    } else {
+      const maj = await genererEtAppliquerTitre({ id, contenu: contenu || article_titre, article_titre, pub_type, categorie: body.categorie, corps_html: contenuHtml || null });
+      if (contenuHtml) {
+        /* Ligne devenue titre (titre_auto=1) : retirée aussi du texte enrichi, comme du texte simple. */
+        const sep = maj && Number(maj.titre_auto) === 1 ? separerPremierBlocHtml(contenuHtml) : null;
+        try { await db.prepare("UPDATE fil_posts SET corps_html=? WHERE id=?").run(sep ? sep.reste : contenuHtml, id); } catch (e) { /* idem */ }
+      }
+    }
   }
 
   // Récupère le post complet pour le renvoyer
@@ -15810,7 +15822,9 @@ route("PUT", "/api/fil/:id", async (req, res, params, body) => {
   if (!p) return sendJSON(res, 404, { error: "Publication introuvable." });
   if (p.auteur_id !== user.id && user.role !== "administrateur") return sendJSON(res, 403, { error: "Action non autorisée." });
 
-  const contenu = (body.contenu !== undefined) ? body.contenu.trim() : p.contenu;
+  const contenuHtmlSaisi = typeof body.contenu_html === "string" ? SEC.sanitizeRichHtml(body.contenu_html).slice(0, 60000) : null;
+  const contenuHtml = contenuHtmlSaisi !== null && texteDuTitre(contenuHtmlSaisi) ? contenuHtmlSaisi : "";
+  const contenu = contenuHtmlSaisi !== null ? htmlEnTexte(contenuHtml).slice(0, 20000) : ((body.contenu !== undefined) ? body.contenu.trim() : p.contenu);
   const categorie = body.categorie || p.categorie;
   const visibilite = body.visibilite || p.visibilite || "public";
   const statut = body.statut || p.statut || "publie";
@@ -15834,20 +15848,25 @@ route("PUT", "/api/fil/:id", async (req, res, params, body) => {
      vidé (ou absent) est regénéré, une fois, à partir du texte courant. `body.contenu` est la case
      « texte » ; `contenu` (version complète) est recomposé ensuite pour les autres modules. */
   {
-    const corpsCourant = body.contenu !== undefined ? contenu : (p.corps != null ? p.corps : p.contenu);
+    const corpsCourant = (body.contenu !== undefined || contenuHtmlSaisi !== null) ? contenu : (p.corps != null ? p.corps : p.contenu);
     let titre = p.titre || null, auto = p.titre_auto == null ? 0 : Number(p.titre_auto), corps = corpsCourant, regenerer = false;
     if (body.titre !== undefined) {
       const saisi = SEC.sanitizeInlineHtml(typeof body.titre === "string" ? body.titre : "").slice(0, 800);
       if (!texteDuTitre(saisi)) regenerer = true;
       else if (saisi !== SEC.sanitizeInlineHtml(p.titre || "")) { titre = saisi; auto = 0; }
     } else if (!p.titre) regenerer = true;
+    let corpsHtmlFinal = contenuHtmlSaisi !== null ? contenuHtml : (body.contenu !== undefined ? "" : (p.corps_html || ""));
     if (regenerer) {
-      const source = { ...p, contenu: corpsCourant, categorie };
+      const source = { ...p, contenu: corpsCourant, categorie, corps_html: corpsHtmlFinal || null };
       const g = genererTitrePost(source);
       const extrait = titreExtractible(source, g);
       titre = g.html; auto = p.article_titre ? 0 : (extrait ? 1 : 2); corps = extrait ? g.reste : corpsCourant;
+      if (extrait && corpsHtmlFinal) { const sep = separerPremierBlocHtml(corpsHtmlFinal); if (sep) corpsHtmlFinal = sep.reste; }
     }
     if (titre) await ecrireTitreEtCorps(p.id, titre, auto, corps, composerContenu(titre, corps, auto));
+    if (contenuHtmlSaisi !== null || body.contenu !== undefined || regenerer) {
+      try { await db.prepare("UPDATE fil_posts SET corps_html=? WHERE id=?").run(corpsHtmlFinal || null, p.id); } catch (e) { /* colonne pas encore migrée */ }
+    }
   }
 
   const updated = await db.prepare("SELECT * FROM fil_posts WHERE id=?").get(p.id);
@@ -28355,7 +28374,29 @@ function composerContenu(titreHtml, corps, auto) {
   if (!t || Number(auto) === 2) return corps || "";
   return corps ? t + "\n\n" + corps : t;
 }
+/* Texte enrichi des publications (2026-11-09) : le HTML nettoyé est gardé à part (corps_html) ; corps et contenu restent du
+   TEXTE SIMPLE, car recherche, notifications, titres, partages et tableaux de bord les lisent comme tel. */
+function htmlEnTexte(html) {
+  return String(html || "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|h[1-6]|li|blockquote|ul|ol)>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&")
+    .replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+/* Premier bloc du HTML (paragraphe ou titre d'une seule ligne) et le reste : sert à ne pas répéter dans le texte la ligne devenue titre. */
+function separerPremierBlocHtml(html) {
+  const m = /^\s*<(p|h2|h3|h4)(?:\s[^>]*)?>((?:(?!<\/?(?:p|h2|h3|h4|ul|ol|li|blockquote)[\s>]|<br)[\s\S])*?)<\/\1>\s*/i.exec(String(html || ""));
+  if (!m) return null;
+  const texte = htmlEnTexte(m[0]).replace(/\s+/g, " ").trim();
+  if (!texte) return null;
+  return { texte, reste: String(html).slice(m[0].length).trim() };
+}
 function titreExtractible(p, g) {
+  if (p.corps_html) {
+    const sep = separerPremierBlocHtml(p.corps_html);
+    if (!sep || sep.texte !== g.texte) return false;
+  }
   return g.reste !== null && !p.article_titre && !["article", "repost"].includes(p.pub_type || p.type);
 }
 async function ecrireTitreEtCorps(id, titre, auto, corps, contenu) {
