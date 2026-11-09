@@ -100,6 +100,9 @@
       <a href="#parametres-vitrine" data-section="parametres-vitrine" data-aide="parametres_vitrine">⭐ Paramètres Boutique</a>
       <a href="#cagnottes" data-section="cagnottes" data-aide="cagnottes">🪙 Cagnottes et dons</a>
       <a href="recensement.html" data-aide="recensement">📋 Recensement</a>
+      <!-- Déplacés ici le 2026-11-09 (demande explicite : « pareil pour les comptes initiatives ») : « Soumettre à Diaspo'Actif » et « Sondages » rangés dans les modules Premium, dorés mais jamais verrouillés (badgeOnly dans SIDEBAR_PREMIUM_LINKS_TOUS). Sondages : la création suit Premium côté serveur (GET /api/sondages/mon-acces). -->
+      <a href="#soumission-da" data-section="soumission-da" data-aide="soumission_da">📤 Soumettre à Diaspo'Actif</a>
+      <a href="sondages.html" id="sb-sondages">🗳️ Sondages</a>
 
       <div class="sb-group-lbl">01 — OUTILS</div>
       <a href="profil.html" data-aide="profil_public">👤 Mon profil public</a>
@@ -120,7 +123,6 @@
       <a href="#presentation" data-section="presentation" style="display:none;">📋 Ma fiche initiative</a>
       <a href="#publications" data-section="publications" data-aide="publications">📰 Publications</a>
       <a href="#avancement" data-section="avancement" data-aide="avancement_initiative" id="sb-avancement" style="display:none;">📈 Avancement de mon initiative</a>
-      <a href="#soumission-da" data-section="soumission-da" data-aide="soumission_da">📤 Soumettre à Diaspo'Actif</a>
 
       <div class="sb-group-lbl">04 — TERRITOIRES</div>
       <a href="#zones" data-section="zones" data-aide="zones_action" style="display:none;">🟨 Zones d'action</a>
@@ -133,8 +135,6 @@
       <a href="#partenaires-liste" data-section="partenaires-liste" data-aide="liste_partenaires">🤝 Liste des partenaires</a>
       <a href="agenda.html" data-aide="mon_agenda">📅 Mon Agenda</a>
       <a href="reseau.html" data-aide="reseau_pro">🌐 Mon Réseau Pro <span class="pill" id="reseau-badge" style="display:none;"></span></a>
-      <!-- Module « Sondages » (2026-11-04, demande explicite : « ajoute le bouton du sondage à tous les comptes initiatives ») : le serveur autorisait déjà les Initiatives à créer des sondages mais aucun lien ne menait à sondages.html depuis ce menu. Ouvert à tout compte Initiative, jamais verrouillé Premium. -->
-      <a href="sondages.html" id="sb-sondages">🗳️ Sondages</a>
       <!-- Désactivé temporairement : intégration réelle des API réseaux sociaux pas encore branchée. <a href="reseaux-sociaux.html">🔄 Synchronisation réseaux sociaux</a> -->
 
       <div class="sb-group-lbl">07 — COLLABORATION</div>
@@ -11605,7 +11605,6 @@ async function initPremiumGates() {
     { href: '#crm', context: 'crm', intercept: true },
     { href: '#paiement', context: 'paiement_boutique' },
     { href: '#cagnottes', context: 'cagnottes', intercept: true },
-    { href: '#formation-diaspora', context: 'formation_diaspora', badgeOnly: true },
     /* Création de formation : verrouillage Premium réel (le serveur exige aussi Premium, POST /api/formations → 402), comme CRM ou Publicités. */
     { href: '#formations-gestion', context: 'espace_formateur', intercept: true },
     { href: '#publicites-init', context: 'publicites' },
@@ -11620,6 +11619,9 @@ async function initPremiumGates() {
        (hasAccreditation('initiative_abonne'), server/index.js ~39192) — verrouillage réel. */
     { href: 'recensement.html', context: 'recensement', intercept: true },
     { href: 'inscriptions-admin.html', context: 'formulaires_inscription', badgeOnly: true },
+    /* Déplacés dans les modules Premium le 2026-11-09 : dorés, jamais verrouillés (soumettre un projet et répondre/créer un sondage restent ouverts ; le serveur contrôle la création de sondage). */
+    { href: '#soumission-da', context: 'soumission_da', badgeOnly: true },
+    { href: 'sondages.html', context: 'sondages', badgeOnly: true },
   ];
   /* Modules dorés spécifiques à certains types — absents (ni socle, ni premium, ni expansion)
      pour les types non listés ici, donc masqués plutôt que simplement laissés non dorés. */
