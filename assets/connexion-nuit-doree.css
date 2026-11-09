@@ -22,6 +22,9 @@ html body.nd .conn-col-titre.second{margin-top:12px}
 /* Colonne de gauche : 2 cartouches côte à côte en haut (événements), 2 en dessous (comptes) */
 html body.nd .conn-grille2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;align-items:stretch}
 
+/* Menu vide (page administrateur junior) : pas de petite barre résiduelle au milieu */
+html body.nd .topbar .nav:empty{display:none!important}
+
 /* Variante à une seule colonne (connexion administrateur junior) */
 html body.nd main.container.conn-simple{max-width:520px;margin:0 auto;padding:56px 24px 80px}
 html body.nd main.container.conn-simple .auth-form-card h2{font-size:28px!important}
