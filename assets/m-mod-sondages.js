@@ -97,14 +97,25 @@
   function fmtDate(s) { const p = A.parseDay(s); if (!p) return '—'; return p.d + ' ' + ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'][p.m - 1] + ' ' + p.y; }
   function joursRestants(d) { if (!d) return null; return Math.ceil((new Date(String(d).slice(0, 10) + 'T23:59:59') - new Date()) / 86400000); }
 
-  function gate(titre) {
+  /* Création de sondages : comptes Initiative, étatiques, administrateurs, ET tout compte qui bénéficie de Premium
+     (réponse du serveur : /api/sondages/mon-acces, mémorisée par compte). */
+  const ACCES = {};
+  async function peutCreerSondage() {
+    if (!S.me) return false;
+    if (ROLES_CREATION.includes(S.me.role)) return true;
+    if (ACCES[S.me.id] === undefined) {
+      try { ACCES[S.me.id] = !!((await api('/api/sondages/mon-acces')) || {}).peut_creer; } catch (e) { return false; }
+    }
+    return ACCES[S.me.id];
+  }
+  async function gate(titre) {
     if (!S.me) {
-      setPane(titre, A.loginCard('Connectez-vous avec votre compte Initiative, Collectivité ou Administrateur pour créer et gérer des sondages.'));
+      setPane(titre, A.loginCard('Connectez-vous avec votre compte Initiative, Premium, Collectivité ou Administrateur pour créer et gérer des sondages.'));
       const b = $('#go-login'); if (b) b.onclick = () => A.openLogin();
       return false;
     }
-    if (!ROLES_CREATION.includes(S.me.role)) {
-      setPane(titre, `<div class="empty"><div class="ei">${ic('lock', 'l')}</div><b>Réservé aux comptes organisateurs</b>La création de sondages est proposée aux comptes Initiative, Collectivité et Administrateur. Vous êtes connecté avec un autre type de compte.<br><br><a class="btn" href="#/sondages">Voir les sondages ouverts</a></div>`);
+    if (!(await peutCreerSondage())) {
+      setPane(titre, `<div class="empty"><div class="ei">${ic('lock', 'l')}</div><b>Réservé aux comptes organisateurs</b>La création de sondages est proposée aux comptes Initiative, Premium, Collectivité et Administrateur. Vous êtes connecté avec un autre type de compte.<br><br><a class="btn" href="#/sondages">Voir les sondages ouverts</a></div>`);
       return false;
     }
     return true;
@@ -148,7 +159,7 @@
     box.innerHTML = l.length ? l.map(carte).join('') : `<div class="empty"><div class="ei">${ic('doc', 'l')}</div><b>Aucun sondage</b>${q || ST.cat ? 'Essayez un autre mot-clé ou une autre catégorie.' : 'Aucun sondage ouvert pour le moment.'}</div>`;
   }
   async function liste(t) {
-    const peutCreer = S.me && ROLES_CREATION.includes(S.me.role);
+    const peutCreer = await peutCreerSondage();
     setPane(NOM, `<div class="search">${ic('search', 's')}<input id="mso-q" type="search" placeholder="Rechercher un sondage…" aria-label="Rechercher un sondage"></div>
       <select id="mso-cat" aria-label="Filtrer par catégorie" style="width:100%;box-sizing:border-box;min-height:44px;padding:0 10px;border:1px solid var(--border);border-radius:10px;background:#fff;font-size:15px;margin:8px 0 12px">
         <option value="">Toutes catégories</option>${CATEGORIES.map(c => `<option value="${c}">${esc(CAT_LABELS[c])}</option>`).join('')}
@@ -180,7 +191,7 @@
     return l;
   }
   async function mesSondages(t) {
-    if (!gate('Mes sondages')) return;
+    if (!(await gate('Mes sondages'))) return;
     setPane('Mes sondages', SK, `<a class="btn block" href="#/sondages/nouveau">${ic('plus', 's')} Créer un sondage</a>`);
     let rows;
     try { rows = (await api('/api/sondages?mine=1')).sondages || []; }
@@ -510,7 +521,7 @@
   document.addEventListener('mso-qopt', ev => { const q = QS.find(x => x.idx === ev.detail.idx); if (q) q.options[ev.detail.oi] = ev.detail.v; });
 
   async function formulaire(t) {
-    if (!gate('Nouveau sondage')) return;
+    if (!(await gate('Nouveau sondage'))) return;
     setPane('Nouveau sondage', SK);
     QS = []; QIDX = 0;
     const auj = new Date().toISOString().slice(0, 10);

@@ -316,6 +316,12 @@ const CAT_LABELS = {consultation_citoyenne:'Consultation citoyenne',projet:'Proj
 let ONGLET='cours';
 let ALERTE_ACTIVE=false;
 const ROLES_CREATION=['initiative','collectivite','administrateur'];
+/* Création : comptes Initiative, étatiques, administrateurs, ET tout compte qui bénéficie de Premium (réponse du serveur : /sondages/mon-acces). */
+let PEUT_CREER=false;
+async function chargerAccesCreation(){
+  PEUT_CREER=!!ME_SOND&&ROLES_CREATION.includes(ME_SOND.role);
+  if(ME_SOND&&!PEUT_CREER){ try{ const a=await api('GET','/sondages/mon-acces'); PEUT_CREER=!!(a&&a.peut_creer); }catch(_){} }
+}
 const SD_ICO_CLOSE='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
 const SD_BELL='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 17V11a6 6 0 0 1 12 0v6l1.5 2h-15z"/><path d="M10 21h4"/></svg>';
 /* Même illustration que la maquette (presse-papier + coche), en bleu nuit et or. */
@@ -349,6 +355,7 @@ document.addEventListener('DOMContentLoaded', async()=>{
   if(idLien){ location.replace('sondage.html?id='+idLien); return; }
   await new Promise(r=>setTimeout(r,400));
   try{ const r=await api('GET','/auth/me'); ME_SOND=r.user; }catch(_){}
+  await chargerAccesCreation();
   if(ME_SOND){ api('GET','/sondages/alerte').then(r=>{ ALERTE_ACTIVE=!!r.actif; majBoutonsAlerte(); }).catch(()=>{}); }
   majBrouillons();
   const h=(location.hash||'').replace('#','');
@@ -372,7 +379,7 @@ function switchSond(name){
 /* « Créer un sondage » : connexion requise, puis réservé aux Initiatives, collectivités et administrateurs. */
 function demanderCreation(){
   if(!ME_SOND){ DA.toast('Connectez-vous pour créer un sondage.',{type:'warning'}); setTimeout(()=>{ location.href='login.html'; },900); return; }
-  if(!ROLES_CREATION.includes(ME_SOND.role)){ DA.toast('La création de sondages est réservée aux Initiatives et aux comptes étatiques.',{type:'warning'}); return; }
+  if(!PEUT_CREER){ DA.toast('La création de sondages est réservée aux Initiatives, aux comptes étatiques et aux comptes Premium.',{type:'warning'}); return; }
   openCreateSond();
 }
 
@@ -694,7 +701,7 @@ async function chargerRepondants(){
 async function loadMesSonds(){
   const el=document.getElementById('mes-sonds-list');
   if(!ME_SOND){ el.innerHTML=etatVide({titre:'Connectez-vous pour voir vos sondages.',texte:'Les Initiatives et comptes étatiques retrouvent ici les sondages qu\'ils ont créés.',bouton:'<a class="sd-btn-or" href="login.html">Se connecter</a>'}); return; }
-  if(!ROLES_CREATION.includes(ME_SOND.role)){ el.innerHTML=etatVide({titre:'Cet espace est réservé aux créateurs de sondages.',texte:'Les Initiatives et les comptes étatiques peuvent publier leurs propres consultations. Vous pouvez en revanche répondre à tous les sondages en cours.',bouton:'<button type="button" class="sd-btn-or" onclick="switchSond(\'cours\')">Voir les sondages en cours</button>'}); return; }
+  if(!PEUT_CREER){ el.innerHTML=etatVide({titre:'Cet espace est réservé aux créateurs de sondages.',texte:'Les Initiatives, les comptes étatiques et les comptes Premium peuvent publier leurs propres consultations. Vous pouvez en revanche répondre à tous les sondages en cours.',bouton:'<button type="button" class="sd-btn-or" onclick="switchSond(\'cours\')">Voir les sondages en cours</button>'}); return; }
   try{
     const r=await api('GET','/sondages?mine=1');
     const sonds=r.sondages||[];
@@ -859,7 +866,7 @@ async function saveSond(){
   try{
     const rCree=await api('POST','/sondages',{diffusion:{onglet:document.getElementById('cs-lieu-onglet').checked,fil:document.getElementById('cs-lieu-fil').checked,profil:document.getElementById('cs-lieu-profil').checked,boutique:document.getElementById('cs-lieu-boutique').checked},titre,description:document.getElementById('cs-desc').value||null,categorie:document.getElementById('cs-cat').value,rayon_publication:document.getElementById('cs-rayon').value,date_debut:debut||null,date_cloture:cloture||null,confidentialite:document.getElementById('cs-conf').value,anonyme:document.getElementById('cs-anonyme').checked,champs_repondant:document.getElementById('cs-anonyme').checked?[]:CS_CHAMPS,resultats_visibles:document.getElementById('cs-res-vis').value,statut:document.getElementById('cs-publier').checked?'ouvert':'brouillon',evenement_ids:[...document.querySelectorAll('.cs-evt:checked')].map(c=>Number(c.value)),questions});
     DA.toast(rCree&&rCree.message?rCree.message:(rCree&&rCree.statut==='ouvert'?'Sondage publié !':'Sondage enregistré en brouillon.'),{type:rCree&&rCree.message?'warning':'success'});closeMod('modal-create-sond-bg');loadSonds();majBrouillons();
-    if(ME_SOND&&['initiative','collectivite','administrateur'].includes(ME_SOND.role)) loadMesSonds();
+    if(ME_SOND&&PEUT_CREER) loadMesSonds();
   }catch(e){DA.toast(e.message,{type:'danger'});}
   finally{btn.disabled=false;btn.textContent='Créer le sondage';}
 }
@@ -887,7 +894,7 @@ function lieuxDe(s){
 }
 async function majBrouillons(){
   const b=document.getElementById('btn-brouillons'); if(!b) return;
-  if(!ME_SOND||!ROLES_CREATION.includes(ME_SOND.role)){ b.style.display='none'; return; }
+  if(!ME_SOND||!PEUT_CREER){ b.style.display='none'; return; }
   try{ const r=await api('GET','/sondages?mine=1'); BROUILLONS=(r.sondages||[]).filter(s=>s.statut==='brouillon'); }catch(_){ BROUILLONS=[]; }
   document.getElementById('nb-brouillons').textContent='('+BROUILLONS.length+')';
   b.style.display='inline-flex';

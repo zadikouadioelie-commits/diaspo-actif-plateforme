@@ -31415,6 +31415,19 @@ function sondageEmailValide(e) { return /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]{2,}$/.te
 function sondageDiffusionLue(s) {
   try { const d = JSON.parse((s && s.diffusion_json) || "{}"); return { fil: !!d.fil, profil: !!d.profil, onglet: d.onglet === undefined ? true : !!d.onglet, boutique: !!d.boutique }; } catch (_) { return { fil: false, profil: false, onglet: true, boutique: false }; }
 }
+/* Qui peut CRÉER un sondage (2026-11-09, demande explicite : « tous les comptes Initiative » et « tous les comptes qui bénéficient de Premium ») :
+   - tout compte Initiative, Collectivité (compte étatique) ou Administrateur, quel que soit son abonnement ;
+   - tout compte qui bénéficie de Premium (abonnement actif, période offerte comprise), quel que soit son rôle ;
+   - l'accréditation « Mobilisation Active » (règle d'origine, conservée).
+   Retourne la raison de l'accès ('role' | 'premium' | 'accreditation') ou null. Répondre à un sondage reste ouvert à tous. */
+async function sondageAccesCreation(user) {
+  if (!user) return null;
+  if (['initiative', 'collectivite', 'administrateur'].includes(user.role)) return 'role';
+  try { if (await hasAccred(user.id, 'mobilisation_active')) return 'accreditation'; } catch (_) { /* table absente : on poursuit */ }
+  try { const st = await getPremiumStatut(user.id, user.role); if (st && st.concerne && st.actif) return 'premium'; } catch (_) { /* statut illisible : pas d'accès Premium */ }
+  return null;
+}
+async function sondagePeutCreer(user) { return !!(await sondageAccesCreation(user)); }
 /* Nombre de lieux d'affichage choisis (les 4 lieux + les événements liés). 0 = le sondage ne peut être que brouillon. */
 async function sondageNbLieux(s, diffusion, nbEvenements) {
   const d = diffusion || sondageDiffusionLue(s);
@@ -40197,6 +40210,13 @@ ${jsonLd}
        SONDAGES — MODULE ENRICHI
        ══════════════════════════════════════════════════════════════ */
 
+    /* ── GET /api/sondages/mon-acces ── le compte peut-il créer des sondages ? (les clients affichent « Créer un sondage » selon cette réponse) ── */
+    if (req.method === 'GET' && pathname === '/api/sondages/mon-acces') {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 200, { peut_creer: false, raison: null });
+      const raison = await sondageAccesCreation(me);
+      return sendJSON(res, 200, { peut_creer: !!raison, raison });
+    }
+
     /* ── GET/POST /api/sondages/alerte ── « Être informé des prochains sondages » (compte connecté) ── */
     if (pathname === '/api/sondages/alerte' && (req.method === 'GET' || req.method === 'POST')) {
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connectez-vous pour être informé des prochains sondages.' });
@@ -40251,7 +40271,7 @@ ${jsonLd}
     /* ── POST /api/sondages ── */
     if (req.method === 'POST' && pathname === '/api/sondages') {
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
-      if (!['initiative','collectivite','administrateur'].includes(me.role) && !(await hasAccred(me.id, 'mobilisation_active'))) return sendJSON(res, 403, { error: 'Réservé aux Initiatives et Comptes Étatiques.' });
+      if (!(await sondagePeutCreer(me))) return sendJSON(res, 403, { error: 'La création de sondages est réservée aux comptes Initiative, aux comptes étatiques et aux comptes Premium.' });
       const { titre, description, objectif, categorie, type = 'sondage', ville, pays, region, departement, rayon_publication, date_debut, date_cloture, anonyme, confidentialite, resultats_visibles, une_reponse_par_compte, modification_autorisee, cible_roles, photos_json, pdf_b64, pdf_nom, video_url, questions = [], statut: statutDemande = 'brouillon' } = body;
       let statut = statutDemande;
       if (!titre) return sendJSON(res, 400, { error: 'Titre requis.' });
