@@ -29,9 +29,9 @@
     forces: '✅ Vos forces', faiblesses: '🟠 À renforcer', pistes: '💡 Pistes concrètes', ouvrirRubrique: 'Ouvrir la rubrique', recommencer: 'Recommencer avec un autre rôle',
     majTitre: 'Koffi est réservé aux personnes majeures', majTexte: 'Pour utiliser Koffi, confirmez que vous avez 18 ans ou plus. Votre business plan reste entièrement utilisable sans lui.', majCase: 'Je confirme avoir 18 ans ou plus', majBtn: 'Confirmer',
     mineur: 'Koffi est réservé aux personnes de 18 ans ou plus. Votre business plan reste entièrement utilisable sans lui.',
-    pays: 'Koffi n\'est pas disponible dans votre pays pour le moment.', desactive: 'Koffi est désactivé pour le moment.', indisponible: 'Koffi est momentanément indisponible. Réessayez un peu plus tard.',
+    pays: 'Koffi n\'est pas disponible dans votre pays pour le moment.', desactive: 'Koffi est désactivé pour le moment.', indisponible: 'Koffi est épuisé pour le moment : l\'équipe le recharge. Réessayez un peu plus tard.',
     rechargeTitre: 'Votre crédit Koffi est épuisé', rechargeTexte: 'Rechargez votre crédit pour continuer : le même crédit sert à tout Koffi (cours, création de formation, Annuaire, événements, business plan). Poser une question sur ce que sait faire Koffi reste gratuit.',
-    rechargeTextePremium: 'Votre crédit du mois est utilisé : il est renouvelé le mois prochain. Vous pouvez aussi recharger dès maintenant ; le même crédit sert à tout Koffi.', recharger: 'Recharger mon crédit',
+    rechargeTextePremium: 'Votre crédit du mois est utilisé : il est renouvelé le mois prochain. Vous pouvez aussi recharger dès maintenant ; le même crédit sert à tout Koffi.', recharger: 'Recharger Koffi',
     erreur: 'Une erreur est survenue. Réessayez.', trop: 'Doucement : patientez quelques secondes avant le message suivant.', compris: 'J\'ai compris'
   };
 

@@ -26,7 +26,7 @@
     auto: '🤖 Autonomie', moi: '✋ Je valide moi-même', autoAide: 'Koffi l\'exécutera seul à l\'heure dite.', moiAide: 'Vous serez prévenu à l\'heure dite et vous validerez.',
     voirModule: 'Ouvrir', moduleIntrouvable: 'Je ne retrouve pas ce module dans le menu de cette page.', aucuneTache: 'Aucune tâche pour le moment.', retour: '← Retour à la discussion',
     majTitre: 'Koffi est réservé aux personnes majeures', majTexte: 'Pour utiliser Koffi, confirmez que vous avez 18 ans ou plus.', majCase: 'Je confirme avoir 18 ans ou plus', majBtn: 'Confirmer',
-    pays: 'Koffi n\'est pas disponible dans votre pays pour le moment.', mineur: 'Koffi est réservé aux personnes de 18 ans ou plus.', desactive: 'Koffi est désactivé pour le moment.', indisponible: 'Koffi est momentanément indisponible. Réessayez un peu plus tard.',
+    pays: 'Koffi n\'est pas disponible dans votre pays pour le moment.', mineur: 'Koffi est réservé aux personnes de 18 ans ou plus.', desactive: 'Koffi est désactivé pour le moment.', indisponible: 'Koffi est épuisé pour le moment : l\'équipe le recharge. Réessayez un peu plus tard.',
     erreur: 'Une erreur est survenue. Réessayez.', trop: 'Doucement : patientez quelques secondes avant le message suivant.', heureManquante: 'Choisissez le jour et l\'heure.',
     statuts: { proposee: 'À décider', a_valider: '✋ À valider', planifiee: '🤖 Programmée (autonome)', planifiee_validation: '✋ Programmée (vous validez)', en_cours: '⏳ En cours', executee: '✅ Exécutée', echec: '⚠️ Échec', annulee: 'Annulée' }
   };

@@ -38,7 +38,7 @@
   /* Réglages affichés : { cle, lib, aide, unite?, step? } — les bornes et les valeurs par défaut viennent du serveur. */
   const GROUPES = [
     { titre: '⚙️ Fonctionnement', champs: [
-      { cle: 'actif_global', lib: 'Koffi activé', type: 'bool', aide: 'Interrupteur général. Désactivé, Koffi répond « momentanément indisponible » dans toutes les formations ; rien n\'est supprimé.' },
+      { cle: 'actif_global', lib: 'Koffi activé', type: 'bool', aide: 'Interrupteur général. Désactivé, Koffi répond « désactivé pour le moment » dans toutes les formations ; rien n\'est supprimé.' },
       { cle: 'modele', lib: 'Modèle d\'IA', type: 'select', aide: 'Choisi côté serveur parmi une liste fermée ; jamais depuis le navigateur. Haiku 5.5 est le modèle prévu (le moins coûteux).' },
     ] },
     { titre: '🌍 Pays', champs: [
@@ -148,7 +148,7 @@
   /* ───── Rendu ───── */
   function alertes() {
     const a = [];
-    if (!B.fournisseur_configure) a.push(['orange', '🔑 <b>Clé du fournisseur absente.</b> Les élèves voient « Koffi est momentanément indisponible ». Créez le compte Anthropic, rechargez-le, puis ajoutez la clé <code>ANTHROPIC_API_KEY</code> dans les variables d\'environnement de Vercel (Production) et redéployez.']);
+    if (!B.fournisseur_configure) a.push(['orange', '🔑 <b>Clé du fournisseur absente.</b> Les élèves voient « Koffi est épuisé pour le moment : l\'équipe le recharge ». Créez le compte Anthropic, rechargez-le, puis ajoutez la clé <code>ANTHROPIC_API_KEY</code> dans les variables d\'environnement de Vercel (Production) et redéployez.']);
     if (B.alerte === 'epuise') a.push(['rouge', '⛔ <b>Réserve épuisée.</b> Koffi est indisponible pour tous les comptes tant qu\'une recharge n\'est pas enregistrée ci-dessous (après avoir rechargé votre compte chez le fournisseur).']);
     else if (B.alerte === 'bas') a.push(['orange', '⚠️ <b>Réserve basse</b> (sous ' + eur(B.seuil_gratuit_eur) + '). Plus de nouvelles questions offertes ; les comptes qui ont épuisé les leurs voient l\'offre de recharge. Pensez à recharger votre compte chez le fournisseur, puis à l\'enregistrer ici.']);
     if (!a.length) a.push(['vert', '✅ Koffi est opérationnel : clé du fournisseur configurée et réserve suffisante.']);

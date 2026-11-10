@@ -34,11 +34,11 @@
     majTitre: 'Koffi est réservé aux personnes majeures', majTexte: 'Pour utiliser Koffi, confirmez que vous avez 18 ans ou plus. Tous vos outils de création restent disponibles sans lui.', majCase: 'Je confirme avoir 18 ans ou plus', majBtn: 'Confirmer',
     mineur: 'Koffi est réservé aux personnes de 18 ans ou plus. Vos outils de création restent disponibles sans lui.',
     pays: 'Koffi n\'est pas disponible dans votre pays pour le moment. Vos outils de création restent accessibles.',
-    desactive: 'Koffi est désactivé pour le moment.', indisponible: 'Koffi est momentanément indisponible. Réessayez plus tard.',
+    desactive: 'Koffi est désactivé pour le moment.', indisponible: 'Koffi est épuisé pour le moment : l\'équipe le recharge. Réessayez un peu plus tard.',
     rechargeTitre: 'Votre crédit Koffi est épuisé',
     rechargeTexte: 'Rechargez votre crédit pour continuer : le même crédit sert à tout Koffi (cours, création de formation, Annuaire). Demander à Koffi ce qu\'il sait faire reste gratuit.',
     rechargeTextePremium: 'Votre crédit du mois est utilisé : il est renouvelé le mois prochain. Vous pouvez aussi recharger dès maintenant ; le même crédit sert à tout Koffi.',
-    acheter: 'Recharger mon crédit', erreur: 'Une erreur est survenue. Réessayez.', trop: 'Message trop long.',
+    acheter: 'Recharger Koffi', erreur: 'Une erreur est survenue. Réessayez.', trop: 'Message trop long.',
     nouvelleDisc: '＋ Nouvelle discussion', nouveauDossier: '📁 Nouveau dossier', nomDossier: 'Nom du dossier (ex. : Module 3)', renommer: 'Renommer', supprimer: 'Supprimer', deplacer: 'Ranger dans…', horsDossier: 'Hors dossier', sansDossier: 'Discussions hors dossier',
     aucune: 'Aucune discussion pour le moment.', plein: 'Agrandir', reduire: 'Réduire la hauteur', nomDisc: 'Nouveau titre'
   };

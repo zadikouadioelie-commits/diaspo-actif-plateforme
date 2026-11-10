@@ -664,7 +664,7 @@ module.exports.register = function register(deps) {
     if (ctx.etat === "pays") return sendJSON(res, 403, { error: "Koffi n'est pas disponible dans votre pays pour le moment.", code: "pays_non_pris_en_charge" });
     if (ctx.etat === "mineur") return sendJSON(res, 403, { error: "Koffi est réservé aux personnes majeures (18 ans ou plus).", code: "mineur" });
     if (ctx.etat === "majorite") return sendJSON(res, 403, { error: "Confirmez avoir 18 ans ou plus pour utiliser Koffi.", code: "majorite_requise", texte: TEXTE_MAJORITE });
-    if (ctx.etat === "indisponible") return sendJSON(res, 503, { error: "Koffi est momentanément indisponible : la recharge est suspendue. Réessayez plus tard.", code: "indisponible" });
+    if (ctx.etat === "indisponible") return sendJSON(res, 503, { error: "Koffi est épuisé pour le moment : l'équipe le recharge, la recharge reprend dès que possible. Réessayez plus tard.", code: "indisponible" });
     const offre = Portefeuille.offresRecharge(r).find(o => Math.abs(o.paye_eur - Number(body && body.montant_eur)) < 0.005);
     if (!offre) return sendJSON(res, 400, { error: "Choisissez l'un des montants proposés.", code: "montant_invalide", offres: Portefeuille.offresRecharge(r) });
     /* Consentement exprès, côté serveur : une interface qui l'oublierait ne contourne rien. */

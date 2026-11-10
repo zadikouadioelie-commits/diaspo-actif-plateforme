@@ -224,7 +224,7 @@ module.exports.register = function register(deps) {
     if (ctx.etat === "mineur") { sendJSON(res, 403, { error: "Koffi est réservé aux personnes majeures (18 ans ou plus).", code: "mineur" }); return true; }
     if (ctx.etat === "majorite") { sendJSON(res, 403, { error: "Confirmez avoir 18 ans ou plus pour utiliser Koffi.", code: "majorite_requise", texte: K.TEXTE_MAJORITE }); return true; }
     if (ctx.etat === "desactive") { sendJSON(res, 403, { error: "Koffi est désactivé pour le moment.", code: "desactive" }); return true; }
-    if (ctx.etat === "indisponible") { sendJSON(res, 503, { error: "Koffi est momentanément indisponible. Réessayez plus tard.", code: "indisponible" }); return true; }
+    if (ctx.etat === "indisponible") { sendJSON(res, 503, { error: "Koffi est épuisé pour le moment : l'équipe le recharge. Réessayez plus tard.", code: "indisponible" }); return true; }
     return false;
   };
   const MSG_ROLE = "Seuls les comptes Initiative, Collectivité et Administrateur peuvent créer une fiche d'inscription. Je peux en revanche vous expliquer comment fonctionne le module.";
