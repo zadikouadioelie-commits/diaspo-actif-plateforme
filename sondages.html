@@ -98,6 +98,7 @@
       </div>
       <button type="button" id="btn-brouillons" onclick="ouvrirBrouillons()" style="display:none;align-items:center;gap:8px;padding:12px 18px;border-radius:999px;border:1px solid rgba(227,192,110,.65);background:transparent;color:#e3c06e;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;">📝 Brouillons <span id="nb-brouillons">(0)</span></button>
       <button type="button" class="sd-creer" id="btn-creer-sond" onclick="demanderCreation()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Créer un sondage</button>
+      <button type="button" id="btn-creer-pf" onclick="PF.creer()" style="display:none;align-items:center;gap:8px;padding:12px 18px;border-radius:999px;border:1px solid rgba(227,192,110,.65);background:transparent;color:#e3c06e;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;">🗂️ Créer un portefeuille</button>
     </div>
 
     <div class="sd-filtres" id="sd-filtres">
@@ -130,12 +131,14 @@
     </div>
 
     <div class="sond-section active" id="sec-offres">
+      <div id="pf-public" style="margin-bottom:18px;"></div>
       <div id="sonds-grid" class="sond-grid" aria-live="polite">
         <div class="sd-chargement">Chargement…</div>
       </div>
     </div>
 
     <div class="sond-section" id="sec-mes-sondages">
+      <div id="mes-portefeuilles" style="margin-bottom:18px;"></div>
       <div id="mes-sonds-list"><div class="sd-chargement">Chargement…</div></div>
     </div>
   </main>
@@ -275,6 +278,7 @@
       <button onclick="closeMod('modal-brouillons-bg')" aria-label="Fermer" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">×</button>
     </div>
     <p style="font-size:12px;color:var(--muted);line-height:1.5;margin:0 0 12px;">Ces sondages ne sont affichés nulle part et <strong>vous seul(e) les voyez</strong>. Choisissez où les afficher, puis publiez-les.</p>
+    <button type="button" class="btn btn-sm" style="border-color:#2563EB;color:#2563EB;margin:0 0 12px;" onclick="closeMod('modal-brouillons-bg');PF.creer()">🗂️ Créer un portefeuille</button>
     <div id="brouillons-liste"></div>
   </div>
 </div>
@@ -292,6 +296,7 @@
 <script src="assets/data.js"></script>
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js?v=13"></script>
+<script src="assets/sondage-portefeuilles-ui.js?v=1"></script>
 <script src="assets/ds.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js" defer></script>
@@ -363,6 +368,7 @@ document.addEventListener('DOMContentLoaded', async()=>{
   try{ const r=await api('GET','/auth/me'); ME_SOND=r.user; }catch(_){}
   await chargerAccesCreation();
   if(ME_SOND){ api('GET','/sondages/alerte').then(r=>{ ALERTE_ACTIVE=!!r.actif; majBoutonsAlerte(); }).catch(()=>{}); }
+  if(window.PF) await PF.init();
   majBrouillons();
   const h=(location.hash||'').replace('#','');
   if(['termines','participations','mes'].includes(h)) ONGLET=h;
@@ -529,6 +535,7 @@ async function openSond(sid){
         <button class="ibtn ${s.est_favori?'active':''}" onclick="toggleFavSond(${sid},this)">⭐ ${s.est_favori?'Sauvegardé':'Favoris'}</button>
         <button class="ibtn" onclick="navigator.clipboard.writeText(location.origin+'/sondage.html?id=${sid}');DA.toast('Lien copié !',{type:'success'})">📤 Copier</button>
         ${estCreateur?`<button class="btn btn-sm" style="border-color:#2563EB;color:#2563EB;" onclick="closeMod('modal-sond-bg');ouvrirDiffusion(${sid})">📣 Diffusion</button>`:''}
+        ${estCreateur?`<button class="btn btn-sm" style="border-color:#2563EB;color:#2563EB;" onclick="closeMod('modal-sond-bg');PF.ajouterA(${sid})">🗂️ Ajouter à un portefeuille</button>`:''}
         ${estCreateur?`<button class="btn btn-sm" style="border-color:#2563EB;color:#2563EB;" onclick="closeMod('modal-sond-bg');openStatsSond(${sid})">📊 Stats</button>`:''}
         ${estCreateur?`<a class="btn btn-sm" style="border-color:#2563EB;color:#2563EB;text-decoration:none;" href="sondage-rapport.html?id=${sid}" target="_blank" rel="noopener">📄 Rapport</a>`:''}
         ${estCreateur&&!ferme?`<button class="btn btn-sm" style="border-color:#ef4444;color:#ef4444;" onclick="cloturerSond(${sid})">🔒 Clôturer</button>`:''}
@@ -712,6 +719,7 @@ async function chargerRepondants(){
 /* ── Mes sondages ── */
 async function loadMesSonds(){
   const el=document.getElementById('mes-sonds-list');
+  if(window.PF) PF.chargerMes();
   if(!ME_SOND){ el.innerHTML=etatVide({titre:'Connectez-vous pour voir vos sondages.',texte:'Les Initiatives et comptes étatiques retrouvent ici les sondages qu\'ils ont créés.',bouton:'<a class="sd-btn-or" href="login.html">Se connecter</a>'}); return; }
   if(!PEUT_CREER){ el.innerHTML=etatVide({titre:'Cet espace est réservé aux créateurs de sondages.',texte:'Les Initiatives, les comptes étatiques et les comptes Premium peuvent publier leurs propres consultations. Vous pouvez en revanche répondre à tous les sondages en cours.',bouton:'<button type="button" class="sd-btn-or" onclick="switchSond(\'cours\')">Voir les sondages en cours</button>'}); return; }
   try{
@@ -737,6 +745,7 @@ async function loadMesSonds(){
           <button class="btn btn-sm btn-outline" onclick="openStatsSond(${s.id})">📊 Stats</button>
           <a class="btn btn-sm" style="border-color:#2563EB;color:#2563EB;text-decoration:none;" href="sondage-rapport.html?id=${s.id}" target="_blank" rel="noopener">📄 Rapport</a>
           <button class="btn btn-sm" style="border-color:#2563EB;color:#2563EB;" onclick="ouvrirDiffusion(${s.id})">📣 Diffusion</button>
+          <button class="btn btn-sm" style="border-color:#2563EB;color:#2563EB;" onclick="PF.ajouterA(${s.id})">🗂️ Ajouter à un portefeuille</button>
           ${s.statut==='ouvert'?`<button class="btn btn-sm" style="border-color:#ef4444;color:#ef4444;" onclick="cloturerSond(${s.id})">🔒 Clôturer</button>`:''}
           ${s.statut==='cloture'?`<button class="btn btn-sm" style="border-color:#2563EB;color:#2563EB;" onclick="ouvrirRepublier(${s.id})">🔁 Republier</button>`:''}
           ${s.statut==='brouillon'?`<button class="btn btn-sm" style="border-color:#2563EB;color:#2563EB;" onclick="ouvrirModifierSond(${s.id})">✏️ Modifier</button><button class="btn btn-sm" style="border-color:#2563EB;color:#2563EB;" onclick="ouvrirRepublier(${s.id},true)">🚀 Publier</button>`:''}
@@ -972,6 +981,7 @@ function lieuxDe(s){
   if(d.profil) l.push('Profil public');
   if(d.boutique) l.push('Boutique');
   const n=Number(s.nb_evts_lies)||0; if(n) l.push(n+' événement'+(n>1?'s':''));
+  if(window.PF_PUB&&window.PF_PUB.has(Number(s.id))) l.push('Portefeuille publié'); /* un portefeuille publié qui le contient compte comme lieu d'affichage */
   return l;
 }
 async function majBrouillons(){
@@ -995,6 +1005,7 @@ async function ouvrirBrouillons(){
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         <button class="btn btn-sm" style="border-color:#2563EB;color:#2563EB;" onclick="ouvrirModifierSond(${s.id})">✏️ Modifier</button>
         <button class="btn btn-sm" style="border-color:#2563EB;color:#2563EB;" onclick="closeMod('modal-brouillons-bg');ouvrirDiffusion(${s.id})">📣 Choisir les lieux</button>
+        <button class="btn btn-sm" style="border-color:#2563EB;color:#2563EB;" onclick="closeMod('modal-brouillons-bg');PF.ajouterA(${s.id})">🗂️ Ajouter à un portefeuille</button>
         <button class="btn btn-sm btn-outline" onclick="publierBrouillon(${s.id})">🚀 Publier</button>
         <button class="btn btn-sm" style="border-color:#ef4444;color:#ef4444;" onclick="supprimerBrouillon(${s.id})">🗑️ Supprimer</button>
       </div></div>`;

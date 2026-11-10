@@ -6350,6 +6350,40 @@ db.exec(`
     UNIQUE(sondage_id, evenement_id),
     FOREIGN KEY(sondage_id) REFERENCES sondages(id) ON DELETE CASCADE
   );
+
+  /* Portefeuilles de sondages (2026-11-10, demande explicite) : un ensemble de sondages d'un même créateur, avec titre et image de couverture, affiché
+     aux mêmes lieux qu'un sondage et lié à des événements (voir server/sondage-portefeuilles.js). statut : 'brouillon' | 'publie'. */
+  CREATE TABLE IF NOT EXISTS sondage_portefeuilles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    createur_id INTEGER NOT NULL,
+    titre TEXT NOT NULL,
+    description TEXT,
+    photos_json TEXT DEFAULT '[]',
+    statut TEXT DEFAULT 'brouillon',
+    diffusion_json TEXT DEFAULT '{}',
+    fil_post_id INTEGER,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+  );
+  CREATE TABLE IF NOT EXISTS sondage_portefeuille_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    portefeuille_id INTEGER NOT NULL,
+    sondage_id INTEGER NOT NULL,
+    ordre INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(portefeuille_id, sondage_id),
+    FOREIGN KEY(portefeuille_id) REFERENCES sondage_portefeuilles(id) ON DELETE CASCADE,
+    FOREIGN KEY(sondage_id) REFERENCES sondages(id) ON DELETE CASCADE
+  );
+  CREATE TABLE IF NOT EXISTS sondage_portefeuille_evenements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    portefeuille_id INTEGER NOT NULL,
+    evenement_id INTEGER NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(portefeuille_id, evenement_id),
+    FOREIGN KEY(portefeuille_id) REFERENCES sondage_portefeuilles(id) ON DELETE CASCADE
+  );
+  CREATE INDEX IF NOT EXISTS idx_sondage_portefeuilles_createur ON sondage_portefeuilles(createur_id);
 `);
 
 /* Influenceur Diaspo'Actif (IDA) — demande d'accès créateur (2026-11-09, demande explicite).

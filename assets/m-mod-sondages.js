@@ -135,6 +135,7 @@
     if (!b) return liste(t);
     if (b === 'voir' && /^\d+$/.test(c || '')) return detail(t, Number(c));
     if (b === 'mes') return mesSondages(t);
+    if (b === 'portefeuille' && /^\d+$/.test(c || '')) return portefeuilleVue(t, Number(c));
     if (b === 'nouveau') return formulaire(t);
     if (b === 'modifier' && /^\d+$/.test(c || '')) return formulaire(t, Number(c));
     location.replace('#/sondages');
@@ -168,8 +169,9 @@
       <select id="mso-cat" aria-label="Filtrer par catégorie" style="width:100%;box-sizing:border-box;min-height:44px;padding:0 10px;border:1px solid var(--border);border-radius:10px;background:#fff;font-size:15px;margin:8px 0 12px">
         <option value="">Toutes catégories</option>${CATEGORIES.map(c => `<option value="${c}">${esc(CAT_LABELS[c])}</option>`).join('')}
       </select>
-      <div id="mso-grid">${SK}</div>`, S.me ? `<a class="btn block" href="#/sondages/nouveau">${ic('plus', 's')} Créer un sondage${peutCreer ? '' : ' · Premium'}</a>` : '');
+      <div id="mso-pf"></div><div id="mso-grid">${SK}</div>`, S.me ? `<a class="btn block" href="#/sondages/nouveau">${ic('plus', 's')} Créer un sondage${peutCreer ? '' : ' · Premium'}</a>` : '');
     const qi = $('#mso-q'), ci = $('#mso-cat');
+    portefeuillesPublics(t);
     if (qi) qi.oninput = () => { ST.q = qi.value.trim(); renderListe(); };
     if (ci) ci.onchange = () => { ST.cat = ci.value; renderListe(); };
     try { ST.items = (await api('/api/sondages')).sondages || []; }
@@ -204,7 +206,7 @@
     if (MES_F === 'brouillons' && !nbBr) MES_F = 'tous';
     const barre = nbBr ? `<div class="chips" id="mso-mesf" style="margin-bottom:10px"><button type="button" class="chip ${MES_F === 'tous' ? 'on' : ''}" data-f="tous">Tous</button><button type="button" class="chip ${MES_F === 'brouillons' ? 'on' : ''}" data-f="brouillons">📝 Brouillons (${nbBr})</button></div>` : '';
     if (MES_F === 'brouillons') rows = rows.filter(s => s.statut === 'brouillon');
-    const html = onglets('mes') + barre + (MES_F === 'brouillons' ? '<p class="mso-hint" style="margin:0 0 10px">Ces sondages ne sont affichés nulle part : vous seul(e) les voyez. Ouvrez-en un, choisissez les lieux (« Diffusion »), puis publiez-le.</p>' : '') + (rows.length ? rows.map(s => {
+    const html = onglets('mes') + '<div id="mso-pfmes"></div>' + barre + (MES_F === 'brouillons' ? '<p class="mso-hint" style="margin:0 0 10px">Ces sondages ne sont affichés nulle part : vous seul(e) les voyez. Ouvrez-en un, choisissez les lieux (« Diffusion »), puis publiez-le.</p>' : '') + (rows.length ? rows.map(s => {
       const st = STATUT_LABELS[s.statut] || s.statut;
       return `<a class="card mso-card" href="#/sondages/voir/${Number(s.id)}">${couvSond(s) ? `<img src="${esc(couvSond(s))}" alt="" loading="lazy" style="display:block;width:100%;height:120px;object-fit:cover;border-radius:12px 12px 0 0;background:#e8edf3">` : ''}<div class="pad">
         <div class="row" style="align-items:flex-start"><div class="sp"><span class="mso-cat">${esc(CAT_LABELS[s.categorie] || 'Sondage')}</span><div style="font-weight:700;font-size:15px;margin-top:4px;word-break:break-word">${esc(s.titre)}</div><div class="small muted">${s.statut === 'ouvert' ? 'Fin le ' : 'Terminé le '}${fmtDate(s.date_cloture)} · ${s.nb_reponses || 0} réponse${s.nb_reponses > 1 ? 's' : ''}</div>${s.statut === 'brouillon' ? `<div class="small muted">${lieuxDe(s).length ? 'Lieux choisis : ' + esc(lieuxDe(s).join(' · ')) : 'Aucun lieu choisi pour l’instant'}</div>` : ''}</div><span class="badge ${s.statut === 'ouvert' ? 'g' : ''}">${esc(st)}</span></div>
@@ -212,6 +214,7 @@
     }).join('') : `<div class="empty"><div class="ei">${ic('doc', 'l')}</div><b>Vous n’avez pas encore créé de sondage</b>Créez-en un pour consulter votre communauté.</div>`);
     paint(t, 'Mes sondages', html, `<a class="btn block" href="#/sondages/nouveau">${ic('plus', 's')} Créer un sondage</a>`);
     $$('#mso-mesf .chip').forEach(b => { b.onclick = () => { MES_F = b.dataset.f; mesSondages(++rendu); }; });
+    portefeuillesMes(t);
   }
 
   /* ============================================================
@@ -272,6 +275,7 @@
         <button type="button" class="btn out sm" id="mso-stats-btn">📊 Statistiques</button>
         <button type="button" class="btn out sm" id="mso-rapport">📄 Rapport</button>
         <button type="button" class="btn out sm" id="mso-diff">📣 Diffusion</button>
+        <button type="button" class="btn out sm" id="mso-pf">🗂️ Portefeuille</button>
         ${!ferme ? `<button type="button" class="btn out sm" id="mso-cloturer">🔒 Clôturer</button>` : ''}
         ${s.statut === 'cloture' ? `<button type="button" class="btn out sm" id="mso-republier">🔁 Republier</button>` : ''}
         ${s.statut === 'brouillon' ? `<button type="button" class="btn out sm" id="mso-modifier">✏️ Modifier</button><button type="button" class="btn sm" id="mso-publier">🚀 Publier</button>` : ''}
@@ -301,6 +305,7 @@
       const sb = $('#mso-stats-btn'); if (sb) sb.onclick = () => chargerStats(id);
       const rap = $('#mso-rapport'); if (rap) rap.onclick = () => { window.open('/sondage-rapport.html?id=' + id, '_blank'); };
       const df = $('#mso-diff'); if (df) df.onclick = () => diffusion(id);
+      const pfb = $('#mso-pf'); if (pfb) pfb.onclick = () => pfAjouter(id, s.titre);
       const cl = $('#mso-cloturer'); if (cl) cl.onclick = () => cloturer(t, id);
       const rp = $('#mso-republier'); if (rp) rp.onclick = () => republier(t, id, false);
       const pb = $('#mso-publier'); if (pb) pb.onclick = () => republier(t, id, true);
@@ -402,15 +407,17 @@
     const q = opts.evenement ? 'evenement=' + encodeURIComponent(opts.evenement) : opts.profil ? 'profil=' + encodeURIComponent(opts.profil) : opts.boutique ? 'boutique=' + encodeURIComponent(opts.boutique) : '';
     const apres = opts.apres;
     if (!q || !apres || !apres.parentNode) return null;
-    let liste;
-    try { liste = (await api('/api/sondages-en-cours?' + q)).sondages || []; } catch (e) { return null; }
-    if (!liste.length || !apres.parentNode) return null;
+    let liste, pfs = [];
+    try { const r = await api('/api/sondages-en-cours?' + q); liste = r.sondages || []; pfs = r.portefeuilles || []; } catch (e) { return null; }
+    if ((!liste.length && !pfs.length) || !apres.parentNode) return null;
     css();
     const cle = opts.evenement ? 'e' + opts.evenement : opts.boutique ? 'b' + opts.boutique : 'p' + opts.profil;
     const ancien = apres.parentNode.querySelector('[data-so="' + cle + '"]'); if (ancien) ancien.remove();
     const bloc = document.createElement('section');
     bloc.className = 'mso-so'; bloc.setAttribute('data-so', cle); bloc.setAttribute('aria-label', 'Sondage en cours');
-    bloc.innerHTML = '<div class="t">📊 Sondage en cours</div>' + liste.map(s => '<div class="it"><div><div style="font-weight:700;font-size:15px;line-height:1.35;word-break:break-word">' + esc(s.titre) + '</div>' +
+    bloc.innerHTML = '<div class="t">📊 Sondage en cours</div>' + pfs.map(p => '<div class="it"><div><div style="font-weight:700;font-size:15px;line-height:1.35;word-break:break-word">🗂️ ' + esc(p.titre) + '</div>' +
+      '<div class="small muted" style="margin-top:2px">Portefeuille de ' + pl(p.nb_sondages || 0, 'sondage', 'sondages') + ', facultatif et sans compte</div></div>' +
+      '<a class="btn sm block" href="portefeuille-sondages.html?id=' + Number(p.id) + '">Voir le portefeuille</a></div>').join('') + liste.map(s => '<div class="it"><div><div style="font-weight:700;font-size:15px;line-height:1.35;word-break:break-word">' + esc(s.titre) + '</div>' +
       '<div class="small muted" style="margin-top:2px">Facultatif, sans compte' + (s.date_cloture ? ' · jusqu’au ' + esc(fmtDate(s.date_cloture)) : '') + '</div></div>' +
       '<a class="btn sm block" href="sondage.html?id=' + Number(s.id) + '">Répondre au sondage</a></div>').join('');
     apres.parentNode.insertBefore(bloc, apres.nextSibling);
@@ -656,4 +663,210 @@
       }
     };
   }
+  /* ============================================================
+     PORTEFEUILLES DE SONDAGES (2026-11-10) — un ensemble de sondages avec un titre et une image de couverture.
+     Public : bloc dans « En cours », page #/sondages/portefeuille/ID. Créateur : « Mes portefeuilles » dans Mes sondages,
+     création / modification, ajout d'un sondage, lieux d'affichage (onglet, fil, profil, boutique, événements) et publication.
+     ============================================================ */
+  const PFAPI = '/api/sondage-portefeuilles';
+  let PFM = { portefeuilles: [], mes_evenements: [], mes_sondages: [] };
+  const couvPf = p => { const u = p && p.couverture; return (typeof u === 'string' && /^(https:\/\/|\/)/.test(u)) ? u : ''; };
+  const imgPf = (c, h) => c ? `<img src="${esc(c)}" alt="" loading="lazy" style="display:block;width:100%;height:auto;max-height:${h}px;object-fit:contain;border-radius:12px 12px 0 0;background:#0b1530">` : '';
+  function cartePf(p) {
+    return `<a class="card mso-card" href="#/sondages/portefeuille/${Number(p.id)}">${imgPf(couvPf(p), 200)}<div class="pad"><span class="mso-cat">🗂️ Portefeuille</span>
+      <div style="font-weight:700;font-size:15.5px;margin-top:8px;word-break:break-word">${esc(p.titre)}</div>
+      ${p.description ? `<p class="small muted" style="margin:4px 0 0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(A.strip(p.description))}</p>` : ''}
+      <div class="small muted" style="margin-top:8px">${pl(p.nb_sondages || 0, 'sondage', 'sondages')}${p.nb_en_cours ? ' · ' + p.nb_en_cours + ' en cours' : ''}</div></div></a>`;
+  }
+  async function portefeuillesPublics(t) {
+    let l; try { l = (await api(PFAPI + '?onglet=1')).portefeuilles || []; } catch (e) { return; }
+    const z = $('#mso-pf'); if (!z || !vivant(t) || !l.length) return;
+    z.innerHTML = '<div class="mso-dl" style="margin:4px 2px 8px">🗂️ Portefeuilles de sondages</div>' + l.map(cartePf).join('') + '<div class="mso-dl" style="margin:14px 2px 8px">Sondages</div>';
+  }
+
+  /* Page d'un portefeuille */
+  async function portefeuilleVue(t, id) {
+    setPane('Portefeuille', SK);
+    let r; try { r = await api(PFAPI + '/' + id); }
+    catch (e) { return showError(t, 'Portefeuille', e, 'Portefeuille introuvable', () => portefeuilleVue(++rendu, id)); }
+    if (!vivant(t)) return;
+    const p = r.portefeuille, prop = !!r.proprietaire;
+    const ligne = s => `<a class="card mso-card" href="#/sondages/voir/${Number(s.id)}"><div class="pad"><div class="row" style="align-items:flex-start"><div class="sp">
+        <div style="font-weight:700;font-size:15px;word-break:break-word">${esc(s.titre)}</div>
+        ${s.description ? `<p class="small muted" style="margin:4px 0 0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(A.strip(s.description))}</p>` : ''}
+        <div class="small muted" style="margin-top:6px">${s.statut === 'ouvert' && s.date_cloture ? 'Jusqu’au ' + fmtDate(s.date_cloture) + ' · ' : ''}${pl(s.nb_reponses || 0, 'réponse', 'réponses')}</div></div>
+        <span class="badge ${s.statut === 'ouvert' ? 'g' : ''}">${esc(STATUT_LABELS[s.statut] || s.statut)}</span></div></div></a>`;
+    const html = `<div class="card">${imgPf(couvPf(p), 340)}<div class="pad"><span class="mso-cat">🗂️ Portefeuille de sondages</span>
+        <h2 style="margin:8px 0 2px;font-size:19px;word-break:break-word">${esc(p.titre)}</h2>
+        <div class="small muted">${p.organisateur ? 'Par ' + esc(p.organisateur) + ' · ' : ''}${pl(p.nb_sondages || 0, 'sondage', 'sondages')}${p.nb_en_cours ? ' · ' + p.nb_en_cours + ' en cours' : ''}</div>
+        ${p.description ? `<p class="small" style="white-space:pre-line;word-break:break-word;margin:10px 0 0">${esc(A.strip(p.description))}</p>` : ''}</div></div>
+      ${prop && p.statut !== 'publie' ? '<div class="mso-hint" style="background:var(--border);border-radius:12px;padding:10px 12px">📝 Brouillon : seul(e) vous voyez ce portefeuille. Choisissez où l’afficher puis publiez-le.</div>' : ''}
+      ${prop ? `<div class="row" style="gap:8px;margin:8px 0;flex-wrap:wrap"><button type="button" class="btn out sm" id="mpf-edit">✏️ Modifier</button><button type="button" class="btn sm" id="mpf-lieux">📣 Lieux et publication</button></div>` : ''}
+      <div class="mso-dl">Sondages</div>
+      ${(p.sondages || []).length ? p.sondages.map(ligne).join('') : '<div class="empty"><b>Aucun sondage à afficher</b>Ce portefeuille ne contient pas encore de sondage visible.</div>'}`;
+    paint(t, 'Portefeuille', html);
+    const e = $('#mpf-edit'); if (e) e.onclick = async () => { await pfCharger(); pfEditeur(p, null, () => portefeuilleVue(++rendu, id)); };
+    const l = $('#mpf-lieux'); if (l) l.onclick = () => pfLieux(id, () => portefeuilleVue(++rendu, id));
+  }
+
+  async function pfCharger() { try { PFM = await api(PFAPI + '/mes'); } catch (e) { /* conserve le cache */ } return PFM; }
+
+  /* Mes portefeuilles (dans Mes sondages) */
+  async function portefeuillesMes(t) {
+    const z = $('#mso-pfmes'); if (!z) return;
+    await pfCharger(); if (!vivant(t) || !$('#mso-pfmes')) return;
+    const l = PFM.portefeuilles || [];
+    z.innerHTML = `<div class="row" style="margin:0 0 8px;align-items:center"><div class="mso-dl sp" style="margin:0">🗂️ Mes portefeuilles</div><button type="button" class="btn out sm" id="mpf-new">＋ Créer un portefeuille</button></div>` +
+      (l.length ? l.map(p => `<div class="card" style="margin-bottom:10px">${imgPf(couvPf(p), 160)}<div class="pad" style="padding:12px 14px">
+        <div class="row" style="align-items:flex-start"><div class="sp" style="font-weight:700;font-size:15px;word-break:break-word">${esc(p.titre)}</div><span class="badge ${p.statut === 'publie' ? 'g' : ''}">${p.statut === 'publie' ? 'Publié' : 'Brouillon'}</span></div>
+        <div class="small muted" style="margin:2px 0 8px">${pl(p.nb_sondages || 0, 'sondage', 'sondages')}</div>
+        <div class="row" style="gap:8px;flex-wrap:wrap"><a class="btn out sm" href="#/sondages/portefeuille/${Number(p.id)}">👁️ Voir</a><button type="button" class="btn out sm" data-pfe="${Number(p.id)}">✏️ Modifier</button><button type="button" class="btn sm" data-pfl="${Number(p.id)}">📣 Lieux</button></div></div></div>`).join('') : '<p class="mso-hint" style="margin-top:0">Un portefeuille réunit plusieurs sondages sous un titre et une image de couverture, à afficher où vous voulez.</p>') + '<div class="mso-dl">Mes sondages</div>';
+    const rafraichir = () => mesSondages(++rendu);
+    $('#mpf-new').onclick = () => pfEditeur(null, null, rafraichir);
+    $$('[data-pfe]', z).forEach(b => { b.onclick = () => pfEditeur(l.find(p => Number(p.id) === Number(b.dataset.pfe)), null, rafraichir); });
+    $$('[data-pfl]', z).forEach(b => { b.onclick = () => pfLieux(Number(b.dataset.pfl), rafraichir); });
+  }
+
+  /* Image : réduite dans l'appareil (1600 px, JPEG) puis envoyée ; l'adresse obtenue sert de couverture. */
+  function pfReduire(file) {
+    return new Promise((ok, ko) => {
+      const fr = new FileReader();
+      fr.onerror = () => ko(new Error('Image illisible.'));
+      fr.onload = () => {
+        const im = new Image();
+        im.onerror = () => ko(new Error('Image illisible.'));
+        im.onload = () => {
+          const k = Math.min(1, 1600 / Math.max(im.width, im.height)), c = document.createElement('canvas');
+          c.width = Math.max(1, Math.round(im.width * k)); c.height = Math.max(1, Math.round(im.height * k));
+          const g = c.getContext('2d'); g.fillStyle = '#ffffff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(im, 0, 0, c.width, c.height);
+          ok(c.toDataURL('image/jpeg', 0.86));
+        };
+        im.src = fr.result;
+      };
+      fr.readAsDataURL(file);
+    });
+  }
+
+  /* Création / modification */
+  function pfEditeur(p, pre, apres) {
+    let sel = p ? (p.sondages || []).map(s => Number(s.id)) : (pre ? [Number(pre)] : []);
+    let couv = p ? (p.couverture || '') : '';
+    const tous = PFM.mes_sondages || [];
+    const close = A.openSheet('');
+    const sb = $('#sheet .sb'); if (!sb) return; sb.className = 'sb mso-f';
+    const nom = id => { const s = tous.find(x => Number(x.id) === Number(id)); return s ? s.titre : 'Sondage #' + id; };
+    const stat = id => { const s = tous.find(x => Number(x.id) === Number(id)); return s ? (STATUT_LABELS[s.statut] || s.statut) : ''; };
+    const rendre = () => {
+      const zc = $('#mpf-couv', sb), zs = $('#mpf-sel', sb); if (!zc || !zs) return;
+      zc.innerHTML = (couv ? `<img src="${esc(couv)}" alt="Couverture" style="display:block;width:100%;height:auto;max-height:240px;object-fit:contain;border-radius:12px;background:#0b1530;margin-bottom:8px">` : '<p class="mso-hint" style="margin:0 0 8px">Aucune image de couverture.</p>') +
+        `<div class="row" style="gap:8px;flex-wrap:wrap"><label class="btn out sm" style="cursor:pointer">🖼️ ${couv ? 'Changer l’image' : 'Choisir une image'}<input type="file" id="mpf-file" accept="image/*" hidden></label>${couv ? '<button type="button" class="btn out sm" id="mpf-rm">Retirer</button>' : ''}</div><div class="small muted" id="mpf-etat"></div>`;
+      const reste = tous.filter(s => sel.indexOf(Number(s.id)) < 0);
+      zs.innerHTML = `<div class="mso-dl">Dans le portefeuille (${sel.length})</div>` +
+        (sel.length ? sel.map((id, i) => `<div class="row" style="gap:6px;align-items:center;border:1px solid var(--border);border-radius:12px;padding:8px 10px;margin-bottom:6px"><div class="sp" style="font-size:14px;word-break:break-word">${esc(nom(id))} <span class="small muted">· ${esc(stat(id))}</span></div><button type="button" class="ibtn" data-h="${i}" aria-label="Monter">↑</button><button type="button" class="ibtn" data-b="${i}" aria-label="Descendre">↓</button><button type="button" class="ibtn" data-x="${i}" aria-label="Retirer">✕</button></div>`).join('') : '<p class="mso-hint" style="margin-top:0">Aucun sondage pour l’instant.</p>') +
+        `<div class="mso-dl">Mes autres sondages</div>` +
+        (reste.length ? reste.map(s => `<div class="row" style="gap:8px;align-items:center;border:1px solid var(--border);border-radius:12px;padding:8px 10px;margin-bottom:6px"><div class="sp" style="font-size:14px;word-break:break-word">${esc(s.titre)} <span class="small muted">· ${esc(STATUT_LABELS[s.statut] || s.statut)}</span></div><button type="button" class="btn out sm" data-a="${Number(s.id)}">＋ Ajouter</button></div>`).join('') : '<p class="mso-hint" style="margin-top:0">Tous vos sondages sont déjà dans ce portefeuille.</p>');
+      const f = $('#mpf-file', sb); if (f) f.onchange = async () => {
+        const fic = f.files && f.files[0]; if (!fic) return; const et = $('#mpf-etat', sb); if (et) et.textContent = 'Envoi de l’image…';
+        try { const data = await pfReduire(fic); const r = await api('/api/upload', { method: 'POST', body: { data, nom: (fic.name || 'couverture').replace(/\.[^.]+$/, '') + '.jpg' } }); couv = r.url; rendre(); }
+        catch (e) { toast((e && e.message) || 'Envoi impossible.', true); if (et) et.textContent = ''; }
+      };
+      const rm = $('#mpf-rm', sb); if (rm) rm.onclick = () => { couv = ''; rendre(); };
+      $$('[data-a]', zs).forEach(b => { b.onclick = () => { sel.push(Number(b.dataset.a)); rendre(); }; });
+      $$('[data-x]', zs).forEach(b => { b.onclick = () => { sel.splice(Number(b.dataset.x), 1); rendre(); }; });
+      const bouge = (i, d) => { const j = i + d; if (j < 0 || j >= sel.length) return; const x = sel[i]; sel[i] = sel[j]; sel[j] = x; rendre(); };
+      $$('[data-h]', zs).forEach(b => { b.onclick = () => bouge(Number(b.dataset.h), -1); });
+      $$('[data-b]', zs).forEach(b => { b.onclick = () => bouge(Number(b.dataset.b), 1); });
+    };
+    sb.innerHTML = `<div class="row" style="align-items:flex-start;gap:8px"><div class="sp"><h3 style="margin:0 0 2px;font-size:18px">${p ? '✏️ Modifier le portefeuille' : '🗂️ Créer un portefeuille'}</h3><div class="small muted">Un ensemble de sondages avec un titre et une image de couverture.</div></div><button type="button" class="ibtn" id="mpf-close" aria-label="Fermer">${ic('close')}</button></div>
+      <label class="mso-l" for="mpf-titre">Titre du portefeuille *</label><input type="text" id="mpf-titre" maxlength="150" value="${esc(p ? p.titre : '')}" placeholder="Ex. : Consultation sur la santé mentale">
+      <label class="mso-l" for="mpf-desc">Description <small>(facultatif)</small></label><textarea id="mpf-desc" rows="3" maxlength="1000" placeholder="Présentez le portefeuille en deux phrases.">${esc(p ? (p.description || '') : '')}</textarea>
+      <div class="mso-dl">Image de couverture</div><div id="mpf-couv"></div><div id="mpf-sel"></div>
+      <div class="mso-gerr" id="mpf-err"></div>
+      <button type="button" class="btn block" id="mpf-save" style="margin-top:14px">${p ? 'Enregistrer' : 'Créer le portefeuille'}</button>`;
+    $('#mpf-close', sb).onclick = close;
+    rendre();
+    $('#mpf-save', sb).onclick = async ev => {
+      const titre = $('#mpf-titre', sb).value.trim();
+      if (!titre) { $('#mpf-err', sb).textContent = 'Donnez un titre au portefeuille.'; $('#mpf-titre', sb).focus(); return; }
+      const btn = ev.currentTarget; btn.disabled = true; $('#mpf-err', sb).textContent = '';
+      const corps = { titre, description: $('#mpf-desc', sb).value.trim(), couverture: couv };
+      try {
+        if (p) {
+          await api(PFAPI + '/' + p.id, { method: 'PUT', body: corps });
+          await api(PFAPI + '/' + p.id + '/sondages', { method: 'PUT', body: { sondage_ids: sel } });
+          toast('Portefeuille enregistré ✓'); close(); apres && apres();
+        } else {
+          const r = await api(PFAPI, { method: 'POST', body: Object.assign({ sondage_ids: sel }, corps) });
+          toast('Portefeuille créé ✓ Choisissez maintenant où l’afficher.'); close(); await pfCharger(); pfLieux(r.id, apres);
+        }
+      } catch (e) { $('#mpf-err', sb).textContent = (e && e.message) || 'Enregistrement impossible.'; btn.disabled = false; }
+    };
+  }
+
+  /* Ajouter UN sondage à un portefeuille (ou en créer un avec lui) */
+  async function pfAjouter(sid, titre) {
+    const close = A.openSheet('<div class="sk skc" style="height:120px"></div>');
+    await pfCharger();
+    const sb = $('#sheet .sb'); if (!sb) return; sb.className = 'sb mso-f';
+    const rendre = () => {
+      const l = PFM.portefeuilles || [];
+      sb.innerHTML = `<div class="row" style="align-items:flex-start;gap:8px"><div class="sp"><h3 style="margin:0 0 2px;font-size:18px">🗂️ Ajouter à un portefeuille</h3><div class="small muted" style="word-break:break-word">${esc(titre)}</div></div><button type="button" class="ibtn" id="mpa-close" aria-label="Fermer">${ic('close')}</button></div>
+        <div style="margin-top:12px">${l.length ? l.map(p => { const dedans = (p.sondages || []).some(s => Number(s.id) === Number(sid)); return `<div class="row" style="gap:8px;align-items:center;border:1px solid var(--border);border-radius:12px;padding:8px 10px;margin-bottom:6px"><div class="sp"><div style="font-weight:700;font-size:14px;word-break:break-word">${esc(p.titre)}</div><div class="small muted">${pl(p.nb_sondages || 0, 'sondage', 'sondages')} · ${p.statut === 'publie' ? 'Publié' : 'Brouillon'}</div></div><button type="button" class="btn ${dedans ? 'out ' : ''}sm" data-p="${Number(p.id)}" data-d="${dedans ? 1 : 0}">${dedans ? 'Retirer' : '＋ Ajouter'}</button></div>`; }).join('') : '<p class="mso-hint">Vous n’avez pas encore de portefeuille.</p>'}</div>
+        <button type="button" class="btn block" id="mpa-new" style="margin-top:8px">🗂️ Nouveau portefeuille avec ce sondage</button>
+        <div class="mso-gerr" id="mpa-err" style="margin-top:8px"></div>`;
+      $('#mpa-close', sb).onclick = close;
+      $('#mpa-new', sb).onclick = () => { close(); pfEditeur(null, sid, null); };
+      $$('[data-p]', sb).forEach(b => { b.onclick = async () => {
+        b.disabled = true;
+        try {
+          if (b.dataset.d === '1') await api(PFAPI + '/' + b.dataset.p + '/sondages/' + sid, { method: 'DELETE' });
+          else await api(PFAPI + '/' + b.dataset.p + '/sondages', { method: 'POST', body: { sondage_id: Number(sid) } });
+          await pfCharger(); rendre();
+        } catch (e) { $('#mpa-err', sb).textContent = (e && e.message) || 'Action impossible.'; b.disabled = false; }
+      }; });
+    };
+    rendre();
+  }
+
+  /* Lieux d'affichage et publication */
+  async function pfLieux(pid, apres) {
+    const close = A.openSheet('<div class="sk skc" style="height:120px"></div>');
+    await pfCharger();
+    const sb = $('#sheet .sb'); if (!sb) return; sb.className = 'sb mso-f';
+    const rendre = () => {
+      const p = (PFM.portefeuilles || []).find(x => Number(x.id) === Number(pid));
+      if (!p) { sb.innerHTML = '<div class="empty"><b>Portefeuille introuvable</b><br><br><button class="btn sm" id="mpl-x">Fermer</button></div>'; $('#mpl-x', sb).onclick = close; return; }
+      const d = p.diffusion || {}, lies = new Set((p.evenement_ids || []).map(Number)), pub = p.statut === 'publie', evts = PFM.mes_evenements || [];
+      const lien = location.origin + '/portefeuille-sondages.html?id=' + p.id;
+      const opt = (id, coche, titre, txt) => `<label class="mso-opt" id="${id}-o"><input type="checkbox" id="${id}" ${coche ? 'checked' : ''}><span><b>${titre}</b><small>${txt}</small></span></label>`;
+      sb.innerHTML = `<div class="row" style="align-items:flex-start;gap:8px"><div class="sp"><h3 style="margin:0 0 2px;font-size:18px">📣 Lieux et publication</h3><div class="small muted" style="word-break:break-word">${esc(p.titre)}</div></div><button type="button" class="ibtn" id="mpl-close" aria-label="Fermer">${ic('close')}</button></div>
+        <p class="mso-hint" style="background:var(--sky-l);border-radius:12px;padding:10px 12px">${pub ? '<b>Portefeuille publié.</b> Il s’affiche aux lieux cochés.' : 'Portefeuille <b>brouillon</b> : vous seul(e) le voyez. Choisissez où l’afficher, puis publiez-le.'} Seuls les sondages en cours ou terminés y sont visibles ; publier le portefeuille ne publie pas ses sondages.</p>
+        <div class="mso-dl" style="margin-top:6px">Où l’afficher</div>
+        ${opt('mpl-onglet', d.onglet, 'Onglet Sondages', 'Le portefeuille figure en tête de la page publique des sondages.')}
+        ${opt('mpl-fil', d.fil, 'Fil d’actualité', 'Une publication annonce le portefeuille avec son lien' + (p.fil_post_id ? ' (déjà publiée)' : '') + '.')}
+        ${opt('mpl-profil', d.profil, 'Mon profil public', 'Un encart s’affiche sur votre page.')}
+        ${opt('mpl-boutique', d.boutique, 'Ma boutique', 'Un encart s’affiche sur votre vitrine.')}
+        <div class="mso-dl">Lier à un événement</div>
+        <p class="mso-hint" style="margin-top:0">Sur la fiche de chaque événement coché, le portefeuille s’affiche dans le bloc « Sondage en cours ». Jamais dans le parcours d’inscription.</p>
+        <div class="mso-evts">${evts.length ? evts.map(e => '<label><input type="checkbox" class="mpl-evt" value="' + Number(e.id) + '" ' + (lies.has(Number(e.id)) ? 'checked' : '') + '><span>' + esc(e.titre) + (e.date_evt ? ' <span class="small muted">· ' + esc(fmtDate(e.date_evt)) + '</span>' : '') + '</span></label>').join('') : '<div class="small muted" style="padding:10px 0">Vous n’avez pas encore d’événement.</div>'}</div>
+        <div class="mso-gerr" id="mpl-err"></div>
+        <div class="row" style="gap:8px;flex-wrap:wrap"><button type="button" class="btn out" id="mpl-save">Enregistrer les lieux</button>${pub ? '<button type="button" class="btn out" id="mpl-dep">Retirer de l’affichage</button>' : '<button type="button" class="btn" id="mpl-pub">🚀 Publier le portefeuille</button>'}</div>
+        <div class="mso-dl">Lien à partager</div>
+        <input type="text" readonly id="mpl-lien" value="${esc(lien)}" aria-label="Lien du portefeuille"><div class="row" style="gap:8px;margin-top:8px"><button type="button" class="btn out sm" id="mpl-copy">${ic('share', 's')} Copier / partager</button></div>`;
+      ['onglet', 'fil', 'profil', 'boutique'].forEach(k => { const x = $('#mpl-' + k, sb), y = $('#mpl-' + k + '-o', sb); if (x && y) { const sync = () => y.classList.toggle('on', x.checked); x.addEventListener('change', sync); sync(); } });
+      const err = m => { $('#mpl-err', sb).textContent = m || ''; };
+      const sauver = async () => {
+        await api(PFAPI + '/' + pid + '/diffusion', { method: 'PUT', body: { onglet: $('#mpl-onglet', sb).checked, fil: $('#mpl-fil', sb).checked, profil: $('#mpl-profil', sb).checked, boutique: $('#mpl-boutique', sb).checked, evenement_ids: $$('.mpl-evt:checked', sb).map(c => Number(c.value)) } });
+      };
+      const agir = (id, fn) => { const b = $(id, sb); if (!b) return; b.onclick = async () => { b.disabled = true; err(''); try { await fn(); } catch (e) { err((e && e.message) || 'Action impossible.'); b.disabled = false; } }; };
+      $('#mpl-close', sb).onclick = () => { close(); apres && apres(); };
+      agir('#mpl-save', async () => { await sauver(); toast('Lieux enregistrés ✓'); await pfCharger(); rendre(); });
+      agir('#mpl-pub', async () => { await sauver(); const r = await api(PFAPI + '/' + pid + '/publier', { method: 'POST' }); toast((r && r.message) || 'Portefeuille publié ✓'); await pfCharger(); rendre(); });
+      agir('#mpl-dep', async () => { const r = await api(PFAPI + '/' + pid + '/depublier', { method: 'POST' }); toast((r && r.message) || 'Portefeuille retiré ✓'); await pfCharger(); rendre(); });
+      $('#mpl-lien', sb).onclick = ev => ev.currentTarget.select();
+      $('#mpl-copy', sb).onclick = () => partager(lien, p.titre);
+    };
+    rendre();
+  }
+
 })();

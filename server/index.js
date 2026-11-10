@@ -3424,6 +3424,8 @@ async function appelerRoute(method, pathname, req, body) {
 }
 Kofi.register({ route, db, sendJSON, getCurrentUser, SEC, getPremiumStatut, getOrigin, creerNotif, checkFormationOwner, exigerPremium, appelerRoute, sondageCreer, sondageDiffusion, sondageAccesCreation });
 /* Envoyer un événement par e-mail (carte complète) + texte d'aperçu du lien (date, lieu) : server/partage-evenement.js. urlImagePartageEvenement est une déclaration de fonction (hissée). */
+/* Portefeuilles de sondages (2026-11-10) : ensembles de sondages avec titre et couverture, affichés comme un sondage ; fonctions d'index.js hissées (déclarations). */
+require("./sondage-portefeuilles").register({ route, db, sendJSON, getCurrentUser, sondagePeutCreer, sondageAutoCloture, nomCompteAffichage, sondageDiffusionLue });
 const PartageEvenement = require("./partage-evenement");
 PartageEvenement.register({ route, db, sendJSON, getCurrentUser, SEC, nomCompteAffichage, getOrigin, urlImagePartageEvenement });
 
@@ -31542,7 +31544,9 @@ async function sondagePeutCreer(user) { return !!(await sondageAccesCreation(use
 async function sondageNbLieux(s, diffusion, nbEvenements) {
   const d = diffusion || sondageDiffusionLue(s);
   const ev = nbEvenements !== undefined ? nbEvenements : Number(((await db.prepare("SELECT COUNT(*) n FROM sondage_evenements WHERE sondage_id=?").get(s.id)) || {}).n) || 0;
-  return (d.fil ? 1 : 0) + (d.profil ? 1 : 0) + (d.onglet ? 1 : 0) + (d.boutique ? 1 : 0) + (ev > 0 ? 1 : 0);
+  /* Un portefeuille PUBLIÉ qui contient le sondage compte comme un lieu d'affichage (server/sondage-portefeuilles.js). */
+  const pf = (await require("./sondage-portefeuilles").nbPortefeuillesPublies(s.id)) > 0 ? 1 : 0;
+  return (d.fil ? 1 : 0) + (d.profil ? 1 : 0) + (d.onglet ? 1 : 0) + (d.boutique ? 1 : 0) + (ev > 0 ? 1 : 0) + pf;
 }
 /* Lieux reçus du client (objet {fil, profil, onglet, boutique}) : tout ce qui n'est pas explicitement vrai est faux. */
 function sondageDiffusionSaisie(b) {
@@ -40964,7 +40968,9 @@ ${jsonLd}
       } else if (q.boutique) {
         lignes = await db.prepare(`SELECT ${cols} FROM sondages s WHERE s.createur_id=? AND s.statut='ouvert' AND s.diffusion_json LIKE '%"boutique":true%' ORDER BY s.created_at DESC LIMIT 5`).all(parseInt(q.boutique, 10) || 0);
       } else return sendJSON(res, 400, { error: 'Paramètre evenement, profil ou boutique requis.' });
-      return sendJSON(res, 200, { sondages: lignes.map(l => ({ id: l.id, titre: l.titre, description: String(l.description || '').slice(0, 200), date_cloture: l.date_cloture, nb_reponses: l.nb_reponses || 0, lien: `sondage.html?id=${l.id}` })) });
+      /* Portefeuilles de sondages affichés au même emplacement (2026-11-10). */
+      let portefeuilles = []; try { portefeuilles = await require('./sondage-portefeuilles').pourEmplacement({ evenement: q.evenement, profil: q.profil, boutique: q.boutique }); } catch (e) { console.error('[sondages-en-cours/portefeuilles]', e.message); }
+      return sendJSON(res, 200, { sondages: lignes.map(l => ({ id: l.id, titre: l.titre, description: String(l.description || '').slice(0, 200), date_cloture: l.date_cloture, nb_reponses: l.nb_reponses || 0, lien: `sondage.html?id=${l.id}` })), portefeuilles });
     }
 
     /* ── GET /api/admin/events — TOUS les événements de la plateforme, quel que soit leur type

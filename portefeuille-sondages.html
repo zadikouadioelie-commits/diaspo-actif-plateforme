@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="/assets/logo.png">
+<title>Diaspo'Actif — Portefeuille de sondages</title>
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Diaspo'Actif">
+<meta property="og:title" content="Diaspo'Actif — Portefeuille de sondages">
+<meta property="og:description" content="Donnez votre avis sur plusieurs sondages réunis en un seul endroit, sans créer de compte.">
+<meta property="og:image" content="https://diaspoactif.com/assets/og-image.png">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="stylesheet" href="assets/styles.v2.css">
+<link rel="stylesheet" href="/assets/responsive.v2.css?v=2">
+<style>
+/* Page publique d'un portefeuille de sondages (2026-11-10) : Nuit dorée, image de couverture entière, titre, description, puis les sondages à répondre. */
+.pw-wrap{max-width:760px;margin:0 auto;color:var(--nd-texte);}
+.pw-tete{background:var(--nd-verre);border:1px solid var(--nd-bord);border-radius:18px;overflow:hidden;margin-bottom:16px;box-shadow:0 22px 44px -30px #000;}
+.pw-couv{display:block;width:100%;height:auto;max-height:440px;object-fit:contain;background:#0b1530;}
+.pw-corps{padding:20px 22px 22px;}
+.pw-badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;background:rgba(227,192,110,.14);color:var(--nd-or);border:1px solid var(--nd-bord);}
+.pw-corps h1{margin:10px 0 0;font-size:26px;line-height:1.25;font-family:var(--nd-display);color:var(--nd-texte);}
+.pw-meta{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px;color:var(--nd-doux);margin-top:8px;}
+.pw-desc{margin:14px 0 0;font-size:15px;line-height:1.6;white-space:pre-line;color:var(--nd-texte);}
+.pw-liste{display:grid;gap:12px;}
+.pw-s{background:var(--nd-verre);border:1px solid var(--nd-bord2);border-radius:14px;padding:16px 18px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;}
+.pw-s-txt{flex:1 1 260px;min-width:0;}
+.pw-s-t{font-size:16px;font-weight:700;line-height:1.35;overflow-wrap:anywhere;color:var(--nd-texte);}
+.pw-s-d{font-size:13px;color:var(--nd-doux);line-height:1.5;margin-top:4px;}
+.pw-s-m{font-size:12px;color:var(--nd-doux);margin-top:6px;}
+.pw-s-img{width:72px;height:72px;border-radius:12px;object-fit:cover;flex:none;background:#0b1530;}
+.pw-etat{border-radius:12px;padding:14px 16px;font-size:14px;line-height:1.5;margin-bottom:16px;background:rgba(227,192,110,.1);border:1px solid var(--nd-bord);color:var(--nd-texte);}
+.pw-etat a{color:var(--nd-or);}
+.pw-pilule{display:inline-block;font-size:11px;font-weight:700;border-radius:999px;padding:2px 9px;margin-right:6px;}
+.pw-pilule.cours{background:rgba(52,211,153,.16);color:#6ee7b7;}.pw-pilule.fin{background:rgba(255,255,255,.1);color:var(--nd-doux);}.pw-pilule.brouillon{background:rgba(227,192,110,.16);color:var(--nd-or);}
+a:focus-visible,button:focus-visible{outline:3px solid var(--nd-or);outline-offset:2px;}
+@media (max-width:600px){.pw-corps{padding:16px;}.pw-corps h1{font-size:22px;}}
+</style>
+<link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
+<link rel="stylesheet" href="/assets/design-upgrade.v2.css">
+<link rel="stylesheet" href="/assets/theme-manager.css">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,500;0,6..96,600;1,6..96,500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/theme-nuit-doree.css?v=8">
+<link rel="stylesheet" href="/assets/sondage-nuit-doree.css?v=2">
+</head>
+<body class="nd">
+<div class="page" id="app">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Menu">&#9776;</button>
+      <div class="logo"><a href="index.html" style="text-decoration:none;color:inherit;display:flex;align-items:center;gap:8px;"><img loading="lazy" class="logo-img" src="assets/logo.png" alt=""> DIASPO'ACTIF</a></div>
+      <nav class="nav">
+        <a href="index.html">Accueil</a>
+        <a href="fil-actualite.html">Fil</a>
+        <a href="sondages.html" style="color:#2563EB;font-weight:700;">Sondages</a>
+        <a href="evenements.html">Autres événements</a>
+      </nav>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container" style="padding-top:24px;padding-bottom:60px;">
+    <div class="pw-wrap" id="pw-racine" aria-live="polite">
+      <div class="pw-tete"><div class="pw-corps" style="text-align:center;color:var(--nd-doux);">Chargement du portefeuille…</div></div>
+    </div>
+  </main>
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/demo.js?v=2"></script>
+<script src="assets/app.js?v=13"></script>
+<script src="assets/ds.js"></script>
+<script>
+(function () {
+  var PID = parseInt(new URLSearchParams(location.search).get('id'), 10) || 0;
+  var racine = document.getElementById('pw-racine');
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function jour(s) { var d = new Date(String(s || '').slice(0, 10) + 'T12:00:00'); return isNaN(d) ? '' : d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }); }
+  function introuvable() {
+    racine.innerHTML = '<div class="pw-tete"><div class="pw-corps" style="text-align:center;"><h1 style="font-size:22px;margin:0 0 8px;">Portefeuille introuvable</h1><p style="color:var(--nd-doux);margin:0 0 14px;">Ce lien ne correspond à aucun portefeuille de sondages en ligne.</p><a class="btn btn-orange" href="sondages.html">Voir les sondages</a></div></div>';
+  }
+  async function init() {
+    if (!PID) return introuvable();
+    var r; try { r = await api('GET', '/sondage-portefeuilles/' + PID); } catch (e) { return introuvable(); }
+    var p = r.portefeuille, proprio = !!r.proprietaire;
+    document.title = "Diaspo'Actif — " + p.titre;
+    var h = '<div class="pw-tete">' + (p.couverture ? '<img class="pw-couv" src="' + esc(p.couverture) + '" alt="Couverture du portefeuille">' : '') +
+      '<div class="pw-corps"><span class="pw-badge">🗂️ Portefeuille de sondages</span><h1>' + esc(p.titre) + '</h1>' +
+      '<div class="pw-meta">' + (p.organisateur ? '<span>Par ' + esc(p.organisateur) + '</span>' : '') + '<span>' + p.nb_sondages + ' sondage' + (p.nb_sondages > 1 ? 's' : '') + (p.nb_en_cours ? ' · ' + p.nb_en_cours + ' en cours' : '') + '</span></div>' +
+      (p.description ? '<p class="pw-desc">' + esc(p.description) + '</p>' : '') + '</div></div>';
+    if (proprio && p.statut !== 'publie') h += '<div class="pw-etat">📝 <strong>Brouillon</strong> — seul(e) vous voyez ce portefeuille. Choisissez où l’afficher puis publiez-le depuis <a href="sondages.html#mes">Mes sondages</a>. Les sondages encore en brouillon ne seront visibles des autres qu’une fois publiés.</div>';
+    if (!p.sondages.length) h += '<div class="pw-etat">Ce portefeuille ne contient pas encore de sondage à afficher.</div>';
+    h += '<div class="pw-liste">' + p.sondages.map(function (s) {
+      var etat = s.statut === 'ouvert' ? '<span class="pw-pilule cours">En cours</span>' : s.statut === 'cloture' ? '<span class="pw-pilule fin">Terminé</span>' : '<span class="pw-pilule brouillon">Brouillon</span>';
+      var action = s.statut === 'ouvert' ? '<a class="btn btn-orange" href="' + esc(s.lien) + '">Répondre</a>' : s.statut === 'brouillon' ? '<a class="btn btn-outline" href="' + esc(s.lien) + '">Aperçu</a>' : '<a class="btn btn-outline" href="' + esc(s.lien) + '">Voir</a>';
+      return '<div class="pw-s">' + (s.couverture ? '<img class="pw-s-img" src="' + esc(s.couverture) + '" alt="" loading="lazy">' : '') +
+        '<div class="pw-s-txt"><div class="pw-s-t">' + esc(s.titre) + '</div>' + (s.description ? '<div class="pw-s-d">' + esc(s.description) + '</div>' : '') +
+        '<div class="pw-s-m">' + etat + (s.statut === 'ouvert' && s.date_cloture ? 'Jusqu’au ' + esc(jour(s.date_cloture)) + ' · ' : '') + s.nb_reponses + ' réponse' + (s.nb_reponses > 1 ? 's' : '') + (s.statut === 'ouvert' ? ' · sans compte, en quelques minutes' : '') + '</div></div>' + action + '</div>';
+    }).join('') + '</div>';
+    h += '<div style="text-align:center;margin-top:20px;"><a class="btn btn-outline" href="sondages.html">Voir tous les sondages</a></div>';
+    racine.innerHTML = h;
+  }
+  init();
+})();
+</script>
+<script src="/assets/cookies-banner.js"></script>
+<script src="/assets/theme-manager.js"></script>
+<script src="assets/back-button.js"></script>
+</body>
+</html>
