@@ -59,7 +59,7 @@
     "label": "Organismes de financement",
     "desc": "Programmes, critères, projets accompagnés et prise de rendez-vous",
     "items": "Programme",
-    "what": "La vitrine d'un organisme de financement, banque, microfinance ou investisseur : ses programmes ouverts, ses critères d'éligibilité et les projets qu'il a accompagnés. Tout dépôt de projet passe par Déposer à Diaspo'Actif.",
+    "what": "La vitrine d'un organisme de financement, banque, microfinance ou investisseur : ses programmes ouverts, ses critères d'éligibilité et les projets qu'il a accompagnés. Tout dépôt de projet passe par Soumettre à Diaspo'Actif.",
     "who": "Banques, organismes de microfinance, fonds d'investissement, partenaires financiers qui proposent des crédits, garanties ou programmes d'accompagnement.",
     "contains": "Des programmes avec critères et montants d'exemple ; les projets accompagnés (résultats déclarés ou vérifiés) ; des rendez-vous, des inscriptions et une newsletter. Aucun formulaire de dépôt de projet.",
     "exemple": "/exemples-boutiques/boutique.html?type=finance"

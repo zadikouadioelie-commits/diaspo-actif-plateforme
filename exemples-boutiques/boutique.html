@@ -608,7 +608,7 @@ CONSIGNE POUR CLAUDE CODE (validée par ZADI) :
       <label>Pays<select id="fPays"><option value="">Tous les pays</option><option>Côte d'Ivoire</option><option>Sénégal</option><option>Bénin</option></select></label>
       <label>Statut<select id="fStat"><option value="">Tous</option><option>Financé</option><option>En cours</option></select></label>
     </div>
-    <div class="ih-box" style="margin:0 0 16px"><b>Vous avez un projet à déposer ?</b><p>Les projets sont reçus, qualifiés et orientés par Diaspo'Actif. Ce bouton est le point de dépôt officiel.</p><span class="ih-btn-p" data-depot="projets" style="justify-self:start">Déposer à Diaspo'Actif →</span></div>
+    <div class="ih-box" style="margin:0 0 16px"><b>Vous avez un projet à déposer ?</b><p>Les projets sont reçus, qualifiés et orientés par Diaspo'Actif. Ce bouton est le point de dépôt officiel.</p><span class="ih-btn-p" data-depot="projets" style="justify-self:start">Soumettre à Diaspo'Actif →</span></div>
     <div class="ih-cards" id="listGrid"></div>
   </div>
 
@@ -620,7 +620,7 @@ CONSIGNE POUR CLAUDE CODE (validée par ZADI) :
     <h2 class="ih-h2">Demander un rendez-vous</h2>
     <p class="ih-mut">Planifiez un échange avec l'équipe Diaspo'Actif.</p>
     <form class="ih-box" id="rdvForm">
-      <p class="ih-mut" style="margin:0">Pour soumettre un projet, utilisez <b>Déposer à Diaspo'Actif</b> : c'est le seul point de dépôt officiel.</p>
+      <p class="ih-mut" style="margin:0">Pour soumettre un projet, utilisez <b>Soumettre à Diaspo'Actif</b> : c'est le seul point de dépôt officiel.</p>
       <label>Objet du rendez-vous *<select name="motif" required><option value="">Choisir un motif</option><option>Découvrir la boutique</option><option>Rejoindre un projet existant</option><option>Question sur le financement</option></select></label>
       <label>Date souhaitée *<input name="date" type="date" required></label>
       <fieldset class="ih-radio"><legend>Mode *</legend><label><input type="radio" name="mode" value="Visio" checked> Visio</label><label><input type="radio" name="mode" value="Présentiel"> Présentiel</label><label><input type="radio" name="mode" value="Téléphone"> Téléphone</label></fieldset>
@@ -635,7 +635,7 @@ CONSIGNE POUR CLAUDE CODE (validée par ZADI) :
     <form class="ih-box" id="partForm">
       <label>Type de partenaire *<select name="type" required><option value="">Choisir</option><option>Entreprise</option><option>Institution</option><option>ONG</option><option>Autre</option></select></label>
       <label>Votre message *<textarea name="message" required placeholder="Décrivez votre intérêt et votre proposition…"></textarea></label>
-      <p class="ih-mut" style="margin:0">Un projet à étudier, financer ou accompagner ne se dépose pas ici : <b>Déposer à Diaspo'Actif</b>.</p>
+      <p class="ih-mut" style="margin:0">Un projet à étudier, financer ou accompagner ne se dépose pas ici : <b>Soumettre à Diaspo'Actif</b>.</p>
       <button class="ih-btn-p" type="submit">Envoyer la demande</button>
     </form>
   </div>
@@ -709,7 +709,7 @@ CONSIGNE POUR CLAUDE CODE (validée par ZADI) :
   <section class="ih-sec fin-sec" id="fin-impact"><div class="fin-head"><h2>Projets d'impact</h2><span class="ih-count">Résultats déclarés ou vérifiés</span></div>
     <p class="ih-mut" style="margin:0 0 12px">Résultats <b>déclarés</b> : fournis par le porteur. Résultats <b>vérifiés</b> : contrôlés par Diaspo'Actif.</p>
     <div class="fin-grid3" id="finProj"></div>
-    <div class="ih-box" style="margin-top:14px"><b>Vous avez un projet à soumettre ?</b><p>Les projets se déposent uniquement via Diaspo'Actif, qui les qualifie avant toute orientation.</p><span class="ih-btn-p" data-depot="impact" style="justify-self:start">Déposer à Diaspo'Actif →</span></div>
+    <div class="ih-box" style="margin-top:14px"><b>Vous avez un projet à soumettre ?</b><p>Les projets se déposent uniquement via Diaspo'Actif, qui les qualifie avant toute orientation.</p><span class="ih-btn-p" data-depot="impact" style="justify-self:start">Soumettre à Diaspo'Actif →</span></div>
   </section>
 
   <section class="ih-sec fin-sec" id="fin-news"><div class="fin-head"><h2>Actualités &amp; Conseils</h2></div>
@@ -733,7 +733,7 @@ CONSIGNE POUR CLAUDE CODE (validée par ZADI) :
         <h3><span class="fin-h3-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></span> Demande de rendez-vous</h3>
         <select name="motif" required><option value="">Choisir un motif</option><option>Renseignements sur mes services</option><option>Devis d'assurance</option><option>Inscription à un programme de formation</option><option>Question sur un produit bancaire courant</option></select>
         <input name="date" type="date" required>
-        <p class="ih-mut" style="margin:0;font-size:13px">Pour financer un projet : <b>Déposer à Diaspo'Actif</b>.</p>
+        <p class="ih-mut" style="margin:0;font-size:13px">Pour financer un projet : <b>Soumettre à Diaspo'Actif</b>.</p>
         <button class="ih-btn-p" type="submit">Demander le rendez-vous</button>
       </form>
       <form class="ih-box" id="finPart">
@@ -1136,8 +1136,8 @@ CONSIGNE POUR CLAUDE CODE (validée par ZADI) :
     if (go) { location.hash = "#" + go.dataset.go; }
   });
 
-  // ----- dépôt de projet : uniquement via « Déposer à Diaspo'Actif » -----
-  const DEPOT = "Déposer à Diaspo'Actif";
+  // ----- dépôt de projet : uniquement via « Soumettre à Diaspo'Actif » -----
+  const DEPOT = "Soumettre à Diaspo'Actif";
   document.addEventListener("click", e => {
     const d = e.target.closest("[data-depot]");
     if (d) { toastI("Redirection vers « " + DEPOT + " » avec le contexte de la boutique « " + SHOP_NAME + " » (module central à brancher)."); }
@@ -1254,7 +1254,7 @@ CONSIGNE POUR CLAUDE CODE (validée par ZADI) :
   const $f = s => document.querySelector(s);
   const eur = n => n.toLocaleString("fr-FR") + " €";
   const toastF = m => { try { toast(m); } catch (e) {} };
-  const DEPOT = "Déposer à Diaspo'Actif";
+  const DEPOT = "Soumettre à Diaspo'Actif";
   const DEPOT_RX = /(projet|financement|dossier|financer)/i;
 
   const FIN = [
