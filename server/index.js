@@ -145,6 +145,7 @@ const ConfirmationAppareil = require("./confirmation-appareil");
 const ProfilObligatoire = require("./profil-obligatoire");
 const RelancePublication = require("./relance-publication");
 const RelanceMessages = require("./relance-messages");
+const BoutiqueTypes = require("./boutique-types"); /* lot B : les 6 types de boutique (registre assets/boutique-types.js) sur la vraie plateforme, derrière un interrupteur administrateur */
 const DepotDetourne = require("./depot-detourne"); /* lot F : un seul module de dépôt (« Soumettre à Diaspo'Actif ») — refuse les textes de boutique qui détournent le dépôt de projet */
 /* Étape 3 : l'échéance réelle d'une session enregistrée est dans le registre (30 jours glissants pour un
    appareil principal, 3 jours pour un autre) — le jeton et le cookie doivent donc pouvoir vivre au moins
@@ -4548,6 +4549,59 @@ async function definirBoutiquesMaintenance(actif, adminId) {
   );
 }
 
+/* Lot B (2026-11-11) — mise en service des 6 types de boutique. Désactivé par défaut : tant que l'administrateur ne l'a pas
+   activé, la plateforme se comporte exactement comme avant (mêmes types, mêmes cartes). Même convention que la maintenance :
+   « true » / « false » en texte dans parametres_plateforme. */
+async function typesBoutiqueV2Actifs() {
+  try {
+    const row = await db.prepare("SELECT valeur FROM parametres_plateforme WHERE cle=?").get(BoutiqueTypes.CLE_INTERRUPTEUR);
+    return !!row && row.valeur === 'true';
+  } catch (e) { return false; }
+}
+async function definirTypesBoutiqueV2(actif, adminId) {
+  const valeur = actif ? 'true' : 'false';
+  const existe = await db.prepare("SELECT cle FROM parametres_plateforme WHERE cle=?").get(BoutiqueTypes.CLE_INTERRUPTEUR);
+  if (existe) await db.prepare("UPDATE parametres_plateforme SET valeur=?, updated_at=datetime('now'), updated_by=? WHERE cle=?").run(valeur, adminId || null, BoutiqueTypes.CLE_INTERRUPTEUR);
+  else await db.prepare("INSERT INTO parametres_plateforme (cle, valeur, type, description, updated_by) VALUES (?,?,?,?,?)").run(
+    BoutiqueTypes.CLE_INTERRUPTEUR, valeur, 'booleen', "Met en service les 6 types de boutique (Vente en ligne, Vidéo, Portfolio, Événements, Impact, Financement) à la place des anciens types.", adminId || null
+  );
+}
+/* Contrôle d'un type demandé pour une boutique. Renvoie { type } (clé à enregistrer) ou { erreur }.
+   `typeActuel` : le type déjà enregistré — le garder tel quel n'est jamais refusé (une boutique « blog » existante continue de fonctionner). */
+async function controlerTypeBoutiqueDemande(cle, user, typeActuel) {
+  const demande = String(cle || '');
+  if (!VITRINE_TEMPLATES[demande]) return { erreur: "Type de boutique inconnu." };
+  if (typeActuel && demande === String(typeActuel)) return { type: demande };
+  const actif = await typesBoutiqueV2Actifs();
+  if (!actif) {
+    if (BoutiqueTypes.CLES_NOUVELLES.includes(demande)) return { erreur: "Ce type de boutique n'est pas encore ouvert." };
+    return { type: demande };
+  }
+  if (BoutiqueTypes.estAncienSansEquivalent(demande)) return { erreur: "Cet ancien type est conservé pour les boutiques qui l'utilisent déjà, mais il n'est plus proposé." };
+  const canon = BoutiqueTypes.typeCanonique(demande);
+  if (!canon) return { erreur: "Type de boutique inconnu." };
+  const estAdmin = !!user && user.role === 'administrateur';
+  if (!BoutiqueTypes.typesSelectionnables({ estAdministrateur: estAdmin }).includes(canon)) {
+    return { erreur: "Ce type de boutique n'a pas encore sa page publique : il n'est ouvert qu'à l'administration pour l'instant." };
+  }
+  return { type: canon };
+}
+
+/* GET admin — état de l'interrupteur des 6 types. */
+route("GET", "/api/admin/boutique-types-v2", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: "Réservé à l'administration." });
+  sendJSON(res, 200, { actif: await typesBoutiqueV2Actifs(), types: Object.keys(BoutiqueTypes.REGISTRE.TYPES), selectionnables_public: BoutiqueTypes.SELECTIONNABLES_PUBLIC });
+});
+/* PUT admin — { actif: true | false }. Ne modifie aucune boutique : seul l'affichage et les choix changent. */
+route("PUT", "/api/admin/boutique-types-v2", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: "Réservé à l'administration." });
+  if (!body || typeof body.actif !== 'boolean') return sendJSON(res, 400, { error: "Indiquez actif : true ou false." });
+  await definirTypesBoutiqueV2(body.actif, user.id);
+  sendJSON(res, 200, { ok: true, actif: await typesBoutiqueV2Actifs() });
+});
+
 /* GET public — consulté par les pages boutique.html / boutique-video.html avant tout rendu. */
 route("GET", "/api/plateforme/boutiques-maintenance", async (req, res) => {
   sendJSON(res, 200, {
@@ -5210,6 +5264,10 @@ const VITRINE_TEMPLATES = {
     optionnels: ["financement_participatif","evenements","formations_catalogue","produits"],
   },
 };
+/* Lot B : modèles des 4 types nouveaux (ecom, events, impact, finance), construits à partir des anciens et du registre
+   assets/boutique-types.js. Les anciens types restent intacts. Ces modèles ne sont montrés par l'API que si l'administrateur
+   a activé les 6 types (voir GET /api/vitrine-modules-registry). */
+BoutiqueTypes.ajouterTemplatesV2(VITRINE_TEMPLATES, VITRINE_MODULES_REGISTRY);
 
 /* Sélection MULTIPLE de types (2026-08-19, demande explicite de l'utilisateur) : une vitrine
    peut désormais cumuler plusieurs modèles (ex. Formation + Projet/Impact), pas un seul —
@@ -5786,6 +5844,8 @@ route("POST", "/api/produits/:id/commander", async (req, res, params, body) => {
   const init = await db.prepare("SELECT * FROM initiatives WHERE id=?").get(prod.initiative_id);
   if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
   if (Number(init.owner_user_id) === Number(user.id)) return sendJSON(res, 400, { error: "Vous ne pouvez pas commander votre propre produit." });
+  /* Même garde que POST /api/panier (acceptation 1.7) : un produit épuisé, indisponible ou masqué ne se commande pas, même en direct. */
+  if ((prod.statut || "disponible") !== "disponible") return sendJSON(res, 400, { error: "Ce produit n'est plus disponible." });
 
   const quantite = Math.max(1, Number(body.quantite) || 1);
   const publicationId = body.publication_id != null ? Number(body.publication_id) : null;
@@ -11500,7 +11560,14 @@ route("PATCH", "/api/initiatives/:id/avancement-visibilite", async (req, res, pa
 
 /* GET /api/vitrine-modules-registry — bibliothèque de modules + modèles de vitrine (public, statique) */
 route("GET", "/api/vitrine-modules-registry", async (req, res) => {
-  sendJSON(res, 200, { modules: VITRINE_MODULES_REGISTRY, templates: VITRINE_TEMPLATES, socle: VITRINE_MODULES_SOCLE });
+  /* Lot B : tant que les 6 types ne sont pas mis en service, la réponse reste celle d'avant (aucun modèle nouveau). */
+  const v2 = await typesBoutiqueV2Actifs();
+  const moi = await getCurrentUser(req).catch(() => null);
+  const templates = v2 ? VITRINE_TEMPLATES : Object.fromEntries(Object.entries(VITRINE_TEMPLATES).filter(([, t]) => !t.v2));
+  sendJSON(res, 200, {
+    modules: VITRINE_MODULES_REGISTRY, templates, socle: VITRINE_MODULES_SOCLE,
+    types_v2: BoutiqueTypes.descriptionPourInterface({ actif: v2, estAdministrateur: !!moi && moi.role === 'administrateur' }),
+  });
 });
 
 /* PUT /api/initiatives/:id/vitrine-draft — constructeur "Paramètres Vitrine" (aperçu dynamique).
@@ -11861,13 +11928,16 @@ route("POST", "/api/initiatives/:id/vitrine/changer-type", async (req, res, para
   if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
   if (Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
 
-  const nouveau = String(body.type || "");
+  const draft = safeParse(init.vitrine_draft_json) || {};
+  const typeActuel = draft.type !== undefined ? draft.type : init.vitrine_type;
+  /* Lot B : types ouverts selon l'interrupteur et le rôle (clé enregistrée = clé du registre quand les 6 types sont en service). */
+  const controle = await controlerTypeBoutiqueDemande(body.type, user, typeActuel);
+  if (controle.erreur) return sendJSON(res, 400, { error: controle.erreur });
+  const nouveau = controle.type;
   const tpl = VITRINE_TEMPLATES[nouveau];
   if (!tpl) return sendJSON(res, 400, { error: "Type de boutique inconnu." });
   const mode = body.mode === "zero" ? "zero" : "adapter";
 
-  const draft = safeParse(init.vitrine_draft_json) || {};
-  const typeActuel = draft.type !== undefined ? draft.type : init.vitrine_type;
   const sauvegarde_id = await sauvegarderVitrine(init, typeActuel, nouveau, mode);
 
   const futurs = new Set([...(tpl.actifs || []), ...(tpl.optionnels || [])]);
@@ -11971,6 +12041,12 @@ route("PUT", "/api/initiatives/:id/vitrine-draft", async (req, res, params, body
 
   if (body.type !== undefined) {
     if (body.type !== null && !VITRINE_TEMPLATES[body.type]) return sendJSON(res, 400, { error: "Type de boutique invalide." });
+    if (body.type !== null) {
+      /* Lot B : même contrôle que « changer de type » (interrupteur des 6 types, types réservés à l'administration). */
+      const controle = await controlerTypeBoutiqueDemande(body.type, user, draft.type !== undefined ? draft.type : init.vitrine_type);
+      if (controle.erreur) return sendJSON(res, 400, { error: controle.erreur });
+      body.type = controle.type;
+    }
     draft.type = body.type;
     if (body.type && VITRINE_TEMPLATES[body.type]) {
       // Appliquer un modèle est toujours ADDITIF : active ses modules recommandés sans jamais en
@@ -12011,6 +12087,8 @@ route("PUT", "/api/initiatives/:id/vitrine-draft-complet", async (req, res, para
   if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
   if (Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
   const draft = (body && typeof body.draft === "object" && body.draft) ? body.draft : {};
+  /* Lot B : une sauvegarde ne peut pas réintroduire un type nouveau tant que les 6 types ne sont pas en service. */
+  if (draft.type && BoutiqueTypes.CLES_NOUVELLES.includes(draft.type) && !(await typesBoutiqueV2Actifs())) return sendJSON(res, 400, { error: "Ce type de boutique n'est pas encore ouvert." });
   /* Lot F : même contrôle que PUT /vitrine sur les contenus du brouillon restauré. */
   const refusDepot = DepotDetourne.controlerTextes(draft.contenu);
   if (refusDepot) return sendJSON(res, 400, { error: refusDepot, depot_detourne: true });
@@ -12033,6 +12111,7 @@ route("POST", "/api/initiatives/:id/vitrine-publish", async (req, res, params) =
   if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
   if (Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
   const draft = resolveVitrineDraft(init);
+  if (draft.type && BoutiqueTypes.CLES_NOUVELLES.includes(draft.type) && !(await typesBoutiqueV2Actifs())) return sendJSON(res, 400, { error: "Ce type de boutique n'est pas encore ouvert." });
   /* Lot F : un brouillon enregistré avant ce contrôle ne peut pas non plus être publié s'il détourne le dépôt de projet. */
   const refusDepot = DepotDetourne.controlerTextes(draft.contenu);
   if (refusDepot) return sendJSON(res, 400, { error: refusDepot, depot_detourne: true });

@@ -41,7 +41,7 @@ CONSIGNE POUR CLAUDE CODE (validée par ZADI) :
   .hero .sub { font-size:19px; margin:8px 0 6px; font-weight:600; }
   .hero .desc { font-size:15px; color:var(--mut); max-width:520px; margin:0; line-height:1.5; }
   .hero .art { min-height:200px; border-radius:18px; background: radial-gradient(circle at 30% 30%, #f5c879 0%, #7a4b12 35%, #14213f 75%); position:relative; }
-  .hero .art::after { content:"🛍"; position:absolute; right:18px; top:12px; font-size:90px; filter: drop-shadow(0 0 18px rgba(231,184,75,.6)); }
+  .hero .art::after { content:""; position:absolute; right:18px; top:12px; width:90px; height:90px; background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23f5c879' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 8h14l-1 12H6z'/%3E%3Cpath d='M9 8V6a3 3 0 0 1 6 0v2'/%3E%3C/svg%3E") center/contain no-repeat; filter: drop-shadow(0 0 18px rgba(231,184,75,.6)); }
 
   /* Bande de confiance */
   .trust { display:grid; grid-template-columns: repeat(6, 1fr); gap:0; margin:16px 18px 0; border:1px solid var(--line); border-radius:16px; background:rgba(255,255,255,.03); }
@@ -404,6 +404,7 @@ CONSIGNE POUR CLAUDE CODE (validée par ZADI) :
 </style>
 </head>
 <body>
+<style>.ia{width:1.1em;height:1.1em;vertical-align:-.18em;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}</style><svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="i-search" viewBox="0 0 24 24"><circle cx='11' cy='11' r='7'/><path d='M20 20l-3.5-3.5'/></symbol><symbol id="i-bell" viewBox="0 0 24 24"><path d='M6 16v-5a6 6 0 0 1 12 0v5l1.5 2h-15z'/><path d='M10 21h4'/></symbol><symbol id="i-cart" viewBox="0 0 24 24"><circle cx='9' cy='20' r='1.4'/><circle cx='17' cy='20' r='1.4'/><path d='M3 4h2.5l2.2 11h10l2-8H6.5'/></symbol><symbol id="i-bag" viewBox="0 0 24 24"><path d='M5 8h14l-1 12H6z'/><path d='M9 8V6a3 3 0 0 1 6 0v2'/></symbol><symbol id="i-box" viewBox="0 0 24 24"><path d='M3 7.5L12 3l9 4.5v9L12 21l-9-4.5z'/><path d='M3 7.5L12 12l9-4.5M12 12v9'/></symbol><symbol id="i-store" viewBox="0 0 24 24"><path d='M4 10v10h16V10'/><path d='M3 10l1.5-6h15L21 10a3 3 0 0 1-6 0 3 3 0 0 1-6 0 3 3 0 0 1-6 0z'/></symbol><symbol id="i-chat" viewBox="0 0 24 24"><path d='M4 5h16v11H9l-5 4z'/></symbol><symbol id="i-check" viewBox="0 0 24 24"><circle cx='12' cy='12' r='9'/><path d='M8 12.5l3 3 5-6'/></symbol><symbol id="i-warn" viewBox="0 0 24 24"><path d='M12 3l10 18H2z'/><path d='M12 10v5M12 18v.01'/></symbol><symbol id="i-truck" viewBox="0 0 24 24"><path d='M2 6h11v10H2zM13 9h4l3 3v4h-7'/><circle cx='6.5' cy='18' r='1.6'/><circle cx='16.5' cy='18' r='1.6'/></symbol><symbol id="i-trash" viewBox="0 0 24 24"><path d='M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13'/></symbol><symbol id="i-card" viewBox="0 0 24 24"><rect x='2.5' y='5' width='19' height='14' rx='2'/><path d='M2.5 10h19'/></symbol><symbol id="i-shield" viewBox="0 0 24 24"><path d='M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z'/></symbol><symbol id="i-headset" viewBox="0 0 24 24"><path d='M4 14v-2a8 8 0 0 1 16 0v2'/><rect x='3' y='14' width='4' height='6' rx='1.5'/><rect x='17' y='14' width='4' height='6' rx='1.5'/></symbol><symbol id="i-gift" viewBox="0 0 24 24"><rect x='3' y='9' width='18' height='4'/><path d='M5 13v8h14v-8M12 9v12M12 9C9 9 8 4 11 4c2 0 1 5 1 5zM12 9c3 0 4-5 1-5-2 0-1 5-1 5z'/></symbol><symbol id="i-tag" viewBox="0 0 24 24"><path d='M3 12V3h9l9 9-9 9z'/><circle cx='7.5' cy='7.5' r='1.3'/></symbol><symbol id="i-bolt" viewBox="0 0 24 24"><path d='M13 2L4 14h7l-1 8 9-12h-7z'/></symbol><symbol id="i-user" viewBox="0 0 24 24"><circle cx='12' cy='8' r='4'/><path d='M4 21c0-4.5 3.5-7 8-7s8 2.5 8 7'/></symbol><symbol id="i-users" viewBox="0 0 24 24"><circle cx='9' cy='8' r='3.5'/><path d='M2 20c0-4 3-6 7-6s7 2 7 6M16 4.5a3.5 3.5 0 0 1 0 7M18 14c2.5.7 4 2.5 4 6'/></symbol><symbol id="i-calendar" viewBox="0 0 24 24"><rect x='3' y='5' width='18' height='16' rx='2'/><path d='M3 10h18M8 3v4M16 3v4'/></symbol><symbol id="i-handshake" viewBox="0 0 24 24"><path d='M2 12l4-4 4 2 3-2 4 3 5-1M2 12l5 6 3-1 2 2 3-2 5-5'/></symbol><symbol id="i-shirt" viewBox="0 0 24 24"><path d='M8 3L3 7l3 3 2-1v12h8V9l2 1 3-3-5-4a4 4 0 0 1-8 0z'/></symbol><symbol id="i-drop" viewBox="0 0 24 24"><path d='M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z'/></symbol><symbol id="i-utensils" viewBox="0 0 24 24"><path d='M6 3v7a2 2 0 0 0 4 0V3M8 10v11M17 3c-2 1-3 4-3 7h3v11'/></symbol><symbol id="i-home" viewBox="0 0 24 24"><path d='M3 11l9-8 9 8M5 10v10h14V10'/></symbol><symbol id="i-book" viewBox="0 0 24 24"><path d='M4 4h7a2 2 0 0 1 2 2v14a2 2 0 0 0-2-2H4zM20 4h-7'/><path d='M20 4v14h-7'/></symbol><symbol id="i-palette" viewBox="0 0 24 24"><path d='M12 3a9 9 0 1 0 0 18c1.5 0 2-1 1.5-2.2-.6-1.4.4-2.8 2-2.8H18a3 3 0 0 0 3-3A9 9 0 0 0 12 3z'/><circle cx='7.5' cy='11' r='1'/><circle cx='11' cy='7' r='1'/><circle cx='16' cy='8' r='1'/></symbol><symbol id="i-leaf" viewBox="0 0 24 24"><path d='M5 19C5 10 10 5 20 4c0 10-4 15-13 15zM5 19l7-7'/></symbol><symbol id="i-grad" viewBox="0 0 24 24"><path d='M2 9l10-5 10 5-10 5z'/><path d='M6 11v5c3 2.5 9 2.5 12 0v-5'/></symbol><symbol id="i-chart" viewBox="0 0 24 24"><path d='M4 20V4M4 20h16M8 16v-5M13 16V8M18 16v-9'/></symbol><symbol id="i-folder" viewBox="0 0 24 24"><path d='M3 6h7l2 2h9v11H3z'/></symbol><symbol id="i-euro" viewBox="0 0 24 24"><path d='M17 6a7 7 0 1 0 0 12M4 10h9M4 14h9'/></symbol><symbol id="i-pin" viewBox="0 0 24 24"><path d='M12 21s7-6 7-12a7 7 0 0 0-14 0c0 6 7 12 7 12z'/><circle cx='12' cy='9' r='2.5'/></symbol><symbol id="i-file" viewBox="0 0 24 24"><path d='M6 3h8l4 4v14H6zM14 3v4h4M9 12h6M9 16h6'/></symbol><symbol id="i-news" viewBox="0 0 24 24"><rect x='4' y='4' width='16' height='16' rx='2'/><path d='M8 9h8M8 13h8M8 17h5'/></symbol><symbol id="i-heart" viewBox="0 0 24 24"><path d='M12 20s-8-5-8-11a4.5 4.5 0 0 1 8-2.5A4.5 4.5 0 0 1 20 9c0 6-8 11-8 11z'/></symbol><symbol id="i-thumb" viewBox="0 0 24 24"><path d='M7 11v9H3v-9zM7 11l4-8c2 0 3 1.5 2.5 3.5L13 10h6a2 2 0 0 1 2 2.3l-1.2 6A2 2 0 0 1 17.8 20H7'/></symbol></svg>
 <script src="/assets/boutique-types.js"></script>
 <script src="exemple-commun.js"></script>
 <header class="top">
@@ -413,9 +414,9 @@ CONSIGNE POUR CLAUDE CODE (validée par ZADI) :
   </nav>
   <div class="sp"></div>
   <div class="icons">
-    <button class="ico" aria-label="Rechercher">🔍</button>
-    <button class="ico" aria-label="Notifications">🔔</button>
-    <button class="ico" id="openCart" aria-label="Voir le panier">🛒</button>
+    <button class="ico" aria-label="Rechercher"><svg class='ia' viewBox='0 0 24 24' aria-hidden='true'><use href='#i-search'/></svg></button>
+    <button class="ico" aria-label="Notifications"><svg class='ia' viewBox='0 0 24 24' aria-hidden='true'><use href='#i-bell'/></svg></button>
+    <button class="ico" id="openCart" aria-label="Voir le panier"><svg class='ia' viewBox='0 0 24 24' aria-hidden='true'><use href='#i-cart'/></svg></button>
     <span class="acc">Mon compte</span>
   </div>
 </header>
@@ -423,7 +424,7 @@ CONSIGNE POUR CLAUDE CODE (validée par ZADI) :
 <section class="hero">
   <div>
     <div class="ttl">
-      <div class="badge-shop">🛍</div>
+      <div class="badge-shop"><svg class='ia' viewBox='0 0 24 24' aria-hidden='true'><use href='#i-bag'/></svg></div>
       <div>
         <h1 id="heroTitle">Boutique <span>Traditionnelle</span></h1>
       </div>
@@ -435,16 +436,16 @@ CONSIGNE POUR CLAUDE CODE (validée par ZADI) :
 </section>
 
 <div class="trust">
-  <div><span class="ti">🚚</span><span><b>Livraison</b>fiable</span></div>
-  <div><span class="ti">🛡</span><span><b>Paiement</b>sécurisé</span></div>
+  <div><span class="ti"><svg class='ia' viewBox='0 0 24 24' aria-hidden='true'><use href='#i-truck'/></svg></span><span><b>Livraison</b>fiable</span></div>
+  <div><span class="ti"><svg class='ia' viewBox='0 0 24 24' aria-hidden='true'><use href='#i-shield'/></svg></span><span><b>Paiement</b>sécurisé</span></div>
   <div><span class="ti">↻</span><span><b>Retours</b>faciles</span></div>
-  <div><span class="ti">🎧</span><span><b>Support</b>client</span></div>
+  <div><span class="ti"><svg class='ia' viewBox='0 0 24 24' aria-hidden='true'><use href='#i-headset'/></svg></span><span><b>Support</b>client</span></div>
   <div><span class="ti">★</span><span><b>Offres et</b>promotions</span></div>
-  <div><span class="ti">🎁</span><span><b>Campagnes</b>spéciales</span></div>
+  <div><span class="ti"><svg class='ia' viewBox='0 0 24 24' aria-hidden='true'><use href='#i-gift'/></svg></span><span><b>Campagnes</b>spéciales</span></div>
 </div>
 
 <div class="search">
-  <div class="field"><span>🔍</span><input id="q" type="search" placeholder="Rechercher un produit (ex : vêtements, cosmétique, livre...)" aria-label="Rechercher un produit"></div>
+  <div class="field"><span><svg class='ia' viewBox='0 0 24 24' aria-hidden='true'><use href='#i-search'/></svg></span><input id="q" type="search" placeholder="Rechercher un produit (ex : vêtements, cosmétique, livre...)" aria-label="Rechercher un produit"></div>
   <select id="catSelect" aria-label="Catégorie"></select>
   <button class="btn-cart" id="openCart2">Mon panier <span class="n" id="cartCount">0</span></button>
 </div>
@@ -458,16 +459,16 @@ CONSIGNE POUR CLAUDE CODE (validée par ZADI) :
 </section>
 
 <section class="block" id="offerBlock">
-  <div class="sh"><span class="ic">🏷</span><div><h2>Offres promotionnelles</h2><p>Profitez de nos meilleures réductions pour une durée limitée.</p></div>
+  <div class="sh"><span class="ic"><svg class='ia' viewBox='0 0 24 24' aria-hidden='true'><use href='#i-tag'/></svg></span><div><h2>Offres promotionnelles</h2><p>Profitez de nos meilleures réductions pour une durée limitée.</p></div>
     <div class="r">
-      <div class="countdown"><span>⚡ Fin de la promotion dans :</span><span class="t" id="cdD">02</span>j<span class="t" id="cdH">14</span>h<span class="t" id="cdM">36</span>min<span class="t" id="cdS">58</span>s</div>
+      <div class="countdown"><span><svg class='ia' viewBox='0 0 24 24' aria-hidden='true'><use href='#i-bolt'/></svg> Fin de la promotion dans :</span><span class="t" id="cdD">02</span>j<span class="t" id="cdH">14</span>h<span class="t" id="cdM">36</span>min<span class="t" id="cdS">58</span>s</div>
       <button class="pill">Voir toutes les offres →</button>
     </div></div>
   <div class="grid4" id="promoGrid"></div>
 </section>
 
 <section class="block" id="mainBlock">
-  <div class="sh"><span class="ic">🛒</span><div><h2 id="sectMain">Nos produits</h2><p>Découvrez toute notre sélection.</p></div>
+  <div class="sh"><span class="ic"><svg class='ia' viewBox='0 0 24 24' aria-hidden='true'><use href='#i-cart'/></svg></span><div><h2 id="sectMain">Nos produits</h2><p>Découvrez toute notre sélection.</p></div>
     <div class="r"><select class="sort" id="sort" aria-label="Trier">
       <option value="recent">Trier par : Pertinence</option>
       <option value="price-asc">Prix croissant</option>
@@ -512,7 +513,7 @@ CONSIGNE POUR CLAUDE CODE (validée par ZADI) :
     <div class="ih-logo"><i></i> <span id="shopLogo"></span></div>
     <nav class="ih-nav"><a class="on" data-go="accueil">Accueil</a><a data-go="projets">Nos projets</a><a data-go="vision">Notre vision</a><a data-go="evenements">Événements</a><a data-go="rendez-vous">Rendez-vous</a><a data-go="partenariat">Partenariat</a></nav>
     <div class="sp"></div>
-    <div class="ih-icons"><span>🔍</span><span>🔔</span><span>👤</span></div>
+    <div class="ih-icons"><span><svg class='ia' viewBox='0 0 24 24' aria-hidden='true'><use href='#i-search'/></svg></span><span><svg class='ia' viewBox='0 0 24 24' aria-hidden='true'><use href='#i-bell'/></svg></span><span><svg class='ia' viewBox='0 0 24 24' aria-hidden='true'><use href='#i-user'/></svg></span></div>
     
   </header>
 
@@ -558,19 +559,19 @@ CONSIGNE POUR CLAUDE CODE (validée par ZADI) :
     </section>
     <aside class="ih-side">
       <div class="ih-box">
-        <h3>📅 Demander un rendez-vous</h3>
+        <h3><svg class='ia' viewBox='0 0 24 24' aria-hidden='true'><use href='#i-calendar'/></svg> Demander un rendez-vous</h3>
         <p>Échangez avec notre équipe pour présenter votre projet ou votre initiative.</p>
         <span class="ih-outline" data-go="rendez-vous">Prendre rendez-vous →</span>
       </div>
       <div class="ih-box">
-        <h3>🤝 Devenir partenaire</h3>
+        <h3><svg class='ia' viewBox='0 0 24 24' aria-hidden='true'><use href='#i-handshake'/></svg> Devenir partenaire</h3>
         <p>Entreprises, organisations, institutions : construisons des projets d'impact ensemble.</p>
         <span class="ih-outline" data-go="partenariat">Demander un partenariat →</span>
       </div>
     </aside>
   </div>
 
-  <section class="ih-bottom"><div class="lead"><span style="font-size:30px">🤝</span><div><b id="shopBottomT"></b><span>Contribuez, rejoignez l'équipe ou devenez partenaire.</span></div></div><span class="ih-btn-p" data-go="partenariat">Devenir partenaire →</span></section>
+  <section class="ih-bottom"><div class="lead"><span style="font-size:30px"><svg class='ia' viewBox='0 0 24 24' aria-hidden='true'><use href='#i-handshake'/></svg></span><div><b id="shopBottomT"></b><span>Contribuez, rejoignez l'équipe ou devenez partenaire.</span></div></div><span class="ih-btn-p" data-go="partenariat">Devenir partenaire →</span></section>
   
   </div>
 
@@ -781,13 +782,13 @@ CONSIGNE POUR CLAUDE CODE (validée par ZADI) :
   ];
   const CATS = [
     { id: "all", label: "Toutes catégories", icon: "▦" },
-    { id: "mode", label: "Mode & Accessoires", icon: "👗" },
-    { id: "beaute", label: "Beauté & Bien-être", icon: "🧴" },
-    { id: "alim", label: "Alimentation & Terroir", icon: "🌶" },
-    { id: "maison", label: "Maison & Décoration", icon: "🏠" },
-    { id: "elec", label: "Électronique & Multimédia", icon: "🎧" },
-    { id: "livres", label: "Livres & Formation", icon: "📚" },
-    { id: "art", label: "Art & Artisanat", icon: "🗿" },
+    { id: "mode", label: "Mode & Accessoires", icon: "<svg class='ia' viewBox='0 0 24 24' aria-hidden='true'><use href='#i-shirt'/></svg>" },
+    { id: "beaute", label: "Beauté & Bien-être", icon: "<svg class='ia' viewBox='0 0 24 24' aria-hidden='true'><use href='#i-drop'/></svg>" },
+    { id: "alim", label: "Alimentation & Terroir", icon: "<svg class='ia' viewBox='0 0 24 24' aria-hidden='true'><use href='#i-utensils'/></svg>" },
+    { id: "maison", label: "Maison & Décoration", icon: "<svg class='ia' viewBox='0 0 24 24' aria-hidden='true'><use href='#i-home'/></svg>" },
+    { id: "elec", label: "Électronique & Multimédia", icon: "<svg class='ia' viewBox='0 0 24 24' aria-hidden='true'><use href='#i-headset'/></svg>" },
+    { id: "livres", label: "Livres & Formation", icon: "<svg class='ia' viewBox='0 0 24 24' aria-hidden='true'><use href='#i-book'/></svg>" },
+    { id: "art", label: "Art & Artisanat", icon: "<svg class='ia' viewBox='0 0 24 24' aria-hidden='true'><use href='#i-palette'/></svg>" },
     { id: "autres", label: "Autres produits", icon: "•••" }
   ];
   const CAT_LABEL = Object.fromEntries(CATS.map(c => [c.id, c.label]));
@@ -839,7 +840,7 @@ CONSIGNE POUR CLAUDE CODE (validée par ZADI) :
     return `<article class="card">
       <div class="media" style="--c:${p.c}" data-open="${p.id}" role="button" aria-label="Voir ${p.t}">
         ${badge}
-        <button class="heart" aria-label="Ajouter aux favoris" onclick="event.stopPropagation()">♡</button>
+        <button class="heart" aria-label="Ajouter aux favoris" onclick="event.stopPropagation()"><svg class='ia' viewBox='0 0 24 24' aria-hidden='true'><use href='#i-heart'/></svg></button>
         ${avail ? "" : `<span class="out">Épuisé</span>`}
       </div>
       <div class="body">
@@ -860,7 +861,7 @@ CONSIGNE POUR CLAUDE CODE (validée par ZADI) :
   function renderVideos() {
     $("#vids").innerHTML = VIDEOS.map(v => `<article class="vid">
       <div class="vm" style="background:${v.c}"><span class="play">▶</span><span class="dur">${v.dur}</span></div>
-      <div class="vb"><h3>${v.t}</h3><div class="st"><span>👍 ${v.likes}</span><span>❤ ${v.hearts}</span><span>💬 ${v.comments}</span></div></div>
+      <div class="vb"><h3>${v.t}</h3><div class="st"><span><svg class='ia' viewBox='0 0 24 24' aria-hidden='true'><use href='#i-thumb'/></svg> ${v.likes}</span><span><svg class='ia' viewBox='0 0 24 24' aria-hidden='true'><use href='#i-heart'/></svg> ${v.hearts}</span><span><svg class='ia' viewBox='0 0 24 24' aria-hidden='true'><use href='#i-chat'/></svg> ${v.comments}</span></div></div>
     </article>`).join("");
   }
   function render() {
@@ -966,9 +967,9 @@ CONSIGNE POUR CLAUDE CODE (validée par ZADI) :
   document.getElementById("impactHome").hidden = false;
 
   const IP = [
-    { id: 1, t: "Énergie solaire pour un centre de santé communautaire", dom: "Environnement", pays: "Côte d'Ivoire", goal: 20000, raised: 20000, ben: 3800, end: "Terminé", statut: "Financé", tag: "🌿 Environnement", color: "#1e9b4c", img: "impact-img/solaire-fiche.jpg", desc: "Équiper un centre de santé en énergie solaire pour garantir la continuité des soins et améliorer l'accès aux services de santé pour la communauté.", objectifs: "Installer un système solaire, former le personnel du centre et assurer la maintenance locale.", porteur: "Santé Solidaire CI · Initiative locale", impact: "Plus de 3 800 personnes ont désormais accès à des soins éclairés par l'énergie solaire, même pendant les coupures.", docs: ["Plan du projet (PDF)", "Devis du matériel (PDF)", "Rapport d'avancement (PDF)"], news: ["Installation des premiers panneaux réalisée.", "Formation de deux techniciens locaux terminée."] },
-    { id: 2, t: "Une bibliothèque numérique pour 10 écoles rurales", dom: "Éducation", pays: "Sénégal", goal: 20000, raised: 14400, ben: 1250, end: "22 janv. 2027", statut: "En cours", tag: "🎓 Éducation", color: "#2563eb", img: "impact-img/card-ecole.jpg", desc: "Doter dix écoles rurales d'une bibliothèque numérique, avec tablettes, contenus scolaires et formation des enseignants.", objectifs: "Équiper 10 écoles, former 30 enseignants et rendre 1 250 élèves autonomes dans la lecture numérique.", porteur: "Éducation Rurale SN · Association locale", impact: "1 250 élèves ont déjà accès à des livres numériques dans leur école.", docs: ["Programme de formation (PDF)", "Budget détaillé (PDF)"], news: ["Trois écoles sont équipées.", "Quinze enseignants formés en mars."] },
-    { id: 3, t: "Autonomisation des femmes par la couture et l'entrepreneuriat", dom: "Économie locale", pays: "Bénin", goal: 10000, raised: 4500, ben: 50, end: "12 mars 2027", statut: "En cours", tag: "📊 Économie", color: "#7c3aed", img: "impact-img/card-couture.jpg", desc: "Former des couturières à la gestion d'un atelier et à la vente, avec l'achat de machines à coudre.", objectifs: "Former 50 femmes, acheter 10 machines et accompagner la création de 10 ateliers.", porteur: "Couture & Avenir BJ · Coopérative", impact: "Cinquante femmes sont formées, et les premières ateliers sont en activité.", docs: ["Plan de formation (PDF)", "Bilan des premières ventes (PDF)"], news: ["Première session de couture terminée.", "Dix machines à coudre achetées."] }
+    { id: 1, t: "Énergie solaire pour un centre de santé communautaire", dom: "Environnement", pays: "Côte d'Ivoire", goal: 20000, raised: 20000, ben: 3800, end: "Terminé", statut: "Financé", tag: "<svg class='ia' viewBox='0 0 24 24' aria-hidden='true'><use href='#i-leaf'/></svg> Environnement", color: "#1e9b4c", img: "impact-img/solaire-fiche.jpg", desc: "Équiper un centre de santé en énergie solaire pour garantir la continuité des soins et améliorer l'accès aux services de santé pour la communauté.", objectifs: "Installer un système solaire, former le personnel du centre et assurer la maintenance locale.", porteur: "Santé Solidaire CI · Initiative locale", impact: "Plus de 3 800 personnes ont désormais accès à des soins éclairés par l'énergie solaire, même pendant les coupures.", docs: ["Plan du projet (PDF)", "Devis du matériel (PDF)", "Rapport d'avancement (PDF)"], news: ["Installation des premiers panneaux réalisée.", "Formation de deux techniciens locaux terminée."] },
+    { id: 2, t: "Une bibliothèque numérique pour 10 écoles rurales", dom: "Éducation", pays: "Sénégal", goal: 20000, raised: 14400, ben: 1250, end: "22 janv. 2027", statut: "En cours", tag: "<svg class='ia' viewBox='0 0 24 24' aria-hidden='true'><use href='#i-grad'/></svg> Éducation", color: "#2563eb", img: "impact-img/card-ecole.jpg", desc: "Doter dix écoles rurales d'une bibliothèque numérique, avec tablettes, contenus scolaires et formation des enseignants.", objectifs: "Équiper 10 écoles, former 30 enseignants et rendre 1 250 élèves autonomes dans la lecture numérique.", porteur: "Éducation Rurale SN · Association locale", impact: "1 250 élèves ont déjà accès à des livres numériques dans leur école.", docs: ["Programme de formation (PDF)", "Budget détaillé (PDF)"], news: ["Trois écoles sont équipées.", "Quinze enseignants formés en mars."] },
+    { id: 3, t: "Autonomisation des femmes par la couture et l'entrepreneuriat", dom: "Économie locale", pays: "Bénin", goal: 10000, raised: 4500, ben: 50, end: "12 mars 2027", statut: "En cours", tag: "<svg class='ia' viewBox='0 0 24 24' aria-hidden='true'><use href='#i-chart'/></svg> Économie", color: "#7c3aed", img: "impact-img/card-couture.jpg", desc: "Former des couturières à la gestion d'un atelier et à la vente, avec l'achat de machines à coudre.", objectifs: "Former 50 femmes, acheter 10 machines et accompagner la création de 10 ateliers.", porteur: "Couture & Avenir BJ · Coopérative", impact: "Cinquante femmes sont formées, et les premières ateliers sont en activité.", docs: ["Plan de formation (PDF)", "Bilan des premières ventes (PDF)"], news: ["Première session de couture terminée.", "Dix machines à coudre achetées."] }
   ];
   const eur = n => n.toLocaleString("fr-FR", { maximumFractionDigits: 2 }) + " €";
   const pctOf = p => Math.min(100, Math.round(p.raised / p.goal * 100));
@@ -999,9 +1000,9 @@ CONSIGNE POUR CLAUDE CODE (validée par ZADI) :
   $i("#shopBottomT").textContent = "Soutenez les projets de " + SHOP_NAME;
   const totRaised = IP.reduce((s, p) => s + p.raised, 0), totBen = IP.reduce((s, p) => s + p.ben, 0);
   $i("#shopStats").innerHTML = [
-    ["📁", IP.length, "Projets"],
-    ["💶", eur(totRaised), "Collectés"],
-    ["👥", totBen.toLocaleString("fr-FR"), "Bénéficiaires"],
+    ["<svg class='ia' viewBox='0 0 24 24' aria-hidden='true'><use href='#i-folder'/></svg>", IP.length, "Projets"],
+    ["<svg class='ia' viewBox='0 0 24 24' aria-hidden='true'><use href='#i-euro'/></svg>", eur(totRaised), "Collectés"],
+    ["<svg class='ia' viewBox='0 0 24 24' aria-hidden='true'><use href='#i-users'/></svg>", totBen.toLocaleString("fr-FR"), "Bénéficiaires"],
     ["✓", IP.filter(p => p.statut === "Financé").length, "Projets financés"]
   ].map(([i, v, l]) => `<div class="ih-stat"><span class="ico">${i}</span><div><b>${v}</b><span>${l}</span></div></div>`).join("");
   $i("#homeCards").innerHTML = IP.map(cardHtml).join("");
@@ -1016,11 +1017,11 @@ CONSIGNE POUR CLAUDE CODE (validée par ZADI) :
   function cardHtml(p) {
     const pc = pctOf(p);
     return `<article class="ih-card" data-go="projet-${p.id}">
-      <div class="ih-media" style="background-image:url('${p.img}')"><span class="ih-tag" style="background:${p.color}">${p.tag}</span><span class="ih-fav">♡</span></div>
-      <div class="ih-body"><h3>${p.t}</h3><div class="ih-place">📍 ${p.pays}</div>
+      <div class="ih-media" style="background-image:url('${p.img}')"><span class="ih-tag" style="background:${p.color}">${p.tag}</span><span class="ih-fav"><svg class='ia' viewBox='0 0 24 24' aria-hidden='true'><use href='#i-heart'/></svg></span></div>
+      <div class="ih-body"><h3>${p.t}</h3><div class="ih-place"><svg class='ia' viewBox='0 0 24 24' aria-hidden='true'><use href='#i-pin'/></svg> ${p.pays}</div>
         <div class="ih-prog"><div class="bar"><i style="width:${pc}%;background:${pc >= 100 ? "#1e9b4c" : "#f47c20"}"></i></div><b>${pc} %</b></div>
         <div class="ih-amount"><b>${eur(p.raised)}</b> sur ${eur(p.goal)}</div>
-        <div class="ih-meta"><span>👥 ${p.ben.toLocaleString("fr-FR")} bénéficiaires</span><span>📅 ${p.end}</span></div></div>
+        <div class="ih-meta"><span><svg class='ia' viewBox='0 0 24 24' aria-hidden='true'><use href='#i-users'/></svg> ${p.ben.toLocaleString("fr-FR")} bénéficiaires</span><span><svg class='ia' viewBox='0 0 24 24' aria-hidden='true'><use href='#i-calendar'/></svg> ${p.end}</span></div></div>
     </article>`;
   }
   ["#fDom", "#fPays", "#fStat"].forEach(s => $i(s).addEventListener("change", renderList));
@@ -1029,7 +1030,7 @@ CONSIGNE POUR CLAUDE CODE (validée par ZADI) :
   $i("#encoursBox").innerHTML = IP.filter(p => p.statut === "En cours").map(p => {
     const pc = pctOf(p);
     return `<div class="row" data-go="projet-${p.id}">
-      <div><b>${p.t}</b><small>📍 ${p.pays} · 📅 Fin : ${p.end}</small></div>
+      <div><b>${p.t}</b><small><svg class='ia' viewBox='0 0 24 24' aria-hidden='true'><use href='#i-pin'/></svg> ${p.pays} · <svg class='ia' viewBox='0 0 24 24' aria-hidden='true'><use href='#i-calendar'/></svg> Fin : ${p.end}</small></div>
       <div class="prog"><div class="ih-prog"><div class="bar"><i style="width:${pc}%;background:#f47c20"></i></div><b>${pc} %</b></div>
         <small>${eur(p.raised)} sur ${eur(p.goal)}</small></div>
     </div>`;
@@ -1094,22 +1095,22 @@ CONSIGNE POUR CLAUDE CODE (validée par ZADI) :
       objectifs: p.objectifs,
       impact: p.impact,
       porteur: p.porteur,
-      documents: "<ul class=\"ih-list\">" + p.docs.map(d => `<li>📄 ${d} <button class=\"ih-small\" data-doc=\"${d}\">Télécharger</button></li>`).join("") + "</ul>",
-      actualites: "<ul class=\"ih-list\">" + p.news.map(n => `<li>🗞 ${n}</li>`).join("") + "</ul>"
+      documents: "<ul class=\"ih-list\">" + p.docs.map(d => `<li><svg class='ia' viewBox='0 0 24 24' aria-hidden='true'><use href='#i-file'/></svg> ${d} <button class=\"ih-small\" data-doc=\"${d}\">Télécharger</button></li>`).join("") + "</ul>",
+      actualites: "<ul class=\"ih-list\">" + p.news.map(n => `<li><svg class='ia' viewBox='0 0 24 24' aria-hidden='true'><use href='#i-news'/></svg> ${n}</li>`).join("") + "</ul>"
     };
     $i("#ficheBox").innerHTML = `
       <div class="ih-fiche">
         <div>
           <div class="ih-media" style="background-image:url('${p.img}')"><span class="ih-tag" style="background:${p.color}">${p.tag}</span></div>
           <h1>${p.t}</h1>
-          <div class="ih-place">📍 ${p.pays} · ${p.dom}</div>
+          <div class="ih-place"><svg class='ia' viewBox='0 0 24 24' aria-hidden='true'><use href='#i-pin'/></svg> ${p.pays} · ${p.dom}</div>
           <div class="ih-tabs">${[["presentation","Présentation"],["objectifs","Objectifs"],["impact","Impact"],["porteur","Porteur"],["documents","Documents"],["actualites","Actualités"]].map(([k,l]) => `<button data-tab="${k}" class="${tab === k ? "on" : ""}">${l}</button>`).join("")}</div>
           <div class="ih-panel">${panels[tab]}</div>
         </div>
         <aside class="ih-contrib">
           <div class="ih-prog"><div class="bar"><i style="width:${pc}%;background:${done ? "#1e9b4c" : "#f47c20"}"></i></div><b>${pc} %</b></div>
           <div class="big">${eur(p.raised)} <span style="font-size:15px;font-weight:400;color:#5b6679">sur ${eur(p.goal)}</span></div>
-          <div class="ih-meta"><span>👥 ${p.ben.toLocaleString("fr-FR")} bénéficiaires</span><span>📅 ${p.end}</span></div>
+          <div class="ih-meta"><span><svg class='ia' viewBox='0 0 24 24' aria-hidden='true'><use href='#i-users'/></svg> ${p.ben.toLocaleString("fr-FR")} bénéficiaires</span><span><svg class='ia' viewBox='0 0 24 24' aria-hidden='true'><use href='#i-calendar'/></svg> ${p.end}</span></div>
           ${done ? `<div class="ih-ok">Projet financé</div>` : `
           <div class="ih-amts">${[5,10,25,50].map(a => `<button data-amt="${a}" class="${amount === a ? "on" : ""}">${a} €</button>`).join("")}</div>
           <button class="ih-btn-p" id="contribBtn" style="width:100%">Contribuer au projet (${amount} €)</button>
@@ -1196,8 +1197,8 @@ CONSIGNE POUR CLAUDE CODE (validée par ZADI) :
   function evCard(e) {
     return `<article class="ih-card" data-go="evenement-${e.id}">
       <div class="ih-media" style="background-image:url('${e.img}')"><span class="ih-tag" style="background:${e.color}">${e.statut === "Passé" ? "Événement passé" : "À venir"}</span></div>
-      <div class="ih-body"><h3>${e.t}</h3><div class="ih-place">📍 ${e.lieu}</div>
-        <div class="ih-meta"><span>📅 ${e.date}</span><span>${e.med.length ? e.med.length + " photo(s) et vidéo(s)" : "Pas encore de média"}</span></div></div>
+      <div class="ih-body"><h3>${e.t}</h3><div class="ih-place"><svg class='ia' viewBox='0 0 24 24' aria-hidden='true'><use href='#i-pin'/></svg> ${e.lieu}</div>
+        <div class="ih-meta"><span><svg class='ia' viewBox='0 0 24 24' aria-hidden='true'><use href='#i-calendar'/></svg> ${e.date}</span><span>${e.med.length ? e.med.length + " photo(s) et vidéo(s)" : "Pas encore de média"}</span></div></div>
     </article>`;
   }
   $i("#evHome").innerHTML = EV.map(evCard).join("");
@@ -1224,7 +1225,7 @@ CONSIGNE POUR CLAUDE CODE (validée par ZADI) :
       <div class="ih-row2" style="margin:0 0 6px"><a class="ih-outline-btn" data-go="evenements">← Retour aux événements</a></div>
       <div class="ih-media" style="background-image:url('${e.img}');height:260px;border-radius:16px"><span class="ih-tag" style="background:${e.color}">${e.statut === "Passé" ? "Événement passé" : "À venir"}</span></div>
       <h1 style="margin:14px 0 6px;font-size:28px;color:#16233a;text-wrap:balance">${e.t}</h1>
-      <div class="ih-evmeta"><span>📅 ${e.date}</span><span>📍 ${e.lieu}</span></div>
+      <div class="ih-evmeta"><span><svg class='ia' viewBox='0 0 24 24' aria-hidden='true'><use href='#i-calendar'/></svg> ${e.date}</span><span><svg class='ia' viewBox='0 0 24 24' aria-hidden='true'><use href='#i-pin'/></svg> ${e.lieu}</span></div>
       <p class="ih-mut" style="margin:12px 0 0">${e.resume}</p>
       <div class="ih-tabs">${[["rapport", "Rapport"], ["galerie", "Photos et vidéos"]].map(([k, l]) => `<button data-evtab="${k}" class="${evTab === k ? "on" : ""}">${l}</button>`).join("")}</div>
       <div class="ih-panel ih-rap">${evTab === "rapport" ? rap : gal}</div>`;

@@ -13,8 +13,7 @@
    Les points 4.1 à 4.8 (réclamations et remboursements) sont dans tests/retours.test.js.
    Les points qui dépendent d'un lot pas encore livré (1.1 à 1.3, 1.5, 1.6, 1.11, 2.x, 3.2 à 3.5, 5.3) ne sont PAS
    écrits ici : ils sont « Bloqués » dans le rapport tant que le lot n'est pas commité.
-   Un point en échec connu est marqué `todo` : il est exécuté et affiché, mais ne fait pas échouer la suite ;
-   retirer `todo` dès que la correction est livrée.
+   Corrections livrées le 2026-11-10 : les points qui étaient en échec connu (`todo`) sont désormais des tests normaux.
    Aucun paiement réel, aucune clé réelle : vrai serveur sur une COPIE de la base de dev.
    Lancer : node --test tests/acceptation-boutiques.test.js
    =========================================================== */
@@ -64,7 +63,7 @@ test('1.10 « Acheter maintenant » n\'existe dans aucune page de boutique ni de
   for (const rel of pagesBoutique()) if (/Acheter maintenant/i.test(sansCommentaires(lire(rel)))) fautes.push(rel);
   assert.deepEqual(fautes, []);
 });
-test('1.10 bis « Acheter maintenant » n\'existe plus dans profil-app.html (publications du fil)', { todo: 'à retirer par la session 1 : 2 occurrences (PUB_CTA_LABEL et liste déroulante du type d\'appel)' }, () => {
+test('1.10 bis « Acheter maintenant » n\'existe plus dans profil-app.html (publications du fil)', () => {
   const occurrences = (sansCommentaires(lire('profil-app.html')).match(/Acheter maintenant/g) || []).length;
   assert.equal(occurrences, 0, `${occurrences} occurrence(s) restante(s) dans profil-app.html`);
 });
@@ -72,7 +71,7 @@ test('1.10 bis « Acheter maintenant » n\'existe plus dans profil-app.html (pub
 /* ═════════════ 1.13 Aucune émoticône ═════════════ */
 const EMOTICONE = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{2604}\u{2607}-\u{27BF}\u{2B50}\u{2B55}\u{FE0F}]/u;
 const SYMBOLES_AUTORISES = /[\u2713-\u2718\u2605\u2606\u2022]/gu; /* coches, croix, étoiles typographiques, puce : pas des émoticônes */
-test('1.13 aucune émoticône dans les pages de boutique (le périmètre « toute la plateforme » est à confirmer)', { todo: 'ÉCHEC À CORRIGER : panier.html et exemples-boutiques/boutique.html contiennent des émoticônes (session 1)' }, () => {
+test('1.13 aucune émoticône dans les pages de boutique (le périmètre « toute la plateforme » est à confirmer)', () => {
   const fautes = [];
   for (const rel of pagesBoutique()) {
     const texte = sansCommentaires(lire(rel)).replace(SYMBOLES_AUTORISES, '');
@@ -83,7 +82,7 @@ test('1.13 aucune émoticône dans les pages de boutique (le périmètre « tout
 });
 
 /* ═════════════ 1.14 Aucun badge vendeur vérifié / créateur certifié ═════════════ */
-test('1.14 aucun badge « vendeur vérifié » ni « créateur certifié » dans les pages de boutique, la page d\'accueil des boutiques et les modules de retour', { todo: "ÉCHEC À CORRIGER : exemples-boutiques/parametres-vitrine.html annonce un badge « Vendeur vérifié » (session 1)" }, () => {
+test('1.14 aucun badge « vendeur vérifié » ni « créateur certifié » dans les pages de boutique, la page d\'accueil des boutiques et les modules de retour', () => {
   const motif = /(vendeur|boutique|marchand|commerçant|créateur|createur)\s+(vérifié|verifie|certifié|certifie|agréé)/i;
   const fautes = [];
   const fichiers = [...pagesBoutique(), 'vitrines.html', 'site-vitrine.html', 'assets/app.js'].filter((rel) => fs.existsSync(path.join(RACINE, rel)));
@@ -179,7 +178,7 @@ test('1.7 un article en rupture ne peut pas être ajouté au panier', async () =
   const contenu = sql('select produit_id from panier_items where user_id=?', acheteur.id).map((r) => r.produit_id);
   assert.ok(!contenu.includes(produitEpuise), 'l\'article en rupture ne doit jamais entrer dans le panier');
 });
-test('1.7 bis un article en rupture ne peut pas être commandé directement (hors panier)', { todo: 'ÉCHEC À CORRIGER : POST /api/produits/:id/commander ne contrôle pas le statut du produit (seul le panier le fait)' }, async () => {
+test('1.7 bis un article en rupture ne peut pas être commandé directement (hors panier)', async () => {
   const avant = sql('select count(*) as n from commandes_vitrine where produit_id=?', produitEpuise)[0].n;
   const r = await env.call(acheteur.jar, 'POST', '/api/produits/' + produitEpuise + '/commander', { quantite: 1, mode_livraison: 'retrait' });
   const apres = sql('select count(*) as n from commandes_vitrine where produit_id=?', produitEpuise)[0].n;

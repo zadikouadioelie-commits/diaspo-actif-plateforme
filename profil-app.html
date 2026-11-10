@@ -1254,7 +1254,7 @@ async function init() {
       if (!isOwn && profil.initiative_id && !_qb.get('paiement') && !_qb.get('preview')) {
         try {
           const _ib = (await api('GET', '/initiatives/' + profil.initiative_id)).initiative;
-          if (_ib && _ib.vitrine_type === 'commercial') { location.replace('boutique.html?id=' + encodeURIComponent(profil.initiative_id)); return; }
+          if (_ib && (_ib.vitrine_type === 'commercial' || _ib.vitrine_type === 'ecom')) { location.replace('boutique.html?id=' + encodeURIComponent(profil.initiative_id)); return; }
           if (_ib && _ib.vitrine_type === 'portfolio') { location.replace('portfolio.html?id=' + encodeURIComponent(profil.initiative_id)); return; }
           if (_ib && _ib.vitrine_type === 'video') { location.replace('boutique-video.html?id=' + encodeURIComponent(profil.initiative_id)); return; }
         } catch (e) { /* repli : l'ancienne vue boutique */ }
@@ -6455,7 +6455,7 @@ let _pubInit = null;
 let _pubOwner = false;
 let _pubOnglet = 'À la une';
 const PUB_ONGLETS = ['À la une', 'Promotions', 'Nouveautés'];
-const PUB_CTA_LABEL = { acheter: '🛒 Acheter maintenant', voir: '🔎 Voir le produit', aucun: '' };
+const PUB_CTA_LABEL = { acheter: 'Ajouter au panier', voir: '🔎 Voir le produit', aucun: '' };
 
 async function renderPublications(init, ownerFlag) {
   const box = document.getElementById('vt-publications');
@@ -6665,7 +6665,17 @@ async function pubVoirProduit(pubId, produitId) {
 async function pubAcheter(pubId, produitId) {
   try { await api('POST', `/publications/${pubId}/clic`); } catch(_){}
   const p = _publications.find(x => x.id === pubId); if (p) p.clics_fiche = (p.clics_fiche||0)+1;
-  openCommanderModal(produitId, pubId);
+  /* « Acheter maintenant » n'existe plus (refonte des boutiques) : le bouton de la publication ajoute l'article au panier.
+     Retrait sur place par défaut ; si le vendeur ne propose que l'expédition, on retente en expédition. */
+  if (!CU) { window.location.href = 'login.html'; return; }
+  let r;
+  try { r = await api('POST', '/panier', { produit_id: produitId, quantite: 1, mode_livraison: 'retrait' }); }
+  catch (e1) {
+    try { r = await api('POST', '/panier', { produit_id: produitId, quantite: 1, mode_livraison: 'expedition' }); }
+    catch (e2) { alert(e2.message || e1.message || 'Erreur.'); return; }
+  }
+  if (typeof window.updatePanierBadge === 'function') window.updatePanierBadge(r.nb_articles);
+  panierToast('Article ajouté au panier.');
 }
 
 /* ---- Modale création / édition d'une publication (propriétaire) ---- */
@@ -6709,7 +6719,7 @@ function openPublicationModal(pubId) {
       <label class="vtp-lbl">Bouton d'action</label>
       <select id="pub-cta" class="vtp-input">
         <option value="aucun" ${!p||p.cta_type==='aucun'?'selected':''}>Aucun</option>
-        <option value="acheter" ${p&&p.cta_type==='acheter'?'selected':''}>🛒 Acheter maintenant</option>
+        <option value="acheter" ${p&&p.cta_type==='acheter'?'selected':''}>Ajouter au panier</option>
         <option value="voir" ${p&&p.cta_type==='voir'?'selected':''}>🔎 Voir le produit</option>
       </select>
       <p style="font-size:11.5px;color:var(--muted);margin:4px 0 0;">Le bouton d'action nécessite un produit lié.</p>

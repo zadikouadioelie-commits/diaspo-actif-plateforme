@@ -1082,7 +1082,7 @@ const FLAG_SVG = {
     const host = document.getElementById("form-" + sec); if (!host) return;
     let extra = "";
     if (sec === "paiements") extra = `<div class="ro"><strong>Encaissements :</strong> les paiements réels passent par Stripe Connect. Aucune donnée de carte bancaire n'est stockée dans la boutique.</div>`;
-    if (sec === "confiance") extra = `<div class="ro"><strong>Statut de vérification :</strong> non vérifiée. Le badge « Vendeur vérifié » n'est attribué que par la plateforme, après ses propres contrôles. Le propriétaire ne peut pas se l'attribuer.</div>`;
+    if (sec === "confiance") extra = `<div class="ro"><strong>Statut de vérification :</strong> aucun badge de vérification n'est affiché sur les boutiques. Les contrôles de la plateforme restent internes.</div>`;
     let after = "";
     if (sec === "visibilite") after = `<label>Photo de couverture (1 Mo maximum)<input type="file" id="coverFile" accept="image/png,image/jpeg,image/webp"></label>
       <h4>Aperçu de ma cartouche dans l'espace Boutique Diaspo'Actif</h4><div id="vcardBox"></div>

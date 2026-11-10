@@ -64,6 +64,7 @@
   <link rel="stylesheet" href="/assets/pages-initiative-nuit-doree.css?v=1">
   <link rel="stylesheet" href="/assets/panier-nuit-doree.css?v=1">
   <script src="/assets/dashboard-nuit-doree.js?v=4" defer></script>
+<style>.ia{width:1.1em;height:1.1em;vertical-align:-.18em;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}</style>
 </head>
 <body class="nd">
 <div class="page">
@@ -89,14 +90,14 @@
   </header>
 
   <main class="pn-wrap nd-zone">
-    <h1>🛒 Mon panier</h1>
+    <h1><svg class="ia" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="20" r="1.4"/><circle cx="17" cy="20" r="1.4"/><path d="M3 4h2.5l2.2 11h10l2-8H6.5"/></svg> Mon panier</h1>
     <p class="pn-sub">Vos articles en attente de paiement et l'historique de tous vos achats, boutiques et vendeurs confondus.</p>
 
     <div id="pn-banner"></div>
 
     <div class="pn-tabs">
-      <button class="pn-tab active" data-tab="panier" onclick="pnTab('panier')">🛒 Panier <span id="pn-tab-count"></span></button>
-      <button class="pn-tab" data-tab="achats" onclick="pnTab('achats')">📦 Mes achats</button>
+      <button class="pn-tab active" data-tab="panier" onclick="pnTab('panier')"><svg class="ia" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="20" r="1.4"/><circle cx="17" cy="20" r="1.4"/><path d="M3 4h2.5l2.2 11h10l2-8H6.5"/></svg> Panier <span id="pn-tab-count"></span></button>
+      <button class="pn-tab" data-tab="achats" onclick="pnTab('achats')"><svg class="ia" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7.5L12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5L12 12l9-4.5M12 12v9"/></svg> Mes achats</button>
     </div>
 
     <section id="pn-panier"><div class="pn-empty">Chargement…</div></section>
@@ -125,7 +126,7 @@ function pnTab(tab) {
 function pnBanner() {
   const p = new URLSearchParams(location.search).get('paiement');
   const box = document.getElementById('pn-banner');
-  if (p === 'succes') box.innerHTML = '<div class="pn-banner ok">✅ Paiement reçu — vos commandes sont enregistrées. Retrouvez-les dans « Mes achats ».</div>';
+  if (p === 'succes') box.innerHTML = '<div class="pn-banner ok"><svg class="ia" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6"/></svg> Paiement reçu — vos commandes sont enregistrées. Retrouvez-les dans « Mes achats ».</div>';
   else if (p === 'annule') box.innerHTML = '<div class="pn-banner ko">Paiement annulé — aucun montant n\'a été débité. Les articles non payés ne sont plus dans votre panier : ajoutez-les de nouveau si besoin.</div>';
   if (p) history.replaceState(null, '', 'panier.html');
   if (p === 'succes') pnTab('achats');
@@ -170,7 +171,7 @@ function pnRender() {
   const choixBoutique = idsVendeurs.length > 1
     ? `<div style="margin-bottom:10px;">
         <div style="font-size:13px;font-weight:700;margin-bottom:4px;">Boutique à régler maintenant</div>
-        <select class="pn-sel" onchange="PN_CIBLE=this.value;pnRender()">${idsVendeurs.map(id => `<option value="${id}" ${String(id) === String(PN_CIBLE) ? 'selected' : ''}>${esc(parVendeur[id][0].initiative_nom)} — ${fmt(parVendeur[id].reduce((s, l) => s + l.sous_total, 0), parVendeur[id][0].devise)}</option>`).join('')}</select>
+        <select class="pn-sel" onchange="PN_CIBLE=this.value;pnRender()">${idsVendeurs.map(id => `<option value="${id}" ${String(id) === String(PN_CIBLE) ? 'selected' : ''}>${esc(parVendeur[id][0].initiative_nom)} — ${fmt(parVendeur[id].reduce((s, l) =>s + l.sous_total, 0), parVendeur[id][0].devise)}</option>`).join('')}</select>
         <p style="font-size:12px;color:var(--muted);margin:6px 0 0;">Chaque boutique reçoit directement son paiement : vos articles se règlent boutique par boutique. Les autres restent dans votre panier.</p>
       </div>` : '';
   const nomDefaut = PN_USER ? ((PN_USER.prenom ? PN_USER.prenom + ' ' : '') + (PN_USER.nom || '')) : '';
@@ -181,24 +182,24 @@ function pnRender() {
     return `<div class="pn-card">
       <div class="pn-vendor">
         <div><div class="pn-vendor-tag">Vendu par</div>
-          <div class="pn-vendor-name"><a href="profil.html?id=${v.vendeur_id}&vitrine=1">🏪 ${esc(v.initiative_nom)}</a></div></div>
-        <a href="messagerie.html?with=${v.vendeur_id}" class="btn btn-sm btn-outline">💬 Contacter le vendeur</a>
+          <div class="pn-vendor-name"><a href="profil.html?id=${v.vendeur_id}&vitrine=1"><svg class="ia" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v10h16V10"/><path d="M3 10l1.5-6h15L21 10a3 3 0 0 1-6 0 3 3 0 0 1-6 0 3 3 0 0 1-6 0z"/></svg> ${esc(v.initiative_nom)}</a></div></div>
+        <a href="messagerie.html?with=${v.vendeur_id}" class="btn btn-sm btn-outline"><svg class="ia" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg> Contacter le vendeur</a>
       </div>
       ${lignes.map(l => {
         const deuxModes = l.livraison_expedition && l.livraison_retrait;
         return `<div class="pn-line">
-          ${l.photo ? `<img class="pn-img" src="${esc(l.photo)}" alt="" loading="lazy">` : '<div class="pn-img">🛍️</div>'}
+          ${l.photo ? `<img class="pn-img" src="${esc(l.photo)}" alt="" loading="lazy">` : '<div class="pn-img"><svg class="ia" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h14l-1 12H6z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg></div>'}
           <div class="pn-info">
             <div class="pn-name">${esc(l.produit_nom)}</div>
             <div class="pn-meta">${fmt(l.prix, l.devise)} / unité</div>
-            ${l.produit_statut !== 'disponible' ? '<div class="pn-warn">⚠️ Ce produit n\'est plus disponible — retirez-le pour payer.</div>' : ''}
+            ${l.produit_statut !== 'disponible' ? '<div class="pn-warn"><svg class="ia" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.01"/></svg> Ce produit n\'est plus disponible — retirez-le pour payer.</div>' : ''}
             <div class="pn-ctrl">
               <div class="pn-qty"><button onclick="pnQte(${l.id},${l.quantite - 1})" ${l.quantite <= 1 ? 'disabled' : ''}>−</button><span>${l.quantite}</span><button onclick="pnQte(${l.id},${l.quantite + 1})">+</button></div>
               ${deuxModes ? `<select class="pn-sel" onchange="pnMode(${l.id},this.value)">
-                <option value="retrait" ${l.mode_livraison === 'retrait' ? 'selected' : ''}>🏬 Retrait sur place</option>
-                <option value="expedition" ${l.mode_livraison === 'expedition' ? 'selected' : ''}>🚚 Expédition${l.frais_expedition > 0 ? ' (+' + fmt(l.frais_expedition, l.devise) + ')' : ' (gratuite)'}</option>
-              </select>` : `<span class="pn-meta">${l.mode_livraison === 'expedition' ? '🚚 Expédition' + (l.frais_expedition > 0 ? ' (+' + fmt(l.frais_expedition, l.devise) + ')' : ' (gratuite)') : '🏬 Retrait sur place'}</span>`}
-              <button class="pn-rm" onclick="pnRetirer(${l.id})">🗑️ Retirer</button>
+                <option value="retrait" ${l.mode_livraison === 'retrait' ? 'selected' : ''}>Retrait sur place</option>
+                <option value="expedition" ${l.mode_livraison === 'expedition' ? 'selected' : ''}>Expédition${l.frais_expedition >0 ? ' (+' + fmt(l.frais_expedition, l.devise) + ')' : ' (gratuite)'}</option>
+              </select>` : `<span class="pn-meta">${l.mode_livraison === 'expedition' ? '<svg class="ia" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 6h11v10H2zM13 9h4l3 3v4h-7"/><circle cx="6.5" cy="18" r="1.6"/><circle cx="16.5" cy="18" r="1.6"/></svg> Expédition' + (l.frais_expedition > 0 ? ' (+' + fmt(l.frais_expedition, l.devise) + ')' : ' (gratuite)') : '<svg class="ia" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v10h16V10"/><path d="M3 10l1.5-6h15L21 10a3 3 0 0 1-6 0 3 3 0 0 1-6 0 3 3 0 0 1-6 0z"/></svg> Retrait sur place'}</span>`}
+              <button class="pn-rm" onclick="pnRetirer(${l.id})"><svg class="ia" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg> Retirer</button>
             </div>
           </div>
           <div class="pn-price">${fmt(l.sous_total, l.devise)}</div>
@@ -209,7 +210,7 @@ function pnRender() {
   }).join('');
 
   const adresse = needsAddress ? `<div style="margin-bottom:8px;">
-      <div style="font-size:13px;font-weight:700;margin-bottom:6px;">🚚 Adresse de livraison (articles en expédition)</div>
+      <div style="font-size:13px;font-weight:700;margin-bottom:6px;"><svg class="ia" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 6h11v10H2zM13 9h4l3 3v4h-7"/><circle cx="6.5" cy="18" r="1.6"/><circle cx="16.5" cy="18" r="1.6"/></svg> Adresse de livraison (articles en expédition)</div>
       <input class="pn-input" id="pn-nom" placeholder="Nom et prénom" value="${esc(nomDefaut)}">
       <input class="pn-input" id="pn-adresse" placeholder="Adresse" value="${esc(PN_USER?.adresse || '')}">
       <div style="display:flex;gap:6px;"><input class="pn-input" id="pn-cp" placeholder="Code postal" value="${esc(PN_USER?.code_postal || '')}" style="flex:1;"><input class="pn-input" id="pn-ville" placeholder="Ville" value="${esc(PN_USER?.ville || '')}" style="flex:2;"></div>
@@ -217,12 +218,12 @@ function pnRender() {
       <input class="pn-input" id="pn-tel" placeholder="Téléphone (optionnel)" value="${esc(PN_USER?.telephone || '')}">
     </div>` : '';
 
-  const ICONE_PRESTATAIRE = { stripe: '💳', paypal: '🅿️' };
+  const ICONE_PRESTATAIRE = { stripe: '<svg class="ia" viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="M2.5 10h19"/></svg>', paypal: 'PayPal' };
   const prestataires = PN_PRESTATAIRES || [];
   const aucunPrestataire = !prestataires.length;
   const moyenPaiementHtml = aucunPrestataire
     ? `<p class="pn-warn" style="margin:0 0 8px;">Aucun moyen de paiement n'est disponible pour le moment — réessayez plus tard.</p>`
-    : `<div class="pn-pay">${prestataires.map((p, i) => `<label><input type="radio" name="pn-provider" value="${p.code}" ${i === 0 ? 'checked' : ''}> ${ICONE_PRESTATAIRE[p.code] || '💳'} ${esc(p.label)}</label>`).join('')}</div>`;
+    : `<div class="pn-pay">${prestataires.map((p, i) => `<label><input type="radio" name="pn-provider" value="${p.code}" ${i === 0 ? 'checked' : ''}> ${ICONE_PRESTATAIRE[p.code] || '<svg class="ia" viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="M2.5 10h19"/></svg>'} ${esc(p.label)}</label>`).join('')}</div>`;
 
   box.innerHTML = groupes + `<div class="pn-card">
     ${choixBoutique}
@@ -231,7 +232,7 @@ function pnRender() {
     ${moyenPaiementHtml}
     <div class="pn-total"><span>Total à payer (${itemsCible.length} article${itemsCible.length > 1 ? 's' : ''})</span><span>${fmt(totalCible, itemsCible[0].devise)}</span></div>
     <p id="pn-err" style="color:#dc2626;font-size:12.5px;display:none;margin:0 0 8px;"></p>
-    <button class="pn-btn" id="pn-payer" onclick="pnPayer()" ${bloquant || aucunPrestataire ? 'disabled' : ''}>💳 Payer ${fmt(totalCible, itemsCible[0].devise)}</button>
+    <button class="pn-btn" id="pn-payer" onclick="pnPayer()" ${bloquant || aucunPrestataire ? 'disabled' : ''}><svg class="ia" viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="M2.5 10h19"/></svg> Payer ${fmt(totalCible, itemsCible[0].devise)}</button>
     <div style="text-align:center;margin-top:10px;"><button class="pn-rm" onclick="pnVider()">Vider le panier</button></div>
   </div>`;
 }
@@ -286,13 +287,13 @@ async function pnChargerAchats() {
         : c.paiement_statut === 'echoue' ? '<span class="pn-badge echoue">Paiement échoué</span>'
         : '<span class="pn-badge attente">Demande envoyée</span>';
       const liv = c.mode_livraison && c.statut_livraison && c.paiement_statut !== 'echoue'
-        ? `<span class="pn-badge livr">${c.mode_livraison === 'expedition' ? '🚚' : '🏬'} ${PN_LIV[c.statut_livraison] || esc(c.statut_livraison)}</span>` : '';
+        ? `<span class="pn-badge livr">${c.mode_livraison === 'expedition' ? '<svg class="ia" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 6h11v10H2zM13 9h4l3 3v4h-7"/><circle cx="6.5" cy="18" r="1.6"/><circle cx="16.5" cy="18" r="1.6"/></svg>' : '<svg class="ia" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v10h16V10"/><path d="M3 10l1.5-6h15L21 10a3 3 0 0 1-6 0 3 3 0 0 1-6 0 3 3 0 0 1-6 0z"/></svg>'} ${PN_LIV[c.statut_livraison] || esc(c.statut_livraison)}</span>` : '';
       const numSuivi = c.lien_suivi
         ? `<a href="${esc(c.lien_suivi)}" target="_blank" rel="noopener noreferrer" style="font-weight:700;">${esc(c.numero_suivi)} — Suivre mon colis ↗</a>`
         : `<strong>${esc(c.numero_suivi || '')}</strong>`;
       const suivi = c.numero_suivi ? `<div class="pn-meta">${c.transporteur_nom ? esc(c.transporteur_nom) + ' · ' : ''}N° de suivi : ${numSuivi}</div>` : '';
       return `<div class="pn-hist-row">
-        ${c.photo ? `<img class="pn-img" src="${esc(c.photo)}" alt="" loading="lazy">` : '<div class="pn-img">🛍️</div>'}
+        ${c.photo ? `<img class="pn-img" src="${esc(c.photo)}" alt="" loading="lazy">` : '<div class="pn-img"><svg class="ia" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h14l-1 12H6z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg></div>'}
         <div class="pn-info">
           <div class="pn-name">${esc(c.produit_nom)} × ${c.quantite}</div>
           <div class="pn-meta">Vendu par <a href="profil.html?id=${c.vendeur_id}&vitrine=1" style="font-weight:700;">${esc(c.initiative_nom)}</a> · ${esc(String(c.created_at || '').slice(0, 10))}</div>
