@@ -145,6 +145,7 @@ const ConfirmationAppareil = require("./confirmation-appareil");
 const ProfilObligatoire = require("./profil-obligatoire");
 const RelancePublication = require("./relance-publication");
 const RelanceMessages = require("./relance-messages");
+const DepotDetourne = require("./depot-detourne"); /* lot F : un seul module de dépôt (« Soumettre à Diaspo'Actif ») — refuse les textes de boutique qui détournent le dépôt de projet */
 /* Étape 3 : l'échéance réelle d'une session enregistrée est dans le registre (30 jours glissants pour un
    appareil principal, 3 jours pour un autre) — le jeton et le cookie doivent donc pouvoir vivre au moins
    aussi longtemps, d'où cette durée longue pour toute session portée par un jti. Sans jti (ancien
@@ -4603,6 +4604,10 @@ route("PUT", "/api/initiatives/:id/vitrine", async (req, res, params, body) => {
   const init = await db.prepare("SELECT * FROM initiatives WHERE id=?").get(params.id);
   if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
   if (Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+
+  /* Lot F : aucun dépôt de projet détourné dans les textes d'une boutique (un seul module : « Soumettre à Diaspo'Actif »). */
+  const refusDepot = DepotDetourne.controlerTextes(body);
+  if (refusDepot) return sendJSON(res, 400, { error: refusDepot, depot_detourne: true });
 
   /* Rendre la vitrine visible au public est réservé aux comptes Premium (initiative_abonne),
      bloqué pendant la réorganisation générale des boutiques (maintenance), et — pour un pays
@@ -11946,6 +11951,10 @@ route("PUT", "/api/initiatives/:id/vitrine-draft", async (req, res, params, body
   if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
   if (Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
 
+  /* Lot F : même contrôle que PUT /vitrine sur les contenus édités depuis l'aperçu. */
+  const refusDepot = DepotDetourne.controlerTextes(body.contenu);
+  if (refusDepot) return sendJSON(res, 400, { error: refusDepot, depot_detourne: true });
+
   const draft = resolveVitrineDraft(init);
   const currentModules = getVitrineModulesState(init, { draft: true });
 
@@ -12002,6 +12011,9 @@ route("PUT", "/api/initiatives/:id/vitrine-draft-complet", async (req, res, para
   if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
   if (Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
   const draft = (body && typeof body.draft === "object" && body.draft) ? body.draft : {};
+  /* Lot F : même contrôle que PUT /vitrine sur les contenus du brouillon restauré. */
+  const refusDepot = DepotDetourne.controlerTextes(draft.contenu);
+  if (refusDepot) return sendJSON(res, 400, { error: refusDepot, depot_detourne: true });
   /* On refiltre les contenus : un instantané ne doit pas pouvoir servir à écrire
      des champs hors liste blanche. */
   if (draft.contenu && typeof draft.contenu === "object") {
@@ -12021,6 +12033,9 @@ route("POST", "/api/initiatives/:id/vitrine-publish", async (req, res, params) =
   if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
   if (Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
   const draft = resolveVitrineDraft(init);
+  /* Lot F : un brouillon enregistré avant ce contrôle ne peut pas non plus être publié s'il détourne le dépôt de projet. */
+  const refusDepot = DepotDetourne.controlerTextes(draft.contenu);
+  if (refusDepot) return sendJSON(res, 400, { error: refusDepot, depot_detourne: true });
   const modules = draft.modules ? JSON.stringify(draft.modules) : init.vitrine_modules_json;
   const type = draft.type !== undefined ? draft.type : init.vitrine_type;
   const style = draft.style ? JSON.stringify(draft.style) : init.vitrine_style_json;

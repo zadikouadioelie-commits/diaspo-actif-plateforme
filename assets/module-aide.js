@@ -52,7 +52,7 @@ window.MODULE_AIDE = {
   paiements_utilisateur: { titre: "💳 Paiements", texte: "Enregistrez vos cartes bancaires pour accélérer vos achats dans la Boutique et vos autres paiements." },
   ma_localisation: { titre: "🟨 Ma localisation", texte: "Indiquez votre position géographique pour être visible dans les recherches locales et l'annuaire." },
   mes_devis: { titre: "📩 Mes demandes de devis", texte: "Retrouvez les demandes de devis que vous avez envoyées et suivez les réponses reçues." },
-  soumission_da: { titre: "📤 Soumettre à Diaspo'Actif", texte: "Proposez une information, un contenu ou un signalement directement à l'équipe Diaspo'Actif." },
+  soumission_da: { titre: "📤 Soumettre à Diaspo'Actif", texte: "Le seul point de dépôt de projet : présentez votre projet, joignez vos pièces et suivez l'analyse de l'équipe Diaspo'Actif. Aucune boutique ne reçoit de dépôt de projet." },
 
   /* ── Dashboard Collectivité ── */
   identite_territoriale: { titre: "🔐 Identité Territoriale", texte: "Gérez les informations officielles rattachant votre institution à son territoire d'origine." },

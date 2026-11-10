@@ -891,6 +891,7 @@ function fmtDate(d){if(!d)return '';try{return new Date(d).toLocaleDateString('f
   /* Retour de l'éditeur de CV (« Terminer plus tard ») : on arrive directement sur la liste des CV. */
   if (location.hash === '#outils') uShowSection('outils');
   if (location.hash === '#formation-diaspora') uShowSection('formation-diaspora');
+  if (location.hash === '#soumission-da') uShowSection('soumission-da');   /* lot F : lien direct depuis les boutons « Soumettre à Diaspo'Actif » (assets/depot-central.js) */
 
   /* KPIs candidatures */
   try {
