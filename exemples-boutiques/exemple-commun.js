@@ -17,8 +17,10 @@
   var PAR_PAGE = { "video.html": "video", "portfolio.html": "portfolio", "evenements.html": "events" };
   var VALIDES = ["ecom", "video", "portfolio", "events", "impact", "finance"];
   var CREATION = fichier === "parametres-vitrine.html";
-  var type = CREATION ? null : (PAR_PAGE[fichier] || params.get("type") || "ecom");
-  if (!CREATION && VALIDES.indexOf(type) < 0) type = "ecom";
+  /* ?suivre=1 : « Aperçu de ma boutique » — la page affiche le type ET les options enregistrés par la création, sans rien forcer. */
+  var SUIVRE = params.get("suivre") === "1";
+  var type = (CREATION || SUIVRE) ? null : (PAR_PAGE[fichier] || params.get("type") || "ecom");
+  if (type && VALIDES.indexOf(type) < 0) type = "ecom";
   window.EXEMPLE_TYPE = type;
 
   /* 2. Stockage isolé : toutes les clés de l'exemple sont préfixées, sans modifier le code des pages.
@@ -70,7 +72,7 @@
     var b = document.createElement("div");
     b.id = "exBandeau";
     b.setAttribute("role", "note");
-    b.innerHTML = '<span><b>Exemple — données fictives.</b> ' + (CREATION ? "Création d'une boutique (Paramètres vitrine)" : (LIBELLES[type] || "")) +'</span>' +
+    b.innerHTML = '<span><b>Exemple — données fictives.</b> ' + (CREATION ? "Création d'une boutique (Paramètres vitrine)" : SUIVRE ? "Aperçu de votre boutique selon vos réglages" : (LIBELLES[type] || "")) +'</span>' +
       '<span class="exsp">Tout est simulé : aucun achat, paiement, message ni inscription réel. Cette page n\'est pas une vraie boutique.</span>' +
       '<button type="button" id="exReset">Remettre l\'exemple à zéro</button>' +
       '<button type="button" id="exClose">Fermer l\'exemple</button>';
@@ -92,6 +94,27 @@
     var toast = document.createElement("div"); toast.id = "exToast"; document.body.appendChild(toast);
     var tt = null;
     window.exempleToast = function (m) { toast.textContent = m; toast.style.display = "block"; clearTimeout(tt); tt = setTimeout(function () { toast.style.display = "none"; }, 2600); };
+
+    /* Texture de la couleur principale sur le bandeau (les couleurs 2 et 3 ne sont pas texturées, comme dans la maquette). */
+    try {
+      var R = window.BOUTIQUE_TYPES, cfgT = JSON.parse(localStorage.getItem("shopConfig") || "{}");
+      var idTex = (cfgT.textures || [])[0];
+      var tex = R && R.TEXTURES && R.TEXTURES.filter(function (t) { return t.id === idTex; })[0];
+      /* Premier bandeau VISIBLE : sur la page commune, impact et finance ont leur propre bandeau (.ih-hero, .fin-hero). */
+      var hero = null;
+      if (!CREATION && fichier !== "video.html") {
+        var cands = document.querySelectorAll(".fin-hero, .ih-hero, section.hero, .hero");
+        for (var ci = 0; ci < cands.length; ci++) { if (cands[ci].getClientRects().length) { hero = cands[ci]; break; } }
+      }
+      if (tex && tex.bg && hero) {
+        hero.style.position = "relative"; hero.style.overflow = "hidden";
+        var couche = document.createElement("div");
+        couche.setAttribute("aria-hidden", "true");
+        couche.style.cssText = "position:absolute;inset:0;pointer-events:none;z-index:0;background:" + tex.bg;
+        hero.insertBefore(couche, hero.firstChild);
+        Array.prototype.forEach.call(hero.children, function (c) { if (c !== couche) { c.style.position = c.style.position || "relative"; c.style.zIndex = "1"; } });
+      }
+    } catch (e) {}
 
     /* Liens vers des pages qui n'existent pas dans l'exemple : message au lieu d'une erreur 404. */
     document.addEventListener("click", function (ev) {

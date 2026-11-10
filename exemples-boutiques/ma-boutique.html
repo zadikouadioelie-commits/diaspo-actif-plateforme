@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Aperçu de ma boutique</title>
+</head>
+<body style="margin:0;background:#14141b;color:#f2f2f6;font:16px system-ui,sans-serif;display:flex;min-height:100vh;align-items:center;justify-content:center">
+<p>Ouverture de l'aperçu de votre boutique…</p>
+<script src="/assets/boutique-types.js"></script>
+<script>
+/* Aperçu de ma boutique : ouvre l'exemple du type choisi dans « Création d'une boutique » (Paramètres vitrine),
+   avec les couleurs, textures, options et rubriques enregistrés. Le stockage de l'exemple est préfixé « exemple: ». */
+(function () {
+  var main = "ecom";
+  try { var c = JSON.parse(localStorage.getItem("exemple:shopConfig")); if (c && c.main) main = c.main; } catch (e) {}
+  var types = window.BOUTIQUE_TYPES.TYPES;
+  var t = types[main] || types.ecom;
+  location.replace(t.exemple + (t.exemple.indexOf("?") >= 0 ? "&" : "?") + "suivre=1");
+})();
+</script>
+</body>
+</html>

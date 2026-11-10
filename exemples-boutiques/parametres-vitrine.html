@@ -648,14 +648,7 @@ CONSIGNE POUR CLAUDE CODE (transfert depuis la maquette, validée par ZADI) :
   });
 
   // --- textures : effets ajoutés par-dessus la couleur ---
-  const TEXTURES = [
-    { id: "uni", label: "Uni (aucune texture)", bg: "" },
-    { id: "dore", label: "Doré", bg: "linear-gradient(115deg, rgba(120,80,10,.55) 0%, rgba(255,238,170,.75) 22%, rgba(185,138,46,.6) 40%, rgba(255,246,200,.8) 55%, rgba(143,100,24,.6) 75%, rgba(233,201,107,.7) 100%)" },
-    { id: "brillant", label: "Brillant", bg: "linear-gradient(115deg, transparent 30%, rgba(255,255,255,.85) 42%, transparent 50%, rgba(255,255,255,.5) 62%, transparent 70%) 0 0 / 250% 100%" },
-    { id: "scintillant", label: "Scintillant", bg: "radial-gradient(circle, #fff 2px, transparent 3px) 0 0 / 26px 22px, radial-gradient(circle, #ffe9a6 1.5px, transparent 3px) 13px 11px / 34px 30px" },
-    { id: "luisant", label: "Luisant (vernis)", bg: "linear-gradient(180deg, rgba(255,255,255,.75) 0%, rgba(255,255,255,.1) 46%, rgba(0,0,0,.22) 52%, rgba(0,0,0,.05) 100%)" },
-    { id: "satine", label: "Satiné", bg: "linear-gradient(90deg, rgba(255,255,255,.25), rgba(0,0,0,.15) 35%, rgba(255,255,255,.22) 65%, rgba(0,0,0,.12))" }
-  ];
+  const TEXTURES = window.BOUTIQUE_TYPES.TEXTURES; // source unique : assets/boutique-types.js
   function textureBg(id, hex) {
     const t = TEXTURES.find(x => x.id === id) || TEXTURES[0];
     return t.bg ? `${t.bg}, ${hex}` : hex;

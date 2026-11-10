@@ -95,7 +95,10 @@
   var OUTILS = {
     creation: { label: "Création d'une boutique", desc: "Paramètres vitrine : modèle, identité, couleurs, options",
       exemple: "/exemples-boutiques/parametres-vitrine.html",
-      what: "Le système de création commun à tous les types : choix du modèle principal (avec « Voir l'exemple »), identité, studio de couleurs, options, rubriques, bonus et publication. Ce que vous réglez ici s'applique aux exemples des types : ouvrez ensuite un type pour voir le rendu." }
+      what: "Le système de création commun à tous les types : choix du modèle principal (avec « Voir l'exemple »), identité, studio de couleurs, options, rubriques, bonus et publication. Ce que vous réglez ici s'applique aux exemples des types : ouvrez ensuite « Aperçu de ma boutique » pour voir le rendu." },
+    apercu: { label: "Aperçu de ma boutique", desc: "Le rendu selon vos réglages de création",
+      exemple: "/exemples-boutiques/ma-boutique.html",
+      what: "Votre boutique d'essai telle que la décrivent vos réglages de création : le type principal, les options, les couleurs et textures, le nom et les rubriques. Modifiez la création, puis revenez ici (bouton « Actualiser ») pour voir le résultat." }
   };
   function fiche(cle) { return R.TYPES[cle] || OUTILS[cle]; }
 
