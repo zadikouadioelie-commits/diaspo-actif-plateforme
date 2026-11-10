@@ -6004,14 +6004,14 @@ function openProductModal(productId, presetCatalogueId) {
         <input type="url" id="pf-video-url" value="${prod?esc(prod.video_url||''):''}" placeholder="https://… (fichier .mp4, YouTube ou Vimeo)" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;margin-bottom:10px;">
         <div style="display:flex;gap:10px;">
           <div style="flex:1;">
-            <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Durée (secondes) *</label>
-            <input type="number" min="1" max="3600" id="pf-video-duree" value="${prod&&prod.video_duree?prod.video_duree:''}" placeholder="Ex : 45" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;">
+            <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Durée (secondes, 57 maximum) *</label>
+            <input type="number" min="1" max="57" id="pf-video-duree" value="${prod&&prod.video_duree?prod.video_duree:''}" placeholder="Ex : 45" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;">
           </div>
           <div style="flex:1;">
             <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Type de vidéo</label>
             <select id="pf-video-type" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;background:#fff;">
               <option value="">Automatique (selon la durée)</option>
-              ${[['courte','Vidéo courte (≤ 60 s)'],['explicative','Vidéo explicative (1–3 min)'],['serie','Série / Épisode']].map(o => `<option value="${o[0]}" ${prod&&prod.video_type===o[0]?'selected':''}>${o[1]}</option>`).join('')}
+              ${[['courte','Vidéo courte (≤ 57 s)'],['explicative','Vidéo explicative'],['serie','Série / Épisode']].map(o => `<option value="${o[0]}" ${prod&&prod.video_type===o[0]?'selected':''}>${o[1]}</option>`).join('')}
             </select>
           </div>
         </div>
@@ -6127,7 +6127,7 @@ async function saveProduct(productId) {
   if (document.getElementById('pf-video-url')) {
     const vu = document.getElementById('pf-video-url').value.trim(), vd = Number(document.getElementById('pf-video-duree').value);
     if (!/^https?:\/\//i.test(vu)) { err.textContent = "L'adresse de la vidéo (http…) est requise."; err.style.display = 'block'; return; }
-    if (!(vd >= 1 && vd <= 3600)) { err.textContent = 'La durée de la vidéo (en secondes, de 1 à 3600) est requise.'; err.style.display = 'block'; return; }
+    if (!(vd >= 1 && vd <= 57)) { err.textContent = 'La durée de la vidéo est requise, de 1 à 57 secondes (57 secondes maximum).'; err.style.display = 'block'; return; }
     payload.video_url = vu; payload.video_duree = Math.round(vd); payload.video_type = document.getElementById('pf-video-type').value || null;
   }
   try {
