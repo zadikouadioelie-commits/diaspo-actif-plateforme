@@ -1,9 +1,14 @@
 /* ═════════════════════════════════════════════════════════════════
    server/retours-config.js — RÉGLAGES du module Retours / Réclamations / Remboursements (lot G, 2026-11-10)
 
-   Tout ce qui est encore une DÉCISION OUVERTE de l'utilisateur est ici, avec la question d'origine
-   (voir Téléchargements\PLAN-lot-G-retours-remboursements.md, §4). Changer une valeur = changer UNE ligne.
-   Les valeurs ci-dessous sont des choix PRUDENTS provisoires, pas des décisions : ne pas les considérer comme validées.
+   Réglages issus des questions Q1 à Q9 (voir Téléchargements\PLAN-lot-G-retours-remboursements.md, §4).
+   Le 2026-11-10, l'utilisateur a VALIDÉ les recommandations de la session pour le lot G : les valeurs ci-dessous sont donc
+   des décisions. Changer une valeur = changer UNE ligne.
+   Autres choix validés, appliqués dans server/retours.js : litiges traités par le rôle « administrateur » (Q3) ; PayPal confirmé
+   par relecture de l'état du remboursement, sans webhook (Q4) ; ligne de commande entière, sans remboursement partiel (Q5) ;
+   aucune étape de retour physique (Q6) ; un refus du vendeur clôt le dossier, une nouvelle demande reste possible (Q7) ;
+   vendeur sans compte retrouvé : « vérification manuelle » par l'administrateur (Q8) ; mêmes dossiers pour les contenus
+   numériques et les services, avec leur règle affichée (Q9).
    ═════════════════════════════════════════════════════════════════ */
 "use strict";
 
@@ -26,14 +31,14 @@ module.exports = {
   ],
 
   /* Q2 — En cas de remboursement, la commission de la plateforme (2 %) est-elle rendue au vendeur ?
-     false = la plateforme garde sa commission (Stripe : refund_application_fee absent). À CONFIRMER. */
+     false = la plateforme garde sa commission (Stripe : refund_application_fee absent). Validé. */
   REMBOURSER_COMMISSION: false,
 
   /* Q5 — Le remboursement inclut-il les frais de livraison ? (montant_total = prix × quantité + frais de livraison.)
-     true = on rembourse tout ce que le client a payé. Remboursement partiel : non géré (ligne entière). À CONFIRMER. */
+     true = on rembourse tout ce que le client a payé. Remboursement partiel : non géré (ligne entière). Validé. */
   INCLURE_LIVRAISON: true,
 
-  /* Q1 — Règles de retour par catégorie. TEXTES DE LA MAQUETTE (commun.js), PROVISOIRES : le dossier précise « à confirmer par ZADI ».
+  /* Q1 — Règles de retour par catégorie. TEXTES DE LA MAQUETTE (commun.js), validés avec les recommandations du lot G.
      Elles sont affichées au client et au vendeur à titre d'information ; elles ne bloquent aucune réclamation. */
   REGLES_RETOUR: [
     { id: "vet", label: "Vêtements, pantalons, robes, manteaux", txt: "Oui, sous 14 jours." },
