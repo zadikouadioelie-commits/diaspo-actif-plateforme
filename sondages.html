@@ -236,7 +236,7 @@
     <div id="cs-evts" style="max-height:150px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;padding:6px 10px;margin-bottom:16px;"></div>
     <div id="cs-couv-bloc" style="display:none;margin-bottom:16px;border-top:1px solid var(--border);padding-top:12px;">
       <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px;">Image de couverture</div>
-      <img id="cs-couv-img" alt="" style="display:block;width:100%;max-height:160px;object-fit:cover;border-radius:10px;background:#e8edf3;margin-bottom:8px;">
+      <img id="cs-couv-img" alt="" style="display:block;width:100%;height:auto;max-height:320px;object-fit:contain;border-radius:10px;background:#0b1530;margin-bottom:8px;">
       <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;"><input type="checkbox" id="cs-couv-retirer" style="accent-color:#2563EB;"> Retirer l'image de couverture</label>
     </div>
     <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px;border-top:1px solid var(--border);padding-top:12px;">Questions</div>
@@ -505,7 +505,7 @@ async function openSond(sid){
     const dejaRepondu=!!maP;
     const peutParticiper=ME_SOND&&!ferme&&!dejaRepondu;
     el.innerHTML=`
-      ${couvSond(s)?`<img src="${escH(couvSond(s))}" alt="" style="display:block;width:100%;max-height:220px;object-fit:cover;border-radius:12px;margin-bottom:14px;background:#e8edf3">`:''}
+      ${couvSond(s)?`<img src="${escH(couvSond(s))}" alt="" style="display:block;width:100%;height:auto;max-height:360px;object-fit:contain;border-radius:12px;margin-bottom:14px;background:#e8edf3">`:''}
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
         <div>
           <span class="cat-badge" style="margin-bottom:6px;display:inline-block;">📊 ${escH(CAT_LABELS[s.categorie]||'Sondage')}</span>

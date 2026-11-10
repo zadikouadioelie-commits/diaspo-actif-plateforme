@@ -250,7 +250,7 @@
     const ferme = s.statut !== 'ouvert';
     const dejaRepondu = !!maP;
     const peutParticiper = S.me && !ferme && !dejaRepondu;
-    const html = `<div class="card">${couvSond(s) ? `<img src="${esc(couvSond(s))}" alt="" style="display:block;width:100%;max-height:200px;object-fit:cover;border-radius:12px 12px 0 0;background:#e8edf3">` : ''}<div class="pad">
+    const html = `<div class="card">${couvSond(s) ? `<img src="${esc(couvSond(s))}" alt="" style="display:block;width:100%;height:auto;max-height:340px;object-fit:contain;border-radius:12px 12px 0 0;background:#e8edf3">` : ''}<div class="pad">
         <span class="mso-cat">${esc(CAT_LABELS[s.categorie] || 'Sondage')}</span>
         <h2 style="margin:8px 0 2px;font-size:19px;word-break:break-word">${esc(s.titre)}</h2>
         <div class="small muted">Par ${esc(s.createur_nom || '—')} · Clôture le ${fmtDate(s.date_cloture)}</div>
