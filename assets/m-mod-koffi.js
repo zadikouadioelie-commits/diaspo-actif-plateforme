@@ -21,6 +21,7 @@
   const chargerAnnuaire = () => charger('/assets/koffi-annuaire.js?v=5', () => !!window.KoffiAnnuaire);
   const chargerEvenements = () => charger('/assets/koffi-evenements.js?v=5', () => !!window.KoffiEvenements);
   const chargerInscriptions = () => charger('/assets/koffi-inscriptions.js?v=2', () => !!window.KoffiInscriptions);
+  const chargerSondages = () => charger('/assets/koffi-sondages.js?v=1', () => !!window.KoffiSondages);
 
   /* Tous les boutons Koffi du téléphone se déplacent au doigt ; une seule position mémorisée pour qu'il reste où on l'a posé d'un écran à l'autre. */
   const CLE_POS = 'da_koffi_pos_tel';
@@ -84,12 +85,31 @@
   setInterval(majInscriptions, 1500);
   majInscriptions();
 
+  /* ── Koffi des sondages : monté sur le module « Sondages » (#/sondages…) seulement ; lit les PDF et photos joints ── */
+  let enCoursSon = false;
+  const surSondages = () => /^#\/sondages(\/|$)/.test(location.hash);
+  async function majSondages() {
+    if (enCoursSon) return;
+    const K = window.KoffiSondages;
+    if (!surSondages() || !S.me) { if (K && K.estMonte()) K.demonter(); return; }
+    if (K && K.estMonte()) return;
+    enCoursSon = true;
+    try {
+      await chargerSondages();
+      if (window.KoffiSondages && surSondages() && S.me && !window.KoffiSondages.estMonte()) { await window.KoffiSondages.monter({ telephone: true, apresCreation: () => { const A = window.MApp; if (A && A.refreshTab) A.refreshTab('sondages'); } }); const r = document.querySelector('.ks-root'); if (r) deplacable(r, r.querySelector('.ks-btn')); }
+      if (window.KoffiSondages && !surSondages() && window.KoffiSondages.estMonte()) window.KoffiSondages.demonter();
+    } finally { enCoursSon = false; }
+  }
+  window.addEventListener('hashchange', majSondages);
+  setInterval(majSondages, 1500);
+  majSondages();
+
   /* ── Guide de navigation : bouton rond Koffi (son visage) en bas à gauche de TOUS les écrans pour une personne connectée (à droite : les boutons Koffi de l'Annuaire et des Événements).
      Le script de la fenêtre n'est chargé qu'au premier appui : aucun appel au serveur ni à l'IA tant que la personne ne l'ouvre pas. ── */
   function majNavigation() {
     const present = document.getElementById('kn-tel-btn');
     /* Sur l'Annuaire et les Événements, le Koffi de l'écran est déjà là : un seul bouton Koffi à la fois. */
-    const koffiDeLEcran = surAnnuaire() || surEvenements() || surInscriptions();
+    const koffiDeLEcran = surAnnuaire() || surEvenements() || surInscriptions() || surSondages();
     if (!S.me || koffiDeLEcran) { if (present) present.remove(); return; }
     if (present) return;
     if (!document.getElementById('kn-tel-style')) {

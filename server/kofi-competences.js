@@ -176,6 +176,22 @@ function reponseInscriptions(r) {
   ].join("\n");
 }
 
+function reponseSondages() {
+  return [
+    "Je suis votre assistant des sondages. Voici tout ce que je sais faire :",
+    "• Lire un document que vous me joignez (PDF, photo JPEG ou PNG) et en faire un sondage : je repère le titre, la description, chaque question et la forme des réponses (oui/non, choix multiple avec la liste des choix, échelle, réponse libre…).",
+    "• Vous demander l'image de couverture, et l'utiliser si vous me la donnez.",
+    "• Vous proposer moi-même où afficher le sondage : onglet Sondages, fil d'actualité, profil public, boutique, et vos événements (pour l'y lier).",
+    "• Vous montrer un aperçu et ne créer le sondage que quand vous confirmez (bouton « Créer le sondage » ou « oui »). Il est publié dans les lieux choisis, ou enregistré en brouillon si vous n'en choisissez aucun.",
+    "• Vous expliquer comment fonctionnent les sondages (durée de 30 jours, résultats, anonymat, qui peut en créer).",
+    "• Vous dire honnêtement quand je ne connais pas une réponse, plutôt que d'inventer.",
+    "",
+    "Ce que je ne fais pas : voir ou modifier vos sondages existants, lire leurs réponses, envoyer des invitations. Le fichier que vous joignez n'est envoyé qu'une fois et n'est pas conservé.",
+    "",
+    "Crédit : un sondage complet, de la préparation jusqu'à sa publication, compte pour UN crédit Koffi (une question offerte pour les comptes sans Premium). Cette question-ci est toujours gratuite.",
+  ].join("\n");
+}
+
 function reponseBusinessPlan(r) {
   return [
     "Je peux jouer un interlocuteur pour tester la solidité de votre business plan. Voici comment cela se passe :",
@@ -227,6 +243,7 @@ module.exports = {
   reponseAnnuaire: r => reponseAnnuaire(r) + ailleurs("fr", "Annuaire"),
   reponseEvenements: r => reponseEvenements(r) + ailleurs("fr", "Événements"),
   reponseInscriptions: r => reponseInscriptions(r) + ailleurs("fr", "Fiches d'inscription"),
+  reponseSondages: r => reponseSondages(r) + ailleurs("fr", "Sondages"),
   reponseBusinessPlan: r => reponseBusinessPlan(r) + ailleurs("fr", "Business Plan"),
   reponseAdmin: () => reponseAdmin() + ailleurs("fr", "Espace administrateur"),
   phraseCredit, normaliser,

@@ -204,6 +204,50 @@ function reponseFausseEvenements({ systeme, messages }) {
 /* Guide des fiches d'inscription (système marqué ASSISTANT_INSCRIPTIONS) : JSON déterministe d'après des marqueurs de la demande —
    FICHEJSON:{…} (une ligne) → action « fiche » avec ce brouillon ; OUIFICHE → « fiche » avec confirme:true (brouillon précédent repris tel quel) ; ABANDON → « abandonner » ;
    sinon une réponse simple. PANNEFAUSSE, LIMITEFAUSSE, REFUSFAUX, JSONFAUX comme les autres. */
+/* Koffi des sondages (2026-11-10) : réponses déterministes. Le fichier joint est LU pour de bon : ses octets (décodés) contiennent des lignes « TITRE: », « DESC: », « Q: texte | type | choix1;choix2 »,
+   ce qui prouve dans les tests que le document arrive bien à l'IA sous forme de bloc « document » ou « image ». Marqueurs : SONDAGEJSON:{…}, OUISONDAGE, SANSIMAGE, LIEUX:onglet,fil EVT:12, PUBLIER, ABANDON, SANSREPONSEFAUX… */
+function reponseFausseSondages({ systeme, messages }) {
+  if (process.env.KOFI_FAUX_LOG) { try { fs.appendFileSync(process.env.KOFI_FAUX_LOG, JSON.stringify({ systeme, messages }) + "\n"); } catch (e) { /* sans importance */ } }
+  const dernierMsg = messages[messages.length - 1] || {};
+  const blocs = Array.isArray(dernierMsg.content) ? dernierMsg.content : [];
+  const dernier = blocs.length ? String((blocs.filter(b => b.type === "text").pop() || {}).text || "") : String(dernierMsg.content || "");
+  const q = (dernier.split("<demande>")[1] || dernier).split("</demande>")[0];
+  const entree = Math.ceil((String(systeme).length + messages.reduce((a, m) => a + JSON.stringify(m.content).length, 0)) / 4);
+  if (/PANNEFAUSSE/.test(q)) throw new KofiIAErreur("indisponible", "Panne simulée.");
+  if (/LIMITEFAUSSE/.test(q)) throw new KofiIAErreur("limite", "Limite simulée.");
+  if (/REFUSFAUX/.test(q)) return { texte: "", entree, sortie: 5, lecture_cache: 0, refus: true, arret: "refusal" };
+  const prec = (() => { try { return JSON.parse(((/<brouillon_precedent>([\s\S]*?)<\/brouillon_precedent>/.exec(dernier) || [])[1]) || "{}"); } catch (e) { return {}; } })();
+  const rep = (o) => ({ texte: JSON.stringify(o), entree, sortie: Math.ceil(JSON.stringify(o).length / 4), lecture_cache: 0, refus: false, arret: "end_turn" });
+  const doc = blocs.filter(b => b.type === "document" || b.type === "image");
+  if (/JSONFAUX/.test(q)) return { texte: "Voici ma réponse sans structure.", entree, sortie: 8, lecture_cache: 0, refus: false, arret: "end_turn" };
+  if (/SANSREPONSEFAUX/.test(q)) return rep({ action: "sans_reponse" });
+  if (/ABANDON/.test(q)) return rep({ action: "abandonner", message: "" });
+  if (doc.length) {
+    const lignes = doc.filter(b => b.type === "document").map(b => Buffer.from(String(b.source && b.source.data || ""), "base64").toString("latin1")).join("\n").split(/\r?\n/);
+    const b = { ...prec, questions: [] };
+    for (const l of lignes) {
+      let m;
+      if ((m = /^TITRE:\s*(.+)$/.exec(l))) b.titre = m[1].trim();
+      else if ((m = /^DESC:\s*(.+)$/.exec(l))) b.description = m[1].trim();
+      else if ((m = /^Q:\s*([^|]+)\|\s*([a-z_0-9]+)\s*(?:\|\s*(.*))?$/.exec(l))) b.questions.push({ texte: m[1].trim(), type: m[2].trim(), options: m[3] ? m[3].split(";").map(x => x.trim()).filter(Boolean) : [], obligatoire: true });
+    }
+    return rep({ action: "sondage", message: b.questions.length ? `J'ai lu le document : ${b.questions.length} question(s).` : "Je ne trouve pas de questions dans ce document.", brouillon: b, confirme: false });
+  }
+  const fj = /SONDAGEJSON:(\{.*\})/.exec(q);
+  if (fj) { let b = {}; try { b = JSON.parse(fj[1]); } catch (e) { b = {}; } return rep({ action: "sondage", message: "Je prépare le sondage.", brouillon: { ...prec, ...b }, confirme: false }); }
+  const b = { ...prec };
+  if (/SANSIMAGE/.test(q)) b.couverture_choix = "sans";
+  const lx = /LIEUX:([a-z,]*)/.exec(q);
+  if (lx) { b.lieux = { onglet: false, fil: false, profil: false, boutique: false }; lx[1].split(",").filter(Boolean).forEach(k => { b.lieux[k] = true; }); b.lieux_choisis = true; }
+  const ev = /EVT:([\d,]+)/.exec(q);
+  if (ev) { b.evenement_ids = ev[1].split(",").map(Number); b.lieux_choisis = true; }
+  if (/AUCUNLIEU/.test(q)) { b.lieux_choisis = true; b.lieux = { onglet: false, fil: false, profil: false, boutique: false }; b.evenement_ids = []; }
+  if (/PUBLIER/.test(q)) b.publier = true;
+  if (/OUISONDAGE/.test(q)) return rep({ action: "sondage", message: "C'est noté.", brouillon: b, confirme: true });
+  if (/SANSIMAGE|LIEUX:|EVT:|AUCUNLIEU|PUBLIER/.test(q)) return rep({ action: "sondage", message: "C'est noté.", brouillon: b, confirme: false });
+  return rep({ action: "repondre", message: "Voici une explication sur les sondages." });
+}
+
 function reponseFausseInscriptions({ systeme, messages }) {
   if (process.env.KOFI_FAUX_LOG) { try { fs.appendFileSync(process.env.KOFI_FAUX_LOG, JSON.stringify({ systeme, messages }) + "\n"); } catch (e) { /* sans importance */ } }
   const dernier = String((messages[messages.length - 1] || {}).content || "");
@@ -275,6 +319,7 @@ function reponseFausse({ systeme, messages }) {
   if (/ASSISTANT_ADMIN/.test(String(systeme))) return reponseFausseAdmin({ systeme, messages });
   if (/ASSISTANT_EVENEMENTS/.test(String(systeme))) return reponseFausseEvenements({ systeme, messages });
   if (/ASSISTANT_BUSINESSPLAN/.test(String(systeme))) return reponseFausseBusinessPlan({ systeme, messages });
+  if (/ASSISTANT_SONDAGES/.test(String(systeme))) return reponseFausseSondages({ systeme, messages });
   if (/ASSISTANT_INSCRIPTIONS/.test(String(systeme))) return reponseFausseInscriptions({ systeme, messages });
   if (/ASSISTANT_NAVIGATION/.test(String(systeme))) return reponseFausseNavigation({ systeme, messages });
   if (/ASSISTANT_FORMATEUR/.test(String(systeme))) return reponseFausseCreateur({ systeme, messages });

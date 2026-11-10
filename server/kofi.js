@@ -567,6 +567,8 @@ module.exports.register = function register(deps) {
   require("./kofi-evenements").register(deps);
   /* Guide des fiches d'inscription (2026-11-04) : server/kofi-inscriptions.js. */
   require("./kofi-inscriptions").register(deps);
+  /* Koffi des sondages : crée un sondage à partir d'un PDF ou d'une photo (2026-11-10) : server/kofi-sondages.js (lecture des fichiers : server/kofi-fichiers.js). */
+  require("./kofi-sondages").register(deps);
   /* Koffi joue l'investisseur / le banquier / le client dans le Business Plan (2026-11-01) : server/kofi-businessplan.js. */
   require("./kofi-businessplan").register(deps);
   /* Guide de navigation dans toutes les pages (2026-11-01), gratuit : server/kofi-navigation.js. */

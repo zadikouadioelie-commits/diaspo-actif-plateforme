@@ -242,7 +242,9 @@ async function readBody(req) {
   // Certains chemins envoient des médias en base64 (messages vocaux/pièces jointes) → plafond élargi
   const u = req.url || "";
   const bigPath = /^\/api\/conversations\/\d+\/messages$/.test(u);
-  const maxBody = bigPath ? 25e6 : 1e6;
+  /* Koffi des sondages : PDF/photos joints (3 Mo au plus, soit ~4 Mo en base64 ; plafond de la plateforme 4,5 Mo) */
+  const kofiFichiers = u === "/api/kofi/sondages/messages";
+  const maxBody = bigPath ? 25e6 : kofiFichiers ? 5e6 : 1e6;
   req._bodyPromise = new Promise((resolve, reject) => {
     let body = "";
     req.on("data", (chunk) => {
@@ -3420,7 +3422,7 @@ async function appelerRoute(method, pathname, req, body) {
   }
   return { status: 404, data: { error: "Route introuvable." } };
 }
-Kofi.register({ route, db, sendJSON, getCurrentUser, SEC, getPremiumStatut, getOrigin, creerNotif, checkFormationOwner, exigerPremium, appelerRoute });
+Kofi.register({ route, db, sendJSON, getCurrentUser, SEC, getPremiumStatut, getOrigin, creerNotif, checkFormationOwner, exigerPremium, appelerRoute, sondageCreer, sondageDiffusion, sondageAccesCreation });
 /* Envoyer un événement par e-mail (carte complète) + texte d'aperçu du lien (date, lieu) : server/partage-evenement.js. urlImagePartageEvenement est une déclaration de fonction (hissée). */
 const PartageEvenement = require("./partage-evenement");
 PartageEvenement.register({ route, db, sendJSON, getCurrentUser, SEC, nomCompteAffichage, getOrigin, urlImagePartageEvenement });
@@ -31541,6 +31543,84 @@ async function sondagePublierSurFil(s, user) {
   } catch (e) { console.error("[sondagePublierSurFil]", e.message); return null; }
 }
 
+/* Création d'un sondage (2026-11-10) : extraite de la route POST /api/sondages pour que Koffi crée un sondage par EXACTEMENT les mêmes contrôles que le formulaire.
+   Renvoie { status, data } ; `me` est le compte connecté (déjà identifié par l'appelant). */
+async function sondageCreer(me, body) {
+  if (!(await sondagePeutCreer(me))) return { status: 403, data: { error: 'La création de sondages est réservée aux comptes Initiative, aux comptes étatiques et aux comptes Premium.' } };
+  const { titre, description, objectif, categorie, type = 'sondage', ville, pays, region, departement, rayon_publication, date_debut, date_cloture, anonyme, confidentialite, resultats_visibles, une_reponse_par_compte, modification_autorisee, cible_roles, photos_json, pdf_b64, pdf_nom, video_url, questions = [], statut: statutDemande = 'brouillon' } = body;
+  let statut = statutDemande;
+  if (!titre) return { status: 400, data: { error: 'Titre requis.' } };
+  if (pdf_b64 && SEC.isDangerousFile(Buffer.from(String(pdf_b64).split(',').pop(), 'base64'))) return { status: 400, data: { error: 'Fichier PDF invalide.' } };
+  if (!['brouillon', 'ouvert'].includes(statut)) return { status: 400, data: { error: 'Statut invalide.' } };
+  if (!Array.isArray(questions) || !questions.length || questions.some(q2 => !q2 || !String(q2.texte || '').trim())) return { status: 400, data: { error: 'Au moins une question, chacune avec un texte.' } };
+  /* Événements liés (facultatif) : uniquement les événements du créateur. Le sondage reste indépendant de l'inscription. */
+  const evtIdsLies = Array.isArray(body.evenement_ids) ? [...new Set(body.evenement_ids.map(Number).filter(n => Number.isInteger(n) && n > 0))].slice(0, 50) : [];
+  if (evtIdsLies.length) {
+    const permisEvt = new Set((await db.prepare(`SELECT id FROM evenements WHERE owner_user_id=?`).all(me.id)).map(r0 => Number(r0.id)));
+    if (evtIdsLies.some(i => !permisEvt.has(i))) return { status: 400, data: { error: 'Vous ne pouvez lier un sondage qu’à vos propres événements.' } };
+  }
+  /* Lieux d'affichage (2026-11-09) : rien n'est affiché d'office. Sans aucun lieu coché, le sondage reste un brouillon (visible de son seul créateur). */
+  const diffSaisie = sondageDiffusionSaisie(body.diffusion);
+  const nbLieuxNouveau = (diffSaisie.fil ? 1 : 0) + (diffSaisie.profil ? 1 : 0) + (diffSaisie.onglet ? 1 : 0) + (diffSaisie.boutique ? 1 : 0) + (evtIdsLies.length ? 1 : 0);
+  let messageStatut = null;
+  if (statut === 'ouvert' && nbLieuxNouveau === 0) { statut = 'brouillon'; messageStatut = 'Aucun lieu d’affichage choisi : le sondage est enregistré en brouillon. Choisissez au moins un lieu pour le publier.'; }
+  const jourOk = (v) => /^\d{4}-\d{2}-\d{2}/.test(String(v || ''));
+  const debutSond = (statut === 'ouvert' || !jourOk(date_debut)) ? sondageJourIso(new Date()) : String(date_debut).slice(0, 10);
+  const finSond = jourOk(date_cloture) ? String(date_cloture).slice(0, 10) : sondageAjouterJours(debutSond, SONDAGE_DUREE_MAX_JOURS - 1);
+  if (finSond < debutSond) return { status: 400, data: { error: 'La date de fin doit être postérieure à la date de début.' } };
+  if (sondageDureeJours(debutSond, finSond) > SONDAGE_DUREE_MAX_JOURS) return { status: 400, data: { error: 'Durée maximale : 30 jours.' } };
+  const champsRep = anonyme ? [] : (sondageChampsRepondant(body.champs_repondant) || SONDAGE_CHAMPS_DEFAUT);
+  const periodeInitiale = { numero: 1, debut: debutSond, fin: finSond, duree_jours: sondageDureeJours(debutSond, finSond) };
+  const r = await db.prepare(`INSERT INTO sondages(createur_id,titre,description,objectif,categorie,type,ville,pays,region,departement,rayon_publication,date_debut,date_cloture,anonyme,confidentialite,resultats_visibles,une_reponse_par_compte,modification_autorisee,cible_roles,photos_json,pdf_b64,pdf_nom,video_url,statut,champs_repondant_json,periodes_json)
+    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+    .run(...[me.id,titre,description,objectif,categorie||'autre',type,ville,pays,region,departement,rayon_publication||'national',debutSond,finSond,anonyme?1:0,confidentialite||'anonyme',resultats_visibles||'apres_cloture',une_reponse_par_compte?1:1,modification_autorisee?1:0,JSON.stringify(cible_roles||[]),JSON.stringify(photos_json||[]),pdf_b64||null,pdf_nom||null,video_url||null,statut,JSON.stringify(champsRep),JSON.stringify(statut === 'ouvert' ? [periodeInitiale] : [])].map(v => v === undefined ? null : v));
+  const sid = Number(r.lastInsertRowid);
+  // Insérer les questions
+  for (let i = 0; i < questions.length; i++) {
+    const q2 = questions[i];
+    await db.prepare(`INSERT INTO sondage_questions(sondage_id,texte,type,options_json,obligatoire,ordre,description,min_label,max_label,min_val,max_val) VALUES(?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(sid,q2.texte,q2.type||'choix_unique',JSON.stringify(q2.options||[]),q2.obligatoire?1:1,i,q2.description||null,q2.min_label||null,q2.max_label||null,q2.min_val||1,q2.max_val||5);
+  }
+  for (const i of evtIdsLies) await db.prepare(`INSERT INTO sondage_evenements(sondage_id,evenement_id) VALUES(?,?)`).run(sid, i);
+  /* La publication dans le fil d'actualité (et les autres lieux) se règle dans « Diffusion » (étape suivante) : l'ancien envoi automatique
+     visait une colonne inexistante (fil_posts.user_id) et ne fonctionnait pas. */
+  await db.prepare(`UPDATE sondages SET diffusion_json=? WHERE id=?`).run(JSON.stringify(diffSaisie), sid);
+  if (statut === 'ouvert') {
+    if (diffSaisie.fil) await sondagePublierSurFil({ id: sid, titre, description, date_cloture: finSond }, { id: me.id });
+    await sondageNotifierAlertes(sid, titre, me.id);
+  }
+  return { status: 201, data: { id: sid, statut, ...(messageStatut ? { message: messageStatut } : {}) } };
+}
+
+/* Lieux d'affichage et événements liés d'un sondage (2026-11-10) : extrait de la route PUT /api/sondages/:id/diffusion, partagé avec Koffi. Renvoie { status, data }. */
+async function sondageDiffusion(me, sid, body) {
+  const s = await db.prepare(`SELECT * FROM sondages WHERE id=?`).get(sid);
+  if (!s || (s.createur_id !== me.id && me.role !== 'administrateur')) return { status: 403, data: { error: 'Accès refusé.' } };
+  const avant = sondageDiffusionLue(s);
+  const apres = {
+    fil: body.fil === undefined ? avant.fil : !!body.fil, profil: body.profil === undefined ? avant.profil : !!body.profil,
+    onglet: body.onglet === undefined ? avant.onglet : !!body.onglet, boutique: body.boutique === undefined ? avant.boutique : !!body.boutique
+  };
+  let idsEvt = null;
+  if (Array.isArray(body.evenement_ids)) {
+    idsEvt = [...new Set(body.evenement_ids.map(Number).filter(n => Number.isInteger(n) && n > 0))].slice(0, 50);
+    const permis = new Set((await db.prepare(`SELECT id FROM evenements WHERE owner_user_id=?`).all(s.createur_id)).map(r => Number(r.id)));
+    if (idsEvt.some(i => !permis.has(i))) return { status: 400, data: { error: 'Vous ne pouvez lier un sondage qu’à vos propres événements.' } };
+  }
+  /* Un sondage en cours doit rester affiché quelque part ; un brouillon peut n'avoir encore aucun lieu. */
+  if (s.statut === 'ouvert' && (await sondageNbLieux(s, apres, idsEvt ? idsEvt.length : undefined)) === 0) return { status: 400, data: { error: 'Un sondage en cours doit avoir au moins un lieu d’affichage.' } };
+  await db.prepare(`UPDATE sondages SET diffusion_json=? WHERE id=?`).run(JSON.stringify(apres), sid);
+  if (idsEvt) {
+    const ids = idsEvt;
+    await db.prepare(`DELETE FROM sondage_evenements WHERE sondage_id=?`).run(sid);
+    for (const i of ids) await db.prepare(`INSERT INTO sondage_evenements(sondage_id,evenement_id) VALUES(?,?)`).run(sid, i);
+  }
+  let fil_post_id = s.fil_post_id || null;
+  /* Annonce dans le fil : tout de suite si le sondage est en cours et si le lieu vient d'être activé ; sinon à la publication. */
+  if (apres.fil && !avant.fil && s.statut === 'ouvert') fil_post_id = await sondagePublierSurFil(s, { id: s.createur_id });
+  return { status: 200, data: { message: 'Diffusion enregistrée.', diffusion: apres, fil_post_id } };
+}
+
 /* ──── MODULE MOBILISATION ACTIVE — Sondages & Consultations ──── */
 
 /* Liste, création, détail et résultats des sondages : servis par le module enrichi de handleRequest (« SONDAGES — MODULE ENRICHI »).
@@ -40340,53 +40420,11 @@ ${jsonLd}
       return sendJSON(res, 200, { sondages: sondages_list });
     }
 
-    /* ── POST /api/sondages ── */
+    /* ── POST /api/sondages ── (logique dans sondageCreer, partagée avec Koffi) */
     if (req.method === 'POST' && pathname === '/api/sondages') {
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
-      if (!(await sondagePeutCreer(me))) return sendJSON(res, 403, { error: 'La création de sondages est réservée aux comptes Initiative, aux comptes étatiques et aux comptes Premium.' });
-      const { titre, description, objectif, categorie, type = 'sondage', ville, pays, region, departement, rayon_publication, date_debut, date_cloture, anonyme, confidentialite, resultats_visibles, une_reponse_par_compte, modification_autorisee, cible_roles, photos_json, pdf_b64, pdf_nom, video_url, questions = [], statut: statutDemande = 'brouillon' } = body;
-      let statut = statutDemande;
-      if (!titre) return sendJSON(res, 400, { error: 'Titre requis.' });
-      if (pdf_b64 && SEC.isDangerousFile(Buffer.from(String(pdf_b64).split(',').pop(), 'base64'))) return sendJSON(res, 400, { error: 'Fichier PDF invalide.' });
-      if (!['brouillon', 'ouvert'].includes(statut)) return sendJSON(res, 400, { error: 'Statut invalide.' });
-      if (!Array.isArray(questions) || !questions.length || questions.some(q2 => !q2 || !String(q2.texte || '').trim())) return sendJSON(res, 400, { error: 'Au moins une question, chacune avec un texte.' });
-      /* Événements liés (facultatif) : uniquement les événements du créateur. Le sondage reste indépendant de l'inscription. */
-      const evtIdsLies = Array.isArray(body.evenement_ids) ? [...new Set(body.evenement_ids.map(Number).filter(n => Number.isInteger(n) && n > 0))].slice(0, 50) : [];
-      if (evtIdsLies.length) {
-        const permisEvt = new Set((await db.prepare(`SELECT id FROM evenements WHERE owner_user_id=?`).all(me.id)).map(r0 => Number(r0.id)));
-        if (evtIdsLies.some(i => !permisEvt.has(i))) return sendJSON(res, 400, { error: 'Vous ne pouvez lier un sondage qu’à vos propres événements.' });
-      }
-      /* Lieux d'affichage (2026-11-09) : rien n'est affiché d'office. Sans aucun lieu coché, le sondage reste un brouillon (visible de son seul créateur). */
-      const diffSaisie = sondageDiffusionSaisie(body.diffusion);
-      const nbLieuxNouveau = (diffSaisie.fil ? 1 : 0) + (diffSaisie.profil ? 1 : 0) + (diffSaisie.onglet ? 1 : 0) + (diffSaisie.boutique ? 1 : 0) + (evtIdsLies.length ? 1 : 0);
-      let messageStatut = null;
-      if (statut === 'ouvert' && nbLieuxNouveau === 0) { statut = 'brouillon'; messageStatut = 'Aucun lieu d’affichage choisi : le sondage est enregistré en brouillon. Choisissez au moins un lieu pour le publier.'; }
-      const jourOk = (v) => /^\d{4}-\d{2}-\d{2}/.test(String(v || ''));
-      const debutSond = (statut === 'ouvert' || !jourOk(date_debut)) ? sondageJourIso(new Date()) : String(date_debut).slice(0, 10);
-      const finSond = jourOk(date_cloture) ? String(date_cloture).slice(0, 10) : sondageAjouterJours(debutSond, SONDAGE_DUREE_MAX_JOURS - 1);
-      if (finSond < debutSond) return sendJSON(res, 400, { error: 'La date de fin doit être postérieure à la date de début.' });
-      if (sondageDureeJours(debutSond, finSond) > SONDAGE_DUREE_MAX_JOURS) return sendJSON(res, 400, { error: 'Durée maximale : 30 jours.' });
-      const champsRep = anonyme ? [] : (sondageChampsRepondant(body.champs_repondant) || SONDAGE_CHAMPS_DEFAUT);
-      const periodeInitiale = { numero: 1, debut: debutSond, fin: finSond, duree_jours: sondageDureeJours(debutSond, finSond) };
-      const r = await db.prepare(`INSERT INTO sondages(createur_id,titre,description,objectif,categorie,type,ville,pays,region,departement,rayon_publication,date_debut,date_cloture,anonyme,confidentialite,resultats_visibles,une_reponse_par_compte,modification_autorisee,cible_roles,photos_json,pdf_b64,pdf_nom,video_url,statut,champs_repondant_json,periodes_json)
-        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-        .run(...[me.id,titre,description,objectif,categorie||'autre',type,ville,pays,region,departement,rayon_publication||'national',debutSond,finSond,anonyme?1:0,confidentialite||'anonyme',resultats_visibles||'apres_cloture',une_reponse_par_compte?1:1,modification_autorisee?1:0,JSON.stringify(cible_roles||[]),JSON.stringify(photos_json||[]),pdf_b64||null,pdf_nom||null,video_url||null,statut,JSON.stringify(champsRep),JSON.stringify(statut === 'ouvert' ? [periodeInitiale] : [])].map(v => v === undefined ? null : v));
-      const sid = Number(r.lastInsertRowid);
-      // Insérer les questions
-      for (let i = 0; i < questions.length; i++) {
-        const q2 = questions[i];
-        await db.prepare(`INSERT INTO sondage_questions(sondage_id,texte,type,options_json,obligatoire,ordre,description,min_label,max_label,min_val,max_val) VALUES(?,?,?,?,?,?,?,?,?,?,?)`)
-          .run(sid,q2.texte,q2.type||'choix_unique',JSON.stringify(q2.options||[]),q2.obligatoire?1:1,i,q2.description||null,q2.min_label||null,q2.max_label||null,q2.min_val||1,q2.max_val||5);
-      }
-      for (const i of evtIdsLies) await db.prepare(`INSERT INTO sondage_evenements(sondage_id,evenement_id) VALUES(?,?)`).run(sid, i);
-      /* La publication dans le fil d'actualité (et les autres lieux) se règle dans « Diffusion » (étape suivante) : l'ancien envoi automatique
-         visait une colonne inexistante (fil_posts.user_id) et ne fonctionnait pas. */
-      await db.prepare(`UPDATE sondages SET diffusion_json=? WHERE id=?`).run(JSON.stringify(diffSaisie), sid);
-      if (statut === 'ouvert') {
-        if (diffSaisie.fil) await sondagePublierSurFil({ id: sid, titre, description, date_cloture: finSond }, { id: me.id });
-        await sondageNotifierAlertes(sid, titre, me.id);
-      }
-      return sendJSON(res, 201, { id: sid, statut, ...(messageStatut ? { message: messageStatut } : {}) });
+      const out = await sondageCreer(me, body);
+      return sendJSON(res, out.status, out.data);
     }
 
     /* ── GET /api/sondages/:id ── */
@@ -40746,35 +40784,11 @@ ${jsonLd}
       });
     }
 
-    /* ── PUT /api/sondages/:id/diffusion ── choix des lieux (fil, profil public) et des événements (créateur) ── */
+    /* ── PUT /api/sondages/:id/diffusion ── choix des lieux (fil, profil public) et des événements (créateur) — logique dans sondageDiffusion */
     if (req.method === 'PUT' && /^\/api\/sondages\/\d+\/diffusion$/.test(pathname)) {
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
-      const sid = parseInt(pathname.split('/')[3]);
-      const s = await db.prepare(`SELECT * FROM sondages WHERE id=?`).get(sid);
-      if (!s || (s.createur_id !== me.id && me.role !== 'administrateur')) return sendJSON(res, 403, { error: 'Accès refusé.' });
-      const avant = sondageDiffusionLue(s);
-      const apres = {
-        fil: body.fil === undefined ? avant.fil : !!body.fil, profil: body.profil === undefined ? avant.profil : !!body.profil,
-        onglet: body.onglet === undefined ? avant.onglet : !!body.onglet, boutique: body.boutique === undefined ? avant.boutique : !!body.boutique
-      };
-      let idsEvt = null;
-      if (Array.isArray(body.evenement_ids)) {
-        idsEvt = [...new Set(body.evenement_ids.map(Number).filter(n => Number.isInteger(n) && n > 0))].slice(0, 50);
-        const permis = new Set((await db.prepare(`SELECT id FROM evenements WHERE owner_user_id=?`).all(s.createur_id)).map(r => Number(r.id)));
-        if (idsEvt.some(i => !permis.has(i))) return sendJSON(res, 400, { error: 'Vous ne pouvez lier un sondage qu’à vos propres événements.' });
-      }
-      /* Un sondage en cours doit rester affiché quelque part ; un brouillon peut n'avoir encore aucun lieu. */
-      if (s.statut === 'ouvert' && (await sondageNbLieux(s, apres, idsEvt ? idsEvt.length : undefined)) === 0) return sendJSON(res, 400, { error: 'Un sondage en cours doit avoir au moins un lieu d’affichage.' });
-      await db.prepare(`UPDATE sondages SET diffusion_json=? WHERE id=?`).run(JSON.stringify(apres), sid);
-      if (idsEvt) {
-        const ids = idsEvt;
-        await db.prepare(`DELETE FROM sondage_evenements WHERE sondage_id=?`).run(sid);
-        for (const i of ids) await db.prepare(`INSERT INTO sondage_evenements(sondage_id,evenement_id) VALUES(?,?)`).run(sid, i);
-      }
-      let fil_post_id = s.fil_post_id || null;
-      /* Annonce dans le fil : tout de suite si le sondage est en cours et si le lieu vient d'être activé ; sinon à la publication. */
-      if (apres.fil && !avant.fil && s.statut === 'ouvert') fil_post_id = await sondagePublierSurFil(s, { id: s.createur_id });
-      return sendJSON(res, 200, { message: 'Diffusion enregistrée.', diffusion: apres, fil_post_id });
+      const out = await sondageDiffusion(me, parseInt(pathname.split('/')[3]), body);
+      return sendJSON(res, out.status, out.data);
     }
 
     /* ── POST /api/sondages/:id/invitations ── e-mails avec lien personnel à usage unique (créateur) ── */

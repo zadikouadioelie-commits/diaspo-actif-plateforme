@@ -143,10 +143,11 @@
      LISTE (publique)
      ============================================================ */
   const ST = { q: '', cat: '', items: [] };
+  function couvSond(s){try{var a=typeof s.photos_json==='string'?JSON.parse(s.photos_json||'[]'):(s.photos_json||[]);var u=a&&a[0];return (typeof u==='string'&&/^(https:\/\/|\/)/.test(u))?u:'';}catch(e){return '';}}
   function carte(s) {
     const jours = joursRestants(s.date_cloture);
     const fini = s.statut !== 'ouvert';
-    return `<a class="card mso-card" href="#/sondages/voir/${Number(s.id)}"><div class="pad">
+    return `<a class="card mso-card" href="#/sondages/voir/${Number(s.id)}">${couvSond(s) ? `<img src="${esc(couvSond(s))}" alt="" loading="lazy" style="display:block;width:100%;height:120px;object-fit:cover;border-radius:12px 12px 0 0;background:#e8edf3">` : ''}<div class="pad">
       <div class="row" style="align-items:flex-start"><span class="mso-cat">${esc(CAT_LABELS[s.categorie] || 'Sondage')}</span><span class="sp"></span>${fini ? '<span class="small muted">Fin de ce sondage</span>' : (jours !== null ? `<span class="small" style="color:${jours <= 3 ? 'var(--red)' : 'var(--muted)'}">${jours > 1 ? jours + ' j restants' : 'Dernier jour'}</span>` : '')}</div>
       <div style="font-weight:700;font-size:15.5px;margin-top:8px;word-break:break-word">${esc(s.titre)}</div>
       ${s.description ? `<p class="small muted" style="margin:4px 0 0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(A.strip(s.description))}</p>` : ''}
@@ -204,7 +205,7 @@
     if (MES_F === 'brouillons') rows = rows.filter(s => s.statut === 'brouillon');
     const html = onglets('mes') + barre + (MES_F === 'brouillons' ? '<p class="mso-hint" style="margin:0 0 10px">Ces sondages ne sont affichés nulle part : vous seul(e) les voyez. Ouvrez-en un, choisissez les lieux (« Diffusion »), puis publiez-le.</p>' : '') + (rows.length ? rows.map(s => {
       const st = STATUT_LABELS[s.statut] || s.statut;
-      return `<a class="card mso-card" href="#/sondages/voir/${Number(s.id)}"><div class="pad">
+      return `<a class="card mso-card" href="#/sondages/voir/${Number(s.id)}">${couvSond(s) ? `<img src="${esc(couvSond(s))}" alt="" loading="lazy" style="display:block;width:100%;height:120px;object-fit:cover;border-radius:12px 12px 0 0;background:#e8edf3">` : ''}<div class="pad">
         <div class="row" style="align-items:flex-start"><div class="sp"><span class="mso-cat">${esc(CAT_LABELS[s.categorie] || 'Sondage')}</span><div style="font-weight:700;font-size:15px;margin-top:4px;word-break:break-word">${esc(s.titre)}</div><div class="small muted">${s.statut === 'ouvert' ? 'Fin le ' : 'Terminé le '}${fmtDate(s.date_cloture)} · ${s.nb_reponses || 0} réponse${s.nb_reponses > 1 ? 's' : ''}</div>${s.statut === 'brouillon' ? `<div class="small muted">${lieuxDe(s).length ? 'Lieux choisis : ' + esc(lieuxDe(s).join(' · ')) : 'Aucun lieu choisi pour l’instant'}</div>` : ''}</div><span class="badge ${s.statut === 'ouvert' ? 'g' : ''}">${esc(st)}</span></div>
       </div></a>`;
     }).join('') : `<div class="empty"><div class="ei">${ic('doc', 'l')}</div><b>Vous n’avez pas encore créé de sondage</b>Créez-en un pour consulter votre communauté.</div>`);
@@ -248,7 +249,7 @@
     const ferme = s.statut !== 'ouvert';
     const dejaRepondu = !!maP;
     const peutParticiper = S.me && !ferme && !dejaRepondu;
-    const html = `<div class="card"><div class="pad">
+    const html = `<div class="card">${couvSond(s) ? `<img src="${esc(couvSond(s))}" alt="" style="display:block;width:100%;max-height:200px;object-fit:cover;border-radius:12px 12px 0 0;background:#e8edf3">` : ''}<div class="pad">
         <span class="mso-cat">${esc(CAT_LABELS[s.categorie] || 'Sondage')}</span>
         <h2 style="margin:8px 0 2px;font-size:19px;word-break:break-word">${esc(s.titre)}</h2>
         <div class="small muted">Par ${esc(s.createur_nom || '—')} · Clôture le ${fmtDate(s.date_cloture)}</div>

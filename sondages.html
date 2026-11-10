@@ -24,6 +24,7 @@
 .sond-tab.active{color:#2563EB;border-bottom-color:#2563EB;}
 .sond-section{display:none;}.sond-section.active{display:block;}
 .sond-card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:20px;cursor:pointer;transition:box-shadow .2s;}
+.sc-couv{display:block;width:calc(100% + 40px);margin:-20px -20px 14px;max-width:none;height:150px;object-fit:cover;border-radius:14px 14px 0 0;background:#e8edf3}
 .sond-card:hover{box-shadow:0 4px 18px rgba(0,0,0,.08);}
 .sond-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;}
 .cat-badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;background:#f3f4f6;color:#374151;}
@@ -463,6 +464,7 @@ function renderSonds(){
     const jours=daysLeft(s.date_cloture);
     const ouvert=s.statut==='ouvert', repondu=Number(s.ai_repondu)===1;
     return `<article class="sond-card" tabindex="0" onclick="openSond(${s.id})" onkeydown="if(event.key==='Enter'&&event.target===this)openSond(${s.id})">
+      ${couvSond(s)?`<img class="sc-couv" src="${escH(couvSond(s))}" alt="" loading="lazy" width="640" height="240">`:''}
       <div class="sc-tete">
         <span class="cat-badge">${escH(CAT_LABELS[s.categorie]||s.categorie||'Sondage')}</span>
         ${!ouvert?`<span class="sc-delai fin">Fin de ce sondage</span>`:(jours!==null?`<span class="sc-delai ${jours<=3?'urgent':''}">${jours>1?jours+' j restants':'Dernier jour'}</span>`:'')}
@@ -482,6 +484,7 @@ function renderSonds(){
   }).join('');
 }
 
+function couvSond(s){try{var a=typeof s.photos_json==='string'?JSON.parse(s.photos_json||'[]'):(s.photos_json||[]);var u=a&&a[0];return (typeof u==='string'&&/^(https:\/\/|\/)/.test(u))?u:'';}catch(e){return '';}}
 async function openSond(sid){
   api('POST','/sondages/'+sid+'/view').catch(()=>{});
   const el=document.getElementById('modal-sond-content');
@@ -495,6 +498,7 @@ async function openSond(sid){
     const dejaRepondu=!!maP;
     const peutParticiper=ME_SOND&&!ferme&&!dejaRepondu;
     el.innerHTML=`
+      ${couvSond(s)?`<img src="${escH(couvSond(s))}" alt="" style="display:block;width:100%;max-height:220px;object-fit:cover;border-radius:12px;margin-bottom:14px;background:#e8edf3">`:''}
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
         <div>
           <span class="cat-badge" style="margin-bottom:6px;display:inline-block;">📊 ${escH(CAT_LABELS[s.categorie]||'Sondage')}</span>
@@ -970,6 +974,9 @@ async function openStatsSond(sid){
   }catch(e){el.innerHTML=`<div style="padding:20px;color:#ef4444;">Erreur : ${escH(e.message)}</div>`;}
 }
 </script>
+<!-- Koffi des sondages (2026-11-10) : lit les PDF et photos joints, prépare le sondage, le crée après accord ; bouton affiché seulement aux personnes connectées, le serveur décide de tout (assets/koffi-sondages.js). Retour arrière : retirer ces 2 lignes. -->
+<script src="/assets/koffi-sondages.js?v=1" defer></script>
+<script>window.addEventListener('load', function () { if (window.KoffiSondages) KoffiSondages.monter({ apresCreation: function () { try { loadSonds(); loadMesSonds(); majBrouillons(); } catch (e) {} } }); });</script>
 <script src="/assets/cookies-banner.js"></script>
   <script src="/assets/theme-manager.js"></script>
 <script src="assets/back-button.js"></script>

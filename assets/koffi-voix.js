@@ -18,7 +18,7 @@
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) { window.KoffiVoix = { disponible: false, brancher: function () {} }; return; }
 
-  var FORMS = '.kn-form,.kad-form,.ke-form,.ki-form,.kb-form,.kf-form';
+  var FORMS = '.kn-form,.kad-form,.ke-form,.ki-form,.kb-form,.kf-form,.ks-form';
   var DELAI_ENVOI = 2000;
   var TXT = {
     fr: {
