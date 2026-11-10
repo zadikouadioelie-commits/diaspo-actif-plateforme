@@ -530,6 +530,7 @@ async function openSond(sid){
         <button class="ibtn" onclick="navigator.clipboard.writeText(location.origin+'/sondage.html?id=${sid}');DA.toast('Lien copié !',{type:'success'})">📤 Copier</button>
         ${estCreateur?`<button class="btn btn-sm" style="border-color:#2563EB;color:#2563EB;" onclick="closeMod('modal-sond-bg');ouvrirDiffusion(${sid})">📣 Diffusion</button>`:''}
         ${estCreateur?`<button class="btn btn-sm" style="border-color:#2563EB;color:#2563EB;" onclick="closeMod('modal-sond-bg');openStatsSond(${sid})">📊 Stats</button>`:''}
+        ${estCreateur?`<a class="btn btn-sm" style="border-color:#2563EB;color:#2563EB;text-decoration:none;" href="sondage-rapport.html?id=${sid}" target="_blank" rel="noopener">📄 Rapport</a>`:''}
         ${estCreateur&&!ferme?`<button class="btn btn-sm" style="border-color:#ef4444;color:#ef4444;" onclick="cloturerSond(${sid})">🔒 Clôturer</button>`:''}
         ${estCreateur&&s.statut==='cloture'?`<button class="btn btn-sm" style="border-color:#2563EB;color:#2563EB;" onclick="ouvrirRepublier(${sid})">🔁 Republier</button>`:''}
         ${estCreateur&&s.statut==='brouillon'?`<button class="btn btn-sm" style="border-color:#2563EB;color:#2563EB;" onclick="ouvrirModifierSond(${sid})">✏️ Modifier</button><button class="btn btn-sm" style="border-color:#2563EB;color:#2563EB;" onclick="ouvrirRepublier(${sid},true)">🚀 Publier</button>`:''}
@@ -734,6 +735,7 @@ async function loadMesSonds(){
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <button class="btn btn-sm btn-outline" onclick="openSond(${s.id})">👁️ Voir</button>
           <button class="btn btn-sm btn-outline" onclick="openStatsSond(${s.id})">📊 Stats</button>
+          <a class="btn btn-sm" style="border-color:#2563EB;color:#2563EB;text-decoration:none;" href="sondage-rapport.html?id=${s.id}" target="_blank" rel="noopener">📄 Rapport</a>
           <button class="btn btn-sm" style="border-color:#2563EB;color:#2563EB;" onclick="ouvrirDiffusion(${s.id})">📣 Diffusion</button>
           ${s.statut==='ouvert'?`<button class="btn btn-sm" style="border-color:#ef4444;color:#ef4444;" onclick="cloturerSond(${s.id})">🔒 Clôturer</button>`:''}
           ${s.statut==='cloture'?`<button class="btn btn-sm" style="border-color:#2563EB;color:#2563EB;" onclick="ouvrirRepublier(${s.id})">🔁 Republier</button>`:''}
@@ -1047,6 +1049,7 @@ async function openStatsSond(sid){
       ${r.par_pays.length?`<div style="margin-bottom:16px;"><strong style="font-size:13px;">🌍 Par pays</strong><div style="margin-top:8px;">${r.par_pays.map(p=>`<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0;"><span>${escH(p.pays||'—')}</span><span style="font-weight:700;">${p.n}</span></div>`).join('')}</div></div>`:''}
       ${r.par_type.length?`<div style="margin-bottom:16px;"><strong style="font-size:13px;">👤 Par type de compte</strong><div style="margin-top:8px;">${r.par_type.map(t=>`<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0;"><span>${escH(t.type_compte||'—')}</span><span style="font-weight:700;">${t.n}</span></div>`).join('')}</div></div>`:''}
       ${r.evolution.length?`<div style="margin-bottom:16px;"><strong style="font-size:13px;">📈 Évolution</strong><div style="margin-top:8px;">${r.evolution.map(e=>`<div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0;color:var(--muted);"><span>${e.jour}</span><strong>${e.n}</strong></div>`).join('')}</div></div>`:''}
+      <a class="btn btn-outline" style="width:100%;display:block;text-align:center;text-decoration:none;margin-bottom:8px;" href="sondage-rapport.html?id=${sid}" target="_blank" rel="noopener">📄 Rapport anonymisé (diagrammes, impression, PDF)</a>
       <button class="btn btn-outline" style="width:100%;" onclick="window.location.href='/api/sondages/${sid}/export'">⬇️ Exporter CSV</button>`;
   }catch(e){el.innerHTML=`<div style="padding:20px;color:#ef4444;">Erreur : ${escH(e.message)}</div>`;}
 }

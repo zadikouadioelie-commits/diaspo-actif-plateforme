@@ -40769,6 +40769,15 @@ ${jsonLd}
       return sendJSON(res, 200, { sondage: s, taux_participation: taux, par_pays, par_type, evolution, nb_repondants, nb_invites });
     }
 
+    /* ── GET /api/sondages/:id/rapport ── agrégats ANONYMES (effectifs, pourcentages, réponses libres nettoyées) pour le rapport imprimable ; créateur et administrateur seulement ── */
+    if (req.method === 'GET' && /^\/api\/sondages\/\d+\/rapport$/.test(pathname)) {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const sid = parseInt(pathname.split('/')[3]);
+      const s = await db.prepare(`SELECT * FROM sondages WHERE id=?`).get(sid);
+      if (!s || (s.createur_id !== me.id && me.role !== 'administrateur')) return sendJSON(res, 403, { error: 'Accès refusé.' });
+      return sendJSON(res, 200, await require('./sondage-rapport').construire(db, s));
+    }
+
     /* ── POST /api/sondages/:id/reaction ── */
     if (req.method === 'POST' && /^\/api\/sondages\/\d+\/reaction$/.test(pathname)) {
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });

@@ -270,6 +270,7 @@
       </div>
       ${estCreateur ? `<div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap">
         <button type="button" class="btn out sm" id="mso-stats-btn">📊 Statistiques</button>
+        <button type="button" class="btn out sm" id="mso-rapport">📄 Rapport</button>
         <button type="button" class="btn out sm" id="mso-diff">📣 Diffusion</button>
         ${!ferme ? `<button type="button" class="btn out sm" id="mso-cloturer">🔒 Clôturer</button>` : ''}
         ${s.statut === 'cloture' ? `<button type="button" class="btn out sm" id="mso-republier">🔁 Republier</button>` : ''}
@@ -298,6 +299,7 @@
 
     if (estCreateur) {
       const sb = $('#mso-stats-btn'); if (sb) sb.onclick = () => chargerStats(id);
+      const rap = $('#mso-rapport'); if (rap) rap.onclick = () => { window.open('/sondage-rapport.html?id=' + id, '_blank'); };
       const df = $('#mso-diff'); if (df) df.onclick = () => diffusion(id);
       const cl = $('#mso-cloturer'); if (cl) cl.onclick = () => cloturer(t, id);
       const rp = $('#mso-republier'); if (rp) rp.onclick = () => republier(t, id, false);
