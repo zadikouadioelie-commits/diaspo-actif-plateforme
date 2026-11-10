@@ -1,0 +1,1081 @@
+<!doctype html>
+<!--
+CONSIGNE POUR CLAUDE CODE (transfert depuis la maquette, validée par ZADI) :
+- Les visuels, les parcours et le système de cette page sont validés. NE PAS les modifier ni les redessiner : il faut seulement les brancher (données réelles, serveur, paiement).
+- Types de boutiques : utiliser uniquement les types définis dans TYPES (video, ecom, portfolio, events, impact). Un nouveau type sera ajouté plus tard, sur demande uniquement.
+- Migration de type : le propriétaire voit un message et valide ; la migration se fait ensuite automatiquement.
+- « Acheter maintenant » est supprimé : l'achat passe toujours par « Ajouter au panier ».
+- La section Équipe est conservée (invitations, postes, acceptation).
+-->
+<html lang="fr">
+<head>
+<meta name="robots" content="noindex,nofollow">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Éclat Beauté Boutique Vidéo · maquette</title>
+<style>
+  /* Charte : une couleur d'accent (celle de la boutique), une couleur promo (choisie), gris neutres */
+  :root {
+    --accent:#7a1a2a; --promo-bg:#7a1a2a; --promo-fg:#fff;
+    --ink:#1d1d24; --muted:#6b6b73; --line:#e5e5e8; --bg:#f5f5f3; --surface:#fff; --alt:#ececef; --chip:#efeff2;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif; color:var(--ink); background:var(--bg); }
+  button { font-family:inherit; }
+  svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; flex:0 0 auto; }
+  svg.solid { fill:currentColor; stroke:none; }
+
+  /* En-tête */
+  header.top { background:#15151c; color:#fff; display:flex; align-items:center; gap:16px; padding:10px 24px; flex-wrap:wrap; }
+  .brand { font-weight:700; letter-spacing:.06em; font-size:16px; white-space:nowrap; }
+  .brand small { display:block; font-weight:400; font-size:10px; letter-spacing:0; opacity:.7; }
+  header nav { display:flex; gap:16px; font-size:14px; flex-wrap:wrap; }
+  header nav a { color:#fff; text-decoration:none; opacity:.8; padding:4px 0; }
+  header nav a.active { border-bottom:2px solid #fff; opacity:1; }
+  .home-btn { display:inline-flex; align-items:center; gap:6px; color:#fff; text-decoration:none; font-size:13px; font-weight:600; border:1px solid rgba(255,255,255,.35); border-radius:8px; padding:6px 12px; white-space:nowrap; }
+  .home-btn:hover { background:#2a2a35; }
+  .search { display:flex; flex:1; max-width:340px; min-width:180px; margin-left:auto; }
+  .search input { flex:1; min-width:0; padding:9px 12px; border:0; border-radius:8px 0 0 8px; font:inherit; font-size:14px; }
+  .search button { background:#fff; color:var(--ink); border:0; border-radius:0 8px 8px 0; padding:0 14px; cursor:pointer; display:flex; align-items:center; }
+  .icon-btn { background:none; border:0; color:#fff; cursor:pointer; position:relative; padding:6px; border-radius:8px; display:inline-flex; }
+  .icon-btn:hover { background:#2a2a35; }
+  .count-dot { position:absolute; top:-3px; right:-5px; background:#fff; color:var(--ink); border-radius:999px; font-size:10px; font-weight:700; min-width:17px; height:17px; line-height:17px; text-align:center; padding:0 4px; }
+  .account { background:none; color:#fff; border:1px solid #444; border-radius:8px; padding:7px 12px; cursor:pointer; font-size:14px; display:inline-flex; gap:6px; align-items:center; }
+
+  /* Bandeau compact + « À la une » */
+  .hero { position:relative; overflow:hidden; color:#fff; padding:18px 24px; background:var(--accent); }
+  .hero .cover { position:absolute; inset:0; pointer-events:none; }
+  .hero-in { position:relative; display:grid; grid-template-columns:1fr minmax(0,560px); gap:28px; align-items:center; }
+  .hero h1 { margin:0 0 8px; font-size:28px; line-height:1.2; font-weight:700; }
+  .hero h1 em { font-style:normal; opacity:.85; }
+  .hero p.slogan { margin:0 0 14px; font-size:15px; max-width:620px; opacity:.92; }
+  .pills { display:flex; gap:8px; flex-wrap:wrap; }
+  .pill { font-size:12px; padding:5px 10px; border-radius:999px; background:rgba(255,255,255,.16); }
+  .feat-card { background:var(--surface); color:var(--ink); border-radius:12px; overflow:hidden; display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,1fr); align-items:stretch; }
+  .feat-media { position:relative; aspect-ratio:16/9; background:linear-gradient(135deg, #3a3a44, #17171d); }
+  .feat-label { position:absolute; left:10px; top:10px; background:#fff; color:var(--ink); font-weight:700; font-size:11px; letter-spacing:.05em; text-transform:uppercase; padding:4px 8px; border-radius:5px; z-index:1; }
+  .feat-media .dur { position:absolute; right:10px; bottom:10px; background:rgba(0,0,0,.7); color:#fff; font-size:12px; padding:2px 7px; border-radius:5px; }
+  .play-big { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:54px; height:54px; border-radius:50%; background:#fff; color:var(--ink); border:0; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+  .play-big svg { width:22px; height:22px; margin-left:3px; }
+  .feat-body { padding:14px 16px; display:flex; flex-direction:column; justify-content:center; gap:4px; }
+  .feat-body h2 { font-size:16px; margin:0 0 4px; }
+  .feat-body .btn-buy { margin-top:6px; }
+
+  /* Offre */
+  .offer { background:var(--promo-bg); color:var(--promo-fg); padding:14px 24px; }
+  .offer-in { display:flex; align-items:center; gap:14px; flex-wrap:wrap; font-size:17px; font-weight:600; }
+  .offer .tag-big { background:var(--promo-fg); color:var(--promo-bg); font-weight:800; font-size:12px; text-transform:uppercase; letter-spacing:.06em; padding:6px 10px; border-radius:6px; }
+  .offer button { margin-left:auto; background:var(--promo-fg); color:var(--promo-bg); border:0; border-radius:8px; padding:10px 16px; font-weight:700; cursor:pointer; font-size:14px; }
+
+  /* Barre de navigation collante : rubriques + catégories, toujours visible */
+  .sticky-nav { position:sticky; top:0; z-index:20; background:var(--surface); border-bottom:1px solid var(--line); box-shadow:0 2px 8px rgba(0,0,0,.05); }
+  .anchors, .cats { display:flex; gap:6px; overflow-x:auto; padding:10px 24px; align-items:center; }
+  .anchors { border-bottom:1px solid var(--line); }
+  .anchors-label { font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; white-space:nowrap; margin-right:6px; }
+  .anchor { border:0; background:none; color:var(--ink); padding:7px 12px; border-radius:7px; font-size:14px; font-weight:600; cursor:pointer; white-space:nowrap; }
+  .anchor:hover { background:var(--chip); }
+  .anchor.current { background:var(--ink); color:#fff; }
+  .anchor.filter-open { margin-left:auto; border:1px solid var(--ink); display:inline-flex; align-items:center; gap:6px; }
+  .fcount { display:inline-block; min-width:20px; height:20px; line-height:20px; border-radius:999px; background:var(--accent); color:#fff; font-size:12px; text-align:center; padding:0 6px; }
+  .fcount:empty { display:none; }
+  .cat { border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:999px; padding:6px 13px; font-size:13px; cursor:pointer; white-space:nowrap; }
+  .cat:hover { border-color:#bbb; }
+  .cat.active { background:var(--accent); border-color:var(--accent); color:#fff; }
+
+  /* Sections : bandes pleine largeur, alternées, avec titre visible */
+  .band { padding:22px 24px 26px; background:var(--surface); border-top:1px solid var(--line); scroll-margin-top:120px; }
+  .band.alt { background:var(--alt); }
+  .band-head { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; }
+  .band-head h2 { margin:0; font-size:20px; font-weight:700; }
+  .band-head .count { font-size:13px; color:var(--muted); }
+  .band-sub { margin:4px 0 14px; font-size:14px; color:var(--muted); }
+  .band.promo { border-top:0; }
+  .band.promo .band-head { background:var(--promo-bg); color:var(--promo-fg); padding:14px 18px; border-radius:8px; }
+  .band.promo .band-head .count { color:var(--promo-fg); opacity:.9; }
+  .band.promo .band-sub { margin-top:10px; }
+
+  /* Filtres : visibles au départ, dans la barre du catalogue */
+  .filterline { display:flex; align-items:center; gap:18px; flex-wrap:wrap; margin:6px 0 14px; font-size:14px; }
+  .filterline label { display:flex; align-items:center; gap:6px; cursor:pointer; }
+  .filterline input[type=checkbox] { accent-color:var(--accent); width:15px; height:15px; }
+  .filterline input[type=range] { accent-color:var(--accent); width:140px; }
+  .filterline select { padding:6px 9px; border:1px solid var(--line); border-radius:8px; background:var(--surface); font:inherit; }
+  .filterline .right { margin-left:auto; display:flex; gap:8px; align-items:center; }
+  .view-btn { border:1px solid var(--line); background:var(--surface); color:var(--ink); padding:5px 7px; cursor:pointer; border-radius:8px; display:inline-flex; }
+  .view-btn.on { background:var(--ink); color:#fff; border-color:var(--ink); }
+  .demo-note { font-size:12px; color:var(--muted); background:var(--surface); border:1px dashed #cfcfd4; border-radius:8px; padding:8px 12px; margin-bottom:14px; }
+  .empty { padding:24px; background:var(--surface); border-radius:12px; color:var(--muted); grid-column:1 / -1; }
+
+  /* Options (rubriques d'option) */
+  .opt-sec { margin-bottom:16px; }
+  .opt-tag { font-size:13px; font-weight:600; color:var(--muted); }
+  .opt-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(180px,1fr)); gap:12px; }
+  .opt-tile { background:var(--surface); border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+  .opt-tile .sw { aspect-ratio:16/6; background:linear-gradient(135deg, #3a3a44, #17171d); }
+  .opt-tile span { display:block; padding:8px 10px; font-size:13px; overflow-wrap:anywhere; }
+
+  /* Grille de vidéos : les colonnes s'étirent pour occuper toute la largeur */
+  .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(210px,1fr)); gap:16px; }
+  .grid.list { grid-template-columns:1fr; }
+  .grid.list .card { flex-direction:row; }
+  .grid.list .thumb { width:280px; flex:0 0 280px; aspect-ratio:16/9; }
+  .card { background:var(--surface); border:1px solid var(--line); border-radius:12px; overflow:hidden; display:flex; flex-direction:column; }
+  .band.alt .card { border-color:#dcdce0; }
+  .thumb { position:relative; border:0; padding:0; cursor:pointer; aspect-ratio:16/10; width:100%; display:block; background:linear-gradient(135deg, #3a3a44, #17171d); }
+  .play-disc { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:42px; height:42px; border-radius:50%; background:rgba(255,255,255,.92); color:var(--ink); display:flex; align-items:center; justify-content:center; z-index:1; }
+  .play-disc svg { width:18px; height:18px; margin-left:3px; }
+  .thumb .dur { position:absolute; right:8px; bottom:8px; background:rgba(0,0,0,.7); color:#fff; font-size:12px; padding:2px 6px; border-radius:5px; z-index:1; }
+  .tags { position:absolute; left:8px; top:8px; display:flex; gap:5px; z-index:1; flex-wrap:wrap; }
+  .tag { font-size:11px; font-weight:600; padding:3px 7px; border-radius:5px; background:#fff; color:var(--ink); }
+  .tag-promo { background:var(--promo-bg); color:var(--promo-fg); }
+  .card-body { padding:12px; display:flex; flex-direction:column; gap:6px; flex:1; }
+  .cat-label { font-size:12px; color:var(--muted); }
+  .card-title { margin:0; font-size:15px; font-weight:600; line-height:1.3; }
+  .rating { font-size:12px; color:var(--muted); }
+  .price-line { display:flex; align-items:baseline; gap:8px; margin-top:auto; flex-wrap:wrap; }
+  .price { font-size:17px; font-weight:700; }
+  .price.big { font-size:24px; }
+  .was { text-decoration:line-through; color:var(--muted); font-size:13px; }
+  .ad-note { font-size:13px; color:var(--muted); }
+  .react { display:flex; gap:6px; }
+  .rbtn { border:1px solid var(--line); background:var(--surface); color:var(--muted); border-radius:999px; padding:3px 9px; cursor:pointer; font-size:12px; display:inline-flex; align-items:center; gap:5px; }
+  .rbtn svg { width:15px; height:15px; }
+  .rbtn.on { background:#f6eef0; border-color:var(--accent); color:var(--accent); }
+  .rbtn.on svg { fill:currentColor; }
+  .act-row { display:flex; gap:6px; flex-wrap:wrap; }
+  .mini { border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:7px; padding:6px 9px; font-size:12px; cursor:pointer; }
+  .mini.on { background:var(--ink); border-color:var(--ink); color:#fff; }
+  .btn-buy { color:#fff; border:0; border-radius:8px; padding:10px; font-size:14px; font-weight:600; cursor:pointer; width:100%; background:var(--accent); }
+  .btn-buy:hover { filter:brightness(1.08); }
+  .btn-ad { background:var(--surface); color:var(--ink); border:1px solid var(--ink); border-radius:8px; padding:10px; font-weight:600; cursor:pointer; width:100%; font-size:13px; }
+
+  /* Catalogue : filtres repliables à gauche, cartes avec cœur et panier */
+  .cat-layout { display:grid; grid-template-columns:250px minmax(0,1fr); gap:22px; align-items:start; }
+  .filters { position:sticky; top:112px; background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:4px 14px; }
+  .filters .fhead { display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px solid var(--line); }
+  .filters .fhead strong { font-size:15px; }
+  .filters .fhead button { background:none; border:0; color:var(--accent); font-weight:600; cursor:pointer; font-size:13px; }
+  .filters details { border-bottom:1px solid var(--line); padding:12px 0; }
+  .filters details:last-child { border-bottom:0; }
+  .filters summary { cursor:pointer; font-weight:600; font-size:14px; list-style:none; display:flex; justify-content:space-between; align-items:center; }
+  .filters summary::-webkit-details-marker { display:none; }
+  .filters summary::after { content:"\2212"; color:var(--muted); font-size:16px; }
+  .filters details:not([open]) summary::after { content:"+"; }
+  .filters .opts { display:grid; gap:7px; margin-top:10px; }
+  .filters .opts label { display:flex; gap:8px; align-items:center; font-size:14px; cursor:pointer; }
+  .filters .opts label .n { margin-left:auto; color:var(--muted); font-size:13px; }
+  .filters input[type=checkbox] { accent-color:var(--accent); width:15px; height:15px; }
+  .filters .rng { margin-top:10px; }
+  .filters .rng input { width:100%; accent-color:var(--accent); display:block; }
+  .filters .rng .vals { display:flex; justify-content:space-between; font-size:13px; color:var(--muted); margin-top:4px; }
+  .cat-main { min-width:0; }
+  .toolbar { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
+  .toolbar .count { margin-right:auto; font-size:15px; font-weight:700; }
+  .toolbar .right { display:flex; gap:8px; align-items:center; font-size:14px; }
+  .toolbar select { padding:6px 9px; border:1px solid var(--line); border-radius:8px; background:var(--surface); font:inherit; }
+  .thumb-wrap { position:relative; }
+  .heart-ov { position:absolute; right:8px; top:8px; z-index:2; width:34px; height:34px; border-radius:50%; border:0; background:rgba(255,255,255,.95); color:var(--ink); display:flex; align-items:center; justify-content:center; cursor:pointer; }
+  .heart-ov svg { width:17px; height:17px; }
+  .heart-ov.on { color:var(--accent); }
+  .heart-ov.on svg { fill:currentColor; }
+  .price-row { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:auto; }
+  .price-row .price-line { margin-top:0; }
+  .cart-btn { width:38px; height:38px; flex:0 0 38px; border-radius:50%; border:0; background:var(--accent); color:#fff; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+  .cart-btn svg { width:18px; height:18px; }
+  .btn-ad-sm { border:1px solid var(--ink); background:var(--surface); border-radius:8px; padding:7px 10px; font-size:12px; font-weight:600; cursor:pointer; }
+  .card-links { display:flex; gap:12px; font-size:12px; border-top:1px solid var(--line); padding-top:8px; margin-top:4px; }
+  .link { background:none; border:0; padding:0; color:var(--muted); cursor:pointer; font-size:12px; display:inline-flex; align-items:center; gap:4px; }
+  .link svg { width:14px; height:14px; }
+  .link.on { color:var(--accent); font-weight:600; }
+  .link.on svg { fill:currentColor; }
+  @media (max-width: 900px) { .cat-layout { grid-template-columns:1fr; } .filters { position:static; } }
+
+  /* Étoiles : notes réelles uniquement */
+  .stars-row { display:inline-flex; gap:2px; vertical-align:middle; }
+  .stars-row .star { position:relative; display:inline-block; width:14px; height:14px; }
+  .stars-row .star > svg { position:absolute; left:0; top:0; width:14px; height:14px; fill:#d6d6dc; }
+  .stars-row .fill { position:absolute; left:0; top:0; height:100%; overflow:hidden; }
+  .stars-row .fill svg { width:14px; height:14px; fill:var(--accent); display:block; }
+  .shop-note { margin:0 0 10px; font-size:14px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .star-pick { border:0; padding:0; margin:8px 0 0; }
+  .star-pick legend { font-size:13px; padding:0; margin-bottom:6px; }
+  .star-pick .opt { display:inline-flex; align-items:center; gap:4px; font-size:13px; margin-right:12px; cursor:pointer; }
+  .star-pick .opt svg { width:18px; height:18px; fill:#d6d6dc; stroke:none; }
+
+  /* Informations pratiques */
+  .trust { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; padding:22px 24px; background:var(--bg); }
+  .trust div { background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:16px; }
+  .trust h3 { margin:0 0 4px; font-size:14px; }
+  .trust p { margin:0; font-size:13px; color:var(--muted); line-height:1.4; }
+
+  /* Avis boutique */
+  .reviews { padding:22px 24px 30px; background:var(--surface); border-top:1px solid var(--line); }
+  .reviews h2 { margin:0 0 12px; font-size:20px; }
+  .shop-reviews { max-width:900px; }
+  .rev { border-top:1px solid var(--line); padding:9px 0; }
+  .rev p { margin:4px 0 0; font-size:14px; }
+  .stars { font-weight:700; font-size:13px; }
+  .rform { display:grid; gap:8px; margin-top:12px; }
+  .rform label { display:grid; gap:4px; font-size:13px; }
+  .rform input, .rform select, .rform textarea { font:inherit; padding:8px; border:1px solid var(--line); border-radius:8px; }
+  .rform textarea { min-height:80px; }
+  .rform small { color:var(--muted); font-size:12px; }
+  .btn-dark { background:var(--ink); color:#fff; border:0; border-radius:8px; padding:10px; width:100%; font-weight:600; cursor:pointer; margin:6px 0; }
+  .btn-outline { background:var(--surface); color:var(--ink); border:1px solid var(--line); border-radius:8px; padding:9px 10px; width:100%; cursor:pointer; margin:6px 0; text-align:left; font-weight:600; font-size:14px; display:flex; align-items:center; gap:8px; }
+  .none { color:var(--muted); font-size:14px; }
+
+  /* Enregistrement */
+  .saved-box { background:var(--surface); border-radius:14px; width:min(620px,100%); max-height:90vh; overflow:auto; padding:18px 20px; position:relative; }
+  .saved-box h2 { margin:0 30px 6px 0; font-size:18px; }
+  .sv { display:flex; gap:12px; align-items:center; border-top:1px solid var(--line); padding:12px 0; flex-wrap:wrap; }
+  .sv-sw { width:56px; height:38px; border-radius:6px; flex:0 0 56px; background:linear-gradient(135deg, #3a3a44, #17171d); }
+  .sv-info { flex:1; min-width:150px; }
+  .sv-info small { display:block; color:var(--muted); }
+  .sv-actions { display:flex; gap:6px; flex-wrap:wrap; }
+
+  /* Lecteur */
+  .modal { position:fixed; inset:0; background:rgba(10,10,14,.7); display:none; align-items:center; justify-content:center; padding:16px; z-index:50; }
+  .modal.open { display:flex; }
+  .player { background:var(--surface); border-radius:14px; width:min(960px,100%); max-height:92vh; overflow:auto; display:grid; grid-template-columns:1.3fr 1fr; }
+  .screen { background:#000; position:relative; min-height:260px; }
+  .poster { position:absolute; inset:0; background:linear-gradient(135deg, #3a3a44, #0c0c10); }
+  .controls { position:absolute; left:0; right:0; bottom:0; display:flex; gap:10px; align-items:center; padding:10px; background:linear-gradient(transparent, rgba(0,0,0,.7)); }
+  .controls button { background:none; border:0; color:#fff; cursor:pointer; display:inline-flex; padding:4px; }
+  .controls .bar { flex:1; height:4px; background:rgba(255,255,255,.3); border-radius:4px; overflow:hidden; }
+  .controls .bar i { display:block; height:100%; width:0%; background:#fff; }
+  .info { padding:20px; position:relative; }
+  .info h2 { margin:8px 0 4px; font-size:19px; padding-right:30px; }
+  .info-tags { display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+  .seller { font-size:13px; color:var(--muted); margin-bottom:8px; }
+  .big-line { margin:6px 0; }
+  .kind { display:inline-block; font-size:11px; padding:3px 8px; border-radius:5px; background:var(--chip); color:var(--ink); }
+  .stock { display:block; color:var(--muted); font-size:13px; margin:8px 0; }
+  .qty { display:inline-flex; align-items:center; border:1px solid var(--line); border-radius:8px; overflow:hidden; margin:6px 0; }
+  .qty button { background:var(--surface); border:0; padding:7px 12px; font-size:16px; cursor:pointer; }
+  .qty span { padding:0 12px; font-weight:600; }
+  .tabs { display:flex; gap:6px; margin:12px 0 8px; flex-wrap:wrap; }
+  .tabs span { font-size:13px; padding:5px 10px; border-radius:7px; cursor:pointer; border:1px solid var(--line); }
+  .tabs span.on { background:var(--ink); color:#fff; border-color:var(--ink); }
+  .info h3 { font-size:13px; margin:12px 0 4px; }
+  .info .desc { font-size:14px; line-height:1.5; }
+  .close { position:absolute; top:10px; right:10px; background:none; border:0; cursor:pointer; color:var(--muted); padding:4px; }
+  .close svg { width:20px; height:20px; }
+
+  .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--ink); color:#fff; padding:10px 16px; border-radius:8px; font-size:14px; opacity:0; transition:.25s; pointer-events:none; z-index:70; max-width:90vw; }
+  .toast.show { opacity:1; }
+
+  @media (max-width: 900px) {
+    .hero-in { grid-template-columns:1fr; }
+    .player { grid-template-columns:1fr; }
+    .grid.list .thumb { width:150px; flex-basis:150px; }
+    .trust { grid-template-columns:1fr; }
+    .filterline .right { margin-left:0; }
+  }
+  @media (max-width: 520px) {
+    .grid { grid-template-columns:1fr 1fr; gap:10px; }
+    .hero h1 { font-size:22px; }
+    .hero, .offer, .anchors, .cats, .band, .trust, .reviews { padding-left:14px; padding-right:14px; }
+    .search { min-width:0; max-width:none; flex-basis:100%; margin-left:0; }
+    .offer button { margin-left:0; }
+    .filterline input[type=range] { width:110px; }
+  }
+</style>
+</head>
+<body>
+<script src="exemple-commun.js"></script>
+<header class="top">
+  <div class="brand">DIASPO'ACTIF<small>Actions locales, impact global</small></div>
+  
+  
+  <nav aria-label="Navigation principale">
+    <a href="#">Accueil</a>
+    <a href="#" class="active" aria-current="page">Boutiques</a>
+    <a href="#">Formations</a>
+    <a href="#">Services</a>
+    <a href="#">Projets diasporas</a>
+    <a href="#">À propos</a>
+  </nav>
+  <form class="search" id="searchForm" role="search">
+    <input id="q" type="search" placeholder="Rechercher une vidéo…" aria-label="Rechercher une vidéo">
+    <button type="submit" aria-label="Lancer la recherche"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg></button>
+  </form>
+  <button class="icon-btn" id="favBtn" aria-label="Favoris"><svg viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-9.6-9.2C.9 7.9 3 4.5 6.6 4.5c2.1 0 3.6 1.2 4.4 2.6h2c.8-1.4 2.3-2.6 4.4-2.6 3.6 0 5.7 3.4 4.2 6.8-2.1 4.6-9.6 9.2-9.6 9.2z"/></svg><span class="count-dot" id="favCount">0</span></button>
+  <button class="icon-btn" id="cartBtn" aria-label="Panier"><svg viewBox="0 0 24 24"><path d="M3 4h2.2l2.3 11h10.4l2.1-7.5H6.4"/><circle cx="9.5" cy="19.5" r="1.5"/><circle cx="17" cy="19.5" r="1.5"/></svg><span class="count-dot" id="cartCount">0</span></button>
+  <button class="icon-btn" id="saveBtn" aria-label="Enregistrement"><svg viewBox="0 0 24 24"><path d="M6 3.5h12v17l-6-4.5-6 4.5z"/></svg><span class="count-dot" id="saveCount">0</span></button>
+  <button class="account" id="accountBtn"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c.8-4 4-6 8-6s7.2 2 8 6"/></svg>Mon compte</button>
+</header>
+
+<section class="hero" id="hero">
+  <div class="hero-in">
+    <div>
+      <h1><span id="typeTitle">Boutique Vidéo</span> <em id="shopName">Éclat Beauté</em></h1>
+      <p class="slogan" id="shopSlogan">Vidéos beauté courtes : soins, maquillage, routines et coulisses de la marque.</p>
+      <div class="pills"><span class="pill">Vidéos professionnelles</span><span class="pill">Téléchargement immédiat</span><span class="pill">Droits d'utilisation inclus</span></div>
+    </div>
+    <div class="feat-card" id="featured" aria-label="Vidéo à la une"></div>
+  </div>
+</section>
+
+<section class="offer" id="offerBar" aria-label="Offre du moment">
+  <div class="offer-in">
+    <span class="tag-big">Offre du moment</span>
+    <span>−15 % sur toute la catégorie Soins du visage</span>
+    <button type="button" data-goto="soins">Voir la sélection</button>
+  </div>
+</section>
+
+<nav class="sticky-nav" aria-label="Rubriques et catégories">
+  <div class="anchors" id="anchors">
+    <span class="anchors-label">Rubriques</span>
+    <button type="button" class="anchor" data-anchor="sec-promo">Offres promotionnelles</button>
+    <button type="button" class="anchor" data-anchor="sec-new">Dernier ajouté</button>
+    <button type="button" class="anchor" data-anchor="sec-top">Top vente</button>
+    <button type="button" class="anchor" data-anchor="sec-ads">Publicités</button>
+    <button type="button" class="anchor" data-anchor="catalogue">Catalogue</button>
+    <button type="button" class="anchor filter-open" id="openFilters" aria-label="Ouvrir les filtres">Filtres <span class="fcount" id="filterCount"></span></button>
+  </div>
+  <div class="cats" id="cats" aria-label="Catégories de vidéos"></div>
+</nav>
+
+<div id="rails"></div>
+
+<div id="optionBlocks"></div>
+
+<section class="band" id="catalogue">
+  <div class="band-head"><h2 id="catTitle">Catalogue complet</h2></div>
+  <p class="band-sub">Les filtres restent à gauche pendant que vous parcourez les vidéos.</p>
+  <div class="cat-layout">
+    <aside class="filters" aria-label="Filtres">
+      <div class="fhead"><strong>Filtres</strong><button type="button" id="reset">Réinitialiser</button></div>
+      <details open><summary>Catégories</summary><div class="opts" id="catFilters"></div></details>
+      <details open><summary>Type d'offre</summary><div class="opts">
+        <label><input type="checkbox" name="kind" value="phys"> Produit physique</label>
+        <label><input type="checkbox" name="kind" value="num"> Contenu numérique</label>
+        <label><input type="checkbox" name="kind" value="srv"> Service / Prestation</label>
+      </div></details>
+      <details open><summary>Prix</summary><div class="rng">
+        <input id="price" type="range" min="0" max="50" step="1" value="50" aria-label="Prix maximum">
+        <div class="vals"><span>0 €</span><span id="priceVal">50 € et plus</span></div>
+      </div></details>
+      <details open><summary>Durée de la vidéo</summary><div class="opts">
+        <label><input type="checkbox" name="len" value="short"> Jusqu'à 40 s</label>
+        <label><input type="checkbox" name="len" value="long"> 40 s à 57 s</label>
+      </div></details>
+    </aside>
+    <div class="cat-main">
+      <div class="toolbar">
+        <div class="count" id="count"></div>
+        <div class="right">
+          <label>Trier par :
+            <select id="sort" aria-label="Trier">
+              <option value="recent">Plus récentes</option>
+              <option value="price-asc">Prix croissant</option>
+              <option value="price-desc">Prix décroissant</option>
+            </select>
+          </label>
+          <button class="view-btn on" id="viewGrid" aria-label="Affichage en grille" aria-pressed="true"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="6.5" height="6.5" rx="1"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1"/></svg></button>
+          <button class="view-btn" id="viewList" aria-label="Affichage en liste" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+        </div>
+      </div>
+      <div class="demo-note">Maquette : vidéos, prix et compteurs sont fictifs. Sans avis réel, la fiche affiche « Aucun avis pour l'instant ».</div>
+      <div class="grid" id="grid"></div>
+    </div>
+  </div>
+</section>
+
+<section class="trust" aria-label="Informations pratiques">
+  <div><h3>Téléchargement immédiat</h3><p>Après l'achat, la vidéo est disponible tout de suite dans votre espace.</p></div>
+  <div><h3>Droits d'utilisation inclus</h3><p>Utilisation sur vos réseaux sociaux, présentations et événements.</p></div>
+  <div><h3>Durée courte et claire</h3><p>Chaque vidéo dure 57 secondes au maximum.</p></div>
+</section>
+
+<section class="reviews" aria-labelledby="shopRevTitle">
+  <h2 id="shopRevTitle">Avis sur la boutique</h2>
+  <div class="shop-reviews"><div id="shopRev"></div></div>
+</section>
+
+<!-- Enregistrement : vidéos à regarder plus tard (distinct du panier) -->
+<div class="modal" id="cartModal" role="dialog" aria-modal="true" aria-labelledby="cartTitle">
+  <div class="saved-box">
+    <button type="button" class="close" data-close-cart aria-label="Fermer"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <h2 id="cartTitle">Votre panier</h2>
+    <div id="cartBody"></div>
+  </div>
+</div>
+<div class="modal" id="checkoutModal" role="dialog" aria-modal="true" aria-label="Achat et livraison" style="z-index:60">
+  <div class="saved-box" style="padding:0;overflow:hidden;width:min(720px,96vw)">
+    <button type="button" class="close" data-close-checkout aria-label="Fermer" style="z-index:2"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <iframe id="checkoutFrame" title="Achat et livraison" style="border:0;width:100%;height:80vh;display:block"></iframe>
+  </div>
+</div>
+<div class="modal" id="savedModal" role="dialog" aria-modal="true" aria-labelledby="savedTitle">
+  <div class="saved-box">
+    <button type="button" class="close" data-close-saved aria-label="Fermer"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <h2 id="savedTitle">Enregistrement</h2>
+    <p class="none" style="margin:0 0 8px">Vidéos gardées pour plus tard. Ce n'est pas le panier : rien n'est acheté ici.</p>
+    <div id="savedList"></div>
+  </div>
+</div>
+
+<div class="modal" id="reviewsModal" role="dialog" aria-modal="true" aria-labelledby="reviewsTitle">
+  <div class="saved-box">
+    <button type="button" class="close" data-close-reviews aria-label="Fermer"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <h2 id="reviewsTitle">Avis</h2>
+    <p id="reviewsSummary" class="shop-note"></p>
+    <div id="reviewsList"></div>
+  </div>
+</div>
+
+<!-- Lecteur -->
+<div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="mTitle">
+  <div class="player">
+    <div class="screen">
+      <div class="poster" id="poster"></div>
+      <div class="controls">
+        <button type="button" id="pp" aria-label="Lecture / pause"></button>
+        <div class="bar"><i id="prog"></i></div>
+        <button type="button" id="snd" aria-label="Son"><svg viewBox="0 0 24 24"><path d="M4 9.5h4l5-4v13l-5-4H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg></button>
+        <button type="button" id="fsc" aria-label="Plein écran"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+        <button type="button" id="next" aria-label="Vidéo suivante"><svg viewBox="0 0 24 24" class="solid"><path d="M5 5.5v13l9-6.5zM16 5.5h2.5v13H16z"/></svg></button>
+      </div>
+    </div>
+    <div class="info" id="info"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+  // Configuration : lue dans le même objet que le moteur (moteur-boutique.html)
+  const SHOP_DEFAULT = {
+    main: "video", options: [], optionCopies: {}, name: "Éclat Beauté",
+    slogan: "Vidéos beauté courtes : soins, maquillage, routines et coulisses de la marque.",
+    colors: ["#7a1a2a", "#14213d", "#c9a227"], textures: ["uni", "uni", "uni"], promoStyle: "rouge", bonusVisible: [],
+    sections: ["Vidéos à la une", "Nouveautés vidéos"], hiddenSections: []
+  };
+  const SHOP = (() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("shopConfig")) || {};
+      // Une configuration enregistrée pour une autre boutique (ex. e-commerce) ne doit pas s'afficher ici.
+      if (saved.main && saved.main !== "video") return SHOP_DEFAULT;
+      return Object.assign({}, SHOP_DEFAULT, saved);
+    } catch (e) { return SHOP_DEFAULT; }
+  })();
+  const TYPE_LABELS = { video: "Boutique Vidéo", ecom: "E-commerce", portfolio: "Portfolio", events: "Créateur d'événements", impact: "Projet Impact" };
+  const OPTION_SECTIONS = { video: "Vidéos à la une", ecom: "Nos produits", portfolio: "Notre portfolio", events: "Nos prochains événements", impact: "Nos projets à impact" };
+  const OPTION_ITEMS = { video: "Vidéo", ecom: "Produit", portfolio: "Réalisation", events: "Événement", impact: "Projet" };
+  const VIDEO_ON = SHOP.main === "video" || SHOP.options.includes("video");
+
+  const TEXTURE_BG = {
+    uni: "",
+    dore: "linear-gradient(115deg, rgba(120,80,10,.55) 0%, rgba(255,238,170,.75) 22%, rgba(185,138,46,.6) 40%, rgba(255,246,200,.8) 55%, rgba(143,100,24,.6) 75%, rgba(233,201,107,.7) 100%)",
+    brillant: "linear-gradient(115deg, transparent 30%, rgba(255,255,255,.85) 42%, transparent 50%, rgba(255,255,255,.5) 62%, transparent 70%) 0 0 / 250% 100%",
+    scintillant: "radial-gradient(circle, #fff 2px, transparent 3px) 0 0 / 26px 22px, radial-gradient(circle, #ffe9a6 1.5px, transparent 3px) 13px 11px / 34px 30px",
+    luisant: "linear-gradient(180deg, rgba(255,255,255,.75) 0%, rgba(255,255,255,.1) 46%, rgba(0,0,0,.22) 52%, rgba(0,0,0,.05) 100%)",
+    satine: "linear-gradient(90deg, rgba(255,255,255,.25), rgba(0,0,0,.15) 35%, rgba(255,255,255,.22) 65%, rgba(0,0,0,.12))"
+  };
+
+  // Icônes SVG (aucun émoji)
+  const ICONS = {
+    heart: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-9.6-9.2C.9 7.9 3 4.5 6.6 4.5c2.1 0 3.6 1.2 4.4 2.6h2c.8-1.4 2.3-2.6 4.4-2.6 3.6 0 5.7 3.4 4.2 6.8-2.1 4.6-9.6 9.2-9.6 9.2z"/></svg>',
+    thumb: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11v9H4v-9h3zm0 0 3.6-7.2c.3-.6.9-1 1.6-.8 1.2.3 1.7 1.6 1.4 2.8L13 9h5.6c1.2 0 2.1 1.1 1.9 2.3l-1.3 7.2c-.2 1-1 1.7-2 1.7H7"/></svg>',
+    play: '<svg viewBox="0 0 24 24" class="solid" aria-hidden="true"><path d="M7 4.5v15l12.5-7.5z"/></svg>',
+    pause: '<svg viewBox="0 0 24 24" class="solid" aria-hidden="true"><rect x="6" y="4.5" width="4" height="15" rx="1"/><rect x="14" y="4.5" width="4" height="15" rx="1"/></svg>',
+    close: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+    back: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>',
+    cart: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2.2l2.3 11h10.4l2.1-7.5H6.4"/><circle cx="9.5" cy="19.5" r="1.5"/><circle cx="17" cy="19.5" r="1.5"/></svg>',
+    star: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17.5l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></svg>'
+  };
+
+  // Catégories (libellés seulement, sans couleur)
+  const CATS = [
+    { id: "all", label: "Toutes les vidéos" },
+    { id: "soins", label: "Soins du visage" },
+    { id: "corps", label: "Soins du corps" },
+    { id: "maquillage", label: "Maquillage" },
+    { id: "coulisses", label: "Coulisses & Fabrication" },
+    { id: "produit", label: "Présentation produit" },
+    { id: "lifestyle", label: "Beauté & Inspiration" }
+  ];
+  const CAT = Object.fromEntries(CATS.map(c => [c.id, c]));
+
+  // Données de démonstration (fictives). Sans avis réel, la fiche affiche « Aucun avis pour l'instant ».
+  // was = ancien prix (promotion), isNew = dernier ajouté, feat = à la une, ad = publicité (sans vente directe).
+  const VIDEOS = [
+    { id: 1, t: "Le sérum éclat : texture et conseils d'application", cat: "soins", dur: 45, price: 24.90, was: 29.90, kind: "Produit physique", seller: "Maison Éclat Beauté", desc: "Présentation du sérum éclat : texture, format et conseils d'application matin et soir." },
+    { id: 2, t: "Le maquillage du quotidien en 7 gestes", cat: "maquillage", dur: 53, price: 6.90, kind: "Contenu numérique", seller: "Démo Boutique", isNew: true, desc: "Sept gestes simples pour un maquillage du quotidien, en version courte." },
+    { id: 3, t: "Le problème du flaconnage (Ép. 2)", cat: "coulisses", dur: 37, price: 7.90, kind: "Produit physique", seller: "Maison Éclat Beauté", desc: "Coulisses de fabrication : pourquoi nous avons repensé nos flacons." },
+    { id: 4, t: "Je crée Éclat Beauté (Ép. 01)", cat: "coulisses", dur: 57, price: 9.90, kind: "Contenu numérique", seller: "Maison Éclat Beauté", feat: true, desc: "Premier épisode : l'histoire de la marque et de sa création." },
+    { id: 5, t: "Routine soin du corps, étape par étape", cat: "corps", dur: 52, price: 5.90, was: 6.90, kind: "Produit physique", seller: "Démo Boutique", desc: "Une routine simple, pas à pas, pour prendre soin de sa peau au quotidien." },
+    { id: 6, t: "Ma routine bien-être au quotidien", cat: "lifestyle", dur: 56, price: 6.90, kind: "Contenu numérique", seller: "Démo Boutique", isNew: true, desc: "Une routine simple et naturelle, à adapter à chaque peau." },
+    { id: 7, t: "Trois idées de maquillage pour les soirées", cat: "maquillage", dur: 51, price: 8.90, kind: "Produit physique", seller: "Maison Éclat Beauté", desc: "Trois looks originaux, présentés avec les produits de la collection." },
+    { id: 8, t: "Présentation : crème hydratante Éclat Beauté", cat: "produit", dur: 49, price: 7.90, was: 9.90, kind: "Produit physique", seller: "Maison Éclat Beauté", desc: "Présentation de la crème hydratante : composition, format et conseils d'usage." },
+    { id: 9, t: "L'art d'appliquer une protection solaire", cat: "corps", dur: 40, price: 5.90, kind: "Contenu numérique", seller: "Démo Boutique", desc: "Conseils pour bien appliquer une protection solaire, zone par zone." },
+    { id: 10, t: "Inspiration : prendre soin de soi", cat: "lifestyle", dur: 30, price: 6.90, kind: "Contenu numérique", seller: "Démo Boutique", isNew: true, desc: "Une pause de trente secondes pour se recentrer." },
+    { id: 11, t: "Présentation : service de conseil beauté", cat: "produit", dur: 55, price: 0, kind: "Service (sur devis)", seller: "Démo Boutique", desc: "Présentation d'un service de conseil personnalisé. Bouton : « Demander un devis »." },
+    { id: 12, t: "Démaquillage doux, geste par geste", cat: "soins", dur: 48, price: 4.50, kind: "Produit physique", seller: "Démo Boutique", isNew: true, desc: "Un démaquillage doux, étape par étape, en 1 min 20 s maximum." }
+  ];
+  // Publicités : elles font découvrir un produit, sans vente directe
+  VIDEOS.push(
+    { id: 13, t: "Routine beauté : notre nouveau sérum", cat: "lifestyle", dur: 45, price: 0, kind: "Publicité", seller: "Maison Éclat Beauté", ad: true, desc: "Une routine beauté filmée simplement pour présenter notre nouveau sérum. Vidéo publicitaire : elle ne vend pas directement, elle fait découvrir le produit." },
+    { id: 14, t: "Nouvelle collection : l'esprit Éclat Beauté", cat: "soins", dur: 35, price: 0, kind: "Publicité", seller: "Maison Éclat Beauté", ad: true, desc: "La nouvelle collection en quelques images. Vidéo de promotion, sans vente directe." },
+    { id: 15, t: "Un matin dans l'atelier", cat: "coulisses", dur: 42, price: 0, kind: "Publicité", seller: "Maison Éclat Beauté", ad: true, desc: "Une journée d'atelier pour faire découvrir la marque. Vidéo de promotion." }
+  );
+  const TOP_IDS = [1, 5, 12]; // Top vente (maquette)
+  // Visuels provisoires (dégradés) : les vraies photos seront fournies par ZADI.
+  // Image de maquette par vidéo (tirage aléatoire fixe ; la première image est celle de la vidéo 1).
+  const POSTERS = { 1: "img/provisoire/p01.svg", 2: "img/provisoire/p03.svg", 3: "img/provisoire/p06.svg", 4: "img/provisoire/p10.svg", 5: "img/provisoire/p10.svg", 6: "img/provisoire/p06.svg", 7: "img/provisoire/p09.svg", 8: "img/provisoire/p05.svg", 9: "img/provisoire/p03.svg", 10: "img/provisoire/p08.svg", 11: "img/provisoire/p04.svg", 12: "img/provisoire/p01.svg", 13: "img/provisoire/p05.svg", 14: "img/provisoire/p03.svg", 15: "img/provisoire/p07.svg" };
+  const posterOf = (v) => POSTERS[v.id] || POSTERS[((v.id - 1) % 15) + 1];
+  // Images des cadres d'options (maquette), tirées au hasard dans la même série.
+  const OPT_IMGS = ["img/provisoire/p02.svg", "img/provisoire/p10.svg", "img/provisoire/p01.svg", "img/provisoire/p07.svg", "img/provisoire/p10.svg", "img/provisoire/p03.svg", "img/provisoire/p04.svg", "img/provisoire/p08.svg", "img/provisoire/p04.svg", "img/provisoire/p09.svg", "img/provisoire/p03.svg", "img/provisoire/p04.svg", "img/provisoire/p03.svg", "img/provisoire/p06.svg", "img/provisoire/p08.svg", "img/provisoire/p07.svg", "img/provisoire/p05.svg", "img/provisoire/p06.svg", "img/provisoire/p06.svg", "img/provisoire/p06.svg", "img/provisoire/p05.svg", "img/provisoire/p01.svg", "img/provisoire/p07.svg", "img/provisoire/p08.svg", "img/provisoire/p05.svg", "img/provisoire/p01.svg", "img/provisoire/p04.svg", "img/provisoire/p02.svg", "img/provisoire/p08.svg", "img/provisoire/p07.svg", "img/provisoire/p09.svg", "img/provisoire/p06.svg", "img/provisoire/p03.svg", "img/provisoire/p05.svg", "img/provisoire/p07.svg", "img/provisoire/p09.svg", "img/provisoire/p09.svg", "img/provisoire/p04.svg", "img/provisoire/p03.svg", "img/provisoire/p08.svg", "img/provisoire/p10.svg", "img/provisoire/p10.svg", "img/provisoire/p05.svg", "img/provisoire/p10.svg", "img/provisoire/p02.svg", "img/provisoire/p07.svg", "img/provisoire/p09.svg", "img/provisoire/p09.svg", "img/provisoire/p05.svg", "img/provisoire/p06.svg", "img/provisoire/p02.svg", "img/provisoire/p03.svg", "img/provisoire/p05.svg", "img/provisoire/p02.svg", "img/provisoire/p02.svg", "img/provisoire/p09.svg", "img/provisoire/p06.svg", "img/provisoire/p01.svg", "img/provisoire/p04.svg", "img/provisoire/p08.svg", "img/provisoire/p03.svg", "img/provisoire/p04.svg", "img/provisoire/p01.svg", "img/provisoire/p08.svg", "img/provisoire/p07.svg", "img/provisoire/p10.svg", "img/provisoire/p01.svg", "img/provisoire/p01.svg", "img/provisoire/p02.svg"];
+  const OPT_OFFSET = { video: 0, portfolio: 0, events: 4, ecom: 8, impact: 12 };
+  // Images des vidéos enregistrées (maquette), 6 images fournies par le client.
+  const SAVED_IMGS = ["img/provisoire/p08.svg", "img/provisoire/p10.svg", "img/provisoire/p09.svg", "img/provisoire/p06.svg", "img/provisoire/p05.svg", "img/provisoire/p04.svg"];
+  const optImg = (k, c, i) => OPT_IMGS[(OPT_OFFSET[k] + c * 4 + i) % OPT_IMGS.length];
+
+  const state = { cat: "all", kinds: new Set(), lengths: new Set(), maxPrice: 50, q: "", sort: "recent", cartItems: [], favs: new Set(), current: null, qty: 1, tab: "desc", full: false, playing: false };
+  const $ = (s) => document.querySelector(s);
+  // Stockage local (prototype) : réactions, avis et enregistrements restent sur cet appareil.
+  const store = {
+    get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  };
+  state.favs = new Set(store.get("vid.hearts", []));
+  state.thumbs = new Set(store.get("vid.thumbs", []));
+  // Avis de démonstration (maquette seulement). Mettre SHOW_DEMO_REVIEWS à false avant toute mise en ligne.
+  const SHOW_DEMO_REVIEWS = true;
+  const DEMO_TEXTS = ["Très bon produit, je recommande.", "Conforme à la présentation.", "Livraison rapide et belle présentation.", "Bien, mais j'attendais un peu plus de contenu."];
+  function demoReviews() {
+    const out = [];
+    for (let id = 1; id <= 15; id++) {
+      const n = (id % 4) + 1;
+      for (let k = 0; k < n; k++) out.push({ vid: id, name: "Exemple", rating: 3 + ((id * 7 + k * 5) % 3), text: DEMO_TEXTS[(id + k) % DEMO_TEXTS.length], date: "15/10/2026" });
+    }
+    [5, 4, 5].forEach((rating, k) => out.push({ vid: "shop", name: "Exemple", rating, text: DEMO_TEXTS[k], date: "20/10/2026" }));
+    return out;
+  }
+  state.reviews = store.get("vid.reviews", null) || (SHOW_DEMO_REVIEWS ? demoReviews() : []);
+  state.saved = new Set(store.get("vid.saved", []));
+  // Vidéos déjà vues (lecture lancée) : seules ces personnes peuvent noter et donner un avis
+  state.watched = new Set(store.get("vid.watched", []));
+  function markWatched(id) { state.watched.add(id); store.set("vid.watched", [...state.watched]); }
+  const escapeHtml = (s) => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  function saveReacts() { store.set("vid.hearts", [...state.favs]); store.set("vid.thumbs", [...state.thumbs]); }
+  function reviewsOf(vid) { return state.reviews.filter(r => r.vid === vid); }
+  // Note moyenne calculée uniquement à partir des avis réels enregistrés
+  function ratingOf(vid) {
+    const rs = reviewsOf(vid);
+    if (!rs.length) return null;
+    return { avg: rs.reduce((a, r) => a + r.rating, 0) / rs.length, n: rs.length };
+  }
+  const avgTxt = (x) => x.avg.toFixed(1).replace(".", ",");
+  // Étoiles : affichées seulement à partir d'avis réels (arrondi à l'entier)
+  function starsRow(avg) {
+    // Moyenne de tous les avis, répartie sur 5 étoiles (étoile partiellement remplie si besoin)
+    const path = "M12 3.5l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17.5l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z";
+    const stars = [1, 2, 3, 4, 5].map(i => {
+      const f = Math.max(0, Math.min(1, avg - (i - 1)));
+      return `<span class="star"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${path}"/></svg><span class="fill" style="width:${Math.round(f * 100)}%"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${path}"/></svg></span></span>`;
+    }).join("");
+    return `<span class="stars-row" role="img" aria-label="${avg.toFixed(1).replace(".", ",")} sur 5">${stars}</span>`;
+  }
+  const fmt = (n) => n.toFixed(2).replace(".", ",") + " €";
+  const fmtDur = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+  function toast(m) { const t = $("#toast"); t.textContent = m; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 2200); }
+  const promoPct = (v) => (v.was ? Math.round((1 - v.price / v.was) * 100) : 0);
+  const actionLabel = (v) => (v.kind.startsWith("Service") ? "Demander un devis" : v.kind === "Contenu numérique" ? "Acheter l'accès" : "Ajouter au panier");
+  function priceHtml(v, big) {
+    if (v.ad) return `<span class="ad-note">Publicité : à découvrir</span>`;
+    const cls = big ? "price big" : "price";
+    if (!v.price) return `<span class="${cls}">Sur devis</span>`;
+    return v.was ? `<span class="was">${fmt(v.was)}</span><span class="${cls}">${fmt(v.price)}</span>` : `<span class="${cls}">${fmt(v.price)}</span>`;
+  }
+  function badgesHtml(v) {
+    let h = "";
+    if (v.was) h += `<span class="tag tag-promo">−${promoPct(v)} %</span>`;
+    if (TOP_IDS.includes(v.id)) h += `<span class="tag">Top vente</span>`;
+    if (v.isNew) h += `<span class="tag">Dernier ajouté</span>`;
+    if (v.ad) h += `<span class="tag">Publicité</span>`;
+    return h ? `<div class="tags">${h}</div>` : "";
+  }
+  function reactBlock(v) {
+    const h = state.favs.has(v.id), t = state.thumbs.has(v.id);
+    return `<div class="react">
+      <button type="button" class="rbtn ${h ? "on" : ""}" data-heart="${v.id}" aria-pressed="${h}" aria-label="J'aime">${ICONS.heart}<span>${h ? 1 : 0}</span></button>
+      <button type="button" class="rbtn ${t ? "on" : ""}" data-thumb="${v.id}" aria-pressed="${t}" aria-label="Pouce levé">${ICONS.thumb}<span>${t ? 1 : 0}</span></button>
+    </div>`;
+  }
+  function saveBtn(v) {
+    const s = state.saved.has(v.id);
+    return `<button type="button" class="mini ${s ? "on" : ""}" data-save="${v.id}" aria-pressed="${s}">${s ? "Enregistrée" : "Enregistrer"}</button>`;
+  }
+  function actRow(v) { return `<div class="act-row">${saveBtn(v)}<button type="button" class="mini" data-share="${v.id}">Partager</button></div>`; }
+  function buyBlock(v) {
+    return v.ad
+      ? `<button type="button" class="btn-ad" data-goto="${v.cat}">Voir les produits de cette rubrique</button>`
+      : `<button type="button" class="btn-buy" data-buy="${v.id}">${actionLabel(v)}</button>`;
+  }
+  function reviewsBlock(vid) {
+    const rs = reviewsOf(vid).slice().reverse();
+    const list = rs.length
+      ? rs.map(r => `<div class="rev"><div>${starsRow(r.rating)} <strong>${escapeHtml(r.name)}</strong> <small>${r.date}</small></div>${r.text ? `<p>${escapeHtml(r.text)}</p>` : ""}</div>`).join("")
+      : `<p class="none">Aucun avis pour l'instant</p>`;
+    const seen = vid === "shop" || state.watched.has(vid);
+    const form = seen
+      ? `<form class="rform" data-review="${vid}">
+        <label>Votre nom <input name="name" required maxlength="40"></label>
+        <fieldset class="star-pick"><legend>Votre note</legend>
+          ${[5, 4, 3, 2, 1].map(n => `<label class="opt"><input type="radio" name="rating" value="${n}" ${n === 5 ? "checked" : ""} required> ${n} ${ICONS.star}</label>`).join("")}
+        </fieldset>
+        <label>Votre avis (facultatif) <textarea name="text" maxlength="500"></textarea></label>
+        <button class="btn-dark" type="submit">Publier mon avis</button>
+        <small>Maquette : l'avis est enregistré sur cet appareil seulement. Sur la plateforme, il sera vérifié avant publication.</small>
+      </form>`
+      : `<p class="none">Regardez cette vidéo pour pouvoir la noter et donner votre avis.</p>`;
+    return `${list}${form}`;
+  }
+  function renderShopReviews() {
+    const r = ratingOf("shop");
+    $("#shopRev").innerHTML = `<p class="shop-note">${r ? `${starsRow(r.avg)} <strong>${avgTxt(r)}</strong> <span>(${r.n})</span>` : "Aucun avis pour l'instant"} <button type="button" class="link" data-reviews="shop">Avis</button></p>`;
+  }
+
+  // Enregistrement (à regarder plus tard) et partage : distincts du panier
+  function toggleSave(id) { state.saved.has(id) ? state.saved.delete(id) : state.saved.add(id); store.set("vid.saved", [...state.saved]); }
+  function savedHtml() {
+    const list = VIDEOS.filter(v => state.saved.has(v.id)).reverse();
+    if (!list.length) return `<p class="none">Aucune vidéo enregistrée pour l'instant. Utilisez « Enregistrer » sur une vidéo pour la retrouver ici.</p>`;
+    return list.map(v => `<div class="sv">
+      <span class="sv-sw" style="background-image:url('${SAVED_IMGS[(v.id - 1) % SAVED_IMGS.length]}');background-size:cover;background-position:center"></span>
+      <div class="sv-info"><strong>${escapeHtml(v.t)}</strong><small>${escapeHtml(v.seller)} · ${fmtDur(v.dur)}</small></div>
+      <div class="sv-actions"><button type="button" class="mini" data-open="${v.id}">Regarder</button><button type="button" class="mini" data-share="${v.id}">Partager</button><button type="button" class="mini" data-unsave="${v.id}">Retirer</button></div>
+    </div>`).join("");
+  }
+  // Partage : feuille système si disponible, sinon copie du lien
+  async function shareVideo(id) {
+    const v = VIDEOS.find(x => x.id === id);
+    const url = location.href.split("#")[0] + "#video-" + id;
+    const text = `${v.t} · ${SHOP.name}`;
+    if (navigator.share) {
+      try { await navigator.share({ title: v.t, text, url }); return; }
+      catch (e) { if (e && e.name === "AbortError") return; }
+    }
+    try { await navigator.clipboard.writeText(url); toast("Lien copié : " + v.t); }
+    catch (e) { toast("Lien à partager : " + url); }
+  }
+
+  // Application de la configuration
+  (function applyShop() {
+    const r = document.documentElement.style;
+    r.setProperty("--accent", SHOP.colors[0]);
+    // Style des offres promotionnelles, choisi par le propriétaire dans le moteur
+    const PROMO = { rouge: ["#7a1a2a", "#ffffff"], or: ["#c9a227", "#1d1d24"], jaune: ["#ffc107", "#1d1d24"] }[SHOP.promoStyle] || ["#7a1a2a", "#ffffff"];
+    r.setProperty("--promo-bg", PROMO[0]); r.setProperty("--promo-fg", PROMO[1]);
+    document.title = SHOP.name + " · " + TYPE_LABELS[SHOP.main];
+    $("#typeTitle").textContent = TYPE_LABELS[SHOP.main];
+    $("#shopName").textContent = SHOP.name;
+    // Logo défini par le propriétaire (forme, taille, zoom, position)
+    if (SHOP.logo && SHOP.logo.src) {
+      const L = SHOP.logo, im = document.createElement("img");
+      im.src = L.src; im.alt = "Logo " + SHOP.name;
+      im.style.cssText = `width:${L.size}px;height:${L.size}px;object-fit:contain;background:#fff;border-radius:${L.shape === "square" ? "12px" : "50%"};transform:translate(${L.x}%,${L.y}%) scale(${L.zoom / 100});vertical-align:middle;margin-right:12px`;
+      $("#shopName").before(im);
+    }
+    // Rubriques ajoutées par le propriétaire (moteur de paramètres)
+    (function renderOwnerSections() {
+      const hidden = SHOP.hiddenSections || [];
+      const names = (SHOP.customSections || []).filter(t => !hidden.includes(t));
+      if (!names.length) return;
+      const box = document.createElement("section");
+      box.id = "ownerSections";
+      box.style.cssText = "max-width:1200px;margin:0 auto;padding:8px 20px 24px";
+      box.innerHTML = names.map(t => `<h2 style="font-size:18px;margin:16px 0 8px">${escapeHtml(t)}</h2>
+        <p style="font-size:14px;color:var(--muted);margin:0">Rubrique ajoutée par le propriétaire. Les contenus seront ajoutés depuis l'espace propriétaire.</p>`).join("");
+      (document.querySelector("main") || document.body).appendChild(box);
+    })();
+    $("#shopSlogan").textContent = SHOP.slogan;
+    // Texture de la couleur principale sur le bandeau
+    const tex = TEXTURE_BG[(SHOP.textures || [])[0] || "uni"];
+    if (tex) {
+      const layer = document.createElement("div");
+      layer.className = "cover"; layer.style.background = tex;
+      $("#hero").prepend(layer);
+    }
+  })();
+
+  // Structure : lecture vidéo visible seulement si le type ou l'option Vidéo est actif
+  (function applyStructure() {
+    if (SHOP.status && SHOP.status !== "public") {
+      const d = document.createElement("div");
+      d.className = "demo-note"; d.style.background = "#fff8e6";
+      d.textContent = SHOP.status === "draft" ? "Aperçu : cette boutique est en brouillon et n'est pas visible par les clients." : "Cette boutique est suspendue pour le moment.";
+      document.querySelector("#catalogue").before(d);
+    }
+    if (!VIDEO_ON) {
+      const note = document.createElement("div");
+      note.id = "videoOff";
+      note.className = "band";
+      note.innerHTML = `<p style="margin:0 0 12px">La lecture vidéo n'est pas disponible dans cette boutique. Les vidéos restent conservées dans le bonus boutique et redeviennent accessibles si l'option Boutique Vidéo est ajoutée.</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn-dark" id="addVideoOpt" style="width:auto;padding:10px 16px">Ajouter l'option Boutique Vidéo</button>
+          <button class="btn-outline" id="openEngine" style="width:auto;padding:10px 16px">Ouvrir le moteur</button>
+        </div>
+        <p id="videoOffMsg" style="margin:12px 0 0;font-size:13px;color:var(--muted)"></p>`;
+      $("#hero").after(note);
+      ["#offerBar", ".sticky-nav", "#rails", "#catalogue", ".trust", "#featured"].forEach(s => { const el = document.querySelector(s); if (el) el.style.display = "none"; });
+      document.addEventListener("click", (e) => {
+        if (e.target.closest("#openEngine")) { $("#videoOffMsg").textContent = "Ouvrez moteur-boutique.html depuis le même dossier, dans le même navigateur, pour modifier la configuration."; return; }
+        if (!e.target.closest("#addVideoOpt")) return;
+        const cur = (() => { try { return JSON.parse(localStorage.getItem("shopConfig")) || {}; } catch (err) { return {}; } })();
+        const opts = [...new Set([...(cur.options || SHOP.options)])];
+        if (opts.length >= 4) { $("#videoOffMsg").textContent = "Maximum atteint : une boutique accepte types − 1 options (4). Retirez une option dans le moteur."; return; }
+        opts.push("video");
+        localStorage.setItem("shopConfig", JSON.stringify({ ...cur, options: opts }));
+        location.reload();
+      });
+    }
+    // Une rubrique par exemplaire d'option, en pleine largeur
+    const block = $("#optionBlocks");
+    SHOP.options.filter(k => k !== SHOP.main && k !== "video").forEach(k => {
+      const copies = SHOP.optionCopies[k] || 1;
+      for (let c = 0; c < copies; c++) {
+        const sec = document.createElement("section");
+        sec.className = "band alt";
+        sec.innerHTML = `<div class="band-head"><h2>${OPTION_SECTIONS[k]}${c ? ` (copie ${c + 1})` : ""}</h2><span class="opt-tag">(O) ${k}</span></div>
+          <div class="opt-grid" style="margin-top:14px">${Array.from({ length: 4 }, (_, i) =>
+            `<div class="opt-tile"><div class="sw" style="background-image:url('${optImg(k, c, i)}');background-size:cover;background-position:center"></div><span>${OPTION_ITEMS[k]} ${i + 1}</span></div>`).join("")}</div>`;
+        block.appendChild(sec);
+      }
+    });
+    // Bonus boutique : produits de l'ancienne boutique rendus visibles par le créateur (non comptés comme option)
+    if (SHOP.bonusVisible && SHOP.bonusVisible.length) {
+      const bsec = document.createElement("section");
+      bsec.className = "band alt";
+      bsec.innerHTML = `<div class="band-head"><h2>Bonus boutique</h2><span class="opt-tag">bonus</span></div>
+        <div class="opt-grid" style="margin-top:14px">${SHOP.bonusVisible.map((t, i) => `<div class="opt-tile"><div class="sw" style="background-image:url('${OPT_IMGS[(i + 2) % OPT_IMGS.length]}');background-size:cover;background-position:center"></div><span>${escapeHtml(t)}</span></div>`).join("")}</div>`;
+      block.appendChild(bsec);
+    }
+  })();
+
+  function buildCats() {
+    $("#cats").innerHTML = CATS.map(c => `<button type="button" class="cat ${c.id === state.cat ? "active" : ""}" data-cat="${c.id}">${c.label}</button>`).join("");
+    $("#catFilters").innerHTML = CATS.map(c => {
+      const n = c.id === "all" ? VIDEOS.length : VIDEOS.filter(v => v.cat === c.id).length;
+      return `<label><input type="checkbox" name="catf" value="${c.id}" ${state.cat === c.id ? "checked" : ""}>${c.label}<span class="n">${n}</span></label>`;
+    }).join("");
+  }
+  // Type d'offre : phys, num, srv (les publicités n'ont pas de type d'offre)
+  const kindKey = (v) => (v.ad ? "" : v.kind === "Produit physique" ? "phys" : v.kind === "Contenu numérique" ? "num" : "srv");
+
+  function filtered() {
+    let list = VIDEOS.filter(v => state.cat === "all" || v.cat === state.cat);
+    if (state.kinds.size) list = list.filter(v => state.kinds.has(kindKey(v)));
+    if (state.lengths.has("short")) list = list.filter(v => v.dur <= 40);
+    if (state.lengths.has("long")) list = list.filter(v => v.dur > 40);
+    list = list.filter(v => v.price === 0 || v.price <= state.maxPrice);
+    if (state.q.trim()) {
+      const q = state.q.trim().toLowerCase();
+      list = list.filter(v => v.t.toLowerCase().includes(q) || v.desc.toLowerCase().includes(q));
+    }
+    if (state.sort === "price-asc") list = [...list].sort((a, b) => a.price - b.price);
+    if (state.sort === "price-desc") list = [...list].sort((a, b) => b.price - a.price);
+    return list;
+  }
+
+  function cardHtml(v) {
+    const r = ratingOf(v.id);
+    const h = state.favs.has(v.id), t = state.thumbs.has(v.id), s = state.saved.has(v.id);
+    const action = v.ad
+      ? `<button type="button" class="btn-ad-sm" data-goto="${v.cat}">Voir les produits</button>`
+      : `<button type="button" class="cart-btn" data-buy="${v.id}" aria-label="${actionLabel(v)} : ${escapeHtml(v.t)}">${ICONS.cart}</button>`;
+    return `<article class="card">
+      <div class="thumb-wrap">
+        <button type="button" class="thumb" data-open="${v.id}" style="background-image:url('${posterOf(v)}');background-size:cover;background-position:center" aria-label="Lire : ${escapeHtml(v.t)}">
+          ${badgesHtml(v)}
+          <span class="play-disc" aria-hidden="true">${ICONS.play}</span>
+          <span class="dur">${fmtDur(v.dur)}</span>
+        </button>
+        <button type="button" class="heart-ov ${h ? "on" : ""}" data-heart="${v.id}" aria-pressed="${h}" aria-label="J'aime">${ICONS.heart}</button>
+      </div>
+      <div class="card-body">
+        <span class="cat-label">${CAT[v.cat].label}</span>
+        <h3 class="card-title">${escapeHtml(v.t)}</h3>
+        <div class="rating">${r ? `${starsRow(r.avg)} <strong>${avgTxt(r)}</strong> <span>(${r.n})</span>` : "Aucun avis"} <button type="button" class="link" data-reviews="${v.id}">Avis</button></div>
+        <div class="price-row"><div class="price-line">${priceHtml(v)}</div>${action}</div>
+        <div class="card-links">
+          <button type="button" class="link ${t ? "on" : ""}" data-thumb="${v.id}" aria-pressed="${t}" aria-label="Pouce levé">${ICONS.thumb}<span>${t ? 1 : 0}</span></button>
+          <button type="button" class="link ${s ? "on" : ""}" data-save="${v.id}" aria-pressed="${s}">${s ? "Enregistrée" : "Enregistrer"}</button>
+          <button type="button" class="link" data-share="${v.id}">Partager</button>
+        </div>
+      </div>
+    </article>`;
+  }
+
+  function renderFeatured() {
+    const v = VIDEOS.find(x => x.feat) || VIDEOS[0];
+    $("#featured").innerHTML = `
+      <div class="feat-media" style="background-image:url('${posterOf(v)}');background-size:cover;background-position:center">
+        <span class="feat-label">À la une</span>
+        <button type="button" class="play-big" data-open="${v.id}" aria-label="Lire : ${escapeHtml(v.t)}">${ICONS.play}</button>
+        <span class="dur">${fmtDur(v.dur)}</span>
+      </div>
+      <div class="feat-body">
+        <h2>${escapeHtml(v.t)}</h2>
+        <div class="price-line">${priceHtml(v, true)}</div>
+        <button type="button" class="btn-buy" data-buy="${v.id}" style="margin-top:8px">${actionLabel(v)}</button>
+      </div>`;
+  }
+
+  // Une section par rubrique : bande pleine largeur, titre et sous-titre, bandes alternées
+  const RAILS = [
+    { id: "sec-promo", title: "Offres promotionnelles", sub: "Prix réduits sur une sélection de vidéos.", filter: v => v.was, promo: true },
+    { id: "sec-new", title: "Dernier ajouté", sub: "Les dernières vidéos publiées dans la boutique.", filter: v => v.isNew },
+    { id: "sec-top", title: "Top vente", sub: "Les vidéos les plus achetées.", filter: v => TOP_IDS.includes(v.id) },
+    { id: "sec-ads", title: "Publicités à découvrir", sub: "Vidéos de promotion : elles font découvrir un produit, sans vente directe.", filter: v => v.ad }
+  ];
+  function railsHtml() {
+    return RAILS.map((r, i) => {
+      const list = VIDEOS.filter(r.filter);
+      if (!list.length) return "";
+      return `<section class="band ${i % 2 ? "alt" : ""} ${r.promo ? "promo" : ""}" id="${r.id}">
+        <div class="band-head"><h2>${r.title}</h2><span class="count">${list.length} vidéo${list.length > 1 ? "s" : ""}</span></div>
+        <p class="band-sub">${r.sub}</p>
+        <div class="grid">${list.map(cardHtml).join("")}</div>
+      </section>`;
+    }).join("");
+  }
+
+  function render() {
+    const list = filtered();
+    const plain = state.cat === "all" && !state.q.trim() && state.lengths.size === 0 && state.kinds.size === 0;
+    $("#catTitle").textContent = state.cat === "all" ? "Catalogue complet" : CAT[state.cat].label;
+    $("#count").textContent = `${list.length} vidéo${list.length > 1 ? "s" : ""} disponible${list.length > 1 ? "s" : ""}`;
+    $("#grid").innerHTML = list.map(cardHtml).join("") || `<div class="empty">Aucune vidéo ne correspond à ces filtres.</div>`;
+    // Rubriques et raccourcis visibles seulement quand on regarde tout le catalogue
+    $("#rails").innerHTML = VIDEO_ON && plain ? railsHtml() : "";
+    document.querySelectorAll("#anchors [data-anchor]").forEach(a => { a.style.display = (a.dataset.anchor === "catalogue" || (VIDEO_ON && plain)) ? "" : "none"; });
+    // Nombre de filtres actifs, visible dans le bouton « Filtres »
+    const active = (state.cat !== "all" ? 1 : 0) + state.kinds.size + state.lengths.size + (state.maxPrice < 50 ? 1 : 0) + (state.q.trim() ? 1 : 0);
+    $("#filterCount").textContent = active ? String(active) : "";
+    $("#favCount").textContent = state.favs.size;
+    $("#saveCount").textContent = state.saved.size;
+    $("#cartCount").textContent = cartCount();
+    buildCats();
+  }
+
+  // Lecteur
+  function setPlayIcon() { $("#pp").innerHTML = state.playing ? ICONS.pause : ICONS.play; }
+  function openPlayer(id) {
+    const v = VIDEOS.find(x => x.id === id);
+    state.current = v; state.qty = 1; state.tab = "desc"; state.full = false; state.playing = false;
+    $("#savedModal").classList.remove("open");
+    $("#poster").style.background = `url('${posterOf(v)}') center / cover no-repeat`;
+    setPlayIcon();
+    renderInfo();
+    $("#modal").classList.add("open");
+  }
+  function relatedHtml(v) {
+    const rel = VIDEOS.filter(x => x.cat === v.cat && x.id !== v.id).slice(0, 3);
+    return rel.length ? rel.map(x => `<button type="button" class="btn-outline" data-open="${x.id}">${escapeHtml(x.t)}</button>`).join("") : `<p>Aucune vidéo associée.</p>`;
+  }
+  function renderInfo() {
+    const v = state.current;
+    const body = state.tab === "avis" ? reviewsBlock(v.id) : state.tab === "videos" ? relatedHtml(v) : `<p class="desc">${escapeHtml(v.desc)}</p>`;
+    $("#info").innerHTML = `
+      <button type="button" class="close" data-close aria-label="Fermer">${ICONS.close}</button>
+      ${state.full ? `<button type="button" class="btn-outline" data-back>${ICONS.back} Retour au lecteur</button>` : ""}
+      <div class="info-tags">${badgesHtml(v)}<span class="kind">${v.kind}</span></div>
+      <h2 id="mTitle">${escapeHtml(v.t)}</h2>
+      <div class="seller">${escapeHtml(v.seller)} · ${CAT[v.cat].label}</div>
+      <div class="price-line big-line">${priceHtml(v, true)}</div>
+      ${reactBlock(v)}
+      ${actRow(v)}
+      ${v.kind === "Produit physique" ? `<span class="stock">En stock</span>
+      <div class="qty"><button type="button" data-qty="-1" aria-label="Diminuer">−</button><span>${state.qty}</span><button type="button" data-qty="1" aria-label="Augmenter">+</button></div>` : ""}
+      ${buyBlock(v)}
+      ${state.full
+        ? `<h3>Description</h3><p class="desc">${escapeHtml(v.desc)}</p><h3>Avis</h3>${reviewsBlock(v.id)}<h3>Vidéos associées</h3>${relatedHtml(v)}`
+        : `<div class="tabs"><span data-tab="desc" class="${state.tab === "desc" ? "on" : ""}">Description</span><span data-tab="avis" class="${state.tab === "avis" ? "on" : ""}">Avis</span><span data-tab="videos" class="${state.tab === "videos" ? "on" : ""}">Vidéos associées</span></div>
+           <div>${body}</div>
+           <button type="button" class="btn-outline" data-full>Voir la fiche complète</button>`}
+      <small>Durée : ${fmtDur(v.dur)} (maximum 57 s)</small>`;
+  }
+  function openReviews(id) {
+    const isShop = id === "shop";
+    const v = isShop ? null : VIDEOS.find(x => x.id === id);
+    const r = ratingOf(id);
+    $("#reviewsTitle").textContent = isShop ? "Avis sur la boutique" : "Avis sur le produit";
+    const name = isShop ? escapeHtml(SHOP.name || "Boutique") : `<strong>${escapeHtml(v.t)}</strong>`;
+    $("#reviewsSummary").innerHTML = `${name}<br>` + (r ? `${starsRow(r.avg)} <strong>${avgTxt(r)} / 5</strong> · ${r.n} avis` : "Aucun avis pour l'instant");
+    $("#reviewsList").innerHTML = reviewsBlock(id);
+    $("#reviewsModal").classList.add("open");
+  }
+  function closePlayer() { $("#modal").classList.remove("open"); }
+
+  // Panier : liste d'articles (quantités, retrait), puis paiement de l'ensemble
+  let pendingFromCart = false;
+  const cartCount = () => state.cartItems.reduce((n, i) => n + i.qty, 0);
+  function checkoutItems(list) {
+    return list.map(l => { const v = VIDEOS.find(x => x.id === l.id); return { t: v.t, price: v.price, digital: v.kind === "Contenu numérique", qty: l.qty }; });
+  }
+  // Ouvre le paiement (module livraison) avec les articles donnés
+  function openCheckout(list, fromCart) {
+    try { localStorage.setItem("liv.v2.cart", JSON.stringify(checkoutItems(list))); } catch (e) {}
+    pendingFromCart = !!fromCart;
+    $("#checkoutFrame").src = "module-livraison.html?embed=1#achat";
+    $("#checkoutModal").classList.add("open");
+  }
+  function addToCart(id, qty) {
+    const v = VIDEOS.find(x => x.id === id);
+    const line = state.cartItems.find(i => i.id === id);
+    if (line) line.qty = Math.min(9, line.qty + qty); else state.cartItems.push({ id, qty: Math.min(9, qty) });
+    render();
+    toast(`« ${v.t} » ajouté au panier`);
+  }
+  // Bouton d'achat : contenu numérique = achat direct ; produit physique = ajout au panier
+  function buy(id, qty) {
+    const v = VIDEOS.find(x => x.id === id);
+    if (!v.price) { toast(`Demande de devis envoyée pour « ${v.t} » (maquette)`); return; }
+    if (v.kind === "Contenu numérique") { openCheckout([{ id, qty: qty || 1 }], false); return; }
+    addToCart(id, qty || 1);
+  }
+  function renderCart() {
+    const body = $("#cartBody");
+    if (!state.cartItems.length) { body.innerHTML = `<p class="muted">Votre panier est vide. Ajoutez une vidéo avec « Ajouter au panier ».</p>`; return; }
+    let total = 0;
+    const rows = state.cartItems.map(l => {
+      const v = VIDEOS.find(x => x.id === l.id), sub = v.price * l.qty; total += sub;
+      return `<div class="cart-row" style="display:grid;grid-template-columns:64px 1fr auto;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line,#e5e5e5)">
+        <div style="width:64px;height:64px;border-radius:8px;background:url('${posterOf(v)}') center/cover"></div>
+        <div><strong>${escapeHtml(v.t)}</strong><div class="muted" style="font-size:13px">${escapeHtml(v.seller)} · ${fmt(v.price)} l'unité</div>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap"><button type="button" class="btn-outline" style="width:auto;padding:4px 12px" data-cart-qty="${v.id}" data-d="-1" aria-label="Diminuer">−</button><span>${l.qty}</span><button type="button" class="btn-outline" style="width:auto;padding:4px 12px" data-cart-qty="${v.id}" data-d="1" aria-label="Augmenter">+</button><button type="button" class="btn-outline" style="width:auto;padding:4px 12px" data-cart-remove="${v.id}">Retirer</button></div></div>
+        <strong>${fmt(sub)}</strong></div>`;
+    }).join("");
+    const n = cartCount();
+    body.innerHTML = rows + `<div style="display:flex;justify-content:space-between;margin:14px 0"><span>Total (hors livraison)</span><strong>${fmt(total)}</strong></div>
+      <p class="muted" style="font-size:13px">Les frais de livraison, s'il y en a, sont calculés à l'étape suivante.</p>
+      <button type="button" class="btn-buy" data-checkout-cart>Commander (${n} article${n > 1 ? "s" : ""})</button>`;
+  }
+  function changeCartQty(id, d) {
+    const line = state.cartItems.find(i => i.id === id); if (!line) return;
+    line.qty = Math.max(1, Math.min(9, line.qty + d));
+    render(); renderCart();
+  }
+  function openCart() { renderCart(); $("#cartModal").classList.add("open"); }
+  function closeCart() { $("#cartModal").classList.remove("open"); }
+  function closeCheckout() { $("#checkoutModal").classList.remove("open"); $("#checkoutFrame").src = "about:blank"; }
+  window.addEventListener("message", (e) => {
+    if (e.data && e.data.type === "liv-done") { closeCheckout(); if (pendingFromCart) { state.cartItems = []; pendingFromCart = false; render(); renderCart(); } toast(`Commande ${e.data.id} confirmée (maquette, paiement simulé)`); }
+  });
+
+  // Défilement vers une section, avec repère de la rubrique active
+  function goSection(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+    document.querySelectorAll("#anchors .anchor").forEach(a => a.classList.toggle("current", a.dataset.anchor === id));
+  }
+
+  document.addEventListener("click", (e) => {
+    const t = e.target;
+    if (t.closest('a[href="#"]')) { e.preventDefault(); toast("Page non incluse dans cette maquette"); return; }
+    if (t.closest("#openFilters")) { goSection("catalogue"); const s = document.querySelector(".filters summary"); if (s) s.focus({ preventScroll: true }); return; }
+    const anchor = t.closest("[data-anchor]"); if (anchor) { goSection(anchor.dataset.anchor); return; }
+    const cat = t.closest("[data-cat]"); if (cat) { state.cat = cat.dataset.cat; render(); goSection("catalogue"); return; }
+    const goto = t.closest("[data-goto]");
+    if (goto) { state.cat = goto.dataset.goto; closePlayer(); render(); goSection("catalogue"); return; }
+    const open = t.closest("[data-open]"); if (open) { openPlayer(Number(open.dataset.open)); return; }
+    const heartBtn = t.closest("[data-heart]");
+    if (heartBtn) { const id = Number(heartBtn.dataset.heart); state.favs.has(id) ? state.favs.delete(id) : state.favs.add(id); saveReacts(); render(); if ($("#modal").classList.contains("open")) renderInfo(); return; }
+    const thumbBtn = t.closest("[data-thumb]");
+    if (thumbBtn) { const id = Number(thumbBtn.dataset.thumb); state.thumbs.has(id) ? state.thumbs.delete(id) : state.thumbs.add(id); saveReacts(); render(); if ($("#modal").classList.contains("open")) renderInfo(); return; }
+    const buyBtn = t.closest("[data-buy]"); if (buyBtn) { buy(Number(buyBtn.dataset.buy), buyBtn.closest("#modal") ? state.qty : 1); return; }
+    const rv = t.closest("[data-reviews]"); if (rv) { openReviews(rv.dataset.reviews === "shop" ? "shop" : Number(rv.dataset.reviews)); return; }
+    if (t.closest("[data-close-reviews]") || t.id === "reviewsModal") { $("#reviewsModal").classList.remove("open"); return; }
+    const tab = t.closest("[data-tab]"); if (tab) { state.tab = tab.dataset.tab; renderInfo(); return; }
+    if (t.closest("[data-full]")) { state.full = true; renderInfo(); return; }
+    if (t.closest("[data-back]")) { state.full = false; renderInfo(); return; }
+    const q = t.closest("[data-qty]"); if (q) { state.qty = Math.max(1, state.qty + Number(q.dataset.qty)); renderInfo(); return; }
+    const view = t.closest("#viewGrid, #viewList");
+    if (view) {
+      const list = view.id === "viewList";
+      $("#grid").classList.toggle("list", list);
+      $("#viewGrid").classList.toggle("on", !list); $("#viewList").classList.toggle("on", list);
+      $("#viewGrid").setAttribute("aria-pressed", String(!list)); $("#viewList").setAttribute("aria-pressed", String(list));
+      return;
+    }
+    if (t.closest("#reset")) {
+      state.cat = "all"; state.lengths.clear(); state.maxPrice = 50; state.q = "";
+      $("#q").value = ""; $("#price").value = 50; $("#priceVal").textContent = "50 € et plus";
+      state.kinds.clear();
+      document.querySelectorAll('input[name="len"], input[name="kind"]').forEach(i => i.checked = false);
+      render(); return;
+    }
+    if (t.closest("#saveBtn")) { $("#savedList").innerHTML = savedHtml(); $("#savedModal").classList.add("open"); return; }
+    if (t.closest("[data-close-saved]") || t.id === "savedModal") { $("#savedModal").classList.remove("open"); return; }
+    const sv = t.closest("[data-save]");
+    if (sv) { toggleSave(Number(sv.dataset.save)); render(); if ($("#modal").classList.contains("open")) renderInfo(); if ($("#savedModal").classList.contains("open")) $("#savedList").innerHTML = savedHtml(); return; }
+    const un = t.closest("[data-unsave]");
+    if (un) { toggleSave(Number(un.dataset.unsave)); $("#savedList").innerHTML = savedHtml(); render(); if ($("#modal").classList.contains("open")) renderInfo(); return; }
+    const shr = t.closest("[data-share]");
+    if (shr) { shareVideo(Number(shr.dataset.share)); return; }
+    const cq = t.closest("[data-cart-qty]"); if (cq) { changeCartQty(Number(cq.dataset.cartQty), Number(cq.dataset.d)); return; }
+    const cr = t.closest("[data-cart-remove]"); if (cr) { state.cartItems = state.cartItems.filter(i => i.id !== Number(cr.dataset.cartRemove)); render(); renderCart(); return; }
+    if (t.closest("[data-checkout-cart]")) { closeCart(); openCheckout(state.cartItems, true); return; }
+    if (t.closest("[data-close-cart]") || t.id === "cartModal") { closeCart(); return; }
+    const iconBtn = t.closest("#favBtn, #cartBtn, #accountBtn");
+    if (iconBtn && iconBtn.id === "cartBtn") { openCart(); return; }
+    if (iconBtn) {
+      toast(iconBtn.id === "favBtn" ? `Favoris : ${state.favs.size} vidéo(s)` : iconBtn.id === "cartBtn" ? `Panier : ${cartCount()} article(s) (maquette)` : "Compte client : connexion non incluse dans la maquette");
+      return;
+    }
+    if (t.closest("[data-close]") || t.id === "modal") { closePlayer(); return; }
+    if (t.closest("#snd, #fsc")) { toast("Son / plein écran : action simulée dans la maquette"); return; }
+  });
+  document.addEventListener("change", (e) => {
+    if (e.target.name === "len") { e.target.checked ? state.lengths.add(e.target.value) : state.lengths.delete(e.target.value); }
+    if (e.target.name === "kind") { e.target.checked ? state.kinds.add(e.target.value) : state.kinds.delete(e.target.value); }
+    if (e.target.name === "catf") { state.cat = e.target.checked ? e.target.value : "all"; }
+    render();
+  });
+  $("#price").addEventListener("input", (e) => {
+    state.maxPrice = Number(e.target.value);
+    $("#priceVal").textContent = state.maxPrice >= 50 ? "50 € et plus" : fmt(state.maxPrice);
+    render();
+  });
+  $("#sort").addEventListener("change", (e) => { state.sort = e.target.value; render(); });
+  $("#q").addEventListener("input", (e) => { state.q = e.target.value; render(); });
+  $("#searchForm").addEventListener("submit", (e) => { e.preventDefault(); state.q = $("#q").value; render(); });
+  $("#pp").addEventListener("click", () => { state.playing = !state.playing; setPlayIcon(); toast(state.playing ? "Lecture simulée" : "Pause"); if (state.playing && state.current) { markWatched(state.current.id); renderInfo(); } });
+  $("#next").addEventListener("click", () => {
+    const list = filtered();
+    const i = list.findIndex(v => state.current && v.id === state.current.id);
+    const nxt = list[(i + 1) % list.length];
+    if (nxt) openPlayer(nxt.id);
+  });
+  document.addEventListener("submit", (e) => {
+    const f = e.target;
+    if (!f.dataset || f.dataset.review === undefined) return;
+    e.preventDefault();
+    const vid = f.dataset.review === "shop" ? "shop" : Number(f.dataset.review);
+    state.reviews.push({
+      vid, name: f.elements["name"].value.trim(), rating: Number(f.elements["rating"].value),
+      text: f.elements["text"].value.trim(), date: new Date().toLocaleDateString("fr-FR")
+    });
+    store.set("vid.reviews", state.reviews);
+    toast("Avis enregistré sur cet appareil (maquette)");
+    if (vid === "shop") { renderShopReviews(); if ($("#reviewsModal").classList.contains("open")) openReviews("shop"); }
+    else { render(); renderInfo(); if ($("#reviewsModal").classList.contains("open")) openReviews(vid); }
+  });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") { closePlayer(); $("#savedModal").classList.remove("open"); $("#reviewsModal").classList.remove("open"); } });
+
+  document.addEventListener("click", (e) => { if (e.target.closest("[data-close-checkout]") || e.target.id === "checkoutModal") closeCheckout(); });
+  renderShopReviews();
+  renderFeatured();
+  setPlayIcon();
+  render();
+  // Lien partagé : #video-N ouvre directement la vidéo
+  const hm = location.hash.match(/^#video-(\d+)$/);
+  if (hm && VIDEOS.some(v => v.id === Number(hm[1]))) openPlayer(Number(hm[1]));
+</script>
+</body>
+</html>

@@ -1,0 +1,1339 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta name="robots" content="noindex,nofollow">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Boutique Traditionnelle</title>
+<!--
+CONSIGNE POUR CLAUDE CODE (validée par ZADI) :
+- Thème « nuit bleu doré » : ne pas le remplacer par le bordeaux de la boutique vidéo.
+- À respecter tel quel : le héros, la bande de confiance, les cartouches (vidéos, offres, nos produits), la présentation des promotions (prix barré + nouveau prix affiché, badge -X %), les boutons dorés « Ajouter au panier ».
+- Ne pas modifier le visuel : seulement brancher (données réelles, stock, paiement après validation).
+- Les produits et vidéos de cette page sont fictifs.
+- PAGE COMMUNE : cette page est la boutique commune de Diaspo'Actif. Elle lit le type choisi (SHOP.main). Le type Boutique Traditionnelle est affiché ici ; les autres types (vidéo, portfolio, événements, impact) seront ajoutés dans cette même page, et non dans des pages séparées.
+- Ne pas créer de système ni de page supplémentaire par type : les types sont des choix, comme les options.
+-->
+<style>
+  :root { --c1:#e7b84b; --c2:#0a1430; --c3:#f3d27a; --gold:#e7b84b; --gold2:#f3d27a; --navy2:#111d3f; --navy3:#182752; --txt:#f4f1ea; --mut:#9fb0d4; --line:rgba(255,255,255,.12); --red:#ef4444; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif; color:var(--txt); background: radial-gradient(1200px 500px at 70% -10%, #1b2c5e 0%, var(--c2) 60%) var(--c2); min-height:100vh; }
+  a { color:inherit; text-decoration:none; }
+  button { font:inherit; }
+
+  /* Barre du haut */
+  .top { display:flex; align-items:center; gap:14px; padding:12px 18px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  .logo { display:flex; align-items:center; gap:8px; font-weight:800; letter-spacing:.5px; color:var(--gold); }
+  .logo i { width:26px; height:26px; border-radius:50%; border:2px solid var(--gold); display:inline-block; }
+  .nav { display:flex; gap:20px; font-size:14px; color:#dfe6f7; flex-wrap:wrap; }
+  .nav a.on { color:var(--gold); border-bottom:2px solid var(--gold); padding-bottom:4px; }
+  .top .sp { flex:1; }
+  .icons { display:flex; gap:12px; align-items:center; }
+  .ico { width:36px; height:36px; border-radius:50%; background:var(--navy3); display:grid; place-items:center; color:#fff; border:0; cursor:pointer; }
+  .acc { background:var(--navy3); border-radius:999px; padding:6px 12px; font-size:14px; }
+
+  /* Héros */
+  .hero { position:relative; display:grid; grid-template-columns: 1.2fr 1fr; gap:10px; padding:28px 22px 12px; min-height:240px; overflow:hidden; background: linear-gradient(100deg, #0b1838 0%, #0a1430 45%, #1a2a5a 100%); }
+  .hero .ttl { display:flex; gap:16px; align-items:flex-start; }
+  .hero .badge-shop { width:72px; height:72px; border-radius:16px; background:linear-gradient(160deg,#f6d27a,#c8922a); display:grid; place-items:center; flex:0 0 72px; box-shadow:0 8px 24px rgba(231,184,75,.25); font-size:34px; }
+  .hero h1 { margin:0; font-family: Georgia, "Times New Roman", serif; font-size:44px; line-height:1.05; font-weight:700; }
+  .hero h1 span { color:var(--gold); }
+  .hero .sub { font-size:19px; margin:8px 0 6px; font-weight:600; }
+  .hero .desc { font-size:15px; color:var(--mut); max-width:520px; margin:0; line-height:1.5; }
+  .hero .art { min-height:200px; border-radius:18px; background: radial-gradient(circle at 30% 30%, #f5c879 0%, #7a4b12 35%, #14213f 75%); position:relative; }
+  .hero .art::after { content:"🛍"; position:absolute; right:18px; top:12px; font-size:90px; filter: drop-shadow(0 0 18px rgba(231,184,75,.6)); }
+
+  /* Bande de confiance */
+  .trust { display:grid; grid-template-columns: repeat(6, 1fr); gap:0; margin:16px 18px 0; border:1px solid var(--line); border-radius:16px; background:rgba(255,255,255,.03); }
+  .trust div { display:flex; align-items:center; gap:10px; padding:14px 12px; font-size:14px; line-height:1.25; }
+  .trust div + div { border-left:1px solid var(--line); }
+  .trust b { display:block; font-weight:700; }
+  .trust .ti { width:38px; height:38px; flex:0 0 38px; border:2px solid var(--gold); border-radius:12px; display:grid; place-items:center; color:var(--gold); font-size:18px; }
+
+  /* Recherche */
+  .search { display:flex; gap:12px; margin:16px 18px 0; padding:12px; border-radius:16px; background:linear-gradient(90deg,#0d1a3d,#15245a); border:1px solid var(--line); align-items:center; flex-wrap:wrap; }
+  .search .field { flex:1; min-width:220px; background:#fff; color:#111; border-radius:999px; padding:11px 16px; display:flex; align-items:center; gap:8px; }
+  .search input { border:0; outline:0; flex:1; font:inherit; font-size:15px; background:transparent; color:#111; min-width:0; }
+  .search select { background:#fff; color:#111; border:0; border-radius:999px; padding:11px 14px; font:inherit; font-size:15px; min-width:200px; }
+  .btn-cart { background: linear-gradient(180deg,#f6cf6c,#dba53a); color:#15171f; border:0; border-radius:999px; padding:11px 18px; font-weight:700; cursor:pointer; white-space:nowrap; }
+  .btn-cart .n { background:#15171f; color:var(--gold); border-radius:999px; padding:1px 7px; font-size:12px; margin-left:4px; }
+
+  /* Catégories */
+  .cats { display:grid; grid-template-columns: repeat(9, 1fr); gap:10px; margin:16px 18px 0; }
+  .cat-tile { background:var(--navy2); border:1px solid var(--line); border-radius:14px; padding:14px 8px; text-align:center; font-size:13px; line-height:1.25; cursor:pointer; color:var(--txt); min-height:96px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; }
+  .cat-tile .ci { font-size:26px; }
+  .cat-tile.on { border:1.5px solid var(--gold); box-shadow:0 0 0 3px rgba(231,184,75,.12); }
+
+  /* Sections */
+  section.block { margin:22px 18px 0; }
+  .sh { display:flex; align-items:center; gap:12px; margin-bottom:12px; flex-wrap:wrap; }
+  .sh .ic { font-size:26px; color:var(--gold); }
+  .sh h2 { margin:0; font-family: Georgia, serif; font-size:26px; font-weight:700; }
+  .sh p { margin:2px 0 0; color:var(--mut); font-size:14px; }
+  .sh .r { margin-left:auto; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .pill { border:1px solid var(--gold); color:var(--gold); background:transparent; border-radius:999px; padding:8px 16px; font-size:14px; cursor:pointer; }
+  .sort { background:var(--navy2); color:var(--txt); border:1px solid var(--line); border-radius:999px; padding:8px 14px; font:inherit; font-size:14px; }
+
+  /* Vidéos */
+  .vids { display:grid; grid-template-columns: repeat(4, 1fr); gap:14px; }
+  .vid { background:var(--navy2); border:1px solid var(--line); border-radius:14px; overflow:hidden; }
+  .vid .vm { height:150px; position:relative; background: var(--c); }
+  .vid .play { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:52px; height:52px; border-radius:50%; background:rgba(0,0,0,.45); display:grid; place-items:center; color:#fff; font-size:20px; border:2px solid rgba(255,255,255,.7); }
+  .vid .dur { position:absolute; right:10px; bottom:10px; background:rgba(0,0,0,.7); color:#fff; font-size:12px; padding:2px 7px; border-radius:6px; }
+  .vid .vb { padding:10px 12px 12px; }
+  .vid h3 { margin:0 0 6px; font-size:15px; }
+  .vid .st { font-size:13px; color:var(--mut); display:flex; gap:12px; }
+
+  /* Offres */
+  .countdown { display:flex; align-items:center; gap:8px; background:linear-gradient(90deg,#3a0f1e,#5a1530); border:1px solid rgba(239,68,68,.4); border-radius:12px; padding:8px 12px; font-size:14px; }
+  .countdown .t { background:#fff; color:#b91c1c; border-radius:6px; font-weight:800; padding:3px 7px; min-width:26px; text-align:center; }
+  .grid4 { display:grid; grid-template-columns: repeat(4, 1fr); gap:16px; }
+  .grid4.compact { grid-template-columns: repeat(4, 1fr); }
+
+  /* Cartes produit */
+  .card { background:var(--navy2); border:1px solid var(--line); border-radius:16px; overflow:hidden; display:flex; flex-direction:column; position:relative; }
+  .media { position:relative; height:170px; background: linear-gradient(135deg, var(--c), #0b1330); cursor:pointer; }
+  .media .pct { position:absolute; left:12px; top:12px; background:var(--red); color:#fff; font-weight:800; font-size:13px; padding:4px 10px; border-radius:8px; }
+  .media .new { position:absolute; left:12px; top:12px; background:var(--gold); color:#15171f; font-weight:800; font-size:12px; padding:4px 10px; border-radius:8px; }
+  .media .heart { position:absolute; right:12px; top:12px; width:32px; height:32px; border-radius:50%; background:rgba(10,20,48,.7); border:0; color:#fff; font-size:16px; cursor:pointer; display:grid; place-items:center; }
+  .media .out { position:absolute; inset:0; background:rgba(5,10,25,.6); display:grid; place-items:center; font-weight:800; font-size:16px; }
+  .body { padding:12px 14px 14px; display:flex; flex-direction:column; gap:6px; flex:1; }
+  .name { font-weight:700; font-size:15px; line-height:1.3; min-height:20px; }
+  .stars { font-size:13px; color:var(--mut); }
+  .stars b { color:var(--gold2); }
+  .prices { display:flex; align-items:baseline; gap:10px; margin-top:2px; }
+  .prices s { color:#8b97b8; font-size:14px; }
+  .prices .now { color:var(--red); font-weight:800; font-size:20px; }
+  .prices .solo { color:var(--txt); font-weight:800; font-size:20px; }
+  .stock { font-size:12px; color:#7ee2a8; }
+  .stock.low { color:#f6c76b; } .stock.none { color:#fca5a5; }
+  .foot { display:flex; align-items:center; gap:10px; margin-top:auto; padding-top:8px; }
+  .btn-add { flex:1; background: linear-gradient(180deg,#f6cf6c,#dba53a); color:#15171f; border:0; border-radius:10px; padding:10px 12px; font-weight:700; font-size:14px; cursor:pointer; }
+  .btn-add:disabled { background:#3a4563; color:#9aa6c4; cursor:not-allowed; }
+  .btn-round { width:40px; height:40px; flex:0 0 40px; border-radius:50%; border:0; background: linear-gradient(180deg,#f6cf6c,#dba53a); color:#15171f; font-size:17px; cursor:pointer; display:grid; place-items:center; }
+  .btn-round:disabled { background:#3a4563; cursor:not-allowed; }
+
+  /* Fenêtres */
+  .overlay { position:fixed; inset:0; background:rgba(3,8,22,.7); display:none; align-items:center; justify-content:center; padding:16px; z-index:50; }
+  .overlay.open { display:flex; }
+  .sheet { background:var(--navy2); border:1px solid var(--line); color:var(--txt); border-radius:16px; max-width:560px; width:100%; max-height:90vh; overflow:auto; padding:20px; position:relative; }
+  .sheet h2 { margin:0 0 8px; font-family: Georgia, serif; font-size:22px; }
+  .close { position:absolute; top:10px; right:12px; background:none; border:0; color:var(--txt); font-size:26px; cursor:pointer; }
+  .pv { height:220px; border-radius:12px; background: var(--c); margin-bottom:14px; }
+  .qty { display:inline-flex; align-items:center; border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+  .qty button { background:var(--navy3); color:var(--txt); border:0; padding:8px 12px; font-size:16px; cursor:pointer; }
+  .qty span { padding:0 12px; min-width:28px; text-align:center; }
+  .row { display:flex; gap:10px; align-items:center; justify-content:space-between; flex-wrap:wrap; }
+  .line { display:flex; gap:10px; align-items:center; padding:10px 0; border-bottom:1px solid var(--line); }
+  .line .sw { width:48px; height:48px; border-radius:10px; flex:0 0 48px; }
+  .line .info { flex:1; }
+  .mut { color:var(--mut); font-size:13px; }
+  .total { font-size:18px; font-weight:800; margin:14px 0; display:flex; justify-content:space-between; }
+  .note { background:rgba(231,184,75,.12); border:1px solid rgba(231,184,75,.4); border-radius:10px; padding:10px 12px; font-size:14px; margin:0 18px; }
+  .empty { color:var(--mut); padding:20px 0; }
+  .demo { font-size:12px; color:var(--mut); margin:22px 18px 26px; }
+  .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#fff; color:#111; padding:10px 16px; border-radius:10px; font-size:14px; opacity:0; transition:.25s; pointer-events:none; z-index:60; max-width:90vw; font-weight:600; }
+  .toast.show { opacity:1; }
+
+  @media (max-width: 1000px) { .cats { grid-template-columns: repeat(5, 1fr); } .trust { grid-template-columns: repeat(3, 1fr); } .trust div:nth-child(4) { border-left:0; } .grid4, .vids { grid-template-columns: repeat(2, 1fr); } .hero { grid-template-columns:1fr; } .hero .art { display:none; } }
+  @media (max-width: 560px) { .hero h1 { font-size:32px; } .cats { grid-template-columns: repeat(3, 1fr); } .trust { grid-template-columns: 1fr 1fr; } .trust div { border-left:0 !important; } .nav { display:none; } .search select { min-width:0; width:100%; } .grid4, .vids { grid-template-columns: 1fr; } }
+
+  [hidden]{display:none!important}
+  .ip-block{margin:22px 18px 0}
+  .ip-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  .ip-card{background:var(--navy2);border:1px solid var(--line);border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:10px;min-width:0}
+  .ip-tag{font-size:12px;color:var(--gold2);text-transform:uppercase;letter-spacing:.06em}
+  .ip-card h3{margin:0;font-family:Georgia,serif;font-size:19px;text-wrap:balance}
+  .ip-card p{margin:0;font-size:14px;color:var(--mut);line-height:1.5}
+  .ip-bar{height:10px;background:rgba(255,255,255,.1);border-radius:999px;overflow:hidden}
+  .ip-bar i{display:block;height:100%;background:linear-gradient(90deg,#f6cf6c,#dba53a);border-radius:999px}
+  .ip-stats{display:flex;justify-content:space-between;gap:8px;font-size:13px;color:var(--mut);flex-wrap:wrap}
+  .ip-stats b{color:var(--txt)}
+  .ip-done{color:#7ee2a8;font-weight:700;font-size:13px}
+  .ip-btn{background:linear-gradient(180deg,#f6cf6c,#dba53a);color:#15171f;border:0;border-radius:10px;padding:10px 13px;font:inherit;font-weight:700;cursor:pointer}
+  .ip-btn.ghost{background:transparent;color:var(--gold);border:1px solid var(--gold)}
+  .ip-btn:disabled{background:#3a4563;color:#9aa6c4;cursor:not-allowed}
+  .ip-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto}
+  .ip-seg,.ip-amts{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+  .ip-seg button,.ip-amts button{border:1px solid var(--line);background:var(--navy3);color:var(--txt);border-radius:9px;padding:8px 12px;font:inherit;cursor:pointer}
+  .ip-seg button.on,.ip-amts button.on{background:var(--gold);color:#15171f;border-color:var(--gold)}
+  .ip-amts input{width:120px;padding:8px 10px;border:1px solid var(--line);border-radius:9px;font:inherit;background:#fff;color:#111}
+  .ip-form{display:grid;gap:10px;margin-top:8px}
+  .ip-form label{font-size:14px;display:grid;gap:4px}
+  .ip-form input{font:inherit;padding:9px 10px;border:1px solid var(--line);border-radius:9px;background:#fff;color:#111}
+  .ip-needs{display:grid;gap:8px;font-size:14px}
+  .ip-needs label{display:flex;gap:8px;align-items:center}
+  @media (max-width: 900px) { .ip-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 560px) { .ip-grid { grid-template-columns: 1fr; } }
+
+  /* ---- Projets d'impact : accueil, thème clair (choix du type impact) ---- */
+  body.impact-mode { background:#fff; color:#16233a; }
+  .ih { --ih-navy:#0d2750; --ih-orange:#f47c20; --ih-line:#e6e9ef; --ih-mut:#5b6679; --ih-bg:#f5f7fb; font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .ih-top { display:flex; align-items:center; gap:18px; padding:14px 22px; background:#fff; border-bottom:1px solid var(--ih-line); flex-wrap:wrap; }
+  .ih-logo { display:flex; align-items:center; gap:8px; font-weight:800; color:var(--ih-navy); letter-spacing:.3px; font-size:18px; }
+  .ih-logo i { width:30px; height:30px; border-radius:50%; background:linear-gradient(135deg,#1e9b4c,#f47c20); display:inline-block; }
+  .ih-logo em { color:var(--ih-orange); font-style:normal; }
+  .ih-nav { display:flex; gap:20px; font-size:14px; color:#334; flex-wrap:wrap; }
+  .ih-nav a.on { color:var(--ih-orange); font-weight:700; border-bottom:2px solid var(--ih-orange); padding-bottom:4px; }
+  .ih-top .sp { flex:1; }
+  .ih-icons { display:flex; gap:14px; align-items:center; color:var(--ih-navy); font-size:18px; }
+  .ih-space { background:var(--ih-orange); color:#fff; border-radius:10px; padding:10px 16px; font-weight:700; font-size:14px; }
+  .ih-hero { position:relative; min-height:380px; display:grid; grid-template-columns:1.1fr .9fr; gap:24px; align-items:center; padding:36px 22px; color:#fff; background: linear-gradient(90deg, rgba(8,28,60,.92) 0%, rgba(8,28,60,.7) 45%, rgba(8,28,60,.15) 100%), url('impact-img/hero.jpg') center / cover no-repeat, var(--ih-navy); }
+  .ih-kicker { margin:0 0 10px; display:flex; align-items:center; gap:10px; font-size:15px; }
+  .ih-kicker::before { content:""; width:34px; height:3px; background:var(--ih-orange); border-radius:2px; }
+  .ih-hero h1 { margin:0 0 12px; font-size:46px; line-height:1.08; font-weight:800; text-wrap:balance; }
+  .ih-hero h1 span { color:var(--ih-orange); }
+  .ih-hero p { margin:0 0 20px; font-size:17px; line-height:1.5; max-width:520px; opacity:.95; }
+  .ih-btns { display:flex; gap:12px; flex-wrap:wrap; }
+  .ih-btn-p { background:var(--ih-orange); color:#fff; border-radius:12px; padding:14px 22px; font-weight:700; font-size:15px; }
+  .ih-btn-g { border:1.5px solid #fff; color:#fff; border-radius:12px; padding:14px 22px; font-weight:700; font-size:15px; }
+  .ih-stats { background:rgba(10,30,62,.72); border:1px solid rgba(255,255,255,.12); border-radius:16px; padding:18px 22px; display:grid; gap:14px; justify-self:end; width:min(100%, 330px); }
+  .ih-stat { display:grid; grid-template-columns:44px 1fr; gap:12px; align-items:center; }
+  .ih-stat .ico { width:44px; height:44px; border-radius:50%; background:rgba(255,255,255,.08); display:grid; place-items:center; font-size:22px; }
+  .ih-stat b { display:block; font-size:24px; line-height:1; }
+  .ih-stat span { font-size:14px; opacity:.9; }
+  .ih-cats { display:grid; grid-template-columns:repeat(7,1fr); margin:-30px 22px 0; position:relative; background:#fff; border-radius:16px; box-shadow:0 8px 26px rgba(13,39,80,.12); padding:14px 8px; }
+  .ih-cat { display:flex; flex-direction:column; align-items:center; gap:6px; text-align:center; font-size:14px; font-weight:700; color:var(--ih-navy); padding:6px; }
+  .ih-cat + .ih-cat { border-left:1px solid var(--ih-line); }
+  .ih-cat i { font-size:24px; font-style:normal; }
+  .ih-main { display:grid; grid-template-columns:minmax(0,1fr) 340px; gap:22px; padding:28px 22px 0; align-items:start; }
+  .ih-sh { display:flex; align-items:flex-end; justify-content:space-between; gap:12px; margin-bottom:16px; }
+  .ih-sh h2 { margin:0; font-size:26px; color:var(--ih-navy); font-weight:800; }
+  .ih-sh h2::after { content:""; display:block; width:56px; height:3px; background:var(--ih-orange); border-radius:2px; margin-top:6px; }
+  .ih-sh a { color:var(--ih-orange); font-weight:700; font-size:15px; }
+  .ih-cards { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; }
+  .ih-card { background:#fff; border:1px solid var(--ih-line); border-radius:16px; overflow:hidden; display:flex; flex-direction:column; min-width:0; }
+  .ih-media { position:relative; height:150px; background-size:cover; background-position:center; }
+  .ih-tag { position:absolute; left:12px; top:12px; color:#fff; font-size:13px; font-weight:700; padding:5px 10px; border-radius:8px; }
+  .ih-fav { position:absolute; right:12px; top:12px; width:34px; height:34px; border-radius:50%; background:#fff; display:grid; place-items:center; color:var(--ih-navy); font-size:16px; }
+  .ih-body { padding:14px 16px 16px; display:flex; flex-direction:column; gap:8px; flex:1; }
+  .ih-body h3 { margin:0; font-size:17px; line-height:1.3; color:#16233a; text-wrap:balance; }
+  .ih-place { font-size:14px; color:var(--ih-mut); }
+  .ih-prog { display:flex; align-items:center; gap:10px; }
+  .ih-prog .bar { flex:1; height:8px; background:#e9edf3; border-radius:999px; overflow:hidden; }
+  .ih-prog .bar i { display:block; height:100%; border-radius:999px; }
+  .ih-prog b { font-size:14px; min-width:44px; text-align:right; }
+  .ih-amount { font-size:14px; color:#16233a; }
+  .ih-financed { align-self:flex-start; background:#e6f6ec; color:#1e7a43; font-weight:700; font-size:13px; padding:5px 10px; border-radius:8px; }
+  .ih-meta { display:flex; justify-content:space-between; gap:8px; font-size:13px; color:var(--ih-mut); margin-top:auto; padding-top:6px; flex-wrap:wrap; }
+  .ih-side { display:grid; gap:14px; }
+  .ih-box { background:#fff; border:1px solid var(--ih-line); border-radius:16px; padding:18px; display:grid; gap:10px; }
+  .ih-box h3 { margin:0; font-size:17px; color:var(--ih-navy); }
+  .ih-box p { margin:0; font-size:14px; color:var(--ih-mut); line-height:1.45; }
+  .ih-input { display:flex; gap:8px; }
+  .ih-input span { flex:1; border:1px solid var(--ih-line); border-radius:10px; padding:11px 12px; font-size:14px; color:#8a93a3; background:#fff; }
+  .ih-input b { width:44px; background:var(--ih-orange); color:#fff; border-radius:10px; display:grid; place-items:center; }
+  .ih-outline { border:1.5px solid var(--ih-navy); color:var(--ih-navy); border-radius:10px; padding:11px 14px; font-weight:700; font-size:14px; text-align:center; }
+  .ih-bottom { margin:30px 22px 26px; background:var(--ih-navy); color:#fff; border-radius:18px; padding:20px 24px; display:flex; align-items:center; gap:18px; flex-wrap:wrap; }
+  .ih-bottom .lead { display:flex; gap:14px; align-items:center; min-width:240px; }
+  .ih-bottom .lead b { display:block; font-size:19px; }
+  .ih-bottom .lead span { font-size:14px; opacity:.85; }
+  .ih-bottom .item { display:flex; gap:10px; align-items:center; font-size:14px; line-height:1.3; min-width:150px; }
+  .ih-bottom .ih-btn-p { margin-left:auto; }
+  @media (max-width: 1000px) { .ih-hero { grid-template-columns:1fr; } .ih-stats { justify-self:start; } .ih-main { grid-template-columns:1fr; } .ih-cards { grid-template-columns:repeat(2,minmax(0,1fr)); } .ih-cats { grid-template-columns:repeat(4,1fr); row-gap:10px; } }
+  @media (max-width: 600px) { .ih-hero h1 { font-size:34px; } .ih-cards { grid-template-columns:1fr; } .ih-cats { grid-template-columns:repeat(2,1fr); } .ih-cat + .ih-cat { border-left:0; } .ih-nav { display:none; } .ih-cats, .ih-main, .ih-bottom { margin-left:14px; margin-right:14px; } .ih-hero, .ih-top { padding-left:16px; padding-right:16px; } .ih-main { padding-left:14px; padding-right:14px; } }
+
+  .ih-page { padding:24px 22px 0; }
+  .ih-narrow { max-width:720px; margin:0 auto; }
+  .ih-h2 { margin:0 0 6px; font-size:26px; color:var(--ih-navy); }
+  .ih-mut { color:var(--ih-mut); margin:0 0 14px; font-size:15px; }
+  .ih-count { color:var(--ih-mut); font-size:14px; }
+  .ih-filters { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin:14px 0 18px; }
+  .ih-filters label, .ih-box label { display:grid; gap:6px; font-size:14px; font-weight:600; color:#16233a; }
+  .ih-filters select, .ih-box select, .ih-box input, .ih-box textarea { font:inherit; padding:11px 12px; border:1px solid var(--ih-line); border-radius:10px; background:#fff; color:#16233a; width:100%; }
+  .ih-box textarea { min-height:110px; resize:vertical; }
+  .ih-box { background:#fff; border:1px solid var(--ih-line); border-radius:16px; padding:18px; display:grid; gap:12px; }
+  .ih-radio { border:0; padding:0; margin:0; display:flex; gap:16px; flex-wrap:wrap; }
+  .ih-radio legend { font-size:14px; font-weight:600; padding:0 0 6px; }
+  .ih-radio label { display:flex; gap:6px; align-items:center; font-weight:400; }
+  .ih-row2 { display:flex; justify-content:space-between; gap:10px; margin-top:14px; flex-wrap:wrap; }
+  .ih-outline-btn { background:#fff; color:var(--ih-navy); border:1.5px solid var(--ih-navy); border-radius:12px; padding:12px 18px; font-weight:700; cursor:pointer; font:inherit; }
+  .ih-btn-p { cursor:pointer; border:0; font:inherit; }
+  .ih-steps { display:flex; gap:6px; margin:6px 0 14px; flex-wrap:wrap; }
+  .ih-steps span { flex:1; min-width:90px; text-align:center; font-size:13px; color:var(--ih-mut); border-top:3px solid var(--ih-line); padding-top:8px; }
+  .ih-steps span.on { color:var(--ih-orange); border-color:var(--ih-orange); font-weight:700; }
+  .ih-steps span.done { border-color:#1e9b4c; color:#1e7a43; }
+  .ih-fiche { display:grid; grid-template-columns:minmax(0,1.5fr) minmax(0,1fr); gap:22px; align-items:start; }
+  .ih-fiche .ih-media { height:300px; border-radius:16px; }
+  .ih-fiche h1 { margin:12px 0 6px; font-size:28px; color:#16233a; text-wrap:balance; }
+  .ih-tabs { display:flex; gap:6px; flex-wrap:wrap; margin:18px 0 12px; }
+  .ih-tabs button { border:1px solid var(--ih-line); background:#fff; border-radius:999px; padding:8px 14px; font:inherit; font-size:14px; cursor:pointer; color:var(--ih-navy); }
+  .ih-tabs button.on { background:var(--ih-orange); color:#fff; border-color:var(--ih-orange); }
+  .ih-panel { background:#fff; border:1px solid var(--ih-line); border-radius:14px; padding:18px; font-size:15px; line-height:1.6; color:#2a3446; }
+  .ih-contrib { background:#fff; border:1px solid var(--ih-line); border-radius:16px; padding:18px; display:grid; gap:12px; }
+  .ih-contrib .big { font-size:22px; font-weight:800; color:#16233a; }
+  .ih-amts { display:flex; gap:8px; flex-wrap:wrap; }
+  .ih-amts button { border:1px solid var(--ih-line); background:#fff; border-radius:10px; padding:9px 13px; font:inherit; font-weight:700; cursor:pointer; color:var(--ih-navy); }
+  .ih-amts button.on { background:var(--ih-navy); color:#fff; border-color:var(--ih-navy); }
+  .ih-ok { background:#e6f6ec; color:#1e7a43; border-radius:10px; padding:10px 12px; font-size:14px; font-weight:600; }
+  .ih-btn-p.disabled { background:#b8c0cc; cursor:not-allowed; }
+  .ih-cards .ih-card { cursor:pointer; }
+  @media (max-width: 900px) { .ih-fiche { grid-template-columns:1fr; } .ih-filters { grid-template-columns:1fr; } }
+  [data-view][hidden], .ih-page[hidden] { display:none !important; }
+  .ih-list { list-style:none; padding:0; margin:0; display:grid; gap:10px; }
+  .ih-list li { display:flex; justify-content:space-between; gap:10px; align-items:center; border-bottom:1px solid var(--ih-line); padding-bottom:10px; }
+  .ih-small { border:1px solid var(--ih-navy); background:#fff; color:var(--ih-navy); border-radius:8px; padding:6px 10px; font:inherit; font-size:13px; cursor:pointer; }
+  /* ---- sections ajoutées : vision, projets en cours, galerie, réseaux ---- */
+  .ih-sec { margin:28px 22px 0; }
+  .ih-strip { display:flex; gap:14px; overflow-x:auto; scroll-snap-type:x mandatory; padding:4px 2px 12px; }
+  .ih-strip > article { flex:0 0 240px; scroll-snap-align:start; background:#fff; border:1px solid var(--ih-line); border-radius:14px; overflow:hidden; cursor:pointer; }
+  .ih-strip .ih-media { height:150px; position:relative; }
+  .ih-play { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:48px; height:48px; border-radius:50%; background:rgba(255,255,255,.92); color:var(--ih-navy); display:grid; place-items:center; font-size:18px; padding-left:3px; box-sizing:border-box; }
+  .ih-cap { padding:10px 12px; display:grid; gap:2px; }
+  .ih-cap b { font-size:15px; color:#16233a; line-height:1.3; }
+  .ih-cap span { font-size:12px; color:var(--ih-mut); }
+  .ih-chips { display:flex; gap:8px; flex-wrap:wrap; margin:6px 0 14px; }
+  .ih-chips button { border:1px solid var(--ih-line); background:#fff; border-radius:999px; padding:7px 13px; font:inherit; font-size:14px; cursor:pointer; color:var(--ih-navy); }
+  .ih-chips button.on { background:var(--ih-navy); color:#fff; border-color:var(--ih-navy); }
+  .ih-encours { background:#fff; border:1px solid var(--ih-line); border-radius:16px; padding:6px 18px; }
+  .ih-encours .row { display:flex; justify-content:space-between; gap:16px; align-items:center; padding:14px 0; border-bottom:1px solid var(--ih-line); cursor:pointer; flex-wrap:wrap; }
+  .ih-encours .row:last-child { border-bottom:0; }
+  .ih-encours .row b { display:block; font-size:16px; color:#16233a; }
+  .ih-encours .row small { font-size:13px; color:var(--ih-mut); }
+  .ih-encours .prog { min-width:200px; flex:0 1 280px; display:grid; gap:6px; }
+  .ih-encours .prog .ih-prog b { font-size:14px; }
+  .ih-nets { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; }
+  .ih-net { background:#fff; border:1px solid var(--ih-line); border-radius:14px; padding:14px; display:flex; gap:12px; align-items:center; cursor:pointer; }
+  .ih-net i { width:40px; height:40px; border-radius:10px; background:var(--ih-navy); color:#fff; display:grid; place-items:center; font-style:normal; font-weight:800; font-size:14px; flex:0 0 40px; }
+  .ih-net b { display:block; font-size:15px; color:#16233a; }
+  .ih-net span { font-size:12px; color:var(--ih-mut); }
+  .ih-vision { background:#fff; border:1px solid var(--ih-line); border-radius:16px; padding:22px; display:grid; gap:16px; }
+  .ih-vision blockquote { margin:0; font-size:20px; color:var(--ih-navy); font-weight:700; line-height:1.4; border-left:4px solid var(--ih-orange); padding-left:14px; text-wrap:balance; }
+  .ih-vision p { margin:0; font-size:15px; line-height:1.6; color:#2a3446; }
+  .ih-vals { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+  .ih-vals div { background:#f5f7fb; border-radius:12px; padding:14px; display:grid; gap:6px; }
+  .ih-vals b { color:var(--ih-navy); font-size:15px; }
+  .ih-vals span { font-size:14px; color:var(--ih-mut); line-height:1.45; }
+  .ih-lb { position:fixed; inset:0; background:rgba(10,20,48,.85); display:grid; place-items:center; z-index:100; padding:16px; }
+  .ih-lb[hidden] { display:none; }
+  .ih-lb-box { background:#fff; border-radius:16px; max-width:720px; width:100%; overflow:hidden; display:grid; }
+  .ih-lb-box .ih-media { height:min(420px,55vh); }
+  .ih-lb-box .ih-cap { padding:14px 16px; }
+  .ih-lb-box .ih-outline-btn { margin:0 16px 16px; }
+  @media (max-width: 900px) { .ih-vals { grid-template-columns:1fr; } }
+  @media (max-width: 600px) { .ih-sec { margin-left:14px; margin-right:14px; } .ih-strip > article { flex-basis:200px; } .ih-encours .prog { min-width:0; flex:1 1 100%; } }
+  /* ---- rubrique événements ---- */
+  .ih-rap p { margin:0 0 14px; }
+  .ih-rmed { margin:6px 0 16px; }
+  .ih-rmed .ih-media { height:280px; border-radius:14px; cursor:pointer; }
+  .ih-rmed figcaption { font-size:13px; color:var(--ih-mut); margin-top:6px; }
+  .ih-gmed { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px; }
+  .ih-gmed > div { cursor:pointer; }
+  .ih-gmed .ih-media { height:120px; border-radius:12px; }
+  .ih-gmed b { display:block; font-size:13px; color:#16233a; margin-top:6px; line-height:1.3; }
+  .ih-evmeta { display:flex; gap:14px; flex-wrap:wrap; font-size:14px; color:var(--ih-mut); margin:6px 0 0; }
+  .ih-evstat { align-self:flex-start; font-size:13px; font-weight:700; padding:5px 10px; border-radius:8px; }
+  .ih-evstat.past { background:#eef1f6; color:#2a3446; }
+  .ih-evstat.soon { background:#fff1e6; color:#c25a12; }
+  @media (max-width: 600px) { .ih-rmed .ih-media { height:200px; } }
+  /* ---- type organismes de financement ---- */
+  .ih-pill { display:inline-block; font-size:12px; font-weight:700; padding:4px 9px; border-radius:8px; background:#eef1f6; color:#2a3446; margin-left:6px; white-space:nowrap; }
+  .ih-pill.ok { background:#e6f6ec; color:#1e7a43; }
+  .ih-sep { margin:26px 0 0; }
+  /* ---- organismes de financement : palette bordeaux, noir, vert ---- */
+  #financeHome { --ih-navy:#0d2750; --ih-orange:#f47c20; --ih-mut:#5b6679; --ih-line:#e6e9ef; }
+  #financeHome .ih-top { background:#ffffff; color:#0d2750; border-bottom:1px solid #e6e9ef; }
+  #financeHome .ih-logo { color:#0d2750; }
+  #financeHome .ih-nav a { color:#0d2750; }
+  #financeHome .ih-nav a.on, #financeHome .ih-nav a:hover { color:#f47c20; }
+  #financeHome .ih-icons span { color:#0d2750; }
+  #financeHome .ih-hero { background:linear-gradient(120deg,#0d2750 0%,#0b3a72 60%,#0d2750 100%); }
+  #financeHome .ih-sh h2, #financeHome .ih-h2, #financeHome h3 { color:#0d2750; }
+  #financeHome .ih-sh h2::after { background:#f47c20; }
+  .fin-tabs { display:flex; gap:8px; overflow-x:auto; padding:14px 22px; background:#fff; border-bottom:1px solid var(--ih-line); }
+  .fin-tabs button { flex:0 0 auto; border:1px solid #d7dde8; background:#fff; color:#0d2750; border-radius:999px; padding:8px 14px; font:inherit; font-size:14px; font-weight:600; cursor:pointer; }
+  .fin-tabs button:hover { border-color:#f47c20; color:#f47c20; }
+  .fin-sec { margin:30px 22px 0; scroll-margin-top:12px; }
+  .fin-grid3 { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; }
+  .fin-grid3 .ih-card { border-top:4px solid #0d2750; }
+  .fin-grid4 { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; }
+  .fin-forf .ih-card { border-top:4px solid #f47c20; }
+  .fin-forf .price { font-size:26px; font-weight:800; color:#0d2750; }
+  .fin-forf ul { margin:0; padding-left:18px; font-size:14px; color:#2a2a2a; display:grid; gap:4px; }
+  .fin-band { background:#0d2750; color:#fff; border-radius:18px; padding:22px; margin:30px 22px 0; }
+  .fin-band h2 { margin:0 0 14px; font-size:24px; color:#fff; }
+  .fin-band .ih-box { background:#fff; }
+  .fin-band .fin-contact-btn { display:flex; gap:8px; flex-wrap:wrap; }
+  .fin-band .fin-contact-btn span { background:#f47c20; color:#fff; border-radius:10px; padding:10px 14px; font-weight:700; font-size:14px; cursor:pointer; }
+  .fin-sim { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:18px; align-items:start; }
+  .fin-sim .ih-box label { font-weight:600; }
+  .fin-result { background:#f7f1f2; border:1px solid #d7dde8; border-radius:16px; padding:18px; display:grid; gap:8px; }
+  .fin-result b.big { font-size:30px; color:#0d2750; }
+  .fin-result small { color:#5b6679; font-size:13px; }
+  .fin-pill { display:inline-block; font-size:12px; font-weight:700; padding:4px 9px; border-radius:8px; background:#eef1ee; color:#2a2a2a; margin-left:6px; }
+  .fin-pill.ok { background:#e6f6ec; color:#f47c20; }
+  .fin-row { display:flex; justify-content:space-between; gap:12px; align-items:center; padding:12px 0; border-bottom:1px solid var(--ih-line); flex-wrap:wrap; }
+  .fin-row:last-child { border-bottom:0; }
+  .fin-row small { color:var(--ih-mut); display:block; font-size:13px; }
+  @media (max-width: 900px) { .fin-grid3, .fin-grid4, .fin-sim { grid-template-columns:1fr; } }
+  @media (max-width: 600px) { .fin-sec, .fin-band { margin-left:14px; margin-right:14px; } .fin-tabs { padding:12px 14px; } }
+  /* ---- présentation visuelle : maquette organismes de financement ---- */
+  #financeHome .fin-hero { min-height:320px; background:linear-gradient(90deg,#0d2750 0%,rgba(13,39,80,.97) 42%,rgba(13,39,80,.35) 100%),url('fin-img/fin-hero.jpg') right center / auto 100% no-repeat,#0d2750; }
+  .fin-head { background:#0d2750; color:#fff; border-radius:14px 14px 0 0; padding:14px 18px; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; border-bottom:3px solid #f47c20; }
+  .fin-head h2 { color:#fff; font-size:20px; margin:0; }
+  .fin-head h2::after { display:none; }
+  .fin-head .ih-count { color:#dfe6f0; }
+  .fin-sec > .fin-grid3, .fin-sec > .fin-grid4, .fin-sec > .ih-encours, .fin-sec > .fin-sim, .fin-sec > .ih-box { margin-top:0; }
+  .fin-sec > .fin-grid3, .fin-sec > .ih-encours { background:#f5f7fb; border:1px solid var(--ih-line); border-top:0; border-radius:0 0 14px 14px; padding:14px; }
+  .fin-sec > .ih-encours { display:block; }
+  .fin-card { background:#fff; border:1px solid var(--ih-line); border-radius:14px; overflow:hidden; display:flex; flex-direction:column; min-width:0; box-shadow:0 2px 8px rgba(0,0,0,.05); }
+  .fin-thumb { width:107px; height:62px; border-radius:8px; background-size:cover; background-position:center; flex:0 0 auto; }
+  .fin-cbody { padding:14px 16px 16px; display:flex; flex-direction:column; gap:8px; flex:1; position:relative; }
+  .fin-cbody h3 { margin:0; font-size:17px; color:#0d2750; line-height:1.3; text-wrap:balance; }
+  .fin-cbody p { margin:0; font-size:14px; color:#5b6679; line-height:1.45; }
+  .fin-ico { width:44px; height:44px; border-radius:12px; display:grid; place-items:center; font-size:22px; color:#fff; background:#f47c20; flex:0 0 44px; }
+  .fin-arrow { position:absolute; right:14px; top:10px; font-size:24px; color:#0d2750; line-height:1; }
+  .fin-meta { display:flex; justify-content:space-between; align-items:center; gap:8px; margin-top:auto; padding-top:8px; flex-wrap:wrap; }
+  .fin-chip { font-size:13px; font-weight:700; color:#0d2750; background:#e8edf5; padding:5px 9px; border-radius:8px; }
+  .fin-btn { font-size:14px; font-weight:700; color:#fff; background:#f47c20; padding:9px 14px; border-radius:10px; cursor:pointer; text-align:center; }
+  .fin-btn.wide { display:block; }
+  .fin-btn.line { background:#fff; color:#f47c20; border:1.5px solid #f47c20; }
+  .fin-ftop { background:#0d2750; color:#fff; font-weight:700; font-size:14px; padding:9px 14px; text-align:center; }
+  .fin-forf-card.star .fin-ftop { background:#f47c20; }
+  .fin-forf-card.star { border:2px solid #f47c20; }
+  .fin-row .fin-ico { width:40px; height:40px; font-size:18px; flex:0 0 40px; }
+  .fin-sec > .ih-encours .fin-row { padding:12px 6px; }
+  .fin-sim .fin-result { background:#fff4ea; border-color:#ffd7b5; }
+  .fin-sim .fin-result b.big { color:#f47c20; }
+  .fin-sim > .ih-box { border-radius:0 0 14px 14px; border-top:0; }
+  .fin-tabs button { font-weight:700; }
+  .fin-tab-ico { display:inline-flex; margin-right:6px; vertical-align:-4px; color:#0d2750; }
+  .fin-tabs button:first-child .fin-tab-ico { color:#fff; }
+  .fin-tabs button:first-child { background:#f47c20; color:#fff; border-color:#f47c20; }
+  @media (max-width: 600px) { #financeHome .fin-hero { min-height:260px; } .fin-cbody h3 { font-size:16px; } }
+</style>
+</head>
+<body>
+<script src="exemple-commun.js"></script>
+<header class="top">
+  <div class="logo"><i></i> DIASPO'ACTIF</div>
+  <nav class="nav">
+    <a href="#">Accueil</a><a href="#">Annuaire</a><a href="#" class="on">Boutiques</a><a href="#">Fil d'actualité</a><a href="#">Formations</a><a href="#">Projets diasporas</a>
+  </nav>
+  <div class="sp"></div>
+  <div class="icons">
+    <button class="ico" aria-label="Rechercher">🔍</button>
+    <button class="ico" aria-label="Notifications">🔔</button>
+    <button class="ico" id="openCart" aria-label="Voir le panier">🛒</button>
+    <span class="acc">Mon compte</span>
+  </div>
+</header>
+
+<section class="hero">
+  <div>
+    <div class="ttl">
+      <div class="badge-shop">🛍</div>
+      <div>
+        <h1 id="heroTitle">Boutique <span>Traditionnelle</span></h1>
+      </div>
+    </div>
+    <div class="sub">Votre boutique en ligne, simple et efficace.</div>
+    <p class="desc">Produits, offres spéciales, promotions et vidéos de présentation pour mieux vous servir.</p>
+  </div>
+  <div class="art" aria-hidden="true"></div>
+</section>
+
+<div class="trust">
+  <div><span class="ti">🚚</span><span><b>Livraison</b>fiable</span></div>
+  <div><span class="ti">🛡</span><span><b>Paiement</b>sécurisé</span></div>
+  <div><span class="ti">↻</span><span><b>Retours</b>faciles</span></div>
+  <div><span class="ti">🎧</span><span><b>Support</b>client</span></div>
+  <div><span class="ti">★</span><span><b>Offres et</b>promotions</span></div>
+  <div><span class="ti">🎁</span><span><b>Campagnes</b>spéciales</span></div>
+</div>
+
+<div class="search">
+  <div class="field"><span>🔍</span><input id="q" type="search" placeholder="Rechercher un produit (ex : vêtements, cosmétique, livre...)" aria-label="Rechercher un produit"></div>
+  <select id="catSelect" aria-label="Catégorie"></select>
+  <button class="btn-cart" id="openCart2">Mon panier <span class="n" id="cartCount">0</span></button>
+</div>
+
+<div class="cats" id="cats"></div>
+
+<section class="block" id="videoBlock">
+  <div class="sh"><span class="ic">▶</span><div><h2>Vidéos promotionnelles</h2><p>Découvrez nos produits en vidéo (max. 57 s).</p></div>
+    <div class="r"><button class="pill">Voir toutes les vidéos →</button></div></div>
+  <div class="vids" id="vids"></div>
+</section>
+
+<section class="block" id="offerBlock">
+  <div class="sh"><span class="ic">🏷</span><div><h2>Offres promotionnelles</h2><p>Profitez de nos meilleures réductions pour une durée limitée.</p></div>
+    <div class="r">
+      <div class="countdown"><span>⚡ Fin de la promotion dans :</span><span class="t" id="cdD">02</span>j<span class="t" id="cdH">14</span>h<span class="t" id="cdM">36</span>min<span class="t" id="cdS">58</span>s</div>
+      <button class="pill">Voir toutes les offres →</button>
+    </div></div>
+  <div class="grid4" id="promoGrid"></div>
+</section>
+
+<section class="block" id="mainBlock">
+  <div class="sh"><span class="ic">🛒</span><div><h2 id="sectMain">Nos produits</h2><p>Découvrez toute notre sélection.</p></div>
+    <div class="r"><select class="sort" id="sort" aria-label="Trier">
+      <option value="recent">Trier par : Pertinence</option>
+      <option value="price-asc">Prix croissant</option>
+      <option value="price-desc">Prix décroissant</option>
+    </select></div></div>
+  <div class="grid4" id="grid"></div>
+  <div class="empty" id="empty" style="display:none">Aucun produit dans cette sélection.</div>
+</section>
+
+<p class="demo">Maquette : produits et vidéos fictifs. Le panier et la commande sont simulés, aucun paiement n'est effectué.</p>
+
+<!-- Fiche produit -->
+<div class="overlay" id="productOv" role="dialog" aria-modal="true">
+  <div class="sheet">
+    <button class="close" data-close aria-label="Fermer">×</button>
+    <div class="pv" id="pvImg"></div>
+    <h2 id="pTitle"></h2>
+    <div class="mut" id="pCat"></div>
+    <p id="pDesc"></p>
+    <div id="pPrice" style="margin:8px 0"></div>
+    <div id="pStock"></div>
+    <div class="row" style="margin-top:14px">
+      <div class="qty"><button data-pqty="-1" aria-label="Diminuer">−</button><span id="pQty">1</span><button data-pqty="1" aria-label="Augmenter">+</button></div>
+      <button class="btn-add" id="pAdd" style="flex:0 0 auto;padding:12px 18px">Ajouter au panier</button>
+    </div>
+  </div>
+</div>
+
+<!-- Panier -->
+<div class="overlay" id="cartOv" role="dialog" aria-modal="true">
+  <div class="sheet">
+    <button class="close" data-close aria-label="Fermer">×</button>
+    <h2>Votre panier</h2>
+    <div id="cartLines"></div>
+    <div class="total"><span>Total</span><span id="cartTotal">0,00 €</span></div>
+    <button class="btn-add" id="checkout" style="width:100%">Commander (maquette)</button>
+  </div>
+</div>
+
+<div class="ih" id="impactHome" hidden>
+  <header class="ih-top">
+    <div class="ih-logo"><i></i> <span id="shopLogo"></span></div>
+    <nav class="ih-nav"><a class="on" data-go="accueil">Accueil</a><a data-go="projets">Nos projets</a><a data-go="vision">Notre vision</a><a data-go="evenements">Événements</a><a data-go="rendez-vous">Rendez-vous</a><a data-go="partenariat">Partenariat</a></nav>
+    <div class="sp"></div>
+    <div class="ih-icons"><span>🔍</span><span>🔔</span><span>👤</span></div>
+    
+  </header>
+
+  
+  <div data-view="accueil">
+  <section class="ih-hero">
+    <div>
+      <p class="ih-kicker">Entreprendre, investir, agir ensemble</p>
+      <h1 id="shopH1"></h1>
+      <p id="shopSlogan"></p>
+      <div class="ih-btns"><span class="ih-btn-p" data-go="projets">Voir les projets →</span><span class="ih-btn-g" data-go="rendez-vous">Prendre rendez-vous</span><span class="ih-btn-g" data-go="vision">Notre vision</span></div>
+    </div>
+    <aside class="ih-stats" id="shopStats"></aside>
+  </section>
+
+  
+
+  <section class="ih-sec" aria-labelledby="hEnCours">
+    <div class="ih-sh"><h2 id="hEnCours">Nos projets en cours</h2><a data-go="projets">Tous les projets →</a></div>
+    <div class="ih-encours" id="encoursBox"></div>
+  </section>
+
+  <section class="ih-sec" aria-labelledby="hEv">
+    <div class="ih-sh"><h2 id="hEv">Événements</h2><a data-go="evenements">Tous les événements →</a></div>
+    <div class="ih-cards" id="evHome"></div>
+  </section>
+
+  <section class="ih-sec" aria-labelledby="hGal">
+    <div class="ih-sh"><h2 id="hGal">Galerie</h2><span class="ih-count">Photos et vidéos de nos projets</span></div>
+    <div class="ih-chips" id="galChips"></div>
+    <div class="ih-strip" id="galStrip"></div>
+  </section>
+
+  <section class="ih-sec" aria-labelledby="hNet">
+    <div class="ih-sh"><h2 id="hNet">Nos réseaux</h2></div>
+    <div class="ih-nets" id="netGrid"></div>
+  </section>
+
+  <div class="ih-main">
+    <section>
+      <div class="ih-sh"><h2>Nos projets</h2><a data-go="projets">Voir tous les projets →</a></div>
+      <div class="ih-cards" id="homeCards"></div>
+    </section>
+    <aside class="ih-side">
+      <div class="ih-box">
+        <h3>📅 Demander un rendez-vous</h3>
+        <p>Échangez avec notre équipe pour présenter votre projet ou votre initiative.</p>
+        <span class="ih-outline" data-go="rendez-vous">Prendre rendez-vous →</span>
+      </div>
+      <div class="ih-box">
+        <h3>🤝 Devenir partenaire</h3>
+        <p>Entreprises, organisations, institutions : construisons des projets d'impact ensemble.</p>
+        <span class="ih-outline" data-go="partenariat">Demander un partenariat →</span>
+      </div>
+    </aside>
+  </div>
+
+  <section class="ih-bottom"><div class="lead"><span style="font-size:30px">🤝</span><div><b id="shopBottomT"></b><span>Contribuez, rejoignez l'équipe ou devenez partenaire.</span></div></div><span class="ih-btn-p" data-go="partenariat">Devenir partenaire →</span></section>
+  
+  </div>
+
+  <!-- VUE : notre vision -->
+  <div data-view="vision" hidden class="ih-page ih-narrow">
+    <h2 class="ih-h2">Notre vision</h2>
+    <p class="ih-mut">Ce qui guide chacun de nos projets.</p>
+    <div class="ih-media" style="background-image:url('impact-img/hero.jpg');height:240px;border-radius:16px;margin-bottom:14px"></div>
+    <div class="ih-vision">
+      <blockquote>Des projets utiles pour nos communautés, financés ensemble et suivis avec transparence.</blockquote>
+      <p>Nous réunissons des citoyens, des entreprises et des institutions autour de projets à impact social, économique et environnemental, en Afrique et dans la diaspora.</p>
+      <div class="ih-vals">
+        <div><b>Impact mesurable</b><span>Chaque projet fixe des objectifs clairs et publie ses résultats.</span></div>
+        <div><b>Transparence</b><span>Les contributions et l'avancement sont visibles dans la fiche de chaque projet.</span></div>
+        <div><b>Solidarité</b><span>Les personnes qui vivent au pays et celles de la diaspora agissent ensemble.</span></div>
+      </div>
+      <span class="ih-btn-p" data-go="projets" style="justify-self:start">Découvrir les projets →</span>
+    </div>
+  </div>
+
+  <!-- VUE : liste des événements -->
+  <div data-view="evenements" hidden class="ih-page">
+    <div class="ih-sh"><h2>Nos événements</h2><span class="ih-count">Rapports, photos et vidéos</span></div>
+    <div class="ih-chips" id="evChips"></div>
+    <div class="ih-cards" id="evList"></div>
+  </div>
+
+  <!-- VUE : fiche événement -->
+  <div data-view="evenement" hidden class="ih-page ih-narrow" id="evBox"></div>
+
+  <!-- VUE : liste des projets -->
+  <div data-view="projets" hidden class="ih-page">
+    <div class="ih-sh"><h2>Tous les projets</h2><span class="ih-count" id="ipCount"></span></div>
+    <div class="ih-filters">
+      <label>Domaine d'impact<select id="fDom"><option value="">Tous les domaines</option><option>Environnement</option><option>Éducation</option><option>Économie locale</option><option>Santé</option></select></label>
+      <label>Pays<select id="fPays"><option value="">Tous les pays</option><option>Côte d'Ivoire</option><option>Sénégal</option><option>Bénin</option></select></label>
+      <label>Statut<select id="fStat"><option value="">Tous</option><option>Financé</option><option>En cours</option></select></label>
+    </div>
+    <div class="ih-box" style="margin:0 0 16px"><b>Vous avez un projet à déposer ?</b><p>Les projets sont reçus, qualifiés et orientés par Diaspo'Actif. Ce bouton est le point de dépôt officiel.</p><span class="ih-btn-p" data-depot="projets" style="justify-self:start">Déposer à Diaspo'Actif →</span></div>
+    <div class="ih-cards" id="listGrid"></div>
+  </div>
+
+  <!-- VUE : fiche projet -->
+  <div data-view="fiche" hidden class="ih-page" id="ficheBox"></div>
+
+  <!-- VUE : demande de rendez-vous -->
+  <div data-view="rendez-vous" hidden class="ih-page ih-narrow">
+    <h2 class="ih-h2">Demander un rendez-vous</h2>
+    <p class="ih-mut">Planifiez un échange avec l'équipe Diaspo'Actif.</p>
+    <form class="ih-box" id="rdvForm">
+      <p class="ih-mut" style="margin:0">Pour soumettre un projet, utilisez <b>Déposer à Diaspo'Actif</b> : c'est le seul point de dépôt officiel.</p>
+      <label>Objet du rendez-vous *<select name="motif" required><option value="">Choisir un motif</option><option>Découvrir la boutique</option><option>Rejoindre un projet existant</option><option>Question sur le financement</option></select></label>
+      <label>Date souhaitée *<input name="date" type="date" required></label>
+      <fieldset class="ih-radio"><legend>Mode *</legend><label><input type="radio" name="mode" value="Visio" checked> Visio</label><label><input type="radio" name="mode" value="Présentiel"> Présentiel</label><label><input type="radio" name="mode" value="Téléphone"> Téléphone</label></fieldset>
+      <button class="ih-btn-p" type="submit">Demander le rendez-vous</button>
+    </form>
+  </div>
+
+  <!-- VUE : devenir partenaire -->
+  <div data-view="partenariat" hidden class="ih-page ih-narrow">
+    <h2 class="ih-h2">Devenir partenaire</h2>
+    <p class="ih-mut">Rejoignez notre réseau et co-développons des projets à impact.</p>
+    <form class="ih-box" id="partForm">
+      <label>Type de partenaire *<select name="type" required><option value="">Choisir</option><option>Entreprise</option><option>Institution</option><option>ONG</option><option>Autre</option></select></label>
+      <label>Votre message *<textarea name="message" required placeholder="Décrivez votre intérêt et votre proposition…"></textarea></label>
+      <p class="ih-mut" style="margin:0">Un projet à étudier, financer ou accompagner ne se dépose pas ici : <b>Déposer à Diaspo'Actif</b>.</p>
+      <button class="ih-btn-p" type="submit">Envoyer la demande</button>
+    </form>
+  </div>
+
+  <p class="demo" style="margin:0 22px 24px;color:#5b6679;font-size:12px">Maquette : projets fictifs. Les paiements et envois sont simulés ; rien n'est transmis.</p>
+</div>
+
+  <div class="ih-lb" id="lb" hidden>
+    <div class="ih-lb-box" role="dialog" aria-modal="true">
+      <div class="ih-media" id="lbMedia"></div>
+      <div class="ih-cap"><b id="lbT"></b><span id="lbA"></span></div>
+      <button class="ih-outline-btn" id="lbClose" type="button">Fermer</button>
+    </div>
+  </div>
+
+<div class="ih" id="financeHome" hidden>
+  <header class="ih-top">
+    <div class="ih-logo"><i></i> <span id="finLogo"></span></div>
+    <nav class="ih-nav"><a data-scroll="fin-fin">Financements</a><a data-scroll="fin-cred">Crédits</a><a data-scroll="fin-ass">Assurances</a><a data-scroll="fin-prog">Programmes</a><a data-scroll="fin-forf">Forfaits</a><a data-scroll="fin-impact">Projets d'impact</a><a data-scroll="fin-news">Actualités</a></nav>
+    <div class="sp"></div>
+    <div class="ih-icons"><span><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-5-5"/></svg></span><span><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 16v-5a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 21h4"/></svg></span><span><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg></span></div>
+  </header>
+
+  <section class="ih-hero fin-hero">
+    <div>
+      <p class="ih-kicker">Financer, assurer, accompagner</p>
+      <h1 id="finH1"></h1>
+      <p id="finSlogan"></p>
+      <div class="ih-btns"><span class="ih-btn-p" data-depot="hero">Demander un financement →</span><span class="ih-btn-g" data-scroll="fin-contact">Nous contacter</span></div>
+    </div>
+    <aside class="ih-stats" id="finStats"></aside>
+  </section>
+
+  <nav class="fin-tabs" aria-label="Rubriques">
+    <button data-scroll="fin-fin"><span class="fin-tab-ico"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10h18"/><path d="M5 10v8M9 10v8M15 10v8M19 10v8"/><path d="M2 20h20"/><path d="M12 4l9 5H3z"/></svg></span>Financements</button>
+    <button data-scroll="fin-cred"><span class="fin-tab-ico"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="6.5" rx="7" ry="3"/><path d="M5 6.5v5c0 1.7 3.1 3 7 3s7-1.3 7-3v-5"/><path d="M5 11.5v5c0 1.7 3.1 3 7 3s7-1.3 7-3v-5"/></svg></span>Crédits</button>
+    <button data-scroll="fin-ass"><span class="fin-tab-ico"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-4.2-7-10V5l7-2 7 2v6c0 5.8-7 10-7 10z"/><path d="M9 11.5l2 2 4-4"/></svg></span>Assurances</button>
+    <button data-scroll="fin-inv"><span class="fin-tab-ico"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg></span>Investissements</button>
+    <button data-scroll="fin-prog"><span class="fin-tab-ico"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11.2V16c0 1.5 2.7 3 6 3s6-1.5 6-3v-4.8"/></svg></span>Programmes</button>
+    <button data-scroll="fin-forf"><span class="fin-tab-ico"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7.5L12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5L12 12l9-4.5"/><path d="M12 12v9"/></svg></span>Forfaits &amp; Offres</button>
+    <button data-scroll="fin-impact"><span class="fin-tab-ico"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21v-9"/><path d="M12 12c0-4-3-7-8-7 0 4 3 7 8 7z"/><path d="M12 14c0-3 2-6 7-6 0 4-2 6-7 6z"/></svg></span>Projets d'impact</button>
+    <button data-scroll="fin-news"><span class="fin-tab-ico"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 8h10M7 12h10M7 16h6"/></svg></span>Actualités &amp; Conseils</button>
+  </nav>
+
+  <section class="ih-sec fin-sec" id="fin-fin"><div class="fin-head"><h2>Financements</h2><span class="ih-count">Solutions de financement pour entreprises, projets et associations</span></div><div class="fin-grid3" id="finFin"></div></section>
+  <section class="ih-sec fin-sec" id="fin-cred"><div class="fin-head"><h2>Crédits</h2><span class="ih-count">Crédit entreprise, équipement et mobilité</span></div><div class="fin-grid3" id="finCred"></div></section>
+  <section class="ih-sec fin-sec" id="fin-ass"><div class="fin-head"><h2>Assurances</h2><span class="ih-count">Santé, biens, voyage</span></div><div class="fin-grid3" id="finAss"></div></section>
+  <section class="ih-sec fin-sec" id="fin-inv"><div class="fin-head"><h2>Investissements</h2></div>
+    <div class="ih-box"><h3>Opportunités d'investissement</h3><p>Fonds, prises de participation, co-investissement et projets structurés. Un dossier d'investissement se présente par prise de contact.</p><span class="ih-outline" data-scroll="fin-contact" style="justify-self:start">Prendre contact →</span></div>
+  </section>
+  <section class="ih-sec fin-sec" id="fin-prog"><div class="fin-head"><h2>Programmes d'accompagnement</h2></div><div class="ih-encours" id="finProg"></div></section>
+  <section class="ih-sec fin-sec" id="fin-forf"><div class="fin-head"><h2>Forfaits &amp; Offres</h2><span class="ih-count">Souscription en ligne</span></div><div class="fin-grid3 fin-forf" id="finForf"></div></section>
+
+  <section class="ih-sec fin-sec" id="fin-sim"><div class="fin-head"><h2>Simulateur de financement</h2><span class="ih-count">Estimation indicative</span></div>
+    <div class="fin-sim">
+      <div class="ih-box">
+        <label>Montant souhaité (€)<input id="sAmt" type="number" min="1000" step="1000" value="50000"></label>
+        <label>Durée (mois)<select id="sDur"><option value="12">12 mois</option><option value="24">24 mois</option><option value="36">36 mois</option><option value="60" selected>60 mois</option><option value="120">120 mois</option></select></label>
+        <label>Type de projet<select id="sType"><option>Particulier</option><option selected>Entreprise</option><option>Association</option><option>Projet d'impact</option></select></label>
+        <p class="ih-mut" style="margin:0;font-size:13px">Taux indicatif de 6,5 % par an. Estimation non contractuelle.</p>
+      </div>
+      <div class="fin-result">
+        <span>Mensualité estimée</span>
+        <b class="big" id="sRes">—</b>
+        <small id="sDetail"></small>
+        <span class="ih-btn-p" data-depot="simulateur" style="justify-self:start;margin-top:6px">Demander ce financement →</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="ih-sec fin-sec" id="fin-impact"><div class="fin-head"><h2>Projets d'impact</h2><span class="ih-count">Résultats déclarés ou vérifiés</span></div>
+    <p class="ih-mut" style="margin:0 0 12px">Résultats <b>déclarés</b> : fournis par le porteur. Résultats <b>vérifiés</b> : contrôlés par Diaspo'Actif.</p>
+    <div class="fin-grid3" id="finProj"></div>
+    <div class="ih-box" style="margin-top:14px"><b>Vous avez un projet à soumettre ?</b><p>Les projets se déposent uniquement via Diaspo'Actif, qui les qualifie avant toute orientation.</p><span class="ih-btn-p" data-depot="impact" style="justify-self:start">Déposer à Diaspo'Actif →</span></div>
+  </section>
+
+  <section class="ih-sec fin-sec" id="fin-news"><div class="fin-head"><h2>Actualités &amp; Conseils</h2></div>
+    <div class="fin-grid3">
+      <article class="ih-card"><div class="ih-body"><h3>Préparer son plan de financement</h3><p class="ih-mut" style="margin:0;font-size:14px">Les étapes pour chiffrer un besoin et présenter un dossier clair.</p></div></article>
+      <article class="ih-card"><div class="ih-body"><h3>Webinaire : accéder au crédit</h3><p class="ih-mut" style="margin:0;font-size:14px">Questions et réponses sur les conditions de crédit pour les PME.</p></div></article>
+      <article class="ih-card"><div class="ih-body"><h3>Assurance et expatriation</h3><p class="ih-mut" style="margin:0;font-size:14px">Ce qu'il faut couvrir avant un départ à l'étranger.</p></div></article>
+    </div>
+  </section>
+
+  <section class="fin-band" id="fin-contact">
+    <h2>Restons en contact</h2>
+    <div class="fin-grid3" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">
+      <form class="ih-box" id="finNews">
+        <h3><span class="fin-h3-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg></span> Newsletter</h3>
+        <p>Nouveaux programmes, appels et offres.</p>
+        <input type="email" required placeholder="Votre adresse e-mail">
+        <button class="ih-btn-p" type="submit">S'inscrire</button>
+      </form>
+      <form class="ih-box" id="finRdv">
+        <h3><span class="fin-h3-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></span> Demande de rendez-vous</h3>
+        <select name="motif" required><option value="">Choisir un motif</option><option>Renseignements sur mes services</option><option>Devis d'assurance</option><option>Inscription à un programme de formation</option><option>Question sur un produit bancaire courant</option></select>
+        <input name="date" type="date" required>
+        <p class="ih-mut" style="margin:0;font-size:13px">Pour financer un projet : <b>Déposer à Diaspo'Actif</b>.</p>
+        <button class="ih-btn-p" type="submit">Demander le rendez-vous</button>
+      </form>
+      <form class="ih-box" id="finPart">
+        <h3><span class="fin-h3-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2 20c1-3.5 3.5-5 7-5s6 1.5 7 5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8"/><path d="M22 20c-.5-2.5-2-4-4-4.6"/></svg></span> Partenariat institutionnel</h3>
+        <select name="type" required><option value="">Type de partenaire</option><option>Institution</option><option>Entreprise</option><option>ONG</option><option>Autre</option></select>
+        <textarea name="message" required placeholder="Votre proposition de collaboration…"></textarea>
+        <button class="ih-btn-p" type="submit">Envoyer la demande</button>
+      </form>
+      <div class="ih-box">
+        <h3><span class="fin-h3-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></svg></span> Contactez-nous</h3>
+        <p>Canaux de contact : coordonnées à renseigner par l'organisme.</p>
+        <div class="fin-contact-btn"><span data-toastf="WhatsApp">WhatsApp</span><span data-toastf="Téléphone">Téléphone</span><span data-toastf="E-mail">E-mail</span><span data-toastf="Chat">Chat</span></div>
+      </div>
+    </div>
+  </section>
+
+  <p class="demo" style="margin:24px 22px;color:#5b6679;font-size:12px">Maquette : programmes, montants et projets fictifs. Les envois et souscriptions sont simulés ; rien n'est transmis ni payé.</p>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  // Configuration : lue dans le même objet que le moteur (moteur-boutique.html)
+  const SHOP_DEFAULT = {
+    main: "ecom", options: [], name: "Diaspo'Actif", slogan: "Produits artisanaux et accessoires de la diaspora.",
+    colors: ["#e7b84b", "#0a1430", "#f3d27a"], textures: ["uni", "uni", "uni"],
+    sections: ["Nos produits", "Nouveautés", "Promotions"], hiddenSections: []
+  };
+  const SHOP = (() => {
+    try { return Object.assign({}, SHOP_DEFAULT, JSON.parse(localStorage.getItem("shopConfig")) || {}); }
+    catch (e) { return SHOP_DEFAULT; }
+  })();
+
+  // Produits et vidéos de démonstration (fictifs)
+  const PRODUCTS = [
+    { id: 1, t: "Bissap artisanal 50 cl", cat: "alim", price: 5.9, stock: 24, c: "#7a1a2a", desc: "Boisson à l'hibiscus, sans conservateur, préparée en petite série.", isNew: true },
+    { id: 2, t: "Infusion gingembre", cat: "alim", price: 4.5, stock: 12, c: "#8a5a1a", desc: "Infusion au gingembre frais, à servir chaude ou glacée.", isNew: true },
+    { id: 3, t: "Carafe en verre artisanale", cat: "maison", price: 18, old: 22, stock: 3, c: "#2c3e63", desc: "Carafe soufflée à la main, contenance 1 litre.", promo: true },
+    { id: 4, t: "Kit bien-être hibiscus", cat: "beaute", price: 14.9, stock: 0, c: "#5c1220", desc: "Infusion, guide et petit accessoire pour un moment de détente." },
+    { id: 5, t: "Bissap en bouteille 1 L", cat: "alim", price: 8.9, old: 9.9, stock: 15, c: "#4a0f1a", desc: "Format familial, idéal pour les réceptions.", promo: true },
+    { id: 6, t: "Coffret dégustation", cat: "art", price: 24, stock: 6, c: "#1f6b55", desc: "Quatre boissons en format découverte.", isNew: true },
+    { id: 7, t: "T-shirt Diaspora Africa", cat: "mode", price: 19, old: 25, stock: 8, c: "#0f1f3d", desc: "T-shirt en coton, motif Afrique aux couleurs de la diaspora.", promo: true },
+    { id: 8, t: "Livre : Entreprendre en Afrique", cat: "livres", price: 15, old: 18, stock: 5, c: "#1d3a6b", desc: "Guide pratique pour entreprendre en Afrique.", promo: true }
+  ];
+  const CATS = [
+    { id: "all", label: "Toutes catégories", icon: "▦" },
+    { id: "mode", label: "Mode & Accessoires", icon: "👗" },
+    { id: "beaute", label: "Beauté & Bien-être", icon: "🧴" },
+    { id: "alim", label: "Alimentation & Terroir", icon: "🌶" },
+    { id: "maison", label: "Maison & Décoration", icon: "🏠" },
+    { id: "elec", label: "Électronique & Multimédia", icon: "🎧" },
+    { id: "livres", label: "Livres & Formation", icon: "📚" },
+    { id: "art", label: "Art & Artisanat", icon: "🗿" },
+    { id: "autres", label: "Autres produits", icon: "•••" }
+  ];
+  const CAT_LABEL = Object.fromEntries(CATS.map(c => [c.id, c.label]));
+  const VIDEOS = [
+    { t: "Beurre de karité 100 % naturel", dur: "0:45", likes: 245, hearts: 78, comments: 24, c: "linear-gradient(135deg,#8a5a1a,#3b2a10)" },
+    { t: "Nouvelle collection africaine", dur: "0:52", likes: 513, hearts: 126, comments: 37, c: "linear-gradient(135deg,#b4451f,#1d3b7a)" },
+    { t: "Café d'Afrique – Édition spéciale", dur: "0:40", likes: 287, hearts: 92, comments: 18, c: "linear-gradient(135deg,#5b3a1f,#1a1410)" },
+    { t: "Promo high-tech de la semaine", dur: "0:57", likes: 402, hearts: 118, comments: 29, c: "linear-gradient(135deg,#1b4f8a,#0a1430)" }
+  ];
+
+  const state = { cat: "all", q: "", sort: "recent", cart: new Map(), current: null, pqty: 1 };
+  const $ = (s) => document.querySelector(s);
+  const fmt = (n) => n.toFixed(2).replace(".", ",") + " €";
+  function toast(m) { const t = $("#toast"); t.textContent = m; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 2200); }
+
+  // Application de la configuration (couleurs). Le visuel nuit bleu doré est conservé.
+  (function applyShop() {
+    const r = document.documentElement.style;
+    r.setProperty("--c1", SHOP.colors[0]); r.setProperty("--c2", SHOP.colors[1]); r.setProperty("--c3", SHOP.colors[2]);
+    document.title = "Boutique Traditionnelle · " + SHOP.name;
+    $("#sectMain").textContent = SHOP.sections[0] || "Nos produits";
+    const ecomOn = SHOP.main === "ecom" || SHOP.options.includes("ecom");
+    if (!ecomOn && SHOP.main !== "impact" && SHOP.main !== "finance") { const n = document.createElement("p"); n.className = "note"; n.style.margin = "16px 18px 0"; n.textContent = "La vente de produits n'est pas active dans cette boutique. Les produits restent conservés dans le bonus boutique."; $("#videoBlock").before(n); }
+  })();
+
+  function stockLabel(p) {
+    if (p.stock === 0) return `<span class="stock none">Rupture de stock</span>`;
+    if (p.stock <= 3) return `<span class="stock low">Plus que ${p.stock} en stock</span>`;
+    return `<span class="stock">En stock</span>`;
+  }
+  function pct(p) { return p.old ? Math.round((1 - p.price / p.old) * 100) : 0; }
+  function ratingOf(p) { return (4.5 + (p.id % 5) / 10).toFixed(1).replace(".", ","); }
+  function countOf(p) { return 60 + p.id * 17; }
+  // Prix : prix barré + nouveau prix affiché, comme dans la maquette validée
+  function pricesHtml(p) {
+    return p.old ? `<s>${fmt(p.old)}</s><span class="now">${fmt(p.price)}</span>` : `<span class="solo">${fmt(p.price)}</span>`;
+  }
+
+  function list() {
+    let l = PRODUCTS.filter(p => (state.cat === "all" || p.cat === state.cat) && p.t.toLowerCase().includes(state.q.toLowerCase()));
+    if (state.sort === "price-asc") l = [...l].sort((a, b) => a.price - b.price);
+    if (state.sort === "price-desc") l = [...l].sort((a, b) => b.price - a.price);
+    return l;
+  }
+  function card(p) {
+    const inCart = state.cart.get(p.id) || 0;
+    const avail = p.stock > 0;
+    const badge = p.old ? `<span class="pct">-${pct(p)}%</span>` : (p.isNew ? `<span class="new">Nouveau</span>` : "");
+    return `<article class="card">
+      <div class="media" style="--c:${p.c}" data-open="${p.id}" role="button" aria-label="Voir ${p.t}">
+        ${badge}
+        <button class="heart" aria-label="Ajouter aux favoris" onclick="event.stopPropagation()">♡</button>
+        ${avail ? "" : `<span class="out">Épuisé</span>`}
+      </div>
+      <div class="body">
+        <div class="name">${p.t}</div>
+        <div class="stars"><b>★ ${ratingOf(p)}</b> (${countOf(p)})</div>
+        <div class="prices">${pricesHtml(p)}</div>
+        <div>${stockLabel(p)}</div>
+        <div class="foot">
+          <button class="btn-add" data-add="${p.id}" ${avail ? "" : "disabled"}>${avail ? (inCart ? `Dans le panier (${inCart})` : "Ajouter au panier") : "Indisponible"}</button>
+        </div>
+      </div>
+    </article>`;
+  }
+  function renderCats() {
+    $("#cats").innerHTML = CATS.map(c => `<button class="cat-tile ${state.cat === c.id ? "on" : ""}" data-cat="${c.id}"><span class="ci">${c.icon}</span>${c.label}</button>`).join("");
+    $("#catSelect").innerHTML = CATS.map(c => `<option value="${c.id}" ${state.cat === c.id ? "selected" : ""}>${c.label}</option>`).join("");
+  }
+  function renderVideos() {
+    $("#vids").innerHTML = VIDEOS.map(v => `<article class="vid">
+      <div class="vm" style="background:${v.c}"><span class="play">▶</span><span class="dur">${v.dur}</span></div>
+      <div class="vb"><h3>${v.t}</h3><div class="st"><span>👍 ${v.likes}</span><span>❤ ${v.hearts}</span><span>💬 ${v.comments}</span></div></div>
+    </article>`).join("");
+  }
+  function render() {
+    renderCats();
+    const l = list();
+    $("#grid").innerHTML = l.map(card).join("");
+    $("#empty").style.display = l.length ? "none" : "";
+    $("#promoGrid").innerHTML = PRODUCTS.filter(p => p.promo).map(card).join("");
+    const n = [...state.cart.values()].reduce((a, b) => a + b, 0);
+    $("#cartCount").textContent = n;
+  }
+
+  function addToCart(id, qty = 1) {
+    const p = PRODUCTS.find(x => x.id === id);
+    if (p.stock <= 0) { toast("Produit indisponible"); return; }
+    const have = state.cart.get(id) || 0;
+    if (have + qty > p.stock) { toast(`Stock limité : ${p.stock} maximum`); return; }
+    state.cart.set(id, have + qty);
+    toast(`« ${p.t} » ajouté au panier`);
+    render();
+  }
+  function openProduct(id) {
+    const p = PRODUCTS.find(x => x.id === id);
+    state.current = p; state.pqty = 1;
+    $("#pvImg").style.background = `linear-gradient(135deg, ${p.c}, #0b1330)`;
+    $("#pTitle").textContent = p.t;
+    $("#pCat").textContent = CAT_LABEL[p.cat];
+    $("#pDesc").textContent = p.desc;
+    $("#pPrice").innerHTML = pricesHtml(p);
+    $("#pStock").innerHTML = stockLabel(p);
+    $("#pQty").textContent = 1;
+    $("#pAdd").disabled = p.stock <= 0;
+    $("#pAdd").textContent = p.stock > 0 ? "Ajouter au panier" : "Indisponible";
+    $("#productOv").classList.add("open");
+  }
+  function renderCart() {
+    const lines = [...state.cart.entries()].map(([id, q]) => ({ p: PRODUCTS.find(x => x.id === id), q }));
+    $("#cartLines").innerHTML = lines.length ? lines.map(({ p, q }) => `
+      <div class="line"><div class="sw" style="background:linear-gradient(135deg,${p.c},#0b1330)"></div>
+        <div class="info"><strong>${p.t}</strong><div class="mut">${fmt(p.price)} × ${q}</div></div>
+        <div class="qty"><button data-cq="-1:${p.id}" aria-label="Diminuer">−</button><span>${q}</span><button data-cq="1:${p.id}" aria-label="Augmenter">+</button></div>
+        <button class="qty" style="padding:8px 12px;background:var(--navy3);color:var(--txt);cursor:pointer" data-rm="${p.id}" aria-label="Retirer">×</button>
+      </div>`).join("") : `<p class="empty">Votre panier est vide.</p>`;
+    const total = lines.reduce((s, { p, q }) => s + p.price * q, 0);
+    $("#cartTotal").textContent = fmt(total);
+    $("#checkout").disabled = !lines.length;
+  }
+
+  // Compte à rebours de la promotion (maquette)
+  const END = Date.now() + ((2 * 24 + 14) * 3600 + 36 * 60 + 58) * 1000;
+  function tick() {
+    let s = Math.max(0, Math.floor((END - Date.now()) / 1000));
+    const d = Math.floor(s / 86400); s -= d * 86400;
+    const h = Math.floor(s / 3600); s -= h * 3600;
+    const m = Math.floor(s / 60); s -= m * 60;
+    $("#cdD").textContent = String(d).padStart(2, "0"); $("#cdH").textContent = String(h).padStart(2, "0");
+    $("#cdM").textContent = String(m).padStart(2, "0"); $("#cdS").textContent = String(s).padStart(2, "0");
+  }
+  tick(); setInterval(tick, 1000);
+
+  // Événements
+  document.addEventListener("click", e => {
+    const t = e.target;
+    const cat = t.closest("[data-cat]"); if (cat) { state.cat = cat.dataset.cat; render(); return; }
+    const add = t.closest("[data-add]"); if (add) { addToCart(Number(add.dataset.add)); return; }
+    const open = t.closest("[data-open]"); if (open) { openProduct(Number(open.dataset.open)); return; }
+    if (t.closest("[data-close]") || t.classList.contains("overlay")) { t.closest(".overlay")?.classList.remove("open"); return; }
+    const pq = t.closest("[data-pqty]");
+    if (pq) { const p = state.current; state.pqty = Math.max(1, Math.min(p.stock || 1, state.pqty + Number(pq.dataset.pqty))); $("#pQty").textContent = state.pqty; return; }
+    if (t.closest("#pAdd")) { addToCart(state.current.id, state.pqty); $("#productOv").classList.remove("open"); return; }
+    if (t.closest("#openCart") || t.closest("#openCart2")) { renderCart(); $("#cartOv").classList.add("open"); return; }
+    const cq = t.closest("[data-cq]");
+    if (cq) {
+      const [d, id] = cq.dataset.cq.split(":").map(Number), p = PRODUCTS.find(x => x.id === id);
+      const next = (state.cart.get(id) || 0) + d;
+      if (next <= 0) state.cart.delete(id); else if (next <= p.stock) state.cart.set(id, next); else toast(`Stock limité : ${p.stock} maximum`);
+      renderCart(); render(); return;
+    }
+    const rm = t.closest("[data-rm]"); if (rm) { state.cart.delete(Number(rm.dataset.rm)); renderCart(); render(); return; }
+    if (t.closest("#checkout")) {
+      const n = [...state.cart.values()].reduce((a, b) => a + b, 0);
+      state.cart.clear(); renderCart(); render();
+      $("#cartOv").classList.remove("open");
+      toast(`Commande simulée : ${n} article(s). Aucun paiement réel.`);
+      return;
+    }
+  });
+  $("#q").addEventListener("input", e => { state.q = e.target.value; render(); });
+  $("#sort").addEventListener("change", e => { state.sort = e.target.value; render(); });
+  $("#catSelect").addEventListener("change", e => { state.cat = e.target.value; render(); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape") document.querySelectorAll(".overlay.open").forEach(o => o.classList.remove("open")); });
+
+  renderVideos();
+  render();
+
+// ---- Projets d'impact : routage des vues (même moteur commun, choisi par shopConfig.main) ----
+(function impactView() {
+  if (SHOP.main !== "impact") return;
+  ["#hero", ".hero", ".top", ".trust", ".search", ".cats", "#videoBlock", "#offerBlock", "#mainBlock", "#openCart", "#openCart2"].forEach(sel =>
+    document.querySelectorAll(sel).forEach(el => { el.hidden = true; }));
+  document.body.classList.add("impact-mode");
+  document.title = (SHOP.name && SHOP.name !== "Diaspo'Actif" ? SHOP.name : "Impact Plus");
+  document.getElementById("impactHome").hidden = false;
+
+  const IP = [
+    { id: 1, t: "Énergie solaire pour un centre de santé communautaire", dom: "Environnement", pays: "Côte d'Ivoire", goal: 20000, raised: 20000, ben: 3800, end: "Terminé", statut: "Financé", tag: "🌿 Environnement", color: "#1e9b4c", img: "impact-img/solaire-fiche.jpg", desc: "Équiper un centre de santé en énergie solaire pour garantir la continuité des soins et améliorer l'accès aux services de santé pour la communauté.", objectifs: "Installer un système solaire, former le personnel du centre et assurer la maintenance locale.", porteur: "Santé Solidaire CI · Initiative locale", impact: "Plus de 3 800 personnes ont désormais accès à des soins éclairés par l'énergie solaire, même pendant les coupures.", docs: ["Plan du projet (PDF)", "Devis du matériel (PDF)", "Rapport d'avancement (PDF)"], news: ["Installation des premiers panneaux réalisée.", "Formation de deux techniciens locaux terminée."] },
+    { id: 2, t: "Une bibliothèque numérique pour 10 écoles rurales", dom: "Éducation", pays: "Sénégal", goal: 20000, raised: 14400, ben: 1250, end: "22 janv. 2027", statut: "En cours", tag: "🎓 Éducation", color: "#2563eb", img: "impact-img/card-ecole.jpg", desc: "Doter dix écoles rurales d'une bibliothèque numérique, avec tablettes, contenus scolaires et formation des enseignants.", objectifs: "Équiper 10 écoles, former 30 enseignants et rendre 1 250 élèves autonomes dans la lecture numérique.", porteur: "Éducation Rurale SN · Association locale", impact: "1 250 élèves ont déjà accès à des livres numériques dans leur école.", docs: ["Programme de formation (PDF)", "Budget détaillé (PDF)"], news: ["Trois écoles sont équipées.", "Quinze enseignants formés en mars."] },
+    { id: 3, t: "Autonomisation des femmes par la couture et l'entrepreneuriat", dom: "Économie locale", pays: "Bénin", goal: 10000, raised: 4500, ben: 50, end: "12 mars 2027", statut: "En cours", tag: "📊 Économie", color: "#7c3aed", img: "impact-img/card-couture.jpg", desc: "Former des couturières à la gestion d'un atelier et à la vente, avec l'achat de machines à coudre.", objectifs: "Former 50 femmes, acheter 10 machines et accompagner la création de 10 ateliers.", porteur: "Couture & Avenir BJ · Coopérative", impact: "Cinquante femmes sont formées, et les premières ateliers sont en activité.", docs: ["Plan de formation (PDF)", "Bilan des premières ventes (PDF)"], news: ["Première session de couture terminée.", "Dix machines à coudre achetées."] }
+  ];
+  const eur = n => n.toLocaleString("fr-FR", { maximumFractionDigits: 2 }) + " €";
+  const pctOf = p => Math.min(100, Math.round(p.raised / p.goal * 100));
+  const $i = s => document.querySelector(s);
+  const toastI = m => { try { toast(m); } catch (e) {} };
+
+  const VIEWS = ["accueil", "projets", "fiche", "vision", "evenements", "rendez-vous", "partenariat"];
+  function show(name) {
+    document.querySelectorAll("[data-view]").forEach(v => { v.hidden = v.dataset.view !== name; });
+    window.scrollTo(0, 0);
+  }
+  function route() {
+    const h = (location.hash || "#accueil").slice(1);
+    if (h.startsWith("projet-")) { openFiche(Number(h.slice(7))); return; }
+    if (h.startsWith("evenement-")) { openEv(Number(h.slice(10))); return; }
+    if (h === "projets") renderList();
+    show(VIEWS.includes(h) ? h : "accueil");
+  }
+  window.addEventListener("hashchange", route);
+
+
+  // ----- vitrine de la structure : nom, projets et statistiques venus des paramètres -----
+  const SHOP_NAME = (SHOP.name && SHOP.name !== "Diaspo'Actif") ? SHOP.name : "Impact Plus";
+  IP.forEach(p => { p.porteur = SHOP_NAME + " · Porteur de projet"; });
+  $i("#shopLogo").textContent = SHOP_NAME;
+  $i("#shopH1").innerHTML = SHOP_NAME + " <span>· projets d'impact</span>";
+  $i("#shopSlogan").textContent = (SHOP.slogan && SHOP.slogan !== "Produits artisanaux et accessoires de la diaspora.") ? SHOP.slogan : "Des projets utiles pour notre communauté, financés ensemble.";
+  $i("#shopBottomT").textContent = "Soutenez les projets de " + SHOP_NAME;
+  const totRaised = IP.reduce((s, p) => s + p.raised, 0), totBen = IP.reduce((s, p) => s + p.ben, 0);
+  $i("#shopStats").innerHTML = [
+    ["📁", IP.length, "Projets"],
+    ["💶", eur(totRaised), "Collectés"],
+    ["👥", totBen.toLocaleString("fr-FR"), "Bénéficiaires"],
+    ["✓", IP.filter(p => p.statut === "Financé").length, "Projets financés"]
+  ].map(([i, v, l]) => `<div class="ih-stat"><span class="ico">${i}</span><div><b>${v}</b><span>${l}</span></div></div>`).join("");
+  $i("#homeCards").innerHTML = IP.map(cardHtml).join("");
+
+  // ----- liste -----
+  function renderList() {
+    const dom = $i("#fDom").value, pays = $i("#fPays").value, stat = $i("#fStat").value;
+    const l = IP.filter(p => (!dom || p.dom === dom) && (!pays || p.pays === pays) && (!stat || p.statut === stat));
+    $i("#ipCount").textContent = l.length + " projet(s)";
+    $i("#listGrid").innerHTML = l.length ? l.map(cardHtml).join("") : `<p class="ih-mut">Aucun projet ne correspond à ces filtres.</p>`;
+  }
+  function cardHtml(p) {
+    const pc = pctOf(p);
+    return `<article class="ih-card" data-go="projet-${p.id}">
+      <div class="ih-media" style="background-image:url('${p.img}')"><span class="ih-tag" style="background:${p.color}">${p.tag}</span><span class="ih-fav">♡</span></div>
+      <div class="ih-body"><h3>${p.t}</h3><div class="ih-place">📍 ${p.pays}</div>
+        <div class="ih-prog"><div class="bar"><i style="width:${pc}%;background:${pc >= 100 ? "#1e9b4c" : "#f47c20"}"></i></div><b>${pc} %</b></div>
+        <div class="ih-amount"><b>${eur(p.raised)}</b> sur ${eur(p.goal)}</div>
+        <div class="ih-meta"><span>👥 ${p.ben.toLocaleString("fr-FR")} bénéficiaires</span><span>📅 ${p.end}</span></div></div>
+    </article>`;
+  }
+  ["#fDom", "#fPays", "#fStat"].forEach(s => $i(s).addEventListener("change", renderList));
+
+  // ----- projets en cours, galerie, réseaux -----
+  $i("#encoursBox").innerHTML = IP.filter(p => p.statut === "En cours").map(p => {
+    const pc = pctOf(p);
+    return `<div class="row" data-go="projet-${p.id}">
+      <div><b>${p.t}</b><small>📍 ${p.pays} · 📅 Fin : ${p.end}</small></div>
+      <div class="prog"><div class="ih-prog"><div class="bar"><i style="width:${pc}%;background:#f47c20"></i></div><b>${pc} %</b></div>
+        <small>${eur(p.raised)} sur ${eur(p.goal)}</small></div>
+    </div>`;
+  }).join("") || `<p class="ih-mut" style="margin:14px 0">Aucun projet en cours pour le moment.</p>`;
+
+  const GAL = [
+    { t: "Des projets portés par des femmes", a: "Portraits", type: "img", src: "impact-img/hero.jpg" },
+    { t: "Centre de santé équipé en solaire", a: "Chantiers", type: "img", src: "impact-img/solaire-maison.jpg" },
+    { t: "Panneaux solaires sur le toit", a: "Chantiers", type: "img", src: "impact-img/solaire-fiche.jpg" },
+    { t: "Présentation du projet solaire", a: "Vidéos", type: "vid", src: "impact-img/card-solaire.jpg" },
+    { t: "Élèves en classe", a: "Écoles", type: "img", src: "impact-img/card-ecole.jpg" },
+    { t: "Témoignage d'un enseignant", a: "Vidéos", type: "vid", src: "impact-img/card-ecole.jpg" },
+    { t: "Atelier de couture", a: "Ateliers", type: "img", src: "impact-img/card-couture.jpg" },
+    { t: "Première session de formation", a: "Vidéos", type: "vid", src: "impact-img/card-couture.jpg" }
+  ];
+  const ALBUMS = ["Tous", ...new Set(GAL.map(g => g.a))];
+  let album = "Tous";
+  function renderGal() {
+    $i("#galChips").innerHTML = ALBUMS.map(a => `<button type="button" class="${a === album ? "on" : ""}" data-album="${a}">${a}</button>`).join("");
+    const l = GAL.map((g, i) => ({ g, i })).filter(({ g }) => album === "Tous" || g.a === album);
+    $i("#galStrip").innerHTML = l.map(({ g, i }) => `<article data-gal="${i}">
+      <div class="ih-media" style="background-image:url('${g.src}')">${g.type === "vid" ? '<span class="ih-play">▶</span>' : ""}</div>
+      <div class="ih-cap"><b>${g.t}</b><span>${g.type === "vid" ? "Vidéo" : "Photo"} · Album : ${g.a}</span></div>
+    </article>`).join("");
+  }
+  renderGal();
+
+  $i("#netGrid").innerHTML = [
+    ["f", "Facebook"], ["in", "Instagram"], ["li", "LinkedIn"], ["yt", "YouTube"], ["tt", "TikTok"], ["wa", "WhatsApp"]
+  ].map(([k, n]) => `<div class="ih-net" data-net="${n}"><i>${k}</i><div><b>${n}</b><span>Lien à renseigner</span></div></div>`).join("");
+
+  const lb = $i("#lb");
+  function openLb(g) {
+    $i("#lbMedia").style.backgroundImage = `url('${g.src}')`;
+    $i("#lbMedia").innerHTML = g.type === "vid" ? '<span class="ih-play">▶</span>' : "";
+    $i("#lbT").textContent = g.t;
+    $i("#lbA").textContent = (g.type === "vid" ? "Vidéo" : "Photo") + " · Album : " + g.a + (g.type === "vid" ? " · lecture simulée" : "");
+    lb.hidden = false;
+  }
+  $i("#lbClose").addEventListener("click", () => { lb.hidden = true; });
+  lb.addEventListener("click", e => { if (e.target === lb) lb.hidden = true; });
+  document.addEventListener("keydown", e => { if (e.key === "Escape") lb.hidden = true; });
+  document.addEventListener("click", e => {
+    const ch = e.target.closest("[data-album]");
+    if (ch) { album = ch.dataset.album; renderGal(); return; }
+    const ga = e.target.closest("[data-gal]");
+    if (ga) { openLb(GAL[Number(ga.dataset.gal)]); return; }
+    const net = e.target.closest("[data-net]");
+    if (net) { toastI("Lien " + net.dataset.net + " à renseigner par le propriétaire de la boutique."); }
+  });
+
+
+  // ----- fiche -----
+  let tab = "presentation", ficheId = null, amount = 10;
+  function openFiche(id) {
+    const p = IP.find(x => x.id === id); if (!p) { location.hash = "#projets"; return; }
+    if (ficheId !== id) { tab = "presentation"; amount = 10; }
+    ficheId = id;
+    const pc = pctOf(p), done = pc >= 100;
+    const panels = {
+      presentation: p.desc,
+      objectifs: p.objectifs,
+      impact: p.impact,
+      porteur: p.porteur,
+      documents: "<ul class=\"ih-list\">" + p.docs.map(d => `<li>📄 ${d} <button class=\"ih-small\" data-doc=\"${d}\">Télécharger</button></li>`).join("") + "</ul>",
+      actualites: "<ul class=\"ih-list\">" + p.news.map(n => `<li>🗞 ${n}</li>`).join("") + "</ul>"
+    };
+    $i("#ficheBox").innerHTML = `
+      <div class="ih-fiche">
+        <div>
+          <div class="ih-media" style="background-image:url('${p.img}')"><span class="ih-tag" style="background:${p.color}">${p.tag}</span></div>
+          <h1>${p.t}</h1>
+          <div class="ih-place">📍 ${p.pays} · ${p.dom}</div>
+          <div class="ih-tabs">${[["presentation","Présentation"],["objectifs","Objectifs"],["impact","Impact"],["porteur","Porteur"],["documents","Documents"],["actualites","Actualités"]].map(([k,l]) => `<button data-tab="${k}" class="${tab === k ? "on" : ""}">${l}</button>`).join("")}</div>
+          <div class="ih-panel">${panels[tab]}</div>
+        </div>
+        <aside class="ih-contrib">
+          <div class="ih-prog"><div class="bar"><i style="width:${pc}%;background:${done ? "#1e9b4c" : "#f47c20"}"></i></div><b>${pc} %</b></div>
+          <div class="big">${eur(p.raised)} <span style="font-size:15px;font-weight:400;color:#5b6679">sur ${eur(p.goal)}</span></div>
+          <div class="ih-meta"><span>👥 ${p.ben.toLocaleString("fr-FR")} bénéficiaires</span><span>📅 ${p.end}</span></div>
+          ${done ? `<div class="ih-ok">Projet financé</div>` : `
+          <div class="ih-amts">${[5,10,25,50].map(a => `<button data-amt="${a}" class="${amount === a ? "on" : ""}">${a} €</button>`).join("")}</div>
+          <button class="ih-btn-p" id="contribBtn" style="width:100%">Contribuer au projet (${amount} €)</button>
+          <p class="ih-mut" style="margin:0;font-size:12px">Contribution simulée : aucun paiement réel.</p>`}
+          <a class="ih-outline-btn" data-go="projets" style="text-align:center">← Retour aux projets</a>
+        </aside>
+      </div>`;
+    show("fiche");
+  }
+  document.addEventListener("click", e => {
+    const t = e.target;
+    const tabBtn = t.closest("[data-tab]");
+    if (tabBtn) { tab = tabBtn.dataset.tab; openFiche(ficheId); return; }
+    const dl = t.closest("[data-doc]");
+    if (dl) { toastI("Téléchargement simulé : " + dl.dataset.doc); return; }
+    const am = t.closest("[data-amt]");
+    if (am) { amount = Number(am.dataset.amt); openFiche(ficheId); return; }
+    if (t.closest("#contribBtn")) {
+      const p = IP.find(x => x.id === ficheId);
+      p.raised = Math.min(p.goal, p.raised + amount); p.ben += 0;
+      toastI(`Contribution simulée de ${amount} € à « ${p.t} ». Aucun paiement réel.`);
+      openFiche(ficheId); return;
+    }
+    const go = t.closest("[data-go]");
+    if (go) { location.hash = "#" + go.dataset.go; }
+  });
+
+  // ----- dépôt de projet : uniquement via « Déposer à Diaspo'Actif » -----
+  const DEPOT = "Déposer à Diaspo'Actif";
+  document.addEventListener("click", e => {
+    const d = e.target.closest("[data-depot]");
+    if (d) { toastI("Redirection vers « " + DEPOT + " » avec le contexte de la boutique « " + SHOP_NAME + " » (module central à brancher)."); }
+  });
+  const DEPOT_RX = /\b(projet|financement|dossier|appel à projets|financer)\b/i;
+
+  // ----- rendez-vous, partenariat, newsletter -----
+  $i("#rdvForm").addEventListener("submit", e => { e.preventDefault(); toastI("Demande de rendez-vous envoyée (maquette)."); e.target.reset(); });
+  $i("#partForm").addEventListener("submit", e => {
+    e.preventDefault();
+    const msg = e.target.elements.message.value;
+    if (DEPOT_RX.test(msg)) { toastI("Ce message ressemble à un dépôt de projet : déposez-le via « " + DEPOT + " ». Rien n'a été envoyé."); return; }
+    toastI("Demande de partenariat envoyée (maquette)."); e.target.reset();
+  });
+
+  // ----- rubrique événements : liste, fiche avec rapport (texte, images, vidéos), galerie -----
+  const EV = [
+    { id: 1, t: "Journée d'information sur le financement participatif", date: "14 oct. 2026", lieu: "Abidjan, Côte d'Ivoire", statut: "Passé", img: "impact-img/hero.jpg", color: "#f47c20",
+      resume: "Présentation des projets financés et explication du financement participatif.",
+      med: [
+        { t: "Accueil des participants", type: "img", src: "impact-img/hero.jpg", a: "Événement 1" },
+        { t: "Présentation du projet solaire", type: "vid", src: "impact-img/solaire-maison.jpg", a: "Événement 1" },
+        { t: "Échanges avec la salle", type: "img", src: "impact-img/card-ecole.jpg", a: "Événement 1" },
+        { t: "Témoignage d'un porteur de projet", type: "vid", src: "impact-img/card-couture.jpg", a: "Événement 1" }
+      ],
+      rapport: [
+        { k: "p", v: "Plus de 120 personnes ont participé à cette journée d'information. Au programme : la présentation des projets en cours, la façon de contribuer, et le suivi de l'avancement de chaque projet." },
+        { k: "m", i: 0 },
+        { k: "p", v: "Le projet solaire pour le centre de santé a été présenté en détail : objectifs, budget et installation réalisée. La vidéo ci-dessous résume la présentation." },
+        { k: "m", i: 1 },
+        { k: "p", v: "Les échanges avec la salle ont porté sur la transparence des dépenses et les délais de réalisation. Chaque question a reçu une réponse écrite dans la semaine." },
+        { k: "m", i: 2 },
+        { k: "p", v: "La journée s'est terminée par le témoignage d'un porteur de projet." },
+        { k: "m", i: 3 }
+      ] },
+    { id: 2, t: "Atelier couture et entrepreneuriat", date: "20 sept. 2026", lieu: "Cotonou, Bénin", statut: "Passé", img: "impact-img/card-couture.jpg", color: "#7c3aed",
+      resume: "Atelier pratique de couture et de gestion d'un petit atelier, avec les participantes du projet.",
+      med: [
+        { t: "Séance de couture", type: "img", src: "impact-img/card-couture.jpg", a: "Événement 2" },
+        { t: "Première démonstration", type: "vid", src: "impact-img/card-couture.jpg", a: "Événement 2" }
+      ],
+      rapport: [
+        { k: "p", v: "Cinquante femmes ont participé à l'atelier de deux jours. Elles ont appris les bases de la gestion d'un atelier : coûts, prix de vente et suivi des commandes." },
+        { k: "m", i: 0 },
+        { k: "p", v: "Une démonstration filmée est disponible. Elle montre les gestes de base et la finition des pièces." },
+        { k: "m", i: 1 },
+        { k: "p", v: "À l'issue de l'atelier, dix participantes ont choisi de lancer leur activité avec l'appui du projet." }
+      ] },
+    { id: 3, t: "Forum des partenaires", date: "12 déc. 2026", lieu: "Dakar, Sénégal", statut: "À venir", img: "impact-img/card-ecole.jpg", color: "#2563eb",
+      resume: "Rencontre entre les porteurs de projets et les entreprises et institutions partenaires.",
+      med: [], rapport: [] }
+  ];
+  let evFilter = "Tous", evId = null, evTab = "rapport";
+  const evStat = e => `<span class="ih-evstat ${e.statut === "Passé" ? "past" : "soon"}">${e.statut === "Passé" ? "Passé" : "À venir"}</span>`;
+  function evCard(e) {
+    return `<article class="ih-card" data-go="evenement-${e.id}">
+      <div class="ih-media" style="background-image:url('${e.img}')"><span class="ih-tag" style="background:${e.color}">${e.statut === "Passé" ? "Événement passé" : "À venir"}</span></div>
+      <div class="ih-body"><h3>${e.t}</h3><div class="ih-place">📍 ${e.lieu}</div>
+        <div class="ih-meta"><span>📅 ${e.date}</span><span>${e.med.length ? e.med.length + " photo(s) et vidéo(s)" : "Pas encore de média"}</span></div></div>
+    </article>`;
+  }
+  $i("#evHome").innerHTML = EV.map(evCard).join("");
+  function renderEvList() {
+    const l = EV.filter(e => evFilter === "Tous" || (evFilter === "Passés" ? e.statut === "Passé" : e.statut === "À venir"));
+    $i("#evChips").innerHTML = ["Tous", "Passés", "À venir"].map(f => `<button type="button" class="${f === evFilter ? "on" : ""}" data-evf="${f}">${f}</button>`).join("");
+    $i("#evList").innerHTML = l.length ? l.map(evCard).join("") : `<p class="ih-mut">Aucun événement dans cette catégorie.</p>`;
+  }
+  function medHtml(m, id, i) {
+    if (m.type === "vid") return `<div class="ih-media" data-evm="${id}-${i}" style="background-image:url('${m.src}')"><span class="ih-play">▶</span></div>`;
+    return `<div class="ih-media" data-evm="${id}-${i}" style="background-image:url('${m.src}')"></div>`;
+  }
+  function openEv(id) {
+    const e = EV.find(x => x.id === id); if (!e) { location.hash = "#evenements"; return; }
+    if (evId !== id) { evTab = "rapport"; }
+    evId = id;
+    const rap = e.rapport.length
+      ? e.rapport.map(b => b.k === "p" ? `<p>${b.v}</p>` : `<figure class="ih-rmed" style="margin:0">${medHtml(e.med[b.i], id, b.i)}<figcaption>${e.med[b.i].type === "vid" ? "▶ Vidéo" : "Photo"} · ${e.med[b.i].t}</figcaption></figure>`).join("")
+      : `<p>Le rapport sera publié après l'événement.</p>`;
+    const gal = e.med.length
+      ? `<div class="ih-gmed">${e.med.map((m, i) => `<div>${medHtml(m, id, i)}<b>${m.type === "vid" ? "▶ " : ""}${m.t}</b></div>`).join("")}</div>`
+      : `<p class="ih-mut">Aucune photo ni vidéo pour le moment.</p>`;
+    $i("#evBox").innerHTML = `
+      <div class="ih-row2" style="margin:0 0 6px"><a class="ih-outline-btn" data-go="evenements">← Retour aux événements</a></div>
+      <div class="ih-media" style="background-image:url('${e.img}');height:260px;border-radius:16px"><span class="ih-tag" style="background:${e.color}">${e.statut === "Passé" ? "Événement passé" : "À venir"}</span></div>
+      <h1 style="margin:14px 0 6px;font-size:28px;color:#16233a;text-wrap:balance">${e.t}</h1>
+      <div class="ih-evmeta"><span>📅 ${e.date}</span><span>📍 ${e.lieu}</span></div>
+      <p class="ih-mut" style="margin:12px 0 0">${e.resume}</p>
+      <div class="ih-tabs">${[["rapport", "Rapport"], ["galerie", "Photos et vidéos"]].map(([k, l]) => `<button data-evtab="${k}" class="${evTab === k ? "on" : ""}">${l}</button>`).join("")}</div>
+      <div class="ih-panel ih-rap">${evTab === "rapport" ? rap : gal}</div>`;
+    show("evenement");
+  }
+  document.addEventListener("click", e => {
+    const f = e.target.closest("[data-evf]"); if (f) { evFilter = f.dataset.evf; renderEvList(); return; }
+    const tb = e.target.closest("[data-evtab]"); if (tb) { evTab = tb.dataset.evtab; openEv(evId); return; }
+    const m = e.target.closest("[data-evm]");
+    if (m) { const [id, i] = m.dataset.evm.split("-").map(Number); const med = EV.find(x => x.id === id).med[i]; openLb(Object.assign({ a: "Événement " + id }, med)); }
+  });
+  renderEvList();
+
+  route();
+})();
+
+(function financeView() {
+  if (SHOP.main !== "finance") return;
+  const P = {"bank": "<path d=\"M3 10h18\"/><path d=\"M5 10v8M9 10v8M15 10v8M19 10v8\"/><path d=\"M2 20h20\"/><path d=\"M12 4l9 5H3z\"/>", "coins": "<ellipse cx=\"12\" cy=\"6.5\" rx=\"7\" ry=\"3\"/><path d=\"M5 6.5v5c0 1.7 3.1 3 7 3s7-1.3 7-3v-5\"/><path d=\"M5 11.5v5c0 1.7 3.1 3 7 3s7-1.3 7-3v-5\"/>", "home": "<path d=\"M3 11l9-7 9 7\"/><path d=\"M5 10v10h14V10\"/><path d=\"M10 20v-5h4v5\"/>", "car": "<path d=\"M4 16v-4l2-5h12l2 5v4z\"/><path d=\"M3 16h18\"/><circle cx=\"7.5\" cy=\"16\" r=\"1.6\"/><circle cx=\"16.5\" cy=\"16\" r=\"1.6\"/>", "plane": "<path d=\"M2 13l8-2 4-7h2l-1 7 5-2 2-2h1l-1 4 1 4h-1l-2-2-5-2 1 7h-2l-4-7-8-2z\"/>", "shield": "<path d=\"M12 21s-7-4.2-7-10V5l7-2 7 2v6c0 5.8-7 10-7 10z\"/><path d=\"M9 11.5l2 2 4-4\"/>", "store": "<path d=\"M4 9l1.5-5h13L20 9\"/><path d=\"M4 9v11h16V9\"/><path d=\"M4 9h16\"/><path d=\"M9 20v-5h6v5\"/>", "globe": "<circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M3 12h18\"/><path d=\"M12 3c2.8 3 2.8 15 0 18M12 3c-2.8 3-2.8 15 0 18\"/>", "cap": "<path d=\"M2 9l10-5 10 5-10 5z\"/><path d=\"M6 11.2V16c0 1.5 2.7 3 6 3s6-1.5 6-3v-4.8\"/>", "trend": "<path d=\"M3 17l6-6 4 4 8-8\"/><path d=\"M15 7h6v6\"/>", "package": "<path d=\"M3 7.5L12 3l9 4.5v9L12 21l-9-4.5z\"/><path d=\"M3 7.5L12 12l9-4.5\"/><path d=\"M12 12v9\"/>", "sprout": "<path d=\"M12 21v-9\"/><path d=\"M12 12c0-4-3-7-8-7 0 4 3 7 8 7z\"/><path d=\"M12 14c0-3 2-6 7-6 0 4-2 6-7 6z\"/>", "news": "<rect x=\"3\" y=\"4\" width=\"18\" height=\"16\" rx=\"2\"/><path d=\"M7 8h10M7 12h10M7 16h6\"/>", "search": "<circle cx=\"11\" cy=\"11\" r=\"7\"/><path d=\"M21 21l-5-5\"/>", "bell": "<path d=\"M6 16v-5a6 6 0 0 1 12 0v5l2 2H4z\"/><path d=\"M10 21h4\"/>", "user": "<circle cx=\"12\" cy=\"8\" r=\"4\"/><path d=\"M4 21c1-4 4-6 8-6s7 2 8 6\"/>", "check": "<path d=\"M5 12.5l4.5 4.5L19 7.5\"/>", "users": "<circle cx=\"9\" cy=\"8\" r=\"3.5\"/><path d=\"M2 20c1-3.5 3.5-5 7-5s6 1.5 7 5\"/><path d=\"M16 4.6a3.5 3.5 0 0 1 0 6.8\"/><path d=\"M22 20c-.5-2.5-2-4-4-4.6\"/>", "wallet": "<rect x=\"3\" y=\"6\" width=\"18\" height=\"13\" rx=\"2\"/><path d=\"M3 10h18\"/><path d=\"M16 14.5h2\"/>", "mail": "<rect x=\"3\" y=\"5\" width=\"18\" height=\"14\" rx=\"2\"/><path d=\"M3 7l9 6 9-6\"/>", "calendar": "<rect x=\"3\" y=\"5\" width=\"18\" height=\"16\" rx=\"2\"/><path d=\"M3 10h18M8 3v4M16 3v4\"/>", "phone": "<path d=\"M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z\"/>", "chat": "<path d=\"M4 5h16v11H9l-5 4z\"/>", "pin": "<path d=\"M12 21s-7-6-7-11a7 7 0 0 1 14 0c0 5-7 11-7 11z\"/><circle cx=\"12\" cy=\"10\" r=\"2.5\"/>", "star": "<path d=\"M12 3l2.8 5.8 6.2.9-4.5 4.4 1 6.3L12 17.3 6.5 20.4l1-6.3-4.5-4.4 6.2-.9z\"/>"};
+  const I = (n, z = 22) => `<svg viewBox="0 0 24 24" width="${z}" height="${z}" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[n]}</svg>`;
+  ["#hero", ".hero", ".top", ".trust", ".search", ".cats", "#videoBlock", "#offerBlock", "#mainBlock", "#openCart", "#openCart2"].forEach(sel =>
+    document.querySelectorAll(sel).forEach(el => { el.hidden = true; }));
+  document.body.classList.add("impact-mode");
+  document.querySelectorAll(".demo").forEach(el => { if (!el.closest("#financeHome")) el.hidden = true; });
+  const NAME = (SHOP.name && SHOP.name !== "Diaspo'Actif") ? SHOP.name : "Finance Plus";
+  document.title = NAME;
+  document.getElementById("financeHome").hidden = false;
+  const $f = s => document.querySelector(s);
+  const eur = n => n.toLocaleString("fr-FR") + " €";
+  const toastF = m => { try { toast(m); } catch (e) {} };
+  const DEPOT = "Déposer à Diaspo'Actif";
+  const DEPOT_RX = /(projet|financement|dossier|financer)/i;
+
+  const FIN = [
+    { t: "Diaspo'Entrepreneur", d: "Financement et accompagnement des entrepreneurs de la diaspora.", m: "jusqu'à 10 000 €" },
+    { t: "Impact Local", d: "Soutien aux projets à fort impact social et environnemental.", m: "jusqu'à 25 000 €" },
+    { t: "Investir en Afrique", d: "Financement de projets d'investissement et d'implantation.", m: "jusqu'à 50 000 €" }
+  ];
+  const CRED = [
+    { t: "Crédit entreprise", d: "Taux compétitifs pour développer votre activité.", m: "jusqu'à 500 000 €" },
+    { t: "Crédit équipement", d: "Matériel, véhicules, outils professionnels.", m: "selon le besoin" },
+    { t: "Crédit mobilité", d: "Installation, études, expatriation.", m: "selon le besoin" }
+  ];
+  const ASS = [
+    { t: "Assurance santé", d: "Vous et votre famille, ici et en Afrique." },
+    { t: "Assurance biens & activité", d: "Locaux, équipements, stocks." },
+    { t: "Assurance voyage & expatriation", d: "Couverture internationale adaptée." }
+  ];
+  const PROG = [
+    { t: "Formation à la gestion", d: "Budget, trésorerie et plan de financement.", m: "Gratuit", cta: "S'inscrire" },
+    { t: "Accompagnement des entrepreneurs", d: "Suivi personnalisé sur six mois.", m: "Sur dossier", cta: "Se renseigner" }
+  ];
+  const FORF = [
+    { t: "Essentiel", p: 29, f: ["Conseil de base", "Accès aux opportunités", "Veille et actualités"] },
+    { t: "Croissance", p: 79, f: ["Accompagnement personnalisé", "Montage de dossier", "Suivi de financement"], star: true },
+    { t: "Premium", p: 149, f: ["Conseil stratégique", "Accès prioritaire aux programmes", "Mise en relation avec les partenaires"] }
+  ];
+  const PROJ = [
+    { t: "Ferme agroécologique de 12 hectares", secteur: "Agriculture", pays: "Côte d'Ivoire", besoin: 18000, statut: "Financé", verif: "Vérifié" },
+    { t: "Atelier de menuiserie solidaire", secteur: "Artisanat", pays: "Sénégal", besoin: 6000, statut: "Accompagné", verif: "Déclaré" },
+    { t: "Cabinet de santé communautaire", secteur: "Santé", pays: "Bénin", besoin: 25000, statut: "Accompagné", verif: "Vérifié" }
+  ];
+
+  $f("#finLogo").textContent = NAME;
+  $f("#finH1").innerHTML = NAME + " <span>· organisme de financement et de crédit</span>";
+  $f("#finSlogan").textContent = (SHOP.slogan && SHOP.slogan !== "Produits artisanaux et accessoires de la diaspora.") ? SHOP.slogan : "Des solutions de financement, de crédit et d'assurance pour vos projets en Afrique et dans la diaspora.";
+  const besoins = PROJ.reduce((s, p) => s + p.besoin, 0);
+  $f("#finStats").innerHTML = [
+    ["bank", FIN.length + CRED.length + PROG.length, "Solutions"],
+    ["users", PROJ.length, "Projets suivis"],
+    ["check", PROJ.filter(p => p.statut === "Financé").length, "Projets financés"],
+    ["wallet", eur(besoins), "Besoins suivis"]
+  ].map(([i, v, l]) => `<div class="ih-stat"><span class="ico">${I(i)}</span><div><b>${v}</b><span>${l}</span></div></div>`).join("");
+
+  $f("#finFin").innerHTML = FIN.map((x, i) => `<article class="fin-card"><div class="fin-cbody"><div class="fin-thumb" style="background-image:url(\'${["fin-img/fin-prog-entreprendre.jpg","fin-img/fin-prog-solaire.jpg","fin-img/fin-prog-port.jpg"][i]}\')"></div><span class="fin-arrow">›</span><h3>${x.t}</h3><p>${x.d}</p><div class="fin-meta"><span class="fin-chip">${x.m}</span><span class="fin-btn" data-depot="financement">Demander</span></div></div></article>`).join("");
+  $f("#finCred").innerHTML = CRED.map((x, i) => `<article class="fin-card"><div class="fin-cbody"><span class="fin-ico" style="background:${["#f47c20","#0d2750","#0d2750"][i]}">${I(["home","car","plane"][i])}</span><h3>${x.t}</h3><p>${x.d}</p><div class="fin-meta"><span class="fin-chip">${x.m}</span><span class="fin-btn line" data-scroll="fin-sim">Simuler</span></div></div></article>`).join("");
+  $f("#finAss").innerHTML = ASS.map((x, i) => `<article class="fin-card"><div class="fin-cbody"><span class="fin-ico" style="background:${["#0d2750","#f47c20","#0d2750"][i]}">${I(["shield","store","globe"][i])}</span><h3>${x.t}</h3><p>${x.d}</p><div class="fin-meta"><span></span><span class="fin-btn line" data-scroll="fin-contact">Demander un devis</span></div></div></article>`).join("");
+  $f("#finProg").innerHTML = PROG.map(x => `<div class="fin-row"><div style="display:flex;gap:12px;align-items:center;flex:1;min-width:200px"><span class="fin-ico">${I("cap")}</span><div><b>${x.t}</b><small>${x.d} · ${x.m}</small></div></div><span class="fin-btn" data-toastf="${x.cta} : inscription simulée">${x.cta}</span></div>`).join("");
+  $f("#finForf").innerHTML = FORF.map(x => `<article class="fin-card fin-forf-card${x.star ? " star" : ""}"><div class="fin-ftop">${x.star ? "Recommandé · " : ""}${x.t}</div><div class="fin-cbody"><div class="price">${x.p} €<small style="font-size:14px;color:#5b6679"> / mois</small></div><ul>${x.f.map(f => `<li>${f}</li>`).join("")}</ul><span class="fin-btn wide" data-toastf="Souscription simulée au forfait ${x.t}. Aucun paiement réel.">Choisir</span></div></article>`).join("");
+  $f("#finProj").innerHTML = PROJ.map(p => `<article class="fin-card"><div class="fin-cbody"><div class="fin-meta" style="margin:0"><span class="fin-pill${p.statut === "Financé" ? " ok" : ""}">${p.statut}</span><span class="fin-pill${p.verif === "Vérifié" ? " ok" : ""}">${p.verif}</span></div><h3>${p.t}</h3><p>${I("pin",14)} ${p.pays} · ${p.secteur}</p><div class="fin-meta"><span class="fin-chip">Besoin : ${eur(p.besoin)}</span><span class="fin-btn line" data-depot="projet">Voir avec Diaspo'Actif</span></div></div></article>`).join("");
+
+  function simulate() {
+    const P = Number($f("#sAmt").value), n = Number($f("#sDur").value), r = 0.065 / 12;
+    if (!(P > 0) || !n) { $f("#sRes").textContent = "—"; $f("#sDetail").textContent = "Saisissez un montant valide."; return; }
+    const m = P * r / (1 - Math.pow(1 + r, -n));
+    $f("#sRes").textContent = Math.round(m).toLocaleString("fr-FR") + " €/mois";
+    $f("#sDetail").textContent = "Montant : " + eur(P) + " · Durée : " + n + " mois · Taux indicatif : 6,5 %";
+  }
+  ["#sAmt", "#sDur", "#sType"].forEach(s => $f(s).addEventListener("input", simulate));
+  ["#sAmt", "#sDur", "#sType"].forEach(s => $f(s).addEventListener("change", simulate));
+  simulate();
+
+  document.addEventListener("click", e => {
+    if (document.getElementById("financeHome").hidden) return;
+    const d = e.target.closest("[data-depot]");
+    if (d) { toastF("Redirection vers « " + DEPOT + " » avec le contexte de « " + NAME + " » (module central à brancher)."); return; }
+    const t = e.target.closest("[data-toastf]");
+    if (t) { toastF(t.dataset.toastf.indexOf(" ") > -1 && t.dataset.toastf.indexOf("simulée") > -1 ? t.dataset.toastf : t.dataset.toastf + " : contact à renseigner par l'organisme."); return; }
+    const sc = e.target.closest("[data-scroll]");
+    if (sc) { const el = document.getElementById(sc.dataset.scroll); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); }
+  });
+  $f("#finRdv").addEventListener("submit", e => { e.preventDefault(); toastF("Demande de rendez-vous envoyée (maquette)."); e.target.reset(); });
+  $f("#finNews").addEventListener("submit", e => { e.preventDefault(); toastF("Inscription à la newsletter simulée."); e.target.reset(); });
+  $f("#finPart").addEventListener("submit", e => {
+    e.preventDefault();
+    if (DEPOT_RX.test(e.target.elements.message.value)) { toastF("Ce message ressemble à un dépôt de projet : déposez-le via « " + DEPOT + " ». Rien n'a été envoyé."); return; }
+    toastF("Demande de partenariat envoyée (maquette)."); e.target.reset();
+  });
+})();
+
+</script>
+</body>
+</html>

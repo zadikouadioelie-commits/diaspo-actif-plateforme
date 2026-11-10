@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta name="robots" content="noindex,nofollow">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Boutique Portfolio · maquette</title>
+<style>
+  :root { --c1:#83172f; --c2:#111c38; --c3:#d8b36a; --line:#e6e1da; --text:#172033; --muted:#6b6b76; --bg:#f7f6f3; --white:#fff; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif; color:var(--text); background:var(--bg); }
+  .top { background:var(--c2); color:#fff; padding:14px 16px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .top h1 { margin:0; font-family: Georgia, serif; font-size:20px; flex:1; min-width:180px; }
+  .top h1 em { color:var(--c3); font-style:normal; }
+  .top button { background:none; border:0; color:#fff; font:inherit; font-size:15px; cursor:pointer; padding:6px 8px; border-radius:8px; }
+  .top button:hover { background:rgba(255,255,255,.12); }
+  .hero { background:var(--c1); color:#fff; padding:26px 16px; }
+  .hero h2 { margin:0 0 6px; font-family: Georgia, serif; font-size:24px; }
+  .hero p { margin:0; opacity:.92; max-width:640px; }
+  .wrap { max-width:1100px; margin:0 auto; padding:16px; }
+  .note { background:#fff8e6; border:1px solid #f1dfa6; border-radius:10px; padding:10px 12px; font-size:14px; margin:12px 0; }
+  .chips { display:flex; gap:8px; flex-wrap:wrap; margin:14px 0; }
+  .chip { border:1px solid var(--line); background:#fff; border-radius:999px; padding:7px 13px; font:inherit; font-size:14px; cursor:pointer; }
+  .chip.on { background:var(--c1); color:#fff; border-color:var(--c1); }
+  .sectitle { font-family: Georgia, serif; font-size:18px; margin:18px 0 10px; color:var(--c2); }
+  .grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap:16px; }
+  .work { all:unset; cursor:pointer; background:#fff; border:1px solid var(--line); border-radius:12px; overflow:hidden; display:flex; flex-direction:column; }
+  .work:focus-visible { outline:3px solid var(--c3); }
+  .work .img { aspect-ratio: 4/3; background: var(--c); position:relative; }
+  .work .img small { position:absolute; left:10px; bottom:8px; color:#fff; background:rgba(0,0,0,.35); padding:2px 8px; border-radius:6px; font-size:12px; }
+  .work .info { padding:10px 12px 12px; }
+  .work h3 { margin:0 0 4px; font-size:16px; }
+  .work .meta { font-size:13px; color:var(--muted); }
+  .overlay { position:fixed; inset:0; background:rgba(10,16,30,.6); display:none; align-items:center; justify-content:center; padding:16px; z-index:50; }
+  .overlay.open { display:flex; }
+  .sheet { background:#fff; border-radius:14px; max-width:720px; width:100%; max-height:90vh; overflow:auto; padding:18px; position:relative; }
+  .sheet h2 { margin:0 0 6px; font-family: Georgia, serif; font-size:22px; padding-right:30px; }
+  .close { position:absolute; top:10px; right:12px; background:none; border:0; font-size:26px; cursor:pointer; }
+  .gallery { display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin:12px 0; }
+  .gallery .shot { aspect-ratio: 4/3; border-radius:8px; background: var(--c); cursor:pointer; border:0; padding:0; }
+  .gallery .shot.big { grid-column: 1 / -1; aspect-ratio: 16/9; }
+  .gallery .shot:focus-visible { outline:3px solid var(--c3); }
+  .facts { display:grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap:10px; margin:12px 0; }
+  .facts div { background:var(--bg); border-radius:10px; padding:8px 10px; font-size:14px; }
+  .facts b { display:block; font-size:12px; color:var(--muted); font-weight:600; }
+  .btn { background:var(--c1); color:#fff; border:0; border-radius:9px; padding:10px 14px; font:inherit; font-weight:600; cursor:pointer; }
+  .btn.ghost { background:#fff; color:var(--text); border:1px solid var(--line); }
+  .form { display:grid; gap:10px; margin-top:8px; }
+  .form label { font-size:14px; display:grid; gap:4px; }
+  .form input, .form textarea { font:inherit; padding:9px 10px; border:1px solid var(--line); border-radius:9px; }
+  .form textarea { min-height:90px; }
+  .lightbox { position:fixed; inset:0; background:rgba(0,0,0,.9); display:none; align-items:center; justify-content:center; z-index:60; padding:16px; }
+  .lightbox.open { display:flex; }
+  .lightbox .frame { width:min(900px, 100%); aspect-ratio: 16/10; border-radius:12px; }
+  .lightbox button { position:absolute; background:rgba(255,255,255,.15); color:#fff; border:0; border-radius:999px; width:44px; height:44px; font-size:22px; cursor:pointer; }
+  .lb-close { top:14px; right:14px; } .lb-prev { left:14px; top:50%; } .lb-next { right:14px; top:50%; }
+  .lb-count { position:absolute; bottom:18px; color:#fff; font-size:14px; }
+  .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--c2); color:#fff; padding:10px 16px; border-radius:10px; font-size:14px; opacity:0; transition:.25s; pointer-events:none; z-index:70; max-width:90vw; }
+  .toast.show { opacity:1; }
+  .demo { font-size:12px; color:var(--muted); margin-top:18px; }
+  @media (max-width: 480px) { .grid { grid-template-columns: 1fr 1fr; gap:10px; } .gallery { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<script src="exemple-commun.js"></script>
+<header class="top">
+  <h1 id="shopName"></h1>
+  <button id="openContact">Demander un devis</button>
+</header>
+<section class="hero"><h2 id="shopTitle"></h2><p id="shopSlogan"></p></section>
+
+<main class="wrap">
+  <div class="note" id="typeNote" style="display:none"></div>
+  <div class="chips" id="cats"></div>
+  <h2 class="sectitle" id="sectMain"></h2>
+  <div class="grid" id="grid"></div>
+  <p class="demo">Maquette : réalisations fictives. Les demandes de devis sont simulées et ne sont envoyées nulle part.</p>
+</main>
+
+<!-- Détail d'une réalisation -->
+<div class="overlay" id="workOv" role="dialog" aria-modal="true">
+  <div class="sheet">
+    <button class="close" data-close aria-label="Fermer">×</button>
+    <h2 id="wTitle"></h2>
+    <p id="wDesc"></p>
+    <div class="facts" id="wFacts"></div>
+    <div class="gallery" id="wGallery"></div>
+    <button class="btn" id="wAsk">Demander un devis similaire</button>
+  </div>
+</div>
+
+<!-- Visionneuse -->
+<div class="lightbox" id="lb" role="dialog" aria-modal="true">
+  <div class="frame" id="lbFrame"></div>
+  <button class="lb-close" data-lbclose aria-label="Fermer">×</button>
+  <button class="lb-prev" data-lbprev aria-label="Photo précédente">‹</button>
+  <button class="lb-next" data-lbnext aria-label="Photo suivante">›</button>
+  <div class="lb-count" id="lbCount"></div>
+</div>
+
+<!-- Demande de devis -->
+<div class="overlay" id="contactOv" role="dialog" aria-modal="true">
+  <div class="sheet">
+    <button class="close" data-close aria-label="Fermer">×</button>
+    <h2>Demande de devis</h2>
+    <form class="form" id="contactForm">
+      <label>Nom <input name="nom" required></label>
+      <label>Adresse e-mail <input name="email" type="email" required></label>
+      <label>Projet concerné <select name="projet" id="projetSel"></select></label>
+      <label>Votre besoin <textarea name="besoin" required></textarea></label>
+      <button class="btn" type="submit">Envoyer la demande (simulée)</button>
+    </form>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const SHOP_DEFAULT = {
+    main: "portfolio", options: [], name: "Diaspo'Actif", slogan: "Nos réalisations, de la conception à la livraison.",
+    colors: ["#83172f", "#111c38", "#d8b36a"], textures: ["uni", "uni", "uni"],
+    sections: ["Notre portfolio", "Projets récents"], hiddenSections: []
+  };
+  const SHOP = (() => {
+    try { return Object.assign({}, SHOP_DEFAULT, JSON.parse(localStorage.getItem("shopConfig")) || {}); }
+    catch (e) { return SHOP_DEFAULT; }
+  })();
+  const TYPE_LABELS = { video: "Boutique Vidéo", ecom: "Boutique Traditionnelle", portfolio: "Portfolio", events: "Créateur d'événements", impact: "Projet Impact" };
+
+  // Réalisations de démonstration (fictives). Chaque réalisation a ses photos (couleurs de démonstration).
+  const WORKS = [
+    { id: 1, t: "Stand événementiel salon de la diaspora", cat: "evenements", year: 2025, client: "Association partenaire", c: "#7a1a2a", desc: "Conception et installation d'un stand de 12 m² : signalétique, mobilier et écran d'information.", photos: ["#7a1a2a", "#8a2232", "#5c1220"] },
+    { id: 2, t: "Identité visuelle d'une coopérative", cat: "graphisme", year: 2025, client: "Coopérative locale", c: "#2c3e63", desc: "Logo, charte graphique et supports de communication imprimés.", photos: ["#2c3e63", "#3b4f7a", "#1d2b48"] },
+    { id: 3, t: "Vidéo de présentation d'un artisan", cat: "video", year: 2026, client: "Artisan indépendant", c: "#1f6b55", desc: "Tournage et montage d'une présentation de deux minutes pour les réseaux sociaux.", photos: ["#1f6b55", "#2a8a6e"] },
+    { id: 4, t: "Site vitrine pour une association", cat: "web", year: 2026, client: "Association culturelle", c: "#4a0f1a", desc: "Site responsive avec agenda, actualités et formulaire de contact.", photos: ["#4a0f1a", "#6b1a28", "#2e0a12", "#8a2232"] },
+    { id: 5, t: "Affiches pour un festival", cat: "graphisme", year: 2024, client: "Festival de quartier", c: "#573a7d", desc: "Série de quatre affiches et déclinaisons pour les réseaux.", photos: ["#573a7d", "#6d4f99"] },
+    { id: 6, t: "Film de fin de chantier", cat: "video", year: 2025, client: "Entreprise de bâtiment", c: "#8a5a1a", desc: "Captation et montage d'un film retraçant la réalisation d'un bâtiment.", photos: ["#8a5a1a", "#a87024", "#5f3d10"] }
+  ];
+  const CATS = [
+    { id: "all", label: "Toutes" }, { id: "graphisme", label: "Graphisme" }, { id: "video", label: "Vidéo" },
+    { id: "web", label: "Web" }, { id: "evenements", label: "Événements" }
+  ];
+  const CAT_LABEL = Object.fromEntries(CATS.map(c => [c.id, c.label]));
+
+  const state = { cat: "all", current: null, photo: 0 };
+  const $ = (s) => document.querySelector(s);
+  function toast(m) { const t = $("#toast"); t.textContent = m; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 2200); }
+
+  (function applyShop() {
+    const r = document.documentElement.style;
+    r.setProperty("--c1", SHOP.colors[0]); r.setProperty("--c2", SHOP.colors[1]); r.setProperty("--c3", SHOP.colors[2]);
+    document.title = SHOP.name + " · " + TYPE_LABELS[SHOP.main];
+    $("#shopName").innerHTML = `${SHOP.name} <em>${TYPE_LABELS[SHOP.main]}</em>`;
+    $("#shopTitle").textContent = SHOP.name;
+    $("#shopSlogan").textContent = SHOP.slogan;
+    $("#sectMain").textContent = SHOP.sections[0] || "Notre portfolio";
+    const on = SHOP.main === "portfolio" || SHOP.options.includes("portfolio");
+    if (!on) {
+      $("#typeNote").style.display = "";
+      $("#typeNote").textContent = "Le portfolio n'est pas actif dans cette boutique. Les réalisations restent conservées dans le bonus boutique.";
+    }
+    $("#projetSel").innerHTML = WORKS.map(w => `<option>${w.t}</option>`).join("") + `<option>Autre projet</option>`;
+  })();
+
+  function render() {
+    $("#cats").innerHTML = CATS.map(c => `<button class="chip ${state.cat === c.id ? "on" : ""}" data-cat="${c.id}">${c.label}</button>`).join("");
+    const l = WORKS.filter(w => state.cat === "all" || w.cat === state.cat);
+    $("#grid").innerHTML = l.length ? l.map(w => `
+      <button class="work" data-work="${w.id}" aria-label="Voir ${w.t}">
+        <div class="img" style="--c:${w.c};background:${w.c}"><small>${w.photos.length} photo(s)</small></div>
+        <div class="info"><h3>${w.t}</h3><div class="meta">${CAT_LABEL[w.cat]} · ${w.year}</div></div>
+      </button>`).join("") : `<p>Aucune réalisation dans cette catégorie.</p>`;
+  }
+
+  function openWork(id) {
+    const w = WORKS.find(x => x.id === id); state.current = w;
+    $("#wTitle").textContent = w.t;
+    $("#wDesc").textContent = w.desc;
+    $("#wFacts").innerHTML = `<div><b>Client</b>${w.client}</div><div><b>Année</b>${w.year}</div><div><b>Catégorie</b>${CAT_LABEL[w.cat]}</div>`;
+    $("#wGallery").innerHTML = w.photos.map((p, i) => `<button class="shot ${i === 0 ? "big" : ""}" style="background:${p}" data-photo="${i}" aria-label="Photo ${i + 1}"></button>`).join("");
+    $("#workOv").classList.add("open");
+  }
+  function showPhoto(i) {
+    const w = state.current, n = w.photos.length;
+    state.photo = (i + n) % n;
+    $("#lbFrame").style.background = w.photos[state.photo];
+    $("#lbCount").textContent = `${state.photo + 1} / ${n} — ${w.t}`;
+  }
+
+  document.addEventListener("click", e => {
+    const t = e.target;
+    const cat = t.closest("[data-cat]"); if (cat) { state.cat = cat.dataset.cat; render(); return; }
+    const work = t.closest("[data-work]"); if (work) { openWork(Number(work.dataset.work)); return; }
+    const photo = t.closest("[data-photo]"); if (photo) { $("#lb").classList.add("open"); showPhoto(Number(photo.dataset.photo)); return; }
+    if (t.closest("[data-lbprev]")) { showPhoto(state.photo - 1); return; }
+    if (t.closest("[data-lbnext]")) { showPhoto(state.photo + 1); return; }
+    if (t.closest("[data-lbclose]")) { $("#lb").classList.remove("open"); return; }
+    if (t.closest("[data-close]") || t.classList.contains("overlay")) { t.closest(".overlay")?.classList.remove("open"); return; }
+    if (t.closest("#wAsk")) { $("#workOv").classList.remove("open"); $("#projetSel").value = state.current.t; $("#contactOv").classList.add("open"); return; }
+    if (t.closest("#openContact")) { $("#contactOv").classList.add("open"); return; }
+  });
+  $("#contactForm").addEventListener("submit", e => {
+    e.preventDefault();
+    e.target.reset();
+    $("#contactOv").classList.remove("open");
+    toast("Demande de devis simulée : aucune donnée n'a été envoyée.");
+  });
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape") { document.querySelectorAll(".overlay.open").forEach(o => o.classList.remove("open")); $("#lb").classList.remove("open"); }
+    if ($("#lb").classList.contains("open")) { if (e.key === "ArrowLeft") showPhoto(state.photo - 1); if (e.key === "ArrowRight") showPhoto(state.photo + 1); }
+  });
+  render();
+</script>
+</body>
+</html>

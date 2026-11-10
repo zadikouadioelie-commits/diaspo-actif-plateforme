@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta name="robots" content="noindex,nofollow">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Créateur d'événements · maquette</title>
+<style>
+  :root { --c1:#83172f; --c2:#111c38; --c3:#d8b36a; --line:#e6e1da; --text:#172033; --muted:#6b6b76; --bg:#f7f6f3; --white:#fff; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif; color:var(--text); background:var(--bg); }
+  .top { background:var(--c2); color:#fff; padding:14px 16px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .top h1 { margin:0; font-family: Georgia, serif; font-size:20px; flex:1; min-width:180px; }
+  .top h1 em { color:var(--c3); font-style:normal; }
+  .top button { background:none; border:0; color:#fff; font:inherit; font-size:15px; cursor:pointer; padding:6px 8px; border-radius:8px; }
+  .top button:hover { background:rgba(255,255,255,.12); }
+  .hero { background:var(--c1); color:#fff; padding:26px 16px; }
+  .hero h2 { margin:0 0 6px; font-family: Georgia, serif; font-size:24px; }
+  .hero p { margin:0; opacity:.92; }
+  .wrap { max-width:1100px; margin:0 auto; padding:16px; }
+  .note { background:#fff8e6; border:1px solid #f1dfa6; border-radius:10px; padding:10px 12px; font-size:14px; margin:12px 0; }
+  .chips { display:flex; gap:8px; flex-wrap:wrap; margin:14px 0; }
+  .chip { border:1px solid var(--line); background:#fff; border-radius:999px; padding:7px 13px; font:inherit; font-size:14px; cursor:pointer; }
+  .chip.on { background:var(--c1); color:#fff; border-color:var(--c1); }
+  .sectitle { font-family: Georgia, serif; font-size:18px; margin:18px 0 10px; color:var(--c2); }
+  .list { display:grid; gap:12px; }
+  .ev { background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px; display:grid; grid-template-columns: 74px 1fr auto; gap:14px; align-items:center; }
+  .date { background:var(--c1); color:#fff; border-radius:10px; text-align:center; padding:8px 4px; }
+  .date b { display:block; font-size:24px; line-height:1; }
+  .date small { font-size:12px; text-transform:uppercase; }
+  .ev h3 { margin:0 0 4px; font-size:16px; }
+  .meta { font-size:13px; color:var(--muted); }
+  .ev .right { text-align:right; display:grid; gap:6px; justify-items:end; }
+  .price { font-weight:700; }
+  .left { font-size:12px; color:#9a5b00; }
+  .full { font-size:12px; color:#9b1c1c; font-weight:700; }
+  .btn { background:var(--c1); color:#fff; border:0; border-radius:9px; padding:9px 13px; font:inherit; font-weight:600; cursor:pointer; }
+  .btn:disabled { background:#b8b2a8; cursor:not-allowed; }
+  .btn.ghost { background:#fff; color:var(--text); border:1px solid var(--line); }
+  .overlay { position:fixed; inset:0; background:rgba(10,16,30,.6); display:none; align-items:center; justify-content:center; padding:16px; z-index:50; }
+  .overlay.open { display:flex; }
+  .sheet { background:#fff; border-radius:14px; max-width:560px; width:100%; max-height:90vh; overflow:auto; padding:18px; position:relative; }
+  .sheet h2 { margin:0 0 6px; font-family: Georgia, serif; font-size:21px; padding-right:30px; }
+  .close { position:absolute; top:10px; right:12px; background:none; border:0; font-size:26px; cursor:pointer; }
+  .qty { display:inline-flex; align-items:center; border:1px solid var(--line); border-radius:9px; overflow:hidden; }
+  .qty button { background:#fff; border:0; padding:8px 12px; font-size:16px; cursor:pointer; }
+  .qty span { padding:0 12px; min-width:28px; text-align:center; }
+  .row { display:flex; gap:10px; align-items:center; justify-content:space-between; flex-wrap:wrap; margin-top:12px; }
+  .form { display:grid; gap:10px; margin-top:10px; }
+  .form label { font-size:14px; display:grid; gap:4px; }
+  .form input { font:inherit; padding:9px 10px; border:1px solid var(--line); border-radius:9px; }
+  .tabs { display:flex; gap:6px; margin:10px 0; }
+  .tabs button { border:1px solid var(--line); background:#fff; border-radius:8px; padding:7px 12px; font:inherit; cursor:pointer; }
+  .tabs button.on { background:var(--c2); color:#fff; border-color:var(--c2); }
+  .total { font-size:18px; font-weight:700; margin:12px 0 4px; display:flex; justify-content:space-between; }
+  .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--c2); color:#fff; padding:10px 16px; border-radius:10px; font-size:14px; opacity:0; transition:.25s; pointer-events:none; z-index:70; max-width:90vw; }
+  .toast.show { opacity:1; }
+  .demo { font-size:12px; color:var(--muted); margin-top:18px; }
+  @media (max-width: 560px) { .ev { grid-template-columns: 64px 1fr; } .ev .right { grid-column: 1 / -1; text-align:left; justify-items:start; } }
+</style>
+</head>
+<body>
+<script src="exemple-commun.js"></script>
+<header class="top">
+  <h1 id="shopName"></h1>
+  <button id="openMine">Mes inscriptions (<span id="mineCount">0</span>)</button>
+</header>
+<section class="hero"><h2 id="shopTitle"></h2><p id="shopSlogan"></p></section>
+
+<main class="wrap">
+  <div class="note" id="typeNote" style="display:none"></div>
+  <div class="chips" id="cats"></div>
+  <h2 class="sectitle" id="sectMain"></h2>
+  <div class="list" id="list"></div>
+  <p class="demo">Maquette : événements fictifs. Les inscriptions et billets sont simulés, aucun paiement n'est effectué.</p>
+</main>
+
+<!-- Inscription / billetterie -->
+<div class="overlay" id="evOv" role="dialog" aria-modal="true">
+  <div class="sheet">
+    <button class="close" data-close aria-label="Fermer">×</button>
+    <h2 id="eTitle"></h2>
+    <div class="meta" id="eMeta"></div>
+    <p id="eDesc"></p>
+    <div class="tabs" id="eTabs"></div>
+    <div id="eBody"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const SHOP_DEFAULT = {
+    main: "events", options: [], name: "Diaspo'Actif", slogan: "Rencontres, ateliers et rendez-vous de la communauté.",
+    colors: ["#83172f", "#111c38", "#d8b36a"], textures: ["uni", "uni", "uni"],
+    sections: ["Nos prochains événements"], hiddenSections: []
+  };
+  const SHOP = (() => {
+    try { return Object.assign({}, SHOP_DEFAULT, JSON.parse(localStorage.getItem("shopConfig")) || {}); }
+    catch (e) { return SHOP_DEFAULT; }
+  })();
+  const TYPE_LABELS = { video: "Boutique Vidéo", ecom: "Boutique Traditionnelle", portfolio: "Portfolio", events: "Créateur d'événements", impact: "Projet Impact" };
+
+  // Événements de démonstration (fictifs)
+  const EVENTS = [
+    { id: 1, t: "Atelier cuisine : saveurs d'Afrique de l'Ouest", month: 11, day: 15, time: "18 h 30", place: "Salle communautaire, Toulouse", cat: "ateliers", price: 12, seats: 20, sold: 14, desc: "Un atelier pratique pour préparer trois plats simples, du marché à l'assiette.", mode: "billet" },
+    { id: 2, t: "Rencontre des entrepreneurs de la diaspora", month: 11, day: 22, time: "14 h 00", place: "Espace Coworking Centre", cat: "rencontres", price: 0, seats: 40, sold: 31, desc: "Échanges, présentation de projets et temps de réseau. Entrée libre sur inscription.", mode: "inscription" },
+    { id: 3, t: "Soirée de contes et musique", month: 12, day: 6, time: "20 h 00", place: "Théâtre municipal", cat: "culture", price: 8, seats: 120, sold: 120, desc: "Une soirée de contes traditionnels accompagnés de musique live.", mode: "billet" },
+    { id: 4, t: "Forum des associations", month: 12, day: 13, time: "10 h 00", place: "Halle des sports", cat: "rencontres", price: 0, seats: 200, sold: 58, desc: "Rencontre avec une trentaine d'associations locales, stands et démonstrations.", mode: "inscription" }
+  ];
+  const CATS = [
+    { id: "all", label: "Tous" }, { id: "ateliers", label: "Ateliers" }, { id: "rencontres", label: "Rencontres" }, { id: "culture", label: "Culture" }
+  ];
+  const MONTHS = ["", "janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
+  const fmt = (n) => n === 0 ? "Gratuit" : n.toFixed(2).replace(".", ",") + " €";
+
+  const state = { cat: "all", current: null, tab: "billet", qty: 1, mine: new Map() }; // mine : id -> { places, mode }
+  const $ = (s) => document.querySelector(s);
+  function toast(m) { const t = $("#toast"); t.textContent = m; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 2400); }
+
+  (function applyShop() {
+    const r = document.documentElement.style;
+    r.setProperty("--c1", SHOP.colors[0]); r.setProperty("--c2", SHOP.colors[1]); r.setProperty("--c3", SHOP.colors[2]);
+    document.title = SHOP.name + " · " + TYPE_LABELS[SHOP.main];
+    $("#shopName").innerHTML = `${SHOP.name} <em>${TYPE_LABELS[SHOP.main]}</em>`;
+    $("#shopTitle").textContent = SHOP.name;
+    $("#shopSlogan").textContent = SHOP.slogan;
+    $("#sectMain").textContent = SHOP.sections[0] || "Nos prochains événements";
+    const on = SHOP.main === "events" || SHOP.options.includes("events");
+    if (!on) {
+      $("#typeNote").style.display = "";
+      $("#typeNote").textContent = "Les événements ne sont pas actifs dans cette boutique. Ils restent conservés dans le bonus boutique.";
+    }
+  })();
+
+  function seatsLeft(e) { return e.seats - e.sold; }
+  function status(e) {
+    const left = seatsLeft(e);
+    if (left <= 0) return `<span class="full">Complet</span>`;
+    if (left <= 5) return `<span class="left">Plus que ${left} place(s)</span>`;
+    return `<span class="meta">${left} place(s) disponibles</span>`;
+  }
+  function render() {
+    $("#cats").innerHTML = CATS.map(c => `<button class="chip ${state.cat === c.id ? "on" : ""}" data-cat="${c.id}">${c.label}</button>`).join("");
+    const l = EVENTS.filter(e => state.cat === "all" || e.cat === state.cat);
+    $("#list").innerHTML = l.length ? l.map(e => `
+      <article class="ev">
+        <div class="date"><b>${e.day}</b><small>${MONTHS[e.month].slice(0, 3)}</small></div>
+        <div><h3>${e.t}</h3><div class="meta">${e.time} · ${e.place}</div></div>
+        <div class="right"><span class="price">${fmt(e.price)}</span>${status(e)}
+          <button class="btn" data-ev="${e.id}">${state.mine.has(e.id) ? "Voir mon inscription" : (e.mode === "billet" ? "Billets" : "S'inscrire")}</button></div>
+      </article>`).join("") : `<p>Aucun événement dans cette catégorie.</p>`;
+    $("#mineCount").textContent = state.mine.size;
+  }
+
+  function openEvent(id) {
+    const e = EVENTS.find(x => x.id === id); state.current = e; state.qty = 1;
+    state.tab = e.mode === "billet" ? "billet" : "inscription";
+    $("#eTitle").textContent = e.t;
+    $("#eMeta").textContent = `${e.day} ${MONTHS[e.month]} · ${e.time} · ${e.place}`;
+    $("#eDesc").textContent = e.desc;
+    $("#evOv").classList.add("open");
+    renderEvent();
+  }
+  function renderEvent() {
+    const e = state.current, left = seatsLeft(e);
+    $("#eTabs").innerHTML = `<button class="${state.tab === "billet" ? "on" : ""}" data-tab="billet">Billets</button><button class="${state.tab === "inscription" ? "on" : ""}" data-tab="inscription">Inscription</button>`;
+    const already = state.mine.get(e.id);
+    if (already) {
+      $("#eBody").innerHTML = `<p>Vous êtes inscrit(e) : ${already.places} place(s), ${fmt(e.price)} par place.</p>
+        <div class="row"><button class="btn ghost" data-cancel="${e.id}">Annuler mon inscription</button></div>`;
+      return;
+    }
+    if (left <= 0) { $("#eBody").innerHTML = `<p class="full">Cet événement est complet.</p>`; return; }
+    if (state.tab === "billet") {
+      $("#eBody").innerHTML = `
+        <div class="row"><span>Prix par billet</span><span class="price">${fmt(e.price)}</span></div>
+        <div class="row"><span>Nombre de billets</span>
+          <div class="qty"><button data-q="-1" aria-label="Diminuer">−</button><span id="qv">${state.qty}</span><button data-q="1" aria-label="Augmenter">+</button></div></div>
+        <div class="total"><span>Total</span><span id="qt">${fmt(e.price * state.qty)}</span></div>
+        <button class="btn" style="width:100%" data-buy="${e.id}">${e.price ? "Payer et réserver (simulé)" : "Réserver gratuitement"}</button>`;
+    } else {
+      $("#eBody").innerHTML = `
+        <form class="form" id="regForm">
+          <label>Nom <input name="nom" required></label>
+          <label>Adresse e-mail <input name="email" type="email" required></label>
+          <label>Nombre de personnes <input name="n" type="number" min="1" max="${Math.min(left, 10)}" value="1" required></label>
+          <button class="btn" type="submit">Confirmer mon inscription</button>
+        </form>`;
+    }
+  }
+  function book(id, places) {
+    const e = EVENTS.find(x => x.id === id);
+    if (places > seatsLeft(e)) { toast(`Il ne reste que ${seatsLeft(e)} place(s)`); return false; }
+    e.sold += places;
+    state.mine.set(id, { places, mode: e.mode });
+    return true;
+  }
+
+  document.addEventListener("click", e => {
+    const t = e.target;
+    const cat = t.closest("[data-cat]"); if (cat) { state.cat = cat.dataset.cat; render(); return; }
+    const ev = t.closest("[data-ev]"); if (ev) { openEvent(Number(ev.dataset.ev)); return; }
+    const tab = t.closest("[data-tab]"); if (tab) { state.tab = tab.dataset.tab; renderEvent(); return; }
+    const q = t.closest("[data-q]");
+    if (q) { state.qty = Math.max(1, Math.min(seatsLeft(state.current), state.qty + Number(q.dataset.q))); $("#qv").textContent = state.qty; $("#qt").textContent = fmt(state.current.price * state.qty); return; }
+    const buy = t.closest("[data-buy]");
+    if (buy) {
+      if (book(Number(buy.dataset.buy), state.qty)) { toast(`Réservation simulée : ${state.qty} billet(s). Aucun paiement réel.`); renderEvent(); render(); }
+      return;
+    }
+    const cancel = t.closest("[data-cancel]");
+    if (cancel) {
+      const id = Number(cancel.dataset.cancel), mine = state.mine.get(id);
+      EVENTS.find(x => x.id === id).sold -= mine.places; state.mine.delete(id);
+      toast("Inscription annulée"); renderEvent(); render(); return;
+    }
+    if (t.closest("[data-close]") || t.classList.contains("overlay")) { t.closest(".overlay")?.classList.remove("open"); render(); return; }
+    if (t.closest("#openMine")) {
+      const lines = [...state.mine.entries()].map(([id, m]) => `${EVENTS.find(x => x.id === id).t} : ${m.places} place(s)`);
+      toast(lines.length ? "Mes inscriptions : " + lines.join(" · ") : "Vous n'avez pas encore d'inscription");
+    }
+  });
+  document.addEventListener("submit", e => {
+    if (e.target.id !== "regForm") return;
+    e.preventDefault();
+    const n = Number(e.target.n.value), id = state.current.id;
+    if (book(id, n)) { toast("Inscription enregistrée (maquette)"); renderEvent(); render(); }
+  });
+  document.addEventListener("keydown", e => { if (e.key === "Escape") { document.querySelectorAll(".overlay.open").forEach(o => o.classList.remove("open")); render(); } });
+  render();
+</script>
+</body>
+</html>
