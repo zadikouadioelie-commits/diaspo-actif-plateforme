@@ -185,6 +185,9 @@
   }).catch(() => {});
 </script>
 <script src="assets/sidebar-premium-cadre.js?v=7"></script>
+<script src="assets/boutique-types.js"></script>
+<script src="assets/boutique-exemple-bouton.js"></script>
+<script src="assets/boutique-types-ui.js"></script>
 <script src="assets/soumission-da.js"></script>
 <script src="assets/retours-commun.js?v=1"></script>
 <script src="assets/retours-vendeur.js?v=1"></script>
@@ -7192,6 +7195,12 @@ function renderPvTemplates() {
   const grid = document.getElementById('pv-templates-grid');
   if (!grid || !__pvRegistry) return;
   const courant = __pvVitrineType || (__pvVitrineTypes[0] || null);
+  /* Lot B : quand l'administrateur a mis en service les 6 types, l'écran vient du registre (assets/boutique-types-ui.js). */
+  if (__pvRegistry.types_v2 && __pvRegistry.types_v2.actif && window.BoutiqueTypesUI) {
+    BoutiqueTypesUI.rendre(grid, { desc: __pvRegistry.types_v2, courant, onChoisir: pvChoisirType });
+    renderPvBonus();
+    return;
+  }
   grid.innerHTML = Object.entries(__pvRegistry.templates).map(([key, t]) => {
     const actif = courant === key;
     const dispo = (t.actifs || []).filter(m => __pvRegistry.modules[m] && __pvRegistry.modules[m].implemente);
@@ -7220,6 +7229,9 @@ function pvChoisirType(type) {
   if (!__pvRegistry) return;
   const courant = __pvVitrineType || (__pvVitrineTypes[0] || null);
   if (type === courant) return;
+  /* Lot B : « commercial » et « ecom » sont le même type (correspondance du registre) ; ne rien proposer dans ce cas. */
+  const v2 = __pvRegistry.types_v2;
+  if (v2 && v2.actif && window.BoutiqueTypesUI && BoutiqueTypesUI.canonique(v2, courant) === type) return;
   pvOuvrirChangementType(type);
 }
 
@@ -7241,9 +7253,9 @@ async function pvOuvrirChangementType(type) {
   overlay.id = 'pv-confirm-modal';
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(13,27,42,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto;';
   overlay.innerHTML = `<div role="dialog" aria-modal="true" style="background:#fff;border-radius:16px;max-width:560px;width:100%;padding:26px;max-height:90vh;overflow:auto;">
-    <h2 style="margin:0 0 10px;font-size:18px;color:#0D1B2A;">Passer en « ${_mvEsc(t.label)} » ?</h2>
+    <h2 style="margin:0 0 10px;font-size:18px;color:#0D1B2A;">Passer en « ${_mvEsc(t.label_v2 || t.label)} » ?</h2>
     <div style="background:#FFF7ED;border:1px solid #FDBA74;border-radius:10px;padding:12px 14px;margin-bottom:12px;font-size:13px;line-height:1.65;color:#7C2D12;">
-      <strong>Votre boutique va changer entièrement de présentation</strong> pour prendre la forme du type « ${_mvEsc(t.label)} ». Certaines rubriques seront réduites ou n'existeront plus dans cette présentation : elles seront <strong>conservées dans l'onglet « Bonus de la boutique »</strong>, sans mise en avant, et masquées aux visiteurs tant que vous ne les publiez pas.
+      <strong>Votre boutique va changer entièrement de présentation</strong> pour prendre la forme du type « ${_mvEsc(t.label_v2 || t.label)} ». Certaines rubriques seront réduites ou n'existeront plus dans cette présentation : elles seront <strong>conservées dans l'onglet « Bonus de la boutique »</strong>, sans mise en avant, et masquées aux visiteurs tant que vous ne les publiez pas.
     </div>
     ${bloc('✅ Conservées', '#F0FDF4', '#BBF7D0', '#166534', conserves.map(o => _mvEsc(o.label)).join(' · '))}
     ${bloc('🔄 Adaptées automatiquement', '#EFF6FF', '#BFDBFE', '#1E3A8A', adaptes.map(o => `<div><strong>${_mvEsc(o.label)}</strong> — ${_mvEsc(o.adaptation.quoi)}</div>`).join(''))}

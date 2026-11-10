@@ -178,3 +178,17 @@ test('B2 profil-app.html redirige toujours commercial, portfolio, video et accep
   assert.match(src, /vitrine_type === 'portfolio'\) \{ location\.replace\('portfolio\.html/);
   assert.match(src, /vitrine_type === 'video'\) \{ location\.replace\('boutique-video\.html/);
 });
+
+/* ═════════════ B3 — l'écran de choix ═════════════ */
+test('B3 le tableau de bord Initiative charge le registre, le bouton « Voir l\'exemple » et l\'écran des types', () => {
+  const src = fs.readFileSync(path.join(RACINE, 'dashboard-initiative.html'), 'utf8');
+  for (const f of ['assets/boutique-types.js', 'assets/boutique-exemple-bouton.js', 'assets/boutique-types-ui.js']) assert.ok(src.includes(`<script src="${f}"></script>`), `${f} non chargé`);
+  assert.match(src, /types_v2 && __pvRegistry\.types_v2\.actif && window\.BoutiqueTypesUI/);
+  assert.match(src, /BoutiqueTypesUI\.canonique\(v2, courant\) === type/, 'choisir le type déjà en place sous une autre clé ne doit rien proposer');
+});
+
+test('B3 l\'écran des types n\'écrit aucun libellé à la main et ne contient aucune émoticône', () => {
+  const src = fs.readFileSync(path.join(RACINE, 'assets', 'boutique-types-ui.js'), 'utf8');
+  for (const t of Object.values(Registre.TYPES)) assert.ok(!src.includes(t.label), `libellé « ${t.label} » écrit à la main`);
+  assert.doesNotMatch(src, /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/u);
+});
