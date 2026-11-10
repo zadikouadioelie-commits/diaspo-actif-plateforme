@@ -355,7 +355,7 @@ html,html body{overflow-x:clip;}
   <div class="ann-filters ann-filtres-barre">
     <div class="ann-filters-inner">
 
-      <div class="ann-filtres-titre"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16l-6.2 7.4V19l-3.6-1.8v-4.8L4 5Z"/></svg><span>Filtres</span></div>
+      <div class="ann-filtres-titre"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16l-6.2 7.4V19l-3.6-1.8v-4.8L4 5Z"/></svg><span>Filtres</span><a href="#annuaire-resultats" class="ann-corresp" id="ann-corresp" role="status" aria-live="polite" title="Voir les résultats"><span id="ann-corresp-lib">Correspondances</span><b id="ann-corresp-n">…</b></a></div>
 
       <!-- Type d'organisme -->
       <div class="ann-filter-group">
@@ -439,7 +439,7 @@ html,html body{overflow-x:clip;}
   </div>
 
   <!-- ===== NOS INITIATIVES ===== -->
-  <div class="ann-section-head">
+  <div class="ann-section-head" id="annuaire-resultats">
     <div>
       <h2>Nos initiatives</h2>
       <div class="ann-result-count"><strong id="result-count">0</strong> initiative(s) trouvée(s)</div>
@@ -588,10 +588,33 @@ html,html body{overflow-x:clip;}
   if (go && q) go.addEventListener('click', function () { q.dispatchEvent(new Event('input')); });
   sync();
 })();
+/* Cadre « Correspondances » dans la barre de filtres : reprend le nombre de comptes trouvés (#result-count, tenu à jour par assets/app.js)
+   pour qu'on le voie sans descendre ; un clic fait défiler jusqu'aux résultats. */
+(function () {
+  var src = document.getElementById('result-count'), n = document.getElementById('ann-corresp-n'),
+      lib = document.getElementById('ann-corresp-lib'), cadre = document.getElementById('ann-corresp');
+  if (!src || !n || !lib || !cadre) return;
+  function maj() {
+    var v = (src.textContent || '').trim();
+    if (!/^\d+$/.test(v)) return;
+    var k = parseInt(v, 10);
+    n.textContent = k;
+    lib.textContent = k === 0 ? 'Aucune correspondance' : (k === 1 ? 'Correspondance' : 'Correspondances');
+    cadre.classList.toggle('vide', k === 0);
+    n.style.display = k === 0 ? 'none' : '';
+  }
+  new MutationObserver(maj).observe(src, { childList: true, characterData: true, subtree: true });
+  maj();
+  cadre.addEventListener('click', function (e) {
+    e.preventDefault();
+    var cible = document.getElementById('annuaire-resultats');
+    if (cible) cible.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+})();
 </script>
 <!-- Design « Nuit dorée » (2026-10-11) : surcharges chargées en dernier, tout est préfixé body.nd ; retour arrière : retirer ces 2 lignes et class="nd" sur <body> -->
 <link rel="stylesheet" href="/assets/theme-nuit-doree.css?v=8">
-<link rel="stylesheet" href="/assets/annuaire-nuit-doree.css?v=11">
+<link rel="stylesheet" href="/assets/annuaire-nuit-doree.css?v=12">
 </body>
 </html>
 

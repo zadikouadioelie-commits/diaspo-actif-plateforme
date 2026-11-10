@@ -177,3 +177,11 @@ html body.nd #btn-reset-filters{grid-row:1;grid-column:6;justify-self:end;align-
   html body.nd .ann-filtres-barre>.ann-filters-inner:not(#ann-affiner){grid-template-columns:minmax(0,1fr);padding:18px}
   html body.nd .ann-filtres-barre .ann-filter-group:has(>#btn-affiner),html body.nd #btn-reset-filters{grid-row:auto;grid-column:1;justify-self:start}
 }
+
+/* Cadre « Correspondances » : nombre de comptes trouvés, visible en haut de la barre de filtres */
+html body.nd .ann-filtres-titre{gap:16px;flex-wrap:wrap}
+html body.nd .ann-corresp{display:inline-flex;align-items:center;gap:10px;padding:7px 8px 7px 16px;border-radius:12px;border:1px solid var(--nd-or);background:rgba(227,192,110,.10);color:#fff;font-size:14px;font-weight:600;text-decoration:none;cursor:pointer;transition:background .2s}
+html body.nd .ann-corresp:hover{background:rgba(227,192,110,.2)}
+html body.nd .ann-corresp:focus-visible{outline:2px solid var(--nd-or);outline-offset:3px}
+html body.nd .ann-corresp b{min-width:34px;padding:3px 10px;border-radius:8px;background:var(--nd-degore);color:#1a1202;font-size:16px;font-weight:800;text-align:center;font-variant-numeric:tabular-nums}
+html body.nd .ann-corresp.vide{border-color:var(--nd-bord2);background:rgba(255,255,255,.04);color:var(--nd-doux);padding:7px 16px}
