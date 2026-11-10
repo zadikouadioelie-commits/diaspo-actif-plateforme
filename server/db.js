@@ -9381,6 +9381,9 @@ db.exec(`
      stripe_session_id. Rétabli le 2026-10-09 : ces deux lignes avaient disparu du code alors que server/index.js les utilise
      (INSERT ... provider) — chaque commande boutique payante échouait en production. */
   ["commandes_vitrine", "provider TEXT DEFAULT 'stripe'"],
+  /* Paiement DIRECT au commerçant (2026-11-10) : 1 = l'argent a été encaissé directement par le vendeur
+     (Stripe Connect / PayPal), sans transiter par la plateforme → aucun crédit de portefeuille. */
+  ["commandes_vitrine", "paiement_direct INTEGER DEFAULT 0"],
   ["commandes_vitrine", "paypal_order_id TEXT"],
   ["vitrine_publications", "media_bg TEXT"],
   ["vitrine_avis", "titre TEXT"],

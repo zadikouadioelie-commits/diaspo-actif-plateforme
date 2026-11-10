@@ -149,6 +149,7 @@ async function pnCharger() {
   }
 }
 
+let PN_CIBLE = null;
 function pnRender() {
   const box = document.getElementById('pn-panier');
   document.getElementById('pn-tab-count').textContent = PN.nb_articles ? '(' + PN.nb_articles + ')' : '';
@@ -158,8 +159,20 @@ function pnRender() {
   }
   const parVendeur = {};
   PN.items.forEach(it => { (parVendeur[it.initiative_id] = parVendeur[it.initiative_id] || []).push(it); });
-  const needsAddress = PN.items.some(it => it.mode_livraison === 'expedition');
-  const bloquant = PN.items.some(it => it.produit_statut !== 'disponible');
+  /* Paiement direct au commerçant : un paiement = une boutique. On règle la boutique choisie,
+     les articles des autres boutiques restent dans le panier. */
+  const idsVendeurs = Object.keys(parVendeur);
+  if (!parVendeur[PN_CIBLE]) PN_CIBLE = idsVendeurs[0];
+  const itemsCible = parVendeur[PN_CIBLE];
+  const totalCible = itemsCible.reduce((s, l) => s + l.sous_total, 0);
+  const needsAddress = itemsCible.some(it => it.mode_livraison === 'expedition');
+  const bloquant = itemsCible.some(it => it.produit_statut !== 'disponible');
+  const choixBoutique = idsVendeurs.length > 1
+    ? `<div style="margin-bottom:10px;">
+        <div style="font-size:13px;font-weight:700;margin-bottom:4px;">Boutique à régler maintenant</div>
+        <select class="pn-sel" onchange="PN_CIBLE=this.value;pnRender()">${idsVendeurs.map(id => `<option value="${id}" ${String(id) === String(PN_CIBLE) ? 'selected' : ''}>${esc(parVendeur[id][0].initiative_nom)} — ${fmt(parVendeur[id].reduce((s, l) => s + l.sous_total, 0), parVendeur[id][0].devise)}</option>`).join('')}</select>
+        <p style="font-size:12px;color:var(--muted);margin:6px 0 0;">Chaque boutique reçoit directement son paiement : vos articles se règlent boutique par boutique. Les autres restent dans votre panier.</p>
+      </div>` : '';
   const nomDefaut = PN_USER ? ((PN_USER.prenom ? PN_USER.prenom + ' ' : '') + (PN_USER.nom || '')) : '';
 
   const groupes = Object.values(parVendeur).map(lignes => {
@@ -212,12 +225,13 @@ function pnRender() {
     : `<div class="pn-pay">${prestataires.map((p, i) => `<label><input type="radio" name="pn-provider" value="${p.code}" ${i === 0 ? 'checked' : ''}> ${ICONE_PRESTATAIRE[p.code] || '💳'} ${esc(p.label)}</label>`).join('')}</div>`;
 
   box.innerHTML = groupes + `<div class="pn-card">
+    ${choixBoutique}
     ${adresse}
     <div style="font-size:13px;font-weight:700;">Moyen de paiement</div>
     ${moyenPaiementHtml}
-    <div class="pn-total"><span>Total (${PN.nb_articles} article${PN.nb_articles > 1 ? 's' : ''})</span><span>${fmt(PN.total, PN.items[0].devise)}</span></div>
+    <div class="pn-total"><span>Total à payer (${itemsCible.length} article${itemsCible.length > 1 ? 's' : ''})</span><span>${fmt(totalCible, itemsCible[0].devise)}</span></div>
     <p id="pn-err" style="color:#dc2626;font-size:12.5px;display:none;margin:0 0 8px;"></p>
-    <button class="pn-btn" id="pn-payer" onclick="pnPayer()" ${bloquant || aucunPrestataire ? 'disabled' : ''}>💳 Payer ${fmt(PN.total, PN.items[0].devise)}</button>
+    <button class="pn-btn" id="pn-payer" onclick="pnPayer()" ${bloquant || aucunPrestataire ? 'disabled' : ''}>💳 Payer ${fmt(totalCible, itemsCible[0].devise)}</button>
     <div style="text-align:center;margin-top:10px;"><button class="pn-rm" onclick="pnVider()">Vider le panier</button></div>
   </div>`;
 }
@@ -234,8 +248,8 @@ async function pnPayer() {
   const err = document.getElementById('pn-err');
   const btn = document.getElementById('pn-payer');
   err.style.display = 'none';
-  const needsAddress = PN.items.some(it => it.mode_livraison === 'expedition');
-  const body = { provider: document.querySelector('input[name="pn-provider"]:checked')?.value || 'stripe' };
+  const needsAddress = PN.items.some(it => String(it.initiative_id) === String(PN_CIBLE) && it.mode_livraison === 'expedition');
+  const body = { provider: document.querySelector('input[name="pn-provider"]:checked')?.value || 'stripe', initiative_id: Number(PN_CIBLE) };
   if (needsAddress) {
     Object.assign(body, {
       livraison_nom: document.getElementById('pn-nom').value.trim(),

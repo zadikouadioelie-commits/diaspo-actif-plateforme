@@ -5724,9 +5724,14 @@ async function finaliserCommandeVitrinePayee(commandeId) {
   await db.prepare(`UPDATE commandes_vitrine SET paiement_statut='paye', statut='traitee', statut_livraison=CASE WHEN mode_livraison='retrait' THEN 'pret_retrait' ELSE statut_livraison END WHERE id=?`).run(commandeId);
   await db.prepare(`INSERT INTO wallet_transactions (commande_vitrine_id,type,beneficiaire_id,montant,commission_rate,prix_billet,platform_fee,organizer_amount) VALUES (?,'platform_fee',NULL,?,?,?,?,?)`)
     .run(commandeId, platform_fee, COMMISSION_RATE, montant, platform_fee, organizer_amount);
+  /* Paiement DIRECT (2026-11-10) : le vendeur a déjà reçu l'argent sur son propre compte, moins la
+     commission → on enregistre la commission au registre mais on ne crédite JAMAIS son portefeuille
+     (sinon il serait payé deux fois). Anciennes commandes (paiement_direct=0) : comportement inchangé. */
+  if (!cmd.paiement_direct) {
   await db.prepare(`INSERT INTO wallet_transactions (commande_vitrine_id,type,beneficiaire_id,montant,commission_rate,prix_billet,platform_fee,organizer_amount) VALUES (?,'organizer_credit',?,?,?,?,?,?)`)
     .run(commandeId, init.owner_user_id, organizer_amount, COMMISSION_RATE, montant, platform_fee, organizer_amount);
   await db.prepare(`UPDATE users SET wallet_balance = COALESCE(wallet_balance,0) + ? WHERE id = ?`).run(organizer_amount, init.owner_user_id);
+  }
   await db.prepare(`UPDATE platform_wallet SET total_commissions = total_commissions + ?, total_transactions = total_transactions + 1, updated_at = datetime('now') WHERE id = 1`).run(platform_fee);
   try {
     await db.prepare(`INSERT INTO transactions (user_id,type,montant,statut,description,date_transaction) VALUES (?,'commande_boutique',?,'reussi',?,?)`)
@@ -5813,6 +5818,13 @@ route("POST", "/api/produits/:id/commander", async (req, res, params, body) => {
     if (!(await Payments.isProviderAllowed(db, provider, { pays: init.pays, devise: prod.devise }))) {
       return sendJSON(res, 503, { error: "Ce moyen de paiement est momentanément indisponible." });
     }
+    /* Paiement DIRECT au commerçant (2026-11-10) : l'argent va sur le compte du vendeur, jamais sur
+       celui de Diaspo'Actif. Vérifié AVANT de créer la commande : sans compte vendeur actif, pas de vente. */
+    try { await Payments.verifierBeneficiaire(db, provider, prod.initiative_id); }
+    catch (e) {
+      if (e.code === "BENEFICIAIRE_NON_PRET") return sendJSON(res, 409, { error: e.message, code: e.code });
+      throw e;
+    }
 
     /* Frais de livraison inclus automatiquement dans le montant encaissé (2026-09-30, demande
        explicite) — calculé côté serveur à partir de la configuration du produit, jamais transmis
@@ -5838,6 +5850,7 @@ route("POST", "/api/produits/:id/commander", async (req, res, params, body) => {
     try {
       const { providerSessionId, checkoutUrl } = await Payments.creerSessionPaiement({
         db, user, providerCode: provider, devise, lineItems,
+        initiativeId: prod.initiative_id,
         customId: id,
         metadata: { diaspoactif_commande_vitrine_id: String(id) },
         enregistrerCarte: !!body.enregistrer_carte,
@@ -5847,7 +5860,7 @@ route("POST", "/api/produits/:id/commander", async (req, res, params, body) => {
         cancelUrl: `${origin}/profil.html?id=${init.owner_user_id}&vitrine=1&paiement=annule&commande=${id}`,
       });
       const sessionColonne = provider === "paypal" ? "paypal_order_id" : "stripe_session_id";
-      await db.prepare(`UPDATE commandes_vitrine SET ${sessionColonne}=? WHERE id=?`).run(providerSessionId, id);
+      await db.prepare(`UPDATE commandes_vitrine SET ${sessionColonne}=?, paiement_direct=1 WHERE id=?`).run(providerSessionId, id);
       return sendJSON(res, 201, { ok: true, id, checkout_url: checkoutUrl });
     } catch (e) {
       await db.prepare(`UPDATE commandes_vitrine SET paiement_statut=? WHERE id=?`).run(Payments.STATUT_PAIEMENT.ECHOUE, id);
@@ -5894,7 +5907,8 @@ route("GET", "/api/paypal/commandes/:id/retour", async (req, res, params) => {
   }
   try {
     const { captureOrder } = require("./paypal-client");
-    await captureOrder(cmd.paypal_order_id);
+    const compteVendeur = await db.prepare("SELECT merchant_id_paypal FROM paypal_connect_accounts WHERE initiative_id=?").get(cmd.initiative_id);
+    await captureOrder(cmd.paypal_order_id, { merchantId: compteVendeur?.merchant_id_paypal });
     await finaliserCommandeVitrinePayee(commandeId);
   } catch (e) {
     logError(e, "paypal-capture-commande-vitrine", req);
@@ -6029,23 +6043,29 @@ route("DELETE", "/api/panier", async (req, res) => {
   sendJSON(res, 200, { ok: true });
 });
 
-/* POST /api/panier/commander — paie TOUT le panier en une fois. Chaque article devient sa
-   propre ligne commandes_vitrine ; si le panier contient plusieurs vendeurs, une seule session
-   de paiement (Stripe ou PayPal) couvre toutes les lignes, qui sont ensuite créditées
-   séparément par finaliserCommandeVitrinePayee (voir le webhook Stripe et le retour PayPal
-   ci-dessous) — même mécanique de commission 4%/wallet que l'achat direct, appliquée N fois. */
+/* POST /api/panier/commander — paie les articles d'UNE boutique à la fois (paiement direct au
+   commerçant, 2026-11-10 : un paiement = un vendeur ; les autres boutiques restent dans le panier).
+   Chaque article devient sa propre ligne commandes_vitrine, finalisée par finaliserCommandeVitrinePayee
+   (webhook Stripe / retour PayPal) ; la commission est prélevée à la source, sans crédit de portefeuille. */
 route("POST", "/api/panier/commander", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   if (await boutiquesEnMaintenance()) return sendJSON(res, 423, { error: "Les achats en boutique sont temporairement suspendus pendant une réorganisation. Merci de réessayer un peu plus tard.", maintenance: true });
 
-  const items = await db.prepare(`
+  const itemsPanier = await db.prepare(`
     SELECT pi.*, p.nom AS produit_nom, p.prix, p.devise, p.initiative_id, p.statut AS produit_statut,
       p.livraison_retrait, p.livraison_expedition, p.frais_expedition
     FROM panier_items pi JOIN produits_vitrine p ON p.id = pi.produit_id
     WHERE pi.user_id = ?
   `).all(user.id);
-  if (!items.length) return sendJSON(res, 400, { error: "Votre panier est vide." });
+  if (!itemsPanier.length) return sendJSON(res, 400, { error: "Votre panier est vide." });
+  /* Paiement DIRECT au commerçant (2026-11-10) : chaque paiement va à UN seul vendeur. Un panier
+     regroupant plusieurs boutiques se règle donc boutique par boutique : on traite d'abord la
+     première, les articles des autres boutiques restent dans le panier pour le paiement suivant. */
+  const demandee = Number(body.initiative_id);
+  const initiativeCible = itemsPanier.some(it => Number(it.initiative_id) === demandee) ? demandee : itemsPanier[0].initiative_id;
+  const items = itemsPanier.filter(it => Number(it.initiative_id) === Number(initiativeCible));
+  const resteDansPanier = itemsPanier.length - items.length;
 
   // Validation complète AVANT toute création de commande/session — même esprit que
   // POST /api/produits/:id/commander (jamais de ligne 'en_attente' orpheline).
@@ -6089,6 +6109,11 @@ route("POST", "/api/panier/commander", async (req, res, params, body) => {
   if (!(await Payments.isProviderAllowed(db, provider))) {
     return sendJSON(res, 503, { error: "Ce moyen de paiement est momentanément indisponible." });
   }
+  try { await Payments.verifierBeneficiaire(db, provider, initiativeCible); }
+  catch (e) {
+    if (e.code === "BENEFICIAIRE_NON_PRET") return sendJSON(res, 409, { error: e.message, code: e.code });
+    throw e;
+  }
 
   const devise = (items[0].devise || "EUR").toUpperCase();
   const commandes = [];
@@ -6119,6 +6144,7 @@ route("POST", "/api/panier/commander", async (req, res, params, body) => {
   try {
     const { providerSessionId, checkoutUrl } = await Payments.creerSessionPaiement({
       db, user, providerCode: provider, devise, lineItems,
+      initiativeId: initiativeCible,
       customId: `panier-${user.id}`,
       metadata: { diaspoactif_panier_checkout: "1" },
       successUrl: provider === "paypal"
@@ -6127,9 +6153,9 @@ route("POST", "/api/panier/commander", async (req, res, params, body) => {
       cancelUrl: `${origin}/panier.html?paiement=annule`,
     });
     const sessionColonne = provider === "paypal" ? "paypal_order_id" : "stripe_session_id";
-    await db.prepare(`UPDATE commandes_vitrine SET ${sessionColonne}=? WHERE id IN (${idsPlaceholders})`).run(providerSessionId, ...commandes.map(c => c.id));
-    await db.prepare("DELETE FROM panier_items WHERE user_id=?").run(user.id);
-    return sendJSON(res, 201, { ok: true, checkout_url: checkoutUrl });
+    await db.prepare(`UPDATE commandes_vitrine SET ${sessionColonne}=?, paiement_direct=1 WHERE id IN (${idsPlaceholders})`).run(providerSessionId, ...commandes.map(c => c.id));
+    await db.prepare(`DELETE FROM panier_items WHERE user_id=? AND id IN (${items.map(() => "?").join(",")})`).run(user.id, ...items.map(it => it.id));
+    return sendJSON(res, 201, { ok: true, checkout_url: checkoutUrl, reste_dans_panier: resteDansPanier });
   } catch (e) {
     await db.prepare(`UPDATE commandes_vitrine SET paiement_statut=? WHERE id IN (${idsPlaceholders})`).run(Payments.STATUT_PAIEMENT.ECHOUE, ...commandes.map(c => c.id));
     return sendJSON(res, 500, SEC.safeError(e, "panier-commander-checkout"));
@@ -6145,10 +6171,11 @@ route("GET", "/api/paypal/panier/retour", async (req, res) => {
   const ids = String(req.query?.ids || "").split(",").map(Number).filter(n => Number.isInteger(n) && n > 0);
   if (ids.length) {
     try {
-      const premiere = await db.prepare(`SELECT paypal_order_id FROM commandes_vitrine WHERE id=?`).get(ids[0]);
+      const premiere = await db.prepare(`SELECT paypal_order_id, initiative_id FROM commandes_vitrine WHERE id=?`).get(ids[0]);
       if (premiere?.paypal_order_id) {
         const { captureOrder } = require("./paypal-client");
-        await captureOrder(premiere.paypal_order_id);
+        const compteVendeur = await db.prepare("SELECT merchant_id_paypal FROM paypal_connect_accounts WHERE initiative_id=?").get(premiere.initiative_id);
+        await captureOrder(premiere.paypal_order_id, { merchantId: compteVendeur?.merchant_id_paypal });
         for (const id of ids) await finaliserCommandeVitrinePayee(id);
       }
     } catch (e) {

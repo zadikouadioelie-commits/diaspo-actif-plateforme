@@ -11,13 +11,15 @@ function isConfigured() {
   return paypalEnabled;
 }
 
-async function createCheckoutSession({ devise, lineItems, customId, successUrl, cancelUrl }) {
+async function createCheckoutSession({ devise, lineItems, customId, successUrl, cancelUrl, beneficiaire, commission }) {
   if (!paypalEnabled) throw new Error("Module PayPal désactivé (clés absentes).");
+  if (!beneficiaire?.compte) throw new Error("Compte PayPal du commerçant absent : paiement direct impossible.");
   const montant = parseFloat(lineItems.reduce((s, li) => s + Number(li.montantUnitaire) * (li.quantite || 1), 0).toFixed(2));
   const description = lineItems.length === 1
     ? `${lineItems[0].nom}${lineItems[0].quantite > 1 ? ` (x${lineItems[0].quantite})` : ""}`
     : `Panier Diaspo'Actif (${lineItems.length} article${lineItems.length > 1 ? "s" : ""})`;
-  const order = await createOrder({ amount: montant, currency: devise, description, custom_id: customId, return_url: successUrl, cancel_url: cancelUrl });
+  const order = await createOrder({ amount: montant, currency: devise, description, custom_id: customId, return_url: successUrl, cancel_url: cancelUrl,
+    payee_merchant_id: beneficiaire.compte, platform_fee: commission });
   return { providerSessionId: order.id, checkoutUrl: order.approveUrl };
 }
 

@@ -2,7 +2,7 @@
    Enveloppe fine autour de server/stripe-client.js : ne change aucun comportement, centralise
    juste la construction de la session Checkout qui était dupliquée dans
    POST /api/produits/:id/commander et POST /api/panier/commander (server/index.js). */
-const { stripe, getOrCreateStripeCustomer } = require("../stripe-client");
+const { stripe } = require("../stripe-client");
 
 const code = "stripe";
 const label = "Carte bancaire";
@@ -12,13 +12,22 @@ function isConfigured() {
 }
 
 /* lineItems: [{ nom, montantUnitaire, quantite }] — montantUnitaire en unité principale (ex. 12.50),
-   converti ici en centimes comme l'exige Stripe. metadata : objet simple string->string. */
-async function createCheckoutSession({ db, user, devise, lineItems, metadata, successUrl, cancelUrl, enregistrerCarte }) {
+   converti ici en centimes comme l'exige Stripe. metadata : objet simple string->string.
+
+   PAIEMENT DIRECT AU COMMERÇANT (décision du 2026-11-10) : la session est créée SUR le compte
+   Stripe Connect du vendeur (en-tête Stripe-Account = beneficiaire.compte, « direct charge »).
+   L'argent est donc encaissé par le commerçant ; Diaspo'Actif ne reçoit que la commission
+   (application_fee_amount, calculée par server/commission.js). Aucun transit sur le compte de la
+   plateforme. Conséquence : le client Stripe de la plateforme n'existe pas sur le compte du
+   vendeur — on passe l'e-mail de l'acheteur (customer_email) et l'enregistrement de carte
+   (setup_future_usage) n'est pas proposé pour ces paiements. */
+async function createCheckoutSession({ user, devise, lineItems, metadata, successUrl, cancelUrl, beneficiaire, commission }) {
   if (!stripe) throw new Error("Module Stripe désactivé (clé absente).");
-  const customerId = await getOrCreateStripeCustomer(db, user);
+  if (!beneficiaire?.compte) throw new Error("Compte Stripe du commerçant absent : paiement direct impossible.");
+  const fraisCentimes = Math.round(Number(commission || 0) * 100);
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
-    customer: customerId,
+    ...(user?.email ? { customer_email: user.email } : {}),
     line_items: lineItems.map(li => ({
       price_data: {
         currency: devise.toLowerCase(),
@@ -27,11 +36,14 @@ async function createCheckoutSession({ db, user, devise, lineItems, metadata, su
       },
       quantity: li.quantite || 1,
     })),
-    ...(enregistrerCarte ? { payment_intent_data: { setup_future_usage: "off_session" } } : {}),
+    payment_intent_data: {
+      ...(fraisCentimes > 0 ? { application_fee_amount: fraisCentimes } : {}),
+      metadata,
+    },
     metadata,
     success_url: successUrl,
     cancel_url: cancelUrl,
-  });
+  }, { stripeAccount: beneficiaire.compte });
   return { providerSessionId: session.id, checkoutUrl: session.url };
 }
 
