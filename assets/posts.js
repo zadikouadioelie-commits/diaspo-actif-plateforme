@@ -1254,6 +1254,15 @@ body:has(.pd-overlay:not([style*="display: none"])) #da-cookie-banner{display:no
   .post-contribute-btn{font-size:.75rem;}
 }`;
   document.head.appendChild(s);
+  /* Fenêtres de création / contribution en Nuit dorée sur TOUTES les pages (2026-11-10) : feuille partagée,
+     indépendante de `body.nd` (avant, seules quelques pages avaient le style sombre → fenêtre blanche, titre invisible). */
+  if (!document.getElementById('posts-modal-nd-css')) {
+    const l = document.createElement('link');
+    l.id = 'posts-modal-nd-css';
+    l.rel = 'stylesheet';
+    l.href = 'assets/posts-modal-nuit-doree.css?v=1';
+    document.head.appendChild(l);
+  }
 }
 
 /* ══════════════════════════════════════════════

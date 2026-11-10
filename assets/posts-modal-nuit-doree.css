@@ -1,0 +1,77 @@
+/* ============================================================================================
+   Fenêtres « Créer une publication » et « Je souhaite contribuer » en Nuit dorée (2026-11-10, demande explicite, capture à l'appui :
+   « style nouvelle D'A »).
+   Constat : la fenêtre était blanche sur fond sombre et son titre INVISIBLE (texte blanc sur fond blanc — une règle de la page force les titres
+   en blanc). Le style existait déjà dans fil-nuit-doree.css / profil-nuit-doree.css, mais seulement sous `body.nd` et seulement sur les pages qui
+   chargent ces feuilles : tableaux de bord Initiative, Collectivité, accueil… n'avaient rien. Cette feuille est donc chargée par assets/posts.js
+   lui-même à la fabrication de la fenêtre : toutes les pages en profitent, sans dépendre de `.nd`.
+   Valeurs littérales (pas de var(--nd-*)) : elles ne sont pas définies partout. Même rendu que fil-nuit-doree.css.
+   ============================================================================================ */
+html body .posts-modal-overlay:not(.pd-overlay){background:rgba(3,6,14,.78)!important;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+html body .posts-modal-box{
+  --muted:#A9B4CC;--text-secondary:#A9B4CC;--border:rgba(255,255,255,.09);--text:#E8ECF6;
+  background:radial-gradient(420px 220px at 100% 0%,rgba(227,192,110,.14),transparent 66%),linear-gradient(160deg,#14234a 0%,#0B1226 62%)!important;
+  border:1px solid rgba(227,192,110,.4)!important;border-radius:26px!important;color:#E8ECF6;
+  box-shadow:0 40px 80px -30px #000;scrollbar-width:thin;scrollbar-color:rgba(227,192,110,.4) transparent;
+}
+html body .posts-modal-box :is(p,span,div,li){color:inherit}
+html body .posts-modal-box .posts-modal-header{background:#101c3e!important;border-bottom:1px solid rgba(255,255,255,.09)!important;padding:16px 22px}
+html body .posts-modal-box .posts-modal-footer{background:#0f1a38!important;border-top:1px solid rgba(255,255,255,.09)!important;flex-wrap:wrap;position:sticky;bottom:0}
+html body .posts-modal-box .posts-modal-title{font-family:"Bodoni Moda","Didot",Georgia,serif!important;font-weight:500;font-size:24px;color:#fff!important;letter-spacing:0}
+html body .posts-modal-box .posts-modal-close{background:rgba(255,255,255,.08)!important;border:1px solid rgba(255,255,255,.09)!important;color:#fff!important;border-radius:50%!important;width:44px;height:44px;flex:none;cursor:pointer;transition:background .2s,border-color .2s}
+html body .posts-modal-box .posts-modal-close:hover{background:rgba(227,192,110,.16)!important;border-color:#E3C06E!important}
+/* Libellés et textes d'aide */
+html body .posts-modal-box :is(label,.posts-label){color:#A9B4CC!important}
+html body .posts-modal-box .posts-aide-corps,html body .posts-modal-box .posts-counter{color:#8E9AB8!important}
+/* Champs */
+html body .posts-modal-box :is(.posts-textarea,.posts-input,.posts-select){background:rgba(255,255,255,.06)!important;border:1px solid rgba(255,255,255,.12)!important;color:#fff!important;border-radius:14px!important;color-scheme:dark;min-height:46px}
+html body .posts-modal-box :is(.posts-textarea,.posts-input,.posts-select)::placeholder{color:#8E9AB8!important}
+html body .posts-modal-box :is(.posts-textarea,.posts-input,.posts-select,.rich-editor-area):focus{outline:none;border-color:#E3C06E!important;box-shadow:0 0 0 3px rgba(227,192,110,.2)}
+html body .posts-modal-box .posts-select option{background:#0f1a38;color:#fff}
+/* Éditeur de texte riche (titre + corps) */
+html body .posts-modal-box .rich-editor-wrap{border:1px solid rgba(255,255,255,.12)!important;border-radius:14px!important;background:rgba(255,255,255,.03)!important;overflow:hidden}
+html body .posts-modal-box .rich-editor-wrap:focus-within{border-color:#E3C06E!important;box-shadow:0 0 0 3px rgba(227,192,110,.2)}
+html body .posts-modal-box .rich-editor-wrap .rich-editor-area{background:transparent!important;border:0!important;border-radius:0!important;box-shadow:none!important;color:#fff!important;caret-color:#E3C06E}
+html body .posts-modal-box .rich-editor-wrap .rich-editor-area:empty::before{color:#8E9AB8!important}
+html body .posts-modal-box .rich-editor-area blockquote{background:rgba(227,192,110,.08)!important;color:#E8ECF6!important;border-left-color:#E3C06E!important}
+html body .posts-modal-box .rich-editor-area a{color:#F3DC9B!important}
+html body .posts-modal-box .rich-editor-toolbar{background:rgba(255,255,255,.05)!important;border-bottom:1px solid rgba(255,255,255,.09)!important;gap:3px}
+html body .posts-modal-box .rich-editor-toolbar button{background:transparent!important;color:#E8ECF6!important;border:1px solid transparent!important;border-radius:10px!important;min-height:34px}
+html body .posts-modal-box .rich-editor-toolbar button:hover{background:rgba(255,255,255,.08)!important;border-color:rgba(227,192,110,.24)!important}
+html body .posts-modal-box .rich-editor-toolbar button.active{background:rgba(227,192,110,.2)!important;border-color:#E3C06E!important;color:#fff!important}
+html body .posts-modal-box .rich-editor-toolbar .rich-editor-sep{background:rgba(255,255,255,.12)!important}
+html body .posts-modal-box .rich-editor-toolbar select{background:rgba(255,255,255,.08)!important;color:#fff!important;border:1px solid rgba(255,255,255,.14)!important;border-radius:10px!important;color-scheme:dark}
+html body .posts-modal-box .rich-editor-toolbar select option{background:#0f1a38!important;color:#fff!important}
+/* Boutons médias, brouillon, programmer, publier */
+html body .posts-modal-box .posts-media-btn{background:rgba(255,255,255,.045)!important;border:1px solid rgba(255,255,255,.12)!important;color:#E8ECF6!important;border-radius:999px!important;min-height:44px;padding:0 16px;font-weight:600;transition:border-color .25s,background .25s}
+html body .posts-modal-box .posts-media-btn:hover{background:rgba(227,192,110,.12)!important;border-color:#E3C06E!important;color:#fff!important}
+html body .posts-modal-box .posts-btn-secondary{background:rgba(255,255,255,.045)!important;border:1px solid rgba(227,192,110,.24)!important;color:#E8ECF6!important;border-radius:999px!important;min-height:46px;padding:0 20px;font-weight:700}
+html body .posts-modal-box .posts-btn-secondary:hover{border-color:#E3C06E!important;color:#fff!important}
+html body .posts-modal-box .posts-btn-primary{background:linear-gradient(135deg,#F3DC9B 0%,#E3C06E 38%,#B9893A 100%)!important;color:#1a1202!important;border:0!important;border-radius:999px!important;min-height:46px;padding:0 26px;font-weight:800;box-shadow:0 12px 26px -14px rgba(227,192,110,.7)}
+html body .posts-modal-box .posts-btn-primary:hover{filter:brightness(1.06)}
+html body .posts-modal-box :is(.posts-media-btn,.posts-btn-secondary,.posts-btn-primary,.posts-modal-close,.contrib-option):focus-visible{outline:3px solid #E3C06E;outline-offset:2px}
+/* Médias ajoutés, programmation */
+html body .posts-modal-box .posts-media-item{background:rgba(255,255,255,.045)!important;border:1px solid rgba(255,255,255,.09)!important;border-radius:14px!important;color:#E8ECF6!important;padding:8px 12px}
+html body .posts-modal-box .posts-media-item input{color:#fff!important;background:none!important;border:0!important;box-shadow:none!important;min-height:0}
+html body .posts-modal-box .posts-media-item input::placeholder{color:#8E9AB8}
+html body .posts-modal-box .posts-media-item :is(img,video){border-radius:10px}
+html body .posts-modal-box .posts-media-remove{color:#FFB4B4!important;border-radius:50%}
+html body .posts-modal-box #posts-schedule-panel{background:rgba(255,255,255,.04)!important;border-top:1px solid rgba(255,255,255,.09)!important}
+html body .posts-modal-box #posts-schedule-panel .posts-btn-primary{margin-top:10px!important}
+html body .posts-modal-box #post-programmed-at{max-width:300px!important}
+/* Fenêtre « Je souhaite contribuer » : choix de contribution */
+html body .posts-modal-box .contrib-option{background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.12)!important;border-radius:14px!important;color:#E8ECF6;min-height:46px;padding:10px 14px}
+html body .posts-modal-box .contrib-option:hover,html body .posts-modal-box .contrib-option:has(input:checked){border-color:#E3C06E!important;background:rgba(227,192,110,.1)}
+html body .posts-modal-box .contrib-option input[type=radio]{accent-color:#E3C06E;width:18px;height:18px}
+/* Téléphone : la fenêtre occupe l'écran, pied de page toujours atteignable */
+@media (max-width:560px){
+  html body .posts-modal-overlay:not(.pd-overlay){padding:8px}
+  html body .posts-modal-box{max-height:96dvh;border-radius:22px!important}
+  html body .posts-modal-box .posts-modal-header{padding:14px 16px}
+  html body .posts-modal-box .posts-modal-title{font-size:21px}
+  html body .posts-modal-box .posts-options-grid{grid-template-columns:1fr}
+  html body .posts-modal-box .posts-modal-footer{padding:12px 14px}
+  html body .posts-modal-box .posts-modal-footer .posts-btn-primary{flex:1 1 100%;order:-1}
+  html body .posts-modal-box .posts-modal-footer .posts-btn-secondary{flex:1 1 calc(50% - 4px);padding:0 10px}
+}
+@media (prefers-reduced-motion:reduce){html body .posts-modal-box *{transition:none!important}}
