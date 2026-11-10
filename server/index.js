@@ -3618,6 +3618,7 @@ route("POST", "/api/initiatives/:id/produits", async (req, res, params, body) =>
   const livraisonRetraitVal = livraison_retrait === false || livraison_retrait === 0 ? 0 : 1;
   const livraisonExpeditionVal = livraison_expedition === true || livraison_expedition === 1 ? 1 : 0;
   const fraisExpeditionVal = frais_expedition != null && frais_expedition !== '' ? Number(frais_expedition) : null;
+  if (dureeVideoTropLongue({ video_duree })) return sendJSON(res, 400, { error: `Vidéo trop longue : ${DUREE_VIDEO_BOUTIQUE_MAX_S} secondes maximum.` });
   const videoChamps = champsVideoProduit({ video_url, video_duree, video_type });
   const id = (await db.prepare(`
     INSERT INTO produits_vitrine (initiative_id, nom, description, prix, devise, disponible, statut, date_retour, reference, categorie, photos_json, ordre, prix_promo, catalogue_id, devis_active, livraison_retrait, livraison_expedition, frais_expedition, video_url, video_duree, video_type)
@@ -3633,11 +3634,18 @@ route("POST", "/api/initiatives/:id/produits", async (req, res, params, body) =>
 
 /* Boutique vidéo (2026-11-01) : champs d'une vidéo à vendre. L'adresse doit être http(s) (aperçu), la durée est en secondes
    (1 à 3600), le genre est « courte » (60 s ou moins), « explicative » (1 à 3 min) ou « serie » ; tout le reste est ignoré. */
+/* Durée maximale d'une vidéo de boutique : 57 secondes (décision du 2026-11-10, remplace 33 s / 3600 s).
+   Contrôle côté serveur sur la durée déclarée ; refus explicite plutôt qu'un arrondi silencieux. */
+const DUREE_VIDEO_BOUTIQUE_MAX_S = 57;
+function dureeVideoTropLongue(b) {
+  const d = Math.round(Number(b && b.video_duree));
+  return Number.isFinite(d) && d > DUREE_VIDEO_BOUTIQUE_MAX_S;
+}
 function champsVideoProduit(b) {
   const u = String(b.video_url == null ? "" : b.video_url).trim();
   const url = /^https?:\/\//i.test(u) && u.length <= 600 ? u : null;
   const d = Math.round(Number(b.video_duree));
-  const duree = Number.isFinite(d) && d > 0 && d <= 3600 ? d : null;
+  const duree = Number.isFinite(d) && d > 0 && d <= DUREE_VIDEO_BOUTIQUE_MAX_S ? d : null;
   const t = String(b.video_type == null ? "" : b.video_type).trim().toLowerCase();
   const type = ["courte", "explicative", "serie"].includes(t) ? t : null;
   return { url, duree, type };
@@ -3673,6 +3681,7 @@ route("PUT", "/api/produits/:id", async (req, res, params, body) => {
       catId = Number(catalogue_id);
     }
   }
+  if (video_duree !== undefined && dureeVideoTropLongue({ video_duree })) return sendJSON(res, 400, { error: `Vidéo trop longue : ${DUREE_VIDEO_BOUTIQUE_MAX_S} secondes maximum.` });
   // devis_active : tri-état (null=hérite le réglage de la vitrine, 1=forcé actif, 0=forcé inactif)
   const devisActiveVal = devis_active !== undefined
     ? (devis_active === true || devis_active === 1 ? 1 : (devis_active === false || devis_active === 0 ? 0 : null))
