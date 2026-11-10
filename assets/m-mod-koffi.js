@@ -19,8 +19,8 @@
     return new Promise(ok => { const sc = document.createElement('script'); sc.src = src; sc.onload = ok; sc.onerror = ok; document.head.appendChild(sc); });
   }
   const chargerAnnuaire = () => charger('/assets/koffi-annuaire.js?v=5', () => !!window.KoffiAnnuaire);
-  const chargerEvenements = () => charger('/assets/koffi-evenements.js?v=4', () => !!window.KoffiEvenements);
-  const chargerInscriptions = () => charger('/assets/koffi-inscriptions.js?v=1', () => !!window.KoffiInscriptions);
+  const chargerEvenements = () => charger('/assets/koffi-evenements.js?v=5', () => !!window.KoffiEvenements);
+  const chargerInscriptions = () => charger('/assets/koffi-inscriptions.js?v=2', () => !!window.KoffiInscriptions);
 
   /* Tous les boutons Koffi du téléphone se déplacent au doigt ; une seule position mémorisée pour qu'il reste où on l'a posé d'un écran à l'autre. */
   const CLE_POS = 'da_koffi_pos_tel';
@@ -100,7 +100,7 @@
     const b = document.createElement('button');
     b.type = 'button'; b.id = 'kn-tel-btn'; b.innerHTML = '<img src="/assets/koffi-avatar-96.webp" alt="" width="46" height="46">'; b.setAttribute('aria-label', 'Koffi : où aller ?'); b.title = 'Koffi : où aller ?';
     b.addEventListener('click', async () => {
-      await charger('/assets/koffi-navigation.js?v=2', () => !!window.KoffiNavigation);
+      await charger('/assets/koffi-navigation.js?v=3', () => !!window.KoffiNavigation);
       if (window.KoffiNavigation) window.KoffiNavigation.ouvrir({ telephone: true });
     });
     document.body.appendChild(b);
