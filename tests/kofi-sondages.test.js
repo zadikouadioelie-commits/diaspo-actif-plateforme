@@ -272,6 +272,31 @@ test('Koffi sondages — parcours complet', async (t) => {
     assert.equal(r.status, 402); assert.equal(r.data.code, 'credits_epuises'); assert.equal(appelsIA().length, avant);
   });
 
+  await t.test('brouillon modifiable en entier : titre, questions (ajout, retrait, ordre, type, choix), obligatoire/facultatif ; refusé aux autres comptes et une fois publié', async () => {
+    const cree = await call(jar.Adm, 'POST', '/api/sondages', { titre: 'À modifier', statut: 'brouillon', diffusion: {}, questions: [
+      { texte: 'Q1', type: 'oui_non', obligatoire: true }, { texte: 'Q2', type: 'texte_libre', obligatoire: false }, { texte: 'Q3', type: 'choix_unique', options: ['a', 'b'] }] });
+    assert.equal(cree.status, 201, JSON.stringify(cree.data)); const id = cree.data.id;
+    const lire = () => sql('select texte, type, obligatoire, ordre, options_json from sondage_questions where sondage_id=? order by ordre', id);
+    assert.deepEqual(lire().map(q => q.obligatoire), [1, 0, 1], 'une question facultative le reste (avant, le serveur forçait « obligatoire »)');
+    assert.equal((await call(jar.Libre, 'PUT', `/api/sondages/${id}/contenu`, { titre: 'piraté' })).status, 403, 'un autre compte ne modifie pas le brouillon');
+    const sans = await call(jar.Adm, 'PUT', `/api/sondages/${id}/contenu`, { questions: [{ texte: 'x', type: 'choix_unique', options: ['seul'] }] });
+    assert.equal(sans.status, 400, 'une question à choix a besoin de 2 choix');
+    const ok = await call(jar.Adm, 'PUT', `/api/sondages/${id}/contenu`, { titre: 'Titre changé', description: 'Nouvelle description', categorie: 'sante', questions: [
+      { texte: 'Q3', type: 'choix_multiple', options: ['a', 'b', 'c'], obligatoire: false }, { texte: 'Q1', type: 'oui_non', obligatoire: true }, { texte: 'Q4', type: 'echelle_5', min_label: 'bas', max_label: 'haut' }] });
+    assert.equal(ok.status, 200, JSON.stringify(ok.data));
+    const l = lire();
+    assert.deepEqual(l.map(q => q.texte), ['Q3', 'Q1', 'Q4'], 'Q2 retirée, Q4 ajoutée, ordre changé');
+    assert.deepEqual(l.map(q => q.obligatoire), [0, 1, 1]); assert.equal(l[0].type, 'choix_multiple'); assert.deepEqual(JSON.parse(l[0].options_json), ['a', 'b', 'c']);
+    assert.equal(sql('select titre from sondages where id=?', id)[0].titre, 'Titre changé');
+    /* Publié : les questions sont figées. */
+    const pub = await call(jar.Adm, 'PUT', `/api/sondages/${id}/diffusion`, { onglet: true });
+    assert.equal(pub.status, 200, JSON.stringify(pub.data));
+    assert.equal((await call(jar.Adm, 'POST', `/api/sondages/${id}/republier`, { duree_jours: 5 })).status, 200);
+    const fige = await call(jar.Adm, 'PUT', `/api/sondages/${id}/contenu`, { titre: 'trop tard' });
+    assert.equal(fige.status, 400); assert.equal(fige.data.code, 'pas_brouillon');
+    assert.equal(sql('select titre from sondages where id=?', id)[0].titre, 'Titre changé');
+  });
+
   await t.test('suppression d\'une conversation : privée, supprimable', async () => {
     assert.equal((await call(jar.Libre, 'DELETE', `/api/kofi/sondages/conversations/${conv}`)).status, 404);
     assert.equal((await call(jar.Adm, 'DELETE', `/api/kofi/sondages/conversations/${conv}`)).status, 200);

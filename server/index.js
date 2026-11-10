@@ -31581,6 +31581,78 @@ async function sondagePublierSurFil(s, user) {
 
 /* Création d'un sondage (2026-11-10) : extraite de la route POST /api/sondages pour que Koffi crée un sondage par EXACTEMENT les mêmes contrôles que le formulaire.
    Renvoie { status, data } ; `me` est le compte connecté (déjà identifié par l'appelant). */
+/* Une question est obligatoire sauf demande contraire explicite (false, 0, « 0 », « false »). Avant le 2026-11-10 le serveur forçait « obligatoire » pour toutes les questions : aucun sondage ne pouvait avoir de question facultative. */
+function sondageObligatoire(v) { return !(v === false || v === 0 || v === '0' || v === 'false') ? 1 : 0; }
+
+/* Modification complète d'un BROUILLON (2026-11-10) : titre, description, catégorie, dates, confidentialité, informations demandées, couverture,
+   lieux d'affichage, événements liés et questions (texte, type, choix, obligatoire/facultatif, ajout, suppression, ordre). Seuls les champs fournis changent.
+   Un sondage déjà publié n'est pas modifiable ici : ses questions sont figées pour ne pas fausser les réponses reçues. Renvoie { status, data }. */
+async function sondageContenuMaj(me, sid, body) {
+  const s = await db.prepare(`SELECT * FROM sondages WHERE id=?`).get(sid);
+  if (!s || (s.createur_id !== me.id && me.role !== 'administrateur')) return { status: 403, data: { error: 'Accès refusé.' } };
+  if (s.statut !== 'brouillon') return { status: 400, data: { error: 'Seul un brouillon peut être modifié librement. Un sondage déjà publié garde ses questions pour ne pas fausser les réponses reçues.', code: 'pas_brouillon' } };
+  body = body && typeof body === 'object' ? body : {};
+  const texteOu = (v, max) => String(v === null || v === undefined ? '' : v).trim().slice(0, max);
+  const set = [], args = [];
+  const poser = (col, val) => { set.push(col + '=?'); args.push(val); };
+  if (body.titre !== undefined) { const t = texteOu(body.titre, 150); if (!t) return { status: 400, data: { error: 'Titre requis.' } }; poser('titre', t); }
+  if (body.description !== undefined) poser('description', texteOu(body.description, 2000) || null);
+  if (body.objectif !== undefined) poser('objectif', texteOu(body.objectif, 300) || null);
+  if (body.categorie !== undefined) poser('categorie', texteOu(body.categorie, 40) || 'autre');
+  if (body.rayon_publication !== undefined) poser('rayon_publication', ['national', 'international', 'region', 'departement', 'ville'].includes(body.rayon_publication) ? body.rayon_publication : 'national');
+  if (body.confidentialite !== undefined) poser('confidentialite', body.confidentialite === 'nominatif' ? 'nominatif' : 'anonyme');
+  if (body.resultats_visibles !== undefined) poser('resultats_visibles', ['apres_cloture', 'temps_reel', 'createur', 'public'].includes(body.resultats_visibles) ? body.resultats_visibles : 'apres_cloture');
+  if (body.anonyme !== undefined || body.champs_repondant !== undefined) {
+    const anonyme = body.anonyme !== undefined ? !!body.anonyme : !!s.anonyme;
+    poser('anonyme', anonyme ? 1 : 0);
+    poser('champs_repondant_json', JSON.stringify(anonyme ? [] : (sondageChampsRepondant(body.champs_repondant) || (body.champs_repondant === undefined ? (() => { try { return JSON.parse(s.champs_repondant_json || 'null') || SONDAGE_CHAMPS_DEFAUT; } catch (_) { return SONDAGE_CHAMPS_DEFAUT; } })() : SONDAGE_CHAMPS_DEFAUT))));
+  }
+  if (body.photos_json !== undefined) {
+    const liste = (Array.isArray(body.photos_json) ? body.photos_json : []).map(u => String(u || '')).filter(u => /^(https:\/\/|\/(?!\/))/.test(u)).slice(0, 5);
+    poser('photos_json', JSON.stringify(liste));
+  }
+  if (body.date_debut !== undefined || body.date_cloture !== undefined) {
+    const jourOk = (v) => /^\d{4}-\d{2}-\d{2}/.test(String(v || ''));
+    const debut = jourOk(body.date_debut) ? String(body.date_debut).slice(0, 10) : (s.date_debut ? String(s.date_debut).slice(0, 10) : sondageJourIso(new Date()));
+    const fin = jourOk(body.date_cloture) ? String(body.date_cloture).slice(0, 10) : sondageAjouterJours(debut, SONDAGE_DUREE_MAX_JOURS - 1);
+    if (fin < debut) return { status: 400, data: { error: 'La date de fin doit être postérieure à la date de début.' } };
+    if (sondageDureeJours(debut, fin) > SONDAGE_DUREE_MAX_JOURS) return { status: 400, data: { error: 'Durée maximale : 30 jours.' } };
+    poser('date_debut', debut); poser('date_cloture', fin);
+  }
+  /* Questions : remplacées en bloc (ajout, suppression, ordre, type, choix, obligatoire). Refusé si une réponse existe déjà. */
+  let questions = null;
+  if (body.questions !== undefined) {
+    if (!Array.isArray(body.questions) || !body.questions.length || body.questions.some(q => !q || !String(q.texte || '').trim())) return { status: 400, data: { error: 'Au moins une question, chacune avec un texte.' } };
+    if (body.questions.length > 60) return { status: 400, data: { error: '60 questions au maximum.' } };
+    const types = ['choix_unique', 'choix_multiple', 'oui_non', 'texte_libre', 'texte_long', 'echelle_5', 'echelle_10', 'etoiles', 'nombre', 'date'];
+    questions = body.questions.map(q => {
+      const type = types.includes(q.type) ? q.type : 'choix_unique';
+      const options = ['choix_unique', 'choix_multiple'].includes(type) ? (Array.isArray(q.options) ? q.options : []).map(o => texteOu(o, 200)).filter(Boolean).slice(0, 30) : [];
+      return { texte: texteOu(q.texte, 500), type, options, obligatoire: sondageObligatoire(q.obligatoire), description: texteOu(q.description, 500) || null, min_label: texteOu(q.min_label, 80) || null, max_label: texteOu(q.max_label, 80) || null, min_val: Number(q.min_val) || 1, max_val: Number(q.max_val) || (type === 'echelle_10' ? 10 : 5) };
+    });
+    const nb = (await db.prepare(`SELECT COUNT(*) AS n FROM sondage_reponses WHERE sondage_id=?`).get(sid)) || {};
+    if (Number(nb.n) > 0) return { status: 409, data: { error: 'Ce sondage a déjà reçu des réponses : ses questions ne peuvent plus être changées.', code: 'a_des_reponses' } };
+    const sansChoix = questions.find(q => ['choix_unique', 'choix_multiple'].includes(q.type) && q.options.length < 2);
+    if (sansChoix) return { status: 400, data: { error: `La question « ${sansChoix.texte.slice(0, 80)} » est à choix : indiquez au moins 2 choix.` } };
+  }
+  if (set.length) await db.prepare(`UPDATE sondages SET ${set.join(', ')} WHERE id=?`).run(...args, sid);
+  if (questions) {
+    await db.prepare(`DELETE FROM sondage_questions WHERE sondage_id=?`).run(sid);
+    for (let i = 0; i < questions.length; i++) {
+      const q = questions[i];
+      await db.prepare(`INSERT INTO sondage_questions(sondage_id,texte,type,options_json,obligatoire,ordre,description,min_label,max_label,min_val,max_val) VALUES(?,?,?,?,?,?,?,?,?,?,?)`)
+        .run(sid, q.texte, q.type, JSON.stringify(q.options), q.obligatoire, i, q.description, q.min_label, q.max_label, q.min_val, q.max_val);
+    }
+  }
+  /* Lieux d'affichage et événements liés (un brouillon peut n'avoir encore aucun lieu). */
+  if (body.diffusion !== undefined || body.evenement_ids !== undefined) {
+    const d = body.diffusion && typeof body.diffusion === 'object' ? body.diffusion : {};
+    const rep = await sondageDiffusion(me, sid, { ...(body.diffusion !== undefined ? { onglet: !!d.onglet, fil: !!d.fil, profil: !!d.profil, boutique: !!d.boutique } : {}), ...(body.evenement_ids !== undefined ? { evenement_ids: body.evenement_ids } : {}) });
+    if (rep.status !== 200) return rep;
+  }
+  return { status: 200, data: { message: 'Brouillon enregistré.', statut: 'brouillon' } };
+}
+
 async function sondageCreer(me, body) {
   if (!(await sondagePeutCreer(me))) return { status: 403, data: { error: 'La création de sondages est réservée aux comptes Initiative, aux comptes étatiques et aux comptes Premium.' } };
   const { titre, description, objectif, categorie, type = 'sondage', ville, pays, region, departement, rayon_publication, date_debut, date_cloture, anonyme, confidentialite, resultats_visibles, une_reponse_par_compte, modification_autorisee, cible_roles, photos_json, pdf_b64, pdf_nom, video_url, questions = [], statut: statutDemande = 'brouillon' } = body;
@@ -31615,7 +31687,7 @@ async function sondageCreer(me, body) {
   for (let i = 0; i < questions.length; i++) {
     const q2 = questions[i];
     await db.prepare(`INSERT INTO sondage_questions(sondage_id,texte,type,options_json,obligatoire,ordre,description,min_label,max_label,min_val,max_val) VALUES(?,?,?,?,?,?,?,?,?,?,?)`)
-      .run(sid,q2.texte,q2.type||'choix_unique',JSON.stringify(q2.options||[]),q2.obligatoire?1:1,i,q2.description||null,q2.min_label||null,q2.max_label||null,q2.min_val||1,q2.max_val||5);
+      .run(sid,q2.texte,q2.type||'choix_unique',JSON.stringify(q2.options||[]),sondageObligatoire(q2.obligatoire),i,q2.description||null,q2.min_label||null,q2.max_label||null,q2.min_val||1,q2.max_val||5);
   }
   for (const i of evtIdsLies) await db.prepare(`INSERT INTO sondage_evenements(sondage_id,evenement_id) VALUES(?,?)`).run(sid, i);
   /* La publication dans le fil d'actualité (et les autres lieux) se règle dans « Diffusion » (étape suivante) : l'ancien envoi automatique
@@ -40498,6 +40570,13 @@ ${jsonLd}
       }
       if (!ma_participation && invitation && invitation.utilise) ma_participation = { invitation: true };
       return sendJSON(res, 200, { sondage, questions, ma_participation, invitation });
+    }
+
+    /* ── PUT /api/sondages/:id/contenu ── modification complète d'un brouillon (questions, obligatoire/facultatif, titre, lieux…) ── */
+    if (req.method === 'PUT' && /^\/api\/sondages\/\d+\/contenu$/.test(pathname)) {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const out = await sondageContenuMaj(me, parseInt(pathname.split('/')[3]), body);
+      return sendJSON(res, out.status, out.data);
     }
 
     /* ── PUT /api/sondages/:id ── */

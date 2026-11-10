@@ -136,6 +136,7 @@
     if (b === 'voir' && /^\d+$/.test(c || '')) return detail(t, Number(c));
     if (b === 'mes') return mesSondages(t);
     if (b === 'nouveau') return formulaire(t);
+    if (b === 'modifier' && /^\d+$/.test(c || '')) return formulaire(t, Number(c));
     location.replace('#/sondages');
   };
 
@@ -257,7 +258,7 @@
         <div class="mso-stats"><div class="mso-stat"><b>${s.nb_reponses || 0}</b><span>réponses</span></div><div class="mso-stat"><b>${s.nb_vues || 0}</b><span>vues</span></div><div class="mso-stat"><b>${s.nb_reactions || 0}</b><span>réactions</span></div></div>
       </div></div>
       ${s.statut === 'cloture' ? `<div class="mso-hint" style="background:var(--orange-l);color:var(--orange-d);border-radius:12px;padding:10px 12px">⏹️ <b>Fin de ce sondage</b> — il n’accepte plus de réponses.${estCreateur ? ' Republiez-le pour le réactiver.' : ''}</div>` : ''}
-      ${s.statut === 'brouillon' ? `<div class="mso-hint" style="background:var(--border);border-radius:12px;padding:10px 12px">📝 Brouillon : ce sondage n’est pas encore publié.</div>` : ''}
+      ${s.statut === 'brouillon' ? `<div class="mso-hint" style="background:var(--border);border-radius:12px;padding:10px 12px">📝 Brouillon : ce sondage n’est pas encore publié.${estCreateur ? ' Touchez « Modifier » pour changer le titre, les questions (obligatoires ou facultatives)…' : ''}</div>` : ''}
       ${dejaRepondu && !ferme ? `<div class="mso-hint" style="background:var(--green-l,#d1fae5);color:var(--green-d,#065f46);border-radius:12px;padding:10px 12px;font-weight:700">✅ Vous avez déjà répondu.</div>` : ''}
       ${peutParticiper ? `<form id="mso-form">${qs.map((q, i) => renderQ(q, i)).join('')}<button type="button" class="btn block" id="mso-submit" style="margin-top:4px">✅ Soumettre</button></form>` : ''}
       ${(ferme || dejaRepondu) ? `<button type="button" class="btn out block" id="mso-res-btn" style="margin-top:4px">📊 Voir les résultats</button><div id="mso-res"></div>` : ''}
@@ -272,7 +273,7 @@
         <button type="button" class="btn out sm" id="mso-diff">📣 Diffusion</button>
         ${!ferme ? `<button type="button" class="btn out sm" id="mso-cloturer">🔒 Clôturer</button>` : ''}
         ${s.statut === 'cloture' ? `<button type="button" class="btn out sm" id="mso-republier">🔁 Republier</button>` : ''}
-        ${s.statut === 'brouillon' ? `<button type="button" class="btn sm" id="mso-publier">🚀 Publier</button>` : ''}
+        ${s.statut === 'brouillon' ? `<button type="button" class="btn out sm" id="mso-modifier">✏️ Modifier</button><button type="button" class="btn sm" id="mso-publier">🚀 Publier</button>` : ''}
         <button type="button" class="btn out sm" id="mso-export">⬇️ Export CSV</button>
       </div><div id="mso-stats-box"></div>` : ''}
       <div class="h2" style="margin-top:16px">COMMENTAIRES</div>
@@ -301,6 +302,7 @@
       const cl = $('#mso-cloturer'); if (cl) cl.onclick = () => cloturer(t, id);
       const rp = $('#mso-republier'); if (rp) rp.onclick = () => republier(t, id, false);
       const pb = $('#mso-publier'); if (pb) pb.onclick = () => republier(t, id, true);
+      const md = $('#mso-modifier'); if (md) md.onclick = () => { location.hash = '#/sondages/modifier/' + id; };
       const ex = $('#mso-export'); if (ex) ex.onclick = () => { window.location.href = '/api/sondages/' + id + '/export'; };
     }
   }
@@ -494,38 +496,65 @@
     const max = new Date(new Date(d.value + 'T00:00:00Z').getTime() + (DUREE_MAX - 1) * 86400000).toISOString().slice(0, 10);
     f.min = d.value; f.max = max; if (f.value && f.value > max) f.value = max;
   }
-  function qCard(idx) {
-    QS.push({ idx, texte: '', type: 'choix_unique', options: [] });
-    const div = document.createElement('div');
-    div.className = 'mso-q'; div.id = 'qb-' + idx;
-    div.innerHTML = `<div class="row" style="justify-content:space-between;align-items:center;margin-bottom:6px"><b class="small">Question ${idx}</b><button type="button" class="btn out sm" data-del-q="${idx}">Retirer</button></div>
-      <label class="mso-l" style="margin:4px 0">Texte</label><input type="text" id="qt-${idx}" placeholder="Texte de la question" oninput="document.dispatchEvent(new CustomEvent('mso-qtxt',{detail:{idx:${idx},v:this.value}}))">
-      <label class="mso-l" style="margin:8px 0 4px">Type</label>
-      <select id="qtype-${idx}">${Q_TYPES.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select>
-      <div id="qopts-${idx}"><div id="qopts-list-${idx}" style="margin-top:8px"></div><button type="button" class="btn out sm" data-add-opt="${idx}" style="margin-top:6px">+ Option</button></div>`;
-    $('#mso-qbuilder').appendChild(div);
-    document.addEventListener('mso-qtxt', ev => { const q = QS.find(x => x.idx === ev.detail.idx); if (q) q.texte = ev.detail.v; });
-    $('#qtype-' + idx).onchange = function () {
-      const q = QS.find(x => x.idx === idx); if (q) q.type = this.value;
-      $('#qopts-' + idx).style.display = ['choix_unique', 'choix_multiple'].includes(this.value) ? '' : 'none';
-    };
-    $(`[data-del-q="${idx}"]`).onclick = () => { QS = QS.filter(x => x.idx !== idx); $('#qb-' + idx).remove(); };
-    $(`[data-add-opt="${idx}"]`).onclick = () => {
-      const q = QS.find(x => x.idx === idx); if (!q) return;
-      const oi = q.options.length; q.options.push('');
-      const row = document.createElement('div');
-      row.style.cssText = 'display:flex;gap:6px;margin-top:4px';
-      row.innerHTML = `<input type="text" placeholder="Option ${oi + 1}" style="flex:1;min-height:40px" oninput="document.dispatchEvent(new CustomEvent('mso-qopt',{detail:{idx:${idx},oi:${oi},v:this.value}}))"><button type="button" class="btn out sm" data-del-opt>×</button>`;
-      $('#qopts-list-' + idx).appendChild(row);
-      row.querySelector('[data-del-opt]').onclick = () => row.remove();
-    };
+  const qAttr = v => esc(v).replace(/"/g, '&quot;');
+  const qDe = idx => QS.find(x => x.idx === idx);
+  function qNouvelle(q) { QIDX++; return Object.assign({ idx: QIDX, texte: '', type: 'choix_unique', options: [], obligatoire: true, description: '', min_label: '', max_label: '', min_val: 1, max_val: 5 }, q || {}); }
+  function qHtml(q, n) {
+    const choix = ['choix_unique', 'choix_multiple'].includes(q.type), echelle = ['echelle_5', 'echelle_10', 'etoiles'].includes(q.type);
+    return `<div class="mso-q" id="qb-${q.idx}">
+      <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:6px;gap:6px"><b class="small">Question ${n + 1}</b>
+        <span style="display:flex;gap:6px"><button type="button" class="btn out sm" data-q-up="${q.idx}" ${n === 0 ? 'disabled' : ''} aria-label="Monter la question ${n + 1}">↑</button><button type="button" class="btn out sm" data-q-down="${q.idx}" ${n === QS.length - 1 ? 'disabled' : ''} aria-label="Descendre la question ${n + 1}">↓</button><button type="button" class="btn out sm" data-del-q="${q.idx}" aria-label="Retirer la question ${n + 1}">Retirer</button></span></div>
+      <label class="mso-l" style="margin:4px 0" for="qt-${q.idx}">Texte</label><input type="text" id="qt-${q.idx}" maxlength="500" value="${qAttr(q.texte)}" placeholder="Texte de la question" data-q-txt="${q.idx}">
+      <label class="mso-l" style="margin:8px 0 4px" for="qtype-${q.idx}">Type</label>
+      <select id="qtype-${q.idx}" data-q-type="${q.idx}">${Q_TYPES.map(([v, l]) => `<option value="${v}" ${v === q.type ? 'selected' : ''}>${l}</option>`).join('')}</select>
+      ${choix ? `<div style="margin-top:8px">${q.options.map((o, i) => `<div style="display:flex;gap:6px;margin-top:4px"><input type="text" maxlength="200" value="${qAttr(o)}" placeholder="Choix ${i + 1}" aria-label="Choix ${i + 1} de la question ${n + 1}" style="flex:1;min-height:40px" data-q-opt="${q.idx}" data-i="${i}"><button type="button" class="btn out sm" data-del-opt="${q.idx}" data-i="${i}" aria-label="Retirer le choix ${i + 1}">×</button></div>`).join('')}<button type="button" class="btn out sm" data-add-opt="${q.idx}" style="margin-top:6px">+ Choix</button></div>` : ''}
+      ${echelle ? `<label class="mso-l" style="margin:8px 0 4px">Libellé du bas de l’échelle <small>(facultatif)</small></label><input type="text" maxlength="80" value="${qAttr(q.min_label)}" data-q-min="${q.idx}"><label class="mso-l" style="margin:8px 0 4px">Libellé du haut de l’échelle <small>(facultatif)</small></label><input type="text" maxlength="80" value="${qAttr(q.max_label)}" data-q-max="${q.idx}">` : ''}
+      <label class="mso-l" style="margin:8px 0 4px" for="qd-${q.idx}">Précision sous la question <small>(facultative)</small></label><input type="text" id="qd-${q.idx}" maxlength="500" value="${qAttr(q.description)}" data-q-desc="${q.idx}">
+      <label class="mso-opt ${q.obligatoire ? 'on' : ''}" style="margin-top:10px"><input type="checkbox" ${q.obligatoire ? 'checked' : ''} data-q-oblig="${q.idx}"><span><b>Réponse obligatoire</b><small>Décochez pour la rendre facultative.</small></span></label>
+    </div>`;
   }
-  document.addEventListener('mso-qopt', ev => { const q = QS.find(x => x.idx === ev.detail.idx); if (q) q.options[ev.detail.oi] = ev.detail.v; });
+  function qRender() {
+    const z = $('#mso-qbuilder'); if (!z) return;
+    z.innerHTML = QS.map((q, n) => qHtml(q, n)).join('');
+    const num = el => Number(el.dataset.qTxt || el.dataset.qType || el.dataset.qOpt || el.dataset.qMin || el.dataset.qMax || el.dataset.qDesc || el.dataset.qOblig);
+    $$('[data-q-txt]', z).forEach(el => { el.oninput = () => { const q = qDe(num(el)); if (q) q.texte = el.value; }; });
+    $$('[data-q-desc]', z).forEach(el => { el.oninput = () => { const q = qDe(num(el)); if (q) q.description = el.value; }; });
+    $$('[data-q-min]', z).forEach(el => { el.oninput = () => { const q = qDe(num(el)); if (q) q.min_label = el.value; }; });
+    $$('[data-q-max]', z).forEach(el => { el.oninput = () => { const q = qDe(num(el)); if (q) q.max_label = el.value; }; });
+    $$('[data-q-opt]', z).forEach(el => { el.oninput = () => { const q = qDe(num(el)); if (q) q.options[Number(el.dataset.i)] = el.value; }; });
+    $$('[data-q-oblig]', z).forEach(el => { el.onchange = () => { const q = qDe(num(el)); if (q) q.obligatoire = el.checked; el.closest('.mso-opt').classList.toggle('on', el.checked); }; });
+    $$('[data-q-type]', z).forEach(el => {
+      el.onchange = () => {
+        const q = qDe(num(el)); if (!q) return; q.type = el.value;
+        if (['choix_unique', 'choix_multiple'].includes(q.type)) { while (q.options.length < 2) q.options.push(''); }
+        q.max_val = q.type === 'echelle_10' ? 10 : 5; qRender();
+      };
+    });
+    $$('[data-del-q]', z).forEach(el => { el.onclick = () => { QS = QS.filter(x => x.idx !== Number(el.dataset.delQ)); qRender(); }; });
+    const bouger = (idx, sens) => { const i = QS.findIndex(x => x.idx === idx), j = i + sens; if (i < 0 || j < 0 || j >= QS.length) return; [QS[i], QS[j]] = [QS[j], QS[i]]; qRender(); };
+    $$('[data-q-up]', z).forEach(el => { el.onclick = () => bouger(Number(el.dataset.qUp), -1); });
+    $$('[data-q-down]', z).forEach(el => { el.onclick = () => bouger(Number(el.dataset.qDown), 1); });
+    $$('[data-add-opt]', z).forEach(el => {
+      el.onclick = () => { const q = qDe(Number(el.dataset.addOpt)); if (!q || q.options.length >= 30) return; q.options.push(''); qRender(); const nv = $$('[data-q-opt="' + q.idx + '"]'); if (nv.length) nv[nv.length - 1].focus(); };
+    });
+    $$('[data-del-opt]', z).forEach(el => { el.onclick = () => { const q = qDe(Number(el.dataset.delOpt)); if (q) { q.options.splice(Number(el.dataset.i), 1); qRender(); } }; });
+  }
+  function qAjouter(q) { const nq = qNouvelle(q); QS.push(nq); qRender(); return nq; }
 
-  async function formulaire(t) {
-    if (!(await gate('Nouveau sondage'))) return;
-    setPane('Nouveau sondage', SK);
+  async function formulaire(t, editId) {
+    const TITRE_F = editId ? 'Modifier le brouillon' : 'Nouveau sondage';
+    if (!(await gate(TITRE_F))) return;
+    setPane(TITRE_F, SK);
     QS = []; QIDX = 0;
+    let ED = null;
+    if (editId) {
+      try {
+        const [d, df] = await Promise.all([api('/api/sondages/' + editId), api('/api/sondages/' + editId + '/diffusion')]);
+        if (!vivant(t)) return;
+        if (d.sondage.statut !== 'brouillon') { toast('Seul un brouillon peut être modifié : un sondage publié garde ses questions.', true); location.replace('#/sondages/voir/' + editId); return; }
+        ED = { s: d.sondage, qs: d.questions || [], dif: df.diffusion || {}, evts: new Set((df.evenement_ids || []).map(Number)) };
+      } catch (e) { return showError(t, TITRE_F, e, 'Sondage introuvable', () => formulaire(++rendu, editId)); }
+    }
     const auj = new Date().toISOString().slice(0, 10);
     const finDef = new Date(Date.now() + (DUREE_MAX - 1) * 86400000).toISOString().slice(0, 10);
     const html = `<form id="mso-form2" class="mso-f" novalidate autocomplete="off">
@@ -560,17 +589,32 @@
       <div class="h2" style="margin-top:16px">QUESTIONS</div>
       <div id="mso-qbuilder"></div>
       <button type="button" class="btn out block" id="mso-addq" style="margin:4px 0 14px">+ Ajouter une question</button>
-      <label class="mso-opt" id="mso-pub-opt"><input type="checkbox" id="mso-publier-ck"><span><b>Publier immédiatement</b><small>Si au moins un lieu est coché. Sinon, le sondage est enregistré comme brouillon.</small></span></label>
+      <label class="mso-opt" id="mso-pub-opt" ${editId ? 'style="display:none"' : ''}><input type="checkbox" id="mso-publier-ck"><span><b>Publier immédiatement</b><small>Si au moins un lieu est coché. Sinon, le sondage est enregistré comme brouillon.</small></span></label>
     </form>`;
-    setPane('Nouveau sondage', html, `<button class="btn block" id="mso-save">Créer le sondage</button>`);
+    setPane(TITRE_F, html, `<button class="btn block" id="mso-save">${editId ? 'Enregistrer les modifications' : 'Créer le sondage'}</button>`);
 
     $('#mso-debut').onchange = majFin;
     $$('.mso-opt input', $('#mso-form2')).forEach(cb => cb.addEventListener('change', () => cb.closest('.mso-opt').classList.toggle('on', cb.checked)));
-    $('#mso-addq').onclick = () => { QIDX++; qCard(QIDX); };
-    qCard(++QIDX);
+    $('#mso-addq').onclick = () => { const nq = qAjouter(); const el = $('#qt-' + nq.idx); if (el) el.focus(); };
+    if (ED) {
+      const sv = ED.s, set = (id, v) => { const x = $('#' + id); if (x) x.value = v == null ? '' : v; };
+      set('mso-titre', sv.titre); set('mso-desc', sv.description);
+      set('mso-cat2', sv.categorie); if ($('#mso-cat2').value !== sv.categorie) $('#mso-cat2').value = 'autre';
+      set('mso-rayon', sv.rayon_publication || 'national'); set('mso-debut', String(sv.date_debut || auj).slice(0, 10)); set('mso-fin', String(sv.date_cloture || finDef).slice(0, 10));
+      set('mso-conf', sv.confidentialite || 'anonyme'); set('mso-vis', sv.resultats_visibles || 'apres_cloture');
+      $('#mso-anon').checked = !!Number(sv.anonyme) && sv.anonyme !== '0';
+      [['onglet', 'mso-lieu-onglet'], ['fil', 'mso-lieu-fil'], ['profil', 'mso-lieu-profil'], ['boutique', 'mso-lieu-boutique']].forEach(([k, id]) => { $('#' + id).checked = !!ED.dif[k]; });
+      $$('.mso-opt input', $('#mso-form2')).forEach(cb => cb.closest('.mso-opt').classList.toggle('on', cb.checked));
+      ED.qs.forEach(q => {
+        let o = []; try { o = JSON.parse(q.options_json || '[]'); } catch (_) { }
+        QS.push(qNouvelle({ texte: q.texte, type: q.type, options: Array.isArray(o) ? o : [], obligatoire: !(q.obligatoire === 0 || q.obligatoire === false || q.obligatoire === '0'), description: q.description || '', min_label: q.min_label || '', max_label: q.max_label || '', min_val: q.min_val || 1, max_val: q.max_val || 5 }));
+      });
+      if (!QS.length) QS.push(qNouvelle());
+      qRender();
+    } else qAjouter();
     api('/api/sondages/mes-evenements').then(d => {
       const evts = (d && d.evenements) || [], z = $('#mso-evts'); if (!z) return;
-      z.innerHTML = evts.length ? evts.map(e => '<label><input type="checkbox" class="mso-evt" value="' + Number(e.id) + '"><span>' + esc(e.titre) + (e.date_evt ? ' <span class="small muted">· ' + esc(fmtDate(e.date_evt)) + '</span>' : '') + '</span></label>').join('') : '<span class="small muted">Vous n’avez pas encore d’événement publié.</span>';
+      z.innerHTML = evts.length ? evts.map(e => '<label><input type="checkbox" class="mso-evt" value="' + Number(e.id) + '"' + (ED && ED.evts.has(Number(e.id)) ? ' checked' : '') + '><span>' + esc(e.titre) + (e.date_evt ? ' <span class="small muted">· ' + esc(fmtDate(e.date_evt)) + '</span>' : '') + '</span></label>').join('') : '<span class="small muted">Vous n’avez pas encore d’événement publié.</span>';
     }).catch(() => { const z = $('#mso-evts'); if (z) z.innerHTML = '<span class="small muted">Liste des événements indisponible.</span>'; });
 
     const val = id => { const x = $('#mso-' + id); return x ? x.value.trim() : ''; };
@@ -582,25 +626,30 @@
       if (!val('titre')) first = bad('titre', 'Donnez un titre à votre sondage.');
       const d1 = $('#mso-debut').value, d2 = $('#mso-fin').value;
       if (d1 && d2 && (new Date(d2) - new Date(d1)) / 86400000 > DUREE_MAX - 1) { if (!first) first = $('#mso-fin'); toast('Un sondage dure 30 jours au maximum.', true); }
-      const questions = QS.map(q => ({ texte: q.texte, type: q.type, options: (q.options || []).filter(Boolean), obligatoire: true })).filter(q => q.texte.trim());
+      const questions = QS.filter(q => q.texte.trim()).map(q => {
+        const ch = ['choix_unique', 'choix_multiple'].includes(q.type);
+        return { texte: q.texte.trim(), type: q.type, options: ch ? (q.options || []).map(o => String(o).trim()).filter(Boolean) : [], obligatoire: !!q.obligatoire, description: q.description || null, min_label: q.min_label || null, max_label: q.max_label || null, min_val: q.min_val || 1, max_val: q.max_val || 5 };
+      });
       if (!questions.length) { toast('Ajoutez au moins une question.', true); if (!first) first = $('#mso-addq'); }
+      const sansChoix = questions.find(q => ['choix_unique', 'choix_multiple'].includes(q.type) && q.options.length < 2);
+      if (sansChoix) { toast('La question « ' + sansChoix.texte.slice(0, 50) + ' » est à choix : indiquez au moins 2 choix (ou changez son type).', true); if (!first) first = $('#mso-addq'); }
       if (first) { first.scrollIntoView({ block: 'center', behavior: 'smooth' }); if (first.focus) first.focus(); $('#mso-gerr').textContent = 'Certains champs sont à corriger.'; return; }
       const btn = $('#mso-save'); btn.disabled = true; const txt = btn.textContent; btn.textContent = '…';
       try {
-        const r = await api('/api/sondages', {
-          method: 'POST', body: {
+        const r = await api(editId ? '/api/sondages/' + editId + '/contenu' : '/api/sondages', {
+          method: editId ? 'PUT' : 'POST', body: {
             diffusion: { onglet: $('#mso-lieu-onglet').checked, fil: $('#mso-lieu-fil').checked, profil: $('#mso-lieu-profil').checked, boutique: $('#mso-lieu-boutique').checked },
             titre: val('titre'), description: val('desc') || null, categorie: $('#mso-cat2').value,
             rayon_publication: $('#mso-rayon').value, date_debut: d1 || null, date_cloture: d2 || null,
             confidentialite: $('#mso-conf').value, anonyme: $('#mso-anon').checked,
-            resultats_visibles: $('#mso-vis').value, statut: $('#mso-publier-ck').checked ? 'ouvert' : 'brouillon', evenement_ids: $$('.mso-evt:checked').map(c => Number(c.value)), questions
+            resultats_visibles: $('#mso-vis').value, ...(editId ? {} : { statut: $('#mso-publier-ck').checked ? 'ouvert' : 'brouillon' }), evenement_ids: $$('.mso-evt:checked').map(c => Number(c.value)), questions
           }
         });
         toast(r && r.message ? r.message : (r && r.statut === 'ouvert' ? 'Sondage publié ✓' : 'Brouillon enregistré ✓'), !!(r && r.message));
-        location.replace('#/sondages/voir/' + Number(r.id));
+        location.replace('#/sondages/voir/' + Number(editId || r.id));
       } catch (e) {
         btn.disabled = false; btn.textContent = txt;
-        $('#mso-gerr').textContent = (e && e.message) || 'Création impossible.';
+        $('#mso-gerr').textContent = (e && e.message) || (editId ? 'Enregistrement impossible.' : 'Création impossible.');
         toast((e && e.message) || 'Création impossible.', true);
       }
     };

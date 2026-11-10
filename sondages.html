@@ -150,7 +150,7 @@
 <div class="modal-bg" id="modal-create-sond-bg" onclick="if(event.target===this)closeMod('modal-create-sond-bg')">
   <div class="modal" style="max-width:680px;max-height:92vh;overflow-y:auto;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-      <h3 style="margin:0;">📊 Créer un sondage</h3>
+      <h3 style="margin:0;" id="cs-modal-titre">📊 Créer un sondage</h3>
       <button onclick="closeMod('modal-create-sond-bg')" style="background:none;border:none;font-size:22px;cursor:pointer;">×</button>
     </div>
     <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px;">Informations générales</div>
@@ -234,11 +234,16 @@
     <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:4px;">Événements</div>
     <div style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:8px;">Sur la page de chaque événement coché, un bloc « Sondage en cours » permet d'y répondre <strong>sans s'inscrire</strong> à l'événement. Il ne fait jamais partie de l'inscription.</div>
     <div id="cs-evts" style="max-height:150px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;padding:6px 10px;margin-bottom:16px;"></div>
+    <div id="cs-couv-bloc" style="display:none;margin-bottom:16px;border-top:1px solid var(--border);padding-top:12px;">
+      <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px;">Image de couverture</div>
+      <img id="cs-couv-img" alt="" style="display:block;width:100%;max-height:160px;object-fit:cover;border-radius:10px;background:#e8edf3;margin-bottom:8px;">
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;"><input type="checkbox" id="cs-couv-retirer" style="accent-color:#2563EB;"> Retirer l'image de couverture</label>
+    </div>
     <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px;border-top:1px solid var(--border);padding-top:12px;">Questions</div>
     <div id="qs-builder"></div>
-    <button class="btn btn-sm btn-outline" onclick="addQuestion()" style="margin-bottom:16px;">+ Ajouter une question</button>
+    <button type="button" class="btn btn-sm btn-outline" onclick="addQuestion()" style="margin-bottom:16px;">+ Ajouter une question</button>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;flex-wrap:wrap;gap:10px;">
-      <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;cursor:pointer;">
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;cursor:pointer;" id="cs-publier-bloc">
         <input type="checkbox" id="cs-publier" style="accent-color:#2563EB;"> Publier immédiatement <span style="font-weight:500;font-size:12px;color:var(--muted);">(si au moins un lieu est coché)</span>
       </label>
       <div style="display:flex;gap:8px;">
@@ -363,7 +368,8 @@ document.addEventListener('DOMContentLoaded', async()=>{
   if(['termines','participations','mes'].includes(h)) ONGLET=h;
   await loadSonds();
   if(ONGLET!=='cours') switchSond(ONGLET);
-  if(h==='brouillons' && ME_SOND && PEUT_CREER) ouvrirBrouillons(); /* lien « Choisir les lieux et publier » de la page d'un brouillon */
+  if(h==='brouillons' && ME_SOND && PEUT_CREER) ouvrirBrouillons();
+  const mod=/^modifier-(\d+)$/.exec(h); if(mod && ME_SOND && PEUT_CREER) ouvrirModifierSond(Number(mod[1])); /* lien « Modifier ce brouillon » de sondage.html */ /* lien « Choisir les lieux et publier » de la page d'un brouillon */
 });
 
 function switchSond(name){
@@ -526,7 +532,7 @@ async function openSond(sid){
         ${estCreateur?`<button class="btn btn-sm" style="border-color:#2563EB;color:#2563EB;" onclick="closeMod('modal-sond-bg');openStatsSond(${sid})">📊 Stats</button>`:''}
         ${estCreateur&&!ferme?`<button class="btn btn-sm" style="border-color:#ef4444;color:#ef4444;" onclick="cloturerSond(${sid})">🔒 Clôturer</button>`:''}
         ${estCreateur&&s.statut==='cloture'?`<button class="btn btn-sm" style="border-color:#2563EB;color:#2563EB;" onclick="ouvrirRepublier(${sid})">🔁 Republier</button>`:''}
-        ${estCreateur&&s.statut==='brouillon'?`<button class="btn btn-sm" style="border-color:#2563EB;color:#2563EB;" onclick="ouvrirRepublier(${sid},true)">🚀 Publier</button>`:''}
+        ${estCreateur&&s.statut==='brouillon'?`<button class="btn btn-sm" style="border-color:#2563EB;color:#2563EB;" onclick="ouvrirModifierSond(${sid})">✏️ Modifier</button><button class="btn btn-sm" style="border-color:#2563EB;color:#2563EB;" onclick="ouvrirRepublier(${sid},true)">🚀 Publier</button>`:''}
         ${estCreateur?`<button class="btn btn-sm" onclick="window.location.href='/api/sondages/${sid}/export'">⬇️ CSV</button>`:''}
       </div>
       <div style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px;">
@@ -731,7 +737,7 @@ async function loadMesSonds(){
           <button class="btn btn-sm" style="border-color:#2563EB;color:#2563EB;" onclick="ouvrirDiffusion(${s.id})">📣 Diffusion</button>
           ${s.statut==='ouvert'?`<button class="btn btn-sm" style="border-color:#ef4444;color:#ef4444;" onclick="cloturerSond(${s.id})">🔒 Clôturer</button>`:''}
           ${s.statut==='cloture'?`<button class="btn btn-sm" style="border-color:#2563EB;color:#2563EB;" onclick="ouvrirRepublier(${s.id})">🔁 Republier</button>`:''}
-          ${s.statut==='brouillon'?`<button class="btn btn-sm" style="border-color:#2563EB;color:#2563EB;" onclick="ouvrirRepublier(${s.id},true)">🚀 Publier</button>`:''}
+          ${s.statut==='brouillon'?`<button class="btn btn-sm" style="border-color:#2563EB;color:#2563EB;" onclick="ouvrirModifierSond(${s.id})">✏️ Modifier</button><button class="btn btn-sm" style="border-color:#2563EB;color:#2563EB;" onclick="ouvrirRepublier(${s.id},true)">🚀 Publier</button>`:''}
           <button class="btn btn-sm" onclick="window.location.href='/api/sondages/${s.id}/export'">⬇️ CSV</button>
           <button class="btn btn-sm" style="border-color:#6b7280;color:#6b7280;" onclick="archiverSond(${s.id})">🗄️ Archiver</button>
         </div>
@@ -758,6 +764,7 @@ function openCreateSond(){
   chargerEvtsSond();
   ['onglet','fil','profil','boutique'].forEach(k=>{ const c=document.getElementById('cs-lieu-'+k); if(c) c.checked=false; });
   document.getElementById('cs-publier').checked=false;
+  csModeEdition(null);
   addQuestion();
   document.getElementById('modal-create-sond-bg').style.display='flex';
 }
@@ -811,52 +818,102 @@ function majFinSond(){
   f.min=d; f.max=max; if(f.value&&f.value>max) f.value=max;
 }
 
-function addQuestion(){
-  QS_IDX++;
-  const idx=QS_IDX;
-  QS_BUILDER.push({idx,texte:'',type:'choix_unique',options:[]});
-  const div=document.createElement('div');
-  div.className='q-card'; div.id='qb-'+idx;
-  div.innerHTML=`
-    <button type="button" class="q-delete" onclick="removeQ(${idx})">×</button>
+/* ── Constructeur de questions (2026-11-10) : tout est dessiné à partir de QS_BUILDER ; ajout, suppression, ordre, type, choix, obligatoire/facultatif. ── */
+const QS_TYPES=[['choix_unique','Choix unique'],['choix_multiple','Choix multiples'],['oui_non','Oui / Non'],['texte_libre','Réponse libre'],['texte_long','Texte long'],['echelle_5','Échelle 1-5'],['echelle_10','Échelle 1-10'],['etoiles','Étoiles'],['nombre','Nombre'],['date','Date']];
+const qsAttr=s=>escH(s).replace(/"/g,'&quot;');
+function qsNouvelle(q){ QS_IDX++; return Object.assign({idx:QS_IDX,texte:'',type:'choix_unique',options:[],obligatoire:true,description:'',min_label:'',max_label:'',min_val:1,max_val:5},q||{}); }
+function qsDe(idx){ return QS_BUILDER.find(q=>q.idx===idx); }
+function qsCarte(q,n){
+  const choix=['choix_unique','choix_multiple'].includes(q.type), echelle=['echelle_5','echelle_10','etoiles'].includes(q.type);
+  const btn='background:#fff;border:1px solid var(--border);border-radius:6px;width:28px;height:28px;cursor:pointer;font-size:14px;line-height:1;';
+  return `<div class="q-card" id="qb-${q.idx}">
+    <div style="display:flex;justify-content:flex-end;gap:6px;margin-bottom:8px;align-items:center;">
+      <span style="flex:1;font-size:12px;font-weight:700;color:var(--muted);">Question ${n+1}</span>
+      <button type="button" style="${btn}" ${n===0?'disabled':''} onclick="moveQ(${q.idx},-1)" aria-label="Monter la question ${n+1}" title="Monter">↑</button>
+      <button type="button" style="${btn}" ${n===QS_BUILDER.length-1?'disabled':''} onclick="moveQ(${q.idx},1)" aria-label="Descendre la question ${n+1}" title="Descendre">↓</button>
+      <button type="button" style="${btn}color:#ef4444;" onclick="removeQ(${q.idx})" aria-label="Supprimer la question ${n+1}" title="Supprimer">×</button>
+    </div>
     <div style="display:grid;grid-template-columns:2fr 1fr;gap:10px;margin-bottom:8px;">
-      <div class="form-row" style="margin:0;"><label style="font-size:11px;">Question ${idx}</label><input type="text" id="qt-${idx}" placeholder="Texte de la question" oninput="QS_BUILDER.find(q=>q.idx===${idx}).texte=this.value"></div>
-      <div class="form-row" style="margin:0;"><label style="font-size:11px;">Type</label>
-        <select id="qtype-${idx}" onchange="changeQType(${idx},this.value)">
-          <option value="choix_unique">Choix unique</option>
-          <option value="choix_multiple">Choix multiples</option>
-          <option value="oui_non">Oui / Non</option>
-          <option value="texte_libre">Réponse libre</option>
-          <option value="texte_long">Texte long</option>
-          <option value="echelle_5">Échelle 1-5</option>
-          <option value="echelle_10">Échelle 1-10</option>
-          <option value="etoiles">Étoiles</option>
-          <option value="nombre">Nombre</option>
-          <option value="date">Date</option>
-        </select>
+      <div class="form-row" style="margin:0;"><label style="font-size:11px;" for="qt-${q.idx}">Texte de la question</label><input type="text" id="qt-${q.idx}" maxlength="500" value="${qsAttr(q.texte)}" placeholder="Texte de la question" oninput="qsDe(${q.idx}).texte=this.value"></div>
+      <div class="form-row" style="margin:0;"><label style="font-size:11px;" for="qtype-${q.idx}">Type</label>
+        <select id="qtype-${q.idx}" onchange="changeQType(${q.idx},this.value)">${QS_TYPES.map(t=>`<option value="${t[0]}" ${t[0]===q.type?'selected':''}>${t[1]}</option>`).join('')}</select>
       </div>
     </div>
-    <div id="qopts-${idx}">
-      <div id="qopts-list-${idx}"></div>
-      <button type="button" class="btn btn-sm btn-outline" onclick="addOpt(${idx})" style="margin-top:4px;">+ Option</button>
-    </div>`;
-  document.getElementById('qs-builder').appendChild(div);
+    ${choix?`<div id="qopts-${q.idx}">
+      ${q.options.map((o,i)=>`<div style="display:flex;gap:6px;margin-bottom:4px;"><input type="text" id="qo-${q.idx}-${i}" maxlength="200" value="${qsAttr(o)}" placeholder="Choix ${i+1}" aria-label="Choix ${i+1} de la question ${n+1}" style="flex:1;height:32px;padding:0 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;" oninput="qsDe(${q.idx}).options[${i}]=this.value"><button type="button" onclick="removeOpt(${q.idx},${i})" aria-label="Retirer le choix ${i+1}" style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:16px;">×</button></div>`).join('')}
+      <button type="button" class="btn btn-sm btn-outline" onclick="addOpt(${q.idx})" style="margin-top:4px;">+ Choix</button>
+    </div>`:''}
+    ${echelle?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px;">
+      <div class="form-row" style="margin:0;"><label style="font-size:11px;">Libellé du bas de l'échelle (facultatif)</label><input type="text" maxlength="80" value="${qsAttr(q.min_label)}" placeholder="Ex : Pas du tout" oninput="qsDe(${q.idx}).min_label=this.value"></div>
+      <div class="form-row" style="margin:0;"><label style="font-size:11px;">Libellé du haut de l'échelle (facultatif)</label><input type="text" maxlength="80" value="${qsAttr(q.max_label)}" placeholder="Ex : Tout à fait" oninput="qsDe(${q.idx}).max_label=this.value"></div>
+    </div>`:''}
+    <div class="form-row" style="margin:8px 0 0;"><label style="font-size:11px;" for="qd-${q.idx}">Précision sous la question (facultatif)</label><input type="text" id="qd-${q.idx}" maxlength="500" value="${qsAttr(q.description)}" placeholder="Ex : plusieurs réponses possibles" oninput="qsDe(${q.idx}).description=this.value"></div>
+    <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-top:10px;"><input type="checkbox" ${q.obligatoire?'checked':''} style="accent-color:#2563EB;" onchange="qsDe(${q.idx}).obligatoire=this.checked"> Réponse obligatoire <span style="font-size:11px;color:var(--muted);">(décochez pour la rendre facultative)</span></label>
+  </div>`;
 }
-
-function removeQ(idx){ QS_BUILDER=QS_BUILDER.filter(q=>q.idx!==idx); document.getElementById('qb-'+idx)?.remove(); }
+function renderQs(){ document.getElementById('qs-builder').innerHTML=QS_BUILDER.map((q,n)=>qsCarte(q,n)).join(''); }
+function addQuestion(q){ const nq=qsNouvelle(q); QS_BUILDER.push(nq); renderQs(); return nq; }
+function removeQ(idx){ QS_BUILDER=QS_BUILDER.filter(q=>q.idx!==idx); renderQs(); }
+function moveQ(idx,sens){
+  const i=QS_BUILDER.findIndex(q=>q.idx===idx), j=i+sens;
+  if(i<0||j<0||j>=QS_BUILDER.length) return;
+  [QS_BUILDER[i],QS_BUILDER[j]]=[QS_BUILDER[j],QS_BUILDER[i]]; renderQs();
+}
 function changeQType(idx,type){
-  const q=QS_BUILDER.find(q=>q.idx===idx); if(q) q.type=type;
-  const d=document.getElementById('qopts-'+idx);
-  if(d) d.style.display=['choix_unique','choix_multiple'].includes(type)?'':'none';
+  const q=qsDe(idx); if(!q) return; q.type=type;
+  if(['choix_unique','choix_multiple'].includes(type)){ while(q.options.length<2) q.options.push(''); }
+  if(type==='echelle_10'){ q.max_val=10; } else if(['echelle_5','etoiles'].includes(type)){ q.max_val=5; }
+  renderQs();
 }
 function addOpt(idx){
-  const q=QS_BUILDER.find(q=>q.idx===idx); if(!q)return;
-  const oi=q.options.length; q.options.push('');
-  const list=document.getElementById('qopts-list-'+idx);
-  const row=document.createElement('div');
-  row.style.cssText='display:flex;gap:6px;margin-bottom:4px;';
-  row.innerHTML=`<input type="text" placeholder="Option ${oi+1}" style="flex:1;height:32px;padding:0 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;" oninput="QS_BUILDER.find(q=>q.idx===${idx}).options[${oi}]=this.value"><button type="button" onclick="this.parentNode.remove()" style="background:none;border:none;cursor:pointer;color:#ef4444;">×</button>`;
-  list.appendChild(row);
+  const q=qsDe(idx); if(!q||q.options.length>=30) return;
+  q.options.push(''); renderQs();
+  const el=document.getElementById('qo-'+idx+'-'+(q.options.length-1)); if(el) el.focus();
+}
+function removeOpt(idx,i){ const q=qsDe(idx); if(!q) return; q.options.splice(i,1); renderQs(); }
+
+/* Modification d'un BROUILLON : le même formulaire que la création, rempli avec le sondage. Un sondage publié n'est pas modifiable (ses questions sont figées). */
+let CS_EDIT=null, CS_COUV=[];
+function csModeEdition(sid){
+  CS_EDIT=sid||null;
+  document.getElementById('cs-modal-titre').textContent=sid?'✏️ Modifier le brouillon':'📊 Créer un sondage';
+  document.getElementById('btn-save-sond').textContent=sid?'Enregistrer les modifications':'Créer le sondage';
+  document.getElementById('cs-publier-bloc').style.display=sid?'none':'';
+  document.getElementById('cs-couv-bloc').style.display='none';
+  CS_COUV=[];
+}
+async function ouvrirModifierSond(sid){
+  closeMod('modal-brouillons-bg'); closeMod('modal-sond-bg');
+  let d, df;
+  try{ d=await api('GET','/sondages/'+sid); df=await api('GET','/sondages/'+sid+'/diffusion'); }
+  catch(e){ DA.toast(e.message||'Sondage introuvable.',{type:'danger'}); return; }
+  const s=d.sondage;
+  if(s.statut!=='brouillon'){ DA.toast('Seul un brouillon peut être modifié. Un sondage publié garde ses questions pour ne pas fausser les réponses.',{type:'warning'}); return; }
+  openCreateSond(); csModeEdition(sid);
+  const val=(id,v)=>{ const el=document.getElementById(id); if(el) el.value=v==null?'':v; };
+  val('cs-titre',s.titre); val('cs-desc',s.description);
+  const cat=document.getElementById('cs-cat'); cat.value=s.categorie; if(cat.value!==s.categorie) cat.value='autre';
+  val('cs-rayon',s.rayon_publication||'national');
+  val('cs-debut',String(s.date_debut||'').slice(0,10)||new Date().toISOString().slice(0,10));
+  val('cs-cloture',String(s.date_cloture||'').slice(0,10));
+  val('cs-conf',s.confidentialite||'anonyme'); val('cs-res-vis',s.resultats_visibles||'apres_cloture');
+  document.getElementById('cs-anonyme').checked=!!Number(s.anonyme)&&s.anonyme!=='0';
+  try{ const c=JSON.parse(s.champs_repondant_json||'null'); CS_CHAMPS=Array.isArray(c)?c:CS_DEFAUT.map(x=>({...x})); }catch(_){ CS_CHAMPS=CS_DEFAUT.map(x=>({...x})); }
+  majChampsSond();
+  try{ const p=JSON.parse(s.photos_json||'[]'); CS_COUV=(Array.isArray(p)?p:[]).filter(u=>typeof u==='string'&&/^(https:\/\/|\/)/.test(u)); }catch(_){ CS_COUV=[]; }
+  if(CS_COUV.length){ document.getElementById('cs-couv-img').src=CS_COUV[0]; document.getElementById('cs-couv-retirer').checked=false; document.getElementById('cs-couv-bloc').style.display=''; }
+  const dif=df.diffusion||{};
+  ['onglet','fil','profil','boutique'].forEach(k=>{ const c=document.getElementById('cs-lieu-'+k); if(c) c.checked=!!dif[k]; });
+  QS_BUILDER=[]; QS_IDX=0;
+  (d.questions||[]).forEach(q=>{
+    let o=[]; try{ o=JSON.parse(q.options_json||'[]'); }catch(_){}
+    QS_BUILDER.push(qsNouvelle({texte:q.texte,type:q.type,options:Array.isArray(o)?o:[],obligatoire:!(q.obligatoire===0||q.obligatoire===false||q.obligatoire==='0'),description:q.description||'',min_label:q.min_label||'',max_label:q.max_label||'',min_val:q.min_val||1,max_val:q.max_val||5}));
+  });
+  if(!QS_BUILDER.length) QS_BUILDER.push(qsNouvelle());
+  renderQs();
+  await chargerEvtsSond();
+  const lies=new Set((df.evenement_ids||[]).map(Number));
+  document.querySelectorAll('.cs-evt').forEach(c=>{ c.checked=lies.has(Number(c.value)); });
 }
 
 async function saveSond(){
@@ -865,15 +922,33 @@ async function saveSond(){
   const debut=document.getElementById('cs-debut').value;
   const cloture=document.getElementById('cs-cloture').value;
   if(debut&&cloture&&(new Date(cloture)-new Date(debut))/86400000>29){DA.toast('Un sondage dure 30 jours au maximum.',{type:'warning'});return;}
-  const questions=QS_BUILDER.map(q=>({texte:q.texte,type:q.type,options:q.options.filter(Boolean),obligatoire:true})).filter(q=>q.texte.trim());
-  if(!questions.length){DA.toast('Ajoutez au moins une question.',{type:'warning'});return;}
+  const garde=QS_BUILDER.filter(q=>q.texte.trim());
+  if(!garde.length){DA.toast('Ajoutez au moins une question.',{type:'warning'});return;}
+  const questions=garde.map(q=>{
+    const choix=['choix_unique','choix_multiple'].includes(q.type);
+    return {texte:q.texte.trim(),type:q.type,options:choix?q.options.map(o=>String(o).trim()).filter(Boolean):[],obligatoire:!!q.obligatoire,description:q.description||null,min_label:q.min_label||null,max_label:q.max_label||null,min_val:q.min_val||1,max_val:q.max_val||5};
+  });
+  const sansChoix=questions.find(q=>['choix_unique','choix_multiple'].includes(q.type)&&q.options.length<2);
+  if(sansChoix){DA.toast('La question « '+sansChoix.texte.slice(0,60)+' » est à choix : indiquez au moins 2 choix (ou changez son type).',{type:'warning'});return;}
+  const diffusion={onglet:document.getElementById('cs-lieu-onglet').checked,fil:document.getElementById('cs-lieu-fil').checked,profil:document.getElementById('cs-lieu-profil').checked,boutique:document.getElementById('cs-lieu-boutique').checked};
+  const evenement_ids=[...document.querySelectorAll('.cs-evt:checked')].map(c=>Number(c.value));
+  const anonyme=document.getElementById('cs-anonyme').checked;
   const btn=document.getElementById('btn-save-sond');btn.disabled=true;btn.textContent='…';
+  const edition=CS_EDIT;
   try{
-    const rCree=await api('POST','/sondages',{diffusion:{onglet:document.getElementById('cs-lieu-onglet').checked,fil:document.getElementById('cs-lieu-fil').checked,profil:document.getElementById('cs-lieu-profil').checked,boutique:document.getElementById('cs-lieu-boutique').checked},titre,description:document.getElementById('cs-desc').value||null,categorie:document.getElementById('cs-cat').value,rayon_publication:document.getElementById('cs-rayon').value,date_debut:debut||null,date_cloture:cloture||null,confidentialite:document.getElementById('cs-conf').value,anonyme:document.getElementById('cs-anonyme').checked,champs_repondant:document.getElementById('cs-anonyme').checked?[]:CS_CHAMPS,resultats_visibles:document.getElementById('cs-res-vis').value,statut:document.getElementById('cs-publier').checked?'ouvert':'brouillon',evenement_ids:[...document.querySelectorAll('.cs-evt:checked')].map(c=>Number(c.value)),questions});
-    DA.toast(rCree&&rCree.message?rCree.message:(rCree&&rCree.statut==='ouvert'?'Sondage publié !':'Sondage enregistré en brouillon.'),{type:rCree&&rCree.message?'warning':'success'});closeMod('modal-create-sond-bg');loadSonds();majBrouillons();
-    if(ME_SOND&&PEUT_CREER) loadMesSonds();
+    const commun={diffusion,titre,description:document.getElementById('cs-desc').value||null,categorie:document.getElementById('cs-cat').value,rayon_publication:document.getElementById('cs-rayon').value,date_debut:debut||null,date_cloture:cloture||null,confidentialite:document.getElementById('cs-conf').value,anonyme,champs_repondant:anonyme?[]:CS_CHAMPS,resultats_visibles:document.getElementById('cs-res-vis').value,evenement_ids,questions};
+    if(edition){
+      commun.photos_json=document.getElementById('cs-couv-retirer')&&document.getElementById('cs-couv-retirer').checked?[]:CS_COUV;
+      await api('PUT','/sondages/'+edition+'/contenu',commun);
+      DA.toast('Brouillon enregistré.',{type:'success'});closeMod('modal-create-sond-bg');loadSonds();majBrouillons();
+      if(ME_SOND&&PEUT_CREER) loadMesSonds();
+    }else{
+      const rCree=await api('POST','/sondages',{...commun,statut:document.getElementById('cs-publier').checked?'ouvert':'brouillon'});
+      DA.toast(rCree&&rCree.message?rCree.message:(rCree&&rCree.statut==='ouvert'?'Sondage publié !':'Sondage enregistré en brouillon.'),{type:rCree&&rCree.message?'warning':'success'});closeMod('modal-create-sond-bg');loadSonds();majBrouillons();
+      if(ME_SOND&&PEUT_CREER) loadMesSonds();
+    }
   }catch(e){DA.toast(e.message,{type:'danger'});}
-  finally{btn.disabled=false;btn.textContent='Créer le sondage';}
+  finally{btn.disabled=false;btn.textContent=CS_EDIT?'Enregistrer les modifications':'Créer le sondage';}
 }
 
 async function cloturerSond(sid){
@@ -916,6 +991,7 @@ async function ouvrirBrouillons(){
       <strong style="font-size:14px;display:block;">${escH(s.titre)}</strong>
       <div style="font-size:12px;color:var(--muted);margin:3px 0 8px;">${l.length?'Lieux choisis : '+escH(l.join(' · ')):'Aucun lieu choisi pour l\'instant'}</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-sm" style="border-color:#2563EB;color:#2563EB;" onclick="ouvrirModifierSond(${s.id})">✏️ Modifier</button>
         <button class="btn btn-sm" style="border-color:#2563EB;color:#2563EB;" onclick="closeMod('modal-brouillons-bg');ouvrirDiffusion(${s.id})">📣 Choisir les lieux</button>
         <button class="btn btn-sm btn-outline" onclick="publierBrouillon(${s.id})">🚀 Publier</button>
         <button class="btn btn-sm" style="border-color:#ef4444;color:#ef4444;" onclick="supprimerBrouillon(${s.id})">🗑️ Supprimer</button>

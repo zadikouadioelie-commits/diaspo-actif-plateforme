@@ -153,7 +153,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,
       ecran(h + '<div class="sr-etat info">' + (br
           ? '📝 <strong>Brouillon</strong> — ce sondage n\'est pas encore publié : seuls vous et l\'administration le voyez, et personne ne peut y répondre pour l\'instant. Choisissez où l\'afficher (onglet Sondages, fil d\'actualité, profil, boutique ou événement), puis publiez-le.'
           : '🗄️ <strong>Sondage archivé</strong> — il n\'est plus affiché ni ouvert aux réponses.') + '</div>' +
-        (br ? '<div style="text-align:center;margin:0 0 14px;"><a class="btn btn-orange" href="sondages.html#brouillons">Choisir les lieux et publier</a></div>' : '') +
+        (br ? '<div style="text-align:center;margin:0 0 14px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;"><a class="btn btn-outline" href="sondages.html#modifier-' + encodeURIComponent(s.id) + '">✏️ Modifier ce brouillon</a><a class="btn btn-orange" href="sondages.html#brouillons">Choisir les lieux et publier</a></div>' : '') +
         '<div class="sr-card"><p class="sr-titre-bloc">Aperçu des questions (' + QUESTIONS.length + ')</p><p class="sr-aide">Lecture seule : voici ce que verront les personnes qui répondront.</p>' +
         '<fieldset disabled style="border:0;margin:0;padding:0;min-width:0;">' + QUESTIONS.map(questionHtml).join('') + '</fieldset></div>' +
         '<div style="text-align:center;"><a class="btn btn-outline" href="sondages.html">Retour aux sondages</a></div>');
