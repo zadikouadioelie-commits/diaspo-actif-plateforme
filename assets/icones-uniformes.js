@@ -90,11 +90,11 @@
     file.push(n);
     if (prevu) return;
     prevu = true;
-    requestAnimationFrame(function () {
+    setTimeout(function () {   /* pas requestAnimationFrame : il ne tourne pas dans un onglet en arrière-plan */
       prevu = false;
       var l = file; file = [];
       l.forEach(traiterRacine);
-    });
+    }, 0);
   }
 
   function demarrer() {
