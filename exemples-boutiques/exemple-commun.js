@@ -11,29 +11,42 @@
   "use strict";
   var PREFIXE = "exemple:";
 
-  /* 1. Stockage isolé : toutes les clés de l'exemple sont préfixées, sans modifier le code des pages. */
-  try {
-    var proto = Storage.prototype;
-    var get = proto.getItem, set = proto.setItem, del = proto.removeItem;
-    proto.getItem = function (k) { return get.call(this, PREFIXE + k); };
-    proto.setItem = function (k, v) { return set.call(this, PREFIXE + k, v); };
-    proto.removeItem = function (k) { return del.call(this, PREFIXE + k); };
-  } catch (e) { /* stockage indisponible : l'exemple fonctionne sans mémoire */ }
-
-  /* 2. Type de l'exemple selon la page. */
+  /* 1. Type de l'exemple selon la page. La page « Paramètres vitrine » (création) ne force aucun type : c'est elle qui choisit. */
   var fichier = (location.pathname.split("/").pop() || "boutique.html").toLowerCase();
   var params = new URLSearchParams(location.search);
   var PAR_PAGE = { "video.html": "video", "portfolio.html": "portfolio", "evenements.html": "events" };
   var VALIDES = ["ecom", "video", "portfolio", "events", "impact", "finance"];
-  var type = PAR_PAGE[fichier] || params.get("type") || "ecom";
-  if (VALIDES.indexOf(type) < 0) type = "ecom";
+  var CREATION = fichier === "parametres-vitrine.html";
+  var type = CREATION ? null : (PAR_PAGE[fichier] || params.get("type") || "ecom");
+  if (!CREATION && VALIDES.indexOf(type) < 0) type = "ecom";
   window.EXEMPLE_TYPE = type;
+
+  /* 2. Stockage isolé : toutes les clés de l'exemple sont préfixées, sans modifier le code des pages.
+     Pour une page d'exemple d'un type, shopConfig.main est FORCÉ À LA LECTURE (la page affiche toujours son type) et
+     n'est jamais réécrit : ouvrir « Voir l'exemple » ne change donc pas la configuration en cours dans Paramètres vitrine. */
   try {
-    var cfg = {};
-    try { cfg = JSON.parse(localStorage.getItem("shopConfig")) || {}; } catch (e) {}
-    cfg.main = type;
-    localStorage.setItem("shopConfig", JSON.stringify(cfg));
-  } catch (e) {}
+    var proto = Storage.prototype;
+    var get = proto.getItem, set = proto.setItem, del = proto.removeItem;
+    proto.getItem = function (k) {
+      var v = get.call(this, PREFIXE + k);
+      if (k === "shopConfig" && type) {
+        try { var c = JSON.parse(v) || {}; c.main = type; return JSON.stringify(c); } catch (e) { return JSON.stringify({ main: type }); }
+      }
+      return v;
+    };
+    proto.setItem = function (k, v) {
+      if (k === "shopConfig" && type) {
+        try {
+          var nouveau = JSON.parse(v) || {}, ancien = {};
+          try { ancien = JSON.parse(get.call(this, PREFIXE + k)) || {}; } catch (e) {}
+          if (ancien.main) nouveau.main = ancien.main; else delete nouveau.main;
+          v = JSON.stringify(nouveau);
+        } catch (e) {}
+      }
+      return set.call(this, PREFIXE + k, v);
+    };
+    proto.removeItem = function (k) { return del.call(this, PREFIXE + k); };
+  } catch (e) { /* stockage indisponible : l'exemple fonctionne sans mémoire */ }
 
   var LIBELLES = { video: "Boutique Vidéo", ecom: "Boutique Traditionnelle", portfolio: "Portfolio",
     events: "Créateur d'événements", impact: "Projet Impact", finance: "Organismes de financement" };
@@ -57,7 +70,7 @@
     var b = document.createElement("div");
     b.id = "exBandeau";
     b.setAttribute("role", "note");
-    b.innerHTML = '<span><b>Exemple — données fictives.</b> ' + (LIBELLES[type] || "") + '</span>' +
+    b.innerHTML = '<span><b>Exemple — données fictives.</b> ' + (CREATION ? "Création d'une boutique (Paramètres vitrine)" : (LIBELLES[type] || "")) +'</span>' +
       '<span class="exsp">Tout est simulé : aucun achat, paiement, message ni inscription réel. Cette page n\'est pas une vraie boutique.</span>' +
       '<button type="button" id="exReset">Remettre l\'exemple à zéro</button>' +
       '<button type="button" id="exClose">Fermer l\'exemple</button>';
@@ -87,7 +100,7 @@
       var h = a.getAttribute("href") || "";
       if (!h || h.charAt(0) === "#" || /^(javascript:|mailto:|tel:)/i.test(h)) return;
       if (/^https?:/i.test(h) && a.hostname !== location.hostname) { ev.preventDefault(); window.exempleToast("Lien externe désactivé dans l'exemple."); return; }
-      if (/^(boutique|video|portfolio|evenements)\.html(\?|#|$)/i.test(h)) return;
+      if (/^(boutique|video|portfolio|evenements|parametres-vitrine)\.html(\?|#|$)/i.test(h)) return;
       ev.preventDefault();
       window.exempleToast("Cette page n'existe pas dans l'exemple.");
     }, true);

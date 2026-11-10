@@ -91,26 +91,37 @@
     r.innerHTML = "<p><b>" + msg + "</b></p>";
   }
 
+  /* Outils de l'atelier, en plus des types : la création d'une boutique (Paramètres vitrine = tronc commun). */
+  var OUTILS = {
+    creation: { label: "Création d'une boutique", desc: "Paramètres vitrine : modèle, identité, couleurs, options",
+      exemple: "/exemples-boutiques/parametres-vitrine.html",
+      what: "Le système de création commun à tous les types : choix du modèle principal (avec « Voir l'exemple »), identité, studio de couleurs, options, rubriques, bonus et publication. Ce que vous réglez ici s'applique aux exemples des types : ouvrez ensuite un type pour voir le rendu." }
+  };
+  function fiche(cle) { return R.TYPES[cle] || OUTILS[cle]; }
+
   function choisir(cle) {
-    if (!R.TYPES[cle]) cle = Object.keys(R.TYPES)[0];
+    if (!fiche(cle)) cle = Object.keys(R.TYPES)[0];
     courant = cle;
-    var t = R.TYPES[cle];
+    var t = fiche(cle);
     liste.querySelectorAll("button").forEach(function (b) { b.setAttribute("aria-current", b.dataset.cle === cle ? "true" : "false"); });
     scene.src = t.exemple;
     document.getElementById("onglet").href = t.exemple;
     document.getElementById("decrit").textContent = t.what;
-    document.getElementById("carteCreateur").innerHTML = window.ExempleBoutique.carte(cle);
+    document.getElementById("carteCreateur").innerHTML = R.TYPES[cle] ? window.ExempleBoutique.carte(cle) : "";
     try { history.replaceState(null, "", "#" + cle); } catch (e) {}
   }
 
   function monter() {
-    Object.keys(R.TYPES).forEach(function (cle) {
-      var t = R.TYPES[cle], b = document.createElement("button");
+    function ajouter(cle, t) {
+      var b = document.createElement("button");
       b.type = "button"; b.dataset.cle = cle;
       b.innerHTML = t.label + "<small>" + t.desc + "</small>";
       b.addEventListener("click", function () { choisir(cle); });
       liste.appendChild(b);
-    });
+    }
+    Object.keys(R.TYPES).forEach(function (cle) { ajouter(cle, R.TYPES[cle]); });
+    var h2 = document.createElement("h2"); h2.textContent = "Création"; liste.appendChild(h2);
+    Object.keys(OUTILS).forEach(function (cle) { ajouter(cle, OUTILS[cle]); });
     document.querySelectorAll("[data-vue]").forEach(function (b) {
       b.addEventListener("click", function () {
         document.querySelectorAll("[data-vue]").forEach(function (x) { x.setAttribute("aria-pressed", x === b ? "true" : "false"); });

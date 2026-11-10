@@ -1,0 +1,1267 @@
+<!doctype html>
+<!--
+CONSIGNE POUR CLAUDE CODE (transfert depuis la maquette, validée par ZADI) :
+- Les visuels, les parcours et le système de cette page sont validés. NE PAS les modifier ni les redessiner : il faut seulement les brancher (données réelles, serveur, paiement).
+- Types de boutiques : utiliser uniquement les types définis dans TYPES (video, ecom, portfolio, events, impact, finance). Un nouveau type sera ajouté plus tard, sur demande uniquement.
+- Migration de type : le propriétaire voit un message et valide ; la migration se fait ensuite automatiquement.
+- « Acheter maintenant » est supprimé : l'achat passe toujours par « Ajouter au panier ».
+- La section Équipe est conservée (invitations, postes, acceptation).
+- Paramètres boutique : ce fichier (« Paramètres vitrine ») remplace entièrement le module « Paramètres boutique ». Procédure : 04-remplacement-parametres-boutique.md. Ne pas reprendre les anciennes versions.
+-->
+<html lang="fr">
+<head>
+<meta name="robots" content="noindex,nofollow">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Moteur de boutiques Diaspo'Actif — maquette interactive</title>
+<style>
+  :root { --navy:#111c38; --bordeaux:#83172f; --gold:#d8b36a; --line:#e6e1da; --text:#172033; --muted:#6b6b76; --bg:#f7f6f3; --ok:#1e6b3a; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif; color:var(--text); background:var(--bg); }
+  header { background:var(--navy); color:#fff; padding:12px 24px; display:flex; justify-content:space-between; align-items:center; }
+  header strong { font-family: Georgia, serif; letter-spacing:.08em; }
+  header span { font-size: 13px; opacity: .8; }
+  main { max-width: 1180px; margin: 20px auto; padding: 0 16px; }
+  .tabs { display:flex; gap:6px; flex-wrap: wrap; margin-bottom: 16px; }
+  .cfg { display:grid; grid-template-columns: 270px 1fr; gap:18px; align-items:start; }
+  .cfg-nav { position:sticky; top:12px; background:#fff; border:1px solid var(--line); border-radius:14px; padding:12px; display:flex; flex-direction:column; gap:4px; }
+  .cfg-search { width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:8px; margin-bottom:6px; font:inherit; font-size:14px; }
+  .cfg-nav .tab { display:flex; align-items:center; justify-content:space-between; gap:8px; width:100%; text-align:left; border-radius:8px; border:0; background:transparent; color:var(--ink); padding:8px 10px; }
+  .cfg-nav .tab:hover { background:#F6F1F2; }
+  .cfg-nav .tab.on { background:var(--bordeaux); color:#fff; }
+  .cfg-nav .tab.sub { padding-left:26px; font-size:13px; }
+  .cfg-nav .tab.hidden { display:none; }
+  .dot { width:9px; height:9px; border-radius:50%; flex:0 0 auto; background:#D9B44A; }
+  .dot.ok { background:#1F7A52; }
+  .cfg-main { min-width:0; }
+  @media (max-width: 900px) { .cfg { grid-template-columns:1fr; } .cfg-nav { position:static; } }
+  .logo-row { display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap; }
+  .logo-frame { overflow:hidden; display:flex; align-items:center; justify-content:center; background:#fff; border:1px solid var(--line); flex:0 0 auto; }
+  .logo-frame.round { border-radius:50%; } .logo-frame.square { border-radius:12px; }
+  .logo-frame img { max-width:100%; max-height:100%; object-fit:contain; transform-origin:center; }
+  .logo-empty { width:110px; height:110px; border:1px dashed var(--line); border-radius:12px; display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:12px; }
+  .logo-ctrl { flex:1; min-width:220px; display:flex; flex-direction:column; gap:8px; font-size:13px; }
+  .logo-ctrl label { display:flex; flex-direction:column; gap:4px; }
+  .frm { display:grid; gap:12px; }
+  .frm label { display:flex; flex-direction:column; gap:4px; font-size:14px; }
+  .frm .chk { flex-direction:row; align-items:center; gap:8px; }
+  .frm fieldset { border:1px solid var(--line); border-radius:10px; padding:8px 12px; }
+  .frm fieldset label { flex-direction:row; align-items:center; gap:8px; padding:3px 0; }
+  .frm legend { font-size:14px; padding:0 4px; }
+  .frm h4 { margin:10px 0 0; font-size:14px; }
+  .frm .ro { background:#F6F4F7; border-radius:10px; padding:10px 12px; font-size:13px; color:var(--muted); }
+  .frm table { width:100%; border-collapse:collapse; font-size:13px; }
+  .frm th, .frm td { border-top:1px solid var(--line); padding:6px 4px; text-align:center; }
+  .frm th:first-child, .frm td:first-child { text-align:left; }
+  .frm th { font-weight:600; font-size:12px; }
+  .frm .twocol { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .pv-logo-img { width:56px; height:56px; background:#fff; overflow:hidden; display:flex; align-items:center; justify-content:center; margin-bottom:8px; }
+  .pv-logo-img img { max-width:100%; max-height:100%; object-fit:contain; }
+  .pv-logo-img.round { border-radius:50%; } .pv-logo-img.square { border-radius:10px; }
+  .vcard { background:#fff; color:#16161A; border:1px solid #E6E3E8; border-radius:14px; overflow:hidden; }
+  .vcard .vc-cover { height:110px; background-size:cover; background-position:center; background-color:#7A1A2A; position:relative; }
+  .vcard .vc-logo { width:56px; height:56px; border-radius:50%; background:#fff; border:3px solid #fff; margin:-30px 0 0 12px; position:relative; display:flex; align-items:center; justify-content:center; overflow:hidden; font-weight:800; color:#8E1B2E; }
+  .vcard .vc-logo img { max-width:100%; max-height:100%; object-fit:contain; }
+  .vcard .vc-body { padding:8px 12px 12px; font-size:13px; }
+  .cpick { display:flex; flex-direction:column; gap:8px; font-size:14px; }
+  .cpick-label { font-size:14px; }
+  .cchips { display:flex; flex-wrap:wrap; gap:6px; min-height:28px; }
+  .cchip { display:inline-flex; align-items:center; gap:4px; background:#F3E8EA; color:var(--bordeaux); border-radius:999px; padding:4px 6px 4px 10px; font-size:13px; }
+  .cchip button { border:0; background:none; color:var(--bordeaux); font-size:16px; line-height:1; cursor:pointer; padding:0 4px; }
+  .cpick-q { width:100%; padding:9px 10px; border:1px solid var(--line); border-radius:8px; font:inherit; font-size:14px; }
+  .cpick-count { font-size:12px; color:var(--muted); }
+  .cpick-list { max-height:280px; overflow:auto; border:1px solid var(--line); border-radius:10px; background:#fff; }
+  .cpick-opt { width:100%; display:flex; align-items:center; gap:10px; border:0; border-bottom:1px solid var(--line); background:#fff; padding:8px 10px; text-align:left; cursor:pointer; font:inherit; font-size:14px; }
+  .cpick-opt:hover { background:#F6F1F2; }
+  .cpick-opt.on { background:#F3E8EA; }
+  .cpick-opt .cc { display:inline-block; min-width:28px; font-size:11px; font-weight:700; color:#555; background:#EEE; border-radius:3px; text-align:center; padding:1px 3px; }
+  .cpick-opt .cn { flex:1; }
+  .cpick-opt .ck { font-size:12px; color:var(--muted); }
+  .cpick-opt.on .ck { color:var(--ok); font-weight:700; }
+  .docf { border:1px solid var(--line); border-radius:10px; padding:10px 12px; display:grid; gap:10px; }
+  .docf legend { font-size:14px; padding:0 4px; }
+  .docf label { display:flex; flex-direction:column; gap:4px; font-size:13px; }
+  .docpdf { font-size:13px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .fh { display:block; color:var(--muted); font-size:12px; line-height:1.4; margin-top:2px; }
+  .cc-chip { display:inline-block; font-size:10px; font-weight:700; letter-spacing:.4px; background:#EEE; color:#333; border-radius:3px; padding:1px 4px; }
+  .flag { width:20px; height:14px; border-radius:2px; box-shadow:0 0 0 1px rgba(0,0,0,.12); vertical-align:-2px; }
+  .cart-card { background:#fff; color:#16161A; border:1px solid #E6E3E8; border-radius:14px; overflow:hidden; display:flex; flex-direction:column; max-width:300px; font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  .cart-card .cover { height:110px; position:relative; }
+  .cart-card .logo-c { width:62px; height:62px; border-radius:50%; background:#fff; border:3px solid #fff; margin:-34px 0 0 14px; display:flex; align-items:center; justify-content:center; font-weight:800; position:relative; font-size:18px; box-shadow:0 2px 8px rgba(0,0,0,.15); overflow:hidden; }
+  .cart-card .logo-c img { max-width:100%; max-height:100%; object-fit:contain; }
+  .cart-card .body { padding:10px 14px 14px; display:flex; flex-direction:column; gap:6px; flex:1; }
+  .cart-card .name { font-weight:800; font-size:16px; }
+  .cart-card .type { align-self:flex-start; background:#F3E8EA; color:#8E1B2E; border-radius:6px; padding:3px 8px; font-size:12px; font-weight:700; }
+  .cart-card .desc { font-size:13.5px; color:#6B6B73; line-height:1.45; }
+  .cart-card .meta { font-size:13px; display:flex; align-items:center; flex-wrap:wrap; gap:4px; }
+  .cart-card .meta .sep { color:#6B6B73; margin:0 2px; }
+  .cart-card .rate { font-size:13px; }
+  .cart-card .stars { color:#E9A43B; letter-spacing:2px; font-size:15px; }
+  .cart-card .tags-row { display:flex; gap:6px; flex-wrap:wrap; font-size:12px; }
+  .cart-card .tags-row span { background:#F6F4F7; border:1px solid #E6E3E8; border-radius:999px; padding:2px 8px; }
+  .cart-card .go { margin-top:auto; background:#8E1B2E; color:#fff; border:0; border-radius:10px; padding:10px; font-weight:700; width:100%; }
+  .tinfo { margin-top:6px; font-size:13px; }
+  .tinfo summary { cursor:pointer; color:var(--bordeaux); font-weight:600; }
+  .tinfo p { margin:6px 0; color:var(--ink); line-height:1.5; }
+  .tab { border:1px solid var(--line); background:#fff; border-radius:999px; padding:7px 14px; cursor:pointer; font: inherit; font-size: 14px; }
+  .tab.on { background: var(--bordeaux); color:#fff; border-color: var(--bordeaux); }
+  .grid { display:grid; grid-template-columns: 1fr 380px; gap: 18px; align-items: start; }
+  .card { background:#fff; border:1px solid var(--line); border-radius: 12px; padding: 18px; }
+  .pane { display:none; }
+  .pane.show { display:block; }
+  .card h2 { margin: 0 0 10px; font-size: 16px; }
+  .hint { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .btn { background: var(--bordeaux); color:#fff; border:0; border-radius: 8px; padding: 9px 14px; font: inherit; font-weight:600; cursor:pointer; font-size: 14px; }
+  .btn:disabled { background:#cfc8bd; cursor: not-allowed; }
+  .btn.ghost { background:#fff; color:var(--text); border:1px solid var(--line); }
+  .btn.sm { padding: 5px 10px; font-size: 13px; }
+  input[type="text"], select, textarea { width:100%; padding: 9px 11px; border:1px solid var(--line); border-radius: 8px; font: inherit; }
+  input[type="range"] { width: 100%; accent-color: var(--bordeaux); }
+  .opt { display:flex; gap:10px; align-items:center; padding:10px; border:1px solid var(--line); border-radius:10px; margin-bottom:8px; cursor:pointer; font-size: 14px; }
+  .opt.on { border-color: var(--bordeaux); background:#fbf3f4; }
+  .opt small { display:block; color:var(--muted); }
+  .sw { display:flex; flex-direction:column; align-items:center; gap:6px; border:2px solid var(--line); background:#fff; border-radius:10px; padding:8px; cursor:pointer; font-size:12px; }
+  .sw.on { border-color: var(--bordeaux); }
+  .chips { display:flex; }
+  .chips i { width:28px; height:28px; display:block; }
+  .palettes { display:grid; grid-template-columns: repeat(3, 1fr); gap:8px; }
+  .colorRow { display:grid; grid-template-columns: 52px 1fr; gap:10px; align-items:start; padding: 10px 0; border-top:1px solid var(--line); }
+  .swatch { width:52px; height:52px; border-radius:10px; border:1px solid var(--line); cursor:pointer; padding: 0; }
+  .ramp { display:flex; gap:3px; margin-top:6px; }
+  .ramp i { flex:1; height: 22px; border-radius: 4px; cursor: pointer; }
+  .ramp i.sel { outline: 2px solid var(--text); outline-offset: 1px; }
+  .sliders { display:grid; grid-template-columns: 90px 1fr; gap: 6px 8px; align-items:center; font-size: 13px; margin-top: 8px; }
+  .warn { color:#a12020; font-size: 13px; margin-top: 6px; min-height: 16px; }
+  .ok { color: var(--ok); font-size: 13px; margin-top: 6px; }
+  .toggle { display:flex; justify-content:space-between; align-items:center; padding: 9px 0; border-top: 1px solid var(--line); font-size: 14px; }
+  .toggle small { display:block; color: var(--muted); }
+  .toggle.disabled { opacity: .5; }
+  .switch { position:relative; width:42px; height:24px; flex: 0 0 42px; }
+  .switch input { display:none; }
+  .switch span { position:absolute; inset:0; background:#cfc8bd; border-radius:999px; cursor:pointer; }
+  .switch span::after { content:""; position:absolute; width:18px; height:18px; left:3px; top:3px; background:#fff; border-radius:50%; transition:.2s; }
+  .switch input:checked + span { background: var(--bordeaux); }
+  .switch input:checked + span::after { transform: translateX(18px); }
+  .switch input:disabled + span { cursor: not-allowed; }
+  .preview { position: sticky; top: 12px; border:1px solid var(--line); border-radius:12px; overflow:hidden; background:#fff; }
+  .preview.dark { background:#14161c; color:#f1f1f4; }
+  .pv-hero { padding:16px; background: var(--c1); color: var(--on1, #fff); }
+  .pv-hero small { color: var(--c3); letter-spacing:.08em; font-size: 11px; }
+  .pv-hero h3 { margin: 6px 0 4px; font-size: 18px; }
+  .pv-hero p { margin: 0 0 8px; font-size: 13px; opacity: .92; }
+  .pv-hero button { background: var(--c3); color:#111; border:0; border-radius:6px; padding:6px 10px; font-size:12px; font-weight:600; }
+  .pv-body { padding: 12px; }
+  .pv-opt { border: 1px dashed var(--c2); border-radius: 10px; padding: 10px; margin-bottom: 10px; }
+  .pv-opt h4 { margin: 0 0 6px; font-size: 13px; color: var(--c2); }
+  .pv-items { display:grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .pv-items div { aspect-ratio: 4/3; border-radius: 6px; background: var(--c1); opacity: .85; font-size: 11px; color:#fff; display:flex; align-items:flex-end; padding: 4px; }
+  .pv-items div:nth-child(2n) { background: var(--c2); }
+  .pv-items div:nth-child(3n) { background: var(--c3); color:#111; }
+  .pv-mode { font-size: 12px; color: var(--muted); padding: 8px 12px; border-top: 1px solid var(--line); }
+  .slot { display:flex; justify-content:space-between; align-items:center; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 6px; font-size: 13px; background: #fff; }
+  .optBox { border: 2px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 12px; background:#fff; }
+  .optBox.copy { margin-left: 18px; border-style: dashed; }
+  .optHead { display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom: 8px; flex-wrap: wrap; }
+  .optHead h3 { margin: 0; font-size: 15px; }
+  .tag { font-size: 11px; background: #f1ede8; color: var(--muted); padding: 2px 8px; border-radius: 999px; }
+  .badgeOff { font-size: 12px; color: var(--muted); }
+  .sect { display:flex; justify-content:space-between; align-items:center; border:1px solid var(--line); border-radius:8px; padding:8px 10px; margin-bottom:6px; font-size:14px; background:#fff; gap: 8px; flex-wrap: wrap; }
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--navy); color:#fff; padding: 10px 16px; border-radius: 8px; font-size: 14px; opacity:0; transition:.25s; pointer-events:none; }
+  .toast.show { opacity:1; }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } .preview { position: static; } .palettes { grid-template-columns: repeat(2, 1fr); } }
+</style>
+</head>
+<body>
+<script src="exemple-commun.js"></script>
+<script src="/assets/boutique-types.js"></script>
+<script src="/assets/boutique-exemple-bouton.js"></script>
+<header><strong>DIASPO'ACTIF</strong><span>Moteur de boutiques — maquette interactive</span></header>
+<main>
+<div class="cfg">
+  <nav class="cfg-nav" aria-label="Rubriques du centre de configuration">
+    <input type="search" id="cfgSearch" class="cfg-search" placeholder="Rechercher un paramètre…" aria-label="Rechercher dans les paramètres">
+    <button class="tab on" data-pane="type" data-cat="type"><span>1. Modèle principal</span><i class="dot" data-dot="type"></i></button>
+    <button class="tab" data-pane="identity" data-cat="identity"><span>2. Identité</span><i class="dot" data-dot="identity"></i></button>
+    <button class="tab" data-pane="options" data-cat="options"><span>3. Modules complémentaires</span><i class="dot" data-dot="options"></i></button>
+    <button class="tab" data-pane="colors" data-cat="colors"><span>4. Apparence et personnalisation</span><i class="dot" data-dot="colors"></i></button>
+    <button class="tab" data-pane="rubriques" data-cat="rubriques"><span>5. Navigation et rubriques</span><i class="dot" data-dot="rubriques"></i></button>
+    <button class="tab sub" data-pane="bonus" data-cat="bonus"><span>Bonus boutique</span><i class="dot" data-dot="bonus"></i></button>
+    <button class="tab" data-pane="commercial" data-cat="commercial"><span>6. Paramètres commerciaux</span><i class="dot" data-dot="commercial"></i></button>
+    <button class="tab" data-pane="livraison" data-cat="livraison"><span>7. Livraison et expéditions</span><i class="dot" data-dot="livraison"></i></button>
+    <button class="tab" data-pane="paiements" data-cat="paiements"><span>8. Paiements et facturation</span><i class="dot" data-dot="paiements"></i></button>
+    <button class="tab" data-pane="equipe" data-cat="equipe"><span>9. Équipe et permissions</span><i class="dot" data-dot="equipe"></i></button>
+    <button class="tab" data-pane="confiance" data-cat="confiance"><span>10. Confiance et informations légales</span><i class="dot" data-dot="confiance"></i></button>
+    <button class="tab" data-pane="notifications" data-cat="notifications"><span>11. Notifications et communication</span><i class="dot" data-dot="notifications"></i></button>
+    <button class="tab" data-pane="publish" data-cat="publish"><span>12. Statistiques et visibilité</span><i class="dot" data-dot="publish"></i></button>
+  </nav>
+  <div class="cfg-main">
+
+  <div class="grid">
+    <div>
+      <section class="card pane show" data-pane="type">
+        <h2>Choisissez le modèle principal</h2>
+        <p class="hint">Le modèle principal détermine la structure et la dynamique de toute la boutique.</p>
+        <div id="mainChoices"></div>
+      </section>
+
+      <section class="card pane" data-pane="identity">
+        <h2>Identité</h2>
+        <p class="hint">Le nom est obligatoire. Les autres champs sont facultatifs.</p>
+        <label>Nom de la boutique *<input type="text" id="name" value="Éclat Beauté" maxlength="60"></label>
+        <div class="warn" id="nameErr"></div>
+        <p></p>
+        <label>Slogan<input type="text" id="slogan" value="Découvrez nos produits, services et réalisations."></label>
+        <p></p>
+        <label>Description<textarea id="desc" rows="3">Une boutique artisanale aux couleurs de la diaspora.</textarea></label>
+        <p></p>
+        <label>Style des offres promotionnelles<select id="promoStyle"><option value="rouge">Rouge</option><option value="or">Doré</option><option value="jaune">Jaune</option></select></label>
+        <p class="hint">Ce style colore le bandeau des offres et les étiquettes de promotion sur la boutique vidéo.</p>
+        <h3 style="font-size:14px;margin:16px 0 8px">Logo de la boutique</h3>
+        <p class="hint">Image carrée ou ronde, au format PNG, JPG ou WebP (1 Mo maximum). Ajustez la taille, le zoom et la position.</p>
+        <div class="logo-row">
+          <div id="logoBox"></div>
+          <div class="logo-ctrl">
+            <input type="file" id="logoFile" accept="image/png,image/jpeg,image/webp">
+            <label>Forme <select id="logoShape"><option value="round">Ronde</option><option value="square">Carrée</option></select></label>
+            <label>Taille <input type="range" id="logoSize" min="40" max="160" step="2"></label>
+            <label>Zoom <input type="range" id="logoZoom" min="50" max="200" step="5"></label>
+            <label>Position horizontale <input type="range" id="logoX" min="-50" max="50" step="1"></label>
+            <label>Position verticale <input type="range" id="logoY" min="-50" max="50" step="1"></label>
+            <button type="button" class="btn ghost sm" id="logoRemove">Retirer le logo</button>
+            <div class="warn" id="logoErr"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card pane" data-pane="colors">
+        <h2>Studio de couleurs</h2>
+        <p class="hint">Choisissez une, deux ou trois couleurs. Les nuances sont générées automatiquement.</p>
+        <div class="row" style="margin-bottom:10px">
+          <label class="opt" style="display:inline-flex"><input type="radio" name="ncol" value="1"> 1 couleur</label>
+          <label class="opt" style="display:inline-flex"><input type="radio" name="ncol" value="2"> 2 couleurs</label>
+          <label class="opt" style="display:inline-flex"><input type="radio" name="ncol" value="3" checked> 3 couleurs</label>
+        </div>
+        <h3 style="font-size:14px;margin:10px 0 6px">Palettes prédéfinies</h3>
+        <div class="palettes" id="palettes"></div>
+        <h3 style="font-size:14px;margin:14px 0 0">Couleurs</h3>
+        <div id="colorRows"></div>
+        <div class="toggle"><span>Mode clair et sombre<small>Réglages indépendants pour chaque mode</small></span>
+          <span class="switch"><input type="checkbox" id="dark" checked><span></span></span></div>
+        <div class="toggle"><span>Aperçu en mode sombre<small>Affiche la boutique sur fond sombre</small></span>
+          <span class="switch"><input type="checkbox" id="showDark"><span></span></span></div>
+        <div class="ok" id="contrastOk"></div>
+        <div class="warn" id="contrastErr"></div>
+      </section>
+
+      <section class="card pane" data-pane="options">
+        <h2>Options complémentaires</h2>
+        <p class="hint">Une option est une cartouche encadrée qui ajoute un type de boutique à la boutique principale.<br>
+          <strong>Limites :</strong> options au maximum = nombre de types − 1 (soit 4 aujourd'hui). Une option peut être dupliquée 3 fois au maximum (4 exemplaires au total).</p>
+        <div id="optionToggles"></div>
+        <h3 style="font-size:14px;margin:14px 0 8px">Cartouches des options</h3>
+        <div id="optionBoxes"></div>
+      </section>
+
+      <section class="card pane" data-pane="rubriques">
+        <h2>Organiser les rubriques</h2>
+        <p class="hint">Réordonnez, masquez ou affichez chaque rubrique. Les contenus restent conservés.</p>
+        <div id="sections"></div>
+        <h3 style="font-size:14px;margin:14px 0 8px">Ajouter une rubrique</h3>
+        <div class="row" style="gap:8px">
+          <input type="text" id="newSec" maxlength="50" placeholder="Ex. Nouveautés, Témoignages…" style="flex:1;min-width:0">
+          <button class="btn sm" id="addSec">Ajouter</button>
+        </div>
+        <div class="warn" id="secErr"></div>
+      </section>
+
+      <section class="card pane" data-pane="bonus">
+        <h2>Bonus boutique</h2>
+        <p class="hint">Toute l'ancienne boutique est conservée ici lors d'un changement de type. Le propriétaire choisit ce qui est visible, par pourcentage des produits. Cet onglet ne compte pas comme une option.</p>
+        <div id="bonusCount" style="font-size:14px"></div>
+        <div style="height:10px;background:#eee8df;border-radius:999px;overflow:hidden;margin:8px 0"><i id="bonusBar" style="display:block;height:100%;background:var(--bordeaux);width:0;transition:.2s"></i></div>
+        <div class="row" style="margin-bottom:10px">
+          <button class="btn ghost sm" id="bonusAuto">Rendre visible 20 %</button>
+          <button class="btn ghost sm" id="bonusOff">Tout masquer</button>
+        </div>
+        <div id="bonusList"></div>
+      </section>
+
+      <section class="card pane" data-pane="commercial">
+        <h2>Paramètres commerciaux</h2>
+        <p class="hint">Remplissez les réglages ci-dessous. Tout est enregistré automatiquement.</p>
+        <div id="form-commercial"></div>
+      </section>
+      <section class="card pane" data-pane="livraison">
+        <h2>Livraison et expéditions</h2>
+        <p class="hint">Remplissez les réglages ci-dessous. Tout est enregistré automatiquement.</p>
+        <div id="form-livraison"></div>
+      </section>
+      <section class="card pane" data-pane="paiements">
+        <h2>Paiements et facturation</h2>
+        <p class="hint">Remplissez les réglages ci-dessous. Tout est enregistré automatiquement.</p>
+        <div id="form-paiements"></div>
+      </section>
+      <section class="card pane" data-pane="equipe">
+        <h2>Équipe et permissions</h2>
+        <p class="hint">Remplissez les réglages ci-dessous. Tout est enregistré automatiquement.</p>
+        <div id="form-equipe"></div>
+      </section>
+      <section class="card pane" data-pane="confiance">
+        <h2>Confiance et informations légales</h2>
+        <p class="hint">Remplissez les réglages ci-dessous. Tout est enregistré automatiquement.</p>
+        <div id="form-confiance"></div>
+      </section>
+      <section class="card pane" data-pane="notifications">
+        <h2>Notifications et communication</h2>
+        <p class="hint">Remplissez les réglages ci-dessous. Tout est enregistré automatiquement.</p>
+        <div id="form-notifications"></div>
+      </section>
+      <section class="card pane" data-pane="publish">
+        <h2>Publication</h2>
+        <div id="summary" style="font-size:14px;line-height:1.7"></div>
+        <label style="display:block;margin-top:10px">Visibilité
+          <select id="vis"><option value="draft">Brouillon</option><option value="public">Publique</option><option value="suspended">Suspendue</option></select></label>
+        <p></p>
+        <button class="btn" id="publishBtn">Publier la boutique</button>
+        <p id="pubMsg" class="ok"></p>
+        <div id="form-visibilite"></div>
+      </section>
+    </div>
+
+    <aside class="preview" id="preview">
+      <div class="pv-hero">
+        <small id="pvTag">BOUTIQUE OFFICIELLE</small>
+        <div id="pvLogo"></div>
+        <h3 id="pvName">Éclat Beauté</h3>
+        <p id="pvSlogan"></p>
+        <button type="button">Découvrir la boutique</button>
+      </div>
+      <div class="pv-body" id="pvBody"></div>
+      <div class="pv-mode" id="pvMode"></div>
+    </aside>
+  </div>
+  </div>
+</main>
+<div class="toast" id="toast"></div>
+
+<div id="modal" role="dialog" aria-modal="true" aria-labelledby="mTitle" style="display:none;position:fixed;inset:0;background:rgba(10,16,30,.6);align-items:center;justify-content:center;padding:16px;z-index:40">
+  <div style="background:#fff;border-radius:14px;padding:22px;max-width:560px;width:100%">
+    <h3 id="mTitle" style="margin:0 0 8px">Changer de type principal</h3>
+    <p id="mIntro" style="font-size:14px"></p>
+    <div id="mMigration" style="background:#FFF6E0;border-radius:10px;padding:10px 12px;font-size:14px;margin:10px 0">
+      <strong>Migration de votre boutique</strong><br>
+      Votre boutique va migrer sur un autre format. Le système vous fera les propositions nécessaires : il vous suffit de les valider. La migration se fait ensuite automatiquement.
+    </div>
+    <strong style="font-size:14px">Ce qui sera modifié :</strong>
+    <ul style="font-size:14px;line-height:1.6"><li>La présentation de la page d'accueil change.</li><li>Toute l'ancienne boutique est déplacée dans « Bonus boutique ».</li></ul>
+    <strong style="font-size:14px;color:#a12020">Ce qui deviendra inaccessible :</strong>
+    <ul id="mLost" style="font-size:14px;line-height:1.6"></ul>
+    <p style="font-size:14px">Rien ne sera supprimé.</p>
+    <label style="display:flex;gap:8px;align-items:center;font-size:14px;margin:12px 0"><input type="checkbox" id="understood"> J'ai compris ces changements.</label>
+    <div class="row" style="justify-content:flex-end">
+      <button class="btn ghost" id="mCancel">Annuler</button>
+      <button class="btn" id="mConfirm" disabled>Confirmer le changement</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  /* Source unique : assets/boutique-types.js (TYPES, TYPE_SECTIONS, MAX_OPTIONS calculé = types − 1, MAX_COPIES). */
+  const { TYPES, TYPE_SECTIONS, MAX_OPTIONS, MAX_COPIES, SLOTS_DEFAULT } = window.BOUTIQUE_TYPES;
+  const PALETTES = [
+    { name: "Bordeaux & Or", c: ["#83172f", "#111c38", "#d8b36a"] },
+    { name: "Émeraude", c: ["#1f6b55", "#0f3330", "#e6c98a"] },
+    { name: "Prestige violet", c: ["#573a7d", "#21163a", "#dcb0d8"] },
+    { name: "Océan", c: ["#1e5e91", "#111c38", "#86cbd9"] },
+    { name: "Terre & Sable", c: ["#a35a3a", "#402c22", "#dcc2a0"] },
+    { name: "Noir & Or", c: ["#222222", "#b38b3a", "#f1e2bd"] }
+  ];
+  const COLOR_NAMES = ["Couleur principale", "Couleur secondaire", "Couleur d'accent"];
+  const COLOR_HINTS = ["Boutons et éléments actifs", "Bannières et zones importantes", "Détails et éléments décoratifs"];
+  const SAMPLE = ["Bissap artisanal RUBIS", "Recette : 3 façons de préparer le Bissap", "Coulisses de fabrication", "Kit bien-être hibiscus", "Projet Agriculture durable", "Rencontre des entrepreneurs"];
+
+  // options : { on, copies: [ { slots, compact } ] }  (copies.length = 1 + duplications, max 4)
+  const st = {
+    main: "video",
+    name: "Éclat Beauté",
+    slogan: "Découvrez nos produits, services et réalisations.",
+    ncol: 3,
+    colors: [...PALETTES[0].c],
+    sel: [0, 0, 0],
+    textures: ["uni", "uni", "uni"],
+    promoStyle: "rouge",
+    dark: true,
+    showDark: false,
+    options: {
+      portfolio: { on: true, copies: [{ slots: 4, compact: true }] },
+      events: { on: true, copies: [{ slots: 2, compact: true }] }
+    },
+    sections: null,
+    vis: "draft"
+  };
+
+  const $ = (s) => document.querySelector(s);
+  const $$ = (s) => document.querySelectorAll(s);
+  const toast = (m) => { const t = $("#toast"); t.textContent = m; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 1800); };
+
+  // --- couleurs ---
+  function hexToHsl(hex) {
+    let r = parseInt(hex.slice(1, 3), 16) / 255, g = parseInt(hex.slice(3, 5), 16) / 255, b = parseInt(hex.slice(5, 7), 16) / 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b); let h = 0, s = 0; const l = (max + min) / 2;
+    if (max !== min) {
+      const d = max - min; s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+      if (max === r) h = (g - b) / d + (g < b ? 6 : 0); else if (max === g) h = (b - r) / d + 2; else h = (r - g) / d + 4;
+      h *= 60;
+    }
+    return [h, s * 100, l * 100];
+  }
+  function hslToHex(h, s, l) {
+    s /= 100; l /= 100;
+    const k = (n) => (n + h / 30) % 12, a = s * Math.min(l, 1 - l);
+    const f = (n) => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+    const to = (x) => Math.round(x * 255).toString(16).padStart(2, "0");
+    return "#" + to(f(0)) + to(f(8)) + to(f(4));
+  }
+  function lum(hex) {
+    const n = parseInt(hex.slice(1), 16);
+    const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+    return 0.2126 * f((n >> 16) & 255) + 0.7152 * f((n >> 8) & 255) + 0.0722 * f(n & 255);
+  }
+  function contrast(a, b) { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); }
+  function ramp(hex) {
+    const [h, s] = hexToHsl(hex);
+    return [95, 88, 78, 66, 54, 44, 34, 24, 14].map(l => hslToHex(h, s, l));
+  }
+
+  function buildMain() {
+    $("#mainChoices").innerHTML = Object.entries(TYPES).map(([k, t]) => `
+      <label class="opt ${st.main === k ? "on" : ""}"><input type="radio" name="main" value="${k}" ${st.main === k ? "checked" : ""}>
+        <span>${t.label}<small>${t.desc}</small>
+        <details class="tinfo"><summary>En savoir plus</summary>
+          <p><strong>Ce que c'est :</strong> ${t.what}</p>
+          <p><strong>Pour qui :</strong> ${t.who}</p>
+          <p><strong>Ce qu'elle contient :</strong> ${t.contains}</p>
+        </details>${window.ExempleBoutique ? window.ExempleBoutique.carte(k) : ""}</span></label>`).join("");
+  }
+  function buildPalettes() {
+    $("#palettes").innerHTML = PALETTES.map((p, i) => `
+      <button class="sw" data-pal="${i}"><div class="chips">${p.c.map(c => `<i style="background:${c}"></i>`).join("")}</div>${p.name}</button>`).join("");
+  }
+  function buildColors() {
+    $("#colorRows").innerHTML = Array.from({ length: st.ncol }, (_, i) => {
+      const hex = st.colors[i];
+      const [h, s, l] = hexToHsl(hex);
+      return `
+      <div class="colorRow">
+        <input type="color" class="swatch" data-ci="${i}" value="${hex}" aria-label="${COLOR_NAMES[i]}">
+        <div>
+          <div class="row"><strong>${COLOR_NAMES[i]}</strong><span style="font-size:12px;color:var(--muted)">${COLOR_HINTS[i]}</span></div>
+          <div class="row" style="margin-top:6px"><input type="text" style="width:130px" data-hex="${i}" value="${hex.toUpperCase()}" aria-label="Code HEX"></div>
+          <div class="studio">
+            <canvas class="wheel" data-wheel="${i}" width="150" height="150" aria-label="Roue de couleurs : ${COLOR_NAMES[i]}"></canvas>
+            <div>
+              <p class="hint" style="margin:0 0 6px">Cliquez ou glissez dans la roue : l'angle choisit la teinte, la distance la saturation. La luminosité reste celle de la couleur.</p>
+              <div style="font-size:13px;margin-top:4px">Texture</div>
+              <div class="texchips">${TEXTURES.map(t => `<button type="button" class="texchip ${st.textures[i] === t.id ? "on" : ""}" data-texbtn="${i}:${t.id}" style="background:${textureBg(t.id, hex)}">${t.label}</button>`).join("")}</div>
+              <div class="texsample" style="background:${textureBg(st.textures[i], hex)}"></div>
+            </div>
+          </div>
+          <div class="ramp">${ramp(hex).map((c, k) => `<i data-nuance="${i}:${k}" class="${st.sel[i] === k ? "sel" : ""}" style="background:${c}" title="${c}"></i>`).join("")}</div>
+          <div class="sliders">
+            <span>Teinte</span><input type="range" min="0" max="360" value="${Math.round(h)}" data-slider="h${i}">
+            <span>Saturation</span><input type="range" min="0" max="100" value="${Math.round(s)}" data-slider="s${i}">
+            <span>Luminosité</span><input type="range" min="0" max="100" value="${Math.round(l)}" data-slider="l${i}">
+          </div>
+        </div>
+      </div>`;
+    }).join("");
+    $$("canvas[data-wheel]").forEach(drawWheel);
+    checkContrast();
+  }
+  function checkContrast() {
+    const c1 = st.colors[0];
+    const bg = st.showDark ? "#14161c" : "#ffffff";
+    const text = st.showDark ? "#f1f1f4" : "#172033";
+    const r1 = contrast(c1, bg);
+    const r2 = contrast(text, c1);
+    const warn = r1 < 3 ? `Attention : la couleur principale est trop proche du fond (${r1.toFixed(1)}:1). Choisissez une couleur plus contrastée.` : (r2 < 4.5 ? `Attention : le texte sur la couleur principale est difficile à lire (${r2.toFixed(1)}:1).` : "");
+    $("#contrastErr").textContent = warn;
+    $("#contrastOk").textContent = warn ? "" : `Contrastes conformes WCAG AA (texte sur couleur principale : ${r2.toFixed(1)}:1).`;
+  }
+
+  function activeOptions() { return Object.keys(st.options).filter(k => st.options[k].on && k !== st.main); }
+  function optionCount() { return activeOptions().length; }
+
+  function buildOptionToggles() {
+    const full = optionCount() >= MAX_OPTIONS;
+    $("#optionToggles").innerHTML = Object.entries(TYPES).filter(([k]) => k !== st.main).map(([k, t]) => {
+      const on = !!(st.options[k] && st.options[k].on);
+      const disabled = !on && full;
+      return `<div class="toggle ${disabled ? "disabled" : ""}"><span>${t.label}<small>${t.desc}</small></span>
+        <span class="switch"><input type="checkbox" data-opt="${k}" ${on ? "checked" : ""} ${disabled ? "disabled" : ""}><span></span></span></div>`;
+    }).join("") + `<p class="badgeOff" style="margin-top:8px">Options actives : ${optionCount()} / ${MAX_OPTIONS}. ${TYPES[st.main].label} est la boutique principale.</p>`;
+  }
+  function buildOptionBoxes() {
+    const opts = activeOptions();
+    if (!opts.length) { $("#optionBoxes").innerHTML = `<p class="hint">Aucune option activée.</p>`; return; }
+    $("#optionBoxes").innerHTML = opts.map(k => {
+      const o = st.options[k];
+      const canDup = o.copies.length < MAX_COPIES + 1;
+      const boxes = o.copies.map((c, ci) => {
+        const slots = Array.from({ length: c.slots }, (_, i) => `
+          <div class="slot"><span>${TYPES[k].items} ${i + 1} — ${SAMPLE[(i + ci + k.length) % SAMPLE.length]}</span>
+            <button class="btn ghost sm" data-del="${k}:${ci}:${i}" ${c.slots <= 1 ? "disabled" : ""}>Retirer</button></div>`).join("");
+        return `
+        <div class="optBox ${ci > 0 ? "copy" : ""}">
+          <div class="optHead">
+            <h3>${TYPES[k].label}${ci > 0 ? ` — copie ${ci}` : ""} <span class="tag">option</span></h3>
+            <div class="row">
+              <button class="btn ghost sm" data-compact="${k}:${ci}">${c.compact ? "Version détaillée" : "Version compacte"}</button>
+              ${ci > 0 ? `<button class="btn ghost sm" data-remove-copy="${k}:${ci}">Supprimer la copie</button>` : ""}
+            </div>
+          </div>
+          ${slots}
+          <div class="row"><button class="btn ghost sm" data-add-slot="${k}:${ci}">+ Ajouter un emplacement</button>
+            <span class="badgeOff">${c.slots} emplacement(s)</span></div>
+        </div>`;
+      }).join("");
+      return boxes + `
+        <div class="row" style="margin:-4px 0 14px">
+          <button class="btn sm" data-dup="${k}" ${canDup ? "" : "disabled"}>Dupliquer ${TYPES[k].label}</button>
+          <span class="badgeOff">${o.copies.length} exemplaire(s) sur ${MAX_COPIES + 1} maximum</span>
+        </div>`;
+    }).join("");
+  }
+  function defaultSections() {
+    const base = [];
+    const add = (k) => base.push(...(TYPE_SECTIONS[k] || []));
+    add(st.main); activeOptions().forEach(add);
+    return base.map(t => ({ title: t, visible: true }));
+  }
+  function buildSections() {
+    if (!st.sections || !st.sections.length) st.sections = defaultSections();
+    $("#sections").innerHTML = st.sections.map((s, i) => `
+      <div class="sect"><span><strong>${s.title}</strong> <span class="badgeOff">${s.visible ? "visible" : "masquée (contenus conservés)"}</span></span>
+        <span class="row">
+          <button class="btn ghost sm" data-up="${i}" ${i === 0 ? "disabled" : ""}>↑</button>
+          <button class="btn ghost sm" data-down="${i}" ${i === st.sections.length - 1 ? "disabled" : ""}>↓</button>
+          <button class="btn ghost sm" data-vis="${i}">${s.visible ? "Masquer" : "Afficher"}</button>
+          ${s.custom ? `<button class="btn ghost sm" data-del-sec="${i}">Supprimer</button>` : ""}
+        </span></div>`).join("") || `<p class="hint">Aucune rubrique.</p>`;
+  }
+  function renderPreview() {
+    const pv = $("#preview");
+    const [c1, c2, c3] = st.colors;
+    pv.style.setProperty("--c1", c1); pv.style.setProperty("--c2", c2); pv.style.setProperty("--c3", c3);
+    pv.style.setProperty("--on1", contrast("#ffffff", c1) >= 4.5 ? "#ffffff" : "#111111");
+    pv.classList.toggle("dark", st.showDark);
+    $("#pvLogo").innerHTML = st.logo && st.logo.src ? `<div class="pv-logo-img ${st.logo.shape}"><img src="${st.logo.src}" alt="" style="transform:translate(${st.logo.x}%,${st.logo.y}%) scale(${st.logo.zoom / 100})"></div>` : "";
+    $("#pvName").textContent = st.name || "Nom de la boutique";
+    $("#pvSlogan").textContent = st.slogan;
+    $("#pvTag").textContent = TYPES[st.main].label.toUpperCase();
+    $("#pvBody").innerHTML = `<div class="pv-opt"><h4>Rubriques affichées</h4><div class="pv-items">${(st.sections || []).filter(x => x.visible).map(x => `<div>${x.title}</div>`).join("") || "<div>Aucune rubrique visible</div>"}</div></div>` + activeOptions().map(k => {
+      const o = st.options[k];
+      return o.copies.map((c, ci) => `
+        <div class="pv-opt"><h4>${TYPES[k].label}${ci ? ` (copie ${ci})` : ""}${c.compact ? " — compacte" : ""}</h4>
+          <div class="pv-items">${Array.from({ length: Math.min(c.slots, 3) }, (_, i) => `<div>${TYPES[k].items} ${i + 1}</div>`).join("")}</div>
+        </div>`).join("");
+    }).join("") + `<p style="font-size:13px;color:var(--muted)">Contenus de la boutique principale : ${TYPES[st.main].label}.</p>`;
+    const tl = pv.querySelector(".tex-layer") || (() => {
+      const d = document.createElement("div"); d.className = "tex-layer";
+      d.style.cssText = "position:absolute;left:0;right:0;top:0;height:160px;pointer-events:none;border-radius:inherit";
+      pv.style.position = "relative"; pv.prepend(d); return d;
+    })();
+    tl.style.background = (TEXTURES.find(x => x.id === st.textures[0]) || TEXTURES[0]).bg || "none";
+    tl.style.animation = st.textures[0] === "scintillant" ? "twinkle 1.6s infinite" : "none";
+    const hero = pv.querySelector(".pv-hero");
+    tl.style.height = (hero ? hero.offsetHeight : 0) + "px";
+    $("#pvMode").textContent = st.dark ? "Clair et sombre : réglages indépendants" : "Mode clair seul";
+    checkContrast();
+    updateDots();
+    saveShop();
+  }
+  // Enregistre la configuration pour la page Boutique Vidéo (prototype : stockage local du navigateur).
+  function saveShop() {
+    try {
+      localStorage.setItem("shopConfig", JSON.stringify({
+        boundTo: "video",
+        main: st.main,
+        options: activeOptions(),
+        optionCopies: Object.fromEntries(activeOptions().map(k => [k, st.options[k].copies.length])),
+        name: st.name,
+        slogan: st.slogan,
+        status: st.vis,
+        promoStyle: st.promoStyle,
+        logo: st.logo,
+        extra: st.extra,
+        bonusVisible: (() => { try { return [...bonus.visible].map(i => BONUS_ITEMS[i]); } catch (e) { return []; } })(),
+        colors: st.colors.slice(0, st.ncol),
+        textures: st.textures.slice(0, st.ncol),
+        sections: st.sections.map(s => s.title),
+        hiddenSections: st.sections.filter(s => !s.visible).map(s => s.title),
+        customSections: st.sections.filter(s => s.custom).map(s => s.title)
+      }));
+    } catch (e) { /* stockage indisponible : la page garde ses valeurs par défaut */ }
+  }
+  function renderSummary() {
+    $("#summary").innerHTML = `
+      <p><strong>Nom :</strong> ${st.name || "(non renseigné)"}</p>
+      <p><strong>Modèle principal :</strong> ${TYPES[st.main].label}</p>
+      <p><strong>Options :</strong> ${activeOptions().map(k => `${TYPES[k].label} (${st.options[k].copies.length} exemplaire(s))`).join(", ") || "aucune"}</p>
+      <p><strong>Couleurs :</strong> ${st.colors.slice(0, st.ncol).join(", ")}</p>`;
+  }
+  function refreshAll() {
+    buildMain(); buildColors(); buildOptionToggles(); buildOptionBoxes(); buildSections(); renderPreview(); renderSummary();
+  }
+
+  // --- fil de création : six étapes, dans l'ordre, avec validation ---
+  const WIZ = ["type", "identity", "colors", "options", "rubriques", "publish"];
+  const WIZ_LABEL = { type: "Modèle principal", identity: "Identité", colors: "Couleurs", options: "Options", rubriques: "Rubriques", publish: "Publication" };
+  const SHOP_PAGE = Object.fromEntries(Object.entries(TYPES).map(([k, t]) => [k, t.exemple.replace("/exemples-boutiques/", "")]));
+  let wizIdx = 0;
+  function showPane(pane) {
+    $$(".tab").forEach(x => x.classList.toggle("on", x.dataset.pane === pane));
+    $$(".pane").forEach(p => p.classList.toggle("show", p.dataset.pane === pane));
+    if (pane === "publish") renderSummary();
+  }
+  function goTo(pane) { wizIdx = WIZ.indexOf(pane); showPane(pane); buildWizard(); }
+  function buildWizard() {
+    if (!$("#wizard")) { const w = document.createElement("div"); w.id = "wizard"; w.className = "wizard"; $(".cfg-main").prepend(w); }
+    const last = wizIdx === WIZ.length - 1;
+    $("#wizard").innerHTML = `
+      <div class="wprog"><span>Étape ${wizIdx + 1} sur ${WIZ.length} : <strong>${WIZ_LABEL[WIZ[wizIdx]]}</strong></span>
+        <div class="wbar"><i style="width:${(wizIdx + 1) / WIZ.length * 100}%"></i></div></div>
+      <div class="wbtns">
+        <button class="btn ghost" id="wPrev" ${wizIdx === 0 ? "disabled" : ""}>← Précédent</button>
+        <button class="btn" id="wNext">${last ? "Publier / terminer" : "Suivant →"}</button>
+      </div>`;
+  }
+  document.addEventListener("click", (e) => {
+    const t = e.target;
+    if (t.id === "wNext") {
+      if (wizIdx === WIZ.length - 1) { $("#publishBtn").click(); return; }
+      if (WIZ[wizIdx] === "identity" && !st.name) { $("#nameErr").textContent = "Le nom est obligatoire pour continuer."; return; }
+      wizIdx++; goTo(WIZ[wizIdx]); return;
+    }
+    if (t.id === "wPrev" && wizIdx > 0) { wizIdx--; goTo(WIZ[wizIdx]); }
+  });
+
+  // --- textures : effets ajoutés par-dessus la couleur ---
+  const TEXTURES = [
+    { id: "uni", label: "Uni (aucune texture)", bg: "" },
+    { id: "dore", label: "Doré", bg: "linear-gradient(115deg, rgba(120,80,10,.55) 0%, rgba(255,238,170,.75) 22%, rgba(185,138,46,.6) 40%, rgba(255,246,200,.8) 55%, rgba(143,100,24,.6) 75%, rgba(233,201,107,.7) 100%)" },
+    { id: "brillant", label: "Brillant", bg: "linear-gradient(115deg, transparent 30%, rgba(255,255,255,.85) 42%, transparent 50%, rgba(255,255,255,.5) 62%, transparent 70%) 0 0 / 250% 100%" },
+    { id: "scintillant", label: "Scintillant", bg: "radial-gradient(circle, #fff 2px, transparent 3px) 0 0 / 26px 22px, radial-gradient(circle, #ffe9a6 1.5px, transparent 3px) 13px 11px / 34px 30px" },
+    { id: "luisant", label: "Luisant (vernis)", bg: "linear-gradient(180deg, rgba(255,255,255,.75) 0%, rgba(255,255,255,.1) 46%, rgba(0,0,0,.22) 52%, rgba(0,0,0,.05) 100%)" },
+    { id: "satine", label: "Satiné", bg: "linear-gradient(90deg, rgba(255,255,255,.25), rgba(0,0,0,.15) 35%, rgba(255,255,255,.22) 65%, rgba(0,0,0,.12))" }
+  ];
+  function textureBg(id, hex) {
+    const t = TEXTURES.find(x => x.id === id) || TEXTURES[0];
+    return t.bg ? `${t.bg}, ${hex}` : hex;
+  }
+  if (!document.getElementById("moteurKeyframes")) {
+    const k = document.createElement("style"); k.id = "moteurKeyframes";
+    k.textContent = "@keyframes twinkle { 50% { opacity: .35; } } .wheel{width:150px;height:150px;cursor:crosshair;touch-action:none} .studio{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;margin-top:8px} .texsample{width:150px;height:44px;border-radius:8px;margin-top:8px;border:1px solid var(--line)} .texchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px} .texchip{border:2px solid transparent;border-radius:8px;padding:8px 10px;font:inherit;font-size:12px;font-weight:600;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.6);min-width:96px;cursor:pointer} .texchip.on{border-color:#111;box-shadow:0 0 0 2px #fff inset} .wizard{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:0 0 12px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap} .wprog{flex:1;min-width:200px;font-size:14px} .wbar{height:6px;background:#eee8df;border-radius:999px;margin-top:6px;overflow:hidden} .wbar i{display:block;height:100%;background:var(--c1,#83172f);border-radius:999px;transition:.2s} .wbtns{display:flex;gap:8px}";
+    document.head.appendChild(k);
+  }
+
+  // --- roue de couleurs : teinte (angle) et saturation (distance), luminosité conservée ---
+  function drawWheel(c) {
+    const i = Number(c.dataset.wheel), ctx = c.getContext("2d"), r = c.width / 2;
+    const img = ctx.createImageData(c.width, c.height);
+    const [, , l] = hexToHsl(st.colors[i]);
+    for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) {
+      const dx = x - r + 0.5, dy = y - r + 0.5, d = Math.hypot(dx, dy), k = (y * c.width + x) * 4;
+      if (d > r) { img.data[k + 3] = 0; continue; }
+      let h = Math.atan2(dy, dx) * 180 / Math.PI; if (h < 0) h += 360;
+      const hex = hslToHex(h, Math.min(100, d / r * 100), l);
+      img.data[k] = parseInt(hex.slice(1, 3), 16); img.data[k + 1] = parseInt(hex.slice(3, 5), 16);
+      img.data[k + 2] = parseInt(hex.slice(5, 7), 16); img.data[k + 3] = 255;
+    }
+    ctx.clearRect(0, 0, c.width, c.height); ctx.putImageData(img, 0, 0);
+    const [h, s] = hexToHsl(st.colors[i]), a = h * Math.PI / 180, d = s / 100 * r;
+    ctx.beginPath(); ctx.arc(r + Math.cos(a) * d, r + Math.sin(a) * d, 6, 0, Math.PI * 2);
+    ctx.lineWidth = 3; ctx.strokeStyle = "#fff"; ctx.stroke(); ctx.lineWidth = 1; ctx.strokeStyle = "#111"; ctx.stroke();
+  }
+  let wheelDrag = null;
+  function pickWheel(c, e) {
+    const i = Number(c.dataset.wheel), r = c.width / 2, rect = c.getBoundingClientRect();
+    const x = (e.clientX - rect.left) * c.width / rect.width - r, y = (e.clientY - rect.top) * c.height / rect.height - r;
+    const d = Math.min(r, Math.hypot(x, y));
+    let h = Math.atan2(y, x) * 180 / Math.PI; if (h < 0) h += 360;
+    const [, , l] = hexToHsl(st.colors[i]);
+    st.colors[i] = hslToHex(h, d / r * 100, l); st.sel[i] = -1;
+    const hexInput = document.querySelector(`[data-hex="${i}"]`); if (hexInput) hexInput.value = st.colors[i].toUpperCase();
+    const sw = document.querySelector(`.swatch[data-ci="${i}"]`); if (sw) sw.value = st.colors[i];
+    drawWheel(c); renderPreview();
+  }
+  document.addEventListener("pointerdown", e => {
+    const c = e.target.closest && e.target.closest("canvas[data-wheel]");
+    if (c) { wheelDrag = c; c.setPointerCapture(e.pointerId); pickWheel(c, e); }
+  });
+  document.addEventListener("pointermove", e => { if (wheelDrag) pickWheel(wheelDrag, e); });
+  document.addEventListener("pointerup", () => { if (wheelDrag) { wheelDrag = null; buildColors(); renderPreview(); } });
+  document.addEventListener("click", e => {
+    const tb = e.target.closest && e.target.closest("[data-texbtn]");
+    if (tb) {
+      const [i, id] = tb.dataset.texbtn.split(":");
+      st.textures[Number(i)] = id; buildColors(); renderPreview(); return;
+    }
+  });
+
+  // --- événements ---
+  $$(".tab").forEach(t => t.addEventListener("click", () => {
+    if (WIZ.includes(t.dataset.pane)) goTo(t.dataset.pane); else showPane(t.dataset.pane);
+  }));
+
+  // --- changement de type principal : avertissement obligatoire, rien ne change avant confirmation ---
+  const BONUS_ITEMS = [
+    "Bissap artisanal RUBIS (50 cl)", "Kit bien-être hibiscus", "Recette : 3 façons de préparer le Bissap",
+    "Coulisses de fabrication Éclat Beauté", "Carafe en verre artisanale", "Atelier de dégustation",
+    "Infusion gingembre", "Présentation de la gamme", "Bissap en bouteille 1 L", "Ma routine bien-être au Bissap"
+  ];
+  const bonus = { visible: new Set(), items: BONUS_ITEMS.map((t, i) => ({ id: i, t })) };
+  // Relecture de la configuration enregistrée (par exemple une option ajoutée depuis la page boutique)
+  st.logo = { src: "", shape: "round", size: 88, zoom: 100, x: 0, y: 0 };
+  st.extra = {};
+  (function loadSaved() {
+    let c = null;
+    try { c = JSON.parse(localStorage.getItem("shopConfig")); } catch (e) { return; }
+    if (!c) return;
+    // Cette configuration est celle de la boutique vidéo Éclat Beauté : une ancienne valeur (ex. e-commerce) sans marque « boundTo » est ignorée.
+    if (c.boundTo === "video" && c.main && TYPES[c.main]) st.main = c.main;
+    if (typeof c.name === "string") st.name = c.name;
+    if (typeof c.slogan === "string") st.slogan = c.slogan;
+    if (Array.isArray(c.colors) && c.colors.length) { st.colors = [...c.colors]; st.ncol = c.colors.length; }
+    if (Array.isArray(c.textures)) st.textures = [...c.textures];
+    if (c.status) st.vis = c.status;
+    if (c.promoStyle) st.promoStyle = c.promoStyle;
+    if (c.logo && typeof c.logo === "object") st.logo = Object.assign({ src: "", shape: "round", size: 88, zoom: 100, x: 0, y: 0 }, c.logo);
+    if (c.extra && typeof c.extra === "object") st.extra = c.extra;
+    if (Array.isArray(c.sections) && c.sections.length) {
+      const hidden = c.hiddenSections || [], custom = c.customSections || [];
+      st.sections = c.sections.map(t => ({ title: t, visible: !hidden.includes(t), custom: custom.includes(t) }));
+    }
+    const wanted = Array.isArray(c.options) ? c.options : [];
+    Object.keys(TYPES).forEach(k => {
+      if (k === st.main) return;
+      const copies = (c.optionCopies && c.optionCopies[k]) || 1;
+      if (!st.options[k]) st.options[k] = { on: false, copies: [{ slots: SLOTS_DEFAULT, compact: true }] };
+      st.options[k].on = wanted.includes(k);
+      while (st.options[k].copies.length < copies) st.options[k].copies.push({ slots: SLOTS_DEFAULT, compact: true });
+      st.options[k].copies.length = Math.max(1, copies);
+    });
+    if (wanted.includes(st.main)) { /* l'option ne peut pas être le type principal */ }
+  })();
+  let pendingMain = null;
+  function lostFor(from, to) {
+    const out = [];
+    if (from === "video" && to !== "video") out.push("La lecture vidéo n'est plus disponible (sauf si l'option Boutique Vidéo est ajoutée).");
+    if (from === "ecom" && to !== "ecom") out.push("Le catalogue et le panier de produits passent dans le bonus.");
+    if (from === "portfolio" && to !== "portfolio") out.push("La galerie de réalisations passe dans le bonus.");
+    if (from === "events" && to !== "events") out.push("L'agenda et les inscriptions passent dans le bonus.");
+    if (from === "impact" && to !== "impact") out.push("Les projets à impact et les demandes de soutien passent dans le bonus.");
+    return out;
+  }
+  function openMainChange(target) {
+    pendingMain = target;
+    $("#mIntro").textContent = `Votre boutique passera de « ${TYPES[st.main].label} » à « ${TYPES[target].label} ».`;
+    const lost = lostFor(st.main, target);
+    $("#mLost").innerHTML = lost.length ? lost.map(x => `<li>${x}</li>`).join("") : "<li>Aucune fonction n'est rendue inaccessible.</li>";
+    $("#understood").checked = false; $("#mConfirm").disabled = true;
+    $("#modal").style.display = "flex";
+  }
+  function closeModal() { $("#modal").style.display = "none"; pendingMain = null; buildMain(); }
+  $("#mCancel").addEventListener("click", closeModal);
+  $("#understood").addEventListener("change", e => { $("#mConfirm").disabled = !e.target.checked; });
+  $("#mConfirm").addEventListener("click", () => {
+    if (!pendingMain) return; // aucun changement en attente
+    // Toute l'ancienne boutique part dans le bonus : rien n'est supprimé.
+    bonus.visible = new Set();
+    delete st.options[pendingMain];
+    st.main = pendingMain;
+    pendingMain = null;
+    st.sections = null;
+    $("#modal").style.display = "none";
+    refreshAll(); renderBonus();
+    toast(`Type principal : ${TYPES[st.main].label}. Ancienne boutique rangée dans le bonus.`);
+  });
+  function renderBonus() {
+    saveShop();
+    const total = bonus.items.length, n = bonus.visible.size, pct = Math.round(n / total * 100);
+    $("#bonusCount").innerHTML = `<strong>${n}</strong> sur ${total} produits visibles (${pct} %).`;
+    $("#bonusBar").style.width = pct + "%";
+    $("#bonusList").innerHTML = bonus.items.map(it => `
+      <div class="sect" style="${bonus.visible.has(it.id) ? "" : "opacity:.6"}"><span>${it.t}</span>
+        <label class="switch" style="position:relative;width:42px;height:24px"><input type="checkbox" data-bonus="${it.id}" ${bonus.visible.has(it.id) ? "checked" : ""} style="display:none"><span style="position:absolute;inset:0;background:${bonus.visible.has(it.id) ? "var(--bordeaux)" : "#cfc8bd"};border-radius:999px;cursor:pointer"></span></label></div>`).join("");
+  }
+  $("#bonusAuto").addEventListener("click", () => { bonus.visible = new Set(bonus.items.slice(0, Math.round(bonus.items.length * 0.2)).map(i => i.id)); renderBonus(); toast("20 % des produits rendus visibles"); });
+  $("#bonusOff").addEventListener("click", () => { bonus.visible = new Set(); renderBonus(); toast("Bonus masqué"); });
+
+  document.addEventListener("change", e => {
+    const t = e.target;
+    if (t.dataset.bonus !== undefined) { const id = Number(t.dataset.bonus); t.checked ? bonus.visible.add(id) : bonus.visible.delete(id); renderBonus(); return; }
+    if (t.name === "main") {
+      if (t.value === st.main) return;
+      openMainChange(t.value);
+      return;
+    }
+    if (t.name === "ncol") { st.ncol = Number(t.value); buildColors(); renderPreview(); return; }
+    if (t.dataset.opt) {
+      const k = t.dataset.opt;
+      if (t.checked) {
+        if (optionCount() >= MAX_OPTIONS) { t.checked = false; toast(`Maximum ${MAX_OPTIONS} options`); return; }
+        st.options[k] = st.options[k] || { on: true, copies: [{ slots: SLOTS_DEFAULT, compact: true }] };
+        st.options[k].on = true;
+      } else if (st.options[k]) {
+        st.options[k].on = false;          // données conservées
+      }
+      st.sections = null;
+      refreshAll();
+      toast(t.checked ? `${TYPES[k].label} ajouté` : `${TYPES[k].label} désactivé (données conservées)`);
+      return;
+    }
+    if (t.id === "dark") { st.dark = t.checked; renderPreview(); }
+    if (t.id === "showDark") { st.showDark = t.checked; renderPreview(); }
+    if (t.id === "vis") st.vis = t.value;
+  });
+
+  document.addEventListener("input", e => {
+    const t = e.target;
+    if (t.dataset.ci !== undefined) {
+      st.colors[Number(t.dataset.ci)] = t.value; st.sel[Number(t.dataset.ci)] = 4; buildColors(); renderPreview(); return;
+    }
+    if (t.dataset.hex !== undefined && /^#[0-9a-fA-F]{6}$/.test(t.value)) {
+      st.colors[Number(t.dataset.hex)] = t.value.toLowerCase(); buildColors(); renderPreview(); return;
+    }
+    if (t.dataset.slider) {
+      const i = Number(t.dataset.slider.slice(1));
+      const kind = t.dataset.slider[0];
+      const [h, s, l] = hexToHsl(st.colors[i]);
+      const v = Number(t.value);
+      st.colors[i] = kind === "h" ? hslToHex(v, s, l) : kind === "s" ? hslToHex(h, v, l) : hslToHex(h, s, v);
+      buildColors(); renderPreview(); return;
+    }
+    if (t.id === "name") { st.name = t.value.trim(); $("#nameErr").textContent = st.name ? "" : "Le nom est obligatoire."; renderPreview(); }
+    if (t.id === "slogan") { st.slogan = t.value; renderPreview(); }
+  });
+
+  document.addEventListener("click", e => {
+    const t = e.target;
+    const pal = t.closest("[data-pal]");
+    if (pal) { const p = PALETTES[Number(pal.dataset.pal)]; st.colors = [...p.c]; st.sel = [4, 4, 4]; buildColors(); renderPreview(); toast(`Palette « ${p.name} »`); return; }
+    const nu = t.closest("[data-nuance]");
+    if (nu) { const [i, k] = nu.dataset.nuance.split(":").map(Number); st.colors[i] = ramp(st.colors[i])[k]; st.sel[i] = k; buildColors(); renderPreview(); return; }
+
+    const dup = t.closest("[data-dup]");
+    if (dup) {
+      const k = dup.dataset.dup, o = st.options[k];
+      if (o.copies.length >= MAX_COPIES + 1) { toast(`Maximum ${MAX_COPIES} duplications`); return; }
+      o.copies.push({ slots: SLOTS_DEFAULT, compact: true });
+      buildOptionBoxes(); renderPreview(); toast(`Cartouche dupliquée (${o.copies.length} exemplaires)`); return;
+    }
+    const rm = t.closest("[data-remove-copy]");
+    if (rm) {
+      const [k, ci] = rm.dataset.removeCopy.split(":"); st.options[k].copies.splice(Number(ci), 1);
+      buildOptionBoxes(); renderPreview(); toast("Copie supprimée"); return;
+    }
+    const addSlot = t.closest("[data-add-slot]");
+    if (addSlot) {
+      const [k, ci] = addSlot.dataset.addSlot.split(":");
+      st.options[k].copies[Number(ci)].slots += 1;
+      buildOptionBoxes(); renderPreview(); return;
+    }
+    const del = t.closest("[data-del]");
+    if (del) {
+      const [k, ci] = del.dataset.del.split(":");
+      const c = st.options[k].copies[Number(ci)];
+      if (c.slots > 1) c.slots -= 1;
+      buildOptionBoxes(); renderPreview(); return;
+    }
+    const cp = t.closest("[data-compact]");
+    if (cp) {
+      const [k, ci] = cp.dataset.compact.split(":");
+      const c = st.options[k].copies[Number(ci)]; c.compact = !c.compact;
+      buildOptionBoxes(); renderPreview(); return;
+    }
+    const up = t.closest("[data-up]"), down = t.closest("[data-down]"), vis = t.closest("[data-vis]");
+    if (up) { const i = Number(up.dataset.up); [st.sections[i - 1], st.sections[i]] = [st.sections[i], st.sections[i - 1]]; buildSections(); return; }
+    if (down) { const i = Number(down.dataset.down); [st.sections[i + 1], st.sections[i]] = [st.sections[i], st.sections[i + 1]]; buildSections(); return; }
+    if (vis) { const i = Number(vis.dataset.vis); st.sections[i].visible = !st.sections[i].visible; buildSections(); return; }
+    const delSec = t.closest("[data-del-sec]");
+    if (delSec) { const i = Number(delSec.dataset.delSec); st.sections.splice(i, 1); buildSections(); renderPreview(); toast("Rubrique supprimée"); return; }
+    if (t.id === "addSec") {
+      const name = $("#newSec").value.trim();
+      if (!name) { $("#secErr").textContent = "Donnez un nom à la rubrique."; return; }
+      if (st.sections.some(x => x.title.toLowerCase() === name.toLowerCase())) { $("#secErr").textContent = "Cette rubrique existe déjà."; return; }
+      st.sections.push({ title: name, visible: true, custom: true });
+      $("#newSec").value = ""; $("#secErr").textContent = "";
+      buildSections(); renderPreview(); toast("Rubrique ajoutée : " + name); return;
+    }
+    if (t.id === "publishBtn") {
+      if (!st.name) { goTo("identity"); $("#nameErr").textContent = "Le nom est obligatoire avant publication."; return; }
+      saveShop();
+      const msg = st.vis === "public" ? "Boutique publiée (démonstration)." : st.vis === "draft" ? "Enregistrée en brouillon." : "Boutique suspendue.";
+      $("#pubMsg").innerHTML = `${msg} Statut enregistré. <a href="${SHOP_PAGE[st.main]}" target="_blank" rel="noopener">Ouvrir la boutique</a>`;
+      toast(msg);
+    }
+  });
+
+const FLAG_SVG = {
+  FR: '<rect x="0" width="10" height="20" fill="#002395"/><rect x="10" width="10" height="20" fill="#fff"/><rect x="20" width="10" height="20" fill="#ED2939"/>',
+  CI: '<rect x="0" width="10" height="20" fill="#F77F00"/><rect x="10" width="10" height="20" fill="#fff"/><rect x="20" width="10" height="20" fill="#009E60"/>',
+  GH: '<rect width="30" height="7" fill="#CE1126"/><rect y="7" width="30" height="6" fill="#FCD116"/><rect y="13" width="30" height="7" fill="#006B3F"/><polygon fill="#000" points="15,7.6 16,9.8 18.3,9.8 16.4,11.1 17.1,13.3 15,12 12.9,13.3 13.6,11.1 11.7,9.8 14,9.8"/>',
+  SN: '<rect x="0" width="10" height="20" fill="#00853F"/><rect x="10" width="10" height="20" fill="#FDEF42"/><rect x="20" width="10" height="20" fill="#E31B23"/><polygon fill="#00853F" points="15,7.5 15.9,10 18.5,10 16.4,11.5 17.2,14 15,12.5 12.8,14 13.6,11.5 11.5,10 14.1,10"/>',
+  BJ: '<rect width="30" height="20" fill="#FCD116"/><rect width="12" height="20" fill="#008751"/><rect x="12" y="10" width="18" height="10" fill="#E8112D"/>',
+  TG: '<rect width="30" height="20" fill="#FFCE00"/><rect y="0" width="30" height="3.3" fill="#006A4E"/><rect y="6.6" width="30" height="3.3" fill="#006A4E"/><rect y="13.3" width="30" height="3.3" fill="#006A4E"/><rect y="0" width="12" height="10" fill="#D21034"/><polygon fill="#fff" points="6,2.5 6.7,4.6 8.9,4.6 7.1,5.9 7.8,8 6,6.7 4.2,8 4.9,5.9 3.1,4.6 5.3,4.6"/>',
+  CM: '<rect x="0" width="10" height="20" fill="#007A5E"/><rect x="10" width="10" height="20" fill="#CE1126"/><rect x="20" width="10" height="20" fill="#FCD116"/><polygon fill="#FCD116" points="15,7.5 15.9,10 18.5,10 16.4,11.5 17.2,14 15,12.5 12.8,14 13.6,11.5 11.5,10 14.1,10"/>',
+  BE: '<rect x="0" width="10" height="20" fill="#000"/><rect x="10" width="10" height="20" fill="#FAE042"/><rect x="20" width="10" height="20" fill="#ED2939"/>',
+  CA: '<rect x="0" width="7.5" height="20" fill="#D52B1E"/><rect x="7.5" width="15" height="20" fill="#fff"/><rect x="22.5" width="7.5" height="20" fill="#D52B1E"/><rect x="12.5" y="7" width="5" height="6" fill="#D52B1E"/>'
+};
+
+  // ===== Rubriques 6 à 12 : formulaires, équipe, notifications, visibilité dans l'annuaire =====
+  const escA = s => String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" })[c]);
+  const PAYS = ["France","Côte d'Ivoire","Sénégal","Bénin","Togo","Cameroun","Belgique","Canada","Autre"];
+  const DEVISES = ["EUR (€)","XOF (FCFA)","USD ($)","GBP (£)"];
+  const CATEGORIES = ["Mode","Cosmétiques & beauté","Alimentation","Artisanat","Formation","Médias & communication","Événements","Agriculture","Bien-être","Photographie","Bijoux","Impact social"];
+  const FORM_SCHEMA = {
+    commercial: [
+      { f:"devise", t:"select", l:"Devise de référence", o:DEVISES },
+      { f:"prix", t:"select", l:"Affichage des prix", o:["TTC (taxes comprises)","HT (hors taxes)"] },
+      { f:"pays", t:"countries", l:"Pays de vente autorisés" },
+      { f:"min", t:"number", l:"Montant minimum de commande (€)" },
+      { f:"promo", t:"check", l:"Activer les promotions" },
+      { f:"devis", t:"check", l:"Accepter les demandes de devis" },
+      { f:"variantes", t:"check", l:"Gérer les variantes (taille, couleur…)" },
+      { f:"stock", t:"check", l:"Suivre le stock" }
+    ],
+    livraison: [
+      { f:"active", t:"check", l:"Proposer la livraison" },
+      { f:"zones", t:"countries", l:"Pays desservis" },
+      { f:"modes", t:"multi", l:"Modes proposés", o:["Transporteur","Point relais","Livraison personnelle","Retrait sur place"] },
+      { f:"frais", t:"select", l:"Frais de livraison", o:["Gratuit","Tarif fixe","Calculé selon des règles"] },
+      { f:"frais_montant", t:"number", l:"Montant des frais fixes (€)" },
+      { f:"preparation", t:"number", l:"Délai de préparation (jours)" },
+      { f:"delai", t:"text", l:"Délai de livraison estimé (ex. 3 à 5 jours)" },
+      { f:"multicolis", t:"check", l:"Autoriser les commandes en plusieurs colis" },
+      { f:"suivi", t:"check", l:"Numéro de suivi pour chaque colis" },
+      { f:"bons", t:"check", l:"Générer des bons de livraison" }
+    ],
+    paiements: [
+      { f:"compte", t:"select", l:"Compte de paiement", o:["Non connecté","Compte Stripe Connect (à connecter)"] },
+      { f:"devise", t:"select", l:"Devise d'encaissement", o:DEVISES },
+      { f:"moyens", t:"multi", l:"Moyens de paiement acceptés", o:["Carte bancaire","Virement","Mobile money","PayPal"] },
+      { f:"tva", t:"number", l:"Taux de TVA appliqué (%)" },
+      { f:"factures", t:"check", l:"Émettre les factures automatiquement" },
+      { f:"nom", t:"text", l:"Nom pour la facturation" },
+      { f:"adresse", t:"textarea", l:"Adresse de facturation" },
+      { f:"identifiant", t:"text", l:"Numéro d'identification fiscale (SIRET, TVA…)" }
+    ],
+    confiance: [
+      { f:"raison", t:"text", l:"Raison sociale (nom officiel)", h:"Le nom officiel de votre entreprise, tel qu'il figure sur vos papiers. Exemple : « Éclat Beauté SAS ». Si vous n'avez pas de société, indiquez votre nom et prénom." },
+      { f:"nomCommercial", t:"text", l:"Nom commercial affiché au public (facultatif)", h:"Le nom que voient vos clients sur votre boutique. Exemple : « Éclat Beauté »." },
+      { f:"forme", t:"select", l:"Statut juridique", o:["Auto-entrepreneur","Entreprise (SAS, SARL…)","Association","Particulier (sans entreprise)","Autre"] },
+      { f:"siret", t:"text", l:"Numéro SIRET (14 chiffres, en France)", h:"Le numéro d'identification de votre entreprise, délivré par l'INSEE. Pour une association : le numéro RNA (la lettre W suivie de 9 chiffres). Hors de France : le numéro officiel équivalent de votre pays." },
+      { f:"cgv", t:"doc", l:"Conditions générales de vente (CGV)", ph:"Écrivez ici vos conditions générales de vente…", h:"Vous pouvez écrire le texte, déposer un PDF, ou donner un lien. Une des trois options suffit." },
+      { f:"retour", t:"doc", l:"Politique de retour et de remboursement", ph:"Exemple : vous pouvez retourner un article sous 14 jours…", h:"Les conditions dans lesquelles un client peut rendre un article ou être remboursé." },
+      { f:"mentions", t:"doc", l:"Mentions légales", ph:"Nom et adresse de l'éditeur, nom de l'hébergeur…", h:"Les informations qui identifient la personne ou l'entreprise qui édite la boutique." },
+      { f:"confidentialite", t:"doc", l:"Politique de confidentialité", ph:"Quelles données vous collectez et pourquoi…", h:"Ce que vous faites des données de vos clients (nom, adresse, email, commandes)." },
+      { f:"email", t:"text", l:"Email de contact" },
+      { f:"tel", t:"text", l:"Téléphone de contact" }
+    ],
+    visibilite: [
+      { f:"origine", t:"countrySelect", l:"Pays d'origine", h:"Le pays d'où vient votre activité ou votre culture (affiché sur la cartouche)." },
+      { f:"residence", t:"countrySelect", l:"Pays de résidence de l'activité", h:"Le pays où se trouve votre activité." },
+      { f:"ville", t:"text", l:"Ville" },
+      { f:"categories", t:"multi", l:"Catégories", o:CATEGORIES },
+      { f:"desc", t:"textarea", l:"Description courte (140 caractères maximum)", max:140 }
+    ]
+  };
+  const COUNTRIES = [["AF", "Afghanistan"], ["ZA", "Afrique du Sud"], ["AL", "Albanie"], ["DZ", "Algérie"], ["DE", "Allemagne"], ["AD", "Andorre"], ["AO", "Angola"], ["AG", "Antigua-et-Barbuda"], ["SA", "Arabie saoudite"], ["AR", "Argentine"], ["AM", "Arménie"], ["AU", "Australie"], ["AT", "Autriche"], ["AZ", "Azerbaïdjan"], ["BS", "Bahamas"], ["BH", "Bahreïn"], ["BD", "Bangladesh"], ["BB", "Barbade"], ["BE", "Belgique"], ["BZ", "Belize"], ["BT", "Bhoutan"], ["MM", "Birmanie"], ["BY", "Biélorussie"], ["BO", "Bolivie"], ["BA", "Bosnie-Herzégovine"], ["BW", "Botswana"], ["BN", "Brunei"], ["BR", "Brésil"], ["BG", "Bulgarie"], ["BF", "Burkina Faso"], ["BI", "Burundi"], ["BJ", "Bénin"], ["KH", "Cambodge"], ["CM", "Cameroun"], ["CA", "Canada"], ["CV", "Cap-Vert"], ["CL", "Chili"], ["CN", "Chine"], ["CY", "Chypre"], ["CO", "Colombie"], ["KM", "Comores"], ["CG", "Congo"], ["KP", "Corée du Nord"], ["KR", "Corée du Sud"], ["CR", "Costa Rica"], ["HR", "Croatie"], ["CU", "Cuba"], ["CI", "Côte d'Ivoire"], ["DK", "Danemark"], ["DJ", "Djibouti"], ["DM", "Dominique"], ["ES", "Espagne"], ["EE", "Estonie"], ["SZ", "Eswatini"], ["FJ", "Fidji"], ["FI", "Finlande"], ["FR", "France"], ["GA", "Gabon"], ["GM", "Gambie"], ["GH", "Ghana"], ["GD", "Grenade"], ["GR", "Grèce"], ["GT", "Guatemala"], ["GN", "Guinée"], ["GQ", "Guinée équatoriale"], ["GW", "Guinée-Bissau"], ["GY", "Guyana"], ["GE", "Géorgie"], ["HT", "Haïti"], ["HN", "Honduras"], ["HU", "Hongrie"], ["IN", "Inde"], ["ID", "Indonésie"], ["IQ", "Irak"], ["IR", "Iran"], ["IE", "Irlande"], ["IS", "Islande"], ["IL", "Israël"], ["IT", "Italie"], ["JM", "Jamaïque"], ["JP", "Japon"], ["JO", "Jordanie"], ["KZ", "Kazakhstan"], ["KE", "Kenya"], ["KG", "Kirghizistan"], ["KI", "Kiribati"], ["KW", "Koweït"], ["LA", "Laos"], ["LS", "Lesotho"], ["LV", "Lettonie"], ["LB", "Liban"], ["LR", "Liberia"], ["LY", "Libye"], ["LI", "Liechtenstein"], ["LT", "Lituanie"], ["LU", "Luxembourg"], ["MK", "Macédoine du Nord"], ["MG", "Madagascar"], ["MY", "Malaisie"], ["MW", "Malawi"], ["MV", "Maldives"], ["ML", "Mali"], ["MT", "Malte"], ["MA", "Maroc"], ["MU", "Maurice"], ["MR", "Mauritanie"], ["MX", "Mexique"], ["FM", "Micronésie"], ["MD", "Moldavie"], ["MC", "Monaco"], ["MN", "Mongolie"], ["ME", "Monténégro"], ["MZ", "Mozambique"], ["NA", "Namibie"], ["NR", "Nauru"], ["NI", "Nicaragua"], ["NE", "Niger"], ["NG", "Nigeria"], ["NO", "Norvège"], ["NZ", "Nouvelle-Zélande"], ["NP", "Népal"], ["OM", "Oman"], ["UG", "Ouganda"], ["UZ", "Ouzbékistan"], ["PK", "Pakistan"], ["PW", "Palaos"], ["PS", "Palestine"], ["PA", "Panama"], ["PG", "Papouasie-Nouvelle-Guinée"], ["PY", "Paraguay"], ["NL", "Pays-Bas"], ["PH", "Philippines"], ["PL", "Pologne"], ["PT", "Portugal"], ["PE", "Pérou"], ["QA", "Qatar"], ["RO", "Roumanie"], ["GB", "Royaume-Uni"], ["RU", "Russie"], ["RW", "Rwanda"], ["CF", "République centrafricaine"], ["CD", "République démocratique du Congo"], ["KN", "Saint-Christophe-et-Niévès"], ["SM", "Saint-Marin"], ["VC", "Saint-Vincent-et-les-Grenadines"], ["LC", "Sainte-Lucie"], ["SV", "Salvador"], ["WS", "Samoa"], ["ST", "Sao Tomé-et-Principe"], ["RS", "Serbie"], ["SC", "Seychelles"], ["SL", "Sierra Leone"], ["SG", "Singapour"], ["SK", "Slovaquie"], ["SI", "Slovénie"], ["SO", "Somalie"], ["SD", "Soudan"], ["SS", "Soudan du Sud"], ["LK", "Sri Lanka"], ["CH", "Suisse"], ["SR", "Suriname"], ["SE", "Suède"], ["SY", "Syrie"], ["SN", "Sénégal"], ["TJ", "Tadjikistan"], ["TZ", "Tanzanie"], ["TW", "Taïwan"], ["TD", "Tchad"], ["CZ", "Tchéquie"], ["TH", "Thaïlande"], ["TL", "Timor oriental"], ["TG", "Togo"], ["TO", "Tonga"], ["TT", "Trinité-et-Tobago"], ["TN", "Tunisie"], ["TM", "Turkménistan"], ["TR", "Turquie"], ["TV", "Tuvalu"], ["UA", "Ukraine"], ["UY", "Uruguay"], ["VU", "Vanuatu"], ["VA", "Vatican"], ["VE", "Venezuela"], ["VN", "Viêt Nam"], ["YE", "Yémen"], ["ZM", "Zambie"], ["ZW", "Zimbabwe"], ["EG", "Égypte"], ["AE", "Émirats arabes unis"], ["EC", "Équateur"], ["ER", "Érythrée"], ["US", "États-Unis"], ["ET", "Éthiopie"], ["MH", "Îles Marshall"], ["SB", "Îles Salomon"]];
+  const normTxt = s => String(s).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[-'’]/g, " ");
+  function countryMatches(q) {
+    const nq = normTxt(q.trim());
+    return COUNTRIES.filter(([code, name]) => !nq || normTxt(name).includes(nq) || code.toLowerCase() === nq);
+  }
+  function pickerHtml(sec, x) {
+    return `<div class="cpick" data-sec="${sec}" data-f="${x.f}">
+      <label class="cpick-label">${x.l}</label>
+      <div class="cchips"></div>
+      <input type="search" class="cpick-q" placeholder="Rechercher un pays (ex. « cot », « sénégal », « FR »)" autocomplete="off" aria-label="Rechercher un pays">
+      <div class="cpick-count"></div>
+      <div class="cpick-list" role="listbox" aria-label="Pays"></div>
+    </div>`;
+  }
+  function updatePicker(root) {
+    const sec = root.dataset.sec, f = root.dataset.f, sel = getV(sec, f);
+    const q = root.querySelector(".cpick-q").value;
+    root.querySelector(".cchips").innerHTML = sel.length
+      ? sel.map(n => `<span class="cchip">${escA(n)} <button type="button" data-cremove="${escA(n)}" aria-label="Retirer ${escA(n)}">×</button></span>`).join("")
+      : `<span class="muted">Aucun pays sélectionné pour l'instant</span>`;
+    root.querySelector(".cpick-count").textContent = `${sel.length} sélectionné(s) sur ${COUNTRIES.length} pays`;
+    const list = countryMatches(q);
+    root.querySelector(".cpick-list").innerHTML = list.length
+      ? list.map(([c, n]) => { const on = sel.includes(n); return `<button type="button" class="cpick-opt${on ? " on" : ""}" data-ctoggle="${escA(n)}" role="option" aria-selected="${on}"><span class="cc">${c}</span><span class="cn">${escA(n)}</span><span class="ck">${on ? "✓ ajouté" : "ajouter"}</span></button>`; }).join("")
+      : `<div class="muted">Aucun pays ne correspond à « ${escA(q)} ». Essayez un autre mot (sans accent, c'est accepté).</div>`;
+  }
+  function toggleCountry(root, name) {
+    const sec = root.dataset.sec, f = root.dataset.f, cur = getV(sec, f).slice();
+    const i = cur.indexOf(name);
+    if (i > -1) cur.splice(i, 1); else cur.push(name);
+    setV(sec, f, cur); updatePicker(root); afterChange(); saveShop();
+  }
+  const ROLES = ["Propriétaire","Administrateur","Gestionnaire commercial","Gestionnaire des commandes","Responsable des expéditions","Éditeur de contenus","Lecteur des statistiques"];
+  const PERMS = ["Modifier les paramètres","Publier","Gérer les commandes","Rembourser","Voir les coordonnées clients","Gérer les paiements","Supprimer des contenus","Voir les statistiques"];
+  const ROLE_DEFAULT = {
+    "Administrateur": ["Modifier les paramètres","Publier","Gérer les commandes","Rembourser","Voir les coordonnées clients","Supprimer des contenus","Voir les statistiques"],
+    "Gestionnaire commercial": ["Publier","Voir les statistiques"],
+    "Gestionnaire des commandes": ["Gérer les commandes","Rembourser","Voir les coordonnées clients"],
+    "Responsable des expéditions": ["Gérer les commandes","Voir les coordonnées clients"],
+    "Éditeur de contenus": ["Publier"],
+    "Lecteur des statistiques": ["Voir les statistiques"]
+  };
+  const NOTIF_EVENTS = ["Nouvelle commande","Paiement reçu","Nouveau message","Nouvelle réservation","Nouvelle inscription","Retard de livraison","Incident"];
+  const NOTIF_DEFAULT = { "Nouvelle commande":[true,true], "Paiement reçu":[true,true], "Nouveau message":[true,true], "Nouvelle réservation":[true,true], "Nouvelle inscription":[false,true], "Retard de livraison":[true,true], "Incident":[true,true] };
+
+  function dflt(x) { if (x.t === "doc") return { text: "", url: "", pdf: null }; return x.t === "check" ? false : (x.t === "multi" || x.t === "countries") ? [] : x.t === "select" ? x.o[0] : ""; }
+  function getV(sec, f) {
+    const x = (FORM_SCHEMA[sec] || []).find(y => y.f === f) || { t: "text" };
+    const v = (st.extra[sec] || {})[f];
+    return v === undefined ? dflt(x) : v;
+  }
+  function setV(sec, f, v) { st.extra[sec] = st.extra[sec] || {}; st.extra[sec][f] = v; }
+  function docHtml(sec, x) {
+    const v = getV(sec, x.f), key = sec + "." + x.f;
+    return `<fieldset class="docf"><legend>${x.l}</legend>
+      ${x.h ? `<small class="fh">${x.h}</small>` : ""}
+      <label>1. Écrire le texte<textarea rows="5" data-doc="${sec}" data-dkey="${x.f}" data-part="text" placeholder="${escA(x.ph || "")}">${escA(v.text || "")}</textarea></label>
+      <div class="docpdf">2. Ou déposer un PDF : ${v.pdf
+        ? `<span>${escA(v.pdf.name)}</span> <button type="button" class="btn ghost sm" data-docremove="${key}">Retirer le PDF</button>`
+        : `<input type="file" accept="application/pdf" data-docfile="${key}">`}</div>
+      <label>3. Lien vers la page en ligne (facultatif)<input type="url" data-doc="${sec}" data-dkey="${x.f}" data-part="url" value="${escA(v.url || "")}" placeholder="https://…"></label>
+    </fieldset>`;
+  }
+  function fieldHtml(sec, x) {
+    if (x.t === "countries") return pickerHtml(sec, x);
+    if (x.t === "doc") return docHtml(sec, x);
+    if (x.t === "countrySelect") return `<label>${x.l}${x.h ? `<small class="fh">${x.h}</small>` : ""}<select data-sec="${sec}" data-f="${x.f}"><option value="">— Choisir un pays —</option>${COUNTRIES.map(([c, n]) => `<option ${n === getV(sec, x.f) ? "selected" : ""}>${escA(n)}</option>`).join("")}</select></label>`;
+    const v = getV(sec, x.f);
+    if (x.t === "check") return `<label class="chk"><input type="checkbox" data-sec="${sec}" data-f="${x.f}" ${v ? "checked" : ""}> ${x.l}</label>`;
+    const hint = x.h ? `<small class="fh">${x.h}</small>` : "";
+    if (x.t === "multi") return `<fieldset><legend>${x.l}</legend>${x.o.map(o => `<label><input type="checkbox" data-sec="${sec}" data-multi="${x.f}" value="${escA(o)}" ${v.includes(o) ? "checked" : ""}> ${escA(o)}</label>`).join("")}</fieldset>`;
+    if (x.t === "select") return `<label>${x.l}<select data-sec="${sec}" data-f="${x.f}">${x.o.map(o => `<option ${o === v ? "selected" : ""}>${escA(o)}</option>`).join("")}</select></label>`;
+    if (x.t === "textarea") return `<label>${x.l}<textarea rows="3" data-sec="${sec}" data-f="${x.f}" ${x.max ? `maxlength="${x.max}"` : ""}>${escA(v)}</textarea></label>`;
+    const type = x.t === "number" ? "number" : x.t === "url" ? "url" : "text";
+    return `<label>${x.l}${hint}<input type="${type}" data-sec="${sec}" data-f="${x.f}" value="${escA(v)}"></label>`;
+  }
+  function codeOf(name) { const c = COUNTRIES.find(x => x[1] === name); return c ? c[0] : ""; }
+  function countryTag(name) {
+    if (!name) return `<span class="muted">Pays non renseigné</span>`;
+    const code = codeOf(name);
+    const art = FLAG_SVG[code];
+    return `${art ? `<svg class="flag" viewBox="0 0 30 20" role="img" aria-label="Drapeau ${escA(name)}">${art}</svg>` : `<span class="cc-chip">${code}</span>`} ${escA(name)}`;
+  }
+  function cartoucheHtml() {
+    const L = st.logo, V = st.extra.visibilite || {}, cover = V.cover;
+    const logo = L.src ? `<img src="${L.src}" alt="" style="transform:translate(${L.x}%,${L.y}%) scale(${L.zoom / 100})">` : escA((st.name || "?").slice(0, 2).toUpperCase());
+    const cats = getV("visibilite", "categories");
+    const livraison = getV("livraison", "active");
+    const city = getV("visibilite", "ville");
+    const origine = getV("visibilite", "origine"), residence = getV("visibilite", "residence");
+    const coverStyle = cover ? `background-image:url('${cover}');background-size:cover;background-position:center` : `background:linear-gradient(120deg,${st.colors[0]},#222)`;
+    return `<article class="cart-card">
+      <div class="cover" style="${coverStyle}"></div>
+      <div class="logo-c" style="border-radius:${L.shape === "square" ? "12px" : "50%"};color:${st.colors[0]}">${logo}</div>
+      <div class="body">
+        <div class="name">${escA(st.name || "Nom de la boutique")}</div>
+        <span class="type">${escA(TYPES[st.main].label)}</span>
+        <div class="desc">${escA(getV("visibilite", "desc") || "Votre description courte apparaîtra ici.")}</div>
+        <div class="meta">${countryTag(origine)} <span class="sep">|</span> ${countryTag(residence)}${city ? " (" + escA(city) + ")" : ""}</div>
+        <div class="rate"><span class="stars" style="color:#C9C4CC">☆☆☆☆☆</span> Aucun avis pour l'instant</div>
+        <div class="tags-row">${livraison ? "<span>Livraison</span>" : ""}${cats.slice(0, 2).map(c => `<span>${escA(c)}</span>`).join("")}</div>
+        <button type="button" class="go" tabindex="-1">Voir la boutique →</button>
+      </div>
+    </article>`;
+  }
+  function renderCardPreview() { const b = document.getElementById("vcardBox"); if (b) b.innerHTML = cartoucheHtml(); }
+  function renderSection(sec) {
+    const host = document.getElementById("form-" + sec); if (!host) return;
+    let extra = "";
+    if (sec === "paiements") extra = `<div class="ro"><strong>Encaissements :</strong> les paiements réels passent par Stripe Connect. Aucune donnée de carte bancaire n'est stockée dans la boutique.</div>`;
+    if (sec === "confiance") extra = `<div class="ro"><strong>Statut de vérification :</strong> non vérifiée. Le badge « Vendeur vérifié » n'est attribué que par la plateforme, après ses propres contrôles. Le propriétaire ne peut pas se l'attribuer.</div>`;
+    let after = "";
+    if (sec === "visibilite") after = `<label>Photo de couverture (1 Mo maximum)<input type="file" id="coverFile" accept="image/png,image/jpeg,image/webp"></label>
+      <h4>Aperçu de ma cartouche dans l'espace Boutique Diaspo'Actif</h4><div id="vcardBox"></div>
+      <div class="ro"><strong>Statistiques :</strong> visites 0 · consultations 0 · favoris 0. Les chiffres réels apparaîtront après publication. Les notes et avis sont ajoutés par les clients, jamais par le propriétaire.</div>`;
+    host.innerHTML = `<div class="frm">${extra}${FORM_SCHEMA[sec].map(x => fieldHtml(sec, x)).join("")}${after}</div>`;
+    host.querySelectorAll(".cpick").forEach(updatePicker);
+    renderCardPreview();
+  }
+  function permOn(role, perm) {
+    if (role === "Propriétaire") return true;
+    const m = (st.extra.equipe || {}).perms;
+    if (m && m[role] && m[role][perm] !== undefined) return m[role][perm];
+    return (ROLE_DEFAULT[role] || []).includes(perm);
+  }
+  function renderTeam() {
+    const host = document.getElementById("form-equipe"); if (!host) return;
+    const members = (st.extra.equipe || {}).members || [];
+    host.innerHTML = `<div class="frm">
+      <div class="ro">Une boutique peut être gérée par plusieurs personnes. Chaque rôle n'a que les droits cochés. Le propriétaire a toujours tous les droits.</div>
+      <div style="overflow:auto"><table><thead><tr><th>Droit</th>${ROLES.map(r => `<th>${escA(r)}</th>`).join("")}</tr></thead><tbody>
+      ${PERMS.map(p => `<tr><td>${escA(p)}</td>${ROLES.map(r => r === "Propriétaire" ? "<td>✓</td>" : `<td><input type="checkbox" data-role="${escA(r)}" data-perm="${escA(p)}" ${permOn(r, p) ? "checked" : ""}></td>`).join("")}</tr>`).join("")}
+      </tbody></table></div>
+      <h4>Membres de l'équipe</h4>
+      <div>${members.length ? members.map((m, i) => `<div class="ro" style="display:flex;justify-content:space-between;gap:8px;margin-bottom:6px"><span>${escA(m.email)} · ${escA(m.role)}</span><button type="button" class="btn ghost sm" data-rm="${i}">Retirer</button></div>`).join("") : `<div class="ro">Aucun membre pour l'instant. Le propriétaire est seul sur la boutique.</div>`}</div>
+      <div class="twocol"><label>Email de la personne<input type="email" id="memEmail" placeholder="nom@exemple.com"></label>
+      <label>Rôle<select id="memRole">${ROLES.slice(1).map(r => `<option>${escA(r)}</option>`).join("")}</select></label></div>
+      <button type="button" class="btn sm" id="memAdd" style="justify-self:start">Ajouter à l'équipe</button>
+      <div class="ro">Maquette : l'invitation n'est pas encore envoyée. L'envoi par email sera branché plus tard.</div>
+    </div>`;
+  }
+  function notifOn(e, ch) {
+    const ev = (st.extra.notifications || {}).events;
+    if (ev && ev[e]) return ev[e][ch];
+    return NOTIF_DEFAULT[e][ch === "email" ? 0 : 1];
+  }
+  function renderNotifs() {
+    const host = document.getElementById("form-notifications"); if (!host) return;
+    host.innerHTML = `<div class="frm">
+      <div class="ro">Le vendeur choisit les alertes qu'il reçoit, par email et dans son espace. Les informations obligatoires (commande, paiement, incident) restent toujours envoyées dans les messages transactionnels.</div>
+      <table><thead><tr><th>Événement</th><th>Par email</th><th>Dans l'espace</th></tr></thead><tbody>
+      ${NOTIF_EVENTS.map(e => `<tr><td>${escA(e)}</td><td><input type="checkbox" data-notif="${escA(e)}" data-ch="email" ${notifOn(e, "email") ? "checked" : ""}></td><td><input type="checkbox" data-notif="${escA(e)}" data-ch="app" ${notifOn(e, "app") ? "checked" : ""}></td></tr>`).join("")}
+      </tbody></table>
+      <label>Message personnalisé pour la confirmation de commande (facultatif)<textarea rows="3" data-sec="notifications" data-f="message">${escA(getV("notifications", "message"))}</textarea></label>
+    </div>`;
+  }
+  function afterChange() { updateDots(); renderPreview(); renderCardPreview(); }
+  function onFieldChange(el) {
+    if (el.dataset.doc !== undefined && el.dataset.dkey) {
+      const cur = Object.assign({ text: "", url: "", pdf: null }, getV(el.dataset.doc, el.dataset.dkey));
+      cur[el.dataset.part] = el.value;
+      setV(el.dataset.doc, el.dataset.dkey, cur);
+    } else if (el.dataset.multi !== undefined && el.dataset.sec) {
+      const sec = el.dataset.sec, f = el.dataset.multi, cur = getV(sec, f).slice();
+      if (el.checked) { if (!cur.includes(el.value)) cur.push(el.value); }
+      else { const i = cur.indexOf(el.value); if (i > -1) cur.splice(i, 1); }
+      setV(sec, f, cur);
+    } else if (el.dataset.sec && el.dataset.f) {
+      setV(el.dataset.sec, el.dataset.f, el.type === "checkbox" ? el.checked : el.value);
+    } else if (el.dataset.role) {
+      st.extra.equipe = st.extra.equipe || {}; st.extra.equipe.perms = st.extra.equipe.perms || {};
+      (st.extra.equipe.perms[el.dataset.role] = st.extra.equipe.perms[el.dataset.role] || {})[el.dataset.perm] = el.checked;
+    } else if (el.dataset.notif) {
+      st.extra.notifications = st.extra.notifications || {}; st.extra.notifications.events = st.extra.notifications.events || {};
+      const e = el.dataset.notif, cur = st.extra.notifications.events[e] || { email: notifOn(e, "email"), app: notifOn(e, "app") };
+      cur[el.dataset.ch] = el.checked; st.extra.notifications.events[e] = cur;
+    } else return;
+    afterChange(); saveShop();
+  }
+  document.addEventListener("input", e => {
+    if (e.target.classList && e.target.classList.contains("cpick-q")) { updatePicker(e.target.closest(".cpick")); return; }
+    onFieldChange(e.target);
+  });
+  document.addEventListener("change", e => {
+    if (e.target.dataset && e.target.dataset.docfile) {
+      const f = e.target.files[0]; if (!f) return;
+      if (f.size > 2 * 1024 * 1024) { toast("PDF trop lourd (2 Mo maximum)"); return; }
+      const [sec, key] = e.target.dataset.docfile.split(".");
+      const r = new FileReader();
+      r.onload = () => { const cur = Object.assign({ text: "", url: "", pdf: null }, getV(sec, key)); cur.pdf = { name: f.name, data: r.result }; setV(sec, key, cur); renderSection(sec); saveShop(); };
+      r.readAsDataURL(f); return;
+    }
+    if (e.target.id === "coverFile") {
+      const f = e.target.files[0]; if (!f) return;
+      if (f.size > 1024 * 1024) { toast("Image trop lourde (1 Mo maximum)"); return; }
+      const r = new FileReader();
+      r.onload = () => { st.extra.visibilite = st.extra.visibilite || {}; st.extra.visibilite.cover = r.result; renderCardPreview(); saveShop(); };
+      r.readAsDataURL(f); return;
+    }
+    onFieldChange(e.target);
+  });
+  document.addEventListener("click", e => {
+    const ct = e.target.closest("[data-ctoggle]"); if (ct) { toggleCountry(ct.closest(".cpick"), ct.dataset.ctoggle); return; }
+    const cr = e.target.closest("[data-cremove]"); if (cr) { toggleCountry(cr.closest(".cpick"), cr.dataset.cremove); return; }
+    const dr = e.target.closest("[data-docremove]");
+    if (dr) { const [sec, key] = dr.dataset.docremove.split("."); const cur = Object.assign({ text: "", url: "", pdf: null }, getV(sec, key)); cur.pdf = null; setV(sec, key, cur); renderSection(sec); saveShop(); return; }
+    if (e.target.id === "memAdd") {
+      const email = document.getElementById("memEmail").value.trim();
+      if (!/^\S+@\S+\.\S+$/.test(email)) { toast("Adresse email invalide"); return; }
+      st.extra.equipe = st.extra.equipe || {};
+      st.extra.equipe.members = (st.extra.equipe.members || []).concat([{ email, role: document.getElementById("memRole").value }]);
+      renderTeam(); saveShop(); toast("Membre ajouté à l'équipe (maquette)"); return;
+    }
+    const rm = e.target.closest("[data-rm]");
+    if (rm) { st.extra.equipe.members.splice(Number(rm.dataset.rm), 1); renderTeam(); saveShop(); }
+  });
+
+  // ===== Logo : forme, taille, zoom, position =====
+  function renderLogo() {
+    const L = st.logo;
+    $("#logoBox").innerHTML = L.src
+      ? `<div class="logo-frame ${L.shape}" style="width:${L.size}px;height:${L.size}px"><img src="${L.src}" alt="Logo de la boutique" style="transform:translate(${L.x}%,${L.y}%) scale(${L.zoom / 100})"></div>`
+      : `<div class="logo-empty" style="width:${Math.max(L.size, 80)}px;height:${Math.max(L.size, 80)}px">Aucun logo</div>`;
+    $("#logoShape").value = L.shape; $("#logoSize").value = L.size; $("#logoZoom").value = L.zoom; $("#logoX").value = L.x; $("#logoY").value = L.y;
+    $("#logoRemove").disabled = !L.src;
+  }
+  ["logoShape","logoSize","logoZoom","logoX","logoY"].forEach(id => $("#" + id).addEventListener("input", () => {
+    const L = st.logo;
+    L.shape = $("#logoShape").value; L.size = Number($("#logoSize").value); L.zoom = Number($("#logoZoom").value);
+    L.x = Number($("#logoX").value); L.y = Number($("#logoY").value);
+    renderLogo(); renderPreview(); renderCardPreview(); saveShop();
+  }));
+  $("#logoFile").addEventListener("change", e => {
+    const f = e.target.files[0]; if (!f) return;
+    if (f.size > 1024 * 1024) { $("#logoErr").textContent = "Image trop lourde (1 Mo maximum)."; return; }
+    const r = new FileReader();
+    r.onload = () => { st.logo.src = r.result; $("#logoErr").textContent = ""; renderLogo(); renderPreview(); renderCardPreview(); saveShop(); };
+    r.readAsDataURL(f);
+  });
+  $("#logoRemove").addEventListener("click", () => { st.logo.src = ""; renderLogo(); renderPreview(); renderCardPreview(); saveShop(); });
+
+  ["commercial","livraison","paiements","confiance","visibilite"].forEach(renderSection);
+  renderTeam(); renderNotifs(); renderLogo();
+
+  // --- centre de configuration : indicateurs de complétude et recherche ---
+  const DOT_RULES = {
+    type: () => [true, "Modèle choisi"],
+    identity: () => [!!(st.name || "").trim() && !!(st.slogan || "").trim(), "Nom et slogan à compléter"],
+    options: () => [true, "Modules configurés"],
+    colors: () => [st.colors.slice(0, st.ncol).length > 0, "Couleurs choisies"],
+    rubriques: () => [st.sections && st.sections.length > 0, "Au moins une rubrique"],
+    bonus: () => [true, "Bonus boutique"],
+    commercial: () => [!!getV("commercial", "devise") && getV("commercial", "pays").length > 0, "Devise et pays de vente à choisir"],
+    livraison: () => { const a = getV("livraison", "active"); return [!a || (getV("livraison", "zones").length > 0 && getV("livraison", "modes").length > 0), "Pays et modes de livraison à choisir"]; },
+    paiements: () => [getV("paiements", "moyens").length > 0 && String(getV("paiements", "tva")) !== "", "Moyens de paiement et TVA à renseigner"],
+    equipe: () => [true, "Propriétaire défini"],
+    confiance: () => [!!String(getV("confiance", "raison")).trim() && !!String(getV("confiance", "email")).trim(), "Raison sociale et email à renseigner"],
+    notifications: () => [true, "Alertes configurées"],
+    publish: () => [!!st.vis && !!String(getV("visibilite", "desc")).trim() && getV("visibilite", "categories").length > 0, "Description et catégories pour l'annuaire"]
+  };
+  function updateDots() {
+    Object.keys(DOT_RULES).forEach(k => {
+      const dot = document.querySelector(`[data-dot="${k}"]`); if (!dot) return;
+      const rule = DOT_RULES[k];
+      const ok = rule ? rule()[0] : false;
+      dot.classList.toggle("ok", ok);
+      dot.title = rule ? rule()[1] : "À compléter (étape suivante)";
+    });
+  }
+  document.getElementById("cfgSearch").addEventListener("input", e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll(".cfg-nav .tab").forEach(b => b.classList.toggle("hidden", !!q && !b.textContent.toLowerCase().includes(q)));
+  });
+  updateDots();
+
+  buildPalettes();
+  $("#name").value = st.name; $("#slogan").value = st.slogan;
+  $("#promoStyle").value = st.promoStyle;
+  $("#promoStyle").addEventListener("change", (e) => { st.promoStyle = e.target.value; saveShop(); });
+  const ncRadio = document.querySelector(`input[name="ncol"][value="${st.ncol}"]`); if (ncRadio) ncRadio.checked = true;
+  refreshAll();
+  buildWizard();
+  renderBonus();
+</script>
+</body>
+</html>
