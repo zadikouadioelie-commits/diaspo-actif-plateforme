@@ -134,3 +134,18 @@ html body.nd .ann-filtres-barre .ann-filter-group label{white-space:nowrap}
 html body.nd .ann-filtres-titre{padding-right:18px}
 html body.nd #btn-reset-filters{white-space:nowrap;flex:none}
 @media (min-width:1280px){html body.nd .ann-filtres-barre>.ann-filters-inner{flex-wrap:nowrap}}
+
+/* Illustrations uniformes (assets/icones-uniformes.js) : remplacent les émoticônes par des icônes au trait */
+html body.nd .ic-u{display:inline-flex;width:1.15em;height:1.15em;vertical-align:-.2em;margin-right:.4em;flex:none}
+html body.nd .ic-u svg{width:100%;height:100%;display:block}
+html body.nd .ann-filter-group label .ic-u{width:1.3em;height:1.3em;margin-right:.45em;vertical-align:-.28em}
+html body.nd .ann-card-btn .ic-u{margin-right:.35em}
+html body.nd .ann-cta-icon .ic-u{width:30px;height:30px;margin:0;color:var(--nd-or)}
+html body.nd .ann-demarc .ic-u{width:1.3em;height:1.3em;color:var(--nd-or)}
+html body.nd .ann-card-nats .ic-u,html body.nd .ann-card-origs .ic-u{margin-right:0}
+
+/* Sous 1280 px : les filtres passent sur plusieurs lignes, les intitulés ne se chevauchent plus */
+@media (max-width:1279px){
+  html body.nd .ann-filtres-barre .ann-filter-group{min-width:150px}
+  html body.nd .ann-filtres-barre .ann-filter-group label{white-space:normal}
+}
