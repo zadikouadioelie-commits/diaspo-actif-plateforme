@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<script src="/assets/m-redirect.js"></script>
+<meta charset="UTF-8">
+<link rel="icon" href="/assets/logo.png">
+<title>Diaspo'Actif — Demande de retour</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="assets/styles.v2.css">
+<link rel="stylesheet" href="/assets/responsive.v2.css?v=2">
+<link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
+<link rel="stylesheet" href="/assets/design-upgrade.v2.css">
+<link rel="stylesheet" href="/assets/theme-manager.css">
+<!-- Nuit dorée (2026-11-10) : polices + thème + feuille de la page ; retour arrière = retirer ces lignes et class="nd" -->
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,500;0,6..96,600;1,6..96,500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/theme-nuit-doree.css?v=8">
+<link rel="stylesheet" href="/assets/retours-nuit-doree.css?v=1">
+</head>
+<body class="nd">
+<div class="page" id="app">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Menu">&#9776;</button>
+      <div class="logo"><a href="index.html" style="text-decoration:none;color:inherit;display:flex;align-items:center;gap:8px;"><img loading="lazy" class="logo-img" src="assets/logo.png" alt=""> DIASPO'ACTIF</a></div>
+      <nav class="nav">
+        <a href="index.html">Accueil</a>
+        <a href="fil-actualite.html">Fil</a>
+        <a href="annuaire.html">Annuaire</a>
+      </nav>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container" style="padding-top:24px;padding-bottom:60px;">
+    <div class="rt-wrap" id="rt-racine" aria-live="polite">
+      <div class="rt-card rt-muet" style="text-align:center;">Chargement…</div>
+    </div>
+  </main>
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/demo.js?v=2"></script>
+<script src="assets/app.js?v=13"></script>
+<script src="assets/ds.js"></script>
+<script src="assets/retours-commun.js?v=1"></script>
+<script>
+(function () {
+  var R = window.RetoursCommun, racine = document.getElementById('rt-racine');
+  var COMMANDES = [], MOTIFS = [], PHOTO = '';
+  var DETAIL_MIN = 20, PHOTO_MAX = 1024 * 1024;
+
+  function squelette() {
+    racine.innerHTML =
+      '<section class="rt-card">' +
+        '<h1>Demander un retour ou un remboursement</h1>' +
+        '<p class="rt-muet">Décrivez le problème. Le vendeur répond sous 15 jours. Sans réponse dans ce délai, votre dossier est transmis à l\'administrateur litiges de Diaspo\'Actif, qui le prend en charge.</p>' +
+        '<div class="rt-msg" id="rt-succes" role="status"></div>' +
+        '<div id="rt-formulaire"></div>' +
+      '</section>' +
+      '<section class="rt-card">' +
+        '<h2>Suivre mes demandes</h2>' +
+        '<p class="rt-muet">L\'état de vos demandes et les échanges avec le vendeur.</p>' +
+        '<ul class="rt-liste" id="rt-mes"></ul>' +
+      '</section>';
+  }
+
+  function formulaire() {
+    var el = document.getElementById('rt-formulaire');
+    if (!COMMANDES.length) {
+      el.innerHTML = '<div class="rt-note">Aucune commande payée ne peut faire l\'objet d\'une demande pour l\'instant (une commande qui a déjà une demande en cours n\'est plus proposée).</div>';
+      return;
+    }
+    var pre = parseInt(new URLSearchParams(location.search).get('commande'), 10) || 0;
+    el.innerHTML =
+      '<label class="rt-lib" for="rt-article">Article concerné</label>' +
+      '<select id="rt-article"><option value="">Choisir un article…</option>' + COMMANDES.map(function (c) {
+        return '<option value="' + c.id + '"' + (c.id === pre ? ' selected' : '') + '>' + R.esc(c.produit + ' · ' + c.boutique + ' · x' + c.quantite + ' · ' + R.euros(c.montant, c.devise) + ' · commande du ' + R.jour(c.le)) + '</option>';
+      }).join('') + '</select>' +
+      '<div class="rt-regle" id="rt-regle" hidden></div>' +
+      '<label class="rt-lib" for="rt-motif">Motif</label>' +
+      '<select id="rt-motif"><option value="">Choisir un motif…</option>' + MOTIFS.map(function (m) { return '<option>' + R.esc(m) + '</option>'; }).join('') + '</select>' +
+      '<label class="rt-lib" for="rt-details">Expliquez le problème (' + DETAIL_MIN + ' caractères minimum)</label>' +
+      '<textarea id="rt-details" maxlength="1000"></textarea><div class="rt-compteur" id="rt-compteur">0 / 1000</div>' +
+      '<label class="rt-lib" for="rt-photo">Photo du problème (facultative, 1 Mo maximum)</label>' +
+      '<input id="rt-photo" type="file" accept="image/*">' +
+      '<button class="rt-bouton" id="rt-envoyer" type="button">Envoyer ma demande</button>' +
+      '<div class="rt-msg" id="rt-msg"></div>';
+    document.getElementById('rt-article').onchange = regle;
+    document.getElementById('rt-details').oninput = function () { document.getElementById('rt-compteur').textContent = this.value.length + ' / 1000'; };
+    document.getElementById('rt-photo').onchange = lirePhoto;
+    document.getElementById('rt-envoyer').onclick = envoyer;
+    regle();
+  }
+  function regle() {
+    var id = parseInt(document.getElementById('rt-article').value, 10);
+    var c = COMMANDES.filter(function (x) { return x.id === id; })[0], box = document.getElementById('rt-regle');
+    if (!c) { box.hidden = true; return; }
+    box.textContent = 'Règle de retour pour cet article : ' + c.regle;
+    box.hidden = false;
+  }
+  function lirePhoto() {
+    var f = this.files[0], msg = document.getElementById('rt-msg');
+    PHOTO = '';
+    if (!f) return;
+    if (f.size > PHOTO_MAX) { R.dire(msg, 'Photo trop lourde : 1 Mo maximum.', true); this.value = ''; return; }
+    var lecteur = new FileReader();
+    lecteur.onload = function () { PHOTO = lecteur.result; R.dire(msg, ''); };
+    lecteur.readAsDataURL(f);
+  }
+  async function envoyer() {
+    var msg = document.getElementById('rt-msg'), btn = document.getElementById('rt-envoyer');
+    var commande = parseInt(document.getElementById('rt-article').value, 10);
+    var motif = document.getElementById('rt-motif').value, details = document.getElementById('rt-details').value.trim();
+    if (!commande) return R.dire(msg, 'Choisissez l\'article concerné.', true);
+    if (!motif) return R.dire(msg, 'Choisissez un motif.', true);
+    if (details.length < DETAIL_MIN) return R.dire(msg, 'Expliquez le problème en au moins ' + DETAIL_MIN + ' caractères.', true);
+    btn.disabled = true;
+    try {
+      await api('POST', '/retours', { commande_id: commande, motif: motif, details: details, photo_base64: PHOTO || undefined });
+      PHOTO = '';
+      await charger();
+      R.dire(document.getElementById('rt-succes'), 'Votre demande a été envoyée. Vous pouvez la suivre ci-dessous.');
+      document.getElementById('rt-mes').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch (e) {
+      btn.disabled = false;
+      R.dire(msg, e && e.message ? e.message : 'L\'envoi a échoué. Réessayez dans un instant.', true);
+    }
+  }
+
+  function mesDemandes(liste) {
+    var ul = document.getElementById('rt-mes');
+    if (!liste.length) { ul.innerHTML = '<li class="rt-muet">Vous n\'avez encore envoyé aucune demande.</li>'; return; }
+    ul.innerHTML = liste.map(function (d) {
+      var attend = d.statut === 'precisions' || d.statut === 'litige';
+      return '<li><div><b>' + R.esc(d.produit) + '</b> · ' + R.esc(d.motif) + ' · ' + R.etiquetteClient(d.statut) + '</div>' +
+        '<div class="rt-hist" style="border:0;padding:0">Demande du ' + R.jour(d.cree_le) + ' · Règle : ' + R.esc(d.regle) + ' · Montant : ' + R.esc(R.euros(d.montant, d.devise)) + '</div>' +
+        (d.remboursement ? '<div class="rt-note">Remboursement de ' + R.esc(R.euros(d.remboursement.montant, d.remboursement.devise)) + ' : ' +
+          (d.remboursement.statut === 'confirme' ? 'confirmé par le prestataire de paiement.' : 'demandé, en attente de la confirmation du prestataire de paiement.') + '</div>' : '') +
+        R.historique(d) +
+        (attend ? '<textarea id="rt-rep-' + d.id + '" placeholder="' + (d.statut === 'litige' ? 'Votre message à l\'administrateur litiges' : 'Votre réponse au vendeur') + '" style="margin-top:10px"></textarea>' +
+          '<button class="rt-bouton discret" type="button" data-rep="' + d.id + '">Envoyer ma réponse</button><div class="rt-msg" id="rt-rm-' + d.id + '"></div>' : '') +
+        '</li>';
+    }).join('');
+  }
+
+  document.addEventListener('click', async function (e) {
+    var b = e.target.closest('[data-rep]');
+    if (!b) return;
+    var id = b.getAttribute('data-rep'), champ = document.getElementById('rt-rep-' + id), sortie = document.getElementById('rt-rm-' + id);
+    var texte = (champ && champ.value || '').trim();
+    if (texte.length < 5) return R.dire(sortie, 'Écrivez votre réponse.', true);
+    b.disabled = true;
+    try { await api('POST', '/retours/' + id + '/repondre', { message: texte }); await charger(); }
+    catch (err) { b.disabled = false; R.dire(sortie, err && err.message ? err.message : 'Envoi impossible.', true); }
+  });
+
+  async function charger() {
+    var r = await Promise.all([api('GET', '/mes-retours/commandes-eligibles'), api('GET', '/mes-retours')]);
+    COMMANDES = r[0].commandes || []; MOTIFS = r[0].motifs || [];
+    formulaire();
+    mesDemandes(r[1].retours || []);
+  }
+
+  async function init() {
+    var moi = null;
+    try { moi = (await api('GET', '/auth/me')).user; } catch (e) {}
+    if (!moi) {
+      racine.innerHTML = '<section class="rt-card" style="text-align:center"><h1>Demande de retour</h1><p class="rt-muet">Connectez-vous pour demander un retour ou un remboursement pour une commande payée.</p>' +
+        '<a class="rt-bouton" style="display:inline-block;text-decoration:none;line-height:24px" href="login.html?redirect=' + encodeURIComponent('retours.html' + location.search) + '">Se connecter</a></section>';
+      return;
+    }
+    squelette();
+    try { await charger(); }
+    catch (e) { document.getElementById('rt-formulaire').innerHTML = '<div class="rt-note">Impossible de charger vos commandes pour le moment. Réessayez dans un instant.</div>'; }
+  }
+  document.addEventListener('DOMContentLoaded', function () { setTimeout(init, 300); });
+})();
+</script>
+</body>
+</html>

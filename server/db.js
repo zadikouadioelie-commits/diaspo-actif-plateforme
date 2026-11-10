@@ -9419,6 +9419,11 @@ db.exec(`
      (Stripe Connect / PayPal), sans transiter par la plateforme → aucun crédit de portefeuille. */
   ["commandes_vitrine", "paiement_direct INTEGER DEFAULT 0"],
   ["commandes_vitrine", "paypal_order_id TEXT"],
+  /* Lot G (2026-11-10) — remboursements : références du prestataire nécessaires pour rembourser depuis le compte du commerçant
+     (payment_intent Stripe, identifiant de capture PayPal) ; règle de retour choisie par le vendeur pour chaque produit. */
+  ["commandes_vitrine", "stripe_payment_intent TEXT"],
+  ["commandes_vitrine", "paypal_capture_id TEXT"],
+  ["produits_vitrine", "regle_retour_id TEXT"],
   ["vitrine_publications", "media_bg TEXT"],
   ["vitrine_avis", "titre TEXT"],
   ["vitrine_avis", "reponse_texte TEXT"],
@@ -10211,6 +10216,78 @@ db.exec(`
     def.id
   );
 })();
+
+/* ── Retours, réclamations et remboursements des commandes de boutique (lot G, 2026-11-10) ──
+   Règles : voir server/retours.js et server/retours-config.js.
+   - `retours` : un dossier par réclamation. Statuts : envoyee, precisions, acceptee, refusee, remboursement_en_cours, remboursee, litige, litige_traite.
+   - `dispute_events` : historique en AJOUT SEUL (jamais de UPDATE ni de DELETE) : auteur, rôle, action, statut avant/après, heure serveur.
+   - `refunds` : un remboursement demandé au prestataire. « confirme » n'est posé que sur preuve du prestataire (webhook Stripe ou état renvoyé par l'API PayPal).
+   Les instantanés (nom du produit, prix) sont figés à l'ouverture du dossier : ils restent lisibles même si le produit est modifié ou supprimé. */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS retours (
+    id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+    commande_id          INTEGER NOT NULL,
+    initiative_id        INTEGER NOT NULL,
+    acheteur_id          INTEGER NOT NULL,
+    produit_nom          TEXT,
+    quantite             INTEGER DEFAULT 1,
+    montant_commande     REAL,
+    devise               TEXT DEFAULT 'EUR',
+    regle_retour         TEXT,
+    motif                TEXT NOT NULL,
+    details              TEXT NOT NULL,
+    photo_url            TEXT,
+    statut               TEXT NOT NULL DEFAULT 'envoyee',
+    decision             TEXT,
+    motif_decision       TEXT,
+    derniere_activite_at TEXT DEFAULT (datetime('now')),
+    created_at           TEXT DEFAULT (datetime('now')),
+    updated_at           TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(commande_id) REFERENCES commandes_vitrine(id),
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id),
+    FOREIGN KEY(acheteur_id) REFERENCES users(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_retours_acheteur ON retours(acheteur_id);
+  CREATE INDEX IF NOT EXISTS idx_retours_initiative ON retours(initiative_id);
+  CREATE INDEX IF NOT EXISTS idx_retours_commande ON retours(commande_id);
+
+  CREATE TABLE IF NOT EXISTS dispute_events (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    retour_id     INTEGER NOT NULL,
+    auteur_id     INTEGER,
+    role          TEXT NOT NULL,
+    action        TEXT NOT NULL,
+    statut_avant  TEXT,
+    statut_apres  TEXT,
+    message       TEXT,
+    piece_url     TEXT,
+    created_at    TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(retour_id) REFERENCES retours(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_dispute_events_retour ON dispute_events(retour_id);
+
+  CREATE TABLE IF NOT EXISTS refunds (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    retour_id           INTEGER NOT NULL,
+    commande_id         INTEGER NOT NULL,
+    provider            TEXT NOT NULL,
+    compte_beneficiaire TEXT,
+    montant             REAL NOT NULL,
+    devise              TEXT DEFAULT 'EUR',
+    provider_refund_id  TEXT,
+    statut              TEXT NOT NULL DEFAULT 'demande',
+    confirme_par        TEXT,
+    confirme_at         TEXT,
+    erreur              TEXT,
+    demande_par         INTEGER,
+    created_at          TEXT DEFAULT (datetime('now')),
+    updated_at          TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(retour_id) REFERENCES retours(id),
+    FOREIGN KEY(commande_id) REFERENCES commandes_vitrine(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_refunds_retour ON refunds(retour_id);
+  CREATE INDEX IF NOT EXISTS idx_refunds_provider_ref ON refunds(provider_refund_id);
+`);
 
 module.exports = db;
 module.exports.backfillOfficialFollow = backfillOfficialFollow;

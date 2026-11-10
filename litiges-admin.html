@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<script src="/assets/m-redirect.js"></script>
+<meta charset="UTF-8">
+<link rel="icon" href="/assets/logo.png">
+<title>Diaspo'Actif — Administrateur litiges</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="assets/styles.v2.css">
+<link rel="stylesheet" href="/assets/responsive.v2.css?v=2">
+<link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
+<link rel="stylesheet" href="/assets/design-upgrade.v2.css">
+<link rel="stylesheet" href="/assets/theme-manager.css">
+<!-- Nuit dorée (2026-11-10) : retour arrière = retirer ces lignes et class="nd" -->
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,500;0,6..96,600;1,6..96,500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/theme-nuit-doree.css?v=8">
+<link rel="stylesheet" href="/assets/retours-nuit-doree.css?v=1">
+</head>
+<body class="nd">
+<div class="page" id="app">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Menu">&#9776;</button>
+      <div class="logo"><a href="index.html" style="text-decoration:none;color:inherit;display:flex;align-items:center;gap:8px;"><img loading="lazy" class="logo-img" src="assets/logo.png" alt=""> DIASPO'ACTIF</a></div>
+      <nav class="nav">
+        <a href="dashboard-administrateur.html">Administration</a>
+        <a href="litiges-admin.html" class="active">Litiges</a>
+      </nav>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container" style="padding-top:24px;padding-bottom:60px;">
+    <div class="rt-wrap large" id="rt-racine" aria-live="polite">
+      <div class="rt-card rt-muet" style="text-align:center;">Chargement…</div>
+    </div>
+  </main>
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/demo.js?v=2"></script>
+<script src="assets/app.js?v=13"></script>
+<script src="assets/ds.js"></script>
+<script src="assets/retours-commun.js?v=1"></script>
+<script>
+(function () {
+  var R = window.RetoursCommun, racine = document.getElementById('rt-racine'), LITIGES = [];
+
+  function carte(l) {
+    var ouvert = l.statut === 'litige';
+    var etat = ouvert ? '<span class="rt-tag off">À traiter</span>'
+      : l.statut === 'remboursement_en_cours' ? '<span class="rt-tag cours">Remboursement en cours</span>'
+      : '<span class="rt-tag ok">Traité : ' + R.esc(l.decision === 'remboursement' ? 'remboursement' : 'refus') + '</span>';
+    return '<li>' +
+      '<div><b>' + R.esc(l.produit) + '</b> · ' + R.esc(l.motif) + ' · ' + etat + '</div>' +
+      '<div class="rt-grille">' +
+        '<div><span>Boutique</span>' + R.esc(l.boutique) + '</div>' +
+        '<div><span>Propriétaire</span>' + R.esc(l.proprietaire) + '</div>' +
+        '<div><span>Plaignant</span>' + R.esc(l.plaignant) + '</div>' +
+        '<div><span>Email du plaignant</span>' + R.esc(l.plaignant_email) + '</div>' +
+        '<div><span>Article</span>' + R.esc(l.produit) + ' · x' + R.esc(l.quantite) + ' · ' + R.esc(R.euros(l.montant, l.devise)) + '</div>' +
+        '<div><span>Règle de retour</span>' + R.esc(l.regle) + '</div>' +
+        '<div><span>Date de la demande</span>' + R.esc(R.jourHeure(l.cree_le)) + '</div>' +
+        '<div><span>Jours sans réponse</span>' + R.esc(l.jours_sans_reponse) + ' jours</div>' +
+      '</div>' +
+      '<div class="rt-note"><b>Description du plaignant :</b><br>' + R.esc(l.details) + '</div>' +
+      R.photo(l.photo, 'Photo jointe par le plaignant') +
+      (l.remboursement ? '<div class="rt-note">Remboursement de ' + R.esc(R.euros(l.remboursement.montant, l.remboursement.devise)) + ' : ' +
+        (l.remboursement.statut === 'confirme' ? 'confirmé par le prestataire de paiement.' : 'demandé, en attente de la confirmation du prestataire de paiement.') + '</div>' : '') +
+      R.historique(l) +
+      (ouvert ?
+        '<label class="rt-lib" for="txt-' + l.id + '">Message au plaignant et au vendeur</label>' +
+        '<textarea id="txt-' + l.id + '" placeholder="Votre message ou motif de décision"></textarea>' +
+        '<div class="rt-actions">' +
+          '<button class="rt-bouton discret" type="button" data-act="demander-pieces" data-id="' + l.id + '">Demander des pièces</button>' +
+          '<button class="rt-bouton" type="button" data-act="rembourser" data-id="' + l.id + '" data-montant="' + R.esc(R.euros(l.montant, l.devise)) + '">Valider le remboursement</button>' +
+          '<button class="rt-bouton danger" type="button" data-act="refuser" data-id="' + l.id + '">Refuser la demande</button>' +
+        '</div><div class="rt-msg" id="m-' + l.id + '"></div>' : '') +
+      '</li>';
+  }
+
+  function afficher() {
+    var a = LITIGES.filter(function (l) { return l.statut === 'litige'; }).length;
+    racine.innerHTML =
+      '<section class="rt-card"><h1>Dossiers transmis à l\'administrateur litiges</h1>' +
+        '<p class="rt-muet">Un dossier arrive ici lorsque le vendeur n\'a pas répondu dans les 15 jours. Vous voyez la boutique, le plaignant et l\'intégralité du dossier.</p>' +
+        '<p class="rt-muet"><b>' + a + '</b> dossier(s) à traiter.</p>' +
+        '<button class="rt-bouton discret" type="button" id="rt-verifier">Vérifier les remboursements en cours</button><div class="rt-msg" id="rt-verif"></div>' +
+      '</section>' +
+      '<section class="rt-card"><ul class="rt-liste">' + (LITIGES.length ? LITIGES.map(carte).join('') : '<li class="rt-muet">Aucun dossier en attente.</li>') + '</ul></section>';
+  }
+
+  document.addEventListener('click', async function (e) {
+    var v = e.target.closest('#rt-verifier');
+    if (v) {
+      var sortie = document.getElementById('rt-verif');
+      v.disabled = true;
+      try {
+        var r = await api('POST', '/admin/litiges/0/verifier-remboursement', {});
+        R.dire(sortie, r.examines + ' remboursement(s) examiné(s) : ' + r.confirmes + ' confirmé(s), ' + r.echoues + ' refusé(s), ' + r.en_cours + ' encore en cours.');
+        await charger(false);
+      } catch (err) { R.dire(sortie, err && err.message ? err.message : 'Vérification impossible.', true); }
+      return;
+    }
+    var b = e.target.closest('[data-act]');
+    if (!b) return;
+    var id = b.getAttribute('data-id'), act = b.getAttribute('data-act');
+    var champ = document.getElementById('txt-' + id), texte = (champ && champ.value || '').trim(), out = document.getElementById('m-' + id);
+    if (act !== 'demander-pieces' && texte.length < 5) return R.dire(out, 'Rédigez un message ou un motif (5 caractères minimum).', true);
+    if (act === 'rembourser' && !confirm('Valider le remboursement de ' + b.getAttribute('data-montant') + ' ? Il sera demandé au prestataire de paiement depuis le compte du vendeur.')) return;
+    b.disabled = true;
+    try {
+      await api('POST', '/admin/litiges/' + id + '/' + act, { message: texte });
+      await charger(false);
+    } catch (err) { b.disabled = false; R.dire(out, err && err.message ? err.message : 'Action impossible.', true); }
+  });
+
+  async function charger(premiere) {
+    var r = await api('GET', '/admin/litiges');
+    LITIGES = r.litiges || [];
+    afficher();
+  }
+
+  async function init() {
+    var moi = null;
+    try { moi = (await api('GET', '/auth/me')).user; } catch (e) {}
+    if (!moi || moi.role !== 'administrateur') {
+      racine.innerHTML = '<section class="rt-card" style="text-align:center"><h1>Espace réservé</h1><p class="rt-muet">Cette page est réservée à l\'administration de Diaspo\'Actif.</p></section>';
+      return;
+    }
+    try { await charger(true); }
+    catch (e) { racine.innerHTML = '<section class="rt-card"><p class="rt-muet">Impossible de charger les dossiers pour le moment. Réessayez dans un instant.</p></section>'; }
+  }
+  document.addEventListener('DOMContentLoaded', function () { setTimeout(init, 300); });
+})();
+</script>
+</body>
+</html>

@@ -244,7 +244,9 @@ async function readBody(req) {
   const bigPath = /^\/api\/conversations\/\d+\/messages$/.test(u);
   /* Koffi des sondages : PDF/photos joints (3 Mo au plus, soit ~4 Mo en base64 ; plafond de la plateforme 4,5 Mo) */
   const kofiFichiers = u === "/api/kofi/sondages/messages";
-  const maxBody = bigPath ? 25e6 : kofiFichiers ? 5e6 : 1e6;
+  /* Réclamation de boutique : photo jointe de 1 Mo au plus, soit ~1,4 Mo en base64 */
+  const retourPhoto = u === "/api/retours";
+  const maxBody = bigPath ? 25e6 : kofiFichiers ? 5e6 : retourPhoto ? 2e6 : 1e6;
   req._bodyPromise = new Promise((resolve, reject) => {
     let body = "";
     req.on("data", (chunk) => {
@@ -21986,6 +21988,10 @@ async function handleStripeWebhook(req, res) {
         }
       }
     }
+    /* Remboursements de commandes de boutique (lot G) : seule la confirmation signée de Stripe les passe à « remboursé ». */
+    if (event.type === "refund.created" || event.type === "refund.updated" || event.type === "charge.refunded") {
+      await Retours.traiterEvenementStripe(db, event, { creerNotif });
+    }
     sendJSON(res, 200, { received: true });
   } catch (e) {
     logError(e, "stripe-webhook", req);
@@ -24734,6 +24740,13 @@ const legal = require("./legal")({ db, logError });
 const notifsAdmin = require("./notifs-admin")({ db, logError });
 const honneur = require("./honneur")({
   db, dateParisISO, nomCompteAffichage, creerNotif, logError,
+  getStripe: () => { try { return require("./stripe-client").stripe; } catch (_) { return null; } },
+});
+
+/* Réclamations, retours sous 15 jours, litiges et remboursements des commandes de boutique (lot G, 2026-11-10). */
+const Retours = require("./retours");
+Retours.enregistrer({
+  route, db, getCurrentUser, sendJSON, creerNotif, SEC,
   getStripe: () => { try { return require("./stripe-client").stripe; } catch (_) { return null; } },
 });
 

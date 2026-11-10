@@ -1,0 +1,46 @@
+/* ============================================================
+   Retours, réclamations et litiges (lot G, 2026-11-10) — pages retours.html, litiges-admin.html et section « Retours et litiges » du tableau de bord Initiative.
+   Structure, textes et parcours de la maquette validée (retours-client / espace-proprietaire / litiges-admin) ; habillage « Nuit dorée » de la plateforme.
+   Tout est préfixé rt- ; retour arrière : retirer ce fichier et ses liens.
+   ============================================================ */
+html body.nd .rt-wrap{max-width:820px;margin:0 auto;color:var(--nd-texte)}
+html body.nd .rt-wrap.large{max-width:960px}
+html body.nd .rt-card{background:var(--nd-verre);border:1px solid var(--nd-bord2);border-radius:22px;padding:22px;margin-bottom:16px;box-shadow:0 30px 60px -38px #000}
+html body.nd .rt-card h1,html body.nd .rt-card h2,html body.nd .rt-card h3{font-family:var(--nd-display);font-weight:500;color:#fff;margin:0 0 6px}
+html body.nd .rt-card h1{font-size:26px}
+html body.nd .rt-card h2{font-size:21px}
+html body.nd .rt-card h3{font-size:18px}
+.rt-muet{color:var(--nd-doux,#A9B4CC);font-size:14px;line-height:1.55}
+.rt-lib{display:block;font-weight:700;font-size:13.5px;margin:14px 0 5px;color:var(--nd-texte,#E8ECF6)}
+html body.nd .rt-card label.rt-lib{color:var(--nd-texte)!important;text-transform:none!important;letter-spacing:0!important}
+html body.nd .rt-card :is(input,select,textarea){width:100%;box-sizing:border-box;padding:11px 13px;border-radius:12px;border:1px solid var(--nd-bord2)!important;background:rgba(255,255,255,.07)!important;color:#fff!important;font:inherit;font-size:15px;color-scheme:dark}
+html body.nd .rt-card textarea{min-height:92px;resize:vertical}
+html body.nd .rt-card :is(input,select,textarea):focus{outline:0;border-color:var(--nd-or)!important;box-shadow:0 0 0 3px rgba(227,192,110,.18)}
+html body.nd .rt-card select option{background:#0f1a38;color:#fff}
+html body.nd .rt-card ::placeholder{color:var(--nd-faible)}
+.rt-bouton{font:inherit;font-weight:800;border:0;border-radius:999px;padding:10px 18px;margin:10px 8px 0 0;cursor:pointer;min-height:44px;background:var(--nd-degore,linear-gradient(135deg,#F3DC9B,#E3C06E 38%,#B9893A));color:#1a1202;box-shadow:0 12px 26px -14px rgba(227,192,110,.75)}
+.rt-bouton.discret{background:rgba(255,255,255,.06);color:var(--nd-texte,#E8ECF6);border:1px solid var(--nd-bord,rgba(227,192,110,.24));box-shadow:none}
+.rt-bouton.danger{background:rgba(255,155,155,.12);color:#FFB4B4;border:1px solid rgba(255,155,155,.4);box-shadow:none}
+.rt-bouton:disabled{opacity:.45;cursor:not-allowed}
+.rt-bouton:focus-visible,.rt-lien:focus-visible{outline:3px solid var(--nd-or,#E3C06E);outline-offset:2px}
+.rt-msg{margin-top:10px;font-size:14px;min-height:20px;color:#8FE0B0}
+.rt-msg.err{color:#FFB4B4}
+.rt-regle{background:rgba(227,192,110,.1);border:1px solid var(--nd-bord);border-radius:12px;padding:10px 13px;margin-top:10px;font-size:14px}
+.rt-note{background:rgba(227,192,110,.1);border:1px solid var(--nd-bord);border-radius:12px;padding:11px 14px;margin-top:12px;font-size:14px;line-height:1.55}
+.rt-tag{display:inline-block;border-radius:999px;padding:3px 11px;font-size:12px;font-weight:800;background:rgba(255,255,255,.08);color:var(--nd-doux,#A9B4CC);border:1px solid var(--nd-bord2)}
+.rt-tag.ok{background:rgba(143,224,176,.14);color:#8FE0B0;border-color:rgba(143,224,176,.35)}
+.rt-tag.off{background:rgba(255,155,155,.12);color:#FFB4B4;border-color:rgba(255,155,155,.4)}
+.rt-tag.cours{background:rgba(63,123,255,.14);color:#CFE0FF;border-color:rgba(127,166,224,.4)}
+.rt-liste{list-style:none;padding:0;margin:8px 0 0}
+.rt-liste>li{border-top:1px solid var(--nd-bord2,rgba(255,255,255,.1));padding:16px 0}
+.rt-hist{font-size:13px;color:var(--nd-doux,#A9B4CC);margin-top:10px;border-left:3px solid var(--nd-bord,rgba(227,192,110,.24));padding-left:12px}
+.rt-hist div{margin:4px 0}
+.rt-grille{display:grid;grid-template-columns:1fr 1fr;gap:10px 18px;font-size:14px;margin-top:12px}
+.rt-grille span{display:block;color:var(--nd-faible,#7C88A4);font-size:12px}
+.rt-photo{max-width:220px;max-height:220px;border-radius:12px;margin-top:10px;border:1px solid var(--nd-bord2);display:block}
+.rt-actions{margin-top:6px}
+.rt-compteur{font-size:12px;color:var(--nd-faible,#7C88A4);text-align:right;margin-top:3px}
+.rt-lien{color:var(--nd-or,#E3C06E);font-weight:700}
+.rt-verrou{color:var(--nd-doux,#A9B4CC);font-size:14px;margin:10px 0 0}
+@media (max-width:600px){html body.nd .rt-card{padding:16px;border-radius:16px}.rt-grille{grid-template-columns:1fr}.rt-bouton{width:100%;margin-right:0}}
+@media (prefers-reduced-motion:reduce){.rt-bouton{transition:none}}
