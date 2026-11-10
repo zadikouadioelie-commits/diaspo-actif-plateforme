@@ -355,7 +355,7 @@ async function repondre({ modele, systeme, messages, maxSortie }) {
   try {
     rep = await client().messages.create({
       model: nom,
-      max_tokens: Math.min(Math.max(Number(maxSortie) || 1200, 200), 4000),
+      max_tokens: Math.min(Math.max(Number(maxSortie) || 1200, 200), 8000),
       system: systeme,
       output_config: { effort: "low" },
       messages,

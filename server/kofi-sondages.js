@@ -27,7 +27,7 @@ const ROLES_CREATION_INFO = "Initiative, Collectivité, Administrateur ou Premiu
 const ACTION_EUR = Number(process.env.KOFI_ACTION_SONDAGE_EUR) > 0 ? Number(process.env.KOFI_ACTION_SONDAGE_EUR) : 0.02;
 /* Garde-fou : au-delà de ce nombre d'échanges pour un même sondage, un nouveau crédit est pris (évite une conversation sans fin pour un seul crédit). */
 const MAX_ECHANGES_PAR_CREDIT = 30;
-const MAX_QUESTIONS = 25, MAX_OPTIONS = 12, MAX_MESSAGE = 1500;
+const MAX_QUESTIONS = 40, MAX_OPTIONS = 12, MAX_MESSAGE = 12000;
 const CATS_ECHANGE = ["sondages_mensuel", "sondages_achat", "sondages_illimite", "sondages_offert", "sondages_inclus"];
 
 const TYPES_QUESTION = {
@@ -444,7 +444,7 @@ module.exports.register = function register(deps) {
       hist.forEach(m => {
         const role = m.role === "assistant" ? "assistant" : "user";
         if (messages.length && messages[messages.length - 1].role === role) messages.pop();
-        messages.push({ role, content: String(m.contenu).slice(0, 1500) });
+        messages.push({ role, content: String(m.contenu).slice(0, role === "user" ? MAX_MESSAGE : 1500) });
       });
       while (messages.length && messages[0].role !== "user") messages.shift();
       if (messages.length && messages[messages.length - 1].role === "user") messages.pop();
@@ -461,7 +461,7 @@ module.exports.register = function register(deps) {
     messages.push({ role: "user", content: Fichiers.contenuIA(lu.blocs, `${contexteIA}<demande>\n${texte}\n</demande>`) });
 
     let rep;
-    try { rep = await IA.repondre({ modele: r.modele, systeme: systemePour(), messages, maxSortie: Math.max(r.inscriptions_max_sortie_tokens, 1200) + (droit ? 2800 : 0) }); }
+    try { rep = await IA.repondre({ modele: r.modele, systeme: systemePour(), messages, maxSortie: Math.max(r.inscriptions_max_sortie_tokens, 1200) + (droit ? 5800 : 0) }); }
     catch (e) {
       if (lot) await K.rendre(db, lot.id);
       if (e instanceof IA.KofiIAErreur) {
