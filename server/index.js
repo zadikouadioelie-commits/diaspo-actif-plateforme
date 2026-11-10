@@ -33596,7 +33596,7 @@ async function similariteSR(a, b) {
   return inter / Math.min(wa.size, wb.size);
 }
 
-async function calcPriorite(count) {
+function calcPriorite(count) {   /* synchrone : appelée sans await dans les requêtes SQL (2026-11-10) */
   if (count >= 20) return 'critique';
   if (count > 10)  return 'elevee';
   if (count >= 3)  return 'moyenne';

@@ -311,19 +311,20 @@ function scorer(question, chunks, max) {
 const DEMANDE_DE_CONTEXTE = /\b(resum\w*|explique\w*\s+(ce|cet|cette|moi)|ce\s+(passage|chapitre|module|cours)|cette\s+(lecon|partie|page|section)|this\s+(passage|chapter|lesson|page|module)|summari[sz]e|explain\s+(this|it))\b/;
 const Competences = require("./kofi-competences");
 const Portefeuille = require("./kofi-portefeuille");
+const SansReponse = require("./kofi-sans-reponse");   /* message unique quand Koffi n'a pas l'information + remontée à l'administration (2026-11-10) */
 const SALUTATION = /^\s*(bonjour|bonsoir|salut|coucou|hello|hi|hey|merci|thanks?|thank you|ok|d'accord)\b[\s!.?,]*$/i;
 
 /* ── Phrases fixes (FR / EN) ──────────────────────────────────────────────────────────────────────── */
 const T = {
   fr: {
-    introuvable: "Je ne trouve pas cette information dans les supports auxquels vous avez accès. Vous pouvez reformuler votre question, ou la poser à votre formateur.",
+    introuvable: SansReponse.PHRASES.fr,
     bienvenue: "Bonjour ! Je suis Koffi. Posez-moi une question sur ce cours : je réponds uniquement à partir des supports auxquels vous avez accès, et je cite la source.",
     refus: "Je ne peux pas répondre à cette question. Reformulez-la ou posez-la à votre formateur.",
     panne: "Koffi est momentanément indisponible. Votre question n'a pas été décomptée : réessayez dans quelques instants.",
     sans_reference: "Aucune source n'est citée pour cette réponse : vérifiez-la dans le cours.",
   },
   en: {
-    introuvable: "I can't find this information in the materials you have access to. You can rephrase your question, or ask your trainer.",
+    introuvable: SansReponse.PHRASES.en,
     bienvenue: "Hello! I'm Koffi. Ask me a question about this course: I only answer from the materials you have access to, and I cite my sources.",
     refus: "I can't answer this question. Please rephrase it or ask your trainer.",
     panne: "Koffi is temporarily unavailable. Your question was not counted: please try again in a moment.",
@@ -456,7 +457,7 @@ function analyserReponse(texte, extraits, formationId) {
   });
   return { texte: propre, citations };
 }
-const DIT_INTROUVABLE = /je ne trouve pas|i can'?t find|i cannot find|i could not find/i;
+const DIT_INTROUVABLE = /je ne trouve pas|i can'?t find|i cannot find|i could not find|je ne peux pas répondre à votre demande|i'?m unable to answer your request/i;
 
 /* ── Accès : qui peut utiliser Koffi, sur quelle formation, et quoi ───────────────────────────────── */
 async function evaluationEnCours(db, inscription) {
@@ -843,6 +844,8 @@ module.exports.register = function register(deps) {
     }
     if (!choisis.length) {
       /* Aucun passage pertinent : aucun appel à l'IA, aucune question décomptée, aucune invention possible. */
+      /* Pas l'information : message officiel, et la demande est remontée à l'administration (file « Questions sans réponse », sans identifiant de compte). Pas pour l'aperçu du formateur. */
+      if (ctx.mode === "eleve") await SansReponse.remonter(db, { question: texte, source: "koffi_tuteur", role: user.role, langue: lg });
       const id = await enregistrer(T[lg].introuvable, { flags: ["hors_cours"] });
       return sendJSON(res, 200, await reponseJson(id, T[lg].introuvable, [], ["hors_cours"]));
     }
@@ -894,6 +897,10 @@ module.exports.register = function register(deps) {
       categorie = d.depuis_achat ? "eleve_achat" : "eleve_mensuel";
     }
     const a = analyserReponse(rep.texte, choisis, ctx.f.id);
+    if (DIT_INTROUVABLE.test(a.texte)) {   /* le modèle ne trouve pas : message officiel (jamais une version improvisée), et la demande est remontée */
+      a.texte = T[lg].introuvable; a.citations = [];
+      if (ctx.mode === "eleve") await SansReponse.remonter(db, { question: texte, source: "koffi_tuteur", role: user.role, langue: lg });
+    }
     const flags = [];
     if (DIT_INTROUVABLE.test(a.texte)) flags.push("hors_cours");
     else if (!a.citations.length) flags.push("sans_reference");

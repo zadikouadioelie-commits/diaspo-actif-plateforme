@@ -234,6 +234,7 @@ function reponseFausseNavigation({ systeme, messages }) {
   if (/REFUSFAUX/.test(q)) return { texte: "", entree, sortie: 5, lecture_cache: 0, refus: true, arret: "refusal" };
   let texte;
   if (/JSONFAUX/.test(q)) texte = "Voici ma réponse sans structure.";
+  else if (/SANSREPONSEFAUX/.test(q)) texte = "```json\n" + JSON.stringify({ message: "Je ne sais pas.", destinations: ["faq"], sans_reponse: true }) + "\n```";   /* le modèle n'a pas l'information */
   else {
     const m = /PAGE:(\S+)/.exec(q);
     const dest = m ? m[1].split(",").filter(Boolean) : [];

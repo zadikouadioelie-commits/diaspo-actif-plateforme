@@ -169,8 +169,12 @@ test('Koffi — règles du socle', async (t) => {
     const avant = nbAppelsIA(), cr = credits(uid('Alpha'));
     const r = await poser(jarA, convA, 'Qu\'est-ce que le microcrédit rural ?');
     assert.equal(r.status, 200, JSON.stringify(r.data));
-    assert.match(r.data.message.contenu, /ne trouve pas/i);
+    assert.match(r.data.message.contenu, /je ne peux pas répondre à votre demande/i);
     assert.deepEqual(r.data.message.flags, ['hors_cours']); assert.deepEqual(r.data.message.citations, []);
+    assert.equal(r.data.message.contenu, "Pour le moment, je ne peux pas répondre à votre demande. Cependant, je remonte l'information pour que nous puissions y travailler. Merci pour votre compréhension.");
+    /* La demande est réellement remontée à l'administration, sans identifiant de compte. */
+    const remontee = sql("select * from faq_sans_reponse where source='koffi_tuteur' and question like '%microcrédit rural%'");
+    assert.equal(remontee.length, 1); assert.equal(remontee[0].user_id, null);
     assert.equal(nbAppelsIA(), avant, 'pas d\'appel au fournisseur');
     assert.equal(credits(uid('Alpha')), cr, 'question non décomptée');
     /* Rien du module fermé n'a jamais quitté le serveur, même pour une autre question qui touche le module 1. */

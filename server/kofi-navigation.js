@@ -17,6 +17,7 @@ const IA = require("./kofi-ia");
 const Competences = require("./kofi-competences");
 const Pages = require("./kofi-navigation-pages");
 const Actions = require("./kofi-actions");
+const SansReponse = require("./kofi-sans-reponse");   /* message unique quand Koffi n'a pas l'information + remontée à l'administration (2026-11-10) */
 
 const MARQUEUR = "ASSISTANT_NAVIGATION";
 const MAX_DESTINATIONS = 3;
@@ -35,14 +36,16 @@ function lireSortie(texte, cles) {
   const o = parseJson(t.slice(a, b + 1));
   if (!o || typeof o !== "object") return null;
   const message = nettoyer(o.message).slice(0, 700);
-  if (!message) return null;
+  /* « sans_reponse » : le modèle dit qu'il n'a pas l'information. Son texte est alors ignoré : le serveur affiche le message officiel (server/kofi-sans-reponse.js) et remonte la demande. */
+  const sansReponse = o.sans_reponse === true;
+  if (!message && !sansReponse) return null;
   const ok = new Set(cles);
   const destinations = [];
   (Array.isArray(o.destinations) ? o.destinations : []).forEach(c => { const k = String(c || "").trim(); if (ok.has(k) && !destinations.includes(k) && destinations.length < MAX_DESTINATIONS) destinations.push(k); });
   /* Action demandée par le modèle : une seule sorte existe, son contenu n'est qu'un BROUILLON que le serveur revalide (server/kofi-actions.js). */
   const act = o.action;
   const action = act && typeof act === "object" && act.type === "ajouter_adherent" && act.adherent && typeof act.adherent === "object" ? { type: "ajouter_adherent", adherent: act.adherent } : null;
-  return { message, destinations, action };
+  return { message, destinations, action: sansReponse ? null : action, sansReponse };
 }
 
 /* Chiffres publics agrégés (aucune donnée de compte) : mêmes filtres que les listes publiques
@@ -99,9 +102,9 @@ function systemePour(pages, stats, cap, aujourdhui) {
     `${MARQUEUR} — Tu es Koffi, le guide de navigation de Diaspo'Actif, plateforme de la diaspora africaine. Tu aides la personne à trouver la bonne page ou à comprendre où et comment faire quelque chose.`,
     "",
     "RÈGLES ABSOLUES :",
-    `1. Tu réponds UNIQUEMENT par un objet JSON, sans autre texte : {"message":"<ta réponse, 1 à 4 phrases>","destinations":["cle1","cle2"]${peut ? ',"action":null' : ""}}.${peut ? " (\"action\" : null sauf dans le cas décrit à la règle 9.)" : ""}`,
+    `1. Tu réponds UNIQUEMENT par un objet JSON, sans autre texte : {"message":"<ta réponse, 1 à 4 phrases>","destinations":["cle1","cle2"],"sans_reponse":false${peut ? ',"action":null' : ""}}.${peut ? " (\"action\" : null sauf dans le cas décrit à la règle 9.)" : ""} \"sans_reponse\" : true UNIQUEMENT si tu n'as pas l'information pour répondre (voir la règle 3) ; dans ce cas \"message\" peut rester vide : le serveur affiche lui-même le message officiel.`,
     "2. \"destinations\" : de 0 à 3 clés EXACTEMENT prises dans la liste <pages> ci-dessous, les plus utiles d'abord. N'invente jamais une clé, une page, un bouton ou une fonction : tu ne connais que ce que dit la liste.",
-    "3. Appuie-toi uniquement sur les descriptions de la liste. Si la liste ne permet pas de répondre avec certitude, dis-le honnêtement et propose la FAQ (faq), le Centre des tutos (tutoriels) ou le Support (support) plutôt que de deviner.",
+    "3. Appuie-toi uniquement sur les descriptions de la liste. Si la liste ne permet pas de répondre avec certitude, ne devine pas : mets \"sans_reponse\" à true et propose en \"destinations\" la FAQ (faq), le Centre des tutos (tutoriels) ou le Support (support). (Une demande sans aucun rapport avec Diaspo'Actif n'est PAS un cas « sans_reponse » : voir la règle 6.)",
     "4. Si la personne se trouve déjà sur la page qui répond à sa question (<page_actuelle>), dis-le et explique ce que la page permet, sans la proposer à nouveau.",
     peut ? "5. Hors l'unique action de la règle 9, tu ne fais rien à la place de la personne (tu ne publies, n'achètes, ne modifies, ne supprimes rien) : tu montres où aller. Tu ne connais ni son compte, ni ses données, ni ses messages."
       : "5. Tu ne fais rien à la place de la personne (tu ne publies, n'achètes, ne modifies, ne supprimes rien) : tu montres où aller. Tu ne connais ni son compte, ni ses données, ni ses messages.",
@@ -237,8 +240,8 @@ module.exports.register = function register(deps) {
   }
 
   /* Capacités → texte annoncé à la personne (avertissement de l'écran) et réponse à « Que sais-tu faire ? ». */
-  const AVERTISSEMENT_SANS = "Koffi vous montre où aller ; il ne fait rien à votre place et ne connaît ni votre compte ni vos messages. Les questions de navigation sont gratuites.";
-  const AVERTISSEMENT_AVEC = "Koffi vous montre où aller et peut ajouter un adhérent à votre registre à votre place, seulement après votre « oui ». Il ne connaît ni votre compte ni vos messages ; ce que vous lui écrivez est traité par son service d'IA. Les questions de navigation sont gratuites.";
+  const AVERTISSEMENT_SANS = "Koffi vous montre où aller ; il ne fait rien à votre place et ne connaît ni votre compte ni vos messages. Les questions de navigation sont gratuites. Si Koffi ne peut pas répondre, votre demande (sans votre nom) est transmise à l'équipe pour améliorer le service.";
+  const AVERTISSEMENT_AVEC = "Koffi vous montre où aller et peut ajouter un adhérent à votre registre à votre place, seulement après votre « oui ». Il ne connaît ni votre compte ni vos messages ; ce que vous lui écrivez est traité par son service d'IA. Les questions de navigation sont gratuites. Si Koffi ne peut pas répondre, votre demande (sans votre nom) est transmise à l'équipe pour améliorer le service.";
 
   const SUGGESTIONS = [
     "Où puis-je publier un événement ?",
@@ -383,12 +386,18 @@ module.exports.register = function register(deps) {
       return sendJSON(res, 200, reponse(id, msg, []));
     }
     const par = new Map(pages.map(p => [p.cle, p]));
-    const destinations = sortie.destinations.map(c => par.get(c)).filter(Boolean).map(vue);
+    let destinations = sortie.destinations.map(c => par.get(c)).filter(Boolean).map(vue);
 
     /* Action « ajouter un adhérent » : le modèle ne fournit qu'un brouillon. Le serveur le revalide, rapproche la formule de celles DE L'ASSOCIATION, demande ce qui manque ou écrit lui-même le résumé à confirmer.
        Sans la capacité réelle (compte, formule, Premium), l'action demandée par le modèle est ignorée. */
     let contenu = sortie.message, meta = { destinations: sortie.destinations }, flags = destinations.length ? ["navigation"] : [], aProposer = null;
-    if (sortie.action && cap.ajouter_adherent) {
+    /* Pas l'information : message officiel mot pour mot, et la demande est VRAIMENT remontée à l'administration (file « Questions sans réponse », sans identifiant de compte). */
+    if (sortie.sansReponse) {
+      const lg = SansReponse.langueDe(texte);
+      contenu = SansReponse.phrase(lg); flags = ["sans_reponse"]; destinations = []; meta = { destinations: [] };   /* message officiel seul : aucun bouton */
+      await SansReponse.remonter(db, { question: texte, source: "koffi_navigation", role: user.role, langue: lg });
+    }
+    if (!sortie.sansReponse && sortie.action && cap.ajouter_adherent) {
       const nouveau = sortie.action.adherent, base = brouillonPrecedent || {};
       const fusion = { ...base, ...nouveau };   /* le modèle renvoie le brouillon COMPLET (corrections comprises) ; une clé absente garde la valeur déjà retenue */
       const v = Actions.validerAdherent(fusion, Date.now());

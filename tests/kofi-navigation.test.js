@@ -162,6 +162,29 @@ test('Koffi navigation — parcours complet', async (t) => {
     assert.ok(cats.includes('navigation_refus') && cats.includes('navigation_illisible'));
   });
 
+  await t.test('SANS INFORMATION (2026-11-10) : phrase officielle mot pour mot + demande réellement remontée (anonyme, contacts effacés, regroupée)', async () => {
+    const PHRASE = "Pour le moment, je ne peux pas répondre à votre demande. Cependant, je remonte l'information pour que nous puissions y travailler. Merci pour votre compréhension.";
+    const file = () => sql("select * from faq_sans_reponse where source='koffi_navigation' order by id");
+    const avant = file().length, s0 = await solde('Libre');
+    const q = 'Comment obtenir un visa pour Mars ? SANSREPONSEFAUX écrire à jean.dupont@exemple.com ou appeler +33 6 12 34 56 78 https://exemple.com/x';
+    const r = await msg(jar.Libre, { texte: q });
+    assert.equal(r.status, 200, JSON.stringify(r.data));
+    assert.equal(r.data.message.contenu, PHRASE);
+    assert.equal(sql('select flags from kofi_messages where id=?', r.data.message.id)[0].flags, 'sans_reponse');
+    assert.deepEqual(r.data.message.destinations, []);
+    const l = file(); assert.equal(l.length, avant + 1);
+    const ligne = l[l.length - 1];
+    assert.equal(ligne.user_id, null, 'aucun identifiant de compte dans la file');
+    assert.equal(ligne.count, 1);
+    assert.ok(!/dupont|exemple\.com|12 34 56/.test(ligne.question), 'e-mail, lien et téléphone effacés : ' + ligne.question);
+    assert.match(ligne.question, /visa pour Mars/);
+    /* La même demande posée par une autre personne : regroupée (compteur 2), pas de doublon. */
+    const r2 = await msg(jar.Autre, { texte: q });
+    assert.equal(r2.data.message.contenu, PHRASE);
+    const l2 = file(); assert.equal(l2.length, avant + 1);
+    assert.equal(l2[l2.length - 1].count, 2);
+    assert.equal(await solde('Libre'), s0, 'la navigation reste gratuite');
+  });
   await t.test('conversations : reprise, privées, supprimables', async () => {
     const e = await etat(jar.Prop);
     assert.ok(e.data.conversation && e.data.conversation.messages.length >= 2);
