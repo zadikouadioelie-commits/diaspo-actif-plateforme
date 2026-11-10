@@ -104,6 +104,58 @@ h2{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-
 .etat a{color:var(--or);font-weight:700}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
+/* ── Présentation « tableau de bord » (modèle fourni le 2026-11-10) : cadre marine à liseré or, cartes claires à bandeau marine, anneaux et barres or ── */
+.feuille.tb{background:linear-gradient(160deg,#0f3157,#0a2240 70%);padding:14px;border:1px solid #0a2240}
+.tb-in{border:2px solid #d9a526;border-radius:14px;padding:22px 22px 18px}
+.tb-tete{display:flex;align-items:center;gap:14px;margin:0 0 4px}
+.tb-tete svg{flex:none;width:44px;height:44px}
+.tb-tete h1{margin:0;color:#fff;font-size:30px;line-height:1.1;font-weight:800;letter-spacing:.01em}
+.tb-sous{margin:6px 0 16px;color:#f0d98f;font-size:15px;font-weight:600;line-height:1.35}
+.tb-chips{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 18px}
+.tb-chip{background:rgba(255,255,255,.1);border:1px solid rgba(240,217,143,.55);color:#fff;border-radius:999px;padding:5px 13px;font-size:13px}
+.tb-chip b{color:#f7d36a;font-size:15px;font-variant-numeric:tabular-nums}
+.tb-grille{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.tb-carte{background:#f9f8f3;border-radius:12px;overflow:hidden;break-inside:avoid;page-break-inside:avoid;display:flex;flex-direction:column;box-shadow:0 2px 0 rgba(0,0,0,.18)}
+.tb-carte.large{grid-column:1/-1}
+.tb-bandeau{background:#0d2b4e;color:#fff;display:flex;align-items:center;gap:10px;padding:9px 14px;min-height:46px}
+.tb-bandeau svg{flex:none;width:24px;height:24px}
+.tb-bandeau h3{margin:0;font-size:15px;line-height:1.25;font-weight:750;color:#fff}
+.tb-corps{padding:14px 16px 12px;flex:1}
+.tb-pied{padding:0 16px 11px;font-size:12px;color:#5b6570;display:flex;flex-wrap:wrap;gap:2px 10px}
+.tb-pied .fb{color:#8a5a00;font-weight:700}
+.tb-bars{display:grid;gap:7px}
+.tb-br{display:grid;grid-template-columns:minmax(90px,40%) 1fr 46px;gap:10px;align-items:center;font-size:14px;color:#16202b}
+.tb-br .piste{height:13px;background:#e3e1d8;border-radius:7px;overflow:hidden}
+.tb-br .rem{height:100%;background:#e0a21a;border-radius:7px}
+.tb-br .pc{text-align:right;font-weight:800;font-variant-numeric:tabular-nums}
+.tb-ring{display:flex;align-items:center;gap:16px}
+.tb-ring svg{flex:none;width:136px;height:136px}
+.tb-leg{list-style:none;margin:0;padding:0;display:grid;gap:7px;font-size:14px;color:#16202b;flex:1;min-width:0}
+.tb-leg li{display:flex;align-items:center;gap:8px}
+.tb-leg i{flex:none;width:13px;height:13px;border-radius:3px;border:1px solid rgba(0,0,0,.15)}
+.tb-leg span{overflow-wrap:anywhere}
+.tb-leg b{margin-left:auto;padding-left:6px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tb-leg em{font-style:normal;color:#6b7580;font-size:12px;margin-left:5px;font-weight:400}
+.tb-moy{display:flex;align-items:baseline;gap:8px;margin:0 0 10px;color:#16202b}
+.tb-moy b{font-size:30px;line-height:1;font-weight:800;color:#0d2b4e;font-variant-numeric:tabular-nums}
+.tb-moy span{font-size:13px;color:#5b6570}
+.tb-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(84px,1fr));gap:8px}
+.tb-stat{background:#fff;border:1px solid #e3e1d8;border-radius:8px;padding:8px 6px;text-align:center}
+.tb-stat b{display:block;font-size:20px;color:#0d2b4e;font-variant-numeric:tabular-nums}
+.tb-stat span{font-size:11.5px;color:#5b6570}
+.tb-cit{margin:0;padding:0;list-style:none;display:grid;gap:7px}
+.tb-cit li{background:#fff;border-left:4px solid #e0a21a;border-radius:4px;padding:6px 10px;font-size:13.5px;color:#16202b;overflow-wrap:anywhere}
+.tb-note{margin:0;font-size:13px;color:#5b6570}
+.tb-bas{margin:16px 2px 0;color:#d9deea;font-size:12px;line-height:1.5}
+.tb-bas b{color:#f7d36a}
+.tb-bas .src{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:6px;color:#aeb8cc}
+@media (max-width:720px){
+  .feuille.tb{padding:8px}.tb-in{padding:16px 12px 14px}
+  .tb-tete h1{font-size:22px}
+  .tb-grille{grid-template-columns:1fr}
+  .tb-ring{flex-wrap:wrap;justify-content:center}
+  .tb-stats{grid-template-columns:1fr 1fr}
+}
 @media (max-width:720px){
   .feuille{padding:26px 18px 24px}
   h1{font-size:22px}
@@ -133,7 +185,13 @@ h2{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-
 <header class="barre no-print" id="barre" hidden>
   <div class="barre-in">
     <a class="retour" href="sondages.html" id="retour">← Mes sondages</a>
-    <div class="grp"><span id="l-vue">Diagramme</span>
+    <div class="grp"><span id="l-pres">Présentation</span>
+      <div class="seg" role="group" aria-labelledby="l-pres">
+        <button type="button" data-pres="tableau" aria-pressed="true">Tableau de bord</button>
+        <button type="button" data-pres="detail" aria-pressed="false">Rapport détaillé</button>
+      </div>
+    </div>
+    <div class="grp" id="grp-diag"><span id="l-vue">Diagramme</span>
       <div class="seg" role="group" aria-labelledby="l-vue">
         <button type="button" data-vue="barres" aria-pressed="true">Barres</button>
         <button type="button" data-vue="camembert" aria-pressed="false">Camembert</button>
@@ -163,9 +221,9 @@ h2{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-
   var CATS = { consultation_citoyenne: 'Consultation citoyenne', projet: 'Projet', emploi: 'Emploi', formation: 'Formation', culture: 'Culture', tourisme: 'Tourisme', investissement: 'Investissement', sante: 'Santé', numerique: 'Numérique', education: 'Éducation', environnement: 'Environnement', autre: 'Sondage' };
   var STAT = { ouvert: 'en cours', cloture: 'terminé', brouillon: 'brouillon', archive: 'archivé' };
   var MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
-  var R = null, OPT = { vue: 'barres', tri: 'questionnaire', verb: true };
+  var R = null, OPT = { pres: 'tableau', vue: 'barres', tri: 'questionnaire', verb: true };
 
-  function load() { try { var o = JSON.parse(localStorage.getItem('rapport_sondage_opts') || '{}'); if (o.vue) OPT.vue = o.vue; if (o.tri) OPT.tri = o.tri; if (o.verb === false) OPT.verb = false; } catch (e) { /* stockage indisponible */ } }
+  function load() { try { var o = JSON.parse(localStorage.getItem('rapport_sondage_opts') || '{}'); if (o.pres === 'detail' || o.pres === 'tableau') OPT.pres = o.pres; if (o.vue) OPT.vue = o.vue; if (o.tri) OPT.tri = o.tri; if (o.verb === false) OPT.verb = false; } catch (e) { /* stockage indisponible */ } }
   function save() { try { localStorage.setItem('rapport_sondage_opts', JSON.stringify(OPT)); } catch (e) { /* stockage indisponible */ } }
   var esc = function (s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); };
   var nf = function (x, d) { return Number(x).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: d === undefined ? 1 : d }); };
@@ -257,8 +315,72 @@ h2{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-
       '<div class="corps">' + corps + '</div></section>';
   }
 
+  /* ── Présentation « tableau de bord » ── */
+  var OR = '#e0a21a', ANNEAU = ['#0d2b4e', '#e0a21a', '#f4ce6a', '#b7791f', '#8a5a10', '#f7e3a3'];
+  var ICO = {
+    tete: '<svg viewBox="0 0 44 44" aria-hidden="true"><rect x="5" y="24" width="8" height="15" rx="2" fill="#e0a21a"/><rect x="18" y="14" width="8" height="25" rx="2" fill="#f4ce6a"/><rect x="31" y="5" width="8" height="34" rx="2" fill="#e0a21a"/></svg>',
+    choix: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="#f4ce6a" stroke-width="2" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 9 9h-9z"/><path d="M15 3.5A9 9 0 0 1 20.5 9H15z" fill="#f4ce6a"/></svg>',
+    multiple: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="#f4ce6a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m4 6 2 2 3-3.5M4 13l2 2 3-3.5M4 20l2 2"/><path d="M12 7h8M12 14h8M12 21h8"/></svg>',
+    echelle: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="#f4ce6a" stroke-width="2" stroke-linecap="round"><path d="M4 20V14M9.5 20V9M15 20v-7M20.5 20V4"/></svg>',
+    nombre: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="#f4ce6a" stroke-width="2" stroke-linecap="round"><path d="M9 4 7 20M17 4l-2 16M4 9h16M3.5 15h16"/></svg>',
+    date: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="#f4ce6a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>',
+    texte: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="#f4ce6a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4z"/></svg>'
+  };
+  function tbBarres(mods) {
+    return '<div class="tb-bars">' + mods.map(function (m) { return '<div class="tb-br"><span>' + esc(m.libelle) + '</span><div class="piste" aria-hidden="true"><div class="rem" style="width:' + Math.max(m.pct, 0) + '%"></div></div><span class="pc">' + nf(m.pct, 0) + ' %</span></div>'; }).join('') + '</div>';
+  }
+  function tbAnneau(mods, total) {
+    var utiles = mods.filter(function (m) { return m.n > 0; }), svg = '', a = -Math.PI / 2, S = utiles.reduce(function (s, m) { return s + m.n; }, 0) || 1, R1 = 62, R0 = 36;
+    if (utiles.length === 1) svg = '<circle cx="70" cy="70" r="' + ((R1 + R0) / 2) + '" fill="none" stroke="' + ANNEAU[mods.indexOf(utiles[0]) % ANNEAU.length] + '" stroke-width="' + (R1 - R0) + '"/>';
+    else utiles.forEach(function (m) {
+      var b = a + (m.n / S) * Math.PI * 2, o = arc(70, 70, R1, a, b), i = arc(70, 70, R0, a, b);
+      svg += '<path d="M' + o[0].toFixed(2) + ' ' + o[1].toFixed(2) + ' A' + R1 + ' ' + R1 + ' 0 ' + o[4] + ' 1 ' + o[2].toFixed(2) + ' ' + o[3].toFixed(2) + ' L' + i[2].toFixed(2) + ' ' + i[3].toFixed(2) + ' A' + R0 + ' ' + R0 + ' 0 ' + i[4] + ' 0 ' + i[0].toFixed(2) + ' ' + i[1].toFixed(2) + ' Z" fill="' + ANNEAU[mods.indexOf(m) % ANNEAU.length] + '" stroke="#f9f8f3" stroke-width="2"><title>' + esc(m.libelle) + ' : ' + pf(m.pct) + '</title></path>';
+      a = b;
+    });
+    svg += '<text x="70" y="69" text-anchor="middle" font-size="20" font-weight="800" fill="#0d2b4e">' + nf(total, 0) + '</text><text x="70" y="84" text-anchor="middle" font-size="9.5" fill="#5b6570">' + (total > 1 ? 'réponses' : 'réponse') + '</text>';
+    return '<div class="tb-ring"><svg viewBox="0 0 140 140" role="img" aria-label="Anneau : ' + esc(mods.map(function (m) { return m.libelle + ' ' + pf(m.pct); }).join(', ')) + '">' + svg + '</svg><ul class="tb-leg">' + mods.map(function (m, i) {
+      return '<li><i style="background:' + ANNEAU[i % ANNEAU.length] + '"></i><span>' + esc(m.libelle) + '</span><b>' + nf(m.pct, 0) + ' %<em>' + nf(m.n, 0) + '</em></b></li>';
+    }).join('') + '</ul></div>';
+  }
+  function carteHtml(q, i) {
+    var mods, corps = '', ico = 'choix', large = false;
+    if (q.n === 0) corps = '<p class="tb-note">Aucune réponse pour le moment.</p>';
+    else if (q.famille === 'choix') { ico = 'choix'; mods = triees(q.modalites, q); corps = mods.length <= 5 ? tbAnneau(mods, q.n) : tbBarres(mods); large = mods.length > 7; }
+    else if (q.famille === 'multiple') { ico = 'multiple'; mods = triees(q.modalites, q); corps = tbBarres(mods) + '<p class="tb-note" style="margin-top:8px">Plusieurs réponses possibles : le total peut dépasser 100 %.</p>'; large = mods.length > 7; }
+    else if (q.famille === 'echelle') {
+      ico = 'echelle'; var st = q.stats || {}, k = q.modalites.length;
+      corps = '<p class="tb-moy"><b>' + (st.moyenne == null ? '—' : nf(st.moyenne, 1)) + '</b><span>/ ' + q.max + ' en moyenne · médiane ' + (st.mediane == null ? '—' : nf(st.mediane, 1)) + '</span></p>' +
+        tbBarres(q.modalites.map(function (m, j) { return { libelle: m.libelle + (j === 0 && q.min_label ? ' – ' + q.min_label : '') + (j === k - 1 && q.max_label ? ' – ' + q.max_label : ''), pct: m.pct }; }));
+    } else if (q.famille === 'nombre') {
+      ico = 'nombre'; var s2 = q.stats;
+      corps = s2 ? '<div class="tb-stats"><div class="tb-stat"><b>' + nf(s2.moyenne, 1) + '</b><span>Moyenne</span></div><div class="tb-stat"><b>' + nf(s2.mediane, 1) + '</b><span>Médiane</span></div><div class="tb-stat"><b>' + nf(s2.min, 0) + '</b><span>Minimum</span></div><div class="tb-stat"><b>' + nf(s2.max, 0) + '</b><span>Maximum</span></div></div>' : '<p class="tb-note">Aucune valeur exploitable.</p>';
+    } else if (q.famille === 'date') { ico = 'date'; corps = tbBarres(q.modalites.map(function (m) { return { libelle: moisLib(m.libelle), pct: m.pct }; })); }
+    else { /* texte */
+      ico = 'texte'; large = true;
+      if (q.verbatims_masques) corps = '<p class="tb-note">Réponses libres non reproduites : moins de ' + R.seuils.verbatims + ' réponses, une citation pourrait désigner son auteur.</p>';
+      else if (!OPT.verb) corps = '<p class="tb-note">' + pl(q.n, 'réponse libre', 'réponses libres') + ' (non reproduites dans cette version).</p>';
+      else corps = '<ul class="tb-cit">' + q.verbatims.slice(0, 8).map(function (v) { return '<li>« ' + esc(v) + ' »</li>'; }).join('') + '</ul>' + (q.verbatims_total > 8 ? '<p class="tb-note" style="margin-top:8px">8 réponses sur ' + q.verbatims_total + ' sont reproduites ; les autres figurent dans l’export des réponses.</p>' : '');
+    }
+    return '<section class="tb-carte' + (large ? ' large' : '') + '" aria-label="Question ' + (i + 1) + '"><div class="tb-bandeau">' + ICO[ico] + '<h3>' + (i + 1) + '. ' + esc(q.texte) + '</h3></div><div class="tb-corps">' + corps + '</div>' +
+      '<div class="tb-pied"><span>' + (q.n === 0 ? 'Aucune réponse' : pl(q.n, 'réponse', 'réponses') + ' sur ' + nf(R.repondants, 0) + ' (' + nf(q.taux_reponse, 0) + ' %)') + '</span>' + (q.effectif_faible ? '<span class="fb">Effectif faible : à interpréter avec prudence</span>' : '') + '</div></section>';
+  }
+  function renderTableau() {
+    var s = R.sondage, now = new Date(), edite = now.toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris', day: 'numeric', month: 'long', year: 'numeric' });
+    var periode = R.premiere_reponse ? jour(R.premiere_reponse) + (R.derniere_reponse !== R.premiere_reponse ? ' au ' + jour(R.derniere_reponse) : '') : '';
+    var h = '<article class="feuille tb" id="feuille"><div class="tb-in"><div class="tb-tete">' + ICO.tete + '<h1>Résultats du sondage</h1></div>' +
+      '<p class="tb-sous">' + esc(s.titre) + '</p>' +
+      '<div class="tb-chips"><span class="tb-chip"><b>' + nf(R.repondants, 0) + '</b> ' + (R.repondants > 1 ? 'répondants' : 'répondant') + '</span><span class="tb-chip"><b>' + nf(R.nb_questions, 0) + '</b> question' + (R.nb_questions > 1 ? 's' : '') + '</span>' +
+      (periode ? '<span class="tb-chip">Collecte : ' + esc(periode) + '</span>' : '') + (s.organisateur ? '<span class="tb-chip">' + esc(s.organisateur) + '</span>' : '') + '</div>';
+    if (R.repondants === 0) h += '<p class="tb-chip" style="display:inline-block">Aucune réponse pour le moment : les diagrammes apparaîtront dès les premières réponses.</p>';
+    else h += '<div class="tb-grille">' + R.questions.map(carteHtml).join('') + '</div>';
+    h += '<p class="tb-bas"><b>Données anonymes.</b> Résultats agrégés uniquement : aucun nom, e-mail, téléphone ni identifiant. Pourcentages calculés sur le nombre de répondants à chaque question ; plusieurs réponses possibles = total supérieur à 100 %. Échantillon de personnes ayant choisi de répondre, non nécessairement représentatif.' +
+      '<span class="src"><span>Source : plateforme Diaspo’Actif · sondage n° ' + s.id + '</span><span>Édité le ' + esc(edite) + '</span></span></p></div></article>';
+    document.getElementById('page').innerHTML = h;
+  }
+
   /* ── Document ── */
   function render() {
+    if (OPT.pres === 'tableau') { renderTableau(); return; }
     var s = R.sondage, now = new Date();
     var edite = now.toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris', day: 'numeric', month: 'long', year: 'numeric' }) + ' à ' + now.toLocaleTimeString('fr-FR', { timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit' });
     var jDeb = s.date_debut, jFin = s.date_fin;
@@ -313,10 +435,13 @@ h2{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-
   function etat(html) { document.getElementById('page').innerHTML = '<div class="etat" role="status">' + html + '</div>'; }
   function majBarre() {
     document.querySelectorAll('[data-vue]').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.vue === OPT.vue ? 'true' : 'false'); });
+    document.querySelectorAll('[data-pres]').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.pres === OPT.pres ? 'true' : 'false'); });
+    document.getElementById('grp-diag').style.display = OPT.pres === 'tableau' ? 'none' : '';
     document.getElementById('tri').value = OPT.tri; document.getElementById('verb').checked = OPT.verb;
   }
   function brancher() {
     document.querySelectorAll('[data-vue]').forEach(function (b) { b.onclick = function () { OPT.vue = b.dataset.vue; save(); majBarre(); render(); }; });
+    document.querySelectorAll('[data-pres]').forEach(function (b) { b.onclick = function () { OPT.pres = b.dataset.pres; save(); majBarre(); render(); }; });
     document.getElementById('tri').onchange = function () { OPT.tri = this.value; save(); render(); };
     document.getElementById('verb').onchange = function () { OPT.verb = this.checked; save(); render(); };
     document.getElementById('imp').onclick = function () { window.print(); };
