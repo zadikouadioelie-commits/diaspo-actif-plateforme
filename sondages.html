@@ -363,6 +363,7 @@ document.addEventListener('DOMContentLoaded', async()=>{
   if(['termines','participations','mes'].includes(h)) ONGLET=h;
   await loadSonds();
   if(ONGLET!=='cours') switchSond(ONGLET);
+  if(h==='brouillons' && ME_SOND && PEUT_CREER) ouvrirBrouillons(); /* lien « Choisir les lieux et publier » de la page d'un brouillon */
 });
 
 function switchSond(name){

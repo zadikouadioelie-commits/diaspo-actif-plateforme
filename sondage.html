@@ -147,6 +147,18 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,
 
   function afficher(r) {
     var s = SONDAGE, h = entete();
+    /* Brouillon (visible de son créateur et de l'administration seulement) : ce n'est pas un sondage terminé. On le dit, on montre les questions en lecture seule et on mène à la publication. */
+    if (s.statut === 'brouillon' || s.statut === 'archive') {
+      var br = s.statut === 'brouillon';
+      ecran(h + '<div class="sr-etat info">' + (br
+          ? '📝 <strong>Brouillon</strong> — ce sondage n\'est pas encore publié : seuls vous et l\'administration le voyez, et personne ne peut y répondre pour l\'instant. Choisissez où l\'afficher (onglet Sondages, fil d\'actualité, profil, boutique ou événement), puis publiez-le.'
+          : '🗄️ <strong>Sondage archivé</strong> — il n\'est plus affiché ni ouvert aux réponses.') + '</div>' +
+        (br ? '<div style="text-align:center;margin:0 0 14px;"><a class="btn btn-orange" href="sondages.html#brouillons">Choisir les lieux et publier</a></div>' : '') +
+        '<div class="sr-card"><p class="sr-titre-bloc">Aperçu des questions (' + QUESTIONS.length + ')</p><p class="sr-aide">Lecture seule : voici ce que verront les personnes qui répondront.</p>' +
+        '<fieldset disabled style="border:0;margin:0;padding:0;min-width:0;">' + QUESTIONS.map(questionHtml).join('') + '</fieldset></div>' +
+        '<div style="text-align:center;"><a class="btn btn-outline" href="sondages.html">Retour aux sondages</a></div>');
+      return;
+    }
     if (s.statut !== 'ouvert') {
       ecran(h + '<div class="sr-etat fin">⏹️ <strong>Fin de ce sondage</strong> — il n\'accepte plus de réponses. Merci à toutes les personnes qui ont participé.</div>' +
         '<div style="text-align:center;"><a class="btn btn-outline" href="sondages.html">Voir les sondages ouverts</a></div>');
