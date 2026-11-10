@@ -308,8 +308,9 @@ html,html body{overflow-x:clip;}
     <div id="hb-account-section"></div>
   </aside>
 
-  <!-- ===== HERO ===== -->
+  <!-- ===== HERO (maquette « Annuaire — initiatives mondiales », 2026-11-09) ===== -->
   <div class="ann-hero">
+    <div class="ann-hero-globe" aria-hidden="true"></div>
     <div class="ann-hero-overlay"></div>
     <div class="ann-hero-content">
       <div class="ann-hero-text">
@@ -319,47 +320,42 @@ html,html body{overflow-x:clip;}
     </div>
   </div>
 
-  <!-- ===== STAT CHIPS ===== -->
-  <div class="ann-stat-band">
-    <div class="ann-stat-band-inner">
-      <div class="ann-stat-chip">
-        <div class="ann-stat-icon">👥</div>
-        <span>Des acteurs engagés</span>
-      </div>
-      <div class="ann-stat-chip">
-        <div class="ann-stat-icon">🌱</div>
-        <span>Des initiatives concrètes</span>
-      </div>
-      <div class="ann-stat-chip">
-        <div class="ann-stat-icon">🌍</div>
-        <span>Un impact durable</span>
-      </div>
+  <!-- ===== CATÉGORIES : un clic filtre l'annuaire sur le type d'organisme correspondant ===== -->
+  <div class="ann-cats">
+    <div class="ann-cats-inner" role="group" aria-label="Parcourir par catégorie">
+      <button type="button" class="ann-cat" data-type="Association"><span class="ann-cat-ico"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.4"/><path d="M3.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5"/><path d="M15.5 14.2c2.7-.4 5 1.3 5 4"/></svg></span><span class="ann-cat-txt"><b>Associations</b>et organisations</span></button>
+      <button type="button" class="ann-cat" data-type="Entreprise"><span class="ann-cat-ico"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 9.5 5 4.5h14l1.5 5"/><path d="M3.5 9.5c0 1.5 1.2 2.5 2.7 2.5s2.6-1 2.6-2.5c0 1.5 1.2 2.5 2.6 2.5s2.6-1 2.6-2.5c0 1.5 1.2 2.5 2.7 2.5s2.7-1 2.7-2.5"/><path d="M5 12v7.5h14V12"/><path d="M10 19.5v-4h4v4"/></svg></span><span class="ann-cat-txt"><b>Entreprises</b>et initiatives économiques</span></button>
+      <button type="button" class="ann-cat" data-type="Organisme de formation"><span class="ann-cat-ico"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 9.5 12 5l9.5 4.5L12 14 2.5 9.5Z"/><path d="M6.5 11.6V16c0 1.2 2.5 2.5 5.5 2.5s5.5-1.3 5.5-2.5v-4.4"/><path d="M21.5 9.5V15"/></svg></span><span class="ann-cat-txt"><b>Formations</b>et expertises</span></button>
+      <button type="button" class="ann-cat" data-type="Média"><span class="ann-cat-ico"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6.5h13a1.5 1.5 0 0 1 1.5 1.5v10.5H5.5A1.5 1.5 0 0 1 4 17V6.5Z"/><path d="M18.5 9.5H20a1 1 0 0 1 1 1v6.5a1.5 1.5 0 0 1-1.5 1.5"/><path d="M7.5 10h7M7.5 13h7M7.5 16h4"/></svg></span><span class="ann-cat-txt"><b>Médias</b>et créateurs</span></button>
     </div>
   </div>
 
-  <!-- ===== RACCOURCIS RAPIDES ===== -->
+  <!-- ===== ONGLETS : Initiatives / Collectivités / Utilisateurs ===== -->
   <div class="ann-quick-row">
     <div class="ann-quick-row-inner">
-      <button type="button" class="ann-quick-btn" id="btn-quick-initiatives">🌱 Initiatives</button>
-      <button type="button" class="ann-quick-btn" id="btn-quick-collectivites">🏛 Collectivités</button>
-      <button type="button" class="ann-quick-btn" id="btn-quick-utilisateurs">👥 Utilisateurs</button>
+      <button type="button" class="ann-quick-btn" id="btn-quick-initiatives"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21v-8"/><path d="M12 13c0-3.5-2.5-6-6.5-6 0 3.8 2.5 6 6.5 6Z"/><path d="M12 15c0-3 2.2-5.2 6-5.2 0 3.4-2.2 5.2-6 5.2Z"/></svg>Initiatives</button>
+      <button type="button" class="ann-quick-btn" id="btn-quick-collectivites"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 20.5h18"/><path d="M5 20.5V10M9.5 20.5V10M14.5 20.5V10M19 20.5V10"/><path d="M3 10 12 4l9 6H3Z"/></svg>Collectivités</button>
+      <button type="button" class="ann-quick-btn" id="btn-quick-utilisateurs"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.6 3.1-6 7-6s7 2.4 7 6"/></svg>Utilisateurs</button>
     </div>
   </div>
 
   <!-- ===== RECHERCHE PAR MOT-CLÉ ===== -->
-  <div class="ann-filters" style="padding-bottom:0;">
-    <div class="ann-filters-inner" style="max-width:100%;">
-      <div class="ann-filter-group" style="flex:1;min-width:260px;position:relative;">
-        <label>🔍 Rechercher par mot-clé</label>
-        <input type="text" id="f-motcle" placeholder="Ex : livraison, comptabilité, formation, avocat…" autocomplete="off">
+  <div class="ann-filters ann-recherche">
+    <div class="ann-filters-inner">
+      <div class="ann-filter-group ann-recherche-champ" style="position:relative;">
+        <span class="ann-recherche-loupe" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8"/></svg></span>
+        <input type="text" id="f-motcle" placeholder="Rechercher un organisme, un domaine, une personne…" autocomplete="off" aria-label="Rechercher par mot-clé">
         <div id="f-motcle-suggestions" style="display:none;position:absolute;z-index:30;top:100%;left:0;right:0;max-height:240px;overflow-y:auto;background:#fff;border:1px solid var(--border);border-radius:8px;margin-top:4px;box-shadow:0 6px 20px rgba(0,0,0,.12);"></div>
       </div>
+      <button type="button" class="ann-search-btn" id="btn-motcle-go">Rechercher</button>
     </div>
   </div>
 
   <!-- ===== FILTRES ===== -->
-  <div class="ann-filters">
+  <div class="ann-filters ann-filtres-barre">
     <div class="ann-filters-inner">
+
+      <div class="ann-filtres-titre"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16l-6.2 7.4V19l-3.6-1.8v-4.8L4 5Z"/></svg><span>Filtres</span></div>
 
       <!-- Type d'organisme -->
       <div class="ann-filter-group">
@@ -433,7 +429,7 @@ html,html body{overflow-x:clip;}
       </div>
 
       <!-- Reset -->
-      <button class="ann-btn-reset" id="btn-reset-filters">✕ Réinitialiser</button>
+      <button class="ann-btn-reset" id="btn-reset-filters">↻ Réinitialiser les filtres</button>
 
     </div>
     <div class="ann-filters-inner" id="ann-affiner" style="display:none;margin-top:10px;padding-top:12px;border-top:1px dashed var(--border);"></div>
@@ -562,9 +558,39 @@ html,html body{overflow-x:clip;}
 <!-- Koffi, conseiller d'orientation de l'Annuaire (2026-11-01) : bouton affiché seulement aux personnes connectées ; règles décidées par le serveur (/api/kofi/annuaire/*). -->
 <script src="assets/koffi-annuaire.js?v=5" defer></script>
 <script>window.addEventListener('load', function () { if (window.KoffiAnnuaire) KoffiAnnuaire.monter({ premiumUrl: 'premium.html' }); });</script>
+<script>
+/* Annuaire — cartes de catégories et bouton « Rechercher » (maquette du 2026-11-09).
+   Aucune logique de filtrage n'est dupliquée : on pilote le menu « Type d'organisme » et le champ mot-clé,
+   que assets/app.js écoute déjà. */
+(function () {
+  var sel = document.getElementById('f-type-org');
+  var cartes = [].slice.call(document.querySelectorAll('.ann-cat'));
+  function sync() {
+    var v = sel ? sel.value : '';
+    cartes.forEach(function (c) { var on = c.getAttribute('data-type') === v; c.classList.toggle('active', on); c.setAttribute('aria-pressed', String(on)); });
+  }
+  cartes.forEach(function (c) {
+    c.addEventListener('click', function () {
+      if (!sel) return;
+      var t = c.getAttribute('data-type');
+      sel.value = sel.value === t ? '' : t;
+      sel.dispatchEvent(new Event('change', { bubbles: true }));
+      sync();
+    });
+  });
+  if (sel) sel.addEventListener('change', sync);
+  ['btn-quick-initiatives', 'btn-quick-collectivites', 'btn-quick-utilisateurs', 'btn-reset-filters'].forEach(function (id) {
+    var b = document.getElementById(id); if (b) b.addEventListener('click', function () { setTimeout(sync, 0); });
+  });
+  document.addEventListener('click', function (e) { if (e.target.closest && e.target.closest('.ann-chip-remove')) setTimeout(sync, 0); });
+  var go = document.getElementById('btn-motcle-go'), q = document.getElementById('f-motcle');
+  if (go && q) go.addEventListener('click', function () { q.dispatchEvent(new Event('input')); });
+  sync();
+})();
+</script>
 <!-- Design « Nuit dorée » (2026-10-11) : surcharges chargées en dernier, tout est préfixé body.nd ; retour arrière : retirer ces 2 lignes et class="nd" sur <body> -->
 <link rel="stylesheet" href="/assets/theme-nuit-doree.css?v=8">
-<link rel="stylesheet" href="/assets/annuaire-nuit-doree.css?v=3">
+<link rel="stylesheet" href="/assets/annuaire-nuit-doree.css?v=5">
 </body>
 </html>
 
