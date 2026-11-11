@@ -4,7 +4,9 @@ const FROM = "Diaspo'Actif <noreply@diaspoactif.com>";
 
 /* attachments : [{ filename, content }] (content = base64) — pièces jointes Resend (CV partagé, 2026-10-09).
    replyTo : adresse de réponse (l'expéditeur réel d'un envoi fait pour le compte d'un membre). */
-async function sendEmail({ to, subject, html, attachments, replyTo }) {
+/* headers : en-têtes supplémentaires (ex. List-Unsubscribe d'une newsletter).
+   fromName : nom affiché de l'expéditeur, suivi de « via Diaspo'Actif » ; l'adresse d'envoi reste toujours celle de la plateforme. */
+async function sendEmail({ to, subject, html, attachments, replyTo, headers, fromName }) {
   if (!RESEND_API_KEY) {
     console.log("[Mailer] RESEND_API_KEY absent — email non envoyé:", subject, "→", to);
     return { ok: false, reason: "no_key" };
@@ -16,7 +18,7 @@ async function sendEmail({ to, subject, html, attachments, replyTo }) {
         "Authorization": `Bearer ${RESEND_API_KEY}`,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({ from: FROM, to, subject, html, ...(attachments && attachments.length ? { attachments } : {}), ...(replyTo ? { reply_to: replyTo } : {}) })
+      body: JSON.stringify({ from: fromName ? `${String(fromName).replace(/["<>\r\n\\]/g, " ").replace(/\s+/g, " ").trim().slice(0, 60)} via Diaspo'Actif <noreply@diaspoactif.com>` : FROM, to, subject, html, ...(attachments && attachments.length ? { attachments } : {}), ...(replyTo ? { reply_to: replyTo } : {}), ...(headers && Object.keys(headers).length ? { headers } : {}) })
     });
     const data = await res.json();
     if (!res.ok) {

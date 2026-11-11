@@ -8,7 +8,7 @@
    - Le lien de confirmation et le lien de désabonnement utilisent un jeton aléatoire propre à la ligne (jamais déductible de l'adresse).
    - La réponse du formulaire public est toujours la même, que l'adresse soit connue ou non : on ne révèle pas qui est inscrit.
    - Une initiative ne voit que ses propres abonnés ; l'administration ne reçoit pas la liste.
-   Les campagnes et l'envoi (étape N2) viendront dans ce même fichier. Aucun paiement dans ce module.
+   Les campagnes et l'envoi (étape N2) sont dans server/newsletter-campagnes.js, branchées en bas de enregistrer(). Aucun paiement dans ce module.
    Lancer les tests : node --test tests/newsletter.test.js
    =========================================================== */
 'use strict';
@@ -50,7 +50,7 @@ function htmlConfirmation({ nomBoutique, lien }) {
     `<p style="font-size:13px;color:#55607a;line-height:1.6">Ce lien est valable 7 jours. Si vous n'êtes pas à l'origine de cette demande, ignorez simplement ce message : vous ne recevrez rien.</p></div>`;
 }
 
-function enregistrer({ route, db, getCurrentUser, sendJSON, SEC, getOrigin, envoyerEmail = mailer.sendEmail }) {
+function enregistrer({ route, db, getCurrentUser, sendJSON, SEC, getOrigin, envoyerEmail = mailer.sendEmail, envoiReel }) {
 
   /* Réponse HTML (pages de confirmation et de désabonnement). */
   function repondrePage(res, status, titre, texte) {
@@ -117,13 +117,16 @@ function enregistrer({ route, db, getCurrentUser, sendJSON, SEC, getOrigin, envo
   });
 
   /* ── Public : désabonnement en un clic, sans connexion, propre à la boutique ── */
-  route('GET', '/api/newsletter/desabonner', async (req, res, params, body, query) => {
+  const desabonner = async (req, res, params, body, query) => {
     const jeton = String((query && query.t) || '');
     const ab = jeton.length >= 20 && jeton.length <= 100 ? await db.prepare('SELECT a.*, i.nom AS boutique FROM nl_abonnes a JOIN initiatives i ON i.id=a.initiative_id WHERE a.jeton=?').get(jeton) : null;
     if (!ab) return repondrePage(res, 400, 'Lien non valide', "Ce lien de désabonnement n'est pas valide.");
     if (ab.statut !== 'desabonne') await db.prepare(`UPDATE nl_abonnes SET statut='desabonne', desabonne_le=? WHERE id=?`).run(maintenant(), ab.id);
     repondrePage(res, 200, 'Vous êtes désabonné(e)', `Vous ne recevrez plus la newsletter de ${ab.boutique}. Les autres boutiques ne sont pas concernées.`);
-  });
+  };
+  route('GET', '/api/newsletter/desabonner', desabonner);
+  /* Désabonnement « en un clic » demandé par les boîtes mail (en-têtes List-Unsubscribe-Post, RFC 8058) : le même jeton, en POST. */
+  route('POST', '/api/newsletter/desabonner', desabonner);
 
   /* ── Propriétaire de la boutique : ses abonnés (jamais ceux d'une autre boutique) ── */
   async function proprietaire(req, res, id) {
@@ -150,6 +153,9 @@ function enregistrer({ route, db, getCurrentUser, sendJSON, SEC, getOrigin, envo
     if (!r || !r.changes) return sendJSON(res, 404, { error: 'Abonné introuvable.' });
     sendJSON(res, 200, { ok: true });
   });
+
+  /* Étape N2 : campagnes, envoi par lots (« à blanc » tant que NEWSLETTER_EMAIL=1 n'est pas réglé) et statistiques agrégées. */
+  require('./newsletter-campagnes').enregistrerCampagnes({ route, db, getCurrentUser, sendJSON, SEC, getOrigin, envoyerEmail, envoiReel, utils: { repondrePage, proprietaire } });
 }
 
 module.exports = { enregistrer, creerJeton, pageMessage, htmlConfirmation, MESSAGE_GENERIQUE, VALIDITE_CONFIRMATION_MS, DELAI_RENVOI_MS };

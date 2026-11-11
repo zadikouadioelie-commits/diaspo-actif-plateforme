@@ -10313,6 +10313,59 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_nl_abonnes_init ON nl_abonnes(initiative_id, statut);
 `);
 
+/* Newsletter, étape N2 (2026-11-11) : campagnes d'une boutique, liste figée des destinataires à l'envoi, liens suivis et signalements.
+   Aucune statistique individuelle : les clics sont comptés par LIEN de campagne (jamais par personne), pas de pixel d'ouverture.
+   nl_envois.statut : en_attente | envoi | envoye | echec | a_blanc | ignore (désabonné entre-temps). */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS nl_campagnes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    initiative_id INTEGER NOT NULL,
+    sujet TEXT NOT NULL,
+    texte TEXT NOT NULL,
+    modele TEXT NOT NULL DEFAULT 'libre',
+    elements_json TEXT NOT NULL DEFAULT '[]',
+    statut TEXT NOT NULL DEFAULT 'brouillon',
+    mode_envoi TEXT,
+    nb_destinataires INTEGER NOT NULL DEFAULT 0,
+    envoye_le TEXT,
+    termine_le TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_nl_campagnes_init ON nl_campagnes(initiative_id, statut);
+
+  CREATE TABLE IF NOT EXISTS nl_envois (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    campagne_id INTEGER NOT NULL,
+    abonne_id INTEGER NOT NULL,
+    statut TEXT NOT NULL DEFAULT 'en_attente',
+    envoye_le TEXT,
+    UNIQUE(campagne_id, abonne_id),
+    FOREIGN KEY(campagne_id) REFERENCES nl_campagnes(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_nl_envois_camp ON nl_envois(campagne_id, statut);
+
+  CREATE TABLE IF NOT EXISTS nl_liens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    campagne_id INTEGER NOT NULL,
+    chemin TEXT NOT NULL,
+    libelle TEXT,
+    clics INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY(campagne_id) REFERENCES nl_campagnes(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_nl_liens_camp ON nl_liens(campagne_id);
+
+  CREATE TABLE IF NOT EXISTS nl_signalements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    campagne_id INTEGER NOT NULL,
+    abonne_id INTEGER NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(campagne_id, abonne_id),
+    FOREIGN KEY(campagne_id) REFERENCES nl_campagnes(id)
+  );
+`);
+
 module.exports = db;
 module.exports.backfillOfficialFollow = backfillOfficialFollow;
 module.exports.generateDaId = generateDaId;
