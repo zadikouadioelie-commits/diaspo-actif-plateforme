@@ -207,6 +207,10 @@
          (classe posée par choisir()), et les anciens titres de groupe n'ont plus de sens. Un lien sans catégorie reste visible partout. */
       P + ' a.mmc-hors{display:none!important}',
       P + '[data-mmc-cats] .sb-group-lbl[data-mmc-niv]{display:none!important}',
+      /* Cinq onglets-catégories ne tiennent pas dans les 380 px habituels : panneau élargi (grand écran). Sur téléphone/tablette (< 1024 px)
+         le tiroir garde sa largeur et les onglets passent sur deux rangées plutôt que de couper les mots. */
+      '@media (min-width:1024px){' + P + '[data-mmc-cats]{width:460px!important}}',
+      '@media (max-width:1023px){' + P + '[data-mmc-cats] .mmc-tabs{flex-wrap:wrap}' + P + '[data-mmc-cats] .mmc-tab{flex:1 1 30%}}',
       /* En-tête en colonne : titre, recherche, onglets, puis les boutons « Partager / Télécharger » (insérés plus tard par app.js, au même endroit que la recherche) */
       P + ' .sb-sticky-header{display:flex!important;flex-direction:column}',
       P + ' .sb-sticky-header>.brand{order:1}' + P + ' .sb-sticky-header>.sb-search-wrap{order:2}' + P + ' .sb-sticky-header>.mmc-tabs{order:3}' + P + ' .sb-sticky-header>.sb-install-group{order:4}' + P + ' .sb-sticky-header>.sb-bandeau-group{order:5}',

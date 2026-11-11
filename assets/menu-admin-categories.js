@@ -1,7 +1,7 @@
 /* ============================================================================================
-   Menu des modules du compte Administrateur : quatre catégories (2026-11-11, demande explicite : « dans le menu du compte
+   Menu des modules du compte Administrateur : cinq catégories (2026-11-11, demande explicite : « dans le menu du compte
    administrateur, crée 4 catégories de modules comme pour les autres comptes : analyse, réponses à une demande, création, modération »,
-   puis, capture du panneau des autres comptes à l'appui : « comme ça »).
+   puis, capture du panneau des autres comptes à l'appui : « comme ça », puis : « élargis la vue, il manque simulation »).
 
    Le panneau est CELUI DES AUTRES COMPTES (assets/menu-modules-cartes.js : titre « Menu des modules », recherche, une rangée d'onglets,
    une carte par module avec icône et description). Ce fichier ne dessine rien : il DÉCLARE seulement la configuration du tiroir
@@ -20,7 +20,7 @@
   if (window.__admCategories) return;
   window.__admCategories = true;
 
-  const CATEGORIES = [['analyse', 'Analyse'], ['demandes', 'Réponses aux demandes'], ['creation', 'Création'], ['moderation', 'Modération']];
+  const CATEGORIES = [['analyse', 'Analyse'], ['demandes', 'Réponses aux demandes'], ['creation', 'Création'], ['moderation', 'Modération'], ['simulation', 'Simulation']];
 
   /* Clé d'un module = son data-section, ou le nom de la page pour les liens vers un autre fichier. */
   const RANGEMENT = {
@@ -39,10 +39,15 @@
       'formations', 'onboarding', 'videos-tutoriels', 'faq', 'chatbot', 'kofi-budget', 'partenaires-admin', 'packages', 'deals-admin',
       'diaspoactif-deals', 'parametres', 'billetterie', 'parrainage-admin', 'liens-adherents', 'contenu', 'communication',
       'publications', 'notifications-admin', 'ads', 'administrateurs-junior',
-      'espace-simulation.html', 'comptes-lies.html', 'comptes-lies-admin.html'
+      'comptes-lies.html', 'comptes-lies-admin.html'
     ],
     moderation: [
       'moderation', 'avis-moderation', 'temoignages-admin', 'regles-contact', 'conformite', 'acces-delegue-admin'
+    ],
+    /* Tous les systèmes simulés sont regroupés dans l'Espace simulation (assets/simulations-registre.js) : un seul module ici,
+       les prochaines simulations s'ajoutent au registre, pas à ce menu. */
+    simulation: [
+      'espace-simulation.html'
     ]
   };
 
