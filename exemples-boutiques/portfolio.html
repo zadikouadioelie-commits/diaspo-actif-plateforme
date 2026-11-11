@@ -243,6 +243,34 @@
     .lettre form { flex-direction:column; }
     .lettre h3 { font-size:22px; }
   }
+  /* Vue 3 : bas de page */
+  .site-pied { margin-top:12px; background:var(--panel); border-top:1px solid var(--line); }
+  .pied-in { max-width:1320px; margin:0 auto; padding:38px 20px 0; }
+  .pied-grille { display:grid; grid-template-columns:minmax(0,1.5fr) repeat(3,minmax(0,1fr)) minmax(0,1.5fr); gap:30px 34px; }
+  .pied-marque .logo-pied { display:flex; align-items:center; gap:10px; font-family:var(--serif); font-size:22px; font-weight:700; }
+  .pied-marque .logo-pied svg.ic { width:30px; height:30px; color:var(--gold); stroke-width:1.5; }
+  .pied-marque p { margin:12px 0 16px; color:var(--muted); font-size:14px; max-width:34ch; }
+  .reseaux { display:flex; gap:10px; flex-wrap:wrap; }
+  .reseaux button { width:44px; height:44px; border-radius:50%; border:1px solid var(--line); background:transparent; color:var(--gold); display:inline-flex; align-items:center; justify-content:center; cursor:pointer; }
+  .reseaux button:hover { background:var(--gold); color:var(--on-gold); }
+  .pied-col h4 { margin:0 0 8px; font-family:var(--serif); font-size:17px; color:var(--text); }
+  .pied-col ul { list-style:none; margin:0; padding:0; }
+  .pied-col li button { display:inline-flex; align-items:center; min-height:44px; padding:0; background:none; border:0; color:var(--muted); font-size:14.5px; cursor:pointer; text-align:left; }
+  .pied-col li button:hover { color:var(--gold); text-decoration:underline; text-underline-offset:4px; }
+  .pied-contact p { margin:0 0 10px; color:var(--muted); font-size:14px; }
+  .pied-contact address { font-style:normal; color:var(--text); font-size:14px; margin-bottom:14px; }
+  .pied-contact .ecrire { min-height:46px; border-radius:999px; border:0; background:var(--gold); color:var(--on-gold); font-weight:700; padding:0 22px; cursor:pointer; }
+  .pied-contact .ecrire:hover { filter:brightness(1.1); }
+  .pied-bas { margin-top:30px; padding:18px 0; border-top:1px solid var(--line); display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:14px 24px; }
+  .pied-bas .copy { margin:0; color:var(--muted); font-size:13.5px; }
+  .paiements { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:0; padding:0; list-style:none; }
+  .paiements .lib { color:var(--muted); font-size:13px; margin-right:4px; }
+  .paiements li.moyen { display:inline-flex; align-items:center; gap:7px; min-height:34px; padding:0 12px; border:1px solid var(--line); border-radius:8px; background:var(--panel2); font-size:13px; font-weight:600; }
+  .paiements li.moyen svg.ic { width:18px; height:18px; color:var(--gold); }
+  .site-pied .demo { margin:0; padding:0 0 22px; text-align:center; }
+  .site-pied :focus-visible { outline:3px solid var(--gold); outline-offset:2px; }
+  @media (max-width:1100px) { .pied-grille { grid-template-columns:repeat(3,minmax(0,1fr)); } .pied-marque, .pied-contact { grid-column:span 3; } .pied-marque p, .pied-contact p { max-width:60ch; } }
+  @media (max-width:600px) { .pied-grille { grid-template-columns:repeat(2,minmax(0,1fr)); gap:22px 18px; } .pied-marque, .pied-contact { grid-column:span 2; } .pied-bas { flex-direction:column; align-items:flex-start; } }
   @media (max-width:380px) { .artistes, .collections { grid-template-columns:1fr; } }
   @media (prefers-reduced-motion:reduce) { .artiste, .collection { transition:none; } .artiste:hover, .collection:hover { transform:none; } }
 </style>
@@ -370,8 +398,70 @@
     </form>
   </section>
 
-  <p class="demo">Exemple : œuvres et artistes fictifs, dessinés pour la démonstration. Le panier et les demandes de devis sont simulés et ne sont envoyés nulle part.</p>
 </main>
+
+<footer class="site-pied" aria-label="Bas de page">
+  <div class="pied-in">
+    <div class="pied-grille">
+      <div class="pied-marque">
+        <div class="logo-pied">
+          <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19C5 10 11 4 20 4c0 9-6 15-15 15z"/><path d="M5 19L14 10M9 16h4M12 13h4"/></svg>
+          <span id="piedNom"></span>
+        </div>
+        <p>La galerie en ligne des artistes du continent et de la diaspora : œuvres originales, créations sur mesure et expositions.</p>
+        <div class="reseaux" role="group" aria-label="Réseaux sociaux (liens fictifs)">
+          <button type="button" data-pied="Instagram" aria-label="Instagram (lien fictif)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17" cy="7" r=".6"/></svg></button>
+          <button type="button" data-pied="Facebook" aria-label="Facebook (lien fictif)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 8.5h2.5V5H14c-2.2 0-3.5 1.5-3.5 3.6V11H8v3.5h2.5V21H14v-6.5h2.4l.6-3.5H14V9.2c0-.5.2-.7 0-.7z"/></svg></button>
+          <button type="button" data-pied="YouTube" aria-label="YouTube (lien fictif)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="5.5" width="19" height="13" rx="4"/><path d="M10 9.5v5l4.5-2.5z"/></svg></button>
+          <button type="button" data-pied="WhatsApp" aria-label="Messagerie (lien fictif)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l1.3-4.2A8 8 0 1 1 8.2 18.7z"/><path d="M9 9.5c0 3 2.500 5.500 5.500 5.500l1-1.500-2-1-1 .7c-.8-.4-1.400-1-1.800-1.800l.7-1-1-2z"/></svg></button>
+        </div>
+      </div>
+
+      <nav class="pied-col" aria-label="Explorer">
+        <h4>Explorer</h4>
+        <ul>
+          <li><button type="button" data-aller="galerie">La galerie</button></li>
+          <li><button type="button" data-aller="artistes">Les artistes</button></li>
+          <li><button type="button" data-aller="collections">Les collections</button></li>
+          <li><button type="button" data-aller="devis">Demander un devis</button></li>
+        </ul>
+      </nav>
+
+      <nav class="pied-col" aria-label="Catégories d'œuvres">
+        <h4>Catégories</h4>
+        <ul id="piedCats"></ul>
+      </nav>
+
+      <nav class="pied-col" aria-label="Informations">
+        <h4>Informations</h4>
+        <ul>
+          <li><button type="button" data-pied="Livraison et retours">Livraison et retours</button></li>
+          <li><button type="button" data-pied="Authenticité et certificats">Authenticité et certificats</button></li>
+          <li><button type="button" data-pied="Paiement sécurisé">Paiement sécurisé</button></li>
+          <li><button type="button" data-pied="Questions fréquentes">Questions fréquentes</button></li>
+        </ul>
+      </nav>
+
+      <div class="pied-col pied-contact">
+        <h4>Nous contacter</h4>
+        <p>Une question, une œuvre à commander, une exposition à proposer ? La galerie répond sous 48 heures.</p>
+        <address>Abidjan, Côte d'Ivoire<br>Du lundi au samedi, de 9 h à 18 h</address>
+        <button type="button" class="ecrire" data-aller="contact">Nous écrire</button>
+      </div>
+    </div>
+
+    <div class="pied-bas">
+      <p class="copy">© 2026 <span id="piedNom2"></span>. Tous droits réservés.</p>
+      <ul class="paiements" aria-label="Moyens de paiement acceptés (exemple)">
+        <li class="lib">Paiement accepté :</li>
+        <li class="moyen"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2.500"/><path d="M3 10h18M7 15h3"/></svg>Carte bancaire</li>
+        <li class="moyen"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/></svg>Mobile Money</li>
+        <li class="moyen"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10l9-6 9 6M5 10v8M9.500 10v8M14.500 10v8M19 10v8M3 20h18"/></svg>Virement</li>
+      </ul>
+    </div>
+    <p class="demo">Exemple : œuvres et artistes fictifs, dessinés pour la démonstration. Le panier, les paiements, les réseaux sociaux et les demandes de devis sont simulés et ne sont envoyés nulle part.</p>
+  </div>
+</footer>
 
 <!-- Fiche d'une œuvre -->
 <div class="overlay" id="workOv" role="dialog" aria-modal="true" aria-labelledby="wTitle">
@@ -762,11 +852,23 @@
     if (q("[data-close]") || t.classList.contains("overlay")) { (t.closest(".overlay") || t).classList.remove("open"); return; }
     if (q("#navDevis")) { $("#objetSel").value = "Création sur mesure"; $("#contactOv").classList.add("open"); return; }
     if (q("#navGalerie")) { window.scrollTo({ top: 0, behavior: "smooth" }); return; }
+    if ((b = q("[data-pcat]"))) { state.cat = b.dataset.pcat; state.artiste = null; state.coll = null; state.page = 1; render(); allerGalerie(); return; }
+    if ((b = q("[data-aller]"))) {
+      const v = b.dataset.aller;
+      if (v === "galerie") window.scrollTo({ top: 0, behavior: "smooth" });
+      else if (v === "contact") { $("#objetSel").value = "Autre demande"; $("#contactOv").classList.add("open"); }
+      else if (v === "devis") { $("#objetSel").value = "Création sur mesure"; $("#contactOv").classList.add("open"); }
+      else $("#" + v).scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    if ((b = q("[data-pied]"))) { toast(b.dataset.pied + " : lien fictif, cette page n'existe pas dans l'exemple."); return; }
     if (q("#navCompte")) { toast("Compte simulé : aucune connexion dans cet exemple."); return; }
     if (q("#wVideo")) { toast("Vidéo de création simulée (57 secondes au plus)."); return; }
   });
   $("#tri").addEventListener("change", e => { state.tri = e.target.value; state.page = 1; render(); });
   $("#parPage").addEventListener("change", e => { state.par = Number(e.target.value); state.page = 1; render(); });
+  ["#piedNom", "#piedNom2"].forEach(sel => { const el = $(sel); if (el) el.textContent = $("#shopName").textContent; });
+  $("#piedCats").innerHTML = CATS.filter(c => c.id !== "all").map(c => '<li><button type="button" data-pcat="' + c.id + '">' + esc(c.label) + "</button></li>").join("");
   $("#lettreForm").addEventListener("submit", e => {
     e.preventDefault(); e.target.reset(); toast("Inscription à la lettre simulée : aucune adresse n'a été enregistrée.");
   });
