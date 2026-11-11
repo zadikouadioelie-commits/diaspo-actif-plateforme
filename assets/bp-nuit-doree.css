@@ -472,6 +472,12 @@ body.nd-bp .bpt-rate button{background:var(--bp-verre);border:1px solid var(--bp
 body.nd-bp .bpt-rate button:hover{border-color:var(--bp-or)}
 body.nd-bp .bpt-rate button.on{border-color:var(--bp-or);background:rgba(227,192,110,.16);color:#fff}
 
+/* Survol d'une ligne de tableau : la règle globale (design-upgrade) force un fond presque blanc en !important,
+   ce qui rendait le texte clair illisible sur le thème sombre. On force ici une teinte dorée discrète ;
+   les feuilles de papier du dossier (.sheet) gardent le survol clair d'origine. */
+body.nd-bp tbody tr:hover{background:rgba(227,192,110,.10)!important}
+body.nd-bp .sheet tbody tr:hover{background:#F8FAFF!important}
+
 /* scrollbars discrètes */
 body.nd-bp *{scrollbar-width:thin;scrollbar-color:rgba(227,192,110,.4) transparent}
 @media (prefers-reduced-motion:reduce){body.nd-bp *{transition:none!important}}
