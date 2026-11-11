@@ -24844,6 +24844,9 @@ Retours.enregistrer({
   getStripe: () => { try { return require("./stripe-client").stripe; } catch (_) { return null; } },
 });
 
+/* Newsletter des initiatives : abonnés avec double confirmation et désabonnement par boutique (2026-11-11, étape N1). */
+require("./newsletter").enregistrer({ route, db, getCurrentUser, sendJSON, SEC, getOrigin });
+
 async function honneurCycleDe(dateISO) {
   const debut = await honneur.debutProgramme();
   return { debut, cycle: honneur.cycleContenant(debut, dateISO) };

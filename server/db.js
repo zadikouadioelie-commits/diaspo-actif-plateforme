@@ -10289,6 +10289,30 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_refunds_provider_ref ON refunds(provider_refund_id);
 `);
 
+/* Newsletter des initiatives (2026-11-11, étape N1) : abonnés d'UNE boutique, avec double confirmation et désabonnement propre à
+   cette boutique. Aucun abonné n'est ajouté sans son consentement : un abonné « en_attente » ne reçoit jamais la newsletter.
+   `jeton` : valeur aléatoire propre à la ligne, utilisée par les liens de confirmation et de désabonnement (jamais déductible de l'adresse). */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS nl_abonnes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    initiative_id INTEGER NOT NULL,
+    email TEXT NOT NULL,
+    nom TEXT,
+    source TEXT NOT NULL DEFAULT 'formulaire',
+    statut TEXT NOT NULL DEFAULT 'en_attente',
+    jeton TEXT NOT NULL,
+    consentement_le TEXT,
+    confirme_le TEXT,
+    desabonne_le TEXT,
+    derniere_confirmation_le TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(initiative_id, email),
+    UNIQUE(jeton),
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_nl_abonnes_init ON nl_abonnes(initiative_id, statut);
+`);
+
 module.exports = db;
 module.exports.backfillOfficialFollow = backfillOfficialFollow;
 module.exports.generateDaId = generateDaId;
