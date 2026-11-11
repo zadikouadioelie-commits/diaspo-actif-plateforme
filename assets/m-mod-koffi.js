@@ -120,7 +120,7 @@
     const b = document.createElement('button');
     b.type = 'button'; b.id = 'kn-tel-btn'; b.innerHTML = '<img src="/assets/koffi-avatar-96.webp" alt="" width="46" height="46">'; b.setAttribute('aria-label', 'Koffi : où aller ?'); b.title = 'Koffi : où aller ?';
     b.addEventListener('click', async () => {
-      await charger('/assets/koffi-navigation.js?v=3', () => !!window.KoffiNavigation);
+      await charger('/assets/koffi-navigation.js?v=4', () => !!window.KoffiNavigation);
       if (window.KoffiNavigation) window.KoffiNavigation.ouvrir({ telephone: true });
     });
     document.body.appendChild(b);

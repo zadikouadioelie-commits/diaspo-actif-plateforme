@@ -7386,7 +7386,7 @@ function injecterKoffiNavigation() {
   b.addEventListener('click', function () {
     var ouvrir = function () { if (window.KoffiNavigation) window.KoffiNavigation.ouvrir({ telephone: false }); };
     if (window.KoffiNavigation) return ouvrir();
-    var s = document.createElement('script'); s.src = '/assets/koffi-navigation.js?v=3'; s.onload = ouvrir; document.body.appendChild(s);
+    var s = document.createElement('script'); s.src = '/assets/koffi-navigation.js?v=4'; s.onload = ouvrir; document.body.appendChild(s);
   });
   document.body.appendChild(b);
 }

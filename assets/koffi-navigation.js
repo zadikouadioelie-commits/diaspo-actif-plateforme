@@ -50,6 +50,12 @@
     '.kn-chips button:hover{background:#fff7ed;border-color:#F26422}.kn-chips button:focus-visible{outline:3px solid #F26422;outline-offset:2px}',
     '.kn-foot{flex:none;background:#fff;border-top:1px solid #e2e8f0;padding:8px 10px 10px}',
     '.kn-av{margin:0 0 6px;font-size:11px;color:#64748b;line-height:1.35}',
+    /* Avertissement replié en petit « i » dès qu'on écrit (2026-11-11) ; texte saisi et bulles toujours en noir, même sous les thèmes qui forcent du blanc sur les champs (ex. Business Plan). */
+    '.kn-i{flex:none;align-self:center;width:28px;height:28px;border-radius:50%;border:1.5px solid #94a3b8;background:#fff;color:#0D2B4E;font:700 14px/1 Georgia,serif;font-style:italic;cursor:pointer;padding:0;display:inline-flex;align-items:center;justify-content:center}.kn-i:hover,.kn-i[aria-expanded=true]{background:#fff7ed;border-color:#F26422}.kn-i:focus-visible{outline:3px solid #F26422;outline-offset:2px}',
+    'html body .kn-root .kn-form textarea{color:#000!important;-webkit-text-fill-color:#000!important;caret-color:#000;background:#fff!important}',
+    'html body .kn-root .kn-form textarea::placeholder{color:#64748b!important;-webkit-text-fill-color:#64748b!important;opacity:1}',
+    'html body .kn-root .kn-msg.a,html body .kn-root .kn-card{color:#000!important}',
+    'html body .kn-root .kn-msg.u{background:#dbeafe!important;color:#000!important;border:1px solid #bfdbfe}',
     '.kn-form{display:flex;gap:8px;align-items:flex-end}',
     '.kn-form textarea{flex:1;resize:none;border:1px solid #cbd5e1;border-radius:12px;padding:9px 11px;font:14px/1.4 inherit;font-family:inherit;max-height:120px;min-height:42px;background:#fff;color:#0f172a}',
     '.kn-form textarea:focus{outline:2px solid #F26422;border-color:#F26422}',
@@ -126,10 +132,18 @@
     d.appendChild(l); d.appendChild(b); return d;
   }
 
+  /* Avertissement : visible au départ ; replié dès qu'on écrit ou qu'on envoie ; le petit « i » le rouvre ou le referme. */
+  function majAv(ouvert) {
+    var av = $('.kn-av'), b = $('.kn-i'); if (!av || !b) return;
+    av.style.display = ouvert ? '' : 'none'; b.setAttribute('aria-expanded', ouvert ? 'true' : 'false');
+    b.title = ouvert ? 'Masquer l’information' : 'Informations sur Koffi'; b.setAttribute('aria-label', b.title);
+  }
+
   function construireCorps() {
     var body = $('.kn-body'); body.innerHTML = '';
     var foot = $('.kn-foot'), e = S.etat;
     foot.style.display = ''; $('.kn-av').textContent = (e && e.avertissement) || T.info;
+    majAv(!(S.msgs && S.msgs.length) && !($('.kn-form textarea').value || '').trim());
     var ok = e && e.etat === 'utilisable';
     S.root.querySelectorAll('[data-a="nouvelle"],[data-a="supprimer"]').forEach(function (b) { b.style.display = ok && S.conv ? '' : 'none'; });
     if (!e) { body.appendChild(carte('Koffi', T.indisponible)); foot.style.display = 'none'; return; }
@@ -168,7 +182,7 @@
     texte = String(texte || '').trim();
     if (!texte || S.occupe || !S.etat || S.etat.etat !== 'utilisable') return;
     var max = S.etat.max_message; if (max && texte.length > max) { ajouterMessage({ role: 'assistant', contenu: 'Votre message est trop long (' + max + ' caractères au maximum).' }); return; }
-    S.occupe = true; $('.kn-send').disabled = true;
+    S.occupe = true; $('.kn-send').disabled = true; majAv(false);
     var corps = $('.kn-body');
     if (!S.msgs.length) corps.innerHTML = '';
     var mu = { role: 'user', contenu: texte }; S.msgs.push(mu); ajouterMessage(mu);
@@ -216,7 +230,7 @@
         '<div class="kn-head"><img src="/assets/koffi-avatar-96.webp" width="42" height="42" alt=""><div class="kn-t"><b></b><span></span></div>' +
           '<button type="button" class="kn-ic" data-a="nouvelle">＋</button><button type="button" class="kn-ic" data-a="supprimer">🗑</button><button type="button" class="kn-ic" data-a="fermer">✕</button></div>' +
         '<div class="kn-body" aria-live="polite"></div>' +
-        '<div class="kn-foot"><p class="kn-av"></p><form class="kn-form"><textarea rows="1" maxlength="1000" aria-label="Votre question à Koffi"></textarea><button type="submit" class="kn-send"></button></form></div>' +
+        '<div class="kn-foot"><p class="kn-av" id="kn-av"></p><form class="kn-form"><button type="button" class="kn-i" aria-controls="kn-av" aria-expanded="true">i</button><textarea rows="1" maxlength="1000" aria-label="Votre question à Koffi"></textarea><button type="submit" class="kn-send"></button></form></div>' +
       '</section>';
     document.body.appendChild(root); S.root = root;
     root.addEventListener('click', function (ev) {
@@ -236,10 +250,14 @@
         return api('DELETE', '/api/kofi/navigation/conversations/' + S.conv).then(function () { S.conv = null; S.msgs = []; construireCorps(); });
       }
     });
-    root.querySelector('.kn-form').addEventListener('submit', function (ev) { ev.preventDefault(); var ta = root.querySelector('textarea'); var v = ta.value; ta.value = ''; ta.style.height = 'auto'; envoyer(v); });
+    root.querySelector('.kn-form').addEventListener('submit', function (ev) { ev.preventDefault(); var ta = root.querySelector('textarea'); var v = ta.value; ta.value = ''; ta.dataset.v = '1'; ta.style.height = 'auto'; envoyer(v); });
     var ta = root.querySelector('textarea');
     ta.addEventListener('keydown', function (ev) { if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); root.querySelector('.kn-form').dispatchEvent(new Event('submit', { cancelable: true })); } });
-    ta.addEventListener('input', function () { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 120) + 'px'; });
+    ta.addEventListener('input', function () {
+      ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
+      var vide = !ta.value.trim(), etaitVide = ta.dataset.v !== '0'; if (etaitVide && !vide) majAv(false); ta.dataset.v = vide ? '1' : '0'; /* repli une seule fois, au début de la saisie */
+    });
+    root.querySelector('.kn-i').addEventListener('click', function () { majAv($('.kn-av').style.display === 'none'); });
     if (!ecouteEchap) { ecouteEchap = true; document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && S.root && S.root.classList.contains('open')) fermerPanneau(); }); }
     traduireUI();
   }
