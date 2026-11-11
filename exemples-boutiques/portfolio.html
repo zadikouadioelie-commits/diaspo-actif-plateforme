@@ -31,14 +31,15 @@
   .logo { display:flex; align-items:center; gap:10px; min-width:0; flex:1 1 auto; }
   .logo svg { width:34px; height:34px; color:var(--gold); }
   .logo b { font-family:var(--serif); font-size:22px; font-weight:700; line-height:1.15; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .nav { display:flex; align-items:center; gap:6px; }
-  .nav button { background:none; border:0; border-bottom:2px solid transparent; padding:10px 12px; min-height:44px; cursor:pointer; color:var(--text); font-weight:500; }
+  .logo { flex:1 0 auto; max-width:300px; }
+  .nav { display:flex; align-items:center; gap:2px; min-width:0; }
+  .nav button { white-space:nowrap; background:none; border:0; border-bottom:2px solid transparent; padding:10px 10px; min-height:44px; cursor:pointer; color:var(--text); font-weight:500; }
   .nav button[aria-current="page"] { color:var(--gold); border-bottom-color:var(--gold); }
   .nav button:hover { color:var(--gold); }
   .tools { display:flex; align-items:center; gap:10px; }
   .iconbtn { background:none; border:0; min-width:44px; min-height:44px; border-radius:999px; display:grid; place-items:center; cursor:pointer; }
   .iconbtn:hover { background:rgba(255,255,255,.08); }
-  .cartbtn { display:flex; align-items:center; gap:8px; border:1.5px solid var(--gold); color:var(--gold); background:none; border-radius:999px; padding:0 18px; min-height:44px; font-weight:600; cursor:pointer; }
+  .cartbtn { white-space:nowrap; display:flex; align-items:center; gap:8px; border:1.5px solid var(--gold); color:var(--gold); background:none; border-radius:999px; padding:0 18px; min-height:44px; font-weight:600; cursor:pointer; }
   .cartbtn:hover { background:rgba(216,179,106,.12); }
 
   /* Bandeau */
@@ -140,8 +141,12 @@
   .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--gold); color:var(--on-gold); font-weight:600; padding:11px 18px; border-radius:10px; font-size:14px; opacity:0; transition:opacity .25s; pointer-events:none; z-index:100; max-width:90vw; text-align:center; }
   .toast.show { opacity:1; }
 
+  @media (max-width:1180px) {
+    .top-in { flex-wrap:wrap; }
+    .tools { margin-left:auto; }
+    .nav { order:3; flex:1 1 100%; overflow-x:auto; scrollbar-width:none; margin:0 -6px; }
+  }
   @media (max-width:900px) {
-    .nav { display:none; }
     .hero-in { grid-template-columns:1fr; }
     .hero-art { min-height:170px; -webkit-mask-image:linear-gradient(180deg, transparent 0, #000 40%); mask-image:linear-gradient(180deg, transparent 0, #000 40%); }
     .garantie + .garantie { padding-left:0; border-left:0; }
@@ -152,6 +157,8 @@
   }
   @media (max-width:600px) {
     .top-in { padding:8px 14px; gap:10px; }
+    .logo { flex:1 1 0; max-width:none; }
+    .tools { gap:6px; margin-left:0; }
     .logo b { font-size:18px; }
     .cartbtn { padding:0 12px; }
     .wrap, .hero-in { padding-left:14px; padding-right:14px; }
@@ -165,6 +172,7 @@
     .lignes li { grid-template-columns:52px 1fr auto; }
     .lignes li .supp { grid-column:3; }
   }
+  @media (max-width:480px) { #navCompte { display:none; } }
   @media (max-width:380px) { .grille { grid-template-columns:1fr; } }
   @media (prefers-reduced-motion:reduce) { html { scroll-behavior:auto; } .carte, .toast { transition:none; } .carte:hover { transform:none; } }
 
@@ -271,6 +279,58 @@
   .site-pied :focus-visible { outline:3px solid var(--gold); outline-offset:2px; }
   @media (max-width:1100px) { .pied-grille { grid-template-columns:repeat(3,minmax(0,1fr)); } .pied-marque, .pied-contact { grid-column:span 3; } .pied-marque p, .pied-contact p { max-width:60ch; } }
   @media (max-width:600px) { .pied-grille { grid-template-columns:repeat(2,minmax(0,1fr)); gap:22px 18px; } .pied-marque, .pied-contact { grid-column:span 2; } .pied-bas { flex-direction:column; align-items:flex-start; } }
+  /* Rubriques activables */
+  .rub-off { display:none !important; }
+  .rubbtn { display:inline-flex; align-items:center; gap:8px; min-height:44px; padding:0 14px; border-radius:999px; border:1px solid var(--line); background:transparent; color:var(--text); cursor:pointer; font-weight:600; }
+  .rubbtn:hover { border-color:var(--gold); color:var(--gold); }
+  #accueil, #catalogue, #artistes, #collections, #apropos, #prestations, #evenements, #avis, #newsletter { scroll-margin-top:calc(var(--ex-h,0px) + 130px); }
+  .apropos { display:grid; grid-template-columns:minmax(0,1.2fr) minmax(0,.8fr); gap:26px; align-items:center; }
+  .apropos p { margin:0 0 12px; color:var(--muted); max-width:62ch; }
+  .chiffres { display:flex; flex-wrap:wrap; gap:12px; margin-top:16px; }
+  .chiffres div { flex:1 1 110px; padding:14px 16px; border:1px solid var(--line); border-radius:12px; background:var(--panel); }
+  .chiffres b { display:block; font-family:var(--serif); font-size:30px; color:var(--gold); line-height:1.1; font-variant-numeric:tabular-nums; }
+  .chiffres span { color:var(--muted); font-size:13.5px; }
+  .apropos-art { border-radius:14px; overflow:hidden; border:1px solid var(--line); aspect-ratio:5/4; background:var(--panel2); }
+  .apropos-art svg { display:block; width:100%; height:100%; }
+  .prestas { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:16px; }
+  .presta { display:flex; flex-direction:column; gap:8px; padding:18px; border:1px solid var(--line); border-radius:14px; background:var(--panel); }
+  .presta svg.ic { width:34px; height:34px; color:var(--gold); stroke-width:1.4; }
+  .presta h3 { margin:4px 0 0; font-family:var(--serif); font-size:19px; }
+  .presta p { margin:0; color:var(--muted); font-size:14.5px; flex:1 1 auto; }
+  .presta .tarif { font-weight:700; color:var(--gold); }
+  .presta .delai { color:var(--muted); font-size:13px; }
+  .evts { display:grid; gap:12px; }
+  .evt { display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:16px; align-items:center; padding:14px 18px; border:1px solid var(--line); border-radius:14px; background:var(--panel); }
+  .evt .date { width:64px; padding:8px 0; text-align:center; border-radius:10px; background:var(--gold); color:var(--on-gold); font-family:var(--serif); line-height:1.05; }
+  .evt .date b { display:block; font-size:26px; }
+  .evt .date span { font-family:var(--sans); font-size:12px; font-weight:700; letter-spacing:.06em; }
+  .evt h3 { margin:0; font-family:var(--serif); font-size:19px; }
+  .evt p { margin:2px 0 0; color:var(--muted); font-size:14px; }
+  .avis-liste { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; }
+  .avis-un { padding:18px; border:1px solid var(--line); border-radius:14px; background:var(--panel); display:flex; flex-direction:column; gap:10px; }
+  .etoiles { display:flex; gap:2px; color:var(--gold); }
+  .etoiles svg.ic { width:18px; height:18px; fill:currentColor; stroke-width:1; }
+  .etoiles svg.ic.vide { fill:none; }
+  .avis-un q { quotes:"« " " »"; font-size:15px; line-height:1.55; }
+  .avis-un .qui { display:flex; align-items:center; gap:10px; margin-top:auto; color:var(--muted); font-size:13.5px; }
+  .avis-un .rond { width:38px; height:38px; border-radius:50%; background:var(--panel2); border:1px solid var(--line); display:grid; place-items:center; color:var(--gold); font-weight:700; flex:none; }
+  .note-moy { display:flex; align-items:center; gap:10px; color:var(--muted); }
+  .note-moy b { font-family:var(--serif); font-size:28px; color:var(--gold); }
+  .sw-liste { list-style:none; margin:12px 0 0; padding:0; display:grid; gap:8px; }
+  .sw-ligne { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:12px; align-items:center; padding:10px 14px; border:1px solid var(--line); border-radius:12px; background:var(--panel2); }
+  .sw-ligne b { display:block; }
+  .sw-ligne span.d { color:var(--muted); font-size:13.5px; }
+  .sw { position:relative; width:56px; height:44px; border:0; background:none; cursor:pointer; padding:0; }
+  .sw::before { content:""; position:absolute; left:0; top:10px; width:56px; height:24px; border-radius:999px; background:#3a4666; border:1px solid var(--line); transition:background .2s; }
+  .sw::after { content:""; position:absolute; left:4px; top:14px; width:18px; height:18px; border-radius:50%; background:#fff; transition:transform .2s; }
+  .sw[aria-checked="true"]::before { background:var(--gold); }
+  .sw[aria-checked="true"]::after { transform:translateX(32px); background:var(--on-gold); }
+  .sw:focus-visible { outline:3px solid var(--gold); outline-offset:2px; border-radius:999px; }
+  .rub-actions { display:flex; flex-wrap:wrap; gap:10px; justify-content:flex-end; margin-top:14px; }
+  @media (max-width:1100px) { .prestas { grid-template-columns:repeat(2,minmax(0,1fr)); } .avis-liste { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+  @media (max-width:900px) { .apropos { grid-template-columns:1fr; } }
+  @media (max-width:600px) { .prestas, .avis-liste { grid-template-columns:1fr; } .evt { grid-template-columns:auto minmax(0,1fr); } .evt .btn { grid-column:1 / -1; } .rubbtn span { display:none; } .rubbtn { padding:0; min-width:44px; justify-content:center; } }
+  @media (prefers-reduced-motion:reduce) { .sw::before, .sw::after { transition:none; } }
   @media (max-width:380px) { .artistes, .collections { grid-template-columns:1fr; } }
   @media (prefers-reduced-motion:reduce) { .artiste, .collection { transition:none; } .artiste:hover, .collection:hover { transform:none; } }
 </style>
@@ -285,17 +345,15 @@
       <svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width:1.5"><path d="M5 19C5 10 11 4 20 4c0 9-6 15-15 15z"/><path d="M5 19L14 10M9 16h4M12 13h4"/></svg>
       <b id="shopName"></b>
     </div>
-    <nav class="nav" aria-label="Rubriques">
-      <button type="button" aria-current="page" id="navGalerie">Galerie</button>
-      <button type="button" id="navArtistes">Artistes</button>
-      <button type="button" id="navCollections">Collections</button>
-      <button type="button" id="navDevis">Demander un devis</button>
-    </nav>
+    <nav class="nav" id="navRub" aria-label="Rubriques"></nav>
     <div class="tools">
+      <button class="rubbtn" type="button" id="openRub" aria-label="Choisir les rubriques de la boutique (exemple)">
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg><span>Rubriques</span>
+      </button>
       <button class="iconbtn" type="button" id="navCompte" aria-label="Mon compte (simulé)">
         <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
       </button>
-      <button class="cartbtn" type="button" id="openCart" aria-label="Ouvrir le panier">
+      <button class="cartbtn" data-rub="boutique" type="button" id="openCart" aria-label="Ouvrir le panier">
         <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2.5l2.2 11h10.3l2-8H6.3"/><circle cx="9.5" cy="19.5" r="1.4"/><circle cx="17" cy="19.5" r="1.4"/></svg>
         <span>Panier (<span id="cartCount">0</span>)</span>
       </button>
@@ -303,7 +361,7 @@
   </div>
 </header>
 
-<section class="hero">
+<section class="hero" id="accueil" data-rub="accueil">
   <div class="hero-in">
     <div>
       <p class="eyebrow">Portfolio artistique</p>
@@ -318,7 +376,7 @@
           <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12l4-4 4 2 4-2 6 5-6 6-3-2-3 2-6-5z"/><path d="M7 8l-4 4M17 15l-3-3"/></svg>
           <span>Artistes<br>du continent</span>
         </div>
-        <div class="garantie">
+        <div class="garantie" data-rub="boutique">
           <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 6h12v10H2zM14 9h4l4 3v4h-8z"/><circle cx="6.5" cy="17.5" r="1.8"/><circle cx="17.5" cy="17.5" r="1.8"/></svg>
           <span>Livraison sécurisée<br>en Afrique et en Europe</span>
         </div>
@@ -330,6 +388,7 @@
 
 <main class="wrap">
   <div class="note" id="typeNote" style="display:none"></div>
+  <div id="catalogue" data-rub="portfolio boutique">
   <div class="barre">
     <span class="lib">Filtrer par catégorie :</span>
     <div class="chips" id="cats" role="group" aria-label="Catégories"></div>
@@ -352,7 +411,8 @@
       <select id="parPage"><option value="6">6 par page</option><option value="12" selected>12 par page</option><option value="24">24 par page</option></select>
     </label>
   </div>
-  <section class="bloc" id="artistes" aria-labelledby="artistesTitre">
+  </div>
+  <section class="bloc" id="artistes" data-rub="portfolio" aria-labelledby="artistesTitre">
     <div class="bloc-tete">
       <div>
         <h2 id="artistesTitre"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19c0-6 3-11 8-14-1 3 0 5 3 6-1 3-3 5-6 6M5 19l5-5"/></svg>Artistes à l'honneur</h2>
@@ -363,7 +423,7 @@
     <div class="artistes" id="artistesListe"></div>
   </section>
 
-  <section class="bloc" id="collections" aria-labelledby="collTitre">
+  <section class="bloc" id="collections" data-rub="portfolio" aria-labelledby="collTitre">
     <div class="bloc-tete">
       <div>
         <h2 id="collTitre"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l9 4.5-9 4.5-9-4.5z"/><path d="M3 12l9 4.5 9-4.5M3 16.5L12 21l9-4.5"/></svg>Collections</h2>
@@ -374,7 +434,37 @@
     <div class="collections" id="collListe"></div>
   </section>
 
-  <section class="garanties-bande" aria-label="Nos garanties">
+  <section class="bloc" id="apropos" data-rub="apropos" aria-labelledby="aproposTitre">
+    <div class="bloc-tete"><div><h2 id="aproposTitre"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>À propos de la galerie</h2></div></div>
+    <div class="apropos">
+      <div>
+        <p>Née de la rencontre entre des artistes du continent et de la diaspora, la galerie présente des œuvres originales et accompagne ceux qui les créent. Chaque pièce est présentée par son artiste, avec son histoire, sa technique et son format.</p>
+        <p>Notre idée est simple : faire découvrir des talents, soutenir leur travail et relier les amateurs d'art à ceux qui font vivre une culture.</p>
+        <div class="chiffres" id="chiffres"></div>
+      </div>
+      <div class="apropos-art" id="aproposArt" role="img" aria-label="Illustration : un baobab au coucher du soleil"></div>
+    </div>
+  </section>
+
+  <section class="bloc" id="prestations" data-rub="prestations" aria-labelledby="prestaTitre">
+    <div class="bloc-tete"><div><h2 id="prestaTitre"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4l6 6-9 9H5v-6z"/><path d="M12 6l6 6"/></svg>Prestations</h2><p>Une idée précise, un format particulier, un événement à monter : les artistes vous répondent sur devis.</p></div></div>
+    <div class="prestas" id="prestaListe"></div>
+  </section>
+
+  <section class="bloc" id="evenements" data-rub="evenements" aria-labelledby="evtTitre">
+    <div class="bloc-tete"><div><h2 id="evtTitre"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Événements à venir</h2><p>Vernissages, ateliers et rencontres avec les artistes.</p></div></div>
+    <div class="evts" id="evtListe"></div>
+  </section>
+
+  <section class="bloc" id="avis" data-rub="avis" aria-labelledby="avisTitre">
+    <div class="bloc-tete">
+      <div><h2 id="avisTitre"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.6 5.600 6.100.7-4.500 4.200 1.200 6L12 16.600 6.600 19.500l1.200-6L3.300 9.300l6.100-.7z"/></svg>Avis des clients</h2><div class="note-moy" id="noteMoy"></div></div>
+      <button class="lienor" type="button" id="avisPlus" aria-expanded="false">Voir tous les avis <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16M14 6l6 6-6 6"/></svg></button>
+    </div>
+    <div class="avis-liste" id="avisListe"></div>
+  </section>
+
+  <section class="garanties-bande" data-rub="boutique" aria-label="Nos garanties">
     <div class="g">
       <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 6h12v10H2zM14 9h4l4 3v4h-8z"/><circle cx="6.5" cy="17.5" r="1.8"/><circle cx="17.5" cy="17.5" r="1.8"/></svg>
       <div><b>Livraison sécurisée</b><span>En Afrique et en Europe, avec suivi de commande.</span></div>
@@ -389,7 +479,7 @@
     </div>
   </section>
 
-  <section class="lettre" aria-labelledby="lettreTitre">
+  <section class="lettre" id="newsletter" data-rub="newsletter" aria-labelledby="lettreTitre">
     <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>
     <div><h3 id="lettreTitre">Restez informé(e) !</h3><p>Recevez nos nouvelles collections, portraits d'artistes, expositions et offres exclusives.</p></div>
     <form id="lettreForm">
@@ -420,19 +510,19 @@
       <nav class="pied-col" aria-label="Explorer">
         <h4>Explorer</h4>
         <ul>
-          <li><button type="button" data-aller="galerie">La galerie</button></li>
-          <li><button type="button" data-aller="artistes">Les artistes</button></li>
-          <li><button type="button" data-aller="collections">Les collections</button></li>
-          <li><button type="button" data-aller="devis">Demander un devis</button></li>
+          <li data-rub="portfolio boutique"><button type="button" data-aller="galerie">La galerie</button></li>
+          <li data-rub="portfolio"><button type="button" data-aller="artistes">Les artistes</button></li>
+          <li data-rub="portfolio"><button type="button" data-aller="collections">Les collections</button></li>
+          <li data-rub="prestations contact"><button type="button" data-aller="devis">Demander un devis</button></li>
         </ul>
       </nav>
 
-      <nav class="pied-col" aria-label="Catégories d'œuvres">
+      <nav class="pied-col" data-rub="portfolio boutique" aria-label="Catégories d'œuvres">
         <h4>Catégories</h4>
         <ul id="piedCats"></ul>
       </nav>
 
-      <nav class="pied-col" aria-label="Informations">
+      <nav class="pied-col" data-rub="boutique" aria-label="Informations">
         <h4>Informations</h4>
         <ul>
           <li><button type="button" data-pied="Livraison et retours">Livraison et retours</button></li>
@@ -442,7 +532,7 @@
         </ul>
       </nav>
 
-      <div class="pied-col pied-contact">
+      <div class="pied-col pied-contact" data-rub="contact">
         <h4>Nous contacter</h4>
         <p>Une question, une œuvre à commander, une exposition à proposer ? La galerie répond sous 48 heures.</p>
         <address>Abidjan, Côte d'Ivoire<br>Du lundi au samedi, de 9 h à 18 h</address>
@@ -452,7 +542,7 @@
 
     <div class="pied-bas">
       <p class="copy">© 2026 <span id="piedNom2"></span>. Tous droits réservés.</p>
-      <ul class="paiements" aria-label="Moyens de paiement acceptés (exemple)">
+      <ul class="paiements" data-rub="boutique" aria-label="Moyens de paiement acceptés (exemple)">
         <li class="lib">Paiement accepté :</li>
         <li class="moyen"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2.500"/><path d="M3 10h18M7 15h3"/></svg>Carte bancaire</li>
         <li class="moyen"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/></svg>Mobile Money</li>
@@ -462,6 +552,17 @@
     <p class="demo">Exemple : œuvres et artistes fictifs, dessinés pour la démonstration. Le panier, les paiements, les réseaux sociaux et les demandes de devis sont simulés et ne sont envoyés nulle part.</p>
   </div>
 </footer>
+
+<!-- Choix des rubriques (exemple) -->
+<div class="overlay" id="rubOv" role="dialog" aria-modal="true" aria-labelledby="rubTitre">
+  <div class="sheet">
+    <button class="close" type="button" data-close aria-label="Fermer"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <h2 id="rubTitre" style="margin:0 0 4px;font-family:var(--serif)">Rubriques de la boutique</h2>
+    <p style="margin:0;color:var(--muted)">Affichez ou masquez chaque rubrique : la page se met à jour tout de suite. Dans une vraie boutique, ce réglage est dans « Paramètres vitrine », onglet « Navigation et rubriques ».</p>
+    <ul class="sw-liste" id="rubListe"></ul>
+    <div class="rub-actions"><button class="btn" type="button" id="rubTout">Tout activer</button><button class="btn or" type="button" data-close>Terminer</button></div>
+  </div>
+</div>
 
 <!-- Fiche d'une œuvre -->
 <div class="overlay" id="workOv" role="dialog" aria-modal="true" aria-labelledby="wTitle">
@@ -683,7 +784,7 @@
   }
 
   /* ── État, panier et favoris (stockés dans la mémoire isolée de l'exemple) ── */
-  const state = { cat: "all", tri: "recent", page: 1, par: 12, current: null, vue: 0, artiste: null, coll: null, tous: false };
+  const state = { cat: "all", tri: "recent", page: 1, par: 12, current: null, vue: 0, artiste: null, coll: null, tous: false, vente: false };
   const $ = (s) => document.querySelector(s);
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const eur = (n) => Number(n).toLocaleString("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + " €";
@@ -709,7 +810,8 @@
   /* ── Liste : filtre, tri, pagination ── */
   function liste() {
     const coll = state.coll ? COLLS.find(c => c.id === state.coll) : null;
-    const l = WORKS.filter(w => (state.cat === "all" || w.cat === state.cat) && (!state.artiste || w.artist === state.artiste) && (!coll || coll.ids.includes(w.id)));
+    const vente = state.vente || boutiqueSeule();
+    const l = WORKS.filter(w => (state.cat === "all" || w.cat === state.cat) && (!state.artiste || w.artist === state.artiste) && (!coll || coll.ids.includes(w.id)) && (!vente || w.mode === "fixe"));
     const prix = (w) => (w.price == null ? Infinity : w.price);
     if (state.tri === "prix-asc") l.sort((a, b) => prix(a) - prix(b) || a.rang - b.rang);
     else if (state.tri === "prix-desc") l.sort((a, b) => (b.price == null ? -1 : b.price) - (a.price == null ? -1 : a.price) || a.rang - b.rang);
@@ -717,9 +819,10 @@
     else l.sort((a, b) => b.year - a.year || a.rang - b.rang);
     return l;
   }
-  function etatCarte(w) { return w.mode === "devis" ? "Sur devis" : w.mode === "expose" ? "Exposée" : w.stock <= 0 ? "Vendue" : w.stock === 1 ? "Pièce unique" : ""; }
-  function prixTexte(w) { return w.mode === "devis" ? '<div class="prix sec">Prix sur devis</div>' : w.mode === "expose" ? '<div class="prix sec">Non destinée à la vente</div>' : w.stock <= 0 ? '<div class="prix sec">Vendue</div>' : '<div class="prix">' + eur(w.price) + "</div>"; }
+  function etatCarte(w) { if (!rubOn("boutique")) return w.mode === "expose" ? "Exposée" : ""; return w.mode === "devis" ? "Sur devis" : w.mode === "expose" ? "Exposée" : w.stock <= 0 ? "Vendue" : w.stock === 1 ? "Pièce unique" : ""; }
+  function prixTexte(w) { if (!rubOn("boutique")) return w.mode === "expose" ? '<div class="prix sec">Non destinée à la vente</div>' : ""; return w.mode === "devis" ? '<div class="prix sec">Prix sur devis</div>' : w.mode === "expose" ? '<div class="prix sec">Non destinée à la vente</div>' : w.stock <= 0 ? '<div class="prix sec">Vendue</div>' : '<div class="prix">' + eur(w.price) + "</div>"; }
   function boutonAchat(w, cls) {
+    if (!rubOn("boutique")) return '<button class="btn or" type="button" data-devis="' + w.id + '">' + ICO.devis + (w.mode === "expose" ? "Me contacter" : "Demander un devis") + "</button>";
     if (w.mode === "devis") return '<button class="btn or" type="button" data-devis="' + w.id + '">' + ICO.devis + "Demander un devis</button>";
     if (w.mode === "expose") return '<button class="btn or" type="button" data-devis="' + w.id + '">' + ICO.devis + "Me contacter</button>";
     if (w.stock <= 0) return '<button class="btn or" type="button" disabled>Vendue</button>';
@@ -747,7 +850,8 @@
     /* filtres actifs (artiste, collection) : puces qu'on peut retirer d'un clic */
     const coll = state.coll ? COLLS.find(c => c.id === state.coll) : null, croix = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
     $("#actifs").innerHTML = (state.artiste ? '<button class="actif" type="button" data-retire="artiste" aria-label="Retirer le filtre artiste ' + esc(state.artiste) + '">Artiste : ' + esc(state.artiste) + croix + "</button>" : "")
-      + (coll ? '<button class="actif" type="button" data-retire="coll" aria-label="Retirer le filtre collection ' + esc(coll.titre) + '">Collection : ' + esc(coll.titre) + croix + "</button>" : "");
+      + (coll ? '<button class="actif" type="button" data-retire="coll" aria-label="Retirer le filtre collection ' + esc(coll.titre) + '">Collection : ' + esc(coll.titre) + croix + "</button>" : "")
+      + (state.vente && rubOn("portfolio") ? '<button class="actif" type="button" data-retire="vente" aria-label="Retirer le filtre œuvres à vendre">Œuvres à vendre' + croix + "</button>" : "");
     document.querySelectorAll(".collection").forEach(c => c.setAttribute("aria-pressed", String(c.dataset.coll === state.coll)));
   }
 
@@ -782,7 +886,7 @@
     $("#wPar").textContent = "Par " + w.artist + " · " + w.year;
     $("#wDesc").textContent = w.desc;
     $("#wFacts").innerHTML = [["Technique", w.tech], ["Dimensions", w.dims], ["Année", w.year], ["Disponibilité", w.mode === "devis" ? "Sur commande" : w.mode === "expose" ? "Exposée, non vendue" : w.stock <= 0 ? "Vendue" : w.stock === 1 ? "Pièce unique" : w.stock + " exemplaires"]]
-      .map(f => "<div><b>" + f[0] + "</b>" + esc(f[1]) + "</div>").join("");
+      .filter(f => rubOn("boutique") || f[0] !== "Disponibilité").map(f => "<div><b>" + f[0] + "</b>" + esc(f[1]) + "</div>").join("");
     $("#wMain").innerHTML = art(w, 0);
     $("#wMinis").innerHTML = [0, 1, 2].map(i => '<button class="mini" type="button" data-photo="' + i + '" aria-label="Vue ' + (i + 1) + '">' + art(w, i) + "</button>").join("");
     const v = $("#wVideo"); v.hidden = !w.video; $("#wVideoDuree").textContent = w.video ? "Durée " + w.video + " (57 secondes au plus) · simulée" : "";
@@ -812,10 +916,97 @@
       : '<p>Votre panier est vide. Parcourez la galerie et ajoutez une œuvre.</p>';
   }
 
+  /* ── Rubriques activables (9) : chacune s'affiche ou se masque, la page suit ── */
+  const RUBS = [
+    { id: "accueil", nom: "Accueil", cible: "#accueil", desc: "Bandeau d'accueil, présentation et garanties." },
+    { id: "portfolio", nom: "Portfolio", cible: "#catalogue", desc: "La galerie des œuvres, les artistes et les collections." },
+    { id: "boutique", nom: "Boutique", cible: "#catalogue", desc: "Prix, panier, livraison et paiement. Désactivée, la galerie ne montre plus ni prix ni panier." },
+    { id: "apropos", nom: "À propos", cible: "#apropos", desc: "Présentation de la galerie et chiffres clés." },
+    { id: "prestations", nom: "Prestations", cible: "#prestations", desc: "Créations sur mesure, reproductions, expositions et ateliers, sur devis." },
+    { id: "evenements", nom: "Événements", cible: "#evenements", desc: "Vernissages, ateliers et rencontres à venir." },
+    { id: "avis", nom: "Avis", cible: "#avis", desc: "Avis des clients et note moyenne." },
+    { id: "contact", nom: "Contact", cible: null, desc: "Coordonnées et formulaire de contact, en bas de page." },
+    { id: "newsletter", nom: "Newsletter", cible: "#newsletter", desc: "Bande d'inscription à la lettre d'information (sans entrée dans le menu)." }
+  ];
+  let rub = lire("pf_ex_rubriques", {});
+  function rubOn(k) { return rub[k] !== false; }
+  function boutiqueSeule() { return rubOn("boutique") && !rubOn("portfolio"); }
+
+  const PRESTAS = [
+    { t: "Création sur mesure", d: "Une œuvre pensée avec vous : format, matériaux, couleurs et sujet.", tarif: "À partir de 350 €", delai: "Délai : 6 à 8 semaines", objet: "Création sur mesure", ic: '<path d="M14 4l6 6-9 9H5v-6z"/><path d="M12 6l6 6"/>' },
+    { t: "Reproduction d'une œuvre", d: "Tirage ou reproduction d'une œuvre existante, livré avec certificat.", tarif: "À partir de 90 €", delai: "Délai : 2 à 3 semaines", objet: "Reproduction d'une œuvre", ic: '<rect x="4" y="3" width="13" height="16" rx="1.500"/><path d="M8 21h11a1 1 0 0 0 1-1V8"/>' },
+    { t: "Exposition et scénographie", d: "Montez une exposition ou accueillez des artistes dans votre lieu.", tarif: "Sur devis", delai: "Étude gratuite du lieu", objet: "Collaboration ou exposition", ic: '<rect x="3" y="4" width="18" height="12" rx="1"/><path d="M8 20h8M12 16v4"/>' },
+    { t: "Atelier d'initiation", d: "Séances en groupe pour s'initier à la peinture, au tissage ou à la photo.", tarif: "À partir de 45 € par personne", delai: "Groupes de 4 à 12", objet: "Autre demande", ic: '<circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.500 2.700-6 6-6s6 2.500 6 6"/><path d="M16 5.500a3 3 0 0 1 0 5M18 14c2 .8 3 3 3 6"/>' }
+  ];
+  const EVTS = [
+    { j: "28", m: "NOV", t: "Vernissage « Lumières du continent »", l: "Abidjan · Galerie principale · 18 h 30", p: "Entrée libre" },
+    { j: "12", m: "DÉC", t: "Atelier de tissage avec Awa Camara", l: "Dakar · Atelier des tisserands · 14 h 00", p: "25 € · 12 places" },
+    { j: "19", m: "DÉC", t: "Rencontre en ligne avec les photographes", l: "En ligne · 19 h 00", p: "Gratuit" }
+  ];
+  const AVIS = [
+    { n: "Mariam K.", v: "Lyon", note: 5, o: "Baobab au couchant", x: "Le tirage est magnifique, bien emballé et arrivé avec son certificat. Je recommande les yeux fermés." },
+    { n: "Jean-Luc A.", v: "Abidjan", note: 5, o: "Gardien de la case", x: "Une sculpture réalisée sur mesure, exactement comme nous l'avions imaginée avec l'artiste. Échanges très agréables." },
+    { n: "Sophie M.", v: "Bruxelles", note: 4, o: "Tissage des quatre saisons", x: "Une toile lumineuse qui change tout le salon. Livraison un peu longue, mais le résultat en valait la peine." },
+    { n: "Kwame O.", v: "Accra", note: 5, o: "Cercles d'ancêtres", x: "Fichier haute définition parfait pour mon impression. Merci à l'artiste pour sa disponibilité." },
+    { n: "Aïcha D.", v: "Paris", note: 5, o: "Bogolan royal", x: "Un tissu superbe, la teinture est profonde et le motif très soigné. Je reviendrai." },
+    { n: "Thomas R.", v: "Toulouse", note: 4, o: "Rythmes du fleuve", x: "Belle photographie, bien encadrée. J'aurais aimé un choix de formats plus large." }
+  ];
+  const ETOILE = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.600 5.600 6.100.7-4.500 4.200 1.200 6L12 16.600 6.600 19.500l1.200-6L3.300 9.300l6.100-.7z"/></svg>';
+  const etoiles = (n) => '<span class="etoiles" role="img" aria-label="Note : ' + n + ' sur 5">' + [1, 2, 3, 4, 5].map(i => i <= n ? ETOILE : ETOILE.replace('class="ic"', 'class="ic vide"')).join("") + "</span>";
+  let tousAvis = false;
+
+  function vueRubriques() {
+    const pays = new Set(ARTISTS.map(a => a.lieu.split(", ").pop()));
+    $("#chiffres").innerHTML = [[ARTISTS.length, "artistes"], [WORKS.length, "œuvres"], [pays.size, "pays"]].map(c => "<div><b>" + c[0] + "</b><span>" + c[1] + "</span></div>").join("");
+    $("#aproposArt").innerHTML = svg(ART.baobab(P.aube), "0 0 400 320");
+    $("#prestaListe").innerHTML = PRESTAS.map((p, i) => '<article class="presta">' + ico(p.ic) + "<h3>" + esc(p.t) + "</h3><p>" + esc(p.d) + '</p><div class="tarif">' + esc(p.tarif) + '</div><div class="delai">' + esc(p.delai) + '</div><button class="btn or" type="button" data-presta="' + i + '">' + ICO.devis + "Demander un devis</button></article>").join("");
+    $("#evtListe").innerHTML = EVTS.map((e, i) => '<article class="evt"><div class="date"><b>' + e.j + "</b><span>" + e.m + "</span></div><div><h3>" + esc(e.t) + "</h3><p>" + esc(e.l) + " · " + esc(e.p) + '</p></div><button class="btn" type="button" data-evt="' + i + '">Je m\'inscris</button></article>').join("");
+    const moy = AVIS.reduce((s, a) => s + a.note, 0) / AVIS.length;
+    $("#noteMoy").innerHTML = "<b>" + moy.toLocaleString("fr-FR", { maximumFractionDigits: 1 }) + "</b>" + etoiles(Math.round(moy)) + "<span>sur 5 · " + AVIS.length + " avis (fictifs)</span>";
+    $("#avisListe").innerHTML = AVIS.filter((a, i) => tousAvis || i < 3).map(a => '<article class="avis-un">' + etoiles(a.note) + "<q>" + esc(a.x) + '</q><div class="qui"><span class="rond" aria-hidden="true">' + esc(a.n[0]) + "</span><span><b style=\"color:var(--text)\">" + esc(a.n) + "</b> · " + esc(a.v) + "<br>" + esc(a.o) + "</span></div></article>").join("");
+    $("#avisPlus").firstChild.textContent = tousAvis ? "Voir moins " : "Voir tous les avis ";
+    $("#avisPlus").setAttribute("aria-expanded", String(tousAvis));
+  }
+  function appliquerRubriques() {
+    document.querySelectorAll("[data-rub]").forEach(el => el.classList.toggle("rub-off", !el.dataset.rub.split(" ").some(rubOn)));
+    const entrees = RUBS.filter(r => r.id !== "newsletter" && rubOn(r.id));
+    $("#navRub").innerHTML = entrees.map((r, i) => '<button type="button" data-nav="' + r.id + '"' + (i === 0 ? ' aria-current="page"' : "") + ">" + esc(r.nom) + "</button>").join("");
+    const sansPrix = !rubOn("boutique");
+    document.querySelectorAll('#tri option[value^="prix"]').forEach(o => { o.hidden = sansPrix; o.disabled = sansPrix; });
+    if (sansPrix && state.tri.indexOf("prix") === 0) { state.tri = "recent"; $("#tri").value = "recent"; }
+    if (!rubOn("portfolio")) { state.artiste = null; state.coll = null; }
+    $("#sectMain").textContent = boutiqueSeule() ? "Œuvres à vendre" : ((SHOP.sections && SHOP.sections[1]) || SHOP_DEFAULT.sections[1]);
+  }
+  function listeRubriques() {
+    $("#rubListe").innerHTML = RUBS.map(r => '<li class="sw-ligne"><div><b id="swn-' + r.id + '">' + esc(r.nom) + '</b><span class="d">' + esc(r.desc) + '</span></div><button class="sw" type="button" role="switch" data-sw="' + r.id + '" aria-checked="' + rubOn(r.id) + '" aria-labelledby="swn-' + r.id + '"></button></li>').join("");
+  }
+  function changerRubriques(maj, message) {
+    const apres = Object.assign({}, rub, maj);
+    if (!RUBS.some(r => apres[r.id] !== false)) { toast("Gardez au moins une rubrique affichée."); return; }
+    rub = apres; ecrire("pf_ex_rubriques", rub);
+    appliquerRubriques(); render(); vueRubriques(); listeRubriques();
+    if (message) toast(message);
+  }
+
   /* ── Événements ── */
   document.addEventListener("click", e => {
     const t = e.target, q = (s) => t.closest(s);
     let b;
+    if ((b = q("[data-nav]"))) {
+      const r = RUBS.find(x => x.id === b.dataset.nav);
+      document.querySelectorAll("#navRub button").forEach(x => x.removeAttribute("aria-current")); b.setAttribute("aria-current", "page");
+      if (r.id === "contact") { $("#objetSel").value = "Autre demande"; $("#contactOv").classList.add("open"); return; }
+      if (r.id === "accueil") { window.scrollTo({ top: 0, behavior: "smooth" }); return; }
+      if (r.id === "boutique" && rubOn("portfolio")) { state.vente = true; state.page = 1; render(); }
+      if (r.id === "portfolio") { state.vente = false; state.page = 1; render(); }
+      $(r.cible).scrollIntoView({ behavior: "smooth", block: "start" }); return;
+    }
+    if ((b = q("[data-presta]"))) { const p = PRESTAS[Number(b.dataset.presta)]; $("#objetSel").value = p.objet; $("#contactForm").elements.besoin.value = "Prestation souhaitée : " + p.t + ".\n"; $("#contactOv").classList.add("open"); return; }
+    if ((b = q("[data-evt]"))) { toast("Inscription simulée à « " + EVTS[Number(b.dataset.evt)].t + " » : aucune donnée enregistrée."); return; }
+    if (q("#avisPlus")) { tousAvis = !tousAvis; vueRubriques(); return; }
+    if (q("#openRub")) { listeRubriques(); $("#rubOv").classList.add("open"); return; }
+    if ((b = q("[data-sw]"))) { const r = RUBS.find(x => x.id === b.dataset.sw); const voulue = !rubOn(r.id); changerRubriques({ [r.id]: voulue }, "Rubrique « " + r.nom + " » " + (voulue ? "affichée." : "masquée.")); const nb = document.querySelector('[data-sw="' + r.id + '"]'); if (nb) nb.focus(); return; }
+    if (q("#rubTout")) { changerRubriques(Object.fromEntries(RUBS.map(r => [r.id, true])), "Toutes les rubriques sont affichées."); return; }
     if ((b = q("[data-artiste]"))) { ouvrirArtiste(Number(b.dataset.artiste)); return; }
     if ((b = q("[data-ouvre]"))) { $("#artistOv").classList.remove("open"); ouvrir(Number(b.dataset.ouvre)); return; }
     if ((b = q("[data-voirartiste]"))) { const a = ARTISTS.find(x => x.id === Number(b.dataset.voirartiste)); state.artiste = a.nom; state.coll = null; state.cat = "all"; state.page = 1; $("#artistOv").classList.remove("open"); render(); allerGalerie(); return; }
@@ -824,8 +1015,6 @@
     if ((b = q("[data-retire]"))) { state[b.dataset.retire] = null; state.page = 1; render(); return; }
     if (q("#artistesTous")) { state.tous = !state.tous; vue2(); return; }
     if (q("#collToutes")) { state.coll = null; state.artiste = null; state.cat = "all"; state.page = 1; render(); allerGalerie(); return; }
-    if (q("#navArtistes")) { $("#artistes").scrollIntoView({ behavior: "smooth", block: "start" }); return; }
-    if (q("#navCollections")) { $("#collections").scrollIntoView({ behavior: "smooth", block: "start" }); return; }
     if ((b = q("[data-cat]"))) { state.cat = b.dataset.cat; state.page = 1; render(); return; }
     if ((b = q("[data-page]"))) { state.page = Number(b.dataset.page); render(); $("#sectMain").scrollIntoView({ behavior: "smooth", block: "start" }); return; }
     if ((b = q("[data-fav]"))) {
@@ -850,8 +1039,6 @@
     if (q("[data-lbnext]")) { voirImage(state.vue + 1); return; }
     if (q("[data-lbclose]")) { $("#lb").classList.remove("open"); return; }
     if (q("[data-close]") || t.classList.contains("overlay")) { (t.closest(".overlay") || t).classList.remove("open"); return; }
-    if (q("#navDevis")) { $("#objetSel").value = "Création sur mesure"; $("#contactOv").classList.add("open"); return; }
-    if (q("#navGalerie")) { window.scrollTo({ top: 0, behavior: "smooth" }); return; }
     if ((b = q("[data-pcat]"))) { state.cat = b.dataset.pcat; state.artiste = null; state.coll = null; state.page = 1; render(); allerGalerie(); return; }
     if ((b = q("[data-aller]"))) {
       const v = b.dataset.aller;
@@ -887,6 +1074,8 @@
     if (window.ResizeObserver) { const b = document.getElementById("exBandeau"); if (b) new ResizeObserver(maj).observe(b); }
   })();
   vue2();
+  vueRubriques();
+  appliquerRubriques();
   render();
 </script>
 </body>
