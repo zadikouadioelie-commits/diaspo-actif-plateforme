@@ -79,6 +79,48 @@ html,body{height:100%;overflow:hidden;}
 .swot-cell.opportunites{background:#dbeafe;border:1px solid #93c5fd;}
 .swot-cell.menaces{background:#fef3c7;border:1px solid #fcd34d;}
 .swot-cell label{display:block;font-weight:800;font-size:12px;text-transform:uppercase;margin-bottom:8px;}
+/* SWOT structuré (2026-11-10) : plusieurs éléments par case, niveau d'impact, détails repliables */
+.bp-intro{font-size:12.5px;color:var(--muted);margin:0 0 12px;line-height:1.5;}
+.bp-note{font-size:12.5px;line-height:1.5;margin:8px 0 0;}
+.bp-note.alerte{color:#92400e;background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:8px 10px;}
+.bp-note.ok{color:#065f46;}
+.swot-item{background:rgba(255,255,255,.72);border-radius:8px;padding:8px;margin-bottom:8px;}
+.swot-ligne{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+.swot-cell .swot-titre{flex:1 1 170px;min-width:0;border:1px solid rgba(0,0,0,.14);border-radius:6px;padding:8px;font:inherit;font-size:13px;background:#fff;min-height:0;resize:none;}
+.swot-impact{flex:0 0 auto;border:1px solid rgba(0,0,0,.14);border-radius:6px;padding:8px 4px;font:inherit;font-size:12px;background:#fff;max-width:170px;}
+.swot-btn,.bp-btn-mini{min-height:36px;padding:0 10px;border:1px solid rgba(0,0,0,.2);border-radius:6px;background:#fff;font:inherit;font-size:12px;font-weight:600;cursor:pointer;color:inherit;}
+.swot-btn:hover,.bp-btn-mini:hover{background:#f3f4f6;}
+.swot-btn:focus-visible,.bp-btn-mini:focus-visible,.swot-titre:focus-visible,.swot-impact:focus-visible,.swot-details textarea:focus-visible{outline:2px solid #1B4B8C;outline-offset:1px;}
+.swot-btn[aria-expanded="true"]{background:#e5e7eb;}
+.swot-add{width:100%;min-height:40px;border:1px dashed rgba(0,0,0,.35);border-radius:8px;background:transparent;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;color:inherit;}
+.swot-add:hover{background:rgba(255,255,255,.55);}
+.swot-barre{display:flex;align-items:center;gap:3px;margin-top:6px;font-size:11.5px;font-weight:600;}
+.swot-seg{width:22px;height:5px;border-radius:3px;background:rgba(0,0,0,.16);}
+.swot-seg.on{background:var(--c);}
+.swot-barre .lib{margin-left:6px;}
+.swot-details{margin-top:8px;display:grid;gap:8px;}
+.swot-details[hidden]{display:none;}
+.swot-cell .swot-details label{font-size:11.5px;font-weight:700;text-transform:none;margin:0 0 3px;}
+.swot-cell .swot-details textarea{min-height:56px;border:1px solid rgba(0,0,0,.14);}
+.swot-vide{font-size:12.5px;opacity:.75;margin:0 0 8px;}
+.swot-count{font-weight:600;opacity:.7;text-transform:none;}
+.bp-table-mini{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px;}
+.bp-table-mini th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);padding:0 8px 6px 0;border-bottom:1px solid var(--border);}
+.bp-table-mini td{padding:8px 8px 8px 0;border-bottom:1px solid var(--border);vertical-align:top;}
+.bp-table-mini .pri{font-weight:700;white-space:nowrap;}
+.bp-ligne-edit{border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;background:var(--bg);}
+.bp-ligne-edit .fg{margin-bottom:0;}
+.bp-badge-statut{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;border:1px solid var(--border);}
+.bp-badge-statut.brouillon{background:#fef3c7;border-color:#fcd34d;color:#92400e;}
+.bp-badge-statut.valide{background:#d1fae5;border-color:#6ee7b7;color:#065f46;}
+.mk-donut-zone{display:flex;gap:18px;align-items:center;flex-wrap:wrap;}
+.mk-legende{list-style:none;margin:0;padding:0;font-size:13px;flex:1 1 220px;}
+.mk-legende li{display:flex;align-items:center;gap:8px;padding:3px 0;}
+.mk-legende i{display:inline-block;width:11px;height:11px;border-radius:3px;flex:none;}
+.mk-legende .v{margin-left:auto;font-variant-numeric:tabular-nums;font-weight:600;}
+.bp-ind-tuiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;}
+@media (prefers-reduced-motion:no-preference){.swot-btn,.bp-btn-mini,.swot-add{transition:background .15s;}}
+@media (max-width:640px){.swot-btn,.bp-btn-mini,.swot-add{min-height:44px;}.swot-impact{max-width:none;flex:1 1 100%;}}
 .swot-cell textarea{width:100%;border:none;background:rgba(255,255,255,.7);border-radius:8px;padding:8px;font-family:inherit;font-size:13px;resize:vertical;min-height:100px;box-sizing:border-box;}
 
 /* BMC - Business Model Canvas */
@@ -620,6 +662,11 @@ body.bp-type-agriculture .bp-conditionnel-agriculture { display: block; }
 <script src="assets/business-plan-calc.js?v=3"></script>
 <script src="assets/business-plan-excel.js?v=2"></script>
 <script src="assets/bp-test-questions.js?v=1"></script>
+<script src="assets/bp-swot.js?v=1"></script>
+<script src="assets/bp-marche.js?v=1"></script>
+<script src="assets/bp-marketing.js?v=1"></script>
+<script src="assets/bp-organisation.js?v=1"></script>
+<script src="assets/bp-enrichi.js?v=1"></script>
 <script>
 /* ===================================================
    BUSINESS PLAN EDITOR
@@ -768,6 +815,14 @@ const HELP = {
   'concurrent_prix':"Est-il plus cher, moins cher, ou similaire à vous ?",
   'concurrent_forces':"Ce que ce concurrent fait bien, mieux que vous éventuellement.",
   'concurrent_faiblesses':"Ce que ce concurrent fait moins bien, une faille que vous pouvez exploiter.",
+  'concurrent_prix_kg':"Prix de vente au kilo (ou au litre) de ses produits comparables aux vôtres — la base d'une comparaison objective.",
+  'concurrent_origine':"D'où viennent ses produits (pays, région, filière) ? Un argument d'authenticité à comparer au vôtre.",
+  'concurrent_emballage':"Qualité perçue de ses emballages : protection, esthétique, informations affichées.",
+  'concurrent_certifications':"Labels et certifications qu'il détient (bio, normes sanitaires, commerce équitable…).",
+  'concurrent_tracabilite':"Peut-il prouver l'origine et le parcours de ses produits ? Si oui, comment ?",
+  'concurrent_statut_donnee':"Vérifié : vous avez contrôlé ces informations à la source. À vérifier : à confirmer avant de présenter le dossier. Hypothèse : concurrent supposé, dont le nom, les prix et les caractéristiques ne sont pas contrôlés.",
+  'segment_priorite':"Note de 0 à 100 qui traduit l'ordre dans lequel vous comptez aborder ce segment. C'est une priorité commerciale, pas une part de marché mesurée : elle alimente les barres du graphique de segmentation.",
+  'camp_statut':"Objectif : ce que vous visez. Hypothèse : une estimation non encore testée. Constaté : un résultat réellement mesuré (campagne déjà menée). Ne marquez « Constaté » que ce qui l'est.",
   // SWOT
   'swot_forces':"Ce que vous faites déjà bien, vos atouts internes (équipe, savoir-faire, moyens...).",
   'swot_faiblesses':"Ce qui vous manque ou vous freine, en interne (manque de moyens, d'expérience...).",
@@ -947,6 +1002,8 @@ const HELP = {
   'ep_seuil_psychologique':"Un prix qui paraît plus attractif psychologiquement pour le client (ex : 99€ plutôt que 100€).",
 };
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+/* Valeur placée dans un attribut value="…" : échappe aussi les guillemets (esc() seul laisse un « " » casser l'attribut). */
+function escA(s){ return esc(s).replace(/"/g,'&quot;'); }
 function g(id){ return sections[currentSection]?.[id]||''; }
 
 /* ---- Koffi joue l'investisseur, le banquier ou le client (2026-11-01) : propriétaire seulement, le serveur refuse tout autre compte ---- */
@@ -1248,6 +1305,55 @@ function updateField(key, value) {
 /* ════════════════════════════════════════════════════
    RENDU DE CHAQUE SECTION
    ════════════════════════════════════════════════════ */
+/* ═══ Compléments des rubriques (cahier des charges enrichi, 2026-11-11) — modèle : assets/bp-enrichi.js ═══
+   Les données restent dans sections[rubrique] sous des clés nouvelles ; tout est facultatif. Les listes « base »
+   (fiches produits, suivi des phases, registre des risques, indicateurs d'impact, registre des annexes)
+   prolongent les lignes du tableau existant : elles se rafraîchissent quand on ajoute ou retire une ligne. */
+function enrDonnees(rub) { if (!sections[rub]) sections[rub] = {}; return sections[rub]; }
+function enrChamp(rub, k, v) { enrDonnees(rub)[k] = v; markDirty(); }
+function enrListe(rub, k) {
+  const d = enrDonnees(rub), l = BPEnrichi.listeSpec(rub, k);
+  if (!Array.isArray(d[k])) d[k] = (l && l.defaut ? l.defaut : []).map(x => Object.assign({}, x));
+  return d[k];
+}
+function enrRerendre(rub, k) {
+  const host = document.getElementById('enr-liste-' + rub + '-' + k);
+  if (host) host.outerHTML = BPEnrichi.listeEditeurHtml(rub, k, enrDonnees(rub), { esc, ro: monRole === 'lecteur' });
+}
+function enrLigne(rub, k, i, c, v) { const l = enrListe(rub, k); if (!l[i]) l[i] = {}; l[i][c] = v; markDirty(); }
+function enrAjouter(rub, k) { enrListe(rub, k).push(BPEnrichi.nouvelleLigne(BPEnrichi.listeSpec(rub, k))); enrRerendre(rub, k); markDirty(); }
+function enrRetirer(rub, k, i) { enrListe(rub, k).splice(i, 1); enrRerendre(rub, k); markDirty(); }
+function enrRafraichirBases() {
+  if (typeof BPEnrichi === 'undefined' || !BPEnrichi.aDesAjouts(currentSection)) return;
+  BPEnrichi.listes(currentSection).filter(l => l.base).forEach(l => enrRerendre(currentSection, l.k));
+}
+['addProduit', 'delProduit', 'addPhase', 'delPhase', 'addRisque', 'delRisque', 'addIndicateurImpact', 'removeIndicateurImpact', 'saveAnnexe', 'delAnnexe'].forEach(n => {
+  const f = window[n];
+  if (typeof f === 'function') window[n] = function () { const r = f.apply(this, arguments); setTimeout(enrRafraichirBases, 0); return r; };
+});
+/* SWOT : base de matrice TOWS et lignes d'action à partir des éléments saisis. Rien n'est écrit par-dessus un texte existant. */
+function enrProposerTows() {
+  const d = enrDonnees('swot'), t = BPEnrichi.proposerTows(BPSwot.elements(d));
+  const vides = Object.keys(t).filter(k => !String(d[k] || '').trim() && t[k]);
+  if (!vides.length) { alert("Rien à proposer : saisissez d'abord des éléments dans la SWOT (au moins une force ou faiblesse, et une opportunité ou menace), ou videz le quadrant à remplir."); return; }
+  vides.forEach(k => { d[k] = t[k]; const el = document.querySelector('[data-enr="swot:' + k + '"]'); if (el) el.value = t[k]; });
+  markDirty();
+}
+function enrProposerActionsSwot() {
+  const d = enrDonnees('swot'), els = BPSwot.elements(d).filter(e => e && String(e.titre || '').trim()), l = enrListe('swot', 'swot_actions');
+  const lib = { forces: 'Force', faiblesses: 'Faiblesse', opportunites: 'Opportunité', menaces: 'Menace' };
+  const deja = new Set(l.map(x => String(x.element || '').trim().toLowerCase()));
+  let n = 0;
+  els.forEach(e => { if (!deja.has(String(e.titre).trim().toLowerCase())) { const o = BPEnrichi.nouvelleLigne(BPEnrichi.listeSpec('swot', 'swot_actions')); o.element = e.titre; o.cat = lib[e.cat] || ''; o.validation = 'À valider'; l.push(o); n++; } });
+  enrRerendre('swot', 'swot_actions');
+  if (n) markDirty(); else alert('Tous les éléments de la SWOT figurent déjà dans le plan d\'action.');
+}
+function enrApercuResume(mode) {
+  const zone = document.getElementById('enr-apercu-resume'); if (!zone) return;
+  const html = BPEnrichi.blocs('resume_executif', { nom_projet: bp && bp.nom_projet, sections }, { esc, modes: [mode] }).map(b => '<h4 style="margin:6px 0;">' + esc(b.titre) + '</h4>' + b.html).join('');
+  zone.innerHTML = html || '<p style="color:var(--muted);font-size:12px;">Aucune information à résumer pour le moment.</p>';
+}
+
 function renderSection(key) {
   const content = document.getElementById('bp-content');
   const def = SECTIONS.find(s=>s.key===key);
@@ -1277,6 +1383,10 @@ function renderSection(key) {
   };
   const fn = renderers[key] || (() => '<div class="bp-section"><div class="bp-card-inner"><p>Section en cours de développement.</p></div></div>');
   content.innerHTML = fn();
+  if (!def?.noSave && typeof BPEnrichi !== 'undefined' && BPEnrichi.aDesAjouts(key)) {   /* compléments facultatifs de la rubrique */
+    BPEnrichi.ensureCss();
+    content.insertAdjacentHTML('beforeend', `<div class="bp-section">${BPEnrichi.editeurHtml(key, sections[key] || {}, { esc, ro: monRole === 'lecteur' })}</div>`);
+  }
   if (!def?.noSave && key !== 'completude') { content.insertAdjacentHTML('beforeend', bpPJBloc(key)); bpPJCharger(key); }   /* pièces jointes de la rubrique */
   if (key === 'plan_financier') calcAllFinance();
   if (key === 'produits') (sections.produits?.etude_prix||[]).forEach((_,i)=>calcMargeEtudePrix(i));
@@ -1285,6 +1395,11 @@ function renderSection(key) {
   if (key === 'annexes') bpLoadBiblioDocuments();
   if (key === 'financement') bpCalcDilution();
   if (key === 'rh') bpCalcMasseSalariale();
+  content.oninput = key === 'rh' ? rhPlanifier : null;
+  if (key === 'rh') rhRafraichir();
+  if (key === 'organisation') ogInit();
+  if (key === 'marche') marcheInit();
+  if (key === 'strategie_marketing') mkInit();
   if (!def?.noSave && monRole !== 'lecteur') {
     content.insertAdjacentHTML('beforeend', `
       <div class="bp-section" style="padding-top:0;">
@@ -2379,12 +2494,43 @@ function renderMarche() {
   const segments = s.segments_clients || [{ nom_segment:'' }];
   return `<div class="bp-section">
     <div class="bp-section-head"><h2>📊 Étude de marché</h2></div>
+    <!-- Indicateurs clés (2026-11-10) : quatre chiffres en tête de la page « Étude de marché » du dossier. -->
+    <div class="bp-card-inner"><h3>Indicateurs clés (en tête de page)</h3>
+      <p class="bp-intro">Jusqu'à quatre chiffres qui ouvrent l'étude de marché dans le dossier. Chaque chiffre doit pouvoir être justifié : indiquez son origine dans « Sources des données » plus bas.</p>
+      <div class="bp-ind-tuiles">${[0,1,2,3].map(i => { const t = (s.indicateurs_cles||[])[i] || {}; return `<div class="bp-ligne-edit">
+        <div><label for="ind-${i}-valeur">Valeur ${i+1}</label><input id="ind-${i}-valeur" value="${escA(t.valeur||'')}" placeholder="Ex : 32 M€, +8 %" oninput="updIndicateur(${i},'valeur',this.value)"></div>
+        <div><label for="ind-${i}-libelle">Intitulé</label><input id="ind-${i}-libelle" value="${escA(t.libelle||'')}" placeholder="Ex : Marché diaspora estimé" oninput="updIndicateur(${i},'libelle',this.value)"></div>
+        <div><label for="ind-${i}-perimetre">Périmètre</label><input id="ind-${i}-perimetre" value="${escA(t.perimetre||'')}" placeholder="Ex : France / an" oninput="updIndicateur(${i},'perimetre',this.value)"></div>
+      </div>`; }).join('')}</div>
+    </div>
     <div class="bp-card-inner bp-niveau-2"><h3>Taille du marché — TAM / SAM / SOM</h3>
       <p style="font-size:12.5px;color:var(--muted);margin:0 0 10px;">TAM : marché total adressable. SAM : marché accessible avec votre modèle. SOM : marché réellement visé à court terme.</p>
       <div class="fg">
         <div>${field('tam','TAM — Marché total adressable','','number')}${provenanceWidget('marche','tam')}</div>
         <div>${field('sam','SAM — Marché accessible','','number')}${provenanceWidget('marche','sam')}</div>
         <div>${field('som','SOM — Marché réellement visé','','number')}${provenanceWidget('marche','som')}</div>
+      </div>
+      <div id="mo-emboit" role="status"></div>
+    </div>
+    <!-- Contrôle de cohérence (2026-11-10) : part visée × marché = objectif annoncé. Né d'un cas réel
+         (0,5 % de 32 M€ = 160 000 €, alors que 90 000 € était annoncé). -->
+    <div class="bp-card-inner bp-niveau-2">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:8px;flex-wrap:wrap;">
+        <h3 style="margin:0;">Objectifs de part de marché — contrôle de cohérence</h3>
+        <button type="button" class="bp-btn-mini" onclick="moAjouter()">+ Ajouter un objectif</button>
+      </div>
+      <p class="bp-intro">Pour chaque marché visé : montant du marché × part visée = objectif annoncé. L'éditeur refait le calcul pour qu'un objectif ne contredise jamais la part visée.</p>
+      <div id="mo-list">${moListeHtml()}</div>
+    </div>
+    <div class="bp-card-inner"><h3>Sources des données et argumentation</h3>
+      <p class="bp-intro">Ce qui rend les chiffres crédibles pour un financeur : d'où ils viennent, ce qui est réellement accessible, comment on achète, comment on distribue, à quel prix, et ce qui prouve la demande.</p>
+      <div class="fg">
+        ${textarea('sources_donnees','Sources des données','Organisme, étude, année et méthode de calcul de chaque chiffre…',3,true)}
+        ${textarea('marche_accessible_detail','Marché accessible','Part du marché réellement atteignable selon vos canaux de vente…',3,true)}
+        ${textarea('comportement_achat','Comportement d\'achat','Fréquence d\'achat, panier moyen, budget, préférences…',3,true)}
+        ${textarea('canaux_distribution_global','Canaux de distribution','E-commerce, épiceries, grossistes, hôtels, événements…',3,true)}
+        ${textarea('analyse_prix','Analyse des prix','Prix au kilo, au litre ou à l\'unité, marges, positionnement face aux concurrents…',3,true)}
+        ${textarea('validation_marche','Validation du marché','Précommandes, enquêtes, tests produits, intentions d\'achat…',3,true)}
       </div>
     </div>
     <div class="bp-card-inner"><h3>Le marché global</h3><div class="fg">
@@ -2443,6 +2589,22 @@ function renderMarche() {
       ${textarea('positionnement','Positionnement','Comment vous positionnez-vous ?',3,true)}
       ${textarea('avantage_concurrentiel','Avantage concurrentiel','Ce qui vous donne un avantage durable…',3,true)}
     </div></div>
+    <!-- Conclusion de faisabilité commerciale (2026-11-10) : trois parties, brouillon assemblé avec la
+         saisie puis validé par l'utilisateur avant d'entrer dans le dossier. -->
+    <div class="bp-card-inner"><h3>Conclusion de faisabilité commerciale</h3>
+      <p class="bp-intro">À écrire vous-même, ou à partir d'une proposition assemblée avec ce que vous avez saisi dans la rubrique (rien n'est ajouté). Une proposition n'est reprise dans le dossier qu'après votre validation.</p>
+      <div class="fg">
+        <div class="full"><label for="fz-attractivite">Attractivité du marché</label><textarea id="fz-attractivite" rows="3" placeholder="Taille, croissance et demande potentielle…" ${monRole==='lecteur'?'readonly':''} oninput="updFaisab('attractivite',this.value)">${esc((s.faisabilite||{}).attractivite||'')}</textarea></div>
+        <div class="full"><label for="fz-penetration">Capacité de pénétration</label><textarea id="fz-penetration" rows="3" placeholder="Clientèle accessible, prix, concurrence et distribution…" ${monRole==='lecteur'?'readonly':''} oninput="updFaisab('penetration',this.value)">${esc((s.faisabilite||{}).penetration||'')}</textarea></div>
+        <div class="full"><label for="fz-conditions">Conditions de réussite</label><textarea id="fz-conditions" rows="3" placeholder="Approvisionnement, réglementation, validation commerciale et financement…" ${monRole==='lecteur'?'readonly':''} oninput="updFaisab('conditions',this.value)">${esc((s.faisabilite||{}).conditions||'')}</textarea></div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px;">
+        ${monRole==='lecteur' ? '' : `<button type="button" class="bp-btn-mini" onclick="faisabProposer()">Proposer une conclusion</button>
+        <button type="button" class="bp-btn-mini" id="fz-valider" onclick="faisabValider()" ${s.faisabilite_validee===false?'':'hidden'}>Valider la conclusion</button>`}
+        <span id="fz-statut">${faisabStatutHtml()}</span>
+      </div>
+      <p class="bp-note" id="fz-note" role="status"></p>
+    </div>
     <!-- Matrice PESTEL (2026-08-31) : les 6 familles de facteurs macro-environnementaux,
          complémentaire du SWOT (qui reste centré projet/marché immédiat) -- outil standard
          des dossiers de création d'entreprise, absent jusqu'ici du module. -->
@@ -2459,6 +2621,90 @@ function renderMarche() {
     </div>
   </div>`;
 }
+/* ---- Étude de marché : indicateurs, cohérence, conclusion (2026-11-10) — voir assets/bp-marche.js ---- */
+function updIndicateur(i, key, val) {
+  if (!sections.marche) sections.marche = {};
+  const l = Array.isArray(sections.marche.indicateurs_cles) ? sections.marche.indicateurs_cles : [];
+  while (l.length < 4) l.push({});
+  l[i][key] = val; sections.marche.indicateurs_cles = l;
+  markDirty();
+}
+function moLignes() { if (!sections.marche) sections.marche = {}; if (!Array.isArray(sections.marche.objectifs_part)) sections.marche.objectifs_part = []; return sections.marche.objectifs_part; }
+function moResultatHtml(i) {
+  const l = moLignes()[i]; if (!l) return '';
+  const r = BPMarche.controleObjectifs([l])[0]; if (!r) return '';
+  const calc = (r.attendu !== null && r.attendu !== undefined) ? BPMarche.fmtPct(r.pct) + ' de ' + BPMarche.fmtMontant(r.montant, r.devise) + ' = ' + BPMarche.fmtMontant(r.attendu, r.devise) : '';
+  const bouton = (r.attendu !== null && r.attendu !== undefined && monRole !== 'lecteur') ? ` <button type="button" class="bp-btn-mini" onclick="moAppliquer(${i})">Utiliser ${esc(BPMarche.fmtMontant(r.attendu, r.devise))} comme objectif</button>` : '';
+  if (r.statut === 'ok') return `<p class="bp-note ok">Cohérent — ${esc(calc)}.</p>`;
+  if (r.statut === 'incoherent') return `<p class="bp-note alerte" role="alert"><strong>Incohérence :</strong> ${esc(r.message)}${bouton}</p>`;
+  return calc ? `<p class="bp-note">Calcul : ${esc(calc)}.${bouton}</p>` : `<p class="bp-note">Renseignez le montant du marché, la part visée et l'objectif pour vérifier le calcul.</p>`;
+}
+function moListeHtml() {
+  const ro = monRole === 'lecteur', l = moLignes();
+  if (!l.length) return `<p class="bp-intro" style="margin:0;">Aucun objectif pour l'instant. Ajoutez par exemple « Marché diaspora France » : 32 000 000 × 0,5 % = 160 000.</p>`;
+  return l.map((r, i) => `<div class="bp-ligne-edit">
+    <div class="fg">
+      <div><label for="mo-${i}-marche">Marché visé</label><input id="mo-${i}-marche" value="${escA(r.marche||'')}" placeholder="Ex : Diaspora en France" ${ro?'readonly':''} oninput="moMaj(${i},'marche',this.value)"></div>
+      <div><label for="mo-${i}-devise">Devise</label><input id="mo-${i}-devise" value="${escA(r.devise||'')}" placeholder="€, FCFA…" ${ro?'readonly':''} oninput="moMaj(${i},'devise',this.value)"></div>
+      <div><label for="mo-${i}-montant">Montant du marché (par an)</label><input id="mo-${i}-montant" type="number" min="0" step="any" value="${escA(r.montant||'')}" ${ro?'readonly':''} oninput="moMaj(${i},'montant',this.value)"></div>
+      <div><label for="mo-${i}-part">Part visée (%)</label><input id="mo-${i}-part" type="number" min="0" max="100" step="any" value="${escA(r.part_pct||'')}" ${ro?'readonly':''} oninput="moMaj(${i},'part_pct',this.value)"></div>
+      <div><label for="mo-${i}-objectif">Objectif annoncé (montant)</label><input id="mo-${i}-objectif" type="number" min="0" step="any" value="${escA(r.objectif||'')}" ${ro?'readonly':''} oninput="moMaj(${i},'objectif',this.value)"></div>
+      ${ro ? '' : `<div style="align-self:end;"><button type="button" class="bp-btn-mini" onclick="moRetirer(${i})">Retirer cet objectif</button></div>`}
+    </div>
+    <div id="mo-res-${i}" role="status">${moResultatHtml(i)}</div>
+  </div>`).join('');
+}
+function moMaj(i, key, val) { const l = moLignes(); if (!l[i]) return; l[i][key] = val; const z = document.getElementById('mo-res-' + i); if (z) z.innerHTML = moResultatHtml(i); markDirty(); }
+function moAjouter() { moLignes().push({ marche: '', montant: '', part_pct: '', objectif: '', devise: '€' }); document.getElementById('mo-list').innerHTML = moListeHtml(); markDirty(); }
+function moRetirer(i) { moLignes().splice(i, 1); document.getElementById('mo-list').innerHTML = moListeHtml(); markDirty(); }
+function moAppliquer(i) {
+  const l = moLignes()[i], r = l && BPMarche.controleObjectifs([l])[0];
+  if (!r || r.attendu === null || r.attendu === undefined) return;
+  l.objectif = String(Math.round(r.attendu * 100) / 100);
+  document.getElementById('mo-list').innerHTML = moListeHtml(); markDirty();
+}
+function marcheControleEmboit() {
+  const z = document.getElementById('mo-emboit'); if (!z) return;
+  const m = sections.marche || {}, msgs = BPMarche.controleEmboitement(m);
+  z.innerHTML = msgs.map(t => `<p class="bp-note alerte">${esc(t)}</p>`).join('');
+}
+function marcheInit() {
+  ['tam', 'sam', 'som'].forEach(k => { const el = document.querySelector(`[data-key="${k}"]`); if (el) el.addEventListener('input', marcheControleEmboit); });
+  marcheControleEmboit();
+}
+function faisabStatutHtml() {
+  const m = sections.marche || {}, f = m.faisabilite || {};
+  if (!(String(f.attractivite||'') + String(f.penetration||'') + String(f.conditions||'')).trim()) return '';
+  return m.faisabilite_validee === false ? `<span class="bp-badge-statut brouillon">Brouillon proposé — à valider avant de figurer dans le dossier</span>` : `<span class="bp-badge-statut valide">Validée</span>`;
+}
+function updFaisab(key, val) {
+  if (!sections.marche) sections.marche = {};
+  if (!sections.marche.faisabilite) sections.marche.faisabilite = {};
+  sections.marche.faisabilite[key] = val;
+  if (sections.marche.faisabilite_validee !== false) sections.marche.faisabilite_validee = true;   /* écrite à la main = validée ; un brouillon reste brouillon jusqu'au clic sur « Valider » */
+  const z = document.getElementById('fz-statut'); if (z) z.innerHTML = faisabStatutHtml();
+  markDirty();
+}
+function faisabProposer() {
+  const p = BPMarche.proposerFaisabilite(sections.marche || {}), note = document.getElementById('fz-note');
+  if (!(p.attractivite + p.penetration + p.conditions)) { if (note) note.textContent = "Renseignez d'abord quelques champs de la rubrique (taille du marché, prix, canaux, réglementation…) : la proposition est assemblée à partir de votre saisie."; return; }
+  const f = (sections.marche || {}).faisabilite || {};
+  if ((String(f.attractivite||'') + String(f.penetration||'') + String(f.conditions||'')).trim() && !confirm('Remplacer les textes actuels par une nouvelle proposition ?')) return;
+  sections.marche.faisabilite = p; sections.marche.faisabilite_validee = false;
+  ['attractivite', 'penetration', 'conditions'].forEach(k => { const t = document.getElementById('fz-' + k); if (t) t.value = p[k]; });
+  const z = document.getElementById('fz-statut'); if (z) z.innerHTML = faisabStatutHtml();
+  const v = document.getElementById('fz-valider'); if (v) v.hidden = false;
+  if (note) note.textContent = "Proposition assemblée avec vos champs, sans aucune donnée ajoutée. Complétez, corrigez, puis validez.";
+  markDirty();
+}
+function faisabValider() {
+  sections.marche.faisabilite_validee = true;
+  const z = document.getElementById('fz-statut'); if (z) z.innerHTML = faisabStatutHtml();
+  const v = document.getElementById('fz-valider'); if (v) v.hidden = true;
+  const note = document.getElementById('fz-note'); if (note) note.textContent = 'Conclusion validée : elle figurera dans le dossier investisseur.';
+  markDirty();
+}
+
 function renderSegmentsClients(list) {
   return list.map((seg,i) => `
     <div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;background:var(--bg);">
@@ -2478,6 +2724,7 @@ function renderSegmentsClients(list) {
         <div><label>Critères de décision${helpIcon('segment_criteres')}</label><input value="${esc(seg.criteres_decision||'')}" oninput="updSegmentClient(${i},'criteres_decision',this.value)"></div>
         <div><label>Comportement d'achat${helpIcon('segment_comportement')}</label><input value="${esc(seg.comportement_achat||'')}" oninput="updSegmentClient(${i},'comportement_achat',this.value)"></div>
         <div><label>Canal d'achat privilégié${helpIcon('segment_canal')}</label><input value="${esc(seg.canal_achat||'')}" oninput="updSegmentClient(${i},'canal_achat',this.value)"></div>
+        <div><label>Priorité commerciale (0-100)${helpIcon('segment_priorite')}</label><input type="number" min="0" max="100" value="${esc(seg.priorite||'')}" placeholder="Ex : 80" oninput="updSegmentClient(${i},'priorite',this.value)"></div>
       </div>
     </div>`).join('');
 }
@@ -2594,6 +2841,14 @@ function renderConcurrents(list) {
         <div><label>Ancienneté${helpIcon('concurrent_anciennete')}</label><input value="${esc(c.anciennete||'')}" placeholder="Ex : 5 ans" oninput="updConcurrent(${i},'anciennete',this.value)"></div>
         <div><label>Présence géographique${helpIcon('concurrent_presence_geo')}</label><input value="${esc(c.presence_geographique||'')}" oninput="updConcurrent(${i},'presence_geographique',this.value)"></div>
         <div><label>Canaux de distribution${helpIcon('concurrent_canaux')}</label><input value="${esc(c.canaux_distribution||'')}" oninput="updConcurrent(${i},'canaux_distribution',this.value)"></div>
+        <div><label>Prix de vente au kilo${helpIcon('concurrent_prix_kg')}</label><input value="${esc(c.prix_kg||'')}" placeholder="Ex : 12 €/kg" oninput="updConcurrent(${i},'prix_kg',this.value)"></div>
+        <div><label>Origine des produits${helpIcon('concurrent_origine')}</label><input value="${esc(c.origine_produits||'')}" oninput="updConcurrent(${i},'origine_produits',this.value)"></div>
+        <div><label>Qualité des emballages${helpIcon('concurrent_emballage')}</label><input value="${esc(c.qualite_emballage||'')}" oninput="updConcurrent(${i},'qualite_emballage',this.value)"></div>
+        <div><label>Certifications${helpIcon('concurrent_certifications')}</label><input value="${esc(c.certifications||'')}" placeholder="Bio, ISO, label…" oninput="updConcurrent(${i},'certifications',this.value)"></div>
+        <div><label>Traçabilité${helpIcon('concurrent_tracabilite')}</label><input value="${esc(c.tracabilite||'')}" oninput="updConcurrent(${i},'tracabilite',this.value)"></div>
+        <div><label>Statut des informations${helpIcon('concurrent_statut_donnee')}</label><select onchange="updConcurrent(${i},'statut_donnee',this.value)">
+          ${[['','À préciser'],['verifie','Vérifié (sources contrôlées)'],['a_verifier','À vérifier'],['hypothese','Hypothèse (concurrent supposé)']].map(([v,l])=>`<option value="${v}" ${(c.statut_donnee||'')===v?'selected':''}>${l}</option>`).join('')}
+        </select></div>
         <div><label>Réputation${helpIcon('concurrent_reputation')}</label><input value="${esc(c.reputation||'')}" oninput="updConcurrent(${i},'reputation',this.value)"></div>
         <div><label>Avantages technologiques${helpIcon('concurrent_avantages_tech')}</label><input value="${esc(c.avantages_technologiques||'')}" oninput="updConcurrent(${i},'avantages_technologiques',this.value)"></div>
         <div><label>Avantages commerciaux${helpIcon('concurrent_avantages_commerciaux')}</label><input value="${esc(c.avantages_commerciaux||'')}" oninput="updConcurrent(${i},'avantages_commerciaux',this.value)"></div>
@@ -2645,22 +2900,155 @@ function updConcurrent(i,key,val) {
 }
 
 /* ---- 7. SWOT ---- */
-function renderSWOT() {
+/* SWOT structuré (2026-11-10) — voir assets/bp-swot.js pour le modèle de données.
+   Plusieurs éléments par case, avec niveau d'impact, justification, conséquence et action
+   corrective ; les quatre textes historiques (forces, faiblesses…) sont recalculés à chaque
+   modification pour que le reste de la plateforme continue de les lire. */
+const swotOuverts = new Set();
+const SWOT_PH = {
+  forces: 'Ex : équipe complémentaire, accès direct à la diaspora…',
+  faiblesses: 'Ex : capacité de production limitée, trésorerie tendue…',
+  opportunites: 'Ex : demande croissante, nouveau canal de distribution…',
+  menaces: 'Ex : aléas climatiques, volatilité des matières premières…',
+};
+function swotEls() { if (!sections.swot) sections.swot = {}; if (!Array.isArray(sections.swot.elements)) sections.swot.elements = BPSwot.elements(sections.swot); return sections.swot.elements; }
+function swotParId(id) { return swotEls().find(e => e.id === id); }
+function swotBarreHtml(e) {
+  const c = BPSwot.cat(e.cat), n = BPSwot.impactNum(e.impact);
+  return `<span aria-hidden="true" style="display:inline-flex;gap:3px;--c:${c.color};">${[1,2,3,4].map(i => `<span class="swot-seg ${i<=n?'on':''}"></span>`).join('')}</span><span class="lib">Impact : ${BPSwot.niveauLabel(e.cat, n)}</span>`;
+}
+function swotLigneHtml(e, ro) {
+  const c = BPSwot.cat(e.cat), ouvert = swotOuverts.has(e.id);
+  const aDetail = !!(String(e.justification||'').trim() || String(e.consequence||'').trim() || String(e.action||'').trim());
+  const ta = (champ, lib, ph) => `<div><label for="swot-${e.id}-${champ}">${lib}</label><textarea id="swot-${e.id}-${champ}" rows="2" placeholder="${ph}" ${ro?'readonly':''} oninput="swotMaj('${e.id}','${champ}',this.value)">${esc(e[champ]||'')}</textarea></div>`;
+  return `<div class="swot-item" data-id="${e.id}">
+    <div class="swot-ligne">
+      <input class="swot-titre" aria-label="Élément — ${c.label}" value="${escA(e.titre||'')}" placeholder="${SWOT_PH[e.cat]}" ${ro?'readonly':''} oninput="swotMaj('${e.id}','titre',this.value)">
+      <select class="swot-impact" aria-label="Niveau d'impact" ${ro?'disabled':''} onchange="swotMaj('${e.id}','impact',this.value)">
+        ${[0,1,2,3,4].map(n => `<option value="${n}" ${BPSwot.impactNum(e.impact)===n?'selected':''}>${n ? 'Impact : ' + BPSwot.niveauLabel(e.cat, n) : 'Impact : à évaluer'}</option>`).join('')}
+      </select>
+      <button type="button" class="swot-btn" id="swot-btn-${e.id}" aria-expanded="${ouvert}" aria-controls="swot-det-${e.id}" onclick="swotDetails('${e.id}')">Détails${aDetail ? ' ●' : ''}</button>
+      ${ro ? '' : `<button type="button" class="swot-btn" aria-label="Retirer cet élément" onclick="swotSupprimer('${e.id}')">Retirer</button>`}
+    </div>
+    <div class="swot-barre" id="swot-barre-${e.id}">${swotBarreHtml(e)}</div>
+    <div class="swot-details" id="swot-det-${e.id}" ${ouvert ? '' : 'hidden'}>
+      ${ta('justification', 'Justification — pourquoi ce niveau ?', 'Un fait, un chiffre, une preuve…')}
+      ${ta('consequence', 'Conséquence pour le projet', c.positif ? 'Ce que cela permet…' : 'Ce que cela risque de provoquer…')}
+      ${ta('action', 'Action stratégique / corrective', c.positif ? 'Comment en tirer parti…' : 'Comment réduire ou contourner ce point…')}
+    </div>
+  </div>`;
+}
+function swotGrilleHtml(ro) {
+  const els = swotEls();
+  return `<div class="swot-grid">${BPSwot.CATS.map(c => {
+    const liste = els.filter(e => e.cat === c.key);
+    return `<div class="swot-cell ${c.key}" role="group" aria-label="${c.label}">
+      <label>${c.label} (${c.origine}s)${helpIcon('swot_' + c.key)} <span class="swot-count" id="swot-count-${c.key}">${liste.filter(e => String(e.titre||'').trim()).length}</span></label>
+      ${liste.length ? liste.map(e => swotLigneHtml(e, ro)).join('') : `<p class="swot-vide">Aucun élément pour l'instant.</p>`}
+      ${ro ? '' : `<button type="button" class="swot-add" onclick="swotAjouter('${c.key}')">+ Ajouter ${c.singulier}</button>`}
+    </div>`;
+  }).join('')}</div>`;
+}
+function swotPlanHtml() {
+  const els = swotEls(), plan = BPSwot.planActions(els), b = BPSwot.bilan(els);
+  const notes = [];
+  if (b.sansImpact) notes.push(`${b.sansImpact} élément${b.sansImpact>1?'s':''} sans niveau d'impact`);
+  if (b.total && b.sansAction) notes.push(`${b.sansAction} élément${b.sansAction>1?'s':''} sans action (bouton « Détails »)`);
+  return (plan.length ? `<table class="bp-table-mini"><thead><tr><th>Constat</th><th>Action stratégique</th><th>Priorité</th></tr></thead><tbody>
+    ${plan.map(r => `<tr><td><strong>${esc(r.titre)}</strong><br><span style="font-size:11.5px;color:var(--muted);">${BPSwot.cat(r.cat).label}</span></td><td>${esc(r.action)}</td><td class="pri">${r.priorite.niveau}</td></tr>`).join('')}
+    </tbody></table>` : `<p class="bp-intro" style="margin:0;">Aucune action pour l'instant. Dans chaque élément, le bouton « Détails » permet de saisir l'action prévue : elle apparaît ici, classée par priorité.</p>`)
+    + (notes.length ? `<p class="bp-note">À compléter : ${notes.join(' · ')}.</p>` : '');
+}
+function swotSyntheseStatutHtml() {
   const s = sections.swot || {};
+  if (!String(s.synthese||'').trim()) return '';
+  return s.synthese_validee === false
+    ? `<span class="bp-badge-statut brouillon">Brouillon proposé — à valider avant de figurer dans le dossier</span>`
+    : `<span class="bp-badge-statut valide">Validée</span>`;
+}
+function swotRafraichir(id) {
+  const e = id && swotParId(id);
+  if (e) { const b = document.getElementById('swot-barre-' + id); if (b) b.innerHTML = swotBarreHtml(e); }
+  BPSwot.CATS.forEach(c => { const n = document.getElementById('swot-count-' + c.key); if (n) n.textContent = swotEls().filter(x => x.cat === c.key && String(x.titre||'').trim()).length; });
+  const p = document.getElementById('swot-plan'); if (p) p.innerHTML = swotPlanHtml();
+  const prop = document.getElementById('swot-proposer'); if (prop) prop.disabled = !BPSwot.bilan(swotEls()).total;
+}
+function swotSync() { Object.assign(sections.swot, BPSwot.textes(swotEls())); markDirty(); }
+function swotMaj(id, champ, val) {
+  const e = swotParId(id); if (!e) return;
+  e[champ] = champ === 'impact' ? BPSwot.impactNum(val) : val;
+  if (champ === 'impact') { const sel = document.querySelector(`.swot-item[data-id="${id}"] .swot-impact`); if (sel) sel.setAttribute('aria-valuetext', BPSwot.niveauLabel(e.cat, e.impact)); }
+  swotSync(); swotRafraichir(id);
+  if (champ !== 'titre' && champ !== 'impact') { const btn = document.getElementById('swot-btn-' + id); if (btn) btn.textContent = 'Détails' + (String((e.justification||'') + (e.consequence||'') + (e.action||'')).trim() ? ' ●' : ''); }
+}
+function swotRedessiner(focusId) {
+  const w = document.getElementById('swot-wrap'); if (!w) return;
+  w.innerHTML = swotGrilleHtml(monRole === 'lecteur'); swotRafraichir();
+  if (focusId) { const i = document.querySelector(`.swot-item[data-id="${focusId}"] .swot-titre`); if (i) i.focus(); }
+}
+function swotAjouter(catKey) { const e = BPSwot.vide(catKey); swotEls().push(e); swotSync(); swotRedessiner(e.id); }
+function swotSupprimer(id) {
+  const e = swotParId(id); if (!e) return;
+  if ((String(e.titre||'').trim() || String(e.action||'').trim()) && !confirm('Retirer cet élément du SWOT ?')) return;
+  sections.swot.elements = swotEls().filter(x => x.id !== id); swotOuverts.delete(id); swotSync(); swotRedessiner();
+}
+function swotDetails(id) {
+  const d = document.getElementById('swot-det-' + id), b = document.getElementById('swot-btn-' + id); if (!d) return;
+  const ouvrir = d.hasAttribute('hidden');
+  if (ouvrir) { d.removeAttribute('hidden'); swotOuverts.add(id); } else { d.setAttribute('hidden', ''); swotOuverts.delete(id); }
+  if (b) b.setAttribute('aria-expanded', String(ouvrir));
+}
+function swotSyntheseSaisie(val) {
+  sections.swot.synthese = val;
+  if (sections.swot.synthese_validee !== false) sections.swot.synthese_validee = true;   /* écrite à la main = validée ; un brouillon proposé le reste jusqu'au clic sur « Valider » */
+  const z = document.getElementById('swot-synthese-statut'); if (z) z.innerHTML = swotSyntheseStatutHtml();
+  markDirty();
+}
+function swotProposer() {
+  const txt = BPSwot.proposerSynthese(swotEls()), note = document.getElementById('swot-synthese-note');
+  if (!txt) { if (note) note.textContent = "Ajoutez d'abord quelques éléments au SWOT : la proposition est assemblée à partir de votre saisie."; return; }
+  const actuel = String(sections.swot.synthese||'').trim();
+  if (actuel && !confirm('Remplacer le texte actuel par une nouvelle proposition ?')) return;
+  sections.swot.synthese = txt; sections.swot.synthese_validee = false;
+  const ta = document.getElementById('swot-synthese'); if (ta) ta.value = txt;
+  const z = document.getElementById('swot-synthese-statut'); if (z) z.innerHTML = swotSyntheseStatutHtml();
+  const v = document.getElementById('swot-valider'); if (v) v.hidden = false;
+  if (note) note.textContent = "Proposition assemblée avec vos éléments, sans aucune donnée ajoutée. Relisez-la, corrigez-la si besoin, puis validez-la.";
+  markDirty();
+}
+function swotValider() {
+  if (!String(sections.swot.synthese||'').trim()) return;
+  sections.swot.synthese_validee = true;
+  const z = document.getElementById('swot-synthese-statut'); if (z) z.innerHTML = swotSyntheseStatutHtml();
+  const v = document.getElementById('swot-valider'); if (v) v.hidden = true;
+  const note = document.getElementById('swot-synthese-note'); if (note) note.textContent = 'Synthèse validée : elle figurera dans le dossier investisseur.';
+  markDirty();
+}
+function renderSWOT() {
+  if (!sections.swot) sections.swot = {};
+  sections.swot.elements = BPSwot.elements(sections.swot);   /* relit aussi les textes modifiés ailleurs (assistant, import) */
+  const s = sections.swot;
   const ro = monRole==='lecteur';
+  const brouillon = s.synthese_validee === false && String(s.synthese||'').trim();
   return `<div class="bp-section">
     <div class="bp-section-head"><h2>⚡ Analyse SWOT</h2><p>Forces · Faiblesses · Opportunités · Menaces</p></div>
     <div class="bp-card-inner">
-      <div class="swot-grid">
-        <div class="swot-cell forces"><label>💪 Forces (internes)${helpIcon('swot_forces')}</label>
-          <textarea data-swot="forces" placeholder="Vos atouts, ressources, compétences uniques…" ${ro?'readonly':''} oninput="updateSwot('forces',this.value)">${esc(s.forces||'')}</textarea></div>
-        <div class="swot-cell faiblesses"><label>🔻 Faiblesses (internes)${helpIcon('swot_faiblesses')}</label>
-          <textarea data-swot="faiblesses" placeholder="Vos points faibles, manques à combler…" ${ro?'readonly':''} oninput="updateSwot('faiblesses',this.value)">${esc(s.faiblesses||'')}</textarea></div>
-        <div class="swot-cell opportunites"><label>🌟 Opportunités (externes)${helpIcon('swot_opportunites')}</label>
-          <textarea data-swot="opportunites" placeholder="Tendances favorables, marchés ouverts…" ${ro?'readonly':''} oninput="updateSwot('opportunites',this.value)">${esc(s.opportunites||'')}</textarea></div>
-        <div class="swot-cell menaces"><label>⚠️ Menaces (externes)${helpIcon('swot_menaces')}</label>
-          <textarea data-swot="menaces" placeholder="Risques externes, concurrence, réglementation…" ${ro?'readonly':''} oninput="updateSwot('menaces',this.value)">${esc(s.menaces||'')}</textarea></div>
+      <p class="bp-intro">Ajoutez autant d'éléments que nécessaire dans chaque case. Pour chacun, choisissez un niveau d'impact et, dans « Détails », indiquez ce qui le justifie, sa conséquence et l'action prévue. Les niveaux sont des repères à justifier, pas des mesures.</p>
+      <div id="swot-wrap">${swotGrilleHtml(ro)}</div>
+    </div>
+    <div class="bp-card-inner bp-niveau-2"><h3>Plan d'action prioritaire</h3>
+      <p class="bp-intro">Construit automatiquement à partir des actions saisies ci-dessus. La priorité découle du niveau d'impact de chaque élément.</p>
+      <div id="swot-plan">${swotPlanHtml()}</div>
+    </div>
+    <div class="bp-card-inner"><h3>Lecture stratégique du SWOT</h3>
+      <p class="bp-intro">Quelques lignes qui disent ce que le SWOT implique pour le projet. Vous pouvez les écrire vous-même ou partir d'une proposition assemblée avec vos éléments ; une proposition n'est reprise dans le dossier qu'après votre validation.</p>
+      <textarea id="swot-synthese" rows="5" ${ro?'readonly':''} aria-label="Lecture stratégique du SWOT" placeholder="Ex : Le projet dispose d'atouts commerciaux et humains… Sa priorité est de sécuriser…" oninput="swotSyntheseSaisie(this.value)" style="width:100%;box-sizing:border-box;">${esc(s.synthese||'')}</textarea>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px;">
+        ${ro ? '' : `<button type="button" class="bp-btn-mini" id="swot-proposer" onclick="swotProposer()" ${BPSwot.bilan(s.elements).total?'':'disabled'}>Proposer une synthèse</button>
+        <button type="button" class="bp-btn-mini" id="swot-valider" onclick="swotValider()" ${brouillon?'':'hidden'}>Valider la synthèse</button>`}
+        <span id="swot-synthese-statut">${swotSyntheseStatutHtml()}</span>
       </div>
+      <p class="bp-note" id="swot-synthese-note" role="status"></p>
     </div>
     <!-- Prolongement du SWOT en plan d'action (2026-08-31) : la matrice seule dit "quoi",
          ce bloc dit "et donc on fait quoi" -- consolider/réduire/exploiter, comme dans les
@@ -2675,12 +3063,6 @@ function renderSWOT() {
     </div>
   </div>`;
 }
-function updateSwot(key,val) {
-  if (!sections.swot) sections.swot={};
-  sections.swot[key]=val;
-  markDirty();
-}
-
 /* ---- 8. Business Model Canvas ---- */
 function renderBMC() {
   const s = sections.business_model || {};
@@ -3049,7 +3431,123 @@ function renderMarketing() {
       </div>
       <div id="campagnes-list">${renderCampagnes(s.campagnes || [{ canal:'' }])}</div>
     </div>
+    <!-- Évolution du 2026-11-10 : parcours d'acquisition, budget par canal, plan d'action daté,
+         tableau de performance calculé, synthèse validée. Règle : on ne présente jamais une
+         performance inventée — chaque chiffre est marqué Objectif, Hypothèse ou Constaté. -->
+    <div class="bp-card-inner"><h3>Répartition du budget par canal</h3>
+      <p class="bp-intro">Calculée à partir des budgets des campagnes ci-dessus.</p>
+      <div id="mk-budget">${mkBudgetHtml()}</div>
+    </div>
+    <div class="bp-card-inner bp-niveau-2"><h3>Parcours d'acquisition client</h3>
+      <p class="bp-intro">Les quatre temps qui mènent un inconnu à devenir un client qui recommande. Modifiez les intitulés et décrivez ce que vous faites à chaque étape.</p>
+      ${[0,1,2,3].map(i => { const p = (s.parcours||[])[i] || {}; return `<div class="bp-ligne-edit"><div class="fg">
+        <div><label for="pc-${i}-etape">Étape ${i+1}</label><input id="pc-${i}-etape" value="${escA(p.etape||BPMarketing.PARCOURS_DEFAUT[i])}" oninput="updParcours(${i},'etape',this.value)"></div>
+        <div class="full"><label for="pc-${i}-desc">Ce que vous faites</label><input id="pc-${i}-desc" value="${escA(p.description||'')}" placeholder="${escA(BPMarketing.PARCOURS_EXEMPLES[i])}" oninput="updParcours(${i},'description',this.value)"></div>
+      </div></div>`; }).join('')}
+    </div>
+    <div class="bp-card-inner">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:8px;flex-wrap:wrap;">
+        <h3 style="margin:0;">Plan d'action marketing</h3>
+        ${monRole==='lecteur' ? '' : `<button type="button" class="bp-btn-mini" onclick="mkAjouterAction()">+ Ajouter une ligne</button>`}
+      </div>
+      <p class="bp-intro">Les actions, leur calendrier et les indicateurs qui diront si elles ont réussi. Indiquez à chaque ligne s'il s'agit d'une hypothèse, d'un objectif ou d'un fait constaté.</p>
+      <div id="mk-actions">${mkActionsHtml()}</div>
+    </div>
+    <div class="bp-card-inner bp-niveau-2"><h3>Tableau de performance marketing</h3>
+      <p class="bp-intro">Les indicateurs sont calculés lorsque les données existent dans le plan (campagnes, business model, plan commercial, plan financier). Choisissez pour chacun son statut : tant que rien n'est choisi, il est présenté comme une hypothèse.</p>
+      <div class="fg"><div>${field('nb_points_vente','Nombre de points de vente','Ex : 3','number')}</div></div>
+      <div id="mk-perf">${mkPerfHtml()}</div>
+    </div>
+    <div class="bp-card-inner"><h3>Synthèse stratégique</h3>
+      <p class="bp-intro">Quels canaux sont prioritaires, et quels résultats en attendre. À écrire vous-même ou à partir d'une proposition assemblée avec vos campagnes ; une proposition n'est reprise dans le dossier qu'après validation.</p>
+      <div class="fg">
+        <div class="full"><label for="mk-s-canaux">Canaux prioritaires</label><textarea id="mk-s-canaux" rows="3" ${monRole==='lecteur'?'readonly':''} oninput="mkSyntheseSaisie('canaux_prioritaires',this.value)">${esc((s.synthese||{}).canaux_prioritaires||'')}</textarea></div>
+        <div class="full"><label for="mk-s-resultats">Résultats attendus</label><textarea id="mk-s-resultats" rows="3" ${monRole==='lecteur'?'readonly':''} oninput="mkSyntheseSaisie('resultats_attendus',this.value)">${esc((s.synthese||{}).resultats_attendus||'')}</textarea></div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px;">
+        ${monRole==='lecteur' ? '' : `<button type="button" class="bp-btn-mini" onclick="mkProposer()">Proposer une synthèse</button>
+        <button type="button" class="bp-btn-mini" id="mk-valider" onclick="mkValider()" ${s.synthese_validee===false?'':'hidden'}>Valider la synthèse</button>`}
+        <span id="mk-s-statut">${mkSyntheseStatutHtml()}</span>
+      </div>
+      <p class="bp-note" id="mk-s-note" role="status"></p>
+    </div>
   </div>`;
+}
+/* ---- Stratégie marketing : budget, plan d'action, performance, synthèse — voir assets/bp-marketing.js ---- */
+function mkS() { if (!sections.strategie_marketing) sections.strategie_marketing = {}; return sections.strategie_marketing; }
+const MK_STATUT_OPTS = (cur) => Object.entries(BPMarketing.STATUTS).map(([v, l]) => `<option value="${v}" ${BPMarketing.statutDe(cur)===v?'selected':''}>${l}</option>`).join('');
+function mkBudgetHtml() {
+  const b = BPMarketing.budgetsParCanal(mkS()), alerte = BPMarketing.controleBudget(mkS());
+  if (!b.lignes.length) return `<p class="bp-intro" style="margin:0;">Renseignez le canal et le budget d'au moins une campagne : la répartition apparaît ici.</p>`;
+  return `<div class="mk-donut-zone">${BPMarketing.donutSvg(b.lignes, 170)}
+    <ul class="mk-legende">${b.lignes.map((l, i) => `<li><i style="background:${BPMarketing.PALETTE[i % BPMarketing.PALETTE.length]}"></i>${esc(l.canal)} <span class="v">${esc(BPMarketing.fmtMontant(l.budget))} · ${BPMarketing.fmtNb(l.pct)} %</span></li>`).join('')}
+    <li style="border-top:1px solid var(--border);margin-top:4px;padding-top:6px;"><strong>Total des canaux</strong><span class="v">${esc(BPMarketing.fmtMontant(b.total))}</span></li></ul></div>`
+    + (alerte ? `<p class="bp-note alerte" role="alert">${esc(alerte)}</p>` : '');
+}
+function mkPerfHtml() {
+  const s = mkS(), ctx = { business_model: sections.business_model, plan_commercial: sections.plan_commercial, presentation: sections.presentation, ca_annee1: mkCaAnnee1() };
+  const rows = BPMarketing.indicateursPerformance(s, ctx);
+  if (!rows.length) return `<p class="bp-intro" style="margin:0;">Aucun indicateur calculable pour l'instant : renseignez les campagnes (budget, prospects, conversions), le business model ou le plan commercial.</p>`;
+  return `<table class="bp-table-mini"><thead><tr><th>Indicateur</th><th>Valeur</th><th>Statut</th></tr></thead><tbody>${rows.map(r => `<tr>
+    <td><strong>${esc(r.label)}</strong><br><span style="font-size:11.5px;color:var(--muted);">${esc(r.mesure)} — ${esc(r.origine)}</span></td>
+    <td style="font-variant-numeric:tabular-nums;white-space:nowrap;"><strong>${esc(r.valeur)}</strong></td>
+    <td><select aria-label="Statut — ${escA(r.label)}" ${monRole==='lecteur'?'disabled':''} onchange="mkStatutIndicateur('${r.cle}',this.value)">${MK_STATUT_OPTS(r.statut)}</select></td></tr>`).join('')}</tbody></table>`;
+}
+function mkCaAnnee1() { try { const c = BPCalc.calcProduits(sections.plan_financier || {}); return c && c.annees && c.annees[0] ? c.annees[0].ca : 0; } catch (e) { return 0; } }
+function mkActionsHtml() {
+  const l = Array.isArray(mkS().plan_actions) ? mkS().plan_actions : [], ro = monRole === 'lecteur';
+  if (!l.length) return `<p class="bp-intro" style="margin:0;">Aucune ligne. Exemple : « Mois 1–2 — lancement de la marque, premières dégustations — indicateurs : visiteurs, prospects ».</p>`;
+  return l.map((a, i) => `<div class="bp-ligne-edit"><div class="fg">
+    <div><label for="pa-${i}-periode">Période</label><input id="pa-${i}-periode" value="${escA(a.periode||'')}" placeholder="Ex : Mois 1–2" ${ro?'readonly':''} oninput="mkMajAction(${i},'periode',this.value)"></div>
+    <div><label for="pa-${i}-budget">Budget</label><input id="pa-${i}-budget" type="number" min="0" value="${escA(a.budget||'')}" ${ro?'readonly':''} oninput="mkMajAction(${i},'budget',this.value)"></div>
+    <div class="full"><label for="pa-${i}-actions">Actions prévues</label><input id="pa-${i}-actions" value="${escA(a.actions||'')}" ${ro?'readonly':''} oninput="mkMajAction(${i},'actions',this.value)"></div>
+    <div class="full"><label for="pa-${i}-ind">Indicateurs de réussite</label><input id="pa-${i}-ind" value="${escA(a.indicateurs||'')}" placeholder="Ex : visiteurs, coût d'acquisition" ${ro?'readonly':''} oninput="mkMajAction(${i},'indicateurs',this.value)"></div>
+    <div><label for="pa-${i}-st">Statut des données</label><select id="pa-${i}-st" ${ro?'disabled':''} onchange="mkMajAction(${i},'statut_donnee',this.value)">${MK_STATUT_OPTS(a.statut_donnee)}</select></div>
+    ${ro ? '' : `<div style="align-self:end;"><button type="button" class="bp-btn-mini" onclick="mkRetirerAction(${i})">Retirer cette ligne</button></div>`}
+  </div></div>`).join('');
+}
+function mkMajAction(i, k, v) { const l = mkS().plan_actions || []; if (!l[i]) return; l[i][k] = v; markDirty(); }
+function mkAjouterAction() { const s = mkS(); if (!Array.isArray(s.plan_actions)) s.plan_actions = []; s.plan_actions.push({ periode: '', actions: '', indicateurs: '', budget: '', statut_donnee: 'hypothese' }); document.getElementById('mk-actions').innerHTML = mkActionsHtml(); markDirty(); }
+function mkRetirerAction(i) { mkS().plan_actions.splice(i, 1); document.getElementById('mk-actions').innerHTML = mkActionsHtml(); markDirty(); }
+function updParcours(i, k, v) { const s = mkS(); const l = Array.isArray(s.parcours) ? s.parcours : []; while (l.length < 4) l.push({}); l[i][k] = v; s.parcours = l; markDirty(); }
+function mkStatutIndicateur(cle, v) { const s = mkS(); if (!s.statuts_indicateurs) s.statuts_indicateurs = {}; s.statuts_indicateurs[cle] = v; markDirty(); }
+function mkRafraichir() {
+  const b = document.getElementById('mk-budget'); if (b) b.innerHTML = mkBudgetHtml();
+  const p = document.getElementById('mk-perf'); if (p) p.innerHTML = mkPerfHtml();
+}
+function mkSyntheseStatutHtml() {
+  const s = mkS(), y = s.synthese || {};
+  if (!(String(y.canaux_prioritaires||'') + String(y.resultats_attendus||'')).trim()) return '';
+  return s.synthese_validee === false ? `<span class="bp-badge-statut brouillon">Brouillon proposé — à valider avant de figurer dans le dossier</span>` : `<span class="bp-badge-statut valide">Validée</span>`;
+}
+function mkSyntheseSaisie(k, v) {
+  const s = mkS(); if (!s.synthese) s.synthese = {}; s.synthese[k] = v;
+  if (s.synthese_validee !== false) s.synthese_validee = true;
+  const z = document.getElementById('mk-s-statut'); if (z) z.innerHTML = mkSyntheseStatutHtml();
+  markDirty();
+}
+function mkProposer() {
+  const s = mkS(), p = BPMarketing.proposerSynthese(s), note = document.getElementById('mk-s-note');
+  if (!(p.canaux_prioritaires + p.resultats_attendus)) { if (note) note.textContent = "Renseignez d'abord le canal, le budget et l'objectif d'au moins une campagne : la proposition est assemblée à partir de votre saisie."; return; }
+  const y = s.synthese || {};
+  if ((String(y.canaux_prioritaires||'') + String(y.resultats_attendus||'')).trim() && !confirm('Remplacer les textes actuels par une nouvelle proposition ?')) return;
+  s.synthese = p; s.synthese_validee = false;
+  const a = document.getElementById('mk-s-canaux'); if (a) a.value = p.canaux_prioritaires;
+  const r = document.getElementById('mk-s-resultats'); if (r) r.value = p.resultats_attendus;
+  const z = document.getElementById('mk-s-statut'); if (z) z.innerHTML = mkSyntheseStatutHtml();
+  const v = document.getElementById('mk-valider'); if (v) v.hidden = false;
+  if (note) note.textContent = "Proposition assemblée avec vos campagnes, sans aucun résultat inventé. Relisez, corrigez, puis validez.";
+  markDirty();
+}
+function mkValider() {
+  mkS().synthese_validee = true;
+  const z = document.getElementById('mk-s-statut'); if (z) z.innerHTML = mkSyntheseStatutHtml();
+  const v = document.getElementById('mk-valider'); if (v) v.hidden = true;
+  const note = document.getElementById('mk-s-note'); if (note) note.textContent = 'Synthèse validée : elle figurera dans le dossier investisseur.';
+  markDirty();
+}
+function mkInit() {
+  ['budget_marketing_annuel', 'budget_marketing_mensuel', 'nb_points_vente'].forEach(k => { const el = document.querySelector(`[data-key="${k}"]`); if (el) el.addEventListener('input', mkRafraichir); });
 }
 function renderCampagnes(list) {
   return list.map((c,i) => `
@@ -3066,6 +3564,7 @@ function renderCampagnes(list) {
         <div><label>Conversions${helpIcon('camp_conversions')}</label><input type="number" value="${esc(c.conversions||'')}" oninput="updCampagne(${i},'conversions',this.value)"></div>
         <div><label>Coût${helpIcon('camp_cout')}</label><input type="number" value="${esc(c.cout||'')}" oninput="updCampagne(${i},'cout',this.value)"></div>
         <div><label>ROI${helpIcon('camp_roi')}</label><input value="${esc(c.roi||'')}" oninput="updCampagne(${i},'roi',this.value)"></div>
+        <div><label>Statut des chiffres${helpIcon('camp_statut')}</label><select onchange="updCampagne(${i},'statut_donnee',this.value)">${Object.entries(BPMarketing.STATUTS).map(([v,l])=>`<option value="${v}" ${BPMarketing.statutDe(c.statut_donnee)===v?'selected':''}>${l}</option>`).join('')}</select></div>
       </div>
     </div>`).join('');
 }
@@ -3087,6 +3586,7 @@ function updCampagne(i,key,val) {
   if (!sections.strategie_marketing.campagnes[i]) sections.strategie_marketing.campagnes[i]={};
   sections.strategie_marketing.campagnes[i][key]=val;
   markDirty();
+  if (typeof mkRafraichir === 'function') mkRafraichir();
 }
 function renderCommercial() {
   setTimeout(bpCalcFunnelConversion, 0);
@@ -3257,11 +3757,12 @@ function renderOrganisation() {
   return `<div class="bp-section">
     <div class="bp-section-head"><h2>🏗 Organisation & Gouvernance</h2></div>
     <div class="bp-card-inner"><div class="fg">
-      ${textarea('dirigeants','Direction & Gouvernance','Qui dirige ? Quelles instances ?',3,true)}
+      ${textarea('dirigeants','Direction & Gouvernance','Qui dirige, avec quel rôle ? Quelles instances examinent les orientations majeures ?',3,true)}
       ${textarea('equipe','Équipe actuelle','Qui fait quoi ?',3,true)}
-      ${textarea('responsabilites','Répartition des responsabilités','Qui est responsable de quoi ?',3,true)}
-      ${textarea('consultants','Consultants & Experts','Experts externes mobilisés…',2,true)}
-      ${textarea('benevoles','Bénévoles (si applicable)','Organisation du bénévolat…',2,true)}
+      ${textarea('responsabilites','Répartition des responsabilités','Qui est responsable de quoi, et à qui chacun rend-il compte ?',3,true)}
+      ${textarea('pilotage','Organisation du pilotage','Instances de suivi (comité de direction, fréquence), indicateurs suivis, qui contrôle les activités et comment les décisions sont prises…',3,true)}
+      ${textarea('consultants','Accompagnement externe','Expert-comptable, consultant, avocat… : ce qu\'ils apportent sans se substituer à la direction.',2,true)}
+      ${textarea('benevoles','Ressources bénévoles','Organisation du bénévolat. Si l\'entreprise n\'en a pas, écrivez-le : « Aucun bénévole n\'intervient… ».',2,true)}
     </div></div>
     <!-- Renforcement 2026-08-26 (point 14). La forme juridique elle-même est déjà renseignée
          dans Informations générales > Structure juridique (incrément 2), pas redemandée ici. -->
@@ -3276,8 +3777,111 @@ function renderOrganisation() {
       ${textarea('conflits_interets','Conflits d\'intérêts éventuels','',2,true)}
       ${textarea('besoins_futurs_gouvernance','Besoins futurs en gouvernance','',2,true)}
     </div></div>
+    <div class="bp-card-inner">
+      <h3 style="margin-top:0;">Organigramme</h3>
+      <p class="bp-intro">Une case par personne, instance ou équipe. Indiquez « Rattaché à » pour tracer les liens hiérarchiques : l'organigramme se dessine tout seul dans le dossier.</p>
+      <div id="og-organigramme"></div>
+      ${monRole==='lecteur'?'':`<button type="button" class="bp-btn-mini" onclick="ogAjouter('organigramme')">+ Ajouter une case</button>`}
+      <div id="og-organigramme-apercu" style="margin-top:12px;"></div>
+    </div>
+    <div class="bp-card-inner">
+      <h3 style="margin-top:0;">Matrice des responsabilités (RACI)</h3>
+      <p class="bp-intro"><strong>R</strong> réalise · <strong>A</strong> approuve (une seule personne) · <strong>C</strong> est consulté · <strong>I</strong> est informé. Une ligne par décision ou activité importante. Pour chacune, précisez si le fonctionnement est déjà en place, seulement prévu ou simplement recommandé.</p>
+      <div id="og-raci"></div>
+      ${monRole==='lecteur'?'':`<button type="button" class="bp-btn-mini" onclick="ogAjouter('raci')">+ Ajouter une décision</button>`}
+      <div id="og-raci-ctrl" style="margin-top:8px;"></div>
+    </div>
+    <div class="bp-card-inner">
+      <h3 style="margin-top:0;">Gouvernance financière</h3>
+      <p class="bp-intro">Qui autorise les dépenses, valide les investissements, contrôle le budget. N'indiquez « En place » que ce qui est réellement appliqué aujourd'hui.</p>
+      <div id="og-gouvernance_financiere"></div>
+      ${monRole==='lecteur'?'':`<button type="button" class="bp-btn-mini" onclick="ogAjouter('gouvernance_financiere')">+ Ajouter une règle</button> <button type="button" class="bp-btn-mini" onclick="ogSujetsUsuels()">Ajouter les 4 sujets usuels</button>`}
+    </div>
+    <div class="bp-card-inner">
+      <h3 style="margin-top:0;">Indicateurs de pilotage</h3>
+      <p class="bp-intro">Les chiffres que la direction suit pour piloter : production, qualité, ventes, trésorerie, ressources humaines.</p>
+      <div id="og-pilotage_indicateurs"></div>
+      ${monRole==='lecteur'?'':`<button type="button" class="bp-btn-mini" onclick="ogAjouter('pilotage_indicateurs')">+ Ajouter un indicateur</button> <button type="button" class="bp-btn-mini" onclick="ogDomainesUsuels()">Ajouter les 5 domaines usuels</button>`}
+      <div id="og-bilan" style="margin-top:12px;"></div>
+    </div>
   </div>`;
 }
+/* ---- Organisation : organigramme, RACI, gouvernance financière, pilotage — voir assets/bp-organisation.js (2026-11-11) ---- */
+const OG_STATUT_OPTS = cur => BPOrga.STATUTS_PRATIQUE.map(s => `<option value="${s.v}" ${BPOrga.statutPratique(cur)===s.v?'selected':''}>${s.l}</option>`).join('');
+const OG_MODELE = { organigramme:{ id:'', nom:'', fonction:'', detail:'', parent_id:'' }, raci:{ activite:'', r:'', a:'', c:'', i:'', statut:'prevu' }, gouvernance_financiere:{ sujet:'', regle:'', statut:'prevu' }, pilotage_indicateurs:{ domaine:'', indicateur:'', frequence:'', responsable:'', statut:'prevu' } };
+function ogS() { if (!sections.organisation) sections.organisation = {}; return sections.organisation; }
+function ogListe(cle) { const s = ogS(); if (!Array.isArray(s[cle])) s[cle] = []; return s[cle]; }
+function ogInput(cle, i, k, label, v, ph, full) { const ro = monRole==='lecteur'; return `<div class="${full?'full':''}"><label for="og-${cle}-${i}-${k}">${label}</label><input id="og-${cle}-${i}-${k}" value="${escA(v||'')}" placeholder="${escA(ph||'')}" ${ro?'readonly':''} oninput="ogMaj('${cle}',${i},'${k}',this.value)" ${cle==='organigramme'&&(k==='nom'||k==='fonction')?`onchange="ogRendre('organigramme')"`:''}></div>`; }
+function ogStatut(cle, i, v) { const ro = monRole==='lecteur'; return `<div><label for="og-${cle}-${i}-statut">Situation réelle</label><select id="og-${cle}-${i}-statut" ${ro?'disabled':''} onchange="ogMaj('${cle}',${i},'statut',this.value)">${OG_STATUT_OPTS(v)}</select></div>`; }
+function ogRetirerBtn(cle, i) { return monRole==='lecteur' ? '' : `<div style="align-self:end;"><button type="button" class="bp-btn-mini" onclick="ogRetirer('${cle}',${i})">Retirer cette ligne</button></div>`; }
+const OG_RENDERERS = {
+  organigramme() {
+    const l = ogListe('organigramme');
+    if (!l.length) return `<p class="bp-intro" style="margin:0 0 8px;">Aucune case. Exemple : « Awa Koné — Direction générale », puis « Comité de direction — 3 associés · réunion mensuelle », puis les responsables de production et de qualité.</p>`;
+    return l.map((n, i) => `<div class="bp-ligne-edit"><div class="fg">
+      ${ogInput('organigramme', i, 'nom', 'Nom ou instance', n.nom, 'Ex : Awa Koné')}
+      ${ogInput('organigramme', i, 'fonction', 'Fonction', n.fonction, 'Ex : Direction générale')}
+      ${ogInput('organigramme', i, 'detail', 'Précision (facultatif)', n.detail, 'Ex : 3 associés · réunion mensuelle', true)}
+      <div><label for="og-organigramme-${i}-parent">Rattaché à</label><select id="og-organigramme-${i}-parent" ${monRole==='lecteur'?'disabled':''} onchange="ogMaj('organigramme',${i},'parent_id',this.value)"><option value="">— Sommet (personne au-dessus)</option>${l.map((x, j) => j===i?'':`<option value="${escA(x.id)}" ${n.parent_id===x.id?'selected':''}>${esc(x.nom||x.fonction||('Case '+(j+1)))}</option>`).join('')}</select></div>
+      ${ogRetirerBtn('organigramme', i)}
+    </div></div>`).join('');
+  },
+  raci() {
+    const l = ogListe('raci');
+    if (!l.length) return `<p class="bp-intro" style="margin:0 0 8px;">Aucune ligne. Exemples : ${BPOrga.RACI_EXEMPLES.map(x => '« ' + esc(x) + ' »').join(', ')}.</p>`;
+    return l.map((r, i) => `<div class="bp-ligne-edit"><div class="fg">
+      ${ogInput('raci', i, 'activite', 'Décision ou activité', r.activite, BPOrga.RACI_EXEMPLES[i % BPOrga.RACI_EXEMPLES.length], true)}
+      ${ogInput('raci', i, 'r', 'R — Réalise', r.r, 'Qui exécute')}
+      ${ogInput('raci', i, 'a', 'A — Approuve (une seule personne)', r.a, 'Qui décide en dernier ressort')}
+      ${ogInput('raci', i, 'c', 'C — Consulté', r.c, 'Dont l\'avis est sollicité')}
+      ${ogInput('raci', i, 'i', 'I — Informé', r.i, 'Tenu au courant')}
+      ${ogStatut('raci', i, r.statut)}
+      ${ogRetirerBtn('raci', i)}
+    </div></div>`).join('');
+  },
+  gouvernance_financiere() {
+    const l = ogListe('gouvernance_financiere');
+    if (!l.length) return `<p class="bp-intro" style="margin:0 0 8px;">Aucune règle. Exemple : « Autorisation des dépenses — au-delà de 500 €, accord écrit de la direction ».</p>`;
+    return l.map((g, i) => `<div class="bp-ligne-edit"><div class="fg">
+      ${ogInput('gouvernance_financiere', i, 'sujet', 'Sujet', g.sujet, 'Ex : Autorisation des dépenses')}
+      ${ogStatut('gouvernance_financiere', i, g.statut)}
+      ${ogInput('gouvernance_financiere', i, 'regle', 'Règle ou mécanisme', g.regle, 'Ex : au-delà de 500 €, accord écrit de la direction', true)}
+      ${ogRetirerBtn('gouvernance_financiere', i)}
+    </div></div>`).join('');
+  },
+  pilotage_indicateurs() {
+    const l = ogListe('pilotage_indicateurs');
+    if (!l.length) return `<p class="bp-intro" style="margin:0 0 8px;">Aucun indicateur. Exemple : « Qualité — taux de non-conformité des lots — chaque semaine — responsable qualité ».</p>`;
+    return l.map((p, i) => `<div class="bp-ligne-edit"><div class="fg">
+      <div><label for="og-pilotage_indicateurs-${i}-domaine">Domaine</label><input id="og-pilotage_indicateurs-${i}-domaine" list="og-domaines" value="${escA(p.domaine||'')}" ${monRole==='lecteur'?'readonly':''} oninput="ogMaj('pilotage_indicateurs',${i},'domaine',this.value)"></div>
+      ${ogInput('pilotage_indicateurs', i, 'indicateur', 'Indicateur suivi', p.indicateur, 'Ex : taux de non-conformité des lots')}
+      ${ogInput('pilotage_indicateurs', i, 'frequence', 'Fréquence', p.frequence, 'Ex : chaque semaine')}
+      ${ogInput('pilotage_indicateurs', i, 'responsable', 'Responsable du suivi', p.responsable, 'Ex : responsable qualité')}
+      ${ogStatut('pilotage_indicateurs', i, p.statut)}
+      ${ogRetirerBtn('pilotage_indicateurs', i)}
+    </div></div>`).join('') + `<datalist id="og-domaines">${BPOrga.DOMAINES_PILOTAGE.map(d => `<option value="${escA(d)}">`).join('')}</datalist>`;
+  },
+};
+function ogApercu(cle) {
+  if (cle === 'organigramme') {
+    const ns = BPOrga.noeuds(ogS()), el = document.getElementById('og-organigramme-apercu'); if (!el) return;
+    el.innerHTML = ns.length ? `<div style="color:var(--text);">${BPOrga.organigrammeHtml(ns, esc)}</div>${BPOrga.controleOrganigramme(ns).map(m => `<p class="bp-intro" style="color:#B5451F;margin:6px 0 0;">${esc(m)}</p>`).join('')}` : '';
+  }
+  if (cle === 'raci') {
+    const el = document.getElementById('og-raci-ctrl'); if (!el) return;
+    const lignes = BPOrga.raci(ogS()), c = BPOrga.controleRaci(lignes).filter(x => x.etat !== 'ok');
+    el.innerHTML = c.map(x => `<p class="bp-intro" style="color:#B5451F;margin:2px 0;">« ${esc(lignes[x.index].activite)} » : ${esc(x.message)}</p>`).join('');
+  }
+  const b = document.getElementById('og-bilan');
+  if (b) { const k = BPOrga.bilanPratiques(ogS()); b.innerHTML = k.total ? `<p class="bp-intro" style="margin:0;"><strong>Bilan des pratiques :</strong> ${k.en_place} en place · ${k.prevu} prévue${k.prevu>1?'s':''} · ${k.recommande} recommandée${k.recommande>1?'s':''}. Le dossier distingue ces trois situations : un contrôle ou un comité non encore opérationnel n'est jamais présenté comme existant.</p>` : ''; }
+}
+function ogRendre(cle) { const el = document.getElementById('og-' + cle); if (el) el.innerHTML = OG_RENDERERS[cle](); ogApercu(cle); }
+function ogMaj(cle, i, k, v) { const l = ogListe(cle); if (!l[i]) return; l[i][k] = v; markDirty(); ogApercu(cle); }
+function ogAjouter(cle) { const l = ogListe(cle), m = Object.assign({}, OG_MODELE[cle]); if (cle === 'organigramme') m.id = BPOrga.nouvelId(l); l.push(m); ogRendre(cle); markDirty(); }
+function ogRetirer(cle, i) { const l = ogListe(cle), [x] = l.splice(i, 1); if (cle === 'organigramme' && x) l.forEach(n => { if (n.parent_id === x.id) n.parent_id = ''; }); ogRendre(cle); markDirty(); }
+function ogSujetsUsuels() { const l = ogListe('gouvernance_financiere'); BPOrga.SUJETS_FINANCE.forEach(s => { if (!l.some(x => x.sujet === s)) l.push({ sujet: s, regle: '', statut: 'prevu' }); }); ogRendre('gouvernance_financiere'); markDirty(); }
+function ogDomainesUsuels() { const l = ogListe('pilotage_indicateurs'); BPOrga.DOMAINES_PILOTAGE.forEach(d => { if (!l.some(x => x.domaine === d)) l.push({ domaine: d, indicateur: '', frequence: '', responsable: '', statut: 'prevu' }); }); ogRendre('pilotage_indicateurs'); markDirty(); }
+function ogInit() { ['organigramme', 'raci', 'gouvernance_financiere', 'pilotage_indicateurs'].forEach(ogRendre); ogApercu('raci'); ogApercu('organigramme'); }
 function renderRH() {
   const s = sections.rh || {};
   return `<div class="bp-section">
@@ -3287,9 +3891,15 @@ function renderRH() {
       ${field('effectif_prevu','Effectif prévu (1 an)','','number')}
       ${textarea('recrutements','Recrutements prévus','Postes à ouvrir, profils recherchés…',3,true)}
       ${textarea('competences','Compétences recherchées','Quelles expertises vous manquent ?',3,true)}
-      ${textarea('formations','Formations prévues','Développement des compétences…',2,true)}
-      ${textarea('politique_rh','Politique RH','Rémunération, avantages, culture d\'entreprise…',3,true)}
+      ${textarea('formations','Formations prévues','Programme de formation, calendrier (ex : HACCP durant les 3 premiers mois), outils numériques, sécurité…',3,true)}
+      ${textarea('politique_rh','Politique de rémunération et fidélisation','Grilles salariales de référence, majoration envisagée, primes, couverture santé… Précisez ce qui est décidé et ce qui est seulement envisagé.',3,true)}
+      ${textarea('suivi_rh','Suivi des ressources humaines','Qui suit les effectifs, les recrutements, les formations et l\'évolution des charges salariales, et à quel rythme ?',2,true)}
     </div></div>
+    <div class="bp-card-inner" id="rh-effectifs-carte">
+      <h3 style="margin-top:0;">Évolution prévisionnelle des effectifs</h3>
+      <p class="bp-intro">Se calcule à partir de l'effectif actuel, des postes détaillés ci-dessous et de l'effectif prévu : les postes qui manquent pour atteindre l'objectif sont signalés « à définir ».</p>
+      <div id="rh-effectifs"></div>
+    </div>
     <div class="bp-card-inner bp-niveau-3">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
         <h3 style="margin:0;">Postes prévus (détail)</h3>
@@ -3332,12 +3942,12 @@ function addPosteRH() {
   if (!sections.rh.postes) sections.rh.postes=[];
   sections.rh.postes.push({intitule:''});
   document.getElementById('postes-rh-list').innerHTML = renderPostesRH(sections.rh.postes);
-  markDirty(); bpCalcProjectionRH();
+  markDirty(); bpCalcProjectionRH(); rhPlanifier();
 }
 function removePosteRH(i) {
   sections.rh.postes.splice(i,1);
   document.getElementById('postes-rh-list').innerHTML = renderPostesRH(sections.rh.postes);
-  markDirty(); bpCalcProjectionRH();
+  markDirty(); bpCalcProjectionRH(); rhPlanifier();
 }
 function updPosteRH(i,key,val) {
   if (!sections.rh) sections.rh={};
@@ -3387,6 +3997,21 @@ function bpCalcProjectionRH() {
       <tr><td>Masse salariale cumulée</td>${[1,2,3,4,5].map(a=>`<td>${parAnnee[a].cout?fmtEuro(parAnnee[a].cout):'—'}</td>`).join('')}</tr>
     </tbody></table></div>`;
 }
+
+/* ---- RH : évolution des effectifs et indicateurs — voir assets/bp-organisation.js (2026-11-11) ---- */
+function rhCaAnnee1() { try { const c = BPCalc.calcProduits(sections.plan_financier || {}); return c && c.annees && c.annees[0] ? c.annees[0].ca : 0; } catch (e) { return 0; } }
+function rhEffectifsHtml() {
+  const rh = sections.rh || {}, courbe = BPRh.courbe(rh), ctrl = BPRh.controle(rh), ind = BPRh.indicateurs(rh, { ca_annee1: rhCaAnnee1() });
+  if (!courbe.length && !ind.length) return `<p class="bp-intro" style="margin:0;">Renseignez l'effectif actuel et l'effectif prévu pour voir l'évolution des effectifs.</p>`;
+  const note = BPRh.noteCourbe(rh);
+  return `${courbe.length ? `<div style="max-width:520px;color:var(--text);">${BPRh.barresSvg(courbe, { largeur: 520, hauteur: 210 })}</div>` : ''}
+    ${note ? `<p class="bp-intro" style="margin:4px 0 0;">${esc(note)}</p>` : ''}
+    ${ctrl.map(m => `<p class="bp-intro" style="color:#B5451F;margin:4px 0 0;">${esc(m)}</p>`).join('')}
+    ${ind.length ? `<table class="bp-table-mini" style="margin-top:10px;"><thead><tr><th>Indicateur RH</th><th>Valeur</th><th>Statut</th><th>Calcul</th></tr></thead><tbody>${ind.map(r => `<tr><td><strong>${esc(r.label)}</strong><br><small>${esc(r.mesure)}</small></td><td><strong>${esc(r.valeur)}</strong></td><td>${esc(BPRh.STATUTS_DONNEE[r.statut])}</td><td><small>${esc(r.origine)}</small></td></tr>`).join('')}</tbody></table>` : ''}`;
+}
+let rhTimer = null;
+function rhRafraichir() { const el = document.getElementById('rh-effectifs'); if (el) el.innerHTML = rhEffectifsHtml(); }
+function rhPlanifier() { clearTimeout(rhTimer); rhTimer = setTimeout(rhRafraichir, 250); }
 
 /* ---- 15. Calendrier (Gantt simplifié) ---- */
 function renderCalendrier() {

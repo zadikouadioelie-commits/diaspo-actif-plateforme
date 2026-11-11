@@ -111,6 +111,13 @@ table.doc-table tr:last-child td{border-bottom:none;}
 table.doc-table tr.total td{font-weight:700;border-top:1.5px solid var(--dp-ink);padding-top:9px;}
 
 .field-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 24px;margin-bottom:6px;}
+.field-grid > .field:only-child{grid-column:1 / -1;}
+/* Compléments des rubriques (assets/bp-enrichi.js) : même échelle typographique que les autres pages. */
+.sheet .ench-bloc{font-size:11px;line-height:1.5;color:var(--dp-ink);}
+.sheet .ench-bloc .ench-v{font-size:11px;line-height:1.5;margin:0;}
+.sheet .ench-bloc .ench-l{font-size:8px;margin:0 0 1px;letter-spacing:.05em;}
+.sheet .ench-bloc .ench-t{font-size:9.5px;}
+.sheet .ench-bloc .ench-n,.sheet .ench-bloc .ench-w{font-size:9px;}
 .field{margin-bottom:12px;break-inside:avoid;}
 .field .fl{font-family:var(--dp-mono);font-size:8.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--dp-ink-soft);margin:0 0 3px;}
 .field .fv{margin:0;font-size:12px;line-height:1.55;white-space:pre-wrap;color:var(--dp-ink);}
@@ -132,6 +139,69 @@ table.doc-table tr.total td{font-weight:700;border-top:1.5px solid var(--dp-ink)
 .empty-note{color:var(--dp-ink-soft);font-size:11.5px;font-style:italic;}
 .annexe-qr{width:44px;height:44px;}
 .annexe-qr img{display:block;width:100%;height:100%;}
+/* Évolution du 2026-11-10 : SWOT structuré, indicateurs de marché, marketing (assets/bp-swot.js, bp-marche.js, bp-marketing.js) */
+.sw-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:6px;}
+.sw-card{border-radius:4px;padding:12px 14px;break-inside:avoid;}
+.sw-card h4{font-family:var(--dp-mono);font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;font-weight:700;margin:0 0 8px;}
+.sw-item{margin:0 0 8px;}
+.sw-item:last-child{margin:0;}
+.sw-item .t{font-size:11px;font-weight:600;line-height:1.35;margin:0 0 3px;color:var(--dp-ink);}
+.sw-item .j,.sw-card .j{font-size:9.5px;line-height:1.4;color:var(--dp-ink-soft);margin:3px 0 0;}
+.imp{display:flex;align-items:center;gap:3px;}
+.imp i{display:block;width:16px;height:4px;border-radius:2px;background:var(--dp-line);}
+.imp i.on{background:var(--c);}
+.imp span{font-size:9px;color:var(--dp-ink-soft);margin-left:5px;font-family:var(--dp-mono);}
+.pri{font-family:var(--dp-mono);font-size:9px;letter-spacing:.04em;text-transform:uppercase;font-weight:700;white-space:nowrap;}
+.lecture{border-left:3px solid var(--dp-orange);padding:2px 0 2px 14px;margin:6px 0 10px;font-size:11.5px;line-height:1.6;color:var(--dp-ink);}
+.st{display:inline-block;font-family:var(--dp-mono);font-size:8.5px;letter-spacing:.04em;text-transform:uppercase;padding:2px 7px;border-radius:10px;border:1px solid var(--dp-ink-soft);color:var(--dp-ink-soft);white-space:nowrap;}
+.st-hypothese,.st-hypothese-c{border-style:dashed;}
+.st-constate,.st-verifie{border-color:var(--dp-green);color:var(--dp-green);font-weight:700;}
+.st-objectif{border-color:var(--dp-blue);color:var(--dp-blue);}
+.st-en_place{border-color:var(--dp-green);color:var(--dp-green);font-weight:700;}
+.st-prevu{border-color:var(--dp-blue);color:var(--dp-blue);}
+.st-recommande{border-style:dashed;}
+.sheet .og{--og-line:var(--dp-ink-soft);--og-bord:var(--dp-line);--og-texte:var(--dp-ink);--og-fond:transparent;--og-fond-top:transparent;--og-accent:var(--dp-blue);margin:4px 0 8px;}
+.sheet .og-b.og-top{border-width:1.5px;}
+.fin-note{font-size:9.5px;line-height:1.5;color:var(--dp-ink-soft);margin:4px 0 8px;font-style:italic;}
+.warn-note{font-size:10.5px;line-height:1.5;margin:4px 0 8px;padding:6px 10px;border:1px solid var(--dp-orange);border-radius:3px;color:var(--dp-ink);}
+.seg-bars{border:1px solid var(--dp-line);border-radius:4px;padding:12px 14px;margin-bottom:6px;}
+.seg-row{margin:0 0 9px;}
+.seg-row:last-of-type{margin-bottom:6px;}
+.seg-row .n{display:flex;justify-content:space-between;font-size:11px;font-weight:600;margin:0 0 3px;}
+.seg-row .n span{font-family:var(--dp-mono);font-size:8.5px;font-weight:400;color:var(--dp-ink-soft);text-transform:uppercase;}
+.seg-row .b{height:7px;border-radius:4px;background:var(--dp-line);}
+.seg-row .b i{display:block;height:7px;border-radius:4px;background:var(--dp-orange);}
+.seg-row .d{font-size:9.5px;color:var(--dp-ink-soft);margin:3px 0 0;}
+.fz-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:6px;}
+.fz-card{border:1px solid var(--dp-line);border-top:2px solid var(--dp-orange);border-radius:3px;padding:10px 12px;break-inside:avoid;}
+.fz-card h4{font-family:var(--dp-mono);font-size:9px;letter-spacing:.05em;text-transform:uppercase;color:var(--dp-ink-soft);margin:0 0 6px;font-weight:700;}
+.fz-card p{margin:0;font-size:10.5px;line-height:1.5;white-space:pre-wrap;}
+.parcours{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:6px;}
+.parcours .p{border:1px solid var(--dp-line);border-radius:3px;padding:10px 12px;break-inside:avoid;}
+.parcours .p b{display:inline-block;font-family:var(--dp-mono);font-size:9px;color:var(--dp-orange);margin-right:6px;}
+.parcours .p h5{font-size:11.5px;font-weight:700;margin:0 0 4px;font-family:var(--dp-display);}
+.parcours .p p{font-size:9.5px;line-height:1.45;color:var(--dp-ink-soft);margin:0;}
+.donut-zone{display:flex;gap:22px;align-items:center;margin-bottom:6px;}
+.donut-leg{list-style:none;margin:0;padding:0;flex:1;font-size:11px;}
+.donut-leg li{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--dp-line);}
+.donut-leg li:last-child{border-bottom:none;}
+.donut-leg i{display:inline-block;width:10px;height:10px;border-radius:2px;flex:none;}
+.donut-leg .v{margin-left:auto;font-family:var(--dp-mono);font-size:10px;font-variant-numeric:tabular-nums;}
+table.doc-table.compact{font-size:9.5px;}
+table.doc-table.compact th{font-size:7.5px;}
+table.doc-table.compact td{padding:6px 6px 6px 0;text-align:left;}
+table.doc-table.compact th{text-align:left;padding-right:6px;}
+/* La feuille de style du site (design-upgrade.v2.css) impose à tout tableau des cellules de 14 px et 12×16 px de marge, en !important :
+   les tableaux du dossier gonflaient (une ligne = 88 px) et la page « Stratégie marketing » dépassait le format A4. On la neutralise dans les feuilles. */
+.sheet table.doc-table thead th{background:transparent !important;color:var(--dp-ink-soft) !important;font-weight:500 !important;font-size:8.5px !important;letter-spacing:.05em !important;text-transform:uppercase !important;padding:0 8px 7px 0 !important;border-bottom:1px solid var(--dp-ink-soft) !important;}
+.dp-inst .sheet table.doc-table thead th{text-transform:none !important;letter-spacing:0 !important;font-size:10.5px !important;font-weight:700 !important;}
+.sheet table.doc-table tbody td{padding:8px 8px 8px 0 !important;font-size:inherit !important;}
+.sheet table.doc-table tr.total td{padding-top:9px !important;}
+.sheet table.doc-table tbody tr{border-bottom:none !important;}
+.sheet table.doc-table tbody tr:hover{background:transparent !important;}
+.sheet table.doc-table.compact thead th{font-size:7.5px !important;padding:0 6px 6px 0 !important;}
+.dp-inst .sheet table.doc-table.compact thead th{font-size:9px !important;}
+.sheet table.doc-table.compact tbody td{padding:6px 6px 6px 0 !important;}
 
 /* ===== Gabarit « Institutionnel » (2026-10-17, demande explicite) : feuilles blanches, écriture administrative, aucun logo Diaspo'Actif ===== */
 body.dp-inst{--dp-mono:Arial,Helvetica,sans-serif;--dp-display:Arial,Helvetica,sans-serif;--dp-body:Arial,Helvetica,sans-serif;}
@@ -200,6 +270,11 @@ body.dp-inst{--dp-mono:Arial,Helvetica,sans-serif;--dp-display:Arial,Helvetica,s
 </div>
 
 <script src="assets/business-plan-calc.js?v=3"></script>
+<script src="assets/bp-swot.js?v=1"></script>
+<script src="assets/bp-marche.js?v=1"></script>
+<script src="assets/bp-marketing.js?v=1"></script>
+<script src="assets/bp-organisation.js?v=1"></script>
+<script src="assets/bp-enrichi.js?v=1"></script>
 <script src="assets/data.js"></script>
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js?v=13"></script>
@@ -298,9 +373,9 @@ function onTemplateChange(key){
 const FORMATS = {
   complet:     { label:'📄 Business Plan complet', ids:null },
   bancaire:    { label:'🏦 Dossier bancaire', ids:['resume','traction','marche','finances','prixproduits','massesalariale','planfinancement','tresorerie','tresorerie36','risques','financement','equipe','annexes'] },
-  investisseur:{ label:'💼 Dossier investisseur', ids:['resume','probleme','solution','traction','marche','pestel','swot','bmc','produits','bcg','finances','prixproduits','massesalariale','planfinancement','tresorerie36','risques','financement','equipe'] },
+  investisseur:{ label:'💼 Dossier investisseur', ids:['resume','presentation','probleme','solution','traction','marche','pestel','swot','bmc','produits','bcg','strategie_marketing','finances','prixproduits','massesalariale','planfinancement','tresorerie36','risques','financement','equipe'] },
   subvention:  { label:'🏛️ Dossier subvention', ids:['resume','probleme','solution','marche','persona','impact','finances','calendrier','equipe','annexes'] },
-  partenaire:  { label:'🤝 Dossier partenaire', ids:['resume','traction','bmc','produits','strategie_marketing','plan_commercial','organisation','equipe'] },
+  partenaire:  { label:'🤝 Dossier partenaire', ids:['resume','presentation','traction','bmc','produits','strategie_marketing','plan_commercial','organisation','equipe'] },
 };
 let ACTIVE_FORMAT = 'complet';
 function onFormatChange(key){
@@ -596,50 +671,352 @@ function competitiveMatrix(concurrents){
 
 function pageMarche(bp){
   const m = (bp.sections||{}).marche || {};
+  /* ── Page 1 : le marché, les chiffres clés et les clients ── */
+  const indic = BPMarche.indicateurs(m);
+  const indicRow = indic.length ? kpiRow(indic.map(i => [i.libelle, i.valeur, i.perimetre])) : '';
   const tamRow = kpiRow([['TAM — Marché total', has(m.tam)?fmtEUR(m.tam):''],['SAM — Marché accessible', has(m.sam)?fmtEUR(m.sam):''],['SOM — Marché visé', has(m.som)?fmtEUR(m.som):'']]);
-  const textSchema = { taille_marche:"Taille du marché", tendances:"Tendances du marché", profil_client:"Profil client", segmentation:"Segmentation", positionnement:"Positionnement", avantage_concurrentiel:"Avantage concurrentiel", opportunites:"Opportunités de marché", barrieres_entree:"Barrières à l'entrée" };
+  const emboit = BPMarche.controleEmboitement(m).map(t => `<p class="warn-note">À corriger : ${esc(t)}</p>`).join('');
+  const objs = BPMarche.controleObjectifs(m.objectifs_part).filter(o => o.statut !== 'incomplet' || o.montant !== null);
+  const objTable = objs.length ? `<p class="block-title">Objectifs de part de marché</p>
+    <table class="doc-table compact"><thead><tr><th>Marché visé</th><th>Marché</th><th>Part visée</th><th>Objectif</th></tr></thead><tbody>
+    ${objs.map(o => `<tr><td><strong>${esc(o.marche||'—')}</strong></td><td>${esc(BPMarche.fmtMontant(o.montant,o.devise)||'—')}</td><td>${o.pct!==null?esc(BPMarche.fmtPct(o.pct)):'—'}</td><td>${o.objectif!==null?esc(BPMarche.fmtMontant(o.objectif,o.devise)):(o.attendu!=null?esc(BPMarche.fmtMontant(o.attendu,o.devise))+' (calculé)':'—')}${o.statut==='incoherent'?`<br><span style="color:var(--dp-orange);font-size:8.5px;">À corriger : ${esc(BPMarche.fmtMontant(o.attendu,o.devise))} attendus</span>`:''}</td></tr>`).join('')}
+    </tbody></table>` : '';
+  const textSchema = { taille_marche:"Taille du marché", evolution:"Évolution du marché", potentiel:"Potentiel pour le projet", tendances:"Tendances du marché", profil_client:"Profil client", segmentation:"Segmentation", comportement_achat:"Comportement d'achat", marche_accessible_detail:"Marché accessible" };
   const grid = fieldGrid(m, textSchema);
-  const concurrents = Array.isArray(m.concurrents) ? m.concurrents.filter(c=>has(c.nom)) : [];
-  const matrix = competitiveMatrix(concurrents);
-  const concTable = concurrents.length ? `<p class="block-title">${matrix?'Concurrents renseignés':'Concurrence'}</p><table class="doc-table"><thead><tr><th style="text-align:left;">Concurrent</th><th style="text-align:left;">Positionnement</th><th>Prix</th><th>Menace</th></tr></thead><tbody>${concurrents.map(c=>`<tr><td>${esc(c.nom)}</td><td style="text-align:left;">${esc(c.positionnement||'—')}</td><td>${esc(c.prix||'—')}</td><td>${esc(c.menace||'—')}</td></tr>`).join('')}</tbody></table>` : '';
-  if (!tamRow && !grid && !concTable) return '';
-  return page('marche','',`
+  const barres = BPMarche.barresSegments(m.segments_clients);
+  const segBloc = barres.length ? `<p class="block-title">Segmentation commerciale</p><div class="seg-bars">
+    ${barres.map(b => `<div class="seg-row"><p class="n">${esc(b.nom)}<span>Segment identifié</span></p><div class="b"><i style="width:${b.pct}%;"></i></div>${b.detail?`<p class="d">${esc(b.detail)}</p>`:''}</div>`).join('')}
+    <p class="fin-note" style="margin:6px 0 0;">Barres illustratives de priorisation commerciale, et non parts de marché mesurées.</p></div>` : '';
+  const sources = has(m.sources_donnees) ? `<p class="block-title">Sources des données</p><p class="fv" style="font-size:10.5px;line-height:1.5;white-space:pre-wrap;margin:0;">${esc(m.sources_donnees)}</p>` : '';
+  const p1 = (indicRow || tamRow || grid || segBloc || objTable) ? page('marche','',`
     ${chromeTop(bp,'Marché')}
     <p class="eyebrow-tag">Étude de marché</p>
     <h2 class="pg-title">Dimension et dynamique du marché</h2>
-    ${tamRow}
+    ${indicRow}
+    ${tamRow ? `${indicRow?'<p class="block-title">Taille du marché (TAM / SAM / SOM)</p>':''}${tamRow}` : ''}${emboit}
+    ${objTable}
     ${grid}
+    ${segBloc}
+    ${sources}
+    ${chromeBottom()}
+  `) : '';
+
+  /* ── Page 2 : concurrence, distribution, prix, faisabilité ── */
+  const concurrents = Array.isArray(m.concurrents) ? m.concurrents.filter(c=>has(c.nom)) : [];
+  const matrix = competitiveMatrix(concurrents);
+  const COLS = [
+    ['nom','Concurrent', c => `<strong>${esc(c.nom)}</strong>${BPMarche.statutLabel(c.statut_donnee)?`<br><span class="st st-${c.statut_donnee==='hypothese'?'hypothese':(c.statut_donnee==='verifie'?'verifie':'x')}">${esc(BPMarche.statutLabel(c.statut_donnee))}</span>`:''}`, true],
+    ['positionnement','Positionnement', c => esc(c.positionnement||'—')],
+    ['prix','Prix', c => esc(c.prix||'—')],
+    ['prix_kg','Prix au kilo', c => esc(c.prix_kg||'—')],
+    ['origine_produits','Origine & traçabilité', c => esc([c.origine_produits,c.tracabilite].filter(has).join(' — ')||'—'), false, ['origine_produits','tracabilite']],
+    ['certifications','Certifications & emballage', c => esc([c.certifications,c.qualite_emballage].filter(has).join(' — ')||'—'), false, ['certifications','qualite_emballage']],
+    ['canaux_distribution','Distribution', c => esc(c.canaux_distribution||'—')],
+    ['menace','Menace', c => esc(c.menace||'—')],
+  ];
+  const cols = COLS.filter(([k,,,always,keys]) => always || concurrents.some(c => (keys||[k]).some(kk => has(c[kk]))));
+  const nonVerif = concurrents.some(c => c.statut_donnee==='hypothese' || c.statut_donnee==='a_verifier' || !has(c.statut_donnee));
+  const concTable = concurrents.length ? `<p class="block-title">${matrix?'Concurrents renseignés':'Concurrence'}</p>
+    <table class="doc-table compact"><thead><tr>${cols.map(([,l])=>`<th>${esc(l)}</th>`).join('')}</tr></thead><tbody>
+    ${concurrents.map(c => `<tr>${cols.map(([,,f])=>`<td>${f(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>
+    ${nonVerif ? `<p class="fin-note">Les concurrents « Hypothèse », « À vérifier » ou sans statut n'ont pas été contrôlés : noms, prix et caractéristiques sont à confirmer avant toute présentation à des financeurs.</p>` : ''}` : '';
+  const schema2 = { canaux_distribution_global:"Canaux de distribution", analyse_prix:"Analyse des prix", positionnement:"Positionnement", avantage_concurrentiel:"Avantage concurrentiel", validation_marche:"Validation du marché", opportunites:"Opportunités de marché", barrieres_entree:"Barrières à l'entrée", reglementation:"Réglementation applicable" };
+  const grid2 = fieldGrid(m, schema2);
+  const fz = BPMarche.faisabiliteAAfficher(m);
+  const fzBloc = fz ? `<p class="block-title">Conclusion de faisabilité commerciale</p><div class="fz-grid">
+    ${[['attractivite','Attractivité du marché'],['penetration','Capacité de pénétration'],['conditions','Conditions de réussite']].map(([k,l]) => `<div class="fz-card"><h4>${esc(l)}</h4><p>${fz[k]?esc(fz[k]):'<span class="empty-note">—</span>'}</p></div>`).join('')}</div>` : '';
+  const p2 = (matrix || concTable || grid2 || fzBloc) ? page('marche-2','',`
+    ${chromeTop(bp,'Marché')}
+    <p class="eyebrow-tag">Concurrence, distribution &amp; prix</p>
+    <h2 class="pg-title">Positionnement et accès au marché</h2>
     ${matrix}
     ${concTable}
+    ${grid2}
+    ${fzBloc}
     ${chromeBottom()}
-  `);
+  `) : '';
+  return p1 + p2;
 }
 
-/* ---- Page : SWOT ---- */
+/* ---- Page : SWOT ----
+   Évolution du 2026-11-10 (assets/bp-swot.js) : plusieurs éléments par case avec leur niveau d'impact,
+   tableau « Risques et actions prioritaires » et « Lecture stratégique » validée par l'auteur du plan.
+   Un plan ancien (textes seuls) s'affiche comme avant : éléments sans barre d'impact. */
+const trunc = (s,n) => { s = String(s==null?'':s).replace(/\s+/g,' ').trim(); return s.length>n ? s.slice(0,n-1).trimEnd()+'…' : s; };
+function impactBars(catKey, n){
+  n = BPSwot.impactNum(n); if (!n) return '';
+  const c = BPSwot.cat(catKey);
+  return `<div class="imp" style="--c:${c.color};">${[1,2,3,4].map(i=>`<i class="${i<=n?'on':''}"></i>`).join('')}<span>${esc(BPSwot.niveauLabel(catKey,n))}</span></div>`;
+}
 function pageSWOT(bp){
   const sw = (bp.sections||{}).swot || {};
-  const quads = [
-    ['forces','Forces','#1A7A52','rgba(26,122,82,.07)'],
-    ['faiblesses','Faiblesses','#B5451F','rgba(181,69,31,.07)'],
-    ['opportunites','Opportunités','#1E4F8A','rgba(30,79,138,.07)'],
-    ['menaces','Menaces','#4B5160','rgba(75,81,96,.09)'],
-  ];
-  if (!quads.some(([k]) => has(sw[k]))) return '';
-  const actions = [['swot_action_forces','Consolider les forces'],['swot_action_faiblesses','Réduire les faiblesses'],['swot_action_opportunites','Exploiter les opportunités'],['swot_facteurs_cles','Facteurs clés de succès']].filter(([k])=>has(sw[k]));
+  const els = BPSwot.elements(sw).filter(e => has(e.titre));
+  if (!els.length) return '';
+  const MAX_ITEMS = 4, MAX_ROWS = 6;
+  const cards = BPSwot.CATS.map(c => {
+    const l = BPSwot.classes(els, c.key), shown = l.slice(0, MAX_ITEMS), reste = l.length - shown.length;
+    return `<div class="sw-card" style="background:${c.bg};border:1px solid ${c.color}33;">
+      <h4 style="color:${c.color};">${esc(c.label)}</h4>
+      ${shown.length ? shown.map(e => `<div class="sw-item"><p class="t">${esc(e.titre)}</p>${impactBars(c.key,e.impact)}${has(e.justification)?`<p class="j">${esc(trunc(e.justification,110))}</p>`:''}</div>`).join('') : '<p class="empty-note">—</p>'}
+      ${reste>0 ? `<p class="j">+ ${reste} autre${reste>1?'s':''} élément${reste>1?'s':''} dans le plan en ligne</p>` : ''}
+    </div>`;
+  }).join('');
+  const aDesImpacts = els.some(e => BPSwot.impactNum(e.impact));
+  const plan = BPSwot.planActions(els), rows = plan.slice(0, MAX_ROWS);
+  const tableau = rows.length ? `<p class="block-title">Risques et actions prioritaires</p>
+    <table class="doc-table compact"><thead><tr><th style="width:30%;">Constat</th><th>Action stratégique</th><th style="width:12%;">Priorité</th></tr></thead><tbody>
+      ${rows.map(r => `<tr><td><strong>${esc(r.titre)}</strong><br><span style="font-size:8.5px;color:var(--dp-ink-soft);">${esc(BPSwot.cat(r.cat).label)}</span></td><td>${esc(r.action)}</td><td class="pri" style="color:${r.priorite.rang>=3?'var(--dp-orange)':'var(--dp-ink-soft)'};">${esc(r.priorite.niveau)}</td></tr>`).join('')}
+    </tbody></table>${plan.length>rows.length?`<p class="fin-note">+ ${plan.length-rows.length} autre${plan.length-rows.length>1?'s':''} action${plan.length-rows.length>1?'s':''} dans le plan en ligne.</p>`:''}` : '';
+  const legacy = [['swot_action_forces','Consolider les forces'],['swot_action_faiblesses','Réduire les faiblesses'],['swot_action_opportunites','Exploiter les opportunités']].filter(([k])=>has(sw[k]));
+  const legacyBloc = (!rows.length && legacy.length) ? `<p class="block-title">Du diagnostic au plan d'action</p><div class="field-grid">${legacy.map(([k,l])=>`<div class="field"><p class="fl">${esc(l)}</p><p class="fv">${esc(sw[k])}</p></div>`).join('')}</div>` : '';
+  const lecture = BPSwot.syntheseAAfficher(sw);
   return page('swot','',`
     ${chromeTop(bp,'SWOT')}
     <p class="eyebrow-tag">Analyse SWOT</p>
     <h2 class="pg-title">Forces, faiblesses, opportunités, menaces</h2>
-    <div style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:10px;height:280px;">
-      ${quads.map(([k,label,color,bg]) => `
-        <div style="background:${bg};border:1px solid ${color}33;border-radius:4px;padding:16px;overflow:hidden;">
-          <p style="font-family:var(--dp-mono);font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:${color};font-weight:700;margin:0 0 8px;">${label}</p>
-          <p style="font-size:11.5px;line-height:1.55;margin:0;color:var(--dp-ink);white-space:pre-wrap;">${has(sw[k])?esc(sw[k]):'—'}</p>
-        </div>`).join('')}
-    </div>
-    ${actions.length ? `<p class="block-title">Du diagnostic au plan d'action</p><div class="field-grid">${actions.map(([k,l])=>`<div class="field"><p class="fl">${esc(l)}</p><p class="fv">${esc(sw[k])}</p></div>`).join('')}</div>` : ''}
+    <div class="sw-grid">${cards}</div>
+    ${aDesImpacts ? `<p class="fin-note">Niveaux d'impact : repères déclarés par l'auteur du plan, justifiés dans le plan en ligne — non des mesures.</p>` : ''}
+    ${tableau}${legacyBloc}
+    ${lecture ? `<p class="block-title">Lecture stratégique du SWOT</p><div class="lecture">${esc(lecture)}</div>` : ''}
+    ${has(sw.swot_facteurs_cles) ? `<div class="field-grid"><div class="field"><p class="fl">Facteurs clés de succès</p><p class="fv">${esc(sw.swot_facteurs_cles)}</p></div></div>` : ''}
     ${chromeBottom()}
   `);
+}
+
+/* ---- Pages : Stratégie marketing (2026-11-10) — assets/bp-marketing.js ----
+   Deux pages : (1) identité de marque, canaux et parcours d'acquisition ; (2) budget, calendrier,
+   acquisition et performance. Chaque donnée chiffrée porte son statut (Objectif / Hypothèse /
+   Constaté) : le dossier ne présente jamais une performance comme acquise sans que l'auteur
+   l'ait marquée « Constaté ». Sans donnée structurée, on retombe sur la page générique historique. */
+function stPill(v){ const k = BPMarketing.statutDe(v); return `<span class="st st-${k}">${esc(BPMarketing.statutLabel(k))}</span>`; }
+function pageMarketing(bp){
+  const s = (bp.sections||{}).strategie_marketing || {};
+  const parc = BPMarketing.parcours(s);
+  const budget = BPMarketing.budgetsParCanal(s);
+  const actions = BPMarketing.planActions(s);
+  let ca1 = 0; try { const c = BPCalc.calcProduits(((bp.sections||{}).plan_financier)||{}); ca1 = c && c.annees && c.annees[0] ? c.annees[0].ca : 0; } catch(e) {}
+  const perf = BPMarketing.indicateursPerformance(s, { business_model:(bp.sections||{}).business_model, plan_commercial:(bp.sections||{}).plan_commercial, presentation:(bp.sections||{}).presentation, ca_annee1:ca1 });
+  const synth = BPMarketing.syntheseAAfficher(s);
+  if (!parc.length && !budget.lignes.length && !actions.length && !perf.length && !synth) return pageGeneriqueLabels(bp,'strategie_marketing').html;   /* plan ancien : page historique */
+
+  const schema1 = { identite_marque:"Identité de marque", communication:"Plan de communication", strategie_digitale:"Stratégie digitale", publicite:"Publicité", partenariats:"Partenariats & co-marketing", evenements:"Événements & présence terrain" };
+  const grid1 = fieldGrid(s, schema1);
+  const parcBloc = parc.length ? `<p class="block-title">Parcours d'acquisition client</p><div class="parcours">${parc.map((p,i) => `<div class="p"><h5><b>${String(i+1).padStart(2,'0')}</b>${esc(p.etape)}</h5><p>${esc(p.description)}</p></div>`).join('')}</div>` : '';
+  const synthBloc = synth ? `<p class="block-title">Synthèse stratégique</p><div class="lecture">${[synth.canaux_prioritaires, synth.resultats_attendus].filter(Boolean).map(esc).join('<br><br>')}</div>` : '';
+  const p1 = (grid1 || parcBloc || synthBloc) ? page('strategie_marketing','',`
+    ${chromeTop(bp,'Stratégie marketing')}
+    <p class="eyebrow-tag">Stratégie marketing</p>
+    <h2 class="pg-title">Identité de marque et canaux de communication</h2>
+    ${grid1}
+    ${parcBloc}
+    ${synthBloc}
+    ${chromeBottom()}
+  `) : '';
+
+  const env = BPMarketing.enveloppeAnnuelle(s), alerte = BPMarketing.controleBudget(s);
+  const kBudget = kpiRow([['Budget marketing annuel', env ? BPMarketing.fmtMontant(env) : ''],['Budget marketing mensuel', has(s.budget_marketing_mensuel) ? BPMarketing.fmtMontant(BPMarketing.nombre(s.budget_marketing_mensuel)) : ''],['Coût de fidélisation', has(s.cout_fidelisation) ? BPMarketing.fmtMontant(BPMarketing.nombre(s.cout_fidelisation)) : '']]);
+  const donut = budget.lignes.length ? `<p class="block-title">Répartition du budget par canal</p><div class="donut-zone">${BPMarketing.donutSvg(budget.lignes, 150)}
+    <ul class="donut-leg">${budget.lignes.map((l,i) => `<li><i style="background:${BPMarketing.PALETTE[i%BPMarketing.PALETTE.length]};"></i>${esc(l.canal)} ${stPill(l.statut)}<span class="v">${esc(BPMarketing.fmtMontant(l.budget))} · ${BPMarketing.fmtNb(l.pct)} %</span></li>`).join('')}</ul></div>
+    ${alerte ? `<p class="warn-note">À corriger : ${esc(alerte)}</p>` : ''}` : '';
+  const planTable = actions.length ? `<p class="block-title">Plan d'action marketing</p><table class="doc-table compact"><thead><tr><th style="width:14%;">Période</th><th>Actions prévues</th><th style="width:26%;">Indicateurs</th><th style="width:13%;">Statut</th></tr></thead><tbody>
+    ${actions.map(a => `<tr><td><strong>${esc(a.periode||'—')}</strong></td><td>${esc(a.actions||'—')}${a.budget!==null?`<br><span style="font-size:8.5px;color:var(--dp-ink-soft);">Budget : ${esc(BPMarketing.fmtMontant(a.budget))}</span>`:''}</td><td>${esc(a.indicateurs||'—')}</td><td>${stPill(a.statut)}</td></tr>`).join('')}</tbody></table>` : '';
+  const perfTable = perf.length ? `<p class="block-title">Tableau de performance marketing</p><table class="doc-table compact"><thead><tr><th style="width:30%;">Indicateur</th><th>Ce qu'il mesure</th><th style="width:14%;">Valeur</th><th style="width:13%;">Statut</th></tr></thead><tbody>
+    ${perf.map(r => `<tr><td><strong>${esc(r.label)}</strong></td><td>${esc(r.mesure)}<br><span style="font-size:8.5px;color:var(--dp-ink-soft);">${esc(r.origine)}</span></td><td style="font-variant-numeric:tabular-nums;"><strong>${esc(r.valeur)}</strong></td><td>${stPill(r.statut)}</td></tr>`).join('')}</tbody></table>` : '';
+  const fid = fieldGrid(s, { fidelisation:"Stratégie de fidélisation" });
+  const aDesStatuts = budget.lignes.length || actions.length || perf.length;
+  const p2 = (kBudget || donut || planTable || perfTable || fid) ? page('strategie_marketing-2','',`
+    ${chromeTop(bp,'Stratégie marketing')}
+    <p class="eyebrow-tag">Budget, calendrier &amp; acquisition</p>
+    <h2 class="pg-title">Piloter l'acquisition et la fidélisation</h2>
+    ${kBudget}${donut}${planTable}${perfTable}${fid}
+    ${aDesStatuts ? `<p class="fin-note">Objectif : ce que l'entreprise vise. Hypothèse : estimation non encore testée. Constaté : résultat réellement mesuré. Sans précision de l'auteur, une donnée est présentée comme une hypothèse.</p>` : ''}
+    ${chromeBottom()}
+  `) : '';
+  return p1 + p2;
+}
+
+/* ---- Pages : Présentation détaillée (2026-11-10) ----
+   Jusqu'ici absente du dossier : vision, mission, valeurs, origine, objectifs par horizon et
+   motivations n'y figuraient pas. Deux pages — (1) vision, mission, valeurs, origine ;
+   (2) objectifs stratégiques par horizon et engagement des fondateurs. Rien n'est ajouté au texte
+   saisi : « Valeurs » reconnaît les lignes « Intitulé : explication » pour les afficher en liste. */
+function valeursListe(txt){
+  return String(txt||'').split(/\r?\n/).map(l => l.replace(/^\s*(?:[-•*–·])\s*/,'').trim()).filter(Boolean).map(l => {
+    const m = l.match(/^([^:—–]{2,45}?)\s*(?::|\s[—–]\s)\s*(.+)$/);
+    return m ? { label:m[1].trim(), texte:m[2].trim() } : { label:'', texte:l };
+  });
+}
+function pagePresentation(bp){
+  const p = (bp.sections||{}).presentation || {};
+  const para = t => `<p class="fv" style="margin:0;">${esc(t)}</p>`;
+  const vm = fieldGrid(p, { vision:"Vision", mission:"Mission" });
+  const vals = has(p.valeurs) ? valeursListe(p.valeurs) : [];
+  const valsBloc = vals.length ? `<p class="block-title">Valeurs et engagements</p><ul class="donut-leg" style="font-size:11.5px;">${vals.map(v => `<li style="align-items:flex-start;line-height:1.5;">${v.label?`<strong style="min-width:92px;flex:none;">${esc(v.label)}</strong><span>${esc(v.texte)}</span>`:`<span>${esc(v.texte)}</span>`}</li>`).join('')}</ul>` : '';
+  const hist = has(p.historique) ? `<p class="block-title">Historique et origine du projet</p>${para(p.historique)}` : '';
+  const p1 = (vm || valsBloc || hist) ? page('presentation','',`
+    ${chromeTop(bp,'Présentation')}
+    <p class="eyebrow-tag">Présentation détaillée</p>
+    <h2 class="pg-title">Vision, mission et origine du projet</h2>
+    ${vm}${valsBloc}${hist}
+    ${chromeBottom()}
+  `) : '';
+  const horizons = [['obj_court','À court terme','0 à 12 mois'],['obj_moyen','À moyen terme','1 à 3 ans'],['obj_long','À long terme','3 à 5 ans']].filter(([k]) => has(p[k]));
+  const objBloc = horizons.length ? `<p class="block-title">Objectifs stratégiques</p><div class="fz-grid" style="grid-template-columns:repeat(${horizons.length},1fr);">${horizons.map(([k,l,h]) => `<div class="fz-card"><h4>${esc(l)} — ${esc(h)}</h4><p>${esc(p[k])}</p></div>`).join('')}</div><p class="fin-note">Objectifs et ambitions de l'équipe : ils dépendent de la croissance commerciale, de la rentabilité des premières activités et des capacités de financement.</p>` : '';
+  const motiv = has(p.motivations) ? `<p class="block-title">Motivations et engagement des fondateurs</p>${para(p.motivations)}` : '';
+  const p2 = (objBloc || motiv) ? page('presentation-2','',`
+    ${chromeTop(bp,'Présentation')}
+    <p class="eyebrow-tag">Présentation détaillée</p>
+    <h2 class="pg-title">Ambitions et engagement des fondateurs</h2>
+    ${objBloc}${motiv}
+    ${chromeBottom()}
+  `) : '';
+  return p1 + p2;
+}
+
+/* ---- Pages : Organisation & gouvernance (2026-11-10, enrichi le 2026-11-11) ----
+   Réponse au constat « les personnes et leurs fonctions sont présentées, mais pas comment l'entreprise
+   est dirigée, comment les décisions sont prises, qui contrôle et comment les responsabilités sont
+   réparties ». Trois pages, dans l'ordre où un financeur se pose les questions :
+   (1) direction, organigramme, équipe et responsabilités ;
+   (2) matrice RACI et gouvernance financière ;
+   (3) pilotage, indicateurs de pilotage, accompagnement externe, bénévoles.
+   Chaque mécanisme (RACI, règle financière, indicateur) porte une situation réelle — En place, Prévu,
+   Recommandé : un business plan ne présente pas comme existant ce qui n'est pas encore opérationnel. */
+function pageOrganisation(bp){
+  const o = (bp.sections||{}).organisation || {};
+  const joint = (...v) => v.filter(has).map(x => String(x).trim()).join('\n\n');
+  const blk = (titre, txt) => has(txt) ? `<p class="block-title">${esc(titre)}</p><p class="fv" style="margin:0 0 4px;font-size:11.5px;line-height:1.6;white-space:pre-wrap;">${esc(txt)}</p>` : '';
+  const pill = v => `<span class="st st-${BPOrga.statutPratique(v)}">${esc(BPOrga.statutPratiqueLabel(v))}</span>`;
+  const note = `<p class="fin-note">${esc(BPOrga.NOTE_STATUTS)}</p>`;
+  const direction = joint(o.dirigeants, o.gouvernance_detail, o.droits_decision, has(o.conseil_administration)?`Conseil d'administration : ${o.conseil_administration}`:'', has(o.comite_strategique)?`Comité stratégique : ${o.comite_strategique}`:'');
+  const ns = BPOrga.noeuds(o);
+  const orgBloc = ns.length ? `<p class="block-title">Organigramme</p>${BPOrga.organigrammeHtml(ns, esc)}` : '';
+  const b1 = blk('Direction et gouvernance', direction) + orgBloc + blk("Composition de l'équipe", o.equipe) + blk('Répartition des responsabilités', joint(o.responsabilites, has(o.associes_gouvernance)?`Associés : ${o.associes_gouvernance}`:''));
+
+  const raci = BPOrga.raci(o);
+  const raciBloc = raci.length ? `<p class="block-title">Matrice des responsabilités (RACI)</p><table class="doc-table compact"><thead><tr><th style="width:24%;">Décision ou activité</th><th>R · Réalise</th><th>A · Approuve</th><th>C · Consulté</th><th>I · Informé</th><th style="width:13%;">Situation</th></tr></thead><tbody>
+    ${raci.map(l => `<tr><td><strong>${esc(l.activite)}</strong></td><td>${esc(l.r||'—')}</td><td><strong>${esc(l.a||'—')}</strong></td><td>${esc(l.c||'—')}</td><td>${esc(l.i||'—')}</td><td>${pill(l.statut)}</td></tr>`).join('')}</tbody></table>
+    <p class="fin-note">R réalise l'action · A approuve : une seule personne a la décision finale · C est consulté avant la décision · I est informé après.</p>
+    ${BPOrga.controleRaci(raci).filter(x => x.etat !== 'ok').map(x => `<p class="warn-note">À corriger — ${esc(raci[x.index].activite)} : ${esc(x.message)}</p>`).join('')}` : '';
+  const fin = BPOrga.gouvernanceFinanciere(o);
+  const finBloc = fin.length ? `<p class="block-title">Gouvernance financière</p><table class="doc-table compact"><thead><tr><th style="width:28%;">Sujet</th><th>Règle ou mécanisme</th><th style="width:13%;">Situation</th></tr></thead><tbody>
+    ${fin.map(l => `<tr><td><strong>${esc(l.sujet)}</strong></td><td>${esc(l.regle)}</td><td>${pill(l.statut)}</td></tr>`).join('')}</tbody></table>` : '';
+
+  const pil = BPOrga.pilotage(o);
+  const pilBloc = pil.length ? `<p class="block-title">Indicateurs de pilotage</p><table class="doc-table compact"><thead><tr><th style="width:17%;">Domaine</th><th>Indicateur suivi</th><th style="width:16%;">Fréquence</th><th style="width:20%;">Responsable</th><th style="width:13%;">Situation</th></tr></thead><tbody>
+    ${pil.map(l => `<tr><td><strong>${esc(l.domaine||'—')}</strong></td><td>${esc(l.indicateur)}</td><td>${esc(l.frequence||'—')}</td><td>${esc(l.responsable||'—')}</td><td>${pill(l.statut)}</td></tr>`).join('')}</tbody></table>` : '';
+  const externe = joint(o.consultants, o.experts_gouvernance);
+  const vigilance = joint(has(o.investisseurs_actuels_gouvernance)?`Investisseurs actuels : ${o.investisseurs_actuels_gouvernance}`:'', has(o.conflits_interets)?`Conflits d'intérêts éventuels : ${o.conflits_interets}`:'', has(o.besoins_futurs_gouvernance)?`Besoins futurs en gouvernance : ${o.besoins_futurs_gouvernance}`:'');
+  const b3 = blk('Organisation du pilotage', o.pilotage) + pilBloc + blk('Accompagnement externe', externe) + blk('Ressources bénévoles', o.benevoles) + blk('Points de vigilance de la gouvernance', vigilance);
+
+  const p1 = b1 ? page('organisation','',`
+    ${chromeTop(bp,'Organisation')}
+    <p class="eyebrow-tag">Gouvernance</p>
+    <h2 class="pg-title">Comment l'entreprise est dirigée</h2>
+    ${b1}
+    ${chromeBottom()}
+  `) : '';
+  const p2 = (raciBloc || finBloc) ? page('organisation-2','',`
+    ${chromeTop(bp,'Organisation')}
+    <p class="eyebrow-tag">Responsabilités &amp; contrôle</p>
+    <h2 class="pg-title">Qui décide, qui exécute, qui contrôle</h2>
+    ${raciBloc}${finBloc}${note}
+    ${chromeBottom()}
+  `) : '';
+  const p3 = b3 ? page('organisation-3','',`
+    ${chromeTop(bp,'Organisation')}
+    <p class="eyebrow-tag">Pilotage &amp; accompagnement</p>
+    <h2 class="pg-title">Comment les décisions sont suivies</h2>
+    ${b3}${pil.length ? note : ''}
+    ${chromeBottom()}
+  `) : '';
+  return p1 + p2 + p3;
+}
+
+/* ---- Pages : Ressources humaines (2026-11-11) — assets/bp-organisation.js (BPRh) ----
+   Constat : « pertinente, mais manque de précision sur les recrutements, les coûts salariaux, le
+   développement des compétences et l'organisation de la croissance ». Deux pages :
+   (1) effectifs (actuel → recrutements identifiés → objectif), plan de recrutement chiffré, indicateurs ;
+   (2) compétences et formations, rémunération et fidélisation, suivi. Rien n'est inventé : tout vient
+   des champs de l'éditeur ; les postes manquants pour atteindre l'objectif sont signalés « à définir ». */
+function pageRH(bp){
+  const rh = (bp.sections||{}).rh || {};
+  const postes = BPRh.postes(rh), e = BPRh.effectifs(rh);
+  const aStructure = e.actuel !== null || e.objectif !== null || postes.length;
+  if (!aStructure) return pageGeneriqueLabels(bp,'rh').html;                    /* plan ancien : page historique */
+  let ca1 = 0; try { const c = BPCalc.calcProduits(((bp.sections||{}).plan_financier)||{}); ca1 = c && c.annees && c.annees[0] ? c.annees[0].ca : 0; } catch(err) {}
+  const ind = BPRh.indicateurs(rh, { ca_annee1: ca1 });
+  const kp = kpiRow([['Effectif actuel', e.actuel !== null ? BPRh.fmtNb(e.actuel) : ''], ['Recrutements identifiés', e.recrutements ? String(e.recrutements) : ''], ['Effectif visé à 12 mois', e.objectif !== null ? BPRh.fmtNb(e.objectif) : ''], ['Postes encore à définir', e.aDefinir ? String(e.aDefinir) : '']]);
+  const courbe = BPRh.courbe(rh), note = BPRh.noteCourbe(rh), ctrl = (e.depasse || e.recule) ? BPRh.controle(rh) : [];   /* « à définir » n'est pas une erreur : la note sous le graphique le dit */
+  const graph = courbe.length ? `<p class="block-title">Évolution prévisionnelle des effectifs</p><div style="max-width:560px;color:var(--dp-ink);">${BPRh.barresSvg(courbe, { largeur: 560, hauteur: 160 })}</div>${note ? `<p class="fin-note">${esc(note)}</p>` : ''}${ctrl.map(m => `<p class="warn-note">À corriger : ${esc(m)}</p>`).join('')}` : (ctrl.length ? ctrl.map(m => `<p class="warn-note">À corriger : ${esc(m)}</p>`).join('') : '');
+  const masse = BPRh.masseRecrutements(rh);
+  const dateFr = d => { const m = String(d||'').match(/^(\d{4})-(\d{2})/); return m ? `${m[2]}/${m[1]}` : ''; };
+  const planTable = postes.length ? `<p class="block-title">Plan de recrutement</p><table class="doc-table compact"><thead><tr><th style="width:24%;">Poste</th><th style="width:6%;">Nb</th><th>Mission et compétences</th><th style="width:12%;">Arrivée</th><th style="width:15%;">Coût employeur</th></tr></thead><tbody>
+    ${postes.map(p => `<tr><td><strong>${esc(p.intitule)}</strong><br><span style="font-size:8.5px;color:var(--dp-ink-soft);">${esc(p.temps)}</span></td><td>${p.nb}</td><td>${esc(p.mission||'—')}${p.competences?`<br><span style="font-size:8.5px;color:var(--dp-ink-soft);">${esc(p.competences)}</span>`:''}</td><td>${esc(dateFr(p.date)||'—')}</td><td>${p.cout!==null?esc(BPRh.fmtMontant(p.cout*p.nb)):'—'}</td></tr>`).join('')}
+    ${masse>0?`<tr class="total"><td>Total</td><td>${e.recrutements}</td><td></td><td></td><td>${esc(BPRh.fmtMontant(masse))}</td></tr>`:''}</tbody></table>` : '';
+  const indTable = ind.length ? `<p class="block-title">Indicateurs RH essentiels</p><table class="doc-table compact"><thead><tr><th style="width:30%;">Indicateur</th><th>Ce qu'il mesure</th><th style="width:14%;">Valeur</th><th style="width:13%;">Statut</th></tr></thead><tbody>
+    ${ind.map(r => `<tr><td><strong>${esc(r.label)}</strong></td><td>${esc(r.mesure)}<br><span style="font-size:8.5px;color:var(--dp-ink-soft);">${esc(r.origine)}</span></td><td style="font-variant-numeric:tabular-nums;"><strong>${esc(r.valeur)}</strong></td><td><span class="st st-${r.statut}">${esc(BPRh.STATUTS_DONNEE[r.statut])}</span></td></tr>`).join('')}</tbody></table>
+    <p class="fin-note">Objectif : ce que l'entreprise vise. Hypothèse : estimation issue des postes saisis. Constaté : effectif réellement en place.</p>` : '';
+  const p1 = page('rh','',`
+    ${chromeTop(bp,'Ressources humaines')}
+    <p class="eyebrow-tag">Effectifs &amp; recrutement</p>
+    <h2 class="pg-title">Recruter au bon rythme</h2>
+    ${kp}${graph}${planTable}
+    ${chromeBottom()}
+  `);
+  const blk = (titre, txt) => has(txt) ? `<p class="block-title">${esc(titre)}</p><p class="fv" style="margin:0 0 4px;font-size:11.5px;line-height:1.6;white-space:pre-wrap;">${esc(txt)}</p>` : '';
+  const formPostes = postes.filter(p => p.formation).map(p => `${p.intitule} : ${p.formation}`).join('\n');
+  const b2 = blk('Recrutements envisagés', rh.recrutements) + blk('Compétences recherchées', rh.competences) + blk('Formations et développement des compétences', joinTxt(rh.formations, formPostes)) + blk('Politique de rémunération et fidélisation', rh.politique_rh) + blk('Suivi des ressources humaines', rh.suivi_rh) + indTable;
+  const p2 = b2 ? page('rh-2','',`
+    ${chromeTop(bp,'Ressources humaines')}
+    <p class="eyebrow-tag">Compétences &amp; fidélisation</p>
+    <h2 class="pg-title">Développer et garder les compétences</h2>
+    ${b2}
+    ${chromeBottom()}
+  `) : '';
+  return p1 + p2;
+}
+function joinTxt(...v){ return v.filter(has).map(x => String(x).trim()).join('\n\n'); }
+
+/* ---- Pages de compléments (cahier des charges enrichi, 2026-11-11) — assets/bp-enrichi.js ----
+   Une page « … — compléments » par rubrique, produite seulement si le porteur a saisi au moins un
+   des champs facultatifs. Chaque bloc = un intitulé .block-title + UN élément : paginerFeuilles()
+   peut donc couper la page entre deux blocs sans jamais séparer un intitulé de son contenu. */
+const ENR_PAGES = [
+  ['infos_generales','identite',"Fiche d'identité","Fiche d'identité & structure",'Qui est le projet'],
+  ['resume_executif','resume-plus','Résumé développé','Résumé exécutif — version développée','Synthèse'],
+  ['presentation','presentation-plus','Présentation — compléments','Présentation — compléments','Trajectoire et objectifs'],
+  ['probleme','probleme-plus','Problème — compléments','Problème — compléments','Causes et priorités'],
+  ['solution','solution-plus','Solution — compléments','Solution — compléments','Fonctionnement et feuille de route'],
+  ['marche','marche-plus','Marché — compléments','Marché — compléments','Historique et analyses'],
+  ['swot','swot-plus','SWOT — compléments',"SWOT — plan d'action",'Croiser pour agir'],
+  ['business_model','bmc-plus','Business model — compléments','Business model — compléments','Rentabilité par segment'],
+  ['produits','produits-plus','Produits — compléments','Produits — fiches et classements','Catalogue'],
+  ['strategie_marketing','strategie_marketing-plus','Marketing — compléments','Stratégie marketing — compléments','Calendrier et campagnes'],
+  ['plan_commercial','plan_commercial-plus','Plan commercial — compléments','Plan commercial — compléments','Entonnoir et pipeline'],
+  ['plan_operationnel','plan_operationnel-plus','Opérations — compléments','Plan opérationnel — compléments','Processus et capacités'],
+  ['organisation','organisation-plus','Gouvernance — compléments','Organisation — gouvernance','Décisions et contrôles'],
+  ['rh','rh-plus','RH — compléments','Ressources humaines — compléments','Effectifs et fiches de poste'],
+  ['calendrier','calendrier-plus','Calendrier — compléments','Calendrier — Gantt et alertes','Suivi du planning'],
+  ['plan_financier','finances-plus','Plan financier — compléments','Plan financier — compléments','Hypothèses et dette'],
+  ['risques','risques-plus','Risques — compléments','Risques — cartographie et registre','Maîtriser'],
+  ['impact','impact-plus','Impact — compléments','Impact — tableau de bord','Mesurer'],
+  ['financement','financement-plus','Financement — compléments','Financement — sources et justificatifs','Structure du financement'],
+  ['annexes','annexes-plus','Annexes — registre','Annexes — registre documentaire','Pièces'],
+];
+function pagePlus(bp, rub, id, label, titre, eyebrow){
+  if (typeof BPEnrichi === 'undefined' || !BPEnrichi.aDesAjouts(rub)) return null;
+  let b = [];
+  try { b = BPEnrichi.blocs(rub, bp, { esc, modes: ['long'], tbClass: 'doc-table compact' }); } catch (e) { console.error('Compléments', rub, e); }
+  if (!b.length) return null;
+  const corps = b.map(x => `<p class="block-title">${esc(x.titre)}</p><div class="ench-bloc">${x.html}</div>`).join('');
+  return { id, label, html: page(id,'',`
+    ${chromeTop(bp, label)}
+    <p class="eyebrow-tag">${esc(eyebrow)}</p>
+    <h2 class="pg-title">${esc(titre)}</h2>
+    ${corps}
+    ${chromeBottom()}
+  `) };
 }
 
 /* ---- Page : PESTEL ---- */
@@ -1309,6 +1686,7 @@ function renderDossier(bp, tplKey, formatKey){
   // et le modèle, le détail opérationnel, la finance, et enfin l'équipe qui porte tout ça.
   const pageDefs = [
     { id:'resume', label:'Résumé exécutif', html: pageResume(bp) },
+    { id:'presentation', label:'Présentation détaillée', html: pagePresentation(bp) },
     generic(bp,'probleme'), generic(bp,'solution'),
     { id:'traction', label:'Traction', html: pageTraction(bp) },
     { id:'marche', label:'Marché', html: pageMarche(bp) },
@@ -1318,9 +1696,9 @@ function renderDossier(bp, tplKey, formatKey){
     { id:'bmc', label:'Business Model', html: pageBMC(bp) },
     generic(bp,'produits'),
     { id:'bcg', label:'Matrice BCG', html: pageBCG(bp) },
-    generic(bp,'strategie_marketing'), generic(bp,'plan_commercial'),
+    { id:'strategie_marketing', label:'Stratégie marketing', html: pageMarketing(bp) }, generic(bp,'plan_commercial'),
     { id:'capsoncas', label:'CAP-SONCAS', html: pageCapSoncas(bp) },
-    generic(bp,'plan_operationnel'), generic(bp,'organisation'), generic(bp,'rh'), generic(bp,'calendrier'),
+    generic(bp,'plan_operationnel'), { id:'organisation', label:'Organisation & gouvernance', html: pageOrganisation(bp) }, { id:'rh', label:'Ressources humaines', html: pageRH(bp) }, generic(bp,'calendrier'),
     { id:'finances', label:'Plan financier', html: pageFinances(bp) },
     { id:'prixproduits', label:'Prix, volumes et marges', html: pagePrixMasse(bp, 'produits') },
     { id:'massesalariale', label:'Masse salariale', html: pagePrixMasse(bp, 'masse') },
@@ -1332,17 +1710,28 @@ function renderDossier(bp, tplKey, formatKey){
     { id:'financement', label:'Financement', html: pageFinancement(bp) },
     generic(bp,'annexes'),
     { id:'equipe', label:'Équipe', html: pageEquipe(bp) },
-  ].filter(p => p.html).filter(p => !format.ids || format.ids.includes(p.id));
+  ].filter(p => p.html);
+  /* Compléments : chaque page « plus » suit la page de sa rubrique ; la fiche d'identité précède le résumé. */
+  if (typeof BPEnrichi !== 'undefined') { BPEnrichi.ensureCss(); }
+  const baseDe = id => id === 'identite' ? 'resume' : id.replace(/-plus$/, '');
+  ENR_PAGES.forEach(([rub, id, label, titre, eyebrow]) => {
+    const pp = pagePlus(bp, rub, id, label, titre, eyebrow); if (!pp) return;
+    if (id === 'identite') { const i = pageDefs.findIndex(p => p.id === 'resume'); pageDefs.splice(i < 0 ? 0 : i, 0, pp); return; }
+    const base = baseDe(id);
+    let i = -1; pageDefs.forEach((p, k) => { if (p.id === base) i = k; });
+    if (i < 0) { const eq = pageDefs.findIndex(p => p.id === 'equipe'); pageDefs.splice(eq < 0 ? pageDefs.length : eq, 0, pp); } else pageDefs.splice(i + 1, 0, pp);
+  });
+  for (let k = pageDefs.length - 1; k >= 0; k--) { if (format.ids && !format.ids.includes(baseDe(pageDefs[k].id)) && !format.ids.includes(pageDefs[k].id)) pageDefs.splice(k, 1); }
 
   // Pages de séparation de chapitre : une grande composition graphique, peu de texte, insérée
   // avant la première page réellement présente de chaque chapitre -- jamais de chapitre listé
   // s'il n'a produit aucune page (calculé sur pageDefs déjà filtré, pas sur une liste figée).
   const CHAPTERS = [
-    { num:1, titre:'Le projet', sous:'Résumé, problème et solution', ids:['resume','probleme','solution'] },
-    { num:2, titre:'Marché & traction', sous:'Étude de marché, positionnement et preuves', ids:['traction','marche','pestel','persona','swot'] },
-    { num:3, titre:'Modèle & opérations', sous:'Business model, produits et organisation', ids:['bmc','produits','bcg','strategie_marketing','plan_commercial','capsoncas','plan_operationnel','organisation','rh','calendrier'] },
-    { num:4, titre:'Finances', sous:'Trajectoire financière, risques et impact', ids:['finances','prixproduits','massesalariale','planfinancement','tresorerie','tresorerie36','risques','impact','financement'] },
-    { num:5, titre:"Équipe & annexes", sous:'Qui porte le projet', ids:['equipe','annexes'] },
+    { num:1, titre:'Le projet', sous:'Résumé, problème et solution', ids:['identite','resume','resume-plus','presentation','presentation-plus','probleme','probleme-plus','solution','solution-plus'] },
+    { num:2, titre:'Marché & traction', sous:'Étude de marché, positionnement et preuves', ids:['traction','marche','marche-plus','pestel','persona','swot','swot-plus'] },
+    { num:3, titre:'Modèle & opérations', sous:'Business model, produits et organisation', ids:['bmc','bmc-plus','produits','produits-plus','bcg','strategie_marketing','strategie_marketing-plus','plan_commercial','plan_commercial-plus','capsoncas','plan_operationnel','plan_operationnel-plus','organisation','organisation-plus','rh','rh-plus','calendrier','calendrier-plus'] },
+    { num:4, titre:'Finances', sous:'Trajectoire financière, risques et impact', ids:['finances','finances-plus','prixproduits','massesalariale','planfinancement','tresorerie','tresorerie36','risques','risques-plus','impact','impact-plus','financement','financement-plus'] },
+    { num:5, titre:"Équipe & annexes", sous:'Qui porte le projet', ids:['equipe','annexes','annexes-plus'] },
   ];
   let currentChapitre = null, bodyHtml = '';
   pageDefs.forEach(p => {
@@ -1359,20 +1748,88 @@ function renderDossier(bp, tplKey, formatKey){
   stage.innerHTML = pageCouverture(bp, tpl) + pageToc(bp) + bodyHtml + pageConclusion(bp, tpl);
   if (tpl.inst) administratifier(stage);
 
-  // Table des matières + numérotation, calculées sur les pages réellement produites.
-  const sheets = [...stage.querySelectorAll('.sheet')];
-  sheets.forEach((sheet, i) => {
-    const n = i+1;
-    const badge = sheet.querySelector('.dp-pagenum');
-    if (badge) badge.textContent = `${String(n).padStart(2,'0')} / ${sheets.length}`;
-  });
-  const tocList = document.getElementById('dp-toc-list');
-  if (tocList) {
-    const entries = pageDefs.map(p => ({ label:p.label, num: sheets.findIndex(s=>s.dataset.pageId===p.id)+1 }));
-    tocList.innerHTML = entries.map((e,i) => `<div style="display:flex;align-items:baseline;gap:10px;padding:7px 0;border-bottom:1px solid var(--dp-line);font-size:12px;"><span style="font-family:var(--dp-mono);color:var(--dp-orange);font-weight:600;">${String(i+1).padStart(2,'0')}</span><span style="flex:1;">${esc(e.label)}</span><span style="font-family:var(--dp-mono);color:var(--dp-ink-soft);">${String(e.num).padStart(2,'0')}</span></div>`).join('');
-  }
+  // Table des matières + numérotation, calculées sur les pages réellement produites
+  // (donc après le découpage des pages trop denses).
+  const numeroter = () => {
+    const sheets = [...stage.querySelectorAll('.sheet')];
+    sheets.forEach((sheet, i) => {
+      const n = i+1;
+      const badge = sheet.querySelector('.dp-pagenum');
+      if (badge) badge.textContent = `${String(n).padStart(2,'0')} / ${sheets.length}`;
+    });
+    const tocList = document.getElementById('dp-toc-list');
+    if (tocList) {
+      const entries = pageDefs.map(p => ({ label:p.label, num: sheets.findIndex(s=>s.dataset.pageId===p.id)+1 }));
+      const pad = entries.length > 24 ? 3 : 7;   // sommaire long : lignes resserrées pour tenir sur une page
+      tocList.style.columnCount = entries.length > 28 ? 2 : '';   // très long (pages de compléments) : deux colonnes
+      tocList.style.columnGap = entries.length > 28 ? '26px' : '';
+      tocList.innerHTML = entries.map((e,i) => `<div style="display:flex;align-items:baseline;gap:10px;break-inside:avoid;padding:${pad}px 0;border-bottom:1px solid var(--dp-line);font-size:12px;"><span style="font-family:var(--dp-mono);color:var(--dp-orange);font-weight:600;">${String(i+1).padStart(2,'0')}</span><span style="flex:1;">${esc(e.label)}</span><span style="font-family:var(--dp-mono);color:var(--dp-ink-soft);">${String(e.num).padStart(2,'0')}</span></div>`).join('');
+    }
+  };
+  paginerFeuilles(stage);
+  numeroter();
+  /* Les polices web changent les hauteurs : on recalcule une fois qu'elles sont chargées. */
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { if (stage.isConnected && paginerFeuilles(stage)) numeroter(); }).catch(() => {});
 
   renderAnnexeQRCodes();
+}
+
+/* ---- Découpage des pages trop denses (2026-11-11) ----
+   Une page A4 ne grandit plus quand son contenu est long : les blocs qui ne tiennent pas
+   passent sur une page « suite » qui reprend l'en-tête et le pied de page. Un bloc =
+   un intitulé + l'élément qui le suit (tableau, grille de champs, graphique…), accompagné
+   de sa note ; on ne coupe jamais à l'intérieur d'un bloc, et un intitulé n'est jamais
+   laissé seul en bas de page. Un bloc plus haut qu'une page à lui seul reste entier.
+   Retourne true si au moins une page a été créée. */
+function paginerFeuilles(stage){
+  const LIMITE = 1124;   // 297 mm à 96 dpi = 1122,5 px
+  const sautees = id => id === 'cover' || id === 'toc' || id === 'conclusion' || id.startsWith('chap-');
+  const estNote = n => n.classList && (n.classList.contains('fin-note') || n.classList.contains('warn-note'));
+  const blocs = corps => {
+    const res = []; let titre = null;
+    corps.forEach(n => {
+      if (n.classList && n.classList.contains('block-title')) { titre = n; return; }
+      if (estNote(n) && res.length && !titre) { res[res.length-1].push(n); return; }
+      res.push(titre ? [titre, n] : [n]); titre = null;
+    });
+    if (titre) res.push([titre]);
+    return res;
+  };
+  let creees = 0;
+  [...stage.querySelectorAll('.sheet[data-page-id]')].forEach(sheet => {
+    const id = sheet.dataset.pageId;
+    if (sautees(id)) return;
+    const base = id.replace(/-s\d+$/, '');
+    let cur = sheet, rang = sheet.dataset.suite ? parseInt((id.match(/-s(\d+)$/) || [0, 1])[1], 10) : 1;
+    while (cur && cur.offsetHeight > LIMITE) {
+      const pg = cur.querySelector(':scope > .pg'); if (!pg) break;
+      const enfants = [...pg.children];
+      const pied = enfants.find(k => k.classList.contains('pg-chrome-bottom'));
+      const iTitre = enfants.findIndex(k => k.classList.contains('pg-title'));
+      if (!pied || iTitre < 0) break;
+      const entete = enfants.slice(0, iTitre + 1);
+      const liste = blocs(enfants.filter((k, i) => i > iTitre && k !== pied));
+      const deplaces = [];
+      while (liste.length > 1 && cur.offsetHeight > LIMITE) {
+        const b = liste.pop();
+        b.forEach(n => n.remove());
+        deplaces.unshift(b);
+      }
+      if (!deplaces.length) break;
+      const nv = cur.cloneNode(false);
+      nv.dataset.pageId = base + '-s' + (++rang); nv.dataset.suite = '1';
+      const pg2 = pg.cloneNode(false);
+      entete.forEach(h => pg2.appendChild(h.cloneNode(true)));
+      const t = pg2.querySelector('.pg-title'); if (t) t.textContent = t.textContent.replace(/\s*\(suite\)$/, '') + ' (suite)';
+      deplaces.forEach(b => b.forEach(n => pg2.appendChild(n)));
+      pg2.appendChild(pied.cloneNode(true));
+      nv.appendChild(pg2);
+      cur.after(nv);
+      creees++;
+      cur = nv;
+    }
+  });
+  return creees > 0;
 }
 
 /* QR codes sur les annexes qui ont un lien -- posés après coup (la bibliothèque dessine dans
@@ -1539,6 +1996,14 @@ async function generatePPTX(){
       }
     }
 
+    /* ---------- Présentation détaillée (2026-11-10) ---------- */
+    {
+      const pz = s.presentation||{};
+      const cut = (t,n) => { t = String(t||'').replace(/\s+/g,' ').trim(); return t.length>n ? t.slice(0,n-1).trimEnd()+'…' : t; };
+      bulletSlide('Présentation', 'Vision, mission et origine du projet', [['Vision', cut(pz.vision,420)], ['Mission', cut(pz.mission,420)], ['Origine du projet', cut(pz.historique,420)]]);
+      bulletSlide('Présentation', 'Objectifs stratégiques et engagement des fondateurs', [['À court terme (0 à 12 mois)', cut(pz.obj_court,300)], ['À moyen terme (1 à 3 ans)', cut(pz.obj_moyen,300)], ['À long terme (3 à 5 ans)', cut(pz.obj_long,300)], ['Motivations et engagement des fondateurs', cut(pz.motivations,300)]]);
+    }
+
     /* ---------- 03 · Investment Highlights ---------- */
     {
       const s2 = s, pf = s.plan_financier||{};
@@ -1591,22 +2056,204 @@ async function generatePPTX(){
       }
     }
 
-    /* ---------- SWOT ---------- */
+    /* ---------- Marché : indicateurs, segmentation, concurrence, faisabilité (2026-11-10) ---------- */
+    {
+      const m = s.marche||{};
+      const indic = BPMarche.indicateurs(m);
+      const barres = BPMarche.barresSegments(m.segments_clients);
+      if (indic.length || barres.length) {
+        const slide = pres.addSlide(); slide.background = { color: C.white };
+        chrome(slide, 'Marché');
+        title(slide, 'Les chiffres clés du marché', { fontSize:24, h:0.8 });
+        if (indic.length) statRow(slide, 1.95, indic.map(i => ({ label:i.libelle||'', value:i.valeur, note:i.perimetre })), 1.35);
+        if (barres.length) {
+          const y0 = indic.length ? 3.65 : 2.0;
+          slide.addText('SEGMENTATION COMMERCIALE', { x:MX, y:y0, w:6, h:0.3, fontFace:FB, fontSize:9, bold:true, color:C.soft, charSpacing:0.8 });
+          barres.slice(0,4).forEach((b,i) => {
+            const y = y0 + 0.4 + i*0.62, bw = W-MX*2-3.2;
+            slide.addText(b.nom, { x:MX, y, w:3.0, h:0.3, fontFace:FB, fontSize:11, bold:true, color:C.ink });
+            slide.addText(b.detail||'', { x:MX, y:y+0.27, w:3.0, h:0.25, fontFace:FB, fontSize:8.5, color:C.soft });
+            slide.addShape(R, { x:MX+3.2, y:y+0.1, w:bw, h:0.16, fill:{color:C.line}, line:{color:C.line, width:0} });
+            slide.addShape(R, { x:MX+3.2, y:y+0.1, w:Math.max(0.05, bw*b.pct/100), h:0.16, fill:{color:C.orange}, line:{color:C.orange, width:0} });
+          });
+          slide.addText('Barres illustratives de priorisation commerciale, et non parts de marché mesurées.', { x:MX, y:7.5-0.95, w:W-MX*2, h:0.3, fontFace:FB, italic:true, fontSize:9, color:C.soft });
+        }
+      }
+      const conc = (m.concurrents||[]).filter(c => has(c.nom));
+      if (conc.length) {
+        const slide = pres.addSlide(); slide.background = { color: C.white };
+        chrome(slide, 'Concurrence');
+        title(slide, 'Positionnement face à la concurrence', { fontSize:24, h:0.8 });
+        const hd = t => ({ text:t, options:{ bold:true, color:C.soft, fontSize:8.5 } });
+        const rows = [[hd('Concurrent'), hd('Statut'), hd('Prix'), hd('Prix au kilo'), hd('Origine'), hd('Certifications'), hd('Distribution')]]
+          .concat(conc.slice(0,7).map(c => [c.nom, BPMarche.statutLabel(c.statut_donnee)||'Sans statut', c.prix||'—', c.prix_kg||'—', c.origine_produits||'—', c.certifications||'—', c.canaux_distribution||'—'].map(String)));
+        slide.addTable(rows, { x:MX, y:1.95, w:W-MX*2, colW:[2.0,1.3,1.3,1.4,1.9,1.9,2.4], fontFace:FB, fontSize:9.5, color:C.ink, border:{type:'solid', color:C.line, pt:0.5}, autoPage:false });
+        slide.addText('Les concurrents « Hypothèse », « À vérifier » ou sans statut ne sont pas contrôlés : à confirmer avant toute présentation.', { x:MX, y:7.5-0.95, w:W-MX*2, h:0.3, fontFace:FB, italic:true, fontSize:9, color:C.soft });
+      }
+      const fz = BPMarche.faisabiliteAAfficher(m);
+      if (fz) {
+        const slide = pres.addSlide(); slide.background = { color: C.white };
+        chrome(slide, 'Marché');
+        title(slide, 'Conclusion de faisabilité commerciale', { fontSize:24, h:0.8 });
+        const cards = [['Attractivité du marché', fz.attractivite], ['Capacité de pénétration', fz.penetration], ['Conditions de réussite', fz.conditions]];
+        const gap = 0.25, cw = (W-MX*2-gap*2)/3;
+        cards.forEach(([l,v],i) => {
+          const x = MX + i*(cw+gap);
+          slide.addShape(R, { x, y:2.0, w:cw, h:4.2, fill:{color:C.paper}, line:{color:C.line, width:0.75} });
+          slide.addText(l.toUpperCase(), { x:x+0.18, y:2.15, w:cw-0.36, h:0.35, fontFace:FB, fontSize:9, bold:true, color:C.orange, charSpacing:0.8 });
+          slide.addText(has(v)?v:'—', { x:x+0.18, y:2.55, w:cw-0.36, h:3.5, fontFace:FB, fontSize:11, color:C.ink, valign:'top', fit:'shrink' });
+        });
+      }
+    }
+
+    /* ---------- SWOT (2026-11-10 : éléments, niveaux d'impact, actions prioritaires) ---------- */
     {
       const sw = s.swot||{};
-      const quads = [['Forces',sw.forces,C.green],['Faiblesses',sw.faiblesses,'B5451F'],['Opportunités',sw.opportunites,C.blue],['Menaces',sw.menaces,C.soft]];
-      if (quads.some(([,v])=>has(v))) {
+      const els = BPSwot.elements(sw).filter(e => has(e.titre));
+      if (els.length) {
         const slide = pres.addSlide(); slide.background = { color: C.white };
         chrome(slide, 'SWOT');
         title(slide, 'Forces, faiblesses, opportunités, menaces', { fontSize:22, h:0.7, y:1.0 });
         const gap=0.18, cw=(W-MX*2-gap)/2, ch=2.4, y0=1.85;
-        quads.forEach(([label,val,color],i) => {
-          const col=i%2, row=Math.floor(i/2);
+        BPSwot.CATS.forEach((c,i) => {
+          const color = c.color.replace('#',''), col=i%2, row=Math.floor(i/2);
           const x=MX+col*(cw+gap), y=y0+row*(ch+gap);
           slide.addShape(R, { x, y, w:cw, h:ch, fill:{color:C.paper}, line:{color, width:1.5} });
-          slide.addText(label.toUpperCase(), { x:x+0.18, y:y+0.14, w:cw-0.36, h:0.3, fontFace:FB, fontSize:9, bold:true, color, charSpacing:0.8 });
-          slide.addText(has(val)?String(val):'—', { x:x+0.18, y:y+0.5, w:cw-0.36, h:ch-0.65, fontFace:FB, fontSize:10.5, color:C.ink, valign:'top' });
+          slide.addText(c.label.toUpperCase(), { x:x+0.18, y:y+0.14, w:cw-0.36, h:0.3, fontFace:FB, fontSize:9, bold:true, color, charSpacing:0.8 });
+          const l = BPSwot.classes(els, c.key), shown = l.slice(0,4), runs = [];
+          shown.forEach(e => { const n = BPSwot.impactNum(e.impact); runs.push({ text:'• '+e.titre, options:{ bold:true, color:C.ink, fontSize:10.5, breakLine:false } }); runs.push({ text:(n?'   Impact : '+BPSwot.niveauLabel(c.key,n):'')+'\n', options:{ color:C.soft, fontSize:8.5, breakLine:false } }); });
+          if (l.length > shown.length) runs.push({ text:'+ '+(l.length-shown.length)+' autre(s) élément(s)', options:{ color:C.soft, fontSize:8.5 } });
+          slide.addText(runs.length ? runs : [{ text:'—', options:{} }], { x:x+0.18, y:y+0.5, w:cw-0.36, h:ch-0.65, fontFace:FB, valign:'top' });
         });
+        if (els.some(e => BPSwot.impactNum(e.impact))) slide.addText("Niveaux d'impact : repères déclarés par l'auteur du plan, non des mesures.", { x:MX, y:7.5-0.65, w:W-MX*2, h:0.25, fontFace:FB, italic:true, fontSize:8.5, color:C.soft });
+      }
+      const plan = BPSwot.planActions(els), lecture = BPSwot.syntheseAAfficher(sw);
+      if (plan.length || lecture) {
+        const slide = pres.addSlide(); slide.background = { color: C.white };
+        chrome(slide, 'SWOT');
+        title(slide, 'Risques et actions prioritaires', { fontSize:24, h:0.8 });
+        let y = 1.95;
+        if (plan.length) {
+          const hd = t => ({ text:t, options:{ bold:true, color:C.soft, fontSize:9 } });
+          const rows = [[hd('Constat'), hd('Action stratégique'), hd('Priorité')]].concat(plan.slice(0,6).map(r => [r.titre, r.action, r.priorite.niveau]));
+          slide.addTable(rows, { x:MX, y, w:W-MX*2, colW:[3.6,7.0,1.6], fontFace:FB, fontSize:10.5, color:C.ink, border:{type:'solid', color:C.line, pt:0.5}, autoPage:false });
+          y += 0.45 + Math.min(plan.length,6)*0.55;
+        }
+        if (lecture) {
+          slide.addText('LECTURE STRATÉGIQUE DU SWOT', { x:MX, y:Math.max(y,4.7), w:6, h:0.3, fontFace:FB, fontSize:9, bold:true, color:C.orange, charSpacing:0.8 });
+          slide.addText(lecture, { x:MX, y:Math.max(y,4.7)+0.32, w:W-MX*2, h:1.3, fontFace:FB, fontSize:11.5, color:C.ink, valign:'top', fit:'shrink' });
+        }
+      }
+    }
+
+    /* ---------- Stratégie marketing (2026-11-10) ---------- */
+    {
+      const mk = s.strategie_marketing||{};
+      const parc = BPMarketing.parcours(mk), budget = BPMarketing.budgetsParCanal(mk), actions = BPMarketing.planActions(mk), synth = BPMarketing.syntheseAAfficher(mk);
+      let ca1 = 0; try { const cc = BPCalc.calcProduits(s.plan_financier||{}); ca1 = cc && cc.annees && cc.annees[0] ? cc.annees[0].ca : 0; } catch(e) {}
+      const perf = BPMarketing.indicateursPerformance(mk, { business_model:s.business_model, plan_commercial:s.plan_commercial, presentation:s.presentation, ca_annee1:ca1 });
+      if (parc.length || synth) {
+        const slide = pres.addSlide(); slide.background = { color: C.white };
+        chrome(slide, 'Stratégie marketing');
+        title(slide, "Parcours d'acquisition client", { fontSize:24, h:0.8 });
+        if (parc.length) {
+          const gap = 0.22, cw = (W-MX*2-gap*(parc.length-1))/parc.length;
+          parc.forEach((p,i) => {
+            const x = MX + i*(cw+gap);
+            slide.addShape(R, { x, y:1.95, w:cw, h:2.0, fill:{color:C.paper}, line:{color:C.line, width:0.75} });
+            slide.addText(String(i+1).padStart(2,'0')+'  '+p.etape, { x:x+0.16, y:2.05, w:cw-0.32, h:0.4, fontFace:FD, fontSize:14, bold:true, color:C.navy });
+            slide.addText(p.description, { x:x+0.16, y:2.5, w:cw-0.32, h:1.35, fontFace:FB, fontSize:10.5, color:C.ink, valign:'top', fit:'shrink' });
+          });
+        }
+        if (synth) slide.addText([synth.canaux_prioritaires, synth.resultats_attendus].filter(Boolean).join('\n\n'), { x:MX, y:4.3, w:W-MX*2, h:2.4, fontFace:FB, fontSize:12, color:C.ink, valign:'top', fit:'shrink' });
+      }
+      if (budget.lignes.length) {
+        const slide = pres.addSlide(); slide.background = { color: C.white };
+        chrome(slide, 'Stratégie marketing');
+        title(slide, 'Répartition du budget par canal', { fontSize:24, h:0.8 });
+        const cols = BPMarketing.PALETTE.map(c => c.replace('#',''));
+        slide.addChart(pres.charts.DOUGHNUT, [{ name:'Budget', labels:budget.lignes.map(l=>l.canal), values:budget.lignes.map(l=>l.budget) }], { x:MX, y:1.9, w:5.4, h:4.6, holeSize:58, chartColors:cols.slice(0,budget.lignes.length), showLegend:true, legendPos:'b', legendFontSize:10, showPercent:true, dataLabelColor:'FFFFFF', dataLabelFontSize:10 });
+        const hd = t => ({ text:t, options:{ bold:true, color:C.soft, fontSize:9 } });
+        const rows = [[hd('Canal'), hd('Budget'), hd('Part'), hd('Statut')]].concat(budget.lignes.slice(0,8).map(l => [l.canal, BPMarketing.fmtMontant(l.budget), BPMarketing.fmtNb(l.pct)+' %', BPMarketing.statutLabel(l.statut)]));
+        slide.addTable(rows, { x:6.3, y:2.1, w:W-MX-6.3, colW:[2.7,1.5,0.9,1.3], fontFace:FB, fontSize:10.5, color:C.ink, border:{type:'solid', color:C.line, pt:0.5}, autoPage:false });
+        const alerte = BPMarketing.controleBudget(mk);
+        slide.addText(alerte ? 'À corriger : '+alerte : 'Répartition indicative, à valider.', { x:6.3, y:2.1+0.45*(Math.min(budget.lignes.length,8)+1)+0.2, w:W-MX-6.3, h:0.7, fontFace:FB, fontSize:9.5, italic:true, color:alerte?C.orange:C.soft, valign:'top' });
+      }
+      if (actions.length || perf.length) {
+        const slide = pres.addSlide(); slide.background = { color: C.white };
+        chrome(slide, 'Stratégie marketing');
+        title(slide, 'Plan d\'action et performance marketing', { fontSize:24, h:0.8 });
+        const hd = t => ({ text:t, options:{ bold:true, color:C.soft, fontSize:9 } });
+        let y = 1.9;
+        if (actions.length) {
+          const rows = [[hd('Période'), hd('Actions prévues'), hd('Indicateurs'), hd('Statut')]].concat(actions.slice(0,5).map(a => [a.periode||'—', a.actions||'—', a.indicateurs||'—', BPMarketing.statutLabel(a.statut)]));
+          slide.addTable(rows, { x:MX, y, w:W-MX*2, colW:[1.6,5.4,3.6,1.6], fontFace:FB, fontSize:10, color:C.ink, border:{type:'solid', color:C.line, pt:0.5}, autoPage:false });
+          y += 0.4 + Math.min(actions.length,5)*0.5;
+        }
+        if (perf.length) {
+          const rows = [[hd('Indicateur'), hd('Valeur'), hd('Statut')]].concat(perf.slice(0,6).map(r => [r.label, r.valeur, BPMarketing.statutLabel(r.statut)]));
+          slide.addTable(rows, { x:MX, y:Math.max(y+0.25, 4.3), w:W-MX*2, colW:[6.5,3.0,2.7], fontFace:FB, fontSize:10, color:C.ink, border:{type:'solid', color:C.line, pt:0.5}, autoPage:false });
+        }
+        slide.addText('Objectif : ce que l\'entreprise vise. Hypothèse : estimation non testée. Constaté : résultat réellement mesuré.', { x:MX, y:7.5-0.65, w:W-MX*2, h:0.25, fontFace:FB, italic:true, fontSize:8.5, color:C.soft });
+      }
+    }
+
+    /* ---------- Organisation & ressources humaines (2026-11-11) ---------- */
+    {
+      const o = s.organisation || {}, rh = s.rh || {};
+      const hd = t => ({ text:t, options:{ bold:true, color:C.soft, fontSize:9 } });
+      const ns = BPOrga.noeuds(o), niv = BPOrga.niveaux(BPOrga.arbre(ns)).filter(Boolean);
+      if (niv.length) {
+        const slide = pres.addSlide(); slide.background = { color: C.white };
+        chrome(slide, 'Organisation & gouvernance');
+        title(slide, 'Organigramme', { fontSize:24, h:0.8 });
+        const bh = 0.95, gapY = 0.38, top = 1.9;
+        niv.slice(0, 4).forEach((ligne, li) => {
+          const l = ligne.slice(0, 5), gap = 0.25, bw = Math.min(2.6, (W - MX*2 - gap*(l.length-1)) / l.length);
+          const total = bw*l.length + gap*(l.length-1), x0 = (W - total) / 2, y = top + li*(bh+gapY);
+          if (li > 0) slide.addShape(pres.ShapeType.line, { x: W/2, y: y-gapY, w: 0, h: gapY, line:{ color:C.soft, width:0.75 } });
+          l.forEach((n, i) => {
+            const x = x0 + i*(bw+gap);
+            slide.addShape(R, { x, y, w:bw, h:bh, fill:{color: li===0 ? C.paper : C.white}, line:{color: li===0 ? C.orange : C.line, width: li===0 ? 1.5 : 0.75} });
+            slide.addText([ { text: n.nom || n.fonction, options:{ bold:true, fontSize:12, color:C.navy, breakLine:true } }, { text: n.nom ? (n.fonction || '') : '', options:{ fontSize:10, color:C.orange, breakLine:true } }, { text: n.detail || '', options:{ fontSize:8.5, color:C.soft } } ], { x:x+0.08, y:y+0.05, w:bw-0.16, h:bh-0.1, fontFace:FB, align:'center', valign:'middle', fit:'shrink' });
+          });
+        });
+      }
+      const raci = BPOrga.raci(o), fin = BPOrga.gouvernanceFinanciere(o);
+      if (raci.length || fin.length) {
+        const slide = pres.addSlide(); slide.background = { color: C.white };
+        chrome(slide, 'Organisation & gouvernance');
+        title(slide, 'Qui décide, qui exécute, qui contrôle', { fontSize:24, h:0.8 });
+        let y = 1.9;
+        if (raci.length) {
+          const rows = [[hd('Décision ou activité'), hd('Réalise (R)'), hd('Approuve (A)'), hd('Consulté (C)'), hd('Informé (I)'), hd('Situation')]].concat(raci.slice(0,5).map(l => [l.activite, l.r||'—', l.a||'—', l.c||'—', l.i||'—', BPOrga.statutPratiqueLabel(l.statut)]));
+          slide.addTable(rows, { x:MX, y, w:W-MX*2, colW:[3.4,2.0,2.0,1.9,1.6,1.3], fontFace:FB, fontSize:10, color:C.ink, border:{type:'solid', color:C.line, pt:0.5}, autoPage:false });
+          y += 0.45 + Math.min(raci.length,5)*0.42;
+        }
+        if (fin.length) {
+          const rows = [[hd('Gouvernance financière'), hd('Règle ou mécanisme'), hd('Situation')]].concat(fin.slice(0,4).map(l => [l.sujet, l.regle, BPOrga.statutPratiqueLabel(l.statut)]));
+          slide.addTable(rows, { x:MX, y:Math.max(y+0.2, 4.4), w:W-MX*2, colW:[3.6,6.7,1.9], fontFace:FB, fontSize:10, color:C.ink, border:{type:'solid', color:C.line, pt:0.5}, autoPage:false });
+        }
+        slide.addText(BPOrga.NOTE_STATUTS, { x:MX, y:7.5-0.7, w:W-MX*2, h:0.4, fontFace:FB, italic:true, fontSize:8, color:C.soft, valign:'top' });
+      }
+      const eff = BPRh.effectifs(rh), courbe = BPRh.courbe(rh);
+      if (courbe.length) {
+        const slide = pres.addSlide(); slide.background = { color: C.white };
+        chrome(slide, 'Ressources humaines');
+        title(slide, 'Évolution prévisionnelle des effectifs', { fontSize:24, h:0.8 });
+        slide.addChart(pres.ChartType.bar, [{ name:'Effectifs', labels: courbe.map(b=>b.libelle), values: courbe.map(b=>b.valeur) }], {
+          x:MX, y:1.9, w:6.6, h:4.4, showTitle:false, showLegend:false, showValue:true, dataLabelPosition:'outEnd', dataLabelColor:C.ink, dataLabelFontSize:11,
+          chartColors:['7FA6E8','4E86DB','1E4F8A'], barGapWidthPct:40, valAxisMinVal:0,
+          catAxisLabelColor:C.soft, catAxisLabelFontSize:10, valAxisLabelColor:C.soft, valAxisLabelFontSize:9,
+          valGridLine:{ color:C.line, size:0.75 }, catGridLine:{ style:'none' }, valAxisLineShow:false, catAxisLineColor:C.line,
+        });
+        let ca1 = 0; try { const c = BPCalc.calcProduits(s.plan_financier || {}); ca1 = c && c.annees && c.annees[0] ? c.annees[0].ca : 0; } catch(err) {}
+        const ind = BPRh.indicateurs(rh, { ca_annee1: ca1 });
+        if (ind.length) {
+          const rows = [[hd('Indicateur RH'), hd('Valeur'), hd('Statut')]].concat(ind.slice(0,7).map(r => [r.label, r.valeur, BPRh.STATUTS_DONNEE[r.statut]]));
+          slide.addTable(rows, { x:7.5, y:2.0, w:W-MX-7.5, colW:[3.0,1.3,1.1], fontFace:FB, fontSize:10, color:C.ink, border:{type:'solid', color:C.line, pt:0.5}, autoPage:false });
+        }
+        slide.addText(BPRh.noteCourbe(rh), { x:MX, y:6.45, w:6.6, h:0.4, fontFace:FB, italic:true, fontSize:9.5, color:C.soft, valign:'top' });
       }
     }
 

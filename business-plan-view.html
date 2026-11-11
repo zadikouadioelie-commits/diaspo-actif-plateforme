@@ -432,6 +432,11 @@
 <script src="assets/app.js?v=13"></script>
 <script src="assets/currency-manager.js"></script>
 <script src="assets/business-plan-calc.js?v=3"></script>
+<script src="assets/bp-swot.js?v=1"></script>
+<script src="assets/bp-marche.js?v=1"></script>
+<script src="assets/bp-marketing.js?v=1"></script>
+<script src="assets/bp-organisation.js?v=1"></script>
+<script src="assets/bp-enrichi.js?v=1"></script>
 <!-- Génération PDF réelle (point 17 du cahier des charges "Gestion multidevise" : "il ne suffit
      pas que les conversions apparaissent uniquement dans l'interface") -- même bibliothèque déjà
      utilisée ailleurs sur la plateforme (cv-builder.js), pas une nouvelle dépendance. -->
@@ -481,7 +486,7 @@ const TEXT_SECTIONS = {
   strategie_marketing: { identite_marque:'Identité de marque', strategie_digitale:'Stratégie digitale', communication:'Communication', publicite:'Publicité', partenariats:'Partenariats marketing', evenements:'Événements', fidelisation:'Fidélisation' },
   plan_commercial: { objectifs_vente:'Objectifs de vente', prospection:'Prospection', tunnel_vente:'Tunnel de vente', politique_tarifaire:'Politique tarifaire', argumentaire:'Argumentaire commercial', sav:'Service après-vente', kpi_commerciaux:'Indicateurs suivis' },
   plan_operationnel: { production:'Production', logistique:'Logistique', fournisseurs:'Fournisseurs', equipements:'Équipements', technologies:'Technologies utilisées', qualite:'Contrôle qualité', securite:'Sécurité' },
-  organisation: { dirigeants:'Dirigeants & gouvernance', equipe:"Composition de l'équipe", responsabilites:'Répartition des responsabilités', consultants:'Consultants externes', benevoles:'Bénévoles' },
+  organisation: { dirigeants:'Dirigeants & gouvernance', equipe:"Composition de l'équipe", responsabilites:'Répartition des responsabilités', gouvernance_detail:'Gouvernance', droits_decision:'Droits de décision', conseil_administration:"Conseil d'administration", comite_strategique:'Comité stratégique', associes_gouvernance:'Associés', pilotage:'Organisation du pilotage', consultants:'Accompagnement externe', experts_gouvernance:'Experts mobilisés', benevoles:'Ressources bénévoles' },
   rh: { effectif_actuel:'Effectif actuel', effectif_prevu:'Effectif prévu à 12 mois', recrutements:'Recrutements prévus', competences:'Compétences recherchées', formations:'Formations prévues', politique_rh:'Politique RH' },
   impact: { economique:'Impact économique', social:'Impact social', environnemental:'Impact environnemental', territorial:'Impact territorial', kpi_impact:"Indicateurs d'impact" },
   // financement : plus dans TEXT_SECTIONS -- rendu par la fonction dédiée renderFinancement()
@@ -612,12 +617,85 @@ function renderInfosGenerales(s){
   return html;
 }
 
+/* SWOT structuré (2026-11-10) — assets/bp-swot.js : éléments avec niveau d'impact, plan d'action, lecture stratégique. */
 function renderSwot(s){
-  const blocs = [['forces','💪 Forces','#d1fae5'],['faiblesses','⚠️ Faiblesses','#fee2e2'],['opportunites','🚀 Opportunités','#dbeafe'],['menaces','🌩️ Menaces','#fef3c7']];
-  const actifs = blocs.filter(([k]) => has(s?.[k]));
-  if (!actifs.length) return '';
-  return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">${actifs.map(([k,label,bg]) => `
-    <div style="background:${bg};border-radius:10px;padding:14px 16px;"><h4 style="margin:0 0 6px;font-size:12px;font-weight:800;">${label}</h4><p style="margin:0;font-size:13px;line-height:1.6;white-space:pre-wrap;">${nl2br(s[k])}</p></div>`).join('')}</div>`;
+  const els = BPSwot.elements(s || {}).filter(e => has(e.titre));
+  if (!els.length) return '';
+  const bg = { forces:'#d1fae5', faiblesses:'#fee2e2', opportunites:'#dbeafe', menaces:'#fef3c7' };
+  const grille = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">${BPSwot.CATS.map(c => {
+    const l = BPSwot.classes(els, c.key); if (!l.length) return '';
+    return `<div style="background:${bg[c.key]};border-radius:10px;padding:14px 16px;"><h4 style="margin:0 0 8px;font-size:12px;font-weight:800;">${esc(c.label)}</h4>${l.map(e => {
+      const n = BPSwot.impactNum(e.impact);
+      return `<div style="margin:0 0 10px;"><p style="margin:0;font-size:13px;font-weight:700;">${esc(e.titre)}</p>${n ? `<p style="margin:2px 0 0;font-size:11.5px;">Impact : ${esc(BPSwot.niveauLabel(c.key,n))} (${n}/4)</p>` : ''}${has(e.justification) ? `<p style="margin:2px 0 0;font-size:12px;line-height:1.5;">${esc(e.justification)}</p>` : ''}${has(e.consequence) ? `<p style="margin:2px 0 0;font-size:12px;line-height:1.5;"><em>Conséquence :</em> ${esc(e.consequence)}</p>` : ''}</div>`;
+    }).join('')}</div>`;
+  }).join('')}</div>`;
+  const plan = BPSwot.planActions(els);
+  const tableau = plan.length ? `<div class="bpv-field" style="margin-top:18px;"><h4>Risques et actions prioritaires</h4></div><div class="bpv-table-wrap"><table class="bpv-table"><thead><tr><th>Constat</th><th>Action stratégique</th><th>Priorité</th></tr></thead><tbody>
+    ${plan.map(r => `<tr><td><strong>${esc(r.titre)}</strong><br><small>${esc(BPSwot.cat(r.cat).label)}</small></td><td>${esc(r.action)}</td><td><strong>${esc(r.priorite.niveau)}</strong></td></tr>`).join('')}</tbody></table></div>` : '';
+  const lecture = BPSwot.syntheseAAfficher(s);
+  const lectureHtml = lecture ? `<div class="bpv-field" style="margin-top:18px;"><h4>Lecture stratégique du SWOT</h4><p style="margin:0;font-size:13px;line-height:1.65;">${esc(lecture)}</p></div>` : '';
+  const legacy = [['swot_action_forces','Comment consolider les forces'],['swot_action_faiblesses','Comment réduire les faiblesses'],['swot_action_opportunites',"Comment exploiter les opportunités"],['swot_facteurs_cles','Facteurs clés de succès']].filter(([k]) => has(s?.[k]));
+  const legacyHtml = legacy.map(([k,l]) => `<div class="bpv-field" style="margin-top:14px;"><h4>${esc(l)}</h4><p style="margin:0;font-size:13px;line-height:1.6;white-space:pre-wrap;">${esc(s[k])}</p></div>`).join('');
+  return grille + tableau + lectureHtml + legacyHtml;
+}
+
+/* Étude de marché (2026-11-10) — assets/bp-marche.js */
+Object.assign(TEXT_SECTIONS.marche, { sources_donnees:'Sources des données', marche_accessible_detail:'Marché accessible', comportement_achat:"Comportement d'achat", canaux_distribution_global:'Canaux de distribution', analyse_prix:'Analyse des prix', validation_marche:'Validation du marché' });
+function renderMarcheExtras(m){
+  let html = '';
+  const ind = BPMarche.indicateurs(m);
+  if (ind.length) html += `<div class="bpv-table-wrap"><table class="bpv-table"><thead><tr><th>Indicateur clé</th><th>Valeur</th><th>Périmètre</th></tr></thead><tbody>${ind.map(i => `<tr><td><strong>${esc(i.libelle||'—')}</strong></td><td>${esc(i.valeur)}</td><td>${esc(i.perimetre||'')}</td></tr>`).join('')}</tbody></table></div>`;
+  const objs = BPMarche.controleObjectifs(m.objectifs_part);
+  if (objs.length) html += `<div class="bpv-field" style="margin-top:16px;"><h4>Objectifs de part de marché</h4></div><div class="bpv-table-wrap"><table class="bpv-table"><thead><tr><th>Marché visé</th><th>Montant du marché</th><th>Part visée</th><th>Objectif</th><th>Contrôle</th></tr></thead><tbody>${objs.map(o => `<tr><td><strong>${esc(o.marche||'—')}</strong></td><td>${esc(BPMarche.fmtMontant(o.montant,o.devise)||'—')}</td><td>${o.pct!==null?esc(BPMarche.fmtPct(o.pct)):'—'}</td><td>${o.objectif!==null?esc(BPMarche.fmtMontant(o.objectif,o.devise)):'—'}</td><td>${o.statut==='ok'?'Cohérent':(o.statut==='incoherent'?'À corriger : '+esc(BPMarche.fmtMontant(o.attendu,o.devise))+' attendus':'Incomplet')}</td></tr>`).join('')}</tbody></table></div>`;
+  const bar = BPMarche.barresSegments(m.segments_clients);
+  if (bar.length) html += `<div class="bpv-field" style="margin-top:16px;"><h4>Segmentation commerciale (priorité 0-100)</h4><p style="margin:0;font-size:12.5px;">${bar.map(b => `${esc(b.nom)} : ${b.pct}`).join(' · ')}</p><p style="margin:4px 0 0;font-size:11.5px;font-style:italic;">Priorisation commerciale, et non parts de marché mesurées.</p></div>`;
+  const fz = BPMarche.faisabiliteAAfficher(m);
+  if (fz) html += `<div class="bpv-field" style="margin-top:16px;"><h4>Conclusion de faisabilité commerciale</h4>${[['attractivite','Attractivité du marché'],['penetration','Capacité de pénétration'],['conditions','Conditions de réussite']].filter(([k]) => fz[k]).map(([k,l]) => `<p style="margin:6px 0 0;font-size:13px;line-height:1.6;"><strong>${esc(l)} :</strong> ${esc(fz[k])}</p>`).join('')}</div>`;
+  return html;
+}
+
+/* Organisation et Ressources humaines (2026-11-11) — assets/bp-organisation.js */
+Object.assign(TEXT_SECTIONS.rh, { politique_rh:'Politique de rémunération et fidélisation', suivi_rh:'Suivi des ressources humaines' });
+function renderOrganisationExtras(o){
+  let html = '';
+  const t = (titre, corps) => `<div class="bpv-field" style="margin-top:16px;"><h4>${esc(titre)}</h4></div>${corps}`;
+  const pill = v => esc(BPOrga.statutPratiqueLabel(v));
+  const ns = BPOrga.noeuds(o);
+  if (ns.length) html += t('Organigramme', `<div style="padding:4px 0;">${BPOrga.organigrammeHtml(ns, esc)}</div>`);
+  const raci = BPOrga.raci(o);
+  if (raci.length) html += t('Matrice des responsabilités (RACI)', `<div class="bpv-table-wrap"><table class="bpv-table"><thead><tr><th>Décision ou activité</th><th>Réalise (R)</th><th>Approuve (A)</th><th>Consulté (C)</th><th>Informé (I)</th><th>Situation</th></tr></thead><tbody>${raci.map(l => `<tr><td><strong>${esc(l.activite)}</strong></td><td>${esc(l.r||'—')}</td><td><strong>${esc(l.a||'—')}</strong></td><td>${esc(l.c||'—')}</td><td>${esc(l.i||'—')}</td><td>${pill(l.statut)}</td></tr>`).join('')}</tbody></table></div>`);
+  const fin = BPOrga.gouvernanceFinanciere(o);
+  if (fin.length) html += t('Gouvernance financière', `<div class="bpv-table-wrap"><table class="bpv-table"><thead><tr><th>Sujet</th><th>Règle ou mécanisme</th><th>Situation</th></tr></thead><tbody>${fin.map(l => `<tr><td><strong>${esc(l.sujet)}</strong></td><td>${esc(l.regle)}</td><td>${pill(l.statut)}</td></tr>`).join('')}</tbody></table></div>`);
+  const pil = BPOrga.pilotage(o);
+  if (pil.length) html += t('Indicateurs de pilotage', `<div class="bpv-table-wrap"><table class="bpv-table"><thead><tr><th>Domaine</th><th>Indicateur</th><th>Fréquence</th><th>Responsable</th><th>Situation</th></tr></thead><tbody>${pil.map(l => `<tr><td><strong>${esc(l.domaine||'—')}</strong></td><td>${esc(l.indicateur)}</td><td>${esc(l.frequence||'—')}</td><td>${esc(l.responsable||'—')}</td><td>${pill(l.statut)}</td></tr>`).join('')}</tbody></table></div>`);
+  if (BPOrga.bilanPratiques(o).total) html += `<p style="margin:10px 0 0;font-size:11.5px;font-style:italic;">${esc(BPOrga.NOTE_STATUTS)}</p>`;
+  return html;
+}
+function renderRhExtras(rh, sections){
+  let html = '';
+  const t = (titre, corps) => `<div class="bpv-field" style="margin-top:16px;"><h4>${esc(titre)}</h4></div>${corps}`;
+  const e = BPRh.effectifs(rh), courbe = BPRh.courbe(rh), postes = BPRh.postes(rh);
+  if (courbe.length) html += t('Évolution prévisionnelle des effectifs', `<div style="max-width:520px;">${BPRh.barresSvg(courbe, { largeur: 520, hauteur: 190 })}</div><p style="margin:4px 0 0;font-size:11.5px;font-style:italic;">${esc(BPRh.noteCourbe(rh))}</p>${(e.depasse||e.recule)?BPRh.controle(rh).map(m => `<p style="margin:4px 0 0;font-size:12px;">À corriger : ${esc(m)}</p>`).join(''):''}`);
+  if (postes.length) html += t('Plan de recrutement', `<div class="bpv-table-wrap"><table class="bpv-table"><thead><tr><th>Poste</th><th>Nb</th><th>Mission</th><th>Coût employeur</th></tr></thead><tbody>${postes.map(p => `<tr><td><strong>${esc(p.intitule)}</strong></td><td>${p.nb}</td><td>${esc(p.mission||'—')}</td><td>${p.cout!==null?esc(BPRh.fmtMontant(p.cout*p.nb)):'—'}</td></tr>`).join('')}</tbody></table></div>`);
+  let ca1 = 0; try { const c = BPCalc.calcProduits((sections||{}).plan_financier || {}); ca1 = c && c.annees && c.annees[0] ? c.annees[0].ca : 0; } catch(err) {}
+  const ind = BPRh.indicateurs(rh, { ca_annee1: ca1 });
+  if (ind.length) html += t('Indicateurs RH essentiels', `<div class="bpv-table-wrap"><table class="bpv-table"><thead><tr><th>Indicateur</th><th>Valeur</th><th>Statut</th><th>Calcul</th></tr></thead><tbody>${ind.map(r => `<tr><td><strong>${esc(r.label)}</strong></td><td>${esc(r.valeur)}</td><td>${esc(BPRh.STATUTS_DONNEE[r.statut])}</td><td>${esc(r.origine)}</td></tr>`).join('')}</tbody></table></div>`);
+  return html;
+}
+
+/* Stratégie marketing (2026-11-10) — assets/bp-marketing.js */
+function renderMarketingView(mk, sections){
+  let html = renderFieldGrid(mk, TEXT_SECTIONS.strategie_marketing);
+  const parc = BPMarketing.parcours(mk), b = BPMarketing.budgetsParCanal(mk), actions = BPMarketing.planActions(mk), synth = BPMarketing.syntheseAAfficher(mk);
+  let ca1 = 0; try { const c = BPCalc.calcProduits((sections||{}).plan_financier || {}); ca1 = c && c.annees && c.annees[0] ? c.annees[0].ca : 0; } catch(e) {}
+  const perf = BPMarketing.indicateursPerformance(mk, { business_model:(sections||{}).business_model, plan_commercial:(sections||{}).plan_commercial, presentation:(sections||{}).presentation, ca_annee1:ca1 });
+  const t = (titre, corps) => `<div class="bpv-field" style="margin-top:16px;"><h4>${esc(titre)}</h4></div>${corps}`;
+  if (parc.length) html += t("Parcours d'acquisition client", `<div class="bpv-table-wrap"><table class="bpv-table"><tbody>${parc.map((p,i) => `<tr><td><strong>${i+1}. ${esc(p.etape)}</strong></td><td>${esc(p.description)}</td></tr>`).join('')}</tbody></table></div>`);
+  if (b.lignes.length) html += t('Répartition du budget par canal', `<div class="bpv-table-wrap"><table class="bpv-table"><thead><tr><th>Canal</th><th>Budget</th><th>Part</th><th>Statut</th></tr></thead><tbody>${b.lignes.map(l => `<tr><td><strong>${esc(l.canal)}</strong></td><td>${esc(BPMarketing.fmtMontant(l.budget))}</td><td>${BPMarketing.fmtNb(l.pct)} %</td><td>${esc(BPMarketing.statutLabel(l.statut))}</td></tr>`).join('')}</tbody></table></div>${BPMarketing.controleBudget(mk) ? `<p style="font-size:12px;margin:6px 0 0;">À corriger : ${esc(BPMarketing.controleBudget(mk))}</p>` : ''}`);
+  if (actions.length) html += t("Plan d'action marketing", `<div class="bpv-table-wrap"><table class="bpv-table"><thead><tr><th>Période</th><th>Actions prévues</th><th>Indicateurs</th><th>Statut</th></tr></thead><tbody>${actions.map(a => `<tr><td><strong>${esc(a.periode||'—')}</strong></td><td>${esc(a.actions||'—')}</td><td>${esc(a.indicateurs||'—')}</td><td>${esc(BPMarketing.statutLabel(a.statut))}</td></tr>`).join('')}</tbody></table></div>`);
+  if (perf.length) html += t('Tableau de performance marketing', `<div class="bpv-table-wrap"><table class="bpv-table"><thead><tr><th>Indicateur</th><th>Valeur</th><th>Statut</th><th>Origine</th></tr></thead><tbody>${perf.map(r => `<tr><td><strong>${esc(r.label)}</strong></td><td>${esc(r.valeur)}</td><td>${esc(BPMarketing.statutLabel(r.statut))}</td><td>${esc(r.origine)}</td></tr>`).join('')}</tbody></table></div>`);
+  if (synth) html += t('Synthèse stratégique', [synth.canaux_prioritaires, synth.resultats_attendus].filter(Boolean).map(x => `<p style="margin:0 0 8px;font-size:13px;line-height:1.6;">${esc(x)}</p>`).join(''));
+  return html;
 }
 
 function renderBMC(bm){
@@ -962,7 +1040,10 @@ async function init(){
     if (meta.key === 'infos_generales') content = renderInfosGenerales(data);
     else if (meta.key === 'swot') content = renderSwot(data);
     else if (meta.key === 'business_model') content = renderBMC(data);
-    else if (meta.key === 'marche') content = renderFieldGrid(data, TEXT_SECTIONS.marche) + renderMarcheConcurrents(data.concurrents);
+    else if (meta.key === 'marche') content = renderFieldGrid(data, TEXT_SECTIONS.marche) + renderMarcheExtras(data) + renderMarcheConcurrents(data.concurrents);
+    else if (meta.key === 'strategie_marketing') content = renderMarketingView(data, s);
+    else if (meta.key === 'organisation') content = renderFieldGrid(data, TEXT_SECTIONS.organisation) + renderOrganisationExtras(data);
+    else if (meta.key === 'rh') content = renderFieldGrid(data, TEXT_SECTIONS.rh) + renderRhExtras(data, s);
     else if (meta.key === 'produits') content = renderProduits(data);
     else if (meta.key === 'calendrier') content = renderCalendrier(data.phases);
     else if (meta.key === 'plan_financier') content = renderPlanFinancier(data);
@@ -971,6 +1052,10 @@ async function init(){
     else if (meta.key === 'solution') content = renderFieldGrid({ ...data, niveau_developpement: NIVEAU_DEV_LABELS[data.niveau_developpement] || data.niveau_developpement }, TEXT_SECTIONS.solution);
     else if (meta.key === 'financement') content = renderFinancement(data);
     else if (TEXT_SECTIONS[meta.key]) content = renderFieldGrid(data, TEXT_SECTIONS[meta.key]);
+    /* Compléments facultatifs de la rubrique (assets/bp-enrichi.js) : n'apparaissent que s'ils contiennent des données saisies. */
+    if (typeof BPEnrichi !== 'undefined') {
+      try { BPEnrichi.ensureCss(); const plus = BPEnrichi.blocsHtml(meta.key, { nom_projet: bp.nom_projet, sections: s }, { esc }); if (plus) content += `<div class="bpv-plus">${plus}</div>`; } catch (e) { console.error('Compléments', meta.key, e); }
+    }
     return buildSection(meta, content);
   });
 
