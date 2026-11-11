@@ -56,6 +56,9 @@ test('Koffi business plan — résumé du plan, sortie du modèle (fonctions pur
   assert.deepEqual(b.forces, ['a', 'b']); assert.deepEqual(b.faiblesses, [{ texte: 'f1', rubrique: 'swot' }, { texte: 'f2', rubrique: '' }, { texte: 'f3', rubrique: '' }]); assert.deepEqual(b.pistes, ['p']);
   assert.match(B.systemePour({ role: 'banquier', social: false, nom: 'X', plan: 'PLAN', nbQuestions: 8 }), /BANQUIER/);
   assert.match(B.systemePour({ role: 'client', social: true, nom: 'X', plan: 'PLAN', nbQuestions: 8 }), /BÉNÉFICIAIRE/);
+  /* Par défaut Koffi interroge sur le PROJET ENTIER et choisit lui-même ; un axe précis seulement si la personne le demande */
+  const sys = B.systemePour({ role: 'investisseur', social: false, nom: 'X', plan: 'PLAN', nbQuestions: 8 });
+  assert.match(sys, /PROJET ENTIER/); assert.match(sys, /c'est toi qui choisis/); assert.match(sys, /axe précis/);
 });
 
 test('Koffi business plan — parcours complet', async (t) => {

@@ -207,6 +207,9 @@
      page habituelle ; choix mémorisé par appareil (localStorage). Téléphone/tablette étroite (<861 px) : inchangé, la page défile normalement. ===== */
   .bpv-lec-back{display:none;}
   @media(max-width:860px){#bpv-lecture-toggle{display:none;}}
+  /* Koffi (grand oral) reste visible PAR-DESSUS le mode lecture (plein écran, z-index 2147483000), ainsi que sa fenêtre de recharge de crédit. */
+  .kb-root{z-index:2147483600!important;}
+  .kcr-fond{z-index:2147483640!important;}
   @media screen and (min-width:861px){
     body.bpv-lecture-on{overflow:hidden;}
     body .bpv-shell.bpv-lecture{position:fixed;inset:0;z-index:2147483000;width:100%;max-width:none;height:100vh;margin:0;padding:0;gap:0;overflow:hidden;background:var(--bg,#060A14);grid-template-columns:clamp(240px,18vw,310px) minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);}
@@ -414,6 +417,7 @@
         <button class="btn btn-outline btn-sm" onclick="window.print()" title="Impression rapide de cette page telle quelle, sans mise en page dédiée.">🖨️ Imprimer</button>
         <button class="btn btn-outline btn-sm" id="bpv-btn-pdf" onclick="bpvExportPDF()" title="Export PDF rapide de cette page de consultation, sans mise en page dédiée.">📥 Télécharger en PDF</button>
         <a class="btn btn-orange btn-sm" id="bpv-btn-edit" href="#" style="display:none;">✏️ Modifier</a>
+        <button type="button" class="btn btn-orange btn-sm" id="bpv-koffi-btn" style="display:none;" title="Koffi joue l'investisseur, le banquier ou le client et vous pose ses questions sur ce projet">🎭 Koffi</button>
         <button type="button" class="btn btn-outline btn-sm" id="bpv-lecture-toggle" title="Mode lecture : le document en grand, sur tout l'écran">📖 Mode lecture</button>
         <button type="button" class="btn btn-outline btn-sm" id="bpv-collapse-toggle" title="Réduire les informations du haut pour agrandir la zone de lecture">▾ Réduire</button>
       </div>
@@ -437,6 +441,7 @@
 <script src="assets/bp-marketing.js?v=1"></script>
 <script src="assets/bp-organisation.js?v=1"></script>
 <script src="assets/bp-enrichi.js?v=1"></script>
+<script src="assets/koffi-businessplan.js?v=5"></script>
 <!-- Génération PDF réelle (point 17 du cahier des charges "Gestion multidevise" : "il ne suffit
      pas que les conversions apparaissent uniquement dans l'interface") -- même bibliothèque déjà
      utilisée ailleurs sur la plateforme (cv-builder.js), pas une nouvelle dépendance. -->
@@ -1180,6 +1185,30 @@ async function init(){
   const calerSommaire = () => { const v = Math.max(0, Math.round(shellEl.getBoundingClientRect().top + window.scrollY)); if (v !== tbPrec) { tbPrec = v; document.documentElement.style.setProperty('--bpv-tb', v + 'px'); } };
   calerSommaire(); window.addEventListener('resize', calerSommaire);
   setInterval(calerSommaire, 800); // un bandeau peut apparaître après coup au-dessus (ex. vérification d'e-mail) et décaler la page
+
+  /* Koffi joue l'investisseur, le banquier ou le client (propriétaire du plan seulement ; le serveur refuse tout autre compte). Le projet est déjà choisi :
+     il enchaîne directement avec ses questions et REPREND le fil de la séance commencée (même plan = même discussion que dans l'éditeur) ; une nouvelle
+     discussion ne démarre que par le bouton « ＋ » de sa fenêtre. En mode lecture, sa bulle flottante est visible ; hors lecture, le bouton de la barre suffit. */
+  if (bp.mon_role === 'proprietaire') {
+    const montrerKoffi = () => {
+      const b = document.getElementById('bpv-koffi-btn');
+      if (!window.KoffiBusinessPlan || !KoffiBusinessPlan.estMonte()) return;
+      if (b) b.style.display = '';
+      const r = document.querySelector('.kb-root'); if (r) r.classList.toggle('kb-sansbtn', !document.body.classList.contains('bpv-lecture-on'));
+    };
+    const monterKoffi = () => {
+      if (!window.KoffiBusinessPlan || KoffiBusinessPlan.estMonte()) return;
+      KoffiBusinessPlan.monter({
+        planId: id, sansBouton: !document.body.classList.contains('bpv-lecture-on'), boutonHote: 'bpv-koffi-btn',
+        ouvrirRubrique: cle => { const k = PAGES.findIndex(p => p.meta.key === cle); if (k >= 0) allerA(k); }
+      }).then(montrerKoffi);
+    };
+    const kb = document.getElementById('bpv-koffi-btn');
+    if (kb) kb.onclick = () => { if (window.KoffiBusinessPlan && KoffiBusinessPlan.estMonte()) KoffiBusinessPlan.ouvrir(); };
+    document.getElementById('bpv-lecture-toggle')?.addEventListener('click', () => setTimeout(montrerKoffi, 0));
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') setTimeout(montrerKoffi, 0); });
+    if (window.KoffiBusinessPlan) monterKoffi(); else window.addEventListener('load', monterKoffi, { once: true });
+  }
 }
 
 /* Export PDF réel (point 17) -- même bibliothèque/pattern que cv-builder.js (repli sur

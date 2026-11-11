@@ -2,6 +2,9 @@
    assets/koffi-businessplan.js — KOFFI JOUE L'INVESTISSEUR, LE BANQUIER OU LE CLIENT : fenêtre de discussion du Business Plan (2026-11-01)
    ═════════════════════════════════════════════════
    Autonome (CSS injecté, préfixe .kb-) : KoffiBusinessPlan.monter({ planId, ouvrirRubrique(cle), telephone })  ·  .ouvrir()  ·  .demonter()
+   Sans planId : monter({ choixProjet: true }) — Koffi demande d'abord le rôle, puis POUR QUEL PROJET, et pose ses questions tout seul (sur le projet entier).
+   Dans un dossier ouvert (planId connu) : le projet est déjà choisi, Koffi enchaîne directement avec les questions et reprend le fil de la séance en cours.
+   Le bilan peut être téléchargé (document Word) ou imprimé / enregistré en PDF : points forts, points faibles, points à améliorer, déroulé de l'entretien.
    Le propriétaire du plan choisit un rôle ; Koffi lit un RÉSUMÉ du plan (après consentement), pose une question à la fois, réagit aux réponses, conseille sur demande
    (« Comment répondre ? ») puis fait un bilan (forces, faiblesses avec la rubrique à retravailler, pistes). Toutes les règles (propriétaire, consentement, majorité, pays,
    crédit, résumé du plan) sont décidées par le SERVEUR (/api/kofi/business-plan/:id/*) : ici on n'affiche que ce qu'il renvoie.
@@ -26,7 +29,10 @@
     info: 'Koffi joue un rôle pour vous faire répéter : ce n\'est ni un avis d\'expert, ni un conseil financier ou juridique, et un vrai investisseur ou banquier peut réagir autrement.',
     consTitre: 'Koffi va lire un résumé de votre business plan', consBtn: 'Autoriser et continuer',
     infoLien: 'En savoir plus : politique de confidentialité',
-    forces: '✅ Vos forces', faiblesses: '🟠 À renforcer', pistes: '💡 Pistes concrètes', ouvrirRubrique: 'Ouvrir la rubrique', recommencer: 'Recommencer avec un autre rôle',
+    forces: '✅ Vos points forts', faiblesses: '🟠 Vos points faibles', pistes: '💡 Points à améliorer',
+    telecharger: '⬇ Télécharger mon bilan', imprimer: '🖨 Imprimer / PDF', docIntro: 'Document de préparation : Koffi joue un rôle pour vous faire répéter, ce n\'est ni un avis d\'expert ni un conseil financier ou juridique.',
+    choixRoleTitre: 'Qui voulez-vous convaincre ?', choixProjetTitre: 'Pour quel projet ?', choixProjetTexte: 'Choisissez le business plan que Koffi doit vous faire défendre. Il vous posera ensuite ses questions tout seul, sur le projet entier.',
+    changerRole: '← Changer de rôle', aucunProjet: 'Vous n\'avez pas encore de business plan. Créez-en un, puis revenez : Koffi pourra alors vous faire passer le grand oral.', creerProjet: 'Créer un business plan', chargementProjets: 'Je cherche vos projets…', projetSansNom: 'Projet sans titre', ouvrirRubrique: 'Ouvrir la rubrique', recommencer: 'Recommencer avec un autre rôle',
     majTitre: 'Koffi est réservé aux personnes majeures', majTexte: 'Pour utiliser Koffi, confirmez que vous avez 18 ans ou plus. Votre business plan reste entièrement utilisable sans lui.', majCase: 'Je confirme avoir 18 ans ou plus', majBtn: 'Confirmer',
     mineur: 'Koffi est réservé aux personnes de 18 ans ou plus. Votre business plan reste entièrement utilisable sans lui.',
     pays: 'Koffi n\'est pas disponible dans votre pays pour le moment.', desactive: 'Koffi est désactivé pour le moment.', indisponible: 'Koffi est épuisé pour le moment : l\'équipe le recharge. Réessayez un peu plus tard.',
@@ -63,6 +69,9 @@
     '.kb-role{display:flex;gap:12px;align-items:flex-start;text-align:left;border:1.5px solid #e2e8f0;background:#fff;border-radius:14px;padding:12px;cursor:pointer;font:inherit;color:#0f172a}',
     '.kb-role:hover:not([disabled]){border-color:#F26422;box-shadow:0 4px 14px rgba(242,100,34,.18)}.kb-role:focus-visible{outline:3px solid #F26422;outline-offset:2px}.kb-role[disabled]{opacity:.55;cursor:not-allowed}',
     '.kb-role .ic{font-size:26px;flex:none}.kb-role b{display:block;font-size:15px;color:#0D2B4E}.kb-role small{display:block;font-size:12.5px;color:#475569}.kb-role em{display:block;font-style:normal;font-size:12px;font-weight:700;color:#b84c1a;margin-bottom:2px}',
+    '.kb-plans{display:flex;flex-direction:column;gap:8px;margin-top:10px}',
+    '.kb-retour{border:0;background:none;color:#b84c1a;font-weight:800;text-decoration:underline;cursor:pointer;font:inherit;font-size:12.5px;padding:0;margin:8px 0 0}',
+    '.kb-dl{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 2px}',
     '.kb-foot{flex:none;background:#fff;border-top:1px solid #e2e8f0;padding:8px 10px 10px}',
     '.kb-av{margin:0 0 6px;font-size:11px;color:#64748b;line-height:1.35}',
     '.kb-acts{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 8px}.kb-acts button{background:#fff;border:1px solid #cbd5e1;border-radius:99px;padding:5px 11px;font-size:12.5px;cursor:pointer;color:#0D2B4E;font-family:inherit}.kb-acts button:hover:not([disabled]){background:#fff7ed;border-color:#F26422}.kb-acts button[disabled]{opacity:.5;cursor:not-allowed}',
@@ -82,7 +91,13 @@
     '@media (prefers-reduced-motion:no-preference){.kb-btn{transition:transform .15s}}'
   ].join('\n');
 
-  var S = { opts: null, etat: null, conv: null, role: '', msgs: [], nb: 0, terminee: false, nouvelle: false, root: null, occupe: false };
+  var S = { opts: null, etat: null, conv: null, role: '', msgs: [], nb: 0, terminee: false, nouvelle: false, root: null, occupe: false, choixRole: '', roleEnAttente: '', plans: null, bilanMsg: null };
+  /* Rôles proposés AVANT le choix du projet (l'état serveur, propre à un plan, n'est pas encore chargé). */
+  var ROLES_CHOIX = [
+    { cle: 'investisseur', icone: '💼', titre: 'Investisseur', court: 'Il décide de financer ou non', description: 'Un investisseur lit votre plan et vous challenge sur le marché, le modèle économique, l\'équipe et les chiffres.' },
+    { cle: 'banquier', icone: '🏦', titre: 'Banquier', court: 'Il décide de prêter ou non', description: 'Un banquier vérifie votre capacité à rembourser : chiffres, garanties, trésorerie, risques.' },
+    { cle: 'client', icone: '🛍️', titre: 'Client', court: 'Il décide d\'acheter ou non', description: 'Un client se demande pourquoi il achèterait chez vous plutôt qu\'ailleurs, et à quel prix.' }
+  ];
   var ecouteEchap = false;
   var esc = function (s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); };
   var $ = function (sel) { return S.root.querySelector(sel); };
@@ -127,6 +142,49 @@
     if (b.pistes && b.pistes.length) html += '<h5>' + T.pistes + '</h5><ul>' + b.pistes.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>';
     d.innerHTML = html; return d;
   }
+  /* ── Document du bilan : points forts, points faibles, points à améliorer, déroulé de l'entretien ── */
+  function boutonsDocument() {
+    var d = document.createElement('div'); d.className = 'kb-dl';
+    d.appendChild(bouton(T.telecharger, 'dl-doc')); d.appendChild(bouton(T.imprimer, 'dl-print', true));
+    return d;
+  }
+  function htmlBilan() {
+    var m = S.bilanMsg; if (!m) return '';
+    var b = m.bilan || {}, e = S.etat || {}, nom = (e.plan && e.plan.nom) || T.projetSansNom;
+    var date = new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+    var liste = function (titre, items) { return items && items.length ? '<h2>' + titre + '</h2><ul>' + items.map(function (x) { return '<li>' + x + '</li>'; }).join('') + '</ul>' : ''; };
+    var deroule = S.msgs.map(function (x) {
+      if (x.role === 'user') return '<p class="r"><b>Votre réponse :</b> ' + esc(x.contenu) + '</p>';
+      if (x.type === 'question') return '<p class="q"><b>Question :</b> ' + esc(x.question || x.contenu) + '</p>';
+      if (x.type === 'conseil') return '<p class="c"><b>Conseil de Koffi :</b> ' + esc(x.contenu) + '</p>';
+      return '';
+    }).join('');
+    return '<!DOCTYPE html><html lang="fr" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>Bilan de l\'entretien — ' + esc(nom) + '</title>' +
+      '<style>body{font-family:Calibri,Arial,sans-serif;color:#0f172a;line-height:1.5;max-width:780px;margin:0 auto;padding:24px}h1{color:#0D2B4E;font-size:24px;margin:0 0 4px}h2{color:#0D2B4E;font-size:17px;border-bottom:2px solid #F26422;padding-bottom:3px;margin:22px 0 8px}' +
+      '.meta{color:#475569;font-size:13px;margin:0 0 14px}li{margin:5px 0}p.q{margin:12px 0 2px;color:#0D2B4E}p.r{margin:2px 0 8px 14px}p.c{margin:2px 0 8px 14px;color:#475569;font-style:italic}.note{margin-top:26px;font-size:11.5px;color:#64748b;border-top:1px solid #e2e8f0;padding-top:8px}</style></head><body>' +
+      '<h1>Bilan de l\'entretien — ' + esc(nom) + '</h1><p class="meta">Entretien avec Koffi dans le rôle de : ' + esc(libRole(S.role) || S.role) + ' · ' + esc(date) + '</p>' +
+      '<h2>Synthèse</h2><p>' + esc(m.contenu) + '</p>' +
+      liste(esc(T.forces.replace(/^\S+\s/, '')), (b.forces || []).map(esc)) +
+      liste(esc(T.faiblesses.replace(/^\S+\s/, '')), (b.faiblesses || []).map(function (f) { return esc(f.texte) + (f.rubrique_label ? ' <i>(rubrique : ' + esc(f.rubrique_label) + ')</i>' : ''); })) +
+      liste(esc(T.pistes.replace(/^\S+\s/, '')), (b.pistes || []).map(esc)) +
+      (deroule ? '<h2>Déroulé de l\'entretien</h2>' + deroule : '') +
+      '<p class="note">' + esc(T.docIntro) + '</p></body></html>';
+  }
+  function telechargerBilan() {
+    var html = htmlBilan(); if (!html) return;
+    var nom = (((S.etat && S.etat.plan && S.etat.plan.nom) || 'projet') + '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'projet';
+    var blob = new Blob(['\ufeff' + html], { type: 'application/msword;charset=utf-8' });
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'Bilan-Koffi-' + nom + '.doc';
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+  }
+  function imprimerBilan() {
+    var html = htmlBilan(); if (!html) return;
+    var f = document.createElement('iframe'); f.setAttribute('aria-hidden', 'true'); f.style.cssText = 'position:fixed;width:0;height:0;border:0;right:0;bottom:0';
+    f.onload = function () { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { /* impression bloquée : le téléchargement reste possible */ } setTimeout(function () { f.remove(); }, 60000); };
+    f.srcdoc = html; document.body.appendChild(f);
+  }
+
   function ajouterMessage(m) {
     var corps = $('.kb-body'), el;
     if (m.role === 'user') corps.appendChild(bulle('u', m.contenu));
@@ -134,7 +192,7 @@
       if (m.reaction) corps.appendChild(bulle('a react', m.reaction));
       corps.appendChild(bulle('a q', m.question || m.contenu));
     } else if (m.type === 'conseil') corps.appendChild(bulle('a cons', '💡 ' + m.contenu));
-    else if (m.type === 'bilan') { corps.appendChild(bulle('a', '🏁 ' + m.contenu)); if (m.bilan) corps.appendChild(carteBilan(m.bilan)); }
+    else if (m.type === 'bilan') { S.bilanMsg = m; corps.appendChild(bulle('a', '🏁 ' + m.contenu)); if (m.bilan) { corps.appendChild(carteBilan(m.bilan)); corps.appendChild(boutonsDocument()); } }
     else {
       el = bulle('a', m.contenu);
       if (m.gratuit) { var n = document.createElement('div'); n.className = 'kb-note'; n.textContent = T.gratuitNote; el.appendChild(n); }
@@ -187,8 +245,64 @@
     }
   }
 
+  /* ── Sans projet encore choisi : d'abord le rôle, puis POUR QUEL PROJET ── */
+  function carteChoix() {
+    var body = $('.kb-body');
+    var d = document.createElement('div'); d.className = 'kb-card';
+    if (!S.choixRole) {
+      d.innerHTML = '<h4>' + esc(T.choixRoleTitre) + '</h4><p>' + esc(T.accueil) + '</p>'; body.appendChild(d);
+      var l = document.createElement('div'); l.className = 'kb-roles';
+      ROLES_CHOIX.forEach(function (r) {
+        var b = document.createElement('button'); b.type = 'button'; b.className = 'kb-role'; b.setAttribute('data-choixrole', r.cle);
+        b.innerHTML = '<span class="ic" aria-hidden="true">' + esc(r.icone) + '</span><span><b>' + esc(r.titre) + '</b><em>' + esc(r.court) + '</em><small>' + esc(r.description) + '</small></span>';
+        l.appendChild(b);
+      });
+      body.appendChild(l); return;
+    }
+    d.innerHTML = '<h4>' + esc(T.choixProjetTitre) + '</h4><p>' + esc(T.choixProjetTexte) + '</p>'; body.appendChild(d);
+    var liste = document.createElement('div'); liste.className = 'kb-plans'; body.appendChild(liste);
+    var retour = document.createElement('button'); retour.type = 'button'; retour.className = 'kb-retour'; retour.setAttribute('data-a', 'choixretour'); retour.textContent = T.changerRole; body.appendChild(retour);
+    var dessiner = function () {
+      liste.innerHTML = '';
+      if (!S.plans.length) { var v = document.createElement('div'); v.className = 'kb-card'; v.innerHTML = '<p>' + esc(T.aucunProjet) + '</p><a class="kb-cta" href="/business-plan.html">' + esc(T.creerProjet) + '</a>'; liste.appendChild(v); return; }
+      S.plans.forEach(function (p) {
+        var b = document.createElement('button'); b.type = 'button'; b.className = 'kb-role'; b.setAttribute('data-plan', p.id);
+        b.innerHTML = '<span class="ic" aria-hidden="true">📋</span><span><b>' + esc(p.nom_projet || T.projetSansNom) + '</b>' + (p.secteur ? '<small>' + esc(p.secteur) + '</small>' : '') + '</span>';
+        liste.appendChild(b);
+      });
+    };
+    if (S.plans) return dessiner();
+    liste.innerHTML = '<div class="kb-typing" role="status">' + esc(T.chargementProjets) + '</div>';
+    api('GET', '/api/business-plans').then(function (r) {
+      S.plans = r.ok && r.data && Array.isArray(r.data.mes_plans) ? r.data.mes_plans : [];
+      if (S.root && S.choixRole && !(S.opts && S.opts.planId)) dessiner();
+    }).catch(function () { S.plans = []; dessiner(); });
+  }
+  /* Le projet est choisi : on charge son état, puis Koffi enchaîne (consentement et crédit d'abord si besoin). */
+  function choisirProjet(id) {
+    if (S.occupe) return;
+    S.opts.planId = id; S.plans = null;
+    S.roleEnAttente = S.choixRole; S.choixRole = '';
+    S.occupe = true;
+    return chargerEtat().then(function (r) { S.occupe = false; if (!r.ok) { S.opts.planId = null; S.roleEnAttente = ''; S.etat = null; } return apresEtat(); });
+  }
+  /* Après chargement de l'état (choix du projet, consentement, majorité) : reprend le fil du même rôle, ou lance l'entretien tout seul. */
+  function apresEtat() {
+    var role = S.roleEnAttente, e = S.etat;
+    if (!role || !e) return construireCorps();
+    if (e.etat !== 'utilisable' || !(e.consentement && e.consentement.accorde) || (e.plan && !e.plan.assez_rempli)) return construireCorps();
+    S.roleEnAttente = '';
+    if (S.conv && !S.terminee && S.role === role) { S.nouvelle = false; return construireCorps(); }
+    return commencer(role);
+  }
+
   function construireCorps() {
     var body = $('.kb-body'); body.innerHTML = '';
+    if (S.opts && !S.opts.planId && S.opts.choixProjet) {
+      $('.kb-foot').style.display = 'none'; $('.kb-prog').style.display = 'none'; majMeta();
+      S.root.querySelectorAll('[data-a="nouvelle"],[data-a="supprimer"]').forEach(function (b) { b.style.display = 'none'; });
+      carteChoix(); body.scrollTop = 0; return;
+    }
     var foot = $('.kb-foot'), e = S.etat, ta = $('.kb-form textarea'), env = $('.kb-send');
     foot.style.display = ''; ta.disabled = false; env.disabled = false; majMeta(); majProgression();
     $('.kb-av').textContent = (e && e.avertissement) || T.info;
@@ -240,6 +354,7 @@
   }
   function ouvrirPanneau() {
     S.root.classList.add('open');
+    if (!(S.opts && S.opts.planId)) { construireCorps(); return; }
     chargerEtat().then(function () { construireCorps(); var ta = $('.kb-form textarea'); if (ta && !ta.disabled && $('.kb-foot').style.display !== 'none' && window.innerWidth > 560) ta.focus(); });
   }
   function fermerPanneau() {
@@ -292,12 +407,12 @@
   function consentir() {
     var c = S.root.querySelector('[data-cons="case"]'); if (!c || !c.checked || S.occupe) return;
     S.occupe = true;
-    api('POST', base() + '/consentement', { accepte: true }).then(function () { S.occupe = false; return chargerEtat().then(construireCorps); }).catch(function () { S.occupe = false; });
+    api('POST', base() + '/consentement', { accepte: true }).then(function () { S.occupe = false; return chargerEtat().then(apresEtat); }).catch(function () { S.occupe = false; });
   }
   function confirmerMajorite() {
     var c = S.root.querySelector('[data-maj="case"]'); if (!c || !c.checked || S.occupe) return;
     S.occupe = true;
-    api('POST', '/api/kofi/majorite', { confirme: true }).then(function () { S.occupe = false; return chargerEtat().then(construireCorps); }).catch(function () { S.occupe = false; });
+    api('POST', '/api/kofi/majorite', { confirme: true }).then(function () { S.occupe = false; return chargerEtat().then(apresEtat); }).catch(function () { S.occupe = false; });
   }
 
   /* Retour de Stripe (?kofi=succes|annule) : le crédit arrive par le webhook, quelques secondes plus tard. */
@@ -328,13 +443,20 @@
     document.body.appendChild(root); S.root = root;
     root.addEventListener('click', function (ev) {
       var rub = ev.target.closest ? ev.target.closest('[data-rub]') : null;
-      if (rub) { if (S.opts && S.opts.ouvrirRubrique) { S.opts.ouvrirRubrique(rub.getAttribute('data-rub')); if (window.innerWidth <= 560) fermerPanneau(); } return; }
+      if (rub) { if (S.opts && S.opts.ouvrirRubrique) { S.opts.ouvrirRubrique(rub.getAttribute('data-rub'), S.opts.planId); if (window.innerWidth <= 560) fermerPanneau(); } return; }
+      var cr = ev.target.closest ? ev.target.closest('[data-choixrole]') : null;
+      if (cr) { S.choixRole = cr.getAttribute('data-choixrole'); return construireCorps(); }
+      var pl = ev.target.closest ? ev.target.closest('[data-plan]') : null;
+      if (pl) return choisirProjet(pl.getAttribute('data-plan'));
       var role = ev.target.closest ? ev.target.closest('[data-role]') : null;
       if (role) { if (!role.disabled) commencer(role.getAttribute('data-role')); return; }
       var t = ev.target.closest ? ev.target.closest('[data-a]') : null; if (!t) return;
       var act = t.getAttribute('data-a');
       if (act === 'ouvrir') return ouvrirPanneau();
       if (act === 'fermer') return fermerPanneau();
+      if (act === 'choixretour') { S.choixRole = ''; return construireCorps(); }
+      if (act === 'dl-doc') return telechargerBilan();
+      if (act === 'dl-print') return imprimerBilan();
       if (act === 'credit') return ouvrirCredit();
       if (act === 'consentir') return consentir();
       if (act === 'majorite') return confirmerMajorite();
@@ -359,7 +481,10 @@
     monter: function (opts) {
       if (S.root) return Promise.resolve();
       S.opts = opts || {};
-      if (!S.opts.planId) return Promise.resolve();
+      if (!S.opts.planId) {
+        if (!S.opts.choixProjet) return Promise.resolve();
+        return chargerCredit().then(function () { if (S.root) return; construire(); traduireUI(); if (S.opts.ouvrirDirect) ouvrirPanneau(); });
+      }
       return Promise.all([chargerEtat(), chargerCredit()]).then(function (rs) {
         if (!rs[0].ok || S.root) return;
         construire(); traduireUI(); majMeta();
@@ -370,7 +495,7 @@
     ouvrir: function () { if (S.root) ouvrirPanneau(); },
     demonter: function () {
       if (S.root && S.root.parentNode) S.root.parentNode.removeChild(S.root);
-      S.root = null; S.etat = null; S.conv = null; S.msgs = []; S.nb = 0; S.terminee = false; S.nouvelle = false; S.occupe = false; S.opts = null;
+      S.root = null; S.etat = null; S.conv = null; S.msgs = []; S.nb = 0; S.terminee = false; S.nouvelle = false; S.occupe = false; S.opts = null; S.choixRole = ''; S.roleEnAttente = ''; S.plans = null; S.bilanMsg = null;
     },
     estMonte: function () { return !!S.root; }
   };

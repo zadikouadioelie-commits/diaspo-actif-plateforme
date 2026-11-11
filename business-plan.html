@@ -136,7 +136,10 @@
         <h1 style="margin:0;font-size:24px;">📋 Mes Business Plans</h1>
         <p style="margin:4px 0 0;color:var(--muted);font-size:14px;">Concevez, structurez et partagez vos projets professionnellement.</p>
       </div>
-      <button class="btn btn-orange" onclick="openCreateModal()">+ Nouveau Business Plan</button>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button type="button" class="btn btn-outline" id="bp-koffi-liste" onclick="bpKoffiListe()" title="Koffi joue l'investisseur, le banquier ou le client : il vous demande le projet puis vous pose ses questions">🎭 Grand oral avec Koffi</button>
+        <button class="btn btn-orange" onclick="openCreateModal()">+ Nouveau Business Plan</button>
+      </div>
     </div>
 
     <!-- Exemple de référence : cartouche distincte, masquée tant qu'aucun exemple n'est publié -->
@@ -228,6 +231,7 @@
 <script src="assets/app.js?v=13"></script>
 <script src="assets/subscription-required.js"></script>
 <script src="assets/upload-media.js"></script>
+<script src="assets/koffi-businessplan.js?v=5"></script>
 <script>
 let me = null;
 let selectedTpl = 'startup';
@@ -672,6 +676,14 @@ function tdaVueConfirmation() {
     </div>`;
 }
 
+/* Koffi « grand oral » depuis la liste : il demande d'abord le rôle, puis POUR QUEL PROJET, et pose ensuite ses questions tout seul. */
+/* Lien « #oral » (proposé par Koffi, le guide) : ouvre directement le choix du rôle puis du projet. */
+window.addEventListener('load', function () { if (location.hash === '#oral') bpKoffiListe(); });
+function bpKoffiListe() {
+  if (!window.KoffiBusinessPlan) return;
+  if (KoffiBusinessPlan.estMonte()) return KoffiBusinessPlan.ouvrir();
+  KoffiBusinessPlan.monter({ choixProjet: true, sansBouton: true, boutonHote: 'bp-koffi-liste', ouvrirDirect: true, ouvrirRubrique: function (cle, planId) { if (planId) window.location.href = 'business-plan-edit.html?id=' + encodeURIComponent(planId) + '&s=' + encodeURIComponent(cle); } });
+}
 function openCreateModal() { document.getElementById('modal-create').style.display='flex'; document.getElementById('new-nom').focus(); }
 function closeCreateModal() { document.getElementById('modal-create').style.display='none'; }
 
