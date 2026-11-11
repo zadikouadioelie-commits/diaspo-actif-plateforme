@@ -184,7 +184,7 @@ test('B2 profil-app.html redirige toujours commercial, portfolio, video et accep
 /* ═════════════ B3 — l'écran de choix ═════════════ */
 test('B3 le tableau de bord Initiative charge le registre, le bouton « Voir l\'exemple » et l\'écran des types', () => {
   const src = fs.readFileSync(path.join(RACINE, 'dashboard-initiative.html'), 'utf8');
-  for (const f of ['assets/boutique-types.js', 'assets/boutique-exemple-bouton.js', 'assets/boutique-types-ui.js']) assert.ok(src.includes(`<script src="${f}"></script>`), `${f} non chargé`);
+  for (const f of ['assets/boutique-types.js', 'assets/boutique-exemple-bouton.js', 'assets/boutique-types-ui.js']) assert.ok(src.includes(`<script src="${f}?v=2"></script>`), `${f} non chargé (avec son numéro de version, pour que les navigateurs n'en gardent pas une ancienne copie)`);
   assert.match(src, /types_v2 && __pvRegistry\.types_v2\.actif && window\.BoutiqueTypesUI/);
   assert.match(src, /BoutiqueTypesUI\.canonique\(v2, courant\) === type/, 'choisir le type déjà en place sous une autre clé ne doit rien proposer');
 });
@@ -193,4 +193,26 @@ test('B3 l\'écran des types n\'écrit aucun libellé à la main et ne contient 
   const src = fs.readFileSync(path.join(RACINE, 'assets', 'boutique-types-ui.js'), 'utf8');
   for (const t of Object.values(Registre.TYPES)) assert.ok(!src.includes(t.label), `libellé « ${t.label} » écrit à la main`);
   assert.doesNotMatch(src, /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/u);
+});
+
+/* Contrôle visuel du 2026-11-11 : une apostrophe non protégée à la ligne 71 rendait le script invalide ; la page gardait alors l'ancien écran sans rien signaler. */
+test("B3 les trois scripts de l'écran des types sont du JavaScript valide et s'exécutent dans une page", () => {
+  const vm = require('node:vm');
+  for (const f of ['boutique-types.js', 'boutique-exemple-bouton.js', 'boutique-types-ui.js']) {
+    const code = fs.readFileSync(path.join(RACINE, 'assets', f), 'utf8');
+    assert.doesNotThrow(() => new vm.Script(code, { filename: f }), `${f} : erreur de syntaxe`);
+  }
+  /* Exécution dans un faux navigateur minimal : l'écran doit s'exposer et dessiner les 6 cartes du registre. */
+  const noeud = () => ({ style: {}, innerHTML: '', classList: { add() {}, remove() {}, toggle() {} }, setAttribute() {}, appendChild() {}, addEventListener() {}, querySelectorAll: () => [], querySelector: () => null });
+  const zone = noeud();
+  const win = { };
+  const doc = { getElementById: () => null, createElement: noeud, head: noeud(), body: noeud(), addEventListener() {} };
+  const ctx = vm.createContext({ window: win, document: doc, console, setTimeout, Registre: null });
+  win.window = win; win.document = doc;
+  for (const f of ['boutique-types.js', 'boutique-types-ui.js']) vm.runInContext(fs.readFileSync(path.join(RACINE, 'assets', f), 'utf8'), ctx, { filename: f });
+  assert.equal(typeof win.BoutiqueTypesUI, 'object', 'BoutiqueTypesUI doit être exposé sur window');
+  const desc = BT.descriptionPourInterface({ actif: true, estAdministrateur: false });
+  win.BoutiqueTypesUI.rendre(zone, { desc, courant: 'ecom', onChoisir() {} });
+  const nb = (zone.innerHTML.match(/class="btui-carte/g) || []).length;
+  assert.equal(nb, desc.types.length, 'une carte par type du registre');
 });

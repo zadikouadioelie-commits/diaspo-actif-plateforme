@@ -68,7 +68,7 @@
     return '<article class="btui-carte' + (actuel ? ' btui-actuel' : '') + (t.selectionnable ? '' : ' btui-bientot') + '" aria-label="' + esc(t.label) + '">' +
       '<div class="btui-tete">' + icone(t.cle) + '<div><div class="btui-nom">' + esc(t.label) + '</div></div></div>' +
       '<div class="btui-desc">' + esc(t.desc) + '</div>' +
-      (t.selectionnable && t.page_dediee === false ? '<div class="btui-desc"><b>Présentation dédiée à venir</b> : en attendant, votre boutique s'affiche avec la présentation générale.</div>' : '') +
+      (t.selectionnable && t.page_dediee === false ? '<div class="btui-desc"><b>Présentation dédiée à venir</b> : en attendant, votre boutique s\'affiche avec la présentation générale.</div>' : '') +
       '<details class="btui-plus"><summary>En savoir plus</summary><div>' +
       '<b>Ce que c\'est</b>' + esc(t.what) + '<b>À qui il s\'adresse</b>' + esc(t.who) + '<b>Ce qu\'il contient</b>' + esc(t.contains) + '</div></details>' +
       exemple +
