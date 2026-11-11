@@ -10366,6 +10366,22 @@ db.exec(`
   );
 `);
 
+/* Newsletter, étape N3 (2026-11-11) : demande d'accord unique envoyée aux comptes qui SUIVENT une boutique. Un compte n'est jamais ajouté
+   à la liste sans répondre « oui » ; UNIQUE(initiative_id, user_id) garantit qu'il n'est interrogé qu'une seule fois par boutique. */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS nl_demandes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    initiative_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    statut TEXT NOT NULL DEFAULT 'en_attente',
+    created_at TEXT DEFAULT (datetime('now')),
+    repondu_le TEXT,
+    UNIQUE(initiative_id, user_id),
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+`);
+
 module.exports = db;
 module.exports.backfillOfficialFollow = backfillOfficialFollow;
 module.exports.generateDaId = generateDaId;

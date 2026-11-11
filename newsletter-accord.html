@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<script src="/assets/m-redirect.js"></script>
+<meta charset="UTF-8">
+<link rel="icon" href="/assets/logo.png">
+<title>Diaspo'Actif — Recevoir une newsletter ?</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="assets/styles.v2.css">
+<link rel="stylesheet" href="/assets/responsive.v2.css?v=2">
+<link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
+<link rel="stylesheet" href="/assets/design-upgrade.v2.css">
+<link rel="stylesheet" href="/assets/theme-manager.css">
+<!-- Nuit dorée (2026-11-11) : mêmes polices, thème et feuille que la page « Demande de retour » ; retour arrière = retirer ces lignes et class="nd" -->
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,500;0,6..96,600;1,6..96,500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/theme-nuit-doree.css?v=8">
+<link rel="stylesheet" href="/assets/retours-nuit-doree.css?v=1">
+</head>
+<body class="nd">
+<div class="page" id="app">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Menu">&#9776;</button>
+      <div class="logo"><a href="index.html" style="text-decoration:none;color:inherit;display:flex;align-items:center;gap:8px;"><img loading="lazy" class="logo-img" src="assets/logo.png" alt=""> DIASPO'ACTIF</a></div>
+      <nav class="nav">
+        <a href="index.html">Accueil</a>
+        <a href="fil-actualite.html">Fil</a>
+        <a href="annuaire.html">Annuaire</a>
+      </nav>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container" style="padding-top:24px;padding-bottom:60px;">
+    <div class="rt-wrap" id="rt-racine" aria-live="polite">
+      <div class="rt-card rt-muet" style="text-align:center;">Chargement…</div>
+    </div>
+  </main>
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/demo.js?v=2"></script>
+<script src="assets/app.js?v=13"></script>
+<script src="assets/ds.js"></script>
+<script>
+(function () {
+  var racine = document.getElementById('rt-racine');
+  var voulue = new URLSearchParams(location.search).get('d');
+
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+
+  function carte(d) {
+    return '<section class="rt-card" id="d-' + d.id + '">' +
+      '<h2>Recevoir la newsletter de ' + esc(d.boutique) + ' ?</h2>' +
+      '<p class="rt-muet">Vous suivez cette boutique sur Diaspo\'Actif. Elle vous propose de recevoir sa newsletter par e-mail (promotions, nouveautés, événements).</p>' +
+      '<div class="rt-note">Vous êtes libre de refuser : rien ne vous sera envoyé sans votre accord. Si vous acceptez, chaque message contiendra un lien pour vous désabonner en un clic.</div>' +
+      '<div class="rt-actions">' +
+        '<button class="rt-bouton" type="button" data-rep="oui" data-id="' + d.id + '">Oui, je veux la recevoir</button>' +
+        '<button class="rt-bouton discret" type="button" data-rep="non" data-id="' + d.id + '">Non merci</button>' +
+      '</div><div class="rt-msg" id="m-' + d.id + '"></div></section>';
+  }
+
+  function vide(texte) {
+    racine.innerHTML = '<section class="rt-card" style="text-align:center"><h1>Newsletter</h1><p class="rt-muet">' + esc(texte) + '</p>' +
+      '<a class="rt-bouton" style="display:inline-block;text-decoration:none;line-height:24px" href="index.html">Retour à l\'accueil</a></section>';
+  }
+
+  async function charger() {
+    var r = await api('GET', '/newsletter/mes-demandes');
+    var l = r.demandes || [];
+    if (voulue) l.sort(function (a, b) { return (String(b.id) === voulue) - (String(a.id) === voulue); });
+    if (!l.length) return vide('Vous n\'avez aucune demande en attente. Si vous avez déjà répondu, votre choix est pris en compte.');
+    racine.innerHTML = l.map(carte).join('');
+  }
+
+  document.addEventListener('click', async function (e) {
+    var b = e.target.closest('[data-rep]');
+    if (!b) return;
+    var id = b.getAttribute('data-id'), sortie = document.getElementById('m-' + id);
+    document.querySelectorAll('#d-' + id + ' button').forEach(function (x) { x.disabled = true; });
+    try {
+      var r = await api('POST', '/newsletter/demandes/' + id + '/repondre', { accepte: b.getAttribute('data-rep') === 'oui' });
+      sortie.className = 'rt-msg'; sortie.textContent = r.message;
+    } catch (err) {
+      sortie.className = 'rt-msg err'; sortie.textContent = err && err.message ? err.message : 'Réponse impossible pour le moment.';
+      document.querySelectorAll('#d-' + id + ' button').forEach(function (x) { x.disabled = false; });
+    }
+  });
+
+  async function init() {
+    var moi = null;
+    try { moi = (await api('GET', '/auth/me')).user; } catch (e) {}
+    if (!moi) {
+      racine.innerHTML = '<section class="rt-card" style="text-align:center"><h1>Newsletter</h1><p class="rt-muet">Connectez-vous pour répondre à cette demande.</p>' +
+        '<a class="rt-bouton" style="display:inline-block;text-decoration:none;line-height:24px" href="login.html?redirect=' + encodeURIComponent('newsletter-accord.html' + location.search) + '">Se connecter</a></section>';
+      return;
+    }
+    try { await charger(); } catch (e) { vide('Impossible de charger votre demande pour le moment. Réessayez dans un instant.'); }
+  }
+  document.addEventListener('DOMContentLoaded', function () { setTimeout(init, 300); });
+})();
+</script>
+</body>
+</html>

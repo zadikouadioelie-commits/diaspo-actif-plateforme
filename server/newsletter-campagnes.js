@@ -39,9 +39,9 @@ function modeles(nomBoutique) {
   const n = (t) => t.replace(/\{boutique\}/g, nomBoutique);
   return [
     { cle: 'libre', label: 'Message libre', sujet: '', texte: '', elements: [] },
-    { cle: 'promotion', label: 'Promotion', sujet: n('Une promotion chez {boutique}'), texte: n("Bonjour,\n\nPendant une durée limitée, {boutique} vous propose une offre spéciale.\n\nRetrouvez les détails ci-dessous."), elements: ['offre_flash', 'produit'] },
-    { cle: 'produit', label: 'Nouveau produit', sujet: n('Nouveau chez {boutique}'), texte: n("Bonjour,\n\n{boutique} vient d'ajouter un nouveau produit à sa boutique. Nous espérons qu'il vous plaira.\n\nDécouvrez-le ci-dessous."), elements: ['produit'] },
-    { cle: 'service', label: 'Nouveau service', sujet: n('Un nouveau service chez {boutique}'), texte: n("Bonjour,\n\n{boutique} élargit son offre avec un nouveau service.\n\nTous les détails ci-dessous."), elements: ['service'] },
+    { cle: 'promotion', label: 'Promotion', sujet: n('Une promotion de {boutique}'), texte: n("Bonjour,\n\nPendant une durée limitée, {boutique} vous propose une offre spéciale.\n\nRetrouvez les détails ci-dessous."), elements: ['offre_flash', 'produit'] },
+    { cle: 'produit', label: 'Nouveau produit', sujet: n('Nouveau produit : {boutique}'), texte: n("Bonjour,\n\n{boutique} vient d'ajouter un nouveau produit à sa boutique. Nous espérons qu'il vous plaira.\n\nDécouvrez-le ci-dessous."), elements: ['produit'] },
+    { cle: 'service', label: 'Nouveau service', sujet: n('Un nouveau service proposé par {boutique}'), texte: n("Bonjour,\n\n{boutique} élargit son offre avec un nouveau service.\n\nTous les détails ci-dessous."), elements: ['service'] },
     { cle: 'evenement', label: 'Événement', sujet: n('Rejoignez-nous : un événement de {boutique}'), texte: n("Bonjour,\n\n{boutique} organise un événement et vous y invite.\n\nLes informations pratiques et la réservation sont ci-dessous."), elements: ['evenement'] },
   ];
 }

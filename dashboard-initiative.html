@@ -36,6 +36,7 @@
   <link rel="stylesheet" href="/assets/theme-nuit-doree.css?v=7">
   <link rel="stylesheet" href="/assets/dashboard-nuit-doree.css?v=5">
   <link rel="stylesheet" href="/assets/retours-nuit-doree.css?v=1">
+  <link rel="stylesheet" href="/assets/newsletter-init.css?v=1">
 </head>
 <body class="nd">
 <div class="page">
@@ -95,6 +96,7 @@
       <a href="accreditation.html" id="lien-accred" class="accred-lien">🛡️ Accréditations</a>
       <a href="#billetterie-init" data-section="billetterie-init" data-aide="billetterie">🎟️ Billetterie <span class="pill" id="init-billets-badge" style="display:none;"></span></a>
       <a href="#messages-vitrine" data-section="messages-vitrine" data-aide="messages_vitrine">🛍️ Messages de la boutique <span class="pill" id="vitrine-msg-count" style="display:none;"></span></a>
+      <a href="#newsletter-init" data-section="newsletter-init"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-2px;margin-right:4px"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg> Newsletter</a>
       <a href="#retours-vendeur" data-section="retours-vendeur"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-2px;margin-right:4px"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg> Retours et litiges</a>
       <a href="#offres-emploi" data-section="offres-emploi" data-aide="emplois_stages">💼 Emplois & Stages</a>
       <a href="#recrutement" data-section="recrutement" data-aide="candidatures">📋 Candidatures <span class="pill" id="cand-badge" style="display:none;"></span></a>
@@ -191,6 +193,7 @@
 <script src="assets/soumission-da.js"></script>
 <script src="assets/retours-commun.js?v=1"></script>
 <script src="assets/retours-vendeur.js?v=1"></script>
+<script src="assets/newsletter-init.js?v=1"></script>
 <script src="/assets/upload-media.js"></script>
 <script src="/assets/carte-proto.js?v=1"></script>
 <script src="/assets/rich-editor.js"></script>
@@ -1262,6 +1265,9 @@ async function initRelaisDiasporaWidget(me, api) {
 
     <!-- ══ SECTION RETOURS ET LITIGES (lot G, 2026-11-10) ══ -->
     <div class="rt-card" style="margin-bottom:20px;display:none;" id="retours-vendeur"></div>
+
+    <!-- ══ SECTION NEWSLETTER (2026-11-11, étape N3) ══ -->
+    <div class="rt-card" style="margin-bottom:20px;display:none;" id="newsletter-init"></div>
 
     <!-- ══ SECTION 🤝 LISTE DES PARTENAIRES ══ -->
     <div style="display:none;" id="partenaires-liste">
@@ -3766,7 +3772,7 @@ async function initRelaisDiasporaWidget(me, api) {
      levé, quel que soit le statut Premium. Symptôme signalé : clic sur "Diaspo Formation"
      sans effet, restait sur les cartes "Paiements boutique"/"Vérification organisation"
      (visibles par ailleurs en permanence, voir commentaire plus bas dans cette fonction). */
-  const INIT_SECTIONS = ['cockpit','crm','presentation','publications','cagnottes','avancement','soumission-da','evenements','billetterie-init','zones','stats-impact','paiement','accreditations','publicites-init','offres-emploi','recrutement','deals','messages-vitrine','retours-vendeur','parametres-vitrine','partenaires-liste','adhesions-init','votes-init','tracker','asso-accreditation','asso-documents','expansion-catalogue','formations-gestion','formation-diaspora'];
+  const INIT_SECTIONS = ['cockpit','crm','presentation','publications','cagnottes','avancement','soumission-da','evenements','billetterie-init','zones','stats-impact','paiement','accreditations','publicites-init','offres-emploi','recrutement','deals','messages-vitrine','retours-vendeur','newsletter-init','parametres-vitrine','partenaires-liste','adhesions-init','votes-init','tracker','asso-accreditation','asso-documents','expansion-catalogue','formations-gestion','formation-diaspora'];
   window.initShowSection = function(name) {
     /* L'ancien module « Affiliation » est désormais l'onglet « Membres affiliés » de Cotisations & Adhésions (2026-10-08) — les anciens liens (#affiliation, notifications d'invitation) y mènent. */
     let ouvrirOngletAffil = false;
@@ -3801,6 +3807,7 @@ async function initRelaisDiasporaWidget(me, api) {
     if (name === 'soumission-da') SoumissionDA.load();
     if (name === 'messages-vitrine') renderMessagesVitrine();
     if (name === 'retours-vendeur' && window.RetoursVendeur) RetoursVendeur.monter(document.getElementById('retours-vendeur'), window.__vitrineInitId);
+    if (name === 'newsletter-init' && window.NewsletterInit) NewsletterInit.monter(document.getElementById('newsletter-init'), window.__vitrineInitId);
     if (name === 'parametres-vitrine') { renderStatutVitrineSection(); loadParametresVitrineFull(); }
     if (name === 'partenaires-liste') renderPartenairesListe();
     if (name === 'adhesions-init') {

@@ -1,0 +1,30 @@
+/* Section « Newsletter » du tableau de bord Initiative (2026-11-11, étape N3) — préfixe nl-.
+   Les boutons, étiquettes, notes et champs viennent de assets/retours-nuit-doree.css (classes rt-*), déjà chargé par le tableau de bord ;
+   ce fichier n'ajoute que la mise en page propre à la newsletter. Retour arrière : retirer ce fichier et ses liens. */
+.nl-chiffres{display:flex;flex-wrap:wrap;gap:12px;margin:14px 0}
+.nl-chiffres>div{flex:1 1 150px;background:rgba(255,255,255,.05);border:1px solid var(--nd-bord2,rgba(255,255,255,.1));border-radius:14px;padding:12px 14px}
+.nl-chiffres b{display:block;font-size:24px;color:var(--nd-or,#E3C06E);font-family:var(--nd-display,inherit);font-weight:500}
+.nl-chiffres span{font-size:13px;color:var(--nd-doux,#A9B4CC)}
+.nl-onglets{display:flex;gap:6px;margin:18px 0 8px;border-bottom:1px solid var(--nd-bord2,rgba(255,255,255,.1))}
+.nl-onglet{font:inherit;font-weight:700;background:none;border:0;border-bottom:3px solid transparent;color:var(--nd-doux,#A9B4CC);padding:10px 16px;min-height:44px;cursor:pointer}
+.nl-onglet.actif{color:var(--nd-or,#E3C06E);border-bottom-color:var(--nd-or,#E3C06E)}
+.nl-onglet:focus-visible{outline:3px solid var(--nd-or,#E3C06E);outline-offset:2px}
+.nl-titre{font-family:var(--nd-display,inherit);font-weight:500;color:#fff;font-size:17px;margin:20px 0 6px}
+.nl-ligne{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.nl-stats{font-size:14px;color:var(--nd-texte,#E8ECF6);margin-top:6px;line-height:1.7}
+.nl-liens{list-style:none;margin:8px 0 0;padding:0;font-size:13px;color:var(--nd-doux,#A9B4CC)}
+.nl-liens li{display:flex;justify-content:space-between;gap:12px;padding:4px 0;border-top:1px dashed var(--nd-bord2,rgba(255,255,255,.1))}
+.nl-rubrique{border:1px solid var(--nd-bord2,rgba(255,255,255,.1));border-radius:14px;padding:10px 14px 6px;margin:10px 0}
+.nl-rubrique legend{padding:0 8px;font-weight:700;font-size:13.5px;color:var(--nd-or,#E3C06E)}
+.nl-choix{display:flex;align-items:flex-start;gap:10px;padding:8px 0;cursor:pointer;font-size:14.5px;color:var(--nd-texte,#E8ECF6)}
+.nl-choix input{width:auto!important;margin-top:3px;flex:none}
+.nl-choix i{color:var(--nd-doux,#A9B4CC);font-style:normal;font-size:13px}
+.nl-apercu{margin-top:18px;border:1px solid var(--nd-bord,rgba(227,192,110,.24));border-radius:14px;overflow:hidden;background:#fff}
+.nl-apercu-tete{display:flex;align-items:center;gap:8px;padding:10px 14px;background:rgba(15,26,56,.96);color:var(--nd-texte,#E8ECF6);font-size:14px}
+.nl-apercu iframe{display:block;width:100%;height:520px;border:0;background:#fff}
+.nl-tableau{overflow-x:auto;margin-top:14px}
+.nl-tableau table{width:100%;border-collapse:collapse;font-size:14px;color:var(--nd-texte,#E8ECF6)}
+.nl-tableau th{text-align:left;font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--nd-faible,#7C88A4);padding:8px 10px;border-bottom:1px solid var(--nd-bord2,rgba(255,255,255,.1))}
+.nl-tableau td{padding:10px;border-bottom:1px solid var(--nd-bord2,rgba(255,255,255,.08));vertical-align:top}
+@media (max-width:600px){.nl-chiffres>div{flex-basis:100%}.nl-apercu iframe{height:420px}}
+@media (prefers-reduced-motion:reduce){.nl-onglet{transition:none}}
