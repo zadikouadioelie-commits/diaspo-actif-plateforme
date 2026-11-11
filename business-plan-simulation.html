@@ -89,6 +89,23 @@
 .timer-opt{border:1px solid var(--border);border-radius:8px;padding:6px 14px;cursor:pointer;font-size:13px;font-weight:600;transition:all .15s;}
 .timer-opt:hover,.timer-opt.selected{border-color:#2563EB;background:var(--orange-light);color:#2563EB;}
 
+/* Icônes uniformes (traits fins, couleur du texte) — remplacent les émojis (demande du 2026-11-11) */
+.ico{display:inline-flex;width:1.15em;height:1.15em;vertical-align:-.2em;flex:none}
+.ico svg{width:100%;height:100%;display:block}
+h1 .ico,h2 .ico,h3 .ico,.btn .ico,.timer-opt .ico,.simu-actions span .ico,.rec-item .ico{margin-right:.45em}
+h1 .ico{width:1.05em;height:1.05em;vertical-align:-.12em;color:#E3C06E}
+.scenario-card .icon{display:flex;justify-content:center;color:#E3C06E}
+.scenario-card .icon .ico{width:34px;height:34px;margin:0}
+.diff-card .dlevel{display:flex;justify-content:center;color:#E3C06E}
+.diff-card .dlevel .ico{width:28px;height:28px;margin:0}
+.dl-inline .ico{width:1em;height:1em;margin:0 .35em 0 0;vertical-align:-.12em;color:#E3C06E}
+.simu-chat-head .hd-av .ico{width:24px;height:24px}
+.hist-item .hi-ic{display:flex;color:#E3C06E}
+.hist-item .hi-ic .ico{width:26px;height:26px}
+.bp-select-card .bp-logo2 .ico{width:22px;height:22px;color:#1a1202}
+.pt-ic{display:inline-flex;width:1.1em;height:1.1em;flex:none}
+.pt-ic svg{width:100%;height:100%;display:block}
+
 @media(max-width:640px){
   .scenario-grid{grid-template-columns:1fr 1fr;}
   .diff-grid{grid-template-columns:1fr 1fr 1fr;}
@@ -135,7 +152,7 @@
     <!-- ÉTAPE 1 : Setup -->
     <div id="step-setup" style="display:none;">
       <div style="margin-bottom:28px;">
-        <h1 style="margin:0;font-size:24px;">🎭 Simulation de présentation</h1>
+        <h1 style="margin:0;font-size:24px;"><span data-ico="scene"></span>Simulation de présentation</h1>
         <p style="margin:6px 0 0;color:var(--muted);font-size:14px;">Entraînez-vous à défendre votre Business Plan dans des conditions réelles.</p>
       </div>
 
@@ -150,32 +167,32 @@
         <h3 style="margin:0 0 14px;">2. Choisissez le scénario</h3>
         <div class="scenario-grid" id="scenario-grid">
           <div class="scenario-card selected" data-scenario="investisseur">
-            <div class="icon">💼</div>
+            <div class="icon"><span data-ico="case"></span></div>
             <div class="name">Investisseur</div>
             <div class="desc">Rentabilité, ROI, stratégie de croissance, exit</div>
           </div>
           <div class="scenario-card" data-scenario="banque">
-            <div class="icon">🏦</div>
+            <div class="icon"><span data-ico="bank"></span></div>
             <div class="name">Banque</div>
             <div class="desc">Solvabilité, garanties, trésorerie, remboursement</div>
           </div>
           <div class="scenario-card" data-scenario="partenaire">
-            <div class="icon">🤝</div>
+            <div class="icon"><span data-ico="link"></span></div>
             <div class="name">Partenaire</div>
             <div class="desc">Synergies, gouvernance, bénéfices mutuels</div>
           </div>
           <div class="scenario-card" data-scenario="client">
-            <div class="icon">🛍</div>
+            <div class="icon"><span data-ico="bag"></span></div>
             <div class="name">Client</div>
             <div class="desc">Valeur ajoutée, prix, qualité, SAV</div>
           </div>
           <div class="scenario-card" data-scenario="jury">
-            <div class="icon">🏆</div>
+            <div class="icon"><span data-ico="trophy"></span></div>
             <div class="name">Jury concours</div>
             <div class="desc">Innovation, impact, faisabilité, équipe</div>
           </div>
           <div class="scenario-card" data-scenario="collectivite">
-            <div class="icon">🏛</div>
+            <div class="icon"><span data-ico="city"></span></div>
             <div class="name">Collectivité</div>
             <div class="desc">Intérêt général, emplois, impact territorial</div>
           </div>
@@ -187,17 +204,17 @@
         <h3 style="margin:0 0 14px;">3. Niveau de difficulté</h3>
         <div class="diff-grid">
           <div class="diff-card" data-diff="debutant">
-            <div class="dlevel">🟢</div>
+            <div class="dlevel"><span data-niveau="1"></span></div>
             <div class="dname">Débutant</div>
             <div class="ddesc">Questions pédagogiques et progressives</div>
           </div>
           <div class="diff-card selected" data-diff="intermediaire">
-            <div class="dlevel">🟡</div>
+            <div class="dlevel"><span data-niveau="2"></span></div>
             <div class="dname">Intermédiaire</div>
             <div class="ddesc">Questions réalistes avec justifications</div>
           </div>
           <div class="diff-card" data-diff="expert">
-            <div class="dlevel">🔴</div>
+            <div class="dlevel"><span data-niveau="3"></span></div>
             <div class="dname">Expert</div>
             <div class="ddesc">Objections, relances, analyses critiques</div>
           </div>
@@ -208,7 +225,7 @@
       <div class="card" style="margin-bottom:28px;">
         <h3 style="margin:0 0 14px;">4. Durée (optionnel)</h3>
         <div class="timer-opts" id="timer-opts">
-          <div class="timer-opt selected" data-timer="0">⏱ Libre</div>
+          <div class="timer-opt selected" data-timer="0"><span data-ico="timer"></span>Libre</div>
           <div class="timer-opt" data-timer="180">3 min</div>
           <div class="timer-opt" data-timer="300">5 min</div>
           <div class="timer-opt" data-timer="600">10 min</div>
@@ -218,7 +235,7 @@
 
       <div style="display:flex;justify-content:space-between;align-items:center;">
         <a href="business-plan.html" class="btn btn-outline">← Retour</a>
-        <button class="btn btn-orange" onclick="startSimulation()" id="btn-start">🎭 Lancer la simulation →</button>
+        <button class="btn btn-orange" onclick="startSimulation()" id="btn-start"><span data-ico="scene"></span>Lancer la simulation →</button>
       </div>
     </div>
 
@@ -227,7 +244,7 @@
 
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
         <div>
-          <h2 style="margin:0;font-size:18px;">🎭 Simulation en cours</h2>
+          <h2 style="margin:0;font-size:18px;"><span data-ico="scene"></span>Simulation en cours</h2>
           <div style="font-size:13px;color:var(--muted);margin-top:2px;" id="simu-meta">—</div>
         </div>
         <div style="display:flex;gap:8px;align-items:center;">
@@ -238,7 +255,7 @@
 
       <div class="simu-chat">
         <div class="simu-chat-head">
-          <div class="hd-av" id="simu-av">💼</div>
+          <div class="hd-av" id="simu-av"><span data-ico="case"></span></div>
           <div class="hd-info">
             <div class="hd-name" id="simu-interv-name">Interlocuteur</div>
             <div class="hd-role" id="simu-interv-role">—</div>
@@ -252,8 +269,8 @@
             <button class="simu-send" id="simu-send" onclick="sendSimuAnswer()">Envoyer</button>
           </div>
           <div class="simu-actions">
-            <button class="btn btn-outline btn-sm" onclick="finishSimulation()">🏁 Terminer et voir le rapport</button>
-            <span id="simu-conseil" style="font-size:12px;color:var(--muted);align-self:center;">💡 Répondez naturellement, comme en vrai entretien.</span>
+            <button class="btn btn-outline btn-sm" onclick="finishSimulation()"><span data-ico="flag"></span>Terminer et voir le rapport</button>
+            <span id="simu-conseil" style="font-size:12px;color:var(--muted);align-self:center;"><span data-ico="bulb"></span>Répondez naturellement, comme en vrai entretien.</span>
           </div>
         </div>
       </div>
@@ -262,24 +279,24 @@
     <!-- ÉTAPE 3 : Rapport -->
     <div id="step-rapport" style="display:none;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
-        <h2 style="margin:0;font-size:22px;">📊 Rapport d'évaluation</h2>
+        <h2 style="margin:0;font-size:22px;"><span data-ico="bars"></span>Rapport d'évaluation</h2>
         <div style="display:flex;gap:8px;">
-          <button class="btn btn-outline" onclick="showStep('setup')">🔄 Nouvelle simulation</button>
-          <button class="btn btn-orange" onclick="exportRapport()">📄 Exporter PDF</button>
+          <button class="btn btn-outline" onclick="showStep('setup')"><span data-ico="refresh"></span>Nouvelle simulation</button>
+          <button class="btn btn-orange" onclick="exportRapport()"><span data-ico="doc"></span>Exporter PDF</button>
         </div>
       </div>
       <div id="rapport-content"></div>
 
       <!-- Historique -->
       <div class="card" style="margin-top:20px;">
-        <h3 style="margin:0 0 14px;">📋 Mes simulations passées</h3>
+        <h3 style="margin:0 0 14px;"><span data-ico="list"></span>Mes simulations passées</h3>
         <div id="hist-list"><div style="color:var(--muted);font-size:13px;">Chargement…</div></div>
       </div>
     </div>
 
     <!-- Historique standalone -->
     <div id="step-history" style="display:none;">
-      <h2 style="margin:0 0 20px;">📋 Historique des simulations</h2>
+      <h2 style="margin:0 0 20px;"><span data-ico="list"></span>Historique des simulations</h2>
       <div id="hist-list-full"></div>
     </div>
 
@@ -310,20 +327,65 @@ function fmtDate(d){ return d ? new Date(d).toLocaleDateString('fr',{day:'2-digi
 function pad(n){ return String(n).padStart(2,'0'); }
 function fmtTime(s){ return `${pad(Math.floor(s/60))}:${pad(s%60)}`; }
 
+/* ---- Icônes uniformes : traits fins (1,8), couleur du texte — aucun émoji dans l'interface ---- */
+const ICO_P = {
+  scene: '<rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M12 16v4M8 20h8M7 12.5l3-3 3 2 4-4"/>',
+  case: '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 5v2M3 13h18"/>',
+  bank: '<path d="M3 21h18M5 21V10M9.5 21V10M14.5 21V10M19 21V10M3 10l9-6 9 6z"/>',
+  link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
+  bag: '<path d="M5 8h14l-1 12H6z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/>',
+  trophy: '<path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8.5 20h7M10 17h4"/>',
+  city: '<path d="M3 21h18M4.5 21V9h5.5v12M10 21V4h6v17M16 21V11h3.5v10"/>',
+  timer: '<circle cx="12" cy="13" r="7.5"/><path d="M12 9v4l2.5 2M9.5 3h5"/>',
+  flag: '<path d="M5 21V4M5 4h11l-2 4 2 4H5"/>',
+  bulb: '<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/>',
+  bars: '<path d="M4 20h16M7 20v-9M12 20V5M17 20v-7"/>',
+  refresh: '<path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v5h-5"/>',
+  doc: '<path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M10 12h5M10 16h5"/>',
+  list: '<rect x="6" y="4.5" width="12" height="16" rx="2"/><path d="M9.5 4.5V4a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v.5M9.5 10h5M9.5 14h5"/>',
+  trend: '<path d="M3 17l6-6 4 4 8-8M15 7h6v6"/>',
+  alert: '<path d="M12 4l9.5 16h-19z"/><path d="M12 10v4.5M12 17.5v.2"/>',
+  check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  up: '<path d="M12 19V6M6 11.5l6-6 6 6"/>',
+  target: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1"/>',
+  pencil: '<path d="M4 20l1-4L16.5 4.5a2.1 2.1 0 0 1 3 3L8 19z"/><path d="M14.5 6.5l3 3"/>',
+  rocket: '<path d="M12 3c3.5 2 5.5 6 5 11l-3 2h-4l-3-2C6.5 9 8.5 5 12 3z"/><circle cx="12" cy="10" r="1.6"/><path d="M9 16l-2 4M15 16l2 4"/>',
+  globe: '<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.7 3 2.7 14 0 17M12 3.5c-2.7 3-2.7 14 0 17"/>',
+  sprout: '<path d="M12 21v-8"/><path d="M12 13c0-3.5-2.5-6-6.5-6 0 3.8 2.5 6 6.5 6z"/><path d="M12 15c0-3 2.2-5.2 6-5.2 0 3.4-2.2 5.2-6 5.2z"/>',
+  heart: '<path d="M12 20s-7.5-4.6-7.5-10A4.3 4.3 0 0 1 12 7.5 4.3 4.3 0 0 1 19.5 10c0 5.4-7.5 10-7.5 10z"/>'
+};
+const SVG_OPEN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" focusable="false">';
+function ico(n){ return '<span class="ico" aria-hidden="true">' + SVG_OPEN + (ICO_P[n]||'') + '</svg></span>'; }
+/* Niveau de difficulté : trois barres, n barres pleines */
+function icoNiveau(n){
+  const b = [['M6 20v-4',1],['M12 20v-8',2],['M18 20V6',3]].map(([d,k])=>`<path d="${d}"${k>n?' opacity=".28"':''}/>`).join('');
+  return '<span class="ico" aria-hidden="true">' + SVG_OPEN + b + '</svg></span>';
+}
+function hydrateIcones(root){
+  (root||document).querySelectorAll('[data-ico]').forEach(el => { el.outerHTML = ico(el.dataset.ico); });
+  (root||document).querySelectorAll('[data-niveau]').forEach(el => { el.outerHTML = icoNiveau(parseInt(el.dataset.niveau)); });
+}
+hydrateIcones();
+/* Le serveur écrit encore "Excellent", "Très bien"... (avec un émoji devant) dans le libellé du rapport : on retire l'émoji à l'affichage (anciens rapports compris) */
+function sansEmoji(s){ return String(s||'').replace(/\p{Extended_Pictographic}️?\s*/gu,'').trim(); }
+
 const SCENARIO_META = {
-  investisseur: { icon:'💼', name:'Investisseur professionnel', role:'Capital-risqueur · Analyse ROI & stratégie', av:'💼' },
-  banque: { icon:'🏦', name:'Conseiller bancaire', role:'Analyste crédit · Évaluation risques financiers', av:'🏦' },
-  partenaire: { icon:'🤝', name:'Responsable partenariats', role:'Développement commercial · Alliances stratégiques', av:'🤝' },
-  client: { icon:'🛍', name:'Client potentiel', role:'Décideur achat · Évaluation solution', av:'🛍' },
-  jury: { icon:'🏆', name:'Jury de concours', role:'Experts sélectionneurs · Évaluation innovation & impact', av:'🏆' },
-  collectivite: { icon:'🏛', name:'Élu / Fonctionnaire territorial', role:'Intérêt général · Développement local', av:'🏛' },
+  investisseur: { icon:'case', name:'Investisseur professionnel', role:'Capital-risqueur · Analyse ROI & stratégie' },
+  banque: { icon:'bank', name:'Conseiller bancaire', role:'Analyste crédit · Évaluation risques financiers' },
+  partenaire: { icon:'link', name:'Responsable partenariats', role:'Développement commercial · Alliances stratégiques' },
+  client: { icon:'bag', name:'Client potentiel', role:'Décideur achat · Évaluation solution' },
+  jury: { icon:'trophy', name:'Jury de concours', role:'Experts sélectionneurs · Évaluation innovation & impact' },
+  collectivite: { icon:'city', name:'Élu / Fonctionnaire territorial', role:'Intérêt général · Développement local' },
 };
 
 const DIFF_META = {
-  debutant: { label:'🟢 Débutant', desc:'Questions pédagogiques' },
-  intermediaire: { label:'🟡 Intermédiaire', desc:'Questions réalistes' },
-  expert: { label:'🔴 Expert', desc:'Questions exigeantes' },
+  debutant: { label:'Débutant', niveau:1, desc:'Questions pédagogiques' },
+  intermediaire: { label:'Intermédiaire', niveau:2, desc:'Questions réalistes' },
+  expert: { label:'Expert', niveau:3, desc:'Questions exigeantes' },
 };
+/* Libellé de difficulté avec ses barres (HTML) */
+function diffLabel(k){ const d = DIFF_META[k]; return d ? `<span class="dl-inline">${icoNiveau(d.niveau)}${d.label}</span>` : ''; }
+const BTN_START_HTML = ico('scene') + 'Lancer la simulation →';
 
 /* ---- Init ---- */
 async function init() {
@@ -363,7 +425,7 @@ function renderBPSelect() {
   }
   el.innerHTML = allBPs.slice(0,4).map(bp => `
     <div class="bp-select-card ${bp.id===selectedBPId?'selected':''}" onclick="selectBP(${bp.id})" data-bp="${bp.id}">
-      <div class="bp-logo2">${bp.logo_url?`<img src="${esc(bp.logo_url)}" style="width:100%;height:100%;object-fit:cover;border-radius:10px;">`:['🚀','🏢','🤝','🌍','🌾','💚'][allBPs.indexOf(bp)%6]}</div>
+      <div class="bp-logo2">${bp.logo_url?`<img src="${esc(bp.logo_url)}" style="width:100%;height:100%;object-fit:cover;border-radius:10px;">`:ico(['rocket','city','link','globe','sprout','heart'][allBPs.indexOf(bp)%6])}</div>
       <div style="flex:1;">
         <div style="font-weight:800;font-size:14px;">${esc(bp.nom_projet||'Sans titre')}</div>
         <div style="font-size:12px;color:var(--muted);">${esc(bp.type_initiative||'')} · ${esc(bp.secteur||'')} · ${bp.progression||0}% complété</div>
@@ -421,11 +483,11 @@ async function startSimulation() {
 
     // Setup UI
     const meta = SCENARIO_META[selectedScenario];
-    document.getElementById('simu-av').textContent = meta.av;
+    document.getElementById('simu-av').innerHTML = ico(meta.icon);
     document.getElementById('simu-interv-name').textContent = meta.name;
     document.getElementById('simu-interv-role').textContent = meta.role;
     const bp = allBPs.find(b=>b.id===selectedBPId);
-    document.getElementById('simu-meta').textContent = `${bp?.nom_projet||'—'} · ${meta.icon} ${selectedScenario} · ${DIFF_META[selectedDiff].label}`;
+    document.getElementById('simu-meta').innerHTML = `${esc(bp?.nom_projet||'—')} · <span class="dl-inline">${ico(meta.icon)}${esc(selectedScenario)}</span> · ${diffLabel(selectedDiff)}`;
 
     // Afficher première question
     document.getElementById('simu-body').innerHTML = '';
@@ -449,7 +511,7 @@ async function startSimulation() {
   } catch(e) {
     alert('Erreur : ' + e.message);
     document.getElementById('btn-start').disabled = false;
-    document.getElementById('btn-start').textContent = '🎭 Lancer la simulation →';
+    document.getElementById('btn-start').innerHTML = BTN_START_HTML;
   }
 }
 
@@ -547,13 +609,13 @@ function renderRapport(rapport) {
     <div class="rapport-card">
       <div class="score-big">
         <div class="score-num" style="color:${scoreColor};">${rapport.score||0}/100</div>
-        <div class="score-mention">${rapport.mention||'—'}</div>
-        <div style="font-size:13px;color:var(--muted);margin-top:6px;">${meta?.icon||''} Scénario : ${rapport.scenario||'—'} · ${DIFF_META[rapport.difficulte||'intermediaire']?.label||''}</div>
+        <div class="score-mention">${esc(sansEmoji(rapport.mention)||'—')}</div>
+        <div style="font-size:13px;color:var(--muted);margin-top:6px;"><span class="dl-inline">${meta?ico(meta.icon):''}Scénario : ${esc(rapport.scenario||'—')}</span> · ${diffLabel(rapport.difficulte||'intermediaire')}</div>
         <div style="font-size:12.5px;color:var(--muted);margin-top:2px;">${rapport.nbQuestions||0} questions · ${rapport.nbReponses||0} réponses · Durée : ${fmtTime(dur)}</div>
       </div>
 
       ${evals.length ? `
-      <h3 style="margin:0 0 12px;font-size:15px;">📊 Évaluation par critère</h3>
+      <h3 style="margin:0 0 12px;font-size:15px;">${ico('bars')}Évaluation par critère</h3>
       ${evals.map(e => {
         const fillColor = e.score>=70?'#10b981':e.score>=50?'#f59e0b':'#dc2626';
         return `<div class="critere-row">
@@ -565,25 +627,25 @@ function renderRapport(rapport) {
 
       ${pts_forts.length ? `
       <div style="margin-top:20px;">
-        <h3 style="margin:0 0 10px;font-size:15px;color:#10b981;">💪 Points forts</h3>
-        ${pts_forts.map(p=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:13px;"><span>✅</span> ${esc(p)}</div>`).join('')}
+        <h3 style="margin:0 0 10px;font-size:15px;color:#10b981;">${ico('trend')}Points forts</h3>
+        ${pts_forts.map(p=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:13px;"><span class="pt-ic" style="color:#10b981;">${SVG_OPEN}${ICO_P.check}</svg></span> ${esc(p)}</div>`).join('')}
       </div>` : ''}
 
       ${pts_faibles.length ? `
       <div style="margin-top:14px;">
-        <h3 style="margin:0 0 10px;font-size:15px;color:#f59e0b;">⚠️ Points à améliorer</h3>
-        ${pts_faibles.map(p=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:13px;"><span>🔧</span> ${esc(p)}</div>`).join('')}
+        <h3 style="margin:0 0 10px;font-size:15px;color:#f59e0b;">${ico('alert')}Points à améliorer</h3>
+        ${pts_faibles.map(p=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:13px;"><span class="pt-ic" style="color:#f59e0b;">${SVG_OPEN}${ICO_P.up}</svg></span> ${esc(p)}</div>`).join('')}
       </div>` : ''}
 
       ${recs.length ? `
       <div style="margin-top:20px;">
-        <h3 style="margin:0 0 10px;font-size:15px;">🎯 Recommandations personnalisées</h3>
+        <h3 style="margin:0 0 10px;font-size:15px;">${ico('target')}Recommandations personnalisées</h3>
         ${recs.map((r,i)=>`<div class="rec-item"><div class="ri">${i+1}.</div><div>${esc(r)}</div></div>`).join('')}
       </div>` : ''}
 
       <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);display:flex;gap:10px;flex-wrap:wrap;">
-        <a href="business-plan-edit.html?id=${rapport.bp_id||selectedBPId||''}" class="btn btn-outline">✏️ Améliorer le Business Plan</a>
-        <button class="btn btn-orange" onclick="showStep('setup');renderBPSelect()">🔄 Relancer une simulation</button>
+        <a href="business-plan-edit.html?id=${rapport.bp_id||selectedBPId||''}" class="btn btn-outline">${ico('pencil')}Améliorer le Business Plan</a>
+        <button class="btn btn-orange" onclick="showStep('setup');renderBPSelect()">${ico('refresh')}Relancer une simulation</button>
       </div>
     </div>`;
 }
@@ -599,9 +661,9 @@ async function loadHistorique() {
       const scoreColor = s.score>=80?'#10b981':s.score>=60?'#f59e0b':'#dc2626';
       return `<div class="hist-item" onclick="loadRapport(${s.id})">
         <div style="display:flex;align-items:center;gap:12px;flex:1;">
-          <div style="font-size:24px;">${meta.icon}</div>
+          <div class="hi-ic">${ico(meta.icon)}</div>
           <div>
-            <div style="font-weight:700;font-size:13.5px;">${esc(s.nom_projet||'—')} · ${esc(s.scenario||'')} · ${DIFF_META[s.difficulte||'intermediaire']?.label||''}</div>
+            <div style="font-weight:700;font-size:13.5px;">${esc(s.nom_projet||'—')} · ${esc(s.scenario||'')} · ${diffLabel(s.difficulte||'intermediaire')}</div>
             <div style="font-size:11.5px;color:var(--muted);">${fmtDate(s.created_at)} · ${fmtTime(s.duree_seconds||0)}</div>
           </div>
         </div>

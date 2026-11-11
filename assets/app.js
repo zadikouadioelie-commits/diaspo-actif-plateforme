@@ -6774,13 +6774,28 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       // Boutons « Partager » et « Télécharger Diaspo'Actif » du vrai tiroir, eux aussi fabriqués par app.js.
       if (menuIci && window.daPartageMenu) window.daPartageMenu(menuIci);
       // Mise en cartes du menu (2026-11-06, maquette fournie) : icônes SVG, descriptions, onglets Standard / Premium / Tous.
-      const cartes = () => { if (menuIci && window.menuModulesCartes) window.menuModulesCartes(menuIci); };
-      if (window.menuModulesCartes) cartes();
-      else if (!document.getElementById("mmc-js")) {
-        const s = document.createElement("script");
-        s.id = "mmc-js"; s.src = "assets/menu-modules-cartes.js?v=1"; s.onload = cartes;
-        document.head.appendChild(s);
-      }
+      /* Compte Administrateur (2026-11-11, signalé : « le menu a régressé » sur business-plan.html) : le tiroir copié d'ici n'a pas les catégories
+         (Analyse / Réponses aux demandes / Création / Modération / Simulation), posées sur le tableau de bord par assets/menu-admin-categories.js —
+         script qui n'est pas dans la copie. On le charge donc ici et on l'applique AVANT la mise en cartes. */
+      const adminCat = /dashboard-administrateur\.html/.test(dest || "");
+      const cartes = () => {
+        if (!menuIci || !window.menuModulesCartes) return;
+        if (adminCat && window.adminCategoriesAppliquer) window.adminCategoriesAppliquer(menuIci);
+        window.menuModulesCartes(menuIci);
+      };
+      const lancerCartes = () => {
+        if (window.menuModulesCartes) cartes();
+        else if (!document.getElementById("mmc-js")) {
+          const s = document.createElement("script");
+          s.id = "mmc-js"; s.src = "assets/menu-modules-cartes.js?v=1"; s.onload = cartes;
+          document.head.appendChild(s);
+        }
+      };
+      if (adminCat && !window.adminCategoriesAppliquer) {
+        const sa = document.createElement("script");
+        sa.src = "assets/menu-admin-categories.js?v=3"; sa.onload = lancerCartes; sa.onerror = lancerCartes;
+        document.head.appendChild(sa);
+      } else lancerCartes();
     }
     function fermerMenuIci(viaNavigation) {
       if (!menuIci) return;

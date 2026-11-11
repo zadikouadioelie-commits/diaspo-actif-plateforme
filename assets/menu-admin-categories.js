@@ -129,7 +129,16 @@
 
   function cleDuLien(a) {
     if (a.dataset.section) return a.dataset.section;
-    const h = (a.getAttribute('href') || '').split('#')[0].split('?')[0];
+    const href = a.getAttribute('href') || '';
+    /* Tiroir copié « sur place » par app.js sur les autres pages (business-plan.html, profil…) : le data-section est devenu dashboard-administrateur.html#section
+       (ou #da-go=data-section:valeur) — la clé est alors ce qui suit le # */
+    const i = href.indexOf('#');
+    if (i >= 0 && /(^|\/)dashboard-administrateur\.html#/.test(href)) {
+      const reste = href.slice(i + 1), m = /^da-go=data-section:(.+)$/.exec(reste);
+      if (m) { try { return decodeURIComponent(m[1]); } catch (e) { return m[1]; } }
+      if (reste && reste.indexOf('da-go=') !== 0) return reste;
+    }
+    const h = href.split('#')[0].split('?')[0];
     return h.split('/').pop();
   }
 
@@ -153,6 +162,22 @@
     sb._admObs = new MutationObserver(() => marquer(sb));
     sb._admObs.observe(sb, { childList: true, subtree: true });
   }
+
+  /* Pour le tiroir fabriqué « sur place » par assets/app.js sur les autres pages : mêmes catégories, même rangement, avant la mise en cartes */
+  window.adminCategoriesAppliquer = function (tiroir) {
+    if (!tiroir) return;
+    tiroir.dataset.mmcCats = JSON.stringify(CATEGORIES);
+    /* La copie garde deux liens vers la même section (« Billetterie » et « Événements » → #billetterie) : le tableau de bord en écarte un par script,
+       pas la copie. On ne garde que le premier de chaque module. */
+    const vus = {};
+    tiroir.querySelectorAll('a').forEach(a => {
+      if (a.closest(HORS_MODULE) || a.id === 'sidebar-close') return;
+      const k = cleDuLien(a);
+      if (!CAT_DE[k]) return;
+      if (vus[k]) a.remove(); else vus[k] = true;
+    });
+    marquer(tiroir);
+  };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
