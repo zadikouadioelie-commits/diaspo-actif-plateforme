@@ -1,33 +1,26 @@
 /* ============================================================================================
-   Menu des modules du compte Administrateur : quatre catégories en onglets (2026-11-11, demande explicite :
-   « dans le menu du compte administrateur, crée 4 catégories de modules comme pour les autres comptes : modules d'analyse,
-   de réponses à une demande, de création et de modération »).
+   Menu des modules du compte Administrateur : quatre catégories (2026-11-11, demande explicite : « dans le menu du compte
+   administrateur, crée 4 catégories de modules comme pour les autres comptes : analyse, réponses à une demande, création, modération »,
+   puis, capture du panneau des autres comptes à l'appui : « comme ça »).
 
-   Les autres comptes ont des onglets (Module Standard / Premium / Tous les modules, assets/menu-modules-cartes.js). Ici, mêmes codes
-   visuels (bleu nuit, bordure et bouton dorés), mais les onglets sont les quatre usages d'un administrateur :
-     Analyse                  — consulter, mesurer, suivre (tableaux de bord, observatoires, finances, journaux)
-     Réponses aux demandes    — traiter ce que les membres demandent (accréditations, vérifications, support, suppressions...)
-     Création                 — produire et configurer (formations, publications, boutiques, partenaires, paramètres...)
-     Modération               — contrôler (modération, avis, règles de contact, conformité, accès délégué)
-   + « Tous les modules » (comportement d'avant : tout le menu, avec ses anciens titres de groupe).
+   Le panneau est CELUI DES AUTRES COMPTES (assets/menu-modules-cartes.js : titre « Menu des modules », recherche, une rangée d'onglets,
+   une carte par module avec icône et description). Ce fichier ne dessine rien : il DÉCLARE seulement la configuration du tiroir
+   Administrateur, avant que menu-modules-cartes.js ne se monte (il doit donc être chargé AVANT lui) :
+     - data-mmc-cats sur le tiroir  → les onglets sont ces quatre catégories (au lieu de Standard / Premium / Tous),
+     - data-mmc-cat sur chaque lien → sa catégorie,
+     - data-mmc-icone / data-mmc-desc sur chaque lien → icône et description d'un administrateur (« Formations » = créer, pas suivre).
+   Rien n'est déplacé ni supprimé. Un module absent des tables ci-dessous reste visible dans TOUS les onglets (jamais perdu), avec l'icône
+   « grille » et sans description.
 
-   Principe : RIEN n'est déplacé ni supprimé. Chaque lien reçoit seulement data-adm-cat ; l'onglet actif ne fait que masquer par CSS
-   les liens des autres catégories (et les anciens titres de groupe, qui n'ont plus de sens dans une vue par catégorie).
-   Un module absent de la table ci-dessous n'a pas d'attribut → il reste visible dans TOUS les onglets (jamais perdu).
-   Pour ranger un module autrement : le déplacer d'une liste à l'autre ci-dessous, c'est tout.
-   Retour arrière : retirer la balise <script> de dashboard-administrateur.html.
+   Pour ranger un module autrement : le changer de liste dans RANGEMENT. Pour en ajouter un : une ligne dans la liste de sa catégorie
+   et une dans FICHES.  Retour arrière : retirer les deux balises <script> (ce fichier et menu-modules-cartes.js) de dashboard-administrateur.html.
    ============================================================================================ */
 (function () {
   'use strict';
   if (window.__admCategories) return;
   window.__admCategories = true;
 
-  const CATEGORIES = [
-    ['analyse', 'Analyse', "Consulter, mesurer et suivre l'activité de la plateforme"],
-    ['demandes', 'Réponses aux demandes', 'Traiter les demandes des membres'],
-    ['creation', 'Création', 'Créer et configurer contenus, offres et réglages'],
-    ['moderation', 'Modération', 'Contrôler les contenus, les accès et la conformité']
-  ];
+  const CATEGORIES = [['analyse', 'Analyse'], ['demandes', 'Réponses aux demandes'], ['creation', 'Création'], ['moderation', 'Modération']];
 
   /* Clé d'un module = son data-section, ou le nom de la page pour les liens vers un autre fichier. */
   const RANGEMENT = {
@@ -46,16 +39,87 @@
       'formations', 'onboarding', 'videos-tutoriels', 'faq', 'chatbot', 'kofi-budget', 'partenaires-admin', 'packages', 'deals-admin',
       'diaspoactif-deals', 'parametres', 'billetterie', 'parrainage-admin', 'liens-adherents', 'contenu', 'communication',
       'publications', 'notifications-admin', 'ads', 'administrateurs-junior',
-      'espace-simulation.html', 'atelier-boutiques.html', 'comptes-lies.html', 'comptes-lies-admin.html'
+      'espace-simulation.html', 'comptes-lies.html', 'comptes-lies-admin.html'
     ],
     moderation: [
       'moderation', 'avis-moderation', 'temoignages-admin', 'regles-contact', 'conformite', 'acces-delegue-admin'
     ]
   };
+
+  /* [icône de menu-modules-cartes.js, description d'une ligne] — du point de vue de l'administrateur */
+  const FICHES = {
+    'vue-ensemble': ['grille', "Suivre l'activité de la plateforme d'un coup d'œil"],
+    'reseau': ['globe', 'Mesurer la diaspora et son réseau'],
+    'retention': ['groupe', "Suivre l'arrivée et la fidélité des membres"],
+    'avancement-criteres': ['courbe', "Suivre l'avancement des initiatives"],
+    'analytics-trafic': ['barres', 'Analyser les visites et le trafic du site'],
+    'error-logs': ['journal', 'Repérer les erreurs techniques'],
+    'initiatives': ['immeuble', 'Consulter les initiatives et leurs projets'],
+    'membres': ['groupe', 'Consulter et suivre les membres'],
+    'reseau-pro': ['reseau', 'Suivre le réseau professionnel'],
+    'diaspora-stats': ['barres', 'Explorer les données de la diaspora'],
+    'obs-eco': ['euro', 'Suivre les données économiques'],
+    'obs-coop': ['globe', 'Suivre la coopération entre territoires'],
+    'obs-instit': ['immeuble', 'Suivre les données institutionnelles'],
+    'revenus-diaspora': ['repere', 'Comparer les revenus par diaspora'],
+    'cartographie-competences': ['boussole', 'Cartographier les compétences des membres'],
+    'obs-recensement': ['liste', 'Suivre le recensement des communautés'],
+    'finances': ['portefeuille', 'Suivre les finances de la plateforme'],
+    'ventes': ['panier', 'Suivre les ventes et les transactions'],
+    'oz-admin': ['etincelle', "Analyses et aide à la décision"],
+    'origines': ['repere', 'Compléter les origines manquantes'],
+    'social-sync': ['synchro', 'Suivre la synchronisation des réseaux sociaux'],
+    'paiements-admin.html': ['carte', 'Suivre et contrôler les paiements'],
+
+    'accreditations': ['bouclier', "Traiter les demandes d'accréditation"],
+    'certifications': ['medaille', 'Examiner les demandes de certification'],
+    'verifications-organisation': ['valide', 'Vérifier les organisations'],
+    'demandes-formateur': ['diplome', 'Répondre aux demandes de compte formateur'],
+    'demandes-passage': ['avion', "Traiter les passages en initiative existante"],
+    'ida-demandes': ['porte_voix', "Répondre aux demandes d'influenceurs"],
+    'rencontres': ['bulle', 'Répondre aux demandes de rencontre'],
+    'suppression-comptes': ['corbeille', 'Traiter les demandes de suppression de compte'],
+    'messages-techniques': ['bouee', "Répondre aux messages d'assistance"],
+    'support-pilote': ['ecran', 'Répondre aux demandes de support pilote'],
+    'faq-sr': ['ampoule', 'Répondre aux questions restées sans réponse'],
+    'partenariat-admin': ['lien', 'Traiter les demandes de partenariat'],
+    'projets-evaluation.html': ['dossier', 'Évaluer les projets déposés'],
+
+    'formations': ['livre', 'Créer et gérer les formations'],
+    'onboarding': ['lecture', "Créer les tutoriels d'accueil"],
+    'videos-tutoriels': ['lecture', 'Publier les vidéos tutoriels'],
+    'faq': ['ampoule', 'Rédiger la foire aux questions'],
+    'chatbot': ['bulle', "Alimenter la mémoire de l'assistant"],
+    'kofi-budget': ['etincelle', "Régler le budget de l'assistant Koffi"],
+    'partenaires-admin': ['medaille', 'Créer et présenter les partenaires officiels'],
+    'packages': ['colis', "Créer les packages Diaspo'Actif"],
+    'deals-admin': ['cadeau', 'Attribuer des deals'],
+    'diaspoactif-deals': ['lien', "Gérer les deals Diaspo'Actif"],
+    'parametres': ['reglages', 'Régler la plateforme'],
+    'billetterie': ['billet', 'Créer et gérer billetteries et événements'],
+    'parrainage-admin': ['cadeau', 'Créer les invitations et le parrainage'],
+    'liens-adherents': ['identite', "Créer les liens d'adhérents"],
+    'contenu': ['document', 'Publier le contenu sur la diaspora'],
+    'communication': ['courrier', 'Créer et envoyer des communications'],
+    'publications': ['journal', 'Créer des publications'],
+    'notifications-admin': ['cloche', 'Créer des notifications'],
+    'ads': ['porte_voix', 'Créer des publicités'],
+    'administrateurs-junior': ['personne', 'Créer les comptes administrateur junior'],
+    'espace-simulation.html': ['ecran', 'Essayer les systèmes en simulation, sans rien de réel'],
+    'comptes-lies.html': ['lien', 'Relier des comptes'],
+    'comptes-lies-admin.html': ['euro', 'Régler les réductions des comptes liés'],
+
+    'moderation': ['bouclier', 'Modérer les contenus signalés'],
+    'avis-moderation': ['etoile', 'Modérer les avis et y répondre'],
+    'temoignages-admin': ['bulle', 'Modérer les témoignages'],
+    'regles-contact': ['groupe', 'Régler les règles de contact et de diffusion'],
+    'conformite': ['valide', 'Contrôler la conformité et les données'],
+    'acces-delegue-admin': ['cle', 'Contrôler les accès délégués']
+  };
+
   const CAT_DE = {};
   Object.keys(RANGEMENT).forEach(c => RANGEMENT[c].forEach(k => { CAT_DE[k] = c; }));
 
-  const CLE_MEMO = 'da_admin_cat';
   const HORS_MODULE = '.sb-search-results,.sb-install-group,.sb-bandeau-group,.sbp-cadre,.sb-reorder-toggle';
 
   function cleDuLien(a) {
@@ -64,113 +128,26 @@
     return h.split('/').pop();
   }
 
-  function css() {
-    if (document.getElementById('adm-cat-css')) return;
-    const st = document.createElement('style');
-    st.id = 'adm-cat-css';
-    const S = 'html body .sidebar[data-adm-actif]';
-    const regles = [
-      /* Vue par catégorie : on masque les modules des autres catégories et les anciens titres de groupe */
-      ...CATEGORIES.map(([c]) => S + '[data-adm-actif="' + c + '"] a[data-adm-cat]:not([data-adm-cat="' + c + '"]){display:none!important}'),
-      S + ':not([data-adm-actif="tous"]) .sb-group-lbl[data-adm-grp]{display:none!important}',
-      /* Onglets — mêmes codes que menu-modules-cartes.js (bleu nuit, or) */
-      /* Deux colonnes : le tiroir fait ~220 px, quatre onglets en ligne écrasaient « Réponses aux demandes » */
-      '.adm-cats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;padding:4px;margin:8px 10px 6px;border:1px solid rgba(232,185,35,.4);border-radius:12px;background:rgba(255,255,255,.04)}',
-      '.adm-cat{min-width:0;min-height:40px;padding:5px 6px;border:0;border-radius:9px;background:transparent;color:rgba(255,255,255,.82);font:700 12px/1.15 inherit;font-family:inherit;text-align:center;cursor:pointer;transition:background .2s,color .2s;overflow-wrap:anywhere}',
-      '.adm-cat:hover{background:rgba(232,185,35,.14);color:#fff}',
-      '.adm-cat[aria-selected="true"]{background:linear-gradient(135deg,#F6C453,#C99A1E);color:#1f1500}',
-      '.adm-cat:focus-visible,.adm-tous:focus-visible{outline:2px solid #fff;outline-offset:2px}',
-      '.adm-tous{grid-column:1/-1;min-height:34px;padding:4px 8px;border:1px solid rgba(232,185,35,.35);border-radius:9px;background:transparent;color:rgba(255,255,255,.82);font:700 12px/1.15 inherit;font-family:inherit;cursor:pointer;transition:background .2s,color .2s}',
-      '.adm-tous:hover{background:rgba(232,185,35,.14);color:#fff}',
-      '.adm-tous[aria-selected="true"]{background:linear-gradient(135deg,#F6C453,#C99A1E);color:#1f1500;border-color:transparent}',
-      '@media (prefers-reduced-motion:reduce){.adm-cat,.adm-tous{transition:none}}'
-    ];
-    st.textContent = regles.join('\n');
-    document.head.appendChild(st);
-  }
-
   function marquer(sb) {
     sb.querySelectorAll('a').forEach(a => {
       if (a.closest(HORS_MODULE) || a.id === 'sidebar-close' || a.classList.contains('sb-standalone')) return;
-      const c = CAT_DE[cleDuLien(a)];
-      if (c) { if (a.dataset.admCat !== c) a.dataset.admCat = c; }
+      const k = cleDuLien(a);
+      if (CAT_DE[k] && a.dataset.mmcCat !== CAT_DE[k]) a.dataset.mmcCat = CAT_DE[k];
+      const f = FICHES[k];
+      if (f) { if (a.dataset.mmcIcone !== f[0]) a.dataset.mmcIcone = f[0]; if (a.dataset.mmcDesc !== f[1]) a.dataset.mmcDesc = f[1]; }
     });
-    sb.querySelectorAll('.sb-group-lbl').forEach(l => {
-      if (l.closest(HORS_MODULE)) return;
-      if (!l.hasAttribute('data-adm-grp')) l.setAttribute('data-adm-grp', '1');
-    });
-  }
-
-  function choisir(sb, cle, memoriser) {
-    sb.setAttribute('data-adm-actif', cle);
-    const barre = sb.querySelector('.adm-cats');
-    if (barre) {
-      barre.querySelectorAll('[data-cat]').forEach(b => {
-        const on = b.dataset.cat === cle;
-        b.setAttribute('aria-selected', on ? 'true' : 'false');
-        b.tabIndex = on ? 0 : -1;
-      });
-      /* Le titre de l'onglet est aussi son explication (lecteurs d'écran, infobulle) */
-      barre.querySelectorAll('.adm-cat').forEach(b => { const c = CATEGORIES.find(x => x[0] === b.dataset.cat); if (c) b.title = c[2]; });
-    }
-    if (memoriser) {
-      try { localStorage.setItem(CLE_MEMO, cle); } catch (e) { /* mémoire indisponible : sans conséquence */ }
-      sb.scrollTop = 0;
-    }
-  }
-
-  function barre(sb) {
-    let b = sb.querySelector('.adm-cats');
-    if (!b) {
-      b = document.createElement('div');
-      b.className = 'adm-cats';
-      b.setAttribute('role', 'tablist');
-      b.setAttribute('aria-label', 'Catégories de modules');
-      CATEGORIES.forEach(([cle, lib]) => {
-        const bt = document.createElement('button');
-        bt.type = 'button'; bt.className = 'adm-cat'; bt.dataset.cat = cle; bt.setAttribute('role', 'tab'); bt.textContent = lib;
-        bt.addEventListener('click', () => choisir(sb, cle, true));
-        b.appendChild(bt);
-      });
-      const tous = document.createElement('button');
-      tous.type = 'button'; tous.className = 'adm-tous'; tous.dataset.cat = 'tous'; tous.setAttribute('role', 'tab'); tous.textContent = 'Tous les modules';
-      tous.addEventListener('click', () => choisir(sb, 'tous', true));
-      b.appendChild(tous);
-    }
-    /* Place : juste sous la recherche (sinon sous le titre) — dans l'en-tête collant quand il existe. */
-    const ancre = sb.querySelector('.sb-search-wrap') || sb.querySelector('.brand');
-    if (ancre && b.previousElementSibling !== ancre) ancre.insertAdjacentElement('afterend', b);
-    else if (!ancre && !b.parentNode) sb.insertBefore(b, sb.firstChild);
-    return b;
-  }
-
-  function monter(sb) {
-    css();
-    marquer(sb);
-    barre(sb);
-    if (!sb.hasAttribute('data-adm-actif')) {
-      let memo = null; try { memo = localStorage.getItem(CLE_MEMO); } catch (e) { /* mémoire indisponible */ }
-      choisir(sb, CATEGORIES.some(c => c[0] === memo) ? memo : 'tous', false);
-    }
   }
 
   function init() {
     const sb = document.querySelector('aside.sidebar[data-full-menu]');
     if (!sb) return;
-    monter(sb);
+    sb.dataset.mmcCats = JSON.stringify(CATEGORIES);
+    marquer(sb);
     if (sb._admObs) return;
-    let attente = 0;
-    sb._admObs = new MutationObserver(() => {
-      if (attente) return;
-      attente = setTimeout(() => {
-        attente = 0;
-        sb._admObs.disconnect();
-        try { monter(sb); } finally { sb._admObs.observe(sb, { childList: true, subtree: true }); }
-      }, 120);
-    });
+    // Un module réinjecté plus tard par un autre script (révélation d'un module, etc.) doit recevoir sa catégorie lui aussi
+    sb._admObs = new MutationObserver(() => marquer(sb));
     sb._admObs.observe(sb, { childList: true, subtree: true });
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
-  window.addEventListener('load', () => setTimeout(init, 500));
 })();

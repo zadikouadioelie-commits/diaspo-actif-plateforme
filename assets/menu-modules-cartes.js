@@ -203,6 +203,10 @@
       /* Onglets : on masque seulement, rien n'est déplacé */
       P + '[data-mmc-tab="premium"] a[data-mmc-niv="standard"],' + P + '[data-mmc-tab="standard"] a[data-mmc-niv="premium"]{display:none!important}',
       P + '[data-mmc-tab="premium"] .sb-group-lbl[data-mmc-niv],' + P + '[data-mmc-tab="standard"] .sb-group-lbl[data-mmc-niv="premium"]{display:none!important}',
+      /* Mode « catégories » (tiroir Administrateur : data-mmc-cats) : les onglets sont des catégories, un lien d'une autre catégorie est masqué
+         (classe posée par choisir()), et les anciens titres de groupe n'ont plus de sens. Un lien sans catégorie reste visible partout. */
+      P + ' a.mmc-hors{display:none!important}',
+      P + '[data-mmc-cats] .sb-group-lbl[data-mmc-niv]{display:none!important}',
       /* En-tête en colonne : titre, recherche, onglets, puis les boutons « Partager / Télécharger » (insérés plus tard par app.js, au même endroit que la recherche) */
       P + ' .sb-sticky-header{display:flex!important;flex-direction:column}',
       P + ' .sb-sticky-header>.brand{order:1}' + P + ' .sb-sticky-header>.sb-search-wrap{order:2}' + P + ' .sb-sticky-header>.mmc-tabs{order:3}' + P + ' .sb-sticky-header>.sb-install-group{order:4}' + P + ' .sb-sticky-header>.sb-bandeau-group{order:5}',
@@ -278,9 +282,13 @@
     directs.forEach(n => n.remove());
     const cle = norm(propre);
     const regle = REGLES.find(r => r[0].test(cle));
-    const ico = document.createElement('span'); ico.className = 'mmc-ico'; ico.innerHTML = svg(regle ? regle[1] : 'grille');
+    // Une page peut imposer icône et description d'un module (data-mmc-icone / data-mmc-desc) : le tiroir Administrateur le fait,
+    // ses modules n'ont pas le même sens que ceux des autres comptes (ex. « Formations » = créer, pas suivre).
+    const nomIcone = a.dataset.mmcIcone || (regle ? regle[1] : 'grille');
+    const desc = a.dataset.mmcDesc || (regle && regle[2]) || '';
+    const ico = document.createElement('span'); ico.className = 'mmc-ico'; ico.innerHTML = svg(nomIcone);
     const txt = document.createElement('span'); txt.className = 'mmc-txt';
-    txt.innerHTML = '<span class="mmc-titre">' + esc(propre) + '</span>' + (regle && regle[2] ? '<span class="mmc-desc">' + esc(regle[2]) + '</span>' : '');
+    txt.innerHTML = '<span class="mmc-titre">' + esc(propre) + '</span>' + (desc ? '<span class="mmc-desc">' + esc(desc) + '</span>' : '');
     const poignee = a.querySelector(':scope > .sb-drag-handle');
     const ref = poignee ? poignee.nextSibling : a.firstChild;
     a.insertBefore(txt, ref);
@@ -365,12 +373,14 @@
     const n = parcourir(sb);
     actions(sb);
 
-    // Onglets (seulement s'il y a des modules des deux niveaux)
+    // Onglets : Standard / Premium / Tous (seulement s'il y a des modules des deux niveaux) — ou, si la page déclare data-mmc-cats
+    // (JSON [[clé, libellé], …]), ses propres catégories (tiroir Administrateur : Analyse, Demandes, Création, Modération).
     let onglets = sb.querySelector('.mmc-tabs');
-    if (n.premium && n.standard) {
+    const cats = categories(sb);
+    if (cats || (n.premium && n.standard)) {
       if (!onglets) {
-        onglets = document.createElement('div'); onglets.className = 'mmc-tabs'; onglets.setAttribute('role', 'tablist'); onglets.setAttribute('aria-label', 'Type de modules');
-        [['standard', 'Module Standard'], ['premium', 'Module Premium'], ['tous', 'Tous les modules']].forEach(([cle, lib]) => {
+        onglets = document.createElement('div'); onglets.className = 'mmc-tabs'; onglets.setAttribute('role', 'tablist'); onglets.setAttribute('aria-label', cats ? 'Catégories de modules' : 'Type de modules');
+        (cats || [['standard', 'Module Standard'], ['premium', 'Module Premium'], ['tous', 'Tous les modules']]).forEach(([cle, lib]) => {
           const b = document.createElement('button'); b.type = 'button'; b.className = 'mmc-tab'; b.dataset.tab = cle; b.setAttribute('role', 'tab'); b.textContent = lib;
           b.addEventListener('click', () => choisir(sb, cle, true));
           onglets.appendChild(b);
@@ -378,9 +388,11 @@
         const recherche = entete.querySelector('.sb-search-wrap');
         if (recherche && recherche.parentNode === entete) recherche.insertAdjacentElement('afterend', onglets);
         else entete.appendChild(onglets);
-        let memo = null; try { memo = localStorage.getItem('da_mmc_onglet'); } catch (e) { /* mémoire indisponible */ }
-        choisir(sb, ['standard', 'premium', 'tous'].includes(memo) ? memo : 'premium', false);
+        let memo = null; try { memo = localStorage.getItem(cleMemo(sb)); } catch (e) { /* mémoire indisponible */ }
+        const permis = cats ? cats.map(c => c[0]) : ['standard', 'premium', 'tous'];
+        choisir(sb, permis.includes(memo) ? memo : (cats ? cats[0][0] : 'premium'), false);
       }
+      if (cats) masquerHorsCategorie(sb); // liens ajoutés/réécrits depuis : on réapplique la catégorie courante
     } else {
       if (onglets) onglets.remove();
       sb.dataset.mmcTab = 'tous';
@@ -401,11 +413,27 @@
     }
   }
 
+  /* Catégories déclarées par la page (data-mmc-cats = JSON [[clé, libellé], …]) ; null = onglets Standard/Premium habituels. */
+  function categories(sb) {
+    if (!sb.dataset.mmcCats) return null;
+    try {
+      const l = JSON.parse(sb.dataset.mmcCats);
+      return Array.isArray(l) && l.length && l.every(c => Array.isArray(c) && c.length >= 2) ? l : null;
+    } catch (e) { return null; }
+  }
+  // Mémoire d'onglet distincte en mode catégories : les clés Standard/Premium des autres comptes n'ont rien à y faire.
+  function cleMemo(sb) { return sb.dataset.mmcCats ? 'da_mmc_onglet_cat' : 'da_mmc_onglet'; }
+  function masquerHorsCategorie(sb) {
+    const cle = sb.dataset.mmcTab;
+    sb.querySelectorAll('a.mmc-carte').forEach(a => { a.classList.toggle('mmc-hors', !!a.dataset.mmcCat && a.dataset.mmcCat !== cle); });
+  }
+
   function choisir(sb, cle, memoriser) {
     sb.dataset.mmcTab = cle;
     sb.querySelectorAll('.mmc-tab').forEach(b => { const on = b.dataset.tab === cle; b.setAttribute('aria-selected', on ? 'true' : 'false'); b.tabIndex = on ? 0 : -1; });
+    if (categories(sb)) masquerHorsCategorie(sb);
     if (memoriser) {
-      try { localStorage.setItem('da_mmc_onglet', cle); } catch (e) { /* mémoire indisponible */ }
+      try { localStorage.setItem(cleMemo(sb), cle); } catch (e) { /* mémoire indisponible */ }
       sb.scrollTop = 0;
     }
   }
