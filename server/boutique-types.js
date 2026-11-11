@@ -30,10 +30,13 @@ const ANCIENS_SANS_EQUIVALENT = Object.freeze(['blog', 'createur', 'formation'])
 /* Types NOUVEAUX : aucune boutique existante n'a ces clés avant la mise en service. */
 const CLES_NOUVELLES = Object.freeze(['ecom', 'events', 'impact', 'finance']);
 
-/* Types qu'une vraie boutique peut choisir aujourd'hui : ceux qui ont une page publique réelle
-   (profil-app.html : ecom → boutique.html, portfolio → portfolio.html, video → boutique-video.html).
-   events / impact / finance : uniquement les administrateurs (Atelier) jusqu'au lot E. */
-const SELECTIONNABLES_PUBLIC = Object.freeze(['ecom', 'video', 'portfolio']);
+/* Types qui ont une page publique DÉDIÉE (profil-app.html : ecom → boutique.html, portfolio → portfolio.html,
+   video → boutique-video.html). Les autres types s'affichent avec la présentation générale en attendant leur page (lot E). */
+const PAGES_DEDIEES = Object.freeze(['ecom', 'video', 'portfolio']);
+
+/* Types qu'une vraie boutique peut choisir aujourd'hui. « Créateur d'événements » est ouvert comme les autres types
+   (décision de l'utilisateur, 2026-11-11) ; impact / finance : uniquement les administrateurs (Atelier) jusqu'à leur lot. */
+const SELECTIONNABLES_PUBLIC = Object.freeze(['ecom', 'video', 'portfolio', 'events']);
 
 /* Type nouveau → type ancien dont on reprend les modules. */
 const MODELE_ANCIEN = Object.freeze({ ecom: 'commercial', events: 'evenement', impact: 'projet' });
@@ -94,12 +97,12 @@ function descriptionPourInterface({ actif, estAdministrateur }) {
     anciens_sans_equivalent: ANCIENS_SANS_EQUIVALENT,
     types: Object.entries(REGISTRE.TYPES).map(([cle, t]) => ({
       cle, label: t.label, desc: t.desc, items: t.items, what: t.what, who: t.who, contains: t.contains,
-      exemple: t.exemple || null, selectionnable: selectionnables.has(cle),
+      exemple: t.exemple || null, selectionnable: selectionnables.has(cle), page_dediee: PAGES_DEDIEES.includes(cle),
     })),
   };
 }
 
 module.exports = {
-  REGISTRE, ANCIEN_VERS_NOUVEAU, ANCIENS_SANS_EQUIVALENT, CLES_NOUVELLES, SELECTIONNABLES_PUBLIC, CLE_INTERRUPTEUR,
+  REGISTRE, ANCIEN_VERS_NOUVEAU, ANCIENS_SANS_EQUIVALENT, CLES_NOUVELLES, SELECTIONNABLES_PUBLIC, PAGES_DEDIEES, CLE_INTERRUPTEUR,
   typeCanonique, estAncienSansEquivalent, typesSelectionnables, ajouterTemplatesV2, descriptionPourInterface,
 };

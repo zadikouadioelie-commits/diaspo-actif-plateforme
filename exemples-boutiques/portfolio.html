@@ -167,84 +167,6 @@
   }
   @media (max-width:380px) { .grille { grid-template-columns:1fr; } }
   @media (prefers-reduced-motion:reduce) { html { scroll-behavior:auto; } .carte, .toast { transition:none; } .carte:hover { transform:none; } }
-
-  /* Vue 2 : artistes, collections, garanties, newsletter */
-  .actifs { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 12px; }
-  .actifs:empty { display:none; }
-  .actif { display:inline-flex; align-items:center; gap:8px; border:1px solid var(--gold); color:var(--gold); background:rgba(216,179,106,.1); border-radius:999px; padding:0 8px 0 14px; min-height:40px; font-size:14px; cursor:pointer; }
-  .actif svg.ic { width:16px; height:16px; }
-  .bloc { margin-top:46px; scroll-margin-top:calc(var(--ex-h,0px) + 80px); }
-  .bloc-tete { display:flex; align-items:flex-end; justify-content:space-between; gap:12px 20px; flex-wrap:wrap; margin-bottom:16px; }
-  .bloc-tete h2 { font-family:var(--serif); font-size:clamp(24px,3.2vw,32px); margin:0; display:flex; align-items:center; gap:12px; line-height:1.15; }
-  .bloc-tete h2 svg.ic { width:30px; height:30px; color:var(--gold); stroke-width:1.5; }
-  .bloc-tete p { margin:4px 0 0; color:var(--muted); font-size:15px; }
-  .lienor { background:none; border:0; color:var(--gold); font-weight:600; cursor:pointer; min-height:44px; padding:0 4px; display:inline-flex; align-items:center; gap:6px; }
-  .lienor:hover { text-decoration:underline; }
-  .artistes { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:18px; }
-  .artiste { background:var(--panel); border:1px solid var(--line); border-radius:12px; overflow:hidden; display:flex; flex-direction:column; transition:transform .2s, border-color .2s; }
-  .artiste:hover { transform:translateY(-3px); border-color:var(--gold); }
-  .artiste .portrait { position:relative; aspect-ratio:4/3.3; display:block; width:100%; border:0; padding:0; cursor:pointer; background:var(--panel2); }
-  .artiste .portrait svg { position:absolute; inset:0; width:100%; height:100%; }
-  .artiste .num { position:absolute; left:10px; top:10px; z-index:2; font-family:var(--serif); font-style:italic; font-size:14px; color:var(--gold); background:rgba(10,18,38,.7); border:1px solid var(--line); padding:1px 10px; border-radius:999px; }
-  .artiste .corps { padding:14px 16px 16px; display:flex; flex-direction:column; gap:6px; flex:1; }
-  .artiste h3 { margin:0; font-family:var(--serif); font-size:21px; }
-  .artiste .spe { color:var(--gold); font-weight:600; font-size:14.5px; }
-  .artiste .bio { color:var(--muted); font-size:14px; margin:0 0 8px; }
-  .artiste .btn { margin-top:auto; flex:none; }
-  .collections { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:18px; }
-  .collection { position:relative; aspect-ratio:4/3.1; border-radius:12px; overflow:hidden; border:1px solid var(--line); cursor:pointer; padding:0; text-align:left; background:var(--panel2); display:block; width:100%; transition:transform .2s, border-color .2s; }
-  .collection:hover { transform:translateY(-3px); border-color:var(--gold); }
-  .collection svg.fond { position:absolute; inset:0; width:100%; height:100%; }
-  .collection .voile { position:absolute; inset:0; background:linear-gradient(180deg, rgba(5,8,18,0) 38%, rgba(5,8,18,.88) 100%); }
-  .collection .txt { position:absolute; left:14px; right:54px; bottom:12px; }
-  .collection .txt b { display:block; font-family:var(--serif); font-size:20px; line-height:1.15; }
-  .collection .txt small { color:#e6e1d6; font-size:13.5px; }
-  .collection .pic { position:absolute; right:12px; bottom:12px; width:36px; height:36px; border-radius:8px; background:rgba(10,18,38,.7); border:1px solid var(--line); display:grid; place-items:center; color:var(--gold); }
-  .collection[aria-pressed="true"] { border-color:var(--gold); box-shadow:0 0 0 2px var(--gold); }
-  .garanties-bande { margin-top:34px; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); border:1px solid var(--line); border-radius:12px; background:var(--panel); }
-  .garanties-bande .g { display:flex; gap:14px; align-items:flex-start; padding:18px 22px; }
-  .garanties-bande .g + .g { border-left:1px solid var(--line); }
-  .garanties-bande svg.ic { width:38px; height:38px; color:var(--gold); stroke-width:1.4; }
-  .garanties-bande b { display:block; font-size:16px; margin-bottom:2px; }
-  .garanties-bande span { color:var(--muted); font-size:14px; }
-  .lettre { margin-top:22px; border-radius:12px; overflow:hidden; display:grid; grid-template-columns:auto minmax(0,1fr) minmax(0,1.1fr); align-items:center; gap:14px 26px; padding:20px 26px 20px 22px; background:linear-gradient(100deg, color-mix(in srgb, var(--gold) 80%, var(--bg)) 0%, var(--gold) 55%); color:var(--on-gold); }
-  .lettre svg.ic { width:46px; height:46px; stroke-width:1.4; }
-  .lettre h3 { margin:0; font-family:var(--serif); font-size:26px; line-height:1.15; }
-  .lettre p { margin:2px 0 0; font-size:14.5px; }
-  .lettre form { display:flex; gap:10px; }
-  .lettre input { flex:1 1 auto; min-width:0; min-height:46px; border-radius:999px; border:1px solid rgba(10,18,38,.45); background:var(--bg); color:var(--text); padding:0 18px; font:inherit; }
-  .lettre input::placeholder { color:#c3cadb; }
-  .lettre button { min-height:46px; border-radius:999px; border:0; background:var(--bg); color:var(--gold); font-weight:700; padding:0 22px; cursor:pointer; font:inherit; font-weight:700; }
-  .lettre button:hover { filter:brightness(1.25); }
-  .lettre :focus-visible { outline-color:var(--bg); }
-  .fiche-artiste { display:grid; grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr); gap:22px; margin-top:8px; }
-  .fiche-artiste .portrait-grand { position:relative; aspect-ratio:4/3.4; border-radius:12px; overflow:hidden; border:1px solid var(--line); background:var(--panel2); }
-  .fiche-artiste .portrait-grand svg { position:absolute; inset:0; width:100%; height:100%; }
-  .oeuvres-artiste { display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:10px; margin:10px 0 14px; }
-  .oeuvres-artiste button { position:relative; text-align:left; background:var(--panel2); border:1px solid var(--line); border-radius:10px; overflow:hidden; padding:0; cursor:pointer; color:inherit; }
-  .oeuvres-artiste .im { position:relative; aspect-ratio:4/3; display:block; }
-  .oeuvres-artiste .im svg { position:absolute; inset:0; width:100%; height:100%; }
-  .oeuvres-artiste small { display:block; padding:6px 8px 8px; font-size:13px; line-height:1.3; }
-  @media (max-width:900px) {
-    .artistes, .collections { grid-template-columns:repeat(2,minmax(0,1fr)); }
-    .garanties-bande { grid-template-columns:1fr; }
-    .garanties-bande .g + .g { border-left:0; border-top:1px solid var(--line); }
-    .lettre { grid-template-columns:auto minmax(0,1fr); }
-    .lettre form { grid-column:1 / -1; }
-    .fiche-artiste { grid-template-columns:1fr; }
-  }
-  @media (max-width:600px) {
-    .artistes, .collections { gap:12px; }
-    .artiste .corps { padding:10px 10px 12px; }
-    .artiste h3 { font-size:17px; }
-    .artiste .bio { display:none; }
-    .collection .txt b { font-size:16px; }
-    .lettre { padding:16px; }
-    .lettre form { flex-direction:column; }
-    .lettre h3 { font-size:22px; }
-  }
-  @media (max-width:380px) { .artistes, .collections { grid-template-columns:1fr; } }
-  @media (prefers-reduced-motion:reduce) { .artiste, .collection { transition:none; } .artiste:hover, .collection:hover { transform:none; } }
 </style>
 </head>
 <body>
@@ -259,8 +181,6 @@
     </div>
     <nav class="nav" aria-label="Rubriques">
       <button type="button" aria-current="page" id="navGalerie">Galerie</button>
-      <button type="button" id="navArtistes">Artistes</button>
-      <button type="button" id="navCollections">Collections</button>
       <button type="button" id="navDevis">Demander un devis</button>
     </nav>
     <div class="tools">
@@ -314,7 +234,6 @@
       </select>
     </label>
   </div>
-  <div class="actifs" id="actifs" aria-live="polite"></div>
   <h2 class="sectitre" id="sectMain"></h2>
   <div class="grille" id="grid"></div>
   <div class="pied">
@@ -324,52 +243,6 @@
       <select id="parPage"><option value="6">6 par page</option><option value="12" selected>12 par page</option><option value="24">24 par page</option></select>
     </label>
   </div>
-  <section class="bloc" id="artistes" aria-labelledby="artistesTitre">
-    <div class="bloc-tete">
-      <div>
-        <h2 id="artistesTitre"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19c0-6 3-11 8-14-1 3 0 5 3 6-1 3-3 5-6 6M5 19l5-5"/></svg>Artistes à l'honneur</h2>
-        <p>Découvrez des talents exceptionnels de la scène africaine et de sa diaspora.</p>
-      </div>
-      <button class="lienor" type="button" id="artistesTous" aria-expanded="false">Voir tous les artistes <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16M14 6l6 6-6 6"/></svg></button>
-    </div>
-    <div class="artistes" id="artistesListe"></div>
-  </section>
-
-  <section class="bloc" id="collections" aria-labelledby="collTitre">
-    <div class="bloc-tete">
-      <div>
-        <h2 id="collTitre"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l9 4.5-9 4.5-9-4.5z"/><path d="M3 12l9 4.5 9-4.5M3 16.5L12 21l9-4.5"/></svg>Collections</h2>
-        <p>Explorez des séries d'œuvres thématiques, créées par nos artistes.</p>
-      </div>
-      <button class="lienor" type="button" id="collToutes">Voir toutes les collections <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16M14 6l6 6-6 6"/></svg></button>
-    </div>
-    <div class="collections" id="collListe"></div>
-  </section>
-
-  <section class="garanties-bande" aria-label="Nos garanties">
-    <div class="g">
-      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 6h12v10H2zM14 9h4l4 3v4h-8z"/><circle cx="6.5" cy="17.5" r="1.8"/><circle cx="17.5" cy="17.5" r="1.8"/></svg>
-      <div><b>Livraison sécurisée</b><span>En Afrique et en Europe, avec suivi de commande.</span></div>
-    </div>
-    <div class="g">
-      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.4 1.8 3-.2 1 2.8 2.5 1.7-.8 2.9.8 2.9-2.5 1.7-1 2.8-3-.2L12 22l-2.4-1.8-3 .2-1-2.8-2.5-1.7.8-2.9-.8-2.9 2.5-1.7 1-2.8 3 .2z"/><path d="M8 12l3 3 5-6"/></svg>
-      <div><b>Authenticité garantie</b><span>Œuvres originales, certificat d'authenticité fourni par l'artiste.</span></div>
-    </div>
-    <div class="g">
-      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg>
-      <div><b>Paiement sécurisé</b><span>Transactions protégées : le paiement va directement à l'artiste.</span></div>
-    </div>
-  </section>
-
-  <section class="lettre" aria-labelledby="lettreTitre">
-    <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>
-    <div><h3 id="lettreTitre">Restez informé(e) !</h3><p>Recevez nos nouvelles collections, portraits d'artistes, expositions et offres exclusives.</p></div>
-    <form id="lettreForm">
-      <input type="email" name="email" required autocomplete="email" placeholder="Votre adresse e-mail" aria-label="Votre adresse e-mail">
-      <button type="submit">S'inscrire</button>
-    </form>
-  </section>
-
   <p class="demo">Exemple : œuvres et artistes fictifs, dessinés pour la démonstration. Le panier et les demandes de devis sont simulés et ne sont envoyés nulle part.</p>
 </main>
 
@@ -406,25 +279,6 @@
   <button class="lb-prev" type="button" data-lbprev aria-label="Image précédente"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
   <button class="lb-next" type="button" data-lbnext aria-label="Image suivante"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
   <div class="lb-count" id="lbCount"></div>
-</div>
-
-<!-- Fiche d'un artiste -->
-<div class="overlay" id="artistOv" role="dialog" aria-modal="true" aria-labelledby="aNom">
-  <div class="sheet">
-    <button class="close" type="button" data-close aria-label="Fermer"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
-    <div class="fiche-artiste">
-      <div class="portrait-grand" id="aPortrait"></div>
-      <div>
-        <span class="badge" id="aSpe"></span>
-        <h2 id="aNom"></h2>
-        <div style="color:var(--muted)" id="aLieu"></div>
-        <p class="histoire" id="aBio" style="margin-top:12px"></p>
-        <b>Ses œuvres</b>
-        <div class="oeuvres-artiste" id="aOeuvres"></div>
-        <div class="actions" id="aActions"></div>
-      </div>
-    </div>
-  </div>
 </div>
 
 <!-- Panier -->
@@ -561,39 +415,8 @@
   ];
   WORKS.forEach((w, i) => { w.rang = i; });
 
-  /* Artistes et collections (fictifs). Une collection regroupe des œuvres de plusieurs artistes. */
-  const ARTISTS = [
-    { id: 1, nom: "Fatou Koné", spe: "Peintre plasticienne", lieu: "Abidjan, Côte d'Ivoire", v: 0, vedette: true, bio: "Elle peint la mémoire des étoffes et des femmes qui les portent : des bandes de couleur, travaillées au couteau, où le tissu devient un langage." },
-    { id: 2, nom: "Moussa Traoré", spe: "Sculpteur", lieu: "Bobo-Dioulasso, Burkina Faso", v: 1, vedette: true, bio: "Sculpteur sur bois d'ébène, il donne vie aux masques et aux gardiens inspirés des traditions de l'Ouest africain, patinés à la main." },
-    { id: 3, nom: "Amina Diarra", spe: "Photographe", lieu: "Bamako, Mali", v: 2, vedette: true, bio: "Photographe de la diaspora, elle capture la beauté des paysages, des fleuves et des instants de vie, en tirages d'art numérotés." },
-    { id: 4, nom: "Yaw Boateng", spe: "Artiste numérique", lieu: "Kumasi, Ghana", v: 3, vedette: true, bio: "Créatif multidisciplinaire, il fusionne art africain, design et technologies numériques pour des œuvres uniques, livrées en haute définition." },
-    { id: 5, nom: "Koffi Mensah", spe: "Peintre et photographe", lieu: "Accra, Ghana", v: 1, bio: "Entre toile et objectif, il explore la lumière des savanes, des dunes et des lagunes à l'aube." },
-    { id: 6, nom: "Awa Camara", spe: "Artiste textile", lieu: "Dakar, Sénégal", v: 0, bio: "Teinture à la boue, motifs peints à la main : elle réinvente le bogolan en panneaux contemporains." },
-    { id: 7, nom: "Issa Ouédraogo", spe: "Potier et graveur", lieu: "Ouagadougou, Burkina Faso", v: 3, bio: "Calebasses gravées, terres cuites engobées : il transmet les gestes de l'atelier familial." },
-    { id: 8, nom: "Nadia Benali", spe: "Photographe et sculptrice", lieu: "Tunis, Tunisie", v: 2, bio: "Du tirage d'art au bronze patiné, elle suit un même fil : l'eau, le fleuve et les silhouettes de la nuit." }
-  ];
-  const COLLS = [
-    { id: "lumieres", titre: "Lumières du continent", kind: "baobab", pal: P.couchant, ids: [1, 4, 7, 11, 12, 18] },
-    { id: "tissages", titre: "Tissages et motifs", kind: "motif", pal: P.indigo, ids: [3, 5, 9, 13, 17] },
-    { id: "heritage", titre: "Héritage et traditions", kind: "sculpture", pal: P.rouge, ids: [2, 6, 10, 14, 16] },
-    { id: "numerique", titre: "Créations numériques", kind: "numerique", pal: P.neon, ids: [8, 15] }
-  ];
-  const artistePar = (nom) => ARTISTS.find(a => a.nom === nom);
-  /* Portrait stylisé (dessiné en SVG, aucun visage réel) : 4 variantes de coiffe. */
-  function portrait(a) {
-    const n = ++uid, peaux = ["#6b3f2a", "#4f2c1e", "#7a4a33", "#5a3322"], peau = peaux[a.id % peaux.length];
-    const fonds = [["#3a1d4a", "#d9632b"], ["#17325a", "#e0795a"], ["#0e2a22", "#c8741f"], ["#14234a", "#3b5fb0"]][a.id % 4];
-    const habit = [P.rouge[1], P.indigo[1], P.ocre[1], P.foret[1]][a.id % 4];
-    let coiffe = "";
-    if (a.v === 0) coiffe = '<path d="M72 92C70 52 102 34 128 36c28 2 48 22 44 58-14-10-30-16-50-16-20 0-38 6-50 14z" fill="' + P.indigo[1] + '"/><path d="M80 70c20-14 50-16 84 0M76 82c24-12 60-14 92 0" stroke="#f0b255" stroke-width="5" fill="none"/><circle cx="76" cy="124" r="6" fill="#f0b255"/><circle cx="166" cy="124" r="6" fill="#f0b255"/>';
-    else if (a.v === 1) coiffe = '<ellipse cx="121" cy="86" rx="68" ry="12" fill="#3b2412"/><path d="M86 86c0-34 14-52 35-52s35 18 35 52z" fill="#5a3a1c"/><rect x="86" y="74" width="70" height="9" fill="#d9a441"/>';
-    else if (a.v === 2) coiffe = '<path d="M80 100c-4-40 20-62 42-62s46 22 42 62c-6-18-22-28-42-28s-36 10-42 28z" fill="#1b1210"/><circle cx="104" cy="112" r="14" fill="none" stroke="#f0b255" stroke-width="3"/><circle cx="140" cy="112" r="14" fill="none" stroke="#f0b255" stroke-width="3"/><path d="M118 112h8" stroke="#f0b255" stroke-width="3"/>';
-    else coiffe = '<path d="M82 98c-2-38 18-56 40-56s42 18 40 56c-6-14-20-20-40-20s-34 6-40 20z" fill="#1b1210"/><path d="M92 142c8 22 22 28 30 28s22-6 30-28c-8 8-18 12-30 12s-22-4-30-12z" fill="#1b1210"/>';
-    return svg('<defs><linearGradient id="p' + n + '" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="' + fonds[0] + '"/><stop offset="1" stop-color="' + fonds[1] + '"/></linearGradient></defs><rect width="240" height="200" fill="url(#p' + n + ')"/><path d="M30 200c4-34 40-46 92-46s88 12 92 46z" fill="' + habit + '"/><path d="M96 200l26-30 26 30z" fill="#f4f0e8" opacity=".85"/><rect x="108" y="124" width="28" height="36" rx="10" fill="' + peau + '"/><ellipse cx="122" cy="106" rx="40" ry="48" fill="' + peau + '"/>' + coiffe + '<circle cx="106" cy="108" r="3.4" fill="#1b1210"/><circle cx="138" cy="108" r="3.4" fill="#1b1210"/><path d="M110 134q12 8 24 0" stroke="#1b1210" stroke-width="3" fill="none" stroke-linecap="round"/>', "0 0 240 200");
-  }
-
   /* ── État, panier et favoris (stockés dans la mémoire isolée de l'exemple) ── */
-  const state = { cat: "all", tri: "recent", page: 1, par: 12, current: null, vue: 0, artiste: null, coll: null, tous: false };
+  const state = { cat: "all", tri: "recent", page: 1, par: 12, current: null, vue: 0 };
   const $ = (s) => document.querySelector(s);
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const eur = (n) => Number(n).toLocaleString("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + " €";
@@ -618,8 +441,7 @@
 
   /* ── Liste : filtre, tri, pagination ── */
   function liste() {
-    const coll = state.coll ? COLLS.find(c => c.id === state.coll) : null;
-    const l = WORKS.filter(w => (state.cat === "all" || w.cat === state.cat) && (!state.artiste || w.artist === state.artiste) && (!coll || coll.ids.includes(w.id)));
+    const l = WORKS.filter(w => state.cat === "all" || w.cat === state.cat);
     const prix = (w) => (w.price == null ? Infinity : w.price);
     if (state.tri === "prix-asc") l.sort((a, b) => prix(a) - prix(b) || a.rang - b.rang);
     else if (state.tri === "prix-desc") l.sort((a, b) => (b.price == null ? -1 : b.price) - (a.price == null ? -1 : a.price) || a.rang - b.rang);
@@ -654,34 +476,6 @@
     p += '<button class="pg" type="button" data-page="' + (state.page + 1) + '" aria-label="Page suivante"' + (state.page >= pages ? " disabled" : "") + ">" + ICO.droite + "</button>";
     $("#pages").innerHTML = pages > 1 ? p : "";
     $("#cartCount").textContent = panier.reduce((s, l) => s + l.q, 0);
-    /* filtres actifs (artiste, collection) : puces qu'on peut retirer d'un clic */
-    const coll = state.coll ? COLLS.find(c => c.id === state.coll) : null, croix = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
-    $("#actifs").innerHTML = (state.artiste ? '<button class="actif" type="button" data-retire="artiste" aria-label="Retirer le filtre artiste ' + esc(state.artiste) + '">Artiste : ' + esc(state.artiste) + croix + "</button>" : "")
-      + (coll ? '<button class="actif" type="button" data-retire="coll" aria-label="Retirer le filtre collection ' + esc(coll.titre) + '">Collection : ' + esc(coll.titre) + croix + "</button>" : "");
-    document.querySelectorAll(".collection").forEach(c => c.setAttribute("aria-pressed", String(c.dataset.coll === state.coll)));
-  }
-
-  /* ── Vue 2 : artistes à l'honneur et collections ── */
-  function vue2() {
-    const liste = ARTISTS.filter(a => state.tous || a.vedette);
-    $("#artistesListe").innerHTML = liste.map((a, i) => '<article class="artiste"><button class="portrait" type="button" data-artiste="' + a.id + '" aria-label="Découvrir l\'artiste : ' + esc(a.nom) + '">' + portrait(a) + '<span class="num">N° ' + String(ARTISTS.indexOf(a) + 1).padStart(2, "0") + "</span></button>"
-      + '<div class="corps"><h3>' + esc(a.nom) + '</h3><div class="spe">' + esc(a.spe) + '</div><p class="bio">' + esc(a.bio.split(". ")[0].replace(/\.$/, "")) + '.</p><button class="btn" type="button" data-artiste="' + a.id + '">Découvrir l\'artiste ' + ICO.droite + "</button></div></article>").join("");
-    $("#artistesTous").firstChild.textContent = state.tous ? "Voir moins " : "Voir tous les artistes ";
-    $("#artistesTous").setAttribute("aria-expanded", String(state.tous));
-    $("#collListe").innerHTML = COLLS.map(c => {
-      const w0 = { kind: c.kind, pal: c.pal };
-      return '<button class="collection" type="button" data-coll="' + c.id + '" aria-pressed="' + (state.coll === c.id) + '" aria-label="Voir la collection ' + esc(c.titre) + '">' + art(w0).replace("<svg ", '<svg class="fond" ') + '<span class="voile"></span><span class="txt"><b>' + esc(c.titre) + "</b><small>Série de " + c.ids.length + " œuvres</small></span>"
-        + '<span class="pic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5-5-9 9"/></svg></span></button>';
-    }).join("");
-  }
-  function allerGalerie() { $("#sectMain").scrollIntoView({ behavior: "smooth", block: "start" }); }
-  function ouvrirArtiste(id) {
-    const a = ARTISTS.find(x => x.id === id), oeuvres = WORKS.filter(w => w.artist === a.nom);
-    $("#aPortrait").innerHTML = portrait(a); $("#aNom").textContent = a.nom; $("#aSpe").textContent = a.spe; $("#aLieu").textContent = a.lieu + " · " + oeuvres.length + " œuvre" + (oeuvres.length > 1 ? "s" : "");
-    $("#aBio").textContent = a.bio;
-    $("#aOeuvres").innerHTML = oeuvres.map(w => '<button type="button" data-ouvre="' + w.id + '" aria-label="Voir l\'œuvre : ' + esc(w.t) + '"><span class="im">' + art(w) + "</span><small>" + esc(w.t) + "</small></button>").join("");
-    $("#aActions").innerHTML = '<button class="btn or" type="button" data-voirartiste="' + a.id + '">' + ICO.oeil + 'Voir ses œuvres dans la galerie</button><button class="btn" type="button" data-contactartiste="' + a.id + '">' + ICO.devis + "Contacter l'artiste</button>";
-    $("#artistOv").classList.add("open");
   }
 
   /* ── Fiche d'une œuvre et visionneuse ── */
@@ -726,16 +520,6 @@
   document.addEventListener("click", e => {
     const t = e.target, q = (s) => t.closest(s);
     let b;
-    if ((b = q("[data-artiste]"))) { ouvrirArtiste(Number(b.dataset.artiste)); return; }
-    if ((b = q("[data-ouvre]"))) { $("#artistOv").classList.remove("open"); ouvrir(Number(b.dataset.ouvre)); return; }
-    if ((b = q("[data-voirartiste]"))) { const a = ARTISTS.find(x => x.id === Number(b.dataset.voirartiste)); state.artiste = a.nom; state.coll = null; state.cat = "all"; state.page = 1; $("#artistOv").classList.remove("open"); render(); allerGalerie(); return; }
-    if ((b = q("[data-contactartiste]"))) { const a = ARTISTS.find(x => x.id === Number(b.dataset.contactartiste)); $("#artistOv").classList.remove("open"); $("#objetSel").value = "Collaboration ou exposition"; $("#contactForm").elements.besoin.value = "À l'attention de " + a.nom + ".\n"; $("#contactOv").classList.add("open"); return; }
-    if ((b = q("[data-coll]"))) { state.coll = state.coll === b.dataset.coll ? null : b.dataset.coll; state.artiste = null; state.cat = "all"; state.page = 1; render(); if (state.coll) allerGalerie(); return; }
-    if ((b = q("[data-retire]"))) { state[b.dataset.retire] = null; state.page = 1; render(); return; }
-    if (q("#artistesTous")) { state.tous = !state.tous; vue2(); return; }
-    if (q("#collToutes")) { state.coll = null; state.artiste = null; state.cat = "all"; state.page = 1; render(); allerGalerie(); return; }
-    if (q("#navArtistes")) { $("#artistes").scrollIntoView({ behavior: "smooth", block: "start" }); return; }
-    if (q("#navCollections")) { $("#collections").scrollIntoView({ behavior: "smooth", block: "start" }); return; }
     if ((b = q("[data-cat]"))) { state.cat = b.dataset.cat; state.page = 1; render(); return; }
     if ((b = q("[data-page]"))) { state.page = Number(b.dataset.page); render(); $("#sectMain").scrollIntoView({ behavior: "smooth", block: "start" }); return; }
     if ((b = q("[data-fav]"))) {
@@ -767,9 +551,6 @@
   });
   $("#tri").addEventListener("change", e => { state.tri = e.target.value; state.page = 1; render(); });
   $("#parPage").addEventListener("change", e => { state.par = Number(e.target.value); state.page = 1; render(); });
-  $("#lettreForm").addEventListener("submit", e => {
-    e.preventDefault(); e.target.reset(); toast("Inscription à la lettre simulée : aucune adresse n'a été enregistrée.");
-  });
   $("#contactForm").addEventListener("submit", e => {
     e.preventDefault(); e.target.reset(); $("#contactOv").classList.remove("open");
     toast("Demande de devis simulée : aucune donnée n'a été envoyée.");
@@ -784,7 +565,6 @@
     maj(); addEventListener("load", maj); addEventListener("resize", maj);
     if (window.ResizeObserver) { const b = document.getElementById("exBandeau"); if (b) new ResizeObserver(maj).observe(b); }
   })();
-  vue2();
   render();
 </script>
 </body>

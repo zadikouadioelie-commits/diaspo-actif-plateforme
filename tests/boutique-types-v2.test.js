@@ -40,8 +40,8 @@ test('B1 le nombre de types et le maximum d\'options viennent du registre, jamai
   assert.equal(d.max_copies, Registre.MAX_COPIES);
 });
 
-test('B1 une vraie boutique ne peut choisir que les types qui ont une page publique ; l\'administration les a tous', () => {
-  assert.deepEqual(BT.typesSelectionnables({}).sort(), ['ecom', 'portfolio', 'video']);
+test('B1 une vraie boutique choisit ecom, video, portfolio et events ; impact et finance restent à l\'administration', () => {
+  assert.deepEqual(BT.typesSelectionnables({}).sort(), ['ecom', 'events', 'portfolio', 'video']);
   assert.deepEqual(BT.typesSelectionnables({ estAdministrateur: true }).sort(), Object.keys(Registre.TYPES).sort());
 });
 
@@ -135,13 +135,15 @@ test('B3 mise en service : registre des 6 types, types réservés à l\'administ
   assert.equal(reg.data.types_v2.actif, true);
   assert.equal(reg.data.types_v2.types.length, 6);
   const sel = Object.fromEntries(reg.data.types_v2.types.map(t => [t.cle, t.selectionnable]));
-  assert.deepEqual(sel, { ecom: true, video: true, portfolio: true, events: false, impact: false, finance: false });
+  assert.deepEqual(sel, { ecom: true, video: true, portfolio: true, events: true, impact: false, finance: false });
   const regAdmin = await env.call(jarAdmin, 'GET', '/api/vitrine-modules-registry');
   assert.ok(regAdmin.data.types_v2.types.every(t => t.selectionnable), 'l\'administration peut choisir les 6');
   assert.ok(reg.data.templates.ecom && reg.data.templates.finance, 'les modèles nouveaux sont servis');
 
   const choisir = (type) => env.call(jarProprio, 'POST', `/api/initiatives/${idInit}/vitrine/changer-type`, { type, mode: 'adapter' });
-  for (const type of ['events', 'impact', 'finance']) assert.equal((await choisir(type)).status, 400, `${type} doit être refusé à une vraie boutique`);
+  for (const type of ['impact', 'finance']) assert.equal((await choisir(type)).status, 400, `${type} doit être refusé à une vraie boutique`);
+  assert.equal((await choisir('events')).status, 200, 'Créateur d\'événements se choisit comme les autres types');
+  assert.equal(typeEnregistre(), 'events');
   for (const ancien of ['blog', 'createur', 'formation']) assert.equal((await choisir(ancien)).status, 400, `${ancien} ne doit plus être proposé`);
   assert.equal((await choisir('inconnu')).status, 400);
 
