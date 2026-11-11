@@ -326,9 +326,21 @@
   .sw[aria-checked="true"]::before { background:var(--gold); }
   .sw[aria-checked="true"]::after { transform:translateX(32px); background:var(--on-gold); }
   .sw:focus-visible { outline:3px solid var(--gold); outline-offset:2px; border-radius:999px; }
+  .mode-titre { margin:16px 0 0; font-family:var(--serif); font-size:18px; }
+  .modes { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin-top:10px; }
+  .mode { text-align:left; padding:12px 14px; min-height:44px; border:1px solid var(--line); border-radius:12px; background:var(--panel2); color:var(--text); cursor:pointer; display:flex; flex-direction:column; gap:4px; }
+  .mode b { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .mode span.d { color:var(--muted); font-size:13px; }
+  .mode svg.ic { width:18px; height:18px; opacity:0; color:var(--on-gold); }
+  .mode:hover { border-color:var(--gold); }
+  .mode[aria-pressed="true"] { background:var(--gold); border-color:var(--gold); color:var(--on-gold); }
+  .mode[aria-pressed="true"] span.d { color:var(--on-gold); }
+  .mode[aria-pressed="true"] svg.ic { opacity:1; }
+  .mode:focus-visible { outline:3px solid var(--gold); outline-offset:2px; }
+  .mode-etat { margin:8px 0 0; color:var(--muted); font-size:13.5px; min-height:1.4em; }
   .rub-actions { display:flex; flex-wrap:wrap; gap:10px; justify-content:flex-end; margin-top:14px; }
   @media (max-width:1100px) { .prestas { grid-template-columns:repeat(2,minmax(0,1fr)); } .avis-liste { grid-template-columns:repeat(2,minmax(0,1fr)); } }
-  @media (max-width:900px) { .apropos { grid-template-columns:1fr; } }
+  @media (max-width:900px) { .apropos { grid-template-columns:1fr; } .modes { grid-template-columns:1fr; } }
   @media (max-width:600px) { .prestas, .avis-liste { grid-template-columns:1fr; } .evt { grid-template-columns:auto minmax(0,1fr); } .evt .btn { grid-column:1 / -1; } .rubbtn span { display:none; } .rubbtn { padding:0; min-width:44px; justify-content:center; } }
   @media (prefers-reduced-motion:reduce) { .sw::before, .sw::after { transition:none; } }
   @media (max-width:380px) { .artistes, .collections { grid-template-columns:1fr; } }
@@ -558,7 +570,11 @@
   <div class="sheet">
     <button class="close" type="button" data-close aria-label="Fermer"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     <h2 id="rubTitre" style="margin:0 0 4px;font-family:var(--serif)">Rubriques de la boutique</h2>
-    <p style="margin:0;color:var(--muted)">Affichez ou masquez chaque rubrique : la page se met à jour tout de suite. Dans une vraie boutique, ce réglage est dans « Paramètres vitrine », onglet « Navigation et rubriques ».</p>
+    <p style="margin:0;color:var(--muted)">Choisissez un mode, puis ajustez au besoin chaque rubrique : la page se met à jour tout de suite. Dans une vraie boutique, ce réglage est dans « Paramètres vitrine », onglet « Navigation et rubriques ».</p>
+    <h3 class="mode-titre">Mode de la boutique</h3>
+    <div class="modes" id="modeListe" role="group" aria-label="Mode de la boutique"></div>
+    <p class="mode-etat" id="modeEtat" aria-live="polite"></p>
+    <h3 class="mode-titre">Rubriques</h3>
     <ul class="sw-liste" id="rubListe"></ul>
     <div class="rub-actions"><button class="btn" type="button" id="rubTout">Tout activer</button><button class="btn or" type="button" data-close>Terminer</button></div>
   </div>
@@ -928,7 +944,17 @@
     { id: "contact", nom: "Contact", cible: null, desc: "Coordonnées et formulaire de contact, en bas de page." },
     { id: "newsletter", nom: "Newsletter", cible: "#newsletter", desc: "Bande d'inscription à la lettre d'information (sans entrée dans le menu)." }
   ];
+  /* Modes : des préréglages complets des 9 rubriques (liste explicite, pour qu'aucune rubrique ne dépende d'une autre). */
+  const MODES = [
+    { id: "seul", nom: "Portfolio seul", desc: "Montrer le travail : galerie, artistes, avis. Ni vente, ni prestations.",
+      rub: { accueil: true, portfolio: true, boutique: false, apropos: true, prestations: false, evenements: true, avis: true, contact: true, newsletter: true } },
+    { id: "prestations", nom: "Portfolio avec prestations", desc: "Montrer le travail et proposer des créations sur devis. Pas de vente en ligne.",
+      rub: { accueil: true, portfolio: true, boutique: false, apropos: true, prestations: true, evenements: true, avis: true, contact: true, newsletter: true } },
+    { id: "boutique", nom: "Portfolio avec boutique", desc: "Tout, y compris la vente en ligne : prix, panier, livraison et paiement.",
+      rub: { accueil: true, portfolio: true, boutique: true, apropos: true, prestations: true, evenements: true, avis: true, contact: true, newsletter: true } }
+  ];
   let rub = lire("pf_ex_rubriques", {});
+  const modeActuel = () => MODES.find(m => Object.keys(m.rub).every(k => (rub[k] !== false) === m.rub[k]));
   function rubOn(k) { return rub[k] !== false; }
   function boutiqueSeule() { return rubOn("boutique") && !rubOn("portfolio"); }
 
@@ -977,7 +1003,13 @@
     if (!rubOn("portfolio")) { state.artiste = null; state.coll = null; }
     $("#sectMain").textContent = boutiqueSeule() ? "Œuvres à vendre" : ((SHOP.sections && SHOP.sections[1]) || SHOP_DEFAULT.sections[1]);
   }
+  function listeModes() {
+    const cur = modeActuel();
+    $("#modeListe").innerHTML = MODES.map(m => '<button class="mode" type="button" data-mode="' + m.id + '" aria-pressed="' + (cur === m) + '"><b>' + esc(m.nom) + ico('<path d="M5 12.500l4.500 4.500L19 7"/>') + '</b><span class="d">' + esc(m.desc) + "</span></button>").join("");
+    $("#modeEtat").textContent = cur ? "Mode actuel : " + cur.nom + "." : "Mode actuel : personnalisé (rubriques réglées à la main).";
+  }
   function listeRubriques() {
+    listeModes();
     $("#rubListe").innerHTML = RUBS.map(r => '<li class="sw-ligne"><div><b id="swn-' + r.id + '">' + esc(r.nom) + '</b><span class="d">' + esc(r.desc) + '</span></div><button class="sw" type="button" role="switch" data-sw="' + r.id + '" aria-checked="' + rubOn(r.id) + '" aria-labelledby="swn-' + r.id + '"></button></li>').join("");
   }
   function changerRubriques(maj, message) {
@@ -1006,6 +1038,7 @@
     if (q("#avisPlus")) { tousAvis = !tousAvis; vueRubriques(); return; }
     if (q("#openRub")) { listeRubriques(); $("#rubOv").classList.add("open"); return; }
     if ((b = q("[data-sw]"))) { const r = RUBS.find(x => x.id === b.dataset.sw); const voulue = !rubOn(r.id); changerRubriques({ [r.id]: voulue }, "Rubrique « " + r.nom + " » " + (voulue ? "affichée." : "masquée.")); const nb = document.querySelector('[data-sw="' + r.id + '"]'); if (nb) nb.focus(); return; }
+    if ((b = q("[data-mode]"))) { const m = MODES.find(x => x.id === b.dataset.mode); changerRubriques(m.rub, "Mode « " + m.nom + " » appliqué."); const nb = document.querySelector('[data-mode="' + m.id + '"]'); if (nb) nb.focus(); return; }
     if (q("#rubTout")) { changerRubriques(Object.fromEntries(RUBS.map(r => [r.id, true])), "Toutes les rubriques sont affichées."); return; }
     if ((b = q("[data-artiste]"))) { ouvrirArtiste(Number(b.dataset.artiste)); return; }
     if ((b = q("[data-ouvre]"))) { $("#artistOv").classList.remove("open"); ouvrir(Number(b.dataset.ouvre)); return; }
