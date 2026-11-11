@@ -35,6 +35,25 @@
   .cadre iframe { border: 1px solid var(--trait); border-radius: 10px; background: #fff; width: 100%; height: 100%; min-height: 70vh; }
   .cadre.tablette iframe { width: 768px; max-width: 100%; }
   .cadre.telephone iframe { width: 400px; max-width: 100%; }
+  .service { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; padding: 10px 16px; background: #181822; border-bottom: 1px solid var(--trait); }
+  .service .etat { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
+  .service .pastille { width: 12px; height: 12px; border-radius: 50%; background: #8a8a98; flex: none; }
+  .service[data-etat="oui"] .pastille { background: #4cc38a; }
+  .service[data-etat="non"] .pastille { background: #e0a43a; }
+  .service[data-etat="erreur"] .pastille { background: #e5675f; }
+  .service .detail { color: var(--discret); font-size: 13px; flex: 1 1 280px; }
+  .service button { border: 1px solid var(--or); background: transparent; color: var(--texte); border-radius: 999px; padding: 8px 16px; cursor: pointer; font: inherit; font-size: 13px; min-height: 44px; }
+  .service button.principal { background: var(--or); color: #111; font-weight: 600; }
+  .service button[disabled] { opacity: .5; cursor: wait; }
+  .service button:focus-visible, dialog.confirmer button:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+  .service .erreur { flex-basis: 100%; margin: 0; color: #ffb3ad; font-size: 13px; }
+  dialog.confirmer { background: var(--carte); color: var(--texte); border: 1px solid var(--or); border-radius: 14px; padding: 22px; max-width: 480px; width: calc(100% - 32px); }
+  dialog.confirmer::backdrop { background: rgba(0,0,0,.65); }
+  dialog.confirmer h2 { margin: 0 0 8px; font-size: 18px; }
+  dialog.confirmer p { margin: 0 0 10px; color: var(--discret); }
+  dialog.confirmer .actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+  dialog.confirmer button { border: 1px solid var(--or); background: transparent; color: var(--texte); border-radius: 999px; padding: 9px 18px; cursor: pointer; font: inherit; min-height: 44px; }
+  dialog.confirmer button.principal { background: var(--or); color: #111; font-weight: 600; }
   .refus { margin: 40px auto; max-width: 480px; padding: 24px; text-align: center; border: 1px solid var(--trait); border-radius: 12px; background: var(--carte); }
   @media (max-width: 800px) {
     main { grid-template-columns: 1fr; }
@@ -52,6 +71,23 @@
   <a href="espace-simulation.html">← Espace simulation</a>
   <a href="dashboard-administrateur.html">Tableau de bord administrateur</a>
 </header>
+
+<section class="service" id="service" data-etat="inconnu" aria-label="Mise en service des 6 types de boutique" hidden>
+  <span class="etat"><span class="pastille" aria-hidden="true"></span><span id="serviceTitre">Types de boutique : vérification en cours…</span></span>
+  <span class="detail" id="serviceDetail"></span>
+  <button type="button" id="serviceBouton" hidden></button>
+  <p class="erreur" id="serviceErreur" role="alert" hidden></p>
+</section>
+
+<dialog class="confirmer" id="confirmer" aria-labelledby="confirmerTitre">
+  <h2 id="confirmerTitre"></h2>
+  <p id="confirmerTexte"></p>
+  <p>Aucune boutique n'est modifiée : seuls l'affichage et les choix proposés aux créateurs changent.</p>
+  <div class="actions">
+    <button type="button" id="confirmerNon">Annuler</button>
+    <button type="button" class="principal" id="confirmerOui"></button>
+  </div>
+</dialog>
 
 <div id="refus" class="refus" hidden></div>
 
@@ -137,11 +173,75 @@
     choisir(location.hash.replace("#", ""));
   }
 
+  /* ── Interrupteur « les 6 types sont en service » (API : GET/PUT /api/admin/boutique-types-v2) ── */
+  var service = document.getElementById("service"), sTitre = document.getElementById("serviceTitre"), sDetail = document.getElementById("serviceDetail");
+  var sBouton = document.getElementById("serviceBouton"), sErreur = document.getElementById("serviceErreur");
+  var boite = document.getElementById("confirmer"), actif = null, occupe = false;
+
+  function messageErreur(status, d) {
+    if (status === 401) return "Votre session a expiré : reconnectez-vous puis réessayez.";
+    if (status === 403) return "Seul un compte administrateur peut changer cet interrupteur.";
+    if (d && d.error) return d.error;
+    return "Impossible de joindre le serveur. Vérifiez votre connexion puis réessayez.";
+  }
+  function appel(methode, corps) {
+    return fetch("/api/admin/boutique-types-v2", { method: methode, credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: corps ? JSON.stringify(corps) : undefined })
+      .then(function (r) {
+        return r.json().catch(function () { return {}; }).then(function (d) { if (!r.ok) throw new Error(messageErreur(r.status, d)); return d; });
+      }, function () { throw new Error(messageErreur(0)); });
+  }
+  function noms(cles) { return (cles || []).map(function (c) { return R.TYPES[c] ? R.TYPES[c].label : c; }).join(", "); }
+  function afficherService(d) {
+    actif = !!d.actif;
+    service.hidden = false; sErreur.hidden = true;
+    service.dataset.etat = actif ? "oui" : "non";
+    sTitre.textContent = actif ? "Types de boutique : les 6 types sont en service" : "Types de boutique : les 6 types ne sont pas encore en service";
+    sDetail.textContent = actif
+      ? "Les créateurs voient les nouveaux types. Ouverts aux vraies boutiques : " + (noms(d.selectionnables_public) || "aucun") + ". Les autres restent réservés aux administrateurs."
+      : "Les créateurs voient l'affichage précédent. Rien ne change pour eux tant que vous n'avez pas mis les 6 types en service.";
+    sBouton.hidden = false; sBouton.disabled = false;
+    sBouton.className = actif ? "" : "principal";
+    sBouton.textContent = actif ? "Retirer les 6 types du service" : "Mettre les 6 types en service";
+  }
+  function echecService(e) {
+    service.hidden = false;
+    if (actif === null) {
+      service.dataset.etat = "erreur"; sTitre.textContent = "Types de boutique : état inconnu"; sDetail.textContent = "";
+      sBouton.hidden = false; sBouton.className = ""; sBouton.textContent = "Réessayer";
+    }
+    sBouton.disabled = false;
+    sErreur.hidden = false; sErreur.textContent = e && e.message ? e.message : "Une erreur est survenue. Réessayez.";
+  }
+  function chargerService() {
+    sBouton.disabled = true;
+    return appel("GET").then(afficherService).catch(echecService);
+  }
+  function demander() {
+    var allumer = !actif;
+    document.getElementById("confirmerTitre").textContent = allumer ? "Mettre les 6 types en service ?" : "Retirer les 6 types du service ?";
+    document.getElementById("confirmerTexte").textContent = allumer
+      ? "Les créateurs verront les 6 types de boutique (e-commerce, vidéo, portfolio, événements, impact, financement) et pourront changer de type. Vous pourrez revenir en arrière à tout moment."
+      : "Les créateurs retrouveront l'affichage précédent. Vous pourrez remettre les 6 types en service à tout moment.";
+    document.getElementById("confirmerOui").textContent = allumer ? "Oui, mettre en service" : "Oui, retirer du service";
+    if (typeof boite.showModal === "function") { boite.showModal(); document.getElementById("confirmerNon").focus(); }
+    else if (window.confirm(document.getElementById("confirmerTitre").textContent)) appliquer(allumer);
+  }
+  function appliquer(allumer) {
+    if (occupe) return;
+    occupe = true; sBouton.disabled = true; sErreur.hidden = true;
+    /* La réponse du PUT ne porte que { ok, actif } : on relit l'état complet (types ouverts au public) avant d'afficher. */
+    appel("PUT", { actif: allumer }).then(function () { return appel("GET"); }).then(afficherService).catch(echecService).then(function () { occupe = false; });
+  }
+  sBouton.addEventListener("click", function () { if (actif === null) chargerService(); else demander(); });
+  document.getElementById("confirmerNon").addEventListener("click", function () { boite.close(); sBouton.focus(); });
+  document.getElementById("confirmerOui").addEventListener("click", function () { var allumer = !actif; boite.close(); appliquer(allumer); });
+
   fetch("/api/auth/me", { credentials: "same-origin" }).then(function (r) { return r.json(); }).then(function (d) {
     var u = d && d.user;
     if (!u) { location.href = "login.html?redirect=" + encodeURIComponent("atelier-boutiques.html"); return; }
     if (ROLES.indexOf(u.role) < 0) { refuser("Cet atelier est réservé aux administrateurs."); return; }
     monter();
+    chargerService();
   }).catch(function () { refuser("Impossible de vérifier votre connexion. Réessayez."); });
 })();
 </script>
