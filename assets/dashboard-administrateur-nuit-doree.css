@@ -20,6 +20,18 @@ html body.nd main.content :is(.btn-secondary,.btn-outline){background:rgba(255,2
 html body.nd main.content :is(.btn-secondary,.btn-outline):hover{background:rgba(227,192,110,.14)!important}
 html body.nd main.content #rp-tab-stats:not(.btn-outline){background:var(--nd-degore)!important;color:#1a1405!important;border:none!important}
 
+/* ═══ pastilles de rôle (« Dernières inscriptions ») ═══
+   styles.v2.css leur donne un fond pâle (#E8F1FC…) avec le texte --navy, que le thème nuit redéfinit en encre claire : blanc sur pâle, illisible. */
+html body.nd main.content .badge.badge-asso{background:rgba(227,192,110,.16)!important;color:#F3DC9B!important;border:1px solid rgba(227,192,110,.5)}
+html body.nd main.content .badge.badge-ent{background:rgba(96,165,250,.16)!important;color:#C7DBFF!important;border:1px solid rgba(147,181,253,.45)}
+html body.nd main.content .badge.badge-instit{background:rgba(96,165,250,.16)!important;color:#C7DBFF!important;border:1px solid rgba(147,181,253,.45)}
+
+/* ═══ colonnes de grille : un texte long en « nowrap » ne doit pas élargir la colonne (publications récentes, inscrits) ═══
+   Un élément de grille a min-width:auto : sans ceci, la ligne de texte impose sa largeur et la page déborde à droite. */
+html body.nd main.content :is(.grid,.grid-2,.grid-3)>*,
+html body.nd main.content div[style*="grid-template-columns"]>*{min-width:0}
+html body.nd main.content :is(#publis-recentes,#derniers-inscrits){min-width:0;overflow:hidden}
+
 /* ═══ tableaux et champs : lisibilité sur fond nuit ═══ */
 html body.nd main.content table{color:var(--nd-texte)}
 html body.nd main.content :is(input,select,textarea):not([type=checkbox]):not([type=radio]):not([type=range]){color-scheme:dark}
