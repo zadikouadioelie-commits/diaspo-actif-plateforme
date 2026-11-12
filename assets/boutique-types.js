@@ -94,32 +94,210 @@
   {
     "id": "uni",
     "label": "Uni (aucune texture)",
-    "bg": ""
+    "bg": "",
+    "groupe": "Aucune"
   },
   {
     "id": "dore",
     "label": "Doré",
-    "bg": "linear-gradient(115deg, rgba(120,80,10,.55) 0%, rgba(255,238,170,.75) 22%, rgba(185,138,46,.6) 40%, rgba(255,246,200,.8) 55%, rgba(143,100,24,.6) 75%, rgba(233,201,107,.7) 100%)"
+    "bg": "linear-gradient(115deg, rgba(120,80,10,.55) 0%, rgba(255,238,170,.75) 22%, rgba(185,138,46,.6) 40%, rgba(255,246,200,.8) 55%, rgba(143,100,24,.6) 75%, rgba(233,201,107,.7) 100%)",
+    "groupe": "Métal et brillance"
   },
   {
     "id": "brillant",
     "label": "Brillant",
-    "bg": "linear-gradient(115deg, transparent 30%, rgba(255,255,255,.85) 42%, transparent 50%, rgba(255,255,255,.5) 62%, transparent 70%) 0 0 / 250% 100%"
+    "bg": "linear-gradient(115deg, transparent 30%, rgba(255,255,255,.85) 42%, transparent 50%, rgba(255,255,255,.5) 62%, transparent 70%) 0 0 / 250% 100%",
+    "groupe": "Métal et brillance"
   },
   {
     "id": "scintillant",
     "label": "Scintillant",
-    "bg": "radial-gradient(circle, #fff 2px, transparent 3px) 0 0 / 26px 22px, radial-gradient(circle, #ffe9a6 1.5px, transparent 3px) 13px 11px / 34px 30px"
+    "bg": "radial-gradient(circle, #fff 2px, transparent 3px) 0 0 / 26px 22px, radial-gradient(circle, #ffe9a6 1.5px, transparent 3px) 13px 11px / 34px 30px",
+    "groupe": "Métal et brillance"
   },
   {
     "id": "luisant",
     "label": "Luisant (vernis)",
-    "bg": "linear-gradient(180deg, rgba(255,255,255,.75) 0%, rgba(255,255,255,.1) 46%, rgba(0,0,0,.22) 52%, rgba(0,0,0,.05) 100%)"
+    "bg": "linear-gradient(180deg, rgba(255,255,255,.75) 0%, rgba(255,255,255,.1) 46%, rgba(0,0,0,.22) 52%, rgba(0,0,0,.05) 100%)",
+    "groupe": "Métal et brillance"
   },
   {
     "id": "satine",
     "label": "Satiné",
-    "bg": "linear-gradient(90deg, rgba(255,255,255,.25), rgba(0,0,0,.15) 35%, rgba(255,255,255,.22) 65%, rgba(0,0,0,.12))"
+    "bg": "linear-gradient(90deg, rgba(255,255,255,.25), rgba(0,0,0,.15) 35%, rgba(255,255,255,.22) 65%, rgba(0,0,0,.12))",
+    "groupe": "Métal et brillance"
+  },
+  {
+    "id": "argent",
+    "label": "Argenté",
+    "groupe": "Métal et brillance",
+    "bg": "linear-gradient(115deg, rgba(80,86,98,.5) 0%, rgba(245,248,252,.82) 22%, rgba(150,156,168,.55) 42%, rgba(255,255,255,.88) 58%, rgba(112,118,130,.55) 78%, rgba(225,230,238,.72) 100%)"
+  },
+  {
+    "id": "cuivre",
+    "label": "Cuivré",
+    "groupe": "Métal et brillance",
+    "bg": "linear-gradient(115deg, rgba(110,48,24,.55) 0%, rgba(255,196,156,.75) 24%, rgba(176,92,56,.58) 44%, rgba(255,214,180,.8) 60%, rgba(128,62,34,.58) 80%, rgba(240,170,130,.7) 100%)"
+  },
+  {
+    "id": "bronze",
+    "label": "Bronze",
+    "groupe": "Métal et brillance",
+    "bg": "linear-gradient(115deg, rgba(70,46,16,.6) 0%, rgba(214,170,98,.65) 26%, rgba(120,84,34,.6) 48%, rgba(232,196,130,.7) 64%, rgba(84,56,20,.6) 84%, rgba(190,146,78,.6) 100%)"
+  },
+  {
+    "id": "nacre",
+    "label": "Nacré",
+    "groupe": "Métal et brillance",
+    "bg": "linear-gradient(135deg, rgba(255,255,255,.62), rgba(255,214,238,.34) 30%, rgba(196,228,255,.4) 62%, rgba(255,255,255,.55))"
+  },
+  {
+    "id": "rayures",
+    "label": "Rayures obliques",
+    "groupe": "Motifs",
+    "bg": "repeating-linear-gradient(45deg, rgba(255,255,255,.16) 0 8px, transparent 8px 16px)"
+  },
+  {
+    "id": "rayures-fines",
+    "label": "Rayures fines",
+    "groupe": "Motifs",
+    "bg": "repeating-linear-gradient(90deg, rgba(255,255,255,.14) 0 2px, transparent 2px 7px)"
+  },
+  {
+    "id": "pois",
+    "label": "Pois",
+    "groupe": "Motifs",
+    "bg": "radial-gradient(circle, rgba(255,255,255,.3) 3px, transparent 4px) 0 0 / 18px 18px"
+  },
+  {
+    "id": "quadrillage",
+    "label": "Quadrillage",
+    "groupe": "Motifs",
+    "bg": "linear-gradient(rgba(255,255,255,.18) 1px, transparent 1px) 0 0 / 14px 14px, linear-gradient(90deg, rgba(255,255,255,.18) 1px, transparent 1px) 0 0 / 14px 14px"
+  },
+  {
+    "id": "zigzag",
+    "label": "Zigzag",
+    "groupe": "Motifs",
+    "bg": "linear-gradient(135deg, rgba(255,255,255,.14) 25%, transparent 25%) -10px 0 / 20px 20px, linear-gradient(225deg, rgba(255,255,255,.14) 25%, transparent 25%) -10px 0 / 20px 20px, linear-gradient(315deg, rgba(0,0,0,.12) 25%, transparent 25%) 0 0 / 20px 20px, linear-gradient(45deg, rgba(0,0,0,.12) 25%, transparent 25%) 0 0 / 20px 20px"
+  },
+  {
+    "id": "vagues",
+    "label": "Vagues",
+    "groupe": "Motifs",
+    "bg": "radial-gradient(circle at 50% 100%, transparent 36%, rgba(255,255,255,.22) 37% 41%, transparent 42%) 0 0 / 28px 16px"
+  },
+  {
+    "id": "cercles-wax",
+    "label": "Cercles (wax)",
+    "groupe": "Motifs",
+    "bg": "radial-gradient(circle at 50% 50%, rgba(255,255,255,.26) 0 3px, transparent 4px 7px, rgba(255,255,255,.2) 8px 10px, transparent 11px) 0 0 / 34px 34px"
+  },
+  {
+    "id": "lin",
+    "label": "Toile de lin",
+    "groupe": "Matières",
+    "bg": "repeating-linear-gradient(0deg, rgba(255,255,255,.08) 0 1px, transparent 1px 3px), repeating-linear-gradient(90deg, rgba(0,0,0,.08) 0 1px, transparent 1px 3px)"
+  },
+  {
+    "id": "papier",
+    "label": "Papier grainé",
+    "groupe": "Matières",
+    "bg": "radial-gradient(rgba(0,0,0,.2) .6px, transparent .9px) 0 0 / 4px 4px, radial-gradient(rgba(255,255,255,.22) .6px, transparent .9px) 2px 2px / 5px 5px"
+  },
+  {
+    "id": "carbone",
+    "label": "Carbone",
+    "groupe": "Matières",
+    "bg": "linear-gradient(27deg, rgba(0,0,0,.34) 5px, transparent 5px) 0 5px / 10px 10px, linear-gradient(207deg, rgba(0,0,0,.34) 5px, transparent 5px) 10px 0 / 10px 10px, linear-gradient(27deg, rgba(0,0,0,.2) 5px, transparent 5px) 0 10px / 10px 10px, linear-gradient(207deg, rgba(0,0,0,.2) 5px, transparent 5px) 10px 5px / 10px 10px"
+  },
+  {
+    "id": "bois",
+    "label": "Bois",
+    "groupe": "Matières",
+    "bg": "repeating-linear-gradient(90deg, rgba(60,30,10,.2) 0 2px, rgba(255,230,190,.1) 2px 6px, rgba(60,30,10,.12) 6px 7px, transparent 7px 14px)"
+  },
+  {
+    "id": "marbre",
+    "label": "Marbre",
+    "groupe": "Matières",
+    "bg": "radial-gradient(ellipse at 20% 30%, rgba(255,255,255,.4), transparent 45%), radial-gradient(ellipse at 80% 70%, rgba(255,255,255,.3), transparent 40%), linear-gradient(115deg, transparent 40%, rgba(255,255,255,.24) 41%, transparent 43%, transparent 60%, rgba(0,0,0,.16) 61%, transparent 63%)"
+  },
+  {
+    "id": "velours",
+    "label": "Velours",
+    "groupe": "Matières",
+    "bg": "radial-gradient(ellipse at 50% 0%, rgba(255,255,255,.24), transparent 62%), linear-gradient(180deg, transparent 58%, rgba(0,0,0,.32))"
+  },
+  {
+    "id": "deg-clair-fonce",
+    "label": "Clair vers foncé",
+    "groupe": "Dégradés",
+    "bg": "linear-gradient(180deg, rgba(255,255,255,.4), rgba(0,0,0,.3))",
+    "sens": "bas"
+  },
+  {
+    "id": "deg-diagonale",
+    "label": "Diagonale lumineuse",
+    "groupe": "Dégradés",
+    "bg": "linear-gradient(135deg, rgba(255,255,255,.42) 0%, rgba(255,255,255,0) 50%, rgba(0,0,0,.3) 100%)",
+    "sens": "diagonale"
+  },
+  {
+    "id": "deg-horizon",
+    "label": "Horizon",
+    "groupe": "Dégradés",
+    "bg": "linear-gradient(180deg, rgba(0,0,0,.3), rgba(0,0,0,0) 45%, rgba(255,255,255,.26))",
+    "sens": "haut-bas"
+  },
+  {
+    "id": "deg-lueur",
+    "label": "Lueur d'angle",
+    "groupe": "Dégradés",
+    "bg": "radial-gradient(circle at 28% 20%, rgba(255,255,255,.55), rgba(255,255,255,0) 62%)",
+    "sens": "lueur"
+  },
+  {
+    "id": "deg-vignette",
+    "label": "Vignette",
+    "groupe": "Dégradés",
+    "bg": "radial-gradient(circle at 50% 50%, rgba(255,255,255,.16), rgba(0,0,0,.42) 120%)",
+    "sens": "vignette"
+  },
+  {
+    "id": "deg-conique",
+    "label": "Reflet tournant",
+    "groupe": "Dégradés",
+    "bg": "conic-gradient(from 200deg at 70% 30%, rgba(255,255,255,.42), rgba(0,0,0,.26), rgba(255,255,255,.42))",
+    "sens": "tour"
+  },
+  {
+    "id": "deg-aube",
+    "label": "Aube (lueur chaude)",
+    "groupe": "Dégradés",
+    "bg": "linear-gradient(0deg, rgba(255,186,116,.55), rgba(255,255,255,0) 72%)",
+    "sens": "haut"
+  },
+  {
+    "id": "deg-crepuscule",
+    "label": "Crépuscule",
+    "groupe": "Dégradés",
+    "bg": "linear-gradient(180deg, rgba(44,22,96,.52), rgba(255,122,92,.36))",
+    "sens": "bas"
+  },
+  {
+    "id": "deg-ocean",
+    "label": "Profondeur d'océan",
+    "groupe": "Dégradés",
+    "bg": "linear-gradient(180deg, rgba(255,255,255,.3), rgba(0,58,140,.46))",
+    "sens": "bas"
+  },
+  {
+    "id": "deg-arcenciel",
+    "label": "Arc-en-ciel doux",
+    "groupe": "Dégradés",
+    "bg": "linear-gradient(90deg, rgba(255,80,80,.36), rgba(255,210,70,.36), rgba(80,200,120,.36), rgba(70,140,255,.36), rgba(170,90,255,.36))",
+    "sens": "droite"
   }
 ];
   var MAX_OPTIONS = Object.keys(TYPES).length - 1;

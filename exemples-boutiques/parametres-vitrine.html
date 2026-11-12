@@ -125,7 +125,10 @@ CONSIGNE POUR CLAUDE CODE (transfert depuis la maquette, validée par ZADI) :
   .sw.on { border-color: var(--bordeaux); }
   .chips { display:flex; }
   .chips i { width:28px; height:28px; display:block; }
-  .palettes { display:grid; grid-template-columns: repeat(3, 1fr); gap:8px; }
+  .palettes { display:grid; grid-template-columns: repeat(3, 1fr); gap:8px; max-height:360px; overflow:auto; padding:2px 4px 2px 0; }
+  .palfam { grid-column:1 / -1; font-size:11px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); margin-top:6px; display:flex; align-items:center; gap:6px; }
+  .palfam::after { content:""; flex:1; height:1px; background:var(--line); }
+  .palfam:first-child { margin-top:0; }
   .colorRow { display:grid; grid-template-columns: 52px 1fr; gap:10px; align-items:start; padding: 10px 0; border-top:1px solid var(--line); }
   .swatch { width:52px; height:52px; border-radius:10px; border:1px solid var(--line); cursor:pointer; padding: 0; }
   .ramp { display:flex; gap:3px; margin-top:6px; }
@@ -175,6 +178,8 @@ CONSIGNE POUR CLAUDE CODE (transfert depuis la maquette, validée par ZADI) :
 <body>
 <script src="exemple-commun.js"></script>
 <script src="/assets/boutique-types.js"></script>
+<script src="/assets/boutique-couleurs.js"></script>
+<script src="/assets/boutique-diagrammes.js"></script>
 <script src="/assets/boutique-exemple-bouton.js"></script>
 <header><strong>DIASPO'ACTIF</strong><span>Moteur de boutiques — maquette interactive</span></header>
 <main>
@@ -236,13 +241,13 @@ CONSIGNE POUR CLAUDE CODE (transfert depuis la maquette, validée par ZADI) :
 
       <section class="card pane" data-pane="colors">
         <h2>Studio de couleurs</h2>
-        <p class="hint">Choisissez une, deux ou trois couleurs. Les nuances sont générées automatiquement.</p>
+        <p class="hint">Choisissez une, deux ou trois couleurs. Les nuances, les harmonies et les textures (dont les dégradés) sont proposées pour chacune.</p>
         <div class="row" style="margin-bottom:10px">
           <label class="opt" style="display:inline-flex"><input type="radio" name="ncol" value="1"> 1 couleur</label>
           <label class="opt" style="display:inline-flex"><input type="radio" name="ncol" value="2"> 2 couleurs</label>
           <label class="opt" style="display:inline-flex"><input type="radio" name="ncol" value="3" checked> 3 couleurs</label>
         </div>
-        <h3 style="font-size:14px;margin:10px 0 6px">Palettes prédéfinies</h3>
+        <h3 style="font-size:14px;margin:10px 0 6px">Palettes prédéfinies <span style="font-weight:400;color:var(--muted)">(29, en 6 familles)</span></h3>
         <div class="palettes" id="palettes"></div>
         <h3 style="font-size:14px;margin:14px 0 0">Couleurs</h3>
         <div id="colorRows"></div>
@@ -369,14 +374,9 @@ CONSIGNE POUR CLAUDE CODE (transfert depuis la maquette, validée par ZADI) :
 <script>
   /* Source unique : assets/boutique-types.js (TYPES, TYPE_SECTIONS, MAX_OPTIONS calculé = types − 1, MAX_COPIES). */
   const { TYPES, TYPE_SECTIONS, MAX_OPTIONS, MAX_COPIES, SLOTS_DEFAULT } = window.BOUTIQUE_TYPES;
-  const PALETTES = [
-    { name: "Bordeaux & Or", c: ["#83172f", "#111c38", "#d8b36a"] },
-    { name: "Émeraude", c: ["#1f6b55", "#0f3330", "#e6c98a"] },
-    { name: "Prestige violet", c: ["#573a7d", "#21163a", "#dcb0d8"] },
-    { name: "Océan", c: ["#1e5e91", "#111c38", "#86cbd9"] },
-    { name: "Terre & Sable", c: ["#a35a3a", "#402c22", "#dcc2a0"] },
-    { name: "Noir & Or", c: ["#222222", "#b38b3a", "#f1e2bd"] }
-  ];
+  /* Source unique : assets/boutique-couleurs.js (29 palettes en 6 familles). */
+  const COUL = window.BOUTIQUE_COULEURS, DIAG = window.BOUTIQUE_DIAGRAMMES;
+  const PALETTES = COUL.PALETTES.map(p => ({ name: p.nom, c: p.c, groupe: p.groupe }));
   const COLOR_NAMES = ["Couleur principale", "Couleur secondaire", "Couleur d'accent"];
   const COLOR_HINTS = ["Boutons et éléments actifs", "Bannières et zones importantes", "Détails et éléments décoratifs"];
   const SAMPLE = ["Bissap artisanal RUBIS", "Recette : 3 façons de préparer le Bissap", "Coulisses de fabrication", "Kit bien-être hibiscus", "Projet Agriculture durable", "Rencontre des entrepreneurs"];
@@ -445,10 +445,11 @@ CONSIGNE POUR CLAUDE CODE (transfert depuis la maquette, validée par ZADI) :
         </details>${window.ExempleBoutique ? window.ExempleBoutique.carte(k) : ""}</span></label>`).join("");
   }
   function buildPalettes() {
-    $("#palettes").innerHTML = PALETTES.map((p, i) => `
-      <button class="sw" data-pal="${i}"><div class="chips">${p.c.map(c => `<i style="background:${c}"></i>`).join("")}</div>${p.name}</button>`).join("");
+    $("#palettes").innerHTML = COUL.GROUPES_PALETTES.map(g => `<div class="palfam">${g}</div>` + PALETTES.map((p, i) => p.groupe !== g ? "" : `
+      <button class="sw" data-pal="${i}" title="${p.name}"><div class="chips">${p.c.map(c => `<i style="background:${c}"></i>`).join("")}</div>${p.name}</button>`).join("")).join("");
   }
   function buildColors() {
+    const volets = [...$$("#colorRows details.bdg")].map(d => d.open);
     $("#colorRows").innerHTML = Array.from({ length: st.ncol }, (_, i) => {
       const hex = st.colors[i];
       const [h, s, l] = hexToHsl(hex);
@@ -462,20 +463,18 @@ CONSIGNE POUR CLAUDE CODE (transfert depuis la maquette, validée par ZADI) :
             <canvas class="wheel" data-wheel="${i}" width="150" height="150" aria-label="Roue de couleurs : ${COLOR_NAMES[i]}"></canvas>
             <div>
               <p class="hint" style="margin:0 0 6px">Cliquez ou glissez dans la roue : l'angle choisit la teinte, la distance la saturation. La luminosité reste celle de la couleur.</p>
-              <div style="font-size:13px;margin-top:4px">Texture</div>
-              <div class="texchips">${TEXTURES.map(t => `<button type="button" class="texchip ${st.textures[i] === t.id ? "on" : ""}" data-texbtn="${i}:${t.id}" style="background:${textureBg(t.id, hex)}">${t.label}</button>`).join("")}</div>
-              <div class="texsample" style="background:${textureBg(st.textures[i], hex)}"></div>
             </div>
           </div>
-          <div class="ramp">${ramp(hex).map((c, k) => `<i data-nuance="${i}:${k}" class="${st.sel[i] === k ? "sel" : ""}" style="background:${c}" title="${c}"></i>`).join("")}</div>
           <div class="sliders">
             <span>Teinte</span><input type="range" min="0" max="360" value="${Math.round(h)}" data-slider="h${i}">
             <span>Saturation</span><input type="range" min="0" max="100" value="${Math.round(s)}" data-slider="s${i}">
             <span>Luminosité</span><input type="range" min="0" max="100" value="${Math.round(l)}" data-slider="l${i}">
           </div>
+          ${DIAG.nuances(hex, i)}${DIAG.harmonies(hex, i)}${DIAG.textures(hex, i, st.textures[i])}
         </div>
       </div>`;
     }).join("");
+    $$("#colorRows details.bdg").forEach((d, k) => { if (k < volets.length) d.open = volets[k]; });
     $$("canvas[data-wheel]").forEach(drawWheel);
     checkContrast();
   }
@@ -844,6 +843,10 @@ CONSIGNE POUR CLAUDE CODE (transfert depuis la maquette, validée par ZADI) :
     const t = e.target;
     const pal = t.closest("[data-pal]");
     if (pal) { const p = PALETTES[Number(pal.dataset.pal)]; st.colors = [...p.c]; st.sel = [4, 4, 4]; buildColors(); renderPreview(); toast(`Palette « ${p.name} »`); return; }
+    const ton = t.closest("[data-ton],[data-harm]");
+    if (ton) { const [ci, hx] = (ton.dataset.ton || ton.dataset.harm).split(":"); st.colors[Number(ci)] = hx; st.sel[Number(ci)] = -1; buildColors(); renderPreview(); return; }
+    const jeu = t.closest("[data-harm-jeu]");
+    if (jeu) { jeu.dataset.harmJeu.split(",").forEach((hx, k) => { if (k < st.ncol) { st.colors[k] = hx; st.sel[k] = -1; } }); buildColors(); renderPreview(); toast("Jeu de couleurs appliqué"); return; }
     const nu = t.closest("[data-nuance]");
     if (nu) { const [i, k] = nu.dataset.nuance.split(":").map(Number); st.colors[i] = ramp(st.colors[i])[k]; st.sel[i] = k; buildColors(); renderPreview(); return; }
 

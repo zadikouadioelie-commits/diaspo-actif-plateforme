@@ -34,13 +34,38 @@
 
   /* Palettes proposées d'un clic (reprises de la maquette des paramètres). */
   var PALETTES = [
-    { nom: "Bordeaux & Or", c: ["#83172f", "#111c38", "#d8b36a"] },
-    { nom: "Émeraude", c: ["#1f6b55", "#0f3330", "#e6c98a"] },
-    { nom: "Prestige violet", c: ["#573a7d", "#21163a", "#dcb0d8"] },
-    { nom: "Océan", c: ["#1e5e91", "#111c38", "#86cbd9"] },
-    { nom: "Terre & Sable", c: ["#a35a3a", "#402c22", "#dcc2a0"] },
-    { nom: "Noir & Or", c: ["#222222", "#b38b3a", "#f1e2bd"] }
+    { nom: "Bordeaux & Or", groupe: "Élégance", c: ["#83172f", "#111c38", "#d8b36a"] },
+    { nom: "Émeraude", groupe: "Nature", c: ["#1f6b55", "#0f3330", "#e6c98a"] },
+    { nom: "Prestige violet", groupe: "Élégance", c: ["#573a7d", "#21163a", "#dcb0d8"] },
+    { nom: "Océan", groupe: "Fraîches", c: ["#1e5e91", "#111c38", "#86cbd9"] },
+    { nom: "Terre & Sable", groupe: "Chaudes", c: ["#a35a3a", "#402c22", "#dcc2a0"] },
+    { nom: "Noir & Or", groupe: "Élégance", c: ["#222222", "#b38b3a", "#f1e2bd"] },
+    { nom: "Ardoise & Cuivre", groupe: "Élégance", c: ["#2f3e4e", "#1a2330", "#d08a5b"] },
+    { nom: "Nuit & Argent", groupe: "Élégance", c: ["#1f2a44", "#0e1424", "#c9d2e3"] },
+    { nom: "Prune & Rose poudré", groupe: "Élégance", c: ["#5a2a4a", "#2c1226", "#f0c6d2"] },
+    { nom: "Forêt & Miel", groupe: "Nature", c: ["#2f5d3a", "#17301f", "#e0b457"] },
+    { nom: "Sauge & Crème", groupe: "Nature", c: ["#4f7a55", "#2f4a3a", "#f1e8d2"] },
+    { nom: "Olive & Moutarde", groupe: "Nature", c: ["#68701f", "#2e3210", "#e0b23a"] },
+    { nom: "Menthe & Ardoise", groupe: "Nature", c: ["#1f7a6b", "#1b3b44", "#bfeadf"] },
+    { nom: "Terracotta & Ocre", groupe: "Chaudes", c: ["#b5522f", "#5a2a18", "#f0c27a"] },
+    { nom: "Soleil d'Afrique", groupe: "Chaudes", c: ["#b8560f", "#4a2208", "#ffd166"] },
+    { nom: "Rouge piment", groupe: "Chaudes", c: ["#b3261e", "#3a0f0c", "#ffb870"] },
+    { nom: "Café & Caramel", groupe: "Chaudes", c: ["#5b3a29", "#2a1a12", "#d9a066"] },
+    { nom: "Lagon", groupe: "Fraîches", c: ["#0e7490", "#0b3d52", "#a5f3fc"] },
+    { nom: "Bleu nuit & Ciel", groupe: "Fraîches", c: ["#23408e", "#0f1c45", "#9ec5ff"] },
+    { nom: "Turquoise & Corail", groupe: "Fraîches", c: ["#13828a", "#0c3f48", "#ff8f78"] },
+    { nom: "Fuchsia & Jaune", groupe: "Vives", c: ["#c2185b", "#4a0a28", "#ffd23f"] },
+    { nom: "Violet & Menthe", groupe: "Vives", c: ["#6a2fb0", "#2a1050", "#6fe3c1"] },
+    { nom: "Orange & Bleu", groupe: "Vives", c: ["#c2500a", "#102a56", "#ffc46b"] },
+    { nom: "Magenta & Or", groupe: "Vives", c: ["#a81d6b", "#2a0f3a", "#e9c46a"] },
+    { nom: "Rose poudré", groupe: "Douces", c: ["#b04a6c", "#5a2a3c", "#fbe3e8"] },
+    { nom: "Lavande & Brume", groupe: "Douces", c: ["#6f5fa6", "#34295c", "#e6e0f8"] },
+    { nom: "Pêche & Sable", groupe: "Douces", c: ["#ad5738", "#6b3a2a", "#fbe4cf"] },
+    { nom: "Sable & Ciel", groupe: "Douces", c: ["#8c6d3c", "#4e3f2a", "#cfe6f2"] },
+    { nom: "Graphite & Citron", groupe: "Douces", c: ["#3d4148", "#16181c", "#e8e46a"] }
   ];
+  /* Ordre d'affichage des familles de palettes (la liste elle-même garde un ordre stable : les 6 premières sont celles d'origine). */
+  var GROUPES_PALETTES = ["Élégance", "Nature", "Chaudes", "Fraîches", "Vives", "Douces"];
   var NOMS = ["Couleur principale", "Couleur secondaire", "Couleur d'accent"];
   var INDICES = ["Bandeaux de rubriques, boutons et éléments actifs", "Bloc contact, offre flash et bannière", "Détails : liseré des rubriques, boutons de contact"];
 
@@ -154,8 +179,8 @@
   }
 
   return {
-    PRESETS: PRESETS, MAX_COULEURS: MAX_COULEURS, TEXTURES: TEXTURES, PALETTES: PALETTES, NOMS: NOMS, INDICES: INDICES,
-    hexValide: hexValide, hexToHsl: hexToHsl, hslToHex: hslToHex, contraste: contraste,
+    PRESETS: PRESETS, MAX_COULEURS: MAX_COULEURS, TEXTURES: TEXTURES, PALETTES: PALETTES, GROUPES_PALETTES: GROUPES_PALETTES, NOMS: NOMS, INDICES: INDICES,
+    hexValide: hexValide, hexToHsl: hexToHsl, hslToHex: hslToHex, contraste: contraste, luminance: luminance,
     variables: variables, textureCss: textureCss, fusionnerStyle: fusionnerStyle, appliquer: appliquer
   };
 });
