@@ -7260,6 +7260,7 @@ async function pvOuvrirChangementType(type) {
   const orph = (a && a.orphelins) || [];
   const adaptes = orph.filter(o => o.adaptation);
   const bonus = orph.filter(o => !o.adaptation);
+  const inacc = (a && a.inaccessibles) || [];
   const bloc = (titre, fond, bord, couleur, lignes) => lignes ? `<div style="background:${fond};border:1px solid ${bord};border-radius:10px;padding:10px 12px;margin-bottom:10px;"><div style="font-size:12px;font-weight:800;color:${couleur};margin-bottom:5px;">${titre}</div><div style="font-size:12.5px;color:${couleur};line-height:1.6;">${lignes}</div></div>` : '';
   const overlay = document.createElement('div');
   overlay.id = 'pv-confirm-modal';
@@ -7267,12 +7268,14 @@ async function pvOuvrirChangementType(type) {
   overlay.innerHTML = `<div role="dialog" aria-modal="true" style="background:#fff;border-radius:16px;max-width:560px;width:100%;padding:26px;max-height:90vh;overflow:auto;">
     <h2 style="margin:0 0 10px;font-size:18px;color:#0D1B2A;">Passer en « ${_mvEsc(t.label_v2 || t.label)} » ?</h2>
     <div style="background:#FFF7ED;border:1px solid #FDBA74;border-radius:10px;padding:12px 14px;margin-bottom:12px;font-size:13px;line-height:1.65;color:#7C2D12;">
-      <strong>Votre boutique va changer entièrement de présentation</strong> pour prendre la forme du type « ${_mvEsc(t.label_v2 || t.label)} ». Certaines rubriques seront réduites ou n'existeront plus dans cette présentation : elles seront <strong>conservées dans l'onglet « Bonus de la boutique »</strong>, sans mise en avant, et masquées aux visiteurs tant que vous ne les publiez pas.
+      <strong>Votre boutique va migrer sur un autre format</strong> : celui du type « ${_mvEsc(t.label_v2 || t.label)} ». Rien n'est supprimé. Les rubriques qui n'ont plus de place dans ce format sont <strong>conservées dans l'onglet « Bonus de la boutique »</strong>, sans mise en avant : pour les rendre visibles aux visiteurs, il vous suffit de les valider une à une.
     </div>
     ${bloc('✅ Conservées', '#F0FDF4', '#BBF7D0', '#166534', conserves.map(o => _mvEsc(o.label)).join(' · '))}
     ${bloc('🔄 Adaptées automatiquement', '#EFF6FF', '#BFDBFE', '#1E3A8A', adaptes.map(o => `<div><strong>${_mvEsc(o.label)}</strong> — ${_mvEsc(o.adaptation.quoi)}</div>`).join(''))}
     ${bloc('🎁 Rangées dans le Bonus de la boutique', '#FFFBEB', '#FCD34D', '#92400E', bonus.map(o => _mvEsc(o.label)).join(' · '))}
-    ${!conserves.length && !orph.length ? '<p style="font-size:12.5px;color:#166534;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;padding:10px 12px;margin:0 0 10px;">Aucun contenu à déplacer.</p>' : ''}
+    ${bloc('⛔ Fonctions qui deviendront inaccessibles', '#FEF2F2', '#FECACA', '#991B1B', inacc.map(o => `<div><strong>${_mvEsc(o.label)}</strong> — ${_mvEsc(o.consequence)}</div>`).join('') + '<div style="margin-top:4px;">Elles ne sont pas supprimées : elles redeviennent accessibles si vous revenez à un type qui les inclut.</div>')}
+    ${!a ? '<p style="font-size:12.5px;color:#991B1B;background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:10px 12px;margin:0 0 10px;">L\'analyse de votre contenu n\'a pas pu être chargée. Fermez cette fenêtre et réessayez avant de changer de type.</p>' : ''}
+    ${a && !conserves.length && !orph.length ? '<p style="font-size:12.5px;color:#166534;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;padding:10px 12px;margin:0 0 10px;">Aucun contenu à déplacer.</p>' : ''}
     <p style="font-size:12px;color:var(--muted);margin:0 0 12px;line-height:1.6;">Rien n'est supprimé. Une sauvegarde est prise automatiquement (retour en arrière possible depuis « Sauvegardes »), et le changement n'apparaît publiquement qu'à la publication : vous vérifiez d'abord l'aperçu.</p>
     <label style="display:flex;gap:9px;align-items:flex-start;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:14px;">
       <input type="checkbox" id="pv-type-compris" style="width:18px;height:18px;margin-top:1px;flex:none;" onchange="document.getElementById('pv-type-ok').disabled=!this.checked">
@@ -7291,7 +7294,7 @@ async function pvConfirmerChangementType(type) {
   const bouton = document.getElementById('pv-type-ok');
   if (bouton) bouton.disabled = true;
   try {
-    const r = await api('POST', `/initiatives/${initId}/vitrine/changer-type`, { type, mode: 'adapter' });
+    const r = await api('POST', `/initiatives/${initId}/vitrine/changer-type`, { type, mode: 'adapter', confirme: !!document.getElementById('pv-type-compris')?.checked });
     __pvVitrineType = r.type;
     __pvVitrineTypes = [r.type];
     __pvModulesState = r.draft.modules;
@@ -7316,11 +7319,20 @@ async function renderPvBonus() {
     <p style="font-size:12.5px;color:var(--muted);margin:0 0 10px;line-height:1.55;">Rubriques de votre ancien contenu qui n'ont pas de place dans ce type. Elles sont conservées, jamais mises en avant, et invisibles aux visiteurs tant que vous ne les publiez pas.</p>
     ${bonus.map(b => `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid #F0E6CF;">
       <span style="font-size:13px;font-weight:700;">${_mvEsc(b.label)}</span>
-      ${b.publiable
+      ${b.pourcentage_reglable
+        ? `<div style="flex:1;min-width:0;">
+            <div style="font-size:12px;color:var(--muted);margin-bottom:6px;" data-bonus-compteur="produits"><strong>${b.produits_visibles}</strong> produit${b.produits_visibles > 1 ? 's' : ''} visible${b.produits_visibles > 1 ? 's' : ''} sur ${b.total_produits} (${b.pourcentage} %). Les autres restent dans le Bonus, avec leurs données.</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">${[0,20,40,60,80,100].map(p => `<button onclick="pvReglerPourcentageProduits(${p})" aria-pressed="${p === b.pourcentage}" style="min-height:44px;min-width:52px;padding:6px 11px;border-radius:20px;border:1.5px solid ${p === b.pourcentage ? 'var(--orange)' : 'var(--border)'};background:${p === b.pourcentage ? '#FFF7ED' : '#fff'};color:${p === b.pourcentage ? 'var(--orange)' : '#374151'};font-size:12px;font-weight:700;cursor:pointer;">${p} %</button>`).join('')}</div>
+          </div>`
+        : b.publiable
         ? `<button onclick="pvBasculerBonus('${b.cle}',${!b.publie})" style="padding:6px 12px;border-radius:20px;border:1.5px solid ${b.publie?'#16A34A':'var(--border)'};background:${b.publie?'#F0FDF4':'#fff'};color:${b.publie?'#166534':'#374151'};font-size:12px;font-weight:700;cursor:pointer;">${b.publie ? '✓ Affiché dans le bonus' : 'Afficher dans le bonus'}</button>`
         : '<span style="font-size:11.5px;color:var(--muted);">Géré depuis son écran dédié</span>'}
     </div>`).join('')}
   </div>`;
+}
+async function pvReglerPourcentageProduits(pourcentage) {
+  try { await api('PUT', `/initiatives/${window.__vitrineInitId}/vitrine/bonus`, { cle: 'produits', pourcentage }); renderPvBonus(); }
+  catch (e) { alert('Erreur : ' + (e.message || '')); }
 }
 async function pvBasculerBonus(cle, publie) {
   try { await api('PUT', `/initiatives/${window.__vitrineInitId}/vitrine/bonus`, { cle, publie }); renderPvBonus(); }

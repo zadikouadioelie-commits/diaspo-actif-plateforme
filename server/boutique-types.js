@@ -86,6 +86,32 @@ function ajouterTemplatesV2(templates, modulesRegistry) {
   return ajoutes;
 }
 
+/** Contrôle côté SERVEUR des options d'une boutique (dossier 05 §3, lot B4) : au plus MAX_OPTIONS (= types − 1, calculé par le
+    registre) options distinctes, jusqu'à MAX_COPIES copies chacune, jamais le type principal. Le Bonus n'est PAS une option :
+    il ne figure pas ici et ne compte donc pas dans la limite. Renvoie { options } normalisées ou { erreur }. */
+function validerOptions(options, typePrincipal, { estAdministrateur = false } = {}) {
+  if (!Array.isArray(options)) return { erreur: 'Les options doivent être une liste.' };
+  const principal = typeCanonique(typePrincipal);
+  if (!principal) return { erreur: 'Choisissez d\'abord un type principal parmi les types proposés.' };
+  const permis = new Set(typesSelectionnables({ estAdministrateur }));
+  const vus = new Set();
+  const propres = [];
+  for (const brut of options) {
+    const type = typeCanonique(brut && typeof brut === 'object' ? brut.type : brut);
+    if (!type) return { erreur: 'Type d\'option inconnu.' };
+    if (type === principal) return { erreur: 'Le type principal ne peut pas être aussi une option.' };
+    if (!permis.has(type)) return { erreur: 'Ce type ne peut pas être ajouté en option pour le moment.' };
+    if (vus.has(type)) return { erreur: 'Une même option ne figure qu\'une fois : utilisez le nombre de copies.' };
+    const copies = brut && typeof brut === 'object' && brut.copies !== undefined ? Number(brut.copies) : 1;
+    if (!Number.isInteger(copies) || copies < 1) return { erreur: 'Nombre de copies invalide.' };
+    if (copies > REGISTRE.MAX_COPIES) return { erreur: 'Une option peut avoir au plus ' + REGISTRE.MAX_COPIES + ' copies.' };
+    vus.add(type);
+    propres.push({ type, copies });
+  }
+  if (propres.length > REGISTRE.MAX_OPTIONS) return { erreur: 'Une boutique a au plus ' + REGISTRE.MAX_OPTIONS + ' options (nombre de types moins un).' };
+  return { options: propres };
+}
+
 /** Description des types pour l'interface (un seul appel) : tout vient du registre, rien n'est écrit à la main. */
 function descriptionPourInterface({ actif, estAdministrateur }) {
   const selectionnables = new Set(typesSelectionnables({ estAdministrateur }));
@@ -104,5 +130,5 @@ function descriptionPourInterface({ actif, estAdministrateur }) {
 
 module.exports = {
   REGISTRE, ANCIEN_VERS_NOUVEAU, ANCIENS_SANS_EQUIVALENT, CLES_NOUVELLES, SELECTIONNABLES_PUBLIC, PAGES_DEDIEES, CLE_INTERRUPTEUR,
-  typeCanonique, estAncienSansEquivalent, typesSelectionnables, ajouterTemplatesV2, descriptionPourInterface,
+  typeCanonique, estAncienSansEquivalent, typesSelectionnables, ajouterTemplatesV2, descriptionPourInterface, validerOptions,
 };

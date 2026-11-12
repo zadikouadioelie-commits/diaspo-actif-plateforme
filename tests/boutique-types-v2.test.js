@@ -105,9 +105,9 @@ test('B2 par défaut les 6 types ne sont PAS en service : le registre garde les 
   assert.equal(r.data.types_v2.actif, false);
   for (const cle of ['ecom', 'events', 'impact', 'finance']) assert.equal(r.data.templates[cle], undefined, `${cle} ne doit pas être visible tant que l'interrupteur est éteint`);
   assert.ok(r.data.templates.commercial, 'les anciens modèles restent');
-  const refus = await env.call(jarProprio, 'POST', `/api/initiatives/${idInit}/vitrine/changer-type`, { type: 'ecom', mode: 'adapter' });
+  const refus = await env.call(jarProprio, 'POST', `/api/initiatives/${idInit}/vitrine/changer-type`, { type: 'ecom', mode: 'adapter', confirme: true });
   assert.equal(refus.status, 400);
-  const ancien = await env.call(jarProprio, 'POST', `/api/initiatives/${idInit}/vitrine/changer-type`, { type: 'portfolio', mode: 'adapter' });
+  const ancien = await env.call(jarProprio, 'POST', `/api/initiatives/${idInit}/vitrine/changer-type`, { type: 'portfolio', mode: 'adapter', confirme: true });
   assert.equal(ancien.status, 200, 'un ancien type reste choisissable tant que rien n\'est activé');
   assert.equal(typeEnregistre(), 'portfolio', 'le type choisi est gardé dans le brouillon, publié ensuite par le propriétaire');
 });
@@ -140,7 +140,7 @@ test('B3 mise en service : registre des 6 types, types réservés à l\'administ
   assert.ok(regAdmin.data.types_v2.types.every(t => t.selectionnable), 'l\'administration peut choisir les 6');
   assert.ok(reg.data.templates.ecom && reg.data.templates.finance, 'les modèles nouveaux sont servis');
 
-  const choisir = (type) => env.call(jarProprio, 'POST', `/api/initiatives/${idInit}/vitrine/changer-type`, { type, mode: 'adapter' });
+  const choisir = (type) => env.call(jarProprio, 'POST', `/api/initiatives/${idInit}/vitrine/changer-type`, { type, mode: 'adapter', confirme: true });
   for (const type of ['impact', 'finance']) assert.equal((await choisir(type)).status, 400, `${type} doit être refusé à une vraie boutique`);
   assert.equal((await choisir('events')).status, 200, 'Créateur d\'événements se choisit comme les autres types');
   assert.equal(typeEnregistre(), 'events');

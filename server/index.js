@@ -3560,6 +3560,11 @@ route("GET", "/api/initiatives/:id/produits", async (req, res, params) => {
   let rows = await db.prepare("SELECT * FROM produits_vitrine WHERE initiative_id=? ORDER BY ordre ASC, id ASC").all(params.id);
   // Les produits "masqué" ne sont visibles que par le propriétaire
   if (!isOwner) rows = rows.filter(p => (p.statut || 'disponible') !== 'masque');
+  /* Produits rangés dans le Bonus : les visiteurs n'en voient que le pourcentage choisi par le propriétaire. */
+  if (!isOwner && !isAdmin) {
+    const permis = await idsProduitsVisiblesBonus(params.id);
+    if (permis) rows = rows.filter(p => permis.has(Number(p.id)));
+  }
 
   const produits = [];
   for (const p of rows) {
@@ -3583,6 +3588,10 @@ route("GET", "/api/produits/:id", async (req, res, params) => {
   const isAdmin = me && me.role === "administrateur";
   if (init && Number(init.vitrine_active) !== 1 && !isOwner && !isAdmin) {
     return sendJSON(res, 404, { error: "Produit introuvable." });
+  }
+  if (init && !isOwner && !isAdmin) {
+    const permis = await idsProduitsVisiblesBonus(p.initiative_id);
+    if (permis && !permis.has(Number(p.id))) return sendJSON(res, 404, { error: "Produit introuvable." });
   }
   sendJSON(res, 200, { produit: {
     ...p, statut: p.statut || 'disponible', photos: safeParse(p.photos_json || "[]"),
@@ -11608,6 +11617,24 @@ async function moduleAContenu(init, cle) {
    Il n'est jamais supprimé. Le propriétaire le retrouve toujours dans les paramètres ; les visiteurs ne voient que les éléments qu'il a
    publiés un par un (vitrine_bonus_json : { rubrique: true }). Les rubriques stockées en tables (produits, catalogue, avis) restent
    gérées depuis leurs propres écrans : elles sont listées mais non publiables ici. */
+/* Nombre de produits montrés pour un pourcentage donné : arrondi à l'entier le plus proche, jamais plus que le total. */
+function nombreProduitsVisibles(total, pct) {
+  return Math.min(total, Math.max(0, Math.round((Number(total) || 0) * (Number(pct) || 0) / 100)));
+}
+
+/* Ids des produits qu'un VISITEUR peut voir quand les produits sont rangés dans le Bonus de la boutique PUBLIÉE et que le
+   propriétaire a réglé un pourcentage. null = aucune restriction (cas général : produits dans le type, ou rien de réglé). */
+async function idsProduitsVisiblesBonus(initiativeId) {
+  const init = await db.prepare("SELECT id, vitrine_type, vitrine_types_json, vitrine_bonus_json FROM initiatives WHERE id=?").get(initiativeId);
+  if (!init) return null;
+  const pct = (safeParse(init.vitrine_bonus_json) || {})._produits_pct;
+  if (typeof pct !== "number") return null;
+  const tpl = VITRINE_TEMPLATES[getVitrineTypesActifs(init, null)[0]];
+  if (!tpl || [...(tpl.actifs || []), ...(tpl.optionnels || [])].includes("produits")) return null;
+  const rows = await db.prepare("SELECT id FROM produits_vitrine WHERE initiative_id=? AND (statut IS NULL OR statut!='masque') ORDER BY ordre ASC, id ASC").all(initiativeId);
+  return new Set(rows.slice(0, nombreProduitsVisibles(rows.length, pct)).map(r => Number(r.id)));
+}
+
 async function calculerBonusVitrine(init, { draft = false, publieSeulement = false } = {}) {
   const types = getVitrineTypesActifs(init, draft ? resolveVitrineDraft(init) : null);
   const tpl = VITRINE_TEMPLATES[types[0]];
@@ -11624,6 +11651,15 @@ async function calculerBonusVitrine(init, { draft = false, publieSeulement = fal
     if (publieSeulement && !publie) continue;
     const item = { cle, label: def.label, publiable, publie };
     if (publiable) { item.contenu = {}; for (const champ of def.champs || []) item.contenu[champ] = init[champ] === undefined ? null : init[champ]; }
+    if (cle === "produits") {
+      /* Dossier 05 §3 : la visibilité des produits du Bonus se règle en POURCENTAGE du nombre de produits (100 % tant que rien n'est réglé). */
+      const total = Number((await db.prepare("SELECT COUNT(*) n FROM produits_vitrine WHERE initiative_id=? AND (statut IS NULL OR statut!='masque')").get(init.id))?.n) || 0;
+      const pct = typeof drapeaux._produits_pct === "number" ? drapeaux._produits_pct : 100;
+      item.pourcentage_reglable = true;
+      item.pourcentage = pct;
+      item.total_produits = total;
+      item.produits_visibles = nombreProduitsVisibles(total, pct);
+    }
     sortie.push(item);
   }
   return sortie;
@@ -11645,6 +11681,18 @@ route("PUT", "/api/initiatives/:id/vitrine/bonus", async (req, res, params, body
   if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
   if (Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
   const cle = String(body.cle || "");
+  if (cle === "produits" && body.pourcentage !== undefined) {
+    /* Visibilité des produits du Bonus, en pourcentage du nombre de produits (dossier 05 §3). Modifiable à tout moment, sans limite. */
+    const pct = body.pourcentage;
+    if (typeof pct !== "number" || !Number.isInteger(pct) || pct < 0 || pct > 100) return sendJSON(res, 400, { error: "Le pourcentage doit être un nombre entier de 0 à 100." });
+    const dansBonus = (await calculerBonusVitrine(init, { draft: true })).some(b => b.cle === "produits");
+    if (!dansBonus) return sendJSON(res, 400, { error: "Les produits ne sont pas dans le Bonus de la boutique." });
+    const flags = safeParse(init.vitrine_bonus_json) || {};
+    flags._produits_pct = pct;
+    const brut = JSON.stringify(flags);
+    await db.prepare("UPDATE initiatives SET vitrine_bonus_json=? WHERE id=?").run(brut, init.id);
+    return sendJSON(res, 200, { ok: true, bonus: await calculerBonusVitrine({ ...init, vitrine_bonus_json: brut }, { draft: true }) });
+  }
   const def = VITRINE_CONTENU_MODULE[cle];
   if (!def || def.table) return sendJSON(res, 400, { error: "Cette rubrique ne peut pas être publiée dans le bonus." });
   const drapeaux = safeParse(init.vitrine_bonus_json) || {};
@@ -11652,6 +11700,20 @@ route("PUT", "/api/initiatives/:id/vitrine/bonus", async (req, res, params, body
   await db.prepare("UPDATE initiatives SET vitrine_bonus_json=? WHERE id=?").run(JSON.stringify(drapeaux), init.id);
   sendJSON(res, 200, { ok: true, bonus: await calculerBonusVitrine({ ...init, vitrine_bonus_json: JSON.stringify(drapeaux) }, { draft: true }) });
 });
+
+/* Ce que les visiteurs ne peuvent plus FAIRE quand le module n'est plus fourni par le type choisi (dossier 05 §2 et §4). */
+const VITRINE_FONCTIONS_INACCESSIBLES = {
+  galerie_videos:       "La lecture des vidéos devient indisponible.",
+  portfolio:            "Le portfolio et sa visionneuse deviennent indisponibles.",
+  evenements:           "Les événements et leurs inscriptions ne sont plus présentés.",
+  reservation:          "La prise de rendez-vous en ligne n'est plus proposée.",
+  formations_catalogue: "Le catalogue de formations n'est plus présenté.",
+  demande_devis:        "La demande de devis n'est plus proposée.",
+  demande_partenariat:  "La demande de partenariat n'est plus proposée.",
+  produits:             "La présentation des produits et l'ajout au panier depuis la vitrine ne sont plus proposés.",
+  catalogue:            "Le catalogue n'est plus présenté.",
+  avis:                 "Les avis clients ne sont plus affichés (ils restent liés à leurs commandes).",
+};
 
 /* GET /api/initiatives/:id/vitrine/analyser-type?type= — que deviendrait mon contenu ?
    Interrogé AVANT de confirmer : l'utilisateur doit voir ce qu'il risque avant d'agir,
@@ -11687,9 +11749,19 @@ route("GET", "/api/initiatives/:id/vitrine/analyser-type", async (req, res, para
     orphelins.push({ cle, label, adaptation: pistes[0] || null });
   }
 
+  /* Fonctions rendues INACCESSIBLES (dossier 05 §2 et §4) : ce que les visiteurs ne pourront plus faire. Ce n'est pas une
+     suppression : tout reste dans le Bonus et redevient accessible si le type qui l'inclut est de nouveau choisi. On part des
+     modules du type actuel et des rubriques qui ont du contenu, moins ce que le nouveau type fournit encore. */
+  const concernes = new Set([...actuels, ...orphelins.map(o => o.cle)]);
+  const inaccessibles = [];
+  for (const cle of concernes) {
+    if (futurs.has(cle) || !VITRINE_FONCTIONS_INACCESSIBLES[cle]) continue;
+    inaccessibles.push({ cle, label: (VITRINE_CONTENU_MODULE[cle] || VITRINE_MODULES_REGISTRY[cle] || {}).label || cle, consequence: VITRINE_FONCTIONS_INACCESSIBLES[cle] });
+  }
+
   sendJSON(res, 200, {
     type_actuel: typeActuel, type_cible: nouveau, libelle_cible: tpl.label,
-    conserves, orphelins, vides,
+    conserves, orphelins, vides, inaccessibles,
     adaptables: orphelins.filter(o => o.adaptation).length,
     sans_destination: orphelins.filter(o => !o.adaptation).length,
   });
@@ -11939,6 +12011,12 @@ route("POST", "/api/initiatives/:id/vitrine/changer-type", async (req, res, para
   if (!tpl) return sendJSON(res, 400, { error: "Type de boutique inconnu." });
   const mode = body.mode === "zero" ? "zero" : "adapter";
 
+  /* Dossier 05 §2 : « Rien ne change tant que le propriétaire n'a pas confirmé. » La case « J'ai compris » est contrôlée
+     par la page, mais la règle vaut aussi pour tout appel direct : sans `confirme: true`, ni sauvegarde ni modification. */
+  if (body.confirme !== true) {
+    return sendJSON(res, 400, { error: "Confirmation requise : cochez « J'ai compris » avant de changer de type. Rien n'a été modifié.", confirmation_requise: true });
+  }
+
   const sauvegarde_id = await sauvegarderVitrine(init, typeActuel, nouveau, mode);
 
   const futurs = new Set([...(tpl.actifs || []), ...(tpl.optionnels || [])]);
@@ -11969,6 +12047,8 @@ route("POST", "/api/initiatives/:id/vitrine/changer-type", async (req, res, para
   /* Le type ne s'applique qu'au BROUILLON : la vitrine publique ne change qu'à la
      publication, ce qui laisse le temps de vérifier l'aperçu (§5). */
   const nouveauDraft = { ...draft, type: nouveau, types: [nouveau], modules: draft.modules || safeParse(init.vitrine_modules_json) || {} };
+  /* Une option ne peut pas être le type principal : si le propriétaire passe à un type qu'il avait en option, l'option disparaît. */
+  if (Array.isArray(nouveauDraft.options)) nouveauDraft.options = nouveauDraft.options.filter(o => o && o.type !== (BoutiqueTypes.typeCanonique(nouveau) || nouveau));
   for (const m of tpl.actifs || []) nouveauDraft.modules[m] = true;
   /* Rubriques sans place dans le nouveau type : elles quittent la présentation et vont dans « Bonus de la boutique »
      (contenu conservé, jamais supprimé, non mis en avant, masqué aux visiteurs tant que le propriétaire ne l'a pas publié). */
@@ -12068,6 +12148,15 @@ route("PUT", "/api/initiatives/:id/vitrine-draft", async (req, res, params, body
     draft.style = fusion.style;
   }
   if (body.theme !== undefined) draft.theme = body.theme;
+
+  /* Options de la boutique (lot B4) : plafonds imposés ICI, pas seulement par l'écran. Réservées à la mise en service des 6 types. */
+  if (body.options !== undefined) {
+    if (!(await typesBoutiqueV2Actifs())) return sendJSON(res, 400, { error: "Les options ne sont pas encore ouvertes." });
+    const principal = draft.type !== undefined ? draft.type : init.vitrine_type;
+    const verif = BoutiqueTypes.validerOptions(body.options, principal, { estAdministrateur: user.role === "administrateur" });
+    if (verif.erreur) return sendJSON(res, 400, { error: verif.erreur });
+    draft.options = verif.options;
+  }
 
   /* Contenus édités depuis l'aperçu : ils rejoignent le brouillon au lieu d'écrire
      directement dans la vitrine publique. C'est ce qui rend « Annuler » réellement

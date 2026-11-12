@@ -8,8 +8,8 @@
    1.11 Message de migration au propriétaire ; la migration ne démarre qu'après sa validation
    5.3  Aucune boutique modifiée sans l'accord de son propriétaire
    5.2  Parcours d'achat complet en simulation : panier, commande, paiement (faux Stripe), livraison, notifications, messagerie
-   Les tests marqués « todo » décrivent ce que le dossier d'acceptation (05) exige et que la plateforme ne fait PAS encore :
-   ils ne bloquent pas la suite, ils apparaissent comme « à faire » dans la sortie et dans le rapport du lot H.
+   Les tests marqués « todo » décrivent ce que le dossier d'acceptation (05) exige et que la plateforme ne fait PAS encore : ils ne bloquent pas la suite.
+   Le 2026-11-12, les cinq écarts relevés au rejeu ont été corrigés : plus aucun « todo » dans ce fichier.
    Aucun paiement réel, aucune clé réelle : vrai serveur sur une COPIE de la base de dev, faux Stripe.
    Lancer : node --test tests/acceptation-boutiques-migration.test.js
    =========================================================== */
@@ -138,7 +138,7 @@ test('5.3 la mise en service des 6 types, la lecture du registre, l\'analyse et 
 
 test('5.3 seul le propriétaire peut changer le type de sa boutique : visiteur 401, tiers 403, administrateur 403 ; rien n\'est modifié', async () => {
   const avant = instantane();
-  const corps = { type: 'ecom', mode: 'adapter' };
+  const corps = { type: 'ecom', mode: 'adapter', confirme: true };
   const url = `/api/initiatives/${initId}/vitrine/changer-type`;
   assert.equal((await env.call(null, 'POST', url, corps)).status, 401);
   assert.equal((await env.call(tiers.jar, 'POST', url, corps)).status, 403);
@@ -169,7 +169,7 @@ test('1.1 l\'analyse « Vidéo → Traditionnelle » répond sans rien modifier 
 test('1.1 / 1.11 l\'écran de changement de type est un avertissement : « J\'ai compris » obligatoire, bouton inactif tant que la case n\'est pas cochée, un seul chemin vers le serveur', () => {
   const src = lire('dashboard-initiative.html');
   assert.match(src, /async function pvOuvrirChangementType\(type\)/);
-  assert.match(src, /Votre boutique va changer entièrement de présentation/, 'message d\'avertissement au propriétaire');
+  assert.match(src, /Votre boutique va migrer sur un autre format/, 'message d\'avertissement au propriétaire');
   assert.match(src, /<input type="checkbox" id="pv-type-compris"[^>]*onchange="document\.getElementById\('pv-type-ok'\)\.disabled=!this\.checked"/, 'la case commande le bouton');
   assert.match(src, /<button id="pv-type-ok" disabled onclick="pvConfirmerChangementType\('\$\{type\}'\)"/, 'le bouton de confirmation est désactivé par défaut');
   assert.match(src, /J'ai compris : la présentation de ma boutique va changer entièrement/);
@@ -183,23 +183,38 @@ test('1.1 / 1.11 l\'écran de changement de type est un avertissement : « J\'ai
   }
 });
 
-test('1.1 l\'avertissement précise que la lecture vidéo devient indisponible (dossier 01 §1.4)', { todo: 'Non livré : ni l\'analyse serveur ni l\'écran ne parlent des fonctions rendues inaccessibles (lecture vidéo)' }, async () => {
+test('1.1 l\'avertissement précise que la lecture vidéo devient indisponible (dossier 05 §2 et §4), et l\'écran l\'affiche', async () => {
   const r = await env.call(vendeur.jar, 'GET', `/api/initiatives/${initId}/vitrine/analyser-type?type=ecom`);
-  const texteServeur = JSON.stringify(r.data);
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  const video = (r.data.inaccessibles || []).find((x) => x.cle === 'galerie_videos');
+  assert.ok(video, 'la galerie vidéos doit figurer parmi les fonctions rendues inaccessibles');
+  assert.match(video.consequence, /lecture des vidéos devient indisponible/i);
+  assert.ok(!(r.data.inaccessibles || []).some((x) => x.cle === 'produits'), 'les produits restent accessibles dans une boutique traditionnelle');
+  /* vers un type qui inclut la vidéo (Portfolio) : rien à annoncer pour la vidéo */
+  const portfolio = await env.call(vendeur.jar, 'GET', `/api/initiatives/${initId}/vitrine/analyser-type?type=portfolio`);
+  assert.ok(!(portfolio.data.inaccessibles || []).some((x) => x.cle === 'galerie_videos'), 'Portfolio fournit la galerie vidéos : la lecture reste accessible');
   const ecran = lire('dashboard-initiative.html');
   const bloc = ecran.slice(ecran.indexOf('async function pvOuvrirChangementType'), ecran.indexOf('async function pvConfirmerChangementType'));
-  assert.ok(/lecture vid[ée]o|inaccessible|indisponible/i.test(texteServeur) || /lecture vid[ée]o/i.test(bloc), 'aucune mention de la lecture vidéo devenue indisponible');
+  assert.match(bloc, /Fonctions qui deviendront inaccessibles/);
+  assert.match(bloc, /inacc\.map/);
 });
 
-test('1.1 / 1.11 le serveur refuse un changement de type non confirmé : rien ne change tant que « J\'ai compris » n\'est pas validé', { todo: 'Non livré : la case n\'est contrôlée que par la page ; POST changer-type migre sans confirmation' }, async () => {
-  const avant = JSON.stringify(sql('select * from initiatives where id=?', initAutre));
-  const r = await env.call(vendeur.jar, 'POST', `/api/initiatives/${initAutre}/vitrine/changer-type`, { type: 'ecom', mode: 'adapter' });
-  const apres = JSON.stringify(sql('select * from initiatives where id=?', initAutre));
-  assert.ok(r.status >= 400 && r.status < 500, `un appel sans confirmation doit être refusé, reçu ${r.status}`);
-  assert.equal(apres, avant, 'la boutique a été modifiée sans confirmation');
+test('1.1 / 1.11 le serveur refuse un changement de type non confirmé : rien ne change tant que « J\'ai compris » n\'est pas validé', async () => {
+  const avant = instantane();
+  const sauvegardesAvant = sql('select count(*) as n from vitrine_sauvegardes where initiative_id=?', initAutre)[0].n;
+  for (const corps of [{ type: 'ecom', mode: 'adapter' }, { type: 'ecom', mode: 'zero' }, { type: 'ecom', mode: 'adapter', confirme: false }, { type: 'ecom', mode: 'adapter', confirme: 'oui' }]) {
+    const r = await env.call(vendeur.jar, 'POST', `/api/initiatives/${initAutre}/vitrine/changer-type`, corps);
+    assert.equal(r.status, 400, `un appel sans confirmation vraie doit être refusé (${JSON.stringify(corps)}), reçu ${r.status}`);
+    assert.equal(r.data.confirmation_requise, true);
+  }
+  assert.deepEqual(differences(avant, instantane()), [], 'la boutique a été modifiée sans confirmation');
+  assert.equal(sql('select count(*) as n from vitrine_sauvegardes where initiative_id=?', initAutre)[0].n, sauvegardesAvant, 'aucune sauvegarde ne doit être prise sans confirmation');
+  assert.equal(typeBrouillon(initAutre), 'video');
+  const src = lire('dashboard-initiative.html');
+  assert.match(src, /confirme: !!document\.getElementById\('pv-type-compris'\)\?\.checked/, 'la page transmet l\'état de la case au serveur');
 });
 
-test('1.11 le message de migration reprend la formulation du dossier (« va migrer sur un autre format… il vous suffit de les valider »)', { todo: 'Libellé différent : « Votre boutique va changer entièrement de présentation… » (le message existe, mais pas avec le texte du dossier 01 §1.4)' }, () => {
+test('1.11 le message de migration reprend la formulation du dossier (« va migrer sur un autre format… il vous suffit de les valider »)', () => {
   const src = lire('dashboard-initiative.html');
   assert.match(src, /va migrer sur un autre format/);
   assert.match(src, /il vous suffit de les valider/);
@@ -210,7 +225,7 @@ let contenuAvant, produitsAvant, sauvegardeId, bonusApres;
 test('1.2 après confirmation, la boutique passe au type Traditionnelle : une sauvegarde est prise, aucun contenu ni produit n\'est modifié', async () => {
   contenuAvant = contenuBoutique(initId);
   produitsAvant = produitsBoutique(initId);
-  const r = await env.call(vendeur.jar, 'POST', `/api/initiatives/${initId}/vitrine/changer-type`, { type: 'ecom', mode: 'adapter' });
+  const r = await env.call(vendeur.jar, 'POST', `/api/initiatives/${initId}/vitrine/changer-type`, { type: 'ecom', mode: 'adapter', confirme: true });
   assert.equal(r.status, 200, JSON.stringify(r.data));
   assert.equal(r.data.type, 'ecom');
   assert.ok(r.data.sauvegarde_id, 'une sauvegarde intégrale est prise avant la transformation');
@@ -251,10 +266,55 @@ test('1.2 le propriétaire publie un élément du bonus un par un ; rien n\'est 
   assert.equal(refus.status, 400, 'une rubrique stockée en table se gère depuis son écran, pas depuis le bonus');
 });
 
-test('1.2 le compteur « 20 % des produits visibles » existe et affiche le bon nombre', { todo: 'Non livré : le bonus se règle rubrique par rubrique, sans bouton ni compteur « 20 % des produits » (dossier 01 §1.3)' }, () => {
+test('1.2 la visibilité des produits du Bonus se règle en pourcentage (20 %) : le compteur affiche le bon nombre, les visiteurs n\'en voient pas plus', async () => {
+  /* Boutique « Organismes de financement » : ce type n'a aucun module produits, donc les produits rejoignent le Bonus. */
+  const bid = Number(inserer('initiatives', { nom: `Boutique Bonus ${rnd}`, owner_user_id: vendeur.id, vitrine_type: 'finance', vitrine_active: 1 }).lastInsertRowid);
+  const ids = [];
+  for (let i = 1; i <= 5; i++) ids.push(Number(inserer('produits_vitrine', { initiative_id: bid, nom: `Produit ${i}`, prix: 10 * i, statut: 'disponible', disponible: 1, ordre: i }).lastInsertRowid));
+  const url = `/api/initiatives/${bid}/vitrine/bonus`;
+  const ligne = (r) => r.data.bonus.find((b) => b.cle === 'produits');
+  const avant = ligne(await env.call(vendeur.jar, 'GET', url));
+  assert.ok(avant && avant.pourcentage_reglable, 'les produits sont dans le Bonus et leur visibilité est réglable en pourcentage');
+  assert.equal(avant.pourcentage, 100, 'tant que rien n\'est réglé, rien n\'est masqué');
+  assert.equal(avant.total_produits, 5);
+  assert.equal(avant.produits_visibles, 5);
+
+  const vingt = await env.call(vendeur.jar, 'PUT', url, { cle: 'produits', pourcentage: 20 });
+  assert.equal(vingt.status, 200, JSON.stringify(vingt.data));
+  assert.equal(ligne(vingt).pourcentage, 20);
+  assert.equal(ligne(vingt).produits_visibles, 1, '20 % de 5 produits = 1 produit');
+  assert.equal(ligne(vingt).total_produits, 5);
+
+  const visiteur = await env.call(null, 'GET', `/api/initiatives/${bid}/produits`);
+  assert.deepEqual(visiteur.data.produits.map((p) => p.id), [ids[0]], 'le visiteur ne voit que le pourcentage choisi, dans l\'ordre de la boutique');
+  assert.equal((await env.call(tiers.jar, 'GET', `/api/initiatives/${bid}/produits`)).data.produits.length, 1, 'un autre compte connecté n\'en voit pas plus');
+  const proprio = await env.call(vendeur.jar, 'GET', `/api/initiatives/${bid}/produits`);
+  assert.equal(proprio.data.produits.length, 5, 'le propriétaire voit toujours tout : rien n\'est supprimé');
+  assert.equal((await env.call(null, 'GET', `/api/produits/${ids[0]}`)).status, 200);
+  assert.equal((await env.call(null, 'GET', `/api/produits/${ids[1]}`)).status, 404, 'un produit masqué n\'est pas joignable par son identifiant');
+  assert.equal((await env.call(vendeur.jar, 'GET', `/api/produits/${ids[1]}`)).status, 200);
+  assert.equal(sql('select count(*) as n from produits_vitrine where initiative_id=?', bid)[0].n, 5, 'aucun produit supprimé');
+
+  const quarante = await env.call(vendeur.jar, 'PUT', url, { cle: 'produits', pourcentage: 40 });
+  assert.equal(ligne(quarante).produits_visibles, 2);
+  assert.equal((await env.call(null, 'GET', `/api/initiatives/${bid}/produits`)).data.produits.length, 2, 'modifiable à tout moment, sans limite');
+  const zero = await env.call(vendeur.jar, 'PUT', url, { cle: 'produits', pourcentage: 0 });
+  assert.equal(ligne(zero).produits_visibles, 0);
+  assert.equal((await env.call(null, 'GET', `/api/initiatives/${bid}/produits`)).data.produits.length, 0);
+  const tout = await env.call(vendeur.jar, 'PUT', url, { cle: 'produits', pourcentage: 100 });
+  assert.equal(ligne(tout).produits_visibles, 5);
+  assert.equal((await env.call(null, 'GET', `/api/initiatives/${bid}/produits`)).data.produits.length, 5);
+
+  for (const mauvais of [-1, 101, 2.5, 'abc', null]) {
+    assert.equal((await env.call(vendeur.jar, 'PUT', url, { cle: 'produits', pourcentage: mauvais })).status, 400, `pourcentage ${JSON.stringify(mauvais)} refusé`);
+  }
+  assert.equal((await env.call(tiers.jar, 'PUT', url, { cle: 'produits', pourcentage: 20 })).status, 403, 'seul le propriétaire règle la visibilité');
+  assert.equal((await env.call(vendeur.jar, 'PUT', `/api/initiatives/${initAutre}/vitrine/bonus`, { cle: 'produits', pourcentage: 20 })).status, 400, 'tant que les produits ont leur place dans le type, il n\'y a rien à régler');
+
   const src = lire('dashboard-initiative.html');
   const bloc = src.slice(src.indexOf('async function renderPvBonus'), src.indexOf('async function pvBasculerBonus'));
-  assert.match(bloc, /20\s?%/, 'aucun bouton ni compteur « 20 % » dans l\'écran du bonus');
+  assert.match(bloc, /\[0,20,40,60,80,100\]/, 'boutons de pourcentage (dont 20 %) dans l\'écran du Bonus');
+  assert.match(bloc, /produits_visibles[\s\S]{0,200}total_produits/, 'compteur « N produits visibles sur M »');
 });
 
 test('1.2 « Repartir à zéro » reste réversible et le retour en arrière restitue la boutique d\'origine', async () => {
@@ -264,7 +324,7 @@ test('1.2 « Repartir à zéro » reste réversible et le retour en arrière res
   assert.deepEqual(contenuBoutique(initId), contenuAvant);
   assert.deepEqual(produitsBoutique(initId), produitsAvant);
   /* Autre boutique : le mode « zéro » efface seulement le contenu hors type, après sauvegarde prise. */
-  const zero = await env.call(vendeur.jar, 'POST', `/api/initiatives/${initAutre}/vitrine/changer-type`, { type: 'ecom', mode: 'zero' });
+  const zero = await env.call(vendeur.jar, 'POST', `/api/initiatives/${initAutre}/vitrine/changer-type`, { type: 'ecom', mode: 'zero', confirme: true });
   assert.equal(zero.status, 200, JSON.stringify(zero.data));
   assert.ok(zero.data.sauvegarde_id, 'même en « repartir à zéro », une sauvegarde est prise');
   const avantRestauration = contenuBoutique(initAutre);
@@ -276,7 +336,7 @@ test('1.2 « Repartir à zéro » reste réversible et le retour en arrière res
 
 /* ═════════════ 1.3 Options et bonus ═════════════ */
 test('1.3 ajouter une option ne réduit pas le bonus (mêmes rubriques avant et après), et le contenu reste intact', async () => {
-  const migre = await env.call(vendeur.jar, 'POST', `/api/initiatives/${initId}/vitrine/changer-type`, { type: 'ecom', mode: 'adapter' });
+  const migre = await env.call(vendeur.jar, 'POST', `/api/initiatives/${initId}/vitrine/changer-type`, { type: 'ecom', mode: 'adapter', confirme: true });
   assert.equal(migre.status, 200, JSON.stringify(migre.data));
   const avant = (await env.call(vendeur.jar, 'GET', `/api/initiatives/${initId}/vitrine/bonus`)).data.bonus.map((b) => b.cle).sort();
   assert.ok(avant.length >= 3);
@@ -301,10 +361,44 @@ test('1.3 le maximum d\'options = types − 1 (calculé) et ne dépend pas du bo
   assert.equal(desc.max_options, nbTypes - 1, 'le plafond annoncé à l\'interface suit le registre, pas le nombre d\'éléments du bonus');
 });
 
-test('1.3 le serveur plafonne le nombre d\'options à MAX_OPTIONS et les copies à MAX_COPIES, sans compter le bonus', { todo: 'Non livré : options et copies (lot B4) n\'existent pas encore sur la vraie plateforme ; les plafonds ne sont lus que par l\'écran' }, () => {
-  const src = lire('server/index.js');
-  assert.match(src, /MAX_OPTIONS|REGISTRE\.MAX_OPTIONS/, 'aucun contrôle serveur du nombre d\'options');
-  assert.match(src, /MAX_COPIES/, 'aucun contrôle serveur du nombre de copies');
+test('1.3 le serveur plafonne le nombre d\'options à MAX_OPTIONS et les copies à MAX_COPIES, sans compter le bonus', async () => {
+  const { validerOptions } = require('../server/boutique-types.js');
+  /* Règle pure : types − 1 options distinctes au plus, 3 copies au plus, jamais le type principal. */
+  const autres = Object.keys(Types.TYPES).filter((t) => t !== 'ecom');
+  const tout = validerOptions(autres.map((type) => ({ type, copies: Types.MAX_COPIES })), 'ecom', { estAdministrateur: true });
+  assert.ok(!tout.erreur, 'le maximum exact (types − 1 options de 3 copies) est accepté : ' + tout.erreur);
+  assert.equal(tout.options.length, Types.MAX_OPTIONS);
+  assert.ok(validerOptions([...autres, 'ecom'], 'ecom', { estAdministrateur: true }).erreur, 'un type de plus que le maximum (le type principal) est refusé');
+  assert.ok(validerOptions([{ type: 'video', copies: Types.MAX_COPIES + 1 }], 'ecom', { estAdministrateur: true }).erreur, 'plus de 3 copies refusées');
+  assert.ok(validerOptions([{ type: 'video', copies: 0 }], 'ecom').erreur);
+  assert.ok(validerOptions([{ type: 'video' }, { type: 'video' }], 'ecom').erreur, 'une même option ne figure qu\'une fois');
+  assert.ok(validerOptions([{ type: 'inconnu' }], 'ecom').erreur);
+  assert.ok(validerOptions([{ type: 'impact' }], 'ecom').erreur, 'un type réservé à l\'administration ne se prend pas en option');
+  assert.ok(validerOptions([{ type: 'video' }], 'blog').erreur, 'il faut un type principal parmi les types proposés');
+  assert.ok(validerOptions('video', 'ecom').erreur, 'une liste est attendue');
+
+  /* Même règle à travers le serveur, sur une boutique réelle ; le Bonus (3 rubriques et plus) ne compte pas. */
+  const oid = creerBoutiqueVideo(vendeur.id, `Studio Options ${rnd}`);
+  const brouillon = () => JSON.parse(sql('select vitrine_draft_json as d from initiatives where id=?', oid)[0].d || '{}');
+  const put = (options) => env.call(vendeur.jar, 'PUT', `/api/initiatives/${oid}/vitrine-draft`, { options });
+  const ok = await put([{ type: 'portfolio', copies: 3 }, { type: 'ecom', copies: 1 }, { type: 'events' }]);
+  assert.equal(ok.status, 200, JSON.stringify(ok.data));
+  assert.deepEqual(brouillon().options, [{ type: 'portfolio', copies: 3 }, { type: 'ecom', copies: 1 }, { type: 'events', copies: 1 }]);
+  assert.ok((await env.call(vendeur.jar, 'GET', `/api/initiatives/${oid}/vitrine/bonus`)).status === 200);
+  assert.equal((await put([{ type: 'portfolio', copies: 4 }])).status, 400, 'plus de 3 copies refusées par le serveur');
+  assert.equal((await put([{ type: 'video' }])).status, 400, 'le type principal n\'est pas une option');
+  assert.equal((await put([{ type: 'ecom' }, { type: 'ecom' }])).status, 400);
+  assert.equal((await put([{ type: 'impact' }])).status, 400, 'impact est réservé à l\'administration');
+  assert.equal((await env.call(tiers.jar, 'PUT', `/api/initiatives/${oid}/vitrine-draft`, { options: [] })).status, 403);
+  assert.equal(brouillon().options.length, 3, 'un refus ne modifie pas les options enregistrées');
+  /* passer à un type qui était une option : l'option disparaît (un type n'est jamais principal ET option) */
+  const migre = await env.call(vendeur.jar, 'POST', `/api/initiatives/${oid}/vitrine/changer-type`, { type: 'portfolio', mode: 'adapter', confirme: true });
+  assert.equal(migre.status, 200, JSON.stringify(migre.data));
+  assert.deepEqual(brouillon().options.map((o) => o.type), ['ecom', 'events']);
+  /* tant que les 6 types ne sont pas en service, pas d'options */
+  await env.call(jarAdmin, 'PUT', '/api/admin/boutique-types-v2', { actif: false });
+  try { assert.equal((await put([{ type: 'ecom' }])).status, 400); }
+  finally { await env.call(jarAdmin, 'PUT', '/api/admin/boutique-types-v2', { actif: true }); }
 });
 
 /* ═════════════ 5.2 Parcours d'achat complet, en simulation ═════════════ */
