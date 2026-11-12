@@ -1186,7 +1186,10 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
     }
   }
 
-  { const sf = cookieSecureFlag(req); sendJSON(res, 201, { user: publicUser(user) }, { "Set-Cookie": [`sid=${token}; HttpOnly; Path=/; SameSite=Lax${sf}`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${dureeJeton(cx)}${sf}`, ...(cx ? [cx.cookieAppareil(sf)] : [])] }); }
+  /* Publication préparée automatiquement (2026-11-12) : dès la fin de la création du compte, la 1re proposition est armée. Jamais bloquant. */
+  try { await PropositionPublication.armer(db, id); } catch (e) { console.error('[proposition-publication-signup]', e.message); }
+
+  { const sf = cookieSecureFlag(req); sendJSON(res, 201, { user: publicUser(user) },{ "Set-Cookie": [`sid=${token}; HttpOnly; Path=/; SameSite=Lax${sf}`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${dureeJeton(cx)}${sf}`, ...(cx ? [cx.cookieAppareil(sf)] : [])] }); }
 });
 
 /* ════════════════ PARRAINAGE & INVITATIONS — Phase 1 ════════════════
@@ -1833,6 +1836,8 @@ async function finaliserConnexion(req, res, user, email, ip, via) {
     await AdminJunior.journaliserJunior(db, { juniorUserId: user.id, acteurId: user.id, acteurNom: fresh.nom, action: 'connexion_reussie' });
   }
   SEC.logSecurity("login_success", { ip, email, uid: Number(user.id), role: user.role, via });
+  /* Publication préparée automatiquement (2026-11-12) : à chaque connexion, arme la proposition (2 affichages au plus, comptes sans publication). Jamais bloquant. */
+  try { await PropositionPublication.armer(db, user.id); } catch (e) { console.error('[proposition-publication-login]', e.message); }
 
   /* Proposition de fusion à la CONNEXION (module "Invitation externe", règle #5 du cahier des
      charges) — pas seulement à l'inscription : une personne ayant DÉJÀ un compte peut très bien
@@ -3392,6 +3397,9 @@ MessageSecurise.register({ route, db, sendJSON, getCurrentUser, creerNotif, SEC,
 /* Accréditations simplifiées (2026-11-02) : module « Accréditations », réservé au compte officiel pendant les tests (server/acces-reserve.js). */
 const AccredSimple = require("./accreditation-simple").register({ route, db, sendJSON, getCurrentUser, SEC, creerNotif, nomCompteAffichage, getInitiativeOfficielleId, MessageSecurise });
 /* Fil de l'accueil du profil public (2026-11-02) : toutes les actualités de la plateforme, filtrables, + « Mes actualités » — server/fil-accueil.js. Enregistré ici, avant GET /api/fil/:id qui l'aurait pris pour un identifiant. */
+/* Publication préparée automatiquement (2026-11-12) : GET /api/fil/proposition + reporter — server/proposition-publication.js. Avant GET /api/fil/:id (même piège). */
+const PropositionPublication = require("./proposition-publication");
+PropositionPublication.register({ route, db, sendJSON, getCurrentUser, nomCompteAffichage });
 const FilAccueil = require("./fil-accueil");
 FilAccueil.register({ route, db, sendJSON, getCurrentUser, enrichPost, filMediasDuPost, dateParisISO, TutoPartage, verifierProgrammes: () => FilProgrammes.verifier() });
 /* Documents PDF et Excel affichés DANS la page du cours (visionneuse, accès contrôlé, lecture par fenêtres) — server/formation-documents.js. checkFormationOwner est une déclaration de fonction (hissée). */

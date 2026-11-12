@@ -1499,6 +1499,115 @@ function showPremierePublicationBanner(user) {
     <button type="button" onclick="document.getElementById('premiere-pub-banner').remove()" style="background:none;border:none;color:#1E3A8A;font-size:18px;cursor:pointer;line-height:1;padding:0 4px;" title="Fermer" aria-label="Fermer">✕</button>`;
   document.body.prepend(bar);
 }
+/* ── Publication préparée automatiquement (2026-11-12, demande explicite) ──
+   « À la prochaine connexion (comptes existants) ou dès la fin de l'inscription (nouveaux comptes), écrire une publication
+   (nom, descriptif, tweet, disponible pour des rencontres et du networking), la proposer pour le fil. Le compte peut la modifier,
+   la publier ou la reporter. Proposée 2 fois, puis plus jamais. Tous les comptes. »
+   Le texte et le décompte sont gérés par server/proposition-publication.js (GET /fil/proposition, POST /fil/proposition/reporter) ;
+   la publication passe par POST /fil, comme n'importe quelle publication — rien n'est publié sans le clic « Publier ».
+   Boutons : Publier = bordeaux, Reporter = vert (demande explicite). Le serveur ne répond « oui » que pour un compte sans
+   publication ; sessionStorage (clé par nb_connexions) évite de redemander à chaque page quand la réponse est « non ». */
+function proposerPublicationAuto(user) {
+  if (!user || user.a_publie || window.__poActif) return;
+  if (document.getElementById('prop-pub-carte')) return;
+  const cle = 'da_prop_pub_' + (user.nb_connexions || 0);
+  try { if (sessionStorage.getItem(cle) === 'non') return; } catch (e) { /* stockage indisponible : on demande au serveur */ }
+  api('GET', '/fil/proposition').then(r => {
+    if (!r || !r.a_proposer) { try { sessionStorage.setItem(cle, 'non'); } catch (e) { /* ignoré */ } return; }
+    afficherPropositionPublication(r, cle);
+  }).catch(() => { /* jamais bloquant */ });
+}
+function afficherPropositionPublication(r, cle) {
+  if (document.getElementById('prop-pub-carte')) return;
+  if (!document.getElementById('prop-pub-style')) {
+    const st = document.createElement('style');
+    st.id = 'prop-pub-style';
+    st.textContent = `
+      #prop-pub-carte{position:fixed;right:18px;bottom:18px;z-index:60;width:min(420px,calc(100vw - 24px));max-height:calc(100vh - 36px);overflow:auto;background:#0A1B3C;color:#E4E9F6;border:1px solid #B7791F;border-radius:14px;padding:16px 16px 14px;box-shadow:0 14px 40px rgba(0,0,0,.45);font-size:14px;line-height:1.5}
+      #prop-pub-carte .pp-tete{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:6px}
+      #prop-pub-carte .pp-titre{color:#F2B33D;font-weight:800;font-size:15.5px}
+      #prop-pub-carte .pp-sous{color:#B8C2DC;font-size:12.5px;margin:0 0 10px}
+      #prop-pub-carte .pp-texte{white-space:pre-wrap;background:rgba(255,255,255,.07);border:1px solid rgba(242,179,61,.28);border-radius:10px;padding:10px 12px;max-height:240px;overflow:auto;margin:0 0 12px;color:#fff}
+      #prop-pub-carte textarea.pp-texte{display:block;width:100%;box-sizing:border-box;min-height:190px;font:inherit;resize:vertical;background:#13264F !important;color:#fff !important;border:1px solid rgba(242,179,61,.55) !important;caret-color:#F2B33D;border-radius:10px !important}
+      #prop-pub-carte textarea.pp-texte:focus{outline:2px solid #F2B33D;outline-offset:1px;box-shadow:none !important}
+      #prop-pub-carte .pp-actions{display:flex;flex-wrap:wrap;gap:8px}
+      #prop-pub-carte button{font:inherit;font-weight:700;border-radius:999px;padding:9px 16px;min-height:40px;cursor:pointer;border:2px solid transparent;transition:filter .15s}
+      #prop-pub-carte button:hover{filter:brightness(1.12)}
+      #prop-pub-carte button:focus-visible{outline:3px solid #F2B33D;outline-offset:2px}
+      #prop-pub-carte button:disabled{opacity:.55;cursor:wait}
+      #prop-pub-carte .pp-publier{background:#8B1E3F;color:#fff;border-color:#8B1E3F}
+      #prop-pub-carte .pp-modifier{background:transparent;color:#F2B33D;border-color:#F2B33D}
+      #prop-pub-carte .pp-reporter{background:#1F7A46;color:#fff;border-color:#1F7A46}
+      #prop-pub-carte .pp-fermer{background:none;border:none;color:#B8C2DC;font-size:18px;padding:0 4px;min-height:0;line-height:1}
+      #prop-pub-carte .pp-msg{margin:8px 0 0;font-size:13px;min-height:1em}
+      #prop-pub-carte .pp-msg.err{color:#FFB4B4}
+      @media (max-width:560px){#prop-pub-carte{right:8px;left:8px;bottom:8px;width:auto}}
+      @media (prefers-reduced-motion:no-preference){#prop-pub-carte{animation:ppEntree .25s ease-out}@keyframes ppEntree{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}}`;
+    document.head.appendChild(st);
+  }
+  const carte = document.createElement('div');
+  carte.id = 'prop-pub-carte';
+  carte.setAttribute('role', 'dialog');
+  carte.setAttribute('aria-label', 'Publication prête pour le fil d’actualité');
+  carte.innerHTML = `
+    <div class="pp-tete"><div class="pp-titre">✍️ Votre publication est prête</div></div>
+    <p class="pp-sous">Proposition ${Number(r.numero) || 1} sur ${Number(r.max) || 2} — rien n’est publié sans votre accord. Vous pouvez la modifier avant de la publier sur le fil d’actualité.</p>
+    <div class="pp-texte" id="pp-apercu">${escapeHtml(r.texte)}</div>
+    <div class="pp-actions">
+      <button type="button" class="pp-publier">Publier</button>
+      <button type="button" class="pp-modifier">Modifier</button>
+      <button type="button" class="pp-reporter">Reporter</button>
+    </div>
+    <p class="pp-msg" role="status" aria-live="polite"></p>`;
+  document.body.appendChild(carte);
+  /* Se pose AU-DESSUS de la bannière des cookies (fixe, en bas, plus haute en z-index) tant qu'elle est là : sinon elle cache les boutons. */
+  const ajusterPosition = () => {
+    if (!carte.isConnected) { clearInterval(suiviCookies); return; }
+    const ck = document.getElementById('da-cookie-banner');
+    const h = ck ? ck.offsetHeight : 0;
+    const bas = h + (window.innerWidth <= 560 ? 8 : 18) + (h ? 8 : 0);
+    carte.style.bottom = bas + 'px';
+    carte.style.maxHeight = 'calc(100vh - ' + (bas + 18) + 'px)';
+  };
+  const suiviCookies = setInterval(ajusterPosition, 600);
+  ajusterPosition();
+  const banniere = document.getElementById('premiere-pub-banner');
+  if (banniere) banniere.remove(); // même invitation : un seul message à la fois
+  const msg = carte.querySelector('.pp-msg');
+  const bPub = carte.querySelector('.pp-publier'), bMod = carte.querySelector('.pp-modifier'), bRep = carte.querySelector('.pp-reporter');
+  let zone = carte.querySelector('#pp-apercu');
+  const texteActuel = () => (zone.tagName === 'TEXTAREA' ? zone.value : r.texte).trim();
+  const verrou = (v) => { bPub.disabled = bMod.disabled = bRep.disabled = v; };
+  bMod.onclick = () => {
+    if (zone.tagName === 'TEXTAREA') { zone.focus(); return; }
+    const ta = document.createElement('textarea');
+    ta.id = 'pp-apercu'; ta.className = 'pp-texte'; ta.value = r.texte; ta.setAttribute('aria-label', 'Texte de la publication');
+    zone.replaceWith(ta); zone = ta; ta.focus();
+    bMod.textContent = 'Modification en cours';
+    bMod.disabled = true;
+  };
+  bRep.onclick = async () => {
+    verrou(true);
+    try { await api('POST', '/fil/proposition/reporter'); } catch (e) { /* le serveur nous reproposera, sans gravité */ }
+    try { sessionStorage.setItem(cle, 'non'); } catch (e) { /* ignoré */ }
+    carte.remove();
+  };
+  bPub.onclick = async () => {
+    const texte = texteActuel();
+    if (!texte) { msg.className = 'pp-msg err'; msg.textContent = 'Le texte est vide : écrivez quelque chose avant de publier.'; return; }
+    verrou(true); msg.className = 'pp-msg'; msg.textContent = 'Publication en cours…';
+    try {
+      await api('POST', '/fil', { contenu: texte, categorie: 'Publication', visibilite: 'public', pub_type: 'texte' });
+      try { if (typeof CURRENT_USER === 'object' && CURRENT_USER) CURRENT_USER.a_publie = true; } catch (e) { /* ignoré */ }
+      try { sessionStorage.setItem(cle, 'non'); } catch (e) { /* ignoré */ }
+      carte.innerHTML = `<div class="pp-titre">✅ Publié sur le fil d’actualité</div><p class="pp-sous" style="margin:6px 0 10px">Merci, votre publication est en ligne.</p><div class="pp-actions"><a class="pp-publier" style="text-decoration:none;display:inline-flex;align-items:center;border-radius:999px;padding:9px 16px;font-weight:700;color:#fff;background:#8B1E3F" href="fil-actualite.html">Voir le fil</a></div>`;
+      setTimeout(() => { if (carte.isConnected && !carte.matches(':hover')) carte.remove(); }, 9000);
+    } catch (e) {
+      verrou(false); if (zone.tagName === 'TEXTAREA') bMod.disabled = true;
+      msg.className = 'pp-msg err'; msg.textContent = (e && e.message) || 'La publication n’a pas pu être envoyée. Réessayez.';
+    }
+  };
+}
 function showPwaInstallBanner(user) {
   _pwaCurrentUser = user;
   maybeShowPwaInstallBanner(user);
@@ -2280,7 +2389,7 @@ async function applyAuthState() {
     showEmailVerifBanner(user);
     showOrigineBanner(user);
     afficherBandeauLegal(user);
-    if (!appliquerProfilObligatoire(user)) { afficherRelanceProfil(user); showPremierePublicationBanner(user); ouvrirAbonnementSiDu(user); proposerNotifications(user); }
+    if (!appliquerProfilObligatoire(user)) { afficherRelanceProfil(user); showPremierePublicationBanner(user); proposerPublicationAuto(user); ouvrirAbonnementSiDu(user); proposerNotifications(user); }
     showPwaInstallBanner(user);
   } else {
     el.innerHTML = `

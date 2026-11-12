@@ -2299,6 +2299,11 @@ const MIGRATIONS = [
   // ── Relance "première publication" (2026-10-09, demande explicite) — voir server/relance-publication.js.
   // Posée une seule fois, jamais réinitialisée : marque la 1re publication propre (pas un partage/republication).
   ["users", "premiere_publication_le TEXT"],
+  // ── Publication préparée automatiquement (2026-11-12, demande explicite) — voir server/proposition-publication.js.
+  // nb = propositions déjà affichées (2 au plus), en_cours = carte à montrer, vue = l'affichage du cycle en cours est déjà compté.
+  ["users", "prop_pub_nb INTEGER DEFAULT 0"],
+  ["users", "prop_pub_en_cours INTEGER DEFAULT 0"],
+  ["users", "prop_pub_vue INTEGER DEFAULT 0"],
   // ── Événement épinglé "3 mois de Premium offerts" (2026-10-09, demande explicite) : marque
   // l'événement qui doit toujours apparaître en premier, quels que soient les autres événements
   // créés ensuite — même idiome que produits_vitrine.mis_en_avant / cagnottes.est_vedette.
