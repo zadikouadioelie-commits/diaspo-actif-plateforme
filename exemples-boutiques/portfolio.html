@@ -141,6 +141,57 @@
   .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--gold); color:var(--on-gold); font-weight:600; padding:11px 18px; border-radius:10px; font-size:14px; opacity:0; transition:opacity .25s; pointer-events:none; z-index:100; max-width:90vw; text-align:center; }
   .toast.show { opacity:1; }
 
+  /* Exposition plein écran */
+  .expo { position:fixed; inset:0; z-index:95; display:none; flex-direction:column; background:#04070f; color:var(--text); padding-top:var(--ex-h,0px); }
+  .expo.open { display:flex; }
+  .expo-haut { display:flex; align-items:center; gap:10px; padding:10px 16px; border-bottom:1px solid var(--line); flex:none; }
+  .expo-titre { margin:0; font-family:var(--serif); font-size:20px; line-height:1.2; min-width:0; flex:1 1 auto; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .expo-titre small { display:block; font-family:var(--sans); font-size:12.5px; color:var(--muted); letter-spacing:.04em; }
+  .expo-outil { background:none; border:1.5px solid var(--line); color:var(--text); border-radius:999px; min-height:44px; min-width:44px; padding:0 14px; display:inline-flex; align-items:center; justify-content:center; gap:8px; cursor:pointer; font-weight:600; font-size:14px; white-space:nowrap; }
+  .expo-outil:hover { border-color:var(--gold); color:var(--gold); }
+  .expo-outil[aria-pressed="true"] { background:var(--gold); border-color:var(--gold); color:var(--on-gold); }
+  .expo-scene { position:relative; flex:1 1 auto; min-height:0; display:grid; place-items:center; padding:16px 72px; container-type:size; background:radial-gradient(ellipse at 50% 38%, rgba(216,179,106,.16), transparent 62%); }
+  .expo-cadre { width:min(100cqw, 160cqh); aspect-ratio:16/10; position:relative; border-radius:6px; overflow:hidden; border:1px solid var(--line); box-shadow:0 18px 60px rgba(0,0,0,.65), 0 0 0 10px #0b1226, 0 0 0 11px var(--line); transition:opacity .28s; }
+  .expo-cadre.change { opacity:0; }
+  .expo-cadre svg { position:absolute; inset:0; width:100%; height:100%; }
+  .expo-nav { position:absolute; top:50%; transform:translateY(-50%); width:48px; height:48px; border-radius:999px; border:0; background:rgba(255,255,255,.14); color:#fff; display:grid; place-items:center; cursor:pointer; z-index:2; }
+  .expo-nav:hover { background:rgba(216,179,106,.4); }
+  .expo-prec { left:12px; } .expo-suiv { right:12px; }
+  .expo-plaque { flex:none; display:grid; grid-template-columns:minmax(0,1fr) auto; gap:6px 24px; align-items:center; max-width:1100px; width:100%; margin:0 auto; padding:12px 20px 8px; }
+  .expo-plaque h3 { margin:0; font-family:var(--serif); font-size:clamp(22px, 3vw, 30px); line-height:1.15; }
+  .expo-plaque .par { color:var(--gold); font-size:15px; }
+  .expo-plaque .tech { color:var(--muted); font-size:14px; }
+  .expo-plaque .desc { margin:2px 0 0; color:#e6e1d6; font-size:15px; max-width:70ch; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .expo-plaque .coll { color:var(--muted); font-size:13px; }
+  .expo-droite { display:flex; flex-direction:column; align-items:flex-end; gap:8px; }
+  .expo-droite .prix { font-family:var(--serif); font-size:24px; font-weight:700; color:var(--gold); }
+  .expo-droite .prix.sec { font-size:15px; font-family:var(--sans); font-weight:600; }
+  .expo-actions { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+  .expo-actions .btn { flex:0 0 auto; }
+  .expo-bas { flex:none; padding:4px 16px 14px; max-width:1100px; width:100%; margin:0 auto; }
+  .expo-prog { height:3px; background:rgba(216,179,106,.22); border-radius:3px; overflow:hidden; margin-bottom:8px; }
+  .expo-prog i { display:block; height:100%; width:100%; background:var(--gold); transform:scaleX(0); transform-origin:left; }
+  .expo-prog i.court { transform:scaleX(1); transition:transform linear; }
+  .expo-vignettes { display:flex; gap:8px; overflow-x:auto; padding:4px 2px; scrollbar-width:thin; align-items:center; }
+  .expo-vig { flex:none; width:72px; height:46px; padding:0; border-radius:6px; border:2px solid transparent; overflow:hidden; position:relative; cursor:pointer; background:none; opacity:.62; }
+  .expo-vig svg { position:absolute; inset:0; width:100%; height:100%; }
+  .expo-vig:hover { opacity:1; }
+  .expo-vig[aria-current="true"] { border-color:var(--gold); opacity:1; }
+  .expo-compte { color:var(--muted); font-size:13px; margin-left:auto; padding-left:8px; flex:none; white-space:nowrap; }
+  .expo-mention { color:var(--muted); font-size:12px; }
+  .entree-expo { flex:0 0 auto; }
+  .hero .btn.entree-expo { margin-top:18px; }
+  @media (max-width:760px) {
+    .expo-scene { padding:10px 10px; }
+    .expo-nav { top:auto; bottom:-6px; transform:none; }
+    .expo-plaque { grid-template-columns:1fr; padding:10px 14px 4px; }
+    .expo-droite { align-items:flex-start; }
+    .expo-actions { justify-content:flex-start; }
+    .expo-bouton-lib { display:none; }
+    .expo-titre { font-size:17px; }
+  }
+  @media (max-height:560px) and (orientation:landscape) { .expo-plaque .desc, .expo-plaque .coll { display:none; } .expo-plaque { padding-top:6px; } }
+  @media (prefers-reduced-motion:reduce) { .expo-cadre, .expo-prog i.court { transition:none; } }
   @media (max-width:1180px) {
     .top-in { flex-wrap:wrap; }
     .tools { margin-left:auto; }
@@ -393,6 +444,9 @@
           <span>Livraison sécurisée<br>en Afrique et en Europe</span>
         </div>
       </div>
+      <button class="btn or entree-expo" type="button" data-rub="portfolio" data-expo>
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V5h4M20 9V5h-4M4 15v4h4M20 15v4h-4"/><rect x="8" y="9" width="8" height="6" rx="1"/></svg>Visiter l'exposition
+      </button>
     </div>
     <div class="hero-art" id="heroArt"></div>
   </div>
@@ -404,6 +458,9 @@
   <div class="barre">
     <span class="lib">Filtrer par catégorie :</span>
     <div class="chips" id="cats" role="group" aria-label="Catégories"></div>
+    <button class="btn entree-expo" type="button" data-expo id="expoBarre" aria-label="Visiter l'exposition en plein écran avec la sélection affichée">
+      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V5h4M20 9V5h-4M4 15v4h4M20 15v4h-4"/><rect x="8" y="9" width="8" height="6" rx="1"/></svg>Exposition plein écran
+    </button>
     <label class="tri" for="tri">Trier par :
       <select id="tri">
         <option value="recent">Les plus récentes</option>
@@ -603,6 +660,45 @@
         <div class="actions" id="wActions"></div>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- Exposition plein écran -->
+<div class="expo" id="expo" role="dialog" aria-modal="true" aria-labelledby="expoTitre">
+  <div class="expo-haut">
+    <h2 class="expo-titre" id="expoTitre"></h2>
+    <button class="expo-outil" type="button" id="expoLecture" aria-pressed="false">
+      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true" id="expoLectureIc"><path d="M8 5l11 7-11 7z"/></svg><span class="expo-bouton-lib" id="expoLectureLib">Diaporama</span>
+    </button>
+    <button class="expo-outil" type="button" id="expoPleinEcran" aria-pressed="false">
+      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><span class="expo-bouton-lib">Plein écran</span>
+    </button>
+    <button class="expo-outil" type="button" data-expoclose aria-label="Quitter l'exposition">
+      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg><span class="expo-bouton-lib">Quitter</span>
+    </button>
+  </div>
+  <div class="expo-scene" id="expoScene">
+    <button class="expo-nav expo-prec" type="button" data-expoprev aria-label="Œuvre précédente"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <div class="expo-cadre" id="expoCadre"></div>
+    <button class="expo-nav expo-suiv" type="button" data-exposuiv aria-label="Œuvre suivante"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
+  </div>
+  <div class="expo-plaque" aria-live="polite">
+    <div>
+      <div class="par" id="expoPar"></div>
+      <h3 id="expoOeuvre"></h3>
+      <div class="tech" id="expoTech"></div>
+      <p class="desc" id="expoDesc"></p>
+      <div class="coll" id="expoColl"></div>
+    </div>
+    <div class="expo-droite">
+      <div id="expoPrix"></div>
+      <div class="expo-actions" id="expoActions"></div>
+    </div>
+  </div>
+  <div class="expo-bas">
+    <div class="expo-prog" aria-hidden="true"><i id="expoProg"></i></div>
+    <div class="expo-vignettes" id="expoVignettes" role="group" aria-label="Œuvres de l'exposition"></div>
+    <div class="expo-mention">Exemple : œuvres fictives dessinées pour la démonstration. Touches : flèches pour avancer, espace pour le diaporama, F pour le plein écran, Échap pour quitter.</div>
   </div>
 </div>
 
@@ -916,6 +1012,90 @@
     $("#lbCount").textContent = (state.vue + 1) + " / " + n + " — " + w.t;
   }
 
+  /* ── Exposition plein écran : visite de la sélection affichée, œuvre par œuvre ── */
+  const expo = { liste: [], i: 0, lecture: false, minuteur: null, ouvreur: null };
+  const EXPO_DELAI = 6000;
+  function expoPlaque(w) {
+    $("#expoOeuvre").textContent = w.t;
+    $("#expoPar").textContent = w.artist + " · " + w.year;
+    $("#expoTech").textContent = w.tech + " · " + w.dims;
+    $("#expoDesc").textContent = w.desc;
+    const c = COLLS.filter(x => x.ids.includes(w.id)).map(x => x.titre);
+    $("#expoColl").textContent = c.length ? "Collection : " + c.join(", ") : "";
+    const etat = etatCarte(w), prix = prixTexte(w).replace(/<[^>]+>/g, "");
+    $("#expoPrix").innerHTML = prix ? '<div class="' + (w.mode === "fixe" && w.stock > 0 ? "prix" : "prix sec") + '">' + esc(prix) + "</div>" : (etat ? '<div class="prix sec">' + esc(etat) + "</div>" : "");
+    $("#expoActions").innerHTML = '<button class="btn" type="button" data-expofiche="' + w.id + '">' + ICO.oeil + "Voir la fiche</button>" + boutonAchat(w);
+  }
+  function expoAller(i, sansFondu) {
+    const n = expo.liste.length; if (!n) return;
+    expo.i = (i + n) % n;
+    const w = expo.liste[expo.i], cadre = $("#expoCadre");
+    const maj = () => {
+      cadre.innerHTML = art(w, 0); cadre.classList.remove("change"); expoPlaque(w);
+      $("#expoTitre").innerHTML = esc(SHOP.name) + "<small>Exposition · œuvre " + (expo.i + 1) + " sur " + n + "</small>";
+      document.querySelectorAll(".expo-vig").forEach((b, k) => { const cur = k === expo.i; if (cur) b.setAttribute("aria-current", "true"); else b.removeAttribute("aria-current"); if (cur) b.scrollIntoView({ block: "nearest", inline: "center" }); });
+      expoProgression();
+    };
+    const reduit = window.matchMedia && matchMedia("(prefers-reduced-motion:reduce)").matches;
+    if (sansFondu || reduit) maj(); else { cadre.classList.add("change"); clearTimeout(expo.fondu); expo.fondu = setTimeout(maj, 240); }
+  }
+  function expoProgression() {
+    const p = $("#expoProg"); p.classList.remove("court"); p.style.transitionDuration = "0ms";
+    if (!expo.lecture) return;
+    void p.offsetWidth; p.style.transitionDuration = EXPO_DELAI + "ms"; p.classList.add("court");
+  }
+  function expoLecture(on) {
+    expo.lecture = on; clearInterval(expo.minuteur);
+    const b = $("#expoLecture"); b.setAttribute("aria-pressed", String(on));
+    $("#expoLectureLib").textContent = on ? "Pause" : "Diaporama";
+    $("#expoLectureIc").innerHTML = on ? '<path d="M8 5v14M16 5v14"/>' : '<path d="M8 5l11 7-11 7z"/>';
+    if (on) expo.minuteur = setInterval(() => { if (!document.hidden) expoAller(expo.i + 1); }, EXPO_DELAI);
+    expoProgression();
+  }
+  function expoSuivi(delta) { expoAller(expo.i + delta); if (expo.lecture) expoLecture(true); }
+  function expoOuvrir(depuis) {
+    expo.liste = liste(); if (!expo.liste.length) { toast("Aucune œuvre à exposer avec ces filtres."); return; }
+    expo.ouvreur = depuis || document.activeElement;
+    $("#expoVignettes").innerHTML = expo.liste.map((w, k) => '<button class="expo-vig" type="button" data-expovig="' + k + '" aria-label="Œuvre ' + (k + 1) + " : " + esc(w.t) + '">' + art(w, 0) + "</button>").join("") + '<span class="expo-compte">' + expo.liste.length + " œuvre" + (expo.liste.length > 1 ? "s" : "") + "</span>";
+    document.querySelectorAll(".overlay.open").forEach(o => o.classList.remove("open"));
+    $("#expo").classList.add("open"); document.body.style.overflow = "hidden";
+    expoAller(0, true); $("#expo [data-expoclose]").focus();
+  }
+  function expoFermer() {
+    if (!$("#expo").classList.contains("open")) return;
+    expoLecture(false); clearTimeout(expo.fondu);
+    if (document.fullscreenElement && document.exitFullscreen) { try { document.exitFullscreen(); } catch (e) { /* déjà quitté */ } }
+    $("#expo").classList.remove("open"); document.body.style.overflow = "";
+    if (expo.ouvreur && expo.ouvreur.focus) expo.ouvreur.focus();
+  }
+  function expoPleinEcran() {
+    const el = $("#expo");
+    if (!el.requestFullscreen) { toast("Le plein écran n'est pas disponible sur cet appareil."); return; }
+    if (document.fullscreenElement) document.exitFullscreen(); else el.requestFullscreen().catch(() => toast("Le plein écran a été refusé par le navigateur."));
+  }
+  document.addEventListener("fullscreenchange", () => { $("#expoPleinEcran").setAttribute("aria-pressed", String(!!document.fullscreenElement)); });
+  document.addEventListener("keydown", e => {
+    if (!$("#expo").classList.contains("open")) return;
+    const surBouton = e.target.closest && e.target.closest("button, a, select, input, textarea");
+    if (e.key === "Escape") { if (!document.fullscreenElement) expoFermer(); return; }
+    if (e.key === "ArrowLeft") { e.preventDefault(); expoSuivi(-1); }
+    else if (e.key === "ArrowRight") { e.preventDefault(); expoSuivi(1); }
+    else if (e.key === "Home") { e.preventDefault(); expoSuivi(-expo.i); }
+    else if (e.key === "End") { e.preventDefault(); expoAller(expo.liste.length - 1); }
+    else if ((e.key === " " || e.key === "Spacebar") && !surBouton) { e.preventDefault(); expoLecture(!expo.lecture); }
+    else if (e.key === "f" || e.key === "F") { if (!surBouton || e.target.id === "expoPleinEcran") { e.preventDefault(); expoPleinEcran(); } }
+    else if (e.key === "Tab") {
+      const foc = [...$("#expo").querySelectorAll("button:not([disabled])")].filter(x => x.getClientRects().length);
+      if (!foc.length) return; const a = foc[0], z = foc[foc.length - 1];
+      if (e.shiftKey && document.activeElement === a) { e.preventDefault(); z.focus(); } else if (!e.shiftKey && document.activeElement === z) { e.preventDefault(); a.focus(); }
+    }
+  });
+  (function glissement() {
+    let x0 = null; const sc = $("#expoScene");
+    sc.addEventListener("touchstart", e => { x0 = e.touches[0].clientX; }, { passive: true });
+    sc.addEventListener("touchend", e => { if (x0 == null) return; const dx = e.changedTouches[0].clientX - x0; x0 = null; if (Math.abs(dx) > 50) expoSuivi(dx < 0 ? 1 : -1); }, { passive: true });
+  })();
+
   /* ── Panier (simulation) ── */
   function ajouter(id) {
     const w = trouver(id); if (!w || !dispo(w)) return;
@@ -1056,6 +1236,15 @@
       document.querySelectorAll('[data-fav="' + id + '"]').forEach(x => x.setAttribute("aria-pressed", favoris.includes(id)));
       toast(favoris.includes(id) ? "Ajoutée à vos favoris." : "Retirée de vos favoris."); return;
     }
+    if (q("[data-expo]")) { expoOuvrir(q("[data-expo]")); return; }
+    if (q("[data-expoclose]")) { expoFermer(); return; }
+    if (q("[data-expoprev]")) { expoSuivi(-1); return; }
+    if (q("[data-exposuiv]")) { expoSuivi(1); return; }
+    if (q("#expoLecture")) { expoLecture(!expo.lecture); return; }
+    if (q("#expoPleinEcran")) { expoPleinEcran(); return; }
+    if ((b = q("[data-expovig]"))) { expoAller(Number(b.dataset.expovig)); if (expo.lecture) expoLecture(true); return; }
+    if ((b = q("[data-expofiche]"))) { const id = Number(b.dataset.expofiche); expo.ouvreur = null; expoFermer(); ouvrir(id); return; }
+    if (q("#expo [data-devis]")) { expo.ouvreur = null; expoFermer(); }
     if ((b = q("[data-add]"))) { ajouter(Number(b.dataset.add)); return; }
     if ((b = q("[data-work]"))) { ouvrir(Number(b.dataset.work)); return; }
     if ((b = q("[data-devis]"))) {
