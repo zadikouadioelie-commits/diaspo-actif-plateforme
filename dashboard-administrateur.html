@@ -3061,6 +3061,21 @@
           <button class="btn btn-orange" onclick="saveParametres()">💾 Enregistrer</button>
         </div>
 
+        <!-- Nouvelle interface des boutiques — accès direct à l'interrupteur des 6 types (2026-11-12, demande explicite) -->
+        <div class="card" id="bqt-carte" style="margin-bottom:18px;">
+          <h3 style="margin:0 0 4px;font-size:15px;">🏬 Boutiques — Nouvelle interface (6 types)</h3>
+          <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">
+            Mise en service des 6 types de boutique (traditionnelle, vidéo, portfolio, événements, impact, financement).
+            Ne modifie aucune boutique existante : seuls l'affichage et les choix des créateurs changent. Réversible à tout moment.
+          </p>
+          <div id="bqt-etat" style="font-size:13px;margin-bottom:12px;">Chargement…</div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+            <button class="btn btn-orange btn-sm" id="bqt-btn-activer" onclick="bqtBasculer(true)" style="display:none;">✅ Mettre les 6 types en service</button>
+            <button class="btn btn-sm" id="bqt-btn-desactiver" onclick="bqtBasculer(false)" style="display:none;">↩️ Retirer les 6 types du service</button>
+            <a href="atelier-boutiques.html" style="font-size:13px;">Ouvrir l'Atelier des boutiques →</a>
+          </div>
+        </div>
+
         <!-- Maintenance des boutiques (2026-11-02, demande explicite) -->
         <div class="card" id="bqm-carte" style="margin-bottom:18px;">
           <h3 style="margin:0 0 4px;font-size:15px;">🏬 Boutiques — Maintenance</h3>
@@ -9993,7 +10008,7 @@ async function submitAccordDirect(){
     'diaspoactif-deals': () => loadDaDeals(),
     'partenaires-admin': () => loadPartenairesAdmin(),
     'temoignages-admin':   () => loadTemoignagesAdmin(),
-    parametres:  () => { loadParametres(); bqmCharger(); },
+    parametres:  () => { loadParametres(); bqtCharger(); bqmCharger(); },
     membres:     () => loadAdminMembres(),
     'reseau-pro': () => loadReseauPro(),
     initiatives: () => loadAdminInitiatives(),
@@ -12201,6 +12216,33 @@ async function submitAccordDirect(){
   window.avcReactiver = async function(id) {
     try { await api('PUT', `/admin/avancement-criteres/${id}`, { actif: true }); avcCharger(); }
     catch(e) { alert('Erreur : ' + (e.message||'')); }
+  };
+
+  // ══ BOUTIQUES — NOUVELLE INTERFACE (6 types) ═══════════════
+  const BQT_NOMS = { ecom: 'Boutique Traditionnelle', video: 'Boutique Vidéo', portfolio: 'Portfolio', events: "Créateur d'événements", impact: 'Projet Impact', finance: 'Organismes de financement' };
+  async function bqtCharger() {
+    const el = document.getElementById('bqt-etat');
+    const btnOn = document.getElementById('bqt-btn-activer'), btnOff = document.getElementById('bqt-btn-desactiver');
+    if (!el) return;
+    try {
+      const r = await api('GET', '/admin/boutique-types-v2');
+      const ouverts = (r.selectionnables_public || []).map(c => BQT_NOMS[c] || c).join(', ') || 'aucun';
+      if (r.actif) {
+        el.innerHTML = '<strong style="color:#10b981;">🟢 Les 6 types sont en service</strong> — ouverts aux vraies boutiques : ' + ouverts + '. Les autres restent réservés aux administrateurs.';
+        btnOn.style.display = 'none'; btnOff.style.display = '';
+      } else {
+        el.innerHTML = '<strong style="color:#ef4444;">⚪ Les 6 types ne sont pas encore en service</strong> — les créateurs voient l\'affichage précédent.';
+        btnOn.style.display = ''; btnOff.style.display = 'none';
+      }
+    } catch (e) { el.textContent = 'Erreur de chargement (réservé aux comptes administrateur).'; btnOn.style.display = 'none'; btnOff.style.display = 'none'; }
+  }
+  window.bqtBasculer = async function (allumer) {
+    const msg = allumer
+      ? "Mettre les 6 types en service ? Les créateurs verront les 6 types de boutique et pourront changer de type. Vous pourrez revenir en arrière à tout moment."
+      : "Retirer les 6 types du service ? Les créateurs retrouveront l'affichage précédent. Vous pourrez les remettre en service à tout moment.";
+    if (!confirm(msg)) return;
+    try { await api('PUT', '/admin/boutique-types-v2', { actif: allumer }); alert(allumer ? '✅ Les 6 types sont en service.' : '✅ Les 6 types sont retirés du service.'); bqtCharger(); }
+    catch (e) { alert('Erreur : ' + (e.message || '')); }
   };
 
   // ══ BOUTIQUES — MAINTENANCE ════════════════════════════════
