@@ -1273,6 +1273,8 @@ async function init() {
           if (_ib && (_ib.vitrine_type === 'commercial' || _ib.vitrine_type === 'ecom')) { location.replace('boutique.html?id=' + encodeURIComponent(profil.initiative_id)); return; }
           if (_ib && _ib.vitrine_type === 'portfolio') { location.replace('portfolio.html?id=' + encodeURIComponent(profil.initiative_id)); return; }
           if (_ib && _ib.vitrine_type === 'video') { location.replace('boutique-video.html?id=' + encodeURIComponent(profil.initiative_id)); return; }
+          /* « Créateur d'événements » (lot E, 2026-11-12) : seule la clé NOUVELLE « events » est redirigée ; une boutique de l'ancien type « evenement » garde sa présentation actuelle jusqu'à la bascule. */
+          if (_ib && _ib.vitrine_type === 'events') { location.replace('boutique-evenements.html?id=' + encodeURIComponent(profil.initiative_id)); return; }
         } catch (e) { /* repli : l'ancienne vue boutique */ }
       }
     }

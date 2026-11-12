@@ -32,8 +32,8 @@ const ANCIENS_SANS_EQUIVALENT = Object.freeze(['blog', 'createur', 'formation'])
 const CLES_NOUVELLES = Object.freeze(['ecom', 'events', 'impact', 'finance']);
 
 /* Types qui ont une page publique DÉDIÉE (profil-app.html : ecom → boutique.html, portfolio → portfolio.html,
-   video → boutique-video.html). Les autres types s'affichent avec la présentation générale en attendant leur page (lot E). */
-const PAGES_DEDIEES = Object.freeze(['ecom', 'video', 'portfolio']);
+   video → boutique-video.html, events → boutique-evenements.html). Les autres types s'affichent avec la présentation générale en attendant leur page (lot E). */
+const PAGES_DEDIEES = Object.freeze(['ecom', 'video', 'portfolio', 'events']);
 
 /* Types qu'une vraie boutique peut choisir aujourd'hui. « Créateur d'événements » est ouvert comme les autres types
    (décision de l'utilisateur, 2026-11-11) ; impact / finance : uniquement les administrateurs (Atelier) jusqu'à leur lot. */
