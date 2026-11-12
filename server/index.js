@@ -809,6 +809,14 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
 
   if (String(bio || "").trim()) {
     try { await db.prepare("UPDATE users SET bio=? WHERE id=?").run(String(bio).trim().slice(0, 800), id); } catch (e) { logError(e, "bio à l'inscription", req); }
+  } else {
+    /* « À propos » rempli dès l'inscription pour TOUS les types de compte (2026-11-12, demande explicite) : une initiative ou une collectivité
+       a déjà écrit sa présentation (obligatoire, voir plus haut) ; on la recopie dans la biographie du compte, que la page profil affiche.
+       Le titulaire peut ensuite la modifier librement (la modification écrase cette copie). */
+    const presentation = role === "initiative" ? description : role === "collectivite" ? description_institution : null;
+    if (texteSeul(presentation)) {
+      try { await db.prepare("UPDATE users SET bio=? WHERE id=?").run(SEC.sanitizeRichHtml(presentation), id); } catch (e) { logError(e, "présentation recopiée en bio à l'inscription", req); }
+    }
   }
   try { await legal.enregistrer(id, legal.A_L_INSCRIPTION, "inscription"); } catch (e) { logError(e, "acceptation légale à l'inscription", req); }
 
@@ -20294,7 +20302,7 @@ route("GET", "/api/profil/:id", async (req, res, params) => {
     /* « À propos » d'une initiative (2026-11-12, signalé : compte tout juste créé, À propos vide alors que la présentation est obligatoire à
        l'inscription) : le formulaire exige la DESCRIPTION de l'initiative (table initiatives), mais la fiche lisait seulement la biographie du
        compte (users.bio), jamais renseignée pour une initiative. Tant que l'initiative n'a pas écrit de bio propre, la fiche affiche sa description. */
-    bio: u.bio || descriptionStructure || u.bio, photo_url: u.photo_url || photoFallbackInitiative, banner_url: u.banner_url,
+    bio: u.bio || descriptionStructure || u.description_institution || u.bio, photo_url: u.photo_url || photoFallbackInitiative, banner_url: u.banner_url,
     prenom: u.prenom, titre_pro: u.titre_pro,
     nationalite1: u.nationalite1, nationalite2: u.nationalite2,
     origine1: u.origine1, origine2: u.origine2,
