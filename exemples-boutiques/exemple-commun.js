@@ -102,7 +102,7 @@
       var tex = R && R.TEXTURES && R.TEXTURES.filter(function (t) { return t.id === idTex; })[0];
       /* Premier bandeau VISIBLE : sur la page commune, impact et finance ont leur propre bandeau (.ih-hero, .fin-hero). */
       var hero = null;
-      if (!CREATION && fichier !== "video.html") {
+      if (!CREATION) {
         var cands = document.querySelectorAll(".fin-hero, .ih-hero, section.hero, .hero");
         for (var ci = 0; ci < cands.length; ci++) { if (cands[ci].getClientRects().length) { hero = cands[ci]; break; } }
       }
