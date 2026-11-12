@@ -181,6 +181,24 @@
   .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--gold); color:var(--on-gold); font-weight:600; padding:11px 18px; border-radius:10px; font-size:14px; opacity:0; transition:opacity .25s; pointer-events:none; z-index:100; max-width:90vw; text-align:center; }
   .toast.show { opacity:1; }
 
+  .etapes { list-style:none; display:flex; gap:8px; margin:0 0 14px; padding:0; }
+  .etapes li { flex:1 1 0; display:flex; align-items:center; gap:8px; font-size:13.5px; color:var(--muted); min-width:0; }
+  .etapes li span { flex:none; width:26px; height:26px; border-radius:50%; border:1px solid var(--line); display:grid; place-items:center; font-weight:700; font-size:13px; }
+  .etapes li[aria-current="step"] { color:var(--gold); font-weight:700; }
+  .etapes li[aria-current="step"] span { background:var(--gold); color:var(--on-gold); border-color:var(--gold); }
+  .etapes li.fait span { border-color:var(--gold); color:var(--gold); }
+  .typesb { list-style:none; margin:0; padding:0; display:grid; gap:10px; }
+  .typesb li { display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:6px 14px; align-items:center; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:10px 12px; }
+  .typesb small { display:block; color:var(--muted); font-size:13px; line-height:1.35; }
+  .typesb .prix { font-size:21px; }
+  .recap { list-style:none; margin:10px 0 0; padding:0; display:grid; gap:8px; }
+  .recap li { display:flex; justify-content:space-between; gap:12px; }
+  .recap li.tot { border-top:1px solid var(--line); padding-top:10px; font-family:var(--serif); font-size:22px; }
+  .promo { display:flex; gap:8px; }
+  .promo input { flex:1 1 auto; min-width:0; }
+  .form .lbl { font-size:14px; color:var(--muted); display:block; margin-bottom:4px; }
+  .resa h3:focus { outline:none; }
+  @media (max-width:600px) { .typesb li { grid-template-columns:minmax(0,1fr) auto; } .typesb .qty { grid-column:1 / -1; justify-self:start; } .etapes li { font-size:12px; } }
   @media (max-width:1180px) {
     .top-in { flex-wrap:wrap; }
     .nav { order:3; flex:1 1 100%; overflow-x:auto; scrollbar-width:none; margin:0 -6px; }
@@ -488,7 +506,7 @@
     cat: "all", q: "", mois: "all", format: "all", prix: "all", tri: "date", vue: "cartes", page: 1, parPage: 6, fav: false,
     favs: new Set(lire("ev_ex_favs", [])),
     mine: new Map(lire("ev_ex_mine", [])),   // id -> { places, ref }
-    current: null, qty: 1, ouvreur: null
+    current: null, sel: {}, etape: 1, coord: { nom: "", email: "" }, promo: null, ouvreur: null
   };
   (lire("ev_ex_ventes", [])).forEach(([id, n]) => { const e = EVENTS.find(x => x.id === id); if (e) e.sold += n; });
   function memoriser() {
@@ -607,7 +625,7 @@
   /* ── Fiche d'événement et réservation simulée ── */
   function ouvrir(id, depuis) {
     const e = EVENTS.find(x => x.id === id); if (!e) return;
-    state.current = e; state.qty = 1; state.ouvreur = depuis || document.activeElement;
+    state.current = e; initResa(e); state.ouvreur = depuis || document.activeElement;
     $("#eTitle").textContent = e.t;
     $("#evOv").classList.add("open");
     ficher();
@@ -625,37 +643,83 @@
       + '</div></div><div class="resa" id="resa"></div>';
     reservation();
   }
+  /* Types de billets : dérivés du prix de l'événement (exemple fictif) */
+  function typesBillets(e) {
+    if (e.mode !== "billet") return [{ id: "part", nom: "Participation libre", desc: "Inscription gratuite, une place par personne.", prix: 0, places: 1 }];
+    const p = e.price, arr = (x) => Math.round(x * 2) / 2;
+    const t = [
+      { id: "std", nom: "Billet standard", desc: "Une place, accès à tout le programme.", prix: p, places: 1 },
+      { id: "red", nom: "Tarif réduit", desc: "Étudiants, moins de 26 ans, demandeurs d'emploi (justificatif à l'entrée).", prix: arr(p * 0.6), places: 1 }
+    ];
+    if (e.cat === "culture" || e.cat === "festivals") t.push({ id: "fam", nom: "Pass famille", desc: "4 places pour une même famille.", prix: arr(p * 3), places: 4 });
+    t.push({ id: "sou", nom: "Billet de soutien", desc: "Une place, avec un don qui finance une place solidaire.", prix: p * 2, places: 1 });
+    return t;
+  }
+  function initResa(e) { state.sel = { [typesBillets(e)[0].id]: 1 }; state.etape = 1; state.promo = null; }
+  const maxPlaces = (e) => Math.min(placesRestantes(e), 10);
+  const placesSel = () => typesBillets(state.current).reduce((n, t) => n + (state.sel[t.id] || 0) * t.places, 0);
+  const sousTotal = () => typesBillets(state.current).reduce((n, t) => n + (state.sel[t.id] || 0) * t.prix, 0);
+  const remise = () => state.promo ? Math.round(sousTotal() * state.promo.pct) / 100 : 0;
+  const aPayer = () => sousTotal() - remise();
+  function etapesHtml() {
+    return '<ol class="etapes" aria-label="Étapes de la réservation">' + ["Billets", "Coordonnées", "Récapitulatif"].map((x, i) =>
+      "<li" + (state.etape === i + 1 ? ' aria-current="step"' : "") + (state.etape > i + 1 ? ' class="fait"' : "") + "><span>" + (i + 1) + "</span>" + x + "</li>").join("") + "</ol>";
+  }
+  function majSel() {
+    const e = state.current, n = placesSel(), a = $("#qaide"), b = $("#btnSuite"), t = $("#qt");
+    if (t) t.textContent = fmt(sousTotal());
+    if (a) a.textContent = n + " place" + (n > 1 ? "s" : "") + " sélectionnée" + (n > 1 ? "s" : "") + " sur " + maxPlaces(e) + " possible" + (maxPlaces(e) > 1 ? "s" : "") + " par réservation.";
+    if (b) b.disabled = n < 1;
+  }
+  function lireCoord(f) { if (f && f.nom) state.coord = { nom: f.nom.value, email: f.email.value }; }
+  function appliquerPromo(valeur) {
+    const code = String(valeur || "").trim().toUpperCase();
+    if (!code) { state.promo = null; return "Aucun code appliqué."; }
+    if (code === "DIASPO10") { state.promo = { code, pct: 10 }; return "Code DIASPO10 appliqué : −10 %."; }
+    state.promo = null; return "Code inconnu. Pour l'exemple, essayez DIASPO10.";
+  }
+  function versTitre() { const h = $("#resa h3"); if (h) { h.tabIndex = -1; h.focus(); } }
   function reservation() {
-    const e = state.current, r = placesRestantes(e), deja = state.mine.get(e.id), z = $("#resa");
+    const e = state.current, r = placesRestantes(e), deja = state.mine.get(e.id), z = $("#resa"), billet = e.mode === "billet";
     if (deja) {
-      z.innerHTML = '<h3>Votre ' + (e.mode === "billet" ? "billet" : "inscription") + '</h3><p class="ok">' + deja.places + " place" + (deja.places > 1 ? "s" : "") + " réservée" + (deja.places > 1 ? "s" : "") + " pour " + esc(dateLongue(e)) + ".</p>"
+      const lg = (deja.lignes || []).map(l => "<li><span>" + l[1] + " × " + esc(l[0]) + "</span><b>" + fmt(l[2]) + "</b></li>").join("");
+      z.innerHTML = '<h3>Votre ' + (billet ? "billet" : "inscription") + '</h3><p class="ok">' + deja.places + " place" + (deja.places > 1 ? "s" : "") + " réservée" + (deja.places > 1 ? "s" : "") + " pour " + esc(dateLongue(e)) + ".</p>"
+        + (lg ? '<ul class="recap">' + lg + (deja.remise ? "<li><span>Code " + esc(deja.promo) + "</span><b>− " + fmt(deja.remise) + "</b></li>" : "") + '<li class="tot"><span>Total</span><b>' + fmt(deja.total) + "</b></li></ul>" : "")
+        + (deja.nom ? '<p class="aide">Au nom de ' + esc(deja.nom) + " (" + esc(deja.email) + ").</p>" : "")
         + '<p>Référence : <span class="refcode">' + deja.ref + '</span></p><p class="aide">' + (e.fmt === "ligne" ? "Le lien de connexion vous est envoyé par e-mail la veille." : "Présentez cette référence à l'entrée.") + " Simulation : aucun e-mail n'est réellement envoyé.</p>"
         + '<div class="rang"><button class="btn" type="button" data-annuler="' + e.id + '" style="flex:0 0 auto">Annuler ma réservation</button></div>';
       return;
     }
     if (r <= 0) { z.innerHTML = '<h3>Événement complet</h3><p class="aide" style="margin-top:0">Toutes les places sont réservées. Laissez-nous votre adresse : vous serez prévenu(e) si une place se libère.</p><div class="rang"><button class="btn or" type="button" data-attente="' + e.id + '" style="flex:0 0 auto">Me prévenir si une place se libère</button></div>'; return; }
-    if (e.mode === "billet") {
-      z.innerHTML = '<h3>' + ICO.billet.replace("ic", "ic\" style=\"vertical-align:-4px;margin-right:8px") + "Réserver des billets</h3>"
-        + '<div class="rang"><span>Prix par billet</span><b class="prix">' + fmt(e.price) + '</b></div>'
-        + '<div class="rang"><span id="qlib">Nombre de billets</span><div class="qty" role="group" aria-labelledby="qlib"><button type="button" data-q="-1" aria-label="Un billet de moins">−</button><span id="qv" aria-live="polite">' + state.qty + '</span><button type="button" data-q="1" aria-label="Un billet de plus">+</button></div></div>'
-        + '<div class="total"><span>Total</span><span id="qt">' + fmt(e.price * state.qty) + '</span></div>'
-        + '<button class="btn or" type="button" data-buy="' + e.id + '" style="width:100%">' + (e.price ? "Payer et réserver (simulé)" : "Réserver gratuitement") + "</button>"
-        + '<p class="aide">' + r + " place" + (r > 1 ? "s" : "") + " restante" + (r > 1 ? "s" : "") + ". Aucun paiement réel n'est effectué.</p>";
-    } else {
-      z.innerHTML = '<h3>S\'inscrire</h3><form class="form" id="regForm" novalidate>'
-        + '<label>Nom et prénom<input type="text" name="nom" autocomplete="name" required></label>'
-        + '<label>Adresse e-mail<input type="email" name="email" autocomplete="email" required></label>'
-        + '<label>Nombre de personnes<input type="number" name="n" min="1" max="' + Math.min(r, 10) + '" value="1" required></label>'
+    const types = typesBillets(e), tete = "<h3>" + (billet ? "Réserver des billets" : "S'inscrire") + "</h3>" + etapesHtml();
+    if (state.etape === 1) {
+      z.innerHTML = tete + '<ul class="typesb">' + types.map(t => "<li><div><b>" + esc(t.nom) + "</b><small>" + esc(t.desc) + '</small></div><span class="prix">' + fmt(t.prix) + '</span><div class="qty" role="group" aria-label="Quantité : ' + esc(t.nom) + '"><button type="button" data-qt="' + t.id + '" data-d="-1" aria-label="Un de moins : ' + esc(t.nom) + '">−</button><span id="qv-' + t.id + '" aria-live="polite">' + (state.sel[t.id] || 0) + '</span><button type="button" data-qt="' + t.id + '" data-d="1" aria-label="Un de plus : ' + esc(t.nom) + '">+</button></div></li>').join("") + "</ul>"
+        + '<div class="total"><span>Sous-total</span><span id="qt"></span></div><p class="aide" id="qaide" style="margin-top:0"></p>'
+        + '<button class="btn or" type="button" data-etape="2" id="btnSuite" style="width:100%">Continuer</button>';
+      majSel();
+    } else if (state.etape === 2) {
+      z.innerHTML = tete + '<form class="form" id="coordForm" novalidate>'
+        + '<label>Nom et prénom<input type="text" name="nom" autocomplete="name" value="' + esc(state.coord.nom) + '" required></label>'
+        + '<label>Adresse e-mail<input type="email" name="email" autocomplete="email" value="' + esc(state.coord.email) + '" required></label>'
+        + (sousTotal() > 0 ? '<div><label class="lbl" for="promoIn">Code promo (facultatif)</label><div class="promo"><input type="text" id="promoIn" name="promo" autocomplete="off" value="' + (state.promo ? esc(state.promo.code) : "") + '"><button class="btn" type="button" data-promo style="flex:0 0 auto">Appliquer</button></div><p class="aide" id="promoMsg" role="status">' + (state.promo ? "Code " + esc(state.promo.code) + " appliqué : −" + state.promo.pct + " %." : "Pour l'exemple, le code DIASPO10 donne 10 % de remise.") + "</p></div>" : "")
         + '<p class="aide" id="regErr" role="alert" style="color:var(--alerte);margin:0"></p>'
-        + '<button class="btn or" type="submit" style="width:100%">Confirmer mon inscription</button></form><p class="aide">' + r + " place" + (r > 1 ? "s" : "") + " restante" + (r > 1 ? "s" : "") + ". Inscription gratuite" + (e.price ? " avant paiement sur place" : "") + ".</p>";
+        + '<div class="rang"><button class="btn" type="button" data-etape="1" style="flex:0 0 auto">Retour</button><button class="btn or" type="submit" style="flex:1 1 auto">Voir le récapitulatif</button></div></form>';
+    } else {
+      const lg = types.filter(t => state.sel[t.id]);
+      z.innerHTML = tete + '<ul class="recap">' + lg.map(t => "<li><span>" + state.sel[t.id] + " × " + esc(t.nom) + "</span><b>" + fmt(state.sel[t.id] * t.prix) + "</b></li>").join("")
+        + (remise() ? "<li><span>Code " + esc(state.promo.code) + " (−" + state.promo.pct + " %)</span><b>− " + fmt(remise()) + "</b></li>" : "")
+        + '<li class="tot"><span>Total</span><b>' + fmt(aPayer()) + "</b></li></ul>"
+        + '<p class="aide">' + placesSel() + " place" + (placesSel() > 1 ? "s" : "") + " pour " + esc(dateLongue(e)) + ", au nom de " + esc(state.coord.nom) + " (" + esc(state.coord.email) + ").</p>"
+        + '<div class="rang"><button class="btn" type="button" data-etape="1" style="flex:0 0 auto">Modifier</button><button class="btn or" type="button" data-confirmer="' + e.id + '" style="flex:1 1 auto">' + (aPayer() > 0 ? "Confirmer et payer (simulé)" : billet ? "Confirmer la réservation" : "Confirmer mon inscription") + "</button></div>"
+        + '<p class="aide">Aucun paiement réel n\'est effectué.</p>';
     }
   }
   let compteur = 1000 + Number(lire("ev_ex_n", 0));
-  function reserver(id, places) {
+  function reserver(id, places, extra) {
     const e = EVENTS.find(x => x.id === id);
     if (places > placesRestantes(e)) { toast("Il ne reste que " + placesRestantes(e) + " place(s)."); return false; }
     compteur++; ecrire("ev_ex_n", compteur - 1000);
-    e.sold += places; state.mine.set(id, { places, ref: "DA-" + id + "-" + compteur });
+    e.sold += places; state.mine.set(id, Object.assign({ places, ref: "DA-" + id + "-" + compteur }, extra || {}));
     memoriser(); return true;
   }
   function fermer(ov) {
@@ -670,7 +734,7 @@
   function listeMine() {
     const l = [...state.mine].map(([id, m]) => ({ e: EVENTS.find(x => x.id === id), m }));
     $("#mineBody").innerHTML = l.length
-      ? '<ul class="lignes">' + l.map(x => '<li><span class="pt">' + affiche(x.e) + '</span><span><b>' + esc(x.e.t) + "</b><small>" + esc(dateLongue(x.e)) + " · " + x.m.places + " place" + (x.m.places > 1 ? "s" : "") + "</small><small>Réf. " + x.m.ref + '</small></span><button class="btn" type="button" data-ev="' + x.e.id + '" style="flex:0 0 auto">Voir</button></li>').join("") + "</ul>"
+      ? '<ul class="lignes">' + l.map(x => '<li><span class="pt">' + affiche(x.e) + '</span><span><b>' + esc(x.e.t) + "</b><small>" + esc(dateLongue(x.e)) + " · " + x.m.places + " place" + (x.m.places > 1 ? "s" : "") + (x.m.total != null ? " · " + fmt(x.m.total) : "") + "</small><small>Réf. " + x.m.ref + '</small></span><button class="btn" type="button" data-ev="' + x.e.id + '" style="flex:0 0 auto">Voir</button></li>').join("") + "</ul>"
       : '<div class="vide"><b>Aucune inscription</b>Réservez un événement : votre billet apparaîtra ici.</div>';
   }
 
@@ -691,8 +755,24 @@
     if ((b = q("[data-page]"))) { state.page = Number(b.dataset.page); render(); $("#sectMain").scrollIntoView({ block: "start" }); return; }
     if ((b = q("[data-fav]"))) { const id = Number(b.dataset.fav); state.favs.has(id) ? state.favs.delete(id) : state.favs.add(id); memoriser(); toast(state.favs.has(id) ? "Ajouté aux favoris." : "Retiré des favoris."); render(); const nb = document.querySelector('[data-fav="' + id + '"]'); if (nb) nb.focus(); return; }
     if ((b = q("[data-ev]"))) { const dansMine = $("#mineOv").classList.contains("open"); if (dansMine) $("#mineOv").classList.remove("open"); ouvrir(Number(b.dataset.ev), dansMine ? $("#openMine") : b); return; }
-    if ((b = q("[data-q]"))) { state.qty = Math.max(1, Math.min(placesRestantes(state.current), state.qty + Number(b.dataset.q))); $("#qv").textContent = state.qty; $("#qt").textContent = fmt(state.current.price * state.qty); return; }
-    if ((b = q("[data-buy]"))) { if (reserver(Number(b.dataset.buy), state.qty)) { toast("Réservation simulée : " + state.qty + " billet(s). Aucun paiement réel."); ficher(); $("#resa").scrollIntoView({ block: "nearest" }); } return; }
+    if ((b = q("[data-qt]"))) {
+      const e = state.current, ty = typesBillets(e).find(x => x.id === b.dataset.qt), d = Number(b.dataset.d), n = (state.sel[ty.id] || 0) + d;
+      if (n < 0) return;
+      if (d > 0 && placesSel() + ty.places > maxPlaces(e)) { toast("Maximum : " + maxPlaces(e) + " place" + (maxPlaces(e) > 1 ? "s" : "") + " par réservation."); return; }
+      state.sel[ty.id] = n; $("#qv-" + ty.id).textContent = n; majSel(); return;
+    }
+    if ((b = q("[data-etape]"))) {
+      lireCoord($("#coordForm"));
+      const v = Number(b.dataset.etape); if (v === 2 && placesSel() < 1) return;
+      state.etape = v; reservation(); versTitre(); return;
+    }
+    if (q("[data-promo]")) { lireCoord($("#coordForm")); $("#promoMsg").textContent = appliquerPromo($("#promoIn").value); return; }
+    if ((b = q("[data-confirmer]"))) {
+      const e = state.current, lignes = typesBillets(e).filter(x => state.sel[x.id]).map(x => [x.nom, state.sel[x.id], state.sel[x.id] * x.prix]);
+      const extra = { nom: state.coord.nom.trim(), email: state.coord.email.trim(), lignes, total: aPayer(), remise: remise(), promo: state.promo ? state.promo.code : "" };
+      if (reserver(e.id, placesSel(), extra)) { toast("Réservation simulée : " + placesSel() + " place(s). Aucun paiement réel."); ficher(); versTitre(); }
+      return;
+    }
     if ((b = q("[data-annuler]"))) { const id = Number(b.dataset.annuler), m = state.mine.get(id); EVENTS.find(x => x.id === id).sold -= m.places; state.mine.delete(id); memoriser(); toast("Réservation annulée."); ficher(); return; }
     if (q("[data-attente]")) { toast("Liste d'attente simulée : vous serez prévenu(e) si une place se libère."); return; }
     if (q("#openMine")) { state.ouvreur = q("#openMine"); listeMine(); $("#mineOv").classList.add("open"); $("#mineOv [data-close]").focus(); return; }
@@ -701,13 +781,17 @@
     if (t.classList && t.classList.contains("overlay")) fermer(t);
   });
   document.addEventListener("submit", ev => {
-    if (ev.target.id !== "regForm") return;
+    if (ev.target.id !== "coordForm") return;
     ev.preventDefault();
-    const f = ev.target, e = state.current, n = Number(f.n.value), err = $("#regErr");
-    if (!f.nom.value.trim()) { err.textContent = "Indiquez votre nom et prénom."; f.nom.focus(); return; }
-    if (!/^\S+@\S+\.\S+$/.test(f.email.value.trim())) { err.textContent = "Indiquez une adresse e-mail valide, par exemple nom@exemple.fr."; f.email.focus(); return; }
-    if (!(n >= 1) || n > placesRestantes(e)) { err.textContent = "Il reste " + placesRestantes(e) + " place(s) : choisissez un nombre valide."; f.n.focus(); return; }
-    if (reserver(e.id, n)) { toast("Inscription enregistrée (maquette)."); ficher(); }
+    const f = ev.target, err = $("#regErr"); lireCoord(f);
+    if (!state.coord.nom.trim()) { err.textContent = "Indiquez votre nom et prénom."; f.nom.focus(); return; }
+    if (!/^\S+@\S+\.\S+$/.test(state.coord.email.trim())) { err.textContent = "Indiquez une adresse e-mail valide, par exemple nom@exemple.fr."; f.email.focus(); return; }
+    const pi = $("#promoIn");
+    if (pi) {
+      const msg = appliquerPromo(pi.value);
+      if (pi.value.trim() && !state.promo) { err.textContent = msg + " Corrigez le code ou videz le champ."; pi.focus(); return; }
+    }
+    state.etape = 3; reservation(); versTitre();
   });
   $("#q").addEventListener("input", ev => { state.q = ev.target.value; state.page = 1; render(); });
   $("#fMois").addEventListener("change", ev => { state.mois = ev.target.value; state.page = 1; render(); });
