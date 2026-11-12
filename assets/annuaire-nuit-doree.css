@@ -79,6 +79,8 @@ html body.nd .ann-cat{display:flex;align-items:center;gap:16px;text-align:left;c
   background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.03)),#0d1633;border:1px solid var(--nd-bord2);border-radius:18px;padding:16px 20px;
   box-shadow:0 22px 46px -30px #000;transition:border-color .2s,transform .2s,box-shadow .2s}
 html body.nd .ann-cat:hover{border-color:var(--nd-bord);transform:translateY(-2px)}
+/* Cartes qui mènent à une autre page (Formations, Influenceurs et créateurs) : liens, pas de filtre (2026-11-12) */
+html body.nd a.ann-cat{text-decoration:none}
 html body.nd .ann-cat:focus-visible{outline:2px solid var(--nd-or);outline-offset:3px}
 html body.nd .ann-cat.active{border-color:var(--nd-or);box-shadow:0 0 0 1px var(--nd-or),0 22px 46px -26px rgba(227,192,110,.55)}
 html body.nd .ann-cat-ico{flex:none;width:54px;height:54px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--nd-or);

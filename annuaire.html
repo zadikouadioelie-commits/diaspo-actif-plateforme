@@ -325,14 +325,16 @@ html,html body{overflow-x:clip;}
     <div class="ann-cats-inner" role="group" aria-label="Parcourir par catégorie">
       <button type="button" class="ann-cat" data-type="Association"><span class="ann-cat-ico"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.4"/><path d="M3.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5"/><path d="M15.5 14.2c2.7-.4 5 1.3 5 4"/></svg></span><span class="ann-cat-txt"><b>Associations</b>et organisations</span></button>
       <button type="button" class="ann-cat" data-type="Entreprise"><span class="ann-cat-ico"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 9.5 5 4.5h14l1.5 5"/><path d="M3.5 9.5c0 1.5 1.2 2.5 2.7 2.5s2.6-1 2.6-2.5c0 1.5 1.2 2.5 2.6 2.5s2.6-1 2.6-2.5c0 1.5 1.2 2.5 2.7 2.5s2.7-1 2.7-2.5"/><path d="M5 12v7.5h14V12"/><path d="M10 19.5v-4h4v4"/></svg></span><span class="ann-cat-txt"><b>Entreprises</b>et initiatives économiques</span></button>
-      <button type="button" class="ann-cat" data-type="Organisme de formation"><span class="ann-cat-ico"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 9.5 12 5l9.5 4.5L12 14 2.5 9.5Z"/><path d="M6.5 11.6V16c0 1.2 2.5 2.5 5.5 2.5s5.5-1.3 5.5-2.5v-4.4"/><path d="M21.5 9.5V15"/></svg></span><span class="ann-cat-txt"><b>Formations</b>et expertises</span></button>
-      <button type="button" class="ann-cat" data-type="Média"><span class="ann-cat-ico"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6.5h13a1.5 1.5 0 0 1 1.5 1.5v10.5H5.5A1.5 1.5 0 0 1 4 17V6.5Z"/><path d="M18.5 9.5H20a1 1 0 0 1 1 1v6.5a1.5 1.5 0 0 1-1.5 1.5"/><path d="M7.5 10h7M7.5 13h7M7.5 16h4"/></svg></span><span class="ann-cat-txt"><b>Médias</b>et créateurs</span></button>
+      <a class="ann-cat" href="formations.html"><span class="ann-cat-ico"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 9.5 12 5l9.5 4.5L12 14 2.5 9.5Z"/><path d="M6.5 11.6V16c0 1.2 2.5 2.5 5.5 2.5s5.5-1.3 5.5-2.5v-4.4"/><path d="M21.5 9.5V15"/></svg></span><span class="ann-cat-txt"><b>Formations</b>et expertises</span></a>
+      <a class="ann-cat" href="influenceur.html"><span class="ann-cat-ico"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 10.5v3a1 1 0 0 0 1 1H7l7 4V5.5l-7 4H4.5a1 1 0 0 0-1 1Z"/><path d="M17.5 9a4 4 0 0 1 0 6"/></svg></span><span class="ann-cat-txt"><b>Influenceurs</b>et créateurs</span></a>
     </div>
   </div>
 
   <!-- ===== ONGLETS : Initiatives / Collectivités / Utilisateurs ===== -->
   <div class="ann-quick-row">
     <div class="ann-quick-row-inner">
+      <button type="button" class="ann-quick-btn active" id="btn-tab-rechercher" aria-pressed="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8"/></svg>Rechercher</button>
+      <button type="button" class="ann-quick-btn" id="btn-tab-liste" aria-pressed="false" title="Tous les comptes, sans aucun filtre"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4.5 6h.01M4.5 12h.01M4.5 18h.01"/></svg>Liste complète</button>
       <button type="button" class="ann-quick-btn" id="btn-quick-initiatives"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21v-8"/><path d="M12 13c0-3.5-2.5-6-6.5-6 0 3.8 2.5 6 6.5 6Z"/><path d="M12 15c0-3 2.2-5.2 6-5.2 0 3.4-2.2 5.2-6 5.2Z"/></svg>Initiatives</button>
       <button type="button" class="ann-quick-btn" id="btn-quick-collectivites"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 20.5h18"/><path d="M5 20.5V10M9.5 20.5V10M14.5 20.5V10M19 20.5V10"/><path d="M3 10 12 4l9 6H3Z"/></svg>Collectivités</button>
       <button type="button" class="ann-quick-btn" id="btn-quick-utilisateurs"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.6 3.1-6 7-6s7 2.4 7 6"/></svg>Utilisateurs</button>
@@ -565,11 +567,42 @@ html,html body{overflow-x:clip;}
    que assets/app.js écoute déjà. */
 (function () {
   var sel = document.getElementById('f-type-org');
-  var cartes = [].slice.call(document.querySelectorAll('.ann-cat'));
+  var cartes = [].slice.call(document.querySelectorAll('.ann-cat[data-type]'));
   function sync() {
     var v = sel ? sel.value : '';
     cartes.forEach(function (c) { var on = c.getAttribute('data-type') === v; c.classList.toggle('active', on); c.setAttribute('aria-pressed', String(on)); });
+    majOnglets();
   }
+  /* Onglets « Rechercher » (par défaut : aucun type choisi) et « Liste complète » (tous les comptes, sans filtre, 12 par page).
+     « Initiatives / Collectivités / Utilisateurs » gardent leur propre logique (assets/app.js). */
+  var ongR = document.getElementById('btn-tab-rechercher'), ongL = document.getElementById('btn-tab-liste'), modeListe = false;
+  function majOnglets() {
+    var v = sel ? sel.value : '';
+    var r = v === '' && !modeListe;
+    if (ongR) { ongR.classList.toggle('active', r); ongR.setAttribute('aria-pressed', String(r)); }
+    if (ongL) { ongL.classList.toggle('active', modeListe); ongL.setAttribute('aria-pressed', String(modeListe)); }
+  }
+  if (ongR) ongR.addEventListener('click', function () {
+    modeListe = false;
+    if (sel && sel.value !== '') { sel.value = ''; sel.dispatchEvent(new Event('change', { bubbles: true })); }
+    majOnglets();
+    var q = document.getElementById('f-motcle'); if (q) q.focus();
+  });
+  if (ongL) ongL.addEventListener('click', function () {
+    if (typeof window.annResetFilters === 'function') window.annResetFilters();
+    modeListe = true;
+    setTimeout(function () { majOnglets(); var c = document.getElementById('annuaire-resultats'); if (c) c.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 0);
+  });
+  /* Toute action de recherche ou de filtre sort du mode « Liste complète ». */
+  function sortirListe(e) {
+    if (!modeListe) return;
+    var t = e.target;
+    if (t && t.closest && t.closest('.ann-recherche, .ann-filtres-barre, .ann-cat, .ann-chip-remove, #btn-quick-initiatives, #btn-quick-collectivites, #btn-quick-utilisateurs')) {
+      if (t.closest('#btn-reset-filters')) return;
+      modeListe = false; setTimeout(majOnglets, 0);
+    }
+  }
+  ['input', 'change', 'click'].forEach(function (ev) { document.addEventListener(ev, sortirListe, true); });
   cartes.forEach(function (c) {
     c.addEventListener('click', function () {
       if (!sel) return;
@@ -614,7 +647,7 @@ html,html body{overflow-x:clip;}
 </script>
 <!-- Design « Nuit dorée » (2026-10-11) : surcharges chargées en dernier, tout est préfixé body.nd ; retour arrière : retirer ces 2 lignes et class="nd" sur <body> -->
 <link rel="stylesheet" href="/assets/theme-nuit-doree.css?v=8">
-<link rel="stylesheet" href="/assets/annuaire-nuit-doree.css?v=12">
+<link rel="stylesheet" href="/assets/annuaire-nuit-doree.css?v=13">
 </body>
 </html>
 
