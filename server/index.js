@@ -5157,10 +5157,11 @@ const VITRINE_MODULES_REGISTRY = {
   avis:                  { label: "Avis clients",               categorie: "interaction", implemente: true },
   carte:                 { label: "Carte",                      categorie: "interaction", implemente: true },
   actualites:            { label: "Actualités / Publications", categorie: "communication", implemente: true },
-  /* "Newsletter" retiré de la bibliothèque (2026-07-25) : proposer une inscription par
-     e-mail imposerait une table d'abonnés par initiative, un consentement et un lien de
-     désabonnement conformes au RGPD. Plutôt que de le laisser indéfiniment en "Bientôt",
-     le module ne figure plus dans le catalogue. */
+  /* "Newsletter" retiré de la bibliothèque le 2026-07-25 (pas encore de table d'abonnés, de
+     consentement ni de désabonnement), REMIS le 2026-11-12 : tout cela existe maintenant
+     (server/newsletter*.js, double confirmation, désabonnement en un clic). Désactivé par défaut :
+     le propriétaire l'active lui-même (voir hasContenu.newsletter plus bas). */
+  newsletter:            { label: "Newsletter",                 categorie: "communication", implemente: true },
   reseaux_sociaux:       { label: "Réseaux sociaux",            categorie: "communication", implemente: true },
   vision_objectifs:      { label: "Vision et objectifs",        categorie: "impact", implemente: true },
   resultats_impact:      { label: "Résultats / Impact",         categorie: "impact", implemente: true },
@@ -5392,6 +5393,7 @@ function getVitrineModulesState(init, { draft = false } = {}) {
     pourquoi_choisir: !!init.vitrine_pourquoi_choisir,
     offre_flash: !!init.vitrine_offre_flash_titre,
     objectif_jauge: !!init.vitrine_objectif_cible,
+    newsletter: false, // jamais affichée sans choix explicite du propriétaire
   };
   const state = {};
   Object.keys(VITRINE_MODULES_REGISTRY).forEach((key, i) => {

@@ -3085,6 +3085,30 @@ async function renderVitrineCols() {
         : `<span style="font-size:12px;color:var(--muted);font-style:italic;">Aucun descriptif. Cliquez sur ✏️ pour en ajouter un.</span>`}
     </div>` : '';
 
+  /* Newsletter (2026-11-12, étape N4) : module activable (désactivé par défaut, voir le registre des modules
+     côté serveur). Inscription par e-mail avec double confirmation : rien n'est enregistré comme actif tant
+     que la personne n'a pas cliqué sur le lien reçu. Le propriétaire voit le bloc comme ses visiteurs. */
+  /* Un visiteur reçoit l'initiative par la liste publique, sans « vitrine_modules_state » : on lit alors la configuration
+     publiée (« vitrine_modules_json »). Ici pas de repli « actif » : sans choix explicite du propriétaire, rien ne s'affiche. */
+  const _nlEtat = _modActifs.newsletter || (() => { try { return (JSON.parse(_vitrineInit.vitrine_modules_json || '{}') || {}).newsletter; } catch (e) { return null; } })();
+  const newsletterOn = !!(_nlEtat && _nlEtat.actif);
+  const newsletterCard = newsletterOn ? `<div class="pp-side-card" id="pv-newsletter">
+      <h4>✉️ Newsletter</h4>
+      <form onsubmit="return pvNewsletterInscrire(event, ${Number(_vitrineInit.id) || 0})" novalidate style="display:flex;flex-direction:column;gap:8px;">
+        <p style="margin:0;font-size:12.5px;line-height:1.5;color:var(--muted);">Recevez les promotions, nouveautés et événements de ${esc2(_vitrineInit.boutique_nom || _vitrineInit.nom || 'cette boutique')}.</p>
+        <label for="pv-nl-email" style="font-size:12px;font-weight:700;">Votre adresse e-mail</label>
+        <input type="email" id="pv-nl-email" name="email" autocomplete="email" inputmode="email" required maxlength="190" placeholder="vous@exemple.com" style="width:100%;padding:9px 10px;border:1px solid var(--border,#d1d5db);border-radius:8px;font-size:13px;box-sizing:border-box;">
+        <input type="text" name="site_perso" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0;">
+        <label style="display:flex;gap:8px;align-items:flex-start;font-size:12px;line-height:1.45;cursor:pointer;">
+          <input type="checkbox" id="pv-nl-consent" name="consentement" style="margin-top:2px;flex:none;">
+          <span>J'accepte de recevoir la newsletter de cette boutique par e-mail. Je peux me désabonner à tout moment en un clic.</span>
+        </label>
+        <button type="submit" class="pp-join-btn" id="pv-nl-btn" style="margin:0;">S'inscrire</button>
+        <div id="pv-nl-msg" role="status" aria-live="polite" style="font-size:12px;line-height:1.45;min-height:1em;"></div>
+        <div style="font-size:11px;color:var(--muted);line-height:1.4;">Un e-mail de confirmation vous sera envoyé : l'inscription n'est valable qu'après un clic sur le lien qu'il contient.</div>
+      </form>
+    </div>` : '';
+
   /* ── COLONNE GAUCHE : réassurance + infos utiles ── */
   left.innerHTML = `
     <div class="pp-side-card">
@@ -3107,6 +3131,7 @@ async function renderVitrineCols() {
       ${_vitrineInit.vitrine_horaires ? `<div class="pp-list-item"><span>🕒</span><span style="flex:1;white-space:pre-line;">${esc2(_vitrineInit.vitrine_horaires)}</span></div>` : ''}
       ${(_vitrineInit.adresse || _vitrineInit.ville) ? `<div class="pp-list-item"><span>📍</span><span style="flex:1;">${esc2([_vitrineInit.adresse, _vitrineInit.ville, _vitrineInit.pays].filter(Boolean).join(', '))}</span></div>` : ''}
     </div>` : ''}
+    ${newsletterCard}
     <div class="pp-side-card">
       <h4>💬 Une question ?</h4>
       <a class="pp-join-btn" href="messagerie.html?user=${profil.id}">✉️ Contacter le vendeur</a>
@@ -5218,6 +5243,28 @@ function pvtToggleDescription(btn) {
 }
 
 /* Même bascule pour la carte « Descriptif » de la colonne de gauche (aperçu de 4 lignes ↔ texte entier). */
+/* Inscription à la newsletter d'une boutique (étape N4). Le serveur répond toujours le même message, que
+   l'adresse soit déjà connue ou non : on ne révèle jamais qui est inscrit. */
+let __pvNlRendu = 0;
+async function pvNewsletterInscrire(ev, initId) {
+  ev.preventDefault();
+  const f = ev.target, msg = document.getElementById('pv-nl-msg'), btn = document.getElementById('pv-nl-btn');
+  const email = (f.email.value || '').trim();
+  /* Couleur du thème conservée (lisible en clair comme en sombre) ; le sens est porté par le symbole, pas par la seule couleur. */
+  const dire = (t, ok) => { msg.textContent = (ok ? '✓ ' : '⚠ ') + t; msg.style.fontWeight = '600'; };
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { dire('Saisissez une adresse e-mail valide.', false); f.email.focus(); return false; }
+  if (!f.consentement.checked) { dire("Cochez la case pour accepter de recevoir la newsletter.", false); return false; }
+  if (!__pvNlRendu) __pvNlRendu = Date.now() - 5000;
+  btn.disabled = true;
+  try {
+    const r = await api('POST', '/newsletter/' + initId + '/abonner', { email, consentement: true, site_perso: f.site_perso.value, _form_ts: __pvNlRendu });
+    dire(r.message || 'Merci ! Consultez votre boîte e-mail pour confirmer votre inscription.', true);
+    f.email.value = ''; f.consentement.checked = false;
+  } catch (e) {
+    dire((e && e.message) || "Inscription impossible pour le moment. Réessayez dans un instant.", false);
+  } finally { btn.disabled = false; }
+  return false;
+}
 function pvtToggleDescriptif(btn) {
   const p = document.getElementById('pvt-descriptif-text');
   if (!p) return;
