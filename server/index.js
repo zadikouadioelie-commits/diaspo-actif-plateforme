@@ -20181,7 +20181,10 @@ route("GET", "/api/profil/:id", async (req, res, params) => {
   }
   sendJSON(res, 200, { profil: {
     ...publicUserVisiteur(u, me),
-    bio: u.bio, photo_url: u.photo_url || photoFallbackInitiative, banner_url: u.banner_url,
+    /* « À propos » d'une initiative (2026-11-12, signalé : compte tout juste créé, À propos vide alors que la présentation est obligatoire à
+       l'inscription) : le formulaire exige la DESCRIPTION de l'initiative (table initiatives), mais la fiche lisait seulement la biographie du
+       compte (users.bio), jamais renseignée pour une initiative. Tant que l'initiative n'a pas écrit de bio propre, la fiche affiche sa description. */
+    bio: u.bio || descriptionStructure || u.bio, photo_url: u.photo_url || photoFallbackInitiative, banner_url: u.banner_url,
     prenom: u.prenom, titre_pro: u.titre_pro,
     nationalite1: u.nationalite1, nationalite2: u.nationalite2,
     origine1: u.origine1, origine2: u.origine2,

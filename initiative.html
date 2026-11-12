@@ -1347,7 +1347,10 @@ const THEME_VITRINE_LABELS = { bordeaux:'Bordeaux', ocean:'Ocean', emeraude:'Eme
   function renderAssistant() {
     document.getElementById('ia-fab')?.remove();
     document.getElementById('ia-panel')?.remove();
-    if (!init.assistant_actif) return;
+    /* Bouton « 🤖 Poser une question » MASQUÉ sur tous les comptes (2026-11-12, demande explicite : « Oz doit disparaître »), comme O-Z lui-même
+       (assets/oz.js). Code conservé ; passer à false pour réactiver. */
+    const ASSISTANT_PROFIL_MASQUE = true;
+    if (ASSISTANT_PROFIL_MASQUE || !init.assistant_actif) return;
     const fab = document.createElement('button');
     fab.id = 'ia-fab'; fab.className = 'ia-fab';
     fab.innerHTML = `🤖 Poser une question`;

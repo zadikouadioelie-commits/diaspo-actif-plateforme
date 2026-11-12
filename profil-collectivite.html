@@ -460,7 +460,9 @@ function applyPcTheme(name) {
   fab.textContent = '🤖';
   fab.title = `Poser une question à ${profil.nom}`;
   fab.style.cssText = 'position:fixed;bottom:22px;right:22px;width:52px;height:52px;border-radius:50%;background:#16457E;color:#fff;border:none;font-size:22px;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.25);z-index:999;';
-  document.body.appendChild(fab);
+  /* Bouton 🤖 MASQUÉ sur tous les comptes (2026-11-12, demande explicite : « Oz doit disparaître »). Code conservé ; passer à false pour réactiver. */
+  const ASSISTANT_PROFIL_MASQUE = true;
+  if (!ASSISTANT_PROFIL_MASQUE) document.body.appendChild(fab);
 
   const panel = document.createElement('div');
   panel.style.cssText = 'position:fixed;bottom:84px;right:22px;width:320px;max-height:420px;background:#fff;border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.25);display:none;flex-direction:column;overflow:hidden;z-index:999;';

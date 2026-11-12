@@ -1815,7 +1815,10 @@ async function renderEnrichedColumns() {
   function ppRenderAssistant() {
     document.getElementById('pp-ia-fab')?.remove();
     document.getElementById('pp-ia-panel')?.remove();
-    if (!profil.assistant_actif || isOwn) return;
+    /* Bouton « 🤖 Poser une question » MASQUÉ sur tous les comptes (2026-11-12, demande explicite : « Oz doit disparaître »), comme O-Z lui-même
+       (assets/oz.js). Code conservé ; passer à false pour réactiver. */
+    const ASSISTANT_PROFIL_MASQUE = true;
+    if (ASSISTANT_PROFIL_MASQUE || !profil.assistant_actif || isOwn) return;
     const nomComplet = [profil.prenom, profil.nom].filter(Boolean).join(' ');
     const fab = document.createElement('button');
     fab.id = 'pp-ia-fab';
