@@ -26,7 +26,7 @@
   button { font:inherit; color:inherit; }
   :focus-visible { outline:3px solid var(--gold); outline-offset:2px; }
   .sr { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
-  #accueil, #selections, #catalogue, #avisBoutique { scroll-margin-top:calc(var(--ex-h,0px) + 130px); }
+  #accueil, #selections, #catalogue, #avisBoutique, #surmesure, #apropos, #createurs, #newsletter { scroll-margin-top:calc(var(--ex-h,0px) + 130px); }
 
   /* En-tête */
   .top { position:sticky; top:var(--ex-h,0px); z-index:40; background:color-mix(in srgb, var(--bg) 94%, transparent); backdrop-filter:blur(8px); border-bottom:1px solid var(--line); }
@@ -286,10 +286,75 @@
   .site-pied .demo { margin:0; padding:0 0 22px; text-align:center; }
   @media (max-width:1100px) { .pied-grille { grid-template-columns:repeat(3,minmax(0,1fr)); } .pied-marque, .pied-contact { grid-column:span 3; } .pied-marque p, .pied-contact p { max-width:60ch; } }
   @media (max-width:600px) { .pied-grille { grid-template-columns:repeat(2,minmax(0,1fr)); gap:22px 18px; } .pied-marque, .pied-contact { grid-column:span 2; } .pied-bas { flex-direction:column; align-items:flex-start; } }
-  @media (max-width:1180px) {
-    .top-in { flex-wrap:wrap; }
-    .nav { order:3; flex:1 1 100%; overflow-x:auto; scrollbar-width:none; margin:0 -6px; }
-  }
+  /* Rubriques activables */
+  .rub-off { display:none !important; }
+  .mise.une-col { grid-template-columns:1fr; }
+  .prixl.seul { justify-content:flex-start; }
+  .rubbtn { display:inline-flex; align-items:center; gap:8px; min-height:44px; padding:0 14px; border-radius:999px; border:1px solid var(--line); background:transparent; color:var(--text); cursor:pointer; font-weight:600; white-space:nowrap; }
+  .rubbtn:hover { border-color:var(--gold); color:var(--gold); }
+  .zone { margin-top:46px; }
+  .zone-tete { margin-bottom:16px; }
+  .zone-tete h2, .apropos h2, .sm h2 { font-family:var(--serif); font-size:clamp(24px,3.2vw,32px); margin:0; line-height:1.15; }
+  .zone-tete p { margin:4px 0 0; color:var(--muted); font-size:15px; }
+  .sm { display:grid; grid-template-columns:minmax(0,1.3fr) minmax(0,.7fr); gap:22px 30px; align-items:center; padding:26px; border:1px solid var(--line); border-radius:16px; background:linear-gradient(100deg, color-mix(in srgb, var(--c1) 45%, var(--bg)), var(--panel)); }
+  .sm p { margin:10px 0 0; color:#e6e1d6; max-width:62ch; }
+  .sm-pts { display:flex; flex-wrap:wrap; gap:10px; margin-top:16px; }
+  .sm-pts div { flex:1 1 150px; padding:10px 12px; border:1px solid var(--line); border-radius:12px; background:rgba(10,18,38,.35); font-size:14px; }
+  .sm-pts b { display:block; color:var(--gold); }
+  .sm-act { display:grid; gap:8px; justify-items:start; }
+  .apropos { display:grid; grid-template-columns:minmax(0,1.2fr) minmax(0,.8fr); gap:26px; align-items:center; }
+  .apropos p { margin:12px 0 0; color:var(--muted); max-width:62ch; }
+  .chiffres { display:flex; flex-wrap:wrap; gap:12px; margin-top:16px; }
+  .chiffres div { flex:1 1 110px; padding:14px 16px; border:1px solid var(--line); border-radius:12px; background:var(--panel); }
+  .chiffres b { display:block; font-family:var(--serif); font-size:30px; color:var(--gold); line-height:1.1; font-variant-numeric:tabular-nums; }
+  .chiffres span { color:var(--muted); font-size:13.5px; }
+  .apropos-art { border-radius:14px; overflow:hidden; border:1px solid var(--line); aspect-ratio:16/10; background:var(--panel2); position:relative; }
+  .createurs { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; }
+  .cr-carte { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:18px; display:flex; flex-direction:column; align-items:flex-start; gap:4px; }
+  .cr-carte .rond { width:52px; height:52px; border-radius:50%; background:var(--panel2); border:1px solid var(--line); display:grid; place-items:center; color:var(--gold); font-family:var(--serif); font-size:24px; font-weight:700; margin-bottom:6px; }
+  .cr-carte h3 { margin:0; font-family:var(--serif); font-size:20px; line-height:1.2; }
+  .cr-carte .role { margin:0; color:var(--gold); font-size:14px; font-weight:600; }
+  .cr-carte .nb { margin:0 0 10px; color:var(--muted); font-size:13.5px; }
+  .cr-carte .btn { margin-top:auto; align-self:stretch; }
+  .lettre { border-radius:12px; border:1px solid var(--line); display:grid; grid-template-columns:auto minmax(0,1fr) minmax(0,1.1fr); align-items:center; gap:14px 26px; padding:20px 26px 20px 22px; background:linear-gradient(100deg, color-mix(in srgb, var(--c1) 65%, var(--bg)), color-mix(in srgb, var(--c1) 22%, var(--bg))); }
+  .lettre svg.ic { width:46px; height:46px; stroke-width:1.4; color:var(--gold); }
+  .lettre h3 { margin:0; font-family:var(--serif); font-size:26px; line-height:1.15; }
+  .lettre p { margin:2px 0 0; font-size:14.5px; color:#e6e1d6; }
+  .lettre form { display:flex; gap:10px; }
+  .lettre input { flex:1 1 auto; min-width:0; min-height:46px; border-radius:999px; border:1px solid rgba(10,18,38,.45); background:var(--bg); color:var(--text); padding:0 18px; font:inherit; }
+  .lettre button { min-height:46px; border-radius:999px; border:0; background:var(--bg); color:var(--gold); padding:0 22px; cursor:pointer; font:inherit; font-weight:700; }
+  .lettre button:hover { filter:brightness(1.25); }
+  .lettre :focus-visible { outline-color:var(--bg); }
+  .sheet.rubs { max-width:760px; }
+  .sw-liste { list-style:none; margin:12px 0 0; padding:0; display:grid; gap:8px; }
+  .sw-ligne { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:12px; align-items:center; padding:10px 14px; border:1px solid var(--line); border-radius:12px; background:var(--panel2); }
+  .sw-ligne b { display:block; }
+  .sw-ligne span.d { color:var(--muted); font-size:13.5px; }
+  .sw { position:relative; width:56px; height:44px; border:0; background:none; cursor:pointer; padding:0; }
+  .sw::before { content:""; position:absolute; left:0; top:10px; width:56px; height:24px; border-radius:999px; background:#3a4666; border:1px solid var(--line); transition:background .2s; }
+  .sw::after { content:""; position:absolute; left:4px; top:14px; width:18px; height:18px; border-radius:50%; background:#fff; transition:transform .2s; }
+  .sw[aria-checked="true"]::before { background:var(--gold); }
+  .sw[aria-checked="true"]::after { transform:translateX(32px); background:var(--on-gold); }
+  .sw:focus-visible { outline:3px solid var(--gold); outline-offset:2px; border-radius:999px; }
+  .mode-titre { margin:16px 0 0; font-family:var(--serif); font-size:18px; }
+  .modes { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin-top:10px; }
+  .mode { text-align:left; padding:12px 14px; min-height:44px; border:1px solid var(--line); border-radius:12px; background:var(--panel2); color:var(--text); cursor:pointer; display:flex; flex-direction:column; gap:4px; }
+  .mode b { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .mode span.d { color:var(--muted); font-size:13px; }
+  .mode svg.ic { width:18px; height:18px; opacity:0; color:var(--on-gold); }
+  .mode:hover { border-color:var(--gold); }
+  .mode[aria-pressed="true"] { background:var(--gold); border-color:var(--gold); color:var(--on-gold); }
+  .mode[aria-pressed="true"] span.d { color:var(--on-gold); }
+  .mode[aria-pressed="true"] svg.ic { opacity:1; }
+  .mode-etat { margin:8px 0 0; color:var(--muted); font-size:13.5px; min-height:1.4em; }
+  .rub-actions { display:flex; flex-wrap:wrap; gap:10px; justify-content:flex-end; margin-top:14px; }
+  @media (max-width:1100px) { .createurs { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+  @media (max-width:900px) { .apropos, .sm { grid-template-columns:1fr; } .modes { grid-template-columns:1fr; } .lettre { grid-template-columns:auto minmax(0,1fr); } .lettre form { grid-column:1 / -1; } }
+  @media (max-width:600px) { .createurs { grid-template-columns:1fr; } .rubbtn span { display:none; } .rubbtn { padding:0; min-width:44px; justify-content:center; } .lettre { padding:16px; } .lettre form { flex-direction:column; } .lettre h3 { font-size:22px; } .sm { padding:18px; } }
+  @media (prefers-reduced-motion:reduce) { .sw::before, .sw::after { transition:none; } }
+  /* Jusqu'à 8 rubriques : le menu occupe toujours sa propre ligne sous l'en-tête. */
+  .top-in { flex-wrap:wrap; row-gap:0; }
+  .nav { order:3; flex:1 1 100%; overflow-x:auto; scrollbar-width:none; margin:0 -6px; }
   @media (max-width:1000px) {
     .mise { grid-template-columns:1fr; }
     .filtres { position:static; display:none; }
@@ -321,7 +386,7 @@
     .grille.liste .carte .vue { width:100%; aspect-ratio:16/10; min-height:0; }
     .pied { justify-content:center; }
   }
-  @media (max-width:480px) { #navCompte, #favBtn { display:none; } }
+  @media (max-width:480px) { #navCompte, #favBtn, #saveBtn { display:none; } .panierbtn { padding:0 10px; gap:6px; } }
   @media (prefers-reduced-motion:reduce) { html { scroll-behavior:auto; } .carte, .toast, .play { transition:none; } .carte:hover { transform:none; } }
 </style>
 </head>
@@ -335,13 +400,11 @@
       <svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width:1.5"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M10 9.500v5l4.500-2.500z" class="plein" style="fill:currentColor"/></svg>
       <b id="shopName"></b>
     </div>
-    <nav class="nav" id="navRub" aria-label="Rubriques">
-      <button type="button" data-nav="accueil" aria-current="true">Accueil</button>
-      <button type="button" data-nav="catalogue">Vidéos</button>
-      <button type="button" data-nav="selections">Sélections</button>
-      <button type="button" data-nav="avisBoutique">Avis</button>
-    </nav>
+    <nav class="nav" id="navRub" aria-label="Rubriques"></nav>
     <div class="tools">
+      <button class="rubbtn" type="button" id="openRub" aria-label="Choisir les rubriques de la boutique (exemple)">
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg><span>Rubriques</span>
+      </button>
       <button class="iconbtn" type="button" id="favBtn" aria-label="Mes favoris : 0 vidéo">
         <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.600-9-9.200C1.600 7.400 3.700 4 7 4c2 0 3.400 1 5 3 1.600-2 3-3 5-3 3.300 0 5.400 3.400 4 6.800-2 4.600-9 9.200-9 9.200z"/></svg>
         <span class="cnt" id="favCount" data-n="0"></span>
@@ -350,10 +413,10 @@
         <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.500h12v17l-6-4.500-6 4.500z"/></svg>
         <span class="cnt" id="saveCount" data-n="0"></span>
       </button>
-      <button class="iconbtn" type="button" id="navCompte" aria-label="Mes achats (compte simulé)">
+      <button class="iconbtn" data-rub="boutique" type="button" id="navCompte" aria-label="Mes achats (compte simulé)">
         <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.400 3.600-7 8-7s8 2.600 8 7"/></svg>
       </button>
-      <button class="panierbtn" type="button" id="cartBtn" aria-label="Ouvrir mon panier : 0 article">
+      <button class="panierbtn" data-rub="boutique" type="button" id="cartBtn" aria-label="Ouvrir mon panier : 0 article">
         <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2.200l2.300 11h10.400l2.100-7.500H6.400"/><circle cx="9.500" cy="19.500" r="1.500"/><circle cx="17" cy="19.500" r="1.500"/></svg>
         <span>Panier (<span id="cartCount">0</span>)</span>
       </button>
@@ -361,7 +424,7 @@
   </div>
 </header>
 
-<section class="hero" id="accueil">
+<section class="hero" id="accueil" data-rub="accueil">
   <div class="hero-in">
     <div>
       <p class="eyebrow">Boutique Vidéo</p>
@@ -372,11 +435,11 @@
           <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M10 9l5 3-5 3z"/></svg>
           <span>Vidéos courtes,<br>57 secondes au plus</span>
         </div>
-        <div class="garantie">
+        <div class="garantie" data-rub="boutique">
           <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7.500 10.500L12 15l4.500-4.500"/><path d="M4 19h16"/></svg>
           <span>Téléchargement<br>immédiat (simulé)</span>
         </div>
-        <div class="garantie">
+        <div class="garantie" data-rub="boutique">
           <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 3v6c0 5-3.500 8-8 9-4.500-1-8-4-8-9V6z"/><path d="M8.500 12l2.500 2.500 4.500-5"/></svg>
           <span>Droits d'utilisation<br>inclus</span>
         </div>
@@ -389,22 +452,22 @@
 <main class="wrap">
   <div class="note" id="typeNote" style="display:none"></div>
 
-  <div id="catalogue">
-    <div class="barre">
+  <div id="catalogue" data-rub="videos selections">
+    <div class="barre" data-rub="videos">
       <div class="chips" id="chips" role="group" aria-label="Catégories de vidéos"></div>
     </div>
-    <div class="actifs" id="actifs" aria-label="Filtres actifs"></div>
+    <div class="actifs" data-rub="videos" id="actifs" aria-label="Filtres actifs"></div>
 
-    <div class="mise">
-      <aside class="filtres" id="filtres" aria-label="Filtres">
+    <div class="mise" id="mise">
+      <aside class="filtres" data-rub="videos" id="filtres" aria-label="Filtres">
         <div class="tete"><b>Filtres</b><button class="lienor" type="button" id="reset">Réinitialiser</button></div>
-        <fieldset>
+        <fieldset data-rub="boutique">
           <legend>Type d'offre</legend>
           <label class="choix"><input type="checkbox" name="kind" value="phys"> Produit physique</label>
           <label class="choix"><input type="checkbox" name="kind" value="num"> Contenu numérique</label>
           <label class="choix"><input type="checkbox" name="kind" value="srv"> Service ou prestation</label>
         </fieldset>
-        <fieldset class="prixr">
+        <fieldset class="prixr" data-rub="boutique">
           <legend>Prix</legend>
           <label class="sr" for="prixMax">Prix maximum</label>
           <input id="prixMax" type="range" min="0" max="50" step="1" value="50">
@@ -418,7 +481,7 @@
       </aside>
 
       <div>
-        <div class="outils">
+        <div class="outils" data-rub="videos">
           <div class="compte" id="compte" aria-live="polite"></div>
           <div class="droite">
             <button class="btn ouvrefiltres" type="button" id="ouvreFiltres" aria-expanded="false" aria-controls="filtres">
@@ -444,16 +507,51 @@
           </div>
         </div>
 
-        <div id="selections" class="selection"></div>
-        <h2 class="sectitre" id="catTitre">Catalogue complet</h2>
-        <p class="soustitre" id="catSous">Les filtres restent à gauche pendant que vous parcourez les vidéos.</p>
-        <div class="grille" id="grille"></div>
-        <div class="pied" id="pagin"></div>
+        <div id="selections" class="selection" data-rub="selections"></div>
+        <h2 class="sectitre" data-rub="videos" id="catTitre">Catalogue complet</h2>
+        <p class="soustitre" data-rub="videos" id="catSous">Les filtres restent à gauche pendant que vous parcourez les vidéos.</p>
+        <div class="grille" data-rub="videos" id="grille"></div>
+        <div class="pied" data-rub="videos" id="pagin"></div>
       </div>
     </div>
   </div>
 
-  <section class="boutiqueavis" id="avisBoutique" aria-labelledby="avisBTitre">
+  <section class="zone" id="surmesure" data-rub="surmesure" aria-labelledby="smTitre">
+    <div class="sm">
+      <div>
+        <h2 id="smTitre">Une vidéo sur mesure pour votre marque</h2>
+        <p>Présentation de produit, routine, coulisses ou publicité courte : l'équipe filme et monte une vidéo de 57 secondes au plus, selon votre brief.</p>
+        <div class="sm-pts">
+          <div><b>Votre brief</b>Votre idée, votre budget et votre délai.</div>
+          <div><b>Le devis</b>Un devis détaillé, gratuit et sans engagement.</div>
+          <div><b>La livraison</b>La vidéo prête à publier, droits inclus.</div>
+        </div>
+      </div>
+      <div class="sm-act">
+        <button class="btn or" type="button" id="ouvreDevis">Demander une vidéo sur mesure</button>
+        <p class="aide" style="margin:0">Exemple : la demande est simulée, elle n'est envoyée nulle part.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="zone" id="apropos" data-rub="apropos" aria-labelledby="aproposTitre">
+    <div class="apropos">
+      <div>
+        <h2 id="aproposTitre">À propos de la boutique</h2>
+        <p>Nous filmons des vidéos courtes pour apprendre un geste, découvrir un produit ou voir les coulisses de la fabrication. Chaque vidéo dure 57 secondes au plus : l'essentiel, sans détour.</p>
+        <p>Les vidéos se regardent librement. Selon la boutique, on peut aussi les acheter, les garder et les télécharger, ou demander une vidéo réalisée sur mesure.</p>
+        <div class="chiffres" id="chiffres"></div>
+      </div>
+      <div class="apropos-art" id="aproposArt" aria-hidden="true"></div>
+    </div>
+  </section>
+
+  <section class="zone" id="createurs" data-rub="createurs" aria-labelledby="creaTitre">
+    <div class="zone-tete"><h2 id="creaTitre">Les créateurs</h2><p>Les personnes et les studios derrière les vidéos de la boutique.</p></div>
+    <div class="createurs" id="creaListe"></div>
+  </section>
+
+  <section class="boutiqueavis" id="avisBoutique" data-rub="avis" aria-labelledby="avisBTitre">
     <div>
       <h2 id="avisBTitre">Avis sur la boutique</h2>
       <div class="avisl" id="avisBoutiqueNote"></div>
@@ -463,6 +561,18 @@
     </div>
   </section>
 
+  <section class="zone" id="newsletter" data-rub="newsletter" aria-labelledby="newsTitre">
+    <div class="lettre">
+      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>
+      <div><h3 id="newsTitre">Recevez les nouvelles vidéos</h3><p>Une sélection de nouveautés chaque mois, dans votre boîte de réception.</p></div>
+      <form id="newsForm" novalidate>
+        <label class="sr" for="newsMail">Votre adresse e-mail</label>
+        <input type="email" id="newsMail" name="mail" placeholder="Votre adresse e-mail" autocomplete="email">
+        <button type="submit">Je m'abonne</button>
+      </form>
+    </div>
+    <p class="aide" id="newsMsg" role="status" style="margin:8px 0 0"></p>
+  </section>
 </main>
 
 <footer class="site-pied" aria-label="Bas de page">
@@ -485,19 +595,20 @@
       <nav class="pied-col" aria-label="Explorer">
         <h4>Explorer</h4>
         <ul>
-          <li><button type="button" data-aller="catalogue">Toutes les vidéos</button></li>
-          <li><button type="button" data-aller="selections">Sélections</button></li>
+          <li data-rub="videos"><button type="button" data-aller="catalogue">Toutes les vidéos</button></li>
+          <li data-rub="selections"><button type="button" data-aller="selections">Sélections</button></li>
           <li><button type="button" data-aller="enreg">Mes vidéos enregistrées</button></li>
-          <li><button type="button" data-aller="achats">Mes achats</button></li>
+          <li data-rub="boutique"><button type="button" data-aller="achats">Mes achats</button></li>
+          <li data-rub="surmesure"><button type="button" data-aller="surmesure">Vidéo sur mesure</button></li>
         </ul>
       </nav>
 
-      <nav class="pied-col" aria-label="Catégories de vidéos">
+      <nav class="pied-col" data-rub="videos" aria-label="Catégories de vidéos">
         <h4>Catégories</h4>
         <ul id="piedCats"></ul>
       </nav>
 
-      <nav class="pied-col" aria-label="Informations">
+      <nav class="pied-col" data-rub="boutique" aria-label="Informations">
         <h4>Informations</h4>
         <ul>
           <li><button type="button" data-pied="Livraison et retours">Livraison et retours</button></li>
@@ -507,7 +618,7 @@
         </ul>
       </nav>
 
-      <div class="pied-col pied-contact">
+      <div class="pied-col pied-contact" data-rub="contact">
         <h4>Nous contacter</h4>
         <p>Une question sur une vidéo, une commande à suivre, une vidéo sur mesure à demander ? L'équipe répond sous 48 heures.</p>
         <address>Lyon, France<br>Du lundi au vendredi, de 9 h à 18 h</address>
@@ -517,7 +628,7 @@
 
     <div class="pied-bas">
       <p class="copy">© 2026 <span id="piedNom2"></span>. Tous droits réservés.</p>
-      <ul class="paiements" aria-label="Moyens de paiement acceptés (exemple)">
+      <ul class="paiements" data-rub="boutique" aria-label="Moyens de paiement acceptés (exemple)">
         <li class="lib">Paiement accepté :</li>
         <li class="moyen"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M3 10h18M7 15h3"/></svg>Carte bancaire</li>
         <li class="moyen"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/></svg>Mobile Money</li>
@@ -606,6 +717,30 @@
     <h2 id="achatsTitre">Mes achats</h2>
     <p class="aide" style="margin:0 0 6px">Commandes de cet exemple, gardées sur cet appareil. Aucun fichier réel : les téléchargements sont simulés.</p>
     <div id="achatsCorps"></div>
+  </div>
+</div>
+
+<!-- Choix des rubriques (exemple) -->
+<div class="overlay" id="rubOv" role="dialog" aria-modal="true" aria-labelledby="rubTitre">
+  <div class="sheet rubs">
+    <button class="close" type="button" data-close aria-label="Fermer"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <h2 id="rubTitre" style="margin:0 0 4px">Rubriques de la boutique</h2>
+    <p style="margin:0;color:var(--muted)">Choisissez un mode, puis ajustez au besoin chaque rubrique : la page se met à jour tout de suite. Dans une vraie boutique, ce réglage est dans « Paramètres vitrine », onglet « Navigation et rubriques ».</p>
+    <h3 class="mode-titre">Mode de la boutique</h3>
+    <div class="modes" id="modeListe" role="group" aria-label="Mode de la boutique"></div>
+    <p class="mode-etat" id="modeEtat" aria-live="polite"></p>
+    <h3 class="mode-titre">Rubriques</h3>
+    <ul class="sw-liste" id="rubListe"></ul>
+    <div class="rub-actions"><button class="btn" type="button" id="rubTout">Tout activer</button><button class="btn or" type="button" data-close>Terminer</button></div>
+  </div>
+</div>
+
+<!-- Vidéo sur mesure (simulée) -->
+<div class="overlay" id="devisOv" role="dialog" aria-modal="true" aria-labelledby="devisTitre">
+  <div class="sheet">
+    <button class="close" type="button" data-close aria-label="Fermer la demande"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <h2 id="devisTitre" tabindex="-1">Demander une vidéo sur mesure</h2>
+    <div id="devisCorps"></div>
   </div>
 </div>
 
@@ -741,8 +876,8 @@
   }
   function tagsHtml(v) {
     let h = "";
-    if (v.was) h += '<span class="tag promo">−' + promoPct(v) + " %</span>";
-    if (TOP_IDS.indexOf(v.id) >= 0) h += '<span class="tag">Top vente</span>';
+    if (ventOn() && v.was) h += '<span class="tag promo">−' + promoPct(v) + " %</span>";
+    if (ventOn() && TOP_IDS.indexOf(v.id) >= 0) h += '<span class="tag">Top vente</span>';
     if (v.isNew) h += '<span class="tag">Dernier ajouté</span>';
     if (v.ad) h += '<span class="tag">Publicité</span>';
     return h ? '<div class="tags">' + h + "</div>" : "";
@@ -765,6 +900,41 @@
   const cartCount = () => state.cart.reduce((n, l) => n + l.qty, 0);
   const memoriser = () => { store.set("vid.hearts", [...state.favs]); store.set("vid.saved", [...state.saved]); store.set("vid.watched", [...state.watched]); store.set("vid.cart", state.cart); store.set("vid.bought", [...state.bought]); store.set("vid.orders", state.orders); };
 
+  /* ── Rubriques activables (10) : chacune s'affiche ou se masque, la page suit ── */
+  const RUBS = [
+    { id: "accueil", nom: "Accueil", desc: "Bandeau d'accueil, vidéo à la une et garanties." },
+    { id: "videos", nom: "Vidéos", desc: "Le catalogue : catégories, recherche, filtres, tri et pagination." },
+    { id: "boutique", nom: "Boutique", desc: "Prix, panier, commande et achats. Désactivée, les vidéos se regardent seulement, sans prix ni panier." },
+    { id: "selections", nom: "Sélections", desc: "Dernier ajouté, publicités et, avec la boutique, promotions et top vente." },
+    { id: "surmesure", nom: "Vidéo sur mesure", desc: "Demande de vidéo réalisée pour vous : type, budget et délai." },
+    { id: "apropos", nom: "À propos", desc: "Présentation de la boutique et chiffres clés." },
+    { id: "createurs", nom: "Créateurs", desc: "Les personnes et studios derrière les vidéos." },
+    { id: "avis", nom: "Avis", desc: "Avis sur la boutique et note moyenne." },
+    { id: "contact", nom: "Contact", desc: "Coordonnées et formulaire de message, en bas de page." },
+    { id: "newsletter", nom: "Newsletter", desc: "Bande d'inscription à la lettre d'information (sans entrée dans le menu)." }
+  ];
+  /* Modes : des préréglages complets des 10 rubriques (liste explicite, pour qu'aucune rubrique ne dépende d'une autre). */
+  const MODES = [
+    { id: "regarder", nom: "Vidéos à regarder", desc: "Un catalogue à parcourir et à regarder. Ni prix, ni panier, ni achat.",
+      rub: { accueil: true, videos: true, boutique: false, selections: true, surmesure: false, apropos: true, createurs: true, avis: true, contact: true, newsletter: true } },
+    { id: "vente", nom: "Vidéos à la vente", desc: "Prix, promotions, panier, commande en trois étapes et téléchargement simulé.",
+      rub: { accueil: true, videos: true, boutique: true, selections: true, surmesure: false, apropos: true, createurs: true, avis: true, contact: true, newsletter: true } },
+    { id: "surmesure", nom: "Vidéos à la vente + sur mesure", desc: "Tout, avec la demande de vidéo sur mesure (type, budget, délai).",
+      rub: { accueil: true, videos: true, boutique: true, selections: true, surmesure: true, apropos: true, createurs: true, avis: true, contact: true, newsletter: true } }
+  ];
+  let rub = store.get("vid_ex_rubriques", {});
+  const modeActuel = () => MODES.find(m => Object.keys(m.rub).every(k => (rub[k] !== false) === m.rub[k]));
+  const rubOn = (k) => rub[k] !== false;
+  const ventOn = () => rubOn("boutique");
+  const CREATEURS = [
+    { nom: "Maison Éclat Beauté", role: "La marque", cat: "produit" },
+    { nom: "Inès Marchal", role: "Maquilleuse", cat: "maquillage" },
+    { nom: "Awa Diallo", role: "Esthéticienne", cat: "soins" },
+    { nom: "Nadia Benali", role: "Soins du corps et bien-être", cat: "corps" },
+    { nom: "Studio Lumière", role: "Réalisation et montage", cat: "coulisses" },
+    { nom: "Léa Fontaine", role: "Beauté et inspiration", cat: "lifestyle" }
+  ];
+
   (function applyShop() {
     document.title = SHOP.name + " · " + TYPE_LABELS[SHOP.main];
     $("#shopName").textContent = SHOP.name;
@@ -778,9 +948,9 @@
     const q = state.q.trim().toLowerCase();
     let l = VIDEOS.filter(v =>
       (state.cat === "all" || v.cat === state.cat) && (!state.fav || state.favs.has(v.id)) &&
-      (!state.kinds.size || state.kinds.has(kindKey(v))) &&
+      (!ventOn() || !state.kinds.size || state.kinds.has(kindKey(v))) &&
       (!state.lengths.size || state.lengths.size === 2 || (state.lengths.has("short") ? v.dur <= 40 : v.dur > 40)) &&
-      (v.price === 0 || v.price <= state.maxPrice) &&
+      (!ventOn() || v.price === 0 || v.price <= state.maxPrice) &&
       (!q || (v.t + " " + v.desc + " " + CAT[v.cat].label + " " + v.seller).toLowerCase().indexOf(q) >= 0));
     if (state.tri === "recent") l = l.slice().sort((a, b) => b.id - a.id);
     if (state.tri === "avis") l = l.slice().sort((a, b) => ((ratingOf(b.id) || { avg: 0 }).avg - (ratingOf(a.id) || { avg: 0 }).avg) || (b.id - a.id));
@@ -792,14 +962,14 @@
 
   function carte(v) {
     const h = state.favs.has(v.id), s = state.saved.has(v.id);
-    const act = estAchetee(v) ? '<button class="btn" type="button" data-dl="' + v.id + '">Télécharger</button>' : v.ad ? '<button class="btn" type="button" data-goto="' + v.cat + '">Voir les produits</button>'
+    const act = !ventOn() ? '<button class="btn or" type="button" data-open="' + v.id + '" aria-label="Regarder la vidéo : ' + esc(v.t) + '">' + ICO.lecture + "Regarder</button>" : estAchetee(v) ? '<button class="btn" type="button" data-dl="' + v.id + '">Télécharger</button>' : v.ad ? '<button class="btn" type="button" data-goto="' + v.cat + '">Voir les produits</button>'
       : '<button class="btn or" type="button" data-buy="' + v.id + '" aria-label="' + actionLabel(v) + " : " + esc(v.t) + '">' + (v.price ? ICO.panier : "") + actionLabel(v) + "</button>";
     return '<article class="carte">'
       + '<button class="vue" type="button" data-open="' + v.id + '" aria-label="Lire la vidéo : ' + esc(v.t) + '">' + art(v) + tagsHtml(v) + '<span class="play">' + ICO.lecture + '</span><span class="dur">' + fmtDur(v.dur) + "</span></button>"
       + '<button class="coeur" type="button" data-heart="' + v.id + '" aria-pressed="' + h + '" aria-label="Ajouter aux favoris : ' + esc(v.t) + '">' + ICO.coeur + "</button>"
       + '<div class="corps"><span class="badge">' + CAT[v.cat].label + "</span><h3>" + esc(v.t) + "</h3>"
       + '<div class="avisl">' + noteHtml(v.id) + '<button class="lienor" type="button" data-avis="' + v.id + '">Avis</button></div>'
-      + '<div class="prixl"><div>' + prixHtml(v) + "</div>" + act + "</div>"
+      + '<div class="prixl' + (ventOn() ? "" : " seul") + '">' + (ventOn() ? "<div>" + prixHtml(v) + "</div>" : "") + act + "</div>"
       + '<div class="liens"><button class="lienor" type="button" data-save="' + v.id + '" aria-pressed="' + s + '">' + (s ? "Enregistrée" : "Enregistrer") + '</button><button class="lienor" type="button" data-share="' + v.id + '">Partager</button></div></div></article>';
   }
 
@@ -811,7 +981,7 @@
   ];
   function selections() {
     if (!simple()) return "";
-    return RAILS.map(r => {
+    return RAILS.filter(r => ventOn() || (r.id !== "promo" && r.id !== "top")).map(r => {
       const l = VIDEOS.filter(r.f).slice(0, 4);
       return l.length ? '<div class="selection"><h2 class="sectitre">' + r.titre + "<small>" + l.length + " vidéo" + (l.length > 1 ? "s" : "") + '</small></h2><p class="soustitre">' + r.sous + '</p><div class="grille">' + l.map(carte).join("") + "</div></div>" : "";
     }).join("");
@@ -838,7 +1008,7 @@
     $("#compte").textContent = l.length + " vidéo" + (l.length > 1 ? "s" : "") + " disponible" + (l.length > 1 ? "s" : "");
     $("#catTitre").textContent = state.cat === "all" ? "Catalogue complet" : CAT[state.cat].label;
     $("#selections").innerHTML = selections();
-    $("#grille").className = "grille" + (state.vue === "liste" ? " liste" : "");
+    $("#grille").className = "grille" + (state.vue === "liste" ? " liste" : "") + (rubOn("videos") ? "" : " rub-off");
     $("#grille").innerHTML = vis.map(carte).join("") || '<div class="vide" style="grid-column:1/-1"><b>Aucune vidéo ne correspond</b>Essayez d\'autres mots ou retirez un filtre.</div>';
     $("#pagin").innerHTML = l.length > state.parPage
       ? '<div class="compte">Vidéos ' + (debut + 1) + " à " + Math.min(debut + state.parPage, l.length) + " sur " + l.length + '</div><nav class="pages" aria-label="Pagination"><button class="pg" type="button" data-pg="' + (state.page - 1) + '" ' + (state.page === 1 ? "disabled" : "") + ' aria-label="Page précédente">‹</button>'
@@ -855,7 +1025,7 @@
   function renderUne() {
     const v = VIDEOS.find(x => x.feat) || VIDEOS[0];
     $("#une").innerHTML = '<button class="media" type="button" data-open="' + v.id + '" aria-label="Lire la vidéo à la une : ' + esc(v.t) + '">' + art(v) + '<span class="etq">À la une</span><span class="play">' + ICO.lecture + '</span><span class="dur">' + fmtDur(v.dur) + "</span></button>"
-      + '<div class="corps"><span class="badge" style="align-self:flex-start">' + CAT[v.cat].label + "</span><h3>" + esc(v.t) + '</h3><div class="avisl">' + noteHtml(v.id) + "</div><div>" + prixHtml(v, true) + "</div>" + (estAchetee(v) ? '<button class="btn" type="button" data-dl="' + v.id + '">Télécharger (simulé)</button>' : '<button class="btn or" type="button" data-buy="' + v.id + '">' + actionLabel(v) + "</button>") + "</div>";
+      + '<div class="corps"><span class="badge" style="align-self:flex-start">' + CAT[v.cat].label + "</span><h3>" + esc(v.t) + '</h3><div class="avisl">' + noteHtml(v.id) + "</div>" + (ventOn() ? "<div>" + prixHtml(v, true) + "</div>" + (estAchetee(v) ? '<button class="btn" type="button" data-dl="' + v.id + '">Télécharger (simulé)</button>' : '<button class="btn or" type="button" data-buy="' + v.id + '">' + actionLabel(v) + "</button>") : '<button class="btn or" type="button" data-open="' + v.id + '">' + ICO.lecture + "Regarder la vidéo</button>") + "</div>";
   }
 
   /* ── Fenêtres (focus rendu, Échap, piège de tabulation) ── */
@@ -902,23 +1072,23 @@
     const rel = VIDEOS.filter(x => x.cat === v.cat && x.id !== v.id).slice(0, 3);
     const av = reviewsOf(v.id).slice().reverse();
     const CHECK = ico('<path d="M5 12.500l4.500 4.500L19 7"/>');
-    const faits = [["Durée", fmtDur(v.dur) + " (57 s au plus)"], ["Catégorie", CAT[v.cat].label], ["Type d'offre", v.kind], ["Vendeur", v.seller]].concat(v.ad ? [] : [["Format", "MP4 haute définition"], ["Langue", "Français"]]);
-    const inclus = v.ad ? [] : v.kind === "Contenu numérique"
+    const faits = [["Durée", fmtDur(v.dur) + " (57 s au plus)"], ["Catégorie", CAT[v.cat].label], ["Type d'offre", v.kind], ["Vendeur", v.seller]].concat(v.ad ? [] : [["Format", "MP4 haute définition"], ["Langue", "Français"]]).filter(x => ventOn() || x[0] !== "Type d'offre");
+    const inclus = (v.ad || !ventOn()) ? [] : v.kind === "Contenu numérique"
       ? ["La vidéo en haute définition, à garder", "Droits d'utilisation : réseaux sociaux, présentations et événements", "Téléchargement dans votre espace après l'achat (simulé)"]
       : v.kind === "Produit physique"
         ? ["Le produit présenté dans la vidéo", "Livraison à l'adresse indiquée : " + fmt(LIVRAISON) + ", offerte dès " + fmt(LIVRAISON_OFFERTE) + " de produits", "Un aperçu vidéo pour bien l'utiliser"]
         : ["Un échange pour cadrer votre besoin", "Un devis détaillé, sans engagement", "Réponse sous deux jours ouvrés (simulée)"];
-    $("#pInfos").innerHTML = '<div style="display:flex;gap:6px;flex-wrap:wrap"><span class="badge">' + CAT[v.cat].label + '</span><span class="badge">' + esc(v.kind) + "</span></div>"
+    $("#pInfos").innerHTML = '<div style="display:flex;gap:6px;flex-wrap:wrap"><span class="badge">' + CAT[v.cat].label + '</span>' + (ventOn() ? '<span class="badge">' + esc(v.kind) + "</span>" : "") + "</div>"
       + '<h2 id="pTitre">' + esc(v.t) + '</h2><div class="qui">' + esc(v.seller) + "</div>"
       + '<div class="avisl">' + noteHtml(v.id) + '<button class="lienor" type="button" data-avis="' + v.id + '">Avis</button></div>'
-      + "<div>" + prixHtml(v, true) + "</div>"
-      + (ach ? '<p class="achetee">' + CHECK + 'Vidéo achetée</p><button class="btn or bloc" type="button" data-dl="' + v.id + '">Télécharger (simulé)</button>'
+      + (ventOn() ? "<div>" + prixHtml(v, true) + "</div>" : "")
+      + (!ventOn() ? "" : ach ? '<p class="achetee">' + CHECK + 'Vidéo achetée</p><button class="btn or bloc" type="button" data-dl="' + v.id + '">Télécharger (simulé)</button>'
         : v.ad ? '<button class="btn bloc" type="button" data-goto="' + v.cat + '">Voir les produits de cette rubrique</button>' : '<button class="btn or bloc" type="button" data-buy="' + v.id + '">' + actionLabel(v) + "</button>")
       + '<div class="rangb"><button class="btn" type="button" data-heart="' + v.id + '" aria-pressed="' + h + '">' + ICO.coeur + (h ? "Dans mes favoris" : "Favori") + '</button><button class="btn" type="button" data-save="' + v.id + '" aria-pressed="' + s + '">' + (s ? "Enregistrée" : "Enregistrer") + '</button><button class="btn" type="button" data-share="' + v.id + '">Partager</button></div>'
       + '<h3 class="st">Description</h3><p class="desc">' + esc(v.desc) + "</p>"
       + '<h3 class="st">En détail</h3><div class="faits">' + faits.map(x => "<div><b>" + x[0] + "</b>" + esc(x[1]) + "</div>").join("") + "</div>"
       + (inclus.length ? '<h3 class="st">' + (v.kind === "Contenu numérique" ? "Ce que vous obtenez" : v.kind === "Produit physique" ? "Livraison et contenu" : "Comment ça se passe") + '</h3><ul class="inclus">' + inclus.map(x => "<li>" + CHECK + "<span>" + esc(x) + "</span></li>").join("") + "</ul>" : "")
-      + '<h3 class="st">Avis des acheteurs</h3>'
+      + '<h3 class="st">' + (ventOn() ? "Avis des acheteurs" : "Avis des spectateurs") + "</h3>"
       + (av.length ? av.slice(0, 2).map(a => '<div class="avis-un"><div>' + etoiles(a.rating) + " <b>" + esc(a.name) + "</b> <small>" + a.date + "</small></div>" + (a.text ? "<p>" + esc(a.text) + "</p>" : "") + "</div>").join("") : '<p class="aide" style="margin:0">Aucun avis pour l\'instant.</p>')
       + '<button class="lienor" type="button" data-avis="' + v.id + '" style="justify-content:flex-start">' + (av.length > 2 ? "Voir les " + av.length + " avis" : state.watched.has(v.id) ? "Donner mon avis" : "Voir les avis") + "</button>"
       + (rel.length ? '<h3 class="st">Vidéos associées</h3><div class="assocc">' + rel.map(x => '<button type="button" data-open="' + x.id + '" aria-label="Voir la vidéo : ' + esc(x.t) + '"><span class="mini">' + art(x) + '<span class="dur">' + fmtDur(x.dur) + '</span></span><span class="nom">' + esc(x.t) + "</span></button>").join("") + "</div>" : "");
@@ -951,7 +1121,8 @@
   }
   function acheter(id, opener) {
     const v = VIDEOS.find(x => x.id === id);
-    if (!v.price) { toast("Demande de devis envoyée pour « " + v.t + " » (simulée)."); return; }
+    if (!ventOn()) return;
+    if (!v.price) { if (rubOn("surmesure")) { ouvrirDevis(opener, v); return; } toast("Demande de devis envoyée pour « " + v.t + " » (simulée)."); return; }
     ajouter(id, 1); state.etape = 1; ouvrirPanier(opener);
   }
   const achatsLien = () => state.orders.length ? '<button class="lienor" type="button" data-achats style="justify-content:flex-start">Mes achats (' + state.orders.length + ")</button>" : "";
@@ -1014,11 +1185,71 @@
   function versCatalogue(id) { const el = document.getElementById(id || "catalogue"); if (el) el.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion:reduce)").matches ? "auto" : "smooth", block: "start" }); }
   function reinit() { state.cat = "all"; state.kinds.clear(); state.lengths.clear(); state.maxPrice = 50; state.q = ""; state.fav = false; state.page = 1; $("#q").value = ""; $("#prixMax").value = 50; $("#prixVal").textContent = "50 € et plus"; document.querySelectorAll('input[name="kind"],input[name="len"]').forEach(i => { i.checked = false; }); }
 
+  /* ── Sections des rubriques ── */
+  function vueRubriques() {
+    const minutes = Math.round(VIDEOS.reduce((n, v) => n + v.dur, 0) / 60);
+    $("#chiffres").innerHTML = [[VIDEOS.length, "vidéos"], [CATS.length - 1, "catégories"], [minutes, "minutes à regarder"]].map(c => "<div><b>" + c[0] + "</b><span>" + c[1] + "</span></div>").join("");
+    $("#aproposArt").innerHTML = art(VIDEOS.find(x => x.id === 4) || VIDEOS[0]);
+    $("#creaListe").innerHTML = CREATEURS.map((c, i) => {
+      const n = VIDEOS.filter(v => v.cat === c.cat).length;
+      return '<article class="cr-carte"><span class="rond" aria-hidden="true">' + esc(c.nom.charAt(0)) + "</span><h3>" + esc(c.nom) + '</h3><p class="role">' + esc(c.role) + '</p><p class="nb">' + n + " vidéo" + (n > 1 ? "s" : "") + ' (exemple)</p><button class="btn" type="button" data-crea="' + i + '">Voir ses vidéos</button></article>';
+    }).join("");
+  }
+  function majNav() {
+    const entrees = [["accueil", "Accueil", "accueil"], ["catalogue", "Vidéos", "videos"], ["selections", "Sélections", "selections"], ["surmesure", "Sur mesure", "surmesure"], ["apropos", "À propos", "apropos"], ["createurs", "Créateurs", "createurs"], ["avisBoutique", "Avis", "avis"], ["contact", "Contact", "contact"]].filter(x => rubOn(x[2]));
+    $("#navRub").innerHTML = entrees.map(x => '<button type="button" data-nav="' + x[0] + '"' + ((state.navCur || "accueil") === x[0] ? ' aria-current="true"' : "") + ">" + x[1] + "</button>").join("");
+  }
+  function appliquerRubriques() {
+    document.querySelectorAll("[data-rub]").forEach(el => el.classList.toggle("rub-off", !el.dataset.rub.split(" ").some(rubOn)));
+    const vente = ventOn();
+    document.querySelectorAll('#tri option[value^="prix"]').forEach(o => { o.hidden = !vente; o.disabled = !vente; });
+    if (!vente) {
+      state.kinds.clear(); state.maxPrice = 50; $("#prixMax").value = 50; $("#prixVal").textContent = "50 € et plus";
+      document.querySelectorAll('input[name="kind"]').forEach(i => { i.checked = false; });
+      if (state.tri.indexOf("prix") === 0) { state.tri = "recent"; $("#tri").value = "recent"; }
+    }
+    if (!rubOn("videos")) reinit();
+    $("#mise").classList.toggle("une-col", !rubOn("videos"));
+    majNav();
+  }
+  function listeModes() {
+    const cur = modeActuel();
+    $("#modeListe").innerHTML = MODES.map(m => '<button class="mode" type="button" data-mode="' + m.id + '" aria-pressed="' + (cur === m) + '"><b>' + esc(m.nom) + ico('<path d="M5 12.5l4.5 4.5L19 7"/>') + '</b><span class="d">' + esc(m.desc) + "</span></button>").join("");
+    $("#modeEtat").textContent = cur ? "Mode actuel : " + cur.nom + "." : "Mode actuel : personnalisé (rubriques réglées à la main).";
+  }
+  function listeRubriques() {
+    listeModes();
+    $("#rubListe").innerHTML = RUBS.map(r => '<li class="sw-ligne"><div><b id="swn-' + r.id + '">' + esc(r.nom) + '</b><span class="d">' + esc(r.desc) + '</span></div><button class="sw" type="button" role="switch" data-sw="' + r.id + '" aria-checked="' + rubOn(r.id) + '" aria-labelledby="swn-' + r.id + '"></button></li>').join("");
+  }
+  function changerRubriques(maj, message) {
+    const apres = Object.assign({}, rub, maj);
+    if (!RUBS.some(r => apres[r.id] !== false)) { toast("Gardez au moins une rubrique affichée."); return; }
+    rub = apres; store.set("vid_ex_rubriques", rub);
+    appliquerRubriques(); renderUne(); render(); vueRubriques(); listeRubriques();
+    if (state.current) infos();
+    if (message) toast(message);
+  }
+  const OPT = (l) => l.map(x => "<option>" + x + "</option>").join("");
+  function devisCorps(v) {
+    $("#devisCorps").innerHTML = '<p class="aide" style="margin:0 0 6px">Cette demande est simulée : elle n\'est envoyée nulle part. Le devis est gratuit et sans engagement.</p>'
+      + '<form class="form" id="devisForm" novalidate>'
+      + '<label>Nom et prénom<input type="text" name="nom" autocomplete="name" required></label>'
+      + '<label>Adresse e-mail<input type="email" name="email" autocomplete="email" required></label>'
+      + '<label>Type de vidéo<select name="type">' + OPT(["Présentation d'un produit", "Routine ou tutoriel", "Coulisses et fabrication", "Publicité courte", "Autre idée"]) + "</select></label>"
+      + '<div class="duo"><label>Budget<select name="budget">' + OPT(["Moins de 300 €", "300 à 800 €", "800 à 2 000 €", "Plus de 2 000 €", "À discuter"]) + '</select></label><label>Délai souhaité<select name="delai">' + OPT(["Sous une semaine", "2 à 3 semaines", "Dans le mois", "Pas pressé"]) + "</select></label></div>"
+      + '<label>Votre idée<textarea name="idee" required>' + (v ? esc("À propos de « " + v.t + " » : ") : "") + "</textarea></label>"
+      + '<p class="aide" id="devisErr" role="alert" style="color:var(--alerte);margin:0"></p>'
+      + '<button class="btn or" type="submit" style="width:100%">Envoyer la demande (simulée)</button></form>';
+  }
+  function ouvrirDevis(opener, v) { devisCorps(v); ouvrir("devisOv", opener, "input[name=nom]"); }
+
   /* ── Interactions ── */
   document.addEventListener("click", ev => {
     const t = ev.target, q = (s) => t.closest(s); let b;
     if ((b = q("[data-nav]"))) {
       const v = b.dataset.nav;
+      if (v === "contact") { $("#contactErr").textContent = ""; ouvrir("contactOv", b, "input[name=nom]"); return; }
+      state.navCur = v;
       document.querySelectorAll("#navRub button").forEach(x => x.removeAttribute("aria-current")); b.setAttribute("aria-current", "true");
       if (v === "accueil") window.scrollTo({ top: 0, behavior: matchMedia("(prefers-reduced-motion:reduce)").matches ? "auto" : "smooth" });
       else { if (v === "selections") { reinit(); render(); } versCatalogue(v); }
@@ -1065,6 +1296,15 @@
     }
     if (q("#pp")) { state.playing ? (arreter(), majLecture()) : lancer(); return; }
     if (q("#suiv")) { const l = filtrer(), i = l.findIndex(v => state.current && v.id === state.current.id), nx = l[(i + 1) % l.length]; if (nx) ouvrirLecteur(nx.id); return; }
+    if (q("#openRub")) { listeRubriques(); ouvrir("rubOv", q("#openRub"), "[data-close]"); return; }
+    if ((b = q("[data-sw]"))) { const r = RUBS.find(x => x.id === b.dataset.sw), voulue = !rubOn(r.id); changerRubriques({ [r.id]: voulue }, "Rubrique « " + r.nom + " » " + (voulue ? "affichée." : "masquée.")); const nb = document.querySelector('[data-sw="' + r.id + '"]'); if (nb) nb.focus(); return; }
+    if ((b = q("[data-mode]"))) { const m = MODES.find(x => x.id === b.dataset.mode); changerRubriques(m.rub, "Mode « " + m.nom + " » appliqué."); const nb = document.querySelector('[data-mode="' + m.id + '"]'); if (nb) nb.focus(); return; }
+    if (q("#rubTout")) { changerRubriques(Object.fromEntries(RUBS.map(r => [r.id, true])), "Toutes les rubriques sont affichées."); return; }
+    if (q("#ouvreDevis")) { ouvrirDevis(q("#ouvreDevis")); return; }
+    if ((b = q("[data-crea]"))) {
+      if (!rubOn("videos")) { toast("La rubrique « Vidéos » est masquée : activez-la pour voir ses vidéos."); return; }
+      reinit(); state.cat = CREATEURS[Number(b.dataset.crea)].cat; render(); versCatalogue(); return;
+    }
     if ((b = q("[data-aller]"))) {
       const v = b.dataset.aller;
       if (v === "catalogue") { reinit(); render(); versCatalogue("catalogue"); }
@@ -1072,6 +1312,7 @@
       else if (v === "enreg") { enregCorps(); ouvrir("enregOv", b, "[data-close]"); }
       else if (v === "achats") { achatsCorps(); ouvrir("achatsOv", b, "[data-close]"); }
       else if (v === "contact") { $("#contactErr").textContent = ""; ouvrir("contactOv", b, "input[name=nom]"); }
+      else if (v === "surmesure") ouvrirDevis(b);
       return;
     }
     if ((b = q("[data-pcat]"))) { reinit(); state.cat = b.dataset.pcat; render(); versCatalogue(); return; }
@@ -1122,6 +1363,27 @@
       fermer($("#contactOv")); toast("Message simulé : rien n'a été envoyé. Dans une vraie boutique, l'équipe répond sous 48 heures.");
       return;
     }
+    if (f.id === "devisForm") {
+      ev.preventDefault();
+      const err = $("#devisErr"), g = (k) => f.elements[k].value.trim();
+      if (!g("nom")) { err.textContent = "Indiquez votre nom et prénom."; f.elements["nom"].focus(); return; }
+      if (!/^\S+@\S+\.\S+$/.test(g("email"))) { err.textContent = "Indiquez une adresse e-mail valide, par exemple nom@exemple.fr."; f.elements["email"].focus(); return; }
+      if (g("idee").length < 10) { err.textContent = "Décrivez votre idée en au moins 10 caractères pour que l'équipe puisse chiffrer la vidéo."; f.elements["idee"].focus(); return; }
+      const n = (store.get("vid.nd", 0) || 0) + 1; store.set("vid.nd", n);
+      const ref = "DA-S-" + String(n).padStart(4, "0");
+      $("#devisCorps").innerHTML = '<p class="achetee">' + ico('<path d="M5 12.5l4.5 4.5L19 7"/>') + "Demande simulée enregistrée</p>"
+        + '<p style="margin:8px 0">Référence <b>' + ref + "</b></p>"
+        + '<div class="faits"><div><b>Type</b>' + esc(g("type")) + "</div><div><b>Budget</b>" + esc(g("budget")) + "</div><div><b>Délai</b>" + esc(g("delai")) + "</div><div><b>Contact</b>" + esc(g("email")) + "</div></div>"
+        + '<p class="aide">Dans une vraie boutique, l\'équipe répond sous deux jours ouvrés avec un devis détaillé. Ici, rien n\'a été envoyé.</p>'
+        + '<button class="btn or bloc" type="button" data-close>Fermer</button>';
+      $("#devisTitre").focus(); return;
+    }
+    if (f.id === "newsForm") {
+      ev.preventDefault();
+      const m = $("#newsMsg"), v = f.elements["mail"].value.trim();
+      if (!/^\S+@\S+\.\S+$/.test(v)) { m.style.color = "var(--alerte)"; m.textContent = "Indiquez une adresse e-mail valide, par exemple nom@exemple.fr."; f.elements["mail"].focus(); return; }
+      m.style.color = ""; m.textContent = "Inscription simulée : aucune adresse n'est enregistrée ni utilisée."; f.reset(); return;
+    }
     if (f.dataset.review === undefined) return;
     ev.preventDefault();
     const id = f.dataset.review === "shop" ? "shop" : Number(f.dataset.review), nom = f.elements["name"].value.trim();
@@ -1142,6 +1404,8 @@
   (function () { const maj = () => { const b = document.getElementById("exBandeau"); document.documentElement.style.setProperty("--ex-h", (b ? b.offsetHeight : 0) + "px"); }; maj(); window.addEventListener("resize", maj); setTimeout(maj, 400); })();
 
   $("#piedCats").innerHTML = CATS.filter(c => c.id !== "all").map(c => '<li><button type="button" data-pcat="' + c.id + '">' + esc(c.label) + "</button></li>").join("");
+  appliquerRubriques();
+  vueRubriques();
   renderUne();
   render();
   const hm = location.hash.match(/^#video-(\d+)$/);
