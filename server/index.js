@@ -5360,6 +5360,13 @@ const VITRINE_MODULES_SOCLE = ["pourquoi_choisir","offre_flash","objectif_jauge"
 function resolveVitrineDraft(init) {
   try { return JSON.parse(init.vitrine_draft_json || "{}") || {}; } catch (_) { return {}; }
 }
+/* Options de la boutique (lot B4) : liste [{ type, copies }] lue dans une colonne JSON ; toute valeur illisible donne une liste vide. */
+function lireOptionsBoutique(brut) {
+  try {
+    const l = JSON.parse(brut || "[]");
+    return Array.isArray(l) ? l.filter(o => o && typeof o.type === "string").map(o => ({ type: o.type, copies: Math.max(1, Number(o.copies) || 1) })) : [];
+  } catch (_) { return []; }
+}
 function getVitrineConfig(init, { draft = false } = {}) {
   const d = draft ? resolveVitrineDraft(init) : {};
   const modulesState = getVitrineModulesState(init, { draft });
@@ -11416,7 +11423,13 @@ route("GET", "/api/mon-initiative", async (req, res, params, body, query) => {
   const useDraft = query.preview === 'draft';
   const cfg = getVitrineConfig(row, { draft: useDraft });
   row.vitrine_modules_state = cfg.modulesState;
+  row.vitrine_options = lireOptionsBoutique(row.vitrine_options_json);
   if (useDraft) {
+    const optionsBrouillon = resolveVitrineDraft(row).options;
+    if (Array.isArray(optionsBrouillon)) row.vitrine_options = lireOptionsBoutique(JSON.stringify(optionsBrouillon));
+    /* Un type n'est jamais à la fois principal et option : le type du brouillon l'emporte. */
+    const principalBrouillon = BoutiqueTypes.typeCanonique(cfg.type) || cfg.type;
+    row.vitrine_options = row.vitrine_options.filter(o => o.type !== principalBrouillon);
     row.vitrine_type = cfg.type;
     row.vitrine_types = cfg.types;
     row.vitrine_style_json = JSON.stringify(cfg.style || {});
@@ -12244,8 +12257,12 @@ route("POST", "/api/initiatives/:id/vitrine-publish", async (req, res, params) =
   const type = draft.type !== undefined ? draft.type : init.vitrine_type;
   const style = draft.style ? JSON.stringify(draft.style) : init.vitrine_style_json;
   const theme = draft.theme || init.vitrine_theme;
-  await db.prepare("UPDATE initiatives SET vitrine_modules_json=?, vitrine_type=?, vitrine_style_json=?, vitrine_theme=?, vitrine_draft_json='{}' WHERE id=?")
-    .run(modules, type, style, theme, params.id);
+  /* Options (lot B4) : celles du brouillon, sinon celles déjà publiées ; l'option qui devient le type principal disparaît. */
+  const principalPublie = BoutiqueTypes.typeCanonique(type) || type;
+  const optionsPubliees = (draft.options !== undefined ? lireOptionsBoutique(JSON.stringify(draft.options)) : lireOptionsBoutique(init.vitrine_options_json))
+    .filter(o => o.type !== principalPublie);
+  await db.prepare("UPDATE initiatives SET vitrine_modules_json=?, vitrine_type=?, vitrine_style_json=?, vitrine_theme=?, vitrine_options_json=?, vitrine_draft_json='{}' WHERE id=?")
+    .run(modules, type, style, theme, JSON.stringify(optionsPubliees), params.id);
 
   /* Contenus du brouillon : écrits colonne par colonne, en ne gardant que la liste blanche.
      Requêtes séparées et paramétrées — le nom de colonne provient exclusivement de
