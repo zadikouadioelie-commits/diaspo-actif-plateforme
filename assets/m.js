@@ -309,6 +309,8 @@
     if (S.me) { refreshBadges(); loadMyInsc(); loadPremium(); }
     /* Invitation à activer les notifications à la connexion (2026-10-13, demande explicite) : assets/notif-invite.js. */
     if (S.me && window.DaNotifInvite) window.DaNotifInvite.proposer(S.me);
+    /* Publication préparée automatiquement (2026-11-12) : fenêtre « Votre publication est prête » (2 propositions au plus, comptes sans publication) — assets/m-mod-proposition-publication.js. */
+    if (S.me && window.MPropPub) window.MPropPub.proposer(S.me);
     renderTop();
   }
   async function loadMyInsc() {
