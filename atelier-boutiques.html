@@ -197,7 +197,7 @@
     service.dataset.etat = actif ? "oui" : "non";
     sTitre.textContent = actif ? "Types de boutique : les 6 types sont en service" : "Types de boutique : les 6 types ne sont pas encore en service";
     sDetail.textContent = actif
-      ? "Les créateurs voient les nouveaux types. Ouverts aux vraies boutiques : " + (noms(d.selectionnables_public) || "aucun") + ". Les autres restent réservés aux administrateurs."
+      ? "Les créateurs voient les nouveaux types. Ouverts aux vraies boutiques : " + (noms(d.selectionnables_public) || "aucun") + ((d.selectionnables_public || []).length < 6 ? ". Les autres restent réservés aux administrateurs." : ".")
       : "Les créateurs voient l'affichage précédent. Rien ne change pour eux tant que vous n'avez pas mis les 6 types en service.";
     sBouton.hidden = false; sBouton.disabled = false;
     sBouton.className = actif ? "" : "principal";

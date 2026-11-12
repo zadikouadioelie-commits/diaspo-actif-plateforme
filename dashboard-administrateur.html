@@ -12228,7 +12228,7 @@ async function submitAccordDirect(){
       const r = await api('GET', '/admin/boutique-types-v2');
       const ouverts = (r.selectionnables_public || []).map(c => BQT_NOMS[c] || c).join(', ') || 'aucun';
       if (r.actif) {
-        el.innerHTML = '<strong style="color:#10b981;">🟢 Les 6 types sont en service</strong> — ouverts aux vraies boutiques : ' + ouverts + '. Les autres restent réservés aux administrateurs.';
+        el.innerHTML = '<strong style="color:#10b981;">🟢 Les 6 types sont en service</strong> — ouverts aux vraies boutiques : ' + ouverts + ((r.selectionnables_public || []).length < 6 ? '. Les autres restent réservés aux administrateurs.' : '.');
         btnOn.style.display = 'none'; btnOff.style.display = '';
       } else {
         el.innerHTML = '<strong style="color:#ef4444;">⚪ Les 6 types ne sont pas encore en service</strong> — les créateurs voient l\'affichage précédent.';

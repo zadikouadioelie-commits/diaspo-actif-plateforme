@@ -373,7 +373,8 @@ test('1.3 le serveur plafonne le nombre d\'options à MAX_OPTIONS et les copies 
   assert.ok(validerOptions([{ type: 'video', copies: 0 }], 'ecom').erreur);
   assert.ok(validerOptions([{ type: 'video' }, { type: 'video' }], 'ecom').erreur, 'une même option ne figure qu\'une fois');
   assert.ok(validerOptions([{ type: 'inconnu' }], 'ecom').erreur);
-  assert.ok(validerOptions([{ type: 'impact' }], 'ecom').erreur, 'un type réservé à l\'administration ne se prend pas en option');
+  assert.ok(!validerOptions([{ type: 'impact' }], 'ecom').erreur, 'impact est ouvert aux propriétaires (2026-11-12)');
+  assert.ok(!validerOptions([{ type: 'finance' }], 'ecom').erreur, 'finance est ouvert aux propriétaires (2026-11-12)');
   assert.ok(validerOptions([{ type: 'video' }], 'blog').erreur, 'il faut un type principal parmi les types proposés');
   assert.ok(validerOptions('video', 'ecom').erreur, 'une liste est attendue');
 
@@ -388,7 +389,7 @@ test('1.3 le serveur plafonne le nombre d\'options à MAX_OPTIONS et les copies 
   assert.equal((await put([{ type: 'portfolio', copies: 4 }])).status, 400, 'plus de 3 copies refusées par le serveur');
   assert.equal((await put([{ type: 'video' }])).status, 400, 'le type principal n\'est pas une option');
   assert.equal((await put([{ type: 'ecom' }, { type: 'ecom' }])).status, 400);
-  assert.equal((await put([{ type: 'impact' }])).status, 400, 'impact est réservé à l\'administration');
+  assert.equal((await put([{ type: 'inconnu' }])).status, 400, 'un type inconnu est refusé');
   assert.equal((await env.call(tiers.jar, 'PUT', `/api/initiatives/${oid}/vitrine-draft`, { options: [] })).status, 403);
   assert.equal(brouillon().options.length, 3, 'un refus ne modifie pas les options enregistrées');
   /* passer à un type qui était une option : l'option disparaît (un type n'est jamais principal ET option) */

@@ -63,10 +63,12 @@ test('E5 parcours d\'une vraie boutique : choisir le type, choisir le rôle, pub
   assert.equal(EV.profilDe(vue.data.initiative.vitrine_modules_state), 'prestataire');
 });
 
-test('E5 impact et finance restent réservés à l\'administration', async () => {
+test('E5 impact et finance sont ouverts aux propriétaires (2026-11-12) : choisir un type ne rend rien public ni achetable', async () => {
+  const BT = require('../server/boutique-types');
+  assert.deepEqual([...BT.SELECTIONNABLES_PUBLIC].sort(), Object.keys(BT.REGISTRE.TYPES).sort(), 'les 6 types sont sélectionnables');
   for (const type of ['impact', 'finance']) {
     const r = await env.call(jarProprio, 'POST', `/api/initiatives/${idInit}/vitrine/changer-type`, { type, mode: 'adapter', confirme: true });
-    assert.equal(r.status, 400, `${type} doit rester refusé`);
+    assert.equal(r.status, 200, `${type} doit être accepté : ${JSON.stringify(r.data)}`);
   }
 });
 

@@ -35,9 +35,11 @@ const CLES_NOUVELLES = Object.freeze(['ecom', 'events', 'impact', 'finance']);
    video → boutique-video.html, events → boutique-evenements.html, impact → boutique-impact.html, finance → boutique-finance.html). Les autres types s'affichent avec la présentation générale en attendant leur page (lot E). */
 const PAGES_DEDIEES = Object.freeze(['ecom', 'video', 'portfolio', 'events', 'impact', 'finance']);
 
-/* Types qu'une vraie boutique peut choisir aujourd'hui. « Créateur d'événements » est ouvert comme les autres types
-   (décision de l'utilisateur, 2026-11-11) ; impact / finance : uniquement les administrateurs (Atelier) jusqu'à leur lot. */
-const SELECTIONNABLES_PUBLIC = Object.freeze(['ecom', 'video', 'portfolio', 'events']);
+/* Types qu'une vraie boutique peut choisir : les 6 (décision de l'utilisateur, 2026-11-12 : « qu'ils puissent choisir et
+   créer toujours, sans rendre disponible pour les achats »). Choisir un type ne rend aucune boutique publique ni
+   achetable : la visibilité publique et les achats restent gouvernés par vitrine_active et par l'interrupteur
+   « Maintenance des boutiques ». Avant le 2026-11-12, impact / finance étaient réservés aux administrateurs. */
+const SELECTIONNABLES_PUBLIC = Object.freeze(['ecom', 'video', 'portfolio', 'events', 'impact', 'finance']);
 
 /* Type nouveau → type ancien dont on reprend les modules. */
 const MODELE_ANCIEN = Object.freeze({ ecom: 'commercial', events: 'evenement', impact: 'projet' });
