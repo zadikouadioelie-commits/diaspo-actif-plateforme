@@ -14,6 +14,7 @@
 'use strict';
 
 const REGISTRE = require('../assets/boutique-types.js');
+const EVENTS = require('./boutique-events'); /* lot E1 : modèle de modules du type « events » */
 
 /* Anciennes clés (colonne initiatives.vitrine_type) → clé du registre. Décision de l'utilisateur du 2026-11-11. */
 const ANCIEN_VERS_NOUVEAU = Object.freeze({
@@ -77,7 +78,7 @@ function ajouterTemplatesV2(templates, modulesRegistry) {
   for (const cle of CLES_NOUVELLES) {
     if (templates[cle]) continue;
     const t = REGISTRE.TYPES[cle];
-    const base = cle === 'finance' ? MODULES_FINANCE : (templates[MODELE_ANCIEN[cle]] || { actifs: [], optionnels: [] });
+    const base = cle === 'finance' ? MODULES_FINANCE : cle === 'events' ? EVENTS.MODULES_EVENTS : (templates[MODELE_ANCIEN[cle]] || { actifs: [], optionnels: [] });
     templates[cle] = { label: t.label, pour: t.who, actifs: connus(base.actifs), optionnels: connus(base.optionnels), v2: true };
     ajoutes.push(cle);
   }
