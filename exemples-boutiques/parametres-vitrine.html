@@ -161,6 +161,47 @@ CONSIGNE POUR CLAUDE CODE (transfert depuis la maquette, validée par ZADI) :
   .pv-items div { aspect-ratio: 4/3; border-radius: 6px; background: var(--c1); opacity: .85; font-size: 11px; color:#fff; display:flex; align-items:flex-end; padding: 4px; }
   .pv-items div:nth-child(2n) { background: var(--c2); }
   .pv-items div:nth-child(3n) { background: var(--c3); color:#111; }
+  .pv-items .pv-tile { appearance:none; -webkit-appearance:none; border:0; font:inherit; text-align:left; cursor:pointer; aspect-ratio: 4/3; min-height:44px; border-radius:6px; background: var(--c1); opacity:.85; font-size:11px; color:#fff; display:flex; align-items:flex-end; padding:4px; position:relative; overflow-wrap:anywhere; }
+  .pv-items .pv-tile:nth-child(2n) { background: var(--c2); }
+  .pv-items .pv-tile:nth-child(3n) { background: var(--c3); color:#111; }
+  .pv-items .pv-tile::after { content:"\270E"; position:absolute; top:3px; right:3px; width:18px; height:18px; border-radius:50%; background:rgba(255,255,255,.85); color:#172033; font-size:11px; line-height:18px; text-align:center; opacity:0; transition:opacity .15s; pointer-events:none; }
+  .pv-items .pv-tile:hover::after, .pv-items .pv-tile:focus-visible::after { opacity:1; }
+  .pv-items .pv-tile.perso { opacity:1; box-shadow: inset 0 0 0 2px rgba(255,255,255,.7); }
+  .pv-items .pv-tile:hover, .pv-items .pv-tile:focus-visible { outline:2px solid var(--bordeaux); outline-offset:2px; }
+  #tilesBar { display:none; align-items:center; gap:10px; flex-wrap:wrap; margin:8px 0 0; font-size:13px; }
+  #tilesBar.on { display:flex; }
+  .tv-sheet { background:#fff; border-radius:14px; max-width:640px; width:100%; max-height:calc(100dvh - 32px); display:flex; flex-direction:column; overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,.35); }
+  .tv-head, .tv-foot { padding:12px 18px; display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .tv-head { border-bottom:1px solid var(--line); }
+  .tv-foot { border-top:1px solid var(--line); flex-wrap:wrap; }
+  .tv-head h3 { margin:0; font-size:16px; }
+  .tv-body { padding:14px 18px 18px; overflow-y:auto; overscroll-behavior:contain; }
+  .tv-body h4 { margin:18px 0 6px; font-size:14px; }
+  .tv-body h5 { margin:10px 0 4px; font-size:12px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.04em; }
+  .tv-prev { height:64px; border-radius:10px; display:flex; align-items:flex-end; padding:8px 10px; font-size:13px; font-weight:600; border:1px solid rgba(0,0,0,.12); }
+  .tv-prev.sm { height:44px; flex:1; min-width:120px; align-items:center; }
+  .tv-read { font-size:13px; margin:6px 0 0; color:var(--muted); }
+  .tv-read.warn { color:#a12020; }
+  .tv-row { display:flex; flex-wrap:wrap; gap:6px; }
+  .tv-sw { width:44px; height:44px; border-radius:8px; border:1px solid rgba(0,0,0,.18); cursor:pointer; padding:0; position:relative; }
+  .tv-sw.cur::after { content:"\2713"; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:18px; font-weight:700; color:var(--tvck,#fff); text-shadow:0 0 3px rgba(0,0,0,.45); }
+  .tv-sw:hover, .tv-sw:focus-visible { outline:2px solid var(--bordeaux); outline-offset:2px; }
+  .tv-ab { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .tv-ab > div { min-width:0; }
+  .tv-ab label, .tv-free label { display:block; font-size:13px; font-weight:600; margin-bottom:4px; }
+  .tv-line { display:flex; gap:8px; align-items:center; margin-bottom:6px; }
+  .tv-line input[type=color] { width:44px; height:44px; padding:2px; border:1px solid var(--line); border-radius:8px; background:#fff; cursor:pointer; flex:none; }
+  .tv-line input[type=text] { width:100%; min-width:0; height:44px; border:1px solid var(--line); border-radius:8px; padding:0 10px; font:inherit; font-size:14px; }
+  .tv-body input[type=range] { width:100%; min-height:44px; margin:0; }
+  .tv-res { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin:8px 0 4px; }
+  .tv-res .btn, .tv-foot .btn { min-height:44px; }
+  .tv-dirs { display:flex; gap:6px; flex-wrap:wrap; border:0; padding:0; margin:10px 0 0; }
+  .tv-dirs legend { font-size:13px; font-weight:600; padding:0; margin-bottom:4px; }
+  .tv-dirs label { display:inline-flex; align-items:center; gap:6px; min-height:44px; padding:0 12px; border:1px solid var(--line); border-radius:8px; font-size:13px; font-weight:500; cursor:pointer; margin:0; }
+  .tv-dirs input:checked + span { font-weight:700; color:var(--bordeaux); }
+  .tv-x { min-width:44px; min-height:44px; }
+  @media (max-width: 520px) { .tv-ab { grid-template-columns:1fr; } .tv-head, .tv-foot { padding:10px 14px; } .tv-body { padding:12px 14px 16px; } }
+  @media (prefers-reduced-motion: reduce) { .pv-items .pv-tile::after { transition:none; } }
   .pv-mode { font-size: 12px; color: var(--muted); padding: 8px 12px; border-top: 1px solid var(--line); }
   .slot { display:flex; justify-content:space-between; align-items:center; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 6px; font-size: 13px; background: #fff; }
   .optBox { border: 2px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 12px; background:#fff; }
@@ -249,6 +290,8 @@ CONSIGNE POUR CLAUDE CODE (transfert depuis la maquette, validée par ZADI) :
         </div>
         <h3 style="font-size:14px;margin:10px 0 6px">Palettes prédéfinies <span style="font-weight:400;color:var(--muted)">(29, en 6 familles)</span></h3>
         <div class="palettes" id="palettes"></div>
+        <p class="hint" style="margin:8px 0 0">Astuce : cliquez sur une case de l'aperçu (par exemple « Nos prochains événements ») pour changer sa couleur seule.</p>
+        <div id="tilesBar"><span id="tilesCount"></span><button type="button" class="btn ghost sm" id="tilesReset" style="min-height:44px">Tout remettre à la palette</button></div>
         <h3 style="font-size:14px;margin:14px 0 0">Couleurs</h3>
         <div id="colorRows"></div>
         <div class="toggle"><span>Mode clair et sombre<small>Réglages indépendants pour chaque mode</small></span>
@@ -371,6 +414,54 @@ CONSIGNE POUR CLAUDE CODE (transfert depuis la maquette, validée par ZADI) :
   </div>
 </div>
 
+<div id="tileOv" role="dialog" aria-modal="true" aria-labelledby="tvTitle" style="display:none;position:fixed;inset:0;background:rgba(10,16,30,.6);align-items:center;justify-content:center;padding:16px;z-index:100001">
+  <div class="tv-sheet" id="tvSheet">
+    <div class="tv-head"><h3 id="tvTitle" tabindex="-1">Couleur de la case</h3><button type="button" class="btn ghost tv-x" data-tv-close aria-label="Fermer le panneau de couleur">✕</button></div>
+    <div class="tv-body">
+      <div class="tv-prev" id="tvPrev"><span id="tvPrevTxt">Aperçu de la case</span></div>
+      <p class="tv-read" id="tvRead" role="status"></p>
+
+      <h4>Couleurs de votre palette</h4>
+      <div class="tv-row" id="tvPal"></div>
+
+      <h4>Batterie de couleurs prêtes</h4>
+      <p class="hint" style="margin:0 0 4px">Toutes les couleurs des 29 palettes, par famille. Survolez une couleur pour voir sa palette.</p>
+      <div id="tvBat"></div>
+
+      <h4>Variantes de la couleur choisie</h4>
+      <div id="tvVar"></div>
+
+      <h4>Mélanger deux couleurs</h4>
+      <div class="tv-ab">
+        <div><label for="tvAh">Couleur A</label>
+          <div class="tv-line"><input type="color" id="tvAc" aria-label="Choisir la couleur A"><input type="text" id="tvAh" maxlength="7" autocomplete="off" spellcheck="false"></div>
+          <div class="tv-row" id="tvAq" aria-label="Couleurs de la palette pour A"></div></div>
+        <div><label for="tvBh">Couleur B</label>
+          <div class="tv-line"><input type="color" id="tvBc" aria-label="Choisir la couleur B"><input type="text" id="tvBh" maxlength="7" autocomplete="off" spellcheck="false"></div>
+          <div class="tv-row" id="tvBq" aria-label="Couleurs de la palette pour B"></div></div>
+      </div>
+      <label for="tvRatio" style="display:block;font-size:13px;font-weight:600;margin-top:12px">Mélange A + B — part de B : <output id="tvRatioO">50 %</output></label>
+      <input type="range" id="tvRatio" min="0" max="100" value="50">
+      <div class="tv-res"><div class="tv-prev sm" id="tvMixPrev"></div><button type="button" class="btn" data-tv-apply="mix">Appliquer le mélange</button></div>
+      <fieldset class="tv-dirs"><legend>Dégradé A → B : direction</legend>
+        <label><input type="radio" name="tvDir" value="135deg" checked><span>Diagonale</span></label>
+        <label><input type="radio" name="tvDir" value="180deg"><span>Vertical</span></label>
+        <label><input type="radio" name="tvDir" value="90deg"><span>Horizontal</span></label>
+      </fieldset>
+      <div class="tv-res"><div class="tv-prev sm" id="tvGradPrev"></div><button type="button" class="btn" data-tv-apply="grad">Appliquer le dégradé</button></div>
+
+      <h4>Réglage libre <span style="font-weight:400;color:var(--muted)">(remplace un éventuel dégradé)</span></h4>
+      <div class="tv-free">
+        <div class="tv-line"><input type="color" id="tvFc" aria-label="Choisir une couleur libre"><input type="text" id="tvFh" maxlength="7" autocomplete="off" spellcheck="false" aria-label="Code couleur hexadécimal, par exemple #83172f"></div>
+        <label for="tvH">Teinte : <output id="tvHo">0</output>°</label><input type="range" id="tvH" min="0" max="360" value="0">
+        <label for="tvS">Saturation : <output id="tvSo">0</output> %</label><input type="range" id="tvS" min="0" max="100" value="0">
+        <label for="tvL">Luminosité : <output id="tvLo">0</output> %</label><input type="range" id="tvL" min="0" max="100" value="0">
+      </div>
+    </div>
+    <div class="tv-foot"><button type="button" class="btn ghost" data-tv-reset>Reprendre la palette</button><button type="button" class="btn" data-tv-close>Fermer</button></div>
+  </div>
+</div>
+
 <script>
   /* Source unique : assets/boutique-types.js (TYPES, TYPE_SECTIONS, MAX_OPTIONS calculé = types − 1, MAX_COPIES). */
   const { TYPES, TYPE_SECTIONS, MAX_OPTIONS, MAX_COPIES, SLOTS_DEFAULT } = window.BOUTIQUE_TYPES;
@@ -398,7 +489,8 @@ CONSIGNE POUR CLAUDE CODE (transfert depuis la maquette, validée par ZADI) :
       events: { on: true, copies: [{ slots: 2, compact: true }] }
     },
     sections: null,
-    vis: "draft"
+    vis: "draft",
+    tiles: {}
   };
 
   const $ = (s) => document.querySelector(s);
@@ -485,8 +577,9 @@ CONSIGNE POUR CLAUDE CODE (transfert depuis la maquette, validée par ZADI) :
     const r1 = contrast(c1, bg);
     const r2 = contrast(text, c1);
     const warn = r1 < 3 ? `Attention : la couleur principale est trop proche du fond (${r1.toFixed(1)}:1). Choisissez une couleur plus contrastée.` : (r2 < 4.5 ? `Attention : le texte sur la couleur principale est difficile à lire (${r2.toFixed(1)}:1).` : "");
-    $("#contrastErr").textContent = warn;
-    $("#contrastOk").textContent = warn ? "" : `Contrastes conformes WCAG AA (texte sur couleur principale : ${r2.toFixed(1)}:1).`;
+    const tw = tilesWarn();
+    $("#contrastErr").textContent = warn || tw;
+    $("#contrastOk").textContent = (warn || tw) ? "" : `Contrastes conformes WCAG AA (texte sur couleur principale : ${r2.toFixed(1)}:1).`;
   }
 
   function activeOptions() { return Object.keys(st.options).filter(k => st.options[k].on && k !== st.main); }
@@ -559,11 +652,11 @@ CONSIGNE POUR CLAUDE CODE (transfert depuis la maquette, validée par ZADI) :
     $("#pvName").textContent = st.name || "Nom de la boutique";
     $("#pvSlogan").textContent = st.slogan;
     $("#pvTag").textContent = TYPES[st.main].label.toUpperCase();
-    $("#pvBody").innerHTML = `<div class="pv-opt"><h4>Rubriques affichées</h4><div class="pv-items">${(st.sections || []).filter(x => x.visible).map(x => `<div>${x.title}</div>`).join("") || "<div>Aucune rubrique visible</div>"}</div></div>` + activeOptions().map(k => {
+    $("#pvBody").innerHTML = `<div class="pv-opt"><h4>Rubriques affichées</h4><div class="pv-items">${(st.sections || []).filter(x => x.visible).map((x, p) => tileHtml("s:" + x.title, x.title, p + 1, x.title)).join("") || "<div>Aucune rubrique visible</div>"}</div></div>` + activeOptions().map(k => {
       const o = st.options[k];
       return o.copies.map((c, ci) => `
         <div class="pv-opt"><h4>${TYPES[k].label}${ci ? ` (copie ${ci})` : ""}${c.compact ? " — compacte" : ""}</h4>
-          <div class="pv-items">${Array.from({ length: Math.min(c.slots, 3) }, (_, i) => `<div>${TYPES[k].items} ${i + 1}</div>`).join("")}</div>
+          <div class="pv-items">${Array.from({ length: Math.min(c.slots, 3) }, (_, i) => tileHtml("o:" + k + ":" + ci + ":" + i, TYPES[k].items + " " + (i + 1), i + 1, TYPES[k].label + " — " + TYPES[k].items + " " + (i + 1))).join("")}</div>
         </div>`).join("");
     }).join("") + `<p style="font-size:13px;color:var(--muted)">Contenus de la boutique principale : ${TYPES[st.main].label}.</p>`;
     const tl = pv.querySelector(".tex-layer") || (() => {
@@ -578,8 +671,175 @@ CONSIGNE POUR CLAUDE CODE (transfert depuis la maquette, validée par ZADI) :
     $("#pvMode").textContent = st.dark ? "Clair et sombre : réglages indépendants" : "Mode clair seul";
     checkContrast();
     updateDots();
+    updateTilesBar();
     saveShop();
   }
+
+  /* ===== Couleur d'une case en particulier ===== */
+  function escT(x) { return String(x).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]); }
+  const HEX6 = /^#[0-9a-f]{6}$/i;
+  function normHex(v) {
+    v = String(v || "").trim().toLowerCase();
+    if (/^#?[0-9a-f]{3}$/.test(v)) { v = v.replace("#", ""); return "#" + v[0] + v[0] + v[1] + v[1] + v[2] + v[2]; }
+    if (/^#?[0-9a-f]{6}$/.test(v)) return v[0] === "#" ? v : "#" + v;
+    return null;
+  }
+  function mixHex(a, b, t) {
+    const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16), to = n => Math.round(n).toString(16).padStart(2, "0");
+    const f = sh => ((pa >> sh) & 255) * (1 - t) + ((pb >> sh) & 255) * t;
+    return "#" + to(f(16)) + to(f(8)) + to(f(0));
+  }
+  function tileBg(t) { return t.c2 ? "linear-gradient(" + (t.dir || "135deg") + "," + t.c + "," + t.c2 + ")" : t.c; }
+  function tileText(t) {
+    const cols = t.c2 ? [t.c, t.c2] : [t.c];
+    const w = Math.min(...cols.map(x => contrast("#ffffff", x))), d = Math.min(...cols.map(x => contrast("#111111", x)));
+    return w >= d ? "#ffffff" : "#111111";
+  }
+  function defIdx(pos) { return pos % 3 === 0 ? 2 : (pos % 2 === 0 ? 1 : 0); }
+  function defColor(pos) { return st.colors[defIdx(pos)] || st.colors[0]; }
+  function tileHtml(key, text, pos, label) {
+    const t = st.tiles[key];
+    const style = t ? ' style="background:' + tileBg(t) + ';color:' + tileText(t) + '"' : "";
+    return '<button type="button" class="pv-tile' + (t ? " perso" : "") + '" data-tile="' + escT(key) + '" data-pos="' + pos + '" data-label="' + escT(label) + '" aria-label="' + escT(label) + ' — modifier la couleur"' + style + '>' + escT(text) + '</button>';
+  }
+  function tilesWarn() {
+    const bg = st.showDark ? "#14161c" : "#ffffff";
+    const n = Object.values(st.tiles).filter(t => contrast(bg, t.c) < 1.3 && (!t.c2 || contrast(bg, t.c2) < 1.3)).length;
+    return n ? "Attention : " + n + (n > 1 ? " cases personnalisées se détachent" : " case personnalisée se détache") + " mal du fond de la boutique." : "";
+  }
+  function updateTilesBar() {
+    const n = Object.keys(st.tiles).length, bar = $("#tilesBar");
+    if (!bar) return;
+    bar.classList.toggle("on", n > 0);
+    $("#tilesCount").textContent = n + (n > 1 ? " cases personnalisées" : " case personnalisée") + " — elles gardent leur couleur quand vous changez de palette.";
+  }
+  const tv = { key: null, label: "", pos: 1, opener: null, base: "#000000", A: "#000000", B: "#ffffff", ratio: 50, dir: "135deg", built: false };
+  const tvOv = () => $("#tileOv");
+  const tvOpen = () => tvOv().style.display === "flex";
+  function tvCur() { return st.tiles[tv.key] || { c: defColor(tv.pos) }; }
+  function tvSw(hex, extra, title) {
+    return '<button type="button" class="tv-sw" ' + extra + ' style="background:' + hex + '" title="' + escT(title) + '" aria-label="' + escT(title) + '" data-hex="' + hex + '"></button>';
+  }
+  function tvBuildStatic() {
+    $("#tvBat").innerHTML = COUL.GROUPES_PALETTES.map(g => '<h5>' + escT(g) + '</h5><div class="tv-row">' +
+      PALETTES.filter(p => p.groupe === g).map(p => p.c.map(c => tvSw(c, 'data-tvc="' + c + '"', p.name + " — " + c)).join("")).join("") + '</div>').join("");
+  }
+  function tvBuildPal() {
+    const names = ["Couleur 1", "Couleur 2", "Couleur 3"];
+    $("#tvPal").innerHTML = st.colors.slice(0, 3).map((c, i) => tvSw(c, 'data-tvc="' + c + '"', "Palette de la boutique — " + names[i] + " " + c)).join("");
+    $("#tvAq").innerHTML = st.colors.slice(0, 3).map((c, i) => tvSw(c, 'data-tva="' + c + '"', "Couleur A : " + names[i] + " " + c)).join("");
+    $("#tvBq").innerHTML = st.colors.slice(0, 3).map((c, i) => tvSw(c, 'data-tvb="' + c + '"', "Couleur B : " + names[i] + " " + c)).join("");
+  }
+  function tvBuildVar() {
+    const base = tv.base, [h, s, l] = hexToHsl(base), hh = d => hslToHex(((h + d) % 360 + 360) % 360, s, l);
+    const row = (arr, name) => '<h5>' + name + '</h5><div class="tv-row">' + arr.map(c => tvSw(c, 'data-tvc="' + c + '" data-tvv="1"', name + " " + c)).join("") + '</div>';
+    $("#tvVar").innerHTML = row(ramp(base), "Nuances (du plus clair au plus foncé)") + row([hh(180)], "Complémentaire") + row([hh(-30), hh(30)], "Voisines") + row([hh(120), hh(240)], "Triade");
+  }
+  function tvMarkCur() {
+    const cur = tvCur().c.toLowerCase();
+    $$("#tileOv .tv-sw").forEach(b => { const on = !tvCur().c2 && b.dataset.hex.toLowerCase() === cur; b.classList.toggle("cur", on); if (on) b.style.setProperty("--tvck", contrast("#ffffff", b.dataset.hex) >= 3 ? "#fff" : "#111"); });
+  }
+  function tvSyncMix() {
+    $("#tvAc").value = tv.A; $("#tvBc").value = tv.B;
+    if (document.activeElement !== $("#tvAh")) $("#tvAh").value = tv.A;
+    if (document.activeElement !== $("#tvBh")) $("#tvBh").value = tv.B;
+    const m = mixHex(tv.A, tv.B, tv.ratio / 100), g = { c: tv.A, c2: tv.B, dir: tv.dir };
+    $("#tvRatioO").textContent = tv.ratio + " %";
+    const mp = $("#tvMixPrev"); mp.style.background = m; mp.style.color = tileText({ c: m }); mp.textContent = "Mélange " + m;
+    const gp = $("#tvGradPrev"); gp.style.background = tileBg(g); gp.style.color = tileText(g); gp.textContent = "Dégradé";
+  }
+  function tvSync() {
+    const t = tvCur(), prev = $("#tvPrev");
+    prev.style.background = tileBg(t); prev.style.color = tileText(t);
+    $("#tvPrevTxt").textContent = tv.label;
+    const bg = st.showDark ? "#14161c" : "#ffffff", cb = Math.min(contrast(bg, t.c), t.c2 ? contrast(bg, t.c2) : 99), ct = Math.max(contrast("#ffffff", t.c), contrast("#111111", t.c));
+    const r = $("#tvRead");
+    r.classList.toggle("warn", cb < 1.3);
+    r.textContent = "Texte " + (tileText(t) === "#ffffff" ? "blanc" : "foncé") + " automatique (lisibilité " + ct.toFixed(1) + ":1)" + (st.tiles[tv.key] ? "" : " — couleur de la palette") + (cb < 1.3 ? ". Attention : cette couleur se confond avec le fond de la boutique." : ".");
+    const sliderOn = ["tvH", "tvS", "tvL", "tvFh"].includes((document.activeElement || {}).id);
+    if (!sliderOn) {
+      const [h, s, l] = hexToHsl(t.c);
+      $("#tvFc").value = t.c; $("#tvFh").value = t.c;
+      $("#tvH").value = Math.round(h); $("#tvS").value = Math.round(s); $("#tvL").value = Math.round(l);
+      $("#tvHo").textContent = Math.round(h); $("#tvSo").textContent = Math.round(s); $("#tvLo").textContent = Math.round(l);
+    }
+    tvMarkCur();
+  }
+  function tvCommit(t, setBase) {
+    st.tiles[tv.key] = t;
+    if (setBase) { tv.base = t.c; tvBuildVar(); }
+    renderPreview(); tvSync();
+  }
+  function tvOpenFor(btn) {
+    tv.key = btn.dataset.tile; tv.label = btn.dataset.label; tv.pos = Number(btn.dataset.pos) || 1; tv.opener = btn;
+    const c = tvCur().c;
+    tv.base = c; tv.A = c;
+    tv.B = st.colors.find(x => x.toLowerCase() !== c.toLowerCase()) || (() => { const [h, s, l] = hexToHsl(c); return hslToHex((h + 180) % 360, s, l); })();
+    tv.ratio = 50; tv.dir = tvCur().dir || "135deg";
+    $("#tvRatio").value = 50;
+    $$("input[name=tvDir]").forEach(r => { r.checked = r.value === tv.dir; });
+    if (!tv.built) { tvBuildStatic(); tv.built = true; }
+    tvBuildPal(); tvBuildVar();
+    $("#tvTitle").textContent = "Couleur de la case « " + tv.label + " »";
+    tvOv().style.display = "flex";
+    tvOv().querySelector(".tv-body").scrollTop = 0;
+    tvSyncMix(); tvSync();
+    $("#tvTitle").focus();
+  }
+  function tvClose() {
+    if (!tvOpen()) return;
+    const key = tv.key;
+    tvOv().style.display = "none";
+    const b = Array.from($$("[data-tile]")).find(x => x.dataset.tile === key) || tv.opener;
+    if (b && b.focus) b.focus();
+  }
+  document.addEventListener("click", e => {
+    const t = e.target;
+    if (t === tvOv()) { tvClose(); return; }
+    const tile = t.closest("[data-tile]");
+    if (tile) { tvOpenFor(tile); return; }
+    if (t.closest("#tilesReset")) { const n = Object.keys(st.tiles).length; st.tiles = {}; renderPreview(); toast(n + (n > 1 ? " cases remises" : " case remise") + " à la palette"); return; }
+    if (!tvOpen()) return;
+    if (t.closest("[data-tv-close]")) { tvClose(); return; }
+    if (t.closest("[data-tv-reset]")) { delete st.tiles[tv.key]; tv.base = defColor(tv.pos); tvBuildVar(); renderPreview(); tvSync(); toast("Case remise à la couleur de la palette"); return; }
+    const c = t.closest("[data-tvc]");
+    if (c) { tvCommit({ c: c.dataset.tvc }, !c.dataset.tvv); return; }
+    const a = t.closest("[data-tva]"); if (a) { tv.A = a.dataset.tva; tvSyncMix(); return; }
+    const b = t.closest("[data-tvb]"); if (b) { tv.B = b.dataset.tvb; tvSyncMix(); return; }
+    const ap = t.closest("[data-tv-apply]");
+    if (ap) {
+      if (ap.dataset.tvApply === "mix") { tvCommit({ c: mixHex(tv.A, tv.B, tv.ratio / 100) }, true); toast("Mélange appliqué à cette case"); }
+      else { tvCommit({ c: tv.A, c2: tv.B, dir: tv.dir }, false); toast("Dégradé appliqué à cette case"); }
+    }
+  });
+  document.addEventListener("input", e => {
+    if (!tvOpen() || !e.target.closest("#tileOv")) return;
+    const id = e.target.id, v = e.target.value;
+    if (id === "tvAc" || id === "tvBc") { tv[id === "tvAc" ? "A" : "B"] = v; tvSyncMix(); }
+    else if (id === "tvAh" || id === "tvBh") { const h = normHex(v); if (h) { tv[id === "tvAh" ? "A" : "B"] = h; tvSyncMix(); } }
+    else if (id === "tvRatio") { tv.ratio = Number(v); tvSyncMix(); }
+    else if (e.target.name === "tvDir") { tv.dir = v; tvSyncMix(); }
+    else if (id === "tvFc") tvCommit({ c: v }, false);
+    else if (id === "tvFh") { const h = normHex(v); if (h) tvCommit({ c: h }, false); }
+    else if (id === "tvH" || id === "tvS" || id === "tvL") {
+      const h = Number($("#tvH").value), s2 = Number($("#tvS").value), l = Number($("#tvL").value);
+      $("#tvHo").textContent = h; $("#tvSo").textContent = s2; $("#tvLo").textContent = l;
+      tvCommit({ c: hslToHex(h, s2, l) }, false);
+    }
+  });
+  document.addEventListener("change", e => {
+    if (tvOpen() && e.target.closest("#tileOv") && /^(tvH|tvS|tvL|tvFc|tvFh)$/.test(e.target.id)) { tv.base = tvCur().c; tvBuildVar(); tvSync(); }
+  });
+  document.addEventListener("keydown", e => {
+    if (!tvOpen()) return;
+    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); tvClose(); return; }
+    if (e.key !== "Tab") return;
+    const f = Array.from($$("#tvSheet button, #tvSheet input, #tvSheet [tabindex='-1']")).filter(x => !x.disabled && x.offsetParent !== null);
+    if (!f.length) return;
+    const first = f[0], last = f[f.length - 1];
+    if (e.shiftKey && (document.activeElement === first || document.activeElement === $("#tvTitle"))) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  }, true);
   // Enregistre la configuration pour la page Boutique Vidéo (prototype : stockage local du navigateur).
   function saveShop() {
     try {
@@ -599,7 +859,8 @@ CONSIGNE POUR CLAUDE CODE (transfert depuis la maquette, validée par ZADI) :
         textures: st.textures.slice(0, st.ncol),
         sections: st.sections.map(s => s.title),
         hiddenSections: st.sections.filter(s => !s.visible).map(s => s.title),
-        customSections: st.sections.filter(s => s.custom).map(s => s.title)
+        customSections: st.sections.filter(s => s.custom).map(s => s.title),
+        tileColors: st.tiles
       }));
     } catch (e) { /* stockage indisponible : la page garde ses valeurs par défaut */ }
   }
@@ -727,6 +988,16 @@ CONSIGNE POUR CLAUDE CODE (transfert depuis la maquette, validée par ZADI) :
     if (typeof c.slogan === "string") st.slogan = c.slogan;
     if (Array.isArray(c.colors) && c.colors.length) { st.colors = [...c.colors]; st.ncol = c.colors.length; }
     if (Array.isArray(c.textures)) st.textures = [...c.textures];
+    if (c.tileColors && typeof c.tileColors === "object") {
+      Object.keys(c.tileColors).forEach(k => {
+        const t = c.tileColors[k];
+        if (t && HEX6.test(t.c)) {
+          const o = { c: t.c.toLowerCase() };
+          if (HEX6.test(t.c2)) { o.c2 = t.c2.toLowerCase(); o.dir = ["135deg", "180deg", "90deg"].includes(t.dir) ? t.dir : "135deg"; }
+          st.tiles[k] = o;
+        }
+      });
+    }
     if (c.status) st.vis = c.status;
     if (c.promoStyle) st.promoStyle = c.promoStyle;
     if (c.logo && typeof c.logo === "object") st.logo = Object.assign({ src: "", shape: "round", size: 88, zoom: 100, x: 0, y: 0 }, c.logo);
@@ -842,7 +1113,7 @@ CONSIGNE POUR CLAUDE CODE (transfert depuis la maquette, validée par ZADI) :
   document.addEventListener("click", e => {
     const t = e.target;
     const pal = t.closest("[data-pal]");
-    if (pal) { const p = PALETTES[Number(pal.dataset.pal)]; st.colors = [...p.c]; st.sel = [4, 4, 4]; buildColors(); renderPreview(); toast(`Palette « ${p.name} »`); return; }
+    if (pal) { const p = PALETTES[Number(pal.dataset.pal)]; st.colors = [...p.c]; st.sel = [4, 4, 4]; buildColors(); renderPreview(); const np = Object.keys(st.tiles).length; toast(`Palette « ${p.name} »` + (np ? ` — ${np} case${np > 1 ? "s" : ""} personnalisée${np > 1 ? "s" : ""} conservée${np > 1 ? "s" : ""}` : "")); return; }
     const ton = t.closest("[data-ton],[data-harm]");
     if (ton) { const [ci, hx] = (ton.dataset.ton || ton.dataset.harm).split(":"); st.colors[Number(ci)] = hx; st.sel[Number(ci)] = -1; buildColors(); renderPreview(); return; }
     const jeu = t.closest("[data-harm-jeu]");
