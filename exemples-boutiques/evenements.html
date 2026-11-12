@@ -228,6 +228,76 @@
   @media (max-width:1100px) { .pied-grille { grid-template-columns:repeat(3,minmax(0,1fr)); } .pied-marque, .pied-contact { grid-column:span 3; } .pied-marque p, .pied-contact p { max-width:60ch; } }
   @media (max-width:600px) { .pied-grille { grid-template-columns:repeat(2,minmax(0,1fr)); gap:22px 18px; } .pied-marque, .pied-contact { grid-column:span 2; } .pied-bas { flex-direction:column; align-items:flex-start; } }
   @media (max-width:600px) { .typesb li { grid-template-columns:minmax(0,1fr) auto; } .typesb .qty { grid-column:1 / -1; justify-self:start; } .etapes li { font-size:12px; } }
+  /* Rubriques activables */
+  .rub-off { display:none !important; }
+  .sr { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+  .rubbtn { display:inline-flex; align-items:center; gap:8px; min-height:44px; padding:0 14px; border-radius:999px; border:1px solid var(--line); background:transparent; color:var(--text); cursor:pointer; font-weight:600; }
+  .rubbtn:hover { border-color:var(--gold); color:var(--gold); }
+  #accueil, #catalogue, #apropos, #intervenants, #avis, #newsletter { scroll-margin-top:calc(var(--ex-h,0px) + 130px); }
+  .bloc { margin-top:46px; }
+  .bloc-tete { display:flex; align-items:flex-end; justify-content:space-between; gap:12px 20px; flex-wrap:wrap; margin-bottom:16px; }
+  .bloc-tete h2, .apropos h2 { font-family:var(--serif); font-size:clamp(24px,3.2vw,32px); margin:0; line-height:1.15; }
+  .bloc-tete p { margin:4px 0 0; color:var(--muted); font-size:15px; }
+  .apropos { display:grid; grid-template-columns:minmax(0,1.2fr) minmax(0,.8fr); gap:26px; align-items:center; }
+  .apropos p { margin:12px 0 0; color:var(--muted); max-width:62ch; }
+  .chiffres { display:flex; flex-wrap:wrap; gap:12px; margin-top:16px; }
+  .chiffres div { flex:1 1 110px; padding:14px 16px; border:1px solid var(--line); border-radius:12px; background:var(--panel); }
+  .chiffres b { display:block; font-family:var(--serif); font-size:30px; color:var(--gold); line-height:1.1; font-variant-numeric:tabular-nums; }
+  .chiffres span { color:var(--muted); font-size:13.5px; }
+  .apropos-art { border-radius:14px; overflow:hidden; border:1px solid var(--line); aspect-ratio:16/10; background:var(--panel2); position:relative; }
+  .apropos-art svg { position:absolute; inset:0; width:100%; height:100%; }
+  .intervs { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:16px; }
+  .iv-carte { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:18px; display:flex; flex-direction:column; align-items:flex-start; gap:4px; }
+  .iv-carte .rond { width:52px; height:52px; border-radius:50%; background:var(--panel2); border:1px solid var(--line); display:grid; place-items:center; color:var(--gold); font-family:var(--serif); font-size:24px; font-weight:700; margin-bottom:6px; }
+  .iv-carte h3 { margin:0; font-family:var(--serif); font-size:20px; line-height:1.2; }
+  .iv-carte .role { margin:0; color:var(--gold); font-size:14px; font-weight:600; }
+  .iv-carte .nb { margin:0 0 10px; color:var(--muted); font-size:13.5px; }
+  .iv-carte .btn { margin-top:auto; flex:none; align-self:stretch; }
+  .avis-liste { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; }
+  .avis-un { padding:18px; border:1px solid var(--line); border-radius:14px; background:var(--panel); display:flex; flex-direction:column; gap:10px; }
+  .etoiles { display:flex; gap:2px; color:var(--gold); }
+  .etoiles svg.ic { width:18px; height:18px; fill:currentColor; stroke-width:1; }
+  .etoiles svg.ic.etoile-off { fill:none; }
+  .avis-un q { quotes:"« " " »"; font-size:15px; line-height:1.55; }
+  .avis-un .qui { display:flex; align-items:center; gap:10px; margin-top:auto; color:var(--muted); font-size:13.5px; }
+  .avis-un .rond { width:38px; height:38px; border-radius:50%; background:var(--panel2); border:1px solid var(--line); display:grid; place-items:center; color:var(--gold); font-weight:700; flex:none; }
+  .note-moy { display:flex; align-items:center; gap:10px; color:var(--muted); margin-top:4px; }
+  .note-moy b { font-family:var(--serif); font-size:28px; color:var(--gold); }
+  .lettre { border-radius:12px; border:1px solid var(--line); display:grid; grid-template-columns:auto minmax(0,1fr) minmax(0,1.1fr); align-items:center; gap:14px 26px; padding:20px 26px 20px 22px; background:linear-gradient(100deg, color-mix(in srgb, var(--c1) 65%, var(--bg)), color-mix(in srgb, var(--c1) 22%, var(--bg))); }
+  .lettre svg.ic { width:46px; height:46px; stroke-width:1.4; color:var(--gold); }
+  .lettre h3 { margin:0; font-family:var(--serif); font-size:26px; line-height:1.15; }
+  .lettre p { margin:2px 0 0; font-size:14.5px; color:#e6e1d6; }
+  .lettre form { display:flex; gap:10px; }
+  .lettre input { flex:1 1 auto; min-width:0; min-height:46px; border-radius:999px; border:1px solid rgba(10,18,38,.45); background:var(--bg); color:var(--text); padding:0 18px; font:inherit; }
+  .lettre button { min-height:46px; border-radius:999px; border:0; background:var(--bg); color:var(--gold); font-weight:700; padding:0 22px; cursor:pointer; font:inherit; font-weight:700; }
+  .lettre button:hover { filter:brightness(1.25); }
+  .lettre :focus-visible { outline-color:var(--bg); }
+  .sw-liste { list-style:none; margin:12px 0 0; padding:0; display:grid; gap:8px; }
+  .sw-ligne { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:12px; align-items:center; padding:10px 14px; border:1px solid var(--line); border-radius:12px; background:var(--panel2); }
+  .sw-ligne b { display:block; }
+  .sw-ligne span.d { color:var(--muted); font-size:13.5px; }
+  .sw { position:relative; width:56px; height:44px; border:0; background:none; cursor:pointer; padding:0; }
+  .sw::before { content:""; position:absolute; left:0; top:10px; width:56px; height:24px; border-radius:999px; background:#3a4666; border:1px solid var(--line); transition:background .2s; }
+  .sw::after { content:""; position:absolute; left:4px; top:14px; width:18px; height:18px; border-radius:50%; background:#fff; transition:transform .2s; }
+  .sw[aria-checked="true"]::before { background:var(--gold); }
+  .sw[aria-checked="true"]::after { transform:translateX(32px); background:var(--on-gold); }
+  .sw:focus-visible { outline:3px solid var(--gold); outline-offset:2px; border-radius:999px; }
+  .mode-titre { margin:16px 0 0; font-family:var(--serif); font-size:18px; }
+  .modes { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin-top:10px; }
+  .mode { text-align:left; padding:12px 14px; min-height:44px; border:1px solid var(--line); border-radius:12px; background:var(--panel2); color:var(--text); cursor:pointer; display:flex; flex-direction:column; gap:4px; }
+  .mode b { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .mode span.d { color:var(--muted); font-size:13px; }
+  .mode svg.ic { width:18px; height:18px; opacity:0; color:var(--on-gold); }
+  .mode:hover { border-color:var(--gold); }
+  .mode[aria-pressed="true"] { background:var(--gold); border-color:var(--gold); color:var(--on-gold); }
+  .mode[aria-pressed="true"] span.d { color:var(--on-gold); }
+  .mode[aria-pressed="true"] svg.ic { opacity:1; }
+  .mode-etat { margin:8px 0 0; color:var(--muted); font-size:13.5px; min-height:1.4em; }
+  .rub-actions { display:flex; flex-wrap:wrap; gap:10px; justify-content:flex-end; margin-top:14px; }
+  @media (max-width:1100px) { .intervs { grid-template-columns:repeat(2,minmax(0,1fr)); } .avis-liste { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+  @media (max-width:900px) { .apropos { grid-template-columns:1fr; } .modes { grid-template-columns:1fr; } .lettre { grid-template-columns:auto minmax(0,1fr); } .lettre form { grid-column:1 / -1; } }
+  @media (max-width:600px) { .intervs, .avis-liste { grid-template-columns:1fr; } .rubbtn span { display:none; } .rubbtn { padding:0; min-width:44px; justify-content:center; } .lettre { padding:16px; } .lettre form { flex-direction:column; } .lettre h3 { font-size:22px; } }
+  @media (prefers-reduced-motion:reduce) { .sw::before, .sw::after { transition:none; } }
   @media (max-width:1180px) {
     .top-in { flex-wrap:wrap; }
     .nav { order:3; flex:1 1 100%; overflow-x:auto; scrollbar-width:none; margin:0 -6px; }
@@ -266,16 +336,15 @@
       <svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width:1.5"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="M12 13l1.2 2.4 2.6.4-1.9 1.8.5 2.6-2.4-1.3-2.4 1.3.5-2.600-1.9-1.800 2.600-.400z" style="stroke-width:1.2"/></svg>
       <b id="shopName"></b>
     </div>
-    <nav class="nav" aria-label="Rubriques">
-      <button type="button" data-nav="accueil">Accueil</button>
-      <button type="button" data-nav="cartes" id="navCartes">Événements</button>
-      <button type="button" data-nav="agenda" id="navAgenda">Agenda</button>
-    </nav>
+    <nav class="nav" id="navRub" aria-label="Rubriques"></nav>
     <div class="tools">
+      <button class="rubbtn" type="button" id="openRub" aria-label="Choisir les rubriques de la boutique (exemple)">
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg><span>Rubriques</span>
+      </button>
       <button class="iconbtn" type="button" id="navCompte" aria-label="Mon compte (simulé)">
         <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
       </button>
-      <button class="minebtn" type="button" id="openMine" aria-label="Ouvrir mes inscriptions">
+      <button class="minebtn" data-rub="inscriptions billetterie" type="button" id="openMine" aria-label="Ouvrir mes inscriptions">
         <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9a2 2 0 0 0 0 6v3h18v-3a2 2 0 0 0 0-6V6H3z"/><path d="M14 6v12" stroke-dasharray="2 2.500"/></svg>
         <span><span class="lib">Mes inscriptions </span>(<span id="mineCount">0</span>)</span>
       </button>
@@ -283,18 +352,18 @@
   </div>
 </header>
 
-<section class="hero" id="accueil">
+<section class="hero" id="accueil" data-rub="accueil">
   <div class="hero-in">
     <div>
       <p class="eyebrow">Créateur d'événements</p>
       <h2 id="shopTitle"></h2>
       <p class="lead" id="shopSlogan"></p>
       <div class="garanties">
-        <div class="garantie">
+        <div class="garantie" data-rub="inscriptions billetterie">
           <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9a2 2 0 0 0 0 6v3h18v-3a2 2 0 0 0 0-6V6H3z"/><path d="M14 6v12" stroke-dasharray="2 2.500"/></svg>
           <span>Réservation en<br>quelques clics</span>
         </div>
-        <div class="garantie">
+        <div class="garantie" data-rub="billetterie">
           <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 3v6c0 5-3.500 8-8 9-4.500-1-8-4-8-9V6z"/><path d="M8.500 12l2.500 2.500 4.500-5"/></svg>
           <span>Billet nominatif<br>et place garantie</span>
         </div>
@@ -303,7 +372,7 @@
           <span>Rappel avant<br>l'événement</span>
         </div>
       </div>
-      <button class="btn or" type="button" data-nav="cartes">
+      <button class="btn or" data-rub="evenements" type="button" data-nav="cartes">
         <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Voir les prochains événements
       </button>
     </div>
@@ -314,7 +383,7 @@
 <main class="wrap">
   <div class="note" id="typeNote" style="display:none"></div>
 
-  <div id="catalogue">
+  <div id="catalogue" data-rub="evenements">
     <div class="recherche" role="search">
       <label class="champ" for="q">Rechercher un événement
         <input type="search" id="q" placeholder="Titre, lieu ou thème" autocomplete="off">
@@ -329,7 +398,7 @@
           <option value="ligne">En ligne</option>
         </select>
       </label>
-      <label for="fPrix">Prix
+      <label for="fPrix" data-rub="billetterie">Prix
         <select id="fPrix">
           <option value="all">Tous les prix</option>
           <option value="gratuit">Gratuit</option>
@@ -360,6 +429,47 @@
     <div class="pied" id="pied"></div>
   </div>
 
+  <section class="bloc" id="apropos" data-rub="apropos" aria-labelledby="aproposTitre">
+    <div class="apropos">
+      <div>
+        <h2 id="aproposTitre">À propos de l'organisation</h2>
+        <p>Nous organisons des rencontres, des ateliers, des soirées culturelles et des formations pour les membres de la communauté, partout où ils vivent. Chaque événement est pensé pour se retrouver, apprendre ensemble et faire vivre nos cultures.</p>
+        <p>Les événements se déroulent sur place, dans des lieux accessibles, ou en ligne pour celles et ceux qui sont loin. Les bénéfices servent à financer des places solidaires.</p>
+        <div class="chiffres" id="chiffres"></div>
+      </div>
+      <div class="apropos-art" id="aproposArt" aria-hidden="true"></div>
+    </div>
+  </section>
+
+  <section class="bloc" id="intervenants" data-rub="intervenants" aria-labelledby="intervTitre">
+    <div class="bloc-tete">
+      <div><h2 id="intervTitre">Les intervenants</h2><p>Artistes, formateurs et animateurs que vous retrouverez sur nos événements.</p></div>
+      <button class="lienor" type="button" id="intervPlus" aria-expanded="false">Voir tous les intervenants</button>
+    </div>
+    <div class="intervs" id="intervListe"></div>
+  </section>
+
+  <section class="bloc" id="avis" data-rub="avis" aria-labelledby="avisTitre">
+    <div class="bloc-tete">
+      <div><h2 id="avisTitre">Avis des participants</h2><div class="note-moy" id="noteMoy"></div></div>
+      <button class="lienor" type="button" id="avisPlus" aria-expanded="false">Voir tous les avis</button>
+    </div>
+    <div class="avis-liste" id="avisListe"></div>
+  </section>
+
+  <section class="bloc" id="newsletter" data-rub="newsletter" aria-labelledby="newsTitre">
+    <div class="lettre">
+      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>
+      <div><h3 id="newsTitre">Recevez l'agenda chaque mois</h3><p>Les prochains événements et les places solidaires, dans votre boîte de réception.</p></div>
+      <form id="newsForm" novalidate>
+        <label class="sr" for="newsMail">Votre adresse e-mail</label>
+        <input type="email" id="newsMail" name="mail" placeholder="Votre adresse e-mail" autocomplete="email">
+        <button type="submit">Je m'abonne</button>
+      </form>
+    </div>
+    <p class="aide" id="newsMsg" role="status" style="margin:8px 0 0"></p>
+  </section>
+
 </main>
 
 <footer class="site-pied" aria-label="Bas de page">
@@ -379,22 +489,22 @@
         </div>
       </div>
 
-      <nav class="pied-col" aria-label="Explorer">
+      <nav class="pied-col" data-rub="evenements" aria-label="Explorer">
         <h4>Explorer</h4>
         <ul>
           <li><button type="button" data-aller="cartes">Prochains événements</button></li>
           <li><button type="button" data-aller="agenda">Agenda par mois</button></li>
-          <li><button type="button" data-aller="mine">Mes inscriptions</button></li>
+          <li data-rub="inscriptions billetterie"><button type="button" data-aller="mine">Mes inscriptions</button></li>
           <li><button type="button" data-pied="Proposer un événement">Proposer un événement</button></li>
         </ul>
       </nav>
 
-      <nav class="pied-col" aria-label="Catégories d'événements">
+      <nav class="pied-col" data-rub="evenements" aria-label="Catégories d'événements">
         <h4>Catégories</h4>
         <ul id="piedCats"></ul>
       </nav>
 
-      <nav class="pied-col" aria-label="Informations">
+      <nav class="pied-col" data-rub="billetterie" aria-label="Informations">
         <h4>Informations</h4>
         <ul>
           <li><button type="button" data-pied="Billetterie et remboursements">Billetterie et remboursements</button></li>
@@ -404,7 +514,7 @@
         </ul>
       </nav>
 
-      <div class="pied-col pied-contact">
+      <div class="pied-col pied-contact" data-rub="contact">
         <h4>Nous contacter</h4>
         <p>Une question sur un événement, une réservation à modifier, un lieu à proposer ? L'équipe répond sous 48 heures.</p>
         <address>Toulouse, France<br>Du lundi au vendredi, de 9 h à 18 h</address>
@@ -414,7 +524,7 @@
 
     <div class="pied-bas">
       <p class="copy">© 2026 <span id="piedNom2"></span>. Tous droits réservés.</p>
-      <ul class="paiements" aria-label="Moyens de paiement acceptés (exemple)">
+      <ul class="paiements" data-rub="billetterie" aria-label="Moyens de paiement acceptés (exemple)">
         <li class="lib">Paiement accepté :</li>
         <li class="moyen"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M3 10h18M7 15h3"/></svg>Carte bancaire</li>
         <li class="moyen"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/></svg>Mobile Money</li>
@@ -464,6 +574,21 @@
     <button class="close" type="button" data-close aria-label="Fermer mes inscriptions"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     <h2 id="mineTitle">Mes inscriptions</h2>
     <div id="mineBody"></div>
+  </div>
+</div>
+
+<!-- Choix des rubriques (exemple) -->
+<div class="overlay" id="rubOv" role="dialog" aria-modal="true" aria-labelledby="rubTitre">
+  <div class="sheet">
+    <button class="close" type="button" data-close aria-label="Fermer"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <h2 id="rubTitre" style="margin:0 0 4px">Rubriques de la boutique</h2>
+    <p style="margin:0;color:var(--muted)">Choisissez un mode, puis ajustez au besoin chaque rubrique : la page se met à jour tout de suite. Dans une vraie boutique, ce réglage est dans « Paramètres vitrine », onglet « Navigation et rubriques ».</p>
+    <h3 class="mode-titre">Mode de la boutique</h3>
+    <div class="modes" id="modeListe" role="group" aria-label="Mode de la boutique"></div>
+    <p class="mode-etat" id="modeEtat" aria-live="polite"></p>
+    <h3 class="mode-titre">Rubriques</h3>
+    <ul class="sw-liste" id="rubListe"></ul>
+    <div class="rub-actions"><button class="btn" type="button" id="rubTout">Tout activer</button><button class="btn or" type="button" data-close>Terminer</button></div>
   </div>
 </div>
 
@@ -621,7 +746,7 @@
     cat: "all", q: "", mois: "all", format: "all", prix: "all", tri: "date", vue: "cartes", page: 1, parPage: 6, fav: false,
     favs: new Set(lire("ev_ex_favs", [])),
     mine: new Map(lire("ev_ex_mine", [])),   // id -> { places, ref }
-    current: null, sel: {}, etape: 1, coord: { nom: "", email: "" }, promo: null, ouvreur: null
+    navCur: "cartes", current: null, sel: {}, etape: 1, coord: { nom: "", email: "" }, promo: null, ouvreur: null
   };
   (lire("ev_ex_ventes", [])).forEach(([id, n]) => { const e = EVENTS.find(x => x.id === id); if (e) e.sold += n; });
   function memoriser() {
@@ -629,6 +754,34 @@
     ecrire("ev_ex_ventes", [...state.mine].map(([id, m]) => [id, m.places]));
     const c = document.getElementById("mineCount"); if (c) c.textContent = state.mine.size;
   }
+
+  /* ── Rubriques activables (9) : chacune s'affiche ou se masque, la page suit ── */
+  const RUBS = [
+    { id: "accueil", nom: "Accueil", desc: "Bandeau d'accueil, présentation et garanties." },
+    { id: "evenements", nom: "Événements", desc: "La liste des événements, l'agenda, la recherche et les filtres." },
+    { id: "inscriptions", nom: "Inscriptions", desc: "Réserver sa place gratuitement. Sans inscriptions ni billetterie, la page se consulte seulement." },
+    { id: "billetterie", nom: "Billetterie", desc: "Prix, types de billets et paiement. Désactivée, plus aucun prix : les inscriptions restent gratuites." },
+    { id: "apropos", nom: "À propos", desc: "Présentation de l'organisation et chiffres clés." },
+    { id: "intervenants", nom: "Intervenants", desc: "Les artistes, formateurs et animateurs des événements." },
+    { id: "avis", nom: "Avis", desc: "Avis des participants et note moyenne." },
+    { id: "contact", nom: "Contact", desc: "Coordonnées et formulaire de message, en bas de page." },
+    { id: "newsletter", nom: "Newsletter", desc: "Bande d'inscription à la lettre d'information (sans entrée dans le menu)." }
+  ];
+  /* Modes : des préréglages complets des 9 rubriques (liste explicite, pour qu'aucune rubrique ne dépende d'une autre). */
+  const MODES = [
+    { id: "seuls", nom: "Événements seuls", desc: "Consulter l'agenda, les programmes et les intervenants. Ni réservation, ni prix.",
+      rub: { accueil: true, evenements: true, inscriptions: false, billetterie: false, apropos: true, intervenants: true, avis: true, contact: true, newsletter: true } },
+    { id: "inscription", nom: "Événements avec inscription", desc: "Réserver sa place gratuitement, sans prix ni paiement.",
+      rub: { accueil: true, evenements: true, inscriptions: true, billetterie: false, apropos: true, intervenants: true, avis: true, contact: true, newsletter: true } },
+    { id: "billetterie", nom: "Événements avec billetterie", desc: "Tout, y compris les prix, les types de billets et le paiement.",
+      rub: { accueil: true, evenements: true, inscriptions: true, billetterie: true, apropos: true, intervenants: true, avis: true, contact: true, newsletter: true } }
+  ];
+  let rub = lire("ev_ex_rubriques", {});
+  const modeActuel = () => MODES.find(m => Object.keys(m.rub).every(k => (rub[k] !== false) === m.rub[k]));
+  function rubOn(k) { return rub[k] !== false; }
+  const payantOn = () => rubOn("billetterie");
+  const reservOn = () => rubOn("inscriptions") || rubOn("billetterie");
+  const estBillet = (e) => e.mode === "billet" && payantOn();
 
   (function applyShop() {
     document.title = SHOP.name + " · " + TYPE_LABELS[SHOP.main];
@@ -654,8 +807,8 @@
   function placesRestantes(e) { return e.seats - e.sold; }
   function etat(e) {
     const r = placesRestantes(e);
-    if (r <= 0) return { txt: "Complet", alerte: true };
-    if (r <= 5) return { txt: "Plus que " + r + " place" + (r > 1 ? "s" : ""), alerte: true };
+    if (reservOn() && r <= 0) return { txt: "Complet", alerte: true };
+    if (reservOn() && r <= 5) return { txt: "Plus que " + r + " place" + (r > 1 ? "s" : ""), alerte: true };
     if (e.fmt === "ligne") return { txt: "En ligne", alerte: false };
     return null;
   }
@@ -665,9 +818,9 @@
       (state.cat === "all" || e.cat === state.cat) &&
       (state.mois === "all" || String(cleMois(e)) === state.mois) &&
       (state.format === "all" || e.fmt === state.format) &&
-      (state.prix === "all" || (state.prix === "gratuit" ? e.price === 0 : e.price > 0)) &&
+      (state.prix === "all" || !payantOn() || (state.prix === "gratuit" ? e.price === 0 : e.price > 0)) &&
       (!state.fav || state.favs.has(e.id)) &&
-      (!q || (e.t + " " + e.place + " " + e.city + " " + e.desc + " " + CAT_LABEL[e.cat]).toLowerCase().includes(q)));
+      (!q || (e.t + " " + e.place + " " + e.city + " " + e.desc + " " + CAT_LABEL[e.cat] + " " + e.interv.map(p => p[0]).join(" ")).toLowerCase().includes(q)));
     const t = state.tri;
     l.sort((a, b) => t === "prix-asc" ? a.price - b.price : t === "prix-desc" ? b.price - a.price : t === "places" ? placesRestantes(b) - placesRestantes(a) : dateDe(a) - dateDe(b));
     return l;
@@ -678,8 +831,8 @@
   }
   function carte(e) {
     const s = etat(e), r = placesRestantes(e), pct = Math.min(100, Math.round(e.sold / e.seats * 100));
-    const complet = r <= 0, inscrit = state.mine.has(e.id);
-    const lib = inscrit ? "Voir mon billet" : complet ? "Liste d'attente" : e.mode === "billet" ? "Réserver" : "S'inscrire";
+    const resa = reservOn(), complet = resa && r <= 0, inscrit = state.mine.has(e.id);
+    const lib = inscrit ? "Voir mon billet" : !resa ? "Voir le programme" : complet ? "Liste d'attente" : estBillet(e) ? "Réserver" : "S'inscrire";
     return '<article class="carte">'
       + '<button class="vue" type="button" data-ev="' + e.id + '" aria-label="Voir l\'événement : ' + esc(e.t) + '">' + affiche(e)
       + '<span class="datebadge"><b>' + e.d + "</b><small>" + MOIS[e.m].slice(0, 3) + "</small></span>"
@@ -687,23 +840,24 @@
       + '<button class="coeur" type="button" data-fav="' + e.id + '" aria-pressed="' + state.favs.has(e.id) + '" aria-label="Ajouter aux favoris : ' + esc(e.t) + '">' + ICO.coeur + "</button>"
       + '<div class="corps"><span class="badge">' + CAT_LABEL[e.cat] + "</span><h3>" + esc(e.t) + "</h3>"
       + '<div class="lieu">' + (e.fmt === "ligne" ? ICO.ecran : ICO.lieu) + "<span>" + esc(jourDe(e)) + " " + e.d + " " + MOIS[e.m] + ", " + e.time + "<br>" + (e.fmt === "ligne" ? "En ligne" : esc(e.place) + ", " + esc(e.city)) + "</span></div>"
-      + '<div class="prix">' + fmt(e.price) + "</div>"
-      + '<div class="jauge' + (complet ? " pleine" : "") + '" role="img" aria-label="' + e.sold + " places réservées sur " + e.seats + '"><i style="width:' + pct + '%"></i></div>'
-      + '<div class="places">' + (complet ? "Aucune place disponible" : r + " place" + (r > 1 ? "s" : "") + " sur " + e.seats) + "</div>"
-      + '<div class="actions"><button class="btn" type="button" data-ev="' + e.id + '">Détails</button><button class="btn or" type="button" data-ev="' + e.id + '"' + (complet && !inscrit ? "" : "") + ">" + lib + "</button></div></div></article>";
+      + (payantOn() ? '<div class="prix">' + fmt(e.price) + "</div>" : "")
+      + (resa ? '<div class="jauge' + (r <= 0 ? " pleine" : "") + '" role="img" aria-label="' + e.sold + " places réservées sur " + e.seats + '"><i style="width:' + pct + '%"></i></div>'
+        + '<div class="places">' + (r <= 0 ? "Aucune place disponible" : r + " place" + (r > 1 ? "s" : "") + " sur " + e.seats) + "</div>" : "")
+      + '<div class="actions">' + (resa ? '<button class="btn" type="button" data-ev="' + e.id + '">Détails</button>' : "") + '<button class="btn or" type="button" data-ev="' + e.id + '">' + lib + "</button></div></div></article>";
   }
   function ligneAgenda(e) {
-    const s = etat(e), complet = placesRestantes(e) <= 0, inscrit = state.mine.has(e.id);
+    const s = etat(e), resa = reservOn(), complet = resa && placesRestantes(e) <= 0, inscrit = state.mine.has(e.id);
     return '<li class="ev"><div class="datebloc"><b>' + e.d + "</b><small>" + MOIS[e.m].slice(0, 3) + "</small></div>"
       + '<div><h3>' + esc(e.t) + '</h3><div class="meta">' + esc(jourDe(e)) + " · " + e.time + " à " + e.end + " · " + (e.fmt === "ligne" ? "En ligne" : esc(e.place) + ", " + esc(e.city)) + "</div>"
       + '<div class="meta">' + CAT_LABEL[e.cat] + (s ? " · " + s.txt : "") + "</div></div>"
-      + '<div class="droite"><span class="prix">' + fmt(e.price) + '</span><button class="btn or" type="button" data-ev="' + e.id + '">' + (inscrit ? "Voir mon billet" : complet ? "Liste d'attente" : e.mode === "billet" ? "Réserver" : "S'inscrire") + "</button></div></li>";
+      + '<div class="droite">' + (payantOn() ? '<span class="prix">' + fmt(e.price) + "</span>" : "") + '<button class="btn or" type="button" data-ev="' + e.id + '">' + (inscrit ? "Voir mon billet" : !resa ? "Voir le programme" : complet ? "Liste d'attente" : estBillet(e) ? "Réserver" : "S'inscrire") + "</button></div></li>";
   }
   function render() {
     $("#cats").innerHTML = CATS.map(c => '<button class="chip" type="button" data-cat="' + c.id + '" aria-pressed="' + (state.cat === c.id) + '">' + ico(c.ic) + c.label + "</button>").join("")
       + '<button class="chip" type="button" data-favfiltre aria-pressed="' + state.fav + '">' + ICO.coeur + "Favoris (" + state.favs.size + ")</button>";
     $("#vueCartes").setAttribute("aria-pressed", state.vue === "cartes"); $("#vueAgenda").setAttribute("aria-pressed", state.vue === "agenda");
-    $("#navCartes").setAttribute("aria-current", state.vue === "cartes"); $("#navAgenda").setAttribute("aria-current", state.vue === "agenda");
+    if (state.navCur === "cartes" || state.navCur === "agenda") state.navCur = state.vue;
+    majNav();
 
     const act = [];
     if (state.q.trim()) act.push(["q", "Recherche : " + state.q.trim()]);
@@ -760,7 +914,7 @@
   }
   /* Types de billets : dérivés du prix de l'événement (exemple fictif) */
   function typesBillets(e) {
-    if (e.mode !== "billet") return [{ id: "part", nom: "Participation libre", desc: "Inscription gratuite, une place par personne.", prix: 0, places: 1 }];
+    if (!estBillet(e)) return [{ id: "part", nom: "Participation libre", desc: "Inscription gratuite, une place par personne.", prix: 0, places: 1 }];
     const p = e.price, arr = (x) => Math.round(x * 2) / 2;
     const t = [
       { id: "std", nom: "Billet standard", desc: "Une place, accès à tout le programme.", prix: p, places: 1 },
@@ -795,7 +949,7 @@
   }
   function versTitre() { const h = $("#resa h3"); if (h) { h.tabIndex = -1; h.focus(); } }
   function reservation() {
-    const e = state.current, r = placesRestantes(e), deja = state.mine.get(e.id), z = $("#resa"), billet = e.mode === "billet";
+    const e = state.current, r = placesRestantes(e), deja = state.mine.get(e.id), z = $("#resa"), billet = estBillet(e);
     if (deja) {
       const lg = (deja.lignes || []).map(l => "<li><span>" + l[1] + " × " + esc(l[0]) + "</span><b>" + fmt(l[2]) + "</b></li>").join("");
       z.innerHTML = '<h3>Votre ' + (billet ? "billet" : "inscription") + '</h3><p class="ok">' + deja.places + " place" + (deja.places > 1 ? "s" : "") + " réservée" + (deja.places > 1 ? "s" : "") + " pour " + esc(dateLongue(e)) + ".</p>"
@@ -803,6 +957,10 @@
         + (deja.nom ? '<p class="aide">Au nom de ' + esc(deja.nom) + " (" + esc(deja.email) + ").</p>" : "")
         + '<p>Référence : <span class="refcode">' + deja.ref + '</span></p><p class="aide">' + (e.fmt === "ligne" ? "Le lien de connexion vous est envoyé par e-mail la veille." : "Présentez cette référence à l'entrée.") + " Simulation : aucun e-mail n'est réellement envoyé.</p>"
         + '<div class="rang"><button class="btn" type="button" data-annuler="' + e.id + '" style="flex:0 0 auto">Annuler ma réservation</button></div>';
+      return;
+    }
+    if (!reservOn()) {
+      z.innerHTML = '<h3>Informations</h3><p class="aide" style="margin-top:0">Les réservations ne sont pas ouvertes sur cette page : consultez le programme et ajoutez l\'événement à votre agenda.</p><div class="rang"><button class="btn or" type="button" data-agenda="' + e.id + '" style="flex:0 0 auto">Ajouter à mon agenda (simulé)</button></div>';
       return;
     }
     if (r <= 0) { z.innerHTML = '<h3>Événement complet</h3><p class="aide" style="margin-top:0">Toutes les places sont réservées. Laissez-nous votre adresse : vous serez prévenu(e) si une place se libère.</p><div class="rang"><button class="btn or" type="button" data-attente="' + e.id + '" style="flex:0 0 auto">Me prévenir si une place se libère</button></div>'; return; }
@@ -853,6 +1011,64 @@
       : '<div class="vide"><b>Aucune inscription</b>Réservez un événement : votre billet apparaîtra ici.</div>';
   }
 
+  /* ── Sections des rubriques ── */
+  const INTERVS = (() => { const m = new Map(); EVENTS.forEach(e => e.interv.forEach(p => { const k = m.get(p[0]) || { nom: p[0], role: p[1], n: 0 }; k.n++; m.set(p[0], k); })); return [...m.values()]; })();
+  const AVIS = [
+    { n: "Mariam K.", v: "Lyon", note: 5, o: "Rencontre des entrepreneurs de la diaspora", x: "Une après-midi très utile : j'ai présenté mon projet et trouvé deux partenaires. L'organisation était impeccable." },
+    { n: "Jean-Luc A.", v: "Toulouse", note: 5, o: "Atelier cuisine", x: "On repart avec les recettes et le sourire. L'animatrice est passionnée et les groupes sont à taille humaine." },
+    { n: "Sophie M.", v: "Bordeaux", note: 4, o: "Soirée de contes et musique", x: "Une belle veillée, les enfants ont adoré la kora. Dommage que la salle ait été complète si vite." },
+    { n: "Kwame O.", v: "Lille", note: 5, o: "Masterclass : financer son projet", x: "Concret et sans jargon. Le replay m'a permis de tout revoir tranquillement." },
+    { n: "Aïcha D.", v: "Paris", note: 5, o: "Atelier wax", x: "Un moment de création magnifique, du matériel de qualité et une ambiance chaleureuse." },
+    { n: "Thomas R.", v: "Nantes", note: 4, o: "Forum des associations", x: "Beaucoup de stands intéressants. J'aurais aimé plus de temps pour échanger avec chacun." }
+  ];
+  const ETOILE = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.600 5.600 6.100.7-4.500 4.200 1.200 6L12 16.600 6.600 19.500l1.200-6L3.300 9.300l6.100-.7z"/></svg>';
+  const etoiles = (n) => '<span class="etoiles" role="img" aria-label="Note : ' + n + ' sur 5">' + [1, 2, 3, 4, 5].map(i => i <= n ? ETOILE : ETOILE.replace('class="ic"', 'class="ic etoile-off"')).join("") + "</span>";
+  let tousAvis = false, tousInterv = false;
+  function vueRubriques() {
+    const villes = new Set(EVENTS.filter(e => e.fmt !== "ligne").map(e => e.city));
+    $("#chiffres").innerHTML = [[EVENTS.length, "événements"], [INTERVS.length, "intervenants"], [villes.size, "villes"]].map(c => "<div><b>" + c[0] + "</b><span>" + c[1] + "</span></div>").join("");
+    $("#aproposArt").innerHTML = svg(ART.scene(P.vin), "0 0 400 250");
+    $("#intervListe").innerHTML = INTERVS.map((p, i) => ({ p, i })).filter(x => tousInterv || x.i < 8).map(x => '<article class="iv-carte"><span class="rond" aria-hidden="true">' + esc(x.p.nom.replace(/^(Dr|Collectif)\s+/, "").charAt(0)) + "</span><h3>" + esc(x.p.nom) + '</h3><p class="role">' + esc(x.p.role) + '</p><p class="nb">' + x.p.n + " événement" + (x.p.n > 1 ? "s" : "") + '</p><button class="btn" type="button" data-interv="' + x.i + '">Voir ses événements</button></article>').join("");
+    $("#intervPlus").textContent = tousInterv ? "Voir moins" : "Voir tous les intervenants";
+    $("#intervPlus").setAttribute("aria-expanded", String(tousInterv));
+    const moy = AVIS.reduce((n, a) => n + a.note, 0) / AVIS.length;
+    $("#noteMoy").innerHTML = "<b>" + moy.toLocaleString("fr-FR", { maximumFractionDigits: 1 }) + "</b>" + etoiles(Math.round(moy)) + "<span>sur 5 · " + AVIS.length + " avis (fictifs)</span>";
+    $("#avisListe").innerHTML = AVIS.filter((a, i) => tousAvis || i < 3).map(a => '<article class="avis-un">' + etoiles(a.note) + "<q>" + esc(a.x) + '</q><div class="qui"><span class="rond" aria-hidden="true">' + esc(a.n[0]) + '</span><span><b style="color:var(--text)">' + esc(a.n) + "</b> · " + esc(a.v) + "<br>" + esc(a.o) + "</span></div></article>").join("");
+    $("#avisPlus").textContent = tousAvis ? "Voir moins" : "Voir tous les avis";
+    $("#avisPlus").setAttribute("aria-expanded", String(tousAvis));
+  }
+  function majNav() {
+    const entrees = [["accueil", "Accueil", "accueil"], ["cartes", "Événements", "evenements"], ["agenda", "Agenda", "evenements"], ["apropos", "À propos", "apropos"], ["intervenants", "Intervenants", "intervenants"], ["avis", "Avis", "avis"], ["contact", "Contact", "contact"]].filter(x => rubOn(x[2]));
+    $("#navRub").innerHTML = entrees.map(x => '<button type="button" data-nav="' + x[0] + '"' + (state.navCur === x[0] ? ' aria-current="true"' : "") + ">" + x[1] + "</button>").join("");
+  }
+  function appliquerRubriques() {
+    document.querySelectorAll("[data-rub]").forEach(el => el.classList.toggle("rub-off", !el.dataset.rub.split(" ").some(rubOn)));
+    const sansPrix = !payantOn(), sansResa = !reservOn();
+    document.querySelectorAll('#tri option[value^="prix"]').forEach(o => { o.hidden = sansPrix; o.disabled = sansPrix; });
+    document.querySelectorAll('#tri option[value="places"]').forEach(o => { o.hidden = sansResa; o.disabled = sansResa; });
+    if ((sansPrix && state.tri.indexOf("prix") === 0) || (sansResa && state.tri === "places")) { state.tri = "date"; $("#tri").value = "date"; }
+    if (sansPrix) { state.prix = "all"; $("#fPrix").value = "all"; }
+    majNav();
+  }
+  function listeModes() {
+    const cur = modeActuel();
+    $("#modeListe").innerHTML = MODES.map(m => '<button class="mode" type="button" data-mode="' + m.id + '" aria-pressed="' + (cur === m) + '"><b>' + esc(m.nom) + ico('<path d="M5 12.5l4.5 4.5L19 7"/>') + '</b><span class="d">' + esc(m.desc) + "</span></button>").join("");
+    $("#modeEtat").textContent = cur ? "Mode actuel : " + cur.nom + "." : "Mode actuel : personnalisé (rubriques réglées à la main).";
+  }
+  function listeRubriques() {
+    listeModes();
+    $("#rubListe").innerHTML = RUBS.map(r => '<li class="sw-ligne"><div><b id="swn-' + r.id + '">' + esc(r.nom) + '</b><span class="d">' + esc(r.desc) + '</span></div><button class="sw" type="button" role="switch" data-sw="' + r.id + '" aria-checked="' + rubOn(r.id) + '" aria-labelledby="swn-' + r.id + '"></button></li>').join("");
+  }
+  function changerRubriques(maj, message) {
+    const apres = Object.assign({}, rub, maj);
+    if (!RUBS.some(r => apres[r.id] !== false)) { toast("Gardez au moins une rubrique affichée."); return; }
+    rub = apres; ecrire("ev_ex_rubriques", rub);
+    appliquerRubriques(); render(); vueRubriques(); listeRubriques();
+    if (message) toast(message);
+  }
+  function ouvrirContact(depuis) { state.ouvreur = depuis; $("#contactErr").textContent = ""; $("#contactOv").classList.add("open"); $("#contactForm").nom.focus(); }
+  const defil = (el) => { if (el) el.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion:reduce)").matches ? "auto" : "smooth", block: "start" }); };
+
   /* ── Navigation et interactions ── */
   function versCatalogue(vue) {
     if (vue) { state.vue = vue; state.page = 1; render(); }
@@ -860,7 +1076,14 @@
   }
   document.addEventListener("click", ev => {
     const t = ev.target, q = (s) => t.closest(s); let b;
-    if ((b = q("[data-nav]"))) { const v = b.dataset.nav; if (v === "accueil") window.scrollTo({ top: 0, behavior: "smooth" }); else versCatalogue(v); return; }
+    if ((b = q("[data-nav]"))) {
+      const v = b.dataset.nav; if (v !== "contact") state.navCur = v;
+      if (v === "accueil") window.scrollTo({ top: 0, behavior: matchMedia("(prefers-reduced-motion:reduce)").matches ? "auto" : "smooth" });
+      else if (v === "cartes" || v === "agenda") versCatalogue(v);
+      else if (v === "contact") ouvrirContact(b);
+      else defil(document.getElementById(v));
+      majNav(); return;
+    }
     if ((b = q("[data-cat]"))) { state.cat = b.dataset.cat; state.page = 1; render(); return; }
     if (q("[data-favfiltre]")) { state.fav = !state.fav; state.page = 1; render(); return; }
     if (q("#vueCartes")) { state.vue = "cartes"; state.page = 1; render(); return; }
@@ -890,11 +1113,22 @@
     }
     if ((b = q("[data-annuler]"))) { const id = Number(b.dataset.annuler), m = state.mine.get(id); EVENTS.find(x => x.id === id).sold -= m.places; state.mine.delete(id); memoriser(); toast("Réservation annulée."); ficher(); return; }
     if (q("[data-attente]")) { toast("Liste d'attente simulée : vous serez prévenu(e) si une place se libère."); return; }
+    if (q("#openRub")) { state.ouvreur = q("#openRub"); listeRubriques(); $("#rubOv").classList.add("open"); $("#rubOv [data-close]").focus(); return; }
+    if ((b = q("[data-sw]"))) { const r = RUBS.find(x => x.id === b.dataset.sw), voulue = !rubOn(r.id); changerRubriques({ [r.id]: voulue }, "Rubrique « " + r.nom + " » " + (voulue ? "affichée." : "masquée.")); const nb = document.querySelector('[data-sw="' + r.id + '"]'); if (nb) nb.focus(); return; }
+    if ((b = q("[data-mode]"))) { const m = MODES.find(x => x.id === b.dataset.mode); changerRubriques(m.rub, "Mode « " + m.nom + " » appliqué."); const nb = document.querySelector('[data-mode="' + m.id + '"]'); if (nb) nb.focus(); return; }
+    if (q("#rubTout")) { changerRubriques(Object.fromEntries(RUBS.map(r => [r.id, true])), "Toutes les rubriques sont affichées."); return; }
+    if (q("#avisPlus")) { tousAvis = !tousAvis; vueRubriques(); $("#avisPlus").focus(); return; }
+    if (q("#intervPlus")) { tousInterv = !tousInterv; vueRubriques(); $("#intervPlus").focus(); return; }
+    if ((b = q("[data-interv]"))) {
+      if (!rubOn("evenements")) { toast("La rubrique « Événements » est masquée : activez-la pour voir ses événements."); return; }
+      const p = INTERVS[Number(b.dataset.interv)]; state.q = p.nom; $("#q").value = p.nom; state.page = 1; render(); versCatalogue(); return;
+    }
+    if ((b = q("[data-agenda]"))) { toast("Ajouté à votre agenda (simulé) : « " + EVENTS.find(x => x.id === Number(b.dataset.agenda)).t + " »."); return; }
     if ((b = q("[data-aller]"))) {
       const v = b.dataset.aller;
       if (v === "cartes" || v === "agenda") versCatalogue(v);
       else if (v === "mine") $("#openMine").click();
-      else if (v === "contact") { state.ouvreur = b; $("#contactErr").textContent = ""; $("#contactOv").classList.add("open"); $("#contactForm").nom.focus(); }
+      else if (v === "contact") ouvrirContact(b);
       return;
     }
     if ((b = q("[data-pcat]"))) { state.cat = b.dataset.pcat; state.page = 1; render(); versCatalogue(); return; }
@@ -927,6 +1161,13 @@
     err.textContent = ""; f.reset();
     fermer($("#contactOv")); toast("Message simulé : rien n'a été envoyé. Dans une vraie boutique, l'équipe répond sous 48 heures.");
   });
+  document.addEventListener("submit", ev => {
+    if (ev.target.id !== "newsForm") return;
+    ev.preventDefault();
+    const m = $("#newsMsg"), v = ev.target.mail.value.trim();
+    if (!/^\S+@\S+\.\S+$/.test(v)) { m.style.color = "var(--alerte)"; m.textContent = "Indiquez une adresse e-mail valide, par exemple nom@exemple.fr."; ev.target.mail.focus(); return; }
+    m.style.color = ""; m.textContent = "Inscription simulée : aucune adresse n'est enregistrée ni utilisée."; ev.target.reset();
+  });
   ["#piedNom", "#piedNom2"].forEach(sel => { const el = $(sel); if (el) el.textContent = SHOP.name; });
   $("#piedCats").innerHTML = CATS.filter(c => c.id !== "all").map(c => '<li><button type="button" data-pcat="' + c.id + '">' + esc(c.label) + "</button></li>").join("");
   $("#q").addEventListener("input", ev => { state.q = ev.target.value; state.page = 1; render(); });
@@ -952,6 +1193,8 @@
     if (window.ResizeObserver) { const b = document.getElementById("exBandeau"); if (b) new ResizeObserver(maj).observe(b); }
   })();
   optionsMois();
+  appliquerRubriques();
+  vueRubriques();
   render();
 </script>
 </body>
