@@ -10382,6 +10382,18 @@ db.exec(`
   );
 `);
 
+/* Newsletter, étape N5 (2026-11-12) : suspension de l'envoi par l'administration. Une boutique suspendue garde ses brouillons et ses abonnés, mais ne peut
+   plus faire de test ni lancer d'envoi. Une seule ligne par boutique ; la lever la supprime. Le motif est montré à la boutique. */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS nl_suspensions (
+    initiative_id INTEGER PRIMARY KEY,
+    motif TEXT NOT NULL,
+    par_user_id INTEGER,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id)
+  );
+`);
+
 module.exports = db;
 module.exports.backfillOfficialFollow = backfillOfficialFollow;
 module.exports.generateDaId = generateDaId;

@@ -17,6 +17,7 @@
 
 const DepotDetourne = require('./depot-detourne');
 const mailer = require('./mailer');
+const { suspensionDe } = require('./newsletter-admin');
 
 const QUOTA_MENSUEL = 500;
 const TAILLE_LOT = 40;              // e-mails envoyés par appel (le tableau de bord rappelle jusqu'à la fin)
@@ -202,6 +203,13 @@ function enregistrerCampagnes({ route, db, getCurrentUser, sendJSON, SEC, getOri
     ctx.init = await initiativeComplete(ctx.init.id);
     return ctx;
   };
+  /* Boutique suspendue par l'administration (étape N5) : ni test ni envoi, mais brouillons, abonnés et statistiques restent accessibles. */
+  async function refuserSiSuspendue(res, ctx) {
+    const s = await suspensionDe(db, ctx.init.id);
+    if (!s) return false;
+    sendJSON(res, 403, { error: `L'envoi de newsletters est suspendu pour votre boutique. Motif : ${s.motif}`, suspendue: true });
+    return true;
+  }
 
   /* ── Aide à la rédaction : contenus insérables, modèles, quota ── */
   route('GET', '/api/initiatives/:id/newsletter/contenus', async (req, res, params) => {
@@ -221,6 +229,7 @@ function enregistrerCampagnes({ route, db, getCurrentUser, sendJSON, SEC, getOri
       limites: { sujet: LONG_SUJET, texte: LONG_TEXTE, elements: MAX_ELEMENTS },
       quota: { limite: QUOTA_MENSUEL, utilise, restant: Math.max(0, QUOTA_MENSUEL - utilise), mode },
       abonnes_actifs: actifs,
+      suspension: await suspensionDe(db, init.id),
     });
   });
 
@@ -282,6 +291,7 @@ function enregistrerCampagnes({ route, db, getCurrentUser, sendJSON, SEC, getOri
   route('POST', '/api/initiatives/:id/newsletter/campagnes/:cid/test', async (req, res, params) => {
     const ctx = await proprio(req, res, params.id); if (!ctx) return;
     const c = await campagneDe(res, ctx, params.cid); if (!c) return;
+    if (await refuserSiSuspendue(res, ctx)) return;
     const lim = SEC.rateLimit(`nl:test:${ctx.user.id}`, 5, 3600000);
     if (!lim.allowed) return sendJSON(res, 429, { error: `Trop d'envois de test. Réessayez dans ${lim.retryAfter}s.` });
     const v = await valider(db, ctx.init, vue(c));
@@ -352,6 +362,7 @@ function enregistrerCampagnes({ route, db, getCurrentUser, sendJSON, SEC, getOri
     const ctx = await proprio(req, res, params.id); if (!ctx) return;
     const c = await campagneDe(res, ctx, params.cid); if (!c) return;
     if (c.statut !== 'brouillon') return sendJSON(res, 409, { error: 'Cette campagne a déjà été lancée.' });
+    if (await refuserSiSuspendue(res, ctx)) return;
     const v = await valider(db, ctx.init, vue(c));
     if (v.erreur) return sendJSON(res, 400, { error: v.erreur });
     const jour = Number(((await db.prepare('SELECT COUNT(*) AS n FROM nl_campagnes WHERE initiative_id=? AND envoye_le >= ?').get(ctx.init.id, sqlDate(Date.now() - 24 * 3600 * 1000))) || {}).n) || 0;
@@ -383,6 +394,7 @@ function enregistrerCampagnes({ route, db, getCurrentUser, sendJSON, SEC, getOri
     const ctx = await proprio(req, res, params.id); if (!ctx) return;
     const c = await campagneDe(res, ctx, params.cid); if (!c) return;
     if (c.statut === 'en_cours') {
+      if (await refuserSiSuspendue(res, ctx)) return;
       const r = await traiterLot(c, ctx.init, getOrigin(req));
       if (r.occupe) return sendJSON(res, 409, { error: 'Un lot est déjà en cours d\'envoi. Patientez quelques secondes.' });
     }

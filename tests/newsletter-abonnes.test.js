@@ -22,6 +22,7 @@ const base = (id) => `/api/initiatives/${id}/newsletter`;
 test.before(async () => {
   env = await H.demarrer('newsletter-abonnes');
   bd = new H.DatabaseSync(env.dbPath);
+  bd.exec('PRAGMA busy_timeout = 5000'); /* le serveur de test écrit dans le même fichier : on attend au lieu d'échouer (« database is locked ») */
   rnd = Math.random().toString(36).slice(2, 8);
   jarA = H.cookieJar(); jarB = H.cookieJar(); jarS1 = H.cookieJar(); jarS2 = H.cookieJar(); jarS3 = H.cookieJar();
   const a = await H.creerApprenant(env, jarA, rnd, 'ProprioA');

@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<script src="/assets/m-redirect.js"></script>
+<meta charset="UTF-8">
+<link rel="icon" href="/assets/logo.png">
+<title>Diaspo'Actif — Newsletters : suivi et suspension</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="assets/styles.v2.css">
+<link rel="stylesheet" href="/assets/responsive.v2.css?v=2">
+<link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
+<link rel="stylesheet" href="/assets/design-upgrade.v2.css">
+<link rel="stylesheet" href="/assets/theme-manager.css">
+<!-- Nuit dorée : mêmes polices, thème et feuilles que l'écran Newsletter du tableau de bord d'une initiative -->
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,500;0,6..96,600;1,6..96,500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/theme-nuit-doree.css?v=8">
+<link rel="stylesheet" href="/assets/retours-nuit-doree.css?v=1">
+<link rel="stylesheet" href="/assets/newsletter-init.css">
+</head>
+<body class="nd">
+<div class="page" id="app">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Menu">&#9776;</button>
+      <div class="logo"><a href="index.html" style="text-decoration:none;color:inherit;display:flex;align-items:center;gap:8px;"><img loading="lazy" class="logo-img" src="assets/logo.png" alt=""> DIASPO'ACTIF</a></div>
+      <nav class="nav">
+        <a href="index.html">Accueil</a>
+        <a href="dashboard-administrateur.html">Administration</a>
+      </nav>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container" style="padding-top:24px;padding-bottom:60px;">
+    <div class="rt-wrap" id="na-racine" aria-live="polite">
+      <div class="rt-card rt-muet" style="text-align:center;">Chargement…</div>
+    </div>
+  </main>
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/demo.js?v=2"></script>
+<script src="assets/app.js?v=13"></script>
+<script src="assets/ds.js"></script>
+<script>
+(function () {
+  var racine = document.getElementById('na-racine');
+  var ETAT = { journal: null };
+
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function jour(t) {
+    if (!t) return '';
+    var d = new Date(String(t).indexOf('T') >= 0 ? t : String(t).replace(' ', 'T') + 'Z');
+    return isNaN(d.getTime()) ? '' : d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+  }
+  function tag(libelle, classe) { return '<span class="rt-tag ' + (classe || '') + '">' + esc(libelle) + '</span>'; }
+  function dire(id, texte, erreur) { var el = document.getElementById(id); if (el) { el.textContent = (erreur ? '⚠ ' : '✓ ') + (texte || ''); el.className = 'rt-msg' + (erreur ? ' err' : ''); } }
+  function boite(titre, contenu) { return '<section class="rt-card"><h2>' + esc(titre) + '</h2>' + contenu + '</section>'; }
+
+  var STATUT = { en_cours: 'En cours', envoyee: 'Envoyée' };
+
+  function ligneSuspension(s) {
+    return '<li><div class="nl-ligne"><b>' + esc(s.boutique) + '</b> ' + tag('Suspendue', 'cours') + '</div>' +
+      '<div class="rt-muet">Depuis le ' + esc(jour(s.depuis)) + ' · Motif : ' + esc(s.motif) + '</div>' +
+      '<div class="rt-actions"><button class="rt-bouton discret" type="button" data-na="lever" data-init="' + esc(s.initiative_id) + '">Rétablir l\'envoi</button></div>' +
+      '<div class="rt-msg" id="nam-s' + esc(s.initiative_id) + '"></div></li>';
+  }
+  function ligneCampagne(c, avecActions) {
+    var st = STATUT[c.statut] || c.statut;
+    var essai = c.mode_envoi === 'a_blanc' ? ' ' + tag('Essai', 'cours') : '';
+    var stats = '<b>' + esc(c.destinataires) + '</b> destinataire(s)' + (c.envoyes ? ' · <b>' + esc(c.envoyes) + '</b> envoyé(s)' : '') +
+      (c.echecs ? ' · <b>' + esc(c.echecs) + '</b> échec(s)' : '') + (c.signalements ? ' · <b>' + esc(c.signalements) + '</b> signalement(s)' : '');
+    var actions = '<button class="rt-bouton discret" type="button" data-na="lire" data-id="' + esc(c.id) + '">Lire le message</button>';
+    if (avecActions && !c.boutique_suspendue) actions += '<button class="rt-bouton danger" type="button" data-na="suspendre" data-init="' + esc(c.initiative_id) + '" data-id="' + esc(c.id) + '">Suspendre cette boutique</button>';
+    return '<li><div class="nl-ligne"><b>' + esc(c.boutique) + '</b> · ' + esc(c.sujet) + ' ' + tag(st) + essai + (c.boutique_suspendue ? ' ' + tag('Boutique suspendue', 'cours') : '') + '</div>' +
+      '<div class="rt-muet">Lancée le ' + esc(jour(c.envoye_le)) + '</div><div class="nl-stats">' + stats + '</div>' +
+      '<div class="rt-actions">' + actions + '</div><div id="nal-' + esc(c.id) + '"></div><div id="nas-' + esc(c.id) + '"></div><div class="rt-msg" id="nam-' + esc(c.id) + '"></div></li>';
+  }
+
+  function dessiner() {
+    var j = ETAT.journal;
+    racine.innerHTML =
+      '<section class="rt-card"><h1>Newsletters des boutiques</h1>' +
+      '<p class="rt-muet">Suivi agrégé : aucun abonné ni aucune adresse n\'est affiché ici. Vous voyez seulement des nombres et le texte des newsletters, pour examiner celles qui sont signalées.</p></section>' +
+      boite('Boutiques suspendues', j.suspensions.length
+        ? '<ul class="rt-liste">' + j.suspensions.map(ligneSuspension).join('') + '</ul>'
+        : '<div class="rt-note">Aucune boutique n\'est suspendue.</div>') +
+      boite('Newsletters signalées', j.signalees.length
+        ? '<ul class="rt-liste">' + j.signalees.map(function (c) { return ligneCampagne(c, true); }).join('') + '</ul>'
+        : '<div class="rt-note">Aucune newsletter n\'a été signalée.</div>') +
+      boite('Dernières newsletters lancées', j.campagnes.length
+        ? '<ul class="rt-liste">' + j.campagnes.map(function (c) { return ligneCampagne(c, true); }).join('') + '</ul>'
+        : '<div class="rt-note">Aucune newsletter n\'a encore été lancée.</div>');
+  }
+
+  async function charger() {
+    ETAT.journal = await api('GET', '/admin/newsletter/journal');
+    dessiner();
+  }
+
+  document.addEventListener('click', async function (e) {
+    var b = e.target.closest('[data-na]');
+    if (!b) return;
+    var action = b.getAttribute('data-na'), id = b.getAttribute('data-id'), init = b.getAttribute('data-init');
+    try {
+      if (action === 'lire') {
+        var zone = document.getElementById('nal-' + id);
+        if (zone.innerHTML) { zone.innerHTML = ''; return; }
+        var r = await api('GET', '/admin/newsletter/campagnes/' + id);
+        zone.innerHTML = '<div class="rt-note" style="white-space:pre-wrap"><b>' + esc(r.campagne.sujet) + '</b>\n\n' + esc(r.campagne.texte) + '</div>';
+      } else if (action === 'suspendre') {
+        var z = document.getElementById('nas-' + id);
+        if (!document.getElementById('na-motif-' + id)) {
+          z.innerHTML = '<div class="rt-note"><div id="na-lab-' + esc(id) + '"><b>Motif de la suspension</b> (montré à la boutique)</div>' +
+            '<textarea id="na-motif-' + esc(id) + '" aria-labelledby="na-lab-' + esc(id) + '" rows="3" maxlength="300" style="width:100%;margin:8px 0"></textarea>' +
+            '<button class="rt-bouton danger" type="button" data-na="confirmer" data-init="' + esc(init) + '" data-id="' + esc(id) + '">Confirmer la suspension</button></div>';
+          document.getElementById('na-motif-' + id).focus();
+        }
+      } else if (action === 'confirmer') {
+        var motif = document.getElementById('na-motif-' + id).value;
+        b.disabled = true;
+        await api('POST', '/admin/newsletter/suspensions', { initiative_id: Number(init), motif: motif });
+        await charger();
+      } else if (action === 'lever') {
+        b.disabled = true;
+        await api('DELETE', '/admin/newsletter/suspensions/' + init);
+        await charger();
+      }
+    } catch (err) {
+      b.disabled = false;
+      dire('nam-' + (action === 'lever' ? 's' + init : id), err && err.message ? err.message : 'Action impossible pour le moment.', true);
+    }
+  });
+
+  async function init() {
+    var moi = null;
+    try { moi = (await api('GET', '/auth/me')).user; } catch (e) {}
+    if (!moi) {
+      racine.innerHTML = '<section class="rt-card" style="text-align:center"><h1>Newsletters</h1><p class="rt-muet">Connectez-vous avec un compte d\'administration.</p>' +
+        '<a class="rt-bouton" style="display:inline-block;text-decoration:none;line-height:24px" href="login.html?redirect=' + encodeURIComponent('newsletter-admin.html') + '">Se connecter</a></section>';
+      return;
+    }
+    if (moi.role !== 'administrateur') {
+      racine.innerHTML = '<section class="rt-card" style="text-align:center"><h1>Newsletters</h1><p class="rt-muet">Cette page est réservée à l\'administration.</p></section>';
+      return;
+    }
+    try { await charger(); } catch (e) { racine.innerHTML = '<section class="rt-card"><p class="rt-muet">Impossible de charger le suivi pour le moment. Réessayez dans un instant.</p></section>'; }
+  }
+  document.addEventListener('DOMContentLoaded', function () { setTimeout(init, 300); });
+})();
+</script>
+</body>
+</html>

@@ -158,6 +158,8 @@ function enregistrer({ route, db, getCurrentUser, sendJSON, SEC, getOrigin, envo
   require('./newsletter-campagnes').enregistrerCampagnes({ route, db, getCurrentUser, sendJSON, SEC, getOrigin, envoyerEmail, envoiReel, utils: { repondrePage, proprietaire } });
   /* Étape N3 : export des abonnés et demande d'accord unique aux comptes qui suivent la boutique. */
   require('./newsletter-abonnes').enregistrerAbonnes({ route, db, getCurrentUser, sendJSON, SEC, utils: { proprietaire } });
+  /* Étape N5 : journal agrégé, signalements et suspension de l'envoi, pour l'administration. */
+  require('./newsletter-admin').enregistrerAdmin({ route, db, getCurrentUser, sendJSON });
 }
 
 module.exports = { enregistrer, creerJeton, pageMessage, htmlConfirmation, MESSAGE_GENERIQUE, VALIDITE_CONFIRMATION_MS, DELAI_RENVOI_MS };

@@ -24,6 +24,7 @@
     var q = ETAT.contenus && ETAT.contenus.quota;
     return '<h3>Newsletter</h3>' +
       '<p class="rt-muet">Écrivez à vos abonnés : promotions, nouveaux produits, nouveaux services, événements. Seules les personnes qui l\'ont demandé et confirmé la reçoivent, et chacune peut se désabonner en un clic.</p>' +
+      (ETAT.contenus && ETAT.contenus.suspension ? '<div class="rt-note" role="alert"><b>Envoi suspendu.</b> L\'équipe Diaspo\'Actif a suspendu l\'envoi de vos newsletters. Motif : ' + esc(ETAT.contenus.suspension.motif) + '. Vos brouillons et vos abonnés sont conservés ; vous pourrez de nouveau envoyer dès que la suspension sera levée.</div>' : '') +
       (q && q.mode === 'a_blanc' ? '<div class="rt-note"><b>Mode essai.</b> L\'envoi réel d\'e-mails n\'est pas encore activé sur la plateforme : vos envois sont préparés et comptés, mais aucun message ne part pour l\'instant.</div>' : '') +
       (q ? '<div class="nl-chiffres"><div><b>' + esc(ETAT.contenus.abonnes_actifs) + '</b><span>abonné(s) actif(s)</span></div><div><b>' + esc(q.restant) + '</b><span>e-mail(s) restant(s) ce mois-ci sur ' + esc(q.limite) + '</span></div></div>' : '') +
       '<div class="nl-onglets" role="tablist">' +
