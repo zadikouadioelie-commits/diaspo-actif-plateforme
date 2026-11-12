@@ -191,6 +191,7 @@
 <script src="assets/boutique-couleurs.js?v=3"></script>
 <script src="assets/boutique-exemple-bouton.js?v=2"></script>
 <script src="assets/boutique-types-ui.js?v=2"></script>
+<script src="assets/boutique-events-espace.js?v=1"></script>
 <script src="assets/soumission-da.js"></script>
 <script src="assets/retours-commun.js?v=1"></script>
 <script src="assets/retours-vendeur.js?v=1"></script>
@@ -2098,6 +2099,8 @@ async function initRelaisDiasporaWidget(me, api) {
             <div id="pv-templates-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;"><div class="notice">Chargement…</div></div>
             <!-- Points de restauration : n'apparaît qu'après un premier changement de type. -->
             <div id="pv-bonus"></div>
+            <!-- Lot E4 : rôle organisateur / prestataire et « Mon espace organisateur » (seulement pour le type « Créateur d'événements »). -->
+            <div id="pv-events-espace"></div>
             <div id="pv-sauvegardes"></div>
           </div>
 
@@ -7211,6 +7214,7 @@ function renderPvTemplates() {
   if (__pvRegistry.types_v2 && __pvRegistry.types_v2.actif && window.BoutiqueTypesUI) {
     BoutiqueTypesUI.rendre(grid, { desc: __pvRegistry.types_v2, courant, onChoisir: pvChoisirType });
     renderPvBonus();
+    renderPvEventsEspace();
     return;
   }
   grid.innerHTML = Object.entries(__pvRegistry.templates).map(([key, t]) => {
@@ -7235,6 +7239,31 @@ function renderPvTemplates() {
     </div>`;
   }).join('');
   renderPvBonus();
+}
+
+/* Lot E4 : « Votre rôle » (organisateur / prestataire / les deux) et « Mon espace organisateur », seulement pour le type « Créateur d'événements ».
+   Le rôle est un raccourci sur les modules (côté serveur : PUT vitrine-draft { profil_evenements }) ; les raccourcis ouvrent des écrans qui existent déjà. */
+function renderPvEventsEspace() {
+  const zone = document.getElementById('pv-events-espace');
+  if (!zone) return;
+  const v2 = __pvRegistry && __pvRegistry.types_v2;
+  const courant = __pvVitrineType || (__pvVitrineTypes[0] || null);
+  const estEvents = !!(v2 && v2.actif && window.BoutiqueTypesUI && window.BoutiqueEventsEspace && BoutiqueTypesUI.canonique(v2, courant) === 'events');
+  if (!estEvents) { zone.innerHTML = ''; return; }
+  BoutiqueEventsEspace.rendre(zone, {
+    profils: v2.profils_evenements || [],
+    modules: __pvModulesState,
+    onProfil: pvChoisirProfilEvenements,
+    onAller: (section) => { if (window.initShowSection) initShowSection(section); }
+  });
+}
+async function pvChoisirProfilEvenements(cle) {
+  try {
+    const r = await pvDraftPatch({ profil_evenements: cle });
+    __pvModulesState = r.draft.modules;
+    renderPvEventsEspace(); renderPvModulesLib(); renderPvOrderList();
+    pvRefreshPreview();
+  } catch (e) { alert('Erreur : ' + (e.message || '')); }
 }
 
 function pvChoisirType(type) {
