@@ -17,7 +17,6 @@ const JS = lire('assets/boutique-impact.js');
 /* ═════════════ 1. Registre et redirection ═════════════ */
 test('I1 le type « impact » a une page dédiée dans le registre', () => {
   assert.ok(BT.PAGES_DEDIEES.includes('impact'));
-  assert.ok(!BT.PAGES_DEDIEES.includes('finance'), 'finance n\'a pas encore de page');
   const reg = BT.REGISTRE.TYPES.impact;
   assert.ok(reg, 'le type existe dans le registre');
 });

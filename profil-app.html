@@ -1277,6 +1277,8 @@ async function init() {
           if (_ib && _ib.vitrine_type === 'events') { location.replace('boutique-evenements.html?id=' + encodeURIComponent(profil.initiative_id)); return; }
           /* « Projet Impact » (lot E, 2026-11-12) : seule la clé NOUVELLE « impact » est redirigée ; l'ancien type « projet » garde sa présentation jusqu'à la bascule. */
           if (_ib && _ib.vitrine_type === 'impact') { location.replace('boutique-impact.html?id=' + encodeURIComponent(profil.initiative_id)); return; }
+          /* « Organismes de financement » (lot E, 2026-11-12) : type NOUVEAU, réservé aux administrateurs jusqu'à la bascule. */
+          if (_ib && _ib.vitrine_type === 'finance') { location.replace('boutique-finance.html?id=' + encodeURIComponent(profil.initiative_id)); return; }
         } catch (e) { /* repli : l'ancienne vue boutique */ }
       }
     }

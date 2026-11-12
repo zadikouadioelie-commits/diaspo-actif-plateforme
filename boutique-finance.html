@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Diaspo'Actif — Boutique Organisme de financement</title>
+<meta name="description" content="Boutique Organisme de financement sur Diaspo'Actif : programmes, projets accompagnés, résultats et prise de rendez-vous. Tout dépôt de projet passe par Soumettre à Diaspo'Actif.">
+<link rel="icon" href="/assets/logo.png">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0d2750">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/boutique-impact.css?v=1">
+<link rel="stylesheet" href="/assets/boutique-finance.css?v=1">
+<!-- Boutique de type « Organismes de financement » (2026-11-12, lot E ; maquette exemples-boutiques/boutique.html?type=finance).
+     Reprend l'habillage clair de la boutique Projet Impact (boutique-impact.css) et y ajoute les blocs propres au financement
+     (boutique-finance.css). Page entièrement rendue par assets/boutique-finance.js ; les données viennent de l'initiative.
+     AUCUN formulaire de dépôt de projet ici : tout bouton « Soumettre à Diaspo'Actif » passe par assets/depot-central.js.
+     Aucun paiement ni souscription. Paramètre d'adresse : ?id=… (ou ?slug=…). -->
+</head>
+<body class="imp fin">
+<div id="imp-app" aria-live="polite"><p class="imp-chargement">Chargement de la boutique…</p></div>
+<script src="/assets/boutique-types.js?v=2"></script>
+<script src="/assets/boutique-couleurs.js?v=3"></script>
+<script src="/assets/boutique-maintenance.js?v=1"></script>
+<script src="/assets/depot-central.js"></script>
+<script src="/assets/boutique-finance.js?v=1"></script>
+</body>
+</html>
