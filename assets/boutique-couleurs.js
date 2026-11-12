@@ -12,11 +12,13 @@
      { preset?: "moderne"|"elegant"|"minimaliste", couleurs?: ["#rrggbb", …1 à 3], textures?: ["uni"|…, …même nombre] }
    Sans « couleurs », la boutique garde son thème actuel (Bordeaux, Océan…) : aucune boutique existante ne change.
 
-   Rôle des 3 couleurs (mêmes libellés que la maquette des paramètres) :
-     1 principale  -> boutons et éléments actifs        (--v1, nuances --v2, --vsoft, --vsoftbd)
-     2 secondaire  -> bannière et zones importantes     (--v4)
-     3 accent      -> détails et boutons d'appel        (--v3)
-   Textures : la texture n°1 se pose sur la bannière, la n°2 sur le bloc contact, la n°3 sur le bouton d'appel.
+   Rôle des 3 couleurs (les libellés de la maquette des paramètres, précisés pour la vraie boutique) :
+     1 principale  -> bandeaux de rubriques, boutons, éléments actifs   (--v1, nuances --v2, --vsoft, --vsoftbd)
+     2 secondaire  -> bloc contact, offre flash, bannière               (--v4)
+     3 accent      -> liseré des rubriques, boutons de contact, bouton d'appel   (--v3 ; texte du bouton en noir ou blanc : --von3)
+   Textures : la n°1 se pose sur les bandeaux de rubriques, la n°2 sur le bloc contact / l'offre flash / la bannière,
+   la n°3 sur le liseré d'accent et le bouton d'appel. L'attribut data-couleurs (posé par appliquer) réserve ces habillages
+   aux boutiques personnalisées : sans couleurs enregistrées, l'aspect actuel est strictement inchangé.
    =========================================================== */
 (function (racine, fabrique) {
   var types = null;
@@ -40,7 +42,7 @@
     { nom: "Noir & Or", c: ["#222222", "#b38b3a", "#f1e2bd"] }
   ];
   var NOMS = ["Couleur principale", "Couleur secondaire", "Couleur d'accent"];
-  var INDICES = ["Boutons et éléments actifs", "Bannière et zones importantes", "Détails et boutons d'appel"];
+  var INDICES = ["Bandeaux de rubriques, boutons et éléments actifs", "Bloc contact, offre flash et bannière", "Détails : liseré des rubriques, boutons de contact"];
 
   function hexValide(h) { return typeof h === "string" && /^#[0-9a-fA-F]{6}$/.test(h) ? h.toLowerCase() : null; }
 
@@ -85,9 +87,11 @@
     var l1 = hexToHsl(v1)[2];
     var v2 = nuance(v1, Math.max(8, l1 - 12));
     var v4 = lisibleSousBlanc(c[1] || nuance(c[0], Math.max(8, Math.min(16, l1 - 20))));
-    var v3 = lisibleSousBlanc(c[2] || (c[1] ? c[1] : nuance(c[0], Math.min(l1 + 8, 52))));
+    /* L'accent garde sa vraie couleur (souvent claire : doré, sable…) ; c'est le TEXTE du bouton d'appel qui s'adapte. */
+    var v3 = c[2] || (c[1] ? c[1] : nuance(c[0], Math.min(l1 + 8, 52)));
+    var von3 = contraste("#ffffff", v3) >= contraste("#111111", v3) ? "#ffffff" : "#111111";
     return {
-      "--v1": v1, "--v2": v2, "--v3": v3, "--v4": v4,
+      "--v1": v1, "--v2": v2, "--v3": v3, "--von3": von3, "--v4": v4,
       "--vsoft": hslToHex(hsl1[0], Math.min(hsl1[1], 55), 95),
       "--vsoftbd": "rgba(" + parseInt(v2.slice(1, 3), 16) + "," + parseInt(v2.slice(3, 5), 16) + "," + parseInt(v2.slice(5, 7), 16) + ",.14)"
     };
@@ -137,10 +141,13 @@
      style = objet du style enregistré ; sans couleurs, les variables posées plus tôt sont retirées et le thème reprend la main. */
   function appliquer(el, style) {
     if (!el || !el.style) return;
-    var noms = ["--v1", "--v2", "--v3", "--v4", "--vsoft", "--vsoftbd", "--vtex1", "--vtex2", "--vtex3"];
+    var noms = ["--v1", "--v2", "--v3", "--von3", "--v4", "--vsoft", "--vsoftbd", "--vtex1", "--vtex2", "--vtex3"];
     noms.forEach(function (n) { el.style.removeProperty(n); });
+    if (el.removeAttribute) el.removeAttribute("data-couleurs");
     var vars = variables(style && style.couleurs);
     if (!vars) return;
+    /* L'attribut déclenche les habillages réservés aux boutiques personnalisées (liserés, textures) : sans lui, l'aspect actuel est inchangé. */
+    if (el.setAttribute) el.setAttribute("data-couleurs", "1");
     Object.keys(vars).forEach(function (n) { el.style.setProperty(n, vars[n]); });
     var tex = (style && Array.isArray(style.textures)) ? style.textures : [];
     for (var i = 0; i < MAX_COULEURS; i++) el.style.setProperty("--vtex" + (i + 1), textureCss(tex[i]) || "none");

@@ -188,12 +188,13 @@
 </script>
 <script src="assets/sidebar-premium-cadre.js?v=7"></script>
 <script src="assets/boutique-types.js?v=2"></script>
+<script src="assets/boutique-couleurs.js?v=3"></script>
 <script src="assets/boutique-exemple-bouton.js?v=2"></script>
 <script src="assets/boutique-types-ui.js?v=2"></script>
 <script src="assets/soumission-da.js"></script>
 <script src="assets/retours-commun.js?v=1"></script>
 <script src="assets/retours-vendeur.js?v=1"></script>
-<script src="assets/newsletter-init.js?v=1"></script>
+<script src="assets/newsletter-init.js?v=2"></script>
 <script src="/assets/upload-media.js"></script>
 <script src="/assets/carte-proto.js?v=1"></script>
 <script src="/assets/rich-editor.js"></script>
@@ -2111,6 +2112,8 @@ async function initRelaisDiasporaWidget(me, api) {
               <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:10px;">Couleur dominante</div>
               <div id="pv-theme-swatches" style="display:flex;gap:12px;flex-wrap:wrap;"><div class="notice">Chargement…</div></div>
             </div>
+            <!-- Studio de couleurs : 1 à 3 couleurs et des textures, vus en direct dans l'aperçu à droite (assets/boutique-couleurs.js). -->
+            <div id="pv-studio" style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border);"></div>
             <p style="font-size:12px;color:var(--muted);margin:14px 0 0;">🔜 Mises en page alternatives (au-delà des 3 styles ci-dessus) : à venir dans une prochaine évolution du module.</p>
           </div>
 
@@ -6616,6 +6619,7 @@ async function loadParametresVitrineFull() {
     let styleObj = {};
     try { styleObj = JSON.parse(init.vitrine_style_json || '{}') || {}; } catch (e) {}
     window.__pvStylePreset = ['moderne','elegant','minimaliste'].includes(styleObj.preset) ? styleObj.preset : 'moderne';
+    pvStudioCharger(styleObj);
     renderPvInfosForm();
     renderPvTemplates();
     renderPvQuickActivate();
@@ -7150,6 +7154,7 @@ async function pvAnnulerConfig() {
       __pvVitrineType = r.draft ? r.draft.type : __pvVitrineType;
       __pvVitrineTypes = (r.draft && Array.isArray(r.draft.types)) ? r.draft.types : __pvVitrineTypes;
       if (r.draft && r.draft.style && r.draft.style.preset) window.__pvStylePreset = r.draft.style.preset;
+      pvStudioCharger((r.draft && r.draft.style) || {});
     } catch (e) { alert('Annulation impossible : ' + (e.message || '')); }
   } else if (ctx && ctx.activeParNous) {
     /* Repli quand l'instantané manque : on défait au moins l'activation automatique. */
@@ -7509,13 +7514,201 @@ function renderPvThemeSwatches() {
 }
 
 async function pvSetTheme(theme) {
+  const avant = window.__pvInitTheme;
   try {
-    await pvDraftPatch({ theme });
+    /* Aperçu instantané : la boutique change tout de suite, l'enregistrement du brouillon suit. */
     window.__pvInitTheme = theme;
     renderPvThemeSwatches();
+    pvApercuInstantane();
+    await pvDraftPatch({ theme });
     pvRenderCartouchePreview();
-    pvRefreshPreview();
-  } catch (e) { alert('Erreur : ' + (e.message||'')); }
+  } catch (e) {
+    window.__pvInitTheme = avant;
+    renderPvThemeSwatches();
+    pvApercuInstantane();
+    alert('Erreur : ' + (e.message||''));
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Aperçu INSTANTANÉ + studio de couleurs et textures
+   Chaque choix est envoyé tout de suite à la boutique affichée dans l'aperçu (postMessage, même origine) :
+   elle change sans se recharger. Le brouillon est enregistré juste après (pause de 0,35 s pour ne pas
+   enregistrer chaque millimètre d'un glissement). Si l'aperçu n'est pas encore chargé, on le recharge.
+   Les types de boutique changent les modules et la page : ils gardent le rechargement de l'aperçu.
+   ══════════════════════════════════════════════════════════════ */
+window.__pvStyleCourant = {};
+let __pvStudioTimer = null;
+
+function pvApercuInstantane() {
+  const frame = document.getElementById('pv-preview-frame');
+  let pret = false;
+  try { pret = !!(frame && frame.contentDocument && frame.contentDocument.getElementById('pvt-scope')); } catch (e) { pret = false; }
+  if (!pret) { pvRefreshPreview(); return false; }
+  const st = window.__pvStyleCourant || {};
+  frame.contentWindow.postMessage({
+    type: 'da-vitrine-style',
+    style: { preset: window.__pvStylePreset || 'moderne', couleurs: st.couleurs, textures: st.textures },
+    theme: window.__pvInitTheme || 'bordeaux'
+  }, location.origin);
+  return true;
+}
+
+function pvStudioCharger(style) {
+  const C = window.BOUTIQUE_COULEURS;
+  window.__pvStyleCourant = {};
+  const s = (style && typeof style === 'object') ? style : {};
+  if (C && Array.isArray(s.couleurs) && s.couleurs.length) {
+    const r = C.fusionnerStyle({}, { couleurs: s.couleurs, textures: s.textures });
+    if (!r.erreur) window.__pvStyleCourant = { couleurs: r.style.couleurs, textures: r.style.textures };
+  }
+  renderPvStudio();
+}
+
+function pvStudioMessage(texte, erreur) {
+  const msg = document.getElementById('pv-studio-msg');
+  if (!msg) return;
+  msg.textContent = texte || '';
+  msg.style.color = erreur ? '#B91C1C' : 'var(--muted)';
+}
+
+function pvStudioEnregistrer() {
+  clearTimeout(__pvStudioTimer);
+  pvStudioMessage('Enregistrement…');
+  __pvStudioTimer = setTimeout(async () => {
+    const st = window.__pvStyleCourant || {};
+    try {
+      await pvDraftPatch({ style: st.couleurs ? { couleurs: st.couleurs, textures: st.textures } : { couleurs: null } });
+      pvStudioMessage("Enregistré dans le brouillon. Cliquez sur « Publier ma boutique » pour l'afficher aux visiteurs.");
+    } catch (e) { pvStudioMessage('Enregistrement impossible : ' + (e.message || ''), true); }
+  }, 350);
+}
+
+/* Applique un correctif (même validation que le serveur), met l'aperçu à jour, puis enregistre. */
+function pvStudioMettre(partiel, options) {
+  const C = window.BOUTIQUE_COULEURS;
+  if (!C) return false;
+  const st = window.__pvStyleCourant || {};
+  const r = C.fusionnerStyle(st.couleurs ? { couleurs: st.couleurs, textures: st.textures } : {}, partiel);
+  if (r.erreur) { pvStudioMessage(r.erreur, true); return false; }
+  window.__pvStyleCourant = r.style.couleurs ? { couleurs: r.style.couleurs, textures: r.style.textures } : {};
+  if (options && options.rendre) renderPvStudio(); else pvStudioSync();
+  pvApercuInstantane();
+  pvStudioEnregistrer();
+  return true;
+}
+
+/* Remet à jour les champs sans reconstruire la zone (sinon le glissement d'un sélecteur de couleur serait coupé). */
+function pvStudioSync() {
+  const C = window.BOUTIQUE_COULEURS;
+  const st = window.__pvStyleCourant || {};
+  if (!C || !st.couleurs) return;
+  st.couleurs.forEach((hex, i) => {
+    const h = document.querySelector('[data-pvs-hex="' + i + '"]');
+    if (h && document.activeElement !== h) h.value = hex.toUpperCase();
+    const c = document.querySelector('[data-pvs-couleur="' + i + '"]');
+    if (c && c.value !== hex) c.value = hex;
+    const e = document.querySelector('[data-pvs-ech="' + i + '"]');
+    if (e) { const t = C.textureCss((st.textures || [])[i]); e.style.background = (t ? t + ', ' : '') + hex; }
+  });
+  const note = document.getElementById('pv-studio-contraste');
+  if (note) {
+    const v = C.variables(st.couleurs);
+    const ajuste = v && (v['--v1'] !== st.couleurs[0] || (st.couleurs[2] && v['--v3'] !== st.couleurs[2]) || (st.couleurs[1] && v['--v4'] !== st.couleurs[1]));
+    note.textContent = ajuste ? "Une de vos couleurs est très claire : sur la boutique, elle est légèrement assombrie pour que le texte blanc reste lisible." : '';
+  }
+}
+
+function renderPvStudio() {
+  const box = document.getElementById('pv-studio');
+  const C = window.BOUTIQUE_COULEURS;
+  if (!box) return;
+  if (!C) { box.innerHTML = ''; return; }
+  pvStudioLier();
+  if (!document.getElementById('pvsCss')) {
+    const s = document.createElement('style');
+    s.id = 'pvsCss';
+    s.textContent = '.pvs-pals{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}' +
+      '.pvs-pal{display:flex;flex-direction:column;gap:6px;align-items:flex-start;border:1.5px solid var(--border);border-radius:10px;background:var(--card,#fff);padding:8px 10px;cursor:pointer;font:inherit;font-size:12px;color:var(--text);min-height:44px}' +
+      '.pvs-pal:hover{border-color:var(--orange)}.pvs-pal:focus-visible,.pvs-ligne input:focus-visible,.pvs-ligne select:focus-visible,.pvs-btn:focus-visible{outline:3px solid var(--orange);outline-offset:2px}' +
+      '.pvs-chips{display:flex;gap:3px}.pvs-chips i{display:block;width:24px;height:16px;border-radius:4px}' +
+      '.pvs-ligne{display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-top:1px solid var(--border)}' +
+      '.pvs-sw{flex:none;width:48px;height:48px;border:1.5px solid var(--border);border-radius:10px;padding:2px;background:none;cursor:pointer}' +
+      '.pvs-corps{flex:1;min-width:0}.pvs-titre{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline;font-size:13px}.pvs-titre span{font-size:12px;color:var(--muted)}' +
+      '.pvs-champs{display:flex;flex-wrap:wrap;gap:8px 14px;margin-top:6px}.pvs-champs label{display:flex;flex-direction:column;gap:3px;font-size:11.5px;font-weight:700;color:var(--muted)}' +
+      '.pvs-champs input,.pvs-champs select{min-height:40px;border:1.5px solid var(--border);border-radius:8px;padding:6px 10px;font:inherit;font-size:13px;color:var(--text);background:var(--card,#fff)}' +
+      '.pvs-champs input{width:112px;font-family:ui-monospace,Consolas,monospace}' +
+      '.pvs-ech{height:34px;border-radius:8px;margin-top:8px;border:1px solid var(--border)}' +
+      '.pvs-btn{min-height:40px;padding:8px 14px;border-radius:10px;border:1.5px solid var(--border);background:var(--card,#fff);color:var(--text);font:inherit;font-size:13px;font-weight:700;cursor:pointer}' +
+      '.pvs-btn:hover{border-color:var(--orange)}.pvs-n{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 2px}.pvs-n label{display:inline-flex;gap:6px;align-items:center;font-size:13px;min-height:40px;cursor:pointer}';
+    document.head.appendChild(s);
+  }
+  const st = window.__pvStyleCourant || {};
+  const actif = Array.isArray(st.couleurs) && st.couleurs.length > 0;
+  const palettes = C.PALETTES.map((p, i) =>
+    '<button type="button" class="pvs-pal" data-pvs-pal="' + i + '" aria-label="Appliquer la palette ' + _mvEsc(p.nom) + '"><span class="pvs-chips">' +
+    p.c.map(c => '<i style="background:' + c + '"></i>').join('') + '</span><span>' + _mvEsc(p.nom) + '</span></button>').join('');
+  let lignes = '';
+  if (actif) {
+    lignes = '<div class="pvs-n" role="radiogroup" aria-label="Nombre de couleurs">' +
+      [2, 3].map(n => '<label><input type="radio" name="pvs-n" value="' + n + '"' + (st.couleurs.length === n ? ' checked' : '') + '> ' + n + ' couleurs</label>').join('') + '</div>' +
+      st.couleurs.map((hex, i) => {
+        const tex = (st.textures || [])[i] || 'uni';
+        const t = C.textureCss(tex);
+        return '<div class="pvs-ligne">' +
+          '<input type="color" class="pvs-sw" data-pvs-couleur="' + i + '" value="' + hex + '" aria-label="' + _mvEsc(C.NOMS[i]) + '">' +
+          '<div class="pvs-corps"><div class="pvs-titre"><strong>' + _mvEsc(C.NOMS[i]) + '</strong><span>' + _mvEsc(C.INDICES[i]) + '</span></div>' +
+          '<div class="pvs-champs"><label>Code couleur<input type="text" data-pvs-hex="' + i + '" value="' + hex.toUpperCase() + '" maxlength="7" spellcheck="false" autocomplete="off"></label>' +
+          '<label>Texture<select data-pvs-texture="' + i + '">' + C.TEXTURES.map(x => '<option value="' + _mvEsc(x.id) + '"' + (x.id === tex ? ' selected' : '') + '>' + _mvEsc(x.label) + '</option>').join('') + '</select></label></div>' +
+          '<div class="pvs-ech" data-pvs-ech="' + i + '" style="background:' + _mvEsc((t ? t + ', ' : '') + hex) + '"></div></div></div>';
+      }).join('') +
+      '<p id="pv-studio-contraste" style="font-size:12px;color:#B45309;margin:6px 0 0;" role="status"></p>' +
+      '<div style="margin-top:10px;"><button type="button" class="pvs-btn" data-pvs-reset="1">Revenir à la couleur dominante</button></div>';
+  }
+  box.innerHTML =
+    '<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:6px;">Vos couleurs et textures</div>' +
+    '<p style="font-size:12.5px;color:var(--muted);margin:0 0 10px;line-height:1.55;">' + (actif
+      ? 'Ces couleurs passent avant la couleur dominante ci-dessus. Chaque changement s’affiche tout de suite dans l’aperçu à droite.'
+      : 'Choisissez une palette pour personnaliser votre boutique : vous verrez le résultat en direct dans l’aperçu à droite, puis vous pourrez ajuster chaque couleur et sa texture.') + '</p>' +
+    '<div class="pvs-pals">' + palettes + '</div>' + lignes +
+    '<p id="pv-studio-msg" role="status" style="font-size:12px;color:var(--muted);margin:10px 0 0;"></p>';
+  pvStudioSync();
+}
+
+function pvStudioLier() {
+  const box = document.getElementById('pv-studio');
+  if (!box || box.__pvsLie) return;
+  box.__pvsLie = true;
+  const copie = () => { const st = window.__pvStyleCourant || {}; return (st.couleurs || []).slice(); };
+  box.addEventListener('click', (e) => {
+    const C = window.BOUTIQUE_COULEURS;
+    const pal = e.target.closest ? e.target.closest('[data-pvs-pal]') : null;
+    if (pal && C) { pvStudioMettre({ couleurs: C.PALETTES[Number(pal.getAttribute('data-pvs-pal'))].c.slice(), textures: ['uni', 'uni', 'uni'] }, { rendre: true }); return; }
+    if (e.target.closest && e.target.closest('[data-pvs-reset]')) pvStudioMettre({ couleurs: null }, { rendre: true });
+  });
+  box.addEventListener('input', (e) => {
+    const t = e.target;
+    if (t.hasAttribute('data-pvs-couleur')) {
+      const c = copie(); c[Number(t.getAttribute('data-pvs-couleur'))] = t.value; pvStudioMettre({ couleurs: c });
+    } else if (t.hasAttribute('data-pvs-hex')) {
+      let v = t.value.trim(); if (v && v[0] !== '#') v = '#' + v;
+      if (/^#[0-9a-fA-F]{6}$/.test(v)) { const c = copie(); c[Number(t.getAttribute('data-pvs-hex'))] = v.toLowerCase(); pvStudioMettre({ couleurs: c }); }
+    }
+  });
+  box.addEventListener('change', (e) => {
+    const t = e.target, st = window.__pvStyleCourant || {};
+    if (t.hasAttribute('data-pvs-texture')) {
+      const tex = (st.textures || []).slice(); tex[Number(t.getAttribute('data-pvs-texture'))] = t.value; pvStudioMettre({ textures: tex });
+    } else if (t.name === 'pvs-n') {
+      const n = Number(t.value), c = copie();
+      while (c.length < n) c.push('#d8b36a');
+      pvStudioMettre({ couleurs: c.slice(0, n) }, { rendre: true });
+    } else if (t.hasAttribute('data-pvs-hex')) {
+      const v = t.value.trim(); const ok = /^#?[0-9a-fA-F]{6}$/.test(v);
+      if (!ok) pvStudioMessage('Code couleur invalide : utilisez 6 caractères, par exemple #83172F.', true);
+      pvStudioSync();
+    }
+  });
 }
 
 const PV_STYLE_PRESETS = [
@@ -7541,13 +7734,20 @@ function renderPvStylePresets() {
   }).join('');
 }
 async function pvSetStylePreset(preset) {
+  const avant = window.__pvStylePreset;
   try {
-    await pvDraftPatch({ style: { preset } });
+    /* Aperçu instantané (voir pvApercuInstantane) : la boutique change tout de suite, l'enregistrement suit. */
     window.__pvStylePreset = preset;
     /* Plus besoin de re-rendre l'etape 1 : elle ne depend plus du style graphique. */
     renderPvStylePresets();
-    pvRefreshPreview();
-  } catch (e) { alert('Erreur : ' + (e.message||'')); }
+    pvApercuInstantane();
+    await pvDraftPatch({ style: { preset } });
+  } catch (e) {
+    window.__pvStylePreset = avant;
+    renderPvStylePresets();
+    pvApercuInstantane();
+    alert('Erreur : ' + (e.message||''));
+  }
 }
 
 /* ══════════════════════════════════════════════

@@ -901,6 +901,20 @@ html body.nd .pvz-idcode-btn:hover { background:var(--nd-or,#E3C06E); color:#0B1
 .pvt-scope[data-theme="emeraude"] { --v1:#1F6B4A; --v2:#0E3D2A; --v3:#2A9163; --v4:#0A2D1F; --vsoft:#E6F3EC; --vsoftbd:rgba(14,61,42,.14); }
 .pvt-scope[data-theme="prune"]    { --v1:#4A2E6B; --v2:#2C1A46; --v3:#6B49A6; --v4:#1E1233; --vsoft:#F0EAF7; --vsoftbd:rgba(44,26,70,.14); }
 .pvt-scope[data-theme="or"]       { --v1:#8A5E1A; --v2:#5E3F0E; --v3:#B5872A; --v4:#3D2907; --vsoft:#F6EFE0; --vsoftbd:rgba(94,63,14,.14); }
+/* Couleurs personnalisees (studio de couleurs, assets/boutique-couleurs.js) : le script pose --v1..--v4, --vsoft et --vsoftbd
+   en style inline sur .pvt-scope (elles passent donc devant le theme), plus --vtex1..3 pour les textures, et l'attribut
+   data-couleurs. Sans couleurs enregistrees, rien de tout cela n'existe : la boutique garde son theme et son aspect actuels.
+   Texture 1 : bandeaux de rubriques · texture 2 : bloc contact, offre flash et banniere · texture 3 : liseré d'accent et bouton d'appel. */
+.pvt-scope .pvt-hero-content { z-index:1; }
+.pvt-scope[data-couleurs] .pvt-section-head { position:relative; }
+.pvt-scope[data-couleurs] .pvt-section-head h3 { position:relative; z-index:1; }
+.pvt-scope[data-couleurs] .pvt-section-head::after { content:""; position:absolute; inset:0; pointer-events:none; background:var(--vtex1,none); opacity:.4; }
+.pvt-scope[data-couleurs] .pvt-section-head::before { content:""; position:absolute; left:0; right:0; bottom:0; height:4px; z-index:2; pointer-events:none; background:var(--vtex3,none), var(--v3); }
+.pvt-scope[data-couleurs] .pvt-hero::after, .pvt-scope[data-couleurs] .pvt-contact::after, .pvt-scope[data-couleurs] #pv-flash::after { content:""; position:absolute; inset:0; pointer-events:none; border-radius:inherit; background:var(--vtex2,none); opacity:.45; }
+.pvt-scope[data-couleurs] .pvt-contact { position:relative; }
+.pvt-scope[data-couleurs] .pvt-contact > *, .pvt-scope[data-couleurs] #pv-flash > * { position:relative; z-index:1; }
+.pvt-scope[data-couleurs] .pvt-contact-btn { box-shadow:inset 0 0 0 1.5px var(--v3); }
+.pvt-scope[data-couleurs] .pvt-hero-cta { background:var(--vtex3,none), var(--v3); color:var(--von3,#fff); }
 /* Style graphique (independant du theme couleur) — 3 presets reels, appliques aux composants
    structurels (hero, sections, boutons) ; les elements de contenu au style inline ne sont pas
    affectes, limitation assumee pour rester contenu. */
@@ -1184,6 +1198,8 @@ html body.nd .pvz-idcode-btn:hover { background:var(--nd-or,#E3C06E); color:#0B1
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/evt-temporel.js"></script>
 <script src="assets/app.js?v=13"></script>
+<script src="assets/boutique-types.js?v=2"></script>
+<script src="assets/boutique-couleurs.js?v=3"></script>
 <script src="assets/rich-editor.js"></script>
 <script src="assets/galerie-lightbox.js"></script>
 <script src="assets/recherche-contacts.js"></script>
@@ -4072,6 +4088,8 @@ async function renderVitrineVisitor(init) {
       ${contactSec}
     </div>
   </div>`;
+  /* Couleurs et textures choisies dans le studio de couleurs (sans elles : le thème ci-dessus reste en place). */
+  try { if (window.BOUTIQUE_COULEURS) BOUTIQUE_COULEURS.appliquer(document.getElementById('pvt-scope'), styleObj); } catch (e) { /* le thème garde la main */ }
 
   // Catalogues → Articles (hiérarchie à deux niveaux)
   renderPvtCatalogues(catalogues, produits, ownerId);
@@ -5538,6 +5556,21 @@ const VITRINE_CHAMPS_BROUILLON_CLIENT = [
   'vitrine_offre_flash_titre', 'vitrine_offre_flash_fin',
 ];
 function vitrineEnApercu() { return /[?&]preview=draft/.test(location.search); }
+/* Aperçu INSTANTANÉ : le centre de création (page parente, même origine) envoie chaque choix de couleur, de texture,
+   de style visuel ou de thème ; la boutique change tout de suite, sans rechargement. Rien n'est écrit ici : la
+   page parente enregistre le brouillon de son côté. Ignoré hors aperçu, et pour tout message qui ne vient pas de la page parente. */
+window.addEventListener('message', function (e) {
+  try {
+    if (!vitrineEnApercu() || e.origin !== location.origin || e.source !== window.parent) return;
+    const d = e.data;
+    if (!d || d.type !== 'da-vitrine-style' || !d.style || typeof d.style !== 'object') return;
+    const sc = document.getElementById('pvt-scope');
+    if (!sc) return;
+    if (['moderne', 'elegant', 'minimaliste'].includes(d.style.preset)) sc.setAttribute('data-style', d.style.preset === 'moderne' ? '' : d.style.preset);
+    if (typeof d.theme === 'string' && PVT_THEMES.some(t => t.id === d.theme)) sc.setAttribute('data-theme', d.theme === 'bordeaux' ? '' : d.theme);
+    if (window.BOUTIQUE_COULEURS) BOUTIQUE_COULEURS.appliquer(sc, d.style);
+  } catch (err) { /* un message mal formé ne doit jamais casser la boutique */ }
+});
 async function vitrineSave(payload) {
   const id = _vitrineInit.id;
   if (!vitrineEnApercu()) return api('PUT', `/initiatives/${id}/vitrine`, payload);

@@ -62,13 +62,15 @@ test('C1 une texture connue est enregistrée ; null remet la boutique sur son th
   assert.equal(sans.preset, 'moderne');
 });
 
-test('C1 les nuances restent lisibles : du texte blanc passe toujours (4,5 : 1) sur les fonds de la boutique', () => {
+test('C1 les nuances restent lisibles : texte blanc sur les fonds de la boutique, texte adapté sur le bouton d\'accent', () => {
   const jeux = [['#ffee00'], ['#ffffff', '#f5f5f5', '#fafafa'], ['#83172f', '#111c38', '#d8b36a'], ['#222222', '#b38b3a', '#f1e2bd'], ['#00ffff', '#ffff00']];
   for (const j of jeux) {
     const v = C.variables(j);
-    for (const n of ['--v1', '--v2', '--v3', '--v4']) {
+    for (const n of ['--v1', '--v2', '--v4']) {
       assert.ok(C.contraste('#ffffff', v[n]) >= 4.5, `${n} (${v[n]}) doit porter du texte blanc pour ${j.join(',')}`);
     }
+    assert.ok(C.contraste(v['--von3'], v['--v3']) >= 4.5, `le texte du bouton d'appel (${v['--von3']}) doit rester lisible sur l'accent ${v['--v3']} pour ${j.join(',')}`);
+    assert.ok(['#ffffff', '#111111'].includes(v['--von3']));
     assert.match(v['--vsoft'], /^#[0-9a-f]{6}$/);
     assert.match(v['--vsoftbd'], /^rgba\(\d+,\d+,\d+,\.14\)$/);
   }
@@ -83,8 +85,13 @@ test('C1 une couleur déjà foncée n\'est pas modifiée', () => {
 
 test('C1 appliquer pose les variables et les textures sur la boutique, et les retire quand il n\'y a plus de couleurs', () => {
   const pose = {};
-  const el = { style: { setProperty: (n, v) => { pose[n] = v; }, removeProperty: (n) => { delete pose[n]; } } };
+  const attrs = {};
+  const el = {
+    style: { setProperty: (n, v) => { pose[n] = v; }, removeProperty: (n) => { delete pose[n]; } },
+    setAttribute: (n, v) => { attrs[n] = v; }, removeAttribute: (n) => { delete attrs[n]; }
+  };
   C.appliquer(el, { couleurs: ['#83172f', '#111c38', '#d8b36a'], textures: ['dore', 'uni', 'brillant'] });
+  assert.equal(attrs['data-couleurs'], '1', 'les habillages réservés aux boutiques personnalisées sont activés');
   assert.equal(pose['--v1'], '#83172f');
   assert.ok(pose['--v3'] && pose['--v4']);
   assert.equal(pose['--vtex1'], C.textureCss('dore'));
@@ -92,6 +99,7 @@ test('C1 appliquer pose les variables et les textures sur la boutique, et les re
   assert.equal(pose['--vtex3'], C.textureCss('brillant'));
   C.appliquer(el, { preset: 'elegant' });
   assert.deepEqual(Object.keys(pose), [], 'sans couleurs, le thème de la boutique reprend la main');
+  assert.deepEqual(Object.keys(attrs), [], 'et l\'aspect actuel est strictement inchangé');
   C.appliquer(null, {});
 });
 
@@ -171,4 +179,73 @@ test('C2 remettre « couleurs: null » rend à la boutique son thème', async ()
   assert.equal((await patch({ style: { couleurs: null } })).status, 200);
   assert.equal(brouillon().style.couleurs, undefined);
   assert.equal(brouillon().style.preset, 'elegant');
+});
+
+/* ═════════════ 3. Les pages ═════════════ */
+const compiler = (html, nom) => {
+  const vm = require('node:vm');
+  const re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g;
+  let m, n = 0;
+  while ((m = re.exec(html))) { n++; assert.doesNotThrow(() => new vm.Script(m[1]), `${nom} : le script en ligne n°${n} doit être du JavaScript valide`); }
+  assert.ok(n > 0);
+};
+
+test('C3 la boutique publique charge le registre puis le module, et applique les couleurs sans toucher au thème par défaut', () => {
+  const h = lireFichier('profil-app.html');
+  const iTypes = h.indexOf('<script src="assets/boutique-types.js');
+  const iCoul = h.indexOf('<script src="assets/boutique-couleurs.js');
+  assert.ok(iTypes > 0 && iCoul > iTypes, 'le registre des textures doit être chargé avant le module des couleurs');
+  assert.match(h, /<script src="assets\/boutique-couleurs\.js\?v=\d+"><\/script>/, 'version dans l\'adresse : pas de copie périmée en cache');
+  assert.match(h, /BOUTIQUE_COULEURS\.appliquer\(document\.getElementById\('pvt-scope'\), styleObj\)/);
+  /* Les habillages des boutiques personnalisées ne s'appliquent que si l'attribut data-couleurs est posé. */
+  const css = h.slice(h.indexOf('Couleurs personnalisees'), h.indexOf('Style graphique (independant du theme couleur)'));
+  const regles = css.split('\n').filter((l) => /^\.pvt-scope/.test(l));
+  assert.ok(regles.length >= 6);
+  for (const l of regles) assert.ok(/\[data-couleurs\]/.test(l) || /\.pvt-hero-content/.test(l), `règle sans garde data-couleurs : ${l.slice(0, 70)}`);
+  compiler(h, 'profil-app.html');
+});
+
+test('C3 l\'aperçu n\'obéit qu\'à la page parente de même origine, et seulement en mode aperçu', () => {
+  const h = lireFichier('profil-app.html');
+  const debut = h.indexOf("window.addEventListener('message'");
+  assert.ok(debut > 0);
+  const bloc = h.slice(debut, h.indexOf('});', h.indexOf('catch (err)', debut)));
+  assert.match(bloc, /vitrineEnApercu\(\)/);
+  assert.match(bloc, /e\.origin !== location\.origin/);
+  assert.match(bloc, /e\.source !== window\.parent/);
+  assert.match(bloc, /da-vitrine-style/);
+  assert.ok(!/api\(/.test(bloc), 'le message ne doit jamais écrire quoi que ce soit côté serveur');
+});
+
+test('C3 le centre de création envoie chaque choix à l\'aperçu sans le recharger, et enregistre le brouillon ensuite', () => {
+  const h = lireFichier('dashboard-initiative.html');
+  assert.ok(h.indexOf('<script src="assets/boutique-types.js') < h.indexOf('<script src="assets/boutique-couleurs.js'));
+  assert.match(h, /<script src="assets\/boutique-couleurs\.js\?v=\d+"><\/script>/);
+  assert.match(h, /id="pv-studio"/);
+  const corps = (nom) => { const i = h.indexOf(`function ${nom}(`); assert.ok(i > 0, nom); const fin = h.indexOf('\nfunction ', i + 10); const fin2 = h.indexOf('\nasync function ', i + 10); const f = Math.min(...[fin, fin2].filter((x) => x > 0)); return h.slice(i, f); };
+  for (const nom of ['pvSetTheme', 'pvSetStylePreset']) {
+    const c = h.indexOf(`async function ${nom}(`);
+    const bloc = h.slice(c, c + 900);
+    assert.match(bloc, /pvApercuInstantane\(\)/, `${nom} doit mettre l'aperçu à jour tout de suite`);
+    assert.ok(!/pvRefreshPreview\(\)/.test(bloc), `${nom} ne doit plus recharger tout l'aperçu`);
+    assert.match(bloc, /catch \(e\)[\s\S]*avant/, `${nom} doit revenir à l'état précédent si l'enregistrement échoue`);
+  }
+  assert.match(corps('pvApercuInstantane'), /postMessage\(/);
+  assert.match(corps('pvApercuInstantane'), /location\.origin/, 'le message n\'est destiné qu\'à la même origine');
+  assert.match(corps('pvStudioMettre'), /fusionnerStyle/, 'même validation que le serveur');
+  assert.match(corps('pvStudioEnregistrer'), /pvDraftPatch\(/);
+  compiler(h, 'dashboard-initiative.html');
+});
+
+test('C3 le studio de couleurs ne contient aucune émoticône et ne code aucune couleur en dur', () => {
+  const h = lireFichier('dashboard-initiative.html');
+  const bloc = h.slice(h.indexOf('function renderPvStudio('), h.indexOf('function pvStudioLier('));
+  assert.ok(bloc.length > 500);
+  assert.ok(!/\p{Extended_Pictographic}/u.test(bloc), 'icônes linéaires ou texte seulement');
+  const zone = h.slice(h.indexOf('<!-- Studio de couleurs'), h.indexOf('id="pv-studio"') + 140);
+  assert.ok(!/\p{Extended_Pictographic}/u.test(zone));
+  /* Les palettes et les textures viennent du module partagé, pas de la page. */
+  assert.match(bloc, /C\.PALETTES/);
+  assert.match(bloc, /C\.TEXTURES/);
+  assert.ok(!/#83172f|#111c38|#d8b36a/i.test(bloc));
 });
