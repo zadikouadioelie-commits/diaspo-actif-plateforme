@@ -1,6 +1,6 @@
 /* Tests — page publique « Créateur d'événements » (lot E, 2026-11-12).
    Lancer : node --test tests/boutique-evenements-page.test.js
-   1. Le type « events » a une page dédiée dans le registre ; les types sans page (impact, finance) n'en ont pas encore.
+   1. Le type « events » a une page dédiée dans le registre ; finance n'en a pas encore.
    2. La page se charge, lit les vraies API et affiche les événements (exécutée dans un faux navigateur, sans réseau).
    3. Règles d'inscription, filtres, texte sûr, aucune émoticône, redirection des visiteurs. */
 const test = require('node:test');
@@ -15,9 +15,8 @@ const lire = (f) => fs.readFileSync(path.join(RACINE, f), 'utf8');
 const JS = lire('assets/boutique-evenements.js');
 
 /* ═════════════ 1. Registre et redirection ═════════════ */
-test('E1 le type « events » a une page dédiée ; impact et finance n\'en ont pas encore', () => {
+test('E1 le type « events » a une page dédiée ; finance n\'en a pas encore', () => {
   assert.ok(BT.PAGES_DEDIEES.includes('events'));
-  assert.ok(!BT.PAGES_DEDIEES.includes('impact'));
   assert.ok(!BT.PAGES_DEDIEES.includes('finance'));
 });
 

@@ -1275,6 +1275,8 @@ async function init() {
           if (_ib && _ib.vitrine_type === 'video') { location.replace('boutique-video.html?id=' + encodeURIComponent(profil.initiative_id)); return; }
           /* « Créateur d'événements » (lot E, 2026-11-12) : seule la clé NOUVELLE « events » est redirigée ; une boutique de l'ancien type « evenement » garde sa présentation actuelle jusqu'à la bascule. */
           if (_ib && _ib.vitrine_type === 'events') { location.replace('boutique-evenements.html?id=' + encodeURIComponent(profil.initiative_id)); return; }
+          /* « Projet Impact » (lot E, 2026-11-12) : seule la clé NOUVELLE « impact » est redirigée ; l'ancien type « projet » garde sa présentation jusqu'à la bascule. */
+          if (_ib && _ib.vitrine_type === 'impact') { location.replace('boutique-impact.html?id=' + encodeURIComponent(profil.initiative_id)); return; }
         } catch (e) { /* repli : l'ancienne vue boutique */ }
       }
     }
