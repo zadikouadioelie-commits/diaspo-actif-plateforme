@@ -145,6 +145,7 @@ const ConfirmationAppareil = require("./confirmation-appareil");
 const ProfilObligatoire = require("./profil-obligatoire");
 const RelancePublication = require("./relance-publication");
 const RelanceMessages = require("./relance-messages");
+const BoutiqueCouleurs = require("../assets/boutique-couleurs.js"); /* couleurs et textures de la boutique : validation du style du brouillon (même fichier que la page) */
 const BoutiqueTypes = require("./boutique-types"); /* lot B : les 6 types de boutique (registre assets/boutique-types.js) sur la vraie plateforme, derrière un interrupteur administrateur */
 const DepotDetourne = require("./depot-detourne"); /* lot F : un seul module de dépôt (« Soumettre à Diaspo'Actif ») — refuse les textes de boutique qui détournent le dépôt de projet */
 /* Étape 3 : l'échéance réelle d'une session enregistrée est dans le registre (30 jours glissants pour un
@@ -12059,7 +12060,13 @@ route("PUT", "/api/initiatives/:id/vitrine-draft", async (req, res, params, body
       });
     }
   }
-  if (body.style !== undefined) draft.style = body.style;
+  if (body.style !== undefined) {
+    /* Fusion (et non remplacement) : changer de style visuel ne perd plus les couleurs choisies, et inversement.
+       Couleurs au format #rrggbb uniquement, textures prises dans le registre des types. */
+    const fusion = BoutiqueCouleurs.fusionnerStyle(draft.style !== undefined ? draft.style : safeParse(init.vitrine_style_json), body.style);
+    if (fusion.erreur) return sendJSON(res, 400, { error: fusion.erreur });
+    draft.style = fusion.style;
+  }
   if (body.theme !== undefined) draft.theme = body.theme;
 
   /* Contenus édités depuis l'aperçu : ils rejoignent le brouillon au lieu d'écrire
