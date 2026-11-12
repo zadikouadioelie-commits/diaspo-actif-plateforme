@@ -259,6 +259,33 @@
   .commande ul { list-style:none; margin:0; padding:0; }
   .commande .btn { min-height:44px; }
   @media (max-width:600px) { .assocc { grid-template-columns:1fr; } .duo { grid-template-columns:1fr; } .etapes li { font-size:12.5px; } .etapes li b.lib { display:none; } .etapes li[aria-current="step"] b.lib { display:inline; } }
+  /* Bas de page */
+  .site-pied { margin-top:12px; background:var(--panel); border-top:1px solid var(--line); }
+  .pied-in { max-width:1320px; margin:0 auto; padding:38px 20px 0; }
+  .pied-grille { display:grid; grid-template-columns:minmax(0,1.5fr) repeat(3,minmax(0,1fr)) minmax(0,1.5fr); gap:30px 34px; }
+  .pied-marque .logo-pied { display:flex; align-items:center; gap:10px; font-family:var(--serif); font-size:22px; font-weight:700; }
+  .pied-marque .logo-pied svg.ic { width:30px; height:30px; color:var(--gold); stroke-width:1.5; }
+  .pied-marque p { margin:12px 0 16px; color:var(--muted); font-size:14px; max-width:34ch; }
+  .reseaux { display:flex; gap:10px; flex-wrap:wrap; }
+  .reseaux button { width:44px; height:44px; border-radius:50%; border:1px solid var(--line); background:transparent; color:var(--gold); display:inline-flex; align-items:center; justify-content:center; cursor:pointer; }
+  .reseaux button:hover { background:var(--gold); color:var(--on-gold); }
+  .pied-col h4 { margin:0 0 8px; font-family:var(--serif); font-size:17px; color:var(--text); }
+  .pied-col ul { list-style:none; margin:0; padding:0; }
+  .pied-col li button { display:inline-flex; align-items:center; min-height:44px; padding:0; background:none; border:0; color:var(--muted); font-size:14.5px; cursor:pointer; text-align:left; }
+  .pied-col li button:hover { color:var(--gold); text-decoration:underline; text-underline-offset:4px; }
+  .pied-contact p { margin:0 0 10px; color:var(--muted); font-size:14px; }
+  .pied-contact address { font-style:normal; color:var(--text); font-size:14px; margin-bottom:14px; }
+  .pied-contact .ecrire { min-height:46px; border-radius:999px; border:0; background:var(--gold); color:var(--on-gold); font-weight:700; padding:0 22px; cursor:pointer; }
+  .pied-contact .ecrire:hover { filter:brightness(1.1); }
+  .pied-bas { margin-top:30px; padding:18px 0; border-top:1px solid var(--line); display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:14px 24px; }
+  .pied-bas .copy { margin:0; color:var(--muted); font-size:13.5px; }
+  .paiements { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:0; padding:0; list-style:none; }
+  .paiements .lib { color:var(--muted); font-size:13px; margin-right:4px; }
+  .paiements li.moyen { display:inline-flex; align-items:center; gap:7px; min-height:34px; padding:0 12px; border:1px solid var(--line); border-radius:8px; background:var(--panel2); font-size:13px; font-weight:600; }
+  .paiements li.moyen svg.ic { width:18px; height:18px; color:var(--gold); }
+  .site-pied .demo { margin:0; padding:0 0 22px; text-align:center; }
+  @media (max-width:1100px) { .pied-grille { grid-template-columns:repeat(3,minmax(0,1fr)); } .pied-marque, .pied-contact { grid-column:span 3; } .pied-marque p, .pied-contact p { max-width:60ch; } }
+  @media (max-width:600px) { .pied-grille { grid-template-columns:repeat(2,minmax(0,1fr)); gap:22px 18px; } .pied-marque, .pied-contact { grid-column:span 2; } .pied-bas { flex-direction:column; align-items:flex-start; } }
   @media (max-width:1180px) {
     .top-in { flex-wrap:wrap; }
     .nav { order:3; flex:1 1 100%; overflow-x:auto; scrollbar-width:none; margin:0 -6px; }
@@ -436,8 +463,94 @@
     </div>
   </section>
 
-  <p class="demo">Exemple : vidéos, prix, avis et compteurs sont fictifs. La lecture, le panier et les commandes sont des simulations : rien n'est envoyé, rien n'est payé. Sans avis, la fiche affiche « Aucun avis pour l'instant ».</p>
 </main>
+
+<footer class="site-pied" aria-label="Bas de page">
+  <div class="pied-in">
+    <div class="pied-grille">
+      <div class="pied-marque">
+        <div class="logo-pied">
+          <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M10 9.5v5l4.5-2.5z" style="fill:currentColor"/></svg>
+          <span id="piedNom"></span>
+        </div>
+        <p>Les vidéos de la marque : soins, maquillage et coulisses, à regarder, à garder et à acheter.</p>
+        <div class="reseaux" role="group" aria-label="Réseaux sociaux (liens fictifs)">
+          <button type="button" data-pied="Instagram" aria-label="Instagram (lien fictif)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17" cy="7" r=".6"/></svg></button>
+          <button type="button" data-pied="Facebook" aria-label="Facebook (lien fictif)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 8.5h2.5V5H14c-2.2 0-3.5 1.5-3.5 3.6V11H8v3.5h2.5V21H14v-6.5h2.4l.6-3.5H14V9.2c0-.5.2-.7 0-.7z"/></svg></button>
+          <button type="button" data-pied="YouTube" aria-label="YouTube (lien fictif)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="5.5" width="19" height="13" rx="4"/><path d="M10 9.5v5l4.5-2.5z"/></svg></button>
+          <button type="button" data-pied="WhatsApp" aria-label="Messagerie (lien fictif)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l1.3-4.2A8 8 0 1 1 8.2 18.7z"/><path d="M9 9.5c0 3 2.5 5.5 5.5 5.5l1-1.5-2-1-1 .7c-.8-.4-1.4-1-1.8-1.8l.7-1-1-2z"/></svg></button>
+        </div>
+      </div>
+
+      <nav class="pied-col" aria-label="Explorer">
+        <h4>Explorer</h4>
+        <ul>
+          <li><button type="button" data-aller="catalogue">Toutes les vidéos</button></li>
+          <li><button type="button" data-aller="selections">Sélections</button></li>
+          <li><button type="button" data-aller="enreg">Mes vidéos enregistrées</button></li>
+          <li><button type="button" data-aller="achats">Mes achats</button></li>
+        </ul>
+      </nav>
+
+      <nav class="pied-col" aria-label="Catégories de vidéos">
+        <h4>Catégories</h4>
+        <ul id="piedCats"></ul>
+      </nav>
+
+      <nav class="pied-col" aria-label="Informations">
+        <h4>Informations</h4>
+        <ul>
+          <li><button type="button" data-pied="Livraison et retours">Livraison et retours</button></li>
+          <li><button type="button" data-pied="Vidéos numériques et téléchargements">Vidéos numériques et téléchargements</button></li>
+          <li><button type="button" data-pied="Paiement sécurisé">Paiement sécurisé</button></li>
+          <li><button type="button" data-pied="Questions fréquentes">Questions fréquentes</button></li>
+        </ul>
+      </nav>
+
+      <div class="pied-col pied-contact">
+        <h4>Nous contacter</h4>
+        <p>Une question sur une vidéo, une commande à suivre, une vidéo sur mesure à demander ? L'équipe répond sous 48 heures.</p>
+        <address>Lyon, France<br>Du lundi au vendredi, de 9 h à 18 h</address>
+        <button type="button" class="ecrire" data-aller="contact">Nous écrire</button>
+      </div>
+    </div>
+
+    <div class="pied-bas">
+      <p class="copy">© 2026 <span id="piedNom2"></span>. Tous droits réservés.</p>
+      <ul class="paiements" aria-label="Moyens de paiement acceptés (exemple)">
+        <li class="lib">Paiement accepté :</li>
+        <li class="moyen"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M3 10h18M7 15h3"/></svg>Carte bancaire</li>
+        <li class="moyen"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/></svg>Mobile Money</li>
+        <li class="moyen"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10l9-6 9 6M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18"/></svg>Virement</li>
+      </ul>
+    </div>
+    <p class="demo">Exemple : vidéos, prix, avis et compteurs sont fictifs. La lecture, le panier, les commandes, les réseaux sociaux et les messages sont des simulations : rien n'est envoyé, rien n'est payé. Sans avis, la fiche affiche « Aucun avis pour l'instant ».</p>
+  </div>
+</footer>
+
+<!-- Nous écrire (simulé) -->
+<div class="overlay" id="contactOv" role="dialog" aria-modal="true" aria-labelledby="contactTitre">
+  <div class="sheet">
+    <button class="close" type="button" data-close aria-label="Fermer le formulaire de contact"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <h2 id="contactTitre">Nous écrire</h2>
+    <p class="aide" style="margin:0 0 10px">Ce message est simulé : il n'est envoyé nulle part.</p>
+    <form class="form" id="contactForm" novalidate>
+      <label>Nom et prénom<input type="text" name="nom" autocomplete="name" required></label>
+      <label>Adresse e-mail<input type="email" name="email" autocomplete="email" required></label>
+      <label>Sujet
+        <select name="sujet">
+          <option>Une question sur une vidéo</option>
+          <option>Suivre ou modifier une commande</option>
+          <option>Demander une vidéo sur mesure</option>
+          <option>Autre demande</option>
+        </select>
+      </label>
+      <label>Message<textarea name="message" required></textarea></label>
+      <p class="aide" id="contactErr" role="alert" style="color:var(--alerte);margin:0"></p>
+      <button class="btn or" type="submit" style="width:100%">Envoyer le message (simulé)</button>
+    </form>
+  </div>
+</div>
 
 <!-- Lecteur -->
 <div class="overlay" id="playerOv" role="dialog" aria-modal="true" aria-labelledby="pTitre">
@@ -655,6 +768,7 @@
   (function applyShop() {
     document.title = SHOP.name + " · " + TYPE_LABELS[SHOP.main];
     $("#shopName").textContent = SHOP.name;
+    ["#piedNom", "#piedNom2"].forEach(sel => { const el = $(sel); if (el) el.textContent = SHOP.name; });
     $("#shopTitle").textContent = SHOP.name;
     $("#shopSlogan").textContent = SHOP.slogan;
   })();
@@ -951,6 +1065,17 @@
     }
     if (q("#pp")) { state.playing ? (arreter(), majLecture()) : lancer(); return; }
     if (q("#suiv")) { const l = filtrer(), i = l.findIndex(v => state.current && v.id === state.current.id), nx = l[(i + 1) % l.length]; if (nx) ouvrirLecteur(nx.id); return; }
+    if ((b = q("[data-aller]"))) {
+      const v = b.dataset.aller;
+      if (v === "catalogue") { reinit(); render(); versCatalogue("catalogue"); }
+      else if (v === "selections") { reinit(); render(); versCatalogue("selections"); }
+      else if (v === "enreg") { enregCorps(); ouvrir("enregOv", b, "[data-close]"); }
+      else if (v === "achats") { achatsCorps(); ouvrir("achatsOv", b, "[data-close]"); }
+      else if (v === "contact") { $("#contactErr").textContent = ""; ouvrir("contactOv", b, "input[name=nom]"); }
+      return;
+    }
+    if ((b = q("[data-pcat]"))) { reinit(); state.cat = b.dataset.pcat; render(); versCatalogue(); return; }
+    if ((b = q("[data-pied]"))) { toast(b.dataset.pied + " : lien fictif, cette page n'existe pas dans l'exemple."); return; }
     if (q("[data-close]")) { fermer(q(".overlay")); return; }
     if (t.classList && t.classList.contains("overlay")) fermer(t);
   });
@@ -987,6 +1112,16 @@
       state.coord = { nom: g("nom"), email: g("email"), adresse: g("adresse"), cp: g("cp"), ville: g("ville") };
       allerEtape(3); return;
     }
+    if (f.id === "contactForm") {
+      ev.preventDefault();
+      const err = $("#contactErr");
+      if (!f.elements["nom"].value.trim()) { err.textContent = "Indiquez votre nom et prénom."; f.elements["nom"].focus(); return; }
+      if (!/^\S+@\S+\.\S+$/.test(f.elements["email"].value.trim())) { err.textContent = "Indiquez une adresse e-mail valide, par exemple nom@exemple.fr."; f.elements["email"].focus(); return; }
+      if (f.elements["message"].value.trim().length < 10) { err.textContent = "Écrivez un message d'au moins 10 caractères pour que l'équipe puisse vous répondre."; f.elements["message"].focus(); return; }
+      err.textContent = ""; f.reset();
+      fermer($("#contactOv")); toast("Message simulé : rien n'a été envoyé. Dans une vraie boutique, l'équipe répond sous 48 heures.");
+      return;
+    }
     if (f.dataset.review === undefined) return;
     ev.preventDefault();
     const id = f.dataset.review === "shop" ? "shop" : Number(f.dataset.review), nom = f.elements["name"].value.trim();
@@ -1006,6 +1141,7 @@
   });
   (function () { const maj = () => { const b = document.getElementById("exBandeau"); document.documentElement.style.setProperty("--ex-h", (b ? b.offsetHeight : 0) + "px"); }; maj(); window.addEventListener("resize", maj); setTimeout(maj, 400); })();
 
+  $("#piedCats").innerHTML = CATS.filter(c => c.id !== "all").map(c => '<li><button type="button" data-pcat="' + c.id + '">' + esc(c.label) + "</button></li>").join("");
   renderUne();
   render();
   const hm = location.hash.match(/^#video-(\d+)$/);
