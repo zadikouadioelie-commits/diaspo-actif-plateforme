@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Créateur d'événements · maquette</title>
 <style>
-  :root { --c1:#83172f; --c2:#111c38; --c3:#d8b36a; --line:#e6e1da; --text:#172033; --muted:#6b6b76; --bg:#f7f6f3; --white:#fff; }
+  :root { --c1:#83172f; --c2:#111c38; --c3:#d8b36a; --line:#e6e1da; --text:#172033; --muted:#6b6b76; --bg:#f7f6f3; --white:#fff; --alerte:#b3261e; }
   * { box-sizing: border-box; }
   body { margin:0; font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif; color:var(--text); background:var(--bg); }
   .top { background:var(--c2); color:#fff; padding:14px 16px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
@@ -14,15 +14,19 @@
   .top h1 em { color:var(--c3); font-style:normal; }
   .top button { background:none; border:0; color:#fff; font:inherit; font-size:15px; cursor:pointer; padding:6px 8px; border-radius:8px; }
   .top button:hover { background:rgba(255,255,255,.12); }
+  .top .rubbtn { border:1px solid rgba(255,255,255,.35); display:inline-flex; gap:6px; align-items:center; }
+  .top .rubbtn svg { width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; }
   .hero { background:var(--c1); color:#fff; padding:26px 16px; }
   .hero h2 { margin:0 0 6px; font-family: Georgia, serif; font-size:24px; }
   .hero p { margin:0; opacity:.92; }
   .wrap { max-width:1100px; margin:0 auto; padding:16px; }
   .note { background:#fff8e6; border:1px solid #f1dfa6; border-radius:10px; padding:10px 12px; font-size:14px; margin:12px 0; }
   .chips { display:flex; gap:8px; flex-wrap:wrap; margin:14px 0; }
-  .chip { border:1px solid var(--line); background:#fff; border-radius:999px; padding:7px 13px; font:inherit; font-size:14px; cursor:pointer; }
-  .chip.on { background:var(--c1); color:#fff; border-color:var(--c1); }
+  .chip { border:1px solid var(--line); background:#fff; border-radius:999px; padding:7px 13px; font:inherit; font-size:14px; cursor:pointer; display:inline-flex; gap:6px; align-items:center; }
+  .chip.on, .chip[aria-pressed="true"] { background:var(--c1); color:#fff; border-color:var(--c1); }
+  .chip svg { width:15px; height:15px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
   .sectitle { font-family: Georgia, serif; font-size:18px; margin:18px 0 10px; color:var(--c2); }
+  .sectitle small { font-family: Inter, system-ui, sans-serif; font-weight:400; font-size:13px; color:var(--muted); margin-left:8px; }
   .list { display:grid; gap:12px; }
   .ev { background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px; display:grid; grid-template-columns: 74px 1fr auto; gap:14px; align-items:center; }
   .date { background:var(--c1); color:#fff; border-radius:10px; text-align:center; padding:8px 4px; }
@@ -48,7 +52,8 @@
   .row { display:flex; gap:10px; align-items:center; justify-content:space-between; flex-wrap:wrap; margin-top:12px; }
   .form { display:grid; gap:10px; margin-top:10px; }
   .form label { font-size:14px; display:grid; gap:4px; }
-  .form input { font:inherit; padding:9px 10px; border:1px solid var(--line); border-radius:9px; }
+  .form input, .form select, .form textarea { font:inherit; padding:9px 10px; border:1px solid var(--line); border-radius:9px; background:#fff; }
+  .form textarea { min-height:90px; }
   .tabs { display:flex; gap:6px; margin:10px 0; }
   .tabs button { border:1px solid var(--line); background:#fff; border-radius:8px; padding:7px 12px; font:inherit; cursor:pointer; }
   .tabs button.on { background:var(--c2); color:#fff; border-color:var(--c2); }
@@ -57,6 +62,174 @@
   .toast.show { opacity:1; }
   .demo { font-size:12px; color:var(--muted); margin-top:18px; }
   @media (max-width: 560px) { .ev { grid-template-columns: 64px 1fr; } .ev .right { grid-column: 1 / -1; text-align:left; justify-items:start; } }
+
+  /* ── Fonctions reconstruites (2026-11-13) dans l'ancien rendu ── */
+  .rub-off { display:none !important; }
+  .sr { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+  .pills { display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
+  .pill { background:rgba(255,255,255,.16); border-radius:999px; padding:5px 12px; font-size:13px; }
+  .subnav { background:#fff; border-bottom:1px solid var(--line); display:flex; gap:6px; overflow-x:auto; padding:8px 16px; }
+  .subnav button { border:0; background:none; color:var(--text); padding:7px 12px; border-radius:7px; font:inherit; font-size:14px; font-weight:600; cursor:pointer; white-space:nowrap; }
+  .subnav button:hover { background:#f0ede7; }
+  .subnav button[aria-current="true"] { background:var(--c2); color:#fff; }
+  .recherche { display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; padding:8px 0 0; }
+  .recherche label { display:grid; gap:4px; font-size:13px; color:var(--muted); font-weight:600; }
+  .recherche .champ { flex:1 1 240px; }
+  .recherche input, .recherche select { font:inherit; font-size:14px; color:var(--text); background:#fff; border:1px solid var(--line); border-radius:9px; padding:9px 10px; min-height:40px; }
+  .recherche input { width:100%; }
+  .barre { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .barre .chips { flex:1 1 auto; }
+  .vues { display:inline-flex; border:1px solid var(--line); border-radius:999px; overflow:hidden; background:#fff; }
+  .vues button { background:none; border:0; padding:8px 14px; font:inherit; font-size:14px; font-weight:600; cursor:pointer; }
+  .vues button[aria-pressed="true"] { background:var(--c2); color:#fff; }
+  .actifs { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:0 0 10px; }
+  .actifs:empty { display:none; }
+  .actif { display:inline-flex; align-items:center; gap:6px; border:1px solid var(--c1); color:var(--c1); background:#fff; border-radius:999px; padding:5px 11px; font:inherit; font-size:13px; cursor:pointer; }
+  .actif svg { width:13px; height:13px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; }
+  .lien { background:none; border:0; color:var(--c1); font:inherit; font-size:13px; font-weight:600; cursor:pointer; padding:4px 6px; }
+  .lien:hover { text-decoration:underline; }
+  .mois { font-family: Georgia, serif; font-size:15px; margin:16px 0 8px; color:var(--c2); text-transform:capitalize; }
+  .mois:first-child { margin-top:0; }
+  .ev .titre { display:flex; gap:8px; align-items:flex-start; }
+  .coeur { background:none; border:1px solid var(--line); border-radius:50%; width:34px; height:34px; display:grid; place-items:center; cursor:pointer; color:var(--muted); flex:0 0 34px; }
+  .coeur svg { width:17px; height:17px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linejoin:round; }
+  .coeur[aria-pressed="true"] { color:var(--c1); border-color:var(--c1); }
+  .coeur[aria-pressed="true"] svg { fill:currentColor; }
+  .cartes { display:grid; grid-template-columns:repeat(auto-fill, minmax(260px,1fr)); gap:14px; }
+  .ecard { background:#fff; border:1px solid var(--line); border-radius:12px; overflow:hidden; display:flex; flex-direction:column; position:relative; }
+  .ecard .bandeau { height:92px; padding:12px; color:#fff; display:flex; align-items:flex-end; justify-content:space-between; }
+  .ecard .bandeau .date { background:rgba(255,255,255,.2); padding:6px 12px; }
+  .ecard .bandeau .etat { background:rgba(0,0,0,.4); border-radius:999px; padding:3px 10px; font-size:12px; font-weight:600; }
+  .ecard .bandeau .etat.alerte { background:#fff; color:var(--alerte); }
+  .ecard .coeur { position:absolute; top:10px; right:10px; background:#fff; border-color:#fff; }
+  .ecard .corps { padding:12px 14px 14px; display:flex; flex-direction:column; gap:6px; flex:1; }
+  .ecard h3 { margin:0; font-size:16px; }
+  .badge { align-self:flex-start; background:#f0ede7; border-radius:6px; padding:2px 8px; font-size:12px; font-weight:600; color:var(--c2); }
+  .jauge { height:6px; border-radius:4px; background:#eee9e1; overflow:hidden; }
+  .jauge i { display:block; height:100%; background:var(--c1); }
+  .jauge.pleine i { background:#9b1c1c; }
+  .ecard .actions { display:flex; gap:8px; margin-top:auto; padding-top:6px; }
+  .ecard .actions .btn { flex:1; }
+  .pied { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-top:16px; font-size:14px; color:var(--muted); }
+  .pages { display:flex; gap:6px; }
+  .pg { min-width:42px; height:42px; border:1px solid var(--line); background:#fff; color:var(--text); border-radius:8px; cursor:pointer; font:inherit; font-weight:600; }
+  .pg[aria-current="page"] { background:var(--c2); border-color:var(--c2); color:#fff; }
+  .pg:disabled { opacity:.4; cursor:default; }
+  .vide { padding:20px; background:#fff; border:1px dashed var(--line); border-radius:12px; color:var(--muted); font-size:14px; }
+  .vide b { display:block; color:var(--text); margin-bottom:2px; }
+  .aide { font-size:13px; color:var(--muted); margin:6px 0; }
+  .ok { color:#1a6b3a; font-weight:700; }
+  .refcode { font-weight:700; font-family:ui-monospace, Consolas, monospace; background:#f0ede7; padding:2px 6px; border-radius:5px; }
+  .bloc { margin:28px 0; }
+  .bloc h2 { font-family: Georgia, serif; font-size:20px; margin:0 0 4px; color:var(--c2); }
+  .bloc-tete { display:flex; justify-content:space-between; align-items:flex-end; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
+  .bloc-tete p { margin:0; color:var(--muted); font-size:14px; }
+  .apropos { display:grid; grid-template-columns:1.2fr .8fr; gap:20px; align-items:center; }
+  .apropos p { font-size:15px; line-height:1.55; }
+  .apropos-art { aspect-ratio:16/10; border-radius:12px; background:linear-gradient(135deg, var(--c2), var(--c1)); }
+  .chiffres { display:flex; gap:12px; flex-wrap:wrap; margin-top:12px; }
+  .chiffres div { background:#fff; border:1px solid var(--line); border-radius:10px; padding:10px 16px; }
+  .chiffres b { display:block; font-size:22px; color:var(--c1); }
+  .chiffres span { font-size:13px; color:var(--muted); }
+  .intervs { display:grid; grid-template-columns:repeat(auto-fill, minmax(190px,1fr)); gap:12px; }
+  .iv-carte { background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px; display:grid; gap:3px; justify-items:start; align-content:start; }
+  .rond { width:44px; height:44px; border-radius:50%; background:var(--c1); color:#fff; display:grid; place-items:center; font-family: Georgia, serif; font-size:20px; font-weight:700; flex:0 0 44px; }
+  .iv-carte h3 { margin:6px 0 0; font-size:15px; }
+  .iv-carte .role { margin:0; font-size:13px; color:var(--muted); }
+  .iv-carte .nb { margin:0 0 6px; font-size:12px; color:var(--muted); }
+  .note-moy { display:flex; align-items:center; gap:8px; font-size:14px; color:var(--muted); }
+  .note-moy b { font-size:22px; color:var(--text); }
+  .etoiles { display:inline-flex; gap:2px; color:var(--c3); }
+  .etoiles svg { width:16px; height:16px; fill:currentColor; stroke:none; }
+  .etoiles .off { fill:#ddd6ca; }
+  .avis-liste { display:grid; grid-template-columns:repeat(auto-fill, minmax(260px,1fr)); gap:12px; }
+  .avis-un { background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px; display:grid; gap:8px; align-content:start; }
+  .avis-un q { quotes:none; font-size:14px; line-height:1.5; }
+  .avis-un .qui { display:flex; gap:10px; align-items:center; font-size:12px; color:var(--muted); }
+  .avis-un .rond { width:34px; height:34px; font-size:15px; flex-basis:34px; }
+  .lettre { background:#fff; border:1px solid var(--line); border-radius:12px; padding:16px; display:flex; gap:16px; align-items:center; flex-wrap:wrap; }
+  .lettre > svg { width:30px; height:30px; fill:none; stroke:var(--c1); stroke-width:1.6; }
+  .lettre h3 { margin:0 0 2px; font-size:16px; }
+  .lettre p { margin:0; font-size:14px; color:var(--muted); }
+  .lettre form { display:flex; gap:8px; margin-left:auto; flex-wrap:wrap; }
+  .lettre input { padding:10px; border:1px solid var(--line); border-radius:9px; font:inherit; min-width:240px; }
+  .lettre button { background:var(--c1); color:#fff; border:0; border-radius:9px; padding:10px 18px; font:inherit; font-weight:600; cursor:pointer; }
+  .site-pied { background:#15151c; color:#d9d9e0; padding:32px 16px 18px; margin-top:28px; }
+  .pied-in { max-width:1100px; margin:0 auto; }
+  .pied-grille { display:grid; grid-template-columns:1.4fr 1fr 1fr 1fr 1.3fr; gap:24px; }
+  .site-pied h4 { margin:0 0 10px; color:#fff; font-size:14px; }
+  .site-pied p { font-size:14px; line-height:1.5; margin:0 0 10px; }
+  .site-pied ul { list-style:none; margin:0; padding:0; display:grid; gap:2px; }
+  .site-pied li button { background:none; border:0; color:#c3c3cd; cursor:pointer; font:inherit; font-size:14px; padding:6px 0; text-align:left; }
+  .site-pied li button:hover { color:#fff; text-decoration:underline; }
+  .logo-pied { display:flex; align-items:center; gap:8px; color:#fff; font-weight:700; font-size:16px; margin-bottom:8px; }
+  .logo-pied svg, .reseaux svg { width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
+  .reseaux { display:flex; gap:8px; }
+  .reseaux button { width:38px; height:38px; border-radius:50%; border:1px solid #444; background:none; color:#fff; cursor:pointer; display:grid; place-items:center; }
+  .site-pied address { font-style:normal; font-size:14px; line-height:1.5; margin-bottom:10px; }
+  .site-pied .ecrire { background:#fff; color:var(--text); border:0; border-radius:8px; padding:10px 16px; font-weight:700; cursor:pointer; }
+  .pied-bas { border-top:1px solid #2c2c36; margin-top:20px; padding-top:14px; display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; align-items:center; font-size:13px; }
+  .pied-bas p { margin:0; }
+  .paiements { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+  .paiements .moyen { display:inline-flex; gap:6px; align-items:center; }
+  .paiements svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
+  .site-pied .demo { margin:10px 0 0; color:#9a9aa6; }
+  /* Fiche d'événement */
+  .sheet.large { max-width:760px; }
+  .sheet.etroit { max-width:520px; }
+  .faits { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:10px 0; }
+  .faits div { background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:8px 10px; font-size:13px; }
+  .faits b { display:block; font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; margin-bottom:2px; }
+  .st { font-size:14px; margin:14px 0 6px; font-family: Georgia, serif; color:var(--c2); }
+  .prog, .interv { list-style:none; margin:0; padding:0; display:grid; gap:6px; }
+  .prog li { display:flex; gap:12px; font-size:14px; }
+  .prog b { min-width:58px; color:var(--c1); }
+  .interv li { display:flex; gap:10px; align-items:center; font-size:14px; }
+  .interv small { display:block; color:var(--muted); font-size:12px; }
+  .interv .rond { width:34px; height:34px; font-size:15px; flex-basis:34px; }
+  .resa { margin-top:16px; border-top:2px solid var(--c1); padding-top:12px; }
+  .resa h3 { margin:0 0 6px; font-family: Georgia, serif; font-size:17px; }
+  .etapes { display:flex; gap:8px; list-style:none; margin:10px 0 12px; padding:0; }
+  .etapes li { flex:1; display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted); }
+  .etapes li span { width:26px; height:26px; border-radius:50%; background:#eee9e1; display:grid; place-items:center; font-weight:700; color:var(--text); flex:0 0 26px; }
+  .etapes li[aria-current="step"] { color:var(--text); font-weight:700; }
+  .etapes li[aria-current="step"] span { background:var(--c1); color:#fff; }
+  .etapes li.fait span { background:var(--c2); color:#fff; }
+  .typesb { list-style:none; margin:0; padding:0; }
+  .typesb li { display:grid; grid-template-columns:1fr auto auto; gap:12px; align-items:center; padding:10px 0; border-bottom:1px solid var(--line); }
+  .typesb small { display:block; color:var(--muted); font-size:12px; }
+  .recap { list-style:none; margin:10px 0; padding:0; display:grid; gap:6px; }
+  .recap li { display:flex; justify-content:space-between; font-size:14px; }
+  .recap .tot { font-weight:700; font-size:17px; border-top:1px solid var(--line); padding-top:8px; }
+  .promo { display:flex; gap:8px; }
+  .promo input { flex:1; min-width:0; }
+  .rang { display:flex; gap:10px; margin-top:12px; flex-wrap:wrap; }
+  .lbl { font-size:14px; }
+  .lignes { list-style:none; margin:0; padding:0; }
+  .lignes li { display:grid; grid-template-columns:1fr auto; gap:10px; align-items:center; padding:10px 0; border-bottom:1px solid var(--line); }
+  .lignes small { display:block; color:var(--muted); font-size:13px; }
+  /* Rubriques et modes */
+  .modes { display:grid; gap:8px; margin:6px 0 4px; }
+  .mode { text-align:left; border:1px solid var(--line); background:#fff; border-radius:10px; padding:11px 13px; cursor:pointer; color:var(--text); font:inherit; }
+  .mode[aria-pressed="true"] { border-color:var(--c1); box-shadow:0 0 0 1px var(--c1); }
+  .mode b { display:flex; justify-content:space-between; align-items:center; font-size:14px; }
+  .mode svg { opacity:0; width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+  .mode[aria-pressed="true"] svg { opacity:1; color:var(--c1); }
+  .mode .d { display:block; font-size:13px; color:var(--muted); margin-top:2px; }
+  .mode-titre { font-size:14px; margin:16px 0 6px; }
+  .mode-etat { font-size:13px; color:var(--muted); margin:4px 0 0; }
+  .sw-liste { list-style:none; margin:0; padding:0; }
+  .sw-ligne { display:flex; justify-content:space-between; gap:12px; align-items:center; padding:10px 0; border-top:1px solid var(--line); }
+  .sw-ligne .d { display:block; font-size:13px; color:var(--muted); }
+  .sw { width:48px; height:28px; border-radius:999px; border:0; background:#c4c4cc; position:relative; cursor:pointer; flex:0 0 48px; }
+  .sw::after { content:""; position:absolute; top:4px; left:4px; width:20px; height:20px; border-radius:50%; background:#fff; transition:left .15s; }
+  .sw[aria-checked="true"] { background:var(--c1); }
+  .sw[aria-checked="true"]::after { left:24px; }
+  .rub-actions { display:flex; gap:10px; justify-content:flex-end; margin-top:14px; flex-wrap:wrap; }
+  .sheet .close svg { width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; }
+  :focus-visible { outline:3px solid var(--c1); outline-offset:2px; }
+  @media (max-width: 900px) { .apropos { grid-template-columns:1fr; } .pied-grille { grid-template-columns:1fr 1fr; } .faits { grid-template-columns:1fr; } }
+  @media (max-width: 560px) { .pied-grille { grid-template-columns:1fr; } .typesb li { grid-template-columns:1fr auto; } .typesb .qty { grid-column:1 / -1; justify-self:start; } .lettre form { margin-left:0; width:100%; } .lettre input { flex:1; min-width:0; } }
 </style>
 </head>
 <body>
@@ -64,31 +237,220 @@
 <script src="exemple-commun.js"></script>
 <header class="top">
   <h1 id="shopName"></h1>
-  <button id="openMine">Mes inscriptions (<span id="mineCount">0</span>)</button>
+  <button class="rubbtn" type="button" id="openRub" aria-label="Choisir les rubriques de la boutique (exemple)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>Rubriques</button>
+  <button id="openMine" data-rub="inscriptions billetterie">Mes inscriptions (<span id="mineCount">0</span>)</button>
 </header>
-<section class="hero"><h2 id="shopTitle"></h2><p id="shopSlogan"></p></section>
+<nav class="subnav" id="navRub" aria-label="Rubriques de la page"></nav>
+
+<section class="hero" id="accueil" data-rub="accueil">
+  <h2 id="shopTitle"></h2><p id="shopSlogan"></p>
+  <div class="pills">
+    <span class="pill" data-rub="inscriptions billetterie">Réservation en quelques clics</span>
+    <span class="pill" data-rub="billetterie">Billet nominatif et place garantie</span>
+    <span class="pill">Rappel avant l'événement</span>
+  </div>
+</section>
 
 <main class="wrap">
   <div class="note" id="typeNote" style="display:none"></div>
-  <div class="chips" id="cats"></div>
-  <h2 class="sectitle" id="sectMain"></h2>
-  <div class="list" id="list"></div>
-  <p class="demo">Maquette : événements fictifs. Les inscriptions et billets sont simulés, aucun paiement n'est effectué.</p>
+
+  <div id="catalogue" data-rub="evenements">
+    <div class="recherche" role="search">
+      <label class="champ" for="q">Rechercher un événement
+        <input type="search" id="q" placeholder="Titre, lieu ou thème" autocomplete="off">
+      </label>
+      <label for="fMois">Mois <select id="fMois"></select></label>
+      <label for="fFormat">Format
+        <select id="fFormat">
+          <option value="all">Tous les formats</option>
+          <option value="presentiel">Sur place</option>
+          <option value="ligne">En ligne</option>
+        </select>
+      </label>
+      <label for="fPrix" data-rub="billetterie">Prix
+        <select id="fPrix">
+          <option value="all">Tous les prix</option>
+          <option value="gratuit">Gratuit</option>
+          <option value="payant">Payant</option>
+        </select>
+      </label>
+      <label for="tri">Trier par
+        <select id="tri">
+          <option value="date">Date (les plus proches)</option>
+          <option value="prix-asc">Prix croissant</option>
+          <option value="prix-desc">Prix décroissant</option>
+          <option value="places">Places restantes</option>
+        </select>
+      </label>
+    </div>
+    <div class="barre">
+      <div class="chips" id="cats" role="group" aria-label="Catégories"></div>
+      <div class="vues" role="group" aria-label="Affichage">
+        <button type="button" id="vueListe" aria-pressed="true">Liste</button>
+        <button type="button" id="vueCartes" aria-pressed="false">Cartes</button>
+      </div>
+    </div>
+    <div class="actifs" id="actifs" aria-live="polite"></div>
+    <h2 class="sectitle" id="sectMain"><span id="sectTxt"></span><small id="sectCount"></small></h2>
+    <div id="liste"></div>
+    <div class="pied" id="pied"></div>
+  </div>
+
+  <section class="bloc" id="apropos" data-rub="apropos" aria-labelledby="aproposTitre">
+    <div class="apropos">
+      <div>
+        <h2 id="aproposTitre">À propos de l'organisation</h2>
+        <p>Nous organisons des rencontres, des ateliers, des soirées culturelles et des formations pour les membres de la communauté, partout où ils vivent. Chaque événement est pensé pour se retrouver, apprendre ensemble et faire vivre nos cultures.</p>
+        <p>Les événements se déroulent sur place, dans des lieux accessibles, ou en ligne pour celles et ceux qui sont loin. Les bénéfices servent à financer des places solidaires.</p>
+        <div class="chiffres" id="chiffres"></div>
+      </div>
+      <div class="apropos-art" id="aproposArt" role="img" aria-label="Image de présentation de l'organisation"></div>
+    </div>
+  </section>
+
+  <section class="bloc" id="intervenants" data-rub="intervenants" aria-labelledby="intervTitre">
+    <div class="bloc-tete">
+      <div><h2 id="intervTitre">Les intervenants</h2><p>Artistes, formateurs et animateurs que vous retrouverez sur nos événements.</p></div>
+      <button class="lien" type="button" id="intervPlus" aria-expanded="false">Voir tous les intervenants</button>
+    </div>
+    <div class="intervs" id="intervListe"></div>
+  </section>
+
+  <section class="bloc" id="avis" data-rub="avis" aria-labelledby="avisTitre">
+    <div class="bloc-tete">
+      <div><h2 id="avisTitre">Avis des participants</h2><div class="note-moy" id="noteMoy"></div></div>
+      <button class="lien" type="button" id="avisPlus" aria-expanded="false">Voir tous les avis</button>
+    </div>
+    <div class="avis-liste" id="avisListe"></div>
+  </section>
+
+  <section class="bloc" id="newsletter" data-rub="newsletter" aria-labelledby="newsTitre">
+    <div class="lettre">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>
+      <div><h3 id="newsTitre">Recevez l'agenda chaque mois</h3><p>Les prochains événements et les places solidaires, dans votre boîte de réception.</p></div>
+      <form id="newsForm" novalidate>
+        <label class="sr" for="newsMail">Votre adresse e-mail</label>
+        <input type="email" id="newsMail" name="mail" placeholder="Votre adresse e-mail" autocomplete="email">
+        <button type="submit">Je m'abonne</button>
+      </form>
+    </div>
+    <p class="aide" id="newsMsg" role="status"></p>
+  </section>
 </main>
 
-<!-- Inscription / billetterie -->
-<div class="overlay" id="evOv" role="dialog" aria-modal="true">
-  <div class="sheet">
-    <button class="close" data-close aria-label="Fermer">×</button>
+<footer class="site-pied" id="contact" aria-label="Bas de page">
+  <div class="pied-in">
+    <div class="pied-grille">
+      <div>
+        <div class="logo-pied"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span id="piedNom"></span></div>
+        <p>L'agenda en ligne de la communauté : ateliers, rencontres, concerts et formations, ici et à distance.</p>
+        <div class="reseaux" role="group" aria-label="Réseaux sociaux (liens fictifs)">
+          <button type="button" data-pied="Instagram" aria-label="Instagram (lien fictif)"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17" cy="7" r=".6"/></svg></button>
+          <button type="button" data-pied="Facebook" aria-label="Facebook (lien fictif)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 8.5h2.5V5H14c-2.2 0-3.5 1.5-3.5 3.6V11H8v3.5h2.5V21H14v-6.5h2.4l.6-3.5H14V9.2c0-.5.2-.7.5-.7z"/></svg></button>
+          <button type="button" data-pied="YouTube" aria-label="YouTube (lien fictif)"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="5.5" width="19" height="13" rx="4"/><path d="M10 9.5v5l4.5-2.5z"/></svg></button>
+          <button type="button" data-pied="Messagerie" aria-label="Messagerie (lien fictif)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l1.3-4.2A8 8 0 1 1 8.2 18.7z"/></svg></button>
+        </div>
+      </div>
+      <nav data-rub="evenements" aria-label="Explorer">
+        <h4>Explorer</h4>
+        <ul>
+          <li><button type="button" data-aller="liste">Prochains événements</button></li>
+          <li><button type="button" data-aller="cartes">Vue en cartes</button></li>
+          <li data-rub="inscriptions billetterie"><button type="button" data-aller="mine">Mes inscriptions</button></li>
+          <li><button type="button" data-pied="Proposer un événement">Proposer un événement</button></li>
+        </ul>
+      </nav>
+      <nav data-rub="evenements" aria-label="Catégories d'événements">
+        <h4>Catégories</h4>
+        <ul id="piedCats"></ul>
+      </nav>
+      <nav data-rub="billetterie" aria-label="Informations">
+        <h4>Informations</h4>
+        <ul>
+          <li><button type="button" data-pied="Billetterie et remboursements">Billetterie et remboursements</button></li>
+          <li><button type="button" data-pied="Accès et accessibilité">Accès et accessibilité</button></li>
+          <li><button type="button" data-pied="Paiement sécurisé">Paiement sécurisé</button></li>
+          <li><button type="button" data-pied="Questions fréquentes">Questions fréquentes</button></li>
+        </ul>
+      </nav>
+      <div data-rub="contact">
+        <h4>Nous contacter</h4>
+        <p>Une question sur un événement, une réservation à modifier, un lieu à proposer ? L'équipe répond sous 48 heures.</p>
+        <address>Toulouse, France<br>Du lundi au vendredi, de 9 h à 18 h</address>
+        <button type="button" class="ecrire" data-aller="contact">Nous écrire</button>
+      </div>
+    </div>
+    <div class="pied-bas">
+      <p>© 2026 <span id="piedNom2"></span>. Tous droits réservés.</p>
+      <ul class="paiements" data-rub="billetterie" aria-label="Moyens de paiement acceptés (exemple)">
+        <li>Paiement accepté :</li>
+        <li class="moyen"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M3 10h18M7 15h3"/></svg>Carte bancaire</li>
+        <li class="moyen"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/></svg>Mobile Money</li>
+        <li class="moyen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10l9-6 9 6M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18"/></svg>Virement</li>
+      </ul>
+    </div>
+    <p class="demo">Maquette : événements, lieux et intervenants fictifs. Les inscriptions, les billets, les paiements, les réseaux sociaux et les messages sont simulés et ne sont envoyés nulle part.</p>
+  </div>
+</footer>
+
+<!-- Fiche d'événement : détails, programme, réservation en 3 étapes -->
+<div class="overlay" id="evOv" role="dialog" aria-modal="true" aria-labelledby="eTitle">
+  <div class="sheet large">
+    <button class="close" type="button" data-close aria-label="Fermer la fiche">×</button>
     <h2 id="eTitle"></h2>
-    <div class="meta" id="eMeta"></div>
-    <p id="eDesc"></p>
-    <div class="tabs" id="eTabs"></div>
     <div id="eBody"></div>
   </div>
 </div>
 
-<div class="toast" id="toast"></div>
+<!-- Mes inscriptions -->
+<div class="overlay" id="mineOv" role="dialog" aria-modal="true" aria-labelledby="mineTitle">
+  <div class="sheet etroit">
+    <button class="close" type="button" data-close aria-label="Fermer mes inscriptions">×</button>
+    <h2 id="mineTitle">Mes inscriptions</h2>
+    <div id="mineBody"></div>
+  </div>
+</div>
+
+<!-- Nous écrire (simulé) -->
+<div class="overlay" id="contactOv" role="dialog" aria-modal="true" aria-labelledby="contactTitre">
+  <div class="sheet etroit">
+    <button class="close" type="button" data-close aria-label="Fermer le formulaire de contact">×</button>
+    <h2 id="contactTitre">Nous écrire</h2>
+    <p class="aide" style="margin:0 0 10px">Ce message est simulé : il n'est envoyé nulle part.</p>
+    <form class="form" id="contactForm" novalidate>
+      <label>Nom et prénom<input type="text" name="nom" autocomplete="name"></label>
+      <label>Adresse e-mail<input type="email" name="email" autocomplete="email"></label>
+      <label>Sujet
+        <select name="sujet">
+          <option>Une question sur un événement</option>
+          <option>Modifier ou annuler une réservation</option>
+          <option>Proposer un lieu ou un événement</option>
+          <option>Autre demande</option>
+        </select>
+      </label>
+      <label>Message<textarea name="message"></textarea></label>
+      <p class="aide" id="contactErr" role="alert" style="color:var(--alerte);margin:0"></p>
+      <button class="btn" type="submit">Envoyer le message (simulé)</button>
+    </form>
+  </div>
+</div>
+
+<!-- Choix des rubriques (maquette) -->
+<div class="overlay" id="rubOv" role="dialog" aria-modal="true" aria-labelledby="rubTitre">
+  <div class="sheet">
+    <button class="close" type="button" data-close aria-label="Fermer">×</button>
+    <h2 id="rubTitre" style="margin:0 0 4px">Rubriques de la boutique</h2>
+    <p class="aide" style="margin:0">Choisissez un mode, puis ajustez au besoin chaque rubrique : la page se met à jour tout de suite. Dans une vraie boutique, ce réglage est dans « Paramètres vitrine », onglet « Navigation et rubriques ».</p>
+    <h3 class="mode-titre">Mode de la boutique</h3>
+    <div class="modes" id="modeListe" role="group" aria-label="Mode de la boutique"></div>
+    <p class="mode-etat" id="modeEtat" aria-live="polite"></p>
+    <h3 class="mode-titre">Rubriques</h3>
+    <ul class="sw-liste" id="rubListe"></ul>
+    <div class="rub-actions"><button class="btn ghost" type="button" id="rubTout">Tout activer</button><button class="btn" type="button" data-close>Terminer</button></div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
   const SHOP_DEFAULT = {
@@ -102,31 +464,138 @@
   })();
   const TYPE_LABELS = { video: "Boutique Vidéo", ecom: "Boutique Traditionnelle", portfolio: "Portfolio", events: "Créateur d'événements", impact: "Projet Impact" };
 
-  // Événements de démonstration (fictifs)
+  const ico = (d) => '<svg viewBox="0 0 24 24" aria-hidden="true">' + d + "</svg>";
+  const ICO = {
+    coeur: ico('<path d="M12 20s-7-4.6-9-9.2C1.6 7.4 3.7 4 7 4c2 0 3.4 1 5 3 1.6-2 3-3 5-3 3.3 0 5.4 3.4 4 6.8-2 4.6-9 9.2-9 9.2z"/>'),
+    croix: ico('<path d="M6 6l12 12M18 6L6 18"/>'),
+    gauche: ico('<path d="M15 5l-7 7 7 7"/>'), droite: ico('<path d="M9 5l7 7-7 7"/>'),
+    coche: ico('<path d="M5 12.5l4.5 4.5L19 7"/>'),
+    etoile: ico('<path d="M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.6 6.6 19.5l1.2-6L3.3 9.3l6.1-.7z"/>')
+  };
+
+  /* ── Événements de démonstration (fictifs) ── */
+  const P = {
+    braise: ["#4a1208", "#c8531f"], nuit: ["#0b1534", "#2a4a8a"], vin: ["#3a0d1c", "#83172f"], foret: ["#0e2a22", "#1f6b55"],
+    indigo: ["#14234a", "#3b5fb0"], terre: ["#3b1f12", "#a85a2a"], aube: ["#17325a", "#e0795a"], neon: ["#0a0f24", "#26577a"]
+  };
   const EVENTS = [
-    { id: 1, t: "Atelier cuisine : saveurs d'Afrique de l'Ouest", month: 11, day: 15, time: "18 h 30", place: "Salle communautaire, Toulouse", cat: "ateliers", price: 12, seats: 20, sold: 14, desc: "Un atelier pratique pour préparer trois plats simples, du marché à l'assiette.", mode: "billet" },
-    { id: 2, t: "Rencontre des entrepreneurs de la diaspora", month: 11, day: 22, time: "14 h 00", place: "Espace Coworking Centre", cat: "rencontres", price: 0, seats: 40, sold: 31, desc: "Échanges, présentation de projets et temps de réseau. Entrée libre sur inscription.", mode: "inscription" },
-    { id: 3, t: "Soirée de contes et musique", month: 12, day: 6, time: "20 h 00", place: "Théâtre municipal", cat: "culture", price: 8, seats: 120, sold: 120, desc: "Une soirée de contes traditionnels accompagnés de musique live.", mode: "billet" },
-    { id: 4, t: "Forum des associations", month: 12, day: 13, time: "10 h 00", place: "Halle des sports", cat: "rencontres", price: 0, seats: 200, sold: 58, desc: "Rencontre avec une trentaine d'associations locales, stands et démonstrations.", mode: "inscription" }
+    { id: 1, t: "Atelier cuisine : saveurs d'Afrique de l'Ouest", cat: "ateliers", fmt: "presentiel", y: 2026, m: 11, d: 15, time: "18 h 30", end: "21 h 00", place: "Salle communautaire", city: "Toulouse", price: 12, seats: 20, sold: 14, mode: "billet", pal: P.braise,
+      desc: "Un atelier pratique pour préparer trois plats simples, du marché à l'assiette. Chaque participant repart avec les recettes et partage le repas préparé ensemble.",
+      prog: [["18 h 30", "Accueil et présentation des produits"], ["19 h 00", "Préparation des trois plats en petits groupes"], ["20 h 15", "Repas partagé"], ["20 h 45", "Remise des recettes"]],
+      interv: [["Mariam Cissé", "Cheffe cuisinière"], ["Idrissa Barry", "Animateur de l'atelier"]], duree: "2 h 30", acces: "Tramway, arrêt Mairie. Salle de plain-pied.", langue: "Français" },
+    { id: 2, t: "Rencontre des entrepreneurs de la diaspora", cat: "rencontres", fmt: "presentiel", y: 2026, m: 11, d: 22, time: "14 h 00", end: "18 h 00", place: "Espace Coworking Centre", city: "Lyon", price: 0, seats: 40, sold: 31, mode: "inscription", pal: P.indigo,
+      desc: "Échanges, présentation de projets et temps de réseau. Entrée libre sur inscription, pour faire connaissance et trouver des partenaires.",
+      prog: [["14 h 00", "Accueil et café"], ["14 h 30", "Présentations de projets (5 minutes chacun)"], ["16 h 00", "Ateliers de mise en relation"], ["17 h 15", "Réseau libre"]],
+      interv: [["Awa Camara", "Animatrice"], ["Koffi Mensah", "Entrepreneur invité"]], duree: "4 h 00", acces: "Métro ligne A, station Centre. Accessible fauteuil roulant.", langue: "Français" },
+    { id: 3, t: "Soirée de contes et musique", cat: "culture", fmt: "presentiel", y: 2026, m: 12, d: 6, time: "20 h 00", end: "22 h 30", place: "Théâtre municipal", city: "Bordeaux", price: 8, seats: 120, sold: 120, mode: "billet", pal: P.nuit,
+      desc: "Une soirée de contes traditionnels accompagnés de musique live à la kora et aux percussions. Une veillée pour toute la famille.",
+      prog: [["20 h 00", "Ouverture et premier conte"], ["20 h 45", "Interlude musical"], ["21 h 15", "Contes d'ailleurs, contes d'ici"], ["22 h 00", "Finale musicale"]],
+      interv: [["Sory Kouyaté", "Joueur de kora"], ["Aïcha Ndiaye", "Conteuse"]], duree: "2 h 30", acces: "Bus 12 et 24, arrêt Théâtre. Places réservées aux personnes à mobilité réduite.", langue: "Français" },
+    { id: 4, t: "Forum des associations", cat: "rencontres", fmt: "presentiel", y: 2026, m: 12, d: 13, time: "10 h 00", end: "17 h 00", place: "Halle des sports", city: "Nantes", price: 0, seats: 200, sold: 58, mode: "inscription", pal: P.foret,
+      desc: "Rencontre avec une trentaine d'associations locales, stands, démonstrations et petite restauration sur place.",
+      prog: [["10 h 00", "Ouverture des stands"], ["11 h 30", "Démonstrations et animations"], ["13 h 00", "Pause déjeuner"], ["15 h 00", "Table ronde : s'engager près de chez soi"]],
+      interv: [["Collectif Tisserands", "Association hôte"], ["Nadia Benali", "Modératrice"]], duree: "7 h 00", acces: "Tram 1, arrêt Halle des sports. Parking gratuit.", langue: "Français" },
+    { id: 5, t: "Masterclass : financer son projet", cat: "formations", fmt: "ligne", y: 2026, m: 11, d: 28, time: "17 h 00", end: "19 h 00", place: "Visioconférence", city: "En ligne", price: 25, seats: 60, sold: 41, mode: "billet", pal: P.neon,
+      desc: "Deux heures pour comprendre les sources de financement d'un projet : subventions, prêts d'honneur, financement participatif. Questions en direct.",
+      prog: [["17 h 00", "Panorama des financements"], ["17 h 45", "Monter un dossier solide"], ["18 h 30", "Questions et réponses"]],
+      interv: [["Yaw Boateng", "Conseiller en financement"]], duree: "2 h 00", acces: "Lien de connexion envoyé par e-mail après l'inscription. Replay disponible 7 jours.", langue: "Français" },
+    { id: 6, t: "Atelier wax : créer son foulard", cat: "ateliers", fmt: "presentiel", y: 2026, m: 12, d: 9, time: "15 h 00", end: "17 h 30", place: "Atelier des Tisseurs", city: "Paris", price: 30, seats: 12, sold: 9, mode: "billet", pal: P.vin,
+      desc: "Découvrez les motifs wax et réalisez votre propre foulard, de la découpe à l'ourlet. Matériel fourni, repartez avec votre création.",
+      prog: [["15 h 00", "Histoire et symboles des motifs"], ["15 h 30", "Choix du tissu et découpe"], ["16 h 15", "Couture de l'ourlet"], ["17 h 15", "Présentation des créations"]],
+      interv: [["Fatou Koné", "Créatrice textile"]], duree: "2 h 30", acces: "Métro ligne 9, station Voltaire. Escalier, pas d'ascenseur.", langue: "Français" },
+    { id: 7, t: "Conférence : transmettre sa langue aux enfants", cat: "formations", fmt: "presentiel", y: 2026, m: 12, d: 18, time: "19 h 00", end: "21 h 00", place: "Médiathèque centrale", city: "Marseille", price: 0, seats: 80, sold: 22, mode: "inscription", pal: P.indigo,
+      desc: "Des chercheurs et des parents racontent comment transmettre la langue familiale dans un environnement multilingue. Temps d'échange avec la salle.",
+      prog: [["19 h 00", "Introduction"], ["19 h 20", "Retours d'expérience de familles"], ["20 h 00", "Échange avec la salle"]],
+      interv: [["Dr Aïssata Diop", "Linguiste"], ["Moussa Traoré", "Père de famille, témoin"]], duree: "2 h 00", acces: "Métro ligne 2, station Médiathèque. Accessible fauteuil roulant.", langue: "Français" },
+    { id: 8, t: "Nuit des talents de la diaspora", cat: "culture", fmt: "presentiel", y: 2027, m: 1, d: 16, time: "19 h 30", end: "23 h 00", place: "Salle des fêtes", city: "Lille", price: 15, seats: 150, sold: 142, mode: "billet", pal: P.vin,
+      desc: "Chant, danse, poésie et humour : douze artistes amateurs et professionnels se succèdent sur scène pour une soirée festive.",
+      prog: [["19 h 30", "Ouverture des portes"], ["20 h 00", "Première partie"], ["21 h 15", "Entracte"], ["21 h 45", "Seconde partie et remise du prix du public"]],
+      interv: [["Aïcha Ndiaye", "Maîtresse de cérémonie"], ["Collectif Rythmes", "Orchestre"]], duree: "3 h 30", acces: "Métro ligne 1, station Gare. Parking à proximité.", langue: "Français" },
+    { id: 9, t: "Webinaire : réussir son installation à l'étranger", cat: "formations", fmt: "ligne", y: 2026, m: 11, d: 19, time: "18 h 00", end: "19 h 30", place: "Visioconférence", city: "En ligne", price: 0, seats: 300, sold: 174, mode: "inscription", pal: P.aube,
+      desc: "Démarches, logement, emploi : les bons réflexes pour s'installer sereinement. Retours de membres de la communauté et temps de questions.",
+      prog: [["18 h 00", "Les démarches essentielles"], ["18 h 40", "Logement et emploi : témoignages"], ["19 h 10", "Questions en direct"]],
+      interv: [["Nadia Benali", "Conseillère"], ["Issa Ouédraogo", "Témoin"]], duree: "1 h 30", acces: "Lien de connexion envoyé par e-mail après l'inscription.", langue: "Français" },
+    { id: 10, t: "Festival des saveurs et des musiques", cat: "festivals", fmt: "presentiel", y: 2027, m: 1, d: 30, time: "11 h 00", end: "22 h 00", place: "Parc des Expositions", city: "Strasbourg", price: 18, seats: 600, sold: 410, mode: "billet", pal: P.terre,
+      desc: "Une journée de concerts, de cuisines du monde, d'artisanat et d'animations pour les enfants. Venez en famille, restez pour le concert de clôture.",
+      prog: [["11 h 00", "Ouverture, marché et cuisines"], ["14 h 00", "Concerts de l'après-midi"], ["17 h 00", "Spectacle pour enfants"], ["19 h 30", "Concert de clôture"]],
+      interv: [["Sory Kouyaté", "Tête d'affiche"], ["Mariam Cissé", "Cheffe invitée"]], duree: "11 h 00", acces: "Tram B, arrêt Parc des Expositions. Parking payant.", langue: "Français" }
   ];
   const CATS = [
-    { id: "all", label: "Tous" }, { id: "ateliers", label: "Ateliers" }, { id: "rencontres", label: "Rencontres" }, { id: "culture", label: "Culture" }
+    { id: "all", label: "Tous", ic: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>' },
+    { id: "ateliers", label: "Ateliers", ic: '<path d="M14 4l6 6-9 9H5v-6z"/><path d="M12 6l6 6"/>' },
+    { id: "rencontres", label: "Rencontres", ic: '<circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3 20c0-3.5 2.7-6 6-6s6 2.5 6 6M15 15c3 0 6 1.5 6 5"/>' },
+    { id: "culture", label: "Culture", ic: '<path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/>' },
+    { id: "formations", label: "Formations", ic: '<path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11.5V16c0 1.5 3 3 6 3s6-1.5 6-3v-4.5"/>' },
+    { id: "festivals", label: "Festivals", ic: '<circle cx="12" cy="14" r="5"/><path d="M12 2v4M4 8l3 2M20 8l-3 2M2 15h3M19 15h3"/>' }
   ];
-  const MONTHS = ["", "janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
+  const CAT_LABEL = Object.fromEntries(CATS.map(c => [c.id, c.label]));
+  const MOIS = ["", "janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
+  const JOURS = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
   const fmt = (n) => n === 0 ? "Gratuit" : n.toFixed(2).replace(".", ",") + " €";
-
-  const state = { cat: "all", current: null, tab: "billet", qty: 1, mine: new Map() }; // mine : id -> { places, mode }
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const $ = (s) => document.querySelector(s);
-  function toast(m) { const t = $("#toast"); t.textContent = m; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 2400); }
+  const dateDe = (e) => new Date(e.y, e.m - 1, e.d);
+  const jourDe = (e) => JOURS[dateDe(e).getDay()];
+  const dateLongue = (e) => jourDe(e) + " " + e.d + " " + MOIS[e.m] + " " + e.y;
+  const cleMois = (e) => e.y * 100 + e.m;
+  const libMois = (k) => MOIS[k % 100] + " " + Math.floor(k / 100);
+  const lieuDe = (e) => e.fmt === "ligne" ? "En ligne" : e.place + ", " + e.city;
+  const initiale = (n) => n.replace(/^(Dr|Collectif)\s+/, "").charAt(0);
+  function toast(m) { const t = $("#toast"); t.textContent = m; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 2800); }
+  function lire(k, def) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : def; } catch (e) { return def; } }
+  function ecrire(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+
+  /* État : réservations et favoris gardés sur cet appareil (stockage isolé par exemple-commun.js) */
+  const state = {
+    cat: "all", q: "", mois: "all", format: "all", prix: "all", tri: "date", vue: "liste", page: 1, parPage: 6, fav: false,
+    favs: new Set(lire("ev_ex_favs", [])),
+    mine: new Map(lire("ev_ex_mine", [])),   // id -> { places, ref, … }
+    navCur: "", current: null, sel: {}, etape: 1, coord: { nom: "", email: "" }, promo: null, ouvreur: null
+  };
+  lire("ev_ex_ventes", []).forEach(([id, n]) => { const e = EVENTS.find(x => x.id === id); if (e) e.sold += n; });
+  function memoriser() {
+    ecrire("ev_ex_favs", [...state.favs]); ecrire("ev_ex_mine", [...state.mine]);
+    ecrire("ev_ex_ventes", [...state.mine].map(([id, m]) => [id, m.places]));
+    $("#mineCount").textContent = state.mine.size;
+  }
+
+  /* ── Rubriques activables (9) : chacune s'affiche ou se masque, la page suit ── */
+  const RUBS = [
+    { id: "accueil", nom: "Accueil", desc: "Bandeau d'accueil, présentation et garanties." },
+    { id: "evenements", nom: "Événements", desc: "La liste des événements, les cartes, la recherche et les filtres." },
+    { id: "inscriptions", nom: "Inscriptions", desc: "Réserver sa place gratuitement. Sans inscriptions ni billetterie, la page se consulte seulement." },
+    { id: "billetterie", nom: "Billetterie", desc: "Prix, types de billets et paiement. Désactivée, plus aucun prix : les inscriptions restent gratuites." },
+    { id: "apropos", nom: "À propos", desc: "Présentation de l'organisation et chiffres clés." },
+    { id: "intervenants", nom: "Intervenants", desc: "Les artistes, formateurs et animateurs des événements." },
+    { id: "avis", nom: "Avis", desc: "Avis des participants et note moyenne." },
+    { id: "contact", nom: "Contact", desc: "Coordonnées et formulaire de message, en bas de page." },
+    { id: "newsletter", nom: "Newsletter", desc: "Bande d'inscription à la lettre d'information (sans entrée dans le menu)." }
+  ];
+  /* Modes : des préréglages complets des 9 rubriques (liste explicite, pour qu'aucune rubrique ne dépende d'une autre). */
+  const MODES = [
+    { id: "seuls", nom: "Événements seuls", desc: "Consulter l'agenda, les programmes et les intervenants. Ni réservation, ni prix.",
+      rub: { accueil: true, evenements: true, inscriptions: false, billetterie: false, apropos: true, intervenants: true, avis: true, contact: true, newsletter: true } },
+    { id: "inscription", nom: "Événements avec inscription", desc: "Réserver sa place gratuitement, sans prix ni paiement.",
+      rub: { accueil: true, evenements: true, inscriptions: true, billetterie: false, apropos: true, intervenants: true, avis: true, contact: true, newsletter: true } },
+    { id: "billetterie", nom: "Événements avec billetterie", desc: "Tout, y compris les prix, les types de billets et le paiement.",
+      rub: { accueil: true, evenements: true, inscriptions: true, billetterie: true, apropos: true, intervenants: true, avis: true, contact: true, newsletter: true } }
+  ];
+  let rub = lire("ev_ex_rubriques", {});
+  const modeActuel = () => MODES.find(m => Object.keys(m.rub).every(k => (rub[k] !== false) === m.rub[k]));
+  const rubOn = (k) => rub[k] !== false;
+  const payantOn = () => rubOn("billetterie");
+  const reservOn = () => rubOn("inscriptions") || rubOn("billetterie");
+  const estBillet = (e) => e.mode === "billet" && payantOn();
 
   (function applyShop() {
     const r = document.documentElement.style;
     r.setProperty("--c1", SHOP.colors[0]); r.setProperty("--c2", SHOP.colors[1]); r.setProperty("--c3", SHOP.colors[2]);
     document.title = SHOP.name + " · " + TYPE_LABELS[SHOP.main];
-    $("#shopName").innerHTML = `${SHOP.name} <em>${TYPE_LABELS[SHOP.main]}</em>`;
+    $("#shopName").innerHTML = `${esc(SHOP.name)} <em>${TYPE_LABELS[SHOP.main]}</em>`;
     $("#shopTitle").textContent = SHOP.name;
     $("#shopSlogan").textContent = SHOP.slogan;
-    $("#sectMain").textContent = SHOP.sections[0] || "Nos prochains événements";
+    $("#sectTxt").textContent = SHOP.sections[0] || "Nos prochains événements";
+    ["#piedNom", "#piedNom2"].forEach(sel => { $(sel).textContent = SHOP.name; });
     const on = SHOP.main === "events" || SHOP.options.includes("events");
     if (!on) {
       $("#typeNote").style.display = "";
@@ -134,101 +603,422 @@
     }
   })();
 
-  function seatsLeft(e) { return e.seats - e.sold; }
-  function status(e) {
-    const left = seatsLeft(e);
-    if (left <= 0) return `<span class="full">Complet</span>`;
-    if (left <= 5) return `<span class="left">Plus que ${left} place(s)</span>`;
-    return `<span class="meta">${left} place(s) disponibles</span>`;
+  /* ── Filtres, tri, rendu ── */
+  const placesRestantes = (e) => e.seats - e.sold;
+  function etat(e) {
+    const r = placesRestantes(e);
+    if (reservOn() && r <= 0) return { txt: "Complet", alerte: true };
+    if (reservOn() && r <= 5) return { txt: "Plus que " + r + " place" + (r > 1 ? "s" : ""), alerte: true };
+    if (e.fmt === "ligne") return { txt: "En ligne", alerte: false };
+    return null;
+  }
+  function filtrer() {
+    const q = state.q.trim().toLowerCase();
+    const l = EVENTS.filter(e =>
+      (state.cat === "all" || e.cat === state.cat) &&
+      (state.mois === "all" || String(cleMois(e)) === state.mois) &&
+      (state.format === "all" || e.fmt === state.format) &&
+      (state.prix === "all" || !payantOn() || (state.prix === "gratuit" ? e.price === 0 : e.price > 0)) &&
+      (!state.fav || state.favs.has(e.id)) &&
+      (!q || (e.t + " " + e.place + " " + e.city + " " + e.desc + " " + CAT_LABEL[e.cat] + " " + e.interv.map(p => p[0]).join(" ")).toLowerCase().includes(q)));
+    const t = state.tri;
+    l.sort((a, b) => t === "prix-asc" ? a.price - b.price : t === "prix-desc" ? b.price - a.price : t === "places" ? placesRestantes(b) - placesRestantes(a) : dateDe(a) - dateDe(b));
+    return l;
+  }
+  function optionsMois() {
+    const cles = [...new Set(EVENTS.map(cleMois))].sort();
+    $("#fMois").innerHTML = '<option value="all">Tous les mois</option>' + cles.map(k => `<option value="${k}">${libMois(k)}</option>`).join("");
+  }
+  function libBouton(e) {
+    const resa = reservOn();
+    return state.mine.has(e.id) ? "Voir mon billet" : !resa ? "Voir le programme" : placesRestantes(e) <= 0 ? "Liste d'attente" : estBillet(e) ? "Réserver" : "S'inscrire";
+  }
+  const coeurHtml = (e) => `<button class="coeur" type="button" data-fav="${e.id}" aria-pressed="${state.favs.has(e.id)}" aria-label="Ajouter aux favoris : ${esc(e.t)}">${ICO.coeur}</button>`;
+  function ligneEvent(e) {
+    const s = etat(e), r = placesRestantes(e);
+    const dispo = !reservOn() ? "" : r <= 0 ? `<span class="full">Complet</span>` : r <= 5 ? `<span class="left">Plus que ${r} place${r > 1 ? "s" : ""}</span>` : `<span class="meta">${r} places disponibles</span>`;
+    return `<article class="ev">
+      <div class="date"><b>${e.d}</b><small>${MOIS[e.m].slice(0, 3)}</small></div>
+      <div><div class="titre"><h3>${esc(e.t)}</h3></div>
+        <div class="meta">${esc(jourDe(e))} · ${e.time} à ${e.end} · ${esc(lieuDe(e))}</div>
+        <div class="meta">${CAT_LABEL[e.cat]}${s && !reservOn() ? " · " + s.txt : ""}</div></div>
+      <div class="right">${payantOn() ? `<span class="price">${fmt(e.price)}</span>` : ""}${dispo}
+        <div style="display:flex;gap:8px;align-items:center">${coeurHtml(e)}<button class="btn" type="button" data-ev="${e.id}">${libBouton(e)}</button></div></div>
+    </article>`;
+  }
+  function carteEvent(e) {
+    const s = etat(e), r = placesRestantes(e), pct = Math.min(100, Math.round(e.sold / e.seats * 100)), resa = reservOn();
+    return `<article class="ecard">
+      <div class="bandeau" style="background:linear-gradient(135deg, ${e.pal[0]}, ${e.pal[1]})">
+        <div class="date"><b>${e.d}</b><small>${MOIS[e.m].slice(0, 3)}</small></div>
+        ${s ? `<span class="etat${s.alerte ? " alerte" : ""}">${s.txt}</span>` : ""}
+      </div>
+      ${coeurHtml(e)}
+      <div class="corps"><span class="badge">${CAT_LABEL[e.cat]}</span><h3>${esc(e.t)}</h3>
+        <div class="meta">${esc(jourDe(e))} ${e.d} ${MOIS[e.m]}, ${e.time}<br>${esc(lieuDe(e))}</div>
+        ${payantOn() ? `<div class="price">${fmt(e.price)}</div>` : ""}
+        ${resa ? `<div class="jauge${r <= 0 ? " pleine" : ""}" role="img" aria-label="${e.sold} places réservées sur ${e.seats}"><i style="width:${pct}%"></i></div><div class="meta">${r <= 0 ? "Aucune place disponible" : r + " place" + (r > 1 ? "s" : "") + " sur " + e.seats}</div>` : ""}
+        <div class="actions">${resa ? `<button class="btn ghost" type="button" data-ev="${e.id}">Détails</button>` : ""}<button class="btn" type="button" data-ev="${e.id}">${libBouton(e)}</button></div>
+      </div>
+    </article>`;
+  }
+  function majNav() {
+    const entrees = [["accueil", "Accueil", "accueil"], ["catalogue", "Événements", "evenements"], ["apropos", "À propos", "apropos"], ["intervenants", "Intervenants", "intervenants"], ["avis", "Avis", "avis"], ["contact", "Contact", "contact"]].filter(x => rubOn(x[2]));
+    $("#navRub").innerHTML = entrees.map(x => `<button type="button" data-nav="${x[0]}"${state.navCur === x[0] ? ' aria-current="true"' : ""}>${x[1]}</button>`).join("");
   }
   function render() {
-    $("#cats").innerHTML = CATS.map(c => `<button class="chip ${state.cat === c.id ? "on" : ""}" data-cat="${c.id}">${c.label}</button>`).join("");
-    const l = EVENTS.filter(e => state.cat === "all" || e.cat === state.cat);
-    $("#list").innerHTML = l.length ? l.map(e => `
-      <article class="ev">
-        <div class="date"><b>${e.day}</b><small>${MONTHS[e.month].slice(0, 3)}</small></div>
-        <div><h3>${e.t}</h3><div class="meta">${e.time} · ${e.place}</div></div>
-        <div class="right"><span class="price">${fmt(e.price)}</span>${status(e)}
-          <button class="btn" data-ev="${e.id}">${state.mine.has(e.id) ? "Voir mon inscription" : (e.mode === "billet" ? "Billets" : "S'inscrire")}</button></div>
-      </article>`).join("") : `<p>Aucun événement dans cette catégorie.</p>`;
+    $("#cats").innerHTML = CATS.map(c => `<button class="chip" type="button" data-cat="${c.id}" aria-pressed="${state.cat === c.id}">${ico(c.ic)}${c.label}</button>`).join("")
+      + `<button class="chip" type="button" data-favfiltre aria-pressed="${state.fav}">${ICO.coeur}Favoris (${state.favs.size})</button>`;
+    $("#vueListe").setAttribute("aria-pressed", String(state.vue === "liste")); $("#vueCartes").setAttribute("aria-pressed", String(state.vue === "cartes"));
+    majNav();
+    const act = [];
+    if (state.q.trim()) act.push(["q", "Recherche : " + state.q.trim()]);
+    if (state.cat !== "all") act.push(["cat", "Catégorie : " + CAT_LABEL[state.cat]]);
+    if (state.mois !== "all") act.push(["mois", "Mois : " + libMois(Number(state.mois))]);
+    if (state.format !== "all") act.push(["format", state.format === "ligne" ? "En ligne" : "Sur place"]);
+    if (state.prix !== "all") act.push(["prix", state.prix === "gratuit" ? "Gratuit" : "Payant"]);
+    if (state.fav) act.push(["fav", "Mes favoris"]);
+    $("#actifs").innerHTML = act.map(a => `<button class="actif" type="button" data-retirer="${a[0]}" aria-label="Retirer le filtre : ${esc(a[1])}">${esc(a[1])}${ICO.croix}</button>`).join("") + (act.length > 1 ? `<button class="lien" type="button" data-raz>Tout réinitialiser</button>` : "");
+    const l = filtrer(), total = l.length, pages = Math.max(1, Math.ceil(total / state.parPage));
+    state.page = Math.min(state.page, pages);
+    $("#sectCount").textContent = total + " événement" + (total > 1 ? "s" : "");
     $("#mineCount").textContent = state.mine.size;
-  }
-
-  function openEvent(id) {
-    const e = EVENTS.find(x => x.id === id); state.current = e; state.qty = 1;
-    state.tab = e.mode === "billet" ? "billet" : "inscription";
-    $("#eTitle").textContent = e.t;
-    $("#eMeta").textContent = `${e.day} ${MONTHS[e.month]} · ${e.time} · ${e.place}`;
-    $("#eDesc").textContent = e.desc;
-    $("#evOv").classList.add("open");
-    renderEvent();
-  }
-  function renderEvent() {
-    const e = state.current, left = seatsLeft(e);
-    $("#eTabs").innerHTML = `<button class="${state.tab === "billet" ? "on" : ""}" data-tab="billet">Billets</button><button class="${state.tab === "inscription" ? "on" : ""}" data-tab="inscription">Inscription</button>`;
-    const already = state.mine.get(e.id);
-    if (already) {
-      $("#eBody").innerHTML = `<p>Vous êtes inscrit(e) : ${already.places} place(s), ${fmt(e.price)} par place.</p>
-        <div class="row"><button class="btn ghost" data-cancel="${e.id}">Annuler mon inscription</button></div>`;
-      return;
+    if (!total) {
+      $("#liste").innerHTML = `<div class="vide"><b>Aucun événement ne correspond</b>Essayez un autre mois, une autre catégorie, ou réinitialisez les filtres.<div style="margin-top:12px"><button class="btn" type="button" data-raz>Réinitialiser les filtres</button></div></div>`;
+      $("#pied").innerHTML = ""; return;
     }
-    if (left <= 0) { $("#eBody").innerHTML = `<p class="full">Cet événement est complet.</p>`; return; }
-    if (state.tab === "billet") {
-      $("#eBody").innerHTML = `
-        <div class="row"><span>Prix par billet</span><span class="price">${fmt(e.price)}</span></div>
-        <div class="row"><span>Nombre de billets</span>
-          <div class="qty"><button data-q="-1" aria-label="Diminuer">−</button><span id="qv">${state.qty}</span><button data-q="1" aria-label="Augmenter">+</button></div></div>
-        <div class="total"><span>Total</span><span id="qt">${fmt(e.price * state.qty)}</span></div>
-        <button class="btn" style="width:100%" data-buy="${e.id}">${e.price ? "Payer et réserver (simulé)" : "Réserver gratuitement"}</button>`;
+    if (state.vue === "cartes") {
+      const vis = l.slice((state.page - 1) * state.parPage, state.page * state.parPage);
+      $("#liste").innerHTML = `<div class="cartes">${vis.map(carteEvent).join("")}</div>`;
+      if (pages > 1) {
+        let p = ""; for (let i = 1; i <= pages; i++) p += `<button class="pg" type="button" data-page="${i}"${i === state.page ? ' aria-current="page"' : ""} aria-label="Page ${i}">${i}</button>`;
+        $("#pied").innerHTML = `<span>${(state.page - 1) * state.parPage + 1} à ${Math.min(total, state.page * state.parPage)} sur ${total}</span><div class="pages"><button class="pg" type="button" data-page="${state.page - 1}"${state.page === 1 ? " disabled" : ""} aria-label="Page précédente">${ICO.gauche.replace("<svg", '<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"')}</button>${p}<button class="pg" type="button" data-page="${state.page + 1}"${state.page === pages ? " disabled" : ""} aria-label="Page suivante">${ICO.droite.replace("<svg", '<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"')}</button></div>`;
+      } else $("#pied").innerHTML = `<span>${total} événement${total > 1 ? "s" : ""} affiché${total > 1 ? "s" : ""}</span>`;
     } else {
-      $("#eBody").innerHTML = `
-        <form class="form" id="regForm">
-          <label>Nom <input name="nom" required></label>
-          <label>Adresse e-mail <input name="email" type="email" required></label>
-          <label>Nombre de personnes <input name="n" type="number" min="1" max="${Math.min(left, 10)}" value="1" required></label>
-          <button class="btn" type="submit">Confirmer mon inscription</button>
-        </form>`;
+      let html = "", dernier = null;
+      l.forEach(e => {
+        const k = cleMois(e);
+        if (state.tri === "date" && k !== dernier) { if (dernier !== null) html += "</div>"; html += `<h3 class="mois">${libMois(k)}</h3><div class="list">`; dernier = k; }
+        else if (state.tri !== "date" && dernier === null) { html += '<div class="list">'; dernier = 0; }
+        html += ligneEvent(e);
+      });
+      $("#liste").innerHTML = html + "</div>";
+      $("#pied").innerHTML = `<span>${total} événement${total > 1 ? "s" : ""} affiché${total > 1 ? "s" : ""}</span>`;
     }
-  }
-  function book(id, places) {
-    const e = EVENTS.find(x => x.id === id);
-    if (places > seatsLeft(e)) { toast(`Il ne reste que ${seatsLeft(e)} place(s)`); return false; }
-    e.sold += places;
-    state.mine.set(id, { places, mode: e.mode });
-    return true;
   }
 
-  document.addEventListener("click", e => {
-    const t = e.target;
-    const cat = t.closest("[data-cat]"); if (cat) { state.cat = cat.dataset.cat; render(); return; }
-    const ev = t.closest("[data-ev]"); if (ev) { openEvent(Number(ev.dataset.ev)); return; }
-    const tab = t.closest("[data-tab]"); if (tab) { state.tab = tab.dataset.tab; renderEvent(); return; }
-    const q = t.closest("[data-q]");
-    if (q) { state.qty = Math.max(1, Math.min(seatsLeft(state.current), state.qty + Number(q.dataset.q))); $("#qv").textContent = state.qty; $("#qt").textContent = fmt(state.current.price * state.qty); return; }
-    const buy = t.closest("[data-buy]");
-    if (buy) {
-      if (book(Number(buy.dataset.buy), state.qty)) { toast(`Réservation simulée : ${state.qty} billet(s). Aucun paiement réel.`); renderEvent(); render(); }
+  /* ── Fenêtres : focus rendu, Échap, piège de tabulation ── */
+  const pile = [];
+  function ouvrirOv(id, depuis, focus) {
+    const ov = document.getElementById(id);
+    ov._op = depuis || document.activeElement; ov.classList.add("open");
+    const i = pile.indexOf(id); if (i >= 0) pile.splice(i, 1); pile.push(id);
+    const f = ov.querySelector(focus || "[data-close]"); if (f) f.focus();
+  }
+  function fermerOv(ov) {
+    ov.classList.remove("open");
+    const i = pile.indexOf(ov.id); if (i >= 0) pile.splice(i, 1);
+    render();
+    let cible = ov._op && document.contains(ov._op) && ov._op.offsetParent !== null ? ov._op : null;
+    if (!cible && ov._op && ov._op.dataset && ov._op.dataset.ev) cible = document.querySelector('.btn[data-ev="' + ov._op.dataset.ev + '"]');
+    if (cible && cible.focus) cible.focus();
+  }
+  const ovHaut = () => { for (let i = pile.length - 1; i >= 0; i--) { const o = document.getElementById(pile[i]); if (o && o.classList.contains("open")) return o; } return null; };
+
+  /* ── Fiche d'événement et réservation en trois étapes (simulée) ── */
+  function ouvrirEvent(id, depuis) {
+    const e = EVENTS.find(x => x.id === id); if (!e) return;
+    state.current = e; initResa(e);
+    $("#eTitle").textContent = e.t;
+    ficher();
+    ouvrirOv("evOv", depuis, "[data-close]");
+    $("#evOv .sheet").scrollTop = 0;
+  }
+  function ficher() {
+    const e = state.current, s = etat(e);
+    $("#eBody").innerHTML = `<div class="meta" style="margin-bottom:6px"><span class="badge">${CAT_LABEL[e.cat]}</span>${s ? ` <b style="margin-left:6px;color:${s.alerte ? "var(--alerte)" : "var(--muted)"}">${s.txt}</b>` : ""}</div>
+      <p style="margin:6px 0 0">${esc(e.desc)}</p>
+      <div class="faits"><div><b>Date</b>${esc(dateLongue(e))}</div><div><b>Horaires</b>${e.time} à ${e.end}</div><div><b>Lieu</b>${esc(lieuDe(e))}</div><div><b>Durée</b>${e.duree}</div></div>
+      <h3 class="st">Programme</h3><ul class="prog">${e.prog.map(p => `<li><b>${p[0]}</b><span>${esc(p[1])}</span></li>`).join("")}</ul>
+      <h3 class="st">Intervenants</h3><ul class="interv">${e.interv.map(p => `<li><span class="rond" aria-hidden="true">${esc(initiale(p[0]))}</span><span>${esc(p[0])}<small>${esc(p[1])}</small></span></li>`).join("")}</ul>
+      <h3 class="st">Informations pratiques</h3><p style="margin:0;font-size:14px">${esc(e.acces)} Langue : ${esc(e.langue)}.</p>
+      <div class="resa" id="resa"></div>`;
+    reservation();
+  }
+  /* Types de billets : dérivés du prix de l'événement (exemple fictif) */
+  function typesBillets(e) {
+    if (!estBillet(e)) return [{ id: "part", nom: "Participation libre", desc: "Inscription gratuite, une place par personne.", prix: 0, places: 1 }];
+    const p = e.price, arr = (x) => Math.round(x * 2) / 2;
+    const t = [
+      { id: "std", nom: "Billet standard", desc: "Une place, accès à tout le programme.", prix: p, places: 1 },
+      { id: "red", nom: "Tarif réduit", desc: "Étudiants, moins de 26 ans, demandeurs d'emploi (justificatif à l'entrée).", prix: arr(p * 0.6), places: 1 }
+    ];
+    if (e.cat === "culture" || e.cat === "festivals") t.push({ id: "fam", nom: "Pass famille", desc: "4 places pour une même famille.", prix: arr(p * 3), places: 4 });
+    t.push({ id: "sou", nom: "Billet de soutien", desc: "Une place, avec un don qui finance une place solidaire.", prix: p * 2, places: 1 });
+    return t;
+  }
+  function initResa(e) { state.sel = { [typesBillets(e)[0].id]: 1 }; state.etape = 1; state.promo = null; }
+  const maxPlaces = (e) => Math.min(placesRestantes(e), 10);
+  const placesSel = () => typesBillets(state.current).reduce((n, t) => n + (state.sel[t.id] || 0) * t.places, 0);
+  const sousTotal = () => typesBillets(state.current).reduce((n, t) => n + (state.sel[t.id] || 0) * t.prix, 0);
+  const remise = () => state.promo ? Math.round(sousTotal() * state.promo.pct) / 100 : 0;
+  const aPayer = () => sousTotal() - remise();
+  function etapesHtml() {
+    return '<ol class="etapes" aria-label="Étapes de la réservation">' + ["Billets", "Coordonnées", "Récapitulatif"].map((x, i) =>
+      `<li${state.etape === i + 1 ? ' aria-current="step"' : ""}${state.etape > i + 1 ? ' class="fait"' : ""}><span>${i + 1}</span>${x}</li>`).join("") + "</ol>";
+  }
+  function majSel() {
+    const e = state.current, n = placesSel(), a = $("#qaide"), b = $("#btnSuite"), t = $("#qt");
+    if (t) t.textContent = fmt(sousTotal());
+    if (a) a.textContent = n + " place" + (n > 1 ? "s" : "") + " sélectionnée" + (n > 1 ? "s" : "") + " sur " + maxPlaces(e) + " possible" + (maxPlaces(e) > 1 ? "s" : "") + " par réservation.";
+    if (b) b.disabled = n < 1;
+  }
+  function lireCoord(f) { if (f && f.nom) state.coord = { nom: f.nom.value, email: f.email.value }; }
+  function appliquerPromo(valeur) {
+    const code = String(valeur || "").trim().toUpperCase();
+    if (!code) { state.promo = null; return "Aucun code appliqué."; }
+    if (code === "DIASPO10") { state.promo = { code, pct: 10 }; return "Code DIASPO10 appliqué : −10 %."; }
+    state.promo = null; return "Code inconnu. Pour la maquette, essayez DIASPO10.";
+  }
+  function versTitre() { const h = $("#resa h3"); if (h) { h.tabIndex = -1; h.focus(); } }
+  function reservation() {
+    const e = state.current, r = placesRestantes(e), deja = state.mine.get(e.id), z = $("#resa"), billet = estBillet(e);
+    if (deja) {
+      const lg = (deja.lignes || []).map(l => `<li><span>${l[1]} × ${esc(l[0])}</span><b>${fmt(l[2])}</b></li>`).join("");
+      z.innerHTML = `<h3>Votre ${billet ? "billet" : "inscription"}</h3><p class="ok">${deja.places} place${deja.places > 1 ? "s" : ""} réservée${deja.places > 1 ? "s" : ""} pour ${esc(dateLongue(e))}.</p>`
+        + (lg ? `<ul class="recap">${lg}${deja.remise ? `<li><span>Code ${esc(deja.promo)}</span><b>− ${fmt(deja.remise)}</b></li>` : ""}<li class="tot"><span>Total</span><b>${fmt(deja.total)}</b></li></ul>` : "")
+        + (deja.nom ? `<p class="aide">Au nom de ${esc(deja.nom)} (${esc(deja.email)}).</p>` : "")
+        + `<p>Référence : <span class="refcode">${deja.ref}</span></p><p class="aide">${e.fmt === "ligne" ? "Le lien de connexion vous est envoyé par e-mail la veille." : "Présentez cette référence à l'entrée."} Simulation : aucun e-mail n'est réellement envoyé.</p>`
+        + `<div class="rang"><button class="btn ghost" type="button" data-annuler="${e.id}">Annuler ma réservation</button></div>`;
       return;
     }
-    const cancel = t.closest("[data-cancel]");
-    if (cancel) {
-      const id = Number(cancel.dataset.cancel), mine = state.mine.get(id);
-      EVENTS.find(x => x.id === id).sold -= mine.places; state.mine.delete(id);
-      toast("Inscription annulée"); renderEvent(); render(); return;
+    if (!reservOn()) {
+      z.innerHTML = `<h3>Informations</h3><p class="aide" style="margin-top:0">Les réservations ne sont pas ouvertes sur cette page : consultez le programme et ajoutez l'événement à votre agenda.</p><div class="rang"><button class="btn" type="button" data-agenda="${e.id}">Ajouter à mon agenda (simulé)</button></div>`;
+      return;
     }
-    if (t.closest("[data-close]") || t.classList.contains("overlay")) { t.closest(".overlay")?.classList.remove("open"); render(); return; }
-    if (t.closest("#openMine")) {
-      const lines = [...state.mine.entries()].map(([id, m]) => `${EVENTS.find(x => x.id === id).t} : ${m.places} place(s)`);
-      toast(lines.length ? "Mes inscriptions : " + lines.join(" · ") : "Vous n'avez pas encore d'inscription");
+    if (r <= 0) { z.innerHTML = `<h3>Événement complet</h3><p class="aide" style="margin-top:0">Toutes les places sont réservées. Laissez-nous votre adresse : vous serez prévenu(e) si une place se libère.</p><div class="rang"><button class="btn" type="button" data-attente="${e.id}">Me prévenir si une place se libère</button></div>`; return; }
+    const types = typesBillets(e), tete = `<h3>${billet ? "Réserver des billets" : "S'inscrire"}</h3>` + etapesHtml();
+    if (state.etape === 1) {
+      z.innerHTML = tete + '<ul class="typesb">' + types.map(t => `<li><div><b>${esc(t.nom)}</b><small>${esc(t.desc)}</small></div><span class="price">${fmt(t.prix)}</span><div class="qty" role="group" aria-label="Quantité : ${esc(t.nom)}"><button type="button" data-qt="${t.id}" data-d="-1" aria-label="Un de moins : ${esc(t.nom)}">−</button><span id="qv-${t.id}" aria-live="polite">${state.sel[t.id] || 0}</span><button type="button" data-qt="${t.id}" data-d="1" aria-label="Un de plus : ${esc(t.nom)}">+</button></div></li>`).join("") + "</ul>"
+        + '<div class="total"><span>Sous-total</span><span id="qt"></span></div><p class="aide" id="qaide" style="margin-top:0"></p>'
+        + '<button class="btn" type="button" data-etape="2" id="btnSuite" style="width:100%">Continuer</button>';
+      majSel();
+    } else if (state.etape === 2) {
+      z.innerHTML = tete + '<form class="form" id="coordForm" novalidate>'
+        + `<label>Nom et prénom<input type="text" name="nom" autocomplete="name" value="${esc(state.coord.nom)}"></label>`
+        + `<label>Adresse e-mail<input type="email" name="email" autocomplete="email" value="${esc(state.coord.email)}"></label>`
+        + (sousTotal() > 0 ? `<div><label class="lbl" for="promoIn">Code promo (facultatif)</label><div class="promo"><input type="text" id="promoIn" name="promo" autocomplete="off" value="${state.promo ? esc(state.promo.code) : ""}"><button class="btn ghost" type="button" data-promo>Appliquer</button></div><p class="aide" id="promoMsg" role="status">${state.promo ? "Code " + esc(state.promo.code) + " appliqué : −" + state.promo.pct + " %." : "Pour la maquette, le code DIASPO10 donne 10 % de remise."}</p></div>` : "")
+        + '<p class="aide" id="regErr" role="alert" style="color:var(--alerte);margin:0"></p>'
+        + '<div class="rang"><button class="btn ghost" type="button" data-etape="1">Retour</button><button class="btn" type="submit" style="flex:1 1 auto">Voir le récapitulatif</button></div></form>';
+    } else {
+      const lg = types.filter(t => state.sel[t.id]);
+      z.innerHTML = tete + '<ul class="recap">' + lg.map(t => `<li><span>${state.sel[t.id]} × ${esc(t.nom)}</span><b>${fmt(state.sel[t.id] * t.prix)}</b></li>`).join("")
+        + (remise() ? `<li><span>Code ${esc(state.promo.code)} (−${state.promo.pct} %)</span><b>− ${fmt(remise())}</b></li>` : "")
+        + `<li class="tot"><span>Total</span><b>${fmt(aPayer())}</b></li></ul>`
+        + `<p class="aide">${placesSel()} place${placesSel() > 1 ? "s" : ""} pour ${esc(dateLongue(e))}, au nom de ${esc(state.coord.nom)} (${esc(state.coord.email)}).</p>`
+        + `<div class="rang"><button class="btn ghost" type="button" data-etape="1">Modifier</button><button class="btn" type="button" data-confirmer="${e.id}" style="flex:1 1 auto">${aPayer() > 0 ? "Confirmer et payer (simulé)" : billet ? "Confirmer la réservation" : "Confirmer mon inscription"}</button></div>`
+        + '<p class="aide">Aucun paiement réel n\'est effectué.</p>';
+    }
+  }
+  let compteur = 1000 + Number(lire("ev_ex_n", 0));
+  function reserver(id, places, extra) {
+    const e = EVENTS.find(x => x.id === id);
+    if (places > placesRestantes(e)) { toast("Il ne reste que " + placesRestantes(e) + " place(s)."); return false; }
+    compteur++; ecrire("ev_ex_n", compteur - 1000);
+    e.sold += places; state.mine.set(id, Object.assign({ places, ref: "DA-" + id + "-" + compteur }, extra || {}));
+    memoriser(); return true;
+  }
+  function listeMine() {
+    const l = [...state.mine].map(([id, m]) => ({ e: EVENTS.find(x => x.id === id), m }));
+    $("#mineBody").innerHTML = l.length
+      ? '<ul class="lignes">' + l.map(x => `<li><span><b>${esc(x.e.t)}</b><small>${esc(dateLongue(x.e))} · ${x.m.places} place${x.m.places > 1 ? "s" : ""}${x.m.total != null ? " · " + fmt(x.m.total) : ""}</small><small>Réf. ${x.m.ref}</small></span><button class="btn ghost" type="button" data-ev="${x.e.id}">Voir</button></li>`).join("") + "</ul>"
+      : '<div class="vide" style="margin-top:10px"><b>Aucune inscription</b>Réservez un événement : votre billet apparaîtra ici.</div>';
+  }
+
+  /* ── Sections des rubriques ── */
+  const INTERVS = (() => { const m = new Map(); EVENTS.forEach(e => e.interv.forEach(p => { const k = m.get(p[0]) || { nom: p[0], role: p[1], n: 0 }; k.n++; m.set(p[0], k); })); return [...m.values()]; })();
+  const AVIS = [
+    { n: "Mariam K.", v: "Lyon", note: 5, o: "Rencontre des entrepreneurs de la diaspora", x: "Une après-midi très utile : j'ai présenté mon projet et trouvé deux partenaires. L'organisation était impeccable." },
+    { n: "Jean-Luc A.", v: "Toulouse", note: 5, o: "Atelier cuisine", x: "On repart avec les recettes et le sourire. L'animatrice est passionnée et les groupes sont à taille humaine." },
+    { n: "Sophie M.", v: "Bordeaux", note: 4, o: "Soirée de contes et musique", x: "Une belle veillée, les enfants ont adoré la kora. Dommage que la salle ait été complète si vite." },
+    { n: "Kwame O.", v: "Lille", note: 5, o: "Masterclass : financer son projet", x: "Concret et sans jargon. Le replay m'a permis de tout revoir tranquillement." },
+    { n: "Aïcha D.", v: "Paris", note: 5, o: "Atelier wax", x: "Un moment de création magnifique, du matériel de qualité et une ambiance chaleureuse." },
+    { n: "Thomas R.", v: "Nantes", note: 4, o: "Forum des associations", x: "Beaucoup de stands intéressants. J'aurais aimé plus de temps pour échanger avec chacun." }
+  ];
+  const etoiles = (n) => `<span class="etoiles" role="img" aria-label="Note : ${n} sur 5">` + [1, 2, 3, 4, 5].map(i => i <= n ? ICO.etoile : ICO.etoile.replace("<svg", '<svg class="off"')).join("") + "</span>";
+  let tousAvis = false, tousInterv = false;
+  function vueRubriques() {
+    const villes = new Set(EVENTS.filter(e => e.fmt !== "ligne").map(e => e.city));
+    $("#chiffres").innerHTML = [[EVENTS.length, "événements"], [INTERVS.length, "intervenants"], [villes.size, "villes"]].map(c => `<div><b>${c[0]}</b><span>${c[1]}</span></div>`).join("");
+    $("#intervListe").innerHTML = INTERVS.map((p, i) => ({ p, i })).filter(x => tousInterv || x.i < 8).map(x => `<article class="iv-carte"><span class="rond" aria-hidden="true">${esc(initiale(x.p.nom))}</span><h3>${esc(x.p.nom)}</h3><p class="role">${esc(x.p.role)}</p><p class="nb">${x.p.n} événement${x.p.n > 1 ? "s" : ""}</p><button class="btn ghost" type="button" data-interv="${x.i}">Voir ses événements</button></article>`).join("");
+    $("#intervPlus").textContent = tousInterv ? "Voir moins" : "Voir tous les intervenants";
+    $("#intervPlus").setAttribute("aria-expanded", String(tousInterv));
+    $("#intervPlus").classList.toggle("rub-off", INTERVS.length <= 8);
+    const moy = AVIS.reduce((n, a) => n + a.note, 0) / AVIS.length;
+    $("#noteMoy").innerHTML = `<b>${moy.toLocaleString("fr-FR", { maximumFractionDigits: 1 })}</b>${etoiles(Math.round(moy))}<span>sur 5 · ${AVIS.length} avis (fictifs)</span>`;
+    $("#avisListe").innerHTML = AVIS.filter((a, i) => tousAvis || i < 3).map(a => `<article class="avis-un">${etoiles(a.note)}<q>${esc(a.x)}</q><div class="qui"><span class="rond" aria-hidden="true">${esc(a.n[0])}</span><span><b style="color:var(--text)">${esc(a.n)}</b> · ${esc(a.v)}<br>${esc(a.o)}</span></div></article>`).join("");
+    $("#avisPlus").textContent = tousAvis ? "Voir moins" : "Voir tous les avis";
+    $("#avisPlus").setAttribute("aria-expanded", String(tousAvis));
+  }
+  function appliquerRubriques() {
+    document.querySelectorAll("[data-rub]").forEach(el => el.classList.toggle("rub-off", !el.dataset.rub.split(" ").some(rubOn)));
+    const sansPrix = !payantOn(), sansResa = !reservOn();
+    document.querySelectorAll('#tri option[value^="prix"]').forEach(o => { o.hidden = sansPrix; o.disabled = sansPrix; });
+    document.querySelectorAll('#tri option[value="places"]').forEach(o => { o.hidden = sansResa; o.disabled = sansResa; });
+    if ((sansPrix && state.tri.indexOf("prix") === 0) || (sansResa && state.tri === "places")) { state.tri = "date"; $("#tri").value = "date"; }
+    if (sansPrix) { state.prix = "all"; $("#fPrix").value = "all"; }
+  }
+  function listeModes() {
+    const cur = modeActuel();
+    $("#modeListe").innerHTML = MODES.map(m => `<button class="mode" type="button" data-mode="${m.id}" aria-pressed="${cur === m}"><b>${esc(m.nom)}${ICO.coche}</b><span class="d">${esc(m.desc)}</span></button>`).join("");
+    $("#modeEtat").textContent = cur ? "Mode actuel : " + cur.nom + "." : "Mode actuel : personnalisé (rubriques réglées à la main).";
+  }
+  function listeRubriques() {
+    listeModes();
+    $("#rubListe").innerHTML = RUBS.map(r => `<li class="sw-ligne"><div><b id="swn-${r.id}">${esc(r.nom)}</b><span class="d">${esc(r.desc)}</span></div><button class="sw" type="button" role="switch" data-sw="${r.id}" aria-checked="${rubOn(r.id)}" aria-labelledby="swn-${r.id}"></button></li>`).join("");
+  }
+  function changerRubriques(maj, message) {
+    const apres = Object.assign({}, rub, maj);
+    if (!RUBS.some(r => apres[r.id] !== false)) { toast("Gardez au moins une rubrique affichée."); return; }
+    rub = apres; ecrire("ev_ex_rubriques", rub);
+    appliquerRubriques(); render(); vueRubriques(); listeRubriques();
+    const ouvert = document.getElementById("evOv");
+    if (ouvert.classList.contains("open") && state.current) { initResa(state.current); ficher(); }
+    if (message) toast(message);
+  }
+  function ouvrirContact(depuis) { $("#contactErr").textContent = ""; ouvrirOv("contactOv", depuis, "input[name=nom]"); }
+  const defil = (el) => { if (el) el.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion:reduce)").matches ? "auto" : "smooth", block: "start" }); };
+  function versCatalogue(vue) {
+    if (vue) { state.vue = vue; state.page = 1; render(); }
+    defil($("#sectMain"));
+  }
+
+  /* ── Interactions ── */
+  document.addEventListener("click", ev => {
+    const t = ev.target, q = (s) => t.closest(s); let b;
+    if ((b = q("[data-nav]"))) {
+      const v = b.dataset.nav;
+      if (v === "contact") { ouvrirContact(b); return; }
+      state.navCur = v;
+      if (v === "accueil") window.scrollTo({ top: 0, behavior: matchMedia("(prefers-reduced-motion:reduce)").matches ? "auto" : "smooth" });
+      else defil(document.getElementById(v));
+      majNav(); return;
+    }
+    if ((b = q("[data-cat]"))) { state.cat = b.dataset.cat; state.page = 1; render(); return; }
+    if (q("[data-favfiltre]")) { state.fav = !state.fav; state.page = 1; render(); return; }
+    if (q("#vueListe")) { state.vue = "liste"; render(); return; }
+    if (q("#vueCartes")) { state.vue = "cartes"; state.page = 1; render(); return; }
+    if ((b = q("[data-retirer]"))) {
+      const k = b.dataset.retirer;
+      if (k === "q") { state.q = ""; $("#q").value = ""; }
+      if (k === "cat") state.cat = "all";
+      if (k === "mois") { state.mois = "all"; $("#fMois").value = "all"; }
+      if (k === "format") { state.format = "all"; $("#fFormat").value = "all"; }
+      if (k === "prix") { state.prix = "all"; $("#fPrix").value = "all"; }
+      if (k === "fav") state.fav = false;
+      state.page = 1; render(); return;
+    }
+    if (q("[data-raz]")) { Object.assign(state, { cat: "all", q: "", mois: "all", format: "all", prix: "all", fav: false, page: 1 }); $("#q").value = ""; $("#fMois").value = "all"; $("#fFormat").value = "all"; $("#fPrix").value = "all"; render(); return; }
+    if ((b = q("[data-page]"))) { state.page = Number(b.dataset.page); render(); defil($("#sectMain")); return; }
+    if ((b = q("[data-fav]"))) { const id = Number(b.dataset.fav); state.favs.has(id) ? state.favs.delete(id) : state.favs.add(id); memoriser(); toast(state.favs.has(id) ? "Ajouté aux favoris." : "Retiré des favoris."); render(); const nb = document.querySelector('[data-fav="' + id + '"]'); if (nb) nb.focus(); return; }
+    if ((b = q("[data-ev]"))) {
+      const dansMine = $("#mineOv").classList.contains("open");
+      if (dansMine) { $("#mineOv").classList.remove("open"); const i = pile.indexOf("mineOv"); if (i >= 0) pile.splice(i, 1); }
+      ouvrirEvent(Number(b.dataset.ev), dansMine ? $("#openMine") : b); return;
+    }
+    if ((b = q("[data-qt]"))) {
+      const e = state.current, ty = typesBillets(e).find(x => x.id === b.dataset.qt), d = Number(b.dataset.d), n = (state.sel[ty.id] || 0) + d;
+      if (n < 0) return;
+      if (d > 0 && placesSel() + ty.places > maxPlaces(e)) { toast("Maximum : " + maxPlaces(e) + " place" + (maxPlaces(e) > 1 ? "s" : "") + " par réservation."); return; }
+      state.sel[ty.id] = n; $("#qv-" + ty.id).textContent = n; majSel(); return;
+    }
+    if ((b = q("[data-etape]"))) {
+      lireCoord($("#coordForm"));
+      const v = Number(b.dataset.etape); if (v === 2 && placesSel() < 1) return;
+      state.etape = v; reservation(); versTitre(); return;
+    }
+    if (q("[data-promo]")) { lireCoord($("#coordForm")); $("#promoMsg").textContent = appliquerPromo($("#promoIn").value); return; }
+    if ((b = q("[data-confirmer]"))) {
+      const e = state.current, lignes = typesBillets(e).filter(x => state.sel[x.id]).map(x => [x.nom, state.sel[x.id], state.sel[x.id] * x.prix]);
+      const extra = { nom: state.coord.nom.trim(), email: state.coord.email.trim(), lignes, total: aPayer(), remise: remise(), promo: state.promo ? state.promo.code : "" };
+      if (reserver(e.id, placesSel(), extra)) { toast("Réservation simulée : " + placesSel() + " place(s). Aucun paiement réel."); ficher(); versTitre(); }
+      return;
+    }
+    if ((b = q("[data-annuler]"))) { const id = Number(b.dataset.annuler), m = state.mine.get(id); EVENTS.find(x => x.id === id).sold -= m.places; state.mine.delete(id); memoriser(); toast("Réservation annulée."); initResa(EVENTS.find(x => x.id === id)); ficher(); return; }
+    if (q("[data-attente]")) { toast("Liste d'attente simulée : vous serez prévenu(e) si une place se libère."); return; }
+    if (q("#openRub")) { listeRubriques(); ouvrirOv("rubOv", q("#openRub"), "[data-close]"); return; }
+    if ((b = q("[data-sw]"))) { const r = RUBS.find(x => x.id === b.dataset.sw), voulue = !rubOn(r.id); changerRubriques({ [r.id]: voulue }, "Rubrique « " + r.nom + " » " + (voulue ? "affichée." : "masquée.")); const nb = document.querySelector('[data-sw="' + r.id + '"]'); if (nb) nb.focus(); return; }
+    if ((b = q("[data-mode]"))) { const m = MODES.find(x => x.id === b.dataset.mode); changerRubriques(m.rub, "Mode « " + m.nom + " » appliqué."); const nb = document.querySelector('[data-mode="' + m.id + '"]'); if (nb) nb.focus(); return; }
+    if (q("#rubTout")) { changerRubriques(Object.fromEntries(RUBS.map(r => [r.id, true])), "Toutes les rubriques sont affichées."); return; }
+    if (q("#avisPlus")) { tousAvis = !tousAvis; vueRubriques(); $("#avisPlus").focus(); return; }
+    if (q("#intervPlus")) { tousInterv = !tousInterv; vueRubriques(); $("#intervPlus").focus(); return; }
+    if ((b = q("[data-interv]"))) {
+      if (!rubOn("evenements")) { toast("La rubrique « Événements » est masquée : activez-la pour voir ses événements."); return; }
+      const p = INTERVS[Number(b.dataset.interv)]; state.q = p.nom; $("#q").value = p.nom; state.page = 1; render(); versCatalogue(); return;
+    }
+    if ((b = q("[data-agenda]"))) { toast("Ajouté à votre agenda (simulé) : « " + EVENTS.find(x => x.id === Number(b.dataset.agenda)).t + " »."); return; }
+    if ((b = q("[data-aller]"))) {
+      const v = b.dataset.aller;
+      if (v === "liste" || v === "cartes") versCatalogue(v);
+      else if (v === "mine") $("#openMine").click();
+      else if (v === "contact") ouvrirContact(b);
+      return;
+    }
+    if ((b = q("[data-pcat]"))) { state.cat = b.dataset.pcat; state.page = 1; render(); versCatalogue(); return; }
+    if ((b = q("[data-pied]"))) { toast(b.dataset.pied + " : lien fictif, cette page n'existe pas dans la maquette."); return; }
+    if (q("#openMine")) { listeMine(); ouvrirOv("mineOv", q("#openMine"), "[data-close]"); return; }
+    if (q("[data-close]")) { fermerOv(q(".overlay")); return; }
+    if (t.classList && t.classList.contains("overlay")) fermerOv(t);
+  });
+  document.addEventListener("submit", ev => {
+    const f = ev.target, mailOk = (s) => /^\S+@\S+\.\S+$/.test(s);
+    if (f.id === "coordForm") {
+      ev.preventDefault();
+      const err = $("#regErr"); lireCoord(f);
+      if (!state.coord.nom.trim()) { err.textContent = "Indiquez votre nom et prénom."; f.nom.focus(); return; }
+      if (!mailOk(state.coord.email.trim())) { err.textContent = "Indiquez une adresse e-mail valide, par exemple nom@exemple.fr."; f.email.focus(); return; }
+      const pi = $("#promoIn");
+      if (pi) {
+        const msg = appliquerPromo(pi.value);
+        if (pi.value.trim() && !state.promo) { err.textContent = msg + " Corrigez le code ou videz le champ."; pi.focus(); return; }
+      }
+      state.etape = 3; reservation(); versTitre(); return;
+    }
+    if (f.id === "contactForm") {
+      ev.preventDefault();
+      const err = $("#contactErr");
+      if (!f.nom.value.trim()) { err.textContent = "Indiquez votre nom et prénom."; f.nom.focus(); return; }
+      if (!mailOk(f.email.value.trim())) { err.textContent = "Indiquez une adresse e-mail valide, par exemple nom@exemple.fr."; f.email.focus(); return; }
+      if (f.message.value.trim().length < 10) { err.textContent = "Écrivez un message d'au moins 10 caractères pour que l'équipe puisse vous répondre."; f.message.focus(); return; }
+      err.textContent = ""; f.reset();
+      fermerOv($("#contactOv")); toast("Message simulé : rien n'a été envoyé. Dans une vraie boutique, l'équipe répond sous 48 heures.");
+      return;
+    }
+    if (f.id === "newsForm") {
+      ev.preventDefault();
+      const m = $("#newsMsg"), v = f.mail.value.trim();
+      if (!mailOk(v)) { m.style.color = "var(--alerte)"; m.textContent = "Indiquez une adresse e-mail valide, par exemple nom@exemple.fr."; f.mail.focus(); return; }
+      m.style.color = ""; m.textContent = "Inscription simulée : aucune adresse n'est enregistrée ni utilisée."; f.reset();
     }
   });
-  document.addEventListener("submit", e => {
-    if (e.target.id !== "regForm") return;
-    e.preventDefault();
-    const n = Number(e.target.n.value), id = state.current.id;
-    if (book(id, n)) { toast("Inscription enregistrée (maquette)"); renderEvent(); render(); }
+  $("#piedCats").innerHTML = CATS.filter(c => c.id !== "all").map(c => `<li><button type="button" data-pcat="${c.id}">${esc(c.label)}</button></li>`).join("");
+  $("#q").addEventListener("input", ev => { state.q = ev.target.value; state.page = 1; render(); });
+  $("#fMois").addEventListener("change", ev => { state.mois = ev.target.value; state.page = 1; render(); });
+  $("#fFormat").addEventListener("change", ev => { state.format = ev.target.value; state.page = 1; render(); });
+  $("#fPrix").addEventListener("change", ev => { state.prix = ev.target.value; state.page = 1; render(); });
+  $("#tri").addEventListener("change", ev => { state.tri = ev.target.value; state.page = 1; render(); });
+  document.addEventListener("keydown", ev => {
+    const ov = ovHaut(); if (!ov) return;
+    if (ev.key === "Escape") { fermerOv(ov); return; }
+    if (ev.key === "Tab") {
+      const f = [...ov.querySelectorAll("button, a[href], input, select, textarea")].filter(x => !x.disabled && x.offsetParent !== null);
+      if (!f.length) return; const a = f[0], z = f[f.length - 1];
+      if (ev.shiftKey && document.activeElement === a) { ev.preventDefault(); z.focus(); } else if (!ev.shiftKey && document.activeElement === z) { ev.preventDefault(); a.focus(); }
+    }
   });
-  document.addEventListener("keydown", e => { if (e.key === "Escape") { document.querySelectorAll(".overlay.open").forEach(o => o.classList.remove("open")); render(); } });
+  optionsMois();
+  appliquerRubriques();
+  vueRubriques();
   render();
 </script>
 </body>
