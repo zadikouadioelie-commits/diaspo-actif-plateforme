@@ -261,6 +261,8 @@
       '<label for="evb-prix">Prix<select id="evb-prix"><option value="">Tous les prix</option><option value="gratuit"' + (etat.prix === 'gratuit' ? ' selected' : '') + '>Gratuit</option><option value="payant"' + (etat.prix === 'payant' ? ' selected' : '') + '>Payant</option></select></label>' +
       '<label for="evb-tri">Trier par<select id="evb-tri"><option value="date">Date</option><option value="prix-asc"' + (etat.tri === 'prix-asc' ? ' selected' : '') + '>Prix croissant</option><option value="prix-desc"' + (etat.tri === 'prix-desc' ? ' selected' : '') + '>Prix décroissant</option><option value="places"' + (etat.tri === 'places' ? ' selected' : '') + '>Places restantes</option></select></label></div>';
   }
+  /* Réglages de la boutique (lot 4A) : livraison, minimum, délais, informations légales — rien si la boutique n'a rien réglé. */
+  function rp(nom, opt) { var m = window.BoutiqueReglagesPublic; return m ? m[nom](opt) : ''; }
   function pied() {
     var i = etat.init, adresse = [i.adresse, i.code_postal, i.vitrine_ville || i.ville, i.vitrine_pays || i.pays].filter(Boolean).join(', ');
     var reseaux = objet(i.reseaux_sociaux), liens = [];
@@ -275,7 +277,7 @@
       '<div class="pied-col pied-contact"><h4>Nous contacter</h4><p>Une question sur un événement ? Écrivez-nous par la messagerie de la plateforme.</p>' +
       (adresse ? '<address>' + esc(adresse) + (texte(i.vitrine_horaires) ? '<br>' + esc(i.vitrine_horaires) : '') + '</address>' : '') +
       '<a class="ecrire" href="' + lienMessage('contact') + '">Nous écrire</a></div></div>' +
-      '<div class="pied-bas"><p class="copy">© ' + new Date().getFullYear() + ' ' + esc(nom()) + '. Boutique propulsée par Diaspo’Actif.</p></div></div></footer>';
+      '<div class="pied-bas"><p class="copy">© ' + new Date().getFullYear() + ' ' + esc(nom()) + '. Boutique propulsée par Diaspo’Actif.</p></div>' + rp('htmlLegal') + '</div></footer>';
   }
   function page() {
     return entete() + hero() + '<main class="wrap"><div id="catalogue">' + onglets() + recherche() + '<div id="liste">' + corpsListe() + '</div></div></main>' + pied() +
@@ -400,6 +402,7 @@
     if (!ref) return Promise.reject(new Error('Aucune boutique indiquée.'));
     return api('GET', '/initiatives/' + encodeURIComponent(ref) + (/[?&]preview=draft(&|$)/.test(location.search) ? '?preview=draft' : '')).then(function (d) {
       etat.init = d.initiative || d;
+      if (window.BoutiqueReglagesPublic) window.BoutiqueReglagesPublic.definir(etat.init.vitrine_reglages);
       appliquerCouleurs(objet(etat.init.vitrine_style_json));
       return Promise.all([
         api('GET', '/evenements?owner=' + encodeURIComponent(etat.init.owner_user_id) + '&boutique=1').then(function (r) {

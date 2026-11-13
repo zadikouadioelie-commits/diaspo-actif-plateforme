@@ -94,6 +94,8 @@
     if (!ref) return Promise.reject(new Error('Aucune boutique indiquée.'));
     return api('GET', '/initiatives/' + encodeURIComponent(ref) + (/[?&]preview=draft(&|$)/.test(location.search) ? '?preview=draft' : '')).then(function (d) {
       etat.init = d.initiative || d;
+      if (window.BoutiqueReglagesPublic) window.BoutiqueReglagesPublic.definir(etat.init.vitrine_reglages);
+      appliquerCouleurs(styleBoutique(etat.init.vitrine_style_json));
       var iid = etat.init.id;
       return Promise.all([
         api('GET', '/initiatives/' + iid + '/produits').then(function (r) { etat.videos = (r.produits || []).filter(function (p) { return (p.statut || 'disponible') !== 'masque'; }).map(normalise); }).catch(function () {}),
@@ -229,11 +231,22 @@
     }
     return h;
   }
+  /* Couleurs de la boutique (lot 4A, 2026-11-13) : les 3 couleurs choisies à l'étape « Apparence » remplacent bordeaux / bleu nuit / or.
+     Sans couleurs enregistrées, la page garde sa charte d'origine. */
+  var NOMS_COULEURS = {'--bv-bord': 'p', '--bv-bord2': 'p_clair', '--bv-bord3': 'p_fonce', '--bv-bord4': 'p_tres_fonce', '--bv-nuit': 's', '--bv-hero': 'hero', '--bv-hero2': 'hero2', '--bv-or': 'a', '--bv-or2': 'a_clair'};
+  function styleBoutique(v) { try { var o = typeof v === 'string' ? JSON.parse(v || '{}') : v; return o && typeof o === 'object' ? o : {}; } catch (e) { return {}; } }
+  function appliquerCouleurs(style) { if (window.BOUTIQUE_COULEURS && window.BOUTIQUE_COULEURS.appliquerPage) window.BOUTIQUE_COULEURS.appliquerPage(document.body, style, NOMS_COULEURS); }
+  window.addEventListener('message', function (ev) {
+    if (window.parent === window || ev.origin !== location.origin || !ev.data || ev.data.type !== 'da-vitrine-style') return;
+    appliquerCouleurs(ev.data.style || {});
+  });
+  /* Réglages de la boutique (lot 4A) : livraison, minimum, délais, informations légales — rien si la boutique n'a rien réglé. */
+  function rp(nom, opt) { var m = window.BoutiqueReglagesPublic; return m ? m[nom](opt) : ''; }
   function pied() {
-    return '<footer class="bv-pied"><div class="bv-pied-in"><span>© Diaspo\'Actif — Du Sud au Nord</span><nav><a href="vitrines.html">Boutiques</a><a href="confidentialite.html">Confidentialité</a><a href="cgu.html">Conditions d’utilisation</a></nav></div></footer>';
+    return '<footer class="bv-pied"><div class="bv-pied-in"><span>© Diaspo\'Actif — Du Sud au Nord</span><nav><a href="vitrines.html">Boutiques</a><a href="confidentialite.html">Confidentialité</a><a href="cgu.html">Conditions d’utilisation</a></nav></div>' + rp('htmlLegal') + '</footer>';
   }
   function dessiner() {
-    app.innerHTML = entete() + hero() + barreCategories() + '<main class="bv-corps">' + blocFiltres() + '<section id="bv-zone">' + zoneListe() + '</section></main>' + pied();
+    app.innerHTML = entete() + hero() + barreCategories() + '<main class="bv-corps">' + blocFiltres() + '<section id="bv-zone">' + zoneListe() + '</section></main>' + rp('htmlConditions', { livraison: false }) + pied();
     document.title = 'Boutique Vidéo ' + nom() + ' — Diaspo\'Actif';
     lier();
     /* Encart « Sondage en cours » : sondages que le propriétaire a choisi d'afficher sur sa boutique (2026-11-09). */

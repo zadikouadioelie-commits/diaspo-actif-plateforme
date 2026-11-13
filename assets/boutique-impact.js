@@ -260,10 +260,12 @@
       '<div class="rang">' + (don || ouvertes.length ? '<a class="btn acc" href="' + esc(cible) + '">' + ic('coeur') + (don ? 'Faire un don' : 'Soutenir un projet') + '</a>' : '') +
       '<a class="btn clair" href="' + esc(lienMessage('Demande de partenariat : ' + nom())) + '">' + ic('main') + 'Devenir partenaire</a></div></section>';
   }
+  /* Réglages de la boutique (lot 4A) : livraison, minimum, délais, informations légales — rien si la boutique n'a rien réglé. */
+  function rp(nom, opt) { var m = window.BoutiqueReglagesPublic; return m ? m[nom](opt) : ''; }
   function pied() {
     var i = etat.init, lieu = [texte(i.ville), texte(i.pays)].filter(Boolean).join(', ');
     return '<footer class="pied"><div class="pied-in"><div><b>' + esc(nom()) + '</b>' + (lieu ? '<div>' + esc(lieu) + '</div>' : '') + '</div>' +
-      '<div>Boutique hébergée sur <a href="index.html">Diaspo’Actif</a></div></div></footer>';
+      '<div>Boutique hébergée sur <a href="index.html">Diaspo’Actif</a></div></div>' + rp('htmlLegal') + '</footer>';
   }
   function page() {
     var vide = !projetsPublics().length && !etatReals().length && !visionTexte() && !presentation() && !equipe().length && !resultats().length && !besoins().length;
@@ -297,6 +299,7 @@
     if (!ref) return Promise.reject(new Error('Aucune boutique indiquée.'));
     return api('GET', '/initiatives/' + encodeURIComponent(ref) + (/[?&]preview=draft(&|$)/.test(location.search) ? '?preview=draft' : '')).then(function (d) {
       etat.init = d.initiative || d;
+      if (window.BoutiqueReglagesPublic) window.BoutiqueReglagesPublic.definir(etat.init.vitrine_reglages);
       appliquerCouleurs(objet(etat.init.vitrine_style_json));
       var id = etat.init.id, prop = etat.init.owner_user_id;
       return Promise.all([

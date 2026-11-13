@@ -216,10 +216,12 @@
       '<div class="rang"><button type="button" class="btn acc" data-depot>' + ic('envoi') + 'Soumettre à Diaspo’Actif</button>' +
       '<a class="btn clair" href="' + esc(lienMessage('Demande de partenariat : ' + nom())) + '">' + ic('message') + 'Nous écrire</a></div></section>';
   }
+  /* Réglages de la boutique (lot 4A) : livraison, minimum, délais, informations légales — rien si la boutique n'a rien réglé. */
+  function rp(nom, opt) { var m = window.BoutiqueReglagesPublic; return m ? m[nom](opt) : ''; }
   function pied() {
     var i = etat.init, lieu = [texte(i.ville), texte(i.pays)].filter(Boolean).join(', ');
     return '<footer class="pied"><div class="pied-in"><div><b>' + esc(nom()) + '</b>' + (lieu ? '<div>' + esc(lieu) + '</div>' : '') + '</div>' +
-      '<div>Boutique hébergée sur <a href="index.html">Diaspo’Actif</a></div></div></footer>';
+      '<div>Boutique hébergée sur <a href="index.html">Diaspo’Actif</a></div></div>' + rp('htmlLegal') + '</footer>';
   }
   function page() {
     var corps = blocPresentation() + blocProgrammes() + blocProjets() + blocResultats() + blocRendezVous() + blocDocuments() + blocTemoignages() + blocAgrements() + blocEquipe() + blocPartenaires();
@@ -241,6 +243,7 @@
     if (!ref) return Promise.reject(new Error('Aucune boutique indiquée.'));
     return api('GET', '/initiatives/' + encodeURIComponent(ref) + (/[?&]preview=draft(&|$)/.test(location.search) ? '?preview=draft' : '')).then(function (d) {
       etat.init = d.initiative || d;
+      if (window.BoutiqueReglagesPublic) window.BoutiqueReglagesPublic.definir(etat.init.vitrine_reglages);
       appliquerCouleurs(objet(etat.init.vitrine_style_json));
       var id = etat.init.id;
       return Promise.all([

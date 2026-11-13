@@ -281,3 +281,6 @@ body.pf img{max-width:100%;display:block}
   .pf-une{min-height:300px}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+
+/* Couleurs personnalisées (lot 4A, 2026-11-13) : le dégradé du bandeau suit les 3 couleurs de la boutique. Sans couleurs : aucune règle ne s'applique. */
+body.pf[data-couleurs] .pf-hero{background:linear-gradient(100deg,var(--pf-marine) 0%,color-mix(in srgb,var(--pf-marine) 75%,var(--pf-bordeaux)) 45%,color-mix(in srgb,var(--pf-marine) 30%,var(--pf-bordeaux)) 80%,var(--pf-bordeaux) 100%);background-size:cover;background-position:center}

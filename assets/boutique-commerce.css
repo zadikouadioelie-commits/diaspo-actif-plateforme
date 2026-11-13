@@ -394,3 +394,10 @@ body.bq img{max-width:100%;display:block}
 .bq-fauteur{font-size:12.5px;color:var(--bq-doux)}
 .bq-fprix{margin-top:auto;padding-top:6px;font-weight:800;color:var(--bq-bordeaux)}
 .bq-fprix s{font-weight:500;font-size:12.5px;color:var(--bq-doux);margin-right:6px}
+
+/* Couleurs personnalisées (lot 4A, 2026-11-13) : les dégradés écrits en dur suivent les 3 couleurs de la boutique. Sans couleurs : aucune règle ne s'applique. */
+body.bq[data-couleurs] .bq-hero{background:linear-gradient(100deg,var(--bq-marine) 0%,color-mix(in srgb,var(--bq-marine) 75%,var(--bq-bordeaux)) 42%,color-mix(in srgb,var(--bq-marine) 30%,var(--bq-bordeaux)) 78%,var(--bq-bordeaux) 100%)}
+body.bq[data-couleurs] .bq-hero::after{background:linear-gradient(165deg,var(--bq-bordeaux2) 0%,var(--bq-bordeaux) 55%,var(--bq-bordeaux3) 100%)}
+body.bq[data-couleurs] .bq-slide{background:linear-gradient(100deg,var(--bq-marine) 0%,var(--bq-marine2) 55%,var(--bq-bordeaux) 120%)}
+body.bq[data-couleurs] .bq-membre{background:linear-gradient(100deg,var(--bq-bordeaux3),var(--bq-bordeaux2) 55%,var(--bq-bordeaux))}
+body.bq[data-couleurs] .bq-actions .plein{background:linear-gradient(180deg,var(--bq-bordeaux2),var(--bq-bordeaux));border-color:var(--bq-bordeaux)}

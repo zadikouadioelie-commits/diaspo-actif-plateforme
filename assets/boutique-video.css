@@ -206,3 +206,15 @@ body.bv img{max-width:100%;display:block}
 }
 @media (max-width:420px){.bv-grille{grid-template-columns:1fr}.bv-tri{width:100%}.bv-tri select{flex:1}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* Couleurs personnalisées (lot 4A, 2026-11-13) : les couleurs écrites en dur suivent celles de la boutique. Sans couleurs : aucune règle ne s'applique. */
+body.bv[data-couleurs] .bv-recherche button{background:linear-gradient(180deg,var(--bv-bord2),var(--bv-bord3))}
+body.bv[data-couleurs] .bv-mini.vide{background:linear-gradient(135deg,var(--bv-hero),var(--bv-nuit))}
+body.bv[data-couleurs] .bv-prix{color:var(--bv-bord)}
+body.bv[data-couleurs] .bv-coeur{color:var(--bv-bord)}
+body.bv[data-couleurs] .bv-ajout{background:linear-gradient(180deg,var(--bv-bord),var(--bv-bord3))}
+body.bv[data-couleurs] .bv-toast.ko{background:var(--bv-bord)}
+body.bv[data-couleurs] .bv-pastille{background:var(--bv-bord2)}
+body.bv[data-couleurs] .bv-prix-plage{background:var(--bv-bord)}
+body.bv[data-couleurs] .bv-prix-pistes input::-webkit-slider-thumb{background:var(--bv-bord)}
+body.bv[data-couleurs] .bv-prix-pistes input::-moz-range-thumb{background:var(--bv-bord)}

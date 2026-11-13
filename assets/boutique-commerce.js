@@ -108,6 +108,8 @@
     return pre.then(function (id) {
       return api('GET', '/initiatives/' + encodeURIComponent(id) + (/[?&]preview=draft(&|$)/.test(location.search) ? '?preview=draft' : '')).then(function (d) {
         etat.init = d.initiative || d;
+        if (window.BoutiqueReglagesPublic) window.BoutiqueReglagesPublic.definir(etat.init.vitrine_reglages);
+        appliquerCouleurs(styleBoutique(etat.init.vitrine_style_json));
         var iid = etat.init.id;
         return Promise.all([
           api('GET', '/initiatives/' + iid + '/produits').then(function (r) { etat.produits = r.produits || []; }).catch(function () {}),
@@ -342,9 +344,21 @@
     return '<section>' + enTete(titre) + '<p class="bq-meta">' + l.length + ' produit' + (l.length > 1 ? 's' : '') + '</p>' +
       (l.length ? '<div class="bq-grille">' + l.map(function (p) { return carteProduit(p); }).join('') + '</div>' : '<div class="bq-vide">Aucun produit ne correspond. Essayez une autre catégorie ou un autre mot.</div>') + '</section>';
   }
+  /* Couleurs de la boutique (lot 4A, 2026-11-13) : les 3 couleurs choisies à l'étape « Apparence » remplacent bordeaux / bleu nuit / or.
+     Sans couleurs enregistrées, la page garde sa charte d'origine. */
+  var NOMS_COULEURS = {'--bq-bordeaux': 'p', '--bq-bordeaux2': 'p_clair', '--bq-bordeaux3': 'p_fonce', '--bq-marine': 's', '--bq-marine2': 's_clair', '--bq-or': 'a', '--bq-or2': 'a_fonce'};
+  function styleBoutique(v) { try { var o = typeof v === 'string' ? JSON.parse(v || '{}') : v; return o && typeof o === 'object' ? o : {}; } catch (e) { return {}; } }
+  function appliquerCouleurs(style) { if (window.BOUTIQUE_COULEURS && window.BOUTIQUE_COULEURS.appliquerPage) window.BOUTIQUE_COULEURS.appliquerPage(document.body, style, NOMS_COULEURS); }
+  window.addEventListener('message', function (ev) {
+    if (window.parent === window || ev.origin !== location.origin || !ev.data || ev.data.type !== 'da-vitrine-style') return;
+    appliquerCouleurs(ev.data.style || {});
+  });
+  /* Réglages de la boutique (lot 4A) : livraison, minimum, délais, informations légales — rien si la boutique n'a rien réglé. */
+  function rp(nom, opt) { var m = window.BoutiqueReglagesPublic; return m ? m[nom](opt) : ''; }
   function assurance() {
     var v = !!Number(etat.init.organisation_verifiee);
-    var l = [['camion', 'Livraison ou retrait', 'selon le produit'], ['bouclier', 'Paiement', '100 % sécurisé'], ['casque', 'Support client', 'réactif'], ['certifie', v ? 'Organisation vérifiée' : 'Boutique de la diaspora', 'Diaspo\'Actif'], ['mainsCoeur', 'Impact local', 'et international']];
+    var rl = window.BoutiqueReglagesPublic ? window.BoutiqueReglagesPublic.resumeLivraison() : null;
+    var l = [['camion', rl ? rl.titre : 'Livraison ou retrait', rl ? rl.sous : 'selon le produit'], ['bouclier', 'Paiement', '100 % sécurisé'], ['casque', 'Support client', 'réactif'], ['certifie', v ? 'Organisation vérifiée' : 'Boutique de la diaspora', 'Diaspo\'Actif'], ['mainsCoeur', 'Impact local', 'et international']];
     return '<div class="bq-assur"><div class="bq-assur-in">' + l.map(function (x) { return '<div>' + ic(x[0]) + '<span><b>' + x[1] + '</b>' + x[2] + '</span></div>'; }).join('') + '</div></div>';
   }
   function pied() {
@@ -354,7 +368,7 @@
       '<div><h4>Boutique</h4><ul><li><button type="button" class="lien" data-act="tout">Tous les produits</button></li>' + cats.slice(0, 4).map(function (c) { return '<li><button type="button" class="lien" data-cat="' + esc(c) + '">' + esc(c) + '</button></li>'; }).join('') + '</ul></div>' +
       '<div><h4>Informations</h4><ul><li><a href="initiative.html?id=' + i.id + '">À propos de la boutique</a></li><li><a href="vitrine-qui-sommes-nous.html">Qui sommes-nous</a></li><li><a href="vitrines.html">Toutes les boutiques</a></li><li><a href="annuaire.html">Annuaire</a></li></ul></div>' +
       '<div><h4>Assistance</h4><ul><li><a href="vitrine-faq.html">FAQ</a></li><li><a href="cgv.html">Conditions de vente</a></li><li><a href="confidentialite.html">Confidentialité</a></li><li><a href="mentions-legales.html">Mentions légales</a></li></ul>' +
-      '<a class="bq-bouton" href="initiative.html?id=' + i.id + '#contact">' + ic('bulle') + 'Écrire à la boutique</a></div></div></footer>';
+      '<a class="bq-bouton" href="initiative.html?id=' + i.id + '#contact">' + ic('bulle') + 'Écrire à la boutique</a></div></div>' + rp('htmlLegal') + '</footer>';
   }
 
   /* Encart « Sondage en cours » : sondages que le propriétaire a choisi d'afficher sur sa boutique (2026-11-09). */
@@ -367,7 +381,7 @@
     var accueil = etat.cat === null && !etat.q;
     document.title = (etat.init.boutique_nom || etat.init.nom) + ' — Boutique Diaspo\'Actif';
     app.innerHTML = entete() + hero() + categories() +
-      '<main class="bq-corps">' + lateral() + '<div class="bq-principal" id="bq-principal">' + (accueil ? vueAccueil() : vueListe()) + '</div></main>' + assurance() + pied();
+      '<main class="bq-corps">' + lateral() + '<div class="bq-principal" id="bq-principal">' + (accueil ? vueAccueil() : vueListe()) + '</div></main>' + assurance() + rp('htmlConditions') + pied();
     var f = document.getElementById('bq-q'); if (f) f.value = etat.q;
     demarreCarrousel();
     sondageBoutique();

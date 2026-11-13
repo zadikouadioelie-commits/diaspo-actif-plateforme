@@ -178,7 +178,38 @@
     for (var i = 0; i < MAX_COULEURS; i++) el.style.setProperty("--vtex" + (i + 1), textureCss(tex[i]) || "none");
   }
 
+  /* Palette des pages de boutique à fond clair (commerce, vidéo, portfolio) — lot 4A, 2026-11-13.
+     Ces pages utilisent un bordeaux / bleu nuit / or. Les 3 couleurs de la boutique les remplacent dans le même rôle :
+     principale -> boutons et bandeaux, secondaire -> en-tête et pied de page, accent -> détails dorés.
+     Sans couleurs enregistrées : null, et la page garde sa charte d'origine (aucune boutique existante ne change). */
+  function paletteClaire(couleurs) {
+    var c = (couleurs || []).map(hexValide).filter(Boolean).slice(0, MAX_COULEURS);
+    if (!c.length) return null;
+    var p = lisibleSousBlanc(c[0]), lp = hexToHsl(p)[2];
+    var s = lisibleSousBlanc(c[1] || nuance(c[0], 12)), ls = hexToHsl(s)[2];
+    var a = c[2] || nuance(c[0], 62), la = hexToHsl(a)[2];
+    return {
+      p: p, p_clair: nuance(p, Math.min(lp + 7, 60)), p_fonce: nuance(p, Math.max(lp - 9, 6)), p_tres_fonce: nuance(p, Math.max(lp - 14, 4)),
+      s: s, s_clair: nuance(s, Math.min(ls + 10, 60)),
+      a: a, a_fonce: nuance(a, Math.max(la - 10, 10)), a_clair: nuance(a, Math.min(la + 12, 92)),
+      hero: nuance(p, 13), hero2: nuance(p, 15)
+    };
+  }
+
+  /* Pose la palette sur l'élément portant la page. noms = { "--variable-css": "clé de la palette", … } propre à chaque page. */
+  function appliquerPage(el, style, noms) {
+    if (!el || !el.style || !noms) return;
+    Object.keys(noms).forEach(function (n) { el.style.removeProperty(n); });
+    if (el.removeAttribute) el.removeAttribute("data-couleurs");
+    var pal = paletteClaire(style && style.couleurs);
+    if (!pal) return;
+    /* L'attribut réserve les dégradés « suivant les couleurs » aux boutiques personnalisées : sans lui, l'aspect d'origine est strictement inchangé. */
+    if (el.setAttribute) el.setAttribute("data-couleurs", "1");
+    Object.keys(noms).forEach(function (n) { if (pal[noms[n]]) el.style.setProperty(n, pal[noms[n]]); });
+  }
+
   return {
+    paletteClaire: paletteClaire, appliquerPage: appliquerPage,
     PRESETS: PRESETS, MAX_COULEURS: MAX_COULEURS, TEXTURES: TEXTURES, PALETTES: PALETTES, GROUPES_PALETTES: GROUPES_PALETTES, NOMS: NOMS, INDICES: INDICES,
     hexValide: hexValide, hexToHsl: hexToHsl, hslToHex: hslToHex, contraste: contraste, luminance: luminance,
     variables: variables, textureCss: textureCss, fusionnerStyle: fusionnerStyle, appliquer: appliquer

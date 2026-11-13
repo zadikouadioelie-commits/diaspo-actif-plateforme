@@ -96,6 +96,8 @@
     return pre.then(function (id) {
       return api('GET', '/initiatives/' + encodeURIComponent(id) + (/[?&]preview=draft(&|$)/.test(location.search) ? '?preview=draft' : '')).then(function (d) {
         etat.init = d.initiative || d;
+        if (window.BoutiqueReglagesPublic) window.BoutiqueReglagesPublic.definir(etat.init.vitrine_reglages);
+        appliquerCouleurs(styleBoutique(etat.init.vitrine_style_json));
         var iid = etat.init.id;
         return Promise.all([
           api('GET', '/initiatives/' + iid + '/produits').then(function (r) { etat.produits = r.produits || []; }).catch(function () {}),
@@ -424,16 +426,27 @@
     }
     return h || '<div class="pf-vide">Rien à afficher ici pour le moment.</div>';
   }
+  /* Couleurs de la boutique (lot 4A, 2026-11-13) : les 3 couleurs choisies à l'étape « Apparence » remplacent bordeaux / bleu nuit / or.
+     Sans couleurs enregistrées, la page garde sa charte d'origine. */
+  var NOMS_COULEURS = {'--pf-bordeaux': 'p', '--pf-bordeaux2': 'p_clair', '--pf-bordeaux3': 'p_fonce', '--pf-marine': 's', '--pf-marine2': 's_clair', '--pf-or': 'a', '--pf-or2': 'a_fonce'};
+  function styleBoutique(v) { try { var o = typeof v === 'string' ? JSON.parse(v || '{}') : v; return o && typeof o === 'object' ? o : {}; } catch (e) { return {}; } }
+  function appliquerCouleurs(style) { if (window.BOUTIQUE_COULEURS && window.BOUTIQUE_COULEURS.appliquerPage) window.BOUTIQUE_COULEURS.appliquerPage(document.body, style, NOMS_COULEURS); }
+  window.addEventListener('message', function (ev) {
+    if (window.parent === window || ev.origin !== location.origin || !ev.data || ev.data.type !== 'da-vitrine-style') return;
+    appliquerCouleurs(ev.data.style || {});
+  });
+  /* Réglages de la boutique (lot 4A) : livraison, minimum, délais, informations légales — rien si la boutique n'a rien réglé. */
+  function rp(nom, opt) { var m = window.BoutiqueReglagesPublic; return m ? m[nom](opt) : ''; }
   function pied() {
     var i = etat.init;
     return '<footer class="pf-pied"><div class="pf-pied-in"><span><b>DIASPO\'ACTIF</b> · Actions locales, impact global</span><div class="liens">' +
-      '<a href="initiative.html?id=' + i.id + '">À propos de la boutique</a><a href="vitrines.html">Toutes les boutiques</a><a href="annuaire.html">Annuaire</a><a href="confidentialite.html">Confidentialité</a><a href="mentions-legales.html">Mentions légales</a></div></div></footer>';
+      '<a href="initiative.html?id=' + i.id + '">À propos de la boutique</a><a href="vitrines.html">Toutes les boutiques</a><a href="annuaire.html">Annuaire</a><a href="confidentialite.html">Confidentialité</a><a href="mentions-legales.html">Mentions légales</a></div></div>' + rp('htmlLegal') + '</footer>';
   }
 
   /* ── affichage ── */
   function dessiner() {
     document.title = nom() + ' — Boutique Portfolio Diaspo\'Actif';
-    app.innerHTML = entete() + hero() + onglets() + '<main class="pf-corps">' + lateral() + '<div class="pf-principal" id="pf-principal">' + panneau() + '</div></main>' + pied();
+    app.innerHTML = entete() + hero() + onglets() + '<main class="pf-corps">' + lateral() + '<div class="pf-principal" id="pf-principal">' + panneau() + '</div></main>' + rp('htmlConditions') + pied();
     demarreCarrousel();
     /* Encart « Sondage en cours » : sondages que le propriétaire a choisi d'afficher sur sa boutique (2026-11-09). */
     var m = app.querySelector('.pf-corps');
