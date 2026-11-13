@@ -100,7 +100,10 @@
     return /^data:/i.test(img) ? '/api/evenements/' + e.id + '/couverture' : img;
   }
   function programme(e) { var p = liste(e.programme_json); return p.filter(function (j) { return j && (liste(j.etapes).length || j.date_debut); }); }
-  function infoSeule(e) { return Number(e.inscription_ouverte) === 0; }
+  /* Rubrique éteinte par le propriétaire à l'étape « Rubriques » (lot 4B) : cachée aux visiteurs, ses données restent. Rien d'éteint = comportement d'avant. */
+  function rub(cle) { return !window.BoutiqueRubriques || window.BoutiqueRubriques.active(etat.init.vitrine_modules_state, cle); }
+  /* Sans la rubrique « Réservation », les événements restent consultables mais ne proposent plus d'inscription (comme un événement informatif). */
+  function infoSeule(e) { return Number(e.inscription_ouverte) === 0 || !rub('reservation'); }
   /* Quel bouton d'inscription ? (mêmes règles que la page des événements) */
   function action(e) {
     if (statut(e) === 'termine') return { lib: 'Événement terminé', actif: false };
@@ -265,18 +268,18 @@
   function rp(nom, opt) { var m = window.BoutiqueReglagesPublic; return m ? m[nom](opt) : ''; }
   function pied() {
     var i = etat.init, adresse = [i.adresse, i.code_postal, i.vitrine_ville || i.ville, i.vitrine_pays || i.pays].filter(Boolean).join(', ');
-    var reseaux = objet(i.reseaux_sociaux), liens = [];
-    if (lienSur(i.site_web)) liens.push(['Web', lienSur(i.site_web), 'Site web']);
+    var reseaux = rub('reseaux_sociaux') ? objet(i.reseaux_sociaux) : {}, liens = [];
+    if (rub('reseaux_sociaux') && lienSur(i.site_web)) liens.push(['Web', lienSur(i.site_web), 'Site web']);
     Object.keys(reseaux).forEach(function (k) { var u = lienSur(reseaux[k]); if (u) liens.push([k.slice(0, 2).toUpperCase(), u, k.charAt(0).toUpperCase() + k.slice(1)]); });
     var cats = categories().slice(0, 6);
     return '<footer class="site-pied" aria-label="Bas de page"><div class="pied-in"><div class="pied-grille">' +
-      '<div class="pied-marque"><div class="logo-pied">' + esc(nom()) + '</div><p>' + esc(texte(i.description).slice(0, 140) || 'L’agenda en ligne de la communauté : ateliers, rencontres, concerts et formations.') + '</p>' +
+      '<div class="pied-marque"><div class="logo-pied">' + esc(nom()) + '</div><p>' + esc((rub('a_propos') ? texte(i.description).slice(0, 140) : '') || 'L’agenda en ligne de la communauté : ateliers, rencontres, concerts et formations.') + '</p>' +
       (liens.length ? '<div class="reseaux" role="group" aria-label="Liens">' + liens.slice(0, 6).map(function (l) { return '<a href="' + esc(l[1]) + '" target="_blank" rel="noopener noreferrer" aria-label="' + esc(l[2]) + '">' + esc(l[0]) + '</a>'; }).join('') + '</div>' : '') + '</div>' +
       '<nav class="pied-col" aria-label="Explorer"><h4>Explorer</h4><ul><li><button type="button" data-nav="cartes">Prochains événements</button></li><li><button type="button" data-nav="agenda">Agenda par mois</button></li><li><a href="annuaire.html">Annuaire des initiatives</a></li><li><a href="vitrines.html">Toutes les boutiques</a></li></ul></nav>' +
       '<nav class="pied-col" aria-label="Catégories"><h4>Catégories</h4><ul>' + (cats.length ? cats.map(function (c) { return '<li><button type="button" data-pied-cat="' + esc(c) + '">' + esc(c) + '</button></li>'; }).join('') : '<li><span class="aide">Bientôt</span></li>') + '</ul></nav>' +
-      '<div class="pied-col pied-contact"><h4>Nous contacter</h4><p>Une question sur un événement ? Écrivez-nous par la messagerie de la plateforme.</p>' +
+      (rub('contact') ? '<div class="pied-col pied-contact"><h4>Nous contacter</h4><p>Une question sur un événement ? Écrivez-nous par la messagerie de la plateforme.</p>' +
       (adresse ? '<address>' + esc(adresse) + (texte(i.vitrine_horaires) ? '<br>' + esc(i.vitrine_horaires) : '') + '</address>' : '') +
-      '<a class="ecrire" href="' + lienMessage('contact') + '">Nous écrire</a></div></div>' +
+      '<a class="ecrire" href="' + lienMessage('contact') + '">Nous écrire</a></div>' : '') + '</div>' +
       '<div class="pied-bas"><p class="copy">© ' + new Date().getFullYear() + ' ' + esc(nom()) + '. Boutique propulsée par Diaspo’Actif.</p></div>' + rp('htmlLegal') + '</div></footer>';
   }
   function page() {

@@ -133,23 +133,29 @@
     if (!m || typeof m !== 'object') return true;
     return !m[cle] || !!m[cle].actif;
   }
+  /* Rubrique éteinte par le propriétaire à l'étape « Rubriques » (lot 4B) : cachée aux visiteurs, ses données restent. Rien d'éteint = comportement d'avant. */
+  function rub(cle) { return !window.BoutiqueRubriques || window.BoutiqueRubriques.active(etat.init.vitrine_modules_state, cle); }
   function creations() {
+    if (!rub('portfolio')) return [];
     return liste(etat.init.vitrine_portfolio_json).map(function (x) {
       return { image: texte(x.image || x.url), titre: texte(x.titre), description: texte(x.description), categorie: texte(x.categorie), lien: lienSur(x.lien) };
     }).filter(function (x) { return x.image; });
   }
   function galerie() {
+    if (!rub('galerie_photos')) return [];
     return liste(etat.init.galerie_json).map(function (x) {
       if (typeof x === 'string') return { image: texte(x), categorie: '', titre: '' };
       return { image: texte(x.url || x.image), categorie: texte(x.categorie), titre: texte(x.titre || x.legende) };
     }).filter(function (x) { return x.image; });
   }
-  function videos() { return liste(etat.init.vitrine_videos_json).filter(function (v) { return texte(v && v.url); }); }
+  function videos() { if (!rub('galerie_videos')) return []; return liste(etat.init.vitrine_videos_json).filter(function (v) { return texte(v && v.url); }); }
   function realisations() {
+    if (!rub('realisations')) return [];
     return liste(etat.init.realisations_json).filter(function (r) { return r && (texte(r.titre) || texte(r.image)); });
   }
-  function temoignages() { return liste(etat.init.vitrine_temoignages_json).filter(function (t) { return t && texte(t.texte); }); }
+  function temoignages() { if (!rub('temoignages')) return []; return liste(etat.init.vitrine_temoignages_json).filter(function (t) { return t && texte(t.texte); }); }
   function services() {
+    if (!rub('services')) return [];
     var i = etat.init, cats = liste(i.vitrine_services_categories_json), exp = liste(i.vitrine_expertise_json), sortie = [];
     function ajoute(x) {
       if (typeof x === 'string') { if (texte(x)) sortie.push({ titre: texte(x), description: '' }); }
@@ -207,19 +213,19 @@
   }
   function lienSurImage(u) { var s = texte(u); return s && !/["'()\\]/.test(s) ? s : ''; }
   function listeOnglets() {
-    var o = [['portfolio', 'Portfolio', 'portfolio']];
+    var o = rub('portfolio') ? [['portfolio', 'Portfolio', 'portfolio']] : [];
     if (realisations().length || galerie().length || videos().length) o.push(['creations', 'Nos créations', 'creations']);
     if (services().length) o.push(['services', 'Services', 'services']);
     if (produitsAffiches().length) o.push(['boutique', 'Boutique', 'boutique']);
-    if (etat.agenda.length || liste(etat.init.vitrine_partenaires_json).length) o.push(['collab', 'Projets & collaborations', 'collab']);
-    var nAvis = (etat.avis && Number(etat.avis.total)) || 0, nTem = temoignages().length;
+    if (agendaVisible().length || partenairesVisibles().length) o.push(['collab', 'Projets & collaborations', 'collab']);
+    var nAvis = rub('avis') ? (etat.avis && Number(etat.avis.total)) || 0 : 0, nTem = temoignages().length;
     if (nAvis || nTem) o.push(['avis', 'Avis' + (nAvis ? ' (' + nAvis + ')' : ''), 'avis']);
-    o.push(['contact', 'Contact', 'contact']);
+    if (rub('contact') || !o.length) o.push(['contact', 'Contact', 'contact']); /* jamais une page sans aucune entrée */
     return o;
   }
   function onglets() {
     var o = listeOnglets();
-    if (!o.some(function (x) { return x[0] === etat.onglet; })) etat.onglet = 'portfolio';
+    if (!o.some(function (x) { return x[0] === etat.onglet; })) etat.onglet = o[0][0];
     return '<div class="pf-onglets"><div class="pf-onglets-in" role="tablist" aria-label="Rubriques de la boutique">' + o.map(function (x) {
       return '<button type="button" class="pf-onglet" role="tab" data-onglet="' + x[0] + '" aria-selected="' + (etat.onglet === x[0]) + '">' + ic(x[2]) + esc(x[1]) + '</button>';
     }).join('') + '</div></div>';
@@ -237,10 +243,10 @@
       '<ul class="pf-infos">' + (lieu ? '<li>' + ic('lieu') + '<span>' + esc(lieu) + '</span></li>' : '') + (i.vitrine_horaires ? '<li>' + ic('horloge') + '<span>' + esc(i.vitrine_horaires) + '</span></li>' : '') + '</ul>' +
       '<a class="pf-bouton pri" href="' + lienMessage('contact') + '">' + ic('contact') + 'Nous contacter</a>' +
       (devisOuvert() ? '<a class="pf-bouton" href="' + lienMessage('devis') + '">Demander un devis</a>' : '') + '</div>';
-    if (desc) h += '<div class="pf-carte pf-apropos"><h3>À propos</h3><p>' + esc(etat.apropos || !longue ? desc : desc.slice(0, 217).replace(/\s+\S*$/, '') + '…') + '</p>' +
+    if (desc && rub('a_propos')) h += '<div class="pf-carte pf-apropos"><h3>À propos</h3><p>' + esc(etat.apropos || !longue ? desc : desc.slice(0, 217).replace(/\s+\S*$/, '') + '…') + '</p>' +
       (longue ? '<button type="button" class="pf-lire" data-act="apropos">' + (etat.apropos ? 'Réduire' : 'Lire la suite') + '</button>' : '') + '</div>';
     if (comp.length) h += '<div class="pf-carte"><h3>Compétences</h3><div class="pf-puces">' + comp.map(function (c) { return '<span class="pf-puce">' + esc(c) + '</span>'; }).join('') + '</div></div>';
-    if (liens.length) h += '<div class="pf-carte"><h3>Liens &amp; réseaux</h3><ul class="pf-liens">' + liens.slice(0, 8).map(function (l) { return '<li><a href="' + esc(l[1]) + '" target="_blank" rel="noopener">' + ic('lien') + esc(l[0]) + '</a></li>'; }).join('') + '</ul></div>';
+    if (liens.length && rub('reseaux_sociaux')) h += '<div class="pf-carte"><h3>Liens &amp; réseaux</h3><ul class="pf-liens">' + liens.slice(0, 8).map(function (l) { return '<li><a href="' + esc(l[1]) + '" target="_blank" rel="noopener">' + ic('lien') + esc(l[0]) + '</a></li>'; }).join('') + '</ul></div>';
     h += '<div class="pf-carte pf-appel"><h3>Vous avez un projet ?</h3><p>Collaborez avec nous : racontez-nous votre idée, nous vous répondons.</p><a class="pf-bouton" href="' + lienMessage('partenariat') + '">Collaborez avec nous</a></div></aside>';
     return h;
   }
@@ -341,6 +347,7 @@
     return '<section>' + enTete(titre || 'Boutique créative') + '<div class="pf-produits">' + p.slice(0, max || 40).map(carteProduit).join('') + '</div></section>';
   }
   function blocAvis() {
+    if (!rub('avis')) return '';
     var av = (etat.avis && etat.avis.avis || []).filter(function (a) { return a.commentaire; });
     if (!av.length) return '';
     return '<section>' + enTete('Avis des clients') + '<div class="pf-avis">' + av.slice(0, 20).map(function (a) {
@@ -348,8 +355,10 @@
       return '<div class="pf-avis-carte"><div class="pf-etoiles">' + etoiles(a.note) + '</div><p>«&nbsp;' + esc(a.commentaire) + '&nbsp;»</p><div class="pf-qui"><span class="pf-rond">' + esc((a.prenom || a.nom || '?').charAt(0).toUpperCase()) + '</span><span>' + esc(n || 'Client') + '</span></div></div>';
     }).join('') + '</div></section>';
   }
+  function agendaVisible() { return rub('evenements') ? etat.agenda : []; }
+  function partenairesVisibles() { return rub('partenaires') ? liste(etat.init.vitrine_partenaires_json).filter(function (x) { return x && texte(x.nom); }) : []; }
   function blocAgenda() {
-    if (!etat.agenda.length) return '';
+    if (!agendaVisible().length) return '';
     return '<section>' + enTete('Prochains événements & formations') + '<div class="pf-agenda">' + etat.agenda.map(function (e) {
       var d = dates(e.date);
       return '<a class="pf-evt" href="' + esc(e.href) + '"><div class="pf-date">' + (d ? '<b>' + d.getDate() + '</b><span>' + d.toLocaleDateString('fr-FR', { month: 'short' }).replace('.', '') + '</span>' : '<b>·</b><span>bientôt</span>') + '</div>' +
@@ -357,13 +366,14 @@
     }).join('') + '</div></section>';
   }
   function blocPartenaires() {
-    var p = liste(etat.init.vitrine_partenaires_json).filter(function (x) { return x && texte(x.nom); });
+    var p = partenairesVisibles();
     if (!p.length) return '';
     return '<section>' + enTete('Nos partenaires') + '<div class="pf-cartouches">' + p.slice(0, 12).map(function (x) {
       return '<div class="pf-cartouche">' + (x.logo_url ? '<img loading="lazy" src="' + esc(x.logo_url) + '" alt="' + esc(x.nom) + '" style="max-height:44px;margin-bottom:6px">' : '') + '<h4>' + esc(x.nom) + '</h4></div>';
     }).join('') + '</div></section>';
   }
   function blocContact() {
+    if (!rub('contact')) return '';
     var i = etat.init, adresse = [i.adresse, i.code_postal, i.vitrine_ville || i.ville, i.vitrine_pays || i.pays].filter(Boolean).join(', ');
     var wa = String(i.vitrine_whatsapp || '').replace(/[^0-9]/g, ''), cartes = '';
     cartes += '<div class="pf-carte"><b>Écrire à ' + esc(nom()) + '</b><span>Par la messagerie de la plateforme.</span><a class="pf-bouton pri" href="' + lienMessage('contact') + '">' + ic('contact') + 'Nous contacter</a>' +

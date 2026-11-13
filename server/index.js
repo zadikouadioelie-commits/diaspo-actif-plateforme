@@ -5423,7 +5423,12 @@ function getVitrineModulesState(init, { draft = false } = {}) {
   const state = {};
   Object.keys(VITRINE_MODULES_REGISTRY).forEach((key, i) => {
     if (stored[key] && typeof stored[key] === "object") {
+      /* choisi : le propriétaire a basculé CETTE rubrique lui-même (étape « Rubriques » de la création, voir PUT /vitrine-draft). Sans lui,
+         "actif" n'est qu'une valeur par défaut (repli sur le contenu, ou éteint à l'inscription) : tout enregistrement du brouillon réécrit
+         l'état complet, donc la simple présence de la rubrique dans l'état enregistré ne prouve aucune décision.
+         Les pages boutique (assets/boutique-rubriques.js) ne cachent une rubrique que sur une décision explicite. */
       state[key] = { actif: !!stored[key].actif, ordre: Number.isFinite(stored[key].ordre) ? stored[key].ordre : i };
+      if (stored[key].choisi === true) state[key].choisi = true;
     } else {
       state[key] = { actif: !!hasContenu[key], ordre: i };
     }
@@ -12182,6 +12187,8 @@ route("PUT", "/api/initiatives/:id/vitrine-draft", async (req, res, params, body
       currentModules[key] = {
         actif: val.actif !== undefined ? !!val.actif : currentModules[key].actif,
         ordre: Number.isFinite(val.ordre) ? val.ordre : currentModules[key].ordre,
+        /* basculée par le propriétaire : les pages de la boutique la suivent désormais (lot 4B) */
+        ...(val.actif !== undefined || currentModules[key].choisi ? { choisi: true } : {}),
       };
     });
   }
