@@ -2173,7 +2173,7 @@ async function initRelaisDiasporaWidget(me, api) {
               <button class="btn btn-sm btn-orange"  id="pv-preview-desktop" onclick="pvSetPreviewDevice('desktop')" aria-pressed="true"  title="Aperçu ordinateur" style="flex:1;min-width:0;justify-content:center;gap:5px;padding-left:6px;padding-right:6px;">Ordinateur</button>
               <button class="btn btn-sm btn-outline" id="pv-preview-tablet"  onclick="pvSetPreviewDevice('tablet')"  aria-pressed="false" title="Aperçu tablette"   style="flex:1;min-width:0;justify-content:center;gap:5px;padding-left:6px;padding-right:6px;">Tablette</button>
               <button class="btn btn-sm btn-outline" id="pv-preview-mobile"  onclick="pvSetPreviewDevice('mobile')"  aria-pressed="false" title="Aperçu mobile"     style="flex:1;min-width:0;justify-content:center;gap:5px;padding-left:6px;padding-right:6px;">Mobile</button>
-              <a href="profil.html?preview=draft#vitrine" target="_blank" class="btn btn-sm btn-outline" style="text-decoration:none;flex:none;" title="Ouvrir dans un onglet" aria-label="Ouvrir l'aperçu dans un nouvel onglet">↗</a>
+              <a id="pv-apercu-lien" href="profil.html?preview=draft#vitrine" target="_blank" class="btn btn-sm btn-outline" style="text-decoration:none;flex:none;" title="Ouvrir dans un onglet" aria-label="Ouvrir l'aperçu dans un nouvel onglet">↗</a>
             </div>
             <div id="pv-zoom-info" style="font-size:11px;color:var(--muted);margin:0 0 8px;flex:none;"></div>
             <!-- direction:rtl place la barre verticale du panneau sur son bord GAUCHE : elle
@@ -2186,7 +2186,7 @@ async function initRelaisDiasporaWidget(me, api) {
                    les marges negatives de compensation posees par pvAjusterEchelleApercu(). -->
               <iframe id="pv-preview-frame" style="direction:ltr;width:1400px!important;max-width:none!important;height:900px!important;border:none;border-radius:8px;background:#fff;box-shadow:0 4px 16px rgba(0,0,0,.12);transition:width .25s ease;display:block;margin:0;flex:none;"></iframe>
             </div>
-            <p style="font-size:11px;color:var(--muted);margin:8px 0 0;flex:none;">Cliquez sur une section de l'aperçu pour aller directement à son réglage.</p>
+            <p id="pv-apercu-note" style="font-size:11px;color:var(--muted);margin:8px 0 0;flex:none;">Cliquez sur une section de l'aperçu pour aller directement à son réglage.</p>
             <div id="pv-draft-status" style="margin:10px 0 8px;font-size:12.5px;font-weight:700;flex:none;"></div>
             <button class="btn btn-orange btn-block" onclick="pvPublish()" style="flex:none;">Publier ma boutique</button>
           </div>
@@ -6675,6 +6675,7 @@ async function pvDraftPatch(payload) {
   const r = await api('PUT', `/initiatives/${window.__vitrineInitId}/vitrine-draft`, payload);
   __pvDraftPending = true;
   renderPvDraftStatus();
+  pvRafraichirApercuDiffere();
   return r;
 }
 
@@ -7027,10 +7028,42 @@ function pvAjusterEchelleApercu() {
   const lbl = document.getElementById('pv-zoom-info');
   if (lbl) lbl.textContent = echelle < 1 ? `Vue d'ensemble · ${Math.round(echelle * 100)} %` : 'Taille réelle · 100 %';
 }
+/* Lot 3 : l'aperçu montre la page dédiée du type de la boutique (celle que verront les visiteurs), lue en mode brouillon.
+   Même correspondance que la redirection de profil-app.html ; un type sans page dédiée (anciens types) garde la présentation générale. */
+const PV_PAGES_DEDIEES = { commercial: 'boutique.html', ecom: 'boutique.html', portfolio: 'portfolio.html', video: 'boutique-video.html',
+  events: 'boutique-evenements.html', impact: 'boutique-impact.html', finance: 'boutique-finance.html' };
+function pvPageDuType() {
+  const t = __pvVitrineType || (__pvVitrineTypes[0] || null);
+  return PV_PAGES_DEDIEES[t] || null;
+}
+/* Adresse de l'aperçu (brouillon) ou de la page publiée de la boutique. */
+function pvUrlBoutique(brouillon) {
+  const page = pvPageDuType(), id = window.__vitrineInitId;
+  if (page && id) return page + '?id=' + encodeURIComponent(id) + (brouillon ? '&preview=draft' : '');
+  return brouillon ? 'profil.html?preview=draft#vitrine' : 'profil.html?vitrine=1#vitrine';
+}
+function pvMajLegendeApercu() {
+  const lien = document.getElementById('pv-apercu-lien');
+  if (lien) lien.href = pvUrlBoutique(true);
+  const note = document.getElementById('pv-apercu-note');
+  if (note) note.textContent = pvPageDuType()
+    ? "C'est la page que verront vos visiteurs, avec vos modifications non publiées. Les réglages se changent dans les étapes, à gauche."
+    : "Ce modèle utilise encore la présentation générale de la boutique. Cliquez sur une section de l'aperçu pour aller directement à son réglage.";
+}
+let __pvDernierApercu = 0, __pvApercuTimer = null;
+/* Après un enregistrement du brouillon, recharge l'aperçu d'une page dédiée (elle n'a pas de mise à jour instantanée). Sans effet si l'aperçu vient d'être rechargé. */
+function pvRafraichirApercuDiffere() {
+  if (!pvPageDuType()) return;
+  clearTimeout(__pvApercuTimer);
+  __pvApercuTimer = setTimeout(() => { if (Date.now() - __pvDernierApercu > 700) pvRefreshPreview(); }, 450);
+}
 function pvRefreshPreview() {
   const frame = document.getElementById('pv-preview-frame');
   if (!frame || !window.__vitrineInitId) return;
-  const targetSrc = `profil.html?preview=draft&_cb=${Date.now()}#vitrine`;
+  __pvDernierApercu = Date.now();
+  pvMajLegendeApercu();
+  const base = pvUrlBoutique(true), coupe = base.indexOf('#');
+  const targetSrc = (coupe >= 0 ? base.slice(0, coupe) : base) + (base.indexOf('?') >= 0 ? '&' : '?') + '_cb=' + Date.now() + (coupe >= 0 ? base.slice(coupe) : '');
   // Ecouteur pose AVANT le changement de src ; par securite (l'evenement 'load' d'iframe s'est
   // revele pas toujours declenche de facon fiable en test), on sonde aussi periodiquement jusqu'a
   // detecter que le nouveau document est bien charge avant de brancher les clics.
@@ -7314,7 +7347,13 @@ function pvMonterAssistant() {
   publication.innerHTML = '<h3 style="margin:0 0 4px;font-size:15px;">Publier</h3>' +
     '<p style="font-size:13px;color:var(--muted);margin:0 0 10px;line-height:1.6;">Rien ne change sur votre boutique publique tant que vous n\'avez pas publié.</p>' +
     '<p id="pv-publication-resume" style="font-size:13px;line-height:1.7;margin:0 0 12px;"></p>' +
-    '<button type="button" class="btn btn-orange" onclick="pvPublish()">Publier ma boutique</button>';
+    '<div id="pv-publication-attente" style="margin:0 0 12px;"></div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">' +
+      '<button type="button" class="btn btn-orange" onclick="pvPublish()">Publier ma boutique</button>' +
+      '<a class="btn btn-outline" id="pv-publication-apercu" target="_blank" rel="noopener" style="text-decoration:none;">Voir l\'aperçu en grand</a>' +
+      '<a class="btn btn-outline" id="pv-publication-publiee" target="_blank" rel="noopener" style="text-decoration:none;">Voir la page publiée</a>' +
+    '</div>' +
+    '<p class="pvw-vide" id="pv-publication-page" style="margin-top:12px;"></p>';
 
   window.__pvAssistant = BoutiqueAssistant.monter(gauche, {
     etapes: [
@@ -7463,6 +7502,22 @@ function pvAssistantResume() {
   lignes.push('Informations légales : ' + (kc.raison_sociale && kc.email ? 'renseignées' : 'à compléter'));
   lignes.push('Rubriques actives : ' + nbRubriques, __pvDraftPending ? 'Des modifications ne sont pas encore publiées.' : 'La boutique publiée est à jour.');
   el.innerHTML = lignes.map(l => _mvEsc(l)).join('<br>');
+  /* Lot 3 : ce qui reste à compléter (sans bloquer la publication), et les liens vers la page dédiée du type. */
+  const attente = document.getElementById('pv-publication-attente');
+  if (attente) {
+    const manque = ['type', 'identite', 'rubriques', 'confiance'].filter(c => pvAssistantEtat(c) === 'afaire');
+    const titres = { type: 'Modèle principal', identite: 'Identité', rubriques: 'Navigation et rubriques', confiance: 'Confiance et informations légales' };
+    attente.innerHTML = manque.length
+      ? '<p style="font-size:13px;font-weight:700;margin:0 0 6px;color:#B45309;">À compléter avant de publier (vous pouvez publier quand même) :</p><div style="display:flex;gap:6px;flex-wrap:wrap;">' +
+        manque.map(c => '<button type="button" class="btn btn-sm btn-outline" onclick="window.__pvAssistant && window.__pvAssistant.afficher(\'' + c + '\', true)">' + _mvEsc(titres[c]) + '</button>').join('') + '</div>'
+      : '<p style="font-size:13px;margin:0;color:#16a34a;font-weight:700;">Les points essentiels sont renseignés.</p>';
+  }
+  const ap = document.getElementById('pv-publication-apercu'), pu = document.getElementById('pv-publication-publiee'), pg = document.getElementById('pv-publication-page');
+  if (ap) ap.href = pvUrlBoutique(true);
+  if (pu) pu.href = pvUrlBoutique(false);
+  if (pg) pg.textContent = pvPageDuType()
+    ? "L'aperçu à droite montre la page de votre modèle (" + modele + "), celle que vos visiteurs verront une fois la boutique publiée."
+    : "Ce modèle utilise encore la présentation générale de la boutique : l'aperçu montre cette présentation.";
 }
 
 /* Lot E4 : « Votre rôle » (organisateur / prestataire / les deux) et « Mon espace organisateur », seulement pour le type « Créateur d'événements ».
@@ -7810,7 +7865,8 @@ function pvApercuInstantane() {
   const frame = document.getElementById('pv-preview-frame');
   let pret = false;
   try { pret = !!(frame && frame.contentDocument && frame.contentDocument.getElementById('pvt-scope')); } catch (e) { pret = false; }
-  if (!pret) { pvRefreshPreview(); return false; }
+  /* Une page dédiée n'a pas de mise à jour instantanée : elle se recharge quand le brouillon est enregistré (pvDraftPatch). */
+  if (!pret) { if (!pvPageDuType()) pvRefreshPreview(); return false; }
   const st = window.__pvStyleCourant || {};
   frame.contentWindow.postMessage({
     type: 'da-vitrine-style',

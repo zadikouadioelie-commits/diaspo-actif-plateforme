@@ -26,17 +26,34 @@
       '</div>'
     );
   }
+  function maintenanceActive() {
+    return fetch('/api/plateforme/boutiques-maintenance', { credentials: 'same-origin' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) { return !!(d && d.en_maintenance); })
+      .catch(function () { return false; });
+  }
+  /* Aperçu du brouillon (?preview=draft&id=…, dans le centre de création) : le propriétaire voit sa propre page même
+     quand la plateforme est en maintenance. On ne s'y fie pas au simple paramètre d'adresse : le serveur répond
+     « apercu_brouillon » vrai seulement au propriétaire connecté de cette boutique. Pour tout autre visiteur, rien ne change. */
+  function apercuDuProprietaire() {
+    var q = new URLSearchParams(location.search), ref = q.get('id') || q.get('slug');
+    if (q.get('preview') !== 'draft' || !ref) return Promise.resolve(false);
+    return fetch('/api/initiatives/' + encodeURIComponent(ref) + '?preview=draft', { credentials: 'same-origin' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) { return !!(d && (d.initiative || d).apercu_brouillon === true); })
+      .catch(function () { return false; });
+  }
   /* Renvoie une Promise<boolean> : true = maintenance active ET conteneur déjà remplacé par
      l'écran (l'appelant doit arrêter son propre chargement), false = continuer normalement. */
   function verifierMaintenanceBoutique(elementOuId) {
     var el = typeof elementOuId === 'string' ? document.getElementById(elementOuId) : elementOuId;
-    return fetch('/api/plateforme/boutiques-maintenance', { credentials: 'same-origin' })
-      .then(function (r) { return r.json(); })
-      .then(function (d) {
-        if (d && d.en_maintenance) { if (el) el.innerHTML = ecran(); return true; }
-        return false;
-      })
-      .catch(function () { return false; });
+    return apercuDuProprietaire().then(function (apercu) {
+      if (apercu) return false;
+      return maintenanceActive().then(function (active) {
+        if (active && el) el.innerHTML = ecran();
+        return active;
+      });
+    });
   }
   window.DA_verifierMaintenanceBoutique = verifierMaintenanceBoutique;
 })();

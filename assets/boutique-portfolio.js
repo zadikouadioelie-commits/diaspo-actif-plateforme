@@ -94,7 +94,7 @@
     var ref = q.get('id') || q.get('slug');
     var pre = ref ? Promise.resolve(ref) : Promise.reject(new Error('Aucune boutique indiquée.'));
     return pre.then(function (id) {
-      return api('GET', '/initiatives/' + encodeURIComponent(id)).then(function (d) {
+      return api('GET', '/initiatives/' + encodeURIComponent(id) + (/[?&]preview=draft(&|$)/.test(location.search) ? '?preview=draft' : '')).then(function (d) {
         etat.init = d.initiative || d;
         var iid = etat.init.id;
         return Promise.all([

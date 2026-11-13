@@ -106,7 +106,7 @@
       return off.id;
     });
     return pre.then(function (id) {
-      return api('GET', '/initiatives/' + encodeURIComponent(id)).then(function (d) {
+      return api('GET', '/initiatives/' + encodeURIComponent(id) + (/[?&]preview=draft(&|$)/.test(location.search) ? '?preview=draft' : '')).then(function (d) {
         etat.init = d.initiative || d;
         var iid = etat.init.id;
         return Promise.all([

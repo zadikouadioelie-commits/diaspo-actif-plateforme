@@ -295,7 +295,7 @@
   function charger() {
     var q = new URLSearchParams(location.search), ref = q.get('id') || q.get('slug');
     if (!ref) return Promise.reject(new Error('Aucune boutique indiquée.'));
-    return api('GET', '/initiatives/' + encodeURIComponent(ref)).then(function (d) {
+    return api('GET', '/initiatives/' + encodeURIComponent(ref) + (/[?&]preview=draft(&|$)/.test(location.search) ? '?preview=draft' : '')).then(function (d) {
       etat.init = d.initiative || d;
       appliquerCouleurs(objet(etat.init.vitrine_style_json));
       var id = etat.init.id, prop = etat.init.owner_user_id;
