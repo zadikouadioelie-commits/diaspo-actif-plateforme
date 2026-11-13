@@ -262,7 +262,7 @@
     return '<section class="pf-une" aria-roledescription="carrousel" aria-label="À la une">' + c.map(function (x, k) {
       return '<div class="pf-diapo' + (k === etat.slide ? ' actif' : '') + '" style="background-image:url(\'' + esc(lienSurImage(x.image)) + '\')">' +
         (x.categorie ? '<span class="etiquette">' + esc(x.categorie) + '</span>' : '') + (x.titre ? '<h2>' + esc(x.titre) + '</h2>' : '') + (x.description ? '<p>' + esc(x.description) + '</p>' : '') +
-        '<button type="button" class="pf-bouton or" data-voir="' + creations().indexOf(x) + '">Voir la création' + ic('fleche') + '</button></div>';
+        '<button type="button" class="pf-bouton or" data-voir="' + k + '">Voir la création' + ic('fleche') + '</button></div>';
     }).join('') + (c.length > 1 ? '<div class="pf-points">' + c.map(function (_, k) { return '<button type="button" data-slide="' + k + '" aria-label="Création ' + (k + 1) + '"' + (k === etat.slide ? ' aria-current="true"' : '') + '></button>'; }).join('') + '</div>' : '') + '</section>';
   }
   function grilleCreations() {
@@ -474,7 +474,12 @@
     clearInterval(etat.minuteur);
     var n = document.querySelectorAll('.pf-diapo').length;
     if (n < 2 || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    etat.minuteur = setInterval(function () { allerSlide((etat.slide + 1) % n); }, 6500);
+    /* lot 4D : le carrousel s'arrête quand une fenêtre est ouverte ou quand on le survole / qu'on y navigue au clavier */
+    etat.minuteur = setInterval(function () {
+      var c = document.querySelector('.pf-une');
+      if (!modalEl.hidden || (c && (c.matches(':hover') || c.contains(document.activeElement)))) return;
+      allerSlide((etat.slide + 1) % n);
+    }, 6500);
   }
   function allerSlide(k) {
     etat.slide = k;
@@ -486,8 +491,10 @@
   function ouvrir(html) {
     modalEl.innerHTML = '<div class="pf-fenetre" role="dialog" aria-modal="true"><button type="button" class="pf-fermer" data-fermer aria-label="Fermer">' + ic('fermer') + '</button>' + html + '</div>';
     modalEl.hidden = false;
+    libererFenetre = window.BoutiqueA11y ? BoutiqueA11y.piege(modalEl) : null; /* lot 4D : le focus entre dans la fenêtre, Tab y reste, retour à la fermeture */
   }
-  function fermer() { modalEl.hidden = true; modalEl.innerHTML = ''; }
+  var libererFenetre = null;
+  function fermer() { modalEl.hidden = true; modalEl.innerHTML = ''; if (libererFenetre) { libererFenetre(); libererFenetre = null; } }
   function voirCreation(k) {
     var x = creations()[k]; if (!x) return;
     ouvrir('<div class="grande"><img src="' + esc(x.image) + '" alt="' + esc(x.titre || 'Création') + '"></div><div class="texte">' +

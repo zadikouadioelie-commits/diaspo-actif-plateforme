@@ -410,7 +410,12 @@
     clearInterval(etat.minuteur);
     var n = document.querySelectorAll('.bq-slide').length;
     if (n < 2 || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    etat.minuteur = setInterval(function () { allerSlide((etat.slide + 1) % n); }, 6500);
+    /* lot 4D : le carrousel s'arrête quand une fenêtre est ouverte ou quand on le survole / qu'on y navigue au clavier */
+    etat.minuteur = setInterval(function () {
+      var c = document.querySelector('.bq-carrousel');
+      if (!modalEl.hidden || (c && (c.matches(':hover') || c.contains(document.activeElement)))) return;
+      allerSlide((etat.slide + 1) % n);
+    }, 6500);
   }
   function allerSlide(k) {
     etat.slide = k;
@@ -426,9 +431,11 @@
   /* ── fenêtres ── */
   function ouvrir(html) {
     modalEl.innerHTML = '<div class="bq-fenetre" role="dialog" aria-modal="true"><button type="button" class="bq-fermer" data-fermer aria-label="Fermer">' + ic('fermer') + '</button>' + html + '</div>';
-    modalEl.hidden = false; var b = modalEl.querySelector('input,textarea,button.plein,a.plein'); if (b) b.focus();
+    modalEl.hidden = false; libererFenetre = window.BoutiqueA11y ? BoutiqueA11y.piege(modalEl) : null; /* lot 4D : Tab reste dans la fenêtre, le focus revient à la fermeture */
+    var b = modalEl.querySelector('input,textarea,button.plein,a.plein'); if (b) b.focus();
   }
-  function fermer() { modalEl.hidden = true; modalEl.innerHTML = ''; }
+  var libererFenetre = null;
+  function fermer() { modalEl.hidden = true; modalEl.innerHTML = ''; if (libererFenetre) { libererFenetre(); libererFenetre = null; } }
   function produit(id) { return etat.produits.filter(function (p) { return Number(p.id) === Number(id); })[0]; }
   function detail(id) {
     var p = produit(id); if (!p) return;

@@ -1,0 +1,40 @@
+/* ===========================================================
+   assets/boutique-a11y.css — Cibles tactiles des pages boutique (lot 4D, 2026-11-13)
+   Sur téléphone et écran tactile SEULEMENT (le rendu de la maquette sur ordinateur ne change pas) :
+   - les petites icônes, cœurs, flèches, croix et points gardent leur aspect mais leur zone de toucher
+     est agrandie à 44 × 44 px par un pseudo-élément invisible ;
+   - les liens et boutons texte trop bas (pied de page, « Voir tout », filtres) prennent 44 px de haut.
+   Pages : Commerce (.bq), Vidéo (.bv), Portfolio (.pf), Événements (.evb) — Impact et Finance partagent leurs règles
+   avec le CSS Impact, traité à part.
+   =========================================================== */
+@media (pointer: coarse), (max-width: 720px) {
+
+  /* ── zone de toucher agrandie, aspect inchangé ── */
+  .bq-icone, .bq-coeur, .bq-fl, .bq-panier-rond, .bq-fermer, .bq-rech button,
+  .bv-icone, .bv-coeur, .bv-fermer, .bv-vue button,
+  .pf-icone, .pf-coeur, .pf-fermer { position: relative; }
+  .bq-coeur, .bq-fl, .bq-fermer, .bv-fermer, .pf-coeur, .pf-fermer { position: absolute; } /* déjà posés par leur page */
+  .bq-icone::after, .bq-coeur::after, .bq-fl::after, .bq-panier-rond::after, .bq-fermer::after, .bq-rech button::after,
+  .bv-icone::after, .bv-coeur::after, .bv-fermer::after, .bv-vue button::after,
+  .pf-icone::after, .pf-coeur::after, .pf-fermer::after {
+    content: ""; position: absolute; left: 50%; top: 50%; width: max(100%, 44px); height: max(100%, 44px); transform: translate(-50%, -50%);
+  }
+
+  /* ── points de défilement (10 px) : zone haute de 44 px, étroite pour ne pas chevaucher le voisin ── */
+  .bq-points button, .pf-points button { position: relative; }
+  .bq-points button::after, .pf-points button::after {
+    content: ""; position: absolute; left: -3px; right: -3px; top: 50%; height: 44px; transform: translateY(-50%);
+  }
+
+  /* ── liens et boutons texte : 44 px de haut ── */
+  .bq-compte, .bv-compte, .pf-compte, .evb .logo { min-height: 44px; }
+  .bq-voir, .bq-bouton, .pf-lire, .pf-bouton, .bv-plus, .bv-ajout, .bv-cat, .bv-bloc-t, .bv-fil-tete button, .bv-proprio a {
+    min-height: 44px; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center;
+  }
+  .bv-bloc-t { display: flex; justify-content: space-between; width: 100%; }
+  .bv-tri select, .bv-vue button { min-height: 44px; }
+  .bq-pied li a, .bq-pied button.lien, .bv-pied nav a, .pf-pied .liens a, .pf-pied li a {
+    display: inline-flex; align-items: center; min-height: 44px;
+  }
+  .bq-nav a, .pf-nav a, .bv-nav a { min-height: 44px; display: inline-flex; align-items: center; box-sizing: border-box; }
+}

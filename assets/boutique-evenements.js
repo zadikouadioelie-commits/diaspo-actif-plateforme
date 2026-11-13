@@ -317,6 +317,7 @@
     document.getElementById('evOv').classList.add('open');
     fiche(e, []);
     document.querySelector('#evOv [data-close]').focus();
+    libererFiche = window.BoutiqueA11y ? BoutiqueA11y.piege(document.getElementById('evOv'), { restaurer: false, ouvreur: etat.ouvreur }) : null; /* lot 4D : Tab reste dans la fiche */
     api('GET', '/evenements/' + e.id).then(function (r) { if (etat.courant && etat.courant.id === e.id) fiche(e, r.cagnottes || []); }).catch(function () { /* la fiche reste complète sans les cagnottes */ });
   }
   function fiche(e, cagnottes) {
@@ -353,9 +354,11 @@
       (cagnottes.length ? '<h3 class="st">Cagnottes liées</h3>' + cagnottes.map(function (c) { return '<div class="cagnotte"><b>' + esc(c.titre) + '</b><a class="btn or" style="flex:0 0 auto" href="cagnotte.html?slug=' + encodeURIComponent(c.slug) + '">Participer</a></div>'; }).join('') : '') + '</div>';
     document.getElementById('eBody').innerHTML = h;
   }
+  var libererFiche = null;
   function fermer() {
     var ov = document.getElementById('evOv'); if (!ov) return;
     ov.classList.remove('open');
+    if (libererFiche) { libererFiche(); libererFiche = null; }
     if (etat.ouvreur && document.contains(etat.ouvreur) && etat.ouvreur.focus) etat.ouvreur.focus();
     etat.courant = null;
   }

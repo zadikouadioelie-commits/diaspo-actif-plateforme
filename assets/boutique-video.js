@@ -312,9 +312,11 @@
       (v.description ? '<p>' + esc(v.description) + '</p>' : '') +
       '<div class="bv-fiche-bas">' + (v.vu == null ? '<span class="bv-prix">Sur devis</span>' : '<span class="bv-prix">' + (v.promo ? '<s>' + argent(v.prix, v.devise) + '</s>' : '') + argent(v.vu, v.devise) + '</span>') +
       (estProprio() ? '' : (v.vu == null ? '<a class="bv-ajout" href="messagerie.html?with=' + esc(etat.init.owner_user_id) + '&origine=vitrine&objet=' + encodeURIComponent('Vidéo : ' + v.nom) + '">Demander un devis</a>' : '<button type="button" class="bv-ajout" data-ajout="' + v.id + '">' + ic('panier') + 'Ajouter au panier</button>')) + '</div></div></div>';
+    libererLecteur = window.BoutiqueA11y ? BoutiqueA11y.piege(modalEl) : null; /* lot 4D : Tab reste dans le lecteur, le focus revient à la fermeture */
     var f = modalEl.querySelector('[data-fermer]'); if (f) f.focus();
   }
-  function fermerLecteur() { modalEl.hidden = true; modalEl.innerHTML = ''; }
+  var libererLecteur = null;
+  function fermerLecteur() { modalEl.hidden = true; modalEl.innerHTML = ''; if (libererLecteur) { libererLecteur(); libererLecteur = null; } }
 
   /* ── panier ── */
   function ajouter(id) {
