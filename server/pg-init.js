@@ -970,6 +970,7 @@ const COLONNES_MIGRATION = [
     ['initiatives', 'vitrine_partenariat_active', 'INTEGER DEFAULT 0'],
     ['initiatives', 'vitrine_style_json', "TEXT DEFAULT '{}'"],
     ['initiatives', 'vitrine_options_json', "TEXT DEFAULT '[]'"],
+    ['initiatives', 'vitrine_reglages_json', "TEXT DEFAULT '{}'"],
     ['initiatives', 'slogan', 'TEXT'],
     ['initiatives', 'vitrine_draft_json', "TEXT DEFAULT '{}'"],
     // Modules "Galerie vidéos", "Portfolio", "Réservation" — miroir de server/db.js

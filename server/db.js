@@ -7705,6 +7705,8 @@ db.exec(`
   if (!initCols7.includes('vitrine_style_json'))              db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_style_json TEXT DEFAULT '{}'");
   // Options de la boutique (lot B4) : [{ type, copies }] publiées avec la vitrine (le brouillon les garde dans vitrine_draft_json.options).
   if (!initCols7.includes('vitrine_options_json'))            db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_options_json TEXT DEFAULT '[]'");
+  // Réglages par boutique (assistant de création, lot 2) : commercial, livraison, confiance — voir server/boutique-reglages.js. Le brouillon les garde dans vitrine_draft_json.reglages.
+  if (!initCols7.includes('vitrine_reglages_json'))           db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_reglages_json TEXT DEFAULT '{}'");
   if (!initCols7.includes('slogan'))                          db.exec("ALTER TABLE initiatives ADD COLUMN slogan TEXT");
   // Brouillon du constructeur "Paramètres Vitrine" (aperçu dynamique) : { type, modules, style, theme }.
   // Tant que non publié via POST /vitrine-publish, la vitrine publique reste inchangée.

@@ -63,3 +63,32 @@
   .pvw-sous .pvw-etape { padding-left: 12px; }
 }
 @media (prefers-reduced-motion: reduce) { .pvw-jauge i { transition: none; } }
+
+/* Formulaires des étapes 6, 7 et 10 (assets/boutique-reglages-ui.js) et listes d'état des étapes 8, 9 et 11 */
+.rgl { display: grid; gap: 14px; }
+.rgl-champ { display: grid; gap: 6px; margin: 0; padding: 0; border: 0; min-width: 0; }
+.rgl-champ[hidden] { display: none; }
+.rgl label, .rgl legend { font-size: 13px; font-weight: 700; color: var(--text, #0f172a); padding: 0; }
+.rgl-lib { font-weight: 700; }
+.rgl-aide { display: block; font-size: 12px; font-weight: 400; line-height: 1.5; color: var(--muted, #475569); }
+.rgl-etat { display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--border, #e2e8f0); color: var(--muted, #475569); vertical-align: middle; }
+.rgl-etat.rgl-applique { color: var(--text, #0f172a); border-color: var(--orange, #c2410c); }
+.rgl input[type="text"], .rgl input[type="number"], .rgl input[type="email"], .rgl input[type="url"], .rgl input[type="search"], .rgl select, .rgl textarea {
+  width: 100%; box-sizing: border-box; min-height: 40px; padding: 8px 12px; border-radius: 10px; font: inherit; font-size: 13px;
+  border: 1.5px solid var(--border, #e2e8f0); background: var(--card, #fff); color: var(--text, #0f172a);
+}
+.rgl textarea { resize: vertical; }
+.rgl input:focus-visible, .rgl select:focus-visible, .rgl textarea:focus-visible, .rgl button:focus-visible { outline: 3px solid var(--orange, #c2410c); outline-offset: 2px; }
+.rgl-case { display: flex; align-items: center; gap: 8px; font-weight: 600; min-height: 32px; }
+.rgl-case input { width: 18px; height: 18px; flex: none; }
+.rgl-puces { display: flex; flex-wrap: wrap; gap: 6px; }
+.rgl-puce { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; padding: 3px 4px 3px 10px; border-radius: 999px; border: 1px solid var(--orange, #c2410c); color: var(--text, #0f172a); }
+.rgl-puce button { min-width: 28px; min-height: 28px; border: 0; background: transparent; color: inherit; font-size: 16px; cursor: pointer; border-radius: 50%; }
+.rgl-vide, .rgl-compte { font-size: 12.5px; color: var(--muted, #475569); }
+.rgl-liste { display: flex; flex-wrap: wrap; gap: 6px; max-height: 190px; overflow: auto; padding: 4px; border: 1px solid var(--border, #e2e8f0); border-radius: 10px; }
+.rgl-pays { min-height: 34px; padding: 4px 12px; border-radius: 999px; border: 1.5px solid var(--border, #e2e8f0); background: transparent; color: var(--text, #0f172a); font: inherit; font-size: 12.5px; cursor: pointer; }
+.rgl-pays.rgl-on { border-color: var(--orange, #c2410c); font-weight: 700; }
+.rgl-erreur { margin: 0; font-size: 13px; font-weight: 700; color: #dc2626; }
+.rgl-ok { margin: 0; font-size: 12.5px; color: var(--muted, #475569); }
+.rgl-erreur[hidden], .rgl-ok[hidden] { display: none; }
+.pvw-liste-info { margin: 0 0 12px; padding-left: 18px; display: grid; gap: 6px; font-size: 13.5px; line-height: 1.55; }

@@ -195,6 +195,7 @@
 <script src="assets/boutique-events-espace.js?v=1"></script>
 <script src="assets/boutique-options-ui.js?v=1"></script>
 <script src="assets/boutique-assistant.js?v=1"></script>
+<script src="assets/boutique-reglages-ui.js?v=1"></script>
 <script src="assets/soumission-da.js"></script>
 <script src="assets/retours-commun.js?v=1"></script>
 <script src="assets/retours-vendeur.js?v=1"></script>
@@ -6602,6 +6603,9 @@ let __pvVitrineTypes = [];
 let __pvInit = null;
 let __pvDraftPending = false;
 let __pvOptions = [];   // options de la boutique (lot B4) : [{ type, copies }], lues dans le brouillon
+let __pvReglages = {};  // réglages de la boutique (lot 2) : { commercial, livraison, confiance }, lus dans le brouillon
+let __pvConnect = null; // état du compte de paiement (Stripe Connect), lu à l'étape Paiements
+let __pvMembres = null; // membres affiliés de l'initiative, lus à l'étape Équipe
 
 async function loadParametresVitrineFull() {
   if (!window.__vitrineInitId) {
@@ -6623,6 +6627,8 @@ async function loadParametresVitrineFull() {
     __pvVitrineTypes = Array.isArray(init.vitrine_types) ? init.vitrine_types : (init.vitrine_type ? [init.vitrine_type] : []);
     __pvDraftPending = !!init.vitrine_draft_pending;
     __pvOptions = Array.isArray(init.vitrine_options) ? init.vitrine_options : [];
+    __pvReglages = init.vitrine_reglages || {};
+    pvRendreReglages();
     window.__pvInitTheme = init.vitrine_theme || 'bordeaux';
     let styleObj = {};
     try { styleObj = JSON.parse(init.vitrine_style_json || '{}') || {}; } catch (e) {}
@@ -7166,6 +7172,7 @@ async function pvAnnulerConfig() {
       if (r.draft && r.draft.style && r.draft.style.preset) window.__pvStylePreset = r.draft.style.preset;
       pvStudioCharger((r.draft && r.draft.style) || {});
       await pvRechargerOptions();
+      await pvRechargerReglages();
     } catch (e) { alert('Annulation impossible : ' + (e.message || '')); }
   } else if (ctx && ctx.activeParNous) {
     /* Repli quand l'instantané manque : on défait au moins l'activation automatique. */
@@ -7294,6 +7301,15 @@ function pvMonterAssistant() {
   const carteOptions = nouvelleCarte('pv-card-options', '', [document.getElementById('pv-options')]);
   const carteBonus = nouvelleCarte('pv-card-bonus', "Toute l'ancienne boutique est conservée ici quand vous changez de type. Vous choisissez ce qui devient visible.",
     [document.getElementById('pv-bonus'), vide('Aucun contenu en bonus pour le moment : cette liste se remplit quand vous changez de type.')]);
+  const zoneReglages = (section) => { const d = document.createElement('div'); d.id = 'pv-reglages-' + section; return d; };
+  const carteReglages = (section, intro) => nouvelleCarte('pv-card-' + section, intro, [zoneReglages(section)]);
+  const zoneEtape = (id) => { const d = document.createElement('div'); d.id = id; return d; };
+  const carteCommercial = carteReglages('commercial', "Ces règles s'appliquent à chaque commande de votre boutique. Elles sont enregistrées dans le brouillon, puis publiées avec le reste.");
+  const carteLivraison = carteReglages('livraison', "Réglez ce que votre boutique propose, quel que soit le produit. Le réglage de chaque produit reste valable : le plus strict l'emporte.");
+  const carteConfiance = carteReglages('confiance', "Les informations qui rassurent vos clients. Elles sont enregistrées avec votre boutique.");
+  const cartePaiements = nouvelleCarte('pv-card-paiements', "Les paiements de votre boutique passent directement par votre compte Stripe Connect. Voici son état réel.", [zoneEtape('pv-etape-paiements')]);
+  const carteEquipe = nouvelleCarte('pv-card-equipe', "Les personnes affiliées à votre initiative. Les invitations et les demandes se gèrent dans Cotisations & Adhésions.", [zoneEtape('pv-etape-equipe')]);
+  const carteNotifications = nouvelleCarte('pv-card-notifications', "Les alertes que vous recevez déjà dans la cloche de votre espace. Elles sont automatiques.", [zoneEtape('pv-etape-notifications')]);
   const publication = nouvelleCarte('pv-card-publication', '', []);
   publication.innerHTML = '<h3 style="margin:0 0 4px;font-size:15px;">Publier</h3>' +
     '<p style="font-size:13px;color:var(--muted);margin:0 0 10px;line-height:1.6;">Rien ne change sur votre boutique publique tant que vous n\'avez pas publié.</p>' +
@@ -7308,7 +7324,13 @@ function pvMonterAssistant() {
       { cle: 'apparence', num: '4', titre: 'Apparence et personnalisation', mots: 'couleurs style texture thème palette dégradé' },
       { cle: 'rubriques', num: '5', titre: 'Navigation et rubriques', mots: 'rubriques modules ordre activation menu sections' },
       { cle: 'bonus', titre: 'Bonus boutique', sous: true, mots: 'bonus ancien contenu migration' },
-      { cle: 'publication', titre: 'Publication', mots: 'publier statut visible masquer brouillon' },
+      { cle: 'commercial', num: '6', titre: 'Paramètres commerciaux', mots: 'minimum commande pays vente expédier montant prix' },
+      { cle: 'livraison', num: '7', titre: 'Livraison et expéditions', mots: 'retrait expédition frais gratuits délai préparation transporteur' },
+      { cle: 'paiements', num: '8', titre: 'Paiements et facturation', mots: 'stripe connect compte paiement virement carte encaisser' },
+      { cle: 'equipe', num: '9', titre: 'Équipe et permissions', mots: 'membres affiliés équipe invitations droits' },
+      { cle: 'confiance', num: '10', titre: 'Confiance et informations légales', mots: 'raison sociale siret cgv retours mentions légales confidentialité contact' },
+      { cle: 'notifications', num: '11', titre: 'Notifications et communication', mots: 'alertes cloche vente devis message' },
+      { cle: 'publication', num: '12', titre: 'Publication', mots: 'publier statut visible masquer brouillon' },
     ],
     contenus: {
       type: [carteDe('pv-templates-grid')],
@@ -7317,12 +7339,99 @@ function pvMonterAssistant() {
       apparence: [carteDe('pv-style-presets')],
       rubriques: [carteDe('pv-quick-activate'), carteDe('pv-modules-lib'), document.getElementById('pv-order-card')],
       bonus: [carteBonus],
+      commercial: [carteCommercial],
+      livraison: [carteLivraison],
+      paiements: [cartePaiements],
+      equipe: [carteEquipe],
+      confiance: [carteConfiance],
+      notifications: [carteNotifications],
       publication: [carteDe('btn-statut-visible'), publication],
     },
     etat: pvAssistantEtat,
+    onAfficher: pvAssistantAfficher,
     onPublier: () => pvPublish(),
   });
 }
+/* Étapes 6, 7 et 10 (lot 2) : formulaires enregistrés dans le brouillon (reglages), appliqués ensuite aux commandes par le serveur. */
+function pvRendreReglages() {
+  if (!window.BoutiqueReglagesUI) return;
+  ['commercial', 'livraison', 'confiance'].forEach(section => {
+    const zone = document.getElementById('pv-reglages-' + section);
+    if (zone) BoutiqueReglagesUI.rendre(zone, { section, valeurs: __pvReglages, onChanger: pvChangerReglages });
+  });
+  if (window.__pvAssistant) window.__pvAssistant.rafraichir();
+}
+async function pvChangerReglages(corps) {
+  const r = await pvDraftPatch({ reglages: corps });
+  if (r && r.draft && r.draft.reglages) __pvReglages = r.draft.reglages;
+  if (window.__pvAssistant) window.__pvAssistant.rafraichir();
+  pvAssistantResume();
+}
+async function pvRechargerReglages() {
+  try {
+    const r = await api('GET', '/mon-initiative?preview=draft');
+    __pvReglages = (r.initiative && r.initiative.vitrine_reglages) || {};
+  } catch (e) { /* l'écran garde ses valeurs */ }
+  pvRendreReglages();
+}
+/* Étapes 8, 9 et 11 : l'état réel de ce qui existe déjà sur la plateforme, lu à l'ouverture de l'étape. */
+function pvAssistantAfficher(cle) {
+  if (cle === 'paiements') pvRendreEtapePaiements();
+  else if (cle === 'equipe') pvRendreEtapeEquipe();
+  else if (cle === 'notifications') pvRendreEtapeNotifications();
+}
+function pvOuvrirSection(nom) {
+  const lien = document.querySelector('#sidebar [data-section="' + nom + '"], [data-section="' + nom + '"]');
+  if (lien) lien.click(); else location.hash = nom;
+}
+async function pvRendreEtapePaiements() {
+  const zone = document.getElementById('pv-etape-paiements'); if (!zone) return;
+  if (!window._daPremiumInitiative && !(window.daBypassActive && window.daBypassActive('paiement_boutique'))) { zone.innerHTML = premiumLockedCardHtml('paiement_boutique'); return; }
+  const initId = window.__vitrineInitId; if (!initId) return;
+  zone.innerHTML = '<p class="pvw-vide">Chargement de l\'état du compte…</p>';
+  try {
+    const r = await api('GET', `/initiatives/${initId}/connect/status`);
+    __pvConnect = r;
+    const actif = r.connecte && r.charges_enabled && r.payouts_enabled;
+    const texte = actif ? 'Paiements activés : votre boutique peut recevoir de vrais paiements et des virements.'
+      : !r.connecte ? 'Aucun compte de paiement configuré pour l\'instant. Sans compte, vos clients ne peuvent pas payer en ligne.'
+      : r.details_submitted ? 'Documents envoyés : Stripe termine sa vérification.' : 'Configuration commencée : des informations manquent encore.';
+    zone.innerHTML = '<p style="font-size:14px;font-weight:700;margin:0 0 10px;">' + _mvEsc(texte) + '</p>' +
+      (actif ? '' : '<button type="button" class="btn btn-orange" onclick="startConnectOnboarding()">' + (r.connecte ? 'Compléter la configuration' : 'Activer les paiements') + '</button> ') +
+      '<button type="button" class="btn btn-outline" onclick="pvOuvrirSection(\'paiement\')">Ouvrir le module paiement</button>' +
+      '<p id="connect-err" style="color:#dc2626;font-size:12px;margin:8px 0 0;display:none;"></p>' +
+      '<p class="pvw-vide" style="margin-top:12px;">La TVA et la facturation se règlent dans votre compte Stripe. Aucune donnée de carte bancaire n\'est stockée sur la plateforme.</p>';
+  } catch (e) { zone.innerHTML = '<p style="color:#dc2626;font-size:13px;">' + _mvEsc(e.message || 'Chargement impossible.') + '</p>'; }
+  if (window.__pvAssistant) window.__pvAssistant.rafraichir();
+}
+async function pvRendreEtapeEquipe() {
+  const zone = document.getElementById('pv-etape-equipe'); if (!zone) return;
+  const initId = window.__vitrineInitId; if (!initId) return;
+  zone.innerHTML = '<p class="pvw-vide">Chargement des membres…</p>';
+  try {
+    const r = await api('GET', `/initiatives/${initId}/membres`);
+    const m = Array.isArray(r.membres) ? r.membres : [];
+    __pvMembres = m;
+    const n = (st, extra) => m.filter(x => x.statut === st && (!extra || extra(x))).length;
+    const demandes = n('en_attente', x => x.origine === 'demande');
+    zone.innerHTML = '<ul class="pvw-liste-info"><li><strong>' + n('accepte') + '</strong> membre(s) affilié(s)</li>' +
+      '<li><strong>' + n('en_attente', x => x.origine !== 'demande') + '</strong> invitation(s) en attente de réponse</li>' +
+      '<li><strong>' + demandes + '</strong> demande(s) d\'affiliation à traiter</li></ul>' +
+      '<p class="pvw-vide">Le propriétaire de la boutique a toujours tous les droits. Les droits détaillés par rôle ne sont pas encore proposés.</p>' +
+      '<button type="button" class="btn btn-orange" onclick="pvOuvrirSection(\'adhesions-init\'); if (window.adhSwitchTab) adhSwitchTab(\'affiliation\')">Gérer les membres affiliés</button>';
+  } catch (e) { zone.innerHTML = '<p style="color:#dc2626;font-size:13px;">' + _mvEsc(e.message || 'Chargement impossible.') + '</p>'; }
+  if (window.__pvAssistant) window.__pvAssistant.rafraichir();
+}
+function pvRendreEtapeNotifications() {
+  const zone = document.getElementById('pv-etape-notifications'); if (!zone || zone.getAttribute('data-ok')) return;
+  zone.setAttribute('data-ok', '1');
+  zone.innerHTML = '<ul class="pvw-liste-info"><li><strong>Nouvelle vente</strong> : à chaque commande payée, avec le mode (retrait ou expédition) et la ville.</li>' +
+    '<li><strong>Nouvelle demande de devis</strong> : quand un visiteur vous écrit depuis un produit.</li>' +
+    '<li><strong>Nouvelle demande de commande</strong> : pour un produit sans prix fixe.</li></ul>' +
+    '<p class="pvw-vide">Ces alertes arrivent dans la cloche de votre espace et ne peuvent pas être désactivées une par une pour l\'instant.</p>' +
+    '<button type="button" class="btn btn-outline" onclick="pvOuvrirSection(\'messages-vitrine\')">Ouvrir les messages de la boutique</button>';
+}
+
 function pvAssistantEtat(cle) {
   const v2 = __pvRegistry && __pvRegistry.types_v2;
   const nbRubriques = __pvModulesState ? Object.values(__pvModulesState).filter(m => m && m.actif).length : 0;
@@ -7332,6 +7441,11 @@ function pvAssistantEtat(cle) {
     case 'options': return (v2 && v2.actif && __pvOptions.length) ? 'ok' : null;
     case 'apparence': { let st = {}; try { st = JSON.parse((__pvInit && __pvInit.vitrine_style_json) || '{}') || {}; } catch (e) {} return (st.couleurs && st.couleurs.length) || st.preset ? 'ok' : null; }
     case 'rubriques': return nbRubriques ? 'ok' : 'afaire';
+    case 'commercial': { const c = __pvReglages.commercial || {}; return (Number(c.minimum_commande) > 0 || (c.pays_vente || []).length) ? 'ok' : null; }
+    case 'livraison': { const l = __pvReglages.livraison || {}; return (l.frais_mode && l.frais_mode !== 'produit') || l.delai_estime || Number(l.preparation_jours) > 0 || l.expedition === false || l.retrait === false ? 'ok' : null; }
+    case 'paiements': return __pvConnect ? (__pvConnect.connecte && __pvConnect.charges_enabled && __pvConnect.payouts_enabled ? 'ok' : 'afaire') : null;
+    case 'equipe': return __pvMembres ? (__pvMembres.filter(m => m.statut === 'accepte').length ? 'ok' : null) : null;
+    case 'confiance': { const k = __pvReglages.confiance || {}; return k.raison_sociale && k.email ? 'ok' : 'afaire'; }
     case 'publication': return __pvDraftPending ? 'afaire' : 'ok';
     default: return null;
   }
@@ -7345,6 +7459,8 @@ function pvAssistantResume() {
   const nbRubriques = __pvModulesState ? Object.values(__pvModulesState).filter(m => m && m.actif).length : 0;
   const lignes = ['Modèle principal : ' + modele];
   if (v2 && v2.actif) lignes.push('Modules complémentaires : ' + (__pvOptions.length || 'aucun'));
+  const kc = __pvReglages.confiance || {};
+  lignes.push('Informations légales : ' + (kc.raison_sociale && kc.email ? 'renseignées' : 'à compléter'));
   lignes.push('Rubriques actives : ' + nbRubriques, __pvDraftPending ? 'Des modifications ne sont pas encore publiées.' : 'La boutique publiée est à jour.');
   el.innerHTML = lignes.map(l => _mvEsc(l)).join('<br>');
 }

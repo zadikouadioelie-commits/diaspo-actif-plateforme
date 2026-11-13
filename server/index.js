@@ -147,6 +147,7 @@ const RelancePublication = require("./relance-publication");
 const RelanceMessages = require("./relance-messages");
 const BoutiqueCouleurs = require("../assets/boutique-couleurs.js"); /* couleurs et textures de la boutique : validation du style du brouillon (même fichier que la page) */
 const BoutiqueEvents = require("./boutique-events"); /* lot E1 : boutique « Créateur d'événements » (modèle de modules, profil organisateur / prestataire) */
+const BoutiqueReglages = require("./boutique-reglages"); /* assistant de création, lot 2 : réglages par boutique (commercial, livraison, confiance), appliqués à la commande */
 const BoutiqueTypes = require("./boutique-types"); /* lot B : les 6 types de boutique (registre assets/boutique-types.js) sur la vraie plateforme, derrière un interrupteur administrateur */
 const DepotDetourne = require("./depot-detourne"); /* lot F : un seul module de dépôt (« Soumettre à Diaspo'Actif ») — refuse les textes de boutique qui détournent le dépôt de projet */
 /* Étape 3 : l'échéance réelle d'une session enregistrée est dans le registre (30 jours glissants pour un
@@ -5901,6 +5902,8 @@ route("POST", "/api/produits/:id/commander", async (req, res, params, body) => {
   }
   let livraisonNom = null, livraisonAdresse = null, livraisonCodePostal = null, livraisonVille = null, livraisonPays = null, livraisonTelephone = null;
   let fraisLivraison = 0;
+  /* Réglages de la boutique (assistant de création, lot 2) : expédition / retrait autorisés, pays desservis, minimum de commande, frais. */
+  const reglagesBoutique = BoutiqueReglages.lire(init.vitrine_reglages_json);
   if (modeLivraisonDemande === "expedition") {
     livraisonNom = String(body.livraison_nom || "").trim();
     livraisonAdresse = String(body.livraison_adresse || "").trim();
@@ -5911,8 +5914,13 @@ route("POST", "/api/produits/:id/commander", async (req, res, params, body) => {
     if (!livraisonNom || !livraisonAdresse || !livraisonCodePostal || !livraisonVille || !livraisonPays) {
       return sendJSON(res, 400, { error: "Adresse de livraison incomplète (nom, adresse, code postal, ville et pays requis)." });
     }
-    fraisLivraison = prod.frais_expedition != null ? Number(prod.frais_expedition) : 0;
+    fraisLivraison = BoutiqueReglages.fraisLivraison(reglagesBoutique, prod.frais_expedition != null ? Number(prod.frais_expedition) : 0);
   }
+  const refusReglages = BoutiqueReglages.controlerCommande(reglagesBoutique, {
+    mode: modeLivraisonDemande, pays: livraisonPays === null ? undefined : livraisonPays,
+    montant: prod.prix != null && Number(prod.prix) > 0 ? Number(prod.prix) * quantite : undefined,
+  });
+  if (refusReglages) return sendJSON(res, 400, { error: refusReglages });
 
   /* ── Produit payant : vraie session de paiement (Stripe par défaut, ou PayPal) ── */
   if (prod.prix != null && Number(prod.prix) > 0) {
@@ -6106,6 +6114,9 @@ route("POST", "/api/panier", async (req, res, params, body) => {
   if (modeLivraisonDemande === "retrait" && !prod.livraison_retrait && prod.livraison_expedition) {
     return sendJSON(res, 400, { error: "Le retrait sur place n'est pas proposé pour ce produit." });
   }
+  /* Réglages de la boutique (lot 2) : modes de livraison autorisés (le pays et le minimum se contrôlent au paiement). */
+  const refusReglagesPanier = BoutiqueReglages.controlerCommande(BoutiqueReglages.lire(init.vitrine_reglages_json), { mode: modeLivraisonDemande });
+  if (refusReglagesPanier) return sendJSON(res, 400, { error: refusReglagesPanier });
 
   const existant = await db.prepare("SELECT id FROM panier_items WHERE user_id=? AND produit_id=? AND mode_livraison=?").get(user.id, produitId, modeLivraisonDemande);
   if (existant) {
@@ -6218,6 +6229,19 @@ route("POST", "/api/panier/commander", async (req, res, params, body) => {
     }
   }
 
+  /* Réglages de la boutique (lot 2) : mode de chaque ligne, pays desservi, minimum sur le total des articles de la boutique. */
+  const reglagesBoutique = BoutiqueReglages.lire(initsCache[initiativeCible] && initsCache[initiativeCible].vitrine_reglages_json);
+  const totalArticles = items.reduce((s, it) => s + Number(it.prix) * it.quantite, 0);
+  for (const it of items) {
+    const refus = BoutiqueReglages.controlerCommande(reglagesBoutique, {
+      mode: it.mode_livraison === "expedition" ? "expedition" : "retrait",
+      pays: it.mode_livraison === "expedition" ? livraisonPays : undefined,
+      montant: totalArticles,
+    });
+    if (refus) return sendJSON(res, 400, { error: refus });
+  }
+  let fraisFixeDejaPris = false;
+
   const provider = body.provider === "paypal" ? "paypal" : "stripe";
   const Payments = require("./payments");
   if (!(await Payments.isProviderAllowed(db, provider))) {
@@ -6232,7 +6256,9 @@ route("POST", "/api/panier/commander", async (req, res, params, body) => {
   const devise = (items[0].devise || "EUR").toUpperCase();
   const commandes = [];
   for (const it of items) {
-    const fraisLivraison = it.mode_livraison === "expedition" && it.frais_expedition != null ? Number(it.frais_expedition) : 0;
+    let fraisLivraison = it.mode_livraison === "expedition" ? BoutiqueReglages.fraisLivraison(reglagesBoutique, it.frais_expedition != null ? Number(it.frais_expedition) : 0) : 0;
+    /* « Frais fixes » : le montant se paie une seule fois par commande, sur la première ligne expédiée. */
+    if (reglagesBoutique.livraison.frais_mode === "fixe" && it.mode_livraison === "expedition") { if (fraisFixeDejaPris) fraisLivraison = 0; else fraisFixeDejaPris = true; }
     const montantTotal = parseFloat((Number(it.prix) * it.quantite + fraisLivraison).toFixed(2));
     const expedie = it.mode_livraison === "expedition";
     const id = (await db.prepare(`
@@ -11424,7 +11450,10 @@ route("GET", "/api/mon-initiative", async (req, res, params, body, query) => {
   const cfg = getVitrineConfig(row, { draft: useDraft });
   row.vitrine_modules_state = cfg.modulesState;
   row.vitrine_options = lireOptionsBoutique(row.vitrine_options_json);
+  row.vitrine_reglages = BoutiqueReglages.lire(row.vitrine_reglages_json);
   if (useDraft) {
+    const reglagesBrouillon = resolveVitrineDraft(row).reglages;
+    if (reglagesBrouillon && typeof reglagesBrouillon === 'object') row.vitrine_reglages = BoutiqueReglages.lire(reglagesBrouillon);
     const optionsBrouillon = resolveVitrineDraft(row).options;
     if (Array.isArray(optionsBrouillon)) row.vitrine_options = lireOptionsBoutique(JSON.stringify(optionsBrouillon));
     /* Un type n'est jamais à la fois principal et option : le type du brouillon l'emporte. */
@@ -12200,6 +12229,15 @@ route("PUT", "/api/initiatives/:id/vitrine-draft", async (req, res, params, body
     draft.options = verif.options;
   }
 
+  /* Réglages de la boutique (lot 2) : commercial, livraison, confiance. Fusionnés champ par champ avec ce que le brouillon (ou la version publiée) contient déjà. */
+  if (body.reglages !== undefined) {
+    if (!body.reglages || typeof body.reglages !== "object") return sendJSON(res, 400, { error: "Réglages invalides." });
+    const actuels = BoutiqueReglages.lire(draft.reglages !== undefined ? draft.reglages : init.vitrine_reglages_json);
+    const fusion = BoutiqueReglages.normaliser(body.reglages, actuels);
+    if (fusion.erreur) return sendJSON(res, 400, { error: fusion.erreur });
+    draft.reglages = fusion.reglages;
+  }
+
   /* Contenus édités depuis l'aperçu : ils rejoignent le brouillon au lieu d'écrire
      directement dans la vitrine publique. C'est ce qui rend « Annuler » réellement
      possible, et ce qui garantit que rien n'est visible avant « Publier ». */
@@ -12261,8 +12299,9 @@ route("POST", "/api/initiatives/:id/vitrine-publish", async (req, res, params) =
   const principalPublie = BoutiqueTypes.typeCanonique(type) || type;
   const optionsPubliees = (draft.options !== undefined ? lireOptionsBoutique(JSON.stringify(draft.options)) : lireOptionsBoutique(init.vitrine_options_json))
     .filter(o => o.type !== principalPublie);
-  await db.prepare("UPDATE initiatives SET vitrine_modules_json=?, vitrine_type=?, vitrine_style_json=?, vitrine_theme=?, vitrine_options_json=?, vitrine_draft_json='{}' WHERE id=?")
-    .run(modules, type, style, theme, JSON.stringify(optionsPubliees), params.id);
+  const reglagesPublies = BoutiqueReglages.lire(draft.reglages !== undefined ? draft.reglages : init.vitrine_reglages_json);
+  await db.prepare("UPDATE initiatives SET vitrine_modules_json=?, vitrine_type=?, vitrine_style_json=?, vitrine_theme=?, vitrine_options_json=?, vitrine_reglages_json=?, vitrine_draft_json='{}' WHERE id=?")
+    .run(modules, type, style, theme, JSON.stringify(optionsPubliees), JSON.stringify(reglagesPublies), params.id);
 
   /* Contenus du brouillon : écrits colonne par colonne, en ne gardant que la liste blanche.
      Requêtes séparées et paramétrées — le nom de colonne provient exclusivement de
