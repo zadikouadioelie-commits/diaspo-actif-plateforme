@@ -5,770 +5,122 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Boutique Portfolio · maquette</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;0,800;1,500&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
-<!-- Exemple « Portfolio artistique » — Vue 1 : galerie et boutique (2026-11-11).
-     Tout est fictif et simulé : œuvres dessinées en SVG, panier et devis locaux, rien n'est envoyé au serveur.
-     Les couleurs viennent de la configuration de l'exemple (shopConfig) ; le fond sombre est calculé à partir de la 2e couleur. -->
 <style>
-  :root {
-    --c1:#83172f; --c2:#111c38; --c3:#d8b36a;
-    --bg:#0a1226; --panel:#101a33; --panel2:#15213f; --gold:#d8b36a; --line:rgba(216,179,106,.32);
-    --text:#f4f0e8; --muted:#b3bbcc; --on-gold:#0a1226;
-    --serif:"Playfair Display", Georgia, "Times New Roman", serif; --sans:"Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
-  }
-  * { box-sizing:border-box; }
-  html { scroll-behavior:smooth; }
-  body { margin:0; font-family:var(--sans); color:var(--text); background:var(--bg); line-height:1.5; }
-  svg.ic { width:20px; height:20px; flex:none; fill:none; stroke:currentColor; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
-  button { font:inherit; color:inherit; }
-  :focus-visible { outline:3px solid var(--gold); outline-offset:2px; }
-
-  /* En-tête */
-  .top { position:sticky; top:var(--ex-h,0px); z-index:40; background:color-mix(in srgb, var(--bg) 94%, transparent); backdrop-filter:blur(8px); border-bottom:1px solid var(--line); }
-  .top-in { max-width:1320px; margin:0 auto; padding:10px 20px; display:flex; align-items:center; gap:22px; }
-  .logo { display:flex; align-items:center; gap:10px; min-width:0; flex:1 1 auto; }
-  .logo svg { width:34px; height:34px; color:var(--gold); }
-  .logo b { font-family:var(--serif); font-size:22px; font-weight:700; line-height:1.15; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .logo { flex:1 0 auto; max-width:300px; }
-  .nav { display:flex; align-items:center; gap:2px; min-width:0; }
-  .nav button { white-space:nowrap; background:none; border:0; border-bottom:2px solid transparent; padding:10px 10px; min-height:44px; cursor:pointer; color:var(--text); font-weight:500; }
-  .nav button[aria-current="page"] { color:var(--gold); border-bottom-color:var(--gold); }
-  .nav button:hover { color:var(--gold); }
-  .tools { display:flex; align-items:center; gap:10px; }
-  .iconbtn { background:none; border:0; min-width:44px; min-height:44px; border-radius:999px; display:grid; place-items:center; cursor:pointer; }
-  .iconbtn:hover { background:rgba(255,255,255,.08); }
-  .cartbtn { white-space:nowrap; display:flex; align-items:center; gap:8px; border:1.5px solid var(--gold); color:var(--gold); background:none; border-radius:999px; padding:0 18px; min-height:44px; font-weight:600; cursor:pointer; }
-  .cartbtn:hover { background:rgba(216,179,106,.12); }
-
-  /* Bandeau */
-  .hero { background:linear-gradient(100deg, color-mix(in srgb, var(--c1) 55%, var(--bg)) 0%, var(--bg) 72%); border-bottom:1px solid var(--line); overflow:hidden; }
-  .hero-in { max-width:1320px; margin:0 auto; padding:34px 20px 28px; display:grid; grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr); gap:20px; align-items:center; }
-  .eyebrow { letter-spacing:.32em; text-transform:uppercase; font-size:13px; font-weight:600; color:var(--gold); margin:0 0 6px; }
-  .hero h2 { font-family:var(--serif); font-weight:800; font-size:clamp(32px, 5.2vw, 58px); line-height:1.08; margin:0 0 12px; text-wrap:balance; }
-  .hero p.lead { margin:0 0 20px; max-width:560px; font-size:18px; color:#e6e1d6; }
-  .garanties { display:flex; flex-wrap:wrap; gap:18px 26px; }
-  .garantie { display:flex; align-items:center; gap:12px; font-size:14px; line-height:1.3; }
-  .garantie svg.ic { width:34px; height:34px; color:var(--gold); stroke-width:1.4; }
-  .garantie + .garantie { padding-left:26px; border-left:1px solid var(--line); }
-  .hero-art { position:relative; min-height:230px; border-radius:14px; overflow:hidden; -webkit-mask-image:linear-gradient(90deg, transparent 0, #000 38%); mask-image:linear-gradient(90deg, transparent 0, #000 38%); }
-  .hero-art svg { position:absolute; inset:0; width:100%; height:100%; }
-
-  /* Filtres */
-  .wrap { max-width:1320px; margin:0 auto; padding:0 20px 36px; }
-  .note { background:#2a2410; border:1px solid #6b5a22; color:#f3e3a6; border-radius:10px; padding:10px 12px; font-size:14px; margin:16px 0 0; }
-  .barre { display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding:20px 0 16px; }
-  .barre .lib { font-weight:600; font-size:15.5px; margin-right:2px; }
-  .chips { display:flex; gap:8px; flex-wrap:wrap; flex:1 1 auto; }
-  .chip { display:inline-flex; align-items:center; gap:8px; border:1px solid var(--line); background:rgba(255,255,255,.03); border-radius:999px; padding:0 14px; min-height:44px; cursor:pointer; font-size:14px; }
-  .chip:hover { border-color:var(--gold); }
-  .chip[aria-pressed="true"] { background:var(--gold); color:var(--on-gold); border-color:var(--gold); font-weight:700; }
-  .tri { display:flex; align-items:center; gap:10px; margin-left:auto; padding-left:18px; border-left:1px solid var(--line); font-weight:600; }
-  select { font:inherit; font-size:14.5px; color:var(--text); background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:0 12px; min-height:44px; cursor:pointer; }
-  .sectitre { font-family:var(--serif); font-size:24px; margin:6px 0 14px; scroll-margin-top:calc(var(--ex-h,0px) + 80px); }
-
-  /* Cartes */
-  .grille { display:grid; grid-template-columns:repeat(auto-fill, minmax(250px,1fr)); gap:20px; }
-  .carte { background:var(--panel); border:1px solid var(--line); border-radius:12px; overflow:hidden; display:flex; flex-direction:column; transition:transform .2s, border-color .2s; }
-  .carte:hover { transform:translateY(-3px); border-color:var(--gold); }
-  .carte .vue { position:relative; aspect-ratio:4/3.4; background:var(--panel2); cursor:pointer; border:0; padding:0; display:block; width:100%; }
-  .carte .vue svg { position:absolute; inset:0; width:100%; height:100%; }
-  .coeur { position:absolute; top:8px; right:8px; width:44px; height:44px; border-radius:999px; border:0; background:rgba(10,18,38,.62); color:#fff; display:grid; place-items:center; cursor:pointer; z-index:2; }
-  .coeur[aria-pressed="true"] { color:#ff7a8d; }
-  .coeur[aria-pressed="true"] svg.ic { fill:currentColor; }
-  .etat { position:absolute; left:10px; top:10px; z-index:2; background:rgba(10,18,38,.78); border:1px solid var(--line); color:var(--gold); padding:3px 10px; border-radius:999px; font-size:12px; font-weight:600; }
-  .carte .corps { padding:14px 16px 16px; display:flex; flex-direction:column; gap:6px; flex:1; }
-  .carte h3 { margin:0; font-family:var(--serif); font-size:21px; line-height:1.2; }
-  .carte .par { color:var(--muted); font-size:14px; }
-  .badge { align-self:flex-start; border:1px solid var(--gold); color:var(--gold); border-radius:999px; padding:1px 12px; font-size:12.5px; margin:4px 0; }
-  .prix { font-family:var(--serif); font-size:25px; font-weight:700; color:var(--gold); margin:2px 0 6px; }
-  .prix.sec { font-family:var(--sans); font-size:15px; font-weight:500; color:var(--muted); }
-  .actions { display:flex; gap:10px; margin-top:auto; }
-  .btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:44px; padding:0 14px; border-radius:10px; font-weight:600; font-size:14px; cursor:pointer; border:1.5px solid var(--gold); background:none; color:var(--text); flex:1 1 0; text-align:center; }
-  .btn:hover { background:rgba(216,179,106,.14); }
-  .btn.or { background:var(--gold); color:var(--on-gold); }
-  .btn.or:hover { filter:brightness(1.08); }
-  .btn[disabled] { opacity:.5; cursor:not-allowed; }
-
-  /* Pied de liste */
-  .pied { display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:14px; margin-top:26px; }
-  .pied .compte { color:var(--muted); font-size:15px; }
-  .pages { display:flex; align-items:center; gap:8px; }
-  .pg { min-width:44px; min-height:44px; border-radius:999px; border:0; background:none; cursor:pointer; font-weight:600; }
-  .pg:hover { background:rgba(255,255,255,.08); }
-  .pg[aria-current="page"] { background:var(--gold); color:var(--on-gold); }
-  .pg[disabled] { opacity:.35; cursor:not-allowed; }
-  .afficher { display:flex; align-items:center; gap:10px; justify-content:flex-end; }
-  .demo { font-size:12.5px; color:var(--muted); margin:22px 0 0; }
-
-  /* Fenêtres */
-  .overlay { position:fixed; inset:0; background:rgba(3,6,14,.72); display:none; align-items:center; justify-content:center; padding:calc(16px + var(--ex-h,0px)) 16px 16px; z-index:80; }
+  :root { --c1:#83172f; --c2:#111c38; --c3:#d8b36a; --line:#e6e1da; --text:#172033; --muted:#6b6b76; --bg:#f7f6f3; --white:#fff; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif; color:var(--text); background:var(--bg); }
+  .top { background:var(--c2); color:#fff; padding:14px 16px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .top h1 { margin:0; font-family: Georgia, serif; font-size:20px; flex:1; min-width:180px; }
+  .top h1 em { color:var(--c3); font-style:normal; }
+  .top button { background:none; border:0; color:#fff; font:inherit; font-size:15px; cursor:pointer; padding:6px 8px; border-radius:8px; }
+  .top button:hover { background:rgba(255,255,255,.12); }
+  .hero { background:var(--c1); color:#fff; padding:26px 16px; }
+  .hero h2 { margin:0 0 6px; font-family: Georgia, serif; font-size:24px; }
+  .hero p { margin:0; opacity:.92; max-width:640px; }
+  .wrap { max-width:1100px; margin:0 auto; padding:16px; }
+  .note { background:#fff8e6; border:1px solid #f1dfa6; border-radius:10px; padding:10px 12px; font-size:14px; margin:12px 0; }
+  .chips { display:flex; gap:8px; flex-wrap:wrap; margin:14px 0; }
+  .chip { border:1px solid var(--line); background:#fff; border-radius:999px; padding:7px 13px; font:inherit; font-size:14px; cursor:pointer; }
+  .chip.on { background:var(--c1); color:#fff; border-color:var(--c1); }
+  .sectitle { font-family: Georgia, serif; font-size:18px; margin:18px 0 10px; color:var(--c2); }
+  .grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap:16px; }
+  .work { all:unset; cursor:pointer; background:#fff; border:1px solid var(--line); border-radius:12px; overflow:hidden; display:flex; flex-direction:column; }
+  .work:focus-visible { outline:3px solid var(--c3); }
+  .work .img { aspect-ratio: 4/3; background: var(--c); position:relative; }
+  .work .img small { position:absolute; left:10px; bottom:8px; color:#fff; background:rgba(0,0,0,.35); padding:2px 8px; border-radius:6px; font-size:12px; }
+  .work .info { padding:10px 12px 12px; }
+  .work h3 { margin:0 0 4px; font-size:16px; }
+  .work .meta { font-size:13px; color:var(--muted); }
+  .overlay { position:fixed; inset:0; background:rgba(10,16,30,.6); display:none; align-items:center; justify-content:center; padding:16px; z-index:50; }
   .overlay.open { display:flex; }
-  .sheet { background:var(--panel); border:1px solid var(--line); border-radius:16px; width:100%; max-width:860px; max-height:calc(100vh - var(--ex-h,0px) - 32px); overflow:auto; padding:22px; position:relative; }
-  .sheet.etroit { max-width:520px; }
-  .sheet h2 { margin:0 0 6px; font-family:var(--serif); font-size:26px; padding-right:44px; }
-  .close { position:absolute; top:10px; right:10px; width:44px; height:44px; border-radius:999px; border:0; background:rgba(255,255,255,.08); cursor:pointer; display:grid; place-items:center; }
-  .fiche { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:22px; margin-top:8px; }
-  .fiche .grand { position:relative; aspect-ratio:4/3.4; border-radius:12px; overflow:hidden; border:1px solid var(--line); cursor:zoom-in; padding:0; display:block; width:100%; background:var(--panel2); }
-  .fiche .grand svg, .mini svg { position:absolute; inset:0; width:100%; height:100%; }
-  .minis { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:8px; }
-  .mini { position:relative; aspect-ratio:4/3; border-radius:8px; overflow:hidden; border:1px solid var(--line); cursor:pointer; padding:0; background:var(--panel2); }
-  .faits { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:12px 0; }
-  .faits div { background:var(--panel2); border:1px solid rgba(216,179,106,.18); border-radius:10px; padding:8px 10px; font-size:14px; }
-  .faits b { display:block; font-size:12px; color:var(--muted); font-weight:600; letter-spacing:.04em; text-transform:uppercase; }
-  .histoire { color:#e6e1d6; margin:0 0 12px; }
-  .video { display:flex; align-items:center; gap:12px; background:var(--panel2); border:1px dashed var(--line); border-radius:10px; padding:10px 12px; width:100%; cursor:pointer; margin-bottom:12px; text-align:left; }
-  .video small { color:var(--muted); display:block; }
-  .lignes { list-style:none; margin:10px 0; padding:0; display:grid; gap:10px; }
-  .lignes li { display:grid; grid-template-columns:64px 1fr auto auto; gap:12px; align-items:center; background:var(--panel2); border-radius:10px; padding:8px 10px; }
-  .lignes .pt { position:relative; width:64px; height:52px; border-radius:6px; overflow:hidden; }
-  .lignes .pt svg { position:absolute; inset:0; width:100%; height:100%; }
-  .total { display:flex; justify-content:space-between; font-family:var(--serif); font-size:22px; margin:10px 0 14px; }
-  .form { display:grid; gap:10px; margin-top:10px; }
-  .form label { font-size:14px; display:grid; gap:4px; color:var(--muted); }
-  .form input, .form textarea, .form select { font:inherit; color:var(--text); padding:10px 12px; border:1px solid var(--line); border-radius:9px; background:var(--panel2); min-height:44px; }
-  .form textarea { min-height:96px; }
-  .duo { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-  .aide { font-size:13px; color:var(--muted); margin:6px 0 0; }
-  .lightbox { position:fixed; inset:0; background:rgba(0,0,0,.92); display:none; align-items:center; justify-content:center; z-index:90; padding:calc(16px + var(--ex-h,0px)) 16px 16px; }
+  .sheet { background:#fff; border-radius:14px; max-width:720px; width:100%; max-height:90vh; overflow:auto; padding:18px; position:relative; }
+  .sheet h2 { margin:0 0 6px; font-family: Georgia, serif; font-size:22px; padding-right:30px; }
+  .close { position:absolute; top:10px; right:12px; background:none; border:0; font-size:26px; cursor:pointer; }
+  .gallery { display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin:12px 0; }
+  .gallery .shot { aspect-ratio: 4/3; border-radius:8px; background: var(--c); cursor:pointer; border:0; padding:0; }
+  .gallery .shot.big { grid-column: 1 / -1; aspect-ratio: 16/9; }
+  .gallery .shot:focus-visible { outline:3px solid var(--c3); }
+  .facts { display:grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap:10px; margin:12px 0; }
+  .facts div { background:var(--bg); border-radius:10px; padding:8px 10px; font-size:14px; }
+  .facts b { display:block; font-size:12px; color:var(--muted); font-weight:600; }
+  .btn { background:var(--c1); color:#fff; border:0; border-radius:9px; padding:10px 14px; font:inherit; font-weight:600; cursor:pointer; }
+  .btn.ghost { background:#fff; color:var(--text); border:1px solid var(--line); }
+  .form { display:grid; gap:10px; margin-top:8px; }
+  .form label { font-size:14px; display:grid; gap:4px; }
+  .form input, .form textarea { font:inherit; padding:9px 10px; border:1px solid var(--line); border-radius:9px; }
+  .form textarea { min-height:90px; }
+  .lightbox { position:fixed; inset:0; background:rgba(0,0,0,.9); display:none; align-items:center; justify-content:center; z-index:60; padding:16px; }
   .lightbox.open { display:flex; }
-  .lightbox .cadre { position:relative; width:min(980px,100%); aspect-ratio:16/10; border-radius:12px; overflow:hidden; border:1px solid var(--line); }
-  .lightbox .cadre svg { position:absolute; inset:0; width:100%; height:100%; }
-  .lightbox button { position:absolute; background:rgba(255,255,255,.16); color:#fff; border:0; border-radius:999px; width:48px; height:48px; cursor:pointer; display:grid; place-items:center; }
+  .lightbox .frame { width:min(900px, 100%); aspect-ratio: 16/10; border-radius:12px; }
+  .lightbox button { position:absolute; background:rgba(255,255,255,.15); color:#fff; border:0; border-radius:999px; width:44px; height:44px; font-size:22px; cursor:pointer; }
   .lb-close { top:14px; right:14px; } .lb-prev { left:14px; top:50%; } .lb-next { right:14px; top:50%; }
   .lb-count { position:absolute; bottom:18px; color:#fff; font-size:14px; }
-  .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--gold); color:var(--on-gold); font-weight:600; padding:11px 18px; border-radius:10px; font-size:14px; opacity:0; transition:opacity .25s; pointer-events:none; z-index:100; max-width:90vw; text-align:center; }
+  .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--c2); color:#fff; padding:10px 16px; border-radius:10px; font-size:14px; opacity:0; transition:.25s; pointer-events:none; z-index:70; max-width:90vw; }
   .toast.show { opacity:1; }
-
-  /* Exposition plein écran */
-  .expo { position:fixed; inset:0; z-index:95; display:none; flex-direction:column; background:#04070f; color:var(--text); padding-top:var(--ex-h,0px); }
-  .expo.open { display:flex; }
-  .expo-haut { display:flex; align-items:center; gap:10px; padding:10px 16px; border-bottom:1px solid var(--line); flex:none; }
-  .expo-titre { margin:0; font-family:var(--serif); font-size:20px; line-height:1.2; min-width:0; flex:1 1 auto; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .expo-titre small { display:block; font-family:var(--sans); font-size:12.5px; color:var(--muted); letter-spacing:.04em; }
-  .expo-outil { background:none; border:1.5px solid var(--line); color:var(--text); border-radius:999px; min-height:44px; min-width:44px; padding:0 14px; display:inline-flex; align-items:center; justify-content:center; gap:8px; cursor:pointer; font-weight:600; font-size:14px; white-space:nowrap; }
-  .expo-outil:hover { border-color:var(--gold); color:var(--gold); }
-  .expo-outil[aria-pressed="true"] { background:var(--gold); border-color:var(--gold); color:var(--on-gold); }
-  .expo-scene { position:relative; flex:1 1 auto; min-height:0; display:grid; place-items:center; padding:16px 72px; container-type:size; background:radial-gradient(ellipse at 50% 38%, rgba(216,179,106,.16), transparent 62%); }
-  .expo-cadre { width:min(100cqw, 160cqh); aspect-ratio:16/10; position:relative; border-radius:6px; overflow:hidden; border:1px solid var(--line); box-shadow:0 18px 60px rgba(0,0,0,.65), 0 0 0 10px #0b1226, 0 0 0 11px var(--line); transition:opacity .28s; }
-  .expo-cadre.change { opacity:0; }
-  .expo-cadre svg { position:absolute; inset:0; width:100%; height:100%; }
-  .expo-nav { position:absolute; top:50%; transform:translateY(-50%); width:48px; height:48px; border-radius:999px; border:0; background:rgba(255,255,255,.14); color:#fff; display:grid; place-items:center; cursor:pointer; z-index:2; }
-  .expo-nav:hover { background:rgba(216,179,106,.4); }
-  .expo-prec { left:12px; } .expo-suiv { right:12px; }
-  .expo-plaque { flex:none; display:grid; grid-template-columns:minmax(0,1fr) auto; gap:6px 24px; align-items:center; max-width:1100px; width:100%; margin:0 auto; padding:12px 20px 8px; }
-  .expo-plaque h3 { margin:0; font-family:var(--serif); font-size:clamp(22px, 3vw, 30px); line-height:1.15; }
-  .expo-plaque .par { color:var(--gold); font-size:15px; }
-  .expo-plaque .tech { color:var(--muted); font-size:14px; }
-  .expo-plaque .desc { margin:2px 0 0; color:#e6e1d6; font-size:15px; max-width:70ch; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
-  .expo-plaque .coll { color:var(--muted); font-size:13px; }
-  .expo-droite { display:flex; flex-direction:column; align-items:flex-end; gap:8px; }
-  .expo-droite .prix { font-family:var(--serif); font-size:24px; font-weight:700; color:var(--gold); }
-  .expo-droite .prix.sec { font-size:15px; font-family:var(--sans); font-weight:600; }
-  .expo-actions { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
-  .expo-actions .btn { flex:0 0 auto; }
-  .expo-bas { flex:none; padding:4px 16px 14px; max-width:1100px; width:100%; margin:0 auto; }
-  .expo-prog { height:3px; background:rgba(216,179,106,.22); border-radius:3px; overflow:hidden; margin-bottom:8px; }
-  .expo-prog i { display:block; height:100%; width:100%; background:var(--gold); transform:scaleX(0); transform-origin:left; }
-  .expo-prog i.court { transform:scaleX(1); transition:transform linear; }
-  .expo-vignettes { display:flex; gap:8px; overflow-x:auto; padding:4px 2px; scrollbar-width:thin; align-items:center; }
-  .expo-vig { flex:none; width:72px; height:46px; padding:0; border-radius:6px; border:2px solid transparent; overflow:hidden; position:relative; cursor:pointer; background:none; opacity:.62; }
-  .expo-vig svg { position:absolute; inset:0; width:100%; height:100%; }
-  .expo-vig:hover { opacity:1; }
-  .expo-vig[aria-current="true"] { border-color:var(--gold); opacity:1; }
-  .expo-compte { color:var(--muted); font-size:13px; margin-left:auto; padding-left:8px; flex:none; white-space:nowrap; }
-  .expo-mention { color:var(--muted); font-size:12px; }
-  .entree-expo { flex:0 0 auto; }
-  .hero .btn.entree-expo { margin-top:18px; }
-  @media (max-width:760px) {
-    .expo-scene { padding:10px 10px; }
-    .expo-nav { top:auto; bottom:-6px; transform:none; }
-    .expo-plaque { grid-template-columns:1fr; padding:10px 14px 4px; }
-    .expo-droite { align-items:flex-start; }
-    .expo-actions { justify-content:flex-start; }
-    .expo-bouton-lib { display:none; }
-    .expo-titre { font-size:17px; }
-  }
-  @media (max-height:560px) and (orientation:landscape) { .expo-plaque .desc, .expo-plaque .coll { display:none; } .expo-plaque { padding-top:6px; } }
-  @media (prefers-reduced-motion:reduce) { .expo-cadre, .expo-prog i.court { transition:none; } }
-  @media (max-width:1180px) {
-    .top-in { flex-wrap:wrap; }
-    .tools { margin-left:auto; }
-    .nav { order:3; flex:1 1 100%; overflow-x:auto; scrollbar-width:none; margin:0 -6px; }
-  }
-  @media (max-width:900px) {
-    .hero-in { grid-template-columns:1fr; }
-    .hero-art { min-height:170px; -webkit-mask-image:linear-gradient(180deg, transparent 0, #000 40%); mask-image:linear-gradient(180deg, transparent 0, #000 40%); }
-    .garantie + .garantie { padding-left:0; border-left:0; }
-    .tri { border-left:0; padding-left:0; }
-    .pied { grid-template-columns:1fr; justify-items:center; }
-    .afficher { justify-content:center; }
-    .fiche { grid-template-columns:1fr; }
-  }
-  @media (max-width:600px) {
-    .top-in { padding:8px 14px; gap:10px; }
-    .logo { flex:1 1 0; max-width:none; }
-    .tools { gap:6px; margin-left:0; }
-    .logo b { font-size:18px; }
-    .cartbtn { padding:0 12px; }
-    .wrap, .hero-in { padding-left:14px; padding-right:14px; }
-    .grille { grid-template-columns:1fr 1fr; gap:12px; }
-    .carte h3 { font-size:17px; }
-    .carte .corps { padding:10px 10px 12px; }
-    .prix { font-size:20px; }
-    .actions { flex-direction:column; }
-    .barre .lib { width:100%; }
-    .duo { grid-template-columns:1fr; }
-    .lignes li { grid-template-columns:52px 1fr auto; }
-    .lignes li .supp { grid-column:3; }
-  }
-  @media (max-width:480px) { #navCompte { display:none; } }
-  @media (max-width:380px) { .grille { grid-template-columns:1fr; } }
-  @media (prefers-reduced-motion:reduce) { html { scroll-behavior:auto; } .carte, .toast { transition:none; } .carte:hover { transform:none; } }
-
-  /* Vue 2 : artistes, collections, garanties, newsletter */
-  .actifs { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 12px; }
-  .actifs:empty { display:none; }
-  .actif { display:inline-flex; align-items:center; gap:8px; border:1px solid var(--gold); color:var(--gold); background:rgba(216,179,106,.1); border-radius:999px; padding:0 8px 0 14px; min-height:40px; font-size:14px; cursor:pointer; }
-  .actif svg.ic { width:16px; height:16px; }
-  .bloc { margin-top:46px; scroll-margin-top:calc(var(--ex-h,0px) + 80px); }
-  .bloc-tete { display:flex; align-items:flex-end; justify-content:space-between; gap:12px 20px; flex-wrap:wrap; margin-bottom:16px; }
-  .bloc-tete h2 { font-family:var(--serif); font-size:clamp(24px,3.2vw,32px); margin:0; display:flex; align-items:center; gap:12px; line-height:1.15; }
-  .bloc-tete h2 svg.ic { width:30px; height:30px; color:var(--gold); stroke-width:1.5; }
-  .bloc-tete p { margin:4px 0 0; color:var(--muted); font-size:15px; }
-  .lienor { background:none; border:0; color:var(--gold); font-weight:600; cursor:pointer; min-height:44px; padding:0 4px; display:inline-flex; align-items:center; gap:6px; }
-  .lienor:hover { text-decoration:underline; }
-  .artistes { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:18px; }
-  .artiste { background:var(--panel); border:1px solid var(--line); border-radius:12px; overflow:hidden; display:flex; flex-direction:column; transition:transform .2s, border-color .2s; }
-  .artiste:hover { transform:translateY(-3px); border-color:var(--gold); }
-  .artiste .portrait { position:relative; aspect-ratio:4/3.3; display:block; width:100%; border:0; padding:0; cursor:pointer; background:var(--panel2); }
-  .artiste .portrait svg { position:absolute; inset:0; width:100%; height:100%; }
-  .artiste .num { position:absolute; left:10px; top:10px; z-index:2; font-family:var(--serif); font-style:italic; font-size:14px; color:var(--gold); background:rgba(10,18,38,.7); border:1px solid var(--line); padding:1px 10px; border-radius:999px; }
-  .artiste .corps { padding:14px 16px 16px; display:flex; flex-direction:column; gap:6px; flex:1; }
-  .artiste h3 { margin:0; font-family:var(--serif); font-size:21px; }
-  .artiste .spe { color:var(--gold); font-weight:600; font-size:14.5px; }
-  .artiste .bio { color:var(--muted); font-size:14px; margin:0 0 8px; }
-  .artiste .btn { margin-top:auto; flex:none; }
-  .collections { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:18px; }
-  .collection { position:relative; aspect-ratio:4/3.1; border-radius:12px; overflow:hidden; border:1px solid var(--line); cursor:pointer; padding:0; text-align:left; background:var(--panel2); display:block; width:100%; transition:transform .2s, border-color .2s; }
-  .collection:hover { transform:translateY(-3px); border-color:var(--gold); }
-  .collection svg.fond { position:absolute; inset:0; width:100%; height:100%; }
-  .collection .voile { position:absolute; inset:0; background:linear-gradient(180deg, rgba(5,8,18,0) 38%, rgba(5,8,18,.88) 100%); }
-  .collection .txt { position:absolute; left:14px; right:54px; bottom:12px; }
-  .collection .txt b { display:block; font-family:var(--serif); font-size:20px; line-height:1.15; }
-  .collection .txt small { color:#e6e1d6; font-size:13.5px; }
-  .collection .pic { position:absolute; right:12px; bottom:12px; width:36px; height:36px; border-radius:8px; background:rgba(10,18,38,.7); border:1px solid var(--line); display:grid; place-items:center; color:var(--gold); }
-  .collection[aria-pressed="true"] { border-color:var(--gold); box-shadow:0 0 0 2px var(--gold); }
-  .garanties-bande { margin-top:34px; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); border:1px solid var(--line); border-radius:12px; background:var(--panel); }
-  .garanties-bande .g { display:flex; gap:14px; align-items:flex-start; padding:18px 22px; }
-  .garanties-bande .g + .g { border-left:1px solid var(--line); }
-  .garanties-bande svg.ic { width:38px; height:38px; color:var(--gold); stroke-width:1.4; }
-  .garanties-bande b { display:block; font-size:16px; margin-bottom:2px; }
-  .garanties-bande span { color:var(--muted); font-size:14px; }
-  .lettre { margin-top:22px; border-radius:12px; overflow:hidden; display:grid; grid-template-columns:auto minmax(0,1fr) minmax(0,1.1fr); align-items:center; gap:14px 26px; padding:20px 26px 20px 22px; background:linear-gradient(100deg, color-mix(in srgb, var(--gold) 80%, var(--bg)) 0%, var(--gold) 55%); color:var(--on-gold); }
-  .lettre svg.ic { width:46px; height:46px; stroke-width:1.4; }
-  .lettre h3 { margin:0; font-family:var(--serif); font-size:26px; line-height:1.15; }
-  .lettre p { margin:2px 0 0; font-size:14.5px; }
-  .lettre form { display:flex; gap:10px; }
-  .lettre input { flex:1 1 auto; min-width:0; min-height:46px; border-radius:999px; border:1px solid rgba(10,18,38,.45); background:var(--bg); color:var(--text); padding:0 18px; font:inherit; }
-  .lettre input::placeholder { color:#c3cadb; }
-  .lettre button { min-height:46px; border-radius:999px; border:0; background:var(--bg); color:var(--gold); font-weight:700; padding:0 22px; cursor:pointer; font:inherit; font-weight:700; }
-  .lettre button:hover { filter:brightness(1.25); }
-  .lettre :focus-visible { outline-color:var(--bg); }
-  .fiche-artiste { display:grid; grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr); gap:22px; margin-top:8px; }
-  .fiche-artiste .portrait-grand { position:relative; aspect-ratio:4/3.4; border-radius:12px; overflow:hidden; border:1px solid var(--line); background:var(--panel2); }
-  .fiche-artiste .portrait-grand svg { position:absolute; inset:0; width:100%; height:100%; }
-  .oeuvres-artiste { display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:10px; margin:10px 0 14px; }
-  .oeuvres-artiste button { position:relative; text-align:left; background:var(--panel2); border:1px solid var(--line); border-radius:10px; overflow:hidden; padding:0; cursor:pointer; color:inherit; }
-  .oeuvres-artiste .im { position:relative; aspect-ratio:4/3; display:block; }
-  .oeuvres-artiste .im svg { position:absolute; inset:0; width:100%; height:100%; }
-  .oeuvres-artiste small { display:block; padding:6px 8px 8px; font-size:13px; line-height:1.3; }
-  @media (max-width:900px) {
-    .artistes, .collections { grid-template-columns:repeat(2,minmax(0,1fr)); }
-    .garanties-bande { grid-template-columns:1fr; }
-    .garanties-bande .g + .g { border-left:0; border-top:1px solid var(--line); }
-    .lettre { grid-template-columns:auto minmax(0,1fr); }
-    .lettre form { grid-column:1 / -1; }
-    .fiche-artiste { grid-template-columns:1fr; }
-  }
-  @media (max-width:600px) {
-    .artistes, .collections { gap:12px; }
-    .artiste .corps { padding:10px 10px 12px; }
-    .artiste h3 { font-size:17px; }
-    .artiste .bio { display:none; }
-    .collection .txt b { font-size:16px; }
-    .lettre { padding:16px; }
-    .lettre form { flex-direction:column; }
-    .lettre h3 { font-size:22px; }
-  }
-  /* Vue 3 : bas de page */
-  .site-pied { margin-top:12px; background:var(--panel); border-top:1px solid var(--line); }
-  .pied-in { max-width:1320px; margin:0 auto; padding:38px 20px 0; }
-  .pied-grille { display:grid; grid-template-columns:minmax(0,1.5fr) repeat(3,minmax(0,1fr)) minmax(0,1.5fr); gap:30px 34px; }
-  .pied-marque .logo-pied { display:flex; align-items:center; gap:10px; font-family:var(--serif); font-size:22px; font-weight:700; }
-  .pied-marque .logo-pied svg.ic { width:30px; height:30px; color:var(--gold); stroke-width:1.5; }
-  .pied-marque p { margin:12px 0 16px; color:var(--muted); font-size:14px; max-width:34ch; }
-  .reseaux { display:flex; gap:10px; flex-wrap:wrap; }
-  .reseaux button { width:44px; height:44px; border-radius:50%; border:1px solid var(--line); background:transparent; color:var(--gold); display:inline-flex; align-items:center; justify-content:center; cursor:pointer; }
-  .reseaux button:hover { background:var(--gold); color:var(--on-gold); }
-  .pied-col h4 { margin:0 0 8px; font-family:var(--serif); font-size:17px; color:var(--text); }
-  .pied-col ul { list-style:none; margin:0; padding:0; }
-  .pied-col li button { display:inline-flex; align-items:center; min-height:44px; padding:0; background:none; border:0; color:var(--muted); font-size:14.5px; cursor:pointer; text-align:left; }
-  .pied-col li button:hover { color:var(--gold); text-decoration:underline; text-underline-offset:4px; }
-  .pied-contact p { margin:0 0 10px; color:var(--muted); font-size:14px; }
-  .pied-contact address { font-style:normal; color:var(--text); font-size:14px; margin-bottom:14px; }
-  .pied-contact .ecrire { min-height:46px; border-radius:999px; border:0; background:var(--gold); color:var(--on-gold); font-weight:700; padding:0 22px; cursor:pointer; }
-  .pied-contact .ecrire:hover { filter:brightness(1.1); }
-  .pied-bas { margin-top:30px; padding:18px 0; border-top:1px solid var(--line); display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:14px 24px; }
-  .pied-bas .copy { margin:0; color:var(--muted); font-size:13.5px; }
-  .paiements { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:0; padding:0; list-style:none; }
-  .paiements .lib { color:var(--muted); font-size:13px; margin-right:4px; }
-  .paiements li.moyen { display:inline-flex; align-items:center; gap:7px; min-height:34px; padding:0 12px; border:1px solid var(--line); border-radius:8px; background:var(--panel2); font-size:13px; font-weight:600; }
-  .paiements li.moyen svg.ic { width:18px; height:18px; color:var(--gold); }
-  .site-pied .demo { margin:0; padding:0 0 22px; text-align:center; }
-  .site-pied :focus-visible { outline:3px solid var(--gold); outline-offset:2px; }
-  @media (max-width:1100px) { .pied-grille { grid-template-columns:repeat(3,minmax(0,1fr)); } .pied-marque, .pied-contact { grid-column:span 3; } .pied-marque p, .pied-contact p { max-width:60ch; } }
-  @media (max-width:600px) { .pied-grille { grid-template-columns:repeat(2,minmax(0,1fr)); gap:22px 18px; } .pied-marque, .pied-contact { grid-column:span 2; } .pied-bas { flex-direction:column; align-items:flex-start; } }
-  /* Rubriques activables */
-  .rub-off { display:none !important; }
-  .rubbtn { display:inline-flex; align-items:center; gap:8px; min-height:44px; padding:0 14px; border-radius:999px; border:1px solid var(--line); background:transparent; color:var(--text); cursor:pointer; font-weight:600; }
-  .rubbtn:hover { border-color:var(--gold); color:var(--gold); }
-  #accueil, #catalogue, #artistes, #collections, #apropos, #prestations, #evenements, #avis, #newsletter { scroll-margin-top:calc(var(--ex-h,0px) + 130px); }
-  .apropos { display:grid; grid-template-columns:minmax(0,1.2fr) minmax(0,.8fr); gap:26px; align-items:center; }
-  .apropos p { margin:0 0 12px; color:var(--muted); max-width:62ch; }
-  .chiffres { display:flex; flex-wrap:wrap; gap:12px; margin-top:16px; }
-  .chiffres div { flex:1 1 110px; padding:14px 16px; border:1px solid var(--line); border-radius:12px; background:var(--panel); }
-  .chiffres b { display:block; font-family:var(--serif); font-size:30px; color:var(--gold); line-height:1.1; font-variant-numeric:tabular-nums; }
-  .chiffres span { color:var(--muted); font-size:13.5px; }
-  .apropos-art { border-radius:14px; overflow:hidden; border:1px solid var(--line); aspect-ratio:5/4; background:var(--panel2); }
-  .apropos-art svg { display:block; width:100%; height:100%; }
-  .prestas { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:16px; }
-  .presta { display:flex; flex-direction:column; gap:8px; padding:18px; border:1px solid var(--line); border-radius:14px; background:var(--panel); }
-  .presta svg.ic { width:34px; height:34px; color:var(--gold); stroke-width:1.4; }
-  .presta h3 { margin:4px 0 0; font-family:var(--serif); font-size:19px; }
-  .presta p { margin:0; color:var(--muted); font-size:14.5px; flex:1 1 auto; }
-  .presta .tarif { font-weight:700; color:var(--gold); }
-  .presta .delai { color:var(--muted); font-size:13px; }
-  .evts { display:grid; gap:12px; }
-  .evt { display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:16px; align-items:center; padding:14px 18px; border:1px solid var(--line); border-radius:14px; background:var(--panel); }
-  .evt .date { width:64px; padding:8px 0; text-align:center; border-radius:10px; background:var(--gold); color:var(--on-gold); font-family:var(--serif); line-height:1.05; }
-  .evt .date b { display:block; font-size:26px; }
-  .evt .date span { font-family:var(--sans); font-size:12px; font-weight:700; letter-spacing:.06em; }
-  .evt h3 { margin:0; font-family:var(--serif); font-size:19px; }
-  .evt p { margin:2px 0 0; color:var(--muted); font-size:14px; }
-  .avis-liste { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; }
-  .avis-un { padding:18px; border:1px solid var(--line); border-radius:14px; background:var(--panel); display:flex; flex-direction:column; gap:10px; }
-  .etoiles { display:flex; gap:2px; color:var(--gold); }
-  .etoiles svg.ic { width:18px; height:18px; fill:currentColor; stroke-width:1; }
-  .etoiles svg.ic.vide { fill:none; }
-  .avis-un q { quotes:"« " " »"; font-size:15px; line-height:1.55; }
-  .avis-un .qui { display:flex; align-items:center; gap:10px; margin-top:auto; color:var(--muted); font-size:13.5px; }
-  .avis-un .rond { width:38px; height:38px; border-radius:50%; background:var(--panel2); border:1px solid var(--line); display:grid; place-items:center; color:var(--gold); font-weight:700; flex:none; }
-  .note-moy { display:flex; align-items:center; gap:10px; color:var(--muted); }
-  .note-moy b { font-family:var(--serif); font-size:28px; color:var(--gold); }
-  .sw-liste { list-style:none; margin:12px 0 0; padding:0; display:grid; gap:8px; }
-  .sw-ligne { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:12px; align-items:center; padding:10px 14px; border:1px solid var(--line); border-radius:12px; background:var(--panel2); }
-  .sw-ligne b { display:block; }
-  .sw-ligne span.d { color:var(--muted); font-size:13.5px; }
-  .sw { position:relative; width:56px; height:44px; border:0; background:none; cursor:pointer; padding:0; }
-  .sw::before { content:""; position:absolute; left:0; top:10px; width:56px; height:24px; border-radius:999px; background:#3a4666; border:1px solid var(--line); transition:background .2s; }
-  .sw::after { content:""; position:absolute; left:4px; top:14px; width:18px; height:18px; border-radius:50%; background:#fff; transition:transform .2s; }
-  .sw[aria-checked="true"]::before { background:var(--gold); }
-  .sw[aria-checked="true"]::after { transform:translateX(32px); background:var(--on-gold); }
-  .sw:focus-visible { outline:3px solid var(--gold); outline-offset:2px; border-radius:999px; }
-  .mode-titre { margin:16px 0 0; font-family:var(--serif); font-size:18px; }
-  .modes { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin-top:10px; }
-  .mode { text-align:left; padding:12px 14px; min-height:44px; border:1px solid var(--line); border-radius:12px; background:var(--panel2); color:var(--text); cursor:pointer; display:flex; flex-direction:column; gap:4px; }
-  .mode b { display:flex; align-items:center; justify-content:space-between; gap:8px; }
-  .mode span.d { color:var(--muted); font-size:13px; }
-  .mode svg.ic { width:18px; height:18px; opacity:0; color:var(--on-gold); }
-  .mode:hover { border-color:var(--gold); }
-  .mode[aria-pressed="true"] { background:var(--gold); border-color:var(--gold); color:var(--on-gold); }
-  .mode[aria-pressed="true"] span.d { color:var(--on-gold); }
-  .mode[aria-pressed="true"] svg.ic { opacity:1; }
-  .mode:focus-visible { outline:3px solid var(--gold); outline-offset:2px; }
-  .mode-etat { margin:8px 0 0; color:var(--muted); font-size:13.5px; min-height:1.4em; }
-  .rub-actions { display:flex; flex-wrap:wrap; gap:10px; justify-content:flex-end; margin-top:14px; }
-  @media (max-width:1100px) { .prestas { grid-template-columns:repeat(2,minmax(0,1fr)); } .avis-liste { grid-template-columns:repeat(2,minmax(0,1fr)); } }
-  @media (max-width:900px) { .apropos { grid-template-columns:1fr; } .modes { grid-template-columns:1fr; } }
-  @media (max-width:600px) { .prestas, .avis-liste { grid-template-columns:1fr; } .evt { grid-template-columns:auto minmax(0,1fr); } .evt .btn { grid-column:1 / -1; } .rubbtn span { display:none; } .rubbtn { padding:0; min-width:44px; justify-content:center; } }
-  @media (prefers-reduced-motion:reduce) { .sw::before, .sw::after { transition:none; } }
-  @media (max-width:380px) { .artistes, .collections { grid-template-columns:1fr; } }
-  @media (prefers-reduced-motion:reduce) { .artiste, .collection { transition:none; } .artiste:hover, .collection:hover { transform:none; } }
+  .demo { font-size:12px; color:var(--muted); margin-top:18px; }
+  @media (max-width: 480px) { .grid { grid-template-columns: 1fr 1fr; gap:10px; } .gallery { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
 <script src="/assets/boutique-types.js"></script>
 <script src="exemple-commun.js"></script>
-
 <header class="top">
-  <div class="top-in">
-    <div class="logo">
-      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width:1.5"><path d="M5 19C5 10 11 4 20 4c0 9-6 15-15 15z"/><path d="M5 19L14 10M9 16h4M12 13h4"/></svg>
-      <b id="shopName"></b>
-    </div>
-    <nav class="nav" id="navRub" aria-label="Rubriques"></nav>
-    <div class="tools">
-      <button class="rubbtn" type="button" id="openRub" aria-label="Choisir les rubriques de la boutique (exemple)">
-        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg><span>Rubriques</span>
-      </button>
-      <button class="iconbtn" type="button" id="navCompte" aria-label="Mon compte (simulé)">
-        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
-      </button>
-      <button class="cartbtn" data-rub="boutique" type="button" id="openCart" aria-label="Ouvrir le panier">
-        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2.5l2.2 11h10.3l2-8H6.3"/><circle cx="9.5" cy="19.5" r="1.4"/><circle cx="17" cy="19.5" r="1.4"/></svg>
-        <span>Panier (<span id="cartCount">0</span>)</span>
-      </button>
-    </div>
-  </div>
+  <h1 id="shopName"></h1>
+  <button id="openContact">Demander un devis</button>
 </header>
-
-<section class="hero" id="accueil" data-rub="accueil">
-  <div class="hero-in">
-    <div>
-      <p class="eyebrow">Portfolio artistique</p>
-      <h2 id="shopTitle"></h2>
-      <p class="lead" id="shopSlogan"></p>
-      <div class="garanties">
-        <div class="garantie">
-          <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12l4 6-10 12L2 9z"/><path d="M2 9h20M9 3l3 6 3-6M12 21L9 9M12 21l3-12"/></svg>
-          <span>Œuvres uniques<br>et authentiques</span>
-        </div>
-        <div class="garantie">
-          <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12l4-4 4 2 4-2 6 5-6 6-3-2-3 2-6-5z"/><path d="M7 8l-4 4M17 15l-3-3"/></svg>
-          <span>Artistes<br>du continent</span>
-        </div>
-        <div class="garantie" data-rub="boutique">
-          <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 6h12v10H2zM14 9h4l4 3v4h-8z"/><circle cx="6.5" cy="17.5" r="1.8"/><circle cx="17.5" cy="17.5" r="1.8"/></svg>
-          <span>Livraison sécurisée<br>en Afrique et en Europe</span>
-        </div>
-      </div>
-      <button class="btn or entree-expo" type="button" data-rub="portfolio" data-expo>
-        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V5h4M20 9V5h-4M4 15v4h4M20 15v4h-4"/><rect x="8" y="9" width="8" height="6" rx="1"/></svg>Visiter l'exposition
-      </button>
-    </div>
-    <div class="hero-art" id="heroArt"></div>
-  </div>
-</section>
+<section class="hero"><h2 id="shopTitle"></h2><p id="shopSlogan"></p></section>
 
 <main class="wrap">
   <div class="note" id="typeNote" style="display:none"></div>
-  <div id="catalogue" data-rub="portfolio boutique">
-  <div class="barre">
-    <span class="lib">Filtrer par catégorie :</span>
-    <div class="chips" id="cats" role="group" aria-label="Catégories"></div>
-    <button class="btn entree-expo" type="button" data-expo id="expoBarre" aria-label="Visiter l'exposition en plein écran avec la sélection affichée">
-      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V5h4M20 9V5h-4M4 15v4h4M20 15v4h-4"/><rect x="8" y="9" width="8" height="6" rx="1"/></svg>Exposition plein écran
-    </button>
-    <label class="tri" for="tri">Trier par :
-      <select id="tri">
-        <option value="recent">Les plus récentes</option>
-        <option value="prix-asc">Prix croissant</option>
-        <option value="prix-desc">Prix décroissant</option>
-        <option value="titre">Titre (A à Z)</option>
-      </select>
-    </label>
-  </div>
-  <div class="actifs" id="actifs" aria-live="polite"></div>
-  <h2 class="sectitre" id="sectMain"></h2>
-  <div class="grille" id="grid"></div>
-  <div class="pied">
-    <div class="compte" id="compte" aria-live="polite"></div>
-    <nav class="pages" id="pages" aria-label="Pagination"></nav>
-    <label class="afficher" for="parPage">Afficher :
-      <select id="parPage"><option value="6">6 par page</option><option value="12" selected>12 par page</option><option value="24">24 par page</option></select>
-    </label>
-  </div>
-  </div>
-  <section class="bloc" id="artistes" data-rub="portfolio" aria-labelledby="artistesTitre">
-    <div class="bloc-tete">
-      <div>
-        <h2 id="artistesTitre"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19c0-6 3-11 8-14-1 3 0 5 3 6-1 3-3 5-6 6M5 19l5-5"/></svg>Artistes à l'honneur</h2>
-        <p>Découvrez des talents exceptionnels de la scène africaine et de sa diaspora.</p>
-      </div>
-      <button class="lienor" type="button" id="artistesTous" aria-expanded="false">Voir tous les artistes <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16M14 6l6 6-6 6"/></svg></button>
-    </div>
-    <div class="artistes" id="artistesListe"></div>
-  </section>
-
-  <section class="bloc" id="collections" data-rub="portfolio" aria-labelledby="collTitre">
-    <div class="bloc-tete">
-      <div>
-        <h2 id="collTitre"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l9 4.5-9 4.5-9-4.5z"/><path d="M3 12l9 4.5 9-4.5M3 16.5L12 21l9-4.5"/></svg>Collections</h2>
-        <p>Explorez des séries d'œuvres thématiques, créées par nos artistes.</p>
-      </div>
-      <button class="lienor" type="button" id="collToutes">Voir toutes les collections <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16M14 6l6 6-6 6"/></svg></button>
-    </div>
-    <div class="collections" id="collListe"></div>
-  </section>
-
-  <section class="bloc" id="apropos" data-rub="apropos" aria-labelledby="aproposTitre">
-    <div class="bloc-tete"><div><h2 id="aproposTitre"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>À propos de la galerie</h2></div></div>
-    <div class="apropos">
-      <div>
-        <p>Née de la rencontre entre des artistes du continent et de la diaspora, la galerie présente des œuvres originales et accompagne ceux qui les créent. Chaque pièce est présentée par son artiste, avec son histoire, sa technique et son format.</p>
-        <p>Notre idée est simple : faire découvrir des talents, soutenir leur travail et relier les amateurs d'art à ceux qui font vivre une culture.</p>
-        <div class="chiffres" id="chiffres"></div>
-      </div>
-      <div class="apropos-art" id="aproposArt" role="img" aria-label="Illustration : un baobab au coucher du soleil"></div>
-    </div>
-  </section>
-
-  <section class="bloc" id="prestations" data-rub="prestations" aria-labelledby="prestaTitre">
-    <div class="bloc-tete"><div><h2 id="prestaTitre"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4l6 6-9 9H5v-6z"/><path d="M12 6l6 6"/></svg>Prestations</h2><p>Une idée précise, un format particulier, un événement à monter : les artistes vous répondent sur devis.</p></div></div>
-    <div class="prestas" id="prestaListe"></div>
-  </section>
-
-  <section class="bloc" id="evenements" data-rub="evenements" aria-labelledby="evtTitre">
-    <div class="bloc-tete"><div><h2 id="evtTitre"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Événements à venir</h2><p>Vernissages, ateliers et rencontres avec les artistes.</p></div></div>
-    <div class="evts" id="evtListe"></div>
-  </section>
-
-  <section class="bloc" id="avis" data-rub="avis" aria-labelledby="avisTitre">
-    <div class="bloc-tete">
-      <div><h2 id="avisTitre"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.6 5.600 6.100.7-4.500 4.200 1.200 6L12 16.600 6.600 19.500l1.200-6L3.300 9.300l6.100-.7z"/></svg>Avis des clients</h2><div class="note-moy" id="noteMoy"></div></div>
-      <button class="lienor" type="button" id="avisPlus" aria-expanded="false">Voir tous les avis <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16M14 6l6 6-6 6"/></svg></button>
-    </div>
-    <div class="avis-liste" id="avisListe"></div>
-  </section>
-
-  <section class="garanties-bande" data-rub="boutique" aria-label="Nos garanties">
-    <div class="g">
-      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 6h12v10H2zM14 9h4l4 3v4h-8z"/><circle cx="6.5" cy="17.5" r="1.8"/><circle cx="17.5" cy="17.5" r="1.8"/></svg>
-      <div><b>Livraison sécurisée</b><span>En Afrique et en Europe, avec suivi de commande.</span></div>
-    </div>
-    <div class="g">
-      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.4 1.8 3-.2 1 2.8 2.5 1.7-.8 2.9.8 2.9-2.5 1.7-1 2.8-3-.2L12 22l-2.4-1.8-3 .2-1-2.8-2.5-1.7.8-2.9-.8-2.9 2.5-1.7 1-2.8 3 .2z"/><path d="M8 12l3 3 5-6"/></svg>
-      <div><b>Authenticité garantie</b><span>Œuvres originales, certificat d'authenticité fourni par l'artiste.</span></div>
-    </div>
-    <div class="g">
-      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg>
-      <div><b>Paiement sécurisé</b><span>Transactions protégées : le paiement va directement à l'artiste.</span></div>
-    </div>
-  </section>
-
-  <section class="lettre" id="newsletter" data-rub="newsletter" aria-labelledby="lettreTitre">
-    <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>
-    <div><h3 id="lettreTitre">Restez informé(e) !</h3><p>Recevez nos nouvelles collections, portraits d'artistes, expositions et offres exclusives.</p></div>
-    <form id="lettreForm">
-      <input type="email" name="email" required autocomplete="email" placeholder="Votre adresse e-mail" aria-label="Votre adresse e-mail">
-      <button type="submit">S'inscrire</button>
-    </form>
-  </section>
-
+  <div class="chips" id="cats"></div>
+  <h2 class="sectitle" id="sectMain"></h2>
+  <div class="grid" id="grid"></div>
+  <p class="demo">Maquette : réalisations fictives. Les demandes de devis sont simulées et ne sont envoyées nulle part.</p>
 </main>
 
-<footer class="site-pied" aria-label="Bas de page">
-  <div class="pied-in">
-    <div class="pied-grille">
-      <div class="pied-marque">
-        <div class="logo-pied">
-          <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19C5 10 11 4 20 4c0 9-6 15-15 15z"/><path d="M5 19L14 10M9 16h4M12 13h4"/></svg>
-          <span id="piedNom"></span>
-        </div>
-        <p>La galerie en ligne des artistes du continent et de la diaspora : œuvres originales, créations sur mesure et expositions.</p>
-        <div class="reseaux" role="group" aria-label="Réseaux sociaux (liens fictifs)">
-          <button type="button" data-pied="Instagram" aria-label="Instagram (lien fictif)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17" cy="7" r=".6"/></svg></button>
-          <button type="button" data-pied="Facebook" aria-label="Facebook (lien fictif)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 8.5h2.5V5H14c-2.2 0-3.5 1.5-3.5 3.6V11H8v3.5h2.5V21H14v-6.5h2.4l.6-3.5H14V9.2c0-.5.2-.7 0-.7z"/></svg></button>
-          <button type="button" data-pied="YouTube" aria-label="YouTube (lien fictif)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="5.5" width="19" height="13" rx="4"/><path d="M10 9.5v5l4.5-2.5z"/></svg></button>
-          <button type="button" data-pied="WhatsApp" aria-label="Messagerie (lien fictif)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l1.3-4.2A8 8 0 1 1 8.2 18.7z"/><path d="M9 9.5c0 3 2.500 5.500 5.500 5.500l1-1.500-2-1-1 .7c-.8-.4-1.400-1-1.800-1.800l.7-1-1-2z"/></svg></button>
-        </div>
-      </div>
-
-      <nav class="pied-col" aria-label="Explorer">
-        <h4>Explorer</h4>
-        <ul>
-          <li data-rub="portfolio boutique"><button type="button" data-aller="galerie">La galerie</button></li>
-          <li data-rub="portfolio"><button type="button" data-aller="artistes">Les artistes</button></li>
-          <li data-rub="portfolio"><button type="button" data-aller="collections">Les collections</button></li>
-          <li data-rub="prestations contact"><button type="button" data-aller="devis">Demander un devis</button></li>
-        </ul>
-      </nav>
-
-      <nav class="pied-col" data-rub="portfolio boutique" aria-label="Catégories d'œuvres">
-        <h4>Catégories</h4>
-        <ul id="piedCats"></ul>
-      </nav>
-
-      <nav class="pied-col" data-rub="boutique" aria-label="Informations">
-        <h4>Informations</h4>
-        <ul>
-          <li><button type="button" data-pied="Livraison et retours">Livraison et retours</button></li>
-          <li><button type="button" data-pied="Authenticité et certificats">Authenticité et certificats</button></li>
-          <li><button type="button" data-pied="Paiement sécurisé">Paiement sécurisé</button></li>
-          <li><button type="button" data-pied="Questions fréquentes">Questions fréquentes</button></li>
-        </ul>
-      </nav>
-
-      <div class="pied-col pied-contact" data-rub="contact">
-        <h4>Nous contacter</h4>
-        <p>Une question, une œuvre à commander, une exposition à proposer ? La galerie répond sous 48 heures.</p>
-        <address>Abidjan, Côte d'Ivoire<br>Du lundi au samedi, de 9 h à 18 h</address>
-        <button type="button" class="ecrire" data-aller="contact">Nous écrire</button>
-      </div>
-    </div>
-
-    <div class="pied-bas">
-      <p class="copy">© 2026 <span id="piedNom2"></span>. Tous droits réservés.</p>
-      <ul class="paiements" data-rub="boutique" aria-label="Moyens de paiement acceptés (exemple)">
-        <li class="lib">Paiement accepté :</li>
-        <li class="moyen"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2.500"/><path d="M3 10h18M7 15h3"/></svg>Carte bancaire</li>
-        <li class="moyen"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/></svg>Mobile Money</li>
-        <li class="moyen"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10l9-6 9 6M5 10v8M9.500 10v8M14.500 10v8M19 10v8M3 20h18"/></svg>Virement</li>
-      </ul>
-    </div>
-    <p class="demo">Exemple : œuvres et artistes fictifs, dessinés pour la démonstration. Le panier, les paiements, les réseaux sociaux et les demandes de devis sont simulés et ne sont envoyés nulle part.</p>
-  </div>
-</footer>
-
-<!-- Choix des rubriques (exemple) -->
-<div class="overlay" id="rubOv" role="dialog" aria-modal="true" aria-labelledby="rubTitre">
+<!-- Détail d'une réalisation -->
+<div class="overlay" id="workOv" role="dialog" aria-modal="true">
   <div class="sheet">
-    <button class="close" type="button" data-close aria-label="Fermer"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
-    <h2 id="rubTitre" style="margin:0 0 4px;font-family:var(--serif)">Rubriques de la boutique</h2>
-    <p style="margin:0;color:var(--muted)">Choisissez un mode, puis ajustez au besoin chaque rubrique : la page se met à jour tout de suite. Dans une vraie boutique, ce réglage est dans « Paramètres vitrine », onglet « Navigation et rubriques ».</p>
-    <h3 class="mode-titre">Mode de la boutique</h3>
-    <div class="modes" id="modeListe" role="group" aria-label="Mode de la boutique"></div>
-    <p class="mode-etat" id="modeEtat" aria-live="polite"></p>
-    <h3 class="mode-titre">Rubriques</h3>
-    <ul class="sw-liste" id="rubListe"></ul>
-    <div class="rub-actions"><button class="btn" type="button" id="rubTout">Tout activer</button><button class="btn or" type="button" data-close>Terminer</button></div>
-  </div>
-</div>
-
-<!-- Fiche d'une œuvre -->
-<div class="overlay" id="workOv" role="dialog" aria-modal="true" aria-labelledby="wTitle">
-  <div class="sheet">
-    <button class="close" type="button" data-close aria-label="Fermer"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
-    <div class="fiche">
-      <div>
-        <button class="grand" type="button" id="wMain" aria-label="Agrandir l'image"></button>
-        <div class="minis" id="wMinis"></div>
-      </div>
-      <div>
-        <span class="badge" id="wCat"></span>
-        <h2 id="wTitle"></h2>
-        <div class="par" id="wPar" style="color:var(--muted)"></div>
-        <div class="faits" id="wFacts"></div>
-        <p class="histoire" id="wDesc"></p>
-        <button class="video" type="button" id="wVideo" hidden>
-          <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M10 8.5l6 3.5-6 3.5z"/></svg>
-          <span><b>Vidéo de création</b><small id="wVideoDuree"></small></span>
-        </button>
-        <div class="prix" id="wPrix"></div>
-        <div class="actions" id="wActions"></div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Exposition plein écran -->
-<div class="expo" id="expo" role="dialog" aria-modal="true" aria-labelledby="expoTitre">
-  <div class="expo-haut">
-    <h2 class="expo-titre" id="expoTitre"></h2>
-    <button class="expo-outil" type="button" id="expoLecture" aria-pressed="false">
-      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true" id="expoLectureIc"><path d="M8 5l11 7-11 7z"/></svg><span class="expo-bouton-lib" id="expoLectureLib">Diaporama</span>
-    </button>
-    <button class="expo-outil" type="button" id="expoPleinEcran" aria-pressed="false">
-      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><span class="expo-bouton-lib">Plein écran</span>
-    </button>
-    <button class="expo-outil" type="button" data-expoclose aria-label="Quitter l'exposition">
-      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg><span class="expo-bouton-lib">Quitter</span>
-    </button>
-  </div>
-  <div class="expo-scene" id="expoScene">
-    <button class="expo-nav expo-prec" type="button" data-expoprev aria-label="Œuvre précédente"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
-    <div class="expo-cadre" id="expoCadre"></div>
-    <button class="expo-nav expo-suiv" type="button" data-exposuiv aria-label="Œuvre suivante"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
-  </div>
-  <div class="expo-plaque" aria-live="polite">
-    <div>
-      <div class="par" id="expoPar"></div>
-      <h3 id="expoOeuvre"></h3>
-      <div class="tech" id="expoTech"></div>
-      <p class="desc" id="expoDesc"></p>
-      <div class="coll" id="expoColl"></div>
-    </div>
-    <div class="expo-droite">
-      <div id="expoPrix"></div>
-      <div class="expo-actions" id="expoActions"></div>
-    </div>
-  </div>
-  <div class="expo-bas">
-    <div class="expo-prog" aria-hidden="true"><i id="expoProg"></i></div>
-    <div class="expo-vignettes" id="expoVignettes" role="group" aria-label="Œuvres de l'exposition"></div>
-    <div class="expo-mention">Exemple : œuvres fictives dessinées pour la démonstration. Touches : flèches pour avancer, espace pour le diaporama, F pour le plein écran, Échap pour quitter.</div>
+    <button class="close" data-close aria-label="Fermer">×</button>
+    <h2 id="wTitle"></h2>
+    <p id="wDesc"></p>
+    <div class="facts" id="wFacts"></div>
+    <div class="gallery" id="wGallery"></div>
+    <button class="btn" id="wAsk">Demander un devis similaire</button>
   </div>
 </div>
 
 <!-- Visionneuse -->
-<div class="lightbox" id="lb" role="dialog" aria-modal="true" aria-label="Visionneuse">
-  <div class="cadre" id="lbFrame"></div>
-  <button class="lb-close" type="button" data-lbclose aria-label="Fermer"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
-  <button class="lb-prev" type="button" data-lbprev aria-label="Image précédente"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
-  <button class="lb-next" type="button" data-lbnext aria-label="Image suivante"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
+<div class="lightbox" id="lb" role="dialog" aria-modal="true">
+  <div class="frame" id="lbFrame"></div>
+  <button class="lb-close" data-lbclose aria-label="Fermer">×</button>
+  <button class="lb-prev" data-lbprev aria-label="Photo précédente">‹</button>
+  <button class="lb-next" data-lbnext aria-label="Photo suivante">›</button>
   <div class="lb-count" id="lbCount"></div>
 </div>
 
-<!-- Fiche d'un artiste -->
-<div class="overlay" id="artistOv" role="dialog" aria-modal="true" aria-labelledby="aNom">
-  <div class="sheet">
-    <button class="close" type="button" data-close aria-label="Fermer"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
-    <div class="fiche-artiste">
-      <div class="portrait-grand" id="aPortrait"></div>
-      <div>
-        <span class="badge" id="aSpe"></span>
-        <h2 id="aNom"></h2>
-        <div style="color:var(--muted)" id="aLieu"></div>
-        <p class="histoire" id="aBio" style="margin-top:12px"></p>
-        <b>Ses œuvres</b>
-        <div class="oeuvres-artiste" id="aOeuvres"></div>
-        <div class="actions" id="aActions"></div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Panier -->
-<div class="overlay" id="cartOv" role="dialog" aria-modal="true" aria-labelledby="cartTitle">
-  <div class="sheet etroit">
-    <button class="close" type="button" data-close aria-label="Fermer"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
-    <h2 id="cartTitle">Mon panier</h2>
-    <div id="cartBody"></div>
-  </div>
-</div>
-
 <!-- Demande de devis -->
-<div class="overlay" id="contactOv" role="dialog" aria-modal="true" aria-labelledby="devisTitle">
-  <div class="sheet etroit">
-    <button class="close" type="button" data-close aria-label="Fermer"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
-    <h2 id="devisTitle">Demande de devis</h2>
-    <p class="aide" style="margin-top:0">Décrivez votre demande, votre budget et vos délais : l'artiste répond par un devis.</p>
+<div class="overlay" id="contactOv" role="dialog" aria-modal="true">
+  <div class="sheet">
+    <button class="close" data-close aria-label="Fermer">×</button>
+    <h2>Demande de devis</h2>
     <form class="form" id="contactForm">
-      <label>Nom <input name="nom" required autocomplete="name"></label>
-      <label>Adresse e-mail <input name="email" type="email" required autocomplete="email"></label>
-      <label>Objet de la demande
-        <select name="objet" id="objetSel"></select>
-      </label>
-      <div class="duo">
-        <label>Budget envisagé <input name="budget" inputmode="numeric" placeholder="par exemple 500 €"></label>
-        <label>Délai souhaité <input name="delai" placeholder="par exemple 6 semaines"></label>
-      </div>
-      <label>Votre demande <textarea name="besoin" required></textarea></label>
-      <button class="btn or" type="submit">Envoyer la demande (simulée)</button>
+      <label>Nom <input name="nom" required></label>
+      <label>Adresse e-mail <input name="email" type="email" required></label>
+      <label>Projet concerné <select name="projet" id="projetSel"></select></label>
+      <label>Votre besoin <textarea name="besoin" required></textarea></label>
+      <button class="btn" type="submit">Envoyer la demande (simulée)</button>
     </form>
-    <p class="aide">Une commande artistique est distincte d'un projet à accompagner : pour soumettre un projet, utilisez « Soumettre à Diaspo'Actif » depuis votre tableau de bord.</p>
   </div>
 </div>
 
-<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="toast" id="toast"></div>
 
 <script>
   const SHOP_DEFAULT = {
-    main: "portfolio", options: [], name: "Diaspo'Actif", slogan: "Découvrez des œuvres authentiques, soutenez les talents du continent et emportez chez vous une part d'Afrique.",
+    main: "portfolio", options: [], name: "Diaspo'Actif", slogan: "Nos réalisations, de la conception à la livraison.",
     colors: ["#83172f", "#111c38", "#d8b36a"], textures: ["uni", "uni", "uni"],
-    sections: ["Galerie d'art africain", "Œuvres récentes"], hiddenSections: []
+    sections: ["Notre portfolio", "Projets récents"], hiddenSections: []
   };
   const SHOP = (() => {
     try { return Object.assign({}, SHOP_DEFAULT, JSON.parse(localStorage.getItem("shopConfig")) || {}); }
@@ -776,528 +128,88 @@
   })();
   const TYPE_LABELS = { video: "Boutique Vidéo", ecom: "Boutique Traditionnelle", portfolio: "Portfolio", events: "Créateur d'événements", impact: "Projet Impact" };
 
-  /* ── Couleurs : le fond sombre se calcule à partir de la 2e couleur, l'or de la 3e ── */
-  function rgb(h) { h = String(h || "#000").replace("#", ""); if (h.length === 3) h = h.replace(/./g, "$&$&"); const n = parseInt(h, 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
-  function hex(a) { return "#" + a.map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0")).join(""); }
-  function mix(a, b, t) { const x = rgb(a), y = rgb(b); return hex(x.map((v, i) => v * (1 - t) + y[i] * t)); }
-  function lum(h) { const c = rgb(h).map(v => { v /= 255; return v <= .03928 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4); }); return .2126 * c[0] + .7152 * c[1] + .0722 * c[2]; }
-  (function couleurs() {
-    const c = SHOP.colors, r = document.documentElement.style;
-    const bg = lum(c[1]) > .2 ? mix(c[1], "#000000", .75) : mix(c[1], "#000000", .35);
-    const or = lum(c[2]) < .3 ? mix(c[2], "#ffffff", .5) : c[2];
-    r.setProperty("--c1", c[0]); r.setProperty("--c2", c[1]); r.setProperty("--c3", c[2]);
-    r.setProperty("--bg", bg); r.setProperty("--panel", mix(bg, "#ffffff", .05)); r.setProperty("--panel2", mix(bg, "#ffffff", .09));
-    r.setProperty("--gold", or); r.setProperty("--line", mix(bg, or, .38)); r.setProperty("--on-gold", lum(or) > .35 ? mix(bg, "#000000", .3) : "#ffffff");
-    const m = document.querySelector('meta[name="theme-color"]'); if (m) m.content = bg;
-  })();
-
-  /* ── Œuvres dessinées en SVG (aucune image externe) ── */
-  let uid = 0;
-  function svg(inner, vb) { return '<svg viewBox="' + (vb || "0 0 400 320") + '" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">' + inner + "</svg>"; }
-  function lin(id, a, b, c) { return '<linearGradient id="' + id + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + a + '"/><stop offset=".55" stop-color="' + b + '"/><stop offset="1" stop-color="' + (c || b) + '"/></linearGradient>'; }
-  function baobab(tx, ty, s, col) {
-    return '<g transform="translate(' + tx + " " + ty + ") scale(" + s + ')" fill="' + col + '" stroke="' + col + '" stroke-linecap="round">'
-      + '<path stroke="none" d="M138 252C146 212 148 186 144 160L176 160C172 186 174 212 182 252Z"/>'
-      + '<path fill="none" stroke-width="7" d="M144 162C120 150 104 142 92 128M176 162C200 146 216 138 232 126M160 160C158 140 156 126 160 112"/>'
-      + '<ellipse stroke="none" cx="92" cy="124" rx="34" ry="14"/><ellipse stroke="none" cx="232" cy="122" rx="38" ry="15"/><ellipse stroke="none" cx="160" cy="106" rx="32" ry="13"/><ellipse stroke="none" cx="120" cy="136" rx="22" ry="9"/><ellipse stroke="none" cx="200" cy="136" rx="24" ry="9"/></g>';
-  }
-  const ART = {
-    baobab(p) { const n = ++uid; return lin("g" + n, p[0], p[1], p[2]) + '<rect width="400" height="320" fill="url(#g' + n + ')"/><circle cx="276" cy="196" r="48" fill="#ffd98a" opacity=".92"/>' + baobab(-30, 30, 1.18, "#1a0e0a") + baobab(230, 120, .5, "#1a0e0a") + '<path d="M0 252Q120 232 220 248T400 242V320H0Z" fill="#1a0e0a"/>'; },
-    motif(p) { const n = ++uid; return '<defs><pattern id="m' + n + '" width="44" height="44" patternUnits="userSpaceOnUse"><path d="M22 4l18 18-18 18L4 22z" fill="none" stroke="' + p[2] + '" stroke-width="2"/><circle cx="22" cy="22" r="4" fill="' + p[2] + '"/><path d="M0 0l8 8M44 0l-8 8M0 44l8-8M44 44l-8-8" stroke="' + p[1] + '" stroke-width="2"/></pattern></defs><rect width="400" height="320" fill="' + p[0] + '"/><rect width="400" height="320" fill="url(#m' + n + ')"/><rect x="110" y="70" width="180" height="180" rx="90" fill="' + p[0] + '" stroke="' + p[2] + '" stroke-width="4"/><path d="M200 100l50 50-50 50-50-50z" fill="' + p[1] + '"/><circle cx="200" cy="150" r="14" fill="' + p[2] + '"/>'; },
-    tissage(p) { let s = '<rect width="400" height="320" fill="' + p[0] + '"/>'; const w = [34, 20, 46, 26, 38, 18, 44, 30, 40, 22, 36, 30], cols = [p[1], p[2], p[0], p[2], p[1]]; let x = 0; w.forEach((v, i) => { s += '<rect x="' + x + '" y="0" width="' + v + '" height="320" fill="' + cols[i % cols.length] + '" opacity="' + (.78 + (i % 3) * .08) + '"/>'; x += v + 2; });
-      return s + '<path d="M0 120Q100 80 200 120T400 120M0 210Q100 170 200 210T400 210" fill="none" stroke="#ffffff" stroke-opacity=".28" stroke-width="3"/>'; },
-    paysage(p) { const n = ++uid; return lin("g" + n, p[0], p[1], p[2]) + '<rect width="400" height="320" fill="url(#g' + n + ')"/><circle cx="110" cy="120" r="40" fill="#fff3d0" opacity=".85"/><path d="M0 210Q90 150 190 200T400 170V320H0Z" fill="' + p[2] + '" opacity=".55"/><path d="M0 250Q120 200 230 245T400 225V320H0Z" fill="#150c10" opacity=".78"/><path d="M0 285Q140 255 260 285T400 275V320H0Z" fill="#0a0608"/>'; },
-    lune(p) { const n = ++uid; return '<defs><radialGradient id="r' + n + '" cx=".5" cy=".42" r=".6"><stop offset="0" stop-color="' + p[1] + '"/><stop offset=".6" stop-color="' + p[0] + '"/><stop offset="1" stop-color="#05070f"/></radialGradient></defs><rect width="400" height="320" fill="url(#r' + n + ')"/><circle cx="200" cy="124" r="62" fill="#f3ead2"/><circle cx="222" cy="112" r="56" fill="' + p[1] + '" opacity=".22"/><path d="M0 240h400V320H0z" fill="#05070f"/><path d="M60 240l14-48 14 48zM90 240l10-34 10 34zM300 240l16-56 16 56zM336 240l10-30 10 30z" fill="#0a0d18"/><path d="M110 70q8-8 16 0M150 52q6-6 12 0M270 80q8-8 16 0" fill="none" stroke="#f3ead2" stroke-width="2"/>'; },
-    sculpture(p) { const n = ++uid; return '<defs><radialGradient id="r' + n + '" cx=".5" cy=".3" r=".8"><stop offset="0" stop-color="' + p[1] + '"/><stop offset="1" stop-color="' + p[0] + '"/></radialGradient><linearGradient id="b' + n + '" x1="0" x2="1"><stop offset="0" stop-color="' + p[2] + '"/><stop offset=".5" stop-color="#f3d9a0"/><stop offset="1" stop-color="' + p[2] + '"/></linearGradient></defs><rect width="400" height="320" fill="url(#r' + n + ')"/><ellipse cx="200" cy="278" rx="92" ry="12" fill="#000" opacity=".45"/><rect x="150" y="226" width="100" height="44" rx="10" fill="url(#b' + n + ')"/><rect x="164" y="150" width="72" height="82" rx="22" fill="url(#b' + n + ')"/><ellipse cx="200" cy="112" rx="42" ry="52" fill="url(#b' + n + ')"/><circle cx="184" cy="104" r="6" fill="#2a160c"/><circle cx="216" cy="104" r="6" fill="#2a160c"/><path d="M200 108v26M186 148h28" stroke="#2a160c" stroke-width="5" stroke-linecap="round" fill="none"/><path d="M174 70q26-26 52 0" fill="none" stroke="#2a160c" stroke-width="4"/>'; },
-    numerique(p) { const n = ++uid; let c = ""; for (let i = 0; i < 7; i++) c += '<circle cx="200" cy="160" r="' + (20 + i * 20) + '" fill="none" stroke="url(#s' + n + ')" stroke-width="' + (2 + (i % 3)) + '" opacity="' + (1 - i * .1).toFixed(2) + '"/>';
-      return '<defs><linearGradient id="s' + n + '" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="' + p[1] + '"/><stop offset="1" stop-color="' + p[2] + '"/></linearGradient></defs><rect width="400" height="320" fill="' + p[0] + '"/><path d="M0 40h400M0 100h400M0 160h400M0 220h400M0 280h400M60 0v320M140 0v320M220 0v320M300 0v320M380 0v320" stroke="' + p[1] + '" stroke-opacity=".16"/>' + c + '<circle cx="200" cy="160" r="10" fill="' + p[2] + '"/>'; },
-    vase(p) { const n = ++uid, forme = "M200 56C172 56 170 88 178 108C142 128 122 180 142 228C160 270 240 270 258 228C278 180 258 128 222 108C230 88 228 56 200 56Z"; return lin("g" + n, p[0], p[1]) + '<clipPath id="c' + n + '"><path d="' + forme + '"/></clipPath><rect width="400" height="320" fill="url(#g' + n + ')"/><ellipse cx="200" cy="276" rx="80" ry="10" fill="#000" opacity=".4"/><path d="' + forme + '" fill="' + p[2] + '"/><g clip-path="url(#c' + n + ')" fill="none" stroke="#2a160c" stroke-width="4"><path d="M120 150l20-14 20 14 20-14 20 14 20-14 20 14 20-14 20 14"/><path d="M120 190l20-14 20 14 20-14 20 14 20-14 20 14 20-14 20 14"/><path d="M120 230l20-14 20 14 20-14 20 14 20-14 20 14 20-14 20 14"/></g>'; }
-  };
-  function art(w, vue) {
-    const vb = ["0 0 400 320", "30 20 230 184", "170 110 230 184"][vue || 0];
-    return svg(ART[w.kind](w.pal), vb);
-  }
+  // Réalisations de démonstration (fictives). Chaque réalisation a ses photos (couleurs de démonstration).
+  const WORKS = [
+    { id: 1, t: "Stand événementiel salon de la diaspora", cat: "evenements", year: 2025, client: "Association partenaire", c: "#7a1a2a", desc: "Conception et installation d'un stand de 12 m² : signalétique, mobilier et écran d'information.", photos: ["#7a1a2a", "#8a2232", "#5c1220"] },
+    { id: 2, t: "Identité visuelle d'une coopérative", cat: "graphisme", year: 2025, client: "Coopérative locale", c: "#2c3e63", desc: "Logo, charte graphique et supports de communication imprimés.", photos: ["#2c3e63", "#3b4f7a", "#1d2b48"] },
+    { id: 3, t: "Vidéo de présentation d'un artisan", cat: "video", year: 2026, client: "Artisan indépendant", c: "#1f6b55", desc: "Tournage et montage d'une présentation de deux minutes pour les réseaux sociaux.", photos: ["#1f6b55", "#2a8a6e"] },
+    { id: 4, t: "Site vitrine pour une association", cat: "web", year: 2026, client: "Association culturelle", c: "#4a0f1a", desc: "Site responsive avec agenda, actualités et formulaire de contact.", photos: ["#4a0f1a", "#6b1a28", "#2e0a12", "#8a2232"] },
+    { id: 5, t: "Affiches pour un festival", cat: "graphisme", year: 2024, client: "Festival de quartier", c: "#573a7d", desc: "Série de quatre affiches et déclinaisons pour les réseaux.", photos: ["#573a7d", "#6d4f99"] },
+    { id: 6, t: "Film de fin de chantier", cat: "video", year: 2025, client: "Entreprise de bâtiment", c: "#8a5a1a", desc: "Captation et montage d'un film retraçant la réalisation d'un bâtiment.", photos: ["#8a5a1a", "#a87024", "#5f3d10"] }
+  ];
   const CATS = [
-    { id: "all", label: "Toutes", ic: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>' },
-    { id: "peinture", label: "Peinture", ic: '<path d="M14 4l6 6-9 9H5v-6z"/><path d="M12 6l6 6"/>' },
-    { id: "photographie", label: "Photographie", ic: '<path d="M4 8h3l2-3h6l2 3h3v12H4z"/><circle cx="12" cy="13.5" r="3.6"/>' },
-    { id: "sculpture", label: "Sculpture", ic: '<path d="M12 3l8 4v10l-8 4-8-4V7z"/><path d="M4 7l8 4 8-4M12 11v10"/>' },
-    { id: "artisanat", label: "Artisanat d'art", ic: '<path d="M10 3h4M11 3c0 3-4 4-4 9 0 5 2 9 5 9s5-4 5-9c0-5-4-6-4-9"/>' },
-    { id: "numerique", label: "Art numérique", ic: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5-5-9 9"/>' }
+    { id: "all", label: "Toutes" }, { id: "graphisme", label: "Graphisme" }, { id: "video", label: "Vidéo" },
+    { id: "web", label: "Web" }, { id: "evenements", label: "Événements" }
   ];
   const CAT_LABEL = Object.fromEntries(CATS.map(c => [c.id, c.label]));
-  const ico = (d) => '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">' + d + "</svg>";
-  const ICO = {
-    coeur: ico('<path d="M12 20s-7-4.6-9-9.2C1.6 7.4 3.7 4 7 4c2 0 3.4 1 5 3 1.6-2 3-3 5-3 3.3 0 5.4 3.4 4 6.8-2 4.6-9 9.2-9 9.2z"/>'),
-    oeil: ico('<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>'),
-    panier: ico('<path d="M3 4h2.5l2.2 11h10.3l2-8H6.3"/><circle cx="9.5" cy="19.5" r="1.4"/><circle cx="17" cy="19.5" r="1.4"/>'),
-    devis: ico('<path d="M5 3h10l4 4v14H5z"/><path d="M15 3v4h4M8 12h8M8 16h5"/>'),
-    gauche: ico('<path d="M15 5l-7 7 7 7"/>'), droite: ico('<path d="M9 5l7 7-7 7"/>'),
-    poubelle: ico('<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>')
-  };
 
-  /* ── Œuvres de démonstration (fictives) : prix fixe, sur devis ou simplement exposées ── */
-  const P = {
-    couchant: ["#3a1d4a", "#d9632b", "#f2a33d"], aube: ["#17325a", "#e0795a", "#f4c27a"], sable: ["#5a2a14", "#d98b3a", "#f0c777"],
-    nuit: ["#0b1534", "#2a4a8a", "#8fb4ff"], foret: ["#0e2a22", "#1f6b55", "#7fcf9a"], rouge: ["#4a0f1a", "#b3342f", "#f0b255"],
-    indigo: ["#14234a", "#3b5fb0", "#e9c46a"], terre: ["#3b1f12", "#a85a2a", "#e7b872"], ocre: ["#2a1608", "#c8741f", "#f6d58f"], neon: ["#0a0f24", "#26e0c4", "#f25fa6"]
-  };
-  const WORKS = [
-    { id: 1, t: "Baobab au couchant", artist: "Amina Diarra", cat: "photographie", kind: "baobab", pal: P.couchant, price: 250, mode: "fixe", stock: 5, year: 2025, tech: "Tirage d'art sur papier baryté", dims: "60 × 80 cm", desc: "Un baobab centenaire photographié au dernier souffle du jour, dans la savane. Tirage signé et numéroté, en cinq exemplaires.", video: "0:42" },
-    { id: 2, t: "Masque des ancêtres", artist: "Moussa Traoré", cat: "sculpture", kind: "sculpture", pal: P.terre, price: 320, mode: "fixe", stock: 1, year: 2024, tech: "Bois d'ébène sculpté, patine cire", dims: "38 × 22 × 14 cm", desc: "Pièce unique inspirée des masques de cérémonie. Chaque entaille raconte une lignée ; la patine est appliquée à la main." },
-    { id: 3, t: "Tissage des quatre saisons", artist: "Fatou Koné", cat: "peinture", kind: "tissage", pal: P.indigo, price: 380, mode: "fixe", stock: 1, year: 2025, tech: "Acrylique sur toile", dims: "90 × 70 cm", desc: "Des bandes de couleur qui rappellent les pagnes tissés et leurs rythmes. Toile tendue sur châssis, prête à accrocher.", video: "0:57" },
-    { id: 4, t: "Dunes de l'aube", artist: "Koffi Mensah", cat: "photographie", kind: "paysage", pal: P.aube, price: 210, mode: "fixe", stock: 8, year: 2026, tech: "Tirage pigmentaire sur papier mat", dims: "50 × 70 cm", desc: "Les premières lueurs sur un horizon de dunes. Série de huit tirages, vendus avec certificat d'authenticité." },
-    { id: 5, t: "Bogolan royal", artist: "Awa Camara", cat: "artisanat", kind: "motif", pal: P.terre, price: 190, mode: "fixe", stock: 3, year: 2025, tech: "Coton teint à la boue, motifs peints", dims: "120 × 80 cm", desc: "Un panneau de tissu teint selon la technique du bogolan : motifs losanges et lignes, teintes de terre." },
-    { id: 6, t: "Calebasse dorée", artist: "Issa Ouédraogo", cat: "artisanat", kind: "vase", pal: P.ocre, price: 140, mode: "fixe", stock: 1, year: 2024, tech: "Calebasse gravée, pigments naturels", dims: "Hauteur 32 cm", desc: "Une calebasse gravée de frises en dents de scie, patinée à l'ocre. Pièce unique." },
-    { id: 7, t: "Lune sur le fleuve", artist: "Nadia Benali", cat: "photographie", kind: "lune", pal: P.nuit, price: 230, mode: "fixe", stock: 6, year: 2025, tech: "Tirage d'art sur papier mat", dims: "60 × 40 cm", desc: "Une nuit claire au bord du fleuve : la lune, les silhouettes des arbres, quelques oiseaux de passage." },
-    { id: 8, t: "Cercles d'ancêtres", artist: "Yaw Boateng", cat: "numerique", kind: "numerique", pal: P.neon, price: 90, mode: "fixe", stock: 50, year: 2026, tech: "Création numérique, fichier haute définition", dims: "6000 × 4800 px", desc: "Œuvre numérique livrée en fichier haute définition, avec licence d'usage personnel. Des cercles concentriques comme des ondes de mémoire." },
-    { id: 9, t: "Harmonie des pagnes", artist: "Fatou Koné", cat: "peinture", kind: "tissage", pal: P.rouge, price: 420, mode: "fixe", stock: 1, year: 2026, tech: "Acrylique et collage sur toile", dims: "100 × 80 cm", desc: "Une composition en bandes chaudes, travaillée au couteau, avec des fragments de tissu collés." },
-    { id: 10, t: "Gardien de la case", artist: "Moussa Traoré", cat: "sculpture", kind: "sculpture", pal: P.rouge, price: null, mode: "devis", stock: 0, year: 2026, tech: "Bois sculpté, dimensions au choix", dims: "Sur mesure", desc: "Cette sculpture se réalise sur commande : taille, essence de bois et finition se décident ensemble. Délai habituel : six à huit semaines." },
-    { id: 11, t: "Savane en fusion", artist: "Koffi Mensah", cat: "peinture", kind: "paysage", pal: P.sable, price: 520, mode: "fixe", stock: 1, year: 2025, tech: "Huile sur toile", dims: "120 × 90 cm", desc: "Une savane brûlée de lumière, peinte à l'huile en couches successives." },
-    { id: 12, t: "Rythmes du fleuve", artist: "Amina Diarra", cat: "photographie", kind: "paysage", pal: P.foret, price: 180, mode: "fixe", stock: 10, year: 2024, tech: "Tirage sur papier photo", dims: "40 × 60 cm", desc: "Un long poser sur un fleuve du sud, entre brume et feuillages." },
-    { id: 13, t: "Motif des initiés", artist: "Awa Camara", cat: "peinture", kind: "motif", pal: P.indigo, price: 340, mode: "fixe", stock: 0, year: 2025, tech: "Acrylique sur toile", dims: "80 × 80 cm", desc: "Œuvre vendue. D'autres compositions du même atelier sont disponibles sur demande." },
-    { id: 14, t: "Vase du marché", artist: "Issa Ouédraogo", cat: "artisanat", kind: "vase", pal: P.terre, price: null, mode: "expose", stock: 0, year: 2023, tech: "Terre cuite, engobe", dims: "Hauteur 28 cm", desc: "Pièce de la collection de l'atelier, exposée mais non destinée à la vente. Vous pouvez demander une création dans le même esprit." },
-    { id: 15, t: "Onde numérique n° 2", artist: "Yaw Boateng", cat: "numerique", kind: "numerique", pal: P.couchant, price: 75, mode: "fixe", stock: 50, year: 2026, tech: "Création numérique, fichier haute définition", dims: "5000 × 5000 px", desc: "Deuxième œuvre de la série « Ondes ». Livrée en fichier, avec licence d'usage personnel." },
-    { id: 16, t: "Gardiennes du fleuve", artist: "Nadia Benali", cat: "sculpture", kind: "sculpture", pal: P.indigo, price: 610, mode: "fixe", stock: 2, year: 2025, tech: "Bronze patiné, édition de 2", dims: "45 × 20 × 18 cm", desc: "Bronze patiné, tiré en deux exemplaires seulement, livré avec son certificat." },
-    { id: 17, t: "Étoffe du soir", artist: "Fatou Koné", cat: "artisanat", kind: "tissage", pal: P.nuit, price: 160, mode: "fixe", stock: 4, year: 2026, tech: "Coton tissé main", dims: "150 × 100 cm", desc: "Une étoffe tissée main sur un métier à lames, dans une gamme de bleus du soir." },
-    { id: 18, t: "Aube sur la lagune", artist: "Koffi Mensah", cat: "photographie", kind: "paysage", pal: P.nuit, price: 200, mode: "fixe", stock: 7, year: 2026, tech: "Tirage d'art sur papier mat", dims: "50 × 75 cm", desc: "Brume et premières lueurs sur une lagune encore endormie." }
-  ];
-  WORKS.forEach((w, i) => { w.rang = i; });
-
-  /* Artistes et collections (fictifs). Une collection regroupe des œuvres de plusieurs artistes. */
-  const ARTISTS = [
-    { id: 1, nom: "Fatou Koné", spe: "Peintre plasticienne", lieu: "Abidjan, Côte d'Ivoire", v: 0, vedette: true, bio: "Elle peint la mémoire des étoffes et des femmes qui les portent : des bandes de couleur, travaillées au couteau, où le tissu devient un langage." },
-    { id: 2, nom: "Moussa Traoré", spe: "Sculpteur", lieu: "Bobo-Dioulasso, Burkina Faso", v: 1, vedette: true, bio: "Sculpteur sur bois d'ébène, il donne vie aux masques et aux gardiens inspirés des traditions de l'Ouest africain, patinés à la main." },
-    { id: 3, nom: "Amina Diarra", spe: "Photographe", lieu: "Bamako, Mali", v: 2, vedette: true, bio: "Photographe de la diaspora, elle capture la beauté des paysages, des fleuves et des instants de vie, en tirages d'art numérotés." },
-    { id: 4, nom: "Yaw Boateng", spe: "Artiste numérique", lieu: "Kumasi, Ghana", v: 3, vedette: true, bio: "Créatif multidisciplinaire, il fusionne art africain, design et technologies numériques pour des œuvres uniques, livrées en haute définition." },
-    { id: 5, nom: "Koffi Mensah", spe: "Peintre et photographe", lieu: "Accra, Ghana", v: 1, bio: "Entre toile et objectif, il explore la lumière des savanes, des dunes et des lagunes à l'aube." },
-    { id: 6, nom: "Awa Camara", spe: "Artiste textile", lieu: "Dakar, Sénégal", v: 0, bio: "Teinture à la boue, motifs peints à la main : elle réinvente le bogolan en panneaux contemporains." },
-    { id: 7, nom: "Issa Ouédraogo", spe: "Potier et graveur", lieu: "Ouagadougou, Burkina Faso", v: 3, bio: "Calebasses gravées, terres cuites engobées : il transmet les gestes de l'atelier familial." },
-    { id: 8, nom: "Nadia Benali", spe: "Photographe et sculptrice", lieu: "Tunis, Tunisie", v: 2, bio: "Du tirage d'art au bronze patiné, elle suit un même fil : l'eau, le fleuve et les silhouettes de la nuit." }
-  ];
-  const COLLS = [
-    { id: "lumieres", titre: "Lumières du continent", kind: "baobab", pal: P.couchant, ids: [1, 4, 7, 11, 12, 18] },
-    { id: "tissages", titre: "Tissages et motifs", kind: "motif", pal: P.indigo, ids: [3, 5, 9, 13, 17] },
-    { id: "heritage", titre: "Héritage et traditions", kind: "sculpture", pal: P.rouge, ids: [2, 6, 10, 14, 16] },
-    { id: "numerique", titre: "Créations numériques", kind: "numerique", pal: P.neon, ids: [8, 15] }
-  ];
-  const artistePar = (nom) => ARTISTS.find(a => a.nom === nom);
-  /* Portrait stylisé (dessiné en SVG, aucun visage réel) : 4 variantes de coiffe. */
-  function portrait(a) {
-    const n = ++uid, peaux = ["#6b3f2a", "#4f2c1e", "#7a4a33", "#5a3322"], peau = peaux[a.id % peaux.length];
-    const fonds = [["#3a1d4a", "#d9632b"], ["#17325a", "#e0795a"], ["#0e2a22", "#c8741f"], ["#14234a", "#3b5fb0"]][a.id % 4];
-    const habit = [P.rouge[1], P.indigo[1], P.ocre[1], P.foret[1]][a.id % 4];
-    let coiffe = "";
-    if (a.v === 0) coiffe = '<path d="M72 92C70 52 102 34 128 36c28 2 48 22 44 58-14-10-30-16-50-16-20 0-38 6-50 14z" fill="' + P.indigo[1] + '"/><path d="M80 70c20-14 50-16 84 0M76 82c24-12 60-14 92 0" stroke="#f0b255" stroke-width="5" fill="none"/><circle cx="76" cy="124" r="6" fill="#f0b255"/><circle cx="166" cy="124" r="6" fill="#f0b255"/>';
-    else if (a.v === 1) coiffe = '<ellipse cx="121" cy="86" rx="68" ry="12" fill="#3b2412"/><path d="M86 86c0-34 14-52 35-52s35 18 35 52z" fill="#5a3a1c"/><rect x="86" y="74" width="70" height="9" fill="#d9a441"/>';
-    else if (a.v === 2) coiffe = '<path d="M80 100c-4-40 20-62 42-62s46 22 42 62c-6-18-22-28-42-28s-36 10-42 28z" fill="#1b1210"/><circle cx="104" cy="112" r="14" fill="none" stroke="#f0b255" stroke-width="3"/><circle cx="140" cy="112" r="14" fill="none" stroke="#f0b255" stroke-width="3"/><path d="M118 112h8" stroke="#f0b255" stroke-width="3"/>';
-    else coiffe = '<path d="M82 98c-2-38 18-56 40-56s42 18 40 56c-6-14-20-20-40-20s-34 6-40 20z" fill="#1b1210"/><path d="M92 142c8 22 22 28 30 28s22-6 30-28c-8 8-18 12-30 12s-22-4-30-12z" fill="#1b1210"/>';
-    return svg('<defs><linearGradient id="p' + n + '" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="' + fonds[0] + '"/><stop offset="1" stop-color="' + fonds[1] + '"/></linearGradient></defs><rect width="240" height="200" fill="url(#p' + n + ')"/><path d="M30 200c4-34 40-46 92-46s88 12 92 46z" fill="' + habit + '"/><path d="M96 200l26-30 26 30z" fill="#f4f0e8" opacity=".85"/><rect x="108" y="124" width="28" height="36" rx="10" fill="' + peau + '"/><ellipse cx="122" cy="106" rx="40" ry="48" fill="' + peau + '"/>' + coiffe + '<circle cx="106" cy="108" r="3.4" fill="#1b1210"/><circle cx="138" cy="108" r="3.4" fill="#1b1210"/><path d="M110 134q12 8 24 0" stroke="#1b1210" stroke-width="3" fill="none" stroke-linecap="round"/>', "0 0 240 200");
-  }
-
-  /* ── État, panier et favoris (stockés dans la mémoire isolée de l'exemple) ── */
-  const state = { cat: "all", tri: "recent", page: 1, par: 12, current: null, vue: 0, artiste: null, coll: null, tous: false, vente: false };
+  const state = { cat: "all", current: null, photo: 0 };
   const $ = (s) => document.querySelector(s);
-  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-  const eur = (n) => Number(n).toLocaleString("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + " €";
-  function lire(cle, def) { try { const v = JSON.parse(localStorage.getItem(cle)); return v == null ? def : v; } catch (e) { return def; } }
-  function ecrire(cle, v) { try { localStorage.setItem(cle, JSON.stringify(v)); } catch (e) { /* stockage indisponible : l'état reste valable pour la page */ } }
-  let favoris = lire("pf_ex_favoris", []), panier = lire("pf_ex_panier", []);
-  const trouver = (id) => WORKS.find(w => w.id === id);
-  function toast(m) { const t = $("#toast"); t.textContent = m; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 2600); }
-  const dispo = (w) => w.mode === "fixe" && w.stock > 0;
+  function toast(m) { const t = $("#toast"); t.textContent = m; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 2200); }
 
-  (function appliquerBoutique() {
-    document.title = SHOP.name + " · " + (TYPE_LABELS[SHOP.main] || "Portfolio");
-    $("#shopName").textContent = SHOP.name;
-    $("#shopTitle").textContent = (SHOP.sections && SHOP.sections[0]) || SHOP_DEFAULT.sections[0];
-    $("#shopSlogan").textContent = SHOP.slogan || SHOP_DEFAULT.slogan;
-    $("#sectMain").textContent = (SHOP.sections && SHOP.sections[1]) || SHOP_DEFAULT.sections[1];
-    $("#heroArt").innerHTML = svg(ART.baobab(P.couchant) + '<rect width="400" height="320" fill="#05070f" opacity=".12"/>', "0 0 400 320");
-    const actif = SHOP.main === "portfolio" || (SHOP.options || []).includes("portfolio");
-    if (!actif) { $("#typeNote").style.display = ""; $("#typeNote").textContent = "Le portfolio n'est pas actif dans cette boutique. Les réalisations restent conservées dans le bonus boutique."; }
-    $("#objetSel").innerHTML = ["Création sur mesure", "Reproduction d'une œuvre", "Collaboration ou exposition", "Autre demande"].map(o => "<option>" + o + "</option>").join("");
+  (function applyShop() {
+    const r = document.documentElement.style;
+    r.setProperty("--c1", SHOP.colors[0]); r.setProperty("--c2", SHOP.colors[1]); r.setProperty("--c3", SHOP.colors[2]);
+    document.title = SHOP.name + " · " + TYPE_LABELS[SHOP.main];
+    $("#shopName").innerHTML = `${SHOP.name} <em>${TYPE_LABELS[SHOP.main]}</em>`;
+    $("#shopTitle").textContent = SHOP.name;
+    $("#shopSlogan").textContent = SHOP.slogan;
+    $("#sectMain").textContent = SHOP.sections[0] || "Notre portfolio";
+    const on = SHOP.main === "portfolio" || SHOP.options.includes("portfolio");
+    if (!on) {
+      $("#typeNote").style.display = "";
+      $("#typeNote").textContent = "Le portfolio n'est pas actif dans cette boutique. Les réalisations restent conservées dans le bonus boutique.";
+    }
+    $("#projetSel").innerHTML = WORKS.map(w => `<option>${w.t}</option>`).join("") + `<option>Autre projet</option>`;
   })();
 
-  /* ── Liste : filtre, tri, pagination ── */
-  function liste() {
-    const coll = state.coll ? COLLS.find(c => c.id === state.coll) : null;
-    const vente = state.vente || boutiqueSeule();
-    const l = WORKS.filter(w => (state.cat === "all" || w.cat === state.cat) && (!state.artiste || w.artist === state.artiste) && (!coll || coll.ids.includes(w.id)) && (!vente || w.mode === "fixe"));
-    const prix = (w) => (w.price == null ? Infinity : w.price);
-    if (state.tri === "prix-asc") l.sort((a, b) => prix(a) - prix(b) || a.rang - b.rang);
-    else if (state.tri === "prix-desc") l.sort((a, b) => (b.price == null ? -1 : b.price) - (a.price == null ? -1 : a.price) || a.rang - b.rang);
-    else if (state.tri === "titre") l.sort((a, b) => a.t.localeCompare(b.t, "fr"));
-    else l.sort((a, b) => b.year - a.year || a.rang - b.rang);
-    return l;
-  }
-  function etatCarte(w) { if (!rubOn("boutique")) return w.mode === "expose" ? "Exposée" : ""; return w.mode === "devis" ? "Sur devis" : w.mode === "expose" ? "Exposée" : w.stock <= 0 ? "Vendue" : w.stock === 1 ? "Pièce unique" : ""; }
-  function prixTexte(w) { if (!rubOn("boutique")) return w.mode === "expose" ? '<div class="prix sec">Non destinée à la vente</div>' : ""; return w.mode === "devis" ? '<div class="prix sec">Prix sur devis</div>' : w.mode === "expose" ? '<div class="prix sec">Non destinée à la vente</div>' : w.stock <= 0 ? '<div class="prix sec">Vendue</div>' : '<div class="prix">' + eur(w.price) + "</div>"; }
-  function boutonAchat(w, cls) {
-    if (!rubOn("boutique")) return '<button class="btn or" type="button" data-devis="' + w.id + '">' + ICO.devis + (w.mode === "expose" ? "Me contacter" : "Demander un devis") + "</button>";
-    if (w.mode === "devis") return '<button class="btn or" type="button" data-devis="' + w.id + '">' + ICO.devis + "Demander un devis</button>";
-    if (w.mode === "expose") return '<button class="btn or" type="button" data-devis="' + w.id + '">' + ICO.devis + "Me contacter</button>";
-    if (w.stock <= 0) return '<button class="btn or" type="button" disabled>Vendue</button>';
-    return '<button class="btn or" type="button" data-add="' + w.id + '">' + ICO.panier + "Ajouter au panier</button>";
-  }
   function render() {
-    $("#cats").innerHTML = CATS.map(c => '<button class="chip" type="button" data-cat="' + c.id + '" aria-pressed="' + (state.cat === c.id) + '">' + ico(c.ic) + esc(c.label) + "</button>").join("");
-    const l = liste(), n = l.length, pages = Math.max(1, Math.ceil(n / state.par));
-    if (state.page > pages) state.page = pages;
-    const debut = (state.page - 1) * state.par, vue = l.slice(debut, debut + state.par);
-    $("#grid").innerHTML = vue.length ? vue.map(w => {
-      const etat = etatCarte(w);
-      return '<article class="carte"><button class="vue" type="button" data-work="' + w.id + '" aria-label="Voir l\'œuvre : ' + esc(w.t) + '">' + art(w) + "</button>"
-        + (etat ? '<span class="etat">' + etat + "</span>" : "")
-        + '<button class="coeur" type="button" data-fav="' + w.id + '" aria-pressed="' + favoris.includes(w.id) + '" aria-label="Mettre en favori : ' + esc(w.t) + '">' + ICO.coeur + "</button>"
-        + '<div class="corps"><h3>' + esc(w.t) + '</h3><div class="par">Par ' + esc(w.artist) + '</div><span class="badge">' + esc(CAT_LABEL[w.cat]) + "</span>" + prixTexte(w)
-        + '<div class="actions"><button class="btn" type="button" data-work="' + w.id + '">' + ICO.oeil + "Voir l'œuvre</button>" + boutonAchat(w) + "</div></div></article>";
-    }).join("") : "<p>Aucune œuvre dans cette catégorie.</p>";
-    $("#compte").textContent = n ? (debut + 1) + " – " + (debut + vue.length) + " sur " + n + " œuvre" + (n > 1 ? "s" : "") : "0 œuvre";
-    let p = '<button class="pg" type="button" data-page="' + (state.page - 1) + '" aria-label="Page précédente"' + (state.page <= 1 ? " disabled" : "") + ">" + ICO.gauche + "</button>";
-    for (let i = 1; i <= pages; i++) p += '<button class="pg" type="button" data-page="' + i + '"' + (i === state.page ? ' aria-current="page"' : "") + ' aria-label="Page ' + i + '">' + i + "</button>";
-    p += '<button class="pg" type="button" data-page="' + (state.page + 1) + '" aria-label="Page suivante"' + (state.page >= pages ? " disabled" : "") + ">" + ICO.droite + "</button>";
-    $("#pages").innerHTML = pages > 1 ? p : "";
-    $("#cartCount").textContent = panier.reduce((s, l) => s + l.q, 0);
-    /* filtres actifs (artiste, collection) : puces qu'on peut retirer d'un clic */
-    const coll = state.coll ? COLLS.find(c => c.id === state.coll) : null, croix = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
-    $("#actifs").innerHTML = (state.artiste ? '<button class="actif" type="button" data-retire="artiste" aria-label="Retirer le filtre artiste ' + esc(state.artiste) + '">Artiste : ' + esc(state.artiste) + croix + "</button>" : "")
-      + (coll ? '<button class="actif" type="button" data-retire="coll" aria-label="Retirer le filtre collection ' + esc(coll.titre) + '">Collection : ' + esc(coll.titre) + croix + "</button>" : "")
-      + (state.vente && rubOn("portfolio") ? '<button class="actif" type="button" data-retire="vente" aria-label="Retirer le filtre œuvres à vendre">Œuvres à vendre' + croix + "</button>" : "");
-    document.querySelectorAll(".collection").forEach(c => c.setAttribute("aria-pressed", String(c.dataset.coll === state.coll)));
+    $("#cats").innerHTML = CATS.map(c => `<button class="chip ${state.cat === c.id ? "on" : ""}" data-cat="${c.id}">${c.label}</button>`).join("");
+    const l = WORKS.filter(w => state.cat === "all" || w.cat === state.cat);
+    $("#grid").innerHTML = l.length ? l.map(w => `
+      <button class="work" data-work="${w.id}" aria-label="Voir ${w.t}">
+        <div class="img" style="--c:${w.c};background:${w.c}"><small>${w.photos.length} photo(s)</small></div>
+        <div class="info"><h3>${w.t}</h3><div class="meta">${CAT_LABEL[w.cat]} · ${w.year}</div></div>
+      </button>`).join("") : `<p>Aucune réalisation dans cette catégorie.</p>`;
   }
 
-  /* ── Vue 2 : artistes à l'honneur et collections ── */
-  function vue2() {
-    const liste = ARTISTS.filter(a => state.tous || a.vedette);
-    $("#artistesListe").innerHTML = liste.map((a, i) => '<article class="artiste"><button class="portrait" type="button" data-artiste="' + a.id + '" aria-label="Découvrir l\'artiste : ' + esc(a.nom) + '">' + portrait(a) + '<span class="num">N° ' + String(ARTISTS.indexOf(a) + 1).padStart(2, "0") + "</span></button>"
-      + '<div class="corps"><h3>' + esc(a.nom) + '</h3><div class="spe">' + esc(a.spe) + '</div><p class="bio">' + esc(a.bio.split(". ")[0].replace(/\.$/, "")) + '.</p><button class="btn" type="button" data-artiste="' + a.id + '">Découvrir l\'artiste ' + ICO.droite + "</button></div></article>").join("");
-    $("#artistesTous").firstChild.textContent = state.tous ? "Voir moins " : "Voir tous les artistes ";
-    $("#artistesTous").setAttribute("aria-expanded", String(state.tous));
-    $("#collListe").innerHTML = COLLS.map(c => {
-      const w0 = { kind: c.kind, pal: c.pal };
-      return '<button class="collection" type="button" data-coll="' + c.id + '" aria-pressed="' + (state.coll === c.id) + '" aria-label="Voir la collection ' + esc(c.titre) + '">' + art(w0).replace("<svg ", '<svg class="fond" ') + '<span class="voile"></span><span class="txt"><b>' + esc(c.titre) + "</b><small>Série de " + c.ids.length + " œuvres</small></span>"
-        + '<span class="pic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5-5-9 9"/></svg></span></button>';
-    }).join("");
-  }
-  function allerGalerie() { $("#sectMain").scrollIntoView({ behavior: "smooth", block: "start" }); }
-  function ouvrirArtiste(id) {
-    const a = ARTISTS.find(x => x.id === id), oeuvres = WORKS.filter(w => w.artist === a.nom);
-    $("#aPortrait").innerHTML = portrait(a); $("#aNom").textContent = a.nom; $("#aSpe").textContent = a.spe; $("#aLieu").textContent = a.lieu + " · " + oeuvres.length + " œuvre" + (oeuvres.length > 1 ? "s" : "");
-    $("#aBio").textContent = a.bio;
-    $("#aOeuvres").innerHTML = oeuvres.map(w => '<button type="button" data-ouvre="' + w.id + '" aria-label="Voir l\'œuvre : ' + esc(w.t) + '"><span class="im">' + art(w) + "</span><small>" + esc(w.t) + "</small></button>").join("");
-    $("#aActions").innerHTML = '<button class="btn or" type="button" data-voirartiste="' + a.id + '">' + ICO.oeil + 'Voir ses œuvres dans la galerie</button><button class="btn" type="button" data-contactartiste="' + a.id + '">' + ICO.devis + "Contacter l'artiste</button>";
-    $("#artistOv").classList.add("open");
-  }
-
-  /* ── Fiche d'une œuvre et visionneuse ── */
-  function ouvrir(id) {
-    const w = trouver(id); state.current = w; state.vue = 0;
+  function openWork(id) {
+    const w = WORKS.find(x => x.id === id); state.current = w;
     $("#wTitle").textContent = w.t;
-    $("#wCat").textContent = CAT_LABEL[w.cat];
-    $("#wPar").textContent = "Par " + w.artist + " · " + w.year;
     $("#wDesc").textContent = w.desc;
-    $("#wFacts").innerHTML = [["Technique", w.tech], ["Dimensions", w.dims], ["Année", w.year], ["Disponibilité", w.mode === "devis" ? "Sur commande" : w.mode === "expose" ? "Exposée, non vendue" : w.stock <= 0 ? "Vendue" : w.stock === 1 ? "Pièce unique" : w.stock + " exemplaires"]]
-      .filter(f => rubOn("boutique") || f[0] !== "Disponibilité").map(f => "<div><b>" + f[0] + "</b>" + esc(f[1]) + "</div>").join("");
-    $("#wMain").innerHTML = art(w, 0);
-    $("#wMinis").innerHTML = [0, 1, 2].map(i => '<button class="mini" type="button" data-photo="' + i + '" aria-label="Vue ' + (i + 1) + '">' + art(w, i) + "</button>").join("");
-    const v = $("#wVideo"); v.hidden = !w.video; $("#wVideoDuree").textContent = w.video ? "Durée " + w.video + " (57 secondes au plus) · simulée" : "";
-    $("#wPrix").outerHTML = '<div class="' + (w.mode === "fixe" && w.stock > 0 ? "prix" : "prix sec") + '" id="wPrix">' + prixTexte(w).replace(/<[^>]+>/g, "") + "</div>";
-    $("#wActions").innerHTML = boutonAchat(w) + '<button class="btn" type="button" data-fav="' + w.id + '" aria-pressed="' + favoris.includes(w.id) + '">' + ICO.coeur + "Favori</button>";
+    $("#wFacts").innerHTML = `<div><b>Client</b>${w.client}</div><div><b>Année</b>${w.year}</div><div><b>Catégorie</b>${CAT_LABEL[w.cat]}</div>`;
+    $("#wGallery").innerHTML = w.photos.map((p, i) => `<button class="shot ${i === 0 ? "big" : ""}" style="background:${p}" data-photo="${i}" aria-label="Photo ${i + 1}"></button>`).join("");
     $("#workOv").classList.add("open");
   }
-  function voirImage(i) {
-    const w = state.current, n = 3; state.vue = (i + n) % n;
-    $("#lbFrame").innerHTML = art(w, state.vue);
-    $("#lbCount").textContent = (state.vue + 1) + " / " + n + " — " + w.t;
+  function showPhoto(i) {
+    const w = state.current, n = w.photos.length;
+    state.photo = (i + n) % n;
+    $("#lbFrame").style.background = w.photos[state.photo];
+    $("#lbCount").textContent = `${state.photo + 1} / ${n} — ${w.t}`;
   }
 
-  /* ── Exposition plein écran : visite de la sélection affichée, œuvre par œuvre ── */
-  const expo = { liste: [], i: 0, lecture: false, minuteur: null, ouvreur: null };
-  const EXPO_DELAI = 6000;
-  function expoPlaque(w) {
-    $("#expoOeuvre").textContent = w.t;
-    $("#expoPar").textContent = w.artist + " · " + w.year;
-    $("#expoTech").textContent = w.tech + " · " + w.dims;
-    $("#expoDesc").textContent = w.desc;
-    const c = COLLS.filter(x => x.ids.includes(w.id)).map(x => x.titre);
-    $("#expoColl").textContent = c.length ? "Collection : " + c.join(", ") : "";
-    const etat = etatCarte(w), prix = prixTexte(w).replace(/<[^>]+>/g, "");
-    $("#expoPrix").innerHTML = prix ? '<div class="' + (w.mode === "fixe" && w.stock > 0 ? "prix" : "prix sec") + '">' + esc(prix) + "</div>" : (etat ? '<div class="prix sec">' + esc(etat) + "</div>" : "");
-    $("#expoActions").innerHTML = '<button class="btn" type="button" data-expofiche="' + w.id + '">' + ICO.oeil + "Voir la fiche</button>" + boutonAchat(w);
-  }
-  function expoAller(i, sansFondu) {
-    const n = expo.liste.length; if (!n) return;
-    expo.i = (i + n) % n;
-    const w = expo.liste[expo.i], cadre = $("#expoCadre");
-    const maj = () => {
-      cadre.innerHTML = art(w, 0); cadre.classList.remove("change"); expoPlaque(w);
-      $("#expoTitre").innerHTML = esc(SHOP.name) + "<small>Exposition · œuvre " + (expo.i + 1) + " sur " + n + "</small>";
-      document.querySelectorAll(".expo-vig").forEach((b, k) => { const cur = k === expo.i; if (cur) b.setAttribute("aria-current", "true"); else b.removeAttribute("aria-current"); if (cur) b.scrollIntoView({ block: "nearest", inline: "center" }); });
-      expoProgression();
-    };
-    const reduit = window.matchMedia && matchMedia("(prefers-reduced-motion:reduce)").matches;
-    if (sansFondu || reduit) maj(); else { cadre.classList.add("change"); clearTimeout(expo.fondu); expo.fondu = setTimeout(maj, 240); }
-  }
-  function expoProgression() {
-    const p = $("#expoProg"); p.classList.remove("court"); p.style.transitionDuration = "0ms";
-    if (!expo.lecture) return;
-    void p.offsetWidth; p.style.transitionDuration = EXPO_DELAI + "ms"; p.classList.add("court");
-  }
-  function expoLecture(on) {
-    expo.lecture = on; clearInterval(expo.minuteur);
-    const b = $("#expoLecture"); b.setAttribute("aria-pressed", String(on));
-    $("#expoLectureLib").textContent = on ? "Pause" : "Diaporama";
-    $("#expoLectureIc").innerHTML = on ? '<path d="M8 5v14M16 5v14"/>' : '<path d="M8 5l11 7-11 7z"/>';
-    if (on) expo.minuteur = setInterval(() => { if (!document.hidden) expoAller(expo.i + 1); }, EXPO_DELAI);
-    expoProgression();
-  }
-  function expoSuivi(delta) { expoAller(expo.i + delta); if (expo.lecture) expoLecture(true); }
-  function expoOuvrir(depuis) {
-    expo.liste = liste(); if (!expo.liste.length) { toast("Aucune œuvre à exposer avec ces filtres."); return; }
-    expo.ouvreur = depuis || document.activeElement;
-    $("#expoVignettes").innerHTML = expo.liste.map((w, k) => '<button class="expo-vig" type="button" data-expovig="' + k + '" aria-label="Œuvre ' + (k + 1) + " : " + esc(w.t) + '">' + art(w, 0) + "</button>").join("") + '<span class="expo-compte">' + expo.liste.length + " œuvre" + (expo.liste.length > 1 ? "s" : "") + "</span>";
-    document.querySelectorAll(".overlay.open").forEach(o => o.classList.remove("open"));
-    $("#expo").classList.add("open"); document.body.style.overflow = "hidden";
-    expoAller(0, true); $("#expo [data-expoclose]").focus();
-  }
-  function expoFermer() {
-    if (!$("#expo").classList.contains("open")) return;
-    expoLecture(false); clearTimeout(expo.fondu);
-    if (document.fullscreenElement && document.exitFullscreen) { try { document.exitFullscreen(); } catch (e) { /* déjà quitté */ } }
-    $("#expo").classList.remove("open"); document.body.style.overflow = "";
-    if (expo.ouvreur && expo.ouvreur.focus) expo.ouvreur.focus();
-  }
-  function expoPleinEcran() {
-    const el = $("#expo");
-    if (!el.requestFullscreen) { toast("Le plein écran n'est pas disponible sur cet appareil."); return; }
-    if (document.fullscreenElement) document.exitFullscreen(); else el.requestFullscreen().catch(() => toast("Le plein écran a été refusé par le navigateur."));
-  }
-  document.addEventListener("fullscreenchange", () => { $("#expoPleinEcran").setAttribute("aria-pressed", String(!!document.fullscreenElement)); });
-  document.addEventListener("keydown", e => {
-    if (!$("#expo").classList.contains("open")) return;
-    const surBouton = e.target.closest && e.target.closest("button, a, select, input, textarea");
-    if (e.key === "Escape") { if (!document.fullscreenElement) expoFermer(); return; }
-    if (e.key === "ArrowLeft") { e.preventDefault(); expoSuivi(-1); }
-    else if (e.key === "ArrowRight") { e.preventDefault(); expoSuivi(1); }
-    else if (e.key === "Home") { e.preventDefault(); expoSuivi(-expo.i); }
-    else if (e.key === "End") { e.preventDefault(); expoAller(expo.liste.length - 1); }
-    else if ((e.key === " " || e.key === "Spacebar") && !surBouton) { e.preventDefault(); expoLecture(!expo.lecture); }
-    else if (e.key === "f" || e.key === "F") { if (!surBouton || e.target.id === "expoPleinEcran") { e.preventDefault(); expoPleinEcran(); } }
-    else if (e.key === "Tab") {
-      const foc = [...$("#expo").querySelectorAll("button:not([disabled])")].filter(x => x.getClientRects().length);
-      if (!foc.length) return; const a = foc[0], z = foc[foc.length - 1];
-      if (e.shiftKey && document.activeElement === a) { e.preventDefault(); z.focus(); } else if (!e.shiftKey && document.activeElement === z) { e.preventDefault(); a.focus(); }
-    }
-  });
-  (function glissement() {
-    let x0 = null; const sc = $("#expoScene");
-    sc.addEventListener("touchstart", e => { x0 = e.touches[0].clientX; }, { passive: true });
-    sc.addEventListener("touchend", e => { if (x0 == null) return; const dx = e.changedTouches[0].clientX - x0; x0 = null; if (Math.abs(dx) > 50) expoSuivi(dx < 0 ? 1 : -1); }, { passive: true });
-  })();
-
-  /* ── Panier (simulation) ── */
-  function ajouter(id) {
-    const w = trouver(id); if (!w || !dispo(w)) return;
-    const l = panier.find(x => x.id === id), max = w.stock;
-    if (l && l.q >= max) { toast(max === 1 ? "Pièce unique : elle est déjà dans votre panier." : "Stock maximal atteint pour cette œuvre."); return; }
-    if (l) l.q++; else panier.push({ id, q: 1 });
-    ecrire("pf_ex_panier", panier); render(); toast("« " + w.t + " » ajoutée au panier.");
-  }
-  function afficherPanier() {
-    const lignes = panier.map(l => ({ w: trouver(l.id), q: l.q })).filter(l => l.w);
-    const total = lignes.reduce((s, l) => s + l.w.price * l.q, 0);
-    $("#cartBody").innerHTML = lignes.length
-      ? '<ul class="lignes">' + lignes.map(l => '<li><div class="pt">' + art(l.w) + '</div><div><b>' + esc(l.w.t) + '</b><div class="par" style="color:var(--muted);font-size:13px">Par ' + esc(l.w.artist) + (l.q > 1 ? " · quantité " + l.q : "") + '</div></div><span>' + eur(l.w.price * l.q) + '</span><button class="iconbtn supp" type="button" data-retirer="' + l.w.id + '" aria-label="Retirer ' + esc(l.w.t) + '">' + ICO.poubelle + "</button></li>").join("") + '</ul><div class="total"><span>Total</span><span>' + eur(total) + '</span></div><button class="btn or" type="button" id="valider" style="width:100%">Valider la commande (simulation)</button><p class="aide">Aucun paiement réel : la commande est simulée dans cet exemple. Dans une vraie boutique, le paiement va directement à l\'artiste.</p>'
-      : '<p>Votre panier est vide. Parcourez la galerie et ajoutez une œuvre.</p>';
-  }
-
-  /* ── Rubriques activables (9) : chacune s'affiche ou se masque, la page suit ── */
-  const RUBS = [
-    { id: "accueil", nom: "Accueil", cible: "#accueil", desc: "Bandeau d'accueil, présentation et garanties." },
-    { id: "portfolio", nom: "Portfolio", cible: "#catalogue", desc: "La galerie des œuvres, les artistes et les collections." },
-    { id: "boutique", nom: "Boutique", cible: "#catalogue", desc: "Prix, panier, livraison et paiement. Désactivée, la galerie ne montre plus ni prix ni panier." },
-    { id: "apropos", nom: "À propos", cible: "#apropos", desc: "Présentation de la galerie et chiffres clés." },
-    { id: "prestations", nom: "Prestations", cible: "#prestations", desc: "Créations sur mesure, reproductions, expositions et ateliers, sur devis." },
-    { id: "evenements", nom: "Événements", cible: "#evenements", desc: "Vernissages, ateliers et rencontres à venir." },
-    { id: "avis", nom: "Avis", cible: "#avis", desc: "Avis des clients et note moyenne." },
-    { id: "contact", nom: "Contact", cible: null, desc: "Coordonnées et formulaire de contact, en bas de page." },
-    { id: "newsletter", nom: "Newsletter", cible: "#newsletter", desc: "Bande d'inscription à la lettre d'information (sans entrée dans le menu)." }
-  ];
-  /* Modes : des préréglages complets des 9 rubriques (liste explicite, pour qu'aucune rubrique ne dépende d'une autre). */
-  const MODES = [
-    { id: "seul", nom: "Portfolio seul", desc: "Montrer le travail : galerie, artistes, avis. Ni vente, ni prestations.",
-      rub: { accueil: true, portfolio: true, boutique: false, apropos: true, prestations: false, evenements: true, avis: true, contact: true, newsletter: true } },
-    { id: "prestations", nom: "Portfolio avec prestations", desc: "Montrer le travail et proposer des créations sur devis. Pas de vente en ligne.",
-      rub: { accueil: true, portfolio: true, boutique: false, apropos: true, prestations: true, evenements: true, avis: true, contact: true, newsletter: true } },
-    { id: "boutique", nom: "Portfolio avec boutique", desc: "Tout, y compris la vente en ligne : prix, panier, livraison et paiement.",
-      rub: { accueil: true, portfolio: true, boutique: true, apropos: true, prestations: true, evenements: true, avis: true, contact: true, newsletter: true } }
-  ];
-  let rub = lire("pf_ex_rubriques", {});
-  const modeActuel = () => MODES.find(m => Object.keys(m.rub).every(k => (rub[k] !== false) === m.rub[k]));
-  function rubOn(k) { return rub[k] !== false; }
-  function boutiqueSeule() { return rubOn("boutique") && !rubOn("portfolio"); }
-
-  const PRESTAS = [
-    { t: "Création sur mesure", d: "Une œuvre pensée avec vous : format, matériaux, couleurs et sujet.", tarif: "À partir de 350 €", delai: "Délai : 6 à 8 semaines", objet: "Création sur mesure", ic: '<path d="M14 4l6 6-9 9H5v-6z"/><path d="M12 6l6 6"/>' },
-    { t: "Reproduction d'une œuvre", d: "Tirage ou reproduction d'une œuvre existante, livré avec certificat.", tarif: "À partir de 90 €", delai: "Délai : 2 à 3 semaines", objet: "Reproduction d'une œuvre", ic: '<rect x="4" y="3" width="13" height="16" rx="1.500"/><path d="M8 21h11a1 1 0 0 0 1-1V8"/>' },
-    { t: "Exposition et scénographie", d: "Montez une exposition ou accueillez des artistes dans votre lieu.", tarif: "Sur devis", delai: "Étude gratuite du lieu", objet: "Collaboration ou exposition", ic: '<rect x="3" y="4" width="18" height="12" rx="1"/><path d="M8 20h8M12 16v4"/>' },
-    { t: "Atelier d'initiation", d: "Séances en groupe pour s'initier à la peinture, au tissage ou à la photo.", tarif: "À partir de 45 € par personne", delai: "Groupes de 4 à 12", objet: "Autre demande", ic: '<circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.500 2.700-6 6-6s6 2.500 6 6"/><path d="M16 5.500a3 3 0 0 1 0 5M18 14c2 .8 3 3 3 6"/>' }
-  ];
-  const EVTS = [
-    { j: "28", m: "NOV", t: "Vernissage « Lumières du continent »", l: "Abidjan · Galerie principale · 18 h 30", p: "Entrée libre" },
-    { j: "12", m: "DÉC", t: "Atelier de tissage avec Awa Camara", l: "Dakar · Atelier des tisserands · 14 h 00", p: "25 € · 12 places" },
-    { j: "19", m: "DÉC", t: "Rencontre en ligne avec les photographes", l: "En ligne · 19 h 00", p: "Gratuit" }
-  ];
-  const AVIS = [
-    { n: "Mariam K.", v: "Lyon", note: 5, o: "Baobab au couchant", x: "Le tirage est magnifique, bien emballé et arrivé avec son certificat. Je recommande les yeux fermés." },
-    { n: "Jean-Luc A.", v: "Abidjan", note: 5, o: "Gardien de la case", x: "Une sculpture réalisée sur mesure, exactement comme nous l'avions imaginée avec l'artiste. Échanges très agréables." },
-    { n: "Sophie M.", v: "Bruxelles", note: 4, o: "Tissage des quatre saisons", x: "Une toile lumineuse qui change tout le salon. Livraison un peu longue, mais le résultat en valait la peine." },
-    { n: "Kwame O.", v: "Accra", note: 5, o: "Cercles d'ancêtres", x: "Fichier haute définition parfait pour mon impression. Merci à l'artiste pour sa disponibilité." },
-    { n: "Aïcha D.", v: "Paris", note: 5, o: "Bogolan royal", x: "Un tissu superbe, la teinture est profonde et le motif très soigné. Je reviendrai." },
-    { n: "Thomas R.", v: "Toulouse", note: 4, o: "Rythmes du fleuve", x: "Belle photographie, bien encadrée. J'aurais aimé un choix de formats plus large." }
-  ];
-  const ETOILE = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.600 5.600 6.100.7-4.500 4.200 1.200 6L12 16.600 6.600 19.500l1.200-6L3.300 9.300l6.100-.7z"/></svg>';
-  const etoiles = (n) => '<span class="etoiles" role="img" aria-label="Note : ' + n + ' sur 5">' + [1, 2, 3, 4, 5].map(i => i <= n ? ETOILE : ETOILE.replace('class="ic"', 'class="ic vide"')).join("") + "</span>";
-  let tousAvis = false;
-
-  function vueRubriques() {
-    const pays = new Set(ARTISTS.map(a => a.lieu.split(", ").pop()));
-    $("#chiffres").innerHTML = [[ARTISTS.length, "artistes"], [WORKS.length, "œuvres"], [pays.size, "pays"]].map(c => "<div><b>" + c[0] + "</b><span>" + c[1] + "</span></div>").join("");
-    $("#aproposArt").innerHTML = svg(ART.baobab(P.aube), "0 0 400 320");
-    $("#prestaListe").innerHTML = PRESTAS.map((p, i) => '<article class="presta">' + ico(p.ic) + "<h3>" + esc(p.t) + "</h3><p>" + esc(p.d) + '</p><div class="tarif">' + esc(p.tarif) + '</div><div class="delai">' + esc(p.delai) + '</div><button class="btn or" type="button" data-presta="' + i + '">' + ICO.devis + "Demander un devis</button></article>").join("");
-    $("#evtListe").innerHTML = EVTS.map((e, i) => '<article class="evt"><div class="date"><b>' + e.j + "</b><span>" + e.m + "</span></div><div><h3>" + esc(e.t) + "</h3><p>" + esc(e.l) + " · " + esc(e.p) + '</p></div><button class="btn" type="button" data-evt="' + i + '">Je m\'inscris</button></article>').join("");
-    const moy = AVIS.reduce((s, a) => s + a.note, 0) / AVIS.length;
-    $("#noteMoy").innerHTML = "<b>" + moy.toLocaleString("fr-FR", { maximumFractionDigits: 1 }) + "</b>" + etoiles(Math.round(moy)) + "<span>sur 5 · " + AVIS.length + " avis (fictifs)</span>";
-    $("#avisListe").innerHTML = AVIS.filter((a, i) => tousAvis || i < 3).map(a => '<article class="avis-un">' + etoiles(a.note) + "<q>" + esc(a.x) + '</q><div class="qui"><span class="rond" aria-hidden="true">' + esc(a.n[0]) + "</span><span><b style=\"color:var(--text)\">" + esc(a.n) + "</b> · " + esc(a.v) + "<br>" + esc(a.o) + "</span></div></article>").join("");
-    $("#avisPlus").firstChild.textContent = tousAvis ? "Voir moins " : "Voir tous les avis ";
-    $("#avisPlus").setAttribute("aria-expanded", String(tousAvis));
-  }
-  function appliquerRubriques() {
-    document.querySelectorAll("[data-rub]").forEach(el => el.classList.toggle("rub-off", !el.dataset.rub.split(" ").some(rubOn)));
-    const entrees = RUBS.filter(r => r.id !== "newsletter" && rubOn(r.id));
-    $("#navRub").innerHTML = entrees.map((r, i) => '<button type="button" data-nav="' + r.id + '"' + (i === 0 ? ' aria-current="page"' : "") + ">" + esc(r.nom) + "</button>").join("");
-    const sansPrix = !rubOn("boutique");
-    document.querySelectorAll('#tri option[value^="prix"]').forEach(o => { o.hidden = sansPrix; o.disabled = sansPrix; });
-    if (sansPrix && state.tri.indexOf("prix") === 0) { state.tri = "recent"; $("#tri").value = "recent"; }
-    if (!rubOn("portfolio")) { state.artiste = null; state.coll = null; }
-    $("#sectMain").textContent = boutiqueSeule() ? "Œuvres à vendre" : ((SHOP.sections && SHOP.sections[1]) || SHOP_DEFAULT.sections[1]);
-  }
-  function listeModes() {
-    const cur = modeActuel();
-    $("#modeListe").innerHTML = MODES.map(m => '<button class="mode" type="button" data-mode="' + m.id + '" aria-pressed="' + (cur === m) + '"><b>' + esc(m.nom) + ico('<path d="M5 12.500l4.500 4.500L19 7"/>') + '</b><span class="d">' + esc(m.desc) + "</span></button>").join("");
-    $("#modeEtat").textContent = cur ? "Mode actuel : " + cur.nom + "." : "Mode actuel : personnalisé (rubriques réglées à la main).";
-  }
-  function listeRubriques() {
-    listeModes();
-    $("#rubListe").innerHTML = RUBS.map(r => '<li class="sw-ligne"><div><b id="swn-' + r.id + '">' + esc(r.nom) + '</b><span class="d">' + esc(r.desc) + '</span></div><button class="sw" type="button" role="switch" data-sw="' + r.id + '" aria-checked="' + rubOn(r.id) + '" aria-labelledby="swn-' + r.id + '"></button></li>').join("");
-  }
-  function changerRubriques(maj, message) {
-    const apres = Object.assign({}, rub, maj);
-    if (!RUBS.some(r => apres[r.id] !== false)) { toast("Gardez au moins une rubrique affichée."); return; }
-    rub = apres; ecrire("pf_ex_rubriques", rub);
-    appliquerRubriques(); render(); vueRubriques(); listeRubriques();
-    if (message) toast(message);
-  }
-
-  /* ── Événements ── */
   document.addEventListener("click", e => {
-    const t = e.target, q = (s) => t.closest(s);
-    let b;
-    if ((b = q("[data-nav]"))) {
-      const r = RUBS.find(x => x.id === b.dataset.nav);
-      document.querySelectorAll("#navRub button").forEach(x => x.removeAttribute("aria-current")); b.setAttribute("aria-current", "page");
-      if (r.id === "contact") { $("#objetSel").value = "Autre demande"; $("#contactOv").classList.add("open"); return; }
-      if (r.id === "accueil") { window.scrollTo({ top: 0, behavior: "smooth" }); return; }
-      if (r.id === "boutique" && rubOn("portfolio")) { state.vente = true; state.page = 1; render(); }
-      if (r.id === "portfolio") { state.vente = false; state.page = 1; render(); }
-      $(r.cible).scrollIntoView({ behavior: "smooth", block: "start" }); return;
-    }
-    if ((b = q("[data-presta]"))) { const p = PRESTAS[Number(b.dataset.presta)]; $("#objetSel").value = p.objet; $("#contactForm").elements.besoin.value = "Prestation souhaitée : " + p.t + ".\n"; $("#contactOv").classList.add("open"); return; }
-    if ((b = q("[data-evt]"))) { toast("Inscription simulée à « " + EVTS[Number(b.dataset.evt)].t + " » : aucune donnée enregistrée."); return; }
-    if (q("#avisPlus")) { tousAvis = !tousAvis; vueRubriques(); return; }
-    if (q("#openRub")) { listeRubriques(); $("#rubOv").classList.add("open"); return; }
-    if ((b = q("[data-sw]"))) { const r = RUBS.find(x => x.id === b.dataset.sw); const voulue = !rubOn(r.id); changerRubriques({ [r.id]: voulue }, "Rubrique « " + r.nom + " » " + (voulue ? "affichée." : "masquée.")); const nb = document.querySelector('[data-sw="' + r.id + '"]'); if (nb) nb.focus(); return; }
-    if ((b = q("[data-mode]"))) { const m = MODES.find(x => x.id === b.dataset.mode); changerRubriques(m.rub, "Mode « " + m.nom + " » appliqué."); const nb = document.querySelector('[data-mode="' + m.id + '"]'); if (nb) nb.focus(); return; }
-    if (q("#rubTout")) { changerRubriques(Object.fromEntries(RUBS.map(r => [r.id, true])), "Toutes les rubriques sont affichées."); return; }
-    if ((b = q("[data-artiste]"))) { ouvrirArtiste(Number(b.dataset.artiste)); return; }
-    if ((b = q("[data-ouvre]"))) { $("#artistOv").classList.remove("open"); ouvrir(Number(b.dataset.ouvre)); return; }
-    if ((b = q("[data-voirartiste]"))) { const a = ARTISTS.find(x => x.id === Number(b.dataset.voirartiste)); state.artiste = a.nom; state.coll = null; state.cat = "all"; state.page = 1; $("#artistOv").classList.remove("open"); render(); allerGalerie(); return; }
-    if ((b = q("[data-contactartiste]"))) { const a = ARTISTS.find(x => x.id === Number(b.dataset.contactartiste)); $("#artistOv").classList.remove("open"); $("#objetSel").value = "Collaboration ou exposition"; $("#contactForm").elements.besoin.value = "À l'attention de " + a.nom + ".\n"; $("#contactOv").classList.add("open"); return; }
-    if ((b = q("[data-coll]"))) { state.coll = state.coll === b.dataset.coll ? null : b.dataset.coll; state.artiste = null; state.cat = "all"; state.page = 1; render(); if (state.coll) allerGalerie(); return; }
-    if ((b = q("[data-retire]"))) { state[b.dataset.retire] = null; state.page = 1; render(); return; }
-    if (q("#artistesTous")) { state.tous = !state.tous; vue2(); return; }
-    if (q("#collToutes")) { state.coll = null; state.artiste = null; state.cat = "all"; state.page = 1; render(); allerGalerie(); return; }
-    if ((b = q("[data-cat]"))) { state.cat = b.dataset.cat; state.page = 1; render(); return; }
-    if ((b = q("[data-page]"))) { state.page = Number(b.dataset.page); render(); $("#sectMain").scrollIntoView({ behavior: "smooth", block: "start" }); return; }
-    if ((b = q("[data-fav]"))) {
-      const id = Number(b.dataset.fav), i = favoris.indexOf(id); if (i >= 0) favoris.splice(i, 1); else favoris.push(id);
-      ecrire("pf_ex_favoris", favoris);
-      document.querySelectorAll('[data-fav="' + id + '"]').forEach(x => x.setAttribute("aria-pressed", favoris.includes(id)));
-      toast(favoris.includes(id) ? "Ajoutée à vos favoris." : "Retirée de vos favoris."); return;
-    }
-    if (q("[data-expo]")) { expoOuvrir(q("[data-expo]")); return; }
-    if (q("[data-expoclose]")) { expoFermer(); return; }
-    if (q("[data-expoprev]")) { expoSuivi(-1); return; }
-    if (q("[data-exposuiv]")) { expoSuivi(1); return; }
-    if (q("#expoLecture")) { expoLecture(!expo.lecture); return; }
-    if (q("#expoPleinEcran")) { expoPleinEcran(); return; }
-    if ((b = q("[data-expovig]"))) { expoAller(Number(b.dataset.expovig)); if (expo.lecture) expoLecture(true); return; }
-    if ((b = q("[data-expofiche]"))) { const id = Number(b.dataset.expofiche); expo.ouvreur = null; expoFermer(); ouvrir(id); return; }
-    if (q("#expo [data-devis]")) { expo.ouvreur = null; expoFermer(); }
-    if ((b = q("[data-add]"))) { ajouter(Number(b.dataset.add)); return; }
-    if ((b = q("[data-work]"))) { ouvrir(Number(b.dataset.work)); return; }
-    if ((b = q("[data-devis]"))) {
-      const w = trouver(Number(b.dataset.devis)); $("#workOv").classList.remove("open");
-      $("#objetSel").value = w.mode === "devis" ? "Création sur mesure" : w.mode === "expose" ? "Collaboration ou exposition" : "Autre demande";
-      $("#contactForm").elements.besoin.value = "Œuvre concernée : « " + w.t + " » de " + w.artist + ".\n"; $("#contactOv").classList.add("open"); return;
-    }
-    if ((b = q("[data-retirer]"))) { panier = panier.filter(l => l.id !== Number(b.dataset.retirer)); ecrire("pf_ex_panier", panier); render(); afficherPanier(); return; }
-    if (q("#valider")) { panier = []; ecrire("pf_ex_panier", panier); render(); $("#cartOv").classList.remove("open"); toast("Commande simulée : aucun paiement ni livraison réels."); return; }
-    if (q("#openCart")) { afficherPanier(); $("#cartOv").classList.add("open"); return; }
-    if (q("#wMain")) { $("#lb").classList.add("open"); voirImage(state.vue); return; }
-    if ((b = q("[data-photo]"))) { state.vue = Number(b.dataset.photo); $("#wMain").innerHTML = art(state.current, state.vue); $("#lb").classList.add("open"); voirImage(state.vue); return; }
-    if (q("[data-lbprev]")) { voirImage(state.vue - 1); return; }
-    if (q("[data-lbnext]")) { voirImage(state.vue + 1); return; }
-    if (q("[data-lbclose]")) { $("#lb").classList.remove("open"); return; }
-    if (q("[data-close]") || t.classList.contains("overlay")) { (t.closest(".overlay") || t).classList.remove("open"); return; }
-    if ((b = q("[data-pcat]"))) { state.cat = b.dataset.pcat; state.artiste = null; state.coll = null; state.page = 1; render(); allerGalerie(); return; }
-    if ((b = q("[data-aller]"))) {
-      const v = b.dataset.aller;
-      if (v === "galerie") window.scrollTo({ top: 0, behavior: "smooth" });
-      else if (v === "contact") { $("#objetSel").value = "Autre demande"; $("#contactOv").classList.add("open"); }
-      else if (v === "devis") { $("#objetSel").value = "Création sur mesure"; $("#contactOv").classList.add("open"); }
-      else $("#" + v).scrollIntoView({ behavior: "smooth", block: "start" });
-      return;
-    }
-    if ((b = q("[data-pied]"))) { toast(b.dataset.pied + " : lien fictif, cette page n'existe pas dans l'exemple."); return; }
-    if (q("#navCompte")) { toast("Compte simulé : aucune connexion dans cet exemple."); return; }
-    if (q("#wVideo")) { toast("Vidéo de création simulée (57 secondes au plus)."); return; }
-  });
-  $("#tri").addEventListener("change", e => { state.tri = e.target.value; state.page = 1; render(); });
-  $("#parPage").addEventListener("change", e => { state.par = Number(e.target.value); state.page = 1; render(); });
-  ["#piedNom", "#piedNom2"].forEach(sel => { const el = $(sel); if (el) el.textContent = $("#shopName").textContent; });
-  $("#piedCats").innerHTML = CATS.filter(c => c.id !== "all").map(c => '<li><button type="button" data-pcat="' + c.id + '">' + esc(c.label) + "</button></li>").join("");
-  $("#lettreForm").addEventListener("submit", e => {
-    e.preventDefault(); e.target.reset(); toast("Inscription à la lettre simulée : aucune adresse n'a été enregistrée.");
+    const t = e.target;
+    const cat = t.closest("[data-cat]"); if (cat) { state.cat = cat.dataset.cat; render(); return; }
+    const work = t.closest("[data-work]"); if (work) { openWork(Number(work.dataset.work)); return; }
+    const photo = t.closest("[data-photo]"); if (photo) { $("#lb").classList.add("open"); showPhoto(Number(photo.dataset.photo)); return; }
+    if (t.closest("[data-lbprev]")) { showPhoto(state.photo - 1); return; }
+    if (t.closest("[data-lbnext]")) { showPhoto(state.photo + 1); return; }
+    if (t.closest("[data-lbclose]")) { $("#lb").classList.remove("open"); return; }
+    if (t.closest("[data-close]") || t.classList.contains("overlay")) { t.closest(".overlay")?.classList.remove("open"); return; }
+    if (t.closest("#wAsk")) { $("#workOv").classList.remove("open"); $("#projetSel").value = state.current.t; $("#contactOv").classList.add("open"); return; }
+    if (t.closest("#openContact")) { $("#contactOv").classList.add("open"); return; }
   });
   $("#contactForm").addEventListener("submit", e => {
-    e.preventDefault(); e.target.reset(); $("#contactOv").classList.remove("open");
+    e.preventDefault();
+    e.target.reset();
+    $("#contactOv").classList.remove("open");
     toast("Demande de devis simulée : aucune donnée n'a été envoyée.");
   });
   document.addEventListener("keydown", e => {
     if (e.key === "Escape") { document.querySelectorAll(".overlay.open").forEach(o => o.classList.remove("open")); $("#lb").classList.remove("open"); }
-    if ($("#lb").classList.contains("open")) { if (e.key === "ArrowLeft") voirImage(state.vue - 1); if (e.key === "ArrowRight") voirImage(state.vue + 1); }
+    if ($("#lb").classList.contains("open")) { if (e.key === "ArrowLeft") showPhoto(state.photo - 1); if (e.key === "ArrowRight") showPhoto(state.photo + 1); }
   });
-  /* Le bandeau « Exemple » (exemple-commun.js) reste collé en haut : l'en-tête et les fenêtres se placent juste en dessous. */
-  (function hauteurBandeau() {
-    const maj = () => { const b = document.getElementById("exBandeau"); document.documentElement.style.setProperty("--ex-h", (b ? b.offsetHeight : 0) + "px"); };
-    maj(); addEventListener("load", maj); addEventListener("resize", maj);
-    if (window.ResizeObserver) { const b = document.getElementById("exBandeau"); if (b) new ResizeObserver(maj).observe(b); }
-  })();
-  vue2();
-  vueRubriques();
-  appliquerRubriques();
   render();
 </script>
 </body>
