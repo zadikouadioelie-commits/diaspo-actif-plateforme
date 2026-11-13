@@ -162,8 +162,10 @@ test('B4 retirer une option, et ajouter/retirer un exemplaire dans les bornes du
 });
 
 test('B4 type non ouvert : « Bientôt disponible », bouton désactivé ; plafond atteint : ajout impossible et expliqué', () => {
-  const e = ecran({ options: [] });
-  assert.match(e.zone.innerHTML, /Bientôt disponible/, 'impact et finance ne sont pas ouverts aux propriétaires');
+  /* Le réglage d'ouverture des types change avec la mise en service : on ferme ici « impact » dans la description, quel que soit le réglage réel. */
+  const ferme = { ...DESC, types: DESC.types.map((t) => (t.cle === 'impact' ? { ...t, selectionnable: false } : t)) };
+  const e = ecran({ desc: ferme, options: [] });
+  assert.match(e.zone.innerHTML, /Bientôt disponible/);
   assert.match(e.zone.innerHTML, /data-btop-ajouter="impact"[^>]*disabled/);
   /* un registre où tout est ouvert, avec le maximum d'options déjà pris */
   const tout = { ...DESC, types: DESC.types.map((t) => ({ ...t, selectionnable: true })) };
