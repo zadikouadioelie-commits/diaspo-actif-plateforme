@@ -37,6 +37,7 @@
   <link rel="stylesheet" href="/assets/dashboard-nuit-doree.css?v=5">
   <link rel="stylesheet" href="/assets/retours-nuit-doree.css?v=1">
   <link rel="stylesheet" href="/assets/newsletter-init.css?v=1">
+  <link rel="stylesheet" href="/assets/boutique-assistant.css?v=1">
 </head>
 <body class="nd">
 <div class="page">
@@ -193,6 +194,7 @@
 <script src="assets/boutique-types-ui.js?v=2"></script>
 <script src="assets/boutique-events-espace.js?v=1"></script>
 <script src="assets/boutique-options-ui.js?v=1"></script>
+<script src="assets/boutique-assistant.js?v=1"></script>
 <script src="assets/soumission-da.js"></script>
 <script src="assets/retours-commun.js?v=1"></script>
 <script src="assets/retours-vendeur.js?v=1"></script>
@@ -1992,13 +1994,13 @@ async function initRelaisDiasporaWidget(me, api) {
 
     <!-- ══ SECTION ⭐ PARAMÈTRES VITRINE ══ -->
     <div style="display:none;" id="parametres-vitrine">
-      <h2 style="margin:0 0 6px;">⭐ Paramètres Boutique</h2>
-      <p style="font-size:13px;color:var(--muted);margin:0 0 16px;">Configurez à gauche, voyez le résultat en direct à droite. Rien ne change sur votre boutique publique tant que vous n'avez pas cliqué sur « 🚀 Publier ma boutique ».</p>
+      <h2 style="margin:0 0 6px;">Paramètres de la boutique</h2>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 16px;">Suivez les étapes à gauche, voyez le résultat en direct à droite. Rien ne change sur votre boutique publique tant que vous n'avez pas cliqué sur « Publier ma boutique ».</p>
 
       <div id="parametres-vitrine-premium-notice" style="display:none;background:linear-gradient(135deg,#fffbeb,#fff7e0);border:1.5px solid #f2c94c;border-radius:12px;padding:14px 18px;margin-bottom:20px;">
-        <div style="font-weight:800;color:#92400e;margin-bottom:4px;">🔒 Vous n'êtes pas encore Abonné</div>
+        <div style="font-weight:800;color:#92400e;margin-bottom:4px;">Vous n'êtes pas encore Abonné</div>
         <p style="font-size:13px;color:#92400e;margin:0 0 10px;">Vous pouvez configurer librement votre boutique : produits, prix, présentation, thème. En revanche, tant que vous n'êtes pas Abonné, elle reste <strong>en brouillon</strong> — invisible du public et impossible à commander.</p>
-        <button class="btn" onclick="openPremiumUpsell('parametres_vitrine')" style="background:linear-gradient(135deg,#c8960c,#f2c94c);color:#2a1e00;font-weight:800;border:none;">🎉 Passer à Premium</button>
+        <button class="btn" onclick="openPremiumUpsell('parametres_vitrine')" style="background:linear-gradient(135deg,#c8960c,#f2c94c);color:#2a1e00;font-weight:800;border:none;">Passer à Premium</button>
       </div>
 
       <!-- 2fr / 3fr : l'apercu occupe 60 % de la largeur au lieu des 50 % d'origine, soit
@@ -2010,7 +2012,7 @@ async function initRelaisDiasporaWidget(me, api) {
         <div class="pv-builder-left">
 
           <div class="card" style="margin-bottom:20px;">
-            <h3 style="margin:0 0 4px;font-size:15px;">📋 Informations générales</h3>
+            <h3 style="margin:0 0 4px;font-size:15px;">Informations générales</h3>
             <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Ces informations sont enregistrées immédiatement (pas de brouillon) et aussi modifiables directement depuis votre boutique publique.</p>
             <div id="pv-infos-form"><div class="notice">Chargement…</div></div>
           </div>
@@ -2024,7 +2026,7 @@ async function initRelaisDiasporaWidget(me, api) {
                un clic directement ici — même route d'enregistrement immédiat que le formulaire
                au-dessus (pvSaveInfos()), jamais un état séparé. ═══ -->
           <div class="card" style="margin-bottom:20px;">
-            <h3 style="margin:0 0 4px;font-size:15px;">🪪 Aperçu de votre cartouche</h3>
+            <h3 style="margin:0 0 4px;font-size:15px;">Aperçu de votre cartouche</h3>
             <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">C'est exactement ce que voient les visiteurs dans l'annuaire des boutiques. Cliquez le nom ou le descriptif pour les modifier directement.</p>
             <div id="pv-card-preview-mount">Chargement…</div>
           </div>
@@ -2077,11 +2079,11 @@ async function initRelaisDiasporaWidget(me, api) {
           </style>
 
           <div class="card" style="margin-bottom:20px;">
-            <h3 style="margin:0 0 12px;font-size:15px;">👁️ Statut de la boutique</h3>
+            <h3 style="margin:0 0 12px;font-size:15px;">Statut de la boutique</h3>
             <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Choisissez si votre boutique est visible par les visiteurs, ou masquée le temps de la préparer.</p>
             <div style="display:flex;gap:10px;flex-wrap:wrap;">
-              <button class="btn" id="btn-statut-visible" onclick="definirStatutVitrine(1)" style="flex:1;min-width:180px;justify-content:center;">🟢 Visible</button>
-              <button class="btn" id="btn-statut-masque" onclick="definirStatutVitrine(0)" style="flex:1;min-width:180px;justify-content:center;">🔒 Non visible</button>
+              <button class="btn" id="btn-statut-visible" onclick="definirStatutVitrine(1)" style="flex:1;min-width:180px;justify-content:center;">Visible</button>
+              <button class="btn" id="btn-statut-masque" onclick="definirStatutVitrine(0)" style="flex:1;min-width:180px;justify-content:center;">Non visible</button>
             </div>
             <div id="parametres-vitrine-statut" style="margin-top:12px;font-size:13px;font-weight:700;"></div>
           </div>
@@ -2093,10 +2095,9 @@ async function initRelaisDiasporaWidget(me, api) {
                repete 3 fois), ce qui rendait impossible de savoir quoi representait quoi. -->
           <div class="card" style="margin-bottom:20px;">
             <div style="display:flex;align-items:center;gap:9px;margin-bottom:4px;flex-wrap:wrap;">
-              <span style="background:var(--navy);color:#fff;font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:3px 9px;border-radius:20px;flex:none;">Étape 1</span>
-              <h3 style="margin:0;font-size:15px;">🎯 Type de votre boutique</h3>
+              <h3 style="margin:0;font-size:15px;">Type de votre boutique</h3>
             </div>
-            <p style="font-size:13px;color:var(--muted);margin:0 0 14px;line-height:1.6;">Le <strong>type</strong> est la <strong>forme globale</strong> de votre boutique : sa présentation, ses couleurs, ses icônes et ses rubriques principales. Une boutique n'a qu'<strong>un seul type</strong>. Les rubriques supplémentaires (portfolio, formations, projets…) sont des <strong>options</strong> : elles s'ajoutent plus bas comme des lignes en plus, sans changer l'aspect de la boutique.</p>
+            <p style="font-size:13px;color:var(--muted);margin:0 0 14px;line-height:1.6;">Le <strong>type</strong> est la <strong>forme globale</strong> de votre boutique : sa présentation, ses couleurs, ses icônes et ses rubriques principales. Une boutique n'a qu'<strong>un seul type</strong>. Les autres types que vous voulez montrer en plus (portfolio, événements…) se règlent à l'étape <strong>Modules complémentaires</strong>, et les rubriques à l'étape <strong>Navigation et rubriques</strong>.</p>
             <div id="pv-templates-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;"><div class="notice">Chargement…</div></div>
             <!-- Points de restauration : n'apparaît qu'après un premier changement de type. -->
             <div id="pv-bonus"></div>
@@ -2109,10 +2110,9 @@ async function initRelaisDiasporaWidget(me, api) {
 
           <div class="card" style="margin-bottom:20px;">
             <div style="display:flex;align-items:center;gap:9px;margin-bottom:4px;flex-wrap:wrap;">
-              <span style="background:var(--navy);color:#fff;font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:3px 9px;border-radius:20px;flex:none;">Étape 2</span>
-              <h3 style="margin:0;font-size:15px;">🖌️ Quel style visuel ?</h3>
+              <h3 style="margin:0;font-size:15px;">Style visuel</h3>
             </div>
-            <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">L'habillage graphique de votre boutique. Indépendant de l'étape 1 : changer de style ne touche jamais à vos modules ni à vos contenus.</p>
+            <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">L'habillage graphique de votre boutique. Indépendant du type : changer de style ne touche jamais à vos modules ni à vos contenus.</p>
             <div id="pv-style-presets" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;"><div class="notice">Chargement…</div></div>
             <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border);">
               <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:10px;">Couleur dominante</div>
@@ -2120,8 +2120,7 @@ async function initRelaisDiasporaWidget(me, api) {
             </div>
             <!-- Studio de couleurs : 1 à 3 couleurs et des textures, vus en direct dans l'aperçu à droite (assets/boutique-couleurs.js). -->
             <div id="pv-studio" style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border);"></div>
-            <p style="font-size:12px;color:var(--muted);margin:14px 0 0;">🔜 Mises en page alternatives (au-delà des 3 styles ci-dessus) : à venir dans une prochaine évolution du module.</p>
-          </div>
+                      </div>
 
           <!-- Activation rapide (2026-09-29, demande explicite) : les organisateurs qui
                cherchaient "Portfolio" ou "Avis clients" devaient d'abord repérer que ces
@@ -2134,23 +2133,23 @@ async function initRelaisDiasporaWidget(me, api) {
                pas les ~30) : les plus utiles pour une boutique, pas une redite de la liste
                complète juste en-dessous. -->
           <div class="card" style="margin-bottom:20px;">
-            <h3 style="margin:0 0 4px;font-size:15px;">⚡ Activation rapide</h3>
+            <h3 style="margin:0 0 4px;font-size:15px;">Activation rapide</h3>
             <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Un clic pour activer et configurer directement une fonctionnalité courante de votre boutique.</p>
             <div id="pv-quick-activate" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
           </div>
 
           <div class="card" style="margin-bottom:20px;">
-            <h3 style="margin:0 0 4px;font-size:15px;">🧩 Options de ma boutique</h3>
+            <h3 style="margin:0 0 4px;font-size:15px;">Rubriques de ma boutique</h3>
             <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Une option est une rubrique en plus (Portfolio, Formations, Projets…) : elle s'affiche sur votre boutique comme une ligne supplémentaire, avec son titre, et ne change pas la forme de la boutique. Activez, masquez ou configurez chaque module. Un module masqué conserve ses données — vous pouvez le réactiver à tout moment sans rien perdre.</p>
             <!-- Barre de recherche (2026-09-10, demande explicite) -- une trentaine de modules
                  repartis en 6 categories rendait un module precis long a retrouver en defilant. -->
-            <input type="text" id="pv-modules-search" placeholder="🔍 Rechercher un module…" autocomplete="off" oninput="pvFilterModulesLib(this.value)" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13.5px;margin-bottom:14px;">
+            <input type="text" id="pv-modules-search" placeholder="Rechercher un module…" autocomplete="off" oninput="pvFilterModulesLib(this.value)" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13.5px;margin-bottom:14px;">
             <div id="pv-modules-lib"><div class="notice">Chargement…</div></div>
             <div id="pv-modules-empty" class="notice" style="display:none;">Aucun module ne correspond à « <span id="pv-modules-empty-q"></span> ».</div>
           </div>
 
           <div class="card" style="margin-bottom:20px;" id="pv-order-card">
-            <h3 style="margin:0 0 4px;font-size:15px;">↕️ Organiser ma boutique</h3>
+            <h3 style="margin:0 0 4px;font-size:15px;">Organiser ma boutique</h3>
             <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Glissez-déposez pour réordonner les sections actives de votre boutique.</p>
             <div id="pv-order-list" style="display:flex;flex-direction:column;gap:8px;"><div class="notice">Chargement…</div></div>
           </div>
@@ -2162,7 +2161,7 @@ async function initRelaisDiasporaWidget(me, api) {
              la page reste a droite. Les 28px recuperes elargissent d'autant l'apercu. -->
         <div class="pv-builder-right" style="position:sticky;top:70px;align-self:start;min-width:0;">
           <div class="card" style="display:flex;flex-direction:column;max-height:calc(100vh - 86px);overflow:hidden;">
-            <h3 style="margin:0 0 4px;font-size:15px;">📱 Aperçu en direct</h3>
+            <h3 style="margin:0 0 4px;font-size:15px;">Aperçu en direct</h3>
             <p style="font-size:12.5px;color:var(--muted);margin:0 0 12px;">Se met à jour automatiquement après chaque modification.</p>
             <!-- Selecteur d'appareil (controle segmente). Tablette et Mobile partageaient le
                  meme 📱 : deux fonctions, une seule icone, impossible de les distinguer sans
@@ -2170,9 +2169,9 @@ async function initRelaisDiasporaWidget(me, api) {
                  (Il n'existe pas d'emoji tablette : 💻 assure le contraste visuel entre le
                  grand et le petit ecran, le mot "Tablette" leve toute ambiguite.) -->
             <div style="display:flex;gap:6px;margin-bottom:10px;flex:none;flex-wrap:wrap;">
-              <button class="btn btn-sm btn-orange"  id="pv-preview-desktop" onclick="pvSetPreviewDevice('desktop')" aria-pressed="true"  title="Aperçu ordinateur" style="flex:1;min-width:0;justify-content:center;gap:5px;padding-left:6px;padding-right:6px;"><span style="font-size:15px;line-height:1;">🖥️</span>Ordinateur</button>
-              <button class="btn btn-sm btn-outline" id="pv-preview-tablet"  onclick="pvSetPreviewDevice('tablet')"  aria-pressed="false" title="Aperçu tablette"   style="flex:1;min-width:0;justify-content:center;gap:5px;padding-left:6px;padding-right:6px;"><span style="font-size:15px;line-height:1;">💻</span>Tablette</button>
-              <button class="btn btn-sm btn-outline" id="pv-preview-mobile"  onclick="pvSetPreviewDevice('mobile')"  aria-pressed="false" title="Aperçu mobile"     style="flex:1;min-width:0;justify-content:center;gap:5px;padding-left:6px;padding-right:6px;"><span style="font-size:15px;line-height:1;">📱</span>Mobile</button>
+              <button class="btn btn-sm btn-orange"  id="pv-preview-desktop" onclick="pvSetPreviewDevice('desktop')" aria-pressed="true"  title="Aperçu ordinateur" style="flex:1;min-width:0;justify-content:center;gap:5px;padding-left:6px;padding-right:6px;">Ordinateur</button>
+              <button class="btn btn-sm btn-outline" id="pv-preview-tablet"  onclick="pvSetPreviewDevice('tablet')"  aria-pressed="false" title="Aperçu tablette"   style="flex:1;min-width:0;justify-content:center;gap:5px;padding-left:6px;padding-right:6px;">Tablette</button>
+              <button class="btn btn-sm btn-outline" id="pv-preview-mobile"  onclick="pvSetPreviewDevice('mobile')"  aria-pressed="false" title="Aperçu mobile"     style="flex:1;min-width:0;justify-content:center;gap:5px;padding-left:6px;padding-right:6px;">Mobile</button>
               <a href="profil.html?preview=draft#vitrine" target="_blank" class="btn btn-sm btn-outline" style="text-decoration:none;flex:none;" title="Ouvrir dans un onglet" aria-label="Ouvrir l'aperçu dans un nouvel onglet">↗</a>
             </div>
             <div id="pv-zoom-info" style="font-size:11px;color:var(--muted);margin:0 0 8px;flex:none;"></div>
@@ -2186,9 +2185,9 @@ async function initRelaisDiasporaWidget(me, api) {
                    les marges negatives de compensation posees par pvAjusterEchelleApercu(). -->
               <iframe id="pv-preview-frame" style="direction:ltr;width:1400px!important;max-width:none!important;height:900px!important;border:none;border-radius:8px;background:#fff;box-shadow:0 4px 16px rgba(0,0,0,.12);transition:width .25s ease;display:block;margin:0;flex:none;"></iframe>
             </div>
-            <p style="font-size:11px;color:var(--muted);margin:8px 0 0;flex:none;">💡 Cliquez sur une section de l'aperçu pour aller directement à son réglage.</p>
+            <p style="font-size:11px;color:var(--muted);margin:8px 0 0;flex:none;">Cliquez sur une section de l'aperçu pour aller directement à son réglage.</p>
             <div id="pv-draft-status" style="margin:10px 0 8px;font-size:12.5px;font-weight:700;flex:none;"></div>
-            <button class="btn btn-orange btn-block" onclick="pvPublish()" style="flex:none;">🚀 Publier ma boutique</button>
+            <button class="btn btn-orange btn-block" onclick="pvPublish()" style="flex:none;">Publier ma boutique</button>
           </div>
         </div>
       </div>
@@ -6498,8 +6497,8 @@ function renderVisibiliteVitrineStatut(vitrineActive) {
   if (!el) return;
   const actif = Number(vitrineActive) === 1;
   el.innerHTML = actif
-    ? '<span style="color:#16a34a;">🟢 Boutique publique</span>'
-    : '<span style="color:#dc2626;">🔒 Boutique masquée</span>';
+    ? '<span style="color:#16a34a;">Boutique publique</span>'
+    : '<span style="color:#dc2626;">Boutique masquée</span>';
   if (btn) btn.textContent = actif ? '👁️ Visibilité de la boutique' : '👁️‍🗨️ Rendre la boutique publique';
 }
 
@@ -6544,8 +6543,8 @@ function renderStatutVitrineSection() {
   const actif = Number(window.__vitrineActive) === 1;
   const elStatut = document.getElementById('parametres-vitrine-statut');
   if (elStatut) elStatut.innerHTML = actif
-    ? '<span style="color:#16a34a;">🟢 Boutique publique — visible par les visiteurs</span>'
-    : '<span style="color:#dc2626;">🔒 Boutique non visible — masquée aux visiteurs</span>';
+    ? '<span style="color:#16a34a;">Boutique publique — visible par les visiteurs</span>'
+    : '<span style="color:#dc2626;">Boutique non visible — masquée aux visiteurs</span>';
   const btnVisible = document.getElementById('btn-statut-visible');
   const btnMasque = document.getElementById('btn-statut-masque');
   if (btnVisible) { btnVisible.classList.toggle('btn-orange', actif); btnVisible.classList.toggle('btn-outline', !actif); }
@@ -6613,6 +6612,7 @@ async function loadParametresVitrineFull() {
     return;
   }
   try {
+    pvMonterAssistant();
     if (!__pvRegistry) __pvRegistry = await api('GET', '/vitrine-modules-registry');
     const r = await api('GET', '/mon-initiative?preview=draft');
     const init = r.initiative;
@@ -6655,11 +6655,13 @@ function pvSyncStickyTop() {
 window.addEventListener('resize', () => { if (document.getElementById('parametres-vitrine')?.style.display !== 'none') pvSyncStickyTop(); });
 
 function renderPvDraftStatus() {
+  if (window.__pvAssistant) window.__pvAssistant.rafraichir();
+  pvAssistantResume();
   const el = document.getElementById('pv-draft-status');
   if (!el) return;
   el.innerHTML = __pvDraftPending
-    ? '<span style="color:#B45309;">🟡 Modifications non publiées</span>'
-    : '<span style="color:#16a34a;">✅ Boutique à jour</span>';
+    ? '<span style="color:#B45309;">Modifications non publiées</span>'
+    : '<span style="color:#16a34a;">Boutique à jour</span>';
 }
 
 /* Merge-patch centralise vers le brouillon — toute action de configuration passe par ici. */
@@ -6676,7 +6678,7 @@ async function pvPublish() {
     __pvDraftPending = false;
     renderPvDraftStatus();
     pvRefreshPreview();
-    if (typeof showToast === 'function') showToast('Boutique publiée ✓', 'success'); else alert('Boutique publiée ✓');
+    if (typeof showToast === 'function') showToast('Boutique publiée.', 'success'); else alert('Boutique publiée.');
   } catch (e) { alert('Erreur : ' + (e.message||'')); }
 }
 
@@ -7271,6 +7273,80 @@ async function pvRechargerOptions() {
     __pvOptions = (r.initiative && Array.isArray(r.initiative.vitrine_options)) ? r.initiative.vitrine_options : [];
   } catch (e) { /* l'écran garde sa liste actuelle */ }
   renderPvOptions();
+}
+
+/* Assistant de création (lot 1) : range les blocs existants dans les étapes de la maquette. Aucun réglage n'est recréé : chaque bloc
+   garde ses identifiants, donc tout le code ci-dessus continue de les remplir. Le montage ne se fait qu'une fois. */
+function pvMonterAssistant() {
+  if (window.__pvAssistant || !window.BoutiqueAssistant) return;
+  const gauche = document.querySelector('#parametres-vitrine .pv-builder-left');
+  if (!gauche) return;
+  const carteDe = (id) => { const e = document.getElementById(id); return e ? e.closest('.card') : null; };
+  const nouvelleCarte = (id, intro, enfants) => {
+    const c = document.createElement('div');
+    c.className = 'card'; c.id = id; c.style.marginBottom = '20px';
+    if (intro) { const p = document.createElement('p'); p.style.cssText = 'font-size:13px;color:var(--muted);margin:0 0 14px;line-height:1.6;'; p.textContent = intro; c.appendChild(p); }
+    enfants.forEach(e => e && c.appendChild(e));
+    return c;
+  };
+  const vide = (texte) => { const p = document.createElement('p'); p.className = 'pvw-vide'; p.textContent = texte; return p; };
+
+  const carteOptions = nouvelleCarte('pv-card-options', '', [document.getElementById('pv-options')]);
+  const carteBonus = nouvelleCarte('pv-card-bonus', "Toute l'ancienne boutique est conservée ici quand vous changez de type. Vous choisissez ce qui devient visible.",
+    [document.getElementById('pv-bonus'), vide('Aucun contenu en bonus pour le moment : cette liste se remplit quand vous changez de type.')]);
+  const publication = nouvelleCarte('pv-card-publication', '', []);
+  publication.innerHTML = '<h3 style="margin:0 0 4px;font-size:15px;">Publier</h3>' +
+    '<p style="font-size:13px;color:var(--muted);margin:0 0 10px;line-height:1.6;">Rien ne change sur votre boutique publique tant que vous n\'avez pas publié.</p>' +
+    '<p id="pv-publication-resume" style="font-size:13px;line-height:1.7;margin:0 0 12px;"></p>' +
+    '<button type="button" class="btn btn-orange" onclick="pvPublish()">Publier ma boutique</button>';
+
+  window.__pvAssistant = BoutiqueAssistant.monter(gauche, {
+    etapes: [
+      { cle: 'type', num: '1', titre: 'Modèle principal', mots: 'type forme boutique modèle changer' },
+      { cle: 'identite', num: '2', titre: 'Identité', mots: 'nom logo description slogan cartouche informations adresse' },
+      { cle: 'options', num: '3', titre: 'Modules complémentaires', mots: 'options exemplaires copies types supplémentaires' },
+      { cle: 'apparence', num: '4', titre: 'Apparence et personnalisation', mots: 'couleurs style texture thème palette dégradé' },
+      { cle: 'rubriques', num: '5', titre: 'Navigation et rubriques', mots: 'rubriques modules ordre activation menu sections' },
+      { cle: 'bonus', titre: 'Bonus boutique', sous: true, mots: 'bonus ancien contenu migration' },
+      { cle: 'publication', titre: 'Publication', mots: 'publier statut visible masquer brouillon' },
+    ],
+    contenus: {
+      type: [carteDe('pv-templates-grid')],
+      identite: [carteDe('pv-infos-form'), carteDe('pv-card-preview-mount')],
+      options: [carteOptions],
+      apparence: [carteDe('pv-style-presets')],
+      rubriques: [carteDe('pv-quick-activate'), carteDe('pv-modules-lib'), document.getElementById('pv-order-card')],
+      bonus: [carteBonus],
+      publication: [carteDe('btn-statut-visible'), publication],
+    },
+    etat: pvAssistantEtat,
+    onPublier: () => pvPublish(),
+  });
+}
+function pvAssistantEtat(cle) {
+  const v2 = __pvRegistry && __pvRegistry.types_v2;
+  const nbRubriques = __pvModulesState ? Object.values(__pvModulesState).filter(m => m && m.actif).length : 0;
+  switch (cle) {
+    case 'type': return __pvVitrineType ? 'ok' : 'afaire';
+    case 'identite': return __pvInit && __pvInit.nom && (__pvInit.description || __pvInit.slogan) ? 'ok' : 'afaire';
+    case 'options': return (v2 && v2.actif && __pvOptions.length) ? 'ok' : null;
+    case 'apparence': { let st = {}; try { st = JSON.parse((__pvInit && __pvInit.vitrine_style_json) || '{}') || {}; } catch (e) {} return (st.couleurs && st.couleurs.length) || st.preset ? 'ok' : null; }
+    case 'rubriques': return nbRubriques ? 'ok' : 'afaire';
+    case 'publication': return __pvDraftPending ? 'afaire' : 'ok';
+    default: return null;
+  }
+}
+function pvAssistantResume() {
+  const el = document.getElementById('pv-publication-resume');
+  if (!el || !__pvRegistry) return;
+  const v2 = __pvRegistry.types_v2;
+  const courant = __pvVitrineType || (__pvVitrineTypes[0] || null);
+  const modele = (__pvRegistry.templates && __pvRegistry.templates[courant]) ? (__pvRegistry.templates[courant].label_v2 || __pvRegistry.templates[courant].label) : 'non choisi';
+  const nbRubriques = __pvModulesState ? Object.values(__pvModulesState).filter(m => m && m.actif).length : 0;
+  const lignes = ['Modèle principal : ' + modele];
+  if (v2 && v2.actif) lignes.push('Modules complémentaires : ' + (__pvOptions.length || 'aucun'));
+  lignes.push('Rubriques actives : ' + nbRubriques, __pvDraftPending ? 'Des modifications ne sont pas encore publiées.' : 'La boutique publiée est à jour.');
+  el.innerHTML = lignes.map(l => _mvEsc(l)).join('<br>');
 }
 
 /* Lot E4 : « Votre rôle » (organisateur / prestataire / les deux) et « Mon espace organisateur », seulement pour le type « Créateur d'événements ».
