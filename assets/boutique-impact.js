@@ -10,7 +10,7 @@
   'use strict';
   var app = document.getElementById('imp-app');
     var PAR_PAGE = 6;
-  var etat = { init: null, camp: [], dons: [], partenaires: [], moi: null, cat: '', affiches: PAR_PAGE };
+  var etat = { init: null, camp: [], dons: [], partenaires: [], evts: [], moi: null, cat: '', statut: '', affiches: PAR_PAGE };
 
   /* ── utilitaires ── */
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -104,7 +104,12 @@
     return ordre.sort().map(function (k) { return { nom: k, n: m[k] }; });
   }
   function filtres() {
-    var v = projetsPublics().filter(function (c) { return !etat.cat || categorieDe(c) === etat.cat; });
+    var v = projetsPublics().filter(function (c) {
+      if (etat.cat && categorieDe(c) !== etat.cat) return false;
+      if (etat.statut === 'ouverts') return estOuverte(c);
+      if (etat.statut === 'termines') return !estOuverte(c);
+      return true;
+    });
     /* Collectes ouvertes d'abord, puis les plus récentes. */
     return v.slice().sort(function (a, b) { return (estOuverte(b) ? 1 : 0) - (estOuverte(a) ? 1 : 0); });
   }
@@ -141,11 +146,33 @@
     var src = imageSure(etat.init.logo_url);
     return src ? '<img src="' + esc(src) + '" alt="">' : esc((nom() || '?').charAt(0).toUpperCase());
   }
+  /* Rubriques ajoutées au lot 4C : cachées seulement si le propriétaire les a éteintes lui-même (voir boutique-rubriques.js). */
+  function rubChoisie(cle) { return !window.BoutiqueRubriques || window.BoutiqueRubriques.active(etat.init.vitrine_modules_state, cle); }
+  function galeriePhotos() {
+    if (!rubChoisie('galerie_photos')) return [];
+    return liste(etat.init.galerie_json).map(function (x) {
+      if (typeof x === 'string') return { image: imageSure(x), titre: '' };
+      return { image: imageSure(x.url || x.image), titre: texte(x.titre || x.legende) };
+    }).filter(function (x) { return x.image; });
+  }
+  function evenementsAVenir() {
+    if (!rubChoisie('evenements')) return [];
+    return (etat.evts || []).filter(function (e) { return e.statut_temporel !== 'termine'; }).slice(0, 3);
+  }
+  function reseauxLiens() {
+    if (!rubChoisie('reseaux_sociaux')) return [];
+    var i = etat.init, out = [], rs = objet(i.reseaux_sociaux);
+    if (lienSur(i.site_web)) out.push(['Site web', lienSur(i.site_web)]);
+    Object.keys(rs).forEach(function (c) { var u = lienSur(rs[c]); if (u) out.push([c.charAt(0).toUpperCase() + c.slice(1), u]); });
+    return out.slice(0, 8);
+  }
   function rubriquesNav() {
     var n = [];
     if (projetsPublics().length || etatReals().length) n.push(['projets', 'Nos projets']);
     if (visionTexte() || presentation()) n.push(['vision', 'Notre vision']);
     if (equipe().length) n.push(['equipe', 'Équipe']);
+    if (galeriePhotos().length) n.push(['galerie', 'Galerie']);
+    if (evenementsAVenir().length) n.push(['evenements', 'Événements']);
     if (resultats().length) n.push(['resultats', 'Résultats']);
     if (besoins().length) n.push(['besoins', 'Besoins']);
     if (rubrique('partenaires') && etat.partenaires.length) n.push(['partenaires', 'Partenaires']);
@@ -170,6 +197,15 @@
       '<a class="btn clair" href="' + esc(lienMessage('Contact : ' + nom())) + '">' + ic('message') + 'Nous contacter</a></div></div>' +
       (t.length ? '<aside class="stats" aria-label="Chiffres clés">' + t.map(function (x) { return '<div class="stat"><span class="pict">' + ic(x.icone) + '</span><div><b>' + esc(x.valeur) + '</b><span>' + esc(x.libelle) + '</span></div></div>'; }).join('') + '</aside>' : '') +
       '</div></section>';
+  }
+  /* Filtre « Ouverts / Terminés » : proposé seulement quand la liste contient les deux sortes de projets. */
+  function filtreStatut() {
+    var p = projetsPublics(), o = p.filter(estOuverte).length;
+    if (!o || o === p.length) return '';
+    var defs = [['', 'Tous', p.length], ['ouverts', 'Collectes ouvertes', o], ['termines', 'Terminés', p.length - o]];
+    return '<div class="statuts" role="group" aria-label="Statut des projets">' + defs.map(function (d) {
+      return '<button type="button" class="statut-b" data-statut="' + d[0] + '" aria-pressed="' + (etat.statut === d[0]) + '">' + esc(d[1]) + ' <small>' + d[2] + '</small></button>';
+    }).join('') + '</div>';
   }
   function tuilesCategories() {
     var cs = categories();
@@ -210,7 +246,7 @@
   function blocProjets() {
     var camp = projetsPublics(), reals = etatReals(), h = '';
     h += '<section class="bloc" id="projets"><div class="sh"><h2>Nos projets à soutenir</h2><span class="nb">' + camp.length + ' projet' + (camp.length > 1 ? 's' : '') + '</span></div>';
-    h += camp.length ? '<div id="imp-liste">' + listeProjets() + '</div>' : '<div class="vide">Aucune collecte n’est ouverte pour le moment. Vous pouvez tout de même contacter l’équipe pour proposer votre aide.</div>';
+    h += camp.length ? filtreStatut() + '<div id="imp-liste">' + listeProjets() + '</div>' : '<div class="vide">Aucune collecte n’est ouverte pour le moment. Vous pouvez tout de même contacter l’équipe pour proposer votre aide.</div>';
     h += '</section>';
     if (reals.length) {
       h += '<section class="bloc" id="realisations"><div class="sh"><h2>Nos réalisations</h2><span class="nb">' + reals.length + '</span></div><div class="realisations">' + reals.map(function (r) {
@@ -245,6 +281,28 @@
     return '<section class="bloc" id="besoins"><div class="sh"><h2>De quoi avons-nous besoin ?</h2></div><div class="besoins">' + b.map(function (x) { return '<span class="besoin">' + esc(x) + '</span>'; }).join('') + '</div>' +
       '<p class="aide">Vous pouvez aider ? <a href="' + esc(lienMessage('Proposition d’aide : ' + nom())) + '">Écrivez-nous</a>.</p></section>';
   }
+  function blocGalerie() {
+    var g = galeriePhotos(); if (!g.length) return '';
+    return '<section class="bloc" id="galerie"><div class="sh"><h2>Galerie photos</h2><span class="nb">' + g.length + '</span></div><div class="galerie-imp">' + g.slice(0, 12).map(function (x) {
+      return '<figure><img loading="lazy" src="' + esc(x.image) + '" alt="' + esc(x.titre || 'Photo de ' + nom()) + '">' + (x.titre ? '<figcaption>' + esc(x.titre) + '</figcaption>' : '') + '</figure>';
+    }).join('') + '</div></section>';
+  }
+  var MOIS_C = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+  function blocEvenements() {
+    var ev = evenementsAVenir(); if (!ev.length) return '';
+    return '<section class="bloc" id="evenements"><div class="sh"><h2>Événements à venir</h2><a class="btn petit" href="boutique-evenements.html?id=' + esc(etat.init.id) + '">Voir tous les événements</a></div><div class="evts-imp">' + ev.map(function (e) {
+      var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(e.date_evt || ''));
+      var d = m ? '<span class="evt-date"><b>' + Number(m[3]) + '</b>' + MOIS_C[Number(m[2]) - 1] + '</span>' : '<span class="evt-date"><b>?</b>date</span>';
+      var lieu = [texte(e.ville), texte(e.pays)].filter(Boolean).join(', ');
+      return '<a class="evt-imp" href="evenements.html?evt=' + esc(e.id) + '">' + d + '<span><b>' + esc(e.titre) + '</b>' + (lieu ? '<small>' + esc(lieu) + '</small>' : '') + '</span></a>';
+    }).join('') + '</div></section>';
+  }
+  function blocReseaux() {
+    var l = reseauxLiens(); if (!l.length) return '';
+    return '<section class="bloc" id="reseaux"><div class="sh"><h2>Suivez-nous</h2></div><ul class="reseaux-imp">' + l.map(function (x) {
+      return '<li><a class="btn" href="' + esc(x[1]) + '" target="_blank" rel="noopener noreferrer">' + esc(x[0]) + '</a></li>';
+    }).join('') + '</ul></section>';
+  }
   function blocPartenaires() {
     if (!rubrique('partenaires') || !etat.partenaires.length) return '';
     return '<section class="bloc" id="partenaires"><div class="sh"><h2>Nos partenaires</h2></div><div class="partenaires">' + etat.partenaires.map(function (p) {
@@ -271,19 +329,22 @@
     var vide = !projetsPublics().length && !etatReals().length && !visionTexte() && !presentation() && !equipe().length && !resultats().length && !besoins().length;
     return entete() + hero() + tuilesCategories() + '<main class="wrap">' +
       (vide ? '<section class="bloc"><div class="vide">Cette boutique n’a pas encore publié de projet. Revenez bientôt, ou écrivez à l’équipe.</div></section>' :
-        blocProjets() + blocVision() + blocEquipe() + blocResultats() + blocBesoins() + blocPartenaires()) +
+        blocProjets() + blocVision() + blocEquipe() + blocGalerie() + blocEvenements() + blocResultats() + blocBesoins() + blocPartenaires() + blocReseaux()) +
       barreFinale() + '</main>' + pied();
   }
   function redessiner() { app.innerHTML = page(); }
   function majListe() {
     var z = document.getElementById('imp-liste'); if (z) z.innerHTML = listeProjets();
     Array.prototype.forEach.call(document.querySelectorAll('.cat'), function (b) { b.setAttribute('aria-pressed', String((b.getAttribute('data-cat') || '') === etat.cat)); });
+    Array.prototype.forEach.call(document.querySelectorAll('.statut-b'), function (b) { b.setAttribute('aria-pressed', String((b.getAttribute('data-statut') || '') === etat.statut)); });
   }
 
   /* ── événements ── */
   app.addEventListener('click', function (ev) {
     var cat = ev.target.closest && ev.target.closest('[data-cat]');
     if (cat) { etat.cat = cat.getAttribute('data-cat') || ''; etat.affiches = PAR_PAGE; majListe(); return; }
+    var st = ev.target.closest && ev.target.closest('[data-statut]');
+    if (st) { etat.statut = st.getAttribute('data-statut') || ''; etat.affiches = PAR_PAGE; majListe(); return; }
     var plus = ev.target.closest && ev.target.closest('[data-plus]');
     if (plus) { etat.affiches += PAR_PAGE; majListe(); }
   });
@@ -311,6 +372,9 @@
           etat.dons.sort(function (a, b) { return (Number(b.est_vedette) || 0) - (Number(a.est_vedette) || 0); });
         }).catch(function () { etat.camp = []; etat.dons = []; }),
         api('GET', '/initiatives/' + encodeURIComponent(id) + '/partenaires').then(function (r) { etat.partenaires = (r.partenaires || []).filter(function (p) { return p && texte(p.nom); }); }).catch(function () { etat.partenaires = []; }),
+        api('GET', '/evenements?owner=' + encodeURIComponent(prop) + '&boutique=1').then(function (r) {
+          etat.evts = (r.evenements || []).filter(function (e) { return Number(e.owner_user_id) === Number(prop) && e.statut !== 'brouillon'; });
+        }).catch(function () { etat.evts = []; }),
         api('GET', '/auth/me').then(function (r) { etat.moi = r.user || null; }).catch(function () {})
       ]);
     });

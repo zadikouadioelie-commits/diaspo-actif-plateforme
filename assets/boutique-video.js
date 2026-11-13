@@ -11,7 +11,7 @@
   var modalEl = document.getElementById('bv-modal');
   var PAGE = 20;
   var PRIX_MAX_PAR_DEFAUT = 50;
-  var etat = { init: null, videos: [], moi: null, panier: 0, favoris: [], cats: [], types: [], prixMin: 0, prixMax: 0, plafond: PRIX_MAX_PAR_DEFAUT, q: '', tri: 'recent', vue: 'grille', nb: PAGE, fermes: {} };
+  var etat = { init: null, videos: [], moi: null, panier: 0, favoris: [], avis: null, cats: [], types: [], prixMin: 0, prixMax: 0, plafond: PRIX_MAX_PAR_DEFAUT, q: '', tri: 'recent', vue: 'grille', nb: PAGE, fermes: {} };
 
   /* ── utilitaires ── */
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -37,6 +37,10 @@
     return [];
   }
   function cleSure(s) { return texte(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
+  function lienSur(u) { var s = texte(u); if (!s) return ''; if (/^https?:\/\//i.test(s)) return s; if (/^[\w.-]+\.[a-z]{2,}/i.test(s)) return 'https://' + s; return ''; }
+  function objet(v) { if (v && typeof v === 'object') return v; try { var o = JSON.parse(v || '{}'); return o && typeof o === 'object' ? o : {}; } catch (e) { return {}; } }
+  /* Rubrique éteinte par le propriétaire à l'étape « Rubriques » : cachée aux visiteurs, ses données restent. Rien d'éteint = comportement d'avant. */
+  function rub(cle) { return !window.BoutiqueRubriques || window.BoutiqueRubriques.active(etat.init.vitrine_modules_state, cle); }
   function lienSurImage(u) { var s = texte(u); return s && /^(https?:)?\/\/|^\//i.test(s) && !/["'()\\\s]/.test(s) ? s : ''; }
 
   /* ── icônes filaires ── */
@@ -99,6 +103,7 @@
       var iid = etat.init.id;
       return Promise.all([
         api('GET', '/initiatives/' + iid + '/produits').then(function (r) { etat.videos = (r.produits || []).filter(function (p) { return (p.statut || 'disponible') !== 'masque'; }).map(normalise); }).catch(function () {}),
+        api('GET', '/initiatives/' + iid + '/avis').then(function (r) { etat.avis = r; }).catch(function () {}),
         api('GET', '/auth/me').then(function (r) { etat.moi = r.user || null; }).catch(function () {})
       ]);
     }).then(function () {
@@ -245,8 +250,33 @@
   function pied() {
     return '<footer class="bv-pied"><div class="bv-pied-in"><span>© Diaspo\'Actif — Du Sud au Nord</span><nav><a href="vitrines.html">Boutiques</a><a href="confidentialite.html">Confidentialité</a><a href="cgu.html">Conditions d’utilisation</a></nav></div>' + rp('htmlLegal') + '</footer>';
   }
+  /* Présentation de la boutique sous le catalogue : À propos, avis des clients, contact et réseaux. Chaque bloc suit sa rubrique ; un bloc sans contenu n'apparaît pas. */
+  function blocsPresentation() {
+    var i = etat.init, cartes = '';
+    var desc = texte(i.description);
+    if (desc && rub('a_propos')) cartes += '<article class="bv-pres-carte"><h2>À propos</h2><p>' + esc(desc.length > 420 ? desc.slice(0, 417).replace(/\s+\S*$/, '') + '…' : desc) + '</p></article>';
+    var a = etat.avis || {}, liste_ = (a.avis || []).filter(function (x) { return texte(x.commentaire); }).slice(0, 3);
+    if (rub('avis') && Number(a.total) > 0) {
+      var n = Math.round(Number(a.moyenne) || 0), et = '';
+      for (var k = 1; k <= 5; k++) et += ic('etoile', k <= n ? '' : 'vide');
+      cartes += '<article class="bv-pres-carte"><h2>Avis des clients</h2><div class="bv-etoiles" aria-label="Note moyenne ' + esc(a.moyenne || 0) + ' sur 5">' + et + '<span>(' + Number(a.total) + ' avis)</span></div>' +
+        liste_.map(function (x) { return '<blockquote>« ' + esc(x.commentaire) + ' »<cite>' + esc(((x.prenom || '') + ' ' + String(x.nom || '').charAt(0) + (x.nom ? '.' : '')).trim() || 'Client') + '</cite></blockquote>'; }).join('') + '</article>';
+    }
+    var liens = [];
+    if (rub('reseaux_sociaux')) {
+      if (lienSur(i.site_web)) liens.push(['Site web', lienSur(i.site_web)]);
+      var rs = objet(i.reseaux_sociaux);
+      Object.keys(rs).forEach(function (c) { var u = lienSur(rs[c]); if (u) liens.push([c.charAt(0).toUpperCase() + c.slice(1), u]); });
+    }
+    if (rub('contact') || liens.length) {
+      cartes += '<article class="bv-pres-carte"><h2>Contact</h2>' +
+        (rub('contact') ? '<p>Une question sur une vidéo ou une licence ? Écrivez-nous par la messagerie de la plateforme.</p><a class="bv-pres-bouton" href="messagerie.html?with=' + esc(i.owner_user_id) + '&amp;origine=vitrine&amp;objet=contact">Nous écrire</a>' : '') +
+        (liens.length ? '<ul class="bv-pres-liens">' + liens.slice(0, 8).map(function (l) { return '<li><a href="' + esc(l[1]) + '" target="_blank" rel="noopener noreferrer">' + esc(l[0]) + '</a></li>'; }).join('') + '</ul>' : '') + '</article>';
+    }
+    return cartes ? '<section class="bv-pres" aria-label="À propos de la boutique"><div class="bv-pres-in">' + cartes + '</div></section>' : '';
+  }
   function dessiner() {
-    app.innerHTML = entete() + hero() + barreCategories() + '<main class="bv-corps">' + blocFiltres() + '<section id="bv-zone">' + zoneListe() + '</section></main>' + rp('htmlConditions', { livraison: false }) + pied();
+    app.innerHTML = entete() + hero() + barreCategories() + '<main class="bv-corps">' + blocFiltres() + '<section id="bv-zone">' + zoneListe() + '</section></main>' + blocsPresentation() + rp('htmlConditions', { livraison: false }) + pied();
     document.title = 'Boutique Vidéo ' + nom() + ' — Diaspo\'Actif';
     lier();
     /* Encart « Sondage en cours » : sondages que le propriétaire a choisi d'afficher sur sa boutique (2026-11-09). */

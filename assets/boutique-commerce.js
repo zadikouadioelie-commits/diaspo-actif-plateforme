@@ -6,7 +6,7 @@
   var app = document.getElementById('bq-app');
   var toastEl = document.getElementById('bq-toast');
   var modalEl = document.getElementById('bq-modal');
-  var etat = { init: null, produits: [], catalogues: [], formationsBande: [], titreBande: '', avis: null, agenda: [], moi: null, panier: 0, cat: null, q: '', favoris: [], slide: 0, minuteur: null };
+  var etat = { init: null, produits: [], catalogues: [], formationsBande: [], titreBande: '', avis: null, agenda: [], moi: null, panier: 0, cat: null, q: '', tri: 'pertinence', favoris: [], slide: 0, minuteur: null };
 
   /* ── utilitaires ── */
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -230,6 +230,9 @@
     var cat = (p.categorie || '').trim(), or = /formation/i.test(cat);
     var dev = devisPossible(p), vendable = prix && disponible(p);
     var etiq = cat ? '<span class="bq-etiquette' + (or ? ' or' : '') + '">' + esc(cat) + '</span>' : '';
+    /* Réduction : calculée à partir du prix barré et du prix promotionnel déjà saisis, jamais inventée. */
+    var pct = promo ? Math.round((1 - promo / prix) * 100) : 0;
+    if (pct >= 1) etiq += '<span class="bq-reduc" aria-label="Réduction de ' + pct + ' pour cent">-' + pct + ' %</span>';
     var vign = '<div class="bq-vignette">' + (ph ? '<img loading="lazy" src="' + esc(ph) + '" alt="' + esc(p.nom) + '">' : ic(iconeCategorie(cat))) + etiq +
       '<button type="button" class="bq-coeur" data-fav="' + p.id + '" aria-pressed="' + (etat.favoris.indexOf(Number(p.id)) >= 0) + '" aria-label="Ajouter aux favoris">' + ic('coeur') + '</button></div>';
     var prixHtml = !prix ? '<div class="bq-prix demande">' + (p.prix != null && Number(p.prix) <= 0 ? 'Gratuit' : 'Sur demande') + '</div>' :
@@ -334,14 +337,31 @@
     h += bonusHtml();
     return h;
   }
+  var TRIS = [['pertinence', 'Pertinence'], ['recents', 'Nouveautés'], ['prix_asc', 'Prix croissant'], ['prix_desc', 'Prix décroissant'], ['promos', 'Promotions d’abord']];
+  function prixEffectif(p) { var x = nombreProduit(p); if (x == null) return null; var r = p.prix_promo != null && Number(p.prix_promo) > 0 && Number(p.prix_promo) < x ? Number(p.prix_promo) : x; return r; }
+  function enPromo(p) { var x = nombreProduit(p); return !!(x && p.prix_promo != null && Number(p.prix_promo) > 0 && Number(p.prix_promo) < x); }
+  /* Tri des résultats : les produits « sur demande » (sans prix) passent toujours après ceux qui ont un prix. */
+  function trier(l) {
+    var t = etat.tri, c = l.slice();
+    if (t === 'recents') c.sort(function (a, b) { return Number(b.id) - Number(a.id); });
+    else if (t === 'prix_asc' || t === 'prix_desc') c.sort(function (a, b) {
+      var x = prixEffectif(a), y = prixEffectif(b);
+      if (x == null && y == null) return 0; if (x == null) return 1; if (y == null) return -1;
+      return t === 'prix_asc' ? x - y : y - x;
+    });
+    else if (t === 'promos') c.sort(function (a, b) { return (enPromo(b) ? 1 : 0) - (enPromo(a) ? 1 : 0); });
+    return c;
+  }
   function vueListe() {
     var q = etat.q.toLowerCase(), l = etat.produits.filter(function (p) {
       if (etat.cat && etat.cat !== 'TOUT' && (p.categorie || '').trim() !== etat.cat) return false;
       return !q || (p.nom + ' ' + (p.description || '') + ' ' + (p.categorie || '')).toLowerCase().indexOf(q) >= 0;
     });
+    l = trier(l);
     var titre = etat.cat === 'TOUT' ? 'Tous les produits' : etat.cat || 'Résultats';
     if (q) titre = 'Résultats pour « ' + etat.q + ' »';
-    return '<section>' + enTete(titre) + '<p class="bq-meta">' + l.length + ' produit' + (l.length > 1 ? 's' : '') + '</p>' +
+    return '<section>' + enTete(titre) + '<div class="bq-barre-tri"><p class="bq-meta">' + l.length + ' produit' + (l.length > 1 ? 's' : '') + '</p>' +
+      (l.length > 1 ? '<label class="bq-tri">Trier par <select id="bq-tri">' + TRIS.map(function (x) { return '<option value="' + x[0] + '"' + (etat.tri === x[0] ? ' selected' : '') + '>' + x[1] + '</option>'; }).join('') + '</select></label>' : '') + '</div>' +
       (l.length ? '<div class="bq-grille">' + l.map(function (p) { return carteProduit(p); }).join('') + '</div>' : '<div class="bq-vide">Aucun produit ne correspond. Essayez une autre catégorie ou un autre mot.</div>') + '</section>';
   }
   /* Couleurs de la boutique (lot 4A, 2026-11-13) : les 3 couleurs choisies à l'étape « Apparence » remplacent bordeaux / bleu nuit / or.
@@ -456,6 +476,11 @@
   }
 
   /* ── événements (délégation) ── */
+  document.addEventListener('change', function (e) {
+    if (!e.target || e.target.id !== 'bq-tri') return;
+    etat.tri = e.target.value; dessiner();
+    var s = document.getElementById('bq-tri'); if (s) s.focus();
+  });
   document.addEventListener('click', function (e) {
     var t = e.target.closest('[data-cat],[data-act],[data-fav],[data-ajout],[data-det],[data-devis],[data-slide],[data-defil],[data-fermer],[data-photo],#bq-fav-b');
     if (!t) { if (e.target === modalEl) fermer(); return; }

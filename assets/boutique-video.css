@@ -218,3 +218,16 @@ body.bv[data-couleurs] .bv-pastille{background:var(--bv-bord2)}
 body.bv[data-couleurs] .bv-prix-plage{background:var(--bv-bord)}
 body.bv[data-couleurs] .bv-prix-pistes input::-webkit-slider-thumb{background:var(--bv-bord)}
 body.bv[data-couleurs] .bv-prix-pistes input::-moz-range-thumb{background:var(--bv-bord)}
+/* Présentation sous le catalogue (lot 4C) : À propos, avis, contact et réseaux */
+.bv-pres{background:#fff;border-top:1px solid var(--bv-ligne)}
+.bv-pres-in{max-width:1760px;margin:0 auto;padding:28px 28px 34px;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px}
+.bv-pres-carte{background:var(--bv-fond);border:1px solid var(--bv-ligne);border-radius:12px;padding:20px 22px}
+.bv-pres-carte h2{margin:0 0 10px;font-family:var(--bv-serif);font-size:20px;color:var(--bv-texte)}
+.bv-pres-carte p{margin:0 0 12px;color:var(--bv-doux);line-height:1.55}
+.bv-pres-carte blockquote{margin:12px 0 0;padding:0;color:var(--bv-texte);line-height:1.5}
+.bv-pres-carte cite{display:block;margin-top:4px;font-style:normal;font-size:12.5px;color:var(--bv-doux)}
+.bv-pres-bouton{display:inline-flex;align-items:center;min-height:44px;padding:0 20px;border-radius:8px;background:linear-gradient(180deg,var(--bv-bord2),var(--bv-bord4));color:#fff;font-weight:700;text-decoration:none}
+.bv-pres-bouton:hover{filter:brightness(1.08)}
+.bv-pres-liens{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 0;padding:0;list-style:none}
+.bv-pres-liens a{display:inline-flex;align-items:center;min-height:44px;padding:0 14px;border:1px solid var(--bv-ligne);border-radius:8px;background:#fff;color:var(--bv-bord);font-weight:700;text-decoration:none}
+.bv-pres-liens a:hover{border-color:var(--bv-or)}

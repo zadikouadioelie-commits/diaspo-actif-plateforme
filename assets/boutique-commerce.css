@@ -401,3 +401,12 @@ body.bq[data-couleurs] .bq-hero::after{background:linear-gradient(165deg,var(--b
 body.bq[data-couleurs] .bq-slide{background:linear-gradient(100deg,var(--bq-marine) 0%,var(--bq-marine2) 55%,var(--bq-bordeaux) 120%)}
 body.bq[data-couleurs] .bq-membre{background:linear-gradient(100deg,var(--bq-bordeaux3),var(--bq-bordeaux2) 55%,var(--bq-bordeaux))}
 body.bq[data-couleurs] .bq-actions .plein{background:linear-gradient(180deg,var(--bq-bordeaux2),var(--bq-bordeaux));border-color:var(--bq-bordeaux)}
+
+/* Réduction et tri du catalogue (lot 4C) */
+.bq-reduc{position:absolute;right:10px;bottom:10px;padding:4px 10px;border-radius:6px;background:#B3261E;color:#fff;font-size:12px;font-weight:800;letter-spacing:.02em}
+body.bq[data-couleurs] .bq-reduc{background:var(--bq-bordeaux)}
+.bq-barre-tri{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:0 0 12px}
+.bq-barre-tri .bq-meta{margin:0}
+.bq-tri{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:var(--bq-texte,#1a1424)}
+.bq-tri select{min-height:44px;padding:0 12px;border:1px solid #d9d4d8;border-radius:8px;background:#fff;color:inherit;font:inherit;font-weight:600}
+.bq-tri select:focus-visible{outline:2px solid var(--bq-or,#C6A16E);outline-offset:2px}

@@ -12,7 +12,7 @@
   var MOIS = ['', 'janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
   var JOURS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
   var TYPES = { evenement: 'Événement', forum: 'Forum', atelier: 'Atelier', webinaire: 'Webinaire', conference: 'Conférence', gala: 'Gala', marche: 'Marché / Foire', networking: 'Réseautage', debat: 'Débat', concours: 'Concours', trophee_diaspora: 'Trophée diaspora', autre: 'Autre' };
-  var etat = { init: null, evts: [], moi: null, agendaIds: [], onglet: 'a_venir', cat: '', q: '', mois: '', format: '', prix: '', tri: 'date', vue: 'cartes', page: 1, courant: null, ouvreur: null };
+  var etat = { init: null, evts: [], moi: null, agendaIds: [], inscrits: [], onglet: 'a_venir', cat: '', q: '', mois: '', format: '', prix: '', tri: 'date', vue: 'cartes', page: 1, courant: null, ouvreur: null };
 
   /* ── utilitaires ── */
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -108,21 +108,34 @@
   function action(e) {
     if (statut(e) === 'termine') return { lib: 'Événement terminé', actif: false };
     if (infoSeule(e)) { var info = lienSur(e.lien_plus_info); return info ? { lib: 'Plus d’informations', href: info, externe: true, actif: true } : { lib: 'Événement informatif', actif: false }; }
+    if (estInscrit(e)) return { lib: 'Inscrit', actif: false, inscrit: true };
     if (lienSur(e.lien_inscription)) return { lib: 'S’inscrire', href: lienSur(e.lien_inscription), externe: true, actif: true };
     if (e.fiche_slug) return { lib: payant(e) ? 'Réserver' : 'S’inscrire', href: 'inscription-publique.html?slug=' + encodeURIComponent(e.fiche_slug), actif: true };
     var r = restantes(e);
     if (r != null && r <= 0) return { lib: 'Complet', actif: false };
+    /* Événement gratuit, sans fiche ni lien externe, visiteur connecté : l'inscription se fait ici même (POST /evenements/:id/rejoindre). */
+    if (etat.moi && !payant(e)) return { lib: 'S’inscrire', direct: true, actif: true };
     return { lib: 'S’inscrire', href: 'evenements.html?evt=' + e.id, actif: true };
   }
-  function boutonAction(e, classe) {
+  function estInscrit(e) { return etat.inscrits.indexOf(Number(e.id)) >= 0; }
+  function boutonAction(e, classe, avecAnnulation) {
     var a = action(e);
+    if (a.direct) return '<button type="button" class="btn ' + classe + '" data-inscrire="' + e.id + '">' + esc(a.lib) + '</button>';
+    if (a.inscrit) return '<button type="button" class="btn ' + classe + '" disabled>' + esc(a.lib) + '</button>' + (avecAnnulation && statut(e) !== 'termine' ? '<button type="button" class="btn" data-quitter="' + e.id + '">Annuler mon inscription</button>' : '');
     if (!a.actif) return '<button type="button" class="btn ' + classe + '" disabled>' + esc(a.lib) + '</button>';
     return '<a class="btn ' + classe + '" href="' + esc(a.href) + '"' + (a.externe ? ' target="_blank" rel="noopener noreferrer"' : '') + '>' + esc(a.lib) + '</a>';
   }
 
   /* ── filtres ── */
-  function parOnglet() { return etat.evts.filter(function (e) { return statut(e) === etat.onglet || (etat.onglet === 'a_venir' && statut(e) === 'en_cours'); }); }
-  function compte(o) { return etat.evts.filter(function (e) { return statut(e) === o || (o === 'a_venir' && statut(e) === 'en_cours'); }).length; }
+  function inscriptionsOuvertes() { return !!etat.moi && rub('reservation'); }
+  function parOnglet() {
+    if (etat.onglet === 'mes') return etat.evts.filter(estInscrit);
+    return etat.evts.filter(function (e) { return statut(e) === etat.onglet || (etat.onglet === 'a_venir' && statut(e) === 'en_cours'); });
+  }
+  function compte(o) {
+    if (o === 'mes') return etat.evts.filter(estInscrit).length;
+    return etat.evts.filter(function (e) { return statut(e) === o || (o === 'a_venir' && statut(e) === 'en_cours'); }).length;
+  }
   function filtrer() {
     var q = etat.q.trim().toLowerCase();
     var l = parOnglet().filter(function (e) {
@@ -184,6 +197,7 @@
   }
   function onglets() {
     var defs = [['a_venir', 'À venir'], ['termine', 'Terminés']];
+    if (inscriptionsOuvertes()) defs.push(['mes', 'Mes inscriptions']);
     return '<div class="ongletsT" role="tablist" aria-label="Période">' + defs.map(function (d) {
       return '<button type="button" role="tab" class="chip" data-onglet="' + d[0] + '" aria-selected="' + (etat.onglet === d[0]) + '">' + d[1] + ' <span class="n">' + compte(d[0]) + '</span></button>';
     }).join('') + '</div>';
@@ -210,7 +224,7 @@
       '<div class="lieu">' + ic(enLigne(e) ? 'ecran' : 'lieu') + '<span>' + esc(dateLongue(e)) + (texte(e.heure_debut) ? ', ' + esc(e.heure_debut) : '') + '<br>' + (enLigne(e) ? 'En ligne' : esc([e.lieu, e.ville].filter(Boolean).join(', ') || 'Lieu à confirmer')) + '</span></div>' +
       '<div class="prix">' + esc(prixTexte(e)) + '</div>' +
       (pct != null ? '<div class="jauge' + (r <= 0 ? ' pleine' : '') + '" role="img" aria-label="' + n + ' places réservées sur ' + m + '"><i style="width:' + pct + '%"></i></div><div class="places">' + (r <= 0 ? 'Aucune place disponible' : r + ' place' + (r > 1 ? 's' : '') + ' sur ' + m) + '</div>' : '') +
-      '<div class="actions"><button class="btn" type="button" data-ev="' + e.id + '">Détails</button>' + boutonAction(e, 'or') + '</div></div></article>';
+      '<div class="actions"><button class="btn" type="button" data-ev="' + e.id + '">Détails</button>' + boutonAction(e, 'or', etat.onglet === 'mes') + '</div></div></article>';
   }
   function ligneAgenda(e) {
     var d = dateDe(e);
@@ -233,7 +247,7 @@
       cats.map(function (c) { return '<button class="chip" type="button" data-cat="' + esc(c) + '" aria-pressed="' + (etat.cat === c) + '">' + esc(c) + '</button>'; }).join('') + '</div>' +
       '<div class="vues" role="group" aria-label="Affichage"><button type="button" data-vue="cartes" aria-pressed="' + (etat.vue === 'cartes') + '">' + ic('grille') + 'Cartes</button><button type="button" data-vue="agenda" aria-pressed="' + (etat.vue === 'agenda') + '">' + ic('liste') + 'Agenda</button></div></div>' +
       '<div class="actifs" aria-live="polite">' + act.map(function (a) { return '<button class="actif" type="button" data-retirer="' + a[0] + '" aria-label="Retirer le filtre : ' + esc(a[1]) + '">' + esc(a[1]) + ic('croix') + '</button>'; }).join('') + (act.length > 1 ? '<button class="lienor" type="button" data-raz>Tout réinitialiser</button>' : '') + '</div>' +
-      '<h2 class="sectitre" id="sectMain">' + (etat.onglet === 'termine' ? 'Événements passés' : 'Nos prochains événements') + '<small>' + total + ' événement' + (total > 1 ? 's' : '') + '</small></h2>';
+      '<h2 class="sectitre" id="sectMain">' + (etat.onglet === 'termine' ? 'Événements passés' : etat.onglet === 'mes' ? 'Mes inscriptions' : 'Nos prochains événements') + '<small>' + total + ' événement' + (total > 1 ? 's' : '') + '</small></h2>';
     if (!total) {
       return h + '<div class="vide"><b>' + (etat.evts.length ? 'Aucun événement ne correspond' : 'Aucun événement publié pour le moment') + '</b>' + (etat.evts.length ? 'Essayez un autre mois, une autre catégorie, ou réinitialisez les filtres.' : 'Revenez bientôt : de nouveaux rendez-vous seront annoncés.') +
         (act.length ? '<div style="margin-top:12px"><button class="btn or" type="button" data-raz style="flex:0 0 auto">Réinitialiser les filtres</button></div>' : '') + '</div>';
@@ -306,6 +320,7 @@
     api('GET', '/evenements/' + e.id).then(function (r) { if (etat.courant && etat.courant.id === e.id) fiche(e, r.cagnottes || []); }).catch(function () { /* la fiche reste complète sans les cagnottes */ });
   }
   function fiche(e, cagnottes) {
+    etat.cagn = cagnottes;
     var img = couverture(e), d = dateDe(e), prog = programme(e), r = restantes(e);
     var org = texte(e.organisateur_externe_nom);
     var wa = lienSur(e.whatsapp_lien), info = lienSur(e.lien_plus_info), desc = enTexte(e.description);
@@ -329,7 +344,7 @@
     }
     h += '</div></div><div class="resa" id="resa"><h3>' + (statut(e) === 'termine' ? 'Événement terminé' : infoSeule(e) ? 'Événement informatif' : (payant(e) ? 'Réserver' : 'S’inscrire')) + '</h3>' +
       '<p class="aide" style="margin-top:0">' + (statut(e) === 'termine' ? 'Cet événement a eu lieu : les inscriptions sont closes.' : infoSeule(e) ? 'Aucune inscription n’est demandée pour cet événement.' : 'L’inscription se termine sur la page sécurisée de la plateforme ou chez l’organisateur. Aucun paiement n’est demandé sur cette page.') + '</p>' +
-      '<div class="rang">' + boutonAction(e, 'or') +
+      '<div class="rang">' + boutonAction(e, 'or', true) +
       (statut(e) !== 'termine' ? '<button class="btn" type="button" data-agenda="' + e.id + '">' + (etat.agendaIds.indexOf(Number(e.id)) >= 0 ? 'Dans mon agenda' : 'Ajouter à mon agenda') + '</button>' : '') +
       '<button class="btn" type="button" data-partager="' + e.id + '">Partager</button>' +
       (info && !infoSeule(e) ? '<a class="btn" href="' + esc(info) + '" target="_blank" rel="noopener noreferrer">Plus d’informations</a>' : '') +
@@ -343,6 +358,34 @@
     ov.classList.remove('open');
     if (etat.ouvreur && document.contains(etat.ouvreur) && etat.ouvreur.focus) etat.ouvreur.focus();
     etat.courant = null;
+  }
+  /* Inscription gratuite directe et annulation : mêmes routes que le reste de la plateforme (rejoindre / quitter). */
+  function majApresInscription(e) {
+    var bloc = document.getElementById('liste'); if (bloc) majListe();
+    var onglets_ = document.querySelector('.ongletsT'); if (onglets_) onglets_.outerHTML = onglets();
+    if (etat.courant && Number(etat.courant.id) === Number(e.id)) fiche(etat.courant, etat.cagn || []);
+  }
+  function evenementPar(id) { return etat.evts.filter(function (x) { return Number(x.id) === Number(id); })[0]; }
+  function inscrire(id, bouton) {
+    var e = evenementPar(id); if (!e) return;
+    if (bouton) bouton.disabled = true;
+    api('POST', '/evenements/' + id + '/rejoindre', {}).then(function () {
+      if (!estInscrit(e)) { etat.inscrits.push(Number(id)); if (e.nb_participants != null) e.nb_participants = Number(e.nb_participants) + 1; }
+      toast('Inscription enregistrée.');
+      majApresInscription(e);
+    }).catch(function (err) { if (bouton) bouton.disabled = false; toast((err && err.message) || 'Inscription impossible pour le moment.'); });
+  }
+  function quitter(id, bouton) {
+    var e = evenementPar(id); if (!e) return;
+    if (!window.confirm('Annuler votre inscription à « ' + e.titre + ' » ?')) return;
+    if (bouton) bouton.disabled = true;
+    api('DELETE', '/evenements/' + id + '/quitter').then(function () {
+      etat.inscrits = etat.inscrits.filter(function (x) { return x !== Number(id); });
+      if (e.nb_participants != null && Number(e.nb_participants) > 0) e.nb_participants = Number(e.nb_participants) - 1;
+      if (etat.onglet === 'mes' && !etat.inscrits.length) etat.onglet = 'a_venir';
+      toast('Inscription annulée.');
+      majApresInscription(e);
+    }).catch(function (err) { if (bouton) bouton.disabled = false; toast((err && err.message) || 'Annulation impossible pour le moment.'); });
   }
   function ajouterAgenda(id) {
     if (!etat.moi) { location.href = 'login.html?next=' + encodeURIComponent('boutique-evenements.html?id=' + etat.init.id); return; }
@@ -365,11 +408,13 @@
 
   /* ── interactions ── */
   app.addEventListener('click', function (ev) {
-    var t = ev.target.closest('[data-ev],[data-nav],[data-onglet],[data-cat],[data-vue],[data-retirer],[data-raz],[data-page],[data-close],[data-agenda],[data-partager],[data-pied-cat]');
+    var t = ev.target.closest('[data-ev],[data-nav],[data-onglet],[data-cat],[data-vue],[data-retirer],[data-raz],[data-page],[data-close],[data-agenda],[data-partager],[data-pied-cat],[data-inscrire],[data-quitter]');
     if (!t) { if (ev.target.id === 'evOv') fermer(); return; }
     if (t.dataset.ev) return ouvrir(t.dataset.ev, t);
     if (t.hasAttribute('data-close')) return fermer();
     if (t.dataset.agenda) return ajouterAgenda(t.dataset.agenda);
+    if (t.dataset.inscrire) return inscrire(t.dataset.inscrire, t);
+    if (t.dataset.quitter) return quitter(t.dataset.quitter, t);
     if (t.dataset.partager) return partager(t.dataset.partager);
     if (t.dataset.nav) {
       if (t.dataset.nav === 'accueil') return window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -411,7 +456,10 @@
         api('GET', '/evenements?owner=' + encodeURIComponent(etat.init.owner_user_id) + '&boutique=1').then(function (r) {
           etat.evts = (r.evenements || []).filter(function (e) { return Number(e.owner_user_id) === Number(etat.init.owner_user_id) && e.statut !== 'brouillon'; });
         }).catch(function () { etat.evts = []; }),
-        api('GET', '/auth/me').then(function (r) { etat.moi = r.user || null; }).catch(function () {}),
+        api('GET', '/auth/me').then(function (r) { etat.moi = r.user || null; }).catch(function () {}).then(function () {
+          if (!etat.moi) return;
+          return api('GET', '/evenements/participants/mine').then(function (r) { etat.inscrits = (r.inscriptions || []).map(function (i) { return Number(i.evenement_id); }); }).catch(function () {});
+        }),
         api('GET', '/agenda/evenements-ajoutes').then(function (r) { etat.agendaIds = (r.ids || []).map(Number); }).catch(function () {})
       ]);
     });
