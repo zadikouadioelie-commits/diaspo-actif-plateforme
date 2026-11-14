@@ -54053,7 +54053,12 @@ route("GET", "/api/insc/public/:slug", async (req, res, params) => {
     if (!["publiee", "fermee"].includes(fiche.statut)) return sendJSON(res, 404, { error: "Fiche introuvable ou non publiée." });
     if (fiche.gele_le) return sendJSON(res, 403, { error: "Cette fiche a été temporairement suspendue par l'administration." });
     const now = new Date();
-    if (fiche.statut === "fermee" || (fiche.date_fermeture_inscriptions && new Date(fiche.date_fermeture_inscriptions) < now)) {
+    /* Une fiche ne se ferme JAMAIS toute seule (2026-11-14, demande explicite, cas du Trophée Ngovu :
+       « ne ferme jamais les fiches, même si la date est passée, tant que la personne n'a pas supprimé
+       son événement »). Ni la date de fermeture saisie, ni la fin de l'événement ne la bloquent plus :
+       l'événement passe seulement en « terminé ». Seule la fermeture manuelle du propriétaire
+       (statut « fermee ») ferme encore la fiche. */
+    if (fiche.statut === "fermee") {
       const medias = await db.prepare("SELECT * FROM insc_fiches_medias WHERE fiche_id=? ORDER BY position ASC, id ASC").all(fiche.id);
       return sendJSON(res, 200, { fiche, fermee: true, message: "Les inscriptions pour cet événement sont désormais fermées.", medias, ...(await inscPublicContexteEvenement(fiche)) });
     }
@@ -54063,15 +54068,8 @@ route("GET", "/api/insc/public/:slug", async (req, res, params) => {
        reste pertinente. Sans lien, la date d'ouverture continue de s'appliquer normalement. */
     const evenementsLies = await db.prepare("SELECT e.id, e.date_evt, e.date_fin FROM insc_fiches_evenements fe JOIN evenements e ON e.id=fe.evenement_id WHERE fe.fiche_id=?").all(fiche.id);
     const estLieeAUnEvenement = evenementsLies.length > 0;
-    /* Tous les événements liés sont terminés (2026-10-04, demande explicite) : plus d'inscription
-       possible, même sans date de fermeture saisie. Une fiche liée à plusieurs événements reste
-       ouverte tant qu'au moins un est à venir (le visiteur choisit alors l'événement). */
-    const evenementsBilletterieLies = await db.prepare("SELECT id, date_debut, date_fin FROM events WHERE insc_fiche_id=?").all(fiche.id);
-    const tousLiesTermines = [...evenementsLies, ...evenementsBilletterieLies];
-    if (tousLiesTermines.length && tousLiesTermines.every(evenementEstTermine) && !(fiche.prolongee_jusquau && new Date(fiche.prolongee_jusquau) > now)) {
-      const medias = await db.prepare("SELECT * FROM insc_fiches_medias WHERE fiche_id=? ORDER BY position ASC, id ASC").all(fiche.id);
-      return sendJSON(res, 200, { fiche, fermee: true, message: "Cet événement est terminé : les inscriptions sont closes.", medias, ...(await inscPublicContexteEvenement(fiche)) });
-    }
+    /* Remplace la règle du 2026-10-04 (« tous les événements liés terminés = inscriptions closes ») :
+       supprimée le 2026-11-14, une fiche n'est plus fermée par la fin de son événement. */
     if (!estLieeAUnEvenement && fiche.date_ouverture_inscriptions && new Date(fiche.date_ouverture_inscriptions) > now) {
       const medias = await db.prepare("SELECT * FROM insc_fiches_medias WHERE fiche_id=? ORDER BY position ASC, id ASC").all(fiche.id);
       return sendJSON(res, 200, { fiche, pas_encore_ouverte: true, message: "Les inscriptions ne sont pas encore ouvertes.", medias, ...(await inscPublicContexteEvenement(fiche)) });
@@ -54225,7 +54223,7 @@ route("POST", "/api/insc/public/:slug/inscriptions", async (req, res, params, bo
   if (fiche.gele_le) return sendJSON(res, 403, { error: "Cette fiche est temporairement suspendue." });
   const now = new Date();
   const liaisons = await db.prepare("SELECT evenement_id FROM insc_fiches_evenements WHERE fiche_id=?").all(fiche.id);
-  if (fiche.date_fermeture_inscriptions && new Date(fiche.date_fermeture_inscriptions) < now) return sendJSON(res, 400, { error: "Les inscriptions pour cet événement sont désormais fermées." });
+  /* Plus aucune fermeture automatique (date passée ou événement terminé) : voir GET /api/insc/public/:slug. */
   /* Lié à un événement = ouverture automatique, seule la fermeture compte (2026-09-28, demande
      explicite) — même règle que GET /api/insc/public/:slug ci-dessus. */
   if (!liaisons.length && fiche.date_ouverture_inscriptions && new Date(fiche.date_ouverture_inscriptions) > now) return sendJSON(res, 400, { error: "Les inscriptions ne sont pas encore ouvertes." });
@@ -54243,14 +54241,7 @@ route("POST", "/api/insc/public/:slug/inscriptions", async (req, res, params, bo
     }
     evenementId = body.evenement_id;
   }
-  if (evenementId) {
-    const evtCible = await db.prepare("SELECT date_evt, date_fin FROM evenements WHERE id=?").get(evenementId);
-    if (evtCible && evenementEstTermine(evtCible)) return sendJSON(res, 400, { error: "Cet événement est terminé : les inscriptions sont closes." });
-  } else if (!liaisons.length) {
-    // Fiche liée à un événement de billetterie (events.insc_fiche_id) : même règle.
-    const liesBilletterie = await db.prepare("SELECT id, date_debut, date_fin FROM events WHERE insc_fiche_id=?").all(fiche.id);
-    if (liesBilletterie.length && liesBilletterie.every(evenementEstTermine)) return sendJSON(res, 400, { error: "Cet événement est terminé : les inscriptions sont closes." });
-  }
+  /* Événement terminé : n'empêche plus l'inscription (2026-11-14, demande explicite). */
 
   if (!body?.nom || !String(body.nom).trim() || !body?.prenom || !String(body.prenom).trim()) return sendJSON(res, 400, { error: "Nom et prénom sont requis." });
   if (!body?.email && !body?.telephone) return sendJSON(res, 400, { error: "Un e-mail ou un téléphone est requis." });
@@ -54445,7 +54436,7 @@ route("POST", "/api/insc/public/:slug/inscriptions/reprendre", async (req, res, 
   const fiche = await db.prepare("SELECT * FROM insc_fiches WHERE slug=?").get(params.slug);
   if (!fiche || fiche.statut !== "publiee") return sendJSON(res, 404, { error: "Fiche introuvable ou non publiée." });
   if (fiche.gele_le) return sendJSON(res, 403, { error: "Cette fiche est temporairement suspendue." });
-  if (fiche.date_fermeture_inscriptions && new Date(fiche.date_fermeture_inscriptions) < new Date()) return sendJSON(res, 400, { error: "Les inscriptions pour cet événement sont désormais fermées." });
+  /* Plus de fermeture automatique à la date (2026-11-14) : voir GET /api/insc/public/:slug. */
 
   await inscPurgerNonAbouties(fiche.id);
   const ref = String(body?.reference || "").trim();
