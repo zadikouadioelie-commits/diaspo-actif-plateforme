@@ -7250,14 +7250,47 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     const input = wrap.querySelector("#sb-search-input");
     const results = wrap.querySelector(".sb-search-results");
 
+    /* Résultat « en carte » (2026-11-14, demande explicite) : une recherche garde les repères du menu — icône, description, niveau
+       (Premium = carte dorée, Standard = carte bleue, mêmes styles que les cartes du menu) et DOSSIER où se trouve le module
+       (titre de groupe, ou catégorie dans le tiroir Administrateur). Seulement quand le menu est en cartes (assets/menu-modules-cartes.js) ;
+       sinon le résultat reste la ligne blanche d'avant. */
+    function dossierDe(a) {
+      const cats = sidebar.dataset.mmcCats;
+      if (cats && a.dataset.mmcCat) {
+        try { const c = JSON.parse(cats).find(x => x[0] === a.dataset.mmcCat); if (c && c[1]) return c[1]; } catch (e) { /* catégories illisibles : on retombe sur le titre de groupe */ }
+      }
+      let groupe = "";
+      for (const el of sidebar.querySelectorAll(".sb-group-lbl, a")) {
+        if (el === a) break;
+        if (el.classList.contains("sb-group-lbl") && !el.closest(".sb-bandeau-group,.sb-install-group")) groupe = (el.textContent || "").replace(/^[\s\p{Extended_Pictographic}\p{Emoji_Modifier}‍️⃣]+/u, "").replace(/\s+/g, " ").trim();
+      }
+      return groupe;
+    }
+    function ligneCarte(m, i) {
+      const a = m.el, txt = a.querySelector(":scope > .mmc-txt");
+      if (!txt || !a.dataset.mmcNiv) return null;
+      const premium = a.dataset.mmcNiv === "premium" && !a.classList.contains("accred-lien");
+      const desc = a.querySelector(".mmc-desc"), ico = a.querySelector(":scope > .mmc-ico .mmc-svg"), dossier = dossierDe(a);
+      const niveau = premium ? "Premium" : "Standard";
+      return `<div class="sb-search-item mmc-res" data-idx="${i}" data-niv="${premium ? "premium" : "standard"}" role="button" tabindex="0">`
+        + `<span class="mmc-res-ico">${ico ? ico.outerHTML : ""}</span>`
+        + `<span class="mmc-res-txt"><span class="mmc-res-titre">${sbEsc(m.label)}</span>`
+        + (desc ? `<span class="mmc-res-desc">${sbEsc(desc.textContent.trim())}</span>` : "")
+        + `<span class="mmc-res-lieu"><span class="mmc-res-niv">${niveau}${a.classList.contains("mmc-verrou") ? " · verrouillé" : ""}</span>`
+        + (dossier ? `<span class="mmc-res-dossier">Dossier : ${sbEsc(dossier)}</span>` : "") + `</span></span></div>`;
+    }
     function renderResults(matches) {
       if (!matches.length) {
         results.innerHTML = `<div style="padding:12px 14px;font-size:13px;color:#8a8f9c;">Aucun module trouvé.</div>`;
       } else {
-        results.innerHTML = matches.map((m, i) => `<div class="sb-search-item" data-idx="${i}" style="padding:10px 14px;font-size:13.5px;font-weight:600;color:#0D2B4E;cursor:pointer;border-bottom:1px solid #eef0f4;">${sbEsc(m.label)}</div>`).join("");
+        results.innerHTML = matches.map((m, i) => ligneCarte(m, i) || `<div class="sb-search-item" data-idx="${i}" style="padding:10px 14px;font-size:13.5px;font-weight:600;color:#0D2B4E;cursor:pointer;border-bottom:1px solid #eef0f4;">${sbEsc(m.label)}</div>`).join("");
         results.querySelectorAll(".sb-search-item").forEach((row, i) => {
-          row.addEventListener("mouseenter", () => row.style.background = "#f3f4f7");
-          row.addEventListener("mouseleave", () => row.style.background = "");
+          if (!row.classList.contains("mmc-res")) {
+            row.addEventListener("mouseenter", () => row.style.background = "#f3f4f7");
+            row.addEventListener("mouseleave", () => row.style.background = "");
+          } else {
+            row.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); row.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true })); } });
+          }
           row.addEventListener("mousedown", e => {
             e.preventDefault();
             matches[i].el.click();
