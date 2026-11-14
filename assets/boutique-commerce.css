@@ -410,3 +410,49 @@ body.bq[data-couleurs] .bq-reduc{background:var(--bq-bordeaux)}
 .bq-tri{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:var(--bq-texte,#1a1424)}
 .bq-tri select{min-height:44px;padding:0 12px;border:1px solid #d9d4d8;border-radius:8px;background:#fff;color:inherit;font:inherit;font-weight:600}
 .bq-tri select:focus-visible{outline:2px solid var(--bq-or,#C6A16E);outline-offset:2px}
+
+/* ── Pleine largeur, cartes plus grandes, bande « Devenez membre » lisible (2026-11-14) ──
+   Ce bloc est volontairement en dernier : il remplace les largeurs plafonnées à 1400 px, les 5 colonnes fixes
+   et les textes sans retour à la ligne qui coupaient la bande des membres et certaines cartes. */
+:root{--bq-large:1880px;--bq-marge:clamp(16px,2.4vw,44px)}
+.bq-top-in,.bq-hero-in,.bq-cats-in,.bq-corps,.bq-assur-in,.bq-pied-in{max-width:var(--bq-large)}
+@media (min-width:981px){
+  .bq-top-in,.bq-hero-in,.bq-cats-in,.bq-assur-in,.bq-pied-in{padding-left:var(--bq-marge);padding-right:var(--bq-marge)}
+  .bq-corps{grid-template-columns:clamp(262px,15vw,300px) minmax(0,1fr);gap:28px;padding:24px var(--bq-marge) 12px}
+  .bq-evt{grid-template-columns:auto minmax(0,1fr) minmax(0,140px) auto}
+  /* Barre du haut souple : la recherche se réduit au lieu de pousser les icônes hors de l'écran */
+  .bq-top-in{gap:clamp(12px,1.6vw,22px)}
+  .bq-nav{gap:clamp(12px,1.4vw,22px)}
+  .bq-rech{flex:1 1 200px;width:auto;max-width:340px;min-width:150px}
+}
+/* Cartes : colonnes fluides (jamais plus étroites que 264 px), image plus haute, textes qui passent à la ligne */
+@media (min-width:641px){
+  .bq-grille,.bq-recents{grid-template-columns:repeat(auto-fill,minmax(min(100%,264px),1fr));gap:20px}
+  .bq-catalogues{grid-template-columns:repeat(auto-fill,minmax(min(100%,190px),1fr))}
+  .bq-cartouches{grid-template-columns:repeat(auto-fill,minmax(min(100%,250px),1fr))}
+  .bq-cartouche .img{height:160px}
+  .bq-agenda{grid-template-columns:repeat(auto-fill,minmax(min(100%,460px),1fr))}
+  .bq-actions{grid-template-columns:minmax(0,1fr) minmax(0,1.5fr)}
+  .bq-fbande{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,264px),1fr));gap:20px;overflow:visible;scroll-snap-type:none;padding:2px 0 8px}
+  .bq-fcarte{flex:none;min-width:0}
+  .bq-fmedia{height:170px}
+}
+.bq-produit .bq-vignette,.bq-recent .bq-vignette{aspect-ratio:16/10}
+.bq-etiquette{max-width:calc(100% - 68px)}
+.bq-produit h3,.bq-recent h3{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.bq-prix.demande{white-space:nowrap}
+.bq-actions button,.bq-actions a{height:auto;min-height:44px;padding:6px 8px;white-space:normal;line-height:1.2;text-align:center;font-size:13.5px}
+.bq-principal>*,.bq-avis-rail{min-width:0}
+/* Avis : on voit des cartes entières (3, 2 ou 1 selon la largeur), jamais une carte coupée en deux */
+@media (min-width:1100px){.bq-avis-carte{flex-basis:calc((100% - 32px)/3)}}
+@media (min-width:641px) and (max-width:1099px){.bq-avis-carte{flex-basis:calc((100% - 16px)/2)}}
+/* Bande « Devenez membre » : la photo s'adapte, le texte passe à la ligne, le bouton descend s'il manque de place */
+.bq-membre{--bq-photo:clamp(210px,17vw,330px);display:flex;flex-wrap:wrap;align-items:center;gap:18px 36px;padding:30px 36px 30px calc(var(--bq-photo) + 32px);min-height:160px}
+.bq-membre::before{width:var(--bq-photo);background:linear-gradient(90deg,transparent 86%,#74102B),url(/assets/boutique-membres.jpg) left bottom/auto 100% no-repeat}
+.bq-membre h2{flex:0 1 auto;font-size:clamp(24px,2.3vw,36px)}
+.bq-membre ul{flex:1 1 300px;min-width:0;padding-left:30px;font-size:14.5px;gap:8px}
+.bq-membre li{white-space:normal;align-items:flex-start}
+.bq-membre li .ic{flex:none;margin-top:3px}
+.bq-membre .bq-bouton{flex:0 0 auto;white-space:nowrap;padding:14px 26px;font-size:15.5px}
+@media (max-width:1100px){.bq-membre{padding:26px 24px}.bq-membre::before{display:none}.bq-membre ul{flex-basis:100%;border-left:0;padding-left:0}}
+@media (max-width:640px){.bq-membre{padding:22px 18px}.bq-membre .bq-bouton{width:100%}}

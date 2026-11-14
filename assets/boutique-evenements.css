@@ -204,3 +204,11 @@ body.evb {
   .evb .prog li { grid-template-columns: 74px minmax(0, 1fr); }
 }
 @media (prefers-reduced-motion: reduce) { .evb { scroll-behavior: auto; } .evb .carte, .evb .toast { transition: none; } .evb .carte:hover { transform: none; } }
+
+/* Pleine largeur et cartes plus grandes (2026-11-14) */
+.evb .top-in, .evb .hero-in, .evb .wrap, .evb .pied-in { max-width: 1840px; }
+@media (min-width: 601px) {
+  .evb .grille { grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 22px; }
+}
+.evb .carte h3, .evb .ev h3 { overflow-wrap: anywhere; }
+.evb .prix { white-space: nowrap; }

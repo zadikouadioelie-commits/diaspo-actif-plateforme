@@ -231,3 +231,14 @@ body.bv[data-couleurs] .bv-prix-pistes input::-moz-range-thumb{background:var(--
 .bv-pres-liens{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 0;padding:0;list-style:none}
 .bv-pres-liens a{display:inline-flex;align-items:center;min-height:44px;padding:0 14px;border:1px solid var(--bv-ligne);border-radius:8px;background:#fff;color:var(--bv-bord);font-weight:700;text-decoration:none}
 .bv-pres-liens a:hover{border-color:var(--bv-or)}
+
+/* ── Pleine largeur et cartes plus grandes (2026-11-14) ── */
+.bv-top-in,.bv-hero-in,.bv-cats-in,.bv-corps,.bv-pied-in,.bv-pres-in{max-width:1920px}
+@media (min-width:721px){
+  .bv-grille{grid-template-columns:repeat(auto-fill,minmax(min(100%,250px),1fr));gap:26px 22px}
+  .bv-info{padding:13px 13px 0}
+  .bv-titre{font-size:14.6px;min-height:38px}
+  .bv-prix{font-size:18px}
+  .bv-ajout{margin:0 11px;height:34px;font-size:13px}
+  .bv-pres-in{grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr))}
+}

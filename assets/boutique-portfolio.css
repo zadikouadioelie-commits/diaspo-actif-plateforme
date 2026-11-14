@@ -284,3 +284,20 @@ body.pf img{max-width:100%;display:block}
 
 /* Couleurs personnalisées (lot 4A, 2026-11-13) : le dégradé du bandeau suit les 3 couleurs de la boutique. Sans couleurs : aucune règle ne s'applique. */
 body.pf[data-couleurs] .pf-hero{background:linear-gradient(100deg,var(--pf-marine) 0%,color-mix(in srgb,var(--pf-marine) 75%,var(--pf-bordeaux)) 45%,color-mix(in srgb,var(--pf-marine) 30%,var(--pf-bordeaux)) 80%,var(--pf-bordeaux) 100%);background-size:cover;background-position:center}
+
+/* ── Pleine largeur et cartes plus grandes (2026-11-14) ── */
+.pf-top-in,.pf-hero-in,.pf-onglets-in,.pf-corps,.pf-pied-in{max-width:1840px}
+@media (min-width:901px){.pf-corps{padding-left:clamp(16px,2.4vw,44px);padding-right:clamp(16px,2.4vw,44px)}}
+@media (min-width:561px){
+  .pf-grille{grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),1fr));gap:20px}
+  .pf-produits{grid-template-columns:repeat(auto-fill,minmax(min(100%,250px),1fr));gap:18px}
+  .pf-services{grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:18px}
+  .pf-videos{grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr))}
+  .pf-avis{grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr))}
+  .pf-agenda{grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr))}
+}
+/* Réalisations phares : des cartes entières (3 puis 4 selon la largeur), jamais une carte coupée en deux */
+@media (min-width:901px){.pf-phare{flex-basis:calc((100% - 32px)/3)}}
+@media (min-width:1500px){.pf-phare{flex-basis:calc((100% - 48px)/4)}}
+.pf-creation h3,.pf-produit h3{overflow-wrap:anywhere}
+.pf-prix.demande{white-space:nowrap}
