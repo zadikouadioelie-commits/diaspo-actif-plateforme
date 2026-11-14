@@ -11555,6 +11555,13 @@ route("GET", "/api/initiatives/:id", async (req, res, params, body, query) => {
   /* Vrai seulement pour le propriétaire connecté qui demande son brouillon : les pages dédiées s'en servent pour savoir
      que ce qu'elles affichent est un aperçu, et l'écran de maintenance le laisse alors passer (lot 3). */
   row.apercu_brouillon = useDraft;
+  /* Vrai seulement pour le propriétaire connecté de cette boutique (2026-11-14) : il voit sa page publiée même pendant la maintenance
+     et la barre « Paramètres / ancienne vue » ne s'affiche que pour lui. Un visiteur n'en reçoit rien d'autre que « false ». */
+  row.est_proprietaire = false;
+  if (row.owner_user_id) {
+    const _moiProp = await getCurrentUser(req).catch(() => null);
+    row.est_proprietaire = !!(_moiProp && Number(_moiProp.id) === Number(row.owner_user_id));
+  }
   /* Réglages de la boutique affichés aux visiteurs (lot 4A, 2026-11-13) : livraison, minimum, pays, délais, informations légales.
      Rien de secret : ce sont des mentions que le propriétaire a saisies pour être lues. Le brouillon n'est lu que pour son propriétaire (aperçu). */
   row.vitrine_reglages = BoutiqueReglages.lire(useDraft && resolveVitrineDraft(row).reglages ? resolveVitrineDraft(row).reglages : row.vitrine_reglages_json);

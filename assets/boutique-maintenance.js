@@ -37,10 +37,12 @@
      « apercu_brouillon » vrai seulement au propriétaire connecté de cette boutique. Pour tout autre visiteur, rien ne change. */
   function apercuDuProprietaire() {
     var q = new URLSearchParams(location.search), ref = q.get('id') || q.get('slug');
-    if (q.get('preview') !== 'draft' || !ref) return Promise.resolve(false);
-    return fetch('/api/initiatives/' + encodeURIComponent(ref) + '?preview=draft', { credentials: 'same-origin' })
+    if (!ref) return Promise.resolve(false);
+    /* 2026-11-14 : le propriétaire voit aussi sa page publiée (sans ?preview=draft) pendant la maintenance ; là encore c'est le serveur
+       qui confirme (« est_proprietaire »), jamais un paramètre d'adresse. Un visiteur reste arrêté. */
+    return fetch('/api/initiatives/' + encodeURIComponent(ref) + (q.get('preview') === 'draft' ? '?preview=draft' : ''), { credentials: 'same-origin' })
       .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (d) { return !!(d && (d.initiative || d).apercu_brouillon === true); })
+      .then(function (d) { var i = d && (d.initiative || d); return !!(i && (i.apercu_brouillon === true || i.est_proprietaire === true)); })
       .catch(function () { return false; });
   }
   /* Renvoie une Promise<boolean> : true = maintenance active ET conteneur déjà remplacé par

@@ -1264,10 +1264,14 @@ async function init() {
        détecte #vitrine et bascule dessus naturellement, sans risque d'être écrasé après coup. */
     if (new URLSearchParams(location.search).get('vitrine') === '1') {
       history.replaceState(null, '', window.location.pathname + window.location.search + '#vitrine');
-      /* Boutique de type « Boutique de vente » (2026-11-01) : les visiteurs voient la présentation dédiée (boutique.html).
-         Le propriétaire garde la vue d'édition ; les retours de paiement et l'aperçu de brouillon restent ici. */
-      const _qb = new URLSearchParams(location.search);
-      if (!isOwn && profil.initiative_id && !_qb.get('paiement') && !_qb.get('preview')) {
+    }
+    /* Boutique de type « Boutique de vente » (2026-11-01) : les visiteurs voient la présentation dédiée (boutique.html).
+       Le 2026-11-14, le PROPRIÉTAIRE aussi (une barre en bas de la page lui donne les paramètres et l'ancienne vue d'édition) et le lien
+       profil.html?id=…#vitrine (sans ?vitrine=1) mène lui aussi à la nouvelle page. Sont exclus : les retours de paiement, l'aperçu de brouillon,
+       la demande explicite de l'ancienne vue (?edition=1). Pendant la maintenance des boutiques, le propriétaire (confirmé par le serveur) voit quand même sa page. */
+    const _qb = new URLSearchParams(location.search);
+    if ((_qb.get('vitrine') === '1' || location.hash === '#vitrine') && !_qb.get('edition')) {
+      if (profil.initiative_id && !_qb.get('paiement') && !_qb.get('preview')) {
         try {
           const _ib = (await api('GET', '/initiatives/' + profil.initiative_id)).initiative;
           if (_ib && (_ib.vitrine_type === 'commercial' || _ib.vitrine_type === 'ecom')) { location.replace('boutique.html?id=' + encodeURIComponent(profil.initiative_id)); return; }
