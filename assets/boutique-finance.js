@@ -225,7 +225,7 @@
   }
   function page() {
     var corps = blocPresentation() + blocProgrammes() + blocProjets() + blocResultats() + blocRendezVous() + blocDocuments() + blocTemoignages() + blocAgrements() + blocEquipe() + blocPartenaires();
-    return entete() + hero() + '<main class="wrap">' +
+    return '<a class="saut" href="#contenu">Aller au contenu</a>' + entete() + hero() + '<main class="wrap" id="contenu" tabindex="-1">' +
       (corps ? corps : '<section class="bloc"><div class="vide">Cet organisme n’a pas encore publié ses programmes. Revenez bientôt, ou écrivez-lui.</div></section>') +
       barreFinale() + '</main>' + pied();
   }

@@ -327,7 +327,7 @@
   }
   function page() {
     var vide = !projetsPublics().length && !etatReals().length && !visionTexte() && !presentation() && !equipe().length && !resultats().length && !besoins().length;
-    return entete() + hero() + tuilesCategories() + '<main class="wrap">' +
+    return '<a class="saut" href="#contenu">Aller au contenu</a>' + entete() + hero() + tuilesCategories() + '<main class="wrap" id="contenu" tabindex="-1">' +
       (vide ? '<section class="bloc"><div class="vide">Cette boutique n’a pas encore publié de projet. Revenez bientôt, ou écrivez à l’équipe.</div></section>' :
         blocProjets() + blocVision() + blocEquipe() + blocGalerie() + blocEvenements() + blocResultats() + blocBesoins() + blocPartenaires() + blocReseaux()) +
       barreFinale() + '</main>' + pied();

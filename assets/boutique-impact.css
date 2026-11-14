@@ -201,3 +201,14 @@ body.imp {
   .imp .top-in { flex-wrap: wrap; row-gap: 0; }
   .imp .nav { display: flex; flex-wrap: nowrap; order: 3; flex: 1 0 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -6px; padding-bottom: 4px; }
 }
+
+/* Accessibilité (lot 4D) : lien d'évitement et cibles tactiles de 44 px sur téléphone et écran tactile (Impact et Finance) */
+.imp .saut { position: absolute; left: 12px; top: -64px; z-index: 100; padding: 12px 18px; border-radius: 10px; background: var(--navy); color: var(--on-navy); font-weight: 700; text-decoration: none; }
+.imp .saut:focus { top: 8px; }
+.imp main:focus { outline: none; }
+@media (pointer: coarse), (max-width: 720px) {
+  .imp .btn.petit { min-height: 44px; }
+  .imp .logo { min-height: 44px; }
+  .imp .pied a { display: inline-flex; align-items: center; min-height: 44px; }
+  .imp .cat { min-height: 44px; }
+}
