@@ -8154,12 +8154,41 @@ document.addEventListener('load', function (e) {
   var ACCES = [
     { href: 'index.html', label: 'Accueil' },
     { href: 'annuaire.html', label: 'Annuaire' },
+    { href: 'evenements.html', label: 'Autres événements' },
     { href: 'vitrines.html', label: 'Boutiques' },
     { href: 'fil-actualite.html', label: "Fil d'actualité" },
-    { href: 'formations.html', label: 'Formations' },
-    { href: 'evenements.html', label: 'Autres événements' }
+    { href: 'formations.html', label: 'Formations' }
   ];
   function nomPage(h) { return String(h || '').split('#')[0].split('?')[0]; }
+
+  /* Ordre des accès (2026-11-14, demande explicite : « Accueil, Annuaire, puis Événements, Boutiques ensuite et tous
+     les autres ainsi de suite — il faut que l'événement et l'annuaire soient vite visibles »). Chaque page écrit sa
+     liste en dur (une soixantaine de pages) : on réordonne ici, une seule fois pour toutes, la barre du haut et le
+     tiroir latéral. Les quatre accès prioritaires passent devant ; tous les autres gardent l'ordre voulu par leur page.
+     Aucun lien n'est ajouté, retiré ni renommé ; seul l'ordre change (les liens sont déplacés, pas recréés). */
+  var PRIORITE = ['index.html', 'annuaire.html', 'evenements.html', 'vitrines.html'];
+  function rangPriorite(a) {
+    var brut = a.getAttribute('href') || '';
+    if (!brut || brut.charAt(0) === '#' || /^javascript:/i.test(brut)) return PRIORITE.length;
+    var page = nomPage(brut).split('/').pop() || 'index.html';
+    var r = PRIORITE.indexOf(page);
+    return r < 0 ? PRIORITE.length : r;
+  }
+  function ordonnerLiens(conteneur) {
+    if (!conteneur) return;
+    var liens = [];
+    for (var n = conteneur.firstElementChild; n; n = n.nextElementSibling) if (n.tagName === 'A') liens.push(n);
+    if (liens.length < 2) return;
+    var tries = liens.map(function (a, i) { return { a: a, k: rangPriorite(a) * 1000 + i }; })
+      .sort(function (x, y) { return x.k - y.k; })
+      .map(function (o) { return o.a; });
+    if (tries.every(function (a, i) { return a === liens[i]; })) return;
+    /* un repère par place : les liens retombent exactement aux places occupées, autres éléments intacts */
+    var reperes = liens.map(function (a) { var m = document.createComment(''); conteneur.insertBefore(m, a); return m; });
+    tries.forEach(function (a, i) { conteneur.insertBefore(a, reperes[i]); });
+    reperes.forEach(function (m) { conteneur.removeChild(m); });
+  }
+  function ordonnerTiroir() { ordonnerLiens(document.querySelector('#sidebar, .sidebar')); }
 
   function completer() {
     var nav = document.querySelector('.topbar .nav, header .nav');
@@ -8183,6 +8212,7 @@ document.addEventListener('load', function (e) {
       /* `fixe` : jamais retiré faute de place (la barre défile plutôt) — les autres accès ajoutés cèdent d'abord. */
       if (!it.fixe) ajoutes.push(a);
     });
+    ordonnerLiens(nav);
     if (!ajoutes.length) return;
     try { if (typeof applyTranslations === 'function') applyTranslations(); } catch (e) { /* libellés en français */ }
 
@@ -8205,6 +8235,9 @@ document.addEventListener('load', function (e) {
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', completer);
   else completer();
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ordonnerTiroir);
+  else ordonnerTiroir();
+  setTimeout(ordonnerTiroir, 1500); /* tiroirs remplis après coup : l'appel est sans effet si l'ordre est déjà bon */
 
   /* Rubrique vidéo « Influenceur Diaspo'Actif » (IDA, 2026-11-02, demande explicite) : entre le Fil d'actualité et les Formations.
      Phase de test : le lien n'apparaît que pour le compte Diaspo'Actif officiel (drapeau `influenceur_disponible` de /api/auth/me,
