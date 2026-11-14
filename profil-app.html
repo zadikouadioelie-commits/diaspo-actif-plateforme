@@ -1269,23 +1269,7 @@ async function init() {
        Le 2026-11-14, le PROPRIÉTAIRE aussi (une barre en bas de la page lui donne les paramètres et l'ancienne vue d'édition) et le lien
        profil.html?id=…#vitrine (sans ?vitrine=1) mène lui aussi à la nouvelle page. Sont exclus : les retours de paiement, l'aperçu de brouillon,
        la demande explicite de l'ancienne vue (?edition=1). Pendant la maintenance des boutiques, le propriétaire (confirmé par le serveur) voit quand même sa page. */
-    const _qb = new URLSearchParams(location.search);
-    if ((_qb.get('vitrine') === '1' || location.hash === '#vitrine') && !_qb.get('edition')) {
-      if (profil.initiative_id && !_qb.get('paiement') && !_qb.get('preview')) {
-        try {
-          const _ib = (await api('GET', '/initiatives/' + profil.initiative_id)).initiative;
-          if (_ib && (_ib.vitrine_type === 'commercial' || _ib.vitrine_type === 'ecom')) { location.replace('boutique.html?id=' + encodeURIComponent(profil.initiative_id)); return; }
-          if (_ib && _ib.vitrine_type === 'portfolio') { location.replace('portfolio.html?id=' + encodeURIComponent(profil.initiative_id)); return; }
-          if (_ib && _ib.vitrine_type === 'video') { location.replace('boutique-video.html?id=' + encodeURIComponent(profil.initiative_id)); return; }
-          /* « Créateur d'événements » (lot E, 2026-11-12) : seule la clé NOUVELLE « events » est redirigée ; une boutique de l'ancien type « evenement » garde sa présentation actuelle jusqu'à la bascule. */
-          if (_ib && _ib.vitrine_type === 'events') { location.replace('boutique-evenements.html?id=' + encodeURIComponent(profil.initiative_id)); return; }
-          /* « Projet Impact » (lot E, 2026-11-12) : seule la clé NOUVELLE « impact » est redirigée ; l'ancien type « projet » garde sa présentation jusqu'à la bascule. */
-          if (_ib && _ib.vitrine_type === 'impact') { location.replace('boutique-impact.html?id=' + encodeURIComponent(profil.initiative_id)); return; }
-          /* « Organismes de financement » (lot E, 2026-11-12) : type NOUVEAU, réservé aux administrateurs jusqu'à la bascule. */
-          if (_ib && _ib.vitrine_type === 'finance') { location.replace('boutique-finance.html?id=' + encodeURIComponent(profil.initiative_id)); return; }
-        } catch (e) { /* repli : l'ancienne vue boutique */ }
-      }
-    }
+    if ((new URLSearchParams(location.search).get('vitrine') === '1' || location.hash === '#vitrine') && await versPageBoutiqueDediee()) return;
     /* Bouton "Adhérer" (Associations/ONG) — même route que initiative.html, statut récupéré
        avant le rendu pour afficher directement le bon état (déjà membre / demande envoyée). */
     if (!isOwn && profil.role === 'initiative' && profil.initiative_id && ['Association','ONG'].includes(profil.initiative_type)) {
@@ -2977,6 +2961,26 @@ function renderBoardToolbar() {
    VITRINE COMMERCIALE (comptes Initiative uniquement)
    ====================================================== */
 let _vitrineLoaded = false;
+let _vitrineDedieeVerifiee = false;
+
+/* Envoie vers la page dédiée du type de boutique (boutique, portfolio, vidéo, événements, impact, finance). Renvoie true si la page part vers
+   cette page. Appelée à l'ouverture de profil.html?id=…#vitrine ET au clic sur l'onglet « Boutique » du profil (2026-11-14) : avant, le clic
+   basculait sur place vers l'ancienne vue, donc le nouveau design n'apparaissait qu'en ouvrant directement le lien #vitrine.
+   Exclus : retours de paiement, aperçu de brouillon, demande explicite de l'ancienne vue (?edition=1) et anciens types sans page dédiée. */
+async function versPageBoutiqueDediee() {
+  const q = new URLSearchParams(location.search);
+  if (q.get('edition') || q.get('paiement') || q.get('preview') || !profil || !profil.initiative_id) return false;
+  const pages = { commercial: 'boutique.html', ecom: 'boutique.html', portfolio: 'portfolio.html', video: 'boutique-video.html',
+    /* lot E : seules les clés NOUVELLES (events, impact, finance) sont redirigées ; les anciens types « evenement » et « projet » gardent leur présentation jusqu'à la bascule. */
+    events: 'boutique-evenements.html', impact: 'boutique-impact.html', finance: 'boutique-finance.html' };
+  try {
+    const ib = (await api('GET', '/initiatives/' + profil.initiative_id)).initiative;
+    const page = ib && pages[ib.vitrine_type];
+    if (!page) return false;
+    location.replace(page + '?id=' + encodeURIComponent(profil.initiative_id));
+    return true;
+  } catch (e) { return false; /* repli : l'ancienne vue boutique */ }
+}
 
 function initVitrineSwitch() {
   const sw = document.getElementById('p-view-switch');
@@ -3014,6 +3018,8 @@ function switchProfileView(view) {
   setPp3colVitrineState(isVitrine);
 
   if (isVitrine) {
+    /* Clic sur « Boutique » : la nouvelle page du type, si elle existe, prend le relais (l'ancienne vue reste le repli). */
+    if (_vitrineDedieeVerifiee !== true) { _vitrineDedieeVerifiee = true; versPageBoutiqueDediee(); }
     // Préserve un éventuel &pub=<id> pour le lien profond
     const pubMatch = (window.location.hash || '').match(/pub=(\d+)/);
     history.replaceState(null, '', pubMatch ? `#vitrine&pub=${pubMatch[1]}` : '#vitrine');

@@ -18,10 +18,11 @@ const PAGES = [['boutique.html', 'commerce'], ['portfolio.html', 'portfolio'], [
 
 test('B1 la redirection vers la page dédiée vaut pour le propriétaire et pour le lien #vitrine, sauf demande de l\'ancienne vue', () => {
   const s = lire('profil-app.html');
-  assert.match(s, /\(_qb\.get\('vitrine'\) === '1' \|\| location\.hash === '#vitrine'\) && !_qb\.get\('edition'\)/);
-  assert.match(s, /if \(profil\.initiative_id && !_qb\.get\('paiement'\) && !_qb\.get\('preview'\)\)/);
+  /* Depuis le 2026-11-14 la décision est dans versPageBoutiqueDediee(), appelée à l'ouverture (#vitrine) et au clic sur l'onglet (voir profil-clic-boutique.test.js). */
+  assert.match(s, /location\.hash === '#vitrine'\) && await versPageBoutiqueDediee\(\)\) return;/);
+  assert.match(s, /if \(q\.get\('edition'\) \|\| q\.get\('paiement'\) \|\| q\.get\('preview'\) \|\| !profil \|\| !profil\.initiative_id\) return false;/);
   assert.ok(!/if \(!isOwn && profil\.initiative_id/.test(s), 'le propriétaire ne doit plus être exclu');
-  ['boutique.html', 'portfolio.html', 'boutique-video.html', 'boutique-evenements.html', 'boutique-impact.html', 'boutique-finance.html'].forEach((p) => assert.ok(s.includes("'" + p + "?id='"), p));
+  ['boutique.html', 'portfolio.html', 'boutique-video.html', 'boutique-evenements.html', 'boutique-impact.html', 'boutique-finance.html'].forEach((p) => assert.ok(s.includes("'" + p), p));
 });
 
 test('B2 le serveur marque le seul propriétaire connecté', () => {
