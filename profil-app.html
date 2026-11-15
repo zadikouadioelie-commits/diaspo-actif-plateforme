@@ -1269,7 +1269,7 @@ async function init() {
        Le 2026-11-14, le PROPRIÉTAIRE aussi (une barre en bas de la page lui donne les paramètres et l'ancienne vue d'édition) et le lien
        profil.html?id=…#vitrine (sans ?vitrine=1) mène lui aussi à la nouvelle page. Sont exclus : les retours de paiement, l'aperçu de brouillon,
        la demande explicite de l'ancienne vue (?edition=1). Pendant la maintenance des boutiques, le propriétaire (confirmé par le serveur) voit quand même sa page. */
-    if ((new URLSearchParams(location.search).get('vitrine') === '1' || location.hash === '#vitrine') && await versPageBoutiqueDediee()) return;
+    if ((new URLSearchParams(location.search).get('vitrine') === '1' || (location.hash || '').startsWith('#vitrine')) && await versPageBoutiqueDediee()) return;
     /* Bouton "Adhérer" (Associations/ONG) — même route que initiative.html, statut récupéré
        avant le rendu pour afficher directement le bon état (déjà membre / demande envoyée). */
     if (!isOwn && profil.role === 'initiative' && profil.initiative_id && ['Association','ONG'].includes(profil.initiative_type)) {
@@ -2961,25 +2961,35 @@ function renderBoardToolbar() {
    VITRINE COMMERCIALE (comptes Initiative uniquement)
    ====================================================== */
 let _vitrineLoaded = false;
-let _vitrineDedieeVerifiee = false;
 
 /* Envoie vers la page dédiée du type de boutique (boutique, portfolio, vidéo, événements, impact, finance). Renvoie true si la page part vers
    cette page. Appelée à l'ouverture de profil.html?id=…#vitrine ET au clic sur l'onglet « Boutique » du profil (2026-11-14) : avant, le clic
    basculait sur place vers l'ancienne vue, donc le nouveau design n'apparaissait qu'en ouvrant directement le lien #vitrine.
    Exclus : retours de paiement, aperçu de brouillon, demande explicite de l'ancienne vue (?edition=1) et anciens types sans page dédiée. */
-async function versPageBoutiqueDediee() {
+let _vitrineDedieePromesse = null;
+function versPageBoutiqueDediee() {
+  /* Une seule vérification par ouverture de la page : l'ouverture par #vitrine et le clic sur l'onglet partagent le même résultat. */
+  if (!_vitrineDedieePromesse) _vitrineDedieePromesse = _verifierPageBoutiqueDediee();
+  return _vitrineDedieePromesse;
+}
+async function _verifierPageBoutiqueDediee() {
   const q = new URLSearchParams(location.search);
   if (q.get('edition') || q.get('paiement') || q.get('preview') || !profil || !profil.initiative_id) return false;
   const pages = { commercial: 'boutique.html', ecom: 'boutique.html', portfolio: 'portfolio.html', video: 'boutique-video.html',
     /* lot E : seules les clés NOUVELLES (events, impact, finance) sont redirigées ; les anciens types « evenement » et « projet » gardent leur présentation jusqu'à la bascule. */
     events: 'boutique-evenements.html', impact: 'boutique-impact.html', finance: 'boutique-finance.html' };
-  try {
-    const ib = (await api('GET', '/initiatives/' + profil.initiative_id)).initiative;
-    const page = ib && pages[ib.vitrine_type];
-    if (!page) return false;
-    location.replace(page + '?id=' + encodeURIComponent(profil.initiative_id));
-    return true;
-  } catch (e) { return false; /* repli : l'ancienne vue boutique */ }
+  /* 2026-11-15 : une boutique OUVERTE sans type enregistré est une boutique de vente (boutique.html) — une boutique pas encore ouverte garde sa page de mise en route ; une panne réseau est retentée une fois
+     avant de se rabattre sur l'ancienne vue. */
+  for (let essai = 0; essai < 2; essai++) {
+    try {
+      const ib = (await api('GET', '/initiatives/' + profil.initiative_id)).initiative;
+      const page = pages[ib && (ib.vitrine_type || (ib.vitrine_active ? 'ecom' : ''))];
+      if (!page) return false;
+      location.replace(page + '?id=' + encodeURIComponent(profil.initiative_id));
+      return true;
+    } catch (e) { /* second essai, puis repli : l'ancienne vue boutique */ }
+  }
+  return false;
 }
 
 function initVitrineSwitch() {
@@ -3018,13 +3028,17 @@ function switchProfileView(view) {
   setPp3colVitrineState(isVitrine);
 
   if (isVitrine) {
-    /* Clic sur « Boutique » : la nouvelle page du type, si elle existe, prend le relais (l'ancienne vue reste le repli). */
-    if (_vitrineDedieeVerifiee !== true) { _vitrineDedieeVerifiee = true; versPageBoutiqueDediee(); }
+    /* Clic sur « Boutique » : la nouvelle page du type, si elle existe, prend le relais. L'ancienne vue n'est dessinée qu'APRÈS cette
+       vérification (repli), pour qu'on ne la voie jamais, même une seconde, quand la nouvelle page existe. */
     // Préserve un éventuel &pub=<id> pour le lien profond
     const pubMatch = (window.location.hash || '').match(/pub=(\d+)/);
     history.replaceState(null, '', pubMatch ? `#vitrine&pub=${pubMatch[1]}` : '#vitrine');
-    if (!_vitrineLoaded) { _vitrineLoaded = true; renderVitrine(); /* renderVitrine appellera renderVitrineCols() une fois _vitrineInit chargé */ }
-    else renderVitrineCols();
+    if (!_vitrineLoaded) vitrine.innerHTML = '<div style="padding:70px 20px;text-align:center;color:var(--muted);font-weight:600;">Ouverture de la boutique…</div>';
+    versPageBoutiqueDediee().then((parti) => {
+      if (parti) return;
+      if (!_vitrineLoaded) { _vitrineLoaded = true; renderVitrine(); /* renderVitrine appellera renderVitrineCols() une fois _vitrineInit chargé */ }
+      else renderVitrineCols();
+    });
   } else {
     history.replaceState(null, '', window.location.pathname + window.location.search);
     if (window._ppRenderProfilCols) window._ppRenderProfilCols();

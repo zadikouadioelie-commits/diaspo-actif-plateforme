@@ -11,15 +11,28 @@ const path = require('node:path');
 const html = fs.readFileSync(path.join(__dirname, '..', 'profil-app.html'), 'utf8');
 
 test('P1 une seule fonction décide de la page dédiée, avec les 6 types et les exclusions', () => {
-  assert.match(html, /async function versPageBoutiqueDediee\(\)/);
-  const f = html.slice(html.indexOf('async function versPageBoutiqueDediee'), html.indexOf('function initVitrineSwitch'));
+  assert.match(html, /function versPageBoutiqueDediee\(\)/);
+  const f = html.slice(html.indexOf('let _vitrineDedieePromesse'), html.indexOf('function initVitrineSwitch'));
   ['boutique.html', 'portfolio.html', 'boutique-video.html', 'boutique-evenements.html', 'boutique-impact.html', 'boutique-finance.html']
     .forEach((p) => assert.ok(f.includes(p), p + ' absent'));
   ['edition', 'paiement', 'preview'].forEach((x) => assert.ok(f.includes("q.get('" + x + "')"), 'exclusion manquante : ' + x));
 });
 
 test('P2 l\'ouverture par #vitrine ET le clic sur l\'onglet appellent cette fonction', () => {
-  assert.match(html, /location\.hash === '#vitrine'\) && await versPageBoutiqueDediee\(\)\) return;/);
+  assert.match(html, /startsWith\('#vitrine'\)\) && await versPageBoutiqueDediee\(\)\) return;/);
   const sw = html.slice(html.indexOf('function switchProfileView'), html.indexOf('COLONNES LATÉRALES ADAPTÉES'));
   assert.match(sw, /versPageBoutiqueDediee\(\)/, 'le clic sur l\'onglet ne vérifie pas la page dédiée');
+});
+
+test('P3 (2026-11-15) tout lien #vitrine… (ex. #vitrine&pub=12) mène à la nouvelle page, et un type vide vaut « boutique de vente »', () => {
+  assert.ok(!/location\.hash === '#vitrine'/.test(html), 'comparaison stricte au hash restante : #vitrine&pub=… échapperait à la redirection');
+  const f = html.slice(html.indexOf('async function _verifierPageBoutiqueDediee'), html.indexOf('function initVitrineSwitch'));
+  assert.match(f, /ib\.vitrine_active \? 'ecom' : ''/, 'une boutique ouverte sans type doit mener à boutique.html, une boutique pas encore ouverte garde sa mise en route');
+  assert.match(f, /essai < 2/, 'une panne passagère doit être retentée avant le repli');
+});
+
+test('P4 (2026-11-15) la vieille vue n est dessinée qu après la vérification : jamais visible quand la nouvelle page existe', () => {
+  const sw = html.slice(html.indexOf('function switchProfileView'), html.indexOf('COLONNES LATÉRALES ADAPTÉES'));
+  assert.match(sw, /versPageBoutiqueDediee\(\)\.then\(\(parti\) => \{\s*if \(parti\) return;/);
+  assert.ok(sw.indexOf('versPageBoutiqueDediee()') < sw.indexOf('renderVitrine();'), 'renderVitrine() est appelé avant la vérification');
 });
