@@ -504,7 +504,7 @@
         } catch (e) { if (essai) throw e; }
       }
       if (page) { location.href = page + '?id=' + encodeURIComponent(iid); return; }
-      toast('Ta boutique n’est pas encore ouverte : ouvre-la depuis « Moi ».');
+      toast('Ta boutique n’est pas encore ouverte : ouvre-la depuis « Profil ».');
       location.hash = '#/moi';
     } catch (e) {
       toast(e.network ? e.message : 'Impossible d’ouvrir ta boutique pour le moment.', true);
@@ -535,7 +535,7 @@
     paintBadges();
   }
   function renderTabs() {
-    const items = [['accueil', 'Accueil', 'home'], ['evenements', 'Événements', 'cal'], ['annuaire', 'Annuaire', 'dir'], ['messages', 'Messages', 'chat'], ['boutiques', 'Boutiques', 'shop'], ['moi', 'Moi', 'user'], ['actualites', 'Actualités', 'fil']];
+    const items = [['accueil', 'Accueil', 'home'], ['evenements', 'Événements', 'cal'], ['annuaire', 'Annuaire', 'dir'], ['messages', 'Messages', 'chat'], ['boutiques', 'Boutiques', 'shop'], ['moi', 'Profil', 'user'], ['actualites', 'Actualités', 'fil']];
     $('#tabs').innerHTML = items.map(([k, l, i]) => `<button data-tab="${k}" aria-label="${l}" ${S.tab === k ? 'aria-current="page"' : ''} class="${S.tab === k ? 'on' : ''}">${ic(i)}<span>${l}</span>${k === 'messages' ? '<span class="dot" id="tab-badge-messages" hidden></span>' : ''}</button>`).join('');
     $$('#tabs button').forEach(b => b.onclick = () => {
       if (S.tab === b.dataset.tab && !S.pane) { window.scrollTo({ top: 0, behavior: 'smooth' }); refreshTab(b.dataset.tab); }
