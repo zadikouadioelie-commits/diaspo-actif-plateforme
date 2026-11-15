@@ -594,7 +594,10 @@
     if (!$('#' + idEl)) return;
     const carte = it => {
       const m = (it.medias && it.medias[0]) || {};
-      const vignette = m.poster ? `<img src="${attrUrl(m.poster)}" alt="" loading="lazy" onerror="this.remove()">` : (m.url ? `<video src="${attrUrl(m.url)}#t=0.5" muted playsinline preload="metadata"></video>` : '');
+      /* Miniature (2026-11-15) : l'adresse enregistrée, sinon celle que l'hébergeur vidéo range à côté du fichier (…/<id>/play_720p.mp4 → …/<id>/thumbnail.jpg) pour les anciens Reels publiés sans miniature ; sinon la vidéo (première image, quand le téléphone veut bien la charger). Sous la vignette, un fond avec ▶ reste visible si rien ne charge. */
+      const guid = String(m.url || '').match(/^(https:\/\/[^\/]+\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/play_\d+p\.mp4/i);
+      const poster = m.poster || (guid ? guid[1] + '/thumbnail.jpg' : '');
+      const vignette = '<span class="fr-fond" aria-hidden="true">▶</span>' + (poster ? `<img src="${attrUrl(poster)}" alt="" loading="lazy" onerror="this.remove()">` : (m.url ? `<video src="${attrUrl(m.url)}#t=0.5" muted playsinline preload="metadata" onerror="this.remove()"></video>` : ''));
       return `<button type="button" class="fr-reel" data-reel="${esc(it.post_id)}" aria-label="Voir le Reel de ${esc(it.auteur_nom || 'la communauté')}">${vignette}<span class="fr-ombre"></span><span class="fr-nom">${esc(it.auteur_nom || '')}</span></button>`;
     };
     el.innerHTML = `<div class="fr-tete"><b>Reels</b><button type="button" class="fr-tout" id="fr-tout">Tout voir</button></div><div class="fr-rail">${items.length ? items.map(carte).join('') : `<button type="button" class="fr-reel fr-nouveau" id="fr-nouveau"><span>Soyez le premier à partager un Reel</span></button>`}</div>`;

@@ -598,7 +598,10 @@ button.li{background:none;font:inherit;color:inherit}
 .fil-reels-box .fr-rail{display:flex;gap:10px;overflow-x:auto;padding:2px 2px 6px;scroll-snap-type:x proximity;scrollbar-width:none}
 .fil-reels-box .fr-rail::-webkit-scrollbar{display:none}
 .fil-reels-box .fr-reel{position:relative;flex:0 0 108px;aspect-ratio:9/16;border-radius:14px;overflow:hidden;border:1px solid #E3C06E66;background:#0B1226;padding:0;scroll-snap-align:start;color:#fff}
-.fil-reels-box .fr-reel img,#fil-reels .fr-reel video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.fil-reels-box .fr-reel img,.fil-reels-box .fr-reel video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+/* 2026-11-15 : fond de secours sous la vignette (visible seulement si l'image ou la vidéo ne charge pas : plus de case vide ni de point d'interrogation). Avant, la règle vidéo ne s'appliquait que dans #fil-reels (accueil) : dans l'onglet « Profil » la vidéo n'était pas calée et s'affichait à sa taille native. */
+.fil-reels-box .fr-fond{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:linear-gradient(160deg,#1B2B57,#0B1226);color:#E3C06E;font-size:28px;line-height:1}
+.fil-reels-box .fr-reel video{background:transparent;pointer-events:none}
 .fil-reels-box .fr-ombre{position:absolute;inset:0;background:linear-gradient(180deg,transparent 55%,rgba(5,9,22,.92) 100%)}
 .fil-reels-box .fr-nom{position:absolute;left:8px;right:8px;bottom:7px;font-size:11.5px;font-weight:700;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .fil-reels-box .fr-reel:focus-visible,#fil-reels .fr-tout:focus-visible{outline:3px solid #E3C06E;outline-offset:2px}
