@@ -36,3 +36,9 @@ test('P4 (2026-11-15) la vieille vue n est dessinée qu après la vérification 
   assert.match(sw, /versPageBoutiqueDediee\(\)\.then\(\(parti\) => \{\s*if \(parti\) return;/);
   assert.ok(sw.indexOf('versPageBoutiqueDediee()') < sw.indexOf('renderVitrine();'), 'renderVitrine() est appelé avant la vérification');
 });
+
+test('P5 (2026-11-15) les anciens types « evenement » et « projet » mènent aussi aux nouvelles pages', () => {
+  const f = html.slice(html.indexOf('async function _verifierPageBoutiqueDediee'), html.indexOf('function initVitrineSwitch'));
+  assert.match(f, /evenement: 'boutique-evenements\.html'/);
+  assert.match(f, /projet: 'boutique-impact\.html'/);
+});

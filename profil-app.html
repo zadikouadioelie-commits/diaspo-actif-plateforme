@@ -2976,8 +2976,9 @@ async function _verifierPageBoutiqueDediee() {
   const q = new URLSearchParams(location.search);
   if (q.get('edition') || q.get('paiement') || q.get('preview') || !profil || !profil.initiative_id) return false;
   const pages = { commercial: 'boutique.html', ecom: 'boutique.html', portfolio: 'portfolio.html', video: 'boutique-video.html',
-    /* lot E : seules les clés NOUVELLES (events, impact, finance) sont redirigées ; les anciens types « evenement » et « projet » gardent leur présentation jusqu'à la bascule. */
-    events: 'boutique-evenements.html', impact: 'boutique-impact.html', finance: 'boutique-finance.html' };
+    /* 2026-11-15 (accord écrit) : les anciens types « evenement » et « projet » mènent aussi aux nouvelles pages. */
+    events: 'boutique-evenements.html', evenement: 'boutique-evenements.html',
+    impact: 'boutique-impact.html', projet: 'boutique-impact.html', finance: 'boutique-finance.html' };
   /* 2026-11-15 : une boutique OUVERTE sans type enregistré est une boutique de vente (boutique.html) — une boutique pas encore ouverte garde sa page de mise en route ; une panne réseau est retentée une fois
      avant de se rabattre sur l'ancienne vue. */
   for (let essai = 0; essai < 2; essai++) {
