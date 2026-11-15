@@ -238,6 +238,7 @@ function cookieSecureFlag(req) {
 }
 
 async function sendJSON(res, status, obj, extraHeaders = {}) {
+  if (res._masque) obj = BoutiqueEquipe.masquer(obj, res._masque);   /* poste sans le droit « coordonnées » : contacts des clients retirés (boutique-equipe.js) */
   send(res, status, JSON.stringify(obj), { "Content-Type": "application/json; charset=utf-8", ...extraHeaders });
 }
 
@@ -267,7 +268,18 @@ async function readBody(req) {
   return req._bodyPromise;
 }
 
+/* Équipe de boutique (2026-11-15, server/boutique-equipe.js) : quand la garde a posé req._delegue, la route s'exécute AU NOM DU PROPRIÉTAIRE de la boutique
+   (les 900 contrôles « le compte connecté est le propriétaire » restent valables sans être réécrits). Sinon : la vraie personne, comme avant. */
 async function getCurrentUser(req) {
+  const reel = await getCurrentUserReel(req);
+  if (reel && req._delegue && Number(req._delegue.vrai_user_id) === Number(reel.id)) {
+    const proprio = await db.prepare("SELECT id, nom, prenom, email, role, ville, pays, profil_json, photo_url, email_verifie, nb_connexions, pwa_prompt_dismiss, temoignage_statut, temoignage_derniere_demande, demo_vue, da_id, identite_verifiee, credential_version, premiere_publication_le, est_relais_diaspora, relais_invite_fiche_id, relais_invite_axe, relais_invite_expire_le, relais_invite_permissions_json, email_visible_annuaire FROM users WHERE id = ?").get(req._delegue.owner_id);
+    if (proprio) { proprio.id = Number(proprio.id); proprio._delegue = req._delegue; return proprio; }
+  }
+  return reel;
+}
+
+async function getCurrentUserReel(req) {
   const cookies = parseCookies(req);
   /* 1. Token stateless signé (résiste aux cold starts Vercel) */
   const authCookie = cookies.auth;
@@ -2975,6 +2987,9 @@ route("GET", "/api/auth/me", async (req, res) => {
     } catch (e) { /* champs de pré-remplissage best-effort, jamais bloquant */ }
   }
 
+  /* Boutique sur laquelle la personne travaille (équipe de boutique, 2026-11-15) : null si elle est sur son propre compte. Information seulement. */
+  if (pub) { try { pub.boutique_active = await BoutiqueEquipe.infoActive(db, req, user.id); } catch (e) { pub.boutique_active = null; } }
+
   sendJSON(res, 200, { user: pub });
 });
 
@@ -3399,6 +3414,10 @@ FormationRelances.register({ route, db, sendJSON, getCurrentUser, SEC, exigerPre
 /* Connexion à plusieurs endroits : question « est-ce vous ? » chaque heure + code secret 4 chiffres (server/multi-connexion.js). */
 const MultiConnexion = require("./multi-connexion");
 MultiConnexion.register({ route, db, sendJSON, getCurrentUser, creerNotif, SEC });
+
+/* Équipe d'une boutique : postes, droits, invitation, bascule de boutique (2026-11-15). */
+const BoutiqueEquipe = require("./boutique-equipe");
+BoutiqueEquipe.register({ route, db, sendJSON, getCurrentUser, creerNotif });
 /* Message sécurisé : lisible 2 minutes après saisie du DS-ID du destinataire, puis détruit (server/message-securise.js). */
 const AccesReserve = require("./acces-reserve");
 const MessageSecurise = require("./message-securise");
@@ -36690,6 +36709,9 @@ ${jsonLd}
     /* Connexion à plusieurs endroits (2026-10-31) : tant que le titulaire n'a pas confirmé « c'est bien moi », toute l'API est refusée
        pour ce compte (assets/multi-connexion.js affiche la question). Exemptés : /api/auth/*, /api/multi-connexion/*, Stripe, cron. */
     { const _mc = await MultiConnexion.garde(db, req, pathname); if (_mc) return sendJSON(res, 403, _mc); }
+
+    /* Équipe de boutique (2026-11-15) : une personne invitée travaille sur la boutique choisie selon les droits de son poste (server/boutique-equipe.js). */
+    { const _be = await BoutiqueEquipe.garde(db, req, res, pathname, getCurrentUserReel); if (_be) return sendJSON(res, _be.status, _be.body); }
 
     // Enregistrer l'activité de l'utilisateur connecté (pour DAU/WAU/MAU)
     if (req.method === "GET") trackActivity(req);

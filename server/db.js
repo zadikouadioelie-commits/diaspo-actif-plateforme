@@ -10403,6 +10403,40 @@ db.exec(`
   );
 `);
 
+/* ── Équipe d'une boutique (2026-11-15) ── règles dans server/boutique-equipe.js.
+   - boutique_equipe : une ligne par boutique et par personne. statut : invite, accepte, refuse, retire. droits_json : liste des droits cochés pour ce poste.
+   - boutique_equipe_journal : qui a fait quoi sur la boutique au nom du propriétaire (ajout seul). */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS boutique_equipe (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    initiative_id INTEGER NOT NULL,
+    user_id       INTEGER NOT NULL,
+    poste         TEXT NOT NULL,
+    droits_json   TEXT DEFAULT '[]',
+    message       TEXT,
+    statut        TEXT NOT NULL DEFAULT 'invite',
+    invite_par    INTEGER,
+    accepte_le    TEXT,
+    created_at    TEXT DEFAULT (datetime('now')),
+    updated_at    TEXT DEFAULT (datetime('now')),
+    UNIQUE(initiative_id, user_id),
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_boutique_equipe_user ON boutique_equipe(user_id, statut);
+
+  CREATE TABLE IF NOT EXISTS boutique_equipe_journal (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    initiative_id INTEGER NOT NULL,
+    acteur_id     INTEGER,
+    poste         TEXT,
+    action        TEXT NOT NULL,
+    details       TEXT,
+    created_at    TEXT DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_boutique_equipe_journal_init ON boutique_equipe_journal(initiative_id, id);
+`);
+
 module.exports = db;
 module.exports.backfillOfficialFollow = backfillOfficialFollow;
 module.exports.generateDaId = generateDaId;
