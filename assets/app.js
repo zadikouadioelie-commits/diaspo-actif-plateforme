@@ -2268,6 +2268,12 @@ async function applyAuthState() {
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
         <span id="panier-topbar-badge" style="display:none;position:absolute;top:-6px;right:-8px;background:var(--orange);color:#fff;border-radius:50%;width:16px;height:16px;font-size:10px;font-weight:700;align-items:center;justify-content:center;"></span>
       </a>
+      ${user.role === 'initiative' ? `<!-- Ma boutique (2026-11-15, demande explicite) : vitrine de magasin, comptes Initiative seulement (les seuls à avoir une boutique).
+           profil.html?id=…#vitrine envoie directement sur la page dédiée du type de boutique (nouveau système : boutique, portfolio, vidéo,
+           événements, impact, finance), jamais sur l'ancienne vue — voir versPageBoutiqueDediee() dans profil-app.html. -->
+      <a href="profil.html?id=${user.id}#vitrine" id="topbar-boutique-btn" class="topbar-icon-btn" title="Ma boutique" aria-label="Ma boutique">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l1.5-5h15L21 9"></path><path d="M3 9a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0"></path><path d="M5 12.5V21h14v-8.5"></path><path d="M10 21v-5h4v5"></path></svg>
+      </a>` : ''}
       <div class="notif-bell-wrap">
         <button class="notif-bell-btn topbar-icon-btn" id="notif-bell-btn" title="Notifications" onclick="openNotifDropdown(this)">
           <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
