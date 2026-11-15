@@ -2684,8 +2684,15 @@
     $('#moi-switch').onclick = openSwitcher;
     $('#moi-part').onclick = () => partagerLien(location.origin + '/profil.html?id=' + encodeURIComponent(m0.id) + '&r=' + jetonPartage(), nom0);
     if (avecFil) filReels('moi-reels');
-    if (window.MMods && MMods.profilTab) MMods.profilTab($('#moi-profil'), m0);
-    else $('#moi-profil').innerHTML = `<a class="btn out block" href="#/profil/${encodeURIComponent(m0.id)}">Voir mon profil public</a>`;
+    if (window.MMods && MMods.profilTab) {
+      /* 2026-11-15 (demande explicite) : d'abord la visibilité du profil (en-tête : photo, nom, statistiques), PUIS les outils, les Reels et le fil des
+         actualités en dessous — avant, l'onglet s'ouvrait sur les Reels et les boutons d'outils, et la personne ne savait plus où elle se trouvait. */
+      Promise.resolve(MMods.profilTab($('#moi-profil'), m0)).then(() => {
+        const tete = $('#moi-profil .pf-hero'); if (!tete) return;
+        let ancre = tete;
+        [$('.moi-bar', el), $('#moi-reels', el)].forEach(n => { if (n) { ancre.after(n); ancre = n; } });
+      }).catch(() => { });
+    } else $('#moi-profil').innerHTML = `<a class="btn out block" href="#/profil/${encodeURIComponent(m0.id)}">Voir mon profil public</a>`;
   }
   /* Ancien contenu de l'onglet « Moi » : le menu complet des modules, désormais un écran à part (#/outils). */
   function paneOutils() {
