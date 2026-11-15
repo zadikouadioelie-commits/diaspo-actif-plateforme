@@ -481,6 +481,36 @@
     toast('Vous êtes déconnecté.'); await afterAuthChange(); location.hash = '#/fil';
   }
 
+  /* Bouton « Ma boutique » de la barre du haut (2026-11-15, demande explicite : « fais-le aussi sur le téléphone », après l'icône du site).
+     Comptes Initiative seulement. Ouvre la page DÉDIÉE du nouveau système selon le type de la boutique (même correspondance que
+     versPageBoutiqueDediee() dans profil-app.html), jamais l'ancienne vue. Une boutique pas encore ouverte, ou un type sans page dédiée,
+     renvoie vers l'écran « Moi » avec un message, au lieu de rester muet. */
+  const PAGES_BOUTIQUE = { commercial: 'boutique.html', ecom: 'boutique.html', portfolio: 'portfolio.html', video: 'boutique-video.html',
+    events: 'boutique-evenements.html', evenement: 'boutique-evenements.html', impact: 'boutique-impact.html', projet: 'boutique-impact.html',
+    finance: 'boutique-finance.html' };
+  async function ouvrirMaBoutique(btn) {
+    if (!S.me || btn.disabled) return;
+    btn.disabled = true;
+    try {
+      let page = '', iid = '';
+      for (let essai = 0; essai < 2 && !page; essai++) {
+        try {
+          const rp = await api('/api/profil/' + encodeURIComponent(S.me.id));
+          iid = (rp.profil && rp.profil.initiative_id) || iid;
+          if (!iid) break;
+          const ib = (await api('/api/initiatives/' + encodeURIComponent(iid))).initiative || {};
+          page = PAGES_BOUTIQUE[ib.vitrine_type || (ib.vitrine_active ? 'ecom' : '')] || '';
+          break;
+        } catch (e) { if (essai) throw e; }
+      }
+      if (page) { location.href = page + '?id=' + encodeURIComponent(iid); return; }
+      toast('Ta boutique n’est pas encore ouverte : ouvre-la depuis « Moi ».');
+      location.hash = '#/moi';
+    } catch (e) {
+      toast(e.network ? e.message : 'Impossible d’ouvrir ta boutique pour le moment.', true);
+    } finally { btn.disabled = false; }
+  }
+
   /* ---------- barre du haut + onglets ---------- */
   function renderTop() {
     const top = $('#top');
@@ -488,7 +518,7 @@
        explicite : "mets-le en bas après le bouton moi") — voir renderTabs(), toujours
        accessible connecté ou non puisque les onglets sont toujours affichés. */
     const right = S.me
-      ? `<button class="ibtn" id="top-switch" aria-label="Changer de compte">${ic('swap')}</button><a class="ibtn" href="panier.html" aria-label="Mon panier" title="Mon panier">${ic('cart')}<span class="dot" id="panier-badge" hidden></span></a><a class="ibtn" href="#/notifs" aria-label="Notifications">${ic('bell')}<span class="dot" id="notif-badge" hidden></span></a>`
+      ? `<button class="ibtn" id="top-switch" aria-label="Changer de compte">${ic('swap')}</button><a class="ibtn" href="panier.html" aria-label="Mon panier" title="Mon panier">${ic('cart')}<span class="dot" id="panier-badge" hidden></span></a>${S.me.role === 'initiative' ? `<button type="button" class="ibtn" id="top-boutique" aria-label="Ma boutique" title="Ma boutique">${ic('shop')}</button>` : ''}<a class="ibtn" href="#/notifs" aria-label="Notifications">${ic('bell')}<span class="dot" id="notif-badge" hidden></span></a>`
       /* Bouton « Créer un compte » restauré dans le bandeau (2026-10-08, demande explicite) : avait
          disparu de la nouvelle interface téléphone, seule « Connexion » y figurait — à la différence
          du bandeau du site (assets/app.js) qui a toujours les deux côte à côte. */
@@ -498,6 +528,7 @@
       <h1 class="sr-only"><span class="brand-s">Diaspo’Actif</span><span id="top-title">${esc(TITLES[S.tab] || '')}</span></h1><span style="flex:1"></span><button class="ibtn reels-top" id="top-reels" type="button" aria-label="Reels, les petites vidéos" title="Reels">${(window.MediaViewer && MediaViewer.iconeReels) ? MediaViewer.iconeReels() : ''}</button>${right}`;
     const l = $('#top-login'); if (l) l.onclick = () => openLogin();
     const sw = $('#top-switch'); if (sw) sw.onclick = openSwitcher;
+    const bq = $('#top-boutique'); if (bq) bq.onclick = () => ouvrirMaBoutique(bq);
     const mn = $('#top-menu'); if (mn) mn.onclick = openMenu;
     /* Bouton Reels de la barre du haut (2026-10-14, demande explicite : « à côté du logo ») : ouvre l'univers des petites vidéos depuis n'importe quel écran, connecté ou non. */
     const rl = $('#top-reels'); if (rl) rl.onclick = () => { if (window.MediaViewer && MediaViewer.openReels) MediaViewer.openReels(MV_OPTS); };
