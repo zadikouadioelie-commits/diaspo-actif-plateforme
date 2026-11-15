@@ -2677,20 +2677,22 @@
     /* Le bouton « Moi » ouvre le PROFIL PUBLIC du compte (2026-10-08, demande explicite), tel que les autres le voient, dans l'habillage
        de l'appli (assets/m-mod-profil.js). Les modules, le changement de compte et la déconnexion restent à un toucher : « Mes outils ». */
     const m0 = S.me, nom0 = m0.nom_affichage || [m0.prenom, m0.nom].filter(Boolean).join(' ') || m0.email;
+    /* 2026-11-15 (demande explicite) : plus de bouton « Mes outils et modules » (déjà dans « Menu ») ni « Changer de compte » (déjà en haut, bouton de bascule) : seul « Partager mon profil » reste sous l'en-tête. */
     const avecFil = m0.role !== 'collectivite' && !m0.relais_invite_fiche_id;
-    el.innerHTML = `${avecFil ? '<div id="moi-reels" class="fil-reels-box"></div>' : ''}<div class="moi-bar"><a class="btn block" href="#/outils">${ic('menu', 's')} Mes outils et modules</a>
-      <div class="row" style="gap:8px;margin-top:8px"><button type="button" class="btn out sm" id="moi-part" style="flex:1">${ic('share', 's')} Partager mon profil</button><button type="button" class="btn out sm" id="moi-switch" style="flex:1">${ic('people', 's')} Changer de compte</button></div></div>
+    el.innerHTML = `${avecFil ? '<div id="moi-reels" class="fil-reels-box"></div>' : ''}<div class="moi-bar"><button type="button" class="btn out sm block" id="moi-part">${ic('share', 's')} Partager mon profil</button></div>
       <div id="moi-profil"><div class="sk" style="height:140px;margin-bottom:12px"></div><div class="sk skc"></div></div>`;
-    $('#moi-switch').onclick = openSwitcher;
     $('#moi-part').onclick = () => partagerLien(location.origin + '/profil.html?id=' + encodeURIComponent(m0.id) + '&r=' + jetonPartage(), nom0);
     if (avecFil) filReels('moi-reels');
     if (window.MMods && MMods.profilTab) {
       /* 2026-11-15 (demande explicite) : d'abord la visibilité du profil (en-tête : photo, nom, statistiques), PUIS les outils, les Reels et le fil des
          actualités en dessous — avant, l'onglet s'ouvrait sur les Reels et les boutons d'outils, et la personne ne savait plus où elle se trouvait. */
-      Promise.resolve(MMods.profilTab($('#moi-profil'), m0)).then(() => {
-        const tete = $('#moi-profil .pf-hero'); if (!tete) return;
+      /* Les éléments de CET affichage sont retenus tout de suite : si l'écran est redessiné entre-temps (deuxième appel), le déplacement de l'ancien appel est ignoré au lieu de perdre la barre et les Reels du nouveau. */
+      const profilEl = $('#moi-profil'), barre = $('.moi-bar', el), reels = $('#moi-reels', el);
+      Promise.resolve(MMods.profilTab(profilEl, m0)).then(() => {
+        if (!profilEl.isConnected || !el.contains(profilEl)) return;
+        const tete = $('.pf-hero', profilEl); if (!tete) return;
         let ancre = tete;
-        [$('.moi-bar', el), $('#moi-reels', el)].forEach(n => { if (n) { ancre.after(n); ancre = n; } });
+        [barre, reels].forEach(n => { if (n && el.contains(n)) { ancre.after(n); ancre = n; } });
       }).catch(() => { });
     } else $('#moi-profil').innerHTML = `<a class="btn out block" href="#/profil/${encodeURIComponent(m0.id)}">Voir mon profil public</a>`;
   }
