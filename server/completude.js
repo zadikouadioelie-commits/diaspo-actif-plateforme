@@ -36,7 +36,7 @@ const CRITERES = {
   initiative: [
     { cles: ['description'], label: 'la description' },
     { cles: ['mission'], label: 'la mission' },
-    { cles: ['historique'], label: 'l\'historique' },
+    { cles: ['historique'], label: 'Notre histoire' },   // 2026-11-15 : même nom que la section de la fiche (« 📖 Notre histoire »), plus « l'historique », ambigu
     { cles: ['logo_url'], label: 'le logo' },
     { cles: ['site_web'], label: 'le site web' },
     { cles: ['adresse'], label: 'l\'adresse' },
