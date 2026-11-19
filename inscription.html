@@ -987,6 +987,8 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
         <div class="success-icon" id="success-icon">&#127881;</div>
         <h3 id="success-title">Compte cree !</h3>
         <p id="success-msg">Bienvenue sur Diaspo'Actif.</p>
+        <!-- Proposition de télécharger l'application à la fin de la création du compte (2026-11-19) : posée par assets/invitation-telechargement.js -->
+        <div id="success-telecharger"></div>
         <button class="btn btn-orange" id="success-btn">Acceder a la plateforme</button>
         <div id="success-identity-box" style="display:none;margin-top:28px;padding-top:24px;border-top:1px solid var(--border);text-align:left;">
           <div style="display:flex;align-items:flex-start;gap:12px;">
@@ -1097,6 +1099,7 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/geo.js"></script>
 <script src="assets/app.js?v=13"></script>
+<script src="assets/invitation-telechargement.js?v=1" defer></script>
 <script>
 /* Colonne de droite : 4 comptes réels à découvrir (2 initiatives + 2 utilisateurs avec photo), tirés par le serveur comme sur l'accueil (/api/talents-diaspora,
    rotation stable 2 h) et présentés avec les vraies cartouches de l'annuaire. Sans réponse ou sans compte : le bloc reste caché. */
@@ -1626,6 +1629,9 @@ async function submitForm(btnId,errId,body){
     const redirectApres = (() => { try { const r = new URLSearchParams(location.search).get("redirect"); return (r && /^\/[^/\\]|^[a-z0-9_-]+\.html/i.test(r) && !/^\/\//.test(r)) ? r : null; } catch(e) { return null; } })();
     document.getElementById("success-btn").onclick=()=>window.location.href=redirectApres||ROLE_DASHBOARD[role]||"index.html";
     document.getElementById("success-identity-box").style.display = (role==="utilisateur") ? "block" : "none";
+    /* Compte créé : proposer tout de suite de télécharger l'application (le bandeau flottant du formulaire laisse la place à la carte). */
+    window.__daInvSansBandeau = true;
+    try { if (window.DAInvitation) window.DAInvitation.carte(document.getElementById("success-telecharger")); } catch(e) { /* la proposition ne doit jamais bloquer la fin de l'inscription */ }
     goToStep(3);
   }catch(err){
     /* Bug réel signalé (2026-10-24, capture : "Failed to fetch" affiché tel quel sur le
