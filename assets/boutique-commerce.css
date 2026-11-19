@@ -493,3 +493,27 @@ body.bq .bq-membre .bq-bouton{position:absolute;right:12px;bottom:18px;z-index:2
   body.bq .bq-membre ul{width:100%;flex:none;border-left:0;padding-left:0}
   body.bq .bq-membre .bq-bouton{width:100%;justify-content:center}
 }
+
+/* ── Téléphone (2026-11-19) : cartes produit sans débordement ──
+   Sur un écran étroit, deux cartes côte à côte laissent environ 145 px de large : les deux boutons « Détails » et « Ajouter au panier » (ou « Contacter »)
+   ne tenaient pas sur une ligne et sortaient du cadre de la carte. On les empile (l'action principale en premier), les colonnes se rétractent
+   (minmax(0,1fr)) et les textes passent à la ligne. Ce bloc est volontairement en dernier : il doit passer après les règles « 1fr 1.3fr » de plus haut. */
+@media (max-width:640px){
+  .bq-grille,.bq-recents{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .bq-produit,.bq-recent{min-width:0;padding:8px 8px 10px;border-radius:14px}
+  .bq-produit .bq-vignette,.bq-recent .bq-vignette{aspect-ratio:4/3;margin-bottom:10px}
+  .bq-etiquette{left:6px;top:6px;padding:3px 9px;font-size:10px;max-width:calc(100% - 52px)}
+  .bq-coeur{right:6px;top:6px;width:32px;height:32px}
+  .bq-coeur .ic{width:17px;height:17px}
+  .bq-produit h3,.bq-recent h3{font-size:14.5px;margin-bottom:4px}
+  .bq-produit .desc{font-size:12.5px;margin-bottom:8px}
+  .bq-prix{font-size:17px}
+  .bq-prix.demande{font-size:15.5px;white-space:normal}
+  .bq-actions{grid-template-columns:minmax(0,1fr);gap:6px;margin-top:10px}
+  .bq-actions .plein{order:-1}
+  .bq-actions button,.bq-actions a{width:100%;min-width:0;min-height:42px;padding:6px 8px;font-size:13px}
+  .bq-actions .ic{width:16px;height:16px;flex:none}
+  .bq-recent .bas{padding-top:6px}
+  .bq-recent .bq-prix{font-size:16.5px}
+  .bq-panier-rond{width:40px;height:40px}
+}

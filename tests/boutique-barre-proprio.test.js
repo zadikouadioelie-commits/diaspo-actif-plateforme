@@ -64,6 +64,17 @@ test('B5 les 6 pages boutique chargent la barre après leur script', () => {
   });
 });
 
+test('B7 la barre ne parle plus d\'« ancienne vue » et tient sur une rangée au téléphone ; les cartes ne débordent plus', () => {
+  const js = lire('assets/boutique-barre-proprio.js');
+  assert.ok(!/Ancienne vue d.édition<\/a>/.test(js), 'le libellé « Ancienne vue d\'édition » ne doit plus être proposé');
+  assert.match(js, /Mes produits/);
+  assert.match(js, /grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
+  const css = lire('assets/boutique-commerce.css');
+  const bloc = css.slice(css.lastIndexOf('Téléphone (2026-11-19)'));
+  assert.match(bloc, /\.bq-actions\{grid-template-columns:minmax\(0,1fr\)/);
+  assert.match(bloc, /\.bq-actions \.plein\{order:-1\}/);
+});
+
 test('B6 « Gérer mes vidéos » ne renvoie plus en boucle vers la nouvelle page', () => {
   const s = lire('assets/boutique-video.js');
   assert.ok(s.includes('profil.html?vitrine=1&edition=1">Gérer mes vidéos'));
