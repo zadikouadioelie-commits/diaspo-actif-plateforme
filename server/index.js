@@ -258,11 +258,16 @@ async function readBody(req) {
   const maxBody = bigPath ? 25e6 : kofiFichiers ? 5e6 : retourPhoto ? 2e6 : 1e6;
   req._bodyPromise = new Promise((resolve, reject) => {
     let body = "";
+    /* Corps trop gros (2026-11-20) : AVANT, la connexion était coupée sans réponse (504 après 30 s en production) et la personne ne savait pas pourquoi. Maintenant on arrête de lire,
+       on note le dépassement (req._tropGros) et on rend la main tout de suite : la garde générale répond 413 avec un message clair (voir plus bas, juste après readBody). */
+    let depasse = false;
     req.on("data", (chunk) => {
+      if (depasse) return;
       body += chunk;
-      if (body.length > maxBody) req.destroy();
+      if (body.length > maxBody) { depasse = true; body = ""; req._tropGros = { kofiFichiers, maxBody }; req.resume(); resolve({}); }
     });
     req.on("end", () => {
+      if (depasse) return;
       if (!body) return resolve({});
       try { resolve(JSON.parse(body)); } catch (e) { resolve({}); }
     });
@@ -36726,6 +36731,14 @@ ${jsonLd}
     const isMultipart = (req.headers["content-type"] || "").startsWith("multipart/form-data");
     if (!isMultipart && (req.method === "POST" || req.method === "PUT" || req.method === "PATCH" || req.method === "DELETE")) {
       await readBody(req);
+      /* Envoi trop volumineux : réponse claire (413) au lieu d'une connexion coupée. Le message dit quoi faire, selon la route. */
+      if (req._tropGros) {
+        const mo = Math.round((req._tropGros.kofiFichiers ? 3 : req._tropGros.maxBody / 1e6) * 10) / 10;
+        const message = req._tropGros.kofiFichiers
+          ? "Les fichiers joints sont trop lourds (3 Mo au total au maximum). Réduisez le PDF (moins de pages ou une meilleure compression) ou envoyez une photo plus légère."
+          : `Ce que vous essayez d'envoyer est trop volumineux (${mo} Mo au maximum). Choisissez un fichier plus léger et réessayez.`;
+        return sendJSON(res, 413, { error: message, code: "trop_volumineux" });
+      }
     }
 
     /* Modèle de référence (2026-10-17, demande explicite) : un business plan is_public=1 est un EXEMPLE — lecture seule pour TOUS les comptes, y compris son

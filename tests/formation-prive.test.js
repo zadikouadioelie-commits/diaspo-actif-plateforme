@@ -76,7 +76,7 @@ test('fichiers privés des cours', async (t) => {
     fid = (await call(jarF, 'POST', '/api/formations', { titre: 'Privé ' + rnd, description: 'x' })).data.id;
     const mid = (await call(jarF, 'POST', `/api/formations/${fid}/modules`, { titre: 'M' })).data.id;
     ch = (await call(jarF, 'POST', `/api/formations/${fid}/modules/${mid}/chapitres`, { titre: 'C' })).data.id;
-    const lecon = async extra => { const r = await call(jarF, 'POST', `/api/formations/${fid}/chapitres/${ch}/lecons`, { titre: 'L', ...extra }); assert.equal(r.status, 201, JSON.stringify(r.data)); return r.data.id; };
+    const lecon = async extra => { const r = await call(jarF, 'POST', `/api/formations/${fid}/chapitres/${ch}/lecons`, { titre: 'L', apercu_gratuit: false /* les 3 premières leçons sont offertes par défaut depuis le 2026-10-31 */, ...extra }); assert.equal(r.status, 201, JSON.stringify(r.data)); return r.data.id; };
     lPdf = await lecon({ type: 'pdf', contenu_url: refPdf, telechargement_autorise: true });
     lXlsx = await lecon({ type: 'telechargement', contenu_url: refXlsx, doc_integre: true, telechargement_autorise: false });
     lApercu = await lecon({ type: 'pdf', contenu_url: refPdf, apercu_gratuit: true });

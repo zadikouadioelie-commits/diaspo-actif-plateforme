@@ -214,6 +214,7 @@ function reponseFausseSondages({ systeme, messages }) {
   const q = (dernier.split("<demande>")[1] || dernier).split("</demande>")[0];
   const entree = Math.ceil((String(systeme).length + messages.reduce((a, m) => a + JSON.stringify(m.content).length, 0)) / 4);
   if (/PANNEFAUSSE/.test(q)) throw new KofiIAErreur("indisponible", "Panne simulée.");
+  if (/REQUETEFAUSSE/.test(q)) throw new KofiIAErreur("requete", "Requête refusée par le fournisseur (simulée).");
   if (/LIMITEFAUSSE/.test(q)) throw new KofiIAErreur("limite", "Limite simulée.");
   if (/REFUSFAUX/.test(q)) return { texte: "", entree, sortie: 5, lecture_cache: 0, refus: true, arret: "refusal" };
   const prec = (() => { try { return JSON.parse(((/<brouillon_precedent>([\s\S]*?)<\/brouillon_precedent>/.exec(dernier) || [])[1]) || "{}"); } catch (e) { return {}; } })();

@@ -29,6 +29,8 @@ test('Pièces jointes de messages (25 Mo) : un corps de 1,5 Mo n\'est pas coupé
   assert.ok(r.status >= 400 && r.status < 500, 'réponse normale du serveur (401/403/404), pas une connexion coupée — reçu ' + r.status);
 });
 
-test('Un corps trop gros pour une route ordinaire reste refusé (plafond 1 Mo conservé)', async () => {
-  await assert.rejects(() => poster('/api/auth/login?path=auth%2Flogin', corps(1.5)), 'la connexion est coupée comme avant');
+test('Un corps trop gros pour une route ordinaire reste refusé (plafond 1 Mo conservé), avec une réponse claire 413', async () => {
+  const r = await poster('/api/auth/login?path=auth%2Flogin', corps(1.5));
+  assert.equal(r.status, 413);
+  assert.equal((await r.json()).code, 'trop_volumineux');
 });

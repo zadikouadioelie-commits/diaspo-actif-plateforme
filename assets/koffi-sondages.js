@@ -36,7 +36,11 @@
     questionsTitre: 'Questions', lieuxTitre: 'Où il sera affiché', ouvrirSondage: 'Voir le sondage',
     joindre: 'Joindre un document', joindreTitre: 'Joindre un PDF ou une photo (JPEG, PNG) que Koffi va lire', couv: 'Image de couverture', couvTitre: 'Joindre l\'image de couverture du sondage',
     retirer: 'Retirer ce fichier', fichierLourd: 'Ce fichier est trop lourd (3 Mo au maximum pour l\'ensemble des fichiers). Réduisez le PDF ou choisissez une photo plus légère.',
-    fichierFormat: 'Je ne sais lire que les PDF et les photos JPEG ou PNG.', fichierTrop: 'Trois fichiers au plus à la fois.', fichierLecture: 'Impossible de lire ce fichier.',
+    /* Chaque refus nomme le fichier concerné et dit quoi faire ({nom}, {taille} remplacés par msgFichier). */
+    fichierFormat: '« {nom} » n\'est pas pris en compte : je ne sais lire que les PDF et les photos JPEG ou PNG.', fichierTrop: 'Trois fichiers au plus à la fois : « {nom} » n\'a pas été ajouté.', fichierLecture: 'Impossible de lire « {nom} ». Essayez à nouveau ou choisissez un autre fichier.',
+    fichierLourdNom: '« {nom} » ({taille}) est trop lourd : les fichiers joints ne peuvent pas dépasser 3 Mo au total. Réduisez le PDF (moins de pages, meilleure compression) ou choisissez une photo plus légère.',
+    envoiTropGros: 'Les fichiers joints sont trop lourds pour être envoyés (3 Mo au total au maximum). Retirez-en un ou réduisez-les, puis réessayez.',
+    envoiDelai: 'Le serveur n\'a pas répondu à temps. Si vous avez joint un fichier, il est peut-être trop lourd : essayez avec un fichier plus léger (3 Mo au maximum).',
     couvAttendue: 'Koffi attend votre image de couverture : joignez-la avec « Image de couverture », ou répondez « sans image ».'
   };
 
@@ -291,24 +295,33 @@
     });
   }
   function octets(dataUrl) { var b = String(dataUrl).split(',')[1] || ''; return Math.floor(b.length * 3 / 4); }
+  /* Message de refus qui NOMME le fichier (et son poids) : « {nom} » / {taille} remplacés. */
+  function msgF(modele, file, poids) {
+    var o = Number(poids || (file && file.size) || 0);
+    var taille = o >= 1e6 ? (Math.round(o / 1e5) / 10 + ' Mo').replace('.', ',') : (o ? Math.max(1, Math.round(o / 1000)) + ' Ko' : '');
+    return String(modele).replace('{nom}', String((file && file.name) || 'ce fichier').slice(0, 60)).replace(' ({taille})', taille ? ' (' + taille + ')' : '').replace('{taille}', taille);
+  }
   function ajouterFichiers(liste, role) {
     var files = Array.prototype.slice.call(liste || []);
     if (role === 'couverture') S.fichiers = S.fichiers.filter(function (f) { return f.role !== 'couverture'; });
     var suite = Promise.resolve();
     files.forEach(function (file) {
       suite = suite.then(function () {
-        if (S.fichiers.length >= MAX_FICHIERS) { ajouterMessage({ role: 'assistant', contenu: T.fichierTrop }); return; }
+        if (S.fichiers.length >= MAX_FICHIERS) { ajouterMessage({ role: 'assistant', contenu: msgF(T.fichierTrop, file) }); return; }
         var type = String(file.type || '').toLowerCase();
         var okType = /^application\/pdf$/.test(type) || /^image\/(jpeg|png)$/.test(type) || /\.(pdf|jpe?g|png)$/i.test(file.name || '');
-        if (!okType || (role === 'couverture' && /pdf/i.test(type + file.name))) { ajouterMessage({ role: 'assistant', contenu: T.fichierFormat }); return; }
+        if (!okType || (role === 'couverture' && /pdf/i.test(type + file.name))) { ajouterMessage({ role: 'assistant', contenu: msgF(T.fichierFormat, file) }); return; }
+        /* Contrôle AVANT lecture : un PDF part tel quel (3 Mo au plus) ; une photo est réduite ensuite, mais on ne charge pas en mémoire un fichier énorme. */
+        var pdfNom = /pdf/i.test(type + (file.name || ''));
+        if (file.size && (pdfNom ? file.size > MAX_OCTETS : file.size > 30 * 1000 * 1000)) { ajouterMessage({ role: 'assistant', contenu: msgF(T.fichierLourdNom, file) }); return; }
         return lireDataUrl(file).then(function (d) {
           var estPdf = /^data:application\/pdf/i.test(d) || /\.pdf$/i.test(file.name || '');
           return (estPdf ? Promise.resolve(d) : reduirePhoto(d)).then(function (dd) {
             var total = octets(dd); S.fichiers.forEach(function (f) { total += octets(f.data); });
-            if (total > MAX_OCTETS) { ajouterMessage({ role: 'assistant', contenu: T.fichierLourd }); return; }
+            if (total > MAX_OCTETS) { ajouterMessage({ role: 'assistant', contenu: msgF(T.fichierLourdNom, file, octets(dd)) }); return; }
             S.fichiers.push({ nom: String(file.name || 'fichier').slice(0, 80), data: dd, role: role === 'couverture' ? 'couverture' : 'lire' });
           });
-        }).catch(function () { ajouterMessage({ role: 'assistant', contenu: T.fichierLecture }); });
+        }).catch(function () { ajouterMessage({ role: 'assistant', contenu: msgF(T.fichierLecture, file) }); });
       });
     });
     return suite.then(majPuces);
@@ -343,9 +356,9 @@
         var code = r.data && r.data.code;
         if (code === 'credits_epuises') { if (S.etat) { S.etat.etat = 'recharge'; if (r.data.portefeuille) S.etat.portefeuille = r.data.portefeuille; } construireCorps(); }
         else if (code === 'majorite_requise' || code === 'mineur' || code === 'pays_non_pris_en_charge') { chargerEtat().then(construireCorps); }
-        else ajouterMessage({ role: 'assistant', contenu: (r.data && r.data.error) || (r.status === 429 ? T.trop : T.erreur) });
+        else ajouterMessage({ role: 'assistant', contenu: (r.data && r.data.error) || (r.status === 413 ? T.envoiTropGros : (r.status === 504 || r.status === 502) ? T.envoiDelai : r.status === 429 ? T.trop : T.erreur) });
       }
-    }).catch(function () { att.remove(); S.msgs.pop(); S.fichiers = fichiers.concat(S.fichiers); majPuces(); ajouterMessage({ role: 'assistant', contenu: T.erreur }); })
+    }).catch(function () { att.remove(); S.msgs.pop(); S.fichiers = fichiers.concat(S.fichiers); majPuces(); ajouterMessage({ role: 'assistant', contenu: fichiers.length ? T.envoiDelai : T.erreur }); })
       .then(function () { S.occupe = false; var ok = S.etat && (S.etat.etat === 'utilisable' || S.etat.etat === 'recharge'); $('.ks-send').disabled = !ok; if (ok) ta.focus(); });
   }
 

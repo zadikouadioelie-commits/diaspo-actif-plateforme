@@ -27,7 +27,7 @@ test('documents : accès, PDF, Excel, téléchargement', async (t) => {
   const call = env.call;
   let fid, mid, ch; const L = {}; const ids = {};
   const base = id => `/api/formations/${fid}/lecons/${id}/document`;
-  const lecon = async (cle, extra) => { const r = await call(jarF, 'POST', `/api/formations/${fid}/chapitres/${ch}/lecons`, { titre: 'Leçon ' + cle, type: 'telechargement', ...extra }); assert.equal(r.status, 201, JSON.stringify(r.data)); L[cle] = r.data.id; return r.data.id; };
+  const lecon = async (cle, extra) => { const r = await call(jarF, 'POST', `/api/formations/${fid}/chapitres/${ch}/lecons`, { titre: 'Leçon ' + cle, type: 'telechargement', apercu_gratuit: false /* depuis le 2026-10-31 les 3 premières leçons sont offertes par défaut : ici seules celles qui le demandent le sont */, ...extra }); assert.equal(r.status, 201, JSON.stringify(r.data)); L[cle] = r.data.id; return r.data.id; };
   const pdf = F.pdf(['Premier chapitre', 'Deuxième chapitre', 'Troisième chapitre']);
   const classeur = F.classeur({ styles: F.STYLES, feuilles: [
     { nom: 'Prévisions', largeurs: [28, 16, 12], merges: ['A1:C1'], lignes: [[{ v: 'Prévision financière', s: 1 }], ['Chiffre d\'affaires', { v: 120000, s: 5 }], ['Charges', { v: 90000, s: 5 }], ['Bénéfice net', { v: 30000, s: 5, f: 'B2-B3' }]] },

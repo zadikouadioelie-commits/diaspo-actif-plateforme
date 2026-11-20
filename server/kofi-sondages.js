@@ -466,6 +466,8 @@ module.exports.register = function register(deps) {
       if (lot) await K.rendre(db, lot.id);
       if (e instanceof IA.KofiIAErreur) {
         if (e.code !== "limite") console.error("[Koffi sondages] IA :", e.code, e.message);
+        /* Le fournisseur a refusé la requête (document abîmé, illisible, trop riche en contenu…) : on le dit, au lieu d'un faux « indisponible ». Crédit rendu plus haut. */
+        if (e.code === "requete" && (lu.blocs.length || couvertureData)) return sendJSON(res, 422, { error: "Je n'ai pas pu lire ce document : il est peut-être abîmé, trop dense ou dans une forme que je ne sais pas traiter. Essayez un autre fichier, un PDF plus court, ou une photo de la page. Votre crédit n'a pas été décompté.", code: "fichier_illisible" });
         return sendJSON(res, e.code === "limite" ? 429 : 503, { error: "Koffi est momentanément indisponible. Votre crédit n'a pas été décompté : réessayez dans un instant.", code: e.code === "limite" ? "limite" : "indisponible" });
       }
       throw e;

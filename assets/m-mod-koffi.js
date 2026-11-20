@@ -21,7 +21,7 @@
   const chargerAnnuaire = () => charger('/assets/koffi-annuaire.js?v=5', () => !!window.KoffiAnnuaire);
   const chargerEvenements = () => charger('/assets/koffi-evenements.js?v=5', () => !!window.KoffiEvenements);
   const chargerInscriptions = () => charger('/assets/koffi-inscriptions.js?v=2', () => !!window.KoffiInscriptions);
-  const chargerSondages = () => charger('/assets/koffi-sondages.js?v=1', () => !!window.KoffiSondages);
+  const chargerSondages = () => charger('/assets/koffi-sondages.js?v=2', () => !!window.KoffiSondages);
 
   /* Tous les boutons Koffi du téléphone se déplacent au doigt ; une seule position mémorisée pour qu'il reste où on l'a posé d'un écran à l'autre. */
   const CLE_POS = 'da_koffi_pos_tel';
