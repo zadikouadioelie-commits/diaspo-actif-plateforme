@@ -2206,6 +2206,9 @@ function renderFields() {
   if (!type) return `${iaConsigne("Choisissez les informations que vous demandez à vos participants (identité, contact, etc.), en plus de nom/prénom/e-mail/téléphone toujours demandés.")}<div style="color:oklch(0.55 0.006 30);">Créez d'abord un type d'inscription (onglet précédent).</div>`;
   const fields = type.champs || [];
   const autresTypes = types.filter(t => Number(t.id) !== Number(type.id));
+  /* État du bouton-bascule "Consentement photo/vidéo" (2026-11-20, demande explicite : le bouton
+     doit montrer clairement s'il est activé ou désactivé, pas juste réagir au clic). */
+  const consentPhotoVideoActif = fields.some(f => String(f.libelle || '').toLowerCase().includes('autorisation de captation photo et vidéo'));
   const fieldsHtml = fields.map((f, i) => {
     let nbUniverselles = 0;
     if (f.type_champ === 'options_payantes' || f.type_champ === 'liens_utiles') {
@@ -2273,10 +2276,18 @@ function renderFields() {
           <button style="background:#fff; border:1.5px solid #0E8F8F; color:#0B6E6E; font-size:12.5px; font-weight:700; padding:6px 13px; border-radius:8px; cursor:pointer; box-shadow:0 0 6px rgba(14,143,143,.35);" data-action="ajouterCommentaireLibre">💬 Commentaire libre</button>
           <!-- "💛 Don / Cagnotte" (2026-10-07, demande explicite) — relie ce formulaire à un don ou une cagnotte, ou en crée un(e) sur place. -->
           <button style="background:#fff; border:1.5px solid #E3B84A; color:#8A5A00; font-size:12.5px; font-weight:700; padding:6px 13px; border-radius:8px; cursor:pointer; box-shadow:0 0 6px rgba(227,184,74,.5);" data-action="ouvrirDonCagnotte">💛 Don / Cagnotte</button>
-          <!-- "📸 Consentement photo/vidéo" (2026-11-20, demande explicite) — ajoute en un clic une question de
-               consentement à choix unique (J'accepte / Je refuse), obligatoire pour forcer une réponse explicite
-               de la personne, qui reste libre de refuser. -->
-          <button style="background:#fff; border:1.5px solid #D6336C; color:#A8124F; font-size:12.5px; font-weight:700; padding:6px 13px; border-radius:8px; cursor:pointer; box-shadow:0 0 6px rgba(214,51,108,.4);" data-action="ajouterConsentementPhotoVideo">📸 Consentement photo/vidéo</button>
+          <!-- "📸 Consentement photo/vidéo" (2026-11-20, demande explicite : "je ne sais pas si ça a été pris en
+               compte" — remplacé par une vraie case à cocher, avec un état Activé/Désactivé écrit en toutes
+               lettres sous le libellé, qui ajoute/retire le champ du formulaire au lieu d'un simple clic
+               "muet". Le champ reste une question à choix unique obligatoire (Oui, j'autorise. / Non, je
+               n'autorise pas.) sur le formulaire public — seul ce bouton de gestion devient une bascule. -->
+          <label style="display:flex; flex-direction:column; align-items:center; gap:2px; padding:6px 13px; border-radius:8px; cursor:pointer; background:#fff; border:1.5px solid #D6336C; box-shadow:0 0 6px rgba(214,51,108,.4);">
+            <span style="display:flex; align-items:center; gap:7px; font-size:12.5px; font-weight:700; color:#A8124F;">
+              <input type="checkbox" ${consentPhotoVideoActif ? 'checked' : ''} data-action="toggleConsentementPhotoVideo" style="width:16px; height:16px; accent-color:#D6336C; cursor:pointer;"/>
+              📸 Consentement photo/vidéo
+            </span>
+            <span style="font-size:10.5px; font-weight:700; color:${consentPhotoVideoActif ? '#1C8A0E' : '#B91C1C'};">État : ${consentPhotoVideoActif ? 'Activé' : 'Désactivé'}</span>
+          </label>
         </div>
         ${panelSuggestions}
       </div>
@@ -4088,23 +4099,34 @@ Si des candidats ont déjà déposé leur version remplie de ce document, ces d�
       await iaChargerFiche(state.selectedFicheId);
     } catch (e) { ia_toast(e.message, false); }
   },
-  /* Consentement photo/vidéo (2026-11-20, demande explicite) : texte intégral fourni par l'utilisateur
-     (notice + question), affiché tel quel comme libellé du champ — ipChampHtml() place le libellé AVANT
-     le select, donc c'est la seule façon d'afficher la notice avant les 2 options sans toucher au gabarit
-     générique des champs. obligatoire:true pour que chacun se prononce explicitement, mais le refus reste
-     une réponse valide et n'empêche jamais l'inscription (voir .ip-champ label{white-space:pre-line} ajouté
-     dans inscription-publique.html pour que les sauts de ligne de la notice s'affichent). Un seul par type. */
-  async ajouterConsentementPhotoVideo() {
+  /* Consentement photo/vidéo (2026-11-20, demande explicite ; bascule ajoutée le même jour suite à
+     "je ne sais pas si ça a été pris en compte") : vraie case à cocher — activer crée le champ, désactiver
+     le supprime, et l'état Activé/Désactivé affiché sous le libellé reflète toujours la vraie présence du
+     champ (recalculé à chaque rendu depuis type.champs, jamais un simple état visuel local). Texte intégral
+     fourni par l'utilisateur (notice + question) utilisé comme libellé du champ — ipChampHtml() place le
+     libellé AVANT le select, donc c'est la seule façon d'afficher la notice avant les 2 options sans toucher
+     au gabarit générique des champs. obligatoire:true pour que chacun se prononce explicitement une fois
+     activé, mais le refus reste une réponse valide et n'empêche jamais l'inscription (voir .ip-champ
+     label{white-space:pre-line} ajouté dans inscription-publique.html pour que les sauts de ligne de la
+     notice s'affichent). Un seul par type. */
+  async toggleConsentementPhotoVideo(el) {
     const type = selectedType(); if (!type) return;
-    if ((type.champs || []).some(c => String(c.libelle || '').toLowerCase().includes('autorisation de captation photo et vidéo'))) { ia_toast('Ce formulaire a déjà la question de consentement photo/vidéo.', false); return; }
+    const champ = (type.champs || []).find(c => String(c.libelle || '').toLowerCase().includes('autorisation de captation photo et vidéo'));
     try {
-      await api('POST', `/insc/types/${type.id}/champs`, {
-        libelle: "📸 Autorisation de captation photo et vidéo\n\nDans le cadre de cet événement, des photographies et des vidéos pourront être réalisées afin d'en valoriser les moments forts et d'en assurer la promotion.\n\nRassurez-vous : ces prises de vue n'ont pas pour objectif de vous photographier ou de vous filmer individuellement. Toutefois, vous pourriez apparaître de manière occasionnelle, de face ou de dos, sur des photos de groupe, des plans d'ensemble ou des vidéos d'ambiance.\n\nCes images pourront être diffusées sur les réseaux sociaux, les sites internet et les supports de communication de l'organisateur, uniquement à des fins d'information et de promotion de l'événement, sans exploitation commerciale de votre image.\n\nVotre accord nous permet de partager les moments forts de cette rencontre tout en respectant votre vie privée et votre droit à l'image.\n\nAutorisez-vous l'utilisation éventuelle de votre image dans les conditions décrites ci-dessus ?",
-        type_champ: 'choix_unique', obligatoire: true, options: ["Oui, j'autorise.", "Non, je n'autorise pas."],
-      });
-      ia_toast('Question de consentement photo/vidéo ajoutée.', true);
+      if (el.checked) {
+        if (!champ) {
+          await api('POST', `/insc/types/${type.id}/champs`, {
+            libelle: "📸 Autorisation de captation photo et vidéo\n\nDans le cadre de cet événement, des photographies et des vidéos pourront être réalisées afin d'en valoriser les moments forts et d'en assurer la promotion.\n\nRassurez-vous : ces prises de vue n'ont pas pour objectif de vous photographier ou de vous filmer individuellement. Toutefois, vous pourriez apparaître de manière occasionnelle, de face ou de dos, sur des photos de groupe, des plans d'ensemble ou des vidéos d'ambiance.\n\nCes images pourront être diffusées sur les réseaux sociaux, les sites internet et les supports de communication de l'organisateur, uniquement à des fins d'information et de promotion de l'événement, sans exploitation commerciale de votre image.\n\nVotre accord nous permet de partager les moments forts de cette rencontre tout en respectant votre vie privée et votre droit à l'image.\n\nAutorisez-vous l'utilisation éventuelle de votre image dans les conditions décrites ci-dessus ?",
+            type_champ: 'choix_unique', obligatoire: true, options: ["Oui, j'autorise.", "Non, je n'autorise pas."],
+          });
+        }
+        ia_toast('Consentement photo/vidéo activé.', true);
+      } else {
+        if (champ) await api('DELETE', `/insc/champs/${champ.id}`);
+        ia_toast('Consentement photo/vidéo désactivé.', true);
+      }
       await iaChargerFiche(state.selectedFicheId);
-    } catch (e) { ia_toast(e.message, false); }
+    } catch (e) { el.checked = !el.checked; ia_toast(e.message, false); }
   },
   /* Mini-formulaire de candidature (2026-10-06) — chaque action relit d'abord les saisies en cours (l'écran est
      reconstruit après chaque action), puis modifie l'état local ; seul « Enregistrer » écrit côté serveur. */
