@@ -246,7 +246,10 @@ async function readBody(req) {
   // Idempotent : si le corps a déjà été bufferisé (cold-start Vercel), on le retourne directement
   if (req._bodyPromise) return req._bodyPromise;
   // Certains chemins envoient des médias en base64 (messages vocaux/pièces jointes) → plafond élargi
-  const u = req.url || "";
+  /* Chemin SANS la query : sur Vercel la réécriture /api/:path* → /api/index ajoute « ?path=… » à req.url (visible dans le journal d'erreurs). Comparé tel quel, le chemin ne
+     correspondait jamais en production : les plafonds élargis ci-dessous n'y valaient pas, tout corps > 1 Mo (PDF de Koffi, pièces jointes, photo de réclamation) restait sans réponse
+     jusqu'au délai de 30 s (504). Corrigé le 2026-11-20. */
+  const u = (req.url || "").split("?")[0];
   const bigPath = /^\/api\/conversations\/\d+\/messages$/.test(u);
   /* Koffi des sondages : PDF/photos joints (3 Mo au plus, soit ~4 Mo en base64 ; plafond de la plateforme 4,5 Mo) */
   const kofiFichiers = u === "/api/kofi/sondages/messages";
