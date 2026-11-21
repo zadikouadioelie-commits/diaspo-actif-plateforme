@@ -311,6 +311,8 @@
     if (S.me && window.DaNotifInvite) window.DaNotifInvite.proposer(S.me);
     /* Publication préparée automatiquement (2026-11-12) : fenêtre « Votre publication est prête » (2 propositions au plus, comptes sans publication) — assets/m-mod-proposition-publication.js. */
     if (S.me && window.MPropPub) window.MPropPub.proposer(S.me);
+    /* Cartouche « Faites le compte-rendu de votre événement » (2026-11-21, demande explicite) : créateur d'un événement terminé sans compte-rendu publié — assets/cr-rappel-carte.js, règles dans server/cr-rappel.js. */
+    if (S.me && window.DACrRappel) window.DACrRappel.demarrer();
     renderTop();
   }
   async function loadMyInsc() {

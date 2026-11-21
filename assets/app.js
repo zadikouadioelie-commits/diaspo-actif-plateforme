@@ -1132,6 +1132,18 @@ async function afficherRelanceProfil(user, opts) {
 }
 function esc2Rp(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
+/* Cartouche « Faites le compte-rendu de votre événement » (2026-11-21, demande explicite) : à la connexion, le créateur d'un événement terminé sans
+   compte-rendu publié voit une vraie cartouche (Ignorer / Me le rappeler plus tard / Ne plus afficher), pas seulement une notification.
+   Le script est chargé à la demande ; les règles sont côté serveur (server/cr-rappel.js). */
+function proposerCompteRendu(user) {
+  if (!user) return;
+  const lancer = () => { if (window.DACrRappel) window.DACrRappel.demarrer(); };
+  if (window.DACrRappel) { lancer(); return; }
+  const s = document.createElement('script');
+  s.src = '/assets/cr-rappel-carte.js?v=1'; s.async = true; s.onload = lancer;
+  document.head.appendChild(s);
+}
+
 /* Appelée après chaque enregistrement d'un formulaire du profil : si la personne est en plein
    parcours « relance », la liste revient, mise à jour. Sans parcours en cours, ne fait rien. */
 window.relanceProfilApresSauvegarde = function () {
@@ -2395,7 +2407,7 @@ async function applyAuthState() {
     showEmailVerifBanner(user);
     showOrigineBanner(user);
     afficherBandeauLegal(user);
-    if (!appliquerProfilObligatoire(user)) { afficherRelanceProfil(user); showPremierePublicationBanner(user); proposerPublicationAuto(user); ouvrirAbonnementSiDu(user); proposerNotifications(user); }
+    if (!appliquerProfilObligatoire(user)) { afficherRelanceProfil(user); proposerCompteRendu(user); showPremierePublicationBanner(user); proposerPublicationAuto(user); ouvrirAbonnementSiDu(user); proposerNotifications(user); }
     showPwaInstallBanner(user);
   } else {
     el.innerHTML = `

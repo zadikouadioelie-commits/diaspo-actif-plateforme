@@ -24737,6 +24737,10 @@ route("POST", "/api/admin/evenements/compte-rendu-anciens", async (req, res, par
   catch (e) { sendJSON(res, 500, SEC.safeError(e, "cr-relance-anciens")); }
 });
 
+/* Cartouche de rappel à la connexion (2026-11-21) : le créateur d'un événement terminé sans compte-rendu publié la voit à sa connexion, avec
+   Ignorer / Me le rappeler plus tard / Ne plus afficher (server/cr-rappel.js). Placée ici : CR_LANCEMENT et dateParisISO sont déjà définis. */
+require("./cr-rappel").register({ route, db, sendJSON, getCurrentUser, SEC, dateParisISO, lancement: CR_LANCEMENT });
+
 /* ══════════════════════════════════════════════════════════════════════════
    ANNONCES OFFICIELLES DIASPO'ACTIF (2026-10-05, demande explicite)
    Une annonce officielle est visible par TOUS pendant une durée fixée (un mois par défaut) :
