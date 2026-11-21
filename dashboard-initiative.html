@@ -38,6 +38,7 @@
   <link rel="stylesheet" href="/assets/retours-nuit-doree.css?v=1">
   <link rel="stylesheet" href="/assets/newsletter-init.css?v=1">
   <link rel="stylesheet" href="/assets/boutique-assistant.css?v=1">
+  <link rel="stylesheet" href="/assets/boutique-produits.css?v=1">
 </head>
 <body class="nd">
 <div class="page">
@@ -195,6 +196,7 @@
 <script src="assets/boutique-events-espace.js?v=1"></script>
 <script src="assets/boutique-options-ui.js?v=1"></script>
 <script src="assets/boutique-assistant.js?v=1"></script>
+<script src="assets/boutique-produits.js?v=1"></script>
 <script src="assets/boutique-reglages-ui.js?v=1"></script>
 <script src="assets/soumission-da.js"></script>
 <script src="assets/retours-commun.js?v=1"></script>
@@ -2087,6 +2089,15 @@ async function initRelaisDiasporaWidget(me, api) {
               <button class="btn" id="btn-statut-masque" onclick="definirStatutVitrine(0)" style="flex:1;min-width:180px;justify-content:center;">Non visible</button>
             </div>
             <div id="parametres-vitrine-statut" style="margin-top:12px;font-size:13px;font-weight:700;"></div>
+          </div>
+
+          <!-- ═══ MES PRODUITS (2026-11-21, étape 2) — le propriétaire d'une boutique de vente ajoute, modifie, range et masque ses produits ICI
+               (assets/boutique-produits.js), plus dans l'ancienne vue d'édition du profil. Visible pour les boutiques de vente seulement ;
+               lien direct : dashboard-initiative.html#parametres-vitrine&produits ═══ -->
+          <div class="card" id="pv-produits" style="margin-bottom:20px;display:none;">
+            <h3 style="margin:0 0 4px;font-size:15px;">Mes produits</h3>
+            <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Ajoutez, modifiez et rangez ce que vos visiteurs voient dans votre boutique. Chaque changement apparaît tout de suite dans l'aperçu.</p>
+            <div id="pv-produits-mount"><div class="notice">Chargement…</div></div>
           </div>
 
           <!-- Deux decisions independantes, deliberement separees en deux etapes :
@@ -6449,7 +6460,7 @@ async function initRelaisDiasporaWidget(me, api) {
   });
   /* Section initiale : depuis le hash d'URL si valide (ex. O-Z, liens directs), sinon cockpit */
   function openFromHash() {
-    const h = (location.hash || '').replace('#','');
+    const h = (location.hash || '').replace('#','').split('&')[0];   // « #parametres-vitrine&produits » : la section, puis la rubrique Mes produits
     if (h && (INIT_SECTIONS.includes(h) || h === 'affiliation')) initShowSection(h);   // « affiliation » = onglet de Cotisations & Adhésions (liens des notifications d'invitation)
     else initShowSection('cockpit');
   }
@@ -6641,6 +6652,7 @@ async function loadParametresVitrineFull() {
     renderPvOrderList();
     renderPvThemeSwatches();
     renderPvStylePresets();
+    if (window.PvProduits) PvProduits.monter(init);
     renderPvDraftStatus();
     pvRenderCartouchePreview();
     pvRefreshPreview();
