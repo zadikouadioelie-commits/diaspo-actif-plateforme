@@ -153,10 +153,12 @@
   function entete() {
     var nav = [['Accueil', 'index.html'], ['Boutiques', 'vitrines.html', 1], ['Formations', 'formations.html'], ['Services', 'annuaire.html'], ['Projets diasporas', 'actualites.html'], ['À propos', 'initiative.html?id=' + etat.init.id]];
     var compte = etat.moi ? ('dashboard-' + (etat.moi.role === 'administrateur' ? 'administrateur' : etat.moi.role) + '.html') : 'login.html';
+    /* Téléphone : la place est comptée, on garde un texte court qui s'affiche en entier (le libellé complet reste pour l'accessibilité). */
+    var petit = !!(window.matchMedia && window.matchMedia('(max-width:640px)').matches);
     return '<header class="bq-top"><div class="bq-top-in">' +
       '<a class="bq-marque" href="index.html"><img src="/assets/logo.png" alt=""><b>DIASPO\'ACTIF</b></a>' +
       '<nav class="bq-nav" aria-label="Navigation principale">' + nav.map(function (n) { return '<a href="' + n[1] + '">' + n[0] + (n[2] ? ic('chevron') : '') + '</a>'; }).join('') + '</nav>' +
-      '<form class="bq-rech" id="bq-rech" role="search"><input type="search" id="bq-q" placeholder="Rechercher un produit, une formation…" aria-label="Rechercher dans la boutique" autocomplete="off"><button type="submit" aria-label="Rechercher">' + ic('loupe') + '</button></form>' +
+      '<form class="bq-rech" id="bq-rech" role="search"><input type="search" id="bq-q" placeholder="' + (petit ? 'Rechercher…' : 'Rechercher un produit, une formation…') + '" aria-label="Rechercher un produit ou une formation dans la boutique" autocomplete="off"><button type="submit" aria-label="Rechercher">' + ic('loupe') + '</button></form>' +
       '<div class="bq-icones"><button class="bq-icone" type="button" id="bq-fav-b" aria-label="Mes favoris">' + ic('coeur') + '<span class="bq-pastille" id="bq-fav-n"' + (etat.favoris.length ? '' : ' hidden') + '>' + etat.favoris.length + '</span></button>' +
       '<a class="bq-icone" href="panier.html" aria-label="Mon panier">' + ic('panier') + '<span class="bq-pastille" id="bq-pan-n"' + (etat.panier ? '' : ' hidden') + '>' + etat.panier + '</span></a>' +
       '<a class="bq-compte" href="' + compte + '">' + ic('compte') + '<span>' + (etat.moi ? 'Mon compte' : 'Connexion') + '</span>' + ic('chevron') + '</a></div></div></header>';

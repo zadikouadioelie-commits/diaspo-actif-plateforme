@@ -277,10 +277,25 @@ body.bq img{max-width:100%;display:block}
   .bq-evt .photo{display:none}
 }
 @media (max-width:640px){
-  .bq-top-in{gap:10px;padding:6px 12px}
+  /* Barre du haut sur téléphone (2026-11-21) : une seule rangée, tous les contrôles à 38 px de haut. La recherche n'est plus une grosse
+     pastille blanche : même verre sombre que le reste, texte court qui tient en entier, loupe de 30 px ; le compte devient un rond sans flèche. */
+  .bq-top-in{gap:8px;padding:6px 12px}
+  .bq-marque img{width:40px;height:40px}
   .bq-marque b{display:none}
-  .bq-rech{min-width:0;width:auto;flex:1}
-  .bq-compte span{display:none}
+  .bq-rech{min-width:0;width:auto;flex:1;height:38px;padding:3px 4px 3px 13px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.26);box-sizing:border-box}
+  .bq-rech:focus-within{background:rgba(255,255,255,.16);border-color:var(--bq-or)}
+  /* La feuille « version téléphone des pages du site » (assets/m-site.css) impose à tout champ un fond blanc, 46 px de haut et un cadre, et à tout bouton d'envoi
+     un fond orange de 46 px, avec !important : on la surpasse ici, uniquement pour cette recherche (identifiant + même !important). 16 px conservé = pas de zoom automatique. */
+  html.m-site .bq-rech #bq-q{min-height:0;height:30px;padding:0;border:0 !important;border-radius:0 !important;background:transparent !important;color:#fff;font-size:16px !important;box-shadow:none}
+  html.m-site .bq-rech #bq-q::placeholder{color:rgba(255,255,255,.72);opacity:1}
+  html.m-site .bq-rech button[type=submit]{min-height:0;width:30px;height:30px;padding:0;border:0 !important;border-radius:50% !important;background:var(--bq-bordeaux) !important;color:#fff !important}
+  .bq-rech button .ic{width:16px;height:16px}
+  .bq-icones{gap:2px}
+  .bq-icone{width:38px;height:38px}
+  .bq-compte{position:relative;width:38px;height:38px;min-height:0;padding:0;justify-content:center;border-radius:50%;box-sizing:border-box}
+  .bq-compte::after{content:"";position:absolute;left:50%;top:50%;width:44px;height:44px;transform:translate(-50%,-50%)}
+  html.m-site .bq-top .bq-compte{min-height:38px;height:38px}
+  .bq-compte span,.bq-compte .ic:last-child{display:none}
   .bq-hero-in{grid-template-columns:1fr;text-align:center;justify-items:center;gap:16px;padding:20px 14px}
   .bq-hero-logo{width:128px;height:128px}
   .bq-confiance{justify-content:center}
@@ -516,4 +531,12 @@ body.bq .bq-membre .bq-bouton{position:absolute;right:12px;bottom:18px;z-index:2
   .bq-recent .bas{padding-top:6px}
   .bq-recent .bq-prix{font-size:16.5px}
   .bq-panier-rond{width:40px;height:40px}
+}
+/* Très petits téléphones (< 360 px, 2026-11-21) : on resserre logo et icônes pour que « Rechercher… » reste lisible en entier. */
+@media (max-width:359px){
+  .bq-top-in{gap:6px;padding:6px 8px}
+  .bq-marque img{width:36px;height:36px}
+  .bq-rech{padding-left:11px}
+  html.m-site .bq-rech #bq-q{font-size:14px !important}
+  .bq-icone,.bq-compte,html.m-site .bq-top .bq-compte{width:34px;height:34px;min-height:34px}
 }
