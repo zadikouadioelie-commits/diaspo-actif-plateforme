@@ -7,8 +7,9 @@ const E = require('../assets/bp-enrichi.js');
 
 const bp = (s, extra) => Object.assign({ nom_projet: 'Projet test', sections: s }, extra || {});
 
-test('structure : 20 rubriques, clés valides et uniques, types connus', () => {
-  assert.equal(E.rubriques().length, 20);
+test('structure : 23 rubriques (dont développement, juridique et pilotage), clés valides et uniques, types connus', () => {
+  assert.equal(E.rubriques().length, 23);
+  ['strategie_developpement', 'juridique', 'pilotage'].forEach(r => assert.ok(E.rubriques().includes(r), r));
   const types = ['texte', 'long', 'nombre', 'date', 'choix'];
   for (const r of E.rubriques()) {
     const cles = new Set();

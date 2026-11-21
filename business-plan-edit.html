@@ -667,6 +667,10 @@ body.bp-type-agriculture .bp-conditionnel-agriculture { display: block; }
 <script src="assets/bp-marketing.js?v=1"></script>
 <script src="assets/bp-organisation.js?v=1"></script>
 <script src="assets/bp-enrichi.js?v=1"></script>
+<script src="assets/bp-previsionnel.js?v=1"></script>
+<script src="assets/bp-finance-avancee.js?v=1"></script>
+<script src="assets/bp-dossier-complet.js?v=1"></script>
+<script src="assets/bp-tableaux-excel.js?v=1"></script>
 <script>
 /* ===================================================
    BUSINESS PLAN EDITOR
@@ -696,11 +700,15 @@ const SECTIONS = [
   { key:'organisation', icon:'🏗', label:'Organisation & Gouvernance' },
   { key:'rh', icon:'👥', label:'Ressources humaines' },
   { key:'calendrier', icon:'📅', label:'Calendrier de mise en œuvre' },
+  { key:'strategie_developpement', icon:'🚀', label:'Stratégie de développement (5 ans)' },
   { key:'plan_financier', icon:'💰', label:'Plan financier' },
   { key:'risques', icon:'⚠️', label:'Analyse des risques' },
   { key:'impact', icon:'🌱', label:'Impact' },
   { key:'financement', icon:'🏦', label:'Recherche de financement' },
+  { key:'juridique', icon:'⚖️', label:'Documents juridiques' },
+  { key:'pilotage', icon:'🧭', label:'Pilotage interne' },
   { key:'annexes', icon:'📎', label:'Annexes' },
+  { key:'dossier_complet', icon:'🗂', label:'Dossier complet (62 documents)', noSave:true },
   { key:'test_bp', icon:'🎤', label:'Tester mon business plan', noSave:true },
   { key:'completude', icon:'✅', label:'Vérification complétude', noSave:true },
 ];
@@ -1310,7 +1318,7 @@ function updateField(key, value) {
    (fiches produits, suivi des phases, registre des risques, indicateurs d'impact, registre des annexes)
    prolongent les lignes du tableau existant : elles se rafraîchissent quand on ajoute ou retire une ligne. */
 function enrDonnees(rub) { if (!sections[rub]) sections[rub] = {}; return sections[rub]; }
-function enrChamp(rub, k, v) { enrDonnees(rub)[k] = v; markDirty(); }
+function enrChamp(rub, k, v) { enrDonnees(rub)[k] = v; markDirty(); if (rub === 'plan_financier') faRecalc(); }
 function enrListe(rub, k) {
   const d = enrDonnees(rub), l = BPEnrichi.listeSpec(rub, k);
   if (!Array.isArray(d[k])) d[k] = (l && l.defaut ? l.defaut : []).map(x => Object.assign({}, x));
@@ -1320,9 +1328,9 @@ function enrRerendre(rub, k) {
   const host = document.getElementById('enr-liste-' + rub + '-' + k);
   if (host) host.outerHTML = BPEnrichi.listeEditeurHtml(rub, k, enrDonnees(rub), { esc, ro: monRole === 'lecteur' });
 }
-function enrLigne(rub, k, i, c, v) { const l = enrListe(rub, k); if (!l[i]) l[i] = {}; l[i][c] = v; markDirty(); }
-function enrAjouter(rub, k) { enrListe(rub, k).push(BPEnrichi.nouvelleLigne(BPEnrichi.listeSpec(rub, k))); enrRerendre(rub, k); markDirty(); }
-function enrRetirer(rub, k, i) { enrListe(rub, k).splice(i, 1); enrRerendre(rub, k); markDirty(); }
+function enrLigne(rub, k, i, c, v) { const l = enrListe(rub, k); if (!l[i]) l[i] = {}; l[i][c] = v; markDirty(); if (rub === 'plan_financier') faRecalc(); }
+function enrAjouter(rub, k) { enrListe(rub, k).push(BPEnrichi.nouvelleLigne(BPEnrichi.listeSpec(rub, k))); enrRerendre(rub, k); markDirty(); if (rub === 'plan_financier') faRecalc(); }
+function enrRetirer(rub, k, i) { enrListe(rub, k).splice(i, 1); enrRerendre(rub, k); markDirty(); if (rub === 'plan_financier') faRecalc(); }
 function enrRafraichirBases() {
   if (typeof BPEnrichi === 'undefined' || !BPEnrichi.aDesAjouts(currentSection)) return;
   BPEnrichi.listes(currentSection).filter(l => l.base).forEach(l => enrRerendre(currentSection, l.k));
@@ -1354,6 +1362,285 @@ function enrApercuResume(mode) {
   zone.innerHTML = html || '<p style="color:var(--muted);font-size:12px;">Aucune information à résumer pour le moment.</p>';
 }
 
+/* ═══ Prévisionnel des gains et des dépenses + Excel de tous les tableaux (2026-11-11) ═══
+   Moteur : assets/bp-previsionnel.js (calculs, tableaux, graphique). Excel : assets/bp-tableaux-excel.js.
+   Donnée : sections.plan_financier.prevision (aucune colonne en base). Rien n'est écrit dans le compte de
+   résultat sans le bouton « Reporter » et sa confirmation. */
+function pvObj() {
+  if (!sections.plan_financier) sections.plan_financier = {};
+  const pf = sections.plan_financier;
+  if (!pf.prevision || typeof pf.prevision !== 'object' || !Array.isArray(pf.prevision.sections)) pf.prevision = BPPrevision.modeleParDefaut();
+  pf.prevision.sections.forEach(s => {
+    if (!s.id) s.id = BPPrevision.nouvelId('s');
+    if (!Array.isArray(s.lignes)) s.lignes = [];
+    s.lignes.forEach(l => { if (!l.id) l.id = BPPrevision.nouvelId('l'); });
+  });
+  return pf.prevision;
+}
+const pvSection = sid => pvObj().sections.find(s => s.id === sid);
+const pvLigne = (sid, lid) => { const s = pvSection(sid); return s && s.lignes.find(l => l.id === lid); };
+const pvOpt = (arr, v) => arr.map(a => `<option value="${a[0]}"${a[0] === v ? ' selected' : ''}>${esc(a[1])}</option>`).join('');
+function pvLigneHtml(s, l, ro) {
+  const dis = ro ? ' disabled' : '';
+  const pers = l.frequence === 'personnalise', ponc = l.frequence === 'ponctuel';
+  const postes = s.nature === 'recette' ? BPPrevision.POSTES_RECETTE : BPPrevision.POSTES_DEPENSE;
+  const inp = (k, ph, w, type) => `<input type="${type || 'number'}"${(type || 'number') === 'number' ? ' step="any"' : ''} value="${esc(l[k] === undefined || l[k] === null ? '' : l[k])}" placeholder="${ph}"${dis} style="width:${w}px" oninput="pvChamp('${s.id}','${l.id}','${k}',this.value)">`;
+  const na = '<span style="color:var(--muted);">—</span>';
+  const ans = [1, 2, 3, 4, 5].map(a => pers ? `<td>${inp('v' + a, '0', 84)}</td>` : `<td class="pv-num" id="pv-${l.id}-${a}">—</td>`).join('');
+  return `<tr>
+    <td>${inp('nom', 'Nom de la ligne', 170, 'text')}</td>
+    <td><select${dis} onchange="pvChamp('${s.id}','${l.id}','poste',this.value)">${pvOpt(postes, l.poste)}</select></td>
+    <td><select${dis} onchange="pvFrequence('${s.id}','${l.id}',this.value)">${pvOpt(BPPrevision.FREQUENCES, l.frequence)}</select></td>
+    <td>${pers ? na : inp('montant', '0', 84)}</td><td>${pers ? na : inp('annee_debut', '1', 46)}</td><td>${(pers || ponc) ? na : inp('mois_debut', '1', 46)}</td>
+    <td>${(pers || ponc) ? na : inp('annee_fin', '5', 46)}</td><td>${(pers || ponc) ? na : inp('croissance_pct', '0', 56)}</td>${ans}
+    <td class="pv-num pv-tot" id="pv-${l.id}-t">—</td>
+    <td>${ro ? '' : `<button class="pv-x" title="Supprimer la ligne" onclick="pvRetirerLigne('${s.id}','${l.id}')">✕</button>`}</td></tr>`;
+}
+function pvSectionHtml(s, ro) {
+  const dis = ro ? ' disabled' : '';
+  return `<div class="pv-sec" id="pv-sec-${s.id}">
+    <div class="pv-sec-tete">
+      <input type="text" value="${esc(s.nom || '')}" placeholder="Nom de la section (ex : Ventes en ligne, Loyers, Formation…)"${dis} class="pv-nom" oninput="pvSectionChamp('${s.id}','nom',this.value)">
+      <select${dis} onchange="pvNature('${s.id}',this.value)"><option value="recette"${s.nature === 'recette' ? ' selected' : ''}>Recettes (gains)</option><option value="depense"${s.nature !== 'recette' ? ' selected' : ''}>Dépenses</option></select>
+      ${ro ? '' : `<button class="btn btn-outline btn-sm" onclick="pvAjouterLigne('${s.id}')">+ Ligne</button><button class="pv-x" title="Supprimer la section" onclick="pvRetirerSection('${s.id}')">✕</button>`}
+    </div>
+    <div style="overflow-x:auto;"><table class="fin-table pv-table"><thead><tr><th>Ligne</th><th>Poste</th><th>Fréquence</th><th>Montant</th><th>Début (an)</th><th>Mois</th><th>Fin (an)</th><th>Hausse %/an</th>${[1, 2, 3, 4, 5].map(a => `<th>An ${a}</th>`).join('')}<th>Total</th><th></th></tr></thead>
+    <tbody>${s.lignes.map(l => pvLigneHtml(s, l, ro)).join('') || '<tr><td colspan="15" style="color:var(--muted);font-size:12.5px;">Aucune ligne dans cette section. Cliquez sur « + Ligne ».</td></tr>'}
+    <tr class="total-row"><td colspan="8">Total de la section</td>${[1, 2, 3, 4, 5].map(a => `<td class="pv-num" id="pv-s-${s.id}-${a}">—</td>`).join('')}<td class="pv-num" id="pv-s-${s.id}-t">—</td><td></td></tr></tbody></table></div></div>`;
+}
+function previsionHTML() {
+  const ro = monRole === 'lecteur', pv = pvObj();
+  return `<div class="bp-card-inner" id="pv-carte">
+    <style>${BPPrevision.CSS}.pv-sec{border:1px solid var(--border);border-radius:10px;padding:12px;margin:12px 0;background:var(--bg)}.pv-sec-tete{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px}.pv-nom{font-weight:700;flex:1;min-width:200px}.pv-num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}.pv-tot{font-weight:700}.pv-x{background:none;border:none;cursor:pointer;color:var(--muted);font-size:15px;padding:4px 8px}.pv-table input,.pv-table select{font-size:12.5px;padding:6px 8px;min-width:0;text-align:left}.pv-table select{width:auto;max-width:165px}.pv-table td{padding:4px 5px}.pv-table input[type=number]{text-align:right}#pv-carte{--pv-grille:var(--border);--pv-texte:var(--text,#1c2433)}</style>
+    <h3>📈 Prévisionnel des gains et des dépenses (5 ans)</h3>
+    <p style="font-size:12.5px;color:var(--muted);margin-top:-4px;">Votre espace de calcul. Créez autant de sections que nécessaire (recettes ou dépenses) et, dans chacune, vos lignes : un montant, sa fréquence (chaque mois, trimestre, année, une seule fois ou année par année), son début, sa fin et sa hausse annuelle. Les montants de chaque année, les totaux, le solde, la trésorerie cumulée et les dépenses récurrentes se calculent tout seuls. Aucun montant n'est inventé : une ligne sans montant vaut zéro.</p>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:6px 0;">
+      <label style="font-size:12.5px;">Trésorerie de départ (${bpDeviseRefSymbole()})</label>
+      <input type="number" step="any" value="${esc(pv.tresorerie_depart || '')}" placeholder="0"${ro ? ' disabled' : ''} style="width:140px;" oninput="pvDepart(this.value)">
+      <span style="font-size:11.5px;color:var(--muted);">Facultatif : somme disponible avant la première année (apport, prêt reçu…).</span>
+    </div>
+    <div id="pv-sections">${pv.sections.map(s => pvSectionHtml(s, ro)).join('')}</div>
+    ${ro ? '' : `<div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0;">
+      <button class="btn btn-outline btn-sm" onclick="pvAjouterSection('recette')">+ Ajouter une section de recettes</button>
+      <button class="btn btn-outline btn-sm" onclick="pvAjouterSection('depense')">+ Ajouter une section de dépenses</button>
+      <button class="btn btn-outline btn-sm" onclick="pvReporter()" title="Copie les totaux par poste dans le compte de résultat ci-dessous (avec confirmation)">⤵ Reporter dans le compte de résultat</button>
+    </div>`}
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:4px 0 8px;font-size:12.5px;">
+      <span style="color:var(--muted);">Excel :</span>
+      <button class="btn btn-outline btn-sm" onclick="bpTxExporter('pv',false,'pv-msg')">📥 Modèle vide</button>
+      <button class="btn btn-outline btn-sm" onclick="bpTxExporter('pv',true,'pv-msg')">📥 Mes lignes</button>
+      ${ro ? '' : `<label class="btn btn-outline btn-sm" style="cursor:pointer;margin:0;">📤 Importer<input type="file" accept=".xlsx,.xls" style="display:none;" onchange="bpTxImporter(this,'pv','pv-msg')"></label>`}
+    </div>
+    <div id="pv-msg"></div>
+    <div id="pv-alertes"></div>
+    <div id="pv-synthese"></div>
+  </div>`;
+}
+function pvRerendre() {
+  const host = document.getElementById('pv-sections'); if (!host) return;
+  const ro = monRole === 'lecteur';
+  host.innerHTML = pvObj().sections.map(s => pvSectionHtml(s, ro)).join('');
+  pvRecalc();
+}
+function pvRecalc() {
+  const synth = document.getElementById('pv-synthese'); if (!synth) return;
+  const c = BPPrevision.calculer(pvObj());
+  const fmt = n => fmtEuro(Math.round(n)), cel = (id, v) => { const e = document.getElementById(id); if (e && e.tagName === 'TD') e.textContent = v ? fmt(v) : '—'; };
+  c.sections.forEach(s => {
+    s.lignes.forEach(l => { [1, 2, 3, 4, 5].forEach(a => cel(`pv-${l.id}-${a}`, l.parAn[a - 1])); cel(`pv-${l.id}-t`, l.total); });
+    [1, 2, 3, 4, 5].forEach(a => cel(`pv-s-${s.id}-${a}`, s.parAn[a - 1])); cel(`pv-s-${s.id}-t`, s.total);
+  });
+  const al = document.getElementById('pv-alertes');
+  if (al) al.innerHTML = c.alertes.length ? `<div style="background:#fef3c7;color:#92400e;border-radius:8px;padding:8px 12px;font-size:12.5px;margin:6px 0;">⚠️ ${c.alertes.map(esc).join('<br>⚠️ ')}</div>` : '';
+  if (c.vide) { synth.innerHTML = '<p style="font-size:12.5px;color:var(--muted);margin:10px 0 0;">Saisissez au moins une ligne avec un montant : le tableau de synthèse (recettes, dépenses, solde, trésorerie cumulée) et le graphique apparaîtront ici.</p>'; return; }
+  synth.innerHTML = `<h4 style="margin:14px 0 6px;">Synthèse : gains, dépenses et trésorerie</h4>
+    <div style="overflow-x:auto;">${BPPrevision.tableauSynthese(c, { esc, fmt, cls: 'pv-t' })}</div>
+    <div style="margin:12px 0;">${BPPrevision.svgGraphique(c, { esc })}</div>
+    <ul style="font-size:12.5px;margin:6px 0 0 18px;">${BPPrevision.lecture(c, { fmt }).map(m => `<li>${esc(m)}</li>`).join('')}</ul>`;
+}
+function pvMarquer() { markDirty(); pvRecalc(); }
+function pvDepart(v) { pvObj().tresorerie_depart = v; pvMarquer(); }
+function pvChamp(sid, lid, k, v) { const l = pvLigne(sid, lid); if (!l) return; l[k] = v; pvMarquer(); }
+function pvSectionChamp(sid, k, v) { const s = pvSection(sid); if (!s) return; s[k] = v; pvMarquer(); }
+function pvFrequence(sid, lid, v) { const l = pvLigne(sid, lid); if (!l) return; l.frequence = v; markDirty(); pvRerendre(); }
+function pvNature(sid, v) {
+  const s = pvSection(sid); if (!s) return;
+  s.nature = v === 'recette' ? 'recette' : 'depense';
+  const ok = (s.nature === 'recette' ? BPPrevision.POSTES_RECETTE : BPPrevision.POSTES_DEPENSE).map(p => p[0]);
+  s.lignes.forEach(l => { if (!ok.includes(l.poste)) l.poste = s.nature === 'recette' ? 'ca' : 'autres_charges'; });
+  markDirty(); pvRerendre();
+}
+function pvAjouterSection(nature) { const pv = pvObj(), s = BPPrevision.nouvelleSection('', nature); s.lignes.push(BPPrevision.nouvelleLigne(nature)); pv.sections.push(s); markDirty(); pvRerendre(); const e = document.querySelector('#pv-sec-' + s.id + ' .pv-nom'); if (e) e.focus(); }
+function pvAjouterLigne(sid) { const s = pvSection(sid); if (!s) return; s.lignes.push(BPPrevision.nouvelleLigne(s.nature)); markDirty(); pvRerendre(); }
+function pvRetirerLigne(sid, lid) { const s = pvSection(sid); if (!s) return; s.lignes = s.lignes.filter(l => l.id !== lid); markDirty(); pvRerendre(); }
+function pvRetirerSection(sid) {
+  const pv = pvObj(), s = pvSection(sid); if (!s) return;
+  if (s.lignes.some(l => l.nom || l.montant) && !confirm('Supprimer la section « ' + (s.nom || 'sans nom') + ' » et ses ' + s.lignes.length + ' ligne(s) ?')) return;
+  pv.sections = pv.sections.filter(x => x.id !== sid); markDirty(); pvRerendre();
+}
+function pvReporter() {
+  const r = BPPrevision.reporterCompteResultat(pvObj()), cles = Object.keys(r.valeurs), pf = sections.plan_financier;
+  if (!cles.length) { alert('Rien à reporter : aucune ligne du prévisionnel ne porte de montant.'); return; }
+  const ecrases = cles.filter(k => pf[k] !== undefined && String(pf[k]).trim() !== '' && Number(pf[k]) !== r.valeurs[k]);
+  const msg = 'Reporter les totaux du prévisionnel, poste par poste, dans le compte de résultat (An 1 à An 5) ?\n\n' + cles.length + ' case(s) seront remplies' + (ecrases.length ? ', dont ' + ecrases.length + ' valeur(s) déjà saisie(s) qui seront remplacées' : '') + '.' + (r.investissements ? '\n\nLes investissements (' + fmtEuro(r.investissements) + ') ne sont pas reportés : ils relèvent des immobilisations.' : '') + '\n\nLes postes sans ligne dans le prévisionnel ne sont pas modifiés.';
+  if (!confirm(msg)) return;
+  cles.forEach(k => { pf[k] = String(r.valeurs[k]); });
+  markDirty();
+  const y = window.scrollY; renderSection('plan_financier'); window.scrollTo(0, y);
+  const m = document.getElementById('pv-msg'); if (m) m.innerHTML = '<div style="background:#d1fae5;color:#065f46;border-radius:8px;padding:8px 12px;font-size:12.5px;margin:6px 0;">Totaux reportés dans le compte de résultat.</div>';
+}
+
+/* ═══ Portefeuille clients, rentabilité, scénarios, bilan et ratios (assets/bp-finance-avancee.js) ═══
+   Les offres se saisissent dans la liste « Offres, prix et portefeuille clients » (compléments du plan financier) ;
+   tout le reste se calcule ici, en direct. Rien n'est écrit dans le compte de résultat sans confirmation. */
+function faHTML() {
+  return `<div class="bp-card-inner" id="fa-carte">
+    <style>${BPFinanceAvancee.CSS}${BPDossierComplet.CSS}#fa-carte{--pv-grille:var(--border);--pv-texte:var(--text,#1c2433)}#fa-carte .pv-neg{color:#c2410c}#fa-carte .pv-total td{font-weight:800}#fa-carte .pv-section td{font-weight:800;background:rgba(120,140,170,.12)}</style>
+    <h3>📊 Portefeuille clients, rentabilité et bilan prévisionnel</h3>
+    <p style="font-size:12.5px;color:var(--muted);margin-top:-4px;">Saisissez vos offres (prix, coût estimé par client, clients visés chaque année) dans la liste « Offres, prix et portefeuille clients » plus bas sur cette page. Le portefeuille sur 60 mois, le chiffre d'affaires par offre, le seuil de rentabilité, le délai de retour sur investissement, les scénarios prudent / central / optimiste, le bilan prévisionnel, le besoin en fonds de roulement et les ratios se calculent ici tout seuls. Le résultat présenté est celui avant amortissements, intérêts et impôts ; le résultat net complet reste celui du compte de résultat.</p>
+    ${monRole === 'lecteur' ? '' : `<div style="display:flex;gap:8px;flex-wrap:wrap;margin:6px 0;"><button class="btn btn-outline btn-sm" onclick="faReporter()" title="Copie le chiffre d'affaires et les coûts variables du portefeuille dans le compte de résultat (avec confirmation)">⤵ Reporter le chiffre d'affaires du portefeuille dans le compte de résultat</button></div>`}
+    <div id="fa-msg"></div>
+    <div id="fa-synthese"></div>
+  </div>`;
+}
+function faCalculer() {
+  const pf = sections.plan_financier || {};
+  return { pf, c: BPFinanceAvancee.calculer(pf, BPPrevision), b: BPFinanceAvancee.bilan(pf, BPCalc) };
+}
+function faRecalc() {
+  const host = document.getElementById('fa-synthese'); if (!host) return;
+  const { c, b } = faCalculer(), fmt = n => fmtEuro(Math.round(n)), ctx = { esc, fmt, cls: 'pv-t' }, F = BPFinanceAvancee;
+  const alertes = c.alertes.concat(b.alertes || []);
+  const bloc = (t, h) => h ? `<h4 style="margin:16px 0 6px;">${t}</h4><div style="overflow-x:auto;">${h}</div>` : '';
+  let h = alertes.length ? `<div style="background:#fef3c7;color:#92400e;border-radius:8px;padding:8px 12px;font-size:12.5px;margin:6px 0;">⚠️ ${alertes.map(esc).join('<br>⚠️ ')}</div>` : '';
+  if (c.vide) h += '<p style="font-size:12.5px;color:var(--muted);margin:10px 0 0;">Ajoutez au moins une offre avec un prix et un nombre de clients : les tableaux et graphiques apparaîtront ici.</p>';
+  else h += F.indicateurs(c, ctx)
+    + `<div class="fa-graphs"><div><h4>Évolution du portefeuille clients</h4>${F.svgClients(c, ctx)}</div><div><h4>Répartition du chiffre d'affaires (année 1)</h4>${F.svgRepartition(c, ctx)}</div><div><h4>Évolution du résultat</h4>${F.svgResultat(c, ctx)}</div></div>`
+    + bloc('Clients actifs et résiliations', F.tableauClients(c, ctx)) + bloc("Chiffre d'affaires, charges fixes et résultat", F.tableauCA(c, ctx))
+    + bloc('Rentabilité par offre', F.tableauRentabiliteOffres(c, ctx)) + bloc('Scénarios financiers', F.tableauScenarios(c, ctx))
+    + `<ul style="font-size:12.5px;margin:8px 0 0 18px;">${F.lecture(c, ctx).map(m => `<li>${esc(m)}</li>`).join('')}</ul>`;
+  if (!b.vide) h += bloc('Bilan prévisionnel simplifié', F.tableauBilan(b, ctx)) + bloc('Besoin en fonds de roulement', F.tableauBFR(b, ctx)) + bloc('Ratios financiers', F.tableauRatios(b, ctx))
+    + `<p style="font-size:11.5px;color:var(--muted);margin:6px 0 0;">Bilan en méthode indirecte : la trésorerie est déduite des flux, l'égalité actif = passif est donc un vrai contrôle${b.equilibre ? ' (vérifié)' : ' (<strong>écart détecté</strong>)'}. Fonds propres : apports et subventions saisis dans « Besoin de financement » ; emprunts : liste des dettes ; délais : paiement clients et fournisseurs.</p>`;
+  host.innerHTML = h;
+}
+function faReporter() {
+  const { c } = faCalculer(), v = BPFinanceAvancee.reporterCompteResultat(c), cles = Object.keys(v), pf = sections.plan_financier;
+  if (!cles.length) { alert('Rien à reporter : saisissez d\'abord vos offres, leurs prix et leurs clients.'); return; }
+  const ecrases = cles.filter(k => pf[k] !== undefined && String(pf[k]).trim() !== '' && Number(pf[k]) !== v[k]);
+  if (!confirm('Reporter dans le compte de résultat (An 1 à An 5) le chiffre d\'affaires du portefeuille et ses coûts variables (en « Achats » ) ?\n\n' + cles.length + ' case(s) seront remplies' + (ecrases.length ? ', dont ' + ecrases.length + ' valeur(s) déjà saisie(s) qui seront remplacées' : '') + '.\n\nLes charges fixes ne sont pas modifiées.')) return;
+  cles.forEach(k => { pf[k] = String(v[k]); });
+  markDirty();
+  const y = window.scrollY; renderSection('plan_financier'); window.scrollTo(0, y);
+  const m = document.getElementById('fa-msg'); if (m) m.innerHTML = '<div style="background:#d1fae5;color:#065f46;border-radius:8px;padding:8px 12px;font-size:12.5px;margin:6px 0;">Chiffre d\'affaires et coûts variables reportés dans le compte de résultat.</div>';
+}
+/* Rubriques dont tout le contenu vient des compléments (assets/bp-enrichi.js) : un simple en-tête, le reste est ajouté par renderSection. */
+function renderRubriqueEnrichie(titre, intro) {
+  return `<div class="bp-section"><div class="bp-card-inner"><h2 style="margin-top:0;">${esc(titre)}</h2><p style="font-size:13px;color:var(--muted);">${esc(intro)}</p></div></div>`;
+}
+/* Les 62 documents d'un dossier d'investissement complet : état réel de chacun et lien vers la rubrique où le remplir. */
+function renderDossierComplet() {
+  const e = BPDossierComplet.etat({ sections });
+  const lien = d => `<a href="#" onclick="navTo('${d.rub}');return false;">${esc(d.libelle)}</a>`;
+  return `<div class="bp-section"><div class="bp-card-inner"><style>${BPDossierComplet.CSS}</style>
+    <h2 style="margin-top:0;">🗂 Dossier complet : 62 documents</h2>
+    <p style="font-size:13px;color:var(--muted);">Le dossier d'investissement d'un projet comme le vôtre regroupe 62 documents en 6 familles. Voici l'état réel de chacun, calculé uniquement sur ce que vous avez saisi : <strong>${e.compte.rempli} rempli(s)</strong>, ${e.compte.partiel} partiel(s), ${e.compte.vide} à faire (${e.pct} % d'avancement). Cliquez sur « Où le trouver » pour aller à la rubrique concernée. Les pièces réelles se joignent en pièces jointes ; les textes juridiques sont à faire valider par un professionnel du droit.</p>
+    ${BPDossierComplet.tableauHtml(e, { esc, lien })}</div></div>`;
+}
+
+/* ── Excel de tous les tableaux ── */
+function bpTxTables() { return BPTableauxExcel.registre(BPEnrichi, BPPrevision); }
+function bpTxPortee(scope) {
+  const t = bpTxTables();
+  if (scope === 'tout') return t;
+  if (scope === 'pv') return t.filter(x => x.special === 'prevision');
+  return t.filter(x => x.rub === String(scope).slice(2));
+}
+function bpTxMsg(id, html, ok) {
+  const el = document.getElementById(id); if (!el) return;
+  el.innerHTML = html ? `<div style="background:${ok ? '#d1fae5' : '#fee2e2'};color:${ok ? '#065f46' : '#991b1b'};border-radius:8px;padding:8px 12px;font-size:12.5px;margin:6px 0;">${html}</div>` : '';
+}
+async function bpTxExporter(scope, avecDonnees, msgId) {
+  try {
+    const XLSX = await bpChargerXLSX(), tables = bpTxPortee(scope);
+    if (!tables.length) { bpTxMsg(msgId, 'Aucun tableau à exporter pour cette rubrique.', false); return; }
+    const { wb } = BPTableauxExcel.construireClasseur(XLSX, tables, { avecDonnees, sections, nomProjet: bp?.nom_projet || '', devise: bpDeviseRefSymbole() });
+    const nom = String(bp?.nom_projet || 'business-plan').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'business-plan';
+    const etiq = scope === 'tout' ? 'tableaux' : scope === 'pv' ? 'previsionnel' : 'tableaux-' + String(scope).slice(2);
+    XLSX.writeFile(wb, `${etiq}-${avecDonnees ? 'donnees' : 'modele'}-${nom}.xlsx`);
+    bpTxMsg(msgId, avecDonnees ? 'Fichier téléchargé avec vos données. Modifiez-les dans Excel, puis réimportez le fichier ici.' : 'Modèle vide téléchargé. Remplissez les lignes sous les titres de colonnes, puis importez le fichier ici.', true);
+  } catch (e) { bpTxMsg(msgId, esc(e.message || 'Export impossible.'), false); }
+}
+async function bpTxImporter(input, scope, msgId) {
+  const f = input.files && input.files[0]; input.value = '';
+  if (!f) return;
+  if (f.size > 5 * 1024 * 1024) { bpTxMsg(msgId, 'Fichier trop volumineux (5 Mo maximum).', false); return; }
+  try {
+    const XLSX = await bpChargerXLSX();
+    const wb = XLSX.read(await f.arrayBuffer(), { type: 'array', cellDates: true });
+    const lu = BPTableauxExcel.lireClasseur(XLSX, wb, bpTxPortee(scope));
+    /* Les feuilles qui appartiennent à d'autres rubriques ne sont pas « inconnues » : on les compte sans les lister. */
+    const connues = scope === 'tout' ? [] : BPTableauxExcel.lireClasseur(XLSX, wb, bpTxTables()).resultats.map(r => r.feuille);
+    lu.autres = lu.inconnues.filter(n => connues.includes(n)).length;
+    lu.inconnues = lu.inconnues.filter(n => !connues.includes(n));
+    const utiles = lu.resultats.filter(r => r.rows.length);
+    if (!utiles.length) {
+      bpTxMsg(msgId, 'Aucune ligne reconnue. Utilisez le modèle téléchargé depuis cette page : la première ligne de chaque feuille doit garder les titres de colonnes d\'origine.' + (lu.inconnues.length ? '<br>Feuilles non reconnues : ' + lu.inconnues.map(esc).join(', ') + '.' : ''), false);
+      return;
+    }
+    window._bpTxAttente = { utiles, scope, msgId };
+    const existantes = utiles.some(r => BPTableauxExcel.lignesActuelles(sections, r.table).length);
+    const liste = utiles.map(r => `<li><strong>${esc(r.table.titre)}</strong> : ${r.rows.length} ligne(s) lue(s) (actuellement ${BPTableauxExcel.lignesActuelles(sections, r.table).length})${r.tronque ? ' — limitées à 500' : ''}</li>`).join('');
+    const avert = utiles.flatMap(r => r.ignorees.map(m => esc(r.table.titre) + ' — ' + esc(m)));
+    bpTxMsg(msgId, `Fichier lu :<ul style="margin:4px 0 4px 18px;">${liste}</ul>${avert.length ? `⚠️ ${avert.length} cellule(s) ignorée(s) :<br>${avert.slice(0, 8).join('<br>')}${avert.length > 8 ? '<br>…' : ''}<br>` : ''}${lu.inconnues.length ? 'Feuilles non reconnues (ignorées) : ' + lu.inconnues.slice(0, 6).map(esc).join(', ') + (lu.inconnues.length > 6 ? '…' : '') + '.<br>' : ''}${lu.autres ? lu.autres + ' feuille(s) d\'autres rubriques non importée(s) ici (utilisez leur rubrique, ou « Importer un classeur complet »).<br>' : ''}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">${existantes ? `<button class="btn btn-outline btn-sm" onclick="bpTxAppliquer('remplacer')">Remplacer les lignes actuelles</button><button class="btn btn-outline btn-sm" onclick="bpTxAppliquer('ajouter')">Ajouter à la suite</button>` : `<button class="btn btn-outline btn-sm" onclick="bpTxAppliquer('remplacer')">Importer ces lignes</button>`}<button class="btn btn-outline btn-sm" onclick="bpTxAnnuler()">Annuler</button></div>`, !avert.length);
+  } catch (e) { bpTxMsg(msgId, 'Fichier illisible : ' + esc(e.message || 'format inattendu') + '. Utilisez un classeur .xlsx.', false); }
+}
+function bpTxAnnuler() { const a = window._bpTxAttente; window._bpTxAttente = null; if (a) bpTxMsg(a.msgId, 'Import annulé : rien n\'a été modifié.', true); }
+/* Enregistre toutes les rubriques touchées (l'enregistrement automatique n'envoie que la rubrique ouverte). */
+async function bpTxSauver(rubs) {
+  if (monRole === 'lecteur') return false;
+  clearTimeout(autoSaveTimer); hasUnsaved = false;
+  document.getElementById('save-status').textContent = 'Sauvegarde…';
+  try {
+    const s = {}; rubs.forEach(r => { s[r] = sections[r] || {}; });
+    await api('PUT', `/business-plans/${bpId}`, { sections: s });
+    const updated = await api('GET', `/business-plans/${bpId}`);
+    bp.completude = updated.completude; bp.progression = updated.progression; updateProgress(updated.progression); buildNav();
+    document.getElementById('save-status').textContent = '✓ Sauvegardé';
+    return true;
+  } catch (e) { hasUnsaved = true; document.getElementById('save-status').textContent = '✗ Erreur sauvegarde'; return false; }
+}
+async function bpTxAppliquer(mode) {
+  const a = window._bpTxAttente; if (!a) return;
+  window._bpTxAttente = null;
+  let n = 0; const noms = [], rubs = new Set();
+  a.utiles.forEach(r => { BPTableauxExcel.appliquer(sections, r.table, r.rows, mode, BPPrevision); n += r.rows.length; noms.push(r.table.titre); rubs.add(r.table.rub); });
+  const y = window.scrollY; renderSection(currentSection); window.scrollTo(0, y);
+  const ok = await bpTxSauver([...rubs]);
+  bpTxMsg(a.msgId, `Import terminé : ${n} ligne(s) ${mode === 'ajouter' ? 'ajoutée(s) à la suite' : 'importée(s)'} (${noms.map(esc).join(', ')}).${ok ? ' Enregistré.' : ' ⚠️ L\'enregistrement a échoué : réessayez ou cliquez sur Sauvegarder.'}`, ok);
+}
+function bpTxCarte(rub) {
+  if (typeof BPTableauxExcel === 'undefined') return '';
+  const tabs = bpTxPortee('r:' + rub).filter(t => t.special !== 'prevision');
+  if (!tabs.length) return '';
+  const ro = monRole === 'lecteur', s = 'r:' + rub;
+  return `<div class="bp-section"><div class="bp-card-inner" id="bp-tx-carte">
+    <h3>📊 Excel : ${tabs.length > 1 ? 'les tableaux de cette rubrique' : 'le tableau de cette rubrique'}</h3>
+    <p style="font-size:12.5px;color:var(--muted);margin-top:-4px;">${tabs.map(t => esc(t.titre)).join(' · ')}.<br>Téléchargez un modèle vide à remplir dans Excel, ou vos lignes actuelles à corriger, puis importez le fichier : les lignes lues remplacent le tableau ou s'ajoutent à la suite, au choix. Les colonnes calculées se recalculent toutes seules.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+      <button class="btn btn-outline btn-sm" onclick="bpTxExporter('${s}',false,'bp-tx-msg')">📥 Modèle vide</button>
+      <button class="btn btn-outline btn-sm" onclick="bpTxExporter('${s}',true,'bp-tx-msg')">📥 Mes lignes</button>
+      ${ro ? '' : `<label class="btn btn-outline btn-sm" style="cursor:pointer;margin:0;">📤 Importer un fichier Excel<input type="file" accept=".xlsx,.xls" style="display:none;" onchange="bpTxImporter(this,'${s}','bp-tx-msg')"></label>`}
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px;font-size:12px;color:var(--muted);">Tout le plan :
+      <button class="btn btn-outline btn-sm" onclick="bpTxExporter('tout',false,'bp-tx-msg')">📥 Modèle vide de tous les tableaux</button>
+      <button class="btn btn-outline btn-sm" onclick="bpTxExporter('tout',true,'bp-tx-msg')">📥 Tous mes tableaux</button>
+      ${ro ? '' : `<label class="btn btn-outline btn-sm" style="cursor:pointer;margin:0;">📤 Importer un classeur complet<input type="file" accept=".xlsx,.xls" style="display:none;" onchange="bpTxImporter(this,'tout','bp-tx-msg')"></label>`}
+    </div>
+    <div id="bp-tx-msg"></div>
+  </div></div>`;
+}
+
 function renderSection(key) {
   const content = document.getElementById('bp-content');
   const def = SECTIONS.find(s=>s.key===key);
@@ -1378,6 +1665,10 @@ function renderSection(key) {
     impact: renderImpact,
     financement: renderFinancement,
     annexes: renderAnnexes,
+    strategie_developpement: () => renderRubriqueEnrichie('🚀 Stratégie de développement sur 5 ans', "Où l'entreprise sera dans 5 ans : étapes, ouverture des agences, organisation type d'une agence et diversification. Tout est facultatif et rien n'est inventé : seules vos saisies apparaissent dans le dossier."),
+    juridique: () => renderRubriqueEnrichie('⚖️ Documents juridiques et administratifs', "Registre de vos statuts, pacte d'associés, contrats, conditions de vente, assurances et conformité des données. Les textes juridiques saisis ici sont à faire valider par un professionnel du droit du pays concerné ; les pièces réelles (immatriculation, assurance) se joignent en pièces jointes."),
+    pilotage: () => renderRubriqueEnrichie('🧭 Pilotage interne', "Budget annuel, résultats par agence, suivi commercial, interventions, stocks et reporting mensuel : le réalisé se compare au prévisionnel, les écarts se calculent seuls."),
+    dossier_complet: renderDossierComplet,
     completude: renderCompletude,
     test_bp: renderTestBP,
   };
@@ -1387,8 +1678,9 @@ function renderSection(key) {
     BPEnrichi.ensureCss();
     content.insertAdjacentHTML('beforeend', `<div class="bp-section">${BPEnrichi.editeurHtml(key, sections[key] || {}, { esc, ro: monRole === 'lecteur' })}</div>`);
   }
+  if (!def?.noSave && key !== 'completude') content.insertAdjacentHTML('beforeend', bpTxCarte(key));   /* Excel des tableaux de la rubrique */
   if (!def?.noSave && key !== 'completude') { content.insertAdjacentHTML('beforeend', bpPJBloc(key)); bpPJCharger(key); }   /* pièces jointes de la rubrique */
-  if (key === 'plan_financier') calcAllFinance();
+  if (key === 'plan_financier') { calcAllFinance(); pvRecalc(); faRecalc(); }
   if (key === 'produits') (sections.produits?.etude_prix||[]).forEach((_,i)=>calcMargeEtudePrix(i));
   if (key === 'presentation') bpLoadTractionDocs();
   if (key === 'infos_generales') bpChargerDocsMembresEquipe();
@@ -1890,7 +2182,7 @@ function renderMembresEquipe(list) {
       <div class="fg">
         <div><label>Nom${helpIcon('membre_nom')}</label><input value="${esc(m.nom||'')}" oninput="updMembreEquipe(${i},'nom',this.value)"></div>
         <div><label>Prénom${helpIcon('membre_prenom')}</label><input value="${esc(m.prenom||'')}" oninput="updMembreEquipe(${i},'prenom',this.value)"></div>
-        <div><label>Fonction${helpIcon('membre_fonction')}</label><input value="${esc(m.fonction||'')}" oninput="updMembreEquipe(${i},'fonction',this.value)"></div>
+        <div><label>Fonction${helpIcon('membre_fonction')}</label><input value="${esc(m.fonction||'')}" oninput="updMembreEquipe(${i},'fonction',this.value)"></div>        <div><label>Catégorie</label><select onchange="updMembreEquipe(${i},'categorie',this.value)"><option value="">— Selon la fonction —</option>${['Dirigeant ou associé','Équipe','Conseil ou expert'].map(c=>`<option ${m.categorie===c?'selected':''}>${c}</option>`).join('')}</select></div>
         <div><label>Formation${helpIcon('membre_formation')}</label><input value="${esc(m.formation||'')}" oninput="updMembreEquipe(${i},'formation',this.value)"></div>
         <div><label>Années d'expérience${helpIcon('membre_annees_experience')}</label><input type="number" min="0" value="${esc(m.annees_experience||'')}" oninput="updMembreEquipe(${i},'annees_experience',this.value)"></div>
         <div><label>Expérience dans le secteur${helpIcon('membre_experience_secteur')}</label><input value="${esc(m.experience_secteur||'')}" oninput="updMembreEquipe(${i},'experience_secteur',this.value)"></div>
@@ -4127,6 +4419,9 @@ function renderFinancier() {
     </div>
 
     ${bpExcelHTML()}
+
+    ${previsionHTML()}
+    ${faHTML()}
 
     <div class="bp-card-inner"><h3>Investissements initiaux</h3><div class="fg">
       <div>${field('investissement_initial',`Investissement total requis (${bpDeviseRefSymbole()})`,'','number').replace("oninput=\"updateField('investissement_initial',this.value)\"","oninput=\"updateField('investissement_initial',this.value);calcAllFinance()\"")}${provenanceWidget('plan_financier','investissement_initial')}</div>

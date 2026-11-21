@@ -29,6 +29,8 @@
   const OUINON = ['Oui', 'Non'];
   const NIVEAU3 = ['Faible', 'Moyen', 'Élevé'];
   const NOTE5 = ['1', '2', '3', '4', '5'];
+  const CATEGORIES_EQUIPE = ['Dirigeant ou associé', 'Équipe', 'Conseil ou expert'];
+  const NIVEAUX_DIPLOME = ['Certificat ou formation courte', 'Bac ou équivalent', 'Bac+2', 'Bac+3 (licence)', 'Bac+5 (master, ingénieur)', 'Doctorat', 'Autre'];
 
   /* ═══════════════ SPÉCIFICATION PAR RUBRIQUE ═══════════════ */
   const SPEC = {
@@ -64,6 +66,12 @@
           D('date', 'Date'), T('changement', 'Changement (ex : passage en SARL)'), A('motif', 'Motif') ] },
         { k: 'chronologie', titre: 'Chronologie de la création', nom: 'jalon', viz: 'frise', ajout: 'Ajouter un jalon', cols: [
           D('date', 'Date'), T('jalon', 'Jalon'), A('detail', 'Détail') ] },
+        { k: 'parcours_professionnel', groupe: 'equipe', titre: 'Parcours professionnel des dirigeants et de l\'équipe', nom: 'personne', ajout: 'Ajouter une expérience', cols: [
+          T('personne', 'Personne (nom tel que dans la fiche du collaborateur)'), C('categorie', 'Catégorie', CATEGORIES_EQUIPE), T('poste', 'Poste ou mission'),
+          T('organisation', 'Entreprise ou organisation'), T('pays', 'Pays'), T('periode', 'Période (ex : 2018 – 2026)'), A('realisations', 'Réalisations et résultats obtenus') ] },
+        { k: 'diplomes_qualifications', groupe: 'equipe', titre: 'Diplômes, certifications et habilitations', nom: 'intitule', ajout: 'Ajouter un diplôme', cols: [
+          T('personne', 'Personne (nom tel que dans la fiche du collaborateur)'), T('intitule', 'Diplôme, certification ou habilitation'), C('niveau', 'Niveau', NIVEAUX_DIPLOME),
+          T('etablissement', 'Établissement ou organisme'), T('pays', 'Pays'), N('annee', 'Année d\'obtention'), C('justificatif', 'Justificatif', ['Fourni', 'À fournir', 'Non applicable']) ] },
       ],
     },
 
@@ -379,6 +387,14 @@
           T('ressource', 'Ressource (atelier, équipement, équipe…)'), T('unite', 'Unité (par mois, par jour…)'), N('theorique', 'Capacité théorique'), N('reelle', 'Capacité réelle'), N('disponible', 'Capacité disponible') ] },
         { k: 'dependances_operationnelles', titre: 'Matrice des dépendances opérationnelles', nom: 'element', ajout: 'Ajouter une dépendance', cols: [
           T('element', 'Activité ou ressource'), T('depend_de', 'Dépend de'), C('criticite', 'Criticité', ['Faible', 'Moyenne', 'Élevée', 'Critique']), A('alternative', 'Solution de repli') ] },
+        { k: 'logistique_moyens', titre: 'Plan logistique : véhicules, matériel et outillage', nom: 'designation', ajout: 'Ajouter un moyen', cols: [
+          C('categorie', 'Catégorie', ['Véhicule', 'Matériel et outillage', 'Informatique', 'Local ou entrepôt', 'Autre']), T('designation', 'Désignation'), N('quantite', 'Quantité'),
+          N('cout_unitaire', 'Coût unitaire'), C('mode_acquisition', 'Mode d\'acquisition', ['Achat', 'Location', 'Crédit-bail', 'Apport en nature']), T('affectation', 'Affectation (agence, équipe)'), D('date_acquisition', 'Date prévue') ] },
+        { k: 'deplacements', titre: 'Plan logistique : zones et déplacements', nom: 'zone', ajout: 'Ajouter une zone', cols: [
+          T('zone', 'Zone ou agence desservie'), T('frequence_tournees', 'Fréquence des tournées'), N('distance_moyenne_km', 'Distance moyenne par intervention (km)'), N('cout_moyen_deplacement', 'Coût moyen par déplacement'), A('observations', 'Observations') ] },
+        { k: 'procedures_operations', titre: 'Manuel des opérations : procédures', nom: 'procedure', ajout: 'Ajouter une procédure', cols: [
+          T('procedure', 'Procédure (intervention, urgence, contrôle qualité…)'), C('type_proc', 'Type', ['Intervention planifiée', 'Urgence', 'Contrôle qualité', 'Suivi client (CRM)', 'Achat et stock', 'Autre']),
+          A('declencheur', 'Déclencheur'), A('etapes', 'Étapes à suivre'), T('responsable', 'Responsable'), T('delai_cible', 'Délai cible'), A('controle', 'Contrôle qualité associé') ] },
       ],
     },
 
@@ -448,8 +464,16 @@
           A('dividendes', 'Distribution éventuelle de dividendes'), A('simulation_retard_financement', 'Simulation de retards de financement'),
           A('coherence_financement_besoins', 'Cohérence entre financement recherché et besoins réels'),
         ] },
+        { id: 'scenarios_portefeuille', titre: 'Portefeuille clients : charges supportées et scénarios (prudent / optimiste)', intro: 'Si l\'entreprise a d\'autres activités que ces offres, indiquez la part de ses charges fixes et de son investissement que ces offres supportent (100 % par défaut). Le scénario central reprend vos chiffres tels quels (100 %) ; indiquez de combien de pour cent les clients et les charges fixes varient dans les deux autres scénarios. Valeurs de départ proposées : prudent 80 % des clients et 110 % des charges ; optimiste 120 % des clients et 100 % des charges.', champs: [
+          N('portefeuille_part_charges_pct', 'Part des charges fixes et de l\'investissement supportée par ces offres (%)', '100'),
+          N('scenario_prudent_clients_pct', 'Prudent : clients (% du central)', '80'), N('scenario_prudent_charges_pct', 'Prudent : charges fixes (% du central)', '110'),
+          N('scenario_optimiste_clients_pct', 'Optimiste : clients (% du central)', '120'), N('scenario_optimiste_charges_pct', 'Optimiste : charges fixes (% du central)', '100'),
+        ] },
       ],
       listes: [
+        { k: 'offres_portefeuille', titre: 'Offres, prix et portefeuille clients sur 5 ans (60 mois)', nom: 'nom', calc: 'portefeuille', ajout: 'Ajouter une offre', cols: [
+          T('nom', 'Nom de l\'offre'), N('prix_mensuel', 'Prix par client et par mois'), N('cout_mensuel', 'Coût estimé par client et par mois'), N('clients_depart', 'Clients au départ'),
+          N('clients_a1', 'Clients fin année 1'), N('clients_a2', 'Clients fin année 2'), N('clients_a3', 'Clients fin année 3'), N('clients_a4', 'Clients fin année 4'), N('clients_a5', 'Clients fin année 5'), N('resiliation_pct', 'Résiliation (% par an)') ] },
         { k: 'hypotheses_financieres', titre: 'Hypothèses financières documentées', nom: 'hypothese', calc: 'fiabilite', ajout: 'Ajouter une hypothèse', cols: [
           T('hypothese', 'Hypothèse'), T('valeur', 'Valeur'), T('source', 'Source ou justification'), D('date', 'Date'), C('fiabilite', 'Fiabilité', ['Vérifiée', 'Estimée', 'Déclarative']) ] },
         { k: 'sensibilite', titre: 'Analyse de sensibilité', nom: 'variable', ajout: 'Ajouter un test', cols: [
@@ -516,6 +540,90 @@
           T('tranche', 'Tranche'), N('montant', 'Montant'), D('date', 'Date prévue'), A('etape_declenchee', 'Étape déclenchée') ] },
         { k: 'justificatifs_financement', titre: 'Justificatifs nécessaires', nom: 'piece', ajout: 'Ajouter un justificatif', cols: [
           T('piece', 'Justificatif'), T('financeur', 'Demandé par'), C('statut_piece', 'Statut', ['À fournir', 'Fourni', 'Vérifié']) ] },
+        { k: 'devis_fournisseurs', titre: 'Devis fournisseurs', nom: 'fournisseur', calc: 'total_montant', ajout: 'Ajouter un devis', cols: [
+          T('fournisseur', 'Fournisseur'), T('objet', 'Objet (véhicule, matériel, informatique, local…)'), N('montant', 'Montant'), D('date_devis', 'Date du devis'), D('validite', 'Valable jusqu\'au'), C('statut_devis', 'Statut', ['À demander', 'Reçu', 'Accepté', 'Expiré']) ] },
+        { k: 'apports_associes', titre: 'Justificatifs des apports (fonds personnels et associés)', nom: 'associe', calc: 'total_montant', ajout: 'Ajouter un apport', cols: [
+          T('associe', 'Associé'), C('nature_apport', 'Nature', ['Numéraire', 'En nature', 'Industrie (compétences)']), N('montant', 'Montant'), T('justificatif', 'Justificatif (relevé, attestation…)'), C('statut_piece', 'Statut', ['À fournir', 'Fourni', 'Vérifié']) ] },
+        { k: 'lettres_intention', titre: 'Lettres d\'intention (clients ou partenaires potentiels)', nom: 'emetteur', ajout: 'Ajouter une lettre', cols: [
+          T('emetteur', 'Émetteur'), C('type_emetteur', 'Type', ['Client', 'Partenaire', 'Fournisseur', 'Autre']), D('date_lettre', 'Date'), A('engagement', 'Engagement ou volume annoncé'), C('statut_lettre', 'Statut', ['Demandée', 'Reçue', 'Signée']) ] },
+        { k: 'garanties_offertes', titre: 'Analyse des garanties proposées à la banque', nom: 'garantie', calc: 'total_montant', ajout: 'Ajouter une garantie', cols: [
+          T('garantie', 'Garantie'), C('nature_garantie', 'Nature', ['Caution personnelle', 'Nantissement', 'Hypothèque', 'Matériel financé', 'Garantie institutionnelle', 'Autre']), T('titulaire', 'Titulaire'),
+          N('montant', 'Valeur ou montant garanti'), C('statut_garantie', 'Statut', ['Envisagée', 'Proposée', 'Acceptée']), A('observations', 'Observations') ] },
+      ],
+    },
+
+    /* ── 21. Stratégie de développement sur 5 ans ── */
+    strategie_developpement: {
+      cartes: [
+        { id: 'vision5', titre: 'Vision et principes de croissance', champs: [
+          A('vision_5_ans', 'Où voulez-vous être dans 5 ans ?', 'Ambition, taille, présence géographique'),
+          A('principes_croissance', 'Principes de croissance', 'Comment l\'entreprise grandit (agence par agence, par palier, par partenariats…)'),
+          A('conditions_ouverture_agence', 'Conditions pour ouvrir une nouvelle agence', 'Clients minimum, trésorerie, équipe en place…'),
+          A('modele_agence', 'Organisation type d\'une agence', 'Direction, équipes opérationnelles, fonctions support, outils'),
+        ] },
+      ],
+      listes: [
+        { k: 'etapes_developpement', titre: 'Principales étapes sur 5 ans', nom: 'etape', ajout: 'Ajouter une étape', cols: [
+          T('annee', 'Année'), T('etape', 'Étape'), A('description', 'Description'), N('clients_cibles', 'Clients visés'), N('investissement', 'Investissement prévu'), A('condition', 'Condition de déclenchement') ] },
+        { k: 'agences', titre: 'Agences : existantes et futures', nom: 'agence', ajout: 'Ajouter une agence', cols: [
+          T('agence', 'Agence'), T('ville', 'Ville'), T('pays', 'Pays'), C('statut_agence', 'Statut', ['Existante', 'En préparation', 'Planifiée', 'À l\'étude']), T('annee_ouverture', 'Année d\'ouverture'),
+          T('responsable', 'Responsable'), N('effectif', 'Effectif prévu'), N('objectif_clients', 'Objectif de clients'), N('objectif_ca', 'Objectif de chiffre d\'affaires'), A('fonctions', 'Fonctions et équipes (direction, équipes opérationnelles, support)') ] },
+        { k: 'diversifications', titre: 'Diversification et nouveaux relais de croissance', nom: 'offre', ajout: 'Ajouter une piste', cols: [
+          T('offre', 'Nouvelle offre ou activité'), T('cible', 'Marché ou clientèle visé'), T('annee', 'Année'), N('investissement', 'Investissement'), A('risques', 'Risques et conditions') ] },
+      ],
+    },
+
+    /* ── 22. Documents juridiques et administratifs ── */
+    juridique: {
+      cartes: [
+        { id: 'avertissement', titre: 'Cadre juridique', champs: [
+          T('forme_juridique_retenue', 'Forme juridique retenue', 'SARL, SAS, SA, association…'), T('siege_social', 'Siège social'),
+          A('objet_social', 'Objet social'), T('duree_societe', 'Durée de la société'),
+          A('professionnel_droit', 'Professionnel du droit consulté', 'Nom du cabinet ou du notaire. Les projets de statuts, de contrats et de pacte doivent être validés par un professionnel du droit du pays concerné.'),
+        ] },
+        { id: 'cgv', titre: 'Conditions générales de vente', champs: [
+          A('cgv_paiements', 'Paiements et échéances'), A('cgv_resiliation', 'Résiliation et durée d\'engagement'), A('cgv_garanties', 'Garanties accordées'), A('cgv_responsabilite', 'Responsabilités et limites'),
+        ] },
+        { id: 'pacte', titre: 'Pacte d\'associés', champs: [
+          A('pacte_gouvernance', 'Gouvernance et décisions'), A('pacte_cession_parts', 'Cession et sortie des parts'), A('pacte_conflits', 'Règlement des conflits'), A('pacte_repartition_capital', 'Répartition envisagée du capital', 'À confirmer entre associés'),
+        ] },
+      ],
+      listes: [
+        { k: 'documents_juridiques', titre: 'Registre des documents juridiques et administratifs', nom: 'document', calc: 'etat_juridique', ajout: 'Ajouter un document', cols: [
+          C('type_document', 'Type', ['Projet de statuts', 'Pacte d\'associés', 'Répartition du capital', 'Immatriculation (RCCM)', 'Identification fiscale', 'Contrat client', 'Conditions générales de vente', 'Assurance', 'Conformité des données (CRM)', 'Autre']),
+          T('document', 'Intitulé'), C('statut_document', 'Statut', ['Non commencé', 'Projet rédigé', 'Validé par un juriste', 'Signé', 'Déposé ou enregistré']), D('date_document', 'Date'), T('version', 'Version'), T('responsable', 'Responsable'), A('observations', 'Observations') ] },
+        { k: 'assurances_couvertures', titre: 'Dossier d\'assurance', nom: 'type_assurance', calc: 'total_montant', ajout: 'Ajouter une couverture', cols: [
+          C('type_assurance', 'Type', ['Responsabilité civile professionnelle', 'Véhicules', 'Matériel et équipements', 'Locaux', 'Accidents du travail', 'Autre']), T('assureur', 'Assureur'), A('garanties', 'Garanties et plafonds'),
+          N('prime_annuelle', 'Prime annuelle'), C('statut_assurance', 'Statut', ['À souscrire', 'Devis reçu', 'Souscrite']) ] },
+        { k: 'registre_donnees', titre: 'Conformité du CRM : données personnelles', nom: 'traitement', ajout: 'Ajouter un traitement', cols: [
+          T('traitement', 'Traitement (clients, salariés, fournisseurs…)'), A('donnees', 'Données collectées'), A('finalite', 'Finalité'), T('base_legale', 'Base légale ou consentement'), T('duree_conservation', 'Durée de conservation'),
+          T('acces', 'Qui y a accès'), A('securite', 'Mesures de sécurité') ] },
+        { k: 'contrats_types', titre: 'Contrats clients : formules et conditions', nom: 'contrat', ajout: 'Ajouter un contrat', cols: [
+          T('contrat', 'Contrat (formule d\'abonnement, prestation ponctuelle…)'), T('duree_engagement', 'Durée d\'engagement'), A('prestations_incluses', 'Prestations incluses'), A('conditions_paiement', 'Conditions de paiement'), A('conditions_resiliation', 'Résiliation') ] },
+      ],
+    },
+
+    /* ── 23. Pilotage interne ── */
+    pilotage: {
+      cartes: [
+        { id: 'cadre_pilotage', titre: 'Cadre du pilotage', champs: [
+          A('rythme_reporting', 'Rythme et destinataires du reporting', 'Mensuel, trimestriel… à qui, sous quelle forme'),
+          A('outils_suivi', 'Outils de suivi (CRM, tableur, comptabilité)'), A('responsable_pilotage', 'Responsable du pilotage'),
+        ] },
+      ],
+      listes: [
+        { k: 'budget_annuel', titre: 'Budget annuel par service', nom: 'poste', calc: 'ecart', ajout: 'Ajouter une ligne', cols: [
+          T('annee', 'Année'), T('service', 'Service ou agence'), T('poste', 'Poste de dépense ou objectif'), N('prevu', 'Prévu'), N('realise', 'Réalisé') ] },
+        { k: 'suivi_agences', titre: 'Tableau de bord par agence', nom: 'agence', calc: 'ecart_ca', ajout: 'Ajouter un relevé', cols: [
+          T('periode', 'Période'), T('agence', 'Agence'), N('ca_prevu', 'Chiffre d\'affaires prévu'), N('ca_realise', 'Chiffre d\'affaires réalisé'), N('clients', 'Clients actifs'), N('interventions', 'Interventions'), N('satisfaction', 'Satisfaction (sur 10)') ] },
+        { k: 'suivi_commercial', titre: 'Suivi commercial (CRM)', nom: 'periode', calc: 'conversion', ajout: 'Ajouter une période', cols: [
+          T('periode', 'Période'), N('prospects', 'Prospects'), N('devis', 'Devis envoyés'), N('contrats', 'Contrats signés'), N('resiliations', 'Résiliations') ] },
+        { k: 'suivi_interventions', titre: 'Suivi des interventions', nom: 'periode', ajout: 'Ajouter une période', cols: [
+          T('periode', 'Période'), T('agence', 'Agence'), N('nombre', 'Nombre d\'interventions'), N('delai_moyen_heures', 'Délai moyen de traitement (heures)'), N('cout_moyen', 'Coût moyen'), N('satisfaction', 'Qualité perçue (sur 10)'), N('reprises', 'Reprises pour malfaçon') ] },
+        { k: 'suivi_stocks', titre: 'Suivi des stocks', nom: 'article', calc: 'stock', ajout: 'Ajouter un article', cols: [
+          T('article', 'Article ou consommable'), N('stock_initial', 'Stock initial'), N('achats', 'Achats'), N('consommation', 'Consommation'), N('stock_minimum', 'Stock minimum') ] },
+        { k: 'reporting_mensuel', titre: 'Reporting mensuel : réalisé et prévisionnel', nom: 'indicateur', calc: 'ecart', ajout: 'Ajouter un indicateur', cols: [
+          T('mois', 'Mois'), T('indicateur', 'Indicateur'), N('prevu', 'Prévu'), N('realise', 'Réalisé'), A('commentaire', 'Commentaire') ] },
       ],
     },
 
@@ -776,6 +884,47 @@
     return [racine].concat(autres.map((m, i) => ({ id: 'm' + (i + 1), nom: nom(m), fonction: m.fonction || '', detail: m.disponibilite === 'temps_partiel' ? 'Temps partiel' : '', parent_id: 'r' })));
   }
 
+  /* ═══ Dirigeants et équipe : fiches regroupées par personne (parcours + diplômes) ═══
+     Sources : « Collaborateurs » (infos_generales.membres_equipe) + listes parcours_professionnel et diplomes_qualifications.
+     Un parcours ou un diplôme est rattaché à la personne dont le nom correspond (mêmes mots, ordre indifférent, accents ignorés) ;
+     une ligne sans fiche correspondante crée une personne à part : rien n'est perdu. La catégorie vient de la fiche ; à défaut,
+     part au capital ou fonction de direction/association → dirigeant, sinon équipe (indiqué par « inferee »). Aucun chiffre inventé. */
+  const normNom = t => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const motsNom = t => normNom(t).split(' ').filter(Boolean);
+  const memePersonne = (a, b) => { const x = motsNom(a), y = motsNom(b); if (!x.length || !y.length) return false; const [p, g] = x.length <= y.length ? [x, y] : [y, x]; return p.every(m => g.includes(m)); };
+  const FONCTION_DIRECTION = /fondat|directeur|directrice|dirigeant|associ|g[ée]rant|pr[ée]sident|\bdg\b|\bpdg\b|co-?fondat/i;
+  function equipeDetaillee(g) {
+    g = g || {};
+    const membres = liste(g.membres_equipe).filter(m => m && (has(m.nom) || has(m.prenom)));
+    const parc = liste(g.parcours_professionnel).filter(x => x && (has(x.personne) || has(x.poste) || has(x.organisation)));
+    const dipl = liste(g.diplomes_qualifications).filter(x => x && (has(x.personne) || has(x.intitule)));
+    const complet = m => [m.prenom, m.nom].filter(has).join(' ');
+    const personnes = membres.map(m => {
+      const cat = CATEGORIES_EQUIPE.includes(m.categorie) ? m.categorie : null;
+      const capital = nombre(String(m.participation_capital || '').replace('%', ''));
+      const inferee = !cat, dirigeant = capital > 0 || FONCTION_DIRECTION.test(m.fonction || '');
+      return { nom: complet(m), fonction: m.fonction || '', categorie: cat || (dirigeant ? CATEGORIES_EQUIPE[0] : CATEGORIES_EQUIPE[1]), inferee,
+        formation: m.formation || '', annees: nombre(m.annees_experience), experienceSecteur: m.experience_secteur || '', competences: m.competences_principales || '',
+        entrepreneuriales: m.experiences_entrepreneuriales || '', realisations: m.realisations || '', capital: has(m.participation_capital) ? String(m.participation_capital) : '',
+        responsabilites: m.responsabilites || '', disponibilite: m.disponibilite || '', cv: m.cv_url || '', linkedin: m.linkedin || '', parcours: [], diplomes: [] };
+    });
+    const trouver = nom => personnes.find(p => memePersonne(p.nom, nom)) || (has(nom) && personnes.find(p => memePersonne([p.nom].join(' '), nom)));
+    const creer = (nom, cat) => { const p = { nom: String(nom).trim(), fonction: '', categorie: CATEGORIES_EQUIPE.includes(cat) ? cat : CATEGORIES_EQUIPE[1], inferee: !CATEGORIES_EQUIPE.includes(cat), formation: '', annees: null, experienceSecteur: '', competences: '', entrepreneuriales: '', realisations: '', capital: '', responsabilites: '', disponibilite: '', cv: '', linkedin: '', parcours: [], diplomes: [], horsFiche: true }; personnes.push(p); return p; };
+    parc.forEach(x => { const p = (has(x.personne) && trouver(x.personne)) || (has(x.personne) ? creer(x.personne, x.categorie) : null); if (p) p.parcours.push(x); });
+    dipl.forEach(x => { const p = (has(x.personne) && trouver(x.personne)) || (has(x.personne) ? creer(x.personne, null) : null); if (p) p.diplomes.push(x); });
+    const sansPersonne = parc.filter(x => !has(x.personne)).length + dipl.filter(x => !has(x.personne)).length;
+    const groupes = { dirigeants: personnes.filter(p => p.categorie === CATEGORIES_EQUIPE[0]), equipe: personnes.filter(p => p.categorie === CATEGORIES_EQUIPE[1]), conseil: personnes.filter(p => p.categorie === CATEGORIES_EQUIPE[2]) };
+    const dips = personnes.reduce((a, p) => a.concat(p.diplomes), []);
+    const somme = l => l.reduce((a, p) => a + (p.annees || 0), 0);
+    const niveauHaut = d => /^Bac\+5|^Doctorat/.test(d.niveau || '');
+    const kpi = { dirigeants: groupes.dirigeants.length, equipe: groupes.equipe.length, conseil: groupes.conseil.length,
+      anneesDirigeants: somme(groupes.dirigeants), anneesEquipe: somme(groupes.equipe), diplomes: dips.length, diplomesBac5: dips.filter(niveauHaut).length,
+      justificatifsFournis: dips.filter(d => d.justificatif === 'Fourni').length, justificatifsAFournir: dips.filter(d => d.justificatif === 'À fournir').length,
+      experiences: personnes.reduce((a, p) => a + p.parcours.length, 0), sansPersonne,
+      sansDiplome: personnes.filter(p => !p.diplomes.length && !has(p.formation)).length, sansParcours: personnes.filter(p => !p.parcours.length && !has(p.experienceSecteur) && !p.annees).length };
+    return { vide: !personnes.length, personnes, groupes, kpi };
+  }
+
   const coupe = (t, n) => { t = String(t || '').replace(/\s+/g, ' ').trim(); return t.length > n ? t.slice(0, n - 1).trimEnd() + '…' : t; };
   /* Résumé exécutif généré : reprend UNIQUEMENT la saisie (champ enrichi, sinon champ d'origine de la rubrique) ;
      ce qui manque est listé, jamais comblé. mode 'court' (1 page) ou 'long' (2 pages). */
@@ -977,6 +1126,35 @@
       return tableHtml([{ l: 'Pièce', html: x => '<strong>' + esc(x.nom) + '</strong>' + (has(x.url) ? '<br><span class="ench-n">' + esc(x.url) + '</span>' : '') }, { l: 'Catégorie', html: x => esc(x.categorie || x.type || '—') }, { l: 'Date · version', html: x => esc([x.date_document, x.version].filter(has).join(' · ') || '—') }, { l: 'Vérification', html: x => esc(x.statut_verification || 'Non vérifié') }, { l: 'Rubriques liées', html: x => esc(x.rubriques_liees || '—') }], it, esc, cls);
     }
     if (l.calc === 'produit') return '';   // rendu séparément (fiches + classement)
+    if (l.calc === 'portefeuille') return '';   // rendu séparément (BPFinanceAvancee : tableaux et graphiques calculés)
+    const base = l.cols.map(c => ({ k: c.k, l: c.l, t: c.t })), pct = (a, b) => (b > 0 ? fmtNb(a / b * 100, 0) + ' %' : '—');
+    const colCalc = (lib, f) => ({ l: lib, html: f });
+    if (l.calc === 'total_montant') {
+      const ck = l.cols.some(c => c.k === 'prime_annuelle') ? 'prime_annuelle' : 'montant', tot = rows.reduce((s, x) => s + (nombre(x[ck]) || 0), 0);
+      return tableHtml(base, rows, esc, cls) + (tot ? `<p class="ench-n"><strong>Total : ${esc(fmtNb(tot, 0))}</strong></p>` : '');
+    }
+    if (l.calc === 'ecart' || l.calc === 'ecart_ca') {
+      const kp = l.calc === 'ecart' ? 'prevu' : 'ca_prevu', kr = l.calc === 'ecart' ? 'realise' : 'ca_realise';
+      const ec = x => (has(x[kp]) && has(x[kr]) ? (nombre(x[kr]) || 0) - (nombre(x[kp]) || 0) : null);
+      const cols = base.concat([colCalc('Écart', x => { const e = ec(x); return e === null ? '—' : esc((e > 0 ? '+' : '') + fmtNb(e, 0)); }), colCalc('Écart (%)', x => { const e = ec(x); return e === null || !(nombre(x[kp]) > 0) ? '—' : esc((e > 0 ? '+' : '') + fmtNb(e / nombre(x[kp]) * 100, 0) + ' %'); })]);
+      const tp = rows.reduce((s, x) => s + (nombre(x[kp]) || 0), 0), tr = rows.reduce((s, x) => s + (nombre(x[kr]) || 0), 0);
+      return tableHtml(cols, rows, esc, cls) + (tp || tr ? `<p class="ench-n">Total prévu : <strong>${esc(fmtNb(tp, 0))}</strong> · total réalisé : <strong>${esc(fmtNb(tr, 0))}</strong>${tp > 0 ? ' · écart : <strong>' + esc((tr - tp > 0 ? '+' : '') + fmtNb((tr - tp) / tp * 100, 0)) + ' %</strong>' : ''}</p>` : '');
+    }
+    if (l.calc === 'conversion') {
+      const cols = base.concat([colCalc('Devis / prospects', x => pct(nombre(x.devis) || 0, nombre(x.prospects) || 0)), colCalc('Contrats / devis', x => pct(nombre(x.contrats) || 0, nombre(x.devis) || 0)),
+        colCalc('Conversion globale', x => pct(nombre(x.contrats) || 0, nombre(x.prospects) || 0)), colCalc('Clients nets', x => (has(x.contrats) ? esc(fmtNb((nombre(x.contrats) || 0) - (nombre(x.resiliations) || 0), 0)) : '—'))]);
+      return tableHtml(cols, rows, esc, cls);
+    }
+    if (l.calc === 'stock') {
+      const fin = x => (has(x.stock_initial) || has(x.achats) || has(x.consommation) ? (nombre(x.stock_initial) || 0) + (nombre(x.achats) || 0) - (nombre(x.consommation) || 0) : null);
+      const cols = base.concat([colCalc('Stock actuel', x => { const f = fin(x); return f === null ? '—' : esc(fmtNb(f, 0)); }), colCalc('Alerte', x => { const f = fin(x); return f !== null && has(x.stock_minimum) && f < nombre(x.stock_minimum) ? '⚠ sous le minimum' : f !== null && f < 0 ? '⚠ stock négatif' : '—'; })]);
+      return tableHtml(cols, rows, esc, cls);
+    }
+    if (l.calc === 'etat_juridique') {
+      const c = {}; rows.forEach(x => { const s = has(x.statut_document) ? x.statut_document : 'Non commencé'; c[s] = (c[s] || 0) + 1; });
+      const aValider = rows.filter(x => ['Projet rédigé', 'Non commencé'].includes(has(x.statut_document) ? x.statut_document : 'Non commencé') && /statuts|pacte|contrat|vente/i.test(String(x.type_document || ''))).length;
+      return tableHtml(base, rows, esc, cls) + `<p class="ench-n">${Object.keys(c).map(k => esc(k) + ' : ' + c[k]).join(' · ')}</p>` + (aValider ? `<p class="ench-w">${aValider} document(s) (statuts, pacte, contrats, conditions de vente) ne sont pas encore validés par un professionnel du droit.</p>` : '');
+    }
     return tableHtml(l.cols.map(c => ({ k: c.k, l: c.l, t: c.t })), rows, esc, cls);
   }
 
@@ -1038,6 +1216,7 @@
       /* La fiche d'identité reprend déjà l'immatriculation, la nature de l'activité et les marchés : on ne les répète pas dans leurs cartes. */
       cartes(rub).forEach(c => { if (fiche.length && (c.id === 'ident' || c.id === 'marches')) return; ajoute(c.titre, champsHtml(c, data, esc)); });
       listes(rub).forEach(l => {
+        if (ctx.sansEquipe && l.groupe === 'equipe') return;   /* présentés par personne dans la page « Équipe » */
         let h = listeLecture(rub, l, data, esc, ctx);
         if (l.k === 'actionnariat' && h) h += act.length && Math.abs(tot - 100) > 0.5 ? `<p class="ench-w">Attention : les parts saisies totalisent ${esc(fmtNb(tot, 1))} % au lieu de 100 %.</p>` : '';
         ajoute(l.titre, h);
@@ -1103,5 +1282,5 @@
   return { SPEC, rubriques, cartes, listes, aDesAjouts, libelles, lignes, contientDonnees, listeSpec, nouvelleLigne,
     smart, prioriser, planSwot, niveauPriorite, proposerTows, ltvCac, validation, campagnes, produitsCalcules, classement,
     objectifsRealises, entonnoir, pipeline, capacites, votes, decisions, effectifs, planRh, alertesRetard, fiabilites, dscr, risquesCalcules, indicateursImpact, sourcesFinancement,
-    ficheIdentite, noeudsOrganigrammeAuto, resume, triChrono, cleDate, nombre, fmtNb, blocs, blocsHtml, editeurHtml, listeEditeurHtml, ensureCss, CSS };
+    ficheIdentite, noeudsOrganigrammeAuto, equipeDetaillee, CATEGORIES_EQUIPE, NIVEAUX_DIPLOME, resume, triChrono, cleDate, nombre, fmtNb, blocs, blocsHtml, editeurHtml, listeEditeurHtml, ensureCss, CSS };
 });

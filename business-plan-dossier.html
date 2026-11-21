@@ -109,6 +109,7 @@ table.doc-table td{padding:8px 8px 8px 0;border-bottom:1px solid var(--dp-line);
 table.doc-table td:first-child{text-align:left;font-weight:600;}
 table.doc-table tr:last-child td{border-bottom:none;}
 table.doc-table tr.total td{font-weight:700;border-top:1.5px solid var(--dp-ink);padding-top:9px;}
+table.doc-table td.num,table.doc-table th.num{white-space:nowrap;}
 
 .field-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 24px;margin-bottom:6px;}
 .field-grid > .field:only-child{grid-column:1 / -1;}
@@ -135,6 +136,19 @@ table.doc-table tr.total td{font-weight:700;border-top:1.5px solid var(--dp-ink)
 
 .team-card{display:flex;gap:12px;padding:14px;break-inside:avoid;}
 .team-avatar{width:40px;height:40px;border-radius:50%;color:#fff;display:flex;align-items:center;justify-content:center;font-family:var(--dp-display);font-weight:700;font-size:14px;flex:none;}
+.eq-fiche{border:1px solid var(--dp-line);border-radius:6px;padding:12px 14px;margin:0 0 10px;break-inside:avoid;}
+.eq-tete{display:flex;gap:12px;align-items:center;margin-bottom:8px;}
+.eq-nom{font-weight:700;font-size:13px;margin:0;}
+.eq-fonction{font-family:var(--dp-mono);font-size:8.5px;color:var(--dp-ink-soft);text-transform:uppercase;letter-spacing:.04em;margin:2px 0 0;}
+.eq-meta{margin-left:auto;text-align:right;font-size:9.5px;line-height:1.5;color:var(--dp-ink-soft);white-space:nowrap;}
+.eq-cols{display:grid;grid-template-columns:1fr 1.25fr;gap:16px;}
+.eq-sous{font-family:var(--dp-mono);font-size:8px;letter-spacing:.06em;text-transform:uppercase;color:var(--dp-ink-soft);margin:0 0 4px;}
+.eq-liste{list-style:none;margin:0;padding:0;font-size:10px;line-height:1.45;}
+.eq-liste li{margin:0 0 5px;}
+.eq-per{display:inline-block;min-width:58px;font-family:var(--dp-mono);font-size:8.5px;color:var(--dp-ink-soft);font-variant-numeric:tabular-nums;}
+.eq-tag{display:inline-block;font-size:8px;padding:0 5px;border:1px solid var(--dp-line);border-radius:8px;margin-left:4px;color:var(--dp-ink-soft);white-space:nowrap;}
+.eq-txt{font-size:10px;line-height:1.45;margin:0 0 4px;}
+.eq-comp{font-size:9.5px;line-height:1.45;margin:8px 0 0;padding-top:6px;border-top:1px dashed var(--dp-line);color:var(--dp-ink-soft);}
 
 .empty-note{color:var(--dp-ink-soft);font-size:11.5px;font-style:italic;}
 .annexe-qr{width:44px;height:44px;}
@@ -187,6 +201,20 @@ table.doc-table tr.total td{font-weight:700;border-top:1.5px solid var(--dp-ink)
 .donut-leg li:last-child{border-bottom:none;}
 .donut-leg i{display:inline-block;width:10px;height:10px;border-radius:2px;flex:none;}
 .donut-leg .v{margin-left:auto;font-family:var(--dp-mono);font-size:10px;font-variant-numeric:tabular-nums;}
+/* Prévisionnel des gains et des dépenses (assets/bp-previsionnel.js) */
+.sheet .pv-wrap{margin:8px 0 6px;--pv-rec:#0F7B5F;--pv-dep:#C2610C;--pv-cum:#1B4B8C;--pv-grille:#DBD6C8;--pv-texte:var(--dp-ink);}
+.sheet .pv-lecture{font-size:10.5px;margin:2px 0 8px 16px;color:var(--dp-ink);}
+.sheet table.doc-table .pv-total td{font-weight:700;border-top:1.5px solid var(--dp-ink);}
+.sheet table.doc-table .pv-section td{font-weight:700;text-align:left;background:#F3F0E6;padding-top:7px;}
+.sheet table.doc-table .pv-neg{color:#B4531A;}
+/* Portefeuille clients, rentabilité, bilan (assets/bp-finance-avancee.js) */
+.sheet .fa-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:6px 0 10px;}
+.sheet .fa-kpi{border:1px solid #DBD6C8;border-radius:6px;padding:7px 9px;}
+.sheet .fa-kpi-v{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--dp-ink);}
+.sheet .fa-kpi-l{font-size:9.5px;font-weight:700;margin-top:2px;}
+.sheet .fa-kpi-n{font-size:8.5px;opacity:.75;margin-top:1px;}
+.sheet .fa-graphs{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:6px 0;}
+.sheet .fa-graphs h4{font-size:9.5px;margin:0 0 3px;}
 table.doc-table.compact{font-size:9.5px;}
 table.doc-table.compact th{font-size:7.5px;}
 table.doc-table.compact td{padding:6px 6px 6px 0;text-align:left;}
@@ -275,6 +303,8 @@ body.dp-inst{--dp-mono:Arial,Helvetica,sans-serif;--dp-display:Arial,Helvetica,s
 <script src="assets/bp-marketing.js?v=1"></script>
 <script src="assets/bp-organisation.js?v=1"></script>
 <script src="assets/bp-enrichi.js?v=1"></script>
+<script src="assets/bp-previsionnel.js?v=1"></script>
+<script src="assets/bp-finance-avancee.js?v=1"></script>
 <script src="assets/data.js"></script>
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js?v=14"></script>
@@ -372,8 +402,8 @@ function onTemplateChange(key){
    source, sélection différente. "complet" = comportement actuel, aucune restriction. */
 const FORMATS = {
   complet:     { label:'📄 Business Plan complet', ids:null },
-  bancaire:    { label:'🏦 Dossier bancaire', ids:['resume','traction','marche','finances','prixproduits','massesalariale','planfinancement','tresorerie','tresorerie36','risques','financement','equipe','annexes'] },
-  investisseur:{ label:'💼 Dossier investisseur', ids:['resume','presentation','probleme','solution','traction','marche','pestel','swot','bmc','produits','bcg','strategie_marketing','finances','prixproduits','massesalariale','planfinancement','tresorerie36','risques','financement','equipe'] },
+  bancaire:    { label:'🏦 Dossier bancaire', ids:['resume','traction','marche','finances','previsionnel','finance_avancee','bilan_ratios','prixproduits','massesalariale','planfinancement','tresorerie','tresorerie36','risques','financement','equipe','annexes'] },
+  investisseur:{ label:'💼 Dossier investisseur', ids:['resume','presentation','probleme','solution','traction','marche','pestel','swot','bmc','produits','bcg','strategie_marketing','strategie_developpement','finances','previsionnel','finance_avancee','bilan_ratios','prixproduits','massesalariale','planfinancement','tresorerie36','risques','financement','juridique','equipe'] },
   subvention:  { label:'🏛️ Dossier subvention', ids:['resume','probleme','solution','marche','persona','impact','finances','calendrier','equipe','annexes'] },
   partenaire:  { label:'🤝 Dossier partenaire', ids:['resume','presentation','traction','bmc','produits','strategie_marketing','plan_commercial','organisation','equipe'] },
 };
@@ -1003,11 +1033,16 @@ const ENR_PAGES = [
   ['impact','impact-plus','Impact — compléments','Impact — tableau de bord','Mesurer'],
   ['financement','financement-plus','Financement — compléments','Financement — sources et justificatifs','Structure du financement'],
   ['annexes','annexes-plus','Annexes — registre','Annexes — registre documentaire','Pièces'],
+  ['strategie_developpement','strategie_developpement-plus','Développement sur 5 ans','Stratégie de développement sur 5 ans','Croissance et agences'],
+  ['juridique','juridique-plus','Documents juridiques','Cadre juridique et administratif','Statuts, contrats, assurances'],
+  ['pilotage','pilotage-plus','Pilotage interne','Pilotage interne — réalisé et prévisionnel','Suivre et corriger'],
 ];
+/* Où se placent les pages des rubriques sans page de base : après la première page présente de cette liste. */
+const ENR_ANCRES = { 'strategie_developpement-plus':['calendrier-plus','calendrier'], 'juridique-plus':['financement-plus','financement'], 'pilotage-plus':['juridique-plus','financement-plus','financement'] };
 function pagePlus(bp, rub, id, label, titre, eyebrow){
   if (typeof BPEnrichi === 'undefined' || !BPEnrichi.aDesAjouts(rub)) return null;
   let b = [];
-  try { b = BPEnrichi.blocs(rub, bp, { esc, modes: ['long'], tbClass: 'doc-table compact' }); } catch (e) { console.error('Compléments', rub, e); }
+  try { b = BPEnrichi.blocs(rub, bp, { esc, modes: ['long'], tbClass: 'doc-table compact', sansEquipe: true }); } catch (e) { console.error('Compléments', rub, e); }
   if (!b.length) return null;
   const corps = b.map(x => `<p class="block-title">${esc(x.titre)}</p><div class="ench-bloc">${x.html}</div>`).join('');
   return { id, label, html: page(id,'',`
@@ -1299,6 +1334,77 @@ function pageFinances(bp){
   `);
 }
 
+/* ---- Page : Prévisionnel des gains et des dépenses (assets/bp-previsionnel.js) ----
+   Même moteur que l'éditeur et la vue de lecture. Absente tant qu'aucune ligne chiffrée n'est saisie.
+   Le détail par section se découpe en pages « (suite) » avec le reste (paginerFeuilles). */
+function pagePrevisionnel(bp){
+  if (typeof BPPrevision === 'undefined') return '';
+  const pf = (bp.sections||{}).plan_financier || {};
+  let c; try { c = BPPrevision.calculer(pf.prevision); } catch(e) { return ''; }
+  if (c.vide) return '';
+  const fmt = n => fmtEUR(Math.round(n)), ctx = { esc, fmt, cls:'doc-table' };
+  const lect = BPPrevision.lecture(c, { fmt });
+  return page('previsionnel','',`
+    ${chromeTop(bp,'Gains et dépenses sur 5 ans')}
+    <p class="eyebrow-tag">Gains et dépenses</p>
+    <h2 class="pg-title">Prévisionnel sur 5 ans</h2>
+    <p class="block-title">Synthèse : recettes, dépenses, solde et trésorerie</p>
+    ${BPPrevision.tableauSynthese(c, ctx)}
+    <div class="pv-wrap">${BPPrevision.svgGraphique(c, ctx)}</div>
+    <ul class="pv-lecture">${lect.map(m=>`<li>${esc(m)}</li>`).join('')}</ul>
+    <p class="block-title">Détail par section et par ligne</p>
+    ${BPPrevision.tableauSections(c, ctx)}
+    ${chromeBottom()}
+  `);
+}
+
+/* ---- Pages : Portefeuille clients et rentabilité ; Bilan prévisionnel et ratios (assets/bp-finance-avancee.js) ----
+   Même moteur que l'éditeur et la vue de lecture. Absentes tant que rien n'est saisi (offres, ou compte de résultat). */
+function pageFinanceAvancee(bp){
+  if (typeof BPFinanceAvancee === 'undefined') return '';
+  const pf = (bp.sections||{}).plan_financier || {};
+  let c; try { c = BPFinanceAvancee.calculer(pf, typeof BPPrevision !== 'undefined' ? BPPrevision : null); } catch(e) { return ''; }
+  if (c.vide) return '';
+  const F = BPFinanceAvancee, fmt = n => fmtEUR(Math.round(n)), ctx = { esc, fmt, cls:'doc-table' };
+  return page('finance_avancee','',`
+    ${chromeTop(bp,'Portefeuille clients et rentabilité')}
+    <p class="eyebrow-tag">Portefeuille et rentabilité</p>
+    <h2 class="pg-title">Portefeuille clients sur 5 ans</h2>
+    ${F.indicateurs(c, ctx)}
+    <div class="pv-wrap fa-graphs"><div><h4>Évolution du portefeuille clients</h4>${F.svgClients(c, ctx)}</div><div><h4>Répartition du chiffre d'affaires (année 1)</h4>${F.svgRepartition(c, ctx)}</div><div><h4>Évolution du résultat</h4>${F.svgResultat(c, ctx)}</div></div>
+    <ul class="pv-lecture">${F.lecture(c, { fmt }).map(m=>`<li>${esc(m)}</li>`).join('')}</ul>
+    <p class="block-title">Clients actifs et résiliations</p>
+    ${F.tableauClients(c, ctx)}
+    <p class="block-title">Chiffre d'affaires, charges fixes et résultat</p>
+    ${F.tableauCA(c, ctx)}
+    <p class="block-title">Rentabilité par offre</p>
+    ${F.tableauRentabiliteOffres(c, ctx)}
+    <p class="block-title">Scénarios financiers</p>
+    ${F.tableauScenarios(c, ctx)}
+    ${c.alertes.length ? `<p class="pv-lecture" style="margin-top:6px;">${c.alertes.map(esc).join(' · ')}</p>` : ''}
+    ${chromeBottom()}
+  `);
+}
+function pageBilanRatios(bp){
+  if (typeof BPFinanceAvancee === 'undefined' || typeof BPCalc === 'undefined') return '';
+  const pf = (bp.sections||{}).plan_financier || {};
+  let b; try { b = BPFinanceAvancee.bilan(pf, BPCalc); } catch(e) { return ''; }
+  if (b.vide) return '';
+  const F = BPFinanceAvancee, fmt = n => fmtEUR(Math.round(n)), ctx = { esc, fmt, cls:'doc-table' };
+  return page('bilan_ratios','',`
+    ${chromeTop(bp,'Bilan prévisionnel et ratios')}
+    <p class="eyebrow-tag">Équilibre financier</p>
+    <h2 class="pg-title">Bilan prévisionnel et ratios</h2>
+    ${F.tableauBilan(b, ctx)}
+    <p class="block-title">Besoin en fonds de roulement</p>
+    ${F.tableauBFR(b, ctx)}
+    <p class="block-title">Ratios financiers</p>
+    ${F.tableauRatios(b, ctx)}
+    <p class="pv-lecture" style="margin-top:6px;">Bilan simplifié en méthode indirecte, calculé à partir du compte de résultat, des immobilisations, des emprunts et des apports saisis ; la trésorerie est déduite des flux.${b.alertes.length ? ' ' + b.alertes.map(esc).join(' · ') : ''}</p>
+    ${chromeBottom()}
+  `);
+}
+
 /* ---- Page : Plan de financement (Ressources/Emplois) + BFR + immobilisations/emprunts ----
    Réutilise BPCalc (assets/business-plan-calc.js), la même source de calcul que l'éditeur --
    aucune formule dupliquée, aucun risque de divergence entre ce que le porteur voit en
@@ -1537,8 +1643,54 @@ function pageFinancement(bp){
   `);
 }
 
-/* ---- Page : Équipe ---- */
+/* ---- Page : Dirigeants et équipe (parcours + diplômes par personne) ---- */
 function pageEquipe(bp){
+  const ig = (bp.sections||{}).infos_generales || {};
+  let eq = null;
+  try { if (typeof BPEnrichi !== 'undefined' && BPEnrichi.equipeDetaillee) eq = BPEnrichi.equipeDetaillee(ig); } catch(e) { console.error('Équipe', e); }
+  const detail = eq && !eq.vide && (eq.kpi.experiences > 0 || eq.kpi.diplomes > 0 || eq.personnes.some(p => !p.inferee));
+  if (!detail) return pageEquipeSimple(bp);
+  const colors = ['#0D2B4E','#B84C1A','#1E4F8A','#1A7A52'];
+  const lib = (t, n) => n + ' ' + (n > 1 ? t[1] : t[0]);
+  const ann = n => n ? (n + (n > 1 ? ' ans' : ' an')) : '';
+  const fiche = (p, i) => {
+    const ini = (p.nom||'').split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('');
+    const meta = [p.annees ? ann(p.annees) + " d'expérience" : '', has(p.capital) ? p.capital + (/%/.test(p.capital) ? '' : ' %') + ' du capital' : '', p.disponibilite === 'temps_partiel' ? 'Temps partiel' : ''].filter(has).join('<br>');
+    const dip = p.diplomes.length
+      ? '<ul class="eq-liste">' + p.diplomes.map(d => '<li><strong>' + esc(d.intitule || 'Diplôme') + '</strong>' + [d.etablissement, d.pays, d.annee].filter(has).map((x,k)=> (k ? ', ' : ' — ') + esc(x)).join('') + (has(d.niveau) && d.niveau !== 'Autre' ? '<span class="eq-tag">' + esc(d.niveau.replace(/ \(.*\)/, '')) + '</span>' : '') + (d.justificatif === 'Fourni' ? '<span class="eq-tag">Justificatif joint</span>' : '') + '</li>').join('') + '</ul>'
+      : (has(p.formation) ? '<p class="eq-txt">' + esc(p.formation) + '</p>' : '');
+    const parc = p.parcours.length
+      ? '<ul class="eq-liste">' + p.parcours.map(x => '<li><span class="eq-per">' + esc(x.periode || '') + '</span><strong>' + esc(x.poste || 'Expérience') + '</strong>' + [x.organisation, x.pays].filter(has).map((y,k)=> (k ? ', ' : ' — ') + esc(y)).join('') + (has(x.realisations) ? '<br><span style="color:var(--dp-ink-soft);">' + esc(x.realisations) + '</span>' : '') + '</li>').join('') + '</ul>'
+      : [p.experienceSecteur, p.entrepreneuriales, p.realisations].filter(has).map(t => '<p class="eq-txt">' + esc(t) + '</p>').join('');
+    const comp = [has(p.competences) ? 'Compétences : ' + p.competences : '', has(p.responsabilites) ? 'Responsabilités : ' + p.responsabilites : ''].filter(has);
+    return '<div class="eq-fiche"><div class="eq-tete"><div class="team-avatar" style="background:' + colors[i % colors.length] + ';">' + esc(ini || '—') + '</div><div><p class="eq-nom">' + esc(p.nom) + '</p>' + (has(p.fonction) ? '<p class="eq-fonction">' + esc(p.fonction) + '</p>' : '') + '</div>' + (meta ? '<div class="eq-meta">' + meta + '</div>' : '') + '</div>'
+      + ((dip || parc) ? '<div class="eq-cols"><div>' + (dip ? '<p class="eq-sous">Diplômes et certifications</p>' + dip : '') + '</div><div>' + (parc ? '<p class="eq-sous">Expériences</p>' + parc : '') + '</div></div>' : '')
+      + (comp.length ? '<p class="eq-comp">' + comp.map(esc).join(' · ') + '</p>' : '') + '</div>';
+  };
+  const k = eq.kpi;
+  const kp = kpiRow([
+    ['Dirigeants et associés', k.dirigeants ? String(k.dirigeants) : ''],
+    ["Années d'expérience cumulées (dirigeants)", k.anneesDirigeants ? String(k.anneesDirigeants) : ''],
+    ['Collaborateurs', k.equipe ? String(k.equipe) : ''],
+    ['Diplômes de niveau Bac+5 ou plus', k.diplomesBac5 ? String(k.diplomesBac5) + (k.diplomes ? ' sur ' + k.diplomes + ' saisis' : '') : ''],
+  ]);
+  let i = 0;
+  const groupe = (titre, liste) => liste.length ? '<p class="block-title">' + esc(titre) + '</p>' + liste.map(p => fiche(p, i++)).join('') : '';
+  return page('equipe','',`
+    ${chromeTop(bp,'Équipe')}
+    <p class="eyebrow-tag">Dirigeants et équipe</p>
+    <h2 class="pg-title">Qui porte le projet</h2>
+    ${kp}
+    ${groupe('Dirigeants et associés', eq.groupes.dirigeants)}
+    ${groupe('Équipe', eq.groupes.equipe)}
+    ${groupe('Conseil et experts', eq.groupes.conseil)}
+    ${has(ig.competences_manquantes_equipe) ? `<p class="block-title">Compétence à recruter</p><p class="fv">${esc(ig.competences_manquantes_equipe)}</p>` : ''}
+    ${chromeBottom()}
+  `);
+}
+
+/* ---- Page : Équipe (version simple, sans parcours ni diplômes détaillés) ---- */
+function pageEquipeSimple(bp){
   const ig = (bp.sections||{}).infos_generales || {};
   const membres = Array.isArray(ig.membres_equipe) ? ig.membres_equipe.filter(m=>has(m.nom)) : [];
   if (!membres.length && !has(ig.equipe_fondatrice)) return '';
@@ -1700,6 +1852,9 @@ function renderDossier(bp, tplKey, formatKey){
     { id:'capsoncas', label:'CAP-SONCAS', html: pageCapSoncas(bp) },
     generic(bp,'plan_operationnel'), { id:'organisation', label:'Organisation & gouvernance', html: pageOrganisation(bp) }, { id:'rh', label:'Ressources humaines', html: pageRH(bp) }, generic(bp,'calendrier'),
     { id:'finances', label:'Plan financier', html: pageFinances(bp) },
+    { id:'previsionnel', label:'Gains et dépenses (5 ans)', html: pagePrevisionnel(bp) },
+    { id:'finance_avancee', label:'Portefeuille clients et rentabilité', html: pageFinanceAvancee(bp) },
+    { id:'bilan_ratios', label:'Bilan prévisionnel et ratios', html: pageBilanRatios(bp) },
     { id:'prixproduits', label:'Prix, volumes et marges', html: pagePrixMasse(bp, 'produits') },
     { id:'massesalariale', label:'Masse salariale', html: pagePrixMasse(bp, 'masse') },
     { id:'planfinancement', label:'Plan de financement', html: pagePlanFinancement(bp) },
@@ -1718,7 +1873,7 @@ function renderDossier(bp, tplKey, formatKey){
     const pp = pagePlus(bp, rub, id, label, titre, eyebrow); if (!pp) return;
     if (id === 'identite') { const i = pageDefs.findIndex(p => p.id === 'resume'); pageDefs.splice(i < 0 ? 0 : i, 0, pp); return; }
     const base = baseDe(id);
-    let i = -1; pageDefs.forEach((p, k) => { if (p.id === base) i = k; });
+    let i = -1; (ENR_ANCRES[id] || [base]).forEach(b => { if (i < 0) pageDefs.forEach((p, k) => { if (p.id === b) i = k; }); });
     if (i < 0) { const eq = pageDefs.findIndex(p => p.id === 'equipe'); pageDefs.splice(eq < 0 ? pageDefs.length : eq, 0, pp); } else pageDefs.splice(i + 1, 0, pp);
   });
   for (let k = pageDefs.length - 1; k >= 0; k--) { if (format.ids && !format.ids.includes(baseDe(pageDefs[k].id)) && !format.ids.includes(pageDefs[k].id)) pageDefs.splice(k, 1); }
@@ -1729,9 +1884,9 @@ function renderDossier(bp, tplKey, formatKey){
   const CHAPTERS = [
     { num:1, titre:'Le projet', sous:'Résumé, problème et solution', ids:['identite','resume','resume-plus','presentation','presentation-plus','probleme','probleme-plus','solution','solution-plus'] },
     { num:2, titre:'Marché & traction', sous:'Étude de marché, positionnement et preuves', ids:['traction','marche','marche-plus','pestel','persona','swot','swot-plus'] },
-    { num:3, titre:'Modèle & opérations', sous:'Business model, produits et organisation', ids:['bmc','bmc-plus','produits','produits-plus','bcg','strategie_marketing','strategie_marketing-plus','plan_commercial','plan_commercial-plus','capsoncas','plan_operationnel','plan_operationnel-plus','organisation','organisation-plus','rh','rh-plus','calendrier','calendrier-plus'] },
-    { num:4, titre:'Finances', sous:'Trajectoire financière, risques et impact', ids:['finances','finances-plus','prixproduits','massesalariale','planfinancement','tresorerie','tresorerie36','risques','risques-plus','impact','impact-plus','financement','financement-plus'] },
-    { num:5, titre:"Équipe & annexes", sous:'Qui porte le projet', ids:['equipe','annexes','annexes-plus'] },
+    { num:3, titre:'Modèle & opérations', sous:'Business model, produits et organisation', ids:['bmc','bmc-plus','produits','produits-plus','bcg','strategie_marketing','strategie_marketing-plus','plan_commercial','plan_commercial-plus','capsoncas','plan_operationnel','plan_operationnel-plus','organisation','organisation-plus','rh','rh-plus','calendrier','calendrier-plus','strategie_developpement-plus'] },
+    { num:4, titre:'Finances', sous:'Trajectoire financière, risques et impact', ids:['finances','finances-plus','previsionnel','finance_avancee','bilan_ratios','prixproduits','massesalariale','planfinancement','tresorerie','tresorerie36','risques','risques-plus','impact','impact-plus','financement','financement-plus'] },
+    { num:5, titre:"Équipe, cadre juridique & annexes", sous:'Qui porte le projet, cadre juridique et pilotage', ids:['equipe','juridique-plus','pilotage-plus','annexes','annexes-plus'] },
   ];
   let currentChapitre = null, bodyHtml = '';
   pageDefs.forEach(p => {

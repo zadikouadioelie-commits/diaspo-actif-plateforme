@@ -123,6 +123,14 @@
 
   /* Tableaux */
   .bpv-table-wrap{overflow-x:auto;margin-bottom:8px;}
+  /* Prévisionnel des gains et des dépenses (assets/bp-previsionnel.js) */
+  .bpv-pv-graph{margin:12px 0;}
+  .bpv-pv-lecture{font-size:13px;margin:6px 0 0 18px;}
+  .bpv-pv-note{font-size:12px;color:var(--muted);margin:4px 0 10px;}
+  body.nd-bp{--pv-grille:rgba(255,255,255,.16);--pv-fond:rgba(227,192,110,.09);--pv-rec:#3FBF98;--pv-dep:#F0A04B;--pv-cum:#7FB2FF;--pv-negatif:#FF9B6B;}
+  .pv-t .pv-total td{font-weight:800;}
+  .pv-t .pv-section td{font-weight:800;background:var(--pv-fond,rgba(120,140,170,.12));}
+  .pv-t .pv-neg{color:var(--pv-negatif,#c2410c);}
   table.bpv-table{width:100%;border-collapse:collapse;font-size:13px;}
   table.bpv-table th{text-align:left;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);border-bottom:2px solid var(--border);padding:6px 10px;white-space:nowrap;}
   table.bpv-table td{padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:top;}
@@ -441,6 +449,8 @@
 <script src="assets/bp-marketing.js?v=1"></script>
 <script src="assets/bp-organisation.js?v=1"></script>
 <script src="assets/bp-enrichi.js?v=1"></script>
+<script src="assets/bp-previsionnel.js?v=1"></script>
+<script src="assets/bp-finance-avancee.js?v=1"></script>
 <script src="assets/koffi-businessplan.js?v=6"></script>
 <!-- Génération PDF réelle (point 17 du cahier des charges "Gestion multidevise" : "il ne suffit
      pas que les conversions apparaissent uniquement dans l'interface") -- même bibliothèque déjà
@@ -782,6 +792,73 @@ function renderAnnexes(items){
     </div>`).join('')}</div>`;
 }
 
+/* Gains et dépenses sur plusieurs années (assets/bp-previsionnel.js) : même moteur que l'éditeur et le dossier.
+   Bloc 1 : le prévisionnel détaillé saisi par le porteur (sections libres), s'il existe.
+   Bloc 2 : synthèse tirée du compte de résultat (recettes, dépenses, résultat, cumul), toujours affichée dès
+   qu'une année est renseignée — le lecteur voit ainsi gains et dépenses sans devoir déduire le résultat. */
+function pvVueBlocs(pf) {
+  if (typeof BPPrevision === 'undefined') return '';
+  pf = pf || {};
+  let html = '';
+  const fmt = n => fmtMontant(Math.round(n)), ctx = { esc, fmt, cls: 'bpv-table pv-t' };
+  try {
+    const c = BPPrevision.calculer(pf.prevision);
+    if (!c.vide) {
+      html += `<div class="bpv-field" style="margin-top:20px;"><h4>Prévisionnel des gains et des dépenses</h4></div>
+        <div class="bpv-table-wrap">${BPPrevision.tableauSynthese(c, ctx)}</div>
+        <div class="bpv-pv-graph">${BPPrevision.svgGraphique(c, ctx)}</div>
+        <ul class="bpv-pv-lecture">${BPPrevision.lecture(c, { fmt }).map(m => `<li>${esc(m)}</li>`).join('')}</ul>
+        <div class="bpv-field" style="margin-top:14px;"><h4>Détail par section</h4></div>
+        <div class="bpv-table-wrap">${BPPrevision.tableauSections(c, ctx)}</div>`;
+    }
+  } catch (e) { console.error('Prévisionnel détaillé', e); }
+  try {
+    if (typeof BPCalc !== 'undefined') {
+      const mod = BPCalc.calcModeleFinancier(pf);
+      const an = mod.annees.map(y => {
+        const dep = y.achats + y.chargesExternes + y.personnel + y.amortissements + y.interets + (mod.regime ? y.impot : 0);
+        return { a: y.a, recettes: y.produits, depenses: dep, recurrentes: dep, ponctuelles: 0, recurrentesParMois: dep / 12, solde: y.produits - dep, cumul: 0, marge: y.produits > 0 ? (y.produits - dep) / y.produits * 100 : null };
+      }).filter(y => y.recettes || y.depenses);
+      let cum = 0; an.forEach(y => { cum += y.solde; y.cumul = cum; });
+      if (an.length) {
+        const cr = { annees: an, vide: false, tresorerieDepart: 0 };
+        const c2 = Object.assign({ sansDetail: true, libSolde: mod.regime ? "Résultat net de l'année" : "Résultat de l'année (avant impôt)", libCumul: 'Résultat cumulé' }, ctx);
+        html += `<div class="bpv-field" style="margin-top:20px;"><h4>Gains et dépenses prévisionnels — synthèse du compte de résultat</h4></div>
+          <div class="bpv-table-wrap">${BPPrevision.tableauSynthese(cr, c2)}</div>
+          <div class="bpv-pv-graph">${BPPrevision.svgGraphique(cr, c2)}</div>
+          <p class="bpv-pv-note">Dépenses = achats, charges externes, personnel, amortissements et intérêts${mod.regime ? ', impôt compris' : ''}. Le résultat cumulé additionne les résultats annuels : ce n'est pas la trésorerie.</p>`;
+      }
+    }
+  } catch (e) { console.error('Synthèse du compte de résultat', e); }
+  return html;
+}
+
+/* Portefeuille clients sur 60 mois, rentabilité par offre, seuil de rentabilité, scénarios, bilan, BFR et ratios
+   (assets/bp-finance-avancee.js) : même moteur que l'éditeur et le dossier ; rien ne s'affiche tant que rien n'est saisi. */
+function faVueBlocs(pf) {
+  if (typeof BPFinanceAvancee === 'undefined') return '';
+  pf = pf || {};
+  const F = BPFinanceAvancee, fmt = n => fmtMontant(Math.round(n)), ctx = { esc, fmt, cls: 'bpv-table pv-t' };
+  const bloc = (t, h) => h ? `<div class="bpv-field" style="margin-top:16px;"><h4>${t}</h4></div><div class="bpv-table-wrap">${h}</div>` : '';
+  let html = '';
+  try {
+    const c = F.calculer(pf, typeof BPPrevision !== 'undefined' ? BPPrevision : null);
+    if (!c.vide) {
+      html += `<style>${F.CSS}</style><div class="bpv-field" style="margin-top:22px;"><h4>Portefeuille clients et rentabilité sur 5 ans</h4></div>${F.indicateurs(c, ctx)}
+        <div class="fa-graphs"><div><h4>Évolution du portefeuille clients</h4>${F.svgClients(c, ctx)}</div><div><h4>Répartition du chiffre d'affaires (année 1)</h4>${F.svgRepartition(c, ctx)}</div><div><h4>Évolution du résultat</h4>${F.svgResultat(c, ctx)}</div></div>`
+        + bloc('Clients actifs et résiliations', F.tableauClients(c, ctx)) + bloc("Chiffre d'affaires, charges fixes et résultat", F.tableauCA(c, ctx))
+        + bloc('Rentabilité par offre', F.tableauRentabiliteOffres(c, ctx)) + bloc('Scénarios financiers', F.tableauScenarios(c, ctx))
+        + `<ul class="bpv-pv-lecture">${F.lecture(c, { fmt }).map(m => `<li>${esc(m)}</li>`).join('')}</ul>`
+        + (c.alertes.length ? `<p class="bpv-pv-note">${c.alertes.map(esc).join(' · ')}</p>` : '');
+    }
+    if (typeof BPCalc !== 'undefined') {
+      const b = F.bilan(pf, BPCalc);
+      if (!b.vide) html += `<style>${F.CSS}</style>` + bloc('Bilan prévisionnel simplifié', F.tableauBilan(b, ctx)) + bloc('Besoin en fonds de roulement', F.tableauBFR(b, ctx)) + bloc('Ratios financiers', F.tableauRatios(b, ctx))
+        + `<p class="bpv-pv-note">Bilan simplifié en méthode indirecte, calculé à partir du compte de résultat, des immobilisations, des emprunts et des apports saisis.${b.alertes.length ? ' ' + b.alertes.map(esc).join(' · ') : ''}</p>`;
+    }
+  } catch (e) { console.error('Finance avancée', e); }
+  return html;
+}
 function renderPlanFinancier(pf){
   if (!pf) return '';
   let html = '';
@@ -794,6 +871,8 @@ function renderPlanFinancier(pf){
     html += `<div class="bpv-field-grid" style="margin-bottom:20px;">${resume.map(([k,l]) => `
       <div class="bpv-field"><h4>${l}</h4><p>${k==='point_mort'?esc(pf[k])+' mois':fmtMontant(pf[k])}</p></div>`).join('')}</div>`;
   }
+  html += pvVueBlocs(pf);   /* gains et dépenses sur plusieurs années : en tête de la rubrique pour être vus tout de suite */
+  html += faVueBlocs(pf);   /* portefeuille clients, rentabilité, scénarios, bilan, BFR et ratios */
   {/* bfr : champ de texte libre ("Explication et montant…" dans l'éditeur), pas un nombre pur
        -- rendu ici en texte comme immobilisations/amortissements/scénarios, jamais via
        fmtMontant() (qui produisait "NaN EUR" dès que la valeur contenait autre chose qu'un
@@ -1032,10 +1111,13 @@ async function init(){
     { key:'organisation', icon:'🏗', label:'Organisation & Gouvernance' },
     { key:'rh', icon:'👥', label:'Ressources humaines' },
     { key:'calendrier', icon:'📅', label:'Calendrier de mise en œuvre' },
+    { key:'strategie_developpement', icon:'🚀', label:'Stratégie de développement (5 ans)' },
     { key:'plan_financier', icon:'💰', label:'Plan financier' },
     { key:'risques', icon:'⚠️', label:'Analyse des risques' },
     { key:'impact', icon:'🌱', label:'Impact' },
     { key:'financement', icon:'🏦', label:'Recherche de financement' },
+    { key:'juridique', icon:'⚖️', label:'Documents juridiques' },
+    { key:'pilotage', icon:'🧭', label:'Pilotage interne' },
     { key:'annexes', icon:'📎', label:'Annexes' },
   ];
 
