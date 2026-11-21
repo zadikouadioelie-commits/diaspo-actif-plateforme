@@ -1,0 +1,27 @@
+/* Bandeau en deux bandes (2026-11-21) — 2e bande sous le bandeau, qui reçoit la barre des accès (.nav) sur ordinateur.
+   Injectée par assets/app.js (bloc « Bandeau en DEUX BANDES »), jamais liée à la main dans les pages.
+   Les couleurs, le verre et le style des liens viennent des règles existantes de .topbar / .nav / body.nd (la bande porte
+   aussi la classe .topbar) : ici on ne règle que la mise en page — passage à la ligne au lieu du défilement, bande non collante.
+   Retour arrière : retirer le bloc de app.js et supprimer ce fichier. */
+html body .topbar.topbar-bande2{
+  position:static!important;top:auto!important;z-index:40;
+  border-top:1px solid rgba(255,255,255,.06);
+}
+html body .topbar.topbar-bande2 .topbar-inner{
+  justify-content:center!important;gap:0!important;
+  padding-top:8px!important;padding-bottom:10px!important;
+}
+html body .topbar.topbar-bande2 .nav{
+  display:flex!important;flex-wrap:wrap!important;justify-content:center!important;
+  gap:6px 8px!important;padding:6px 8px!important;
+  overflow:visible!important;overflow-x:visible!important;
+  -webkit-mask-image:none!important;mask-image:none!important;
+  flex:0 1 auto!important;max-width:100%!important;
+  scrollbar-width:none!important;
+}
+html body .topbar.topbar-bande2 .nav::-webkit-scrollbar{display:none!important;height:0!important}
+html body .topbar.topbar-bande2 .nav a{
+  font-size:14.5px!important;padding:9px 20px!important;white-space:nowrap!important;
+}
+/* Pages imprimées ou intégrées en iframe : pas de seconde bande. */
+@media print{html body .topbar.topbar-bande2{display:none!important}}

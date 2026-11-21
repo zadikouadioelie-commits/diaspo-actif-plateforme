@@ -8269,3 +8269,64 @@ document.addEventListener('load', function (e) {
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ajouterInfluenceur);
   else ajouterInfluenceur();
 })();
+
+/* ── Bandeau en DEUX BANDES sur ordinateur (2026-11-21, demande explicite : « plutôt que de ne voir qu'une partie des
+   propositions du héros, créer en dessous un espace où tous ces boutons sont bien visibles — sur toutes les pages ») ──
+   La barre des accès (.nav : Accueil, Annuaire, Événements…) défilait horizontalement dans la bande du haut et cachait
+   une partie de ses liens. Sur écran ≥ 769 px, on DÉPLACE (jamais recréé : tous les scripts, classes « active » et liens
+   ajoutés par completer()/ajouterInfluenceur() continuent de marcher) cette barre dans une 2e bande posée juste sous le
+   bandeau ; elle passe à la ligne au lieu de défiler. La 2e bande n'est PAS collante : de nombreuses pages ont des menus
+   « sticky » calés sur la hauteur de la bande du haut (top:70-80px) — seule la bande du haut (logo, menu, compte) reste
+   fixée, donc rien ne se décale. Sous 769 px la barre retourne à sa place (menu mobile inchangé).
+   Retour arrière : supprimer ce bloc et assets/nav-deux-bandes.css. Une page qui veut l'ancien rail pose data-nav-fixe
+   (déjà respecté par completer()) ou data-nav-une-bande sur <body>. */
+(function () {
+  if (document.body && document.body.hasAttribute('data-nav-une-bande')) return;
+  var mq = window.matchMedia ? window.matchMedia('(min-width:769px)') : null;
+  if (!mq) return;
+  var header, nav, band, inner, repere;
+
+  function trouver() {
+    header = document.querySelector('header.topbar, .topbar');
+    nav = header && header.querySelector('.nav');
+    if (!header || !nav || nav.hasAttribute('data-nav-fixe')) return false;
+    if (nav.querySelectorAll('a').length < 2) return false; /* pages à barre vide ou à lien unique : intactes */
+    return true;
+  }
+  function vers2eBande() {
+    if (!nav || nav.parentNode === (inner || null)) return;
+    if (!band) {
+      band = document.createElement('div');
+      band.className = 'topbar topbar-bande2';
+      band.setAttribute('data-nav-bande', '2');
+      inner = document.createElement('div');
+      inner.className = 'topbar-inner';
+      band.appendChild(inner);
+    }
+    if (!repere) { repere = document.createComment('nav-origine'); nav.parentNode.insertBefore(repere, nav); }
+    inner.appendChild(nav);
+    if (!band.parentNode) header.parentNode.insertBefore(band, header.nextSibling);
+    /* completer() mesure le rail pour retirer les accès ajoutés qui « ne tiennent pas » : le rail passe maintenant à la ligne,
+       on lui fait remesurer pour qu'il remette tous les accès. */
+    setTimeout(function () { try { window.dispatchEvent(new Event('resize')); } catch (e) { /* sans effet */ } }, 60);
+  }
+  function versBandeHaut() {
+    if (!nav || !repere || !repere.parentNode) return;
+    if (nav.parentNode !== repere.parentNode) repere.parentNode.insertBefore(nav, repere);
+    if (band && band.parentNode) band.parentNode.removeChild(band);
+  }
+  function appliquer() { if (mq.matches) vers2eBande(); else versBandeHaut(); }
+
+  function demarrer() {
+    if (!trouver()) return;
+    if (!document.getElementById('nav-deux-bandes-css')) {
+      var l = document.createElement('link');
+      l.id = 'nav-deux-bandes-css'; l.rel = 'stylesheet'; l.href = '/assets/nav-deux-bandes.css?v=1';
+      document.head.appendChild(l);
+    }
+    appliquer();
+    if (mq.addEventListener) mq.addEventListener('change', appliquer); else if (mq.addListener) mq.addListener(appliquer);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', demarrer);
+  else demarrer();
+})();
