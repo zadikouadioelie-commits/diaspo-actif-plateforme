@@ -420,7 +420,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,500;0,6..96,600;1,6..96,500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <!-- Design « Nuit dorée » (2026-10-12) : surcharges chargées en dernier, tout est préfixé html body.nd ; retour arrière : retirer ces 2 lignes et class="nd" sur <body> -->
   <link rel="stylesheet" href="/assets/theme-nuit-doree.css?v=8">
-  <link rel="stylesheet" href="/assets/evenements-nuit-doree.css?v=9">
+  <link rel="stylesheet" href="/assets/evenements-nuit-doree.css?v=10">
 </head>
 <body class="nd">
 <div class="page">
@@ -462,13 +462,26 @@
 
 <!-- IDENTITY BANNER -->
 <div id="evt-identity">
-  <span class="evt-pill">📅 Tous les événements de la plateforme</span>
-  <span class="evt-pill">🌍 Public ou privé</span>
-  <span class="evt-pill">🎟️ Billetterie & QR Codes</span>
-  <span class="evt-pill">📊 Statistiques & rappels</span>
+  <!-- Icônes au trait uniformes (2026-11-21, demande explicite : « pas d'emojis mais des illustrations uniformes ») — retour arrière : remettre les emojis -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
+    <symbol id="i-cal" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></symbol>
+    <symbol id="i-calcheck" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4M9.2 15l2 2 3.8-3.8"/></symbol>
+    <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.6 2.4 3.8 5.3 3.8 8.5s-1.2 6.1-3.8 8.5c-2.6-2.4-3.8-5.3-3.8-8.5S9.4 5.9 12 3.5z"/></symbol>
+    <symbol id="i-ticket" viewBox="0 0 24 24"><path d="M4 9V7.5A1.5 1.5 0 0 1 5.5 6h13A1.5 1.5 0 0 1 20 7.5V9a3 3 0 0 0 0 6v1.5a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 16.5V15a3 3 0 0 0 0-6z"/><path d="M14 7.5v9" stroke-dasharray="1.6 2.2"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20.5h16"/><rect x="5.5" y="12" width="3" height="8.5" rx=".8"/><rect x="10.5" y="6.5" width="3" height="14" rx=".8"/><rect x="15.5" y="9.5" width="3" height="11" rx=".8"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></symbol>
+    <symbol id="i-doc" viewBox="0 0 24 24"><path d="M7 3.5h6.5L18 8v11a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 6 19V5A1.5 1.5 0 0 1 7 3.5z"/><path d="M13.5 3.5V8H18M9 12.5h6M9 16h6"/></symbol>
+    <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 3L5.5 13.5H11L10 21l7.5-10.5H12z"/></symbol>
+    <symbol id="i-mega" viewBox="0 0 24 24"><path d="M4 10v4a1 1 0 0 0 1 1h2.5l7 4V5l-7 4H5a1 1 0 0 0-1 1z"/><path d="M18 9.5a3.5 3.5 0 0 1 0 5"/></symbol>
+    <symbol id="i-save" viewBox="0 0 24 24"><path d="M5 4.5h11l3 3V19a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1z"/><path d="M8 4.5V9h7V4.5M8 20v-6h8v6"/></symbol>
+  </defs></svg>
+  <span class="evt-feat"><span class="evt-ico"><svg class="ic" width="20" height="20" aria-hidden="true"><use href="#i-cal"/></svg></span><span class="evt-feat-t"><b>Tous les événements</b><small>de la plateforme</small></span></span>
+  <span class="evt-feat"><span class="evt-ico"><svg class="ic" width="20" height="20" aria-hidden="true"><use href="#i-globe"/></svg></span><span class="evt-feat-t"><b>Public ou privé</b><small>au choix de l'organisateur</small></span></span>
+  <span class="evt-feat"><span class="evt-ico"><svg class="ic" width="20" height="20" aria-hidden="true"><use href="#i-ticket"/></svg></span><span class="evt-feat-t"><b>Billetterie</b><small>& QR Codes</small></span></span>
+  <span class="evt-feat"><span class="evt-ico"><svg class="ic" width="20" height="20" aria-hidden="true"><use href="#i-chart"/></svg></span><span class="evt-feat-t"><b>Statistiques</b><small>& rappels</small></span></span>
   <span style="flex:1"></span>
   <span style="font-size:.74rem;opacity:.8;">Pour un rendez-vous privé :</span>
-  <a class="evt-identity-link" href="/agenda.html">📅 Mon Agenda →</a>
+  <a class="evt-identity-link" href="/agenda.html"><svg class="ic" width="16" height="16" aria-hidden="true"><use href="#i-calcheck"/></svg>Mon Agenda<span aria-hidden="true">→</span></a>
 </div>
 
 <div id="evt-page-row">
@@ -478,28 +491,28 @@
       <h2 style="margin:0 0 4px">📅 Événements Diaspo'Actif</h2>
       <p class="sub" style="margin:0">Tous les événements présents sur la plateforme Diaspo'Actif, réunis au même endroit — affinez avec les filtres ci-contre.</p>
     </div>
-    <div style="display:flex;gap:8px;align-items:center;">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
       <!-- Cloche des événements (2026-10-13, demande explicite) : choisir les événements pour lesquels on veut être notifié — retour arrière : retirer ce bouton et le script en bas de page -->
       <button type="button" id="btn-alertes-evt" aria-label="Être informé des événements" title="Être informé des événements"></button>
-      <a class="btn btn-outline" href="programmation.html" style="font-size:12.5px;">🔔 Programmation d'alertes</a>
+      <a class="btn btn-outline btn-ic" href="programmation.html" style="font-size:12.5px;"><svg class="ic" width="16" height="16" aria-hidden="true"><use href="#i-clock"/></svg>Programmation d'alertes</a>
       <!-- Espace « Compte-rendu d'événement » (2026-11-02, demande explicite) : tous les comptes-rendus publiés, rangés au même endroit — retour arrière : retirer ce bouton -->
-      <a class="btn btn-outline" id="btn-comptes-rendus" href="comptes-rendus.html" style="font-size:12.5px;">📄 Compte-rendu d'événement</a>
-      <button class="btn btn-outline" id="btn-calendrier-diaspora" style="font-size:12.5px;" onclick="cdOuvrirCalendrier()">📅 Calendrier Diaspora</button>
+      <a class="btn btn-outline btn-ic" id="btn-comptes-rendus" href="comptes-rendus.html" style="font-size:12.5px;"><svg class="ic" width="16" height="16" aria-hidden="true"><use href="#i-doc"/></svg>Compte-rendu d'événement</a>
+      <button class="btn btn-outline btn-ic" id="btn-calendrier-diaspora" style="font-size:12.5px;" onclick="cdOuvrirCalendrier()"><svg class="ic" width="16" height="16" aria-hidden="true"><use href="#i-cal"/></svg>Calendrier Diaspora</button>
       <span id="btn-flash-wrap" style="display:none;align-items:center;gap:2px;">
-        <button class="btn" id="btn-flash" style="font-size:12.5px;background:#7BE87B;color:#052e0f;border:none;font-weight:800;border-radius:8px 0 0 8px;" onclick="flashOuvrir()">⚡ Événement flash</button>
+        <button class="btn btn-ic" id="btn-flash" style="font-size:12.5px;background:#7BE87B;color:#052e0f;border:none;font-weight:800;border-radius:8px 0 0 8px;" onclick="flashOuvrir()"><svg class="ic" width="16" height="16" aria-hidden="true"><use href="#i-bolt"/></svg>Événement flash</button>
         <!-- "?" rattaché visuellement au bouton Flash (2026-10-01, demande explicite : "permet
              de comprendre que ce point d'interrogation concerne ce bouton et rend le plus
              visible") — même teinte verte que le bouton, accolé sans espace (coins arrondis
              complémentaires), au lieu d'un cercle gris générique qui semblait flotter à part. -->
-        <button type="button" onclick="alert('Événement flash : publiez en quelques secondes une simple annonce (photo, adresse, dates, description) pour prévenir rapidement la communauté. Purement informatif — aucune inscription n\'est proposée. Pour un événement où les gens peuvent s\'inscrire, utilisez plutôt « 📢 Créer un événement ».')" title="À quoi sert le bouton ⚡ Événement flash ?" style="width:24px;height:24px;border-radius:0 8px 8px 0;border:none;border-left:1px solid rgba(5,46,15,.25);background:#7BE87B;color:#052e0f;font-size:13px;font-weight:800;cursor:pointer;line-height:1;padding:0;flex-shrink:0;">?</button>
+        <button type="button" onclick="alert('Événement flash : publiez en quelques secondes une simple annonce (photo, adresse, dates, description) pour prévenir rapidement la communauté. Purement informatif — aucune inscription n\'est proposée. Pour un événement où les gens peuvent s\'inscrire, utilisez plutôt « Créer un événement ».')" title="À quoi sert le bouton Événement flash ?" style="width:24px;height:24px;border-radius:0 8px 8px 0;border:none;border-left:1px solid rgba(5,46,15,.25);background:#7BE87B;color:#052e0f;font-size:13px;font-weight:800;cursor:pointer;line-height:1;padding:0;flex-shrink:0;">?</button>
       </span>
       <!-- Brouillons (2026-10-28, demande explicite : « lorsque la création d'un événement a été mise en brouillon, fais apparaître ici un bouton Brouillon pour pouvoir le récupérer et continuer ») :
            visible seulement s'il existe au moins un brouillon à soi (voir chargerBrouillons) ; un seul brouillon → la modale s'ouvre directement, plusieurs → liste à choisir. -->
       <span id="btn-brouillon-wrap" style="display:none;position:relative;">
-        <button type="button" class="btn btn-outline" id="btn-brouillon" style="font-size:12.5px;" aria-haspopup="true" aria-expanded="false">💾 Brouillon <span id="btn-brouillon-nb" style="font-weight:800;"></span></button>
+        <button type="button" class="btn btn-outline btn-ic" id="btn-brouillon" style="font-size:12.5px;" aria-haspopup="true" aria-expanded="false"><svg class="ic" width="16" height="16" aria-hidden="true"><use href="#i-save"/></svg>Brouillon <span id="btn-brouillon-nb" style="font-weight:800;"></span></button>
         <div id="brouillon-liste" role="menu" style="display:none;position:absolute;top:calc(100% + 6px);right:0;z-index:50;min-width:280px;max-width:360px;background:var(--card,#fff);border:1px solid var(--border,#e2e8f0);border-radius:12px;padding:8px;box-shadow:0 12px 32px rgba(0,0,0,.35);"></div>
       </span>
-      <button class="btn btn-orange" id="btn-creer" style="display:none">📢 Créer un événement</button>
+      <button class="btn btn-orange btn-ic" id="btn-creer" style="display:none"><svg class="ic" width="16" height="16" aria-hidden="true"><use href="#i-mega"/></svg>Créer un événement</button>
     </div>
   </div>
 
