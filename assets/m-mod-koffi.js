@@ -18,10 +18,10 @@
     if (test()) return Promise.resolve();
     return new Promise(ok => { const sc = document.createElement('script'); sc.src = src; sc.onload = ok; sc.onerror = ok; document.head.appendChild(sc); });
   }
-  const chargerAnnuaire = () => charger('/assets/koffi-annuaire.js?v=5', () => !!window.KoffiAnnuaire);
-  const chargerEvenements = () => charger('/assets/koffi-evenements.js?v=5', () => !!window.KoffiEvenements);
-  const chargerInscriptions = () => charger('/assets/koffi-inscriptions.js?v=2', () => !!window.KoffiInscriptions);
-  const chargerSondages = () => charger('/assets/koffi-sondages.js?v=2', () => !!window.KoffiSondages);
+  const chargerAnnuaire = () => charger('/assets/koffi-annuaire.js?v=6', () => !!window.KoffiAnnuaire);
+  const chargerEvenements = () => charger('/assets/koffi-evenements.js?v=6', () => !!window.KoffiEvenements);
+  const chargerInscriptions = () => charger('/assets/koffi-inscriptions.js?v=3', () => !!window.KoffiInscriptions);
+  const chargerSondages = () => charger('/assets/koffi-sondages.js?v=3', () => !!window.KoffiSondages);
 
   /* Tous les boutons Koffi du téléphone se déplacent au doigt ; une seule position mémorisée pour qu'il reste où on l'a posé d'un écran à l'autre. */
   const CLE_POS = 'da_koffi_pos_tel';

@@ -83,6 +83,8 @@
       '.kc-foot{border-top:1px solid #e2e8f0;padding:8px 76px 8px 10px;background:#fff;flex:0 0 auto}', /* 76 px à droite : le bouton d'assistance du site (coin bas-droit) ne doit jamais masquer « Envoyer » */
       '.kc-cred{font-size:11.5px;color:#64748b;margin:0 0 6px;min-height:15px}',
       '.kc-compo{display:flex;gap:6px;align-items:flex-end}',
+      /* Texte saisi toujours NOIR sur fond blanc, même sous le thème sombre du téléphone (2026-11-21). */
+      'html body .kc-compo textarea{color:#000!important;-webkit-text-fill-color:#000!important;caret-color:#000;background:#fff!important;color-scheme:light}', 'html body .kc-compo textarea::placeholder{color:#64748b!important;-webkit-text-fill-color:#64748b!important;opacity:1}',
       '.kc-compo textarea{flex:1;min-width:0;resize:none;border:1px solid #cbd5e1;border-radius:10px;padding:8px 10px;font:14px/1.4 system-ui,sans-serif;min-height:40px;max-height:140px}',
       '.kc-mic{background:#fff;border:1px solid #cbd5e1;border-radius:10px;width:40px;height:40px;cursor:pointer;font-size:17px;flex:0 0 auto}.kc-mic.rec{background:#dc2626;border-color:#dc2626;animation:kcPulse 1.2s infinite}@keyframes kcPulse{50%{opacity:.6}}',
       '.kc-send{background:#E6B84A;color:#0F2342;border:0;border-radius:10px;padding:0 12px;height:40px;font-weight:800;cursor:pointer;flex:0 0 auto}.kc-send:disabled{opacity:.5;cursor:default}',

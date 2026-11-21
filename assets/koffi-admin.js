@@ -75,6 +75,8 @@
     '.kad-form{display:flex;gap:8px;align-items:flex-end}',
     '.kad-form textarea{flex:1;resize:none;border:1px solid #cbd5e1;border-radius:12px;padding:9px 11px;font:14px/1.4 inherit;font-family:inherit;max-height:110px;min-height:42px;background:#fff;color:#0f172a}',
     '.kad-form textarea:focus{outline:2px solid #F26422;border-color:#F26422}',
+    /* Texte saisi toujours NOIR sur fond blanc, même sous le thème sombre du téléphone (2026-11-21) ; la date « quand » aussi. */
+    'html body .kad-root .kad-form textarea,html body .kad-root .kad-quand{color:#000!important;-webkit-text-fill-color:#000!important;caret-color:#000;background:#fff!important;color-scheme:light}', 'html body .kad-root .kad-form textarea::placeholder{color:#64748b!important;-webkit-text-fill-color:#64748b!important;opacity:1}',
     '.kad-send{border:0;background:#F26422;color:#fff;border-radius:12px;height:42px;padding:0 16px;font:800 14px inherit;font-family:inherit;cursor:pointer}.kad-send:disabled{opacity:.5;cursor:not-allowed}',
     '.kad-card{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:14px;font-size:13.5px;line-height:1.55;color:#0f172a}',
     '.kad-card h4{margin:0 0 6px;font-size:15px;color:#0D2B4E}.kad-card p{margin:0 0 8px}.kad-card ul{margin:8px 0 12px;padding-left:18px}.kad-card li{margin:4px 0}',

@@ -84,6 +84,8 @@
     /* Zone d'écriture : trois lignes d'emblée (on voit ce qu'on écrit), elle grandit jusqu'à 200 px puis défile. */
     '.ka-form textarea{flex:1;min-width:0;resize:none;border:1px solid #cbd5e1;border-radius:12px;padding:10px 12px;font:15px/1.45 inherit;font-family:inherit;max-height:200px;min-height:92px;background:#fff;color:#0f172a}',
     '.ka-form textarea:focus{outline:2px solid #F26422;border-color:#F26422}',
+    /* Texte saisi toujours NOIR sur fond blanc, même sous le thème sombre du téléphone (2026-11-21). */
+    'html body .ka-root .ka-form textarea{color:#000!important;-webkit-text-fill-color:#000!important;caret-color:#000;background:#fff!important;color-scheme:light}', 'html body .ka-root .ka-form textarea::placeholder{color:#64748b!important;-webkit-text-fill-color:#64748b!important;opacity:1}',
     '.ka-side{display:flex;flex-direction:column;gap:6px;justify-content:flex-end}',
     '.ka-send{border:0;background:#F26422;color:#fff;border-radius:12px;height:42px;padding:0 16px;font:800 14px inherit;font-family:inherit;cursor:pointer}.ka-send:disabled{opacity:.5;cursor:not-allowed}',
     '.ka-mic{border:1.5px solid #cbd5e1;background:#fff;color:#0D2B4E;border-radius:12px;height:42px;font-size:19px;cursor:pointer;line-height:1}.ka-mic:hover{background:#fff7ed;border-color:#F26422}.ka-mic:focus-visible{outline:3px solid #F26422;outline-offset:2px}',
