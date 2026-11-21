@@ -2575,7 +2575,7 @@
   const MODS = [
     { t: 'Sondages', i: 'doc', h: '#/sondages', d: 'Sondages en cours, vos propres sondages, en créer un', r: { utilisateur: 4, initiative: 4, collectivite: 1, administrateur: 1 } },
     { t: 'Mes événements', i: 'cal', h: '#/mesevenements', d: 'Créer et gérer vos événements', r: { initiative: 2, collectivite: 1, administrateur: 1 } },
-    { t: 'Fiches d’inscription', i: 'ticket', h: '#/inscriptions', d: 'Inscriptions à vos événements, billets, QR codes', r: { initiative: 2, collectivite: 1, administrateur: 1 } },
+    { t: 'Fiche d’inscription', i: 'ticket', h: '#/inscriptions', d: 'Inscriptions à vos événements, billets, QR codes', r: { initiative: 2, collectivite: 1, administrateur: 1 } },
     { t: 'Cotisations et adhésions', i: 'people', h: '#/cotisations', d: 'Formules, adhérents, paiements', r: { initiative: 2 } },
     { t: 'Création de formation', i: 'book', h: '#/creationformation', d: 'Créer et vendre vos formations (avec l’autorisation de Diaspo’Actif)', r: { initiative: 2 }, formateur: 1 },
     { t: 'Centre Financier', i: 'card', h: '#/centrefinancier', d: 'Revenus, retraits, comptes de réception', r: { initiative: 1 } },

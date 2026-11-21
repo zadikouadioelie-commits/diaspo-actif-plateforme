@@ -1,5 +1,5 @@
 /* ============================================================
-   Diaspo'Actif — Version téléphone : module « Fiches d'inscription » (Initiative, Collectivité, Administrateur)
+   Diaspo'Actif — Version téléphone : module « Fiche d'inscription » (Initiative, Collectivité, Administrateur)
    Route : #/inscriptions                   mes fiches (brouillons, publiées…)
            #/inscriptions/nouvelle          création d'une fiche
            #/inscriptions/<id>              pilotage : état, lien public, accès aux sections
@@ -20,7 +20,7 @@
   const { S, api, esc, ic, setPane, toast } = A;
   window.MMods = window.MMods || {};
 
-  const NOM = 'Fiches d’inscription';
+  const NOM = 'Fiche d’inscription';
   const ROLES = ['initiative', 'collectivite', 'administrateur'];
   const $ = (s, r) => (r || document).querySelector(s);
   const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
