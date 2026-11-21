@@ -291,3 +291,22 @@ html body.nd [data-nd-encre="violet"]{color:#CFC1FF!important}
 html body.nd .li.gold [data-nd-encre],html body.nd .promo-or [data-nd-encre]{color:#1a1202!important}
 /* zones qui doivent rester telles quelles (QR, carte, vidéos) */
 html body.nd [data-nd-skip],html body.nd [data-nd-skip] *{--keep:1}
+
+/* Menu de la plateforme (2026-11-21) : feuille bleu nuit, bouton bleu (jamais doré) ; le « Menu des modules » garde la feuille dorée habituelle. */
+html body.nd #sheet .sh.dark.plat{background:linear-gradient(180deg,#14305a 0%,#0D2B4E 42%,#0B1226 100%);border-color:rgba(127,166,224,.4)}
+html body.nd #sheet .sh.dark.plat .grip{background:rgba(127,166,224,.5)}
+html body.nd #sheet .sh.dark.plat .h2{color:#7FA6E0;opacity:1}
+html body.nd #sheet .sh.dark.plat .li:not(.gold){background:rgba(255,255,255,.07);border:1px solid rgba(127,166,224,.3);color:#fff}
+html body.nd #sheet .sh.dark.plat .li:not(.gold) .d{color:#b9c7e0}
+html body.nd #sheet .sh.dark.plat .li:not(.gold) .ic{background:rgba(46,116,224,.28);color:#a9c8ff}
+html body.nd #sheet .sh.dark.plat .li:not(.gold) .ch{color:#7FA6E0}
+html body.nd #sheet .mp-cta{display:flex;flex-direction:column;gap:8px;margin:4px 0 2px}
+html body.nd #sheet .mp-cta .btn.mp-b{background:rgba(255,255,255,.06);border:1.5px solid rgba(127,166,224,.5);color:#fff;box-shadow:none}
+html body.nd #sheet .mp-cta .btn.mp-b1{background:linear-gradient(135deg,#2E74E0,#1B4B8C);border-color:transparent;color:#fff}
+
+/* Deux boutons séparés sous l'en-tête (2026-11-21, proposition A choisie) : bleu = plateforme, doré = modules. */
+#menu-duo{position:sticky;top:calc(var(--top-h) + env(safe-area-inset-top));z-index:29;display:flex;gap:8px;padding:8px 12px;background:rgba(8,13,30,.92);border-bottom:1px solid rgba(227,192,110,.18)}
+#menu-duo .duo-b{flex:1;min-width:0;min-height:44px;display:flex;align-items:center;justify-content:center;gap:6px;padding:6px 8px;border-radius:12px;font:inherit;font-weight:800;font-size:12.5px;line-height:1.15;text-align:center;cursor:pointer;border:1.5px solid transparent}
+#menu-duo .duo-b svg.i{width:18px;height:18px;flex:none}
+#menu-duo .duo-plat{background:linear-gradient(135deg,#2E74E0,#1B4B8C);border-color:#7FA6E0;color:#fff}
+#menu-duo .duo-mod{background:var(--nd-degore);color:#1a1202}

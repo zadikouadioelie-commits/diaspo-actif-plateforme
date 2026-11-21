@@ -523,13 +523,13 @@
          disparu de la nouvelle interface téléphone, seule « Connexion » y figurait — à la différence
          du bandeau du site (assets/app.js) qui a toujours les deux côte à côte. */
       : `<div class="top-auth"><a class="pill-cta ghost" href="inscription.html">Créer un compte</a><button class="pill-cta" id="top-login">Connexion</button></div>`;
-    const left = S.me ? `<button class="menu-btn" id="top-menu" aria-label="Menu des modules">${ic('menu')}<span>Menu</span></button>` : '';
-    top.innerHTML = `${left}<img class="logo" src="assets/logo-roundel.webp" alt="" onerror="this.src='assets/logo.svg'">
+    /* 2026-11-21 (demande explicite, proposition A choisie) : plus de bouton « Menu » dans la barre du haut ; les deux menus (« Menu de la plateforme » et « Menu des modules ») ont chacun leur bouton dans la bande #menu-duo juste dessous (renderDuo). */
+    top.innerHTML = `<img class="logo" src="assets/logo-roundel.webp" alt="" onerror="this.src='assets/logo.svg'">
       <h1 class="sr-only"><span class="brand-s">Diaspo’Actif</span><span id="top-title">${esc(TITLES[S.tab] || '')}</span></h1><span style="flex:1"></span><button class="ibtn reels-top" id="top-reels" type="button" aria-label="Reels, les petites vidéos" title="Reels">${(window.MediaViewer && MediaViewer.iconeReels) ? MediaViewer.iconeReels() : ''}</button>${right}`;
     const l = $('#top-login'); if (l) l.onclick = () => openLogin();
     const sw = $('#top-switch'); if (sw) sw.onclick = openSwitcher;
     const bq = $('#top-boutique'); if (bq) bq.onclick = () => ouvrirMaBoutique(bq);
-    const mn = $('#top-menu'); if (mn) mn.onclick = openMenu;
+    renderDuo();
     /* Bouton Reels de la barre du haut (2026-10-14, demande explicite : « à côté du logo ») : ouvre l'univers des petites vidéos depuis n'importe quel écran, connecté ou non. */
     const rl = $('#top-reels'); if (rl) rl.onclick = () => { if (window.MediaViewer && MediaViewer.openReels) MediaViewer.openReels(MV_OPTS); };
     paintBadges();
@@ -2651,25 +2651,77 @@
     const admin = m.role === 'administrateur' && window.MAdminModules ? window.MAdminModules.map(x => `<a class="li" href="${esc(x.h)}"><span class="ic">${ic(x.i)}</span><span class="sp"><span class="t">${esc(x.t)}</span><br><span class="d">${esc(x.d)}</span></span><span class="ch">${ic('chev', 's')}</span></a>`).join('') : '';
     return { role, admin, premium: MODS.filter(x => lvl(x) === 2 || lvl(x) === 4).map(li).join(''), mods: MODS.filter(x => lvl(x) !== 2 && lvl(x) !== 4).map(li).join(''), compte: MODS_COMPTE.map(li).join('') };
   }
-  function openMenu() {
-    if (!S.me) { openLogin(); return; }
-    const m = S.me, resp = [m.prenom, m.nom].filter(Boolean).join(' ') || m.email, nm = m.nom_affichage || resp;
-    const prem = S.premium && S.premium.concerne ? (S.premium.actif ? '👑 Premium actif' : '🔒 Premium expiré') : '';
-    const { premium: modsPrem, mods, compte, admin: modsAdmin } = modulesHtml(m);
-    const close = openSheet(`<div class="row" style="margin:0 0 6px"><div class="av big" style="width:48px;height:48px">${m.photo_url ? `<img src="${attrUrl(m.photo_url)}" alt="" onerror="this.remove()">` : esc(initials(nm))}</div><div class="sp"><div style="font-weight:700;font-size:17px;line-height:1.2">${esc(nm)}</div><div class="small muted">${esc(ROLE_LABEL[m.role] || m.role)}${prem ? ' · ' + prem : ''}</div></div></div>
-      <div class="h2" style="margin-top:12px">MENU DES MODULES</div>${partageBouton()}${daBouton()}
+  /* ============================================================
+     MENU — deux menus distincts (2026-11-21, demande explicite : « Menu de la plateforme » et « Menu des modules »).
+     - Menu de la plateforme : ouvert à tous, connectés ou non ; il remplace le héros de l'accueil du bureau (boutons rapides : Rejoindre, Initiatives,
+       Annuaire, puis Formations, Projets diasporas, Sondages, Site internet, Premium…). Bleu nuit, bouton bleu (jamais doré).
+     - Menu des modules : les outils de la personne connectée (doré, comme avant). Un visiteur qui le touche est invité à se connecter.
+     Deux portes d'entrée : les boutons de la bande #menu-duo sous l'en-tête (renderDuo), un par menu ; chacun ouvre sa propre feuille.
+     Chaque entrée mène au même écran dans les deux vues (aucune copie).
+     ============================================================ */
+  const LIENS_PLATEFORME = [
+    ['home', 'Accueil', 'Actualités, tutoriels vidéo, comptes à l’honneur, carte du monde', '#/accueil'],
+    ['dir', 'Annuaire', 'Trouvez et connectez-vous aux acteurs de la diaspora', '#/annuaire', { ann: '' }],
+    ['people', 'Initiatives', 'Découvrez et soutenez des projets porteurs', '#/annuaire', { ann: 'Initiative' }],
+    ['shop', 'Boutiques', 'Accédez aux boutiques et produits des initiatives', '#/boutiques'],
+    ['fil', 'Fil d’actualité', 'Publications, Reels et comptes-rendus de la communauté', '#/actualites'],
+    ['book', 'Formations', 'Développez vos compétences et saisissez des opportunités', '#/formations'],
+    ['brief', 'Projets diasporas', 'La diaspora crée, la diaspora innove', 'actualites.html'],
+    ['cal', 'Événements', 'Ne manquez plus les rendez-vous importants', '#/evenements'],
+    ['desk', 'Site internet Diaspo’Actif', 'Présentation de la plateforme', 'site-vitrine.html'],
+    ['doc', 'Sondages', 'Répondre aux sondages en cours', '#/sondages'],
+    ['star', 'Passer Premium', 'Boutique en ligne, mise en avant, gestion d’association', 'premium.html', { or: true }]
+  ];
+  function menuPlateformeHtml() {
+    const li = ([i, t, d, h, o]) => `<a class="li${o && o.or ? ' gold' : ''}" href="${esc(h)}"${o && o.ann !== undefined ? ` data-ann="${esc(o.ann)}"` : ''}><span class="ic">${ic(i)}</span><span class="sp"><span class="t">${esc(t)}</span><br><span class="d">${esc(d)}</span></span><span class="ch">${ic('chev', 's')}</span></a>`;
+    return `<div class="mp-cta">${S.me ? '' : '<a class="btn block mp-b mp-b1" href="inscription.html">Rejoindre la communauté</a>'}<a class="btn block mp-b" href="#/annuaire" data-ann="Initiative">Découvrir les initiatives</a><a class="btn block mp-b" href="#/annuaire" data-ann="">Explorer l’annuaire</a></div>
+      <div class="h2">ACCÈS RAPIDE</div><div class="lst">${LIENS_PLATEFORME.map(li).join('')}</div>`;
+  }
+  function menuModulesHtml() {
+    const m = S.me, { premium: modsPrem, mods, compte, admin: modsAdmin } = modulesHtml(m);
+    return `${partageBouton()}${daBouton()}
       <div class="lst"><a class="li" href="#/accueil"><span class="ic">${ic('home')}</span><span class="sp"><span class="t">Accueil</span><br><span class="d">Tutoriels vidéo, actualités, initiatives</span></span><span class="ch">${ic('chev', 's')}</span></a></div>
       ${modsAdmin ? `<div class="h2">🛡 ADMINISTRATION</div><div class="lst">${modsAdmin}</div>` : ''}
       ${modsPrem ? `<div class="h2">MODULES PREMIUM</div><div class="lst">${modsPrem}</div>` : ''}
       <div class="h2">OUTILS</div><div class="lst">${mods}</div>
       <div class="h2">MON COMPTE</div><div class="lst">${compte}<a class="li" href="#/moi"><span class="ic">${ic('user')}</span><span class="sp"><span class="t">Mon espace</span><br><span class="d">Profil, tout le menu et les outils sur ordinateur</span></span><span class="ch">${ic('chev', 's')}</span></a></div>
       <button class="btn out block" id="menu-switch" style="margin-top:14px">${ic('people', 's')} Changer de compte</button>
-      <button class="btn out block" id="menu-logout" style="margin-top:10px">${ic('logout', 's')} Se déconnecter</button>`);
-    const sh = $('#sheet'); sh.querySelector('.sh').classList.add('dark');
-    /* un lien du menu referme la feuille ; les verrous Premium et le changement de compte ouvrent leur propre feuille */
-    $$('a.li', sh).forEach(a => a.addEventListener('click', () => { if (!a.dataset.lock && !a.dataset.act) close(); }));
-    $('#menu-switch').onclick = () => { close(); openSwitcher(); };
-    $('#menu-logout').onclick = () => { close(); logout(); };
+      <button class="btn out block" id="menu-logout" style="margin-top:10px">${ic('logout', 's')} Se déconnecter</button>`;
+  }
+  /* Deux boutons séparés sous l'en-tête (2026-11-21, proposition A choisie), chacun ouvre sa propre feuille : bleu = plateforme, doré = modules. */
+  function renderDuo() {
+    let d = $('#menu-duo');
+    if (!d) { d = document.createElement('div'); d.id = 'menu-duo'; $('#top').after(d); }
+    d.innerHTML = `<button type="button" class="duo-b duo-plat" data-v="plateforme">${ic('desk', 's')} Menu de la plateforme</button><button type="button" class="duo-b duo-mod" data-v="modules">${ic('menu', 's')} Menu des modules</button>`;
+    $$('.duo-b', d).forEach(b => b.onclick = () => { if (b.dataset.v === 'modules' && !S.me) { openLogin(); return; } openMenu(b.dataset.v); });
+  }
+  function openMenu(vue) {
+    const m = S.me;
+    const v = vue === 'modules' ? 'modules' : 'plateforme';
+    let tete = '';
+    if (m) {
+      const resp = [m.prenom, m.nom].filter(Boolean).join(' ') || m.email, nm = m.nom_affichage || resp;
+      const prem = S.premium && S.premium.concerne ? (S.premium.actif ? '👑 Premium actif' : '🔒 Premium expiré') : '';
+      tete = `<div class="row" style="margin:0 0 6px"><div class="av big" style="width:48px;height:48px">${m.photo_url ? `<img src="${attrUrl(m.photo_url)}" alt="" onerror="this.remove()">` : esc(initials(nm))}</div><div class="sp"><div style="font-weight:700;font-size:17px;line-height:1.2">${esc(nm)}</div><div class="small muted">${esc(ROLE_LABEL[m.role] || m.role)}${prem ? ' · ' + prem : ''}</div></div></div>`;
+    }
+    const close = openSheet(`${tete}<div id="menu-corps"></div>`);
+    const sh = $('#sheet'), boite = sh.querySelector('.sh'); boite.classList.add('dark');
+    const peindre = () => {
+      boite.classList.toggle('plat', v === 'plateforme');
+      $('#menu-corps').innerHTML = v === 'plateforme' ? menuPlateformeHtml() : menuModulesHtml();
+      /* un lien du menu referme la feuille ; les verrous Premium et le changement de compte ouvrent leur propre feuille */
+      $$('#menu-corps a.li, #menu-corps a.btn', sh).forEach(a => a.addEventListener('click', () => { if (!a.dataset.lock && !a.dataset.act && a.dataset.ann === undefined) close(); }));
+      /* « Initiatives » / « Annuaire » : l'onglet Annuaire s'ouvre avec le bon filtre (le même que ses pastilles). */
+      $$('#menu-corps [data-ann]', sh).forEach(a => a.addEventListener('click', e => {
+        e.preventDefault(); close();
+        S.ann.type = a.dataset.ann; S.ann.loaded = false;
+        location.hash = '#/annuaire';
+        setTimeout(() => { if (S.tab === 'annuaire') viewAnnuaire(); }, 80);
+      }));
+      const sw = $('#menu-switch'); if (sw) sw.onclick = () => { close(); openSwitcher(); };
+      const lo = $('#menu-logout'); if (lo) lo.onclick = () => { close(); logout(); };
+    };
+    peindre();
   }
   function viewMoi() {
     const el = $('#t-moi');
