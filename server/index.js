@@ -24572,13 +24572,15 @@ route("GET", "/api/evenements/:id/compte-rendu/sources", async (req, res, params
     participation = { inscrits, presents, par_type: stats.map(r => ({ label: r.label || 'Autre', inscrits: Number(r.inscrits), presents: Number(r.presents || 0) })) };
   }
   sources.push({ cle: 'inscriptions', libelle: "Fiche d'inscription", trouve: !!participation, detail: participation ? `${participation.inscrits} inscrit(s)${participation.presents ? ', ' + participation.presents + ' présent(s)' : ''}` : "Aucune fiche d'inscription liée." });
-  const partenaires = []; fiches.forEach(f => { [crJson(f.partenaires_json, []), crJson(f.sponsors_json, [])].forEach(arr => (Array.isArray(arr) ? arr : []).forEach(p => { const n = (p && (p.nom || p.name)) || (typeof p === 'string' ? p : ''); if (n) partenaires.push(String(n)); })); });
+  const partenaires = [], partenairesDetail = []; fiches.forEach(f => { [crJson(f.partenaires_json, []), crJson(f.sponsors_json, [])].forEach(arr => (Array.isArray(arr) ? arr : []).forEach(p => { const n = (p && (p.nom || p.name)) || (typeof p === 'string' ? p : ''); if (n) { partenaires.push(String(n)); /* fiche = [{nom, logo_url}] : repris tels quels dans le compte-rendu (nom, logo ; description et lien restent à saisir) */ if (p && typeof p === 'object' && !partenairesDetail.some(x => x.nom === String(n))) partenairesDetail.push({ nom: String(n).slice(0, 120), logo_url: String(p.logo_url || p.logo || '').slice(0, 500) }); } })); });
   sources.push({ cle: 'partenaires', libelle: 'Partenaires', trouve: partenaires.length > 0, detail: partenaires.length ? [...new Set(partenaires)].join(', ') : 'Aucun partenaire renseigné.' });
   const textesProg = programmes.map(p => p.texte).filter(Boolean).join('\n');
   const forts = [...crTempsFortsDepuisProgramme(textesProg)];
   legendes.forEach(l => { if (!forts.some(f => f.toLowerCase() === l.toLowerCase())) forts.push(l); });
   sendJSON(res, 200, {
-    sources, programmes, participation, partenaires: [...new Set(partenaires)],
+    sources, programmes, participation, partenaires: [...new Set(partenaires)], partenaires_detail: partenairesDetail.slice(0, 12),
+    /* Photos de la galerie de l'événement, proposées d'office dans le brouillon (l'auteur retire celles qu'il ne veut pas). */
+    photos: galerie.map(x => (typeof x === 'string' ? x : (x && (x.url || x.src)) || '')).filter(u => /^https?:\/\//i.test(String(u))).slice(0, 20),
     suggestions: { forts: forts.slice(0, 8), deroule: textesProg || '', participation_texte: participation ? `${participation.inscrits} inscrit(s)${participation.presents ? ', dont ' + participation.presents + ' présent(s) (contrôle d\'entrée)' : ''}. ${participation.par_type.map(t => `${t.label} : ${t.inscrits}`).join(' · ')}.` : '', video_url: video },
     resume_fiche: fcLiee ? { resume: fcLiee.fc_resume || '', objectifs: fcLiee.fc_objectifs || '' } : null,
   });

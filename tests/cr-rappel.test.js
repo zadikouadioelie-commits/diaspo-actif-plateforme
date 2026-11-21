@@ -99,6 +99,17 @@ test('publier le compte-rendu éteint la cartouche', async () => {
   assert.deepEqual(await titres(), []);
 });
 
+test('les sources du brouillon proposent les photos de la galerie (liens http(s) seulement) et gardent les données existantes', async () => {
+  const e = evt(uid('Createur'), 'Avec photos', '2026-11-13');
+  sql('update evenements set galerie_photos=? where id=?', JSON.stringify(['https://cdn.example/a.jpg', { url: 'https://cdn.example/b.png' }, 'data:image/png;base64,AAAA', { legende: 'sans url' }]), e);
+  const r = await env.call(jarC, 'GET', `/api/evenements/${e}/compte-rendu/sources`);
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.data.photos, ['https://cdn.example/a.jpg', 'https://cdn.example/b.png']);
+  assert.ok(Array.isArray(r.data.partenaires_detail));
+  assert.ok(r.data.suggestions && 'participation_texte' in r.data.suggestions, 'les suggestions existantes sont intactes');
+  assert.equal((await env.call(jarA, 'GET', `/api/evenements/${e}/compte-rendu/sources`)).status, 403, 'réservé au créateur');
+});
+
 test('un compte démo ne voit jamais la cartouche', async () => {
   const moi = uid('Autre');
   evt(moi, 'Démo finie', '2026-11-13');

@@ -45,8 +45,13 @@
 .crp-seg button.on{background:#0D2B4E;color:#fff;border-color:#0D2B4E}
 .crp-prefill{border:1.5px dashed #2E74E0;background:#E8F0FD;border-radius:12px;padding:12px 14px;margin:0 0 14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
 .crp-prefill div{flex:1;min-width:220px;font-size:13.5px}
-.crp-auto{border:1.5px solid #16794C;background:#E6F5EC;color:#0F3D28;border-radius:12px;padding:12px 14px;margin:0 0 14px;font-size:14px;line-height:1.5}
-.crp-auto small{color:#2F5E47;font-size:12.5px}
+/* Encart « brouillon préparé » : bleu nuit et doré, couleurs de la plateforme (Nuit dorée). */
+.crp-auto{border:1.5px solid #E3C06E;background:linear-gradient(160deg,#14305A 0%,#0D2B4E 60%,#0B1226 100%);color:#F4EBD3;border-radius:14px;padding:14px 16px;margin:0 0 14px;font-size:14px;line-height:1.55;box-shadow:0 6px 18px rgba(11,18,38,.25)}
+.crp-auto b{color:#E3C06E}
+.crp-auto small{color:#C9D3E6;font-size:12.5px}
+.crp-auto-lien{display:inline-block;margin-top:6px;color:#0B1226;background:#E3C06E;border-radius:999px;padding:6px 14px;font-weight:700;font-size:13px;text-decoration:none}
+.crp-auto-lien:hover,.crp-auto-lien:focus-visible{background:#F0D58E}
+.crp-auto-lien:focus-visible{outline:2px solid #fff;outline-offset:2px}
 .crp-chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:6px 0}
 /* Sections libres (2026-10-07) : titre modifiable + monter/descendre/retirer, puis zone d'ajout avec suggestions. */
 .crp-xsec{border:1.5px solid var(--border,#DCE4F0);border-radius:12px;padding:12px;background:#FBFCFE}
@@ -1130,7 +1135,7 @@ function vueEditeur() {
   root.innerHTML = '<h1>' + (publie ? '✏️ Modifier le compte-rendu' : '✍️ Rédiger le compte-rendu') + '</h1><div class="crp-meta">' + esc(ev.titre) + ' · ' + esc(fmtDateCourte(ev.date_evt)) + (ev.ville ? ' · ' + esc(ev.ville) : '') + '</div>'
     + '<div class="crp-card">'
     + (ST.autoNote ? '<div class="crp-auto" role="status">' + ST.autoNote + '</div>' : '')
-    + '<div class="crp-prefill"><div><b>✨ Partir de l\'événement</b><br>Pré-remplir à partir de ce qui existe déjà : programme, fiche conceptuelle, photos, chiffres de la fiche d\'inscription et partenaires.</div><button class="cr-btn pri" id="ed-prefill">✨ Pré-remplir depuis l\'événement</button></div>'
+    + '<div class="crp-prefill"' + (ST.autoNote ? ' style="display:none"' : '') + '><div><b>✨ Partir de l\'événement</b><br>Pré-remplir à partir de ce qui existe déjà : programme, fiche conceptuelle, photos, chiffres de la fiche d\'inscription et partenaires.</div><button class="cr-btn pri" id="ed-prefill">✨ Pré-remplir depuis l\'événement</button></div>'
     + '<div class="crp-fld"><label>Titre</label><input id="ed-titre" maxlength="160"></div>'
     + '<div class="crp-fld"><label>Type d\'événement</label><div class="crp-seg" id="ed-types"></div><div class="crp-hint" id="ed-typehint"></div><input id="ed-libre" maxlength="60" placeholder="Écrivez votre type d\'événement (ex. sportif, culturel, caritatif…)" style="display:none;margin-top:8px"></div>'
     + '<div class="crp-lbl">Niveau 1 · Le résumé (affiché dans le fil)</div>'
@@ -1523,20 +1528,40 @@ function debutResume(ev, sg) {
   if (sg.forts && sg.forts.length) para.push('Temps forts : ' + sg.forts.slice(0, 8).join(', ') + '.');
   return para.join('\n\n');
 }
+/* Modèle de référence : le compte-rendu de l'Acte fondateur (type Forum : thème, programme, intervenants, idées, participation, suites, remerciements,
+   temps forts en vignettes, partenaires avec logo, photos, étape suivante). Le brouillon part de la même structure, avec les seules données de l'événement. */
 async function prefillAuto() {
   ST.autoNote = '';
   let r; try { r = await api('GET', `/evenements/${ST.evtId}/compte-rendu/sources`); } catch (_) { return; }
   const ed = ST.ed, sg = r.suggestions || {}, ev = ST.data.evenement, faits = [];
+  ed.type = 'forum'; /* le canevas du modèle (Acte fondateur) ; le créateur peut changer de type d'un clic, ses saisies sont conservées par type */
+  const champs = CANEVAS[ed.type].champs, saisie = ed.saisie[ed.type], icones = ed.icones[ed.type];
   const deroule = ((r.programmes || []).find(p => p.texte) || {}).texte || '';
+  const fiche = r.resume_fiche || null;
+  const parts = (r.partenaires_detail || []).slice(0, 12);
   if (sg.forts && sg.forts.length) { ed.forts = sg.forts.slice(0, 8); faits.push('les temps forts'); }
-  CANEVAS[ed.type].champs.forEach((c, i) => {
-    if (/^(Déroulé|Programme|Contenu et déroulé)/.test(c[0]) && deroule && !ed.saisie[ed.type][i]) { ed.saisie[ed.type][i] = deroule; faits.push('le déroulé'); }
-    else if (/^Participation/.test(c[0]) && sg.participation_texte && !ed.saisie[ed.type][i]) { ed.saisie[ed.type][i] = sg.participation_texte; faits.push('la participation'); }
+  champs.forEach((c, i) => {
+    if (saisie[i]) return;
+    if (/^(Déroulé|Programme|Contenu et déroulé)/.test(c[0]) && deroule) { saisie[i] = deroule; faits.push('le programme'); }
+    else if (/^Participation/.test(c[0]) && sg.participation_texte) { saisie[i] = sg.participation_texte; faits.push('la participation'); }
+    else if (/^(Thème|Contexte|Le sens|Enjeu|Public visé|Problématique)/.test(c[0]) && fiche && (fiche.resume || fiche.objectifs)) { saisie[i] = [fiche.resume, fiche.objectifs].filter(Boolean).join('\n\n'); faits.push('le thème (fiche conceptuelle)'); }
+    else if (/^Remerciements/.test(c[0])) {
+      icones[i] = icones[i] || 'heart';
+      saisie[i] = 'Nous remercions chaleureusement :\n\n' + (parts.length ? '• nos partenaires ' + parts.map(p => p.nom).join(', ') + ' ;\n' : '') + '• les intervenants ;\n• l’ensemble des participants.';
+      faits.push('les remerciements');
+    }
   });
+  if (parts.length) { ed.partenaires = parts.map(p => ({ nom: p.nom, description: '', lien: '', logo_url: p.logo_url || '' })); faits.push(parts.length + ' partenaire(s) avec logo'); }
+  if ((r.photos || []).length && !ed.medias.length) { ed.medias = r.photos.slice(0, 20); faits.push(r.photos.length + ' photo(s)'); }
   if (sg.video_url && !ed.video) { ed.video = sg.video_url; faits.push('la vidéo'); }
   if (!ed.resume.trim()) { ed.resume = debutResume(ev, sg); faits.unshift('la phrase d’ouverture'); }
+  /* Lien vers le compte-rendu de l'Acte fondateur, montré comme exemple de la qualité attendue (jamais pour lui-même). */
+  let modele = null;
+  try { const l = await api('GET', '/comptes-rendus/publies'); modele = (l.comptes_rendus || []).find(c => /acte fondateur/i.test(c.titre || '') && Number(c.evenement_id) !== Number(ST.evtId)) || null; } catch (_) { /* l'exemple est facultatif */ }
   const manques = (r.sources || []).filter(s => !s.trouve && ['programme', 'inscriptions', 'photos'].includes(s.cle)).map(s => s.libelle.toLowerCase());
-  ST.autoNote = '<b>✨ Votre brouillon est déjà préparé.</b> Nous avons repris de votre événement : ' + faits.map(esc).join(', ') + '. Relisez, ajoutez ce qui vous a marqué (ambiance, remerciements, ce qu’il faut retenir), puis publiez.'
+  ST.autoNote = '<b>Votre compte-rendu est déjà préparé.</b> Il suit le modèle du compte-rendu de l’Acte fondateur et reprend de votre événement : ' + faits.map(esc).join(', ') + '.'
+    + ' Il reste à relire, à ajouter les <b>moments clés</b> (une section chacun, avec une icône), les <b>intervenants et personnes mises en lumière</b>, l’<b>étape suivante</b> et vos propres mots, puis à publier.'
+    + (modele ? '<br><a class="crp-auto-lien" href="compte-rendu.html?evt=' + Number(modele.evenement_id) + '" target="_blank" rel="noopener">Voir le compte-rendu de l’Acte fondateur, notre modèle →</a>' : '')
     + (manques.length ? '<br><small>Rien trouvé pour : ' + manques.map(esc).join(', ') + ' — à compléter si vous le souhaitez.</small>' : '')
     + '<br><small>Rien n’est enregistré tant que vous n’avez pas cliqué « Enregistrer le brouillon » ou « Publier ».</small>';
 }
