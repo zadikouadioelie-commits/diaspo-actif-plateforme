@@ -49,6 +49,12 @@
 .evt-filters-col{display:flex;flex-direction:column;gap:10px;}
 .evt-filters-col select,.evt-filters-col input{width:100%;height:36px;padding:0 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:#fff;box-sizing:border-box;}
 .evt-col-title{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:2px;}
+/* Icône au trait à gauche de chaque champ de filtre (2026-11-21), à la place de l'emoji qui
+   était jusque-là dans le placeholder/l'option — retour arrière : supprimer .evt-ic-field et
+   remettre les emojis dans placeholder/option. */
+.evt-ic-field{position:relative;}
+.evt-ic-field>.ic{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none;}
+.evt-ic-field>input,.evt-ic-field>select{padding-left:32px !important;}
 /* Défilement indépendant par colonne (2026-09-29, demande explicite : "fait des défilements
    indépendants pour les trois colonnes") — même convention déjà utilisée ailleurs sur le site
    pour ce même agencement filtres/contenu/suggestions (top:80px sous le bandeau sticky, voir
@@ -474,6 +480,18 @@
     <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 3L5.5 13.5H11L10 21l7.5-10.5H12z"/></symbol>
     <symbol id="i-mega" viewBox="0 0 24 24"><path d="M4 10v4a1 1 0 0 0 1 1h2.5l7 4V5l-7 4H5a1 1 0 0 0-1 1z"/><path d="M18 9.5a3.5 3.5 0 0 1 0 5"/></symbol>
     <symbol id="i-save" viewBox="0 0 24 24"><path d="M5 4.5h11l3 3V19a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1z"/><path d="M8 4.5V9h7V4.5M8 20v-6h8v6"/></symbol>
+    <!-- Icônes ajoutées (2026-11-21, suite de la demande ci-dessus) : colonne Filtres + bandeau
+         épinglé + cachets + titres de modale ; même convention (trait 1.7, sans remplissage). -->
+    <symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 5h16l-6 7.3V19l-4 2v-8.7z"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.3" cy="10.3" r="6.3"/><path d="M19.5 19.5l-4.4-4.4"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s7-7.1 7-12a7 7 0 0 0-14 0c0 4.9 7 12 7 12z"/><circle cx="12" cy="9" r="2.3"/></symbol>
+    <symbol id="i-tag" viewBox="0 0 24 24"><path d="M11.4 3.5H5.8a2.3 2.3 0 0 0-2.3 2.3v5.6l9.7 9.7a2 2 0 0 0 2.8 0l5.1-5.1a2 2 0 0 0 0-2.8z"/><circle cx="8.3" cy="8.3" r="1.3"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3.3 20c0-3.6 2.6-6 5.7-6s5.7 2.4 5.7 6"/><circle cx="17.3" cy="9" r="2.3"/><path d="M15.8 14.3c2.3.4 4 2.4 4 5.7"/></symbol>
+    <symbol id="i-trophy" viewBox="0 0 24 24"><path d="M6 4h12v3a6 6 0 0 1-12 0z"/><path d="M6 5H4.3a2 2 0 0 0 0 4H6M18 5h1.7a2 2 0 0 1 0 4H18"/><path d="M12 13v3.3"/><path d="M9 21h6"/><path d="M9.6 17h4.8l.4 1.8a2 2 0 0 1-2 2.2h-1.6a2 2 0 0 1-2-2.2z"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3.3l2.5 5.3 5.8.8-4.2 4.1 1 5.8-5.1-2.7-5.1 2.7 1-5.8-4.2-4.1 5.8-.8z"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24"><circle cx="18" cy="5.5" r="2.3"/><circle cx="6" cy="12" r="2.3"/><circle cx="18" cy="18.5" r="2.3"/><path d="M8.1 10.7l7.8-4.2M8.1 13.3l7.8 4.2"/></symbol>
+    <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M4 20l1-4.3L15.5 5.2a1.8 1.8 0 0 1 2.5 0l.8.8a1.8 1.8 0 0 1 0 2.5L8.3 19l-4.3 1z"/><path d="M13.8 7l3.2 3.2"/></symbol>
   </defs></svg>
   <span class="evt-feat"><span class="evt-ico"><svg class="ic" width="20" height="20" aria-hidden="true"><use href="#i-cal"/></svg></span><span class="evt-feat-t"><b>Tous les événements</b><small>de la plateforme</small></span></span>
   <span class="evt-feat"><span class="evt-ico"><svg class="ic" width="20" height="20" aria-hidden="true"><use href="#i-globe"/></svg></span><span class="evt-feat-t"><b>Public ou privé</b><small>au choix de l'organisateur</small></span></span>
@@ -519,23 +537,23 @@
   <div class="evt-layout">
     <!-- ═══ COLONNE GAUCHE : FILTRES ═══ -->
     <aside class="evt-filters-col">
-      <div class="evt-col-title">🔍 Filtres</div>
-      <input type="text" id="q" placeholder="🔎 Mot-clé...">
-      <select id="f-pays" title="Localisation / territoire"><option value="">🌍 Tous pays</option></select>
-      <input type="text" id="f-ville" placeholder="📍 Ville...">
+      <div class="evt-col-title"><svg class="ic" width="13" height="13" aria-hidden="true" style="vertical-align:-2px;margin-right:4px;"><use href="#i-filter"/></svg>Filtres</div>
+      <div class="evt-ic-field"><svg class="ic" width="15" height="15" aria-hidden="true"><use href="#i-search"/></svg><input type="text" id="q" placeholder="Mot-clé..."></div>
+      <div class="evt-ic-field"><svg class="ic" width="15" height="15" aria-hidden="true"><use href="#i-globe"/></svg><select id="f-pays" title="Localisation / territoire"><option value="">Tous pays</option></select></div>
+      <div class="evt-ic-field"><svg class="ic" width="15" height="15" aria-hidden="true"><use href="#i-pin"/></svg><input type="text" id="f-ville" placeholder="Ville..."></div>
       <input type="date" id="f-date" title="À partir de cette date">
-      <select id="f-domaine" title="Domaine de l'événement"><option value="">🏷️ Domaine de l'événement</option><option>Entrepreneuriat</option><option>Formation</option><option>Culture</option><option>Sante</option><option>Agriculture</option><option>Technologie</option><option>Sport</option><option>Action Sociale</option><option>Business</option><option>Diaspora</option><option>Gastronomie</option><option>Economique</option><option>Politique</option><option>Panafricanisme</option><option>Autre</option></select>
-      <select id="f-type" title="Forme de l'événement"><option value="">👥 Forme de l'événement</option><option value="evenement">Événement</option><option value="forum">Forum</option><option value="atelier">Atelier</option><option value="webinaire">Webinaire</option><option value="conference">Conférence</option><option value="gala">Gala</option><option value="marche">Marché / Foire</option><option value="networking">Networking</option><option value="debat">Débat</option><option value="concours">Concours</option><option value="trophee_diaspora">🏆 Trophée diaspora</option><option value="autre">Autre</option></select>
-      <select id="f-gratuit" title="Gratuit / payant"><option value="">🎟️ Gratuit ou payant</option><option value="1">🟢 Gratuit</option><option value="partiel">🟡 Partiellement payant</option><option value="0">🔴 Payant</option></select>
-      <button class="btn btn-orange btn-block" id="btn-search" style="font-size:12px;">🔍 Rechercher</button>
-      <button class="btn btn-block" id="btn-search-global" style="font-size:12px;">🌍 Rechercher sur tout Diaspo'Actif</button>
+      <div class="evt-ic-field"><svg class="ic" width="15" height="15" aria-hidden="true"><use href="#i-tag"/></svg><select id="f-domaine" title="Domaine de l'événement"><option value="">Domaine de l'événement</option><option>Entrepreneuriat</option><option>Formation</option><option>Culture</option><option>Sante</option><option>Agriculture</option><option>Technologie</option><option>Sport</option><option>Action Sociale</option><option>Business</option><option>Diaspora</option><option>Gastronomie</option><option>Economique</option><option>Politique</option><option>Panafricanisme</option><option>Autre</option></select></div>
+      <div class="evt-ic-field"><svg class="ic" width="15" height="15" aria-hidden="true"><use href="#i-users"/></svg><select id="f-type" title="Forme de l'événement"><option value="">Forme de l'événement</option><option value="evenement">Événement</option><option value="forum">Forum</option><option value="atelier">Atelier</option><option value="webinaire">Webinaire</option><option value="conference">Conférence</option><option value="gala">Gala</option><option value="marche">Marché / Foire</option><option value="networking">Networking</option><option value="debat">Débat</option><option value="concours">Concours</option><option value="trophee_diaspora">Trophée diaspora</option><option value="autre">Autre</option></select></div>
+      <div class="evt-ic-field"><svg class="ic" width="15" height="15" aria-hidden="true"><use href="#i-ticket"/></svg><select id="f-gratuit" title="Gratuit / payant"><option value="">Gratuit ou payant</option><option value="1">Gratuit</option><option value="partiel">Partiellement payant</option><option value="0">Payant</option></select></div>
+      <button class="btn btn-orange btn-block btn-ic" id="btn-search" style="font-size:12px;"><svg class="ic" width="15" height="15" aria-hidden="true"><use href="#i-search"/></svg>Rechercher</button>
+      <button class="btn btn-block btn-ic" id="btn-search-global" style="font-size:12px;"><svg class="ic" width="15" height="15" aria-hidden="true"><use href="#i-globe"/></svg>Rechercher sur tout Diaspo'Actif</button>
       <button class="btn btn-block" id="btn-reset" style="font-size:12px;">Réinitialiser</button>
       <!-- Trophée diaspora (2026-09-23, demande explicite : "ajoute un nouveau type
            d'événement... bouton doré et scintillant") — filtre direct vers ce type en un clic.
            Le bouton "Nouveau Trophée" ne vit plus ici (demande explicite : "ce bouton doit être
            à l'intérieur de trophée diaspora") — il apparaît désormais dans la colonne centrale,
            uniquement une fois ce filtre actif, voir #trophee-cta-zone et renderEvts(). -->
-      <button class="btn btn-block btn-trophee" id="btn-filtre-trophee" style="font-size:12px;margin-top:6px;">🏆 Trophée diaspora</button>
+      <button class="btn btn-block btn-trophee btn-ic" id="btn-filtre-trophee" style="font-size:12px;margin-top:6px;"><svg class="ic" width="15" height="15" aria-hidden="true"><use href="#i-trophy"/></svg>Trophée diaspora</button>
     </aside>
 
     <!-- ═══ COLONNE CENTRALE : ÉVÉNEMENTS ═══ -->
@@ -557,7 +575,7 @@
          assets/app.js). Colonne de cette grille (2026-09-30, demande explicite) plutôt que
          panneau externe séparé — voir le commentaire CSS de .evt-ad-col. ═══ -->
     <aside class="evt-ad-col">
-      <div class="evt-col-title">📢 Espace publicitaire</div>
+      <div class="evt-col-title"><svg class="ic" width="13" height="13" aria-hidden="true" style="vertical-align:-2px;margin-right:4px;"><use href="#i-mega"/></svg>Espace publicitaire</div>
       <!-- En l'absence de publicité active, cette case affiche désormais des publications du fil
            en rotation (assets/app.js, afficherPublicationsRelais) — plus de gabarit statique ici. -->
       <div id="ad-evenements-sidebar" data-ad-emplacement="evenements_sidebar" data-ad-count="2" data-ad-rotate="60000" style="margin-top:10px;"></div>
@@ -569,7 +587,7 @@
          comptes Initiative/Collectivité/Administrateur, jamais les comptes Utilisateur
          individuels. Voir GET /api/fil?mode=organisations, nouveau mode dédié côté serveur. ═══ -->
     <aside class="evt-pub-col">
-      <div class="evt-col-title">📰 Publications</div>
+      <div class="evt-col-title"><svg class="ic" width="13" height="13" aria-hidden="true" style="vertical-align:-2px;margin-right:4px;"><use href="#i-doc"/></svg>Publications</div>
       <div id="evt-pub-list" style="margin-top:10px;font-size:12.5px;color:var(--muted);">Chargement…</div>
     </aside>
   </div>
@@ -579,7 +597,7 @@
 <!-- ═══ MODAL CRÉATION ÉVÉNEMENT (enrichie) ═══ -->
 <div class="modal-bg" id="modal-bg">
   <div class="modal">
-    <h3 id="modal-evt-titre">📢 Mobiliser la diaspora — Créer un événement</h3>
+    <h3 id="modal-evt-titre"><svg class="ic" width="18" height="18" aria-hidden="true" style="vertical-align:-3px;margin-right:6px;"><use href="#i-mega"/></svg>Mobiliser la diaspora — Créer un événement</h3>
 
     <div class="section-divider">Informations principales</div>
     <div class="grid-2">
@@ -820,9 +838,9 @@
            envoyé change (voir btn-save-brouillon plus bas) — un brouillon n'apparaît que pour
            son propriétaire (et l'admin), jamais dans la liste publique, voir GET /api/evenements
            et GET /api/evenements/:id côté serveur. -->
-      <button class="btn btn-outline" id="btn-save-brouillon">💾 Enregistrer en brouillon</button>
-      <button class="btn btn-orange" id="btn-creer-fiche" title="Enregistre l'événement puis ouvre le module de création de fiches d'inscription, déjà relié à cet événement">📝 Créer une fiche d'inscription pour pouvoir publier</button>
-      <button class="btn btn-orange" id="btn-save">📢 Publier l'événement</button>
+      <button class="btn btn-outline btn-ic" id="btn-save-brouillon"><svg class="ic" width="15" height="15" aria-hidden="true"><use href="#i-save"/></svg>Enregistrer en brouillon</button>
+      <button class="btn btn-orange btn-ic" id="btn-creer-fiche" title="Enregistre l'événement puis ouvre le module de création de fiches d'inscription, déjà relié à cet événement"><svg class="ic" width="15" height="15" aria-hidden="true"><use href="#i-doc"/></svg>Créer une fiche d'inscription pour pouvoir publier</button>
+      <button class="btn btn-orange btn-ic" id="btn-save"><svg class="ic" width="15" height="15" aria-hidden="true"><use href="#i-mega"/></svg>Publier l'événement</button>
     </div>
     <div style="font-size:.72rem;color:#aaa;text-align:center;margin-top:10px;">
       Cet événement sera visible sur Diaspo'Actif selon la visibilité choisie.
@@ -838,7 +856,7 @@
      inscription_ouverte:false pour ne proposer aucune inscription sur la cartouche publiée. ═══ -->
 <div class="modal-bg" id="modal-flash-bg" onclick="if(event.target===this)flashFermer()">
   <div class="modal" style="max-width:520px;">
-    <h3>⚡ Événement flash</h3>
+    <h3><svg class="ic" width="18" height="18" aria-hidden="true" style="vertical-align:-3px;margin-right:6px;"><use href="#i-bolt"/></svg>Événement flash</h3>
     <p style="font-size:.8rem;color:var(--muted,#6b7280);margin:-8px 0 14px;">Un événement informatif, sans inscription — pour prévenir rapidement la communauté.</p>
 
     <div id="flash-step-form">
@@ -965,7 +983,7 @@
      passés grisés, navigation mois par mois bornée à cette fenêtre. ═══ -->
 <div class="modal-bg" id="modal-cd-bg" onclick="if(event.target===this)cdFermerCalendrier()">
   <div class="modal" style="max-width:520px;">
-    <h3>📅 Calendrier Diaspora</h3>
+    <h3><svg class="ic" width="18" height="18" aria-hidden="true" style="vertical-align:-3px;margin-right:6px;"><use href="#i-cal"/></svg>Calendrier Diaspora</h3>
     <p style="font-size:.8rem;color:var(--muted,#6b7280);margin:-8px 0 14px;">Tous les événements de la plateforme, sur 2 ans — cliquez un jour marqué pour voir ses événements.</p>
     <div id="cd-cal-mount">Chargement…</div>
     <div id="cd-jour-liste" style="margin-top:16px;"></div>
@@ -1106,15 +1124,15 @@ async function chargerEvenementEpingle() {
     const fin = evt.date_fin ? new Date(evt.date_fin + 'T12:00:00Z').toLocaleDateString('fr-FR', { day:'numeric', month:'long', year:'numeric', timeZone:'Europe/Paris' }) : '';
     zone.innerHTML = `<div class="evt-epingle">
       <div class="evt-epingle-main">
-        <span class="evt-epingle-badge">⭐ Événement spécial Diaspo'Actif</span>
+        <span class="evt-epingle-badge"><svg class="ic" width="13" height="13" aria-hidden="true"><use href="#i-star"/></svg>Événement spécial Diaspo'Actif</span>
         <h3>${esc(evt.titre)}</h3>
         <p>${evtDescApercu(evt.description, 280)}</p>
         <div>
-          <span class="evt-epingle-meta">📅 Du ${debut} au ${fin}</span>
+          <span class="evt-epingle-meta"><svg class="ic" width="14" height="14" aria-hidden="true"><use href="#i-cal"/></svg>Du ${debut} au ${fin}</span>
         </div>
         <div class="evt-epingle-ctas">
-          <a class="evt-epingle-cta-primary" href="javascript:void(0)" onclick="openDetail(${evt.id})">👁 Voir l'événement</a>
-          <button type="button" class="evt-epingle-cta-secondary" onclick="partagerEvenement(${evt.id})">📤 Partager — gagnez 3 points de fiabilité</button>
+          <a class="evt-epingle-cta-primary" href="javascript:void(0)" onclick="openDetail(${evt.id})"><svg class="ic" width="15" height="15" aria-hidden="true"><use href="#i-eye"/></svg>Voir l'événement</a>
+          <button type="button" class="evt-epingle-cta-secondary" onclick="partagerEvenement(${evt.id})"><svg class="ic" width="15" height="15" aria-hidden="true"><use href="#i-share"/></svg>Partager — gagnez 3 points de fiabilité</button>
         </div>
       </div>
       <div class="evt-cd" id="evt-cd" role="timer" hidden></div>
@@ -1262,8 +1280,8 @@ function renderEvts() {
     // Réservé au vrai parcours flash (même garde que badgeFlash), jamais un événement trophée
     // en même temps dans la pratique, mais le trophée garde la priorité visuelle si jamais.
     const estFlash = !estTrophee && evt.inscription_ouverte === 0;
-    const cachetHtml = estTrophee ? `<div class="trophee-cachet" title="Événement Trophée diaspora"><span class="ic">🏆</span><span class="tx">Trophée</span></div>`
-      : estFlash ? `<div class="flash-cachet" title="Événement flash — informatif, sans inscription"><span class="ic">⚡</span></div>` : '';
+    const cachetHtml = estTrophee ? `<div class="trophee-cachet" title="Événement Trophée diaspora"><svg class="ic" width="17" height="17" aria-hidden="true"><use href="#i-trophy"/></svg><span class="tx">Trophée</span></div>`
+      : estFlash ? `<div class="flash-cachet" title="Événement flash — informatif, sans inscription"><svg class="ic" width="19" height="19" aria-hidden="true"><use href="#i-bolt"/></svg></div>` : '';
     /* Design « Promo J-7 » (2026-10-05) : uniquement tant que la promotion est lancée ET que
        l'événement n'est pas terminé (evt.promo_active, calculé côté serveur à la lecture). */
     const promoBand = evt.promo_active
@@ -1334,8 +1352,8 @@ function evtBoutonTermine(evt, inscrit, taille) {
    terminé. Publié → « Compte-rendu » pour tout le monde ; sinon, seul le créateur voit « Rédiger ». */
 function evtBoutonCompteRendu(evt, peutGerer, taille) {
   const st = `font-size:${taille}px;text-decoration:none;font-weight:800;`;
-  if (evt.cr_statut === 'publie') return `<a class="btn btn-orange" style="${st}" href="compte-rendu.html?evt=${evt.id}">📄 Compte-rendu</a>`;
-  if (peutGerer) return `<a class="btn btn-orange" style="${st}" href="compte-rendu.html?evt=${evt.id}&edition=1">✍️ ${evt.cr_statut === 'brouillon' ? 'Reprendre le compte-rendu' : 'Rédiger le compte-rendu'}</a>`;
+  if (evt.cr_statut === 'publie') return `<a class="btn btn-orange btn-ic" style="${st}" href="compte-rendu.html?evt=${evt.id}"><svg class="ic" width="14" height="14" aria-hidden="true"><use href="#i-doc"/></svg>Compte-rendu</a>`;
+  if (peutGerer) return `<a class="btn btn-orange btn-ic" style="${st}" href="compte-rendu.html?evt=${evt.id}&edition=1"><svg class="ic" width="14" height="14" aria-hidden="true"><use href="#i-pencil"/></svg>${evt.cr_statut === 'brouillon' ? 'Reprendre le compte-rendu' : 'Rédiger le compte-rendu'}</a>`;
   return '';
 }
 
@@ -1803,8 +1821,8 @@ function resetModaleEvenement() {
 async function ouvrirModaleCreation() {
   evenementEnEditionId = null;
   resetModaleEvenement();
-  document.getElementById('modal-evt-titre').textContent = '📢 Mobiliser la diaspora — Créer un événement';
-  document.getElementById('btn-save').textContent = '📢 Publier l\'événement';
+  document.getElementById('modal-evt-titre').innerHTML = '<svg class="ic" width="18" height="18" aria-hidden="true" style="vertical-align:-3px;margin-right:6px;"><use href="#i-mega"/></svg>Mobiliser la diaspora — Créer un événement';
+  document.getElementById('btn-save').innerHTML = '<svg class="ic" width="15" height="15" aria-hidden="true"><use href="#i-mega"/></svg>Publier l\'événement';
   document.getElementById('modal-bg').classList.add('open');
   ficheChoisie = null;
   document.getElementById('fiche-choisie-cartouche').style.display = 'none';
@@ -1896,8 +1914,12 @@ function ouvrirModaleEdition(id) {
   document.getElementById('fiche-picker-panel').style.display = 'none';
   /* Un brouillon repris (2026-10-28) : « Publier » le met en ligne, « Enregistrer en brouillon » le garde tel quel. */
   const estBrouillon = evt.statut === 'brouillon';
-  document.getElementById('modal-evt-titre').textContent = estBrouillon ? '💾 Reprendre mon brouillon' : '✏️ Modifier l\'événement';
-  document.getElementById('btn-save').textContent = estBrouillon ? '📢 Publier l\'événement' : '💾 Enregistrer les modifications';
+  document.getElementById('modal-evt-titre').innerHTML = estBrouillon
+    ? '<svg class="ic" width="18" height="18" aria-hidden="true" style="vertical-align:-3px;margin-right:6px;"><use href="#i-save"/></svg>Reprendre mon brouillon'
+    : '<svg class="ic" width="18" height="18" aria-hidden="true" style="vertical-align:-3px;margin-right:6px;"><use href="#i-pencil"/></svg>Modifier l\'événement';
+  document.getElementById('btn-save').innerHTML = estBrouillon
+    ? '<svg class="ic" width="15" height="15" aria-hidden="true"><use href="#i-mega"/></svg>Publier l\'événement'
+    : '<svg class="ic" width="15" height="15" aria-hidden="true"><use href="#i-save"/></svg>Enregistrer les modifications';
   majBoutonsPublication();
   document.getElementById('modal-bg').classList.add('open');
 }
@@ -3075,8 +3097,8 @@ function renderEventDetail(evt, isPreview) {
   // Cachet "⚡ Flash" sur la vue détail (2026-10-12) — même badge que sur la carte de liste,
   // voir .flash-cachet et son commentaire.
   const estFlashDetail = !estTropheeDetail && evt.inscription_ouverte === 0;
-  const cachetDetailHtml = estTropheeDetail ? `<div class="trophee-cachet" title="Événement Trophée diaspora"><span class="ic">🏆</span><span class="tx">Trophée</span></div>`
-    : estFlashDetail ? `<div class="flash-cachet" title="Événement flash — informatif, sans inscription"><span class="ic">⚡</span></div>` : '';
+  const cachetDetailHtml = estTropheeDetail ? `<div class="trophee-cachet" title="Événement Trophée diaspora"><svg class="ic" width="17" height="17" aria-hidden="true"><use href="#i-trophy"/></svg><span class="tx">Trophée</span></div>`
+    : estFlashDetail ? `<div class="flash-cachet" title="Événement flash — informatif, sans inscription"><svg class="ic" width="19" height="19" aria-hidden="true"><use href="#i-bolt"/></svg></div>` : '';
   const classeCachetDetail = estTropheeDetail ? ' evt-card-trophee trophee-shimmer' : estFlashDetail ? ' evt-card-flash flash-shimmer' : '';
   const carouselHTML = uniqueSlides.length ? `
     <div class="carousel-wrap${classeCachetDetail}" id="${prefix}-carousel-wrap">
