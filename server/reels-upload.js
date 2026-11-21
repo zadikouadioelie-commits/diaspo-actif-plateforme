@@ -62,7 +62,16 @@ const SPEC_EVENEMENT = Object.freeze({ ...SPEC, duree_reel: null, duree_min: 1, 
 /* Vidéo de COURS d'une formation (Studio, 2026-10-30) : même hébergement et même envoi direct, mais des règles de cours — jusqu'à 1 h, cadre horizontal 16:9 recommandé,
    définition minimale plus souple. Règles choisies ICI (jamais par le navigateur). */
 const SPEC_FORMATION = Object.freeze({ ...SPEC, duree_reel: null, duree_min: 1, duree_max: 3600, duree_ideale: [120, 1200], taille_max_mo: 1024, cote_min_px: 360, cadre_recommande: "16:9", resolution_recommandee: "1920x1080", cadres_acceptes: ["16:9", "9:16", "4:5", "1:1"] });
-const specDe = usage => (usage === "evenement" ? SPEC_EVENEMENT : usage === "formation" ? SPEC_FORMATION : SPEC);
+/* Vidéo d'Influenceur Diaspo'Actif (IDA, 2026-11-21, demande explicite) : podcasts vidéo de 30 minutes
+   à 1 heure. Même hébergement et même envoi direct ; durée minimale assouplie à 1 minute pour ne pas
+   bloquer un essai ou un format plus court que prévu — la page elle-même annonce 30 min à 1 h. */
+const SPEC_IDA_VIDEO = Object.freeze({ ...SPEC, duree_reel: null, duree_min: 60, duree_max: 3600, duree_ideale: [1800, 3600], taille_max_mo: 1024, cote_min_px: 360, cadre_recommande: "16:9", resolution_recommandee: "1920x1080", cadres_acceptes: ["16:9", "9:16", "4:5", "1:1"] });
+/* Podcast AUDIO d'Influenceur Diaspo'Actif (IDA, 2026-11-21, demande explicite) : même hébergement et
+   même envoi direct que les vidéos — Bunny Stream encode aussi un fichier audio seul (bibliothèque
+   « Audio Only ») — mais formats et durées propres à l'audio, et cote_min_px à 0 : un fichier audio
+   n'a pas de largeur/hauteur, le contrôle de définition (pensé pour la vidéo) ne doit jamais s'y appliquer. */
+const SPEC_IDA_PODCAST = Object.freeze({ ...SPEC, duree_reel: null, duree_min: 60, duree_max: 10800, duree_ideale: [900, 3600], taille_max_mo: 500, cote_min_px: 0, cadre_recommande: null, resolution_recommandee: null, cadres_acceptes: [], formats: ["audio/mpeg", "audio/mp4", "audio/x-m4a", "audio/wav"], extensions: ["mp3", "m4a", "wav"] });
+const specDe = usage => (usage === "evenement" ? SPEC_EVENEMENT : usage === "formation" ? SPEC_FORMATION : usage === "ida_video" ? SPEC_IDA_VIDEO : usage === "ida_podcast" ? SPEC_IDA_PODCAST : SPEC);
 const actif = () => { const c = cfg(); return !!(c.lib && c.cle && c.hote); };
 
 const secret = () => process.env.AUTH_SECRET || "diaspo-actif-2026-secret";
@@ -144,7 +153,11 @@ function registerReelsUpload({ route, sendJSON, getCurrentUser }) {
     const taille = Number(body && body.taille), type = String((body && body.type) || "").toLowerCase();
     if (!Number.isFinite(taille) || taille <= 0) return sendJSON(res, 400, { error: "Taille du fichier inconnue." });
     if (taille > SP.taille_max_mo * 1024 * 1024) return sendJSON(res, 400, { error: `Fichier trop volumineux (maximum ${SP.taille_max_mo} Mo). ${SP === SPEC ? "Exportez la vidéo en 1080×1920 : un reel de 90 s dépasse rarement 150 Mo." : "Réduisez la définition (720p suffit) ou la durée de la vidéo."}` });
-    if (type && !SPEC.formats.includes(type)) return sendJSON(res, 400, { error: "Format non pris en charge. Utilisez une vidéo MP4 ou MOV." });
+    /* Bug corrigé le 2026-11-21 : ce contrôle comparait toujours au SPEC de base (vidéo seulement,
+       mp4/mov), jamais à SP (le spec réellement résolu pour cet usage) — resté invisible tant que
+       tous les usages existants (reel, événement, formation) étaient tous des vidéos avec les mêmes
+       formats acceptés. Le premier usage audio (ida_podcast) aurait rejeté tout MP3 valide. */
+    if (type && !SP.formats.includes(type)) return sendJSON(res, 400, { error: SP.formats.some(f => f.startsWith("audio/")) ? "Format non pris en charge. Utilisez un fichier audio MP3, M4A ou WAV." : "Format non pris en charge. Utilisez une vidéo MP4 ou MOV." });
     const titre = String((body && body.titre) || "Reel").replace(/[\r\n]+/g, " ").trim().slice(0, 80) || "Reel";
     try {
       const c = cfg();
@@ -197,6 +210,18 @@ async function verifierVideoFormation(userId, guid, jeton) {
   if (!e || e.etat !== "pret") return { erreur: e && e.erreur ? e.erreur : "Votre vidéo n’est pas encore prête. Patientez quelques instants puis réessayez.", code: 409 };
   return { url: e.urls.mp4, miniature: e.urls.miniature, duree: e.duree };
 }
+/* Vérifie l'envoi d'un média d'Influenceur Diaspo'Actif — vidéo OU podcast audio (2026-11-21, demande
+   explicite) : même preuve guid + jeton du compte que les autres usages, règles (durée/format) selon
+   mediaType. → { url, miniature, duree } ou { erreur, code }. */
+async function verifierVideoIda(userId, guid, jeton, mediaType) {
+  if (!actif()) return { erreur: "L’envoi de médias n’est pas encore activé.", code: 503 };
+  if (!guidValide(guid) || !jetonValide(userId, guid, jeton)) return { erreur: "Envoi de média inconnu.", code: 403 };
+  const usage = mediaType === "podcast" ? "ida_podcast" : "ida_video";
+  let e;
+  try { e = await etatVideo(guid, specDe(usage)); } catch (err) { return { erreur: "Le média n’a pas pu être vérifié. Réessayez.", code: 502 }; }
+  if (!e || e.etat !== "pret") return { erreur: e && e.erreur ? e.erreur : "Votre média n’est pas encore prêt. Patientez quelques instants puis réessayez.", code: 409 };
+  return { url: e.urls.mp4, miniature: e.urls.miniature, duree: e.duree };
+}
 /* Supprime de l'hébergement une vidéo d'événement remplacée ou retirée (seulement si l'adresse est bien celle de NOTRE bibliothèque). */
 async function supprimerVideoParUrl(url) {
   const h = cfg().hote; if (!h || !url) return false;
@@ -204,4 +229,4 @@ async function supprimerVideoParUrl(url) {
   return supprimerVideo(String(url).slice(pref.length).split("/")[0]);
 }
 
-module.exports = { verifierVideoEvenement, verifierVideoFormation, supprimerVideoParUrl, SPEC_EVENEMENT, SPEC_FORMATION, registerReelsUpload, SPEC, actif, urlsLecture, etatVideo, supprimerVideo, jetonValide, jetonPour, guidValide };
+module.exports = { verifierVideoEvenement, verifierVideoFormation, verifierVideoIda, supprimerVideoParUrl, SPEC_EVENEMENT, SPEC_FORMATION, SPEC_IDA_VIDEO, SPEC_IDA_PODCAST, registerReelsUpload, SPEC, actif, urlsLecture, etatVideo, supprimerVideo, jetonValide, jetonPour, guidValide, specDe };

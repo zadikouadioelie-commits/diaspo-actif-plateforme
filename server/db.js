@@ -6413,6 +6413,35 @@ db.exec(`
   );
 `);
 
+/* Influenceur Diaspo'Actif (IDA) — contenus publiés : vidéos ET podcasts audio (2026-11-21, demande
+   explicite). Remplace la demande d'accès créateur ci-dessus par une vérification automatique au
+   moment de publier (voir server/ida-contenus.js, idaPeutPublier) : Administrateur toujours, ou
+   Initiative/Collectivité avec Premium actif. Aucune colonne de statut de modération : publier rend
+   le contenu visible immédiatement. Si l'auteur perd son Premium ensuite, ses contenus déjà publiés
+   restent visibles (cette table n'est jamais filtrée sur le Premium de l'auteur à la lecture) ; lui
+   seul (ou l'administrateur) peut les supprimer, à tout moment, qu'il ait encore Premium ou non.
+   media_guid : identifiant Bunny Stream (usages ida_video/ida_podcast de server/reels-upload.js) ;
+   media_url : adresse de lecture résolue une fois le média prêt (mp4 pour une vidéo, mp4/m4a pour un
+   podcast — Bunny Stream encode aussi l'audio seul). theme : sous-ensemble de THEMES (influenceur.html,
+   à garder synchronisée). format : étiquette libre affichée sur la fiche (« Interview », « Débat »…). */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS ida_contenus (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    media_type TEXT NOT NULL,
+    titre TEXT NOT NULL,
+    description TEXT,
+    theme TEXT,
+    format TEXT,
+    image_couverture TEXT,
+    media_guid TEXT,
+    media_url TEXT,
+    duree_secondes INTEGER,
+    vues INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+`);
+
 /* Sondages (2026-11-05) : la table sondage_questions avait été créée avec CHECK(type IN ('choix_unique','choix_multiple','texte_libre','echelle','classement')),
    alors que la page Sondages propose oui_non, texte_court, texte_long, echelle_5, echelle_10, etoiles, nombre, date… : toute question d'un de ces types faisait
    échouer la création du sondage. On reconstruit la table SANS cette contrainte (SQLite ; sur Postgres, voir checkFixes dans pg-init.js). Les lignes sont conservées. */

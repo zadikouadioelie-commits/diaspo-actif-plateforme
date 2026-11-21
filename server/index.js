@@ -3139,6 +3139,37 @@ route("POST", "/api/upload/logo", async (req, res) => {
   } catch (e) { sendJSON(res, 500, SEC.safeError(e, "upload logo")); }
 });
 
+/* POST /api/upload/ida-couverture — image de couverture d'un contenu Influenceur Diaspo'Actif
+   (2026-11-21, demande explicite). Réservé aux comptes qui peuvent publier (server/ida-contenus.js,
+   idaPeutPublier) : inutile de laisser un compte non admissible stocker une image qui ne pourra
+   jamais être attachée à un contenu. */
+route("POST", "/api/upload/ida-couverture", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Non authentifié" });
+  const { idaPeutPublier } = require("./ida-contenus");
+  if (!(await idaPeutPublier(user, estPremiumActif))) return sendJSON(res, 403, { error: "Publier sur Influenceur Diaspo'Actif est réservé aux comptes Initiative et Collectivité Premium (ou à l'administration)." });
+  const contentType = req.headers["content-type"] || "";
+  const boundaryMatch = contentType.match(/boundary=([^\s;]+)/);
+  if (!boundaryMatch) return sendJSON(res, 400, { error: "Format invalide" });
+  const chunks = []; req.on("data", c => chunks.push(c));
+  await new Promise(r => req.on("end", r));
+  const body = Buffer.concat(chunks);
+  const { uploadToBunny, parseMultipart, uniqueFilename, compressImage } = require("./upload");
+  const { files } = parseMultipart(body, boundaryMatch[1]);
+  const file = files["couverture"] || files["file"] || files[Object.keys(files)[0]];
+  if (!file) return sendJSON(res, 400, { error: "Aucun fichier reçu" });
+  if (file.buffer.length > 8 * 1024 * 1024) return sendJSON(res, 400, { error: "Fichier trop grand (max 8 Mo)" });
+  const imgType = SEC.isSafeRasterImage(file.buffer);
+  if (!imgType) return sendJSON(res, 400, { error: "Format d'image non valide (JPEG, PNG, GIF ou WebP requis)." });
+  try {
+    const filename = uniqueFilename(file.filename, user.id);
+    const compressed = await compressImage(file.buffer, "post");
+    const url = await uploadToBunny(compressed, filename, "ida-couvertures");
+    SEC.logSecurity("upload", { uid: Number(user.id), kind: "ida-couverture", type: imgType, size: file.buffer.length });
+    sendJSON(res, 200, { url });
+  } catch (e) { sendJSON(res, 500, SEC.safeError(e, "upload ida-couverture")); }
+});
+
 /* POST /api/upload/post — upload image pour publication/annonce */
 route("POST", "/api/upload/post", async (req, res) => {
   const user = await getCurrentUser(req);
