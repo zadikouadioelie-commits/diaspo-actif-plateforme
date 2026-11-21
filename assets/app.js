@@ -2280,12 +2280,6 @@ async function applyAuthState() {
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
         <span id="panier-topbar-badge" style="display:none;position:absolute;top:-6px;right:-8px;background:var(--orange);color:#fff;border-radius:50%;width:16px;height:16px;font-size:10px;font-weight:700;align-items:center;justify-content:center;"></span>
       </a>
-      ${user.role === 'initiative' ? `<!-- Ma boutique (2026-11-15, demande explicite) : vitrine de magasin, comptes Initiative seulement (les seuls à avoir une boutique).
-           profil.html?id=…#vitrine envoie directement sur la page dédiée du type de boutique (nouveau système : boutique, portfolio, vidéo,
-           événements, impact, finance), jamais sur l'ancienne vue — voir versPageBoutiqueDediee() dans profil-app.html. -->
-      <a href="profil.html?id=${user.id}#vitrine" id="topbar-boutique-btn" class="topbar-icon-btn" title="Ma boutique" aria-label="Ma boutique">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l1.5-5h15L21 9"></path><path d="M3 9a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0"></path><path d="M5 12.5V21h14v-8.5"></path><path d="M10 21v-5h4v5"></path></svg>
-      </a>` : ''}
       <div class="notif-bell-wrap">
         <button class="notif-bell-btn topbar-icon-btn" id="notif-bell-btn" title="Notifications" onclick="openNotifDropdown(this)">
           <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
@@ -2293,44 +2287,38 @@ async function applyAuthState() {
         </button>
         <div class="notif-dropdown" id="notif-dropdown"></div>
       </div>
-      <!-- Bouton dédié vers le tableau de bord (icône maison) : la pastille d'identité
-           juste après y mène déjà, mais rien n'indiquait visuellement que ce lien existait
-           (demandé le 2026-08-19, capture à l'appui). Icône remplacée le 2026-09-20 (demande
-           explicite) : un engrenage évoquait des paramètres, pas un tableau de bord — une
-           maison est le repère standard pour "retour à mon espace". -->
-      <a href="${ROLE_DASHBOARD[user.role] || '#'}" id="topbar-dashboard-btn" class="topbar-icon-btn" title="Tableau de bord">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+      <a href="mon-associe.html" id="mon-associe-btn" style="text-decoration:none;cursor:pointer;display:flex;align-items:center;gap:5px;background:#0F2A50;color:#fff;font-weight:800;font-size:12.5px;padding:7px 14px;border-radius:14px;white-space:nowrap;border:1px solid rgba(255,255,255,.25);box-shadow:0 1px 4px rgba(0,0,0,.25);" title="Mon Associé">
+        <span style="font-size:14px;">💎</span> Mon Associé
       </a>
-      <!-- Bouton profil public (2026-08-31, demande explicite) : accès rapide depuis le bandeau
-           du haut vers SA PROPRE fiche publique -- même construction d'URL déjà utilisée et
-           éprouvée pour l'onglet "Profil" de la barre mobile basse (profilHref ci-dessous, voir
-           renderMobileBottomNav un peu plus bas dans ce fichier), pour rester cohérent. -->
-      <a href="${user.role === 'collectivite' ? `profil-collectivite.html?id=${user.id}` : `profil.html?id=${user.id}`}" class="topbar-icon-btn" title="Mon profil public">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-      </a>
-      <!-- Paramètres du compte (2026-09-04) : nom, domaine d'activité, e-mail, mot de passe,
-           notifications — module unique, distinct du tableau de bord et du profil public.
-           Icône "curseurs de réglage", volontairement différente de l'engrenage du tableau
-           de bord juste au-dessus pour ne pas dupliquer visuellement la même icône. -->
-      <a href="parametres-compte.html" id="topbar-parametres-btn" class="topbar-icon-btn" title="Paramètres du compte">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line></svg>
-      </a>
-      <!-- Identité fusionnée (refonte "onglets segmentés") : avatar + nom + rôle dans une
-           seule pastille cliquable vers le tableau de bord, au lieu de 3 éléments distincts. -->
-      <a href="${ROLE_DASHBOARD[user.role] || '#'}" class="acc-chip">
-        <div class="avatar">${user.photo_url ? `<img src="${user.photo_url}" alt="${user.nom}" style="width:30px;height:30px;border-radius:50%;display:block;object-fit:cover;" loading="lazy">` : photoAvatar(user.nom, 30)}</div>
+      <!-- Bandeau harmonisé (2026-11-21, demande explicite, capture à l'appui : « disposition
+           plus harmonieuse ») : Tableau de bord / Mon profil public / Ma boutique / Paramètres /
+           Mes connexions / Déconnexion n'ont plus chacun leur icône à part dans le bandeau —
+           regroupés dans UN SEUL menu, ouvert par un clic sur la pastille de compte (avatar +
+           nom + rôle), qui réutilise telle quelle l'infrastructure déjà existante et éprouvée
+           du menu compact "plus d'options" (toggleCompactMenu()/compact-menu-dd, déjà sortie de
+           .topbar pour échapper à son empilement — voir initCompactMenu() plus haut). Le
+           déclencheur "hamburger" dédié disparaît : la pastille de compte est désormais le seul
+           et même bouton, à toute largeur d'écran (plus seulement sous 1180px). -->
+      <button type="button" class="acc-chip" id="acc-chip-btn" style="font:inherit;cursor:pointer;" aria-haspopup="true" aria-label="Menu du compte" onclick="toggleCompactMenu(this)">
+        <span style="position:relative;display:inline-flex;flex:none;">
+          <div class="avatar">${user.photo_url ? `<img src="${user.photo_url}" alt="${user.nom}" style="width:30px;height:30px;border-radius:50%;display:block;object-fit:cover;" loading="lazy">` : photoAvatar(user.nom, 30)}</div>
+          <!-- Pastille « Mes connexions » (2026-10-05) : nombre d'appareils sur lesquels le compte est
+               ouvert, orange dès qu'il y en a plus d'un. Cachée tant que assets/connexions.js n'a pas
+               répondu (voir chargerConnexionsUI). Repositionnée (2026-11-21) en petit badge sur
+               l'avatar plutôt qu'en pastille à part : toujours visible d'un coup d'œil, sans
+               ajouter un élément de plus à la rangée. Un sibling de .avatar, jamais un enfant :
+               .avatar a overflow:hidden (pour rogner la photo en cercle), qui aurait rogné le
+               badge lui-même puisqu'il déborde volontairement du cercle. -->
+          <span id="cx-btn" class="cx-btn" style="display:none;position:absolute;top:-5px;right:-7px;height:15px;padding:0 4px;font-size:9px;border-radius:999px;margin:0;" title="Mes connexions">🛡 <span class="cx-n">1</span></span>
+        </span>
         <span class="acc-chip-text">
           <span class="acc-chip-name">${user.nom}</span>
           <span class="role-tag">${ROLE_LABEL_FR[user.role] || user.role}</span>
         </span>
-      </a>
+      </button>
       <span class="cl-switch-wrap" id="cl-switch-wrap" style="display:none;position:relative;">
         <button type="button" id="cl-switch-btn" class="cl-switch-btn" title="Changer de compte ou lier un compte">▾</button>
       </span>
-      <!-- Pastille « Mes connexions » (2026-10-05) : nombre d'appareils sur lesquels le compte est
-           ouvert, orange dès qu'il y en a plus d'un. Cachée tant que assets/connexions.js n'a pas
-           répondu (voir chargerConnexionsUI). -->
-      <button type="button" id="cx-btn" class="cx-btn" style="display:none;" onclick="window.ouvrirMesConnexions && ouvrirMesConnexions()" aria-label="Mes connexions">🛡 <span class="cx-n">1</span></button>
       <!-- Sorti de .cl-switch-wrap (2026-09-19, bug réel) : ce menu est en position:fixed et
            partagé par le déclencheur desktop (▾ ci-dessus) ET le bouton "Comptes" de la barre
            du bas mobile (#mobile-nav-comptes-toggle, voir renderMobileBottomNavAuto). Mais
@@ -2341,24 +2329,29 @@ async function applyAuthState() {
            rien n'était visible ("le bouton ne fonctionne pas sur téléphone", signalé et
            reproduit avec deux comptes liés réels). -->
       <div class="cl-switch-dd" id="cl-switch-dd"></div>
-      <a href="#" id="logout-link" class="btn btn-sm btn-outline" style="color:#000;">Déconnexion</a>
-      <a href="mon-associe.html" id="mon-associe-btn" style="text-decoration:none;cursor:pointer;display:flex;align-items:center;gap:5px;background:#0F2A50;color:#fff;font-weight:800;font-size:12.5px;padding:7px 14px;border-radius:14px;white-space:nowrap;border:1px solid rgba(255,255,255,.25);box-shadow:0 1px 4px rgba(0,0,0,.25);" title="Mon Associé">
-        <span style="font-size:14px;">💎</span> Mon Associé
-      </a>
-      <!-- Menu compact "plus d'options" (2026-09-19, demande explicite, capture à l'appui) —
-           voir initCompactMenu() ci-dessous pour le détail de ce qui y est déplacé/dupliqué et pourquoi. -->
-      <span class="compact-menu-wrap" id="compact-menu-wrap" style="position:relative;">
-        <button type="button" class="compact-menu-toggle topbar-icon-btn" id="compact-menu-toggle" title="Plus d'options" onclick="toggleCompactMenu(this)">
-          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
-        </button>
-        <div class="compact-menu-dd" id="compact-menu-dd">
-          <a href="${ROLE_DASHBOARD[user.role] || '#'}">📊 Tableau de bord</a>
-          <a href="parametres-compte.html">⚙️ Paramètres</a>
-          <a href="#" onclick="window.ouvrirMesConnexions ? ouvrirMesConnexions() : null;return false;">🛡 Mes connexions</a>
-          <a href="#" onclick="document.getElementById('notif-bell-btn')?.click();return false;">🔔 Notifications</a>
-          <a href="site-vitrine.html">🌐 Site Diaspo'Actif</a>
-        </div>
-      </span>`;
+      <div class="compact-menu-dd" id="compact-menu-dd">
+        <!-- Bouton dédié vers le tableau de bord : icône remplacée le 2026-09-20 (demande
+             explicite) — une maison est le repère standard pour "retour à mon espace". -->
+        <a href="${ROLE_DASHBOARD[user.role] || '#'}">📊 Tableau de bord</a>
+        <!-- Profil public (2026-08-31, demande explicite) : accès rapide vers SA PROPRE fiche
+             publique -- même construction d'URL déjà utilisée et éprouvée pour l'onglet "Profil"
+             de la barre mobile basse (profilHref, voir renderMobileBottomNav plus bas), pour
+             rester cohérent. -->
+        <a href="${user.role === 'collectivite' ? `profil-collectivite.html?id=${user.id}` : `profil.html?id=${user.id}`}">👤 Mon profil public</a>
+        ${user.role === 'initiative' ? `<!-- Ma boutique (2026-11-15, demande explicite) : vitrine de magasin, comptes Initiative
+             seulement (les seuls à avoir une boutique). profil.html?id=…#vitrine envoie
+             directement sur la page dédiée du type de boutique (nouveau système : boutique,
+             portfolio, vidéo, événements, impact, finance), jamais sur l'ancienne vue — voir
+             versPageBoutiqueDediee() dans profil-app.html. -->
+        <a href="profil.html?id=${user.id}#vitrine">🏪 Ma boutique</a>` : ''}
+        <!-- Paramètres du compte (2026-09-04) : nom, domaine d'activité, e-mail, mot de passe,
+             notifications — module unique, distinct du tableau de bord et du profil public. -->
+        <a href="parametres-compte.html">⚙️ Paramètres</a>
+        <a href="#" onclick="window.ouvrirMesConnexions ? ouvrirMesConnexions() : null;return false;">🛡 Mes connexions</a>
+        <a href="#" onclick="document.getElementById('notif-bell-btn')?.click();return false;">🔔 Notifications</a>
+        <a href="site-vitrine.html">🌐 Site Diaspo'Actif</a>
+        <a href="#" id="logout-link">🚪 Déconnexion</a>
+      </div>`;
     const logout = document.getElementById("logout-link");
     if (logout) logout.addEventListener("click", async (e) => {
       e.preventDefault();
