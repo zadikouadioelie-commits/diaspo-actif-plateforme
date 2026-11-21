@@ -1,0 +1,252 @@
+/* ============================================================
+   Comptes-rendus d'événements — design « Nuit dorée » (2026-11-21).
+   Trois écrans : comptes-rendus.html (liste), compte-rendu-app.html (lecture d'un compte-rendu, « Gérer mes comptes-rendus », éditeur).
+   Règle du titulaire : « à chaque nouvelle création, il faut garder la nouvelle DA, pas l'ancienne ».
+   Complète theme-nuit-doree.css (fond, barre du haut, boutons). Tout est préfixé html body.nd : la carte du fil (assets/posts.js)
+   qui réutilise compte-rendu.css n'est PAS touchée. Aucun changement de logique, de texte ni de structure.
+   Retour arrière : retirer les liens polices/thème/feuille et class="nd" sur <body> des deux pages.
+   ============================================================ */
+
+/* ── Variables : les pages existantes sont écrites avec --cr-* et --border/--text… ; on les redéfinit en sombre ── */
+html body.nd :is(.crl,.crp,.cr-synth,.crp-ov){
+  --bg:rgba(255,255,255,.06); --card:rgba(255,255,255,.045); --text:#E8ECF6; --muted:#A9B4CC; --border:rgba(255,255,255,.14);
+  --navy:#FFFFFF; --orange:#E3C06E; --orange-light:rgba(227,192,110,.14);
+  --cr-bleu:#E3C06E; --cr-bleu2:#FFFFFF; --cr-bleu-soft:rgba(227,192,110,.13);
+  --cr-or:#E3C06E; --cr-or-soft:rgba(227,192,110,.14); --cr-creme:rgba(255,255,255,.05);
+  --cr-vert:#8FE0B0; --cr-ink:#E8ECF6; --cr-ink2:#A9B4CC; --cr-line:rgba(255,255,255,.13);
+  --line:rgba(255,255,255,.13);
+}
+html body.nd :is(.crl,.crp) :is(h1,h2,h3){color:#fff;font-family:var(--nd-display)!important;font-weight:500;letter-spacing:-.005em}
+html body.nd :is(.crl,.crp) a:not([class]),html body.nd :is(.crl,.crp) .cr-link{color:var(--nd-or)}
+
+/* ── Boutons communs (.cr-btn) ── */
+html body.nd .cr-btn{border-radius:999px;padding:11px 20px;font-weight:800;transition:transform .2s,box-shadow .2s,border-color .2s,color .2s}
+html body.nd .cr-btn.pri,html body.nd .cr-btn.gold{background:var(--nd-degore)!important;color:#1a1202!important;box-shadow:0 14px 30px -14px rgba(227,192,110,.75)}
+html body.nd .cr-btn.pri:hover,html body.nd .cr-btn.gold:hover{transform:translateY(-2px);box-shadow:0 18px 34px -14px rgba(227,192,110,.9)}
+html body.nd .cr-btn.sec{background:rgba(227,192,110,.14)!important;color:var(--nd-or)!important;border:1px solid var(--nd-bord)}
+html body.nd .cr-btn.out{background:var(--nd-verre)!important;color:var(--nd-texte)!important;border:1px solid var(--nd-bord2)}
+html body.nd .cr-btn.sec:hover,html body.nd .cr-btn.out:hover{border-color:var(--nd-or);color:#fff!important}
+html body.nd .cr-btn:focus-visible{outline:3px solid var(--nd-or);outline-offset:2px}
+html body.nd .cr-btn:disabled{opacity:.5}
+
+/* ══════════════ 1. LISTE (comptes-rendus.html) ══════════════ */
+html body.nd .crl{max-width:1240px;color:var(--nd-texte)}
+html body.nd .crl h1{font-size:clamp(28px,3.4vw,44px);line-height:1.1;margin:6px 0 8px}
+html body.nd .crl-note{color:var(--nd-doux);font-size:15px}
+html body.nd .crl-top{margin:18px 0 10px;padding:12px;border:1px solid var(--nd-bord2);border-radius:22px;background:var(--nd-verre)}
+html body.nd .crl-search{height:48px;padding:0 20px;border-radius:999px;border:1px solid var(--nd-bord2);background:rgba(255,255,255,.07)!important;color:#fff;font:600 14.5px var(--nd-sans);color-scheme:dark}
+html body.nd .crl-search::placeholder{color:var(--nd-faible);font-weight:500}
+html body.nd .crl-search:focus-visible{outline:0;border-color:var(--nd-or);box-shadow:0 0 0 3px rgba(227,192,110,.18)}
+html body.nd .crl-count{color:var(--nd-doux)}
+html body.nd .crl-grid{gap:20px}
+html body.nd .crl-card{background:var(--nd-verre);border:1px solid var(--nd-bord2);border-radius:22px;box-shadow:0 26px 54px -36px #000;color:var(--nd-texte);transition:transform .35s var(--nd-ease),border-color .35s}
+html body.nd .crl-card:hover,html body.nd .crl-card:focus-within{transform:translateY(-4px);border-color:var(--nd-bord)}
+html body.nd .crl-band{background:linear-gradient(100deg,#0A1B45 0%,#0B2258 55%,#0B1226 100%);color:var(--nd-or);border-bottom:1px solid var(--nd-bord);font-weight:800;letter-spacing:.14em}
+html body.nd .crl-band b{color:var(--nd-or)}
+html body.nd .crl-band small{color:var(--nd-doux);letter-spacing:.04em}
+html body.nd .crl-img{background:rgba(255,255,255,.06)}
+html body.nd .crl-t{font-size:20px;font-weight:500;line-height:1.25}
+html body.nd .crl-t a{color:#fff!important;text-decoration:none}
+html body.nd .crl-t a:hover{color:var(--nd-or)!important;text-decoration:none}
+html body.nd .crl-meta{color:var(--nd-doux)}
+html body.nd .crl-meta b{color:#fff}
+html body.nd .crl-ap{color:var(--nd-texte);opacity:.92}
+html body.nd .crl-btns{border-top:1px solid var(--nd-bord2);margin-top:auto;padding-top:14px}
+html body.nd .crl-empty{background:var(--nd-verre);border:1px dashed var(--nd-bord);border-radius:22px;color:var(--nd-doux)}
+
+/* ══════════════ 2. LECTURE D'UN COMPTE-RENDU ══════════════ */
+html body.nd .cr2-tools{color:var(--nd-doux)}
+html body.nd .cr2-fs{background:var(--nd-verre2);border:1px solid var(--nd-bord2);color:#fff;border-radius:999px;width:42px}
+html body.nd .cr2-fs:hover{border-color:var(--nd-or);color:var(--nd-or)}
+html body.nd .cr2-synth-mini{background:var(--nd-verre2);border:1px solid var(--nd-bord);color:var(--nd-or);border-radius:999px}
+/* barre de navigation de la page */
+html body.nd .cr2-nav{background:rgba(8,13,30,.86);border:1px solid var(--nd-bord);border-radius:999px;box-shadow:0 18px 40px -22px #000;backdrop-filter:blur(14px)}
+html body.nd .cr2-nav.fixe{border-radius:0 0 22px 22px}
+html body.nd .cr2-nav-i{color:var(--nd-doux)}
+html body.nd .cr2-nav-i:hover{background:var(--nd-verre2);color:#fff}
+html body.nd .cr2-nav-i.on{background:rgba(227,192,110,.16);color:#fff;box-shadow:inset 0 0 0 1px var(--nd-or)}
+html body.nd .cr2-nav-synth{background:var(--nd-verre2);border:1px solid var(--nd-bord);color:var(--nd-or)}
+html body.nd .cr2-nav-pop,html body.nd .cr2-help-pop{background:#0f1a38;border:1px solid var(--nd-bord);border-top:3px solid var(--nd-or);color:var(--nd-texte);box-shadow:0 30px 60px -20px #000}
+html body.nd .cr2-nav-pop-t{color:#fff}
+html body.nd .cr2-nav-pop-all{background:rgba(227,192,110,.14);color:var(--nd-or)}
+html body.nd .cr2-nav-pop-l button{color:var(--nd-texte)}
+html body.nd .cr2-nav-pop-l button:hover{background:var(--nd-verre2)}
+html body.nd .cr2-haut{background:var(--nd-degore);color:#1a1202}
+html body.nd .cr2-help{background:var(--nd-verre2);border-color:var(--nd-or);color:var(--nd-or)}
+html body.nd .cr2-help:hover,html body.nd .cr2-help[aria-expanded="true"]{background:var(--nd-or);color:#1a1202}
+html body.nd .cr2-toc,html body.nd .cr2-mtoc .cr2-toc-i{background:var(--nd-verre);border-color:var(--nd-bord2)}
+html body.nd .cr2-toc-i{color:var(--nd-texte)}
+html body.nd .cr2-toc-i:hover,html body.nd .cr2-toc-i.on{background:rgba(227,192,110,.14);color:#fff}
+html body.nd .cr2-mtoc{background:transparent}
+/* feuille de lecture */
+html body.nd .cr2-page{background:var(--nd-verre);border:1px solid var(--nd-bord2);border-radius:26px;box-shadow:0 34px 70px -40px #000;color:var(--nd-texte);font-family:var(--nd-sans)}
+html body.nd .cr2-hero{border-bottom:1px solid var(--nd-bord);border-radius:26px 26px 0 0;
+  background:radial-gradient(520px 300px at 8% 0%,rgba(63,123,255,.24),transparent 70%),linear-gradient(100deg,#0A1B45 0%,#0B2258 52%,#0B1226 100%)}
+html body.nd .cr2-hero:after{height:3px;background:linear-gradient(90deg,transparent,#F3DC9B 20%,#B9893A 70%,transparent);opacity:.9}
+html body.nd .cr2-hero .dev{color:var(--nd-or);letter-spacing:.24em}
+html body.nd .cr2-hero h1{font-family:var(--nd-display)!important;font-weight:600;color:#fff}
+html body.nd .cr2-hero .puces span{background:rgba(255,255,255,.07);border:1px solid var(--nd-bord);color:var(--nd-texte)}
+html body.nd .cr2-sous{color:var(--nd-doux)}
+html body.nd .cr2-affiche img{border:1px solid var(--nd-bord2);box-shadow:0 26px 54px -30px #000}
+html body.nd .cr2-resume{background:rgba(227,192,110,.09);border:1px solid var(--nd-bord);border-left:5px solid var(--nd-or);color:var(--nd-texte)}
+html body.nd .cr2-resume b{color:var(--nd-or)}
+html body.nd .cr2-page h2,html body.nd .cr2-in h2{font-family:var(--nd-display);font-weight:500;color:#fff}
+html body.nd .cr2-kpi{background:var(--nd-verre2);border:1px solid var(--nd-bord2)}
+html body.nd .cr2-kpi .n{font-family:var(--nd-display);color:var(--nd-or)}
+html body.nd .cr2-graph{background:var(--nd-verre);border:1px solid var(--nd-bord2)}
+html body.nd .cr2-graph h4{font-family:var(--nd-display);font-weight:500;color:#fff}
+html body.nd .cr2-piste{background:rgba(255,255,255,.1)}
+html body.nd .cr2-barre{background:var(--nd-degore)}
+html body.nd .cr2-br-n{font-family:var(--nd-display);color:var(--nd-or)}
+html body.nd .cr2-donut .d-n{font-family:var(--nd-display);fill:#fff}
+html body.nd .cr2-donut .d-l{fill:var(--nd-doux)}
+html body.nd .cr2-nom-lien{color:var(--nd-or);border-bottom-color:var(--nd-bord)}
+html body.nd .cr2-nom-lien:hover,html body.nd .cr2-nom-lien:focus-visible{background:rgba(227,192,110,.14)}
+html body.nd .cr2-bm-t svg{color:var(--nd-or)}
+/* récit en cartes */
+html body.nd .cr2-card{background:var(--nd-verre);border:1px solid var(--nd-bord2);box-shadow:0 26px 54px -38px #000;border-radius:22px}
+html body.nd .cr2-card-t,html body.nd .cr2-bloc h3,html body.nd .cr2-page .cr2-bloc h3{color:#fff;font-family:var(--nd-display);font-weight:500}
+html body.nd .cr2-page .cr2-bloc h3{border-bottom:1px solid var(--nd-bord)}
+html body.nd .cr2-bulle{background:rgba(227,192,110,.14);color:var(--nd-or);border:1px solid var(--nd-bord);box-shadow:none}
+/* fondu du texte replié : un masque (et non un dégradé de couleur) pour suivre n'importe quel fond translucide */
+html body.nd .cr2-card-b.coupe{-webkit-mask-image:linear-gradient(180deg,#000 55%,transparent 100%);mask-image:linear-gradient(180deg,#000 55%,transparent 100%)}
+html body.nd .cr2-card-b.coupe:after{display:none}
+html body.nd .cr2-card-more{background:rgba(227,192,110,.14);color:var(--nd-or);border:1px solid var(--nd-bord)}
+html body.nd .cr2-card-more:hover{background:var(--nd-or);color:#1a1202}
+html body.nd .cr2-puces li:before{background:var(--nd-or);box-shadow:0 0 0 3px rgba(227,192,110,.18)}
+html body.nd .cr2-tuile,html body.nd .cr2-orga-l{background:var(--nd-verre);border:1px solid var(--nd-bord2);color:var(--nd-texte)}
+html body.nd .cr2-tuile svg{color:var(--nd-or)}
+html body.nd .cr2-slot{background:rgba(227,192,110,.08);border-color:var(--nd-bord)}
+html body.nd .cr2-slot .ini{font-family:var(--nd-display);color:var(--nd-or)}
+html body.nd .cr2-part-lien{color:var(--nd-or);border-bottom-color:var(--nd-bord)}
+html body.nd .cr2-rich h2,html body.nd .cr2-rich h3,html body.nd .cr2-rich h4{color:#fff}
+html body.nd .cr2-rich h3{color:var(--nd-or)}
+html body.nd .cr2-rich blockquote{background:rgba(227,192,110,.09);border-left-color:var(--nd-or);color:var(--nd-texte)}
+html body.nd .cr2-rich a:not(.crp-chip){color:var(--nd-or);text-decoration-color:var(--nd-bord)}
+/* boutons d'action en tête de page : l'or lumineux et le bleu scintillant existants sont conservés, seule l'enveloppe change */
+html body.nd .cr2-cta-multi{background:rgba(227,192,110,.07);border:1px solid var(--nd-bord);border-radius:22px}
+html body.nd .cr2-cta-multi-t,html body.nd .cr2-agir-bleu-t{color:#fff}
+html body.nd .cr2-cta-wrap small,html body.nd .cr2-agir-bleu small{color:var(--nd-doux)}
+html body.nd .cr2-nav-pop-agir a{color:#1a1202}
+html body.nd .cr2-synth-btn{background:linear-gradient(135deg,#14234a,#0B1226);border:1px solid var(--nd-bord);border-bottom:2px solid var(--nd-or)}
+/* « L'étape suivante » : theme-nuit-doree.css impose un texte sombre (!important) pour la carte claire du fil ; ici le cadre est sombre, on le surclasse par .crp / .cr-synth */
+html body.nd .cr-etape{background:rgba(227,192,110,.1);border-color:var(--nd-or);border-radius:16px}
+html body.nd :is(.crp,.cr-synth) .cr-etape *{color:var(--nd-texte)!important}
+html body.nd :is(.crp,.cr-synth) .cr-etape .cr-etape-lbl{color:var(--nd-or)!important}
+html body.nd :is(.crp,.cr-synth) .cr-etape .cr-etape-date{color:#fff!important;background:var(--nd-verre2);border-color:var(--nd-or)}
+html body.nd .crp-tile{background:linear-gradient(160deg,rgba(63,123,255,.2),rgba(255,255,255,.05))!important;border:1px solid var(--nd-bord);color:#fff;font-weight:700;border-radius:16px}
+/* comptes identifiés (cadre doré) */
+html body.nd .cr-dore-in{background:linear-gradient(180deg,#14234a,#0B1226)}
+html body.nd .cr-dore-in:before{color:var(--nd-or)}
+html body.nd .cr-dore .crp-idcard{background:var(--nd-verre2);border-color:var(--nd-bord)}
+html body.nd .cr-dore .crp-idcard:hover{border-color:var(--nd-or)}
+html body.nd .crp-idcard{background:var(--nd-verre);border-color:var(--nd-bord2);color:var(--nd-texte)}
+html body.nd .crp-idcard:hover{border-color:var(--nd-or)}
+html body.nd .crp-idcard b{color:#fff}
+html body.nd .crp-idav,html body.nd .crp-cm .av{background:var(--nd-degore);color:#1a1202}
+/* galerie, réactions, commentaires */
+html body.nd .crg-it{background:rgba(255,255,255,.06);box-shadow:0 20px 40px -26px #000}
+html body.nd .crg-it:hover,html body.nd .crg-it:focus-visible{box-shadow:0 24px 44px -22px rgba(227,192,110,.5)}
+html body.nd .crg-t small{color:var(--nd-doux)}
+html body.nd .mgb-t{background:rgba(255,255,255,.06)}
+html body.nd .mgb-lib b{color:var(--nd-or)}
+html body.nd .crp-react{border-top-color:var(--nd-bord2)}
+html body.nd .crp-r{background:var(--nd-verre);border-color:var(--nd-bord2);color:var(--nd-texte)}
+html body.nd .crp-r:hover{border-color:var(--nd-or)}
+html body.nd .crp-r.on{background:rgba(227,192,110,.16);border-color:var(--nd-or);color:var(--nd-or)}
+html body.nd .crp-cm .bub{background:var(--nd-verre2);color:var(--nd-texte)}
+html body.nd .crp-cm small{color:var(--nd-doux)}
+
+/* ══════════════ 3. « GÉRER MES COMPTES-RENDUS » + ÉDITEUR ══════════════ */
+html body.nd .crp{color:var(--nd-texte)}
+html body.nd .crp h1{font-size:clamp(26px,3vw,38px);line-height:1.12}
+html body.nd .crp-card{background:var(--nd-verre);border:1px solid var(--nd-bord2);border-radius:22px;box-shadow:0 26px 54px -38px #000;color:var(--nd-texte)}
+html body.nd .crp-meta,html body.nd .crp-note,html body.nd .crp-hint,html body.nd .crp-count,html body.nd .crp-fld>label em,html body.nd .crp-src small,html body.nd .crp-grp small,html body.nd .crg-aide{color:var(--nd-doux)}
+html body.nd .crp-count.warn{color:#FFB37A}
+html body.nd .crp-lbl{color:var(--nd-or)}
+html body.nd .crp-sum{background:rgba(227,192,110,.09);border-left-color:var(--nd-or);color:var(--nd-texte)}
+html body.nd .crp-prefill{background:rgba(63,123,255,.12);border-color:rgba(127,166,224,.5);color:var(--nd-texte)}
+html body.nd .crp-auto{border-color:var(--nd-bord);background:linear-gradient(160deg,#14305A 0%,#0D2B4E 60%,#0B1226 100%)}
+/* champs */
+html body.nd .crp :is(input:not([type=checkbox]):not([type=radio]),textarea,select){background:rgba(255,255,255,.07)!important;border:1px solid var(--nd-bord2);border-radius:12px;color:#fff;color-scheme:dark}
+html body.nd .crp :is(input,textarea,select):focus{outline:0;border-color:var(--nd-or);box-shadow:0 0 0 3px rgba(227,192,110,.18)}
+html body.nd .crp :is(input,textarea)::placeholder{color:var(--nd-faible)}
+html body.nd .crp select option{background:#0f1a38;color:#fff}
+html body.nd .crp :is(input[type=checkbox],input[type=radio]){accent-color:var(--nd-or)}
+/* choix, listes, puces */
+html body.nd .crp-seg button{background:var(--nd-verre);border:1px solid var(--nd-bord2);color:var(--nd-texte)}
+html body.nd .crp-seg button:hover{border-color:var(--nd-or)}
+html body.nd .crp-seg button.on{background:rgba(227,192,110,.18);border-color:var(--nd-or);color:#fff}
+html body.nd .crp-grp label,html body.nd .crp-list,html body.nd .crp-list label,html body.nd .crp-pick,html body.nd .crp-pick>div,html body.nd .crp-src,html body.nd .crp-ev{border-color:var(--nd-bord2)}
+html body.nd .crp-grp label.sel{border-color:var(--nd-or);background:rgba(227,192,110,.12)}
+html body.nd .crp-pick>div:hover,html body.nd .crp-ac div.act,html body.nd .crp-ac div:hover{background:rgba(227,192,110,.14)}
+html body.nd .crp-q{background:rgba(227,192,110,.14);color:var(--nd-or)}
+html body.nd .crp-chip{background:rgba(227,192,110,.14);color:var(--nd-or)}
+html body.nd .crp-chip.ext{background:rgba(143,224,176,.14);color:#8FE0B0}
+html body.nd .crp-chip.add{border-color:var(--nd-bord);color:var(--nd-doux)}
+html body.nd .crp-xsec,html body.nd .crp-xadd,html body.nd .crp-wiz,html body.nd .crp-act,html body.nd .crp-part{background:var(--nd-verre);border-color:var(--nd-bord2)}
+html body.nd .crp-xadd{border-style:dashed}
+html body.nd .crp-xbtn{background:var(--nd-verre2);border-color:var(--nd-bord2);color:var(--nd-or)}
+html body.nd .crp-xbtn.crp-xdel,html body.nd .crp-x,html body.nd .crp-act-x{color:#FF9B9B}
+html body.nd .crp-act-badge{color:#FFD08A}
+html body.nd .crp-sug button{background:var(--nd-verre);border-color:var(--nd-bord);color:var(--nd-texte)}
+html body.nd .crp-sug button:hover{background:rgba(227,192,110,.14)}
+html body.nd .crp-act-btn{background:var(--nd-degore);color:#1a1202}
+html body.nd .crp-logo-prev{background:var(--nd-verre2);border-color:var(--nd-bord)}
+html body.nd .crp-prof-h span{color:var(--nd-doux)}
+html body.nd .crp-photos div{background:rgba(255,255,255,.06)}
+html body.nd .crp-st.todo{background:rgba(255,155,90,.16);color:#FFB37A}
+html body.nd .crp-st.draft{background:rgba(227,192,110,.18);color:var(--nd-or)}
+html body.nd .crp-st.pub{background:rgba(143,224,176,.16);color:#8FE0B0}
+html body.nd .crp-rep th{color:var(--nd-doux);border-bottom-color:var(--nd-or)}
+html body.nd .crp-rep td{border-bottom-color:var(--nd-bord2)}
+html body.nd .crp-rep td a{color:var(--nd-or)}
+html body.nd .crp-ev-wrap{border-bottom-color:var(--nd-bord2)}
+/* fenêtres, aide à la saisie, message d'information */
+html body.nd .crp-ov{background:rgba(3,6,14,.8);backdrop-filter:blur(6px)}
+html body.nd .crp-modal{color:var(--nd-texte);border:1px solid rgba(227,192,110,.4);border-radius:26px;
+  background:radial-gradient(420px 220px at 100% 0%,rgba(227,192,110,.14),transparent 66%),linear-gradient(160deg,#14234a 0%,#0B1226 62%);box-shadow:0 40px 90px -30px #000}
+html body.nd .crp-modal :is(h2,h3,strong,b){color:#fff}
+html body.nd .crp-ac{background:#0f1a38;border-color:var(--nd-bord);box-shadow:0 18px 40px -16px #000}
+html body.nd .crp-toast{background:#0f1a38;border:1px solid var(--nd-bord);color:#fff}
+/* couleurs claires écrites dans le balisage généré */
+html body.nd .crp [style*="color:#0D2B4E"]{color:#fff!important}
+html body.nd .crp [style*="color:#B91C1C"],html body.nd .crp [style*="color:#dc2626"]{color:#FF9B9B!important}
+html body.nd .crp [style*="color:#B45309"]{color:#FFD08A!important}
+html body.nd .crp [style*="background:#FFF8E6"],html body.nd .crp [style*="background:#FEF3C7"]{background:rgba(227,192,110,.14)!important;border-color:var(--nd-bord)!important}
+html body.nd .crp [style*="border:1px solid #E1E8F2"],html body.nd .crp [style*="border:1px solid #D5DEEA"]{border-color:var(--nd-bord2)!important}
+html body.nd .crp textarea[style*="border:1px solid #D5DEEA"]{background:rgba(255,255,255,.07)!important;color:#fff}
+
+/* ══════════════ 4. SYNTHÈSE (fenêtre « l'essentiel ») ══════════════ */
+html body.nd .cr-synth{background:rgba(3,6,14,.82);backdrop-filter:blur(6px);color:var(--nd-texte);font-family:var(--nd-sans)}
+html body.nd .cr-synth-card{background:linear-gradient(160deg,#14234a 0%,#0B1226 62%);border:1px solid rgba(227,192,110,.4);border-radius:26px;box-shadow:0 40px 90px -30px #000}
+html body.nd .cr-synth-bar{background:linear-gradient(100deg,#0A1B45 0%,#0B2258 55%,#0B1226 100%);border-bottom:1px solid var(--nd-bord);color:var(--nd-or)}
+html body.nd .cr-synth-head h2{font-family:var(--nd-display);font-weight:500;color:#fff}
+html body.nd .cr-synth-head .dev{color:var(--nd-or)}
+html body.nd .cr-synth-head img{background:#fff}
+html body.nd .cr-synth-head .puces span{background:rgba(227,192,110,.14);color:var(--nd-or)}
+html body.nd .cr-synth-h{color:#fff;border-bottom-color:var(--nd-bord)}
+html body.nd .cr-synth-forts li{background:var(--nd-verre);border-color:var(--nd-bord2);color:var(--nd-texte)}
+html body.nd .cr-synth-cats b{color:var(--nd-doux)}
+html body.nd .cr-synth-part .sl{background:#fff;border-color:var(--nd-bord2)}
+html body.nd .cr-synth-part .ini{font-family:var(--nd-display);color:#14234a}
+html body.nd .cr-synth-part a{color:var(--nd-or);text-decoration-color:var(--nd-bord)}
+@media print{
+  html body.nd .cr-synth{background:#fff;color:#16224D}
+  html body.nd .cr-synth-card{background:#fff;border:0}
+  html body.nd .cr-synth-head h2,html body.nd .cr-synth-h{color:#0B1F5C}
+  html body.nd .cr-synth-forts li{background:#fff;color:#16224D}
+}
+
+/* ── Téléphones et tablettes ── */
+@media (max-width:620px){
+  html body.nd .crl{padding:16px 12px 60px}
+  html body.nd .crl-top{padding:10px;border-radius:18px}
+  html body.nd .cr2-nav{border-radius:18px}
+  html body.nd .cr2-page{border-radius:20px}
+  html body.nd .cr2-hero{border-radius:20px 20px 0 0}
+}
+@media (prefers-reduced-motion:reduce){
+  html body.nd :is(.crl-card,.cr-btn){transition:none}
+  html body.nd .crl-card:hover{transform:none}
+}
