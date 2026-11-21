@@ -1269,7 +1269,7 @@ async function init() {
        Le 2026-11-14, le PROPRIÉTAIRE aussi (une barre en bas de la page lui donne les paramètres et l'ancienne vue d'édition) et le lien
        profil.html?id=…#vitrine (sans ?vitrine=1) mène lui aussi à la nouvelle page. Sont exclus : les retours de paiement, l'aperçu de brouillon,
        la demande explicite de l'ancienne vue (?edition=1). Pendant la maintenance des boutiques, le propriétaire (confirmé par le serveur) voit quand même sa page. */
-    if ((new URLSearchParams(location.search).get('vitrine') === '1' || (location.hash || '').startsWith('#vitrine')) && await versPageBoutiqueDediee()) return;
+    if ((new URLSearchParams(location.search).get('vitrine') === '1' || (location.hash || '').startsWith('#vitrine')) && (await versPageBoutiqueDediee()) === true) return;
     /* Bouton "Adhérer" (Associations/ONG) — même route que initiative.html, statut récupéré
        avant le rendu pour afficher directement le bon état (déjà membre / demande envoyée). */
     if (!isOwn && profil.role === 'initiative' && profil.initiative_id && ['Association','ONG'].includes(profil.initiative_type)) {
@@ -2963,10 +2963,12 @@ function renderBoardToolbar() {
 let _vitrineLoaded = false;
 
 /* Envoie vers la page dédiée du type de boutique (boutique, portfolio, vidéo, événements, impact, finance). Renvoie true si la page part vers
-   cette page. Appelée à l'ouverture de profil.html?id=…#vitrine ET au clic sur l'onglet « Boutique » du profil (2026-11-14) : avant, le clic
+   cette page, false s'il n'y en a pas (boutique pas encore ouverte, ancien type sans page, exclusions ci-dessous) et 'erreur' si la vérification
+   a échoué deux fois : on n'affiche alors JAMAIS l'ancienne vue, mais un message avec un bouton « Réessayer » (2026-11-21). Appelée à l'ouverture de profil.html?id=…#vitrine ET au clic sur l'onglet « Boutique » du profil (2026-11-14) : avant, le clic
    basculait sur place vers l'ancienne vue, donc le nouveau design n'apparaissait qu'en ouvrant directement le lien #vitrine.
    Exclus : retours de paiement, aperçu de brouillon, demande explicite de l'ancienne vue (?edition=1) et anciens types sans page dédiée. */
 let _vitrineDedieePromesse = null;
+let _vitrineDedieeCause = '';
 function versPageBoutiqueDediee() {
   /* Une seule vérification par ouverture de la page : l'ouverture par #vitrine et le clic sur l'onglet partagent le même résultat. */
   if (!_vitrineDedieePromesse) _vitrineDedieePromesse = _verifierPageBoutiqueDediee();
@@ -2980,7 +2982,7 @@ async function _verifierPageBoutiqueDediee() {
     events: 'boutique-evenements.html', evenement: 'boutique-evenements.html',
     impact: 'boutique-impact.html', projet: 'boutique-impact.html', finance: 'boutique-finance.html' };
   /* 2026-11-15 : une boutique OUVERTE sans type enregistré est une boutique de vente (boutique.html) — une boutique pas encore ouverte garde sa page de mise en route ; une panne réseau est retentée une fois
-     avant de se rabattre sur l'ancienne vue. */
+     avant d'afficher le message d'erreur (plus de repli silencieux sur l'ancienne vue). */
   for (let essai = 0; essai < 2; essai++) {
     try {
       const ib = (await api('GET', '/initiatives/' + profil.initiative_id)).initiative;
@@ -2988,9 +2990,24 @@ async function _verifierPageBoutiqueDediee() {
       if (!page) return false;
       location.replace(page + '?id=' + encodeURIComponent(profil.initiative_id));
       return true;
-    } catch (e) { /* second essai, puis repli : l'ancienne vue boutique */ }
+    } catch (e) { /* second essai, puis message d'erreur avec « Réessayer » */
+      _vitrineDedieeCause = (e && e.status ? 'HTTP ' + e.status + ' — ' : '') + String((e && e.message) || e || 'erreur inconnue').slice(0, 160);
+    }
   }
-  return false;
+  return 'erreur';
+}
+
+/* Message affiché à la place de l'ancienne vue quand la page de la boutique n'a pas pu être retrouvée. Le détail technique aide à comprendre la panne. */
+function afficherErreurBoutique(zone) {
+  if (!zone) return;
+  zone.innerHTML = '<div style="padding:60px 20px;text-align:center;max-width:520px;margin:0 auto;">'
+    + '<div style="font-size:18px;font-weight:800;margin-bottom:8px;">Votre boutique n’a pas pu s’ouvrir</div>'
+    + '<div style="color:var(--muted);font-weight:600;margin-bottom:18px;">La connexion a été interrompue pendant la vérification. Réessayez dans un instant.</div>'
+    + '<button type="button" id="vitrine-retenter" style="cursor:pointer;border:0;border-radius:999px;padding:12px 26px;font-weight:700;font-size:15px;font-family:inherit;background:var(--primary,#1565C0);color:#fff;">Réessayer</button>'
+    + '<div id="vitrine-cause" style="margin-top:16px;font-size:12px;color:var(--muted);opacity:.8;"></div></div>';
+  const c = zone.querySelector('#vitrine-cause'); if (c && _vitrineDedieeCause) c.textContent = 'Détail : ' + _vitrineDedieeCause;
+  const b = zone.querySelector('#vitrine-retenter');
+  if (b) b.onclick = () => { _vitrineDedieePromesse = null; _vitrineDedieeCause = ''; switchProfileView('vitrine'); };
 }
 
 function initVitrineSwitch() {
@@ -3036,7 +3053,8 @@ function switchProfileView(view) {
     history.replaceState(null, '', pubMatch ? `#vitrine&pub=${pubMatch[1]}` : '#vitrine');
     if (!_vitrineLoaded) vitrine.innerHTML = '<div style="padding:70px 20px;text-align:center;color:var(--muted);font-weight:600;">Ouverture de la boutique…</div>';
     versPageBoutiqueDediee().then((parti) => {
-      if (parti) return;
+      if (parti === true) return;
+      if (parti === 'erreur') { afficherErreurBoutique(vitrine); return; }
       if (!_vitrineLoaded) { _vitrineLoaded = true; renderVitrine(); /* renderVitrine appellera renderVitrineCols() une fois _vitrineInit chargé */ }
       else renderVitrineCols();
     });
