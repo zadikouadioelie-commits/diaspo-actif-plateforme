@@ -935,8 +935,8 @@
     const el = $('#t-evenements');
     /* Entrée « ⚡ Événement flash » + « ? » (comptes Initiative seulement) — fournie par le module Mes événements, vide sinon. */
     el.innerHTML = `${(window.MMods && window.MMods.flashCarte) ? window.MMods.flashCarte() : ''}<div id="ev-brouillon-slot"></div><div class="ev-top"><div class="search">${ic('search', 's')}<input id="evq" type="search" placeholder="Rechercher un événement…" aria-label="Rechercher un événement" value="${esc(S.ev.q)}"></div><button type="button" id="ev-cloche" aria-label="Être informé des événements" title="Être informé des événements"></button></div>
-      <a class="btn out block" href="#/calendrier" style="margin:10px 0 2px">${ic('cal', 's')} Calendrier — voir par mois et ajouter à mon agenda</a>
-      <a class="btn out block" href="#/comptesrendus" style="margin:6px 0 2px">${ic('doc', 's')} Compte-rendu d’événement — tous les comptes-rendus</a>
+      <a class="cr-bleu" href="#/comptesrendus" style="margin:12px 0 4px;min-height:62px;font-size:17px" aria-label="Comptes-rendus d’événements : lire tous les comptes-rendus">${ic('doc', 'l')}<span style="display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:2px">Comptes-rendus d’événements<small style="font-weight:600;font-size:12.5px;opacity:.92">Lire tous les comptes-rendus</small></span><i aria-hidden="true">→</i></a>
+      <a class="btn out block" href="#/calendrier" style="margin:8px 0 2px">${ic('cal', 's')} Calendrier — voir par mois et ajouter à mon agenda</a>
       <div class="chips">${[['avenir', 'À venir'], ['passes', 'Terminés'], ['gratuit', 'Gratuits'], ['mes', 'Mes inscriptions']].map(([k, l]) => `<button class="chip ${S.ev.filtre === k ? 'on' : ''}" data-f="${k}">${l}</button>`).join('')}</div>
       ${pubSlot('evenements_sidebar')}<div id="ev-bar"></div><div class="small muted" id="ev-count" style="margin:0 4px 10px"></div><div id="ev-list"></div>`;
     $$('.chip[data-f]', el).forEach(c => c.onclick = async () => {
