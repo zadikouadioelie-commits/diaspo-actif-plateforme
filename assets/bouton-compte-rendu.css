@@ -1,0 +1,27 @@
+/* Bouton « Compte-rendu d'événement » du site (evenements-app.html) — 2026-11-21, demande explicite : « rends ce bouton plus visible et surtout
+   donne-lui le design des comptes-rendus ».
+   Même identité que le bouton « Comptes-rendus d'événements » de la version téléphone (assets/m.css, .cr-bleu) : le « bleu compte-rendu »
+   (dégradé bleu, anneau bleu clair, halo, petits éclats qui scintillent, reflet qui passe), comme « Événement flash » est le vert scintillant.
+   Le bouton est plus grand que ses voisins, pour qu'on le voie en premier. Retour arrière : retirer la classe « btn-cr-site » du bouton
+   #btn-comptes-rendus et le lien vers ce fichier. */
+html body a.btn.btn-cr-site{position:relative;overflow:hidden;display:inline-flex;align-items:center;justify-content:center;gap:10px;
+  min-height:46px;padding:11px 22px;border:0;border-radius:14px;font:inherit;font-weight:800;font-size:14.5px;line-height:1.2;letter-spacing:.005em;
+  text-decoration:none;white-space:nowrap;color:#fff;cursor:pointer;
+  background:linear-gradient(135deg,#0A2F7A 0%,#1558C8 45%,#2E8BFF 100%);
+  box-shadow:0 0 0 1px rgba(160,205,255,.55),0 8px 22px rgba(46,116,224,.42);
+  transition:transform .18s ease,box-shadow .18s ease,filter .18s ease}
+html body a.btn.btn-cr-site>*{position:relative;z-index:1}
+html body a.btn.btn-cr-site .ic{width:20px;height:20px;flex:none;color:#fff;stroke:currentColor}
+html body a.btn.btn-cr-site:before{content:"";position:absolute;inset:0;pointer-events:none;
+  background-image:radial-gradient(circle,rgba(255,255,255,.95) 0 1.2px,transparent 1.9px),radial-gradient(circle,rgba(190,225,255,.9) 0 1px,transparent 1.7px),radial-gradient(circle,rgba(255,255,255,.8) 0 1.5px,transparent 2.1px);
+  background-size:46px 46px,31px 31px,67px 67px;background-position:0 0,13px 19px,29px 7px;animation:crsite-scint 3.2s ease-in-out infinite}
+html body a.btn.btn-cr-site:after{content:"";position:absolute;top:0;left:-60%;width:35%;height:100%;pointer-events:none;
+  background:linear-gradient(115deg,transparent,rgba(255,255,255,.45),transparent);animation:crsite-reflet 4.2s ease-in-out infinite}
+html body a.btn.btn-cr-site:hover{transform:translateY(-2px);filter:brightness(1.07);
+  box-shadow:0 0 0 1px rgba(190,225,255,.8),0 12px 28px rgba(46,116,224,.55)}
+html body a.btn.btn-cr-site:active{transform:scale(.98)}
+html body a.btn.btn-cr-site:focus-visible{outline:3px solid #E3C06E;outline-offset:3px}
+@keyframes crsite-scint{0%,100%{opacity:.5}50%{opacity:1}}
+@keyframes crsite-reflet{0%{left:-60%}55%,100%{left:130%}}
+@media (prefers-reduced-motion:reduce){html body a.btn.btn-cr-site:before,html body a.btn.btn-cr-site:after{animation:none}
+  html body a.btn.btn-cr-site{transition:none}}
