@@ -68,7 +68,9 @@ async function aProposer(db, { userId, auj, lancement, maintenant = Date.now() }
     titre: r.titre || 'Votre événement',
     date: String(r.date_fin || r.date_evt || '').slice(0, 10),
     brouillon: Number(r.nb_brouillons) > 0,
-    lien: 'compte-rendu.html?evt=' + Number(r.id)
+    /* Un brouillon existant ouvre directement l'éditeur (sans &edition=1, la page montrerait le brouillon en lecture) ; sinon l'éditeur s'ouvre de lui-même,
+       déjà pré-rempli à partir de l'événement (compte-rendu-app.html : prefillAuto). */
+    lien: 'compte-rendu.html?evt=' + Number(r.id) + (Number(r.nb_brouillons) > 0 ? '&edition=1' : '')
   }));
 }
 

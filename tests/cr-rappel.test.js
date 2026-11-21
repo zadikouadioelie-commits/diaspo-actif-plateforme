@@ -57,6 +57,7 @@ test('un compte-rendu en brouillon n\'éteint pas la cartouche : elle propose de
   const d = evt(uid('Createur'), 'Commencé seulement', '2026-11-13'); cr(d, 'brouillon');
   const e = (await voir()).data.evenements.find(x => x.id === d);
   assert.ok(e && e.brouillon === true);
+  assert.equal(e.lien, `compte-rendu.html?evt=${d}&edition=1`, 'un brouillon ouvre directement l\'éditeur');
   sql('delete from evenement_comptes_rendus where evenement_id=?', d); sql('delete from evenements where id=?', d);
 });
 

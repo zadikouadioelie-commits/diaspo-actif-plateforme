@@ -45,6 +45,8 @@
 .crp-seg button.on{background:#0D2B4E;color:#fff;border-color:#0D2B4E}
 .crp-prefill{border:1.5px dashed #2E74E0;background:#E8F0FD;border-radius:12px;padding:12px 14px;margin:0 0 14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
 .crp-prefill div{flex:1;min-width:220px;font-size:13.5px}
+.crp-auto{border:1.5px solid #16794C;background:#E6F5EC;color:#0F3D28;border-radius:12px;padding:12px 14px;margin:0 0 14px;font-size:14px;line-height:1.5}
+.crp-auto small{color:#2F5E47;font-size:12.5px}
 .crp-chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:6px 0}
 /* Sections libres (2026-10-07) : titre modifiable + monter/descendre/retirer, puis zone d'ajout avec suggestions. */
 .crp-xsec{border:1.5px solid var(--border,#DCE4F0);border-radius:12px;padding:12px;background:#FBFCFE}
@@ -1127,6 +1129,7 @@ function vueEditeur() {
   const root = $('#crp');
   root.innerHTML = '<h1>' + (publie ? '✏️ Modifier le compte-rendu' : '✍️ Rédiger le compte-rendu') + '</h1><div class="crp-meta">' + esc(ev.titre) + ' · ' + esc(fmtDateCourte(ev.date_evt)) + (ev.ville ? ' · ' + esc(ev.ville) : '') + '</div>'
     + '<div class="crp-card">'
+    + (ST.autoNote ? '<div class="crp-auto" role="status">' + ST.autoNote + '</div>' : '')
     + '<div class="crp-prefill"><div><b>✨ Partir de l\'événement</b><br>Pré-remplir à partir de ce qui existe déjà : programme, fiche conceptuelle, photos, chiffres de la fiche d\'inscription et partenaires.</div><button class="cr-btn pri" id="ed-prefill">✨ Pré-remplir depuis l\'événement</button></div>'
     + '<div class="crp-fld"><label>Titre</label><input id="ed-titre" maxlength="160"></div>'
     + '<div class="crp-fld"><label>Type d\'événement</label><div class="crp-seg" id="ed-types"></div><div class="crp-hint" id="ed-typehint"></div><input id="ed-libre" maxlength="60" placeholder="Écrivez votre type d\'événement (ex. sportif, culturel, caritatif…)" style="display:none;margin-top:8px"></div>'
@@ -1508,6 +1511,36 @@ function drawProfils() {
   const add = $('#ed-profadd'); if (add) add.disabled = ed.profils.length >= 40;
 }
 
+/* ---------- pré-remplissage automatique à la première ouverture (2026-11-21, demande explicite : « simplifier la rédaction ») ----------
+   À l'ouverture d'un compte-rendu qui n'existe pas encore, le brouillon est préparé SANS que le créateur ait à cliquer : phrase d'ouverture
+   (titre, date, lieu), programme, chiffres de participation, temps forts. Rien n'est inventé : seul ce que l'événement contient déjà est repris,
+   et ce qui manque est signalé. Rien n'est enregistré tant que le créateur n'a pas cliqué « Enregistrer le brouillon » ou « Publier ». */
+function debutResume(ev, sg) {
+  const d1 = fmtDateCourte(ev.date_evt), d2 = ev.date_fin && String(ev.date_fin).slice(0, 10) !== String(ev.date_evt).slice(0, 10) ? fmtDateCourte(ev.date_fin) : '';
+  const lieu = [ev.lieu, ev.ville].filter(Boolean).join(', ');
+  const para = ['« ' + ev.titre + ' » s’est tenu ' + (d2 ? 'du ' + d1 + ' au ' + d2 : 'le ' + d1) + (lieu ? ' — ' + lieu : '') + '.'];
+  if (sg.participation_texte) para.push('Participation : ' + String(sg.participation_texte).trim());
+  if (sg.forts && sg.forts.length) para.push('Temps forts : ' + sg.forts.slice(0, 8).join(', ') + '.');
+  return para.join('\n\n');
+}
+async function prefillAuto() {
+  ST.autoNote = '';
+  let r; try { r = await api('GET', `/evenements/${ST.evtId}/compte-rendu/sources`); } catch (_) { return; }
+  const ed = ST.ed, sg = r.suggestions || {}, ev = ST.data.evenement, faits = [];
+  const deroule = ((r.programmes || []).find(p => p.texte) || {}).texte || '';
+  if (sg.forts && sg.forts.length) { ed.forts = sg.forts.slice(0, 8); faits.push('les temps forts'); }
+  CANEVAS[ed.type].champs.forEach((c, i) => {
+    if (/^(Déroulé|Programme|Contenu et déroulé)/.test(c[0]) && deroule && !ed.saisie[ed.type][i]) { ed.saisie[ed.type][i] = deroule; faits.push('le déroulé'); }
+    else if (/^Participation/.test(c[0]) && sg.participation_texte && !ed.saisie[ed.type][i]) { ed.saisie[ed.type][i] = sg.participation_texte; faits.push('la participation'); }
+  });
+  if (sg.video_url && !ed.video) { ed.video = sg.video_url; faits.push('la vidéo'); }
+  if (!ed.resume.trim()) { ed.resume = debutResume(ev, sg); faits.unshift('la phrase d’ouverture'); }
+  const manques = (r.sources || []).filter(s => !s.trouve && ['programme', 'inscriptions', 'photos'].includes(s.cle)).map(s => s.libelle.toLowerCase());
+  ST.autoNote = '<b>✨ Votre brouillon est déjà préparé.</b> Nous avons repris de votre événement : ' + faits.map(esc).join(', ') + '. Relisez, ajoutez ce qui vous a marqué (ambiance, remerciements, ce qu’il faut retenir), puis publiez.'
+    + (manques.length ? '<br><small>Rien trouvé pour : ' + manques.map(esc).join(', ') + ' — à compléter si vous le souhaitez.</small>' : '')
+    + '<br><small>Rien n’est enregistré tant que vous n’avez pas cliqué « Enregistrer le brouillon » ou « Publier ».</small>';
+}
+
 /* ---------- pré-remplissage depuis l'événement ---------- */
 async function prefillModal() {
   let r;
@@ -1606,7 +1639,9 @@ async function init() {
       root.innerHTML = '<div class="crp-card"><h1>Pas encore</h1><p class="crp-note">Le compte-rendu s\'écrit une fois l\'événement terminé. En attendant, vous pouvez déjà identifier des participants depuis <a class="cr-link" href="evenements.html?evt=' + d.evenement.id + '">la page de l\'événement</a>.</p></div>';
       return;
     }
-    ST.ed = nouvelEd(); return vueEditeur();
+    ST.ed = nouvelEd(); ST.autoNote = '';
+    if (!d.compte_rendu) await prefillAuto(); /* premier passage : brouillon préparé d'office */
+    return vueEditeur();
   }
   if (d.compte_rendu) return vuePublique();
   root.innerHTML = '<div class="crp-card"><h1>' + esc(d.evenement.titre) + '</h1><p class="crp-note">Aucun compte-rendu n\'a été publié pour cet événement.</p><div class="cr-btns"><a class="cr-btn sec" href="evenements.html?evt=' + d.evenement.id + '">ℹ️ Voir l\'événement</a></div></div>';
