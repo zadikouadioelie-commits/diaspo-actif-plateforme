@@ -7602,7 +7602,13 @@ function injecterKoffiNavigation() {
       '#assist-hub-fab.koffi img{width:100%;height:100%;border-radius:50%;display:block;background:#fff;}'+
       /* Un seul Koffi par écran : sur l'Annuaire (conseiller) et les Événements (guide), la page a déjà son propre Koffi, donc le visage global s'efface.
          En CSS pur (:has) pour ne pas dépendre de l'ordre de chargement des scripts ; si le Koffi de la page est absent (compte non éligible), le global reste. */
-      'body:has(.ka-root, .ke-root, .ks-root) #assist-hub-fab{display:none !important;}'+
+      /* 2026-11-21 (signalement de Mme Agnelé, Moov To Learn : « elle voit deux Koffi, un petit et un grand ») : la règle ne couvrait que
+         l'Annuaire, les Événements et les Sondages ; la page Formations (Koffi de création, gros bouton), l'inscription, le Business Plan,
+         l'administration et le tuteur de formation affichaient EN PLUS le petit visage global. Désormais TOUT Koffi de page l'efface.
+         .kb-root.kb-sansbtn = Business Plan ouvert depuis un autre bouton (pas de pastille propre) : le global reste. Le Koffi de création
+         (.kc-btn) se montre/se cache en JS : il pose body.koffi-page-actif tant qu'il est disponible (voir assets/koffi-createur.js). */
+      'body:has(.ka-root, .ke-root, .ks-root, .ki-root, .kad-root, .kf-root, .kb-root:not(.kb-sansbtn)) #assist-hub-fab,body.koffi-page-actif #assist-hub-fab,'+
+      'body:has(.ka-root, .ke-root, .ks-root, .ki-root, .kad-root, .kf-root, .kb-root:not(.kb-sansbtn)) #assist-hub-menu,body.koffi-page-actif #assist-hub-menu{display:none !important;}'+
       '.assist-hub-hidden{display:none !important;}';
     document.head.appendChild(style);
 

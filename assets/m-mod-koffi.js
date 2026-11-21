@@ -109,7 +109,10 @@
   function majNavigation() {
     const present = document.getElementById('kn-tel-btn');
     /* Sur l'Annuaire et les Événements, le Koffi de l'écran est déjà là : un seul bouton Koffi à la fois. */
-    const koffiDeLEcran = surAnnuaire() || surEvenements() || surInscriptions() || surSondages();
+    /* 2026-11-21 : aussi dès qu'un autre Koffi est réellement affiché (tuteur de formation .kf-root, Business Plan, Koffi de création…),
+       pas seulement sur ces 4 écrans — sinon la personne voyait deux Koffi (le tuteur ET le bouton rond de navigation). */
+    const koffiDeLEcran = surAnnuaire() || surEvenements() || surInscriptions() || surSondages()
+      || !!document.querySelector('.ka-root, .ke-root, .ks-root, .ki-root, .kad-root, .kf-root, .kb-root:not(.kb-sansbtn)') || document.body.classList.contains('koffi-page-actif');
     if (!S.me || koffiDeLEcran) { if (present) present.remove(); return; }
     if (present) return;
     if (!document.getElementById('kn-tel-style')) {

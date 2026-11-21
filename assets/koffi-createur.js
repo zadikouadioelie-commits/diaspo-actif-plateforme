@@ -159,7 +159,7 @@
     window.addEventListener('resize', function () { if (ouvert()) { majHaut(); reserver(); } });
     window.addEventListener('scroll', function () { if (ouvert() && !petitEcran()) majHaut(); }, { passive: true });
     /* La pastille n'apparaît que lorsque l'éditeur de formation est ouvert ; quand il se ferme, Koffi se réduit. */
-    var maj = function () { var v = opts && opts.visible ? !!opts.visible() : true; E.btn.style.display = v && !ouvert() ? 'inline-flex' : 'none'; if (!v && ouvert()) fermer(); };
+    var maj = function () { var v = opts && opts.visible ? !!opts.visible() : true; document.body.classList.toggle('koffi-page-actif', v); /* un seul Koffi : efface le visage global (app.js) */ E.btn.style.display = v && !ouvert() ? 'inline-flex' : 'none'; if (!v && ouvert()) fermer(); };
     setInterval(maj, 700); maj();
   }
 
