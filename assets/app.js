@@ -1885,8 +1885,16 @@ function injectCompactMenuStyles() {
 .compact-menu-dd.open{display:flex;}
 .compact-menu-dd a{display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:8px;color:#fff!important;text-decoration:none;font-size:13.5px;font-weight:600;white-space:nowrap;}
 .compact-menu-dd a:hover{background:rgba(255,255,255,.1);}
-/* Éléments déplacés tels quels (icônes rondes .topbar-icon-btn, sélecteur de langue, pastille
-   Premium, bouton Déconnexion) : gardent leur propre habillage, juste alignés en colonne. */
+.compact-menu-dd a svg{flex:none;color:#C7D0E6;}
+/* Éléments déplacés tels quels sous 1180px (sélecteur de langue, pastille Premium) : gardent
+   leur propre habillage, juste alignés en colonne. Déconnexion, elle, vit ICI en permanence
+   depuis le bandeau harmonisé (2026-11-21) — jamais juste "déplacée" — donc annule la pastille
+   blanche héritée de html body.nd #logout-link (theme-nuit-doree.css) et .topbar #logout-link
+   (design-upgrade.v2.css), pensée pour un bouton isolé dans le bandeau, qui jurerait au milieu
+   d'une liste uniforme (demande explicite 2026-11-22 : "pas la", capture à l'appui). Sélecteur
+   volontairement surchargé (2 classes + 2 types) pour l'emporter sur ces deux règles !important
+   existantes, jamais touchées pour ne pas affecter d'autres pages où #logout-link reste seul. */
+html body.nd .compact-menu-dd #logout-link{background:none!important;color:#fff!important;border:0!important;border-radius:8px!important;font-weight:600!important;margin-top:4px!important;padding-top:12px!important;border-top:1px solid rgba(255,255,255,.12)!important;}
 .compact-menu-dd > *{flex:none;}
 @media(max-width:1180px){ .compact-menu-toggle{display:flex!important;} }
 /* Tableau de bord/Paramètres restent dans le menu compact jusqu'en dessous de 768px aussi
@@ -1952,8 +1960,9 @@ function initCompactMenu() {
      ce n'est pas un élément position:fixed). */
   if (dd.parentNode !== document.body) document.body.appendChild(dd);
   // Ancrage stable dans le menu : les éléments déplacés sont insérés juste avant, dans cet
-  // ordre — les 4 liens neufs (Tableau de bord/Paramètres/Notifications/Site Diaspo'Actif),
-  // déjà dans le HTML, restent en dernier.
+  // ordre — les liens du bandeau harmonisé (Tableau de bord/Profil public/Boutique/Paramètres/
+  // Mes connexions/Notifications/Site Diaspo'Actif/Déconnexion), déjà dans le HTML en
+  // permanence depuis le 2026-11-21, restent en dernier, Déconnexion fermant toujours la liste.
   const ancre = dd.firstElementChild;
   const cibles = [
     document.querySelector('.topbar .nav a[href="fil-actualite.html"]'),
@@ -1961,7 +1970,11 @@ function initCompactMenu() {
     document.querySelector('.topbar .nav a[href="actualites.html"]'),
     document.getElementById('lang-select'),
     document.getElementById('premium-topbar-btn'),
-    document.getElementById('logout-link'),
+    // logout-link RETIRÉ d'ici (2026-11-22, correction) : avant le bandeau harmonisé il vivait
+    // dans le bandeau et n'était déplacé ICI que sous 1180px (comme les autres cibles) ; depuis
+    // il réside en permanence dans compact-menu-dd (dernier élément du HTML, avec son séparateur
+    // visuel) — le garder dans "cibles" l'aurait réinséré juste avant `ancre` comme les autres,
+    // le faisant sauter au milieu de la liste au lieu de rester en dernier (bug réel vérifié).
   ].filter(Boolean);
   if (!cibles.length) return; // page sans le bandeau standard (nav absente) — rien à déplacer
   const emplacements = cibles.map(el => ({ el, parent: el.parentNode, suivant: el.nextSibling }));
@@ -2330,27 +2343,29 @@ async function applyAuthState() {
            reproduit avec deux comptes liés réels). -->
       <div class="cl-switch-dd" id="cl-switch-dd"></div>
       <div class="compact-menu-dd" id="compact-menu-dd">
-        <!-- Bouton dédié vers le tableau de bord : icône remplacée le 2026-09-20 (demande
-             explicite) — une maison est le repère standard pour "retour à mon espace". -->
-        <a href="${ROLE_DASHBOARD[user.role] || '#'}">📊 Tableau de bord</a>
+        <!-- Icônes au trait (2026-11-22, demande explicite : « retire les emoticon, crée des
+             illustrations homogènes ») — mêmes tracés que les anciennes icônes dédiées qu'ils
+             remplacent (dashboard/profil/boutique/paramètres/notifications), pour ne rien changer
+             de ce qui était déjà reconnu ; shield/globe/logout neufs, même style de trait. -->
+        <a href="${ROLE_DASHBOARD[user.role] || '#'}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>Tableau de bord</a>
         <!-- Profil public (2026-08-31, demande explicite) : accès rapide vers SA PROPRE fiche
              publique -- même construction d'URL déjà utilisée et éprouvée pour l'onglet "Profil"
              de la barre mobile basse (profilHref, voir renderMobileBottomNav plus bas), pour
              rester cohérent. -->
-        <a href="${user.role === 'collectivite' ? `profil-collectivite.html?id=${user.id}` : `profil.html?id=${user.id}`}">👤 Mon profil public</a>
+        <a href="${user.role === 'collectivite' ? `profil-collectivite.html?id=${user.id}` : `profil.html?id=${user.id}`}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>Mon profil public</a>
         ${user.role === 'initiative' ? `<!-- Ma boutique (2026-11-15, demande explicite) : vitrine de magasin, comptes Initiative
              seulement (les seuls à avoir une boutique). profil.html?id=…#vitrine envoie
              directement sur la page dédiée du type de boutique (nouveau système : boutique,
              portfolio, vidéo, événements, impact, finance), jamais sur l'ancienne vue — voir
              versPageBoutiqueDediee() dans profil-app.html. -->
-        <a href="profil.html?id=${user.id}#vitrine">🏪 Ma boutique</a>` : ''}
+        <a href="profil.html?id=${user.id}#vitrine"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l1.5-5h15L21 9"></path><path d="M3 9a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0"></path><path d="M5 12.5V21h14v-8.5"></path><path d="M10 21v-5h4v5"></path></svg>Ma boutique</a>` : ''}
         <!-- Paramètres du compte (2026-09-04) : nom, domaine d'activité, e-mail, mot de passe,
              notifications — module unique, distinct du tableau de bord et du profil public. -->
-        <a href="parametres-compte.html">⚙️ Paramètres</a>
-        <a href="#" onclick="window.ouvrirMesConnexions ? ouvrirMesConnexions() : null;return false;">🛡 Mes connexions</a>
-        <a href="#" onclick="document.getElementById('notif-bell-btn')?.click();return false;">🔔 Notifications</a>
-        <a href="site-vitrine.html">🌐 Site Diaspo'Actif</a>
-        <a href="#" id="logout-link">🚪 Déconnexion</a>
+        <a href="parametres-compte.html"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line></svg>Paramètres</a>
+        <a href="#" onclick="window.ouvrirMesConnexions ? ouvrirMesConnexions() : null;return false;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3.5v5c0 4.5-3 7.8-7 9.5-4-1.7-7-5-7-9.5v-5z"></path></svg>Mes connexions</a>
+        <a href="#" onclick="document.getElementById('notif-bell-btn')?.click();return false;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>Notifications</a>
+        <a href="site-vitrine.html"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18M12 3c2.3 2.4 3.5 5.8 3.5 9s-1.2 6.6-3.5 9c-2.3-2.4-3.5-5.8-3.5-9s1.2-6.6 3.5-9z"></path></svg>Site Diaspo'Actif</a>
+        <a href="#" id="logout-link"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>Déconnexion</a>
       </div>`;
     const logout = document.getElementById("logout-link");
     if (logout) logout.addEventListener("click", async (e) => {
