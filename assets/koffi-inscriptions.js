@@ -2,7 +2,7 @@
    assets/koffi-inscriptions.js — KOFFI, GUIDE DES FICHES D'INSCRIPTION : fenêtre de discussion (2026-11-04)
    ═════════════════════════════════════════════════
    Autonome (CSS injecté, préfixe .ki-) : KoffiInscriptions.monter({ telephone, apresCreation })
-   Dans le module « Formulaires de réponse et d'inscription », Koffi explique à quoi sert chaque partie d'une fiche (types d'inscription, champs, validation, QR…)
+   Dans le module « Fiche d'inscription », Koffi explique à quoi sert chaque partie d'une fiche (types d'inscription, champs, validation, QR…)
    et, pour les comptes Initiative, Collectivité et Administrateur, prépare une fiche en BROUILLON : aperçu écrit par le serveur, création seulement après le clic
    « Créer la fiche » (ou un « oui »). Toutes les règles (majorité, pays, crédit, droits) sont décidées par le serveur (/api/kofi/inscriptions/*) : ici on n'affiche
    que ce qu'il renvoie. Le crédit (pastille, recharge) vient de assets/koffi-credit.js : un seul portefeuille pour tout Koffi.

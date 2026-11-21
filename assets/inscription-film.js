@@ -1669,7 +1669,7 @@
 <div class="fi-abs fn-win" data-r="nwin"><div class="fn-bar"><i></i><i></i><i></i><span>diaspoactif.com/inscriptions-admin.html</span></div>
  <div class="fn-body">
   <div class="fn-p" data-r="nP1">
-    <div class="fn-ti">Formulaires de réponse et d'inscription</div>
+    <div class="fn-ti">Fiche d'inscription</div>
     <div class="fn-btns"><span class="fn-b">⚙️ Partenaires & sponsors par défaut</span><span class="fn-b">📥 Formulaires partagés avec moi (2)</span><span class="fn-b dark" data-r="nCre">+ Créer une fiche d'inscription</span></div>
     <div class="fn-cards"><div class="fn-c"><div class="im" style="background:linear-gradient(120deg,#0B2A5B,#c2410c)"></div><div class="tx"><span class="st">Publiée</span><b>Journée portes ouvertes</b><small>Inscrits : 24</small></div></div>
       <div class="fn-c"><div class="im" style="background:linear-gradient(120deg,#0f766e,#fde68a)"></div><div class="tx"><span class="st">Publiée</span><b>Gala annuel 2026</b><small>Inscrits : 58</small></div></div></div>

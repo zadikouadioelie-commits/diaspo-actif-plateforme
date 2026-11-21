@@ -3405,9 +3405,14 @@ FormationAcces.register({ route, db, sendJSON, getCurrentUser, SEC, checkFormati
 /* Formation Diaspora : demande d'accès à l'espace formateur (Initiative → administration, accepter/refuser sans motif) — server/formation-demandes-formateur.js. */
 const FormationDemandesFormateur = require("./formation-demandes-formateur");
 FormationDemandesFormateur.register({ route, db, sendJSON, getCurrentUser, creerNotif, nomCompteAffichage, hasAccreditation });
-/* Influenceur Diaspo'Actif (IDA) : demande d'accès créateur (Initiative/Utilisateur Premium → administration, autoriser/décliner avec ou sans commentaire) — server/ida-demandes-createur.js. */
-const IdaDemandesCreateur = require("./ida-demandes-createur");
-IdaDemandesCreateur.register({ route, db, sendJSON, getCurrentUser, creerNotif, nomCompteAffichage, exigerPremium, getPremiumStatut });
+/* Influenceur Diaspo'Actif (IDA) : publication de contenus, vidéos et podcasts (2026-11-21, demande
+   explicite) — remplace l'ancienne demande d'accès créateur par une vérification automatique au
+   moment de publier (Administrateur toujours, Initiative/Collectivité si Premium actif) —
+   server/ida-contenus.js. estPremiumActif référencée avant sa définition textuelle (~l.18268) :
+   c'est une déclaration `function`, hissée, donc déjà utilisable ici (l'appel réel n'a lieu qu'au
+   traitement d'une requête, bien après le chargement du module). */
+const IdaContenus = require("./ida-contenus");
+IdaContenus.register({ route, db, sendJSON, getCurrentUser, estPremiumActif, nomCompteAffichage, SEC });
 /* Formation Diaspora, lot A : droits d'accès par formation ou par module, commandes, expiration — server/formation-droits.js. getOrigin est une déclaration de fonction (hissée). */
 const FormationDroits = require("./formation-droits");
 FormationDroits.register({ route, db, sendJSON, getCurrentUser, SEC, checkFormationOwner, creerNotif, getOrigin, ParcoursFormation });
@@ -52465,7 +52470,7 @@ route("PUT", "/api/insc/mes-partenaires-sponsors-defaut", async (req, res, param
 route("POST", "/api/insc/fiches", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  if (!inscBetaAutorise(user)) return sendJSON(res, 403, { error: "Le module Formulaires de réponse et d'inscription est réservé aux comptes Initiative et Collectivité." });
+  if (!inscBetaAutorise(user)) return sendJSON(res, 403, { error: "Le module Fiche d'inscription est réservé aux comptes Initiative et Collectivité." });
   if (!body?.nom || !String(body.nom).trim()) return sendJSON(res, 400, { error: "Le nom de la fiche est requis." });
   const init = await db.prepare("SELECT id, partenaires_evenements_json, sponsors_evenements_json FROM initiatives WHERE owner_user_id=?").get(user.id);
   const slug = await inscSlugUnique(body.nom);

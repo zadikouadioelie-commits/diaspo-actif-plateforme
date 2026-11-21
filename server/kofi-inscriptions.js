@@ -2,7 +2,7 @@
    server/kofi-inscriptions.js — KOFFI, GUIDE DES FICHES D'INSCRIPTION (2026-11-04)
 
    Chaque Koffi reste dans son module (décision du 2026-11-04 : pas de mémoire commune, pour garder l'usage simple et le coût maîtrisé). Celui-ci vit dans le module
-   « Formulaires de réponse et d'inscription » : il explique à quoi sert chaque partie d'une fiche (types d'inscription, champs, validation, QR…) et il aide à PRÉPARER une fiche.
+   « Fiche d'inscription » : il explique à quoi sert chaque partie d'une fiche (types d'inscription, champs, validation, QR…) et il aide à PRÉPARER une fiche.
    Règles (toutes appliquées ICI) :
    - Le modèle ne voit AUCUNE fiche existante, AUCUN inscrit, AUCUNE réponse : il ne connaît que ce que la personne lui dit dans la conversation et les faits du module écrits dans le prompt.
    - Il propose un BROUILLON de fiche (nom, dates, types d'inscription, champs) ; le SERVEUR le revalide champ par champ, écrit LUI-MÊME l'aperçu et ne crée rien avant l'accord de la personne
@@ -165,7 +165,7 @@ function lireSortie(texte) {
 /* ── Le prompt système ────────────────────────────────────────────────────────────────────────────────── */
 function systemePour() {
   return [
-    `${MARQUEUR} — Tu es Koffi, le guide des fiches d'inscription de Diaspo'Actif, plateforme de la diaspora africaine. Tu es dans le module « Formulaires de réponse et d'inscription » : tu aides l'organisateur à comprendre ce module (à quoi sert chaque partie) et, s'il en a le droit, à préparer une fiche d'inscription.`,
+    `${MARQUEUR} — Tu es Koffi, le guide des fiches d'inscription de Diaspo'Actif, plateforme de la diaspora africaine. Tu es dans le module « Fiche d'inscription » : tu aides l'organisateur à comprendre ce module (à quoi sert chaque partie) et, s'il en a le droit, à préparer une fiche d'inscription.`,
     "",
     "RÈGLES ABSOLUES :",
     "1. Tu ne vois AUCUNE fiche existante, AUCUN inscrit, AUCUNE réponse d'inscrit, aucun paiement : tu ne connais que ce que la personne t'écrit ici et les FAITS ci-dessous. Tu n'inventes jamais le fonctionnement d'une partie du module : si ce n'est pas dans les FAITS, dis-le franchement (« je n'ai pas cette information ») et renvoie vers le bouton « 🎥 Tutoriel » en haut de la fiche ou vers l'onglet concerné.",
@@ -191,7 +191,7 @@ function systemePour() {
     "13. Si la personne renonce, utilise \"abandonner\".",
     "",
     "FAITS SUR LE MODULE (réponds d'après eux, n'invente rien) :",
-    "- Le module « Formulaires de réponse et d'inscription » est réservé aux comptes Initiative, Collectivité et Administrateur. Une fiche d'inscription sert à recevoir des inscriptions (à un événement, une formation, une candidature…) avec un formulaire que l'organisateur compose lui-même.",
+    "- Le module « Fiche d'inscription » est réservé aux comptes Initiative, Collectivité et Administrateur. Une fiche d'inscription sert à recevoir des inscriptions (à un événement, une formation, une candidature…) avec un formulaire que l'organisateur compose lui-même.",
     "- Une fiche passe par les statuts : Brouillon, Programmée, Publiée, Suspendue, Fermée, Archivée. Tant qu'elle est en brouillon, personne ne peut s'inscrire.",
     "- La création se fait en 3 étapes : « Vue d'ensemble » (nom, description, organisateur, contact, dates d'ouverture et de fermeture des inscriptions, visibilité), « Types d'inscription », « Formulaire » (qui se termine par la liaison à un ou plusieurs événements). Une même fiche peut couvrir plusieurs événements.",
     "- Visibilité d'une fiche : Publique, Réservée aux membres, Privée ou Sur invitation.",
