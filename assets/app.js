@@ -1886,16 +1886,21 @@ function injectCompactMenuStyles() {
 .compact-menu-dd a{display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:8px;color:#fff!important;text-decoration:none;font-size:13.5px;font-weight:600;white-space:nowrap;}
 .compact-menu-dd a:hover{background:rgba(255,255,255,.1);}
 .compact-menu-dd a svg{flex:none;color:#C7D0E6;}
-/* Éléments déplacés tels quels sous 1180px (sélecteur de langue, pastille Premium) : gardent
-   leur propre habillage, juste alignés en colonne. Déconnexion, elle, vit ICI en permanence
-   depuis le bandeau harmonisé (2026-11-21) — jamais juste "déplacée" — donc annule la pastille
-   blanche héritée de html body.nd #logout-link (theme-nuit-doree.css) et .topbar #logout-link
-   (design-upgrade.v2.css), pensée pour un bouton isolé dans le bandeau, qui jurerait au milieu
-   d'une liste uniforme (demande explicite 2026-11-22 : "pas la", capture à l'appui). Sélecteur
-   volontairement surchargé (2 classes + 2 types) pour l'emporter sur ces deux règles !important
-   existantes, jamais touchées pour ne pas affecter d'autres pages où #logout-link reste seul. */
-html body.nd .compact-menu-dd #logout-link{background:none!important;color:#fff!important;border:0!important;border-radius:8px!important;font-weight:600!important;margin-top:4px!important;padding-top:12px!important;border-top:1px solid rgba(255,255,255,.12)!important;}
+/* Éléments déplacés tels quels sous 1180px (sélecteur de langue, pastille Premium, Déconnexion) :
+   gardent leur propre habillage, juste alignés en colonne — Déconnexion y retrouve donc sa
+   pastille blanche habituelle une fois à l'étroit, ce qui est très bien : seule dans la colonne,
+   elle ne jure avec rien. */
 .compact-menu-dd > *{flex:none;}
+/* Déconnexion en icône ronde dans le bandeau plein écran (2026-11-22, demande explicite : « je
+   veux avoir accès à ces boutons depuis le hero, sans les emoticon, crée des illustrations
+   homogènes ») — même rond que Tableau de bord/Profil/Paramètres juste à côté, au lieu de la
+   pastille blanche pleine de html body.nd #logout-link (theme-nuit-doree.css) et .topbar
+   #logout-link (design-upgrade.v2.css), pensées pour un bouton texte isolé. Sélecteur
+   volontairement surchargé pour l'emporter sur ces deux règles !important existantes (jamais
+   touchées : la pastille blanche reste correcte une fois Déconnexion seule, voir ci-dessus),
+   et restreint à .topbar pour ne jamais s'appliquer une fois l'élément déplacé dans le menu. */
+html body.nd .topbar a.topbar-icon-btn#logout-link{background:rgba(255,255,255,.08)!important;color:#fff!important;border:1px solid rgba(255,255,255,.16)!important;border-radius:10px!important;font-weight:400!important;}
+html body.nd .topbar a.topbar-icon-btn#logout-link:hover{background:rgba(255,255,255,.16)!important;}
 @media(max-width:1180px){ .compact-menu-toggle{display:flex!important;} }
 /* Tableau de bord/Paramètres restent dans le menu compact jusqu'en dessous de 768px aussi
    (icônes seules, pas la place). Notifications, en revanche, redevient visible directement
@@ -1959,10 +1964,9 @@ function initCompactMenu() {
      tout le reste de la page. Le bouton déclencheur, lui, reste en place (rien à corriger,
      ce n'est pas un élément position:fixed). */
   if (dd.parentNode !== document.body) document.body.appendChild(dd);
-  // Ancrage stable dans le menu : les éléments déplacés sont insérés juste avant, dans cet
-  // ordre — les liens du bandeau harmonisé (Tableau de bord/Profil public/Boutique/Paramètres/
-  // Mes connexions/Notifications/Site Diaspo'Actif/Déconnexion), déjà dans le HTML en
-  // permanence depuis le 2026-11-21, restent en dernier, Déconnexion fermant toujours la liste.
+  // Ancrage stable dans le menu (null si compact-menu-dd est vide — insertBefore(el, null)
+  // équivaut alors à appendChild, donc aucun cas particulier à gérer) : les éléments déplacés
+  // sont insérés juste avant, dans cet ordre.
   const ancre = dd.firstElementChild;
   const cibles = [
     document.querySelector('.topbar .nav a[href="fil-actualite.html"]'),
@@ -1970,11 +1974,7 @@ function initCompactMenu() {
     document.querySelector('.topbar .nav a[href="actualites.html"]'),
     document.getElementById('lang-select'),
     document.getElementById('premium-topbar-btn'),
-    // logout-link RETIRÉ d'ici (2026-11-22, correction) : avant le bandeau harmonisé il vivait
-    // dans le bandeau et n'était déplacé ICI que sous 1180px (comme les autres cibles) ; depuis
-    // il réside en permanence dans compact-menu-dd (dernier élément du HTML, avec son séparateur
-    // visuel) — le garder dans "cibles" l'aurait réinséré juste avant `ancre` comme les autres,
-    // le faisant sauter au milieu de la liste au lieu de rester en dernier (bug réel vérifié).
+    document.getElementById('logout-link'),
   ].filter(Boolean);
   if (!cibles.length) return; // page sans le bandeau standard (nav absente) — rien à déplacer
   const emplacements = cibles.map(el => ({ el, parent: el.parentNode, suivant: el.nextSibling }));
@@ -2303,35 +2303,50 @@ async function applyAuthState() {
       <a href="mon-associe.html" id="mon-associe-btn" style="text-decoration:none;cursor:pointer;display:flex;align-items:center;gap:5px;background:#0F2A50;color:#fff;font-weight:800;font-size:12.5px;padding:7px 14px;border-radius:14px;white-space:nowrap;border:1px solid rgba(255,255,255,.25);box-shadow:0 1px 4px rgba(0,0,0,.25);" title="Mon Associé">
         <span style="font-size:14px;">💎</span> Mon Associé
       </a>
-      <!-- Bandeau harmonisé (2026-11-21, demande explicite, capture à l'appui : « disposition
-           plus harmonieuse ») : Tableau de bord / Mon profil public / Ma boutique / Paramètres /
-           Mes connexions / Déconnexion n'ont plus chacun leur icône à part dans le bandeau —
-           regroupés dans UN SEUL menu, ouvert par un clic sur la pastille de compte (avatar +
-           nom + rôle), qui réutilise telle quelle l'infrastructure déjà existante et éprouvée
-           du menu compact "plus d'options" (toggleCompactMenu()/compact-menu-dd, déjà sortie de
-           .topbar pour échapper à son empilement — voir initCompactMenu() plus haut). Le
-           déclencheur "hamburger" dédié disparaît : la pastille de compte est désormais le seul
-           et même bouton, à toute largeur d'écran (plus seulement sous 1180px). -->
-      <button type="button" class="acc-chip" id="acc-chip-btn" style="font:inherit;cursor:pointer;" aria-haspopup="true" aria-label="Menu du compte" onclick="toggleCompactMenu(this)">
-        <span style="position:relative;display:inline-flex;flex:none;">
-          <div class="avatar">${user.photo_url ? `<img src="${user.photo_url}" alt="${user.nom}" style="width:30px;height:30px;border-radius:50%;display:block;object-fit:cover;" loading="lazy">` : photoAvatar(user.nom, 30)}</div>
-          <!-- Pastille « Mes connexions » (2026-10-05) : nombre d'appareils sur lesquels le compte est
-               ouvert, orange dès qu'il y en a plus d'un. Cachée tant que assets/connexions.js n'a pas
-               répondu (voir chargerConnexionsUI). Repositionnée (2026-11-21) en petit badge sur
-               l'avatar plutôt qu'en pastille à part : toujours visible d'un coup d'œil, sans
-               ajouter un élément de plus à la rangée. Un sibling de .avatar, jamais un enfant :
-               .avatar a overflow:hidden (pour rogner la photo en cercle), qui aurait rogné le
-               badge lui-même puisqu'il déborde volontairement du cercle. -->
-          <span id="cx-btn" class="cx-btn" style="display:none;position:absolute;top:-5px;right:-7px;height:15px;padding:0 4px;font-size:9px;border-radius:999px;margin:0;" title="Mes connexions">🛡 <span class="cx-n">1</span></span>
-        </span>
+      <!-- Retour en arrière (2026-11-22, demande explicite, capture à l'appui : « rien n'a
+           changé, je veux avoir accès à ces boutons depuis le hero » — le regroupement du
+           2026-11-21 réduisait le nombre d'éléments visibles mais au prix d'un clic de plus pour
+           tout, ce que l'utilisateur ne veut pas). Tableau de bord / Mon profil public / Ma
+           boutique / Paramètres / Mes connexions / Site Diaspo'Actif / Déconnexion redeviennent
+           des icônes directement visibles — mais, cette fois, de vraies icônes au trait
+           homogènes (mêmes tracés .topbar-icon-btn que Messagerie/Panier/Notifications), jamais
+           d'emoji : c'était le vrai défaut du bandeau d'origine (icônes ET emoji ET pastilles
+           de styles différents mélangés), pas le fait d'avoir plusieurs icônes visibles. -->
+      <a href="${ROLE_DASHBOARD[user.role] || '#'}" id="topbar-dashboard-btn" class="topbar-icon-btn" title="Tableau de bord">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+      </a>
+      <a href="${user.role === 'collectivite' ? `profil-collectivite.html?id=${user.id}` : `profil.html?id=${user.id}`}" class="topbar-icon-btn" title="Mon profil public">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+      </a>
+      ${user.role === 'initiative' ? `<a href="profil.html?id=${user.id}#vitrine" class="topbar-icon-btn" title="Ma boutique" aria-label="Ma boutique">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l1.5-5h15L21 9"></path><path d="M3 9a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0"></path><path d="M5 12.5V21h14v-8.5"></path><path d="M10 21v-5h4v5"></path></svg>
+      </a>` : ''}
+      <a href="parametres-compte.html" id="topbar-parametres-btn" class="topbar-icon-btn" title="Paramètres du compte">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line></svg>
+      </a>
+      <a href="site-vitrine.html" class="topbar-icon-btn" title="Site Diaspo'Actif">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18M12 3c2.3 2.4 3.5 5.8 3.5 9s-1.2 6.6-3.5 9c-2.3-2.4-3.5-5.8-3.5-9s1.2-6.6 3.5-9z"></path></svg>
+      </a>
+      <!-- Identité : avatar + nom + rôle, cliquable vers le tableau de bord (comme l'icône
+           Tableau de bord juste avant — redondance assumée, déjà le cas avant le 2026-11-21). -->
+      <a href="${ROLE_DASHBOARD[user.role] || '#'}" class="acc-chip">
+        <div class="avatar">${user.photo_url ? `<img src="${user.photo_url}" alt="${user.nom}" style="width:30px;height:30px;border-radius:50%;display:block;object-fit:cover;" loading="lazy">` : photoAvatar(user.nom, 30)}</div>
         <span class="acc-chip-text">
           <span class="acc-chip-name">${user.nom}</span>
           <span class="role-tag">${ROLE_LABEL_FR[user.role] || user.role}</span>
         </span>
-      </button>
+      </a>
       <span class="cl-switch-wrap" id="cl-switch-wrap" style="display:none;position:relative;">
         <button type="button" id="cl-switch-btn" class="cl-switch-btn" title="Changer de compte ou lier un compte">▾</button>
       </span>
+      <!-- Pastille « Mes connexions » (2026-10-05) : nombre d'appareils sur lesquels le compte est
+           ouvert, orange dès qu'il y en a plus d'un. Cachée tant que assets/connexions.js n'a pas
+           répondu (voir chargerConnexionsUI). Icône au trait (2026-11-22) au lieu de l'émoji 🛡
+           d'origine, même principe que les autres icônes de ce bandeau. -->
+      <button type="button" id="cx-btn" class="cx-btn" style="display:none;" onclick="window.ouvrirMesConnexions && ouvrirMesConnexions()" aria-label="Mes connexions">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3.5v5c0 4.5-3 7.8-7 9.5-4-1.7-7-5-7-9.5v-5z"></path></svg>
+        <span class="cx-n">1</span>
+      </button>
       <!-- Sorti de .cl-switch-wrap (2026-09-19, bug réel) : ce menu est en position:fixed et
            partagé par le déclencheur desktop (▾ ci-dessus) ET le bouton "Comptes" de la barre
            du bas mobile (#mobile-nav-comptes-toggle, voir renderMobileBottomNavAuto). Mais
@@ -2342,31 +2357,23 @@ async function applyAuthState() {
            rien n'était visible ("le bouton ne fonctionne pas sur téléphone", signalé et
            reproduit avec deux comptes liés réels). -->
       <div class="cl-switch-dd" id="cl-switch-dd"></div>
-      <div class="compact-menu-dd" id="compact-menu-dd">
-        <!-- Icônes au trait (2026-11-22, demande explicite : « retire les emoticon, crée des
-             illustrations homogènes ») — mêmes tracés que les anciennes icônes dédiées qu'ils
-             remplacent (dashboard/profil/boutique/paramètres/notifications), pour ne rien changer
-             de ce qui était déjà reconnu ; shield/globe/logout neufs, même style de trait. -->
-        <a href="${ROLE_DASHBOARD[user.role] || '#'}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>Tableau de bord</a>
-        <!-- Profil public (2026-08-31, demande explicite) : accès rapide vers SA PROPRE fiche
-             publique -- même construction d'URL déjà utilisée et éprouvée pour l'onglet "Profil"
-             de la barre mobile basse (profilHref, voir renderMobileBottomNav plus bas), pour
-             rester cohérent. -->
-        <a href="${user.role === 'collectivite' ? `profil-collectivite.html?id=${user.id}` : `profil.html?id=${user.id}`}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>Mon profil public</a>
-        ${user.role === 'initiative' ? `<!-- Ma boutique (2026-11-15, demande explicite) : vitrine de magasin, comptes Initiative
-             seulement (les seuls à avoir une boutique). profil.html?id=…#vitrine envoie
-             directement sur la page dédiée du type de boutique (nouveau système : boutique,
-             portfolio, vidéo, événements, impact, finance), jamais sur l'ancienne vue — voir
-             versPageBoutiqueDediee() dans profil-app.html. -->
-        <a href="profil.html?id=${user.id}#vitrine"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l1.5-5h15L21 9"></path><path d="M3 9a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0"></path><path d="M5 12.5V21h14v-8.5"></path><path d="M10 21v-5h4v5"></path></svg>Ma boutique</a>` : ''}
-        <!-- Paramètres du compte (2026-09-04) : nom, domaine d'activité, e-mail, mot de passe,
-             notifications — module unique, distinct du tableau de bord et du profil public. -->
-        <a href="parametres-compte.html"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line></svg>Paramètres</a>
-        <a href="#" onclick="window.ouvrirMesConnexions ? ouvrirMesConnexions() : null;return false;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3.5v5c0 4.5-3 7.8-7 9.5-4-1.7-7-5-7-9.5v-5z"></path></svg>Mes connexions</a>
-        <a href="#" onclick="document.getElementById('notif-bell-btn')?.click();return false;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>Notifications</a>
-        <a href="site-vitrine.html"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18M12 3c2.3 2.4 3.5 5.8 3.5 9s-1.2 6.6-3.5 9c-2.3-2.4-3.5-5.8-3.5-9s1.2-6.6 3.5-9z"></path></svg>Site Diaspo'Actif</a>
-        <a href="#" id="logout-link"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>Déconnexion</a>
-      </div>`;
+      <!-- Déconnexion : icône au trait (2026-11-22) dans le même rond que les autres —
+           neutralise la pastille blanche héritée de html body.nd #logout-link
+           (theme-nuit-doree.css) et .topbar #logout-link (design-upgrade.v2.css), pensée pour un
+           bouton texte isolé, pas pour une icône ronde parmi d'autres icônes rondes. Sélecteur
+           volontairement surchargé pour l'emporter sur ces deux règles !important existantes,
+           jamais touchées pour ne pas affecter d'autres pages où #logout-link reste seul. -->
+      <a href="#" id="logout-link" class="topbar-icon-btn" title="Déconnexion">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+      </a>
+      <!-- Menu compact "plus d'options" (2026-09-19, demande explicite, capture à l'appui) —
+           voir initCompactMenu() ci-dessous pour le détail de ce qui y est déplacé/dupliqué et pourquoi. -->
+      <span class="compact-menu-wrap" id="compact-menu-wrap" style="position:relative;">
+        <button type="button" class="compact-menu-toggle topbar-icon-btn" id="compact-menu-toggle" title="Plus d'options" onclick="toggleCompactMenu(this)">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
+        </button>
+        <div class="compact-menu-dd" id="compact-menu-dd"></div>
+      </span>`;
     const logout = document.getElementById("logout-link");
     if (logout) logout.addEventListener("click", async (e) => {
       e.preventDefault();
