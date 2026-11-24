@@ -109,7 +109,7 @@ test('PV3 l\'adresse (http/https) et la durée entière de 1 à 57 s sont obliga
 });
 
 test('PV4 une vidéo ne se livre pas : pas de champs de livraison, réglages existants conservés ; sans prix = 0', () => {
-  assert.match(mod, /\(enVideo\(\) \? '' :\n/);
+  assert.match(mod, /\(enVideo\(\) \? '' :\r?\n/);
   assert.match(mod, /if \(d\.prix == null\) d\.prix = 0;/);
   assert.match(mod, /Demande de devis/);
 });
@@ -126,7 +126,7 @@ test('PV6 la liste montre la durée et le type de chaque vidéo ; une vidéo san
   assert.match(mod, /pvp-pastille pvp-duree/);
   assert.match(mod, /'Gratuite'/);
   const css = lire('assets/boutique-produits.css');
-  assert.match(css, /#pv-produits \.pvp-duree/);
+  assert.match(css, /:is\(#pv-produits,#pv-portfolio\) \.pvp-duree/);
 });
 
 test('PV7 la boutique de vente garde exactement ses textes et ses champs de livraison', () => {

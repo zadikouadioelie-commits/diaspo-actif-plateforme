@@ -197,6 +197,8 @@
 <script src="assets/boutique-options-ui.js?v=1"></script>
 <script src="assets/boutique-assistant.js?v=1"></script>
 <script src="assets/boutique-produits.js?v=1"></script>
+<script src="assets/boutique-rubriques.js?v=1"></script>
+<script src="assets/boutique-portfolio-contenus.js?v=1"></script>
 <script src="assets/boutique-reglages-ui.js?v=1"></script>
 <script src="assets/soumission-da.js"></script>
 <script src="assets/retours-commun.js?v=1"></script>
@@ -2098,6 +2100,14 @@ async function initRelaisDiasporaWidget(me, api) {
             <h3 id="pv-produits-titre" style="margin:0 0 4px;font-size:15px;">Mes produits</h3>
             <p id="pv-produits-intro" style="font-size:13px;color:var(--muted);margin:0 0 14px;">Ajoutez, modifiez et rangez ce que vos visiteurs voient dans votre boutique. Chaque changement apparaît tout de suite dans l'aperçu.</p>
             <div id="pv-produits-mount"><div class="notice">Chargement…</div></div>
+          </div>
+
+          <!-- ═══ MON PORTFOLIO (2026-11-24, étape 2) — le propriétaire d'une boutique Portfolio gère ses créations, réalisations et vidéos ICI
+               (assets/boutique-portfolio-contenus.js), plus dans l'ancienne vue d'édition du profil. Lien direct : dashboard-initiative.html#parametres-vitrine&portfolio ═══ -->
+          <div class="card" id="pv-portfolio" style="margin-bottom:20px;display:none;">
+            <h3 style="margin:0 0 4px;font-size:15px;">Mon portfolio</h3>
+            <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Ajoutez, modifiez et rangez vos créations, vos réalisations et vos vidéos. Chaque changement est enregistré tout de suite et apparaît dans l'aperçu.</p>
+            <div id="pv-portfolio-mount"><div class="notice">Chargement…</div></div>
           </div>
 
           <!-- Deux decisions independantes, deliberement separees en deux etapes :
@@ -6653,6 +6663,7 @@ async function loadParametresVitrineFull() {
     renderPvThemeSwatches();
     renderPvStylePresets();
     if (window.PvProduits) PvProduits.monter(init);
+    if (window.PvPortfolio) PvPortfolio.monter(init);
     renderPvDraftStatus();
     pvRenderCartouchePreview();
     pvRefreshPreview();
