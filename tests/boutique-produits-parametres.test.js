@@ -126,7 +126,7 @@ test('PV6 la liste montre la durée et le type de chaque vidéo ; une vidéo san
   assert.match(mod, /pvp-pastille pvp-duree/);
   assert.match(mod, /'Gratuite'/);
   const css = lire('assets/boutique-produits.css');
-  assert.match(css, /:is\(#pv-produits,#pv-portfolio\) \.pvp-duree/);
+  assert.match(css, /:is\(#pv-produits,#pv-portfolio(,#pv-evenements)?\) \.pvp-duree/);
 });
 
 test('PV7 la boutique de vente garde exactement ses textes et ses champs de livraison', () => {

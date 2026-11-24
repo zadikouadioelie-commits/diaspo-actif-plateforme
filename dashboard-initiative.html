@@ -199,6 +199,7 @@
 <script src="assets/boutique-produits.js?v=1"></script>
 <script src="assets/boutique-rubriques.js?v=1"></script>
 <script src="assets/boutique-portfolio-contenus.js?v=1"></script>
+<script src="assets/boutique-evenements-contenus.js?v=1"></script>
 <script src="assets/boutique-reglages-ui.js?v=1"></script>
 <script src="assets/soumission-da.js"></script>
 <script src="assets/retours-commun.js?v=1"></script>
@@ -2108,6 +2109,14 @@ async function initRelaisDiasporaWidget(me, api) {
             <h3 style="margin:0 0 4px;font-size:15px;">Mon portfolio</h3>
             <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Ajoutez, modifiez et rangez vos créations, vos réalisations et vos vidéos. Chaque changement est enregistré tout de suite et apparaît dans l'aperçu.</p>
             <div id="pv-portfolio-mount"><div class="notice">Chargement…</div></div>
+          </div>
+
+          <!-- ═══ MES ÉVÉNEMENTS (2026-11-24, étape 2) — le propriétaire d'une boutique « Créateur d'événements » voit ICI les événements que sa boutique présente
+               (assets/boutique-evenements-contenus.js), plus dans l'ancienne vue d'édition du profil. Lien direct : dashboard-initiative.html#parametres-vitrine&evenements ═══ -->
+          <div class="card" id="pv-evenements" style="margin-bottom:20px;display:none;">
+            <h3 style="margin:0 0 4px;font-size:15px;">Mes événements</h3>
+            <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Retrouvez les événements de votre boutique, publiez vos brouillons et ouvrez leur modification.</p>
+            <div id="pv-evenements-mount"><div class="notice">Chargement…</div></div>
           </div>
 
           <!-- Deux decisions independantes, deliberement separees en deux etapes :
@@ -6664,6 +6673,7 @@ async function loadParametresVitrineFull() {
     renderPvStylePresets();
     if (window.PvProduits) PvProduits.monter(init);
     if (window.PvPortfolio) PvPortfolio.monter(init);
+    if (window.PvEvenements) PvEvenements.monter(init);
     renderPvDraftStatus();
     pvRenderCartouchePreview();
     pvRefreshPreview();
