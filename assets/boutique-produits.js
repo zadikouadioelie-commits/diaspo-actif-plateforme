@@ -8,7 +8,9 @@
    Limites imposées par le serveur : 100 produits, 10 articles par catalogue, 4 photos, 3 produits vedettes.
    Les paiements restent SIMULÉS : ce module ne touche à aucun paiement.
    Utilise les fonctions globales de la page : api(method, path, body), uploadMedia(), compressImageFile(), pvRefreshPreview(), pvRenderCartouchePreview().
-   Montage : PvProduits.monter(initiative) depuis loadParametresVitrineFull() ; visible pour les types « boutique de vente » seulement.
+   Montage : PvProduits.monter(initiative) depuis loadParametresVitrineFull() ; visible pour les boutiques de vente (« Mes produits »)
+   et, depuis le 2026-11-24, pour la boutique vidéo (« Mes vidéos » : une vidéo est un produit avec video_url, video_duree 1–57 s, video_type).
+   Les autres types gardent leur lien actuel en attendant leur propre rubrique.
    =========================================================== */
 (function () {
   'use strict';
@@ -16,11 +18,55 @@
 
   var MAX_PRODUITS = 100, MAX_PAR_CATALOGUE = 10;
   var TYPES_VENTE = ['ecom', 'commercial', ''];
+  var TYPES_VIDEO = ['video'];
+  var DUREE_MAX = 57;
+  var TYPES_VIDEO_LIB = [['courte', 'Vidéo courte (57 s maximum)'], ['explicative', 'Vidéo explicative'], ['serie', 'Série / Épisode']];
+  /* Les mots qui changent d'un type à l'autre (genre compris : « un produit » / « une vidéo »). */
+  var MOTS = {
+    vente: {
+      pl: 'produits', sing: 'produit', icone: '📦', ajouter: '＋ Ajouter un produit', retour: '← Retour à mes produits', nouveau: 'Nouveau produit',
+      rech: 'Rechercher un produit…', rechAria: 'Rechercher un produit', nomObl: 'Le nom du produit est obligatoire.', btnAjout: 'Ajouter le produit',
+      limite: 'Limite de 100 produits atteinte : supprimez-en un pour en ajouter un nouveau.',
+      vide: '<b>Votre boutique n\'a pas encore de produit.</b><br>Ajoutez votre premier produit : une photo, un nom et un prix suffisent pour commencer.',
+      aucun: '<b>Aucun produit ne correspond.</b><br>Essayez un autre mot ou un autre statut.',
+      noteOrdre: 'Glissez la poignée ⋮⋮ (ou utilisez les flèches) pour changer l\'ordre d\'affichage. 3 produits « mis en avant » au maximum.',
+      avantOn: 'Retirer des produits mis en avant', avantOff: 'Mettre en avant (3 maximum)',
+      ajoute: 'Produit ajouté. Il apparaît déjà dans votre boutique.', supprime: 'Produit supprimé.',
+      avantMsgOn: 'Produit mis en avant.', avantMsgOff: 'Produit retiré des produits mis en avant.',
+      masqueMsg: function (n) { return '« ' + n + ' » est masqué : les visiteurs ne le voient plus.'; },
+      visibleMsg: function (n) { return '« ' + n + ' » est de nouveau visible.'; },
+      supprConfirm: function (n) { return 'Supprimer « ' + n + ' » ? Cette action est définitive.'; },
+      nomPh: 'Ex : Pagne wax premium — 6 yards', descPh: 'Matière, taille, origine, conseils d\'entretien…', catPh: 'Ex : Mode',
+      photosAide: 'Jusqu\'à 4 photos. La première s\'affiche sur la carte du produit.', photosTitre: 'Photos',
+      charge: 'Chargement de vos produits…', echecCharge: 'Vos produits n\'ont pas pu être chargés : '
+    },
+    video: {
+      pl: 'vidéos', sing: 'vidéo', icone: '🎞️', ajouter: '＋ Ajouter une vidéo', retour: '← Retour à mes vidéos', nouveau: 'Nouvelle vidéo',
+      rech: 'Rechercher une vidéo…', rechAria: 'Rechercher une vidéo', nomObl: 'Le titre de la vidéo est obligatoire.', btnAjout: 'Ajouter la vidéo',
+      limite: 'Limite de 100 vidéos atteinte : supprimez-en une pour en ajouter une nouvelle.',
+      vide: '<b>Votre boutique n\'a pas encore de vidéo.</b><br>Ajoutez votre première vidéo : l\'adresse du fichier ou du lien, sa durée et un titre suffisent pour commencer.',
+      aucun: '<b>Aucune vidéo ne correspond.</b><br>Essayez un autre mot ou un autre statut.',
+      noteOrdre: 'Glissez la poignée ⋮⋮ (ou utilisez les flèches) pour changer l\'ordre d\'affichage. 3 vidéos « mises en avant » au maximum.',
+      avantOn: 'Retirer des vidéos mises en avant', avantOff: 'Mettre en avant (3 maximum)',
+      ajoute: 'Vidéo ajoutée. Elle apparaît déjà dans votre boutique.', supprime: 'Vidéo supprimée.',
+      avantMsgOn: 'Vidéo mise en avant.', avantMsgOff: 'Vidéo retirée des vidéos mises en avant.',
+      masqueMsg: function (n) { return '« ' + n + ' » est masquée : les visiteurs ne la voient plus.'; },
+      visibleMsg: function (n) { return '« ' + n + ' » est de nouveau visible.'; },
+      supprConfirm: function (n) { return 'Supprimer « ' + n + ' » ? Cette action est définitive.'; },
+      nomPh: 'Ex : Préparer un thieboudienne en 45 secondes', descPh: 'De quoi parle la vidéo, pour qui, ce que l\'on y apprend…', catPh: 'Ex : Cuisine',
+      photosAide: 'La première photo sert de miniature à la vidéo. Jusqu\'à 4 images.', photosTitre: 'Miniature',
+      charge: 'Chargement de vos vidéos…', echecCharge: 'Vos vidéos n\'ont pas pu être chargées : '
+    }
+  };
+  function W() { return MOTS[S.mode] || MOTS.vente; }
+  function enVideo() { return S.mode === 'video'; }
+  function hms(v) { var n = Number(v); if (!isFinite(n) || n <= 0) return ''; var m = Math.floor(n / 60), r = Math.round(n % 60); return m + ':' + (r < 10 ? '0' : '') + r; }
+  function libTypeVideo(t) { for (var i = 0; i < TYPES_VIDEO_LIB.length; i++) if (TYPES_VIDEO_LIB[i][0] === t) return TYPES_VIDEO_LIB[i][1].replace(' (57 s maximum)', ''); return ''; }
   var LIB = {
     disponible: ['Disponible', 'pvp-dispo'], indisponible: ['Indisponible', 'pvp-indispo'],
     epuise: ['Épuisé', 'pvp-epuise'], masque: ['Masqué', 'pvp-masque']
   };
-  var S = { initId: null, produits: [], catalogues: [], vue: 'liste', edition: null, photos: [null, null, null, null], filtre: 'tous', q: '', glisse: null, message: '', erreur: '' };
+  var S = { mode: 'vente', initId: null, produits: [], catalogues: [], vue: 'liste', edition: null, photos: [null, null, null, null], filtre: 'tous', q: '', glisse: null, message: '', erreur: '' };
 
   function $(id) { return document.getElementById(id); }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -54,7 +100,7 @@
     var photo = p.photos && p.photos[0];
     var st = LIB[p.statut] || LIB.disponible;
     var enPromo = p.prix_promo != null && p.prix != null && Number(p.prix_promo) < Number(p.prix);
-    var pr = p.prix == null ? '<span class="pvp-prix">Prix sur demande</span>'
+    var pr = p.prix == null || (enVideo() && !(Number(p.prix) > 0)) ? '<span class="pvp-prix">' + (enVideo() ? 'Gratuite' : 'Prix sur demande') + '</span>'
       : enPromo ? '<span class="pvp-prix"><s>' + prix(p.prix, p.devise) + '</s>' + prix(p.prix_promo, p.devise) + '</span>'
       : '<span class="pvp-prix">' + prix(p.prix, p.devise) + '</span>';
     var vedette = Number(p.mis_en_avant) === 1;
@@ -62,13 +108,14 @@
       '<div class="pvp-ordre"><button type="button" class="pvp-mini" data-a="haut" aria-label="Monter « ' + esc(p.nom) + ' »"' + (i === 0 ? ' disabled' : '') + '>▲</button>' +
       '<span class="pvp-poignee" aria-hidden="true" title="Glisser pour changer l\'ordre">⋮⋮</span>' +
       '<button type="button" class="pvp-mini" data-a="bas" aria-label="Descendre « ' + esc(p.nom) + ' »"' + (i === total - 1 ? ' disabled' : '') + '>▼</button></div>' +
-      '<div class="pvp-vignette">' + (photo ? '<img src="' + esc(photo) + '" alt="" loading="lazy">' : '<span aria-hidden="true">📦</span>') + '</div>' +
+      '<div class="pvp-vignette">' + (photo ? '<img src="' + esc(photo) + '" alt="" loading="lazy">' : '<span aria-hidden="true">' + W().icone + '</span>') + '</div>' +
       '<div class="pvp-info"><p class="pvp-nom">' + esc(p.nom) + '</p><div class="pvp-meta">' + pr +
       '<span class="pvp-pastille ' + st[1] + '">' + st[0] + '</span>' +
+      (enVideo() && Number(p.video_duree) > 0 ? '<span class="pvp-pastille pvp-duree">▶ ' + hms(p.video_duree) + (libTypeVideo(p.video_type) ? ' · ' + libTypeVideo(p.video_type) : '') + '</span>' : '') +
       (vedette ? '<span class="pvp-pastille pvp-avant">★ Mis en avant</span>' : '') + '</div></div>' +
       '<div class="pvp-actions">' +
       '<button type="button" class="pvp-btn pvp-petit" data-a="edit">Modifier</button>' +
-      '<button type="button" class="pvp-btn pvp-petit' + (vedette ? ' pvp-on' : '') + '" data-a="avant" aria-pressed="' + (vedette ? 'true' : 'false') + '" title="' + (vedette ? 'Retirer des produits mis en avant' : 'Mettre en avant (3 maximum)') + '" aria-label="' + (vedette ? 'Retirer « ' + esc(p.nom) + ' » des produits mis en avant' : 'Mettre « ' + esc(p.nom) + ' » en avant') + '">★</button>' +
+      '<button type="button" class="pvp-btn pvp-petit' + (vedette ? ' pvp-on' : '') + '" data-a="avant" aria-pressed="' + (vedette ? 'true' : 'false') + '" title="' + (vedette ? W().avantOn : W().avantOff) + '" aria-label="' + (vedette ? 'Retirer « ' + esc(p.nom) + ' » ' + (enVideo() ? 'des vidéos mises en avant' : 'des produits mis en avant') : 'Mettre « ' + esc(p.nom) + ' » en avant') + '">★</button>' +
       '<button type="button" class="pvp-btn pvp-petit" data-a="masque" title="' + (p.statut === 'masque' ? 'Afficher dans la boutique' : 'Masquer de la boutique') + '" aria-label="' + (p.statut === 'masque' ? 'Afficher' : 'Masquer') + ' « ' + esc(p.nom) + ' »">' + (p.statut === 'masque' ? '👁' : '🙈') + '</button>' +
       '</div></div>';
   }
@@ -92,28 +139,28 @@
   function vueListe() {
     var n = S.produits.length;
     var gs = groupes();
-    var h = '<div class="pvp-barre"><span class="pvp-compteur"><b>' + n + '</b> produit' + (n > 1 ? 's' : '') + ' sur ' + MAX_PRODUITS +
+    var h = '<div class="pvp-barre"><span class="pvp-compteur"><b>' + n + '</b> ' + W().sing + (n > 1 ? 's' : '') + ' sur ' + MAX_PRODUITS +
       ' <span class="pvp-jauge" aria-hidden="true"><i style="width:' + Math.min(100, Math.max(3, n)) + '%"></i></span></span>' +
-      '<button type="button" class="pvp-btn pvp-or pvp-pousse" data-a="ajouter"' + (n >= MAX_PRODUITS ? ' disabled' : '') + '>＋ Ajouter un produit</button></div>';
-    if (n >= MAX_PRODUITS) h += '<p class="pvp-note">Limite de ' + MAX_PRODUITS + ' produits atteinte : supprimez-en un pour en ajouter un nouveau.</p>';
+      '<button type="button" class="pvp-btn pvp-or pvp-pousse" data-a="ajouter"' + (n >= MAX_PRODUITS ? ' disabled' : '') + '>' + W().ajouter + '</button></div>';
+    if (n >= MAX_PRODUITS) h += '<p class="pvp-note">' + W().limite + '</p>';
     if (n) {
-      h += '<div class="pvp-outils"><input type="search" id="pvp-rech" placeholder="Rechercher un produit…" aria-label="Rechercher un produit" value="' + esc(S.q) + '">' +
+      h += '<div class="pvp-outils"><input type="search" id="pvp-rech" placeholder="' + W().rech + '" aria-label="' + W().rechAria + '" value="' + esc(S.q) + '">' +
         '<div class="pvp-puces" role="group" aria-label="Filtrer par statut">' +
         [['tous', 'Tous'], ['disponible', 'Disponibles'], ['indisponible', 'Indisponibles'], ['epuise', 'Épuisés'], ['masque', 'Masqués']].map(function (f) {
           return '<button type="button" class="pvp-puce' + (S.filtre === f[0] ? ' on' : '') + '" data-f="' + f[0] + '" aria-pressed="' + (S.filtre === f[0]) + '">' + f[1] + '</button>';
         }).join('') + '</div></div>';
     }
     if (!n) {
-      h += '<div class="pvp-vide"><b>Votre boutique n\'a pas encore de produit.</b><br>Ajoutez votre premier produit : une photo, un nom et un prix suffisent pour commencer.</div>';
+      h += '<div class="pvp-vide">' + W().vide + '</div>';
     } else if (!gs.length) {
-      h += '<div class="pvp-vide"><b>Aucun produit ne correspond.</b><br>Essayez un autre mot ou un autre statut.</div>';
+      h += '<div class="pvp-vide">' + W().aucun + '</div>';
     } else {
       h += '<div class="pvp-groupes">' + gs.map(function (g) {
         var total = S.produits.filter(function (p) { return g.id == null ? p.catalogue_id == null : Number(p.catalogue_id) === Number(g.id); }).length;
         return '<section class="pvp-groupe" data-cat="' + (g.id == null ? '' : esc(g.id)) + '"><header><h4>' + esc(g.nom) + (g.masque ? ' <small>(catalogue masqué)</small>' : '') + '</h4>' +
           '<small>' + total + (g.id == null ? ' article' + (total > 1 ? 's' : '') : ' / ' + MAX_PAR_CATALOGUE + ' articles') + '</small></header>' +
           g.items.map(function (p, i) { return ligne(p, i, g.items.length); }).join('') + '</section>';
-      }).join('') + '</div><p class="pvp-note">Glissez la poignée ⋮⋮ (ou utilisez les flèches) pour changer l\'ordre d\'affichage. 3 produits « mis en avant » au maximum.</p>';
+      }).join('') + '</div><p class="pvp-note">' + W().noteOrdre + '</p>';
     }
     return h;
   }
@@ -135,20 +182,29 @@
     var opts = '<option value="">— Non classé —</option>' + S.catalogues.map(function (c) {
       return '<option value="' + esc(c.id) + '"' + (cat != null && Number(cat) === Number(c.id) ? ' selected' : '') + '>' + esc(c.nom) + '</option>';
     }).join('');
+    var typeVid = p && p.video_type ? p.video_type : '';
+    var blocVideo = !enVideo() ? '' :
+      '<fieldset class="pvp-carte"><legend>La vidéo</legend><p class="pvp-aide">Collez l\'adresse de la vidéo (fichier .mp4, YouTube ou Vimeo). Elle sert d\'aperçu dans votre boutique. Durée maximale : ' + DUREE_MAX + ' secondes.</p><div class="pvp-champs">' +
+        champ('pvp-vurl', 'Adresse de la vidéo *', '<input type="url" id="pvp-vurl" inputmode="url" maxlength="600" value="' + esc(p ? p.video_url || '' : '') + '" placeholder="https://…">', true) +
+        champ('pvp-vduree', 'Durée (secondes, ' + DUREE_MAX + ' maximum) *', '<input type="number" id="pvp-vduree" min="1" max="' + DUREE_MAX + '" step="1" inputmode="numeric" value="' + (p && p.video_duree ? esc(p.video_duree) : '') + '" placeholder="Ex : 45">') +
+        champ('pvp-vtype', 'Type de vidéo', '<select id="pvp-vtype"><option value="">Automatique (selon la durée)</option>' + TYPES_VIDEO_LIB.map(function (o) {
+          return '<option value="' + o[0] + '"' + (typeVid === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select>') +
+      '</div></fieldset>';
     return '<div class="pvp-form">' +
-      '<div><button type="button" class="pvp-btn pvp-petit" data-a="retour">← Retour à mes produits</button>' +
-      '<h4 class="pvp-titre">' + (p ? 'Modifier « ' + esc(p.nom) + ' »' : 'Nouveau produit') + '</h4>' +
+      '<div><button type="button" class="pvp-btn pvp-petit" data-a="retour">' + W().retour + '</button>' +
+      '<h4 class="pvp-titre">' + (p ? 'Modifier « ' + esc(p.nom) + ' »' : W().nouveau) + '</h4>' +
       '<p class="pvp-aide">Les champs marqués d\'une étoile sont obligatoires. Vous pourrez tout modifier plus tard.</p></div>' +
-      '<fieldset class="pvp-carte"><legend>Photos</legend><p class="pvp-aide">Jusqu\'à 4 photos. La première s\'affiche sur la carte du produit.</p><div class="pvp-photos">' + slots + '</div></fieldset>' +
+      blocVideo +
+      '<fieldset class="pvp-carte"><legend>' + W().photosTitre + '</legend><p class="pvp-aide">' + W().photosAide + '</p><div class="pvp-photos">' + slots + '</div></fieldset>' +
       '<fieldset class="pvp-carte"><legend>Informations</legend><div class="pvp-champs">' +
-        champ('pvp-nom', 'Nom *', '<input type="text" id="pvp-nom" maxlength="140" value="' + esc(p ? p.nom : '') + '" placeholder="Ex : Pagne wax premium — 6 yards">', true) +
-        champ('pvp-desc', 'Description', '<textarea id="pvp-desc" placeholder="Matière, taille, origine, conseils d\'entretien…">' + esc(p ? p.description || '' : '') + '</textarea>', true) +
+        champ('pvp-nom', enVideo() ? 'Titre *' : 'Nom *', '<input type="text" id="pvp-nom" maxlength="140" value="' + esc(p ? p.nom : '') + '" placeholder="' + esc(W().nomPh) + '">', true) +
+        champ('pvp-desc', 'Description', '<textarea id="pvp-desc" placeholder="' + esc(W().descPh) + '">' + esc(p ? p.description || '' : '') + '</textarea>', true) +
         champ('pvp-cat', 'Catalogue', '<select id="pvp-cat">' + opts + '</select><button type="button" class="pvp-lien" data-a="nouveau-cat">＋ Créer un catalogue</button>' +
           '<div class="pvp-nouveau-cat" id="pvp-nouveau-cat" hidden><input type="text" id="pvp-cat-nom" maxlength="80" placeholder="Nom du catalogue"><button type="button" class="pvp-btn pvp-petit" data-a="creer-cat">Créer</button></div>') +
-        champ('pvp-categorie', 'Catégorie', '<input type="text" id="pvp-categorie" maxlength="80" value="' + esc(p ? p.categorie || '' : '') + '" placeholder="Ex : Mode">') +
+        champ('pvp-categorie', 'Catégorie', '<input type="text" id="pvp-categorie" maxlength="80" value="' + esc(p ? p.categorie || '' : '') + '" placeholder="' + esc(W().catPh) + '">' + (enVideo() ? '<p class="pvp-aide">La catégorie classe la vidéo dans la barre du haut de votre boutique.</p>' : '')) +
         champ('pvp-ref', 'Référence', '<input type="text" id="pvp-ref" maxlength="60" value="' + esc(p ? p.reference || '' : '') + '" placeholder="Automatique si vide">') +
       '</div></fieldset>' +
-      '<fieldset class="pvp-carte"><legend>Prix</legend><p class="pvp-aide">Les paiements restent en simulation : aucun argent réel n\'est encaissé.</p><div class="pvp-champs">' +
+      '<fieldset class="pvp-carte"><legend>Prix</legend><p class="pvp-aide">' + (enVideo() ? 'Laissez vide (ou 0) pour une vidéo gratuite. ' : '') + 'Les paiements restent en simulation : aucun argent réel n\'est encaissé.</p><div class="pvp-champs">' +
         champ('pvp-prix', 'Prix (EUR)', '<input type="number" id="pvp-prix" step="0.01" min="0" inputmode="decimal" value="' + (p && p.prix != null ? esc(p.prix) : '') + '" placeholder="0.00">') +
         champ('pvp-promo', 'Prix promo (facultatif)', '<input type="number" id="pvp-promo" step="0.01" min="0" inputmode="decimal" value="' + (p && p.prix_promo != null ? esc(p.prix_promo) : '') + '" placeholder="0.00">') +
       '</div></fieldset>' +
@@ -157,16 +213,17 @@
           return '<option value="' + s[0] + '"' + (statut === s[0] ? ' selected' : '') + '>' + s[1] + '</option>'; }).join('') + '</select>') +
         '<div id="pvp-retour-wrap"' + (statut === 'indisponible' ? '' : ' hidden') + '><label for="pvp-retour">Date de retour estimée</label><input type="date" id="pvp-retour" value="' + esc(p && p.date_retour ? p.date_retour : '') + '"></div>' +
       '</div></fieldset>' +
-      '<fieldset class="pvp-carte"><legend>Livraison et devis</legend><p class="pvp-aide">Le retrait est proposé par défaut. L\'expédition doit être activée ici pour être choisie à l\'achat.</p><div class="pvp-choix">' +
+      '<fieldset class="pvp-carte"><legend>' + (enVideo() ? 'Demande de devis' : 'Livraison et devis') + '</legend>' + (enVideo() ? '' : '<p class="pvp-aide">Le retrait est proposé par défaut. L\'expédition doit être activée ici pour être choisie à l\'achat.</p>') + '<div class="pvp-choix">' +
+        (enVideo() ? '' :
         '<label class="pvp-option"><input type="checkbox" id="pvp-retrait"' + (!p || Number(p.livraison_retrait) !== 0 ? ' checked' : '') + '><div><b>Retrait sur place</b><span>Le client vient récupérer sa commande.</span></div></label>' +
         '<label class="pvp-option"><input type="checkbox" id="pvp-exp"' + (exp ? ' checked' : '') + '><div><b>Expédition</b><span>L\'acheteur renseigne son adresse à la commande.</span></div></label>' +
-        '<div id="pvp-frais-wrap"' + (exp ? '' : ' hidden') + '><label for="pvp-frais">Frais d\'expédition (EUR)</label><input type="number" id="pvp-frais" step="0.01" min="0" inputmode="decimal" value="' + (p && p.frais_expedition != null ? esc(p.frais_expedition) : '') + '" placeholder="0.00"><p class="pvp-aide">Ajoutés au montant payé si l\'acheteur choisit l\'expédition. Laissez vide pour une expédition gratuite.</p></div>' +
+        '<div id="pvp-frais-wrap"' + (exp ? '' : ' hidden') + '><label for="pvp-frais">Frais d\'expédition (EUR)</label><input type="number" id="pvp-frais" step="0.01" min="0" inputmode="decimal" value="' + (p && p.frais_expedition != null ? esc(p.frais_expedition) : '') + '" placeholder="0.00"><p class="pvp-aide">Ajoutés au montant payé si l\'acheteur choisit l\'expédition. Laissez vide pour une expédition gratuite.</p></div>') +
         champ('pvp-devis', '📩 Demande de devis', '<select id="pvp-devis"><option value=""' + (!p || p.devis_active == null ? ' selected' : '') + '>Selon le réglage général de la boutique</option>' +
           '<option value="1"' + (p && p.devis_active != null && Number(p.devis_active) === 1 ? ' selected' : '') + '>Autoriser les demandes de devis</option>' +
           '<option value="0"' + (p && p.devis_active != null && Number(p.devis_active) === 0 ? ' selected' : '') + '>Désactiver les demandes de devis</option></select>') +
       '</div></fieldset>' +
       '<p class="pvp-erreur" id="pvp-err" role="alert"' + (S.erreur ? '' : ' hidden') + '>' + esc(S.erreur) + '</p>' +
-      '<div class="pvp-pied"><button type="button" class="pvp-btn pvp-or" data-a="enreg" id="pvp-enreg">' + (p ? 'Enregistrer les modifications' : 'Ajouter le produit') + '</button>' +
+      '<div class="pvp-pied"><button type="button" class="pvp-btn pvp-or" data-a="enreg" id="pvp-enreg">' + (p ? 'Enregistrer les modifications' : W().btnAjout) + '</button>' +
       '<button type="button" class="pvp-btn" data-a="retour">Annuler</button>' +
       (p ? '<button type="button" class="pvp-btn pvp-danger pvp-pousse" data-a="suppr">Supprimer</button>' : '') + '</div></div>';
   }
@@ -194,7 +251,7 @@
   function lireForm() {
     var num = function (id) { var v = $(id).value; return v === '' ? null : Number(v); };
     var statut = $('pvp-statut').value;
-    return {
+    var d = {
       nom: $('pvp-nom').value.trim(),
       description: $('pvp-desc').value.trim() || null,
       prix: num('pvp-prix'), prix_promo: num('pvp-promo'),
@@ -203,10 +260,19 @@
       statut: statut, date_retour: statut === 'indisponible' ? ($('pvp-retour').value || null) : null,
       photos: S.photos.filter(Boolean),
       catalogue_id: $('pvp-cat').value ? Number($('pvp-cat').value) : null,
-      devis_active: $('pvp-devis').value === '' ? null : Number($('pvp-devis').value),
-      livraison_retrait: $('pvp-retrait').checked, livraison_expedition: $('pvp-exp').checked,
-      frais_expedition: $('pvp-exp').checked ? num('pvp-frais') : null
+      devis_active: $('pvp-devis').value === '' ? null : Number($('pvp-devis').value)
     };
+    if (enVideo()) {
+      /* Une vidéo ne se livre pas : on ne touche pas aux réglages de livraison (le serveur garde ceux qui existent). Sans prix = gratuite (0), car le serveur ne sait pas effacer un prix. */
+      if (d.prix == null) d.prix = 0;
+      d.video_url = $('pvp-vurl').value.trim();
+      d.video_duree = num('pvp-vduree');
+      d.video_type = $('pvp-vtype').value || null;
+    } else {
+      d.livraison_retrait = $('pvp-retrait').checked; d.livraison_expedition = $('pvp-exp').checked;
+      d.frais_expedition = $('pvp-exp').checked ? num('pvp-frais') : null;
+    }
+    return d;
   }
   function erreurForm(msg) {
     S.erreur = msg; var e = $('pvp-err'); if (e) { e.textContent = msg; e.hidden = false; e.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
@@ -214,7 +280,11 @@
 
   function enregistrer() {
     var d = lireForm();
-    if (!d.nom) { erreurForm('Le nom du produit est obligatoire.'); $('pvp-nom').focus(); return; }
+    if (!d.nom) { erreurForm(W().nomObl); $('pvp-nom').focus(); return; }
+    if (enVideo()) {
+      if (!/^https?:\/\//i.test(d.video_url)) { erreurForm('L\'adresse de la vidéo est obligatoire : elle doit commencer par http:// ou https://.'); $('pvp-vurl').focus(); return; }
+      if (!(d.video_duree >= 1 && d.video_duree <= DUREE_MAX) || Math.round(d.video_duree) !== d.video_duree) { erreurForm('La durée est obligatoire : un nombre entier de secondes, de 1 à ' + DUREE_MAX + '.'); $('pvp-vduree').focus(); return; }
+    }
     if ((d.prix != null && !(d.prix >= 0)) || (d.prix_promo != null && !(d.prix_promo >= 0))) { erreurForm('Les prix doivent être des nombres positifs.'); return; }
     if (d.prix_promo != null && d.prix != null && d.prix_promo >= d.prix) { erreurForm('Le prix promo doit être inférieur au prix normal.'); return; }
     var b = $('pvp-enreg'); if (b) { b.disabled = true; b.textContent = 'Enregistrement…'; }
@@ -222,29 +292,29 @@
     var req = edition ? api('PUT', '/produits/' + edition, d) : api('POST', '/initiatives/' + S.initId + '/produits', d);
     req.then(function () {
       S.vue = 'liste'; S.edition = null;
-      return apresChangement(edition ? 'Modifications enregistrées. Votre boutique est à jour.' : 'Produit ajouté. Il apparaît déjà dans votre boutique.');
+      return apresChangement(edition ? 'Modifications enregistrées. Votre boutique est à jour.' : W().ajoute);
     }).catch(function (e) {
-      if (b) { b.disabled = false; b.textContent = edition ? 'Enregistrer les modifications' : 'Ajouter le produit'; }
+      if (b) { b.disabled = false; b.textContent = edition ? 'Enregistrer les modifications' : W().btnAjout; }
       erreurForm((e && e.message) || 'Enregistrement impossible. Réessayez.');
     });
   }
 
   function supprimer() {
     var p = produit(S.edition); if (!p) return;
-    if (!confirm('Supprimer « ' + p.nom + ' » ? Cette action est définitive.')) return;
-    api('DELETE', '/produits/' + p.id).then(function () { S.vue = 'liste'; S.edition = null; return apresChangement('Produit supprimé.'); }).catch(echec);
+    if (!confirm(W().supprConfirm(p.nom))) return;
+    api('DELETE', '/produits/' + p.id).then(function () { S.vue = 'liste'; S.edition = null; return apresChangement(W().supprime); }).catch(echec);
   }
 
   function basculerVedette(id) {
     api('PUT', '/produits/' + id + '/mise-en-avant').then(function (r) {
-      return apresChangement(r && r.mis_en_avant ? 'Produit mis en avant.' : 'Produit retiré des produits mis en avant.');
+      return apresChangement(r && r.mis_en_avant ? W().avantMsgOn : W().avantMsgOff);
     }).catch(echec);
   }
   function basculerMasque(id) {
     var p = produit(id); if (!p) return;
     var vers = p.statut === 'masque' ? 'disponible' : 'masque';
     api('PUT', '/produits/' + id, { statut: vers }).then(function () {
-      return apresChangement(vers === 'masque' ? '« ' + p.nom + ' » est masqué : les visiteurs ne le voient plus.' : '« ' + p.nom + ' » est de nouveau visible.');
+      return apresChangement(vers === 'masque' ? W().masqueMsg(p.nom) : W().visibleMsg(p.nom));
     }).catch(echec);
   }
 
@@ -292,10 +362,16 @@
     if (!d) return;
     $('pvp-nom').value = d.nom || ''; $('pvp-desc').value = d.description || ''; $('pvp-categorie').value = d.categorie || ''; $('pvp-ref').value = d.reference || '';
     $('pvp-prix').value = d.prix == null ? '' : d.prix; $('pvp-promo').value = d.prix_promo == null ? '' : d.prix_promo;
-    $('pvp-statut').value = d.statut; $('pvp-retrait').checked = d.livraison_retrait; $('pvp-exp').checked = d.livraison_expedition;
+    $('pvp-statut').value = d.statut;
     $('pvp-devis').value = d.devis_active == null ? '' : String(d.devis_active);
-    $('pvp-frais').value = d.frais_expedition == null ? '' : d.frais_expedition; $('pvp-retour').value = d.date_retour || '';
-    $('pvp-retour-wrap').hidden = d.statut !== 'indisponible'; $('pvp-frais-wrap').hidden = !d.livraison_expedition;
+    $('pvp-retour').value = d.date_retour || '';
+    $('pvp-retour-wrap').hidden = d.statut !== 'indisponible';
+    if (enVideo()) {
+      $('pvp-vurl').value = d.video_url || ''; $('pvp-vduree').value = d.video_duree == null ? '' : d.video_duree; $('pvp-vtype').value = d.video_type || '';
+    } else {
+      $('pvp-retrait').checked = d.livraison_retrait; $('pvp-exp').checked = d.livraison_expedition;
+      $('pvp-frais').value = d.frais_expedition == null ? '' : d.frais_expedition; $('pvp-frais-wrap').hidden = !d.livraison_expedition;
+    }
     S.photos = [null, null, null, null]; (d.photos || []).forEach(function (u, i) { S.photos[i] = u; }); majPhotos();
   }
 
@@ -347,15 +423,22 @@
   function monter(init) {
     var carte = $('pv-produits'); if (!carte) return;
     var type = init && init.vitrine_type ? String(init.vitrine_type) : '';
-    if (!init || !init.id || TYPES_VENTE.indexOf(type) < 0) { carte.style.display = 'none'; return; }
+    var vente = TYPES_VENTE.indexOf(type) >= 0, video = TYPES_VIDEO.indexOf(type) >= 0;
+    if (!init || !init.id || (!vente && !video)) { carte.style.display = 'none'; return; }
     carte.style.display = '';
+    S.mode = video ? 'video' : 'vente';
+    S.produits = []; S.catalogues = []; S.q = ''; S.filtre = 'tous';
+    var t = $('pv-produits-titre'), i = $('pv-produits-intro');
+    if (t) t.textContent = video ? 'Mes vidéos' : 'Mes produits';
+    if (i) i.textContent = video ? 'Ajoutez, modifiez et rangez les vidéos que vos visiteurs voient dans votre boutique. Chaque changement apparaît tout de suite dans l\'aperçu.'
+      : 'Ajoutez, modifiez et rangez ce que vos visiteurs voient dans votre boutique. Chaque changement apparaît tout de suite dans l\'aperçu.';
     S.initId = init.id; S.vue = 'liste'; S.edition = null; S.message = ''; S.erreur = '';
     brancher();
-    var r = racine(); if (r && !S.produits.length) r.innerHTML = '<div class="notice">Chargement de vos produits…</div>';
+    var r = racine(); if (r && !S.produits.length) r.innerHTML = '<div class="notice">' + W().charge + '</div>';
     charger().then(function () {
       dessiner();
-      if (/[#&]produits(&|$)/.test(location.hash)) { try { carte.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {} }
-    }).catch(function (e) { if (r) r.innerHTML = '<p class="pvp-erreur" role="alert">Vos produits n\'ont pas pu être chargés : ' + esc((e && e.message) || 'erreur réseau') + '. <button type="button" class="pvp-lien" id="pvp-retenter">Réessayer</button></p>'; var b = $('pvp-retenter'); if (b) b.onclick = function () { monter(init); }; });
+      if (/[#&](produits|videos)(&|$)/.test(location.hash)) { try { carte.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {} }
+    }).catch(function (e) { if (r) r.innerHTML = '<p class="pvp-erreur" role="alert">' + W().echecCharge + esc((e && e.message) || 'erreur réseau') + '. <button type="button" class="pvp-lien" id="pvp-retenter">Réessayer</button></p>'; var b = $('pvp-retenter'); if (b) b.onclick = function () { monter(init); }; });
   }
 
   window.PvProduits = { monter: monter };

@@ -3,7 +3,8 @@
    Le propriétaire voit désormais la NOUVELLE page de sa boutique (comme ses visiteurs). Une fine barre fixe en bas de page lui donne :
    - « Paramètres de la boutique » (l'assistant de création),
    - « Mes produits » (boutique de vente, depuis le 2026-11-21) : dashboard-initiative.html#parametres-vitrine&produits, la rubrique « Mes produits » des Paramètres de la boutique ;
-     « Mes vidéos » / « Mes contenus » (autres types, en attendant leur propre rubrique) : profil.html?…&vitrine=1&edition=1 ; ne JAMAIS appeler cette vue « ancienne vue » — le propriétaire ne veut pas de retour en arrière,
+     « Mes vidéos » (boutique vidéo, depuis le 2026-11-24) : dashboard-initiative.html#parametres-vitrine&videos ;
+     « Mes contenus » (autres types, en attendant leur propre rubrique) : profil.html?…&vitrine=1&edition=1 ; ne JAMAIS appeler cette vue « ancienne vue » — le propriétaire ne veut pas de retour en arrière,
    - « Mon profil ».
    Téléphone (≤ 640 px) : une ligne de texte puis trois boutons de même largeur sur une rangée.
    La barre n'apparaît QUE pour le propriétaire connecté, jamais pour un visiteur, jamais dans l'aperçu de l'assistant (cadre ou ?preview=draft).
@@ -49,8 +50,8 @@
     /* Le lien du milieu mène à la gestion du contenu (produits, vidéos…), qui n'existe aujourd'hui que dans la page de profil : on le nomme par ce qu'il fait, pas par « ancienne vue ». */
     var page = location.pathname.split('/').pop();
     var contenu = page === 'boutique.html' ? 'Mes produits' : page === 'boutique-video.html' ? 'Mes vidéos' : 'Mes contenus';
-    /* Boutique de vente : « Mes produits » ouvre la rubrique des Paramètres (plus l'ancienne vue d'édition du profil). Les autres types gardent leur lien actuel. */
-    var lienContenu = page === 'boutique.html' ? 'dashboard-initiative.html#parametres-vitrine&produits' : 'profil.html?id=' + compte + '&vitrine=1&edition=1';
+    /* Boutique de vente : « Mes produits » ; boutique vidéo : « Mes vidéos » (depuis le 2026-11-24) — ouvrent la rubrique des Paramètres (plus l'ancienne vue d'édition du profil). Les autres types gardent leur lien actuel. */
+    var lienContenu = page === 'boutique.html' ? 'dashboard-initiative.html#parametres-vitrine&produits' : page === 'boutique-video.html' ? 'dashboard-initiative.html#parametres-vitrine&videos' : 'profil.html?id=' + compte + '&vitrine=1&edition=1';
     b.innerHTML = '<span class="bq-bp-texte">Vous voyez votre boutique comme vos visiteurs.</span>' +
       '<div class="bq-bp-liens">' +
       '<a class="or" href="dashboard-initiative.html#parametres-vitrine"><span class="bq-bp-long">Paramètres de la boutique</span><span class="bq-bp-court">Paramètres</span></a>' +

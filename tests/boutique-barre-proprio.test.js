@@ -75,7 +75,8 @@ test('B7 la barre ne parle plus d\'« ancienne vue » et tient sur une rangée a
   assert.match(bloc, /\.bq-actions \.plein\{order:-1\}/);
 });
 
-test('B6 « Gérer mes vidéos » ne renvoie plus en boucle vers la nouvelle page', () => {
+test('B6 « Gérer mes vidéos » mène à la rubrique « Mes vidéos » des Paramètres (plus à l’ancienne vue d’édition)', () => {
   const s = lire('assets/boutique-video.js');
-  assert.ok(s.includes('profil.html?vitrine=1&edition=1">Gérer mes vidéos'));
+  assert.ok(s.includes('dashboard-initiative.html#parametres-vitrine&videos">Gérer mes vidéos'));
+  assert.ok(!s.includes('profil.html?vitrine=1&edition=1">Gérer mes vidéos'));
 });

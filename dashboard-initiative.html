@@ -2092,11 +2092,11 @@ async function initRelaisDiasporaWidget(me, api) {
           </div>
 
           <!-- ═══ MES PRODUITS (2026-11-21, étape 2) — le propriétaire d'une boutique de vente ajoute, modifie, range et masque ses produits ICI
-               (assets/boutique-produits.js), plus dans l'ancienne vue d'édition du profil. Visible pour les boutiques de vente seulement ;
-               lien direct : dashboard-initiative.html#parametres-vitrine&produits ═══ -->
+               (assets/boutique-produits.js), plus dans l'ancienne vue d'édition du profil. Visible pour les boutiques de vente (« Mes produits ») et la boutique vidéo (« Mes vidéos », depuis le 2026-11-24) ;
+               liens directs : dashboard-initiative.html#parametres-vitrine&produits ou &videos ═══ -->
           <div class="card" id="pv-produits" style="margin-bottom:20px;display:none;">
-            <h3 style="margin:0 0 4px;font-size:15px;">Mes produits</h3>
-            <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Ajoutez, modifiez et rangez ce que vos visiteurs voient dans votre boutique. Chaque changement apparaît tout de suite dans l'aperçu.</p>
+            <h3 id="pv-produits-titre" style="margin:0 0 4px;font-size:15px;">Mes produits</h3>
+            <p id="pv-produits-intro" style="font-size:13px;color:var(--muted);margin:0 0 14px;">Ajoutez, modifiez et rangez ce que vos visiteurs voient dans votre boutique. Chaque changement apparaît tout de suite dans l'aperçu.</p>
             <div id="pv-produits-mount"><div class="notice">Chargement…</div></div>
           </div>
 
