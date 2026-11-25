@@ -1268,7 +1268,7 @@ async function init() {
     /* Boutique de type « Boutique de vente » (2026-11-01) : les visiteurs voient la présentation dédiée (boutique.html).
        Le 2026-11-14, le PROPRIÉTAIRE aussi (une barre en bas de la page lui donne les paramètres et l'ancienne vue d'édition) et le lien
        profil.html?id=…#vitrine (sans ?vitrine=1) mène lui aussi à la nouvelle page. Sont exclus : les retours de paiement, l'aperçu de brouillon,
-       la demande explicite de l'ancienne vue (?edition=1). Pendant la maintenance des boutiques, le propriétaire (confirmé par le serveur) voit quand même sa page. */
+       (la demande ?edition=1 n'existe plus depuis le 2026-11-25). Pendant la maintenance des boutiques, le propriétaire (confirmé par le serveur) voit quand même sa page. */
     if ((new URLSearchParams(location.search).get('vitrine') === '1' || (location.hash || '').startsWith('#vitrine')) && (await versPageBoutiqueDediee()) === true) return;
     /* Bouton "Adhérer" (Associations/ONG) — même route que initiative.html, statut récupéré
        avant le rendu pour afficher directement le bon état (déjà membre / demande envoyée). */
@@ -2967,7 +2967,7 @@ let _vitrineLoaded = false;
    cette page, false s'il n'y en a pas (boutique pas encore ouverte, ancien type sans page, exclusions ci-dessous) et 'erreur' si la vérification
    a échoué deux fois : on n'affiche alors JAMAIS l'ancienne vue, mais un message avec un bouton « Réessayer » (2026-11-21). Appelée à l'ouverture de profil.html?id=…#vitrine ET au clic sur l'onglet « Boutique » du profil (2026-11-14) : avant, le clic
    basculait sur place vers l'ancienne vue, donc le nouveau design n'apparaissait qu'en ouvrant directement le lien #vitrine.
-   Exclus : retours de paiement, aperçu de brouillon, demande explicite de l'ancienne vue (?edition=1) et anciens types sans page dédiée. */
+   Exclus : retours de paiement, aperçu de brouillon, et anciens types sans page dédiée (?edition=1 retiré le 2026-11-25 : le propriétaire arrive toujours sur la nouvelle boutique). */
 let _vitrineDedieePromesse = null;
 let _vitrineDedieeCause = '';
 function versPageBoutiqueDediee() {
@@ -2977,7 +2977,7 @@ function versPageBoutiqueDediee() {
 }
 async function _verifierPageBoutiqueDediee() {
   const q = new URLSearchParams(location.search);
-  if (q.get('edition') || q.get('paiement') || q.get('preview') || !profil || !profil.initiative_id) return false;
+  if (q.get('paiement') || q.get('preview') || !profil || !profil.initiative_id) return false;
   const pages = { commercial: 'boutique.html', ecom: 'boutique.html', portfolio: 'portfolio.html', video: 'boutique-video.html',
     /* 2026-11-15 (accord écrit) : les anciens types « evenement » et « projet » mènent aussi aux nouvelles pages. */
     events: 'boutique-evenements.html', evenement: 'boutique-evenements.html',

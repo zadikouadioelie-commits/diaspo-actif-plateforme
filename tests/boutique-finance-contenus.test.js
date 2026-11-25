@@ -125,7 +125,7 @@ test('FI13 suppression avec confirmation, ordre par flèches, limites par rubriq
 test('FI14 la barre du propriétaire mène à « Mon organisme » ; seul le repli garde l\'ancien lien', () => {
   assert.match(barre, /page === 'boutique-finance\.html' \? 'Mon organisme'/);
   assert.match(barre, /page === 'boutique-finance\.html' \? 'dashboard-initiative\.html#parametres-vitrine&finance'/);
-  assert.match(barre, /vitrine=1&edition=1/, 'repli conservé jusqu\'à l\'étape 3');
+  assert.ok(!/edition=1/.test(barre.replace(/\/\*[\s\S]*?\*\//g, '')), 'plus de lien de repli vers ?edition=1 (étape 3)');
 });
 
 test('FI15 la carte partage le style de « Mes produits » sans le casser', () => {

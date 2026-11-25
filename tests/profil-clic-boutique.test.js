@@ -15,7 +15,8 @@ test('P1 une seule fonction décide de la page dédiée, avec les 6 types et les
   const f = html.slice(html.indexOf('let _vitrineDedieePromesse'), html.indexOf('function initVitrineSwitch'));
   ['boutique.html', 'portfolio.html', 'boutique-video.html', 'boutique-evenements.html', 'boutique-impact.html', 'boutique-finance.html']
     .forEach((p) => assert.ok(f.includes(p), p + ' absent'));
-  ['edition', 'paiement', 'preview'].forEach((x) => assert.ok(f.includes("q.get('" + x + "')"), 'exclusion manquante : ' + x));
+  ['paiement', 'preview'].forEach((x) => assert.ok(f.includes("q.get('" + x + "')"), 'exclusion manquante : ' + x));
+  assert.ok(!f.includes("q.get('edition')"), "?edition=1 ne doit plus ramener à l'ancienne vue");
 });
 
 test('P2 l\'ouverture par #vitrine ET le clic sur l\'onglet appellent cette fonction', () => {

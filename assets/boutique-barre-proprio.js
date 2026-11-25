@@ -8,7 +8,7 @@
      « Mes événements » (boutique Créateur d'événements, depuis le 2026-11-24) : dashboard-initiative.html#parametres-vitrine&evenements ;
      « Mon impact » (boutique Projet à impact, depuis le 2026-11-25) : dashboard-initiative.html#parametres-vitrine&impact ;
      « Mon organisme » (boutique Organisme de financement, depuis le 2026-11-25) : dashboard-initiative.html#parametres-vitrine&finance ;
-     « Mes contenus » (autres types, en attendant leur propre rubrique) : profil.html?…&vitrine=1&edition=1 ; ne JAMAIS appeler cette vue « ancienne vue » — le propriétaire ne veut pas de retour en arrière,
+     Les six types ont leur rubrique : plus de lien de repli vers l'ancienne vue d'édition du profil (?edition=1 retiré le 2026-11-25, étape 3) ; ne JAMAIS appeler cette vue « ancienne vue » dans un libellé visible,
    - « Mon profil ».
    Téléphone (≤ 640 px) : une ligne de texte puis trois boutons de même largeur sur une rangée.
    La barre n'apparaît QUE pour le propriétaire connecté, jamais pour un visiteur, jamais dans l'aperçu de l'assistant (cadre ou ?preview=draft).
@@ -55,12 +55,12 @@
     var page = location.pathname.split('/').pop();
     var contenu = page === 'boutique.html' ? 'Mes produits' : page === 'boutique-video.html' ? 'Mes vidéos' : page === 'portfolio.html' ? 'Mon portfolio' : page === 'boutique-evenements.html' ? 'Mes événements' : page === 'boutique-impact.html' ? 'Mon impact' : page === 'boutique-finance.html' ? 'Mon organisme' : 'Mes contenus';
     /* Boutique de vente : « Mes produits » ; boutique vidéo : « Mes vidéos » (depuis le 2026-11-24) — ouvrent la rubrique des Paramètres (plus l'ancienne vue d'édition du profil). Les autres types gardent leur lien actuel. */
-    var lienContenu = page === 'boutique.html' ? 'dashboard-initiative.html#parametres-vitrine&produits' : page === 'boutique-video.html' ? 'dashboard-initiative.html#parametres-vitrine&videos' : page === 'portfolio.html' ? 'dashboard-initiative.html#parametres-vitrine&portfolio' : page === 'boutique-evenements.html' ? 'dashboard-initiative.html#parametres-vitrine&evenements' : page === 'boutique-impact.html' ? 'dashboard-initiative.html#parametres-vitrine&impact' : page === 'boutique-finance.html' ? 'dashboard-initiative.html#parametres-vitrine&finance' : 'profil.html?id=' + compte + '&vitrine=1&edition=1';
+    var lienContenu = page === 'boutique.html' ? 'dashboard-initiative.html#parametres-vitrine&produits' : page === 'boutique-video.html' ? 'dashboard-initiative.html#parametres-vitrine&videos' : page === 'portfolio.html' ? 'dashboard-initiative.html#parametres-vitrine&portfolio' : page === 'boutique-evenements.html' ? 'dashboard-initiative.html#parametres-vitrine&evenements' : page === 'boutique-impact.html' ? 'dashboard-initiative.html#parametres-vitrine&impact' : page === 'boutique-finance.html' ? 'dashboard-initiative.html#parametres-vitrine&finance' : 'dashboard-initiative.html#parametres-vitrine';
     b.innerHTML = '<span class="bq-bp-texte">Vous voyez votre boutique comme vos visiteurs.</span>' +
       '<div class="bq-bp-liens">' +
       '<a class="or" href="dashboard-initiative.html#parametres-vitrine"><span class="bq-bp-long">Paramètres de la boutique</span><span class="bq-bp-court">Paramètres</span></a>' +
       '<a href="' + lienContenu + '">' + contenu + '</a>' +
-      '<a href="profil.html?id=' + compte + '&edition=1">Mon profil</a>' +
+      '<a href="profil.html?id=' + compte + '">Mon profil</a>' +
       '</div>';
     document.body.appendChild(b);
     /* la barre ne doit pas cacher le bas de la page */

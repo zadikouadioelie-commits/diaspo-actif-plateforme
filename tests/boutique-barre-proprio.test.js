@@ -1,6 +1,6 @@
 /* ===========================================================
    tests/boutique-barre-proprio.test.js — Le propriétaire voit la NOUVELLE boutique (2026-11-14)
-   1. profil.html?id=…#vitrine et ?vitrine=1 mènent à la page dédiée, propriétaire compris ; ?edition=1, brouillon et paiement gardent l'ancienne vue.
+   1. profil.html?id=…#vitrine et ?vitrine=1 mènent à la page dédiée, propriétaire compris ; brouillon et paiement gardent l'ancienne vue (?edition=1 retiré le 2026-11-25).
    2. Le serveur dit « est_proprietaire » au seul propriétaire ; la maintenance le laisse passer, pas un visiteur.
    3. Une barre (Paramètres / ancienne vue / profil) s'affiche pour lui seul, jamais dans l'aperçu de l'assistant.
    Lancer : node --test tests/boutique-barre-proprio.test.js
@@ -20,7 +20,7 @@ test('B1 la redirection vers la page dédiée vaut pour le propriétaire et pour
   const s = lire('profil-app.html');
   /* Depuis le 2026-11-14 la décision est dans versPageBoutiqueDediee(), appelée à l'ouverture (#vitrine) et au clic sur l'onglet (voir profil-clic-boutique.test.js). */
   assert.match(s, /startsWith\('#vitrine'\)\) && \(await versPageBoutiqueDediee\(\)\) === true\) return;/);
-  assert.match(s, /if \(q\.get\('edition'\) \|\| q\.get\('paiement'\) \|\| q\.get\('preview'\) \|\| !profil \|\| !profil\.initiative_id\) return false;/);
+  assert.match(s, /if \(q\.get\('paiement'\) \|\| q\.get\('preview'\) \|\| !profil \|\| !profil\.initiative_id\) return false;/);
   assert.ok(!/if \(!isOwn && profil\.initiative_id/.test(s), 'le propriétaire ne doit plus être exclu');
   ['boutique.html', 'portfolio.html', 'boutique-video.html', 'boutique-evenements.html', 'boutique-impact.html', 'boutique-finance.html'].forEach((p) => assert.ok(s.includes("'" + p), p));
 });
@@ -52,7 +52,7 @@ test('B4 la barre du propriétaire existe, ne s\'affiche pas dans l\'aperçu et 
   assert.match(js, /window\.top !== window\.self \|\| q\.get\('preview'\)/);
   assert.match(js, /Number\(moi\.id\) === Number\(ini\.owner_user_id\)/);
   assert.match(js, /dashboard-initiative\.html#parametres-vitrine/);
-  assert.match(js, /vitrine=1&edition=1/);
+  assert.ok(!/edition=1/.test(js.replace(/\/\*[\s\S]*?\*\//g, '')), 'plus aucun lien vers ?edition=1');
   assert.match(js, /min-height:44px/);
 });
 

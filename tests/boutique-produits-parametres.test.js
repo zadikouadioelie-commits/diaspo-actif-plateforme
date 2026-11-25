@@ -28,7 +28,7 @@ test('PP2 le lien #parametres-vitrine&produits ouvre bien la section (le hash es
 
 test('PP3 « Mes produits » de la boutique de vente mène aux Paramètres ; les autres types gardent leur lien', () => {
   assert.match(barre, /page === 'boutique\.html' \? 'dashboard-initiative\.html#parametres-vitrine&produits'/);
-  assert.match(barre, /vitrine=1&edition=1/, 'les autres types (vidéos, contenus) gardent leur lien en attendant leur rubrique');
+  assert.ok(!/edition=1/.test(barre.replace(/\/\*[\s\S]*?\*\//g, '')), 'plus de lien de repli vers ?edition=1 (étape 3)');
 });
 
 test('PP4 le module réutilise les routes existantes, sans route ni donnée nouvelle', () => {
@@ -90,7 +90,7 @@ test('PV1 la boutique vidéo a sa rubrique : titre « Mes vidéos », lien direc
   assert.match(dash, /id="pv-produits-titre"/);
   assert.match(dash, /id="pv-produits-intro"/);
   assert.match(barre, /page === 'boutique-video\.html' \? 'dashboard-initiative\.html#parametres-vitrine&videos'/);
-  assert.match(barre, /vitrine=1&edition=1/, 'les autres types gardent leur lien en attendant leur rubrique');
+  assert.ok(!/edition=1/.test(barre.replace(/\/\*[\s\S]*?\*\//g, '')), 'plus de lien de repli vers ?edition=1 (étape 3)');
 });
 
 test('PV2 une vidéo est un produit : mêmes routes, avec video_url, video_duree (1 à 57 s) et video_type', () => {

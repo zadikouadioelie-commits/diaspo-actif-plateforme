@@ -89,7 +89,7 @@ test('PF10 une rubrique éteinte est signalée au propriétaire, sans rien suppr
 test('PF11 la barre du propriétaire mène à « Mon portfolio » ; les autres types gardent leur lien', () => {
   assert.match(barre, /page === 'portfolio\.html' \? 'Mon portfolio'/);
   assert.match(barre, /page === 'portfolio\.html' \? 'dashboard-initiative\.html#parametres-vitrine&portfolio'/);
-  assert.match(barre, /vitrine=1&edition=1/, 'les types sans rubrique gardent leur lien en attendant');
+  assert.ok(!/edition=1/.test(barre.replace(/\/\*[\s\S]*?\*\//g, '')), 'plus de lien de repli vers ?edition=1 (étape 3)');
 });
 
 test('PF12 la carte partage le style de « Mes produits » sans le casser', () => {

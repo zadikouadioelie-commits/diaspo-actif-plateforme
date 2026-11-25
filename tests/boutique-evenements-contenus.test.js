@@ -101,7 +101,7 @@ test('EV12 une panne de chargement donne un message et un bouton Réessayer, pas
 test('EV13 la barre du propriétaire mène à « Mes événements » ; impact et finance gardent leur lien en attendant', () => {
   assert.match(barre, /page === 'boutique-evenements\.html' \? 'Mes événements'/);
   assert.match(barre, /page === 'boutique-evenements\.html' \? 'dashboard-initiative\.html#parametres-vitrine&evenements'/);
-  assert.match(barre, /vitrine=1&edition=1/, 'les types sans rubrique gardent leur lien en attendant');
+  assert.ok(!/edition=1/.test(barre.replace(/\/\*[\s\S]*?\*\//g, '')), 'plus de lien de repli vers ?edition=1 (étape 3)');
 });
 
 test('EV14 la carte partage le style de « Mes produits » sans le casser ; les liens ne sont pas soulignés', () => {

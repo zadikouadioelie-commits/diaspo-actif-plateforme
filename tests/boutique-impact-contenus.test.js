@@ -109,7 +109,7 @@ test('IM13 limites : 12 chiffres, 100 réalisations, 50 membres ; le bouton Ajou
 test('IM14 la barre du propriétaire mène à « Mon impact » ; les types sans rubrique gardent leur lien en attendant', () => {
   assert.match(barre, /page === 'boutique-impact\.html' \? 'Mon impact'/);
   assert.match(barre, /page === 'boutique-impact\.html' \? 'dashboard-initiative\.html#parametres-vitrine&impact'/);
-  assert.match(barre, /vitrine=1&edition=1/, 'les types sans rubrique gardent leur lien en attendant');
+  assert.ok(!/edition=1/.test(barre.replace(/\/\*[\s\S]*?\*\//g, '')), 'plus de lien de repli vers ?edition=1 (étape 3)');
 });
 
 test('IM15 la carte partage le style de « Mes produits » sans le casser', () => {
