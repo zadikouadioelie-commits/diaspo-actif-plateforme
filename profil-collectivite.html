@@ -423,7 +423,7 @@ function applyPcTheme(name) {
         </div></div>`;
       document.body.appendChild(ov);
       if (window.RichEditor) {
-        RichEditor.attach('pce-bio', { placeholder: 'Présentez le territoire…' });
+        RichEditor.attach('pce-bio', { placeholder: 'Présentez le territoire…', avance: true });
         RichEditor.attach('pce-gouv', { placeholder: 'Présentez la gouvernance…' });
       }
       ov.querySelector('#pce-cancel').onclick = () => ov.remove();

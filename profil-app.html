@@ -2179,8 +2179,9 @@ async function pvzChargerPublications(suite) {
       const vus = new Set(pvzPubsVues.map(p => p.id));
       pvzPubsVues = pvzPubsVues.concat((r.publications || []).filter(p => !vus.has(p.id)));
       const reste = pvzPubPage < (r.pages || 1);
-      if (!pvzPubsVues.length) { feed.innerHTML = `<div class="pvz-empty" style="padding:8px 0;">Aucune publication pour le moment.</div>`; return; }
-      Posts.renderFeed(pvzPubsVues, 'pvz-pub-feed', { currentUserId: CU?.id });
+      const bio = Posts.bioCard ? Posts.bioCard(profil) : null;
+      if (!pvzPubsVues.length && !bio) { feed.innerHTML = `<div class="pvz-empty" style="padding:8px 0;">Aucune publication pour le moment.</div>`; return; }
+      Posts.renderFeed(bio ? [bio, ...pvzPubsVues] : pvzPubsVues, 'pvz-pub-feed', { currentUserId: CU?.id });
       const ancien = document.getElementById('pvz-pub-plus'); if (ancien) ancien.remove();
       if (reste) {
         const b = document.createElement('button');
@@ -7381,7 +7382,7 @@ function openAproposEditor() {
   else if (block) { block.appendChild(wrap); }
   const ta = document.getElementById('apropos-ta');
   ta.addEventListener('input', () => { document.getElementById('apropos-counter').textContent = stripRichTags(ta.value).length + '/2000'; });
-  const editor = window.RichEditor ? RichEditor.attach('apropos-ta', { placeholder: "Parlez de vous : votre parcours, vos projets, vos valeurs…" }) : null;
+  const editor = window.RichEditor ? RichEditor.attach('apropos-ta', { placeholder: "Parlez de vous : votre parcours, vos projets, vos valeurs…", avance: true }) : null;
   if (editor) editor.focus(); else { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
 }
 
@@ -7812,11 +7813,13 @@ async function loadPublicationsTab(reset=true) {
     let list = document.getElementById('pub-list');
     if (!list) { list = document.createElement('div'); list.id='pub-list'; panel.querySelector('.pub-list-wrap')?.appendChild(list); }
     if (reset) list.innerHTML = '';
-    if (!r.publications.length && reset) {
+    // Carte « Biographie » : seulement en tête de la toute première page, vue « Tout », sans recherche en cours.
+    const bio = (window.Posts && window.Posts.bioCard && _pubPage === 1 && _pubCat === 'all' && !_pubQ) ? Posts.bioCard(profil) : null;
+    if (!r.publications.length && !bio && reset) {
       list.innerHTML = `<div class="empty-p"><div class="ei">📝</div>${isOwn ? 'Aucune publication. <button class="btn btn-sm" onclick="if(window.Posts){Posts.openModal();}else{location.href=\'fil-actualite.html\';}" style="background:#4338CA;color:#fff;border:none;border-radius:6px;padding:5px 12px;margin-left:8px;cursor:pointer;">Créer mon premier post</button>' : 'Aucune publication pour l\'instant.'}</div>`;
     } else {
       if (window.Posts) {
-        Posts.renderFeed(r.publications, list.id || 'pub-list', { currentUserId: CU?.id });
+        Posts.renderFeed(bio ? [bio, ...r.publications] : r.publications, list.id || 'pub-list', { currentUserId: CU?.id });
       } else {
         r.publications.forEach(p => {
           const d = document.createElement('div');
@@ -9342,7 +9345,7 @@ function openEditIdentity() {
 
   const slot = document.getElementById('pvz-identity-edit-slot') || document.getElementById('p-identity');
   slot.appendChild(form);
-  if (window.RichEditor) RichEditor.attach('id-bio', { placeholder: "Parlez de vous : votre parcours, vos projets, vos valeurs…" });
+  if (window.RichEditor) RichEditor.attach('id-bio', { placeholder: "Parlez de vous : votre parcours, vos projets, vos valeurs…", avance: true });
   form.scrollIntoView({behavior:'smooth', block:'nearest'});
 }
 

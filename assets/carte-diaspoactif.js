@@ -451,7 +451,11 @@
       zone.querySelector('#cda-pp-later').addEventListener('click', () => { try { localStorage.setItem(cleMasque, '1'); } catch (e) { /* sans stockage, la proposition revient au prochain affichage */ } zone.innerHTML = ''; });
     }
     if (window.Posts) {
-      const peindreListe = () => { if (document.getElementById('cda-publications-list')) window.Posts.renderFeed(profil.publications || [], 'cda-publications-list'); };
+      const peindreListe = () => {
+        if (!document.getElementById('cda-publications-list')) return;
+        const bio = window.Posts.bioCard ? window.Posts.bioCard(profil) : null;
+        window.Posts.renderFeed(bio ? [bio, ...(profil.publications || [])] : (profil.publications || []), 'cda-publications-list');
+      };
       peindreListe();
       montrerPremierPost();
       /* Profil d'une autre personne : « Afficher plus d'actualités » poursuit la liste de cette personne (page suivante de /profil/:id/publications). */
@@ -621,7 +625,7 @@
         Object.assign(profil, r.profil);
         render(container, profil, opts);
       });
-    if (window.RichEditor) RichEditor.attach('cda-e-bio', { placeholder: 'Parlez de vous en quelques lignes…' });
+    if (window.RichEditor) RichEditor.attach('cda-e-bio', { placeholder: 'Parlez de vous en quelques lignes…', avance: true });
   }
 
   /* Centres d'intérêt : liste propre (sans doublon ni vide), 12 au plus, 40 caractères chacun. */

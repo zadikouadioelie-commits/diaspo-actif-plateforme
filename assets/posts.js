@@ -642,9 +642,36 @@ async function _ouvrirTutoInline(id) {
 // sans cet export explicite — même raison que `window.Posts = Posts;` plus bas dans ce fichier.
 window._ouvrirTutoInline = _ouvrirTutoInline;
 
+/* Carte « Biographie » (2026-11-25, demande explicite : « traite la bio comme une publication, affiche-la
+   à l'endroit des publications également ») — prépendue côté client par Posts.bioCard() (plus bas) à
+   chaque rendu du fil d'un profil, jamais une ligne réelle de fil_posts : lecture seule, sans
+   réactions/commentaires/menu (même logique d'exclusion que carte_vitrine ci-dessus). */
+function renderBioCard(post) {
+  const profil = post.auteur_profil || {};
+  const titrePro = profil.titre_pro ? `<span class="post-auteur-titre">${escHtml(profil.titre_pro)}</span>` : '';
+  const villeInfo = profil.ville ? ` · ${escHtml(profil.ville)}` : '';
+  return `
+<article class="post-card post-card-bio" id="post-${post.id}">
+  <div class="post-header">
+    <a href="profil.html?id=${post.auteur_id||''}" class="post-auteur-link">
+      ${avatarHTML(post)}
+      <div class="post-auteur-info">
+        <div class="post-auteur-name">${escHtml(post.auteur_nom)}</div>
+        ${titrePro}
+        <div class="post-meta">📝 Biographie${villeInfo}</div>
+      </div>
+    </a>
+  </div>
+  <div class="post-body" data-expanded="true">
+    <div class="post-body-full post-riche">${rendreCorpsHtml(post.corps_html || '')}</div>
+  </div>
+</article>`;
+}
+
 function renderPostCard(post, options = {}) {
   if (post.type === 'carte_vitrine') return renderVitrineCard(post);
   if (post.type === 'evenement_promo') return renderEvenementPromoCard(post);
+  if (post.type === 'bio') return renderBioCard(post);
   const { currentUserId, showStats } = options;
   const isAuteur = currentUserId && post.auteur_id === currentUserId;
   const reactions = post.reactions || {};
@@ -2153,13 +2180,29 @@ const Posts = {
     } catch(e) {}
   },
 
+  /* Carte « Biographie » à prépendre (jamais stockée) au fil des publications d'un profil, quand
+     son « À propos » est rempli (2026-11-25, demande explicite). Construite depuis l'objet `profil`
+     déjà en mémoire côté page (jamais via une requête réseau ni une entrée persistée dans
+     `profil.publications`, pour ne jamais fausser les compteurs « X publications » ailleurs sur la
+     page) : null si pas de bio, sinon un objet au type 'bio' que renderPostCard rend en carte
+     non interactive (voir plus bas). À appeler à chaque rendu du fil d'un profil, jamais mémorisé. */
+  bioCard(profil) {
+    if (!profil || !profil.bio || !String(profil.bio).trim()) return null;
+    const nom = profil.nom_structure || [profil.prenom, profil.nom].filter(Boolean).join(' ') || profil.nom || 'Membre';
+    return {
+      id: `bio-${profil.id}`, type: 'bio', auteur_id: profil.id, auteur_nom: nom,
+      auteur_profil: { photo_url: profil.photo_url, titre_pro: profil.titre_pro, ville: profil.ville, pays: profil.pays },
+      corps_html: profil.bio, created_at: profil.created_at,
+    };
+  },
+
   /* ── Rendu d'un fil ── */
   renderFeed(posts, containerId, options = {}) {
     const container = document.getElementById(containerId);
     if (!container) return;
     // Mémorise l'ordre des posts affichés pour la navigation ‹ › de la vue détaillée
     // (Posts.detailNext/detailPrev) — ignore les cartes vitrine, qui n'ont pas de vue détaillée.
-    this._feedIds = posts.filter(p => p.type !== 'carte_vitrine').map(p => p.id);
+    this._feedIds = posts.filter(p => p.type !== 'carte_vitrine' && p.type !== 'bio').map(p => p.id);
     // Un fil classique reprend la main sur toute séquence fournie par une vue en grille.
     this._navItems = null; this._navNeedMore = null; this._navHasMore = false;
     if (!posts.length) {
