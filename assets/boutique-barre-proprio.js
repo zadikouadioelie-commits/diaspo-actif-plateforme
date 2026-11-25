@@ -6,6 +6,7 @@
      « Mes vidéos » (boutique vidéo, depuis le 2026-11-24) : dashboard-initiative.html#parametres-vitrine&videos ;
      « Mon portfolio » (boutique Portfolio, depuis le 2026-11-24) : dashboard-initiative.html#parametres-vitrine&portfolio ;
      « Mes événements » (boutique Créateur d'événements, depuis le 2026-11-24) : dashboard-initiative.html#parametres-vitrine&evenements ;
+     « Mon impact » (boutique Projet à impact, depuis le 2026-11-25) : dashboard-initiative.html#parametres-vitrine&impact ;
      « Mes contenus » (autres types, en attendant leur propre rubrique) : profil.html?…&vitrine=1&edition=1 ; ne JAMAIS appeler cette vue « ancienne vue » — le propriétaire ne veut pas de retour en arrière,
    - « Mon profil ».
    Téléphone (≤ 640 px) : une ligne de texte puis trois boutons de même largeur sur une rangée.
@@ -51,9 +52,9 @@
     b.id = 'bq-barre-proprio'; b.setAttribute('role', 'region'); b.setAttribute('aria-label', 'Outils du propriétaire de la boutique');
     /* Le lien du milieu mène à la gestion du contenu (produits, vidéos…), qui n'existe aujourd'hui que dans la page de profil : on le nomme par ce qu'il fait, pas par « ancienne vue ». */
     var page = location.pathname.split('/').pop();
-    var contenu = page === 'boutique.html' ? 'Mes produits' : page === 'boutique-video.html' ? 'Mes vidéos' : page === 'portfolio.html' ? 'Mon portfolio' : page === 'boutique-evenements.html' ? 'Mes événements' : 'Mes contenus';
+    var contenu = page === 'boutique.html' ? 'Mes produits' : page === 'boutique-video.html' ? 'Mes vidéos' : page === 'portfolio.html' ? 'Mon portfolio' : page === 'boutique-evenements.html' ? 'Mes événements' : page === 'boutique-impact.html' ? 'Mon impact' : 'Mes contenus';
     /* Boutique de vente : « Mes produits » ; boutique vidéo : « Mes vidéos » (depuis le 2026-11-24) — ouvrent la rubrique des Paramètres (plus l'ancienne vue d'édition du profil). Les autres types gardent leur lien actuel. */
-    var lienContenu = page === 'boutique.html' ? 'dashboard-initiative.html#parametres-vitrine&produits' : page === 'boutique-video.html' ? 'dashboard-initiative.html#parametres-vitrine&videos' : page === 'portfolio.html' ? 'dashboard-initiative.html#parametres-vitrine&portfolio' : page === 'boutique-evenements.html' ? 'dashboard-initiative.html#parametres-vitrine&evenements' : 'profil.html?id=' + compte + '&vitrine=1&edition=1';
+    var lienContenu = page === 'boutique.html' ? 'dashboard-initiative.html#parametres-vitrine&produits' : page === 'boutique-video.html' ? 'dashboard-initiative.html#parametres-vitrine&videos' : page === 'portfolio.html' ? 'dashboard-initiative.html#parametres-vitrine&portfolio' : page === 'boutique-evenements.html' ? 'dashboard-initiative.html#parametres-vitrine&evenements' : page === 'boutique-impact.html' ? 'dashboard-initiative.html#parametres-vitrine&impact' : 'profil.html?id=' + compte + '&vitrine=1&edition=1';
     b.innerHTML = '<span class="bq-bp-texte">Vous voyez votre boutique comme vos visiteurs.</span>' +
       '<div class="bq-bp-liens">' +
       '<a class="or" href="dashboard-initiative.html#parametres-vitrine"><span class="bq-bp-long">Paramètres de la boutique</span><span class="bq-bp-court">Paramètres</span></a>' +

@@ -93,7 +93,7 @@ test('PF11 la barre du propriétaire mène à « Mon portfolio » ; les autres t
 });
 
 test('PF12 la carte partage le style de « Mes produits » sans le casser', () => {
-  assert.match(css, /:is\(#pv-produits,#pv-portfolio(,#pv-evenements)?\) \.pvp-ligne/);
-  assert.match(css, /html body\.nd :is\(#pv-produits,#pv-portfolio(,#pv-evenements)?\) :is\(input\[type=text\]/);
+  assert.match(css, /:is\(#pv-produits,#pv-portfolio(,#pv-evenements)?(,#pv-impact)?\) \.pvp-ligne/);
+  assert.match(css, /html body\.nd :is\(#pv-produits,#pv-portfolio(,#pv-evenements)?(,#pv-impact)?\) :is\(input\[type=text\]/);
   assert.ok(!/^#pv-produits /m.test(css), 'sélecteur restant propre à « Mes produits » seulement');
 });

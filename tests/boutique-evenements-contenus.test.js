@@ -20,7 +20,7 @@ test('EV1 le tableau de bord porte la carte « Mes événements », son script e
   assert.match(dash, /id="pv-evenements"/);
   assert.match(dash, /id="pv-evenements-mount"/);
   assert.match(dash, /<h3[^>]*>Mes événements<\/h3>/);
-  assert.match(dash, /<script src="assets\/boutique-evenements-contenus\.js\?v=1"><\/script>/);
+  assert.match(dash, /<script src="assets\/boutique-evenements-contenus\.js\?v=2"><\/script>/);
   assert.match(dash, /if \(window\.PvEvenements\) PvEvenements\.monter\(init\);/);
 });
 
@@ -105,7 +105,7 @@ test('EV13 la barre du propriétaire mène à « Mes événements » ; impact et
 });
 
 test('EV14 la carte partage le style de « Mes produits » sans le casser ; les liens ne sont pas soulignés', () => {
-  assert.match(css, /:is\(#pv-produits,#pv-portfolio,#pv-evenements\) \.pvp-ligne/);
+  assert.match(css, /:is\(#pv-produits,#pv-portfolio,#pv-evenements(,#pv-impact)?\) \.pvp-ligne/);
   assert.match(css, /a\.pvp-btn\{text-decoration:none\}/);
   assert.match(css, /\.pvp-ligne\.pvp-ev\{grid-template-columns:56px minmax\(0,1fr\) auto\}/);
   assert.match(mod, /class="pvp-ligne pvp-ev"/);
