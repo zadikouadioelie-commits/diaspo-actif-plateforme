@@ -25989,6 +25989,30 @@ route("PATCH", "/api/evenements/:id/prolonger-inscriptions", async (req, res, pa
   sendJSON(res, 200, { ok: true, inscriptions_prolongees_jusquau: jusquau });
 });
 
+/* PATCH /api/evenements/:id/visibilite-boutique — masque ou affiche UN événement dans la boutique de son
+   organisateur (2026-11-25, « Mes événements » des Paramètres de la boutique), sans passer par le formulaire
+   complet (PUT /api/evenements/:id, qui réécrit tous les champs et n'écrit jamais masquer_boutique).
+   Même esprit que /publier et /prolonger-inscriptions : ne touche QUE la colonne masquer_boutique.
+   Corps : { afficher: true | false }  (true = « Boutique et Événements », false = « Événements uniquement »).
+   Refusé pour un événement « Boutique uniquement » (visibilite='boutique') : le masquer de la boutique le
+   rendrait invisible partout — pour le sortir de la boutique, il faut d'abord le passer en public. */
+route("PATCH", "/api/evenements/:id/visibilite-boutique", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const evt = await db.prepare("SELECT id, owner_user_id, visibilite FROM evenements WHERE id=?").get(params.id);
+  if (!evt) return sendJSON(res, 404, { error: "Événement introuvable." });
+  if (Number(evt.owner_user_id) !== Number(user.id) && user.role !== "administrateur") {
+    return sendJSON(res, 403, { error: "Vous ne pouvez modifier que vos propres événements." });
+  }
+  if (typeof body?.afficher !== "boolean") return sendJSON(res, 400, { error: "Indiquez si l'événement doit être affiché ou masqué dans la boutique." });
+  if (evt.visibilite === "boutique") {
+    return sendJSON(res, 400, { error: "Cet événement est réservé à votre boutique : le masquer de la boutique le rendrait invisible partout. Passez-le d'abord en public dans sa modification." });
+  }
+  const masquer = body.afficher ? 0 : 1;
+  await db.prepare("UPDATE evenements SET masquer_boutique=? WHERE id=?").run(masquer, evt.id);
+  sendJSON(res, 200, { ok: true, masquer_boutique: masquer });
+});
+
 /* POST /api/evenements/:id/inscription-rapide — réservé aux événements flash
    (inscription_rapide_active, activé par l'organisateur), 2026-10-14, demande explicite :
    "déclencher une inscription rapide avec inscription dans l'agenda des personnes ayant un

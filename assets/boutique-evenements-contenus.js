@@ -3,9 +3,10 @@
    Le propriétaire d'une boutique « Créateur d'événements » voit ICI les événements que sa boutique présente (À venir, Brouillons, Terminés),
    les publie, et ouvre leur modification, dans Paramètres Boutique (dashboard-initiative.html#parametres-vitrine&evenements),
    au lieu de l'ancienne vue d'édition du profil (?edition=1) — qui ne faisait que les afficher et renvoyer vers « Créer un événement ».
-   Aucune donnée ni route nouvelle :
+   Aucune donnée nouvelle ; une seule petite route (visibilite-boutique) :
      - Liste      → GET   /api/evenements?owner=<compte>   (le propriétaire y voit aussi ses brouillons ; même source que la page boutique-evenements.html)
      - Publier    → PATCH /api/evenements/:id/publier      (ne touche que le statut : aucun champ de l'événement n'est réécrit)
+     - Masquer / Afficher dans la boutique → PATCH /api/evenements/:id/visibilite-boutique (2026-11-25 ; ne touche que masquer_boutique)
      - Créer / Modifier / Voir → écrans qui existent déjà (evenements.html) ; « Tout gérer » ouvre le module « Mes événements » du tableau de bord.
    Le formulaire complet d'un événement, la billetterie et les statistiques ne sont PAS recopiés ici.
    Utilise les fonctions globales de la page : api(method, path, body), pvRefreshPreview().
@@ -59,6 +60,8 @@
     if (Number(e.masquer_boutique)) return { lib: 'Hors de votre boutique', cl: 'pvp-masque' };
     return { lib: 'Boutique et Événements', cl: 'pvp-dispo' };
   }
+  /* « Boutique uniquement » ne peut pas être masqué de la boutique (il disparaîtrait partout) ; un brouillon n'est pas encore visible. */
+  function masquable(e) { return e.statut !== 'brouillon' && e.visibilite !== 'boutique'; }
   function ligne(e) {
     var id = entier(e.id), img = imageDe(e), nom = texte(e.titre) || 'Sans titre';
     var ou = [texte(e.ville || e.lieu), texte(e.pays)].filter(Boolean).join(', ');
@@ -78,6 +81,7 @@
       '<div class="pvp-meta">' + pastilles + '</div></div>' +
       '<div class="pvp-actions">' +
       (brouillon ? '<button type="button" class="pvp-btn pvp-petit pvp-or" data-a="publier" aria-label="Publier « ' + esc(nom) + ' »"' + (S.occupe ? ' disabled' : '') + '>Publier</button>' : '') +
+      (masquable(e) ? '<button type="button" class="pvp-btn pvp-petit" data-a="visibilite" aria-label="' + (Number(e.masquer_boutique) ? 'Afficher' : 'Masquer') + ' « ' + esc(nom) + ' » dans la boutique"' + (S.occupe ? ' disabled' : '') + '>' + (Number(e.masquer_boutique) ? 'Afficher dans la boutique' : 'Masquer de la boutique') + '</button>' : '') +
       '<a class="pvp-btn pvp-petit" href="evenements.html#evt-' + id + '" aria-label="Modifier « ' + esc(nom) + ' »">Modifier</a>' +
       (brouillon ? '' : '<a class="pvp-btn pvp-petit" href="evenements.html?evt=' + id + '" aria-label="Voir « ' + esc(nom) + ' »">Voir</a>') +
       '</div></div>';
@@ -138,6 +142,19 @@
     }).catch(function (x) { S.occupe = 0; S.erreur = (x && x.message) || 'La publication a échoué. Réessayez.'; dessiner(); });
   }
 
+  function basculer(id) {
+    var e = (S.evts || []).filter(function (x) { return Number(x.id) === id; })[0]; if (!e || !masquable(e)) return;
+    var afficher = !!Number(e.masquer_boutique), nom = texte(e.titre) || 'cet événement';
+    S.occupe = 1; S.erreur = ''; S.message = ''; dessiner();
+    api('PATCH', '/evenements/' + id + '/visibilite-boutique', { afficher: afficher }).then(function () {
+      e.masquer_boutique = afficher ? 0 : 1;
+      S.occupe = 0;
+      S.message = afficher ? '« ' + nom + ' » apparaît de nouveau dans votre boutique.' : '« ' + nom + ' » n\'apparaît plus dans votre boutique. Il reste visible dans Événements.';
+      try { if (typeof pvRefreshPreview === 'function') pvRefreshPreview(); } catch (x) {}
+      dessiner();
+    }).catch(function (x) { S.occupe = 0; S.erreur = (x && x.message) || 'Le changement a échoué. Réessayez.'; dessiner(); });
+  }
+
   function brancher() {
     var r = racine(); if (!r || r.__pvevBranche) return; r.__pvevBranche = true;
     r.addEventListener('click', function (e) {
@@ -146,6 +163,7 @@
       var b = e.target.closest('[data-a]'); if (!b) return;
       var a = b.dataset.a, l = b.closest('.pvp-ligne');
       if (a === 'publier' && l) publier(entier(l.dataset.id));
+      else if (a === 'visibilite' && l) basculer(entier(l.dataset.id));
       else if (a === 'plus') { S.n += PAGE; dessiner(); }
       else if (a === 'gerer') { if (typeof window.initShowSection === 'function') window.initShowSection('evenements'); else location.href = 'dashboard-initiative.html#evenements'; }
       else if (a === 'reessayer') charger();

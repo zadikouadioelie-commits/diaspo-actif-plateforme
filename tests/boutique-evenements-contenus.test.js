@@ -35,10 +35,11 @@ test('EV3 les événements viennent de la même source que la page boutique-even
   assert.match(mod, /Number\(e\.owner_user_id\) === Number\(S\.ownerId\)/);
 });
 
-test('EV4 aucune route nouvelle : seulement GET /evenements et PATCH /evenements/:id/publier, qui existent déjà', () => {
+test('EV4 le module n\'appelle que GET /evenements, GET /auth/me et deux PATCH ciblés (publier, visibilite-boutique)', () => {
   const appels = (mod.match(/api\('[A-Z]+', '[^']*'/g) || []);
   assert.deepEqual([...new Set(appels)].sort(), ["api('GET', '/auth/me'", "api('GET', '/evenements?owner='", "api('PATCH', '/evenements/'"].sort());
   assert.match(mod, /'\/evenements\/' \+ id \+ '\/publier'/);
+  assert.match(mod, /'\/evenements\/' \+ id \+ '\/visibilite-boutique'/);
   assert.match(serveur, /route\("PATCH", "\/api\/evenements\/:id\/publier"/);
   assert.match(serveur, /route\("GET", "\/api\/evenements"/);
 });
@@ -114,4 +115,38 @@ test('EV14 la carte partage le style de « Mes produits » sans le casser ; les 
 test('EV15 le propriétaire est retrouvé même si l\'initiative ne le porte pas', () => {
   assert.match(mod, /api\('GET', '\/auth\/me'\)/);
   assert.match(mod, /S\.ownerId = init\.owner_user_id \|\| null/);
+});
+
+test('EV16 la route visibilite-boutique ne touche QUE masquer_boutique, pour le propriétaire ou un administrateur', () => {
+  const m = serveur.match(/route\("PATCH", "\/api\/evenements\/:id\/visibilite-boutique"[\s\S]*?\n\}\);/);
+  assert.ok(m, 'route absente');
+  const r = m[0];
+  assert.match(r, /if \(!user\) return sendJSON\(res, 401/);
+  assert.match(r, /Number\(evt\.owner_user_id\) !== Number\(user\.id\) && user\.role !== "administrateur"/);
+  assert.match(r, /UPDATE evenements SET masquer_boutique=\? WHERE id=\?/);
+  assert.equal((r.match(/UPDATE /g) || []).length, 1, 'une seule écriture');
+  assert.ok(!/DELETE|INSERT/.test(r), 'aucune suppression ni insertion');
+  assert.match(r, /typeof body\?\.afficher !== "boolean"/);
+});
+
+test('EV17 un événement « Boutique uniquement » ne peut pas être masqué de la boutique (il disparaîtrait partout)', () => {
+  const r = serveur.match(/route\("PATCH", "\/api\/evenements\/:id\/visibilite-boutique"[\s\S]*?\n\}\);/)[0];
+  assert.match(r, /if \(evt\.visibilite === "boutique"\)/);
+  assert.match(r, /sendJSON\(res, 400/);
+  assert.match(mod, /function masquable\(e\) \{ return e\.statut !== 'brouillon' && e\.visibilite !== 'boutique'; \}/);
+});
+
+test('EV18 le bouton « Masquer de la boutique » / « Afficher dans la boutique » écrit afficher et rafraîchit l\'aperçu', () => {
+  assert.match(mod, /data-a="visibilite"/);
+  assert.match(mod, /Afficher dans la boutique/);
+  assert.match(mod, /Masquer de la boutique/);
+  assert.match(mod, /api\('PATCH', '\/evenements\/' \+ id \+ '\/visibilite-boutique', \{ afficher: afficher \}\)/);
+  assert.match(mod, /e\.masquer_boutique = afficher \? 0 : 1;/);
+  assert.match(mod, /else if \(a === 'visibilite' && l\) basculer\(entier\(l\.dataset\.id\)\);/);
+  assert.match(mod, /Il reste visible dans Événements/);
+});
+
+test('EV19 la lecture publique de la boutique respecte déjà masquer_boutique (rien d\'autre à changer côté lecture)', () => {
+  assert.match(serveur, /if \(query\.boutique\) rows = rows\.filter\(r => !r\.masquer_boutique\);/);
+  assert.match(page, /boutique=1/);
 });
