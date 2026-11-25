@@ -11022,7 +11022,7 @@ route("GET", "/api/annuaire/suggestions", async (req, res, params, body, query) 
 /* GET /api/annuaire/utilisateurs — liste publique des comptes Utilisateur (annuaire), filtrable par nom/prénom/ville */
 route("GET", "/api/annuaire/utilisateurs", async (req, res, params, body, query) => {
   let rows = await db.prepare(
-    "SELECT id, nom, prenom, ville, pays, photo_url, banner_url, titre_pro, nationalite1, nationalite2, origine1, origine2, domaine_principal, sous_domaine_1, sous_domaine_2, invisible_annuaire_definitif, invisible_annuaire_jusqu_au FROM users WHERE role='utilisateur' AND compte_masque=0 AND nom != 'Compte supprimé' AND (is_demo IS NULL OR is_demo=FALSE) ORDER BY nom ASC LIMIT 2000"
+    "SELECT id, nom, prenom, ville, pays, photo_url, banner_url, titre_pro, bio, nationalite1, nationalite2, origine1, origine2, domaine_principal, sous_domaine_1, sous_domaine_2, invisible_annuaire_definitif, invisible_annuaire_jusqu_au FROM users WHERE role='utilisateur' AND compte_masque=0 AND nom != 'Compte supprimé' AND (is_demo IS NULL OR is_demo=FALSE) ORDER BY nom ASC LIMIT 2000"
   ).all();
   rows = rows.filter(r => !annuaireEstInvisible(r));
   rows.forEach(r => { delete r.invisible_annuaire_definitif; delete r.invisible_annuaire_jusqu_au; });

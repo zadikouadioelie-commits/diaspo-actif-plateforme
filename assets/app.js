@@ -3370,7 +3370,8 @@ function renderPersonCard(u) {
       ${u.email ? `<div class="ann-card-origs" style="color:#0D2B4E;font-weight:700;">✉️ ${u.email}</div>` : ''}
       ${domaineLigneUser ? `<div class="ann-card-origs">🎯 <strong>Domaine d'activité :</strong> ${domaineLigneUser}</div>` : ''}
       ${sousDomaineLigneUser ? `<div class="ann-card-origs">${sousDomaineLigneUser}</div>` : ''}
-      ${u.titre_pro ? `<div class="ann-card-desc">${stripRichTags(u.titre_pro)}</div>` : ''}
+      ${u.titre_pro ? `<div class="ann-card-origs"><strong>${stripRichTags(u.titre_pro)}</strong></div>` : ''}
+      ${u.bio ? `<div class="ann-card-desc">${stripRichTags(u.bio)}</div>` : ''}
       <div class="ann-card-foot" onclick="event.stopPropagation()">
         <a href="${profilHref}" class="ann-card-btn ann-card-btn-primary" onclick="event.stopPropagation()">👁 Voir le profil</a>
         <a href="${profilHref}#avis" class="ann-card-btn" onclick="event.stopPropagation()">⭐ Avis</a>
