@@ -106,14 +106,14 @@ test('IM13 limites : 12 chiffres, 100 réalisations, 50 membres ; le bouton Ajou
   assert.match(mod, /n >= s\.max \|\| S\.occupe \? ' disabled' : ''/);
 });
 
-test('IM14 la barre du propriétaire mène à « Mon impact » ; seule la finance garde son lien en attendant', () => {
+test('IM14 la barre du propriétaire mène à « Mon impact » ; les types sans rubrique gardent leur lien en attendant', () => {
   assert.match(barre, /page === 'boutique-impact\.html' \? 'Mon impact'/);
   assert.match(barre, /page === 'boutique-impact\.html' \? 'dashboard-initiative\.html#parametres-vitrine&impact'/);
-  assert.match(barre, /vitrine=1&edition=1/, 'la finance garde son lien en attendant');
+  assert.match(barre, /vitrine=1&edition=1/, 'les types sans rubrique gardent leur lien en attendant');
 });
 
 test('IM15 la carte partage le style de « Mes produits » sans le casser', () => {
-  assert.match(css, /:is\(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact\) \.pvp-ligne/);
+  assert.match(css, /:is\(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact(,#pv-finance)?\) \.pvp-ligne/);
   assert.ok(!/^#pv-produits /m.test(css), 'sélecteur restant propre à « Mes produits » seulement');
   assert.match(mod, /document\.querySelector\('#pv-impact \.pvp-photo'\)/);
 });

@@ -201,6 +201,7 @@
 <script src="assets/boutique-portfolio-contenus.js?v=1"></script>
 <script src="assets/boutique-evenements-contenus.js?v=2"></script>
 <script src="assets/boutique-impact-contenus.js?v=1"></script>
+<script src="assets/boutique-finance-contenus.js?v=1"></script>
 <script src="assets/boutique-reglages-ui.js?v=1"></script>
 <script src="assets/soumission-da.js"></script>
 <script src="assets/retours-commun.js?v=1"></script>
@@ -2126,6 +2127,15 @@ async function initRelaisDiasporaWidget(me, api) {
             <h3 style="margin:0 0 4px;font-size:15px;">Mon impact</h3>
             <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Ajoutez, modifiez et rangez vos chiffres clés, vos réalisations et votre équipe. Chaque changement est enregistré tout de suite et apparaît dans l'aperçu.</p>
             <div id="pv-impact-mount"><div class="notice">Chargement…</div></div>
+          </div>
+
+          <!-- ═══ MON ORGANISME (2026-11-25, étape 2) — le propriétaire d'une boutique « Organisme de financement » gère ICI ses programmes, projets accompagnés, résultats,
+               rendez-vous, documents, témoignages, agréments et équipe (assets/boutique-finance-contenus.js), plus dans l'ancienne vue d'édition du profil.
+               Lien direct : dashboard-initiative.html#parametres-vitrine&finance ═══ -->
+          <div class="card" id="pv-finance" style="margin-bottom:20px;display:none;">
+            <h3 style="margin:0 0 4px;font-size:15px;">Mon organisme</h3>
+            <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Ajoutez, modifiez et rangez vos programmes, vos projets accompagnés, vos documents et le reste de votre présentation. Chaque changement est enregistré tout de suite et apparaît dans l'aperçu.</p>
+            <div id="pv-finance-mount"><div class="notice">Chargement…</div></div>
           </div>
 
           <!-- Deux decisions independantes, deliberement separees en deux etapes :
@@ -6684,6 +6694,7 @@ async function loadParametresVitrineFull() {
     if (window.PvPortfolio) PvPortfolio.monter(init);
     if (window.PvEvenements) PvEvenements.monter(init);
     if (window.PvImpact) PvImpact.monter(init);
+    if (window.PvFinance) PvFinance.monter(init);
     renderPvDraftStatus();
     pvRenderCartouchePreview();
     pvRefreshPreview();

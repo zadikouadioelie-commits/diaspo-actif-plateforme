@@ -105,7 +105,7 @@ test('EV13 la barre du propriétaire mène à « Mes événements » ; impact et
 });
 
 test('EV14 la carte partage le style de « Mes produits » sans le casser ; les liens ne sont pas soulignés', () => {
-  assert.match(css, /:is\(#pv-produits,#pv-portfolio,#pv-evenements(,#pv-impact)?\) \.pvp-ligne/);
+  assert.match(css, /:is\(#pv-produits,#pv-portfolio,#pv-evenements(,#pv-impact)?(,#pv-finance)?\) \.pvp-ligne/);
   assert.match(css, /a\.pvp-btn\{text-decoration:none\}/);
   assert.match(css, /\.pvp-ligne\.pvp-ev\{grid-template-columns:56px minmax\(0,1fr\) auto\}/);
   assert.match(mod, /class="pvp-ligne pvp-ev"/);

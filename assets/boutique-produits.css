@@ -1,109 +1,109 @@
 /* ===========================================================
    assets/boutique-produits.css — « Mes produits » dans Paramètres Boutique (2026-11-21), Nuit dorée
-   Tout est préfixé #pv-produits (et #pv-portfolio, #pv-evenements, #pv-impact : les cartes « Mon portfolio », « Mes événements » et « Mon impact » qui partagent ce style) : aucune autre partie du tableau de bord n'est touchée.
+   Tout est préfixé #pv-produits (et #pv-portfolio, #pv-evenements, #pv-impact, #pv-finance : les cartes « Mon portfolio », « Mes événements », « Mon impact » et « Mon organisme » qui partagent ce style) : aucune autre partie du tableau de bord n'est touchée.
    styles.v2.css impose un fond sur les champs avec !important : on le surclasse ici.
    =========================================================== */
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact){--pvp-or:var(--nd-or,#E3C06E);--pvp-texte:var(--nd-texte,#E8ECF6);--pvp-doux:var(--nd-doux,#A9B4CC);--pvp-faible:var(--nd-faible,#7C88A4);
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance){--pvp-or:var(--nd-or,#E3C06E);--pvp-texte:var(--nd-texte,#E8ECF6);--pvp-doux:var(--nd-doux,#A9B4CC);--pvp-faible:var(--nd-faible,#7C88A4);
   --pvp-bord:var(--nd-bord,rgba(227,192,110,.24));--pvp-bord2:var(--nd-bord2,rgba(255,255,255,.09));--pvp-verre:var(--nd-verre,rgba(255,255,255,.045));--pvp-verre2:var(--nd-verre2,rgba(255,255,255,.08));
   --pvp-degore:var(--nd-degore,linear-gradient(135deg,#F3DC9B 0%,#E3C06E 38%,#B9893A 100%));}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-barre{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-compteur{font-size:13px;color:var(--pvp-doux)}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-compteur b{color:var(--pvp-or)}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-jauge{display:inline-block;vertical-align:middle;margin-left:8px;width:110px;height:6px;border-radius:99px;background:var(--pvp-bord2);overflow:hidden}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-jauge i{display:block;height:100%;background:var(--pvp-degore)}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-pousse{margin-left:auto}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 18px;border-radius:12px;border:1px solid var(--pvp-bord);background:var(--pvp-verre2);color:var(--pvp-texte);font:inherit;font-weight:800;font-size:14px;cursor:pointer}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-btn:hover:not(:disabled){background:rgba(227,192,110,.18)}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-btn:disabled{opacity:.45;cursor:not-allowed}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-btn.pvp-or{background:var(--pvp-degore);color:#1B1304;border-color:transparent}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-btn.pvp-or:hover:not(:disabled){filter:brightness(1.06);background:var(--pvp-degore)}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-btn.pvp-petit{min-height:36px;padding:0 12px;font-size:13px;border-radius:10px}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-btn.pvp-on{background:rgba(227,192,110,.22);color:var(--pvp-or);border-color:var(--pvp-or)}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-btn.pvp-danger{color:#FF7A7A;border-color:rgba(255,122,122,.35)}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) :is(.pvp-btn,.pvp-puce,.pvp-mini,.pvp-lien,.pvp-photo-add,.pvp-photo-x):focus-visible,
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) :is(input,select,textarea):focus-visible{outline:2px solid var(--pvp-or);outline-offset:2px}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-note{font-size:12.5px;color:var(--pvp-faible);margin:10px 0 0}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-ok{margin:0 0 12px;padding:10px 14px;border-radius:12px;border:1px solid rgba(76,195,138,.4);background:rgba(76,195,138,.1);color:#7FE3B1;font-weight:700;font-size:13px}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-erreur{margin:0 0 12px;color:#FF7A7A;font-weight:700;font-size:13px}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-erreur[hidden]{display:none}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-lien{background:none;border:0;padding:6px 0;color:var(--pvp-or);font:inherit;font-weight:700;font-size:13px;cursor:pointer;text-decoration:underline}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-barre{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-compteur{font-size:13px;color:var(--pvp-doux)}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-compteur b{color:var(--pvp-or)}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-jauge{display:inline-block;vertical-align:middle;margin-left:8px;width:110px;height:6px;border-radius:99px;background:var(--pvp-bord2);overflow:hidden}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-jauge i{display:block;height:100%;background:var(--pvp-degore)}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-pousse{margin-left:auto}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 18px;border-radius:12px;border:1px solid var(--pvp-bord);background:var(--pvp-verre2);color:var(--pvp-texte);font:inherit;font-weight:800;font-size:14px;cursor:pointer}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-btn:hover:not(:disabled){background:rgba(227,192,110,.18)}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-btn:disabled{opacity:.45;cursor:not-allowed}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-btn.pvp-or{background:var(--pvp-degore);color:#1B1304;border-color:transparent}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-btn.pvp-or:hover:not(:disabled){filter:brightness(1.06);background:var(--pvp-degore)}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-btn.pvp-petit{min-height:36px;padding:0 12px;font-size:13px;border-radius:10px}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-btn.pvp-on{background:rgba(227,192,110,.22);color:var(--pvp-or);border-color:var(--pvp-or)}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-btn.pvp-danger{color:#FF7A7A;border-color:rgba(255,122,122,.35)}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) :is(.pvp-btn,.pvp-puce,.pvp-mini,.pvp-lien,.pvp-photo-add,.pvp-photo-x):focus-visible,
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) :is(input,select,textarea):focus-visible{outline:2px solid var(--pvp-or);outline-offset:2px}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-note{font-size:12.5px;color:var(--pvp-faible);margin:10px 0 0}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-ok{margin:0 0 12px;padding:10px 14px;border-radius:12px;border:1px solid rgba(76,195,138,.4);background:rgba(76,195,138,.1);color:#7FE3B1;font-weight:700;font-size:13px}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-erreur{margin:0 0 12px;color:#FF7A7A;font-weight:700;font-size:13px}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-erreur[hidden]{display:none}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-lien{background:none;border:0;padding:6px 0;color:var(--pvp-or);font:inherit;font-weight:700;font-size:13px;cursor:pointer;text-decoration:underline}
 
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-outils{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px}
-html body.nd :is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) input[type=search]{flex:1 1 200px;min-height:42px;border-radius:12px;padding:0 14px}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-puces{display:flex;gap:6px;flex-wrap:wrap}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-puce{background:var(--pvp-verre);border:1px solid var(--pvp-bord2);border-radius:999px;padding:6px 12px;font:inherit;font-size:12px;font-weight:700;cursor:pointer;color:var(--pvp-doux)}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-puce.on{border-color:var(--pvp-or);color:var(--pvp-or)}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-outils{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px}
+html body.nd :is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) input[type=search]{flex:1 1 200px;min-height:42px;border-radius:12px;padding:0 14px}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-puces{display:flex;gap:6px;flex-wrap:wrap}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-puce{background:var(--pvp-verre);border:1px solid var(--pvp-bord2);border-radius:999px;padding:6px 12px;font:inherit;font-size:12px;font-weight:700;cursor:pointer;color:var(--pvp-doux)}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-puce.on{border-color:var(--pvp-or);color:var(--pvp-or)}
 
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-groupes{display:flex;flex-direction:column;gap:14px}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-groupe{border:1px solid var(--pvp-bord2);border-radius:16px;background:var(--pvp-verre);overflow:hidden}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-groupe>header{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--pvp-bord2)}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-groupe>header h4{margin:0;font-size:14px;flex:1;color:var(--pvp-texte)}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-groupe>header small{color:var(--pvp-faible);font-weight:600}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-ligne{display:grid;grid-template-columns:30px 56px minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--pvp-bord2)}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-ligne:last-child{border-bottom:0}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-ligne.glisse{opacity:.45}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-ordre{display:flex;flex-direction:column;align-items:center;gap:0;color:var(--pvp-faible)}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-poignee{cursor:grab;user-select:none;font-size:14px;line-height:1;padding:2px 0}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-mini{background:none;border:0;color:var(--pvp-faible);font-size:10px;line-height:1;padding:3px 6px;cursor:pointer;border-radius:6px}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-mini:hover:not(:disabled){color:var(--pvp-or)}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-mini:disabled{opacity:.25;cursor:default}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-vignette{width:56px;height:56px;border-radius:12px;border:1px solid var(--pvp-bord2);background:linear-gradient(135deg,#1C2A52,#2B3C73);overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:22px}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-vignette img{width:100%;height:100%;object-fit:cover;display:block}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-nom{margin:0;font-weight:800;font-size:15px;color:var(--pvp-texte);overflow-wrap:anywhere}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-meta{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin-top:3px;font-size:12px;color:var(--pvp-doux)}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-prix{color:var(--pvp-or);font-weight:800}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-prix s{color:var(--pvp-faible);font-weight:600;margin-right:6px}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-pastille{border-radius:999px;padding:2px 9px;font-size:11px;font-weight:800;border:1px solid}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-dispo{color:#4CC38A;border-color:rgba(76,195,138,.4);background:rgba(76,195,138,.1)}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-indispo{color:#F0B24A;border-color:rgba(240,178,74,.4);background:rgba(240,178,74,.1)}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-epuise{color:#FF7A7A;border-color:rgba(255,122,122,.4);background:rgba(255,122,122,.1)}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-masque{color:var(--pvp-faible);border-color:var(--pvp-bord2);background:var(--pvp-verre)}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-avant{color:var(--pvp-or);border-color:var(--pvp-bord);background:rgba(227,192,110,.1)}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-duree{color:var(--pvp-texte);border-color:var(--pvp-bord2);background:var(--pvp-verre);font-variant-numeric:tabular-nums}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-actions{display:flex;gap:6px}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-vide{padding:30px 16px;text-align:center;color:var(--pvp-doux);border:1px dashed var(--pvp-bord);border-radius:16px}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-groupes{display:flex;flex-direction:column;gap:14px}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-groupe{border:1px solid var(--pvp-bord2);border-radius:16px;background:var(--pvp-verre);overflow:hidden}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-groupe>header{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--pvp-bord2)}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-groupe>header h4{margin:0;font-size:14px;flex:1;color:var(--pvp-texte)}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-groupe>header small{color:var(--pvp-faible);font-weight:600}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-ligne{display:grid;grid-template-columns:30px 56px minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--pvp-bord2)}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-ligne:last-child{border-bottom:0}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-ligne.glisse{opacity:.45}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-ordre{display:flex;flex-direction:column;align-items:center;gap:0;color:var(--pvp-faible)}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-poignee{cursor:grab;user-select:none;font-size:14px;line-height:1;padding:2px 0}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-mini{background:none;border:0;color:var(--pvp-faible);font-size:10px;line-height:1;padding:3px 6px;cursor:pointer;border-radius:6px}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-mini:hover:not(:disabled){color:var(--pvp-or)}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-mini:disabled{opacity:.25;cursor:default}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-vignette{width:56px;height:56px;border-radius:12px;border:1px solid var(--pvp-bord2);background:linear-gradient(135deg,#1C2A52,#2B3C73);overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:22px}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-vignette img{width:100%;height:100%;object-fit:cover;display:block}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-nom{margin:0;font-weight:800;font-size:15px;color:var(--pvp-texte);overflow-wrap:anywhere}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-meta{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin-top:3px;font-size:12px;color:var(--pvp-doux)}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-prix{color:var(--pvp-or);font-weight:800}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-prix s{color:var(--pvp-faible);font-weight:600;margin-right:6px}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-pastille{border-radius:999px;padding:2px 9px;font-size:11px;font-weight:800;border:1px solid}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-dispo{color:#4CC38A;border-color:rgba(76,195,138,.4);background:rgba(76,195,138,.1)}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-indispo{color:#F0B24A;border-color:rgba(240,178,74,.4);background:rgba(240,178,74,.1)}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-epuise{color:#FF7A7A;border-color:rgba(255,122,122,.4);background:rgba(255,122,122,.1)}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-masque{color:var(--pvp-faible);border-color:var(--pvp-bord2);background:var(--pvp-verre)}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-avant{color:var(--pvp-or);border-color:var(--pvp-bord);background:rgba(227,192,110,.1)}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-duree{color:var(--pvp-texte);border-color:var(--pvp-bord2);background:var(--pvp-verre);font-variant-numeric:tabular-nums}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-actions{display:flex;gap:6px}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-vide{padding:30px 16px;text-align:center;color:var(--pvp-doux);border:1px dashed var(--pvp-bord);border-radius:16px}
 
 /* Formulaire */
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-form{display:flex;flex-direction:column;gap:14px}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-titre{font-family:var(--nd-display,Georgia,serif);font-size:24px;margin:10px 0 0;color:var(--pvp-texte)}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-aide{margin:0 0 10px;color:var(--pvp-faible);font-size:12.5px}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) fieldset.pvp-carte{margin:0;border:1px solid var(--pvp-bord2);border-radius:16px;background:var(--pvp-verre);padding:14px 16px 16px;min-width:0}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) fieldset.pvp-carte>legend{padding:0 6px;font-weight:800;font-size:14px;color:var(--pvp-texte)}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-champs{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-large{grid-column:1/-1}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) label{display:block;font-size:12.5px;font-weight:800;color:var(--pvp-doux);margin-bottom:5px}
-html body.nd :is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) :is(input[type=text],input[type=url],input[type=number],input[type=date],select,textarea){width:100%;min-height:44px;background:rgba(255,255,255,.06)!important;border:1px solid var(--pvp-bord2)!important;border-radius:12px;padding:10px 12px;color:var(--pvp-texte)!important;font:inherit;box-sizing:border-box}
-html body.nd :is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) textarea{min-height:96px;resize:vertical}
-html body.nd :is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) select option{background:#0B1226;color:#E8ECF6}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-nouveau-cat{display:flex;gap:8px;margin-top:6px}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-nouveau-cat[hidden],:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) [hidden]{display:none!important}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-photos{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-photo{position:relative;aspect-ratio:1/1;border:1.5px dashed var(--pvp-bord);border-radius:14px;background:var(--pvp-verre);overflow:hidden}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-photo.pleine{border-style:solid}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-photo.charge{opacity:.5}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-photo img{width:100%;height:100%;object-fit:cover;display:block}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-photo small{position:absolute;left:6px;bottom:6px;background:var(--pvp-degore);color:#1B1304;border-radius:6px;padding:1px 7px;font-weight:800;font-size:11px}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-photo-add{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;background:none;border:0;color:var(--pvp-doux);font:inherit;font-size:12px;font-weight:700;cursor:pointer}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-photo-add b{font-size:22px;color:var(--pvp-or)}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-photo-x{position:absolute;top:6px;right:6px;width:28px;height:28px;border-radius:50%;border:0;background:rgba(0,0,0,.65);color:#fff;cursor:pointer;font-size:12px}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-choix{display:grid;gap:8px}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-option{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--pvp-bord2);border-radius:12px;background:rgba(255,255,255,.03);cursor:pointer;margin:0}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-option input{margin-top:3px;accent-color:#E3C06E;width:18px;height:18px;flex:none}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-option b{display:block;font-size:14px;color:var(--pvp-texte)}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-option span{color:var(--pvp-faible);font-size:12.5px;font-weight:600}
-:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-pied{position:sticky;bottom:0;display:flex;gap:10px;flex-wrap:wrap;padding:12px 0 2px;background:linear-gradient(180deg,transparent,rgba(11,18,38,.96) 35%)}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-form{display:flex;flex-direction:column;gap:14px}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-titre{font-family:var(--nd-display,Georgia,serif);font-size:24px;margin:10px 0 0;color:var(--pvp-texte)}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-aide{margin:0 0 10px;color:var(--pvp-faible);font-size:12.5px}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) fieldset.pvp-carte{margin:0;border:1px solid var(--pvp-bord2);border-radius:16px;background:var(--pvp-verre);padding:14px 16px 16px;min-width:0}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) fieldset.pvp-carte>legend{padding:0 6px;font-weight:800;font-size:14px;color:var(--pvp-texte)}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-champs{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-large{grid-column:1/-1}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) label{display:block;font-size:12.5px;font-weight:800;color:var(--pvp-doux);margin-bottom:5px}
+html body.nd :is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) :is(input[type=text],input[type=url],input[type=number],input[type=date],select,textarea){width:100%;min-height:44px;background:rgba(255,255,255,.06)!important;border:1px solid var(--pvp-bord2)!important;border-radius:12px;padding:10px 12px;color:var(--pvp-texte)!important;font:inherit;box-sizing:border-box}
+html body.nd :is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) textarea{min-height:96px;resize:vertical}
+html body.nd :is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) select option{background:#0B1226;color:#E8ECF6}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-nouveau-cat{display:flex;gap:8px;margin-top:6px}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-nouveau-cat[hidden],:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) [hidden]{display:none!important}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-photos{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-photo{position:relative;aspect-ratio:1/1;border:1.5px dashed var(--pvp-bord);border-radius:14px;background:var(--pvp-verre);overflow:hidden}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-photo.pleine{border-style:solid}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-photo.charge{opacity:.5}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-photo img{width:100%;height:100%;object-fit:cover;display:block}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-photo small{position:absolute;left:6px;bottom:6px;background:var(--pvp-degore);color:#1B1304;border-radius:6px;padding:1px 7px;font-weight:800;font-size:11px}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-photo-add{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;background:none;border:0;color:var(--pvp-doux);font:inherit;font-size:12px;font-weight:700;cursor:pointer}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-photo-add b{font-size:22px;color:var(--pvp-or)}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-photo-x{position:absolute;top:6px;right:6px;width:28px;height:28px;border-radius:50%;border:0;background:rgba(0,0,0,.65);color:#fff;cursor:pointer;font-size:12px}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-choix{display:grid;gap:8px}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-option{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--pvp-bord2);border-radius:12px;background:rgba(255,255,255,.03);cursor:pointer;margin:0}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-option input{margin-top:3px;accent-color:#E3C06E;width:18px;height:18px;flex:none}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-option b{display:block;font-size:14px;color:var(--pvp-texte)}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-option span{color:var(--pvp-faible);font-size:12.5px;font-weight:600}
+:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-pied{position:sticky;bottom:0;display:flex;gap:10px;flex-wrap:wrap;padding:12px 0 2px;background:linear-gradient(180deg,transparent,rgba(11,18,38,.96) 35%)}
 
 @media (max-width:560px){
-  :is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-ligne{grid-template-columns:26px 48px minmax(0,1fr)}
-  :is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-vignette{width:48px;height:48px}
-  :is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-actions{grid-column:1/-1}
-  :is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-actions .pvp-btn{flex:1}
-  :is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-champs{grid-template-columns:1fr}
-  :is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-photos{grid-template-columns:repeat(2,1fr)}
-  :is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-btn{flex:1}
-  :is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) .pvp-pousse{margin-left:0}
+  :is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-ligne{grid-template-columns:26px 48px minmax(0,1fr)}
+  :is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-vignette{width:48px;height:48px}
+  :is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-actions{grid-column:1/-1}
+  :is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-actions .pvp-btn{flex:1}
+  :is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-champs{grid-template-columns:1fr}
+  :is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-photos{grid-template-columns:repeat(2,1fr)}
+  :is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-btn{flex:1}
+  :is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) .pvp-pousse{margin-left:0}
 }
-@media (prefers-reduced-motion:reduce){:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact) *{transition:none!important;animation:none!important}}
+@media (prefers-reduced-motion:reduce){:is(#pv-produits,#pv-portfolio,#pv-evenements,#pv-impact,#pv-finance) *{transition:none!important;animation:none!important}}
 /* « Mes événements » : Modifier / Voir / Nouvel événement sont des liens vers les écrans existants, pas des boutons. */
 :is(#pv-evenements) a.pvp-btn{text-decoration:none}
 /* Une ligne d'événement n'a pas de flèches d'ordre : vignette, texte, actions. */
